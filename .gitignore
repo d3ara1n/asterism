@@ -1,0 +1,42 @@
+# Operating system and editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# JavaScript / Electron build and dependency output
+node_modules/
+.pnpm-store/
+dist/
+dist-electron/
+out/
+release/
+coverage/
+.vite/
+.cache/
+*.tsbuildinfo
+*.log
+
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Local runtime / development data (not source fixtures)
+/.weft/
+/.local/
+/runtime-data/
+/tmp/
+/temp/
+*.sqlite-wal
+*.sqlite-shm
+*.db-wal
+*.db-shm
+
+# Test and diagnostic output
+playwright-report/
+test-results/
