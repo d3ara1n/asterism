@@ -17,12 +17,15 @@
 | 上下文 | 资源变化进入 messages 事件，不反复修改顶层动态资源声明 |
 | 权限 | 执行层验证，工具可见性和 UI 连线均不是权限机制 |
 | 历史 | 查看与恢复分开，外部不可恢复资源不假装回滚 |
+| 平台 | 测试以 macOS 为主；发布覆盖 macOS、Windows、Linux |
 
 ## 初版技术基线
 
-采用 Electron + React + TypeScript，本地桌面、单用户起步；React Flow 画布、Monaco 编辑与 diff、SQLite 和本地对象存储，独立 Node.js 任务运行时。
+本地桌面、单用户起步。Electron 外壳，React + TypeScript + Vite；Park UI 作为组件与视觉语言，@xyflow/react 作为卡片与连线画布，Monaco 按需用于文件与 diff。SQLite 与本地对象存储；独立 Node.js 任务运行时。
 
-目录与内置俄罗斯方块作为两种验证资源。运行时拥有任务历史，模型 SDK 与 MCP 是接入层。
+模型接入为 Vercel AI SDK，MCP 接入为官方 TypeScript SDK。运行时拥有任务历史与授权，接入层不拥有会话真值。
+
+目录与虚拟资源作为验证：目录验证外部授权与 diff；虚拟资源验证完整状态的历史查看与恢复。
 
 ## 初版缓存取舍
 
@@ -34,10 +37,10 @@
 
 ### 实现开始前
 
-- 目标平台与首个 provider。
-- 包管理器、SDK、数据库绑定和打包工具的具体选择。
+- 首个 provider。
+- 包管理器、数据库绑定和 Electron 打包工具的具体选择。
 - 最终工具协议：优先考虑操作名 + resource_id；统一 resource_call 尚未采纳。
-- 执行循环、事件与状态投影的最小接口。
+- 事件与检查点的存储 schema。
 - 应用数据、凭据、日志和历史快照的保存策略。
 
 ### 交互原型中

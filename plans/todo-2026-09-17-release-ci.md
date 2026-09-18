@@ -9,7 +9,7 @@
 ## 前置条件
 
 - roadmap 阶段 1 完成，存在首个可运行里程碑。
-- `docs/decisions.md`「实现开始前」中的目标平台与发布方式已拍板。
+- 发布覆盖 macOS、Windows、Linux；Electron 打包工具已选定。
 
 ## 范围
 

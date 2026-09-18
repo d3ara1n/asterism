@@ -6,24 +6,24 @@
 
 它不是一次模型 API 请求，也不一定与主代理的一条消息一一对应。
 
-每轮开始固定：
+每轮 `turn_started` 固定：
 
-- 规则与配置版本。
-- 当前资源绑定及授权版本。
-- 本轮可用工具目录版本。
-- 输入与历史位置。
+- `rules_version`
+- `binding_version`
+- `tool_catalog_version`
+- 输入与历史位置
 
-固定授权不等于固定资源内容。外部文件在执行期间仍可能被其他进程改变。
+本轮工具执行只认这次冻结的绑定与授权。固定授权不等于固定资源内容。外部文件在执行期间仍可能被其他进程改变。
 
 ## 资源绑定变化
 
-普通 attach/detach 在执行轮次交界处应用。
+普通 attach/detach 记为 `binding_requested`，在执行轮次交界处记 `bindings_applied`。
 
-1. 用户发起变化，记录请求。
-2. 目标代理正在执行时，标记 pending，连线半透明。
-3. 本轮继续使用此前固定的绑定和授权。
-4. 本轮结束后记录生效事件，更新绑定版本。
-5. 下一轮模型看到变化事件，工具执行层使用新授权。
+1. 发起变化，追加 `binding_requested`。
+2. 目标代理有在途轮次时，该请求为 pending，连线半透明；本轮仍使用 `turn_started` 冻结的 `binding_version`。
+3. 目标代理空闲时，`binding_requested` 与 `bindings_applied` 同一次提交。
+4. 在途轮次 `turn_ended` 之后，按请求顺序追加 `bindings_applied`，得到新的 `binding_version`。
+5. 下一轮 `turn_started` 带上新版本；模型上下文看到已生效的变化事件，执行层按新授权校验。
 
 一个代理的普通解绑不应被暗中解释为全任务权限撤销。全任务解绑需要追踪所有受影响的在途执行；其详细交互尚待确认。
 

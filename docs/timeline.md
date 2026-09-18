@@ -2,11 +2,49 @@
 
 ## 历史由事件记录
 
-任务记录对象与关系的创建、资源变化请求与生效、执行开始结束、工具操作及结果、配置应用、分叉等事件。
+每个任务分支是一条只追加的事件序列。历史位置是该序列上的一个事件；查看、重建、分叉都定位到这个点，并且包含该事件本身。
 
-检查点保存可重建的状态以加速读取；不要求每个 turn 完整复制所有资源和对话。事件结构、检查点频率和迁移方案在实现时确定。
+事件信封：
 
-任务中的多代理事件有明确记录顺序，同时保留各执行消费的历史位置和来源关系。记录顺序不意味着并发执行彼此看到了全部信息。
+- `event_id`、`branch_id`、分支内单调的 `seq`
+- `recorded_at`
+- `type` 与载荷
+
+多代理事件进入同一分支顺序。每个执行轮次记录自己消费的历史位置；记录顺序不表示并发执行彼此看到了全部信息。
+
+检查点是某历史位置上可重建状态的缓存，用来加速读取，不替代事件。序列化格式、检查点频率和迁移在实现时锁定。
+
+## 事件种类
+
+| `type` | 何时记录 | 载荷要点 |
+| --- | --- | --- |
+| `task_created` | 任务建立 | `task_id` |
+| `branch_created` | 任务的初始分支，或从历史分叉 | `branch_id`；分叉时含 `origin_branch_id` 与 `origin_position` |
+| `agent_created` | 代理建立 | `agent_id`；子代理含 `parent_agent_id` |
+| `resource_created` | 资源进入任务 | `resource_id`、类型、能力声明 |
+| `binding_requested` | 请求 attach 或 detach | `agent_id`、`resource_id`、`attach` 或 `detach`、权限 |
+| `bindings_applied` | 请求在轮次交界（代理空闲则立即）生效 | `agent_id`、本次生效的请求、新 `binding_version` |
+| `turn_started` | 代理开始一轮 | `agent_id`、`turn_id`、历史位置、`binding_version`、`rules_version`、`tool_catalog_version`、输入 |
+| `turn_ended` | 交还控制权 | `turn_id`、状态：完成、等待、失败或取消 |
+| `operation_started` | 操作开始 | `operation_id`、`agent_id`、`turn_id`、`resource_id`、操作名、参数 |
+| `operation_finished` | 操作结束 | `operation_id`、成功 / 部分成功 / 失败 / 未知、实际结果与关系 |
+| `subagent_result_delivered` | 子代理结果交给父代理 | 父与子的 `agent_id`、结果引用 |
+| `config_applied` | 规则与配置对后续轮次生效 | `rules_version` |
+
+打开、折叠、移动卡片和布局坐标不是事件。关系由事件导出：绑定来自 `bindings_applied`，分叉来自 `branch_created` 的来源，使用与产出来自 `operation_finished`，委派来自带 `parent_agent_id` 的 `agent_created`，输入来自 `turn_started`。
+
+## 历史位置与重建
+
+指定历史位置的状态由该分支从起点（或最近且不晚于该位置的检查点）折叠事件得到，直到并包含该位置：
+
+- 已存在的对象：已 `*_created` 的身份
+- 有效绑定：折叠至该位置为止的 `bindings_applied`
+- 在途轮次：已 `turn_started` 且尚未 `turn_ended`
+- pending：已 `binding_requested`、尚未纳入 `bindings_applied`，且目标代理当时有在途轮次
+
+重建只读。回看不写资源、不结束在途轮次、不把 pending 提前生效。同一对象的多个视图指向同一身份，打开视图不产生 `*_created`。
+
+缺乏对应历史内容时，该视图明确不可用，不回退成当前位置的内容。
 
 ## 用户导航
 
@@ -14,10 +52,9 @@
 
 查看过去时：
 
-- 只显示该历史位置之前已经产生的对象与关系。
-- 绑定是否有效由生效与结束区间决定。
+- 只显示截至该历史位置已经产生的对象与关系。
+- 绑定是否有效由 `bindings_applied` 决定。
 - 资源内容使用对应历史记录，不以今天的内容冒充。
-- 缺乏历史内容时明确显示不可用，而不是悄悄展示当前内容。
 - 当前实时运行可以继续，但历史视图需要明确的历史模式标识。
 
 打开、折叠或移动卡片通常是视图行为，不改变工作事实。可以在历史视图里展开当时已存在的操作，即使用户当时没有打开过该卡片。
@@ -28,8 +65,8 @@
 | --- | --- | --- |
 | 已保存的成功 edit diff | 可以查看实际变更 | 不代表文件可恢复 |
 | 未保存旧内容的文件 view | 不可假装能看完整旧文件 | 不承诺 |
-| 已保存游戏画面 | 可以查看画面 | 单独画面不够 |
-| 完整游戏状态快照 | 可以构造相应视图 | 资源实现支持时可以 |
+| 已保存的资源视图 | 可以查看当时记录 | 单独视图不够恢复 |
+| 完整状态快照 | 可以构造相应视图 | 资源实现支持时可以 |
 
 string-replace 参数仅能说明请求的变更；实际 diff 应结合执行是否成功、匹配位置和实际结果。部分成功需精确记录。
 

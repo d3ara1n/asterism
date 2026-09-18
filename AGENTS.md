@@ -14,7 +14,7 @@
 ## 环境
 
 - 文档孵化阶段：资产为 `README.md`、`AGENTS.md`、`docs/`、`plans/`；无构建、无依赖、无 CI。
-- 实现期基线（已定、未开工）：Electron + React + TypeScript，SQLite 与本地对象存储，独立 Node.js 任务运行时；具体版本待 `docs/decisions.md` 拍板后回填 `docs/architecture.md`。
+- 实现期基线（已定、未开工）：Electron + React + TypeScript，Park UI 与 @xyflow/react，SQLite 与本地对象存储，独立 Node.js 任务运行时，模型接入为 Vercel AI SDK；测试以 macOS 为主，发布覆盖 macOS、Windows 与 Linux。具体版本见 `docs/architecture.md`，进入实现时锁定。
 
 ## 验证职责
 
