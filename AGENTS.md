@@ -14,7 +14,7 @@
 ## 环境
 
 - 文档孵化阶段：资产为 `README.md`、`AGENTS.md`、`docs/`、`plans/`；无构建、无依赖、无 CI。
-- 实现期基线（已定、未开工）：Electron + React + TypeScript，shadcn/ui + Tailwind CSS 与 @xyflow/react，SQLite 与本地对象存储，独立 Node.js 任务运行时，模型接入为 Vercel AI SDK；测试以 macOS 为主，发布覆盖 macOS、Windows 与 Linux。选型与职责见 `docs/architecture.md`，具体版本进入实现时锁定。
+- 实现期基线（已定、未开工）：Electron + React + TypeScript，shadcn/ui + Tailwind CSS 与 @xyflow/react，SQLite（`node:sqlite`）与本地对象存储，Zod，独立 Node.js 任务运行时，模型接入为 Vercel AI SDK；包管理器 npm，构建 electron-vite，打包 Electron Forge。测试以 macOS 为主，发布覆盖 macOS、Windows 与 Linux。选型与职责见 `docs/architecture.md`，具体版本进入实现时锁定。
 
 ## 验证职责
 

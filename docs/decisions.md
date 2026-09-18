@@ -21,7 +21,9 @@
 
 ## 初版技术基线
 
-本地桌面、单用户起步。Electron 外壳，React + TypeScript + Vite；shadcn/ui + Tailwind CSS 作为组件与样式体系，组件源码纳入仓库，不并行维护另一套组件样式体系。@xyflow/react 作为卡片与连线画布，Monaco 按需用于文件与 diff。SQLite 与本地对象存储；独立 Node.js 任务运行时。
+本地桌面、单用户起步。Electron 外壳，React + TypeScript + Vite；shadcn/ui + Tailwind CSS 作为组件与样式体系，组件源码纳入仓库，不并行维护另一套组件样式体系。@xyflow/react 作为卡片与连线画布，Monaco 按需用于文件与 diff。结构化持久化为 SQLite（`node:sqlite`，运行时不可用或能力不足时改用 better-sqlite3），大内容为本地对象存储，校验为 Zod。独立 Node.js 任务运行时。包管理器为 npm，不使用 bun 或 pnpm。代码构建为 electron-vite，打包分发为 Electron Forge。
+
+应用数据在 `app.getPath('userData')` 下分目录存放：`db/`、`objects/`、`logs/`、`credentials/`。凭据与任务日志、事件记录分离；Chromium 会话数据使用独立 `sessionData`。
 
 模型接入为 Vercel AI SDK，MCP 接入为官方 TypeScript SDK。运行时拥有任务历史与授权，接入层不拥有会话真值；不以完整 agent 框架替代织台的历史、资源和授权内核。
 
@@ -38,10 +40,10 @@
 ### 实现开始前
 
 - 首个 provider。
-- 包管理器、数据库绑定、schema 校验库与依赖版本；Electron 构建与打包组合按 [工程工具验证立案](../plans/todo-2026-09-18-desktop-tooling.md) 确认。
 - 最终工具协议：优先考虑操作名 + resource_id；统一 resource_call 尚未采纳。
 - 事件与检查点的存储 schema。
-- 应用数据、凭据、日志和历史快照的保存策略。
+- 依赖版本；桌面工程入口与打包产物按 [工程工具立案](../plans/todo-2026-09-18-desktop-tooling.md) 验证。
+- 完整请求留存与敏感内容保留期限。
 
 ### 交互原型中
 

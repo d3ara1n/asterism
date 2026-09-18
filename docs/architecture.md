@@ -9,13 +9,17 @@
 | 设计系统 | shadcn/ui + Tailwind CSS | 组件源码纳入仓库；统一使用 Tailwind 与设计 token，不并行维护另一套组件样式体系 |
 | 节点工作台 | @xyflow/react | DOM 卡片、端点与连线 |
 | 文件编辑与 diff | Monaco Editor | 文件视图和差异视图，按需挂载 |
-| 结构化持久化 | SQLite | 对象元数据、事件、关系、检查点索引 |
+| 结构化持久化 | SQLite（`node:sqlite`） | 对象元数据、事件、关系、检查点索引；运行时未提供该模块或能力不足时改用 better-sqlite3 |
+| 校验 | Zod | 事件、工具参数与配置的运行时校验；与 Vercel AI SDK 对齐 |
+| 代码构建 | electron-vite | 主进程、preload、renderer 与任务运行时的开发与构建 |
+| 打包分发 | Electron Forge | 跨平台打包；不与 electron-vite 叠加承担同一构建职责 |
 | 大内容 | 本地对象文件存储 | 图片、资源快照和大段内容，不都塞入 UI 状态 |
 | 任务运行时 | 独立 Node.js 进程 + TypeScript | 执行不依赖 React 生命周期，不阻塞主进程 |
 | 模型接入 | Vercel AI SDK | 无状态适配：流式、工具调用、多 provider；不拥有任务历史 |
 | MCP 接入 | 官方 MCP TypeScript SDK | 一种能力接入方式，不作为产品核心对象模型 |
+| 包管理器 | npm | 不使用 bun 或 pnpm |
 
-包管理器、数据库绑定、schema 校验库、打包工具与各依赖版本在进入实现时锁定。
+各依赖版本在进入实现时锁定。
 
 ## 选型边界
 
@@ -24,7 +28,7 @@
 - React Flow 只维护节点、端点和连线的视图投影，不拥有对象、授权或任务历史。其核心不提供自动布局算法，布局引擎与手动位置保留策略须单独验证，见 [布局验证立案](../plans/todo-2026-09-18-workbench-layout.md)。
 - Monaco 只在需要编辑或查看 diff 时挂载，不为每张文件卡片常驻编辑器。流式内容更新应局限于相关视图，不因每个文本增量重算整张画布布局。
 - Vercel AI SDK 用于模型请求、流式响应和工具协议适配。可复用执行辅助能力，但所有工具执行仍经过织台的授权与事件记录；不引入另一套 agent 框架会话或检查点作为任务历史真值。
-- Electron 专用构建与打包工具用于减少工程配置，不接管运行时职责；具体组合见 [工程工具验证立案](../plans/todo-2026-09-18-desktop-tooling.md)。
+- electron-vite 负责代码构建，Electron Forge 负责打包分发；二者减少工程配置，不接管运行时职责。版本、进程入口与打包产物验证见 [工程工具立案](../plans/todo-2026-09-18-desktop-tooling.md)。
 
 ## 进程职责
 
@@ -63,6 +67,9 @@
 - 历史快照、资源状态、配置与上下文投影需要可迁移的版本标识。
 - 当前视图状态与业务事件分开。
 - 正式存储 schema 在最小运行时契约明确后设计。
+- 应用数据位于 Electron `app.getPath('userData')` 的子目录，不写入源码仓库。SQLite 在 `db/`，大内容在 `objects/`，运行日志在 `logs/`，凭据在 `credentials/`。凭据与任务日志、事件记录分离。
+- Chromium 的 cookie、缓存等会话数据使用独立的 `sessionData` 路径，不与应用数据混放。
+- 不把 API key 写入事件或模型请求记录。完整请求留存与保留期限未定，不默认永久保存全部原始内容。
 
 ## 资源扩展契约
 

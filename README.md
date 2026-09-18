@@ -36,9 +36,9 @@
 
 ## 技术基线
 
-Electron、React、TypeScript、Vite、shadcn/ui + Tailwind CSS、@xyflow/react、Monaco Editor、SQLite；代理运行时置于独立 Node.js 进程。模型接入为 Vercel AI SDK，MCP 接入为官方 TypeScript SDK；二者不拥有任务历史，也不决定产品对象模型。测试以 macOS 为主，发布覆盖 macOS、Windows 与 Linux。
+Electron、React、TypeScript、Vite、shadcn/ui + Tailwind CSS、@xyflow/react、Monaco Editor、SQLite（`node:sqlite`）、Zod；包管理器为 npm。代码构建为 electron-vite，打包分发为 Electron Forge。代理运行时置于独立 Node.js 进程。模型接入为 Vercel AI SDK，MCP 接入为官方 TypeScript SDK；二者不拥有任务历史，也不决定产品对象模型。测试以 macOS 为主，发布覆盖 macOS、Windows 与 Linux。
 
-包管理器、数据库绑定、打包工具与各依赖版本在进入实现时锁定。这里的技术基线不是已安装的依赖清单。
+各依赖版本在进入实现时锁定。这里的技术基线不是已安装的依赖清单。
 
 ## 仓库范围
 
