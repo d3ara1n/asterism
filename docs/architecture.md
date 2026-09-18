@@ -6,7 +6,7 @@
 | --- | --- | --- |
 | 桌面外壳 | Electron | 本地集成与统一 Chromium；测试以 macOS 为主，发布覆盖 macOS、Windows、Linux |
 | 界面 | React + TypeScript + Vite | 交互面板与常规 Web 组件 |
-| 设计系统 | Park UI | Ark UI 与 Panda CSS，组件源码纳入仓库 |
+| 设计系统 | shadcn/ui + Tailwind CSS | 组件源码纳入仓库；统一使用 Tailwind 与设计 token，不并行维护另一套组件样式体系 |
 | 节点工作台 | @xyflow/react | DOM 卡片、端点与连线 |
 | 文件编辑与 diff | Monaco Editor | 文件视图和差异视图，按需挂载 |
 | 结构化持久化 | SQLite | 对象元数据、事件、关系、检查点索引 |
@@ -16,6 +16,15 @@
 | MCP 接入 | 官方 MCP TypeScript SDK | 一种能力接入方式，不作为产品核心对象模型 |
 
 包管理器、数据库绑定、schema 校验库、打包工具与各依赖版本在进入实现时锁定。
+
+## 选型边界
+
+- Electron 提供随应用分发的 Chromium 与 Node.js，优先保证复杂工作台的渲染一致性和本地 TypeScript 接入，不以最小安装包为首要目标。独立任务进程不等于工具执行沙箱。
+- shadcn/ui 用于常规控件与卡片外壳，可复用 React Flow 的可选 UI 组件；产品对象模型不依赖组件库。
+- React Flow 只维护节点、端点和连线的视图投影，不拥有对象、授权或任务历史。其核心不提供自动布局算法，布局引擎与手动位置保留策略须单独验证，见 [布局验证立案](../plans/todo-2026-09-18-workbench-layout.md)。
+- Monaco 只在需要编辑或查看 diff 时挂载，不为每张文件卡片常驻编辑器。流式内容更新应局限于相关视图，不因每个文本增量重算整张画布布局。
+- Vercel AI SDK 用于模型请求、流式响应和工具协议适配。可复用执行辅助能力，但所有工具执行仍经过织台的授权与事件记录；不引入另一套 agent 框架会话或检查点作为任务历史真值。
+- Electron 专用构建与打包工具用于减少工程配置，不接管运行时职责；具体组合见 [工程工具验证立案](../plans/todo-2026-09-18-desktop-tooling.md)。
 
 ## 进程职责
 

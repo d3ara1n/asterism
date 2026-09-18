@@ -21,9 +21,9 @@
 
 ## 初版技术基线
 
-本地桌面、单用户起步。Electron 外壳，React + TypeScript + Vite；Park UI 作为组件与视觉语言，@xyflow/react 作为卡片与连线画布，Monaco 按需用于文件与 diff。SQLite 与本地对象存储；独立 Node.js 任务运行时。
+本地桌面、单用户起步。Electron 外壳，React + TypeScript + Vite；shadcn/ui + Tailwind CSS 作为组件与样式体系，组件源码纳入仓库，不并行维护另一套组件样式体系。@xyflow/react 作为卡片与连线画布，Monaco 按需用于文件与 diff。SQLite 与本地对象存储；独立 Node.js 任务运行时。
 
-模型接入为 Vercel AI SDK，MCP 接入为官方 TypeScript SDK。运行时拥有任务历史与授权，接入层不拥有会话真值。
+模型接入为 Vercel AI SDK，MCP 接入为官方 TypeScript SDK。运行时拥有任务历史与授权，接入层不拥有会话真值；不以完整 agent 框架替代织台的历史、资源和授权内核。
 
 目录与虚拟资源作为验证：目录验证外部授权与 diff；虚拟资源验证完整状态的历史查看与恢复。
 
@@ -38,13 +38,14 @@
 ### 实现开始前
 
 - 首个 provider。
-- 包管理器、数据库绑定和 Electron 打包工具的具体选择。
+- 包管理器、数据库绑定、schema 校验库与依赖版本；Electron 构建与打包组合按 [工程工具验证立案](../plans/todo-2026-09-18-desktop-tooling.md) 确认。
 - 最终工具协议：优先考虑操作名 + resource_id；统一 resource_call 尚未采纳。
 - 事件与检查点的存储 schema。
 - 应用数据、凭据、日志和历史快照的保存策略。
 
 ### 交互原型中
 
+- 自动布局引擎与布局策略：优先验证 ELK，尚未选定依赖；验证动态卡片尺寸、手动位置保留与折叠端点，见 [布局验证立案](../plans/todo-2026-09-18-workbench-layout.md)。
 - 拖入资源时默认加入任务还是同时请求绑定代理。
 - 单次输入与持续绑定的快捷操作。
 - 子代理授权的默认继承方式。
