@@ -41,7 +41,7 @@
 
 - 首个 provider。
 - 最终工具协议：优先考虑操作名 + resource_id；统一 resource_call 尚未采纳。
-- 事件与检查点的存储 schema。
+- 检查点格式与迁移。事件表见 `docs/architecture.md`。
 - 依赖版本；桌面工程入口与打包产物按 [工程工具立案](../plans/todo-2026-09-18-desktop-tooling.md) 验证。
 - 完整请求留存与敏感内容保留期限。
 
@@ -65,4 +65,4 @@
 
 ## 当前授权范围
 
-仓库当前只包含产品与架构文档及协作约定。实现代码、依赖安装、CI 与远端仓库按 [实施路线](roadmap.md) 逐步立案确认。
+已授权无模型的任务历史骨架（契约测试与 `node:sqlite` 事件存储）。不含 provider、工具协议、目录真实 IO、工作台画布、Electron 窗口与 CI。

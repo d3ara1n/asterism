@@ -4,7 +4,7 @@
 
 它面向日常事务、信息收集、计算机维护，也包含编程，而不以代码仓库或聊天记录作为唯一的工作单位。
 
-> 当前阶段：产品与架构孵化。仓库仅包含文档，尚无可运行应用、依赖配置或实现代码。
+> 当前阶段：无模型的任务历史骨架。仓库含文档与可运行的历史内核契约测试；尚无桌面窗口、模型接入或工作台画布。
 
 ## 核心约定
 
@@ -38,7 +38,16 @@
 
 Electron、React、TypeScript、Vite、shadcn/ui + Tailwind CSS、@xyflow/react、Monaco Editor、SQLite（`node:sqlite`）、Zod；包管理器为 npm。代码构建为 electron-vite，打包分发为 Electron Forge。代理运行时置于独立 Node.js 进程。模型接入为 Vercel AI SDK，MCP 接入为官方 TypeScript SDK；二者不拥有任务历史，也不决定产品对象模型。测试以 macOS 为主，发布覆盖 macOS、Windows 与 Linux。
 
-各依赖版本在进入实现时锁定。这里的技术基线不是已安装的依赖清单。
+历史内核依赖见 `package-lock.json`。桌面依赖版本在接入 Electron 时锁定。
+
+## 开发
+
+当前实现是无模型的任务历史骨架。
+
+```bash
+npm test
+npm run typecheck
+```
 
 ## 仓库范围
 

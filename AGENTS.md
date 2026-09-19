@@ -1,6 +1,6 @@
 # 织台 Weft 项目规范
 
-以对象为中心的个人 agent 工作台：代理、资源与操作以卡片和连线呈现，任务过程可查看、分叉，资源支持时可恢复。定位与边界见 `docs/product.md`。当前处于文档孵化阶段：仓库只有文档，没有实现代码、依赖与 CI。
+以对象为中心的个人 agent 工作台：代理、资源与操作以卡片和连线呈现，任务过程可查看、分叉，资源支持时可恢复。定位与边界见 `docs/product.md`。当前在实现无模型的任务历史骨架：含契约测试，无 Electron 窗口与 CI。
 
 ## 心智模型
 
@@ -13,8 +13,8 @@
 
 ## 环境
 
-- 文档孵化阶段：资产为 `README.md`、`AGENTS.md`、`docs/`、`plans/`；无构建、无依赖、无 CI。
-- 实现期基线（已定、未开工）：Electron + React + TypeScript，shadcn/ui + Tailwind CSS 与 @xyflow/react，SQLite（`node:sqlite`）与本地对象存储，Zod，独立 Node.js 任务运行时，模型接入为 Vercel AI SDK；包管理器 npm，构建 electron-vite，打包 Electron Forge。测试以 macOS 为主，发布覆盖 macOS、Windows 与 Linux。选型与职责见 `docs/architecture.md`，具体版本进入实现时锁定。
+- 实现中：资产为 `README.md`、`AGENTS.md`、`docs/`、`plans/`、`src/` 与 npm 工程文件；无 Electron 窗口、无 CI。
+- 实现期基线：Electron + React + TypeScript，shadcn/ui + Tailwind CSS 与 @xyflow/react，SQLite（`node:sqlite`）与本地对象存储，Zod，独立 Node.js 任务运行时，模型接入为 Vercel AI SDK；包管理器 npm，构建 electron-vite，打包 Electron Forge。测试以 macOS 为主，发布覆盖 macOS、Windows 与 Linux。选型与职责见 `docs/architecture.md`。历史内核依赖见 `package-lock.json`；桌面依赖版本在接入 Electron 时锁定。
 
 ## 验证职责
 
