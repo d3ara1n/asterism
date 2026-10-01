@@ -6,14 +6,14 @@
 
 ## 已有基础
 
-- shadcn/ui + Radix + Tailwind，统一 Button/Dialog。
-- 集中颜色、圆角、阴影及表面样式；WindowShell 负责平台窗口布局。
+- shadcn/ui + Radix + Tailwind，统一 Button/IconButton/Dialog/Select/Input/Textarea/Field/Item/Alert/Badge/Switch/Separator/Menu/PageState。
+- 集中颜色、圆角、阴影及表面样式；Window 负责平台窗口布局；图标为 lucide-react，动效为 Motion。
 - AGENTS 与设计文档约束新增功能复用现有组件和 token。
 
 ## 待实施
 
-- 将输入框、文本框、选择框、图标按钮等统一为公共组件，保留当前视觉。
-- 确定统一图标来源；依赖引入单独确认，不以 Unicode 符号不断扩充图标系统。
+- 评估加深 `--muted-foreground`，使小字在背景上满足 WCAG AA 对比度（色相不变）。
+- 需要可搜索选择时以 shadcn Combobox（Popover + cmdk）接入，依赖届时确认。
 - 建立内部组件展示页，集中检查默认、悬停、聚焦、禁用、错误、空态与长文本。
 - 若需要暗色内容主题，先确定主题行为和色板，再实现；原生材质跟随系统不代表已有完整暗色主题。
 - 代码审查时保持公共组件和 token 的使用约定；不为视觉配置添加测试或测试基础设施。

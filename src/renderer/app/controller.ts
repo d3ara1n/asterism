@@ -1,3 +1,4 @@
+import { t } from "../shared/i18n";
 import type { AppSnapshot, Command, DesktopBridge, RuntimeStatus } from "../../shared/contracts";
 
 export type ApplicationState = { snapshot: AppSnapshot | null; busy: boolean; error: string | null; status: RuntimeStatus };
@@ -15,7 +16,7 @@ export class ApplicationController {
   }
   connect(): () => void {
     const unsubscribe = this.bridge.onStatus(status => this.update({
-      status, ...(status === "unavailable" ? { error: "The task runtime stopped. Restart Weft to reopen your workspace. · 任务运行时已停止，请重启应用。" } : {}),
+      status, ...(status === "unavailable" ? { error: t.runtimeStopped } : {}),
     }));
     void this.run({ type: "workspace.read" });
     return unsubscribe;
@@ -33,7 +34,7 @@ export class ApplicationController {
         this.update({ snapshot: result.snapshot, status: "ready" });
         return true;
       } catch {
-        this.update({ status: "unavailable", error: "The application connection was lost. Restart Weft before retrying. · 连接已断开。" });
+        this.update({ status: "unavailable", error: t.connectionLost });
         return false;
       } finally { this.update({ busy: false }); }
     });

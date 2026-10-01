@@ -14,18 +14,54 @@
 
 | 平台 | 原生窗口 | 内容留白 |
 | --- | --- | --- |
-| macOS | hidden 标题栏 + 原生红黄绿 + under-window vibrancy | 原生按钮使用集中配置的坐标，左上按 Window Controls Overlay 报告的安全区避让 |
+| macOS | hidden 标题栏 + 原生红黄绿 + under-window vibrancy | 原生按钮使用集中配置的坐标，导航部件按按钮组宽度对称留白 |
 | Windows 11 22H2+ | hidden 标题栏 + titleBarOverlay + Acrylic | 使用 Window Controls Overlay 的环境变量避开右上控件 |
 | 较旧 Windows | 原生控件覆盖 + 实色背景 | 与现代 Windows 使用相同内容布局 |
 | Linux | 保留桌面环境窗口装饰 + 实色背景 | 不模拟 macOS/Windows 的系统按钮 |
 
 主进程通过 nativeTheme 响应减少透明度/高对比度设置，必要时禁用材质。系统材质跟随系统外观；当前内容主题保持已确认的浅色。暗色内容主题需单独设计和验收。
 
-系统材质使用 Electron 原生 API，不使用全窗口 CSS backdrop-filter 模拟桌面模糊，不开启 transparent 窗口模式。HTML、body、root 与 WindowShell 无不透明全屏底色。卡片与内容表面保留实色，确保文字可读。
+系统材质使用 Electron 原生 API，不使用全窗口 CSS backdrop-filter 模拟桌面模糊，不开启 transparent 窗口模式。HTML、body、root 与 Window 无不透明全屏底色。卡片与内容表面保留实色，确保文字可读。
 
-macOS 覆盖区域高为顶部表面高度加两倍窗口边距。原生按钮位置在 `windowGeometry.macControlsPosition` 集中配置，当前为 `{ x: 20, y: 15 }` DIP，以提供更充足的左侧留白。自定义坐标替代系统默认位置，纵向观感需在目标系统验收；renderer 使用 titlebar-area-x 环境变量避让按钮区域。
+macOS 覆盖区域高为顶部表面高度加两倍窗口边距。原生按钮位置在 `windowGeometry.macControlsPosition` 集中配置，当前为 `{ x: 20, y: 15 }` DIP，以提供更充足的左侧留白。自定义坐标替代系统默认位置，纵向观感需在目标系统验收；renderer 按 `macControlsPosition` 与 `macControlsWidth` 计算左侧留白，使按钮组两侧到部件边缘等距；不使用 titlebar-area-x，其值含系统额外留白。
 
 窗口底座可拖动，包括外沿与部件之间露出的空白；标题区、操作区和工作台均完整排除拖动，保留给交互。根节点声明 drag，部件边界声明 no-drag；所有后代直接使用 `window-drag: initial` 重置，避免 Electron 44 的继承语义使画布变换后的后代生成超出可见边界的排除区域。不可用显式 none 代替 initial：Chromium 的历史兼容规则也会把显式 none 转为排除区域。弹窗和遮罩另行排除底座拖动。React Flow 的平移和卡片拖动不能触发窗口移动。改变布局后，初始卡片位置按实际工作台容器计算。
+
+## 窗口层次
+
+```
+Window          平台差异、拖动区域、窗口几何变量
+├─ Titlebar     全局，不随屏平移
+└─ Space        受管空间：唯一负责与窗口的关系，内边距为 --space-inset
+   └─ 屏[]      自左向右平铺，整屏平移切换
+      └─ Screen 屏内浮岛编织
+         └─ Island[]
+```
+
+- 屏与浮岛只相对所在层定位，不感知标题栏。全屏、浮动标题栏等变化只改 Window 中 Titlebar 与 Space 的排布。
+- 屏带方向固定：左浅右深。设置在工作台左侧，更深的任务内容在右侧。屏间切换只由菜单等明确操作触发，不设快捷键，不接管触控板手势。视口外的屏保持挂载并设为 inert，焦点转移使用 `preventScroll`，视口用 `overflow: clip`。
+- 屏可声明无底板，内容直接位于窗口材质上（如设置）；工作台屏有底板。
+
+## 浮岛编织
+
+- 浮岛是屏内一列独立的白色表面，彼此留 6px 间隙。每个浮岛声明 `min`、`grow`、可选 `max`。
+- 所有 `min` 放得下时按 `grow` 分配并居中，屏内静止；放不下时退到 `min` 并溢出，视口跟随焦点：完整可见不动，越界贴边。被挤出的浮岛变淡，点击露出部分移回；溢出时底部显示位置指示条；触控板横向滚动只在浮岛之间的缝隙生效。
+- 浮岛在其父浮岛右侧打开，替换父浮岛右侧原有的更深浮岛；Esc 由最深的屏先处理，关闭焦点浮岛，焦点回到打开它的元素。屏内有多个浮岛时，焦点浮岛显示 1px 高光。
+- 业务代码只调用 `useIsland().open/close/closeChild`，不写坐标与动画。布局规则是 `shared/weave/model.ts` 的纯函数，有单元测试。
+- 设置屏：根浮岛先平铺分类卡片；打开分类时卡片底板共享布局放大为分类内容，其余卡片淡出；分类内容在右侧打开更深浮岛（如提供商详情）。分类在 `SettingsPage.tsx` 注册表中追加。
+
+## 动效
+
+- 动画使用 Motion：进退场随存在性由 `AnimatePresence` 自动播放，替换时 `mode="popLayout"` 让退场者脱离布局流，位移由 `layout` 自动补位；共享元素用 `layoutId`。不手写测量、关键帧或动画状态机。
+- 时长：短动效 200ms（`--motion-fast`），屏间平移 380ms（`--motion-page`），浮岛 420ms；曲线统一 `--ease-out`。`MotionConfig reducedMotion="user"` 与 CSS 媒体查询共同遵循减少动态。
+
+## 文字、图标与控件
+
+- 界面按系统语言单语显示（中文或英文），文案集中于 `shared/i18n.ts`；窄窗口时顶栏按钮只留图标。
+- 字号五级：`type-page`、`type-section`、`type-body`、`type-caption`、`type-label`。
+- 图标统一使用 lucide-react，不使用 Unicode 符号；界面标识为 `weft-mark.tsx` 的经纬线框。
+- 表单与列表控件全部使用 `shared/ui/` 中的 shadcn（new-york）实现：Select、Input、Textarea、Field、Item、Alert、Badge、Switch、Separator、Menu、Dialog、Button/IconButton、PageState。业务代码不使用原生 select 等裸控件。
+- 焦点样式只有全局一套。描边、遮罩、success/warning/destructive 及浅底色、焦点浮岛高光均为语义 token；错误提示为白色表面加红色左边条。
 
 ## 唯一维护入口
 
@@ -33,7 +69,10 @@ macOS 覆盖区域高为顶部表面高度加两倍窗口边距。原生按钮�
 | --- | --- |
 | 颜色、字体、圆角、阴影、共享表面 | `src/renderer/styles.css` |
 | 控件行为与视觉变体 | `src/renderer/shared/ui/` |
-| 窗口布局与原生控件留白 | `src/renderer/app/WindowShell.tsx` |
+| 窗口布局与原生控件留白 | `src/renderer/app/Window.tsx` |
+| 受管空间、屏与浮岛编织 | `src/renderer/shared/weave/` |
+| 动效时长与曲线 | `styles.css` 的 `--motion-*`，Motion 侧镜像于 `shared/weave/motion.ts` |
+| 界面文案 | `src/renderer/shared/i18n.ts` |
 | 主进程和 renderer 共用的窗口尺寸 | `src/shared/desktop.ts` |
 | 平台材质、实色回退与系统偏好监听 | `src/main/window-appearance.ts` |
 | shadcn/ui 组件配置 | `components.json` |

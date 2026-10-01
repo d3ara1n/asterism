@@ -62,7 +62,7 @@ main 与 runtime 使用 ESM；preload 使用独立 CJS bundle，第三方校验�
 
 正式应用标识为 `dev.dearain.weft`：Forge 配置 `appBundleId`，Windows 设置 AppUserModelID。开发启动仍运行 Electron.app；此标识不决定应用数据库目录。
 
-窗口外观独立于任务运行时：`window-appearance.ts` 配置平台材质、回退和系统偏好监听，`WindowShell` 只摆放内容表面。macOS 使用 vibrancy；Windows 11 22H2+ 使用 Acrylic 与原生窗口控件覆盖；旧版 Windows/Linux 使用实色。preload 额外暴露只读平台标签，不开放窗口通用控制 API。窗口几何由 `src/shared/desktop.ts` 统一；细节见 `docs/design-system.md`。
+窗口外观独立于任务运行时：`window-appearance.ts` 配置平台材质、回退和系统偏好监听，`app/Window.tsx` 只组合标题栏与受管空间。macOS 使用 vibrancy；Windows 11 22H2+ 使用 Acrylic 与原生窗口控件覆盖；旧版 Windows/Linux 使用实色。preload 额外暴露只读平台标签，不开放窗口通用控制 API。窗口几何由 `src/shared/desktop.ts` 统一；细节见 `docs/design-system.md`。
 
 任务进程启动就绪后才创建窗口。请求带协议版本与关联 ID，只发送一次；超时/退出使在途请求失败，不自动重放。退出时先要求任务进程关闭数据库，再等待退出；超时终止进程。初版关闭最后一个窗口即退出应用。任务进程崩溃后要求重启应用，不把进程重启当作未完成操作的重试。
 

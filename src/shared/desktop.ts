@@ -8,7 +8,8 @@ export const windowGeometry = {
   gutter: 6,
   gap: 6,
   headerHeight: 32,
-  macControlsWidth: 72,
+  // 红绿灯按钮组自身宽度；左右留白按 x 坐标对称计算。
+  macControlsWidth: 52,
   // 原生控件的视觉落点，单位为窗口客户区 DIP；不依赖默认位置偏移。
   macControlsPosition: { x: 20, y: 15 },
 } as const;

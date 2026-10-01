@@ -27,3 +27,9 @@
 - [React Flow 布局能力与外部引擎](https://reactflow.dev/learn/layouting/layouting)
 - [React Flow 自定义节点](https://reactflow.dev/learn/customization/custom-nodes)
 - [React Flow Base Node](https://reactflow.dev/ui/components/base-node)
+
+## 工作台分屏
+
+- [ ] 双击或按钮聚焦节点，在工作台屏内以浮岛编织并列：主代理手稿区在左，其他聚焦对象在右；工作台画布始终是一格，可平移缩放。
+- [ ] 关闭 React Flow 默认双击缩放；分屏布局存入视图表，不产生业务历史、不改变授权。
+- [ ] 代理与资源是否统一为更通用的对象类型，待对象模型讨论。

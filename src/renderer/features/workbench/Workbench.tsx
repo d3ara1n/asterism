@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ReactFlow, Background, Controls, ControlButton, useReactFlow, applyNodeChanges, type NodeChange, type Edge } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import type { Command, TaskSnapshot } from "../../../shared/contracts";
+import { Maximize, Minus, Plus } from "lucide-react";
+import { t } from "../../shared/i18n";
 import { ObjectNode, type ObjectNodeType } from "./ObjectNode";
 
 const nodeTypes = { object: ObjectNode };
@@ -28,7 +30,7 @@ export function Workbench({ task, run }: { task: TaskSnapshot; run: (command: Co
   }, [toNodes]);
   const edges: Edge[] = useMemo(() => task.bindings.map(binding => ({
     id: `${binding.agent_id}:${binding.resource_id}`, source: binding.resource_id, target: binding.agent_id,
-    label: binding.pending ? "Pending · 待生效" : "Read access · 可读取",
+    label: binding.pending ? t.pending : t.readAccess,
     style: { stroke: "var(--primary)", ...(binding.pending ? { opacity: 0.5, strokeDasharray: "5 5" } : {}) },
     selectable: false, deletable: false,
   })), [task.bindings]);
@@ -60,8 +62,8 @@ function ViewControls({ task, run }: { task: TaskSnapshot; run: (command: Comman
     if (!task.historical) await run({ type: "viewport.set", task_id: task.id, viewport: flow.getViewport() });
   };
   return <Controls showZoom={false} showFitView={false} showInteractive={false} position="bottom-right">
-    <ControlButton onClick={() => { void move(() => flow.zoomIn()); }} title="Zoom in · 放大" aria-label="Zoom in · 放大">+</ControlButton>
-    <ControlButton onClick={() => { void move(() => flow.zoomOut()); }} title="Zoom out · 缩小" aria-label="Zoom out · 缩小">−</ControlButton>
-    <ControlButton onClick={() => { void move(() => flow.fitView({ padding: 0.25 })); }} title="Fit objects · 显示全部对象" aria-label="Fit objects · 显示全部对象">⊡</ControlButton>
+    <ControlButton onClick={() => { void move(() => flow.zoomIn()); }} title={t.zoomIn} aria-label={t.zoomIn}><Plus /></ControlButton>
+    <ControlButton onClick={() => { void move(() => flow.zoomOut()); }} title={t.zoomOut} aria-label={t.zoomOut}><Minus /></ControlButton>
+    <ControlButton onClick={() => { void move(() => flow.fitView({ padding: 0.25 })); }} title={t.fitObjects} aria-label={t.fitObjects}><Maximize /></ControlButton>
   </Controls>;
 }

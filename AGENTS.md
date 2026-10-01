@@ -69,8 +69,12 @@
 
 - 主干 `main`。文档孵化阶段直接提交 `main`；实现期按 type 开分支（`feat/`、`fix/`、`docs/`…），经 PR squash merge 回 `main`，一个 PR 对应一个合并提交。
 - 提交信息用 Conventional Commits：type 英文小写（feat/fix/docs/chore/refactor…），主题中文。
-- AI 辅助的提交加 `Co-Authored-By: <模型名> <邮箱>` trailer；模型身份查 `PI_*` 环境变量，无对应邮箱用 `noreply@pi.dev`，不伪造 provider 域名。
+- AI 辅助的提交加 `Co-Authored-By: <模型名> <邮箱>` trailer；模型身份查 `PI_*` 环境变量。邮箱用模型提供方的官方 noreply 地址（如 Anthropic 为 `noreply@anthropic.com`），无法确定时用 `noreply@pi.dev`，不自行编造地址。
 - PR label 分组与 release CI 暂缓，已立案 `plans/`；首个可运行里程碑后接入。
+
+### 依赖优先
+
+- 优先采用成熟、维护活跃的现有库解决通用问题（控件、动画、布局测量、拖拽、虚拟列表等），不自行实现同类机制。引入依赖仍按决策边界单独确认，确认时说明选型理由与替代方案。
 
 ### 语言规范
 

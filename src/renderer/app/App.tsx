@@ -1,112 +1,128 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { ArrowLeft, ChevronDown, FileText, History, KeyRound, LayoutList, ListTree, Plus, Settings, X } from "lucide-react";
 import type { Command } from "../../shared/contracts";
 import type { ApplicationController } from "./controller";
-import { Button } from "../shared/ui/button";
+import { t } from "../shared/i18n";
+import { Button, IconButton } from "../shared/ui/button";
+import { WeftMark } from "../shared/ui/weft-mark";
+import { Menu, MenuItem, MenuSeparator } from "../shared/ui/menu";
+import { PageState } from "../shared/ui/page-state";
 import { Workbench } from "../features/workbench/Workbench";
 import { AccessDialog } from "../features/workbench/AccessDialog";
-import { CreateDialog, type Creation } from "./CreateDialog";
-import { Dialog } from "../shared/ui/dialog";
+import { SidePanel, type PanelKind } from "../features/workbench/SidePanel";
+import { SettingsPage } from "../features/settings/SettingsPage";
 import { placeObject } from "../features/workbench/placement";
-import { WindowShell } from "./WindowShell";
+import { CreateDialog, type Creation } from "./CreateDialog";
+import { Titlebar, Window } from "./Window";
+import { Space } from "../shared/weave/Space";
+
+/** 页面带站点，自左向右：应用级（浅）→ 工作台（原点）。更深的任务内容日后在右侧追加。 */
+type PageId = "settings" | "workbench";
 
 export function App({ controller }: { controller: ApplicationController }) {
   const state = useSyncExternalStore(controller.subscribe, controller.getSnapshot);
-  const workbenchRef = useRef<HTMLElement>(null);
-  const [panel, setPanel] = useState<"tasks" | "objects" | "history" | null>(null);
+  const workbenchRef = useRef<HTMLDivElement>(null);
+  const returnFocus = useRef<HTMLElement | null>(null);
+  const [page, setPage] = useState<PageId>("workbench");
+  const [panel, setPanel] = useState<PanelKind | null>(null);
   const [creation, setCreation] = useState<Creation | null>(null);
   const [accessOpen, setAccessOpen] = useState(false);
-  const [aboutOpen, setAboutOpen] = useState(false);
   const run = useCallback((command: Command) => controller.run(command), [controller]);
   useEffect(() => controller.connect(), [controller]);
   const snapshot = state.snapshot;
   const task = snapshot?.task;
-  const writable = state.status === "ready" && !state.busy && !task?.historical;
+  const ready = state.status === "ready";
+  const writable = ready && !state.busy && !task?.historical;
+  const inSettings = page === "settings";
+
+  // 页面切换后焦点移到新页面；返回工作台时归还到进入前的位置。
+  const go = (next: PageId) => {
+    if (next === page) return;
+    if (next !== "workbench") returnFocus.current = document.activeElement as HTMLElement | null;
+    setPage(next);
+    requestAnimationFrame(() => {
+      if (next === "workbench" && returnFocus.current?.isConnected) returnFocus.current.focus({ preventScroll: true });
+      else document.getElementById(`screen-${next}`)?.focus({ preventScroll: true });
+    });
+  };
+  useEffect(() => {
+    if (!inSettings) return;
+    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape" && !event.defaultPrevented) go("workbench"); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
+
   const add = (kind: "agent" | "note") => {
     const bounds = workbenchRef.current?.getBoundingClientRect();
     if (!task || !bounds) return;
     setCreation({ kind, taskId: task.id, position: placeObject(task, bounds.width, bounds.height) });
   };
+  const togglePanel = (kind: PanelKind) => setPanel(panel === kind ? null : kind);
 
-  const navigation = <>
-    <Button variant="ghost" size="sm" onClick={() => setPanel(panel === "tasks" ? null : "tasks")} aria-expanded={panel === "tasks"} aria-label="Tasks · 任务">
-      <span className="text-sm font-semibold text-primary">weft</span>
-      <span className="text-muted-foreground" aria-hidden="true">⌄</span>
-    </Button>
+  const navigation = inSettings ? <>
+    <Button variant="ghost" size="sm" onClick={() => go("workbench")}><ArrowLeft />{t.backToWorkbench}</Button>
     <span className="h-4 w-px shrink-0 bg-border" />
-    <span className="window-task-title" title={task?.title}>{task?.title ?? "Workspace · 工作区"}</span>
-    {task && <Button size="sm" variant="ghost" onClick={() => setPanel(panel === "history" ? null : "history")} aria-expanded={panel === "history"} aria-label="History · 历史">
-      History<span className="toolbar-translation">· 历史</span>
-    </Button>}
+    <span className="window-task-title font-medium">{t.settings}</span>
+  </> : <>
+    <Menu trigger={<Button variant="ghost" size="sm" aria-label={t.menu}>
+      <WeftMark className="size-4 text-primary" /><span className="text-sm font-semibold text-primary">{t.appName}</span><ChevronDown className="text-muted-foreground" />
+    </Button>}>
+      <MenuItem disabled={!snapshot} onSelect={() => setPanel("tasks")}><LayoutList />{t.menuTasks}</MenuItem>
+      <MenuItem disabled={!ready || state.busy} onSelect={() => setCreation({ kind: "task" })}><Plus />{t.newTask}</MenuItem>
+      <MenuSeparator />
+      <MenuItem onSelect={() => go("settings")}><Settings />{t.menuSettings}</MenuItem>
+    </Menu>
+    <span className="h-4 w-px shrink-0 bg-border" />
+    <span className="window-task-title" title={task?.title}>{task?.title ?? t.workspace}</span>
+    {task && <Button size="sm" variant="ghost" onClick={() => togglePanel("history")} aria-expanded={panel === "history"}><History />{t.history}</Button>}
   </>;
-  const actions = task ? <>
-    <Button variant="ghost" size="sm" disabled={!writable} onClick={() => add("agent")} aria-label="Add agent · 添加代理">+ Agent<span className="toolbar-translation">· 代理</span></Button>
-    <Button variant="ghost" size="sm" disabled={!writable} onClick={() => add("note")} aria-label="Add note · 添加笔记">+ Note<span className="toolbar-translation">· 笔记</span></Button>
-    <Button variant="ghost" size="sm" disabled={!writable} onClick={() => setAccessOpen(true)} aria-label="Resource access · 资源授权">Access<span className="toolbar-translation">· 授权</span></Button>
-    <Button variant="ghost" size="sm" onClick={() => setPanel(panel === "objects" ? null : "objects")} aria-expanded={panel === "objects"} aria-label="Objects · 对象">Objects<span className="toolbar-translation">· 对象</span></Button>
-  </> : <Button variant="ghost" size="sm" disabled={!writable} onClick={() => setCreation({ kind: "task" })}>+ Task<span className="toolbar-translation">· 新建任务</span></Button>;
 
-  return <WindowShell navigation={navigation} actions={actions} workbenchRef={workbenchRef}>
+  const actions = task ? <>
+    <Button variant="ghost" size="sm" disabled={!writable} onClick={() => add("agent")} aria-label={t.addAgentLabel}><Plus /><span className="toolbar-label">{t.addAgent}</span></Button>
+    <Button variant="ghost" size="sm" disabled={!writable} onClick={() => add("note")} aria-label={t.addNoteLabel}><FileText /><span className="toolbar-label">{t.addNote}</span></Button>
+    <Button variant="ghost" size="sm" disabled={!writable} onClick={() => setAccessOpen(true)} aria-label={t.accessLabel}><KeyRound /><span className="toolbar-label">{t.access}</span></Button>
+    <Button variant="ghost" size="sm" onClick={() => togglePanel("objects")} aria-expanded={panel === "objects"} aria-label={t.objects}><ListTree /><span className="toolbar-label">{t.objects}</span></Button>
+  </> : <Button variant="ghost" size="sm" disabled={!writable} onClick={() => setCreation({ kind: "task" })}><Plus />{t.newTask}</Button>;
+
+  const workbench = <div ref={workbenchRef} className="overlay-inset relative h-full">
     {task ? <Workbench key={task.id + ":" + (task.historical ? task.at_seq : "live")} task={task} run={run} /> : <div className="empty-workbench">
-      <div className="max-w-md text-center">
-        <div className="mx-auto mb-6 text-5xl font-light text-primary" aria-hidden="true">⌘</div>
-        <h1 className="text-2xl font-semibold tracking-tight">{snapshot ? "A place for your next task" : state.status === "unavailable" ? "Workspace unavailable" : "Opening your workspace"}</h1>
-        <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{snapshot ? "Start a task, then bring agents and resources onto your workbench." : state.status === "unavailable" ? "Restart Weft to reopen your saved work." : "Reading your saved work."}</p>
-        <p className="mt-2 text-xs text-muted-foreground">{snapshot ? "创建任务，在工作台组织代理与资源。" : "织台"}</p>
-        {snapshot && <Button className="mt-7" disabled={!writable} onClick={() => setCreation({ kind: "task" })}>New task · 新建任务</Button>}
-      </div>
+      {snapshot ? <div className="max-w-md text-center">
+        <h1 className="type-page">{t.emptyTitle}</h1>
+        <p className="type-caption mt-2">{t.emptyBody}</p>
+        <Button className="mt-6" disabled={!writable} onClick={() => setCreation({ kind: "task" })}><Plus />{t.newTask}</Button>
+      </div> : <PageState kind={state.status === "unavailable" ? "error" : "loading"}
+        title={state.status === "unavailable" ? t.unavailableTitle : t.openingTitle}
+        body={state.status === "unavailable" ? t.unavailableBody : t.openingBody} />}
     </div>}
     {task && task.objects.length === 0 && <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
       <div className="max-w-sm text-center">
-        <h1 className="text-xl font-semibold">{task.title}</h1>
-        <p className="mt-3 text-sm text-muted-foreground">{task.historical ? "No objects existed here yet. · 此时尚无对象。" : "Add an agent or a note to begin. · 添加代理或笔记开始工作。"}</p>
+        <h1 className="type-page">{task.title}</h1>
+        <p className="type-caption mt-2">{task.historical ? t.noObjectsHistorical : t.noObjects}</p>
       </div>
     </div>}
-
-    {panel && <aside aria-label={panel} className="floating-panel absolute bottom-12 left-2 top-2 z-20 flex w-72 flex-col">
-      <header className="flex items-center justify-between p-2">
-        <h2 className="text-sm font-semibold">{panel === "tasks" ? "Tasks · 任务" : panel === "objects" ? "Objects · 对象" : "History · 历史"}</h2>
-        <Button variant="ghost" size="icon" onClick={() => setPanel(null)} aria-label="Close panel · 关闭面板">×</Button>
-      </header>
-      <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
-        {panel === "tasks" && <>
-          <p className="mb-4 px-2 text-xs text-muted-foreground">{snapshot?.workspace.title}</p>
-          {snapshot?.tasks.map(item => <button key={item.id} className={`list-item ${task?.id === item.id ? "bg-secondary" : ""}`} disabled={state.busy} onClick={() => { void run({ type: "workspace.read", task_id: item.id }); setPanel(null); }}>
-            <span className="truncate">{item.title}</span>
-          </button>)}
-          <Button className="mt-4 w-full" disabled={state.status !== "ready" || state.busy} onClick={() => setCreation({ kind: "task" })}>New task · 新建任务</Button>
-        </>}
-        {panel === "objects" && task?.objects.map(object => {
-          const view = task.views.find(v => v.object_id === object.id);
-          return <div className="list-item" key={object.id}>
-            <div className="min-w-0 flex-1"><p className="truncate">{object.title}</p><p className="mt-1 text-xs text-muted-foreground">{object.kind}</p></div>
-            <Button variant="ghost" size="sm" disabled={!writable} onClick={() => { void run({ type: "view.set", task_id: task.id, object_id: object.id, hidden: !view?.hidden }); }}>{view?.hidden ? "Open · 打开" : "Close · 关闭"}</Button>
-          </div>;
-        })}
-        {panel === "history" && task && <>
-          <Button className="mb-4 w-full" variant={task.historical ? "secondary" : "default"} disabled={state.busy} onClick={() => { void run({ type: "workspace.read", task_id: task.id }); }}>Live · 当前</Button>
-          {task.history.map(entry => <button className={`list-item flex-col items-start ${task.historical && task.at_seq === entry.seq ? "bg-secondary" : ""}`} key={entry.event_id} disabled={state.busy} onClick={() => { void run({ type: "workspace.read", task_id: task.id, at_seq: entry.seq }); }}>
-            <span>{entry.label}</span><time className="text-xs text-muted-foreground">{new Date(entry.recorded_at).toLocaleString()}</time>
-          </button>)}
-        </>}
-      </div>
-    </aside>}
-
-    {task?.historical && <div className="floating-bar absolute bottom-5 left-1/2 z-10 flex -translate-x-1/2 items-center gap-4 whitespace-nowrap text-sm">
-      <span>Viewing history · 正在查看历史</span>
-      <Button size="sm" disabled={state.busy} onClick={() => { void run({ type: "workspace.read", task_id: task.id }); }}>Back to live · 返回当前</Button>
+    {panel && <SidePanel panel={panel} snapshot={snapshot} busy={state.busy} ready={ready} writable={writable} run={run}
+      onClose={() => setPanel(null)} onNewTask={() => setCreation({ kind: "task" })} />}
+    {task?.historical && <div className="floating-bar absolute bottom-[var(--overlay-inset)] left-1/2 z-10 flex -translate-x-1/2 items-center gap-3 whitespace-nowrap pl-3 text-sm">
+      <span>{t.viewingHistory}</span>
+      <Button size="sm" disabled={state.busy} onClick={() => { void run({ type: "workspace.read", task_id: task.id }); }}>{t.backToLive}</Button>
     </div>}
-    <div className="absolute bottom-2 left-2 z-10 flex items-center gap-2 text-xs text-muted-foreground">
-      <span role="status" className="rounded-control bg-background/90 px-2 py-1">{state.busy ? "Saving / loading · 正在处理" : state.status === "ready" ? "Local workspace · 本地工作区" : "Connection unavailable · 连接不可用"}</span>
-      <button className="hover:text-foreground" onClick={() => setAboutOpen(true)}>About · 关于</button>
-    </div>
-    {state.error && <div role="alert" className="absolute bottom-16 left-1/2 z-[60] flex w-[min(600px,calc(100%-32px))] -translate-x-1/2 items-start gap-3 rounded-surface bg-destructive p-4 text-sm text-white shadow-dialog">
-      <p className="flex-1">{state.error}</p><button aria-label="Dismiss error · 关闭错误" onClick={controller.clearError}>×</button>
+    <span role="status" className="status-chip absolute left-[var(--overlay-inset)] top-[var(--overlay-inset)] z-10" data-hidden={!!panel || undefined}>
+      {state.busy ? t.statusBusy : ready ? t.statusReady : t.statusUnavailable}
+    </span>
+  </div>;
+
+  return <>
+    <Window skipTarget={`screen-${page}`} titlebar={<Titlebar navigation={navigation} actions={actions} actionsHidden={inSettings} />}>
+      <Space active={page} screens={[
+        { id: "settings", label: t.settings, surface: false, content: <SettingsPage active={inSettings} /> },
+        { id: "workbench", label: t.workbench, content: workbench },
+      ]} />
+    </Window>
+    {state.error && <div role="alert" className="notice notice-error fixed bottom-4 left-1/2 z-[60] w-[min(560px,calc(100%-32px))] -translate-x-1/2">
+      <p className="flex-1">{state.error}</p>
+      <IconButton label={t.dismissError} onClick={controller.clearError}><X /></IconButton>
     </div>}
     {creation && <CreateDialog creation={creation} busy={state.busy} run={run} onClose={() => setCreation(null)} />}
     {accessOpen && task && <AccessDialog task={task} busy={state.busy} run={run} onClose={() => setAccessOpen(false)} />}
-    {aboutOpen && <Dialog title="Weft · 织台" description="Your local, object-centered workbench. · 以对象为中心的本地工作台。" onClose={() => setAboutOpen(false)}>
-      <p className="text-sm leading-relaxed text-muted-foreground">Tasks, notes, bindings and canvas positions are saved locally. Model execution and external file tools are not connected yet.</p>
-      <p className="mt-3 text-sm text-muted-foreground">任务、笔记、绑定和画布位置已在本地保存。模型执行与外部文件工具尚未接入。</p>
-    </Dialog>}
-  </WindowShell>;
+  </>;
 }
