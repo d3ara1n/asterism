@@ -2,7 +2,7 @@
 
 这是正式桌面应用，不依赖固定场景或浏览器内存演示。
 
-首页、侧栏与三类真实配置已实现，交互验收见 [首页计划](../plans/todo-2026-10-02-home-navigation.md) 和 [UI 计划](../plans/todo-2026-10-01-ui-shell-settings.md)。提供商保存/测试、模型角色和 agent 配置能力见 `configuration/README.md`；下一步按 [模型接入计划](../plans/todo-2026-10-01-model-protocol-storage.md) 接入首次发送及执行。
+首页、侧栏与三类真实配置已实现并验收。提供商保存/测试、模型角色和 agent 配置能力见 `configuration/README.md`；下一步按 [模型接入计划](../plans/todo-2026-10-01-model-protocol-storage.md) 接入首次发送及执行。
 
 | 目录 | 职责 | 依赖方向 |
 | --- | --- | --- |

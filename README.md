@@ -4,7 +4,7 @@
 
 它面向日常事务、信息收集、计算机维护，也包含编程，而不以代码仓库或聊天记录作为唯一的工作单位。
 
-> 当前阶段：首页、侧栏与三类真实配置已实现，下一步接入首次发送与代理执行。启动不打开会话，已有会话从侧栏按需读取；设置支持提供商/具体模型、加密凭据、连接测试、模型角色与 agent 管理，首页可选择 agent 和模型。工作台支持笔记、显式绑定、历史查看和布局保存；消息执行、目录工具、历史分叉与资源恢复尚未接入。当前工作见 [模型接入计划](plans/todo-2026-10-01-model-protocol-storage.md)，界面验收见 [首页计划](plans/todo-2026-10-02-home-navigation.md) 与 [UI 壳子计划](plans/todo-2026-10-01-ui-shell-settings.md)。
+> 当前阶段：首页、侧栏与三类真实配置已实现，下一步接入首次发送与代理执行。启动不打开会话，已有会话从侧栏按需读取；设置支持提供商/具体模型、加密凭据、连接测试、模型角色与 agent 管理，首页可选择 agent 和模型。工作台支持笔记、显式绑定、历史查看和布局保存；消息执行、目录工具、历史分叉与资源恢复尚未接入。当前工作见 [模型接入计划](plans/todo-2026-10-01-model-protocol-storage.md)。
 
 ## 核心约定
 
@@ -71,7 +71,7 @@ npm run build
 
 开发数据位于 Electron `appData/Weft-development`，发布版使用 `userData`；数据库为 `db/weft.sqlite`，正文在 `objects/`，运行时日志在 `logs/runtime.log`，Chromium 数据在 `chromium/`。重启会读取已保存的工作。当前没有后台常驻服务，关闭最后一个窗口会退出应用与任务进程。
 
-模块入口见 [源码地图](src/README.md)、[界面维护](src/renderer/README.md)。实施与待验收项见 [应用框架立案](plans/todo-2026-10-01-application-foundation.md)。
+模块入口见 [源码地图](src/README.md)、[界面维护](src/renderer/README.md)。跨平台与打包兼容性验收见 [桌面工程立案](plans/todo-2026-09-18-desktop-tooling.md)。
 
 ## 仓库范围
 

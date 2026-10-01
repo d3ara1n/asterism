@@ -1,6 +1,6 @@
 # 织台 Weft 项目规范
 
-以对象为中心的个人 agent 工作台：代理、资源与操作以卡片和连线呈现，任务过程可查看、分叉，资源支持时可恢复。定位与边界见 `docs/product.md`。首页、侧栏、持久化工作台与三类真实配置已实现，首次发送和模型执行尚未接入，无 CI。能力入口见 `plans/todo-2026-10-01-model-protocol-storage.md`；首页验收见 `plans/todo-2026-10-02-home-navigation.md`，设置验收见 `plans/todo-2026-10-01-ui-shell-settings.md`。
+以对象为中心的个人 agent 工作台：代理、资源与操作以卡片和连线呈现，任务过程可查看、分叉，资源支持时可恢复。定位与边界见 `docs/product.md`。首页、侧栏、持久化工作台与三类真实配置已实现，首次发送和模型执行尚未接入，无 CI。能力入口见 `plans/todo-2026-10-01-model-protocol-storage.md`。
 
 ## 心智模型
 
