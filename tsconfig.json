@@ -12,5 +12,5 @@
     "types": ["node"],
     "rootDir": "."
   },
-  "include": ["src", "vitest.config.ts"]
+  "include": ["src/history", "src/shared", "src/runtime", "src/main", "src/preload", "*.config.ts"]
 }

@@ -67,13 +67,13 @@ export class HistoryKernel {
     this.db.close();
   }
 
-  createTask(): { task_id: string; branch_id: string; position: HistoryPosition } {
+  createTask(title?: string): { task_id: string; branch_id: string; position: HistoryPosition } {
     const task_id = newId();
     const branch_id = newId();
     return this.transact(() => {
       this.append(branch_id, {
         type: "task_created",
-        payload: { task_id },
+        payload: { task_id, title },
       });
       const branch = this.append(branch_id, {
         type: "branch_created",
@@ -85,7 +85,7 @@ export class HistoryKernel {
 
   createAgent(
     branch_id: string,
-    options: { parent_agent_id?: string } = {},
+    options: { parent_agent_id?: string; title?: string } = {},
   ): { agent_id: string; position: HistoryPosition } {
     const agent_id = newId();
     const event = this.append(branch_id, {
@@ -93,6 +93,7 @@ export class HistoryKernel {
       payload: {
         agent_id,
         parent_agent_id: options.parent_agent_id,
+        title: options.title,
       },
     });
     return { agent_id, position: positionOf(event) };
@@ -100,7 +101,7 @@ export class HistoryKernel {
 
   createResource(
     branch_id: string,
-    input: { type: string; capabilities?: Partial<Capability> },
+    input: { type: string; capabilities?: Partial<Capability>; title?: string; content_ref?: string },
   ): { resource_id: string; position: HistoryPosition } {
     const resource_id = newId();
     const event = this.append(branch_id, {
@@ -108,6 +109,8 @@ export class HistoryKernel {
       payload: {
         resource_id,
         type: input.type,
+        title: input.title,
+        content_ref: input.content_ref,
         capabilities: {
           history_viewing: input.capabilities?.history_viewing ?? false,
           state_restore: input.capabilities?.state_restore ?? false,
@@ -292,7 +295,7 @@ export class HistoryKernel {
     return pending;
   }
 
-  private eventsOn(branch_id: string): StoredEvent[] {
+  eventsOn(branch_id: string): StoredEvent[] {
     const rows = this.db
       .prepare(
         "SELECT event_id, branch_id, seq, recorded_at, type, payload FROM events WHERE branch_id = ? ORDER BY seq ASC",
@@ -349,13 +352,15 @@ export class HistoryKernel {
   }
 
   private transact<T>(fn: () => T): T {
-    this.db.exec("BEGIN IMMEDIATE");
+    // 保存点允许应用元数据与历史事件处于同一个外层事务。
+    this.db.exec("SAVEPOINT history_command");
     try {
       const result = fn();
-      this.db.exec("COMMIT");
+      this.db.exec("RELEASE SAVEPOINT history_command");
       return result;
     } catch (error) {
-      this.db.exec("ROLLBACK");
+      this.db.exec("ROLLBACK TO SAVEPOINT history_command");
+      this.db.exec("RELEASE SAVEPOINT history_command");
       throw error;
     }
   }

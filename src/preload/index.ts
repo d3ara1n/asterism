@@ -1,0 +1,21 @@
+import { contextBridge, ipcRenderer } from "electron";
+import { commandChannel, statusChannel, commandSchema, resultSchema, runtimeStatusSchema, type DesktopBridge } from "../shared/contracts.ts";
+
+const bridge: DesktopBridge = {
+  platform: process.platform === "darwin" ? "darwin" : process.platform === "win32" ? "win32" : "linux",
+  async execute(command) {
+    const parsed = commandSchema.safeParse(command);
+    if (!parsed.success) return { ok: false, error: { code: "invalid_request", message: "Invalid application command." } };
+    try { return resultSchema.parse(await ipcRenderer.invoke(commandChannel, parsed.data)); }
+    catch { return { ok: false, error: { code: "unavailable", message: "The application connection was lost. Restart Weft and inspect the workspace before retrying." } }; }
+  },
+  onStatus(listener) {
+    const handler = (_event: Electron.IpcRendererEvent, raw: unknown) => {
+      const status = runtimeStatusSchema.safeParse(raw);
+      if (status.success) listener(status.data);
+    };
+    ipcRenderer.on(statusChannel, handler);
+    return () => ipcRenderer.removeListener(statusChannel, handler);
+  },
+};
+contextBridge.exposeInMainWorld("weft", bridge);

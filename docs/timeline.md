@@ -18,10 +18,10 @@
 
 | `type` | 何时记录 | 载荷要点 |
 | --- | --- | --- |
-| `task_created` | 任务建立 | `task_id` |
+| `task_created` | 任务建立 | `task_id`，可选 `title` |
 | `branch_created` | 任务的初始分支，或从历史分叉 | `branch_id`；分叉时含 `origin_branch_id` 与 `origin_position` |
-| `agent_created` | 代理建立 | `agent_id`；子代理含 `parent_agent_id` |
-| `resource_created` | 资源进入任务 | `resource_id`、类型、能力声明 |
+| `agent_created` | 代理建立 | `agent_id`，可选 `title`；子代理含 `parent_agent_id` |
+| `resource_created` | 资源进入任务 | `resource_id`、类型、能力声明；可选 `title` 与不可变正文引用 `content_ref` |
 | `binding_requested` | 请求 attach 或 detach | `agent_id`、`resource_id`、`attach` 或 `detach`、权限 |
 | `bindings_applied` | 请求在轮次交界（代理空闲则立即）生效 | `agent_id`、本次生效的请求、新 `binding_version` |
 | `turn_started` | 代理开始一轮 | `agent_id`、`turn_id`、历史位置、`binding_version`、`rules_version`、`tool_catalog_version`、输入 |

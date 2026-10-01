@@ -4,7 +4,7 @@
 
 它面向日常事务、信息收集、计算机维护，也包含编程，而不以代码仓库或聊天记录作为唯一的工作单位。
 
-> 当前阶段：无模型的任务历史骨架。仓库含文档与可运行的历史内核契约测试；尚无桌面窗口、模型接入或工作台画布。
+> 当前阶段：正式桌面应用框架。Electron 窗口、独立任务运行时、SQLite 历史与 React Flow 工作台已接通；支持创建任务、代理、笔记、显式绑定、历史查看和布局保存。尚未接入模型执行、目录工具、历史分叉或资源恢复。
 
 ## 核心约定
 
@@ -38,16 +38,34 @@
 
 Electron、React、TypeScript、Vite、shadcn/ui + Tailwind CSS、@xyflow/react、Monaco Editor、SQLite（`node:sqlite`）、Zod；包管理器为 npm。代码构建为 electron-vite，打包分发为 Electron Forge。代理运行时置于独立 Node.js 进程。模型接入为 Vercel AI SDK，MCP 接入为官方 TypeScript SDK；二者不拥有任务历史，也不决定产品对象模型。测试以 macOS 为主，发布覆盖 macOS、Windows 与 Linux。
 
-历史内核依赖见 `package-lock.json`。桌面依赖版本在接入 Electron 时锁定。
+已安装版本见 `package-lock.json`。Monaco、模型 SDK 与 MCP SDK 在接入对应能力时安装。应用进程与存储约定见 `docs/architecture.md`。
 
 ## 开发
 
-当前实现是无模型的任务历史骨架。
+需要 Node.js 22.13+ 与 npm。首次安装依赖后启动桌面应用：
+
+```bash
+npm install
+npm run dev
+```
+
+应用从空工作区开始，没有示例任务。先创建任务，再添加代理或笔记；通过 Access 显式授予笔记读取权限，通过 History 查看过去。关闭卡片只隐藏视图，可从 Objects 重新打开。代理尚未接入模型，不会生成模拟回复。
+
+窗口采用系统材质底座，左上标题区、右上快捷操作与下方工作台之间留出间隙。macOS 使用原生 vibrancy；Windows 11 22H2+ 使用 Acrylic，其他平台/不支持场景使用实色回退。正式 bundle ID 为 `dev.dearain.weft`。窗口主进程配置变更后需要退出并重新 `npm run dev`，仅刷新页面不够；设计约定见 [界面设计系统](docs/design-system.md)。
+
+检查与构建：
 
 ```bash
 npm test
 npm run typecheck
+npm run build
 ```
+
+`npm run package` 生成当前平台的未签名应用目录；`npm run make` 进一步生成 ZIP，均先构建代码。Forge 产物位于 `out/`，编译产物位于 `dist/`。macOS arm64 已做本地打包与内容检查；GUI 与其他平台需人工验收。
+
+开发数据位于 Electron `appData/Weft-development`，发布版使用 `userData`；数据库为 `db/weft.sqlite`，正文在 `objects/`，运行时日志在 `logs/runtime.log`，Chromium 数据在 `chromium/`。重启会读取已保存的工作。当前没有后台常驻服务，关闭最后一个窗口会退出应用与任务进程。
+
+模块入口见 [源码地图](src/README.md)、[界面维护](src/renderer/README.md)。实施与待验收项见 [应用框架立案](plans/todo-2026-10-01-application-foundation.md)。
 
 ## 仓库范围
 

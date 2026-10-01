@@ -17,7 +17,7 @@ export const historyPositionSchema = z.object({
 
 const taskCreated = z.object({
   type: z.literal("task_created"),
-  payload: z.object({ task_id: z.string() }),
+  payload: z.object({ task_id: z.string(), title: z.string().optional() }),
 });
 
 const branchCreated = z.object({
@@ -35,6 +35,7 @@ const agentCreated = z.object({
   payload: z.object({
     agent_id: z.string(),
     parent_agent_id: z.string().optional(),
+    title: z.string().optional(),
   }),
 });
 
@@ -44,6 +45,8 @@ const resourceCreated = z.object({
     resource_id: z.string(),
     type: z.string(),
     capabilities: capabilitySchema,
+    title: z.string().optional(),
+    content_ref: z.string().optional(),
   }),
 });
 

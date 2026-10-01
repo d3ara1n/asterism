@@ -19,7 +19,7 @@
 | MCP 接入 | 官方 MCP TypeScript SDK | 一种能力接入方式，不作为产品核心对象模型 |
 | 包管理器 | npm | 不使用 bun 或 pnpm |
 
-历史内核依赖见 `package-lock.json`。桌面依赖版本在接入 Electron 时锁定。
+已安装版本见 `package-lock.json`：Electron 44.5.1、electron-vite 5.0.0、Forge 8.0.1、React 19.3.0、React Flow 12.12.0、Tailwind 4.3.3。Vite 锁定 7.3.6 以符合 electron-vite 的 peer 范围。shadcn/ui 控件采用 Radix UI，源码位于 `src/renderer/shared/ui/`；配置入口为 `components.json`。Monaco、模型 SDK、MCP SDK 随模块接入。
 
 ## 选型边界
 
@@ -46,6 +46,27 @@
 
 独立进程不自动提供桌面应用退出后继续运行的能力。初版默认随应用关闭；持久后台服务需另行确认。
 
+### 工程入口与生命周期
+
+| 源码 | 构建产物 | 职责 |
+| --- | --- | --- |
+| `src/main/index.ts` | `dist/main/index.js` | 窗口、单实例锁、数据目录、IPC 信任检查 |
+| `src/preload/index.ts` | `dist/preload/index.cjs` | 沙箱桥；仅暴露应用命令和状态订阅 |
+| `src/runtime/index.ts` | `dist/main/runtime.js` | Electron utilityProcess 入口，拥有应用服务与数据库 |
+| `src/renderer/main.tsx` | `dist/renderer/` | React 组合与工作台视图 |
+
+main 与 runtime 使用 ESM；preload 使用独立 CJS bundle，第三方校验代码内联，适配 sandbox。运行时与主进程是同一 main 构建的两个入口，共享构建块保留相对路径。Forge 只打包 `dist/`、清单和生产依赖，不叠加 Vite 插件。包默认 ASAR，数据始终写到包外。
+
+应用只接受同一窗口主 frame 的命令；禁止 renderer 任意 Node 调用、窗口跳转、webview 与新窗口。开发版仅为 Fast Refresh 的内联脚本放宽 CSP，发布版脚本只允许自身资源。preload、main、runtime 分别校验边界数据。
+
+正式应用标识为 `dev.dearain.weft`：Forge 配置 `appBundleId`，Windows 设置 AppUserModelID。开发启动仍运行 Electron.app；此标识不决定应用数据库目录。
+
+窗口外观独立于任务运行时：`window-appearance.ts` 配置平台材质、回退和系统偏好监听，`WindowShell` 只摆放内容表面。macOS 使用 vibrancy；Windows 11 22H2+ 使用 Acrylic 与原生窗口控件覆盖；旧版 Windows/Linux 使用实色。preload 额外暴露只读平台标签，不开放窗口通用控制 API。窗口几何由 `src/shared/desktop.ts` 统一；细节见 `docs/design-system.md`。
+
+任务进程启动就绪后才创建窗口。请求带协议版本与关联 ID，只发送一次；超时/退出使在途请求失败，不自动重放。退出时先要求任务进程关闭数据库，再等待退出；超时终止进程。初版关闭最后一个窗口即退出应用。任务进程崩溃后要求重启应用，不把进程重启当作未完成操作的重试。
+
+应用命令与投影契约位于 `src/shared/contracts.ts`，协议版本为 1；它不依赖 Electron、React Flow 或 provider 类型。当前命令只覆盖真实实现的任务、代理、笔记、绑定、视图与历史查询。后续模型执行与资源操作通过运行时服务接入，不能在 renderer 中模拟执行或直写数据库。
+
 ## 建议的核心模块
 
 | 模块 | 外部职责 |
@@ -70,6 +91,18 @@
 - 应用数据位于 Electron `app.getPath('userData')` 的子目录，不写入源码仓库。SQLite 在 `db/`，大内容在 `objects/`，运行日志在 `logs/`，凭据在 `credentials/`。凭据与任务日志、事件记录分离。
 - Chromium 的 cookie、缓存等会话数据使用独立的 `sessionData` 路径，不与应用数据混放。
 - 不把 API key 写入事件或模型请求记录。完整请求留存与保留期限未定，不默认永久保存全部原始内容。
+
+### 应用存储版本 1
+
+`db/weft.sqlite` 使用 WAL、外键与 `PRAGMA user_version` 迁移；发现更高版本时拒绝打开，不静默降级。任务进程是应用数据的单一写入者，主进程单实例锁阻止重复实例。
+
+- `events` 沿用历史内核的只追加记录；创建事件可带 `title`，笔记创建事件可带 `content_ref`。可选字段兼容旧的历史内核记录。
+- `workspace` 保存本地工作区身份与名称；`tasks` 保存任务查询索引。每个新任务创建一个初始分支。
+- `object_views` 保存当前卡片位置、隐藏和折叠状态；`viewports` 保存每个任务当前视口。两者不追加工作事件，也不声称重建历史布局。
+- 应用元数据与相应事件处于同一 SQLite 事务；历史内核用保存点嵌入外层事务。
+- `objects/<sha256>` 保存不可变 UTF-8 正文。先通过临时文件写入、刷新与重命名完成内容，再提交事件引用；文件系统与数据库没有跨介质原子事务，失败可能留下无引用对象。读取校验 hash，丢失或不匹配时报告内容不可用。无引用对象回收与更强的崩溃对账见后续立案。
+
+笔记初版仅支持创建和读取。历史查看读已保存的正文引用，不代入当前内容；笔记不声明状态恢复能力。目录资源、资源修改版本和检查点仍按各自契约实施。开发数据根为 `appData/Weft-development`，`sessionData` 单独放在该根的 `chromium/`。
 
 ## 资源扩展契约
 

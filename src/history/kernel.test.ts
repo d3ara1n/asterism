@@ -1,4 +1,4 @@
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -6,6 +6,7 @@ import { turnBindings } from "./fold.ts";
 import { HistoryKernel, MemoryReality } from "./kernel.ts";
 
 const kernels: HistoryKernel[] = [];
+const temporaryDirectories: string[] = [];
 
 function kernel(): HistoryKernel {
   const instance = HistoryKernel.memory();
@@ -17,11 +18,13 @@ afterEach(() => {
   while (kernels.length > 0) {
     kernels.pop()?.close();
   }
+  for (const directory of temporaryDirectories.splice(0)) rmSync(directory, { recursive: true, force: true });
 });
 
 describe("任务历史骨架", () => {
   it("持久化并重建指定历史位置", () => {
     const dir = mkdtempSync(join(tmpdir(), "weft-history-"));
+    temporaryDirectories.push(dir);
     const path = join(dir, "events.sqlite");
     const first = HistoryKernel.open(path);
     const { branch_id, task_id } = first.createTask();

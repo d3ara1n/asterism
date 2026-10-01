@@ -1,0 +1,135 @@
+@import "tailwindcss";
+
+/* 已确认的织台视觉。颜色、圆角与层级在此维护，业务页面只组合语义样式。 */
+:root {
+  color-scheme: light;
+  --background: #edf1f0;
+  --foreground: #263c36;
+  --card: #ffffff;
+  --primary: #256651;
+  --primary-foreground: #ffffff;
+  --secondary: #e7efeb;
+  --muted-foreground: #60776e;
+  --border: #d3dfd9;
+  --ring: #438c72;
+  --destructive: #8f403d;
+  --canvas-grid: #c4cfca;
+  --selection: #cae5d7;
+  --control-radius: 6px;
+  --surface-radius: 8px;
+  --dialog-radius: 12px;
+  --surface-elevation: 0 3px 16px #29453710;
+  --object-elevation: 0 4px 20px #2945370d;
+  --dialog-elevation: 0 16px 64px #26473920, 0 2px 8px #26473908;
+}
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-ring: var(--ring);
+  --color-destructive: var(--destructive);
+  --font-sans: "Avenir Next", "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --radius-control: var(--control-radius);
+  --radius-surface: var(--surface-radius);
+  --radius-dialog: var(--dialog-radius);
+  --shadow-surface: var(--surface-elevation);
+  --shadow-object: var(--object-elevation);
+  --shadow-dialog: var(--dialog-elevation);
+}
+@layer base {
+  * { box-sizing: border-box; }
+  html, body, #root { height: 100%; background: transparent; }
+  body { @apply m-0 overflow-hidden font-sans text-foreground antialiased; }
+  button, input, textarea, select { font: inherit; }
+  button { cursor: pointer; }
+  button:disabled { cursor: default; }
+  :focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
+  ::selection { background: var(--selection); }
+}
+@layer components {
+  .window-shell {
+    @apply grid h-dvh min-h-0 overflow-hidden text-foreground;
+    grid-template-rows: var(--window-header-height) minmax(0, 1fr);
+    gap: var(--window-gap);
+    padding: var(--window-gutter);
+    /* 没有全窗口底色，间隙直接露出主进程的系统材质或实色回退。 */
+    -webkit-app-region: drag;
+    app-region: drag;
+  }
+  .window-shell * {
+    /* Electron 44 中区域属性会继承。必须用 CSS-wide initial 清除区域贡献；
+       显式 none 也会按历史兼容规则生成 no-drag，不能用它重置后代。 */
+    window-drag: initial;
+  }
+  .window-header {
+    @apply relative z-10 flex min-w-0 items-stretch justify-between;
+    gap: var(--window-gap);
+    user-select: none;
+  }
+  .window-part {
+    @apply flex min-w-0 items-center rounded-surface bg-card px-1 shadow-surface ring-1 ring-foreground/5;
+    -webkit-app-region: no-drag;
+    app-region: no-drag;
+  }
+  .window-navigation { @apply gap-0.5; }
+  .window-task-title {
+    @apply min-w-0 max-w-52 truncate px-1.5 text-sm;
+  }
+  .window-actions { @apply shrink-0 gap-0.5; }
+  .window-shell[data-platform="darwin"] .window-navigation {
+    /* 按原生控件占用区域避让；首帧尚未提供环境变量时使用最小预留。 */
+    padding-inline-start: max(var(--mac-controls-width), calc(env(titlebar-area-x, 0px) - var(--window-gutter)));
+  }
+  .window-shell[data-platform="win32"] .window-header {
+    /* 覆盖区域由系统提供，回退宽度仅用于环境变量尚未就绪的首帧。 */
+    padding-inline-end: clamp(0px, calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, calc(100vw - 138px)) - var(--window-gutter)), 180px);
+  }
+  .workbench-surface {
+    @apply relative isolate min-h-0 min-w-0 overflow-hidden rounded-surface bg-background shadow-surface ring-1 ring-foreground/5;
+    -webkit-app-region: no-drag;
+    app-region: no-drag;
+  }
+  .skip-link {
+    @apply sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-20 focus:z-30 focus:rounded-control focus:bg-card focus:p-3;
+    -webkit-app-region: no-drag;
+    app-region: no-drag;
+  }
+  .dialog-overlay, .dialog-content {
+    /* Portal 位于 shell 外，模态层需要显式排除其下方的底座拖动区域。 */
+    -webkit-app-region: no-drag;
+    app-region: no-drag;
+  }
+  .dialog-content * {
+    window-drag: initial;
+  }
+  .floating-bar { @apply rounded-surface bg-card p-1 shadow-surface ring-1 ring-foreground/5; }
+  .floating-panel { @apply overflow-hidden rounded-surface bg-card shadow-dialog ring-1 ring-foreground/5; }
+  .object-card { @apply w-[340px] overflow-hidden rounded-surface bg-card shadow-object ring-1 ring-foreground/10; }
+  .object-card-selected { @apply ring-2 ring-primary/60; }
+  .object-symbol { @apply flex size-7 shrink-0 items-center justify-center rounded-control text-lg; }
+  .field { @apply block w-full rounded-control border border-border bg-background/30 px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-ring; }
+  .list-item { @apply flex w-full items-center gap-2 rounded-control px-2 py-1.5 text-left text-sm hover:bg-secondary/60; }
+  .empty-workbench {
+    @apply flex h-full items-center justify-center px-6;
+    background-image: radial-gradient(var(--canvas-grid) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+}
+.react-flow__attribution { background: transparent !important; font-size: 9px !important; }
+.react-flow__controls { bottom: 16px !important; margin: 8px !important; box-shadow: var(--surface-elevation) !important; overflow: hidden; border-radius: var(--control-radius); }
+.react-flow__controls-button { background: var(--card) !important; border-color: var(--border) !important; fill: var(--foreground) !important; }
+.react-flow__edge-text { fill: var(--muted-foreground); font-family: var(--font-sans); font-size: 10px; }
+.react-flow__edge-textbg { fill: var(--background); }
+.react-flow__handle { width: 7px; height: 7px; background: var(--primary); border: 2px solid var(--card); }
+@media (max-width: 1100px) {
+  .toolbar-translation { display: none; }
+  .window-task-title { max-width: 160px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation: none !important; transition: none !important; }
+}
