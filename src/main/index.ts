@@ -6,12 +6,15 @@ import { commandChannel, commandSchema, statusChannel, type CommandResult } from
 import { RuntimeHost } from "./runtime-host.ts";
 import { applicationId } from "../shared/desktop.ts";
 import { followWindowAppearance, initialWindowAppearance } from "./window-appearance.ts";
+import { configurationChannel, configurationChangedChannel, configurationCommandSchema, type ConfigurationResult } from "../shared/configuration.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 let window: BrowserWindow | null = null;
 let quitting = false;
 const runtime = new RuntimeHost(status => {
   if (window && !window.isDestroyed()) window.webContents.send(statusChannel, status);
+}, () => {
+  if (window && !window.isDestroyed()) window.webContents.send(configurationChangedChannel);
 });
 
 function createWindow(): void {
@@ -34,6 +37,7 @@ function createWindow(): void {
   current.webContents.on("will-navigate", event => event.preventDefault());
   current.webContents.on("will-attach-webview", event => event.preventDefault());
   ipcMain.removeHandler(commandChannel);
+  ipcMain.removeHandler(configurationChannel);
   ipcMain.handle(commandChannel, async (event, raw): Promise<CommandResult> => {
     if (event.sender !== current.webContents || event.senderFrame !== current.webContents.mainFrame ||
       event.senderFrame.url !== allowedURL) {
@@ -43,7 +47,18 @@ function createWindow(): void {
     if (!parsed.success) return { ok: false, error: { code: "invalid_request", message: "Invalid application command." } };
     return runtime.execute(parsed.data);
   });
-  current.on("closed", () => { window = null; ipcMain.removeHandler(commandChannel); });
+  ipcMain.handle(configurationChannel, async (event, raw): Promise<ConfigurationResult> => {
+    if (event.sender !== current.webContents || event.senderFrame !== current.webContents.mainFrame ||
+      event.senderFrame.url !== allowedURL) {
+      return { ok: false, error: { code: "invalid_request", message: "Untrusted application frame." } };
+    }
+    const parsed = configurationCommandSchema.safeParse(raw);
+    if (!parsed.success) return { ok: false, error: { code: "invalid_request", message: "Invalid configuration command." } };
+    return runtime.configure(parsed.data);
+  });
+  current.on("closed", () => {
+    window = null; ipcMain.removeHandler(commandChannel); ipcMain.removeHandler(configurationChannel);
+  });
   const loading = developmentURL ? current.loadURL(developmentURL) : current.loadFile(rendererFile);
   loading.catch(error => { console.error("Renderer initialization failed.", error); dialog.showErrorBox("Weft", "The application window could not be loaded."); });
 }

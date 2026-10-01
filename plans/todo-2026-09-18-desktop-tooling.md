@@ -30,7 +30,7 @@
 - `npm run package`、`npm run make` 已成功生成本机未签名应用与 ZIP；未启动 GUI。
 - 已完成类型检查、15 个历史/应用/请求生命周期测试。Tailwind 与 React Flow 样式已进入 renderer 产物。
 - 待用户确认：开发启动与热更新、打包应用打开工作区、关闭/重启、真实 utilityProcess 中的 SQLite，以及 Windows/Linux 的构建与交互。
-- Monaco、模型 SDK 与 MCP SDK 尚未接入，不宣称兼容验证完成；跟踪 `todo-2026-10-01-runtime-capabilities.md`。
+- 模型 SDK 已用于三种协议连接测试，类型检查与构建通过，真实端点及打包后调用待用户验收；Monaco 与 MCP SDK 尚未接入。跟踪 `todo-2026-10-01-runtime-capabilities.md`。
 
 ## 参考
 

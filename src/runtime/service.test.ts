@@ -24,6 +24,25 @@ afterEach(() => {
 const position = { x: -40, y: 120 };
 
 describe("应用持久化与历史边界", () => {
+  it("启动只读取列表，显式选择任务才读取正文；无任务时不能读取历史位置", () => {
+    const { service, root } = open();
+    const task = service.execute({ type: "task.create", title: "Saved conversation" }).task!;
+    service.execute({ type: "note.create", task_id: task.id, title: "Note", content: "Saved", position });
+    const event = service.history.eventsOn(task.branch_id).find(e => e.type === "resource_created")!;
+    if (event.type !== "resource_created") throw new Error("Expected a resource event.");
+    // 正文不可读也不应妨碍启动或显示侧栏；只有打开此任务才触及它。
+    const contentPath = join(root, "objects", event.payload.content_ref!);
+    rmSync(contentPath);
+    mkdirSync(contentPath);
+    const count = service.history.eventCount();
+    const home = service.execute({ type: "workspace.read" });
+    expect(home.tasks.map(item => item.id)).toEqual([task.id]);
+    expect(home.task).toBeNull();
+    expect(() => service.execute({ type: "workspace.read", task_id: task.id })).toThrow();
+    expect(() => service.execute({ type: "workspace.read", at_seq: 1 })).toThrow("History requires a task");
+    expect(service.history.eventCount()).toBe(count);
+  });
+
   it("空工作区不生成示例；重开后读取任务、笔记内容、绑定与视图", () => {
     const { service, root } = open();
     expect(service.execute({ type: "workspace.read" }).tasks).toEqual([]);

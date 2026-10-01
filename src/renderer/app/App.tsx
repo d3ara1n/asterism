@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { ArrowLeft, ChevronDown, FileText, History, KeyRound, LayoutList, ListTree, Plus, Settings, X } from "lucide-react";
+import { ArrowLeft, ChevronDown, FileText, History, House, KeyRound, ListTree, PanelLeft, Settings, X } from "lucide-react";
 import type { Command } from "../../shared/contracts";
 import type { ApplicationController } from "./controller";
 import { t } from "../shared/i18n";
@@ -10,119 +10,150 @@ import { PageState } from "../shared/ui/page-state";
 import { Workbench } from "../features/workbench/Workbench";
 import { AccessDialog } from "../features/workbench/AccessDialog";
 import { SidePanel, type PanelKind } from "../features/workbench/SidePanel";
+import { CreateNoteDialog, type NoteCreation } from "../features/workbench/CreateNoteDialog";
 import { SettingsPage } from "../features/settings/SettingsPage";
+import { HomePage } from "../features/home/HomePage";
 import { placeObject } from "../features/workbench/placement";
-import { CreateDialog, type Creation } from "./CreateDialog";
 import { Titlebar, Window } from "./Window";
+import { Sidebar } from "./Sidebar";
 import { Space } from "../shared/weave/Space";
+import { Screen, type IslandSpec } from "../shared/weave/Screen";
 
-/** 页面带站点，自左向右：应用级（浅）→ 工作台（原点）。更深的任务内容日后在右侧追加。 */
-type PageId = "settings" | "workbench";
+/** 主屏包含侧栏与首页/工作台；设置为左侧独立屏，切换时主屏整体平移。 */
+type MainView = { kind: "home" } | { kind: "conversation"; taskId: string };
+type PageId = "settings" | "main";
 
 export function App({ controller }: { controller: ApplicationController }) {
   const state = useSyncExternalStore(controller.subscribe, controller.getSnapshot);
   const workbenchRef = useRef<HTMLDivElement>(null);
   const returnFocus = useRef<HTMLElement | null>(null);
-  const [page, setPage] = useState<PageId>("workbench");
+  const sidebarToggle = useRef<HTMLButtonElement>(null);
+  const [page, setPage] = useState<PageId>("main");
+  const [view, setView] = useState<MainView>({ kind: "home" });
+  const [sidebarVisible, setSidebarVisible] = useState(true);
+  const [draft, setDraft] = useState("");
   const [panel, setPanel] = useState<PanelKind | null>(null);
-  const [creation, setCreation] = useState<Creation | null>(null);
+  const [creation, setCreation] = useState<NoteCreation | null>(null);
   const [accessOpen, setAccessOpen] = useState(false);
   const run = useCallback((command: Command) => controller.run(command), [controller]);
   useEffect(() => controller.connect(), [controller]);
   const snapshot = state.snapshot;
-  const task = snapshot?.task;
+  // 晚到响应不能把首页或另一个会话替换为旧工作台。
+  const task = view.kind === "conversation" && snapshot?.task?.id === view.taskId ? snapshot.task : null;
   const ready = state.status === "ready";
-  const writable = ready && !state.busy && !task?.historical;
+  const writable = ready && !state.busy && !!task && !task.historical;
   const inSettings = page === "settings";
+  const mainTitle = view.kind === "home" ? t.home : task?.title ?? t.conversation;
 
-  // 页面切换后焦点移到新页面；返回工作台时归还到进入前的位置。
+  const focusMain = () => requestAnimationFrame(() => document.getElementById("screen-main")?.focus({ preventScroll: true }));
   const go = (next: PageId) => {
     if (next === page) return;
-    if (next !== "workbench") returnFocus.current = document.activeElement as HTMLElement | null;
+    if (next === "settings") returnFocus.current = document.activeElement as HTMLElement | null;
     setPage(next);
     requestAnimationFrame(() => {
-      if (next === "workbench" && returnFocus.current?.isConnected) returnFocus.current.focus({ preventScroll: true });
+      if (next === "main" && returnFocus.current?.isConnected) returnFocus.current.focus({ preventScroll: true });
       else document.getElementById(`screen-${next}`)?.focus({ preventScroll: true });
     });
   };
   useEffect(() => {
     if (!inSettings) return;
-    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape" && !event.defaultPrevented) go("workbench"); };
+    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape" && !event.defaultPrevented) go("main"); };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   });
-
-  const add = (kind: "agent" | "note") => {
+  const navigate = (next: MainView) => {
+    setView(next); setPage("main"); setPanel(null); setCreation(null); setAccessOpen(false);
+    controller.clearError();
+    focusMain();
+  };
+  const goHome = () => {
+    navigate({ kind: "home" });
+    // 清除已打开的正文，只保留列表；队列也保证在途读取之后最终回到无任务状态。
+    if (ready || state.busy) void run({ type: "workspace.read" });
+  };
+  const openTask = (taskId: string) => {
+    navigate({ kind: "conversation", taskId });
+    void run({ type: "workspace.read", task_id: taskId });
+  };
+  const addNote = () => {
     const bounds = workbenchRef.current?.getBoundingClientRect();
-    if (!task || !bounds) return;
-    setCreation({ kind, taskId: task.id, position: placeObject(task, bounds.width, bounds.height) });
+    if (task && bounds) setCreation({ taskId: task.id, position: placeObject(task, bounds.width, bounds.height) });
   };
   const togglePanel = (kind: PanelKind) => setPanel(panel === kind ? null : kind);
+  const hideSidebar = () => {
+    setSidebarVisible(false);
+    requestAnimationFrame(() => sidebarToggle.current?.focus({ preventScroll: true }));
+  };
 
-  const navigation = inSettings ? <>
-    <Button variant="ghost" size="sm" onClick={() => go("workbench")}><ArrowLeft />{t.backToWorkbench}</Button>
+  const navigation = <>
+    {!inSettings && <IconButton ref={sidebarToggle} label={sidebarVisible ? t.hideSidebar : t.showSidebar}
+      aria-expanded={sidebarVisible} aria-controls={sidebarVisible ? "app-sidebar" : undefined}
+      onClick={() => setSidebarVisible(visible => !visible)}><PanelLeft /></IconButton>}
+    {inSettings ? <Button variant="ghost" size="sm" onClick={() => go("main")}><ArrowLeft />{t.back}</Button> :
+      <Menu trigger={<Button variant="ghost" size="sm" aria-label={t.menu}>
+        <WeftMark className="size-4 text-primary" /><span className="text-sm font-semibold text-primary">{t.appName}</span><ChevronDown className="text-muted-foreground" />
+      </Button>}>
+        <MenuItem onSelect={goHome}><House />{t.home}</MenuItem>
+        <MenuSeparator />
+        <MenuItem onSelect={() => go("settings")}><Settings />{t.menuSettings}</MenuItem>
+      </Menu>}
     <span className="h-4 w-px shrink-0 bg-border" />
-    <span className="window-task-title font-medium">{t.settings}</span>
-  </> : <>
-    <Menu trigger={<Button variant="ghost" size="sm" aria-label={t.menu}>
-      <WeftMark className="size-4 text-primary" /><span className="text-sm font-semibold text-primary">{t.appName}</span><ChevronDown className="text-muted-foreground" />
-    </Button>}>
-      <MenuItem disabled={!snapshot} onSelect={() => setPanel("tasks")}><LayoutList />{t.menuTasks}</MenuItem>
-      <MenuItem disabled={!ready || state.busy} onSelect={() => setCreation({ kind: "task" })}><Plus />{t.newTask}</MenuItem>
-      <MenuSeparator />
-      <MenuItem onSelect={() => go("settings")}><Settings />{t.menuSettings}</MenuItem>
-    </Menu>
-    <span className="h-4 w-px shrink-0 bg-border" />
-    <span className="window-task-title" title={task?.title}>{task?.title ?? t.workspace}</span>
-    {task && <Button size="sm" variant="ghost" onClick={() => togglePanel("history")} aria-expanded={panel === "history"}><History />{t.history}</Button>}
+    <span className="window-task-title" title={inSettings ? t.settings : mainTitle}>{inSettings ? t.settings : mainTitle}</span>
+    {!inSettings && task && <Button size="sm" variant="ghost" onClick={() => togglePanel("history")} aria-expanded={panel === "history"}><History />{t.history}</Button>}
   </>;
-
   const actions = task ? <>
-    <Button variant="ghost" size="sm" disabled={!writable} onClick={() => add("agent")} aria-label={t.addAgentLabel}><Plus /><span className="toolbar-label">{t.addAgent}</span></Button>
-    <Button variant="ghost" size="sm" disabled={!writable} onClick={() => add("note")} aria-label={t.addNoteLabel}><FileText /><span className="toolbar-label">{t.addNote}</span></Button>
+    <Button variant="ghost" size="sm" disabled={!writable} onClick={addNote} aria-label={t.addNoteLabel}><FileText /><span className="toolbar-label">{t.addNote}</span></Button>
     <Button variant="ghost" size="sm" disabled={!writable} onClick={() => setAccessOpen(true)} aria-label={t.accessLabel}><KeyRound /><span className="toolbar-label">{t.access}</span></Button>
     <Button variant="ghost" size="sm" onClick={() => togglePanel("objects")} aria-expanded={panel === "objects"} aria-label={t.objects}><ListTree /><span className="toolbar-label">{t.objects}</span></Button>
-  </> : <Button variant="ghost" size="sm" disabled={!writable} onClick={() => setCreation({ kind: "task" })}><Plus />{t.newTask}</Button>;
+  </> : undefined;
 
-  const workbench = <div ref={workbenchRef} className="overlay-inset relative h-full">
-    {task ? <Workbench key={task.id + ":" + (task.historical ? task.at_seq : "live")} task={task} run={run} /> : <div className="empty-workbench">
-      {snapshot ? <div className="max-w-md text-center">
-        <h1 className="type-page">{t.emptyTitle}</h1>
-        <p className="type-caption mt-2">{t.emptyBody}</p>
-        <Button className="mt-6" disabled={!writable} onClick={() => setCreation({ kind: "task" })}><Plus />{t.newTask}</Button>
-      </div> : <PageState kind={state.status === "unavailable" ? "error" : "loading"}
-        title={state.status === "unavailable" ? t.unavailableTitle : t.openingTitle}
-        body={state.status === "unavailable" ? t.unavailableBody : t.openingBody} />}
-    </div>}
+  const workbench = <div ref={workbenchRef} className="overlay-inset relative h-full overflow-hidden rounded-surface bg-background">
+    {task ? <Workbench key={task.id + ":" + (task.historical ? task.at_seq : "live")} task={task} run={run} /> :
+      <div className="flex h-full items-center justify-center px-6"><div>
+        <PageState kind={state.busy ? "loading" : "error"} title={state.busy ? t.openingTitle : t.unavailableTitle}
+          body={state.busy ? t.openingBody : t.unavailableBody} />
+        {!state.busy && view.kind === "conversation" && <div className="mt-4 text-center">
+          <Button variant="secondary" onClick={() => openTask(view.taskId)} disabled={!ready}>{t.retry}</Button>
+        </div>}
+      </div></div>}
     {task && task.objects.length === 0 && <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-      <div className="max-w-sm text-center">
-        <h1 className="type-page">{task.title}</h1>
-        <p className="type-caption mt-2">{task.historical ? t.noObjectsHistorical : t.noObjects}</p>
-      </div>
+      <p className="type-caption">{task.historical ? t.noObjectsHistorical : t.noObjects}</p>
     </div>}
-    {panel && <SidePanel panel={panel} snapshot={snapshot} busy={state.busy} ready={ready} writable={writable} run={run}
-      onClose={() => setPanel(null)} onNewTask={() => setCreation({ kind: "task" })} />}
+    {panel && task && <SidePanel panel={panel} snapshot={snapshot} busy={state.busy} writable={writable} run={run} onClose={() => setPanel(null)} />}
     {task?.historical && <div className="floating-bar absolute bottom-[var(--overlay-inset)] left-1/2 z-10 flex -translate-x-1/2 items-center gap-3 whitespace-nowrap pl-3 text-sm">
       <span>{t.viewingHistory}</span>
       <Button size="sm" disabled={state.busy} onClick={() => { void run({ type: "workspace.read", task_id: task.id }); }}>{t.backToLive}</Button>
     </div>}
-    <span role="status" className="status-chip absolute left-[var(--overlay-inset)] top-[var(--overlay-inset)] z-10" data-hidden={!!panel || undefined}>
+    {task && <span role="status" className="status-chip absolute left-[var(--overlay-inset)] top-[var(--overlay-inset)] z-10" data-hidden={!!panel || undefined}>
       {state.busy ? t.statusBusy : ready ? t.statusReady : t.statusUnavailable}
-    </span>
+    </span>}
   </div>;
+  const sidebar: IslandSpec = {
+    id: "navigation", label: t.appNavigation, width: { min: 224, max: 224 },
+    render: () => <Sidebar snapshot={snapshot} status={state.status} busy={state.busy}
+      selectedTaskId={view.kind === "conversation" ? view.taskId : null}
+      homeActive={view.kind === "home"}
+      onHome={goHome} onTask={openTask} onSettings={() => go("settings")} onHide={hideSidebar}
+      onRetry={() => { void run({ type: "workspace.read" }); }} />,
+  };
+  const main: IslandSpec = {
+    id: "main-view", label: mainTitle, width: { min: 440, grow: 1 }, surface: view.kind === "conversation",
+    render: () => view.kind === "home" ? <HomePage active={!inSettings} draft={draft} onDraftChange={setDraft} onSettings={() => go("settings")} /> : workbench,
+  };
 
   return <>
     <Window skipTarget={`screen-${page}`} titlebar={<Titlebar navigation={navigation} actions={actions} actionsHidden={inSettings} />}>
       <Space active={page} screens={[
         { id: "settings", label: t.settings, surface: false, content: <SettingsPage active={inSettings} /> },
-        { id: "workbench", label: t.workbench, content: workbench },
+        { id: "main", label: mainTitle, surface: false,
+          content: <Screen label={t.appNavigation} leading={sidebarVisible ? [sidebar] : []} root={main} className="h-full" /> },
       ]} />
     </Window>
     {state.error && <div role="alert" className="notice notice-error fixed bottom-4 left-1/2 z-[60] w-[min(560px,calc(100%-32px))] -translate-x-1/2">
       <p className="flex-1">{state.error}</p>
       <IconButton label={t.dismissError} onClick={controller.clearError}><X /></IconButton>
     </div>}
-    {creation && <CreateDialog creation={creation} busy={state.busy} run={run} onClose={() => setCreation(null)} />}
+    {creation && <CreateNoteDialog creation={creation} busy={state.busy} run={run} onClose={() => setCreation(null)} />}
     {accessOpen && task && <AccessDialog task={task} busy={state.busy} run={run} onClose={() => setAccessOpen(false)} />}
   </>;
 }

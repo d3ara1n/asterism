@@ -2,13 +2,17 @@ import { utilityProcess, type UtilityProcess } from "electron";
 import { createWriteStream, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { runtimeMessageSchema, type Command, type CommandResult, type RuntimeStatus } from "../shared/contracts.ts";
-import { RuntimeRequests } from "./requests.ts";
+import { ConfigurationRequests, RuntimeRequests } from "./requests.ts";
+import { configurationChangedSchema, configurationResponseSchema, type ConfigurationCommand, type ConfigurationResult } from "../shared/configuration.ts";
+import { secretRequestSchema } from "../shared/secrets.ts";
+import { handleSecretRequest } from "./secrets.ts";
 
 export class RuntimeHost {
   private child: UtilityProcess | null = null;
   private requests: RuntimeRequests | null = null;
+  private configurationRequests: ConfigurationRequests | null = null;
   private status: RuntimeStatus = "starting";
-  constructor(private readonly onStatus: (status: RuntimeStatus) => void) {}
+  constructor(private readonly onStatus: (status: RuntimeStatus) => void, private readonly onConfigurationChanged: () => void = () => {}) {}
   private setStatus(status: RuntimeStatus): void { this.status = status; this.onStatus(status); }
 
   start(entry: string, root: string): Promise<void> {
@@ -31,10 +35,15 @@ export class RuntimeHost {
       this.setStatus("unavailable");
       child.kill();
     });
+    this.configurationRequests = new ConfigurationRequests(message => child.postMessage(message), () => {
+      this.setStatus("unavailable");
+      child.kill();
+    });
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
         this.setStatus("unavailable");
         this.requests?.close();
+        this.configurationRequests?.close();
         child.kill();
         reject(new Error("Task runtime initialization timed out."));
       }, 15_000);
@@ -42,11 +51,22 @@ export class RuntimeHost {
         clearTimeout(timeout);
         console.error("Task runtime encountered a fatal process error.");
         this.requests?.close();
+        this.configurationRequests?.close();
         this.setStatus("unavailable");
         child.kill();
         reject(new Error("Task runtime encountered a fatal process error."));
       });
       child.on("message", raw => {
+        if (secretRequestSchema.safeParse(raw).success) {
+          void handleSecretRequest(raw).then(response => {
+            if (response && this.child === child && this.status !== "stopping") {
+              try { child.postMessage(response); } catch { /* 子进程可能已退出；不记录凭据消息。 */ }
+            }
+          });
+          return;
+        }
+        if (configurationChangedSchema.safeParse(raw).success) { this.onConfigurationChanged(); return; }
+        if (configurationResponseSchema.safeParse(raw).success) { this.configurationRequests?.receive(raw); return; }
         const parsed = runtimeMessageSchema.safeParse(raw);
         if (!parsed.success) return;
         if (parsed.data.kind === "ready") {
@@ -58,6 +78,7 @@ export class RuntimeHost {
           clearTimeout(timeout);
           this.setStatus("unavailable");
           this.requests?.close();
+          this.configurationRequests?.close();
           child.kill();
           reject(new Error(parsed.data.message));
         } else this.requests?.receive(raw);
@@ -67,6 +88,7 @@ export class RuntimeHost {
         log.end();
         this.child = null;
         this.requests?.close();
+        this.configurationRequests?.close();
         if (this.status !== "stopping") this.setStatus("unavailable");
         reject(new Error("Task runtime exited with code " + code));
       });
@@ -80,9 +102,17 @@ export class RuntimeHost {
     return this.requests.execute(command);
   }
 
+  configure(command: ConfigurationCommand): Promise<ConfigurationResult> {
+    if (this.status !== "ready" || !this.configurationRequests) return Promise.resolve({
+      ok: false, error: { code: "unavailable", message: "Configuration service is unavailable. Restart Weft." },
+    });
+    return this.configurationRequests.execute(command);
+  }
+
   stop(): Promise<void> {
     this.setStatus("stopping");
     this.requests?.close("Weft is shutting down.");
+    this.configurationRequests?.close("Weft is shutting down.");
     const child = this.child;
     if (!child) return Promise.resolve();
     return new Promise(resolve => {

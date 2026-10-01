@@ -4,6 +4,8 @@ import { HistoryKernel } from "../history/kernel.ts";
 import type { StoredEvent } from "../history/schema.ts";
 import { commandSchema, snapshotSchema, type Command, type AppSnapshot, type AppError, type Point, type Viewport, type WorkbenchObject } from "../shared/contracts.ts";
 import { ObjectStore, openDatabase } from "./storage.ts";
+import { ConfigurationService } from "../configuration/service.ts";
+import type { SecretProtector } from "../shared/secrets.ts";
 
 export class ApplicationError extends Error {
   constructor(readonly code: AppError["code"], message: string) { super(message); }
@@ -14,16 +16,21 @@ type ViewRow = { object_id: string; x: number; y: number; hidden: number; collap
 /** 唯一应用命令入口；不依赖 Electron、React 或画布类型。 */
 export class ApplicationService {
   readonly history: HistoryKernel;
+  readonly configuration: ConfigurationService;
   private readonly db: DatabaseSync;
   private readonly objects: ObjectStore;
-  constructor(root: string) {
+  constructor(root: string, options: { protector?: SecretProtector; onConfigurationChanged?: () => void } = {}) {
     this.db = openDatabase(root);
     try {
       this.history = new HistoryKernel(this.db);
       this.objects = new ObjectStore(join(root, "objects"));
+      const unavailable = async (): Promise<string> => { throw new Error("System credential protection is unavailable."); };
+      this.configuration = new ConfigurationService(this.db, root, options.protector ?? {
+        available: async () => false, encrypt: unavailable, decrypt: unavailable,
+      }, options.onConfigurationChanged);
     } catch (error) { this.db.close(); throw error; }
   }
-  close(): void { this.history.close(); }
+  close(): void { this.configuration.close(); this.history.close(); }
 
   execute(raw: unknown): AppSnapshot {
     const parsed = commandSchema.safeParse(raw);
@@ -117,8 +124,9 @@ export class ApplicationService {
   private snapshot(taskId?: string, atSeq?: number): AppSnapshot {
     const tasks = this.db.prepare("SELECT * FROM tasks ORDER BY created_at, id").all() as TaskRow[];
     const workspace = this.db.prepare("SELECT * FROM workspace LIMIT 1").get() as { id: string; title: string };
-    const result: AppSnapshot = { workspace, tasks, task: null, execution: { available: false, reason: "provider_not_configured" } };
-    const selectedId = taskId ?? tasks[0]?.id;
+    const result: AppSnapshot = { workspace, tasks, task: null, execution: { available: false, reason: "execution_not_connected" } };
+    // 未指定任务时只返回列表摘要；启动和首页均不读取任何会话正文。
+    const selectedId = taskId;
     if (!selectedId) {
       if (atSeq !== undefined) throw new ApplicationError("invalid_request", "History requires a task.");
       return result;

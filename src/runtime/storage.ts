@@ -9,7 +9,7 @@ export function openDatabase(root: string): DatabaseSync {
   try {
     db.exec("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;");
     const version = (db.prepare("PRAGMA user_version").get() as { user_version: number }).user_version;
-    if (version > 1) throw new Error("This workspace requires a newer version of Weft.");
+    if (version > 2) throw new Error("This workspace requires a newer version of Weft.");
     if (version < 1) {
       db.exec(`BEGIN IMMEDIATE;
         CREATE TABLE workspace (id TEXT PRIMARY KEY, title TEXT NOT NULL);
@@ -21,6 +21,18 @@ export function openDatabase(root: string): DatabaseSync {
         );
         CREATE TABLE viewports (task_id TEXT PRIMARY KEY REFERENCES tasks(id), x REAL NOT NULL, y REAL NOT NULL, zoom REAL NOT NULL);
         PRAGMA user_version = 1;
+        COMMIT;`);
+    }
+    if (version < 2) {
+      db.exec(`BEGIN IMMEDIATE;
+        CREATE TABLE configuration_items (
+          kind TEXT NOT NULL CHECK (kind IN ('provider', 'model', 'role', 'agent')),
+          id TEXT NOT NULL, revision INTEGER NOT NULL CHECK (revision > 0),
+          data_json TEXT NOT NULL, builtin INTEGER NOT NULL DEFAULT 0 CHECK (builtin IN (0, 1)),
+          credential_ref TEXT, PRIMARY KEY (kind, id)
+        ) STRICT;
+        CREATE TABLE configuration_state (id INTEGER PRIMARY KEY CHECK (id = 1)) STRICT;
+        PRAGMA user_version = 2;
         COMMIT;`);
     }
     if (!db.prepare("SELECT id FROM workspace LIMIT 1").get()) {

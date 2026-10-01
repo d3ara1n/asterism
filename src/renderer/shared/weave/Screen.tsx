@@ -37,18 +37,24 @@ export function useIsland(): IslandApi {
 
 
 /**
- * 一屏：根浮岛固定，更深的浮岛由 open/close 管理。
+ * 一屏：可声明位于根浮岛左侧的受控浮岛；根右侧更深的浮岛由 open/close 管理。
  * 所有 min 放得下时按 grow 分配并居中、不平移；放不下时退到 min，视口跟随焦点。
  */
-export function Screen({ label, root, className, resetKey }: { label: string; root: IslandSpec; className?: string; /** 变化时关闭全部更深浮岛。 */ resetKey?: string }) {
+export function Screen({ label, root, leading, className, resetKey }: {
+  label: string; root: IslandSpec; leading?: IslandSpec[]; className?: string;
+  /** 变化时关闭全部更深浮岛。 */ resetKey?: string;
+}) {
   const viewport = useRef<HTMLDivElement>(null);
   const [deeper, setDeeper] = useState<IslandSpec[]>([]);
   const [focus, setFocus] = useState(root.id);
   const [width, setWidth] = useState(0);
   const [offset, setOffset] = useState(0);
-  const islands = useMemo(() => [root, ...deeper], [root, deeper]);
+  const islands = useMemo(() => [...(leading ?? []), root, ...deeper], [leading, root, deeper]);
   const gap = windowGeometry.gap;
   useEffect(() => { setDeeper([]); setFocus(root.id); }, [resetKey, root.id]);
+  useEffect(() => {
+    if (!islands.some(island => island.id === focus)) setFocus(root.id);
+  }, [islands, focus, root.id]);
 
   useLayoutEffect(() => {
     const element = viewport.current;
@@ -64,15 +70,18 @@ export function Screen({ label, root, className, resetKey }: { label: string; ro
   // 仅溢出时跟随焦点：已可见不动，越界贴边；放得下时不平移。
   useLayoutEffect(() => { setOffset(current => overflow ? follow(spans, focusIndex, width, current) : 0); }, [spans, focusIndex, width, overflow]);
 
-  const state = { islands, focus };
+  // 受控前置浮岛只参与布局与焦点，不参与父子浮岛的打开/关闭。
+  const state = { islands: [root, ...deeper], focus };
   const apply = (next: { islands: { id: string }[]; focus: string }, added?: IslandSpec) => {
     setDeeper(current => next.islands.slice(1).map(slot => added?.id === slot.id ? added : current.find(spec => spec.id === slot.id)!).filter(Boolean));
     setFocus(next.focus);
   };
-  const open = (parent: string, spec: IslandSpec) => apply(openIsland(state, parent, spec), spec);
+  const open = (parent: string, spec: IslandSpec) => {
+    if (state.islands.some(island => island.id === parent)) apply(openIsland(state, parent, spec), spec);
+  };
   // 退场动画由 AnimatePresence 在卸载前完成。
   const close = (id: string) => {
-    const spec = islands.find(item => item.id === id);
+    const spec = deeper.find(item => item.id === id);
     if (!spec || id === root.id) return;
     apply(closeIsland(state, id));
     const target = spec.origin?.isConnected ? spec.origin : null;
@@ -87,7 +96,7 @@ export function Screen({ label, root, className, resetKey }: { label: string; ro
   };
   const onKeyDown = (event: React.KeyboardEvent) => {
     // 最深的屏先处理 Esc：关闭焦点浮岛；只剩根浮岛时交给外层。
-    if (event.key !== "Escape" || event.defaultPrevented || focusIndex === 0) return;
+    if (event.key !== "Escape" || event.defaultPrevented || !deeper.some(island => island.id === focus)) return;
     event.preventDefault(); event.stopPropagation();
     close(focus);
   };

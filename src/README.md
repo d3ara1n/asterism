@@ -2,14 +2,15 @@
 
 这是正式桌面应用，不依赖固定场景或浏览器内存演示。
 
-当前实现重点为 [UI 壳子与设置入口](../plans/todo-2026-10-01-ui-shell-settings.md)。提供商配置与保存方案已确认，待设置壳子完成后按 [模型接入计划](../plans/todo-2026-10-01-model-protocol-storage.md) 实施；下列源码地图仅列已存在模块。
+首页、侧栏与三类真实配置已实现，交互验收见 [首页计划](../plans/todo-2026-10-02-home-navigation.md) 和 [UI 计划](../plans/todo-2026-10-01-ui-shell-settings.md)。提供商保存/测试、模型角色和 agent 配置能力见 `configuration/README.md`；下一步按 [模型接入计划](../plans/todo-2026-10-01-model-protocol-storage.md) 接入首次发送及执行。
 
 | 目录 | 职责 | 依赖方向 |
 | --- | --- | --- |
 | `shared/` | 版本化命令、投影与传输校验 | 仅 Zod，不依赖任何进程或 UI |
 | `main/` | Electron 窗口、单实例锁、数据目录、运行时生命周期、可信 IPC 路由 | shared，不调用数据库 |
 | `preload/` | 沙箱桥，受控命令与状态订阅 | shared，只暴露 `window.weft` |
-| `runtime/` | 应用命令、查询、事务、SQLite 迁移与对象存储 | shared、history、Node 内建 API |
+| `runtime/` | 应用命令、查询、事务、SQLite 迁移、对象存储与私有凭据客户端 | shared、history、configuration、Node 内建 API |
+| `configuration/` | 三类配置、密文凭据、连接测试与默认角色，见目录 README | shared、Node SQLite、模型 SDK；不依赖 Electron |
 | `history/` | 事件存储、轮次与绑定、历史投影 | Node SQLite、Zod；不依赖 renderer |
 | `renderer/` | 应用视图、React Flow、用户意图 | shared、React 与 UI 库；不访问 Node/数据库 |
 
@@ -18,6 +19,8 @@
 `renderer/controller → preload → main/RuntimeHost → utilityProcess → ApplicationService → HistoryKernel / ObjectStore`
 
 每次应用命令先由 Zod 校验，再交运行时单一写入者处理。业务创建、查询索引与初始视图处于同一事务；正文引用只在内容文件成功落盘后进入事件。运行时返回应用投影，UI 将它映射为画布节点和连线。
+
+`workspace.read` 不带 `task_id` 时只返回工作区与会话列表摘要，`task` 为 null；启动与回首页均走此路径。读取具体正文和历史必须显式指定任务。
 
 画布库类型只存在于 renderer。IPC 不提供 SQL、任意路径、通用脚本或动态方法调用。对外工具协议不等于内部应用命令；模型与 MCP 接入时仍需独立资源校验与授权执行层。
 

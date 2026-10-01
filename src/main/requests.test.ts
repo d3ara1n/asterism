@@ -1,8 +1,30 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { RuntimeRequests } from "./requests.ts";
+import { ConfigurationRequests, RuntimeRequests } from "./requests.ts";
 
 afterEach(() => vi.useRealTimers());
 describe("任务进程请求生命周期", () => {
+  it("配置请求使用独立响应类型，不接受工作台响应冒充", async () => {
+    const sent: { id: string }[] = [];
+    const requests = new ConfigurationRequests(message => sent.push(message as { id: string }), () => {});
+    const pending = requests.execute({ type: "read" });
+    const error = { ok: false as const, error: { code: "not_found", message: "Configuration unavailable." } };
+    requests.receive({ kind: "response", version: 1, id: sent[0]!.id, result: error });
+    requests.receive({ kind: "configuration.response", version: 1, id: sent[0]!.id, result: error });
+    expect(await pending).toEqual(error);
+    requests.close();
+  });
+  it("配置保存容纳系统凭据处理，不沿用工作台的 15 秒超时", async () => {
+    vi.useFakeTimers();
+    const sent: { id: string }[] = [];
+    const timeout = vi.fn();
+    const requests = new ConfigurationRequests(message => sent.push(message as { id: string }), timeout);
+    const pending = requests.execute({ type: "read" });
+    await vi.advanceTimersByTimeAsync(20_000);
+    expect(timeout).not.toHaveBeenCalled();
+    requests.receive({ kind: "configuration.response", version: 1, id: sent[0]!.id, result: { ok: false, error: { code: "unavailable", message: "System protection is unavailable." } } });
+    expect((await pending).ok).toBe(false);
+    requests.close();
+  });
   it("按请求身份匹配响应，忽略未知响应", async () => {
     const sent: { id: string }[] = [];
     const requests = new RuntimeRequests(message => sent.push(message as { id: string }), () => {});

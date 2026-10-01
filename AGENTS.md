@@ -1,6 +1,6 @@
 # 织台 Weft 项目规范
 
-以对象为中心的个人 agent 工作台：代理、资源与操作以卡片和连线呈现，任务过程可查看、分叉，资源支持时可恢复。定位与边界见 `docs/product.md`。当前具备 Electron 应用框架、独立任务运行时、历史内核与持久化工作台；应用级设置壳子、模型与真实外部资源操作尚未完成，无 CI。当前工作入口见 `plans/todo-2026-10-01-ui-shell-settings.md`，模型接入的前置与暂缓状态见 `plans/todo-2026-10-01-model-protocol-storage.md`。
+以对象为中心的个人 agent 工作台：代理、资源与操作以卡片和连线呈现，任务过程可查看、分叉，资源支持时可恢复。定位与边界见 `docs/product.md`。首页、侧栏、持久化工作台与三类真实配置已实现，首次发送和模型执行尚未接入，无 CI。能力入口见 `plans/todo-2026-10-01-model-protocol-storage.md`；首页验收见 `plans/todo-2026-10-02-home-navigation.md`，设置验收见 `plans/todo-2026-10-01-ui-shell-settings.md`。
 
 ## 心智模型
 
@@ -14,7 +14,7 @@
 ## 环境
 
 - 实现中：正式入口 `npm run dev`；模块地图见 `src/README.md`，界面维护见 `src/renderer/README.md`。
-- 实现期基线：Electron + React + TypeScript，shadcn/ui（Radix）+ Tailwind CSS 与 @xyflow/react，SQLite（`node:sqlite`）与本地对象存储，Zod，独立 Node.js 任务运行时；包管理器 npm，构建 electron-vite，打包 Electron Forge。模型接入为 Vercel AI SDK，尚未安装。测试以 macOS 为主，发布目标覆盖 macOS、Windows 与 Linux。选型与职责见 `docs/architecture.md`，已安装版本见 `package-lock.json`。
+- 实现期基线：Electron + React + TypeScript，shadcn/ui（Radix）+ Tailwind CSS 与 @xyflow/react，SQLite（`node:sqlite`）与本地对象存储，Zod，独立 Node.js 任务运行时；包管理器 npm，构建 electron-vite，打包 Electron Forge。Vercel AI SDK 已用于三协议连接测试，代理执行待接入。测试以 macOS 为主，发布目标覆盖 macOS、Windows 与 Linux。选型与职责见 `docs/architecture.md`，已安装版本见 `package-lock.json`。
 - 开发数据与发布数据隔离，均使用 Electron 数据目录；测试使用独立临时目录并清理。一次性原型仅留于 `feat/ux-prototype`，正式分支不依赖其代码。
 - 正式应用标识为 `dev.dearain.weft`。UI 视觉以 `docs/design-system.md` 为准：原生材质底座、独立内容表面、统一 token 与公共控件；新功能复用现有风格，整体视觉变更须由用户确认。
 
@@ -34,6 +34,7 @@
 | `docs/glossary.md` | 产品词汇的中英对照与含义 | 随命名与含义同步 |
 | `docs/object-model.md` | Workspace、Task、资源、操作、视图语义 | 最终状态真值 |
 | `docs/runtime.md` | 执行轮次、绑定、工具目录、授权 | 最终状态真值 |
+| `docs/model-configuration.md` | 配置提供商、模型角色、agent 或设计对话模型选择时读取 | 最终状态真值 |
 | `docs/timeline.md` | 事件、检查点、历史查看、分叉、恢复 | 最终状态真值 |
 | `docs/workbench.md` | 卡片、连线、执行段、时间导航 | 最终状态真值 |
 | `docs/design-system.md` | 已确认视觉、平台窗口、主题参数与组件约束 | 随设计决策同步 |

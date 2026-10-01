@@ -177,11 +177,12 @@
     @apply flex w-full items-center gap-2 rounded-control px-2 py-1.5 text-left text-sm hover:bg-secondary/60 disabled:opacity-45;
     transition: background-color var(--motion-fast);
   }
-  .empty-workbench {
-    @apply flex h-full items-center justify-center px-6;
-    background-image: radial-gradient(var(--canvas-grid) 1px, transparent 1px);
-    background-size: 24px 24px;
-  }
+  /* 应用导航与主内容为相邻浮岛；首页只让输入框形成表面，其余透出窗口材质。 */
+  .app-sidebar { @apply flex h-full min-h-0 flex-col p-3; }
+  .app-sidebar .list-item[aria-current="page"] { @apply bg-secondary font-medium; }
+  .home-page { @apply flex h-full overflow-y-auto px-6 py-10; }
+  .home-content { @apply m-auto w-full max-w-2xl shrink-0; }
+  .home-composer { @apply overflow-hidden rounded-dialog bg-card shadow-surface ring-1 ring-surface-ring; }
 
   /* 设置：分类卡片平铺在材质上；选中卡片底板扩展为内容区，其余收缩消失。 */
   /* 浮岛编织：屏内浮岛自左向右；放得下时分栏居中，放不下时溢出并跟随焦点。 */

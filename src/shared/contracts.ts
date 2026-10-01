@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { ConfigurationBridge } from "./configuration.ts";
 import type { DesktopPlatform } from "./desktop.ts";
 
 export const protocolVersion = 1;
@@ -10,6 +11,7 @@ const coordinate = z.number().finite().min(-1_000_000).max(1_000_000);
 export const pointSchema = z.strictObject({ x: coordinate, y: coordinate });
 export const viewportSchema = z.strictObject({ x: coordinate, y: coordinate, zoom: z.number().min(0.1).max(4) });
 export const commandSchema = z.discriminatedUnion("type", [
+  // 不带 task_id 时仅返回工作区与会话列表摘要，不选择或读取任何任务。
   z.strictObject({ type: z.literal("workspace.read"), task_id: id.optional(), at_seq: z.number().int().positive().optional() }),
   z.strictObject({ type: z.literal("task.create"), title }),
   z.strictObject({ type: z.literal("agent.create"), task_id: id, title, position: pointSchema }),
@@ -37,7 +39,7 @@ const taskSchema = z.strictObject({ id, branch_id: id, title: z.string(), create
 export const snapshotSchema = z.strictObject({
   workspace: z.strictObject({ id, title: z.string() }),
   tasks: z.array(taskSchema),
-  execution: z.strictObject({ available: z.literal(false), reason: z.literal("provider_not_configured") }),
+  execution: z.strictObject({ available: z.literal(false), reason: z.literal("execution_not_connected") }),
   task: z.strictObject({
     ...taskSchema.shape,
     head_seq: z.number().int(),
@@ -71,6 +73,7 @@ export const runtimeMessageSchema = z.discriminatedUnion("kind", [
 ]);
 export type RuntimeMessage = z.infer<typeof runtimeMessageSchema>;
 export interface DesktopBridge {
+  configuration: ConfigurationBridge;
   readonly platform: DesktopPlatform;
   execute(command: Command): Promise<CommandResult>;
   onStatus(listener: (status: RuntimeStatus) => void): () => void;
