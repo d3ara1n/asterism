@@ -2,6 +2,8 @@
 
 > 已确认保留当前 UI 风格，后续 agent 不自行更换风格。窗口系统材质与部件布局见 todo-2026-10-01-native-window.md，视觉真值见 docs/design-system.md。
 
+> 当前配合 [UI 壳子与设置入口](todo-2026-10-01-ui-shell-settings.md) 推进，按设置与既有页面的实际需要补齐控件。此计划负责公共组件，应用导航与设置页面承载由壳子计划负责；实施进度与验收随 UI 会话回填。
+
 ## 已有基础
 
 - shadcn/ui + Radix + Tailwind，统一 Button/Dialog。

@@ -19,13 +19,15 @@
 
 ## 后续
 
+- 当前优先补齐 [UI 壳子与设置入口](todo-2026-10-01-ui-shell-settings.md)，完成阶段性界面验收后再接提供商能力。
+
 - 功能接入已独立立案：`todo-2026-10-01-runtime-capabilities.md`，包括 provider、目录 IO、取消与崩溃对账、分叉/恢复、资源版本、编辑器和消息视图。
 - 自动布局、动态端点沿 `todo-2026-09-18-workbench-layout.md` 推进。
 - 签名、分发与 CI 沿 release 立案；本次不提交、不 push、不创建 PR。
 
 ## 交付与待验收
 
-- 框架实现已完成，源码地图见 `src/README.md`；架构、存储版本与界面约定已同步 docs。
+- 工程框架与基础工作台已实现，源码地图见 `src/README.md`；架构、存储版本与界面约定已同步 docs。应用级 UI 壳子尚未完成，Settings 入口与设置页面承载由独立计划跟踪，不能将工程框架完成等同于全部 UI 完成。
 - 已通过 `npm run typecheck`、`npm test`（15 项）、`npm run make`（含构建、macOS arm64 打包与 ZIP），以及 diff 格式检查。
 - 应用包内容已检查：main、runtime、preload、renderer、运行时依赖和第三方许可均应存在；源码和运行数据不进入包。
 - 待用户运行 `npm run dev` 验证窗口、卡片操作、绑定与历史、关闭重开后的持久化；同时检查打包应用能否正常启动。

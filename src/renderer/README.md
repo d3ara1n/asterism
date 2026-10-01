@@ -31,7 +31,11 @@
 
 ## 未接入能力
 
-代理执行、资源编辑、目录 IO、分叉/恢复、自动布局、聚焦阅读与长历史虚拟化均有后续立案。未实现能力不提供假按钮、固定回复或示例状态。具体任务见 `plans/todo-2026-10-01-application-foundation.md`。
+当前优先补齐应用级设置入口、页面承载与公共控件，见 [UI 壳子计划](../../plans/todo-2026-10-01-ui-shell-settings.md) 和 [设计系统待办](../../plans/todo-2026-10-01-ui-design-system.md)。Settings 尚未实现，不将已存在的 WindowShell 等同于完整应用壳子。
+
+提供商配置与连接测试待 UI 前置完成后接入，见 [模型接入计划](../../plans/todo-2026-10-01-model-protocol-storage.md)。设置页面通过能力接口管理配置，不直接使用 provider SDK、数据库或凭据解密能力。未实现能力不提供假按钮、固定回复或示例状态。
+
+代理执行、资源编辑、目录 IO、分叉/恢复、聚焦阅读与长历史虚拟化见 [运行时能力计划](../../plans/todo-2026-10-01-runtime-capabilities.md)，自动布局见 [布局计划](../../plans/todo-2026-09-18-workbench-layout.md)。
 
 ## 验证
 

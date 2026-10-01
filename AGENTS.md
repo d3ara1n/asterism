@@ -1,6 +1,6 @@
 # 织台 Weft 项目规范
 
-以对象为中心的个人 agent 工作台：代理、资源与操作以卡片和连线呈现，任务过程可查看、分叉，资源支持时可恢复。定位与边界见 `docs/product.md`。当前具备 Electron 应用框架、独立任务运行时、历史内核与持久化工作台；模型与真实外部资源操作尚未接入，无 CI。
+以对象为中心的个人 agent 工作台：代理、资源与操作以卡片和连线呈现，任务过程可查看、分叉，资源支持时可恢复。定位与边界见 `docs/product.md`。当前具备 Electron 应用框架、独立任务运行时、历史内核与持久化工作台；应用级设置壳子、模型与真实外部资源操作尚未完成，无 CI。当前工作入口见 `plans/todo-2026-10-01-ui-shell-settings.md`，模型接入的前置与暂缓状态见 `plans/todo-2026-10-01-model-protocol-storage.md`。
 
 ## 心智模型
 
@@ -41,6 +41,7 @@
 | `docs/decisions.md` | 已定原则、初版取舍、开放问题 | 最终状态真值，演进看 git log |
 | `docs/roadmap.md` | 实现顺序与验收场景 | 随实施推进更新 |
 | `docs/mcp-caching.md` | MCP 延迟加载与提示缓存调研 | 时点固化，接入时重新核验 |
+| `docs/agent-transcript-research.md` | 开源项目的模型适配、对话记录与执行分工 | 源码事实按提交固化；织台决策以设计文档为准 |
 | `plans/` | 立案任务 | 见下方 plans 纪律 |
 
 ## plans 纪律
