@@ -52,7 +52,7 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --font-sans: "Avenir Next", "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-sans: system-ui, -apple-system, "Segoe UI Variable Text", "Segoe UI", "PingFang SC", "Microsoft YaHei UI", "Noto Sans CJK SC", sans-serif;
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -173,14 +173,9 @@
     @apply grid gap-3;
     grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   }
-  .settings-card {
-    @apply surface flex flex-col items-start gap-3 p-4 text-left hover:bg-accent;
-    transition: background-color var(--motion-fast);
-  }
-  .settings-detail {
-    /* 与卡片区同宽，高度随内容，超出时在卡片内滚动。 */
-    @apply surface absolute inset-x-0 top-0 max-h-full overflow-y-auto overscroll-contain;
-  }
+  /* 卡片外观来自官方 Card；这里只有共享元素动画所需的定位与按钮重置。 */
+  .settings-card { @apply rounded-xl text-left outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50; }
+  .settings-detail { @apply absolute inset-x-0 top-0 max-h-full overflow-y-auto overscroll-contain; }
 }
 @keyframes slide-in-left { from { opacity: 0; transform: translateX(-8px); } }
 .react-flow__attribution { background: transparent !important; font-size: 9px !important; }

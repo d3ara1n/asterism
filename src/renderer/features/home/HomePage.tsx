@@ -5,6 +5,7 @@ import { t } from "../../shared/i18n";
 import { Button } from "../../shared/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "../../shared/ui/dropdown-menu";
 import { InputGroup, InputGroupAddon, InputGroupTextarea } from "../../shared/ui/input-group";
+import { Showcase, showcaseSpell } from "../showcase/Showcase";
 import { WeftMark } from "../../shared/ui/weft-mark";
 import { s, useConfiguration } from "../configuration/state";
 
@@ -17,6 +18,7 @@ export function HomePage({ active, draft, onDraftChange, onSettings }: {
   const [agentId, setAgentId] = useState<string | null>(null);
   const [modelId, setModelId] = useState<string | null>(null);
   const [thinking, setThinking] = useState<ThinkingLevel | null>(null);
+  const [showcase, setShowcase] = useState(false);
   const [selectionError, setSelectionError] = useState<string | null>(null);
   const selectAgent = (id: string, config: ConfigurationSnapshot) => {
     const agent = config.agents.find(item => item.id === id && item.enabled);
@@ -49,7 +51,12 @@ export function HomePage({ active, draft, onDraftChange, onSettings }: {
       <InputGroup className="rounded-xl border-0 border-b bg-card shadow-none">
         <label htmlFor="home-message" className="sr-only">{t.firstMessage}</label>
         <InputGroupTextarea id="home-message" className="min-h-32 px-4 py-4" rows={4} maxLength={100_000}
-          placeholder={t.homePlaceholder} value={draft} onChange={event => onDraftChange(event.target.value)} aria-describedby="home-availability" />
+          placeholder={t.homePlaceholder} value={draft} onChange={event => onDraftChange(event.target.value)} aria-describedby="home-availability"
+          onKeyDown={event => {
+            // 彩蛋：完整输入口令后回车打开组件展示，不进入命令系统。
+            if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing || draft.trim() !== showcaseSpell) return;
+            event.preventDefault(); onDraftChange(""); setShowcase(true);
+          }} />
         <InputGroupAddon align="block-end" className="justify-end">
           <Button size="icon-sm" className="rounded-full" aria-label={t.sendMessage} title={t.sendMessage} type="submit" disabled aria-describedby="home-availability"><ArrowUp /></Button>
         </InputGroupAddon>
@@ -74,6 +81,7 @@ export function HomePage({ active, draft, onDraftChange, onSettings }: {
       <p id="home-availability" className="type-caption">{t.homeUnavailable}</p>
       <Button variant="ghost" size="sm" onClick={onSettings}><Settings />{t.menuSettings}</Button>
     </div>
+    <Showcase open={showcase} onOpenChange={setShowcase} />
   </div></div>;
 }
 

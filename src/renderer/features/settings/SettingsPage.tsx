@@ -4,6 +4,10 @@ import { ArrowLeft, Info, Palette, Cpu, PlugZap, Bot, type LucideProps } from "l
 import { applicationId } from "../../../shared/desktop";
 import { t } from "../../shared/i18n";
 import { Button } from "../../shared/ui/button";
+import { Card, CardDescription, CardHeader, CardTitle } from "../../shared/ui/card";
+
+/** 官方 Card 作为共享元素动画的承载元素；组件源码不改。 */
+const MotionCard = motion.create(Card);
 import { fadeTransition, islandTransition } from "../../shared/weave/motion";
 import { Screen, useIsland, type IslandSpec } from "../../shared/weave/Screen";
 import { Row } from "./preview";
@@ -54,23 +58,25 @@ function SettingsRoot({ openId, onOpen, onClosed }: { openId: string | null; onO
       onExitComplete={() => { const id = lastCard.current; if (id) cards.current.get(id)?.focus({ preventScroll: true }); lastCard.current = null; }}>
       {!open ? <motion.div key="grid" className="settings-grid"
         initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={fadeTransition}>
-        {categories.map(({ id, title, summary, icon: Icon }) => <motion.button key={id} type="button" className="settings-card"
+        {categories.map(({ id, title, summary, icon: Icon }) => <motion.button key={id} type="button" className="settings-card group"
           layoutId={`settings-card-${id}`} transition={islandTransition}
           initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.85 }}
           ref={node => { if (node) cards.current.set(id, node); else cards.current.delete(id); }}
           onClick={() => onOpen(id)}>
-          <Icon className="size-4 text-muted-foreground" aria-hidden="true" />
-          <span><span className="type-section block">{title}</span><span className="type-caption mt-0.5 block">{summary}</span></span>
+          <Card className="h-full gap-0 py-4 transition-colors group-hover:bg-accent"><CardHeader className="gap-1.5 px-4">
+            <Icon className="mb-2 size-4 text-muted-foreground" aria-hidden="true" />
+            <CardTitle>{title}</CardTitle><CardDescription>{summary}</CardDescription>
+          </CardHeader></Card>
         </motion.button>)}
-      </motion.div> : <motion.div key={`detail-${open.id}`} layoutId={`settings-card-${open.id}`} transition={islandTransition}
-        className="settings-detail" style={{ borderRadius: "var(--radius)" }}>
+      </motion.div> : <MotionCard key={`detail-${open.id}`} layoutId={`settings-card-${open.id}`} transition={islandTransition}
+        className="settings-detail gap-0 py-0" style={{ borderRadius: "calc(var(--radius) + 4px)" }}>
         <motion.div className="p-6" initial={{ opacity: 0 }} animate={{ opacity: 1, transition: { ...islandTransition, delay: 0.18 } }} exit={{ opacity: 0, transition: fadeTransition }}>
           <Button variant="ghost" size="sm" className="-ml-2 mb-4" onClick={close}><ArrowLeft />{t.allSettings}</Button>
           <h2 ref={heading} tabIndex={-1} className="type-page mb-2 outline-none">{open.title}</h2>
           {["providers", "models", "agents"].includes(open.id) && <ConfigurationStatus />}
           {open.content()}
         </motion.div>
-      </motion.div>}
+      </MotionCard>}
     </AnimatePresence>
   </div></LayoutGroup>;
 }
