@@ -2,7 +2,7 @@
 
 ## 已确认的视觉
 
-窗口作为系统材质底座，独立内容表面铺在其上。默认主题为灰绿浅色预设；配色、圆角、密度与画布纹理由用户在设置的「外观」中选择。
+窗口作为系统材质底座，独立内容表面铺在其上。默认跟随系统亮暗，主题色 jade、灰色 sage；亮暗、主题色、灰色、圆角、密度与画布纹理由用户在设置的「外观」中选择。
 
 - 左上是应用导航与当前视图标题，macOS 原生红黄绿置于该区域。
 - 右上是紧凑快捷操作，Windows 原生窗口控件在右侧保留安全区。
@@ -19,7 +19,7 @@
 | 较旧 Windows | 原生控件覆盖 + 实色背景 | 与现代 Windows 使用相同内容布局 |
 | Linux | 保留桌面环境窗口装饰 + 实色背景 | 不模拟 macOS/Windows 的系统按钮 |
 
-主进程通过 nativeTheme 响应减少透明度/高对比度设置，必要时禁用材质。系统材质跟随系统外观；内容主题目前只有浅色预设。暗色内容主题需单独设计和验收。
+主进程通过 nativeTheme 响应减少透明度/高对比度设置，必要时禁用材质。亮暗模式经 `nativeTheme.themeSource` 下发，系统材质、renderer 的 `prefers-color-scheme` 与实色回退同源。
 
 系统材质使用 Electron 原生 API，不使用全窗口 CSS backdrop-filter 模拟桌面模糊，不开启 transparent 窗口模式。HTML、body、root 与 Window 无不透明全屏底色。卡片与内容表面保留实色，确保文字可读。
 
@@ -82,7 +82,7 @@ Window          平台差异、拖动区域、窗口几何变量
 | 平台材质、实色回退与系统偏好监听 | `src/main/window-appearance.ts` |
 | shadcn/ui 组件配置 | `components.json` |
 
-主题采用 shadcn 语义 token（background、card、popover、primary、secondary、muted、accent、border、input、ring、destructive 等）与单一 `--radius` 圆角刻度，另加 `--canvas-grid` 画布纹理色。主题定义在 `src/shared/theme.ts`：预设为完整调色板，强调色与灰阶成组定死、不单独自定义；派生 token 由 `themeTokens` 推出；`styles.css` 中的值仅作首帧兜底。原生窗口回退色取当前主题背景色。
+主题采用 shadcn 语义 token（background、card、popover、primary、secondary、muted、accent、border、input、ring、destructive 等）与单一 `--radius` 圆角刻度，另加 `--canvas-grid` 画布纹理色。主题定义在 `src/shared/theme.ts`：原始层为 Radix Colors 色阶，语义层由 `themeTokens(appearance, scheme)` 按固定级别映射（如 border 取灰色 6 级、primary 取主题色）；组件的 `dark:` 变体绑定 `data-mode=dark`，业务代码不写 `dark:`；`styles.css` 中的值仅作首帧兜底。原生窗口回退色取当前主题背景色。
 
 shadcn/ui 组件源码由项目维护，Radix 管理基础交互，Tailwind 表达布局与 token。业务页面只组合已有控件、布局与语义样式；不新增局部色板、任意阴影或独立控件皮肤。确需新增变体时进入公共组件，整体视觉变更须由用户确认。
 

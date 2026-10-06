@@ -6,7 +6,7 @@ import { commandChannel, commandSchema, statusChannel, type CommandResult } from
 import { RuntimeHost } from "./runtime-host.ts";
 import { applicationId } from "../shared/desktop.ts";
 import { followWindowAppearance, initialWindowAppearance } from "./window-appearance.ts";
-import { serveAppearance } from "./appearance.ts";
+import { applyThemeSource, serveAppearance } from "./appearance.ts";
 import { configurationChannel, configurationChangedChannel, configurationCommandSchema, type ConfigurationResult } from "../shared/configuration.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -19,6 +19,7 @@ const runtime = new RuntimeHost(status => {
 });
 
 function createWindow(): void {
+  applyThemeSource();
   const rendererFile = join(here, "../renderer/index.html");
   const developmentURL = !app.isPackaged ? process.env.ELECTRON_RENDERER_URL : undefined;
   const allowedURL = new URL(developmentURL ?? pathToFileURL(rendererFile).href).href;

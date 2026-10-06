@@ -7,9 +7,10 @@ import { ErrorBoundary } from "./app/ErrorBoundary";
 import "./styles.css";
 import { locale } from "./shared/i18n";
 import { startAppearance } from "./features/appearance/state";
+import { TooltipProvider } from "./shared/ui/tooltip";
 
 document.documentElement.lang = locale === "zh" ? "zh-CN" : "en";
 
 startAppearance();
 const controller = new ApplicationController(window.weft);
-createRoot(document.getElementById("root")!).render(<StrictMode><ErrorBoundary><MotionConfig reducedMotion="user"><App controller={controller} /></MotionConfig></ErrorBoundary></StrictMode>);
+createRoot(document.getElementById("root")!).render(<StrictMode><ErrorBoundary><MotionConfig reducedMotion="user"><TooltipProvider><App controller={controller} /></TooltipProvider></MotionConfig></ErrorBoundary></StrictMode>);

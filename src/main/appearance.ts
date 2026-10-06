@@ -1,5 +1,5 @@
 import Store from "electron-store";
-import { ipcMain, type BrowserWindow } from "electron";
+import { ipcMain, nativeTheme, type BrowserWindow } from "electron";
 import {
   appearanceChangedChannel, appearanceGetChannel, appearancePatchSchema, appearanceSetChannel,
   defaultAppearance, parseAppearance, type Appearance,
@@ -16,6 +16,11 @@ function open(): Store<{ appearance: Appearance }> {
 }
 
 /** 同步读取，供创建窗口前决定实色回退色。 */
+/** 三态模式交给 nativeTheme：系统材质与 renderer 的 prefers-color-scheme 同源。 */
+export function applyThemeSource(appearance: Appearance = readAppearance()): void {
+  nativeTheme.themeSource = appearance.mode;
+}
+
 export function readAppearance(): Appearance {
   try { return parseAppearance(open().get("appearance")); }
   catch (error) { console.error("Appearance settings could not be read.", error); return defaultAppearance; }
@@ -32,6 +37,7 @@ export function serveAppearance(window: BrowserWindow, trusted: (event: Electron
     if (!patch.success) return readAppearance();
     const next = parseAppearance({ ...readAppearance(), ...patch.data });
     open().set("appearance", next);
+    applyThemeSource(next);
     onChange(next);
     if (!window.isDestroyed()) window.webContents.send(appearanceChangedChannel, next);
     return next;

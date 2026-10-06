@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { contrastRatio, defaultAppearance, parseAppearance, presets, themeTokens } from "./theme.ts";
+import { accentIds, contrastRatio, defaultAppearance, grayIds, parseAppearance, themeTokens } from "./theme.ts";
 
 describe("parseAppearance", () => {
   it("非对象回退为默认值", () => {
@@ -7,8 +7,7 @@ describe("parseAppearance", () => {
     expect(parseAppearance("x")).toEqual(defaultAppearance);
   });
   it("单项损坏只回退该项", () => {
-    expect(parseAppearance({ preset: "warm", density: "huge" }))
-      .toEqual({ ...defaultAppearance, preset: "warm" });
+    expect(parseAppearance({ accent: "blue", density: "huge" })).toEqual({ ...defaultAppearance, accent: "blue" });
   });
 });
 
@@ -17,17 +16,15 @@ describe("contrast", () => {
 });
 
 describe("themeTokens", () => {
-  it("每个预设的按钮文字在强调色上满足 AA", () => {
-    for (const preset of Object.keys(presets) as (keyof typeof presets)[]) {
-      const tokens = themeTokens({ ...defaultAppearance, preset });
-      expect(contrastRatio(tokens.primary, tokens["primary-foreground"])).toBeGreaterThanOrEqual(4.5);
-    }
-  });
-  it("每个预设的正文与次要文字在背景上满足 AA", () => {
-    for (const palette of Object.values(presets)) {
-      expect(contrastRatio(palette.foreground, palette.background)).toBeGreaterThanOrEqual(4.5);
-      expect(contrastRatio(palette["muted-foreground"], palette.background)).toBeGreaterThanOrEqual(4.5);
-      expect(contrastRatio(palette.primary, palette["primary-foreground"])).toBeGreaterThanOrEqual(4.5);
+  it("所有主题色 × 灰色 × 亮暗组合的正文、次要文字与按钮文字满足 AA", () => {
+    for (const accent of accentIds) for (const gray of grayIds) for (const scheme of ["light", "dark"] as const) {
+      const t = themeTokens({ ...defaultAppearance, accent, gray }, scheme);
+      const at = `${accent}/${gray}/${scheme}`;
+      for (const surface of [t.card!, t.background!]) {
+        expect(contrastRatio(t.foreground!, surface), at).toBeGreaterThanOrEqual(4.5);
+        expect(contrastRatio(t["muted-foreground"]!, surface), at).toBeGreaterThanOrEqual(4.5);
+      }
+      expect(contrastRatio(t.primary!, t["primary-foreground"]!), at).toBeGreaterThanOrEqual(4.5);
     }
   });
 });

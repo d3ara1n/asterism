@@ -5,13 +5,14 @@ import type { Command, TaskSnapshot } from "../../../shared/contracts";
 import { Maximize, Minus, Plus } from "lucide-react";
 import { t } from "../../shared/i18n";
 import { Button } from "../../shared/ui/button";
-import { useAppearance } from "../appearance/state";
+import { useAppearance, useScheme } from "../appearance/state";
 import { ObjectNode, type ObjectNodeType } from "./ObjectNode";
 
 const nodeTypes = { object: ObjectNode };
 
 export function Workbench({ task, run }: { task: TaskSnapshot; run: (command: Command) => Promise<boolean> }) {
   const { canvas } = useAppearance();
+  const scheme = useScheme();
   const toNodes = useCallback((): ObjectNodeType[] => task.objects.flatMap(object => {
     const view = task.views.find(v => v.object_id === object.id);
     if (!view || view.hidden) return [];
@@ -46,13 +47,13 @@ export function Workbench({ task, run }: { task: TaskSnapshot; run: (command: Co
     }
   }, [run, task.id, task.historical, toNodes]);
   return <ReactFlow<ObjectNodeType>
-    nodes={nodes} edges={edges} nodeTypes={nodeTypes} onNodesChange={onNodesChange}
+    colorMode={scheme} nodes={nodes} edges={edges} nodeTypes={nodeTypes} onNodesChange={onNodesChange}
     defaultViewport={task.viewport} minZoom={0.1} maxZoom={4}
     nodesDraggable={!task.historical} nodesConnectable={false} edgesReconnectable={false}
     deleteKeyCode={null} panOnScroll selectionOnDrag panOnDrag={[1, 2]} zoomOnDoubleClick={false}
     onMoveEnd={(event, viewport) => { if (event && !task.historical) void run({ type: "viewport.set", task_id: task.id, viewport }); }}
   >
-    {canvas !== "none" && <Background color="var(--canvas-grid)" gap={24} size={canvas === "dots" ? 1.5 : 1}
+    {canvas !== "none" && <Background color="var(--canvas-grid)" gap={24} size={canvas === "dots" ? 1.5 : canvas === "cross" ? 6 : undefined}
       variant={canvas === "dots" ? BackgroundVariant.Dots : canvas === "lines" ? BackgroundVariant.Lines : BackgroundVariant.Cross} />}
     <ViewControls task={task} run={run} />
   </ReactFlow>;

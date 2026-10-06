@@ -33,6 +33,23 @@
   --motion-page: 380ms;
   --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
+/* 暗色首帧兜底（苔原 jade + sage）；运行时由 themeTokens 覆盖。 */
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --background: #101211; --foreground: #eceeed;
+    --card: #171918; --card-foreground: #eceeed;
+    --popover: #202221; --popover-foreground: #eceeed;
+    --primary: #29a383; --primary-foreground: #101211;
+    --secondary: #272a29; --secondary-foreground: #eceeed;
+    --muted: #202221; --muted-foreground: #adb5b2;
+    --accent: #272a29; --accent-foreground: #eceeed;
+    --destructive: #ff9592; --border: #373b39; --input: #444947; --ring: #2a7e68;
+    --canvas-grid: #373b39; --selection: #114837;
+  }
+}
+/* shadcn 组件自带的 dark: 类绑定到解析后的亮暗；业务代码不写 dark:。 */
+@custom-variant dark (&:where([data-mode=dark], [data-mode=dark] *));
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

@@ -5,7 +5,9 @@ import { themeTokens } from "../shared/theme.ts";
 import { readAppearance } from "./appearance.ts";
 
 /** 实色回退取当前主题背景，与工作台底色一致。 */
-const fallback = () => themeTokens(readAppearance()).background!;
+const scheme = () => nativeTheme.shouldUseDarkColors ? "dark" as const : "light" as const;
+const tokens = () => themeTokens(readAppearance(), scheme());
+const fallback = () => tokens().background!;
 
 /** 使用系统材质，不开启会改变缩放/阴影行为的 transparent 窗口模式。 */
 export function initialWindowAppearance(): BrowserWindowConstructorOptions {
@@ -30,7 +32,7 @@ export function initialWindowAppearance(): BrowserWindowConstructorOptions {
       titleBarStyle: "hidden",
       titleBarOverlay: {
         color: "#00000000",
-        symbolColor: material && nativeTheme.shouldUseDarkColors ? "#ffffff" : themeTokens(readAppearance()).foreground!,
+        symbolColor: material && nativeTheme.shouldUseDarkColors ? "#ffffff" : tokens().foreground!,
         height: windowGeometry.gutter + windowGeometry.headerHeight,
       },
       backgroundColor: material ? "#00000000" : fallbackColor,
