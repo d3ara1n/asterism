@@ -7,6 +7,7 @@ import { RuntimeHost } from "./runtime-host.ts";
 import { applicationId } from "../shared/desktop.ts";
 import { followWindowAppearance, initialWindowAppearance } from "./window-appearance.ts";
 import { applyThemeSource, serveAppearance } from "./appearance.ts";
+import { initialWindowState, trackWindowState } from "./window-state.ts";
 import { configurationChannel, configurationChangedChannel, configurationCommandSchema, type ConfigurationResult } from "../shared/configuration.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -23,8 +24,9 @@ function createWindow(): void {
   const rendererFile = join(here, "../renderer/index.html");
   const developmentURL = !app.isPackaged ? process.env.ELECTRON_RENDERER_URL : undefined;
   const allowedURL = new URL(developmentURL ?? pathToFileURL(rendererFile).href).href;
+  const state = initialWindowState();
   window = new BrowserWindow({
-    width: 1440, height: 960, minWidth: 800, minHeight: 600, title: "Weft",
+    ...state.bounds, minWidth: state.minWidth, minHeight: state.minHeight, title: "Weft",
     ...initialWindowAppearance(),
     autoHideMenuBar: true,
     webPreferences: {
@@ -34,6 +36,8 @@ function createWindow(): void {
     },
   });
   const current = window;
+  if (state.maximized) current.maximize();
+  trackWindowState(current);
   const refreshAppearance = followWindowAppearance(current);
   current.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
   current.webContents.on("will-navigate", event => event.preventDefault());
