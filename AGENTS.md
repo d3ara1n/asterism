@@ -68,10 +68,10 @@
 
 ### 分支与提交
 
-- 主干 `main`。文档孵化阶段直接提交 `main`；实现期按 type 开分支（`feat/`、`fix/`、`docs/`…），经 PR squash merge 回 `main`，一个 PR 对应一个合并提交。
+- 主干 `main`。首个版本发布前（尚未建立远端仓库）直接在 `main` 上开发与提交，不开分支、不走 PR；首个版本发布后改为按 type 开分支（`feat/`、`fix/`、`docs/`…），经 PR squash merge 回 `main`，一个 PR 对应一个合并提交。
 - 提交信息用 Conventional Commits：type 英文小写（feat/fix/docs/chore/refactor…），主题中文。
 - AI 辅助的提交加 `Co-Authored-By: <模型名> <邮箱>` trailer；模型身份查 `PI_*` 环境变量。邮箱用模型提供方的官方 noreply 地址（如 Anthropic 为 `noreply@anthropic.com`），无法确定时用 `noreply@pi.dev`，不自行编造地址。
-- PR label 分组与 release CI 暂缓，已立案 `plans/`；首个可运行里程碑后接入。
+- PR label 分组与 release CI 暂缓，已立案 `plans/`；首个版本发布后接入。
 
 ### 依赖优先
 

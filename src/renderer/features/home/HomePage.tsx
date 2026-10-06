@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from "react";
-import { ArrowUp, Settings } from "lucide-react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { ArrowUp, Bot, Brain, ChevronDown, Cpu, Settings } from "lucide-react";
 import { resolveModelRole, resolveProviderModel, thinkingSchema, type ConfigurationSnapshot, type ThinkingLevel } from "../../../shared/configuration";
 import { t } from "../../shared/i18n";
 import { Button } from "../../shared/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../shared/ui/select";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "../../shared/ui/dropdown-menu";
 import { InputGroup, InputGroupAddon, InputGroupTextarea } from "../../shared/ui/input-group";
 import { WeftMark } from "../../shared/ui/weft-mark";
 import { s, useConfiguration } from "../configuration/state";
@@ -44,35 +44,55 @@ export function HomePage({ active, draft, onDraftChange, onSettings }: {
       <WeftMark className="mb-4 size-12 text-primary" /><h1 className="type-page">{t.appName}</h1>
       <p className="type-body mt-2 text-muted-foreground">{t.homePrompt}</p>
     </header>
-    <form onSubmit={event => event.preventDefault()} aria-label={t.newConversation}><InputGroup className="bg-card">
-      <label htmlFor="home-message" className="sr-only">{t.firstMessage}</label>
-      <InputGroupTextarea id="home-message" className="min-h-40 px-4 py-4" rows={5} maxLength={100_000}
-        placeholder={t.homePlaceholder} value={draft} onChange={event => onDraftChange(event.target.value)} aria-describedby="home-availability" />
-      <InputGroupAddon align="block-end" className="flex-wrap justify-between gap-3">
-        <div className="flex min-w-0 flex-wrap items-center gap-2">
-          <Select value={agent?.id ?? ""} disabled={!snapshot} onValueChange={id => snapshot && selectAgent(id, snapshot)}>
-            <SelectTrigger aria-label={t.agent} className="w-32"><SelectValue placeholder={t.agent} /></SelectTrigger>
-            <SelectContent>{snapshot?.agents.filter(agent => agent.enabled).map(agent => <SelectItem key={agent.id} value={agent.id}>{agent.name}</SelectItem>)}</SelectContent>
-          </Select>
-          <Select value={model?.id ?? ""} disabled={!snapshot || !models.length} onValueChange={id => {
-            setModelId(id); setSelectionError(null); if (!models.find(item => item.id === id)?.capabilities.reasoning) setThinking("off");
-          }}>
-            <SelectTrigger aria-label={t.model} className="w-48"><SelectValue placeholder={models.length ? t.model : s("Add a model in settings", "先在设置中添加模型")} /></SelectTrigger>
-            <SelectContent>{models.map(item => <SelectItem key={item.id} value={item.id}>{snapshot?.providers.find(provider => provider.id === item.providerId)?.name} / {item.name}</SelectItem>)}</SelectContent>
-          </Select>
-          <Select value={model?.capabilities.reasoning ? thinking ?? "__default" : "off"} disabled={!model?.capabilities.reasoning}
-            onValueChange={value => setThinking(value === "__default" ? null : value as ThinkingLevel)}>
-            <SelectTrigger aria-label={s("Thinking level", "思考等级")} className="w-28"><SelectValue /></SelectTrigger>
-            <SelectContent><SelectItem value="__default">{s("Default", "默认")}</SelectItem>{thinkingSchema.options.map(level => <SelectItem key={level} value={level}>{level}</SelectItem>)}</SelectContent>
-          </Select>
-        </div>
-        <Button size="icon-sm" aria-label={t.sendMessage} title={t.sendMessage} type="submit" disabled aria-describedby="home-availability"><ArrowUp /></Button>
-      </InputGroupAddon>
-    </InputGroup></form>
+    {/* 两层输入区：亮色输入表面在上，灰色选项托盘挂在下方；选项为紧凑的幽灵按钮 + 菜单，不用表单下拉框。 */}
+    <form onSubmit={event => event.preventDefault()} aria-label={t.newConversation} className="rounded-xl border bg-muted">
+      <InputGroup className="rounded-xl border-0 border-b bg-card shadow-none">
+        <label htmlFor="home-message" className="sr-only">{t.firstMessage}</label>
+        <InputGroupTextarea id="home-message" className="min-h-32 px-4 py-4" rows={4} maxLength={100_000}
+          placeholder={t.homePlaceholder} value={draft} onChange={event => onDraftChange(event.target.value)} aria-describedby="home-availability" />
+        <InputGroupAddon align="block-end" className="justify-end">
+          <Button size="icon-sm" className="rounded-full" aria-label={t.sendMessage} title={t.sendMessage} type="submit" disabled aria-describedby="home-availability"><ArrowUp /></Button>
+        </InputGroupAddon>
+      </InputGroup>
+      <div className="flex min-w-0 flex-wrap items-center gap-0.5 px-1.5 py-1">
+        <Choice icon={<Bot />} label={t.agent} value={agent?.name ?? t.agent} disabled={!snapshot}
+          selected={agent?.id ?? ""} onSelect={id => snapshot && selectAgent(id, snapshot)}
+          options={snapshot?.agents.filter(item => item.enabled).map(item => ({ value: item.id, label: item.name })) ?? []} />
+        <Choice icon={<Cpu />} label={t.model} disabled={!snapshot || !models.length}
+          value={model?.name ?? (models.length ? t.model : s("Add a model in settings", "先在设置中添加模型"))}
+          selected={model?.id ?? ""} onSelect={id => { setModelId(id); setSelectionError(null); if (!models.find(item => item.id === id)?.capabilities.reasoning) setThinking("off"); }}
+          options={models.map(item => ({ value: item.id, label: `${snapshot?.providers.find(provider => provider.id === item.providerId)?.name ?? ""} / ${item.name}` }))} />
+        <Choice icon={<Brain />} label={s("Thinking level", "思考等级")} disabled={!model?.capabilities.reasoning}
+          value={!model?.capabilities.reasoning ? s("Off", "关闭") : thinking ?? s("Default", "默认")}
+          selected={model?.capabilities.reasoning ? thinking ?? "__default" : "off"}
+          onSelect={value => setThinking(value === "__default" ? null : value as ThinkingLevel)}
+          options={[{ value: "__default", label: s("Default", "默认") }, ...thinkingSchema.options.map(level => ({ value: level, label: level }))]} />
+      </div>
+    </form>
     {(error || unavailable || selectionError) && <p role="alert" className="mt-3 text-center text-xs text-destructive">{error ?? unavailable ?? selectionError}</p>}
     <div className="mt-4 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-center">
       <p id="home-availability" className="type-caption">{t.homeUnavailable}</p>
       <Button variant="ghost" size="sm" onClick={onSettings}><Settings />{t.menuSettings}</Button>
     </div>
   </div></div>;
+}
+
+/** 托盘中的紧凑选项：幽灵小按钮显示当前值，点击弹出单选菜单。 */
+function Choice({ icon, label, value, selected, options, disabled, onSelect }: {
+  icon: ReactNode; label: string; value: string; selected: string; disabled?: boolean;
+  options: { value: string; label: string }[]; onSelect: (value: string) => void;
+}) {
+  return <DropdownMenu modal={false}>
+    <DropdownMenuTrigger asChild>
+      <Button variant="ghost" size="xs" disabled={disabled} aria-label={`${label}: ${value}`} className="max-w-48 text-muted-foreground hover:text-foreground">
+        {icon}<span className="truncate">{value}</span><ChevronDown className="opacity-60" />
+      </Button>
+    </DropdownMenuTrigger>
+    <DropdownMenuContent align="start" className="min-w-44">
+      <DropdownMenuLabel className="text-xs text-muted-foreground">{label}</DropdownMenuLabel>
+      <DropdownMenuRadioGroup value={selected} onValueChange={onSelect}>
+        {options.map(option => <DropdownMenuRadioItem key={option.value} value={option.value}>{option.label}</DropdownMenuRadioItem>)}
+      </DropdownMenuRadioGroup>
+    </DropdownMenuContent>
+  </DropdownMenu>;
 }
