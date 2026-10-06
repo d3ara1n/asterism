@@ -4,7 +4,7 @@
 
 | 主题 | 约定 |
 | --- | --- |
-| 名称 | 中文“织台”，英文工作名 Weft，仓库 weft |
+| 名称 | 中文“织台”，英文 Weft，仓库 weft |
 | 应用标识 | 正式 bundle ID 与 Windows AppUserModelID 为 `dev.dearain.weft`；应用数据目录独立于该标识 |
 | 定位 | 比 coding agent 更宽的个人工作台，包含日常事务、研究、维护与编程 |
 | 展示 | 对象卡片与关系线；工具调用默认收纳在代理流 |
