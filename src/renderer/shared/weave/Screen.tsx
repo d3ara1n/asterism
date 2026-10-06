@@ -103,14 +103,14 @@ export function Screen({ label, root, leading, className, resetKey }: {
 
   return <div className={cn("weave-viewport", className)} aria-label={label} role="group" ref={viewport} onWheel={onWheel} onKeyDown={onKeyDown}>
     {/* 视口宽度测得之前不排布浮岛，避免以 0 宽度按溢出布局渲染一帧。 */}
-    <motion.div className="weave-strip" initial={false} animate={{ x: shift }} transition={islandTransition} style={{ gap, visibility: width ? undefined : "hidden" }}>
-      {/* popLayout：退场浮岛立即脱离布局流，其余浮岛以 layout 动画平移补位；进场、退场、补位各自独立过渡。 */}
-      <AnimatePresence initial={false} mode="popLayout">{islands.map((island, index) => {
+    <div className="weave-strip" style={{ visibility: width ? undefined : "hidden" }}>
+      {/* 每个浮岛绝对定位，自身插值到目标 x 与宽度：增删浮岛时其余浮岛从当前位置平滑让位，不叠加整条平移与 layout 动画。 */}
+      <AnimatePresence initial={false}>{islands.map((island, index) => {
         const span = spans[index] ?? { left: 0, width: 0 };
         const visibleLeft = span.left - (overflow ? offset : 0), visibleRight = visibleLeft + span.width;
         const hidden = overflow && (visibleRight <= 0 || visibleLeft >= width);
         const peek = overflow && !hidden && (visibleLeft < -1 || visibleRight > width + 1);
-        return <Island key={island.id} spec={island} width={span.width} hidden={hidden} peek={peek}
+        return <Island key={island.id} spec={island} width={span.width} x={span.left + shift} hidden={hidden} peek={peek}
           focused={islands.length > 1 && island.id === focus}
           api={{
             id: island.id, child: islands[index + 1]?.id,
@@ -120,15 +120,15 @@ export function Screen({ label, root, leading, className, resetKey }: {
           }}
           onFocus={() => setFocus(current => focusIsland({ islands, focus: current }, island.id).focus)} />;
       })}</AnimatePresence>
-    </motion.div>
+    </div>
     {overflow && <div className="weave-indicator" aria-hidden="true">
       <span style={{ left: `${(offset / total) * 100}%`, width: `${(width / total) * 100}%` }} />
     </div>}
   </div>;
 }
 
-function Island({ ref, spec, width, hidden, peek, focused, api, onFocus }: {
-  ref?: React.Ref<HTMLElement>; spec: IslandSpec; width: number; hidden: boolean; peek: boolean; focused: boolean; api: IslandApi; onFocus: () => void;
+function Island({ ref, spec, width, x, hidden, peek, focused, api, onFocus }: {
+  ref?: React.Ref<HTMLElement>; spec: IslandSpec; width: number; x: number; hidden: boolean; peek: boolean; focused: boolean; api: IslandApi; onFocus: () => void;
 }) {
   const element = useRef<HTMLElement>(null);
   // 由内容打开的浮岛挂载后接收焦点。
@@ -141,13 +141,13 @@ function Island({ ref, spec, width, hidden, peek, focused, api, onFocus }: {
   }), []);
   const focusSelf = useCallback(() => onFocus(), [onFocus]);
   // 部分越出视口的浮岛：点击露出的部分即移入。
-  // 原地展开：自左侧轻微位移淡入；宽度变化由 Motion 过渡。
-  return <motion.section ref={node => { element.current = node; if (typeof ref === "function") ref(node); else if (ref) ref.current = node; }} layout="position"
-    initial={{ opacity: 0, x: -16, scale: 0.98 }} animate={{ opacity: 1, x: 0, scale: 1, width }} exit={{ opacity: 0, x: -16, scale: 0.98, transition: fadeTransition }}
+  // 原地展开：在目标位置左侧轻微位移淡入；位置与宽度变化由 Motion 从当前值过渡。
+  return <motion.section ref={node => { element.current = node; if (typeof ref === "function") ref(node); else if (ref) ref.current = node; }}
+    initial={{ opacity: 0, x: x - 16, scale: 0.98, width }} animate={{ opacity: 1, x, scale: 1, width }} exit={{ opacity: 0, scale: 0.98, transition: fadeTransition }}
     transition={islandTransition} data-island={spec.id} tabIndex={-1} aria-label={spec.label}
     inert={hidden} aria-hidden={hidden || undefined} data-peek={peek || undefined} data-focused={focused || undefined}
     data-surface={spec.surface !== false || undefined}
-    className="island" style={{ flexBasis: width }}
+    className="island"
     onFocusCapture={focusSelf} onPointerDownCapture={focusSelf}>
     {spec.surface !== false && <div className="island-backdrop" aria-hidden="true" />}
     <div className="island-body"><IslandContext.Provider value={stable}>{spec.render()}</IslandContext.Provider></div>

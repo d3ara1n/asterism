@@ -156,8 +156,8 @@
   /* 设置：分类卡片平铺在材质上；选中卡片底板扩展为内容区，其余收缩消失。 */
   /* 浮岛编织：屏内浮岛自左向右；放得下时分栏居中，放不下时溢出并跟随焦点。 */
   .weave-viewport { @apply relative min-h-0 min-w-0 overflow-clip; }
-  .weave-strip { @apply relative flex h-full w-max; }
-  .island { @apply relative h-full min-w-0 shrink-0 outline-none; }
+  .weave-strip { @apply relative h-full; }
+  .island { @apply absolute top-0 left-0 h-full outline-none; }
   .island-backdrop {
     @apply surface pointer-events-none absolute inset-0;
     transition: border-color var(--motion-fast) var(--ease-out);
