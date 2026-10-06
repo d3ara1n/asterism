@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
 import { AnimatePresence, LayoutGroup, motion } from "motion/react";
-import { ArrowLeft, Info, SlidersHorizontal, Cpu, PlugZap, Bot, type LucideProps } from "lucide-react";
+import { ArrowLeft, Info, Palette, Cpu, PlugZap, Bot, type LucideProps } from "lucide-react";
 import { applicationId } from "../../../shared/desktop";
 import { t } from "../../shared/i18n";
 import { Button } from "../../shared/ui/button";
 import { fadeTransition, islandTransition } from "../../shared/weave/motion";
 import { Screen, useIsland, type IslandSpec } from "../../shared/weave/Screen";
-import { GeneralPreview, Row } from "./preview";
+import { Row } from "./preview";
+import { AppearanceSettings } from "../appearance/AppearanceSettings";
 import { ConfigurationContext, s, useConfiguration } from "../configuration/state";
 import { ConfigurationStatus } from "../configuration/forms";
 import { ProvidersSettings } from "../configuration/ProvidersSettings";
@@ -16,7 +17,7 @@ import { AgentsSettings, RolesSettings } from "../configuration/RolesSettings";
 interface SettingsCategory { id: string; title: string; summary: string; icon: ComponentType<LucideProps>; content: () => ReactNode }
 
 const categories: SettingsCategory[] = [
-  { id: "general", title: t.generalTitle, summary: t.generalSummary, icon: SlidersHorizontal, content: () => <GeneralPreview /> },
+  { id: "appearance", title: s("Appearance", "外观"), summary: s("Colors, density, and canvas", "配色、密度与画布"), icon: Palette, content: () => <AppearanceSettings /> },
   { id: "providers", title: s("Providers", "提供商"), summary: s("Connections and available models", "连接与具体模型"), icon: PlugZap, content: () => <ProvidersSettings /> },
   { id: "models", title: t.modelsTitle, summary: s("Reusable model roles", "可复用的模型角色"), icon: Cpu, content: () => <RolesSettings /> },
   { id: "agents", title: s("Agents", "代理"), summary: s("Prompts, tools, and delegation", "提示词、工具与委派配置"), icon: Bot, content: () => <AgentsSettings /> },

@@ -1,11 +1,15 @@
 import { nativeTheme, type BrowserWindow, type BrowserWindowConstructorOptions } from "electron";
 import { release } from "node:os";
 import { windowGeometry } from "../shared/desktop.ts";
+import { themeTokens } from "../shared/theme.ts";
+import { readAppearance } from "./appearance.ts";
 
-const fallbackColor = "#edf1f0";
+/** 实色回退取当前主题背景，与工作台底色一致。 */
+const fallback = () => themeTokens(readAppearance()).background!;
 
 /** 使用系统材质，不开启会改变缩放/阴影行为的 transparent 窗口模式。 */
 export function initialWindowAppearance(): BrowserWindowConstructorOptions {
+  const fallbackColor = fallback();
   const allowMaterial = !nativeTheme.prefersReducedTransparency && !nativeTheme.shouldUseHighContrastColors;
   if (process.platform === "darwin") {
     return {
@@ -26,7 +30,7 @@ export function initialWindowAppearance(): BrowserWindowConstructorOptions {
       titleBarStyle: "hidden",
       titleBarOverlay: {
         color: "#00000000",
-        symbolColor: material && nativeTheme.shouldUseDarkColors ? "#ffffff" : "#263c36",
+        symbolColor: material && nativeTheme.shouldUseDarkColors ? "#ffffff" : themeTokens(readAppearance()).foreground!,
         height: windowGeometry.gutter + windowGeometry.headerHeight,
       },
       backgroundColor: material ? "#00000000" : fallbackColor,
@@ -37,7 +41,7 @@ export function initialWindowAppearance(): BrowserWindowConstructorOptions {
 }
 
 /** 监听系统偏好；减少透明度与高对比度时切回实色，关闭窗口后释放监听。 */
-export function followWindowAppearance(window: BrowserWindow): void {
+export function followWindowAppearance(window: BrowserWindow): () => void {
   const update = () => {
     if (window.isDestroyed()) return;
     const options = initialWindowAppearance();
@@ -52,4 +56,5 @@ export function followWindowAppearance(window: BrowserWindow): void {
   };
   nativeTheme.on("updated", update);
   window.once("closed", () => nativeTheme.removeListener("updated", update));
+  return update;
 }

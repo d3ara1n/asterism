@@ -6,8 +6,10 @@ import { ApplicationController } from "./app/controller";
 import { ErrorBoundary } from "./app/ErrorBoundary";
 import "./styles.css";
 import { locale } from "./shared/i18n";
+import { startAppearance } from "./features/appearance/state";
 
 document.documentElement.lang = locale === "zh" ? "zh-CN" : "en";
 
+startAppearance();
 const controller = new ApplicationController(window.weft);
 createRoot(document.getElementById("root")!).render(<StrictMode><ErrorBoundary><MotionConfig reducedMotion="user"><App controller={controller} /></MotionConfig></ErrorBoundary></StrictMode>);

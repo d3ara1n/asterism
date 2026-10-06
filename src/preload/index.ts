@@ -1,8 +1,18 @@
 import { contextBridge, ipcRenderer } from "electron";
 import { commandChannel, statusChannel, commandSchema, resultSchema, runtimeStatusSchema, type DesktopBridge } from "../shared/contracts.ts";
 import { configurationChannel, configurationChangedChannel, configurationCommandSchema, configurationResultSchema } from "../shared/configuration.ts";
+import { appearanceChangedChannel, appearanceGetChannel, appearancePatchSchema, appearanceSetChannel, parseAppearance } from "../shared/theme.ts";
 
 const bridge: DesktopBridge = {
+  appearance: {
+    async get() { return parseAppearance(await ipcRenderer.invoke(appearanceGetChannel)); },
+    async set(patch) { return parseAppearance(await ipcRenderer.invoke(appearanceSetChannel, appearancePatchSchema.parse(patch))); },
+    onChanged(listener) {
+      const handler = (_event: Electron.IpcRendererEvent, raw: unknown) => listener(parseAppearance(raw));
+      ipcRenderer.on(appearanceChangedChannel, handler);
+      return () => ipcRenderer.removeListener(appearanceChangedChannel, handler);
+    },
+  },
   configuration: {
     async execute(command) {
       const parsed = configurationCommandSchema.safeParse(command);

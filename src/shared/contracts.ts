@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { ConfigurationBridge } from "./configuration.ts";
 import type { DesktopPlatform } from "./desktop.ts";
+import type { AppearanceBridge } from "./theme.ts";
 
 export const protocolVersion = 1;
 export const commandChannel = "weft:command";
@@ -74,6 +75,7 @@ export const runtimeMessageSchema = z.discriminatedUnion("kind", [
 export type RuntimeMessage = z.infer<typeof runtimeMessageSchema>;
 export interface DesktopBridge {
   configuration: ConfigurationBridge;
+  appearance: AppearanceBridge;
   readonly platform: DesktopPlatform;
   execute(command: Command): Promise<CommandResult>;
   onStatus(listener: (status: RuntimeStatus) => void): () => void;

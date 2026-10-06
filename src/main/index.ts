@@ -6,6 +6,7 @@ import { commandChannel, commandSchema, statusChannel, type CommandResult } from
 import { RuntimeHost } from "./runtime-host.ts";
 import { applicationId } from "../shared/desktop.ts";
 import { followWindowAppearance, initialWindowAppearance } from "./window-appearance.ts";
+import { serveAppearance } from "./appearance.ts";
 import { configurationChannel, configurationChangedChannel, configurationCommandSchema, type ConfigurationResult } from "../shared/configuration.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -32,12 +33,15 @@ function createWindow(): void {
     },
   });
   const current = window;
-  followWindowAppearance(current);
+  const refreshAppearance = followWindowAppearance(current);
   current.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
   current.webContents.on("will-navigate", event => event.preventDefault());
   current.webContents.on("will-attach-webview", event => event.preventDefault());
   ipcMain.removeHandler(commandChannel);
   ipcMain.removeHandler(configurationChannel);
+  const trusted = (event: Electron.IpcMainInvokeEvent) => event.sender === current.webContents &&
+    event.senderFrame === current.webContents.mainFrame && event.senderFrame?.url === allowedURL;
+  const stopAppearance = serveAppearance(current, trusted, () => refreshAppearance());
   ipcMain.handle(commandChannel, async (event, raw): Promise<CommandResult> => {
     if (event.sender !== current.webContents || event.senderFrame !== current.webContents.mainFrame ||
       event.senderFrame.url !== allowedURL) {
@@ -57,7 +61,7 @@ function createWindow(): void {
     return runtime.configure(parsed.data);
   });
   current.on("closed", () => {
-    window = null; ipcMain.removeHandler(commandChannel); ipcMain.removeHandler(configurationChannel);
+    window = null; ipcMain.removeHandler(commandChannel); ipcMain.removeHandler(configurationChannel); stopAppearance();
   });
   const loading = developmentURL ? current.loadURL(developmentURL) : current.loadFile(rendererFile);
   loading.catch(error => { console.error("Renderer initialization failed.", error); dialog.showErrorBox("Weft", "The application window could not be loaded."); });

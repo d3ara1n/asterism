@@ -91,7 +91,7 @@ main 与 runtime 使用 ESM；preload 使用独立 CJS bundle，第三方校验�
 - 历史快照、资源状态、配置与上下文投影需要可迁移的版本标识。
 - 当前视图状态与业务事件分开。
 - 事件表：`event_id`、`branch_id`、`seq`、`recorded_at`、`type`、`payload`；`UNIQUE (branch_id, seq)`。检查点格式未定。
-- 应用数据位于 Electron `app.getPath('userData')` 的子目录，不写入源码仓库。SQLite 在 `db/`，大内容在 `objects/`，运行日志在 `logs/`，凭据在 `credentials/`。凭据与任务日志、事件记录分离。
+- 应用数据位于 Electron `app.getPath('userData')` 的子目录，不写入源码仓库。SQLite 在 `db/`，大内容在 `objects/`，运行日志在 `logs/`，凭据在 `credentials/`。凭据与任务日志、事件记录分离。外观设置为 `appearance.json`（electron-store）。所有应用数据只写平台用户数据目录，不写安装目录。
 - Chromium 的 cookie、缓存等会话数据使用独立的 `sessionData` 路径，不与应用数据混放。
 - 不把 API key 写入事件或模型请求记录。完整请求留存与保留期限未定，不默认永久保存全部原始内容。
 
