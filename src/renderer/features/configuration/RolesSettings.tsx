@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Plus } from "lucide-react";
 import type { AgentConfiguration, ModelRole } from "../../../shared/configuration";
 import { thinkingSchema } from "../../../shared/configuration";
+import { Item, ItemContent, ItemTitle } from "../../shared/ui/item";
 import { Button } from "../../shared/ui/button";
 import { FieldGroup } from "../../shared/ui/field";
 import { useIsland } from "../../shared/weave/Screen";
@@ -14,9 +15,9 @@ export function RolesSettings() {
   const open = (id: string | null) => island.open({ id: `role-${id ?? "new"}`, label: s("Model role", "模型角色"), width: { min: 400, grow: 1, max: 620 }, render: () => <RoleEditor key={id ?? "new"} initialId={id} /> });
   return <>
     <p className="type-caption mb-4">{s("Reusable model choices for agents and application features. Hidden roles remain editable here.", "为代理与功能模块复用模型选择；隐藏的角色也可在这里编辑。")}</p>
-    {snapshot?.roles.map(role => <button key={role.id} className="list-item" onClick={() => open(role.id)}>
-      <span className="flex-1 truncate">{role.name}</span><span className="type-caption">{!role.enabled ? s("Disabled", "已停用") : role.hidden ? s("Hidden", "隐藏") : role.builtin ? s("Built-in", "内置") : ""}</span>
-    </button>)}
+    {snapshot?.roles.map(role => <Item key={role.id} asChild size="sm"><button type="button" className="w-full text-left hover:bg-accent" onClick={() => open(role.id)}>
+      <ItemContent><ItemTitle>{role.name}</ItemTitle></ItemContent><span className="type-caption">{!role.enabled ? s("Disabled", "已停用") : role.hidden ? s("Hidden", "隐藏") : role.builtin ? s("Built-in", "内置") : ""}</span>
+    </button></Item>)}
     <Button className="mt-4" disabled={!snapshot} onClick={() => open(null)}><Plus />{s("Add role", "添加角色")}</Button>
   </>;
 }
@@ -53,9 +54,9 @@ export function AgentsSettings() {
   const open = (id: string | null) => island.open({ id: `agent-${id ?? "new"}`, label: s("Agent configuration", "代理配置"), width: { min: 440, grow: 1, max: 720 }, render: () => <AgentEditor key={id ?? "new"} initialId={id} /> });
   return <>
     <p className="type-caption mb-4">{s("Shared definitions for main agents and delegated agents. Changes apply when a configuration is next selected.", "主代理与子代理共用的配置，修改在下次取用配置时生效。")}</p>
-    {snapshot?.agents.map(agent => <button key={agent.id} className="list-item" onClick={() => open(agent.id)}>
-      <span className="flex-1 truncate">{agent.name}</span><span className="type-caption">{!agent.enabled ? s("Disabled", "已停用") : agent.id === "worker" ? s("Default", "默认") : ""}</span>
-    </button>)}
+    {snapshot?.agents.map(agent => <Item key={agent.id} asChild size="sm"><button type="button" className="w-full text-left hover:bg-accent" onClick={() => open(agent.id)}>
+      <ItemContent><ItemTitle>{agent.name}</ItemTitle></ItemContent><span className="type-caption">{!agent.enabled ? s("Disabled", "已停用") : agent.id === "worker" ? s("Default", "默认") : ""}</span>
+    </button></Item>)}
     <Button className="mt-4" disabled={!snapshot} onClick={() => open(null)}><Plus />{s("Add agent", "添加代理")}</Button>
   </>;
 }

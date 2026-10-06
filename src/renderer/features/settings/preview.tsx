@@ -28,7 +28,7 @@ const s = zh ? {
 };
 
 export function PreviewNotice() {
-  return <Alert variant="warning" className="mb-2"><Eye /><AlertDescription>{s.notice}</AlertDescription></Alert>;
+  return <Alert className="mb-2"><Eye /><AlertDescription>{s.notice}</AlertDescription></Alert>;
 }
 
 /** 设置分组：标题 + 圆角分组底板，行之间用分隔线。 */
@@ -51,7 +51,7 @@ export function Row({ label, hint, children }: { label: string; hint?: string; c
 }
 
 function Rows({ children }: { children: ReactNode[] }) {
-  return <ItemGroup className="settings-group">
+  return <ItemGroup className="rounded-lg border bg-card">
     {children.flatMap((child, index) => index ? [<ItemSeparator key={`s${index}`} />, child] : [child])}
   </ItemGroup>;
 }

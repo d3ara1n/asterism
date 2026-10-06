@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ReactFlow, Background, Controls, ControlButton, useReactFlow, applyNodeChanges, type NodeChange, type Edge } from "@xyflow/react";
+import { ReactFlow, Background, Panel, useReactFlow, applyNodeChanges, type NodeChange, type Edge } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import type { Command, TaskSnapshot } from "../../../shared/contracts";
 import { Maximize, Minus, Plus } from "lucide-react";
 import { t } from "../../shared/i18n";
+import { Button } from "../../shared/ui/button";
 import { ObjectNode, type ObjectNodeType } from "./ObjectNode";
 
 const nodeTypes = { object: ObjectNode };
@@ -61,9 +62,8 @@ function ViewControls({ task, run }: { task: TaskSnapshot; run: (command: Comman
     // 工具栏是明确的用户操作；程序化缩放不产生 DOM event，需显式保存。
     if (!task.historical) await run({ type: "viewport.set", task_id: task.id, viewport: flow.getViewport() });
   };
-  return <Controls showZoom={false} showFitView={false} showInteractive={false} position="bottom-right">
-    <ControlButton onClick={() => { void move(() => flow.zoomIn()); }} title={t.zoomIn} aria-label={t.zoomIn}><Plus /></ControlButton>
-    <ControlButton onClick={() => { void move(() => flow.zoomOut()); }} title={t.zoomOut} aria-label={t.zoomOut}><Minus /></ControlButton>
-    <ControlButton onClick={() => { void move(() => flow.fitView({ padding: 0.25 })); }} title={t.fitObjects} aria-label={t.fitObjects}><Maximize /></ControlButton>
-  </Controls>;
+  return <Panel position="bottom-right" className="surface flex flex-col p-0.5">
+    {([[t.zoomIn, Plus, () => flow.zoomIn()], [t.zoomOut, Minus, () => flow.zoomOut()], [t.fitObjects, Maximize, () => flow.fitView({ padding: 0.25 })]] as const).map(([label, Icon, action]) =>
+      <Button key={label} variant="ghost" size="icon-sm" aria-label={label} title={label} onClick={() => { void move(action); }}><Icon /></Button>)}
+  </Panel>;
 }

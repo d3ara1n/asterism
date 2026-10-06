@@ -1,6 +1,7 @@
 import { useId, type ReactNode } from "react";
 import { X } from "lucide-react";
-import { Button, IconButton } from "../../shared/ui/button";
+import { Alert, AlertDescription } from "../../shared/ui/alert";
+import { Button } from "../../shared/ui/button";
 import { useIsland } from "../../shared/weave/Screen";
 import { Field, FieldDescription, FieldLabel } from "../../shared/ui/field";
 import { Input } from "../../shared/ui/input";
@@ -45,7 +46,7 @@ export const lines = (value: string): string[] => [...new Set(value.split("\n").
 export function Editor({ title, children }: { title: string; children: ReactNode }) {
   const island = useIsland();
   return <div className="p-6"><header className="mb-5 flex items-center justify-between gap-3"><h2 className="type-section">{title}</h2>
-    <IconButton label={s("Close", "关闭")} onClick={island.close}><X /></IconButton></header><ConfigurationStatus />{children}</div>;
+    <Button variant="ghost" size="icon-xs" aria-label={s("Close", "关闭")} title={s("Close", "关闭")} onClick={island.close}><X /></Button></header><ConfigurationStatus />{children}</div>;
 }
 export function SaveActions({ onRemove, cannotRemove = false }: { onRemove?: () => void; cannotRemove?: boolean }) {
   const { busy } = useSettingsConfiguration();
@@ -57,6 +58,6 @@ export function SaveActions({ onRemove, cannotRemove = false }: { onRemove?: () 
 }
 export function ConfigurationStatus() {
   const { snapshot, error, load } = useSettingsConfiguration();
-  if (error) return <div role="alert" className="notice notice-error mb-4"><p>{error}</p><Button variant="ghost" onClick={() => void load()}>{s("Reload", "重新读取")}</Button></div>;
+  if (error) return <Alert variant="destructive" className="mb-4"><AlertDescription>{error}<Button variant="outline" size="sm" className="mt-2" onClick={() => void load()}>{s("Reload", "重新读取")}</Button></AlertDescription></Alert>;
   return !snapshot ? <p role="status" className="type-caption py-4">{s("Loading configuration…", "正在读取配置…")}</p> : null;
 }

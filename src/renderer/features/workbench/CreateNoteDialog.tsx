@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { Command, Point } from "../../../shared/contracts";
-import { Dialog } from "../../shared/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../../shared/ui/dialog";
 import { Button } from "../../shared/ui/button";
 import { Field, FieldGroup, FieldLabel } from "../../shared/ui/field";
 import { Input } from "../../shared/ui/input";
@@ -13,7 +13,7 @@ export function CreateNoteDialog({ creation, busy, run, onClose }: {
 }) {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
-  return <Dialog title={t.createNoteTitle} description={t.createNoteDescription} onClose={onClose}>
+  return <Dialog open onOpenChange={open => { if (!open) onClose(); }}><DialogContent><DialogHeader><DialogTitle>{t.createNoteTitle}</DialogTitle><DialogDescription>{t.createNoteDescription}</DialogDescription></DialogHeader>
     <form onSubmit={event => {
       event.preventDefault();
       const command: Command = { type: "note.create", task_id: creation.taskId, title, content, position: creation.position };
@@ -23,5 +23,5 @@ export function CreateNoteDialog({ creation, busy, run, onClose }: {
       <Field><FieldLabel htmlFor="create-content">{t.content}</FieldLabel><Textarea id="create-content" required maxLength={100_000} value={content} onChange={e => setContent(e.target.value)} rows={7} /></Field></FieldGroup>
       <div className="flex justify-end gap-2"><Button type="button" variant="ghost" onClick={onClose}>{t.cancel}</Button><Button disabled={busy || !title.trim() || !content.trim()}>{t.create}</Button></div>
     </form>
-  </Dialog>;
+  </DialogContent></Dialog>;
 }

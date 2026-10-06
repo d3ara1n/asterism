@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Plus } from "lucide-react";
 import type { Provider, ProviderInput, ProviderModel } from "../../../shared/configuration";
+import { Item, ItemContent, ItemTitle } from "../../shared/ui/item";
 import { Button } from "../../shared/ui/button";
 import { Field, FieldGroup, FieldLabel } from "../../shared/ui/field";
 import { Input } from "../../shared/ui/input";
@@ -18,9 +19,9 @@ export function ProvidersSettings() {
   const open = (id: string | null) => island.open({ id: `provider-${id ?? "new"}`, label: s("Provider", "提供商"), width: { min: 400, grow: 1, max: 620 }, render: () => <ProviderEditor key={id ?? "new"} initialId={id} /> });
   return <>
     <p className="type-caption mb-4">{s("Connections, credentials, and the models they provide.", "管理连接、凭据及其提供的具体模型。")}</p>
-    {snapshot?.providers.map(provider => <button key={provider.id} className="list-item" onClick={() => open(provider.id)}>
-      <span className="flex-1 truncate">{provider.name}</span><span className="type-caption">{provider.enabled ? protocols.find(item => item.value === provider.protocol)?.label : s("Disabled", "已停用")}</span>
-    </button>)}
+    {snapshot?.providers.map(provider => <Item key={provider.id} asChild size="sm"><button type="button" className="w-full text-left hover:bg-accent" onClick={() => open(provider.id)}>
+      <ItemContent><ItemTitle>{provider.name}</ItemTitle></ItemContent><span className="type-caption">{provider.enabled ? protocols.find(item => item.value === provider.protocol)?.label : s("Disabled", "已停用")}</span>
+    </button></Item>)}
     {snapshot?.providers.length === 0 && <p className="type-caption py-4">{s("Add a connection to configure your models.", "添加连接后即可配置模型。")}</p>}
     <Button className="mt-4" disabled={!snapshot} onClick={() => open(null)}><Plus />{s("Add provider", "添加提供商")}</Button>
   </>;
@@ -72,10 +73,10 @@ function ProviderEditor({ initialId }: { initialId: string | null }) {
       const result = await run({ type: "remove", kind: "provider", id: current.id});
       if (result.ok) island.close();
     } : undefined} /></form>
-    {id && <section className="mt-8 border-t border-border pt-5"><h3 className="type-section mb-2">{s("Models", "具体模型")}</h3>
-      {snapshot?.models.filter(model => model.providerId === id).map(model => <button key={model.id} className="list-item" onClick={() => openModel(model.id)}>
-        <span className="flex-1 truncate">{model.name}</span><span className="type-caption truncate">{model.modelId}</span>
-      </button>)}
+    {id && <section className="mt-8 border-t pt-5"><h3 className="type-section mb-2">{s("Models", "具体模型")}</h3>
+      {snapshot?.models.filter(model => model.providerId === id).map(model => <Item key={model.id} asChild size="sm"><button type="button" className="w-full text-left hover:bg-accent" onClick={() => openModel(model.id)}>
+        <ItemContent><ItemTitle>{model.name}</ItemTitle></ItemContent><span className="type-caption truncate">{model.modelId}</span>
+      </button></Item>)}
       <Button className="mt-3" variant="secondary" disabled={busy} onClick={() => openModel(null)}><Plus />{s("Add model", "添加模型")}</Button>
     </section>}
   </Editor>;
@@ -111,7 +112,7 @@ function ModelEditor({ initialId, providerId }: { initialId: string | null; prov
     const result = await run({ type: "remove", kind: "model", id: current.id});
     if (result.ok) island.close();
   } : undefined} /></form>
-    {current && <section className="mt-7 border-t border-border pt-5">
+    {current && <section className="mt-7 border-t pt-5">
       <h3 className="type-section">{s("Connection test", "连接测试")}</h3>
       <p className="type-caption my-2">{s("Uses the saved configuration and sends a short request. Provider charges may apply.", "使用已保存的配置发送简短请求，可能产生提供商费用。")}</p>
       {latest && <div role="status" className="type-caption my-3">

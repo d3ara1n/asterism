@@ -1,10 +1,20 @@
-import type { ComponentProps } from "react";
-import { cn } from "../utils";
+import * as React from "react"
+import { cn } from "../utils"
 
-/** 输入类控件共用外观：实色背景、悬停、聚焦、错误、禁用。焦点轮廓由全局 :focus-visible 提供。 */
-export const controlStyle = "rounded-control border border-border bg-card text-sm shadow-xs outline-none transition-[border-color,background-color] placeholder:text-muted-foreground hover:border-ring/50 focus-visible:border-ring disabled:pointer-events-none disabled:opacity-45 aria-invalid:border-destructive";
-
-// 基于 shadcn/ui Input（MIT）。
-export function Input({ className, type, ...props }: ComponentProps<"input">) {
-  return <input type={type} data-slot="input" className={cn(controlStyle, "h-7 w-full min-w-0 px-2", className)} {...props} />;
+function Input({ className, type, ...props }: React.ComponentProps<"input">) {
+  return (
+    <input
+      type={type}
+      data-slot="input"
+      className={cn(
+        "h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none selection:bg-primary selection:text-primary-foreground file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm dark:bg-input/30",
+        "focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50",
+        "aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40",
+        className
+      )}
+      {...props}
+    />
+  )
 }
+
+export { Input }

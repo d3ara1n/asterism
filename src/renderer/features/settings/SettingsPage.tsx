@@ -58,11 +58,11 @@ function SettingsRoot({ openId, onOpen, onClosed }: { openId: string | null; onO
           initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.85 }}
           ref={node => { if (node) cards.current.set(id, node); else cards.current.delete(id); }}
           onClick={() => onOpen(id)}>
-          <span className="flex size-8 items-center justify-center rounded-control bg-card text-primary ring-1 ring-surface-ring" aria-hidden="true"><Icon className="size-4" /></span>
+          <Icon className="size-4 text-muted-foreground" aria-hidden="true" />
           <span><span className="type-section block">{title}</span><span className="type-caption mt-0.5 block">{summary}</span></span>
         </motion.button>)}
       </motion.div> : <motion.div key={`detail-${open.id}`} layoutId={`settings-card-${open.id}`} transition={islandTransition}
-        className="settings-detail" style={{ borderRadius: "var(--surface-radius)" }}>
+        className="settings-detail" style={{ borderRadius: "var(--radius)" }}>
         <motion.div className="p-6" initial={{ opacity: 0 }} animate={{ opacity: 1, transition: { ...islandTransition, delay: 0.18 } }} exit={{ opacity: 0, transition: fadeTransition }}>
           <Button variant="ghost" size="sm" className="-ml-2 mb-4" onClick={close}><ArrowLeft />{t.allSettings}</Button>
           <h2 ref={heading} tabIndex={-1} className="type-page mb-2 outline-none">{open.title}</h2>

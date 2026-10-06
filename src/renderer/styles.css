@@ -1,36 +1,34 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
-/* 已确认的织台视觉。颜色、字号、圆角、层级与动效在此维护，业务页面只组合语义样式。 */
+/* 主题 token、两种表面、窗口与编织布局机制。控件外观只来自 shared/ui 的 shadcn 官方源码。 */
 :root {
   color-scheme: light;
+  /* shadcn 标准语义 token；组件与业务只消费这一层。主题替换整组值即可。 */
+  --radius: 8px;
   --background: #edf1f0;
   --foreground: #263c36;
   --card: #ffffff;
+  --card-foreground: #263c36;
+  --popover: #ffffff;
+  --popover-foreground: #263c36;
   --primary: #256651;
   --primary-foreground: #ffffff;
   --secondary: #e7efeb;
+  --secondary-foreground: #263c36;
+  --muted: #e7efeb;
   --muted-foreground: #53695f;
-  --border: #d3dfd9;
-  --surface-ring: #263c360f;
-  --island-focus: #256651;
-  /* 受管空间内边距：浮岛顶边与页面顶边对齐，间距只由此处决定。 */
-  --space-inset: 0px;
-  --ring: #438c72;
+  --accent: #e7efeb;
+  --accent-foreground: #263c36;
   --destructive: #8f403d;
-  --destructive-soft: #f6e9e8;
-  --success: #2f6b45;
-  --success-soft: #e4f1e8;
-  --warning: #8a5a12;
-  --warning-soft: #f7efdf;
-  --overlay: #263c3626;
+  --border: #d3dfd9;
+  --input: #d3dfd9;
+  --ring: #438c72;
+  /* 织台扩展：画布纹理与选区。 */
   --canvas-grid: #c4cfca;
   --selection: #cae5d7;
-  --control-radius: 6px;
-  --surface-radius: 8px;
-  --dialog-radius: 12px;
-  --surface-elevation: 0 3px 16px #29453710;
-  --object-elevation: 0 4px 20px #2945370d;
-  --dialog-elevation: 0 16px 64px #26473920, 0 2px 8px #26473908;
+  /* 受管空间内边距：浮岛顶边与页面顶边对齐。 */
+  --space-inset: 0px;
   --motion-fast: 200ms;
   --motion-page: 380ms;
   --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -39,28 +37,31 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
   --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
-  --color-border: var(--border);
-  --color-surface-ring: var(--surface-ring);
-  --color-ring: var(--ring);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
-  --color-destructive-soft: var(--destructive-soft);
-  --color-success: var(--success);
-  --color-success-soft: var(--success-soft);
-  --color-warning: var(--warning);
-  --color-warning-soft: var(--warning-soft);
-  --color-overlay: var(--overlay);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
   --font-sans: "Avenir Next", "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
-  --radius-control: var(--control-radius);
-  --radius-surface: var(--surface-radius);
-  --radius-dialog: var(--dialog-radius);
-  --shadow-surface: var(--surface-elevation);
-  --shadow-object: var(--object-elevation);
-  --shadow-dialog: var(--dialog-elevation);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
 }
+/* 唯二的表面：内容面与 Card 一致（实色 + 1px 边框），浮层与 Popover 一致（实色 + 边框 + 阴影）。
+   不能使用 Card 组件的位置（窗口部件、浮岛底板、动画元素）用这两个 utility。 */
+@utility surface { @apply rounded-lg border bg-card text-card-foreground; }
+@utility surface-floating { @apply rounded-lg border bg-popover text-popover-foreground shadow-md; }
 @layer base {
   * { box-sizing: border-box; }
   html, body, #root { height: 100%; background: transparent; }
@@ -68,8 +69,7 @@
   button, input, textarea, select { font: inherit; }
   button { cursor: pointer; }
   button:disabled { cursor: default; }
-  /* 唯一的焦点样式；控件不再叠加 ring。 */
-  :focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+  * { border-color: var(--border); }
   ::selection { background: var(--selection); }
 }
 @layer components {
@@ -100,7 +100,7 @@
     user-select: none;
   }
   .window-part {
-    @apply flex min-w-0 items-center rounded-surface bg-card px-1 shadow-surface ring-1 ring-surface-ring;
+    @apply surface flex min-w-0 items-center px-1;
     -webkit-app-region: no-drag;
     app-region: no-drag;
   }
@@ -131,58 +131,27 @@
     transform: translateX(calc(var(--screen-index) * -1 * (100% + var(--window-gap))));
     transition: transform var(--motion-page) var(--ease-out);
   }
-  .space-screen { @apply relative isolate h-full min-h-0 w-full shrink-0 overflow-hidden rounded-surface; }
-  .space-screen[data-surface] { @apply bg-background shadow-surface ring-1 ring-surface-ring; }
+  .space-screen { @apply relative isolate h-full min-h-0 w-full shrink-0 overflow-hidden rounded-lg; }
+  .space-screen[data-surface] { @apply surface bg-background; }
 
   .skip-link {
-    @apply sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-20 focus:z-30 focus:rounded-control focus:bg-card focus:p-3;
+    @apply sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-20 focus:z-30 focus:rounded-md focus:bg-card focus:p-3;
     -webkit-app-region: no-drag;
     app-region: no-drag;
   }
-  .dialog-overlay, .dialog-content, .menu-content {
-    /* Portal 位于 shell 外，浮层需要显式排除其下方的底座拖动区域。 */
+  /* Portal 位于 shell 外，浮层需要显式排除其下方的底座拖动区域；按 shadcn 的 data-slot 识别。 */
+  [data-slot$="-overlay"], [data-slot$="-content"] {
     -webkit-app-region: no-drag;
     app-region: no-drag;
   }
-  .dialog-content *, .menu-content * { window-drag: initial; }
-  .dialog-overlay { animation: fade-in var(--motion-fast) var(--ease-out); }
-  .dialog-content { animation: rise-in var(--motion-fast) var(--ease-out); }
-  .menu-content {
-    @apply z-50 min-w-44 rounded-surface bg-card p-1 shadow-dialog ring-1 ring-surface-ring;
-    animation: rise-in var(--motion-fast) var(--ease-out);
-  }
-  .menu-item {
-    @apply flex h-7 cursor-default select-none items-center gap-2 rounded-control px-2 text-sm outline-none data-[highlighted]:bg-secondary data-[disabled]:opacity-45;
-  }
+  [data-slot$="-content"] * { window-drag: initial; }
 
-  /* 工作台浮层：左侧面板、底部状态与提示统一按 inset 排布，避免手调避让。 */
   .overlay-inset { --overlay-inset: 8px; }
-  .floating-bar { @apply rounded-surface bg-card p-1 shadow-surface ring-1 ring-surface-ring; }
-  .floating-panel {
-    @apply overflow-hidden rounded-surface bg-card shadow-dialog ring-1 ring-surface-ring;
-    animation: slide-in-left var(--motion-fast) var(--ease-out);
-  }
-  .notice {
-    @apply flex items-start gap-3 rounded-surface border-l-4 bg-card p-3 text-sm shadow-dialog ring-1 ring-surface-ring;
-    animation: rise-in var(--motion-fast) var(--ease-out);
-  }
-  .status-chip { @apply rounded-control bg-card/90 px-2 py-0.5 text-xs leading-relaxed text-muted-foreground ring-1 ring-surface-ring; transition: opacity var(--motion-fast); }
-  .status-chip[data-hidden="true"] { opacity: 0; }
-  .notice-error { @apply border-destructive; }
-  .notice-warning { @apply border-warning; }
-  .object-card { @apply w-[340px] overflow-hidden rounded-surface bg-card shadow-object ring-1 ring-surface-ring; }
-  .object-card-selected { @apply ring-2 ring-primary/60; }
-  .object-symbol { @apply flex size-7 shrink-0 items-center justify-center rounded-control; }
-  .list-item {
-    @apply flex w-full items-center gap-2 rounded-control px-2 py-1.5 text-left text-sm hover:bg-secondary/60 disabled:opacity-45;
-    transition: background-color var(--motion-fast);
-  }
+  .floating-panel { animation: slide-in-left var(--motion-fast) var(--ease-out); }
   /* 应用导航与主内容为相邻浮岛；首页只让输入框形成表面，其余透出窗口材质。 */
   .app-sidebar { @apply flex h-full min-h-0 flex-col p-3; }
-  .app-sidebar .list-item[aria-current="page"] { @apply bg-secondary font-medium; }
   .home-page { @apply flex h-full overflow-y-auto px-6 py-10; }
   .home-content { @apply m-auto w-full max-w-2xl shrink-0; }
-  .home-composer { @apply overflow-hidden rounded-dialog bg-card shadow-surface ring-1 ring-surface-ring; }
 
   /* 设置：分类卡片平铺在材质上；选中卡片底板扩展为内容区，其余收缩消失。 */
   /* 浮岛编织：屏内浮岛自左向右；放得下时分栏居中，放不下时溢出并跟随焦点。 */
@@ -190,10 +159,10 @@
   .weave-strip { @apply relative flex h-full w-max; }
   .island { @apply relative h-full min-w-0 shrink-0 outline-none; }
   .island-backdrop {
-    @apply pointer-events-none absolute inset-0 rounded-surface bg-card shadow-surface ring-1 ring-surface-ring;
-    transition: box-shadow var(--motion-fast) var(--ease-out);
+    @apply surface pointer-events-none absolute inset-0;
+    transition: border-color var(--motion-fast) var(--ease-out);
   }
-  .island[data-focused] > .island-backdrop { box-shadow: var(--surface-elevation), 0 0 0 1px var(--island-focus); }
+  .island[data-focused] > .island-backdrop { border-color: var(--ring); }
   .island-body { @apply relative h-full overflow-y-auto; }
   .island[data-peek] { cursor: pointer; }
   .island[data-peek] > .island-body { opacity: 0.6; transition: opacity var(--motion-fast); }
@@ -205,22 +174,16 @@
     grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   }
   .settings-card {
-    @apply flex flex-col items-start gap-3 rounded-surface bg-card p-4 text-left shadow-surface ring-1 ring-surface-ring hover:bg-secondary;
+    @apply surface flex flex-col items-start gap-3 p-4 text-left hover:bg-accent;
     transition: background-color var(--motion-fast);
   }
   .settings-detail {
     /* 与卡片区同宽，高度随内容，超出时在卡片内滚动。 */
-    @apply absolute inset-x-0 top-0 max-h-full overflow-y-auto overscroll-contain rounded-surface bg-card shadow-surface ring-1 ring-surface-ring;
+    @apply surface absolute inset-x-0 top-0 max-h-full overflow-y-auto overscroll-contain;
   }
-  .settings-row { @apply flex flex-wrap items-start justify-between gap-x-6 gap-y-2 border-b border-border/70 py-4 last:border-b-0; }
 }
-@keyframes fade-in { from { opacity: 0; } }
-@keyframes rise-in { from { opacity: 0; transform: translateY(4px); } }
 @keyframes slide-in-left { from { opacity: 0; transform: translateX(-8px); } }
 .react-flow__attribution { background: transparent !important; font-size: 9px !important; }
-.react-flow__controls { box-shadow: var(--surface-elevation) !important; overflow: hidden; border-radius: var(--control-radius); }
-.react-flow__controls-button { background: var(--card) !important; border-color: var(--border) !important; color: var(--foreground) !important; }
-.react-flow__controls-button svg { fill: none !important; max-width: 14px !important; max-height: 14px !important; }
 .react-flow__edge-text { fill: var(--muted-foreground); font-family: var(--font-sans); font-size: 10px; }
 .react-flow__edge-textbg { fill: var(--background); }
 .react-flow__handle { width: 7px; height: 7px; background: var(--primary); border: 2px solid var(--card); }

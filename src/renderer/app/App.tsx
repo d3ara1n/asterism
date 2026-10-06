@@ -3,10 +3,12 @@ import { ArrowLeft, ChevronDown, FileText, History, House, KeyRound, ListTree, P
 import type { Command } from "../../shared/contracts";
 import type { ApplicationController } from "./controller";
 import { t } from "../shared/i18n";
-import { Button, IconButton } from "../shared/ui/button";
+import { Button } from "../shared/ui/button";
 import { WeftMark } from "../shared/ui/weft-mark";
-import { Menu, MenuItem, MenuSeparator } from "../shared/ui/menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "../shared/ui/dropdown-menu";
 import { PageState } from "../shared/ui/page-state";
+import { Alert, AlertDescription } from "../shared/ui/alert";
+import { Badge } from "../shared/ui/badge";
 import { Workbench } from "../features/workbench/Workbench";
 import { AccessDialog } from "../features/workbench/AccessDialog";
 import { SidePanel, type PanelKind } from "../features/workbench/SidePanel";
@@ -86,17 +88,17 @@ export function App({ controller }: { controller: ApplicationController }) {
   };
 
   const navigation = <>
-    {!inSettings && <IconButton ref={sidebarToggle} label={sidebarVisible ? t.hideSidebar : t.showSidebar}
+    {!inSettings && <Button ref={sidebarToggle} variant="ghost" size="icon-xs" aria-label={sidebarVisible ? t.hideSidebar : t.showSidebar} title={sidebarVisible ? t.hideSidebar : t.showSidebar}
       aria-expanded={sidebarVisible} aria-controls={sidebarVisible ? "app-sidebar" : undefined}
-      onClick={() => setSidebarVisible(visible => !visible)}><PanelLeft /></IconButton>}
+      onClick={() => setSidebarVisible(visible => !visible)}><PanelLeft /></Button>}
     {inSettings ? <Button variant="ghost" size="sm" onClick={() => go("main")}><ArrowLeft />{t.back}</Button> :
-      <Menu trigger={<Button variant="ghost" size="sm" aria-label={t.menu}>
+      <DropdownMenu modal={false}><DropdownMenuTrigger asChild><Button variant="ghost" size="sm" aria-label={t.menu}>
         <WeftMark className="size-4 text-primary" /><span className="text-sm font-semibold text-primary">{t.appName}</span><ChevronDown className="text-muted-foreground" />
-      </Button>}>
-        <MenuItem onSelect={goHome}><House />{t.home}</MenuItem>
-        <MenuSeparator />
-        <MenuItem onSelect={() => go("settings")}><Settings />{t.menuSettings}</MenuItem>
-      </Menu>}
+      </Button></DropdownMenuTrigger><DropdownMenuContent align="start">
+        <DropdownMenuItem onSelect={goHome}><House />{t.home}</DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={() => go("settings")}><Settings />{t.menuSettings}</DropdownMenuItem>
+      </DropdownMenuContent></DropdownMenu>}
     <span className="h-4 w-px shrink-0 bg-border" />
     <span className="window-task-title" title={inSettings ? t.settings : mainTitle}>{inSettings ? t.settings : mainTitle}</span>
     {!inSettings && task && <Button size="sm" variant="ghost" onClick={() => togglePanel("history")} aria-expanded={panel === "history"}><History />{t.history}</Button>}
@@ -107,7 +109,7 @@ export function App({ controller }: { controller: ApplicationController }) {
     <Button variant="ghost" size="sm" onClick={() => togglePanel("objects")} aria-expanded={panel === "objects"} aria-label={t.objects}><ListTree /><span className="toolbar-label">{t.objects}</span></Button>
   </> : undefined;
 
-  const workbench = <div ref={workbenchRef} className="overlay-inset relative h-full overflow-hidden rounded-surface bg-background">
+  const workbench = <div ref={workbenchRef} className="overlay-inset relative h-full overflow-hidden rounded-lg bg-background">
     {task ? <Workbench key={task.id + ":" + (task.historical ? task.at_seq : "live")} task={task} run={run} /> :
       <div className="flex h-full items-center justify-center px-6"><div>
         <PageState kind={state.busy ? "loading" : "error"} title={state.busy ? t.openingTitle : t.unavailableTitle}
@@ -120,13 +122,13 @@ export function App({ controller }: { controller: ApplicationController }) {
       <p className="type-caption">{task.historical ? t.noObjectsHistorical : t.noObjects}</p>
     </div>}
     {panel && task && <SidePanel panel={panel} snapshot={snapshot} busy={state.busy} writable={writable} run={run} onClose={() => setPanel(null)} />}
-    {task?.historical && <div className="floating-bar absolute bottom-[var(--overlay-inset)] left-1/2 z-10 flex -translate-x-1/2 items-center gap-3 whitespace-nowrap pl-3 text-sm">
+    {task?.historical && <div className="surface-floating absolute p-1 bottom-[var(--overlay-inset)] left-1/2 z-10 flex -translate-x-1/2 items-center gap-3 whitespace-nowrap pl-3 text-sm">
       <span>{t.viewingHistory}</span>
       <Button size="sm" disabled={state.busy} onClick={() => { void run({ type: "workspace.read", task_id: task.id }); }}>{t.backToLive}</Button>
     </div>}
-    {task && <span role="status" className="status-chip absolute left-[var(--overlay-inset)] top-[var(--overlay-inset)] z-10" data-hidden={!!panel || undefined}>
+    {task && <Badge variant="outline" role="status" className={`absolute left-[var(--overlay-inset)] top-[var(--overlay-inset)] z-10 bg-card text-muted-foreground transition-opacity ${panel ? "opacity-0" : ""}`}>
       {state.busy ? t.statusBusy : ready ? t.statusReady : t.statusUnavailable}
-    </span>}
+    </Badge>}
   </div>;
   const sidebar: IslandSpec = {
     id: "navigation", label: t.appNavigation, width: { min: 224, max: 224 },
@@ -149,10 +151,10 @@ export function App({ controller }: { controller: ApplicationController }) {
           content: <Screen label={t.appNavigation} leading={sidebarVisible ? [sidebar] : []} root={main} className="h-full" /> },
       ]} />
     </Window>
-    {state.error && <div role="alert" className="notice notice-error fixed bottom-4 left-1/2 z-[60] w-[min(560px,calc(100%-32px))] -translate-x-1/2">
-      <p className="flex-1">{state.error}</p>
-      <IconButton label={t.dismissError} onClick={controller.clearError}><X /></IconButton>
-    </div>}
+    {state.error && <Alert variant="destructive" className="fixed bottom-4 left-1/2 z-[60] w-[min(560px,calc(100%-32px))] -translate-x-1/2 flex items-start gap-3 shadow-md">
+      <AlertDescription className="flex-1">{state.error}</AlertDescription>
+      <Button variant="ghost" size="icon-xs" aria-label={t.dismissError} title={t.dismissError} onClick={controller.clearError}><X /></Button>
+    </Alert>}
     {creation && <CreateNoteDialog creation={creation} busy={state.busy} run={run} onClose={() => setCreation(null)} />}
     {accessOpen && task && <AccessDialog task={task} busy={state.busy} run={run} onClose={() => setAccessOpen(false)} />}
   </>;

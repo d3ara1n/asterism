@@ -2,12 +2,12 @@
 
 ## 已确认的视觉
 
-织台使用浅灰绿色工作台、白色卡片与深青色操作强调。窗口作为系统材质底座，独立内容表面铺在其上；后续功能沿用此视觉，不随实现者重新设计。
+窗口作为系统材质底座，独立内容表面铺在其上。当前默认主题为浅灰绿工作台、白色表面与深青强调；配色、圆角、密度与画布纹理属于主题，后续由用户在设置中选择。
 
 - 左上是应用导航与当前视图标题，macOS 原生红黄绿置于该区域。
 - 右上是紧凑快捷操作，Windows 原生窗口控件在右侧保留安全区。
 - 下方是左侧可隐藏的应用侧栏与右侧主内容两个浮岛。启动主内容为无背景首页，不加载会话；选择已有会话或首次发送创建后才显示工作台。对象与历史面板在工作台内按需展开。
-- 窗口外沿与部件之间均留 6px 间隙，让系统材质可见。顶部表面高 32px；工作台和顶部部件使用 8px 圆角。采用紧凑桌面密度，标准按钮高 28px，顶部小按钮和图标按钮高 24px；不靠缩小正文字号压缩空间。
+- 窗口外沿与部件之间均留 6px 间隙，让系统材质可见。顶部表面高 32px。控件尺寸使用 shadcn 官方尺寸档；界面密度作为主题项统一缩放，不在调用处写死像素。
 - 状态、画布控制和内容都处于对应表面内，外部间隙保持空白。
 
 ## 原生窗口与 Web 内容
@@ -63,8 +63,10 @@ Window          平台差异、拖动区域、窗口几何变量
 - 界面按系统语言单语显示（中文或英文），文案集中于 `shared/i18n.ts`；窄窗口时顶栏按钮只留图标。
 - 字号五级：`type-page`、`type-section`、`type-body`、`type-caption`、`type-label`。
 - 图标统一使用 lucide-react，不使用 Unicode 符号；界面标识为 `weft-mark.tsx` 的经纬线框。
-- 表单与列表控件全部使用 `shared/ui/` 中的 shadcn（new-york）实现：Select、Input、Textarea、Field、Item、Alert、Badge、Switch、Separator、Menu、Dialog、Button/IconButton、PageState。业务代码不使用原生 select 等裸控件。
-- 焦点样式只有全局一套。描边、遮罩、success/warning/destructive 及浅底色、焦点浮岛高光均为语义 token；错误提示为白色表面加红色左边条。
+- `shared/ui/` 只放 shadcn（new-york-v4）官方 registry 源码，不手改结构与样式类；升级即重新拉取覆盖。官方没有的组合（如 PageState）放在 `shared/ui/` 内但只组合官方组件，不另写皮肤。
+- 业务代码只用官方组件与布局类，不使用裸 button/select 等控件，不写控件颜色、阴影或圆角。
+- 表面只有两种：`surface`（边框 + 卡片底，无阴影，用于浮岛、顶栏部件、卡片、画布）与 `surface-floating`（加阴影，用于悬浮面板、浮条、通知）；对话框、菜单、下拉由官方组件提供浮层外观。
+- 焦点、错误、禁用状态使用官方组件自带样式；进出场动画由 `tw-animate-css` 提供。
 
 ## 唯一维护入口
 
@@ -80,7 +82,7 @@ Window          平台差异、拖动区域、窗口几何变量
 | 平台材质、实色回退与系统偏好监听 | `src/main/window-appearance.ts` |
 | shadcn/ui 组件配置 | `components.json` |
 
-主题采用语义 token：背景、卡片、前景、强调、次级、边框、焦点、危险、画布网点，以及控件/表面/弹窗三级圆角与阴影。原生窗口回退色在 window-appearance 中与工作台背景保持一致。
+主题采用 shadcn 语义 token（background、card、popover、primary、secondary、muted、accent、border、input、ring、destructive 等）与单一 `--radius` 圆角刻度，另加 `--canvas-grid` 画布纹理色。原生窗口回退色在 window-appearance 中与工作台背景保持一致。
 
 shadcn/ui 组件源码由项目维护，Radix 管理基础交互，Tailwind 表达布局与 token。业务页面只组合已有控件、布局与语义样式；不新增局部色板、任意阴影或独立控件皮肤。确需新增变体时进入公共组件，整体视觉变更须由用户确认。
 

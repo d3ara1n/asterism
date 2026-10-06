@@ -2,9 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import { ArrowUp, Settings } from "lucide-react";
 import { resolveModelRole, resolveProviderModel, thinkingSchema, type ConfigurationSnapshot, type ThinkingLevel } from "../../../shared/configuration";
 import { t } from "../../shared/i18n";
-import { Button, IconButton } from "../../shared/ui/button";
+import { Button } from "../../shared/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../shared/ui/select";
-import { Textarea } from "../../shared/ui/textarea";
+import { InputGroup, InputGroupAddon, InputGroupTextarea } from "../../shared/ui/input-group";
 import { WeftMark } from "../../shared/ui/weft-mark";
 import { s, useConfiguration } from "../configuration/state";
 
@@ -44,11 +44,11 @@ export function HomePage({ active, draft, onDraftChange, onSettings }: {
       <WeftMark className="mb-4 size-12 text-primary" /><h1 className="type-page">{t.appName}</h1>
       <p className="type-body mt-2 text-muted-foreground">{t.homePrompt}</p>
     </header>
-    <form className="home-composer" onSubmit={event => event.preventDefault()} aria-label={t.newConversation}>
+    <form onSubmit={event => event.preventDefault()} aria-label={t.newConversation}><InputGroup className="bg-card">
       <label htmlFor="home-message" className="sr-only">{t.firstMessage}</label>
-      <Textarea id="home-message" variant="plain" className="min-h-40 resize-none px-4 py-4" rows={5} maxLength={100_000}
+      <InputGroupTextarea id="home-message" className="min-h-40 px-4 py-4" rows={5} maxLength={100_000}
         placeholder={t.homePlaceholder} value={draft} onChange={event => onDraftChange(event.target.value)} aria-describedby="home-availability" />
-      <div className="flex flex-wrap items-center justify-between gap-3 px-3 pb-3">
+      <InputGroupAddon align="block-end" className="flex-wrap justify-between gap-3">
         <div className="flex min-w-0 flex-wrap items-center gap-2">
           <Select value={agent?.id ?? ""} disabled={!snapshot} onValueChange={id => snapshot && selectAgent(id, snapshot)}>
             <SelectTrigger aria-label={t.agent} className="w-32"><SelectValue placeholder={t.agent} /></SelectTrigger>
@@ -66,9 +66,9 @@ export function HomePage({ active, draft, onDraftChange, onSettings }: {
             <SelectContent><SelectItem value="__default">{s("Default", "默认")}</SelectItem>{thinkingSchema.options.map(level => <SelectItem key={level} value={level}>{level}</SelectItem>)}</SelectContent>
           </Select>
         </div>
-        <IconButton label={t.sendMessage} type="submit" variant="default" className="size-8" disabled aria-describedby="home-availability"><ArrowUp /></IconButton>
-      </div>
-    </form>
+        <Button size="icon-sm" aria-label={t.sendMessage} title={t.sendMessage} type="submit" disabled aria-describedby="home-availability"><ArrowUp /></Button>
+      </InputGroupAddon>
+    </InputGroup></form>
     {(error || unavailable || selectionError) && <p role="alert" className="mt-3 text-center text-xs text-destructive">{error ?? unavailable ?? selectionError}</p>}
     <div className="mt-4 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-center">
       <p id="home-availability" className="type-caption">{t.homeUnavailable}</p>
