@@ -1,6 +1,7 @@
 {
   "name": "weft",
   "private": true,
+  "license": "MIT",
   "version": "0.1.0",
   "description": "An object-centered personal agent workbench",
   "author": "Weft contributors",
