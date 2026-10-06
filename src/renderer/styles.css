@@ -101,7 +101,8 @@
     @apply grid h-dvh min-h-0 overflow-hidden text-foreground;
     grid-template-rows: var(--window-header-height) minmax(0, 1fr);
     gap: var(--window-gap);
-    padding: var(--window-gutter);
+    /* 外边距只给标题栏；主体行贴住窗口左右下边缘，边距由 Space 在滚动容器内部提供。 */
+    padding-top: var(--window-gutter);
     /* 没有全窗口底色，间隙直接露出主进程的系统材质或实色回退。 */
     -webkit-app-region: drag;
     app-region: drag;
@@ -114,6 +115,7 @@
   .titlebar {
     @apply relative z-10 flex min-w-0 items-stretch justify-between;
     gap: var(--window-gap);
+    margin-inline: var(--window-gutter);
     user-select: none;
   }
   .window-part {
@@ -138,7 +140,6 @@
   .space {
     /* clip 而非 hidden：hidden 仍可被 focus/scrollIntoView 程序化滚动，会打乱平移方向。 */
     @apply relative min-h-0 min-w-0 overflow-clip;
-    padding: var(--space-inset);
     -webkit-app-region: no-drag;
     app-region: no-drag;
   }
@@ -149,7 +150,13 @@
     transition: transform var(--motion-page) var(--ease-out);
   }
   .space-screen { @apply relative isolate h-full min-h-0 w-full shrink-0 overflow-hidden rounded-lg; }
-  .space-screen[data-surface] { @apply surface bg-background; }
+  /* 屏铺满 Space、贴住窗口边缘；滚动容器在屏内部留出 --space-inset。带底板的屏自身让出边距。 */
+  .space-screen[data-surface] {
+    @apply surface bg-background;
+    margin: 0 var(--space-inset) var(--space-inset);
+    width: calc(100% - 2 * var(--space-inset));
+    height: calc(100% - var(--space-inset));
+  }
 
   .skip-link {
     @apply sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-20 focus:z-30 focus:rounded-md focus:bg-card focus:p-3;
@@ -167,13 +174,13 @@
   .floating-panel { animation: slide-in-left var(--motion-fast) var(--ease-out); }
   /* 应用导航与主内容为相邻浮岛；首页只让输入框形成表面，其余透出窗口材质。 */
   .app-sidebar { @apply flex h-full min-h-0 flex-col p-3; }
-  .home-page { @apply flex h-full overflow-y-auto px-6 py-10; }
+  .home-page { @apply flex h-full overflow-y-auto px-6 py-10; padding-inline: calc(1.5rem + var(--space-inset)); }
   .home-content { @apply m-auto w-full max-w-2xl shrink-0; }
 
   /* 设置：分类卡片平铺在材质上；选中卡片底板扩展为内容区，其余收缩消失。 */
   /* 浮岛编织：屏内浮岛自左向右；放得下时分栏居中，放不下时溢出并跟随焦点。 */
   .weave-viewport { @apply relative min-h-0 min-w-0 overflow-clip; }
-  .weave-strip { @apply relative h-full; }
+  .weave-strip { position: absolute; inset: 0 var(--space-inset) var(--space-inset); }
   .island { @apply absolute top-0 left-0 h-full outline-none; }
   .island-backdrop {
     @apply surface pointer-events-none absolute inset-0;
@@ -181,9 +188,15 @@
   }
   .island[data-focused] > .island-backdrop { border-color: var(--ring); }
   .island-body { @apply relative h-full overflow-y-auto; }
+  /* 面板浮岛：标题栏固定，内容区单独滚动；body 不再滚动，由内容区承担。 */
+  .island-body:has(> .island-panel) { overflow: hidden; }
+  .island-panel { @apply flex h-full min-h-0 flex-col; }
+  .island-panel-header { @apply flex shrink-0 items-center gap-2 border-b py-2.5 pr-2.5 pl-5; }
+  .island-panel-content { @apply min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-5; }
   .island[data-peek] { cursor: pointer; }
   .island[data-peek] > .island-body { opacity: 0.6; transition: opacity var(--motion-fast); }
-  .weave-indicator { @apply pointer-events-none absolute inset-x-6 bottom-1 h-1 rounded-full bg-foreground/5; }
+  .weave-indicator { @apply pointer-events-none absolute bottom-px h-1 rounded-full bg-foreground/5; }
+  .weave-indicator { inset-inline: var(--space-inset); }
   .weave-indicator > span { @apply absolute inset-y-0 rounded-full bg-foreground/20; transition: left var(--motion-page) var(--ease-out); }
   .settings-stage { @apply relative h-full; }
   .settings-grid {

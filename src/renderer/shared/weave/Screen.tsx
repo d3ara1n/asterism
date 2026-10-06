@@ -45,6 +45,7 @@ export function Screen({ label, root, leading, className, resetKey }: {
   /** 变化时关闭全部更深浮岛。 */ resetKey?: string;
 }) {
   const viewport = useRef<HTMLDivElement>(null);
+  const strip = useRef<HTMLDivElement>(null);
   const [deeper, setDeeper] = useState<IslandSpec[]>([]);
   const [focus, setFocus] = useState(root.id);
   const [width, setWidth] = useState(0);
@@ -57,7 +58,8 @@ export function Screen({ label, root, leading, className, resetKey }: {
   }, [islands, focus, root.id]);
 
   useLayoutEffect(() => {
-    const element = viewport.current;
+    // 排布宽度取扣掉 --space-inset 后的条带宽度；视口本身铺满容器。
+    const element = strip.current;
     if (!element) return;
     setWidth(element.clientWidth);
     const observer = new ResizeObserver(() => setWidth(element.clientWidth));
@@ -103,7 +105,7 @@ export function Screen({ label, root, leading, className, resetKey }: {
 
   return <div className={cn("weave-viewport", className)} aria-label={label} role="group" ref={viewport} onWheel={onWheel} onKeyDown={onKeyDown}>
     {/* 视口宽度测得之前不排布浮岛，避免以 0 宽度按溢出布局渲染一帧。 */}
-    <div className="weave-strip" style={{ visibility: width ? undefined : "hidden" }}>
+    <div className="weave-strip" ref={strip} style={{ visibility: width ? undefined : "hidden" }}>
       {/* 每个浮岛绝对定位，自身插值到目标 x 与宽度：增删浮岛时其余浮岛从当前位置平滑让位，不叠加整条平移与 layout 动画。 */}
       <AnimatePresence initial={false}>{islands.map((island, index) => {
         const span = spans[index] ?? { left: 0, width: 0 };

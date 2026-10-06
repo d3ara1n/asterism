@@ -5,6 +5,8 @@ import { t } from "../shared/i18n";
 const geometry = {
   "--window-gutter": `${windowGeometry.gutter}px`,
   "--window-gap": `${windowGeometry.gap}px`,
+  // 窗口边距由 Space 内的滚动容器提供，滚动条与指示条因此贴住窗口边缘。
+  "--space-inset": `${windowGeometry.gutter}px`,
   "--window-header-height": `${windowGeometry.headerHeight}px`,
   // 导航部件内：按钮组左侧留白与右侧留白相等。
   "--mac-controls-inset": `${2 * windowGeometry.macControlsPosition.x - 2 * windowGeometry.gutter + windowGeometry.macControlsWidth}px`,

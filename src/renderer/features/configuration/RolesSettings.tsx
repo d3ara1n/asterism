@@ -30,7 +30,7 @@ function RoleEditor({ initialId }: { initialId: string | null }) {
     name: current.name, modelId: current.modelId, thinking: current.thinking, enabled: current.enabled, description: current.description, hidden: current.hidden,
   } : { name: "", modelId: null, thinking: null, enabled: true, description: "", hidden: false });
   const set = <K extends keyof typeof value>(field: K, next: typeof value[K]) => setValue(previous => ({ ...previous, [field]: next }));
-  return <Editor title={s("Model role", "模型角色")}><form onSubmit={async event => {
+  return <Editor form="role-form" title={s("Model role", "模型角色")}><form id="role-form" onSubmit={async event => {
     event.preventDefault(); const result = await run({ type: "role.save", id, value });
     if (result.ok) setId(result.savedId);
   }}><FieldGroup>
@@ -76,7 +76,7 @@ function AgentEditor({ initialId }: { initialId: string | null }) {
   const mode = value.tools !== null ? "allow" : value.excludeTools !== null ? "exclude" : "all";
   const set = <K extends keyof typeof value>(field: K, next: typeof value[K]) => setValue(previous => ({ ...previous, [field]: next }));
   const roleOptions = snapshot?.roles.map(role => ({ value: role.id, label: `${role.name}${role.enabled ? "" : s(" (disabled)", "（已停用）")}` })) ?? [];
-  return <Editor title={s("Agent configuration", "代理配置")}><form onSubmit={async event => {
+  return <Editor form="agent-form" title={s("Agent configuration", "代理配置")}><form id="agent-form" onSubmit={async event => {
     event.preventDefault(); const result = await run({ type: "agent.save", id,
       value: { ...value, tools: mode === "allow" ? lines(toolText) : null, excludeTools: mode === "exclude" ? lines(toolText) : null,
         subagentRoles: value.subagentRoles === null ? null : lines(delegateText), examples: lines(exampleText) } });

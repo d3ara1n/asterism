@@ -44,8 +44,8 @@ function ProviderEditor({ initialId }: { initialId: string | null }) {
   const openModel = (modelId: string | null) => {
     if (id) island.open({ id: `model-${modelId ?? "new"}`, label: s("Provider model", "具体模型"), width: { min: 400, grow: 1, max: 620 }, render: () => <ModelEditor key={modelId ?? "new"} initialId={modelId} providerId={id} /> });
   };
-  return <Editor title={s("Provider connection", "提供商连接")}>
-    <form onSubmit={async event => {
+  return <Editor form="provider-form" title={s("Provider connection", "提供商连接")}>
+    <form id="provider-form" onSubmit={async event => {
       event.preventDefault();
       const result = await run({ type: "provider.save", id, value,
         credential: value.auth === "none" || clearKey ? { action: "clear" } : key.trim() ? { action: "replace", value: key } : { action: "keep" } });
@@ -94,7 +94,7 @@ function ModelEditor({ initialId, providerId }: { initialId: string | null; prov
   const tests = snapshot?.tests.filter(test => test.modelId === id).slice().reverse() ?? [];
   const latest = tests[0];
   const provider = snapshot?.providers.find(item => item.id === providerId);
-  return <Editor title={s("Provider model", "具体模型")}><form onSubmit={async event => {
+  return <Editor form="model-form" title={s("Provider model", "具体模型")}><form id="model-form" onSubmit={async event => {
     event.preventDefault(); const result = await run({ type: "model.save", id, value });
     if (result.ok) setId(result.savedId);
   }}><FieldGroup>

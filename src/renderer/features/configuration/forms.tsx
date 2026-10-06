@@ -1,8 +1,7 @@
 import { useId, type ReactNode } from "react";
-import { X } from "lucide-react";
 import { Alert, AlertDescription } from "../../shared/ui/alert";
 import { Button } from "../../shared/ui/button";
-import { useIsland } from "../../shared/weave/Screen";
+import { IslandPanel } from "../../shared/weave/IslandPanel";
 import { Field, FieldDescription, FieldLabel } from "../../shared/ui/field";
 import { Input } from "../../shared/ui/input";
 import { Textarea } from "../../shared/ui/textarea";
@@ -43,16 +42,23 @@ export function ChoiceField({ label, value, onChange, options, empty }: {
     </SelectContent></Select></Field>;
 }
 export const lines = (value: string): string[] => [...new Set(value.split("\n").map(line => line.trim()).filter(Boolean))];
-export function Editor({ title, children }: { title: string; children: ReactNode }) {
-  const island = useIsland();
-  return <div className="p-6"><header className="mb-5 flex items-center justify-between gap-3"><h2 className="type-section">{title}</h2>
-    <Button variant="ghost" size="icon-xs" aria-label={s("Close", "关闭")} title={s("Close", "关闭")} onClick={island.close}><X /></Button></header><ConfigurationStatus />{children}</div>;
+/**
+ * 配置编辑器：套用面板浮岛；保存位于标题栏，经 form 属性提交内容区中的表单。
+ * TODO: 配置能力实际接入时，保存按钮改为「有修改且校验通过」才可用（需各编辑器跟踪修改），目前仅在保存中禁用。
+ */
+export function Editor({ title, form, children }: { title: string; form: string; children: ReactNode }) {
+  const { busy } = useSettingsConfiguration();
+  return <IslandPanel title={title}
+    action={<Button type="submit" form={form} size="sm" disabled={busy}>{busy ? s("Saving…", "正在保存…") : s("Save", "保存")}</Button>}>
+    <ConfigurationStatus />{children}
+  </IslandPanel>;
 }
+/** 次要的删除操作随表单内容放在末尾。 */
 export function SaveActions({ onRemove, cannotRemove = false }: { onRemove?: () => void; cannotRemove?: boolean }) {
   const { busy } = useSettingsConfiguration();
-  return <div className="mt-5 flex items-center justify-between gap-3">
-    <Button type="submit" disabled={busy}>{busy ? s("Saving…", "正在保存…") : s("Save", "保存")}</Button>
-    {onRemove && <Button type="button" variant="ghost" disabled={busy || cannotRemove} onClick={onRemove}>{s("Delete", "删除")}</Button>}
+  if (!onRemove && !cannotRemove) return null;
+  return <div className="mt-5 flex items-center gap-3">
+    {onRemove && <Button type="button" variant="ghost" className="-ml-2 text-destructive" disabled={busy || cannotRemove} onClick={onRemove}>{s("Delete", "删除")}</Button>}
     {cannotRemove && <span className="type-caption">{s("Built-in role", "内置角色")}</span>}
   </div>;
 }
