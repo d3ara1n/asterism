@@ -1,6 +1,7 @@
 import type { ConversationBridge, ConversationCommand, ConversationResult, ConversationSnapshot } from "../../../shared/conversation.ts";
 
-export type ConversationState = { snapshot: ConversationSnapshot | null; loading: boolean; busy: boolean; error: string | null; missing: boolean };
+/** inspected 为正在查看的历史节点；只是视图位置，不改变 runtime 游标。 */
+export type ConversationState = { snapshot: ConversationSnapshot | null; loading: boolean; busy: boolean; error: string | null; missing: boolean; inspected?: string };
 /** 订阅在查询前建立，合并密集通知；只接受不倒退的已提交版本，卸载不取消模型执行。 */
 export class ConversationController {
   private state: ConversationState = { snapshot: null, loading: true, busy: false, error: null, missing: false };
@@ -11,6 +12,7 @@ export class ConversationController {
   private dirty = false;
   constructor(private readonly bridge: ConversationBridge, readonly taskId: string, readonly agentId: string) {}
   getSnapshot = (): ConversationState => this.state;
+  inspect = (nodeId: string | undefined): void => this.update({ inspected: nodeId });
   subscribe = (listener: () => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; };
   private update(patch: Partial<ConversationState>) { this.state = { ...this.state, ...patch }; this.listeners.forEach(listener => listener()); }
   private accept(snapshot: ConversationSnapshot) {

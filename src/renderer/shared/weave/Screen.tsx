@@ -16,7 +16,7 @@ export interface IslandSpec {
   origin?: HTMLElement | null;
 }
 
-interface IslandApi {
+export interface IslandApi {
   id: string;
   /** 本浮岛右侧（更深一层）的浮岛 id。 */
   child?: string;

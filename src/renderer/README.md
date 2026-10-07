@@ -13,7 +13,12 @@
 | `app/ErrorBoundary.tsx` | 渲染异常后的重新加载入口 |
 | `features/home/HomePage.tsx` | 草稿、agent/模型/思考选择及首次发送 |
 | `features/workbench/Workbench.tsx` | 对象/关系到画布的投影、定位和视图保存 |
-| `features/workbench/ObjectNode.tsx` | 对象卡片外壳，按对象身份嵌入主代理或资源内容 |
+| `features/workbench/ObjectNode.tsx` | 按对象种类选择卡片内容 |
+| `features/workbench/ObjectCard.tsx` | 对象卡片控件：Card 外壳、拖动柄、视图操作与内容区 |
+| `features/workbench/SidePanel.tsx` | 对象、历史面板浮岛 |
+| `features/workbench/context.ts` | 工作台向卡片与更深浮岛提供的环境 |
+| `features/workbench/placement.ts` | 新卡片初始位置，不重排已有卡片 |
+| `features/conversation/session.ts` | 每个代理对话共享的控制器与提交身份 |
 | `features/workbench/CreateNoteDialog.tsx` / `AccessDialog.tsx` | 已有笔记创建与显式资源绑定入口 |
 | `features/conversation/Conversation.tsx` | 主代理连续对话、工具过程、停止/继续、历史查看与分支 |
 | `features/conversation/controller.ts` | 通知合并查询、单调快照、命令状态与提交身份 |

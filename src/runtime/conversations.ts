@@ -129,6 +129,8 @@ export class ConversationService {
         this.db.prepare("INSERT INTO tasks (id, branch_id, title, created_at) VALUES (?, ?, ?, ?)").run(taskId, branchId, title, new Date().toISOString());
         this.history.append(branchId, { type: "agent_created", payload: { agent_id: agentId, title: agent.name } });
         this.store(taskId, agentId, false).append({ type: "created", agent });
+        // 工作台视图与领域对象同时建立；位置只是视图状态。
+        this.db.prepare("INSERT INTO object_views (task_id, object_id, x, y) VALUES (?, ?, ?, ?)").run(taskId, agentId, 48, 48);
       }
       const store = this.store(taskId, agentId, false);
       if (command.type !== "continue") {
