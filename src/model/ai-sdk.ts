@@ -5,6 +5,10 @@ import { ModelFailure, type ModelAdapter, type ModelEvent, type ModelInput, type
 import { createProviderModel, validateProviderTransport } from "./provider.ts";
 
 function json(value: unknown): Json { return jsonSchema.parse(JSON.parse(JSON.stringify(value))); }
+function reasoningFor(input: ModelInput) {
+  const thinking = input.settings.model.capabilities.reasoning ? input.settings.thinking : null;
+  return thinking === "off" ? "none" as const : thinking ?? undefined;
+}
 function providerOptions(input: ModelInput): Record<string, Record<string, Json>> {
   const { provider, thinking, model } = input.settings;
   if (thinking && thinking !== "off" && !model.capabilities.reasoning) throw new ModelFailure("unsupported_thinking", "This model does not support thinking.");
@@ -13,7 +17,7 @@ function providerOptions(input: ModelInput): Record<string, Record<string, Json>
     return {};
   }
   return { openai: { ...(provider.protocol === "openai-responses" ? { store: false, include: ["reasoning.encrypted_content"] } : {}),
-    ...(thinking ? { reasoningEffort: thinking === "off" ? "none" : thinking } : {}) } };
+    ...(reasoningFor(input) ? { reasoningEffort: reasoningFor(input)! } : {}) } };
 }
 /** 只保留白名单续接资料，不持久化原始 HTTP 请求、响应头或错误对象。 */
 function replayMessage(message: AssistantModelMessage): Json {
@@ -65,7 +69,7 @@ export class AiSdkAdapter implements ModelAdapter {
     const options = providerOptions(input);
     const declarations = input.tools;
     const record = json({ system: input.system, messages, tools: declarations, providerOptions: options,
-      generation: input.settings.model.generation, reasoning: input.settings.thinking, maxRetries: 0 });
+      generation: input.settings.model.generation, reasoning: reasoningFor(input) ?? null, maxRetries: 0 });
     return { input: record, stream: signal => this.stream(input, messages, options, signal) };
   }
   private async *stream(input: ModelInput, messages: ModelMessage[], providerOptions: Record<string, Record<string, Json>>, signal: AbortSignal): AsyncIterable<ModelEvent> {
@@ -77,7 +81,7 @@ export class AiSdkAdapter implements ModelAdapter {
     const result = streamText({ model: languageModel, system: input.system, messages, tools,
       providerOptions, maxOutputTokens: model.generation.maxOutputTokens ?? undefined, maxRetries: 0, abortSignal: signal,
       temperature: model.generation.temperature ?? undefined, topP: model.generation.topP ?? undefined,
-      reasoning: input.settings.thinking === "off" ? "none" : input.settings.thinking ?? undefined,
+      reasoning: reasoningFor(input),
       // SDK 不执行工具；单步结果交还织台循环，工具注册中不提供 execute。
       onError: () => {},
     });

@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { setImmediate } from "node:timers/promises";
 import { afterEach, describe, expect, it } from "vitest";
 import { ApplicationService } from "./service.ts";
-import type { ModelAdapter } from "../model/contract.ts";
+import { ModelFailure, type ModelAdapter } from "../model/contract.ts";
 import type { ConversationCommand } from "../shared/conversation.ts";
 import { dispatchConversation } from "./dispatch.ts";
 import { sdkMessages } from "../model/ai-sdk.ts";
@@ -19,9 +19,9 @@ const adapter: ModelAdapter = { version: "ai-sdk-v7/1", prepare: input => { sdkM
   yield { type: "part.end", partId: "text" };
   yield { type: "finish", reason: "stop", usage: null, replay: { role: "assistant", content: [{ type: "text", text: "Hello" }] } };
 } }; } };
-async function setup() {
+async function setup(modelAdapter = adapter) {
   const root = mkdtempSync(join(tmpdir(), "weft-conversation-")); roots.push(root);
-  const service = new ApplicationService(root, { adapterFactory: () => adapter }); services.add(service);
+  const service = new ApplicationService(root, { adapterFactory: () => modelAdapter }); services.add(service);
   const { savedId: providerId } = await service.configuration.execute({ type: "provider.save", id: null,
     value: { name: "Test", protocol: "openai-responses", baseUrl: "https://example.invalid/v1", enabled: true, auth: "none" }, credential: { action: "keep" } });
   const { savedId: modelId } = await service.configuration.execute({ type: "model.save", id: null,
@@ -36,10 +36,26 @@ async function settled(service: ApplicationService): Promise<void> {
 }
 
 describe("会话运行时与持久化", () => {
+  it("无模型回复的准备失败仍向前端提供错误与续接选择", async () => {
+    let prepared = 0;
+    const { service, command } = await setup({ version: adapter.version, prepare: input => {
+      if (++prepared === 2) throw new ModelFailure("prepare_failed", "The request could not be prepared.");
+      return adapter.prepare(input);
+    } });
+    const accepted = await service.conversations.execute(command); await settled(service);
+    const current = await service.conversations.execute({ type: "read", taskId: accepted.taskId, agentId: accepted.agentId });
+    expect(current.nodes.some(node => node.kind === "model")).toBe(false);
+    expect(current.activeTurnId).toBeNull();
+    expect(current.selection).toEqual({ modelId: command.modelId, thinking: null });
+    expect(current.lastError).toEqual({ code: "prepare_failed", message: "The request could not be prepared." });
+  });
+
   it("首次提交原子保存且并发重试不重复创建；关闭重开重建相同消息", async () => {
     const { service, root, command } = await setup();
     const [a, b] = await Promise.all([service.conversations.execute(command), service.conversations.execute(command)]);
     expect(a.taskId).toBe(b.taskId); expect(a.agentId).toBe(b.agentId);
+    expect(a.selection).toEqual({ modelId: command.modelId, thinking: null });
+    expect(a.agentName).toBeTruthy();
     await settled(service);
     const snapshot = await service.conversations.execute({ type: "read", taskId: a.taskId, agentId: a.agentId });
     expect(snapshot.nodes.map(n => n.kind)).toEqual(["input", "extension", "model"]);

@@ -6,6 +6,7 @@
 | --- | --- | --- |
 | 桌面外壳 | Electron | 本地集成与统一 Chromium；测试以 macOS 为主，发布覆盖 macOS、Windows、Linux |
 | 界面 | React + TypeScript + Vite | 交互面板与常规 Web 组件 |
+| 对话渲染 | Streamdown 2.7.0 | Markdown、GFM 与流式未闭合语法，应用不自建解析器 |
 | 设计系统 | shadcn/ui + Tailwind CSS | 组件源码纳入仓库；统一使用 Tailwind 与设计 token，不并行维护另一套组件样式体系 |
 | 节点工作台 | @xyflow/react | DOM 卡片、端点与连线 |
 | 文件编辑与 diff | Monaco Editor | 文件视图和差异视图，按需挂载 |
@@ -66,7 +67,7 @@ main 与 runtime 使用 ESM；preload 使用独立 CJS bundle，第三方校验�
 
 任务进程启动就绪后才创建窗口。请求带协议版本与关联 ID，只发送一次；超时/退出使在途请求失败，不自动重放。退出时先要求任务进程关闭数据库，再等待退出；超时终止进程。初版关闭最后一个窗口即退出应用。任务进程崩溃后要求重启应用，不把进程重启当作未完成操作的重试。
 
-应用命令与投影契约位于 `src/shared/contracts.ts`，协议版本为 1；它不依赖 Electron、React Flow 或 provider 类型。配置能力通过 `src/shared/configuration.ts` 的独立版本 1 通道提供，配置读写不会重新载入工作台。连接测试完成通知只触发消费方重新查询；普通配置编辑不广播级联更新。后续模型执行与资源操作通过运行时服务接入，不能在 renderer 中模拟执行或直写数据库。
+应用命令与投影契约位于 `src/shared/contracts.ts`，协议版本为 1；它不依赖 Electron、React Flow 或 provider 类型。配置能力通过 `src/shared/configuration.ts` 的独立版本 1 通道提供，配置读写不会重新载入工作台。连接测试完成通知只触发消费方重新查询；普通配置编辑不广播级联更新。模型执行由独立 conversation 通道提供提交、读取、订阅、停止与续接；首页和主代理视图已消费它。资源操作仍通过运行时服务，不能在 renderer 中模拟执行或直写数据库。
 
 ## 建议的核心模块
 

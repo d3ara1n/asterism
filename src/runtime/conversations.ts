@@ -10,7 +10,7 @@ import { runAgent } from "../execution/loop.ts";
 import { allowedTool, type RuntimeTool } from "../execution/tools.ts";
 import type { HistoryKernel } from "../history/kernel.ts";
 import type { ObjectStore } from "./storage.ts";
-import { resolveProviderModel, type AgentConfiguration, type ThinkingLevel } from "../shared/configuration.ts";
+import { resolveProviderModel, thinkingSchema, type AgentConfiguration, type ThinkingLevel } from "../shared/configuration.ts";
 import { conversationCommandSchema, conversationSnapshotSchema, jsonSchema, type ConversationCommand, type ConversationSnapshot, type ConversationChanged, type ModelSettings } from "../shared/conversation.ts";
 
 type Task = { id: string; branch_id: string };
@@ -41,8 +41,17 @@ export class ConversationService {
     if (!state.agent) throw new ConversationError("not_found", "Conversation not found.");
     const history = atSeq === undefined ? this.history.reconstruct(this.history.head(store.branchId)) : this.history.reconstruct({ branch_id: store.branchId,
       event_id: this.history.eventsOn(store.branchId).find(e => e.seq === atSeq)!.event_id, seq: atSeq });
+    const events = this.history.eventsOn(store.branchId).filter(e => atSeq === undefined || e.seq <= atSeq);
+    const latestTurn = events.findLast(e => e.type === "turn_started" && e.payload.agent_id === agentId);
+    const selectionSchema = z.object({ modelId: z.string(), thinking: thinkingSchema.nullable() });
+    const savedSelection = selectionSchema.safeParse(latestTurn?.type === "turn_started" ? latestTurn.payload.input : null);
+    const latestModel = [...state.nodes.values()].findLast(n => n.kind === "model");
+    const failure = latestTurn?.type === "turn_started" ? events.findLast(e => e.type === "execution_failed" && e.payload.turn_id === latestTurn.payload.turn_id) : null;
     return conversationSnapshotSchema.parse({ taskId, agentId, cursor: state.cursor, seq: state.seq,
-      nodes: [...state.nodes.values()], activeTurnId: history.in_flight_turns.find(t => t.agent_id === agentId)?.turn_id ?? null });
+      nodes: [...state.nodes.values()], activeTurnId: history.in_flight_turns.find(t => t.agent_id === agentId)?.turn_id ?? null,
+      agentName: state.agent.name, selection: savedSelection.success ? savedSelection.data : latestModel?.kind === "model"
+        ? { modelId: latestModel.request.settings.model.id, thinking: latestModel.request.settings.thinking } : null,
+      lastError: failure?.type === "execution_failed" ? { code: failure.payload.code, message: failure.payload.message } : null });
   }
   private ensureIdle(taskId: string, agentId: string): void {
     if (this.runs.has(this.key(taskId, agentId)) || this.history.reconstruct(this.history.head(this.task(taskId).branch_id)).in_flight_turns.some(t => t.agent_id === agentId)) {
@@ -128,7 +137,7 @@ export class ConversationService {
           .run(command.submissionId, JSON.stringify(command), taskId, agentId);
       }
       if (store.read().cursor === null) throw new ConversationError("invalid_request", "A conversation needs input before it can continue.");
-      turnId = this.history.startTurn(branchId, { agent_id: agentId, input: { nodeId: store.read().cursor } }).turn_id;
+      turnId = this.history.startTurn(branchId, { agent_id: agentId, input: { nodeId: store.read().cursor, modelId: settings.model.id, thinking: settings.thinking } }).turn_id;
       this.db.exec("COMMIT");
     } catch (error) { this.db.exec("ROLLBACK"); throw error; }
     const store = this.store(taskId, agentId);

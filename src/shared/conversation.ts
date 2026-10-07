@@ -71,6 +71,9 @@ export const conversationEventSchema = z.strictObject({ version: z.literal(1), a
 export const conversationSnapshotSchema = z.strictObject({
   taskId: id, agentId: id, cursor: id.nullable(), seq: z.number().int().nonnegative(),
   nodes: z.array(nodeSchema), activeTurnId: id.nullable(),
+  agentName: z.string(),
+  selection: z.strictObject({ modelId: id, thinking: thinkingSchema.nullable() }).nullable(),
+  lastError: error.nullable(),
 });
 export type ConversationSnapshot = z.infer<typeof conversationSnapshotSchema>;
 

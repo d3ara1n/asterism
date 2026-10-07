@@ -1,4 +1,5 @@
-import { app, BrowserWindow, dialog, ipcMain, session } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, session, shell } from "electron";
+import { externalWebUrl } from "../shared/links.ts";
 import { mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -42,7 +43,11 @@ function createWindow(): void {
   if (state.maximized) current.maximize();
   trackWindowState(current);
   const refreshAppearance = followWindowAppearance(current);
-  current.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+  current.webContents.setWindowOpenHandler(({ url }) => {
+    const external = externalWebUrl(url);
+    if (external) void shell.openExternal(external).catch(() => console.error("External link could not be opened."));
+    return { action: "deny" };
+  });
   current.webContents.on("will-navigate", event => event.preventDefault());
   current.webContents.on("will-attach-webview", event => event.preventDefault());
   ipcMain.removeHandler(commandChannel);

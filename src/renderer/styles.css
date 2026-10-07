@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@source "../../node_modules/streamdown/dist/*.js";
 
 /* 主题 token、两种表面、窗口与编织布局机制。控件外观只来自 shared/ui 的 shadcn 官方源码。 */
 :root {
@@ -170,8 +171,6 @@
   }
   [data-slot$="-content"] * { window-drag: initial; }
 
-  .overlay-inset { --overlay-inset: 8px; }
-  .floating-panel { animation: slide-in-left var(--motion-fast) var(--ease-out); }
   /* 应用导航与主内容为相邻浮岛；首页只让输入框形成表面，其余透出窗口材质。 */
   .app-sidebar { @apply flex h-full min-h-0 flex-col p-3; }
   .home-page { @apply flex h-full overflow-y-auto px-6 py-10; padding-inline: calc(1.5rem + var(--space-inset)); }
@@ -207,7 +206,6 @@
   .settings-card { @apply rounded-xl text-left outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50; }
   .settings-detail { @apply absolute inset-x-0 top-0 max-h-full overflow-y-auto overscroll-contain; }
 }
-@keyframes slide-in-left { from { opacity: 0; transform: translateX(-8px); } }
 .react-flow__attribution { background: transparent !important; font-size: 9px !important; }
 .react-flow__edge-text { fill: var(--muted-foreground); font-family: var(--font-sans); font-size: 10px; }
 .react-flow__edge-textbg { fill: var(--background); }

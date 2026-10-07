@@ -40,10 +40,15 @@ describe("AI SDK 适配契约", () => {
       expect(new Headers(init?.headers).has("authorization")).toBe(false);
       expect(new Headers(init?.headers).has("x-api-key")).toBe(false);
       expect(init?.redirect).toBe("error");
+      const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      expect(body).not.toHaveProperty("reasoning_effort");
+      expect(body).not.toHaveProperty("reasoning");
+      expect(body).not.toHaveProperty("thinking");
       return new Response(frames.map(frame => `data: ${JSON.stringify(frame)}\n\n`).join("") + (protocol === "openai-chat" ? "data: [DONE]\n\n" : ""), { headers: { "content-type": "text/event-stream" } });
     };
     const current = structuredClone(input);
-    current.settings.provider.protocol = protocol; current.settings.provider.auth = "none"; current.settings.thinking = null;
+    current.settings.provider.protocol = protocol; current.settings.provider.auth = "none"; current.settings.thinking = "off";
+    current.settings.model.capabilities.reasoning = false;
     const adapter = new AiSdkAdapter(async () => { throw new Error("Anonymous execution must not read credentials"); },
       (value, key) => createProviderModel(value.settings.provider, value.settings.model, key, transport));
     const events: ModelEvent[] = [];

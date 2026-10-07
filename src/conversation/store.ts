@@ -2,6 +2,8 @@ import type { AgentConfiguration } from "../shared/configuration.ts";
 import { conversationMutationSchema, toolOutcomeSchema, type ConversationMutation, type ConversationNode, type ModelNode } from "../shared/conversation.ts";
 import type { HistoryKernel } from "../history/kernel.ts";
 import type { EventBody, StoredEvent } from "../history/schema.ts";
+import { canContinue } from "../shared/conversation-view.ts";
+export { canContinue } from "../shared/conversation-view.ts";
 
 export class ConversationError extends Error {
   constructor(readonly code: "invalid_request" | "not_found" | "conflict" | "unavailable", message: string) { super(message); }
@@ -18,10 +20,6 @@ export function pathTo(state: ConversationState, cursor = state.cursor): Convers
     path.unshift(node); cursor = node.parentId;
   }
   return path;
-}
-export function canContinue(node: ConversationNode): boolean {
-  return node.kind !== "model" || node.state === "complete" && node.parts.every(part =>
-    part.complete && (part.kind !== "tool" || part.execution === "settled" && part.outcome !== null && part.outcome.kind !== "unknown"));
 }
 function requireSafePath(state: ConversationState, cursor: string | null): void {
   if (pathTo(state, cursor).some(node => !canContinue(node))) throw new ConversationError("conflict", "Cannot continue from an incomplete execution. Select an earlier complete node.");

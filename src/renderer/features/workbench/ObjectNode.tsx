@@ -1,36 +1,43 @@
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
-import type { WorkbenchObject } from "../../../shared/contracts";
 import { Bot, FileText, Maximize2, Minus, X } from "lucide-react";
+import type { ReactNode } from "react";
+import type { WorkbenchObject } from "../../../shared/contracts";
 import { Button } from "../../shared/ui/button";
-import { Card } from "../../shared/ui/card";
 import { t } from "../../shared/i18n";
+import { s } from "../configuration/state";
 
 export type ObjectNodeType = Node<{
-  object: WorkbenchObject; collapsed: boolean; historical: boolean; bindingCount: number;
+  object: WorkbenchObject;
+  collapsed: boolean;
+  historical: boolean;
+  renderAgent?: (actions: ReactNode) => ReactNode;
   onView: (patch: { hidden?: boolean; collapsed?: boolean }) => void;
 }, "object">;
 
+/** 节点身份沿用领域对象 ID；卡片不创建第二份代理、资源或执行状态。 */
 export function ObjectNode({ data, selected }: NodeProps<ObjectNodeType>) {
-  const { object, collapsed } = data;
-  return <Card className={`w-[340px] gap-0 overflow-hidden py-0 ${selected ? "border-ring" : ""}`}>
-    <Handle type={object.kind === "agent" ? "target" : "source"} position={object.kind === "agent" ? Position.Left : Position.Right} isConnectable={false} />
-    <header className="card-drag-handle flex cursor-grab items-center gap-2 p-3 active:cursor-grabbing">
-      <span className="text-muted-foreground" aria-hidden="true">{object.kind === "agent" ? <Bot className="size-4" /> : <FileText className="size-4" />}</span>
-      <div className="min-w-0 flex-1">
-        <p className="type-label">{object.kind === "agent" ? t.kindAgent : t.kindNote}</p>
-        <h2 className="type-section mt-0.5 truncate">{object.title}</h2>
-      </div>
-      <div className="nodrag flex">
-        <Button variant="ghost" size="icon-xs" aria-label={collapsed ? t.expand : t.collapse} title={collapsed ? t.expand : t.collapse} disabled={data.historical} onClick={() => data.onView({ collapsed: !collapsed })}>{collapsed ? <Maximize2 /> : <Minus />}</Button>
-        <Button variant="ghost" size="icon-xs" aria-label={t.closeView} title={t.closeView} disabled={data.historical} onClick={() => data.onView({ hidden: true })}><X /></Button>
-      </div>
-    </header>
-    {!collapsed && <div className="nodrag nowheel border-t p-3">
-      {object.kind === "agent" ? <>
-        <p className="type-body font-medium">{t.noModel}</p>
-        <p className="type-caption mt-1">{t.noModelBody}</p>
-        <p className="mt-3 text-xs text-primary">{t.bindings(data.bindingCount)}</p>
-      </> : object.content_available ? <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words font-sans text-sm leading-relaxed">{object.content}</pre> : <p className="type-body text-muted-foreground">{t.contentUnavailable}</p>}
-    </div>}
-  </Card>;
+  const { object, collapsed, renderAgent } = data;
+  const actions = <div className="nodrag nopan flex">
+    <Button variant="ghost" size="icon-xs" aria-label={collapsed ? t.expand : t.collapse} title={collapsed ? t.expand : t.collapse} disabled={data.historical} onClick={() => data.onView({ collapsed: !collapsed })}>{collapsed ? <Maximize2 /> : <Minus />}</Button>
+    <Button variant="ghost" size="icon-xs" aria-label={t.closeView} title={t.closeView} disabled={data.historical} onClick={() => data.onView({ hidden: true })}><X /></Button>
+  </div>;
+  return <>
+    <Handle type="target" position={Position.Left} isConnectable={false} />
+    <Handle type="source" position={Position.Right} isConnectable={false} />
+    <div className={`object-card h-full overflow-hidden rounded-xl border bg-card text-card-foreground shadow-md ${selected ? "border-ring" : ""}`}>
+      {renderAgent && !collapsed ? renderAgent(actions) : <>
+        <header className="agent-drag-handle flex cursor-grab items-center gap-2 p-3 active:cursor-grabbing">
+          {object.kind === "agent" ? <Bot className="size-4 shrink-0 text-primary" /> : <FileText className="size-4 shrink-0 text-muted-foreground" />}
+          <div className="min-w-0 flex-1"><p className="type-caption">{object.kind === "agent" ? t.kindAgent : t.kindNote}</p><h2 className="type-section truncate">{object.title}</h2></div>
+          {actions}
+        </header>
+        {!collapsed && <div className="nodrag nopan nowheel max-h-80 select-text overflow-auto border-t p-4">
+          {object.kind === "note" ? object.content_available
+            ? <p className="type-body whitespace-pre-wrap break-words">{object.content}</p>
+            : <p className="type-caption">{t.contentUnavailable}</p>
+            : <p className="type-caption">{s("This agent has no conversation record yet.", "这个代理尚无对话记录。")}</p>}
+        </div>}
+      </>}
+    </div>
+  </>;
 }
