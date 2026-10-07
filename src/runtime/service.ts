@@ -6,6 +6,9 @@ import { commandSchema, snapshotSchema, type Command, type AppSnapshot, type App
 import { ObjectStore, openDatabase } from "./storage.ts";
 import { ConfigurationService } from "../configuration/service.ts";
 import type { SecretProtector } from "../shared/secrets.ts";
+import { ConversationService } from "./conversations.ts";
+import type { ConversationChanged, ModelSettings } from "../shared/conversation.ts";
+import type { ModelAdapter } from "../model/contract.ts";
 
 export class ApplicationError extends Error {
   constructor(readonly code: AppError["code"], message: string) { super(message); }
@@ -17,9 +20,10 @@ type ViewRow = { object_id: string; x: number; y: number; hidden: number; collap
 export class ApplicationService {
   readonly history: HistoryKernel;
   readonly configuration: ConfigurationService;
+  readonly conversations: ConversationService;
   private readonly db: DatabaseSync;
   private readonly objects: ObjectStore;
-  constructor(root: string, options: { protector?: SecretProtector; onConfigurationChanged?: () => void } = {}) {
+  constructor(root: string, options: { protector?: SecretProtector; onConfigurationChanged?: () => void; onConversationChanged?: (event: ConversationChanged) => void; adapterFactory?: (settings: ModelSettings) => ModelAdapter } = {}) {
     this.db = openDatabase(root);
     try {
       this.history = new HistoryKernel(this.db);
@@ -28,9 +32,16 @@ export class ApplicationService {
       this.configuration = new ConfigurationService(this.db, root, options.protector ?? {
         available: async () => false, encrypt: unavailable, decrypt: unavailable,
       }, options.onConfigurationChanged);
+      this.conversations = new ConversationService(this.db, this.history, this.objects, this.configuration, options.onConversationChanged, options.adapterFactory);
     } catch (error) { this.db.close(); throw error; }
   }
-  close(): void { this.configuration.close(); this.history.close(); }
+  close(): Promise<void> {
+    this.configuration.close();
+    const running = this.conversations.running;
+    const stopped = this.conversations.close();
+    if (!running) { this.history.close(); return Promise.resolve(); }
+    return stopped.finally(() => this.history.close());
+  }
 
   execute(raw: unknown): AppSnapshot {
     const parsed = commandSchema.safeParse(raw);
@@ -188,5 +199,7 @@ function eventLabel(event: StoredEvent): string {
     case "operation_finished": return "Operation " + event.payload.status;
     case "subagent_result_delivered": return "Agent result delivered";
     case "config_applied": return "Configuration applied";
+    case "conversation_event": return event.payload.mutation.type;
+    case "execution_failed": return "Execution failed";
   }
 }

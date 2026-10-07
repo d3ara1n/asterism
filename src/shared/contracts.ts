@@ -74,6 +74,7 @@ export const runtimeMessageSchema = z.discriminatedUnion("kind", [
 ]);
 export type RuntimeMessage = z.infer<typeof runtimeMessageSchema>;
 export interface DesktopBridge {
+  conversation: import("./conversation.ts").ConversationBridge;
   configuration: ConfigurationBridge;
   appearance: AppearanceBridge;
   readonly platform: DesktopPlatform;

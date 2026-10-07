@@ -34,6 +34,13 @@ export class ConfigurationService {
     return operation;
   }
   private assertOpen(): void { if (this.closed) throw new ConfigurationError("unavailable", "Configuration service is unavailable."); }
+  async executionCredential(providerId: string, revision: number): Promise<string | null> {
+    this.assertOpen();
+    const row = this.repository.get("provider", providerId);
+    if (!row || row.revision !== revision) throw new ConfigurationError("conflict", "The provider changed before execution started.");
+    if (data(row).auth === "none") return "weft-no-auth";
+    return row.credential_ref ? this.vault.read(row.credential_ref) : null;
+  }
   private provider(row: ConfigurationRow): Provider {
     const stored = data(row);
     const ref = row.credential_ref;

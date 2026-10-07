@@ -1,29 +1,14 @@
 import { APICallError, generateText } from "ai";
-import { createOpenAI } from "@ai-sdk/openai";
-import { createAnthropic } from "@ai-sdk/anthropic";
+import { createProviderModel, ProviderTransportError } from "../model/provider.ts";
 import type { Provider, ProviderModel, TestError } from "../shared/configuration.ts";
 
 export interface ProbeInput { provider: Provider; model: ProviderModel; apiKey: string; signal: AbortSignal }
 export type ConnectionProbe = (input: ProbeInput) => Promise<void>;
-class ProbeConfigurationError extends Error {}
 
 /** 显式协议实例，不使用 Gateway 或环境变量中的模型/凭据。无鉴权连接删除鉴权头。 */
 export async function runConnectionProbe(input: ProbeInput, transport: typeof fetch = fetch): Promise<void> {
   const { provider, model, apiKey, signal } = input;
-  const endpoint = new URL(provider.baseUrl);
-  const loopback = ["localhost", "[::1]", "::1"].includes(endpoint.hostname) || /^127(?:\.\d{1,3}){3}$/.test(endpoint.hostname);
-  if (provider.auth === "api_key" && endpoint.protocol !== "https:" && !loopback) {
-    throw new ProbeConfigurationError("API key connections require HTTPS, except on loopback addresses.");
-  }
-  const scopedFetch: typeof fetch = (url, init) => {
-    const headers = new Headers(init?.headers);
-    if (provider.auth === "none") { headers.delete("authorization"); headers.delete("x-api-key"); }
-    return transport(url, { ...init, headers, redirect: "error" });
-  };
-  const options = { baseURL: provider.baseUrl, apiKey, fetch: scopedFetch };
-  const languageModel = provider.protocol === "anthropic" ? createAnthropic(options).messages(model.modelId)
-    : provider.protocol === "openai-chat" ? createOpenAI(options).chat(model.modelId)
-    : createOpenAI(options).responses(model.modelId);
+  const languageModel = createProviderModel(provider, model, apiKey, transport);
   await generateText({
     model: languageModel, prompt: "Reply with OK.", maxRetries: 0, abortSignal: signal,
     maxOutputTokens: Math.min(model.generation.maxOutputTokens ?? 64, 128),
@@ -35,7 +20,7 @@ export async function runConnectionProbe(input: ProbeInput, transport: typeof fe
 
 /** provider 的原始错误正文和请求信息可能含凭据，只返回固定分类与文案。 */
 export function classifyProbeError(error: unknown): { error: TestError; message: string } {
-  if (error instanceof ProbeConfigurationError) return { error: "configuration", message: error.message };
+  if (error instanceof ProviderTransportError) return { error: "configuration", message: error.message };
   if (APICallError.isInstance(error)) {
     const code = error.statusCode;
     if (code === 401 || code === 403) return { error: "authentication", message: "Authentication failed. Check the connection credential." };

@@ -2,8 +2,25 @@ import { contextBridge, ipcRenderer } from "electron";
 import { commandChannel, statusChannel, commandSchema, resultSchema, runtimeStatusSchema, type DesktopBridge } from "../shared/contracts.ts";
 import { configurationChannel, configurationChangedChannel, configurationCommandSchema, configurationResultSchema } from "../shared/configuration.ts";
 import { appearanceChangedChannel, appearanceGetChannel, appearancePatchSchema, appearanceSetChannel, parseAppearance } from "../shared/theme.ts";
+import { conversationChannel, conversationChangedChannel, conversationCommandSchema, conversationResultSchema, conversationChangedSchema } from "../shared/conversation.ts";
 
 const bridge: DesktopBridge = {
+  conversation: {
+    async execute(command) {
+      const parsed = conversationCommandSchema.safeParse(command);
+      if (!parsed.success) return { ok: false, error: { code: "invalid_request", message: "Invalid conversation command." } };
+      try { return conversationResultSchema.parse(await ipcRenderer.invoke(conversationChannel, parsed.data)); }
+      catch { return { ok: false, error: { code: "unavailable", message: "The conversation connection was lost. Reopen history before retrying." } }; }
+    },
+    onChanged(listener) {
+      const handler = (_event: Electron.IpcRendererEvent, raw: unknown) => {
+        const parsed = conversationChangedSchema.safeParse(raw);
+        if (parsed.success) listener(parsed.data);
+      };
+      ipcRenderer.on(conversationChangedChannel, handler);
+      return () => ipcRenderer.removeListener(conversationChangedChannel, handler);
+    },
+  },
   appearance: {
     async get() { return parseAppearance(await ipcRenderer.invoke(appearanceGetChannel)); },
     async set(patch) { return parseAppearance(await ipcRenderer.invoke(appearanceSetChannel, appearancePatchSchema.parse(patch))); },

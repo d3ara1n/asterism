@@ -143,6 +143,8 @@ function applyEvent(state: InternalState, event: StoredEvent): void {
     case "operation_finished":
     case "subagent_result_delivered":
     case "config_applied":
+    case "conversation_event":
+    case "execution_failed":
       return;
   }
 }

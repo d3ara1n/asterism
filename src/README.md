@@ -2,7 +2,7 @@
 
 这是正式桌面应用，不依赖固定场景或浏览器内存演示。
 
-首页、侧栏与三类真实配置已实现并验收。提供商保存/测试、模型角色和 agent 配置能力见 `configuration/README.md`；下一步按 [模型接入计划](../plans/todo-2026-10-01-model-protocol-storage.md) 接入首次发送及执行。
+首页、侧栏与三类真实配置已实现并验收。提供商保存/测试、模型角色和 agent 配置能力见 `configuration/README.md`；单代理核心与会话 IPC 已实现，契约见 [会话与单代理能力](../docs/conversation-core.md)，下一步按 [模型接入计划](../plans/todo-2026-10-01-model-protocol-storage.md) 接入首页发送与 GUI 执行流。
 
 | 目录 | 职责 | 依赖方向 |
 | --- | --- | --- |
@@ -12,6 +12,9 @@
 | `runtime/` | 应用命令、查询、事务、SQLite 迁移、对象存储与私有凭据客户端 | shared、history、configuration、Node 内建 API |
 | `configuration/` | 三类配置、密文凭据、连接测试与默认角色，见目录 README | shared、Node SQLite、模型 SDK；不依赖 Electron |
 | `history/` | 事件存储、轮次与绑定、历史投影 | Node SQLite、Zod；不依赖 renderer |
+| `conversation/` | 会话树投影、续接约束、压缩与扩展节点 | shared、history；不依赖 UI/SDK |
+| `model/` | 单次请求契约、三协议 SDK 适配与续接资料 | shared、conversation、AI SDK |
+| `execution/` | 单代理循环、工具授权与批次收束 | conversation、model 契约、history |
 | `renderer/` | 应用视图、React Flow、用户意图 | shared、React 与 UI 库；不访问 Node/数据库 |
 
 ## 完整路径

@@ -178,7 +178,7 @@ describe("真实配置与消费边界", () => {
     db.close();
     db = openDatabase(root);
     expect(db.prepare("SELECT title FROM tasks WHERE id = ?").get("saved-task")).toEqual({ title: "Existing work" });
-    expect(db.prepare("PRAGMA user_version").get()).toEqual({ user_version: 2 });
+    expect(db.prepare("PRAGMA user_version").get()).toEqual({ user_version: 3 });
     expect(db.prepare("SELECT COUNT(*) AS count FROM configuration_items").get()).toEqual({ count: 0 });
   });
 });

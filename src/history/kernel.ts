@@ -3,6 +3,7 @@ import { foldEvents, type Projection } from "./fold.ts";
 import { newId, nowIso } from "./ids.ts";
 import {
   storedEventSchema,
+  eventBodySchema,
   type BindingAction,
   type Capability,
   type EventBody,
@@ -320,7 +321,8 @@ export class HistoryKernel {
     return events;
   }
 
-  private append(branch_id: string, body: EventBody): StoredEvent {
+  append(branch_id: string, body: EventBody): StoredEvent {
+    body = eventBodySchema.parse(body);
     const seq = this.nextSeq(branch_id);
     const event: StoredEvent = {
       event_id: newId(),
@@ -342,6 +344,10 @@ export class HistoryKernel {
         JSON.stringify(event.payload),
       );
     return event;
+  }
+
+  atomic<T>(write: () => T): T {
+    return this.transact(write);
   }
 
   private nextSeq(branch_id: string): number {

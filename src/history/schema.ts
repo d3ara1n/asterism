@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { conversationEventSchema } from "../shared/conversation.ts";
 
 export const capabilitySchema = z.object({
   history_viewing: z.boolean(),
@@ -7,7 +8,7 @@ export const capabilitySchema = z.object({
 
 export const bindingActionSchema = z.enum(["attach", "detach"]);
 
-export const turnStatusSchema = z.enum(["completed", "waiting", "failed", "cancelled"]);
+export const turnStatusSchema = z.enum(["completed", "waiting", "failed", "cancelled", "interrupted"]);
 
 export const historyPositionSchema = z.object({
   branch_id: z.string(),
@@ -128,6 +129,8 @@ const configApplied = z.object({
 });
 
 export const eventBodySchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("conversation_event"), payload: conversationEventSchema }),
+  z.object({ type: z.literal("execution_failed"), payload: z.object({ agent_id: z.string(), turn_id: z.string(), code: z.string(), message: z.string() }) }),
   taskCreated,
   branchCreated,
   agentCreated,
