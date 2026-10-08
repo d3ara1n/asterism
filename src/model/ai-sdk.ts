@@ -1,6 +1,5 @@
 import { jsonSchema as sdkJsonSchema, streamText, tool, type ModelMessage, type ToolSet, type AssistantModelMessage, type LanguageModel } from "ai";
-import { jsonSchema, type Json, type Usage } from "../shared/conversation.ts";
-import { modelScope } from "../conversation/projection.ts";
+import { jsonSchema, modelScope, type Json, type Usage } from "../shared/conversation.ts";
 import { ModelFailure, type ModelAdapter, type ModelEvent, type ModelInput, type PreparedModel } from "./contract.ts";
 import { createProviderModel, validateProviderTransport } from "./provider.ts";
 import { projectSystemPrompt } from "./system-prompt.ts";

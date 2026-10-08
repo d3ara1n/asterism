@@ -55,14 +55,14 @@ describe("会话运行时与持久化", () => {
     const { id: _id, revision: _revision, ...model } = config.models.find(item => item.id === command.modelId)!;
     await service.configuration.execute({ type: "model.save", id: command.modelId, value: { ...model, generation: { ...model.generation, maxOutputTokens: 16 } } });
     await service.conversations.execute({ type: "submit", taskId: initial.taskId, agentId: initial.agentId,
-      submissionId: randomUUID(), modelId: command.modelId, thinking: null, text: "Next" }); await settled(service);
+      submissionId: randomUUID(), text: "Next" }); await settled(service);
     expect(prompts.at(-1)).toBe("Updated instructions");
     expect(tools.at(-1)).toEqual([]);
     expect(limits.at(-1)).toBe(16);
     await service.close(); services.delete(service);
     const reopened = new ApplicationService(root, { adapterFactory: () => capturing }); services.add(reopened);
     await reopened.conversations.execute({ type: "submit", taskId: initial.taskId, agentId: initial.agentId,
-      submissionId: randomUUID(), modelId: command.modelId, thinking: null, text: "Continue" });
+      submissionId: randomUUID(), text: "Continue" });
     await settled(reopened);
     expect(prompts.at(-1)).toBe("Updated instructions");
     const after = await reopened.conversations.execute({ type: "read", taskId: initial.taskId, agentId: initial.agentId });
@@ -89,12 +89,11 @@ describe("会话运行时与持久化", () => {
       selection: { agentConfigurationId: custom.savedId!, modelId: command.modelId, thinking: null } });
     expect(service.history.eventCount()).toBe(count);
     expect(selected.selection?.agentConfigurationId).toBe(custom.savedId);
-    await service.conversations.execute({ type: "continue", taskId: initial.taskId, agentId: initial.agentId, modelId: command.modelId, thinking: null });
+    await service.conversations.execute({ type: "continue", taskId: initial.taskId, agentId: initial.agentId });
     await settled(service); expect(prompts.at(-1)).toBe("Supervise");
     await service.configuration.execute({ type: "remove", kind: "agent", id: custom.savedId! });
     const before = service.history.eventCount();
-    await expect(service.conversations.execute({ type: "submit", taskId: initial.taskId, agentId: initial.agentId,
-      modelId: command.modelId, thinking: null, submissionId: randomUUID(), text: "No fallback" })).rejects.toThrow("Choose an available agent");
+    await expect(service.conversations.execute({ type: "submit", taskId: initial.taskId, agentId: initial.agentId, submissionId: randomUUID(), text: "No fallback" })).rejects.toThrow("Choose an available agent");
     expect(service.history.eventCount()).toBe(before);
     expect((await service.conversations.execute({ type: "read", taskId: initial.taskId, agentId: initial.agentId })).nodes.length).toBeGreaterThan(0);
     const { snapshot: configuration } = await service.configuration.execute({ type: "read" });
@@ -105,7 +104,7 @@ describe("会话运行时与持久化", () => {
       selection: { agentConfigurationId: custom.savedId!, modelId: replacement.savedId!, thinking: null } });
     await service.conversations.execute({ type: "configure", taskId: initial.taskId, agentId: initial.agentId,
       selection: { agentConfigurationId: "worker", modelId: replacement.savedId!, thinking: null } });
-    await service.conversations.execute({ type: "continue", taskId: initial.taskId, agentId: initial.agentId, modelId: replacement.savedId!, thinking: null });
+    await service.conversations.execute({ type: "continue", taskId: initial.taskId, agentId: initial.agentId });
     await settled(service);
   });
   it("运行中修改配置只影响下一轮，本轮后续请求使用已取用环境", async () => {
@@ -132,43 +131,8 @@ describe("会话运行时与持久化", () => {
     } finally { release(); }
     await settled(service);
     expect(seen).toEqual(["Before", "Before"]);
-    await service.conversations.execute({ type: "continue", taskId: initial.taskId, agentId: initial.agentId, modelId: command.modelId, thinking: null });
+    await service.conversations.execute({ type: "continue", taskId: initial.taskId, agentId: initial.agentId });
     await settled(service); expect(seen.at(-1)).toBe("After");
-  });
-  it("旧事件只迁移选择身份，保留原始事件并忽略冻结的代理正文", async () => {
-    const { service, root, command } = await setup();
-    const initial = await service.conversations.execute(command); await settled(service);
-    const { snapshot: config } = await service.configuration.execute({ type: "read" });
-    await service.close(); services.delete(service);
-    const db = new DatabaseSync(join(root, "db", "weft.sqlite"));
-    let legacyPayload = "";
-    try {
-      const row = db.prepare("SELECT event_id, payload FROM events WHERE type = 'conversation_event' AND json_extract(payload, '$.mutation.type') = 'created'").get()!;
-      legacyPayload = JSON.stringify({ ...JSON.parse(String(row.payload)), version: 1, mutation: { type: "created", agent: { ...config.agents.find(a => a.id === "worker")!, systemPrompt: "Frozen legacy instructions" } } });
-      db.prepare("UPDATE events SET payload = ? WHERE event_id = ?").run(legacyPayload, row.event_id!);
-      const node = db.prepare("SELECT event_id, payload FROM events WHERE type = 'conversation_event' AND json_extract(payload, '$.mutation.node.kind') = 'model'").get()!;
-      const oldNode = JSON.parse(String(node.payload));
-      const { credentialState: _credential, ...provider } = config.providers[0]!;
-      oldNode.mutation.node.request = { adapter: adapter.version, settings: { provider, model: config.models[0]!, thinking: null },
-        input: { system: "Obsolete system", tools: [] }, historySeq: 0, bindingVersion: 0, bindings: [] };
-      db.prepare("UPDATE events SET payload = ? WHERE event_id = ?").run(JSON.stringify(oldNode), node.event_id!);
-      db.prepare("UPDATE events SET payload = json_set(payload, '$.input.modelId', ?, '$.input.thinking', NULL) WHERE type = 'turn_started'").run(command.modelId);
-      db.exec("DROP TABLE conversation_selections; PRAGMA user_version = 4;");
-    } finally { db.close(); }
-    const seen: string[] = [];
-    const reopened = new ApplicationService(root, { adapterFactory: () => ({ version: adapter.version, prepare: input => {
-      seen.push(input.system.blocks.find(block => block.kind === "agent")!.text); return adapter.prepare(input);
-    } }) }); services.add(reopened);
-    await reopened.configuration.execute({ type: "agent.save", id: "worker", value: { systemPrompt: "Current instructions" } });
-    const loaded = await reopened.conversations.execute({ type: "read", taskId: initial.taskId, agentId: initial.agentId });
-    expect(loaded.selection).toEqual({ agentConfigurationId: "worker", modelId: command.modelId, thinking: null });
-    expect(loaded.nodes.find(node => node.kind === "model")).not.toHaveProperty("request.settings");
-    await reopened.conversations.execute({ type: "continue", taskId: initial.taskId, agentId: initial.agentId, modelId: command.modelId, thinking: null });
-    await settled(reopened); expect(seen.at(-1)).toBe("Current instructions");
-    const check = new DatabaseSync(join(root, "db", "weft.sqlite"), { readOnly: true });
-    try {
-      expect(check.prepare("SELECT payload FROM events WHERE type = 'conversation_event' AND json_extract(payload, '$.mutation.type') = 'created'").get()?.payload).toBe(legacyPayload);
-    } finally { check.close(); }
   });
   it("无模型回复的准备失败仍向前端提供错误与续接选择", async () => {
     let prepared = 0;
@@ -180,7 +144,7 @@ describe("会话运行时与持久化", () => {
     const current = await service.conversations.execute({ type: "read", taskId: accepted.taskId, agentId: accepted.agentId });
     expect(current.nodes.some(node => node.kind === "model")).toBe(false);
     expect(current.activeTurnId).toBeNull();
-    expect(current.selection).toEqual({ agentConfigurationId: "worker", modelId: command.modelId, thinking: null });
+    expect(current.selection).toEqual({ agentConfigurationId: "worker", modelId: command.modelId, thinking: "off" });
     expect(current.lastError).toEqual({ code: "prepare_failed", message: "The request could not be prepared." });
   });
 
@@ -188,7 +152,7 @@ describe("会话运行时与持久化", () => {
     const { service, root, command } = await setup();
     const [a, b] = await Promise.all([service.conversations.execute(command), service.conversations.execute(command)]);
     expect(a.taskId).toBe(b.taskId); expect(a.agentId).toBe(b.agentId);
-    expect(a.selection).toEqual({ agentConfigurationId: "worker", modelId: command.modelId, thinking: null });
+    expect(a.selection).toEqual({ agentConfigurationId: "worker", modelId: command.modelId, thinking: "off" });
     expect(a.agentName).toBeTruthy();
     await settled(service);
     const snapshot = await service.conversations.execute({ type: "read", taskId: a.taskId, agentId: a.agentId });
@@ -215,7 +179,7 @@ describe("会话运行时与持久化", () => {
     const first = await service.conversations.execute({ type: "read", taskId: initial.taskId, agentId: initial.agentId });
     await service.conversations.execute({ type: "select", taskId: first.taskId, agentId: first.agentId, nodeId: first.nodes[0]!.id });
     await service.conversations.execute({ type: "submit", submissionId: randomUUID(), taskId: first.taskId, agentId: first.agentId,
-      text: "New branch", modelId: command.modelId, thinking: null });
+      text: "New branch" });
     await settled(service);
     const branched = await service.conversations.execute({ type: "read", taskId: first.taskId, agentId: first.agentId });
     expect(branched.nodes).toHaveLength(6);
@@ -231,10 +195,14 @@ describe("会话运行时与持久化", () => {
     const { id: _id, revision: _revision, ...original } = config.models.find(m => m.id === command.modelId)!;
     const { savedId } = await service.configuration.execute({ type: "model.save", id: null, value: { ...original, modelId: "other-model" } });
     const count = service.history.eventCount();
-    const submit = { type: "submit" as const, submissionId: randomUUID(), taskId: initial.taskId, agentId: initial.agentId, text: "Next input", modelId: savedId!, thinking: null };
+    const configure = (modelId: string) => service.conversations.execute({ type: "configure", taskId: initial.taskId, agentId: initial.agentId,
+      selection: { agentConfigurationId: "worker", modelId, thinking: null } });
+    const submit = { type: "submit" as const, submissionId: randomUUID(), taskId: initial.taskId, agentId: initial.agentId, text: "Next input" };
+    await configure(savedId!);
     await expect(service.conversations.execute(submit)).rejects.toThrow("Cross-model");
     expect(service.history.eventCount()).toBe(count);
-    await service.conversations.execute({ ...submit, modelId: command.modelId }); await settled(service);
+    await configure(command.modelId);
+    await service.conversations.execute(submit); await settled(service);
     const current = await service.conversations.execute({ type: "read", taskId: initial.taskId, agentId: initial.agentId });
     expect(current.nodes.filter(n => n.kind === "input")).toHaveLength(2);
   });

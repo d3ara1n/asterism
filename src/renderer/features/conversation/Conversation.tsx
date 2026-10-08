@@ -70,7 +70,6 @@ export function Conversation({ session, ready, draft, onDraftChange, onHome, onT
   const selection = snapshot.selection;
   const selectedAgent = configuration?.agents.find(agent => agent.id === selection?.agentConfigurationId && agent.enabled);
   const selectedModel = configuration ? resolveProviderModel(configuration, selection?.modelId ?? null)?.model : null;
-  const selectionForTurn = selection && selectedModel && !selectedModel.capabilities.reasoning ? { ...selection, thinking: "off" as const } : selection;
   const models = configuration?.models.filter(model => resolveProviderModel(configuration, model.id)) ?? [];
   const configure = async (next: ConversationSelection) => {
     const result = await controller.execute({ type: "configure", taskId: controller.taskId, agentId: controller.agentId, selection: next });
@@ -84,18 +83,18 @@ export function Conversation({ session, ready, draft, onDraftChange, onHome, onT
     if (scroll.current) scroll.current.scrollTop = scroll.current.scrollHeight;
   };
   const resume = async (nodeId?: string | null) => {
-    if (!selectionForTurn || state.busy || running || !ready) return;
+    if (!selection || state.busy || running || !ready) return;
     if (nodeId !== undefined) {
       const selected = await controller.execute({ type: "select", taskId: controller.taskId, agentId: controller.agentId, nodeId });
       if (!selected.ok) return;
       controller.inspect(undefined);
     }
-    await controller.execute({ type: "continue", taskId: controller.taskId, agentId: controller.agentId, ...selectionForTurn });
+    await controller.execute({ type: "continue", taskId: controller.taskId, agentId: controller.agentId });
     latest();
   };
   const send = async () => {
-    if (!writable || !draft.trim() || !selectionForTurn) return;
-    const input = { type: "submit" as const, taskId: controller.taskId, agentId: controller.agentId, ...selectionForTurn, text: draft.trim() };
+    if (!writable || !draft.trim() || !selection) return;
+    const input = { type: "submit" as const, taskId: controller.taskId, agentId: controller.agentId, text: draft.trim() };
     const result = await controller.execute({ ...input, submissionId: submission.forInput(input) });
     if (!result.ok) return;
     submission.accepted(); onDraftChange(""); latest();
@@ -139,13 +138,12 @@ export function Conversation({ session, ready, draft, onDraftChange, onHome, onT
             const agent = configuration.agents.find(item => item.id === id)!;
             const defaults = resolveModelRole(configuration, agent.modelRole ?? "default", { modelId: selection.modelId, thinking: selection.thinking });
             if (defaults.error || !defaults.modelId) { setSelectionError(s("This agent's default model is unavailable. Select an available model or update settings.", "此代理的默认模型不可用，请先选择可用模型或修改设置。")); return; }
-            const model = resolveProviderModel(configuration, defaults.modelId)?.model;
-            void configure({ agentConfigurationId: id, modelId: defaults.modelId, thinking: model?.capabilities.reasoning ? defaults.thinking : "off" });
+            void configure({ agentConfigurationId: id, modelId: defaults.modelId, thinking: defaults.thinking });
           }} />
         <ConfigurationChoice icon={<Cpu />} label={t.model} value={selectedModel?.name ?? s("Unavailable model", "模型不可用")}
           selected={selection.modelId} disabled={!ready || state.busy || !models.length}
           options={models.map(model => ({ value: model.id, label: `${configuration?.providers.find(provider => provider.id === model.providerId)?.name ?? ""} / ${model.name}` }))}
-          onSelect={id => { void configure({ ...selection, modelId: id, thinking: models.find(model => model.id === id)?.capabilities.reasoning ? selection.thinking : "off" }); }} />
+          onSelect={id => { void configure({ ...selection, modelId: id }); }} />
         <ConfigurationChoice icon={<Brain />} label={s("Thinking level", "思考等级")} value={selectedModel?.capabilities.reasoning ? selection.thinking ?? s("Default", "默认") : s("Off", "关闭")}
           selected={selectedModel?.capabilities.reasoning ? selection.thinking ?? "__default" : "off"} disabled={!ready || state.busy || !selectedModel?.capabilities.reasoning}
           options={[{ value: "__default", label: s("Default", "默认") }, ...thinkingSchema.options.map(level => ({ value: level, label: level }))]}

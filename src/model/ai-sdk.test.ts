@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { MockLanguageModelV4, simulateReadableStream } from "ai/test";
 import { AiSdkAdapter, sdkMessages } from "./ai-sdk.ts";
-import { modelScope } from "../conversation/projection.ts";
+import { modelScope } from "../shared/conversation.ts";
 import type { ModelInput, ModelEvent } from "./contract.ts";
 import { createProviderModel } from "./provider.ts";
 import { composeSystemPrompt, projectSystemPrompt } from "./system-prompt.ts";

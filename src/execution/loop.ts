@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { ConversationError, pathTo, type ConversationStore } from "../conversation/store.ts";
 import { projectModel, type ExtensionRegistry } from "../conversation/projection.ts";
 import type { InFlightTurn } from "../history/fold.ts";
-import { modelScope, type ModelSettings, type ToolPart } from "../shared/conversation.ts";
+import { modelExpression, modelScope, type ModelSettings, type ToolPart } from "../shared/conversation.ts";
 import type { AgentConfiguration } from "../shared/configuration.ts";
 import { ModelFailure, type ModelAdapter } from "../model/contract.ts";
 import { allowedTool, executeToolBatch, type RuntimeTool } from "./tools.ts";
@@ -40,7 +40,7 @@ export async function runAgent(options: RunOptions): Promise<void> {
       const nodeId = randomUUID();
       activeNode = nodeId;
       store.append({ type: "node.appended", node: { id: nodeId, parentId: state.cursor, kind: "model", createdAt: new Date().toISOString(), turnId: turn.turn_id,
-        request: { adapter: adapter.version, scope: modelScope(settings), historySeq: state.seq, bindingVersion: turn.binding_version },
+        request: { adapter: adapter.version, model: modelExpression(settings), scope: modelScope(settings), historySeq: state.seq, bindingVersion: turn.binding_version },
         state: "streaming", parts: [], usage: null, finishReason: null, responseId: null, rawFinishReason: null, replay: null, error: null } });
       let finished = false;
       // 同一块的网络碎片合并成有序落盘片段；只发布已提交增量。

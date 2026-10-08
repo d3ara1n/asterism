@@ -77,7 +77,7 @@ export function HomePage({ active, draft, onDraftChange, onSettings, ready, busy
           options={snapshot?.agents.filter(item => item.enabled).map(item => ({ value: item.id, label: item.name })) ?? []} />
         <Choice icon={<Cpu />} label={t.model} disabled={!snapshot || !models.length || busy}
           value={model?.name ?? (models.length ? t.model : s("Add a model in settings", "先在设置中添加模型"))}
-          selected={model?.id ?? ""} onSelect={id => { setModelId(id); setSelectionError(null); if (!models.find(item => item.id === id)?.capabilities.reasoning) setThinking("off"); }}
+          selected={model?.id ?? ""} onSelect={id => { setModelId(id); setSelectionError(null); }}
           options={models.map(item => ({ value: item.id, label: `${snapshot?.providers.find(provider => provider.id === item.providerId)?.name ?? ""} / ${item.name}` }))} />
         <Choice icon={<Brain />} label={s("Thinking level", "思考等级")} disabled={!model?.capabilities.reasoning || busy}
           value={!model?.capabilities.reasoning ? s("Off", "关闭") : thinking ?? s("Default", "默认")}

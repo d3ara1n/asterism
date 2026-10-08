@@ -1,5 +1,4 @@
 import { randomUUID } from "node:crypto";
-import { composeSystemPrompt } from "../model/system-prompt.ts";
 import type { DatabaseSync } from "node:sqlite";
 import { z } from "zod";
 import type { ConfigurationService } from "../configuration/service.ts";
@@ -7,21 +6,32 @@ import { ConversationError, ConversationStore, canContinue, pathTo } from "../co
 import { projectModel, type ModelItem } from "../conversation/projection.ts";
 import { AiSdkAdapter } from "../model/ai-sdk.ts";
 import { ModelFailure, type ModelAdapter } from "../model/contract.ts";
+import { composeSystemPrompt } from "../model/system-prompt.ts";
 import { runAgent } from "../execution/loop.ts";
 import { allowedTool, type RuntimeTool } from "../execution/tools.ts";
 import type { HistoryKernel } from "../history/kernel.ts";
 import type { ObjectStore } from "./storage.ts";
-import { resolveProviderModel, type ThinkingLevel } from "../shared/configuration.ts";
-import { conversationCommandSchema, conversationSelectionSchema, conversationSnapshotSchema, jsonSchema, type ConversationCommand, type ConversationSnapshot, type ConversationChanged, type ConversationSelection, type ModelSettings } from "../shared/conversation.ts";
+import { SelectionRepository, normalizeSelection } from "./selections.ts";
+import { resolveProviderModel, type AgentConfiguration, type ConfigurationSnapshot } from "../shared/configuration.ts";
+import { conversationCommandSchema, conversationSnapshotSchema, jsonSchema, type ConversationCommand, type ConversationSnapshot,
+  type ConversationChanged, type ConversationSelection, type ModelSettings } from "../shared/conversation.ts";
 
 type Task = { id: string; branch_id: string };
 type Submission = { task_id: string; agent_id: string; command_json: string };
+type TurnCommand = Extract<ConversationCommand, { type: "start" | "submit" | "continue" }>;
+/** 一轮执行所需的已解析环境；只在内存中存在，不写入历史。 */
+interface Execution { taskId: string; agentId: string; branchId: string; agent: AgentConfiguration; settings: ModelSettings; selection: ConversationSelection; adapter: ModelAdapter }
+
 export class ConversationService {
   private runs = new Map<string, { controller: AbortController; done: Promise<void> }>();
   private closed = false;
+  private readonly selections: SelectionRepository;
   constructor(private readonly db: DatabaseSync, private readonly history: HistoryKernel, private readonly objects: ObjectStore,
     private readonly configuration: ConfigurationService, private readonly changed: (event: ConversationChanged) => void = () => {},
-    private readonly adapterFactory?: (settings: ModelSettings) => ModelAdapter) { this.recover(); }
+    private readonly adapterFactory?: (settings: ModelSettings) => ModelAdapter) {
+    this.selections = new SelectionRepository(db);
+    this.recover();
+  }
   get running(): boolean { return this.runs.size > 0; }
   private task(id: string): Task {
     const task = this.db.prepare("SELECT id, branch_id FROM tasks WHERE id = ?").get(id) as Task | undefined;
@@ -29,25 +39,9 @@ export class ConversationService {
     return task;
   }
   private key(taskId: string, agentId: string): string { return JSON.stringify([taskId, agentId]); }
-  private selectionRevision(taskId: string, agentId: string): number {
-    return (this.db.prepare("SELECT revision FROM conversation_selections WHERE task_id = ? AND agent_id = ?").get(taskId, agentId) as { revision: number } | undefined)?.revision ?? 0;
-  }
-  private selection(taskId: string, agentId: string): ConversationSelection | null {
-    const row = this.db.prepare(`SELECT agent_configuration_id AS agentConfigurationId, model_id AS modelId, thinking
-      FROM conversation_selections WHERE task_id = ? AND agent_id = ?`).get(taskId, agentId);
-    const parsed = conversationSelectionSchema.safeParse(row);
-    return parsed.success ? parsed.data : null;
-  }
-  private saveSelection(taskId: string, agentId: string, selection: ConversationSelection): void {
-    this.db.prepare(`INSERT INTO conversation_selections (task_id, agent_id, agent_configuration_id, model_id, thinking)
-      VALUES (?, ?, ?, ?, ?) ON CONFLICT(task_id, agent_id) DO UPDATE SET
-      agent_configuration_id = excluded.agent_configuration_id, model_id = excluded.model_id, thinking = excluded.thinking,
-      revision = conversation_selections.revision + 1`)
-      .run(taskId, agentId, selection.agentConfigurationId, selection.modelId, selection.thinking);
-  }
   private notify(taskId: string, agentId: string, seq?: number): void {
     try { this.changed({ kind: "conversation.changed", taskId, agentId, seq: seq ?? this.history.head(this.task(taskId).branch_id).seq,
-      selectionRevision: this.selectionRevision(taskId, agentId) }); } catch { /* 查询始终可以恢复通知遗漏。 */ }
+      selectionRevision: this.selections.get(taskId, agentId)?.revision ?? 0 }); } catch { /* 查询始终可以恢复通知遗漏。 */ }
   }
   private store(taskId: string, agentId: string, notify = true): ConversationStore {
     const task = this.task(taskId);
@@ -57,17 +51,16 @@ export class ConversationService {
     const store = this.store(taskId, agentId);
     const state = store.read(atSeq);
     if (!state.created) throw new ConversationError("not_found", "Conversation not found.");
-    const history = atSeq === undefined ? this.history.reconstruct(this.history.head(store.branchId)) : this.history.reconstruct({ branch_id: store.branchId,
-      event_id: this.history.eventsOn(store.branchId).find(e => e.seq === atSeq)!.event_id, seq: atSeq });
     const events = this.history.eventsOn(store.branchId).filter(e => atSeq === undefined || e.seq <= atSeq);
+    const history = this.history.reconstruct(atSeq === undefined ? this.history.head(store.branchId)
+      : { branch_id: store.branchId, event_id: events.at(-1)!.event_id, seq: atSeq });
     const latestTurn = events.findLast(e => e.type === "turn_started" && e.payload.agent_id === agentId);
-    const selection = this.selection(taskId, agentId);
     const failure = latestTurn?.type === "turn_started" ? events.findLast(e => e.type === "execution_failed" && e.payload.turn_id === latestTurn.payload.turn_id) : null;
+    const current = this.selections.get(taskId, agentId);
     return conversationSnapshotSchema.parse({ taskId, agentId, cursor: state.cursor, seq: state.seq,
       nodes: [...state.nodes.values()], activeTurnId: history.in_flight_turns.find(t => t.agent_id === agentId)?.turn_id ?? null,
-      agentName: selection ? this.configuration.agentConfiguration(selection.agentConfigurationId)?.name ?? selection.agentConfigurationId : "Agent",
-      selection,
-      selectionRevision: this.selectionRevision(taskId, agentId),
+      agentName: current ? this.configuration.agentConfiguration(current.selection.agentConfigurationId)?.name ?? current.selection.agentConfigurationId : "Agent",
+      selection: current?.selection ?? null, selectionRevision: current?.revision ?? 0,
       lastError: failure?.type === "execution_failed" ? { code: failure.payload.code, message: failure.payload.message } : null });
   }
   private ensureIdle(taskId: string, agentId: string): void {
@@ -81,78 +74,96 @@ export class ConversationService {
     if (previous.command_json !== JSON.stringify(command)) throw new ConversationError("conflict", "This submission ID was already used for different input.");
     return this.snapshot(previous.task_id, previous.agent_id);
   }
+  private async readConfiguration(): Promise<ConfigurationSnapshot> {
+    const { snapshot } = await this.configuration.execute({ type: "read" });
+    if (this.closed) throw new ConversationError("unavailable", "The conversation service is closed.");
+    return snapshot;
+  }
   async execute(raw: ConversationCommand): Promise<ConversationSnapshot> {
     if (this.closed) throw new ConversationError("unavailable", "The conversation service is closed.");
     const parsed = conversationCommandSchema.safeParse(raw);
     if (!parsed.success) throw new ConversationError("invalid_request", "Invalid conversation command.");
     const command = parsed.data;
-    if (command.type === "read") return this.snapshot(command.taskId, command.agentId, command.atSeq);
-    if (command.type === "cancel") {
-      const snapshot = this.snapshot(command.taskId, command.agentId);
-      this.runs.get(this.key(command.taskId, command.agentId))?.controller.abort();
-      return snapshot;
-    }
-    if (command.type === "select") {
-      this.ensureIdle(command.taskId, command.agentId);
-      this.store(command.taskId, command.agentId).append({ type: "cursor.selected", nodeId: command.nodeId });
-      return this.snapshot(command.taskId, command.agentId);
-    }
-    if (command.type === "configure") {
-      if (!this.store(command.taskId, command.agentId).read().created) throw new ConversationError("not_found", "Conversation not found.");
-      const { snapshot: config } = await this.configuration.execute({ type: "read" });
-      if (this.closed) throw new ConversationError("unavailable", "The conversation service is closed.");
-      const resolved = resolveProviderModel(config, command.selection.modelId);
-      const previous = this.selection(command.taskId, command.agentId);
-      // 已失效的另一项允许暂时保留，避免两个引用同时失效时无法逐项修复。
-      // 新选择必须有效；真正执行仍完整校验全部引用。
-      if ((!config.agents.some(agent => agent.id === command.selection.agentConfigurationId && agent.enabled)
-          && command.selection.agentConfigurationId !== previous?.agentConfigurationId)
-        || (!resolved && command.selection.modelId !== previous?.modelId)) throw new ConversationError("unavailable", "The selected configuration is unavailable.");
-      if (resolved && command.selection.thinking && command.selection.thinking !== "off" && !resolved.model.capabilities.reasoning) {
-        throw new ConversationError("invalid_request", "This model does not support thinking.");
+    switch (command.type) {
+      case "read": return this.snapshot(command.taskId, command.agentId, command.atSeq);
+      case "cancel": {
+        const snapshot = this.snapshot(command.taskId, command.agentId);
+        this.runs.get(this.key(command.taskId, command.agentId))?.controller.abort();
+        return snapshot;
       }
-      this.saveSelection(command.taskId, command.agentId, command.selection);
-      this.notify(command.taskId, command.agentId);
-      return this.snapshot(command.taskId, command.agentId);
+      case "select":
+        this.ensureIdle(command.taskId, command.agentId);
+        this.store(command.taskId, command.agentId).append({ type: "cursor.selected", nodeId: command.nodeId });
+        return this.snapshot(command.taskId, command.agentId);
+      case "configure": return this.configure(command);
+      default: return this.runTurn(command);
     }
+  }
+  /** 当前选择的唯一写入口；规整结果由服务端决定，界面只显示返回值。 */
+  private async configure(command: Extract<ConversationCommand, { type: "configure" }>): Promise<ConversationSnapshot> {
+    const { taskId, agentId } = command;
+    if (!this.store(taskId, agentId).read().created) throw new ConversationError("not_found", "Conversation not found.");
+    const config = await this.readConfiguration();
+    this.selections.save(taskId, agentId, normalizeSelection(config, command.selection, this.selections.get(taskId, agentId)?.selection));
+    this.notify(taskId, agentId);
+    return this.snapshot(taskId, agentId);
+  }
+  private async runTurn(command: TurnCommand): Promise<ConversationSnapshot> {
     if (command.type !== "continue") { const prior = this.existing(command); if (prior) return prior; }
-    const { snapshot: config } = await this.configuration.execute({ type: "read" });
-    if (this.closed) throw new ConversationError("unavailable", "The conversation service is closed.");
-    // 配置读取会让出执行权；提交事务前重新检查幂等身份和执行状态。
+    const config = await this.readConfiguration();
+    // 配置读取会让出执行权；提交事务前重新检查幂等身份。
     if (command.type !== "continue") { const prior = this.existing(command); if (prior) return prior; }
-    const resolved = resolveProviderModel(config, command.modelId);
-    if (!resolved) throw new ConversationError("unavailable", "The model or provider is unavailable.");
-    if (resolved.provider.auth === "api_key" && resolved.provider.credentialState !== "available") throw new ConversationError("unavailable", "Provider credentials are unavailable.");
-    const { credentialState: _credentialState, ...provider } = resolved.provider;
-    const settings: ModelSettings = { provider, model: resolved.model, thinking: command.thinking as ThinkingLevel | null };
-    if (command.thinking && command.thinking !== "off" && !settings.model.capabilities.reasoning) throw new ConversationError("invalid_request", "This model does not support thinking.");
-    const taskId = command.type === "start" ? randomUUID() : command.taskId;
-    const agentId = command.type === "start" ? randomUUID() : command.agentId;
-    const agentConfigurationId = command.agentConfigurationId ?? this.selection(taskId, agentId)?.agentConfigurationId;
-    const agent = config.agents.find(a => a.id === agentConfigurationId && a.enabled);
-    if (!agent) throw new ConversationError("not_found", "Agent configuration is unavailable. Choose an available agent.");
+    const execution = this.resolveExecution(command, config);
+    const turnId = this.commitTurn(command, execution);
+    this.launch(execution, turnId);
+    return this.snapshot(execution.taskId, execution.agentId);
+  }
+  /** 从当前选择与最新配置解析本轮环境，并在提交输入前预检可判定的请求错误。 */
+  private resolveExecution(command: TurnCommand, config: ConfigurationSnapshot): Execution {
+    const isStart = command.type === "start";
+    const taskId = isStart ? randomUUID() : command.taskId;
+    const agentId = isStart ? randomUUID() : command.agentId;
     let messages: ModelItem[] = [];
-    if (command.type !== "start") {
+    let selection: ConversationSelection;
+    if (isStart) selection = normalizeSelection(config, { agentConfigurationId: command.agentConfigurationId, modelId: command.modelId, thinking: command.thinking });
+    else {
       this.ensureIdle(taskId, agentId);
       const state = this.store(taskId, agentId).read();
       if (!state.created) throw new ConversationError("not_found", "Conversation not found.");
       if (pathTo(state).some(n => !canContinue(n))) throw new ConversationError("conflict", "Select a complete history position before continuing.");
+      const current = this.selections.get(taskId, agentId);
+      if (!current) throw new ConversationError("not_found", "Conversation selection not found.");
+      selection = current.selection;
       messages = projectModel(state);
     }
+    const agent = config.agents.find(a => a.id === selection.agentConfigurationId && a.enabled);
+    if (!agent) throw new ConversationError("unavailable", "Agent configuration is unavailable. Choose an available agent.");
     if (agent.maxCost !== null) throw new ConversationError("unavailable", "Cost limits require model pricing support, which is not available yet.");
-    const branchId = command.type === "start" ? randomUUID() : this.task(taskId).branch_id;
-    // 可判定的协议/配置错误在提交输入前返回；prepare 不访问网络或凭据。
+    const resolved = resolveProviderModel(config, selection.modelId);
+    if (!resolved) throw new ConversationError("unavailable", "The model or provider is unavailable.");
+    if (resolved.provider.auth === "api_key" && resolved.provider.credentialState !== "available") throw new ConversationError("unavailable", "Provider credentials are unavailable.");
+    if (selection.thinking && selection.thinking !== "off" && !resolved.model.capabilities.reasoning) throw new ConversationError("invalid_request", "This model does not support thinking.");
+    const { credentialState: _credentialState, ...provider } = resolved.provider;
+    const settings: ModelSettings = { provider, model: resolved.model, thinking: selection.thinking };
+    const branchId = isStart ? randomUUID() : this.task(taskId).branch_id;
     let credential: Promise<string | null> | undefined;
     const adapter = this.adapterFactory?.(settings) ?? new AiSdkAdapter(() => credential ??= this.configuration.executionCredential(provider.id, provider.revision));
     if (command.type !== "continue") messages.push({ kind: "input", text: command.text });
     try {
-      adapter.prepare({ settings, system: composeSystemPrompt(agent), messages,
-        tools: settings.model.capabilities.tools ? this.tools(branchId).filter(t => allowedTool(agent, t.name)).map(({ name, description, parameters }) => ({ name, description, parameters })) : [] });
+      // prepare 不访问网络或凭据。
+      adapter.prepare({ settings, system: composeSystemPrompt(agent), messages, tools: this.declarations(branchId, agent, settings) });
     } catch (error) {
       throw new ConversationError("invalid_request", error instanceof ModelFailure ? error.message : "The model request cannot be prepared.");
     }
+    return { taskId, agentId, branchId, agent, settings, selection, adapter };
+  }
+  private declarations(branchId: string, agent: AgentConfiguration, settings: ModelSettings) {
+    if (!settings.model.capabilities.tools) return [];
+    return this.tools(branchId).filter(t => allowedTool(agent, t.name)).map(({ name, description, parameters }) => ({ name, description, parameters }));
+  }
+  /** 在单个事务内建立任务（首次）、输入节点和轮次。 */
+  private commitTurn(command: TurnCommand, { taskId, agentId, branchId, agent, selection }: Execution): string {
     this.db.exec("BEGIN IMMEDIATE");
-    let turnId: string;
     try {
       if (command.type === "start") {
         const title = command.text.slice(0, 72);
@@ -163,30 +174,33 @@ export class ConversationService {
         this.store(taskId, agentId, false).append({ type: "created" });
         // 工作台视图与领域对象同时建立；位置只是视图状态。
         this.db.prepare("INSERT INTO object_views (task_id, object_id, x, y) VALUES (?, ?, ?, ?)").run(taskId, agentId, 48, 48);
+        this.selections.save(taskId, agentId, selection);
       }
       const store = this.store(taskId, agentId, false);
-      this.saveSelection(taskId, agentId, { agentConfigurationId: agent.id, modelId: command.modelId, thinking: command.thinking });
       if (command.type !== "continue") {
         store.append({ type: "node.appended", node: { id: randomUUID(), parentId: store.read().cursor, kind: "input", text: command.text, createdAt: new Date().toISOString() } });
         this.db.prepare("INSERT INTO conversation_submissions (id, command_json, task_id, agent_id) VALUES (?, ?, ?, ?)")
           .run(command.submissionId, JSON.stringify(command), taskId, agentId);
       }
-      if (store.read().cursor === null) throw new ConversationError("invalid_request", "A conversation needs input before it can continue.");
-      turnId = this.history.startTurn(branchId, { agent_id: agentId, input: { nodeId: store.read().cursor } }).turn_id;
+      const cursor = store.read().cursor;
+      if (cursor === null) throw new ConversationError("invalid_request", "A conversation needs input before it can continue.");
+      const turnId = this.history.startTurn(branchId, { agent_id: agentId, input: { nodeId: cursor } }).turn_id;
       this.db.exec("COMMIT");
+      return turnId;
     } catch (error) { this.db.exec("ROLLBACK"); throw error; }
+  }
+  /** 后台执行本轮；凭据只在本轮内存中保留，不进入历史或 renderer。 */
+  private launch({ taskId, agentId, branchId, agent, settings, adapter }: Execution, turnId: string): void {
     const store = this.store(taskId, agentId);
     const turn = this.history.reconstruct(this.history.head(branchId)).in_flight_turns.find(t => t.turn_id === turnId)!;
     const controller = new AbortController();
     const key = this.key(taskId, agentId);
     const timer = setTimeout(() => controller.abort(), (agent.timeout ?? 600) * 1000);
-    // 凭据只在本轮内存中保留，不进入历史或 renderer。
     const done = Promise.resolve().then(() => runAgent({ store, adapter, agent, settings, turn, signal: controller.signal, tools: this.tools(branchId) }))
       .catch(() => { console.error("Conversation execution could not be finalized."); })
       .finally(() => { clearTimeout(timer); this.runs.delete(key); this.notify(taskId, agentId); });
     this.runs.set(key, { controller, done });
     this.notify(taskId, agentId);
-    return this.snapshot(taskId, agentId);
   }
   private tools(branchId: string): RuntimeTool[] {
     const schema = z.strictObject({ resource_id: z.string().min(1) });

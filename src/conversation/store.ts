@@ -108,7 +108,7 @@ export class ConversationStore {
     applyMutation(this.read(), structuredClone(mutation));
     const event = this.history.atomic(() => {
       for (const body of preceding) this.history.append(this.branchId, body);
-      return this.history.append(this.branchId, { type: "conversation_event", payload: { version: 2, agentId: this.agentId, mutation } });
+      return this.history.append(this.branchId, { type: "conversation_event", payload: { version: 1, agentId: this.agentId, mutation } });
     });
     try { this.changed(event.seq); } catch { /* 通知失败不改变已提交事实；消费方可重新查询。 */ }
   }

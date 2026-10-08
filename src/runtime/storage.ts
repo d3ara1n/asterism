@@ -8,74 +8,36 @@ export function openDatabase(root: string): DatabaseSync {
   const db = new DatabaseSync(join(root, "db", "weft.sqlite"));
   try {
     db.exec("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;");
+    // 发布前只有当前结构；版本不符直接报错，开发数据由使用者删除重建。
     const version = (db.prepare("PRAGMA user_version").get() as { user_version: number }).user_version;
-    if (version > 5) throw new Error("This workspace requires a newer version of Weft.");
-    if (version < 1) {
-      db.exec(`BEGIN IMMEDIATE;
-        CREATE TABLE workspace (id TEXT PRIMARY KEY, title TEXT NOT NULL);
-        CREATE TABLE tasks (id TEXT PRIMARY KEY, branch_id TEXT NOT NULL UNIQUE, title TEXT NOT NULL, created_at TEXT NOT NULL);
-        CREATE TABLE object_views (
-          task_id TEXT NOT NULL REFERENCES tasks(id), object_id TEXT NOT NULL,
-          x REAL NOT NULL, y REAL NOT NULL, hidden INTEGER NOT NULL DEFAULT 0,
-          collapsed INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(task_id, object_id)
-        );
-        CREATE TABLE viewports (task_id TEXT PRIMARY KEY REFERENCES tasks(id), x REAL NOT NULL, y REAL NOT NULL, zoom REAL NOT NULL);
-        PRAGMA user_version = 1;
-        COMMIT;`);
-    }
-    if (version < 2) {
-      db.exec(`BEGIN IMMEDIATE;
-        CREATE TABLE configuration_items (
-          kind TEXT NOT NULL CHECK (kind IN ('provider', 'model', 'role', 'agent')),
-          id TEXT NOT NULL, revision INTEGER NOT NULL CHECK (revision > 0),
-          data_json TEXT NOT NULL, builtin INTEGER NOT NULL DEFAULT 0 CHECK (builtin IN (0, 1)),
-          credential_ref TEXT, PRIMARY KEY (kind, id)
-        ) STRICT;
-        CREATE TABLE configuration_state (id INTEGER PRIMARY KEY CHECK (id = 1)) STRICT;
-        PRAGMA user_version = 2;
-        COMMIT;`);
-    }
-    if (version < 3) {
-      db.exec(`BEGIN IMMEDIATE;
-        CREATE TABLE IF NOT EXISTS conversation_submissions (
-          id TEXT PRIMARY KEY, command_json TEXT NOT NULL,
-          task_id TEXT NOT NULL REFERENCES tasks(id), agent_id TEXT NOT NULL
-        ) STRICT;
-        PRAGMA user_version = 3;
-        COMMIT;`);
-    }
-    if (version < 4) {
-      // v4 将角色与代理 data_json 解释为局部覆盖。旧完整记录逐字段保留，
-      // 不推测用户意图、不改写历史；升级版本阻止旧程序误读新的稀疏记录。
-      db.exec("BEGIN IMMEDIATE; PRAGMA user_version = 4; COMMIT;");
-    }
-    if (version < 5) {
-      db.exec(`BEGIN IMMEDIATE;
-        CREATE TABLE conversation_selections (
-          task_id TEXT NOT NULL REFERENCES tasks(id), agent_id TEXT NOT NULL,
-          agent_configuration_id TEXT NOT NULL, model_id TEXT, thinking TEXT, revision INTEGER NOT NULL DEFAULT 1,
-          PRIMARY KEY(task_id, agent_id)
-        ) STRICT;`);
-      try {
-        if (db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'events'").get()) {
-          // 仅迁移当前选择的身份，不复制任何提示词、策略或模型配置正文；旧事件不改写。
-          db.exec(`INSERT INTO conversation_selections (task_id, agent_id, agent_configuration_id, model_id, thinking)
-            SELECT t.id, json_extract(e.payload, '$.agentId'), json_extract(e.payload, '$.mutation.agent.id'),
-              (SELECT json_extract(r.payload, '$.input.modelId') FROM events r
-                WHERE r.branch_id = t.branch_id AND r.type = 'turn_started'
-                  AND json_extract(r.payload, '$.agent_id') = json_extract(e.payload, '$.agentId')
-                ORDER BY r.seq DESC LIMIT 1),
-              (SELECT json_extract(r.payload, '$.input.thinking') FROM events r
-                WHERE r.branch_id = t.branch_id AND r.type = 'turn_started'
-                  AND json_extract(r.payload, '$.agent_id') = json_extract(e.payload, '$.agentId')
-                ORDER BY r.seq DESC LIMIT 1)
-            FROM tasks t JOIN events e ON e.branch_id = t.branch_id
-            WHERE e.type = 'conversation_event' AND json_extract(e.payload, '$.mutation.type') = 'created'
-              AND json_extract(e.payload, '$.mutation.agent.id') IS NOT NULL;`);
-        }
-        db.exec("PRAGMA user_version = 5; COMMIT;");
-      } catch (error) { db.exec("ROLLBACK"); throw error; }
-    }
+    if (version === 0) db.exec(`BEGIN IMMEDIATE;
+      CREATE TABLE workspace (id TEXT PRIMARY KEY, title TEXT NOT NULL);
+      CREATE TABLE tasks (id TEXT PRIMARY KEY, branch_id TEXT NOT NULL UNIQUE, title TEXT NOT NULL, created_at TEXT NOT NULL);
+      CREATE TABLE object_views (
+        task_id TEXT NOT NULL REFERENCES tasks(id), object_id TEXT NOT NULL,
+        x REAL NOT NULL, y REAL NOT NULL, hidden INTEGER NOT NULL DEFAULT 0,
+        collapsed INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(task_id, object_id)
+      );
+      CREATE TABLE viewports (task_id TEXT PRIMARY KEY REFERENCES tasks(id), x REAL NOT NULL, y REAL NOT NULL, zoom REAL NOT NULL);
+      CREATE TABLE configuration_items (
+        kind TEXT NOT NULL CHECK (kind IN ('provider', 'model', 'role', 'agent')),
+        id TEXT NOT NULL, revision INTEGER NOT NULL CHECK (revision > 0),
+        data_json TEXT NOT NULL, builtin INTEGER NOT NULL DEFAULT 0 CHECK (builtin IN (0, 1)),
+        credential_ref TEXT, PRIMARY KEY (kind, id)
+      ) STRICT;
+      CREATE TABLE configuration_state (id INTEGER PRIMARY KEY CHECK (id = 1)) STRICT;
+      CREATE TABLE conversation_submissions (
+        id TEXT PRIMARY KEY, command_json TEXT NOT NULL,
+        task_id TEXT NOT NULL REFERENCES tasks(id), agent_id TEXT NOT NULL
+      ) STRICT;
+      CREATE TABLE conversation_selections (
+        task_id TEXT NOT NULL REFERENCES tasks(id), agent_id TEXT NOT NULL,
+        agent_configuration_id TEXT NOT NULL, model_id TEXT NOT NULL, thinking TEXT,
+        revision INTEGER NOT NULL DEFAULT 1, PRIMARY KEY(task_id, agent_id)
+      ) STRICT;
+      PRAGMA user_version = 1;
+      COMMIT;`);
+    else if (version !== 1) throw new Error("This workspace database format is not supported by this build of Weft.");
     if (!db.prepare("SELECT id FROM workspace LIMIT 1").get()) {
       db.prepare("INSERT INTO workspace VALUES (?, ?)").run(randomUUID(), "Personal workspace");
     }

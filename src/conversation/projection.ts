@@ -10,7 +10,6 @@ export interface ExtensionProjection {
   user(data: Json): Json[];
 }
 export type ExtensionRegistry = ReadonlyMap<string, ExtensionProjection>;
-export { modelScope } from "../shared/conversation.ts";
 /** 压缩只作用于当前祖先路径；跳回压缩前自然重新取得原始上下文。 */
 export function projectModel(state: ConversationState, extensions: ExtensionRegistry = new Map()): ModelItem[] {
   let result: ModelItem[] = [];

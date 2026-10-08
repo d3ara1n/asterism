@@ -8,7 +8,7 @@ import { projectModel, projectUser } from "../conversation/projection.ts";
 import { runAgent } from "./loop.ts";
 import type { RuntimeTool } from "./tools.ts";
 import type { ModelAdapter, ModelEvent, ModelInput } from "../model/contract.ts";
-import { modelScope, type ModelSettings, type ToolPart } from "../shared/conversation.ts";
+import { modelExpression, modelScope, type ModelSettings, type ToolPart } from "../shared/conversation.ts";
 
 export const settings: ModelSettings = {
   provider: { id: "provider", revision: 1, name: "Provider", protocol: "openai-responses", baseUrl: "https://example.invalid/v1", enabled: true, auth: "none" },
@@ -133,7 +133,7 @@ describe("单代理执行契约", () => {
   it("重建时运行中工具标记结果未知，未启动工具标记取消，不重放任何操作", () => {
     const { store, turn } = setup();
     store.append({ type: "node.appended", node: { kind: "model", id: "model", parentId: "input", createdAt: "now", turnId: turn.turn_id,
-      request: { adapter: "test", scope: modelScope(settings), historySeq: store.read().seq, bindingVersion: turn.binding_version },
+      request: { adapter: "test", model: modelExpression(settings), scope: modelScope(settings), historySeq: store.read().seq, bindingVersion: turn.binding_version },
       state: "streaming", parts: [], usage: null, finishReason: null, responseId: null, rawFinishReason: null, replay: null, error: null } });
     for (const id of ["a", "b"]) {
       const first = call(id, "resource")[0]!;

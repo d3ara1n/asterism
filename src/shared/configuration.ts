@@ -2,7 +2,7 @@ import { z } from "zod";
 
 export const configurationChannel = "weft:configuration";
 export const configurationChangedChannel = "weft:configuration-changed";
-export const configurationVersion = 2;
+export const configurationVersion = 1;
 const id = z.string().min(1).max(160);
 const name = z.string().trim().min(1).max(160);
 const revision = z.number().int().positive();
@@ -31,10 +31,7 @@ export const modelSchema = modelInputSchema.extend({ id, revision });
 export const modelRoleInputSchema = z.strictObject({
   name, modelId: id.nullable(), thinking: thinkingSchema.nullable(), enabled: z.boolean(), description: z.string().max(20_000), hidden: z.boolean(),
 });
-const configurationSourceSchema = z.strictObject({
-  defaultsVersion: z.string(), baseId: id, overriddenFields: z.array(z.string()),
-});
-export const modelRoleSchema = modelRoleInputSchema.extend({ id, revision, builtin: z.boolean(), source: configurationSourceSchema.optional() });
+export const modelRoleSchema = modelRoleInputSchema.extend({ id, revision, builtin: z.boolean() });
 const names = z.array(id).max(200);
 const agentFieldsSchema = z.strictObject({
   name, enabled: z.boolean(), description: z.string().max(20_000), systemPrompt: z.string().max(100_000),
@@ -43,7 +40,7 @@ const agentFieldsSchema = z.strictObject({
   timeout: z.number().int().positive().max(86_400).nullable(), maxTurns: z.number().int().positive().nullable(), maxCost: z.number().positive().nullable(),
 });
 export const agentInputSchema = agentFieldsSchema.refine(value => value.tools === null || value.excludeTools === null, "Tool allowlist and denylist are mutually exclusive.");
-export const agentSchema = agentInputSchema.safeExtend({ id, revision, builtin: z.boolean(), source: configurationSourceSchema.optional() });
+export const agentSchema = agentInputSchema.safeExtend({ id, revision, builtin: z.boolean() });
 // 留空文本在保存时移除覆盖；false、null 和空列表保留各自的业务含义。
 const overrideName = z.string().trim().max(160).optional();
 export const modelRoleOverridesSchema = modelRoleInputSchema.partial().extend({ name: overrideName });
@@ -59,7 +56,7 @@ export const configurationSnapshotSchema = z.strictObject({
   providers: z.array(providerSchema), models: z.array(modelSchema), roles: z.array(modelRoleSchema), agents: z.array(agentSchema),
   tests: z.array(connectionTestSchema), credentialStorageAvailable: z.boolean(),
   defaults: z.strictObject({
-    version: z.string(), roles: z.record(id, modelRoleInputSchema), agents: z.record(id, agentInputSchema),
+    roles: z.record(id, modelRoleInputSchema), agents: z.record(id, agentInputSchema),
   }),
   overrides: z.strictObject({
     roles: z.record(id, modelRoleOverridesSchema), agents: z.record(id, agentOverridesSchema),
