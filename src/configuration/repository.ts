@@ -14,8 +14,8 @@ export class ConfigurationRepository {
   constructor(private readonly db: DatabaseSync) {
     if (!db.prepare("SELECT id FROM configuration_state WHERE id = 1").get()) this.transaction(() => {
       for (const [kind, items] of [["role", defaultRoles], ["agent", defaultAgents]] as const) {
-        for (const { id, builtin, ...data } of items) {
-          db.prepare("INSERT INTO configuration_items (kind, id, revision, data_json, builtin) VALUES (?, ?, 1, ?, ?)").run(kind, id, JSON.stringify(data), builtin ? 1 : 0);
+        for (const { id, builtin } of items) {
+          db.prepare("INSERT INTO configuration_items (kind, id, revision, data_json, builtin) VALUES (?, ?, 1, ?, ?)").run(kind, id, "{}", builtin ? 1 : 0);
         }
       }
       db.prepare("INSERT INTO configuration_state VALUES (1)").run();

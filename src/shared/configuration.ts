@@ -2,7 +2,7 @@ import { z } from "zod";
 
 export const configurationChannel = "weft:configuration";
 export const configurationChangedChannel = "weft:configuration-changed";
-export const configurationVersion = 1;
+export const configurationVersion = 2;
 const id = z.string().min(1).max(160);
 const name = z.string().trim().min(1).max(160);
 const revision = z.number().int().positive();
@@ -31,15 +31,24 @@ export const modelSchema = modelInputSchema.extend({ id, revision });
 export const modelRoleInputSchema = z.strictObject({
   name, modelId: id.nullable(), thinking: thinkingSchema.nullable(), enabled: z.boolean(), description: z.string().max(20_000), hidden: z.boolean(),
 });
-export const modelRoleSchema = modelRoleInputSchema.extend({ id, revision, builtin: z.boolean() });
+const configurationSourceSchema = z.strictObject({
+  defaultsVersion: z.string(), baseId: id, overriddenFields: z.array(z.string()),
+});
+export const modelRoleSchema = modelRoleInputSchema.extend({ id, revision, builtin: z.boolean(), source: configurationSourceSchema.optional() });
 const names = z.array(id).max(200);
-export const agentInputSchema = z.strictObject({
+const agentFieldsSchema = z.strictObject({
   name, enabled: z.boolean(), description: z.string().max(20_000), systemPrompt: z.string().max(100_000),
   modelRole: id.nullable(), fallbackRole: id.nullable(), examples: z.array(z.string().max(4_000)).max(50), decisionTrigger: z.string().max(4_000),
   tools: names.nullable(), excludeTools: names.nullable(), subagentRoles: names.nullable(),
   timeout: z.number().int().positive().max(86_400).nullable(), maxTurns: z.number().int().positive().nullable(), maxCost: z.number().positive().nullable(),
-}).refine(value => value.tools === null || value.excludeTools === null, "Tool allowlist and denylist are mutually exclusive.");
-export const agentSchema = agentInputSchema.safeExtend({ id, revision, builtin: z.boolean() });
+});
+export const agentInputSchema = agentFieldsSchema.refine(value => value.tools === null || value.excludeTools === null, "Tool allowlist and denylist are mutually exclusive.");
+export const agentSchema = agentInputSchema.safeExtend({ id, revision, builtin: z.boolean(), source: configurationSourceSchema.optional() });
+// 留空文本在保存时移除覆盖；false、null 和空列表保留各自的业务含义。
+const overrideName = z.string().trim().max(160).optional();
+export const modelRoleOverridesSchema = modelRoleInputSchema.partial().extend({ name: overrideName });
+export const agentOverridesSchema = agentFieldsSchema.partial().extend({ name: overrideName })
+  .refine(value => value.tools == null || value.excludeTools == null, "Tool allowlist and denylist are mutually exclusive.");
 export const testErrorSchema = z.enum(["configuration", "credential", "authentication", "model_unavailable", "rate_limit", "network", "timeout", "protocol", "server", "cancelled"]);
 export const connectionTestSchema = z.strictObject({
   id, providerId: id, providerRevision: revision, modelId: id, modelRevision: revision,
@@ -49,6 +58,12 @@ export const connectionTestSchema = z.strictObject({
 export const configurationSnapshotSchema = z.strictObject({
   providers: z.array(providerSchema), models: z.array(modelSchema), roles: z.array(modelRoleSchema), agents: z.array(agentSchema),
   tests: z.array(connectionTestSchema), credentialStorageAvailable: z.boolean(),
+  defaults: z.strictObject({
+    version: z.string(), roles: z.record(id, modelRoleInputSchema), agents: z.record(id, agentInputSchema),
+  }),
+  overrides: z.strictObject({
+    roles: z.record(id, modelRoleOverridesSchema), agents: z.record(id, agentOverridesSchema),
+  }),
 });
 const target = { id: id.nullable() };
 const credentialUpdateSchema = z.discriminatedUnion("action", [
@@ -59,8 +74,8 @@ export const configurationCommandSchema = z.discriminatedUnion("type", [
   z.strictObject({ type: z.literal("read") }),
   z.strictObject({ type: z.literal("provider.save"), ...target, value: providerInputSchema, credential: credentialUpdateSchema }),
   z.strictObject({ type: z.literal("model.save"), ...target, value: modelInputSchema }),
-  z.strictObject({ type: z.literal("role.save"), ...target, value: modelRoleInputSchema }),
-  z.strictObject({ type: z.literal("agent.save"), ...target, value: agentInputSchema }),
+  z.strictObject({ type: z.literal("role.save"), ...target, value: modelRoleOverridesSchema }),
+  z.strictObject({ type: z.literal("agent.save"), ...target, value: agentOverridesSchema }),
   z.strictObject({ type: z.literal("remove"), kind: z.enum(["provider", "model", "role", "agent"]), id }),
   z.strictObject({ type: z.literal("test.start"), modelId: id }),
   z.strictObject({ type: z.literal("test.cancel"), id }),
@@ -80,6 +95,8 @@ export type ProviderInput = z.infer<typeof providerInputSchema>;
 export type ProviderModel = z.infer<typeof modelSchema>;
 export type ModelRole = z.infer<typeof modelRoleSchema>;
 export type AgentConfiguration = z.infer<typeof agentSchema>;
+export type ModelRoleOverrides = z.infer<typeof modelRoleOverridesSchema>;
+export type AgentOverrides = z.infer<typeof agentOverridesSchema>;
 export type ConfigurationSnapshot = z.infer<typeof configurationSnapshotSchema>;
 export type ConfigurationCommand = z.infer<typeof configurationCommandSchema>;
 export type ConfigurationResult = z.infer<typeof configurationResultSchema>;

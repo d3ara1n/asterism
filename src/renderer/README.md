@@ -24,6 +24,7 @@
 | `features/conversation/controller.ts` | 通知合并查询、单调快照、命令状态与提交身份 |
 | `features/conversation/Markdown.tsx` | Streamdown 流式 Markdown 配置，复用库的解析与控件 |
 | `features/configuration/` | 提供商/模型角色/agent 配置表单及共享读取入口 |
+| `features/configuration/forms.tsx` | 配置编辑器与字段公共入口；文本 placeholder、内置选择、显式空值与恢复操作在此复用 |
 | `features/settings/` | 设置屏与分类注册表，通用偏好仍为预览 |
 | `shared/weave/` | Space 屏间平移、Screen 浮岛、布局模型与动效 |
 | `shared/ui/` | 本地维护的 shadcn/ui Radix 控件 |
@@ -42,6 +43,7 @@
 - 工作台按 Task 的对象和关系投影卡片与连线。主代理卡片消费真实会话，其他已有对象保留自身视图；隐藏、折叠、位置与视口不改变领域状态。没有对话记录的早期代理显示说明，不伪造消息。可添加资源另行收敛，工作台形态与对象模型不变。
 - Sidebar 继续通过 `Screen.leading` 参与浮岛布局。设置是独立屏，侧栏和首页/会话同属主屏；切换设置整屏平移。窄窗口保持控件可访问，窗口当前最小为 800×600。
 - 配色、圆角和密度消费共享主题；正文渲染复用库与语义 token，不自行实现 Markdown 解析器。图标使用 lucide-react，动效使用 Motion，普通控件复用 shadcn/ui。
+- 设置中的角色与代理编辑器只编辑用户覆盖，使用配置能力返回的内置基准展示继承值，不把完整生效配置回填并保存。文本留空恢复内置；列表清空和布尔关闭通过明确选项表达。恢复内置值是草稿操作，保存后生效；已有对话配置不刷新。
 
 ## 后续范围
 

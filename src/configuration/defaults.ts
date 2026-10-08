@@ -1,7 +1,7 @@
 import type { AgentConfiguration, ModelRole } from "../shared/configuration.ts";
 
 // 默认角色取自 pi-subagent 及经用户确认的 agentOverrides；不包含本机模型或凭据。
-// worker 按产品约定启用，smart 为内置模型角色。只在首次初始化时写入，用户编辑后不重置。
+// worker 按产品约定启用，smart 为内置模型角色。作为原始基准参与解析，不回写到用户覆盖。
 export const defaultAgents: Omit<AgentConfiguration, "revision">[] = [
   {
     "id": "worker",

@@ -4,9 +4,10 @@ import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { openDatabase } from "../runtime/storage.ts";
-import { resolveModelRole, type ConfigurationCommand, type ConfigurationSnapshot } from "../shared/configuration.ts";
+import { configurationResultSchema, resolveModelRole, type ConfigurationCommand, type ConfigurationSnapshot } from "../shared/configuration.ts";
 import { ConfigurationService } from "./service.ts";
 import type { ConnectionProbe } from "./probe.ts";
+import { configurationDefaults, resolveAgentConfiguration, resolveRoleConfiguration } from "./layers.ts";
 
 const cleanups: (() => void)[] = [];
 afterEach(() => { cleanups.splice(0).reverse().forEach(cleanup => cleanup()); vi.useRealTimers(); });
@@ -35,11 +36,73 @@ async function addModel(service: ConfigurationService, auth: "none" | "api_key" 
   return { providerId: provider.savedId!, modelId: model.savedId!, snapshot: model.snapshot };
 }
 function roleValue(snapshot: ConfigurationSnapshot, id: string) {
-  const { id: _id, revision: _revision, builtin: _builtin, ...value } = snapshot.roles.find(role => role.id === id)!;
+  const { id: _id, revision: _revision, builtin: _builtin, source: _source, ...value } = snapshot.roles.find(role => role.id === id)!;
   return value;
 }
 
 describe("真实配置与消费边界", () => {
+  it("只保存用户覆盖，空提示词恢复内置，显式 false 与空列表不丢失", async () => {
+    const { service, db } = setup();
+    const initial = await service.execute({ type: "read" });
+    expect(initial.snapshot.overrides.agents.worker).toEqual({});
+    const saved = await service.execute({ type: "agent.save", id: "worker", value: {
+      systemPrompt: "Custom instructions", enabled: false, tools: [], subagentRoles: [],
+    } });
+    expect(configurationResultSchema.safeParse({ ok: true, ...saved }).success).toBe(true);
+    expect(saved.snapshot.agents.find(agent => agent.id === "worker")).toMatchObject({
+      systemPrompt: "Custom instructions", enabled: false, tools: [], subagentRoles: [],
+      source: { baseId: "worker", defaultsVersion: "1", overriddenFields: ["enabled", "subagentRoles", "systemPrompt", "tools"] },
+    });
+    const cleared = await service.execute({ type: "agent.save", id: "worker", value: { systemPrompt: " \n " } });
+    expect(cleared.snapshot.overrides.agents.worker).toEqual({});
+    expect(cleared.snapshot.agents.find(agent => agent.id === "worker")?.systemPrompt).toBe(initial.snapshot.defaults.agents.worker!.systemPrompt);
+    expect(db.prepare("SELECT data_json FROM configuration_items WHERE kind = 'agent' AND id = 'worker'").get()).toEqual({ data_json: "{}" });
+    expect(saved.snapshot.agents.find(agent => agent.id === "worker")?.systemPrompt).toBe("Custom instructions");
+  });
+  it("自定义配置始终继承原始基准；worker 被修改或删除不改变新代理", async () => {
+    const { service } = setup();
+    await service.execute({ type: "agent.save", id: "worker", value: { systemPrompt: "Changed worker", timeout: 1, enabled: false } });
+    await service.execute({ type: "role.save", id: "default", value: { thinking: "off", enabled: false } });
+    const agent = await service.execute({ type: "agent.save", id: null, value: { name: "Supervisor", tools: [] } });
+    expect(agent.snapshot.agents.find(item => item.id === agent.savedId)).toMatchObject({
+      name: "Supervisor", tools: [], systemPrompt: configurationDefaults.agents.worker!.systemPrompt, timeout: 2400, enabled: true,
+    });
+    const role = await service.execute({ type: "role.save", id: null, value: { name: "Custom" } });
+    expect(role.snapshot.roles.find(item => item.id === role.savedId)).toMatchObject({ name: "Custom", thinking: "medium", enabled: true });
+    await service.execute({ type: "remove", kind: "agent", id: "worker" });
+    const after = await service.execute({ type: "agent.save", id: null, value: { name: "Independent" } });
+    expect(after.snapshot.agents.find(item => item.id === after.savedId)?.systemPrompt).toBe(configurationDefaults.agents.worker!.systemPrompt);
+    await expect(service.execute({ type: "role.save", id: null, value: {} })).rejects.toThrow("require a name");
+  });
+  it("工具策略覆盖替换内置策略；显式 null 与缺省分别表示调用方继承和内置值", async () => {
+    const { service } = setup();
+    const saved = await service.execute({ type: "agent.save", id: "explorer", value: { excludeTools: ["bash"] } });
+    expect(saved.snapshot.agents.find(item => item.id === "explorer")).toMatchObject({ tools: null, excludeTools: ["bash"] });
+    const empty = await service.execute({ type: "agent.save", id: "explorer", value: { tools: [] } });
+    expect(empty.snapshot.agents.find(item => item.id === "explorer")).toMatchObject({ tools: [], excludeTools: null });
+    await expect(service.execute({ type: "agent.save", id: "explorer", value: { tools: [], excludeTools: [] } })).rejects.toThrow("Invalid configuration");
+    const inherited = await service.execute({ type: "role.save", id: "heavy", value: { thinking: null, hidden: false } });
+    expect(resolveModelRole(inherited.snapshot, "heavy", { modelId: null, thinking: "low" }).thinking).toBe("low");
+    const reset = await service.execute({ type: "role.save", id: "heavy", value: {} });
+    expect(resolveModelRole(reset.snapshot, "heavy", { modelId: null, thinking: "low" }).thinking).toBe("high");
+  });
+  it("内置升级只改变未覆盖字段，已取得的生效配置保持稳定", () => {
+    const oldDefaults = structuredClone(configurationDefaults);
+    const nextDefaults = structuredClone(configurationDefaults);
+    nextDefaults.version = "2";
+    nextDefaults.agents.worker!.timeout = 3000;
+    nextDefaults.agents.worker!.systemPrompt = "New built-in prompt";
+    nextDefaults.roles.default!.thinking = "high";
+    const agentRow = { kind: "agent" as const, id: "custom-agent", revision: 1, builtin: 0, credential_ref: null,
+      data_json: JSON.stringify({ name: "Custom", systemPrompt: "Pinned prompt" }) };
+    const before = resolveAgentConfiguration(agentRow, oldDefaults);
+    const after = resolveAgentConfiguration(agentRow, nextDefaults);
+    expect(before.timeout).toBe(2400);
+    expect(after).toMatchObject({ timeout: 3000, systemPrompt: "Pinned prompt", source: { defaultsVersion: "2", baseId: "worker" } });
+    const roleRow = { ...agentRow, kind: "role" as const, data_json: JSON.stringify({ name: "Custom", hidden: false }) };
+    expect(resolveRoleConfiguration(roleRow, nextDefaults)).toMatchObject({ thinking: "high", hidden: false });
+    expect(before.source?.defaultsVersion).toBe("1");
+  });
   it("初始化五种模型角色和五种 agent；worker 默认可用，utility 可管理且隐藏", async () => {
     const { service } = setup();
     const { snapshot } = await service.execute({ type: "read" });
@@ -178,7 +241,27 @@ describe("真实配置与消费边界", () => {
     db.close();
     db = openDatabase(root);
     expect(db.prepare("SELECT title FROM tasks WHERE id = ?").get("saved-task")).toEqual({ title: "Existing work" });
-    expect(db.prepare("PRAGMA user_version").get()).toEqual({ user_version: 3 });
+    expect(db.prepare("PRAGMA user_version").get()).toEqual({ user_version: 4 });
     expect(db.prepare("SELECT COUNT(*) AS count FROM configuration_items").get()).toEqual({ count: 0 });
+  });
+  it("v3 完整配置迁移为显式覆盖，旧值与删除状态重开后保留", async () => {
+    const root = mkdtempSync(join(tmpdir(), "weft-configuration-v3-"));
+    let db = openDatabase(root);
+    cleanups.push(() => { db.close(); rmSync(root, { recursive: true, force: true }); });
+    const legacy = { ...configurationDefaults.agents.worker!, systemPrompt: "Legacy prompt", tools: [], excludeTools: null };
+    db.prepare("INSERT INTO configuration_items (kind, id, revision, data_json, builtin) VALUES ('agent', 'worker', 7, ?, 1)").run(JSON.stringify(legacy));
+    db.exec("INSERT INTO configuration_state VALUES (1); PRAGMA user_version = 3;");
+    db.close();
+    db = openDatabase(root);
+    const service = new ConfigurationService(db, root, { available: async () => false, encrypt: async () => "", decrypt: async () => "" });
+    try {
+      const { snapshot } = await service.execute({ type: "read" });
+      expect(snapshot.agents).toHaveLength(1);
+      expect(snapshot.agents[0]).toMatchObject({ id: "worker", revision: 7, systemPrompt: "Legacy prompt", tools: [] });
+      expect(snapshot.overrides.agents.worker).toEqual(legacy);
+      expect(db.prepare("PRAGMA user_version").get()).toEqual({ user_version: 4 });
+      const reset = await service.execute({ type: "agent.save", id: "worker", value: {} });
+      expect(reset.snapshot.agents[0]?.systemPrompt).toBe(configurationDefaults.agents.worker!.systemPrompt);
+    } finally { service.close(); }
   });
 });

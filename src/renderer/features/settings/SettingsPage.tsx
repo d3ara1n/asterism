@@ -23,7 +23,7 @@ interface SettingsCategory { id: string; title: string; summary: string; icon: C
 const categories: SettingsCategory[] = [
   { id: "appearance", title: s("Appearance", "外观"), summary: s("Colors, density, and canvas", "配色、密度与画布"), icon: Palette, content: () => <AppearanceSettings /> },
   { id: "providers", title: s("Providers", "提供商"), summary: s("Connections and available models", "连接与具体模型"), icon: PlugZap, content: () => <ProvidersSettings /> },
-  { id: "models", title: t.modelsTitle, summary: s("Reusable model roles", "可复用的模型角色"), icon: Cpu, content: () => <RolesSettings /> },
+  { id: "roles", title: t.rolesTitle, summary: s("Reusable model roles", "可复用的模型角色"), icon: Cpu, content: () => <RolesSettings /> },
   { id: "agents", title: s("Agents", "代理"), summary: s("Prompts, tools, and delegation", "提示词、工具与委派配置"), icon: Bot, content: () => <AgentsSettings /> },
   { id: "about", title: t.aboutTitle, summary: t.aboutSummary, icon: Info, content: () => <>
     <p className="type-body py-4 text-muted-foreground">{t.aboutBody}</p>
@@ -73,7 +73,7 @@ function SettingsRoot({ openId, onOpen, onClosed }: { openId: string | null; onO
         <motion.div className="p-6" initial={{ opacity: 0 }} animate={{ opacity: 1, transition: { ...islandTransition, delay: 0.18 } }} exit={{ opacity: 0, transition: fadeTransition }}>
           <Button variant="ghost" size="sm" className="-ml-2 mb-4" onClick={close}><ArrowLeft />{t.allSettings}</Button>
           <h2 ref={heading} tabIndex={-1} className="type-page mb-2 outline-none">{open.title}</h2>
-          {["providers", "models", "agents"].includes(open.id) && <ConfigurationStatus />}
+          {["providers", "roles", "agents"].includes(open.id) && <ConfigurationStatus />}
           {open.content()}
         </motion.div>
       </MotionCard>}

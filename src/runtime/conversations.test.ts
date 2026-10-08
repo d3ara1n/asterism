@@ -36,6 +36,24 @@ async function settled(service: ApplicationService): Promise<void> {
 }
 
 describe("会话运行时与持久化", () => {
+  it("新对话采用覆盖后的配置，重开续接保留原提示词", async () => {
+    const prompts: string[] = [];
+    const capturing: ModelAdapter = { version: adapter.version, prepare: input => {
+      prompts.push(input.system); return adapter.prepare(input);
+    } };
+    const { service, root, command } = await setup(capturing);
+    await service.configuration.execute({ type: "agent.save", id: "worker", value: { systemPrompt: "Original instructions" } });
+    const initial = await service.conversations.execute(command); await settled(service);
+    await service.configuration.execute({ type: "agent.save", id: "worker", value: { systemPrompt: "Updated instructions" } });
+    await service.conversations.execute({ ...command, submissionId: randomUUID() }); await settled(service);
+    expect(prompts.at(-1)).toBe("Updated instructions");
+    await service.close(); services.delete(service);
+    const reopened = new ApplicationService(root, { adapterFactory: () => capturing }); services.add(reopened);
+    await reopened.conversations.execute({ type: "submit", taskId: initial.taskId, agentId: initial.agentId,
+      submissionId: randomUUID(), modelId: command.modelId, thinking: null, text: "Continue" });
+    await settled(reopened);
+    expect(prompts.at(-1)).toBe("Original instructions");
+  });
   it("无模型回复的准备失败仍向前端提供错误与续接选择", async () => {
     let prepared = 0;
     const { service, command } = await setup({ version: adapter.version, prepare: input => {

@@ -34,9 +34,11 @@
 
 提供商连接为本机应用级配置，首批覆盖 OpenAI Responses、OpenAI Chat Completions 与 Anthropic Messages。普通配置和凭据引用保存于 SQLite；API key 由 Electron safeStorage 加密，密文独立保存在应用数据目录 credentials/，加密不可用时不回退明文。能力层提供配置管理与异步连接测试，界面消费接口。具体实施状态见 [模型接入计划](../plans/todo-2026-10-01-model-protocol-storage.md)。
 
-设置分为提供商、模型、代理：提供商管理连接与具体模型的能力、生成参数；模型管理 `heavy/fast/default/utility/smart` 及自定义模型角色；代理管理主代理与子代理共用的 agent 配置。内置模型角色不能删除，其余设置可编辑；`utility` 默认隐藏，内部功能仍可引用。模型角色是配置参考，不是工作台对象。
+设置分为提供商、角色、代理：提供商管理连接与具体模型的能力、生成参数；角色管理 `heavy/fast/default/utility/smart` 及自定义模型角色；代理管理主代理与子代理共用的 agent 配置。内置模型角色不能删除，其余设置可编辑；`utility` 默认隐藏，内部功能仍可引用。模型角色是配置参考，不是工作台对象。
 
-配置按取用时读取、消费时校验处理，不建跨配置引用约束，不级联刷新会话或已选项。删除不因其他配置持有其 ID 而受阻；非空失效 ID 不降级为继承。选择 agent 时取得默认配置，已有会话不随配置编辑刷新。内置 agent 为 worker、explorer、reviewer、researcher、advisor，worker 默认，advisor 使用 smart；默认内容来自指定 pi 配置，首次初始化后不重置用户编辑。
+配置按取用时读取、消费时校验处理，不建跨配置引用约束，不级联刷新会话或已选项。删除不因其他配置持有其 ID 而受阻；非空失效 ID 不降级为继承。模型角色与 agent 配置由内置原始定义和用户局部覆盖解析出最终视图；用户未提供字段表示未覆盖，提示词留空恢复继承。自定义模型角色以内置原始 default 为基准，自定义 agent 以内置原始 worker 为基准，不依赖其他项的最终视图。编辑器可用 placeholder 展示继承值，不将其回存为用户覆盖。已有会话保存完整生效配置，不随设置或内置定义更新重算。内置 agent 为 worker、explorer、reviewer、researcher、advisor，worker 默认，advisor 使用 smart；初始内容来自指定 pi 配置。具体语义见 [模型与代理配置](model-configuration.md)，实施状态见模型接入计划。
+
+系统指令从有序的结构化提示块统一渲染，使用 XML-like 分段表达 harness、agent 及后续 context、skill 的来源与边界。harness 解释环境和运行机制，动态资源状态只通过消息节点追加；工具定义由独立协议通道传递，不重复拼入系统指令。插件扩展面允许追加及拦截替换结构化提示块，插件接入、AGENTS.md 指令注入与 skills 暂缓实现。相同配置下提示块与工具定义的内容及顺序保持稳定；标签不改变协议指令层级或执行授权。详细约定见 [运行时与上下文](runtime.md)。
 
 对话创建选择 agent 与具体模型，agent 的模型角色提供默认参考，用户可覆盖；无继承来源且模型未定义时要求明确选择。对话开始后 agent 固定、模型可切换，委派也可覆盖模型。只读 agent 不因作为主代理或委派而获得写权限。完整规则见 [模型与代理配置](model-configuration.md)。
 

@@ -1,11 +1,12 @@
 import { randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
-import { agentSchema, configurationCommandSchema, modelRoleSchema, modelSchema, providerSchema, resolveProviderModel,
+import { agentOverridesSchema, configurationCommandSchema, modelRoleOverridesSchema, modelSchema, providerSchema, resolveProviderModel,
   type ConfigurationCommand, type ConfigurationSnapshot, type ConnectionTest, type Provider, type ProviderModel } from "../shared/configuration.ts";
 import type { SecretProtector } from "../shared/secrets.ts";
 import { ConfigurationError, ConfigurationRepository, type ConfigurationKind, type ConfigurationRow } from "./repository.ts";
 import { CredentialVault } from "./credentials.ts";
 import { classifyProbeError, runConnectionProbe, type ConnectionProbe } from "./probe.ts";
+import { configurationDefaults, normalizeOverrides, resolveAgentConfiguration, resolveRoleConfiguration } from "./layers.ts";
 
 const data = (row: ConfigurationRow): Record<string, unknown> => ({ ...JSON.parse(row.data_json), id: row.id, revision: row.revision });
 export class ConfigurationService {
@@ -49,11 +50,18 @@ export class ConfigurationService {
     return providerSchema.parse({ ...stored, credentialState });
   }
   private snapshot(): ConfigurationSnapshot {
+    const roles = this.repository.list("role");
+    const agents = this.repository.list("agent");
     return {
       providers: this.repository.list("provider").map(row => this.provider(row)),
       models: this.repository.list("model").map(row => modelSchema.parse(data(row))),
-      roles: this.repository.list("role").map(row => modelRoleSchema.parse({ ...data(row), builtin: !!row.builtin })),
-      agents: this.repository.list("agent").map(row => agentSchema.parse({ ...data(row), builtin: !!row.builtin })),
+      roles: roles.map(row => resolveRoleConfiguration(row)),
+      agents: agents.map(row => resolveAgentConfiguration(row)),
+      defaults: structuredClone(configurationDefaults),
+      overrides: {
+        roles: Object.fromEntries(roles.map(row => [row.id, modelRoleOverridesSchema.parse(JSON.parse(row.data_json))])),
+        agents: Object.fromEntries(agents.map(row => [row.id, agentOverridesSchema.parse(JSON.parse(row.data_json))])),
+      },
       tests: [...this.tests.values()].map(test => ({ ...test.value })), credentialStorageAvailable: this.storageAvailable,
     };
   }
@@ -70,6 +78,19 @@ export class ConfigurationService {
     const id = command.id ?? randomUUID();
     const old = this.repository.get(kind, id);
     if (command.id && !old) throw new ConfigurationError("not_found", "This configuration no longer exists. Reload settings.");
+    if (command.type === "role.save" || command.type === "agent.save") {
+      const value = normalizeOverrides(command.value);
+      if (!old?.builtin && !value.name) throw new ConfigurationError("invalid_request", "Custom configurations require a name.");
+      const candidate: ConfigurationRow = { kind, id, revision: (old?.revision ?? 0) + 1,
+        data_json: JSON.stringify(value), builtin: old?.builtin ?? 0, credential_ref: null };
+      // 写入前验证完整视图，不能让局部合法但组合无效的配置落盘。
+      try {
+        if (command.type === "role.save") resolveRoleConfiguration(candidate);
+        else resolveAgentConfiguration(candidate);
+      } catch { throw new ConfigurationError("invalid_request", "Invalid configuration overrides."); }
+      this.repository.save(kind, id, value);
+      return id;
+    }
     if (kind === "model") {
       const providerId = (command as Extract<ConfigurationCommand, { type: "model.save" }>).value.providerId;
       if (!this.repository.get("provider", providerId)) throw new ConfigurationError("not_found", "The provider no longer exists. Reload settings.");

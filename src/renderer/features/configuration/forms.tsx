@@ -9,22 +9,28 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Switch } from "../../shared/ui/switch";
 import { s, useSettingsConfiguration } from "./state";
 
-export function TextField({ label, value, onChange, multiline = false, required = false, hint }: {
-  label: string; value: string; onChange: (value: string) => void; multiline?: boolean; required?: boolean; hint?: string;
+export function TextField({ label, value, onChange, multiline = false, required = false, hint, placeholder }: {
+  label: string; value: string; onChange: (value: string) => void; multiline?: boolean; required?: boolean; hint?: string; placeholder?: string;
 }) {
   const id = useId();
   return <Field><FieldLabel htmlFor={id}>{label}</FieldLabel>
-    {multiline ? <Textarea id={id} value={value} onChange={event => onChange(event.target.value)} required={required} rows={5} />
-      : <Input id={id} value={value} onChange={event => onChange(event.target.value)} required={required} maxLength={160} />}
+    {multiline ? <Textarea id={id} value={value} placeholder={placeholder} onChange={event => onChange(event.target.value)} required={required} rows={5} />
+      : <Input id={id} value={value} placeholder={placeholder} onChange={event => onChange(event.target.value)} required={required} maxLength={160} />}
     {hint && <FieldDescription>{hint}</FieldDescription>}
   </Field>;
 }
-export function NumberField({ label, value, onChange, min = 0, max, integer = false }: {
+export function NumberField({ label, value, onChange, min = 0, max, integer = false, placeholder, onReset, onClear, clearLabel }: {
   label: string; value: number | null; onChange: (value: number | null) => void; min?: number; max?: number; integer?: boolean;
+  placeholder?: string; onReset?: () => void; onClear?: () => void; clearLabel?: string;
 }) {
   const id = useId();
   return <Field><FieldLabel htmlFor={id}>{label}</FieldLabel><Input id={id} type="number" value={value ?? ""} min={min} max={max} step={integer ? 1 : "any"}
-    placeholder={s("Default", "默认")} onChange={event => onChange(event.target.value === "" ? null : Number(event.target.value))} /></Field>;
+    placeholder={placeholder ?? s("Default", "默认")} onChange={event => onChange(event.target.value === "" ? null : Number(event.target.value))} />
+    {(onReset || onClear) && <div className="flex flex-wrap gap-2">
+      {onReset && <Button type="button" variant="ghost" size="sm" onClick={onReset}>{s("Use built-in", "使用内置值")}</Button>}
+      {onClear && <Button type="button" variant="ghost" size="sm" onClick={onClear}>{clearLabel}</Button>}
+    </div>}
+  </Field>;
 }
 export function ToggleField({ label, value, onChange }: { label: string; value: boolean; onChange: (value: boolean) => void }) {
   const id = useId();
@@ -42,6 +48,46 @@ export function ChoiceField({ label, value, onChange, options, empty }: {
     </SelectContent></Select></Field>;
 }
 export const lines = (value: string): string[] => [...new Set(value.split("\n").map(line => line.trim()).filter(Boolean))];
+/** 覆盖表单复用同一选择控件，缺省与显式 null 各有独立选项。 */
+export function OverrideChoiceField({ value, inherited, onChange, ...props }: {
+  label: string; value: string | null | undefined; inherited: string | null; onChange: (value: string | null | undefined) => void;
+  options: { value: string; label: string; disabled?: boolean }[]; empty?: string;
+}) {
+  const inheritedLabel = props.options.find(option => option.value === inherited)?.label ?? inherited ?? props.empty;
+  return <ChoiceField {...props} value={value === undefined ? "__inherit" : value}
+    options={[{ value: "__inherit", label: `${s("Built-in", "内置")} · ${inheritedLabel ?? ""}` }, ...props.options]}
+    onChange={next => onChange(next === "__inherit" ? undefined : next)} />;
+}
+export function OverrideToggleField({ value, inherited, onChange, label }: {
+  label: string; value: boolean | undefined; inherited: boolean; onChange: (value: boolean | undefined) => void;
+}) {
+  return <OverrideChoiceField label={label} value={value === undefined ? undefined : String(value)} inherited={String(inherited)}
+    options={[{ value: "true", label: s("Yes", "是") }, { value: "false", label: s("No", "否") }]}
+    onChange={next => onChange(next === undefined ? undefined : next === "true")} />;
+}
+export function OverrideNumberField({ value, inherited, onChange, empty, ...props }: {
+  label: string; value: number | null | undefined; inherited: number | null; onChange: (value: number | null | undefined) => void;
+  empty: string; min?: number; max?: number; integer?: boolean;
+}) {
+  return <NumberField {...props} value={value ?? null}
+    placeholder={value === null ? empty : `${s("Built-in", "内置")} · ${inherited ?? empty}`}
+    onChange={next => onChange(next ?? undefined)}
+    onReset={value !== undefined ? () => onChange(undefined) : undefined}
+    onClear={value !== null ? () => onChange(null) : undefined} clearLabel={empty} />;
+}
+/** 列表缺省继承，显式空列表清空；不以空文本猜测列表策略。 */
+export function OverrideListField({ label, value, inherited, onChange, empty, hint }: {
+  label: string; value: string[] | undefined; inherited: string[]; onChange: (value: string[] | undefined) => void; empty: string; hint?: string;
+}) {
+  return <>
+    <OverrideChoiceField label={label} value={value === undefined ? undefined : value.length ? "list" : "none"}
+      inherited={inherited.length ? inherited.join(" · ") : "none"}
+      options={[{ value: "none", label: empty }, { value: "list", label: s("Custom list", "自定义列表") }]}
+      onChange={next => onChange(next === undefined ? undefined : next === "none" ? [] : [...(inherited.length ? inherited : [""])])} />
+    {value !== undefined && value.length > 0 && <TextField label={s("Items (one per line)", "列表项（每行一项）")}
+      value={value.join("\n")} placeholder={inherited.join("\n")} onChange={next => onChange(next.split("\n"))} multiline hint={hint} />}
+  </>;
+}
 /**
  * 配置编辑器：套用面板浮岛；保存位于标题栏，经 form 属性提交内容区中的表单。
  * TODO: 配置能力实际接入时，保存按钮改为「有修改且校验通过」才可用（需各编辑器跟踪修改），目前仅在保存中禁用。
@@ -54,12 +100,13 @@ export function Editor({ title, form, children }: { title: string; form: string;
   </IslandPanel>;
 }
 /** 次要的删除操作随表单内容放在末尾。 */
-export function SaveActions({ onRemove, cannotRemove = false }: { onRemove?: () => void; cannotRemove?: boolean }) {
+export function SaveActions({ onRemove, cannotRemove = false, onReset }: { onRemove?: () => void; cannotRemove?: boolean; onReset?: () => void }) {
   const { busy } = useSettingsConfiguration();
-  if (!onRemove && !cannotRemove) return null;
+  if (!onRemove && !cannotRemove && !onReset) return null;
   return <div className="mt-5 flex items-center gap-3">
     {onRemove && <Button type="button" variant="ghost" className="-ml-2 text-destructive" disabled={busy || cannotRemove} onClick={onRemove}>{s("Delete", "删除")}</Button>}
     {cannotRemove && <span className="type-caption">{s("Built-in role", "内置角色")}</span>}
+    {onReset && <Button type="button" variant="ghost" disabled={busy} onClick={onReset}>{s("Restore built-in values", "恢复内置值")}</Button>}
   </div>;
 }
 export function ConfigurationStatus() {

@@ -9,7 +9,7 @@ export function openDatabase(root: string): DatabaseSync {
   try {
     db.exec("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;");
     const version = (db.prepare("PRAGMA user_version").get() as { user_version: number }).user_version;
-    if (version > 3) throw new Error("This workspace requires a newer version of Weft.");
+    if (version > 4) throw new Error("This workspace requires a newer version of Weft.");
     if (version < 1) {
       db.exec(`BEGIN IMMEDIATE;
         CREATE TABLE workspace (id TEXT PRIMARY KEY, title TEXT NOT NULL);
@@ -43,6 +43,11 @@ export function openDatabase(root: string): DatabaseSync {
         ) STRICT;
         PRAGMA user_version = 3;
         COMMIT;`);
+    }
+    if (version < 4) {
+      // v4 将角色与代理 data_json 解释为局部覆盖。旧完整记录逐字段保留，
+      // 不推测用户意图、不改写历史；升级版本阻止旧程序误读新的稀疏记录。
+      db.exec("BEGIN IMMEDIATE; PRAGMA user_version = 4; COMMIT;");
     }
     if (!db.prepare("SELECT id FROM workspace LIMIT 1").get()) {
       db.prepare("INSERT INTO workspace VALUES (?, ?)").run(randomUUID(), "Personal workspace");

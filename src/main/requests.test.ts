@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ConfigurationRequests, RuntimeRequests } from "./requests.ts";
+import { configurationVersion } from "../shared/configuration.ts";
 
 afterEach(() => vi.useRealTimers());
 describe("任务进程请求生命周期", () => {
@@ -9,7 +10,7 @@ describe("任务进程请求生命周期", () => {
     const pending = requests.execute({ type: "read" });
     const error = { ok: false as const, error: { code: "not_found", message: "Configuration unavailable." } };
     requests.receive({ kind: "response", version: 1, id: sent[0]!.id, result: error });
-    requests.receive({ kind: "configuration.response", version: 1, id: sent[0]!.id, result: error });
+    requests.receive({ kind: "configuration.response", version: configurationVersion, id: sent[0]!.id, result: error });
     expect(await pending).toEqual(error);
     requests.close();
   });
@@ -21,7 +22,7 @@ describe("任务进程请求生命周期", () => {
     const pending = requests.execute({ type: "read" });
     await vi.advanceTimersByTimeAsync(20_000);
     expect(timeout).not.toHaveBeenCalled();
-    requests.receive({ kind: "configuration.response", version: 1, id: sent[0]!.id, result: { ok: false, error: { code: "unavailable", message: "System protection is unavailable." } } });
+    requests.receive({ kind: "configuration.response", version: configurationVersion, id: sent[0]!.id, result: { ok: false, error: { code: "unavailable", message: "System protection is unavailable." } } });
     expect((await pending).ok).toBe(false);
     requests.close();
   });
