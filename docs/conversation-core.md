@@ -1,93 +1,75 @@
-# 会话与单代理能力契约
+# 会话与代理能力契约
 
-本文描述首批能力层实现。源码入口为 `src/shared/conversation.ts`、`src/conversation/`、`src/model/`、`src/execution/` 与 `src/runtime/conversations.ts`。GUI 消费这些接口；正文、卡片和时间导航的组件不进入存储契约。
+本文描述能力层契约。会话树结构、投影与回溯语义见 [会话树、历史与回溯](timeline.md)；对象与资源见 [对象模型](object-model.md)。GUI 消费这些接口，组件不进入存储契约。
 
-## 会话节点树
-
-一个 Task 的每个 agent 各有一棵会话节点树及当前游标。节点用 `id / parentId` 关联；选择旧位置追加 `cursor.selected` 事件，新输入沿该位置追加，原来的后代仍然保留。节点树位于任务事件分支内；选择会话节点不执行资源恢复，也不回退当前资源授权。
+## 节点数据
 
 | 节点 | 数据 |
 | --- | --- |
-| `input` | 用户正文；首批仅文本 |
-| `model` | 一次模型调用与响应，包含有序 parts、工具结果、用量、结束原因、续接资料及最小执行引用 |
-| `compaction` | 摘要；首批替代整条父路径的模型上下文，不删除原始节点 |
-| `extension` | 扩展名、载荷版本、JSON 数据、模型与用户投影要求 |
+| message | 目标 agent_id、用户正文；首批仅文本 |
+| thinking / text | agent_id、response_id、序号、正文、complete、可选续接资料 |
+| toolcall | agent_id、response_id、序号、本地与 provider 调用 ID、工具名、参数、结局 |
+| event | 类型与小载荷；大内容存 `objects/<hash>` 后引用 |
+| notice | 来源对象、级别、类型、消息 |
 
-一次响应与一个模型节点一一对应，不另存 response 实体。模型节点内部的 parts 为 `thinking / text / tool`；工具单元同时保存模型提出的调用与执行器产生的结果，二者来源不同。节点内单元不作为历史分叉位置。工具 ID 在节点内唯一；本地引用由节点 ID 与 part ID 共同定位，provider call ID 单独保留。
+响应的用量（缺失为 null）、原始与归一化结束原因、服务端 responseId，以及请求计算结果（adapter、模型表达式 `<providerId>/<modelId>[:<thinking>]`、协议作用域）挂在该响应末个块上。系统提示词、角色正文、工具目录、模型参数和完整请求不持久化。
 
-输入先于执行持久化。模型节点在请求准备完成、网络调用开始前建立；鉴权或流错误可以留下空或部分输出。请求准备阶段失败记 `execution_failed`，不构造虚假回复。服务端 `responseId`、原始结束原因、归一化结束原因和用量归属模型节点；缺失用量为 null。重新请求产生新节点，不覆盖旧尝试。
+续接资料保存为带适配版本的块级不透明字段：保留 Anthropic signature/redactedData，以及 OpenAI itemId/reasoningEncryptedContent/phase 白名单。不保存原始 HTTP、凭据、响应头或未筛选的 provider metadata。
 
-模型节点的 request 只记录计算后的结果：adapter、模型表达式 model（`<providerId>/<modelId>[:<thinking>]`）、协议作用域 scope、消费的历史位置 historySeq 与授权版本 bindingVersion。代理与角色属于上层设施，不进入请求记录；角色提示词、工具目录、模型参数和完整请求投影不持久化。created 事件只表达创建事实。
+## 写入时机
 
-`conversation_selections` 是独立于历史的可修改会话设置，只保存 agent 配置 ID、具体模型 ID、思考等级和选择修订号。每轮开始从应用配置重新解析当前环境，显式传入执行器，本轮保持一致；配置修改与角色切换从下一轮生效。选择旧消息位置或重开不会恢复旧环境。所选身份失效时明确失败，不静默采用其他配置。
+- 输入先于执行持久化。
+- 流增量在运行时内存中按块累积；块完成时追加节点。取消、网络中断或请求失败时，已收到的部分以 `complete=false` 追加。
+- toolcall 执行期间不落库；取得结局时调用与结果作为一个节点追加。用户打断记为 cancelled。
+- 请求在产生任何块之前失败（鉴权、限流、超时、请求准备失败），代理发出错误级 notice。
+- 通知只在保存后发出，消费方重新查询恢复丢失通知。进程崩溃不做兜底与自动重放。
 
-## 追加事实与可查看状态
+## 工具结局
 
-底层沿用 `events` 表，`conversation_event` 版本为 1。节点建立、part 增量与完成、响应收束、工具开始与结果、节点终结、游标选择均为追加事件。节点的当前形状是这些事件的投影，不是被反复覆盖的历史事实。首次输入幂等表与独立会话选择表随应用库一并建立。
+每个工具声明参数 schema、所需权限、读写副作用、顺序/并行策略与执行器。结局为：
 
-流片段在同一 part 内合并，达到 1024 字符或下一个片段到来时距上次提交超过 50ms 就提交；内容块边界、正常完成、异常和取消都会冲刷已收到的片段。不依赖定时器保证静默期间的落盘延迟。只有已提交片段有崩溃恢复保证。通知只在事件保存后发出，消费方重新查询恢复丢失通知。
-
-模型节点状态为 `streaming → tools → complete`，异常可以终结为 `failed / cancelled / interrupted`。响应收束与节点收束不同：模型已经输出完整调用时，工具结果仍可能未完成。
-
-全部节点可查看。只有完整祖先路径允许继续；模型节点须 complete、所有内容块完整、工具已收束且无 unknown 结果。首批不对不完整节点进行自动补全或静默丢弃；用户可选择较早的完整位置另起路径。进程重开追加 interrupted 记录，不自动重新请求模型或重放工具；已有操作结果可与工具单元对账，缺失结果的运行中工具记 unknown，未启动工具记 cancelled。
-
-## 两种投影
-
-`projectModel` 从当前游标读取祖先路径。压缩节点以摘要替代先前模型上下文；跳回压缩前追加新路径不会继承那次压缩。自动生成压缩摘要尚未接入。
-
-每个模型节点投影为完整 assistant 消息，随后才输出该节点的所有工具结果，顺序按原调用排列。GUI 可以在同一工具单元中紧邻展示调用和结果，不改变协议顺序。`projectUser` 返回可序列化视图数据，React 渲染留在 renderer。
-
-扩展分别声明 model/user 为 `omit` 或 `required`，允许两种投影都为空。model 必需扩展缺少处理器时阻止续接；user 必需扩展缺少处理器时显示可检查的未知类型数据。处理器负责按版本解码和双投影，数据可供插件沿当前分支自行折叠。首批提供扩展节点与注册表机制，不包含动态插件加载器。扩展载荷不会自行获得执行权限。
-
-内建 `weft.bindings` 节点在轮次交界记录授权上下文，模型可见、用户投影为空。资源列表以 messages 中的运行时事件进入上下文，不反复修改 system。压缩后重新补入当前绑定状态。
-
-## 工具与执行循环
-
-每个工具声明参数 schema、所需权限、读/写副作用类型、顺序/并行策略与执行器。执行器返回 JSON 数据，通用结局为：
-
-- succeeded：保存当次模型内容和 GUI/程序使用的结构化数据。
+- succeeded：保存当次交给模型的 `model` 内容和用于重建视图的 `data`。
 - rejected：工具策略、参数或授权拒绝。
 - failed：已知失败。
-- cancelled：已取消。
+- cancelled：已取消，包括用户打断。
 - partial：已知部分结果及剩余说明。
-- unknown：无法可靠确认操作结局，禁止自动续接。
 
-成功/部分结果中的 `model` 保存当次实际交给模型的内容，`data` 用于重建用户视图，不能依赖未来格式化器重新猜测当时的输入。协议需要错误布尔值时由适配层映射，领域契约不使用 `isError`。
+协议需要错误布尔值时由适配层映射。结果形态按工具类型固定，不按长度分派内联或引用。
 
-执行顺序为：模型响应正常结束 → 参数与 agent 工具策略校验 → 显式 resource_id 与本轮冻结授权校验 → 工具/操作开始记录 → 执行 → 操作与工具结果在同一事务保存 → 整批收束 → 下一请求。输出截断、无终态流和不完整参数不启动工具。并行完成顺序不影响后续模型输入顺序；含顺序工具的批次按原顺序执行。
+## 执行循环
 
-用于验证基础链路的原生工具为 `read({ resource_id })`，只读取已授权笔记的对象存储正文。笔记来自框架验证占位，不是已确定的正式产品资源类型；现有笔记与 Access 界面不作为后续工具或授权交互的设计依据。目录、编辑、宿主命令、MCP 和委派未接入。工具目录取决于 agent 策略及模型能力，不随绑定实例增删。
+模型响应正常结束 → 参数与 agent 工具策略校验 → 显式 resource_id 与本轮有效链接校验 → 执行 → 结局节点保存 → 整批收束 → 下一请求。输出截断与不完整参数不启动工具。并行完成顺序不影响模型输入顺序，投影按序号排列；含顺序工具的批次按原顺序执行。
 
-一个执行轮次内可以有多个模型请求，授权使用 `turn_started` 冻结的绑定。attach/detach 在本轮期间 pending，在轮次结束时应用。取消传递到模型与工具，不承诺撤销副作用。读工具异常记失败或取消；写工具抛异常且没有可靠结果时保守记 unknown。
+模型可见工具为资源类全局工具：`resource_list`、`resource_inspect`、`resource_call(resource_id, tool, args)` 等。资源工具 schema 不进入顶层 tools，在资源链接通知或 inspect 中提供；执行层严格校验参数。首批原生资源工具为笔记的 read；目录、编辑、MCP 与代理间通信待接入。
+
+一个执行轮次内可有多次模型请求。轮次请求上限采用 agent.maxTurns，空值为 32；timeout 空值为 600 秒，取消协作式中止，不承诺撤销副作用。maxCost 尚无价格契约，设置后明确拒绝启动。
+
+## 环境
+
+代理控制器在每次请求前组装系统提示词：当前代码的 harness、当前 agent 配置，以及该代理当前链接的目录资源中的 AGENTS.md（读取不走 resource_call，不缓存）。设置与文件变化即时反映；由此产生的缓存失效属于用户预期。代理选择（agent 配置 ID、模型 ID、思考等级、修订号）按代理对象保存，可修改，独立于会话树。所选身份失效时明确失败。
 
 ## 模型适配
 
-三协议使用已安装 AI SDK：OpenAI Responses、OpenAI Chat Completions、Anthropic Messages。工具定义不提供 SDK execute；关闭请求隐式重试，不开启流重试。连接测试与真实执行共用传输保护：带凭据的远程端点要求 HTTPS，无鉴权模式去除认证头，禁止自动重定向。每个 SDK 调用只进行一个模型步骤，由织台执行后续循环。
+三协议使用已安装 AI SDK：OpenAI Responses、OpenAI Chat Completions、Anthropic Messages。工具定义不提供 SDK execute；关闭隐式重试与流重试。带凭据的远程端点要求 HTTPS，无鉴权模式去除认证头，禁止自动重定向。每个 SDK 调用只进行一个模型步骤，由织台执行后续循环。OpenAI Responses 使用 store:false 并请求 encrypted reasoning。
 
-续接资料保存为带适配版本的 assistant 协议投影；保留 Anthropic signature/redactedData，以及 OpenAI itemId/reasoningEncryptedContent/phase 白名单。OpenAI Responses 使用 store:false 并请求 encrypted reasoning。不保存原始 HTTP 抓包、凭据、响应头或未经筛选的 provider metadata。
-
-首批直接续接要求 provider 身份、协议、端点、模型标识和适配版本兼容。跨作用域续接在输入提交前明确失败，不静默丢弃推理资料；兼容转换或用户选择的摘要桥接留待后续。温度、topP、输出上限和 thinking 消费本轮最新环境；思考等级由 SDK 映射协议参数。图片与服务端工具暂不支持。
-
-轮次请求上限采用 agent.maxTurns，空值为 32；到达上限记失败事件，可在完整节点显式继续。timeout 空值为 600 秒，取消采用协作式中止。maxCost 尚无价格契约，设置了费用上限的 agent 明确拒绝启动，不静默忽略限制。contextWindow 自动压缩、费用估算和标题 utility 调用仍待接入。
+直接续接要求 provider、协议、端点、模型标识和适配版本兼容；不兼容时在提交前明确失败。图片与服务端工具暂不支持。
 
 ## 前端能力接口
 
-`window.weft.conversation` 提供 `execute` 与 `onChanged`，IPC 版本为 1。submit/continue 只读取已保存的会话选择；configure 是修改选择的唯一入口，模型不支持推理时服务端将思考等级规整为 off。命令、响应在 preload/main/runtime 各边界校验；主进程只接受可信主 frame。
+`window.weft.session` 提供 `execute` 与 `onChanged`，IPC 版本为 2。
 
 | 命令 | 行为 |
 | --- | --- |
-| `start` | 显式 agent 配置、模型和 thinking；原子保存 Task、主代理、首条输入、提交身份和轮次开始 |
-| `submit` | 在当前节点追加输入并执行；运行中返回 conflict |
-| `continue` | 从当前完整位置继续，产生新的执行轮次 |
-| `configure` | 修改当前 agent/模型/thinking 选择，不追加历史；运行中可改，下一轮生效 |
-| `read` | 读取节点树、游标、已提交序号、在途轮次；可指定历史事件 seq |
-| `select` | 空闲时选择完整节点，或 null 回到空根；只追加选择事件 |
-| `cancel` | 请求停止；返回接收请求时的状态，终态通过通知/查询观察 |
+| `start` | 显式 agent 配置、模型和 thinking；原子保存 Session、首个代理、首条输入并开始执行 |
+| `submit` | 在游标处向指定代理追加消息并执行；运行中返回 conflict |
+| `continue` | 从当前合法位置继续指定代理 |
+| `configure` | 修改代理选择，不追加历史；下一请求生效 |
+| `read` | 读取会话树、游标、已提交序号与运行状态 |
+| `select` | 会话 settled 时移动游标；只追加选择事件，非法继续点退到合法祖先 |
+| `cancel` | 请求停止；终态通过通知或查询观察 |
 
-start/submit 的 submissionId 为 UUID。同一身份与相同命令重复提交只返回已有会话，不启动第二次执行；同一身份配不同内容返回 conflict。submit/continue 可携带 agentConfigurationId；缺省时使用独立会话设置中的当前选择。通知带 taskId、agentId、已提交 seq 与 selectionRevision，任一推进都触发刷新，迟到查询不能覆盖较新选择。SDK 请求不受 React 挂载影响。
-
-首页发送和工作台内的主代理对象卡片已消费此接口。卡片承载对话投影，执行身份、状态和关系仍属于领域对象；工作台位置和缩放不参与模型上下文或授权。查询附带当前选择、选择修订和请求前错误，确保无模型响应时也能显示失败并继续。首页与会话共用紧凑配置菜单，允许在对话中切换 agent、模型与思考等级。正文和思考由 Streamdown 渲染；工具单元分别显示参数、执行结局与用户结果。通知合并为串行查询；切换会话不取消运行。历史查看只改变观察位置，明确点击继续才选择节点并创建新轮次。不完整输出保留，可显式从前一完整位置另起分支重试。新任务暂用输入前 72 字符作本地临时标题，异步 utility 命名仍待接入。
+start/submit 的 submissionId 为 UUID，相同身份与内容重复提交只返回已有会话，内容不同返回 conflict。通知带 sessionId、已提交序号与选择修订。
 
 ## 验证边界
 
-单元与契约测试使用临时 SQLite、合成模型流、AI SDK 的模型 mock，不请求真实 provider。覆盖工具批次、冻结授权、截断/取消、重建、压缩前分支、不可见节点、原子提交去重和协议续接资料。真实端点、Electron GUI 和跨平台行为由用户验收；通过类型/契约测试不代表这些验证已完成。
+单元与契约测试使用临时 SQLite、合成模型流与 AI SDK mock，不请求真实 provider。真实端点、Electron GUI 和跨平台行为由用户验收。
