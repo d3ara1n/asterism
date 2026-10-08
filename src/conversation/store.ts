@@ -1,4 +1,3 @@
-import type { AgentConfiguration } from "../shared/configuration.ts";
 import { conversationMutationSchema, toolOutcomeSchema, type ConversationMutation, type ConversationNode, type ModelNode } from "../shared/conversation.ts";
 import type { HistoryKernel } from "../history/kernel.ts";
 import type { EventBody, StoredEvent } from "../history/schema.ts";
@@ -8,7 +7,7 @@ export { canContinue } from "../shared/conversation-view.ts";
 export class ConversationError extends Error {
   constructor(readonly code: "invalid_request" | "not_found" | "conflict" | "unavailable", message: string) { super(message); }
 }
-export interface ConversationState { agent: AgentConfiguration | null; cursor: string | null; nodes: Map<string, ConversationNode>; seq: number }
+export interface ConversationState { created: boolean; cursor: string | null; nodes: Map<string, ConversationNode>; seq: number }
 export function pathTo(state: ConversationState, cursor = state.cursor): ConversationNode[] {
   const path: ConversationNode[] = [];
   const seen = new Set<string>();
@@ -26,10 +25,10 @@ function requireSafePath(state: ConversationState, cursor: string | null): void 
 }
 export function applyMutation(state: ConversationState, mutation: ConversationMutation): void {
   if (mutation.type === "created") {
-    if (state.agent) throw new ConversationError("conflict", "Conversation already exists.");
-    state.agent = mutation.agent; return;
+    if (state.created) throw new ConversationError("conflict", "Conversation already exists.");
+    state.created = true; return;
   }
-  if (!state.agent) throw new ConversationError("not_found", "Conversation not found.");
+  if (!state.created) throw new ConversationError("not_found", "Conversation not found.");
   if (mutation.type === "cursor.selected") {
     requireSafePath(state, mutation.nodeId); state.cursor = mutation.nodeId; return;
   }
@@ -88,7 +87,7 @@ export function applyMutation(state: ConversationState, mutation: ConversationMu
   }
 }
 export function foldConversation(events: StoredEvent[], agentId: string): ConversationState {
-  const state: ConversationState = { agent: null, cursor: null, nodes: new Map(), seq: 0 };
+  const state: ConversationState = { created: false, cursor: null, nodes: new Map(), seq: 0 };
   for (const event of events) {
     state.seq = event.seq;
     if (event.type === "conversation_event" && event.payload.agentId === agentId) applyMutation(state, structuredClone(event.payload.mutation));
@@ -109,7 +108,7 @@ export class ConversationStore {
     applyMutation(this.read(), structuredClone(mutation));
     const event = this.history.atomic(() => {
       for (const body of preceding) this.history.append(this.branchId, body);
-      return this.history.append(this.branchId, { type: "conversation_event", payload: { version: 1, agentId: this.agentId, mutation } });
+      return this.history.append(this.branchId, { type: "conversation_event", payload: { version: 2, agentId: this.agentId, mutation } });
     });
     try { this.changed(event.seq); } catch { /* 通知失败不改变已提交事实；消费方可重新查询。 */ }
   }

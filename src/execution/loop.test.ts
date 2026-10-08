@@ -8,7 +8,7 @@ import { projectModel, projectUser } from "../conversation/projection.ts";
 import { runAgent } from "./loop.ts";
 import type { RuntimeTool } from "./tools.ts";
 import type { ModelAdapter, ModelEvent, ModelInput } from "../model/contract.ts";
-import type { ModelSettings, ToolPart } from "../shared/conversation.ts";
+import { modelScope, type ModelSettings, type ToolPart } from "../shared/conversation.ts";
 
 export const settings: ModelSettings = {
   provider: { id: "provider", revision: 1, name: "Provider", protocol: "openai-responses", baseUrl: "https://example.invalid/v1", enabled: true, auth: "none" },
@@ -16,6 +16,7 @@ export const settings: ModelSettings = {
     capabilities: { reasoning: true, tools: true, images: false }, generation: { temperature: null, topP: null, maxOutputTokens: 1000 } }, thinking: null,
 };
 const kernels: HistoryKernel[] = [];
+const agent = { ...defaultAgents[0]!, revision: 1 };
 afterEach(() => { for (const kernel of kernels.splice(0)) kernel.close(); });
 function setup() {
   const db = new DatabaseSync(":memory:");
@@ -23,7 +24,7 @@ function setup() {
   const { branch_id } = history.createTask();
   const { agent_id } = history.createAgent(branch_id);
   const store = new ConversationStore(history, branch_id, agent_id);
-  store.append({ type: "created", agent: { ...defaultAgents[0]!, revision: 1 } });
+  store.append({ type: "created" });
   store.append({ type: "node.appended", node: { id: "input", parentId: null, kind: "input", text: "Read both notes", createdAt: "now" } });
   const a = history.createResource(branch_id, { type: "note" }).resource_id;
   const b = history.createResource(branch_id, { type: "note" }).resource_id;
@@ -62,7 +63,7 @@ describe("单代理执行契约", () => {
         AND json_extract(NEW.payload, '$.mutation.type') = 'tool.settled'
         AND json_extract(NEW.payload, '$.mutation.outcome.kind') = 'succeeded'
       BEGIN SELECT RAISE(ABORT, 'synthetic write failure'); END;`);
-    await runAgent({ store, turn, settings, signal: new AbortController().signal,
+    await runAgent({ agent, store, turn, settings, signal: new AbortController().signal,
       tools: [readTool(async () => ({ kind: "succeeded", model: "read", data: null }))],
       adapter: scripted([() => events([...call("a", a), finish("tool-calls")])]) });
     expect(history.eventsOn(store.branchId).some(e => e.type === "operation_finished" && e.payload.status === "succeeded")).toBe(false);
@@ -81,7 +82,7 @@ describe("单代理执行契约", () => {
       if (resource === a) settled.push("a");
       return { kind: "succeeded", model: resource, data: { resource } };
     });
-    await runAgent({ store, turn, settings, tools: [tool], signal: new AbortController().signal,
+    await runAgent({ agent, store, turn, settings, tools: [tool], signal: new AbortController().signal,
       adapter: scripted([() => events([...call("a", a), ...call("b", b), finish("tool-calls")]), () => events(text())], inputs) });
     expect(settled).toEqual(["b", "a"]);
     expect(inputs).toHaveLength(2);
@@ -89,14 +90,16 @@ describe("单代理执行契约", () => {
     const models = [...store.read().nodes.values()].filter(n => n.kind === "model");
     expect(models.map(n => n.state)).toEqual(["complete", "complete"]);
     expect(models.map(n => n.usage?.total)).toEqual([30, 30]);
-    expect(models[0]!.request.bindings).toEqual(turn.bindings);
+    expect(models[0]!.request.bindingVersion).toBe(turn.binding_version);
+    expect(models[0]!.request).not.toHaveProperty("settings");
+    expect(models[0]!.request).not.toHaveProperty("input");
     expect(history.reconstruct(history.head(store.branchId)).bindings_by_agent[store.agentId]!.resources.map(r => r.resource_id)).toEqual([b]);
   });
 
   it("未授权资源被拒绝并交付模型，执行器不会被调用", async () => {
     const { store, turn } = setup(); let executed = 0;
     const inputs: ModelInput[] = [];
-    await runAgent({ store, turn, settings, tools: [readTool(async () => { executed++; return { kind: "succeeded", model: null, data: null }; })], signal: new AbortController().signal,
+    await runAgent({ agent, store, turn, settings, tools: [readTool(async () => { executed++; return { kind: "succeeded", model: null, data: null }; })], signal: new AbortController().signal,
       adapter: scripted([() => events([...call("forbidden", "guessed-resource"), finish("tool-calls")]), () => events(text())], inputs) });
     expect(executed).toBe(0);
     expect(inputs[1]!.messages.find(m => m.kind === "result")).toMatchObject({ outcome: { kind: "rejected", error: { code: "access_denied" } } });
@@ -104,7 +107,7 @@ describe("单代理执行契约", () => {
 
   it("输出上限截断时，即使工具参数完整也不执行，仍保存用量和可查看的内容", async () => {
     const { store, turn, a } = setup(); let executed = false;
-    await runAgent({ store, turn, settings, tools: [readTool(async () => { executed = true; return { kind: "succeeded", model: null, data: null }; })], signal: new AbortController().signal,
+    await runAgent({ agent, store, turn, settings, tools: [readTool(async () => { executed = true; return { kind: "succeeded", model: null, data: null }; })], signal: new AbortController().signal,
       adapter: scripted([() => events([...call("a", a), finish("length")])]) });
     const node = store.model(store.read().cursor!);
     expect(executed).toBe(false); expect(node.state).toBe("failed"); expect(node.usage?.total).toBe(30);
@@ -123,14 +126,14 @@ describe("单代理执行契约", () => {
       yield { type: "part.delta", partId: "text", delta: "Partial output" };
       controller.abort(); controller.signal.throwIfAborted();
     }]);
-    await runAgent({ store, turn, settings, tools: [], adapter, signal: controller.signal });
+    await runAgent({ agent, store, turn, settings, tools: [], adapter, signal: controller.signal });
     expect(store.model(store.read().cursor!)).toMatchObject({ state: "cancelled", usage: null, parts: [{ text: "Partial output", complete: false }] });
   });
 
   it("重建时运行中工具标记结果未知，未启动工具标记取消，不重放任何操作", () => {
     const { store, turn } = setup();
     store.append({ type: "node.appended", node: { kind: "model", id: "model", parentId: "input", createdAt: "now", turnId: turn.turn_id,
-      request: { adapter: "test", settings, input: null, historySeq: store.read().seq, bindingVersion: turn.binding_version, bindings: turn.bindings },
+      request: { adapter: "test", scope: modelScope(settings), historySeq: store.read().seq, bindingVersion: turn.binding_version },
       state: "streaming", parts: [], usage: null, finishReason: null, responseId: null, rawFinishReason: null, replay: null, error: null } });
     for (const id of ["a", "b"]) {
       const first = call(id, "resource")[0]!;

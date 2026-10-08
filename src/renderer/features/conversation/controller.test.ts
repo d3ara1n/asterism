@@ -3,7 +3,7 @@ import type { ConversationBridge, ConversationChanged, ConversationCommand, Conv
 import { ConversationController, SubmissionIdentity } from "./controller.ts";
 
 function snapshot(seq: number): ConversationSnapshot {
-  return { taskId: "task", agentId: "agent", agentName: "Worker", cursor: null, seq, nodes: [], activeTurnId: null, selection: null, lastError: null };
+  return { taskId: "task", agentId: "agent", agentName: "Worker", cursor: null, seq, nodes: [], activeTurnId: null, selection: null, selectionRevision: 0, lastError: null };
 }
 function fixture() {
   let listener: ((event: ConversationChanged) => void) | null = null;
@@ -13,10 +13,20 @@ function fixture() {
     onChanged: callback => { listener = callback; return () => { if (listener === callback) listener = null; }; },
   };
   const controller = new ConversationController(bridge, "task", "agent");
-  return { controller, requests, notify: (seq: number) => listener?.({ kind: "conversation.changed", taskId: "task", agentId: "agent", seq }) };
+  return { controller, requests, notify: (seq: number, selectionRevision = 0) => listener?.({ kind: "conversation.changed", taskId: "task", agentId: "agent", seq, selectionRevision }) };
 }
 
 describe("会话消费时序", () => {
+  it("选择变化独立于历史序号刷新，晚到查询不能还原旧选择", async () => {
+    const { controller, requests, notify } = fixture(); const disconnect = controller.connect();
+    requests[0]!.resolve({ ok: true, snapshot: snapshot(3) }); await Promise.resolve();
+    notify(3, 1); expect(requests).toHaveLength(2);
+    const command = controller.execute({ type: "configure", taskId: "task", agentId: "agent",
+      selection: { agentConfigurationId: "reviewer", modelId: "model", thinking: null } });
+    requests[2]!.resolve({ ok: true, snapshot: { ...snapshot(3), selectionRevision: 2 } }); await command;
+    requests[1]!.resolve({ ok: true, snapshot: { ...snapshot(3), selectionRevision: 1 } }); await Promise.resolve();
+    expect(controller.getSnapshot().snapshot?.selectionRevision).toBe(2); disconnect();
+  });
   it("查询途中收到增量通知时补读一次，不漏掉最后一批输出", async () => {
     const { controller, requests, notify } = fixture(); const disconnect = controller.connect();
     notify(2); notify(3);

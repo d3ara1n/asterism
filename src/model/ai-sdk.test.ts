@@ -4,12 +4,13 @@ import { AiSdkAdapter, sdkMessages } from "./ai-sdk.ts";
 import { modelScope } from "../conversation/projection.ts";
 import type { ModelInput, ModelEvent } from "./contract.ts";
 import { createProviderModel } from "./provider.ts";
+import { composeSystemPrompt, projectSystemPrompt } from "./system-prompt.ts";
 
 const input: ModelInput = {
   settings: { provider: { id: "p", revision: 1, name: "Provider", enabled: true, baseUrl: "https://example.invalid", protocol: "anthropic", auth: "api_key" },
     model: { id: "m", revision: 1, name: "Model", modelId: "test", providerId: "p", enabled: true, contextWindow: null,
       capabilities: { reasoning: true, tools: true, images: false }, generation: { temperature: 0.2, topP: null, maxOutputTokens: 1000 } }, thinking: "low" },
-  system: "System", messages: [{ kind: "input", text: "Read" }],
+  system: composeSystemPrompt({ id: "worker", systemPrompt: "System" }), messages: [{ kind: "input", text: "Read" }],
   tools: [{ name: "read", description: "Read", parameters: { type: "object", properties: { resource_id: { type: "string" } }, required: ["resource_id"] } }],
 };
 
@@ -95,15 +96,17 @@ describe("AI SDK 适配契约", () => {
     ] }) }) });
     const adapter = new AiSdkAdapter(async () => "credential-not-for-history", () => model);
     const prepared = adapter.prepare(input);
+    expect(prepared).not.toHaveProperty("input");
     const events: ModelEvent[] = [];
     for await (const event of prepared.stream(new AbortController().signal)) events.push(event);
     expect(model.doStreamCalls).toHaveLength(1);
     expect(model.doStreamCalls[0]).toMatchObject({ reasoning: "low", temperature: 0.2, maxOutputTokens: 1000 });
+    expect(model.doStreamCalls[0]?.prompt[0]).toEqual({ role: "system", content: projectSystemPrompt(input.system) });
     expect(events.find(e => e.type === "part.end" && e.partId === "tool:call-1")).toMatchObject({ arguments: { resource_id: "note" } });
     const end = events.at(-1)!;
     expect(end).toMatchObject({ type: "finish", reason: "tool-calls", responseId: "response-1", rawFinishReason: "tool_use", usage: { input: 10, output: 5, total: 15, reasoning: 2, cacheRead: 2 } });
     if (end.type !== "finish") throw new Error();
-    const serialized = JSON.stringify({ input: prepared.input, events });
+    const serialized = JSON.stringify(events);
     expect(serialized).toContain("signature-value"); expect(serialized).not.toContain("credential-not-for-history"); expect(serialized).not.toContain("secret-metadata");
     const next = sdkMessages({ ...input, messages: [...input.messages, { kind: "output", parts: [], replay: end.replay, scope: modelScope(input.settings), adapter: adapter.version },
       { kind: "result", callId: "call-1", name: "read", outcome: { kind: "succeeded", model: "Note text", data: { userOnly: "detail" } } }] });

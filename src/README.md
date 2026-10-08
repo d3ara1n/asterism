@@ -13,7 +13,7 @@
 | `configuration/` | 三类配置、密文凭据、连接测试与默认角色，见目录 README | shared、Node SQLite、模型 SDK；不依赖 Electron |
 | `history/` | 事件存储、轮次与绑定、历史投影 | Node SQLite、Zod；不依赖 renderer |
 | `conversation/` | 会话树投影、续接约束、压缩与扩展节点 | shared、history；不依赖 UI/SDK |
-| `model/` | 单次请求契约、三协议 SDK 适配与续接资料 | shared、conversation、AI SDK |
+| `model/` | 系统提示块组装与模型投影、单次请求契约、三协议 SDK 适配与续接资料 | shared、conversation、AI SDK |
 | `execution/` | 单代理循环、工具授权与批次收束 | conversation、model 契约、history |
 | `renderer/` | 应用视图、React Flow、用户意图 | shared、React 与 UI 库；不访问 Node/数据库 |
 

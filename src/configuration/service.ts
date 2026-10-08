@@ -35,6 +35,11 @@ export class ConfigurationService {
     return operation;
   }
   private assertOpen(): void { if (this.closed) throw new ConfigurationError("unavailable", "Configuration service is unavailable."); }
+  agentConfiguration(id: string) {
+    this.assertOpen();
+    const row = this.repository.get("agent", id);
+    return row ? resolveAgentConfiguration(row) : null;
+  }
   async executionCredential(providerId: string, revision: number): Promise<string | null> {
     this.assertOpen();
     const row = this.repository.get("provider", providerId);

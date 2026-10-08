@@ -5,7 +5,7 @@ import {
 import { defaultAgents, defaultRoles } from "./defaults.ts";
 import type { ConfigurationRow } from "./repository.ts";
 
-/** 内置内容变更时递增；会话保存完整生效配置及此来源版本。 */
+/** 内置内容变更时递增；来源版本用于当前配置投影，不存入会话历史。 */
 export const defaultsVersion = "1";
 export const configurationDefaults: ConfigurationSnapshot["defaults"] = {
   version: defaultsVersion,

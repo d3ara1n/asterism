@@ -2,18 +2,20 @@ import { randomUUID } from "node:crypto";
 import { ConversationError, pathTo, type ConversationStore } from "../conversation/store.ts";
 import { projectModel, type ExtensionRegistry } from "../conversation/projection.ts";
 import type { InFlightTurn } from "../history/fold.ts";
-import type { ModelSettings, ToolPart } from "../shared/conversation.ts";
+import { modelScope, type ModelSettings, type ToolPart } from "../shared/conversation.ts";
+import type { AgentConfiguration } from "../shared/configuration.ts";
 import { ModelFailure, type ModelAdapter } from "../model/contract.ts";
 import { allowedTool, executeToolBatch, type RuntimeTool } from "./tools.ts";
+import { composeSystemPrompt } from "../model/system-prompt.ts";
 
 export interface RunOptions {
-  store: ConversationStore; adapter: ModelAdapter; settings: ModelSettings; turn: InFlightTurn;
+  store: ConversationStore; adapter: ModelAdapter; agent: AgentConfiguration; settings: ModelSettings; turn: InFlightTurn;
   tools: RuntimeTool[]; signal: AbortSignal; extensions?: ExtensionRegistry;
 }
 /** 一轮冻结授权，多次请求；所有执行事实提交成功后才推进到下一阶段。 */
 export async function runAgent(options: RunOptions): Promise<void> {
-  const { store, adapter, settings, turn, tools, signal } = options;
-  const agent = store.read().agent!;
+  const { store, adapter, agent, settings, turn, tools, signal } = options;
+  const system = composeSystemPrompt(agent);
   const selectedTools = settings.model.capabilities.tools ? tools.filter(t => allowedTool(agent, t.name)) : [];
   let activeNode: string | null = null;
   let turnStatus: "completed" | "failed" | "cancelled" = "completed";
@@ -33,12 +35,12 @@ export async function runAgent(options: RunOptions): Promise<void> {
     for (let requestIndex = 0; requestIndex < limit; requestIndex++) {
       signal.throwIfAborted();
       const state = store.read();
-      const prepared = adapter.prepare({ settings, system: agent.systemPrompt,
+      const prepared = adapter.prepare({ settings, system,
         messages: projectModel(state, options.extensions), tools: selectedTools.map(({ name, description, parameters }) => ({ name, description, parameters })) });
       const nodeId = randomUUID();
       activeNode = nodeId;
       store.append({ type: "node.appended", node: { id: nodeId, parentId: state.cursor, kind: "model", createdAt: new Date().toISOString(), turnId: turn.turn_id,
-        request: { adapter: adapter.version, settings, input: prepared.input, historySeq: state.seq, bindingVersion: turn.binding_version, bindings: turn.bindings },
+        request: { adapter: adapter.version, scope: modelScope(settings), historySeq: state.seq, bindingVersion: turn.binding_version },
         state: "streaming", parts: [], usage: null, finishReason: null, responseId: null, rawFinishReason: null, replay: null, error: null } });
       let finished = false;
       // 同一块的网络碎片合并成有序落盘片段；只发布已提交增量。

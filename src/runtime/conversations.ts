@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { composeSystemPrompt } from "../model/system-prompt.ts";
 import type { DatabaseSync } from "node:sqlite";
 import { z } from "zod";
 import type { ConfigurationService } from "../configuration/service.ts";
@@ -10,8 +11,8 @@ import { runAgent } from "../execution/loop.ts";
 import { allowedTool, type RuntimeTool } from "../execution/tools.ts";
 import type { HistoryKernel } from "../history/kernel.ts";
 import type { ObjectStore } from "./storage.ts";
-import { resolveProviderModel, thinkingSchema, type AgentConfiguration, type ThinkingLevel } from "../shared/configuration.ts";
-import { conversationCommandSchema, conversationSnapshotSchema, jsonSchema, type ConversationCommand, type ConversationSnapshot, type ConversationChanged, type ModelSettings } from "../shared/conversation.ts";
+import { resolveProviderModel, type ThinkingLevel } from "../shared/configuration.ts";
+import { conversationCommandSchema, conversationSelectionSchema, conversationSnapshotSchema, jsonSchema, type ConversationCommand, type ConversationSnapshot, type ConversationChanged, type ConversationSelection, type ModelSettings } from "../shared/conversation.ts";
 
 type Task = { id: string; branch_id: string };
 type Submission = { task_id: string; agent_id: string; command_json: string };
@@ -28,8 +29,25 @@ export class ConversationService {
     return task;
   }
   private key(taskId: string, agentId: string): string { return JSON.stringify([taskId, agentId]); }
+  private selectionRevision(taskId: string, agentId: string): number {
+    return (this.db.prepare("SELECT revision FROM conversation_selections WHERE task_id = ? AND agent_id = ?").get(taskId, agentId) as { revision: number } | undefined)?.revision ?? 0;
+  }
+  private selection(taskId: string, agentId: string): ConversationSelection | null {
+    const row = this.db.prepare(`SELECT agent_configuration_id AS agentConfigurationId, model_id AS modelId, thinking
+      FROM conversation_selections WHERE task_id = ? AND agent_id = ?`).get(taskId, agentId);
+    const parsed = conversationSelectionSchema.safeParse(row);
+    return parsed.success ? parsed.data : null;
+  }
+  private saveSelection(taskId: string, agentId: string, selection: ConversationSelection): void {
+    this.db.prepare(`INSERT INTO conversation_selections (task_id, agent_id, agent_configuration_id, model_id, thinking)
+      VALUES (?, ?, ?, ?, ?) ON CONFLICT(task_id, agent_id) DO UPDATE SET
+      agent_configuration_id = excluded.agent_configuration_id, model_id = excluded.model_id, thinking = excluded.thinking,
+      revision = conversation_selections.revision + 1`)
+      .run(taskId, agentId, selection.agentConfigurationId, selection.modelId, selection.thinking);
+  }
   private notify(taskId: string, agentId: string, seq?: number): void {
-    try { this.changed({ kind: "conversation.changed", taskId, agentId, seq: seq ?? this.history.head(this.task(taskId).branch_id).seq }); } catch { /* 查询始终可以恢复通知遗漏。 */ }
+    try { this.changed({ kind: "conversation.changed", taskId, agentId, seq: seq ?? this.history.head(this.task(taskId).branch_id).seq,
+      selectionRevision: this.selectionRevision(taskId, agentId) }); } catch { /* 查询始终可以恢复通知遗漏。 */ }
   }
   private store(taskId: string, agentId: string, notify = true): ConversationStore {
     const task = this.task(taskId);
@@ -38,19 +56,18 @@ export class ConversationService {
   private snapshot(taskId: string, agentId: string, atSeq?: number): ConversationSnapshot {
     const store = this.store(taskId, agentId);
     const state = store.read(atSeq);
-    if (!state.agent) throw new ConversationError("not_found", "Conversation not found.");
+    if (!state.created) throw new ConversationError("not_found", "Conversation not found.");
     const history = atSeq === undefined ? this.history.reconstruct(this.history.head(store.branchId)) : this.history.reconstruct({ branch_id: store.branchId,
       event_id: this.history.eventsOn(store.branchId).find(e => e.seq === atSeq)!.event_id, seq: atSeq });
     const events = this.history.eventsOn(store.branchId).filter(e => atSeq === undefined || e.seq <= atSeq);
     const latestTurn = events.findLast(e => e.type === "turn_started" && e.payload.agent_id === agentId);
-    const selectionSchema = z.object({ modelId: z.string(), thinking: thinkingSchema.nullable() });
-    const savedSelection = selectionSchema.safeParse(latestTurn?.type === "turn_started" ? latestTurn.payload.input : null);
-    const latestModel = [...state.nodes.values()].findLast(n => n.kind === "model");
+    const selection = this.selection(taskId, agentId);
     const failure = latestTurn?.type === "turn_started" ? events.findLast(e => e.type === "execution_failed" && e.payload.turn_id === latestTurn.payload.turn_id) : null;
     return conversationSnapshotSchema.parse({ taskId, agentId, cursor: state.cursor, seq: state.seq,
       nodes: [...state.nodes.values()], activeTurnId: history.in_flight_turns.find(t => t.agent_id === agentId)?.turn_id ?? null,
-      agentName: state.agent.name, selection: savedSelection.success ? savedSelection.data : latestModel?.kind === "model"
-        ? { modelId: latestModel.request.settings.model.id, thinking: latestModel.request.settings.thinking } : null,
+      agentName: selection ? this.configuration.agentConfiguration(selection.agentConfigurationId)?.name ?? selection.agentConfigurationId : "Agent",
+      selection,
+      selectionRevision: this.selectionRevision(taskId, agentId),
       lastError: failure?.type === "execution_failed" ? { code: failure.payload.code, message: failure.payload.message } : null });
   }
   private ensureIdle(taskId: string, agentId: string): void {
@@ -80,6 +97,24 @@ export class ConversationService {
       this.store(command.taskId, command.agentId).append({ type: "cursor.selected", nodeId: command.nodeId });
       return this.snapshot(command.taskId, command.agentId);
     }
+    if (command.type === "configure") {
+      if (!this.store(command.taskId, command.agentId).read().created) throw new ConversationError("not_found", "Conversation not found.");
+      const { snapshot: config } = await this.configuration.execute({ type: "read" });
+      if (this.closed) throw new ConversationError("unavailable", "The conversation service is closed.");
+      const resolved = resolveProviderModel(config, command.selection.modelId);
+      const previous = this.selection(command.taskId, command.agentId);
+      // 已失效的另一项允许暂时保留，避免两个引用同时失效时无法逐项修复。
+      // 新选择必须有效；真正执行仍完整校验全部引用。
+      if ((!config.agents.some(agent => agent.id === command.selection.agentConfigurationId && agent.enabled)
+          && command.selection.agentConfigurationId !== previous?.agentConfigurationId)
+        || (!resolved && command.selection.modelId !== previous?.modelId)) throw new ConversationError("unavailable", "The selected configuration is unavailable.");
+      if (resolved && command.selection.thinking && command.selection.thinking !== "off" && !resolved.model.capabilities.reasoning) {
+        throw new ConversationError("invalid_request", "This model does not support thinking.");
+      }
+      this.saveSelection(command.taskId, command.agentId, command.selection);
+      this.notify(command.taskId, command.agentId);
+      return this.snapshot(command.taskId, command.agentId);
+    }
     if (command.type !== "continue") { const prior = this.existing(command); if (prior) return prior; }
     const { snapshot: config } = await this.configuration.execute({ type: "read" });
     if (this.closed) throw new ConversationError("unavailable", "The conversation service is closed.");
@@ -93,18 +128,15 @@ export class ConversationService {
     if (command.thinking && command.thinking !== "off" && !settings.model.capabilities.reasoning) throw new ConversationError("invalid_request", "This model does not support thinking.");
     const taskId = command.type === "start" ? randomUUID() : command.taskId;
     const agentId = command.type === "start" ? randomUUID() : command.agentId;
-    let agent: AgentConfiguration;
+    const agentConfigurationId = command.agentConfigurationId ?? this.selection(taskId, agentId)?.agentConfigurationId;
+    const agent = config.agents.find(a => a.id === agentConfigurationId && a.enabled);
+    if (!agent) throw new ConversationError("not_found", "Agent configuration is unavailable. Choose an available agent.");
     let messages: ModelItem[] = [];
-    if (command.type === "start") {
-      const selected = config.agents.find(a => a.id === command.agentConfigurationId && a.enabled);
-      if (!selected) throw new ConversationError("not_found", "Agent configuration is unavailable.");
-      agent = selected;
-    } else {
+    if (command.type !== "start") {
       this.ensureIdle(taskId, agentId);
       const state = this.store(taskId, agentId).read();
-      if (!state.agent) throw new ConversationError("not_found", "Conversation not found.");
+      if (!state.created) throw new ConversationError("not_found", "Conversation not found.");
       if (pathTo(state).some(n => !canContinue(n))) throw new ConversationError("conflict", "Select a complete history position before continuing.");
-      agent = state.agent;
       messages = projectModel(state);
     }
     if (agent.maxCost !== null) throw new ConversationError("unavailable", "Cost limits require model pricing support, which is not available yet.");
@@ -114,7 +146,7 @@ export class ConversationService {
     const adapter = this.adapterFactory?.(settings) ?? new AiSdkAdapter(() => credential ??= this.configuration.executionCredential(provider.id, provider.revision));
     if (command.type !== "continue") messages.push({ kind: "input", text: command.text });
     try {
-      adapter.prepare({ settings, system: agent.systemPrompt, messages,
+      adapter.prepare({ settings, system: composeSystemPrompt(agent), messages,
         tools: settings.model.capabilities.tools ? this.tools(branchId).filter(t => allowedTool(agent, t.name)).map(({ name, description, parameters }) => ({ name, description, parameters })) : [] });
     } catch (error) {
       throw new ConversationError("invalid_request", error instanceof ModelFailure ? error.message : "The model request cannot be prepared.");
@@ -128,18 +160,19 @@ export class ConversationService {
         this.history.append(branchId, { type: "branch_created", payload: { task_id: taskId, branch_id: branchId } });
         this.db.prepare("INSERT INTO tasks (id, branch_id, title, created_at) VALUES (?, ?, ?, ?)").run(taskId, branchId, title, new Date().toISOString());
         this.history.append(branchId, { type: "agent_created", payload: { agent_id: agentId, title: agent.name } });
-        this.store(taskId, agentId, false).append({ type: "created", agent });
+        this.store(taskId, agentId, false).append({ type: "created" });
         // 工作台视图与领域对象同时建立；位置只是视图状态。
         this.db.prepare("INSERT INTO object_views (task_id, object_id, x, y) VALUES (?, ?, ?, ?)").run(taskId, agentId, 48, 48);
       }
       const store = this.store(taskId, agentId, false);
+      this.saveSelection(taskId, agentId, { agentConfigurationId: agent.id, modelId: command.modelId, thinking: command.thinking });
       if (command.type !== "continue") {
         store.append({ type: "node.appended", node: { id: randomUUID(), parentId: store.read().cursor, kind: "input", text: command.text, createdAt: new Date().toISOString() } });
         this.db.prepare("INSERT INTO conversation_submissions (id, command_json, task_id, agent_id) VALUES (?, ?, ?, ?)")
           .run(command.submissionId, JSON.stringify(command), taskId, agentId);
       }
       if (store.read().cursor === null) throw new ConversationError("invalid_request", "A conversation needs input before it can continue.");
-      turnId = this.history.startTurn(branchId, { agent_id: agentId, input: { nodeId: store.read().cursor, modelId: settings.model.id, thinking: settings.thinking } }).turn_id;
+      turnId = this.history.startTurn(branchId, { agent_id: agentId, input: { nodeId: store.read().cursor } }).turn_id;
       this.db.exec("COMMIT");
     } catch (error) { this.db.exec("ROLLBACK"); throw error; }
     const store = this.store(taskId, agentId);
@@ -147,8 +180,8 @@ export class ConversationService {
     const controller = new AbortController();
     const key = this.key(taskId, agentId);
     const timer = setTimeout(() => controller.abort(), (agent.timeout ?? 600) * 1000);
-    // 凭据只在本轮内存中保留，不进入请求快照或 renderer。
-    const done = Promise.resolve().then(() => runAgent({ store, adapter, settings, turn, signal: controller.signal, tools: this.tools(branchId) }))
+    // 凭据只在本轮内存中保留，不进入历史或 renderer。
+    const done = Promise.resolve().then(() => runAgent({ store, adapter, agent, settings, turn, signal: controller.signal, tools: this.tools(branchId) }))
       .catch(() => { console.error("Conversation execution could not be finalized."); })
       .finally(() => { clearTimeout(timer); this.runs.delete(key); this.notify(taskId, agentId); });
     this.runs.set(key, { controller, done });

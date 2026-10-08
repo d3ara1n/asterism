@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
-import { ArrowUp, Bot, Brain, ChevronDown, Cpu, Settings } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ArrowUp, Bot, Brain, Cpu, Settings } from "lucide-react";
 import { resolveModelRole, resolveProviderModel, thinkingSchema, type ConfigurationSnapshot, type ThinkingLevel } from "../../../shared/configuration";
 import { t } from "../../shared/i18n";
 import { Button } from "../../shared/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "../../shared/ui/dropdown-menu";
+import { ConfigurationChoice as Choice } from "../configuration/ConfigurationChoice";
 import { InputGroup, InputGroupAddon, InputGroupTextarea } from "../../shared/ui/input-group";
 import { Showcase, showcaseSpell } from "../showcase/Showcase";
 import { WeftMark } from "../../shared/ui/weft-mark";
@@ -93,24 +93,4 @@ export function HomePage({ active, draft, onDraftChange, onSettings, ready, busy
     </div>
     <Showcase open={showcase} onOpenChange={setShowcase} />
   </div></div>;
-}
-
-/** 托盘中的紧凑选项：幽灵小按钮显示当前值，点击弹出单选菜单。 */
-function Choice({ icon, label, value, selected, options, disabled, onSelect }: {
-  icon: ReactNode; label: string; value: string; selected: string; disabled?: boolean;
-  options: { value: string; label: string }[]; onSelect: (value: string) => void;
-}) {
-  return <DropdownMenu modal={false}>
-    <DropdownMenuTrigger asChild>
-      <Button variant="ghost" size="xs" disabled={disabled} aria-label={`${label}: ${value}`} className="max-w-48 text-muted-foreground hover:text-foreground">
-        {icon}<span className="truncate">{value}</span><ChevronDown className="opacity-60" />
-      </Button>
-    </DropdownMenuTrigger>
-    <DropdownMenuContent align="start" className="min-w-44">
-      <DropdownMenuLabel className="text-xs text-muted-foreground">{label}</DropdownMenuLabel>
-      <DropdownMenuRadioGroup value={selected} onValueChange={onSelect}>
-        {options.map(option => <DropdownMenuRadioItem key={option.value} value={option.value}>{option.label}</DropdownMenuRadioItem>)}
-      </DropdownMenuRadioGroup>
-    </DropdownMenuContent>
-  </DropdownMenu>;
 }

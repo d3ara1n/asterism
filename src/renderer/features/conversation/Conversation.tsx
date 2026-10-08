@@ -1,10 +1,12 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { ArrowDown, ArrowUp, Bot, Brain, Check, ChevronDown, GitBranch, History, LoaderCircle, RotateCcw, Square, Wrench } from "lucide-react";
-import type { ConversationNode, ModelNode, ToolPart } from "../../../shared/conversation";
+import { ArrowDown, ArrowUp, Bot, Brain, Check, ChevronDown, Cpu, GitBranch, History, LoaderCircle, RotateCcw, Square, Wrench } from "lucide-react";
+import type { ConversationNode, ConversationSelection, ModelNode, ToolPart } from "../../../shared/conversation";
+import { resolveModelRole, resolveProviderModel, thinkingSchema, type ThinkingLevel } from "../../../shared/configuration";
 import { canContinue, completeAncestor, conversationPath } from "../../../shared/conversation-view";
 import type { ConversationSession } from "./session";
 import { Markdown } from "./Markdown";
-import { s } from "../configuration/state";
+import { s, useConfiguration } from "../configuration/state";
+import { ConfigurationChoice } from "../configuration/ConfigurationChoice";
 import { t } from "../../shared/i18n";
 import { Button } from "../../shared/ui/button";
 import { Badge } from "../../shared/ui/badge";
@@ -40,6 +42,8 @@ export function Conversation({ session, ready, draft, onDraftChange, onHome, onT
 }) {
   const { controller, submission } = session;
   const { state, snapshot, cursor, path, running, historical } = useConversation(session);
+  const { snapshot: configuration, error: configurationError } = useConfiguration(ready);
+  const [selectionError, setSelectionError] = useState<string | null>(null);
   const [awayFromBottom, setAwayFromBottom] = useState(false);
   const follow = useRef(true);
   const scroll = useRef<HTMLDivElement>(null);
@@ -63,26 +67,35 @@ export function Conversation({ session, ready, draft, onDraftChange, onHome, onT
   </div>;
 
   const visible = path.filter(node => node.kind !== "extension" || node.user !== "omit");
+  const selection = snapshot.selection;
+  const selectedAgent = configuration?.agents.find(agent => agent.id === selection?.agentConfigurationId && agent.enabled);
+  const selectedModel = configuration ? resolveProviderModel(configuration, selection?.modelId ?? null)?.model : null;
+  const selectionForTurn = selection && selectedModel && !selectedModel.capabilities.reasoning ? { ...selection, thinking: "off" as const } : selection;
+  const models = configuration?.models.filter(model => resolveProviderModel(configuration, model.id)) ?? [];
+  const configure = async (next: ConversationSelection) => {
+    const result = await controller.execute({ type: "configure", taskId: controller.taskId, agentId: controller.agentId, selection: next });
+    if (result.ok) setSelectionError(null);
+  };
   const writable = ready && !state.busy && !running && !historical && !!snapshot.selection && path.every(canContinue);
   const interrupted = !running && path.some(node => !canContinue(node));
-  const error = state.error ?? (!historical ? snapshot.lastError?.message : null);
+  const error = state.error ?? configurationError ?? selectionError ?? (!historical ? snapshot.lastError?.message : null);
   const latest = () => {
     follow.current = true; setAwayFromBottom(false);
     if (scroll.current) scroll.current.scrollTop = scroll.current.scrollHeight;
   };
   const resume = async (nodeId?: string | null) => {
-    if (!snapshot.selection || state.busy || running || !ready) return;
+    if (!selectionForTurn || state.busy || running || !ready) return;
     if (nodeId !== undefined) {
       const selected = await controller.execute({ type: "select", taskId: controller.taskId, agentId: controller.agentId, nodeId });
       if (!selected.ok) return;
       controller.inspect(undefined);
     }
-    await controller.execute({ type: "continue", taskId: controller.taskId, agentId: controller.agentId, ...snapshot.selection });
+    await controller.execute({ type: "continue", taskId: controller.taskId, agentId: controller.agentId, ...selectionForTurn });
     latest();
   };
   const send = async () => {
-    if (!writable || !draft.trim() || !snapshot.selection) return;
-    const input = { type: "submit" as const, taskId: controller.taskId, agentId: controller.agentId, ...snapshot.selection, text: draft.trim() };
+    if (!writable || !draft.trim() || !selectionForTurn) return;
+    const input = { type: "submit" as const, taskId: controller.taskId, agentId: controller.agentId, ...selectionForTurn, text: draft.trim() };
     const result = await controller.execute({ ...input, submissionId: submission.forInput(input) });
     if (!result.ok) return;
     submission.accepted(); onDraftChange(""); latest();
@@ -108,7 +121,7 @@ export function Conversation({ session, ready, draft, onDraftChange, onHome, onT
           {node.kind === "input" ? <>
             <p className="type-label">{s("You", "你")}</p>
             <div className="rounded-md bg-muted px-3 py-2"><Markdown>{node.text}</Markdown></div>
-          </> : node.kind === "model" ? <ModelResponse node={node} agentName={snapshot.agentName} />
+          </> : node.kind === "model" ? <ModelResponse node={node} />
             : node.kind === "compaction" ? <Disclosure label={s("Earlier conversation summary", "此前对话摘要")}><Markdown>{node.summary}</Markdown></Disclosure>
               : <Disclosure label={node.extension}><JsonView value={node.data} /></Disclosure>}
         </article>)}
@@ -117,6 +130,28 @@ export function Conversation({ session, ready, draft, onDraftChange, onHome, onT
       </div>
     </div>
     <footer className="shrink-0 space-y-3 border-t p-3">
+      {!historical && selection && <div className="flex min-w-0 flex-wrap items-center gap-0.5">
+        <ConfigurationChoice icon={<Bot />} label={t.agent} value={selectedAgent?.name ?? s("Unavailable agent", "代理不可用")}
+          selected={selection.agentConfigurationId} disabled={!ready || state.busy || !configuration}
+          options={configuration?.agents.filter(agent => agent.enabled).map(agent => ({ value: agent.id, label: agent.name })) ?? []}
+          onSelect={id => {
+            if (!configuration) return;
+            const agent = configuration.agents.find(item => item.id === id)!;
+            const defaults = resolveModelRole(configuration, agent.modelRole ?? "default", { modelId: selection.modelId, thinking: selection.thinking });
+            if (defaults.error || !defaults.modelId) { setSelectionError(s("This agent's default model is unavailable. Select an available model or update settings.", "此代理的默认模型不可用，请先选择可用模型或修改设置。")); return; }
+            const model = resolveProviderModel(configuration, defaults.modelId)?.model;
+            void configure({ agentConfigurationId: id, modelId: defaults.modelId, thinking: model?.capabilities.reasoning ? defaults.thinking : "off" });
+          }} />
+        <ConfigurationChoice icon={<Cpu />} label={t.model} value={selectedModel?.name ?? s("Unavailable model", "模型不可用")}
+          selected={selection.modelId} disabled={!ready || state.busy || !models.length}
+          options={models.map(model => ({ value: model.id, label: `${configuration?.providers.find(provider => provider.id === model.providerId)?.name ?? ""} / ${model.name}` }))}
+          onSelect={id => { void configure({ ...selection, modelId: id, thinking: models.find(model => model.id === id)?.capabilities.reasoning ? selection.thinking : "off" }); }} />
+        <ConfigurationChoice icon={<Brain />} label={s("Thinking level", "思考等级")} value={selectedModel?.capabilities.reasoning ? selection.thinking ?? s("Default", "默认") : s("Off", "关闭")}
+          selected={selectedModel?.capabilities.reasoning ? selection.thinking ?? "__default" : "off"} disabled={!ready || state.busy || !selectedModel?.capabilities.reasoning}
+          options={[{ value: "__default", label: s("Default", "默认") }, ...thinkingSchema.options.map(level => ({ value: level, label: level }))]}
+          onSelect={value => { void configure({ ...selection, thinking: value === "__default" ? null : value as ThinkingLevel }); }} />
+        {running && <span className="type-caption">{s("Changes apply next turn", "修改于下一轮生效")}</span>}
+      </div>}
       {awayFromBottom && <div className="text-center"><Button variant="secondary" size="sm" onClick={latest}><ArrowDown />{s("Latest output", "最新内容")}</Button></div>}
       {error && <Alert variant="destructive"><AlertDescription className="flex flex-wrap items-center gap-2">
         <span className="flex-1">{error}</span>
@@ -176,10 +211,10 @@ function nodeLabel(node: ConversationNode): string {
   }
   return node.kind === "compaction" ? s("Conversation summary", "对话摘要") : node.extension;
 }
-function ModelResponse({ node, agentName }: { node: ModelNode; agentName: string }) {
+function ModelResponse({ node }: { node: ModelNode }) {
   const streaming = (complete: boolean) => node.state === "streaming" && !complete;
   return <>
-    <p className="type-label flex items-center gap-2"><Bot className="size-3.5" />{agentName}</p>
+    <p className="type-label flex items-center gap-2"><Bot className="size-3.5" />{s("Agent", "代理")}</p>
     {node.parts.map(part => part.kind === "text" ? <Markdown key={part.id} streaming={streaming(part.complete)}>{part.text}</Markdown>
       : part.kind === "thinking" ? <Disclosure key={part.id} label={s("Thinking", "思考")} icon={<Brain className="size-3.5" />}>
         <Markdown streaming={streaming(part.complete)}>{part.text || s("No visible reasoning text.", "没有可显示的思考文本。")}</Markdown></Disclosure>

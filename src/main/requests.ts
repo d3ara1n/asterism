@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { protocolVersion, runtimeMessageSchema, type Command, type CommandResult } from "../shared/contracts.ts";
 import { configurationVersion, configurationResponseSchema, type ConfigurationCommand, type ConfigurationResult } from "../shared/configuration.ts";
-import { conversationResponseSchema, type ConversationCommand, type ConversationResult } from "../shared/conversation.ts";
+import { conversationResponseSchema, conversationVersion, type ConversationCommand, type ConversationResult } from "../shared/conversation.ts";
 
 /** 独立能力通道共用请求生命周期；只发送一次，断线不重放可能已提交的命令。 */
 class PendingRequests<C, R> {
@@ -56,7 +56,7 @@ export class ConfigurationRequests extends PendingRequests<ConfigurationCommand,
 }
 export class ConversationRequests extends PendingRequests<ConversationCommand, ConversationResult> {
   constructor(send: (message: unknown) => void, onTimeout: () => void, timeoutMs = 45_000) {
-    super(send, onTimeout, (id, command) => ({ kind: "conversation.request", version: 1, id, command }), raw => {
+    super(send, onTimeout, (id, command) => ({ kind: "conversation.request", version: conversationVersion, id, command }), raw => {
       const parsed = conversationResponseSchema.safeParse(raw);
       return parsed.success ? parsed.data : null;
     }, message => ({ ok: false, error: { code: "unavailable", message } }), timeoutMs);

@@ -1,4 +1,4 @@
-import type { ConversationNode, ExtensionNode, Json, ModelSettings, Part, ToolOutcome } from "../shared/conversation.ts";
+import type { ConversationNode, ExtensionNode, Json, Part, ToolOutcome } from "../shared/conversation.ts";
 import { ConversationError, canContinue, pathTo, type ConversationState } from "./store.ts";
 import { z } from "zod";
 
@@ -10,9 +10,7 @@ export interface ExtensionProjection {
   user(data: Json): Json[];
 }
 export type ExtensionRegistry = ReadonlyMap<string, ExtensionProjection>;
-export function modelScope(settings: ModelSettings): string {
-  return JSON.stringify([settings.provider.id, settings.provider.protocol, settings.provider.baseUrl, settings.model.modelId]);
-}
+export { modelScope } from "../shared/conversation.ts";
 /** 压缩只作用于当前祖先路径；跳回压缩前自然重新取得原始上下文。 */
 export function projectModel(state: ConversationState, extensions: ExtensionRegistry = new Map()): ModelItem[] {
   let result: ModelItem[] = [];
@@ -22,7 +20,7 @@ export function projectModel(state: ConversationState, extensions: ExtensionRegi
       case "input": result.push({ kind: "input", text: node.text }); break;
       case "compaction": result = [{ kind: "input", text: `Conversation summary:\n${node.summary}` }]; break;
       case "model":
-        result.push({ kind: "output", parts: node.parts, replay: node.replay, scope: modelScope(node.request.settings), adapter: node.request.adapter });
+        result.push({ kind: "output", parts: node.parts, replay: node.replay, scope: node.request.scope, adapter: node.request.adapter });
         for (const part of node.parts) if (part.kind === "tool" && part.outcome) result.push({ kind: "result", callId: part.callId, name: part.name, outcome: part.outcome });
         break;
       case "extension":

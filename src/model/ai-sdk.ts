@@ -3,6 +3,7 @@ import { jsonSchema, type Json, type Usage } from "../shared/conversation.ts";
 import { modelScope } from "../conversation/projection.ts";
 import { ModelFailure, type ModelAdapter, type ModelEvent, type ModelInput, type PreparedModel } from "./contract.ts";
 import { createProviderModel, validateProviderTransport } from "./provider.ts";
+import { projectSystemPrompt } from "./system-prompt.ts";
 
 function json(value: unknown): Json { return jsonSchema.parse(JSON.parse(JSON.stringify(value))); }
 function reasoningFor(input: ModelInput) {
@@ -66,19 +67,17 @@ export class AiSdkAdapter implements ModelAdapter {
   prepare(input: ModelInput): PreparedModel {
     validateProviderTransport(input.settings.provider);
     const messages = sdkMessages(input);
+    const system = projectSystemPrompt(input.system);
     const options = providerOptions(input);
-    const declarations = input.tools;
-    const record = json({ system: input.system, messages, tools: declarations, providerOptions: options,
-      generation: input.settings.model.generation, reasoning: reasoningFor(input) ?? null, maxRetries: 0 });
-    return { input: record, stream: signal => this.stream(input, messages, options, signal) };
+    return { stream: signal => this.stream(input, system, messages, options, signal) };
   }
-  private async *stream(input: ModelInput, messages: ModelMessage[], providerOptions: Record<string, Record<string, Json>>, signal: AbortSignal): AsyncIterable<ModelEvent> {
+  private async *stream(input: ModelInput, system: string, messages: ModelMessage[], providerOptions: Record<string, Record<string, Json>>, signal: AbortSignal): AsyncIterable<ModelEvent> {
     const { provider, model } = input.settings;
     const key = provider.auth === "none" ? "weft-no-auth" : await this.readCredential(provider.id);
     if (!key) throw new ModelFailure("missing_credential", "Provider credentials are unavailable.");
     const languageModel = this.languageModelFactory?.(input, key) ?? createProviderModel(provider, model, key);
     const tools: ToolSet = Object.fromEntries(input.tools.map(t => [t.name, tool({ description: t.description, inputSchema: sdkJsonSchema(t.parameters as Record<string, unknown>) })]));
-    const result = streamText({ model: languageModel, system: input.system, messages, tools,
+    const result = streamText({ model: languageModel, system, messages, tools,
       providerOptions, maxOutputTokens: model.generation.maxOutputTokens ?? undefined, maxRetries: 0, abortSignal: signal,
       temperature: model.generation.temperature ?? undefined, topP: model.generation.topP ?? undefined,
       reasoning: reasoningFor(input),

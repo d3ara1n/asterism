@@ -16,14 +16,16 @@ export class ConversationController {
   subscribe = (listener: () => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; };
   private update(patch: Partial<ConversationState>) { this.state = { ...this.state, ...patch }; this.listeners.forEach(listener => listener()); }
   private accept(snapshot: ConversationSnapshot) {
-    if (snapshot.taskId !== this.taskId || snapshot.agentId !== this.agentId || snapshot.seq < (this.state.snapshot?.seq ?? 0)) return;
+    if (snapshot.taskId !== this.taskId || snapshot.agentId !== this.agentId || snapshot.seq < (this.state.snapshot?.seq ?? 0)
+      || snapshot.selectionRevision < (this.state.snapshot?.selectionRevision ?? 0)) return;
     this.update({ snapshot, loading: false, missing: false });
   }
   connect(): () => void {
     this.connected = true;
     const generation = ++this.generation;
     const unsubscribe = this.bridge.onChanged(event => {
-      if (event.taskId === this.taskId && event.agentId === this.agentId && event.seq > (this.state.snapshot?.seq ?? 0)) void this.refresh();
+      if (event.taskId === this.taskId && event.agentId === this.agentId
+        && (event.seq > (this.state.snapshot?.seq ?? 0) || event.selectionRevision > (this.state.snapshot?.selectionRevision ?? 0))) void this.refresh();
     });
     void this.refresh();
     return () => {

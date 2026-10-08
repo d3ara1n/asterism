@@ -235,22 +235,22 @@ describe("真实配置与消费边界", () => {
   it("从 v1 数据库迁移配置表不改写已有任务", () => {
     const root = mkdtempSync(join(tmpdir(), "weft-configuration-migration-"));
     let db = openDatabase(root);
-    cleanups.push(() => { db.close(); rmSync(root, { recursive: true, force: true }); });
+    cleanups.push(() => { if (db.isOpen) db.close(); rmSync(root, { recursive: true, force: true }); });
     db.prepare("INSERT INTO tasks VALUES (?, ?, ?, ?)").run("saved-task", "saved-branch", "Existing work", "2026-01-01");
-    db.exec("DROP TABLE configuration_items; DROP TABLE configuration_state; PRAGMA user_version = 1;");
+    db.exec("DROP TABLE configuration_items; DROP TABLE configuration_state; DROP TABLE conversation_selections; PRAGMA user_version = 1;");
     db.close();
     db = openDatabase(root);
     expect(db.prepare("SELECT title FROM tasks WHERE id = ?").get("saved-task")).toEqual({ title: "Existing work" });
-    expect(db.prepare("PRAGMA user_version").get()).toEqual({ user_version: 4 });
+    expect(db.prepare("PRAGMA user_version").get()).toEqual({ user_version: 5 });
     expect(db.prepare("SELECT COUNT(*) AS count FROM configuration_items").get()).toEqual({ count: 0 });
   });
   it("v3 完整配置迁移为显式覆盖，旧值与删除状态重开后保留", async () => {
     const root = mkdtempSync(join(tmpdir(), "weft-configuration-v3-"));
     let db = openDatabase(root);
-    cleanups.push(() => { db.close(); rmSync(root, { recursive: true, force: true }); });
+    cleanups.push(() => { if (db.isOpen) db.close(); rmSync(root, { recursive: true, force: true }); });
     const legacy = { ...configurationDefaults.agents.worker!, systemPrompt: "Legacy prompt", tools: [], excludeTools: null };
     db.prepare("INSERT INTO configuration_items (kind, id, revision, data_json, builtin) VALUES ('agent', 'worker', 7, ?, 1)").run(JSON.stringify(legacy));
-    db.exec("INSERT INTO configuration_state VALUES (1); PRAGMA user_version = 3;");
+    db.exec("INSERT INTO configuration_state VALUES (1); DROP TABLE conversation_selections; PRAGMA user_version = 3;");
     db.close();
     db = openDatabase(root);
     const service = new ConfigurationService(db, root, { available: async () => false, encrypt: async () => "", decrypt: async () => "" });
@@ -259,7 +259,7 @@ describe("真实配置与消费边界", () => {
       expect(snapshot.agents).toHaveLength(1);
       expect(snapshot.agents[0]).toMatchObject({ id: "worker", revision: 7, systemPrompt: "Legacy prompt", tools: [] });
       expect(snapshot.overrides.agents.worker).toEqual(legacy);
-      expect(db.prepare("PRAGMA user_version").get()).toEqual({ user_version: 4 });
+      expect(db.prepare("PRAGMA user_version").get()).toEqual({ user_version: 5 });
       const reset = await service.execute({ type: "agent.save", id: "worker", value: {} });
       expect(reset.snapshot.agents[0]?.systemPrompt).toBe(configurationDefaults.agents.worker!.systemPrompt);
     } finally { service.close(); }

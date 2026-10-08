@@ -13,9 +13,9 @@
 
 入口为 `window.weft.configuration.execute`，经 preload/main 校验转入任务进程。响应只有配置快照、保存 ID 或固定错误，不携带密钥或密文。配置修改不触发会话重载或级联刷新；选择与实际消费通过 `resolveProviderModel` / `resolveModelRole` 检查配置。
 
-配置 IPC 版本为 2，SQLite 版本为 4。角色/代理保存命令提交完整的用户覆盖集合，省略字段即撤下该字段的覆盖；非空文本覆盖、说明与提示词留空恢复内置，false/null/空列表保留业务含义。工具允许/排除列表作为一组互斥策略替换，列表不拼接。新自定义角色与代理只继承内置原始 default/worker，不受用户修改这两项影响。
+配置 IPC 版本为 2，SQLite 版本为 5。角色/代理保存命令提交完整的用户覆盖集合，省略字段即撤下该字段的覆盖；非空文本覆盖、说明与提示词留空恢复内置，false/null/空列表保留业务含义。工具允许/排除列表作为一组互斥策略替换，列表不拼接。新自定义角色与代理只继承内置原始 default/worker，不受用户修改这两项影响。
 
-读取快照中的 roles/agents 是完整生效配置，defaults 是原始内置基准，overrides 是编辑器填写值。执行消费只用完整配置；agent 快照保存 defaultsVersion、baseId 和 overriddenFields 来源信息，旧历史无 source 时仍可读取。更新内置定义时同步递增 `layers.ts` 的 defaultsVersion。
+读取快照中的 roles/agents 是完整生效配置，defaults 是原始内置基准，overrides 是编辑器填写值。执行每轮取用最新完整配置；配置投影携带 defaultsVersion、baseId 和 overriddenFields 来源信息，不写入会话历史。更新内置定义时同步递增 `layers.ts` 的 defaultsVersion。
 
 首次初始化只写入内置项身份和空覆盖。v3 完整配置原样保留为显式覆盖，不按值是否与内置相同猜测用户意图；删除状态由记录是否存在保持，重开不重新播种。编辑器可逐项选择内置值，或恢复整项内置值后保存；自定义项恢复时保留名称。更新配置不改写已有会话历史。
 

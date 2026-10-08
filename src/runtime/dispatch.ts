@@ -2,7 +2,7 @@ import { protocolVersion, requestSchema, type RuntimeMessage } from "../shared/c
 import { ApplicationError, type ApplicationService } from "./service.ts";
 import { configurationRequestSchema, configurationResponseSchema, configurationVersion } from "../shared/configuration.ts";
 import { ConfigurationError } from "../configuration/repository.ts";
-import { conversationRequestSchema, conversationResponseSchema } from "../shared/conversation.ts";
+import { conversationRequestSchema, conversationResponseSchema, conversationVersion } from "../shared/conversation.ts";
 import { ConversationError } from "../conversation/store.ts";
 
 /** 配置响应独立于工作台投影，保存设置不会重新加载当前会话。 */
@@ -28,11 +28,11 @@ export async function dispatchConversation(service: ApplicationService, raw: unk
   const { id, command } = parsed.data;
   try {
     const snapshot = await service.conversations.execute(command);
-    return conversationResponseSchema.parse({ kind: "conversation.response", version: 1, id, result: { ok: true, snapshot } });
+    return conversationResponseSchema.parse({ kind: "conversation.response", version: conversationVersion, id, result: { ok: true, snapshot } });
   } catch (error) {
     const known = error instanceof ConversationError || error instanceof ConfigurationError;
     if (!known) console.error("Conversation command failed.");
-    return conversationResponseSchema.parse({ kind: "conversation.response", version: 1, id, result: { ok: false,
+    return conversationResponseSchema.parse({ kind: "conversation.response", version: conversationVersion, id, result: { ok: false,
       error: { code: known ? error.code : "internal", message: known ? error.message : "The conversation command could not be completed." } } });
   }
 }
