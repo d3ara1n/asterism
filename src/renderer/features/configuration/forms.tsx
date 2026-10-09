@@ -7,6 +7,7 @@ import { IslandPanel } from "../../shared/weave/IslandPanel";
 import { useCloseGuard } from "../../shared/weave/Screen";
 import { Field, FieldDescription, FieldLabel } from "../../shared/ui/field";
 import { Input } from "../../shared/ui/input";
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "../../shared/ui/input-group";
 import { Textarea } from "../../shared/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../shared/ui/select";
 import { Switch } from "../../shared/ui/switch";
@@ -27,13 +28,16 @@ export function NumberField({ label, value, onChange, min = 0, max, integer = fa
   placeholder?: string; onReset?: () => void; onClear?: () => void; clearLabel?: string;
 }) {
   const id = useId();
-  return <Field><FieldLabel htmlFor={id}>{label}</FieldLabel><Input id={id} type="number" value={value ?? ""} min={min} max={max} step={integer ? 1 : "any"}
-    placeholder={placeholder ?? s("Default", "默认")} onChange={event => onChange(event.target.value === "" ? null : Number(event.target.value))} />
-    {(onReset || onClear) && <div className="flex flex-wrap gap-2">
-      {onReset && <Button type="button" variant="ghost" size="sm" onClick={onReset}>{s("Use built-in", "使用内置值")}</Button>}
-      {onClear && <Button type="button" variant="ghost" size="sm" onClick={onClear}>{clearLabel}</Button>}
-    </div>}
-  </Field>;
+  // InputGroup 组合：去掉原生步进箭头，恢复/清除作为输入框内的附加按钮。
+  return <Field><FieldLabel htmlFor={id}>{label}</FieldLabel><InputGroup>
+    <InputGroupInput id={id} type="number" inputMode={integer ? "numeric" : "decimal"} value={value ?? ""} min={min} max={max} step={integer ? 1 : "any"}
+      className="[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+      placeholder={placeholder ?? s("Default", "默认")} onChange={event => onChange(event.target.value === "" ? null : Number(event.target.value))} />
+    {(onReset || onClear) && <InputGroupAddon align="inline-end">
+      {onReset && <InputGroupButton onClick={onReset}>{s("Use built-in", "使用内置值")}</InputGroupButton>}
+      {onClear && <InputGroupButton onClick={onClear}>{clearLabel}</InputGroupButton>}
+    </InputGroupAddon>}
+  </InputGroup></Field>;
 }
 export function ToggleField({ label, value, onChange }: { label: string; value: boolean; onChange: (value: boolean) => void }) {
   const id = useId();

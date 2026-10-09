@@ -5,15 +5,15 @@ import { presetGroups, providerPresets, type ProviderPreset } from "../../../sha
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemSeparator, ItemTitle } from "../../shared/ui/item";
 import { Badge } from "../../shared/ui/badge";
 import { Button } from "../../shared/ui/button";
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "../../shared/ui/field";
+import { Field, FieldDescription, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "../../shared/ui/field";
 import { Input } from "../../shared/ui/input";
 import { Switch } from "../../shared/ui/switch";
 import { Spinner } from "../../shared/ui/spinner";
-import { Tooltip, TooltipContent, TooltipTrigger } from "../../shared/ui/tooltip";
+import { Checkbox } from "../../shared/ui/checkbox";
 import { useIsland } from "../../shared/weave/Screen";
 import { cn } from "../../shared/utils";
 import { Section } from "../settings/preview";
-import { ChoiceField, Editor, NumberField, TextField, ToggleField } from "./forms";
+import { ChoiceField, Editor, NumberField, TextField } from "./forms";
 import { s, useSettingsConfiguration } from "./state";
 
 const protocols = [
@@ -163,7 +163,6 @@ const blank: ProviderInput = { name: "", protocol: "openai-responses", baseUrl: 
 function ProviderEditor({ initialId }: { initialId: string | null }) {
   const { snapshot, run, busy } = useSettingsConfiguration();
   const island = useIsland();
-  const quick = useQuickActions();
   const [id, setId] = useState(initialId);
   const [picking, setPicking] = useState(initialId === null);
   const [preset, setPreset] = useState<ProviderPreset | null>(null);
@@ -230,19 +229,14 @@ function ProviderEditor({ initialId }: { initialId: string | null }) {
           </FieldDescription>
           {!snapshot?.credentialStorageAvailable && <p className="text-xs text-destructive">{s("System encryption is unavailable. API keys cannot be saved.", "系统加密不可用，无法保存 API key。")}</p>}
         </Field>}
-        {current && <ToggleField label={s("Enabled", "启用")} value={current.enabled} onChange={next => void quick.setProviderEnabled(current, next)} />}
       </FieldGroup>
     </form>
 
     {current && snapshot && <section className="mt-8 border-t pt-5">
       <div className="mb-3 flex items-center justify-between gap-2">
         <h3 className="type-section">{s("Models", "模型")}</h3>
-        <div className="flex gap-1">
-          {/* 模型发现尚未接入，见 plans/todo-2026-10-07-model-catalog.md。 */}
-          <Tooltip><TooltipTrigger asChild><span tabIndex={0}><Button size="sm" variant="ghost" disabled>{s("Fetch list", "拉取列表")}</Button></span></TooltipTrigger>
-            <TooltipContent>{s("Model discovery is coming later.", "模型发现即将支持。")}</TooltipContent></Tooltip>
-          <Button size="sm" variant="outline" disabled={busy} onClick={event => openModel(null, event.currentTarget)}><Plus />{s("Add model", "添加模型")}</Button>
-        </div>
+        {/* 模型发现尚未接入，入口待 plans/todo-2026-10-07-model-catalog.md 落地后加在此处。 */}
+        <Button size="sm" variant="outline" disabled={busy} onClick={event => openModel(null, event.currentTarget)}><Plus />{s("Add model", "添加模型")}</Button>
       </div>
       {models.length ? <ItemGroup className="surface">{models.map((model, index) => <div key={model.id}>{index > 0 && <ItemSeparator />}
         <ModelRow model={model} provider={current} selected={island.child === `model-${model.id}`} onOpen={origin => openModel(model.id, origin)} />
@@ -269,7 +263,7 @@ function ModelRow({ model, provider, selected, onOpen }: { model: ProviderModel;
     <ItemContent className="min-w-0">
       <button type="button" className="text-left outline-none after:absolute after:inset-0 focus-visible:underline" aria-current={selected || undefined}
         onClick={event => onOpen(event.currentTarget)}><ItemTitle>{model.name}</ItemTitle></button>
-      <ItemDescription className="truncate">{test ? <TestResult test={test} stale={stale} /> : model.modelId}</ItemDescription>
+      <ItemDescription className="truncate"><span className="font-mono">{model.modelId}</span>{test && <> · <TestResult test={test} stale={stale} /></>}</ItemDescription>
     </ItemContent>
     <ItemActions className="relative">
       <Button size="sm" variant="ghost" disabled={busy || (!running && (!model.enabled || !provider.enabled))} onClick={() => void quick.test(model)}>
@@ -297,9 +291,14 @@ function ModelEditor({ initialId, providerId }: { initialId: string | null; prov
   const dirty = useMemo(() => !current || JSON.stringify({ ...modelValue(current), enabled: 0 }) !== JSON.stringify({ ...value, enabled: 0 }), [current, value]);
   const test = current && snapshot ? latestTest(snapshot, current.id) : undefined;
   const stale = !!test && !!current && (test.modelRevision !== current.revision || test.providerRevision !== provider?.revision);
+  const users = current && snapshot ? snapshot.roles.filter(role => role.modelId === current.id) : [];
 
   return <Editor form="model-form" title={current?.name ?? s("New model", "新模型")} description={provider?.name} dirty={dirty}
-    remove={current ? { title: s("Delete this model?", "删除此模型？"), description: s(`“${current.name}” will be removed. Roles using it fall back to their defaults.`, `将移除「${current.name}」，使用它的角色需重新选择模型。`),
+    remove={current ? { title: s("Delete this model?", "删除此模型？"),
+      description: users.length
+        ? s(`“${current.name}” will be removed. These roles will be unavailable until you choose another model: ${users.map(role => role.name).join(", ")}.`,
+          `将移除「${current.name}」。以下角色在重新选择模型前不可用：${users.map(role => role.name).join("、")}。`)
+        : s(`“${current.name}” will be removed. No roles use it.`, `将移除「${current.name}」，没有角色使用它。`),
       onConfirm: async () => { const result = await run({ type: "remove", kind: "model", id: current.id }); if (result.ok) void island.close({ force: true }); } } : undefined}>
     <form id="model-form" onSubmit={async event => {
       event.preventDefault();
@@ -308,9 +307,20 @@ function ModelEditor({ initialId, providerId }: { initialId: string | null; prov
     }}><FieldGroup>
       <TextField label={s("Server model ID", "服务端模型 ID")} value={value.modelId} onChange={next => set("modelId", next)} required placeholder="gpt-5" />
       <TextField label={s("Display name", "显示名称")} value={value.name} onChange={next => set("name", next)} placeholder={value.modelId || s("Defaults to the model ID", "默认使用模型 ID")} />
-      <ToggleField label={s("Reasoning", "支持思考")} value={value.capabilities.reasoning} onChange={next => set("capabilities", { ...value.capabilities, reasoning: next })} />
-      <ToggleField label={s("Tool calls", "支持工具调用")} value={value.capabilities.tools} onChange={next => set("capabilities", { ...value.capabilities, tools: next })} />
-      <ToggleField label={s("Image input", "支持图片输入")} value={value.capabilities.images} onChange={next => set("capabilities", { ...value.capabilities, images: next })} />
+      <FieldSet><FieldLegend variant="label">{s("Capabilities", "能力")}</FieldLegend>
+        <FieldGroup data-slot="checkbox-group" className="gap-3">
+          {([["reasoning", s("Reasoning", "支持思考")], ["tools", s("Tool calls", "支持工具调用")], ["images", s("Image input", "支持图片输入")]] as const).map(([key, label]) =>
+            <Field key={key} orientation="horizontal">
+              <Checkbox id={`capability-${key}`} checked={value.capabilities[key]} onCheckedChange={next => set("capabilities", { ...value.capabilities, [key]: next === true })} />
+              <FieldLabel htmlFor={`capability-${key}`} className="font-normal">{label}</FieldLabel>
+            </Field>)}
+        </FieldGroup>
+      </FieldSet>
+      {current && <Field><FieldLabel>{s("Used by", "被引用")}</FieldLabel>
+        {users.length ? <ul className="flex flex-wrap gap-1.5" aria-label={s("Roles using this model", "使用此模型的角色")}>
+          {users.map(role => <li key={role.id}><Badge variant="secondary">{role.name}</Badge></li>)}
+        </ul> : <FieldDescription>{s("No roles use this model.", "没有角色使用此模型。")}</FieldDescription>}
+      </Field>}
     </FieldGroup>
       <Button type="button" variant="ghost" size="sm" className="-ml-2 mt-5" aria-expanded={advanced} onClick={() => setAdvanced(open => !open)}>
         <ChevronDown className={advanced ? "rotate-180 transition-transform" : "transition-transform"} />{s("Advanced", "高级")}</Button>
@@ -320,7 +330,6 @@ function ModelEditor({ initialId, providerId }: { initialId: string | null; prov
         <NumberField label="Top P" value={value.generation.topP} onChange={next => set("generation", { ...value.generation, topP: next })} max={1} />
         <NumberField label={s("Maximum output tokens", "最大输出 token")} value={value.generation.maxOutputTokens} onChange={next => set("generation", { ...value.generation, maxOutputTokens: next })} min={1} integer />
       </FieldGroup>}
-      {current && <FieldGroup className="mt-5"><ToggleField label={s("Enabled", "启用")} value={current.enabled} onChange={next => void quick.setModelEnabled(current, next)} /></FieldGroup>}
     </form>
     {current && <section className="mt-7 border-t pt-5">
       <div className="flex items-center justify-between gap-2">
