@@ -1,6 +1,6 @@
 import type { WorkbenchOperation } from "../session/controller";
 import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type ReactNode, type Ref } from "react";
-import { ReactFlow, ReactFlowProvider, Background, BackgroundVariant, Panel, useReactFlow, applyNodeChanges, applyEdgeChanges, type NodeChange, type EdgeChange, type Edge, MarkerType, type Connection, type IsValidConnection } from "@xyflow/react";
+import { ReactFlow, ReactFlowProvider, Background, BackgroundVariant, Panel, useReactFlow, applyNodeChanges, applyEdgeChanges, type NodeChange, type EdgeChange, type Edge, MarkerType, ConnectionMode, type Connection, type IsValidConnection } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { Maximize, Minus, Plus, Scan } from "lucide-react";
 import type { WorkbenchSnapshot } from "../../../shared/workbench";
@@ -16,6 +16,7 @@ import { IconAction, cardDragHandle, type ViewPatch } from "./ObjectCard";
 import { ObjectsPanel } from "./ObjectsPanel";
 import { placeObject, type ResourcePlacement } from "./placement";
 import { defaultCardPosition } from "./layout";
+import { layoutConnections } from "./connections";
 import { WorkbenchContext, WorkbenchScope, WorkbenchStore, type WorkbenchEnvironment } from "./context";
 
 const nodeTypes = { object: ObjectNode };
@@ -95,19 +96,22 @@ function Canvas({ session, run, writable }: { session: WorkbenchSnapshot; run: R
         ? current.data : { object, collapsed: view.collapsed, onView };
       const node: ObjectNodeType = { id: object.id, type: "object", position: view.position, dragHandle: cardDragHandle, deletable: false, data };
       if (!current) return [node];
-      return [{ ...node, selected: current.selected, ...(current.dragging ? { position: current.position, dragging: true } : {}) }];
+      return [{ ...node, measured: current.measured, selected: current.selected, ...(current.dragging ? { position: current.position, dragging: true } : {}) }];
     }), [onView]);
   const [nodes, setNodes] = useState<ObjectNodeType[]>(() => toNodes(session, []));
   useEffect(() => { setNodes(previous => toNodes(session, previous)); }, [session, toNodes]);
+  const connections = useMemo(() => layoutConnections(nodes, session.links), [nodes, session.links]);
+  const canvasNodes = useMemo(() => nodes.map(node => ({
+    ...node, data: { ...node.data, ports: connections.ports.get(node.id) },
+  })), [nodes, connections]);
   // 连线由快照决定，选中状态留在本地；否则受控连线永远选不中，Delete 无从生效。
   const [selectedEdges, setSelectedEdges] = useState<ReadonlySet<string>>(new Set());
-  const edges: Edge[] = useMemo(() => session.links.map(binding => {
-    const id = `${binding.agentId}:${binding.resourceId}`;
-    return { id, source: binding.resourceId, target: binding.agentId, selected: selectedEdges.has(id),
-      style: { stroke: "var(--primary)", strokeWidth: selectedEdges.has(id) ? 2.5 : 1.5 },
-      markerEnd: { type: MarkerType.ArrowClosed, color: "var(--primary)" },
-      selectable: writable, deletable: writable, interactionWidth: 16 };
-  }), [session.links, writable, selectedEdges]);
+  const edges: Edge[] = useMemo(() => connections.edges.map(edge => ({
+    ...edge, selected: selectedEdges.has(edge.id),
+    style: { stroke: "var(--primary)", strokeWidth: selectedEdges.has(edge.id) ? 2.5 : 1.5 },
+    markerEnd: { type: MarkerType.ArrowClosed, color: "var(--primary)" },
+    selectable: writable, deletable: writable, interactionWidth: 16,
+  })), [connections, writable, selectedEdges]);
   const onEdgesChange = useCallback((changes: EdgeChange[]) => {
     setSelectedEdges(previous => {
       const next = new Set(applyEdgeChanges(changes, edges).filter(e => e.selected).map(e => e.id));
@@ -152,9 +156,9 @@ function Canvas({ session, run, writable }: { session: WorkbenchSnapshot; run: R
   {dropping && <div className="pointer-events-none absolute inset-2 z-20 flex items-center justify-center rounded-lg border-2 border-dashed border-primary bg-primary/5">
     <p className="type-body">{s("Drop to add as resources", "松开以添加为资源")}</p></div>}
   <ReactFlow<ObjectNodeType>
-    colorMode={scheme} nodes={nodes} edges={edges} nodeTypes={nodeTypes} onNodesChange={onNodesChange}
+    colorMode={scheme} nodes={canvasNodes} edges={edges} nodeTypes={nodeTypes} onNodesChange={onNodesChange}
     defaultViewport={session.viewport} minZoom={0.1} maxZoom={4}
-    nodesDraggable nodesConnectable={writable} edgesReconnectable={false} isValidConnection={isValidConnection}
+    nodesDraggable nodesConnectable={writable} connectionMode={ConnectionMode.Loose} edgesReconnectable={false} isValidConnection={isValidConnection}
     onConnect={onConnect} onEdgesChange={onEdgesChange} onEdgesDelete={onEdgesDelete}
     onBeforeDelete={async ({ edges }) => ({ nodes: [], edges: edges.filter(edge => edge.selected) })}
     deleteKeyCode={writable ? ["Backspace", "Delete"] : null} panOnScroll selectionOnDrag panOnDrag={[1, 2]} zoomOnDoubleClick={false}
