@@ -1,205 +1,151 @@
-import { join } from "node:path";
+import { basename, isAbsolute, join } from "node:path";
+import { directoryType, noteType, toolSummary } from "../resources/index.ts";
 import type { DatabaseSync } from "node:sqlite";
-import { HistoryKernel } from "../history/kernel.ts";
-import type { StoredEvent } from "../history/schema.ts";
 import { commandSchema, snapshotSchema, type Command, type AppSnapshot, type AppError, type Point, type Viewport, type WorkbenchObject } from "../shared/contracts.ts";
 import { ObjectStore, openDatabase } from "./storage.ts";
 import { ConfigurationService } from "../configuration/service.ts";
 import type { SecretProtector } from "../shared/secrets.ts";
-import { ConversationService } from "./conversations.ts";
-import type { ConversationChanged, ModelSettings } from "../shared/conversation.ts";
+import { SessionService } from "./sessions.ts";
+import type { SessionChanged } from "../shared/session.ts";
+import type { ModelSettings } from "../shared/model.ts";
 import type { ModelAdapter } from "../model/contract.ts";
+import { foldWorkbench } from "../session/fold.ts";
+import { SessionError } from "../session/tree.ts";
+
+const toolNames = (kind: string) => kind === "directory" ? directoryType.tools.map(t => t.name) : ["read"];
 
 export class ApplicationError extends Error {
   constructor(readonly code: AppError["code"], message: string) { super(message); }
 }
-type TaskRow = { id: string; branch_id: string; title: string; created_at: string };
 type ViewRow = { object_id: string; x: number; y: number; hidden: number; collapsed: number };
 
-/** 唯一应用命令入口；不依赖 Electron、React 或画布类型。 */
+/** 工作台命令入口：对象与链接作为会话树事件节点追加，布局是独立视图状态。 */
 export class ApplicationService {
-  readonly history: HistoryKernel;
   readonly configuration: ConfigurationService;
-  readonly conversations: ConversationService;
+  readonly sessions: SessionService;
   private readonly db: DatabaseSync;
   private readonly objects: ObjectStore;
-  constructor(root: string, options: { protector?: SecretProtector; onConfigurationChanged?: () => void; onConversationChanged?: (event: ConversationChanged) => void; adapterFactory?: (settings: ModelSettings) => ModelAdapter } = {}) {
+  constructor(root: string, options: { protector?: SecretProtector; onConfigurationChanged?: () => void; onSessionChanged?: (event: SessionChanged) => void; adapterFactory?: (settings: ModelSettings) => ModelAdapter } = {}) {
     this.db = openDatabase(root);
     try {
-      this.history = new HistoryKernel(this.db);
       this.objects = new ObjectStore(join(root, "objects"));
       const unavailable = async (): Promise<string> => { throw new Error("System credential protection is unavailable."); };
-      this.configuration = new ConfigurationService(this.db, root, options.protector ?? {
-        available: async () => false, encrypt: unavailable, decrypt: unavailable,
-      }, options.onConfigurationChanged);
-      this.conversations = new ConversationService(this.db, this.history, this.objects, this.configuration, options.onConversationChanged, options.adapterFactory);
+      this.configuration = new ConfigurationService(this.db, root, options.protector ?? { available: async () => false, encrypt: unavailable, decrypt: unavailable }, options.onConfigurationChanged);
+      this.sessions = new SessionService(this.db, this.objects, this.configuration, options.onSessionChanged, options.adapterFactory);
     } catch (error) { this.db.close(); throw error; }
   }
-  close(): Promise<void> {
+  async close(): Promise<void> {
     this.configuration.close();
-    const running = this.conversations.running;
-    const stopped = this.conversations.close();
-    if (!running) { this.history.close(); return Promise.resolve(); }
-    return stopped.finally(() => this.history.close());
+    await this.sessions.close();
+    this.db.close();
   }
 
   execute(raw: unknown): AppSnapshot {
     const parsed = commandSchema.safeParse(raw);
     if (!parsed.success) throw new ApplicationError("invalid_request", "Invalid application command.");
     const command = parsed.data;
-    if (command.type === "workspace.read") return this.snapshot(command.task_id, command.at_seq);
+    if (command.type === "workspace.read") return this.snapshot(command.session_id, command.at);
     this.db.exec("BEGIN IMMEDIATE");
     try {
-      const taskId = this.mutate(command);
-      // 响应构造/校验失败也必须回滚，不能向调用方报告失败却留下已提交命令。
-      const snapshot = this.snapshot(taskId);
+      this.mutate(command);
+      const snapshot = this.snapshot(command.session_id);
       this.db.exec("COMMIT");
+      if (command.type !== "view.set" && command.type !== "viewport.set") this.sessions.notify(command.session_id);
       return snapshot;
-    } catch (error) {
-      this.db.exec("ROLLBACK");
-      throw error;
-    }
+    } catch (error) { this.db.exec("ROLLBACK"); throw error; }
   }
 
-  private task(id: string): TaskRow {
-    const task = this.db.prepare("SELECT * FROM tasks WHERE id = ?").get(id) as TaskRow | undefined;
-    if (!task) throw new ApplicationError("not_found", "Task not found.");
-    return task;
+  private requireSession(id: string, at?: string) {
+    try { return at === undefined ? this.sessions.tree.path(id) : this.sessions.tree.path(id, at); }
+    catch (error) { if (error instanceof SessionError) throw new ApplicationError("not_found", "Session not found."); throw error; }
   }
 
-  private mutate(command: Exclude<Command, { type: "workspace.read" }>): string {
-    if (command.type === "task.create") {
-      const created = this.history.createTask(command.title);
-      this.db.prepare("INSERT INTO tasks VALUES (?, ?, ?, ?)").run(created.task_id, created.branch_id, command.title, new Date().toISOString());
-      return created.task_id;
-    }
-    const task = this.task(command.task_id);
-    const projection = this.history.reconstruct(this.history.head(task.branch_id));
-    const requireObject = (id: string) => {
-      if (![...projection.agent_ids, ...projection.resource_ids].includes(id)) {
-        throw new ApplicationError("not_found", "Object does not belong to this task.");
-      }
-    };
+  private mutate(command: Exclude<Command, { type: "workspace.read" }>): void {
+    const folded = foldWorkbench(this.requireSession(command.session_id));
+    const has = (id: string) => folded.objects.some(o => o.id === id);
+    const tree = this.sessions.tree;
     switch (command.type) {
-      case "agent.create": {
-        const created = this.history.createAgent(task.branch_id, { title: command.title });
-        this.addView(task.id, created.agent_id, command.position);
-        break;
-      }
       case "note.create": {
-        const content_ref = this.objects.put(command.content);
-        const created = this.history.createResource(task.branch_id, {
-          type: "note", title: command.title, content_ref,
-          capabilities: { history_viewing: true, state_restore: false },
-        });
-        this.addView(task.id, created.resource_id, command.position);
+        // 笔记正文以不可变对象保存；回溯仅恢复存在性与引用。
+        const contentRef = this.objects.put(command.content);
+        const id = crypto.randomUUID();
+        tree.append(command.session_id, { kind: "event", agentId: null, type: "resource_created", data: { id, title: command.title, contentRef }, model: null });
+        this.addView(command.session_id, id, command.position);
         break;
       }
-      case "binding.set": {
-        if (!projection.agent_ids.includes(command.agent_id) || !projection.resource_ids.includes(command.resource_id)) {
-          throw new ApplicationError("not_found", "Agent or resource does not belong to this task.");
-        }
-        if (projection.pending.some(p => p.agent_id === command.agent_id && p.resource_id === command.resource_id)) {
-          throw new ApplicationError("conflict", "A binding change is already pending.");
-        }
-        const bound = projection.bindings_by_agent[command.agent_id]?.resources.some(r => r.resource_id === command.resource_id) ?? false;
-        if (bound !== command.attached) this.history.requestBinding(task.branch_id, {
-          agent_id: command.agent_id, resource_id: command.resource_id,
-          action: command.attached ? "attach" : "detach",
-          permissions: command.attached ? ["read"] : [],
-        });
+      case "directory.add": {
+        // 目录是纯引用：只记录绝对路径，内容与存在性由 inspect 实时感知。
+        if (!isAbsolute(command.path)) throw new ApplicationError("invalid_request", "Directory path must be absolute.");
+        const id = crypto.randomUUID();
+        tree.append(command.session_id, { kind: "event", agentId: null, type: "resource_created",
+          data: { id, type: "directory", title: basename(command.path) || command.path, path: command.path }, model: null });
+        this.addView(command.session_id, id, command.position);
+        break;
+      }
+      case "object.remove": {
+        const target = folded.objects.find(o => o.id === command.object_id);
+        if (!target || target.kind === "agent") throw new ApplicationError("not_found", "Resource does not belong to this session.");
+        // 先对每个已链接代理发出断开通知，再从工作台移除；移除本身只重建视图。
+        for (const l of folded.links.filter(l => l.resourceId === target.id)) tree.append(command.session_id, { kind: "event", agentId: l.agentId,
+          type: "resource_detached", data: { id: target.id }, model: `Resource "${target.title}" (resource_id: ${target.id}) is no longer linked to you.` });
+        tree.append(command.session_id, { kind: "event", agentId: null, type: "object_removed", data: { id: target.id }, model: null });
+        break;
+      }
+      case "link.set": {
+        const agent = folded.objects.find(o => o.id === command.agent_id && o.kind === "agent");
+        const resource = folded.objects.find(o => o.id === command.resource_id && o.kind !== "agent");
+        if (!agent || !resource) throw new ApplicationError("not_found", "Agent or resource does not belong to this session.");
+        const linked = folded.links.some(l => l.agentId === agent.id && l.resourceId === resource.id);
+        if (linked === command.linked) break;
+        tree.append(command.session_id, { kind: "event", agentId: agent.id, type: command.linked ? "resource_attached" : "resource_detached",
+          data: { id: resource.id }, model: command.linked
+            ? `Resource "${resource.title}" (type: ${resource.kind}, resource_id: ${resource.id}) is now linked to you. Tools: ${JSON.stringify(toolSummary(resource.kind === "directory" ? directoryType : noteType(this.objects)))}. Call them with resource_call.`
+            : `Resource "${resource.title}" (resource_id: ${resource.id}) is no longer linked to you.` });
         break;
       }
       case "view.set": {
-        requireObject(command.object_id);
-        const previous = this.db.prepare("SELECT * FROM object_views WHERE task_id = ? AND object_id = ?").get(task.id, command.object_id) as ViewRow | undefined;
+        if (!has(command.object_id)) throw new ApplicationError("not_found", "Object does not belong to this session.");
+        const previous = this.db.prepare("SELECT * FROM object_views WHERE session_id = ? AND object_id = ?").get(command.session_id, command.object_id) as ViewRow | undefined;
         this.db.prepare(`INSERT INTO object_views VALUES (?, ?, ?, ?, ?, ?)
-          ON CONFLICT(task_id, object_id) DO UPDATE SET x=excluded.x, y=excluded.y, hidden=excluded.hidden, collapsed=excluded.collapsed`)
-          .run(task.id, command.object_id, command.position?.x ?? previous?.x ?? 0, command.position?.y ?? previous?.y ?? 0,
+          ON CONFLICT(session_id, object_id) DO UPDATE SET x=excluded.x, y=excluded.y, hidden=excluded.hidden, collapsed=excluded.collapsed`)
+          .run(command.session_id, command.object_id, command.position?.x ?? previous?.x ?? 0, command.position?.y ?? previous?.y ?? 0,
             command.hidden === undefined ? previous?.hidden ?? 0 : Number(command.hidden),
             command.collapsed === undefined ? previous?.collapsed ?? 0 : Number(command.collapsed));
         break;
       }
       case "viewport.set":
-        this.db.prepare(`INSERT INTO viewports VALUES (?, ?, ?, ?) ON CONFLICT(task_id) DO UPDATE SET x=excluded.x, y=excluded.y, zoom=excluded.zoom`)
-          .run(task.id, command.viewport.x, command.viewport.y, command.viewport.zoom);
+        this.db.prepare("INSERT INTO viewports VALUES (?, ?, ?, ?) ON CONFLICT(session_id) DO UPDATE SET x=excluded.x, y=excluded.y, zoom=excluded.zoom")
+          .run(command.session_id, command.viewport.x, command.viewport.y, command.viewport.zoom);
         break;
     }
-    return task.id;
   }
 
-  private addView(taskId: string, objectId: string, position: Point): void {
-    this.db.prepare("INSERT INTO object_views (task_id, object_id, x, y) VALUES (?, ?, ?, ?)").run(taskId, objectId, position.x, position.y);
+  private addView(sessionId: string, objectId: string, position: Point): void {
+    this.db.prepare("INSERT INTO object_views (session_id, object_id, x, y) VALUES (?, ?, ?, ?)").run(sessionId, objectId, position.x, position.y);
   }
 
-  private snapshot(taskId?: string, atSeq?: number): AppSnapshot {
-    const tasks = this.db.prepare("SELECT * FROM tasks ORDER BY created_at, id").all() as TaskRow[];
+  /** 工作台状态 = 当前游标路径上的事件折叠；不完整节点与旁支不影响对象集合。 */
+  private snapshot(sessionId?: string, at?: string): AppSnapshot {
+    const sessions = this.sessions.tree.list().map(s => ({ id: s.id, title: s.title, created_at: s.createdAt }));
     const workspace = this.db.prepare("SELECT * FROM workspace LIMIT 1").get() as { id: string; title: string };
-    const result: AppSnapshot = { workspace, tasks, task: null, execution: { available: false, reason: "execution_not_connected" } };
-    // 未指定任务时只返回列表摘要；启动和首页均不读取任何会话正文。
-    const selectedId = taskId;
-    if (!selectedId) {
-      if (atSeq !== undefined) throw new ApplicationError("invalid_request", "History requires a task.");
-      return result;
-    }
-    const task = this.task(selectedId);
-    const allEvents = this.history.eventsOn(task.branch_id);
-    const head = allEvents.at(-1)!;
-    const position = atSeq === undefined ? head : allEvents.find(e => e.seq === atSeq);
-    if (!position) throw new ApplicationError("not_found", "History position not found.");
-    const events = allEvents.filter(e => e.seq <= position.seq);
-    const projection = this.history.reconstruct({ branch_id: task.branch_id, event_id: position.event_id, seq: position.seq });
-    const objects: WorkbenchObject[] = [];
-    for (const event of events) {
-      if (event.type === "agent_created") objects.push({
-        id: event.payload.agent_id, kind: "agent", title: event.payload.title ?? "Agent",
-        content: null, content_available: false,
-      });
-      if (event.type === "resource_created" && event.payload.type === "note") {
-        const content = event.payload.content_ref ? this.objects.get(event.payload.content_ref) : null;
-        objects.push({ id: event.payload.resource_id, kind: "note", title: event.payload.title ?? "Note", content, content_available: content !== null });
-      }
-    }
-    const bindings = Object.entries(projection.bindings_by_agent).flatMap(([agent_id, value]) => value.resources.map(r => ({
-      agent_id, resource_id: r.resource_id, pending: projection.pending.find(p => p.agent_id === agent_id && p.resource_id === r.resource_id)?.action ?? null,
-    })));
-    for (const pending of projection.pending) {
-      if (!bindings.some(b => b.agent_id === pending.agent_id && b.resource_id === pending.resource_id)) bindings.push({
-        agent_id: pending.agent_id, resource_id: pending.resource_id, pending: pending.action,
-      });
-    }
-    const rows = this.db.prepare("SELECT * FROM object_views WHERE task_id = ?").all(task.id) as ViewRow[];
-    const viewport = this.db.prepare("SELECT x, y, zoom FROM viewports WHERE task_id = ?").get(task.id) as Viewport | undefined;
-    result.task = {
-      ...task, head_seq: head.seq, at_seq: position.seq, historical: atSeq !== undefined,
-      objects, bindings,
-      views: rows.filter(row => objects.some(o => o.id === row.object_id)).map(row => ({
-        object_id: row.object_id, position: { x: row.x, y: row.y }, hidden: !!row.hidden, collapsed: !!row.collapsed,
-      })),
-      viewport: viewport ?? { x: 0, y: 0, zoom: 1 },
-      history: allEvents.map(event => ({
-        seq: event.seq, event_id: event.event_id, type: event.type, recorded_at: event.recorded_at, label: eventLabel(event),
-      })),
-    };
+    const result: AppSnapshot = { workspace, sessions, session: null };
+    if (!sessionId) return result;
+    const folded = foldWorkbench(this.requireSession(sessionId, at));
+    const objects: WorkbenchObject[] = folded.objects.map(o => {
+      if (o.kind === "agent") return { id: o.id, kind: "agent", title: o.title, content: null, content_available: false };
+      if (o.kind === "directory") return { id: o.id, kind: "directory", title: o.title, content: String(o.data.path), content_available: true };
+      const ref = typeof o.data.contentRef === "string" ? o.data.contentRef : null;
+      const content = ref ? this.objects.get(ref) : null;
+      return { id: o.id, kind: "note", title: o.title, content, content_available: content !== null };
+    });
+    const rows = this.db.prepare("SELECT * FROM object_views WHERE session_id = ?").all(sessionId) as ViewRow[];
+    const viewport = this.db.prepare("SELECT x, y, zoom FROM viewports WHERE session_id = ?").get(sessionId) as Viewport | undefined;
+    const meta = sessions.find(s => s.id === sessionId)!;
+    result.session = { ...meta, objects,
+      links: folded.links.map(l => ({ agent_id: l.agentId, resource_id: l.resourceId })),
+      views: rows.filter(r => objects.some(o => o.id === r.object_id)).map(r => ({
+        object_id: r.object_id, position: { x: r.x, y: r.y }, hidden: !!r.hidden, collapsed: !!r.collapsed })),
+      viewport: viewport ?? { x: 0, y: 0, zoom: 1 }, at: at ?? null };
     return snapshotSchema.parse(result);
-  }
-}
-
-function eventLabel(event: StoredEvent): string {
-  switch (event.type) {
-    case "task_created": return event.payload.title ?? "Task created";
-    case "branch_created": return "Branch created";
-    case "agent_created": return event.payload.title ?? "Agent created";
-    case "resource_created": return event.payload.title ?? "Resource added";
-    case "binding_requested": return event.payload.action === "attach" ? "Access requested" : "Access removal requested";
-    case "bindings_applied": return "Access updated";
-    case "turn_started": return "Turn started";
-    case "turn_ended": return "Turn " + event.payload.status;
-    case "operation_started": return event.payload.name;
-    case "operation_finished": return "Operation " + event.payload.status;
-    case "subagent_result_delivered": return "Agent result delivered";
-    case "config_applied": return "Configuration applied";
-    case "conversation_event": return event.payload.mutation.type;
-    case "execution_failed": return "Execution failed";
   }
 }

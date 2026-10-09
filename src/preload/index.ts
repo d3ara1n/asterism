@@ -2,23 +2,23 @@ import { contextBridge, ipcRenderer } from "electron";
 import { commandChannel, statusChannel, commandSchema, resultSchema, runtimeStatusSchema, type DesktopBridge } from "../shared/contracts.ts";
 import { configurationChannel, configurationChangedChannel, configurationCommandSchema, configurationResultSchema } from "../shared/configuration.ts";
 import { appearanceChangedChannel, appearanceGetChannel, appearancePatchSchema, appearanceSetChannel, parseAppearance } from "../shared/theme.ts";
-import { conversationChannel, conversationChangedChannel, conversationCommandSchema, conversationResultSchema, conversationChangedSchema } from "../shared/conversation.ts";
+import { sessionChannel, sessionChangedChannel, sessionCommandSchema, sessionResultSchema, sessionChangedSchema } from "../shared/session.ts";
 
 const bridge: DesktopBridge = {
-  conversation: {
+  session: {
     async execute(command) {
-      const parsed = conversationCommandSchema.safeParse(command);
-      if (!parsed.success) return { ok: false, error: { code: "invalid_request", message: "Invalid conversation command." } };
-      try { return conversationResultSchema.parse(await ipcRenderer.invoke(conversationChannel, parsed.data)); }
-      catch { return { ok: false, error: { code: "unavailable", message: "The conversation connection was lost. Reopen history before retrying." } }; }
+      const parsed = sessionCommandSchema.safeParse(command);
+      if (!parsed.success) return { ok: false, error: { code: "invalid_request", message: "Invalid session command." } };
+      try { return sessionResultSchema.parse(await ipcRenderer.invoke(sessionChannel, parsed.data)); }
+      catch { return { ok: false, error: { code: "unavailable", message: "The session connection was lost. Reopen history before retrying." } }; }
     },
     onChanged(listener) {
       const handler = (_event: Electron.IpcRendererEvent, raw: unknown) => {
-        const parsed = conversationChangedSchema.safeParse(raw);
+        const parsed = sessionChangedSchema.safeParse(raw);
         if (parsed.success) listener(parsed.data);
       };
-      ipcRenderer.on(conversationChangedChannel, handler);
-      return () => ipcRenderer.removeListener(conversationChangedChannel, handler);
+      ipcRenderer.on(sessionChangedChannel, handler);
+      return () => ipcRenderer.removeListener(sessionChangedChannel, handler);
     },
   },
   appearance: {

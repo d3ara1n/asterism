@@ -2,8 +2,8 @@ import { protocolVersion, requestSchema, type RuntimeMessage } from "../shared/c
 import { ApplicationError, type ApplicationService } from "./service.ts";
 import { configurationRequestSchema, configurationResponseSchema, configurationVersion } from "../shared/configuration.ts";
 import { ConfigurationError } from "../configuration/repository.ts";
-import { conversationRequestSchema, conversationResponseSchema, conversationVersion } from "../shared/conversation.ts";
-import { ConversationError } from "../conversation/store.ts";
+import { sessionRequestSchema, sessionResponseSchema, sessionVersion } from "../shared/session.ts";
+import { SessionError } from "../session/tree.ts";
 
 /** 配置响应独立于工作台投影，保存设置不会重新加载当前会话。 */
 export async function dispatchConfiguration(service: ApplicationService, raw: unknown): Promise<unknown | null> {
@@ -22,18 +22,18 @@ export async function dispatchConfiguration(service: ApplicationService, raw: un
   }
 }
 
-export async function dispatchConversation(service: ApplicationService, raw: unknown): Promise<unknown | null> {
-  const parsed = conversationRequestSchema.safeParse(raw);
+export async function dispatchSession(service: ApplicationService, raw: unknown): Promise<unknown | null> {
+  const parsed = sessionRequestSchema.safeParse(raw);
   if (!parsed.success) return null;
   const { id, command } = parsed.data;
   try {
-    const snapshot = await service.conversations.execute(command);
-    return conversationResponseSchema.parse({ kind: "conversation.response", version: conversationVersion, id, result: { ok: true, snapshot } });
+    const snapshot = await service.sessions.execute(command);
+    return sessionResponseSchema.parse({ kind: "session.response", version: sessionVersion, id, result: { ok: true, snapshot } });
   } catch (error) {
-    const known = error instanceof ConversationError || error instanceof ConfigurationError;
-    if (!known) console.error("Conversation command failed.");
-    return conversationResponseSchema.parse({ kind: "conversation.response", version: conversationVersion, id, result: { ok: false,
-      error: { code: known ? error.code : "internal", message: known ? error.message : "The conversation command could not be completed." } } });
+    const known = error instanceof SessionError || error instanceof ConfigurationError;
+    if (!known) console.error("Session command failed.");
+    return sessionResponseSchema.parse({ kind: "session.response", version: sessionVersion, id, result: { ok: false,
+      error: { code: known ? error.code : "internal", message: known ? error.message : "The session command could not be completed." } } });
   }
 }
 

@@ -1,7 +1,7 @@
-import type { Point, TaskSnapshot } from "../../../shared/contracts";
+import type { Point, WorkbenchSnapshot } from "../../../shared/contracts";
 
 /** 仅为新卡片寻找附近空位，不重排用户已有的位置。 */
-export function placeObject(task: TaskSnapshot, width: number, height: number): Point {
+export function placeObject(task: WorkbenchSnapshot, width: number, height: number): Point {
   const origin = {
     x: (width / 2 - task.viewport.x) / task.viewport.zoom - 170,
     y: (height / 2 - task.viewport.y) / task.viewport.zoom - 100,

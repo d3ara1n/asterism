@@ -22,12 +22,12 @@ export function Sidebar({ snapshot, status, busy, selectedTaskId, homeActive, on
     <section className="mt-6 flex min-h-0 flex-1 flex-col" aria-labelledby="conversation-list-title">
       <h2 id="conversation-list-title" className="type-label mb-2 px-2">{t.conversations}</h2>
       <div className="min-h-0 flex-1 overflow-y-auto">
-        {snapshot?.tasks.map(task => <Button key={task.id} variant={selectedTaskId === task.id ? "secondary" : "ghost"} className="w-full justify-start"
+        {snapshot?.sessions.map(task => <Button key={task.id} variant={selectedTaskId === task.id ? "secondary" : "ghost"} className="w-full justify-start"
           aria-current={selectedTaskId === task.id ? "page" : undefined} disabled={busy || status !== "ready"}
           onClick={() => onTask(task.id)} title={task.title}>
           <MessageSquare className="text-muted-foreground" /><span className="truncate">{task.title}</span>
         </Button>)}
-        {snapshot?.tasks.length === 0 && <p className="type-caption px-2 py-3">{t.noConversations}</p>}
+        {snapshot?.sessions.length === 0 && <p className="type-caption px-2 py-3">{t.noConversations}</p>}
         {!snapshot && status !== "unavailable" && <p role="status" className="type-caption px-2 py-3">{t.loadingConversations}</p>}
         {status === "unavailable" && <p role="status" className="type-caption px-2 py-3">{t.statusUnavailable}</p>}
         {!snapshot && !busy && status !== "unavailable" && <Button variant="ghost" size="sm" onClick={onRetry}>{t.retry}</Button>}

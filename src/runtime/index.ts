@@ -1,5 +1,5 @@
 import { ApplicationService } from "./service.ts";
-import { dispatch, dispatchConfiguration, dispatchConversation } from "./dispatch.ts";
+import { dispatch, dispatchConfiguration, dispatchSession } from "./dispatch.ts";
 import { protocolVersion } from "../shared/contracts.ts";
 import { SecretClient } from "./secret-client.ts";
 
@@ -12,7 +12,7 @@ try {
   const root = process.argv[2];
   if (!root) throw new Error("Application data directory is required.");
   service = new ApplicationService(root, { protector: secrets, onConfigurationChanged: () => port.postMessage({ kind: "configuration.changed" }),
-    onConversationChanged: event => port.postMessage(event) });
+    onSessionChanged: event => port.postMessage(event) });
   port.on("message", ({ data }) => {
     if (data?.kind === "shutdown") {
       secrets.close();
@@ -20,8 +20,8 @@ try {
       return;
     }
     if (secrets.receive(data)) return;
-    if (data?.kind === "conversation.request") {
-      void dispatchConversation(service, data).then(response => { if (response) port.postMessage(response); });
+    if (data?.kind === "session.request") {
+      void dispatchSession(service, data).then(response => { if (response) port.postMessage(response); });
       return;
     }
     if (data?.kind === "configuration.request") {

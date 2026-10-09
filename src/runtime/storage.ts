@@ -12,13 +12,17 @@ export function openDatabase(root: string): DatabaseSync {
     const version = (db.prepare("PRAGMA user_version").get() as { user_version: number }).user_version;
     if (version === 0) db.exec(`BEGIN IMMEDIATE;
       CREATE TABLE workspace (id TEXT PRIMARY KEY, title TEXT NOT NULL);
-      CREATE TABLE tasks (id TEXT PRIMARY KEY, branch_id TEXT NOT NULL UNIQUE, title TEXT NOT NULL, created_at TEXT NOT NULL);
+      CREATE TABLE sessions (id TEXT PRIMARY KEY, title TEXT NOT NULL, created_at TEXT NOT NULL, cursor TEXT);
+      CREATE TABLE session_nodes (
+        seq INTEGER PRIMARY KEY AUTOINCREMENT, id TEXT NOT NULL UNIQUE, session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+        parent_id TEXT, kind TEXT NOT NULL, payload TEXT NOT NULL);
+      CREATE INDEX session_nodes_session ON session_nodes(session_id, seq);
       CREATE TABLE object_views (
-        task_id TEXT NOT NULL REFERENCES tasks(id), object_id TEXT NOT NULL,
+        session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE, object_id TEXT NOT NULL,
         x REAL NOT NULL, y REAL NOT NULL, hidden INTEGER NOT NULL DEFAULT 0,
-        collapsed INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(task_id, object_id)
+        collapsed INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(session_id, object_id)
       );
-      CREATE TABLE viewports (task_id TEXT PRIMARY KEY REFERENCES tasks(id), x REAL NOT NULL, y REAL NOT NULL, zoom REAL NOT NULL);
+      CREATE TABLE viewports (session_id TEXT PRIMARY KEY REFERENCES sessions(id) ON DELETE CASCADE, x REAL NOT NULL, y REAL NOT NULL, zoom REAL NOT NULL);
       CREATE TABLE configuration_items (
         kind TEXT NOT NULL CHECK (kind IN ('provider', 'model', 'role', 'agent')),
         id TEXT NOT NULL, revision INTEGER NOT NULL CHECK (revision > 0),
@@ -26,18 +30,19 @@ export function openDatabase(root: string): DatabaseSync {
         credential_ref TEXT, PRIMARY KEY (kind, id)
       ) STRICT;
       CREATE TABLE configuration_state (id INTEGER PRIMARY KEY CHECK (id = 1)) STRICT;
-      CREATE TABLE conversation_submissions (
+      CREATE TABLE session_submissions (
         id TEXT PRIMARY KEY, command_json TEXT NOT NULL,
-        task_id TEXT NOT NULL REFERENCES tasks(id), agent_id TEXT NOT NULL
+        session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE, agent_id TEXT NOT NULL
       ) STRICT;
-      CREATE TABLE conversation_selections (
-        task_id TEXT NOT NULL REFERENCES tasks(id), agent_id TEXT NOT NULL,
+      -- 代理当前选择属于环境，不进会话树。
+      CREATE TABLE agent_selections (
+        session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE, agent_id TEXT NOT NULL,
         agent_configuration_id TEXT NOT NULL, model_id TEXT NOT NULL, thinking TEXT,
-        revision INTEGER NOT NULL DEFAULT 1, PRIMARY KEY(task_id, agent_id)
+        revision INTEGER NOT NULL DEFAULT 1, PRIMARY KEY(session_id, agent_id)
       ) STRICT;
-      PRAGMA user_version = 1;
+      PRAGMA user_version = 3;
       COMMIT;`);
-    else if (version !== 1) throw new Error("This workspace database format is not supported by this build of Weft.");
+    else if (version !== 3) throw new Error("This workspace database format is not supported by this build of Weft. Delete the development data directory to recreate it.");
     if (!db.prepare("SELECT id FROM workspace LIMIT 1").get()) {
       db.prepare("INSERT INTO workspace VALUES (?, ?)").run(randomUUID(), "Personal workspace");
     }

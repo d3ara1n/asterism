@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ConfigurationRequests, RuntimeRequests } from "./requests.ts";
 import { configurationVersion } from "../shared/configuration.ts";
+import { protocolVersion } from "../shared/contracts.ts";
 
 afterEach(() => vi.useRealTimers());
 describe("任务进程请求生命周期", () => {
@@ -9,7 +10,7 @@ describe("任务进程请求生命周期", () => {
     const requests = new ConfigurationRequests(message => sent.push(message as { id: string }), () => {});
     const pending = requests.execute({ type: "read" });
     const error = { ok: false as const, error: { code: "not_found", message: "Configuration unavailable." } };
-    requests.receive({ kind: "response", version: 1, id: sent[0]!.id, result: error });
+    requests.receive({ kind: "response", version: protocolVersion, id: sent[0]!.id, result: error });
     requests.receive({ kind: "configuration.response", version: configurationVersion, id: sent[0]!.id, result: error });
     expect(await pending).toEqual(error);
     requests.close();
@@ -30,7 +31,7 @@ describe("任务进程请求生命周期", () => {
     const sent: { id: string }[] = [];
     const requests = new RuntimeRequests(message => sent.push(message as { id: string }), () => {});
     const pending = requests.execute({ type: "workspace.read" });
-    requests.receive({ kind: "response", version: 1, id: sent[0]!.id, result: { ok: false, error: { code: "not_found", message: "Missing task." } } });
+    requests.receive({ kind: "response", version: protocolVersion, id: sent[0]!.id, result: { ok: false, error: { code: "not_found", message: "Missing task." } } });
     expect(await pending).toEqual({ ok: false, error: { code: "not_found", message: "Missing task." } });
     requests.close();
   });
@@ -38,12 +39,12 @@ describe("任务进程请求生命周期", () => {
   it("断开结算所有在途请求，后续命令不发送", async () => {
     const send = vi.fn();
     const requests = new RuntimeRequests(send, () => {});
-    const first = requests.execute({ type: "task.create", title: "Once" });
+    const first = requests.execute({ type: "workspace.read" });
     const second = requests.execute({ type: "workspace.read" });
     requests.close();
     expect((await first).ok).toBe(false);
     expect((await second).ok).toBe(false);
-    expect((await requests.execute({ type: "task.create", title: "Again" })).ok).toBe(false);
+    expect((await requests.execute({ type: "workspace.read" })).ok).toBe(false);
     expect(send).toHaveBeenCalledTimes(2);
   });
 
@@ -52,7 +53,7 @@ describe("任务进程请求生命周期", () => {
     const send = vi.fn();
     const timeout = vi.fn();
     const requests = new RuntimeRequests(send, timeout, 50);
-    const result = requests.execute({ type: "task.create", title: "Only once" });
+    const result = requests.execute({ type: "workspace.read" });
     await vi.advanceTimersByTimeAsync(50);
     expect((await result).ok).toBe(false);
     expect(send).toHaveBeenCalledTimes(1);

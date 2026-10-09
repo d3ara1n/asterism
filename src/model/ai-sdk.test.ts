@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { MockLanguageModelV4, simulateReadableStream } from "ai/test";
 import { AiSdkAdapter, sdkMessages } from "./ai-sdk.ts";
-import { modelScope } from "../shared/conversation.ts";
+import { modelScope } from "../shared/model.ts";
 import type { ModelInput, ModelEvent } from "./contract.ts";
 import { createProviderModel } from "./provider.ts";
 import { composeSystemPrompt, projectSystemPrompt } from "./system-prompt.ts";
@@ -108,7 +108,7 @@ describe("AI SDK 适配契约", () => {
     if (end.type !== "finish") throw new Error();
     const serialized = JSON.stringify(events);
     expect(serialized).toContain("signature-value"); expect(serialized).not.toContain("credential-not-for-history"); expect(serialized).not.toContain("secret-metadata");
-    const next = sdkMessages({ ...input, messages: [...input.messages, { kind: "output", parts: [], replay: end.replay, scope: modelScope(input.settings), adapter: adapter.version },
+    const next = sdkMessages({ ...input, messages: [...input.messages, { kind: "output", parts: [{ kind: "thinking", text: "Think", continuation: (events.find(e => e.type === "part.end" && e.partId === "thinking:r") as { continuation: never }).continuation }, { kind: "toolcall", callId: "call-1", name: "read", arguments: { resource_id: "note" }, continuation: null }], scope: modelScope(input.settings), adapter: adapter.version },
       { kind: "result", callId: "call-1", name: "read", outcome: { kind: "succeeded", model: "Note text", data: { userOnly: "detail" } } }] });
     expect(next.map(m => m.role)).toEqual(["user", "assistant", "tool"]);
     expect(JSON.stringify(next)).toContain("signature-value"); expect(JSON.stringify(next)).not.toContain("userOnly");
@@ -119,6 +119,6 @@ describe("AI SDK 适配契约", () => {
     const adapter = new AiSdkAdapter(async () => "credential", () => model);
     await expect((async () => { for await (const _event of adapter.prepare(input).stream(new AbortController().signal)) { /* 消费流 */ } })()).rejects.toThrow("provider request failed");
     expect(model.doStreamCalls).toHaveLength(1);
-    expect(() => sdkMessages({ ...input, messages: [{ kind: "output", parts: [], replay: {}, scope: "different-provider", adapter: adapter.version }] })).toThrow("Cross-model");
+    expect(() => sdkMessages({ ...input, messages: [{ kind: "output", parts: [], scope: "different-provider", adapter: adapter.version }] })).toThrow("Cross-model");
   });
 });

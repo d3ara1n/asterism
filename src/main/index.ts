@@ -10,7 +10,7 @@ import { followWindowAppearance, initialWindowAppearance } from "./window-appear
 import { applyThemeSource, serveAppearance } from "./appearance.ts";
 import { initialWindowState, trackWindowState } from "./window-state.ts";
 import { configurationChannel, configurationChangedChannel, configurationCommandSchema, type ConfigurationResult } from "../shared/configuration.ts";
-import { conversationChannel, conversationChangedChannel, conversationCommandSchema, type ConversationResult } from "../shared/conversation.ts";
+import { sessionChannel, sessionChangedChannel, sessionCommandSchema, type SessionResult } from "../shared/session.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 let window: BrowserWindow | null = null;
@@ -20,7 +20,7 @@ const runtime = new RuntimeHost(status => {
 }, () => {
   if (window && !window.isDestroyed()) window.webContents.send(configurationChangedChannel);
 }, event => {
-  if (window && !window.isDestroyed()) window.webContents.send(conversationChangedChannel, event);
+  if (window && !window.isDestroyed()) window.webContents.send(sessionChangedChannel, event);
 });
 
 function createWindow(): void {
@@ -52,15 +52,15 @@ function createWindow(): void {
   current.webContents.on("will-attach-webview", event => event.preventDefault());
   ipcMain.removeHandler(commandChannel);
   ipcMain.removeHandler(configurationChannel);
-  ipcMain.removeHandler(conversationChannel);
+  ipcMain.removeHandler(sessionChannel);
   const trusted = (event: Electron.IpcMainInvokeEvent) => event.sender === current.webContents &&
     event.senderFrame === current.webContents.mainFrame && event.senderFrame?.url === allowedURL;
   const stopAppearance = serveAppearance(current, trusted, () => refreshAppearance());
-  ipcMain.handle(conversationChannel, async (event, raw): Promise<ConversationResult> => {
+  ipcMain.handle(sessionChannel, async (event, raw): Promise<SessionResult> => {
     if (!trusted(event)) return { ok: false, error: { code: "invalid_request", message: "Untrusted application frame." } };
-    const parsed = conversationCommandSchema.safeParse(raw);
-    if (!parsed.success) return { ok: false, error: { code: "invalid_request", message: "Invalid conversation command." } };
-    return runtime.converse(parsed.data);
+    const parsed = sessionCommandSchema.safeParse(raw);
+    if (!parsed.success) return { ok: false, error: { code: "invalid_request", message: "Invalid session command." } };
+    return runtime.session(parsed.data);
   });
   ipcMain.handle(commandChannel, async (event, raw): Promise<CommandResult> => {
     if (event.sender !== current.webContents || event.senderFrame !== current.webContents.mainFrame ||
@@ -81,7 +81,7 @@ function createWindow(): void {
     return runtime.configure(parsed.data);
   });
   current.on("closed", () => {
-    window = null; ipcMain.removeHandler(commandChannel); ipcMain.removeHandler(configurationChannel); ipcMain.removeHandler(conversationChannel); stopAppearance();
+    window = null; ipcMain.removeHandler(commandChannel); ipcMain.removeHandler(configurationChannel); ipcMain.removeHandler(sessionChannel); stopAppearance();
   });
   const loading = developmentURL ? current.loadURL(developmentURL) : current.loadFile(rendererFile);
   loading.catch(error => { console.error("Renderer initialization failed.", error); dialog.showErrorBox("Weft", "The application window could not be loaded."); });

@@ -2,8 +2,8 @@ import { utilityProcess, type UtilityProcess } from "electron";
 import { createWriteStream, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { runtimeMessageSchema, type Command, type CommandResult, type RuntimeStatus } from "../shared/contracts.ts";
-import { ConfigurationRequests, ConversationRequests, RuntimeRequests } from "./requests.ts";
-import { conversationChangedSchema, conversationResponseSchema, type ConversationChanged, type ConversationCommand, type ConversationResult } from "../shared/conversation.ts";
+import { ConfigurationRequests, SessionRequests, RuntimeRequests } from "./requests.ts";
+import { sessionChangedSchema, sessionResponseSchema, type SessionChanged, type SessionCommand, type SessionResult } from "../shared/session.ts";
 import { configurationChangedSchema, configurationResponseSchema, type ConfigurationCommand, type ConfigurationResult } from "../shared/configuration.ts";
 import { secretRequestSchema } from "../shared/secrets.ts";
 import { handleSecretRequest } from "./secrets.ts";
@@ -12,10 +12,10 @@ export class RuntimeHost {
   private child: UtilityProcess | null = null;
   private requests: RuntimeRequests | null = null;
   private configurationRequests: ConfigurationRequests | null = null;
-  private conversationRequests: ConversationRequests | null = null;
+  private sessionRequests: SessionRequests | null = null;
   private status: RuntimeStatus = "starting";
   constructor(private readonly onStatus: (status: RuntimeStatus) => void, private readonly onConfigurationChanged: () => void = () => {},
-    private readonly onConversationChanged: (event: ConversationChanged) => void = () => {}) {}
+    private readonly onSessionChanged: (event: SessionChanged) => void = () => {}) {}
   private setStatus(status: RuntimeStatus): void { this.status = status; this.onStatus(status); }
 
   start(entry: string, root: string): Promise<void> {
@@ -42,7 +42,7 @@ export class RuntimeHost {
       this.setStatus("unavailable");
       child.kill();
     });
-    this.conversationRequests = new ConversationRequests(message => child.postMessage(message), () => {
+    this.sessionRequests = new SessionRequests(message => child.postMessage(message), () => {
       this.setStatus("unavailable");
       child.kill();
     });
@@ -51,7 +51,7 @@ export class RuntimeHost {
         this.setStatus("unavailable");
         this.requests?.close();
         this.configurationRequests?.close();
-        this.conversationRequests?.close();
+        this.sessionRequests?.close();
         child.kill();
         reject(new Error("Task runtime initialization timed out."));
       }, 15_000);
@@ -60,7 +60,7 @@ export class RuntimeHost {
         console.error("Task runtime encountered a fatal process error.");
         this.requests?.close();
         this.configurationRequests?.close();
-        this.conversationRequests?.close();
+        this.sessionRequests?.close();
         this.setStatus("unavailable");
         child.kill();
         reject(new Error("Task runtime encountered a fatal process error."));
@@ -76,9 +76,9 @@ export class RuntimeHost {
         }
         if (configurationChangedSchema.safeParse(raw).success) { this.onConfigurationChanged(); return; }
         if (configurationResponseSchema.safeParse(raw).success) { this.configurationRequests?.receive(raw); return; }
-        const conversation = conversationChangedSchema.safeParse(raw);
-        if (conversation.success) { this.onConversationChanged(conversation.data); return; }
-        if (conversationResponseSchema.safeParse(raw).success) { this.conversationRequests?.receive(raw); return; }
+        const conversation = sessionChangedSchema.safeParse(raw);
+        if (conversation.success) { this.onSessionChanged(conversation.data); return; }
+        if (sessionResponseSchema.safeParse(raw).success) { this.sessionRequests?.receive(raw); return; }
         const parsed = runtimeMessageSchema.safeParse(raw);
         if (!parsed.success) return;
         if (parsed.data.kind === "ready") {
@@ -91,7 +91,7 @@ export class RuntimeHost {
           this.setStatus("unavailable");
           this.requests?.close();
           this.configurationRequests?.close();
-          this.conversationRequests?.close();
+          this.sessionRequests?.close();
           child.kill();
           reject(new Error(parsed.data.message));
         } else this.requests?.receive(raw);
@@ -102,7 +102,7 @@ export class RuntimeHost {
         this.child = null;
         this.requests?.close();
         this.configurationRequests?.close();
-        this.conversationRequests?.close();
+        this.sessionRequests?.close();
         if (this.status !== "stopping") this.setStatus("unavailable");
         reject(new Error("Task runtime exited with code " + code));
       });
@@ -123,18 +123,18 @@ export class RuntimeHost {
     return this.configurationRequests.execute(command);
   }
 
-  converse(command: ConversationCommand): Promise<ConversationResult> {
-    if (this.status !== "ready" || !this.conversationRequests) return Promise.resolve({
-      ok: false, error: { code: "unavailable", message: "Conversation service is unavailable. Restart Weft." },
+  session(command: SessionCommand): Promise<SessionResult> {
+    if (this.status !== "ready" || !this.sessionRequests) return Promise.resolve({
+      ok: false, error: { code: "unavailable", message: "Session service is unavailable. Restart Weft." },
     });
-    return this.conversationRequests.execute(command);
+    return this.sessionRequests.execute(command);
   }
 
   stop(): Promise<void> {
     this.setStatus("stopping");
     this.requests?.close("Weft is shutting down.");
     this.configurationRequests?.close("Weft is shutting down.");
-    this.conversationRequests?.close("Weft is shutting down.");
+    this.sessionRequests?.close("Weft is shutting down.");
     const child = this.child;
     if (!child) return Promise.resolve();
     return new Promise(resolve => {

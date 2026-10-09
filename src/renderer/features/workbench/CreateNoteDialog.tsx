@@ -16,7 +16,7 @@ export function CreateNoteDialog({ creation, busy, run, onClose }: {
   return <Dialog open onOpenChange={open => { if (!open) onClose(); }}><DialogContent><DialogHeader><DialogTitle>{t.createNoteTitle}</DialogTitle><DialogDescription>{t.createNoteDescription}</DialogDescription></DialogHeader>
     <form onSubmit={event => {
       event.preventDefault();
-      const command: Command = { type: "note.create", task_id: creation.taskId, title, content, position: creation.position };
+      const command: Command = { type: "note.create", session_id: creation.taskId, title, content, position: creation.position };
       void run(command).then(saved => { if (saved) onClose(); });
     }} className="flex flex-col gap-5">
       <FieldGroup><Field><FieldLabel htmlFor="create-name">{t.name}</FieldLabel><Input id="create-name" autoFocus required maxLength={160} value={title} onChange={e => setTitle(e.target.value)} /></Field>

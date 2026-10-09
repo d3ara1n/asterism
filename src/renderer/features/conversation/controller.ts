@@ -1,58 +1,64 @@
-import type { ConversationBridge, ConversationCommand, ConversationResult, ConversationSnapshot } from "../../../shared/conversation.ts";
+import type { SessionBridge, SessionCommand, SessionResult, SessionSnapshot } from "../../../shared/session.ts";
 
-/** inspected 为正在查看的历史节点；只是视图位置，不改变 runtime 游标。 */
-export type ConversationState = { snapshot: ConversationSnapshot | null; loading: boolean; busy: boolean; error: string | null; missing: boolean; inspected?: string };
-/** 订阅在查询前建立，合并密集通知；只接受不倒退的已提交版本，卸载不取消模型执行。 */
-export class ConversationController {
-  private state: ConversationState = { snapshot: null, loading: true, busy: false, error: null, missing: false };
+/** inspected 为正在查看的历史节点；只是视图位置，不改变会话游标。 */
+export type SessionViewState = { snapshot: SessionSnapshot | null; loading: boolean; busy: boolean; error: string | null; missing: boolean; inspected?: string };
+/** 每个会话一个控制器：订阅先于查询，合并密集通知；只接受不倒退的版本，卸载不取消执行。 */
+export class SessionController {
+  private state: SessionViewState = { snapshot: null, loading: true, busy: false, error: null, missing: false };
   private listeners = new Set<() => void>();
   private generation = 0;
-  private connected = false;
+  private connections = 0;
   private reading = false;
   private dirty = false;
-  constructor(private readonly bridge: ConversationBridge, readonly taskId: string, readonly agentId: string) {}
-  getSnapshot = (): ConversationState => this.state;
+  private unsubscribe: (() => void) | null = null;
+  constructor(private readonly bridge: SessionBridge, readonly sessionId: string) {}
+  getSnapshot = (): SessionViewState => this.state;
   inspect = (nodeId: string | undefined): void => this.update({ inspected: nodeId });
   subscribe = (listener: () => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; };
-  private update(patch: Partial<ConversationState>) { this.state = { ...this.state, ...patch }; this.listeners.forEach(listener => listener()); }
-  private accept(snapshot: ConversationSnapshot) {
-    if (snapshot.taskId !== this.taskId || snapshot.agentId !== this.agentId || snapshot.seq < (this.state.snapshot?.seq ?? 0)
-      || snapshot.selectionRevision < (this.state.snapshot?.selectionRevision ?? 0)) return;
+  private update(patch: Partial<SessionViewState>) { this.state = { ...this.state, ...patch }; this.listeners.forEach(listener => listener()); }
+  private accept(snapshot: SessionSnapshot) {
+    const current = this.state.snapshot;
+    if (snapshot.sessionId !== this.sessionId || snapshot.seq < (current?.seq ?? 0) || snapshot.selectionRevision < (current?.selectionRevision ?? 0)) return;
     this.update({ snapshot, loading: false, missing: false });
   }
+  /** 卡片与历史浮岛可同时连接；最后一个断开才停止订阅。 */
   connect(): () => void {
-    this.connected = true;
-    const generation = ++this.generation;
-    const unsubscribe = this.bridge.onChanged(event => {
-      if (event.taskId === this.taskId && event.agentId === this.agentId
-        && (event.seq > (this.state.snapshot?.seq ?? 0) || event.selectionRevision > (this.state.snapshot?.selectionRevision ?? 0))) void this.refresh();
-    });
-    void this.refresh();
+    if (this.connections++ === 0) {
+      this.generation++;
+      this.unsubscribe = this.bridge.onChanged(event => {
+        const current = this.state.snapshot;
+        if (event.sessionId === this.sessionId && (event.seq > (current?.seq ?? 0) || event.selectionRevision > (current?.selectionRevision ?? 0))) void this.refresh();
+      });
+      void this.refresh();
+    }
+    let open = true;
     return () => {
-      unsubscribe();
-      if (generation !== this.generation) return;
-      this.connected = false; this.generation++; this.reading = false;
+      if (!open) return;
+      open = false;
+      if (--this.connections > 0) return;
+      this.unsubscribe?.(); this.unsubscribe = null;
+      this.generation++; this.reading = false;
     };
   }
   refresh = async (): Promise<void> => {
-    if (!this.connected) return;
+    if (!this.connections) return;
     if (this.reading) { this.dirty = true; return; }
     const generation = this.generation;
     this.reading = true;
     try {
       do {
         this.dirty = false;
-        const result = await this.bridge.execute({ type: "read", taskId: this.taskId, agentId: this.agentId });
+        const result = await this.bridge.execute({ type: "read", sessionId: this.sessionId });
         if (generation !== this.generation) return;
         if (result.ok) { this.accept(result.snapshot); this.update({ error: null }); }
         else { this.update({ loading: false, error: result.error.message, missing: result.error.code === "not_found" }); break; }
       } while (this.dirty);
     } catch {
-      if (generation === this.generation) this.update({ loading: false, error: "The conversation connection was lost. Reload to read saved progress." });
+      if (generation === this.generation) this.update({ loading: false, error: "The session connection was lost. Reload to read saved progress." });
     } finally { if (generation === this.generation) this.reading = false; }
   };
-  execute = async (command: ConversationCommand): Promise<ConversationResult> => {
-    if (this.state.busy) return { ok: false, error: { code: "conflict", message: "A conversation command is already pending." } };
+  execute = async (command: SessionCommand): Promise<SessionResult> => {
+    if (this.state.busy) return { ok: false, error: { code: "conflict", message: "A session command is already pending." } };
     this.update({ busy: true, error: null });
     try {
       const result = await this.bridge.execute(command);
@@ -60,7 +66,7 @@ export class ConversationController {
       else this.update({ error: result.error.message });
       return result;
     } catch {
-      const result: ConversationResult = { ok: false, error: { code: "unavailable", message: "The conversation connection was lost. Reload before retrying." } };
+      const result: SessionResult = { ok: false, error: { code: "unavailable", message: "The session connection was lost. Reload before retrying." } };
       this.update({ error: result.error.message }); return result;
     } finally { this.update({ busy: false }); }
   };

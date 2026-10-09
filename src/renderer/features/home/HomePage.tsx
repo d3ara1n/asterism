@@ -8,9 +8,9 @@ import { InputGroup, InputGroupAddon, InputGroupTextarea } from "../../shared/ui
 import { Showcase, showcaseSpell } from "../showcase/Showcase";
 import { WeftMark } from "../../shared/ui/weft-mark";
 import { s, useConfiguration } from "../configuration/state";
-import type { ConversationCommand } from "../../../shared/conversation";
+import type { SessionCommand } from "../../../shared/session";
 
-export type StartInput = Omit<Extract<ConversationCommand, { type: "start" }>, "type" | "submissionId">;
+export type StartInput = Omit<Extract<SessionCommand, { type: "start" }>, "type" | "submissionId">;
 
 /** 应用级草稿入口；取用配置填入选择，但不订阅角色变化去刷新已选 agent 的默认值。 */
 export function HomePage({ active, draft, onDraftChange, onSettings, ready, busy, submitError, onStart }: {

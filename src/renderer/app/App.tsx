@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { ArrowLeft, ChevronDown, FileText, History, House, KeyRound, ListTree, PanelLeft, Settings, X } from "lucide-react";
+import { ArrowLeft, ChevronDown, FileText, Folder, History, House, KeyRound, ListTree, PanelLeft, Settings, X } from "lucide-react";
 import type { Command } from "../../shared/contracts";
 import type { ApplicationController } from "./controller";
 import { t } from "../shared/i18n";
@@ -11,6 +11,7 @@ import { Alert, AlertDescription } from "../shared/ui/alert";
 import { SettingsPage } from "../features/settings/SettingsPage";
 import { HomePage, type StartInput } from "../features/home/HomePage";
 import { Workbench, type WorkbenchHandle } from "../features/workbench/Workbench";
+import { AddDirectoryDialog } from "../features/workbench/AddDirectoryDialog";
 import { AccessDialog } from "../features/workbench/AccessDialog";
 import { CreateNoteDialog, type NoteCreation } from "../features/workbench/CreateNoteDialog";
 import { SubmissionIdentity } from "../features/conversation/controller";
@@ -38,6 +39,7 @@ export function App({ controller }: { controller: ApplicationController }) {
   const [conversationDrafts, setConversationDrafts] = useState<Record<string, string>>({});
   const [creation, setCreation] = useState<NoteCreation | null>(null);
   const [accessOpen, setAccessOpen] = useState(false);
+  const [directory, setDirectory] = useState<NoteCreation | null>(null);
   const start = useStart();
   // 每次导航递增；异步创建完成时据此判断用户是否已离开，不夺走当前视图。
   const navigation = useRef(0);
@@ -45,12 +47,12 @@ export function App({ controller }: { controller: ApplicationController }) {
   useEffect(() => controller.connect(), [controller]);
   const snapshot = state.snapshot;
   // 晚到响应不能把首页或另一个会话替换为旧工作台。
-  const task = view.kind === "conversation" && snapshot?.task?.id === view.taskId ? snapshot.task : null;
+  const task = view.kind === "conversation" && snapshot?.session?.id === view.taskId ? snapshot.session : null;
   const ready = state.status === "ready";
-  const writable = ready && !state.busy && !!task && !task.historical;
+  const writable = ready && !state.busy && !!task && !task.at;
   const inSettings = page === "settings";
   const mainTitle = view.kind === "home" ? t.home
-    : task?.title ?? snapshot?.tasks.find(item => item.id === view.taskId)?.title ?? t.conversation;
+    : task?.title ?? snapshot?.sessions.find(item => item.id === view.taskId)?.title ?? t.conversation;
 
   const focusMain = () => requestAnimationFrame(() => document.getElementById("screen-main")?.focus({ preventScroll: true }));
   const go = (next: PageId) => {
@@ -70,7 +72,7 @@ export function App({ controller }: { controller: ApplicationController }) {
   });
   const navigate = (next: MainView) => {
     navigation.current++;
-    setView(next); setPage("main"); setCreation(null); setAccessOpen(false);
+    setView(next); setPage("main"); setCreation(null); setDirectory(null); setAccessOpen(false);
     controller.clearError();
     focusMain();
   };
@@ -81,7 +83,7 @@ export function App({ controller }: { controller: ApplicationController }) {
   };
   const openTask = (taskId: string) => {
     navigate({ kind: "conversation", taskId });
-    void run({ type: "workspace.read", task_id: taskId });
+    void run({ type: "workspace.read", session_id: taskId });
   };
   const startConversation = async (input: StartInput) => {
     if (!ready) return;
@@ -90,8 +92,9 @@ export function App({ controller }: { controller: ApplicationController }) {
     if (!created) return;
     setDraft("");
     if (token === navigation.current) openTask(created);
-    else void run({ type: "workspace.read", ...(view.kind === "conversation" ? { task_id: view.taskId } : {}) });
+    else void run({ type: "workspace.read", ...(view.kind === "conversation" ? { session_id: view.taskId } : {}) });
   };
+  const addDirectory = () => { const placement = workbench.current?.notePlacement(); if (placement) setDirectory(placement); };
   const addNote = () => { const placement = workbench.current?.notePlacement(); if (placement) setCreation(placement); };
   const hideSidebar = () => {
     setSidebarVisible(false);
@@ -112,18 +115,19 @@ export function App({ controller }: { controller: ApplicationController }) {
       </DropdownMenuContent></DropdownMenu>}
     <span className="h-4 w-px shrink-0 bg-border" />
     <span className="window-task-title" title={inSettings ? t.settings : mainTitle}>{inSettings ? t.settings : mainTitle}</span>
-    {!inSettings && task && <Button size="sm" variant="ghost" onClick={event => workbench.current?.togglePanel("history", event.currentTarget)}><History />{t.history}</Button>}
   </>;
   const actions = task ? <>
     <Button variant="ghost" size="sm" disabled={!writable} onClick={addNote} aria-label={t.addNoteLabel}><FileText /><span className="toolbar-label">{t.addNote}</span></Button>
+    <Button variant="ghost" size="sm" disabled={!writable} onClick={addDirectory} aria-label={s("Add directory", "添加目录")}><Folder /><span className="toolbar-label">{s("Directory", "目录")}</span></Button>
     <Button variant="ghost" size="sm" disabled={!writable} onClick={() => setAccessOpen(true)} aria-label={t.accessLabel}><KeyRound /><span className="toolbar-label">{t.access}</span></Button>
     <Button variant="ghost" size="sm" onClick={event => workbench.current?.togglePanel("objects", event.currentTarget)} aria-label={t.objects}><ListTree /><span className="toolbar-label">{t.objects}</span></Button>
+    <Button variant="ghost" size="sm" onClick={event => workbench.current?.togglePanel("history", event.currentTarget)} aria-label={t.history}><History /><span className="toolbar-label">{t.history}</span></Button>
   </> : undefined;
 
   const conversation = task
     ? <Workbench key={task.id} ref={workbench} task={task} ready={ready} busy={state.busy} run={run}
       draft={conversationDrafts[task.id] ?? ""} onDraftChange={value => setConversationDrafts(drafts => ({ ...drafts, [task.id]: value }))}
-      onHome={goHome} onTurnEnded={() => { void run({ type: "workspace.read", task_id: task.id }); }} />
+      onHome={goHome} onTurnEnded={() => { void run({ type: "workspace.read", session_id: task.id }); }} />
     : <div className="flex h-full items-center justify-center px-6"><div>
       <PageState kind={state.busy ? "loading" : "error"} title={state.busy ? t.openingTitle : t.unavailableTitle}
         body={state.busy ? t.openingBody : t.unavailableBody} />
@@ -166,6 +170,7 @@ export function App({ controller }: { controller: ApplicationController }) {
       <Button variant="ghost" size="icon-xs" aria-label={t.dismissError} title={t.dismissError} onClick={controller.clearError}><X /></Button>
     </Alert>}
     {creation && <CreateNoteDialog creation={creation} busy={state.busy} run={run} onClose={() => setCreation(null)} />}
+    {directory && <AddDirectoryDialog creation={directory} busy={state.busy} run={run} onClose={() => setDirectory(null)} />}
     {accessOpen && task && <AccessDialog task={task} busy={state.busy} run={run} onClose={() => setAccessOpen(false)} />}
   </>;
 }
@@ -180,10 +185,10 @@ function useStart() {
     if (pending.current) return null;
     pending.current = true; setBusy(true); setError(null);
     try {
-      const result = await window.weft.conversation.execute({ type: "start", ...input, submissionId: identity.current.forInput(input) });
+      const result = await window.weft.session.execute({ type: "start", ...input, submissionId: identity.current.forInput(input) });
       if (!result.ok) { setError(result.error.message); return null; }
       identity.current.accepted();
-      return result.snapshot.taskId;
+      return result.snapshot.sessionId;
     } catch {
       setError(s("The connection was lost. Retry the same message to recover the submitted conversation.", "连接中断。重试相同消息可找回已提交的会话。"));
       return null;

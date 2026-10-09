@@ -1,9 +1,9 @@
 import { createContext, createElement, useContext, useSyncExternalStore, type ReactNode } from "react";
-import type { Command, TaskSnapshot } from "../../../shared/contracts";
+import type { Command, WorkbenchSnapshot } from "../../../shared/contracts";
 
 /** 工作台向卡片与更深浮岛提供的环境；卡片节点数据只保留对象与视图状态。 */
 export interface WorkbenchEnvironment {
-  task: TaskSnapshot;
+  task: WorkbenchSnapshot;
   ready: boolean;
   busy: boolean;
   run: (command: Command) => Promise<boolean>;
@@ -12,8 +12,6 @@ export interface WorkbenchEnvironment {
   onDraftChange: (value: string) => void;
   onHome: () => void;
   onTurnEnded: () => void;
-  /** 在工作台右侧打开代理的对话历史浮岛。 */
-  openConversationHistory: (agentId: string, origin: HTMLElement | null) => void;
 }
 
 /**

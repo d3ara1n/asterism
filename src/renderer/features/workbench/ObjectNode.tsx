@@ -1,9 +1,10 @@
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
-import { Bot, FileText } from "lucide-react";
+import { Bot, FileText, Folder } from "lucide-react";
 import type { WorkbenchObject } from "../../../shared/contracts";
 import { t } from "../../shared/i18n";
+import { s } from "../configuration/state";
 import { Conversation, ConversationActions } from "../conversation/Conversation";
-import { conversationSession } from "../conversation/session";
+import { agentView } from "../conversation/registry";
 import { ObjectCard } from "./ObjectCard";
 import { useWorkbench } from "./context";
 
@@ -22,9 +23,9 @@ export function ObjectNode({ data, selected }: NodeProps<ObjectNodeType>) {
   return <>
     <Handle type={object.kind === "agent" ? "target" : "source"} position={object.kind === "agent" ? Position.Left : Position.Right} isConnectable={false} />
     {object.kind === "agent" ? <AgentCard agentId={object.id} {...card} />
-      : <ObjectCard icon={<FileText className="size-4" />} kind={t.kindNote} width={cardSize.object.width} {...card}>
+      : <ObjectCard icon={object.kind === "directory" ? <Folder className="size-4" /> : <FileText className="size-4" />} kind={object.kind === "directory" ? s("Directory", "目录") : t.kindNote} width={cardSize.object.width} {...card}>
         <div className="max-h-80 select-text overflow-auto p-3">
-          {object.content_available
+          {object.kind === "directory" ? <p className="type-body break-all font-mono text-xs">{object.content}</p> : object.content_available
             ? <p className="type-body whitespace-pre-wrap break-words">{object.content}</p>
             : <p className="type-body text-muted-foreground">{t.contentUnavailable}</p>}
         </div>
@@ -34,10 +35,10 @@ export function ObjectNode({ data, selected }: NodeProps<ObjectNodeType>) {
 
 function AgentCard({ agentId, ...card }: { agentId: string; title: string; collapsed: boolean; historical: boolean; selected: boolean; onView: ObjectNodeType["data"]["onView"] }) {
   const workbench = useWorkbench();
-  const session = conversationSession(workbench.task.id, agentId);
+  const view = agentView(workbench.task.id, agentId);
   return <ObjectCard icon={<Bot className="size-4" />} kind={t.kindAgent} {...cardSize.agent} {...card}
-    actions={<ConversationActions session={session} ready={workbench.ready} onHistory={origin => workbench.openConversationHistory(agentId, origin)} />}>
-    <Conversation session={session} ready={workbench.ready} draft={workbench.draft} onDraftChange={workbench.onDraftChange}
+    actions={<ConversationActions view={view} ready={workbench.ready} />}>
+    <Conversation view={view} ready={workbench.ready} draft={workbench.draft} onDraftChange={workbench.onDraftChange}
       onHome={workbench.onHome} onTurnEnded={workbench.onTurnEnded} />
   </ObjectCard>;
 }

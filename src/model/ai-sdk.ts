@@ -1,5 +1,5 @@
 import { jsonSchema as sdkJsonSchema, streamText, tool, type ModelMessage, type ToolSet, type AssistantModelMessage, type LanguageModel } from "ai";
-import { jsonSchema, modelScope, type Json, type Usage } from "../shared/conversation.ts";
+import { jsonSchema, modelScope, type Json, type Usage } from "../shared/model.ts";
 import { ModelFailure, type ModelAdapter, type ModelEvent, type ModelInput, type PreparedModel } from "./contract.ts";
 import { createProviderModel, validateProviderTransport } from "./provider.ts";
 import { projectSystemPrompt } from "./system-prompt.ts";
@@ -19,21 +19,18 @@ function providerOptions(input: ModelInput): Record<string, Record<string, Json>
   return { openai: { ...(provider.protocol === "openai-responses" ? { store: false, include: ["reasoning.encrypted_content"] } : {}),
     ...(reasoningFor(input) ? { reasoningEffort: reasoningFor(input)! } : {}) } };
 }
-/** 只保留白名单续接资料，不持久化原始 HTTP 请求、响应头或错误对象。 */
-function replayMessage(message: AssistantModelMessage): Json {
-  if (typeof message.content === "string") return json(message);
-  return json({ role: "assistant", content: message.content.map(part => {
-    if (part.type !== "text" && part.type !== "reasoning" && part.type !== "tool-call") throw new ModelFailure("unsupported_content", "This response contains unsupported content and cannot be continued safely.");
-    const options: Record<string, Record<string, Json>> = {};
-    for (const [provider, keys] of Object.entries({ anthropic: ["signature", "redactedData"], openai: ["itemId", "reasoningEncryptedContent", "phase"] })) {
-      const source = part.providerOptions?.[provider];
-      if (!source || typeof source !== "object" || Array.isArray(source)) continue;
-      const picked: Record<string, Json> = {};
-      for (const key of keys) if (source[key] !== undefined) picked[key] = json(source[key]);
-      if (Object.keys(picked).length) options[provider] = picked;
-    }
-    return { ...part, providerOptions: options };
-  }) });
+/** 只保留白名单续接资料，不持久化原始 HTTP、响应头或未筛选的 provider metadata。 */
+export function pickContinuation(metadata: unknown): Json {
+  const options: Record<string, Record<string, Json>> = {};
+  if (!metadata || typeof metadata !== "object") return options;
+  for (const [provider, keys] of Object.entries({ anthropic: ["signature", "redactedData"], openai: ["itemId", "reasoningEncryptedContent", "phase"] })) {
+    const source = (metadata as Record<string, unknown>)[provider];
+    if (!source || typeof source !== "object" || Array.isArray(source)) continue;
+    const picked: Record<string, Json> = {};
+    for (const key of keys) { const v = (source as Record<string, unknown>)[key]; if (v !== undefined) picked[key] = json(v); }
+    if (Object.keys(picked).length) options[provider] = picked;
+  }
+  return options;
 }
 export function sdkMessages(input: ModelInput): ModelMessage[] {
   const messages: ModelMessage[] = [];
@@ -41,10 +38,13 @@ export function sdkMessages(input: ModelInput): ModelMessage[] {
   for (const item of input.messages) {
     if (item.kind === "input" || item.kind === "context") messages.push({ role: "user", content: item.text });
     if (item.kind === "output") {
-      if (item.adapter !== "ai-sdk-v7/1") throw new ModelFailure("replay_version", "The saved response needs a compatible protocol adapter.");
+      if (item.adapter !== "ai-sdk-v7/2") throw new ModelFailure("replay_version", "The saved response needs a compatible protocol adapter.");
       if (item.scope !== scope) throw new ModelFailure("model_switch", "Cross-model continuation is not supported yet. Start from a history position before the model output.");
-      if (!item.replay) throw new ModelFailure("missing_replay", "The response is missing protocol continuation data.");
-      messages.push(item.replay as unknown as AssistantModelMessage);
+      messages.push({ role: "assistant", content: item.parts.map(p => {
+        const providerOptions = (p.continuation ?? {}) as Record<string, Record<string, never>>;
+        return p.kind === "toolcall" ? { type: "tool-call" as const, toolCallId: p.callId, toolName: p.name, input: p.arguments, providerOptions }
+          : { type: p.kind === "text" ? "text" as const : "reasoning" as const, text: p.text, providerOptions };
+      }) } as AssistantModelMessage);
     }
     if (item.kind === "result") {
       const outcome = item.outcome;
@@ -60,7 +60,7 @@ export function sdkMessages(input: ModelInput): ModelMessage[] {
   return messages;
 }
 export class AiSdkAdapter implements ModelAdapter {
-  readonly version = "ai-sdk-v7/1";
+  readonly version = "ai-sdk-v7/2";
   constructor(private readonly readCredential: (providerId: string) => Promise<string | null>,
     private readonly languageModelFactory?: (input: ModelInput, key: string) => LanguageModel) {}
   prepare(input: ModelInput): PreparedModel {
@@ -89,24 +89,24 @@ export class AiSdkAdapter implements ModelAdapter {
     for await (const event of result.stream) {
       switch (event.type) {
         case "text-start": case "reasoning-start":
-          yield { type: "part.start", part: { id: `${event.type === "text-start" ? "text" : "thinking"}:${event.id}`, kind: event.type === "text-start" ? "text" : "thinking", text: "", complete: false } }; break;
+          yield { type: "part.start", part: { id: `${event.type === "text-start" ? "text" : "thinking"}:${event.id}`, kind: event.type === "text-start" ? "text" : "thinking" } }; break;
         case "text-delta": case "reasoning-delta":
           yield { type: "part.delta", partId: `${event.type === "text-delta" ? "text" : "thinking"}:${event.id}`, delta: event.text }; break;
         case "text-end": case "reasoning-end":
-          yield { type: "part.end", partId: `${event.type === "text-end" ? "text" : "thinking"}:${event.id}` }; break;
+          yield { type: "part.end", partId: `${event.type === "text-end" ? "text" : "thinking"}:${event.id}`, continuation: pickContinuation(event.providerMetadata) }; break;
         case "tool-input-start":
           if (event.providerExecuted) throw new ModelFailure("server_tool", "Provider-executed tools are not supported.");
           calls.add(event.id);
-          yield { type: "part.start", part: { id: `tool:${event.id}`, kind: "tool", callId: event.id, name: event.toolName, argumentsText: "", arguments: null, complete: false, execution: "proposed", outcome: null } }; break;
+          yield { type: "part.start", part: { id: `tool:${event.id}`, kind: "toolcall", callId: event.id, name: event.toolName } }; break;
         case "tool-input-delta": yield { type: "part.delta", partId: `tool:${event.id}`, delta: event.delta }; break;
         case "tool-call":
           if (event.providerExecuted) throw new ModelFailure("invalid_tool_call", "Provider-executed tools are not supported.");
           if (event.invalid) rejectedBySdk.add(event.toolCallId);
           if (!calls.has(event.toolCallId)) {
             calls.add(event.toolCallId);
-            yield { type: "part.start", part: { id: `tool:${event.toolCallId}`, kind: "tool", callId: event.toolCallId, name: event.toolName, argumentsText: JSON.stringify(event.input), arguments: null, complete: false, execution: "proposed", outcome: null } };
+            yield { type: "part.start", part: { id: `tool:${event.toolCallId}`, kind: "toolcall", callId: event.toolCallId, name: event.toolName } };
           }
-          yield { type: "part.end", partId: `tool:${event.toolCallId}`, arguments: json(event.input) }; break;
+          yield { type: "part.end", partId: `tool:${event.toolCallId}`, arguments: json(event.input), continuation: pickContinuation(event.providerMetadata) }; break;
         case "error": throw new ModelFailure("provider_error", "The provider request failed. Check provider configuration and connectivity.");
         case "abort": throw new ModelFailure("cancelled", "The provider stream was cancelled.");
         case "tool-error":
@@ -125,8 +125,6 @@ export class AiSdkAdapter implements ModelAdapter {
     }
     if (!finish) throw new ModelFailure("interrupted", "The provider stream ended without a finish event.");
     const response = await result.response;
-    const assistants = response.messages.filter((m): m is AssistantModelMessage => m.role === "assistant");
-    if (assistants.length !== 1) throw new ModelFailure("response_shape", "Expected exactly one assistant response.");
-    yield { type: "finish", ...finish, responseId: response.id, replay: replayMessage(assistants[0]!) };
+    yield { type: "finish", ...finish, responseId: response.id };
   }
 }
