@@ -57,7 +57,7 @@ function RoleEditor({ initialId }: { initialId: string | null }) {
     <OverrideToggleField label={s("Hide from agent model-role selection", "不向代理开放为可选模型角色")} value={value.hidden} inherited={base.hidden} onChange={next => set("hidden", next)} />
   </FieldGroup><SaveActions cannotRemove={current?.builtin} onReset={() => setValue(current?.builtin ? {} : { name: value.name })} onRemove={current ? async () => {
     const result = await run({ type: "remove", kind: "role", id: current.id });
-    if (result.ok) island.close();
+    if (result.ok) void island.close({ force: true });
   } : undefined} /></fieldset></form></Editor>;
 }
 export function AgentsSettings() {
@@ -144,6 +144,6 @@ function AgentEditor({ initialId }: { initialId: string | null }) {
     setToolDrafts({ allow: undefined, exclude: undefined }); setDelegateDraft(undefined);
   }} onRemove={current ? async () => {
     const result = await run({ type: "remove", kind: "agent", id: current.id });
-    if (result.ok) island.close();
+    if (result.ok) void island.close({ force: true });
   } : undefined} /></fieldset></form></Editor>;
 }

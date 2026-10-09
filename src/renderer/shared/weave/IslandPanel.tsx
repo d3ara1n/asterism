@@ -20,7 +20,7 @@ export function IslandPanel({ title, description, action, children }: {
         {description && <p className="type-caption truncate">{description}</p>}
       </div>
       {action}
-      <Button variant="ghost" size="icon-sm" aria-label={t.close} title={t.close} onClick={island.close}><X /></Button>
+      <Button variant="ghost" size="icon-sm" aria-label={t.close} title={t.close} onClick={() => void island.close()}><X /></Button>
     </header>
     <div className="island-panel-content">{children}</div>
   </div>;

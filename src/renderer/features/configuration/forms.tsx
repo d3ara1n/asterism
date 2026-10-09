@@ -1,7 +1,10 @@
-import { useId, type ReactNode } from "react";
+import { useId, useState, type ReactNode } from "react";
+import { Trash2 } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "../../shared/ui/alert-dialog";
 import { Alert, AlertDescription } from "../../shared/ui/alert";
 import { Button } from "../../shared/ui/button";
 import { IslandPanel } from "../../shared/weave/IslandPanel";
+import { useCloseGuard } from "../../shared/weave/Screen";
 import { Field, FieldDescription, FieldLabel } from "../../shared/ui/field";
 import { Input } from "../../shared/ui/input";
 import { Textarea } from "../../shared/ui/textarea";
@@ -90,13 +93,45 @@ export function OverrideListField({ label, value, inherited, onChange, empty, hi
 }
 /**
  * 配置编辑器：套用面板浮岛；保存位于标题栏，经 form 属性提交内容区中的表单。
- * TODO: 配置能力实际接入时，保存按钮改为「有修改且校验通过」才可用（需各编辑器跟踪修改），目前仅在保存中禁用。
+ * 传入 dirty 时：无修改禁用保存；有修改时关闭本浮岛（含上级关闭或替换）先确认放弃。
  */
-export function Editor({ title, form, children }: { title: string; form: string; children: ReactNode }) {
+export interface RemoveAction { title: string; description: string; onConfirm: () => void }
+export function Editor({ title, description, form, dirty, remove, children }: { title: string; description?: string; form: string; dirty?: boolean; remove?: RemoveAction; children: ReactNode }) {
   const { busy } = useSettingsConfiguration();
-  return <IslandPanel title={title}
-    action={<Button type="submit" form={form} size="sm" disabled={busy}>{busy ? s("Saving…", "正在保存…") : s("Save", "保存")}</Button>}>
+  const [asking, setAsking] = useState<((discard: boolean) => void) | null>(null);
+  const [removing, setRemoving] = useState(false);
+  useCloseGuard(dirty ? () => new Promise<boolean>(resolve => setAsking(() => resolve)) : null);
+  const answer = (discard: boolean) => { asking?.(discard); setAsking(null); };
+  return <IslandPanel title={title} description={description}
+    action={<>
+      {remove && <Button type="button" variant="ghost" size="icon-sm" className="text-destructive" aria-label={s("Delete", "删除")} title={s("Delete", "删除")} disabled={busy} onClick={() => setRemoving(true)}><Trash2 /></Button>}
+      <Button type="submit" form={form} size="sm" disabled={busy || dirty === false}>{busy ? s("Saving…", "正在保存…") : s("Save", "保存")}</Button>
+    </>}>
     <ConfigurationStatus />{children}
+    {remove && <AlertDialog open={removing} onOpenChange={setRemoving}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{remove.title}</AlertDialogTitle>
+          <AlertDialogDescription>{remove.description}</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>{s("Cancel", "取消")}</AlertDialogCancel>
+          <AlertDialogAction variant="destructive" onClick={remove.onConfirm}>{s("Delete", "删除")}</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>}
+    <AlertDialog open={asking !== null} onOpenChange={open => { if (!open) answer(false); }}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{s("Discard unsaved changes?", "放弃未保存的修改？")}</AlertDialogTitle>
+          <AlertDialogDescription>{s("Changes in “{title}” have not been saved.", "「{title}」中的修改尚未保存。").replace("{title}", title)}</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>{s("Keep editing", "继续编辑")}</AlertDialogCancel>
+          <AlertDialogAction variant="destructive" onClick={() => answer(true)}>{s("Discard", "放弃")}</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   </IslandPanel>;
 }
 /** 次要的删除操作随表单内容放在末尾。 */

@@ -43,9 +43,8 @@ function SettingsRoot({ openId, onOpen, onClosed }: { openId: string | null; onO
   const open = categories.find(category => category.id === openId);
 
   useEffect(() => { if (openId) heading.current?.focus({ preventScroll: true }); }, [openId]);
-  const close = () => {
-    if (!openId) return;
-    island.closeChild();
+  const close = async () => {
+    if (!openId || !(await island.closeChild())) return;
     lastCard.current = openId;
     onClosed();
   };
@@ -71,7 +70,7 @@ function SettingsRoot({ openId, onOpen, onClosed }: { openId: string | null; onO
       </motion.div> : <MotionCard key={`detail-${open.id}`} layoutId={`settings-card-${open.id}`} transition={islandTransition}
         className="settings-detail gap-0 py-0" style={{ borderRadius: "calc(var(--radius) + 4px)" }}>
         <motion.div className="p-6" initial={{ opacity: 0 }} animate={{ opacity: 1, transition: { ...islandTransition, delay: 0.18 } }} exit={{ opacity: 0, transition: fadeTransition }}>
-          <Button variant="ghost" size="sm" className="-ml-2 mb-4" onClick={close}><ArrowLeft />{t.allSettings}</Button>
+          <Button variant="ghost" size="sm" className="-ml-2 mb-4" onClick={() => void close()}><ArrowLeft />{t.allSettings}</Button>
           <h2 ref={heading} tabIndex={-1} className="type-page mb-2 outline-none">{open.title}</h2>
           {["providers", "roles", "agents"].includes(open.id) && <ConfigurationStatus />}
           {open.content()}
