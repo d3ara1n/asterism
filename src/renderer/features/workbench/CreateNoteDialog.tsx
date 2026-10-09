@@ -1,22 +1,24 @@
 import { useState } from "react";
-import type { Command } from "../../../shared/contracts";
+import type { WorkbenchCommand } from "../../../shared/workbench";
 import type { ResourcePlacement } from "./placement";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../../shared/ui/dialog";
 import { Button } from "../../shared/ui/button";
+import { Alert, AlertDescription } from "../../shared/ui/alert";
 import { Field, FieldGroup, FieldLabel } from "../../shared/ui/field";
 import { Input } from "../../shared/ui/input";
 import { Textarea } from "../../shared/ui/textarea";
 import { t } from "../../shared/i18n";
 
-export function CreateNoteDialog({ creation, busy, run, onClose }: {
-  creation: ResourcePlacement; busy: boolean; run: (command: Command) => Promise<boolean>; onClose: () => void;
+export function CreateNoteDialog({ creation, busy, error, run, onClose }: {
+  creation: ResourcePlacement; busy: boolean; error?: string | null; run: (command: WorkbenchCommand) => Promise<boolean>; onClose: () => void;
 }) {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   return <Dialog open onOpenChange={open => { if (!open) onClose(); }}><DialogContent><DialogHeader><DialogTitle>{t.createNoteTitle}</DialogTitle><DialogDescription>{t.createNoteDescription}</DialogDescription></DialogHeader>
+    {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
     <form onSubmit={event => {
       event.preventDefault();
-      const command: Command = { type: "note.create", session_id: creation.sessionId, title, content, position: creation.position };
+      const command: WorkbenchCommand = { type: "note.create", sessionId: creation.sessionId, title, content, position: creation.position };
       void run(command).then(saved => { if (saved) onClose(); });
     }} className="flex flex-col gap-5">
       <FieldGroup><Field><FieldLabel htmlFor="create-name">{t.name}</FieldLabel><Input id="create-name" autoFocus required maxLength={160} value={title} onChange={e => setTitle(e.target.value)} /></Field>

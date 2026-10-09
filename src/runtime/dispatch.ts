@@ -27,8 +27,8 @@ export async function dispatchSession(service: ApplicationService, raw: unknown)
   if (!parsed.success) return null;
   const { id, command } = parsed.data;
   try {
-    const snapshot = await service.sessions.execute(command);
-    return sessionResponseSchema.parse({ kind: "session.response", version: sessionVersion, id, result: { ok: true, snapshot } });
+    const reply = await service.sessions.execute(command);
+    return sessionResponseSchema.parse({ kind: "session.response", version: sessionVersion, id, result: { ok: true, reply } });
   } catch (error) {
     const known = error instanceof SessionError || error instanceof ConfigurationError;
     if (!known) console.error("Session command failed.");

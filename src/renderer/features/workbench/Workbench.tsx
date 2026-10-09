@@ -1,16 +1,15 @@
-import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, useSyncExternalStore, type Ref } from "react";
+import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from "react";
 import { ReactFlow, Background, BackgroundVariant, Panel, useReactFlow, applyNodeChanges, type NodeChange, type Edge } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { Maximize, Minus, Plus, Scan } from "lucide-react";
-import type { Command, WorkbenchSnapshot } from "../../../shared/contracts";
+import type { WorkbenchCommand, WorkbenchSnapshot } from "../../../shared/workbench";
 import { t } from "../../shared/i18n";
 import { Button } from "../../shared/ui/button";
 import { Badge } from "../../shared/ui/badge";
 import { useIsland } from "../../shared/weave/Screen";
 import { useAppearance, useScheme } from "../appearance/state";
 import { s } from "../configuration/state";
-import { SessionHistoryPanel } from "../conversation/Conversation";
-import { sessionController } from "../conversation/registry";
+import { SessionHistoryPanel } from "../session/History";
 import { ObjectNode, type ObjectNodeType } from "./ObjectNode";
 import { cardDragHandle } from "./ObjectCard";
 import { ObjectsPanel } from "./SidePanel";
@@ -26,11 +25,11 @@ export interface WorkbenchHandle {
   resourcePlacement: () => ResourcePlacement | null;
 }
 
-type Props = Omit<WorkbenchEnvironment, "historical"> & { ref?: Ref<WorkbenchHandle> };
+type Props = WorkbenchEnvironment & { ref?: Ref<WorkbenchHandle> };
 
 /** 工作台根浮岛：投影对象和关系；主代理对话只是对应对象的卡片内容。 */
 export function Workbench({ ref, ...environment }: Props) {
-  const { session, run, ready, busy } = environment;
+  const { session, run, ready, busy, controller, historical } = environment;
   const island = useIsland();
   const host = useRef<HTMLDivElement>(null);
   const [store] = useState(() => new WorkbenchStore());
@@ -41,29 +40,21 @@ export function Workbench({ ref, ...environment }: Props) {
   }, [island, store]);
   useImperativeHandle(ref, () => ({
     togglePanel: (kind, origin) => open(`workbench-${kind}`, kind === "objects" ? t.objects : t.history,
-      () => kind === "objects" ? <ObjectsPanel /> : <SessionHistoryPanel controller={sessionController(session.id)} />, origin),
+      () => kind === "objects" ? <ObjectsPanel /> : <SessionHistoryPanel controller={controller} />, origin),
     resourcePlacement: () => {
       const bounds = host.current?.getBoundingClientRect();
       return bounds ? { sessionId: session.id, position: placeObject(session, bounds.width, bounds.height) } : null;
     },
-  }), [open, session]);
-  // 工作台按会话历史中正在查看的位置重建；游标移动或树变化后重新读取。
-  const controller = sessionController(session.id);
-  const viewing = useSyncExternalStore(controller.subscribe, controller.getSnapshot);
-  const at = viewing.inspected;
-  const seq = viewing.snapshot?.seq ?? 0;
-  const cursor = viewing.snapshot?.cursor ?? null;
-  useEffect(() => controller.connect(), [controller]);
-  useEffect(() => { void run({ type: "workspace.read", session_id: session.id, ...(at ? { at } : {}) }); }, [run, session.id, at, seq, cursor]);
-  const context = useMemo(() => ({ ...environment, historical: at !== undefined }), [environment, at]);
+  }), [open, session, controller]);
+  const context = environment;
   useEffect(() => store.set(context), [store, context]);
 
   return <WorkbenchContext.Provider value={context}>
     <div ref={host} className="overlay-inset relative h-full overflow-hidden rounded-lg bg-background">
-      <Canvas key={session.at ?? "live"} session={session} run={run} />
-      {session.at && <div className="surface-floating absolute bottom-[var(--overlay-inset)] left-1/2 z-10 flex -translate-x-1/2 items-center gap-3 whitespace-nowrap p-1 pl-3 text-sm">
+      <Canvas session={session} run={run} />
+      {historical && <div className="surface-floating absolute bottom-[var(--overlay-inset)] left-1/2 z-10 flex -translate-x-1/2 items-center gap-3 whitespace-nowrap p-1 pl-3 text-sm">
         <span>{t.viewingHistory}</span>
-        <Button size="sm" onClick={() => controller.inspect(undefined)}>{t.backToLive}</Button>
+        <Button size="sm" onClick={controller.followCursor}>{t.backToLive}</Button>
       </div>}
       {session.objects.length === 0 && <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
         <p className="type-caption">{t.noObjects}</p>
@@ -75,18 +66,18 @@ export function Workbench({ ref, ...environment }: Props) {
   </WorkbenchContext.Provider>;
 }
 
-function Canvas({ session, run }: { session: WorkbenchSnapshot; run: (command: Command) => Promise<boolean> }) {
+function Canvas({ session, run }: { session: WorkbenchSnapshot; run: (command: WorkbenchCommand) => Promise<boolean> }) {
   const { canvas } = useAppearance();
   const scheme = useScheme();
   const toNodes = useCallback((): ObjectNodeType[] => session.objects.flatMap(object => {
     // 早期会话可能缺少视图行：按默认可见处理，位置在用户首次移动时保存。
-    const view = session.views.find(v => v.object_id === object.id) ?? { position: { x: 48, y: 48 }, hidden: false, collapsed: false };
+    const view = session.views.find(v => v.objectId === object.id) ?? { position: { x: 48, y: 48 }, hidden: false, collapsed: false };
     if (view.hidden) return [];
     return [{
       id: object.id, type: "object" as const, position: view.position, dragHandle: cardDragHandle,
       data: {
-        object, collapsed: view.collapsed, historical: session.at !== null,
-        onView: patch => { void run({ type: "view.set", session_id: session.id, object_id: object.id, ...patch }); },
+        object, collapsed: view.collapsed,
+        onView: patch => { void run({ type: "view.set", sessionId: session.id, objectId: object.id, ...patch }); },
       },
     }];
   }), [session, run]);
@@ -98,7 +89,7 @@ function Canvas({ session, run }: { session: WorkbenchSnapshot; run: (command: C
     }));
   }, [toNodes]);
   const edges: Edge[] = useMemo(() => session.links.map(binding => ({
-    id: `${binding.agent_id}:${binding.resource_id}`, source: binding.resource_id, target: binding.agent_id,
+    id: `${binding.agentId}:${binding.resourceId}`, source: binding.resourceId, target: binding.agentId,
     label: t.readAccess,
     style: { stroke: "var(--primary)" },
     selectable: false, deletable: false,
@@ -107,7 +98,7 @@ function Canvas({ session, run }: { session: WorkbenchSnapshot; run: (command: C
     setNodes(current => applyNodeChanges(changes, current));
     for (const change of changes) {
       if (change.type === "position" && change.position && change.dragging === false) {
-        void run({ type: "view.set", session_id: session.id, object_id: change.id, position: change.position }).then(saved => { if (!saved) setNodes(toNodes()); });
+        void run({ type: "view.set", sessionId: session.id, objectId: change.id, position: change.position }).then(saved => { if (!saved) setNodes(toNodes()); });
       }
     }
   }, [run, session.id, toNodes]);
@@ -116,7 +107,7 @@ function Canvas({ session, run }: { session: WorkbenchSnapshot; run: (command: C
     defaultViewport={session.viewport} minZoom={0.1} maxZoom={4}
     nodesDraggable={true} nodesConnectable={false} edgesReconnectable={false}
     deleteKeyCode={null} panOnScroll selectionOnDrag panOnDrag={[1, 2]} zoomOnDoubleClick={false}
-    onMoveEnd={(event, viewport) => { if (event) void run({ type: "viewport.set", session_id: session.id, viewport }); }}
+    onMoveEnd={(event, viewport) => { if (event) void run({ type: "viewport.set", sessionId: session.id, viewport }); }}
   >
     {canvas !== "none" && <Background color="var(--canvas-grid)" gap={24} size={canvas === "dots" ? 1.5 : canvas === "cross" ? 6 : undefined}
       variant={canvas === "dots" ? BackgroundVariant.Dots : canvas === "lines" ? BackgroundVariant.Lines : BackgroundVariant.Cross} />}
@@ -124,14 +115,14 @@ function Canvas({ session, run }: { session: WorkbenchSnapshot; run: (command: C
   </ReactFlow>;
 }
 
-function ViewControls({ session, run }: { session: WorkbenchSnapshot; run: (command: Command) => Promise<boolean> }) {
+function ViewControls({ session, run }: { session: WorkbenchSnapshot; run: (command: WorkbenchCommand) => Promise<boolean> }) {
   const flow = useReactFlow();
   const move = async (action: () => Promise<boolean>) => {
     await action();
     // 工具栏是明确的用户操作；程序化缩放不产生 DOM event，需显式保存。
-    await run({ type: "viewport.set", session_id: session.id, viewport: flow.getViewport() });
+    await run({ type: "viewport.set", sessionId: session.id, viewport: flow.getViewport() });
   };
-  const agent = session.objects.find(object => object.kind === "agent" && !session.views.find(v => v.object_id === object.id)?.hidden);
+  const agent = session.objects.find(object => object.kind === "agent" && !session.views.find(v => v.objectId === object.id)?.hidden);
   const controls = [
     [t.zoomIn, Plus, () => flow.zoomIn()],
     [t.zoomOut, Minus, () => flow.zoomOut()],

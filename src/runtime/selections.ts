@@ -13,9 +13,6 @@ export class SelectionRepository {
     const { revision, ...selection } = row;
     return { selection: agentSelectionSchema.parse(selection), revision: Number(revision) };
   }
-  revision(sessionId: string): number {
-    return Number((this.db.prepare("SELECT COALESCE(SUM(revision), 0) AS r FROM agent_selections WHERE session_id = ?").get(sessionId) as { r: number }).r);
-  }
   save(sessionId: string, agentId: string, selection: AgentSelection): void {
     this.db.prepare(`INSERT INTO agent_selections (session_id, agent_id, agent_configuration_id, model_id, thinking)
       VALUES (?, ?, ?, ?, ?) ON CONFLICT(session_id, agent_id) DO UPDATE SET

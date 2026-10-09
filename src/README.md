@@ -9,7 +9,7 @@
 | `shared/` | 版本化命令、投影与传输校验 | 仅 Zod，不依赖任何进程或 UI |
 | `main/` | Electron 窗口、单实例锁、数据目录、运行时生命周期、可信 IPC 路由 | shared，不调用数据库 |
 | `preload/` | 沙箱桥，受控命令与状态订阅 | shared，只暴露 `window.weft` |
-| `runtime/` | 应用命令、查询、事务、SQLite 建库、对象存储与私有凭据客户端 | shared、session、configuration、modules 后台入口、Node API |
+| `runtime/` | 应用组合与列表；会话命令、历史查询、资源与布局、执行进度；SQLite、对象存储与私有凭据客户端 | shared、session、configuration、modules 后台入口、Node API |
 | `configuration/` | 三类配置、密文凭据、连接测试与默认角色，见目录 README | shared、Node SQLite、模型 SDK；不依赖 Electron |
 | `session/` | 会话级扁平树、游标与吸附、模型投影、工作台折叠 | shared、Node SQLite；不依赖 UI/SDK |
 | `model/` | 系统提示块组装与模型投影、单次请求契约、三协议 SDK 适配与续接资料 | shared、session、AI SDK |
@@ -21,13 +21,13 @@
 
 ## 完整路径
 
-`renderer/controller → preload → main/RuntimeHost → utilityProcess → ApplicationService → SessionTree / ObjectStore`
+`renderer/features/session → preload → main/RuntimeHost → utilityProcess → SessionService → SessionTree / SessionWorkbench / ObjectStore`
 
-每次应用命令先由 Zod 校验，再交运行时单一写入者处理。业务创建、查询索引与初始视图处于同一事务；正文引用只在内容文件成功落盘后进入事件。运行时返回应用投影，UI 将它映射为画布节点和连线。
+会话命令先由 Zod 校验，再交运行时单一写入者处理。业务创建、查询索引与初始视图处于同一事务；正文引用只在内容文件成功落盘后进入事件。命令返回受理结果，读取返回指定位置的会话树与工作台投影，UI 将其映射为画布和代理对话。
 
-路径遍历、块识别和合法续接判断统一位于 `shared/session-path.ts`，运行时与 renderer 共用。`execution/response.ts` 校验一次响应内的块生命周期；已完成块追加到树，未完成输出经会话快照的 `live` 字段提供给界面，不写入存储。数据库结构只在运行时建库，仓储构造不隐式建表。
+路径遍历、块识别和合法续接判断统一位于 `shared/session-path.ts`，运行时与 renderer 共用。`execution/response.ts` 校验一次响应内的块生命周期；已完成块追加到树，未完成输出经 `session.progress` 的 `live` 字段提供给界面，不写入存储；完整读取也携带当前进度以恢复连接。数据库结构只在运行时建库，仓储构造不隐式建表。
 
-块的 `requestParentId` 记录请求使用的路径末端；`session/projection.ts` 在该位置后组合响应，把期间事件留在响应外。终态通过 `SessionTree.completeBlock` 只追加一次并绑定到最高序号块，读取时合并可空字段，原始节点不变。`SessionTree.select` 将选择审计与游标更新原子提交，`cursorSelections` 可读取日志。`seq` 只计节点追加，同序号通知也可能带来新计量或游标变化。
+块的 `requestParentId` 记录请求使用的路径末端；`session/projection.ts` 在该位置后组合响应，把期间事件留在响应外。终态通过 `SessionTree.completeBlock` 只追加一次并绑定到最高序号块，读取时合并可空字段，原始节点不变。`SessionTree.select` 将选择审计与游标更新原子提交，`cursorSelections` 可读取日志。`seq` 只计节点追加，视图同步使用独立 `revision`，涵盖计量、游标、配置选择和布局变化。
 
 SQLite 的 `session_blocks` 视图可直接查询每块计量；`session_usage` 还包含没有输出块的异常诊断计量。例如：
 
@@ -36,7 +36,7 @@ SELECT model, SUM(json_extract(usage, '$.total')) AS tokens
 FROM session_usage WHERE session_id = ? GROUP BY model;
 ```
 
-`workspace.read` 不带 `session_id` 时只返回工作区与会话列表摘要，`session` 为 null；启动与回首页均走此路径。读取具体正文和历史必须显式指定会话。
+`workspace.read` 只返回工作区与会话列表摘要，不接受会话身份或历史位置。应用导航打开会话后由 `features/session/` 读取正文，查看位置在该模块中维护。`runtime/workbench.ts` 管理资源事件与独立布局，在会话查询所固定的同一路径上投影对象；不再经应用快照中转。
 
 画布库类型只存在于 renderer。IPC 不提供 SQL、任意路径、通用脚本或动态方法调用。对外工具协议不等于内部应用命令；模型与 MCP 接入时仍需独立资源校验与授权执行层。
 

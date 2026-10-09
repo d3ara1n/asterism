@@ -12,13 +12,13 @@ export function ObjectsPanel() {
   const writable = ready && !busy;
   return <IslandPanel title={t.objects}>
     <div className="flex flex-col gap-1">{session.objects.map(object => {
-      const view = session.views.find(v => v.object_id === object.id);
+      const view = session.views.find(v => v.objectId === object.id);
       return <div className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm" key={object.id}>
         <div className="min-w-0 flex-1"><p className="truncate">{object.title}</p><p className="type-caption">{registry.card(object.presentation)?.label ?? object.kind}</p></div>
         <Button variant="ghost" size="sm" disabled={!writable}
-          onClick={() => { void run({ type: "view.set", session_id: session.id, object_id: object.id, hidden: !view?.hidden }); }}>{view?.hidden ? t.open : t.close}</Button>
+          onClick={() => { void run({ type: "view.set", sessionId: session.id, objectId: object.id, hidden: !view?.hidden }); }}>{view?.hidden ? t.open : t.close}</Button>
         {object.kind !== "agent" && <Button variant="ghost" size="sm" disabled={!writable || historical}
-          onClick={() => { void run({ type: "object.remove", session_id: session.id, object_id: object.id }); }}>{s("Remove", "移除")}</Button>}
+          onClick={() => { void run({ type: "object.remove", sessionId: session.id, objectId: object.id }); }}>{s("Remove", "移除")}</Button>}
       </div>;
     })}</div>
   </IslandPanel>;

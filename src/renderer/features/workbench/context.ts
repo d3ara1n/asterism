@@ -1,13 +1,15 @@
 import { createContext, createElement, useContext, useSyncExternalStore, type ReactNode } from "react";
-import type { Command, WorkbenchSnapshot } from "../../../shared/contracts";
+import type { WorkbenchCommand, WorkbenchSnapshot } from "../../../shared/workbench";
+import type { SessionController } from "../session/controller";
 
 /** 工作台向卡片与更深浮岛提供的环境；卡片节点数据只保留对象与视图状态。 */
 export interface WorkbenchEnvironment {
+  controller: SessionController;
   session: WorkbenchSnapshot;
   ready: boolean;
   busy: boolean;
   historical: boolean;
-  run: (command: Command) => Promise<boolean>;
+  run: (command: WorkbenchCommand) => Promise<boolean>;
   /** 主代理对话草稿由应用层按任务保存。 */
   draft: string;
   onDraftChange: (value: string) => void;

@@ -1,4 +1,4 @@
-import type { Point, WorkbenchSnapshot } from "../../../shared/contracts";
+import type { Point, WorkbenchSnapshot } from "../../../shared/workbench";
 
 export type ResourcePlacement = { sessionId: string; position: Point };
 

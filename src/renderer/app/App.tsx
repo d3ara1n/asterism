@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { ArrowLeft, ChevronDown, FileText, Folder, History, House, KeyRound, ListTree, PanelLeft, Settings, X } from "lucide-react";
-import type { Command } from "../../shared/contracts";
+import type { WorkbenchCommand } from "../../shared/workbench";
 import type { ApplicationController } from "./controller";
 import { t } from "../shared/i18n";
 import { Button } from "../shared/ui/button";
@@ -15,8 +15,8 @@ import { AddDirectoryDialog } from "../features/workbench/AddDirectoryDialog";
 import { AccessDialog } from "../features/workbench/AccessDialog";
 import { CreateNoteDialog } from "../features/workbench/CreateNoteDialog";
 import type { ResourcePlacement } from "../features/workbench/placement";
-import { SubmissionIdentity } from "../features/conversation/controller";
-import { sessionController } from "../features/conversation/registry";
+import { SubmissionIdentity } from "../features/session/controller";
+import { sessionController } from "../features/session/registry";
 import { s } from "../features/configuration/state";
 import { Titlebar, Window } from "./Window";
 import { Sidebar } from "./Sidebar";
@@ -28,6 +28,8 @@ import { islandTransition } from "../shared/weave/motion";
 /** 主屏包含侧栏与首页/工作台；设置为左侧独立屏，切换时主屏整体平移。 */
 type MainView = { kind: "home" } | { kind: "conversation"; sessionId: string };
 type PageId = "settings" | "main";
+const idleSubscribe = () => () => {};
+const noSession = () => null;
 
 export function App({ controller }: { controller: ApplicationController }) {
   const state = useSyncExternalStore(controller.subscribe, controller.getSnapshot);
@@ -36,7 +38,6 @@ export function App({ controller }: { controller: ApplicationController }) {
   const sidebarToggle = useRef<HTMLButtonElement>(null);
   const [page, setPage] = useState<PageId>("main");
   const [view, setView] = useState<MainView>({ kind: "home" });
-  const currentView = useRef(view);
   const [sidebarVisible, setSidebarVisible] = useState(true);
   const [draft, setDraft] = useState("");
   const [conversationDrafts, setConversationDrafts] = useState<Record<string, string>>({});
@@ -46,14 +47,19 @@ export function App({ controller }: { controller: ApplicationController }) {
   const start = useStart();
   // 每次导航递增；异步创建完成时据此判断用户是否已离开，不夺走当前视图。
   const navigation = useRef(0);
-  const run = useCallback((command: Command) => controller.run(command, () =>
-    command.session_id ? sessionController(command.session_id).getSnapshot().inspected : undefined), [controller]);
+  const run = useCallback((command: WorkbenchCommand) => sessionController(command.sessionId).mutate(command), []);
   useEffect(() => controller.connect(), [controller]);
+  const active = view.kind === "conversation" ? sessionController(view.sessionId) : null;
+  const sessionState = useSyncExternalStore(active?.subscribe ?? idleSubscribe, active?.getSnapshot ?? noSession);
+  useEffect(() => active?.connect(), [active]);
   const snapshot = state.snapshot;
-  // 晚到响应不能把首页或另一个会话替换为旧工作台。
-  const session = view.kind === "conversation" && snapshot?.session?.id === view.sessionId ? snapshot.session : null;
+  const session = sessionState?.snapshot?.workbench ?? null;
   const ready = state.status === "ready";
-  const writable = ready && !state.busy && !!session && !session.at;
+  const sessionBusy = !!sessionState && (sessionState.busy || sessionState.status !== "ready");
+  const sessionLoading = sessionState?.status === "loading";
+  const error = state.error ?? sessionState?.error;
+  const historical = sessionState?.position.kind === "history";
+  const writable = ready && !sessionBusy && !!session && !historical;
   const inSettings = page === "settings";
   const mainTitle = view.kind === "home" ? t.home
     : session?.title ?? snapshot?.sessions.find(item => item.id === view.sessionId)?.title ?? t.conversation;
@@ -76,19 +82,15 @@ export function App({ controller }: { controller: ApplicationController }) {
   });
   const navigate = (next: MainView) => {
     navigation.current++;
-    currentView.current = next;
     setView(next); setPage("main"); setCreation(null); setDirectory(null); setAccessOpen(false);
     controller.clearError();
     focusMain();
   };
   const goHome = () => {
     navigate({ kind: "home" });
-    // 清除已打开的正文，只保留列表；队列也保证在途读取之后最终回到无任务状态。
-    if (ready || state.busy) void run({ type: "workspace.read" });
   };
   const openSession = (sessionId: string) => {
     navigate({ kind: "conversation", sessionId });
-    void run({ type: "workspace.read", session_id: sessionId });
   };
   const startConversation = async (input: StartInput) => {
     if (!ready) return;
@@ -97,13 +99,10 @@ export function App({ controller }: { controller: ApplicationController }) {
     if (!created) return;
     setDraft("");
     if (token === navigation.current) openSession(created);
-    else {
-      const current = currentView.current;
-      void run({ type: "workspace.read", ...(current.kind === "conversation" ? { session_id: current.sessionId } : {}) });
-    }
+    void controller.refresh();
   };
-  const addDirectory = () => { const placement = workbench.current?.resourcePlacement(); if (placement) setDirectory(placement); };
-  const addNote = () => { const placement = workbench.current?.resourcePlacement(); if (placement) setCreation(placement); };
+  const addDirectory = () => { const placement = workbench.current?.resourcePlacement(); if (placement) { active?.clearError(); setDirectory(placement); } };
+  const addNote = () => { const placement = workbench.current?.resourcePlacement(); if (placement) { active?.clearError(); setCreation(placement); } };
   const hideSidebar = () => {
     setSidebarVisible(false);
     requestAnimationFrame(() => sidebarToggle.current?.focus({ preventScroll: true }));
@@ -127,20 +126,21 @@ export function App({ controller }: { controller: ApplicationController }) {
   const actions = session ? <>
     <Button variant="ghost" size="sm" disabled={!writable} onClick={addNote} aria-label={t.addNoteLabel}><FileText /><span className="toolbar-label">{t.addNote}</span></Button>
     <Button variant="ghost" size="sm" disabled={!writable} onClick={addDirectory} aria-label={s("Add directory", "添加目录")}><Folder /><span className="toolbar-label">{s("Directory", "目录")}</span></Button>
-    <Button variant="ghost" size="sm" disabled={!writable} onClick={() => setAccessOpen(true)} aria-label={t.accessLabel}><KeyRound /><span className="toolbar-label">{t.access}</span></Button>
+    <Button variant="ghost" size="sm" disabled={!writable} onClick={() => { active?.clearError(); setAccessOpen(true); }} aria-label={t.accessLabel}><KeyRound /><span className="toolbar-label">{t.access}</span></Button>
     <Button variant="ghost" size="sm" onClick={event => workbench.current?.togglePanel("objects", event.currentTarget)} aria-label={t.objects}><ListTree /><span className="toolbar-label">{t.objects}</span></Button>
     <Button variant="ghost" size="sm" onClick={event => workbench.current?.togglePanel("history", event.currentTarget)} aria-label={t.history}><History /><span className="toolbar-label">{t.history}</span></Button>
   </> : undefined;
 
-  const conversation = session
-    ? <Workbench key={session.id} ref={workbench} session={session} ready={ready} busy={state.busy} run={run}
+  const conversation = session && active
+    ? <Workbench key={session.id} ref={workbench} session={session} controller={active} historical={historical}
+      ready={ready} busy={sessionBusy} run={run}
       draft={conversationDrafts[session.id] ?? ""} onDraftChange={value => setConversationDrafts(drafts => ({ ...drafts, [session.id]: value }))}
       onHome={goHome} />
     : <div className="flex h-full items-center justify-center px-6"><div>
-      <PageState kind={state.busy ? "loading" : "error"} title={state.busy ? t.openingTitle : t.unavailableTitle}
-        body={state.busy ? t.openingBody : t.unavailableBody} />
-      {!state.busy && view.kind === "conversation" && <div className="mt-4 text-center">
-        <Button variant="secondary" onClick={() => openSession(view.sessionId)} disabled={!ready}>{t.retry}</Button>
+      <PageState kind={sessionLoading ? "loading" : "error"} title={sessionLoading ? t.openingTitle : t.unavailableTitle}
+        body={sessionState?.error ?? (sessionLoading ? t.openingBody : t.unavailableBody)} />
+      {!sessionLoading && view.kind === "conversation" && <div className="mt-4 text-center">
+        <Button variant="secondary" onClick={() => { void active?.refresh(); }} disabled={!ready}>{t.retry}</Button>
       </div>}
     </div></div>;
   const sidebar: IslandSpec = {
@@ -149,7 +149,7 @@ export function App({ controller }: { controller: ApplicationController }) {
       selectedSessionId={view.kind === "conversation" ? view.sessionId : null}
       homeActive={view.kind === "home"}
       onHome={goHome} onSession={openSession} onSettings={() => go("settings")} onHide={hideSidebar}
-      onRetry={() => { void run({ type: "workspace.read" }); }} />,
+      onRetry={() => { void controller.refresh(); }} />,
   };
   const main: IslandSpec = {
     id: "main-view", label: mainTitle, width: { min: 440, grow: 1 }, surface: view.kind === "conversation",
@@ -173,13 +173,15 @@ export function App({ controller }: { controller: ApplicationController }) {
           content: <Screen label={t.appNavigation} leading={sidebarVisible ? [sidebar] : []} root={main} resetKey={view.kind === "conversation" ? view.sessionId : "home"} className="h-full" /> },
       ]} />
     </Window>
-    {state.error && <Alert variant="destructive" className="fixed bottom-4 left-1/2 z-[60] w-[min(560px,calc(100%-32px))] -translate-x-1/2 flex items-start gap-3 shadow-md">
-      <AlertDescription className="flex-1">{state.error}</AlertDescription>
-      <Button variant="ghost" size="icon-xs" aria-label={t.dismissError} title={t.dismissError} onClick={controller.clearError}><X /></Button>
+    {error && !creation && !directory && !accessOpen && <Alert variant="destructive" className="fixed bottom-4 left-1/2 z-[60] w-[min(560px,calc(100%-32px))] -translate-x-1/2 flex items-start gap-3 shadow-md">
+      <AlertDescription className="flex-1">{error}</AlertDescription>
+      {sessionState?.status === "error" && <Button variant="ghost" size="sm" onClick={() => { void active?.refresh(); }}>{t.retry}</Button>}
+      {(state.error || sessionState?.status !== "error") && <Button variant="ghost" size="icon-xs" aria-label={t.dismissError} title={t.dismissError}
+        onClick={state.error ? controller.clearError : active?.clearError}><X /></Button>}
     </Alert>}
-    {creation && <CreateNoteDialog creation={creation} busy={state.busy} run={run} onClose={() => setCreation(null)} />}
-    {directory && <AddDirectoryDialog creation={directory} busy={state.busy} run={run} onClose={() => setDirectory(null)} />}
-    {accessOpen && session && <AccessDialog session={session} busy={state.busy} run={run} onClose={() => setAccessOpen(false)} />}
+    {creation && <CreateNoteDialog creation={creation} busy={sessionBusy} error={sessionState?.error} run={run} onClose={() => setCreation(null)} />}
+    {directory && <AddDirectoryDialog creation={directory} busy={sessionBusy} error={sessionState?.error} run={run} onClose={() => setDirectory(null)} />}
+    {accessOpen && session && <AccessDialog session={session} busy={sessionBusy} error={sessionState?.error} run={run} onClose={() => setAccessOpen(false)} />}
   </>;
 }
 
@@ -195,8 +197,9 @@ function useStart() {
     try {
       const result = await window.weft.session.execute({ type: "start", ...input, submissionId: identity.current.forInput(input) });
       if (!result.ok) { setError(result.error.message); return null; }
+      if (result.reply.kind !== "accepted") throw new Error("Invalid session receipt.");
       identity.current.accepted();
-      return result.snapshot.sessionId;
+      return result.reply.sessionId;
     } catch {
       setError(s("The connection was lost. Retry the same message to recover the submitted conversation.", "连接中断。重试相同消息可找回已提交的会话。"));
       return null;

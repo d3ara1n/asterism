@@ -10,9 +10,10 @@ export function sessionController(sessionId: string): SessionController {
   if (!controller) { controller = new SessionController(window.weft.session, sessionId); controllers.set(sessionId, controller); }
   return controller;
 }
-export function agentView(sessionId: string, agentId: string): AgentView {
+export function agentView(controller: SessionController, agentId: string): AgentView {
+  const sessionId = controller.sessionId;
   const key = `${sessionId}:${agentId}`;
   let submission = submissions.get(key);
   if (!submission) { submission = new SubmissionIdentity(); submissions.set(key, submission); }
-  return { controller: sessionController(sessionId), agentId, submission };
+  return { controller, agentId, submission };
 }
