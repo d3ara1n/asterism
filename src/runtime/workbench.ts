@@ -1,6 +1,7 @@
 
 import type { DatabaseSync } from "node:sqlite";
 import type { ResourceRegistry } from "../resources/registry.ts";
+import { createResourceId } from "../resources/id.ts";
 import { foldWorkbench, type FoldedObject } from "../session/fold.ts";
 import { SessionError, type SessionTree } from "../session/tree.ts";
 import type { Json } from "../shared/json.ts";
@@ -17,7 +18,7 @@ export class SessionWorkbench {
 
   /** 通用资源创建：资源控制器给出标题并保存私有状态；创建事件只记录身份与类型。 */
   create(sessionId: string, kind: string, input: Json, position: Point): string {
-    return this.createWith(sessionId, kind, crypto.randomUUID(), input, position);
+    return this.createWith(sessionId, kind, createResourceId(), input, position);
   }
   createWith(sessionId: string, kind: string, id: string, input: Json, position: Point): string {
     const controller = this.resources.controller(kind);

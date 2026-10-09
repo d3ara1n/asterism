@@ -8,6 +8,7 @@ import { AgentCapabilities } from "../execution/capabilities.ts";
 import { createModules } from "../modules/runtime.ts";
 import type { SessionHost, SessionWriter } from "../modules/runtime-contract.ts";
 import type { ResourceRegistry } from "../resources/registry.ts";
+import { createResourceId } from "../resources/id.ts";
 import { ResourceStateStore } from "../resources/state.ts";
 import type { ToolRegistry } from "../tools/registry.ts";
 import type { ModelSettings } from "../shared/model.ts";
@@ -179,7 +180,7 @@ export class SessionService {
     const input = await agents.prepareCreate!({ selection });
     const again = existing(); if (again) return again;
     const sessionId = randomUUID();
-    const agentId = randomUUID();
+    const agentId = createResourceId();
     const before = () => {
       this.tree.create(command.text.slice(0, 72), sessionId);
       this.workbench.createWith(sessionId, "agent", agentId, input, { x: 48, y: 48 });

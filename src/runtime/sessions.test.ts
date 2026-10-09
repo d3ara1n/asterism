@@ -175,6 +175,7 @@ describe("会话运行时", () => {
     const first = await execute(service, start); await settled(service);
     const created = await execute(service, { type: "resource.create", sessionId: first.sessionId, kind: "directory", input: { path: root }, position: { x: 0, y: 0 } });
     const directory = created.workbench.objects.find(object => object.kind === "directory")!;
+    expect(directory.id).toMatch(/^[A-Za-z0-9_-]{16}$/);
     expect(directory.presentation).toEqual({ contract: { id: "weft.directory.card", version: 1 }, data: { path: root } });
     resourceId = directory.id;
     const agentId = agentOf(first);
@@ -198,6 +199,7 @@ describe("会话运行时", () => {
     const snap = await execute(service, { type: "read", sessionId: a.sessionId });
     expect(snap.nodes.map(n => n.kind)).toEqual(["event", "message", "text"]);
     expect(snap.workbench.objects.filter(o => o.kind === "agent")).toHaveLength(1);
+    expect(agentOf(snap)).toMatch(/^[A-Za-z0-9_-]{16}$/);
     await expect(execute(service, { ...start, text: "Other" })).rejects.toThrow("different input");
     await service.close(); services.delete(service);
     const reopened = new ApplicationService(root, { adapterFactory: () => adapter() }); services.add(reopened);

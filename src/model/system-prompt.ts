@@ -17,6 +17,7 @@ const environment: PromptBlock = {
     "A session can contain agents, resources, and operations. Cards and connections are views of these objects; visibility does not grant access.",
     "Tools are defined independently and declare which resources they support. Linking a resource makes matching tools available, subject to your tool policy.",
     "Weft provides resource_list, resource_inspect, and resource_call as fixed controls. Use them to list linked resources, inspect live state and available tools, and apply a tool to a resource.",
+    "Resource IDs are opaque handles for tool calls. Use resource titles when describing resources to the user.",
     "Messages like \"Resource ... is now linked to you\" report the current link state; they do not grant access by themselves. The runtime enforces access.",
     "External changes (edited or deleted files) are not announced; inspect a resource when its current state matters.",
     "Detaching a resource removes future access, but does not erase earlier messages, results, or knowledge.",
