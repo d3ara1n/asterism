@@ -20,7 +20,7 @@ function providerOptions(input: ModelInput): Record<string, Record<string, Json>
     ...(reasoningFor(input) ? { reasoningEffort: reasoningFor(input)! } : {}) } };
 }
 /** 只保留白名单续接资料，不持久化原始 HTTP、响应头或未筛选的 provider metadata。 */
-export function pickContinuation(metadata: unknown): Json {
+export function pickContinuation(metadata: unknown): Record<string, Record<string, Json>> {
   const options: Record<string, Record<string, Json>> = {};
   if (!metadata || typeof metadata !== "object") return options;
   for (const [provider, keys] of Object.entries({ anthropic: ["signature", "redactedData"], openai: ["itemId", "reasoningEncryptedContent", "phase"] })) {
@@ -47,7 +47,7 @@ export function sdkMessages(input: ModelInput): ModelMessage[] {
       }) } as AssistantModelMessage);
     }
     if (item.kind === "result") {
-      const outcome = item.outcome;
+      const { implementation: _implementation, ...outcome } = item.outcome;
       const output = outcome.kind === "succeeded" || outcome.kind === "partial"
         ? { type: "json" as const, value: outcome.model }
         : { type: "error-json" as const, value: json(outcome) };
@@ -84,16 +84,38 @@ export class AiSdkAdapter implements ModelAdapter {
       onError: () => {},
     });
     const calls = new Set<string>();
+    const continuations = new Map<string, ReturnType<typeof pickContinuation>>();
+    const collectContinuation = (id: string, metadata: unknown) => {
+      const accumulated = continuations.get(id) ?? {};
+      for (const [provider, values] of Object.entries(pickContinuation(metadata))) {
+        accumulated[provider] = { ...accumulated[provider], ...values };
+      }
+      continuations.set(id, accumulated);
+      return accumulated;
+    };
     const rejectedBySdk = new Set<string>();
     let finish: { reason: string; rawFinishReason?: string; usage: Usage } | null = null;
     for await (const event of result.stream) {
       switch (event.type) {
-        case "text-start": case "reasoning-start":
-          yield { type: "part.start", part: { id: `${event.type === "text-start" ? "text" : "thinking"}:${event.id}`, kind: event.type === "text-start" ? "text" : "thinking" } }; break;
-        case "text-delta": case "reasoning-delta":
-          yield { type: "part.delta", partId: `${event.type === "text-delta" ? "text" : "thinking"}:${event.id}`, delta: event.text }; break;
-        case "text-end": case "reasoning-end":
-          yield { type: "part.end", partId: `${event.type === "text-end" ? "text" : "thinking"}:${event.id}`, continuation: pickContinuation(event.providerMetadata) }; break;
+        case "text-start": case "reasoning-start": {
+          const kind = event.type === "text-start" ? "text" : "thinking";
+          const id = `${kind}:${event.id}`;
+          collectContinuation(id, event.providerMetadata);
+          yield { type: "part.start", part: { id, kind } };
+          break;
+        }
+        case "text-delta": case "reasoning-delta": {
+          const partId = `${event.type === "text-delta" ? "text" : "thinking"}:${event.id}`;
+          collectContinuation(partId, event.providerMetadata);
+          yield { type: "part.delta", partId, delta: event.text };
+          break;
+        }
+        case "text-end": case "reasoning-end": {
+          const partId = `${event.type === "text-end" ? "text" : "thinking"}:${event.id}`;
+          yield { type: "part.end", partId, continuation: collectContinuation(partId, event.providerMetadata) };
+          continuations.delete(partId);
+          break;
+        }
         case "tool-input-start":
           if (event.providerExecuted) throw new ModelFailure("server_tool", "Provider-executed tools are not supported.");
           calls.add(event.id);

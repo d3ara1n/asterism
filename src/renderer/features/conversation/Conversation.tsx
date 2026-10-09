@@ -1,8 +1,9 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { ArrowDown, ArrowUp, Bot, Brain, Check, ChevronDown, Cpu, GitBranch, Info, LoaderCircle, Square, TriangleAlert, Wrench } from "lucide-react";
 import type { AgentSelection } from "../../../shared/model";
-import type { SessionNode } from "../../../shared/session";
+import type { LiveBlock, SessionNode } from "../../../shared/session";
 import { agentTimeline, isBlockNode } from "../../../shared/session-view";
+import { sessionPath, snap } from "../../../shared/session-path";
 import { resolveModelRole, resolveProviderModel, thinkingSchema, type ThinkingLevel } from "../../../shared/configuration";
 import type { AgentView } from "./registry";
 import type { SessionController } from "./controller";
@@ -16,6 +17,7 @@ import { Alert, AlertDescription } from "../../shared/ui/alert";
 import { PageState } from "../../shared/ui/page-state";
 import { InputGroup, InputGroupAddon, InputGroupTextarea } from "../../shared/ui/input-group";
 import { IslandPanel } from "../../shared/weave/IslandPanel";
+import { JsonView, ToolResultView } from "../../modules/views";
 
 function useSession(controller: SessionController) {
   useEffect(() => controller.connect(), [controller]);
@@ -42,8 +44,8 @@ export function ConversationActions({ view, ready }: { view: AgentView; ready: b
 }
 
 /** 代理卡片内容：当前路径的最终视图与输入区；没有分支感，回溯在会话历史中进行。 */
-export function Conversation({ view, ready, draft, onDraftChange, onHome, onTurnEnded }: {
-  view: AgentView; ready: boolean; draft: string; onDraftChange: (value: string) => void; onHome: () => void; onTurnEnded: () => void;
+export function Conversation({ view, ready, draft, onDraftChange, onHome }: {
+  view: AgentView; ready: boolean; draft: string; onDraftChange: (value: string) => void; onHome: () => void;
 }) {
   const { controller, agentId, submission } = view;
   const { state, snapshot, timeline, agent, running, historical } = useAgent(view);
@@ -53,9 +55,7 @@ export function Conversation({ view, ready, draft, onDraftChange, onHome, onTurn
   const follow = useRef(true);
   const scroll = useRef<HTMLDivElement>(null);
   const composer = useRef<HTMLTextAreaElement>(null);
-  const wasRunning = useRef(false);
-  useEffect(() => { if (wasRunning.current && !running) onTurnEnded(); wasRunning.current = running; }, [running, onTurnEnded]);
-  useLayoutEffect(() => { if (follow.current && scroll.current) scroll.current.scrollTop = scroll.current.scrollHeight; }, [snapshot?.seq, state.inspected]);
+  useLayoutEffect(() => { if (follow.current && scroll.current) scroll.current.scrollTop = scroll.current.scrollHeight; }, [snapshot, state.inspected]);
 
   if (!snapshot) return <div className="flex flex-1 items-center justify-center p-6">
     <PageState kind={state.loading ? "loading" : "error"} title={state.loading ? t.openingTitle : t.unavailableTitle}
@@ -99,8 +99,9 @@ export function Conversation({ view, ready, draft, onDraftChange, onHome, onTurn
     }}>
       <div className="space-y-4 p-4">
         {timeline.map(node => <NodeView key={node.id} node={node} />)}
+        {!historical && snapshot.live.filter(block => block.agentId === agentId).map(block => <LiveBlockView key={block.id} block={block} />)}
         {agent?.running && !historical && <p role="status" className="type-caption flex items-center gap-2"><LoaderCircle className="size-3 animate-spin" />{s("The agent is working…", "代理正在执行…")}</p>}
-        {!timeline.length && <p className="type-caption">{s("Send a message to begin.", "发送消息开始对话。")}</p>}
+        {!timeline.length && !running && <p className="type-caption">{s("Send a message to begin.", "发送消息开始对话。")}</p>}
       </div>
     </div>
     <footer className="shrink-0 space-y-3 border-t p-3">
@@ -159,9 +160,10 @@ export function SessionHistoryPanel({ controller }: { controller: SessionControl
   const { snapshot, state, historical } = useSession(controller);
   const [kinds, setKinds] = useState<Set<SessionNode["kind"]>>(new Set(["message", "text", "toolcall", "event", "notice"]));
   if (!snapshot) return <IslandPanel title={s("Session history", "会话历史")}><p className="type-caption">{t.openingBody}</p></IslandPanel>;
-  const onPath = new Set<string>();
-  for (let c = snapshot.cursor; c;) { onPath.add(c); c = snapshot.nodes.find(n => n.id === c)?.parentId ?? null; }
-  const visible = snapshot.nodes.filter(n => (!isBlockNode(n) || n.complete) && n.kind !== "response_end" && kinds.has(n.kind));
+  const onPath = new Set(sessionPath(snapshot.nodes, snapshot.cursor).map(node => node.id));
+  const continuation = state.inspected ? snap(snapshot.nodes, state.inspected) : snapshot.cursor;
+  const continuationNode = snapshot.nodes.find(node => node.id === continuation);
+  const visible = snapshot.nodes.filter(n => (!isBlockNode(n) || n.complete) && kinds.has(n.kind));
   const toggle = (kind: SessionNode["kind"]) => setKinds(prev => { const next = new Set(prev); if (next.has(kind)) next.delete(kind); else next.add(kind); return next; });
   const continueHere = async () => {
     if (!state.inspected) return;
@@ -179,6 +181,9 @@ export function SessionHistoryPanel({ controller }: { controller: SessionControl
         <GitBranch />{s("Continue from here", "从此处继续")}</Button>
     </div>
     {snapshot.running && <p className="type-caption mb-2">{s("Stop or wait for running agents before branching.", "分叉前需等待或停止正在运行的代理。")}</p>}
+    {historical && continuation !== state.inspected && <p className="type-caption mb-2">
+      {s("Continuation starts at: ", "实际继续位置：")}{continuationNode ? `${kindLabel(continuationNode.kind)} · ${nodeLabel(continuationNode)}` : s("Session start", "会话起点")}
+    </p>}
     <div className="flex flex-col gap-0.5">
       {visible.map(node => <Button key={node.id} variant={state.inspected === node.id ? "secondary" : "ghost"}
         className={`h-auto justify-start py-1.5 font-normal ${onPath.has(node.id) ? "" : "opacity-60"}`} onClick={() => controller.inspect(node.id)}>
@@ -190,7 +195,7 @@ export function SessionHistoryPanel({ controller }: { controller: SessionControl
 
 function kindLabel(kind: SessionNode["kind"]): string {
   return ({ message: s("Input", "输入"), thinking: s("Thinking", "思考"), text: s("Reply", "回复"), toolcall: s("Tool", "工具"),
-    event: s("Event", "事件"), notice: s("Notice", "通知"), response_end: s("End", "结束") } as const)[kind];
+    event: s("Event", "事件"), notice: s("Notice", "通知") } as const)[kind];
 }
 function nodeLabel(node: SessionNode): string {
   switch (node.kind) {
@@ -198,7 +203,6 @@ function nodeLabel(node: SessionNode): string {
     case "toolcall": return node.name;
     case "event": return node.type;
     case "notice": return node.message;
-    case "response_end": return node.model;
   }
 }
 const toolLabels: Record<string, string> = {
@@ -206,6 +210,15 @@ const toolLabels: Record<string, string> = {
   cancelled: s("Cancelled", "已取消"), partial: s("Partially completed", "部分完成"), unknown: s("Outcome unknown", "结果未知"),
 };
 function NodeView({ node }: { node: SessionNode }) {
+  const usage = isBlockNode(node) ? node.usage : node.kind === "notice" ? node.response?.usage : null;
+  return <div className="flex flex-col gap-1">
+    <NodeContent node={node} />
+    {usage && <p className="type-caption">
+      {s("Input", "输入")} {usage.input ?? "—"} · {s("Output", "输出")} {usage.output ?? "—"} · {s("Cached", "缓存读取")} {usage.cacheRead ?? "—"}
+    </p>}
+  </div>;
+}
+function NodeContent({ node }: { node: SessionNode }) {
   const incomplete = isBlockNode(node) && !node.complete;
   const tag = incomplete ? <Badge variant="outline">{s("Incomplete", "未完成")}</Badge> : null;
   switch (node.kind) {
@@ -219,8 +232,9 @@ function NodeView({ node }: { node: SessionNode }) {
         <p className="type-label">{s("Arguments", "参数")}</p><JsonView value={node.complete ? node.arguments : node.argumentsText} />
         {outcome && <>
           <p className="type-label mt-3">{s("Result", "结果")}</p>
-          {outcome.kind === "succeeded" || outcome.kind === "partial" ? <JsonView value={outcome.data} />
+          {outcome.kind === "succeeded" || outcome.kind === "partial" ? <ToolResultView outcome={outcome} />
             : <p className="type-caption">{"error" in outcome ? outcome.error.message : outcome.message}</p>}
+          {outcome.kind === "partial" && <p className="type-caption">{outcome.message}</p>}
         </>}
       </Disclosure>;
     }
@@ -229,12 +243,20 @@ function NodeView({ node }: { node: SessionNode }) {
     default: return null;
   }
 }
+
+function LiveBlockView({ block }: { block: LiveBlock }) {
+  if (block.kind === "text") return <article><Markdown>{block.text}</Markdown></article>;
+  if (block.kind === "thinking") return <Disclosure label={s("Thinking", "思考")} icon={<Brain className="size-3.5" />}>
+    <Markdown>{block.text}</Markdown>
+  </Disclosure>;
+  return <Disclosure label={`${block.name} · ${block.state === "executing" ? s("Running", "执行中") : s("Preparing", "准备中")}`}
+    icon={<LoaderCircle className="size-3.5 animate-spin" />}>
+    <JsonView value={block.state === "input" ? block.argumentsText : block.arguments} />
+  </Disclosure>;
+}
 function Disclosure({ label, icon, extra, children }: { label: string; icon?: React.ReactNode; extra?: React.ReactNode; children: React.ReactNode }) {
   return <details className="rounded-md border px-3 py-2">
     <summary className="type-caption flex cursor-pointer select-none items-center gap-2 py-1"><ChevronDown className="size-3" />{icon}{label}{extra}</summary>
     <div className="pt-3">{children}</div>
   </details>;
-}
-function JsonView({ value }: { value: unknown }) {
-  return <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words font-mono text-xs leading-relaxed">{typeof value === "string" ? value : JSON.stringify(value, null, 2)}</pre>;
 }

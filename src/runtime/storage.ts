@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync, renameSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import { sessionSchemaSql } from "../session/schema.ts";
 
 export function openDatabase(root: string): DatabaseSync {
   mkdirSync(join(root, "db"), { recursive: true });
@@ -12,11 +13,7 @@ export function openDatabase(root: string): DatabaseSync {
     const version = (db.prepare("PRAGMA user_version").get() as { user_version: number }).user_version;
     if (version === 0) db.exec(`BEGIN IMMEDIATE;
       CREATE TABLE workspace (id TEXT PRIMARY KEY, title TEXT NOT NULL);
-      CREATE TABLE sessions (id TEXT PRIMARY KEY, title TEXT NOT NULL, created_at TEXT NOT NULL, cursor TEXT);
-      CREATE TABLE session_nodes (
-        seq INTEGER PRIMARY KEY AUTOINCREMENT, id TEXT NOT NULL UNIQUE, session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
-        parent_id TEXT, kind TEXT NOT NULL, payload TEXT NOT NULL);
-      CREATE INDEX session_nodes_session ON session_nodes(session_id, seq);
+      ${sessionSchemaSql}
       CREATE TABLE object_views (
         session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE, object_id TEXT NOT NULL,
         x REAL NOT NULL, y REAL NOT NULL, hidden INTEGER NOT NULL DEFAULT 0,
@@ -40,9 +37,9 @@ export function openDatabase(root: string): DatabaseSync {
         agent_configuration_id TEXT NOT NULL, model_id TEXT NOT NULL, thinking TEXT,
         revision INTEGER NOT NULL DEFAULT 1, PRIMARY KEY(session_id, agent_id)
       ) STRICT;
-      PRAGMA user_version = 3;
+      PRAGMA user_version = 5;
       COMMIT;`);
-    else if (version !== 3) throw new Error("This workspace database format is not supported by this build of Weft. Delete the development data directory to recreate it.");
+    else if (version !== 5) throw new Error("This workspace database format is not supported by this build of Weft. Back up and recreate the development database before opening it.");
     if (!db.prepare("SELECT id FROM workspace LIMIT 1").get()) {
       db.prepare("INSERT INTO workspace VALUES (?, ?)").run(randomUUID(), "Personal workspace");
     }

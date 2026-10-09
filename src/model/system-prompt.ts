@@ -5,7 +5,7 @@ export type PromptBlock =
   | { id: string; kind: "agent"; role: string; text: string }
   | { id: string; kind: "context"; file: string; text: string };
 
-/** 启动或加载对话时由代码构造的运行数据，不进入 Task 事件或请求记录。 */
+/** 每次请求由代码构造的运行数据，不进入会话树或请求记录。 */
 export interface SystemPrompt { blocks: readonly PromptBlock[] }
 
 const environment: PromptBlock = {
@@ -14,8 +14,9 @@ const environment: PromptBlock = {
   from: "weft",
   text: [
     "You are working in Weft, a local personal agent workbench.",
-    "A task can contain agents, resources, and operations. Cards and connections are views of these objects; visibility does not grant access.",
-    "Resources provide their own tools. Use resource_list to see linked resources, resource_inspect to check a resource's live state and tools, and resource_call to run a resource tool.",
+    "A session can contain agents, resources, and operations. Cards and connections are views of these objects; visibility does not grant access.",
+    "Tools are defined independently and declare which resources they support. Linking a resource makes matching tools available, subject to your tool policy.",
+    "Weft provides resource_list, resource_inspect, and resource_call as fixed controls. Use them to list linked resources, inspect live state and available tools, and apply a tool to a resource.",
     "Messages like \"Resource ... is now linked to you\" report the current link state; they do not grant access by themselves. The runtime enforces access.",
     "External changes (edited or deleted files) are not announced; inspect a resource when its current state matters.",
     "Detaching a resource removes future access, but does not erase earlier messages, results, or knowledge.",

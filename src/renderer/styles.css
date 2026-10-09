@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @source "../../node_modules/streamdown/dist/*.js";
+@source "../modules";
 
 /* 主题 token、两种表面、窗口与编织布局机制。控件外观只来自 shared/ui 的 shadcn 官方源码。 */
 :root {
@@ -125,7 +126,7 @@
     app-region: no-drag;
   }
   .window-navigation { @apply gap-0.5; }
-  .window-task-title { @apply min-w-0 max-w-52 truncate px-1.5 text-sm; }
+  .window-session-title { @apply min-w-0 max-w-52 truncate px-1.5 text-sm; }
   .window-actions { @apply shrink-0 gap-0.5; }
   .window-actions[data-hidden="true"] { visibility: hidden; }
   .window[data-platform="darwin"] .window-navigation {
@@ -212,7 +213,7 @@
 .react-flow__handle { width: 7px; height: 7px; background: var(--primary); border: 2px solid var(--card); }
 @media (max-width: 1100px) {
   .toolbar-label { display: none; }
-  .window-task-title { max-width: 160px; }
+  .window-session-title { max-width: 160px; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation: none !important; transition: none !important; }

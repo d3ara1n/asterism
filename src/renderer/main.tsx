@@ -8,9 +8,13 @@ import "./styles.css";
 import { locale } from "./shared/i18n";
 import { startAppearance } from "./features/appearance/state";
 import { TooltipProvider } from "./shared/ui/tooltip";
+import { ModuleViewsProvider } from "./modules/views";
+import { moduleViews } from "../modules/renderer";
 
 document.documentElement.lang = locale === "zh" ? "zh-CN" : "en";
 
 startAppearance();
 const controller = new ApplicationController(window.weft);
-createRoot(document.getElementById("root")!).render(<StrictMode><ErrorBoundary><MotionConfig reducedMotion="user"><TooltipProvider><App controller={controller} /></TooltipProvider></MotionConfig></ErrorBoundary></StrictMode>);
+createRoot(document.getElementById("root")!).render(<StrictMode><ErrorBoundary><MotionConfig reducedMotion="user"><TooltipProvider>
+  <ModuleViewsProvider registry={moduleViews}><App controller={controller} /></ModuleViewsProvider>
+</TooltipProvider></MotionConfig></ErrorBoundary></StrictMode>);

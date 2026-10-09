@@ -46,7 +46,7 @@ export const defaultAgents: Omit<AgentConfiguration, "revision">[] = [
       "read",
       "find",
       "grep",
-      "ls",
+      "list",
       "fffind",
       "ffgrep",
       "bash"
@@ -143,7 +143,7 @@ export const defaultAgents: Omit<AgentConfiguration, "revision">[] = [
       "bash",
       "grep",
       "find",
-      "ls",
+      "list",
       "fffind",
       "ffgrep",
       "subagent_delegate"

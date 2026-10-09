@@ -1,17 +1,19 @@
 import { z } from "zod";
 import { modelSchema, providerInputSchema, thinkingSchema } from "./configuration.ts";
+import { jsonSchema } from "./json.ts";
+import { contractReferenceSchema } from "./presentation.ts";
+export { jsonSchema, type Json } from "./json.ts";
 
-export type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
-export const jsonSchema: z.ZodType<Json> = z.json();
 const id = z.string().min(1).max(160);
 const error = z.strictObject({ code: z.string(), message: z.string() });
+const implementation = { implementation: contractReferenceSchema.optional() };
 export const toolOutcomeSchema = z.discriminatedUnion("kind", [
-  z.strictObject({ kind: z.literal("succeeded"), model: jsonSchema, data: jsonSchema }),
-  z.strictObject({ kind: z.literal("rejected"), error }),
-  z.strictObject({ kind: z.literal("failed"), error }),
-  z.strictObject({ kind: z.literal("cancelled"), message: z.string() }),
-  z.strictObject({ kind: z.literal("partial"), model: jsonSchema, data: jsonSchema, message: z.string() }),
-  z.strictObject({ kind: z.literal("unknown"), message: z.string() }),
+  z.strictObject({ ...implementation, kind: z.literal("succeeded"), model: jsonSchema, data: jsonSchema }),
+  z.strictObject({ ...implementation, kind: z.literal("rejected"), error }),
+  z.strictObject({ ...implementation, kind: z.literal("failed"), error }),
+  z.strictObject({ ...implementation, kind: z.literal("cancelled"), message: z.string() }),
+  z.strictObject({ ...implementation, kind: z.literal("partial"), model: jsonSchema, data: jsonSchema, message: z.string() }),
+  z.strictObject({ ...implementation, kind: z.literal("unknown"), message: z.string() }),
 ]);
 export type ToolOutcome = z.infer<typeof toolOutcomeSchema>;
 export const usageSchema = z.strictObject({

@@ -9,18 +9,32 @@
 | `shared/` | 版本化命令、投影与传输校验 | 仅 Zod，不依赖任何进程或 UI |
 | `main/` | Electron 窗口、单实例锁、数据目录、运行时生命周期、可信 IPC 路由 | shared，不调用数据库 |
 | `preload/` | 沙箱桥，受控命令与状态订阅 | shared，只暴露 `window.weft` |
-| `runtime/` | 应用命令、查询、事务、SQLite 迁移、对象存储与私有凭据客户端 | shared、session、configuration、Node 内建 API |
+| `runtime/` | 应用命令、查询、事务、SQLite 建库、对象存储与私有凭据客户端 | shared、session、configuration、modules 后台入口、Node API |
 | `configuration/` | 三类配置、密文凭据、连接测试与默认角色，见目录 README | shared、Node SQLite、模型 SDK；不依赖 Electron |
 | `session/` | 会话级扁平树、游标与吸附、模型投影、工作台折叠 | shared、Node SQLite；不依赖 UI/SDK |
 | `model/` | 系统提示块组装与模型投影、单次请求契约、三协议 SDK 适配与续接资料 | shared、session、AI SDK |
-| `execution/` | 单代理循环、工具授权与批次收束 | session、model 契约 |
-| `renderer/` | 应用视图、React Flow、用户意图 | shared、React 与 UI 库；不访问 Node/数据库 |
+| `execution/` | 单代理循环、流块状态机、请求能力视图、外部工具策略、固定 Weft 操作入口与批次调度 | session、model、resources、tools 契约 |
+| `resources/` | 资源后台契约、注册目录、卡片投影与环境聚合 | shared、session 对象类型 |
+| `tools/` | 共享工具声明、实现注册与校验、资源支持关系；不持有外部授权策略 | shared、session 对象类型 |
+| `modules/` | 笔记、文件系统、代理的纯契约、后台实现、前端视图，见目录 README | 后台/前端分入口，各自遵守进程边界 |
+| `renderer/` | 应用视图、视图注册机制、React Flow、用户意图 | shared、modules 前端入口、React 与 UI 库；不访问 Node/数据库 |
 
 ## 完整路径
 
 `renderer/controller → preload → main/RuntimeHost → utilityProcess → ApplicationService → SessionTree / ObjectStore`
 
 每次应用命令先由 Zod 校验，再交运行时单一写入者处理。业务创建、查询索引与初始视图处于同一事务；正文引用只在内容文件成功落盘后进入事件。运行时返回应用投影，UI 将它映射为画布节点和连线。
+
+路径遍历、块识别和合法续接判断统一位于 `shared/session-path.ts`，运行时与 renderer 共用。`execution/response.ts` 校验一次响应内的块生命周期；已完成块追加到树，未完成输出经会话快照的 `live` 字段提供给界面，不写入存储。数据库结构只在运行时建库，仓储构造不隐式建表。
+
+块的 `requestParentId` 记录请求使用的路径末端；`session/projection.ts` 在该位置后组合响应，把期间事件留在响应外。终态通过 `SessionTree.completeBlock` 只追加一次并绑定到最高序号块，读取时合并可空字段，原始节点不变。`SessionTree.select` 将选择审计与游标更新原子提交，`cursorSelections` 可读取日志。`seq` 只计节点追加，同序号通知也可能带来新计量或游标变化。
+
+SQLite 的 `session_blocks` 视图可直接查询每块计量；`session_usage` 还包含没有输出块的异常诊断计量。例如：
+
+```sql
+SELECT model, SUM(json_extract(usage, '$.total')) AS tokens
+FROM session_usage WHERE session_id = ? GROUP BY model;
+```
 
 `workspace.read` 不带 `session_id` 时只返回工作区与会话列表摘要，`session` 为 null；启动与回首页均走此路径。读取具体正文和历史必须显式指定会话。
 
@@ -40,6 +54,6 @@ GUI 由用户验证。测试使用独立临时数据库，结束后清理；不�
 
 - 新增应用操作：先定义 shared 命令与响应，再在 runtime 实现事务/查询，最后接 UI。
 - 模型与执行：运行时接入 provider 与工具调度；不在 React 生命周期执行，不把 provider 会话当任务历史。
-- 资源类型：定义资源能力、授权与版本约束，再接运行时操作和专门视图。当前笔记只读，不代表目录已获授权。
+- 资源与工具：按 [功能模块约定](modules/README.md) 添加纯契约、后台实现与前端视图，遵守统一工具 args 和实现自有 target/result；支持关系不替代执行授权。
 - 数据变更：发布前直接修改建表结构与 schema，不写迁移或兼容读取；旧开发数据删除重建。
 - UI 布局：独立视图存储；不得把 React Flow 节点 JSON 作为持久领域模型。

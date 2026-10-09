@@ -20,7 +20,12 @@
 | 对话 | conversation | 某代理从会话树即时投影出的上下文与视图，不单独存储 |
 | 代理配置 | agent configuration | 提示词、工具策略、委派范围与模型角色引用等可复用配置；所有代理对象共用，区别于执行实例 |
 | 资源 | resource | 具有稳定身份、状态、操作与视图的对象，可以是完全虚拟的 |
-| 资源类型 / 资源实例 | resource type / instance | 类型共享工具定义；实例携带身份与状态 |
+| 资源类型 / 资源实例 | resource type / instance | 类型定义资源状态与检查方式；实例携带身份与状态；工具实现声明支持关系 |
+| 工具 | tool | 与资源平级的共享契约，规定身份与 args；可有多个后端实现，外部策略另行决定是否允许使用 |
+| 工具实现 | tool implementation | 后端对某工具的实现，规定支持的资源类型、target/result、handler 与执行策略；有稳定 ID 和版本 |
+| 资源内部目标 | target | resource_call 的可选定位参数，由选定实现解释；形状不限于 path |
+| 功能模块 | feature module | 共置纯契约、后台实现、前端视图的代码单元；两个进程分别装配，当前静态内置 |
+| 展示契约 | presentation contract | 连接后台数据与前端视图的稳定 ID、版本和数据 schema，不携带 UI 代码 |
 | 资源身份 | resource_id | 稳定身份，不等于路径或 URL |
 | 操作 | operation | 对资源的执行记录：目标、参数、状态、实际结果与关联资源 |
 | 视图 | view | 对象的呈现；同一对象可有多个视图 |
@@ -38,8 +43,9 @@
 | 摘要列表 | summary list | 执行/用户输入的导航列表，历史导航主入口 |
 | 绑定 | binding | 代理在某个有效区间获得资源访问能力 |
 | 挂接 / 解绑 | attach / detach | 绑定的建立与撤销；作为会话树 event 节点记录，模型可见并用于回溯重建 |
-| 待生效 | pending | 绑定变化已请求、在轮次交界尚未生效的状态 |
-| 工具目录 | tool catalog | 已挂接资源声明的工具集合，按资源类型合并；经 `resource_call` 二级调用 |
+| 待生效 | pending | 变化已记录，但在途请求仍使用开始时的环境；下一次请求取用新状态 |
+| 工具目录 | tool catalog | 共享工具契约及后端实现的唯一目录；按支持关系匹配已链接资源，再由外部策略筛选；经 `resource_call` 调用 |
+| Weft 操作入口 | Weft action | 软件提供的固定外围接口，如 resource_list/inspect/call；仅在 provider 协议中表示为 tools，不进入资源工具目录或插件注册面 |
 | 运行支撑环境 | harness | 软件为代理提供的执行环境、工作机制及通用指令；执行授权由运行时落实 |
 | 提示块 | prompt block | 带身份、种类、来源与正文的结构化指令单元，按确定顺序统一渲染为系统指令 |
 | 事件 | event | 会话树节点的一类，记录资源与工作台状态变化，种类见 `docs/timeline.md` |

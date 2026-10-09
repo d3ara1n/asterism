@@ -10,6 +10,7 @@ export class SessionController {
   private connections = 0;
   private reading = false;
   private dirty = false;
+  private commandRevision = 0;
   private unsubscribe: (() => void) | null = null;
   constructor(private readonly bridge: SessionBridge, readonly sessionId: string) {}
   getSnapshot = (): SessionViewState => this.state;
@@ -26,8 +27,8 @@ export class SessionController {
     if (this.connections++ === 0) {
       this.generation++;
       this.unsubscribe = this.bridge.onChanged(event => {
-        const current = this.state.snapshot;
-        if (event.sessionId === this.sessionId && (event.seq > (current?.seq ?? 0) || event.selectionRevision > (current?.selectionRevision ?? 0))) void this.refresh();
+        // 游标与运行状态变化不追加节点，同序号通知也必须重新查询。
+        if (event.sessionId === this.sessionId) void this.refresh();
       });
       void this.refresh();
     }
@@ -42,14 +43,20 @@ export class SessionController {
   }
   refresh = async (): Promise<void> => {
     if (!this.connections) return;
-    if (this.reading) { this.dirty = true; return; }
+    if (this.reading || this.state.busy) { this.dirty = true; return; }
     const generation = this.generation;
     this.reading = true;
     try {
       do {
         this.dirty = false;
+        const commandRevision = this.commandRevision;
         const result = await this.bridge.execute({ type: "read", sessionId: this.sessionId });
         if (generation !== this.generation) return;
+        if (commandRevision !== this.commandRevision) {
+          this.dirty = true;
+          if (this.state.busy) return;
+          continue;
+        }
         if (result.ok) { this.accept(result.snapshot); this.update({ error: null }); }
         else { this.update({ loading: false, error: result.error.message, missing: result.error.code === "not_found" }); break; }
       } while (this.dirty);
@@ -59,6 +66,7 @@ export class SessionController {
   };
   execute = async (command: SessionCommand): Promise<SessionResult> => {
     if (this.state.busy) return { ok: false, error: { code: "conflict", message: "A session command is already pending." } };
+    this.commandRevision++;
     this.update({ busy: true, error: null });
     try {
       const result = await this.bridge.execute(command);
@@ -68,7 +76,10 @@ export class SessionController {
     } catch {
       const result: SessionResult = { ok: false, error: { code: "unavailable", message: "The session connection was lost. Reload before retrying." } };
       this.update({ error: result.error.message }); return result;
-    } finally { this.update({ busy: false }); }
+    } finally {
+      this.update({ busy: false });
+      if (this.dirty) void this.refresh();
+    }
   };
 }
 

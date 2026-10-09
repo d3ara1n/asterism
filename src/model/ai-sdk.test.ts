@@ -15,6 +15,31 @@ const input: ModelInput = {
 };
 
 describe("AI SDK 适配契约", () => {
+  it("真实 Anthropic 解码保留 start 的 redactedData 与 delta 的签名", async () => {
+    const frames = [
+      { type: "message_start", message: { id: "response-thinking", type: "message", role: "assistant", model: "test", content: [],
+        stop_reason: null, stop_sequence: null, usage: { input_tokens: 3, output_tokens: 0 } } },
+      { type: "content_block_start", index: 0, content_block: { type: "thinking", thinking: "", signature: "" } },
+      { type: "content_block_delta", index: 0, delta: { type: "thinking_delta", thinking: "Reasoning" } },
+      { type: "content_block_delta", index: 0, delta: { type: "signature_delta", signature: "signed-thinking" } },
+      { type: "content_block_stop", index: 0 },
+      { type: "content_block_start", index: 1, content_block: { type: "redacted_thinking", data: "redacted-thinking" } },
+      { type: "content_block_stop", index: 1 },
+      { type: "message_delta", delta: { stop_reason: "end_turn", stop_sequence: null }, usage: { output_tokens: 2 } },
+      { type: "message_stop" },
+    ];
+    const transport: typeof fetch = async () => new Response(frames.map(frame => `data: ${JSON.stringify(frame)}\n\n`).join(""),
+      { headers: { "content-type": "text/event-stream" } });
+    const adapter = new AiSdkAdapter(async () => "synthetic-key",
+      (value, key) => createProviderModel(value.settings.provider, value.settings.model, key, transport));
+    const events: ModelEvent[] = [];
+    for await (const event of adapter.prepare(input).stream(new AbortController().signal)) events.push(event);
+    expect(events.filter(event => event.type === "part.end")).toEqual([
+      expect.objectContaining({ continuation: { anthropic: { signature: "signed-thinking" } } }),
+      expect.objectContaining({ continuation: { anthropic: { redactedData: "redacted-thinking" } } }),
+    ]);
+  });
+
   it.each(["openai-chat", "openai-responses", "anthropic"] as const)("合成 %s 协议流通过真实 provider 解码，无鉴权头且禁止重定向", async protocol => {
     const response = { id: "response-1", model: "test", created_at: 0 };
     const frames = protocol === "openai-chat" ? [
@@ -108,7 +133,9 @@ describe("AI SDK 适配契约", () => {
     if (end.type !== "finish") throw new Error();
     const serialized = JSON.stringify(events);
     expect(serialized).toContain("signature-value"); expect(serialized).not.toContain("credential-not-for-history"); expect(serialized).not.toContain("secret-metadata");
-    const next = sdkMessages({ ...input, messages: [...input.messages, { kind: "output", parts: [{ kind: "thinking", text: "Think", continuation: (events.find(e => e.type === "part.end" && e.partId === "thinking:r") as { continuation: never }).continuation }, { kind: "toolcall", callId: "call-1", name: "read", arguments: { resource_id: "note" }, continuation: null }], scope: modelScope(input.settings), adapter: adapter.version },
+    const thinking = events.find(e => e.type === "part.end" && e.partId === "thinking:r");
+    if (thinking?.type !== "part.end") throw new Error("Missing thinking completion.");
+    const next = sdkMessages({ ...input, messages: [...input.messages, { kind: "output", parts: [{ kind: "thinking", text: "Think", continuation: thinking.continuation ?? null }, { kind: "toolcall", callId: "call-1", name: "read", arguments: { resource_id: "note" }, continuation: null }], scope: modelScope(input.settings), adapter: adapter.version },
       { kind: "result", callId: "call-1", name: "read", outcome: { kind: "succeeded", model: "Note text", data: { userOnly: "detail" } } }] });
     expect(next.map(m => m.role)).toEqual(["user", "assistant", "tool"]);
     expect(JSON.stringify(next)).toContain("signature-value"); expect(JSON.stringify(next)).not.toContain("userOnly");

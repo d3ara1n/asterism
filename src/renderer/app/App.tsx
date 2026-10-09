@@ -13,8 +13,10 @@ import { HomePage, type StartInput } from "../features/home/HomePage";
 import { Workbench, type WorkbenchHandle } from "../features/workbench/Workbench";
 import { AddDirectoryDialog } from "../features/workbench/AddDirectoryDialog";
 import { AccessDialog } from "../features/workbench/AccessDialog";
-import { CreateNoteDialog, type NoteCreation } from "../features/workbench/CreateNoteDialog";
+import { CreateNoteDialog } from "../features/workbench/CreateNoteDialog";
+import type { ResourcePlacement } from "../features/workbench/placement";
 import { SubmissionIdentity } from "../features/conversation/controller";
+import { sessionController } from "../features/conversation/registry";
 import { s } from "../features/configuration/state";
 import { Titlebar, Window } from "./Window";
 import { Sidebar } from "./Sidebar";
@@ -24,7 +26,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { islandTransition } from "../shared/weave/motion";
 
 /** 主屏包含侧栏与首页/工作台；设置为左侧独立屏，切换时主屏整体平移。 */
-type MainView = { kind: "home" } | { kind: "conversation"; taskId: string };
+type MainView = { kind: "home" } | { kind: "conversation"; sessionId: string };
 type PageId = "settings" | "main";
 
 export function App({ controller }: { controller: ApplicationController }) {
@@ -34,25 +36,27 @@ export function App({ controller }: { controller: ApplicationController }) {
   const sidebarToggle = useRef<HTMLButtonElement>(null);
   const [page, setPage] = useState<PageId>("main");
   const [view, setView] = useState<MainView>({ kind: "home" });
+  const currentView = useRef(view);
   const [sidebarVisible, setSidebarVisible] = useState(true);
   const [draft, setDraft] = useState("");
   const [conversationDrafts, setConversationDrafts] = useState<Record<string, string>>({});
-  const [creation, setCreation] = useState<NoteCreation | null>(null);
+  const [creation, setCreation] = useState<ResourcePlacement | null>(null);
   const [accessOpen, setAccessOpen] = useState(false);
-  const [directory, setDirectory] = useState<NoteCreation | null>(null);
+  const [directory, setDirectory] = useState<ResourcePlacement | null>(null);
   const start = useStart();
   // 每次导航递增；异步创建完成时据此判断用户是否已离开，不夺走当前视图。
   const navigation = useRef(0);
-  const run = useCallback((command: Command) => controller.run(command), [controller]);
+  const run = useCallback((command: Command) => controller.run(command, () =>
+    command.session_id ? sessionController(command.session_id).getSnapshot().inspected : undefined), [controller]);
   useEffect(() => controller.connect(), [controller]);
   const snapshot = state.snapshot;
   // 晚到响应不能把首页或另一个会话替换为旧工作台。
-  const task = view.kind === "conversation" && snapshot?.session?.id === view.taskId ? snapshot.session : null;
+  const session = view.kind === "conversation" && snapshot?.session?.id === view.sessionId ? snapshot.session : null;
   const ready = state.status === "ready";
-  const writable = ready && !state.busy && !!task && !task.at;
+  const writable = ready && !state.busy && !!session && !session.at;
   const inSettings = page === "settings";
   const mainTitle = view.kind === "home" ? t.home
-    : task?.title ?? snapshot?.sessions.find(item => item.id === view.taskId)?.title ?? t.conversation;
+    : session?.title ?? snapshot?.sessions.find(item => item.id === view.sessionId)?.title ?? t.conversation;
 
   const focusMain = () => requestAnimationFrame(() => document.getElementById("screen-main")?.focus({ preventScroll: true }));
   const go = (next: PageId) => {
@@ -72,6 +76,7 @@ export function App({ controller }: { controller: ApplicationController }) {
   });
   const navigate = (next: MainView) => {
     navigation.current++;
+    currentView.current = next;
     setView(next); setPage("main"); setCreation(null); setDirectory(null); setAccessOpen(false);
     controller.clearError();
     focusMain();
@@ -81,9 +86,9 @@ export function App({ controller }: { controller: ApplicationController }) {
     // 清除已打开的正文，只保留列表；队列也保证在途读取之后最终回到无任务状态。
     if (ready || state.busy) void run({ type: "workspace.read" });
   };
-  const openTask = (taskId: string) => {
-    navigate({ kind: "conversation", taskId });
-    void run({ type: "workspace.read", session_id: taskId });
+  const openSession = (sessionId: string) => {
+    navigate({ kind: "conversation", sessionId });
+    void run({ type: "workspace.read", session_id: sessionId });
   };
   const startConversation = async (input: StartInput) => {
     if (!ready) return;
@@ -91,11 +96,14 @@ export function App({ controller }: { controller: ApplicationController }) {
     const created = await start.submit(input);
     if (!created) return;
     setDraft("");
-    if (token === navigation.current) openTask(created);
-    else void run({ type: "workspace.read", ...(view.kind === "conversation" ? { session_id: view.taskId } : {}) });
+    if (token === navigation.current) openSession(created);
+    else {
+      const current = currentView.current;
+      void run({ type: "workspace.read", ...(current.kind === "conversation" ? { session_id: current.sessionId } : {}) });
+    }
   };
-  const addDirectory = () => { const placement = workbench.current?.notePlacement(); if (placement) setDirectory(placement); };
-  const addNote = () => { const placement = workbench.current?.notePlacement(); if (placement) setCreation(placement); };
+  const addDirectory = () => { const placement = workbench.current?.resourcePlacement(); if (placement) setDirectory(placement); };
+  const addNote = () => { const placement = workbench.current?.resourcePlacement(); if (placement) setCreation(placement); };
   const hideSidebar = () => {
     setSidebarVisible(false);
     requestAnimationFrame(() => sidebarToggle.current?.focus({ preventScroll: true }));
@@ -114,9 +122,9 @@ export function App({ controller }: { controller: ApplicationController }) {
         <DropdownMenuItem onSelect={() => go("settings")}><Settings />{t.menuSettings}</DropdownMenuItem>
       </DropdownMenuContent></DropdownMenu>}
     <span className="h-4 w-px shrink-0 bg-border" />
-    <span className="window-task-title" title={inSettings ? t.settings : mainTitle}>{inSettings ? t.settings : mainTitle}</span>
+    <span className="window-session-title" title={inSettings ? t.settings : mainTitle}>{inSettings ? t.settings : mainTitle}</span>
   </>;
-  const actions = task ? <>
+  const actions = session ? <>
     <Button variant="ghost" size="sm" disabled={!writable} onClick={addNote} aria-label={t.addNoteLabel}><FileText /><span className="toolbar-label">{t.addNote}</span></Button>
     <Button variant="ghost" size="sm" disabled={!writable} onClick={addDirectory} aria-label={s("Add directory", "添加目录")}><Folder /><span className="toolbar-label">{s("Directory", "目录")}</span></Button>
     <Button variant="ghost" size="sm" disabled={!writable} onClick={() => setAccessOpen(true)} aria-label={t.accessLabel}><KeyRound /><span className="toolbar-label">{t.access}</span></Button>
@@ -124,23 +132,23 @@ export function App({ controller }: { controller: ApplicationController }) {
     <Button variant="ghost" size="sm" onClick={event => workbench.current?.togglePanel("history", event.currentTarget)} aria-label={t.history}><History /><span className="toolbar-label">{t.history}</span></Button>
   </> : undefined;
 
-  const conversation = task
-    ? <Workbench key={task.id} ref={workbench} task={task} ready={ready} busy={state.busy} run={run}
-      draft={conversationDrafts[task.id] ?? ""} onDraftChange={value => setConversationDrafts(drafts => ({ ...drafts, [task.id]: value }))}
-      onHome={goHome} onTurnEnded={() => { void run({ type: "workspace.read", session_id: task.id }); }} />
+  const conversation = session
+    ? <Workbench key={session.id} ref={workbench} session={session} ready={ready} busy={state.busy} run={run}
+      draft={conversationDrafts[session.id] ?? ""} onDraftChange={value => setConversationDrafts(drafts => ({ ...drafts, [session.id]: value }))}
+      onHome={goHome} />
     : <div className="flex h-full items-center justify-center px-6"><div>
       <PageState kind={state.busy ? "loading" : "error"} title={state.busy ? t.openingTitle : t.unavailableTitle}
         body={state.busy ? t.openingBody : t.unavailableBody} />
       {!state.busy && view.kind === "conversation" && <div className="mt-4 text-center">
-        <Button variant="secondary" onClick={() => openTask(view.taskId)} disabled={!ready}>{t.retry}</Button>
+        <Button variant="secondary" onClick={() => openSession(view.sessionId)} disabled={!ready}>{t.retry}</Button>
       </div>}
     </div></div>;
   const sidebar: IslandSpec = {
     id: "navigation", label: t.appNavigation, width: { min: 224, max: 224 },
     render: () => <Sidebar snapshot={snapshot} status={state.status} busy={state.busy}
-      selectedTaskId={view.kind === "conversation" ? view.taskId : null}
+      selectedSessionId={view.kind === "conversation" ? view.sessionId : null}
       homeActive={view.kind === "home"}
-      onHome={goHome} onTask={openTask} onSettings={() => go("settings")} onHide={hideSidebar}
+      onHome={goHome} onSession={openSession} onSettings={() => go("settings")} onHide={hideSidebar}
       onRetry={() => { void run({ type: "workspace.read" }); }} />,
   };
   const main: IslandSpec = {
@@ -162,7 +170,7 @@ export function App({ controller }: { controller: ApplicationController }) {
         { id: "settings", label: t.settings, surface: false, content: <SettingsPage active={inSettings} /> },
         { id: "main", label: mainTitle, surface: false,
           // 切换会话时关闭工作台右侧的更深浮岛。
-          content: <Screen label={t.appNavigation} leading={sidebarVisible ? [sidebar] : []} root={main} resetKey={view.kind === "conversation" ? view.taskId : "home"} className="h-full" /> },
+          content: <Screen label={t.appNavigation} leading={sidebarVisible ? [sidebar] : []} root={main} resetKey={view.kind === "conversation" ? view.sessionId : "home"} className="h-full" /> },
       ]} />
     </Window>
     {state.error && <Alert variant="destructive" className="fixed bottom-4 left-1/2 z-[60] w-[min(560px,calc(100%-32px))] -translate-x-1/2 flex items-start gap-3 shadow-md">
@@ -171,7 +179,7 @@ export function App({ controller }: { controller: ApplicationController }) {
     </Alert>}
     {creation && <CreateNoteDialog creation={creation} busy={state.busy} run={run} onClose={() => setCreation(null)} />}
     {directory && <AddDirectoryDialog creation={directory} busy={state.busy} run={run} onClose={() => setDirectory(null)} />}
-    {accessOpen && task && <AccessDialog task={task} busy={state.busy} run={run} onClose={() => setAccessOpen(false)} />}
+    {accessOpen && session && <AccessDialog session={session} busy={state.busy} run={run} onClose={() => setAccessOpen(false)} />}
   </>;
 }
 

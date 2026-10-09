@@ -76,8 +76,8 @@ export class RuntimeHost {
         }
         if (configurationChangedSchema.safeParse(raw).success) { this.onConfigurationChanged(); return; }
         if (configurationResponseSchema.safeParse(raw).success) { this.configurationRequests?.receive(raw); return; }
-        const conversation = sessionChangedSchema.safeParse(raw);
-        if (conversation.success) { this.onSessionChanged(conversation.data); return; }
+        const session = sessionChangedSchema.safeParse(raw);
+        if (session.success) { this.onSessionChanged(session.data); return; }
         if (sessionResponseSchema.safeParse(raw).success) { this.sessionRequests?.receive(raw); return; }
         const parsed = runtimeMessageSchema.safeParse(raw);
         if (!parsed.success) return;

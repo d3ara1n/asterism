@@ -120,8 +120,8 @@ function AgentEditor({ initialId }: { initialId: string | null }) {
         tools: next === "allow" ? [...(toolDrafts.allow ?? base.tools ?? [])] : null,
         excludeTools: next === "exclude" ? [...(toolDrafts.exclude ?? base.excludeTools ?? [])] : null };
     })} />
-    {effectiveMode !== "all" && <TextField label={s("Tool IDs (one per line)", "工具 ID（每行一项）")} value={toolText} placeholder={mode === undefined ? (base.tools ?? base.excludeTools ?? []).join("\n") : undefined}
-      hint={s("An empty custom allowlist permits no tools. Select the built-in policy to inherit.", "自定义允许列表留空表示不允许任何工具；选择内置策略可恢复继承。")}
+    {effectiveMode !== "all" && <TextField label={s("Tool names (one per line)", "工具名（每行一项）")} value={toolText} placeholder={mode === undefined ? (base.tools ?? base.excludeTools ?? []).join("\n") : undefined}
+      hint={s("Use names such as read or list. An empty allowlist disables resource tools; Weft's resource controls remain available.", "填写 read、list 等资源工具名。允许列表留空会禁用资源工具，Weft 的资源操作入口仍可用。")}
       onChange={next => {
         const entries = next.split("\n");
         setToolDrafts(previous => ({ ...previous, [effectiveMode]: entries }));

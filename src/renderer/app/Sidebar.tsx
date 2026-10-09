@@ -5,9 +5,9 @@ import { Button } from "../shared/ui/button";
 import { WeftMark } from "../shared/ui/weft-mark";
 
 /** 应用导航只消费会话摘要；选择会话后由应用层显式加载工作台。 */
-export function Sidebar({ snapshot, status, busy, selectedTaskId, homeActive, onHome, onTask, onSettings, onHide, onRetry }: {
-  snapshot: AppSnapshot | null; status: RuntimeStatus; busy: boolean; selectedTaskId: string | null;
-  homeActive: boolean; onHome: () => void; onTask: (id: string) => void;
+export function Sidebar({ snapshot, status, busy, selectedSessionId, homeActive, onHome, onSession, onSettings, onHide, onRetry }: {
+  snapshot: AppSnapshot | null; status: RuntimeStatus; busy: boolean; selectedSessionId: string | null;
+  homeActive: boolean; onHome: () => void; onSession: (id: string) => void;
   onSettings: () => void; onHide: () => void; onRetry: () => void;
 }) {
   return <aside id="app-sidebar" className="app-sidebar" aria-label={t.appNavigation}>
@@ -22,10 +22,10 @@ export function Sidebar({ snapshot, status, busy, selectedTaskId, homeActive, on
     <section className="mt-6 flex min-h-0 flex-1 flex-col" aria-labelledby="conversation-list-title">
       <h2 id="conversation-list-title" className="type-label mb-2 px-2">{t.conversations}</h2>
       <div className="min-h-0 flex-1 overflow-y-auto">
-        {snapshot?.sessions.map(task => <Button key={task.id} variant={selectedTaskId === task.id ? "secondary" : "ghost"} className="w-full justify-start"
-          aria-current={selectedTaskId === task.id ? "page" : undefined} disabled={busy || status !== "ready"}
-          onClick={() => onTask(task.id)} title={task.title}>
-          <MessageSquare className="text-muted-foreground" /><span className="truncate">{task.title}</span>
+        {snapshot?.sessions.map(session => <Button key={session.id} variant={selectedSessionId === session.id ? "secondary" : "ghost"} className="w-full justify-start"
+          aria-current={selectedSessionId === session.id ? "page" : undefined} disabled={busy || status !== "ready"}
+          onClick={() => onSession(session.id)} title={session.title}>
+          <MessageSquare className="text-muted-foreground" /><span className="truncate">{session.title}</span>
         </Button>)}
         {snapshot?.sessions.length === 0 && <p className="type-caption px-2 py-3">{t.noConversations}</p>}
         {!snapshot && status !== "unavailable" && <p role="status" className="type-caption px-2 py-3">{t.loadingConversations}</p>}

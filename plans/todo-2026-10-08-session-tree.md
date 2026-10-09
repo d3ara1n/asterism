@@ -1,15 +1,15 @@
 # 会话级扁平树改造
 
-> 立案 2026-10-08。语义见 `docs/timeline.md`、`docs/object-model.md`、`docs/conversation-core.md`。现有开发数据直接丢弃，存储版本 3 不做迁移。
+> 立案 2026-10-08。语义见 `docs/timeline.md`、`docs/object-model.md`、`docs/conversation-core.md`。当前存储版本 5，开发数据不做迁移，重建由用户操作。
 
 ## 第一批：存储、运行时、投影（一起交付）
 
-- [x] 存储版本 3：`sessions` 索引与会话级节点表（id、session_id、parent_id、agent_id、kind、response_id、ordinal、complete、recorded_at、payload），游标为追加记录；移除 `tasks.branch_id`、线性 `events` 与每代理 conversation 事件；代理选择按代理对象保存。
+- [x] `sessions` 索引与会话级节点表；移除 `tasks.branch_id`、线性 `events` 与每代理 conversation 事件；代理选择按代理对象保存。
 - [x] `history/` 与 `conversation/` 合并为会话树模块：追加校验、祖先路径、路径折叠出工作台对象与链接。
 - [x] 运行时：流增量只在内存，块完成追加；中断时以 complete=false 追加；toolcall 取得结局后与结果一并追加；无块失败发错误级 notice。
 - [x] 模型投影：按 agent 过滤、按 response_id/序号归组、展开 tool 结果、响应期间事件延后、跳过不完整块。
 - [x] 回溯：会话 settled 才可 select；继续点 thinking 结尾时退到合法祖先。
-- [x] IPC 版本 2：`session` 通道；renderer 控制器与工作台改读新投影。
+- [x] 应用 IPC 版本 3、session IPC 版本 4：renderer 控制器与工作台消费会话树和版本化资源投影。
 - [x] Task 全面改名 Session（代码、命令、测试）。
 - [x] typecheck 与契约测试：投影归组与延后、序号排序、不完整块跳过、吸附、并行代理节点交错、settled 约束、幂等提交。
 
@@ -22,6 +22,17 @@
 
 ## 实测后再定
 
-- [ ] 动态工具调用可靠性；不理想时改为链接时合并加入顶层 tools。
+- [ ] 动态资源工具调用可靠性；保持 Weft 一级入口固定，通过资源工具目录与 inspect 提供动态 schema。
 - [ ] 只截掉末尾 toolcall 的投影在三协议的接受情况。
 - [ ] 代理间通信工具与“子代理” skill；对象自身事件机制（如象棋）。
+
+## 审查整修与后续契约
+
+- [x] **游标选择审计**：独立追加日志记录原位置、请求位置、吸附结果、原因与时间；与游标更新同事务，支持外层事务回退，不进入树或模型上下文。覆盖显式选择、返回起点、自动续接吸附与数据库重开。
+- [x] **块级计量与响应投影**：移除 response_end；迟到终态只追加一次并绑定响应最高序号块，查询时合并 usage、服务端 responseId 与原始/归一化结束原因。唯一约束防止重复计量，原始块与游标不变；SQL 视图支持筛选汇总，无块异常由诊断 notice 留档。
+- [x] **请求起点关联**：块保存请求取用的路径末端；投影据此组合响应并后置期间事件，包括首块前事件、并行代理的不可见起点和工具执行期间事件。原始时序不改，下一请求保留已发送消息前缀，历史分叉只消费当前路径。
+- [x] **资源变更的生效边界**：消息路径、配置与资源授权在每次模型请求开始时固定，连同该响应的工具批次使用；期间事件按真实顺序记录，下一次请求重新取用。已修正整轮冻结并同步文档；同一轮内的下一请求采用新授权已有契约测试。
+- [x] **资源、工具与外部策略分离**：ResourceRegistry 与 ToolRegistry 平级；共享工具契约固定 args，后端实现定义 target/result、支持关系和 handler。请求能力视图先匹配已链接资源，再应用 agent.tools/excludeTools 等外部策略；通知、inspect 与 call 共用同一结果。固定 Weft 入口不进入工具目录，不开放插件注册；批次采用实际实现的副作用与调度策略。
+- [x] **模块化调用与展示**：纯契约、runtime、renderer 同目录分入口；资源卡片携带版本化投影，工具结果保存实现 ID/版本与当次数据。笔记、目录、代理卡片及工具结果改走注册目录；无对应 renderer 时回退原始数据。
+- [x] **target 定位参数**：resource_call 独立携带 target，由工具实现解释；目录 read/list 的路径转入 target，笔记 read 使用 null，args 保持共享工具契约。
+- [ ] **直接文件资源身份**：另行确定直接文件资源与目录内 path 定位的身份关系，以及 edit 的前置版本条件；target 接口已定，不因目录包含可编辑文件而把目录自身当作文本。

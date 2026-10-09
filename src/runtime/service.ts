@@ -1,5 +1,6 @@
 import { basename, isAbsolute, join } from "node:path";
-import { directoryType, noteType, toolSummary } from "../resources/index.ts";
+import { createModules } from "../modules/runtime.ts";
+import type { ResourceRegistry } from "../resources/registry.ts";
 import type { DatabaseSync } from "node:sqlite";
 import { commandSchema, snapshotSchema, type Command, type AppSnapshot, type AppError, type Point, type Viewport, type WorkbenchObject } from "../shared/contracts.ts";
 import { ObjectStore, openDatabase } from "./storage.ts";
@@ -12,8 +13,6 @@ import type { ModelAdapter } from "../model/contract.ts";
 import { foldWorkbench } from "../session/fold.ts";
 import { SessionError } from "../session/tree.ts";
 
-const toolNames = (kind: string) => kind === "directory" ? directoryType.tools.map(t => t.name) : ["read"];
-
 export class ApplicationError extends Error {
   constructor(readonly code: AppError["code"], message: string) { super(message); }
 }
@@ -25,13 +24,16 @@ export class ApplicationService {
   readonly sessions: SessionService;
   private readonly db: DatabaseSync;
   private readonly objects: ObjectStore;
+  private readonly resources: ResourceRegistry;
   constructor(root: string, options: { protector?: SecretProtector; onConfigurationChanged?: () => void; onSessionChanged?: (event: SessionChanged) => void; adapterFactory?: (settings: ModelSettings) => ModelAdapter } = {}) {
     this.db = openDatabase(root);
     try {
       this.objects = new ObjectStore(join(root, "objects"));
       const unavailable = async (): Promise<string> => { throw new Error("System credential protection is unavailable."); };
       this.configuration = new ConfigurationService(this.db, root, options.protector ?? { available: async () => false, encrypt: unavailable, decrypt: unavailable }, options.onConfigurationChanged);
-      this.sessions = new SessionService(this.db, this.objects, this.configuration, options.onSessionChanged, options.adapterFactory);
+      const modules = createModules({ objects: this.objects });
+      this.resources = modules.resources;
+      this.sessions = new SessionService(this.db, modules, this.configuration, options.onSessionChanged, options.adapterFactory);
     } catch (error) { this.db.close(); throw error; }
   }
   async close(): Promise<void> {
@@ -62,14 +64,13 @@ export class ApplicationService {
 
   private mutate(command: Exclude<Command, { type: "workspace.read" }>): void {
     const folded = foldWorkbench(this.requireSession(command.session_id));
-    const has = (id: string) => folded.objects.some(o => o.id === id);
     const tree = this.sessions.tree;
     switch (command.type) {
       case "note.create": {
         // 笔记正文以不可变对象保存；回溯仅恢复存在性与引用。
         const contentRef = this.objects.put(command.content);
         const id = crypto.randomUUID();
-        tree.append(command.session_id, { kind: "event", agentId: null, type: "resource_created", data: { id, title: command.title, contentRef }, model: null });
+        tree.append(command.session_id, { kind: "event", agentId: null, type: "resource_created", data: { id, type: "note", title: command.title, contentRef }, model: null });
         this.addView(command.session_id, id, command.position);
         break;
       }
@@ -99,12 +100,17 @@ export class ApplicationService {
         if (linked === command.linked) break;
         tree.append(command.session_id, { kind: "event", agentId: agent.id, type: command.linked ? "resource_attached" : "resource_detached",
           data: { id: resource.id }, model: command.linked
-            ? `Resource "${resource.title}" (type: ${resource.kind}, resource_id: ${resource.id}) is now linked to you. Tools: ${JSON.stringify(toolSummary(resource.kind === "directory" ? directoryType : noteType(this.objects)))}. Call them with resource_call.`
+            ? `Resource "${resource.title}" (type: ${resource.kind}, resource_id: ${resource.id}) is now linked to you. Tools: ${JSON.stringify(this.sessions.resourceTools(command.session_id, agent.id, resource))}. Call them with resource_call.`
             : `Resource "${resource.title}" (resource_id: ${resource.id}) is no longer linked to you.` });
         break;
       }
       case "view.set": {
-        if (!has(command.object_id)) throw new ApplicationError("not_found", "Object does not belong to this session.");
+        // 布局独立于路径；历史中已移除或位于旁支的对象也能保存视图。
+        const exists = tree.nodes(command.session_id).some(node => node.kind === "event"
+          && (node.type === "agent_created" || node.type === "resource_created")
+          && node.data !== null && typeof node.data === "object" && !Array.isArray(node.data)
+          && node.data.id === command.object_id);
+        if (!exists) throw new ApplicationError("not_found", "Object does not belong to this session.");
         const previous = this.db.prepare("SELECT * FROM object_views WHERE session_id = ? AND object_id = ?").get(command.session_id, command.object_id) as ViewRow | undefined;
         this.db.prepare(`INSERT INTO object_views VALUES (?, ?, ?, ?, ?, ?)
           ON CONFLICT(session_id, object_id) DO UPDATE SET x=excluded.x, y=excluded.y, hidden=excluded.hidden, collapsed=excluded.collapsed`)
@@ -131,13 +137,9 @@ export class ApplicationService {
     const result: AppSnapshot = { workspace, sessions, session: null };
     if (!sessionId) return result;
     const folded = foldWorkbench(this.requireSession(sessionId, at));
-    const objects: WorkbenchObject[] = folded.objects.map(o => {
-      if (o.kind === "agent") return { id: o.id, kind: "agent", title: o.title, content: null, content_available: false };
-      if (o.kind === "directory") return { id: o.id, kind: "directory", title: o.title, content: String(o.data.path), content_available: true };
-      const ref = typeof o.data.contentRef === "string" ? o.data.contentRef : null;
-      const content = ref ? this.objects.get(ref) : null;
-      return { id: o.id, kind: "note", title: o.title, content, content_available: content !== null };
-    });
+    const objects: WorkbenchObject[] = folded.objects.map(o => ({
+      id: o.id, kind: o.kind, title: o.title, presentation: this.resources.project(o),
+    }));
     const rows = this.db.prepare("SELECT * FROM object_views WHERE session_id = ?").all(sessionId) as ViewRow[];
     const viewport = this.db.prepare("SELECT x, y, zoom FROM viewports WHERE session_id = ?").get(sessionId) as Viewport | undefined;
     const meta = sessions.find(s => s.id === sessionId)!;
