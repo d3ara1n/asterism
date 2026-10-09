@@ -3,7 +3,7 @@ import { externalWebUrl } from "../shared/links.ts";
 import { mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { commandChannel, commandSchema, statusChannel, type CommandResult } from "../shared/contracts.ts";
+import { commandChannel, commandSchema, pickDirectoryChannel, statusChannel, type CommandResult } from "../shared/contracts.ts";
 import { RuntimeHost } from "./runtime-host.ts";
 import { applicationId } from "../shared/desktop.ts";
 import { followWindowAppearance, initialWindowAppearance } from "./window-appearance.ts";
@@ -53,6 +53,7 @@ function createWindow(): void {
   ipcMain.removeHandler(commandChannel);
   ipcMain.removeHandler(configurationChannel);
   ipcMain.removeHandler(sessionChannel);
+  ipcMain.removeHandler(pickDirectoryChannel);
   const trusted = (event: Electron.IpcMainInvokeEvent) => event.sender === current.webContents &&
     event.senderFrame === current.webContents.mainFrame && event.senderFrame?.url === allowedURL;
   const stopAppearance = serveAppearance(current, trusted, () => refreshAppearance());
@@ -61,6 +62,12 @@ function createWindow(): void {
     const parsed = sessionCommandSchema.safeParse(raw);
     if (!parsed.success) return { ok: false, error: { code: "invalid_request", message: "Invalid session command." } };
     return runtime.session(parsed.data);
+  });
+  // 只返回用户在系统窗口中选择的路径；渲染端不能借此读取文件。
+  ipcMain.handle(pickDirectoryChannel, async event => {
+    if (!trusted(event)) return null;
+    const result = await dialog.showOpenDialog(current, { properties: ["openDirectory"] });
+    return result.canceled ? null : result.filePaths[0] ?? null;
   });
   ipcMain.handle(commandChannel, async (event, raw): Promise<CommandResult> => {
     if (event.sender !== current.webContents || event.senderFrame !== current.webContents.mainFrame ||
@@ -81,7 +88,7 @@ function createWindow(): void {
     return runtime.configure(parsed.data);
   });
   current.on("closed", () => {
-    window = null; ipcMain.removeHandler(commandChannel); ipcMain.removeHandler(configurationChannel); ipcMain.removeHandler(sessionChannel); stopAppearance();
+    window = null; ipcMain.removeHandler(commandChannel); ipcMain.removeHandler(configurationChannel); ipcMain.removeHandler(sessionChannel); ipcMain.removeHandler(pickDirectoryChannel); stopAppearance();
   });
   const loading = developmentURL ? current.loadURL(developmentURL) : current.loadFile(rendererFile);
   loading.catch(error => { console.error("Renderer initialization failed.", error); dialog.showErrorBox("Weft", "The application window could not be loaded."); });

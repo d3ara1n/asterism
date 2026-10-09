@@ -10,8 +10,6 @@ export type Viewport = z.infer<typeof viewportSchema>;
 
 /** 资源变更与布局属于指定会话；命令不携带用户的查看位置。 */
 export const workbenchCommands = [
-  z.strictObject({ type: z.literal("note.create"), sessionId: id, title: z.string().trim().min(1).max(160), content: z.string().min(1).max(100_000), position: pointSchema }),
-  z.strictObject({ type: z.literal("directory.add"), sessionId: id, path: z.string().min(1).max(4096), position: pointSchema }),
   z.strictObject({ type: z.literal("object.remove"), sessionId: id, objectId: id }),
   z.strictObject({ type: z.literal("link.set"), sessionId: id, agentId: id, resourceId: id, linked: z.boolean() }),
   z.strictObject({ type: z.literal("view.set"), sessionId: id, objectId: id, position: pointSchema.optional(), hidden: z.boolean().optional(), collapsed: z.boolean().optional() }),

@@ -31,9 +31,9 @@ export function ObjectsPanel() {
             <Button variant="ghost" size="sm" disabled={!writable}
               aria-label={hidden ? t.openObject(object.title) : t.closeObject(object.title)}
               onClick={() => { void run({ type: "view.set", sessionId: session.id, objectId: object.id, hidden: !hidden }); }}>
-              {hidden ? t.open : t.close}
+              {hidden ? t.showCard : t.hideCard}
             </Button>
-            {object.kind !== "agent" && <Button variant="ghost" size="sm" disabled={!writable || historical}
+            {<Button variant="ghost" size="sm" disabled={!writable || historical}
               aria-label={t.removeObject(object.title)} onClick={() => setRemoving(object)}>
               {t.remove}
             </Button>}

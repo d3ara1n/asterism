@@ -7,6 +7,7 @@ import type { SessionBridge } from "./session.ts";
 export const protocolVersion = 4;
 export const commandChannel = "weft:command";
 export const statusChannel = "weft:runtime-status";
+export const pickDirectoryChannel = "weft:pick-directory";
 const id = z.string().uuid();
 /** 应用入口只读取工作区身份和会话摘要，不持有已打开会话的正文。 */
 export const commandSchema = z.strictObject({ type: z.literal("workspace.read") });
@@ -38,6 +39,10 @@ export interface DesktopBridge {
   configuration: ConfigurationBridge;
   appearance: AppearanceBridge;
   readonly platform: DesktopPlatform;
+  /** 系统目录选择窗口；取消返回 null。 */
+  pickDirectory(): Promise<string | null>;
+  /** 拖入文件的本机路径；由 Electron webUtils 解析，renderer 不能伪造 File.path。 */
+  pathForFile(file: File): string;
   execute(command: Command): Promise<CommandResult>;
   onStatus(listener: (status: RuntimeStatus) => void): () => void;
 }

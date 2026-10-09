@@ -28,7 +28,7 @@ function setup() {
   const objects = new ObjectStore(join(base, "objects"));
   const resource: FoldedObject = { id: "d1", kind: "directory", title: "root", data: { path: root } };
   const note: FoldedObject = { id: "n1", kind: "note", title: "Note", data: { contentRef: objects.put("note text") } };
-  const { resources, tools } = createModules({ objects });
+  const { resources, tools } = createModules({ objects, state: null as never, sessions: null as never, configuration: null as never });
   const scope = (linked: readonly FoldedObject[] = [resource], policy: Parameters<typeof agentToolPolicy>[0] = unrestricted) =>
     new AgentCapabilities(resources, tools, linked, agentToolPolicy(policy));
   return { root, outside, resource, note, resources, tools, scope };

@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { agentSelectionSchema, jsonSchema, toolOutcomeSchema, usageSchema } from "./model.ts";
+import { jsonSchema, toolOutcomeSchema, usageSchema } from "./model.ts";
 import { thinkingSchema } from "./configuration.ts";
-import { workbenchCommands, workbenchSnapshotSchema } from "./workbench.ts";
+import { pointSchema, workbenchCommands, workbenchSnapshotSchema } from "./workbench.ts";
 
 const id = z.string().min(1).max(160);
 /** 会话树节点共有字段：父指针组织分支，agentId 标明归属代理（事件与通知可无归属）。 */
@@ -51,20 +51,18 @@ export type ViewPosition = z.infer<typeof viewPositionSchema>;
 export const sessionChannel = "weft:session";
 export const sessionChangedChannel = "weft:session-changed";
 export const sessionCommandSchema = z.discriminatedUnion("type", [
+  // 首页组合入口：建立会话、创建第一个代理资源并向它提交首条输入。
   z.strictObject({ type: z.literal("start"), submissionId: uuid, agentConfigurationId: id, modelId: id, thinking: thinkingSchema.nullable(), text }),
-  z.strictObject({ type: z.literal("submit"), submissionId: uuid, sessionId: id, agentId: id, text }),
-  z.strictObject({ type: z.literal("continue"), sessionId: id, agentId: id }),
-  z.strictObject({ type: z.literal("configure"), sessionId: id, agentId: id, selection: agentSelectionSchema }),
   z.strictObject({ type: z.literal("read"), sessionId: id, position: viewPositionSchema }),
   z.strictObject({ type: z.literal("select"), sessionId: id, nodeId: id.nullable() }),
-  z.strictObject({ type: z.literal("cancel"), sessionId: id }),
+  // 资源卡片的行为入口：按对象类型路由到资源控制器，command 由该资源模块校验。
+  z.strictObject({ type: z.literal("resource.command"), sessionId: id, objectId: id, command: jsonSchema }),
+  // 向工作台添加资源；input 由该资源模块校验。
+  z.strictObject({ type: z.literal("resource.create"), sessionId: id, kind: id, input: jsonSchema, position: pointSchema }),
   ...workbenchCommands,
 ]);
 export type SessionCommand = z.infer<typeof sessionCommandSchema>;
 export type SessionMutation = Exclude<SessionCommand, { type: "read" }>;
-const agentStateSchema = z.strictObject({ id, name: z.string(),
-  selection: agentSelectionSchema.nullable(), selectionRevision: z.number().int().nonnegative() });
-export type AgentState = z.infer<typeof agentStateSchema>;
 /** 仅在运行时存在的输出投影；没有父指针，不属于可选择的历史节点。 */
 const liveBase = { id, agentId: id, responseId: id, ordinal: z.number().int().nonnegative() };
 export const liveBlockSchema = z.discriminatedUnion("kind", [
@@ -83,7 +81,7 @@ export type SessionProgress = z.infer<typeof sessionProgressSchema>;
 /** 同次读取固定路径与对象投影；seq 是节点序号，revision 还涵盖计量、选择与布局。 */
 export const sessionSnapshotSchema = z.strictObject({
   sessionId: id, title: z.string(), cursor: id.nullable(), at: id.nullable(), seq: revision, revision,
-  nodes: z.array(sessionNodeSchema), agents: z.array(agentStateSchema),
+  nodes: z.array(sessionNodeSchema),
   workbench: workbenchSnapshotSchema, progress: sessionProgressSchema,
 });
 export type SessionSnapshot = z.infer<typeof sessionSnapshotSchema>;

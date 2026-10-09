@@ -12,7 +12,7 @@ export function foldWorkbench(path: readonly SessionNode[]): FoldedState {
     const d = (node.data ?? {}) as Record<string, unknown>;
     const id = String(d.id ?? d.resourceId ?? "");
     switch (node.type) {
-      case "agent_created": objects.set(id, { id, kind: "agent", title: String(d.title ?? "Agent"), data: d }); break;
+      // 代理与其他资源同为 resource_created；类型只由 data.type 区分。
       case "resource_created": {
         if (typeof d.type !== "string" || !d.type) throw new Error("Resource creation is missing its type.");
         objects.set(id, { id, kind: d.type, title: String(d.title ?? "Resource"), data: d });

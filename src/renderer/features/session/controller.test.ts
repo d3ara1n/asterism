@@ -4,7 +4,7 @@ import { conversationTimeline, timelineKey } from "../../../shared/session-view.
 import { SessionController, SubmissionIdentity } from "./controller.ts";
 
 function snapshot(revision: number, at: string | null = null): SessionSnapshot {
-  return { sessionId: "s", title: "S", cursor: "current", at, seq: 4, revision, nodes: [], agents: [],
+  return { sessionId: "s", title: "S", cursor: "current", at, seq: 4, revision, nodes: [],
     workbench: { id: "s", title: "S", objects: [], links: [], views: [], viewport: { x: 0, y: 0, zoom: 1 } },
     progress: { revision, version: revision, runningAgentIds: [], live: [] } };
 }
@@ -28,13 +28,13 @@ describe("会话视图所有权", () => {
   it("命令受理后仍等待新投影，不能基于旧选择再次配置", async () => {
     const { controller, requests } = fixture(); const disconnect = controller.connect();
     requests[0]!.resolve(view(snapshot(1))); await flush();
-    const command = { type: "configure" as const, sessionId: "s", agentId: "a",
-      selection: { agentConfigurationId: "worker", modelId: "new", thinking: null } };
+    const command = { type: "resource.command" as const, sessionId: "s", objectId: "a",
+      command: { type: "configure", selection: { agentConfigurationId: "worker", modelId: "new", thinking: null } } };
     const changed = controller.execute(command); await flush();
     requests[1]!.resolve(accepted); await changed;
     expect(controller.getSnapshot()).toMatchObject({ busy: false, status: "loading" });
     expect((await controller.execute(command)).ok).toBe(false);
-    expect(requests.filter(request => request.command.type === "configure")).toHaveLength(1);
+    expect(requests.filter(request => request.command.type === "resource.command")).toHaveLength(1);
     requests[2]!.resolve(view(snapshot(2))); await flush();
     expect(controller.getSnapshot().status).toBe("ready");
     disconnect();
@@ -61,9 +61,9 @@ describe("会话视图所有权", () => {
   it("操作错误由会话持有，后台重读不清除它，调用方可明确关闭", async () => {
     const { controller, requests } = fixture(); const disconnect = controller.connect();
     requests[0]!.resolve(view(snapshot(1))); await flush();
-    const failed = controller.mutate({ type: "directory.add", sessionId: "s", path: "relative", position: { x: 0, y: 0 } }); await flush();
+    const failed = controller.execute({ type: "resource.create", sessionId: "s", kind: "directory", input: { path: "relative" }, position: { x: 0, y: 0 } }); await flush();
     requests[1]!.resolve({ ok: false, error: { code: "invalid_request", message: "Directory path must be absolute." } });
-    expect(await failed).toBe(false);
+    expect((await failed).ok).toBe(false);
     requests[2]!.resolve(view(snapshot(1))); await flush();
     expect(controller.getSnapshot()).toMatchObject({ status: "ready", error: "Directory path must be absolute." });
     controller.clearError();

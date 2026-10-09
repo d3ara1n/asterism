@@ -1,6 +1,5 @@
 import { join } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
-import { createModules } from "../modules/runtime.ts";
 import { commandSchema, snapshotSchema, type AppSnapshot, type AppError } from "../shared/contracts.ts";
 import type { SecretProtector } from "../shared/secrets.ts";
 import type { SessionChanged } from "../shared/session.ts";
@@ -25,7 +24,7 @@ export class ApplicationService {
       const objects = new ObjectStore(join(root, "objects"));
       const unavailable = async (): Promise<string> => { throw new Error("System credential protection is unavailable."); };
       this.configuration = new ConfigurationService(this.db, root, options.protector ?? { available: async () => false, encrypt: unavailable, decrypt: unavailable }, options.onConfigurationChanged);
-      this.sessions = new SessionService(this.db, createModules({ objects }), objects, this.configuration, options.onSessionChanged, options.adapterFactory);
+      this.sessions = new SessionService(this.db, objects, this.configuration, options.onSessionChanged, options.adapterFactory);
     } catch (error) { this.db.close(); throw error; }
   }
   async close(): Promise<void> {

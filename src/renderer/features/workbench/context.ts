@@ -1,3 +1,4 @@
+import type { WorkbenchOperation } from "../session/controller";
 import { createContext, createElement, useContext, useSyncExternalStore, type ReactNode } from "react";
 import type { WorkbenchCommand, WorkbenchSnapshot } from "../../../shared/workbench";
 import type { SessionController } from "../session/controller";
@@ -9,10 +10,10 @@ export interface WorkbenchEnvironment {
   ready: boolean;
   busy: boolean;
   historical: boolean;
-  run: (command: WorkbenchCommand) => Promise<boolean>;
-  /** 主代理对话草稿由应用层按任务保存。 */
-  draft: string;
-  onDraftChange: (value: string) => void;
+  run: (command: WorkbenchOperation) => Promise<boolean>;
+  /** 代理对话草稿由应用层按代理对象保存；同一会话的多个代理互不共享。 */
+  draft: (agentId: string) => string;
+  onDraftChange: (agentId: string, value: string) => void;
   onHome: () => void;
 }
 

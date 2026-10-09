@@ -65,7 +65,7 @@ export function AgentsSettings() {
   const island = useIsland();
   const open = (id: string | null) => island.open({ id: `agent-${id ?? "new"}`, label: s("Agent configuration", "代理配置"), width: { min: 440, grow: 1, max: 720 }, render: () => <AgentEditor key={id ?? "new"} initialId={id} /> });
   return <>
-    <p className="type-caption mb-4">{s("Shared definitions for main agents and delegated agents. Changes apply to existing conversations next turn.", "主代理与子代理共用的配置，修改从已有对话的下一轮生效。")}</p>
+    <p className="type-caption mb-4">{s("Shared definitions for every agent object. Changes apply to existing agents on their next request.", "所有代理对象共用的配置，修改从已有代理的下一次请求生效。")}</p>
     {snapshot?.agents.map(agent => <Item key={agent.id} asChild size="sm"><Button type="button" variant="ghost" className="h-auto w-full justify-start text-left" onClick={() => open(agent.id)}>
       <ItemContent><ItemTitle>{agent.name}</ItemTitle></ItemContent><span className="type-caption">{!agent.enabled ? s("Disabled", "已停用") : agent.id === "worker" ? s("Default", "默认") : agent.builtin ? s("Built-in", "内置") : ""}</span>
     </Button></Item>)}

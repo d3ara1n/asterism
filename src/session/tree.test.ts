@@ -226,7 +226,7 @@ describe("工作台折叠", () => {
   it("移除对象连带清除链接；回溯到移除之前对象与链接恢复", async () => {
     const { foldWorkbench } = await import("./fold.ts");
     const { tree, s } = setup();
-    tree.append(s, { kind: "event", agentId: null, type: "agent_created", data: { id: "a", title: "A" }, model: null });
+    tree.append(s, { kind: "event", agentId: null, type: "resource_created", data: { id: "a", type: "agent", title: "A" }, model: null });
     tree.append(s, { kind: "event", agentId: null, type: "resource_created", data: { id: "d", type: "directory", title: "d", path: "/x" }, model: null });
     const linkedAt = tree.append(s, attached("a", "d")).id;
     tree.append(s, { kind: "event", agentId: null, type: "object_removed", data: { id: "d" }, model: null });

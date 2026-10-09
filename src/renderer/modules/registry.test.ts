@@ -7,7 +7,7 @@ import { cardRenderer, resultRenderer, ViewRegistry } from "./registry";
 const data = defineData("test.text", 1, z.strictObject({ text: z.string() }));
 function Text({ data }: { data: { text: string } }) { return createElement("p", null, data.text); }
 const result = resultRenderer(data, Text);
-const card = cardRenderer(data, { label: "Text", icon: null, width: 340, connection: "source", Body: Text });
+const card = cardRenderer(data, { label: "Text", icon: null, width: 340, Body: Text });
 
 describe("视图契约分派", () => {
   it("按精确身份与版本选择组件，数据通过 schema 才进入组件", () => {

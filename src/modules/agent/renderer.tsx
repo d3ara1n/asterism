@@ -8,11 +8,11 @@ import { AgentView } from "./contract";
 
 export default {
   cards: [cardRenderer(AgentView, {
-    label: t.kindAgent, icon: <Bot className="size-4" />, width: 560, height: 640, connection: "target",
+    label: t.kindAgent, icon: <Bot className="size-4" />, width: 560, height: 640,
     Body: ({ data }) => {
       const workbench = useWorkbench();
-      return <Conversation view={agentView(workbench.controller, data.agentId)} ready={workbench.ready}
-        draft={workbench.draft} onDraftChange={workbench.onDraftChange} onHome={workbench.onHome} />;
+      return <Conversation view={agentView(workbench.controller, data.agentId)} selection={data.selection} ready={workbench.ready}
+        draft={workbench.draft(data.agentId)} onDraftChange={value => workbench.onDraftChange(data.agentId, value)} onHome={workbench.onHome} />;
     },
     Actions: ({ data }) => {
       const workbench = useWorkbench();

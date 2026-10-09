@@ -7,7 +7,6 @@ export interface CardAppearance {
   icon: ReactNode;
   width: number;
   height?: number;
-  connection: "source" | "target";
 }
 export interface CardView extends CardAppearance {
   body: ReactNode;

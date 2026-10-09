@@ -1,23 +1,24 @@
+import type { WorkbenchOperation } from "../features/session/controller";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { ArrowLeft, ChevronDown, FileText, Folder, History, House, KeyRound, ListTree, PanelLeft, Settings, X } from "lucide-react";
+import { ArrowLeft, Bot, ChevronDown, Plus, FileText, Folder, History, House, KeyRound, ListTree, PanelLeft, Settings, X } from "lucide-react";
 import type { WorkbenchCommand } from "../../shared/workbench";
 import type { ApplicationController } from "./controller";
 import { t } from "../shared/i18n";
 import { Button } from "../shared/ui/button";
 import { WeftMark } from "../shared/ui/weft-mark";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "../shared/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "../shared/ui/dropdown-menu";
 import { PageState } from "../shared/ui/page-state";
 import { Alert, AlertDescription } from "../shared/ui/alert";
 import { SettingsPage } from "../features/settings/SettingsPage";
 import { HomePage, type StartInput } from "../features/home/HomePage";
 import { Workbench, type WorkbenchHandle } from "../features/workbench/Workbench";
-import { AddDirectoryDialog } from "../features/workbench/AddDirectoryDialog";
 import { AccessDialog } from "../features/workbench/AccessDialog";
-import { CreateNoteDialog } from "../features/workbench/CreateNoteDialog";
 import type { ResourcePlacement } from "../features/workbench/placement";
 import { SubmissionIdentity } from "../features/session/controller";
 import { sessionController } from "../features/session/registry";
-import { s } from "../features/configuration/state";
+import { s, useConfiguration } from "../features/configuration/state";
+import type { AgentSelection } from "../../shared/model";
+import { AddAgentDialog } from "../features/workbench/AddAgentDialog";
 import { Titlebar, Window } from "./Window";
 import { Sidebar } from "./Sidebar";
 import { Space } from "../shared/weave/Space";
@@ -41,13 +42,14 @@ export function App({ controller }: { controller: ApplicationController }) {
   const [sidebarVisible, setSidebarVisible] = useState(true);
   const [draft, setDraft] = useState("");
   const [conversationDrafts, setConversationDrafts] = useState<Record<string, string>>({});
-  const [creation, setCreation] = useState<ResourcePlacement | null>(null);
   const [accessOpen, setAccessOpen] = useState(false);
-  const [directory, setDirectory] = useState<ResourcePlacement | null>(null);
+  const [agentCreation, setAgentCreation] = useState<ResourcePlacement | null>(null);
   const start = useStart();
+  const agentDraft = useCallback((agentId: string) => conversationDrafts[agentId] ?? "", [conversationDrafts]);
+  const setAgentDraft = useCallback((agentId: string, value: string) => setConversationDrafts(drafts => ({ ...drafts, [agentId]: value })), []);
   // 每次导航递增；异步创建完成时据此判断用户是否已离开，不夺走当前视图。
   const navigation = useRef(0);
-  const run = useCallback((command: WorkbenchCommand) => sessionController(command.sessionId).mutate(command), []);
+  const run = useCallback((command: WorkbenchOperation) => sessionController(command.sessionId).mutate(command), []);
   useEffect(() => controller.connect(), [controller]);
   const active = view.kind === "conversation" ? sessionController(view.sessionId) : null;
   const sessionState = useSyncExternalStore(active?.subscribe ?? idleSubscribe, active?.getSnapshot ?? noSession);
@@ -82,7 +84,7 @@ export function App({ controller }: { controller: ApplicationController }) {
   });
   const navigate = (next: MainView) => {
     navigation.current++;
-    setView(next); setPage("main"); setCreation(null); setDirectory(null); setAccessOpen(false);
+    setView(next); setPage("main"); setAgentCreation(null); setAccessOpen(false);
     controller.clearError();
     focusMain();
   };
@@ -101,8 +103,28 @@ export function App({ controller }: { controller: ApplicationController }) {
     if (token === navigation.current) openSession(created);
     void controller.refresh();
   };
-  const addDirectory = () => { const placement = workbench.current?.resourcePlacement(); if (placement) { active?.clearError(); setDirectory(placement); } };
-  const addNote = () => { const placement = workbench.current?.resourcePlacement(); if (placement) { active?.clearError(); setCreation(placement); } };
+  // 目录走系统选择窗口，笔记直接落卡；不再经过表单对话框。
+  const addDirectory = async () => {
+    const placement = workbench.current?.resourcePlacement();
+    if (!placement || !active) return;
+    const path = await window.weft.pickDirectory();
+    if (!path) return;
+    active.clearError();
+    void active.execute({ type: "resource.create", sessionId: placement.sessionId, kind: "directory", input: { path }, position: placement.position });
+  };
+  const configuration = useConfiguration(ready);
+  const addAgent = () => { const placement = workbench.current?.resourcePlacement(); if (placement) { active?.clearError(); setAgentCreation(placement); } };
+  const createAgent = async (selection: AgentSelection) => {
+    if (!active || !agentCreation) return false;
+    const result = await active.execute({ type: "resource.create", sessionId: agentCreation.sessionId, kind: "agent", position: agentCreation.position, input: { selection } });
+    return result.ok;
+  };
+  const addNote = () => {
+    const placement = workbench.current?.resourcePlacement();
+    if (!placement || !active) return;
+    active.clearError();
+    void active.execute({ type: "resource.create", sessionId: placement.sessionId, kind: "note", input: { title: s("Untitled note", "未命名笔记") }, position: placement.position });
+  };
   const hideSidebar = () => {
     setSidebarVisible(false);
     requestAnimationFrame(() => sidebarToggle.current?.focus({ preventScroll: true }));
@@ -124,8 +146,16 @@ export function App({ controller }: { controller: ApplicationController }) {
     <span className="window-session-title" title={inSettings ? t.settings : mainTitle}>{inSettings ? t.settings : mainTitle}</span>
   </>;
   const actions = session ? <>
-    <Button variant="ghost" size="sm" disabled={!writable} onClick={addNote} aria-label={t.addNoteLabel}><FileText /><span className="toolbar-label">{t.addNote}</span></Button>
-    <Button variant="ghost" size="sm" disabled={!writable} onClick={addDirectory} aria-label={s("Add directory", "添加目录")}><Folder /><span className="toolbar-label">{s("Directory", "目录")}</span></Button>
+    <DropdownMenu modal={false}><DropdownMenuTrigger asChild>
+      <Button variant="ghost" size="sm" disabled={!writable} aria-label={s("Add to workbench", "添加到工作台")}><Plus /><span className="toolbar-label">{s("Add", "添加")}</span><ChevronDown className="text-muted-foreground" /></Button>
+    </DropdownMenuTrigger><DropdownMenuContent align="end">
+      <DropdownMenuLabel>{s("Agents", "代理")}</DropdownMenuLabel>
+      <DropdownMenuItem onSelect={addAgent}><Bot />{s("Agent…", "代理…")}</DropdownMenuItem>
+      <DropdownMenuSeparator />
+      <DropdownMenuLabel>{s("Resources", "资源")}</DropdownMenuLabel>
+      <DropdownMenuItem onSelect={addNote}><FileText />{t.addNote}</DropdownMenuItem>
+      <DropdownMenuItem onSelect={() => { void addDirectory(); }}><Folder />{s("Directory…", "目录…")}</DropdownMenuItem>
+    </DropdownMenuContent></DropdownMenu>
     <Button variant="ghost" size="sm" disabled={!writable} onClick={() => { active?.clearError(); setAccessOpen(true); }} aria-label={t.accessLabel}><KeyRound /><span className="toolbar-label">{t.access}</span></Button>
     <Button variant="ghost" size="sm" onClick={event => workbench.current?.togglePanel("objects", event.currentTarget)} aria-label={t.objects}><ListTree /><span className="toolbar-label">{t.objects}</span></Button>
     <Button variant="ghost" size="sm" onClick={event => workbench.current?.togglePanel("history", event.currentTarget)} aria-label={t.history}><History /><span className="toolbar-label">{t.history}</span></Button>
@@ -134,7 +164,7 @@ export function App({ controller }: { controller: ApplicationController }) {
   const conversation = session && active
     ? <Workbench key={session.id} ref={workbench} session={session} controller={active} historical={historical}
       ready={ready} busy={sessionBusy} run={run}
-      draft={conversationDrafts[session.id] ?? ""} onDraftChange={value => setConversationDrafts(drafts => ({ ...drafts, [session.id]: value }))}
+      draft={agentDraft} onDraftChange={setAgentDraft}
       onHome={goHome} />
     : <div className="flex h-full items-center justify-center px-6"><div>
       <PageState kind={sessionLoading ? "loading" : "error"} title={sessionLoading ? t.openingTitle : t.unavailableTitle}
@@ -173,14 +203,13 @@ export function App({ controller }: { controller: ApplicationController }) {
           content: <Screen label={t.appNavigation} leading={sidebarVisible ? [sidebar] : []} root={main} resetKey={view.kind === "conversation" ? view.sessionId : "home"} className="h-full" /> },
       ]} />
     </Window>
-    {error && !creation && !directory && !accessOpen && <Alert variant="destructive" className="fixed bottom-4 left-1/2 z-[60] w-[min(560px,calc(100%-32px))] -translate-x-1/2 flex items-start gap-3 shadow-md">
+    {error && !accessOpen && !agentCreation && <Alert variant="destructive" className="fixed bottom-4 left-1/2 z-[60] w-[min(560px,calc(100%-32px))] -translate-x-1/2 flex items-start gap-3 shadow-md">
       <AlertDescription className="flex-1">{error}</AlertDescription>
       {sessionState?.status === "error" && <Button variant="ghost" size="sm" onClick={() => { void active?.refresh(); }}>{t.retry}</Button>}
       {(state.error || sessionState?.status !== "error") && <Button variant="ghost" size="icon-xs" aria-label={t.dismissError} title={t.dismissError}
         onClick={state.error ? controller.clearError : active?.clearError}><X /></Button>}
     </Alert>}
-    {creation && <CreateNoteDialog creation={creation} busy={sessionBusy} error={sessionState?.error} run={run} onClose={() => setCreation(null)} />}
-    {directory && <AddDirectoryDialog creation={directory} busy={sessionBusy} error={sessionState?.error} run={run} onClose={() => setDirectory(null)} />}
+    {agentCreation && <AddAgentDialog creation={agentCreation} configuration={configuration.snapshot} busy={sessionBusy} error={sessionState?.error ?? configuration.error} onCreate={createAgent} onClose={() => setAgentCreation(null)} />}
     {accessOpen && session && <AccessDialog session={session} ready={ready} busy={sessionBusy} historical={historical} error={sessionState?.error} run={run} onClose={() => setAccessOpen(false)} />}
   </>;
 }

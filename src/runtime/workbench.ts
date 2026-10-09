@@ -1,4 +1,4 @@
-import { basename, isAbsolute } from "node:path";
+
 import type { DatabaseSync } from "node:sqlite";
 import type { ResourceRegistry } from "../resources/registry.ts";
 import { foldWorkbench, type FoldedObject } from "../session/fold.ts";
@@ -16,38 +16,41 @@ export class SessionWorkbench {
     private readonly objects: ObjectStore, private readonly resources: ResourceRegistry,
     private readonly tools: (sessionId: string, agentId: string, resource: FoldedObject) => Json) {}
 
+  /** 通用资源创建：资源控制器给出标题并保存私有状态；创建事件只记录身份与类型。 */
+  create(sessionId: string, kind: string, input: Json, position: Point): string {
+    return this.createWith(sessionId, kind, crypto.randomUUID(), input, position);
+  }
+  createWith(sessionId: string, kind: string, id: string, input: Json, position: Point): string {
+    const controller = this.resources.controller(kind);
+    if (!controller?.create) throw new SessionError("invalid_request", "This resource type cannot be created here.");
+    const { title, data } = controller.create(sessionId, id, input);
+    this.tree.append(sessionId, { kind: "event", agentId: null, type: "resource_created", data: { ...data, id, type: kind, title }, model: null });
+    this.addView(sessionId, id, position);
+    return id;
+  }
+
   mutate(command: WorkbenchCommand): void {
     const folded = foldWorkbench(this.tree.path(command.sessionId));
     const tree = this.tree;
     switch (command.type) {
-      case "note.create": {
-        const contentRef = this.objects.put(command.content);
-        const id = crypto.randomUUID();
-        tree.append(command.sessionId, { kind: "event", agentId: null, type: "resource_created",
-          data: { id, type: "note", title: command.title, contentRef }, model: null });
-        this.addView(command.sessionId, id, command.position);
-        break;
-      }
-      case "directory.add": {
-        if (!isAbsolute(command.path)) throw new SessionError("invalid_request", "Directory path must be absolute.");
-        const id = crypto.randomUUID();
-        tree.append(command.sessionId, { kind: "event", agentId: null, type: "resource_created",
-          data: { id, type: "directory", title: basename(command.path) || command.path, path: command.path }, model: null });
-        this.addView(command.sessionId, id, command.position);
-        break;
-      }
       case "object.remove": {
         const target = folded.objects.find(o => o.id === command.objectId);
-        if (!target || target.kind === "agent") throw new SessionError("not_found", "Resource does not belong to this session.");
-        for (const link of folded.links.filter(l => l.resourceId === target.id)) tree.append(command.sessionId, { kind: "event", agentId: link.agentId,
-          type: "resource_detached", data: { id: target.id }, model: `Resource "${target.title}" (resource_id: ${target.id}) is no longer linked to you.` });
+        if (!target) throw new SessionError("not_found", "Object does not belong to this session.");
+        // 代理同样是资源：入向与出向链接都解除。
+        for (const link of folded.links.filter(l => l.resourceId === target.id || l.agentId === target.id)) {
+          const resource = folded.objects.find(o => o.id === link.resourceId)!;
+          tree.append(command.sessionId, { kind: "event", agentId: link.agentId, type: "resource_detached", data: { id: resource.id },
+            model: link.agentId === target.id ? null : `Resource "${resource.title}" (resource_id: ${resource.id}) is no longer linked to you.` });
+        }
         tree.append(command.sessionId, { kind: "event", agentId: null, type: "object_removed", data: { id: target.id }, model: null });
         break;
       }
       case "link.set": {
+        // 终点必须是代理；起点是任意资源，包括另一个代理。
         const agent = folded.objects.find(o => o.id === command.agentId && o.kind === "agent");
-        const resource = folded.objects.find(o => o.id === command.resourceId && o.kind !== "agent");
+        const resource = folded.objects.find(o => o.id === command.resourceId);
         if (!agent || !resource) throw new SessionError("not_found", "Agent or resource does not belong to this session.");
+        if (agent.id === resource.id) throw new SessionError("invalid_request", "An agent cannot be linked to itself.");
         if (folded.links.some(l => l.agentId === agent.id && l.resourceId === resource.id) === command.linked) break;
         tree.append(command.sessionId, { kind: "event", agentId: agent.id, type: command.linked ? "resource_attached" : "resource_detached",
           data: { id: resource.id }, model: command.linked
@@ -58,7 +61,7 @@ export class SessionWorkbench {
       case "view.set": {
         // 布局不属于历史路径；旁支和已移除对象的卡片也可以调整。
         const exists = tree.nodes(command.sessionId).some(node => node.kind === "event"
-          && (node.type === "agent_created" || node.type === "resource_created")
+          && node.type === "resource_created"
           && node.data !== null && typeof node.data === "object" && !Array.isArray(node.data) && node.data.id === command.objectId);
         if (!exists) throw new SessionError("not_found", "Object does not belong to this session.");
         const previous = this.db.prepare("SELECT * FROM object_views WHERE session_id = ? AND object_id = ?").get(command.sessionId, command.objectId) as ViewRow | undefined;

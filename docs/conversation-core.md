@@ -66,12 +66,10 @@ block 通过 response_id 关联，response 由消费者投影，不设独立 res
 | 命令 | 行为 |
 | --- | --- |
 | `start` | 显式 agent 配置、模型和 thinking；原子保存 Session、首个代理、首条输入并开始执行 |
-| `submit` | 在游标处向指定代理追加消息并执行；运行中返回 conflict |
-| `continue` | 从当前合法位置继续指定代理 |
-| `configure` | 修改代理选择，不追加历史；下一请求生效 |
+| `resource.command` | 路由到对象所属资源控制器；代理命令为 `submit`（追加消息并执行，仅本代理运行中返回 conflict）、`continue`、`configure`（修改资源私有选择，下一请求生效）、`cancel`（只停止该代理） |
+| `resource.create` | 由资源模块校验 input 并创建对象：代理需显式选择，笔记可空正文，目录须为存在的绝对路径 |
 | `read` | 指定跟随游标或历史位置；同次读取返回会话树、实际查看节点、代理选择、工作台投影和当前进度 |
 | `select` | 会话 settled 时选择位置；记录原位置、请求位置和吸附后的实际位置，与游标更新同事务提交，不追加模型可见节点 |
-| `cancel` | 请求停止；终态通过通知或查询观察 |
 | `note.create` / `directory.add` / `object.remove` / `link.set` | 变更指定会话的资源与关系，事务提交后通知 |
 | `view.set` / `viewport.set` | 保存当前布局，不修改历史；历史查看期间也可调整 |
 

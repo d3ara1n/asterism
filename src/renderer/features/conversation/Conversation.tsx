@@ -4,6 +4,7 @@ import type { AgentSelection } from "../../../shared/model";
 import { conversationTimeline, timelineKey, type TimelineItem } from "../../../shared/session-view";
 import { resolveModelRole, resolveProviderModel, thinkingSchema, type ThinkingLevel } from "../../../shared/configuration";
 import type { AgentView } from "../session/registry";
+import type { AgentCommand } from "../../../modules/agent/contract";
 import { useSession, useSessionProgress } from "../session/state";
 import { Markdown } from "./Markdown";
 import { s, useConfiguration } from "../configuration/state";
@@ -22,8 +23,9 @@ function useAgent(view: AgentView) {
   const { snapshot, historical } = session;
   const timeline = useMemo(() => snapshot ? conversationTimeline(snapshot.nodes, snapshot.at, view.agentId, historical ? [] : progress.live) : [],
     [snapshot, historical, view.agentId, progress.live]);
-  const agent = snapshot?.agents.find(a => a.id === view.agentId) ?? null;
-  return { ...session, progress, timeline, agent, agentRunning: progress.runningAgentIds.includes(view.agentId), running: progress.runningAgentIds.length > 0 };
+  // 平级代理互不阻塞：只关心本代理是否在运行。
+  const agentRunning = progress.runningAgentIds.includes(view.agentId);
+  return { ...session, progress, timeline, agentRunning, running: agentRunning, sessionRunning: progress.runningAgentIds.length > 0 };
 }
 
 /** 卡片标题栏中的执行状态；历史属于会话，入口在窗口标题栏。 */
@@ -38,11 +40,12 @@ export function ConversationActions({ view, ready }: { view: AgentView; ready: b
 }
 
 /** 代理卡片内容：当前路径的最终视图与输入区；没有分支感，回溯在会话历史中进行。 */
-export function Conversation({ view, ready, draft, onDraftChange, onHome }: {
-  view: AgentView; ready: boolean; draft: string; onDraftChange: (value: string) => void; onHome: () => void;
+export function Conversation({ view, selection, ready, draft, onDraftChange, onHome }: {
+  view: AgentView; selection: AgentSelection | null; ready: boolean; draft: string; onDraftChange: (value: string) => void; onHome: () => void;
 }) {
   const { controller, agentId, submission } = view;
-  const { state, snapshot, timeline, agent, agentRunning, running, historical } = useAgent(view);
+  const { state, snapshot, timeline, agentRunning, running, historical } = useAgent(view);
+  const command = (value: AgentCommand) => controller.execute({ type: "resource.command", sessionId: controller.sessionId, objectId: agentId, command: value });
   const { snapshot: configuration, error: configurationError } = useConfiguration(ready);
   const [selectionError, setSelectionError] = useState<string | null>(null);
   const [awayFromBottom, setAwayFromBottom] = useState(false);
@@ -57,12 +60,11 @@ export function Conversation({ view, ready, draft, onDraftChange, onHome }: {
       action={state.status !== "loading" && <Button variant="secondary" size="sm" onClick={state.missing ? onHome : () => { void controller.refresh(); }}>{state.missing ? t.newConversation : t.retry}</Button>} />
   </div>;
 
-  const selection = agent?.selection ?? null;
   const selectedAgent = configuration?.agents.find(a => a.id === selection?.agentConfigurationId && a.enabled);
   const selectedModel = configuration ? resolveProviderModel(configuration, selection?.modelId ?? null)?.model : null;
   const models = configuration?.models.filter(model => resolveProviderModel(configuration, model.id)) ?? [];
   const configure = async (next: AgentSelection) => {
-    const result = await controller.execute({ type: "configure", sessionId: controller.sessionId, agentId, selection: next });
+    const result = await command({ type: "configure", selection: next });
     if (result.ok) setSelectionError(null);
   };
   const writable = ready && !state.busy && state.status === "ready" && !running && !historical && !!selection;
@@ -71,15 +73,15 @@ export function Conversation({ view, ready, draft, onDraftChange, onHome }: {
   const latest = () => { follow.current = true; setAwayFromBottom(false); if (scroll.current) scroll.current.scrollTop = scroll.current.scrollHeight; };
   const send = async () => {
     if (!writable || !draft.trim()) return;
-    const input = { type: "submit" as const, sessionId: controller.sessionId, agentId, text: draft.trim() };
-    const result = await controller.execute({ ...input, submissionId: submission.forInput(input) });
+    const input = { agentId, text: draft.trim() };
+    const result = await command({ type: "submit", text: input.text, submissionId: submission.forInput(input) });
     if (!result.ok) return;
     submission.accepted(); onDraftChange(""); latest();
     composer.current?.focus({ preventScroll: true });
   };
   const resume = async () => {
     if (!writable) return;
-    await controller.execute({ type: "continue", sessionId: controller.sessionId, agentId }); latest();
+    await command({ type: "continue" }); latest();
   };
 
   return <>
@@ -137,7 +139,7 @@ export function Conversation({ view, ready, draft, onDraftChange, onHome }: {
           <InputGroupAddon align="block-end" className="justify-between">
             <span className="type-caption">{s("Enter to send · Shift + Enter for a new line", "Enter 发送 · Shift + Enter 换行")}</span>
             {running ? <Button type="button" size="sm" variant="secondary" disabled={state.busy || !ready}
-              onClick={() => { void controller.execute({ type: "cancel", sessionId: controller.sessionId }); }}><Square />{s("Stop", "停止")}</Button>
+              onClick={() => { void command({ type: "cancel" }); }}><Square />{s("Stop", "停止")}</Button>
               : <div className="flex gap-1">
                 <Button type="button" size="sm" variant="ghost" disabled={!writable} onClick={() => { void resume(); }}>{s("Continue", "继续执行")}</Button>
                 <Button type="submit" size="icon-sm" disabled={!writable || !draft.trim()} aria-label={t.sendMessage} title={t.sendMessage}><ArrowUp /></Button>

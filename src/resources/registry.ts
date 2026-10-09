@@ -1,7 +1,7 @@
 import { jsonSchema, type Json } from "../shared/json.ts";
 import type { Presentation } from "../shared/presentation.ts";
 import type { FoldedObject } from "../session/fold.ts";
-import type { ContextFile, ResourceBackend } from "./contract.ts";
+import type { ContextFile, ResourceBackend, ResourceController } from "./contract.ts";
 
 /** 后台资源 adapter 目录；资源内容投影由对应模块负责。 */
 export class ResourceRegistry {
@@ -20,6 +20,9 @@ export class ResourceRegistry {
     if (backend) return backend.project(resource);
     return { contract: { id: "weft.unknown-resource", version: 1 }, data: jsonSchema.parse(resource.data) };
   }
+
+  controller(kind: string): ResourceController | undefined { return this.backends.get(kind)?.controller; }
+  controllers(): ResourceController[] { return [...this.backends.values()].flatMap(backend => backend.controller ? [backend.controller] : []); }
 
   inspect(resource: FoldedObject): Promise<Json> {
     const backend = this.backends.get(resource.kind);

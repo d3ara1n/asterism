@@ -17,13 +17,15 @@ export const ObjectNode = memo(function ObjectNode({ data, selected }: NodeProps
   const { object, collapsed, onView } = data;
   const registry = useModuleViews();
   const view = useMemo(() => registry.card(object.presentation) ?? {
-    label: object.kind, icon: <FileQuestion className="size-4" />, width: fallbackCardWidth, connection: "source" as const,
+    label: object.kind, icon: <FileQuestion className="size-4" />, width: fallbackCardWidth,
     body: <div className="select-text p-3"><JsonView value={object.presentation.data} /></div>,
     actions: undefined, height: undefined,
   }, [registry, object]);
   const onObjectView = useCallback((patch: ViewPatch) => onView(object.id, patch), [onView, object.id]);
   return <>
-    <Handle type={view.connection} position={view.connection === "target" ? Position.Left : Position.Right} isConnectable={false} />
+    {/* 任何对象都可作为链接起点；只有代理可作为终点。 */}
+    {object.kind === "agent" && <Handle type="target" position={Position.Left} />}
+    <Handle type="source" position={Position.Right} />
     <ObjectCard title={object.title} collapsed={collapsed} selected={!!selected} onView={onObjectView}
       icon={view.icon} kind={view.label} width={view.width} height={view.height} actions={view.actions}>
       {view.body}

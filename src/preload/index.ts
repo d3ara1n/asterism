@@ -1,5 +1,5 @@
-import { contextBridge, ipcRenderer } from "electron";
-import { commandChannel, statusChannel, commandSchema, resultSchema, runtimeStatusSchema, type DesktopBridge } from "../shared/contracts.ts";
+import { contextBridge, ipcRenderer, webUtils } from "electron";
+import { commandChannel, pickDirectoryChannel, statusChannel, commandSchema, resultSchema, runtimeStatusSchema, type DesktopBridge } from "../shared/contracts.ts";
 import { configurationChannel, configurationChangedChannel, configurationCommandSchema, configurationResultSchema } from "../shared/configuration.ts";
 import { appearanceChangedChannel, appearanceGetChannel, appearancePatchSchema, appearanceSetChannel, parseAppearance } from "../shared/theme.ts";
 import { sessionChannel, sessionChangedChannel, sessionCommandSchema, sessionResultSchema, sessionChangedSchema } from "../shared/session.ts";
@@ -43,6 +43,11 @@ const bridge: DesktopBridge = {
       return () => ipcRenderer.removeListener(configurationChangedChannel, handler);
     },
   },
+  async pickDirectory() {
+    const path = await ipcRenderer.invoke(pickDirectoryChannel);
+    return typeof path === "string" ? path : null;
+  },
+  pathForFile: file => webUtils.getPathForFile(file),
   platform: process.platform === "darwin" ? "darwin" : process.platform === "win32" ? "win32" : "linux",
   async execute(command) {
     const parsed = commandSchema.safeParse(command);

@@ -1,3 +1,4 @@
+import type { WorkbenchOperation } from "../session/controller";
 import { useState } from "react";
 import type { WorkbenchCommand, WorkbenchSnapshot } from "../../../shared/workbench";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../../shared/ui/dialog";
@@ -10,13 +11,14 @@ import { t } from "../../shared/i18n";
 
 export function AccessDialog({ session, ready, busy, historical, error, run, onClose }: {
   session: WorkbenchSnapshot; ready: boolean; busy: boolean; historical: boolean; error?: string | null;
-  run: (command: WorkbenchCommand) => Promise<boolean>; onClose: () => void;
+  run: (command: WorkbenchOperation) => Promise<boolean>; onClose: () => void;
 }) {
   const agents = session.objects.filter(o => o.kind === "agent");
-  const resources = session.objects.filter(o => o.kind !== "agent");
   const [selected, setSelected] = useState(agents[0]?.id ?? "");
   // 代理列表变化后，失效的选择回落到第一个代理。
   const agentId = agents.some(agent => agent.id === selected) ? selected : agents[0]?.id ?? "";
+  // 代理也是资源：除所选代理自身外的任何对象都可授权给它。
+  const resources = session.objects.filter(o => o.id !== agentId);
   const writable = ready && !busy && !historical;
   return <Dialog open onOpenChange={open => { if (!open) onClose(); }}>
     <DialogContent>

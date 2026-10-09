@@ -27,19 +27,20 @@ export function openDatabase(root: string): DatabaseSync {
         credential_ref TEXT, PRIMARY KEY (kind, id)
       ) STRICT;
       CREATE TABLE configuration_state (id INTEGER PRIMARY KEY CHECK (id = 1)) STRICT;
+      -- 首页发送的会话级提交去重；代理内部的提交去重属于代理资源状态。
       CREATE TABLE session_submissions (
         id TEXT PRIMARY KEY, command_json TEXT NOT NULL,
-        session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE, agent_id TEXT NOT NULL
+        session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE
       ) STRICT;
-      -- 代理当前选择属于环境，不进会话树。
-      CREATE TABLE agent_selections (
-        session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE, agent_id TEXT NOT NULL,
-        agent_configuration_id TEXT NOT NULL, model_id TEXT NOT NULL, thinking TEXT,
-        revision INTEGER NOT NULL DEFAULT 1, PRIMARY KEY(session_id, agent_id)
+      -- 资源私有的可变状态，按对象与键划分；会话不解释其内容，也不进会话树。
+      CREATE TABLE resource_states (
+        object_id TEXT NOT NULL, key TEXT NOT NULL,
+        session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+        value_json TEXT NOT NULL, PRIMARY KEY(object_id, key)
       ) STRICT;
-      PRAGMA user_version = 5;
+      PRAGMA user_version = 6;
       COMMIT;`);
-    else if (version !== 5) throw new Error("This workspace database format is not supported by this build of Weft. Back up and recreate the development database before opening it.");
+    else if (version !== 6) throw new Error("This workspace database format is not supported by this build of Weft. Back up and recreate the development database before opening it.");
     if (!db.prepare("SELECT id FROM workspace LIMIT 1").get()) {
       db.prepare("INSERT INTO workspace VALUES (?, ?)").run(randomUUID(), "Personal workspace");
     }
