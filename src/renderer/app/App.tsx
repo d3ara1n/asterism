@@ -17,7 +17,10 @@ import { SubmissionIdentity } from "../features/session/controller";
 import { sessionController } from "../features/session/registry";
 import { s, useConfiguration } from "../features/configuration/state";
 import type { AgentSelection } from "../../shared/model";
+import type { Json } from "../../shared/json";
 import { AddAgentDialog } from "../features/workbench/AddAgentDialog";
+import { AddNoteDialog } from "../features/workbench/AddNoteDialog";
+import { AddDirectoryDialog } from "../features/workbench/AddDirectoryDialog";
 import { Titlebar, Window } from "./Window";
 import { Sidebar } from "./Sidebar";
 import { Space } from "../shared/weave/Space";
@@ -28,6 +31,7 @@ import { islandTransition } from "../shared/weave/motion";
 /** 主屏包含侧栏与首页/工作台；设置为左侧独立屏，切换时主屏整体平移。 */
 type MainView = { kind: "home" } | { kind: "conversation"; sessionId: string };
 type PageId = "settings" | "main";
+type ResourceCreation = { kind: "agent" | "note" | "directory"; placement: ResourcePlacement };
 const idleSubscribe = () => () => {};
 const noSession = () => null;
 
@@ -42,7 +46,7 @@ export function App({ controller }: { controller: ApplicationController }) {
   const [draft, setDraft] = useState("");
   const [conversationDrafts, setConversationDrafts] = useState<Record<string, string>>({});
   const [accessOpen, setAccessOpen] = useState(false);
-  const [agentCreation, setAgentCreation] = useState<ResourcePlacement | null>(null);
+  const [resourceCreation, setResourceCreation] = useState<ResourceCreation | null>(null);
   const start = useStart();
   const agentDraft = useCallback((agentId: string) => conversationDrafts[agentId] ?? "", [conversationDrafts]);
   const setAgentDraft = useCallback((agentId: string, value: string) => setConversationDrafts(drafts => ({ ...drafts, [agentId]: value })), []);
@@ -83,7 +87,7 @@ export function App({ controller }: { controller: ApplicationController }) {
   });
   const navigate = (next: MainView) => {
     navigation.current++;
-    setView(next); setPage("main"); setAgentCreation(null); setAccessOpen(false);
+    setView(next); setPage("main"); setResourceCreation(null); setAccessOpen(false);
     controller.clearError();
     focusMain();
   };
@@ -102,28 +106,30 @@ export function App({ controller }: { controller: ApplicationController }) {
     if (token === navigation.current) openSession(created);
     void controller.refresh();
   };
-  // 目录走系统选择窗口，笔记直接落卡；不再经过表单对话框。
-  const addDirectory = async () => {
+  /** 先记下放置位置再打开对话框，确认后才创建资源。 */
+  const openResourceCreation = (kind: ResourceCreation["kind"]) => {
     const placement = workbench.current?.resourcePlacement();
-    if (!placement || !active) return;
-    const path = await window.weft.pickDirectory();
-    if (!path) return;
-    active.clearError();
-    void active.execute({ type: "resource.create", sessionId: placement.sessionId, kind: "directory", input: { path }, position: placement.position });
+    if (placement) { active?.clearError(); setResourceCreation({ kind, placement }); }
   };
-  const configuration = useConfiguration(ready);
-  const addAgent = () => { const placement = workbench.current?.resourcePlacement(); if (placement) { active?.clearError(); setAgentCreation(placement); } };
-  const createAgent = async (selection: AgentSelection) => {
-    if (!active || !agentCreation) return false;
-    const result = await active.execute({ type: "resource.create", sessionId: agentCreation.sessionId, kind: "agent", position: agentCreation.position, input: { selection } });
+  const createResource = async (input: Json) => {
+    if (!active || !resourceCreation || active.sessionId !== resourceCreation.placement.sessionId) return false;
+    const { kind, placement } = resourceCreation;
+    const result = await active.execute({ type: "resource.create", sessionId: placement.sessionId, kind, input, position: placement.position });
     return result.ok;
   };
-  const addNote = () => {
-    const placement = workbench.current?.resourcePlacement();
-    if (!placement || !active) return;
-    active.clearError();
-    void active.execute({ type: "resource.create", sessionId: placement.sessionId, kind: "note", input: { title: s("Untitled note", "未命名笔记") }, position: placement.position });
+  // 迟到的回调只能关闭它所属的创建表单。
+  const closeResourceCreation = () => setResourceCreation(current => current === resourceCreation ? null : current);
+  const creationDialog = {
+    busy: sessionBusy,
+    error: sessionState?.error,
+    onClose: closeResourceCreation,
+    onRetry: sessionState?.status === "error" ? () => { void active?.refresh(); } : undefined,
   };
+  const addDirectory = () => openResourceCreation("directory");
+  const configuration = useConfiguration(ready);
+  const addAgent = () => openResourceCreation("agent");
+  const createAgent = (selection: AgentSelection, title?: string) => createResource({ selection, ...(title ? { title } : {}) });
+  const addNote = () => openResourceCreation("note");
   const hideSidebar = () => {
     setSidebarVisible(false);
     requestAnimationFrame(() => sidebarToggle.current?.focus({ preventScroll: true }));
@@ -153,7 +159,7 @@ export function App({ controller }: { controller: ApplicationController }) {
       <DropdownMenuSeparator />
       <DropdownMenuLabel>{s("Resources", "资源")}</DropdownMenuLabel>
       <DropdownMenuItem onSelect={addNote}><FileText />{t.addNote}</DropdownMenuItem>
-      <DropdownMenuItem onSelect={() => { void addDirectory(); }}><Folder />{s("Directory…", "目录…")}</DropdownMenuItem>
+      <DropdownMenuItem onSelect={addDirectory}><Folder />{s("Directory…", "目录…")}</DropdownMenuItem>
     </DropdownMenuContent></DropdownMenu>
     <Button variant="ghost" size="sm" disabled={!writable} onClick={() => { active?.clearError(); setAccessOpen(true); }} aria-label={t.accessLabel}><KeyRound /><span className="toolbar-label">{t.access}</span></Button>
     <Button variant="ghost" size="sm" onClick={event => workbench.current?.togglePanel("objects", event.currentTarget)} aria-label={t.objects}><ListTree /><span className="toolbar-label">{t.objects}</span></Button>
@@ -202,13 +208,15 @@ export function App({ controller }: { controller: ApplicationController }) {
           content: <Screen label={t.appNavigation} leading={sidebarVisible ? [sidebar] : []} root={main} resetKey={view.kind === "conversation" ? view.sessionId : "home"} className="h-full" /> },
       ]} />
     </Window>
-    {error && !accessOpen && !agentCreation && <Alert variant="destructive" className="fixed bottom-4 left-1/2 z-[60] w-[min(560px,calc(100%-32px))] -translate-x-1/2 flex items-start gap-3 shadow-md">
+    {error && !accessOpen && !resourceCreation && <Alert variant="destructive" className="fixed bottom-4 left-1/2 z-[60] w-[min(560px,calc(100%-32px))] -translate-x-1/2 flex items-start gap-3 shadow-md">
       <AlertDescription className="flex-1">{error}</AlertDescription>
       {sessionState?.status === "error" && <Button variant="ghost" size="sm" onClick={() => { void active?.refresh(); }}>{t.retry}</Button>}
       {(state.error || sessionState?.status !== "error") && <Button variant="ghost" size="icon-xs" aria-label={t.dismissError} title={t.dismissError}
         onClick={state.error ? controller.clearError : active?.clearError}><X /></Button>}
     </Alert>}
-    {agentCreation && <AddAgentDialog configuration={configuration.snapshot} busy={sessionBusy} error={sessionState?.error ?? configuration.error} onCreate={createAgent} onClose={() => setAgentCreation(null)} />}
+    {resourceCreation?.kind === "agent" && <AddAgentDialog {...creationDialog} configuration={configuration.snapshot} error={sessionState?.error ?? configuration.error} onCreate={createAgent} />}
+    {resourceCreation?.kind === "note" && <AddNoteDialog {...creationDialog} onCreate={createResource} />}
+    {resourceCreation?.kind === "directory" && <AddDirectoryDialog {...creationDialog} onCreate={createResource} />}
     {accessOpen && session && <AccessDialog session={session} ready={ready} busy={sessionBusy} historical={historical} error={sessionState?.error} run={run} onClose={() => setAccessOpen(false)} />}
   </>;
 }

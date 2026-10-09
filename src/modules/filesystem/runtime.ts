@@ -8,7 +8,7 @@ import type { RuntimeModuleFactory } from "../runtime-contract.ts";
 import { Directory, DirectoryView, DirectoryRead, DirectoryList } from "./contract.ts";
 import { withinDirectory } from "./paths.ts";
 
-const directoryCreate = z.strictObject({ path: z.string().min(1).max(4096) });
+const directoryCreate = z.strictObject({ path: z.string().min(1).max(4096), title: z.string().trim().min(1).max(160).optional() });
 const fail = (code: string, message: string) => ({ kind: "failed" as const, error: { code, message } });
 const outside = () => ({ kind: "rejected" as const, error: { code: "outside_resource", message: "The path is outside this directory resource or does not exist." } });
 
@@ -20,16 +20,16 @@ export default (() => ({
       return { type: Directory.kind, title: resource.title, path: state.path, exists: !!info?.isDirectory() };
     },
     controller: {
-      /** 拖入与系统选择共用：只接受存在的绝对目录路径。 */
+      /** 拖入与对话框共用；title 可选，不填用 basename。只接受存在的绝对目录路径。 */
       async prepareCreate(input) {
-        const { path } = directoryCreate.parse(input);
+        const { path, title } = directoryCreate.parse(input);
         if (!isAbsolute(path)) throw new SessionError("invalid_request", "Directory path must be absolute.");
         if (!(await stat(path).catch(() => null))?.isDirectory()) throw new SessionError("invalid_request", "The path is not an existing directory.");
-        return { path };
+        return { path, ...(title ? { title } : {}) };
       },
       create(_sessionId, _objectId, input) {
-        const { path } = directoryCreate.parse(input);
-        return { title: basename(path) || path, data: { path } };
+        const { path, title } = directoryCreate.parse(input);
+        return { title: title ?? (basename(path) || path), data: { path } };
       },
     },
     async context(state) {

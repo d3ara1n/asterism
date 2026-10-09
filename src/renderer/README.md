@@ -21,7 +21,8 @@
 | `features/workbench/context.ts` | 工作台向卡片与更深浮岛提供的环境 |
 | `features/workbench/placement.ts` | 新卡片初始位置，不重排已有卡片 |
 | `features/session/registry.ts` | 会话共享控制器与各代理提交身份 |
-| `features/workbench/AddAgentDialog.tsx` / `AccessDialog.tsx` | 添加代理与显式资源绑定入口；笔记直接创建，目录经系统选择或拖入 |
+| `features/workbench/ResourceCreationDialog.tsx` / `Add*Dialog.tsx` | 添加代理、笔记与目录；共用布局、提交门禁与错误展示，名称校验按资源处理；目录可填写路径、系统选择或拖入 |
+| `features/workbench/AccessDialog.tsx` | 显式资源绑定入口 |
 | `features/conversation/Conversation.tsx` | 代理连续对话、工具过程、停止/继续；块从生成到保存保持同一组件 |
 | `features/session/controller.ts` | 查看位置、协调查询、会话操作队列与独立进度订阅 |
 | `features/session/History.tsx` | 会话历史面板，查看和分叉意图 |

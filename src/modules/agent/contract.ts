@@ -21,4 +21,5 @@ export const agentCommandSchema = z.discriminatedUnion("type", [
 ]);
 export type AgentCommand = z.infer<typeof agentCommandSchema>;
 /** 创建代理资源时的初始数据。 */
-export const agentCreateSchema = z.strictObject({ selection: agentSelectionSchema });
+/** title 可选，不填时用 agent 配置名。 */
+export const agentCreateSchema = z.strictObject({ selection: agentSelectionSchema, title: z.string().trim().min(1).max(160).optional() });

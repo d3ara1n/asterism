@@ -70,15 +70,15 @@ class AgentController implements ResourceController {
   }
 
   create(sessionId: string, objectId: string, input: unknown): { title: string } {
-    const { selection } = agentCreateSchema.parse(input);
-    const name = this.services.configuration.agentConfiguration(selection.agentConfigurationId)?.name ?? "Agent";
+    const { selection, title } = agentCreateSchema.parse(input);
+    const name = title ?? this.services.configuration.agentConfiguration(selection.agentConfigurationId)?.name ?? "Agent";
     this.saveSelection(sessionId, objectId, selection);
     return { title: name };
   }
   /** 创建前规整选择；首页与工作台添加共用。 */
-  async prepareCreate(input: unknown): Promise<{ selection: AgentSelection }> {
-    const { selection } = agentCreateSchema.parse(input);
-    return { selection: normalizeSelection(await this.config(), selection) };
+  async prepareCreate(input: unknown): Promise<{ selection: AgentSelection; title?: string }> {
+    const { selection, title } = agentCreateSchema.parse(input);
+    return { selection: normalizeSelection(await this.config(), selection), ...(title ? { title } : {}) };
   }
 
   async execute({ sessionId, resource }: { sessionId: string; resource: { id: string } }, raw: unknown, before?: () => void): Promise<void> {

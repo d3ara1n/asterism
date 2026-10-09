@@ -61,6 +61,7 @@ Window          平台差异、拖动区域、窗口几何变量
 ## 文字、图标与控件
 
 - 界面按系统语言单语显示（中文或英文），文案集中于 `shared/i18n.ts`；窄窗口时顶栏按钮只留图标。
+- 对话框描述只提供当前操作的填写引导或特有行为说明，不重复资源创建与授权等通用性质；同类表单使用一致的语气与结构。
 - 字号五级：`type-page`、`type-section`、`type-body`、`type-caption`、`type-label`。
 - 图标统一使用 lucide-react，不使用 Unicode 符号；界面标识为 `weft-mark.tsx` 的经纬线框。
 - `shared/ui/` 只放 shadcn（new-york-v4）官方 registry 源码，不手改结构与样式类；升级即重新拉取覆盖。官方没有的组合（如 PageState）放在 `shared/ui/` 内但只组合官方组件，不另写皮肤。业务代码需要的控件官方已有时（如确认用 AlertDialog、列表行用 Item、加载用 Spinner），先拉取再使用，不以 div 与 class 手写同类控件。
