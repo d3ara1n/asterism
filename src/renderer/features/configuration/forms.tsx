@@ -61,12 +61,21 @@ export function OverrideChoiceField({ value, inherited, onChange, ...props }: {
     options={[{ value: "__inherit", label: `${s("Built-in", "内置")} · ${inheritedLabel ?? ""}` }, ...props.options]}
     onChange={next => onChange(next === "__inherit" ? undefined : next)} />;
 }
-export function OverrideToggleField({ value, inherited, onChange, label }: {
-  label: string; value: boolean | undefined; inherited: boolean; onChange: (value: boolean | undefined) => void;
+/** 开关显示生效值；与内置值不同才写覆盖，并给出“已修改 · 恢复”。 */
+export function OverrideToggleField({ value, inherited, onChange, label, hint }: {
+  label: string; value: boolean | undefined; inherited: boolean; onChange: (value: boolean | undefined) => void; hint?: string;
 }) {
-  return <OverrideChoiceField label={label} value={value === undefined ? undefined : String(value)} inherited={String(inherited)}
-    options={[{ value: "true", label: s("Yes", "是") }, { value: "false", label: s("No", "否") }]}
-    onChange={next => onChange(next === undefined ? undefined : next === "true")} />;
+  const id = useId();
+  const effective = value ?? inherited;
+  const modified = value !== undefined && value !== inherited;
+  return <Field orientation="horizontal">
+    <div className="flex min-w-0 flex-1 flex-col gap-1">
+      <FieldLabel htmlFor={id}>{label}</FieldLabel>
+      {hint && <FieldDescription>{hint}</FieldDescription>}
+      {modified && <span className="type-caption">{s("Modified", "已修改")} · <button type="button" className="underline-offset-2 hover:underline" onClick={() => onChange(undefined)}>{s("Restore", "恢复")}</button></span>}
+    </div>
+    <Switch id={id} checked={effective} onCheckedChange={next => onChange(next === inherited ? undefined : next)} />
+  </Field>;
 }
 export function OverrideNumberField({ value, inherited, onChange, empty, ...props }: {
   label: string; value: number | null | undefined; inherited: number | null; onChange: (value: number | null | undefined) => void;
