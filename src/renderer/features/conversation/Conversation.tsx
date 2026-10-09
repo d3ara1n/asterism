@@ -25,7 +25,7 @@ function useAgent(view: AgentView) {
     [snapshot, historical, view.agentId, progress.live]);
   // 平级代理互不阻塞：只关心本代理是否在运行。
   const agentRunning = progress.runningAgentIds.includes(view.agentId);
-  return { ...session, progress, timeline, agentRunning, running: agentRunning, sessionRunning: progress.runningAgentIds.length > 0 };
+  return { ...session, timeline, agentRunning, running: agentRunning };
 }
 
 /** 卡片标题栏中的执行状态；历史属于会话，入口在窗口标题栏。 */

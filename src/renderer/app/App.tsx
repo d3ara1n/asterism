@@ -1,7 +1,6 @@
 import type { WorkbenchOperation } from "../features/session/controller";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { ArrowLeft, Bot, ChevronDown, Plus, FileText, Folder, History, House, KeyRound, ListTree, PanelLeft, Settings, X } from "lucide-react";
-import type { WorkbenchCommand } from "../../shared/workbench";
 import type { ApplicationController } from "./controller";
 import { t } from "../shared/i18n";
 import { Button } from "../shared/ui/button";
@@ -209,7 +208,7 @@ export function App({ controller }: { controller: ApplicationController }) {
       {(state.error || sessionState?.status !== "error") && <Button variant="ghost" size="icon-xs" aria-label={t.dismissError} title={t.dismissError}
         onClick={state.error ? controller.clearError : active?.clearError}><X /></Button>}
     </Alert>}
-    {agentCreation && <AddAgentDialog creation={agentCreation} configuration={configuration.snapshot} busy={sessionBusy} error={sessionState?.error ?? configuration.error} onCreate={createAgent} onClose={() => setAgentCreation(null)} />}
+    {agentCreation && <AddAgentDialog configuration={configuration.snapshot} busy={sessionBusy} error={sessionState?.error ?? configuration.error} onCreate={createAgent} onClose={() => setAgentCreation(null)} />}
     {accessOpen && session && <AccessDialog session={session} ready={ready} busy={sessionBusy} historical={historical} error={sessionState?.error} run={run} onClose={() => setAccessOpen(false)} />}
   </>;
 }

@@ -1,6 +1,6 @@
 import type { WorkbenchOperation } from "../session/controller";
 import { useState } from "react";
-import type { WorkbenchCommand, WorkbenchSnapshot } from "../../../shared/workbench";
+import type { WorkbenchSnapshot } from "../../../shared/workbench";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../../shared/ui/dialog";
 import { Button } from "../../shared/ui/button";
 import { Alert, AlertDescription } from "../../shared/ui/alert";

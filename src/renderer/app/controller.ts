@@ -21,7 +21,6 @@ export class ApplicationController {
     return unsubscribe;
   }
   clearError = (): void => this.update({ error: null });
-  reportError = (message: string): void => this.update({ error: message });
   refresh = async (): Promise<void> => {
     if (this.reading) { this.dirty = true; return; }
     this.reading = true;

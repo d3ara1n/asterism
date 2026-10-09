@@ -7,12 +7,12 @@
 | 文件 | 职责 |
 | --- | --- |
 | `contract.ts` | 纯 Zod 契约：资源状态、卡片数据、工具实现的 target/result 和稳定 ID/版本 |
-| `runtime.ts` | 默认导出 RuntimeModuleFactory，注册资源后端与工具实现，可使用 Node 和注入的 ObjectStore |
+| `runtime.ts` | 默认导出 RuntimeModuleFactory，注册资源后端、资源控制器与工具实现；可使用 Node 和注入的存储、会话及配置服务 |
 | `renderer.tsx` | 默认导出 RendererModule，注册卡片内容、附加操作和结果组件，只依赖纯契约与前端代码 |
 
 `modules/runtime.ts` 与 `modules/renderer.ts` 分别通过 Vite 静态 glob 收集对应入口。新增目录遵守入口约定即可进入构建；两个入口不要相互导入，也不要创建同时导出它们的 barrel。运行时不依赖 React，renderer 不导入 Node/数据库。当前只加载内置源码，不提供第三方安装、动态执行或沙箱。
 
-新增资源的创建与生命周期操作仍通过应用命令契约接入；注册后端和视图不会自动开放创建命令或新 IPC 权限。
+资源创建与卡片行为通过 `resource.create` / `resource.command` 接入，由资源控制器校验输入并执行；没有对应控制器行为时拒绝命令。模型操作入口和资源授权独立于这些内部应用命令。
 
 ## 工具契约与实现
 
@@ -40,6 +40,10 @@ implement(DirectoryRead, {
 ## 资源后端与视图
 
 `implementResource` 注册状态投影 `project`、实时检查 `inspect` 和可选环境来源 `context`。project 返回卡片契约的数据；包装层生成 `{contract: {id, version}, data}`，经 IPC 发送给前端。
+
+可选 `controller` 负责创建、命令与活动状态。命令经异步准备后须在写入事务中执行会话传入的 `before`，重新确认对象仍在当前路径上。`activity.running` 报告仍会向会话树追加事件的对象 ID，包括代理与其他被捕获的资源；只引用外部状态的持续运行不计入。活动开始、结束经 `SessionHost.progressChanged` 通知。会话仅在全部资源收束后允许回溯，移除对象也要求该对象收束。
+
+`SessionHost.path` 读取当前路径；`SessionHost.commit` 在同步事务中接收成型记录与资源私有状态修改，提交后统一发布持久通知。回调内的 `SessionWriter` 只提供追加、终态与取得续接路径，节点身份、父指针、游标和自动吸附均由会话管理；不向资源控制器暴露可修改的 `SessionTree`。流增量保存在代理执行侧，不作为时间轴记录提交。
 
 `cardRenderer(NoteView, …)` 与 `resultRenderer(NoteRead, …)` 使用相同纯契约推导组件 data 类型，并在接收端校验。卡片提供外观元数据、Body、可选 Actions；ObjectCard 统一处理框架、拖动、折叠与关闭。模块不重建这套外壳。
 

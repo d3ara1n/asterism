@@ -11,6 +11,8 @@ import { sessionResultSchema, type SessionChanged, type SessionCommand, type Ses
 import { dispatchSession } from "./dispatch.ts";
 import { sessionVersion } from "../shared/session.ts";
 import type { AgentSelection, Json } from "../shared/model.ts";
+import { projectForAgent } from "../session/projection.ts";
+import * as runtimeModules from "../modules/runtime.ts";
 
 const roots: string[] = [];
 type Snap = { workbench: { objects: { id: string; kind: string; presentation: { data: unknown } }[] } };
@@ -18,7 +20,7 @@ const agentOf = (snap: Snap) => snap.workbench.objects.find(o => o.kind === "age
 const selectionOf = (snap: Snap) => (snap.workbench.objects.find(o => o.kind === "agent")!.presentation.data as { selection: AgentSelection }).selection;
 const agentCommand = (sessionId: string, objectId: string, command: Json): SessionMutation => ({ type: "resource.command", sessionId, objectId, command });
 const services = new Set<ApplicationService>();
-afterEach(async () => { vi.useRealTimers(); for (const s of services) await s.close(); services.clear(); for (const r of roots.splice(0)) rmSync(r, { recursive: true, force: true }); });
+afterEach(async () => { vi.useRealTimers(); for (const s of services) await s.close(); services.clear(); vi.restoreAllMocks(); for (const r of roots.splice(0)) rmSync(r, { recursive: true, force: true }); });
 
 function reply(textValue = "Hello"): ModelEvent[] {
   return [{ type: "part.start", part: { id: "t", kind: "text" } }, { type: "part.delta", partId: "t", delta: textValue },
@@ -242,11 +244,124 @@ describe("会话运行时", () => {
     const message = before.nodes.find(n => n.kind === "message")!;
     await execute(service, { type: "select", sessionId: first.sessionId, nodeId: message.id });
     await execute(service, agentCommand(first.sessionId, agentId, { type: "submit", submissionId: randomUUID(), text: "Branch" }));
-    await expect(execute(service, { type: "select", sessionId: first.sessionId, nodeId: message.id })).rejects.toThrow("running");
+    await expect(execute(service, { type: "select", sessionId: first.sessionId, nodeId: message.id })).rejects.toThrow("settle");
     release(); await settled(service);
     const after = await execute(service, { type: "read", sessionId: first.sessionId });
     expect(after.nodes.slice(0, before.nodes.length)).toEqual(before.nodes);
     expect(after.nodes.find(n => n.kind === "message" && n.text === "Branch")!.parentId).toBe(message.id);
+  });
+
+  it("其他代理在 thinking 后发送时沿同一路径追加，不回溯或拆开响应", async () => {
+    let release!: () => void;
+    let markThinking!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    const thinkingSaved = new Promise<void>(resolve => { markThinking = resolve; });
+    let calls = 0;
+    const model: ModelAdapter = { version: "ai-sdk-v7/2", prepare: () => ({ async *stream() {
+      if (++calls === 2) {
+        yield { type: "part.start", part: { id: "r", kind: "thinking" } };
+        yield { type: "part.delta", partId: "r", delta: "Reasoning" };
+        yield { type: "part.end", partId: "r" };
+        markThinking(); await gate;
+      }
+      yield* reply();
+    } }) };
+    const { service, start } = await setup(model);
+    const first = await execute(service, start); await settled(service);
+    const sessionId = first.sessionId;
+    const a = agentOf(first);
+    await execute(service, { type: "resource.create", sessionId, kind: "agent", input: { selection: selectionOf(first) }, position: { x: 600, y: 0 } });
+    const b = service.sessions.snapshot(sessionId).workbench.objects.find(o => o.id !== a)!.id;
+    try {
+      await execute(service, agentCommand(sessionId, a, { type: "submit", submissionId: randomUUID(), text: "To A" }));
+      await thinkingSaved;
+      const thinking = service.sessions.tree.path(sessionId).at(-1)!;
+      expect(thinking.kind).toBe("thinking");
+      await execute(service, agentCommand(sessionId, b, { type: "submit", submissionId: randomUUID(), text: "To B" }));
+      expect(service.sessions.tree.path(sessionId)).toContainEqual(thinking);
+      expect(service.sessions.tree.nodes(sessionId).find(n => n.kind === "message" && n.text === "To B")?.parentId).toBe(thinking.id);
+      expect(service.sessions.tree.cursorSelections(sessionId)).toEqual([]);
+    } finally { release(); }
+    await settled(service);
+    const lastOutput = projectForAgent(service.sessions.tree.path(sessionId), a).filter(item => item.kind === "output").at(-1)!;
+    expect(lastOutput.parts.map(part => part.kind)).toEqual(["thinking", "text"]);
+  });
+
+  it("移除活动代理返回 conflict；收束后移除同时解除入向与出向链接", async () => {
+    let release!: () => void;
+    let entered!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    const started = new Promise<void>(resolve => { entered = resolve; });
+    let calls = 0;
+    const model: ModelAdapter = { version: "ai-sdk-v7/2", prepare: () => ({ async *stream() {
+      if (++calls === 2) { entered(); await gate; }
+      yield* reply();
+    } }) };
+    const { service, start } = await setup(model);
+    const first = await execute(service, start); await settled(service);
+    const sessionId = first.sessionId;
+    const a = agentOf(first);
+    await execute(service, { type: "resource.create", sessionId, kind: "agent", input: { selection: selectionOf(first) }, position: { x: 600, y: 0 } });
+    const b = service.sessions.snapshot(sessionId).workbench.objects.find(o => o.id !== a)!.id;
+    await execute(service, { type: "link.set", sessionId, agentId: a, resourceId: b, linked: true });
+    await execute(service, { type: "link.set", sessionId, agentId: b, resourceId: a, linked: true });
+    try {
+      await execute(service, agentCommand(sessionId, a, { type: "continue" })); await started;
+      const cursor = service.sessions.tree.cursor(sessionId);
+      await expect(execute(service, { type: "object.remove", sessionId, objectId: a })).rejects.toMatchObject({ code: "conflict" });
+      expect(service.sessions.tree.cursor(sessionId)).toBe(cursor);
+      expect(service.sessions.snapshot(sessionId).workbench.links).toHaveLength(2);
+    } finally { release(); }
+    await settled(service);
+    const removed = await execute(service, { type: "object.remove", sessionId, objectId: a });
+    expect(removed.workbench.objects.map(o => o.id)).toEqual([b]);
+    expect(removed.workbench.links).toEqual([]);
+  });
+
+  it.each(["submit", "configure"] as const)("异步 %s 准备期间对象被移除，落地前拒绝命令", async type => {
+    const { service, start } = await setup();
+    const first = await execute(service, start); await settled(service);
+    const sessionId = first.sessionId;
+    const agentId = agentOf(first);
+    const read = service.configuration.execute.bind(service.configuration);
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    vi.spyOn(service.configuration, "execute").mockImplementationOnce(async command => { await gate; return read(command); });
+    const command: Json = type === "submit" ? { type, submissionId: randomUUID(), text: "Too late" }
+      : { type, selection: selectionOf(first) };
+    const pending = execute(service, agentCommand(sessionId, agentId, command));
+    const rejected = expect(pending).rejects.toMatchObject({ code: "not_found" });
+    try {
+      await execute(service, { type: "object.remove", sessionId, objectId: agentId });
+      const nodes = service.sessions.tree.nodes(sessionId);
+      release(); await rejected;
+      expect(service.sessions.tree.nodes(sessionId)).toEqual(nodes);
+      expect(service.sessions.running).toBe(false);
+    } finally { release(); }
+  });
+
+  it("被捕获的非代理资源活动阻止回溯与自身移除，外部引用不阻止", async () => {
+    let capturedId = "";
+    const createModules = runtimeModules.createModules;
+    vi.spyOn(runtimeModules, "createModules").mockImplementation(services => {
+      const modules = createModules(services);
+      modules.resources.controller("note")!.activity = () => ({ running: capturedId ? [capturedId] : [], live: [] });
+      return modules;
+    });
+    const { service, root, start } = await setup();
+    const first = await execute(service, start); await settled(service);
+    const sessionId = first.sessionId;
+    const note = await execute(service, { type: "resource.create", sessionId, kind: "note", input: {}, position: { x: 0, y: 0 } });
+    capturedId = note.workbench.objects.find(o => o.kind === "note")!.id;
+    expect(service.sessions.snapshot(sessionId).progress).toMatchObject({ runningAgentIds: [], unsettledObjectIds: [capturedId] });
+    await expect(execute(service, { type: "select", sessionId, nodeId: first.cursor })).rejects.toMatchObject({ code: "conflict" });
+    await expect(execute(service, { type: "object.remove", sessionId, objectId: capturedId })).rejects.toMatchObject({ code: "conflict" });
+    const directory = await execute(service, { type: "resource.create", sessionId, kind: "directory", input: { path: root }, position: { x: 0, y: 0 } });
+    await execute(service, { type: "object.remove", sessionId, objectId: directory.workbench.objects.find(o => o.kind === "directory")!.id });
+    const id = capturedId;
+    capturedId = "";
+    await execute(service, { type: "object.remove", sessionId, objectId: id });
+    await execute(service, { type: "select", sessionId, nodeId: first.cursor });
   });
 
   it("请求在产生块之前失败时记录错误级通知，不伪造回复", async () => {

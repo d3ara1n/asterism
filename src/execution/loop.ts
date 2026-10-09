@@ -1,11 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { modelExpression, modelScope, type ModelSettings } from "../shared/model.ts";
 import type { AgentConfiguration } from "../shared/configuration.ts";
-import type { LiveBlock, NewNode } from "../shared/session.ts";
+import type { BlockCompletion, LiveBlock, NewNode } from "../shared/session.ts";
 import { ModelFailure, type ModelAdapter } from "../model/contract.ts";
 import { composeSystemPrompt } from "../model/system-prompt.ts";
 import type { ModelItem } from "../session/projection.ts";
-import type { SessionTree } from "../session/tree.ts";
 import { SessionError } from "../shared/session-path.ts";
 import { executeWeftBatch, weftDeclarations } from "./weft.ts";
 import type { AgentCapabilities } from "./capabilities.ts";
@@ -21,24 +20,19 @@ export interface RequestEnvironment {
   context: { file: string; text: string }[];
 }
 export interface RunOptions {
-  tree: SessionTree;
-  sessionId: string;
   agentId: string;
   signal: AbortSignal;
-  changed?: () => void;
+  /** 只提交成型记录；身份、追加位置、事务与持久通知由会话入口处理。 */
+  append: (node: NewNode) => string;
+  complete: (blockId: string, completion: BlockCompletion) => void;
   progress?: (blocks: LiveBlock[]) => void;
   /** 每次请求前重新解析配置、选择与环境文件；不写入会话树。 */
   environment: () => Promise<RequestEnvironment>;
 }
 
-/** 一轮执行：请求准备、流块持久化、工具批次收束；流事件校验由 ResponseBuffer 负责。 */
+/** 一轮执行：请求准备、内存流块、工具批次收束；成型记录提交给会话。 */
 export async function runAgent(options: RunOptions): Promise<void> {
-  const { tree, sessionId, agentId, signal } = options;
-  const append = (node: NewNode) => {
-    const saved = tree.append(sessionId, node);
-    try { options.changed?.(); } catch { /* 查询可恢复遗漏的通知 */ }
-    return saved.id;
-  };
+  const { agentId, signal, append } = options;
   const notice = (code: string, message: string, level: "error" | "warning" = "error") =>
     append({ kind: "notice", agentId, level, code, message });
   try {
@@ -55,8 +49,7 @@ export async function runAgent(options: RunOptions): Promise<void> {
       const response = new ResponseBuffer({ agentId, responseId, requestParentId, model, adapter: adapter.version, scope: modelScope(settings) },
         append, (blockId, completion) => {
           if (blockId) {
-            tree.completeBlock(sessionId, blockId, completion);
-            try { options.changed?.(); } catch { /* 终态查询可恢复 */ }
+            options.complete(blockId, completion);
           } else append({ kind: "notice", agentId, level: "error", code: "empty_response",
             message: "The provider finished without returning any content blocks.",
             response: { responseId, requestParentId, model, ...completion } });

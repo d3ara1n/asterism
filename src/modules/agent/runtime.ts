@@ -7,7 +7,6 @@ import { agentToolPolicy } from "../../execution/capabilities.ts";
 import { implementResource, type ResourceController } from "../../resources/contract.ts";
 import { projectForAgent } from "../../session/projection.ts";
 import { SessionError } from "../../session/tree.ts";
-import { snap } from "../../shared/session-path.ts";
 import { resolveProviderModel, type ConfigurationSnapshot } from "../../shared/configuration.ts";
 import { agentSelectionSchema, type AgentSelection, type ModelSettings } from "../../shared/model.ts";
 import type { LiveBlock } from "../../shared/session.ts";
@@ -92,11 +91,10 @@ class AgentController implements ResourceController {
       case "cancel": this.runs.get(this.key(sessionId, agentId))?.controller.abort(); return;
       case "configure": {
         const config = await this.config();
-        host.transaction(() => {
+        host.commit(sessionId, () => {
           before?.();
           this.saveSelection(sessionId, agentId, normalizeSelection(config, command.selection, this.selection(agentId)?.selection));
         });
-        host.notify(sessionId);
         return;
       }
       case "submit": case "continue": {
@@ -106,19 +104,14 @@ class AgentController implements ResourceController {
         // 只检查本代理；其他代理并行运行互不阻塞。
         if (this.runs.has(this.key(sessionId, agentId))) throw new SessionError("conflict", "This agent is running. Cancel or wait for it to finish.");
         let timeout = 600;
-        host.transaction(() => {
+        host.commit(sessionId, timeline => {
           // before 可能刚创建本代理（首页组合入口），因此选择在其后读取。
           before?.();
           const current = this.selection(agentId);
           if (!current) throw new SessionError("not_found", "Agent not found.");
           const environment = this.environment(config, current.selection);
           timeout = environment.agent.timeout ?? 600;
-          const tree = host.tree;
-          // 历史位置上继续时先吸附到合法续接点。
-          const cursor = tree.cursor(sessionId);
-          const snapped = cursor === null ? null : snap(tree.nodes(sessionId), cursor);
-          if (snapped !== cursor) tree.select(sessionId, cursor, "continuation");
-          const path = tree.path(sessionId);
+          const path = timeline.continuation();
           if (!path.some(n => n.kind === "event" && n.type === "resource_created" && (n.data as { id?: unknown }).id === agentId)) {
             throw new SessionError("not_found", "Agent not found on the current session path.");
           }
@@ -131,7 +124,7 @@ class AgentController implements ResourceController {
             throw new SessionError("invalid_request", error instanceof ModelFailure ? error.message : "The model request cannot be prepared.");
           }
           if (command.type === "submit") {
-            tree.append(sessionId, { kind: "message", agentId, text: command.text });
+            timeline.append({ kind: "message", agentId, text: command.text });
             this.services.state.set(sessionId, agentId, submissionKey(command.submissionId), JSON.stringify(command));
           }
         });
@@ -153,8 +146,10 @@ class AgentController implements ResourceController {
     const key = this.key(sessionId, agentId);
     const timer = setTimeout(() => controller.abort(), timeout * 1000);
     let progressTimer: ReturnType<typeof setTimeout> | undefined;
-    const done = Promise.resolve().then(() => runAgent({ tree: host.tree, sessionId, agentId,
-      signal: controller.signal, changed: () => host.notify(sessionId),
+    const done = Promise.resolve().then(() => runAgent({ agentId,
+      signal: controller.signal,
+      append: node => host.commit(sessionId, timeline => timeline.append(node)),
+      complete: (blockId, completion) => host.commit(sessionId, timeline => timeline.completeBlock(blockId, completion)),
       progress: blocks => {
         const run = this.runs.get(key);
         if (run) run.live = blocks;
@@ -165,7 +160,7 @@ class AgentController implements ResourceController {
         const current = this.selection(agentId);
         if (!current) throw new SessionError("not_found", "Agent not found.");
         // 消息、资源和策略取自同一请求边界；期间事件由投影排在本响应之后。
-        const path = host.tree.path(sessionId);
+        const path = host.path(sessionId);
         const environment = this.environment(config, current.selection);
         const linked = host.linked(path, agentId);
         return { ...environment, messages: projectForAgent(path, agentId), requestParentId: path.at(-1)?.id ?? null,
@@ -176,17 +171,11 @@ class AgentController implements ResourceController {
       .finally(() => { clearTimeout(timer); clearTimeout(progressTimer); this.runs.delete(key); host.progressChanged(sessionId); });
     this.runs.set(key, { sessionId, agentId, controller, done, live: [] });
     host.progressChanged(sessionId);
-    host.notify(sessionId);
   }
 
   activity(sessionId: string): { running: string[]; live: LiveBlock[] } {
     const runs = [...this.runs.values()].filter(run => run.sessionId === sessionId);
     return { running: runs.map(run => run.agentId), live: runs.flatMap(run => run.live) };
-  }
-  async release(sessionId: string, objectId: string): Promise<void> {
-    const run = this.runs.get(this.key(sessionId, objectId));
-    run?.controller.abort();
-    await run?.done;
   }
   linkTools(_sessionId: string, objectId: string, resource: Parameters<NonNullable<ResourceController["linkTools"]>>[2]) {
     const current = this.selection(objectId);
@@ -214,4 +203,3 @@ export default ((services: RuntimeServices) => {
     tools: [],
   };
 }) satisfies RuntimeModuleFactory;
-export type { AgentController };

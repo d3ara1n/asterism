@@ -20,7 +20,7 @@
 | `features/workbench/context.ts` | 工作台向卡片与更深浮岛提供的环境 |
 | `features/workbench/placement.ts` | 新卡片初始位置，不重排已有卡片 |
 | `features/session/registry.ts` | 会话共享控制器与各代理提交身份 |
-| `features/workbench/CreateNoteDialog.tsx` / `AccessDialog.tsx` | 已有笔记创建与显式资源绑定入口 |
+| `features/workbench/AddAgentDialog.tsx` / `AccessDialog.tsx` | 添加代理与显式资源绑定入口；笔记直接创建，目录经系统选择或拖入 |
 | `features/conversation/Conversation.tsx` | 代理连续对话、工具过程、停止/继续；块从生成到保存保持同一组件 |
 | `features/session/controller.ts` | 查看位置、协调查询、会话操作队列与独立进度订阅 |
 | `features/session/History.tsx` | 会话历史面板，查看和分叉意图 |
@@ -31,6 +31,7 @@
 | `features/configuration/` | 提供商/模型角色/agent 配置表单及共享读取入口 |
 | `features/configuration/forms.tsx` | 配置编辑器与字段公共入口；文本 placeholder、内置选择、显式空值与恢复操作在此复用 |
 | `features/configuration/ConfigurationChoice.tsx` | 首页与会话输入托盘共用的紧凑配置菜单 |
+| `features/configuration/agent-selection.ts` | 首页与添加代理共用的创建前默认选择解析 |
 | `features/settings/` | 设置屏与分类注册表，通用偏好仍为预览 |
 | `shared/weave/` | Space 屏间平移、Screen 浮岛、布局模型与动效 |
 | `shared/ui/` | 本地维护的 shadcn/ui Radix 控件 |

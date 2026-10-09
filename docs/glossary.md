@@ -20,6 +20,7 @@
 | 对话 | conversation | 某代理从会话树即时投影出的上下文与视图，不单独存储 |
 | 代理配置 | agent configuration | 提示词、工具策略、委派范围与模型角色引用等可复用配置；所有代理对象共用，区别于执行实例 |
 | 资源 | resource | 具有稳定身份、状态、操作与视图的对象，可以是完全虚拟的 |
+| 被捕获的资源 | captured resource | 活动过程以事件进入会话树的资源；区别于只引用外部状态的资源 |
 | 资源类型 / 资源实例 | resource type / instance | 类型定义资源状态与检查方式；实例携带身份与状态；工具实现声明支持关系 |
 | 工具 | tool | 与资源平级的共享契约，规定身份与 args；可有多个后端实现，外部策略另行决定是否允许使用 |
 | 工具实现 | tool implementation | 后端对某工具的实现，规定支持的资源类型、target/result、handler 与执行策略；有稳定 ID 和版本 |
@@ -39,6 +40,7 @@
 | --- | --- | --- |
 | 执行轮次 | turn | 代理处理一次输入的完整过程，可含多次模型与工具调用 |
 | 会话树 | session tree | Session 唯一的只追加扁平节点树：message、thinking、text、toolcall、event、notice |
+| 收束 | settled | 资源没有仍在进行的会话树事件写入；会话收束要求所有被捕获的资源均已收束 |
 | 执行段 | execution segment | 代理流中按一次用户输入组织的可定位区段 |
 | 摘要列表 | summary list | 执行/用户输入的导航列表，历史导航主入口 |
 | 绑定 | binding | 代理在某个有效区间获得资源访问能力 |

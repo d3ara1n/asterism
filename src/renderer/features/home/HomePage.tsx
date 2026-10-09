@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowUp, Bot, Brain, Cpu, Settings } from "lucide-react";
-import { resolveModelRole, resolveProviderModel, thinkingSchema, type ConfigurationSnapshot, type ThinkingLevel } from "../../../shared/configuration";
+import { resolveProviderModel, thinkingSchema, type ConfigurationSnapshot, type ThinkingLevel } from "../../../shared/configuration";
+import { initialAgentSelection } from "../configuration/agent-selection";
 import { t } from "../../shared/i18n";
 import { Button } from "../../shared/ui/button";
 import { ConfigurationChoice as Choice } from "../configuration/ConfigurationChoice";
@@ -25,11 +26,9 @@ export function HomePage({ active, draft, onDraftChange, onSettings, ready, busy
   const [showcase, setShowcase] = useState(false);
   const [selectionError, setSelectionError] = useState<string | null>(null);
   const selectAgent = (id: string, config: ConfigurationSnapshot) => {
-    const agent = config.agents.find(item => item.id === id && item.enabled);
-    setAgentId(agent?.id ?? null);
-    if (!agent) { setModelId(null); setThinking(null); return; }
-    const resolved = resolveModelRole(config, agent.modelRole ?? "default");
-    setModelId(resolved.error ? null : resolved.modelId); setThinking(resolved.thinking);
+    const resolved = initialAgentSelection(config, id);
+    setAgentId(resolved.agentId);
+    setModelId(resolved.modelId); setThinking(resolved.thinking);
     setSelectionError(resolved.error ? s("This agent’s default model configuration is unavailable. Select a model or update settings.", "此代理的默认模型配置不可用，请选择模型或修改设置。") : null);
   };
   useEffect(() => {

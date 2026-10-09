@@ -42,7 +42,7 @@ export type NewNode = SessionNode extends infer N ? N extends SessionNode ? Omit
 // ---- 会话能力接口 ----
 const uuid = z.string().uuid();
 const text = z.string().trim().min(1).max(100_000);
-export const sessionVersion = 5;
+export const sessionVersion = 6;
 export const viewPositionSchema = z.discriminatedUnion("kind", [
   z.strictObject({ kind: z.literal("live") }),
   z.strictObject({ kind: z.literal("history"), nodeId: id.nullable() }),
@@ -76,6 +76,8 @@ const revision = z.number().int().nonnegative();
 /** 进度可独立替换；revision 指出它依赖的持久视图版本，version 表示内存进度先后。 */
 export const sessionProgressSchema = z.strictObject({
   revision, version: revision, runningAgentIds: z.array(id), live: z.array(liveBlockSchema),
+  /** 所有尚未收束的被捕获资源；外部状态的持续运行不计入。 */
+  unsettledObjectIds: z.array(id),
 });
 export type SessionProgress = z.infer<typeof sessionProgressSchema>;
 /** 同次读取固定路径与对象投影；seq 是节点序号，revision 还涵盖计量、选择与布局。 */

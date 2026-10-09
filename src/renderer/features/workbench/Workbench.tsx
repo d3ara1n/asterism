@@ -3,7 +3,7 @@ import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState,
 import { ReactFlow, ReactFlowProvider, Background, BackgroundVariant, Panel, useReactFlow, applyNodeChanges, applyEdgeChanges, type NodeChange, type EdgeChange, type Edge, MarkerType, type Connection, type IsValidConnection } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { Maximize, Minus, Plus, Scan } from "lucide-react";
-import type { WorkbenchCommand, WorkbenchSnapshot } from "../../../shared/workbench";
+import type { WorkbenchSnapshot } from "../../../shared/workbench";
 import { t } from "../../shared/i18n";
 import { s } from "../configuration/state";
 import { Button } from "../../shared/ui/button";
@@ -93,7 +93,7 @@ function Canvas({ session, run, writable }: { session: WorkbenchSnapshot; run: R
       // 对象与视图状态未变时复用原 data，memo 的卡片跳过重渲染。
       const data = current && current.data.object === object && current.data.collapsed === view.collapsed
         ? current.data : { object, collapsed: view.collapsed, onView };
-      const node: ObjectNodeType = { id: object.id, type: "object", position: view.position, dragHandle: cardDragHandle, data };
+      const node: ObjectNodeType = { id: object.id, type: "object", position: view.position, dragHandle: cardDragHandle, deletable: false, data };
       if (!current) return [node];
       return [{ ...node, selected: current.selected, ...(current.dragging ? { position: current.position, dragging: true } : {}) }];
     }), [onView]);
@@ -155,17 +155,18 @@ function Canvas({ session, run, writable }: { session: WorkbenchSnapshot; run: R
     colorMode={scheme} nodes={nodes} edges={edges} nodeTypes={nodeTypes} onNodesChange={onNodesChange}
     defaultViewport={session.viewport} minZoom={0.1} maxZoom={4}
     nodesDraggable nodesConnectable={writable} edgesReconnectable={false} isValidConnection={isValidConnection}
-    onConnect={onConnect} onEdgesChange={onEdgesChange} onEdgesDelete={onEdgesDelete} onBeforeDelete={async ({ edges }) => ({ nodes: [], edges })}
+    onConnect={onConnect} onEdgesChange={onEdgesChange} onEdgesDelete={onEdgesDelete}
+    onBeforeDelete={async ({ edges }) => ({ nodes: [], edges: edges.filter(edge => edge.selected) })}
     deleteKeyCode={writable ? ["Backspace", "Delete"] : null} panOnScroll selectionOnDrag panOnDrag={[1, 2]} zoomOnDoubleClick={false}
     onMoveEnd={(event, viewport) => { if (event) void run({ type: "viewport.set", sessionId: session.id, viewport }); }}
   >
     {canvas !== "none" && <Background color="var(--canvas-grid)" gap={24} size={canvas === "dots" ? 1.5 : canvas === "cross" ? 6 : undefined}
       variant={canvas === "dots" ? BackgroundVariant.Dots : canvas === "lines" ? BackgroundVariant.Lines : BackgroundVariant.Cross} />}
-    <ViewControls session={session} run={run} />
+    <ViewControls session={session} run={run} selected={nodes.filter(node => node.selected).map(node => ({ id: node.id }))} />
   </ReactFlow></div>;
 }
 
-function ViewControls({ session, run }: { session: WorkbenchSnapshot; run: Run }) {
+function ViewControls({ session, run, selected }: { session: WorkbenchSnapshot; run: Run; selected: { id: string }[] }) {
   const flow = useReactFlow();
   const move = async (action: () => Promise<boolean>) => {
     await action();
@@ -173,7 +174,6 @@ function ViewControls({ session, run }: { session: WorkbenchSnapshot; run: Run }
     await run({ type: "viewport.set", sessionId: session.id, viewport: flow.getViewport() });
   };
   // 所有对象平级：定位当前选中的卡片，而非某个“主”代理。
-  const selected = flow.getNodes().filter(node => node.selected).map(node => ({ id: node.id }));
   const controls = [
     [t.zoomIn, Plus, () => flow.zoomIn()],
     [t.zoomOut, Minus, () => flow.zoomOut()],

@@ -71,7 +71,7 @@ npm run build
 
 开发数据位于 Electron `appData/Weft-development`，发布版使用 `userData`；数据库为 `db/weft.sqlite`，正文在 `objects/`，运行时日志在 `logs/runtime.log`，Chromium 数据在 `chromium/`。重启会读取已保存的工作。当前没有后台常驻服务，关闭最后一个窗口会退出应用与任务进程。
 
-当前应用存储版本为 5；旧开发数据库会明确报版本不兼容，不自动迁移或清理。需要重建时先关闭应用并自行备份开发数据。
+当前应用存储版本为 6；旧开发数据库会明确报版本不兼容，不自动迁移或清理。需要重建时先关闭应用并自行备份开发数据。
 
 模块入口见 [源码地图](src/README.md)、[界面维护](src/renderer/README.md)。跨平台与打包兼容性验收见 [桌面工程立案](plans/todo-2026-09-18-desktop-tooling.md)。
 

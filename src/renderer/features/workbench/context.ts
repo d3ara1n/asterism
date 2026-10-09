@@ -1,6 +1,6 @@
 import type { WorkbenchOperation } from "../session/controller";
 import { createContext, createElement, useContext, useSyncExternalStore, type ReactNode } from "react";
-import type { WorkbenchCommand, WorkbenchSnapshot } from "../../../shared/workbench";
+import type { WorkbenchSnapshot } from "../../../shared/workbench";
 import type { SessionController } from "../session/controller";
 
 /** 工作台向卡片与更深浮岛提供的环境；卡片节点数据只保留对象与视图状态。 */

@@ -6,14 +6,14 @@ import { SessionError, SessionTree } from "../session/tree.ts";
 import { foldWorkbench, type FoldedObject } from "../session/fold.ts";
 import { AgentCapabilities } from "../execution/capabilities.ts";
 import { createModules } from "../modules/runtime.ts";
-import type { SessionHost } from "../modules/runtime-contract.ts";
+import type { SessionHost, SessionWriter } from "../modules/runtime-contract.ts";
 import type { ResourceRegistry } from "../resources/registry.ts";
 import { ResourceStateStore } from "../resources/state.ts";
 import type { ToolRegistry } from "../tools/registry.ts";
 import type { ModelSettings } from "../shared/model.ts";
 import { sessionCommandSchema, sessionSnapshotSchema, type SessionChanged, type SessionCommand, type SessionSnapshot,
   type SessionProgress, type SessionReply, type ViewPosition } from "../shared/session.ts";
-import { sessionPath } from "../shared/session-path.ts";
+import { sessionPath, snap } from "../shared/session-path.ts";
 import { SessionWorkbench } from "./workbench.ts";
 import type { ObjectStore } from "./storage.ts";
 
@@ -33,11 +33,9 @@ export class SessionService {
     private readonly changed: (event: SessionChanged) => void = () => {}, adapterFactory?: (settings: ModelSettings) => ModelAdapter) {
     this.tree = new SessionTree(db);
     const host: SessionHost = {
-      tree: this.tree,
-      transaction: work => this.transaction(work),
-      notify: sessionId => this.notify(sessionId),
+      path: sessionId => this.tree.path(sessionId),
+      commit: (sessionId, work) => this.commit(sessionId, work),
       progressChanged: sessionId => this.progressChanged(sessionId),
-      settled: sessionId => this.settled(sessionId),
       linked: (path, objectId) => {
         const folded = foldWorkbench(path);
         const ids = new Set(folded.links.filter(link => link.agentId === objectId).map(link => link.resourceId));
@@ -49,7 +47,7 @@ export class SessionService {
     const modules = createModules({ objects, state: new ResourceStateStore(db), sessions: host, configuration, adapterFactory });
     this.resources = modules.resources;
     this.tools = modules.tools;
-    this.workbench = new SessionWorkbench(db, this.tree, objects, this.resources,
+    this.workbench = new SessionWorkbench(db, this.tree, this.resources,
       (sessionId, agentId, resource) => this.linkTools(sessionId, agentId, resource));
   }
   get running(): boolean { return this.resources.controllers().some(c => this.tree.list().some(s => (c.activity?.(s.id).running ?? []).length > 0)); }
@@ -57,6 +55,22 @@ export class SessionService {
     this.db.exec("BEGIN IMMEDIATE");
     try { const result = work(); this.db.exec("COMMIT"); return result; }
     catch (error) { this.db.exec("ROLLBACK"); throw error; }
+  }
+  /** 单一写入者的同步提交区间：取父节点、记录事件与更新游标不可交错。 */
+  private commit<T>(sessionId: string, work: (writer: SessionWriter) => T): T {
+    const result = this.transaction(() => work({
+      append: node => this.tree.append(sessionId, node).id,
+      completeBlock: (blockId, completion) => this.tree.completeBlock(sessionId, blockId, completion),
+      continuation: () => {
+        const cursor = this.tree.cursor(sessionId);
+        if (this.settled(sessionId) && cursor !== null && snap(this.tree.nodes(sessionId), cursor) !== cursor) {
+          this.tree.select(sessionId, cursor, "continuation");
+        }
+        return this.tree.path(sessionId);
+      },
+    }));
+    this.notify(sessionId);
+    return result;
   }
   /** 会话 settled：没有任何资源在活动；回溯只在此时允许。 */
   private settled(sessionId: string): boolean {
@@ -71,7 +85,9 @@ export class SessionService {
   private progress(sessionId: string): SessionProgress {
     const activity = this.resources.controllers().map(controller => controller.activity?.(sessionId) ?? { running: [], live: [] });
     return { revision: this.revisions.get(sessionId) ?? 0, version: this.progressVersions.get(sessionId) ?? 0,
-      runningAgentIds: activity.flatMap(a => a.running), live: activity.flatMap(a => a.live) };
+      unsettledObjectIds: [...new Set(activity.flatMap(a => a.running))],
+      runningAgentIds: this.resources.controller("agent")?.activity?.(sessionId).running ?? [],
+      live: activity.flatMap(a => a.live) };
   }
   private progressChanged(sessionId: string): void {
     this.progressVersions.set(sessionId, (this.progressVersions.get(sessionId) ?? 0) + 1);
@@ -104,34 +120,33 @@ export class SessionService {
     switch (command.type) {
       case "read": return { kind: "view", snapshot: this.snapshot(command.sessionId, command.position) };
       case "select":
-        if (!this.settled(command.sessionId)) throw new SessionError("conflict", "Wait for or stop running agents before moving through history.");
-        this.tree.select(command.sessionId, command.nodeId);
-        this.notify(command.sessionId);
+        if (!this.settled(command.sessionId)) throw new SessionError("conflict", "Wait for all captured resources to settle before moving through history.");
+        this.commit(command.sessionId, () => this.tree.select(command.sessionId, command.nodeId));
         return { kind: "accepted", sessionId: command.sessionId };
       case "start": return this.start(command);
       case "resource.command": {
         const resource = this.object(command.sessionId, command.objectId);
         const controller = this.resources.controller(resource.kind);
         if (!controller?.execute) throw new SessionError("invalid_request", "This resource has no actions.");
-        await controller.execute({ sessionId: command.sessionId, resource }, command.command);
+        await controller.execute({ sessionId: command.sessionId, resource }, command.command,
+          () => { this.object(command.sessionId, command.objectId); });
         return { kind: "accepted", sessionId: command.sessionId };
       }
       case "resource.create": {
         this.tree.cursor(command.sessionId);
         const controller = this.resources.controller(command.kind);
         const input = controller?.prepareCreate ? await controller.prepareCreate(command.input) : command.input;
-        this.transaction(() => this.workbench.create(command.sessionId, command.kind, input, command.position));
-        this.notify(command.sessionId);
+        this.commit(command.sessionId, () => this.workbench.create(command.sessionId, command.kind, input, command.position));
         return { kind: "accepted", sessionId: command.sessionId };
       }
       default: {
         if (command.type === "object.remove") {
           const target = this.object(command.sessionId, command.objectId);
-          // 资源自行停止其活动后再移除。
-          await this.resources.controller(target.kind)?.release?.(command.sessionId, target.id);
+          if (this.resources.controllers().some(controller => controller.activity?.(command.sessionId).running.includes(target.id))) {
+            throw new SessionError("conflict", "Wait for this resource to settle before removing it.");
+          }
         }
-        this.transaction(() => this.workbench.mutate(command));
-        this.notify(command.sessionId);
+        this.commit(command.sessionId, () => this.workbench.mutate(command));
         return { kind: "accepted", sessionId: command.sessionId };
       }
     }

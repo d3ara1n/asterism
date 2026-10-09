@@ -8,6 +8,8 @@
 | 应用标识 | 正式 bundle ID 与 Windows AppUserModelID 为 `dev.dearain.weft`；应用数据目录独立于该标识 |
 | 代理即资源 | 代理是普通资源对象，以 `resource_created { type: "agent" }` 创建，可被移除，也可作为链接起点授权给另一个代理；链接终点只能是代理。所有代理平级，可在同一会话并行运行 |
 | 资源控制器 | 资源卡片的行为（代理的提交、继续、配置、取消）由该资源模块的控制器执行，经 `resource.command` 路由；会话只负责会话树、对象与链接事件、布局和通知。资源私有可变数据（如代理的模型选择）存于资源状态，不进会话树 |
+| 资源收束 | 所有被捕获的资源（活动事件进入会话树）均 settled 才能回溯游标；外部状态的持续运行不计入。移除对象要求该对象 settled，未收束时明确拒绝；移除同时解除全部入向、出向链接 |
+| 时间轴写入 | 资源控制器持有未成型的流与活动状态，成型记录提交给 Session；时间轴追加、终态、续接位置与回溯由 Session 管理。提交事务同步串行，模型流与资源准备可并行，不在写入区间异步等待 |
 | 定位 | 比 coding agent 更宽的个人工作台，包含日常事务、研究、维护与编程 |
 | 展示 | 对象卡片与关系线；工具调用默认收纳在代理流 |
 | Session | 一段工作的持续过程；唯一会话树，可含任意数量代理，代理不分主子 |
@@ -40,7 +42,7 @@
 
 模型接入为 Vercel AI SDK，MCP 接入为官方 TypeScript SDK。运行时拥有任务历史与授权，接入层不拥有会话真值；不以完整 agent 框架替代织台的历史、资源和授权内核。
 
-模型接入的上层封装须支持继续扩展协议，首批围绕 OpenAI 与 Anthropic 协议。每个 Session 有唯一的只追加扁平会话树：message、thinking、text、toolcall（带结果）、event、notice 平级节点；代理块带 agent_id 与 response_id，不完整块以 complete=false 落库但不发给模型。对话是代理从树上的即时投影，不单独存储；模型投影按响应归组并把响应期间的事件延后。会话 settled 才可回溯，继续点不得使投影以 thinking 结尾。具体契约见 [会话树](timeline.md) 与 [会话与代理能力](conversation-core.md)。
+模型接入的上层封装须支持继续扩展协议，首批围绕 OpenAI 与 Anthropic 协议。每个 Session 有唯一的只追加扁平会话树：message、thinking、text、toolcall（带结果）、event、notice 平级节点；代理块带 agent_id 与 response_id，不完整块以 complete=false 落库但不发给模型。对话是代理从树上的即时投影，不单独存储；模型投影按响应归组并把响应期间的事件延后。会话所有被捕获的资源 settled 才可回溯，继续点不得使投影以 thinking 结尾。具体契约见 [会话树](timeline.md) 与 [会话与代理能力](conversation-core.md)。
 
 同一批次工具调用共同收束后统一向模型交付结果，再开始后续模型请求；单个工具完成可更新进度，但不触发提前续轮。批次身份是执行关联，不是 transcript 容器。
 

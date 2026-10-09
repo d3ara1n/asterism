@@ -2,8 +2,7 @@ import type { ObjectStore } from "../runtime/storage.ts";
 import type { ConfigurationService } from "../configuration/service.ts";
 import type { ModelAdapter } from "../model/contract.ts";
 import type { ModelSettings } from "../shared/model.ts";
-import type { SessionNode } from "../shared/session.ts";
-import type { SessionTree } from "../session/tree.ts";
+import type { BlockCompletion, NewNode, SessionNode } from "../shared/session.ts";
 import type { FoldedObject } from "../session/fold.ts";
 import type { AgentCapabilities, ToolPolicy } from "../execution/capabilities.ts";
 import type { ContextFile, ResourceBackend } from "../resources/contract.ts";
@@ -14,13 +13,18 @@ export interface RuntimeModule {
   resources: ResourceBackend[];
   tools: ToolImplementation[];
 }
-/** 会话向资源控制器开放的边界：记录事件、事务、通知与按请求边界取用授权。 */
+/** 只在会话的同步提交事务中使用；节点身份、父指针、游标与续接位置由会话管理。 */
+export interface SessionWriter {
+  append(node: NewNode): string;
+  completeBlock(blockId: string, completion: BlockCompletion): void;
+  continuation(): SessionNode[];
+}
+/** 会话向资源控制器开放的边界：提交成型记录、读取路径与按请求边界取用授权。 */
 export interface SessionHost {
-  tree: SessionTree;
-  transaction<T>(work: () => T): T;
-  notify(sessionId: string): void;
+  path(sessionId: string): SessionNode[];
+  /** 回调内不可异步等待；记录和资源私有状态同事务提交，通知在提交后发布。 */
+  commit<T>(sessionId: string, work: (writer: SessionWriter) => T): T;
   progressChanged(sessionId: string): void;
-  settled(sessionId: string): boolean;
   /** 路径上以该对象为终点的链接起点。 */
   linked(path: readonly SessionNode[], objectId: string): FoldedObject[];
   capabilities(linked: readonly FoldedObject[], policy: ToolPolicy): AgentCapabilities;

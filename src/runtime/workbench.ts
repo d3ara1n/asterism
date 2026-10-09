@@ -6,14 +6,13 @@ import { SessionError, type SessionTree } from "../session/tree.ts";
 import type { Json } from "../shared/json.ts";
 import type { SessionNode } from "../shared/session.ts";
 import { workbenchSnapshotSchema, type WorkbenchCommand, type WorkbenchSnapshot, type Point, type Viewport } from "../shared/workbench.ts";
-import type { ObjectStore } from "./storage.ts";
 
 type ViewRow = { object_id: string; x: number; y: number; hidden: number; collapsed: number };
 
 /** 会话的资源事件与独立布局；由会话入口统一事务和通知，不拥有查看位置。 */
 export class SessionWorkbench {
   constructor(private readonly db: DatabaseSync, private readonly tree: SessionTree,
-    private readonly objects: ObjectStore, private readonly resources: ResourceRegistry,
+    private readonly resources: ResourceRegistry,
     private readonly tools: (sessionId: string, agentId: string, resource: FoldedObject) => Json) {}
 
   /** 通用资源创建：资源控制器给出标题并保存私有状态；创建事件只记录身份与类型。 */

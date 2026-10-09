@@ -1,5 +1,5 @@
 import type { SessionBridge, SessionMutation, SessionResult, SessionSnapshot, SessionProgress, ViewPosition } from "../../../shared/session.ts";
-import { isLayoutCommand, type WorkbenchCommand } from "../../../shared/workbench.ts";
+import { isLayoutCommand } from "../../../shared/workbench.ts";
 
 /** 资源命令中的取消在历史或同步中也允许，以便随时停止运行。 */
 const isCancel = (value: unknown) => typeof value === "object" && value !== null && (value as { type?: unknown }).type === "cancel";
@@ -11,7 +11,7 @@ export type SessionViewState = {
   snapshot: SessionView | null; position: ViewPosition; status: "loading" | "ready" | "error"; busy: boolean; error: string | null; missing: boolean;
 };
 const live: ViewPosition = { kind: "live" };
-const emptyProgress: SessionProgress = { revision: 0, version: 0, runningAgentIds: [], live: [] };
+const emptyProgress: SessionProgress = { revision: 0, version: 0, runningAgentIds: [], unsettledObjectIds: [], live: [] };
 
 /** 一个会话的查看位置、协调投影与操作入口。进度单独订阅，调用方不编排历史查询。 */
 export class SessionController {
@@ -20,6 +20,7 @@ export class SessionController {
   private pendingProgress: SessionProgress | null = null;
   private listeners = new Set<() => void>();
   private progressListeners = new Set<() => void>();
+  private viewWaiters = new Set<() => void>();
   private requestedPosition: ViewPosition = live;
   private generation = 0;
   private connections = 0;
@@ -36,6 +37,7 @@ export class SessionController {
   private update(patch: Partial<SessionViewState>): void {
     this.state = { ...this.state, ...patch };
     this.listeners.forEach(listener => listener());
+    this.viewWaiters.forEach(waiter => waiter());
   }
   private acceptProgress(progress: SessionProgress): void {
     if (progress.version < this.progress.version) return;
@@ -75,6 +77,7 @@ export class SessionController {
       if (--this.connections > 0) return;
       this.unsubscribe?.(); this.unsubscribe = null;
       this.generation++; this.reading = false;
+      this.viewWaiters.forEach(waiter => waiter());
     };
   }
   /** 完整读取用于打开、历史定位与持久变化；同一位置的密集通知合并读取。 */
@@ -116,10 +119,28 @@ export class SessionController {
   }
   /** 命令按会话串行；执行时检查查看模式，返回受理结果不会替换任何展示投影。 */
   execute = (command: SessionOperation): Promise<SessionResult> => {
-    const operation = this.queue.then(() => this.perform(command));
+    // 就绪视图上连续发出的意图可排队；后项等前项投影发布后再检查执行位置。
+    // 在同步期间新构造的领域命令仍由门禁拒绝，避免使用旧配置或链接。
+    const queuedWithCurrentView = this.state.status === "ready" && !isLayoutCommand(command)
+      && command.type !== "select" && !(command.type === "resource.command" && isCancel(command.command));
+    const operation = this.queue.then(async () => {
+      if (queuedWithCurrentView && this.state.status === "loading" && this.requestedPosition.kind === "live") await this.waitForView();
+      return this.perform(command);
+    });
     this.queue = operation;
     return operation;
   };
+  private waitForView(): Promise<void> {
+    return new Promise(resolve => {
+      const complete = () => {
+        if (this.state.status === "loading" && this.connections > 0 && this.requestedPosition.kind === "live") return;
+        this.viewWaiters.delete(complete);
+        resolve();
+      };
+      this.viewWaiters.add(complete);
+      complete();
+    });
+  }
   private async perform(command: SessionOperation): Promise<SessionResult> {
     const reject = (code: "conflict" | "invalid_request", message: string): SessionResult => {
       this.update({ error: message }); return { ok: false, error: { code, message } };
@@ -129,7 +150,7 @@ export class SessionController {
       return reject("conflict", "History is read-only. Continue from this position before making changes.");
     }
     if (this.state.status !== "ready" && !isLayoutCommand(command) && command.type !== "select" && !(command.type === "resource.command" && isCancel(command.command))) {
-      return reject("conflict", "Wait for the session view to synchronize before making changes.");
+      return reject("conflict", this.state.error ?? "Wait for the session view to synchronize before making changes.");
     }
     const position = this.requestedPosition;
     // 在途读取可能早于本次变更；命令完成后统一重新读取当前目标位置。
