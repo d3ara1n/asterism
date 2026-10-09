@@ -112,12 +112,15 @@ export function resolveProviderModel(snapshot: ConfigurationSnapshot, modelId: s
   return provider?.enabled ? { model, provider } : null;
 }
 
-/** 空值才继承；丢失、停用的配置必须由消费方显式处理，不能偷偷换成其他模型。 */
-export function resolveModelRole(snapshot: ConfigurationSnapshot, roleId: string, current?: { modelId: string | null; thinking: ThinkingLevel | null }): {
+/**
+ * 空值才继承；丢失、停用的配置必须由消费方显式处理，不能偷偷换成其他模型。
+ * 隐藏角色只对代理不开放：代理路径使用默认值，内部功能显式传 allowHidden。
+ */
+export function resolveModelRole(snapshot: ConfigurationSnapshot, roleId: string, current?: { modelId: string | null; thinking: ThinkingLevel | null }, options: { allowHidden?: boolean } = {}): {
   modelId: string | null; thinking: ThinkingLevel | null; error: "role_unavailable" | "model_unavailable" | null;
 } {
   const role = snapshot.roles.find(item => item.id === roleId);
-  if (!role?.enabled) return { modelId: null, thinking: null, error: "role_unavailable" };
+  if (!role?.enabled || (role.hidden && !options.allowHidden)) return { modelId: null, thinking: null, error: "role_unavailable" };
   const modelId = role.modelId ?? current?.modelId ?? null;
   const thinking = role.thinking ?? current?.thinking ?? null;
   if (modelId === null) return { modelId, thinking, error: null };

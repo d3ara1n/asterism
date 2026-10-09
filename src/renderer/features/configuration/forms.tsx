@@ -1,5 +1,5 @@
 import { useId, useState, type ReactNode } from "react";
-import { Trash2 } from "lucide-react";
+import { RotateCcw, Trash2 } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "../../shared/ui/alert-dialog";
 import { Alert, AlertDescription } from "../../shared/ui/alert";
 import { Button } from "../../shared/ui/button";
@@ -109,7 +109,7 @@ export function OverrideListField({ label, value, inherited, onChange, empty, hi
  * 传入 dirty 时：无修改禁用保存；有修改时关闭本浮岛（含上级关闭或替换）先确认放弃。
  */
 export interface RemoveAction { title: string; description: string; onConfirm: () => void }
-export function Editor({ title, description, form, dirty, remove, children }: { title: string; description?: string; form: string; dirty?: boolean; remove?: RemoveAction; children: ReactNode }) {
+export function Editor({ title, description, form, dirty, remove, restore, children }: { title: string; description?: string; form: string; dirty?: boolean; remove?: RemoveAction; restore?: () => void; children: ReactNode }) {
   const { busy } = useSettingsConfiguration();
   const [asking, setAsking] = useState<((discard: boolean) => void) | null>(null);
   const [removing, setRemoving] = useState(false);
@@ -117,6 +117,7 @@ export function Editor({ title, description, form, dirty, remove, children }: { 
   const answer = (discard: boolean) => { asking?.(discard); setAsking(null); };
   return <IslandPanel title={title} description={description}
     action={<>
+      {restore && <Button type="button" variant="ghost" size="icon-sm" aria-label={s("Restore all built-in values", "全部恢复内置值")} title={s("Restore all built-in values", "全部恢复内置值")} disabled={busy} onClick={restore}><RotateCcw /></Button>}
       {remove && <Button type="button" variant="ghost" size="icon-sm" className="text-destructive" aria-label={s("Delete", "删除")} title={s("Delete", "删除")} disabled={busy} onClick={() => setRemoving(true)}><Trash2 /></Button>}
       <Button type="submit" form={form} size="sm" disabled={busy || dirty === false}>{busy ? s("Saving…", "正在保存…") : s("Save", "保存")}</Button>
     </>}>

@@ -142,11 +142,11 @@ describe("真实配置与消费边界", () => {
     const { snapshot, modelId } = await addModel(service);
     const value = { ...roleValue(snapshot, "utility"), thinking: null };
     const saved = await service.execute({ type: "role.save", id: "utility", value });
-    expect(resolveModelRole(saved.snapshot, "utility", { modelId, thinking: "high" })).toEqual({ modelId, thinking: "high", error: null });
+    expect(resolveModelRole(saved.snapshot, "utility", { modelId, thinking: "high" }, { allowHidden: true })).toEqual({ modelId, thinking: "high", error: null });
     const off = await service.execute({ type: "role.save", id: "utility", value: { ...value, thinking: "off" } });
-    expect(resolveModelRole(off.snapshot, "utility", { modelId, thinking: "high" }).thinking).toBe("off");
+    expect(resolveModelRole(off.snapshot, "utility", { modelId, thinking: "high" }, { allowHidden: true }).thinking).toBe("off");
     const disabled = await service.execute({ type: "role.save", id: "utility", value: { ...value, enabled: false } });
-    expect(resolveModelRole(disabled.snapshot, "utility").error).toBe("role_unavailable");
+    expect(resolveModelRole(disabled.snapshot, "utility", undefined, { allowHidden: true }).error).toBe("role_unavailable");
   });
   it("内置模型角色不可删除；自定义和 agent 可删，重开不重新播种", async () => {
     const { service, db, root, protector } = setup();

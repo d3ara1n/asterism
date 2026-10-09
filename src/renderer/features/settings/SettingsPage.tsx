@@ -15,7 +15,8 @@ import { AppearanceSettings } from "../appearance/AppearanceSettings";
 import { ConfigurationContext, s, useConfiguration } from "../configuration/state";
 import { ConfigurationStatus } from "../configuration/forms";
 import { ProvidersSettings } from "../configuration/ProvidersSettings";
-import { AgentsSettings, RolesSettings } from "../configuration/RolesSettings";
+import { RolesSettings } from "../configuration/RolesSettings";
+import { AgentsSettings } from "../configuration/AgentsSettings";
 
 /** 设置分类注册表：新增分类只需追加一项。仅列入有明确用途的分类。 */
 interface SettingsCategory { id: string; title: string; summary: string; icon: ComponentType<LucideProps>; content: () => ReactNode }
