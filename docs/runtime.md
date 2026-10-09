@@ -45,6 +45,8 @@ Weft 操作入口是软件提供的外围接口，仅在 provider 协议中表�
 - `resource_list` / `resource_inspect`：列出已链接资源，查看资源的实时状态与可用工具及 schema。
 - `resource_call(resource_id, tool, target?, args)`：以工具操作已链接资源或其内部目标。省略 target 等价于 null，是否接受由实现声明。
 
+上述三个固定入口称一级工具，是协议 `tools` 中的工具，代表 Weft 与工作台的操作界面；经 `resource_call` 使用的动态资源工具称二级工具，是模型完成实际任务的主要工具。层级描述调用关系，不表示产品中的重要性；可管理、可扩展的核心工具目录属于资源工具。用户视图需区分两类调用，至少使用不同标签；资源工具的专用调用 renderer 由其实现所在功能模块提供。
+
 资源与工具独立定义：资源契约描述类型与状态；共享工具契约只规定工具名称与 args schema。后端的工具实现声明自己支持的资源类型、target schema、result schema、读写副作用和调度策略，并提供 handler。一个 read 契约可以对应笔记、目录等多个实现，不在公共 read 函数中集中判断资源类型。资源实例不保存工具列表或白名单。
 
 target 是 `resource_call` 的定位参数，由选中的实现直接解释，不要求使用 path，也不引入通用目标解析层。笔记 read 接受 null；目录 read 接受 `{path}`，表示目录内的文件；游戏工具可接受 `{piece}`。args 始终遵循共享工具契约，target 与 result 随实现变化。注册器拒绝同名工具的 args 冲突，以及同一资源类型、工具名的多个当前实现。

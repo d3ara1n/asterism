@@ -61,6 +61,10 @@ Session 是时间轴的单一写入者。成型记录、终态元数据、对象
 
 直接续接要求 provider、协议、端点、模型标识和适配版本兼容；不兼容时在提交前明确失败。图片与服务端工具暂不支持。
 
+Responses 模型声明的思考能力显式传给 SDK，不依赖 SDK 的 OpenAI 模型名称识别；声明思考能力时，开启、关闭与等级参数均传到请求中。模型声明思考能力且未关闭思考时，显式请求可见摘要，包括采用默认思考等级的情况；加密推理资料独立用于续接。代理页面只展示含可见正文的思考块，空块仍保留在历史与模型投影中，不显示空折叠项。
+
+DeepSeek 官方端点 `api.deepseek.com` 的 Responses 返回 `response.reasoning_text.delta`，不生成思考摘要。适配层通过 SDK 的原始事件接口读取已知正文增量，复用原有思考块身份、即时进度与保存流程；原始帧不持久化或写入日志。DeepSeek 不支持 reasoning 输入的 summary/encrypted_content，声明将纯文本 content 合入相邻 assistant 正文，因此模型投影将保存的思考作为 assistant 文本发送，不携带该块的 OpenAI 续接字段；织台历史仍区分 thinking 与 text。系统指令保留 system 身份，避免 DeepSeek 把 developer 当作 user。协议依据见 [DeepSeek Responses 指南](https://api-docs.deepseek.com/guides/responses_api/) 与 [接口参考](https://api-docs.deepseek.com/api/create-response/)。
+
 ## 前端能力接口
 
 `window.weft.session` 提供 `execute` 与 `onChanged`，IPC 版本为 6。资源与布局命令也属于此会话入口。应用通道只读取工作区身份和会话列表，不持有已打开会话的正文。
@@ -86,7 +90,7 @@ Session 是时间轴的单一写入者。成型记录、终态元数据、对象
 
 `session.changed` 携带会话身份与持久视图修订 `revision`，节点、终态元数据、选择或布局变化后通知重读。`seq` 仍只表示节点追加序号。`session.progress` 独立发布完整的当前内存进度，携带单调 `version`、所依赖的持久 `revision`、运行代理与 live 块，以及所有尚未收束的被捕获资源 `unsettledObjectIds`，不触发每个增量的全历史查询。历史分叉依据全部资源的收束状态，代理卡片只依据自身运行状态。进度先于对应持久视图到达时，消费者保留已有块并等待该视图；初次打开或重连通过完整读取恢复两者。两个修订只在任务进程生命周期内用于同步，不写入历史，任务进程退出后仍须重启应用。
 
-块的展示身份使用 `responseId + ordinal`，在内存与持久阶段保持一致；保存后以持久数据接替，不创建另一套块组件。历史节点 ID 继续用于路径、审计和分叉。画布订阅持久视图，对话另行订阅进度；展开状态不因落库而重置。
+块的展示身份使用 `responseId + ordinal`，在内存与持久阶段保持一致；保存后以持久数据接替，不创建另一套块组件。历史节点 ID 继续用于路径、审计和分叉。画布订阅持久视图，对话另行订阅进度。正文与思考按即时增量使用流式 Markdown 渲染；思考从首个可见增量起默认展开，生成期间可手动开合，增量更新不覆盖用户选择。该思考块结束或中断、由持久数据接替时自动折叠，之后可手动展开；历史思考默认折叠。其他块的展开状态不因落库而重置。
 
 ## 验证边界
 

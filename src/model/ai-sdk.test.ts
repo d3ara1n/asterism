@@ -5,6 +5,8 @@ import { modelScope } from "../shared/model.ts";
 import type { ModelInput, ModelEvent } from "./contract.ts";
 import { createProviderModel } from "./provider.ts";
 import { composeSystemPrompt, projectSystemPrompt } from "./system-prompt.ts";
+import { ResponseBuffer } from "../execution/response.ts";
+import type { NewNode } from "../shared/session.ts";
 
 const input: ModelInput = {
   settings: { provider: { id: "p", revision: 1, name: "Provider", enabled: true, baseUrl: "https://example.invalid", protocol: "anthropic", auth: "api_key" },
@@ -15,6 +17,109 @@ const input: ModelInput = {
 };
 
 describe("AI SDK 适配契约", () => {
+  it.each([
+    { modelId: "o3", thinking: null }, { modelId: "o3", thinking: "low" }, { modelId: "o3", thinking: "off" },
+    { modelId: "deepseek-flash", thinking: null }, { modelId: "deepseek-flash", thinking: "medium" }, { modelId: "deepseek-flash", thinking: "off" },
+  ] as const)("Responses $modelId 思考等级 $thinking 的摘要请求与可见正文解码", async ({ modelId, thinking }) => {
+    const current = structuredClone(input);
+    current.settings.provider.protocol = "openai-responses";
+    current.settings.model.modelId = modelId;
+    current.settings.model.generation.temperature = null;
+    current.settings.thinking = thinking;
+    const response = { id: "response-thinking", model: modelId, created_at: 0 };
+    const frames = [
+      { type: "response.created", response: { ...response, status: "in_progress" } },
+      { type: "response.output_item.added", output_index: 0, item: { id: "reasoning-1", type: "reasoning", summary: [] } },
+      { type: "response.reasoning_summary_part.added", item_id: "reasoning-1", output_index: 0, summary_index: 0,
+        part: { type: "summary_text", text: "" } },
+      { type: "response.reasoning_summary_text.delta", item_id: "reasoning-1", output_index: 0, summary_index: 0, delta: "Visible summary" },
+      { type: "response.reasoning_summary_part.done", item_id: "reasoning-1", output_index: 0, summary_index: 0,
+        part: { type: "summary_text", text: "Visible summary" } },
+      { type: "response.output_item.done", output_index: 0, item: { id: "reasoning-1", type: "reasoning",
+        summary: [{ type: "summary_text", text: "Visible summary" }], encrypted_content: "encrypted-continuation" } },
+      { type: "response.completed", response: { ...response, status: "completed", usage: { input_tokens: 3, output_tokens: 2, total_tokens: 5 } } },
+    ];
+    let request: Record<string, unknown> | undefined;
+    const transport: typeof fetch = async (_url, init) => {
+      request = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      return new Response(frames.map(frame => `data: ${JSON.stringify(frame)}\n\n`).join(""),
+        { headers: { "content-type": "text/event-stream" } });
+    };
+    const adapter = new AiSdkAdapter(async () => "synthetic-key",
+      (value, key) => createProviderModel(value.settings.provider, value.settings.model, key, transport));
+    const events: ModelEvent[] = [];
+    for await (const event of adapter.prepare(current).stream(new AbortController().signal)) events.push(event);
+    // 摘要是可见内容；加密推理只供后续请求续接，两者需分别请求和保留。
+    if (thinking === "off") expect(request?.reasoning).not.toHaveProperty("summary");
+    else expect(request?.reasoning).toMatchObject({ summary: "auto" });
+    if (thinking !== null) expect(request?.reasoning).toMatchObject({ effort: thinking === "off" ? "none" : thinking });
+    expect(request).toMatchObject({ store: false, include: ["reasoning.encrypted_content"] });
+    expect(events.find(event => event.type === "part.delta")).toMatchObject({ partId: "thinking:reasoning-1:0", delta: "Visible summary" });
+    expect(events.find(event => event.type === "part.end")).toMatchObject({
+      continuation: { openai: { itemId: "reasoning-1", reasoningEncryptedContent: "encrypted-continuation" } },
+    });
+  });
+
+  it("DeepSeek Responses 的 reasoning_text 增量进入即时与保存正文，续接使用受支持的纯文本", async () => {
+    const current = structuredClone(input);
+    current.settings.provider.protocol = "openai-responses";
+    current.settings.provider.baseUrl = "https://api.deepseek.com";
+    current.settings.model.modelId = "deepseek-flash";
+    current.settings.thinking = "medium";
+    current.settings.model.generation.temperature = null;
+    const response = { id: "response-plain", model: "deepseek-flash", created_at: 0 };
+    // DeepSeek 官方 Responses 示例使用 reasoning_text；summary 为空，不产生摘要事件。
+    const frames = [
+      { type: "response.created", response: { ...response, status: "in_progress" } },
+      { type: "response.output_item.added", output_index: 0, item: { id: "rs_1", type: "reasoning", summary: [] } },
+      { type: "response.content_part.added", item_id: "rs_1", output_index: 0, content_index: 0, part: { type: "reasoning_text", text: "" } },
+      { type: "response.reasoning_text.delta", item_id: "rs_1", output_index: 0, content_index: 0, delta: "Assess " },
+      { type: "response.reasoning_text.delta", item_id: "rs_1", output_index: 0, content_index: 0, delta: "the plan." },
+      { type: "response.reasoning_text.done", item_id: "rs_1", output_index: 0, content_index: 0, text: "Assess the plan." },
+      { type: "response.output_item.done", output_index: 0, item: { id: "rs_1", type: "reasoning", summary: [],
+        content: [{ type: "reasoning_text", text: "Assess the plan." }] } },
+      { type: "response.completed", response: { ...response, status: "completed", usage: { input_tokens: 3, output_tokens: 2, total_tokens: 5 } } },
+    ];
+    const requests: Record<string, unknown>[] = [];
+    const transport: typeof fetch = async (_url, init) => {
+      requests.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+      return new Response(frames.map(frame => `data: ${JSON.stringify(frame)}\n\n`).join(""),
+        { headers: { "content-type": "text/event-stream" } });
+    };
+    const adapter = new AiSdkAdapter(async () => "synthetic-key",
+      (value, key) => createProviderModel(value.settings.provider, value.settings.model, key, transport));
+    const nodes: NewNode[] = [];
+    const buffer = new ResponseBuffer({ agentId: "a", responseId: "r", requestParentId: null, model: "p/m:medium",
+      adapter: adapter.version, scope: modelScope(current.settings) },
+      node => { nodes.push(node); return `block-${nodes.length}`; }, () => {});
+    const liveText: string[] = [];
+    for await (const event of adapter.prepare(current).stream(new AbortController().signal)) {
+      buffer.accept(event);
+      if (event.type === "part.delta") {
+        const live = buffer.live()[0];
+        if (live?.kind === "thinking") liveText.push(live.text);
+      }
+    }
+    buffer.close();
+    expect(liveText).toEqual(["Assess ", "Assess the plan."]);
+    expect(nodes).toHaveLength(1);
+    expect(nodes[0]).toMatchObject({ kind: "thinking", text: "Assess the plan.", complete: true });
+    const thought = nodes[0];
+    if (thought?.kind !== "thinking") throw new Error("Missing saved thinking.");
+    const next: ModelInput = { ...current, messages: [...current.messages, {
+      kind: "output", adapter: adapter.version, scope: modelScope(current.settings),
+      parts: [{ kind: "thinking", text: thought.text, continuation: thought.continuation }, { kind: "text", text: "Answer", continuation: null }],
+    }] };
+    for await (const _event of adapter.prepare(next).stream(new AbortController().signal)) { /* 检查实际序列化请求。 */ }
+    expect(requests[0]?.reasoning).toMatchObject({ effort: "medium" });
+    expect((requests[0]?.input as Array<{ role?: string }>)[0]?.role).toBe("system");
+    const replay = requests[1]?.input as Array<{ type?: string; role?: string; content?: unknown }>;
+    const assistant = replay.filter(item => item.role === "assistant");
+    expect(JSON.stringify(assistant)).toContain("Assess the plan.");
+    expect(JSON.stringify(assistant)).toContain("Answer");
+    expect(replay.some(item => item.type === "reasoning")).toBe(false);
+  });
+
   it("真实 Anthropic 解码保留 start 的 redactedData 与 delta 的签名", async () => {
     const frames = [
       { type: "message_start", message: { id: "response-thinking", type: "message", role: "assistant", model: "test", content: [],
@@ -34,6 +139,7 @@ describe("AI SDK 适配契约", () => {
       (value, key) => createProviderModel(value.settings.provider, value.settings.model, key, transport));
     const events: ModelEvent[] = [];
     for await (const event of adapter.prepare(input).stream(new AbortController().signal)) events.push(event);
+    expect(events.find(event => event.type === "part.delta")).toMatchObject({ partId: "thinking:0", delta: "Reasoning" });
     expect(events.filter(event => event.type === "part.end")).toEqual([
       expect.objectContaining({ continuation: { anthropic: { signature: "signed-thinking" } } }),
       expect.objectContaining({ continuation: { anthropic: { redactedData: "redacted-thinking" } } }),

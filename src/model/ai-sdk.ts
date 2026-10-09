@@ -5,6 +5,10 @@ import { createProviderModel, validateProviderTransport } from "./provider.ts";
 import { projectSystemPrompt } from "./system-prompt.ts";
 
 function json(value: unknown): Json { return jsonSchema.parse(JSON.parse(JSON.stringify(value))); }
+function usesPlainResponseReasoning(input: ModelInput): boolean {
+  const { provider } = input.settings;
+  return provider.protocol === "openai-responses" && new URL(provider.baseUrl).hostname === "api.deepseek.com";
+}
 function reasoningFor(input: ModelInput) {
   const thinking = input.settings.model.capabilities.reasoning ? input.settings.thinking : null;
   return thinking === "off" ? "none" as const : thinking ?? undefined;
@@ -16,7 +20,14 @@ function providerOptions(input: ModelInput): Record<string, Record<string, Json>
     // SDK 按模型能力把统一 reasoning 参数转换成 adaptive 或预算模式。
     return {};
   }
-  return { openai: { ...(provider.protocol === "openai-responses" ? { store: false, include: ["reasoning.encrypted_content"] } : {}),
+  return { openai: { ...(provider.protocol === "openai-responses" ? {
+    store: false, include: ["reasoning.encrypted_content"],
+    // 能力由织台配置声明，兼容端点的模型名不必在 SDK 的 OpenAI 名单中。
+    ...(model.capabilities.reasoning ? { forceReasoning: true } : {}),
+    // DeepSeek 把 developer 视为 user，系统指令需保留 system 身份。
+    ...(usesPlainResponseReasoning(input) ? { systemMessageMode: "system" } : {}),
+    ...(model.capabilities.reasoning && thinking !== "off" ? { reasoningSummary: "auto" } : {}),
+  } : {}),
     ...(reasoningFor(input) ? { reasoningEffort: reasoningFor(input)! } : {}) } };
 }
 /** 只保留白名单续接资料，不持久化原始 HTTP、响应头或未筛选的 provider metadata。 */
@@ -35,15 +46,18 @@ export function pickContinuation(metadata: unknown): Record<string, Record<strin
 export function sdkMessages(input: ModelInput): ModelMessage[] {
   const messages: ModelMessage[] = [];
   const scope = modelScope(input.settings);
+  const plainReasoning = usesPlainResponseReasoning(input);
   for (const item of input.messages) {
     if (item.kind === "input" || item.kind === "context") messages.push({ role: "user", content: item.text });
     if (item.kind === "output") {
       if (item.adapter !== "ai-sdk-v7/2") throw new ModelFailure("replay_version", "The saved response needs a compatible protocol adapter.");
       if (item.scope !== scope) throw new ModelFailure("model_switch", "Cross-model continuation is not supported yet. Start from a history position before the model output.");
       messages.push({ role: "assistant", content: item.parts.map(p => {
-        const providerOptions = (p.continuation ?? {}) as Record<string, Record<string, never>>;
+        // DeepSeek 将 reasoning.content 合入相邻 assistant 正文，不支持 summary/encrypted_content 输入。
+        const plainThinking = plainReasoning && p.kind === "thinking";
+        const providerOptions = (plainThinking ? {} : p.continuation ?? {}) as Record<string, Record<string, never>>;
         return p.kind === "toolcall" ? { type: "tool-call" as const, toolCallId: p.callId, toolName: p.name, input: p.arguments, providerOptions }
-          : { type: p.kind === "text" ? "text" as const : "reasoning" as const, text: p.text, providerOptions };
+          : { type: p.kind === "text" || plainThinking ? "text" as const : "reasoning" as const, text: p.text, providerOptions };
       }) } as AssistantModelMessage);
     }
     if (item.kind === "result") {
@@ -75,15 +89,18 @@ export class AiSdkAdapter implements ModelAdapter {
     const key = provider.auth === "none" ? "weft-no-auth" : await this.readCredential(provider.id);
     if (!key) throw new ModelFailure("missing_credential", "Provider credentials are unavailable.");
     const languageModel = this.languageModelFactory?.(input, key) ?? createProviderModel(provider, model, key);
+    const plainReasoning = usesPlainResponseReasoning(input);
     const tools: ToolSet = Object.fromEntries(input.tools.map(t => [t.name, tool({ description: t.description, inputSchema: sdkJsonSchema(t.parameters as Record<string, unknown>) })]));
     const result = streamText({ model: languageModel, system, messages, tools,
       providerOptions, maxOutputTokens: model.generation.maxOutputTokens ?? undefined, maxRetries: 0, abortSignal: signal,
       temperature: model.generation.temperature ?? undefined, topP: model.generation.topP ?? undefined,
       reasoning: reasoningFor(input),
+      include: { rawChunks: plainReasoning },
       // SDK 不执行工具；单步结果交还织台循环，工具注册中不提供 execute。
       onError: () => {},
     });
     const calls = new Set<string>();
+    const plainThinkingParts = new Map<string, string>();
     const continuations = new Map<string, ReturnType<typeof pickContinuation>>();
     const collectContinuation = (id: string, metadata: unknown) => {
       const accumulated = continuations.get(id) ?? {};
@@ -100,8 +117,24 @@ export class AiSdkAdapter implements ModelAdapter {
         case "text-start": case "reasoning-start": {
           const kind = event.type === "text-start" ? "text" : "thinking";
           const id = `${kind}:${event.id}`;
-          collectContinuation(id, event.providerMetadata);
+          const metadata = collectContinuation(id, event.providerMetadata);
+          if (plainReasoning && kind === "thinking" && typeof metadata.openai?.itemId === "string") {
+            plainThinkingParts.set(metadata.openai.itemId, id);
+          }
           yield { type: "part.start", part: { id, kind } };
+          break;
+        }
+        case "raw": {
+          if (!plainReasoning || !event.rawValue || typeof event.rawValue !== "object") break;
+          const raw = event.rawValue as Record<string, unknown>;
+          // SDK 尚未解码 DeepSeek 的 reasoning_text；只取已知正文增量，不保存原始帧。
+          if (raw.type !== "response.reasoning_text.delta") break;
+          if (typeof raw.item_id !== "string" || typeof raw.delta !== "string") {
+            throw new ModelFailure("protocol", "The provider returned an invalid reasoning text delta.");
+          }
+          const partId = plainThinkingParts.get(raw.item_id);
+          if (!partId) throw new ModelFailure("protocol", "The provider updated an inactive reasoning item.");
+          yield { type: "part.delta", partId, delta: raw.delta };
           break;
         }
         case "text-delta": case "reasoning-delta": {
@@ -112,7 +145,9 @@ export class AiSdkAdapter implements ModelAdapter {
         }
         case "text-end": case "reasoning-end": {
           const partId = `${event.type === "text-end" ? "text" : "thinking"}:${event.id}`;
-          yield { type: "part.end", partId, continuation: collectContinuation(partId, event.providerMetadata) };
+          const metadata = collectContinuation(partId, event.providerMetadata);
+          if (typeof metadata.openai?.itemId === "string") plainThinkingParts.delete(metadata.openai.itemId);
+          yield { type: "part.end", partId, continuation: metadata };
           continuations.delete(partId);
           break;
         }
