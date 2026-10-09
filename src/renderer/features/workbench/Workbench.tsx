@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from "react";
+import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type ReactNode, type Ref } from "react";
 import { ReactFlow, Background, BackgroundVariant, Panel, useReactFlow, applyNodeChanges, type NodeChange, type Edge } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { Maximize, Minus, Plus, Scan } from "lucide-react";
@@ -8,12 +8,12 @@ import { Button } from "../../shared/ui/button";
 import { Badge } from "../../shared/ui/badge";
 import { useIsland } from "../../shared/weave/Screen";
 import { useAppearance, useScheme } from "../appearance/state";
-import { s } from "../configuration/state";
 import { SessionHistoryPanel } from "../session/History";
 import { ObjectNode, type ObjectNodeType } from "./ObjectNode";
-import { cardDragHandle } from "./ObjectCard";
-import { ObjectsPanel } from "./SidePanel";
+import { IconAction, cardDragHandle, type ViewPatch } from "./ObjectCard";
+import { ObjectsPanel } from "./ObjectsPanel";
 import { placeObject, type ResourcePlacement } from "./placement";
+import { defaultCardPosition } from "./layout";
 import { WorkbenchContext, WorkbenchScope, WorkbenchStore, type WorkbenchEnvironment } from "./context";
 
 const nodeTypes = { object: ObjectNode };
@@ -26,14 +26,18 @@ export interface WorkbenchHandle {
 }
 
 type Props = WorkbenchEnvironment & { ref?: Ref<WorkbenchHandle> };
+type Run = (command: WorkbenchCommand) => Promise<boolean>;
 
 /** 工作台根浮岛：投影对象和关系；主代理对话只是对应对象的卡片内容。 */
-export function Workbench({ ref, ...environment }: Props) {
-  const { session, run, ready, busy, controller, historical } = environment;
+export function Workbench({ ref, controller, session, ready, busy, historical, run, draft, onDraftChange, onHome }: Props) {
+  // 按字段组装环境，只有字段真的变化时才通知卡片与面板浮岛。
+  const context = useMemo<WorkbenchEnvironment>(
+    () => ({ controller, session, ready, busy, historical, run, draft, onDraftChange, onHome }),
+    [controller, session, ready, busy, historical, run, draft, onDraftChange, onHome]);
   const island = useIsland();
   const host = useRef<HTMLDivElement>(null);
   const [store] = useState(() => new WorkbenchStore());
-  const open = useCallback((id: string, label: string, render: () => React.ReactNode, origin: HTMLElement | null) => {
+  const open = useCallback((id: string, label: string, render: () => ReactNode, origin: HTMLElement | null) => {
     if (island.child === id) island.closeChild();
     // 面板浮岛在工作台子树之外渲染，经 WorkbenchScope 取得同一份环境。
     else island.open({ id, label, width: { min: 288, max: 360 }, origin, render: () => <WorkbenchScope store={store}>{render()}</WorkbenchScope> });
@@ -46,48 +50,51 @@ export function Workbench({ ref, ...environment }: Props) {
       return bounds ? { sessionId: session.id, position: placeObject(session, bounds.width, bounds.height) } : null;
     },
   }), [open, session, controller]);
-  const context = environment;
   useEffect(() => store.set(context), [store, context]);
 
   return <WorkbenchContext.Provider value={context}>
     <div ref={host} className="overlay-inset relative h-full overflow-hidden rounded-lg bg-background">
       <Canvas session={session} run={run} />
-      {historical && <div className="surface-floating absolute bottom-[var(--overlay-inset)] left-1/2 z-10 flex -translate-x-1/2 items-center gap-3 whitespace-nowrap p-1 pl-3 text-sm">
+      {historical && <div role="status"
+        className="surface-floating absolute bottom-[var(--overlay-inset)] left-1/2 z-10 flex -translate-x-1/2 items-center gap-3 whitespace-nowrap p-1 pl-3 text-sm">
         <span>{t.viewingHistory}</span>
         <Button size="sm" onClick={controller.followCursor}>{t.backToLive}</Button>
       </div>}
       {session.objects.length === 0 && <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
         <p className="type-caption">{t.noObjects}</p>
       </div>}
-      <Badge variant="outline" role="status" className="absolute left-[var(--overlay-inset)] top-[var(--overlay-inset)] z-10 bg-card text-muted-foreground">
+      {/* 忙碌/就绪频繁切换不播报；仅不可用时作为提示。 */}
+      <Badge variant="outline" role={!busy && !ready ? "alert" : undefined}
+        className="absolute left-[var(--overlay-inset)] top-[var(--overlay-inset)] z-10 bg-card text-muted-foreground">
         {busy ? t.statusBusy : ready ? t.statusReady : t.statusUnavailable}
       </Badge>
     </div>
   </WorkbenchContext.Provider>;
 }
 
-function Canvas({ session, run }: { session: WorkbenchSnapshot; run: (command: WorkbenchCommand) => Promise<boolean> }) {
+function Canvas({ session, run }: { session: WorkbenchSnapshot; run: Run }) {
   const { canvas } = useAppearance();
   const scheme = useScheme();
-  const toNodes = useCallback((): ObjectNodeType[] => session.objects.flatMap(object => {
-    // 早期会话可能缺少视图行：按默认可见处理，位置在用户首次移动时保存。
-    const view = session.views.find(v => v.objectId === object.id) ?? { position: { x: 48, y: 48 }, hidden: false, collapsed: false };
-    if (view.hidden) return [];
-    return [{
-      id: object.id, type: "object" as const, position: view.position, dragHandle: cardDragHandle,
-      data: {
-        object, collapsed: view.collapsed,
-        onView: patch => { void run({ type: "view.set", sessionId: session.id, objectId: object.id, ...patch }); },
-      },
-    }];
-  }), [session, run]);
-  const [nodes, setNodes] = useState<ObjectNodeType[]>(toNodes);
-  useEffect(() => {
-    setNodes(previous => toNodes().map(node => {
-      const current = previous.find(n => n.id === node.id);
-      return current ? { ...node, selected: current.selected, ...(current.dragging ? { position: current.position, dragging: true } : {}) } : node;
-    }));
-  }, [toNodes]);
+  // 回调经 ref 读取最新会话，保持稳定身份，避免每次快照更新重建所有节点。
+  const latest = useRef(session);
+  latest.current = session;
+  const onView = useCallback((objectId: string, patch: ViewPatch) => {
+    void run({ type: "view.set", sessionId: latest.current.id, objectId, ...patch });
+  }, [run]);
+  const toNodes = useCallback((snapshot: WorkbenchSnapshot, previous: ObjectNodeType[]): ObjectNodeType[] =>
+    snapshot.objects.flatMap(object => {
+      const view = snapshot.views.find(v => v.objectId === object.id) ?? { position: defaultCardPosition, hidden: false, collapsed: false };
+      if (view.hidden) return [];
+      const current = previous.find(n => n.id === object.id);
+      // 对象与视图状态未变时复用原 data，memo 的卡片跳过重渲染。
+      const data = current && current.data.object === object && current.data.collapsed === view.collapsed
+        ? current.data : { object, collapsed: view.collapsed, onView };
+      const node: ObjectNodeType = { id: object.id, type: "object", position: view.position, dragHandle: cardDragHandle, data };
+      if (!current) return [node];
+      return [{ ...node, selected: current.selected, ...(current.dragging ? { position: current.position, dragging: true } : {}) }];
+    }), [onView]);
+  const [nodes, setNodes] = useState<ObjectNodeType[]>(() => toNodes(session, []));
+  useEffect(() => { setNodes(previous => toNodes(session, previous)); }, [session, toNodes]);
   const edges: Edge[] = useMemo(() => session.links.map(binding => ({
     id: `${binding.agentId}:${binding.resourceId}`, source: binding.resourceId, target: binding.agentId,
     label: t.readAccess,
@@ -98,14 +105,17 @@ function Canvas({ session, run }: { session: WorkbenchSnapshot; run: (command: W
     setNodes(current => applyNodeChanges(changes, current));
     for (const change of changes) {
       if (change.type === "position" && change.position && change.dragging === false) {
-        void run({ type: "view.set", sessionId: session.id, objectId: change.id, position: change.position }).then(saved => { if (!saved) setNodes(toNodes()); });
+        void run({ type: "view.set", sessionId: latest.current.id, objectId: change.id, position: change.position }).then(saved => {
+          // 失败时按最新快照回滚，而非拖动开始时的旧位置。
+          if (!saved) setNodes(previous => toNodes(latest.current, previous.map(n => ({ ...n, dragging: false }))));
+        });
       }
     }
-  }, [run, session.id, toNodes]);
+  }, [run, toNodes]);
   return <ReactFlow<ObjectNodeType>
     colorMode={scheme} nodes={nodes} edges={edges} nodeTypes={nodeTypes} onNodesChange={onNodesChange}
     defaultViewport={session.viewport} minZoom={0.1} maxZoom={4}
-    nodesDraggable={true} nodesConnectable={false} edgesReconnectable={false}
+    nodesDraggable nodesConnectable={false} edgesReconnectable={false}
     deleteKeyCode={null} panOnScroll selectionOnDrag panOnDrag={[1, 2]} zoomOnDoubleClick={false}
     onMoveEnd={(event, viewport) => { if (event) void run({ type: "viewport.set", sessionId: session.id, viewport }); }}
   >
@@ -115,7 +125,7 @@ function Canvas({ session, run }: { session: WorkbenchSnapshot; run: (command: W
   </ReactFlow>;
 }
 
-function ViewControls({ session, run }: { session: WorkbenchSnapshot; run: (command: WorkbenchCommand) => Promise<boolean> }) {
+function ViewControls({ session, run }: { session: WorkbenchSnapshot; run: Run }) {
   const flow = useReactFlow();
   const move = async (action: () => Promise<boolean>) => {
     await action();
@@ -127,10 +137,10 @@ function ViewControls({ session, run }: { session: WorkbenchSnapshot; run: (comm
     [t.zoomIn, Plus, () => flow.zoomIn()],
     [t.zoomOut, Minus, () => flow.zoomOut()],
     [t.fitObjects, Maximize, () => flow.fitView({ padding: 0.25 })],
-    ...(agent ? [[s("Focus main agent", "定位主代理"), Scan, () => flow.fitView({ nodes: [{ id: agent.id }], padding: 0.12, maxZoom: 1 })] as const] : []),
+    ...(agent ? [[t.focusMainAgent, Scan, () => flow.fitView({ nodes: [{ id: agent.id }], padding: 0.12, maxZoom: 1 })] as const] : []),
   ] as const;
   return <Panel position="bottom-right" className="surface flex flex-col p-0.5">
     {controls.map(([label, Icon, action]) =>
-      <Button key={label} variant="ghost" size="icon-sm" aria-label={label} title={label} onClick={() => { void move(action); }}><Icon /></Button>)}
+      <IconAction key={label} label={label} size="icon-sm" onClick={() => { void move(action); }}><Icon /></IconAction>)}
   </Panel>;
 }

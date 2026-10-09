@@ -181,7 +181,7 @@ export function App({ controller }: { controller: ApplicationController }) {
     </Alert>}
     {creation && <CreateNoteDialog creation={creation} busy={sessionBusy} error={sessionState?.error} run={run} onClose={() => setCreation(null)} />}
     {directory && <AddDirectoryDialog creation={directory} busy={sessionBusy} error={sessionState?.error} run={run} onClose={() => setDirectory(null)} />}
-    {accessOpen && session && <AccessDialog session={session} busy={sessionBusy} error={sessionState?.error} run={run} onClose={() => setAccessOpen(false)} />}
+    {accessOpen && session && <AccessDialog session={session} ready={ready} busy={sessionBusy} historical={historical} error={sessionState?.error} run={run} onClose={() => setAccessOpen(false)} />}
   </>;
 }
 

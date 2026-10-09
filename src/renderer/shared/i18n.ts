@@ -98,6 +98,19 @@ const en = {
   aboutBody: "Your local, object-centered workbench. Tasks, notes, bindings and canvas positions are saved on this device. Model execution and external file tools are not connected yet.",
   aboutIdentity: "Application ID",
   notAvailable: "Not available yet",
+  focusMainAgent: "Focus main agent",
+  remove: "Remove",
+  removeObjectTitle: "Remove this object?",
+  removeObjectDescription: (title: string) => `“${title}” will be removed from this session. Its card and links are removed too.`,
+  openObject: (title: string) => `Open ${title}`,
+  closeObject: (title: string) => `Close ${title}`,
+  removeObject: (title: string) => `Remove ${title}`,
+  bindResource: (title: string) => `Bind ${title}`,
+  unbindResource: (title: string) => `Unbind ${title}`,
+  addDirectoryTitle: "Add directory",
+  addDirectoryDescription: "Adds a reference to a local directory. Link it to an agent to grant access.",
+  absolutePath: "Absolute path",
+  creating: "Creating…",
 };
 type Messages = typeof en;
 
@@ -198,6 +211,19 @@ const zh: Messages = {
   aboutBody: "以对象为中心的本地工作台。任务、笔记、绑定和画布位置保存在本设备上。模型执行与外部文件工具尚未接入。",
   aboutIdentity: "应用标识",
   notAvailable: "尚未提供",
+  focusMainAgent: "定位主代理",
+  remove: "移除",
+  removeObjectTitle: "移除这个对象？",
+  removeObjectDescription: (title: string) => `「${title}」将从本会话移除，其卡片与连线一并移除。`,
+  openObject: (title: string) => `打开「${title}」`,
+  closeObject: (title: string) => `关闭「${title}」`,
+  removeObject: (title: string) => `移除「${title}」`,
+  bindResource: (title: string) => `绑定「${title}」`,
+  unbindResource: (title: string) => `解绑「${title}」`,
+  addDirectoryTitle: "添加目录",
+  addDirectoryDescription: "添加对本地目录的引用；链接到代理后才授予访问。",
+  absolutePath: "绝对路径",
+  creating: "正在创建…",
 };
 
 export const locale: Locale = typeof navigator !== "undefined" && navigator.language.toLowerCase().startsWith("zh") ? "zh" : "en";

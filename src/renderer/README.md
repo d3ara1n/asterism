@@ -15,7 +15,8 @@
 | `features/workbench/Workbench.tsx` | 对象/关系到画布的投影、定位和视图保存 |
 | `features/workbench/ObjectNode.tsx` | 消费已注册卡片投影，统一挂载 ObjectCard；缺失视图时显示原始数据 |
 | `features/workbench/ObjectCard.tsx` | 对象卡片控件：Card 外壳、拖动柄、视图操作与内容区 |
-| `features/workbench/SidePanel.tsx` | 对象面板浮岛 |
+| `features/workbench/ObjectsPanel.tsx` | 对象面板浮岛，移除前确认 |
+| `features/workbench/layout.ts` | 卡片兜底尺寸、默认位置与放置间距常量 |
 | `features/workbench/context.ts` | 工作台向卡片与更深浮岛提供的环境 |
 | `features/workbench/placement.ts` | 新卡片初始位置，不重排已有卡片 |
 | `features/session/registry.ts` | 会话共享控制器与各代理提交身份 |

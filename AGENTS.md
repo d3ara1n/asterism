@@ -22,6 +22,7 @@
 - 实现期基线：Electron + React + TypeScript，shadcn/ui（Radix）+ Tailwind CSS 与 @xyflow/react，SQLite（`node:sqlite`）与本地对象存储，Zod，独立 Node.js 任务运行时；包管理器 npm，构建 electron-vite，打包 Electron Forge。Vercel AI SDK 已用于三协议连接测试与单代理请求适配，核心契约见 `docs/conversation-core.md`。测试以 macOS 为主，发布目标覆盖 macOS、Windows 与 Linux。选型与职责见 `docs/architecture.md`，已安装版本见 `package-lock.json`。
 - 开发数据与发布数据隔离，均使用 Electron 数据目录；测试使用独立临时目录并清理。一次性原型仅留于 `feat/ux-prototype`，正式分支不依赖其代码。
 - 正式应用标识为 `dev.dearain.weft`。UI 视觉以 `docs/design-system.md` 为准：原生材质底座、独立内容表面、统一 token 与公共控件；新功能复用现有风格，整体视觉变更须由用户确认。
+- 界面控件先查 shadcn registry：`shared/ui/` 缺少时用 `npx shadcn@latest add <name>` 拉取（官方控件不算新依赖），再组合使用；拉取后核对导入路径为相对路径，并清理 CLI 误加的依赖或目录。
 
 ## 验证职责
 

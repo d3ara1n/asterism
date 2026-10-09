@@ -63,7 +63,7 @@ Window          平台差异、拖动区域、窗口几何变量
 - 界面按系统语言单语显示（中文或英文），文案集中于 `shared/i18n.ts`；窄窗口时顶栏按钮只留图标。
 - 字号五级：`type-page`、`type-section`、`type-body`、`type-caption`、`type-label`。
 - 图标统一使用 lucide-react，不使用 Unicode 符号；界面标识为 `weft-mark.tsx` 的经纬线框。
-- `shared/ui/` 只放 shadcn（new-york-v4）官方 registry 源码，不手改结构与样式类；升级即重新拉取覆盖。官方没有的组合（如 PageState）放在 `shared/ui/` 内但只组合官方组件，不另写皮肤。
+- `shared/ui/` 只放 shadcn（new-york-v4）官方 registry 源码，不手改结构与样式类；升级即重新拉取覆盖。官方没有的组合（如 PageState）放在 `shared/ui/` 内但只组合官方组件，不另写皮肤。业务代码需要的控件官方已有时（如确认用 AlertDialog、列表行用 Item、加载用 Spinner），先拉取再使用，不以 div 与 class 手写同类控件。
 - 业务代码只用官方组件与布局类，不使用裸 button/select 等控件，不写控件颜色、阴影或圆角。
 - 表面只有两种：`surface`（边框 + 卡片底，无阴影，用于浮岛、顶栏部件、卡片、画布）与 `surface-floating`（加阴影，用于悬浮面板、浮条、通知）；对话框、菜单、下拉由官方组件提供浮层外观。
 - 焦点、错误、禁用状态使用官方组件自带样式；进出场动画由 `tw-animate-css` 提供。
