@@ -245,7 +245,7 @@ function AgentEditor({ initialId }: { initialId: string | null }) {
           {toolMode !== "all" && <Field>
             <TagInput id={ids.tools} value={(toolMode === "allow" ? tools : excluded) ?? []} onChange={setToolList} placeholder={s("Tool name, e.g. read", "工具名，如 read")} />
             <FieldDescription>{toolMode === "allow"
-              ? s("An empty allowlist disables resource tools; Weft's resource controls remain available.", "允许列表为空时没有资源工具，Weft 的资源操作入口仍可用。")
+              ? s("An empty allowlist disables resource tools; the application's resource controls remain available.", "允许列表为空时没有资源工具，应用的资源操作入口仍可用。")
               : s("Listed tools are hidden and cannot be called.", "列表中的工具不出现，也不能调用。")}</FieldDescription>
           </Field>}
           <FieldDescription>{s("Tool policies narrow what is available. They never grant resource access.", "工具策略只收窄可用范围，不授予资源访问权。")}</FieldDescription>

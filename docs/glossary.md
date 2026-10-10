@@ -6,7 +6,7 @@
 
 | 中文 | 英文 | 含义 |
 | --- | --- | --- |
-| 织台 | Weft | 产品名；以对象为中心的个人 agent 工作台 |
+| 工坊 | Atelier | 产品名；本地优先、以对象为中心的个人 agent 工作台。品牌表达为与代理一起做事的个人工坊，资源是可操作的工作材料 |
 | 工作台 | workbench | 卡片与连线的画布交互层，见 `docs/workbench.md` |
 | 首页 | home | 应用启动与新会话创建入口，不属于任何会话；首次发送后主内容切换为工作台 |
 | 会话 | Session | 一段工作的持续过程及期间的输入、对象与关系；拥有唯一会话树；以生成的 ID 标识 |
@@ -50,8 +50,8 @@
 | 挂接 / 解绑 | attach / detach | 绑定的建立与撤销；作为会话树 event 节点记录，模型可见并用于回溯重建 |
 | 待生效 | pending | 变化已记录，但在途请求仍使用开始时的环境；下一次请求取用新状态 |
 | 工具目录 | tool catalog | 共享工具契约及后端实现的唯一目录；按支持关系匹配已链接资源，再由外部策略筛选；经 `resource_call` 调用 |
-| Weft 操作入口 | Weft action | 软件提供的固定外围接口，如 resource_list/inspect/call；仅在 provider 协议中表示为 tools，不进入资源工具目录或插件注册面 |
-| 一级工具 / 二级工具 | protocol tool / resource tool | 一级是协议 tools 中的固定 Weft 入口 resource_list/inspect/call；二级是经 resource_call 使用的动态资源工具。层级表示调用关系，资源工具是产品主要的工具扩展面 |
+| 宿主操作入口 | core action | 软件提供的固定外围接口，如 resource_list/inspect/call；仅在 provider 协议中表示为 tools，不进入资源工具目录或插件注册面 |
+| 一级工具 / 二级工具 | protocol tool / resource tool | 一级是协议 tools 中的固定宿主入口 resource_list/inspect/call；二级是经 resource_call 使用的动态资源工具。层级表示调用关系，资源工具是产品主要的工具扩展面 |
 | 运行支撑环境 | harness | 软件为代理提供的执行环境、工作机制及通用指令；执行授权由运行时落实 |
 | 提示块 | prompt block | 带身份、种类、来源与正文的结构化指令单元，按确定顺序统一渲染为系统指令 |
 | 事件 | event | 会话树节点的一类，记录资源与工作台状态变化，种类见 `docs/timeline.md` |
@@ -86,7 +86,7 @@
 | 中文 | 英文 | 含义 |
 | --- | --- | --- |
 | 目录资源 | directory resource | 首批验证资源：提供列举、读取、写入、编辑等操作 |
-| 虚拟资源 | virtual resource | 织台持有完整状态的资源，用于验证历史查看与状态恢复 |
+| 虚拟资源 | virtual resource | 工坊持有完整状态的资源，用于验证历史查看与状态恢复 |
 
 ## 界面结构
 

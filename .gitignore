@@ -29,7 +29,6 @@ coverage/
 *.pfx
 
 # Local runtime / development data (not source fixtures)
-/.weft/
 /.local/
 /runtime-data/
 /tmp/

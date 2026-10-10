@@ -207,7 +207,7 @@ function Canvas({ ref, session, run, writable, locating }: {
     event.preventDefault();
     const origin = flow.screenToFlowPosition({ x: event.clientX, y: event.clientY });
     [...event.dataTransfer.files].forEach((file, index) => {
-      const path = window.weft.pathForFile(file);
+      const path = window.host.pathForFile(file);
       if (path) void run({ type: "resource.create", sessionId: latest.current.id, kind: "directory", input: { path },
         position: { x: origin.x + index * 32, y: origin.y + index * 32 } });
     });

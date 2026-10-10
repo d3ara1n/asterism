@@ -7,11 +7,11 @@ import type { CallResult, Invocation, PreparedResult } from "../tools/contract.t
 import { finishToolResult, resolveToolCompletion } from "../tools/result.ts";
 import { declareTool } from "../tools/definition.ts";
 import { jsonArgumentHint, validationMessage } from "../tools/validation.ts";
-import { ResourceCall, ResourceInspect, ResourceList, ResourceInspectResult, ResourceListResult } from "../tools/weft.ts";
+import { ResourceCall, ResourceInspect, ResourceList, ResourceInspectResult, ResourceListResult } from "../tools/core.ts";
 import type { AgentCapabilities } from "./capabilities.ts";
 
-/** Weft 自身的固定操作入口；只在 provider 协议中表示为 tools，不属于资源工具目录。 */
-interface WeftAction {
+/** 宿主固定操作入口；只在 provider 协议中表示为 tools，不属于资源工具目录。 */
+interface CoreAction {
   tool: ToolContract;
   resolve(args: Json, capabilities: AgentCapabilities): Invocation | PreparedResult;
 }
@@ -22,8 +22,8 @@ export interface ToolObserver {
   published?(call: PendingCall, data: Json): void;
 }
 
-// 此目录由 Weft 维护；可扩展的工具位于独立 ToolRegistry，不注册或替换这些入口。
-const actions: readonly WeftAction[] = [
+// 此目录由宿主维护；可扩展的工具位于独立 ToolRegistry，不注册或替换这些入口。
+const actions: readonly CoreAction[] = [
   { tool: ResourceList,
     resolve: (_args, capabilities) => ({ effect: "read", execution: "parallel", implementation: reference(ResourceListResult), async execute() {
       return { kind: "succeeded", data: ResourceListResult.schema.parse({ resources: capabilities.list() }) };
@@ -44,18 +44,18 @@ const actions: readonly WeftAction[] = [
     } },
 ];
 
-export function weftDeclarations(): ToolDeclaration[] {
+export function coreDeclarations(): ToolDeclaration[] {
   return actions.map(({ tool }) => declareTool(tool));
 }
 
 /** 批次先解析实际资源工具，再按其执行策略调度；发布快照不改变批次的模型交付边界。 */
-export async function executeWeftBatch(calls: readonly PendingCall[], capabilities: AgentCapabilities | null,
+export async function executeCoreBatch(calls: readonly PendingCall[], capabilities: AgentCapabilities | null,
   signal: AbortSignal, settle: (call: PendingCall, outcome: ToolOutcome) => void,
   observer: ToolObserver = {}): Promise<void> {
   const resolved = calls.map(call => {
     let result: Invocation | PreparedResult;
     const action = actions.find(action => action.tool.name === call.name);
-    if (!action || !capabilities) result = { kind: "rejected", error: { code: "operation_unavailable", message: "This Weft operation is unavailable." } };
+    if (!action || !capabilities) result = { kind: "rejected", error: { code: "operation_unavailable", message: "This core operation is unavailable." } };
     else {
       const parsed = action.tool.argsSchema.safeParse(call.arguments);
       if (!parsed.success) result = { kind: "rejected", error: { code: "invalid_arguments",

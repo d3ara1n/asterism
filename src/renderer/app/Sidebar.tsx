@@ -2,7 +2,7 @@ import { House, MessageSquare, PanelLeftClose, Settings } from "lucide-react";
 import type { AppSnapshot, RuntimeStatus } from "../../shared/contracts";
 import { t } from "../shared/i18n";
 import { Button } from "../shared/ui/button";
-import { WeftMark } from "../shared/ui/weft-mark";
+import { BrandMark } from "../shared/ui/brand-mark";
 
 /** 应用导航只消费会话摘要；选择会话后由应用层显式加载工作台。 */
 export function Sidebar({ snapshot, status, busy, selectedSessionId, homeActive, onHome, onSession, onSettings, onHide, onRetry }: {
@@ -12,7 +12,7 @@ export function Sidebar({ snapshot, status, busy, selectedSessionId, homeActive,
 }) {
   return <aside id="app-sidebar" className="app-sidebar" aria-label={t.appNavigation}>
     <header className="flex items-center justify-between gap-2 px-2 pb-5 pt-1">
-      <span className="flex items-center gap-2 text-sm font-semibold"><WeftMark className="size-5 text-primary" />{t.appName}</span>
+      <span className="flex items-center gap-2 text-sm font-semibold"><BrandMark className="size-5 text-primary" />{t.appName}</span>
       <Button variant="ghost" size="icon-xs" aria-label={t.hideSidebar} title={t.hideSidebar} onClick={onHide}><PanelLeftClose /></Button>
     </header>
     <nav className="flex flex-col gap-1" aria-label={t.mainViews}>

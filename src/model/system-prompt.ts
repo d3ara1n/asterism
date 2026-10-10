@@ -1,4 +1,6 @@
 import type { AgentConfiguration } from "../shared/configuration.ts";
+import { applicationBrand } from "../shared/application.ts";
+import { coreId, coreNamespace } from "../shared/core.ts";
 
 export type PromptBlock =
   | { id: string; kind: "system"; from: string; text: string }
@@ -9,14 +11,14 @@ export type PromptBlock =
 export interface SystemPrompt { blocks: readonly PromptBlock[] }
 
 const environment: PromptBlock = {
-  id: "weft.environment",
+  id: coreId("environment"),
   kind: "system",
-  from: "weft",
+  from: coreNamespace,
   text: [
-    "You are working in Weft, a local personal agent workbench.",
+    `You are working in ${applicationBrand.en}, a local personal agent workbench.`,
     "A session can contain agents, resources, and operations. Cards and connections are views of these objects; visibility does not grant access.",
     "Tools are defined independently and declare which resources they support. Linking a resource makes matching tools available, subject to your tool policy.",
-    "Weft provides resource_list, resource_inspect, and resource_call as fixed controls. Use them to list linked resources, inspect live state and available tools, and apply a tool to a resource.",
+    `${applicationBrand.en} provides resource_list, resource_inspect, and resource_call as fixed controls. Use them to list linked resources, inspect live state and available tools, and apply a tool to a resource.`,
     "Resource IDs are opaque handles for tool calls. Use resource titles when describing resources to the user.",
     "Messages like \"Resource ... is now linked to you\" report the current link state; they do not grant access by themselves. The runtime enforces access.",
     "External changes (edited or deleted files) are not announced; inspect a resource when its current state matters.",
@@ -32,8 +34,8 @@ const environment: PromptBlock = {
 export function composeSystemPrompt(agent: Pick<AgentConfiguration, "id" | "systemPrompt">, context: readonly { file: string; text: string }[] = []): SystemPrompt {
   return { blocks: [
     { ...environment },
-    { id: "weft.agent", kind: "agent", role: agent.id, text: agent.systemPrompt },
-    ...context.map((c, i) => ({ id: `weft.context.${i}`, kind: "context" as const, file: c.file, text: c.text })),
+    { id: coreId("agent"), kind: "agent", role: agent.id, text: agent.systemPrompt },
+    ...context.map((c, i) => ({ id: coreId(`context.${i}`), kind: "context" as const, file: c.file, text: c.text })),
   ] };
 }
 

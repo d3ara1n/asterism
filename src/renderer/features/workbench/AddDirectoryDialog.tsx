@@ -7,8 +7,8 @@ import { t } from "../../shared/i18n";
 import { ResourceCreationDialog, type ResourceCreationDialogState } from "./ResourceCreationDialog";
 
 /** 路径示例按平台给出；仅作提示，不参与校验。 */
-const pathPlaceholder = window.weft.platform === "win32" ? "C:\\Users\\me\\project"
-  : window.weft.platform === "darwin" ? "/Users/me/project" : "/home/me/project";
+const pathPlaceholder = window.host.platform === "win32" ? "C:\\Users\\me\\project"
+  : window.host.platform === "darwin" ? "/Users/me/project" : "/home/me/project";
 
 /** 目录创建表单：手填路径或系统选择，名称回落与路径校验由运行时处理。 */
 export function AddDirectoryDialog({ onCreate, busy, ...dialog }: ResourceCreationDialogState & {
@@ -22,7 +22,7 @@ export function AddDirectoryDialog({ onCreate, busy, ...dialog }: ResourceCreati
     setBrowsing(true);
     setBrowseError(null);
     try {
-      const picked = await window.weft.pickDirectory();
+      const picked = await window.host.pickDirectory();
       if (picked) setPath(picked);
     } catch {
       setBrowseError(t.directoryBrowseFailed);

@@ -1,5 +1,6 @@
 import Store from "electron-store";
-import { ipcMain, nativeTheme, type BrowserWindow } from "electron";
+import { app, ipcMain, nativeTheme, type BrowserWindow } from "electron";
+import { applicationStorage } from "../shared/application.ts";
 import {
   appearanceChangedChannel, appearanceGetChannel, appearancePatchSchema, appearanceSetChannel,
   defaultAppearance, parseAppearance, type Appearance,
@@ -11,7 +12,7 @@ import {
  */
 let store: Store<{ appearance: Appearance }> | null = null;
 function open(): Store<{ appearance: Appearance }> {
-  store ??= new Store<{ appearance: Appearance }>({ name: "appearance", defaults: { appearance: defaultAppearance }, clearInvalidConfig: true });
+  store ??= new Store<{ appearance: Appearance }>({ cwd: app.getPath("userData"), name: applicationStorage.appearanceStore, defaults: { appearance: defaultAppearance }, clearInvalidConfig: true });
   return store;
 }
 

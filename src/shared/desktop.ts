@@ -1,5 +1,4 @@
-/** 桌面身份与窗口几何，不属于任务历史或运行时协议。 */
-export const applicationId = "dev.dearain.weft";
+/** 桌面平台与窗口几何，不属于任务历史或运行时协议。 */
 
 export type DesktopPlatform = "darwin" | "win32" | "linux";
 

@@ -7,7 +7,7 @@ const submissions = new Map<string, SubmissionIdentity>();
 
 export function sessionController(sessionId: string): SessionController {
   let controller = controllers.get(sessionId);
-  if (!controller) { controller = new SessionController(window.weft.session, sessionId); controllers.set(sessionId, controller); }
+  if (!controller) { controller = new SessionController(window.host.session, sessionId); controllers.set(sessionId, controller); }
   return controller;
 }
 export function agentView(controller: SessionController, agentId: string): AgentView {

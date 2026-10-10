@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
+import { applicationStorage } from "../shared/application.ts";
 import { agentOverridesSchema, modelRoleOverridesSchema, modelSchema, providerInputSchema,
   type AgentOverrides, type ModelRoleOverrides, type ProviderInput, type ProviderModel } from "../shared/configuration.ts";
 import { defaultAgents, defaultRoles } from "./defaults.ts";
@@ -62,7 +63,7 @@ export class ConfigurationStore {
   private document: ConfigurationDocument;
   constructor(root: string) {
     mkdirSync(root, { recursive: true });
-    this.path = join(root, "configuration.json");
+    this.path = join(root, applicationStorage.configurationFile);
     let content: string;
     try { content = readFileSync(this.path, "utf8"); }
     catch (error) {

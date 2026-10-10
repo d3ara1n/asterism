@@ -1,5 +1,6 @@
 import * as radix from "@radix-ui/colors";
 import { z } from "zod";
+import { coreChannel } from "./core.ts";
 
 /**
  * 外观设置：主题、字体、画布纹理与思考展示偏好。主题色值来自 Radix Colors，renderer 写入 :root 的 CSS 变量，
@@ -56,9 +57,9 @@ export function parseAppearance(raw: unknown): Appearance {
 export const appearancePatchSchema = appearanceSchema.partial().strict();
 export type AppearancePatch = z.infer<typeof appearancePatchSchema>;
 
-export const appearanceGetChannel = "weft:appearance:get";
-export const appearanceSetChannel = "weft:appearance:set";
-export const appearanceChangedChannel = "weft:appearance:changed";
+export const appearanceGetChannel = coreChannel("appearance:get");
+export const appearanceSetChannel = coreChannel("appearance:set");
+export const appearanceChangedChannel = coreChannel("appearance:changed");
 
 export interface AppearanceBridge {
   get(): Promise<Appearance>;

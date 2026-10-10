@@ -1,13 +1,14 @@
 import { z } from "zod";
+import { coreId } from "../shared/core.ts";
 import { jsonSchema } from "../shared/json.ts";
 import { defineTool } from "../shared/module-contract.ts";
 import { contractReferenceSchema, defineData } from "../shared/presentation.ts";
 import { jsonArgumentHint } from "./validation.ts";
 
-export const ResourceListResult = defineData("weft.resource-list", 1, z.strictObject({
+export const ResourceListResult = defineData(coreId("resource-list"), 1, z.strictObject({
   resources: z.array(z.strictObject({ resource_id: z.string(), type: z.string(), title: z.string() })),
 }));
-export const ResourceInspectResult = defineData("weft.resource-inspect", 1, z.strictObject({
+export const ResourceInspectResult = defineData(coreId("resource-inspect"), 1, z.strictObject({
   resource_id: z.string(),
   state: jsonSchema,
   tools: z.array(z.strictObject({

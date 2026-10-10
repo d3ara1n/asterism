@@ -39,7 +39,7 @@ const adapter = (prepare?: () => void): ModelAdapter => ({ version: "ai-sdk-v7/2
   return { async *stream() { yield* reply(); } };
 } });
 async function setup(model: ModelAdapter = adapter(), onSessionChanged?: (event: SessionChanged) => void) {
-  const root = mkdtempSync(join(tmpdir(), "weft-session-")); roots.push(root);
+  const root = mkdtempSync(join(tmpdir(), "core-session-")); roots.push(root);
   const service = new ApplicationService(root, { adapterFactory: () => model, onSessionChanged }); services.add(service);
   const { savedId: providerId } = await service.configuration.execute({ type: "provider.save", id: null,
     value: { name: "Test", protocol: "openai-responses", baseUrl: "https://example.invalid/v1", enabled: true, auth: "none" }, credential: { action: "keep" } });
@@ -358,14 +358,14 @@ describe("会话运行时", () => {
     const created = await execute(service, { type: "resource.create", sessionId: first.sessionId, kind: "directory", input: { path: root }, position: { x: 0, y: 0 } });
     const directory = created.workbench.objects.find(object => object.kind === "directory")!;
     expect(directory.id).toMatch(/^[A-Za-z0-9_-]{16}$/);
-    expect(directory.presentation).toEqual({ contract: { id: "weft.directory.card", version: 1 }, data: { path: root } });
+    expect(directory.presentation).toEqual({ contract: { id: "core.directory.card", version: 1 }, data: { path: root } });
     resourceId = directory.id;
     const agentId = agentOf(first);
     await execute(service, { type: "link.set", sessionId: first.sessionId, agentId: agentId, resourceId: resourceId, linked: true });
     await execute(service, agentCommand(first.sessionId, agentId, { type: "continue" })); await settled(service);
     const saved = service.sessions.tree.nodes(first.sessionId).find(node => node.kind === "toolcall");
     const listing = { path: "files", entries: [{ name: "a.txt", type: "file" }], truncated: false };
-    expect(saved).toMatchObject({ outcome: { kind: "succeeded", implementation: { id: "weft.directory.list", version: 1 },
+    expect(saved).toMatchObject({ outcome: { kind: "succeeded", implementation: { id: "core.directory.list", version: 1 },
       model: listing, data: listing } });
     writeFileSync(join(root, "files", "b.txt"), "changed");
     await execute(service, { type: "object.remove", sessionId: first.sessionId, objectId: resourceId });

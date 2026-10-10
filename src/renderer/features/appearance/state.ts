@@ -31,12 +31,12 @@ function apply(appearance: Appearance) {
 export function startAppearance(): void {
   render();
   darkQuery.addEventListener("change", event => { scheme = event.matches ? "dark" : "light"; render(); });
-  void window.weft.appearance.get().then(apply).catch(error => console.error("Appearance settings could not be loaded.", error));
-  window.weft.appearance.onChanged(apply);
+  void window.host.appearance.get().then(apply).catch(error => console.error("Appearance settings could not be loaded.", error));
+  window.host.appearance.onChanged(apply);
 }
 
 export async function updateAppearance(patch: AppearancePatch): Promise<void> {
-  try { apply(await window.weft.appearance.set(patch)); }
+  try { apply(await window.host.appearance.set(patch)); }
   catch (error) { console.error("Appearance settings could not be saved.", error); }
 }
 

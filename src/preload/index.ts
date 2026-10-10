@@ -1,4 +1,6 @@
 import { contextBridge, ipcRenderer, webUtils } from "electron";
+import { applicationBrand } from "../shared/application.ts";
+import { desktopBridgeKey } from "../shared/core.ts";
 import { commandChannel, pickDirectoryChannel, statusChannel, commandSchema, resultSchema, runtimeStatusSchema, type DesktopBridge } from "../shared/contracts.ts";
 import { configurationChannel, configurationChangedChannel, configurationCommandSchema, configurationResultSchema } from "../shared/configuration.ts";
 import { appearanceChangedChannel, appearanceGetChannel, appearancePatchSchema, appearanceSetChannel, parseAppearance } from "../shared/theme.ts";
@@ -53,7 +55,7 @@ const bridge: DesktopBridge = {
     const parsed = commandSchema.safeParse(command);
     if (!parsed.success) return { ok: false, error: { code: "invalid_request", message: "Invalid application command." } };
     try { return resultSchema.parse(await ipcRenderer.invoke(commandChannel, parsed.data)); }
-    catch { return { ok: false, error: { code: "unavailable", message: "The application connection was lost. Restart Weft and inspect the workspace before retrying." } }; }
+    catch { return { ok: false, error: { code: "unavailable", message: `The application connection was lost. Restart ${applicationBrand.en} and inspect the workspace before retrying.` } }; }
   },
   onStatus(listener) {
     const handler = (_event: Electron.IpcRendererEvent, raw: unknown) => {
@@ -64,4 +66,4 @@ const bridge: DesktopBridge = {
     return () => ipcRenderer.removeListener(statusChannel, handler);
   },
 };
-contextBridge.exposeInMainWorld("weft", bridge);
+contextBridge.exposeInMainWorld(desktopBridgeKey, bridge);

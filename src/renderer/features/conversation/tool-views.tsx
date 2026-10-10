@@ -1,6 +1,6 @@
 import { Boxes, ScanSearch, Wrench } from "lucide-react";
 import type { ReactNode } from "react";
-import { ResourceCall, ResourceInspectResult, ResourceListResult } from "../../../tools/weft";
+import { ResourceCall, ResourceInspectResult, ResourceListResult } from "../../../tools/core";
 import type { Json } from "../../../shared/json";
 import { contractKey } from "../../../shared/presentation";
 import { toolRenderer, type ToolRenderProps, type ToolRenderer, type ToolView, type ViewRegistry } from "../../modules/registry";

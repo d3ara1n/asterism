@@ -1,9 +1,11 @@
+import { applicationBrand } from "../../shared/application";
+
 /** 界面文案按语言单语显示；语言跟随系统，启动时确定。 */
 export type Locale = "en" | "zh";
 
 const en = {
-  appName: "Weft",
-  menu: "Weft menu",
+  appName: applicationBrand.en,
+  menu: `${applicationBrand.en} menu`,
   menuSettings: "Settings",
   workspace: "Workspace",
   workspaceNavigation: "Workspace navigation",
@@ -77,11 +79,11 @@ const en = {
   renderFailedTitle: "The workspace could not be displayed",
   renderFailedBody: "Reload the window to read your saved work again.",
   reload: "Reload",
-  runtimeStopped: "The task runtime stopped. Restart Weft to reopen your workspace.",
-  connectionLost: "The application connection was lost. Restart Weft before retrying.",
+  runtimeStopped: `The task runtime stopped. Restart ${applicationBrand.en} to reopen your workspace.`,
+  connectionLost: `The application connection was lost. Restart ${applicationBrand.en} before retrying.`,
   settings: "Settings",
   allSettings: "All settings",
-  settingsIntro: "Preferences for Weft on this device.",
+  settingsIntro: `Preferences for ${applicationBrand.en} on this device.`,
   generalTitle: "General",
   generalSummary: "Language and appearance",
   languageLabel: "Interface language",
@@ -94,8 +96,8 @@ const en = {
   modelsUnavailableTitle: "Model providers are not connected yet",
   modelsUnavailableBody: "Adding providers and testing connections will appear here. Agents stay saved and cannot run until then.",
   aboutTitle: "About",
-  aboutSummary: "Weft on this device",
-  aboutBody: "Your local, object-centered workbench. Tasks, notes, bindings and canvas positions are saved on this device. Model execution and external file tools are not connected yet.",
+  aboutSummary: "A personal AI workshop",
+  aboutBody: `${applicationBrand.en} brings agents, working materials and their progress to one workbench. Use your models, link the resources they need, and follow the work through cards and history. Conversations, notes and layout are saved on this device; resource operations require explicit authorization.`,
   aboutIdentity: "Application ID",
   notAvailable: "Not available yet",
   focusSelection: "Focus selection",
@@ -216,11 +218,11 @@ const en = {
   thinkingAutoCollapseHint: "Automatically close the block when thinking finishes or is interrupted.",
   thinkingPreviewHint: "While thinking, a small window follows the latest content. Afterward, expand to read the full text.",
 };
-type Messages = typeof en;
+type Messages = { [K in keyof typeof en]: typeof en[K] extends string ? string : typeof en[K] };
 
 const zh: Messages = {
-  appName: "织台",
-  menu: "织台菜单",
+  appName: applicationBrand.zh,
+  menu: `${applicationBrand.zh}菜单`,
   menuSettings: "设置",
   workspace: "工作区",
   workspaceNavigation: "工作区导航",
@@ -294,11 +296,11 @@ const zh: Messages = {
   renderFailedTitle: "无法显示工作区",
   renderFailedBody: "重新加载窗口以读取已保存的工作。",
   reload: "重新加载",
-  runtimeStopped: "任务运行时已停止，请重启织台以重新打开工作区。",
-  connectionLost: "应用连接已断开，请重启织台后重试。",
+  runtimeStopped: `任务运行时已停止，请重启${applicationBrand.zh}以重新打开工作区。`,
+  connectionLost: `应用连接已断开，请重启${applicationBrand.zh}后重试。`,
   settings: "设置",
   allSettings: "全部设置",
-  settingsIntro: "织台在本设备上的偏好。",
+  settingsIntro: `${applicationBrand.zh}在本设备上的偏好。`,
   generalTitle: "通用",
   generalSummary: "语言与外观",
   languageLabel: "界面语言",
@@ -311,8 +313,8 @@ const zh: Messages = {
   modelsUnavailableTitle: "尚未接入模型提供商",
   modelsUnavailableBody: "添加提供商与测试连接将在这里提供。在此之前，代理保持已保存状态，不能执行。",
   aboutTitle: "关于",
-  aboutSummary: "本设备上的织台",
-  aboutBody: "以对象为中心的本地工作台。任务、笔记、绑定和画布位置保存在本设备上。模型执行与外部文件工具尚未接入。",
+  aboutSummary: "与代理一起做事的个人工坊",
+  aboutBody: `${applicationBrand.zh}把代理、工作材料和操作过程放在同一张工作台上。使用自己的模型，链接需要的资源，通过卡片和历史跟进工作。对话、笔记与布局保存在本设备上，资源操作遵循显式授权。`,
   aboutIdentity: "应用标识",
   notAvailable: "尚未提供",
   focusSelection: "定位选中对象",

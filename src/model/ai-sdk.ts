@@ -1,5 +1,5 @@
 import { jsonSchema as sdkJsonSchema, streamText, tool, type ModelMessage, type ToolSet, type AssistantModelMessage, type LanguageModel } from "ai";
-import { jsonSchema, modelScope, type Json, type Usage } from "../shared/model.ts";
+import { jsonSchema, modelScope, unauthenticatedApiKey, type Json, type Usage } from "../shared/model.ts";
 import { ModelFailure, type ModelAdapter, type ModelEvent, type ModelInput, type PreparedModel } from "./contract.ts";
 import { createProviderModel, validateProviderTransport } from "./provider.ts";
 import { projectSystemPrompt } from "./system-prompt.ts";
@@ -22,7 +22,7 @@ function providerOptions(input: ModelInput): Record<string, Record<string, Json>
   }
   return { openai: { ...(provider.protocol === "openai-responses" ? {
     store: false, include: ["reasoning.encrypted_content"],
-    // 能力由织台配置声明，兼容端点的模型名不必在 SDK 的 OpenAI 名单中。
+    // 能力由工坊配置声明，兼容端点的模型名不必在 SDK 的 OpenAI 名单中。
     ...(model.capabilities.reasoning ? { forceReasoning: true } : {}),
     // DeepSeek 把 developer 视为 user，系统指令需保留 system 身份。
     ...(usesPlainResponseReasoning(input) ? { systemMessageMode: "system" } : {}),
@@ -86,7 +86,7 @@ export class AiSdkAdapter implements ModelAdapter {
   }
   private async *stream(input: ModelInput, system: string, messages: ModelMessage[], providerOptions: Record<string, Record<string, Json>>, signal: AbortSignal): AsyncIterable<ModelEvent> {
     const { provider, model } = input.settings;
-    const key = provider.auth === "none" ? "weft-no-auth" : await this.readCredential(provider.id);
+    const key = provider.auth === "none" ? unauthenticatedApiKey : await this.readCredential(provider.id);
     if (!key) throw new ModelFailure("missing_credential", "Provider credentials are unavailable.");
     const languageModel = this.languageModelFactory?.(input, key) ?? createProviderModel(provider, model, key);
     const plainReasoning = usesPlainResponseReasoning(input);
@@ -96,7 +96,7 @@ export class AiSdkAdapter implements ModelAdapter {
       temperature: model.generation.temperature ?? undefined, topP: model.generation.topP ?? undefined,
       reasoning: reasoningFor(input),
       include: { rawChunks: plainReasoning },
-      // SDK 不执行工具；单步结果交还织台循环，工具注册中不提供 execute。
+      // SDK 不执行工具；单步结果交还工坊循环，工具注册中不提供 execute。
       onError: () => {},
     });
     const calls = new Set<string>();
@@ -167,7 +167,7 @@ export class AiSdkAdapter implements ModelAdapter {
         case "error": throw new ModelFailure("provider_error", "The provider request failed. Check provider configuration and connectivity.");
         case "abort": throw new ModelFailure("cancelled", "The provider stream was cancelled.");
         case "tool-error":
-          // SDK 会为解析/目录错误合成结果；正式拒绝由织台记录，避免保存 SDK 错误对象。
+          // SDK 会为解析/目录错误合成结果；正式拒绝由工坊记录，避免保存 SDK 错误对象。
           if (!event.providerExecuted && rejectedBySdk.has(event.toolCallId)) break;
           throw new ModelFailure("unsupported_content", "The provider returned an unexpected tool result.");
         case "file": case "reasoning-file": case "custom": case "tool-result":

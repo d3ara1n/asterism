@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { configurationCommandSchema, providerSchema, resolveProviderModel,
   type ConfigurationCommand, type ConfigurationSnapshot, type ConnectionTest, type Provider, type ProviderModel } from "../shared/configuration.ts";
 import type { SecretProtector } from "../shared/secrets.ts";
+import { unauthenticatedApiKey } from "../shared/model.ts";
 import { ConfigurationError } from "./errors.ts";
 import { ConfigurationStore, type StoredProvider } from "./store.ts";
 import { CredentialVault } from "./credentials.ts";
@@ -45,7 +46,7 @@ export class ConfigurationService {
     this.assertOpen();
     const provider = this.store.get("provider", providerId);
     if (!provider || provider.revision !== revision) throw new ConfigurationError("conflict", "The provider changed before execution started.");
-    if (provider.auth === "none") return "weft-no-auth";
+    if (provider.auth === "none") return unauthenticatedApiKey;
     return provider.credentialRef ? this.vault.read(provider.credentialRef) : null;
   }
   private provider(stored: StoredProvider): Provider {

@@ -3,10 +3,13 @@ import { mkdirSync, readFileSync, writeFileSync, renameSync, rmSync } from "node
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { sessionSchemaSql } from "../session/schema.ts";
+import { applicationBrand, applicationStorage } from "../shared/application.ts";
+
+const workspaceDatabaseVersion = 11;
 
 export function openDatabase(root: string): DatabaseSync {
-  mkdirSync(join(root, "db"), { recursive: true });
-  const db = new DatabaseSync(join(root, "db", "weft.sqlite"));
+  mkdirSync(join(root, applicationStorage.databaseDirectory), { recursive: true });
+  const db = new DatabaseSync(join(root, applicationStorage.databaseDirectory, applicationStorage.databaseFile));
   try {
     db.exec("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;");
     // 发布前只有当前结构；版本不符直接报错，开发数据由使用者删除重建。
@@ -34,9 +37,9 @@ export function openDatabase(root: string): DatabaseSync {
         session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
         value_json TEXT NOT NULL, PRIMARY KEY(object_id, key)
       ) STRICT;
-      PRAGMA user_version = 10;
+      PRAGMA user_version = ${workspaceDatabaseVersion};
       COMMIT;`);
-    else if (version !== 10) throw new Error("This workspace database format is not supported by this build of Weft. Back up and recreate the development database before opening it.");
+    else if (version !== workspaceDatabaseVersion) throw new Error(`This workspace database format is not supported by this build of ${applicationBrand.en}. Recreate the development data before restarting.`);
     if (!db.prepare("SELECT id FROM workspace LIMIT 1").get()) {
       db.prepare("INSERT INTO workspace VALUES (?, ?)").run(randomUUID(), "Personal workspace");
     }

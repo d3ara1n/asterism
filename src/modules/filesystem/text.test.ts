@@ -7,7 +7,7 @@ import filesystem from "./runtime.ts";
 import { ResourceRegistry } from "../../resources/registry.ts";
 import { ToolRegistry } from "../../tools/registry.ts";
 import { AgentCapabilities } from "../../execution/capabilities.ts";
-import { executeWeftBatch } from "../../execution/weft.ts";
+import { executeCoreBatch } from "../../execution/core.ts";
 import type { Json, ToolOutcome } from "../../shared/model.ts";
 import { textReadSchema, textChangeSchema } from "../../tools/text-contract.ts";
 import { readTextFile, commitTextFile } from "./text-io.ts";
@@ -20,7 +20,7 @@ vi.mock("node:fs/promises", async importOriginal => {
 const roots: string[] = [];
 afterEach(() => { vi.restoreAllMocks(); for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
 function setup() {
-  const root = mkdtempSync(join(tmpdir(), "weft-text-")); roots.push(root);
+  const root = mkdtempSync(join(tmpdir(), "core-text-")); roots.push(root);
   const directory = join(root, "directory"), outside = join(root, "outside");
   mkdirSync(directory); mkdirSync(outside);
   const module = filesystem();
@@ -28,7 +28,7 @@ function setup() {
   const capabilities = new AgentCapabilities(new ResourceRegistry(module.resources), new ToolRegistry(module.tools), [resource], () => true);
   const call = async (tool: string, target: Json, args: Json = {}, cap = capabilities, signal = new AbortController().signal, resourceId = resource.id) => {
     const results: ToolOutcome[] = [];
-    await executeWeftBatch([{ callId: "call", name: "resource_call", arguments: { resource_id: resourceId, tool, target, args } }], cap, signal, (_call, outcome) => results.push(outcome));
+    await executeCoreBatch([{ callId: "call", name: "resource_call", arguments: { resource_id: resourceId, tool, target, args } }], cap, signal, (_call, outcome) => results.push(outcome));
     return results[0];
   };
   return { root, directory, outside, resource, module, call };

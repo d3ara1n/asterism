@@ -49,7 +49,7 @@ Session 是时间轴的单一写入者。成型记录、终态元数据、对象
 
 模型响应正常结束 → 参数与 agent 工具策略校验 → 显式 resource_id 与本轮有效链接校验 → 执行 → 结局节点保存 → 整批收束 → 下一请求。输出截断与不完整参数不启动工具。并行完成顺序不影响模型输入顺序，投影按序号排列；含顺序工具的批次按原顺序执行。
 
-模型协议中的 tools 是 Weft 固定操作入口：`resource_list`、`resource_inspect`、`resource_call(resource_id, tool, target?, args)`。两层工具使用同一 ToolContract 与定义投影；一级入口的 guidelines 合入协议说明，二级工具的 description、guidelines、args 及实现的 target/result schema 在资源链接通知或 inspect 中提供，不进入顶层 tools。核心工具与资源平级定义，通过后端实现声明支持关系。链接资源激活匹配工具，agent 的 tools/excludeTools 等外部策略再决定是否允许使用；资源实例不持有工具列表或白名单。Weft 入口不受名单约束，也不开放插件注册。请求能力视图从统一目录选择实现并应用链接状态和外部策略；批次按实际实现的副作用和调度策略执行。当前原生资源工具包括目录 list 与文件、笔记的 read/edit/write；MCP 与代理间通信待接入。
+模型协议中的 tools 是 Atelier 固定操作入口：`resource_list`、`resource_inspect`、`resource_call(resource_id, tool, target?, args)`。两层工具使用同一 ToolContract 与定义投影；一级入口的 guidelines 合入协议说明，二级工具的 description、guidelines、args 及实现的 target/result schema 在资源链接通知或 inspect 中提供，不进入顶层 tools。核心工具与资源平级定义，通过后端实现声明支持关系。链接资源激活匹配工具，agent 的 tools/excludeTools 等外部策略再决定是否允许使用；资源实例不持有工具列表或白名单。宿主入口不受名单约束，也不开放插件注册。请求能力视图从统一目录选择实现并应用链接状态和外部策略；批次按实际实现的副作用和调度策略执行。当前原生资源工具包括目录 list 与文件、笔记的 read/edit/write；MCP 与代理间通信待接入。
 
 一个执行轮次内可有多次模型请求。轮次请求上限采用 agent.maxTurns，空值为 32；timeout 空值为 600 秒，取消协作式中止，不承诺撤销副作用。maxCost 尚无价格契约，设置后明确拒绝启动。
 
@@ -59,19 +59,19 @@ Session 是时间轴的单一写入者。成型记录、终态元数据、对象
 
 ## 模型适配
 
-三协议使用已安装 AI SDK：OpenAI Responses、OpenAI Chat Completions、Anthropic Messages。工具定义不提供 SDK execute；关闭隐式重试与流重试。带凭据的远程端点要求 HTTPS，无鉴权模式去除认证头，禁止自动重定向。每个 SDK 调用只进行一个模型步骤，由织台执行后续循环。OpenAI Responses 使用 store:false 并请求 encrypted reasoning。
+三协议使用已安装 AI SDK：OpenAI Responses、OpenAI Chat Completions、Anthropic Messages。工具定义不提供 SDK execute；关闭隐式重试与流重试。带凭据的远程端点要求 HTTPS，无鉴权模式去除认证头，禁止自动重定向。每个 SDK 调用只进行一个模型步骤，由工坊执行后续循环。OpenAI Responses 使用 store:false 并请求 encrypted reasoning。
 
 直接续接要求 provider、协议、端点、模型标识和适配版本兼容；不兼容时在提交前明确失败。图片与服务端工具暂不支持。
 
 Responses 模型声明的思考能力显式传给 SDK，不依赖 SDK 的 OpenAI 模型名称识别；声明思考能力时，开启、关闭与等级参数均传到请求中。模型声明思考能力且未关闭思考时，显式请求可见摘要，包括采用默认思考等级的情况；加密推理资料独立用于续接。代理页面只展示含可见正文的思考块，空块仍保留在历史与模型投影中，不显示空折叠项。
 
-DeepSeek 官方端点 `api.deepseek.com` 的 Responses 返回 `response.reasoning_text.delta`，不生成思考摘要。适配层通过 SDK 的原始事件接口读取已知正文增量，复用原有思考块身份、即时进度与保存流程；原始帧不持久化或写入日志。DeepSeek 不支持 reasoning 输入的 summary/encrypted_content，声明将纯文本 content 合入相邻 assistant 正文，因此模型投影将保存的思考作为 assistant 文本发送，不携带该块的 OpenAI 续接字段；织台历史仍区分 thinking 与 text。系统指令保留 system 身份，避免 DeepSeek 把 developer 当作 user。协议依据见 [DeepSeek Responses 指南](https://api-docs.deepseek.com/guides/responses_api/) 与 [接口参考](https://api-docs.deepseek.com/api/create-response/)。
+DeepSeek 官方端点 `api.deepseek.com` 的 Responses 返回 `response.reasoning_text.delta`，不生成思考摘要。适配层通过 SDK 的原始事件接口读取已知正文增量，复用原有思考块身份、即时进度与保存流程；原始帧不持久化或写入日志。DeepSeek 不支持 reasoning 输入的 summary/encrypted_content，声明将纯文本 content 合入相邻 assistant 正文，因此模型投影将保存的思考作为 assistant 文本发送，不携带该块的 OpenAI 续接字段；工坊历史仍区分 thinking 与 text。系统指令保留 system 身份，避免 DeepSeek 把 developer 当作 user。协议依据见 [DeepSeek Responses 指南](https://api-docs.deepseek.com/guides/responses_api/) 与 [接口参考](https://api-docs.deepseek.com/api/create-response/)。
 
 可组合的模型兼容包方向已确认，通用机制尚未实现。后续由提供商默认组合和模型覆盖统一控制编码、解码与续接，将上述端点专用行为迁入兼容模块，支持用户为自定义与中转端点显式选择；实施与待定契约见 [模型兼容计划](../plans/todo-2026-10-10-model-compatibility.md)。
 
 ## 前端能力接口
 
-`window.weft.session` 提供 `execute` 与 `onChanged`，IPC 版本为 9。资源与布局命令也属于此会话入口。应用通道只读取工作区身份和会话列表，不持有已打开会话的正文。
+`window.host.session` 提供 `execute` 与 `onChanged`，IPC 版本为 9。资源与布局命令也属于此会话入口。应用通道只读取工作区身份和会话列表，不持有已打开会话的正文。
 
 | 命令 | 行为 |
 | --- | --- |

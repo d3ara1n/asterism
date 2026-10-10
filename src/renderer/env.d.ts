@@ -1,2 +1,3 @@
 import type { DesktopBridge } from "../shared/contracts";
-declare global { interface Window { weft: DesktopBridge; } }
+import { desktopBridgeKey } from "../shared/core";
+declare global { interface Window { [desktopBridgeKey]: DesktopBridge; } }

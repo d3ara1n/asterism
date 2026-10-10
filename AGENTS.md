@@ -1,6 +1,6 @@
-# 织台 Weft 项目规范
+# 工坊 Atelier 项目规范
 
-以对象为中心的个人 agent 工作台：代理、资源与操作以卡片和连线呈现，任务过程可查看、分叉，资源支持时可恢复。定位与边界见 `docs/product.md`。首页、侧栏、持久化工作台与三类真实配置已实现，单代理核心与会话 IPC 已实现，首页发送与主代理对话视图已接通，真实端点和 GUI 待用户验收，无 CI。能力入口见 `plans/todo-2026-10-01-model-protocol-storage.md`。
+以对象为中心的个人 agent 工作台：代理、资源与操作以卡片和连线呈现，任务过程可查看、分叉，资源支持时可恢复。定位与边界见 `docs/product.md`。首页、侧栏、持久化工作台与三类真实配置已实现，单代理核心与会话 IPC 已实现，首页发送与代理对话视图已接通，真实端点和 GUI 待用户验收，无 CI。能力入口见 `plans/todo-2026-10-01-model-protocol-storage.md`。
 
 ## 工作台占位边界
 
@@ -12,16 +12,16 @@
 
 - **授权先于能力**：资源操作凭显式资源身份加执行层授权完成。Workspace 存储目录、卡片与连线的可见性、工具出现在目录中，都只是视图，不构成授权。
 - **资源与工具平级**：工具独立声明可操作的资源，链接资源激活匹配工具；支持关系不等于白名单。agent.tools 等外部策略另行筛选，资源定义不包含工具或工具策略。
-- **历史是事件，永不改写**：任务历史由织台拥有，不以某个 provider 或 agent 框架的会话格式作为唯一存储。查看历史不改变现实；detach 以生效事件表达而非删除旧消息；不可恢复资源不宣称回滚。
+- **历史是事件，永不改写**：任务历史由工坊拥有，不以某个 provider 或 agent 框架的会话格式作为唯一存储。查看历史不改变现实；detach 以生效事件表达而非删除旧消息；不可恢复资源不宣称回滚。
 - **环境在请求边界取用**：每次模型请求固定消息路径、代理配置与资源授权，连同该响应的工具批次使用到底；期间变化按发生顺序记录，下次请求重新取用。
-- **稳定上下文优先**：Weft 的一级操作入口固定，资源工具是唯一可管理、可扩展的工具目录；资源变化经投影进入响应之外，不打断同一 response 的连续性。
+- **稳定上下文优先**：Atelier 的一级操作入口固定，资源工具是唯一可管理、可扩展的工具目录；资源变化经投影进入响应之外，不打断同一 response 的连续性。
 
 ## 环境
 
 - 实现中：正式入口 `npm run dev`；模块地图见 `src/README.md`，界面维护见 `src/renderer/README.md`。
 - 实现期基线：Electron + React + TypeScript，shadcn/ui（Radix）+ Tailwind CSS 与 @xyflow/react，SQLite（`node:sqlite`）与本地对象存储，Zod，独立 Node.js 任务运行时；包管理器 npm，构建 electron-vite，打包 Electron Forge。Vercel AI SDK 已用于三协议连接测试与单代理请求适配，核心契约见 `docs/conversation-core.md`。测试以 macOS 为主，发布目标覆盖 macOS、Windows 与 Linux。选型与职责见 `docs/architecture.md`，已安装版本见 `package-lock.json`。
 - 开发数据与发布数据隔离，均使用 Electron 数据目录；测试使用独立临时目录并清理。一次性原型仅留于 `feat/ux-prototype`，正式分支不依赖其代码。
-- 正式应用标识为 `dev.dearain.weft`。UI 视觉以 `docs/design-system.md` 为准：原生材质底座、独立内容表面、统一 token 与公共控件；新功能复用现有风格，整体视觉变更须由用户确认。
+- 品牌、固定应用身份与数据布局统一维护在 `src/shared/application.ts`，内部契约与通道身份见 `src/shared/core.ts`。UI 视觉以 `docs/design-system.md` 为准：原生材质底座、独立内容表面、统一 token 与公共控件；新功能复用现有风格，整体视觉变更须由用户确认。
 - 界面控件先查 shadcn registry：`shared/ui/` 缺少时用 `npx shadcn@latest add <name>` 拉取（官方控件不算新依赖），再组合使用；拉取后核对导入路径为相对路径，并清理 CLI 误加的依赖或目录。
 
 ## 验证职责
@@ -38,7 +38,7 @@
 | --- | --- | --- |
 | `docs/product.md` | 定位、核心体验、边界、成功标准 | 极稳定 |
 | `docs/glossary.md` | 产品词汇的中英对照与含义 | 随命名与含义同步 |
-| `docs/object-model.md` | Workspace、Task、资源、操作、视图语义 | 最终状态真值 |
+| `docs/object-model.md` | Workspace、Session、资源、操作、视图语义 | 最终状态真值 |
 | `docs/runtime.md` | 执行轮次、绑定、工具目录、授权 | 最终状态真值 |
 | `docs/model-configuration.md` | 配置提供商、模型角色、agent 或设计对话模型选择时读取 | 最终状态真值 |
 | `docs/timeline.md` | 事件、检查点、历史查看、分叉、恢复 | 最终状态真值 |
@@ -48,7 +48,7 @@
 | `docs/decisions.md` | 已定原则、初版取舍、开放问题 | 最终状态真值，演进看 git log |
 | `docs/roadmap.md` | 实现顺序与验收场景 | 随实施推进更新 |
 | `docs/mcp-caching.md` | MCP 延迟加载与提示缓存调研 | 时点固化，接入时重新核验 |
-| `docs/agent-transcript-research.md` | 开源项目的模型适配、对话记录与执行分工 | 源码事实按提交固化；织台决策以设计文档为准 |
+| `docs/agent-transcript-research.md` | 开源项目的模型适配、对话记录与执行分工 | 源码事实按提交固化；工坊决策以设计文档为准 |
 | `plans/` | 立案任务 | 见下方 plans 纪律 |
 
 ## plans 纪律
@@ -74,7 +74,7 @@
 
 ### 分支与提交
 
-- 主干 `main`。首个版本发布前（尚未建立远端仓库）直接在 `main` 上开发与提交，不开分支、不走 PR；首个版本发布后改为按 type 开分支（`feat/`、`fix/`、`docs/`…），经 PR squash merge 回 `main`，一个 PR 对应一个合并提交。
+- 主干 `main`。首个版本发布前直接在 `main` 上开发与提交，不开分支、不走 PR；首个版本发布后改为按 type 开分支（`feat/`、`fix/`、`docs/`…），经 PR squash merge 回 `main`，一个 PR 对应一个合并提交。
 - 提交信息用 Conventional Commits：type 英文小写（feat/fix/docs/chore/refactor…），主题中文。
 - AI 辅助的提交加 `Co-Authored-By: <模型名> <邮箱>` trailer；模型身份查 `PI_*` 环境变量。邮箱用模型提供方的官方 noreply 地址（如 Anthropic 为 `noreply@anthropic.com`），无法确定时用 `noreply@pi.dev`，不自行编造地址。
 - PR label 分组与 release CI 暂缓，已立案 `plans/`；首个版本发布后接入。

@@ -2,6 +2,8 @@ import { resolve } from "node:path";
 import { defineConfig } from "electron-vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
+import { applicationBrand } from "./src/shared/application.ts";
+import { coreId } from "./src/shared/core.ts";
 
 export default defineConfig({
   main: {
@@ -29,7 +31,14 @@ export default defineConfig({
     plugins: [
       react(), tailwindcss(),
       {
-        name: "weft-development-csp",
+        name: "application-title",
+        transformIndexHtml: {
+          order: "pre",
+          handler: html => html.replace("%APPLICATION_TITLE%", `${applicationBrand.en} · ${applicationBrand.zh}`),
+        },
+      },
+      {
+        name: coreId("development-csp"),
         apply: "serve",
         // React Fast Refresh 的开发入口包含内联 preamble；发布构建不放宽脚本策略。
         transformIndexHtml: html => html.replace("script-src 'self';", "script-src 'self' 'unsafe-inline';"),

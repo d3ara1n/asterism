@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
+import { applicationStorage } from "../shared/application.ts";
 import type { SecretProtector } from "../shared/secrets.ts";
 
 const referenceSchema = z.string().uuid();
@@ -9,7 +10,7 @@ export class CredentialVault {
   private root: string;
   readonly failures = new Set<string>();
   constructor(root: string, private readonly protector: SecretProtector) {
-    this.root = join(root, "credentials");
+    this.root = join(root, applicationStorage.credentialsDirectory);
     mkdirSync(this.root, { recursive: true, mode: 0o700 });
   }
   private path(reference: string): string { return join(this.root, referenceSchema.parse(reference) + ".enc"); }

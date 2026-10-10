@@ -3,6 +3,7 @@ import { constants } from "node:fs";
 import { open, stat, mkdir, realpath, rename, link, unlink, rmdir } from "node:fs/promises";
 import { dirname, join, relative, sep } from "node:path";
 import { randomUUID } from "node:crypto";
+import { coreTemporaryFilePrefix } from "../../shared/core.ts";
 import { TextError } from "../../tools/text.ts";
 import { FilesystemError, failed, rejected } from "./errors.ts";
 import { directoryRoot, insideDirectory, outsideDirectory, withinDirectory, writableTarget } from "./paths.ts";
@@ -87,7 +88,7 @@ export async function commitTextFile(root: string, rel: string, before: TextFile
     }
     const parentStamp = await stat(parent);
     if (await directoryRoot(root) !== selected.root || (await writableTarget(root, rel)).path !== selected.path) throw conflict();
-    temp = join(parent, `.weft-${randomUUID()}.tmp`);
+    temp = join(parent, `${coreTemporaryFilePrefix}${randomUUID()}.tmp`);
     const handle = await open(temp, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, before ? before.stamp.mode & 0o777 : 0o666);
     try {
       // 创建后复核父目录与暂存目标，避免向已换位的目录继续写正文。

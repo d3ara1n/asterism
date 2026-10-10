@@ -6,7 +6,7 @@ import { ModelFailure, type ModelAdapter } from "../model/contract.ts";
 import { composeSystemPrompt } from "../model/system-prompt.ts";
 import type { ModelItem } from "../session/projection.ts";
 import { SessionError } from "../shared/session-path.ts";
-import { executeWeftBatch, weftDeclarations } from "./weft.ts";
+import { executeCoreBatch, coreDeclarations } from "./core.ts";
 import type { AgentCapabilities } from "./capabilities.ts";
 import { ResponseBuffer } from "./response.ts";
 
@@ -43,7 +43,7 @@ export async function runAgent(options: RunOptions): Promise<void> {
       if (agent.maxCost !== null) throw new ModelFailure("unavailable", "Cost limits require model pricing support, which is not available yet.");
       if (request >= (agent.maxTurns ?? 32)) throw new ModelFailure("request_limit", "The agent reached the model request limit. Continue explicitly to resume.");
       const prepared = adapter.prepare({ settings, system: composeSystemPrompt(agent, context), messages,
-        tools: settings.model.capabilities.tools ? weftDeclarations() : [] });
+        tools: settings.model.capabilities.tools ? coreDeclarations() : [] });
       const responseId = randomUUID();
       const model = modelExpression(settings);
       const response = new ResponseBuffer({ agentId, responseId, requestParentId, model, adapter: adapter.version, scope: modelScope(settings) },
@@ -69,7 +69,7 @@ export async function runAgent(options: RunOptions): Promise<void> {
         const calls = response.calls();
         const byCall = new Map(calls.map(call => [call.part.callId, call]));
         let unknown = false;
-        await executeWeftBatch(calls.map(call => ({ callId: call.part.callId, name: call.part.name, arguments: call.arguments })),
+        await executeCoreBatch(calls.map(call => ({ callId: call.part.callId, name: call.part.name, arguments: call.arguments })),
           settings.model.capabilities.tools ? capabilities : null, signal, (call, outcome) => {
             if (outcome.kind === "unknown") unknown = true;
             response.settle(byCall.get(call.callId)!, outcome);

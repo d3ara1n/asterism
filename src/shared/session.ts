@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { coreChannel } from "./core.ts";
 import { jsonSchema, toolOutcomeSchema, usageSchema } from "./model.ts";
 import { thinkingSchema } from "./configuration.ts";
 import { pointSchema, workbenchCommands, workbenchSnapshotSchema } from "./workbench.ts";
@@ -49,8 +50,8 @@ export const viewPositionSchema = z.discriminatedUnion("kind", [
   z.strictObject({ kind: z.literal("history"), nodeId: id.nullable() }),
 ]);
 export type ViewPosition = z.infer<typeof viewPositionSchema>;
-export const sessionChannel = "weft:session";
-export const sessionChangedChannel = "weft:session-changed";
+export const sessionChannel = coreChannel("session");
+export const sessionChangedChannel = coreChannel("session-changed");
 export const sessionCommandSchema = z.discriminatedUnion("type", [
   // 首页组合入口：建立会话、创建第一个代理资源并向它提交首条输入。
   z.strictObject({ type: z.literal("start"), submissionId: uuid, agentConfigurationId: id, modelId: id, thinking: thinkingSchema.nullable(), text }),

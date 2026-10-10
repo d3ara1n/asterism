@@ -10,7 +10,7 @@ export function useConfiguration(active: boolean) {
   const generation = useRef(0);
   const load = useCallback(async () => {
     const version = ++generation.current;
-    const result = await window.weft.configuration.execute({ type: "read" });
+    const result = await window.host.configuration.execute({ type: "read" });
     if (version !== generation.current) return;
     if (result.ok) { setSnapshot(result.snapshot); setError(null); }
     else setError(result.error.message);
@@ -18,14 +18,14 @@ export function useConfiguration(active: boolean) {
   useEffect(() => {
     if (!active) return;
     void load();
-    const unsubscribe = window.weft.configuration.onChanged(() => { void load(); });
+    const unsubscribe = window.host.configuration.onChanged(() => { void load(); });
     return () => { generation.current++; unsubscribe(); };
   }, [active, load]);
   const run = useCallback(async (command: ConfigurationCommand): Promise<ConfigurationResult> => {
     setBusy(true); setError(null);
     ++generation.current;
     try {
-      const result = await window.weft.configuration.execute(command);
+      const result = await window.host.configuration.execute(command);
       ++generation.current;
       if (result.ok) setSnapshot(result.snapshot); else setError(result.error.message);
       return result;

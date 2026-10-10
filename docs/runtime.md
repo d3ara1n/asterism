@@ -31,21 +31,21 @@
 系统指令由有序结构化提示块组装，统一渲染为 XML-like 分段，例如：
 
 ```xml
-<system from="weft">环境描述与运行机制。</system>
+<system from="core">环境描述与运行机制。</system>
 <agent role="worker">代理职责。</agent>
 <context file="…/AGENTS.md">…</context>
 ```
 
 标签是文本分段约定，不建立新的指令权限。实现入口为 `src/model/system-prompt.ts`。
 
-## 工具匹配与 Weft 操作入口
+## 工具匹配与 宿主操作入口
 
-Weft 操作入口是软件提供的外围接口，仅在 provider 协议中表示为顶层 tools：
+宿主操作入口是软件提供的外围接口，仅在 provider 协议中表示为顶层 tools：
 
 - `resource_list` / `resource_inspect`：列出已链接资源，查看资源的实时状态与可用工具及 schema。
 - `resource_call(resource_id, tool, target?, args)`：以工具操作已链接资源或其内部目标。省略 target 等价于 null，是否接受由实现声明。
 
-上述三个固定入口称一级工具，是协议 `tools` 中的工具，代表 Weft 与工作台的操作界面；经 `resource_call` 使用的动态资源工具称二级工具，是模型完成实际任务的主要工具。层级描述调用关系，不表示产品中的重要性；可管理、可扩展的核心工具目录属于资源工具。一级视图由 Weft 内置，resource_list/inspect 显示资源列表与详情，resource_call 的视图适配将摘要、正文和图标转交选定的二级工具。外壳显示实际工具的一层视图，不嵌套展示外围调用。
+上述三个固定入口称一级工具，是协议 `tools` 中的工具，代表 Atelier 与工作台的操作界面；经 `resource_call` 使用的动态资源工具称二级工具，是模型完成实际任务的主要工具。层级描述调用关系，不表示产品中的重要性；可管理、可扩展的核心工具目录属于资源工具。一级视图由 Atelier 内置，resource_list/inspect 显示资源列表与详情，resource_call 的视图适配将摘要、正文和图标转交选定的二级工具。外壳显示实际工具的一层视图，不嵌套展示外围调用。
 
 资源与工具独立定义：资源契约描述类型与状态；工具契约统一规定 name、description、guidelines 与 args schema。description 说明能力和适用场景，guidelines 说明选定后的使用规则，参数 schema 说明字段语义，不另设 snippet。后端的工具实现声明自己支持的资源类型、target schema、result schema、读写副作用和调度策略，并提供 handler；实现不重复或覆写工具的 description/guidelines。同一工具可对应多个实现，用法与行为含义保持一致，资源实例不保存工具列表或白名单。
 
@@ -53,11 +53,11 @@ target 是 `resource_call` 的定位参数，由选中的实现直接解释，�
 
 入口指导与 schema 描述明确要求直接传递符合 schema 的 JSON 值：对象保持为对象，null 保持为 null，不先编码成字符串。一级入口提供通用传参规则，共享工具定义提供操作用法，资源实现通过 target/result schema 提供定位与结果说明。
 
-一级入口与二级工具使用同一个 ToolContract、defineTool 和定义投影；层级由装配与执行位置决定。一级入口将 guidelines 合入协议工具的 description，二级工具在链接通知与 inspect 中提供结构化 description、guidelines 与 args schema，再附加实现的 target/result schema。模型适配器中的 ToolDeclaration 只是 provider 传输投影，不是另一份工具定义。插件可以声明工具或共享纯契约库，无需将工具加入 Weft 的内置声明文件。
+一级入口与二级工具使用同一个 ToolContract、defineTool 和定义投影；层级由装配与执行位置决定。一级入口将 guidelines 合入协议工具的 description，二级工具在链接通知与 inspect 中提供结构化 description、guidelines 与 args schema，再附加实现的 target/result schema。模型适配器中的 ToolDeclaration 只是 provider 传输投影，不是另一份工具定义。插件可以声明工具或共享纯契约库，无需将工具加入 Atelier 的内置声明文件。
 
 每次请求先取得已链接资源，再由工具目录匹配支持关系，最后应用 agent.tools/excludeTools 等外部策略。支持关系回答“工具能否操作这个资源”，外部策略回答“当前代理是否被允许使用”；两者独立。链接通知、inspect 和实际调用共用这份能力视图及同一工具定义，避免维护另一份名称或 schema。
 
-Weft 入口集合由软件维护，外部工具策略只检查 `resource_call` 内的工具名，不检查一级入口。插件可扩展资源和工具实现，不能注册或替换一级入口。实际工具不加入顶层 tools，attach/detach 不改变协议工具前缀；链接通知与 inspect 提供同一实现的 args、target、result schema。调用可靠性需实测，但不通过混合两个目录改变架构边界。创建资源的外围操作尚未开放，具体接口另行设计。
+宿主入口集合由软件维护，外部工具策略只检查 `resource_call` 内的工具名，不检查一级入口。插件可扩展资源和工具实现，不能注册或替换一级入口。实际工具不加入顶层 tools，attach/detach 不改变协议工具前缀；链接通知与 inspect 提供同一实现的 args、target、result schema。调用可靠性需实测，但不通过混合两个目录改变架构边界。创建资源的外围操作尚未开放，具体接口另行设计。
 
 ### 原生正文工具
 

@@ -2,6 +2,7 @@ import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAI } from "@ai-sdk/openai";
 import type { ProviderInput, ProviderModel } from "../shared/configuration.ts";
 import { ModelFailure } from "./contract.ts";
+import { unauthenticatedApiKey } from "../shared/model.ts";
 
 export class ProviderTransportError extends ModelFailure {
   constructor() { super("configuration", "API key connections require HTTPS, except on loopback addresses."); }
@@ -19,7 +20,7 @@ export function createProviderModel(provider: ProviderInput, model: ProviderMode
     if (provider.auth === "none") { headers.delete("authorization"); headers.delete("x-api-key"); }
     return transport(url, { ...init, headers, redirect: "error" });
   };
-  const options = { baseURL: provider.baseUrl, apiKey: provider.auth === "none" ? "weft-no-auth" : key, fetch: scopedFetch };
+  const options = { baseURL: provider.baseUrl, apiKey: provider.auth === "none" ? unauthenticatedApiKey : key, fetch: scopedFetch };
   return provider.protocol === "anthropic" ? createAnthropic(options).messages(model.modelId)
     : provider.protocol === "openai-chat" ? createOpenAI(options).chat(model.modelId)
       : createOpenAI(options).responses(model.modelId);

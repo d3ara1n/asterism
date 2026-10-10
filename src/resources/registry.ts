@@ -1,4 +1,5 @@
 import { jsonSchema, type Json } from "../shared/json.ts";
+import { coreId } from "../shared/core.ts";
 import type { Presentation } from "../shared/presentation.ts";
 import type { FoldedObject } from "../session/fold.ts";
 import type { ContextFile, ResourceBackend, ResourceController } from "./contract.ts";
@@ -18,7 +19,7 @@ export class ResourceRegistry {
   project(resource: FoldedObject): Presentation {
     const backend = this.backends.get(resource.kind);
     if (backend) return backend.project(resource);
-    return { contract: { id: "weft.unknown-resource", version: 1 }, data: jsonSchema.parse(resource.data) };
+    return { contract: { id: coreId("unknown-resource"), version: 1 }, data: jsonSchema.parse(resource.data) };
   }
 
   controller(kind: string): ResourceController | undefined { return this.backends.get(kind)?.controller; }

@@ -7,7 +7,7 @@ import { Button } from "../../shared/ui/button";
 import { ConfigurationChoice as Choice } from "../configuration/ConfigurationChoice";
 import { InputGroup, InputGroupAddon, InputGroupTextarea } from "../../shared/ui/input-group";
 import { Showcase, showcaseSpell } from "../showcase/Showcase";
-import { WeftMark } from "../../shared/ui/weft-mark";
+import { BrandMark } from "../../shared/ui/brand-mark";
 import { s, useConfiguration } from "../configuration/state";
 import type { SessionCommand } from "../../../shared/session";
 
@@ -47,7 +47,7 @@ export function HomePage({ active, draft, onDraftChange, onSettings, ready, busy
   const canSend = ready && !busy && !!agent && !!model && !!draft.trim() && !unavailable;
   return <div className="home-page"><div className="home-content">
     <header className="mb-8 flex flex-col items-center text-center">
-      <WeftMark className="mb-4 size-12 text-primary" /><h1 className="type-page">{t.appName}</h1>
+      <BrandMark className="mb-4 size-12 text-primary" /><h1 className="type-page">{t.appName}</h1>
       <p className="type-body mt-2 text-muted-foreground">{t.homePrompt}</p>
     </header>
     {/* 两层输入区：亮色输入表面在上，灰色选项托盘挂在下方；选项为紧凑的幽灵按钮 + 菜单，不用表单下拉框。 */}

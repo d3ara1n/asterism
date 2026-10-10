@@ -1,8 +1,8 @@
 # 模型接入与 Transcript 源码调研
 
-> 调研日期：2026-10-01。固定源码快照的静态调查，未运行这些项目的测试，也不代表全部发布版本的行为。第 1—5 节为源码事实，第 6 节列出织台采用的边界；当前实现契约见 `conversation-core.md`。
+> 调研日期：2026-10-01。固定源码快照的静态调查，未运行这些项目的测试，也不代表全部发布版本的行为。第 1—5 节为源码事实，第 6 节列出工坊采用的边界；当前实现契约见 `conversation-core.md`。
 >
-> 已确认方向：Vercel AI SDK 作为模型适配基线，上层能扩展更多协议；织台拥有可扩展的对话记录（transcript），组织用户消息、助手消息、思考与工具过程。实施任务见 [模型协议与存储立案](../plans/todo-2026-10-01-model-protocol-storage.md)。
+> 已确认方向：Vercel AI SDK 作为模型适配基线，上层能扩展更多协议；工坊拥有可扩展的对话记录（transcript），组织用户消息、助手消息、思考与工具过程。实施任务见 [模型协议与存储立案](../plans/todo-2026-10-01-model-protocol-storage.md)。
 
 ## 1. 范围与源码版本
 
@@ -14,7 +14,7 @@
 | Codex | `openai/codex@a933dd77dbe101d7bd746ea3c7d1f8174eca4a05` | 模型项目/轮次项目/持久化记录分工，工具执行与恢复 |
 | Vercel AI SDK | `vercel/ai@45e1fbc3ea10d22f852e12b1c1851e289c85e835` | 协议接口、provider 注册、应用消息到模型消息的转换 |
 
-这里调查的是源码快照，不将 upstream main 中的接口版本等同于当前 npm 稳定版；织台安装依赖前仍需核验版本。pi 源码来自 `badlogic/pi-mono`，不假定与本机 `@earendil-works/pi-coding-agent` 发行完全相同。
+这里调查的是源码快照，不将 upstream main 中的接口版本等同于当前 npm 稳定版；工坊安装依赖前仍需核验版本。pi 源码来自 `badlogic/pi-mono`，不假定与本机 `@earendil-works/pi-coding-agent` 发行完全相同。
 
 OpenCode 同时存在 V1 与 V2 路径，Cline 已有 `apps/` 与 `sdk/` 结构。旧文章中的路径不能直接用来描述当前源码。下文明确讨论的具体路径，不推断整个项目已经完成迁移。
 
@@ -55,7 +55,7 @@ type AgentMessage = Message | CustomAgentMessages[keyof CustomAgentMessages];
 
 工具状态明确区分 pending/running/completed/error；text、reasoning、file、tool 等内容与模型消息角色是不同维度。其转换代码针对模型变化和 provider metadata 有具体分支，不能将应用消息原样发送给所有模型。
 
-[session/sql.ts](https://github.com/anomalyco/opencode/blob/0112a92c416f5ad833d96e7a8308441f0a875d94/packages/core/src/session/sql.ts) 中 `MessageTable` 与 `PartTable` 分别存消息和内容块；这些可更新的消息表并非织台“历史只追加”契约的直接替代品。
+[session/sql.ts](https://github.com/anomalyco/opencode/blob/0112a92c416f5ad833d96e7a8308441f0a875d94/packages/core/src/session/sql.ts) 中 `MessageTable` 与 `PartTable` 分别存消息和内容块；这些可更新的消息表并非工坊“历史只追加”契约的直接替代品。
 
 ### V2 路径
 
@@ -94,9 +94,9 @@ type AgentMessage = Message | CustomAgentMessages[keyof CustomAgentMessages];
 
 [sqlite-session-store.ts](https://github.com/cline/cline/blob/8eee168b80127b0c94bad849323754b5864865e7/sdk/packages/core/src/services/storage/sqlite-session-store.ts) 的 SQLite 保存会话状态、关联和 messages_path 等索引资料，不能把“用了 SQLite”解读为“对话事实全存于只追加事件表”。完整 artifact 写入路径与不同宿主的持久化时机需分别看对应调用链。
 
-[agents/agent-runtime.ts](https://github.com/cline/cline/blob/8eee168b80127b0c94bad849323754b5864865e7/sdk/packages/agents/src/agent-runtime.ts) 在模型流中累积工具参数，再统一 `parseToolInput()`；`executeToolCalls()` 支持顺序执行和相邻的并行组。被 steering 打断的模型流在重建可续接消息时排除工具块和 reasoning 块，避免续用不完整 JSON 或无签名推理；这不等于整个产品从未保存/显示过这些增量。织台应保留可查看的中断事实，再单独决定续接输入。
+[agents/agent-runtime.ts](https://github.com/cline/cline/blob/8eee168b80127b0c94bad849323754b5864865e7/sdk/packages/agents/src/agent-runtime.ts) 在模型流中累积工具参数，再统一 `parseToolInput()`；`executeToolCalls()` 支持顺序执行和相邻的并行组。被 steering 打断的模型流在重建可续接消息时排除工具块和 reasoning 块，避免续用不完整 JSON 或无签名推理；这不等于整个产品从未保存/显示过这些增量。工坊应保留可查看的中断事实，再单独决定续接输入。
 
-其分叉路径 [apps/cli/src/runtime/interactive/session-runtime.ts](https://github.com/cline/cline/blob/8eee168b80127b0c94bad849323754b5864865e7/apps/cli/src/runtime/interactive/session-runtime.ts) 的 `forkCurrentSession()` 以源消息作为 `initialMessages` 创建新会话；没有据此认定其与织台共享前缀事件的分支语义相同。
+其分叉路径 [apps/cli/src/runtime/interactive/session-runtime.ts](https://github.com/cline/cline/blob/8eee168b80127b0c94bad849323754b5864865e7/apps/cli/src/runtime/interactive/session-runtime.ts) 的 `forkCurrentSession()` 以源消息作为 `initialMessages` 创建新会话；没有据此认定其与工坊共享前缀事件的分支语义相同。
 
 **已核验的模块分工**：`llms/providers` 管 handler、注册和 AI SDK 转换，`core/runtime/config` 管运行时 codec，`core/session` 管会话服务，`core/services/storage` 管存储设施。
 
@@ -114,7 +114,7 @@ type AgentMessage = Message | CustomAgentMessages[keyof CustomAgentMessages];
 
 [stream_events_utils.rs](https://github.com/openai/codex/blob/a933dd77dbe101d7bd746ea3c7d1f8174eca4a05/codex-rs/core/src/stream_events_utils.rs) 的 `handle_output_item_done()` 在生成工具执行任务前先保存调用；[session/turn.rs](https://github.com/openai/codex/blob/a933dd77dbe101d7bd746ea3c7d1f8174eca4a05/codex-rs/core/src/session/turn.rs) 消费流、等待工具收束、保存结果并决定是否继续请求。工具可以在响应整体结束前启动，前提是对应调用项目已完成；与“半截参数直接执行”是不同事情。
 
-[rollout/recorder.rs](https://github.com/openai/codex/blob/a933dd77dbe101d7bd746ea3c7d1f8174eca4a05/codex-rs/rollout/src/recorder.rs) 管 JSONL 追加；[thread_manager.rs](https://github.com/openai/codex/blob/a933dd77dbe101d7bd746ea3c7d1f8174eca4a05/codex-rs/core/src/thread_manager.rs) 管恢复和分叉，`ForkPersistence` 区分 copied/referenced。它说明模型记录、轮次状态、存储 IO 可以分工；不意味着织台应照搬 Responses 形状或 JSONL。
+[rollout/recorder.rs](https://github.com/openai/codex/blob/a933dd77dbe101d7bd746ea3c7d1f8174eca4a05/codex-rs/rollout/src/recorder.rs) 管 JSONL 追加；[thread_manager.rs](https://github.com/openai/codex/blob/a933dd77dbe101d7bd746ea3c7d1f8174eca4a05/codex-rs/core/src/thread_manager.rs) 管恢复和分叉，`ForkPersistence` 区分 copied/referenced。它说明模型记录、轮次状态、存储 IO 可以分工；不意味着工坊应照搬 Responses 形状或 JSONL。
 
 ### Vercel AI SDK
 
@@ -124,17 +124,17 @@ type AgentMessage = Message | CustomAgentMessages[keyof CustomAgentMessages];
 
 [convert-to-model-messages.ts](https://github.com/vercel/ai/blob/45e1fbc3ea10d22f852e12b1c1851e289c85e835/packages/ai/src/ui/convert-to-model-messages.ts) 区分 UI data part 与模型内容，并允许 `convertDataPart`。这提供转换机制，但不替应用定义每种自定义内容是否应发送、如何持久化、如何授权。
 
-## 6. 织台采用的边界
+## 6. 工坊采用的边界
 
-源码事实保留在前五节，织台最终契约以 [会话与单代理能力](conversation-core.md)、[运行时](runtime.md) 和 [决策](decisions.md) 为准。
+源码事实保留在前五节，工坊最终契约以 [会话与单代理能力](conversation-core.md)、[运行时](runtime.md) 和 [决策](decisions.md) 为准。
 
 - 借鉴 pi 的协议适配、循环与会话管理分层；一次响应对应一个模型节点，节点树支持历史查看与分支。
 - 借鉴事件投影方式：流片段、工具结果和终态只追加，节点状态可重建。
 - 工具调用与结果聚合在节点内部；模型与 GUI 独立投影，不照搬 TUI 渲染结构。
-- AI SDK 负责请求和协议解码，织台负责轮次、冻结授权、工具批次与持久化。
+- AI SDK 负责请求和协议解码，工坊负责轮次、冻结授权、工具批次与持久化。
 - SQLite 与对象存储继续拥有任务历史，不引入第三方会话文件作为另一份真值。
 - provider 不透明数据按白名单、作用域和适配版本保存；不静默将不兼容思考降级为正文。
 
 ## 7. 调查限制
 
-固定源码调查没有完整核验所有 UI/CLI 路由、fork/compaction 情形及 provider 兼容性。OpenCode V2 未完成项不当作已交付能力；Cline 持久化文档需和实际 writer/codec 联合解释。前五节的源码调查不代表真实端点或第三方项目性能、崩溃恢复已经运行验证。织台自身实现与测试状态见 [模型接入计划](../plans/todo-2026-10-01-model-protocol-storage.md)。
+固定源码调查没有完整核验所有 UI/CLI 路由、fork/compaction 情形及 provider 兼容性。OpenCode V2 未完成项不当作已交付能力；Cline 持久化文档需和实际 writer/codec 联合解释。前五节的源码调查不代表真实端点或第三方项目性能、崩溃恢复已经运行验证。工坊自身实现与测试状态见 [模型接入计划](../plans/todo-2026-10-01-model-protocol-storage.md)。

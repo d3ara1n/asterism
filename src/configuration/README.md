@@ -12,7 +12,7 @@
 | `probe.ts` | 三种显式 SDK 协议实例，简短连通请求和脱敏错误分类 |
 | `defaults.ts` | 五种模型角色、五种 agent 的内置原始定义；不导入本机模型或凭据 |
 
-入口为 `window.weft.configuration.execute`，经 preload/main 校验转入任务进程。响应只有配置快照、保存 ID 或固定错误，不携带密钥或密文。配置修改不触发会话重载或级联刷新；选择与实际消费通过 `resolveProviderModel` / `resolveModelRole` 检查配置。
+入口为 `window.host.configuration.execute`，经 preload/main 校验转入任务进程。响应只有配置快照、保存 ID 或固定错误，不携带密钥或密文。配置修改不触发会话重载或级联刷新；选择与实际消费通过 `resolveProviderModel` / `resolveModelRole` 检查配置。
 
 角色/代理保存命令提交完整的用户覆盖集合，省略字段即撤下该字段的覆盖；非空文本覆盖、说明与提示词留空恢复内置，false/null/空列表保留业务含义。工具允许/排除列表作为一组互斥策略替换，列表不拼接。新自定义角色与代理只继承内置原始 default/worker，不受用户修改这两项影响。
 

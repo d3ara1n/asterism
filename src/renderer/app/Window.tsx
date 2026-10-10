@@ -17,7 +17,7 @@ const geometry = {
  * 原生材质由主进程绘制；本层无不透明底色。全屏或浮动标题栏只改这里两者的排布。
  */
 export function Window({ titlebar, children, skipTarget }: { titlebar: ReactNode; children: ReactNode; skipTarget: string }) {
-  return <main className="window" data-platform={window.weft.platform} style={geometry}>
+  return <main className="window" data-platform={window.host.platform} style={geometry}>
     <a href={`#${skipTarget}`} className="skip-link">{t.skipToContent}</a>
     {titlebar}
     {children}

@@ -11,7 +11,7 @@ import { configurationDefaults, resolveAgentConfiguration, resolveRoleConfigurat
 const cleanups: (() => void)[] = [];
 afterEach(() => { cleanups.splice(0).reverse().forEach(cleanup => cleanup()); vi.useRealTimers(); });
 function setup(probe: ConnectionProbe = async () => {}, available = true, timeout = 30_000) {
-  const root = mkdtempSync(join(tmpdir(), "weft-configuration-"));
+  const root = mkdtempSync(join(tmpdir(), "core-configuration-"));
   const ciphertexts = new Map<string, string>();
   const protector = {
     available: async () => available,

@@ -8,7 +8,7 @@ import { implement, type CallResult } from "../tools/contract.ts";
 import { ToolRegistry } from "../tools/registry.ts";
 import { ResourceRegistry } from "../resources/registry.ts";
 import { AgentCapabilities } from "./capabilities.ts";
-import { executeWeftBatch, type ToolObserver } from "./weft.ts";
+import { executeCoreBatch, type ToolObserver } from "./core.ts";
 
 const contract = defineImplementation({
   ...defineData("test.stream", 1, z.strictObject({ text: z.string() }).describe("Current captured text.")),
@@ -26,7 +26,7 @@ async function run(handler: Handler, options: { effect?: "read" | "write"; signa
   });
   const capabilities = new AgentCapabilities(new ResourceRegistry([]), new ToolRegistry([tool]), [resource], () => true);
   const results: ToolOutcome[] = [];
-  await executeWeftBatch([call], capabilities, options.signal ?? new AbortController().signal, (_call, result) => results.push(result), options.observer);
+  await executeCoreBatch([call], capabilities, options.signal ?? new AbortController().signal, (_call, result) => results.push(result), options.observer);
   expect(results).toHaveLength(1);
   return results[0]!;
 }

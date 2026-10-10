@@ -3,6 +3,9 @@ import { modelSchema, providerInputSchema, thinkingSchema } from "./configuratio
 export { jsonSchema, type Json } from "./json.ts";
 export { toolOutcomeSchema, type ToolOutcome } from "./tool-result.ts";
 
+/** SDK 需要非空凭据占位；无鉴权请求在传输层移除认证头。 */
+export const unauthenticatedApiKey = "no-auth";
+
 const id = z.string().min(1).max(160);
 export const usageSchema = z.strictObject({
   input: z.number().nonnegative().nullable(), output: z.number().nonnegative().nullable(),

@@ -5,7 +5,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { commandChannel, commandSchema, pickDirectoryChannel, statusChannel, type CommandResult } from "../shared/contracts.ts";
 import { RuntimeHost } from "./runtime-host.ts";
-import { applicationId } from "../shared/desktop.ts";
+import { applicationBrand, applicationDataDirectory, applicationId, applicationStorage } from "../shared/application.ts";
 import { followWindowAppearance, initialWindowAppearance } from "./window-appearance.ts";
 import { applyThemeSource, serveAppearance } from "./appearance.ts";
 import { initialWindowState, trackWindowState } from "./window-state.ts";
@@ -33,7 +33,7 @@ function createWindow(): void {
   trustedURL = allowedURL.split("#")[0]!;
   const state = initialWindowState();
   window = new BrowserWindow({
-    ...state.bounds, minWidth: state.minWidth, minHeight: state.minHeight, title: "Weft",
+    ...state.bounds, minWidth: state.minWidth, minHeight: state.minHeight, title: applicationBrand.en,
     ...initialWindowAppearance(),
     autoHideMenuBar: true,
     webPreferences: {
@@ -94,18 +94,19 @@ function createWindow(): void {
     window = null; ipcMain.removeHandler(commandChannel); ipcMain.removeHandler(configurationChannel); ipcMain.removeHandler(sessionChannel); ipcMain.removeHandler(pickDirectoryChannel); stopAppearance();
   });
   const loading = developmentURL ? current.loadURL(developmentURL) : current.loadFile(rendererFile);
-  loading.catch(error => { console.error("Renderer initialization failed.", error); dialog.showErrorBox("Weft", "The application window could not be loaded."); });
+  loading.catch(error => { console.error("Renderer initialization failed.", error); dialog.showErrorBox(applicationBrand.en, "The application window could not be loaded."); });
 }
 
-app.setName("Weft");
+app.setName(applicationBrand.en);
 if (process.platform === "win32") app.setAppUserModelId(applicationId);
-// 数据位置在获取单实例锁之前确定，开发版与发布版分别持有锁。
-if (!app.isPackaged) app.setPath("userData", join(app.getPath("appData"), "Weft-development"));
+// 两种构建都显式取固定身份目录；先建目录，再设置路径和获取单实例锁。
+const dataRoot = join(app.getPath("appData"), applicationDataDirectory(app.isPackaged));
+mkdirSync(dataRoot, { recursive: true });
+app.setPath("userData", dataRoot);
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
-  const dataRoot = app.getPath("userData");
-  const sessionRoot = join(dataRoot, "chromium");
+  const sessionRoot = join(dataRoot, applicationStorage.chromiumDirectory);
   mkdirSync(sessionRoot, { recursive: true });
   app.setPath("sessionData", sessionRoot);
   app.on("second-instance", () => {
@@ -125,7 +126,7 @@ if (!app.requestSingleInstanceLock()) {
     try { await runtime.start(join(here, "runtime.js"), dataRoot); }
     catch (error) {
       console.error("Application startup failed.", error);
-      dialog.showErrorBox("Weft", error instanceof Error ? error.message : "The workspace could not be opened.");
+      dialog.showErrorBox(applicationBrand.en, error instanceof Error ? error.message : "The workspace could not be opened.");
     }
     if (!quitting) createWindow();
     app.on("activate", () => { if (!quitting && BrowserWindow.getAllWindows().length === 0) createWindow(); });

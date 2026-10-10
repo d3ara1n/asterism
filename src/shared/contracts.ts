@@ -1,13 +1,14 @@
 import { z } from "zod";
+import { coreChannel } from "./core.ts";
 import type { ConfigurationBridge } from "./configuration.ts";
 import type { DesktopPlatform } from "./desktop.ts";
 import type { AppearanceBridge } from "./theme.ts";
 import type { SessionBridge } from "./session.ts";
 
 export const protocolVersion = 4;
-export const commandChannel = "weft:command";
-export const statusChannel = "weft:runtime-status";
-export const pickDirectoryChannel = "weft:pick-directory";
+export const commandChannel = coreChannel("command");
+export const statusChannel = coreChannel("runtime-status");
+export const pickDirectoryChannel = coreChannel("pick-directory");
 const id = z.string().uuid();
 /** 应用入口只读取工作区身份和会话摘要，不持有已打开会话的正文。 */
 export const commandSchema = z.strictObject({ type: z.literal("workspace.read") });

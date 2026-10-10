@@ -1,7 +1,8 @@
 import { z } from "zod";
+import { coreChannel } from "./core.ts";
 
-export const configurationChannel = "weft:configuration";
-export const configurationChangedChannel = "weft:configuration-changed";
+export const configurationChannel = coreChannel("configuration");
+export const configurationChangedChannel = coreChannel("configuration-changed");
 export const configurationVersion = 1;
 const id = z.string().min(1).max(160);
 const name = z.string().trim().min(1).max(160);

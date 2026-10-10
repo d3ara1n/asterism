@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
 import { AnimatePresence, LayoutGroup, motion } from "motion/react";
 import { ArrowLeft, Info, Palette, Cpu, PlugZap, Bot, type LucideProps } from "lucide-react";
-import { applicationId } from "../../../shared/desktop";
+import { applicationId } from "../../../shared/application";
 import { t } from "../../shared/i18n";
 import { Button } from "../../shared/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "../../shared/ui/card";

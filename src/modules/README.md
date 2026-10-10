@@ -18,9 +18,9 @@
 
 工具通过 `defineTool({ name, description, guidelines, argsSchema })` 定义。`description` 说明能力与适用场景，供模型挑选；`guidelines` 说明选定后的使用规则、示例和跨工具配合，允许为空数组；`argsSchema` 固定操作参数及其含义。不另设 snippet。
 
-`tools/declarations.ts` 是内置共享定义的位置，包含 `List / Read / Edit / Write`。模块可在自己的纯契约文件声明独特工具，也可导出给其他模块引用；多个模块共用的契约可抽到共享库，不必修改 Weft 内置定义。相同工具复用同一份完整契约；用法或行为含义不同就定义另一工具，不在实现中覆写 description 或 guidelines。
+`tools/declarations.ts` 是内置共享定义的位置，包含 `List / Read / Edit / Write`。模块可在自己的纯契约文件声明独特工具，也可导出给其他模块引用；多个模块共用的契约可抽到共享库，不必修改 Atelier 内置定义。相同工具复用同一份完整契约；用法或行为含义不同就定义另一工具，不在实现中覆写 description 或 guidelines。
 
-一级 Weft 入口在 `tools/weft.ts` 声明，同样使用 ToolContract 和 defineTool；`execution/weft.ts` 固定装配执行器，不将入口注册到资源工具目录。`tools/definition.ts` 统一投影定义：一级入口将 guidelines 合入 provider 的 description，二级工具在链接说明与 inspect 中提供结构化 description、guidelines 和 args schema。注册与执行路径决定工具层级。
+一级宿主入口在 `tools/core.ts` 声明，同样使用 ToolContract 和 defineTool；`execution/core.ts` 固定装配执行器，不将入口注册到资源工具目录。`tools/definition.ts` 统一投影定义：一级入口将 guidelines 合入 provider 的 description，二级工具在链接说明与 inspect 中提供结构化 description、guidelines 和 args schema。注册与执行路径决定工具层级。
 
 下面是一个可由多个模块引用的纯工具定义示例：
 
@@ -44,13 +44,13 @@ export const Search = defineTool({
 
 handler 的 context 提供 `signal / resource / publish(data)`。publish 发布当前完整产出，使用与最终 data 相同的 schema；快照通过校验后替换最近的产出，经会话进度送到 UI，不写历史或交给模型。尚未确定的字段用 schema 中明确的 null 或阶段联合表达，不使用 `Partial<最终成功结果>` 绕过校验。工具完成时返回 CallResult；成功/部分完成必须提供 data，失败/拒绝/取消/未知结局可省略 data 以保留最近产出，显式 null 则清空。终结后 publish 失效。
 
-工具应在结束前收束自己的事件监听与子进程；回调失效不等于停止底层操作。运行时在异常路径保留最后合法产出，只读中止记 cancelled，无法确认写入影响记 unknown；不因为收到了 abort 信号就宣称写入已撤销。连续产出、终结与取消的完整用例见 [工具执行契约测试](../execution/weft.test.ts)。
+工具应在结束前收束自己的事件监听与子进程；回调失效不等于停止底层操作。运行时在异常路径保留最后合法产出，只读中止记 cancelled，无法确认写入影响记 unknown；不因为收到了 abort 信号就宣称写入已撤销。连续产出、终结与取消的完整用例见 [工具执行契约测试](../execution/core.test.ts)。
 
 args、target、result schema 必须有非空的整体 description，声明 helper 在定义时检查；各字段也应说明类型、定位基准、空值、限制与结果含义，描述随 JSON Schema 投影。target/result 的说明由资源实现提供，不重复共享工具用法。
 
 注册边界负责校验资源状态、target、args 和返回数据。一个资源类型与工具名只能有一个当前实现；同名工具的 description、guidelines、args schema（含描述）及读写属性必须一致，target/result 可以不同。实现有独立 ID/版本；更改已保存结果的形状或含义时增加版本。读写副作用与并行/顺序策略属于执行信息，调度器据此执行和分类失败。
 
-外部授权位于 `execution/`：请求开始时按已链接资源匹配工具，再应用 agent.tools/excludeTools。资源实例不持有工具白名单。Weft 固定入口 resource_list/inspect/call 不注册到工具目录。
+外部授权位于 `execution/`：请求开始时按已链接资源匹配工具，再应用 agent.tools/excludeTools。资源实例不持有工具白名单。宿主固定入口 resource_list/inspect/call 不注册到工具目录。
 
 ### 调用说明与错误自愈
 
@@ -82,7 +82,7 @@ args、target、result schema 必须有非空的整体 description，声明 help
 
 header 按单行摘要设计，由 renderer 自行安排内容、排列和省略；这是设计规范，外壳不设置高度上限或强制裁切。工具 header 可复用 `renderer/shared/tool-header.tsx` 的 ToolHeader，组合操作名、可收缩的资源名称或路径及右侧摘要；长文本末尾省略，数量与类型不换行。header 不嵌套交互控件，正文渲染独立。
 
-三个 Weft 固定入口在 `renderer/features/conversation/tool-views.tsx` 内置，不进入模块注册面。resource_call 的适配器将完整内层参数、选定实现身份和同一结果交给 ViewRegistry，直接采用二级工具的图标与两个视图入口；不新增外层折叠框。
+三个宿主固定入口在 `renderer/features/conversation/tool-views.tsx` 内置，不进入模块注册面。resource_call 的适配器将完整内层参数、选定实现身份和同一结果交给 ViewRegistry，直接采用二级工具的图标与两个视图入口；不新增外层折叠框。
 
 前端目录在应用根通过 ModuleViewsProvider 注入。卡片和对话只消费目录接口，不能导入模块总表，否则会形成“总表 → 代理卡片 → 对话 → 总表”的依赖环。
 

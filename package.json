@@ -1,9 +1,9 @@
 {
-  "name": "weft",
+  "name": "atelier",
   "private": true,
   "license": "MIT",
   "version": "0.1.0",
-  "description": "An object-centered personal agent workbench",
+  "description": "A local-first AI workshop for agents, resources, and work in progress",
   "author": "Chien Zhang",
   "main": "dist/main/index.js",
   "type": "module",

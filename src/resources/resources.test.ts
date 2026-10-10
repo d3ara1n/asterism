@@ -10,7 +10,7 @@ import { defineImplementation, defineTool } from "../shared/module-contract.ts";
 import { implement } from "../tools/contract.ts";
 import { ToolRegistry } from "../tools/registry.ts";
 import { AgentCapabilities, agentToolPolicy } from "../execution/capabilities.ts";
-import { executeWeftBatch, weftDeclarations } from "../execution/weft.ts";
+import { executeCoreBatch, coreDeclarations } from "../execution/core.ts";
 import { ObjectStore } from "../runtime/storage.ts";
 import type { Json, ToolOutcome } from "../shared/model.ts";
 import type { FoldedObject } from "../session/fold.ts";
@@ -20,7 +20,7 @@ const signal = new AbortController().signal;
 const unrestricted = { tools: null, excludeTools: null };
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
 function setup() {
-  const base = mkdtempSync(join(tmpdir(), "weft-res-")); roots.push(base);
+  const base = mkdtempSync(join(tmpdir(), "core-res-")); roots.push(base);
   const root = join(base, "root");
   const outside = join(base, "outside");
   mkdirSync(root); mkdirSync(outside);
@@ -36,7 +36,7 @@ function setup() {
 }
 async function invoke(capabilities: AgentCapabilities, name: string, args: Json): Promise<ToolOutcome> {
   const results: ToolOutcome[] = [];
-  await executeWeftBatch([{ callId: "call", name, arguments: args }], capabilities, signal, (_call, outcome) => results.push(outcome));
+  await executeCoreBatch([{ callId: "call", name, arguments: args }], capabilities, signal, (_call, outcome) => results.push(outcome));
   expect(results).toHaveLength(1);
   return results[0]!;
 }
@@ -181,8 +181,8 @@ describe("工具与资源的匹配及授权", () => {
       .toMatchObject({ kind: "succeeded" });
     expect(await invoke(capabilities, "resource_call", { resource_id: resource.id, tool: "read", args: {} }))
       .toMatchObject({ kind: "rejected", error: { code: "tool_unavailable" } });
-    expect(weftDeclarations().map(action => action.name)).toEqual(["resource_list", "resource_inspect", "resource_call"]);
-    expect(weftDeclarations().find(action => action.name === "resource_call")?.description)
+    expect(coreDeclarations().map(action => action.name)).toEqual(["resource_list", "resource_inspect", "resource_call"]);
+    expect(coreDeclarations().find(action => action.name === "resource_call")?.description)
       .toContain("Follow the selected tool's guidelines");
   });
 
@@ -195,7 +195,7 @@ describe("工具与资源的匹配及授权", () => {
       .toMatchObject({ kind: "rejected", error: { code: "tool_unavailable" } });
   });
 
-  it("禁用所有工具时 Weft 列举与 inspect 仍可用；一级入口名字不授权实际工具", async () => {
+  it("禁用所有工具时宿主列举与 inspect 仍可用；一级入口名字不授权实际工具", async () => {
     const { resource, scope } = setup();
     for (const tools of [[], ["resource_call"]]) {
       const capabilities = scope([resource], { tools, excludeTools: null });
@@ -222,11 +222,11 @@ describe("工具与资源的匹配及授权", () => {
     const controller = new AbortController();
     controller.abort();
     const results: ToolOutcome[] = [];
-    await executeWeftBatch([{ callId: "cancelled", name: "resource_call",
+    await executeCoreBatch([{ callId: "cancelled", name: "resource_call",
       arguments: { resource_id: resource.id, tool: "list", args: {} } }],
     scope(), controller.signal, (_call, result) => results.push(result));
     expect(results).toMatchObject([{
-      kind: "cancelled", message: "The operation was not started.", implementation: { id: "weft.directory.list", version: 1 },
+      kind: "cancelled", message: "The operation was not started.", implementation: { id: "core.directory.list", version: 1 },
       data: null, model: { kind: "cancelled", data: null, message: "The operation was not started." },
     }]);
     expect(results[0]).not.toHaveProperty("startedAt");
@@ -250,7 +250,7 @@ describe("工具与资源的匹配及授权", () => {
     })]);
     const capabilities = new AgentCapabilities(resources, tools, [resource], () => true);
     const results: ToolOutcome[] = [];
-    await executeWeftBatch(["a", "b"].map(id => ({ callId: id, name: "resource_call",
+    await executeCoreBatch(["a", "b"].map(id => ({ callId: id, name: "resource_call",
       arguments: { resource_id: resource.id, tool: "work", args: { id } } })), capabilities, signal, (_call, outcome) => results.push(outcome));
     expect(results.map(result => result.kind)).toEqual(["succeeded", "succeeded"]);
     expect(order).toEqual(execution === "parallel" ? ["start:a", "start:b", "end:a", "end:b"] : ["start:a", "end:a", "start:b", "end:b"]);

@@ -1,10 +1,12 @@
 import Store from "electron-store";
+import { app } from "electron";
+import { applicationStorage } from "../shared/application.ts";
 import { parseUiState, type UiState, type UiStateKey } from "../shared/ui-state.ts";
 
 /** 界面状态统一存于 userData 下的 ui-state.json；electron-store 负责原子写入。 */
 let store: Store<Partial<UiState>> | null = null;
 function open(): Store<Partial<UiState>> {
-  store ??= new Store<Partial<UiState>>({ name: "ui-state", clearInvalidConfig: true });
+  store ??= new Store<Partial<UiState>>({ cwd: app.getPath("userData"), name: applicationStorage.uiStateStore, clearInvalidConfig: true });
   return store;
 }
 

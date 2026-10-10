@@ -14,7 +14,7 @@ import { moduleViews } from "../modules/renderer";
 document.documentElement.lang = locale === "zh" ? "zh-CN" : "en";
 
 startAppearance();
-const controller = new ApplicationController(window.weft);
+const controller = new ApplicationController(window.host);
 createRoot(document.getElementById("root")!).render(<StrictMode><ErrorBoundary><MotionConfig reducedMotion="user"><TooltipProvider>
   <ModuleViewsProvider registry={moduleViews}><App controller={controller} /></ModuleViewsProvider>
 </TooltipProvider></MotionConfig></ErrorBoundary></StrictMode>);

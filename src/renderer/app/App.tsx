@@ -4,7 +4,7 @@ import { ArrowLeft, ChevronDown, Plus, History, House, KeyRound, ListTree, Panel
 import type { ApplicationController } from "./controller";
 import { t } from "../shared/i18n";
 import { Button } from "../shared/ui/button";
-import { WeftMark } from "../shared/ui/weft-mark";
+import { BrandMark } from "../shared/ui/brand-mark";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "../shared/ui/dropdown-menu";
 import { PageState } from "../shared/ui/page-state";
 import { Alert, AlertDescription } from "../shared/ui/alert";
@@ -141,7 +141,7 @@ export function App({ controller }: { controller: ApplicationController }) {
       onClick={() => setSidebarVisible(visible => !visible)}><PanelLeft /></Button>}
     {inSettings ? <Button variant="ghost" size="sm" onClick={() => go("main")}><ArrowLeft />{t.back}</Button> :
       <DropdownMenu modal={false}><DropdownMenuTrigger asChild><Button variant="ghost" size="sm" aria-label={t.menu}>
-        <WeftMark className="size-4 text-primary" /><span className="text-sm font-semibold text-primary">{t.appName}</span><ChevronDown className="text-muted-foreground" />
+        <BrandMark className="size-4 text-primary" /><span className="text-sm font-semibold text-primary">{t.appName}</span><ChevronDown className="text-muted-foreground" />
       </Button></DropdownMenuTrigger><DropdownMenuContent align="start">
         <DropdownMenuItem onSelect={goHome}><House />{t.home}</DropdownMenuItem>
         <DropdownMenuSeparator />
@@ -230,7 +230,7 @@ function useStart() {
     if (pending.current) return null;
     pending.current = true; setBusy(true); setError(null);
     try {
-      const result = await window.weft.session.execute({ type: "start", ...input, submissionId: identity.current.forInput(input) });
+      const result = await window.host.session.execute({ type: "start", ...input, submissionId: identity.current.forInput(input) });
       if (!result.ok) { setError(result.error.message); return null; }
       if (result.reply.kind !== "accepted") throw new Error("Invalid session receipt.");
       identity.current.accepted();

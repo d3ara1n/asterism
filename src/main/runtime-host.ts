@@ -1,4 +1,5 @@
 import { utilityProcess, type UtilityProcess } from "electron";
+import { applicationBrand, applicationStorage } from "../shared/application.ts";
 import { createWriteStream, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { runtimeMessageSchema, type Command, type CommandResult, type RuntimeStatus } from "../shared/contracts.ts";
@@ -19,13 +20,13 @@ export class RuntimeHost {
   private setStatus(status: RuntimeStatus): void { this.status = status; this.onStatus(status); }
 
   start(entry: string, root: string): Promise<void> {
-    mkdirSync(join(root, "logs"), { recursive: true });
-    const log = createWriteStream(join(root, "logs", "runtime.log"), { flags: "a", mode: 0o600 });
+    mkdirSync(join(root, applicationStorage.logsDirectory), { recursive: true });
+    const log = createWriteStream(join(root, applicationStorage.logsDirectory, applicationStorage.runtimeLogFile), { flags: "a", mode: 0o600 });
     // 流错误必须有监听器，不能把日志故障变成未捕获异常。
     log.on("error", error => console.error("Runtime log write failed.", error));
     let child: UtilityProcess;
     try {
-      child = utilityProcess.fork(entry, [root], { serviceName: "Weft task runtime", stdio: "pipe" });
+      child = utilityProcess.fork(entry, [root], { serviceName: `${applicationBrand.en} task runtime`, stdio: "pipe" });
     } catch (error) {
       log.end();
       this.setStatus("unavailable");
@@ -111,30 +112,30 @@ export class RuntimeHost {
 
   execute(command: Command): Promise<CommandResult> {
     if (this.status !== "ready" || !this.requests) return Promise.resolve({
-      ok: false, error: { code: "unavailable", message: "The workspace is unavailable. Restart Weft to reopen it." },
+      ok: false, error: { code: "unavailable", message: `The workspace is unavailable. Restart ${applicationBrand.en} to reopen it.` },
     });
     return this.requests.execute(command);
   }
 
   configure(command: ConfigurationCommand): Promise<ConfigurationResult> {
     if (this.status !== "ready" || !this.configurationRequests) return Promise.resolve({
-      ok: false, error: { code: "unavailable", message: "Configuration service is unavailable. Restart Weft." },
+      ok: false, error: { code: "unavailable", message: `Configuration service is unavailable. Restart ${applicationBrand.en}.` },
     });
     return this.configurationRequests.execute(command);
   }
 
   session(command: SessionCommand): Promise<SessionResult> {
     if (this.status !== "ready" || !this.sessionRequests) return Promise.resolve({
-      ok: false, error: { code: "unavailable", message: "Session service is unavailable. Restart Weft." },
+      ok: false, error: { code: "unavailable", message: `Session service is unavailable. Restart ${applicationBrand.en}.` },
     });
     return this.sessionRequests.execute(command);
   }
 
   stop(): Promise<void> {
     this.setStatus("stopping");
-    this.requests?.close("Weft is shutting down.");
-    this.configurationRequests?.close("Weft is shutting down.");
-    this.sessionRequests?.close("Weft is shutting down.");
+    this.requests?.close(`${applicationBrand.en} is shutting down.`);
+    this.configurationRequests?.close(`${applicationBrand.en} is shutting down.`);
+    this.sessionRequests?.close(`${applicationBrand.en} is shutting down.`);
     const child = this.child;
     if (!child) return Promise.resolve();
     return new Promise(resolve => {

@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { applicationBrand } from "../shared/application.ts";
 import { protocolVersion, runtimeMessageSchema, type Command, type CommandResult } from "../shared/contracts.ts";
 import { configurationVersion, configurationResponseSchema, type ConfigurationCommand, type ConfigurationResult } from "../shared/configuration.ts";
 import { sessionResponseSchema, sessionVersion, type SessionCommand, type SessionResult } from "../shared/session.ts";
@@ -12,16 +13,16 @@ class PendingRequests<C, R> {
     private readonly decode: (raw: unknown) => { id: string; result: R } | null,
     private readonly unavailable: (message: string) => R, private readonly timeoutMs: number) {}
   execute(command: C): Promise<R> {
-    if (!this.available) return Promise.resolve(this.unavailable("The task runtime is unavailable. Restart Weft to reopen the workspace."));
+    if (!this.available) return Promise.resolve(this.unavailable(`The task runtime is unavailable. Restart ${applicationBrand.en} to reopen the workspace.`));
     return new Promise(resolve => {
       const id = randomUUID();
       const timer = setTimeout(() => {
-        this.close("The runtime stopped responding. The command may have completed; restart Weft and inspect the workspace before retrying.");
+        this.close(`The runtime stopped responding. The command may have completed; restart ${applicationBrand.en} and inspect the workspace before retrying.`);
         this.onTimeout();
       }, this.timeoutMs);
       this.pending.set(id, { resolve, timer });
       try { this.send(this.encode(id, command)); }
-      catch { this.close("The task runtime disconnected. Restart Weft before retrying."); }
+      catch { this.close(`The task runtime disconnected. Restart ${applicationBrand.en} before retrying.`); }
     });
   }
   receive(raw: unknown): void {
@@ -31,7 +32,7 @@ class PendingRequests<C, R> {
     if (!request) return;
     clearTimeout(request.timer); this.pending.delete(response.id); request.resolve(response.result);
   }
-  close(message = "The task runtime has stopped. Restart Weft to reopen the workspace."): void {
+  close(message = `The task runtime has stopped. Restart ${applicationBrand.en} to reopen the workspace.`): void {
     this.available = false;
     for (const request of this.pending.values()) { clearTimeout(request.timer); request.resolve(this.unavailable(message)); }
     this.pending.clear();

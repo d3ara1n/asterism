@@ -2,7 +2,7 @@ import { AiSdkAdapter } from "../../model/ai-sdk.ts";
 import { ModelFailure } from "../../model/contract.ts";
 import { composeSystemPrompt } from "../../model/system-prompt.ts";
 import { runAgent, type RequestEnvironment } from "../../execution/loop.ts";
-import { weftDeclarations } from "../../execution/weft.ts";
+import { coreDeclarations } from "../../execution/core.ts";
 import { agentToolPolicy } from "../../execution/capabilities.ts";
 import { implementResource, type ResourceController } from "../../resources/contract.ts";
 import { projectForAgent } from "../../session/projection.ts";
@@ -119,7 +119,7 @@ class AgentController implements ResourceController {
           if (command.type === "submit") messages.push({ kind: "input", text: command.text });
           try {
             environment.adapter.prepare({ settings: environment.settings, system: composeSystemPrompt(environment.agent), messages,
-              tools: environment.settings.model.capabilities.tools ? weftDeclarations() : [] });
+              tools: environment.settings.model.capabilities.tools ? coreDeclarations() : [] });
           } catch (error) {
             throw new SessionError("invalid_request", error instanceof ModelFailure ? error.message : "The model request cannot be prepared.");
           }
