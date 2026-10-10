@@ -74,7 +74,7 @@ args、target、result schema 必须有非空的整体 description，声明 help
 
 `RendererModule.resources` 按资源类型声明静态 `kind / label / icon`，label 在模块中使用应用本地化文案。`ViewRegistry.resource(kind)` 不解析正文、不构造 Body，向对象目录、历史、授权、添加入口和卡片外壳提供同一份识别信息；未知类型回退为通用资源。类型身份重复注册会被拒绝。描述不随实例存储，不包含动态能力与授权。
 
-`cardRenderer(DirectoryView, …)` 使用卡片契约推导 data 类型。卡片提供尺寸、Body、可选 Actions；ObjectCard 统一处理框架、拖动、折叠与关闭，ObjectActions 提供对象移除入口。模块不重建这套外壳。
+`cardRenderer(DirectoryView, …)` 使用卡片契约推导 data 类型。卡片提供默认 width/height、可选 minWidth/minHeight、Body 和可选 Actions；宽高使用画布单位，未声明下限时使用公共下限。工作台统一处理缩放、尺寸覆盖和保存，ObjectCard 处理框架、标题栏拖动、折叠与关闭，ObjectActions 提供尺寸预设、恢复默认与对象移除入口。模块不重建这套外壳。Body 使用可伸缩的内容区，溢出时在内部滚动；媒体视图可在内容区按比例适配，外框尺寸不强制锁定比例。
 
 `RendererModule.tools` 注册 `toolRenderer(DirectoryList, { label, icon, headerRenderer?, bodyRenderer? })`。两个 renderer 是独立可选的 React 组件，接收同一份 `ToolRenderProps`：phase、name、target、args、invocation 与 result；实现契约推导并校验 target、args、data 类型。result 为 null 表示尚未执行；运行中为 `{kind: "running", data}`，终结后沿用 data 并携带具体结局。invocation 包含当次资源身份与可用的开始/结束时间。header 可只依据调用信息渲染，也可随 data 更新；只输出摘要内容，不嵌套按钮等交互控件。
 

@@ -43,7 +43,7 @@ export type NewNode = SessionNode extends infer N ? N extends SessionNode ? Omit
 // ---- 会话能力接口 ----
 const uuid = z.string().uuid();
 const text = z.string().trim().min(1).max(100_000);
-export const sessionVersion = 8;
+export const sessionVersion = 9;
 export const viewPositionSchema = z.discriminatedUnion("kind", [
   z.strictObject({ kind: z.literal("live") }),
   z.strictObject({ kind: z.literal("history"), nodeId: id.nullable() }),

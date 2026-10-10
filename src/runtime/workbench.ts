@@ -8,7 +8,7 @@ import type { Json } from "../shared/json.ts";
 import type { SessionNode } from "../shared/session.ts";
 import { workbenchSnapshotSchema, type WorkbenchCommand, type WorkbenchSnapshot, type Point, type Viewport } from "../shared/workbench.ts";
 
-type ViewRow = { object_id: string; x: number; y: number; hidden: number; collapsed: number };
+type ViewRow = { object_id: string; x: number; y: number; hidden: number; collapsed: number; width: number | null; height: number | null };
 
 /** 会话的资源事件与独立布局；由会话入口统一事务和通知，不拥有查看位置。 */
 export class SessionWorkbench {
@@ -65,11 +65,15 @@ export class SessionWorkbench {
           && node.data !== null && typeof node.data === "object" && !Array.isArray(node.data) && node.data.id === command.objectId);
         if (!exists) throw new SessionError("not_found", "Object does not belong to this session.");
         const previous = this.db.prepare("SELECT * FROM object_views WHERE session_id = ? AND object_id = ?").get(command.sessionId, command.objectId) as ViewRow | undefined;
-        this.db.prepare(`INSERT INTO object_views VALUES (?, ?, ?, ?, ?, ?)
-          ON CONFLICT(session_id, object_id) DO UPDATE SET x=excluded.x, y=excluded.y, hidden=excluded.hidden, collapsed=excluded.collapsed`)
+        const size = command.size === undefined
+          ? { width: previous?.width ?? null, height: previous?.height ?? null }
+          : command.size ?? { width: null, height: null };
+        this.db.prepare(`INSERT INTO object_views (session_id, object_id, x, y, hidden, collapsed, width, height) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(session_id, object_id) DO UPDATE SET x=excluded.x, y=excluded.y, hidden=excluded.hidden, collapsed=excluded.collapsed,
+          width=excluded.width, height=excluded.height`)
           .run(command.sessionId, command.objectId, command.position?.x ?? previous?.x ?? 0, command.position?.y ?? previous?.y ?? 0,
             command.hidden === undefined ? previous?.hidden ?? 0 : Number(command.hidden),
-            command.collapsed === undefined ? previous?.collapsed ?? 0 : Number(command.collapsed));
+            command.collapsed === undefined ? previous?.collapsed ?? 0 : Number(command.collapsed), size.width, size.height);
         break;
       }
       case "viewport.set":
@@ -92,6 +96,7 @@ export class SessionWorkbench {
     return workbenchSnapshotSchema.parse({ id: sessionId, title, objects, links: folded.links,
       views: rows.filter(row => ids.has(row.object_id)).map(row => ({
         objectId: row.object_id, position: { x: row.x, y: row.y }, hidden: !!row.hidden, collapsed: !!row.collapsed,
+        size: row.width === null || row.height === null ? null : { width: row.width, height: row.height },
       })), viewport: viewport ?? { x: 0, y: 0, zoom: 1 } });
   }
 }

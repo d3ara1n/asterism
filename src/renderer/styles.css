@@ -221,6 +221,15 @@
 .react-flow__edge-text { fill: var(--muted-foreground); font-family: var(--font-sans); font-size: 10px; }
 .react-flow__edge-textbg { fill: var(--background); }
 .react-flow__handle { width: 7px; height: 7px; background: var(--primary); border: 2px solid var(--card); }
+/* 复用画布缩放控件；右下角独立命中区与四边的连线端点分开。 */
+.react-flow__resize-control.object-resize-handle {
+  display: flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--card); color: var(--muted-foreground);
+  z-index: 5;
+}
+.react-flow__resize-control.object-resize-handle:hover { color: var(--foreground); border-color: var(--ring); }
 @media (max-width: 1100px) {
   .toolbar-label { display: none; }
   .window-session-title { max-width: 160px; }

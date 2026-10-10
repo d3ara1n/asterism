@@ -13,8 +13,11 @@ export interface ResourceDescription {
   icon: ReactNode;
 }
 export interface CardAppearance {
+  /** 画布单位下的默认尺寸；用户覆盖由工作台保存。 */
   width: number;
-  height?: number;
+  height: number;
+  minWidth?: number;
+  minHeight?: number;
 }
 export interface CardView extends CardAppearance {
   body: ReactNode;

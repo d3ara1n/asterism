@@ -71,7 +71,7 @@ DeepSeek 官方端点 `api.deepseek.com` 的 Responses 返回 `response.reasonin
 
 ## 前端能力接口
 
-`window.weft.session` 提供 `execute` 与 `onChanged`，IPC 版本为 8。资源与布局命令也属于此会话入口。应用通道只读取工作区身份和会话列表，不持有已打开会话的正文。
+`window.weft.session` 提供 `execute` 与 `onChanged`，IPC 版本为 9。资源与布局命令也属于此会话入口。应用通道只读取工作区身份和会话列表，不持有已打开会话的正文。
 
 | 命令 | 行为 |
 | --- | --- |

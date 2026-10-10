@@ -1,11 +1,14 @@
 import { memo, useCallback, useEffect, useMemo } from "react";
-import { Handle, Position, useUpdateNodeInternals, type Node, type NodeProps } from "@xyflow/react";
-import type { WorkbenchObject } from "../../../shared/workbench";
+import { Handle, NodeResizeControl, Position, useUpdateNodeInternals, type Node, type NodeProps } from "@xyflow/react";
+import { Grip } from "lucide-react";
+import { maximumCardDimension, type WorkbenchObject } from "../../../shared/workbench";
 import { JsonView, useModuleViews } from "../../modules/views";
 import { ObjectCard, type ViewPatch } from "./ObjectCard";
-import { fallbackCardWidth } from "./layout";
+import { minimumCardHeight, minimumCardWidth } from "./layout";
+import { cardSize, fallbackCardAppearance } from "./sizing";
 import { defaultConnectionPorts, type ConnectionPort } from "./connections";
 import { ObjectActions } from "./ObjectActions";
+import { t } from "../../shared/i18n";
 
 export type ObjectNodeType = Node<{
   object: WorkbenchObject; collapsed: boolean;
@@ -25,9 +28,9 @@ export const ObjectNode = memo(function ObjectNode({ id, data, selected }: NodeP
   const registry = useModuleViews();
   const descriptor = registry.resource(object.kind);
   const view = useMemo(() => registry.card(object.presentation) ?? {
-    width: fallbackCardWidth,
-    body: <div className="select-text p-3"><JsonView value={object.presentation.data} /></div>,
-    actions: undefined, height: undefined,
+    ...fallbackCardAppearance,
+    body: <div className="min-h-0 flex-1 select-text overflow-auto p-3"><JsonView value={object.presentation.data} /></div>,
+    actions: undefined,
   }, [registry, object]);
   const onObjectView = useCallback((patch: ViewPatch) => onView(object.id, patch), [onView, object.id]);
   return <>
@@ -37,9 +40,14 @@ export const ObjectNode = memo(function ObjectNode({ id, data, selected }: NodeP
       style={port.side === "left" || port.side === "right" ? { top: `${port.offset * 100}%` } : { left: `${port.offset * 100}%` }}
       isConnectableEnd={object.kind === "agent"} />)}
     <ObjectCard title={object.title} collapsed={collapsed} selected={!!selected} onView={onObjectView}
-      icon={descriptor.icon} kind={descriptor.label} width={view.width} height={view.height}
-      actions={<>{view.actions}<ObjectActions object={object} /></>}>
+      icon={descriptor.icon} kind={descriptor.label}
+      actions={<>{view.actions}<ObjectActions object={object} defaultSize={cardSize(view)} onView={onObjectView} /></>}>
       {view.body}
     </ObjectCard>
+    {selected && !collapsed && <NodeResizeControl position="bottom-right"
+      className="object-resize-handle nopan" minWidth={view.minWidth ?? minimumCardWidth}
+      minHeight={view.minHeight ?? minimumCardHeight} maxWidth={maximumCardDimension} maxHeight={maximumCardDimension}>
+      <Grip className="size-3" aria-label={t.resizeCard}><title>{t.resizeCard}</title></Grip>
+    </NodeResizeControl>}
   </>;
 });

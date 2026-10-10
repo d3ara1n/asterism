@@ -1,5 +1,5 @@
 import type { Point, WorkbenchSnapshot } from "../../../shared/workbench";
-import { fallbackCardWidth, placementCardHeight } from "./layout";
+import { fallbackCardWidth, fallbackCardHeight } from "./layout";
 
 export type ConnectionSide = "left" | "right" | "top" | "bottom";
 export type ConnectionPort = { id: string; side: ConnectionSide; offset: number };
@@ -17,7 +17,7 @@ export type ConnectionEdge = {
 export function layoutConnections(nodes: readonly LayoutNode[], links: WorkbenchSnapshot["links"]) {
   const geometry = new Map(nodes.map(node => {
     const width = node.measured?.width ?? fallbackCardWidth;
-    const height = node.measured?.height ?? placementCardHeight;
+    const height = node.measured?.height ?? fallbackCardHeight;
     return [node.id, { x: node.position.x + width / 2, y: node.position.y + height / 2, width, height }];
   }));
   const groups = new Map(nodes.map(node => [node.id, {

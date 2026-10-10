@@ -9,7 +9,7 @@ import { AgentView } from "./contract";
 export default {
   resources: [{ kind: "agent", label: t.kindAgent, icon: <Bot className="size-4" /> }],
   cards: [cardRenderer(AgentView, {
-    width: 560, height: 640,
+    width: 560, height: 640, minWidth: 480, minHeight: 480,
     Body: ({ data }) => {
       const workbench = useWorkbench();
       return <Conversation view={agentView(workbench.controller, data.agentId)} selection={data.selection} ready={workbench.ready}

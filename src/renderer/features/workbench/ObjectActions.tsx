@@ -1,20 +1,37 @@
 import { useState } from "react";
-import { MoreHorizontal, Trash2 } from "lucide-react";
-import type { WorkbenchObject } from "../../../shared/workbench";
+import { MoreHorizontal, RotateCcw, Scaling, Trash2 } from "lucide-react";
+import { maximumCardDimension, type CardSize, type WorkbenchObject } from "../../../shared/workbench";
 import { t } from "../../shared/i18n";
 import { Button } from "../../shared/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../../shared/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent } from "../../shared/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "../../shared/ui/alert-dialog";
 import { Spinner } from "../../shared/ui/spinner";
 import { useSession, useSessionProgress } from "../session/state";
 import { useWorkbench } from "./context";
+import type { ViewPatch } from "./ObjectCard";
 
-/** 领域操作放在卡片菜单，快速对象目录只负责定位。 */
-export function ObjectActions({ object }: { object: WorkbenchObject }) {
+/** 卡片菜单集中管理视图尺寸与对象移除；快速对象目录只负责定位。 */
+export function ObjectActions({ object, defaultSize, onView }: {
+  object: WorkbenchObject; defaultSize: CardSize; onView: (patch: ViewPatch) => void;
+}) {
   const { ready, busy, historical } = useWorkbench();
   const [open, setOpen] = useState(false);
   return <><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon-xs" aria-label={t.objectActions}><MoreHorizontal /></Button></DropdownMenuTrigger>
-    <DropdownMenuContent align="end"><DropdownMenuItem disabled={!ready || busy || historical} onSelect={() => setOpen(true)}><Trash2 />{t.removeObject(object.title)}…</DropdownMenuItem></DropdownMenuContent>
+    <DropdownMenuContent align="end">
+      <DropdownMenuSub><DropdownMenuSubTrigger><Scaling />{t.cardSize}</DropdownMenuSubTrigger>
+        <DropdownMenuSubContent>
+          {[{ label: t.cardSizeLarge, scale: 1.5 }, { label: t.cardSizeExtraLarge, scale: 2 }].map(({ label, scale }) =>
+            <DropdownMenuItem key={label} onSelect={() => onView({ size: {
+              width: Math.min(maximumCardDimension, Math.round(defaultSize.width * scale)),
+              height: Math.min(maximumCardDimension, Math.round(defaultSize.height * scale)),
+            } })}>{label}</DropdownMenuItem>)}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onSelect={() => onView({ size: null })}><RotateCcw />{t.restoreCardSize}</DropdownMenuItem>
+        </DropdownMenuSubContent>
+      </DropdownMenuSub>
+      <DropdownMenuSeparator />
+      <DropdownMenuItem disabled={!ready || busy || historical} onSelect={() => setOpen(true)}><Trash2 />{t.removeObject(object.title)}…</DropdownMenuItem>
+    </DropdownMenuContent>
   </DropdownMenu>{open && <RemoveObject object={object} onClose={() => setOpen(false)} />}</>;
 }
 function RemoveObject({ object, onClose }: { object: WorkbenchObject; onClose: () => void }) {

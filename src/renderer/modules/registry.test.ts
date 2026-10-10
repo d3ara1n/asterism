@@ -10,7 +10,7 @@ function Text({ data }: { data: { text: string } }) { return createElement("p", 
 function Header({ result }: ToolRenderProps<{ text: string }>) { return createElement("span", null, result?.data?.text); }
 function Body({ result }: ToolRenderProps<{ text: string }>) { return createElement("p", null, result?.data?.text); }
 const tool = toolRenderer(data, { bodyRenderer: Body });
-const card = cardRenderer(data, { width: 340, Body: Text });
+const card = cardRenderer(data, { width: 340, height: 200, Body: Text });
 const props = (value: Json): ToolRenderProps => ({ phase: "settled", name: "sample", target: null, args: {}, invocation: {}, result: { kind: "succeeded", data: value } });
 
 describe("视图契约分派", () => {

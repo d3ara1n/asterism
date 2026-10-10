@@ -2,8 +2,9 @@ import type { WorkbenchOperation } from "../session/controller";
 import { useCallback, useEffect, useLayoutEffect, useImperativeHandle, useMemo, useRef, useState, type ReactNode, type Ref } from "react";
 import { ReactFlow, ReactFlowProvider, Background, BackgroundVariant, Panel, useReactFlow, getViewportForBounds, applyNodeChanges, applyEdgeChanges, type NodeChange, type EdgeChange, type Edge, MarkerType, ConnectionMode, type Connection, type IsValidConnection } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { Maximize, Minus, Plus, Scan } from "lucide-react";
+import { Crosshair, Maximize, Minus, Plus } from "lucide-react";
 import type { WorkbenchSnapshot } from "../../../shared/workbench";
+import { useModuleViews } from "../../modules/views";
 import { t } from "../../shared/i18n";
 import { s } from "../configuration/state";
 import { Button } from "../../shared/ui/button";
@@ -12,11 +13,12 @@ import { useIsland } from "../../shared/weave/Screen";
 import { useAppearance, useScheme } from "../appearance/state";
 import { SessionHistoryPanel } from "../session/History";
 import { ObjectNode, type ObjectNodeType } from "./ObjectNode";
-import { IconAction, cardDragHandle, type ViewPatch } from "./ObjectCard";
+import { IconAction, type ViewPatch } from "./ObjectCard";
 import { ObjectsPanel } from "./ObjectsPanel";
 import { AccessPanel } from "./AccessPanel";
 import { placeObject, type ResourcePlacement } from "./placement";
-import { defaultCardPosition } from "./layout";
+import { workbenchNodes } from "./nodes";
+import { confirmCardSizes, saveCardSize, type SizeIntent } from "./size-intents";
 import { layoutConnections, type ConnectionEdge } from "./connections";
 import { WorkbenchContext, WorkbenchScope, WorkbenchStore, useWorkbench, type WorkbenchEnvironment, type WorkbenchView } from "./context";
 
@@ -33,6 +35,7 @@ export interface WorkbenchHandle {
 type Props = WorkbenchEnvironment & { ref?: Ref<WorkbenchHandle> };
 type Run = (command: WorkbenchOperation) => Promise<boolean>;
 type WorkbenchEdge = Edge<ConnectionEdge["data"]>;
+type CanvasHandle = { place: (width: number, height: number) => ResourcePlacement["position"] };
 
 /** 工作台根浮岛：投影平级对象和关系；代理对话只是代理对象的卡片内容。 */
 export function Workbench({ ref, controller, session, ready, busy, historical, run, draft, onDraftChange, onHome }: Props) {
@@ -61,6 +64,7 @@ export function Workbench({ ref, controller, session, ready, busy, historical, r
     [controller, session, ready, busy, historical, run, draft, onDraftChange, onHome, locate]);
   const island = useIsland();
   const host = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<CanvasHandle>(null);
   const [store] = useState(() => new WorkbenchStore());
   const open = useCallback((id: string, label: string, render: () => ReactNode, origin: HTMLElement | null) => {
     if (island.child === id) island.closeChild();
@@ -72,14 +76,14 @@ export function Workbench({ ref, controller, session, ready, busy, historical, r
       () => kind === "objects" ? <ObjectsPanel /> : kind === "access" ? <AccessPanel /> : <SessionHistoryPanel controller={controller} />, origin),
     resourcePlacement: () => {
       const bounds = host.current?.getBoundingClientRect();
-      return bounds ? { sessionId: session.id, position: placeObject(session, bounds.width, bounds.height) } : null;
+      return bounds && canvasRef.current ? { sessionId: session.id, position: canvasRef.current.place(bounds.width, bounds.height) } : null;
     },
   }), [open, session, controller]);
   useLayoutEffect(() => store.set(context), [store, context]);
 
   return <WorkbenchContext.Provider value={context}>
     <div ref={host} className="overlay-inset relative h-full overflow-hidden rounded-lg bg-background">
-      <ReactFlowProvider><Canvas session={session} run={run} writable={ready && !busy && !historical}
+      <ReactFlowProvider><Canvas ref={canvasRef} session={session} run={run} writable={ready && !busy && !historical}
         locating={ready && !busy && locating?.navigationVersion === navigationVersion ? locating : null} /></ReactFlowProvider>
       {historical && <div role="status"
         className="surface-floating absolute bottom-[var(--overlay-inset)] left-1/2 z-10 flex -translate-x-1/2 items-center gap-3 whitespace-nowrap p-1 pl-3 text-sm">
@@ -98,8 +102,11 @@ export function Workbench({ ref, controller, session, ready, busy, historical, r
   </WorkbenchContext.Provider>;
 }
 
-function Canvas({ session, run, writable, locating }: { session: WorkbenchSnapshot; run: Run; writable: boolean; locating: LocateRequest | null }) {
+function Canvas({ ref, session, run, writable, locating }: {
+  ref?: Ref<CanvasHandle>; session: WorkbenchSnapshot; run: Run; writable: boolean; locating: LocateRequest | null;
+}) {
   const flow = useReactFlow();
+  const registry = useModuleViews();
   const { controller } = useWorkbench();
   const viewportElement = useRef<HTMLDivElement>(null);
   const [dropping, setDropping] = useState(false);
@@ -108,23 +115,31 @@ function Canvas({ session, run, writable, locating }: { session: WorkbenchSnapsh
   // 回调经 ref 读取最新会话，保持稳定身份，避免每次快照更新重建所有节点。
   const latest = useRef(session);
   latest.current = session;
+  const pendingSizes = useRef(new Map<string, SizeIntent>());
   const onView = useCallback((objectId: string, patch: ViewPatch) => {
-    void run({ type: "view.set", sessionId: latest.current.id, objectId, ...patch });
-  }, [run]);
-  const toNodes = useCallback((snapshot: WorkbenchSnapshot, previous: ObjectNodeType[]): ObjectNodeType[] =>
-    snapshot.objects.flatMap(object => {
-      const view = snapshot.views.find(v => v.objectId === object.id) ?? { position: defaultCardPosition, hidden: false, collapsed: false };
-      if (view.hidden) return [];
-      const current = previous.find(n => n.id === object.id);
-      // 对象与视图状态未变时复用原 data，memo 的卡片跳过重渲染。
-      const data = current && current.data.object === object && current.data.collapsed === view.collapsed
-        ? current.data : { object, collapsed: view.collapsed, onView };
-      const node: ObjectNodeType = { id: object.id, type: "object", position: view.position, dragHandle: cardDragHandle, deletable: false, data };
-      if (!current) return [node];
-      return [{ ...node, measured: current.measured, selected: current.selected, ...(current.dragging ? { position: current.position, dragging: true } : {}) }];
-    }), [onView]);
+    const command = { type: "view.set" as const, sessionId: latest.current.id, objectId, ...patch };
+    if (patch.size === undefined) { void run(command); return; }
+    void saveCardSize({
+      pending: pendingSizes.current, objectId, size: patch.size,
+      saveAndRead: async () => (await controller.executeAndRead(command)).ok,
+      read: () => {
+        const state = controller.getSnapshot();
+        return state.status === "ready" ? state.snapshot?.workbench ?? null : null;
+      },
+      project: snapshot => setNodes(previous =>
+        workbenchNodes(snapshot ?? latest.current, previous, registry, onView, pendingSizes.current)),
+    });
+  }, [run, registry, controller]);
+  const toNodes = useCallback((snapshot: WorkbenchSnapshot, previous: ObjectNodeType[]) =>
+    workbenchNodes(snapshot, previous, registry, onView, pendingSizes.current), [registry, onView]);
   const [nodes, setNodes] = useState<ObjectNodeType[]>(() => toNodes(session, []));
-  useEffect(() => { setNodes(previous => toNodes(session, previous)); }, [session, toNodes]);
+  useEffect(() => {
+    confirmCardSizes(pendingSizes.current, session);
+    setNodes(previous => toNodes(session, previous));
+  }, [session, toNodes]);
+  useImperativeHandle(ref, () => ({
+    place: (width, height) => placeObject(latest.current, width, height, flow.getNodes()),
+  }), [flow]);
   const located = useRef(0);
   const target = nodes.find(node => node.id === locating?.objectId);
   useEffect(() => {
@@ -200,6 +215,9 @@ function Canvas({ session, run, writable, locating }: { session: WorkbenchSnapsh
   const onNodesChange = useCallback((changes: NodeChange<ObjectNodeType>[]) => {
     setNodes(current => applyNodeChanges(changes, current));
     for (const change of changes) {
+      if (change.type === "dimensions" && change.resizing === false && change.dimensions) {
+        onView(change.id, { size: change.dimensions });
+      }
       if (change.type === "position" && change.position && change.dragging === false) {
         void run({ type: "view.set", sessionId: latest.current.id, objectId: change.id, position: change.position }).then(saved => {
           // 失败时按最新快照回滚，而非拖动开始时的旧位置。
@@ -207,7 +225,7 @@ function Canvas({ session, run, writable, locating }: { session: WorkbenchSnapsh
         });
       }
     }
-  }, [run, toNodes]);
+  }, [run, toNodes, onView]);
   return <div ref={viewportElement} className="relative h-full" onDragOver={event => { if (writable && event.dataTransfer.types.includes("Files")) { event.preventDefault(); setDropping(true); } }}
     onDragLeave={event => { if (event.currentTarget === event.target) setDropping(false); }} onDrop={onDrop}>
   {dropping && <div className="pointer-events-none absolute inset-2 z-20 flex items-center justify-center rounded-lg border-2 border-dashed border-primary bg-primary/5">
@@ -239,7 +257,7 @@ function ViewControls({ session, run, selected }: { session: WorkbenchSnapshot; 
     [t.zoomIn, Plus, () => flow.zoomIn()],
     [t.zoomOut, Minus, () => flow.zoomOut()],
     [t.fitObjects, Maximize, () => flow.fitView({ padding: 0.25 })],
-    ...(selected.length ? [[t.focusSelection, Scan, () => flow.fitView({ nodes: selected, padding: 0.12, maxZoom: 1 })] as const] : []),
+    ...(selected.length ? [[t.focusSelection, Crosshair, () => flow.fitView({ nodes: selected, padding: 0.12, maxZoom: 1 })] as const] : []),
   ] as const;
   return <Panel position="bottom-right" className="surface flex flex-col p-0.5">
     {controls.map(([label, Icon, action]) =>

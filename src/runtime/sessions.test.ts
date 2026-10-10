@@ -216,6 +216,39 @@ describe("会话运行时", () => {
     expect(sessionResultSchema.parse((response as { result: unknown }).result)).toMatchObject({ ok: true, reply: { kind: "view", snapshot: { at: history } } });
   });
 
+  it("通用卡片尺寸跨重开保存，折叠与历史读取保留尺寸，清除覆盖不改变任务历史", async () => {
+    const { service, root, start } = await setup();
+    const first = await execute(service, start); await settled(service);
+    const sessionId = first.sessionId, agentId = agentOf(first);
+    const created = await execute(service, { type: "resource.create", sessionId, kind: "note",
+      input: { title: "Resizable note", content: "text" }, position: { x: 10, y: 20 } });
+    const noteId = created.workbench.objects.find(object => object.kind === "note")!.id;
+    const original = service.sessions.tree.nodes(sessionId), cursor = service.sessions.tree.cursor(sessionId);
+    for (const objectId of [agentId, noteId]) {
+      await execute(service, { type: "view.set", sessionId, objectId, size: { width: 900, height: 1000 } });
+      await execute(service, { type: "view.set", sessionId, objectId, collapsed: true });
+      await execute(service, { type: "view.set", sessionId, objectId, position: { x: 30, y: 40 } });
+    }
+    const history = service.sessions.snapshot(sessionId, { kind: "history", nodeId: cursor });
+    for (const objectId of [agentId, noteId]) {
+      expect(history.workbench.views.find(view => view.objectId === objectId))
+        .toMatchObject({ size: { width: 900, height: 1000 }, collapsed: true, position: { x: 30, y: 40 } });
+    }
+    expect(history.nodes).toEqual(created.nodes);
+    expect(service.sessions.tree.nodes(sessionId)).toEqual(original);
+    expect(service.sessions.tree.cursor(sessionId)).toBe(cursor);
+    await service.close(); services.delete(service);
+    const reopened = new ApplicationService(root); services.add(reopened);
+    expect(reopened.sessions.snapshot(sessionId).workbench.views.find(view => view.objectId === agentId)?.size)
+      .toEqual({ width: 900, height: 1000 });
+    await execute(reopened, { type: "view.set", sessionId, objectId: agentId, size: null, collapsed: false });
+    expect(reopened.sessions.snapshot(sessionId).workbench.views.find(view => view.objectId === agentId))
+      .toMatchObject({ size: null, collapsed: false, position: { x: 30, y: 40 } });
+    expect(reopened.sessions.snapshot(sessionId).workbench.views.find(view => view.objectId === noteId)?.size)
+      .toEqual({ width: 900, height: 1000 });
+    expect(reopened.sessions.tree.nodes(sessionId)).toEqual(original);
+  });
+
   it("正文增量发布独立进度，持久节点和终态才使会话视图失效", async () => {
     let release!: () => void;
     let entered!: () => void;

@@ -17,7 +17,10 @@ export function openDatabase(root: string): DatabaseSync {
       CREATE TABLE object_views (
         session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE, object_id TEXT NOT NULL,
         x REAL NOT NULL, y REAL NOT NULL, hidden INTEGER NOT NULL DEFAULT 0,
-        collapsed INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(session_id, object_id)
+        collapsed INTEGER NOT NULL DEFAULT 0,
+        width REAL, height REAL,
+        CHECK ((width IS NULL AND height IS NULL) OR (width > 0 AND height > 0 AND width IS NOT NULL AND height IS NOT NULL)),
+        PRIMARY KEY(session_id, object_id)
       );
       CREATE TABLE viewports (session_id TEXT PRIMARY KEY REFERENCES sessions(id) ON DELETE CASCADE, x REAL NOT NULL, y REAL NOT NULL, zoom REAL NOT NULL);
       CREATE TABLE configuration_items (
@@ -38,9 +41,9 @@ export function openDatabase(root: string): DatabaseSync {
         session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
         value_json TEXT NOT NULL, PRIMARY KEY(object_id, key)
       ) STRICT;
-      PRAGMA user_version = 8;
+      PRAGMA user_version = 9;
       COMMIT;`);
-    else if (version !== 8) throw new Error("This workspace database format is not supported by this build of Weft. Back up and recreate the development database before opening it.");
+    else if (version !== 9) throw new Error("This workspace database format is not supported by this build of Weft. Back up and recreate the development database before opening it.");
     if (!db.prepare("SELECT id FROM workspace LIMIT 1").get()) {
       db.prepare("INSERT INTO workspace VALUES (?, ?)").run(randomUUID(), "Personal workspace");
     }
