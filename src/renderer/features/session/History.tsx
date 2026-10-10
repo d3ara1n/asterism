@@ -1,9 +1,10 @@
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Check, ChevronDown, Eye, GitBranch, History, Layers, MoreHorizontal, PanelsTopLeft } from "lucide-react";
-import { sessionPath, snap } from "../../../shared/session-path";
+import { ArrowUpLeft, Check, ChevronDown, CircleDot, Eye, GitBranch, History, Layers, MoreHorizontal, PanelsTopLeft } from "lucide-react";
+import { snap } from "../../../shared/session-path";
 import { Button } from "../../shared/ui/button";
 import { SearchInput } from "../../shared/ui/search-input";
 import { Spinner } from "../../shared/ui/spinner";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../shared/ui/tabs";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../../shared/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "../../shared/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from "../../shared/ui/command";
@@ -14,6 +15,9 @@ import { t } from "../../shared/i18n";
 import type { SessionController } from "./controller";
 import { useSession, useSessionProgress } from "./state";
 import { historyBefore, historyEntries, historyResources, historyResourceViews, matchesHistoryView, type HistoryView, type HistoryEntry } from "./history-navigation";
+import { arrivedBranch, branchContains, historyBranches, viewedBranch, type BranchNavigation, type HistoryBranch } from "./history-branches";
+
+const branchLabel = (branch: HistoryBranch) => branch.number === 0 ? t.historyMainBranch : t.historyBranch(branch.number);
 
 /** 历史逐节点导航；正文阅读与 response 聚合属于代理卡片。 */
 export function SessionHistoryPanel({ controller }: { controller: SessionController }) {
@@ -21,54 +25,142 @@ export function SessionHistoryPanel({ controller }: { controller: SessionControl
   const registry = useModuleViews();
   const [query, setQuery] = useState("");
   const [view, setView] = useState<HistoryView>({ kind: "all" });
-  const [currentOnly, setCurrentOnly] = useState(false);
+  const [preferredBranch, setPreferredBranch] = useState<string | null>(null);
+  const pending = useRef<BranchNavigation | null>(null);
+  const focusOrigin = useRef<Element | null>(null);
+  const remembered = useRef(new Map<string, string | null>());
   const list = useRef<HTMLDivElement>(null);
-  const positioned = useRef(false);
+  const tabs = useRef<HTMLDivElement>(null);
+  const scrollRequested = useRef(true);
   const entries = useMemo(() => snapshot ? historyEntries(snapshot.nodes, kind => registry.resource(kind).label) : [], [snapshot?.nodes, registry]);
-  const cursorPath = useMemo(() => new Set(snapshot ? sessionPath(snapshot.nodes, snapshot.cursor).map(node => node.id) : []), [snapshot?.nodes, snapshot?.cursor]);
+  const tree = useMemo(() => historyBranches(snapshot?.nodes ?? []), [snapshot?.nodes]);
+  const arrived = arrivedBranch(pending.current, state);
+  const branch = viewedBranch(tree, snapshot?.at ?? null, historical ? arrived ?? preferredBranch : null);
+  const executionBranch = viewedBranch(tree, snapshot?.cursor ?? null);
+  const branchesByFork = useMemo(() => {
+    const result = new Map<string | null, HistoryBranch[]>();
+    for (const child of tree.branches) {
+      if (child.parentId !== branch.id) continue;
+      const siblings = result.get(child.forkId);
+      if (siblings) siblings.push(child);
+      else result.set(child.forkId, [child]);
+    }
+    return result;
+  }, [tree, branch.id]);
+  const parent = tree.branches.find(item => item.id === branch.parentId);
   const search = query.trim().toLocaleLowerCase();
-  const visible = entries.filter(entry => (!currentOnly || cursorPath.has(entry.node.id)) && matchesHistoryView(entry, view)
+  const visible = entries.filter(entry => branch.nodeIds.has(entry.node.id) && matchesHistoryView(entry, view)
     && (!search || `${"text" in entry.node ? entry.node.text : entry.label} ${entry.resource?.title ?? t.workbench} ${entry.resource ? registry.resource(entry.resource.kind).label : ""}`.toLocaleLowerCase().includes(search)));
+  const showStart = branch.forkId === null && !search && view.kind === "all";
+  const navigate = (target: HistoryBranch, at?: string | null, reveal = false) => {
+    const last = remembered.current.get(target.id);
+    const nodeId = at !== undefined ? at : last !== undefined && branchContains(target, last) ? last : target.tip;
+    if (reveal) { setQuery(""); setView({ kind: "all" }); }
+    focusOrigin.current = at !== undefined ? document.activeElement : null;
+    scrollRequested.current = true;
+    controller.inspect(nodeId);
+    pending.current = { branchId: target.id, nodeId, version: controller.getSnapshot().navigationVersion };
+  };
+  const inspect = (at: string | null) => navigate(viewedBranch(tree, at, branch.id), at);
   useLayoutEffect(() => {
-    if (!snapshot || state.status !== "ready" || positioned.current) return;
-    positioned.current = true;
-    list.current?.querySelector<HTMLElement>('[data-inspected="true"]')?.scrollIntoView({ block: "nearest" });
-  }, [snapshot, state.status]);
+    // 旧 Tab 移除后承接焦点；等待期间用户已移到搜索等控件时，不夺回焦点。
+    const transferFocus = arrived && focusOrigin.current && (document.activeElement === focusOrigin.current
+      || document.activeElement === document.body || list.current?.contains(document.activeElement));
+    if (state.status !== "loading") { pending.current = null; focusOrigin.current = null; }
+    if (!snapshot || state.status !== "ready") return;
+    setPreferredBranch(branch.id);
+    remembered.current.set(branch.id, snapshot.at);
+    const row = list.current?.querySelector<HTMLElement>('[data-inspected="true"]');
+    if (transferFocus) {
+      const target = row?.querySelector<HTMLButtonElement>("[data-history-entry]")
+        ?? tabs.current?.querySelector<HTMLButtonElement>('[data-state="active"]');
+      target?.focus({ preventScroll: true });
+    }
+    if (!scrollRequested.current) return;
+    scrollRequested.current = false;
+    row?.scrollIntoView({ block: "nearest" });
+  }, [snapshot, state.status, branch.id, arrived]);
+  useLayoutEffect(() => {
+    tabs.current?.querySelector<HTMLElement>('[data-state="active"]')?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [branch.id]);
   if (!snapshot) return <IslandPanel title={t.history}><p className="type-caption">{state.error ?? t.openingBody}</p></IslandPanel>;
   const selected = entries.find(entry => entry.node.id === snapshot.at);
-  const selectedVisible = snapshot.at === null || visible.some(entry => entry.node.id === snapshot.at);
-  return <IslandPanel title={t.history} compact contentRef={list} action={<ContinueAction controller={controller} />} toolbar={<>
-    <SearchInput value={query} onChange={setQuery} label={t.searchHistory} />
-    <div className="flex items-center justify-between gap-1">
-      <HistoryViewPicker entries={entries} value={view} onChange={next => { setView(next); if (list.current) list.current.scrollTop = 0; }} />
-      <DropdownMenu><DropdownMenuTrigger asChild><Button size="xs" variant="ghost">{currentOnly ? t.currentPath : t.allPaths}<ChevronDown /></Button></DropdownMenuTrigger>
-      <DropdownMenuContent align="end"><DropdownMenuItem onSelect={() => setCurrentOnly(false)}>{t.allPaths}</DropdownMenuItem><DropdownMenuItem onSelect={() => setCurrentOnly(true)}>{t.currentPath}</DropdownMenuItem></DropdownMenuContent></DropdownMenu></div>
-    <div className="flex items-center justify-between gap-2"><p className="type-caption min-w-0 truncate" title={selected?.label ?? t.historyStart}>
-      {state.status === "loading" ? t.openingBody : historical ? snapshot.at === null ? t.historyStart : t.viewingHistory : t.live}</p>
-      {historical && <Button size="xs" variant="secondary" onClick={() => { positioned.current = false; controller.followCursor(); }}>{t.backToLive}</Button>}</div>
-    {!selectedVisible && (search || view.kind !== "all" || currentOnly) && <p className="type-caption">{t.historyFiltered}</p>}
-    {state.error && <p role="alert" className="type-caption">{state.error}</p>}
-  </>}>
-    {visible.map(entry => {
-      const { node, resource } = entry;
-      const descriptor = registry.resource(resource?.kind ?? "");
-      const source = entry.scope === "session" ? `${t.sessionEvents} · ${t.workbench}` : `${descriptor.label} · ${resource?.title ?? t.unknownResource}`;
-      const active = snapshot.at === node.id;
-      return <div key={node.id} data-inspected={active} className="flex items-center gap-0.5">
-        <Button variant={active ? "secondary" : "ghost"} aria-pressed={active} className="h-auto min-w-0 flex-1 justify-start gap-3 px-2 py-1.5 text-left font-normal"
-          title={`${entry.label}\n${source}\n${new Date(node.createdAt).toLocaleString()}`} onClick={() => controller.inspect(node.id)}>
-          <span className="shrink-0 text-muted-foreground" aria-hidden="true">{entry.scope === "session" ? <PanelsTopLeft className="size-4" /> : descriptor.icon}</span>
-          <span className="min-w-0 flex-1"><span className="block truncate leading-5">{entry.label}</span><span className="type-caption block truncate leading-4">{source}</span></span>
-          {!cursorPath.has(node.id) && <GitBranch className="size-3 text-muted-foreground" aria-label={t.otherPath} />}
-          {active && <Eye className="size-3" aria-label={t.viewingHistory} />}
-        </Button>
-        <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon-xs" aria-label={t.historyEntryActions}><MoreHorizontal /></Button></DropdownMenuTrigger>
-          <DropdownMenuContent align="end"><DropdownMenuItem onSelect={() => controller.inspect(historyBefore(snapshot.nodes, node))}>{t.historyBefore}</DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => controller.inspect(node.id)}>{t.historyAfter}</DropdownMenuItem></DropdownMenuContent></DropdownMenu>
-      </div>;
-    })}
-    {!visible.length && <p className="type-caption px-2 py-6 text-center">{t.noMatches}</p>}
-  </IslandPanel>;
+  const selectedVisible = snapshot.at === null ? showStart : visible.some(entry => entry.node.id === snapshot.at);
+  const junction = (at: string | null) => <BranchNavigationRow
+    parent={branch.forkId === at ? parent : undefined}
+    branches={branchesByFork.get(at) ?? []}
+    onNavigate={target => navigate(target, at, true)}
+  />;
+  return <Tabs value={branch.id} activationMode="manual" onValueChange={id => { const target = tree.branches.find(item => item.id === id); if (target) navigate(target); }} className="island-panel min-w-0 gap-0">
+    <IslandPanel title={t.history} compact contentRef={list} action={<ContinueAction controller={controller} />} toolbar={<>
+      <div ref={tabs} className="overflow-x-auto pb-1"><TabsList variant="line" aria-label={t.historyBranches}>
+        {tree.branches.map(item => <TabsTrigger key={item.id} value={item.id}
+          onClick={() => { if (item.id === branch.id && pending.current) navigate(item); }}
+          title={item.id === executionBranch.id ? `${branchLabel(item)} · ${t.historyExecutionBranch}` : branchLabel(item)}>
+          {branchLabel(item)}{item.id === executionBranch.id && <CircleDot className="size-3" aria-label={t.historyExecutionBranch} />}
+        </TabsTrigger>)}
+      </TabsList></div>
+      <SearchInput value={query} onChange={setQuery} label={t.searchHistory} />
+      <div className="flex items-center gap-1">
+        <HistoryViewPicker entries={entries} value={view} onChange={next => { setView(next); if (list.current) list.current.scrollTop = 0; }} />
+      </div>
+      <div className="flex items-center justify-between gap-2"><p className="type-caption min-w-0 truncate" title={selected?.label ?? t.historyStart}>
+        {state.status === "loading" ? t.openingBody : historical ? snapshot.at === null ? t.historyStart : t.viewingHistory : t.live}</p>
+        {historical && <Button size="xs" variant="secondary" onClick={() => { scrollRequested.current = true; controller.followCursor(); }}>{t.backToLive}</Button>}</div>
+      {!selectedVisible && (search || view.kind !== "all") && <p className="type-caption">{t.historyFiltered}</p>}
+      {state.error && <p role="alert" className="type-caption">{state.error}</p>}
+    </>}>
+      {tree.branches.map(item => <TabsContent key={item.id} value={item.id}>{item.id === branch.id && <>
+        {showStart && <div data-inspected={snapshot.at === null}>
+          <div className="flex items-center gap-0.5">
+            <Button data-history-entry variant={snapshot.at === null ? "secondary" : "ghost"} aria-pressed={snapshot.at === null} className="min-w-0 flex-1 justify-start font-normal" onClick={() => inspect(null)}>
+              <History className="size-4 text-muted-foreground" />{t.historyStart}
+              {snapshot.cursor === null && <CircleDot className="size-3" aria-label={t.historyExecutionPosition} />}
+              {snapshot.at === null && <Eye className="size-3" aria-label={t.viewingHistory} />}
+            </Button>
+          </div>
+          {junction(null)}
+        </div>}
+        {visible.map(entry => {
+          const { node, resource } = entry;
+          const descriptor = registry.resource(resource?.kind ?? "");
+          const source = entry.scope === "session" ? `${t.sessionEvents} · ${t.workbench}` : `${descriptor.label} · ${resource?.title ?? t.unknownResource}`;
+          const active = snapshot.at === node.id;
+          return <div key={node.id} data-inspected={active}>
+            <div className="flex items-center gap-0.5">
+              <Button data-history-entry variant={active ? "secondary" : "ghost"} aria-pressed={active} className="h-auto min-w-0 flex-1 justify-start gap-3 px-2 py-1.5 text-left font-normal"
+                title={`${entry.label}\n${source}\n${new Date(node.createdAt).toLocaleString()}`} onClick={() => inspect(node.id)}>
+                <span className="shrink-0 text-muted-foreground" aria-hidden="true">{entry.scope === "session" ? <PanelsTopLeft className="size-4" /> : descriptor.icon}</span>
+                <span className="min-w-0 flex-1"><span className="block truncate leading-5">{entry.label}</span><span className="type-caption block truncate leading-4">{source}</span></span>
+                {snapshot.cursor === node.id && <CircleDot className="size-3" aria-label={t.historyExecutionPosition} />}
+                {active && <Eye className="size-3" aria-label={t.viewingHistory} />}
+              </Button>
+              <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon-xs" aria-label={t.historyEntryActions}><MoreHorizontal /></Button></DropdownMenuTrigger>
+                <DropdownMenuContent align="end"><DropdownMenuItem onSelect={() => inspect(historyBefore(snapshot.nodes, node))}>{t.historyBefore}</DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => inspect(node.id)}>{t.historyAfter}</DropdownMenuItem></DropdownMenuContent></DropdownMenu>
+            </div>
+            {junction(node.id)}
+          </div>;
+        })}
+        {!visible.length && !showStart && <p className="type-caption px-2 py-6 text-center">{t.noMatches}</p>}
+      </>}</TabsContent>)}
+    </IslandPanel>
+  </Tabs>;
+}
+
+/** 分叉点是事件之后的导航行；随所属事件筛选，不作为历史节点或事件操作。 */
+function BranchNavigationRow({ parent, branches, onNavigate }: { parent?: HistoryBranch; branches: HistoryBranch[]; onNavigate: (branch: HistoryBranch) => void }) {
+  if (!parent && branches.length === 0) return null;
+  const singleBranch = branches.length === 1 ? branches[0] : undefined;
+  return <div className="flex flex-wrap items-center gap-1 py-1 pl-9 pr-2">
+    {parent && <Button variant="ghost" size="xs" title={t.historyBranchOrigin(branchLabel(parent))} aria-label={t.historyBranchOrigin(branchLabel(parent))} onClick={() => onNavigate(parent)}><ArrowUpLeft />{branchLabel(parent)}</Button>}
+    {singleBranch && <Button variant="ghost" size="xs" title={t.historyBranchJump(branchLabel(singleBranch))} aria-label={t.historyBranchJump(branchLabel(singleBranch))} onClick={() => onNavigate(singleBranch)}>
+      <GitBranch />{branchLabel(singleBranch)}
+    </Button>}
+    {branches.length > 1 && <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="xs" aria-label={t.historyBranchChildren(branches.length)}><GitBranch />{branches.length}<ChevronDown /></Button></DropdownMenuTrigger>
+      <DropdownMenuContent align="end">{branches.map(child => <DropdownMenuItem key={child.id} onSelect={() => onNavigate(child)}><GitBranch />{branchLabel(child)}</DropdownMenuItem>)}</DropdownMenuContent>
+    </DropdownMenu>}
+  </div>;
 }
 
 function HistoryViewPicker({ entries, value, onChange }: { entries: HistoryEntry[]; value: HistoryView; onChange: (view: HistoryView) => void }) {

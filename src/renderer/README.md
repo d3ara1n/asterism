@@ -26,7 +26,7 @@
 | `features/workbench/AccessPanel.tsx` | 授权浮岛，按代理／资源查看有向链接，受理后的读取结束即显示实际状态 |
 | `features/conversation/Conversation.tsx` | 代理连续对话、工具过程、停止/继续；块从生成到保存保持同一组件 |
 | `features/session/controller.ts` | 查看位置、协调查询、会话操作队列与独立进度订阅 |
-| `features/session/History.tsx` / `history-navigation.ts` | 两行逐节点历史列表、按工作台／资源身份切换视图、来源解析、真实父节点定位与明确继续 |
+| `features/session/History.tsx` / `history-navigation.ts` / `history-branches.ts` | 分支 Tab 与共享起点双向定位、两行逐节点列表、来源筛选、真实父节点定位与明确继续；Tab 随成功发布的查看位置切换 |
 | `features/session/state.ts` | 持久视图与进度的独立 React 订阅 |
 | `features/conversation/Markdown.tsx` | Streamdown 流式 Markdown 配置，复用库的解析与控件 |
 | `modules/registry.ts` / `views.tsx` | 静态资源展示描述与按版本分派的卡片／工具结果；应用根注入注册目录 |
