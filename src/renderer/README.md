@@ -43,6 +43,7 @@
 | `shared/weave/` | Space 屏间平移、Screen 浮岛、布局模型与动效 |
 | `shared/ui/` | 本地维护的 shadcn/ui Radix 控件 |
 | `shared/i18n.ts` | 按系统语言显示单语文案 |
+| `shared/tool-header.tsx` | 可复用的工具单行标题，名称与路径末尾省略，数量和类型等摘要保留右侧 |
 | `styles.css` | Tailwind、主题 token、窗口与编织布局、Streamdown 与功能模块样式扫描 |
 
 ## 界面与状态约定

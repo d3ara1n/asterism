@@ -38,9 +38,9 @@ export function openDatabase(root: string): DatabaseSync {
         session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
         value_json TEXT NOT NULL, PRIMARY KEY(object_id, key)
       ) STRICT;
-      PRAGMA user_version = 7;
+      PRAGMA user_version = 8;
       COMMIT;`);
-    else if (version !== 7) throw new Error("This workspace database format is not supported by this build of Weft. Back up and recreate the development database before opening it.");
+    else if (version !== 8) throw new Error("This workspace database format is not supported by this build of Weft. Back up and recreate the development database before opening it.");
     if (!db.prepare("SELECT id FROM workspace LIMIT 1").get()) {
       db.prepare("INSERT INTO workspace VALUES (?, ?)").run(randomUUID(), "Personal workspace");
     }

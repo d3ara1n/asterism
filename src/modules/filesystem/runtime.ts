@@ -3,13 +3,20 @@ import { basename, isAbsolute } from "node:path";
 import { z } from "zod";
 import { SessionError } from "../../session/tree.ts";
 import { implementResource } from "../../resources/contract.ts";
-import { implement } from "../../tools/contract.ts";
+import { implement, type CallResult } from "../../tools/contract.ts";
+import { TextError, readText, readToModel, editText, textChange, changeToModel } from "../../tools/text.ts";
 import type { RuntimeModuleFactory } from "../runtime-contract.ts";
-import { Directory, DirectoryView, DirectoryList } from "./contract.ts";
-import { withinDirectory } from "./paths.ts";
+import { Directory, DirectoryView, DirectoryList, DirectoryRead, DirectoryEdit, DirectoryWrite } from "./contract.ts";
+import { withinDirectory, writableTarget } from "./paths.ts";
 import { failed, filesystemFailure } from "./errors.ts";
+import { readTextFile, withFileMutation, commitTextFile, validateTextSize, UnconfirmedWriteError } from "./text-io.ts";
 
 const directoryCreate = z.strictObject({ path: z.string().min(1).max(4096), title: z.string().trim().min(1).max(160).optional() });
+function textFailure(error: unknown, signal: AbortSignal, operation: string): CallResult<never> {
+  if (error instanceof UnconfirmedWriteError) return { kind: "unknown", message: error.message };
+  if (signal.aborted) return { kind: "cancelled", message: `${operation} was cancelled before committing file content.` };
+  return error instanceof TextError ? error.outcome() : filesystemFailure(error, operation);
+}
 
 export default (() => ({
   resources: [implementResource(Directory, DirectoryView, {
@@ -62,6 +69,61 @@ export default (() => ({
           return filesystemFailure(error, "List target directory");
         }
       },
+    }),
+    implement(DirectoryRead, {
+      async call(state, target, args, { signal }) {
+        try {
+          const file = await readTextFile(state.path, target.path, signal);
+          const data = readText(file.text, args.anchored !== false, {
+            offset: target.offset, limit: target.limit ?? 1000, maxBytes: 64 * 1024,
+          });
+          return { kind: "succeeded", data: { path: target.path, ...data } };
+        } catch (error) { return textFailure(error, signal, "Read target file"); }
+      },
+      toModel: data => `${data.path}\n${readToModel(data)}`,
+    }),
+    implement(DirectoryEdit, {
+      async call(state, target, args, { signal }) {
+        try {
+          const resolved = await withinDirectory(state.path, target.path);
+          return await withFileMutation(resolved, async () => {
+            const before = await readTextFile(state.path, target.path, signal);
+            if (before.path !== resolved) throw new TextError("file_changed", "The target path changed while waiting for an earlier operation. Read it again before retrying.");
+            const edited = editText(before.text, args.edits);
+            validateTextSize(edited.text);
+            const data = { path: target.path, ...textChange(before.text, edited.text, target.path, edited.touchedLines) };
+            await commitTextFile(state.path, target.path, before, edited.text, signal);
+            return { kind: "succeeded" as const, data };
+          });
+        } catch (error) { return textFailure(error, signal, "Edit target file"); }
+      },
+      toModel: data => `${data.path}\n${changeToModel(data)}`,
+    }),
+    implement(DirectoryWrite, {
+      async call(state, target, args, { signal }) {
+        try {
+          signal.throwIfAborted();
+          validateTextSize(args.content);
+          const selected = await writableTarget(state.path, target.path);
+          return await withFileMutation(selected.path, async () => {
+            signal.throwIfAborted();
+            let before: Awaited<ReturnType<typeof readTextFile>> | null = null;
+            try { before = await readTextFile(state.path, target.path, signal); }
+            catch (error) {
+              const outcome = filesystemFailure(error, "Read existing target");
+              if (outcome.error.code !== "path_not_found") throw error;
+              // 断开的符号链接不会被当成不存在的目标覆盖。
+              await writableTarget(state.path, target.path);
+            }
+            if ((await writableTarget(state.path, target.path)).path !== selected.path) throw new TextError("file_changed", "The target path changed while waiting for an earlier operation. Read it again before retrying.");
+            const change = textChange(before?.text ?? "", args.content, target.path);
+            const data = { path: target.path, created: before === null, ...change, changed: before === null || change.changed };
+            if (before === null || data.changed) await commitTextFile(state.path, target.path, before, args.content, signal);
+            return { kind: "succeeded" as const, data };
+          });
+        } catch (error) { return textFailure(error, signal, "Write target file"); }
+      },
+      toModel: data => `${data.path}${data.created ? " (created)" : ""}\n${changeToModel(data)}`,
     }),
   ],
 })) satisfies RuntimeModuleFactory;

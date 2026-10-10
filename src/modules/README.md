@@ -18,7 +18,7 @@
 
 工具通过 `defineTool({ name, description, guidelines, argsSchema })` 定义。`description` 说明能力与适用场景，供模型挑选；`guidelines` 说明选定后的使用规则、示例和跨工具配合，允许为空数组；`argsSchema` 固定操作参数及其含义。不另设 snippet。
 
-`tools/declarations.ts` 是内置共享定义的位置，目前只有 `List`。模块可在自己的纯契约文件声明独特工具，也可导出给其他模块引用；多个模块共用的契约可抽到共享库，不必修改 Weft 内置定义。相同工具复用同一份完整契约；用法或行为含义不同就定义另一工具，不在实现中覆写 description 或 guidelines。
+`tools/declarations.ts` 是内置共享定义的位置，包含 `List / Read / Edit / Write`。模块可在自己的纯契约文件声明独特工具，也可导出给其他模块引用；多个模块共用的契约可抽到共享库，不必修改 Weft 内置定义。相同工具复用同一份完整契约；用法或行为含义不同就定义另一工具，不在实现中覆写 description 或 guidelines。
 
 一级 Weft 入口在 `tools/weft.ts` 声明，同样使用 ToolContract 和 defineTool；`execution/weft.ts` 固定装配执行器，不将入口注册到资源工具目录。`tools/definition.ts` 统一投影定义：一级入口将 guidelines 合入 provider 的 description，二级工具在链接说明与 inspect 中提供结构化 description、guidelines 和 args schema。注册与执行路径决定工具层级。
 
@@ -40,7 +40,7 @@ export const Search = defineTool({
 
 `defineImplementation` 将共享工具、资源契约与实现的 target/result 关联；`implement` 推导 handler 的 state、target、args 和返回值类型。完整实现见 [目录契约](filesystem/contract.ts) 与 [目录后端](filesystem/runtime.ts)。
 
-`toModel` 可省略，默认使用 data；只在终结时生成并保存模型投影，自定义投影应保留结果契约的含义。非成功结局的模型投影还包含 kind、错误或说明。target 由 handler 直接解释：目录 list 使用 null 或 `{path}`，其他模块可以使用 `{piece}` 等结构。无通用目标解析器，不在公共工具函数里维护资源类型分支。
+`toModel` 可省略，默认使用 data；只在终结时生成并保存模型投影，自定义投影应保留结果契约的含义。非成功结局的模型投影还包含 kind、错误或说明。target 由 handler 直接解释：目录 list 使用 null 或 `{path}`，文件 read 使用 `{path, offset?, limit?}`，笔记 read 使用 null，其他模块可以使用 `{piece}` 等结构。内容范围属于定位，不强制所有资源采用行号；anchored 属于 read 自身的行为参数。无通用目标解析器，不在公共工具函数里维护资源类型分支。
 
 handler 的 context 提供 `signal / resource / publish(data)`。publish 发布当前完整产出，使用与最终 data 相同的 schema；快照通过校验后替换最近的产出，经会话进度送到 UI，不写历史或交给模型。尚未确定的字段用 schema 中明确的 null 或阶段联合表达，不使用 `Partial<最终成功结果>` 绕过校验。工具完成时返回 CallResult；成功/部分完成必须提供 data，失败/拒绝/取消/未知结局可省略 data 以保留最近产出，显式 null 则清空。终结后 publish 失效。
 
@@ -79,6 +79,8 @@ args、target、result schema 必须有非空的整体 description，声明 help
 `RendererModule.tools` 注册 `toolRenderer(DirectoryList, { label, icon, headerRenderer?, bodyRenderer? })`。两个 renderer 是独立可选的 React 组件，接收同一份 `ToolRenderProps`：phase、name、target、args、invocation 与 result；实现契约推导并校验 target、args、data 类型。result 为 null 表示尚未执行；运行中为 `{kind: "running", data}`，终结后沿用 data 并携带具体结局。invocation 包含当次资源身份与可用的开始/结束时间。header 可只依据调用信息渲染，也可随 data 更新；只输出摘要内容，不嵌套按钮等交互控件。
 
 缺少 headerRenderer 时显示工具名称与资源，缺少 bodyRenderer 时显示原始数据。两个入口互不影响。外壳控制状态图标、异常标识、展开与调用详情；过程数据更新和最终保存不重置展开。参数填充期间不调用专用 renderer，使用内置提示；执行中尚无产出时不能展开，终结后可查看空结果或失败原因。
+
+header 按单行摘要设计，由 renderer 自行安排内容、排列和省略；这是设计规范，外壳不设置高度上限或强制裁切。工具 header 可复用 `renderer/shared/tool-header.tsx` 的 ToolHeader，组合操作名、可收缩的资源名称或路径及右侧摘要；长文本末尾省略，数量与类型不换行。header 不嵌套交互控件，正文渲染独立。
 
 三个 Weft 固定入口在 `renderer/features/conversation/tool-views.tsx` 内置，不进入模块注册面。resource_call 的适配器将完整内层参数、选定实现身份和同一结果交给 ViewRegistry，直接采用二级工具的图标与两个视图入口；不新增外层折叠框。
 

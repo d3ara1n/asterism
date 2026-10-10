@@ -1,8 +1,10 @@
-import { Folder, ListTree } from "lucide-react";
+import { Folder, ListTree, BookOpen, FilePenLine, FilePlus2 } from "lucide-react";
 import { cardRenderer, toolRenderer, type RendererModule } from "../../renderer/modules/registry";
 import { s } from "../../renderer/features/configuration/state";
 import { t } from "../../renderer/shared/i18n";
-import { DirectoryView, DirectoryList } from "./contract";
+import { DirectoryView, DirectoryList, DirectoryRead, DirectoryEdit, DirectoryWrite } from "./contract";
+import { TextReadBody, TextChangeBody } from "../text-view";
+import { ToolHeader } from "../../renderer/shared/tool-header";
 
 export default {
   resources: [{ kind: "directory", label: s("Directory", "目录"), icon: <Folder className="size-4" /> }],
@@ -13,14 +15,33 @@ export default {
     </div>,
   })],
   tools: [
+    toolRenderer(DirectoryRead, {
+      label: t.toolTextRead, icon: <BookOpen className="size-3.5" />,
+      headerRenderer: ({ target, invocation, result }) => <ToolHeader label={t.toolTextRead} monospace
+        subject={[invocation.resource?.title, target.path].filter(Boolean).join(" / ")}
+        meta={result?.data && t.toolTextLines(result.data.rows.length, result.data.totalLines)} />,
+      bodyRenderer: TextReadBody,
+    }),
+    toolRenderer(DirectoryEdit, {
+      label: t.toolTextEdit, icon: <FilePenLine className="size-3.5" />,
+      headerRenderer: ({ target, invocation, result }) => <ToolHeader label={t.toolTextEdit} monospace
+        subject={[invocation.resource?.title, target.path].filter(Boolean).join(" / ")}
+        meta={result?.data && <>+{result.data.added} −{result.data.removed}</>} />,
+      bodyRenderer: TextChangeBody,
+    }),
+    toolRenderer(DirectoryWrite, {
+      label: t.toolTextWrite, icon: <FilePlus2 className="size-3.5" />,
+      headerRenderer: ({ target, invocation, result }) => <ToolHeader label={t.toolTextWrite} monospace
+        subject={[invocation.resource?.title, target.path].filter(Boolean).join(" / ")}
+        meta={result?.data && <>+{result.data.added} −{result.data.removed}</>} />,
+      bodyRenderer: TextChangeBody,
+    }),
     toolRenderer(DirectoryList, {
       label: t.toolDirectoryList,
       icon: <ListTree className="size-3.5" />,
-      headerRenderer: ({ target, invocation, result }) => <span className="flex min-w-0 flex-wrap items-center gap-x-2">
-        <span>{t.toolDirectoryList}</span>
-        <span className="truncate font-mono">{invocation.resource?.title}{target?.path && target.path !== "." ? ` / ${target.path}` : ""}</span>
-        {result?.data && <span className="type-caption">{t.toolEntryCount(result.data.entries.length, result.data.truncated)}</span>}
-      </span>,
+      headerRenderer: ({ target, invocation, result }) => <ToolHeader label={t.toolDirectoryList} monospace
+        subject={[invocation.resource?.title, target?.path && target.path !== "." ? target.path : null].filter(Boolean).join(" / ")}
+        meta={result?.data && t.toolEntryCount(result.data.entries.length, result.data.truncated)} />,
       bodyRenderer: ({ result }) => {
         const data = result?.data;
         return data ? <div className="flex flex-col gap-2">

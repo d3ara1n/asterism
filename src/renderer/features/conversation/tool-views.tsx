@@ -9,6 +9,7 @@ import { t } from "../../shared/i18n";
 import { Button } from "../../shared/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../../shared/ui/collapsible";
 import { Item, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "../../shared/ui/item";
+import { ToolHeader } from "../../shared/tool-header";
 
 export function ToolDetails({ label, children }: { label: string; children: ReactNode }) {
   return <Collapsible>
@@ -31,7 +32,8 @@ function Field({ name, value }: { name: string; value: Json }) {
 }
 const list = toolRenderer(ResourceListResult, {
   label: t.toolResourceList, icon: <Boxes className="size-3.5" />,
-  headerRenderer: ({ result }) => <span>{t.toolResourceList}{result?.data && <span className="type-caption"> · {t.toolResourceCount(result.data.resources.length)}</span>}</span>,
+  headerRenderer: ({ result }) => <ToolHeader label={t.toolResourceList}
+    meta={result?.data && t.toolResourceCount(result.data.resources.length)} />,
   bodyRenderer: function ResourceListBody({ result }) {
     const registry = useModuleViews();
     if (!result?.data) return null;
@@ -51,10 +53,8 @@ const inspect = toolRenderer(ResourceInspectResult, {
   headerRenderer: function InspectHeader({ invocation }) {
     const registry = useModuleViews();
     const resource = invocation.resource;
-    return <span className="flex min-w-0 flex-wrap gap-x-2">
-      <span>{t.toolResourceInspect}</span>
-      {resource && <><span className="type-caption">{registry.resource(resource.kind).label}</span><span className="truncate">{resource.title}</span></>}
-    </span>;
+    return <ToolHeader label={t.toolResourceInspect} subject={resource?.title}
+      meta={resource && registry.resource(resource.kind).label} />;
   },
   bodyRenderer: ({ result }) => result?.data ? <div className="space-y-4">
     <section className="space-y-2"><p className="type-label">{t.toolResourceState}</p><ResourceFields value={result.data.state} /></section>
@@ -104,10 +104,7 @@ export function resolveToolView(props: ToolRenderProps, registry: ViewRegistry):
   return builtinViews.get(props.name)?.render(props, registry) ?? { props, icon: <Wrench className="size-3.5" /> };
 }
 export function DefaultToolHeader({ props, label }: { props: ToolRenderProps; label?: string }) {
-  return <span className="flex min-w-0 flex-wrap gap-x-2">
-    <span>{label ?? props.name}</span>
-    {props.invocation.resource && <span className="truncate type-caption">{props.invocation.resource.title}</span>}
-  </span>;
+  return <ToolHeader label={label ?? props.name} subject={props.invocation.resource?.title} />;
 }
 export function DefaultToolBody({ result }: ToolRenderProps) {
   return result?.data !== null && result?.data !== undefined ? <JsonView value={result.data} /> : <p className="type-caption">{t.toolNoOutput}</p>;

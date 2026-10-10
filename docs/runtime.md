@@ -49,7 +49,7 @@ Weft 操作入口是软件提供的外围接口，仅在 provider 协议中表�
 
 资源与工具独立定义：资源契约描述类型与状态；工具契约统一规定 name、description、guidelines 与 args schema。description 说明能力和适用场景，guidelines 说明选定后的使用规则，参数 schema 说明字段语义，不另设 snippet。后端的工具实现声明自己支持的资源类型、target schema、result schema、读写副作用和调度策略，并提供 handler；实现不重复或覆写工具的 description/guidelines。同一工具可对应多个实现，用法与行为含义保持一致，资源实例不保存工具列表或白名单。
 
-target 是 `resource_call` 的定位参数，由选中的实现直接解释，不要求使用 path，也不引入通用目标解析层。目录 list 接受 null 或 `{path}`，游戏工具可接受 `{piece}`。args 始终遵循共享工具契约，target 与 result 随实现变化。三种 schema 都须有整体 description，字段说明随 schema 提供；target/result 的描述由实现解释定位规则与返回含义。注册器拒绝同名工具的 description、guidelines、args schema（含描述）或读写属性冲突，以及同一资源类型、工具名的多个当前实现。不同用法或行为应另定义工具。
+target 是 `resource_call` 的定位参数，由选中的实现直接解释，不要求使用 path，也不引入通用目标解析层。定位可包含资源内部对象与内容范围：目录 list 接受 null 或 `{path}`，文件 read 接受 `{path, offset?, limit?}`，笔记 read 接受 null，游戏工具可接受 `{piece}`。不要求所有文本资源都采用行定位。args 始终遵循共享工具契约，target 与 result 随实现变化。三种 schema 都须有整体 description，字段说明随 schema 提供；target/result 的描述由实现解释定位规则与返回含义。注册器拒绝同名工具的 description、guidelines、args schema（含描述）或读写属性冲突，以及同一资源类型、工具名的多个当前实现。不同用法或行为应另定义工具。
 
 入口指导与 schema 描述明确要求直接传递符合 schema 的 JSON 值：对象保持为对象，null 保持为 null，不先编码成字符串。一级入口提供通用传参规则，共享工具定义提供操作用法，资源实现通过 target/result schema 提供定位与结果说明。
 
@@ -58,6 +58,18 @@ target 是 `resource_call` 的定位参数，由选中的实现直接解释，�
 每次请求先取得已链接资源，再由工具目录匹配支持关系，最后应用 agent.tools/excludeTools 等外部策略。支持关系回答“工具能否操作这个资源”，外部策略回答“当前代理是否被允许使用”；两者独立。链接通知、inspect 和实际调用共用这份能力视图及同一工具定义，避免维护另一份名称或 schema。
 
 Weft 入口集合由软件维护，外部工具策略只检查 `resource_call` 内的工具名，不检查一级入口。插件可扩展资源和工具实现，不能注册或替换一级入口。实际工具不加入顶层 tools，attach/detach 不改变协议工具前缀；链接通知与 inspect 提供同一实现的 args、target、result schema。调用可靠性需实测，但不通过混合两个目录改变架构边界。创建资源的外围操作尚未开放，具体接口另行设计。
+
+### 原生正文工具
+
+笔记与目录内文件共用 read/edit/write 的操作契约。read 的 args 只有 `anchored?`，默认 true；当前两类实现采用 `LINE#HASH│正文`，false 返回行号与正文而不提供哈希。文件的 offset/limit 属于 target，使用完整文件的绝对行号；笔记以 null 选择完整当前正文。文件读取返回最多指定行数与 64 KiB 完整行文本，nextOffset 指向首个未返回行；无法容纳的一整行明确报错，不将截断内容标成可编辑行。
+
+edit 以 `{line, hash}` 引用当前正文；replace/delete 的范围首尾含端点，只有被引用的端点接受哈希检查，未引用的内部行不具有独立变化保护。insert_before/after 保留引用行，append/prepend 无需锚点。整批基于同一份当前正文校验，任一锚点或范围失败都不写入。位移恢复仅提供重试候选，不自动移动目标。成功返回实际 unified diff 与受影响行的新锚点，保留原有换行及末尾换行状态；短哈希用于编辑校验，不构成版本身份或授权凭证。
+
+write 直接创建或覆盖完整正文，不要求锚点，也不返回新锚点；相同正文成功返回无变化。目录 write 可创建根内缺失的父目录。文件操作限于 8 MiB UTF-8 文本，笔记限于 100,000 UTF-16 代码单元。差异由 diff 库生成，超出计算预算时在保存前拒绝；工具历史保存完整 diff，模型输出的 diff 与新锚点受独立大小限制并明确提示省略。
+
+文件修改按真实路径串行，读取使用固定句柄，写入先暂存，再复核根、父目录、目标身份及完整当前正文，最后提交替换。创建新文件采用排他提交，防止覆盖期间由其他进程创建的目标；无法确认最终提交时返回 unknown。真实路径复核处理常规变化与符号链接越界，但并非操作系统级目录沙箱；外部进程仍可能在最后复核与文件系统提交之间改变路径或内容。
+
+笔记保存只更新资源私有的当前正文并使视图失效，不追加正文事件、资源日志或历史版本，不移动会话游标。历史位置的笔记卡片与实时 inspect/read 都显示当前内容；代理工具结果保留当次数据，不重新读当前正文。
 
 ## 链接与授权
 

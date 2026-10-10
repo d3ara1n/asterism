@@ -25,6 +25,8 @@ export interface SessionHost {
   /** 回调内不可异步等待；记录和资源私有状态同事务提交，通知在提交后发布。 */
   commit<T>(sessionId: string, work: (writer: SessionWriter) => T): T;
   progressChanged(sessionId: string): void;
+  /** 当前资源内容变化使持久视图失效，不追加事件或移动时间轴。 */
+  resourceChanged(sessionId: string): void;
   /** 路径上以该对象为终点的链接起点。 */
   linked(path: readonly SessionNode[], objectId: string): FoldedObject[];
   capabilities(linked: readonly FoldedObject[], policy: ToolPolicy): AgentCapabilities;

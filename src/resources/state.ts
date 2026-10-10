@@ -12,4 +12,11 @@ export class ResourceStateStore {
     this.db.prepare(`INSERT INTO resource_states (session_id, object_id, key, value_json) VALUES (?, ?, ?, ?)
       ON CONFLICT(object_id, key) DO UPDATE SET value_json = excluded.value_json`).run(sessionId, objectId, key, JSON.stringify(value));
   }
+  /** 修改已存在的当前状态并返回所属会话；不创建历史版本或时间轴节点。 */
+  update(objectId: string, key: string, value: Json): string {
+    const row = this.db.prepare("UPDATE resource_states SET value_json = ? WHERE object_id = ? AND key = ? RETURNING session_id")
+      .get(JSON.stringify(value), objectId, key) as { session_id: string } | undefined;
+    if (!row) throw new Error("The resource state is unavailable.");
+    return row.session_id;
+  }
 }

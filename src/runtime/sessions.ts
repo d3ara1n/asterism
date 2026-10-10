@@ -37,6 +37,7 @@ export class SessionService {
       path: sessionId => this.tree.path(sessionId),
       commit: (sessionId, work) => this.commit(sessionId, work),
       progressChanged: sessionId => this.progressChanged(sessionId),
+      resourceChanged: sessionId => this.notify(sessionId),
       linked: (path, objectId) => {
         const folded = foldWorkbench(path);
         const ids = new Set(folded.links.filter(link => link.agentId === objectId).map(link => link.resourceId));

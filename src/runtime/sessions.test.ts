@@ -19,6 +19,8 @@ import { defineImplementation, defineTool } from "../shared/module-contract.ts";
 import { Directory } from "../modules/filesystem/contract.ts";
 import { implement } from "../tools/contract.ts";
 import { ToolRegistry } from "../tools/registry.ts";
+import { foldWorkbench } from "../session/fold.ts";
+import { textReadSchema, textChangeSchema } from "../tools/text-contract.ts";
 
 const roots: string[] = [];
 type Snap = { workbench: { objects: { id: string; kind: string; presentation: { data: unknown } }[] } };
@@ -57,6 +59,48 @@ async function settled(service: ApplicationService) {
 }
 
 describe("会话运行时", () => {
+  it("笔记保存只改当前正文和视图修订，历史位置与重开都读取当前内容", async () => {
+    let tools!: ToolRegistry;
+    const createModules = runtimeModules.createModules;
+    vi.spyOn(runtimeModules, "createModules").mockImplementation(services => {
+      const modules = createModules(services); tools = modules.tools; return modules;
+    });
+    const { service, root, start } = await setup();
+    const first = await execute(service, start); await settled(service);
+    const sessionId = first.sessionId;
+    const created = await execute(service, { type: "resource.create", sessionId, kind: "note",
+      input: { title: "Notebook", content: "first\nsecond" }, position: { x: 0, y: 0 } });
+    const note = foldWorkbench(created.nodes).objects.find(object => object.kind === "note")!;
+    const nodeId = created.cursor!;
+    const nodes = service.sessions.tree.nodes(sessionId), cursor = service.sessions.tree.cursor(sessionId);
+    const call = async (name: string, args: Json, target: Json = null) => {
+      const implementation = tools.match(note).find(tool => tool.tool.name === name)!;
+      const invocation = implementation.prepare(note, target, args);
+      if (!("execute" in invocation)) return invocation;
+      return invocation.execute(new AbortController().signal);
+    };
+    const read = textReadSchema.parse((await call("read", {})).data);
+    expect(read.rows).toHaveLength(2);
+    expect((await call("read", { anchored: false }))).toMatchObject({ kind: "succeeded", data: { rows: [{ line: 1, hash: null }, { line: 2, hash: null }] } });
+    expect(await call("read", {}, { offset: 1 })).toMatchObject({ kind: "rejected", error: { code: "invalid_arguments" } });
+    expect(await call("edit", { edits: [{ op: "replace", anchor: { line: 2, hash: read.rows[1].hash! }, body: ["edited"] }] })).toMatchObject({
+      kind: "succeeded", data: { anchors: [{ line: 2, content: "edited" }] },
+    });
+    const write = await call("write", { content: "latest" });
+    expect(textChangeSchema.parse(write.data).anchors).toEqual([]);
+    expect(service.sessions.snapshot(sessionId).revision).toBeGreaterThan(created.revision);
+    expect(service.sessions.tree.nodes(sessionId)).toEqual(nodes);
+    expect(service.sessions.tree.cursor(sessionId)).toBe(cursor);
+    const history = service.sessions.snapshot(sessionId, { kind: "history", nodeId });
+    expect(history.workbench.objects.find(object => object.id === note.id)?.presentation.data).toEqual({ text: "latest" });
+    expect(await call("write", { content: "x".repeat(100_001) })).toMatchObject({ kind: "rejected", error: { code: "note_too_large" } });
+    expect(service.sessions.snapshot(sessionId).workbench.objects.find(object => object.id === note.id)?.presentation.data).toEqual({ text: "latest" });
+    await service.close(); services.delete(service);
+    const reopened = new ApplicationService(root); services.add(reopened);
+    expect(reopened.sessions.snapshot(sessionId, { kind: "history", nodeId }).workbench.objects.find(object => object.id === note.id)?.presentation.data).toEqual({ text: "latest" });
+    expect(textReadSchema.parse((await call("read", {})).data).rows[0].content).toBe("latest");
+  });
+
   it("工具产出进入独立进度，取消后保存产出与身份；移除资源并重开仍可重放", async () => {
     let entered!: () => void;
     const executing = new Promise<void>(resolve => { entered = resolve; });

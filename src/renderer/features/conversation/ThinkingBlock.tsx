@@ -45,8 +45,8 @@ function ThinkingHeader({ streaming, startedAt, endedAt, interrupted }: {
     <span className="inline-flex shrink-0" aria-hidden="true">
       {streaming ? <Spinner className="size-3.5 motion-reduce:animate-none" /> : <Brain className="size-3.5" />}
     </span>
-    <span className="min-w-0 flex-1 text-left">{streaming ? t.thinkingActive : t.thinkingTitle}</span>
-    {duration && <span role="timer" aria-live="off" aria-label={t.thinkingElapsed(duration)} className="type-caption tabular-nums">{duration}</span>}
+    <span className="min-w-0 flex-1 truncate text-left">{streaming ? t.thinkingActive : t.thinkingTitle}</span>
+    {duration && <span role="timer" aria-live="off" aria-label={t.thinkingElapsed(duration)} className="shrink-0 whitespace-nowrap type-caption tabular-nums">{duration}</span>}
     {interrupted && <Badge variant="outline">{t.thinkingInterrupted}</Badge>}
   </>;
 }

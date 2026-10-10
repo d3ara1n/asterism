@@ -9,6 +9,7 @@ import { Spinner } from "../../shared/ui/spinner";
 import { toolCallState, type ToolCallNode } from "./tool-state";
 import { DefaultToolBody, DefaultToolHeader, resolveToolView, ToolDetails, toolPreparation } from "./tool-views";
 import { Disclosure } from "./Disclosure";
+import { ToolHeader } from "../../shared/tool-header";
 
 const labels = {
   running: t.toolRunning, partial: t.toolPartial, failed: t.toolFailed,
@@ -36,7 +37,7 @@ export function ToolCall({ node }: { node: ToolCallNode }) {
     <span className="inline-flex shrink-0" aria-hidden="true">{icon}</span>
     <span className="min-w-0 flex-1 text-left">
       {view ? view.header ?? <DefaultToolHeader props={view.props} label={view.label} />
-        : state.phase === "incomplete" ? t.toolIncompleteRequest : toolPreparation(node.name)}
+        : <ToolHeader label={state.phase === "incomplete" ? t.toolIncompleteRequest : toolPreparation(node.name)} />}
     </span>
     {status && <Badge variant={error ? "destructive" : "secondary"}>{status}</Badge>}
     {state.phase === "settled" && result?.kind === "succeeded" && <span className="sr-only">{t.toolSucceeded}</span>}
