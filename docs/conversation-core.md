@@ -65,6 +65,8 @@ Responses 模型声明的思考能力显式传给 SDK，不依赖 SDK 的 OpenAI
 
 DeepSeek 官方端点 `api.deepseek.com` 的 Responses 返回 `response.reasoning_text.delta`，不生成思考摘要。适配层通过 SDK 的原始事件接口读取已知正文增量，复用原有思考块身份、即时进度与保存流程；原始帧不持久化或写入日志。DeepSeek 不支持 reasoning 输入的 summary/encrypted_content，声明将纯文本 content 合入相邻 assistant 正文，因此模型投影将保存的思考作为 assistant 文本发送，不携带该块的 OpenAI 续接字段；织台历史仍区分 thinking 与 text。系统指令保留 system 身份，避免 DeepSeek 把 developer 当作 user。协议依据见 [DeepSeek Responses 指南](https://api-docs.deepseek.com/guides/responses_api/) 与 [接口参考](https://api-docs.deepseek.com/api/create-response/)。
 
+可组合的模型兼容包方向已确认，通用机制尚未实现。后续由提供商默认组合和模型覆盖统一控制编码、解码与续接，将上述端点专用行为迁入兼容模块，支持用户为自定义与中转端点显式选择；实施与待定契约见 [模型兼容计划](../plans/todo-2026-10-10-model-compatibility.md)。
+
 ## 前端能力接口
 
 `window.weft.session` 提供 `execute` 与 `onChanged`，IPC 版本为 6。资源与布局命令也属于此会话入口。应用通道只读取工作区身份和会话列表，不持有已打开会话的正文。
