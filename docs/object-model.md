@@ -50,13 +50,13 @@ Session 不是 provider 会话，也不是某个代理的消息数组。对话�
 
 ## 工具：独立定义与资源匹配
 
-工具与资源平级存在。工具契约规定身份与 args；资源后端通过实现该契约声明支持关系，同一个工具可以有多个后端实现。资源实例不持有工具列表，支持关系不是授权白名单；后端代码与实现可放在同一功能模块内。
+工具与资源平级存在。工具契约统一规定身份、description、guidelines 与 args schema：description 用于选择，guidelines 用于选定后的使用，参数描述解释各字段。资源后端通过实现该契约声明支持关系，同一个工具可以有多个后端实现，但用法和行为含义保持一致。资源实例不持有工具列表，支持关系不是授权白名单；工具定义与实现可放在同一功能模块内，也可通过纯契约库共享。
 
 代理链接资源后，支持该资源的工具被激活；agent.tools、excludeTools 等外部策略再决定是否允许使用。可用调用必须同时满足：目标已链接、工具支持目标、外部策略允许。工具匹配不自动授予访问权，白名单也不能让不支持某资源的工具操作它。
 
-工具实现规定 target、result 的形状与 handler，args 的形状由共享工具契约约束。target 由资源后端直接解释，可为路径、方块标识等；省略时为 null。目录上的 read 实现通过 target.path 定位文件，不表示目录本身是文本。直接文件资源与目录内文件之间的身份关系另行设计。
+工具实现规定 target、result 的形状与描述，并提供 handler，不重复工具的 description/guidelines；args 的形状与含义由共享工具契约约束。target 由资源后端直接解释，可为路径、方块标识等；省略时为 null，是否接受由实现声明。目录 list 通过 target.path 定位子目录，null 选择根目录。直接文件资源与目录内文件之间的身份关系另行设计。
 
-对 provider 协议只暴露 Weft 自身固定的操作入口，实际工具通过 `resource_call(resource_id, tool, target?, args)` 调用。Weft 入口相当于操作工具的机械臂，当前为 resource_list/inspect/call；可管理、替换、扩展的是工具及其后端实现。一级入口不参加 agent 工具允许/排除列表，不向插件开放注册或替换。工具管理、链接通知、inspect 与实际调用共用同一工具目录及支持关系，schema 通过链接通知或 inspect 提供。
+对 provider 协议只暴露 Weft 自身固定的操作入口，实际工具通过 `resource_call(resource_id, tool, target?, args)` 调用。Weft 入口相当于操作工具的机械臂，当前为 resource_list/inspect/call；可管理、替换、扩展的是工具及其后端实现。两层共用同一工具定义结构与投影，一级入口不参加 agent 工具允许/排除列表，不向插件开放注册或替换。工具管理、链接通知、inspect 与实际调用共用同一工具目录及支持关系，二级工具的完整定义和 target/result schema 通过链接通知或 inspect 提供。
 
 ## 工具结果与审计
 

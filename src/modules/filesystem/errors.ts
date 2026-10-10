@@ -24,9 +24,7 @@ export function filesystemFailure(error: unknown, operation: string, root = fals
     case "ENOTDIR":
       return failed(root ? "resource_not_directory" : "not_directory", `${operation}: ${subject} or one of its path components is not a directory. ${root
         ? "Ask the user to relink an existing directory."
-        : "Use list on an existing parent to check entry types; use read for a file, or correct target.path."}`);
-    case "EISDIR":
-      return failed("not_file", `${operation}: The target is a directory. Use list to select a file, then call read with that relative path.`);
+        : "Use list on an existing parent to check entry types, then correct target.path to select a directory."}`);
     case "EACCES": case "EPERM":
       return failed("permission_denied", `${operation}: The operating system denied access to ${root ? "the resource root" : "the target"}. Ask the user to check filesystem permissions and application access. Retrying the same call without a permission change will not help.`);
     case "ELOOP":

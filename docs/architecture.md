@@ -134,7 +134,7 @@ API key 由主进程调用 safeStorage 加密，运行时保存密文至 `creden
 - 应用元数据与相应事件处于同一 SQLite 事务；历史内核用保存点嵌入外层事务。
 - `objects/<sha256>` 保存不可变 UTF-8 正文。先通过临时文件写入、刷新与重命名完成内容，再提交事件引用；文件系统与数据库没有跨介质原子事务，失败可能留下无引用对象。读取校验 hash，丢失或不匹配时报告内容不可用。无引用对象回收与更强的崩溃对账见后续立案。
 
-笔记初版仅支持创建和读取。历史查看读已保存的正文引用，不代入当前内容；笔记不声明状态恢复能力。目录资源、资源修改版本和检查点仍按各自契约实施。开发数据根为 `appData/Weft-development`，`sessionData` 单独放在该根的 `chromium/`。
+笔记初版仅支持创建和正文展示，不提供模型读取工具。历史查看读已保存的正文引用，不代入当前内容；笔记不声明状态恢复能力。目录资源提供 list，文件读取与编辑、资源修改版本和检查点仍按各自契约实施。开发数据根为 `appData/Weft-development`，`sessionData` 单独放在该根的 `chromium/`。
 
 ## 资源扩展契约
 
@@ -142,7 +142,7 @@ API key 由主进程调用 safeStorage 加密，运行时保存密文至 `creden
 
 | 入口 | 内容 | 可依赖 |
 | --- | --- | --- |
-| `contract.ts` | 资源状态、工具实现的 target/result、卡片数据契约；共享工具只定义 args | Zod 与纯契约，不依赖 Node/React |
+| `contract.ts` | 资源状态、工具实现的 target/result schema 及描述、卡片数据契约；共享工具统一定义 description、guidelines 与 args schema | Zod 与纯契约，不依赖 Node/React |
 | `runtime.ts` | 资源 project/inspect/context，工具 handler 与可选 toModel | 后台服务、Node API、纯契约 |
 | `renderer.tsx` | 卡片内容、附加操作与工具结果组件 | React、公共控件、纯契约 |
 

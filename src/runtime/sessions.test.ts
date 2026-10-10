@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setImmediate } from "node:timers/promises";
@@ -165,13 +165,14 @@ describe("会话运行时", () => {
     let calls = 0;
     const model: ModelAdapter = { version: "ai-sdk-v7/2", prepare: () => ({ async *stream() {
       if (++calls === 2) {
-        yield { type: "part.start", part: { id: "c", kind: "toolcall", callId: "read-file", name: "resource_call" } };
-        yield { type: "part.end", partId: "c", arguments: { resource_id: resourceId, tool: "read", target: { path: "a.txt" }, args: {} } };
+        yield { type: "part.start", part: { id: "c", kind: "toolcall", callId: "list-directory", name: "resource_call" } };
+        yield { type: "part.end", partId: "c", arguments: { resource_id: resourceId, tool: "list", target: { path: "files" }, args: {} } };
         yield { type: "finish", reason: "tool-calls", usage: null };
       } else yield* reply();
     } }) };
     const { service, root, start } = await setup(model);
-    writeFileSync(join(root, "a.txt"), "original");
+    mkdirSync(join(root, "files"));
+    writeFileSync(join(root, "files", "a.txt"), "original");
     const first = await execute(service, start); await settled(service);
     const created = await execute(service, { type: "resource.create", sessionId: first.sessionId, kind: "directory", input: { path: root }, position: { x: 0, y: 0 } });
     const directory = created.workbench.objects.find(object => object.kind === "directory")!;
@@ -182,9 +183,10 @@ describe("会话运行时", () => {
     await execute(service, { type: "link.set", sessionId: first.sessionId, agentId: agentId, resourceId: resourceId, linked: true });
     await execute(service, agentCommand(first.sessionId, agentId, { type: "continue" })); await settled(service);
     const saved = service.sessions.tree.nodes(first.sessionId).find(node => node.kind === "toolcall");
-    expect(saved).toMatchObject({ outcome: { kind: "succeeded", implementation: { id: "weft.directory.read", version: 1 },
-      model: { path: "a.txt", text: "original" }, data: { path: "a.txt", text: "original" } } });
-    writeFileSync(join(root, "a.txt"), "changed");
+    const listing = { path: "files", entries: [{ name: "a.txt", type: "file" }], truncated: false };
+    expect(saved).toMatchObject({ outcome: { kind: "succeeded", implementation: { id: "weft.directory.list", version: 1 },
+      model: listing, data: listing } });
+    writeFileSync(join(root, "files", "b.txt"), "changed");
     await execute(service, { type: "object.remove", sessionId: first.sessionId, objectId: resourceId });
     await service.close(); services.delete(service);
     const reopened = new ApplicationService(root); services.add(reopened);
@@ -502,7 +504,7 @@ describe("会话运行时", () => {
         if (request === 2) {
           if (firstBlockSaved) {
             yield { type: "part.start", part: { id: "t", kind: "text" } };
-            yield { type: "part.delta", partId: "t", delta: "Reading now" };
+            yield { type: "part.delta", partId: "t", delta: "Listing now" };
             yield { type: "part.end", partId: "t" };
           }
           entered();
@@ -510,18 +512,18 @@ describe("会话运行时", () => {
         }
         if (request === 2 || request === 3) {
           yield { type: "part.start", part: { id: "c", kind: "toolcall", callId: `call-${request}`, name: "resource_call" } };
-          yield { type: "part.end", partId: "c", arguments: { resource_id: resourceId, tool: "read", args: {} } };
+          yield { type: "part.end", partId: "c", arguments: { resource_id: resourceId, tool: "list", args: {} } };
           yield { type: "finish", reason: "tool-calls", usage: null };
         } else yield* reply();
       } };
     } };
-    const { service, start } = await setup(model);
+    const { service, root, start } = await setup(model);
     const first = await execute(service, start);
     await settled(service);
     const sessionId = first.sessionId;
     const agentId = agentOf(first);
-    const created = await execute(service, { type: "resource.create", sessionId, kind: "note", input: { title: "Note", content: "content" }, position: { x: 0, y: 0 } });
-    resourceId = created.workbench.objects.find(object => object.kind === "note")!.id;
+    const created = await execute(service, { type: "resource.create", sessionId, kind: "directory", input: { path: root }, position: { x: 0, y: 0 } });
+    resourceId = created.workbench.objects.find(object => object.kind === "directory")!.id;
     await execute(service, { type: "link.set", sessionId: sessionId, agentId: agentId, resourceId: resourceId, linked: true });
     await execute(service, agentCommand(sessionId, agentId, { type: "continue" }));
     await started;

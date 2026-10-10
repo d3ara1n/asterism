@@ -16,24 +16,35 @@
 
 ## 工具契约与实现
 
-共享工具在 `tools/declarations.ts` 定义身份与 args；例如 `Read` 的 args 是空对象。模块引用同一个契约，不自行声明另一份 read 参数。新工具也可由模块导出纯契约供其他模块引用。
+工具通过 `defineTool({ name, description, guidelines, argsSchema })` 定义。`description` 说明能力与适用场景，供模型挑选；`guidelines` 说明选定后的使用规则、示例和跨工具配合，允许为空数组；`argsSchema` 固定操作参数及其含义。不另设 snippet。
 
-`defineImplementation` 将共享工具、资源契约与实现的 target/result 关联；`implement` 推导 handler 的参数与返回值类型：
+`tools/declarations.ts` 是内置共享定义的位置，目前只有 `List`。模块可在自己的纯契约文件声明独特工具，也可导出给其他模块引用；多个模块共用的契约可抽到共享库，不必修改 Weft 内置定义。相同工具复用同一份完整契约；用法或行为含义不同就定义另一工具，不在实现中覆写 description 或 guidelines。
+
+一级 Weft 入口在 `tools/weft.ts` 声明，同样使用 ToolContract 和 defineTool；`execution/weft.ts` 固定装配执行器，不将入口注册到资源工具目录。`tools/definition.ts` 统一投影定义：一级入口将 guidelines 合入 provider 的 description，二级工具在链接说明与 inspect 中提供结构化 description、guidelines 和 args schema。注册与执行路径决定工具层级。
+
+下面是一个可由多个模块引用的纯工具定义示例：
 
 ```ts
-implement(DirectoryRead, {
-  async call(state, target, args, { signal, resource }) {
-    // state.path 来自资源状态；target.path 来自本实现的定位契约。
-    // 在这里校验访问范围、读取文件，并返回契约规定的数据。
-    return { kind: "succeeded", data: { path: target.path, text: "…" } };
-  },
-  toModel: result => result,
+export const Search = defineTool({
+  name: "search",
+  description: "Find entries containing the supplied text.",
+  guidelines: [
+    "Select the search scope using the resource's target schema.",
+    "Match query as literal text, not as a regular expression.",
+  ],
+  argsSchema: z.strictObject({
+    query: z.string().min(1).describe("Non-empty literal text to find."),
+  }).describe("Parameters for literal text search."),
 });
 ```
 
-实际例子见 `filesystem/contract.ts` 与 `filesystem/runtime.ts`。`toModel` 可省略，默认使用 data。target 由 handler 直接解释：目录 `{path}`、笔记 null，其他模块可以使用 `{piece}` 等结构。无通用目标解析器，不在公共工具函数里维护资源类型分支。
+`defineImplementation` 将共享工具、资源契约与实现的 target/result 关联；`implement` 推导 handler 的 state、target、args 和返回值类型。完整实现见 [目录契约](filesystem/contract.ts) 与 [目录后端](filesystem/runtime.ts)。
 
-注册边界负责校验资源状态、target、args 和返回数据。一个资源类型与工具名只能有一个当前实现，同名工具必须遵循同一 args 契约。实现有独立 ID/版本；更改已保存结果的形状或含义时增加版本。读写副作用与并行/顺序策略属于实现，调度器据此执行和分类失败。
+`toModel` 可省略，默认使用 data；自定义投影应保留结果契约的含义。target 由 handler 直接解释：目录 list 使用 null 或 `{path}`，其他模块可以使用 `{piece}` 等结构。无通用目标解析器，不在公共工具函数里维护资源类型分支。
+
+args、target、result schema 必须有非空的整体 description，声明 helper 在定义时检查；各字段也应说明类型、定位基准、空值、限制与结果含义，描述随 JSON Schema 投影。target/result 的说明由资源实现提供，不重复共享工具用法。
+
+注册边界负责校验资源状态、target、args 和返回数据。一个资源类型与工具名只能有一个当前实现；同名工具的 description、guidelines、args schema（含描述）及读写属性必须一致，target/result 可以不同。实现有独立 ID/版本；更改已保存结果的形状或含义时增加版本。读写副作用与并行/顺序策略属于执行信息，调度器据此执行和分类失败。
 
 外部授权位于 `execution/`：请求开始时按已链接资源匹配工具，再应用 agent.tools/excludeTools。资源实例不持有工具白名单。Weft 固定入口 resource_list/inspect/call 不注册到工具目录。
 
@@ -59,7 +70,7 @@ implement(DirectoryRead, {
 
 `RendererModule.resources` 按资源类型声明静态 `kind / label / icon`，label 在模块中使用应用本地化文案。`ViewRegistry.resource(kind)` 不解析正文、不构造 Body，向对象目录、历史、授权、添加入口和卡片外壳提供同一份识别信息；未知类型回退为通用资源。类型身份重复注册会被拒绝。描述不随实例存储，不包含动态能力与授权。
 
-`cardRenderer(NoteView, …)` 与 `resultRenderer(NoteRead, …)` 使用相同纯契约推导组件 data 类型，并在接收端校验。卡片提供尺寸、Body、可选 Actions；ObjectCard 统一处理框架、拖动、折叠与关闭，ObjectActions 提供对象移除入口。模块不重建这套外壳。
+`cardRenderer(DirectoryView, …)` 与 `resultRenderer(DirectoryList, …)` 使用对应纯契约推导组件 data 类型，并在接收端校验。卡片提供尺寸、Body、可选 Actions；ObjectCard 统一处理框架、拖动、折叠与关闭，ObjectActions 提供对象移除入口。模块不重建这套外壳。
 
 前端目录在应用根通过 ModuleViewsProvider 注入。卡片和对话只消费目录接口，不能导入模块总表，否则会形成“总表 → 代理卡片 → 对话 → 总表”的依赖环。
 

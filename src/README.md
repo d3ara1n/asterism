@@ -15,7 +15,7 @@
 | `model/` | 系统提示块组装与模型投影、单次请求契约、三协议 SDK 适配与续接资料 | shared、session、AI SDK |
 | `execution/` | 单代理循环、流块状态机、请求能力视图、外部工具策略、固定 Weft 操作入口与批次调度 | session、model、resources、tools 契约 |
 | `resources/` | 资源身份生成、后台契约、注册目录、卡片投影与环境聚合 | shared、session 对象类型、Nano ID |
-| `tools/` | 共享工具声明、实现注册与校验、资源支持关系；不持有外部授权策略 | shared、session 对象类型 |
+| `tools/` | 两层共用的工具定义投影、资源工具实现注册与完整契约校验、支持关系；不持有外部授权策略 | shared、session 对象类型 |
 | `modules/` | 笔记、文件系统、代理的纯契约、后台实现、前端视图，见目录 README | 后台/前端分入口，各自遵守进程边界 |
 | `renderer/` | 应用视图、视图注册机制、React Flow、用户意图 | shared、modules 前端入口、React 与 UI 库；不访问 Node/数据库 |
 

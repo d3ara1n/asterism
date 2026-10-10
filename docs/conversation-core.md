@@ -30,7 +30,7 @@ Session 是时间轴的单一写入者。成型记录、终态元数据、对象
 
 ## 工具结局
 
-工具契约统一 args schema，后端实现分别声明 target/result schema、读写副作用、顺序/并行策略与执行器。选定实现后，结局携带该实现的 ID 与版本。结局为：
+工具契约统一 description、guidelines 与 args schema，后端实现分别声明含描述的 target/result schema、读写副作用、顺序/并行策略与执行器，不重复工具使用指导。选定实现后，结局携带该实现的 ID 与版本。结局为：
 
 - succeeded：保存当次交给模型的 `model` 内容和用于重建视图的 `data`。
 - rejected：工具策略、参数或授权拒绝。
@@ -47,7 +47,7 @@ Session 是时间轴的单一写入者。成型记录、终态元数据、对象
 
 模型响应正常结束 → 参数与 agent 工具策略校验 → 显式 resource_id 与本轮有效链接校验 → 执行 → 结局节点保存 → 整批收束 → 下一请求。输出截断与不完整参数不启动工具。并行完成顺序不影响模型输入顺序，投影按序号排列；含顺序工具的批次按原顺序执行。
 
-模型协议中的 tools 是 Weft 固定操作入口：`resource_list`、`resource_inspect`、`resource_call(resource_id, tool, target?, args)`。核心工具与资源平级定义，通过后端实现声明支持关系。链接资源激活匹配工具，agent 的 tools/excludeTools 等外部策略再决定是否允许使用；资源实例不持有工具列表或白名单。Weft 入口不受名单约束，也不开放插件注册。请求能力视图从统一目录选择实现并应用链接状态和外部策略；批次按实际实现的副作用和调度策略执行。args、target、result schema 在资源链接通知或 inspect 中提供，不进入顶层 tools。当前原生资源工具为笔记 read 与目录 list/read；编辑、MCP 与代理间通信待接入。
+模型协议中的 tools 是 Weft 固定操作入口：`resource_list`、`resource_inspect`、`resource_call(resource_id, tool, target?, args)`。两层工具使用同一 ToolContract 与定义投影；一级入口的 guidelines 合入协议说明，二级工具的 description、guidelines、args 及实现的 target/result schema 在资源链接通知或 inspect 中提供，不进入顶层 tools。核心工具与资源平级定义，通过后端实现声明支持关系。链接资源激活匹配工具，agent 的 tools/excludeTools 等外部策略再决定是否允许使用；资源实例不持有工具列表或白名单。Weft 入口不受名单约束，也不开放插件注册。请求能力视图从统一目录选择实现并应用链接状态和外部策略；批次按实际实现的副作用和调度策略执行。当前原生资源工具只有目录 list；文件读取、编辑、MCP 与代理间通信待接入。
 
 一个执行轮次内可有多次模型请求。轮次请求上限采用 agent.maxTurns，空值为 32；timeout 空值为 600 秒，取消协作式中止，不承诺撤销副作用。maxCost 尚无价格契约，设置后明确拒绝启动。
 

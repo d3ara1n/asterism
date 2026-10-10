@@ -1,45 +1,37 @@
-import { z } from "zod";
-import { jsonSchema, toolOutcomeSchema, type Json, type ToolOutcome } from "../shared/model.ts";
+import { toolOutcomeSchema, type Json, type ToolOutcome } from "../shared/model.ts";
 import type { ToolDeclaration } from "../model/contract.ts";
-import { schemaOf, type Invocation } from "../tools/contract.ts";
+import type { ToolContract } from "../shared/module-contract.ts";
+import type { Invocation } from "../tools/contract.ts";
+import { declareTool } from "../tools/definition.ts";
 import { jsonArgumentHint, validationMessage } from "../tools/validation.ts";
+import { ResourceCall, ResourceInspect, ResourceList } from "../tools/weft.ts";
 import type { AgentCapabilities } from "./capabilities.ts";
 
 /** Weft 自身的固定操作入口；只在 provider 协议中表示为 tools，不属于资源工具目录。 */
 interface WeftAction {
-  name: string;
-  description: string;
-  schema: z.ZodType<Json>;
+  tool: ToolContract;
   resolve(args: Json, capabilities: AgentCapabilities): Invocation | ToolOutcome;
 }
 export interface PendingCall { callId: string; name: string; arguments: Json }
-const listSchema = z.strictObject({});
-const inspectSchema = z.strictObject({ resource_id: z.string().min(1) });
-const callSchema = z.strictObject({
-  resource_id: z.string().min(1),
-  tool: z.string().min(1),
-  target: jsonSchema.default(null).describe("A JSON value matching this resource tool's target schema from resource_inspect. Pass objects directly, e.g. {\"path\":\"subdir\"}; use null only when supported. Do not JSON-encode the value into a string."),
-  args: jsonSchema.default({}).describe("A JSON value matching the tool's args schema from resource_inspect. Pass an object directly when the schema requires one, e.g. {}. Do not JSON-encode the value into a string."),
-});
 
 // 此目录由 Weft 维护；可扩展的工具位于独立 ToolRegistry，不注册或替换这些入口。
 const actions: readonly WeftAction[] = [
-  { name: "resource_list", description: "List resources currently linked to you.", schema: listSchema,
+  { tool: ResourceList,
     resolve: (_args, capabilities) => ({ effect: "read", execution: "parallel", async execute() {
       const value = { resources: capabilities.list() };
       return { kind: "succeeded", model: value, data: value };
     } }) },
-  { name: "resource_inspect", description: "Inspect a linked resource's live state and its available tools with parameter schemas.", schema: inspectSchema,
-    resolve: (args, capabilities) => ({ effect: "read", execution: "parallel", execute: () => capabilities.inspect(inspectSchema.parse(args).resource_id) }) },
-  { name: "resource_call", description: `Use a tool on a linked resource. Follow the target and args schemas supplied for the selected resource tool; resource_inspect provides both schemas. target locates an object within the resource; args follows the shared tool contract. ${jsonArgumentHint}`, schema: callSchema,
+  { tool: ResourceInspect,
+    resolve: (args, capabilities) => ({ effect: "read", execution: "parallel", execute: () => capabilities.inspect(ResourceInspect.argsSchema.parse(args).resource_id) }) },
+  { tool: ResourceCall,
     resolve(args, capabilities) {
-      const { resource_id, tool, target, args: inner } = callSchema.parse(args);
+      const { resource_id, tool, target, args: inner } = ResourceCall.argsSchema.parse(args);
       return capabilities.resolve(resource_id, tool, target, inner);
     } },
 ];
 
 export function weftDeclarations(): ToolDeclaration[] {
-  return actions.map(({ name, description, schema }) => ({ name, description, parameters: schemaOf(schema) }));
+  return actions.map(({ tool }) => declareTool(tool));
 }
 
 /** 批次先解析实际资源工具，再按其执行策略调度；一级入口不消费 agent 的工具白名单。 */
@@ -48,10 +40,10 @@ export async function executeWeftBatch(calls: readonly PendingCall[], capabiliti
   started?: (call: PendingCall) => void): Promise<void> {
   const resolved = calls.map(call => {
     let result: Invocation | ToolOutcome;
-    const action = actions.find(action => action.name === call.name);
+    const action = actions.find(action => action.tool.name === call.name);
     if (!action || !capabilities) result = { kind: "rejected", error: { code: "operation_unavailable", message: "This Weft operation is unavailable." } };
     else {
-      const parsed = action.schema.safeParse(call.arguments);
+      const parsed = action.tool.argsSchema.safeParse(call.arguments);
       if (!parsed.success) result = { kind: "rejected", error: { code: "invalid_arguments",
         message: `${validationMessage(parsed.error, call.name)}. Correct the reported fields and retry.${call.name === "resource_call" ? ` ${jsonArgumentHint}` : ""}` } };
       else result = action.resolve(parsed.data, capabilities);

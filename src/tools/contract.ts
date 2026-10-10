@@ -1,4 +1,4 @@
-import { z } from "zod";
+import type { z } from "zod";
 import { jsonSchema, type Json } from "../shared/json.ts";
 import type { ToolOutcome } from "../shared/model.ts";
 import type { ImplementationContract, ToolContract } from "../shared/module-contract.ts";
@@ -21,13 +21,10 @@ export interface ToolImplementation {
   reference: ContractReference;
   resourceKind: string;
   tool: ToolContract;
-  description: string;
+  effect: "read" | "write";
   targetSchema: z.ZodType<Json>;
   resultSchema: z.ZodType<Json>;
   prepare(resource: FoldedObject, target: Json, args: Json): Invocation | ToolOutcome;
-}
-export function schemaOf(schema: z.ZodType<Json>): Json {
-  return jsonSchema.parse(z.toJSONSchema(schema));
 }
 export function implement<S extends Json, T extends Json, A extends Json, O extends Json>(
   contract: ImplementationContract<S, T, A, O>,
@@ -38,7 +35,7 @@ export function implement<S extends Json, T extends Json, A extends Json, O exte
 ): ToolImplementation {
   const identity = reference(contract);
   return {
-    reference: identity, resourceKind: contract.resource.kind, tool: contract.tool, description: contract.description,
+    reference: identity, resourceKind: contract.resource.kind, tool: contract.tool, effect: contract.effect,
     targetSchema: contract.targetSchema, resultSchema: contract.schema,
     prepare(resource, target, args) {
       const state = contract.resource.stateSchema.safeParse(resource.data);

@@ -24,6 +24,7 @@ function setup() {
   const root = join(base, "root");
   const outside = join(base, "outside");
   mkdirSync(root); mkdirSync(outside);
+  mkdirSync(join(root, "subdir"));
   writeFileSync(join(root, "a.txt"), "hello"); writeFileSync(join(outside, "secret.txt"), "secret");
   const objects = new ObjectStore(join(base, "objects"));
   const resource: FoldedObject = { id: "d1", kind: "directory", title: "root", data: { path: root } };
@@ -41,21 +42,21 @@ async function invoke(capabilities: AgentCapabilities, name: string, args: Json)
 }
 
 describe("工具与资源的匹配及授权", () => {
-  it("目录读取限制在根内：拒绝 ..、绝对路径与指向外部的符号链接", async () => {
+  it("目录列举限制在根内：拒绝 ..、绝对路径与指向外部的符号链接", async () => {
     const { root, outside, resource, scope } = setup();
-    symlinkSync(join(outside, "secret.txt"), join(root, "link.txt"));
-    const read = (path: string) => invoke(scope(), "resource_call", { resource_id: resource.id, tool: "read", target: { path }, args: {} });
-    expect(await read("a.txt")).toMatchObject({ kind: "succeeded", model: { text: "hello" } });
-    for (const path of ["../outside/secret.txt", "../missing/secret.txt", "link.txt"])
-      expect(await read(path)).toMatchObject({ kind: "rejected", error: { code: "outside_resource" } });
-    expect(await read(join(outside, "secret.txt"))).toMatchObject({ kind: "rejected", error: { code: "absolute_path" } });
+    symlinkSync(outside, join(root, "link"));
+    const list = (path: string) => invoke(scope(), "resource_call", { resource_id: resource.id, tool: "list", target: { path }, args: {} });
+    expect(await list("subdir")).toMatchObject({ kind: "succeeded", model: { entries: [] } });
+    for (const path of ["../outside", "../missing", "link"])
+      expect(await list(path)).toMatchObject({ kind: "rejected", error: { code: "outside_resource" } });
+    expect(await list(outside)).toMatchObject({ kind: "rejected", error: { code: "absolute_path" } });
   });
 
   it("resource_call 只作用于已链接资源，参数不合 schema 时指向 inspect 契约", async () => {
     const { scope } = setup();
-    expect(await invoke(scope(), "resource_call", { resource_id: "d1", tool: "read", target: { path: "a.txt" }, args: {} })).toMatchObject({ kind: "succeeded" });
-    expect(await invoke(scope(), "resource_call", { resource_id: "d1", tool: "read", args: {} })).toMatchObject({ kind: "rejected", error: { code: "invalid_arguments" } });
-    expect(await invoke(scope([]), "resource_call", { resource_id: "d1", tool: "read", target: { path: "a.txt" }, args: {} })).toMatchObject({ kind: "rejected", error: { code: "access_denied" } });
+    expect(await invoke(scope(), "resource_call", { resource_id: "d1", tool: "list", args: {} })).toMatchObject({ kind: "succeeded" });
+    expect(await invoke(scope(), "resource_call", { resource_id: "d1", tool: "list", target: { path: 42 }, args: {} })).toMatchObject({ kind: "rejected", error: { code: "invalid_arguments" } });
+    expect(await invoke(scope([]), "resource_call", { resource_id: "d1", tool: "list", args: {} })).toMatchObject({ kind: "rejected", error: { code: "access_denied" } });
   });
 
   it("字符串化的 target 和 args 同时报出类型错误，按提示修正后即可执行", async () => {
@@ -76,7 +77,7 @@ describe("工具与资源的匹配及授权", () => {
 
   it("校验错误保留嵌套字段与多余键，一级入口也返回具体原因", async () => {
     const { scope } = setup();
-    const result = await invoke(scope(), "resource_call", { resource_id: "d1", tool: "read", target: { path: 42, extra: true }, args: {} });
+    const result = await invoke(scope(), "resource_call", { resource_id: "d1", tool: "list", target: { path: 42, extra: true }, args: {} });
     expect(result).toMatchObject({ kind: "rejected", error: { message: expect.stringMatching(/target\.path: [^\n]*expected string, received number/) } });
     expect(result).toMatchObject({ error: { message: expect.stringContaining('Unrecognized key: "extra"') } });
     expect(await invoke(scope(), "resource_inspect", { resource_id: 42 })).toMatchObject({
@@ -88,18 +89,17 @@ describe("工具与资源的匹配及授权", () => {
     const { root, scope } = setup();
     symlinkSync("loop", join(root, "loop"));
     for (const [tool, path, code, hint] of [
-      ["read", "missing.txt", "path_not_found", "Use list"],
-      ["list", "a.txt", "not_directory", "use read"],
-      ["read", ".", "not_file", "Use list"],
-      ["read", "a.txt/child", "not_directory", "correct target.path"],
-      ["read", "loop", "symlink_loop", "repair the link"],
-      ["read", "bad\0path", "invalid_path", "NUL"],
+      ["list", "missing", "path_not_found", "Use list"],
+      ["list", "a.txt", "not_directory", "correct target.path"],
+      ["list", "a.txt/child", "not_directory", "correct target.path"],
+      ["list", "loop", "symlink_loop", "repair the link"],
+      ["list", "bad\0path", "invalid_path", "NUL"],
     ]) {
       expect(await invoke(scope(), "resource_call", { resource_id: "d1", tool: tool!, target: { path: path! }, args: {} }))
         .toMatchObject({ error: { code, message: expect.stringContaining(hint!) } });
     }
     // 修正不存在的目标后，同一能力视图可直接重试。
-    expect(await invoke(scope(), "resource_call", { resource_id: "d1", tool: "read", target: { path: "a.txt" }, args: {} }))
+    expect(await invoke(scope(), "resource_call", { resource_id: "d1", tool: "list", target: { path: "subdir" }, args: {} }))
       .toMatchObject({ kind: "succeeded" });
     rmSync(root, { recursive: true });
     expect(await invoke(scope(), "resource_call", { resource_id: "d1", tool: "list", target: null, args: {} }))
@@ -109,15 +109,15 @@ describe("工具与资源的匹配及授权", () => {
       .toMatchObject({ error: { code: "resource_not_directory", message: expect.stringContaining("relink") } });
   });
 
-  it("一个 read 定义匹配两类资源；链接任何支持的资源即可激活，list 只匹配目录", async () => {
+  it("list 只匹配目录；笔记与目录都不再提供读取工具", async () => {
     const { resource, note, tools, scope } = setup();
-    expect(tools.match(resource).map(tool => tool.tool.name)).toEqual(["list", "read"]);
-    expect(tools.match(note).map(tool => tool.tool.name)).toEqual(["read"]);
+    expect(tools.match(resource).map(tool => tool.tool.name)).toEqual(["list"]);
+    expect(tools.match(note).map(tool => tool.tool.name)).toEqual([]);
     expect(tools.match({ id: "a", kind: "agent", title: "A", data: {} })).toEqual([]);
     expect(await invoke(scope([note]), "resource_call", { resource_id: note.id, tool: "read", args: {} }))
-      .toMatchObject({ kind: "succeeded", model: { text: "note text" } });
+      .toMatchObject({ kind: "rejected", error: { code: "tool_unavailable" } });
     expect(await invoke(scope(), "resource_call", { resource_id: resource.id, tool: "read", target: { path: "a.txt" }, args: {} }))
-      .toMatchObject({ kind: "succeeded", model: { text: "hello" } });
+      .toMatchObject({ kind: "rejected", error: { code: "tool_unavailable" } });
     expect(await invoke(scope([note]), "resource_call", { resource_id: note.id, tool: "list", args: {} }))
       .toMatchObject({ kind: "rejected", error: { code: "tool_unavailable" } });
   });
@@ -134,11 +134,11 @@ describe("工具与资源的匹配及授权", () => {
     expect(await invoke(capabilities, "resource_inspect", { resource_id: resource.id })).toMatchObject({ kind: "succeeded", model: { state: { exists: false } } });
   });
 
-  it("允许根内以双点开头的文件，环境文件也拒绝越界符号链接", async () => {
+  it("允许根内以双点开头的目录，环境文件也拒绝越界符号链接", async () => {
     const { root, outside, resource, resources, scope } = setup();
-    writeFileSync(join(root, "..notes"), "inside");
-    expect(await invoke(scope(), "resource_call", { resource_id: resource.id, tool: "read", target: { path: "..notes" }, args: {} }))
-      .toMatchObject({ kind: "succeeded", model: { text: "inside" } });
+    mkdirSync(join(root, "..notes"));
+    expect(await invoke(scope(), "resource_call", { resource_id: resource.id, tool: "list", target: { path: "..notes" }, args: {} }))
+      .toMatchObject({ kind: "succeeded", model: { entries: [] } });
     symlinkSync(join(outside, "secret.txt"), join(root, "AGENTS.md"));
     expect(await resources.context([resource])).toEqual([]);
   });
@@ -146,9 +146,9 @@ describe("工具与资源的匹配及授权", () => {
   it.each(["read", "write"] as const)("独立的 %s 工具抛错按自身副作用分类", async effect => {
     const { resource, resources } = setup();
     const contract = defineImplementation({
-      ...defineData("test.broken", 1, z.null()), resource: Directory,
-      tool: defineTool("broken", z.strictObject({})), targetSchema: z.null(),
-      description: "Fails.", effect, execution: "parallel",
+      ...defineData("test.broken", 1, z.null().describe("No result.")), resource: Directory,
+      tool: defineTool({ name: "broken", description: "Fails.", guidelines: [], argsSchema: z.strictObject({}).describe("No parameters.") }),
+      targetSchema: z.null().describe("Select the whole resource."), effect, execution: "parallel",
     });
     const tools = new ToolRegistry([implement(contract, {
       async call() { throw new Error("Synthetic failure"); },
@@ -160,25 +160,35 @@ describe("工具与资源的匹配及授权", () => {
 
   it("外部白名单不改变支持关系；摘要、inspect 和调用使用同一份筛选结果", async () => {
     const { resource, tools, scope } = setup();
-    const capabilities = scope([resource], { tools: ["read"], excludeTools: null });
+    const capabilities = scope([resource], { tools: ["list"], excludeTools: null });
     const description = capabilities.describe(resource.id);
-    expect(description).toEqual([expect.objectContaining({ name: "read" })]);
-    expect(tools.match(resource).map(tool => tool.tool.name)).toEqual(["list", "read"]);
+    expect(description).toHaveLength(1);
+    expect((description as Json[])[0]).toMatchObject({
+      name: "list", description: expect.stringContaining("List the entries"),
+      guidelines: expect.arrayContaining([expect.stringContaining("truncation")]),
+      args: { description: expect.stringContaining("empty object") },
+      target: { description: expect.stringContaining("resource root") },
+      result: { description: expect.stringContaining("directory listing"),
+        properties: { truncated: { description: expect.stringContaining("incomplete") } } },
+    });
+    expect(tools.match(resource).map(tool => tool.tool.name)).toEqual(["list"]);
     expect(await invoke(capabilities, "resource_inspect", { resource_id: resource.id }))
       .toMatchObject({ kind: "succeeded", model: { tools: description } });
-    expect(await invoke(capabilities, "resource_call", { resource_id: resource.id, tool: "read", target: { path: "a.txt" }, args: {} }))
-      .toMatchObject({ kind: "succeeded" });
     expect(await invoke(capabilities, "resource_call", { resource_id: resource.id, tool: "list", args: {} }))
+      .toMatchObject({ kind: "succeeded" });
+    expect(await invoke(capabilities, "resource_call", { resource_id: resource.id, tool: "read", args: {} }))
       .toMatchObject({ kind: "rejected", error: { code: "tool_unavailable" } });
     expect(weftDeclarations().map(action => action.name)).toEqual(["resource_list", "resource_inspect", "resource_call"]);
+    expect(weftDeclarations().find(action => action.name === "resource_call")?.description)
+      .toContain("Follow the selected tool's guidelines");
   });
 
   it("外部策略可组合，资源与工具定义无需变更", async () => {
     const { resource, resources, tools } = setup();
-    const agent = agentToolPolicy({ tools: ["read", "list"], excludeTools: null });
-    const capabilities = new AgentCapabilities(resources, tools, [resource], name => agent(name) && name !== "read");
-    expect(capabilities.describe(resource.id)).toEqual([expect.objectContaining({ name: "list" })]);
-    expect(await invoke(capabilities, "resource_call", { resource_id: resource.id, tool: "read", target: { path: "a.txt" }, args: {} }))
+    const agent = agentToolPolicy({ tools: ["list"], excludeTools: null });
+    const capabilities = new AgentCapabilities(resources, tools, [resource], name => agent(name) && name !== "list");
+    expect(capabilities.describe(resource.id)).toEqual([]);
+    expect(await invoke(capabilities, "resource_call", { resource_id: resource.id, tool: "list", args: {} }))
       .toMatchObject({ kind: "rejected", error: { code: "tool_unavailable" } });
   });
 
@@ -188,18 +198,18 @@ describe("工具与资源的匹配及授权", () => {
       const capabilities = scope([resource], { tools, excludeTools: null });
       expect(await invoke(capabilities, "resource_list", {})).toMatchObject({ kind: "succeeded" });
       expect(await invoke(capabilities, "resource_inspect", { resource_id: resource.id })).toMatchObject({ kind: "succeeded", model: { tools: [] } });
-      expect(await invoke(capabilities, "resource_call", { resource_id: resource.id, tool: "read", target: { path: "a.txt" }, args: {} }))
+      expect(await invoke(capabilities, "resource_call", { resource_id: resource.id, tool: "list", args: {} }))
         .toMatchObject({ kind: "rejected", error: { code: "tool_unavailable" } });
     }
   });
 
   it("请求内固定策略与资源身份，下一次请求才采用变更", async () => {
     const { resource, scope } = setup();
-    const policy = { tools: ["read"], excludeTools: null };
+    const policy = { tools: ["list"], excludeTools: null };
     const capabilities = scope([resource], policy);
     policy.tools.length = 0;
     resource.data.path = "/no-longer-linked";
-    expect(await invoke(capabilities, "resource_call", { resource_id: resource.id, tool: "read", target: { path: "a.txt" }, args: {} }))
+    expect(await invoke(capabilities, "resource_call", { resource_id: resource.id, tool: "list", args: {} }))
       .toMatchObject({ kind: "succeeded" });
     expect(scope([resource], policy).describe(resource.id)).toEqual([]);
   });
@@ -210,10 +220,10 @@ describe("工具与资源的匹配及授权", () => {
     controller.abort();
     const results: ToolOutcome[] = [];
     await executeWeftBatch([{ callId: "cancelled", name: "resource_call",
-      arguments: { resource_id: resource.id, tool: "read", target: { path: "a.txt" }, args: {} } }],
+      arguments: { resource_id: resource.id, tool: "list", args: {} } }],
     scope(), controller.signal, (_call, result) => results.push(result));
     expect(results).toEqual([{
-      kind: "cancelled", message: "The operation was not started.", implementation: { id: "weft.directory.read", version: 1 },
+      kind: "cancelled", message: "The operation was not started.", implementation: { id: "weft.directory.list", version: 1 },
     }]);
   });
 
@@ -221,9 +231,9 @@ describe("工具与资源的匹配及授权", () => {
     const { resource, resources } = setup();
     const order: string[] = [];
     const contract = defineImplementation({
-      ...defineData("test.work", 1, z.string()), resource: Directory,
-      tool: defineTool("work", z.strictObject({ id: z.string() })), targetSchema: z.null(),
-      description: "Work.", effect: "read", execution,
+      ...defineData("test.work", 1, z.string().describe("The completed work ID.")), resource: Directory,
+      tool: defineTool({ name: "work", description: "Work.", guidelines: [], argsSchema: z.strictObject({ id: z.string() }).describe("Identify the work.") }),
+      targetSchema: z.null().describe("Select the whole resource."), effect: "read", execution,
     });
     const tools = new ToolRegistry([implement(contract, {
       async call(_state, _target, { id }) {

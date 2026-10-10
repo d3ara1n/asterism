@@ -16,7 +16,7 @@
 ## 第二批
 
 - [x] 资源 created / 加入移除工作台 / attach / detach 事件节点；链接通知投影给模型，加入移除只重建视图。
-- [x] `resource_list` / `resource_inspect` / `resource_call` 骨架；笔记 read 迁入。
+- [x] `resource_list` / `resource_inspect` / `resource_call` 骨架与目录 list；两层共用工具定义和指导投影。
 - [x] 代理控制器读取已链接目录的 AGENTS.md 组装系统提示词。
 - [x] notice 通道接入错误、缓存过期、预算提示。
 
@@ -33,7 +33,7 @@
 - [x] **块级计量与响应投影**：移除 response_end；迟到终态只追加一次并绑定响应最高序号块，查询时合并 usage、服务端 responseId 与原始/归一化结束原因。唯一约束防止重复计量，原始块与游标不变；SQL 视图支持筛选汇总，无块异常由诊断 notice 留档。
 - [x] **请求起点关联**：块保存请求取用的路径末端；投影据此组合响应并后置期间事件，包括首块前事件、并行代理的不可见起点和工具执行期间事件。原始时序不改，下一请求保留已发送消息前缀，历史分叉只消费当前路径。
 - [x] **资源变更的生效边界**：消息路径、配置与资源授权在每次模型请求开始时固定，连同该响应的工具批次使用；期间事件按真实顺序记录，下一次请求重新取用。已修正整轮冻结并同步文档；同一轮内的下一请求采用新授权已有契约测试。
-- [x] **资源、工具与外部策略分离**：ResourceRegistry 与 ToolRegistry 平级；共享工具契约固定 args，后端实现定义 target/result、支持关系和 handler。请求能力视图先匹配已链接资源，再应用 agent.tools/excludeTools 等外部策略；通知、inspect 与 call 共用同一结果。固定 Weft 入口不进入工具目录，不开放插件注册；批次采用实际实现的副作用与调度策略。
+- [x] **资源、工具与外部策略分离**：ResourceRegistry 与 ToolRegistry 平级；共享工具契约固定 description、guidelines 与 args，后端实现定义含描述的 target/result、支持关系和 handler。请求能力视图先匹配已链接资源，再应用 agent.tools/excludeTools 等外部策略；通知、inspect 与 call 共用同一结果。固定 Weft 入口不进入工具目录，不开放插件注册；批次采用实际实现的副作用与调度策略。
 - [x] **模块化调用与展示**：纯契约、runtime、renderer 同目录分入口；资源卡片携带版本化投影，工具结果保存实现 ID/版本与当次数据。笔记、目录、代理卡片及工具结果改走注册目录；无对应 renderer 时回退原始数据。
-- [x] **target 定位参数**：resource_call 独立携带 target，由工具实现解释；目录 read/list 的路径转入 target，笔记 read 使用 null，args 保持共享工具契约。
+- [x] **target 定位参数**：resource_call 独立携带 target，由工具实现解释；目录 list 使用 null 或 target.path，args 保持共享工具契约。
 - [ ] **直接文件资源身份**：另行确定直接文件资源与目录内 path 定位的身份关系，以及 edit 的前置版本条件；target 接口已定，不因目录包含可编辑文件而把目录自身当作文本。

@@ -47,11 +47,13 @@ Weft 操作入口是软件提供的外围接口，仅在 provider 协议中表�
 
 上述三个固定入口称一级工具，是协议 `tools` 中的工具，代表 Weft 与工作台的操作界面；经 `resource_call` 使用的动态资源工具称二级工具，是模型完成实际任务的主要工具。层级描述调用关系，不表示产品中的重要性；可管理、可扩展的核心工具目录属于资源工具。用户视图需区分两类调用，至少使用不同标签；资源工具的专用调用 renderer 由其实现所在功能模块提供。
 
-资源与工具独立定义：资源契约描述类型与状态；共享工具契约只规定工具名称与 args schema。后端的工具实现声明自己支持的资源类型、target schema、result schema、读写副作用和调度策略，并提供 handler。一个 read 契约可以对应笔记、目录等多个实现，不在公共 read 函数中集中判断资源类型。资源实例不保存工具列表或白名单。
+资源与工具独立定义：资源契约描述类型与状态；工具契约统一规定 name、description、guidelines 与 args schema。description 说明能力和适用场景，guidelines 说明选定后的使用规则，参数 schema 说明字段语义，不另设 snippet。后端的工具实现声明自己支持的资源类型、target schema、result schema、读写副作用和调度策略，并提供 handler；实现不重复或覆写工具的 description/guidelines。同一工具可对应多个实现，用法与行为含义保持一致，资源实例不保存工具列表或白名单。
 
-target 是 `resource_call` 的定位参数，由选中的实现直接解释，不要求使用 path，也不引入通用目标解析层。笔记 read 接受 null；目录 read 接受 `{path}`，表示目录内的文件；游戏工具可接受 `{piece}`。args 始终遵循共享工具契约，target 与 result 随实现变化。注册器拒绝同名工具的 args 冲突，以及同一资源类型、工具名的多个当前实现。
+target 是 `resource_call` 的定位参数，由选中的实现直接解释，不要求使用 path，也不引入通用目标解析层。目录 list 接受 null 或 `{path}`，游戏工具可接受 `{piece}`。args 始终遵循共享工具契约，target 与 result 随实现变化。三种 schema 都须有整体 description，字段说明随 schema 提供；target/result 的描述由实现解释定位规则与返回含义。注册器拒绝同名工具的 description、guidelines、args schema（含描述）或读写属性冲突，以及同一资源类型、工具名的多个当前实现。不同用法或行为应另定义工具。
 
-入口参数说明与实现描述明确要求直接传递符合 schema 的 JSON 值：对象保持为对象，null 保持为 null，不先编码成字符串。一级入口提供通用传参规则，资源实现提供具体类型、定位基准和使用示例。
+入口指导与 schema 描述明确要求直接传递符合 schema 的 JSON 值：对象保持为对象，null 保持为 null，不先编码成字符串。一级入口提供通用传参规则，共享工具定义提供操作用法，资源实现通过 target/result schema 提供定位与结果说明。
+
+一级入口与二级工具使用同一个 ToolContract、defineTool 和定义投影；层级由装配与执行位置决定。一级入口将 guidelines 合入协议工具的 description，二级工具在链接通知与 inspect 中提供结构化 description、guidelines 与 args schema，再附加实现的 target/result schema。模型适配器中的 ToolDeclaration 只是 provider 传输投影，不是另一份工具定义。插件可以声明工具或共享纯契约库，无需将工具加入 Weft 的内置声明文件。
 
 每次请求先取得已链接资源，再由工具目录匹配支持关系，最后应用 agent.tools/excludeTools 等外部策略。支持关系回答“工具能否操作这个资源”，外部策略回答“当前代理是否被允许使用”；两者独立。链接通知、inspect 和实际调用共用这份能力视图及同一工具定义，避免维护另一份名称或 schema。
 
@@ -69,7 +71,7 @@ Weft 入口集合由软件维护，外部工具策略只检查 `resource_call` �
 
 同一响应的工具调用共同收束后，才统一把结果交给模型发起下一次请求。工具声明并行或顺序，含顺序工具的批次按原顺序执行。输出截断、无终态流与不完整参数不启动工具。
 
-工具结局为 succeeded / rejected / failed / cancelled / partial / unknown；工具一旦开始必有结局，用户打断记 cancelled，写操作抛错且无法判断影响时记 unknown。已选定实现的结局保存其 ID 与版本。成功或部分结果经该实现的 result schema 校验，保存 `data` 与当次模型投影 `model`；实现可提供 `toModel`，默认使用结构化结果。工具结果随 toolcall 节点内联保存，不另设产物实体。
+工具结局为 succeeded / rejected / failed / cancelled / partial / unknown；工具一旦开始必有结局，用户打断记 cancelled，写操作抛错且无法判断影响时记 unknown。已选定实现的结局保存其 ID 与版本。成功或部分结果经该实现的 result schema 校验，保存 `data` 与当次模型投影 `model`；实现可提供 `toModel`，默认使用结构化结果，自定义投影保留结果契约的含义。工具结果随 toolcall 节点内联保存，不另设产物实体。
 
 前端按保存的实现 ID/版本选取结果组件，只消费当次保存的数据；不重新解析当前资源或执行工具。找不到对应版本或数据不合契约时显示原始数据。视图与执行代码在同一功能模块内维护，通过纯契约关联，见 [资源扩展契约](architecture.md#资源扩展契约)。
 

@@ -3,7 +3,8 @@ import type { Json, ToolOutcome } from "../shared/model.ts";
 import type { FoldedObject } from "../session/fold.ts";
 import type { ResourceRegistry } from "../resources/registry.ts";
 import type { ToolRegistry } from "../tools/registry.ts";
-import { schemaOf, type Invocation, type ToolImplementation } from "../tools/contract.ts";
+import type { Invocation, ToolImplementation } from "../tools/contract.ts";
+import { projectTool, schemaOf } from "../tools/definition.ts";
 
 /** 外部工具策略；支持关系、资源链接与这层策略分别判断。 */
 export type ToolPolicy = (name: string) => boolean;
@@ -31,8 +32,8 @@ export class AgentCapabilities {
 
   describe(id: string): Json {
     return (this.linked.get(id)?.tools ?? []).map(implementation => ({
-      name: implementation.tool.name, implementation: implementation.reference, description: implementation.description,
-      args: schemaOf(implementation.tool.argsSchema), target: schemaOf(implementation.targetSchema), result: schemaOf(implementation.resultSchema),
+      ...projectTool(implementation.tool), implementation: implementation.reference,
+      target: schemaOf(implementation.targetSchema), result: schemaOf(implementation.resultSchema),
     }));
   }
 

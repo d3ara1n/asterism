@@ -5,7 +5,7 @@ import { SessionError } from "../../session/tree.ts";
 import { implementResource } from "../../resources/contract.ts";
 import { implement } from "../../tools/contract.ts";
 import type { RuntimeModuleFactory } from "../runtime-contract.ts";
-import { Directory, DirectoryView, DirectoryRead, DirectoryList } from "./contract.ts";
+import { Directory, DirectoryView, DirectoryList } from "./contract.ts";
 import { withinDirectory } from "./paths.ts";
 import { failed, filesystemFailure } from "./errors.ts";
 
@@ -60,22 +60,6 @@ export default (() => ({
         } catch (error) {
           signal.throwIfAborted();
           return filesystemFailure(error, "List target directory");
-        }
-      },
-    }),
-    implement(DirectoryRead, {
-      async call(state, target, _args, { signal }) {
-        try {
-          const resolved = await withinDirectory(state.path, target.path);
-          signal.throwIfAborted();
-          const info = await stat(resolved);
-          if (!info.isFile()) return failed("not_file", "target.path is not a regular file. Use list for a directory, then select a regular file to read.");
-          if (info.size > 256 * 1024) return failed("too_large", "The file exceeds the 256 KB read limit. This tool does not support partial reads; choose a smaller file or explain the limit to the user.");
-          const text = await readFile(resolved, "utf8");
-          return { kind: "succeeded", data: { path: target.path, text } };
-        } catch (error) {
-          signal.throwIfAborted();
-          return filesystemFailure(error, "Read target file");
         }
       },
     }),
