@@ -2,8 +2,8 @@ import * as radix from "@radix-ui/colors";
 import { z } from "zod";
 
 /**
- * 外观主题：亮暗模式 + 主题色（accent）+ 灰色（gray）+ 圆角、密度、画布纹理；色值来自 Radix Colors。renderer 把解析结果写到 :root 的 CSS 变量上，
- * 组件只消费 shadcn 语义 token。存储由主进程经 electron-store 落在平台用户数据目录。
+ * 外观设置：主题、字体、画布纹理与思考展示偏好。主题色值来自 Radix Colors，renderer 写入 :root 的 CSS 变量，
+ * 组件消费 shadcn 语义 token。存储由主进程经 electron-store 落在平台用户数据目录。
  */
 export const modes = ["system", "light", "dark"] as const;
 export const accentIds = ["jade", "teal", "blue", "indigo", "violet", "crimson", "orange", "amber"] as const;
@@ -40,9 +40,12 @@ export const appearanceSchema = z.object({
   codeFont: fontFamilySchema.catch(null),
   /** 代码字号（px），null 跟随所在界面文字。 */
   codeFontSize: z.number().int().min(codeFontSizes[0]).max(codeFontSizes[codeFontSizes.length - 1]).nullable().default(null).catch(null),
+  thinkingAutoExpand: z.boolean().catch(true),
+  thinkingAutoCollapse: z.boolean().catch(true),
 });
 export type Appearance = z.infer<typeof appearanceSchema>;
-export const defaultAppearance: Appearance = { mode: "system", accent: "jade", gray: "sage", density: "standard", radius: "md", canvas: "dots", uiFont: null, codeFont: null, codeFontSize: null };
+export const defaultAppearance: Appearance = { mode: "system", accent: "jade", gray: "sage", density: "standard", radius: "md", canvas: "dots", uiFont: null, codeFont: null, codeFontSize: null,
+  thinkingAutoExpand: true, thinkingAutoCollapse: true };
 
 /** 读取的原始数据不可信：逐项回退到默认值，不因单项损坏丢弃整份设置。 */
 export function parseAppearance(raw: unknown): Appearance {

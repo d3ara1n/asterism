@@ -247,6 +247,15 @@ describe("AI SDK 适配契约", () => {
     expect(JSON.stringify(next)).toContain("signature-value"); expect(JSON.stringify(next)).not.toContain("userOnly");
   });
 
+  it("失败工具也只发送保存的模型投影，不泄漏界面产出、资源名称或执行元数据", () => {
+    const model = { kind: "cancelled", data: "Captured output", message: "Stopped." };
+    const messages = sdkMessages({ ...input, messages: [{ kind: "result", callId: "cancelled", name: "resource_call",
+      outcome: { kind: "cancelled", message: "Stopped.", data: { privateView: "GUI details" }, model,
+        implementation: { id: "test.hidden", version: 1 }, resource: { id: "r", kind: "directory", title: "GUI title" }, startedAt: 10, finishedAt: 20 } }] });
+    expect(messages).toEqual([{ role: "tool", content: [{ type: "tool-result", toolCallId: "cancelled", toolName: "resource_call",
+      output: { type: "error-json", value: model } }] }]);
+  });
+
   it("provider 错误脱敏且不自动重试；跨模型续接明确拒绝", async () => {
     const model = new MockLanguageModelV4({ doStream: async () => { throw new Error("secret-provider-header"); } });
     const adapter = new AiSdkAdapter(async () => "credential", () => model);

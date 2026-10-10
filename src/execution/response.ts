@@ -1,16 +1,20 @@
 import { ModelFailure, type ModelEvent, type StreamPart } from "../model/contract.ts";
 import type { Json, ToolOutcome } from "../shared/model.ts";
+import type { ToolInvocationInfo, ToolResult } from "../shared/tool-result.ts";
 import { emptyCompletion, type BlockCompletion, type LiveBlock, type NewNode } from "../shared/session.ts";
 
 type BufferedBlock = {
   part: StreamPart;
   ordinal: number;
   text: string;
+  startedAt: number;
   arguments: Json;
   continuation: Json;
   done: boolean;
   savedId: string | null;
   executing: boolean;
+  invocation: ToolInvocationInfo | null;
+  result: Extract<ToolResult, { kind: "running" }> | null;
 };
 export type LiveCall = BufferedBlock & { part: Extract<StreamPart, { kind: "toolcall" }> };
 
@@ -35,8 +39,8 @@ export class ResponseBuffer {
         throw new ModelFailure("protocol", "The provider started a duplicate response block.");
       }
       if (event.part.kind === "toolcall") this.callIds.add(event.part.callId);
-      this.blocks.set(event.part.id, { part: event.part, ordinal: this.blocks.size, text: "", arguments: null, continuation: null,
-        done: false, savedId: null, executing: false });
+      this.blocks.set(event.part.id, { part: event.part, ordinal: this.blocks.size, text: "", startedAt: Date.now(), arguments: null, continuation: null,
+        done: false, savedId: null, executing: false, invocation: null, result: null });
       return;
     }
     if (event.type === "finish") {
@@ -68,8 +72,9 @@ export class ResponseBuffer {
         responseId: this.identity.responseId, ordinal: block.ordinal };
       return block.part.kind === "toolcall"
         ? { ...base, kind: "toolcall", name: block.part.name, argumentsText: block.text, arguments: block.arguments,
-          state: block.executing ? "executing" : block.done ? "ready" : "input" }
-        : { ...base, kind: block.part.kind, text: block.text };
+          state: block.executing ? "executing" : block.done ? "ready" : "input", invocation: block.invocation, result: block.result }
+        : block.part.kind === "thinking" ? { ...base, kind: "thinking", text: block.text, startedAt: block.startedAt }
+          : { ...base, kind: "text", text: block.text };
     });
   }
 
@@ -77,8 +82,19 @@ export class ResponseBuffer {
     this.save(call, true, outcome);
   }
 
-  start(call: LiveCall): void {
+  prepare(call: LiveCall, info: ToolInvocationInfo): void {
+    call.invocation = info;
+  }
+
+  start(call: LiveCall, info: ToolInvocationInfo = {}): void {
     call.executing = true;
+    call.invocation = info;
+    call.result = { kind: "running", data: null };
+  }
+
+  publish(call: LiveCall, data: Json): void {
+    if (this.finalized || call.savedId || !call.executing) return;
+    call.result = { kind: "running", data };
   }
 
   /** 未执行的调用和未结束的块只留审计记录，已保存的块不重复追加。 */

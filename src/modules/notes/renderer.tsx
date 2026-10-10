@@ -12,5 +12,5 @@ export default {
         : <p className="type-body text-muted-foreground">{t.contentUnavailable}</p>}
     </div>,
   })],
-  results: [],
+  tools: [],
 } satisfies RendererModule;

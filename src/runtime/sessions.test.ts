@@ -13,6 +13,12 @@ import { sessionVersion } from "../shared/session.ts";
 import type { AgentSelection, Json } from "../shared/model.ts";
 import { projectForAgent } from "../session/projection.ts";
 import * as runtimeModules from "../modules/runtime.ts";
+import { z } from "zod";
+import { defineData } from "../shared/presentation.ts";
+import { defineImplementation, defineTool } from "../shared/module-contract.ts";
+import { Directory } from "../modules/filesystem/contract.ts";
+import { implement } from "../tools/contract.ts";
+import { ToolRegistry } from "../tools/registry.ts";
 
 const roots: string[] = [];
 type Snap = { workbench: { objects: { id: string; kind: string; presentation: { data: unknown } }[] } };
@@ -51,6 +57,91 @@ async function settled(service: ApplicationService) {
 }
 
 describe("会话运行时", () => {
+  it("工具产出进入独立进度，取消后保存产出与身份；移除资源并重开仍可重放", async () => {
+    let entered!: () => void;
+    const executing = new Promise<void>(resolve => { entered = resolve; });
+    let publish!: (data: { text: string }) => void;
+    const implementation = defineImplementation({
+      ...defineData("test.streaming", 1, z.strictObject({ text: z.string() }).describe("Captured output.")),
+      resource: Directory,
+      tool: defineTool({ name: "stream", description: "Stream output.", guidelines: [], argsSchema: z.strictObject({}).describe("No parameters.") }),
+      targetSchema: z.null().describe("Use the directory."), effect: "read", execution: "parallel",
+    });
+    const createModules = runtimeModules.createModules;
+    vi.spyOn(runtimeModules, "createModules").mockImplementation(services => ({
+      ...createModules(services),
+      tools: new ToolRegistry([implement(implementation, {
+        async call(_state, _target, _args, context) {
+          publish = context.publish;
+          publish({ text: "first" });
+          await new Promise<never>((_resolve, reject) => {
+            context.signal.addEventListener("abort", () => reject(context.signal.reason), { once: true });
+            entered();
+          });
+          return { kind: "succeeded", data: { text: "unreachable" } };
+        },
+        toModel: data => data.text,
+      })]),
+    }));
+    let resourceId = "", requests = 0;
+    const model: ModelAdapter = { version: "ai-sdk-v7/2", prepare: () => ({ async *stream() {
+      if (++requests === 2) {
+        yield { type: "part.start", part: { id: "c", kind: "toolcall", callId: "stream-call", name: "resource_call" } };
+        yield { type: "part.end", partId: "c", arguments: { resource_id: resourceId, tool: "stream", args: {} } };
+        yield { type: "finish", reason: "tool-calls", usage: null };
+      } else yield* reply();
+    } }) };
+    const events: SessionChanged[] = [];
+    const { service, root, start } = await setup(model, event => events.push(event));
+    const first = await execute(service, start); await settled(service);
+    const sessionId = first.sessionId, agentId = agentOf(first);
+    const created = await execute(service, { type: "resource.create", sessionId, kind: "directory",
+      input: { path: root, title: "Captured directory" }, position: { x: 0, y: 0 } });
+    resourceId = created.workbench.objects.find(object => object.kind === "directory")!.id;
+    await execute(service, { type: "link.set", sessionId, agentId, resourceId, linked: true });
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      await execute(service, agentCommand(sessionId, agentId, { type: "continue" }));
+      await executing;
+      const running = service.sessions.snapshot(sessionId);
+      expect(running.nodes.some(node => node.kind === "toolcall")).toBe(false);
+      expect(running.progress.live).toEqual([expect.objectContaining({
+        kind: "toolcall", state: "executing", result: { kind: "running", data: { text: "first" } },
+        invocation: expect.objectContaining({ resource: { id: resourceId, kind: "directory", title: "Captured directory" } }),
+      })]);
+      publish({ text: "first\nsecond" });
+      events.length = 0;
+      await vi.advanceTimersByTimeAsync(32);
+      expect(events).toEqual([expect.objectContaining({ kind: "session.progress", progress: expect.objectContaining({
+        live: [expect.objectContaining({ result: { kind: "running", data: { text: "first\nsecond" } } })],
+      }) })]);
+      expect(requests).toBe(2);
+    } finally {
+      await execute(service, agentCommand(sessionId, agentId, { type: "cancel" }));
+      await settled(service);
+      vi.useRealTimers();
+    }
+    const snapshot = service.sessions.snapshot(sessionId);
+    const saved = snapshot.nodes.find(node => node.kind === "toolcall")!;
+    expect(saved).toMatchObject({ complete: true, outcome: {
+      kind: "cancelled", data: { text: "first\nsecond" }, model: { kind: "cancelled", data: "first\nsecond" },
+      implementation: { id: "test.streaming", version: 1 }, resource: { id: resourceId, kind: "directory", title: "Captured directory" },
+      startedAt: expect.any(Number), finishedAt: expect.any(Number),
+    } });
+    expect(snapshot.progress.live).toEqual([]);
+    publish({ text: "too late" });
+    expect(service.sessions.snapshot(sessionId).nodes.find(node => node.id === saved.id)).toEqual(saved);
+    await execute(service, { type: "object.remove", sessionId, objectId: resourceId });
+    await service.close(); services.delete(service);
+    const reopened = new ApplicationService(root); services.add(reopened);
+    const history = reopened.sessions.snapshot(sessionId);
+    expect(history.nodes.find(node => node.id === saved.id)).toEqual(saved);
+    expect(projectForAgent(history.nodes, agentId).find(item => item.kind === "result")).toMatchObject({
+      outcome: { kind: "cancelled", model: { data: "first\nsecond" } },
+    });
+    expect(history.progress.live).toEqual([]);
+  });
+
   it("资源与布局命令只返回受理结果；历史读取统一对象与路径，布局保存不移动历史", async () => {
     const { service, start } = await setup();
     const first = await execute(service, start); await settled(service);

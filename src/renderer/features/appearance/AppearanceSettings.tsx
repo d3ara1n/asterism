@@ -8,6 +8,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemSeparator, ItemTitle } from "../../shared/ui/item";
 import { ToggleGroup, ToggleGroupItem } from "../../shared/ui/toggle-group";
 import { FontPicker } from "../../shared/ui/font-picker";
+import { Switch } from "../../shared/ui/switch";
+import { t } from "../../shared/i18n";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../shared/ui/select";
 import { ColorSwatch, SwatchGroup, TileSwatch } from "../../shared/ui/swatch";
 import { updateAppearance, useAppearance, useScheme } from "./state";
@@ -143,6 +145,20 @@ export function AppearanceSettings() {
         {([["dots", s("Dots", "点阵")], ["lines", s("Grid", "网格线")], ["cross", s("Crosses", "十字")], ["none", s("None", "无")]] as const).map(([v, text]) =>
           <TileSwatch key={v} value={v} label={text}><Texture kind={v} /></TileSwatch>)}
       </SwatchGroup>
+    </Section>
+
+    <Section title={t.thinkingTitle} hint={t.thinkingPreviewHint}>
+      <ItemGroup className="surface">
+        <Row label={t.thinkingAutoExpand} hint={t.thinkingAutoExpandHint}>
+          <Switch checked={appearance.thinkingAutoExpand} aria-label={t.thinkingAutoExpand}
+            onCheckedChange={thinkingAutoExpand => void updateAppearance({ thinkingAutoExpand })} />
+        </Row>
+        <ItemSeparator />
+        <Row label={t.thinkingAutoCollapse} hint={t.thinkingAutoCollapseHint}>
+          <Switch checked={appearance.thinkingAutoCollapse} aria-label={t.thinkingAutoCollapse}
+            onCheckedChange={thinkingAutoCollapse => void updateAppearance({ thinkingAutoCollapse })} />
+        </Row>
+      </ItemGroup>
     </Section>
 
     <PaletteDialog open={picking} onOpenChange={setPicking} appearance={appearance} />

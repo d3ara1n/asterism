@@ -1,6 +1,6 @@
-import type { ToolOutcome } from "../../shared/model.ts";
+import type { CallResult } from "../../tools/contract.ts";
 
-type Failure = Extract<ToolOutcome, { kind: "failed" | "rejected" }>;
+type Failure = Extract<CallResult<never>, { kind: "failed" | "rejected" }>;
 
 /** 文件系统预期失败携带可公开的原因与下一步；不返回原始异常中的宿主路径或堆栈。 */
 export class FilesystemError extends Error {

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { BlockCompletion, NewNode } from "../shared/session.ts";
 import type { ModelEvent } from "../model/contract.ts";
 import { ResponseBuffer } from "./response.ts";
@@ -17,6 +17,23 @@ const call: ModelEvent = { type: "part.start", part: { id: "c", kind: "toolcall"
 const finish: ModelEvent = { type: "finish", reason: "stop", usage: null };
 
 describe("响应块状态机", () => {
+  it("即时思考携带运行时块起点，读取和增量不会重新计时；结束后保留全文", () => {
+    const clock = vi.spyOn(Date, "now").mockReturnValue(1000);
+    try {
+      const { response, nodes } = setup();
+      response.accept({ type: "part.start", part: { id: "thought", kind: "thinking" } });
+      clock.mockReturnValue(4000);
+      response.accept({ type: "part.delta", partId: "thought", delta: "First" });
+      expect(response.live()[0]).toMatchObject({ kind: "thinking", text: "First", startedAt: 1000 });
+      clock.mockReturnValue(9000);
+      response.accept({ type: "part.delta", partId: "thought", delta: " second" });
+      expect(response.live()[0]).toMatchObject({ text: "First second", startedAt: 1000 });
+      response.accept({ type: "part.end", partId: "thought" });
+      expect(response.live()).toEqual([]);
+      expect(nodes[0]).toMatchObject({ kind: "thinking", text: "First second", complete: true });
+    } finally { clock.mockRestore(); }
+  });
+
   it("终态归属最高序号块，和并行工具完成顺序无关；关闭只计量一次", () => {
     const { response, nodes, completions } = setup();
     response.accept(call);
@@ -27,7 +44,7 @@ describe("响应块状态机", () => {
     response.accept({ type: "finish", reason: "tool-calls", usage, responseId: "remote", rawFinishReason: "tool_use" });
     const [first, last] = response.calls();
     response.settle(last!, { kind: "succeeded", model: null, data: null });
-    response.settle(first!, { kind: "cancelled", message: "Cancelled." });
+    response.settle(first!, { kind: "cancelled", message: "Cancelled.", data: null, model: { kind: "cancelled", message: "Cancelled.", data: null } });
     response.close();
     response.close();
     expect(nodes.map(node => "ordinal" in node && node.ordinal)).toEqual([1, 0]);
@@ -75,7 +92,7 @@ describe("响应块状态机", () => {
     expect(response.live()).toEqual([expect.objectContaining({ kind: "toolcall", state: "ready" })]);
     response.start(response.calls()[0]!);
     expect(response.live()[0]).toMatchObject({ state: "executing" });
-    response.settle(response.calls()[0]!, { kind: "cancelled", message: "Stopped." });
+    response.settle(response.calls()[0]!, { kind: "cancelled", message: "Stopped.", data: null, model: { kind: "cancelled", message: "Stopped.", data: null } });
     response.interrupt();
     expect(response.live()).toEqual([]);
     expect(nodes).toHaveLength(2);

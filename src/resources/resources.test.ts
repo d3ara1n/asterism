@@ -222,9 +222,11 @@ describe("工具与资源的匹配及授权", () => {
     await executeWeftBatch([{ callId: "cancelled", name: "resource_call",
       arguments: { resource_id: resource.id, tool: "list", args: {} } }],
     scope(), controller.signal, (_call, result) => results.push(result));
-    expect(results).toEqual([{
+    expect(results).toMatchObject([{
       kind: "cancelled", message: "The operation was not started.", implementation: { id: "weft.directory.list", version: 1 },
+      data: null, model: { kind: "cancelled", data: null, message: "The operation was not started." },
     }]);
+    expect(results[0]).not.toHaveProperty("startedAt");
   });
 
   it.each(["parallel", "sequential"] as const)("resource_call 按实际工具的 %s 策略调度", async execution => {

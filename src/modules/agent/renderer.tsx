@@ -20,5 +20,5 @@ export default {
       return <ConversationActions view={agentView(workbench.controller, data.agentId)} ready={workbench.ready} />;
     },
   })],
-  results: [],
+  tools: [],
 } satisfies RendererModule;

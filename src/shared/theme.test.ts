@@ -9,6 +9,14 @@ describe("parseAppearance", () => {
   it("单项损坏只回退该项", () => {
     expect(parseAppearance({ accent: "blue", density: "huge" })).toEqual({ ...defaultAppearance, accent: "blue" });
   });
+  it("思考开合偏好分别保存，缺失或损坏时保留默认的自动展开与折叠", () => {
+    expect(parseAppearance({ thinkingAutoExpand: false, thinkingAutoCollapse: false })).toMatchObject({
+      thinkingAutoExpand: false, thinkingAutoCollapse: false,
+    });
+    expect(parseAppearance({ thinkingAutoExpand: false, thinkingAutoCollapse: "invalid" })).toMatchObject({
+      thinkingAutoExpand: false, thinkingAutoCollapse: true,
+    });
+  });
 });
 
 describe("contrast", () => {

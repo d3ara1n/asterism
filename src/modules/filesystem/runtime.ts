@@ -56,7 +56,7 @@ export default (() => ({
           return { kind: "succeeded", data: { path, truncated: entries.length > 500,
             entries: entries.slice(0, 500).map(entry => ({
               name: entry.name, type: entry.isDirectory() ? "directory" : entry.isFile() ? "file" : "other",
-            })) } };
+            } as const)) } };
         } catch (error) {
           signal.throwIfAborted();
           return filesystemFailure(error, "List target directory");

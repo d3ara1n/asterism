@@ -242,7 +242,7 @@ describe("会话视图所有权", () => {
 
   it("块落库后的进度等待对应持久版本，不在查询途中丢掉正在阅读的块", async () => {
     const { controller, requests, progress } = fixture(); const disconnect = controller.connect();
-    const block = { id: "r:0", agentId: "a", responseId: "r", ordinal: 0, kind: "thinking" as const, text: "thinking" };
+    const block = { id: "r:0", agentId: "a", responseId: "r", ordinal: 0, kind: "thinking" as const, text: "thinking", startedAt: 1000 };
     requests[0]!.resolve(view({ ...snapshot(1), progress: { revision: 1, version: 1, runningAgentIds: ["a"], unsettledObjectIds: ["a"], live: [block] } })); await flush();
     progress({ revision: 2, version: 3, runningAgentIds: ["a"], unsettledObjectIds: ["a"], live: [] });
     expect(controller.getProgress().live).toEqual([block]);
@@ -275,7 +275,7 @@ describe("会话视图所有权", () => {
   });
 
   it("同一块从内存转入历史时展示身份不变，过渡快照不重复展示", () => {
-    const live = { id: "r:0", agentId: "a", responseId: "r", ordinal: 0, kind: "thinking" as const, text: "thinking" };
+    const live = { id: "r:0", agentId: "a", responseId: "r", ordinal: 0, kind: "thinking" as const, text: "thinking", startedAt: 1000 };
     const saved: SessionNode = { ...live, ...emptyCompletion, id: "saved-id", sessionId: "s", parentId: null, createdAt: "",
       requestParentId: null, model: "p/m", complete: true, continuation: null, adapter: "test", scope: "s" };
     const before = conversationTimeline([], null, "a", [live]);

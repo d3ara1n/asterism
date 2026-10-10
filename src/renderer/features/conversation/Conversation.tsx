@@ -1,5 +1,5 @@
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
-import { ArrowDown, ArrowUp, Bot, Brain, ChevronDown, Cpu, Info, LoaderCircle, Square, TriangleAlert, Wrench } from "lucide-react";
+import { ArrowDown, ArrowUp, Bot, Brain, Cpu, Info, LoaderCircle, Square, TriangleAlert } from "lucide-react";
 import type { AgentSelection } from "../../../shared/model";
 import { conversationTimeline, timelineKey, type TimelineItem } from "../../../shared/session-view";
 import { resolveModelRole, resolveProviderModel, thinkingSchema, type ThinkingLevel } from "../../../shared/configuration";
@@ -12,11 +12,11 @@ import { ConfigurationChoice } from "../configuration/ConfigurationChoice";
 import { t } from "../../shared/i18n";
 import { Button } from "../../shared/ui/button";
 import { Badge } from "../../shared/ui/badge";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../../shared/ui/collapsible";
 import { Alert, AlertDescription } from "../../shared/ui/alert";
 import { PageState } from "../../shared/ui/page-state";
 import { InputGroup, InputGroupAddon, InputGroupTextarea } from "../../shared/ui/input-group";
-import { JsonView, ToolResultView } from "../../modules/views";
+import { ToolCall } from "./ToolCall";
+import { ThinkingBlock } from "./ThinkingBlock";
 
 function useAgent(view: AgentView) {
   const session = useSession(view.controller);
@@ -90,16 +90,23 @@ export function Conversation({ view, selection, ready, draft, onDraftChange, onH
       <p className="type-caption">{s("Viewing saved history. Choose “Continue from here” in history to branch.", "正在查看已保存历史。在会话历史中选择“从此处继续”即可分叉。")}</p>
       <Button variant="ghost" size="sm" onClick={controller.followCursor}>{t.backToLive}</Button>
     </div>}
-    <div ref={scroll} className="min-h-0 flex-1 select-text overflow-y-auto overscroll-contain" onScroll={event => {
-      const element = event.currentTarget;
-      follow.current = element.scrollHeight - element.scrollTop - element.clientHeight < 80;
-      setAwayFromBottom(!follow.current);
-    }}>
-      <div className="space-y-4 p-4">
-        {timeline.map(node => <NodeView key={timelineKey(node)} node={node} />)}
-        {agentRunning && !historical && <p role="status" className="type-caption flex items-center gap-2"><LoaderCircle className="size-3 animate-spin" />{s("The agent is working…", "代理正在执行…")}</p>}
-        {!timeline.length && !running && <p className="type-caption">{s("Send a message to begin.", "发送消息开始对话。")}</p>}
+    <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div ref={scroll} className="min-h-0 flex-1 select-text overflow-y-auto overscroll-contain" onScroll={event => {
+        const element = event.currentTarget;
+        follow.current = element.scrollHeight - element.scrollTop - element.clientHeight < 80;
+        setAwayFromBottom(!follow.current);
+      }}>
+        <div className="space-y-4 p-4">
+          {timeline.map(node => <NodeView key={timelineKey(node)} node={node} />)}
+          {agentRunning && !historical && <p role="status" className="type-caption flex items-center gap-2"><LoaderCircle className="size-3 animate-spin" />{s("The agent is working…", "代理正在执行…")}</p>}
+          {!timeline.length && !running && <p className="type-caption">{s("Send a message to begin.", "发送消息开始对话。")}</p>}
+        </div>
       </div>
+      {awayFromBottom && <div className="pointer-events-none absolute inset-x-0 bottom-3 z-10 flex justify-center">
+        <div className="surface-floating pointer-events-auto">
+          <Button variant="ghost" size="sm" onClick={latest}><ArrowDown />{s("Latest output", "最新内容")}</Button>
+        </div>
+      </div>}
     </div>
     <footer className="shrink-0 space-y-3 border-t p-3">
       {!historical && selection && <div className="flex min-w-0 flex-wrap items-center gap-0.5">
@@ -123,7 +130,6 @@ export function Conversation({ view, selection, ready, draft, onDraftChange, onH
           onSelect={value => { void configure({ ...selection, thinking: value === "__default" ? null : value as ThinkingLevel }); }} />
         {running && <span className="type-caption">{s("Changes apply to the next request", "修改于下一次请求生效")}</span>}
       </div>}
-      {awayFromBottom && <div className="text-center"><Button variant="secondary" size="sm" onClick={latest}><ArrowDown />{s("Latest output", "最新内容")}</Button></div>}
       {error && <Alert variant="destructive"><AlertDescription className="flex flex-wrap items-center gap-2">
         <span className="flex-1">{error}</span>
         <Button variant="ghost" size="sm" onClick={() => { void controller.refresh(); }}>{s("Reload", "重新读取")}</Button>
@@ -152,10 +158,6 @@ export function Conversation({ view, selection, ready, draft, onDraftChange, onH
   </>;
 }
 
-const toolLabels: Record<string, string> = {
-  pending: s("Incomplete", "未完成"), succeeded: s("Completed", "已完成"), rejected: s("Not allowed", "已拒绝"), failed: s("Failed", "失败"),
-  cancelled: s("Cancelled", "已取消"), partial: s("Partially completed", "部分完成"), unknown: s("Outcome unknown", "结果未知"),
-};
 function NodeView({ node }: { node: TimelineItem }) {
   const usage = "usage" in node ? node.usage : node.kind === "notice" ? node.response?.usage : null;
   return <div className="flex flex-col gap-1">
@@ -173,43 +175,10 @@ function NodeContent({ node }: { node: TimelineItem }) {
     case "message": return <article className="space-y-2"><p className="type-label">{s("You", "你")}</p>
       <div className="rounded-md bg-muted px-3 py-2"><Markdown>{node.text}</Markdown></div></article>;
     case "text": return <article className="space-y-1">{tag}<Markdown streaming={streaming}>{node.text}</Markdown></article>;
-    case "thinking": return node.text.trim()
-      ? <Disclosure label={s("Thinking", "思考")} icon={<Brain className="size-3.5" />} extra={tag} streaming={streaming}>
-        <Markdown streaming={streaming}>{node.text}</Markdown>
-      </Disclosure>
-      : null;
-    case "toolcall": {
-      const outcome = "outcome" in node ? node.outcome : null;
-      const live = "state" in node;
-      const label = live ? node.state === "executing" ? s("Running", "执行中") : s("Preparing", "准备中") : toolLabels[outcome?.kind ?? "pending"];
-      return <Disclosure label={`${node.name} · ${label}`} icon={live ? <LoaderCircle className="size-3.5 animate-spin" /> : <Wrench className="size-3.5" />} extra={tag}>
-        <p className="type-label">{s("Arguments", "参数")}</p><JsonView value={live ? node.state === "input" ? node.argumentsText : node.arguments : node.complete ? node.arguments : node.argumentsText} />
-        {outcome && <>
-          <p className="type-label mt-3">{s("Result", "结果")}</p>
-          {outcome.kind === "succeeded" || outcome.kind === "partial" ? <ToolResultView outcome={outcome} />
-            : <p className="type-caption">{"error" in outcome ? outcome.error.message : outcome.message}</p>}
-          {outcome.kind === "partial" && <p className="type-caption">{outcome.message}</p>}
-        </>}
-      </Disclosure>;
-    }
+    case "thinking": return node.text.trim() ? <ThinkingBlock node={node} /> : null;
+    case "toolcall": return <ToolCall node={node} />;
     case "notice": return <Alert variant={node.level === "error" ? "destructive" : "default"}>
       {node.level === "error" ? <TriangleAlert /> : <Info />}<AlertDescription>{node.message}</AlertDescription></Alert>;
     default: return null;
   }
-}
-
-function Disclosure({ label, icon, extra, children, streaming = false }: {
-  label: string; icon?: React.ReactNode; extra?: React.ReactNode; children: React.ReactNode; streaming?: boolean;
-}) {
-  const [override, setOverride] = useState<{ streaming: boolean; open: boolean } | null>(null);
-  // 手动开合只覆盖当前阶段；增量更新保留选择，流结束时采用收起默认值。
-  const open = override && override.streaming === streaming ? override.open : streaming;
-  return <Collapsible className="rounded-md border px-3 py-2" open={open} onOpenChange={open => setOverride({ streaming, open })}>
-    <CollapsibleTrigger asChild>
-      <Button variant="ghost" size="xs" className="group type-caption h-auto w-full justify-start py-1">
-        <ChevronDown className="size-3 transition-transform group-data-[state=open]:rotate-180" />{icon}{label}{extra}
-      </Button>
-    </CollapsibleTrigger>
-    <CollapsibleContent className="pt-3">{children}</CollapsibleContent>
-  </Collapsible>;
 }

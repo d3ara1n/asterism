@@ -74,9 +74,19 @@ export async function runAgent(options: RunOptions): Promise<void> {
             if (outcome.kind === "unknown") unknown = true;
             response.settle(byCall.get(call.callId)!, outcome);
             options.progress?.(response.live());
-          }, call => {
-            response.start(byCall.get(call.callId)!);
-            options.progress?.(response.live());
+          }, {
+            prepared(call, info) {
+              response.prepare(byCall.get(call.callId)!, info);
+              options.progress?.(response.live());
+            },
+            started(call, info) {
+              response.start(byCall.get(call.callId)!, info);
+              options.progress?.(response.live());
+            },
+            published(call, data) {
+              response.publish(byCall.get(call.callId)!, data);
+              options.progress?.(response.live());
+            },
           });
         if (request > 0 && finish.usage?.cacheRead === 0 && (finish.usage.input ?? 0) > 2048) {
           notice("cache_miss", "The provider reported no cached input for this request.", "warning");

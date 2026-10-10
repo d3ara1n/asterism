@@ -5,6 +5,7 @@ import { defineData } from "../shared/presentation.ts";
 import { implement } from "./contract.ts";
 import { declareTool, projectTool } from "./definition.ts";
 import { ToolRegistry } from "./registry.ts";
+import { finishToolResult } from "./result.ts";
 
 const Sample = defineTool({
   name: "sample",
@@ -92,7 +93,8 @@ describe("工具定义与实现注册边界", () => {
     const invoke = (delta: number) => {
       const prepared = implementation.prepare(resource, { piece: "T" }, { delta });
       if (!("execute" in prepared)) throw new Error("Valid arguments were rejected.");
-      return prepared.execute(new AbortController().signal);
+      return prepared.execute(new AbortController().signal).then(result => finishToolResult(result,
+        { implementation: prepared.implementation }, null, prepared.toModel));
     };
     expect(await invoke(1)).toEqual({ kind: "succeeded", data: { x: 3, piece: "T" },
       model: "Moved T to 3", implementation: { id: "test.game.move", version: 1 } });

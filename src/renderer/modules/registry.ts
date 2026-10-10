@@ -2,6 +2,8 @@ import { createElement, type ComponentType, type ReactNode } from "react";
 import { Box } from "lucide-react";
 import { t } from "../shared/i18n";
 import type { Json } from "../../shared/json.ts";
+import type { z } from "zod";
+import type { ToolInvocationInfo, ToolResult } from "../../shared/tool-result.ts";
 import { contractKey, reference, type ContractReference, type DataContract, type Presentation } from "../../shared/presentation.ts";
 
 /** 类型级静态识别信息，不解析卡片数据，也不创建正文组件。 */
@@ -22,14 +24,28 @@ export interface CardRenderer {
   contract: ContractReference;
   resolve(data: Json): CardView | null;
 }
-export interface ResultRenderer {
+export interface ToolRenderProps<D = Json, T = Json, A = Json> {
+  phase: "ready" | "executing" | "settled";
+  name: string;
+  target: T;
+  args: A;
+  invocation: ToolInvocationInfo;
+  result: ToolResult<D> | null;
+}
+export interface ToolView {
+  label?: string;
+  icon?: ReactNode;
+  header?: ReactNode;
+  body?: ReactNode;
+}
+export interface ToolRenderer {
   contract: ContractReference;
-  resolve(data: Json): ReactNode;
+  resolve(props: ToolRenderProps): ToolView | null;
 }
 export interface RendererModule {
   resources: ResourceDescription[];
   cards: CardRenderer[];
-  results: ResultRenderer[];
+  tools: ToolRenderer[];
 }
 
 /** 类型擦除只发生在注册边界；组件接收到的是已通过契约校验的数据。 */
@@ -45,10 +61,33 @@ export function cardRenderer<T extends Json>(
       actions: Actions ? createElement(Actions, { data: parsed.data }) : undefined };
   } };
 }
-export function resultRenderer<T extends Json>(contract: DataContract<T>, Component: ComponentType<{ data: T }>): ResultRenderer {
-  return { contract: reference(contract), resolve(raw) {
-    const parsed = contract.schema.safeParse(raw);
-    return parsed.success ? createElement(Component, { data: parsed.data }) : null;
+/** header/body 独立覆盖；过程态和终结态以同一个 schema 校验，空产出仍可渲染调用摘要。 */
+export function toolRenderer<D extends Json, T extends Json = Json, A extends Json = Json>(
+  contract: DataContract<D> & { targetSchema?: z.ZodType<T>; tool?: { argsSchema: z.ZodType<A> } },
+  definition: {
+    label?: string;
+    icon?: ReactNode;
+    headerRenderer?: ComponentType<ToolRenderProps<D, T, A>>;
+    bodyRenderer?: ComponentType<ToolRenderProps<D, T, A>>;
+  },
+): ToolRenderer {
+  return { contract: reference(contract), resolve(props) {
+    const data = props.result?.data;
+    const parsed = data === null || data === undefined ? null : contract.schema.safeParse(data);
+    if (parsed && !parsed.success) return null;
+    const target = contract.targetSchema?.safeParse(props.target);
+    const args = contract.tool?.argsSchema.safeParse(props.args);
+    if (target && !target.success || args && !args.success) return null;
+    // 无参数 schema 的纯数据契约保留 JSON 参数；实现契约在上面完成校验。
+    const typed: ToolRenderProps<D, T, A> = {
+      ...props, target: (target ? target.data : props.target) as T, args: (args ? args.data : props.args) as A,
+      result: props.result ? { ...props.result, data: parsed?.data ?? null } : null,
+    };
+    return {
+      label: definition.label, icon: definition.icon,
+      header: definition.headerRenderer ? createElement(definition.headerRenderer, typed) : undefined,
+      body: definition.bodyRenderer ? createElement(definition.bodyRenderer, typed) : undefined,
+    };
   } };
 }
 function index<T extends { contract: ContractReference }>(entries: readonly T[]): ReadonlyMap<string, T> {
@@ -63,14 +102,14 @@ function index<T extends { contract: ContractReference }>(entries: readonly T[])
 export class ViewRegistry {
   private readonly resources = new Map<string, ResourceDescription>();
   private readonly cards: ReadonlyMap<string, CardRenderer>;
-  private readonly results: ReadonlyMap<string, ResultRenderer>;
+  private readonly tools: ReadonlyMap<string, ToolRenderer>;
   constructor(modules: readonly RendererModule[]) {
     for (const resource of modules.flatMap(module => module.resources)) {
       if (this.resources.has(resource.kind)) throw new Error(`Duplicate resource description: ${resource.kind}`);
       this.resources.set(resource.kind, resource);
     }
     this.cards = index(modules.flatMap(module => module.cards));
-    this.results = index(modules.flatMap(module => module.results));
+    this.tools = index(modules.flatMap(module => module.tools));
   }
   resource(kind: string): ResourceDescription {
     return this.resources.get(kind) ?? { kind, label: t.kindResource, icon: createElement(Box, { className: "size-4" }) };
@@ -78,7 +117,7 @@ export class ViewRegistry {
   card(presentation: Presentation): CardView | null {
     return this.cards.get(contractKey(presentation.contract))?.resolve(presentation.data) ?? null;
   }
-  result(contract: ContractReference | undefined, data: Json): ReactNode {
-    return contract ? this.results.get(contractKey(contract))?.resolve(data) ?? null : null;
+  tool(contract: ContractReference | undefined, props: ToolRenderProps): ToolView | null {
+    return contract ? this.tools.get(contractKey(contract))?.resolve(props) ?? null : null;
   }
 }

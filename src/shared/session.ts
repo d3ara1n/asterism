@@ -2,6 +2,7 @@ import { z } from "zod";
 import { jsonSchema, toolOutcomeSchema, usageSchema } from "./model.ts";
 import { thinkingSchema } from "./configuration.ts";
 import { pointSchema, workbenchCommands, workbenchSnapshotSchema } from "./workbench.ts";
+import { toolInvocationSchema, toolRunningResultSchema } from "./tool-result.ts";
 
 const id = z.string().min(1).max(160);
 /** 会话树节点共有字段：父指针组织分支，agentId 标明归属代理（事件与通知可无归属）。 */
@@ -42,7 +43,7 @@ export type NewNode = SessionNode extends infer N ? N extends SessionNode ? Omit
 // ---- 会话能力接口 ----
 const uuid = z.string().uuid();
 const text = z.string().trim().min(1).max(100_000);
-export const sessionVersion = 6;
+export const sessionVersion = 8;
 export const viewPositionSchema = z.discriminatedUnion("kind", [
   z.strictObject({ kind: z.literal("live") }),
   z.strictObject({ kind: z.literal("history"), nodeId: id.nullable() }),
@@ -67,9 +68,10 @@ export type SessionMutation = Exclude<SessionCommand, { type: "read" }>;
 const liveBase = { id, agentId: id, responseId: id, ordinal: z.number().int().nonnegative() };
 export const liveBlockSchema = z.discriminatedUnion("kind", [
   z.strictObject({ ...liveBase, kind: z.literal("text"), text: z.string() }),
-  z.strictObject({ ...liveBase, kind: z.literal("thinking"), text: z.string() }),
+  z.strictObject({ ...liveBase, kind: z.literal("thinking"), text: z.string(), startedAt: z.number().nonnegative() }),
   z.strictObject({ ...liveBase, kind: z.literal("toolcall"), name: id, argumentsText: z.string(),
-    arguments: jsonSchema, state: z.enum(["input", "ready", "executing"]) }),
+    arguments: jsonSchema, state: z.enum(["input", "ready", "executing"]),
+    invocation: toolInvocationSchema.nullable(), result: toolRunningResultSchema.nullable() }),
 ]);
 export type LiveBlock = z.infer<typeof liveBlockSchema>;
 const revision = z.number().int().nonnegative();

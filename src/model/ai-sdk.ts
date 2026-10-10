@@ -61,10 +61,10 @@ export function sdkMessages(input: ModelInput): ModelMessage[] {
       }) } as AssistantModelMessage);
     }
     if (item.kind === "result") {
-      const { implementation: _implementation, ...outcome } = item.outcome;
+      const outcome = item.outcome;
       const output = outcome.kind === "succeeded" || outcome.kind === "partial"
         ? { type: "json" as const, value: outcome.model }
-        : { type: "error-json" as const, value: json(outcome) };
+        : { type: "error-json" as const, value: outcome.model };
       const part = { type: "tool-result" as const, toolCallId: item.callId, toolName: item.name, output };
       const previous = messages.at(-1);
       if (previous?.role === "tool") previous.content.push(part);

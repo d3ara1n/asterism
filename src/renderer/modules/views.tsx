@@ -1,5 +1,4 @@
 import { createContext, useContext, type ReactNode } from "react";
-import type { ToolOutcome } from "../../shared/model";
 import type { ViewRegistry } from "./registry";
 
 const Views = createContext<ViewRegistry | null>(null);
@@ -13,8 +12,4 @@ export function useModuleViews(): ViewRegistry {
 }
 export function JsonView({ value }: { value: unknown }) {
   return <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words font-mono text-xs leading-relaxed">{typeof value === "string" ? value : JSON.stringify(value, null, 2)}</pre>;
-}
-export function ToolResultView({ outcome }: { outcome: Extract<ToolOutcome, { kind: "succeeded" | "partial" }> }) {
-  const registry = useModuleViews();
-  return registry.result(outcome.implementation, outcome.data) ?? <JsonView value={outcome.data} />;
 }

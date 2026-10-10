@@ -1,6 +1,6 @@
 # 会话级扁平树改造
 
-> 立案 2026-10-08。语义见 `docs/timeline.md`、`docs/object-model.md`、`docs/conversation-core.md`。当前存储版本 5，开发数据不做迁移，重建由用户操作。
+> 立案 2026-10-08。语义见 `docs/timeline.md`、`docs/object-model.md`、`docs/conversation-core.md`。当前存储版本见 `docs/architecture.md`，开发数据不做迁移，重建由用户操作。
 
 ## 第一批：存储、运行时、投影（一起交付）
 
@@ -9,7 +9,7 @@
 - [x] 运行时：流增量只在内存，块完成追加；中断时以 complete=false 追加；toolcall 取得结局后与结果一并追加；无块失败发错误级 notice。
 - [x] 模型投影：按 agent 过滤、按 response_id/序号归组、展开 tool 结果、响应期间事件延后、跳过不完整块。
 - [x] 回溯：会话 settled 才可 select；继续点 thinking 结尾时退到合法祖先。
-- [x] 应用 IPC 版本 4、session IPC 版本 5：应用只读取列表；会话统一历史查询、资源与布局命令、版本化资源投影与独立进度。
+- [x] 应用与会话 IPC 分离（当前协议见 shared 契约）：应用只读取列表；会话统一历史查询、资源与布局命令、版本化资源投影与独立进度。
 - [x] Task 全面改名 Session（代码、命令、测试）。
 - [x] typecheck 与契约测试：投影归组与延后、序号排序、不完整块跳过、吸附、并行代理节点交错、settled 约束、幂等提交。
 
