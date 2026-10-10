@@ -16,7 +16,7 @@ import { IconAction, cardDragHandle, type ViewPatch } from "./ObjectCard";
 import { ObjectsPanel } from "./ObjectsPanel";
 import { placeObject, type ResourcePlacement } from "./placement";
 import { defaultCardPosition } from "./layout";
-import { layoutConnections } from "./connections";
+import { layoutConnections, type ConnectionEdge } from "./connections";
 import { WorkbenchContext, WorkbenchScope, WorkbenchStore, type WorkbenchEnvironment } from "./context";
 
 const nodeTypes = { object: ObjectNode };
@@ -30,6 +30,7 @@ export interface WorkbenchHandle {
 
 type Props = WorkbenchEnvironment & { ref?: Ref<WorkbenchHandle> };
 type Run = (command: WorkbenchOperation) => Promise<boolean>;
+type WorkbenchEdge = Edge<ConnectionEdge["data"]>;
 
 /** 工作台根浮岛：投影平级对象和关系；代理对话只是代理对象的卡片内容。 */
 export function Workbench({ ref, controller, session, ready, busy, historical, run, draft, onDraftChange, onHome }: Props) {
@@ -106,13 +107,14 @@ function Canvas({ session, run, writable }: { session: WorkbenchSnapshot; run: R
   })), [nodes, connections]);
   // 连线由快照决定，选中状态留在本地；否则受控连线永远选不中，Delete 无从生效。
   const [selectedEdges, setSelectedEdges] = useState<ReadonlySet<string>>(new Set());
-  const edges: Edge[] = useMemo(() => connections.edges.map(edge => ({
+  const edges: WorkbenchEdge[] = useMemo(() => connections.edges.map(edge => ({
     ...edge, selected: selectedEdges.has(edge.id),
     style: { stroke: "var(--primary)", strokeWidth: selectedEdges.has(edge.id) ? 2.5 : 1.5 },
     markerEnd: { type: MarkerType.ArrowClosed, color: "var(--primary)" },
+    markerStart: edge.data.links.length === 2 ? { type: MarkerType.ArrowClosed, color: "var(--primary)", orient: "auto-start-reverse" } : undefined,
     selectable: writable, deletable: writable, interactionWidth: 16,
   })), [connections, writable, selectedEdges]);
-  const onEdgesChange = useCallback((changes: EdgeChange[]) => {
+  const onEdgesChange = useCallback((changes: EdgeChange<WorkbenchEdge>[]) => {
     setSelectedEdges(previous => {
       const next = new Set(applyEdgeChanges(changes, edges).filter(e => e.selected).map(e => e.id));
       return next.size === previous.size && [...next].every(id => previous.has(id)) ? previous : next;
@@ -125,8 +127,11 @@ function Canvas({ session, run, writable }: { session: WorkbenchSnapshot; run: R
   const onConnect = useCallback((c: Connection) => {
     void run({ type: "link.set", sessionId: latest.current.id, agentId: c.target, resourceId: c.source, linked: true });
   }, [run]);
-  const onEdgesDelete = useCallback((removed: Edge[]) => {
-    for (const edge of removed) void run({ type: "link.set", sessionId: latest.current.id, agentId: edge.target, resourceId: edge.source, linked: false });
+  const onEdgesDelete = useCallback((removed: WorkbenchEdge[]) => {
+    // 合并线携带其代表的有向关系；整条删除时逐一解除，后端仍分别记录事件。
+    for (const edge of removed) for (const link of edge.data?.links ?? []) {
+      void run({ type: "link.set", sessionId: latest.current.id, ...link, linked: false });
+    }
   }, [run]);
   // 拖入文件夹：主进程只接收绝对路径，由目录模块校验是否为已存在目录。
   const onDrop = (event: React.DragEvent) => {
@@ -155,7 +160,7 @@ function Canvas({ session, run, writable }: { session: WorkbenchSnapshot; run: R
     onDragLeave={event => { if (event.currentTarget === event.target) setDropping(false); }} onDrop={onDrop}>
   {dropping && <div className="pointer-events-none absolute inset-2 z-20 flex items-center justify-center rounded-lg border-2 border-dashed border-primary bg-primary/5">
     <p className="type-body">{s("Drop to add as resources", "松开以添加为资源")}</p></div>}
-  <ReactFlow<ObjectNodeType>
+  <ReactFlow<ObjectNodeType, WorkbenchEdge>
     colorMode={scheme} nodes={canvasNodes} edges={edges} nodeTypes={nodeTypes} onNodesChange={onNodesChange}
     defaultViewport={session.viewport} minZoom={0.1} maxZoom={4}
     nodesDraggable nodesConnectable={writable} connectionMode={ConnectionMode.Loose} edgesReconnectable={false} isValidConnection={isValidConnection}
