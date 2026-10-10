@@ -7,7 +7,7 @@ import { definePlugin, defineModule, type PluginDefinition } from "./contract.ts
 import { loadPlugins, type PluginHostServices } from "./loader.ts";
 
 const services = { extensionsDirectory: "/unused", state: null as never, kindOf: () => null, sessions: null as never,
-  internal: null as never, log: () => {} } satisfies PluginHostServices;
+  registry: null as never, models: null as never, log: () => {} } satisfies PluginHostServices;
 const args = z.strictObject({}).describe("No parameters.");
 const tool = (description: string) => defineTool({ name: "read", description, guidelines: [], argsSchema: args });
 function plugin(id: string, contract: ReturnType<typeof tool>, extra: ReturnType<typeof tool>[] = []): PluginDefinition {

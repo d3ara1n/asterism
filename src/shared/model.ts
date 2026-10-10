@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { modelSchema, providerInputSchema, thinkingSchema } from "./configuration.ts";
+import { modelExpressionSchema, modelSchema, providerInputSchema, thinkingSchema } from "./configuration.ts";
 export { jsonSchema, type Json } from "./json.ts";
 export { toolOutcomeSchema, type ToolOutcome } from "./tool-result.ts";
 
@@ -14,7 +14,7 @@ export const usageSchema = z.strictObject({
 });
 export type Usage = z.infer<typeof usageSchema>;
 export const modelSettingsSchema = z.strictObject({
-  provider: providerInputSchema.extend({ id, revision: z.number().int().positive() }),
+  provider: providerInputSchema.extend({ revision: z.number().int().positive() }),
   model: modelSchema, thinking: thinkingSchema.nullable(),
 });
 export type ModelSettings = z.infer<typeof modelSettingsSchema>;
@@ -26,5 +26,6 @@ export function modelExpression(settings: Pick<ModelSettings, "thinking"> & { pr
   return `${settings.provider.id}/${settings.model.modelId}${settings.thinking ? `:${settings.thinking}` : ""}`;
 }
 /** 代理当前选择：属于环境，可修改，不进会话树。 */
-export const agentSelectionSchema = z.strictObject({ agentConfigurationId: id, modelId: id, thinking: thinkingSchema.nullable() });
+/** agent 为代理配置 ID；model 与 thinking 覆盖其角色，值与角色相同时效果一致。 */
+export const agentSelectionSchema = z.strictObject({ agent: id, model: modelExpressionSchema, thinking: thinkingSchema.nullable() });
 export type AgentSelection = z.infer<typeof agentSelectionSchema>;

@@ -23,7 +23,7 @@ function setup(probe: ConnectionProbe = async () => {}, available = true, timeou
   cleanups.push(() => { service.close(); rmSync(root, { recursive: true, force: true }); });
   return { root, service, protector, changed };
 }
-const providerValue = { name: "Local", protocol: "openai-chat" as const, baseUrl: "http://127.0.0.1:1234/v1", enabled: true, auth: "none" as "none" | "api_key" };
+const providerValue = { id: "local", name: "Local", protocol: "openai-chat" as const, baseUrl: "http://127.0.0.1:1234/v1", enabled: true, auth: "none" as "none" | "api_key" };
 async function addModel(service: ConfigurationService, auth: "none" | "api_key" = "none") {
   const provider = await service.execute({ type: "provider.save", id: null, value: { ...providerValue, auth },
     credential: auth === "none" ? { action: "keep" } : { action: "replace", value: "test-key-not-for-network" } });
@@ -78,9 +78,9 @@ describe("真实配置与消费边界", () => {
     expect(empty.snapshot.agents.find(item => item.id === "explorer")).toMatchObject({ tools: [], excludeTools: null });
     await expect(service.execute({ type: "agent.save", id: "explorer", value: { tools: [], excludeTools: [] } })).rejects.toThrow("Invalid configuration");
     const inherited = await service.execute({ type: "role.save", id: "heavy", value: { thinking: null, hidden: false } });
-    expect(resolveModelRole(inherited.snapshot, "heavy", { modelId: null, thinking: "low" }).thinking).toBe("low");
+    expect(resolveModelRole(inherited.snapshot, "heavy", { model: null, thinking: "low" }).thinking).toBe("low");
     const reset = await service.execute({ type: "role.save", id: "heavy", value: {} });
-    expect(resolveModelRole(reset.snapshot, "heavy", { modelId: null, thinking: "low" }).thinking).toBe("high");
+    expect(resolveModelRole(reset.snapshot, "heavy", { model: null, thinking: "low" }).thinking).toBe("high");
   });
   it("内置升级只改变未覆盖字段，已取得的生效配置保持稳定", () => {
     const oldDefaults = structuredClone(configurationDefaults);
@@ -101,7 +101,7 @@ describe("真实配置与消费边界", () => {
     const { snapshot } = await service.execute({ type: "read" });
     expect(snapshot.providers).toEqual([]);
     expect(new Set(snapshot.roles.map(role => role.id))).toEqual(new Set(["default", "heavy", "fast", "utility", "smart"]));
-    expect(snapshot.roles.find(role => role.id === "utility")).toMatchObject({ hidden: true, builtin: true, modelId: null });
+    expect(snapshot.roles.find(role => role.id === "utility")).toMatchObject({ hidden: true, builtin: true, model: null });
     expect(snapshot.agents.map(agent => agent.id)).toEqual(["worker", "explorer", "reviewer", "researcher", "advisor"]);
     expect(snapshot.agents.find(agent => agent.id === "worker")).toMatchObject({ enabled: true, modelRole: "default" });
     expect(snapshot.agents.find(agent => agent.id === "advisor")).toMatchObject({ modelRole: "smart" });
@@ -131,22 +131,22 @@ describe("真实配置与消费边界", () => {
   it("删除提供商与其模型不刷新角色，旧快照不变，消费失效 ID 时明确失败", async () => {
     const { service } = setup();
     const { providerId, modelId, snapshot } = await addModel(service);
-    const assigned = await service.execute({ type: "role.save", id: "heavy", value: { ...roleValue(snapshot, "heavy"), modelId } });
+    const assigned = await service.execute({ type: "role.save", id: "heavy", value: { ...roleValue(snapshot, "heavy"), model: modelId } });
     const removed = await service.execute({ type: "remove", kind: "provider", id: providerId});
     expect(removed.snapshot.models).toEqual([]);
-    expect(removed.snapshot.roles.find(role => role.id === "heavy")?.modelId).toBe(modelId);
+    expect(removed.snapshot.roles.find(role => role.id === "heavy")?.model).toBe(modelId);
     expect(assigned.snapshot.models).toHaveLength(1);
-    expect(resolveModelRole(removed.snapshot, "heavy", { modelId: "another", thinking: "low" }).error).toBe("model_unavailable");
-    await expect(service.execute({ type: "test.start", modelId })).rejects.toThrow("no longer exists");
+    expect(resolveModelRole(removed.snapshot, "heavy", { model: "another", thinking: "low" }).error).toBe("model_unavailable");
+    await expect(service.execute({ type: "test.start", model: modelId })).rejects.toThrow("no longer exists");
   });
   it("只有空值继承；显式 off 不继承，停用不等于隐藏", async () => {
     const { service } = setup();
     const { snapshot, modelId } = await addModel(service);
     const value = { ...roleValue(snapshot, "utility"), thinking: null };
     const saved = await service.execute({ type: "role.save", id: "utility", value });
-    expect(resolveModelRole(saved.snapshot, "utility", { modelId, thinking: "high" }, { allowHidden: true })).toEqual({ modelId, thinking: "high", error: null });
+    expect(resolveModelRole(saved.snapshot, "utility", { model: modelId, thinking: "high" }, { allowHidden: true })).toEqual({ model: modelId, thinking: "high", error: null });
     const off = await service.execute({ type: "role.save", id: "utility", value: { ...value, thinking: "off" } });
-    expect(resolveModelRole(off.snapshot, "utility", { modelId, thinking: "high" }, { allowHidden: true }).thinking).toBe("off");
+    expect(resolveModelRole(off.snapshot, "utility", { model: modelId, thinking: "high" }, { allowHidden: true }).thinking).toBe("off");
     const disabled = await service.execute({ type: "role.save", id: "utility", value: { ...value, enabled: false } });
     expect(resolveModelRole(disabled.snapshot, "utility", undefined, { allowHidden: true }).error).toBe("role_unavailable");
   });
@@ -177,7 +177,7 @@ describe("真实配置与消费边界", () => {
     const probe = vi.fn<ConnectionProbe>(async () => new Promise<void>(resolve => { resolveProbe = resolve; }));
     const { service } = setup(probe);
     const { modelId } = await addModel(service);
-    const started = await service.execute({ type: "test.start", modelId });
+    const started = await service.execute({ type: "test.start", model: modelId });
     expect(started.snapshot.tests[0]?.state).toBe("running");
     expect((await service.execute({ type: "read" })).snapshot.models).toHaveLength(1);
     const cancelled = await service.execute({ type: "test.cancel", id: started.savedId! });
@@ -191,7 +191,7 @@ describe("真实配置与消费边界", () => {
     const probe = vi.fn<ConnectionProbe>(async ({ signal }) => new Promise<void>((_resolve, reject) => signal.addEventListener("abort", () => reject(new Error("aborted")), { once: true })));
     const { service } = setup(probe, true, 50);
     const { modelId } = await addModel(service);
-    const started = await service.execute({ type: "test.start", modelId });
+    const started = await service.execute({ type: "test.start", model: modelId });
     await vi.advanceTimersByTimeAsync(50);
     const read = await service.execute({ type: "read" });
     expect(read.snapshot.tests[0]).toMatchObject({ id: started.savedId, state: "failed", error: "timeout", modelRevision: 1, providerRevision: 1 });
@@ -267,7 +267,7 @@ describe("真实配置与消费边界", () => {
     const probe = vi.fn<ConnectionProbe>(async ({ signal }) => new Promise<void>((_resolve, reject) => signal.addEventListener("abort", () => reject(new Error("aborted")), { once: true })));
     const { service } = setup(probe);
     const { modelId } = await addModel(service);
-    await service.execute({ type: "test.start", modelId });
+    await service.execute({ type: "test.start", model: modelId });
     service.close();
     expect(probe.mock.calls[0]![0].signal.aborted).toBe(true);
     await expect(service.execute({ type: "read" })).rejects.toThrow("unavailable");

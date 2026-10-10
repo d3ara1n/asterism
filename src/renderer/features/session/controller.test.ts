@@ -76,7 +76,7 @@ describe("会话视图所有权", () => {
     const { controller, requests } = fixture(); const disconnect = controller.connect();
     requests[0]!.resolve(view(snapshot(1))); await flush();
     const command = { type: "resource.command" as const, sessionId: "s", objectId: "a",
-      command: { type: "configure", selection: { agentConfigurationId: "worker", modelId: "new", thinking: null } } };
+      command: { type: "configure", selection: { agent: "worker", model: "new", thinking: null } } };
     const changed = controller.execute(command); await flush();
     requests[1]!.resolve(accepted); await changed;
     expect(controller.getSnapshot()).toMatchObject({ busy: false, status: "loading" });

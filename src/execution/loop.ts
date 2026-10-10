@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
 import { modelExpression, modelScope, type ModelSettings } from "../shared/model.ts";
-import type { AgentConfiguration } from "../shared/configuration.ts";
 import type { BlockCompletion, LiveBlock, NewNode } from "../shared/session.ts";
 import { ModelFailure, type ModelAdapter } from "../model/contract.ts";
 import { composeSystemPrompt } from "../model/system-prompt.ts";
@@ -12,7 +11,9 @@ import { ResponseBuffer } from "./response.ts";
 
 export interface RequestEnvironment {
   adapter: ModelAdapter;
-  agent: AgentConfiguration;
+  /** 代理身份与指令；由调用方从代理配置组装。 */
+  prompt: { id: string; systemPrompt: string };
+  maxTurns: number | null;
   settings: ModelSettings;
   capabilities: AgentCapabilities;
   messages: ModelItem[];
@@ -38,11 +39,10 @@ export async function runAgent(options: RunOptions): Promise<void> {
   try {
     for (let request = 0; ; request++) {
       signal.throwIfAborted();
-      const { adapter, agent, settings, capabilities, messages, requestParentId, context } = await options.environment();
+      const { adapter, prompt, maxTurns, settings, capabilities, messages, requestParentId, context } = await options.environment();
       signal.throwIfAborted();
-      if (agent.maxCost !== null) throw new ModelFailure("unavailable", "Cost limits require model pricing support, which is not available yet.");
-      if (request >= (agent.maxTurns ?? 32)) throw new ModelFailure("request_limit", "The agent reached the model request limit. Continue explicitly to resume.");
-      const prepared = adapter.prepare({ settings, system: composeSystemPrompt(agent, context), messages,
+      if (request >= (maxTurns ?? 32)) throw new ModelFailure("request_limit", "The agent reached the model request limit. Continue explicitly to resume.");
+      const prepared = adapter.prepare({ settings, system: composeSystemPrompt(prompt, context), messages,
         tools: settings.model.capabilities.tools ? coreDeclarations() : [] });
       const responseId = randomUUID();
       const model = modelExpression(settings);

@@ -7,6 +7,7 @@ import { SessionError, SessionTree } from "../session/tree.ts";
 import { foldWorkbench, type FoldedObject } from "../session/fold.ts";
 import { AgentCapabilities } from "../execution/capabilities.ts";
 import { createModules } from "../modules/runtime.ts";
+import { createModelServices } from "../plugins/models.ts";
 import { Agent } from "../modules/agent/contract.ts";
 import type { PluginSessions, PluginSessionWriter as SessionWriter } from "../plugins/contract.ts";
 import type { PluginManifest } from "../plugins/loader.ts";
@@ -65,7 +66,7 @@ export class SessionService {
       return null;
     };
     const modules = createModules({ extensionsDirectory: join(dataRoot, "extensions"), state: new ResourceStateStore(db), kindOf, vault: configuration.vault,
-      sessions: host, internal: { configuration, ...(adapterFactory ? { adapterFactory } : {}) } });
+      sessions: host, ...createModelServices(configuration, adapterFactory) });
     this.resources = modules.resources;
     this.tools = modules.tools;
     this.plugins = modules.manifest;
@@ -198,7 +199,7 @@ export class SessionService {
     };
     const prior = existing(); if (prior) return prior;
     const agents = this.resources.controller(agentKind)!;
-    const selection = { agentConfigurationId: command.agentConfigurationId, modelId: command.modelId, thinking: command.thinking };
+    const selection = { agent: command.agent, model: command.model, thinking: command.thinking };
     const input = await agents.prepareCreate!({ selection });
     const again = existing(); if (again) return again;
     const sessionId = randomUUID();

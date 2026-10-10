@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Bot, Brain, Cpu } from "lucide-react";
-import { resolveProviderModel, thinkingSchema, type ConfigurationSnapshot, type ThinkingLevel } from "../../../shared/configuration";
+import { resolveProviderModel, thinkingSchema, type ConfigurationSnapshot, type ThinkingLevel , modelReference } from "../../../shared/configuration";
 import { initialAgentSelection } from "../configuration/agent-selection";
 import type { AgentSelection } from "../../../shared/model";
 import { Alert, AlertDescription } from "../../shared/ui/alert";
@@ -26,7 +26,7 @@ export function AddAgentDialog({ configuration, onCreate, ...dialog }: ResourceC
   const [selectionError, setSelectionError] = useState<string | null>(null);
   const agents = configuration?.agents.filter(item => item.enabled) ?? [];
   const agent = agents.find(item => item.id === agentId);
-  const models = configuration?.models.filter(item => resolveProviderModel(configuration, item.id)) ?? [];
+  const models = configuration?.models.filter(item => resolveProviderModel(configuration, modelReference(item))) ?? [];
   const model = configuration ? resolveProviderModel(configuration, modelId)?.model : null;
   const selectAgent = (id: string) => {
     if (!configuration) return;
@@ -37,7 +37,7 @@ export function AddAgentDialog({ configuration, onCreate, ...dialog }: ResourceC
   return <ResourceCreationDialog {...dialog} title={t.addAgentTitle}
     description={t.addAgentDescription}
     disabled={!agent || !model}
-    onCreate={() => onCreate({ agentConfigurationId: agent!.id, modelId: model!.id, thinking: model!.capabilities.reasoning ? thinking : "off" }, title.trim() || undefined)}>
+    onCreate={() => onCreate({ agent: agent!.id, model: modelReference(model!), thinking: model!.capabilities.reasoning ? thinking : "off" }, title.trim() || undefined)}>
     <Field>
       <FieldLabel htmlFor="agent-title">{t.name}</FieldLabel>
       <Input id="agent-title" autoFocus maxLength={160} value={title} onChange={e => setTitle(e.target.value)} />
@@ -50,8 +50,8 @@ export function AddAgentDialog({ configuration, onCreate, ...dialog }: ResourceC
           selected={agent?.id ?? ""} onSelect={selectAgent} options={agents.map(item => ({ value: item.id, label: item.name }))} />
         <Choice icon={<Cpu />} label={t.model} disabled={!configuration || !models.length || dialog.busy}
           value={model?.name ?? (models.length ? s("Choose model", "选择模型") : s("Add a model in settings", "先在设置中添加模型"))}
-          selected={model?.id ?? ""} onSelect={id => { setModelId(id); setSelectionError(null); }}
-          options={models.map(item => ({ value: item.id, label: `${configuration?.providers.find(p => p.id === item.providerId)?.name ?? ""} / ${item.name}` }))} />
+          selected={(model ? modelReference(model) : "")} onSelect={id => { setModelId(id); setSelectionError(null); }}
+          options={models.map(item => ({ value: modelReference(item), label: `${configuration?.providers.find(p => p.id === item.providerId)?.name ?? ""} / ${item.name}` }))} />
         <Choice icon={<Brain />} label={s("Thinking level", "思考等级")} disabled={!model?.capabilities.reasoning || dialog.busy}
           value={!model?.capabilities.reasoning ? s("Off", "关闭") : thinking ?? s("Default", "默认")}
           selected={model?.capabilities.reasoning ? thinking ?? "__default" : "off"}

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowUp, Bot, Brain, Cpu, Settings } from "lucide-react";
-import { resolveProviderModel, thinkingSchema, type ConfigurationSnapshot, type ThinkingLevel } from "../../../shared/configuration";
+import { resolveProviderModel, thinkingSchema, type ConfigurationSnapshot, type ThinkingLevel , modelReference } from "../../../shared/configuration";
 import { initialAgentSelection } from "../configuration/agent-selection";
 import { t } from "../../shared/i18n";
 import { Button } from "../../shared/ui/button";
@@ -40,7 +40,7 @@ export function HomePage({ active, draft, onDraftChange, onSettings, ready, busy
     }
   }, [snapshot]);
   // 读取后的可用状态直接用于渲染；不回写/清空先前选择，也不重取 agent 默认值。
-  const models = snapshot?.models.filter(model => resolveProviderModel(snapshot, model.id)) ?? [];
+  const models = snapshot?.models.filter(model => resolveProviderModel(snapshot, modelReference(model))) ?? [];
   const model = snapshot ? resolveProviderModel(snapshot, modelId)?.model : null;
   const agent = snapshot?.agents.find(item => item.id === agentId && item.enabled);
   const unavailable = snapshot && ((agentId && !agent) || (modelId && !model)) ? s("The selected configuration is unavailable. Choose again.", "已选配置不可用，请重新选择。") : null;
@@ -53,7 +53,7 @@ export function HomePage({ active, draft, onDraftChange, onSettings, ready, busy
     {/* 两层输入区：亮色输入表面在上，灰色选项托盘挂在下方；选项为紧凑的幽灵按钮 + 菜单，不用表单下拉框。 */}
     <form onSubmit={event => {
       event.preventDefault();
-      if (canSend) void onStart({ agentConfigurationId: agent!.id, modelId: model!.id, thinking, text: draft.trim() });
+      if (canSend) void onStart({ agent: agent!.id, model: modelReference(model!), thinking, text: draft.trim() });
     }} aria-label={t.newConversation} className="rounded-xl border bg-muted">
       <InputGroup className="rounded-xl border-0 border-b bg-card shadow-none">
         <label htmlFor="home-message" className="sr-only">{t.firstMessage}</label>
@@ -76,8 +76,8 @@ export function HomePage({ active, draft, onDraftChange, onSettings, ready, busy
           options={snapshot?.agents.filter(item => item.enabled).map(item => ({ value: item.id, label: item.name })) ?? []} />
         <Choice icon={<Cpu />} label={t.model} disabled={!snapshot || !models.length || busy}
           value={model?.name ?? (models.length ? t.model : s("Add a model in settings", "先在设置中添加模型"))}
-          selected={model?.id ?? ""} onSelect={id => { setModelId(id); setSelectionError(null); }}
-          options={models.map(item => ({ value: item.id, label: `${snapshot?.providers.find(provider => provider.id === item.providerId)?.name ?? ""} / ${item.name}` }))} />
+          selected={(model ? modelReference(model) : "")} onSelect={id => { setModelId(id); setSelectionError(null); }}
+          options={models.map(item => ({ value: modelReference(item), label: `${snapshot?.providers.find(provider => provider.id === item.providerId)?.name ?? ""} / ${item.name}` }))} />
         <Choice icon={<Brain />} label={s("Thinking level", "思考等级")} disabled={!model?.capabilities.reasoning || busy}
           value={!model?.capabilities.reasoning ? s("Off", "关闭") : thinking ?? s("Default", "默认")}
           selected={model?.capabilities.reasoning ? thinking ?? "__default" : "off"}

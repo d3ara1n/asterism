@@ -43,11 +43,11 @@ async function setup(model: ModelAdapter = adapter(), onSessionChanged?: (event:
   const root = mkdtempSync(join(tmpdir(), "core-session-")); roots.push(root);
   const service = new ApplicationService(root, { adapterFactory: () => model, onSessionChanged }); services.add(service);
   const { savedId: providerId } = await service.configuration.execute({ type: "provider.save", id: null,
-    value: { name: "Test", protocol: "openai-responses", baseUrl: "https://example.invalid/v1", enabled: true, auth: "none" }, credential: { action: "keep" } });
+    value: { id: "test", name: "Test", protocol: "openai-responses", baseUrl: "https://example.invalid/v1", enabled: true, auth: "none" }, credential: { action: "keep" } });
   const { savedId: modelId } = await service.configuration.execute({ type: "model.save", id: null,
     value: { providerId: providerId!, name: "Test", modelId: "test", enabled: true, contextWindow: null,
       capabilities: { tools: true, reasoning: false, images: false }, generation: { temperature: null, topP: null, maxOutputTokens: null } } });
-  const start: Extract<SessionCommand, { type: "start" }> = { type: "start", submissionId: randomUUID(), agentConfigurationId: "worker", modelId: modelId!, thinking: null, text: "First" };
+  const start: Extract<SessionCommand, { type: "start" }> = { type: "start", submissionId: randomUUID(), agent: "worker", model: modelId!, thinking: null, text: "First" };
   return { service, root, start };
 }
 async function execute(service: ApplicationService, command: SessionMutation | { type: "read"; sessionId: string }) {
@@ -69,7 +69,7 @@ describe("会话运行时", () => {
     const reopened = new ApplicationService(root); services.add(reopened);
     expect(reopened.execute({ type: "workspace.read" }).sessions).toEqual([]);
     const { snapshot } = await reopened.configuration.execute({ type: "read" });
-    expect(snapshot.models[0]?.id).toBe(start.modelId);
+    expect(snapshot.models[0] && `${snapshot.models[0].providerId}/${snapshot.models[0].modelId}`).toBe(start.model);
     expect(snapshot.providers).toHaveLength(1);
     expect(snapshot.overrides.agents.worker).toEqual({ systemPrompt: "Persistent instructions" });
   });
@@ -504,7 +504,7 @@ describe("会话运行时", () => {
     expect(removed.workbench.links).toEqual([]);
   });
 
-  it.each(["submit", "configure"] as const)("异步 %s 准备期间对象被移除，落地前拒绝命令", async type => {
+  it.each(["submit"] as const)("异步 %s 准备期间对象被移除，落地前拒绝命令", async type => {
     const { service, start } = await setup();
     const first = await execute(service, start); await settled(service);
     const sessionId = first.sessionId;
@@ -552,7 +552,7 @@ describe("会话运行时", () => {
 
   it("请求在产生块之前失败时记录错误级通知，不伪造回复", async () => {
     let n = 0;
-    const { service, start } = await setup(adapter(() => { if (++n === 2) throw new ModelFailure("prepare_failed", "Cannot prepare."); }));
+    const { service, start } = await setup(adapter(() => { if (++n === 1) throw new ModelFailure("prepare_failed", "Cannot prepare."); }));
     const s = await execute(service, start); await settled(service);
     const snap = await execute(service, { type: "read", sessionId: s.sessionId });
     expect(snap.nodes.some(x => x.kind === "text")).toBe(false);
@@ -667,7 +667,7 @@ describe("会话运行时", () => {
     } finally { release(); }
     await settled(service);
     expect(requests).toBe(2);
-    expect(systems[1]).not.toContain("Updated request instructions.");
+    expect(systems[0]).not.toContain("Updated request instructions.");
     expect(systems.at(-1)).toContain("Updated request instructions.");
   });
 

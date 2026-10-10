@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { configurationCommandSchema, providerSchema, resolveProviderModel,
+import { configurationCommandSchema, modelReference, providerSchema, resolveProviderModel,
   type ConfigurationCommand, type ConfigurationSnapshot, type ConnectionTest, type Provider, type ProviderModel } from "../shared/configuration.ts";
 import type { SecretProtector } from "../shared/secrets.ts";
 import { unauthenticatedApiKey } from "../shared/model.ts";
@@ -38,11 +38,8 @@ export class ConfigurationService {
     return operation;
   }
   private assertOpen(): void { if (this.closed) throw new ConfigurationError("unavailable", "Configuration service is unavailable."); }
-  agentConfiguration(id: string) {
-    this.assertOpen();
-    const agent = this.store.get("agent", id);
-    return agent ? resolveAgentConfiguration(agent) : null;
-  }
+  /** 同步取得当前生效配置；凭据状态沿用最近一次检查结果。 */
+  current(): ConfigurationSnapshot { this.assertOpen(); return this.snapshot(); }
   async executionCredential(providerId: string, revision: number): Promise<string | null> {
     this.assertOpen();
     const provider = this.store.get("provider", providerId);
@@ -74,25 +71,28 @@ export class ConfigurationService {
   }
   private async perform(command: ConfigurationCommand): Promise<string | null> {
     if (command.type === "read") return null;
-    if (command.type === "test.start") return this.startTest(command.modelId);
+    if (command.type === "test.start") return this.startTest(command.model);
     if (command.type === "test.cancel") { this.cancelTest(command.id); return command.id; }
     if (command.type === "remove") {
       const { credentialRef } = this.store.remove(command.kind, command.id);
       if (credentialRef) this.removeCredential(credentialRef);
       return command.id;
     }
-    const id = command.id ?? randomUUID();
-    if (command.id && !this.store.get(saveKinds[command.type], id)) throw new ConfigurationError("not_found", "This configuration no longer exists. Reload settings.");
+    if (command.id && !this.store.get(saveKinds[command.type], command.id)) throw new ConfigurationError("not_found", "This configuration no longer exists. Reload settings.");
     switch (command.type) {
-      case "role.save": this.store.save({ kind: "role", id, value: command.value }); return id;
-      case "agent.save": this.store.save({ kind: "agent", id, value: command.value }); return id;
+      case "role.save": case "agent.save": {
+        const id = command.id ?? randomUUID();
+        this.store.save({ kind: command.type === "role.save" ? "role" : "agent", id, value: command.value } as never);
+        return id;
+      }
       case "model.save":
         if (!this.store.get("provider", command.value.providerId)) throw new ConfigurationError("not_found", "The provider no longer exists. Reload settings.");
-        this.store.save({ kind: "model", id, value: command.value });
-        return id;
+        this.store.save({ kind: "model", id: command.id, value: command.value });
+        return modelReference(command.value);
       case "provider.save": break;
     }
-    const oldRef = this.store.get("provider", id)?.credentialRef ?? null;
+    const id = command.value.id;
+    const oldRef = command.id ? this.store.get("provider", command.id)?.credentialRef ?? null : null;
     let ref = oldRef;
     let newRef: string | null = null;
     try {
@@ -103,7 +103,7 @@ export class ConfigurationService {
         ref = newRef;
       }
       this.assertOpen();
-      this.store.save({ kind: "provider", id, value: command.value, credentialRef: ref });
+      this.store.save({ kind: "provider", id: command.id, value: command.value, credentialRef: ref });
     } catch (error) {
       if (newRef) this.removeCredential(newRef);
       if (error instanceof ConfigurationError) throw error;
@@ -128,7 +128,7 @@ export class ConfigurationService {
     }
     const id = randomUUID();
     const controller = new AbortController();
-    const value: ConnectionTest = { id, providerId: provider.id, providerRevision: provider.revision, modelId: model.id, modelRevision: model.revision,
+    const value: ConnectionTest = { id, providerId: provider.id, providerRevision: provider.revision, model: modelReference(model), modelRevision: model.revision,
       state: "running", startedAt: new Date().toISOString(), durationMs: null, error: null, message: null };
     const timer = setTimeout(() => {
       this.finishTest(id, { state: "failed", error: "timeout", message: "The connection test timed out." });

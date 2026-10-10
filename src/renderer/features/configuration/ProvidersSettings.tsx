@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { ChevronDown, ExternalLink, Plus, Search, Zap } from "lucide-react";
-import type { ConfigurationSnapshot, ConnectionTest, Provider, ProviderInput, ProviderModel, TestError } from "../../../shared/configuration";
+import { modelReference, type ConfigurationSnapshot, type ConnectionTest, type Provider, type ProviderInput, type ProviderModel, type TestError } from "../../../shared/configuration";
 import { presetGroups, providerPresets, type ProviderPreset } from "../../../shared/provider-presets";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemSeparator, ItemTitle } from "../../shared/ui/item";
 import { Badge } from "../../shared/ui/badge";
@@ -29,13 +29,13 @@ type ModelValue = Omit<ProviderModel, "id" | "revision">;
 type Tone = "ok" | "warn" | "off" | "idle";
 interface Health { tone: Tone; label: string }
 const latestTest = (snapshot: ConfigurationSnapshot, modelId: string): ConnectionTest | undefined =>
-  snapshot.tests.filter(test => test.modelId === modelId).at(-1);
+  snapshot.tests.filter(test => test.model === modelId).at(-1);
 function providerHealth(snapshot: ConfigurationSnapshot, provider: Provider): Health {
   if (!provider.enabled) return { tone: "off", label: s("Disabled", "已停用") };
   if (provider.auth === "api_key" && provider.credentialState !== "available") return { tone: "warn", label: s("Needs API key", "缺少密钥") };
   const models = snapshot.models.filter(model => model.providerId === provider.id);
   if (!models.length) return { tone: "idle", label: s("No models", "未添加模型") };
-  const tests = models.map(model => latestTest(snapshot, model.id)).filter(test => test && test.providerRevision === provider.revision);
+  const tests = models.map(model => latestTest(snapshot, modelReference(model))).filter(test => test && test.providerRevision === provider.revision);
   if (tests.some(test => test!.state === "failed")) return { tone: "warn", label: s("Last test failed", "最近测试失败") };
   if (tests.some(test => test!.state === "succeeded")) return { tone: "ok", label: s("Connected", "连接正常") };
   return { tone: "idle", label: s("Not tested", "未测试") };
@@ -68,11 +68,11 @@ function useQuickActions() {
   const { snapshot, run } = useSettingsConfiguration();
   return {
     setProviderEnabled: (provider: Provider, enabled: boolean) => run({ type: "provider.save", id: provider.id, credential: { action: "keep" },
-      value: { name: provider.name, protocol: provider.protocol, baseUrl: provider.baseUrl, auth: provider.auth, enabled } }),
-    setModelEnabled: (model: ProviderModel, enabled: boolean) => run({ type: "model.save", id: model.id, value: { ...modelValue(model), enabled } }),
+      value: { id: provider.id, name: provider.name, protocol: provider.protocol, baseUrl: provider.baseUrl, auth: provider.auth, enabled } }),
+    setModelEnabled: (model: ProviderModel, enabled: boolean) => run({ type: "model.save", id: modelReference(model), value: { ...modelValue(model), enabled } }),
     test: (model: ProviderModel) => {
-      const running = snapshot && latestTest(snapshot, model.id);
-      return running?.state === "running" ? run({ type: "test.cancel", id: running.id }) : run({ type: "test.start", modelId: model.id });
+      const running = snapshot && latestTest(snapshot, modelReference(model));
+      return running?.state === "running" ? run({ type: "test.cancel", id: running.id }) : run({ type: "test.start", model: modelReference(model) });
     },
   };
 }
@@ -158,7 +158,7 @@ function PresetPicker({ onPick }: { onPick: (preset: ProviderPreset | null) => v
 /* ---------- 提供商详情 ---------- */
 
 type KeyAction = "keep" | "replace" | "clear";
-const blank: Omit<ProviderInput, "enabled"> = { name: "", protocol: "openai-responses", baseUrl: "https://api.openai.com/v1", auth: "api_key" };
+const blank: Omit<ProviderInput, "enabled"> = { id: "", name: "", protocol: "openai-responses", baseUrl: "https://api.openai.com/v1", auth: "api_key" };
 
 function ProviderEditor({ initialId }: { initialId: string | null }) {
   const { snapshot, run, busy } = useSettingsConfiguration();
@@ -168,7 +168,7 @@ function ProviderEditor({ initialId }: { initialId: string | null }) {
   const [preset, setPreset] = useState<ProviderPreset | null>(null);
   const current = snapshot?.providers.find(item => item.id === id);
   // 草稿不含 enabled：启用是即时操作，始终取快照，避免与上级浮岛的开关互相覆盖。
-  const fromCurrent = (provider: Provider): Omit<ProviderInput, "enabled"> => ({ name: provider.name, protocol: provider.protocol, baseUrl: provider.baseUrl, auth: provider.auth });
+  const fromCurrent = (provider: Provider): Omit<ProviderInput, "enabled"> => ({ id: provider.id, name: provider.name, protocol: provider.protocol, baseUrl: provider.baseUrl, auth: provider.auth });
   const [value, setValue] = useState<Omit<ProviderInput, "enabled">>(() => current ? fromCurrent(current) : blank);
   const [keyAction, setKeyAction] = useState<KeyAction>(current ? "keep" : "replace");
   const [key, setKey] = useState("");
@@ -181,7 +181,7 @@ function ProviderEditor({ initialId }: { initialId: string | null }) {
   if (picking) return <Editor form="provider-form" title={s("Add provider", "添加提供商")} dirty={false}>
     <PresetPicker onPick={picked => {
       setPreset(picked);
-      setValue(picked ? { name: picked.name, protocol: picked.protocol, baseUrl: picked.baseUrl, auth: picked.auth } : { ...blank });
+      setValue(picked ? { id: picked.id, name: picked.name, protocol: picked.protocol, baseUrl: picked.baseUrl, auth: picked.auth } : { ...blank });
       setPicking(false);
     }} />
   </Editor>;
@@ -214,6 +214,7 @@ function ProviderEditor({ initialId }: { initialId: string | null }) {
       <h3 className="type-section mb-3">{s("Connection", "连接")}</h3>
       <FieldGroup>
         <TextField label={s("Name", "名称")} value={value.name} onChange={next => set("name", next)} required />
+        <TextField label={s("Provider ID", "提供商 ID")} value={value.id} onChange={next => set("id", next)} required placeholder="deepseek" hint={s("Used in model references such as deepseek/deepseek-chat. Changing it breaks existing references.", "用于模型引用，如 deepseek/deepseek-chat；修改后已有引用将失效。")} />
         <ChoiceField label={s("Protocol", "协议")} value={value.protocol} options={protocols} onChange={next => next && set("protocol", next as ProviderInput["protocol"])} />
         <TextField label="Base URL" value={value.baseUrl} onChange={next => set("baseUrl", next)} required
           hint={value.auth === "api_key" ? s("API keys require HTTPS, except on localhost or a loopback address.", "使用 API key 时需 HTTPS，本机回环地址除外。") : undefined} />
@@ -244,8 +245,8 @@ function ProviderEditor({ initialId }: { initialId: string | null }) {
         {/* 模型发现尚未接入，入口待 plans/todo-2026-10-07-model-catalog.md 落地后加在此处。 */}
         <Button size="sm" variant="outline" disabled={busy} onClick={event => openModel(null, event.currentTarget)}><Plus />{s("Add model", "添加模型")}</Button>
       </div>
-      {models.length ? <ItemGroup className="surface">{models.map((model, index) => <div key={model.id}>{index > 0 && <ItemSeparator />}
-        <ModelRow model={model} provider={current} selected={island.child === `model-${model.id}`} onOpen={origin => openModel(model.id, origin)} />
+      {models.length ? <ItemGroup className="surface">{models.map((model, index) => <div key={modelReference(model)}>{index > 0 && <ItemSeparator />}
+        <ModelRow model={model} provider={current} selected={island.child === `model-${modelReference(model)}`} onOpen={origin => openModel(modelReference(model), origin)} />
       </div>)}</ItemGroup>
         : <p className="type-caption rounded-md border border-dashed px-3 py-4 text-center">{s("Add the first model to use this provider.", "添加第一个模型即可使用此提供商。")}</p>}
     </section>}
@@ -262,7 +263,7 @@ function TestResult({ test, stale }: { test: ConnectionTest; stale: boolean }) {
 function ModelRow({ model, provider, selected, onOpen }: { model: ProviderModel; provider: Provider; selected: boolean; onOpen: (origin: HTMLElement) => void }) {
   const { snapshot, busy } = useSettingsConfiguration();
   const quick = useQuickActions();
-  const test = snapshot ? latestTest(snapshot, model.id) : undefined;
+  const test = snapshot ? latestTest(snapshot, modelReference(model)) : undefined;
   const stale = !!test && (test.modelRevision !== model.revision || test.providerRevision !== provider.revision);
   const running = test?.state === "running";
   return <Item size="sm" className={cn("relative transition-colors hover:bg-accent/60 has-[button:focus-visible]:bg-accent/60", selected && "bg-accent hover:bg-accent")}>
@@ -286,7 +287,7 @@ function ModelEditor({ initialId, providerId }: { initialId: string | null; prov
   const island = useIsland();
   const quick = useQuickActions();
   const [id, setId] = useState(initialId);
-  const current = snapshot?.models.find(model => model.id === id);
+  const current = snapshot?.models.find(model => modelReference(model) === id);
   const provider = snapshot?.providers.find(item => item.id === providerId);
   const [value, setValue] = useState<ModelValue>(() => current ? modelValue(current) : {
     providerId, name: "", modelId: "", enabled: true, contextWindow: null,
@@ -295,9 +296,9 @@ function ModelEditor({ initialId, providerId }: { initialId: string | null; prov
   const set = <K extends keyof ModelValue>(field: K, next: ModelValue[K]) => setValue(previous => ({ ...previous, [field]: next }));
   // enabled 为即时操作，比较与保存都取快照值。
   const dirty = useMemo(() => !current || JSON.stringify({ ...modelValue(current), enabled: 0 }) !== JSON.stringify({ ...value, enabled: 0 }), [current, value]);
-  const test = current && snapshot ? latestTest(snapshot, current.id) : undefined;
+  const test = current && snapshot ? latestTest(snapshot, modelReference(current)) : undefined;
   const stale = !!test && !!current && (test.modelRevision !== current.revision || test.providerRevision !== provider?.revision);
-  const users = current && snapshot ? snapshot.roles.filter(role => role.modelId === current.id) : [];
+  const users = current && snapshot ? snapshot.roles.filter(role => role.model === modelReference(current)) : [];
 
   return <Editor form="model-form" title={current?.name ?? s("New model", "新模型")} description={provider?.name} dirty={dirty}
     remove={current ? { title: s("Delete this model?", "删除此模型？"),
@@ -305,12 +306,12 @@ function ModelEditor({ initialId, providerId }: { initialId: string | null; prov
         ? s(`“${current.name}” will be removed. These roles will be unavailable until you choose another model: ${users.map(role => role.name).join(", ")}.`,
           `将移除「${current.name}」。以下角色在重新选择模型前不可用：${users.map(role => role.name).join("、")}。`)
         : s(`“${current.name}” will be removed. No roles use it.`, `将移除「${current.name}」，没有角色使用它。`),
-      onConfirm: async () => { const result = await run({ type: "remove", kind: "model", id: current.id }); if (result.ok) void island.close({ force: true }); } } : undefined}>
+      onConfirm: async () => { const result = await run({ type: "remove", kind: "model", id: modelReference(current) }); if (result.ok) void island.close({ force: true }); } } : undefined}>
     <form id="model-form" onSubmit={async event => {
       event.preventDefault();
       const result = await run({ type: "model.save", id, value: { ...value, name: value.name.trim() || value.modelId, enabled: current?.enabled ?? true } });
       if (result.ok) {
-        const persisted = result.snapshot.models.find(item => item.id === result.savedId);
+        const persisted = result.snapshot.models.find(item => modelReference(item) === result.savedId);
         if (persisted) setValue(modelValue(persisted));
         setId(result.savedId);
       }

@@ -165,7 +165,7 @@ export const defaultRoles: Omit<ModelRole, "revision">[] = [
     "builtin": true,
     "name": "default",
     "enabled": true,
-    "modelId": null,
+    "model": null,
     "thinking": "medium",
     "description": "General development tasks: writing new features, modifying existing code, code review, adding tests, routine debugging, file-level changes",
     "hidden": false
@@ -175,7 +175,7 @@ export const defaultRoles: Omit<ModelRole, "revision">[] = [
     "builtin": true,
     "name": "heavy",
     "enabled": true,
-    "modelId": null,
+    "model": null,
     "thinking": "high",
     "description": "Tasks requiring deep thinking: cross-file refactoring, architecture design, complex bug debugging, performance optimization, security analysis, database schema changes, multi-module migrations",
     "hidden": false
@@ -185,7 +185,7 @@ export const defaultRoles: Omit<ModelRole, "revision">[] = [
     "builtin": true,
     "name": "fast",
     "enabled": true,
-    "modelId": null,
+    "model": null,
     "thinking": "low",
     "description": "Simple deterministic tasks: one-line edits, formatting tweaks, simple Q&A, doc lookups, git operations, confirmation replies",
     "hidden": false
@@ -195,7 +195,7 @@ export const defaultRoles: Omit<ModelRole, "revision">[] = [
     "builtin": true,
     "name": "utility",
     "enabled": true,
-    "modelId": null,
+    "model": null,
     "thinking": "off",
     "description": "Lightweight utilities: model routing, commit generation, title/summary, etc. (hidden)",
     "hidden": true
@@ -205,7 +205,7 @@ export const defaultRoles: Omit<ModelRole, "revision">[] = [
     "builtin": true,
     "name": "smart",
     "enabled": true,
-    "modelId": null,
+    "model": null,
     "thinking": "high",
     "description": "Expert judgment, architectural advice, and decisions grounded in evidence.",
     "hidden": false

@@ -27,7 +27,7 @@ function setup() {
   writeFileSync(join(root, "a.txt"), "hello"); writeFileSync(join(outside, "secret.txt"), "secret");
   const resource: FoldedObject = { id: "d1", kind: "atelier.core/directory", title: "root", data: { path: root } };
   const note: FoldedObject = { id: "n1", kind: "atelier.core/note", title: "Note", data: {} };
-  const { resources, tools } = createModules({ extensionsDirectory: join(base, "extensions"), state: null as never, kindOf: () => null, sessions: null as never, internal: null as never });
+  const { resources, tools } = createModules({ extensionsDirectory: join(base, "extensions"), state: null as never, kindOf: () => null, sessions: null as never, registry: null as never, models: null as never });
   const scope = (linked: readonly FoldedObject[] = [resource], policy: Parameters<typeof agentToolPolicy>[0] = unrestricted) =>
     new AgentCapabilities(resources, tools, linked, agentToolPolicy(policy));
   return { root, outside, resource, note, resources, tools, scope };

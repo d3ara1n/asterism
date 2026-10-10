@@ -7,6 +7,23 @@ export const configurationVersion = 1;
 const id = z.string().min(1).max(160);
 const name = z.string().trim().min(1).max(160);
 const revision = z.number().int().positive();
+/** 提供商 ID：程序与用户共用的可读 slug，可编辑，不含 `/` 与空白。 */
+export const providerIdSchema = z.string().trim().min(1).max(160).regex(/^[^/\s]+$/u, "Provider IDs cannot contain '/' or whitespace.");
+/** 服务端模型 ID：全局共识的模型名，可含 `/`，不含空白。 */
+const serverModelId = z.string().trim().min(1).max(160).regex(/^\S+$/u, "Model IDs cannot contain whitespace.");
+/** 模型表达式 `<providerId>/<modelId>`：提供商与模型必定成对，按第一个 `/` 切分。 */
+export interface ModelExpression { provider: string; model: string }
+export function parseModelExpression(value: string): ModelExpression | null {
+  const index = value.indexOf("/");
+  if (index <= 0 || index === value.length - 1) return null;
+  return { provider: value.slice(0, index), model: value.slice(index + 1) };
+}
+export function formatModelExpression(expression: ModelExpression): string { return `${expression.provider}/${expression.model}`; }
+export const modelExpressionSchema = z.string().max(321).refine(value => parseModelExpression(value) !== null, "Use a model expression such as provider/model.");
+/** 具体模型的引用串；与模型记录一一对应，不使用随机记录 ID。 */
+export function modelReference(model: { providerId: string; modelId: string }): string {
+  return formatModelExpression({ provider: model.providerId, model: model.modelId });
+}
 export const protocolSchema = z.enum(["openai-responses", "openai-chat", "anthropic"]);
 export const thinkingSchema = z.enum(["off", "minimal", "low", "medium", "high", "xhigh"]);
 export type ThinkingLevel = z.infer<typeof thinkingSchema>;
@@ -15,12 +32,12 @@ const endpoint = z.string().trim().url().refine(value => {
   return ["http:", "https:"].includes(url.protocol) && !url.username && !url.password && !url.search && !url.hash;
 }, "Use an HTTP(S) base URL without credentials, query, or fragment.");
 export const providerInputSchema = z.strictObject({
-  name, protocol: protocolSchema, baseUrl: endpoint, enabled: z.boolean(), auth: z.enum(["api_key", "none"]),
+  id: providerIdSchema, name, protocol: protocolSchema, baseUrl: endpoint, enabled: z.boolean(), auth: z.enum(["api_key", "none"]),
 });
 export const credentialStateSchema = z.enum(["not_required", "missing", "available", "storage_unavailable", "decryption_failed"]);
-export const providerSchema = providerInputSchema.extend({ id, revision, credentialState: credentialStateSchema });
+export const providerSchema = providerInputSchema.extend({ revision, credentialState: credentialStateSchema });
 export const modelInputSchema = z.strictObject({
-  providerId: id, name, modelId: name, enabled: z.boolean(),
+  providerId: providerIdSchema, name, modelId: serverModelId, enabled: z.boolean(),
   contextWindow: z.number().int().positive().nullable(),
   capabilities: z.strictObject({ reasoning: z.boolean(), tools: z.boolean(), images: z.boolean() }),
   generation: z.strictObject({
@@ -28,9 +45,9 @@ export const modelInputSchema = z.strictObject({
     maxOutputTokens: z.number().int().positive().nullable(),
   }),
 });
-export const modelSchema = modelInputSchema.extend({ id, revision });
+export const modelSchema = modelInputSchema.extend({ revision });
 export const modelRoleInputSchema = z.strictObject({
-  name, modelId: id.nullable(), thinking: thinkingSchema.nullable(), enabled: z.boolean(), description: z.string().max(20_000), hidden: z.boolean(),
+  name, model: modelExpressionSchema.nullable(), thinking: thinkingSchema.nullable(), enabled: z.boolean(), description: z.string().max(20_000), hidden: z.boolean(),
 });
 export const modelRoleSchema = modelRoleInputSchema.extend({ id, revision, builtin: z.boolean() });
 const names = z.array(id).max(200);
@@ -49,7 +66,7 @@ export const agentOverridesSchema = agentFieldsSchema.partial().extend({ name: o
   .refine(value => value.tools == null || value.excludeTools == null, "Tool allowlist and denylist are mutually exclusive.");
 export const testErrorSchema = z.enum(["configuration", "credential", "authentication", "model_unavailable", "rate_limit", "network", "timeout", "protocol", "server", "cancelled"]);
 export const connectionTestSchema = z.strictObject({
-  id, providerId: id, providerRevision: revision, modelId: id, modelRevision: revision,
+  id, providerId: providerIdSchema, providerRevision: revision, model: modelExpressionSchema, modelRevision: revision,
   state: z.enum(["running", "succeeded", "failed", "cancelled"]), startedAt: z.string(),
   durationMs: z.number().nonnegative().nullable(), error: testErrorSchema.nullable(), message: z.string().nullable(),
 });
@@ -70,19 +87,20 @@ const credentialUpdateSchema = z.discriminatedUnion("action", [
 ]);
 export const configurationCommandSchema = z.discriminatedUnion("type", [
   z.strictObject({ type: z.literal("read") }),
-  z.strictObject({ type: z.literal("provider.save"), ...target, value: providerInputSchema, credential: credentialUpdateSchema }),
-  z.strictObject({ type: z.literal("model.save"), ...target, value: modelInputSchema }),
+  // 保存目标是当前 ID；value 中的 ID 可以不同，即改名。
+  z.strictObject({ type: z.literal("provider.save"), id: providerIdSchema.nullable(), value: providerInputSchema, credential: credentialUpdateSchema }),
+  z.strictObject({ type: z.literal("model.save"), id: modelExpressionSchema.nullable(), value: modelInputSchema }),
   z.strictObject({ type: z.literal("role.save"), ...target, value: modelRoleOverridesSchema }),
   z.strictObject({ type: z.literal("agent.save"), ...target, value: agentOverridesSchema }),
-  z.strictObject({ type: z.literal("remove"), kind: z.enum(["provider", "model", "role", "agent"]), id }),
-  z.strictObject({ type: z.literal("test.start"), modelId: id }),
+  z.strictObject({ type: z.literal("remove"), kind: z.enum(["provider", "model", "role", "agent"]), id: z.string().min(1).max(321) }),
+  z.strictObject({ type: z.literal("test.start"), model: modelExpressionSchema }),
   z.strictObject({ type: z.literal("test.cancel"), id }),
 ]);
 export const configurationErrorSchema = z.strictObject({
   code: z.enum(["invalid_request", "not_found", "conflict", "unavailable", "internal"]), message: z.string(),
 });
 export const configurationResultSchema = z.discriminatedUnion("ok", [
-  z.strictObject({ ok: z.literal(true), snapshot: configurationSnapshotSchema, savedId: id.nullable() }),
+  z.strictObject({ ok: z.literal(true), snapshot: configurationSnapshotSchema, savedId: z.string().max(321).nullable() }),
   z.strictObject({ ok: z.literal(false), error: configurationErrorSchema }),
 ]);
 export const configurationRequestSchema = z.strictObject({ kind: z.literal("configuration.request"), version: z.literal(configurationVersion), id: z.string().uuid(), command: configurationCommandSchema });
@@ -106,8 +124,10 @@ export interface ConfigurationBridge {
 }
 
 /** 选择器和执行消费共用这一存在性/启用检查，不维护配置引用或级联状态。 */
-export function resolveProviderModel(snapshot: ConfigurationSnapshot, modelId: string | null): { model: ProviderModel; provider: Provider } | null {
-  const model = snapshot.models.find(item => item.id === modelId);
+export function resolveProviderModel(snapshot: ConfigurationSnapshot, reference: string | null): { model: ProviderModel; provider: Provider } | null {
+  const expression = reference === null ? null : parseModelExpression(reference);
+  if (!expression) return null;
+  const model = snapshot.models.find(item => item.providerId === expression.provider && item.modelId === expression.model);
   if (!model?.enabled) return null;
   const provider = snapshot.providers.find(item => item.id === model.providerId);
   return provider?.enabled ? { model, provider } : null;
@@ -117,13 +137,13 @@ export function resolveProviderModel(snapshot: ConfigurationSnapshot, modelId: s
  * 空值才继承；丢失、停用的配置必须由消费方显式处理，不能偷偷换成其他模型。
  * 隐藏角色只对代理不开放：代理路径使用默认值，内部功能显式传 allowHidden。
  */
-export function resolveModelRole(snapshot: ConfigurationSnapshot, roleId: string, current?: { modelId: string | null; thinking: ThinkingLevel | null }, options: { allowHidden?: boolean } = {}): {
-  modelId: string | null; thinking: ThinkingLevel | null; error: "role_unavailable" | "model_unavailable" | null;
+export function resolveModelRole(snapshot: ConfigurationSnapshot, roleId: string, current?: { model: string | null; thinking: ThinkingLevel | null }, options: { allowHidden?: boolean } = {}): {
+  model: string | null; thinking: ThinkingLevel | null; error: "role_unavailable" | "model_unavailable" | null;
 } {
   const role = snapshot.roles.find(item => item.id === roleId);
-  if (!role?.enabled || (role.hidden && !options.allowHidden)) return { modelId: null, thinking: null, error: "role_unavailable" };
-  const modelId = role.modelId ?? current?.modelId ?? null;
+  if (!role?.enabled || (role.hidden && !options.allowHidden)) return { model: null, thinking: null, error: "role_unavailable" };
+  const model = role.model ?? current?.model ?? null;
   const thinking = role.thinking ?? current?.thinking ?? null;
-  if (modelId === null) return { modelId, thinking, error: null };
-  return { modelId, thinking, error: resolveProviderModel(snapshot, modelId) ? null : "model_unavailable" };
+  if (model === null) return { model, thinking, error: null };
+  return { model, thinking, error: resolveProviderModel(snapshot, model) ? null : "model_unavailable" };
 }

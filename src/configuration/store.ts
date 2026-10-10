@@ -3,16 +3,18 @@ import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node
 import { join } from "node:path";
 import { z } from "zod";
 import { applicationStorage } from "../shared/application.ts";
-import { agentOverridesSchema, modelRoleOverridesSchema, modelSchema, providerInputSchema,
+import { agentOverridesSchema, modelReference, modelRoleOverridesSchema, modelSchema, providerInputSchema,
   type AgentOverrides, type ModelRoleOverrides, type ProviderInput, type ProviderModel } from "../shared/configuration.ts";
 import { defaultAgents, defaultRoles } from "./defaults.ts";
 import { ConfigurationError } from "./errors.ts";
 import { normalizeOverrides, resolveAgentConfiguration, resolveRoleConfiguration } from "./layers.ts";
 
 const identity = { id: z.string().min(1).max(160), revision: z.number().int().positive() };
-const storedProviderSchema = providerInputSchema.extend({ ...identity, credentialRef: z.string().uuid().nullable() });
+const storedProviderSchema = providerInputSchema.extend({ revision: identity.revision, credentialRef: z.string().uuid().nullable() });
 const storedRoleSchema = z.strictObject({ ...identity, builtin: z.boolean(), overrides: modelRoleOverridesSchema });
 const storedAgentSchema = z.strictObject({ ...identity, builtin: z.boolean(), overrides: agentOverridesSchema });
+/** 模型以 `<providerId>/<modelId>` 识别，其余以 id 识别。 */
+const keyOf = (item: { id: string } | { providerId: string; modelId: string }): string => "id" in item ? item.id : modelReference(item);
 const documentSchema = z.strictObject({
   version: z.literal(1),
   providers: z.array(storedProviderSchema), models: z.array(modelSchema),
@@ -21,8 +23,9 @@ const documentSchema = z.strictObject({
   for (const key of ["providers", "models", "roles", "agents"] as const) {
     const ids = new Set<string>();
     document[key].forEach((item, index) => {
-      if (ids.has(item.id)) context.addIssue({ code: "custom", message: "Duplicate configuration identity.", path: [key, index, "id"] });
-      ids.add(item.id);
+      const key_ = keyOf(item);
+      if (ids.has(key_)) context.addIssue({ code: "custom", message: "Duplicate configuration identity.", path: [key, index, "id"] });
+      ids.add(key_);
     });
   }
 });
@@ -33,8 +36,8 @@ const collections = { provider: "providers", model: "models", role: "roles", age
 export type ConfigurationKind = keyof typeof collections;
 type Entry = { [K in ConfigurationKind]: ConfigurationDocument[(typeof collections)[K]][number] };
 type ConfigurationSave =
-  | { kind: "provider"; id: string; value: ProviderInput; credentialRef: string | null }
-  | { kind: "model"; id: string; value: Omit<ProviderModel, "id" | "revision"> }
+  | { kind: "provider"; id: string | null; value: ProviderInput; credentialRef: string | null }
+  | { kind: "model"; id: string | null; value: Omit<ProviderModel, "revision"> }
   | { kind: "role"; id: string; value: ModelRoleOverrides }
   | { kind: "agent"; id: string; value: AgentOverrides };
 
@@ -51,8 +54,10 @@ function validate(raw: unknown): ConfigurationDocument {
   return document;
 }
 
-function upsert<T extends { id: string }>(items: T[], item: T): void {
-  const index = items.findIndex(value => value.id === item.id);
+/** 以旧身份定位并替换；新身份与其他项冲突时拒绝。 */
+function upsert<T extends { id: string } | { providerId: string; modelId: string }>(items: T[], previous: string | null, item: T): void {
+  const index = previous === null ? -1 : items.findIndex(value => keyOf(value) === previous);
+  if (items.some((value, i) => i !== index && keyOf(value) === keyOf(item))) throw new ConfigurationError("conflict", "This ID is already used. Choose another.");
   if (index < 0) items.push(item);
   else items[index] = item;
 }
@@ -84,18 +89,22 @@ export class ConfigurationStore {
     return structuredClone(this.document[collections[kind]]) as Entry[K][];
   }
   get<K extends ConfigurationKind>(kind: K, id: string): Entry[K] | null {
-    const item = this.document[collections[kind]].find(item => item.id === id);
+    const item = (this.document[collections[kind]] as (Entry[K])[]).find(item => keyOf(item as never) === id);
     return item ? structuredClone(item) as Entry[K] : null;
   }
   save(input: ConfigurationSave): void {
     const next = structuredClone(this.document);
     const { id } = input;
-    const revision = (this.get(input.kind, id)?.revision ?? 0) + 1;
+    const revision = (id === null ? 0 : this.get(input.kind, id)?.revision ?? 0) + 1;
     switch (input.kind) {
-      case "provider": upsert(next.providers, { ...input.value, id, revision, credentialRef: input.credentialRef }); break;
-      case "model": upsert(next.models, { ...input.value, id, revision }); break;
-      case "role": upsert(next.roles, { id, revision, builtin: this.get("role", id)?.builtin ?? false, overrides: normalizeOverrides(input.value) }); break;
-      case "agent": upsert(next.agents, { id, revision, builtin: this.get("agent", id)?.builtin ?? false, overrides: normalizeOverrides(input.value) }); break;
+      case "provider":
+        upsert(next.providers, id, { ...input.value, revision, credentialRef: input.credentialRef });
+        // 提供商拥有其模型：改名时模型随之迁移；角色等引用不改写。
+        if (id !== null && id !== input.value.id) for (const model of next.models) if (model.providerId === id) model.providerId = input.value.id;
+        break;
+      case "model": upsert(next.models, id, { ...input.value, revision }); break;
+      case "role": upsert(next.roles, id, { id: id!, revision, builtin: this.get("role", id!)?.builtin ?? false, overrides: normalizeOverrides(input.value) }); break;
+      case "agent": upsert(next.agents, id, { id: id!, revision, builtin: this.get("agent", id!)?.builtin ?? false, overrides: normalizeOverrides(input.value) }); break;
     }
     this.commit(next);
   }
@@ -107,7 +116,7 @@ export class ConfigurationStore {
     // 提供商与它拥有的模型在同一次保存中删除，不修改角色或会话的选择。
     switch (kind) {
       case "provider": next.providers = next.providers.filter(item => item.id !== id); next.models = next.models.filter(item => item.providerId !== id); break;
-      case "model": next.models = next.models.filter(item => item.id !== id); break;
+      case "model": next.models = next.models.filter(item => modelReference(item) !== id); break;
       case "role": next.roles = next.roles.filter(item => item.id !== id); break;
       case "agent": next.agents = next.agents.filter(item => item.id !== id); break;
     }

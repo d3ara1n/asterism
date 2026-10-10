@@ -7,7 +7,7 @@ export function initialAgentSelection(configuration: ConfigurationSnapshot, agen
   const resolved = resolveModelRole(configuration, agent.modelRole ?? "default");
   return {
     agentId: agent.id,
-    modelId: resolved.error ? null : resolved.modelId,
+    modelId: resolved.error ? null : resolved.model,
     thinking: resolved.thinking,
     error: resolved.error,
   };

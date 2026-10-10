@@ -7,14 +7,14 @@
 已完成：内置模块改造为 `atelier.core` 插件（两阶段装配、命名空间补全、契约覆盖、贡献清单、绑定会话/对象的 context 与 `emit`）；插件缺席时的实现缺失呈现；plugin api 便利设施后端（`plugin.config` / `secrets` / `db`）。
 
 3. 插件配置的设置页分组：按 Zod schema 渲染表单、renderer 到 runtime 的配置通道，与插件页一同在首个真实插件出现后设计。
-4. `plugin.models`：按模型角色发起对话，不接触密钥；agent 的模型、提供商与凭据调用由此替换内部接口。
 5. 拆出版本化的插件 API 契约包与宿主 API 版本检查。
 6. 外部加载：npm 安装与版本锁定、用户插件顺序、启用/禁用重启生效、renderer 运行时加载插件视图 bundle。
 7. 插件页：身份、版本、贡献与覆盖、占用配置与数据、失败原因。
 
 ## 遗留
 
-- agent 仍用插件级 `plugin.state` / `plugin.sessions` 手传 ID，随第 4 步迁到绑定 context；之后移除这两个插件级入口。
+- agent 仍用插件级 `plugin.state` 手传对象 ID；迁到 `plugin.object` 后移除该入口。
+- 首页组合入口在 before 内才创建代理，提交前不再预检模型请求，首个请求失败以错误通知呈现。
 
 ## 待定
 

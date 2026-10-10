@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Plus } from "lucide-react";
 import type { ConfigurationSnapshot, ModelRole, ModelRoleOverrides, ThinkingLevel } from "../../../shared/configuration";
-import { thinkingSchema } from "../../../shared/configuration";
+import { thinkingSchema , modelReference } from "../../../shared/configuration";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemSeparator, ItemTitle } from "../../shared/ui/item";
 import { Badge } from "../../shared/ui/badge";
 import { Switch } from "../../shared/ui/switch";
@@ -23,7 +23,7 @@ const toOverride = <T,>(next: T, inherited: T): T | undefined => next === inheri
 function ModelSelect({ value, onChange, disabled }: { value: string | null; onChange: (value: string | null) => void; disabled?: boolean }) {
   const { snapshot } = useSettingsConfiguration();
   if (!snapshot) return null;
-  const missing = value !== null && !snapshot.models.some(model => model.id === value);
+  const missing = value !== null && !snapshot.models.some(model => modelReference(model) === value);
   return <Select value={value ?? FOLLOW} disabled={disabled} onValueChange={next => onChange(next === FOLLOW ? null : next)}>
     <SelectTrigger size="sm" className={cn("w-48", missing && "text-destructive")} aria-label={s("Model", "模型")}><SelectValue /></SelectTrigger>
     <SelectContent>
@@ -33,7 +33,7 @@ function ModelSelect({ value, onChange, disabled }: { value: string | null; onCh
         const models = snapshot.models.filter(model => model.providerId === provider.id);
         if (!models.length) return null;
         return <SelectGroup key={provider.id}><SelectSeparator /><SelectLabel>{provider.name}</SelectLabel>
-          {models.map(model => <SelectItem key={model.id} value={model.id} className={cn(!(model.enabled && provider.enabled) && "text-muted-foreground")}>
+          {models.map(model => <SelectItem key={modelReference(model)} value={modelReference(model)} className={cn(!(model.enabled && provider.enabled) && "text-muted-foreground")}>
             {model.name}{model.enabled && provider.enabled ? "" : s(" (disabled)", "（已停用）")}</SelectItem>)}
         </SelectGroup>;
       })}
@@ -78,7 +78,7 @@ export function RolesSettings() {
           <ItemDescription className="truncate">{role.description}</ItemDescription>
         </ItemContent>
         <ItemActions className="relative">
-          <ModelSelect value={role.modelId} disabled={busy} onChange={next => patch(role, "modelId", next)} />
+          <ModelSelect value={role.model} disabled={busy} onChange={next => patch(role, "model", next)} />
           <ThinkingSelect value={role.thinking} disabled={busy} onChange={next => patch(role, "thinking", next)} />
           <Switch aria-label={s(`Enable ${role.name}`, `启用 ${role.name}`)} checked={role.enabled} disabled={busy} onCheckedChange={next => patch(role, "enabled", next)} />
         </ItemActions>

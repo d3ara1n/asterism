@@ -7,9 +7,7 @@ import type { FoldedObject } from "../session/fold.ts";
 import type { AgentCapabilities, ToolPolicy } from "../execution/capabilities.ts";
 import type { ContextFile, ResourceBackend } from "../resources/contract.ts";
 import type { ToolImplementation } from "../tools/contract.ts";
-import type { ConfigurationService } from "../configuration/service.ts";
-import type { ModelAdapter } from "../model/contract.ts";
-import type { ModelSettings } from "../shared/model.ts";
+import type { PluginModels, RegistryView } from "./models.ts";
 
 /** 插件 API 的稳定错误：code 供插件分支处理，message 用于日志。 */
 export class PluginApiError extends Error {
@@ -44,11 +42,6 @@ export interface PluginSessions {
   capabilities(linked: readonly FoldedObject[], policy: ToolPolicy): AgentCapabilities;
   context(linked: readonly FoldedObject[]): Promise<ContextFile[]>;
 }
-/** 底层模型能力在 plugin.models 开放前的临时内部接口，仅供内置代理使用。 */
-export interface InternalModelServices {
-  configuration: ConfigurationService;
-  adapterFactory?: (settings: ModelSettings) => ModelAdapter;
-}
 /** 绑定到一个会话的外观：插件事件类型以短名传入，宿主补全命名空间并经会话事务追加。 */
 export interface PluginSession {
   readonly id: string;
@@ -56,7 +49,12 @@ export interface PluginSession {
   linked(objectId: string): FoldedObject[];
   /** 在 commit 回调外调用时自成一个事务；回调内请改用 writer.append。 */
   emit(type: string, data: Json, options?: { agentId?: string | null; model?: string | null }): string;
+  /** 同步事务提交成型记录；回调内不可异步等待。 */
+  commit<T>(work: (writer: PluginSessionWriter) => T): T;
   changed(): void;
+  progressChanged(): void;
+  capabilities(linked: readonly FoldedObject[], policy: ToolPolicy): AgentCapabilities;
+  context(linked: readonly FoldedObject[]): Promise<ContextFile[]>;
 }
 /** 绑定到一个对象的资源状态；随所属会话保存、分叉与删除。 */
 export interface PluginObjectState {
@@ -86,12 +84,13 @@ export interface PluginContext {
   /** `.atelier/db.sqlite`，与宿主数据库独立；首次访问时打开，宿主退出时关闭。 */
   db(): DatabaseSync;
   readonly state: PluginResourceState;
-  readonly sessions: PluginSessions;
   /** 绑定会话与对象的调用 context；优先使用，避免手动传递身份。 */
   session(sessionId: string): PluginSession;
   object(sessionId: string, objectId: string): PluginObjectState;
-  /** @deprecated 由 plugin.models 替换。 */
-  readonly internal: InternalModelServices;
+  /** 只读系统目录：角色、模型与代理；不含端点、凭据与兼容参数。 */
+  readonly registry: RegistryView;
+  /** 按模型目标请求模型：stream 单次请求，run 封装宿主代理循环；均无状态。 */
+  readonly models: PluginModels;
 }
 export interface ModuleContribution {
   resources?: ResourceBackend[];

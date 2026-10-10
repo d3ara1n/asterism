@@ -2,7 +2,7 @@ import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, Bot, Brain, Cpu, Info, LoaderCircle, Square, TriangleAlert } from "lucide-react";
 import type { AgentSelection } from "../../../shared/model";
 import { conversationTimeline, timelineKey, type TimelineItem } from "../../../shared/session-view";
-import { resolveModelRole, resolveProviderModel, thinkingSchema, type ThinkingLevel } from "../../../shared/configuration";
+import { resolveModelRole, resolveProviderModel, thinkingSchema, type ThinkingLevel , modelReference } from "../../../shared/configuration";
 import type { AgentView } from "../session/registry";
 import type { AgentCommand } from "../../../modules/agent/contract";
 import { useSession, useSessionProgress } from "../session/state";
@@ -60,9 +60,9 @@ export function Conversation({ view, selection, ready, draft, onDraftChange, onH
       action={<Button variant="secondary" size="sm" onClick={state.missing ? onHome : () => { void controller.refresh(); }}>{state.missing ? t.newConversation : t.retry}</Button>} />
   </div>;
 
-  const selectedAgent = configuration?.agents.find(a => a.id === selection?.agentConfigurationId && a.enabled);
-  const selectedModel = configuration ? resolveProviderModel(configuration, selection?.modelId ?? null)?.model : null;
-  const models = configuration?.models.filter(model => resolveProviderModel(configuration, model.id)) ?? [];
+  const selectedAgent = configuration?.agents.find(a => a.id === selection?.agent && a.enabled);
+  const selectedModel = configuration ? resolveProviderModel(configuration, selection?.model ?? null)?.model : null;
+  const models = configuration?.models.filter(model => resolveProviderModel(configuration, modelReference(model))) ?? [];
   const configure = async (next: AgentSelection) => {
     const result = await command({ type: "configure", selection: next });
     if (result.ok) setSelectionError(null);
@@ -110,19 +110,19 @@ export function Conversation({ view, selection, ready, draft, onDraftChange, onH
     <footer className="shrink-0 space-y-3 border-t p-3">
       {!historical && selection && <div className="flex min-w-0 flex-wrap items-center gap-0.5">
         <ConfigurationChoice icon={<Bot />} label={t.agent} value={selectedAgent?.name ?? s("Unavailable agent", "代理不可用")}
-          selected={selection.agentConfigurationId} disabled={!configurable || !configuration}
+          selected={selection.agent} disabled={!configurable || !configuration}
           options={configuration?.agents.filter(a => a.enabled).map(a => ({ value: a.id, label: a.name })) ?? []}
           onSelect={id => {
             if (!configuration) return;
             const next = configuration.agents.find(item => item.id === id)!;
-            const defaults = resolveModelRole(configuration, next.modelRole ?? "default", { modelId: selection.modelId, thinking: selection.thinking });
-            if (defaults.error || !defaults.modelId) { setSelectionError(s("This agent's default model is unavailable. Select an available model or update settings.", "此代理的默认模型不可用，请先选择可用模型或修改设置。")); return; }
-            void configure({ agentConfigurationId: id, modelId: defaults.modelId, thinking: defaults.thinking });
+            const defaults = resolveModelRole(configuration, next.modelRole ?? "default", { model: selection.model, thinking: selection.thinking });
+            if (defaults.error || !defaults.model) { setSelectionError(s("This agent's default model is unavailable. Select an available model or update settings.", "此代理的默认模型不可用，请先选择可用模型或修改设置。")); return; }
+            void configure({ agent: id, model: defaults.model, thinking: defaults.thinking });
           }} />
         <ConfigurationChoice icon={<Cpu />} label={t.model} value={selectedModel?.name ?? s("Unavailable model", "模型不可用")}
-          selected={selection.modelId} disabled={!configurable || !models.length}
-          options={models.map(model => ({ value: model.id, label: `${configuration?.providers.find(p => p.id === model.providerId)?.name ?? ""} / ${model.name}` }))}
-          onSelect={id => { void configure({ ...selection, modelId: id }); }} />
+          selected={selection.model} disabled={!configurable || !models.length}
+          options={models.map(model => ({ value: modelReference(model), label: `${configuration?.providers.find(p => p.id === model.providerId)?.name ?? ""} / ${model.name}` }))}
+          onSelect={id => { void configure({ ...selection, model: id }); }} />
         <ConfigurationChoice icon={<Brain />} label={s("Thinking level", "思考等级")} value={selectedModel?.capabilities.reasoning ? selection.thinking ?? s("Default", "默认") : s("Off", "关闭")}
           selected={selectedModel?.capabilities.reasoning ? selection.thinking ?? "__default" : "off"} disabled={!configurable || !selectedModel?.capabilities.reasoning}
           options={[{ value: "__default", label: s("Default", "默认") }, ...thinkingSchema.options.map(level => ({ value: level, label: level }))]}

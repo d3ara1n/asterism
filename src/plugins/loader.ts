@@ -1,5 +1,6 @@
 import type { CredentialVault } from "../configuration/credentials.ts";
 import { PluginStorage } from "./storage.ts";
+import type { PluginModels, RegistryView } from "./models.ts";
 import type { Json } from "../shared/json.ts";
 import { belongsTo } from "../shared/plugin.ts";
 import { contractKey } from "../shared/presentation.ts";
@@ -9,7 +10,7 @@ import { ResourceRegistry } from "../resources/registry.ts";
 import type { ToolImplementation } from "../tools/contract.ts";
 import { ToolRegistry } from "../tools/registry.ts";
 import type { ToolContract } from "../shared/module-contract.ts";
-import { PluginApiError, type InternalModelServices, type PluginContext, type PluginDefinition, type PluginLogger, type PluginSession, type PluginSessions } from "./contract.ts";
+import { PluginApiError, type PluginContext, type PluginDefinition, type PluginLogger, type PluginSession, type PluginSessions } from "./contract.ts";
 
 export interface PluginHostServices {
   extensionsDirectory: string;
@@ -17,7 +18,8 @@ export interface PluginHostServices {
   /** 由对象 ID 查对象类型，用于约束资源状态的归属。 */
   kindOf(objectId: string): string | null;
   sessions: PluginSessions;
-  internal: InternalModelServices;
+  registry: RegistryView;
+  models: PluginModels;
   /** 插件凭据复用宿主 vault；缺失时 secrets 返回 unavailable。 */
   vault?: CredentialVault | null;
   log?: (pluginId: string, level: "info" | "warn" | "error", message: string, error?: unknown) => void;
@@ -70,10 +72,14 @@ function context(plugin: PluginDefinition, services: PluginHostServices, storage
       return services.sessions.commit(sessionId, writer => writer.append({ kind: "event", type: qualified, data,
         agentId: options.agentId ?? null, model: options.model ?? null }));
     },
+    commit: work => services.sessions.commit(sessionId, work),
     changed: () => services.sessions.changed(sessionId),
+    progressChanged: () => services.sessions.progressChanged(sessionId),
+    capabilities: (linked, policy) => services.sessions.capabilities(linked, policy),
+    context: linked => services.sessions.context(linked),
   });
   return {
-    id, dir: storage.dir, log, config: (schema, defaults) => storage.config(schema, defaults), secrets: storage.secrets, db: () => storage.db(), state, sessions: services.sessions, internal: services.internal,
+    id, dir: storage.dir, log, config: (schema, defaults) => storage.config(schema, defaults), secrets: storage.secrets, db: () => storage.db(), state, registry: services.registry, models: services.models,
     session,
     object: (sessionId, objectId) => ({
       objectId,

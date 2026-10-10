@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { coreChannel } from "./core.ts";
 import { jsonSchema, toolOutcomeSchema, usageSchema } from "./model.ts";
-import { thinkingSchema } from "./configuration.ts";
+import { modelExpressionSchema, thinkingSchema } from "./configuration.ts";
 import { pointSchema, workbenchCommands, workbenchSnapshotSchema } from "./workbench.ts";
 import { toolInvocationSchema, toolRunningResultSchema } from "./tool-result.ts";
 
@@ -54,7 +54,7 @@ export const sessionChannel = coreChannel("session");
 export const sessionChangedChannel = coreChannel("session-changed");
 export const sessionCommandSchema = z.discriminatedUnion("type", [
   // 首页组合入口：建立会话、创建第一个代理资源并向它提交首条输入。
-  z.strictObject({ type: z.literal("start"), submissionId: uuid, agentConfigurationId: id, modelId: id, thinking: thinkingSchema.nullable(), text }),
+  z.strictObject({ type: z.literal("start"), submissionId: uuid, agent: id, model: modelExpressionSchema, thinking: thinkingSchema.nullable(), text }),
   z.strictObject({ type: z.literal("read"), sessionId: id, position: viewPositionSchema }),
   z.strictObject({ type: z.literal("select"), sessionId: id, nodeId: id.nullable() }),
   // 资源卡片的行为入口：按对象类型路由到资源控制器，command 由该资源模块校验。
