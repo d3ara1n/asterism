@@ -10,7 +10,7 @@
 | `main/` | Electron 窗口、单实例锁、数据目录、运行时生命周期、可信 IPC 路由 | shared，不调用数据库 |
 | `preload/` | 沙箱桥，受控命令与状态订阅 | shared，只暴露 `window.weft` |
 | `runtime/` | 应用组合与列表；会话命令、历史查询、资源与布局、执行进度；SQLite、对象存储与私有凭据客户端 | shared、session、configuration、modules 后台入口、Node API |
-| `configuration/` | 三类配置、密文凭据、连接测试与默认角色，见目录 README | shared、Node SQLite、模型 SDK；不依赖 Electron |
+| `configuration/` | 全局配置 JSON、密文凭据、连接测试与默认角色，见目录 README | shared、Node 文件系统、模型 SDK；不依赖 Electron 或数据库 |
 | `session/` | 会话级扁平树、游标与吸附、模型投影、工作台折叠 | shared、Node SQLite；不依赖 UI/SDK |
 | `model/` | 系统提示块组装与模型投影、单次请求契约、三协议 SDK 适配与续接资料 | shared、session、AI SDK |
 | `execution/` | 单代理循环、流块状态机、请求能力视图、外部工具策略、固定 Weft 操作入口与批次调度 | session、model、resources、tools 契约 |

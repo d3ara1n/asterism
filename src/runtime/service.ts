@@ -23,7 +23,7 @@ export class ApplicationService {
     try {
       const objects = new ObjectStore(join(root, "objects"));
       const unavailable = async (): Promise<string> => { throw new Error("System credential protection is unavailable."); };
-      this.configuration = new ConfigurationService(this.db, root, options.protector ?? { available: async () => false, encrypt: unavailable, decrypt: unavailable }, options.onConfigurationChanged);
+      this.configuration = new ConfigurationService(root, options.protector ?? { available: async () => false, encrypt: unavailable, decrypt: unavailable }, options.onConfigurationChanged);
       this.sessions = new SessionService(this.db, objects, this.configuration, options.onSessionChanged, options.adapterFactory);
     } catch (error) { this.db.close(); throw error; }
   }

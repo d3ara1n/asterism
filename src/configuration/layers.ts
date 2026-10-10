@@ -3,7 +3,10 @@ import {
   type AgentOverrides, type ModelRoleOverrides, type ConfigurationSnapshot,
 } from "../shared/configuration.ts";
 import { defaultAgents, defaultRoles } from "./defaults.ts";
-import type { ConfigurationRow } from "./repository.ts";
+
+type ConfigurationIdentity = { id: string; revision: number; builtin: boolean };
+export type RoleConfigurationEntry = ConfigurationIdentity & { overrides: ModelRoleOverrides };
+export type AgentConfigurationEntry = ConfigurationIdentity & { overrides: AgentOverrides };
 
 export const configurationDefaults: ConfigurationSnapshot["defaults"] = {
   roles: Object.fromEntries(defaultRoles.map(({ id, builtin: _builtin, ...value }) => [id, value])),
@@ -16,29 +19,29 @@ export function normalizeOverrides<T extends ModelRoleOverrides | AgentOverrides
 }
 
 /** 新自定义项的名称由用户提供；只继承行为字段，不继承内置身份。 */
-function baseId(row: Pick<ConfigurationRow, "id" | "builtin">, fallback: string): string {
-  return row.builtin ? row.id : fallback;
+function baseId(item: { id: string; builtin: boolean }, fallback: string): string {
+  return item.builtin ? item.id : fallback;
 }
-export function resolveRoleConfiguration(row: ConfigurationRow, defaults = configurationDefaults) {
-  const overrides = modelRoleOverridesSchema.parse(JSON.parse(row.data_json));
-  const base = baseId(row, "default");
+export function resolveRoleConfiguration(role: RoleConfigurationEntry, defaults = configurationDefaults) {
+  const overrides = modelRoleOverridesSchema.parse(role.overrides);
+  const base = baseId(role, "default");
   const inherited = defaults.roles[base];
   if (!inherited) throw new Error("Built-in role definition is unavailable.");
   return modelRoleSchema.parse({
-    ...inherited, ...overrides, name: overrides.name ?? (row.builtin ? inherited.name : row.id),
-    id: row.id, revision: row.revision, builtin: !!row.builtin,
+    ...inherited, ...overrides, name: overrides.name ?? (role.builtin ? inherited.name : role.id),
+    id: role.id, revision: role.revision, builtin: role.builtin,
   });
 }
-export function resolveAgentConfiguration(row: ConfigurationRow, defaults = configurationDefaults) {
-  const overrides = agentOverridesSchema.parse(JSON.parse(row.data_json));
-  const base = baseId(row, "worker");
+export function resolveAgentConfiguration(agent: AgentConfigurationEntry, defaults = configurationDefaults) {
+  const overrides = agentOverridesSchema.parse(agent.overrides);
+  const base = baseId(agent, "worker");
   const inherited = defaults.agents[base];
   if (!inherited) throw new Error("Built-in agent definition is unavailable.");
   // 允许/排除列表是一项互斥策略；覆盖其中一侧同时撤下内置的另一侧。
   const policy = overrides.tools !== undefined || overrides.excludeTools !== undefined
     ? { tools: overrides.tools ?? null, excludeTools: overrides.excludeTools ?? null } : {};
   return agentSchema.parse({
-    ...inherited, ...overrides, ...policy, name: overrides.name ?? (row.builtin ? inherited.name : row.id),
-    id: row.id, revision: row.revision, builtin: !!row.builtin,
+    ...inherited, ...overrides, ...policy, name: overrides.name ?? (agent.builtin ? inherited.name : agent.id),
+    id: agent.id, revision: agent.revision, builtin: agent.builtin,
   });
 }

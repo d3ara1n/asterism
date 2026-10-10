@@ -23,13 +23,6 @@ export function openDatabase(root: string): DatabaseSync {
         PRIMARY KEY(session_id, object_id)
       );
       CREATE TABLE viewports (session_id TEXT PRIMARY KEY REFERENCES sessions(id) ON DELETE CASCADE, x REAL NOT NULL, y REAL NOT NULL, zoom REAL NOT NULL);
-      CREATE TABLE configuration_items (
-        kind TEXT NOT NULL CHECK (kind IN ('provider', 'model', 'role', 'agent')),
-        id TEXT NOT NULL, revision INTEGER NOT NULL CHECK (revision > 0),
-        data_json TEXT NOT NULL, builtin INTEGER NOT NULL DEFAULT 0 CHECK (builtin IN (0, 1)),
-        credential_ref TEXT, PRIMARY KEY (kind, id)
-      ) STRICT;
-      CREATE TABLE configuration_state (id INTEGER PRIMARY KEY CHECK (id = 1)) STRICT;
       -- 首页发送的会话级提交去重；代理内部的提交去重属于代理资源状态。
       CREATE TABLE session_submissions (
         id TEXT PRIMARY KEY, command_json TEXT NOT NULL,
@@ -41,9 +34,9 @@ export function openDatabase(root: string): DatabaseSync {
         session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
         value_json TEXT NOT NULL, PRIMARY KEY(object_id, key)
       ) STRICT;
-      PRAGMA user_version = 9;
+      PRAGMA user_version = 10;
       COMMIT;`);
-    else if (version !== 9) throw new Error("This workspace database format is not supported by this build of Weft. Back up and recreate the development database before opening it.");
+    else if (version !== 10) throw new Error("This workspace database format is not supported by this build of Weft. Back up and recreate the development database before opening it.");
     if (!db.prepare("SELECT id FROM workspace LIMIT 1").get()) {
       db.prepare("INSERT INTO workspace VALUES (?, ?)").run(randomUUID(), "Personal workspace");
     }

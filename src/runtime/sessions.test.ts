@@ -59,6 +59,19 @@ async function settled(service: ApplicationService) {
 }
 
 describe("会话运行时", () => {
+  it("重建会话数据库保留全局模型配置与用户覆盖", async () => {
+    const { service, root, start } = await setup();
+    await execute(service, start); await settled(service);
+    await service.configuration.execute({ type: "agent.save", id: "worker", value: { systemPrompt: "Persistent instructions" } });
+    await service.close(); services.delete(service);
+    rmSync(join(root, "db"), { recursive: true });
+    const reopened = new ApplicationService(root); services.add(reopened);
+    expect(reopened.execute({ type: "workspace.read" }).sessions).toEqual([]);
+    const { snapshot } = await reopened.configuration.execute({ type: "read" });
+    expect(snapshot.models[0]?.id).toBe(start.modelId);
+    expect(snapshot.providers).toHaveLength(1);
+    expect(snapshot.overrides.agents.worker).toEqual({ systemPrompt: "Persistent instructions" });
+  });
   it("笔记保存只改当前正文和视图修订，历史位置与重开都读取当前内容", async () => {
     let tools!: ToolRegistry;
     const createModules = runtimeModules.createModules;

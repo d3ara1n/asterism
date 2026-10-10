@@ -1,9 +1,8 @@
-import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { openDatabase } from "../runtime/storage.ts";
 import { configurationResultSchema, resolveModelRole, type ConfigurationCommand, type ConfigurationSnapshot } from "../shared/configuration.ts";
 import { ConfigurationService } from "./service.ts";
 import type { ConnectionProbe } from "./probe.ts";
@@ -13,7 +12,6 @@ const cleanups: (() => void)[] = [];
 afterEach(() => { cleanups.splice(0).reverse().forEach(cleanup => cleanup()); vi.useRealTimers(); });
 function setup(probe: ConnectionProbe = async () => {}, available = true, timeout = 30_000) {
   const root = mkdtempSync(join(tmpdir(), "weft-configuration-"));
-  const db = openDatabase(root);
   const ciphertexts = new Map<string, string>();
   const protector = {
     available: async () => available,
@@ -21,9 +19,9 @@ function setup(probe: ConnectionProbe = async () => {}, available = true, timeou
     decrypt: vi.fn(async (encrypted: string) => { const value = ciphertexts.get(Buffer.from(encrypted, "base64").toString()); if (!value) throw new Error("Cannot decrypt"); return value; }),
   };
   const changed = vi.fn();
-  const service = new ConfigurationService(db, root, protector, changed, probe, timeout);
-  cleanups.push(() => { service.close(); db.close(); rmSync(root, { recursive: true, force: true }); });
-  return { root, db, service, protector, changed };
+  const service = new ConfigurationService(root, protector, changed, probe, timeout);
+  cleanups.push(() => { service.close(); rmSync(root, { recursive: true, force: true }); });
+  return { root, service, protector, changed };
 }
 const providerValue = { name: "Local", protocol: "openai-chat" as const, baseUrl: "http://127.0.0.1:1234/v1", enabled: true, auth: "none" as "none" | "api_key" };
 async function addModel(service: ConfigurationService, auth: "none" | "api_key" = "none") {
@@ -42,7 +40,7 @@ function roleValue(snapshot: ConfigurationSnapshot, id: string) {
 
 describe("真实配置与消费边界", () => {
   it("只保存用户覆盖，空提示词恢复内置，显式 false 与空列表不丢失", async () => {
-    const { service, db } = setup();
+    const { service } = setup();
     const initial = await service.execute({ type: "read" });
     expect(initial.snapshot.overrides.agents.worker).toEqual({});
     const saved = await service.execute({ type: "agent.save", id: "worker", value: {
@@ -55,7 +53,6 @@ describe("真实配置与消费边界", () => {
     const cleared = await service.execute({ type: "agent.save", id: "worker", value: { systemPrompt: " \n " } });
     expect(cleared.snapshot.overrides.agents.worker).toEqual({});
     expect(cleared.snapshot.agents.find(agent => agent.id === "worker")?.systemPrompt).toBe(initial.snapshot.defaults.agents.worker!.systemPrompt);
-    expect(db.prepare("SELECT data_json FROM configuration_items WHERE kind = 'agent' AND id = 'worker'").get()).toEqual({ data_json: "{}" });
     expect(saved.snapshot.agents.find(agent => agent.id === "worker")?.systemPrompt).toBe("Custom instructions");
   });
   it("自定义配置始终继承原始基准；worker 被修改或删除不改变新代理", async () => {
@@ -91,14 +88,13 @@ describe("真实配置与消费边界", () => {
     nextDefaults.agents.worker!.timeout = 3000;
     nextDefaults.agents.worker!.systemPrompt = "New built-in prompt";
     nextDefaults.roles.default!.thinking = "high";
-    const agentRow = { kind: "agent" as const, id: "custom-agent", revision: 1, builtin: 0, credential_ref: null,
-      data_json: JSON.stringify({ name: "Custom", systemPrompt: "Pinned prompt" }) };
-    const before = resolveAgentConfiguration(agentRow, oldDefaults);
-    const after = resolveAgentConfiguration(agentRow, nextDefaults);
+    const agent = { id: "custom-agent", revision: 1, builtin: false, overrides: { name: "Custom", systemPrompt: "Pinned prompt" } };
+    const before = resolveAgentConfiguration(agent, oldDefaults);
+    const after = resolveAgentConfiguration(agent, nextDefaults);
     expect(before.timeout).toBe(2400);
     expect(after).toMatchObject({ timeout: 3000, systemPrompt: "Pinned prompt" });
-    const roleRow = { ...agentRow, kind: "role" as const, data_json: JSON.stringify({ name: "Custom", hidden: false }) };
-    expect(resolveRoleConfiguration(roleRow, nextDefaults)).toMatchObject({ thinking: "high", hidden: false });
+    const role = { id: "custom-role", revision: 1, builtin: false, overrides: { name: "Custom", hidden: false } };
+    expect(resolveRoleConfiguration(role, nextDefaults)).toMatchObject({ thinking: "high", hidden: false });
   });
   it("初始化五种模型角色和五种 agent；worker 默认可用，utility 可管理且隐藏", async () => {
     const { service } = setup();
@@ -110,20 +106,26 @@ describe("真实配置与消费边界", () => {
     expect(snapshot.agents.find(agent => agent.id === "worker")).toMatchObject({ enabled: true, modelRole: "default" });
     expect(snapshot.agents.find(agent => agent.id === "advisor")).toMatchObject({ modelRole: "smart" });
   });
-  it("配置重开仍可读取；密钥只进入加密文件，不进入 SQLite 和界面响应", async () => {
-    const { service, db, root, protector } = setup();
+  it("配置独立于数据库重开；密钥只进入加密文件，不进入配置和界面响应", async () => {
+    const { service, root, protector } = setup();
     const { providerId } = await addModel(service, "api_key");
+    await service.execute({ type: "agent.save", id: "worker", value: { systemPrompt: "Pinned", enabled: false, tools: [] } });
+    await service.execute({ type: "role.save", id: "heavy", value: { thinking: null, hidden: false } });
     expect(protector.encrypt).toHaveBeenCalledWith("test-key-not-for-network");
-    const rows = db.prepare("SELECT * FROM configuration_items").all();
-    expect(JSON.stringify(rows)).not.toContain("test-key-not-for-network");
+    expect(existsSync(join(root, "db"))).toBe(false);
+    expect(readFileSync(join(root, "configuration.json"), "utf8")).not.toContain("test-key-not-for-network");
     const encrypted = readFileSync(join(root, "credentials", readdirSync(join(root, "credentials"))[0]!));
     expect(encrypted.toString()).not.toContain("test-key-not-for-network");
     service.close();
-    const reopened = new ConfigurationService(db, root, protector);
+    const reopened = new ConfigurationService(root, protector);
     try {
       const result = await reopened.execute({ type: "read" });
       expect(result.snapshot.providers[0]).toMatchObject({ id: providerId, credentialState: "available" });
-      expect(JSON.stringify(result)).not.toMatch(/test-key-not-for-network|credential_ref|ciphertext/);
+      expect(result.snapshot.models).toHaveLength(1);
+      expect(result.snapshot.overrides.agents.worker).toEqual({ systemPrompt: "Pinned", enabled: false, tools: [] });
+      expect(result.snapshot.agents.find(agent => agent.id === "worker")).toMatchObject({ revision: 2, enabled: false, tools: [] });
+      expect(result.snapshot.overrides.roles.heavy).toEqual({ thinking: null, hidden: false });
+      expect(JSON.stringify(result)).not.toMatch(/test-key-not-for-network|credentialRef|ciphertext/);
     } finally { reopened.close(); }
   });
   it("删除提供商与其模型不刷新角色，旧快照不变，消费失效 ID 时明确失败", async () => {
@@ -149,14 +151,14 @@ describe("真实配置与消费边界", () => {
     expect(resolveModelRole(disabled.snapshot, "utility", undefined, { allowHidden: true }).error).toBe("role_unavailable");
   });
   it("内置模型角色不可删除；自定义和 agent 可删，重开不重新播种", async () => {
-    const { service, db, root, protector } = setup();
+    const { service, root, protector } = setup();
     await expect(service.execute({ type: "remove", kind: "role", id: "smart"})).rejects.toThrow("cannot be deleted");
     const { snapshot } = await service.execute({ type: "read" });
     const custom = await service.execute({ type: "role.save", id: null, value: { ...roleValue(snapshot, "default"), name: "Custom" } });
     await service.execute({ type: "remove", kind: "role", id: custom.savedId!});
     await service.execute({ type: "remove", kind: "agent", id: "advisor"});
     service.close();
-    const reopened = new ConfigurationService(db, root, protector);
+    const reopened = new ConfigurationService(root, protector);
     try { expect((await reopened.execute({ type: "read" })).snapshot.agents.some(agent => agent.id === "advisor")).toBe(false); }
     finally { reopened.close(); }
   });
@@ -219,6 +221,47 @@ describe("真实配置与消费边界", () => {
     expect(result.snapshot.providers[0]?.credentialState).toBe("not_required");
     expect(protector.encrypt).not.toHaveBeenCalled();
     expect(readdirSync(join(root, "credentials"))).toEqual([]);
+  });
+  it("保存失败保留内存配置和旧凭据，清理新密文与临时文件", async () => {
+    const { service, root } = setup();
+    const { providerId } = await addModel(service, "api_key");
+    const before = (await service.execute({ type: "read" })).snapshot;
+    const credentials = readdirSync(join(root, "credentials"));
+    const path = join(root, "configuration.json");
+    const content = readFileSync(path, "utf8");
+    // 同名目录使最终 rename 明确失败，无需依赖当前用户的文件权限。
+    rmSync(path);
+    mkdirSync(path);
+    try {
+      await expect(service.execute({ type: "provider.save", id: providerId,
+        value: { ...providerValue, name: "Must not commit", auth: "api_key" },
+        credential: { action: "replace", value: "replacement-test-key" } })).rejects.toThrow("could not be saved");
+      expect((await service.execute({ type: "read" })).snapshot.providers).toEqual(before.providers);
+      expect(readdirSync(join(root, "credentials"))).toEqual(credentials);
+      expect(readdirSync(root).some(file => file.endsWith(".tmp"))).toBe(false);
+    } finally {
+      rmSync(path, { recursive: true });
+      writeFileSync(path, content);
+    }
+    service.close();
+    const reopened = new ConfigurationService(root, { available: async () => false, encrypt: async () => "", decrypt: async () => "" });
+    try {
+      expect((await reopened.execute({ type: "read" })).snapshot.providers[0]).toMatchObject({ id: providerId, name: "Local", revision: 1 });
+    } finally { reopened.close(); }
+  });
+  it.each([
+    ["无效 JSON", "{broken"],
+    ["不支持的版本", JSON.stringify({ version: 999, providers: [], models: [], roles: [], agents: [] })],
+    ["缺失配置类别", JSON.stringify({ version: 1, providers: [], models: [] })],
+    ["身份重复", JSON.stringify({ version: 1, providers: [], models: [], agents: [],
+      roles: [{ id: "default", revision: 1, builtin: true, overrides: {} }, { id: "default", revision: 2, builtin: true, overrides: {} }] })],
+  ])("%s 不触发重置或覆盖原配置", (_name, content) => {
+    const { root, service, protector } = setup();
+    service.close();
+    const path = join(root, "configuration.json");
+    writeFileSync(path, content);
+    expect(() => new ConfigurationService(root, protector)).toThrow("invalid or unsupported");
+    expect(readFileSync(path, "utf8")).toBe(content);
   });
   it("关闭服务取消在途连接测试并拒绝后续命令", async () => {
     const probe = vi.fn<ConnectionProbe>(async ({ signal }) => new Promise<void>((_resolve, reject) => signal.addEventListener("abort", () => reject(new Error("aborted")), { once: true })));

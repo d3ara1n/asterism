@@ -1,24 +1,25 @@
 import { randomUUID } from "node:crypto";
-import type { DatabaseSync } from "node:sqlite";
-import { agentOverridesSchema, configurationCommandSchema, modelRoleOverridesSchema, modelSchema, providerSchema, resolveProviderModel,
+import { configurationCommandSchema, providerSchema, resolveProviderModel,
   type ConfigurationCommand, type ConfigurationSnapshot, type ConnectionTest, type Provider, type ProviderModel } from "../shared/configuration.ts";
 import type { SecretProtector } from "../shared/secrets.ts";
-import { ConfigurationError, ConfigurationRepository, type ConfigurationKind, type ConfigurationRow } from "./repository.ts";
+import { ConfigurationError } from "./errors.ts";
+import { ConfigurationStore, type StoredProvider } from "./store.ts";
 import { CredentialVault } from "./credentials.ts";
 import { classifyProbeError, runConnectionProbe, type ConnectionProbe } from "./probe.ts";
-import { configurationDefaults, normalizeOverrides, resolveAgentConfiguration, resolveRoleConfiguration } from "./layers.ts";
+import { configurationDefaults, resolveAgentConfiguration, resolveRoleConfiguration } from "./layers.ts";
 
-const data = (row: ConfigurationRow): Record<string, unknown> => ({ ...JSON.parse(row.data_json), id: row.id, revision: row.revision });
+const saveKinds = { "provider.save": "provider", "model.save": "model", "role.save": "role", "agent.save": "agent" } as const;
+
 export class ConfigurationService {
-  readonly repository: ConfigurationRepository;
-  private vault: CredentialVault;
+  private readonly store: ConfigurationStore;
+  private readonly vault: CredentialVault;
   private queue: Promise<unknown> = Promise.resolve();
   private closed = false;
   private storageAvailable = false;
   private tests = new Map<string, { value: ConnectionTest; controller: AbortController; timer: ReturnType<typeof setTimeout>; started: number }>();
-  constructor(db: DatabaseSync, root: string, protector: SecretProtector, private readonly onChanged: () => void = () => {},
+  constructor(root: string, protector: SecretProtector, private readonly onChanged: () => void = () => {},
     private readonly probe: ConnectionProbe = runConnectionProbe, private readonly testTimeoutMs = 30_000) {
-    this.repository = new ConfigurationRepository(db);
+    this.store = new ConfigurationStore(root);
     this.vault = new CredentialVault(root, protector);
   }
   execute(raw: ConfigurationCommand): Promise<{ snapshot: ConfigurationSnapshot; savedId: string | null }> {
@@ -37,35 +38,34 @@ export class ConfigurationService {
   private assertOpen(): void { if (this.closed) throw new ConfigurationError("unavailable", "Configuration service is unavailable."); }
   agentConfiguration(id: string) {
     this.assertOpen();
-    const row = this.repository.get("agent", id);
-    return row ? resolveAgentConfiguration(row) : null;
+    const agent = this.store.get("agent", id);
+    return agent ? resolveAgentConfiguration(agent) : null;
   }
   async executionCredential(providerId: string, revision: number): Promise<string | null> {
     this.assertOpen();
-    const row = this.repository.get("provider", providerId);
-    if (!row || row.revision !== revision) throw new ConfigurationError("conflict", "The provider changed before execution started.");
-    if (data(row).auth === "none") return "weft-no-auth";
-    return row.credential_ref ? this.vault.read(row.credential_ref) : null;
+    const provider = this.store.get("provider", providerId);
+    if (!provider || provider.revision !== revision) throw new ConfigurationError("conflict", "The provider changed before execution started.");
+    if (provider.auth === "none") return "weft-no-auth";
+    return provider.credentialRef ? this.vault.read(provider.credentialRef) : null;
   }
-  private provider(row: ConfigurationRow): Provider {
-    const stored = data(row);
-    const ref = row.credential_ref;
+  private provider(stored: StoredProvider): Provider {
+    const { credentialRef: ref, ...value } = stored;
     const credentialState = stored.auth === "none" ? "not_required" : !ref || !this.vault.exists(ref) ? "missing"
       : !this.storageAvailable ? "storage_unavailable" : this.vault.failures.has(ref) ? "decryption_failed" : "available";
-    return providerSchema.parse({ ...stored, credentialState });
+    return providerSchema.parse({ ...value, credentialState });
   }
   private snapshot(): ConfigurationSnapshot {
-    const roles = this.repository.list("role");
-    const agents = this.repository.list("agent");
+    const roles = this.store.list("role");
+    const agents = this.store.list("agent");
     return {
-      providers: this.repository.list("provider").map(row => this.provider(row)),
-      models: this.repository.list("model").map(row => modelSchema.parse(data(row))),
-      roles: roles.map(row => resolveRoleConfiguration(row)),
-      agents: agents.map(row => resolveAgentConfiguration(row)),
+      providers: this.store.list("provider").map(provider => this.provider(provider)),
+      models: this.store.list("model"),
+      roles: roles.map(role => resolveRoleConfiguration(role)),
+      agents: agents.map(agent => resolveAgentConfiguration(agent)),
       defaults: structuredClone(configurationDefaults),
       overrides: {
-        roles: Object.fromEntries(roles.map(row => [row.id, modelRoleOverridesSchema.parse(JSON.parse(row.data_json))])),
-        agents: Object.fromEntries(agents.map(row => [row.id, agentOverridesSchema.parse(JSON.parse(row.data_json))])),
+        roles: Object.fromEntries(roles.map(role => [role.id, role.overrides])),
+        agents: Object.fromEntries(agents.map(agent => [agent.id, agent.overrides])),
       },
       tests: [...this.tests.values()].map(test => ({ ...test.value })), credentialStorageAvailable: this.storageAvailable,
     };
@@ -75,36 +75,23 @@ export class ConfigurationService {
     if (command.type === "test.start") return this.startTest(command.modelId);
     if (command.type === "test.cancel") { this.cancelTest(command.id); return command.id; }
     if (command.type === "remove") {
-      const old = this.repository.remove(command.kind, command.id);
-      if (old.credential_ref) this.removeCredential(old.credential_ref);
+      const { credentialRef } = this.store.remove(command.kind, command.id);
+      if (credentialRef) this.removeCredential(credentialRef);
       return command.id;
     }
-    const kind = command.type.split(".")[0] as ConfigurationKind;
     const id = command.id ?? randomUUID();
-    const old = this.repository.get(kind, id);
-    if (command.id && !old) throw new ConfigurationError("not_found", "This configuration no longer exists. Reload settings.");
-    if (command.type === "role.save" || command.type === "agent.save") {
-      const value = normalizeOverrides(command.value);
-      if (!old?.builtin && !value.name) throw new ConfigurationError("invalid_request", "Custom configurations require a name.");
-      const candidate: ConfigurationRow = { kind, id, revision: (old?.revision ?? 0) + 1,
-        data_json: JSON.stringify(value), builtin: old?.builtin ?? 0, credential_ref: null };
-      // 写入前验证完整视图，不能让局部合法但组合无效的配置落盘。
-      try {
-        if (command.type === "role.save") resolveRoleConfiguration(candidate);
-        else resolveAgentConfiguration(candidate);
-      } catch { throw new ConfigurationError("invalid_request", "Invalid configuration overrides."); }
-      this.repository.save(kind, id, value);
-      return id;
+    if (command.id && !this.store.get(saveKinds[command.type], id)) throw new ConfigurationError("not_found", "This configuration no longer exists. Reload settings.");
+    switch (command.type) {
+      case "role.save": this.store.save({ kind: "role", id, value: command.value }); return id;
+      case "agent.save": this.store.save({ kind: "agent", id, value: command.value }); return id;
+      case "model.save":
+        if (!this.store.get("provider", command.value.providerId)) throw new ConfigurationError("not_found", "The provider no longer exists. Reload settings.");
+        this.store.save({ kind: "model", id, value: command.value });
+        return id;
+      case "provider.save": break;
     }
-    if (kind === "model") {
-      const providerId = (command as Extract<ConfigurationCommand, { type: "model.save" }>).value.providerId;
-      if (!this.repository.get("provider", providerId)) throw new ConfigurationError("not_found", "The provider no longer exists. Reload settings.");
-    }
-    if (command.type !== "provider.save") {
-      this.repository.save(kind, id, command.value);
-      return id;
-    }
-    let ref = old?.credential_ref ?? null;
+    const oldRef = this.store.get("provider", id)?.credentialRef ?? null;
+    let ref = oldRef;
     let newRef: string | null = null;
     try {
       if (command.value.auth === "none" || command.credential.action === "clear") ref = null;
@@ -114,13 +101,13 @@ export class ConfigurationService {
         ref = newRef;
       }
       this.assertOpen();
-      this.repository.save("provider", id, command.value, ref);
+      this.store.save({ kind: "provider", id, value: command.value, credentialRef: ref });
     } catch (error) {
       if (newRef) this.removeCredential(newRef);
       if (error instanceof ConfigurationError) throw error;
       throw new ConfigurationError("unavailable", "The connection could not be saved. Check system credential protection and local storage.");
     }
-    if (old?.credential_ref && old.credential_ref !== ref) this.removeCredential(old.credential_ref);
+    if (oldRef && oldRef !== ref) this.removeCredential(oldRef);
     return id;
   }
   private removeCredential(ref: string): void {
@@ -131,7 +118,7 @@ export class ConfigurationService {
     const resolved = resolveProviderModel(this.snapshot(), modelId);
     if (!resolved) throw new ConfigurationError("not_found", "The model or provider no longer exists or is disabled. Reload settings.");
     const { model, provider } = resolved;
-    const providerRow = this.repository.get("provider", provider.id)!;
+    const storedProvider = this.store.get("provider", provider.id)!;
     if ([...this.tests.values()].filter(test => test.value.state === "running").length >= 8) throw new ConfigurationError("conflict", "Too many connection tests are running.");
     for (const [key, test] of this.tests) {
       if (this.tests.size < 50) break;
@@ -147,7 +134,7 @@ export class ConfigurationService {
     }, this.testTimeoutMs);
     this.tests.set(id, { value, controller, timer, started: performance.now() });
     // 配置与修订在点击测试时取得；后续编辑不改变这次请求。
-    void this.runTest(id, provider, model, providerRow.credential_ref, controller.signal);
+    void this.runTest(id, provider, model, storedProvider.credentialRef, controller.signal);
     return id;
   }
   private async runTest(id: string, provider: Provider, model: ProviderModel, reference: string | null, signal: AbortSignal): Promise<void> {

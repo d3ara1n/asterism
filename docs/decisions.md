@@ -66,7 +66,9 @@
 
 同一批次工具调用共同收束后统一向模型交付结果，再开始后续模型请求；单个工具完成可更新进度，但不触发提前续轮。批次身份是执行关联，不是 transcript 容器。
 
-提供商连接为本机应用级配置，首批覆盖 OpenAI Responses、OpenAI Chat Completions 与 Anthropic Messages。普通配置和凭据引用保存于 SQLite；API key 由 Electron safeStorage 加密，密文独立保存在应用数据目录 credentials/，加密不可用时不回退明文。能力层提供配置管理与异步连接测试，界面消费接口。具体实施状态见 [模型接入计划](../plans/todo-2026-10-01-model-protocol-storage.md)。
+全局设置与工作数据分开持久化：提供商、具体模型、模型角色与 agent 配置保存在 `configuration.json`，外观与全局界面状态分别保存在 `appearance.json`、`ui-state.json`。SQLite 保存工作区身份、累计会话记录、资源当前状态及会话视图，不承担应用配置存储。配置修改按完整文档原子保存，只在文件不存在时初始化，损坏配置明确报错并保留原文件；重建工作数据库不重置全局设置。单实例内由对应进程独占各文件写入，不引入文件锁或跨实例同步。
+
+提供商连接为本机应用级配置，首批覆盖 OpenAI Responses、OpenAI Chat Completions 与 Anthropic Messages。普通配置和凭据引用保存于 `configuration.json`；API key 由 Electron safeStorage 加密，密文独立保存在应用数据目录 credentials/，加密不可用时不回退明文。能力层提供配置管理与异步连接测试，界面消费接口。具体实施状态见 [模型接入计划](../plans/todo-2026-10-01-model-protocol-storage.md)。
 
 设置分为提供商、角色、代理：提供商管理连接与具体模型的能力、生成参数；角色管理 `heavy/fast/default/utility/smart` 及自定义模型角色；代理管理所有代理共用的 agent 配置。内置模型角色不能删除，其余设置可编辑；`utility` 默认隐藏，内部功能仍可引用。模型角色是配置参考，不是工作台对象。
 

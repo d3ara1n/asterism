@@ -1,7 +1,7 @@
 import { protocolVersion, requestSchema, type RuntimeMessage } from "../shared/contracts.ts";
 import { ApplicationError, type ApplicationService } from "./service.ts";
 import { configurationRequestSchema, configurationResponseSchema, configurationVersion } from "../shared/configuration.ts";
-import { ConfigurationError } from "../configuration/repository.ts";
+import { ConfigurationError } from "../configuration/errors.ts";
 import { sessionRequestSchema, sessionResponseSchema, sessionVersion } from "../shared/session.ts";
 import { SessionError } from "../session/tree.ts";
 
