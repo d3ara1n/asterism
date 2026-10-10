@@ -158,7 +158,7 @@ function PresetPicker({ onPick }: { onPick: (preset: ProviderPreset | null) => v
 /* ---------- 提供商详情 ---------- */
 
 type KeyAction = "keep" | "replace" | "clear";
-const blank: ProviderInput = { name: "", protocol: "openai-responses", baseUrl: "https://api.openai.com/v1", enabled: true, auth: "api_key" };
+const blank: Omit<ProviderInput, "enabled"> = { name: "", protocol: "openai-responses", baseUrl: "https://api.openai.com/v1", auth: "api_key" };
 
 function ProviderEditor({ initialId }: { initialId: string | null }) {
   const { snapshot, run, busy } = useSettingsConfiguration();
@@ -181,7 +181,7 @@ function ProviderEditor({ initialId }: { initialId: string | null }) {
   if (picking) return <Editor form="provider-form" title={s("Add provider", "添加提供商")} dirty={false}>
     <PresetPicker onPick={picked => {
       setPreset(picked);
-      setValue(picked ? { name: picked.name, protocol: picked.protocol, baseUrl: picked.baseUrl, auth: picked.auth } : { ...blank, name: "" });
+      setValue(picked ? { name: picked.name, protocol: picked.protocol, baseUrl: picked.baseUrl, auth: picked.auth } : { ...blank });
       setPicking(false);
     }} />
   </Editor>;
@@ -203,7 +203,13 @@ function ProviderEditor({ initialId }: { initialId: string | null }) {
       event.preventDefault();
       const result = await run({ type: "provider.save", id, value: { ...value, enabled: current?.enabled ?? true },
         credential: value.auth === "none" || keyAction === "clear" ? { action: "clear" } : keyAction === "replace" && key.trim() ? { action: "replace", value: key } : { action: "keep" } });
-      if (result.ok) { setId(result.savedId); setKey(""); setKeyAction("keep"); }
+      if (result.ok) {
+        const persisted = result.snapshot.providers.find(item => item.id === result.savedId);
+        if (persisted) setValue(fromCurrent(persisted));
+        setId(result.savedId);
+        setKey("");
+        setKeyAction("keep");
+      }
     }}>
       <h3 className="type-section mb-3">{s("Connection", "连接")}</h3>
       <FieldGroup>
@@ -303,7 +309,11 @@ function ModelEditor({ initialId, providerId }: { initialId: string | null; prov
     <form id="model-form" onSubmit={async event => {
       event.preventDefault();
       const result = await run({ type: "model.save", id, value: { ...value, name: value.name.trim() || value.modelId, enabled: current?.enabled ?? true } });
-      if (result.ok) { setId(result.savedId); setValue(previous => ({ ...previous, name: previous.name.trim() || previous.modelId })); }
+      if (result.ok) {
+        const persisted = result.snapshot.models.find(item => item.id === result.savedId);
+        if (persisted) setValue(modelValue(persisted));
+        setId(result.savedId);
+      }
     }}><FieldGroup>
       <TextField label={s("Server model ID", "服务端模型 ID")} value={value.modelId} onChange={next => set("modelId", next)} required placeholder="gpt-5" />
       <TextField label={s("Display name", "显示名称")} value={value.name} onChange={next => set("name", next)} placeholder={value.modelId || s("Defaults to the model ID", "默认使用模型 ID")} />
