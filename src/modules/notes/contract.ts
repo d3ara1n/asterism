@@ -8,6 +8,6 @@ export const NoteView = defineData("weft.note.card", 1, z.strictObject({ text: z
 export const NoteRead = defineImplementation({
   ...defineData("weft.note.read", 1, z.strictObject({ text: z.string() })),
   resource: Note, tool: Read, targetSchema: z.null(),
-  description: "Read the full note text. Omit target to read the note itself.",
+  description: "Read the full note text. Pass target as null and args as {}.",
   effect: "read", execution: "parallel",
 });

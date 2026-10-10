@@ -8,7 +8,7 @@ export const DirectoryView = defineData("weft.directory.card", 1, z.strictObject
 export const DirectoryRead = defineImplementation({
   ...defineData("weft.directory.read", 1, z.strictObject({ path: z.string(), text: z.string() })),
   resource: Directory, tool: Read, targetSchema: z.strictObject({ path: z.string().min(1).max(4096) }),
-  description: "Read a UTF-8 text file (up to 256 KB). target.path is relative to the directory root.",
+  description: "Read a UTF-8 text file (up to 256 KB). Pass target as an object, e.g. {\"path\":\"README.md\"}, and args as {}. target.path must be relative to the directory root; absolute paths and paths outside the resource are rejected.",
   effect: "read", execution: "parallel",
 });
 export const DirectoryList = defineImplementation({
@@ -19,6 +19,6 @@ export const DirectoryList = defineImplementation({
   })),
   resource: Directory, tool: List,
   targetSchema: z.union([z.null(), z.strictObject({ path: z.string().min(1).max(4096) })]),
-  description: "List directory entries. Omit target for the resource root, or set target.path to a relative subdirectory.",
+  description: "List directory entries. Pass target as null for the resource root, or as an object such as {\"path\":\"subdir\"} for a relative subdirectory; args is {}. Absolute paths and paths outside the resource are rejected.",
   effect: "read", execution: "parallel",
 });

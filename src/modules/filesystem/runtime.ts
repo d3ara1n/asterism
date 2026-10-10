@@ -7,17 +7,23 @@ import { implement } from "../../tools/contract.ts";
 import type { RuntimeModuleFactory } from "../runtime-contract.ts";
 import { Directory, DirectoryView, DirectoryRead, DirectoryList } from "./contract.ts";
 import { withinDirectory } from "./paths.ts";
+import { failed, filesystemFailure } from "./errors.ts";
 
 const directoryCreate = z.strictObject({ path: z.string().min(1).max(4096), title: z.string().trim().min(1).max(160).optional() });
-const fail = (code: string, message: string) => ({ kind: "failed" as const, error: { code, message } });
-const outside = () => ({ kind: "rejected" as const, error: { code: "outside_resource", message: "The path is outside this directory resource or does not exist." } });
 
 export default (() => ({
   resources: [implementResource(Directory, DirectoryView, {
     project: state => ({ path: state.path }),
     async inspect(state, resource) {
-      const info = await stat(state.path).catch(() => null);
-      return { type: Directory.kind, title: resource.title, path: state.path, exists: !!info?.isDirectory() };
+      const base = { type: Directory.kind, title: resource.title, path: state.path };
+      try {
+        const info = await stat(state.path);
+        return info.isDirectory() ? { ...base, exists: true }
+          : { ...base, exists: false, error: failed("resource_not_directory", "The resource root is no longer a directory. Ask the user to relink an existing directory.").error };
+      } catch (error) {
+        const failure = filesystemFailure(error, "Inspect resource root", true);
+        return { ...base, exists: failure.error.code === "resource_not_found" || failure.error.code === "resource_not_directory" ? false : null, error: failure.error };
+      }
     },
     controller: {
       /** 拖入与对话框共用；title 可选，不填用 basename。只接受存在的绝对目录路径。 */
@@ -43,27 +49,34 @@ export default (() => ({
     implement(DirectoryList, {
       async call(state, target, _args, { signal }) {
         const path = target?.path ?? ".";
-        const resolved = await withinDirectory(state.path, path);
-        if (!resolved) return outside();
-        signal.throwIfAborted();
-        const entries = await readdir(resolved, { withFileTypes: true }).catch(() => null);
-        if (!entries) return fail("not_directory", "The path is not a readable directory.");
-        return { kind: "succeeded", data: { path, truncated: entries.length > 500,
-          entries: entries.slice(0, 500).map(entry => ({
-            name: entry.name, type: entry.isDirectory() ? "directory" : entry.isFile() ? "file" : "other",
-          })) } };
+        try {
+          const resolved = await withinDirectory(state.path, path);
+          signal.throwIfAborted();
+          const entries = await readdir(resolved, { withFileTypes: true });
+          return { kind: "succeeded", data: { path, truncated: entries.length > 500,
+            entries: entries.slice(0, 500).map(entry => ({
+              name: entry.name, type: entry.isDirectory() ? "directory" : entry.isFile() ? "file" : "other",
+            })) } };
+        } catch (error) {
+          signal.throwIfAborted();
+          return filesystemFailure(error, "List target directory");
+        }
       },
     }),
     implement(DirectoryRead, {
       async call(state, target, _args, { signal }) {
-        const resolved = await withinDirectory(state.path, target.path);
-        if (!resolved) return outside();
-        signal.throwIfAborted();
-        const info = await stat(resolved).catch(() => null);
-        if (!info?.isFile()) return fail("not_file", "The path is not a readable file.");
-        if (info.size > 256 * 1024) return fail("too_large", "The file exceeds the 256 KB read limit.");
-        const text = await readFile(resolved, "utf8");
-        return { kind: "succeeded", data: { path: target.path, text } };
+        try {
+          const resolved = await withinDirectory(state.path, target.path);
+          signal.throwIfAborted();
+          const info = await stat(resolved);
+          if (!info.isFile()) return failed("not_file", "target.path is not a regular file. Use list for a directory, then select a regular file to read.");
+          if (info.size > 256 * 1024) return failed("too_large", "The file exceeds the 256 KB read limit. This tool does not support partial reads; choose a smaller file or explain the limit to the user.");
+          const text = await readFile(resolved, "utf8");
+          return { kind: "succeeded", data: { path: target.path, text } };
+        } catch (error) {
+          signal.throwIfAborted();
+          return filesystemFailure(error, "Read target file");
+        }
       },
     }),
   ],

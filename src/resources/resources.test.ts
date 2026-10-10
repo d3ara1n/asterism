@@ -46,8 +46,9 @@ describe("工具与资源的匹配及授权", () => {
     symlinkSync(join(outside, "secret.txt"), join(root, "link.txt"));
     const read = (path: string) => invoke(scope(), "resource_call", { resource_id: resource.id, tool: "read", target: { path }, args: {} });
     expect(await read("a.txt")).toMatchObject({ kind: "succeeded", model: { text: "hello" } });
-    for (const path of ["../outside/secret.txt", join(outside, "secret.txt"), "link.txt"])
+    for (const path of ["../outside/secret.txt", "../missing/secret.txt", "link.txt"])
       expect(await read(path)).toMatchObject({ kind: "rejected", error: { code: "outside_resource" } });
+    expect(await read(join(outside, "secret.txt"))).toMatchObject({ kind: "rejected", error: { code: "absolute_path" } });
   });
 
   it("resource_call 只作用于已链接资源，参数不合 schema 时指向 inspect 契约", async () => {
@@ -55,6 +56,57 @@ describe("工具与资源的匹配及授权", () => {
     expect(await invoke(scope(), "resource_call", { resource_id: "d1", tool: "read", target: { path: "a.txt" }, args: {} })).toMatchObject({ kind: "succeeded" });
     expect(await invoke(scope(), "resource_call", { resource_id: "d1", tool: "read", args: {} })).toMatchObject({ kind: "rejected", error: { code: "invalid_arguments" } });
     expect(await invoke(scope([]), "resource_call", { resource_id: "d1", tool: "read", target: { path: "a.txt" }, args: {} })).toMatchObject({ kind: "rejected", error: { code: "access_denied" } });
+  });
+
+  it("字符串化的 target 和 args 同时报出类型错误，按提示修正后即可执行", async () => {
+    const { scope } = setup();
+    const capabilities = scope();
+    const call = (target: Json, args: Json) => invoke(capabilities, "resource_call", { resource_id: "d1", tool: "list", target, args });
+    const outcome = await call('{"path":"."}', "{}");
+    expect(outcome).toMatchObject({ kind: "rejected", error: { code: "invalid_arguments" } });
+    if (outcome.kind !== "rejected") throw new Error("Expected schema rejection");
+    expect(outcome.error.message).toMatch(/target: [^\n]*expected null, received string/);
+    expect(outcome.error.message).toMatch(/target: [^\n]*expected object, received string/);
+    expect(outcome.error.message).toMatch(/args: [^\n]*expected object, received string/);
+    expect(outcome.error.message).toContain("not JSON-encoded strings");
+    expect(await call({ path: "." }, {})).toMatchObject({ kind: "succeeded" });
+    expect(await call("null", {})).toMatchObject({ kind: "rejected" });
+    expect(await call(null, {})).toMatchObject({ kind: "succeeded" });
+  });
+
+  it("校验错误保留嵌套字段与多余键，一级入口也返回具体原因", async () => {
+    const { scope } = setup();
+    const result = await invoke(scope(), "resource_call", { resource_id: "d1", tool: "read", target: { path: 42, extra: true }, args: {} });
+    expect(result).toMatchObject({ kind: "rejected", error: { message: expect.stringMatching(/target\.path: [^\n]*expected string, received number/) } });
+    expect(result).toMatchObject({ error: { message: expect.stringContaining('Unrecognized key: "extra"') } });
+    expect(await invoke(scope(), "resource_inspect", { resource_id: 42 })).toMatchObject({
+      kind: "rejected", error: { message: expect.stringMatching(/resource_inspect\.resource_id: [^\n]*expected string, received number/) },
+    });
+  });
+
+  it("目录错误区分目标缺失、类型、无效路径和符号链接解析失败，并提供下一步", async () => {
+    const { root, scope } = setup();
+    symlinkSync("loop", join(root, "loop"));
+    for (const [tool, path, code, hint] of [
+      ["read", "missing.txt", "path_not_found", "Use list"],
+      ["list", "a.txt", "not_directory", "use read"],
+      ["read", ".", "not_file", "Use list"],
+      ["read", "a.txt/child", "not_directory", "correct target.path"],
+      ["read", "loop", "symlink_loop", "repair the link"],
+      ["read", "bad\0path", "invalid_path", "NUL"],
+    ]) {
+      expect(await invoke(scope(), "resource_call", { resource_id: "d1", tool: tool!, target: { path: path! }, args: {} }))
+        .toMatchObject({ error: { code, message: expect.stringContaining(hint!) } });
+    }
+    // 修正不存在的目标后，同一能力视图可直接重试。
+    expect(await invoke(scope(), "resource_call", { resource_id: "d1", tool: "read", target: { path: "a.txt" }, args: {} }))
+      .toMatchObject({ kind: "succeeded" });
+    rmSync(root, { recursive: true });
+    expect(await invoke(scope(), "resource_call", { resource_id: "d1", tool: "list", target: null, args: {} }))
+      .toMatchObject({ error: { code: "resource_not_found", message: expect.stringContaining("restore or relink") } });
+    writeFileSync(root, "not a directory");
+    expect(await invoke(scope(), "resource_call", { resource_id: "d1", tool: "list", target: null, args: {} }))
+      .toMatchObject({ error: { code: "resource_not_directory", message: expect.stringContaining("relink") } });
   });
 
   it("一个 read 定义匹配两类资源；链接任何支持的资源即可激活，list 只匹配目录", async () => {
