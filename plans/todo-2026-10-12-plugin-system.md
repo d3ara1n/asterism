@@ -4,9 +4,9 @@
 
 ## 步骤
 
-已完成：内置模块改造为 `atelier.core` 插件（两阶段装配、命名空间补全、契约覆盖、贡献清单、绑定会话/对象的 context 与 `emit`）；插件缺席时的实现缺失呈现。
+已完成：内置模块改造为 `atelier.core` 插件（两阶段装配、命名空间补全、契约覆盖、贡献清单、绑定会话/对象的 context 与 `emit`）；插件缺席时的实现缺失呈现；plugin api 便利设施后端（`plugin.config` / `secrets` / `db`）。
 
-3. plugin api 便利设施：配置 schema 与设置页分组、命名空间凭据、`.atelier/` 托管数据库。
+3. 插件配置的设置页分组：按 Zod schema 渲染表单、renderer 到 runtime 的配置通道，与插件页一同在首个真实插件出现后设计。
 4. `plugin.models`：按模型角色发起对话，不接触密钥；agent 的模型、提供商与凭据调用由此替换内部接口。
 5. 拆出版本化的插件 API 契约包与宿主 API 版本检查。
 6. 外部加载：npm 安装与版本锁定、用户插件顺序、启用/禁用重启生效、renderer 运行时加载插件视图 bundle。

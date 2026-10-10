@@ -173,6 +173,7 @@ const acme = pluginNamespace("acme.mcp");          // 唯一声明 id 的地方�
 definePlugin({ namespace: acme, version, modules: [defineModule(plugin => ({ resources, tools }))] });
 
 plugin.id / plugin.dir / plugin.log                 // 跟随插件
+plugin.config(schema, defaults) / plugin.secrets / plugin.db()  // .atelier/ 托管：config.json、secrets.json（仅引用）、db.sqlite
 plugin.session(sessionId) { path, linked, emit, changed }   // 绑定会话
 plugin.object(sessionId, objectId) { get, set }             // 绑定对象的资源状态
 ```

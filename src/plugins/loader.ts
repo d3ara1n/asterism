@@ -1,4 +1,5 @@
-import { join } from "node:path";
+import type { CredentialVault } from "../configuration/credentials.ts";
+import { PluginStorage } from "./storage.ts";
 import type { Json } from "../shared/json.ts";
 import { belongsTo } from "../shared/plugin.ts";
 import { contractKey } from "../shared/presentation.ts";
@@ -17,6 +18,8 @@ export interface PluginHostServices {
   kindOf(objectId: string): string | null;
   sessions: PluginSessions;
   internal: InternalModelServices;
+  /** 插件凭据复用宿主 vault；缺失时 secrets 返回 unavailable。 */
+  vault?: CredentialVault | null;
   log?: (pluginId: string, level: "info" | "warn" | "error", message: string, error?: unknown) => void;
 }
 export interface PluginManifest {
@@ -31,13 +34,15 @@ export interface LoadedPlugins {
   resources: ResourceRegistry;
   tools: ToolRegistry;
   manifest: readonly PluginManifest[];
+  /** 关闭插件托管数据库。 */
+  close(): void;
 }
 interface Collected { plugin: PluginDefinition; resources: ResourceBackend[]; tools: ToolImplementation[] }
 
 const defaultLog: NonNullable<PluginHostServices["log"]> = (pluginId, level, message, error) =>
   console[level](`[plugin ${pluginId}] ${message}`, ...(error === undefined ? [] : [error]));
 
-function context(plugin: PluginDefinition, services: PluginHostServices): PluginContext {
+function context(plugin: PluginDefinition, services: PluginHostServices, storage: PluginStorage): PluginContext {
   const id = plugin.namespace.id;
   const write = services.log ?? defaultLog;
   const log: PluginLogger = {
@@ -68,7 +73,7 @@ function context(plugin: PluginDefinition, services: PluginHostServices): Plugin
     changed: () => services.sessions.changed(sessionId),
   });
   return {
-    id, dir: join(services.extensionsDirectory, id), log, state, sessions: services.sessions, internal: services.internal,
+    id, dir: storage.dir, log, config: (schema, defaults) => storage.config(schema, defaults), secrets: storage.secrets, db: () => storage.db(), state, sessions: services.sessions, internal: services.internal,
     session,
     object: (sessionId, objectId) => ({
       objectId,
@@ -99,13 +104,17 @@ function validate(collected: Collected): void {
 export function loadPlugins(plugins: readonly PluginDefinition[], services: PluginHostServices): LoadedPlugins {
   const manifest: PluginManifest[] = [];
   const collected: Collected[] = [];
+  const storages: PluginStorage[] = [];
   const kinds = new Set<string>();
   const identities = new Set<string>();
   for (const plugin of plugins) {
     const id = plugin.namespace.id;
     try {
       if (manifest.some(entry => entry.id === id)) throw new Error(`Duplicate plugin ID: ${id}`);
-      const plugged = context(plugin, services);
+      const storage = new PluginStorage(services.extensionsDirectory, id, services.vault ?? null,
+        (message, error) => (services.log ?? defaultLog)(id, "warn", message, error));
+      storages.push(storage);
+      const plugged = context(plugin, services, storage);
       const entry: Collected = { plugin, resources: [], tools: [] };
       for (const module of plugin.modules) {
         const contribution = module(plugged);
@@ -143,5 +152,6 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
     resources: new ResourceRegistry(collected.flatMap(entry => entry.resources)),
     tools: new ToolRegistry(active),
     manifest: Object.freeze(manifest.map(entry => Object.freeze(entry))),
+    close: () => { for (const storage of storages) storage.close(); },
   };
 }

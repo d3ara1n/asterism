@@ -13,7 +13,8 @@ const saveKinds = { "provider.save": "provider", "model.save": "model", "role.sa
 
 export class ConfigurationService {
   private readonly store: ConfigurationStore;
-  private readonly vault: CredentialVault;
+  /** 宿主凭据库；插件凭据以独立引用存于同一 vault。 */
+  readonly vault: CredentialVault;
   private queue: Promise<unknown> = Promise.resolve();
   private closed = false;
   private storageAvailable = false;

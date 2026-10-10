@@ -1,3 +1,5 @@
+import type { z } from "zod";
+import type { DatabaseSync } from "node:sqlite";
 import type { Json } from "../shared/json.ts";
 import type { PluginNamespace } from "../shared/plugin.ts";
 import type { BlockCompletion, NewNode, SessionNode } from "../shared/session.ts";
@@ -62,12 +64,27 @@ export interface PluginObjectState {
   get(key: string): Json | null;
   set(key: string, value: Json): void;
 }
+/** 宿主托管配置：schema 校验，文件缺失或不合 schema 时回退默认值。 */
+export interface PluginConfig<T extends Json> {
+  get(): T;
+  set(value: T): void;
+}
+/** 命名空间凭据：明文只在系统保护的 vault 中，插件目录只存引用。 */
+export interface PluginSecrets {
+  get(key: string): Promise<string | null>;
+  set(key: string, value: string): Promise<void>;
+  delete(key: string): Promise<void>;
+}
 /** 插件级 context：宿主按插件身份构造，身份不由插件自报。 */
 export interface PluginContext {
   readonly id: string;
   /** `<data>/extensions/<pluginId>/`，插件自由写入；`.atelier/` 由宿主托管。 */
   readonly dir: string;
   readonly log: PluginLogger;
+  config<T extends Json>(schema: z.ZodType<T>, defaults: T): PluginConfig<T>;
+  readonly secrets: PluginSecrets;
+  /** `.atelier/db.sqlite`，与宿主数据库独立；首次访问时打开，宿主退出时关闭。 */
+  db(): DatabaseSync;
   readonly state: PluginResourceState;
   readonly sessions: PluginSessions;
   /** 绑定会话与对象的调用 context；优先使用，避免手动传递身份。 */

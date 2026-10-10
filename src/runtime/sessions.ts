@@ -35,6 +35,7 @@ export class SessionService {
   private readonly resources: ResourceRegistry;
   private readonly tools: ToolRegistry;
   readonly plugins: readonly PluginManifest[];
+  private readonly closePlugins: () => void;
   constructor(private readonly db: DatabaseSync, dataRoot: string, configuration: ConfigurationService,
     private readonly changed: (event: SessionChanged) => void = () => {}, adapterFactory?: (settings: ModelSettings) => ModelAdapter) {
     this.tree = new SessionTree(db);
@@ -63,11 +64,12 @@ export class SessionService {
       }
       return null;
     };
-    const modules = createModules({ extensionsDirectory: join(dataRoot, "extensions"), state: new ResourceStateStore(db), kindOf,
+    const modules = createModules({ extensionsDirectory: join(dataRoot, "extensions"), state: new ResourceStateStore(db), kindOf, vault: configuration.vault,
       sessions: host, internal: { configuration, ...(adapterFactory ? { adapterFactory } : {}) } });
     this.resources = modules.resources;
     this.tools = modules.tools;
     this.plugins = modules.manifest;
+    this.closePlugins = modules.close;
     this.workbench = new SessionWorkbench(db, this.tree, this.resources,
       (sessionId, agentId, resource) => this.linkTools(sessionId, agentId, resource));
   }
@@ -213,5 +215,6 @@ export class SessionService {
   async close(): Promise<void> {
     this.closed = true;
     await Promise.allSettled(this.resources.controllers().map(controller => controller.close?.()));
+    this.closePlugins();
   }
 }
