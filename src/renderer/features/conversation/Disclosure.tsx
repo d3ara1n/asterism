@@ -22,7 +22,7 @@ export function Disclosure({ header, children, open, onOpenChange, expandable = 
           <ChevronDown aria-hidden="true" className={cn("size-3.5 shrink-0 transition-transform motion-reduce:transition-none", open && "rotate-180")} />
         </Button>
       </CollapsibleTrigger> : <div className="flex items-center gap-2 px-3 py-2 type-caption">{header}</div>}
-      <CollapsibleContent className="space-y-3 px-3 pb-3">{children}</CollapsibleContent>
+      <CollapsibleContent className="space-y-3 p-3">{children}</CollapsibleContent>
     </Item>
   </Collapsible>;
 }
