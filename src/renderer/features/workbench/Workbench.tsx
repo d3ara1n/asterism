@@ -1,7 +1,7 @@
 import type { WorkbenchOperation } from "../session/controller";
 import { useCallback, useEffect, useLayoutEffect, useImperativeHandle, useMemo, useRef, useState, type ReactNode, type Ref } from "react";
 import { ReactFlow, ReactFlowProvider, Panel, useReactFlow, applyNodeChanges, applyEdgeChanges, type NodeChange, type EdgeChange, type Edge, MarkerType, ConnectionMode, type Connection, type IsValidConnection } from "@xyflow/react";
-import { Crosshair, Maximize, Minus, Plus } from "lucide-react";
+import { Crosshair, Maximize, Minus, Plus, RotateCcw } from "lucide-react";
 import { maximumViewportZoom, type WorkbenchSnapshot } from "../../../shared/workbench";
 import { useModuleViews } from "../../modules/views";
 import { t } from "../../shared/i18n";
@@ -202,6 +202,7 @@ function ViewControls({ session, run, canvas, objects, selected }: { session: Wo
   // 所有对象平级：定位当前选中的卡片，而非某个“主”代理。
   const controls = [
     [t.zoomIn, Plus, () => move(() => flow.zoomIn())],
+    [t.resetZoom, RotateCcw, () => move(() => flow.zoomTo(1))],
     [t.zoomOut, Minus, () => move(() => flow.zoomOut())],
     [t.fitObjects, Maximize, () => canvas.focusObjects(objects)],
     ...(selected.length ? [[t.focusSelection, Crosshair, () => canvas.focusObjects(selected)] as const] : []),
