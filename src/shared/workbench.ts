@@ -10,7 +10,10 @@ export const cardSizeSchema = z.strictObject({
   width: z.number().finite().min(1).max(maximumCardDimension),
   height: z.number().finite().min(1).max(maximumCardDimension),
 });
-export const viewportSchema = z.strictObject({ x: coordinate, y: coordinate, zoom: z.number().min(0.1).max(4) });
+/** 存储允许远距离对象的全图概览；交互下限由画布按可见对象范围收紧。 */
+export const minimumViewportZoom = 0.00001;
+export const maximumViewportZoom = 4;
+export const viewportSchema = z.strictObject({ x: coordinate, y: coordinate, zoom: z.number().min(minimumViewportZoom).max(maximumViewportZoom) });
 export type Point = z.infer<typeof pointSchema>;
 export type CardSize = z.infer<typeof cardSizeSchema>;
 export type Viewport = z.infer<typeof viewportSchema>;

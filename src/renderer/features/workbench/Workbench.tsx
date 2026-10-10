@@ -1,8 +1,8 @@
 import type { WorkbenchOperation } from "../session/controller";
 import { useCallback, useEffect, useLayoutEffect, useImperativeHandle, useMemo, useRef, useState, type ReactNode, type Ref } from "react";
-import { ReactFlow, ReactFlowProvider, Panel, useReactFlow, getViewportForBounds, applyNodeChanges, applyEdgeChanges, type NodeChange, type EdgeChange, type Edge, MarkerType, ConnectionMode, type Connection, type IsValidConnection } from "@xyflow/react";
+import { ReactFlow, ReactFlowProvider, Panel, useReactFlow, applyNodeChanges, applyEdgeChanges, type NodeChange, type EdgeChange, type Edge, MarkerType, ConnectionMode, type Connection, type IsValidConnection } from "@xyflow/react";
 import { Crosshair, Maximize, Minus, Plus } from "lucide-react";
-import type { WorkbenchSnapshot } from "../../../shared/workbench";
+import { maximumViewportZoom, type WorkbenchSnapshot } from "../../../shared/workbench";
 import { useModuleViews } from "../../modules/views";
 import { t } from "../../shared/i18n";
 import { s } from "../configuration/state";
@@ -16,7 +16,7 @@ import { ObjectNode, type ObjectNodeType } from "./ObjectNode";
 import { IconAction, type ViewPatch } from "./ObjectCard";
 import { ObjectsPanel } from "./ObjectsPanel";
 import { AccessPanel } from "./AccessPanel";
-import { placeObject, type ResourcePlacement } from "./placement";
+import { useWorkbenchCanvas, type WorkbenchCanvas } from "./canvas";
 import { workbenchNodes } from "./nodes";
 import { confirmCardSizes, saveCardSize, type SizeIntent } from "./size-intents";
 import { layoutConnections, type ConnectionEdge } from "./connections";
@@ -24,47 +24,29 @@ import { WorkbenchContext, WorkbenchScope, WorkbenchStore, useWorkbench, type Wo
 
 const nodeTypes = { object: ObjectNode };
 export type PanelKind = "objects" | "history" | "access";
-type LocateRequest = { objectId: string; token: number; navigationVersion: number };
 
 /** 标题栏操作经此句柄进入工作台浮岛；面板作为更深浮岛打开，不另建浮层。 */
 export interface WorkbenchHandle {
   togglePanel: (kind: PanelKind, origin: HTMLElement | null) => void;
-  resourcePlacement: () => ResourcePlacement | null;
+  canvas: WorkbenchCanvas;
 }
 
 type Props = WorkbenchEnvironment & { ref?: Ref<WorkbenchHandle> };
 type Run = (command: WorkbenchOperation) => Promise<boolean>;
 type WorkbenchEdge = Edge<ConnectionEdge["data"]>;
-type CanvasHandle = { place: (width: number, height: number) => ResourcePlacement["position"] };
 
 /** 工作台根浮岛：投影平级对象和关系；代理对话只是代理对象的卡片内容。 */
 export function Workbench({ ref, controller, session, ready, busy, historical, run, draft, onDraftChange, onHome }: Props) {
-  const [locating, setLocating] = useState<LocateRequest | null>(null);
-  const locateSequence = useRef(0);
-  const navigationVersion = controller.getSnapshot().navigationVersion;
-  useLayoutEffect(() => { locateSequence.current++; setLocating(null); }, [navigationVersion]);
-  useLayoutEffect(() => {
-    if (!ready || busy) { locateSequence.current++; setLocating(null); }
-  }, [ready, busy]);
-  const locate = useCallback(async (objectId: string) => {
-    const state = controller.getSnapshot();
-    if (state.status !== "ready" || !state.snapshot?.workbench.objects.some(object => object.id === objectId)) return;
-    const token = ++locateSequence.current;
-    if (state.snapshot.workbench.views.some(view => view.objectId === objectId && view.hidden)) {
-      if (!(await controller.executeAndRead({ type: "view.set", sessionId: session.id, objectId, hidden: false })).ok) return;
-    }
-    // 命令受理与投影发布分离；后续由画布等待节点测量。导航变化或新定位意图取消旧意图。
-    if (locateSequence.current === token && controller.getSnapshot().status === "ready" && controller.getSnapshot().navigationVersion === state.navigationVersion) {
-      setLocating({ objectId, token, navigationVersion: state.navigationVersion });
-    }
-  }, [controller, session.id]);
+  const canvasRef = useRef<WorkbenchCanvas>(null);
+  const canvas = useMemo<WorkbenchCanvas>(() => ({
+    findPlacement: options => canvasRef.current?.findPlacement(options) ?? null,
+    focusObjects: async (ids, options) => { await canvasRef.current?.focusObjects(ids, options); },
+  }), []);
   // 按字段组装环境，只有字段真的变化时才通知卡片与面板浮岛。
   const context = useMemo<WorkbenchView>(
-    () => ({ controller, session, ready, busy, historical, run, draft, onDraftChange, onHome, locate }),
-    [controller, session, ready, busy, historical, run, draft, onDraftChange, onHome, locate]);
+    () => ({ controller, session, ready, busy, historical, run, draft, onDraftChange, onHome, canvas }),
+    [controller, session, ready, busy, historical, run, draft, onDraftChange, onHome, canvas]);
   const island = useIsland();
-  const host = useRef<HTMLDivElement>(null);
-  const canvasRef = useRef<CanvasHandle>(null);
   const [store] = useState(() => new WorkbenchStore());
   const open = useCallback((id: string, label: string, render: () => ReactNode, origin: HTMLElement | null) => {
     if (island.child === id) island.closeChild();
@@ -74,17 +56,13 @@ export function Workbench({ ref, controller, session, ready, busy, historical, r
   useImperativeHandle(ref, () => ({
     togglePanel: (kind, origin) => open(`workbench-${kind}`, ({ objects: t.objects, history: t.history, access: t.accessLabel })[kind],
       () => kind === "objects" ? <ObjectsPanel /> : kind === "access" ? <AccessPanel /> : <SessionHistoryPanel controller={controller} />, origin),
-    resourcePlacement: () => {
-      const bounds = host.current?.getBoundingClientRect();
-      return bounds && canvasRef.current ? { sessionId: session.id, position: canvasRef.current.place(bounds.width, bounds.height) } : null;
-    },
-  }), [open, session, controller]);
+    canvas,
+  }), [open, canvas, controller]);
   useLayoutEffect(() => store.set(context), [store, context]);
 
   return <WorkbenchContext.Provider value={context}>
-    <div ref={host} className="relative h-full">
-      <ReactFlowProvider><Canvas ref={canvasRef} session={session} run={run} writable={ready && !busy && !historical}
-        locating={ready && !busy && locating?.navigationVersion === navigationVersion ? locating : null} /></ReactFlowProvider>
+    <div className="relative h-full">
+      <ReactFlowProvider><Canvas ref={canvasRef} session={session} run={run} writable={ready && !busy && !historical} /></ReactFlowProvider>
       {historical && <div role="status"
         className="surface-floating absolute bottom-[var(--overlay-inset)] left-1/2 z-10 flex -translate-x-1/2 items-center gap-3 whitespace-nowrap p-1 pl-3 text-sm">
         <span>{t.viewingHistory}</span>
@@ -102,8 +80,8 @@ export function Workbench({ ref, controller, session, ready, busy, historical, r
   </WorkbenchContext.Provider>;
 }
 
-function Canvas({ ref, session, run, writable, locating }: {
-  ref?: Ref<CanvasHandle>; session: WorkbenchSnapshot; run: Run; writable: boolean; locating: LocateRequest | null;
+function Canvas({ ref, session, run, writable }: {
+  ref?: Ref<WorkbenchCanvas>; session: WorkbenchSnapshot; run: Run; writable: boolean;
 }) {
   const flow = useReactFlow();
   const registry = useModuleViews();
@@ -136,37 +114,8 @@ function Canvas({ ref, session, run, writable, locating }: {
     confirmCardSizes(pendingSizes.current, session);
     setNodes(previous => toNodes(session, previous));
   }, [session, toNodes]);
-  useImperativeHandle(ref, () => ({
-    place: (width, height) => placeObject(latest.current, width, height, flow.getNodes()),
-  }), [flow]);
-  const located = useRef(0);
-  const target = nodes.find(node => node.id === locating?.objectId);
-  useEffect(() => {
-    if (!locating || located.current === locating.token || !target?.measured?.width || !target.measured.height) return;
-    let active = true, animating = false;
-    const frame = requestAnimationFrame(() => {
-      const element = viewportElement.current;
-      if (!element?.clientWidth || !element.clientHeight) return;
-      located.current = locating.token;
-      setNodes(current => current.map(node => ({ ...node, selected: node.id === locating.objectId })));
-      animating = true;
-      const bounds = flow.getNodesBounds([locating.objectId]);
-      const viewport = getViewportForBounds(bounds, element.clientWidth, element.clientHeight, 0.1, 1, 0.25);
-      // 节点已测量，使用画布公开 API 立即开始可中断的视口过渡。
-      void flow.setViewport(viewport, {
-        duration: matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 420 }).then(() => {
-        animating = false;
-        if (!active || controller.getSnapshot().navigationVersion !== locating.navigationVersion) return;
-        // 定位属于显式视图操作；不追加会话历史。
-        void run({ type: "viewport.set", sessionId: session.id, viewport: flow.getViewport() });
-      });
-    });
-    return () => {
-      active = false; cancelAnimationFrame(frame);
-      // 即时设置当前视口会中断画布原生过渡，导航后不再继续移动或保存旧定位。
-      if (animating) void flow.setViewport(flow.getViewport(), { duration: 0 });
-    };
-  }, [locating, target?.measured?.width, target?.measured?.height, flow, run, session.id, controller]);
+  const { api: canvas, minZoom } = useWorkbenchCanvas(nodes, setNodes, viewportElement);
+  useImperativeHandle(ref, () => canvas, [canvas]);
   const connections = useMemo(() => layoutConnections(nodes, session.links), [nodes, session.links]);
   const canvasNodes = useMemo(() => nodes.map(node => ({
     ...node, data: { ...node.data, ports: connections.ports.get(node.id) },
@@ -231,7 +180,7 @@ function Canvas({ ref, session, run, writable, locating }: {
     <p className="type-body">{s("Drop to add as resources", "松开以添加为资源")}</p></div>}
   <ReactFlow<ObjectNodeType, WorkbenchEdge>
     colorMode={scheme} nodes={canvasNodes} edges={edges} nodeTypes={nodeTypes} onNodesChange={onNodesChange}
-    defaultViewport={session.viewport} minZoom={0.1} maxZoom={4}
+    defaultViewport={session.viewport} minZoom={minZoom} maxZoom={maximumViewportZoom}
     nodesDraggable nodesConnectable={writable} connectionMode={ConnectionMode.Loose} edgesReconnectable={false} isValidConnection={isValidConnection}
     onConnect={onConnect} onEdgesChange={onEdgesChange} onEdgesDelete={onEdgesDelete}
     onBeforeDelete={async ({ edges }) => ({ nodes: [], edges: edges.filter(edge => edge.selected) })}
@@ -239,11 +188,11 @@ function Canvas({ ref, session, run, writable, locating }: {
     onMoveEnd={(event, viewport) => { if (event) void run({ type: "viewport.set", sessionId: session.id, viewport }); }}
   >
     <WorkbenchBackground />
-    <ViewControls session={session} run={run} selected={nodes.filter(node => node.selected).map(node => ({ id: node.id }))} />
+    <ViewControls session={session} run={run} canvas={canvas} objects={nodes.map(node => node.id)} selected={nodes.filter(node => node.selected).map(node => node.id)} />
   </ReactFlow></div>;
 }
 
-function ViewControls({ session, run, selected }: { session: WorkbenchSnapshot; run: Run; selected: { id: string }[] }) {
+function ViewControls({ session, run, canvas, objects, selected }: { session: WorkbenchSnapshot; run: Run; canvas: WorkbenchCanvas; objects: string[]; selected: string[] }) {
   const flow = useReactFlow();
   const move = async (action: () => Promise<boolean>) => {
     await action();
@@ -252,13 +201,13 @@ function ViewControls({ session, run, selected }: { session: WorkbenchSnapshot; 
   };
   // 所有对象平级：定位当前选中的卡片，而非某个“主”代理。
   const controls = [
-    [t.zoomIn, Plus, () => flow.zoomIn()],
-    [t.zoomOut, Minus, () => flow.zoomOut()],
-    [t.fitObjects, Maximize, () => flow.fitView({ padding: 0.25 })],
-    ...(selected.length ? [[t.focusSelection, Crosshair, () => flow.fitView({ nodes: selected, padding: 0.12, maxZoom: 1 })] as const] : []),
+    [t.zoomIn, Plus, () => move(() => flow.zoomIn())],
+    [t.zoomOut, Minus, () => move(() => flow.zoomOut())],
+    [t.fitObjects, Maximize, () => canvas.focusObjects(objects)],
+    ...(selected.length ? [[t.focusSelection, Crosshair, () => canvas.focusObjects(selected)] as const] : []),
   ] as const;
   return <Panel position="bottom-right" className="surface flex flex-col p-0.5">
     {controls.map(([label, Icon, action]) =>
-      <IconAction key={label} label={label} size="icon-sm" onClick={() => { void move(action); }}><Icon /></IconAction>)}
+      <IconAction key={label} label={label} size="icon-sm" onClick={() => { void action(); }}><Icon /></IconAction>)}
   </Panel>;
 }

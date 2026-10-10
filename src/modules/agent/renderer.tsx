@@ -6,10 +6,12 @@ import { agentView } from "../../renderer/features/session/registry";
 import { useWorkbench } from "../../renderer/features/workbench/context";
 import { AgentView } from "./contract";
 
+const appearance = { width: 560, height: 640, minWidth: 480, minHeight: 480 };
+
 export default {
-  resources: [{ kind: "agent", label: t.kindAgent, icon: <Bot className="size-4" /> }],
+  resources: [{ kind: "agent", label: t.kindAgent, icon: <Bot className="size-4" />, card: appearance }],
   cards: [cardRenderer(AgentView, {
-    width: 560, height: 640, minWidth: 480, minHeight: 480,
+    ...appearance,
     Body: ({ data }) => {
       const workbench = useWorkbench();
       return <Conversation view={agentView(workbench.controller, data.agentId)} selection={data.selection} ready={workbench.ready}

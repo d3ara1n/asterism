@@ -13,7 +13,6 @@ import { HomePage, type StartInput } from "../features/home/HomePage";
 import { Workbench, type WorkbenchHandle } from "../features/workbench/Workbench";
 import { WorkbenchSurface } from "../features/workbench/WorkbenchSurface";
 import { useModuleViews } from "../modules/views";
-import type { ResourcePlacement } from "../features/workbench/placement";
 import { SubmissionIdentity } from "../features/session/controller";
 import { sessionController } from "../features/session/registry";
 import { s, useConfiguration } from "../features/configuration/state";
@@ -32,7 +31,7 @@ import { islandTransition } from "../shared/weave/motion";
 /** 主屏包含侧栏与首页/工作台；设置为左侧独立屏，切换时主屏整体平移。 */
 type MainView = { kind: "home" } | { kind: "conversation"; sessionId: string };
 type PageId = "settings" | "main";
-type ResourceCreation = { kind: "agent" | "note" | "directory"; placement: ResourcePlacement };
+type ResourceCreation = { kind: "agent" | "note" | "directory"; sessionId: string };
 const idleSubscribe = () => () => {};
 const noSession = () => null;
 
@@ -107,15 +106,27 @@ export function App({ controller }: { controller: ApplicationController }) {
     if (token === navigation.current) openSession(created);
     void controller.refresh();
   };
-  /** 先记下放置位置再打开对话框，确认后才创建资源。 */
+  /** 表单绑定会话；提交时按最新画布寻找空位，避免使用过时的位置。 */
   const openResourceCreation = (kind: ResourceCreation["kind"]) => {
-    const placement = workbench.current?.resourcePlacement();
-    if (placement) { active?.clearError(); setResourceCreation({ kind, placement }); }
+    if (active && writable) { active.clearError(); setResourceCreation({ kind, sessionId: active.sessionId }); }
   };
   const createResource = async (input: Json) => {
-    if (!active || !resourceCreation || active.sessionId !== resourceCreation.placement.sessionId) return false;
-    const { kind, placement } = resourceCreation;
-    const result = await active.execute({ type: "resource.create", sessionId: placement.sessionId, kind, input, position: placement.position });
+    if (!active || !resourceCreation || active.sessionId !== resourceCreation.sessionId) return false;
+    const { kind } = resourceCreation;
+    const canvas = workbench.current?.canvas;
+    const placement = canvas?.findPlacement({ kind });
+    if (!canvas || !placement || placement.sessionId !== active.sessionId) return false;
+    const before = active.getSnapshot();
+    const existing = new Set(before.snapshot?.workbench.objects.map(object => object.id));
+    const token = navigation.current;
+    const result = await active.executeAndRead({ type: "resource.create", sessionId: placement.sessionId, kind, input, position: placement.position });
+    const after = active.getSnapshot();
+    if (result.ok && after.status === "ready" && token === navigation.current
+      && after.navigationVersion === before.navigationVersion && canvas === workbench.current?.canvas) {
+      // 受理结果不携带对象身份，从命令之后的真实投影识别新增对象。
+      const created = after.snapshot?.workbench.objects.filter(object => !existing.has(object.id) && object.kind === kind) ?? [];
+      if (created.length === 1) void canvas.focusObjects([...placement.selectedObjectIds, created[0]!.id]);
+    }
     return result.ok;
   };
   // 迟到的回调只能关闭它所属的创建表单。

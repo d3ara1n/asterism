@@ -11,6 +11,8 @@ export interface ResourceDescription {
   kind: string;
   label: string;
   icon: ReactNode;
+  /** 创建前可取用的默认卡片尺寸，与卡片 renderer 共用声明。 */
+  card?: CardAppearance;
 }
 export interface CardAppearance {
   /** 画布单位下的默认尺寸；用户覆盖由工作台保存。 */

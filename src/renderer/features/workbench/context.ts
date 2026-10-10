@@ -2,6 +2,7 @@ import type { WorkbenchOperation } from "../session/controller";
 import { createContext, createElement, useContext, useSyncExternalStore, type ReactNode } from "react";
 import type { WorkbenchSnapshot } from "../../../shared/workbench";
 import type { SessionController } from "../session/controller";
+import type { WorkbenchCanvas } from "./canvas";
 
 /** 工作台向卡片与更深浮岛提供的环境；卡片节点数据只保留对象与视图状态。 */
 export interface WorkbenchEnvironment {
@@ -17,8 +18,7 @@ export interface WorkbenchEnvironment {
   onHome: () => void;
 }
 export type WorkbenchView = WorkbenchEnvironment & {
-  /** 打开隐藏卡片并在投影和测量就绪后定位；不改变历史查看位置。 */
-  locate: (objectId: string) => Promise<void>;
+  canvas: WorkbenchCanvas;
 };
 
 /**

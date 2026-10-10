@@ -6,10 +6,12 @@ import { DirectoryView, DirectoryList, DirectoryRead, DirectoryEdit, DirectoryWr
 import { TextReadBody, TextChangeBody } from "../text-view";
 import { ToolHeader } from "../../renderer/shared/tool-header";
 
+const appearance = { width: 340, height: 200, minWidth: 280, minHeight: 160 };
+
 export default {
-  resources: [{ kind: "directory", label: s("Directory", "目录"), icon: <Folder className="size-4" /> }],
+  resources: [{ kind: "directory", label: s("Directory", "目录"), icon: <Folder className="size-4" />, card: appearance }],
   cards: [cardRenderer(DirectoryView, {
-    width: 340, height: 200, minWidth: 280, minHeight: 160,
+    ...appearance,
     Body: ({ data }) => <div className="min-h-0 flex-1 select-text overflow-auto p-3">
       <p className="type-body break-all font-mono text-xs">{data.path}</p>
     </div>,

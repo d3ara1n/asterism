@@ -5,10 +5,12 @@ import { NoteView, NoteRead, NoteEdit, NoteWrite } from "./contract";
 import { TextReadBody, TextChangeBody } from "../text-view";
 import { ToolHeader } from "../../renderer/shared/tool-header";
 
+const appearance = { width: 340, height: 320, minWidth: 280, minHeight: 160 };
+
 export default {
-  resources: [{ kind: "note", label: t.kindNote, icon: <FileText className="size-4" /> }],
+  resources: [{ kind: "note", label: t.kindNote, icon: <FileText className="size-4" />, card: appearance }],
   cards: [cardRenderer(NoteView, {
-    width: 340, height: 320, minWidth: 280, minHeight: 160,
+    ...appearance,
     Body: ({ data }) => <div className="min-h-0 flex-1 select-text overflow-auto p-3">
       {data.text !== null ? <p className="type-body whitespace-pre-wrap break-words">{data.text}</p>
         : <p className="type-body text-muted-foreground">{t.contentUnavailable}</p>}

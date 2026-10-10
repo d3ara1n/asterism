@@ -9,7 +9,7 @@ import { useModuleViews } from "../../modules/views";
 
 /** 对象只出现一次；面板负责快速识别与定位，不展开内容或关系。 */
 export function ObjectsPanel() {
-  const { session, ready, busy, historical, locate } = useWorkbench();
+  const { session, ready, busy, historical, canvas } = useWorkbench();
   const registry = useModuleViews();
   const [query, setQuery] = useState("");
   const [hiddenOnly, setHiddenOnly] = useState(false);
@@ -24,7 +24,7 @@ export function ObjectsPanel() {
   </>}>
     {objects.map(object => { const descriptor = registry.resource(object.kind); return <Button key={object.id} variant="ghost"
       className="h-auto w-full justify-start gap-3 px-2 py-1.5 text-left" title={t.locateObject(object.title)} aria-label={t.locateObject(object.title)}
-      disabled={!ready || busy} onClick={() => { void locate(object.id); }}>
+      disabled={!ready || busy} onClick={() => { void canvas.focusObjects([object.id], { select: true }); }}>
       <span className="shrink-0 text-muted-foreground" aria-hidden="true">{descriptor.icon}</span>
       <span className="min-w-0 flex-1"><span className="block truncate leading-5">{object.title}</span>
         <span className="type-caption block truncate leading-4 font-normal">{descriptor.label}{hidden.has(object.id) ? ` · ${t.cardHidden}` : ""}</span></span>

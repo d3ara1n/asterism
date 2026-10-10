@@ -13,6 +13,7 @@
 | `app/ErrorBoundary.tsx` | 渲染异常后的重新加载入口 |
 | `features/home/HomePage.tsx` | 草稿、agent/模型/思考选择及首次发送 |
 | `features/workbench/Workbench.tsx` | 对象/关系到画布的投影、定位和视图保存 |
+| `features/workbench/canvas.ts` / `viewport.ts` | 统一的 `WorkbenchCanvas` 接口：`findPlacement` 寻找最近空位，`focusObjects` 聚焦任意对象集合；管理测量等待、隐藏视图打开、导航取消、动画保存与动态缩放下限 |
 | `features/workbench/WorkbenchSurface.tsx` | 随导航立即入场的工作台底板、无内容画布与共用纹理 |
 | `features/workbench/ObjectNode.tsx` | 消费已注册卡片投影，统一挂载 ObjectCard；缺失视图时显示原始数据 |
 | `features/workbench/ObjectCard.tsx` | 对象卡片控件：Card 外壳、拖动柄、视图操作与内容区 |
@@ -22,7 +23,7 @@
 | `features/workbench/connections.ts` | 合并双向链接的显示，保留对应有向关系；按可见卡片位置与尺寸投影四边动态端点，同边连线排序与分散 |
 | `features/workbench/context.ts` | 工作台向卡片与更深浮岛提供的环境 |
 | `features/workbench/nodes.ts` / `size-intents.ts` | 工作台节点投影，协调后台布局与本地拖动；尺寸意图在对应命令受理后的读取完成后确认 |
-| `features/workbench/placement.ts` | 按已有卡片的实际测量边界寻找新卡片初始空位，不重排已有卡片 |
+| `features/workbench/placement.ts` | 按新卡片尺寸和已有卡片实际边界求离指定中心最近的空位，不重排已有卡片 |
 | `features/session/registry.ts` | 会话共享控制器与各代理提交身份 |
 | `features/workbench/ResourceCreationDialog.tsx` / `Add*Dialog.tsx` | 添加代理、笔记与目录；共用布局、提交门禁与错误展示，名称校验按资源处理；目录可填写路径、系统选择或拖入 |
 | `features/workbench/AccessPanel.tsx` | 授权浮岛，按代理／资源查看有向链接，受理后的读取结束即显示实际状态 |

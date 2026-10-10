@@ -29,7 +29,7 @@
 | 资源内部目标 | target | resource_call 的可选定位参数，由选定实现解释；形状不限于 path |
 | 功能模块 | feature module | 共置纯契约、后台实现、前端视图的代码单元；两个进程分别装配，当前静态内置 |
 | 展示契约 | presentation contract | 连接后台数据与前端视图的稳定 ID、版本和数据 schema，不携带 UI 代码 |
-| 资源展示描述 | resource display descriptor | 资源类型模块声明的静态 UI 识别信息，含类型身份、图标和本地化类型名；独立于实例正文、卡片 renderer 与权限 |
+| 资源展示描述 | resource display descriptor | 资源类型模块声明的静态 UI 信息，含类型身份、图标、本地化类型名与可选创建卡片尺寸；尺寸与卡片 renderer 共用声明，独立于实例正文与权限 |
 | 资源身份 | resource_id | 稳定身份，不等于路径或 URL |
 | 操作 | operation | 对资源的执行记录：目标、参数、状态、实际结果与关联资源 |
 | 视图 | view | 对象的呈现；同一对象可有多个视图 |
