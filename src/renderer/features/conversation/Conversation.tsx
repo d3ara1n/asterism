@@ -55,10 +55,9 @@ export function Conversation({ view, selection, ready, draft, onDraftChange, onH
   const composer = useRef<HTMLTextAreaElement>(null);
   useLayoutEffect(() => { if (follow.current && scroll.current) scroll.current.scrollTop = scroll.current.scrollHeight; }, [timeline]);
 
-  if (!snapshot) return <div className="flex flex-1 items-center justify-center p-6">
-    <PageState kind={(state.status === "loading") ? "loading" : "error"} title={(state.status === "loading") ? t.openingTitle : t.unavailableTitle}
-      body={state.error ?? t.openingBody}
-      action={state.status !== "loading" && <Button variant="secondary" size="sm" onClick={state.missing ? onHome : () => { void controller.refresh(); }}>{state.missing ? t.newConversation : t.retry}</Button>} />
+  if (!snapshot) return state.status === "loading" ? null : <div className="flex flex-1 items-center justify-center p-6">
+    <PageState kind="error" title={t.unavailableTitle} body={state.error ?? t.unavailableBody}
+      action={<Button variant="secondary" size="sm" onClick={state.missing ? onHome : () => { void controller.refresh(); }}>{state.missing ? t.newConversation : t.retry}</Button>} />
   </div>;
 
   const selectedAgent = configuration?.agents.find(a => a.id === selection?.agentConfigurationId && a.enabled);

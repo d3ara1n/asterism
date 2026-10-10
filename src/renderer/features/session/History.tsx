@@ -83,7 +83,7 @@ export function SessionHistoryPanel({ controller }: { controller: SessionControl
   useLayoutEffect(() => {
     tabs.current?.querySelector<HTMLElement>('[data-state="active"]')?.scrollIntoView({ block: "nearest", inline: "nearest" });
   }, [branch.id]);
-  if (!snapshot) return <IslandPanel title={t.history}><p className="type-caption">{state.error ?? t.openingBody}</p></IslandPanel>;
+  if (!snapshot) return <IslandPanel title={t.history}><p className="type-caption">{state.error ?? t.historyLoadingBody}</p></IslandPanel>;
   const selected = entries.find(entry => entry.node.id === snapshot.at);
   const selectedVisible = snapshot.at === null ? showStart : visible.some(entry => entry.node.id === snapshot.at);
   const junction = (at: string | null) => <BranchNavigationRow
@@ -105,7 +105,7 @@ export function SessionHistoryPanel({ controller }: { controller: SessionControl
         <HistoryViewPicker entries={entries} value={view} onChange={next => { setView(next); if (list.current) list.current.scrollTop = 0; }} />
       </div>
       <div className="flex items-center justify-between gap-2"><p className="type-caption min-w-0 truncate" title={selected?.label ?? t.historyStart}>
-        {state.status === "loading" ? t.openingBody : historical ? snapshot.at === null ? t.historyStart : t.viewingHistory : t.live}</p>
+        {state.status === "loading" ? t.historyLoadingBody : historical ? snapshot.at === null ? t.historyStart : t.viewingHistory : t.live}</p>
         {historical && <Button size="xs" variant="secondary" onClick={() => { scrollRequested.current = true; controller.followCursor(); }}>{t.backToLive}</Button>}</div>
       {!selectedVisible && (search || view.kind !== "all") && <p className="type-caption">{t.historyFiltered}</p>}
       {state.error && <p role="alert" className="type-caption">{state.error}</p>}

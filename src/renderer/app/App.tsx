@@ -11,6 +11,7 @@ import { Alert, AlertDescription } from "../shared/ui/alert";
 import { SettingsPage } from "../features/settings/SettingsPage";
 import { HomePage, type StartInput } from "../features/home/HomePage";
 import { Workbench, type WorkbenchHandle } from "../features/workbench/Workbench";
+import { WorkbenchSurface } from "../features/workbench/WorkbenchSurface";
 import { useModuleViews } from "../modules/views";
 import type { ResourcePlacement } from "../features/workbench/placement";
 import { SubmissionIdentity } from "../features/session/controller";
@@ -166,18 +167,16 @@ export function App({ controller }: { controller: ApplicationController }) {
     <Button variant="ghost" size="sm" onClick={event => workbench.current?.togglePanel("history", event.currentTarget)} aria-label={t.history}><History /><span className="toolbar-label">{t.history}</span></Button>
   </> : undefined;
 
-  const conversation = session && active
-    ? <Workbench key={session.id} ref={workbench} session={session} controller={active} historical={historical}
+  const conversation = <WorkbenchSurface overlay={!session && !sessionLoading && view.kind === "conversation"
+    ? <div className="absolute inset-0 flex items-center justify-center px-6">
+      <PageState kind="error" title={t.unavailableTitle} body={sessionState?.error ?? t.unavailableBody}
+        action={<Button variant="secondary" onClick={() => { void active?.refresh(); }} disabled={!ready}>{t.retry}</Button>} />
+    </div> : undefined}>
+    {session && active ? <Workbench key={session.id} ref={workbench} session={session} controller={active} historical={historical}
       ready={ready} busy={sessionBusy} run={run}
       draft={agentDraft} onDraftChange={setAgentDraft}
-      onHome={goHome} />
-    : <div className="flex h-full items-center justify-center px-6"><div>
-      <PageState kind={sessionLoading ? "loading" : "error"} title={sessionLoading ? t.openingTitle : t.unavailableTitle}
-        body={sessionState?.error ?? (sessionLoading ? t.openingBody : t.unavailableBody)} />
-      {!sessionLoading && view.kind === "conversation" && <div className="mt-4 text-center">
-        <Button variant="secondary" onClick={() => { void active?.refresh(); }} disabled={!ready}>{t.retry}</Button>
-      </div>}
-    </div></div>;
+      onHome={goHome} /> : null}
+  </WorkbenchSurface>;
   const sidebar: IslandSpec = {
     id: "navigation", label: t.appNavigation, width: { min: 224, max: 224 },
     render: () => <Sidebar snapshot={snapshot} status={state.status} busy={state.busy}
@@ -188,13 +187,15 @@ export function App({ controller }: { controller: ApplicationController }) {
   };
   const main: IslandSpec = {
     id: "main-view", label: mainTitle, width: { min: 440, grow: 1 }, surface: view.kind === "conversation",
-    // 首页放大淡出、工作台放大淡入；退场者脱离布局流，不与入场内容叠加占位。
+    // 首页与工作台双向同时进退场；退场者脱离布局流，不与入场内容叠加占位。
     render: () => <AnimatePresence mode="popLayout" initial={false}>
       {view.kind === "home"
-        ? <motion.div key="home" className="h-full" exit={{ opacity: 0, scale: 1.04 }} transition={islandTransition}>
+        ? <motion.div key="home" className="h-full" initial={{ opacity: 0, scale: 1.04 }} animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 1.04 }} transition={islandTransition}>
           <HomePage active={!inSettings} draft={draft} onDraftChange={setDraft} onSettings={() => go("settings")}
             ready={ready} busy={start.busy} submitError={start.error} onStart={startConversation} /></motion.div>
-        : <motion.div key="conversation" className="h-full" initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} transition={islandTransition}>
+        : <motion.div key="conversation" className="h-full" initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.96 }} transition={islandTransition}>
           {conversation}</motion.div>}
     </AnimatePresence>,
   };

@@ -1,7 +1,6 @@
 import type { WorkbenchOperation } from "../session/controller";
 import { useCallback, useEffect, useLayoutEffect, useImperativeHandle, useMemo, useRef, useState, type ReactNode, type Ref } from "react";
-import { ReactFlow, ReactFlowProvider, Background, BackgroundVariant, Panel, useReactFlow, getViewportForBounds, applyNodeChanges, applyEdgeChanges, type NodeChange, type EdgeChange, type Edge, MarkerType, ConnectionMode, type Connection, type IsValidConnection } from "@xyflow/react";
-import "@xyflow/react/dist/style.css";
+import { ReactFlow, ReactFlowProvider, Panel, useReactFlow, getViewportForBounds, applyNodeChanges, applyEdgeChanges, type NodeChange, type EdgeChange, type Edge, MarkerType, ConnectionMode, type Connection, type IsValidConnection } from "@xyflow/react";
 import { Crosshair, Maximize, Minus, Plus } from "lucide-react";
 import type { WorkbenchSnapshot } from "../../../shared/workbench";
 import { useModuleViews } from "../../modules/views";
@@ -10,7 +9,8 @@ import { s } from "../configuration/state";
 import { Button } from "../../shared/ui/button";
 import { Badge } from "../../shared/ui/badge";
 import { useIsland } from "../../shared/weave/Screen";
-import { useAppearance, useScheme } from "../appearance/state";
+import { useScheme } from "../appearance/state";
+import { WorkbenchBackground } from "./WorkbenchSurface";
 import { SessionHistoryPanel } from "../session/History";
 import { ObjectNode, type ObjectNodeType } from "./ObjectNode";
 import { IconAction, type ViewPatch } from "./ObjectCard";
@@ -82,7 +82,7 @@ export function Workbench({ ref, controller, session, ready, busy, historical, r
   useLayoutEffect(() => store.set(context), [store, context]);
 
   return <WorkbenchContext.Provider value={context}>
-    <div ref={host} className="overlay-inset relative h-full overflow-hidden rounded-lg bg-background">
+    <div ref={host} className="relative h-full">
       <ReactFlowProvider><Canvas ref={canvasRef} session={session} run={run} writable={ready && !busy && !historical}
         locating={ready && !busy && locating?.navigationVersion === navigationVersion ? locating : null} /></ReactFlowProvider>
       {historical && <div role="status"
@@ -110,7 +110,6 @@ function Canvas({ ref, session, run, writable, locating }: {
   const { controller } = useWorkbench();
   const viewportElement = useRef<HTMLDivElement>(null);
   const [dropping, setDropping] = useState(false);
-  const { canvas } = useAppearance();
   const scheme = useScheme();
   // 回调经 ref 读取最新会话，保持稳定身份，避免每次快照更新重建所有节点。
   const latest = useRef(session);
@@ -239,8 +238,7 @@ function Canvas({ ref, session, run, writable, locating }: {
     deleteKeyCode={writable ? ["Backspace", "Delete"] : null} panOnScroll selectionOnDrag panOnDrag={[1, 2]} zoomOnDoubleClick={false}
     onMoveEnd={(event, viewport) => { if (event) void run({ type: "viewport.set", sessionId: session.id, viewport }); }}
   >
-    {canvas !== "none" && <Background color="var(--canvas-grid)" gap={24} size={canvas === "dots" ? 1.5 : canvas === "cross" ? 6 : undefined}
-      variant={canvas === "dots" ? BackgroundVariant.Dots : canvas === "lines" ? BackgroundVariant.Lines : BackgroundVariant.Cross} />}
+    <WorkbenchBackground />
     <ViewControls session={session} run={run} selected={nodes.filter(node => node.selected).map(node => ({ id: node.id }))} />
   </ReactFlow></div>;
 }
