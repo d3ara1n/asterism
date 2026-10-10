@@ -1,7 +1,6 @@
 import type { CredentialVault } from "../configuration/credentials.ts";
 import { PluginStorage } from "./storage.ts";
 import type { PluginModels, RegistryView } from "./models.ts";
-import type { Json } from "../shared/json.ts";
 import { belongsTo } from "../shared/plugin.ts";
 import { contractKey } from "../shared/presentation.ts";
 import type { ResourceBackend } from "../resources/contract.ts";

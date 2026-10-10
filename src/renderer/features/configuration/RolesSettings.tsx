@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Plus } from "lucide-react";
-import type { ConfigurationSnapshot, ModelRole, ModelRoleOverrides, ThinkingLevel } from "../../../shared/configuration";
+import type { ModelRole, ModelRoleOverrides, ThinkingLevel } from "../../../shared/configuration";
 import { thinkingSchema , modelReference } from "../../../shared/configuration";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemSeparator, ItemTitle } from "../../shared/ui/item";
 import { Badge } from "../../shared/ui/badge";

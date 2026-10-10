@@ -1,5 +1,3 @@
-import { join } from "node:path";
-import { applicationStorage } from "../shared/application.ts";
 import type { DatabaseSync } from "node:sqlite";
 import { commandSchema, snapshotSchema, type AppSnapshot, type AppError } from "../shared/contracts.ts";
 import type { SecretProtector } from "../shared/secrets.ts";

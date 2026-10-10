@@ -158,6 +158,11 @@ function PresetPicker({ onPick }: { onPick: (preset: ProviderPreset | null) => v
 /* ---------- 提供商详情 ---------- */
 
 type KeyAction = "keep" | "replace" | "clear";
+/** 由显示名称规范化出 ID：小写、空白转连字符、去掉不允许的字符；模型 ID 允许 `/`。 */
+export function slugify(name: string, options: { slash?: boolean } = {}): string {
+  const allowed = options.slash ? /[^\p{L}\p{N}._\/-]/gu : /[^\p{L}\p{N}._-]/gu;
+  return name.trim().toLowerCase().replace(/\s+/gu, "-").replace(allowed, "").replace(/-+/gu, "-").replace(/^-|-$/gu, "");
+}
 const blank: Omit<ProviderInput, "enabled"> = { id: "", name: "", protocol: "openai-responses", baseUrl: "https://api.openai.com/v1", auth: "api_key" };
 
 function ProviderEditor({ initialId }: { initialId: string | null }) {
@@ -173,6 +178,9 @@ function ProviderEditor({ initialId }: { initialId: string | null }) {
   const [keyAction, setKeyAction] = useState<KeyAction>(current ? "keep" : "replace");
   const [key, setKey] = useState("");
   const set = <K extends keyof typeof value>(field: K, next: (typeof value)[K]) => setValue(previous => ({ ...previous, [field]: next }));
+  // 新建时 ID 跟随显示名称生成；用户手动改过 ID 后不再跟随。
+  const [idEdited, setIdEdited] = useState(!!current);
+  const setName = (name: string) => setValue(previous => ({ ...previous, name, ...(idEdited ? {} : { id: slugify(name) }) }));
 
   const saved = current ? fromCurrent(current) : null;
   const credentialChanged = value.auth === "api_key" && (keyAction === "clear" || (keyAction === "replace" && key.trim() !== ""));
@@ -213,8 +221,8 @@ function ProviderEditor({ initialId }: { initialId: string | null }) {
     }}>
       <h3 className="type-section mb-3">{s("Connection", "连接")}</h3>
       <FieldGroup>
-        <TextField label={s("Name", "名称")} value={value.name} onChange={next => set("name", next)} required />
-        <TextField label={s("Provider ID", "提供商 ID")} value={value.id} onChange={next => set("id", next)} required placeholder="deepseek" hint={s("Used in model references such as deepseek/deepseek-chat. Changing it breaks existing references.", "用于模型引用，如 deepseek/deepseek-chat；修改后已有引用将失效。")} />
+        <TextField label={s("Display name", "显示名称")} value={value.name} onChange={setName} required />
+        <TextField label={s("Provider ID", "提供商 ID")} value={value.id} onChange={next => { setIdEdited(true); set("id", next); }} required hint={s("Slug that identifies this provider; no '/' or spaces. Generated from the name; it does not need to match anything upstream.", "标识提供商的 slug，不含 / 与空白；默认由名称生成，无需与上游对应。")} />
         <ChoiceField label={s("Protocol", "协议")} value={value.protocol} options={protocols} onChange={next => next && set("protocol", next as ProviderInput["protocol"])} />
         <TextField label="Base URL" value={value.baseUrl} onChange={next => set("baseUrl", next)} required
           hint={value.auth === "api_key" ? s("API keys require HTTPS, except on localhost or a loopback address.", "使用 API key 时需 HTTPS，本机回环地址除外。") : undefined} />
@@ -294,6 +302,9 @@ function ModelEditor({ initialId, providerId }: { initialId: string | null; prov
     capabilities: { reasoning: false, tools: true, images: false }, generation: { temperature: null, topP: null, maxOutputTokens: null } });
   const [advanced, setAdvanced] = useState(false);
   const set = <K extends keyof ModelValue>(field: K, next: ModelValue[K]) => setValue(previous => ({ ...previous, [field]: next }));
+  // 与提供商一致：名称在前并生成 ID；手动改过 ID 或编辑已有模型时不再覆盖。
+  const [idEdited, setIdEdited] = useState(!!current);
+  const setName = (name: string) => setValue(previous => ({ ...previous, name, ...(idEdited ? {} : { modelId: slugify(name, { slash: true }) }) }));
   // enabled 为即时操作，比较与保存都取快照值。
   const dirty = useMemo(() => !current || JSON.stringify({ ...modelValue(current), enabled: 0 }) !== JSON.stringify({ ...value, enabled: 0 }), [current, value]);
   const test = current && snapshot ? latestTest(snapshot, modelReference(current)) : undefined;
@@ -309,15 +320,15 @@ function ModelEditor({ initialId, providerId }: { initialId: string | null; prov
       onConfirm: async () => { const result = await run({ type: "remove", kind: "model", id: modelReference(current) }); if (result.ok) void island.close({ force: true }); } } : undefined}>
     <form id="model-form" onSubmit={async event => {
       event.preventDefault();
-      const result = await run({ type: "model.save", id, value: { ...value, name: value.name.trim() || value.modelId, enabled: current?.enabled ?? true } });
+      const result = await run({ type: "model.save", id, value: { ...value, enabled: current?.enabled ?? true } });
       if (result.ok) {
         const persisted = result.snapshot.models.find(item => modelReference(item) === result.savedId);
         if (persisted) setValue(modelValue(persisted));
         setId(result.savedId);
       }
     }}><FieldGroup>
-      <TextField label={s("Server model ID", "服务端模型 ID")} value={value.modelId} onChange={next => set("modelId", next)} required placeholder="gpt-5" />
-      <TextField label={s("Display name", "显示名称")} value={value.name} onChange={next => set("name", next)} placeholder={value.modelId || s("Defaults to the model ID", "默认使用模型 ID")} />
+      <TextField label={s("Display name", "显示名称")} value={value.name} onChange={setName} required />
+      <TextField label={s("Server model ID", "服务端模型 ID")} value={value.modelId} onChange={next => { setIdEdited(true); set("modelId", next); }} required hint={s("Must match the model name used by the provider's API; may contain '/', no spaces. Generated from the name.", "须与提供商 API 的模型名一致；可含 /，不含空白；默认由名称生成。")} />
       <FieldSet><FieldLegend variant="label">{s("Capabilities", "能力")}</FieldLegend>
         <FieldGroup data-slot="checkbox-group" className="gap-3">
           {([["reasoning", s("Reasoning", "支持思考")], ["tools", s("Tool calls", "支持工具调用")], ["images", s("Image input", "支持图片输入")]] as const).map(([key, label]) =>
