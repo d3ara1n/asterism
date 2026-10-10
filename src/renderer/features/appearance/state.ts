@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import { defaultAppearance, densityRootPx, themeTokens, type Appearance, type AppearancePatch, type Scheme } from "../../../shared/theme";
+import { defaultAppearance, densityRootPx, fontStack, monoStack, sansStack, themeTokens, type Appearance, type AppearancePatch, type Scheme } from "../../../shared/theme";
 
 /**
  * 外观的唯一 renderer 入口：读取、写入并把 token 应用到 :root。
@@ -13,6 +13,10 @@ const listeners = new Set<() => void>();
 function render() {
   const root = document.documentElement;
   for (const [name, value] of Object.entries(themeTokens(current, scheme))) root.style.setProperty(`--${name}`, value);
+  root.style.setProperty("--app-font-sans", fontStack(current.uiFont, sansStack));
+  root.style.setProperty("--app-font-mono", fontStack(current.codeFont, monoStack));
+  if (current.codeFontSize) root.style.setProperty("--code-font-size", `${current.codeFontSize}px`);
+  else root.style.removeProperty("--code-font-size");
   root.style.fontSize = `${densityRootPx[current.density]}px`;
   root.style.colorScheme = scheme;
   root.dataset.mode = scheme;

@@ -15,6 +15,19 @@ export type Scheme = "light" | "dark";
 export type AccentId = (typeof accentIds)[number];
 export type GrayId = (typeof grayIds)[number];
 
+export const codeFontSizes = [11, 12, 13, 14, 15, 16, 18] as const;
+export type CodeFontSize = (typeof codeFontSizes)[number];
+const fontFamilySchema = z.string().trim().min(1).max(128).nullable().default(null);
+
+/** 默认字体栈；用户字体只前置，不替换回退。 */
+export const sansStack = `system-ui, -apple-system, "Segoe UI Variable Text", "Segoe UI", "PingFang SC", "Microsoft YaHei UI", "Noto Sans CJK SC", sans-serif`;
+export const monoStack = `ui-monospace, "SF Mono", Menlo, Consolas, "Cascadia Mono", "Noto Sans Mono CJK SC", monospace`;
+/** 字体名作为 CSS 字符串转义后加引号，防止注入。 */
+export function fontStack(family: string | null, fallback: string): string {
+  if (!family) return fallback;
+  return `"${family.replace(/[\\"]/g, "\\$&").replace(/[\n\r\f]/g, " ")}", ${fallback}`;
+}
+
 export const appearanceSchema = z.object({
   mode: z.enum(modes).catch("system"),
   accent: z.enum(accentIds).catch("jade"),
@@ -22,9 +35,14 @@ export const appearanceSchema = z.object({
   density: z.enum(densities).catch("standard"),
   radius: z.enum(radii).catch("md"),
   canvas: z.enum(canvasPatterns).catch("dots"),
+  /** 本机字体家族名；null 为系统默认栈。 */
+  uiFont: fontFamilySchema.catch(null),
+  codeFont: fontFamilySchema.catch(null),
+  /** 代码字号（px），null 跟随所在界面文字。 */
+  codeFontSize: z.number().int().min(codeFontSizes[0]).max(codeFontSizes[codeFontSizes.length - 1]).nullable().default(null).catch(null),
 });
 export type Appearance = z.infer<typeof appearanceSchema>;
-export const defaultAppearance: Appearance = { mode: "system", accent: "jade", gray: "sage", density: "standard", radius: "md", canvas: "dots" };
+export const defaultAppearance: Appearance = { mode: "system", accent: "jade", gray: "sage", density: "standard", radius: "md", canvas: "dots", uiFont: null, codeFont: null, codeFontSize: null };
 
 /** 读取的原始数据不可信：逐项回退到默认值，不因单项损坏丢弃整份设置。 */
 export function parseAppearance(raw: unknown): Appearance {

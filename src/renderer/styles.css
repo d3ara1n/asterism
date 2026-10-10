@@ -71,7 +71,9 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --font-sans: system-ui, -apple-system, "Segoe UI Variable Text", "Segoe UI", "PingFang SC", "Microsoft YaHei UI", "Noto Sans CJK SC", sans-serif;
+  /* 字体由外观设置在 :root 写入 --app-font-sans / --app-font-mono；此处为未加载前的回退。 */
+  --font-sans: var(--app-font-sans, system-ui, -apple-system, "Segoe UI Variable Text", "Segoe UI", "PingFang SC", "Microsoft YaHei UI", "Noto Sans CJK SC", sans-serif);
+  --font-mono: var(--app-font-mono, ui-monospace, "SF Mono", Menlo, Consolas, "Cascadia Mono", "Noto Sans Mono CJK SC", monospace);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -95,6 +97,8 @@
   /* 字号层级：页面标题 / 区块标题 / 正文 / 说明 / 标签。 */
   .type-page { @apply text-xl font-semibold tracking-tight; }
   .type-section { @apply text-sm font-semibold; }
+  /* 代码文字：代码字体 + 代码字号（未设置时跟随所在文字）；代码块、行内代码与编辑器统一使用。 */
+  .type-code { font-family: var(--font-mono); font-size: var(--code-font-size, 1em); }
   .type-body { @apply text-sm leading-relaxed; }
   .type-caption { @apply text-xs leading-relaxed text-muted-foreground; }
   .type-label { @apply text-xs font-medium text-muted-foreground; }

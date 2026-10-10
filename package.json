@@ -27,6 +27,7 @@
     "ai": "7.0.127",
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
+    "cmdk": "1.1.1",
     "electron-store": "11.0.2",
     "lucide-react": "1.49.0",
     "motion": "12.23.24",

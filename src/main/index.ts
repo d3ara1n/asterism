@@ -15,6 +15,8 @@ import { sessionChannel, sessionChangedChannel, sessionCommandSchema, type Sessi
 const here = dirname(fileURLToPath(import.meta.url));
 let window: BrowserWindow | null = null;
 let quitting = false;
+/** 受信渲染页地址（不含 hash），供权限判定使用。 */
+let trustedURL: string | null = null;
 const runtime = new RuntimeHost(status => {
   if (window && !window.isDestroyed()) window.webContents.send(statusChannel, status);
 }, () => {
@@ -28,6 +30,7 @@ function createWindow(): void {
   const rendererFile = join(here, "../renderer/index.html");
   const developmentURL = !app.isPackaged ? process.env.ELECTRON_RENDERER_URL : undefined;
   const allowedURL = new URL(developmentURL ?? pathToFileURL(rendererFile).href).href;
+  trustedURL = allowedURL.split("#")[0]!;
   const state = initialWindowState();
   window = new BrowserWindow({
     ...state.bounds, minWidth: state.minWidth, minHeight: state.minHeight, title: "Weft",
@@ -111,8 +114,14 @@ if (!app.requestSingleInstanceLock()) {
   });
   app.whenReady().then(async () => {
     if (quitting) return;
-    session.defaultSession.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
-    session.defaultSession.setPermissionCheckHandler(() => false);
+    // 仅放行受信主框架的本机字体枚举（只暴露字体名），其余权限一律拒绝。
+    // 以窗口当前 URL 判定受信：file:// 的 origin 可能为 "null"，不可依赖 origin 字符串。
+    const trustedFonts = (contents: Electron.WebContents | null, permission: string, isMainFrame: boolean) =>
+      permission === "local-fonts" && isMainFrame && !!contents && contents === window?.webContents && !!trustedURL && contents.getURL().split("#")[0] === trustedURL;
+    session.defaultSession.setPermissionRequestHandler((contents, permission, callback, details) =>
+      callback(trustedFonts(contents, permission, details.isMainFrame)));
+    session.defaultSession.setPermissionCheckHandler((contents, permission, _origin, details) =>
+      trustedFonts(contents, permission, details.isMainFrame));
     try { await runtime.start(join(here, "runtime.js"), dataRoot); }
     catch (error) {
       console.error("Application startup failed.", error);

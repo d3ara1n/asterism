@@ -1,12 +1,14 @@
 import { useState, type CSSProperties } from "react";
 import { Bot, FileText, Monitor, Moon, Sun } from "lucide-react";
-import { accentIds, grayIds, palettes, themeTokens, type AccentId, type Appearance, type GrayId } from "../../../shared/theme";
+import { accentIds, codeFontSizes, grayIds, palettes, themeTokens, type AccentId, type CodeFontSize, type Appearance, type GrayId } from "../../../shared/theme";
 import { s } from "../configuration/state";
 import { Section } from "../settings/preview";
 import { Button } from "../../shared/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../../shared/ui/dialog";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemSeparator, ItemTitle } from "../../shared/ui/item";
 import { ToggleGroup, ToggleGroupItem } from "../../shared/ui/toggle-group";
+import { FontPicker } from "../../shared/ui/font-picker";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../shared/ui/select";
 import { ColorSwatch, SwatchGroup, TileSwatch } from "../../shared/ui/swatch";
 import { updateAppearance, useAppearance, useScheme } from "./state";
 
@@ -16,6 +18,12 @@ const accentLabels: Record<AccentId, string> = {
 };
 const grayLabels: Record<GrayId, string> = {
   gray: s("Neutral", "中性灰"), sage: s("Sage", "灰绿"), slate: s("Slate", "蓝灰"), sand: s("Sand", "暖灰"), mauve: s("Mauve", "紫灰"),
+};
+const fontText = {
+  defaultLabel: s("System default", "系统默认"),
+  searchPlaceholder: s("Search fonts", "搜索字体"),
+  emptyText: s("No matching fonts.", "没有匹配的字体。"),
+  unavailableText: s("Installed fonts are unavailable.", "无法读取本机字体。"),
 };
 const radiusCorner: Record<Appearance["radius"], string> = { none: "0px", sm: "3px", md: "5px", lg: "8px" };
 
@@ -109,6 +117,27 @@ export function AppearanceSettings() {
       </ItemGroup>
     </Section>
 
+    <Section title={s("Fonts", "字体")} hint={s("Markdown uses the interface font for text and the code font for code.", "Markdown 正文使用界面字体，代码使用代码字体。")}>
+      <ItemGroup className="surface">
+        <Row label={s("Interface font", "界面字体")}>
+          <FontPicker aria-label={s("Interface font", "界面字体")} value={appearance.uiFont} onValueChange={uiFont => void updateAppearance({ uiFont })} {...fontText} />
+        </Row>
+        <ItemSeparator />
+        <Row label={s("Code font", "代码字体")}>
+          <Select value={appearance.codeFontSize ? String(appearance.codeFontSize) : "auto"}
+            onValueChange={v => void updateAppearance({ codeFontSize: v === "auto" ? null : Number(v) as CodeFontSize })}>
+            <SelectTrigger size="sm" className="w-24" aria-label={s("Code font size", "代码字号")}><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="auto">{s("Auto", "跟随")}</SelectItem>
+              {codeFontSizes.map(size => <SelectItem key={size} value={String(size)}>{size} px</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <FontPicker aria-label={s("Code font", "代码字体")} monospaceOnly showAllLabel={s("Show all fonts", "显示全部字体")}
+            value={appearance.codeFont} onValueChange={codeFont => void updateAppearance({ codeFont })} {...fontText} />
+        </Row>
+      </ItemGroup>
+    </Section>
+
     <Section title={s("Canvas", "画布")} hint={s("Background texture of the workbench.", "工作台的背景纹理。")}>
       <SwatchGroup aria-label={s("Canvas texture", "画布纹理")} value={appearance.canvas} onValueChange={canvas => void updateAppearance({ canvas: canvas as Appearance["canvas"] })}>
         {([["dots", s("Dots", "点阵")], ["lines", s("Grid", "网格线")], ["cross", s("Crosses", "十字")], ["none", s("None", "无")]] as const).map(([v, text]) =>
@@ -152,6 +181,7 @@ function LivePreview({ appearance }: { appearance: Appearance }) {
           <span className="rounded-full bg-secondary px-1.5 py-0.5 text-[10px] text-secondary-foreground">{s("Ready", "就绪")}</span>
         </div>
         <p className="type-caption px-3">{s("1 resource attached", "已绑定 1 个资源")}</p>
+        <p className="mx-3 mt-1.5 truncate rounded-sm bg-muted px-1.5 py-0.5 text-[11px]"><span className="type-code text-muted-foreground">read("checklist.md")</span></p>
         <div className="mt-2 flex justify-end gap-1.5 border-t p-2">
           <span className="rounded-md border bg-card px-2.5 py-1 text-xs">{s("Edit", "编辑")}</span>
           <span className="rounded-md bg-primary px-2.5 py-1 text-xs text-primary-foreground">{s("Run", "运行")}</span>
