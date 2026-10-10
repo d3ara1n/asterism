@@ -168,7 +168,20 @@ API key 由主进程调用 safeStorage 加密，运行时保存密文至 `creden
 
 插件以插件身份包装一组模块，内置模块即宿主自带的内置插件，外部插件经 npm 安装后走同一装配路径。后端模块在任务运行时进程内、前端视图在 renderer 内装配，均与宿主同进程、完全信任，不做权限或进程隔离。启动时一次装配并冻结注册表，变更重启生效。
 
-模块工厂接收宿主按插件构造的 plugin api，插件身份由宿主注入而非自报。plugin api 提供本插件命名空间下的配置、凭据、私有数据目录与日志等设施，以及模块办事所需的宿主服务；不暴露宿主注册表、其他插件贡献或会话改写能力。插件页展示插件身份、版本、注册的贡献、占用的配置与数据及加载失败原因，供管理与诊断。贡献 ID 带插件命名空间，插件缺席时按[结果展示](#资源扩展契约)的默认视图回退。
+全部内置功能打包为 `atelier.core` 插件，并只经 plugin api 办事；底层模型调用、提供商与凭据在 `plugin.models` 开放前暂直接使用内部接口。模块工厂接收插件级 context，插件身份由宿主注入而非自报；工具 handler 与资源控制器每次调用另获调用 context：
+
+```ts
+definePlugin({ id: "acme.mcp", version, api: "^1", modules: [defineModule(plugin => ({ resources, tools, events }))] });
+
+plugin.id / plugin.dir / plugin.config / plugin.secrets / plugin.db / plugin.log   // 跟随插件
+ctx.resource / ctx.state / ctx.session { path, linked, emit, changed, capabilities, context, signal } // 跟随会话
+```
+
+plugin api 是包装层：校验参数、返回稳定错误码，内部接口变化由适配层吸收；不暴露宿主注册表或其他插件贡献。资源状态与插件事件是会话数据；插件数据位于 `<data>/extensions/<pluginId>/`，插件自由写入，`.atelier/` 由宿主托管配置与数据库，凭据明文仍在 secrets 机制中。
+
+插件以短名声明 kind、实现、事件与视图契约，宿主补全为 `<pluginId>/<name>`。工具契约是全局知识，模型只见短名：装配先收集全部贡献，再按插件装配顺序（`atelier.core` 最先，外部插件按用户列表）让同名的最后一个契约生效；实现绑定契约对象，所绑契约被覆盖即下线，复用同一契约对象为共享。同一插件内同名异契约使该插件装配失败。解析后冻结注册表并生成贡献清单。
+
+插件页展示插件身份、版本、注册的贡献（含被覆盖的契约）、占用的配置与数据及加载失败原因，供管理与诊断。插件缺席时按[结果展示](#资源扩展契约)的默认视图回退，资源显示为实现缺失。
 
 资源投影携带 `{contract: {id, version}, data}`，不再用一个 content 字符串容纳所有资源。工具通过 publish 发布完整产出快照，过程态与终结态共用 data schema；运行时校验并保留最近合法产出，通过 session.progress 更新 UI。终结结果保存实际实现的 `{id, version}`、当次资源身份与执行时间；失败、取消和未知结局同样保留有效产出。模型投影只在终结时生成并保存，进度不发给模型。
 
