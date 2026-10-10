@@ -176,6 +176,9 @@ plugin.id / plugin.dir / plugin.log                 // 跟随插件
 plugin.config(schema, defaults) / plugin.secrets / plugin.db()  // .atelier/ 托管：config.json、secrets.json（仅引用）、db.sqlite
 plugin.session(sessionId) { path, linked, emit, changed }   // 绑定会话
 plugin.object(sessionId, objectId) { get, set }             // 绑定对象的资源状态
+plugin.registry { agents, roles, models }                   // 稳定只读目录
+plugin.models.stream({ target, system, messages, tools? })  // 无状态单次请求
+plugin.models.run({ session, agentId, target, instructions, toolPolicy, timeout, signal }) // Atelier 代理循环
 ```
 
 #### 设计方向
