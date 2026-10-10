@@ -8,7 +8,7 @@ import { ToolHeader } from "../../renderer/shared/tool-header";
 const appearance = { width: 340, height: 320, minWidth: 280, minHeight: 160 };
 
 export default {
-  resources: [{ kind: "note", label: t.kindNote, icon: <FileText className="size-4" />, card: appearance }],
+  resources: [{ kind: "atelier.core/note", label: t.kindNote, icon: <FileText className="size-4" />, card: appearance }],
   cards: [cardRenderer(NoteView, {
     ...appearance,
     Body: ({ data }) => <div className="min-h-0 flex-1 select-text overflow-auto p-3">

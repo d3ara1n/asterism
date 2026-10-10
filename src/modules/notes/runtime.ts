@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { implementResource } from "../../resources/contract.ts";
 import { implement } from "../../tools/contract.ts";
-import type { RuntimeModuleFactory } from "../runtime-contract.ts";
+import { defineModule } from "../../plugins/contract.ts";
 import { Note, NoteView, NoteRead, NoteEdit, NoteWrite } from "./contract.ts";
 import { TextError, readText, readToModel, editText, textChange, changeToModel } from "../../tools/text.ts";
 
@@ -15,7 +15,8 @@ function validateNoteText(text: string): void {
 }
 
 /** 笔记只保存当前可变正文；任何历史位置的卡片与读取都取用此状态。 */
-export default (({ state, sessions }) => {
+export default defineModule(plugin => {
+  const { state } = plugin;
   const get = (objectId: string) => currentContent.safeParse(state.get(objectId, contentKey));
   const requireText = (objectId: string): string => {
     const parsed = get(objectId);
@@ -23,8 +24,7 @@ export default (({ state, sessions }) => {
     return parsed.data.text;
   };
   const save = (objectId: string, text: string) => {
-    const sessionId = state.update(objectId, contentKey, { text });
-    sessions.resourceChanged(sessionId);
+    plugin.session(state.update(objectId, contentKey, { text })).changed();
   };
   return {
     resources: [implementResource(Note, NoteView, {
@@ -40,7 +40,7 @@ export default (({ state, sessions }) => {
       controller: {
         create(sessionId, objectId, input) {
           const { title, content } = noteCreate.parse(input);
-          state.set(sessionId, objectId, contentKey, { text: content });
+          plugin.object(sessionId, objectId).set(contentKey, { text: content });
           return { title };
         },
       },
@@ -86,4 +86,4 @@ export default (({ state, sessions }) => {
       }),
     ],
   };
-}) satisfies RuntimeModuleFactory;
+});

@@ -5,7 +5,7 @@ import { SessionError } from "../../session/tree.ts";
 import { implementResource } from "../../resources/contract.ts";
 import { implement, type CallResult } from "../../tools/contract.ts";
 import { TextError, readText, readToModel, editText, textChange, changeToModel } from "../../tools/text.ts";
-import type { RuntimeModuleFactory } from "../runtime-contract.ts";
+import { defineModule } from "../../plugins/contract.ts";
 import { Directory, DirectoryView, DirectoryList, DirectoryRead, DirectoryEdit, DirectoryWrite } from "./contract.ts";
 import { withinDirectory, writableTarget } from "./paths.ts";
 import { failed, filesystemFailure } from "./errors.ts";
@@ -18,7 +18,7 @@ function textFailure(error: unknown, signal: AbortSignal, operation: string): Ca
   return error instanceof TextError ? error.outcome() : filesystemFailure(error, operation);
 }
 
-export default (() => ({
+export default defineModule(() => ({
   resources: [implementResource(Directory, DirectoryView, {
     project: state => ({ path: state.path }),
     async inspect(state, resource) {
@@ -126,4 +126,4 @@ export default (() => ({
       toModel: data => `${data.path}${data.created ? " (created)" : ""}\n${changeToModel(data)}`,
     }),
   ],
-})) satisfies RuntimeModuleFactory;
+}));

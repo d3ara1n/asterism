@@ -6,7 +6,7 @@ import type { SecretProtector } from "../shared/secrets.ts";
 import type { SessionChanged } from "../shared/session.ts";
 import type { ModelSettings } from "../shared/model.ts";
 import type { ModelAdapter } from "../model/contract.ts";
-import { ObjectStore, openDatabase } from "./storage.ts";
+import { openDatabase } from "./storage.ts";
 import { ConfigurationService } from "../configuration/service.ts";
 import { SessionService } from "./sessions.ts";
 
@@ -22,10 +22,9 @@ export class ApplicationService {
   constructor(root: string, options: { protector?: SecretProtector; onConfigurationChanged?: () => void; onSessionChanged?: (event: SessionChanged) => void; adapterFactory?: (settings: ModelSettings) => ModelAdapter } = {}) {
     this.db = openDatabase(root);
     try {
-      const objects = new ObjectStore(join(root, applicationStorage.objectsDirectory));
       const unavailable = async (): Promise<string> => { throw new Error("System credential protection is unavailable."); };
       this.configuration = new ConfigurationService(root, options.protector ?? { available: async () => false, encrypt: unavailable, decrypt: unavailable }, options.onConfigurationChanged);
-      this.sessions = new SessionService(this.db, objects, this.configuration, options.onSessionChanged, options.adapterFactory);
+      this.sessions = new SessionService(this.db, root, this.configuration, options.onSessionChanged, options.adapterFactory);
     } catch (error) { this.db.close(); throw error; }
   }
   async close(): Promise<void> {

@@ -21,7 +21,7 @@ export interface ResourceController {
   /**
    * running 是仍可能向会话树追加事件的对象 ID，涵盖代理与其他被捕获的资源。
    * 外部状态的持续运行不计入；会话回溯与对象移除据此判断 settled。
-   * live 只包含代理的临时输出；活动开始与结束通过 SessionHost.progressChanged 通知。
+   * live 只包含代理的临时输出；活动开始与结束通过 PluginSessions.progressChanged 通知。
    */
   activity?(sessionId: string): { running: string[]; live: LiveBlock[] };
   /** 本对象作为链接终点时，向它描述被链接资源的可用工具。 */

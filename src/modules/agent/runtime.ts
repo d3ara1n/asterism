@@ -10,7 +10,7 @@ import { SessionError } from "../../session/tree.ts";
 import { resolveProviderModel, type ConfigurationSnapshot } from "../../shared/configuration.ts";
 import { agentSelectionSchema, type AgentSelection, type ModelSettings } from "../../shared/model.ts";
 import type { LiveBlock } from "../../shared/session.ts";
-import type { RuntimeModuleFactory, RuntimeServices } from "../runtime-contract.ts";
+import { defineModule, type PluginContext } from "../../plugins/contract.ts";
 import { Agent, AgentView, agentCommandSchema, agentCreateSchema } from "./contract.ts";
 
 const selectionKey = "selection";
@@ -36,21 +36,21 @@ export function normalizeSelection(config: ConfigurationSnapshot, selection: Age
 class AgentController implements ResourceController {
   private runs = new Map<string, Run>();
   private closed = false;
-  constructor(private readonly services: RuntimeServices) {}
+  constructor(private readonly plugin: PluginContext) {}
   private key(sessionId: string, agentId: string) { return `${sessionId}:${agentId}`; }
 
   selection(agentId: string): Stored | null {
-    const raw = this.services.state.get(agentId, selectionKey);
+    const raw = this.plugin.state.get(agentId, selectionKey);
     if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
     const value = raw as { selection: unknown; revision: unknown };
     return { selection: agentSelectionSchema.parse(value.selection), revision: Number(value.revision) };
   }
   private saveSelection(sessionId: string, agentId: string, selection: AgentSelection): void {
     const revision = (this.selection(agentId)?.revision ?? 0) + 1;
-    this.services.state.set(sessionId, agentId, selectionKey, { selection, revision });
+    this.plugin.state.set(sessionId, agentId, selectionKey, { selection, revision });
   }
   private async config(): Promise<ConfigurationSnapshot> {
-    const { snapshot } = await this.services.configuration.execute({ type: "read" });
+    const { snapshot } = await this.plugin.internal.configuration.execute({ type: "read" });
     if (this.closed) throw new SessionError("unavailable", "The agent runtime is closed.");
     return snapshot;
   }
@@ -64,14 +64,14 @@ class AgentController implements ResourceController {
     const { credentialState: _c, ...provider } = resolved.provider;
     const settings: ModelSettings = { provider, model: resolved.model, thinking: selection.thinking };
     let credential: Promise<string | null> | undefined;
-    const adapter = this.services.adapterFactory?.(settings)
-      ?? new AiSdkAdapter(() => credential ??= this.services.configuration.executionCredential(provider.id, provider.revision));
+    const adapter = this.plugin.internal.adapterFactory?.(settings)
+      ?? new AiSdkAdapter(() => credential ??= this.plugin.internal.configuration.executionCredential(provider.id, provider.revision));
     return { agent, settings, adapter };
   }
 
   create(sessionId: string, objectId: string, input: unknown): { title: string } {
     const { selection, title } = agentCreateSchema.parse(input);
-    const name = title ?? this.services.configuration.agentConfiguration(selection.agentConfigurationId)?.name ?? "Agent";
+    const name = title ?? this.plugin.internal.configuration.agentConfiguration(selection.agentConfigurationId)?.name ?? "Agent";
     this.saveSelection(sessionId, objectId, selection);
     return { title: name };
   }
@@ -86,7 +86,7 @@ class AgentController implements ResourceController {
     if (!parsed.success) throw new SessionError("invalid_request", "Invalid agent command.");
     const command = parsed.data;
     const agentId = resource.id;
-    const host = this.services.sessions;
+    const host = this.plugin.sessions;
     switch (command.type) {
       case "cancel": this.runs.get(this.key(sessionId, agentId))?.controller.abort(); return;
       case "configure": {
@@ -125,7 +125,7 @@ class AgentController implements ResourceController {
           }
           if (command.type === "submit") {
             timeline.append({ kind: "message", agentId, text: command.text });
-            this.services.state.set(sessionId, agentId, submissionKey(command.submissionId), JSON.stringify(command));
+            this.plugin.state.set(sessionId, agentId, submissionKey(command.submissionId), JSON.stringify(command));
           }
         });
         this.launch(sessionId, agentId, timeout);
@@ -134,14 +134,14 @@ class AgentController implements ResourceController {
     }
   }
   private duplicate(agentId: string, command: { submissionId: string }): boolean {
-    const prior = this.services.state.get(agentId, submissionKey(command.submissionId));
+    const prior = this.plugin.state.get(agentId, submissionKey(command.submissionId));
     if (prior === null) return false;
     if (prior !== JSON.stringify(command)) throw new SessionError("conflict", "This submission ID was already used for different input.");
     return true;
   }
 
   private launch(sessionId: string, agentId: string, timeout: number): void {
-    const host = this.services.sessions;
+    const host = this.plugin.sessions;
     const controller = new AbortController();
     const key = this.key(sessionId, agentId);
     const timer = setTimeout(() => controller.abort(), timeout * 1000);
@@ -179,8 +179,8 @@ class AgentController implements ResourceController {
   }
   linkTools(_sessionId: string, objectId: string, resource: Parameters<NonNullable<ResourceController["linkTools"]>>[2]) {
     const current = this.selection(objectId);
-    const agent = current && this.services.configuration.agentConfiguration(current.selection.agentConfigurationId);
-    return agent ? this.services.sessions.capabilities([resource], agentToolPolicy(agent)).describe(resource.id) : [];
+    const agent = current && this.plugin.internal.configuration.agentConfiguration(current.selection.agentConfigurationId);
+    return agent ? this.plugin.sessions.capabilities([resource], agentToolPolicy(agent)).describe(resource.id) : [];
   }
   async close(): Promise<void> {
     this.closed = true;
@@ -189,8 +189,8 @@ class AgentController implements ResourceController {
   }
 }
 
-export default ((services: RuntimeServices) => {
-  const controller = new AgentController(services);
+export default defineModule(plugin => {
+  const controller = new AgentController(plugin);
   return {
     resources: [implementResource(Agent, AgentView, {
       project: (_state, resource) => {
@@ -202,4 +202,4 @@ export default ((services: RuntimeServices) => {
     })],
     tools: [],
   };
-}) satisfies RuntimeModuleFactory;
+});

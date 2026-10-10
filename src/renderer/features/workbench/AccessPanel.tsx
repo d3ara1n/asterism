@@ -22,7 +22,7 @@ export function AccessPanel() {
   const [selectedAgent, setSelectedAgent] = useState("");
   const [selectedResource, setSelectedResource] = useState("");
   const [query, setQuery] = useState("");
-  const agents = session.objects.filter(object => object.kind === "agent");
+  const agents = session.objects.filter(object => object.kind === "atelier.core/agent");
   const byAgent = mode === "agent";
   const choices = byAgent ? agents : session.objects;
   const selectedId = byAgent ? selectedAgent : selectedResource;

@@ -54,6 +54,8 @@ export class AgentCapabilities {
     const target = this.linked.get(id);
     if (!target) return denied();
     const tool = target.tools.find(implementation => implementation.tool.name === name);
+    if (!tool && !this.resources.has(target.resource.kind)) return { ...this.identity(id), kind: "rejected", error: { code: "implementation_missing",
+      message: `The plugin providing ${target.resource.kind} is not installed or is disabled. Ask the user to enable it before using this resource.` } };
     if (!tool) return { ...this.identity(id), kind: "rejected", error: { code: "tool_unavailable", message: "This tool is unavailable for the resource. Use resource_inspect to list available tools." } };
     return { ...tool.prepare(target.resource, selector, args), ...this.identity(id) };
   }

@@ -25,7 +25,7 @@
 
 会话命令先由 Zod 校验，再交运行时单一写入者处理。业务创建、查询索引与初始视图处于同一事务；正文引用只在内容文件成功落盘后进入事件。命令返回受理结果，读取返回指定位置的会话树与工作台投影，UI 将其映射为画布和代理对话。
 
-路径遍历、块识别和合法续接判断统一位于 `shared/session-path.ts`，运行时与 renderer 共用。`execution/response.ts` 在代理执行侧持有一次响应的内存流状态，块成型后经 `SessionHost.commit` 交会话记录；终态与续接游标也由会话管理。未完成输出经 `session.progress` 的 `live` 字段提供给界面，不写入存储；完整读取也携带当前进度以恢复连接。数据库结构只在运行时建库，仓储构造不隐式建表。
+路径遍历、块识别和合法续接判断统一位于 `shared/session-path.ts`，运行时与 renderer 共用。`execution/response.ts` 在代理执行侧持有一次响应的内存流状态，块成型后经 `PluginSessions.commit` 交会话记录；终态与续接游标也由会话管理。未完成输出经 `session.progress` 的 `live` 字段提供给界面，不写入存储；完整读取也携带当前进度以恢复连接。数据库结构只在运行时建库，仓储构造不隐式建表。
 
 块的 `requestParentId` 记录请求使用的路径末端；`session/projection.ts` 在该位置后组合响应，把期间事件留在响应外。终态通过 `SessionTree.completeBlock` 只追加一次并绑定到最高序号块，读取时合并可空字段，原始节点不变。`SessionTree.select` 将选择审计与游标更新原子提交，`cursorSelections` 可读取日志。`seq` 只计节点追加，视图同步使用独立 `revision`，涵盖计量、游标、配置选择和布局变化。
 

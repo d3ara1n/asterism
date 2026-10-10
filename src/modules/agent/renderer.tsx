@@ -9,7 +9,7 @@ import { AgentView } from "./contract";
 const appearance = { width: 560, height: 640, minWidth: 480, minHeight: 480 };
 
 export default {
-  resources: [{ kind: "agent", label: t.kindAgent, icon: <Bot className="size-4" />, card: appearance }],
+  resources: [{ kind: "atelier.core/agent", label: t.kindAgent, icon: <Bot className="size-4" />, card: appearance }],
   cards: [cardRenderer(AgentView, {
     ...appearance,
     Body: ({ data }) => {

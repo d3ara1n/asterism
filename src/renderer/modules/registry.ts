@@ -4,6 +4,7 @@ import { t } from "../shared/i18n";
 import type { Json } from "../../shared/json.ts";
 import type { z } from "zod";
 import type { ToolInvocationInfo, ToolResult } from "../../shared/tool-result.ts";
+import { pluginOf } from "../../shared/plugin.ts";
 import { contractKey, reference, type ContractReference, type DataContract, type Presentation } from "../../shared/presentation.ts";
 
 /** 类型级静态识别信息，不解析卡片数据，也不创建正文组件。 */
@@ -117,7 +118,8 @@ export class ViewRegistry {
     this.tools = index(modules.flatMap(module => module.tools));
   }
   resource(kind: string): ResourceDescription {
-    return this.resources.get(kind) ?? { kind, label: t.kindResource, icon: createElement(Box, { className: "size-4" }) };
+    const plugin = pluginOf(kind);
+    return this.resources.get(kind) ?? { kind, label: plugin ? t.kindMissing(plugin) : t.kindResource, icon: createElement(Box, { className: "size-4" }) };
   }
   card(presentation: Presentation): CardView | null {
     return this.cards.get(contractKey(presentation.contract))?.resolve(presentation.data) ?? null;

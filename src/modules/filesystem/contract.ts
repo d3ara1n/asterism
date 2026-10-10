@@ -1,14 +1,13 @@
 import { z } from "zod";
-import { coreId } from "../../shared/core.ts";
-import { defineData } from "../../shared/presentation.ts";
-import { defineImplementation, defineResource } from "../../shared/module-contract.ts";
+import { core } from "../plugin.ts";
+import { defineImplementation } from "../../shared/module-contract.ts";
 import { List, Read, Edit, Write } from "../../tools/declarations.ts";
 import { textReadSchema, textChangeSchema } from "../../tools/text-contract.ts";
 
-export const Directory = defineResource("directory", z.object({ path: z.string() }));
-export const DirectoryView = defineData(coreId("directory.card"), 1, z.strictObject({ path: z.string() }));
+export const Directory = core.resource("directory", z.object({ path: z.string() }));
+export const DirectoryView = core.data("directory.card", 1, z.strictObject({ path: z.string() }));
 export const DirectoryList = defineImplementation({
-  ...defineData(coreId("directory.list"), 1, z.strictObject({
+  ...core.data("directory.list", 1, z.strictObject({
     path: z.string().describe("The listed directory path relative to the resource root; '.' denotes the root."),
     entries: z.array(z.strictObject({
       name: z.string().describe("Entry name within the listed directory."),
@@ -30,7 +29,7 @@ const filePath = z.string().min(1).max(4096).describe("File path relative to the
 const fileTarget = z.strictObject({ path: filePath })
   .describe("Select one UTF-8 text file with {\"path\":\"relative/file.txt\"}. Content operations are limited to 8 MiB. edit requires an existing file; write can create missing parents inside the root.");
 export const DirectoryRead = defineImplementation({
-  ...defineData(coreId("directory.read"), 1, textReadSchema.extend({ path: filePath })
+  ...core.data("directory.read", 1, textReadSchema.extend({ path: filePath })
     .describe("Complete selected file lines with absolute line numbers, optional hashes, final-newline state and the next unread line.")),
   resource: Directory, tool: Read,
   targetSchema: z.strictObject({
@@ -41,12 +40,12 @@ export const DirectoryRead = defineImplementation({
   effect: "read", execution: "parallel",
 });
 export const DirectoryEdit = defineImplementation({
-  ...defineData(coreId("directory.edit"), 1, textChangeSchema.extend({ path: filePath })
+  ...core.data("directory.edit", 1, textChangeSchema.extend({ path: filePath })
     .describe("The actual committed file diff and fresh edit anchors. The full resulting file is limited to 8 MiB.")),
   resource: Directory, tool: Edit, targetSchema: fileTarget, effect: "write", execution: "sequential",
 });
 export const DirectoryWrite = defineImplementation({
-  ...defineData(coreId("directory.write"), 1, textChangeSchema.extend({
+  ...core.data("directory.write", 1, textChangeSchema.extend({
     path: filePath,
     created: z.boolean().describe("True when this call created the target file; false when it already existed."),
   }).describe("The written file's actual diff and creation status; write never returns edit anchors. Full content is limited to 8 MiB.")),

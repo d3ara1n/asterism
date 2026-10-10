@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import type { ConfigurationService } from "../configuration/service.ts";
@@ -6,7 +7,9 @@ import { SessionError, SessionTree } from "../session/tree.ts";
 import { foldWorkbench, type FoldedObject } from "../session/fold.ts";
 import { AgentCapabilities } from "../execution/capabilities.ts";
 import { createModules } from "../modules/runtime.ts";
-import type { SessionHost, SessionWriter } from "../modules/runtime-contract.ts";
+import { Agent } from "../modules/agent/contract.ts";
+import type { PluginSessions, PluginSessionWriter as SessionWriter } from "../plugins/contract.ts";
+import type { PluginManifest } from "../plugins/loader.ts";
 import type { ResourceRegistry } from "../resources/registry.ts";
 import { createResourceId } from "../resources/id.ts";
 import { ResourceStateStore } from "../resources/state.ts";
@@ -16,7 +19,8 @@ import { sessionCommandSchema, sessionSnapshotSchema, type SessionChanged, type 
   type SessionProgress, type SessionReply, type ViewPosition } from "../shared/session.ts";
 import { sessionPath, snap } from "../shared/session-path.ts";
 import { SessionWorkbench } from "./workbench.ts";
-import type { ObjectStore } from "./storage.ts";
+
+const agentKind = Agent.kind;
 
 /**
  * 会话入口：只拥有会话树、工作台对象与连线事件、布局和通知。
@@ -30,14 +34,15 @@ export class SessionService {
   private readonly workbench: SessionWorkbench;
   private readonly resources: ResourceRegistry;
   private readonly tools: ToolRegistry;
-  constructor(private readonly db: DatabaseSync, objects: ObjectStore, configuration: ConfigurationService,
+  readonly plugins: readonly PluginManifest[];
+  constructor(private readonly db: DatabaseSync, dataRoot: string, configuration: ConfigurationService,
     private readonly changed: (event: SessionChanged) => void = () => {}, adapterFactory?: (settings: ModelSettings) => ModelAdapter) {
     this.tree = new SessionTree(db);
-    const host: SessionHost = {
+    const host: PluginSessions = {
       path: sessionId => this.tree.path(sessionId),
       commit: (sessionId, work) => this.commit(sessionId, work),
       progressChanged: sessionId => this.progressChanged(sessionId),
-      resourceChanged: sessionId => this.notify(sessionId),
+      changed: sessionId => this.notify(sessionId),
       linked: (path, objectId) => {
         const folded = foldWorkbench(path);
         const ids = new Set(folded.links.filter(link => link.agentId === objectId).map(link => link.resourceId));
@@ -46,9 +51,23 @@ export class SessionService {
       capabilities: (linked, policy) => new AgentCapabilities(this.resources, this.tools, linked, policy),
       context: linked => this.resources.context(linked),
     };
-    const modules = createModules({ objects, state: new ResourceStateStore(db), sessions: host, configuration, adapterFactory });
+    const kindOf = (objectId: string): string | null => {
+      const row = db.prepare("SELECT session_id FROM resource_states WHERE object_id = ? LIMIT 1").get(objectId) as { session_id: string } | undefined;
+      const sessionIds = row ? [row.session_id] : this.tree.list().map(session => session.id);
+      for (const sessionId of sessionIds) {
+        for (const node of this.tree.nodes(sessionId)) {
+          if (node.kind !== "event" || node.type !== "resource_created") continue;
+          const data = node.data as { id?: unknown; type?: unknown };
+          if (data.id === objectId) return String(data.type);
+        }
+      }
+      return null;
+    };
+    const modules = createModules({ extensionsDirectory: join(dataRoot, "extensions"), state: new ResourceStateStore(db), kindOf,
+      sessions: host, internal: { configuration, ...(adapterFactory ? { adapterFactory } : {}) } });
     this.resources = modules.resources;
     this.tools = modules.tools;
+    this.plugins = modules.manifest;
     this.workbench = new SessionWorkbench(db, this.tree, this.resources,
       (sessionId, agentId, resource) => this.linkTools(sessionId, agentId, resource));
   }
@@ -88,7 +107,7 @@ export class SessionService {
     const activity = this.resources.controllers().map(controller => controller.activity?.(sessionId) ?? { running: [], live: [] });
     return { revision: this.revisions.get(sessionId) ?? 0, version: this.progressVersions.get(sessionId) ?? 0,
       unsettledObjectIds: [...new Set(activity.flatMap(a => a.running))],
-      runningAgentIds: this.resources.controller("agent")?.activity?.(sessionId).running ?? [],
+      runningAgentIds: this.resources.controller(agentKind)?.activity?.(sessionId).running ?? [],
       live: activity.flatMap(a => a.live) };
   }
   private progressChanged(sessionId: string): void {
@@ -97,7 +116,7 @@ export class SessionService {
     catch { /* 重新读取会话恢复当前进度 */ }
   }
   private linkTools(sessionId: string, agentId: string, resource: FoldedObject) {
-    return this.resources.controller("agent")?.linkTools?.(sessionId, agentId, resource) ?? [];
+    return this.resources.controller(agentKind)?.linkTools?.(sessionId, agentId, resource) ?? [];
   }
   snapshot(sessionId: string, position: ViewPosition = { kind: "live" }): SessionSnapshot {
     const nodes = this.tree.nodes(sessionId);
@@ -176,7 +195,7 @@ export class SessionService {
       return { kind: "accepted" as const, sessionId: row.session_id };
     };
     const prior = existing(); if (prior) return prior;
-    const agents = this.resources.controller("agent")!;
+    const agents = this.resources.controller(agentKind)!;
     const selection = { agentConfigurationId: command.agentConfigurationId, modelId: command.modelId, thinking: command.thinking };
     const input = await agents.prepareCreate!({ selection });
     const again = existing(); if (again) return again;
@@ -184,10 +203,10 @@ export class SessionService {
     const agentId = createResourceId();
     const before = () => {
       this.tree.create(command.text.slice(0, 72), sessionId);
-      this.workbench.createWith(sessionId, "agent", agentId, input, { x: 48, y: 48 });
+      this.workbench.createWith(sessionId, agentKind, agentId, input, { x: 48, y: 48 });
       this.db.prepare("INSERT INTO session_submissions (id, command_json, session_id) VALUES (?, ?, ?)").run(command.submissionId, JSON.stringify(command), sessionId);
     };
-    const resource: FoldedObject = { id: agentId, kind: "agent", title: "", data: {} };
+    const resource: FoldedObject = { id: agentId, kind: agentKind, title: "", data: {} };
     await agents.execute!({ sessionId, resource }, { type: "submit", submissionId: command.submissionId, text: command.text }, before);
     return { kind: "accepted", sessionId };
   }

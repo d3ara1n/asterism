@@ -24,7 +24,7 @@ function setup() {
   const directory = join(root, "directory"), outside = join(root, "outside");
   mkdirSync(directory); mkdirSync(outside);
   const module = filesystem();
-  const resource = { id: "directory", kind: "directory", title: "Directory", data: { path: directory } };
+  const resource = { id: "directory", kind: "atelier.core/directory", title: "Directory", data: { path: directory } };
   const capabilities = new AgentCapabilities(new ResourceRegistry(module.resources), new ToolRegistry(module.tools), [resource], () => true);
   const call = async (tool: string, target: Json, args: Json = {}, cap = capabilities, signal = new AbortController().signal, resourceId = resource.id) => {
     const results: ToolOutcome[] = [];

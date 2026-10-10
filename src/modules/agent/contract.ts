@@ -1,12 +1,10 @@
 import { z } from "zod";
-import { coreId } from "../../shared/core.ts";
-import { defineResource } from "../../shared/module-contract.ts";
-import { defineData } from "../../shared/presentation.ts";
+import { core } from "../plugin.ts";
 import { agentSelectionSchema } from "../../shared/model.ts";
 
 /** 代理是普通资源：创建事件只记录身份；模型选择等可变数据属于资源私有状态。 */
-export const Agent = defineResource("agent", z.object({}));
-export const AgentView = defineData(coreId("agent.card"), 2, z.strictObject({
+export const Agent = core.resource("agent", z.object({}));
+export const AgentView = core.data("agent.card", 2, z.strictObject({
   agentId: z.string(),
   selection: agentSelectionSchema.nullable(),
   selectionRevision: z.number().int().nonnegative(),

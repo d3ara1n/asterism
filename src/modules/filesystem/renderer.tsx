@@ -9,7 +9,7 @@ import { ToolHeader } from "../../renderer/shared/tool-header";
 const appearance = { width: 340, height: 200, minWidth: 280, minHeight: 160 };
 
 export default {
-  resources: [{ kind: "directory", label: s("Directory", "目录"), icon: <Folder className="size-4" />, card: appearance }],
+  resources: [{ kind: "atelier.core/directory", label: s("Directory", "目录"), icon: <Folder className="size-4" />, card: appearance }],
   cards: [cardRenderer(DirectoryView, {
     ...appearance,
     Body: ({ data }) => <div className="min-h-0 flex-1 select-text overflow-auto p-3">

@@ -11,7 +11,6 @@ import { implement } from "../tools/contract.ts";
 import { ToolRegistry } from "../tools/registry.ts";
 import { AgentCapabilities, agentToolPolicy } from "../execution/capabilities.ts";
 import { executeCoreBatch, coreDeclarations } from "../execution/core.ts";
-import { ObjectStore } from "../runtime/storage.ts";
 import type { Json, ToolOutcome } from "../shared/model.ts";
 import type { FoldedObject } from "../session/fold.ts";
 
@@ -26,10 +25,9 @@ function setup() {
   mkdirSync(root); mkdirSync(outside);
   mkdirSync(join(root, "subdir"));
   writeFileSync(join(root, "a.txt"), "hello"); writeFileSync(join(outside, "secret.txt"), "secret");
-  const objects = new ObjectStore(join(base, "objects"));
-  const resource: FoldedObject = { id: "d1", kind: "directory", title: "root", data: { path: root } };
-  const note: FoldedObject = { id: "n1", kind: "note", title: "Note", data: {} };
-  const { resources, tools } = createModules({ objects, state: null as never, sessions: null as never, configuration: null as never });
+  const resource: FoldedObject = { id: "d1", kind: "atelier.core/directory", title: "root", data: { path: root } };
+  const note: FoldedObject = { id: "n1", kind: "atelier.core/note", title: "Note", data: {} };
+  const { resources, tools } = createModules({ extensionsDirectory: join(base, "extensions"), state: null as never, kindOf: () => null, sessions: null as never, internal: null as never });
   const scope = (linked: readonly FoldedObject[] = [resource], policy: Parameters<typeof agentToolPolicy>[0] = unrestricted) =>
     new AgentCapabilities(resources, tools, linked, agentToolPolicy(policy));
   return { root, outside, resource, note, resources, tools, scope };
@@ -226,7 +224,7 @@ describe("工具与资源的匹配及授权", () => {
       arguments: { resource_id: resource.id, tool: "list", args: {} } }],
     scope(), controller.signal, (_call, result) => results.push(result));
     expect(results).toMatchObject([{
-      kind: "cancelled", message: "The operation was not started.", implementation: { id: "core.directory.list", version: 1 },
+      kind: "cancelled", message: "The operation was not started.", implementation: { id: "atelier.core/directory.list", version: 1 },
       data: null, model: { kind: "cancelled", data: null, message: "The operation was not started." },
     }]);
     expect(results[0]).not.toHaveProperty("startedAt");

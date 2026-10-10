@@ -38,7 +38,7 @@ export const ObjectNode = memo(function ObjectNode({ id, data, selected }: NodeP
     {ports.map(port => <Handle key={port.id} id={port.id} type="source"
       position={{ left: Position.Left, right: Position.Right, top: Position.Top, bottom: Position.Bottom }[port.side]}
       style={port.side === "left" || port.side === "right" ? { top: `${port.offset * 100}%` } : { left: `${port.offset * 100}%` }}
-      isConnectableEnd={object.kind === "agent"} />)}
+      isConnectableEnd={object.kind === "atelier.core/agent"} />)}
     <ObjectCard title={object.title} collapsed={collapsed} selected={!!selected} onView={onObjectView}
       icon={descriptor.icon} kind={descriptor.label}
       actions={<>{view.actions}<ObjectActions object={object} defaultSize={cardSize(view)} onView={onObjectView} /></>}>

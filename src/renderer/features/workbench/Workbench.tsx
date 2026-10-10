@@ -138,7 +138,7 @@ function Canvas({ ref, session, run, writable }: {
   const objects = useMemo(() => new Map(session.objects.map(o => [o.id, o])), [session.objects]);
   // 终点只能是代理；起点是任意其他对象，含另一个代理。
   const isValidConnection: IsValidConnection = useCallback(c => !!c.source && !!c.target && c.source !== c.target
-    && objects.get(c.target)?.kind === "agent" && !session.links.some(l => l.agentId === c.target && l.resourceId === c.source), [objects, session.links]);
+    && objects.get(c.target)?.kind === "atelier.core/agent" && !session.links.some(l => l.agentId === c.target && l.resourceId === c.source), [objects, session.links]);
   const onConnect = useCallback((c: Connection) => {
     void run({ type: "link.set", sessionId: latest.current.id, agentId: c.target, resourceId: c.source, linked: true });
   }, [run]);
@@ -156,7 +156,7 @@ function Canvas({ ref, session, run, writable }: {
     const origin = flow.screenToFlowPosition({ x: event.clientX, y: event.clientY });
     [...event.dataTransfer.files].forEach((file, index) => {
       const path = window.host.pathForFile(file);
-      if (path) void run({ type: "resource.create", sessionId: latest.current.id, kind: "directory", input: { path },
+      if (path) void run({ type: "resource.create", sessionId: latest.current.id, kind: "atelier.core/directory", input: { path },
         position: { x: origin.x + index * 32, y: origin.y + index * 32 } });
     });
   };

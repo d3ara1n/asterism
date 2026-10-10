@@ -11,7 +11,7 @@ import { resolveToolView, toolPreparation } from "./tool-views";
 import { t } from "../../shared/i18n";
 
 const args = { resource_id: "directory", tool: "list", target: { path: "src" }, args: {} };
-const invocation = { implementation: reference(DirectoryList), resource: { id: "directory", kind: "directory", title: "Saved title" }, startedAt: 100 };
+const invocation = { implementation: reference(DirectoryList), resource: { id: "directory", kind: "atelier.core/directory", title: "Saved title" }, startedAt: 100 };
 const live: Extract<LiveBlock, { kind: "toolcall" }> = {
   id: "r:0", agentId: "a", responseId: "r", ordinal: 0, kind: "toolcall", name: "resource_call", argumentsText: "", arguments: null,
   state: "input", invocation: null, result: null,

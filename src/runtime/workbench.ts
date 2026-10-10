@@ -47,7 +47,7 @@ export class SessionWorkbench {
       }
       case "link.set": {
         // 终点必须是代理；起点是任意资源，包括另一个代理。
-        const agent = folded.objects.find(o => o.id === command.agentId && o.kind === "agent");
+        const agent = folded.objects.find(o => o.id === command.agentId && o.kind === "atelier.core/agent");
         const resource = folded.objects.find(o => o.id === command.resourceId);
         if (!agent || !resource) throw new SessionError("not_found", "Agent or resource does not belong to this session.");
         if (agent.id === resource.id) throw new SessionError("invalid_request", "An agent cannot be linked to itself.");

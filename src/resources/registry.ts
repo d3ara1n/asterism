@@ -1,5 +1,5 @@
 import { jsonSchema, type Json } from "../shared/json.ts";
-import { coreId } from "../shared/core.ts";
+import { missingResourceContract, pluginOf } from "../shared/plugin.ts";
 import type { Presentation } from "../shared/presentation.ts";
 import type { FoldedObject } from "../session/fold.ts";
 import type { ContextFile, ResourceBackend, ResourceController } from "./contract.ts";
@@ -19,15 +19,17 @@ export class ResourceRegistry {
   project(resource: FoldedObject): Presentation {
     const backend = this.backends.get(resource.kind);
     if (backend) return backend.project(resource);
-    return { contract: { id: coreId("unknown-resource"), version: 1 }, data: jsonSchema.parse(resource.data) };
+    return { contract: { ...missingResourceContract }, data: { plugin: pluginOf(resource.kind), kind: resource.kind, data: jsonSchema.parse(resource.data) } };
   }
 
+  has(kind: string): boolean { return this.backends.has(kind); }
   controller(kind: string): ResourceController | undefined { return this.backends.get(kind)?.controller; }
   controllers(): ResourceController[] { return [...this.backends.values()].flatMap(backend => backend.controller ? [backend.controller] : []); }
 
   inspect(resource: FoldedObject): Promise<Json> {
     const backend = this.backends.get(resource.kind);
-    if (!backend) throw new Error(`Unsupported resource type: ${resource.kind}`);
+    if (!backend) return Promise.resolve({ type: resource.kind, title: resource.title, available: false,
+      error: { code: "implementation_missing", message: `The plugin providing ${resource.kind} is not installed or is disabled. Ask the user to enable it; this resource cannot be operated until then.` } });
     return backend.inspect(resource);
   }
 

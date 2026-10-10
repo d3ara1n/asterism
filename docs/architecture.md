@@ -166,22 +166,44 @@ API key 由主进程调用 safeStorage 加密，运行时保存密文至 `creden
 
 ### 插件
 
-插件以插件身份包装一组模块，内置模块即宿主自带的内置插件，外部插件经 npm 安装后走同一装配路径。后端模块在任务运行时进程内、前端视图在 renderer 内装配，均与宿主同进程、完全信任，不做权限或进程隔离。启动时一次装配并冻结注册表，变更重启生效。
-
-全部内置功能打包为 `atelier.core` 插件，并只经 plugin api 办事；底层模型调用、提供商与凭据在 `plugin.models` 开放前暂直接使用内部接口。模块工厂接收插件级 context，插件身份由宿主注入而非自报；工具 handler 与资源控制器每次调用另获调用 context：
+插件以插件身份包装一组模块，是安装、身份与管理单位；模块是插件内部的贡献单位，不在界面展示。全部内置功能打包为 `atelier.core` 插件，并只经 plugin api 办事；底层模型调用、提供商与凭据在 `plugin.models` 开放前暂经 `plugin.internal` 使用内部接口。模块工厂接收插件级 context，插件身份由宿主注入而非自报：
 
 ```ts
-definePlugin({ id: "acme.mcp", version, api: "^1", modules: [defineModule(plugin => ({ resources, tools, events }))] });
+const acme = pluginNamespace("acme.mcp");          // 唯一声明 id 的地方；契约用 acme.resource / acme.data 短名声明
+definePlugin({ namespace: acme, version, modules: [defineModule(plugin => ({ resources, tools }))] });
 
-plugin.id / plugin.dir / plugin.config / plugin.secrets / plugin.db / plugin.log   // 跟随插件
-ctx.resource / ctx.state / ctx.session { path, linked, emit, changed, capabilities, context, signal } // 跟随会话
+plugin.id / plugin.dir / plugin.log                 // 跟随插件
+plugin.session(sessionId) { path, linked, emit, changed }   // 绑定会话
+plugin.object(sessionId, objectId) { get, set }             // 绑定对象的资源状态
 ```
 
-plugin api 是包装层：校验参数、返回稳定错误码，内部接口变化由适配层吸收；不暴露宿主注册表或其他插件贡献。资源状态与插件事件是会话数据；插件数据位于 `<data>/extensions/<pluginId>/`，插件自由写入，`.atelier/` 由宿主托管配置与数据库，凭据明文仍在 secrets 机制中。
+#### 设计方向
 
-插件以短名声明 kind、实现、事件与视图契约，宿主补全为 `<pluginId>/<name>`。工具契约是全局知识，模型只见短名：装配先收集全部贡献，再按插件装配顺序（`atelier.core` 最先，外部插件按用户列表）让同名的最后一个契约生效；实现绑定契约对象，所绑契约被覆盖即下线，复用同一契约对象为共享。同一插件内同名异契约使该插件装配失败。解析后冻结注册表并生成贡献清单。
+后续扩展 plugin api 时以下列方向为准，偏离须先改 `decisions.md`：
 
-插件页展示插件身份、版本、注册的贡献（含被覆盖的契约）、占用的配置与数据及加载失败原因，供管理与诊断。插件缺席时按[结果展示](#资源扩展契约)的默认视图回退，资源显示为实现缺失。
+- 插件是管理单位，模块是贡献单位；扩展能力只以资源及其工具、视图、控制器提供，不注册全局常驻能力。
+- 完全信任、同进程，不做权限与隔离；身份用于命名空间、诊断与插件页，不用于授权。
+- plugin api 为插件消费而设计：带身份、参数校验、稳定错误码，形状不随内部重构变化；内置插件同样只用它，缺口补进公开 API，不开特权后门。
+- 会话与对象绑定的 context 优先于手传 ID；会话数据（资源状态、插件事件）随会话走，插件数据随插件目录走。
+- 改写类能力（processor、modifier、生命周期钩子）是另一种模块对象与另一个 API 面，不混入第一版。
+- 启动时装配并冻结，不热加载；贡献 ID 带命名空间，插件缺席只回退展示，不改写记录。
+
+plugin api 是包装层：校验参数、返回稳定错误码（`PluginApiError`），内部接口变化由适配层吸收；不暴露宿主注册表或其他插件贡献。资源状态与插件事件是会话数据；插件数据位于 `<data>/extensions/<pluginId>/`，插件自由写入，`.atelier/` 由宿主托管配置与数据库，凭据明文仍在 secrets 机制中。
+
+工具契约是全局知识，模型只见短名。装配先收集全部贡献，再按插件装配顺序（`atelier.core` 最先，外部插件按用户列表）让同名的最后一个契约生效；实现绑定契约对象，所绑契约被覆盖即下线，复用同一契约对象为共享。同一插件内同名异契约、越出命名空间的贡献或模块抛错只使该插件装配失败。解析后冻结注册表并生成贡献清单（`PluginManifest`），供插件页展示身份、版本、贡献与覆盖、失败原因。
+
+插件缺席时，对象与历史保留：资源投影为 `atelier.core/missing-resource`（携带来源插件、kind 与原始数据），inspect 与工具调用返回 `implementation_missing`，前端显示插件未安装或已禁用并可查看原始数据。
+
+#### 设计方向
+
+后续演进按以下边界判断，偏离须先拍板：
+
+- 扩展能力只经资源提供：插件贡献资源类型及其工具、视图、控制器与事件，不注册全局工具、常驻能力或设置项式功能；MCP 等接入表现为可链接的资源。
+- 插件不能改写宿主：一级入口 resource_list/inspect/call、会话树格式、授权判定与其他插件贡献不开放注册或替换。processor、modifier 等改写类能力是另一种模块对象，另行设计其 API 面。
+- 宿主能力向所有插件平等开放：内置插件不保留特权接口；宿主自有能力（会话、模型对话）以 plugin api 开放，使第三方可写出替代的代理插件。`plugin.internal` 只是过渡，不得新增用途。
+- plugin api 为插件服务而非安全边界：优先稳定与易用，带身份、校验与稳定错误码；不承诺可序列化，不引入权限系统。
+- 身份与命名空间由宿主补全：插件作者只写短名；持久化的 kind、实现与契约 ID 一经发布保持稳定，形状变化增加版本。
+- 只在启动时装配：不引入热加载、运行中卸载或依赖装配顺序之外的覆盖规则。
 
 资源投影携带 `{contract: {id, version}, data}`，不再用一个 content 字符串容纳所有资源。工具通过 publish 发布完整产出快照，过程态与终结态共用 data schema；运行时校验并保留最近合法产出，通过 session.progress 更新 UI。终结结果保存实际实现的 `{id, version}`、当次资源身份与执行时间；失败、取消和未知结局同样保留有效产出。模型投影只在终结时生成并保存，进度不发给模型。
 

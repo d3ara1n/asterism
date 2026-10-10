@@ -31,7 +31,7 @@ import { islandTransition } from "../shared/weave/motion";
 /** 主屏包含侧栏与首页/工作台；设置为左侧独立屏，切换时主屏整体平移。 */
 type MainView = { kind: "home" } | { kind: "conversation"; sessionId: string };
 type PageId = "settings" | "main";
-type ResourceCreation = { kind: "agent" | "note" | "directory"; sessionId: string };
+type ResourceCreation = { kind: "atelier.core/agent" | "atelier.core/note" | "atelier.core/directory"; sessionId: string };
 const idleSubscribe = () => () => {};
 const noSession = () => null;
 
@@ -137,11 +137,11 @@ export function App({ controller }: { controller: ApplicationController }) {
     onClose: closeResourceCreation,
     onRetry: sessionState?.status === "error" ? () => { void active?.refresh(); } : undefined,
   };
-  const addDirectory = () => openResourceCreation("directory");
+  const addDirectory = () => openResourceCreation("atelier.core/directory");
   const configuration = useConfiguration(ready);
-  const addAgent = () => openResourceCreation("agent");
+  const addAgent = () => openResourceCreation("atelier.core/agent");
   const createAgent = (selection: AgentSelection, title?: string) => createResource({ selection, ...(title ? { title } : {}) });
-  const addNote = () => openResourceCreation("note");
+  const addNote = () => openResourceCreation("atelier.core/note");
   const hideSidebar = () => {
     setSidebarVisible(false);
     requestAnimationFrame(() => sidebarToggle.current?.focus({ preventScroll: true }));
@@ -167,11 +167,11 @@ export function App({ controller }: { controller: ApplicationController }) {
       <Button variant="ghost" size="sm" disabled={!writable} aria-label={s("Add to workbench", "添加到工作台")}><Plus /><span className="toolbar-label">{s("Add", "添加")}</span><ChevronDown className="text-muted-foreground" /></Button>
     </DropdownMenuTrigger><DropdownMenuContent align="end">
       <DropdownMenuLabel>{s("Agents", "代理")}</DropdownMenuLabel>
-      <DropdownMenuItem onSelect={addAgent}>{moduleViews.resource("agent").icon}{moduleViews.resource("agent").label}…</DropdownMenuItem>
+      <DropdownMenuItem onSelect={addAgent}>{moduleViews.resource("atelier.core/agent").icon}{moduleViews.resource("atelier.core/agent").label}…</DropdownMenuItem>
       <DropdownMenuSeparator />
       <DropdownMenuLabel>{s("Resources", "资源")}</DropdownMenuLabel>
-      <DropdownMenuItem onSelect={addNote}>{moduleViews.resource("note").icon}{moduleViews.resource("note").label}…</DropdownMenuItem>
-      <DropdownMenuItem onSelect={addDirectory}>{moduleViews.resource("directory").icon}{moduleViews.resource("directory").label}…</DropdownMenuItem>
+      <DropdownMenuItem onSelect={addNote}>{moduleViews.resource("atelier.core/note").icon}{moduleViews.resource("atelier.core/note").label}…</DropdownMenuItem>
+      <DropdownMenuItem onSelect={addDirectory}>{moduleViews.resource("atelier.core/directory").icon}{moduleViews.resource("atelier.core/directory").label}…</DropdownMenuItem>
     </DropdownMenuContent></DropdownMenu>
     <Button variant="ghost" size="sm" onClick={event => workbench.current?.togglePanel("access", event.currentTarget)} aria-label={t.accessLabel}><KeyRound /><span className="toolbar-label">{t.access}</span></Button>
     <Button variant="ghost" size="sm" onClick={event => workbench.current?.togglePanel("objects", event.currentTarget)} aria-label={t.objects}><ListTree /><span className="toolbar-label">{t.objects}</span></Button>
@@ -226,9 +226,9 @@ export function App({ controller }: { controller: ApplicationController }) {
       {(state.error || sessionState?.status !== "error") && <Button variant="ghost" size="icon-xs" aria-label={t.dismissError} title={t.dismissError}
         onClick={state.error ? controller.clearError : active?.clearError}><X /></Button>}
     </Alert>}
-    {resourceCreation?.kind === "agent" && <AddAgentDialog {...creationDialog} configuration={configuration.snapshot} error={sessionState?.error ?? configuration.error} onCreate={createAgent} />}
-    {resourceCreation?.kind === "note" && <AddNoteDialog {...creationDialog} onCreate={createResource} />}
-    {resourceCreation?.kind === "directory" && <AddDirectoryDialog {...creationDialog} onCreate={createResource} />}
+    {resourceCreation?.kind === "atelier.core/agent" && <AddAgentDialog {...creationDialog} configuration={configuration.snapshot} error={sessionState?.error ?? configuration.error} onCreate={createAgent} />}
+    {resourceCreation?.kind === "atelier.core/note" && <AddNoteDialog {...creationDialog} onCreate={createResource} />}
+    {resourceCreation?.kind === "atelier.core/directory" && <AddDirectoryDialog {...creationDialog} onCreate={createResource} />}
   </>;
 }
 
