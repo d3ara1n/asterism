@@ -1,4 +1,4 @@
-import { House, MessageSquare, PanelLeftClose, Plus, Settings } from "lucide-react";
+import { House, MessageSquare, PanelLeftClose, Settings } from "lucide-react";
 import type { AppSnapshot, RuntimeStatus } from "../../shared/contracts";
 import { t } from "../shared/i18n";
 import { Button } from "../shared/ui/button";
@@ -16,8 +16,7 @@ export function Sidebar({ snapshot, status, busy, selectedSessionId, homeActive,
       <Button variant="ghost" size="icon-xs" aria-label={t.hideSidebar} title={t.hideSidebar} onClick={onHide}><PanelLeftClose /></Button>
     </header>
     <nav className="flex flex-col gap-1" aria-label={t.mainViews}>
-      <Button variant={homeActive ? "secondary" : "ghost"} className="w-full justify-start" aria-current={homeActive ? "page" : undefined} onClick={onHome}><House />{t.home}</Button>
-      <Button variant="secondary" className="mt-2 w-full justify-start" onClick={onHome}><Plus />{t.newConversation}</Button>
+      <Button variant={homeActive ? "secondary" : "ghost"} className="w-full justify-start disabled:opacity-100" aria-current={homeActive ? "page" : undefined} disabled={homeActive} onClick={onHome}><House />{t.home}</Button>
     </nav>
     <section className="mt-6 flex min-h-0 flex-1 flex-col" aria-labelledby="conversation-list-title">
       <h2 id="conversation-list-title" className="type-label mb-2 px-2">{t.conversations}</h2>
