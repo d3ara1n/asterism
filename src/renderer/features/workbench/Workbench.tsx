@@ -1,6 +1,6 @@
 import type { WorkbenchOperation } from "../session/controller";
-import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type ReactNode, type Ref } from "react";
-import { ReactFlow, ReactFlowProvider, Background, BackgroundVariant, Panel, useReactFlow, applyNodeChanges, applyEdgeChanges, type NodeChange, type EdgeChange, type Edge, MarkerType, ConnectionMode, type Connection, type IsValidConnection } from "@xyflow/react";
+import { useCallback, useEffect, useLayoutEffect, useImperativeHandle, useMemo, useRef, useState, type ReactNode, type Ref } from "react";
+import { ReactFlow, ReactFlowProvider, Background, BackgroundVariant, Panel, useReactFlow, getViewportForBounds, applyNodeChanges, applyEdgeChanges, type NodeChange, type EdgeChange, type Edge, MarkerType, ConnectionMode, type Connection, type IsValidConnection } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { Maximize, Minus, Plus, Scan } from "lucide-react";
 import type { WorkbenchSnapshot } from "../../../shared/workbench";
@@ -14,13 +14,15 @@ import { SessionHistoryPanel } from "../session/History";
 import { ObjectNode, type ObjectNodeType } from "./ObjectNode";
 import { IconAction, cardDragHandle, type ViewPatch } from "./ObjectCard";
 import { ObjectsPanel } from "./ObjectsPanel";
+import { AccessPanel } from "./AccessPanel";
 import { placeObject, type ResourcePlacement } from "./placement";
 import { defaultCardPosition } from "./layout";
 import { layoutConnections, type ConnectionEdge } from "./connections";
-import { WorkbenchContext, WorkbenchScope, WorkbenchStore, type WorkbenchEnvironment } from "./context";
+import { WorkbenchContext, WorkbenchScope, WorkbenchStore, useWorkbench, type WorkbenchEnvironment, type WorkbenchView } from "./context";
 
 const nodeTypes = { object: ObjectNode };
-export type PanelKind = "objects" | "history";
+export type PanelKind = "objects" | "history" | "access";
+type LocateRequest = { objectId: string; token: number; navigationVersion: number };
 
 /** 标题栏操作经此句柄进入工作台浮岛；面板作为更深浮岛打开，不另建浮层。 */
 export interface WorkbenchHandle {
@@ -34,31 +36,51 @@ type WorkbenchEdge = Edge<ConnectionEdge["data"]>;
 
 /** 工作台根浮岛：投影平级对象和关系；代理对话只是代理对象的卡片内容。 */
 export function Workbench({ ref, controller, session, ready, busy, historical, run, draft, onDraftChange, onHome }: Props) {
+  const [locating, setLocating] = useState<LocateRequest | null>(null);
+  const locateSequence = useRef(0);
+  const navigationVersion = controller.getSnapshot().navigationVersion;
+  useLayoutEffect(() => { locateSequence.current++; setLocating(null); }, [navigationVersion]);
+  useLayoutEffect(() => {
+    if (!ready || busy) { locateSequence.current++; setLocating(null); }
+  }, [ready, busy]);
+  const locate = useCallback(async (objectId: string) => {
+    const state = controller.getSnapshot();
+    if (state.status !== "ready" || !state.snapshot?.workbench.objects.some(object => object.id === objectId)) return;
+    const token = ++locateSequence.current;
+    if (state.snapshot.workbench.views.some(view => view.objectId === objectId && view.hidden)) {
+      if (!(await controller.executeAndRead({ type: "view.set", sessionId: session.id, objectId, hidden: false })).ok) return;
+    }
+    // 命令受理与投影发布分离；后续由画布等待节点测量。导航变化或新定位意图取消旧意图。
+    if (locateSequence.current === token && controller.getSnapshot().status === "ready" && controller.getSnapshot().navigationVersion === state.navigationVersion) {
+      setLocating({ objectId, token, navigationVersion: state.navigationVersion });
+    }
+  }, [controller, session.id]);
   // 按字段组装环境，只有字段真的变化时才通知卡片与面板浮岛。
-  const context = useMemo<WorkbenchEnvironment>(
-    () => ({ controller, session, ready, busy, historical, run, draft, onDraftChange, onHome }),
-    [controller, session, ready, busy, historical, run, draft, onDraftChange, onHome]);
+  const context = useMemo<WorkbenchView>(
+    () => ({ controller, session, ready, busy, historical, run, draft, onDraftChange, onHome, locate }),
+    [controller, session, ready, busy, historical, run, draft, onDraftChange, onHome, locate]);
   const island = useIsland();
   const host = useRef<HTMLDivElement>(null);
   const [store] = useState(() => new WorkbenchStore());
   const open = useCallback((id: string, label: string, render: () => ReactNode, origin: HTMLElement | null) => {
     if (island.child === id) island.closeChild();
     // 面板浮岛在工作台子树之外渲染，经 WorkbenchScope 取得同一份环境。
-    else island.open({ id, label, width: { min: 288, max: 360 }, origin, render: () => <WorkbenchScope store={store}>{render()}</WorkbenchScope> });
+    else island.open({ id, label, width: { min: 320, max: 400 }, origin, render: () => <WorkbenchScope store={store}>{render()}</WorkbenchScope> });
   }, [island, store]);
   useImperativeHandle(ref, () => ({
-    togglePanel: (kind, origin) => open(`workbench-${kind}`, kind === "objects" ? t.objects : t.history,
-      () => kind === "objects" ? <ObjectsPanel /> : <SessionHistoryPanel controller={controller} />, origin),
+    togglePanel: (kind, origin) => open(`workbench-${kind}`, ({ objects: t.objects, history: t.history, access: t.accessLabel })[kind],
+      () => kind === "objects" ? <ObjectsPanel /> : kind === "access" ? <AccessPanel /> : <SessionHistoryPanel controller={controller} />, origin),
     resourcePlacement: () => {
       const bounds = host.current?.getBoundingClientRect();
       return bounds ? { sessionId: session.id, position: placeObject(session, bounds.width, bounds.height) } : null;
     },
   }), [open, session, controller]);
-  useEffect(() => store.set(context), [store, context]);
+  useLayoutEffect(() => store.set(context), [store, context]);
 
   return <WorkbenchContext.Provider value={context}>
     <div ref={host} className="overlay-inset relative h-full overflow-hidden rounded-lg bg-background">
-      <ReactFlowProvider><Canvas session={session} run={run} writable={ready && !busy && !historical} /></ReactFlowProvider>
+      <ReactFlowProvider><Canvas session={session} run={run} writable={ready && !busy && !historical}
+        locating={ready && !busy && locating?.navigationVersion === navigationVersion ? locating : null} /></ReactFlowProvider>
       {historical && <div role="status"
         className="surface-floating absolute bottom-[var(--overlay-inset)] left-1/2 z-10 flex -translate-x-1/2 items-center gap-3 whitespace-nowrap p-1 pl-3 text-sm">
         <span>{t.viewingHistory}</span>
@@ -76,8 +98,10 @@ export function Workbench({ ref, controller, session, ready, busy, historical, r
   </WorkbenchContext.Provider>;
 }
 
-function Canvas({ session, run, writable }: { session: WorkbenchSnapshot; run: Run; writable: boolean }) {
+function Canvas({ session, run, writable, locating }: { session: WorkbenchSnapshot; run: Run; writable: boolean; locating: LocateRequest | null }) {
   const flow = useReactFlow();
+  const { controller } = useWorkbench();
+  const viewportElement = useRef<HTMLDivElement>(null);
   const [dropping, setDropping] = useState(false);
   const { canvas } = useAppearance();
   const scheme = useScheme();
@@ -101,6 +125,34 @@ function Canvas({ session, run, writable }: { session: WorkbenchSnapshot; run: R
     }), [onView]);
   const [nodes, setNodes] = useState<ObjectNodeType[]>(() => toNodes(session, []));
   useEffect(() => { setNodes(previous => toNodes(session, previous)); }, [session, toNodes]);
+  const located = useRef(0);
+  const target = nodes.find(node => node.id === locating?.objectId);
+  useEffect(() => {
+    if (!locating || located.current === locating.token || !target?.measured?.width || !target.measured.height) return;
+    let active = true, animating = false;
+    const frame = requestAnimationFrame(() => {
+      const element = viewportElement.current;
+      if (!element?.clientWidth || !element.clientHeight) return;
+      located.current = locating.token;
+      setNodes(current => current.map(node => ({ ...node, selected: node.id === locating.objectId })));
+      animating = true;
+      const bounds = flow.getNodesBounds([locating.objectId]);
+      const viewport = getViewportForBounds(bounds, element.clientWidth, element.clientHeight, 0.1, 1, 0.25);
+      // 节点已测量，使用画布公开 API 立即开始可中断的视口过渡。
+      void flow.setViewport(viewport, {
+        duration: matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 420 }).then(() => {
+        animating = false;
+        if (!active || controller.getSnapshot().navigationVersion !== locating.navigationVersion) return;
+        // 定位属于显式视图操作；不追加会话历史。
+        void run({ type: "viewport.set", sessionId: session.id, viewport: flow.getViewport() });
+      });
+    });
+    return () => {
+      active = false; cancelAnimationFrame(frame);
+      // 即时设置当前视口会中断画布原生过渡，导航后不再继续移动或保存旧定位。
+      if (animating) void flow.setViewport(flow.getViewport(), { duration: 0 });
+    };
+  }, [locating, target?.measured?.width, target?.measured?.height, flow, run, session.id, controller]);
   const connections = useMemo(() => layoutConnections(nodes, session.links), [nodes, session.links]);
   const canvasNodes = useMemo(() => nodes.map(node => ({
     ...node, data: { ...node.data, ports: connections.ports.get(node.id) },
@@ -156,7 +208,7 @@ function Canvas({ session, run, writable }: { session: WorkbenchSnapshot; run: R
       }
     }
   }, [run, toNodes]);
-  return <div className="relative h-full" onDragOver={event => { if (writable && event.dataTransfer.types.includes("Files")) { event.preventDefault(); setDropping(true); } }}
+  return <div ref={viewportElement} className="relative h-full" onDragOver={event => { if (writable && event.dataTransfer.types.includes("Files")) { event.preventDefault(); setDropping(true); } }}
     onDragLeave={event => { if (event.currentTarget === event.target) setDropping(false); }} onDrop={onDrop}>
   {dropping && <div className="pointer-events-none absolute inset-2 z-20 flex items-center justify-center rounded-lg border-2 border-dashed border-primary bg-primary/5">
     <p className="type-body">{s("Drop to add as resources", "松开以添加为资源")}</p></div>}

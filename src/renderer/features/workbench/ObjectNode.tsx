@@ -1,11 +1,11 @@
 import { memo, useCallback, useEffect, useMemo } from "react";
 import { Handle, Position, useUpdateNodeInternals, type Node, type NodeProps } from "@xyflow/react";
-import { FileQuestion } from "lucide-react";
 import type { WorkbenchObject } from "../../../shared/workbench";
 import { JsonView, useModuleViews } from "../../modules/views";
 import { ObjectCard, type ViewPatch } from "./ObjectCard";
 import { fallbackCardWidth } from "./layout";
 import { defaultConnectionPorts, type ConnectionPort } from "./connections";
+import { ObjectActions } from "./ObjectActions";
 
 export type ObjectNodeType = Node<{
   object: WorkbenchObject; collapsed: boolean;
@@ -23,8 +23,9 @@ export const ObjectNode = memo(function ObjectNode({ id, data, selected }: NodeP
   // 端点数量或位置变化后，使用画布自身的测量机制刷新连线锚点。
   useEffect(() => { updateNodeInternals(id); }, [id, portLayout, updateNodeInternals]);
   const registry = useModuleViews();
+  const descriptor = registry.resource(object.kind);
   const view = useMemo(() => registry.card(object.presentation) ?? {
-    label: object.kind, icon: <FileQuestion className="size-4" />, width: fallbackCardWidth,
+    width: fallbackCardWidth,
     body: <div className="select-text p-3"><JsonView value={object.presentation.data} /></div>,
     actions: undefined, height: undefined,
   }, [registry, object]);
@@ -36,7 +37,8 @@ export const ObjectNode = memo(function ObjectNode({ id, data, selected }: NodeP
       style={port.side === "left" || port.side === "right" ? { top: `${port.offset * 100}%` } : { left: `${port.offset * 100}%` }}
       isConnectableEnd={object.kind === "agent"} />)}
     <ObjectCard title={object.title} collapsed={collapsed} selected={!!selected} onView={onObjectView}
-      icon={view.icon} kind={view.label} width={view.width} height={view.height} actions={view.actions}>
+      icon={descriptor.icon} kind={descriptor.label} width={view.width} height={view.height}
+      actions={<>{view.actions}<ObjectActions object={object} /></>}>
       {view.body}
     </ObjectCard>
   </>;

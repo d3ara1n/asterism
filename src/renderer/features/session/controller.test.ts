@@ -25,6 +25,53 @@ function fixture() {
 }
 
 describe("会话视图所有权", () => {
+  it("观察命令等待受理后的读取，后续命令覆盖链接结果也能结束等待", async () => {
+    const { controller, requests, notify } = fixture(); const disconnect = controller.connect();
+    requests[0]!.resolve(view(snapshot(1))); await flush();
+    const settled = vi.fn();
+    const saved = controller.executeAndRead({ type: "link.set", sessionId: "s", agentId: "a", resourceId: "n", linked: true }).then(result => { settled(); return result; });
+    await flush();
+    notify(2); // 受理前已经开始的读取，不能结束观察。
+    requests[1]!.resolve(accepted); await flush();
+    const linked = snapshot(2); linked.workbench.links = [{ agentId: "a", resourceId: "n" }];
+    requests[2]!.resolve(view(linked)); await flush();
+    expect(settled).not.toHaveBeenCalled();
+    const continued = controller.execute({ type: "resource.command", sessionId: "s", objectId: "a", command: { type: "continue" } });
+    await flush(); requests[4]!.resolve(accepted); await continued;
+    requests[3]!.resolve(view(linked)); await flush(); // 已被继续操作使之过时。
+    expect(settled).not.toHaveBeenCalled();
+    requests[5]!.resolve(view(snapshot(3, "legal-ancestor"))); await flush();
+    expect((await saved).ok).toBe(true);
+    expect(controller.getSnapshot().snapshot?.workbench.links).toEqual([]);
+    disconnect();
+  });
+
+  it.each(["error", "disconnect"] as const)("命令受理后 %s 会结束读取观察，不永久挂起保存", async action => {
+    const { controller, requests } = fixture(); const disconnect = controller.connect();
+    requests[0]!.resolve(view(snapshot(1))); await flush();
+    const saved = controller.executeAndRead({ type: "link.set", sessionId: "s", agentId: "a", resourceId: "n", linked: true });
+    await flush(); requests[1]!.resolve(accepted); await flush();
+    if (action === "error") requests[2]!.resolve({ ok: false, error: { code: "unavailable", message: "Read failed." } });
+    else disconnect();
+    expect((await saved).ok).toBe(true); // 受理结果与查询失败分别表达。
+    if (action === "error") expect(controller.getSnapshot()).toMatchObject({ status: "error", error: "Read failed." });
+    disconnect();
+  });
+
+  it("离开并返回 live 仍产生新的导航身份，使旧定位意图永久失效", async () => {
+    const { controller, requests } = fixture(); const disconnect = controller.connect();
+    requests[0]!.resolve(view(snapshot(1))); await flush();
+    const initial = controller.getSnapshot().navigationVersion;
+    controller.inspect("old");
+    const historical = controller.getSnapshot().navigationVersion;
+    controller.followCursor();
+    requests.at(-1)!.resolve(view(snapshot(1))); await flush();
+    expect(historical).toBeGreaterThan(initial);
+    expect(controller.getSnapshot().navigationVersion).toBeGreaterThan(historical);
+    expect(controller.getSnapshot().position.kind).toBe("live");
+    disconnect();
+  });
+
   it("命令受理后仍等待新投影，不能基于旧选择再次配置", async () => {
     const { controller, requests } = fixture(); const disconnect = controller.connect();
     requests[0]!.resolve(view(snapshot(1))); await flush();

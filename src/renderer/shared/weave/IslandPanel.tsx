@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { ReactNode, Ref } from "react";
 import { X } from "lucide-react";
 import { Button } from "../ui/button";
 import { t } from "../i18n";
@@ -9,8 +9,9 @@ import { useIsland } from "./Screen";
  * 标题栏固定，内容区单独滚动；主操作与关闭位于标题栏右侧，不设底部操作栏，避免呈现为对话框。
  * 次要操作随内容放在对应分组中。
  */
-export function IslandPanel({ title, description, action, children }: {
-  title: string; description?: string; action?: ReactNode; children: ReactNode;
+export function IslandPanel({ title, description, action, toolbar, compact, contentRef, children }: {
+  title: string; description?: string; action?: ReactNode; toolbar?: ReactNode;
+  compact?: boolean; contentRef?: Ref<HTMLDivElement>; children: ReactNode;
 }) {
   const island = useIsland();
   return <div className="island-panel">
@@ -22,6 +23,7 @@ export function IslandPanel({ title, description, action, children }: {
       {action}
       <Button variant="ghost" size="icon-sm" aria-label={t.close} title={t.close} onClick={() => void island.close()}><X /></Button>
     </header>
-    <div className="island-panel-content">{children}</div>
+    {toolbar && <div className="shrink-0 space-y-2 border-b px-3 py-3">{toolbar}</div>}
+    <div ref={contentRef} className={`island-panel-content${compact ? " px-2 py-2" : ""}`}>{children}</div>
   </div>;
 }

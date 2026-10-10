@@ -27,6 +27,7 @@
 | 资源内部目标 | target | resource_call 的可选定位参数，由选定实现解释；形状不限于 path |
 | 功能模块 | feature module | 共置纯契约、后台实现、前端视图的代码单元；两个进程分别装配，当前静态内置 |
 | 展示契约 | presentation contract | 连接后台数据与前端视图的稳定 ID、版本和数据 schema，不携带 UI 代码 |
+| 资源展示描述 | resource display descriptor | 资源类型模块声明的静态 UI 识别信息，含类型身份、图标和本地化类型名；独立于实例正文、卡片 renderer 与权限 |
 | 资源身份 | resource_id | 稳定身份，不等于路径或 URL |
 | 操作 | operation | 对资源的执行记录：目标、参数、状态、实际结果与关联资源 |
 | 视图 | view | 对象的呈现；同一对象可有多个视图 |
@@ -42,7 +43,7 @@
 | 会话树 | session tree | Session 唯一的只追加扁平节点树：message、thinking、text、toolcall、event、notice |
 | 收束 | settled | 资源没有仍在进行的会话树事件写入；会话收束要求所有被捕获的资源均已收束 |
 | 执行段 | execution segment | 代理流中按一次用户输入组织的可定位区段 |
-| 摘要列表 | summary list | 执行/用户输入的导航列表，历史导航主入口 |
+| 历史列表 | history list | 按真实追加次序逐节点展示的紧凑历史导航；每行有独立落点，不按响应或执行段聚合 |
 | 绑定 | binding | 代理在某个有效区间获得资源访问能力 |
 | 挂接 / 解绑 | attach / detach | 绑定的建立与撤销；作为会话树 event 节点记录，模型可见并用于回溯重建 |
 | 待生效 | pending | 变化已记录，但在途请求仍使用开始时的环境；下一次请求取用新状态 |

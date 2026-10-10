@@ -4,8 +4,9 @@ import { s } from "../../renderer/features/configuration/state";
 import { DirectoryView, DirectoryRead, DirectoryList } from "./contract";
 
 export default {
+  resources: [{ kind: "directory", label: s("Directory", "目录"), icon: <Folder className="size-4" /> }],
   cards: [cardRenderer(DirectoryView, {
-    label: s("Directory", "目录"), icon: <Folder className="size-4" />, width: 340,
+    width: 340,
     Body: ({ data }) => <div className="max-h-80 select-text overflow-auto p-3">
       <p className="type-body break-all font-mono text-xs">{data.path}</p>
     </div>,

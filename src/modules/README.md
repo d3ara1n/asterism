@@ -8,7 +8,7 @@
 | --- | --- |
 | `contract.ts` | 纯 Zod 契约：资源状态、卡片数据、工具实现的 target/result 和稳定 ID/版本 |
 | `runtime.ts` | 默认导出 RuntimeModuleFactory，注册资源后端、资源控制器与工具实现；可使用 Node 和注入的存储、会话及配置服务 |
-| `renderer.tsx` | 默认导出 RendererModule，注册卡片内容、附加操作和结果组件，只依赖纯契约与前端代码 |
+| `renderer.tsx` | 默认导出 RendererModule，声明静态资源展示描述，注册卡片内容、附加操作和结果组件，只依赖纯契约与前端代码 |
 
 `modules/runtime.ts` 与 `modules/renderer.ts` 分别通过 Vite 静态 glob 收集对应入口。新增目录遵守入口约定即可进入构建；两个入口不要相互导入，也不要创建同时导出它们的 barrel。运行时不依赖 React，renderer 不导入 Node/数据库。当前只加载内置源码，不提供第三方安装、动态执行或沙箱。
 
@@ -45,7 +45,9 @@ implement(DirectoryRead, {
 
 `SessionHost.path` 读取当前路径；`SessionHost.commit` 在同步事务中接收成型记录与资源私有状态修改，提交后统一发布持久通知。回调内的 `SessionWriter` 只提供追加、终态与取得续接路径，节点身份、父指针、游标和自动吸附均由会话管理；不向资源控制器暴露可修改的 `SessionTree`。流增量保存在代理执行侧，不作为时间轴记录提交。
 
-`cardRenderer(NoteView, …)` 与 `resultRenderer(NoteRead, …)` 使用相同纯契约推导组件 data 类型，并在接收端校验。卡片提供外观元数据、Body、可选 Actions；ObjectCard 统一处理框架、拖动、折叠与关闭。模块不重建这套外壳。
+`RendererModule.resources` 按资源类型声明静态 `kind / label / icon`，label 在模块中使用应用本地化文案。`ViewRegistry.resource(kind)` 不解析正文、不构造 Body，向对象目录、历史、授权、添加入口和卡片外壳提供同一份识别信息；未知类型回退为通用资源。类型身份重复注册会被拒绝。描述不随实例存储，不包含动态能力与授权。
+
+`cardRenderer(NoteView, …)` 与 `resultRenderer(NoteRead, …)` 使用相同纯契约推导组件 data 类型，并在接收端校验。卡片提供尺寸、Body、可选 Actions；ObjectCard 统一处理框架、拖动、折叠与关闭，ObjectActions 提供对象移除入口。模块不重建这套外壳。
 
 前端目录在应用根通过 ModuleViewsProvider 注入。卡片和对话只消费目录接口，不能导入模块总表，否则会形成“总表 → 代理卡片 → 对话 → 总表”的依赖环。
 

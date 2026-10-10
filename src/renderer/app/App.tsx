@@ -1,6 +1,6 @@
 import type { WorkbenchOperation } from "../features/session/controller";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { ArrowLeft, Bot, ChevronDown, Plus, FileText, Folder, History, House, KeyRound, ListTree, PanelLeft, Settings, X } from "lucide-react";
+import { ArrowLeft, ChevronDown, Plus, History, House, KeyRound, ListTree, PanelLeft, Settings, X } from "lucide-react";
 import type { ApplicationController } from "./controller";
 import { t } from "../shared/i18n";
 import { Button } from "../shared/ui/button";
@@ -11,7 +11,7 @@ import { Alert, AlertDescription } from "../shared/ui/alert";
 import { SettingsPage } from "../features/settings/SettingsPage";
 import { HomePage, type StartInput } from "../features/home/HomePage";
 import { Workbench, type WorkbenchHandle } from "../features/workbench/Workbench";
-import { AccessDialog } from "../features/workbench/AccessDialog";
+import { useModuleViews } from "../modules/views";
 import type { ResourcePlacement } from "../features/workbench/placement";
 import { SubmissionIdentity } from "../features/session/controller";
 import { sessionController } from "../features/session/registry";
@@ -36,6 +36,7 @@ const idleSubscribe = () => () => {};
 const noSession = () => null;
 
 export function App({ controller }: { controller: ApplicationController }) {
+  const moduleViews = useModuleViews();
   const state = useSyncExternalStore(controller.subscribe, controller.getSnapshot);
   const workbench = useRef<WorkbenchHandle>(null);
   const returnFocus = useRef<HTMLElement | null>(null);
@@ -45,7 +46,6 @@ export function App({ controller }: { controller: ApplicationController }) {
   const [sidebarVisible, setSidebarVisible] = useState(true);
   const [draft, setDraft] = useState("");
   const [conversationDrafts, setConversationDrafts] = useState<Record<string, string>>({});
-  const [accessOpen, setAccessOpen] = useState(false);
   const [resourceCreation, setResourceCreation] = useState<ResourceCreation | null>(null);
   const start = useStart();
   const agentDraft = useCallback((agentId: string) => conversationDrafts[agentId] ?? "", [conversationDrafts]);
@@ -87,7 +87,7 @@ export function App({ controller }: { controller: ApplicationController }) {
   });
   const navigate = (next: MainView) => {
     navigation.current++;
-    setView(next); setPage("main"); setResourceCreation(null); setAccessOpen(false);
+    setView(next); setPage("main"); setResourceCreation(null);
     controller.clearError();
     focusMain();
   };
@@ -155,13 +155,13 @@ export function App({ controller }: { controller: ApplicationController }) {
       <Button variant="ghost" size="sm" disabled={!writable} aria-label={s("Add to workbench", "添加到工作台")}><Plus /><span className="toolbar-label">{s("Add", "添加")}</span><ChevronDown className="text-muted-foreground" /></Button>
     </DropdownMenuTrigger><DropdownMenuContent align="end">
       <DropdownMenuLabel>{s("Agents", "代理")}</DropdownMenuLabel>
-      <DropdownMenuItem onSelect={addAgent}><Bot />{s("Agent…", "代理…")}</DropdownMenuItem>
+      <DropdownMenuItem onSelect={addAgent}>{moduleViews.resource("agent").icon}{moduleViews.resource("agent").label}…</DropdownMenuItem>
       <DropdownMenuSeparator />
       <DropdownMenuLabel>{s("Resources", "资源")}</DropdownMenuLabel>
-      <DropdownMenuItem onSelect={addNote}><FileText />{t.addNote}</DropdownMenuItem>
-      <DropdownMenuItem onSelect={addDirectory}><Folder />{s("Directory…", "目录…")}</DropdownMenuItem>
+      <DropdownMenuItem onSelect={addNote}>{moduleViews.resource("note").icon}{moduleViews.resource("note").label}…</DropdownMenuItem>
+      <DropdownMenuItem onSelect={addDirectory}>{moduleViews.resource("directory").icon}{moduleViews.resource("directory").label}…</DropdownMenuItem>
     </DropdownMenuContent></DropdownMenu>
-    <Button variant="ghost" size="sm" disabled={!writable} onClick={() => { active?.clearError(); setAccessOpen(true); }} aria-label={t.accessLabel}><KeyRound /><span className="toolbar-label">{t.access}</span></Button>
+    <Button variant="ghost" size="sm" onClick={event => workbench.current?.togglePanel("access", event.currentTarget)} aria-label={t.accessLabel}><KeyRound /><span className="toolbar-label">{t.access}</span></Button>
     <Button variant="ghost" size="sm" onClick={event => workbench.current?.togglePanel("objects", event.currentTarget)} aria-label={t.objects}><ListTree /><span className="toolbar-label">{t.objects}</span></Button>
     <Button variant="ghost" size="sm" onClick={event => workbench.current?.togglePanel("history", event.currentTarget)} aria-label={t.history}><History /><span className="toolbar-label">{t.history}</span></Button>
   </> : undefined;
@@ -208,7 +208,7 @@ export function App({ controller }: { controller: ApplicationController }) {
           content: <Screen label={t.appNavigation} leading={sidebarVisible ? [sidebar] : []} root={main} resetKey={view.kind === "conversation" ? view.sessionId : "home"} className="h-full" /> },
       ]} />
     </Window>
-    {error && !accessOpen && !resourceCreation && <Alert variant="destructive" className="fixed bottom-4 left-1/2 z-[60] w-[min(560px,calc(100%-32px))] -translate-x-1/2 flex items-start gap-3 shadow-md">
+    {error && !resourceCreation && <Alert variant="destructive" className="fixed bottom-4 left-1/2 z-[60] w-[min(560px,calc(100%-32px))] -translate-x-1/2 flex items-start gap-3 shadow-md">
       <AlertDescription className="flex-1">{error}</AlertDescription>
       {sessionState?.status === "error" && <Button variant="ghost" size="sm" onClick={() => { void active?.refresh(); }}>{t.retry}</Button>}
       {(state.error || sessionState?.status !== "error") && <Button variant="ghost" size="icon-xs" aria-label={t.dismissError} title={t.dismissError}
@@ -217,7 +217,6 @@ export function App({ controller }: { controller: ApplicationController }) {
     {resourceCreation?.kind === "agent" && <AddAgentDialog {...creationDialog} configuration={configuration.snapshot} error={sessionState?.error ?? configuration.error} onCreate={createAgent} />}
     {resourceCreation?.kind === "note" && <AddNoteDialog {...creationDialog} onCreate={createResource} />}
     {resourceCreation?.kind === "directory" && <AddDirectoryDialog {...creationDialog} onCreate={createResource} />}
-    {accessOpen && session && <AccessDialog session={session} ready={ready} busy={sessionBusy} historical={historical} error={sessionState?.error} run={run} onClose={() => setAccessOpen(false)} />}
   </>;
 }
 

@@ -9,13 +9,15 @@ type SessionOperation = Exclude<SessionMutation, { type: "start" }>;
 export type WorkbenchOperation = Exclude<SessionOperation, { type: "select" }>;
 export type SessionViewState = {
   snapshot: SessionView | null; position: ViewPosition; status: "loading" | "ready" | "error"; busy: boolean; error: string | null; missing: boolean;
+  /** 显式导航意图的代次；离开再返回同一位置也会递增。 */
+  navigationVersion: number;
 };
 const live: ViewPosition = { kind: "live" };
 const emptyProgress: SessionProgress = { revision: 0, version: 0, runningAgentIds: [], unsettledObjectIds: [], live: [] };
 
 /** 一个会话的查看位置、协调投影与操作入口。进度单独订阅，调用方不编排历史查询。 */
 export class SessionController {
-  private state: SessionViewState = { snapshot: null, position: live, status: "loading", busy: false, error: null, missing: false };
+  private state: SessionViewState = { snapshot: null, position: live, status: "loading", busy: false, error: null, missing: false, navigationVersion: 0 };
   private progress: SessionProgress = emptyProgress;
   private pendingProgress: SessionProgress | null = null;
   private listeners = new Set<() => void>();
@@ -23,6 +25,7 @@ export class SessionController {
   private viewWaiters = new Set<() => void>();
   private requestedPosition: ViewPosition = live;
   private generation = 0;
+  private publishedGeneration = -1;
   private connections = 0;
   private reading = false;
   private dirty = false;
@@ -56,7 +59,7 @@ export class SessionController {
     this.requestedPosition = position;
     this.generation++;
     this.reading = false;
-    this.update({ status: "loading", error: null });
+    this.update({ status: "loading", error: null, navigationVersion: this.state.navigationVersion + 1 });
     void this.read();
   }
   connect(): () => void {
@@ -107,6 +110,7 @@ export class SessionController {
         const { progress, ...snapshot } = result.reply.snapshot;
         if (snapshot.revision < this.requiredRevision) { this.dirty = true; continue; }
         this.requiredRevision = snapshot.revision;
+        this.publishedGeneration = generation;
         this.update({ snapshot, position, status: "ready", missing: false });
         this.acceptProgress(progress);
         const pending = this.pendingProgress;
@@ -118,18 +122,36 @@ export class SessionController {
     } finally { if (generation === this.generation) this.reading = false; }
   }
   /** 命令按会话串行；执行时检查查看模式，返回受理结果不会替换任何展示投影。 */
-  execute = (command: SessionOperation): Promise<SessionResult> => {
+  execute = (command: SessionOperation): Promise<SessionResult> => this.enqueue(command, false);
+  /** 等待受理后的读取结束；返回值仍是命令结果，读取错误由视图状态报告。 */
+  executeAndRead = (command: SessionOperation): Promise<SessionResult> => this.enqueue(command, true);
+  private enqueue(command: SessionOperation, observe: boolean): Promise<SessionResult> {
     // 就绪视图上连续发出的意图可排队；后项等前项投影发布后再检查执行位置。
     // 在同步期间新构造的领域命令仍由门禁拒绝，避免使用旧配置或链接。
     const queuedWithCurrentView = this.state.status === "ready" && !isLayoutCommand(command)
       && command.type !== "select" && !(command.type === "resource.command" && isCancel(command.command));
+    let observed: Promise<void> | undefined;
     const operation = this.queue.then(async () => {
       if (queuedWithCurrentView && this.state.status === "loading" && this.requestedPosition.kind === "live") await this.waitForView();
-      return this.perform(command);
+      return this.perform(command, observe ? () => {
+        // 使受理前开始的读取失效，确认的是此命令之后的真实视图，而非期望状态。
+        this.generation++; this.reading = false;
+        observed = this.waitForRead(this.generation);
+      } : undefined);
     });
     this.queue = operation;
-    return operation;
-  };
+    // 等待读取不占用命令队列；后续命令可以覆盖状态，最终投影仍结束本次观察。
+    return observe ? operation.then(async result => { await observed; return result; }) : operation;
+  }
+  private waitForRead(generation: number): Promise<void> {
+    return new Promise(resolve => {
+      const complete = () => {
+        if (this.connections > 0 && this.state.status !== "error" && this.publishedGeneration < generation) return;
+        this.viewWaiters.delete(complete); resolve();
+      };
+      this.viewWaiters.add(complete); complete();
+    });
+  }
   private waitForView(): Promise<void> {
     return new Promise(resolve => {
       const complete = () => {
@@ -141,7 +163,7 @@ export class SessionController {
       complete();
     });
   }
-  private async perform(command: SessionOperation): Promise<SessionResult> {
+  private async perform(command: SessionOperation, onAccepted?: () => void): Promise<SessionResult> {
     const reject = (code: "conflict" | "invalid_request", message: string): SessionResult => {
       this.update({ error: message }); return { ok: false, error: { code, message } };
     };
@@ -163,7 +185,11 @@ export class SessionController {
       if (!result.ok) this.update({ error: result.error.message });
       else {
         if (result.reply.kind !== "accepted" || result.reply.sessionId !== this.sessionId) throw new Error("Invalid session receipt.");
-        if (command.type === "select" && this.requestedPosition === position) this.requestedPosition = live;
+        if (command.type === "select" && this.requestedPosition === position) {
+          this.requestedPosition = live;
+          this.update({ navigationVersion: this.state.navigationVersion + 1 });
+        }
+        onAccepted?.();
       }
       return result;
     } catch {

@@ -1,63 +1,35 @@
 import { useState } from "react";
-import type { WorkbenchObject } from "../../../shared/workbench";
+import { Scan } from "lucide-react";
 import { t } from "../../shared/i18n";
 import { Button } from "../../shared/ui/button";
-import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
-  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-} from "../../shared/ui/alert-dialog";
-import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "../../shared/ui/item";
-import { Spinner } from "../../shared/ui/spinner";
+import { SearchInput } from "../../shared/ui/search-input";
 import { IslandPanel } from "../../shared/weave/IslandPanel";
 import { useWorkbench } from "./context";
 import { useModuleViews } from "../../modules/views";
 
-/** 对象面板浮岛：隐藏与重新打开卡片视图；移除对象前需确认。 */
+/** 对象只出现一次；面板负责快速识别与定位，不展开内容或关系。 */
 export function ObjectsPanel() {
-  const { session, ready, busy, historical, run } = useWorkbench();
+  const { session, ready, busy, historical, locate } = useWorkbench();
   const registry = useModuleViews();
-  const [removing, setRemoving] = useState<WorkbenchObject | null>(null);
-  const writable = ready && !busy;
-  return <IslandPanel title={t.objects}>
-    <ItemGroup className="gap-1">
-      {session.objects.map(object => {
-        const hidden = session.views.find(v => v.objectId === object.id)?.hidden ?? false;
-        return <Item key={object.id} size="sm" className="px-2 py-1.5">
-          <ItemContent className="min-w-0">
-            <ItemTitle className="truncate">{object.title}</ItemTitle>
-            <ItemDescription>{registry.card(object.presentation)?.label ?? object.kind}</ItemDescription>
-          </ItemContent>
-          <ItemActions>
-            <Button variant="ghost" size="sm" disabled={!writable}
-              aria-label={hidden ? t.openObject(object.title) : t.closeObject(object.title)}
-              onClick={() => { void run({ type: "view.set", sessionId: session.id, objectId: object.id, hidden: !hidden }); }}>
-              {hidden ? t.showCard : t.hideCard}
-            </Button>
-            {<Button variant="ghost" size="sm" disabled={!writable || historical}
-              aria-label={t.removeObject(object.title)} onClick={() => setRemoving(object)}>
-              {t.remove}
-            </Button>}
-          </ItemActions>
-        </Item>;
-      })}
-    </ItemGroup>
-    <AlertDialog open={!!removing} onOpenChange={open => { if (!open) setRemoving(null); }}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>{t.removeObjectTitle}</AlertDialogTitle>
-          <AlertDialogDescription>{removing && t.removeObjectDescription(removing.title)}</AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>{t.cancel}</AlertDialogCancel>
-          <AlertDialogAction variant="destructive" disabled={!writable || historical} aria-busy={busy} onClick={event => {
-            // 等待运行时受理后再关闭；失败时保留对话框。
-            event.preventDefault();
-            if (!removing) return;
-            void run({ type: "object.remove", sessionId: session.id, objectId: removing.id })
-              .then(saved => { if (saved) setRemoving(null); });
-          }}>{busy && <Spinner aria-hidden="true" />}{t.remove}</AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+  const [query, setQuery] = useState("");
+  const [hiddenOnly, setHiddenOnly] = useState(false);
+  const hidden = new Set(session.views.filter(view => view.hidden).map(view => view.objectId));
+  const search = query.trim().toLocaleLowerCase();
+  const objects = session.objects.filter(object => (!hiddenOnly || hidden.has(object.id))
+    && `${object.title} ${registry.resource(object.kind).label}`.toLocaleLowerCase().includes(search));
+  return <IslandPanel title={t.objects} description={historical ? t.viewingHistory : undefined} compact toolbar={<>
+    <SearchInput value={query} onChange={setQuery} label={t.searchObjects} />
+    <div className="flex gap-1"><Button size="xs" variant={!hiddenOnly ? "secondary" : "ghost"} aria-pressed={!hiddenOnly} onClick={() => setHiddenOnly(false)}>{t.all}</Button>
+      <Button size="xs" variant={hiddenOnly ? "secondary" : "ghost"} aria-pressed={hiddenOnly} onClick={() => setHiddenOnly(true)}>{t.hiddenObjects}</Button></div>
+  </>}>
+    {objects.map(object => { const descriptor = registry.resource(object.kind); return <Button key={object.id} variant="ghost"
+      className="h-auto w-full justify-start gap-3 px-2 py-1.5 text-left" title={t.locateObject(object.title)} aria-label={t.locateObject(object.title)}
+      disabled={!ready || busy} onClick={() => { void locate(object.id); }}>
+      <span className="shrink-0 text-muted-foreground" aria-hidden="true">{descriptor.icon}</span>
+      <span className="min-w-0 flex-1"><span className="block truncate leading-5">{object.title}</span>
+        <span className="type-caption block truncate leading-4 font-normal">{descriptor.label}{hidden.has(object.id) ? ` · ${t.cardHidden}` : ""}</span></span>
+      <Scan className="size-3.5 text-muted-foreground" aria-hidden="true" />
+    </Button>; })}
+    {!objects.length && <p className="type-caption px-2 py-6 text-center">{session.objects.length ? t.noMatches : historical ? t.noObjectsHistorical : t.noObjects}</p>}
   </IslandPanel>;
 }

@@ -15,20 +15,21 @@
 | `features/workbench/Workbench.tsx` | 对象/关系到画布的投影、定位和视图保存 |
 | `features/workbench/ObjectNode.tsx` | 消费已注册卡片投影，统一挂载 ObjectCard；缺失视图时显示原始数据 |
 | `features/workbench/ObjectCard.tsx` | 对象卡片控件：Card 外壳、拖动柄、视图操作与内容区 |
-| `features/workbench/ObjectsPanel.tsx` | 对象面板浮岛，移除前确认 |
+| `features/workbench/ObjectsPanel.tsx` | 紧凑对象目录、搜索与画布定位，隐藏卡片定位时重新打开 |
+| `features/workbench/ObjectActions.tsx` | 卡片更多菜单与移除确认 |
 | `features/workbench/layout.ts` | 卡片兜底尺寸、默认位置与放置间距常量 |
 | `features/workbench/connections.ts` | 合并双向链接的显示，保留对应有向关系；按可见卡片位置与尺寸投影四边动态端点，同边连线排序与分散 |
 | `features/workbench/context.ts` | 工作台向卡片与更深浮岛提供的环境 |
 | `features/workbench/placement.ts` | 新卡片初始位置，不重排已有卡片 |
 | `features/session/registry.ts` | 会话共享控制器与各代理提交身份 |
 | `features/workbench/ResourceCreationDialog.tsx` / `Add*Dialog.tsx` | 添加代理、笔记与目录；共用布局、提交门禁与错误展示，名称校验按资源处理；目录可填写路径、系统选择或拖入 |
-| `features/workbench/AccessDialog.tsx` | 显式资源绑定入口 |
+| `features/workbench/AccessPanel.tsx` | 授权浮岛，按代理／资源查看有向链接，受理后的读取结束即显示实际状态 |
 | `features/conversation/Conversation.tsx` | 代理连续对话、工具过程、停止/继续；块从生成到保存保持同一组件 |
 | `features/session/controller.ts` | 查看位置、协调查询、会话操作队列与独立进度订阅 |
-| `features/session/History.tsx` | 会话历史面板，查看和分叉意图 |
+| `features/session/History.tsx` / `history-navigation.ts` | 两行逐节点历史列表、按工作台／资源身份切换视图、来源解析、真实父节点定位与明确继续 |
 | `features/session/state.ts` | 持久视图与进度的独立 React 订阅 |
 | `features/conversation/Markdown.tsx` | Streamdown 流式 Markdown 配置，复用库的解析与控件 |
-| `modules/registry.ts` / `views.tsx` | 按 ID/版本与 schema 分派卡片、工具结果；应用根注入注册目录 |
+| `modules/registry.ts` / `views.tsx` | 静态资源展示描述与按版本分派的卡片／工具结果；应用根注入注册目录 |
 | `../modules/*/renderer.tsx` | 资源模块的具体卡片、附加操作和结果视图，与后端共用纯契约 |
 | `features/configuration/` | 提供商/模型角色/agent 配置表单及共享读取入口 |
 | `features/configuration/forms.tsx` | 配置编辑器与字段公共入口；文本 placeholder、内置选择、显式空值与恢复操作在此复用 |
@@ -53,6 +54,7 @@
 - 运行时状态决定发送、停止和继续是否可用。历史查看不改变执行游标；只有明确选择完整节点继续，才在旧位置追加新路径。不完整响应可查看，重试从之前完整位置另起分支，不撤销资源影响。计量随所属块展示；终态元数据后到时增加视图修订，不要求新增节点。
 - 网页链接经 HTTP(S) 协议检查后交给系统浏览器，不导航 Electron 主 frame。远程图片首批显示为来源链接；保持现有 CSP，不因显示模型文本扩大本机文件或网络权限。
 - 会话控制器持有 `live/history` 查看位置，统一读取工作台与对话；查询返回前保持原位置的完整画面，成功后一起切换。组件调用 `inspect`、`followCursor`、`branchFrom` 或会话操作，不通过 effect 同步另一套控制器。命令只返回受理结果，不能覆盖当前画面。历史查看期间禁止领域变更，隐藏、展开、折叠、位置与视口仍可保存；它们不改变领域状态或查看位置。可添加资源另行收敛，工作台形态与对象模型不变。
+- `executeAndRead` 在命令受理后等待新读取结束，查询等待不占用命令队列，读取失败或断开也会结束等待；命令结果与读取错误分别表达。导航代次在离开再返回同一位置时仍递增，旧对象定位意图永久失效；已经开始的画布过渡中断，旧完成回调不保存视口。
 - 会话视图状态为 loading/ready/error，命令受理后仍须等新投影就绪才恢复配置等领域操作。导航失败放弃未发布目标并保留原视图，重读成功后恢复就绪。会话错误在工作台独立提示，模态操作在对话框内提示，不依赖代理卡片展开。
 - Sidebar 继续通过 `Screen.leading` 参与浮岛布局。设置是独立屏，侧栏和首页/会话同属主屏；切换设置整屏平移。窄窗口保持控件可访问，窗口当前最小为 800×600。
 - 配色、圆角和密度消费共享主题；正文渲染复用库与语义 token，不自行实现 Markdown 解析器。图标使用 lucide-react，动效使用 Motion，普通控件复用 shadcn/ui。
