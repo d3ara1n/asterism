@@ -18,7 +18,10 @@ try {
   const packages = await loadPackages(new PackageList(join(root, "plugins.json")), join(root, "plugins"), join(root, "plugins", ".cache"), [core.id])
     .catch(error => { console.error("Plugin packages could not be loaded.", error); return []; });
   for (const item of packages) if (item.error) console.error(`Plugin package ${item.root} is ${item.status}: ${item.error}`);
-  service = new ApplicationService(root, { plugins: packages.flatMap(item => item.definition ? [item.definition] : []), protector: secrets, onConfigurationChanged: () => port.postMessage({ kind: "configuration.changed" }),
+  const listed = packages.map((item, index) => ({ index, id: item.manifest?.id ?? null,
+    source: item.entry.source.kind === "path" ? item.entry.source.path : `${item.entry.source.name}@${item.entry.source.version}`,
+    status: item.status, error: item.error ?? null, renderer: item.status === "loaded" ? item.renderer ?? null : null }));
+  service = new ApplicationService(root, { packages: listed, plugins: packages.flatMap(item => item.definition ? [item.definition] : []), protector: secrets, onConfigurationChanged: () => port.postMessage({ kind: "configuration.changed" }),
     onSessionChanged: event => port.postMessage(event) });
   port.on("message", ({ data }) => {
     if (data?.kind === "shutdown") {

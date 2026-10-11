@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { AppSnapshot, CommandResult } from "../../shared/contracts.ts";
 import { ApplicationController } from "./controller.ts";
 
-const snapshot: AppSnapshot = { workspace: { id: "w", title: "Workspace" }, sessions: [] };
+const snapshot: AppSnapshot = { workspace: { id: "w", title: "Workspace" }, sessions: [], plugins: [] };
 describe("应用会话列表", () => {
   it("查询途中再次刷新时补读，晚到创建可刷新列表且不携带任何会话位置", async () => {
     const requests: Array<(result: CommandResult) => void> = [];

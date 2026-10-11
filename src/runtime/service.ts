@@ -18,8 +18,10 @@ export class ApplicationService {
   readonly configuration: ConfigurationService;
   readonly sessions: SessionService;
   private readonly db: DatabaseSync;
-  constructor(root: string, options: { protector?: SecretProtector; onConfigurationChanged?: () => void; onSessionChanged?: (event: SessionChanged) => void; adapterFactory?: (settings: ModelSettings) => ModelAdapter; plugins?: readonly PluginDefinition[] } = {}) {
+  private readonly packages: AppSnapshot["plugins"];
+  constructor(root: string, options: { packages?: AppSnapshot["plugins"]; protector?: SecretProtector; onConfigurationChanged?: () => void; onSessionChanged?: (event: SessionChanged) => void; adapterFactory?: (settings: ModelSettings) => ModelAdapter; plugins?: readonly PluginDefinition[] } = {}) {
     this.db = openDatabase(root);
+    this.packages = options.packages ?? [];
     try {
       const unavailable = async (): Promise<string> => { throw new Error("System credential protection is unavailable."); };
       this.configuration = new ConfigurationService(root, options.protector ?? { available: async () => false, encrypt: unavailable, decrypt: unavailable }, options.onConfigurationChanged);
@@ -35,6 +37,6 @@ export class ApplicationService {
     if (!commandSchema.safeParse(raw).success) throw new ApplicationError("invalid_request", "Invalid application command.");
     const workspace = this.db.prepare("SELECT * FROM workspace LIMIT 1").get();
     const sessions = this.sessions.tree.list().map(session => ({ id: session.id, title: session.title, created_at: session.createdAt }));
-    return snapshotSchema.parse({ workspace, sessions });
+    return snapshotSchema.parse({ workspace, sessions, plugins: this.packages });
   }
 }

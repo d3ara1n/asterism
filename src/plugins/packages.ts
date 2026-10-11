@@ -106,8 +106,8 @@ const shared: Record<string, Record<string, unknown>> = {
 };
 const sharedGlobal = "__atelierSharedModules";
 (globalThis as Record<string, unknown>)[sharedGlobal] = shared;
-function sharedModuleSource(id: string): string {
-  const names = Object.keys(shared[id]!).filter(name => name !== "default" && /^[A-Za-z_$][\w$]*$/u.test(name));
+function sharedModuleSource(id: string, table: Record<string, Record<string, unknown>> = shared): string {
+  const names = Object.keys(table[id]!).filter(name => name !== "default" && /^[A-Za-z_$][\w$]*$/u.test(name));
   return [`const m = globalThis[${JSON.stringify(sharedGlobal)}][${JSON.stringify(id)}];`,
     `export default m.default ?? m;`, ...names.map(name => `export const ${name} = m[${JSON.stringify(name)}];`)].join("\n");
 }
@@ -157,6 +157,42 @@ export async function buildRuntime(root: string, manifest: PluginPackageManifest
   return outfile;
 }
 
+/** renderer 共享模块：由宿主页面在 window.__atelierRendererModules 提供同一实例。 */
+export const rendererShared: readonly string[] = ["react", "react/jsx-runtime", "react-dom", "react-dom/client", "zod", "@atelier/sdk/contracts", "@atelier/sdk/renderer"];
+function rendererModuleSource(id: string): string {
+  // CJS 形态转发：esbuild 的互操作让具名导入按属性读取同一实例。
+  return `const m = globalThis.__atelierRendererModules[${JSON.stringify(id)}]; module.exports = m;`;
+}
+
+/** 打包前端入口为单个 ESM；返回相对缓存根的路径，经 atelier-plugin:// 提供。 */
+export async function buildRenderer(root: string, manifest: PluginPackageManifest, cacheRoot: string): Promise<string> {
+  if (!manifest.renderer) throw new PluginPackageError("invalid_entry", `Plugin ${manifest.id} has no renderer entry.`);
+  const esbuild = await import("esbuild");
+  const hash = sourceHash(root, esbuild.version);
+  const directory = join(cacheRoot, manifest.id, hash);
+  const outfile = join(directory, "renderer.mjs");
+  if (!existsSync(outfile)) {
+    mkdirSync(directory, { recursive: true });
+    try {
+      await esbuild.build({
+        entryPoints: [resolve(root, manifest.renderer)], absWorkingDir: root, outfile, bundle: true,
+        platform: "browser", format: "esm", target: "chrome130", sourcemap: "linked", logLevel: "silent", jsx: "automatic",
+        loader: { ".png": "file", ".jpg": "file", ".svg": "file", ".wasm": "file", ".woff2": "file", ".mp3": "file", ".ogg": "file" },
+        plugins: [{
+          name: "atelier-renderer-shared",
+          setup(build) {
+            build.onResolve({ filter: /.*/ }, args => rendererShared.includes(args.path) ? { path: args.path, namespace: "atelier-shared" } : undefined);
+            build.onLoad({ filter: /.*/, namespace: "atelier-shared" }, args => ({ contents: rendererModuleSource(args.path), loader: "js" }));
+          },
+        }],
+      });
+    } catch (error) {
+      throw new PluginPackageError("build_failed", `Plugin ${manifest.id} renderer failed to build: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  return `${manifest.id}/${hash}/renderer.mjs`;
+}
+
 export interface ResolvedPackage {
   entry: PackageEntry;
   root: string;
@@ -164,6 +200,8 @@ export interface ResolvedPackage {
   status: "loaded" | "disabled" | "invalid" | "failed";
   error?: string;
   definition?: PluginDefinition;
+  /** 相对 renderer 缓存根的入口路径。 */
+  renderer?: string;
 }
 
 /** 读取列表、校验清单与冲突、打包并导入启用的插件；单个失败只禁用该包。 */
@@ -186,6 +224,7 @@ export async function loadPackages(list: PackageList, npmRoot: string, cacheRoot
     try {
       if (reserved.includes(id)) throw new PluginPackageError("duplicate", `Plugin ID ${id} is reserved by a built-in plugin.`);
       if ((ids.get(id) ?? 0) > 1) throw new PluginPackageError("duplicate", `Plugin ${id} is added more than once; disable one of them.`);
+      if (item.manifest.renderer) item.renderer = await buildRenderer(item.root, item.manifest, cacheRoot);
       if (!item.manifest.runtime) continue;
       const file = await buildRuntime(item.root, item.manifest, cacheRoot);
       const module = await import(pathToFileURL(file).href) as { default?: unknown };

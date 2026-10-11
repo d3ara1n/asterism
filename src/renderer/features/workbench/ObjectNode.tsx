@@ -3,6 +3,7 @@ import { Handle, NodeResizeControl, Position, useUpdateNodeInternals, type Node,
 import { Grip } from "lucide-react";
 import { maximumCardDimension, type WorkbenchObject } from "../../../shared/workbench";
 import { JsonView, useModuleViews } from "../../modules/views";
+import { SlotBoundary } from "../../modules/SlotBoundary";
 import { ObjectCard, type ViewPatch } from "./ObjectCard";
 import { minimumCardHeight, minimumCardWidth } from "./layout";
 import { cardSize, fallbackCardAppearance } from "./sizing";
@@ -41,8 +42,8 @@ export const ObjectNode = memo(function ObjectNode({ id, data, selected }: NodeP
       isConnectableEnd={object.kind === "atelier.core/agent"} />)}
     <ObjectCard title={object.title} collapsed={collapsed} selected={!!selected} onView={onObjectView}
       icon={descriptor.icon} kind={descriptor.label}
-      actions={<>{view.actions}<ObjectActions object={object} defaultSize={cardSize(view)} onView={onObjectView} /></>}>
-      {view.body}
+      actions={<><SlotBoundary fallback={null}>{view.actions}</SlotBoundary><ObjectActions object={object} defaultSize={cardSize(view)} onView={onObjectView} /></>}>
+      <SlotBoundary key={JSON.stringify(object.presentation.contract)}>{view.body}</SlotBoundary>
     </ObjectCard>
     {selected && !collapsed && <NodeResizeControl position="bottom-right"
       className="object-resize-handle nopan" minWidth={view.minWidth ?? minimumCardWidth}

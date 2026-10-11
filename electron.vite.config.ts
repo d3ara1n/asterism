@@ -41,7 +41,7 @@ export default defineConfig({
         name: coreId("development-csp"),
         apply: "serve",
         // React Fast Refresh 的开发入口包含内联 preamble；发布构建不放宽脚本策略。
-        transformIndexHtml: html => html.replace("script-src 'self';", "script-src 'self' 'unsafe-inline';"),
+        transformIndexHtml: html => html.replace("script-src 'self' atelier-plugin:;", "script-src 'self' atelier-plugin: 'unsafe-inline';"),
       },
     ],
     server: { host: "127.0.0.1" },
