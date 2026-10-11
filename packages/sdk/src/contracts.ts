@@ -5,3 +5,7 @@ export * from "./module-contract.ts";
 export * from "./plugin.ts";
 export * from "./records.ts";
 export * from "./tool-result.ts";
+export * from "./workspace.ts";
+export type * from "./models.ts";
+export * from "./model-records.ts";
+export { validationMessage, jsonArgumentHint } from "./tool-validation.ts";

@@ -1,16 +1,16 @@
 import type { ConfigurationService } from "../configuration/service.ts";
 import { AiSdkAdapter } from "../model/ai-sdk.ts";
-import { ModelFailure, type ModelAdapter, type ModelEvent, type ToolDeclaration } from "../model/contract.ts";
-import type { SystemPrompt } from "../model/system-prompt.ts";
-import { runAgent, type RunOptions, type RunTermination } from "../execution/loop.ts";
+import { ModelFailure, type ModelAdapter, type ModelEvent } from "../model/contract.ts";
+import { runModelRequest } from "../execution/request.ts";
+import type { ModelRunRequest, ModelRunResult, ModelTarget, StreamRequest } from "@atelier/sdk/contracts";
 import type { AgentCapabilities } from "../execution/capabilities.ts";
-import type { ModelItem } from "../session/projection.ts";
 import { modelReference, parseModelExpression, resolveProviderModel, type ConfigurationSnapshot, type ThinkingLevel } from "../shared/configuration.ts";
-import type { ModelSettings } from "../shared/model.ts";
+import { modelExpression, modelScope, type ModelSettings } from "../shared/model.ts";
 import { PluginApiError } from "./contract.ts";
+import { coreId } from "../shared/core.ts";
 
 /** 模型目标：选择一个角色，可覆盖模型表达式或思考等级；未给出的沿用角色。 */
-export interface ModelTarget { role: string; model?: string; thinking?: ThinkingLevel }
+export type { ModelTarget, StreamRequest } from "@atelier/sdk/contracts";
 export type ModelTargetError = "role_unavailable" | "model_unavailable" | "credential_unavailable";
 export class ModelTargetFailure extends PluginApiError {
   constructor(readonly reason: ModelTargetError, message: string) { super("unavailable", message); }
@@ -24,17 +24,16 @@ export interface RegistryView {
     excludeTools: string[] | null; timeout: number | null; maxTurns: number | null; maxCost: number | null }[];
 }
 export interface ResolvedTarget { settings: ModelSettings; adapter: ModelAdapter }
-export interface StreamRequest { target: ModelTarget; system: SystemPrompt; messages: ModelItem[]; tools?: ToolDeclaration[]; signal: AbortSignal }
-/** run：无状态封装宿主代理循环；上下文、提示与策略由调用方每次请求重新给出。 */
-export interface RunRequest extends Omit<RunOptions, "environment"> {
-  environment: () => Promise<{ target: ModelTarget; prompt: { id: string; systemPrompt: string }; maxTurns: number | null;
-    capabilities: AgentCapabilities; messages: ModelItem[]; requestParentId: string | null; context: { file: string; text: string }[] }>;
+/** 内部 adapter 的一次调用输入；授权视图与资源环境取用不进入公开 SDK。 */
+export interface RunRequest extends ModelRunRequest {
+  capabilities: AgentCapabilities;
+  context: Promise<{ file: string; text: string }[]>;
 }
 export interface PluginModels {
   /** 解析目标到实际模型与适配器；失败以 ModelTargetFailure 区分原因。 */
   resolve(target: ModelTarget): Promise<ResolvedTarget>;
   stream(request: StreamRequest): AsyncIterable<ModelEvent>;
-  run(request: RunRequest): Promise<RunTermination>;
+  run(request: RunRequest): Promise<ModelRunResult>;
 }
 
 /** 按角色与覆盖解析；模型不支持 reasoning 时思考归为 off。 */
@@ -82,14 +81,28 @@ export function createModelServices(configuration: ConfigurationService, adapter
   return { registry, models: {
     resolve,
     async *stream(request) {
-      const { settings, adapter } = await resolve(request.target);
-      yield* adapter.prepare({ settings, system: request.system, messages: request.messages,
-        tools: settings.model.capabilities.tools ? request.tools ?? [] : [] }).stream(request.signal);
+      const { target, system, messages, tools } = structuredClone({
+        target: request.target, system: request.system, messages: request.messages, tools: request.tools,
+      });
+      const { settings, adapter } = await resolve(target);
+      const source = { model: modelExpression(settings), adapter: adapter.version, scope: modelScope(settings) };
+      for await (const event of adapter.prepare({ settings, system, messages,
+        tools: settings.model.capabilities.tools ? tools ?? [] : [] }).stream(request.signal)) {
+        yield event.type === "finish" ? { ...event, source } : event;
+      }
     },
-    run: request => runAgent({ ...request, environment: async () => {
-      const { target, ...rest } = await request.environment();
-      try { return { ...rest, ...await resolve(target) }; }
-      catch (error) { if (error instanceof ModelTargetFailure) throw new ModelFailure(error.reason, error.message); throw error; }
-    } }),
+    run(request) {
+      const { system, messages, target } = structuredClone({ system: request.system, messages: request.messages, target: request.target });
+      const environment = Promise.all([resolve(target), request.context]).then(([resolved, context]) => ({
+        ...resolved, capabilities: request.capabilities, messages,
+        system: { blocks: [...system.blocks, ...context.map((file, index) => ({
+          id: coreId(`context.${index}`), kind: "context" as const, ...file,
+        }))] },
+      })).catch(error => {
+        if (error instanceof ModelTargetFailure) throw new ModelFailure(error.reason, error.message);
+        throw error;
+      });
+      return runModelRequest(request, environment);
+    },
   } };
 }

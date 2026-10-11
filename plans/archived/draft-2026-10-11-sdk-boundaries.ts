@@ -1,4 +1,4 @@
-/** 收敛后的 SDK 声明原型：只用于接口评审与类型检查，不是运行时实现。 */
+/** 已归档的声明原型；实际契约以 packages/sdk/src 为准，不参与当前类型检查。 */
 import type { z } from "zod";
 import type { DatabaseSync } from "node:sqlite";
 import type {
@@ -135,67 +135,10 @@ export declare function implementTool<S extends Json, T extends Json, A extends 
   },
 ): ToolContribution;
 
-export type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
-export interface ModelTarget { role: string; model?: string; thinking?: ThinkingLevel }
-export type Usage = {
-  input: number | null; output: number | null; total: number | null;
-  reasoning: number | null; cacheRead: number | null; cacheWrite: number | null;
-};
-export type ModelItem =
-  | { kind: "input" | "context"; text: string }
-  | { kind: "output"; parts: ModelPart[]; scope: string; adapter: string }
-  | { kind: "result"; callId: string; name: string; outcome: ToolOutcome };
-export type ModelPart =
-  | { kind: "thinking" | "text"; text: string; continuation: Json }
-  | { kind: "toolcall"; callId: string; name: string; arguments: Json; continuation: Json };
-export type ModelSource = { model: string; adapter: string; scope: string };
-export type ModelEvent =
-  | { type: "part.start"; part: { id: string; kind: "text" | "thinking" } | { id: string; kind: "toolcall"; callId: string; name: string } }
-  | { type: "part.delta"; partId: string; delta: string }
-  | { type: "part.end"; partId: string; arguments?: Json; continuation?: Json }
-  | { type: "finish"; reason: string; usage: Usage | null; source: ModelSource };
-export interface ModelInput {
-  system: string;
-  messages: readonly ModelItem[];
-  tools?: readonly { name: string; description: string; parameters: Json }[];
-  signal: AbortSignal;
-}
-export interface ModelServices {
-  stream(request: ModelInput & { target: ModelTarget }): AsyncIterable<ModelEvent>;
-  /** 可选模型执行能力：对象引用只是地址，宿主验证归属与真实链接。 */
-  run(object: ResourceRef, policy: RoundPolicy, signal: AbortSignal): Promise<RoundOutcome>;
-  roles(): readonly { id: string; name: string; description: string; hidden: boolean; model: string | null; thinking: ThinkingLevel | null }[];
-  list(): readonly { model: string; provider: string; name: string; contextWindow: number | null; capabilities: { reasoning: boolean; tools: boolean; images: boolean } }[];
-}
-/** 既有模型块的公开读取投影；正式字段和格式版本由 adapter 映射阶段核定。 */
-export declare const ModelOutput: RecordContract<{
-  responseId: string; requestParentId: string | null; ordinal: number;
-  complete: boolean; source: ModelSource; items: ModelItem[];
-}>;
-export type ReliableToolOutcome = Exclude<ToolOutcome, { kind: "unknown" }>;
-export interface NormalRoundResult {
-  readonly requests: number;
-  readonly finishReason: "stop" | "tool-calls";
-  readonly tools: readonly ReliableToolOutcome[];
-}
-export interface RoundRequest {
-  target: ModelTarget;
-  system: string;
-  messages: readonly ModelItem[];
-  /** 只收窄宿主按真实链接匹配的工具，不产生授权。 */
-  tools?: { allow?: readonly string[]; exclude?: readonly string[] };
-  /** 值由领域配置提供，次数检查由宿主执行。 */
-  maxRequests?: number | null;
-}
-export interface RoundPolicy {
-  request(snapshot: SessionSnapshot): RoundRequest;
-  /** 仅正常响应、批次收束且无未知影响时调用。 */
-  next(result: NormalRoundResult): boolean;
-}
-export type RoundOutcome =
-  | { reason: "completed" }
-  | { reason: "cancelled" }
-  | { reason: "failed"; code: string };
+/** 模型分支采用 SDK 的单次调用契约。 */
+export type { ModelRunRequest, ModelRunResult, ModelRunEvent } from "@atelier/sdk/contracts";
+export type { ModelServices } from "@atelier/sdk/contracts";
+import type { ModelServices } from "@atelier/sdk/contracts";
 export interface PluginContext {
   readonly id: string;
   readonly dir: string;

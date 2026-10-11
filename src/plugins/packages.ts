@@ -6,7 +6,7 @@ import { z } from "zod";
 import * as zod from "zod";
 import * as sdkContracts from "@atelier/sdk/contracts";
 import * as sdkRuntime from "@atelier/sdk/runtime";
-import type { PluginDefinition } from "./contract.ts";
+import type { PluginDefinition } from "@atelier/sdk/runtime";
 
 /** SDK 主版本；插件清单的 api.major 必须相同，minMinor 不得高于宿主。 */
 export const sdkApi = { major: 1, minor: 0 } as const;
@@ -109,12 +109,13 @@ const sharedGlobal = "__atelierSharedModules";
 function sharedModuleSource(id: string, table: Record<string, Record<string, unknown>> = shared): string {
   const names = Object.keys(table[id]!).filter(name => name !== "default" && /^[A-Za-z_$][\w$]*$/u.test(name));
   return [`const m = globalThis[${JSON.stringify(sharedGlobal)}][${JSON.stringify(id)}];`,
-    `export default m.default ?? m;`, ...names.map(name => `export const ${name} = m[${JSON.stringify(name)}];`)].join("\n");
+    `export default m.default ?? m;`, ...names.map((name, index) =>
+      `const shared${index} = m[${JSON.stringify(name)}]; export { shared${index} as ${name} };`)].join("\n");
 }
 
-/** 内容哈希：源码文件（跳过 node_modules 与 .git）、lockfile 与宿主 SDK 版本。 */
-function sourceHash(root: string, compiler: string): string {
-  const hash = createHash("sha256").update(`${compiler}\0${sdkApi.major}.${sdkApi.minor}\0`);
+/** 内容哈希：源码文件（含 lockfile）、宿主 SDK 版本与共享导出；跳过 node_modules 与 .git。 */
+function sourceHash(root: string, compiler: string, bindings = ""): string {
+  const hash = createHash("sha256").update(`${compiler}\0${sdkApi.major}.${sdkApi.minor}\0${bindings}\0`);
   const walk = (directory: string) => {
     for (const name of readdirSync(directory).sort()) {
       if (name === "node_modules" || name === ".git") continue;
@@ -132,7 +133,7 @@ function sourceHash(root: string, compiler: string): string {
 export async function buildRuntime(root: string, manifest: PluginPackageManifest, cacheRoot: string): Promise<string> {
   if (!manifest.runtime) throw new PluginPackageError("invalid_entry", `Plugin ${manifest.id} has no runtime entry.`);
   const esbuild = await import("esbuild");
-  const directory = join(cacheRoot, manifest.id, sourceHash(root, esbuild.version));
+  const directory = join(cacheRoot, manifest.id, sourceHash(root, esbuild.version, Object.keys(shared).map(id => sharedModuleSource(id)).join("\n")));
   const outfile = join(directory, "runtime.mjs");
   if (existsSync(outfile)) return outfile;
   mkdirSync(directory, { recursive: true });
@@ -229,7 +230,9 @@ export async function loadPackages(list: PackageList, npmRoot: string, cacheRoot
       const file = await buildRuntime(item.root, item.manifest, cacheRoot);
       const module = await import(pathToFileURL(file).href) as { default?: unknown };
       const definition = module.default as PluginDefinition | undefined;
-      if (!definition || typeof definition !== "object" || !Array.isArray(definition.modules) || definition.namespace?.id !== id) {
+      if (!definition || typeof definition !== "object" || !Array.isArray(definition.modules) || definition.namespace?.id !== id
+        || typeof definition.version !== "string" || !definition.version.trim()
+        || definition.modules.some(module => !module || typeof module !== "object" || typeof module.setup !== "function")) {
         throw new PluginPackageError("invalid_entry", `Runtime entry of ${id} must default-export definePlugin(...) with namespace ${id}.`);
       }
       item.definition = definition;

@@ -10,6 +10,7 @@ import type { LiveBlock } from "../../shared/session.ts";
 import { defineModule, type PluginContext } from "../../plugins/contract.ts";
 import { ModelTargetFailure, type ModelTarget, type RegistryView } from "../../plugins/models.ts";
 import { Agent, AgentView, agentCommandSchema, agentCreateSchema } from "./contract.ts";
+import { modelEvents } from "./model-events.ts";
 
 const selectionKey = "selection";
 const submissionKey = (id: string) => `submission:${id}`;
@@ -138,27 +139,45 @@ class AgentController implements ResourceController {
     const key = this.key(sessionId, agentId);
     const timer = setTimeout(() => controller.abort(), timeout * 1000);
     let progressTimer: ReturnType<typeof setTimeout> | undefined;
-    const done = Promise.resolve().then(() => this.plugin.models.run({ agentId,
-      signal: controller.signal,
-      append: node => host.commit(timeline => timeline.append(node)),
-      complete: (blockId, completion) => host.commit(timeline => timeline.completeBlock(blockId, completion)),
-      progress: blocks => {
-        const run = this.runs.get(key);
-        if (run) run.live = blocks;
-        progressTimer ??= setTimeout(() => { progressTimer = undefined; host.progressChanged(); }, 32);
-      },
-      environment: async () => {
+    const done = Promise.resolve().then(async () => {
+      for (let request = 0; ; request++) {
+        controller.signal.throwIfAborted();
         const current = this.selection(agentId);
         if (!current) throw new SessionError("not_found", "Agent not found.");
-        // 消息、资源和策略取自同一请求边界；期间事件由投影排在本响应之后。
         const agent = this.agent(current.selection);
+        if (request >= (agent.maxTurns ?? 32)) {
+          host.commit(writer => writer.append({ kind: "notice", agentId, level: "error", code: "request_limit",
+            message: "The agent reached the model request limit. Continue explicitly to resume." }));
+          return;
+        }
+        // context 每次从时间轴投影；控制器不持有消息数组或另一份对话。
         const path = host.path();
         const linked = host.linked(agentId);
-        return { target: targetOf(agent, current.selection), prompt: agent, maxTurns: agent.maxTurns,
-          messages: projectForAgent(path, agentId), requestParentId: path.at(-1)?.id ?? null,
-          capabilities: host.capabilities(linked, agentToolPolicy(agent)), context: await host.context(linked) };
-      } }))
-      .then(() => {}, () => { console.error("Agent execution could not be finalized."); })
+        const result = await this.plugin.models.run({
+          object: { sessionId, id: agentId, kind: Agent.kind },
+          requestParentId: path.at(-1)?.id ?? null,
+          target: targetOf(agent, current.selection), system: composeSystemPrompt(agent),
+          messages: projectForAgent(path, agentId), signal: controller.signal,
+          capabilities: host.capabilities(linked, agentToolPolicy(agent)), context: host.context(linked),
+          cache: { expectHit: request > 0 },
+          observer: modelEvents(host, agentId, blocks => {
+            const run = this.runs.get(key);
+            if (run) run.live = blocks;
+            progressTimer ??= setTimeout(() => { progressTimer = undefined; host.progressChanged(); }, 32);
+          }),
+        });
+        if (result.reason !== "completed" || result.tools.length === 0) return;
+      }
+    })
+      .catch(error => {
+        if (controller.signal.aborted) host.commit(writer => writer.append({ kind: "notice", agentId, level: "warning", code: "cancelled", message: "Execution was cancelled." }));
+        else {
+          const known = error instanceof ModelFailure || error instanceof SessionError;
+          host.commit(writer => writer.append({ kind: "notice", agentId, level: "error", code: known ? error.code : "execution_failed",
+            message: known ? error.message : "Execution could not be completed." }));
+        }
+      })
+      .catch(() => { console.error("Agent execution could not be finalized."); })
       .finally(() => { clearTimeout(timer); clearTimeout(progressTimer); this.runs.delete(key); host.progressChanged(); });
     this.runs.set(key, { sessionId, agentId, controller, done, live: [] });
     host.progressChanged();

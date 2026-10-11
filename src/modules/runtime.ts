@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 import { definePlugin, type PluginDefinition, type PluginModule } from "../plugins/contract.ts";
-import { loadPlugins, type PluginHostServices } from "../plugins/loader.ts";
+import { loadPlugins, type PluginHostServices, type LoadablePlugin } from "../plugins/loader.ts";
 import { core, coreVersion } from "./plugin.ts";
 
 const entries = import.meta.glob<PluginModule>("./*/runtime.ts", { eager: true, import: "default" });
@@ -10,6 +10,6 @@ export const corePlugin = definePlugin({ namespace: core, version: coreVersion,
   modules: Object.keys(entries).sort().map(path => entries[path]!) });
 
 /** 装配顺序：atelier.core 最先，外部插件包随后，按用户列表顺序。 */
-export function createModules(services: PluginHostServices, external: readonly PluginDefinition[] = []) {
+export function createModules(services: PluginHostServices, external: readonly LoadablePlugin[] = []) {
   return loadPlugins([corePlugin, ...external], services);
 }

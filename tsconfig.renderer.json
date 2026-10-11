@@ -8,5 +8,5 @@
     "types": ["vite/client"],
     "paths": { "@/*": ["./src/renderer/*"] }
   },
-  "include": ["src/renderer", "packages/sdk/src", "src/shared", "src/modules/*/renderer.tsx"]
+  "include": ["src/renderer", "packages/sdk/src/contracts.ts", "packages/sdk/src/renderer.ts", "src/shared", "src/modules/*/renderer.tsx"]
 }

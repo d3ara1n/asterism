@@ -1,6 +1,8 @@
 # 功能模块
 
-资源与工具在模型中平级；后端实现和对应 UI 在这里按功能共置。当前内置模块为 `notes/`、`filesystem/`、`agent/`。
+资源与工具在模型中平级；后端实现和对应 UI 在这里按功能共置。当前内置模块为 `notes/`、`filesystem/`、`agent/` 与提交后观察模块 `naming/`；命名只提供后台入口。
+
+本目录的后台实现尚使用宿主内部工厂，按 [插件计划](../../plans/todo-2026-10-12-plugin-system.md) 迁到 [公开 SDK](../../packages/sdk/README.md)。以下 `controller / PluginSessions / plugin.state` 为内置实现约定，不是外部插件 API；外部资源用 SDK 的内联 `creation / actions` 和绑定对象的 `get / commit`。
 
 ## 三个入口
 

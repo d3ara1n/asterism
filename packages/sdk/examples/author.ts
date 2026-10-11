@@ -1,10 +1,10 @@
-/** SDK 作者用例：只编译，不执行原型、插件、数据库或真实模型请求。 */
+/** SDK 作者用例与类型反例：只编译，不执行插件、数据库或真实模型请求。 */
 import { z } from "zod";
-import { pluginNamespace, defineRecord, defineTool, defineImplementation } from "@atelier/sdk/contracts";
+import { pluginNamespace, defineRecord, defineTool, defineImplementation, modelRunRecordSchema, type ModelItem } from "@atelier/sdk/contracts";
 import {
   defineModule, definePlugin, implementResource, implementTool,
-  type PluginContext, type ObjectContext, type SessionObserver, type RoundPolicy,
-} from "./draft-2026-10-11-sdk-boundaries.ts";
+  type PluginContext, type ObjectContext, type SessionObserver, type SessionSnapshot, type ResourceRef,
+} from "@atelier/sdk/runtime";
 
 /** 场景一：只使用会话事件与生命周期，不需要资源、模型或 Agent。 */
 const journal = pluginNamespace("example.journal");
@@ -92,23 +92,30 @@ export const counterPlugin = definePlugin({
   }))],
 });
 
-/** 场景三：插件自己提供模型工作策略；按需消费模型分支，不依赖内置 Agent。 */
+/** 场景三：插件自己的 Agent 推动循环，context 每次从时间轴投影。 */
+const research = pluginNamespace("example.research");
+const Execution = defineRecord(research.name("execution"), { version: 1, schema: modelRunRecordSchema });
+export const modelRecordsModule = defineModule(() => ({ records: [Execution] }));
+/** 由领域插件根据自己的输入／执行事件构造投影，不保存在 Agent 或 run 中。 */
+declare function projectOwnContext(snapshot: SessionSnapshot, object: ResourceRef): ModelItem[];
 export async function modelWork(plugin: PluginContext, object: ObjectContext, signal: AbortSignal) {
-  const policy = {
-    request(_snapshot) {
-      return {
-        target: { role: "default" }, system: "Inspect the linked materials and report findings.",
-        messages: [{ kind: "input", text: "Inspect the available resources." }],
-        maxRequests: 1,
-      };
-    },
-    // 此用例只执行一个请求及其工具批次；完整代理可用自己的记录构造后续请求。
-    next(_result) { return false; },
-  } satisfies RoundPolicy;
-  return plugin.models.run(object.ref, policy, signal);
+  for (let request = 0; request < 8; request++) {
+    const snapshot = object.session.snapshot();
+    const result = await plugin.models.run({
+      object: object.ref, requestParentId: snapshot.position.nodeId, target: { role: "default" },
+      system: { blocks: [{ id: research.name("instruction"), kind: "system", from: research.id, text: "Inspect linked materials and report findings." }] },
+      messages: projectOwnContext(snapshot, object.ref), cache: { expectHit: request > 0 }, signal,
+      observer: { event(event) {
+        if (event.type === "progress") return;
+        object.commit(writer => { writer.append(Execution, modelRunRecordSchema.parse(event)); });
+      } },
+    });
+    if (result.reason !== "completed" || result.tools.length === 0) return result;
+  }
+  throw new Error("The model request limit was reached.");
 }
 
-/** 反例依据：具型事件、同步提交／观察、具型策略与资源输入。 */
+/** 反例依据：具型事件、同步提交／观察、显式模型输入与资源输入。 */
 export function rejectInvalidUsage(plugin: PluginContext, object: ObjectContext) {
   // @ts-expect-error 生命周期不是字符串事件总线。
   plugin.on("start", () => {});
@@ -132,14 +139,6 @@ export function rejectInvalidUsage(plugin: PluginContext, object: ObjectContext)
     // @ts-expect-error 事件数据须匹配持有的契约。
     writer.append(CountChanged, { value: "wrong" });
   });
-  const policy: RoundPolicy = {
-    request() { return { target: { role: "default" }, system: "", messages: [] }; },
-    next(result) {
-      // @ts-expect-error 未知影响由宿主停止，不进入策略的正常分支。
-      const unknown: "unknown" = result.tools[0]!.kind;
-      void unknown;
-      return false;
-    },
-  };
-  void policy;
+  // @ts-expect-error 每次调用必须显式提供目标、提示、投影输入和事件消费者。
+  plugin.models.run({ object: object.ref, signal: new AbortController().signal });
 }

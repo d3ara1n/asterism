@@ -1,14 +1,9 @@
 import type { AgentConfiguration } from "../shared/configuration.ts";
 import { applicationBrand } from "../shared/application.ts";
 import { coreId, coreNamespace } from "../shared/core.ts";
+import type { PromptBlock, SystemPrompt } from "@atelier/sdk/contracts";
 
-export type PromptBlock =
-  | { id: string; kind: "system"; from: string; text: string }
-  | { id: string; kind: "agent"; role: string; text: string }
-  | { id: string; kind: "context"; file: string; text: string };
-
-/** 每次请求由代码构造的运行数据，不进入会话树或请求记录。 */
-export interface SystemPrompt { blocks: readonly PromptBlock[] }
+export type { PromptBlock, SystemPrompt } from "@atelier/sdk/contracts";
 
 const environment: PromptBlock = {
   id: coreId("environment"),

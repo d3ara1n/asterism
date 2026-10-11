@@ -12,12 +12,22 @@ import { ToolRegistry } from "../tools/registry.ts";
 import type { ToolContract } from "@atelier/sdk/contracts";
 import { PluginApiError, type CommitEvent, type CommandPreparer, type SessionObserver, type PluginContext, type PluginTasks, type PluginDefinition, type PluginLogger, type PluginSession, type PluginSessions } from "./contract.ts";
 import { sessionView, toRecords } from "./records.ts";
+import { sessionSnapshot } from "./records.ts";
+import type { PluginDefinition as SdkPluginDefinition, ResourceRef } from "@atelier/sdk/runtime";
+import { createSdkContext, type SdkContext } from "./sdk-context.ts";
+import { synchronous } from "./synchronous.ts";
+import { adaptResource, adaptTool } from "./sdk-adapters.ts";
+import type { LiveBlock } from "../shared/session.ts";
+
+/** 旧工厂仅供尚未迁移的内置模块；外部包必须使用 SDK 的具名模块入口。 */
+export type LoadablePlugin = PluginDefinition | SdkPluginDefinition;
 
 export interface PluginHostServices {
   extensionsDirectory: string;
   state: ResourceStateStore;
   /** 由对象 ID 查对象类型，用于约束资源状态的归属。 */
   kindOf(objectId: string): string | null;
+  refOf?(objectId: string): ResourceRef | null;
   sessions: PluginSessions;
   registry: RegistryView;
   models: PluginModels;
@@ -36,6 +46,8 @@ export interface PluginManifest {
   implementations: { id: string; version: number; tool: string; resource: string; active: boolean; overriddenBy?: string }[];
 }
 export interface LoadedPlugins {
+  /** 模型分支的临时活动，不持有消息或历史。 */
+  activity(sessionId: string): { running: string[]; live: LiveBlock[] };
   resources: ResourceRegistry;
   tools: ToolRegistry;
   manifest: readonly PluginManifest[];
@@ -46,7 +58,7 @@ export interface LoadedPlugins {
   /** 取消托管任务并关闭插件托管数据库。 */
   close(): Promise<void>;
 }
-interface Collected { plugin: PluginDefinition; resources: ResourceBackend[]; tools: ToolImplementation[]; observers: SessionObserver[]; preparers: CommandPreparer[]; context: PluginContext; tasks: TaskHost }
+interface Collected { plugin: LoadablePlugin; resources: ResourceBackend[]; tools: ToolImplementation[]; observers: SessionObserver[]; preparers: CommandPreparer[]; context: PluginContext; tasks: TaskHost; sdk: SdkContext; closing: (() => Promise<void>)[] }
 
 class TaskHost implements PluginTasks {
   private running = new Map<string, { controller: AbortController; done: Promise<void> }>();
@@ -73,7 +85,7 @@ const defaultLog: NonNullable<PluginHostServices["log"]> = (pluginId, level, mes
   console[level](`[plugin ${pluginId}] ${message}`, ...(error === undefined ? [] : [error]));
 
 
-function context(plugin: PluginDefinition, services: PluginHostServices, storage: PluginStorage, tasks: PluginTasks): PluginContext {
+function context(plugin: LoadablePlugin, services: PluginHostServices, storage: PluginStorage, tasks: PluginTasks): PluginContext {
   const id = plugin.namespace.id;
   const write = services.log ?? defaultLog;
   const log: PluginLogger = {
@@ -148,10 +160,12 @@ function validate(collected: Collected): void {
  * 两阶段装配：先按插件顺序收集全部贡献（失败只禁用该插件），再解析工具契约覆盖并冻结注册表。
  * 结果只取决于插件顺序，与插件内部注册顺序无关。
  */
-export function loadPlugins(plugins: readonly PluginDefinition[], services: PluginHostServices): LoadedPlugins {
+export function loadPlugins(plugins: readonly LoadablePlugin[], services: PluginHostServices): LoadedPlugins {
   const manifest: PluginManifest[] = [];
   const collected: Collected[] = [];
   const storages: PluginStorage[] = [];
+  const taskHosts: TaskHost[] = [];
+  const sdkContexts: SdkContext[] = [];
   const kinds = new Set<string>();
   const identities = new Set<string>();
   for (const plugin of plugins) {
@@ -163,9 +177,40 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
       storages.push(storage);
       const write = services.log ?? defaultLog;
       const tasks = new TaskHost({ info: m => write(id, "info", m), warn: m => write(id, "warn", m), error: (m, e) => write(id, "error", m, e) });
+      taskHosts.push(tasks);
       const plugged = context(plugin, services, storage, tasks);
-      const entry: Collected = { plugin, resources: [], tools: [], observers: [], preparers: [], context: plugged, tasks };
+      const sdk = createSdkContext(plugged, services);
+      sdkContexts.push(sdk);
+      const entry: Collected = { plugin, resources: [], tools: [], observers: [], preparers: [], context: plugged, tasks, sdk, closing: [] };
       for (const module of plugin.modules) {
+        if (typeof module !== "function") {
+          const contribution = module.setup(sdk.context);
+          for (const record of contribution.records ?? []) sdk.declare(record);
+          for (const resource of contribution.resources ?? []) {
+            for (const record of resource.records) sdk.declare(record);
+            entry.resources.push(adaptResource(resource, sdk, services));
+          }
+          entry.tools.push(...(contribution.tools ?? []).map(tool => adaptTool(tool, sdk, services)));
+          entry.observers.push(...(contribution.observers ?? []).map(observer => ({
+            id: observer.id,
+            committed(event: CommitEvent) {
+              synchronous(() => observer.committed({
+                snapshot: event.snapshot,
+                records: event.records, session: sdk.context.session(event.sessionId),
+              }));
+            },
+          })));
+          entry.preparers.push(...(contribution.preparers ?? []).map<CommandPreparer>(preparer => ({
+            id: preparer.id, kind: preparer.resource.kind,
+            async prepare(input, context) {
+              const result = await preparer.prepare(preparer.schema.parse(input),
+                sdk.object({ sessionId: context.sessionId, id: context.objectId, kind: preparer.resource.kind }), context.signal);
+              return result.action === "replace" ? { action: "replace", command: result.input } : result;
+            },
+          })));
+          if (contribution.closing) entry.closing.push(() => contribution.closing!());
+          continue;
+        }
         const contribution = module(plugged);
         entry.resources.push(...contribution.resources ?? []);
         entry.tools.push(...contribution.tools ?? []);
@@ -187,6 +232,9 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
       manifest.push({ id, version: plugin.version, status: "failed", error: error instanceof Error ? error.message : String(error), resources: [], implementations: [] });
     }
   }
+  // 失败装配留下的 context 失效；托管任务仍纳入关闭等待。
+  for (const sdk of sdkContexts) if (!collected.some(entry => entry.sdk === sdk)) sdk.disable();
+  for (const tasks of taskHosts) if (!collected.some(entry => entry.tasks === tasks)) void tasks.close();
   // 同名契约取装配顺序中最后定义者；绑定其他契约对象的实现下线。
   const effective = new Map<string, { contract: ToolContract; plugin: string }>();
   for (const entry of collected) for (const tool of entry.tools) effective.set(tool.tool.name, { contract: tool.tool, plugin: entry.plugin.namespace.id });
@@ -201,8 +249,15 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
         ...(live ? {} : { overriddenBy: winner.plugin }) });
     }
   }
+  const resources = new ResourceRegistry(collected.flatMap(entry => entry.resources));
+  const notifications: { sessionId: string; nodes: readonly CommitEvent["nodes"][number][]; records: CommitEvent["records"]; view: CommitEvent["view"]; snapshot: CommitEvent["snapshot"] }[] = [];
+  let dispatching = false;
   return {
-    resources: new ResourceRegistry(collected.flatMap(entry => entry.resources)),
+    activity(sessionId) {
+      const active = collected.map(entry => entry.sdk.activity(sessionId));
+      return { running: active.flatMap(run => run.running), live: active.flatMap(run => run.live) };
+    },
+    resources,
     tools: new ToolRegistry(active),
     manifest: Object.freeze(manifest.map(entry => Object.freeze(entry))),
     committed: (sessionId, nodes) => {
@@ -210,26 +265,45 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
       const frozen = Object.freeze(nodes.map(node => Object.freeze(structuredClone(node))));
       const records = toRecords(frozen, services.sessions.nodes(sessionId));
       const view = sessionView(sessionId, services.sessions.title(sessionId), services.sessions.nodes(sessionId), services.sessions.path(sessionId));
-      for (const entry of collected) for (const observer of entry.observers) {
-        try { observer.committed({ sessionId, nodes: frozen, records, view, session: entry.context.session(sessionId) }); }
-        catch (error) { (services.log ?? defaultLog)(entry.plugin.namespace.id, "error", `Observer ${observer.id} failed.`, error); }
-      }
+      const snapshot = sessionSnapshot(sessionId, view.title, services.sessions.nodes(sessionId), services.sessions.path(sessionId));
+      notifications.push({ sessionId, nodes: frozen, records, view, snapshot });
+      if (dispatching) return;
+      dispatching = true;
+      try {
+        while (notifications.length) {
+          const event = notifications.shift()!;
+          for (const entry of collected) for (const observer of entry.observers) {
+            try { synchronous(() => observer.committed({ ...event, session: entry.context.session(event.sessionId) })); }
+            catch (error) { (services.log ?? defaultLog)(entry.plugin.namespace.id, "error", `Observer ${observer.id} failed.`, error); }
+          }
+        }
+      } finally { dispatching = false; }
     },
     prepare: async (kind, command, context) => {
-      let current = command;
+      const controller = resources.controller(kind);
+      const ref = { sessionId: context.sessionId, id: context.objectId, kind };
+      let current = controller?.validateCommand ? controller.validateCommand(command) : command;
       for (const entry of collected) for (const preparer of entry.preparers) {
         if (preparer.kind !== kind) continue;
         const result = await preparer.prepare(current, context);
         if (result.action === "reject") throw new PluginApiError("rejected", result.message, result.code);
         if (result.action === "replace") {
           (services.log ?? defaultLog)(entry.plugin.namespace.id, "info", `Preparer ${preparer.id} replaced a ${kind} command.`);
-          current = result.command;
+          current = controller?.validateCommand ? controller.validateCommand(result.command) : result.command;
         }
       }
-      return current;
+      return controller?.prepareCommand ? controller.prepareCommand(current, ref, context.signal)
+        : controller?.validateCommand ? controller.validateCommand(current) : current;
     },
     close: async () => {
-      await Promise.allSettled(collected.map(entry => entry.tasks.close()));
+      await Promise.allSettled([...sdkContexts.map(sdk => sdk.close()), ...taskHosts.map(tasks => tasks.close())]);
+      for (const entry of collected) {
+        for (const close of entry.closing) {
+          try { await close(); }
+          catch (error) { (services.log ?? defaultLog)(entry.plugin.namespace.id, "error", "Plugin closing callback failed.", error); }
+        }
+      }
+      for (const sdk of sdkContexts) sdk.disable();
       for (const storage of storages) storage.close();
     },
   };

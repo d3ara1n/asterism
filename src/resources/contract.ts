@@ -4,6 +4,7 @@ import { present } from "@atelier/sdk/contracts";
 import type { ResourceContract } from "@atelier/sdk/contracts";
 import type { LiveBlock } from "../shared/session.ts";
 import type { FoldedObject } from "../session/fold.ts";
+import type { ResourceRef } from "@atelier/sdk/runtime";
 
 export interface ContextFile { file: string; text: string }
 export interface ResourceCommandContext { sessionId: string; resource: FoldedObject }
@@ -13,6 +14,9 @@ export interface ResourceCommandContext { sessionId: string; resource: FoldedObj
  * 或供组合入口（如首页）原子创建会话与对象；异步准备后也必须执行此检查。
  */
 export interface ResourceController {
+  /** 外部准备者按装配顺序执行后，进入资源自己的准备；每次替换按目标 schema 校验。 */
+  prepareCommand?(input: Json, ref: ResourceRef, signal: AbortSignal): Promise<Json>;
+  validateCommand?(input: Json): Json;
   /** 校验创建输入（可异步读取配置或文件系统），结果再交给 create。 */
   prepareCreate?(input: unknown): Promise<Json>;
   /** 在创建事务内执行：返回标题与写入创建事件的不可变资源数据，可同时保存私有状态。 */

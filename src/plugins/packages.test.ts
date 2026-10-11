@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { PackageList, loadPackages, readManifest } from "./packages.ts";
+import { ApplicationService } from "../runtime/service.ts";
 
 const roots: string[] = [];
 afterEach(() => { for (const r of roots.splice(0)) rmSync(r, { recursive: true, force: true }); });
@@ -13,8 +14,9 @@ function pkg(root: string, atelier: unknown, source?: string) {
   if (source) writeFileSync(join(root, "src", "runtime.ts"), source);
 }
 const runtime = (id: string) => `import { pluginNamespace } from "@atelier/sdk/contracts";
+import { definePlugin, defineModule } from "@atelier/sdk/runtime";
 const ns: { id: string } = pluginNamespace(${JSON.stringify(id)});
-export default { namespace: ns, version: "0.0.1", modules: [] };`;
+export default definePlugin({ namespace: ns, version: "0.0.1", modules: [defineModule(() => ({}))] });`;
 
 describe("插件包", () => {
   it("只认包根：无清单的目录添加失败且不留条目", () => {
@@ -51,5 +53,33 @@ describe("插件包", () => {
     const [item] = await loadPackages(list, data, join(data, "cache"), []);
     expect(item!.status).toBe("failed");
     expect(item!.error).toMatch(/failed to build/);
+  });
+  it("源码包仅引入公开 SDK 即可提供真实资源，不需要宿主内部工厂", async () => {
+    const data = temp(); const root = temp();
+    pkg(root, { id: "acme.sdk", api: { major: 1, minMinor: 0 }, runtime: "src/runtime.ts" }, `
+      import { z } from "zod";
+      import { pluginNamespace } from "@atelier/sdk/contracts";
+      import { definePlugin, defineModule, implementResource } from "@atelier/sdk/runtime";
+      const ns = pluginNamespace("acme.sdk");
+      const resource = ns.resource("label", z.object({ label: z.string() }));
+      export default definePlugin({ namespace: ns, version: "1", modules: [defineModule(() => ({
+        resources: [implementResource(resource, ns.data("view", 1, z.string()), {
+          creation: { schema: z.string(), create: label => ({ title: label, data: { label } }) },
+          project: data => data.label, inspect: async data => data,
+        })],
+      }))] });
+    `);
+    const list = new PackageList(join(data, "plugins.json"));
+    list.add({ source: { kind: "path", path: root } }, data);
+    const [loaded] = await loadPackages(list, data, join(data, "cache"), []);
+    expect(loaded!.status, loaded!.error).toBe("loaded");
+    const service = new ApplicationService(data, { plugins: [loaded!.definition!] });
+    try {
+      const sessionId = service.sessions.tree.create("SDK");
+      await service.sessions.execute({ type: "resource.create", sessionId, kind: "acme.sdk/label", input: "Hello", position: { x: 0, y: 0 } });
+      expect(service.sessions.snapshot(sessionId).workbench.objects[0]!.presentation).toEqual({
+        contract: { id: "acme.sdk/view", version: 1 }, data: "Hello",
+      });
+    } finally { await service.close(); }
   });
 });

@@ -7,7 +7,7 @@ import type { ModelAdapter } from "../model/contract.ts";
 import { openDatabase } from "./storage.ts";
 import { ConfigurationService } from "../configuration/service.ts";
 import { SessionService } from "./sessions.ts";
-import type { PluginDefinition } from "../plugins/contract.ts";
+import type { LoadablePlugin } from "../plugins/loader.ts";
 import { join } from "node:path";
 import { PackageList, PluginPackageError } from "../plugins/packages.ts";
 
@@ -25,7 +25,7 @@ export class ApplicationService {
   private readonly packages: StartupPackage[];
   private readonly list: PackageList;
   private readonly started: string;
-  constructor(root: string, options: { packages?: StartupPackage[]; protector?: SecretProtector; onConfigurationChanged?: () => void; onSessionChanged?: (event: SessionChanged) => void; adapterFactory?: (settings: ModelSettings) => ModelAdapter; plugins?: readonly PluginDefinition[]; onStream?: (event: { sessionId: string; objectId: string; channel: string; data: Uint8Array }) => void } = {}) {
+  constructor(root: string, options: { packages?: StartupPackage[]; protector?: SecretProtector; onConfigurationChanged?: () => void; onSessionChanged?: (event: SessionChanged) => void; adapterFactory?: (settings: ModelSettings) => ModelAdapter; plugins?: readonly LoadablePlugin[]; onStream?: (event: { sessionId: string; objectId: string; channel: string; data: Uint8Array }) => void } = {}) {
     this.db = openDatabase(root);
     this.packages = options.packages ?? [];
     this.list = new PackageList(join(root, "plugins.json"));

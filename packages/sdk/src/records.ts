@@ -27,19 +27,23 @@ export function defineRecord<D extends Json>(id: string, definition: {
   version: number; schema: z.ZodType<D>; upgrade?: Readonly<Record<number, (data: Json) => Json>>;
 }): RecordContract<D> {
   const { version, schema, upgrade = {} } = definition;
+  if (!Number.isInteger(version) || version < 1) throw new Error("Record contract versions must be positive integers.");
   return {
     id, version, schema,
     decode(record) {
       if (record.contract.id !== id) return null;
-      let data = record.data;
+      let data = structuredClone(record.data);
       for (let from = record.contract.version; from < version; from++) {
         const step = upgrade[from];
         if (!step) return { status: "unknown", record, reason: "unsupported_version" };
-        data = step(data);
+        try { data = step(data); }
+        catch { return { status: "unknown", record, reason: "invalid_data" }; }
       }
       if (record.contract.version > version) return { status: "unknown", record, reason: "unsupported_version" };
-      const parsed = schema.safeParse(data);
-      return parsed.success ? { status: "known", record, data: parsed.data } : { status: "unknown", record, reason: "invalid_data" };
+      try {
+        const parsed = schema.safeParse(data);
+        return parsed.success ? { status: "known", record, data: parsed.data } : { status: "unknown", record, reason: "invalid_data" };
+      } catch { return { status: "unknown", record, reason: "invalid_data" }; }
     },
   };
 }

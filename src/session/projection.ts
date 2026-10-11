@@ -1,14 +1,8 @@
-import type { Json, ToolOutcome } from "../shared/model.ts";
+import type { ModelItem, ModelPart as ProjectedPart } from "@atelier/sdk/contracts";
 import type { BlockNode, SessionNode } from "../shared/session.ts";
 import { isBlockNode, SessionError } from "../shared/session-path.ts";
 
-export type ProjectedPart =
-  | { kind: "thinking" | "text"; text: string; continuation: Json }
-  | { kind: "toolcall"; callId: string; name: string; arguments: Json; continuation: Json };
-export type ModelItem =
-  | { kind: "input" | "context"; text: string }
-  | { kind: "output"; parts: ProjectedPart[]; scope: string; adapter: string }
-  | { kind: "result"; callId: string; name: string; outcome: ToolOutcome };
+export type { ModelItem, ModelPart as ProjectedPart } from "@atelier/sdk/contracts";
 
 /**
  * 代理视角的上下文投影：

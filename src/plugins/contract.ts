@@ -8,7 +8,7 @@ import type { AgentCapabilities, ToolPolicy } from "../execution/capabilities.ts
 import type { ContextFile, ResourceBackend } from "../resources/contract.ts";
 import type { ToolImplementation } from "../tools/contract.ts";
 import type { PluginModels, RegistryView } from "./models.ts";
-import type { PluginConfig, PluginLogger, PluginSecrets, PluginTasks, PluginStreams } from "@atelier/sdk/runtime";
+import type { PluginConfig, PluginLogger, PluginSecrets, PluginTasks, PluginStreams, SessionSnapshot } from "@atelier/sdk/runtime";
 export { PluginApiError, type PluginConfig, type PluginLogger, type PluginSecrets, type PluginTasks } from "@atelier/sdk/runtime";
 
 /** 资源状态属于会话数据；只能读写本插件资源类型的对象。 */
@@ -82,7 +82,7 @@ export interface PluginContext {
   object(sessionId: string, objectId: string): PluginObjectState;
   /** 只读系统目录：角色、模型与代理；不含端点、凭据与兼容参数。 */
   readonly registry: RegistryView;
-  /** 按模型目标请求模型：stream 单次请求，run 封装宿主代理循环；均无状态。 */
+  /** 按模型目标请求模型：stream 一次补全，run 一次补全及工具批次；均不持有 context。 */
   readonly models: PluginModels;
   /** 宿主托管的进程内异步任务：同 key 运行中不重复启动，宿主关闭时取消；重启不补做。 */
   readonly tasks: PluginTasks;
@@ -92,6 +92,7 @@ export interface PluginContext {
 }
 /** 最外层事务成功提交后的不可变批次；回滚不派发。 */
 export interface CommitEvent {
+  readonly snapshot: SessionSnapshot;
   readonly sessionId: string;
   readonly nodes: readonly SessionNode[];
   /** 本批次的公开记录信封。 */

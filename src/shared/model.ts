@@ -7,12 +7,7 @@ export { toolOutcomeSchema, type ToolOutcome } from "@atelier/sdk/contracts";
 export const unauthenticatedApiKey = "no-auth";
 
 const id = z.string().min(1).max(160);
-export const usageSchema = z.strictObject({
-  input: z.number().nonnegative().nullable(), output: z.number().nonnegative().nullable(),
-  total: z.number().nonnegative().nullable(), reasoning: z.number().nonnegative().nullable(),
-  cacheRead: z.number().nonnegative().nullable(), cacheWrite: z.number().nonnegative().nullable(),
-});
-export type Usage = z.infer<typeof usageSchema>;
+export { modelUsageSchema as usageSchema, type Usage } from "@atelier/sdk/contracts";
 export const modelSettingsSchema = z.strictObject({
   provider: providerInputSchema.extend({ revision: z.number().int().positive() }),
   model: modelSchema, thinking: thinkingSchema.nullable(),

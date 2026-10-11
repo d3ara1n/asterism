@@ -1,5 +1,9 @@
 /** SDK runtime 入口：后台插件可用的通用服务接口；不含宿主内部类型与领域知识。 */
 import type { Json } from "./json.ts";
+export * from "./runtime-contracts.ts";
+export * from "./runtime-resources.ts";
+export type * from "./models.ts";
+export { validationMessage, jsonArgumentHint } from "./tool-validation.ts";
 
 /** 插件 API 的稳定错误：code 供插件分支处理，message 用于日志。 */
 export class PluginApiError extends Error {

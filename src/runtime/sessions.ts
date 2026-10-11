@@ -10,15 +10,15 @@ import { createModules } from "../modules/runtime.ts";
 import { createModelServices } from "../plugins/models.ts";
 import { Agent } from "../modules/agent/contract.ts";
 import type { PluginSessions, PluginSessionWriter as SessionWriter } from "../plugins/contract.ts";
-import type { PluginManifest } from "../plugins/loader.ts";
-import type { PluginDefinition } from "../plugins/contract.ts";
+import type { PluginManifest, LoadablePlugin } from "../plugins/loader.ts";
+import type { ResourceRef } from "@atelier/sdk/runtime";
 import type { ResourceRegistry } from "../resources/registry.ts";
 import { createResourceId } from "../resources/id.ts";
 import { ResourceStateStore } from "../resources/state.ts";
 import type { ToolRegistry } from "../tools/registry.ts";
 import type { ModelSettings } from "../shared/model.ts";
 import { sessionCommandSchema, sessionSnapshotSchema, type SessionChanged, type SessionCommand, type SessionSnapshot,
-  type SessionProgress, type SessionReply, type ViewPosition, type SessionNode } from "../shared/session.ts";
+  type SessionProgress, type SessionReply, type ViewPosition, type SessionNode, type LiveBlock } from "../shared/session.ts";
 import { sessionPath, snap } from "../shared/session-path.ts";
 import { SessionWorkbench } from "./workbench.ts";
 import { PluginApiError } from "@atelier/sdk/runtime";
@@ -42,8 +42,9 @@ export class SessionService {
   private readonly closePlugins: () => Promise<void>;
   private readonly prepare: (kind: string, command: Json, context: { sessionId: string; objectId: string; signal: AbortSignal }) => Promise<Json>;
   private readonly committed: (sessionId: string, nodes: SessionNode[]) => void;
+  private readonly modelActivity: (sessionId: string) => { running: string[]; live: LiveBlock[] };
   constructor(private readonly db: DatabaseSync, dataRoot: string, configuration: ConfigurationService,
-    private readonly changed: (event: SessionChanged) => void = () => {}, adapterFactory?: (settings: ModelSettings) => ModelAdapter, external: readonly PluginDefinition[] = [],
+    private readonly changed: (event: SessionChanged) => void = () => {}, adapterFactory?: (settings: ModelSettings) => ModelAdapter, external: readonly LoadablePlugin[] = [],
     stream?: (event: { sessionId: string; objectId: string; channel: string; data: Uint8Array }) => void) {
     this.tree = new SessionTree(db);
     const host: PluginSessions = {
@@ -69,19 +70,19 @@ export class SessionService {
       capabilities: (linked, policy) => new AgentCapabilities(this.resources, this.tools, linked, policy),
       context: linked => this.resources.context(linked),
     };
-    const kindOf = (objectId: string): string | null => {
+    const refOf = (objectId: string): ResourceRef | null => {
       const row = db.prepare("SELECT session_id FROM resource_states WHERE object_id = ? LIMIT 1").get(objectId) as { session_id: string } | undefined;
       const sessionIds = row ? [row.session_id] : this.tree.list().map(session => session.id);
       for (const sessionId of sessionIds) {
         for (const node of this.tree.nodes(sessionId)) {
           if (node.kind !== "event" || node.type !== "resource_created") continue;
           const data = node.data as { id?: unknown; type?: unknown };
-          if (data.id === objectId) return String(data.type);
+          if (data.id === objectId) return { sessionId, id: objectId, kind: String(data.type) };
         }
       }
       return null;
     };
-    const modules = createModules({ extensionsDirectory: join(dataRoot, "extensions"), state: new ResourceStateStore(db), kindOf, vault: configuration.vault, stream,
+    const modules = createModules({ extensionsDirectory: join(dataRoot, "extensions"), state: new ResourceStateStore(db), refOf, kindOf: id => refOf(id)?.kind ?? null, vault: configuration.vault, stream,
       sessions: host, ...createModelServices(configuration, adapterFactory) }, external);
     this.resources = modules.resources;
     this.tools = modules.tools;
@@ -89,19 +90,35 @@ export class SessionService {
     this.closePlugins = modules.close;
     this.committed = modules.committed;
     this.prepare = modules.prepare;
+    this.modelActivity = modules.activity;
     this.workbench = new SessionWorkbench(db, this.tree, this.resources,
       (sessionId, agentId, resource) => this.linkTools(sessionId, agentId, resource));
   }
-  get running(): boolean { return this.resources.controllers().some(c => this.tree.list().some(s => (c.activity?.(s.id).running ?? []).length > 0)); }
+  get running(): boolean { return this.tree.list().some(session => !this.settled(session.id)); }
   private transaction<T>(work: () => T): T {
     this.db.exec("BEGIN IMMEDIATE");
     try { const result = work(); this.db.exec("COMMIT"); return result; }
     catch (error) { this.db.exec("ROLLBACK"); throw error; }
   }
   /** 单一写入者的同步提交区间：取父节点、记录事件与更新游标不可交错。 */
+  private committing: { sessionId: string; writer: SessionWriter } | null = null;
+  private writesClosed = false;
   private commit<T>(sessionId: string, work: (writer: SessionWriter) => T): T {
+    if (this.writesClosed) throw new SessionError("unavailable", "The session service is closed.");
+    if (this.committing) {
+      if (this.committing.sessionId !== sessionId) throw new SessionError("conflict", "A commit cannot write another session.");
+      this.db.exec("SAVEPOINT nested_session_commit");
+      try {
+        const result = work(this.committing.writer);
+        this.db.exec("RELEASE nested_session_commit");
+        return result;
+      } catch (error) {
+        this.db.exec("ROLLBACK TO nested_session_commit; RELEASE nested_session_commit");
+        throw error;
+      }
+    }
     const head = this.tree.head(sessionId);
-    const result = this.transaction(() => work({
+    const writer: SessionWriter = {
       append: node => this.tree.append(sessionId, node).id,
       completeBlock: (blockId, completion) => this.tree.completeBlock(sessionId, blockId, completion),
       continuation: () => {
@@ -111,7 +128,12 @@ export class SessionService {
         }
         return this.tree.path(sessionId);
       },
-    }));
+    };
+    const result = this.transaction(() => {
+      this.committing = { sessionId, writer };
+      try { return work(writer); }
+      finally { this.committing = null; }
+    });
     this.notify(sessionId);
     // 提交后派发：事务已结束，处理器不在写入事务内运行。
     if (!this.closed) { const nodes = this.tree.since(sessionId, head); this.committed(sessionId, nodes); }
@@ -119,7 +141,8 @@ export class SessionService {
   }
   /** 会话 settled：没有任何资源在活动；回溯只在此时允许。 */
   private settled(sessionId: string): boolean {
-    return this.resources.controllers().every(controller => (controller.activity?.(sessionId).running.length ?? 0) === 0);
+    return this.modelActivity(sessionId).running.length === 0
+      && this.resources.controllers().every(controller => (controller.activity?.(sessionId).running.length ?? 0) === 0);
   }
   private notify(sessionId: string): void {
     const revision = (this.revisions.get(sessionId) ?? 0) + 1;
@@ -128,7 +151,7 @@ export class SessionService {
     catch { /* 查询可恢复遗漏的通知 */ }
   }
   private progress(sessionId: string): SessionProgress {
-    const activity = this.resources.controllers().map(controller => controller.activity?.(sessionId) ?? { running: [], live: [] });
+    const activity = [...this.resources.controllers().map(controller => controller.activity?.(sessionId) ?? { running: [], live: [] }), this.modelActivity(sessionId)];
     return { revision: this.revisions.get(sessionId) ?? 0, version: this.progressVersions.get(sessionId) ?? 0,
       unsettledObjectIds: [...new Set(activity.flatMap(a => a.running))],
       runningAgentIds: this.resources.controller(agentKind)?.activity?.(sessionId).running ?? [],
@@ -201,7 +224,8 @@ export class SessionService {
       default: {
         if (command.type === "object.remove") {
           const target = this.object(command.sessionId, command.objectId);
-          if (this.resources.controllers().some(controller => controller.activity?.(command.sessionId).running.includes(target.id))) {
+          if (this.modelActivity(command.sessionId).running.includes(target.id)
+            || this.resources.controllers().some(controller => controller.activity?.(command.sessionId).running.includes(target.id))) {
             throw new SessionError("conflict", "Wait for this resource to settle before removing it.");
           }
         }
@@ -254,5 +278,6 @@ export class SessionService {
     this.closed = true;
     await Promise.allSettled(this.resources.controllers().map(controller => controller.close?.()));
     await this.closePlugins();
+    this.writesClosed = true;
   }
 }
