@@ -100,19 +100,8 @@ function createWindow(): void {
   loading.catch(error => { console.error("Renderer initialization failed.", error); dialog.showErrorBox(applicationBrand.en, "The application window could not be loaded."); });
 }
 
-// 插件产物协议：只读提供启动时打包的 renderer bundle 与资源，路径限定在插件缓存目录内。
-protocol.registerSchemesAsPrivileged([{ scheme: "atelier-plugin", privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } }]);
-function servePluginAssets(cacheRoot: string): void {
-  protocol.handle("atelier-plugin", request => {
-    const url = new URL(request.url);
-    const file = resolve(cacheRoot, decodeURIComponent(`${url.host}${url.pathname}`));
-    if (relative(cacheRoot, file).startsWith("..")) return new Response("Not found", { status: 404 });
-    return net.fetch(pathToFileURL(file).href);
-  });
-}
-
 // 插件产物协议：只读提供启动时打包的插件缓存目录，不访问其他路径。
-protocol.registerSchemesAsPrivileged([{ scheme: "atelier-plugin", privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
+protocol.registerSchemesAsPrivileged([{ scheme: "atelier-plugin", privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } }]);
 function servePluginArtifacts(root: string): void {
   const cache = resolve(root, "plugins", ".cache");
   protocol.handle("atelier-plugin", request => {
@@ -150,7 +139,6 @@ if (!app.requestSingleInstanceLock()) {
       callback(trustedFonts(contents, permission, details.isMainFrame)));
     session.defaultSession.setPermissionCheckHandler((contents, permission, _origin, details) =>
       trustedFonts(contents, permission, details.isMainFrame));
-    servePluginAssets(join(dataRoot, "plugins", ".cache"));
     servePluginArtifacts(dataRoot);
     try { await runtime.start(join(here, "runtime.js"), dataRoot); }
     catch (error) {
