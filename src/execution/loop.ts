@@ -31,8 +31,11 @@ export interface RunOptions {
   environment: () => Promise<RequestEnvironment>;
 }
 
+/** 终止原因：completed 正常结束；其余对应写入会话的 notice code。 */
+export type RunTermination = { reason: "completed" } | { reason: "cancelled" } | { reason: "failed"; code: string };
+
 /** 一轮执行：请求准备、内存流块、工具批次收束；成型记录提交给会话。 */
-export async function runAgent(options: RunOptions): Promise<void> {
+export async function runAgent(options: RunOptions): Promise<RunTermination> {
   const { agentId, signal, append } = options;
   const notice = (code: string, message: string, level: "error" | "warning" = "error") =>
     append({ kind: "notice", agentId, level, code, message });
@@ -96,7 +99,7 @@ export async function runAgent(options: RunOptions): Promise<void> {
         }
         if (unknown) throw new ModelFailure("unknown_outcome", "A tool outcome is unknown. Automatic continuation stopped.");
         signal.throwIfAborted();
-        if (!calls.length) return;
+        if (!calls.length) return { reason: "completed" };
       } finally {
         try {
           response.close();
@@ -104,10 +107,10 @@ export async function runAgent(options: RunOptions): Promise<void> {
       }
     }
   } catch (error) {
-    if (signal.aborted) notice("cancelled", "Execution was cancelled.", "warning");
-    else {
-      const known = error instanceof ModelFailure || error instanceof SessionError;
-      notice(known ? error.code : "execution_failed", known ? error.message : "Execution could not be completed.");
-    }
+    if (signal.aborted) { notice("cancelled", "Execution was cancelled.", "warning"); return { reason: "cancelled" }; }
+    const known = error instanceof ModelFailure || error instanceof SessionError;
+    const code = known ? error.code : "execution_failed";
+    notice(code, known ? error.message : "Execution could not be completed.");
+    return { reason: "failed", code };
   }
 }

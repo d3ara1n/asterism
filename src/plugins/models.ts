@@ -2,7 +2,7 @@ import type { ConfigurationService } from "../configuration/service.ts";
 import { AiSdkAdapter } from "../model/ai-sdk.ts";
 import { ModelFailure, type ModelAdapter, type ModelEvent, type ToolDeclaration } from "../model/contract.ts";
 import type { SystemPrompt } from "../model/system-prompt.ts";
-import { runAgent, type RunOptions } from "../execution/loop.ts";
+import { runAgent, type RunOptions, type RunTermination } from "../execution/loop.ts";
 import type { AgentCapabilities } from "../execution/capabilities.ts";
 import type { ModelItem } from "../session/projection.ts";
 import { modelReference, parseModelExpression, resolveProviderModel, type ConfigurationSnapshot, type ThinkingLevel } from "../shared/configuration.ts";
@@ -34,7 +34,7 @@ export interface PluginModels {
   /** 解析目标到实际模型与适配器；失败以 ModelTargetFailure 区分原因。 */
   resolve(target: ModelTarget): Promise<ResolvedTarget>;
   stream(request: StreamRequest): AsyncIterable<ModelEvent>;
-  run(request: RunRequest): Promise<void>;
+  run(request: RunRequest): Promise<RunTermination>;
 }
 
 /** 按角色与覆盖解析；模型不支持 reasoning 时思考归为 off。 */

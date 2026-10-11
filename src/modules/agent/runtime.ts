@@ -158,7 +158,7 @@ class AgentController implements ResourceController {
           messages: projectForAgent(path, agentId), requestParentId: path.at(-1)?.id ?? null,
           capabilities: host.capabilities(linked, agentToolPolicy(agent)), context: await host.context(linked) };
       } }))
-      .catch(() => { console.error("Agent execution could not be finalized."); })
+      .then(() => {}, () => { console.error("Agent execution could not be finalized."); })
       .finally(() => { clearTimeout(timer); clearTimeout(progressTimer); this.runs.delete(key); host.progressChanged(); });
     this.runs.set(key, { sessionId, agentId, controller, done, live: [] });
     host.progressChanged();
