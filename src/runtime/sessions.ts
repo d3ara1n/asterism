@@ -11,6 +11,7 @@ import { createModelServices } from "../plugins/models.ts";
 import { Agent } from "../modules/agent/contract.ts";
 import type { PluginSessions, PluginSessionWriter as SessionWriter } from "../plugins/contract.ts";
 import type { PluginManifest } from "../plugins/loader.ts";
+import type { PluginDefinition } from "../plugins/contract.ts";
 import type { ResourceRegistry } from "../resources/registry.ts";
 import { createResourceId } from "../resources/id.ts";
 import { ResourceStateStore } from "../resources/state.ts";
@@ -39,7 +40,7 @@ export class SessionService {
   private readonly closePlugins: () => Promise<void>;
   private readonly committed: (sessionId: string, nodes: SessionNode[]) => void;
   constructor(private readonly db: DatabaseSync, dataRoot: string, configuration: ConfigurationService,
-    private readonly changed: (event: SessionChanged) => void = () => {}, adapterFactory?: (settings: ModelSettings) => ModelAdapter) {
+    private readonly changed: (event: SessionChanged) => void = () => {}, adapterFactory?: (settings: ModelSettings) => ModelAdapter, external: readonly PluginDefinition[] = []) {
     this.tree = new SessionTree(db);
     const host: PluginSessions = {
       path: sessionId => this.tree.path(sessionId),
@@ -76,7 +77,7 @@ export class SessionService {
       return null;
     };
     const modules = createModules({ extensionsDirectory: join(dataRoot, "extensions"), state: new ResourceStateStore(db), kindOf, vault: configuration.vault,
-      sessions: host, ...createModelServices(configuration, adapterFactory) });
+      sessions: host, ...createModelServices(configuration, adapterFactory) }, external);
     this.resources = modules.resources;
     this.tools = modules.tools;
     this.plugins = modules.manifest;

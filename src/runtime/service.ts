@@ -7,6 +7,7 @@ import type { ModelAdapter } from "../model/contract.ts";
 import { openDatabase } from "./storage.ts";
 import { ConfigurationService } from "../configuration/service.ts";
 import { SessionService } from "./sessions.ts";
+import type { PluginDefinition } from "../plugins/contract.ts";
 
 export class ApplicationError extends Error {
   constructor(readonly code: AppError["code"], message: string) { super(message); }
@@ -17,12 +18,12 @@ export class ApplicationService {
   readonly configuration: ConfigurationService;
   readonly sessions: SessionService;
   private readonly db: DatabaseSync;
-  constructor(root: string, options: { protector?: SecretProtector; onConfigurationChanged?: () => void; onSessionChanged?: (event: SessionChanged) => void; adapterFactory?: (settings: ModelSettings) => ModelAdapter } = {}) {
+  constructor(root: string, options: { protector?: SecretProtector; onConfigurationChanged?: () => void; onSessionChanged?: (event: SessionChanged) => void; adapterFactory?: (settings: ModelSettings) => ModelAdapter; plugins?: readonly PluginDefinition[] } = {}) {
     this.db = openDatabase(root);
     try {
       const unavailable = async (): Promise<string> => { throw new Error("System credential protection is unavailable."); };
       this.configuration = new ConfigurationService(root, options.protector ?? { available: async () => false, encrypt: unavailable, decrypt: unavailable }, options.onConfigurationChanged);
-      this.sessions = new SessionService(this.db, root, this.configuration, options.onSessionChanged, options.adapterFactory);
+      this.sessions = new SessionService(this.db, root, this.configuration, options.onSessionChanged, options.adapterFactory, options.plugins);
     } catch (error) { this.db.close(); throw error; }
   }
   async close(): Promise<void> {
