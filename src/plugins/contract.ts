@@ -8,7 +8,7 @@ import type { AgentCapabilities, ToolPolicy } from "../execution/capabilities.ts
 import type { ContextFile, ResourceBackend } from "../resources/contract.ts";
 import type { ToolImplementation } from "../tools/contract.ts";
 import type { PluginModels, RegistryView } from "./models.ts";
-import type { PluginConfig, PluginLogger, PluginSecrets, PluginTasks } from "@atelier/sdk/runtime";
+import type { PluginConfig, PluginLogger, PluginSecrets, PluginTasks, PluginStreams } from "@atelier/sdk/runtime";
 export { PluginApiError, type PluginConfig, type PluginLogger, type PluginSecrets, type PluginTasks } from "@atelier/sdk/runtime";
 
 /** 资源状态属于会话数据；只能读写本插件资源类型的对象。 */
@@ -86,7 +86,7 @@ export interface PluginContext {
   readonly models: PluginModels;
   /** 宿主托管的进程内异步任务：同 key 运行中不重复启动，宿主关闭时取消；重启不补做。 */
   readonly tasks: PluginTasks;
-  readonly streams: import("@atelier/sdk/runtime").PluginStreams;
+  readonly streams: PluginStreams;
   /** 跨插件协作统一走资源命令。 */
   readonly commands: { invoke(sessionId: string, objectId: string, command: Json): Promise<void> };
 }

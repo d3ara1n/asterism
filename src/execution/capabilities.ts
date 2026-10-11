@@ -1,6 +1,6 @@
 import type { AgentConfiguration } from "../shared/configuration.ts";
 import type { Json } from "../shared/model.ts";
-import type { ToolInvocationInfo } from "../shared/tool-result.ts";
+import type { ToolInvocationInfo } from "@atelier/sdk/contracts";
 import type { FoldedObject } from "../session/fold.ts";
 import type { ResourceRegistry } from "../resources/registry.ts";
 import type { ToolRegistry } from "../tools/registry.ts";

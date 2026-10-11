@@ -1,4 +1,4 @@
-import type { ToolResult } from "../shared/tool-result";
+import type { ToolResult } from "@atelier/sdk/contracts";
 import type { TextRead, TextChange } from "../tools/text-contract";
 import { t } from "../renderer/shared/i18n";
 

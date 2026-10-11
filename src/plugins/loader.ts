@@ -11,6 +11,7 @@ import type { ToolImplementation } from "../tools/contract.ts";
 import { ToolRegistry } from "../tools/registry.ts";
 import type { ToolContract } from "@atelier/sdk/contracts";
 import { PluginApiError, type CommitEvent, type CommandPreparer, type SessionObserver, type PluginContext, type PluginTasks, type PluginDefinition, type PluginLogger, type PluginSession, type PluginSessions } from "./contract.ts";
+import { sessionView, toRecords } from "./records.ts";
 
 export interface PluginHostServices {
   extensionsDirectory: string;
@@ -71,7 +72,6 @@ class TaskHost implements PluginTasks {
 const defaultLog: NonNullable<PluginHostServices["log"]> = (pluginId, level, message, error) =>
   console[level](`[plugin ${pluginId}] ${message}`, ...(error === undefined ? [] : [error]));
 
-import { sessionView, toRecords } from "./records.ts";
 
 function context(plugin: PluginDefinition, services: PluginHostServices, storage: PluginStorage, tasks: PluginTasks): PluginContext {
   const id = plugin.namespace.id;

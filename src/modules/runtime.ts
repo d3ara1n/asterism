@@ -9,7 +9,7 @@ const entries = import.meta.glob<PluginModule>("./*/runtime.ts", { eager: true, 
 export const corePlugin = definePlugin({ namespace: core, version: coreVersion,
   modules: Object.keys(entries).sort().map(path => entries[path]!) });
 
-/** 装配顺序：atelier.core 最先，外部插件随后（外部加载待实现）。 */
+/** 装配顺序：atelier.core 最先，外部插件包随后，按用户列表顺序。 */
 export function createModules(services: PluginHostServices, external: readonly PluginDefinition[] = []) {
   return loadPlugins([corePlugin, ...external], services);
 }

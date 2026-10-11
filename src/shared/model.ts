@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { modelExpressionSchema, modelSchema, providerInputSchema, thinkingSchema } from "./configuration.ts";
 export { jsonSchema, type Json } from "@atelier/sdk/contracts";
-export { toolOutcomeSchema, type ToolOutcome } from "./tool-result.ts";
+export { toolOutcomeSchema, type ToolOutcome } from "@atelier/sdk/contracts";
 
 /** SDK 需要非空凭据占位；无鉴权请求在传输层移除认证头。 */
 export const unauthenticatedApiKey = "no-auth";

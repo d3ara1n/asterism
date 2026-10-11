@@ -3,7 +3,7 @@ import { z } from "zod";
 import { defineData, reference } from "@atelier/sdk/contracts";
 import { defineImplementation, defineResource, defineTool } from "@atelier/sdk/contracts";
 import type { Json, ToolOutcome } from "../shared/model.ts";
-import type { ToolInvocationInfo } from "../shared/tool-result.ts";
+import type { ToolInvocationInfo } from "@atelier/sdk/contracts";
 import { implement, type CallResult } from "../tools/contract.ts";
 import { ToolRegistry } from "../tools/registry.ts";
 import { ResourceRegistry } from "../resources/registry.ts";

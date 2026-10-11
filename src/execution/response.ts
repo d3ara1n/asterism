@@ -1,6 +1,6 @@
 import { ModelFailure, type ModelEvent, type StreamPart } from "../model/contract.ts";
 import type { Json, ToolOutcome } from "../shared/model.ts";
-import type { ToolInvocationInfo, ToolResult } from "../shared/tool-result.ts";
+import type { ToolInvocationInfo, ToolResult } from "@atelier/sdk/contracts";
 import { emptyCompletion, type BlockCompletion, type LiveBlock, type NewNode } from "../shared/session.ts";
 
 type BufferedBlock = {

@@ -1,6 +1,6 @@
 import type { z } from "zod";
 import { jsonSchema, type Json } from "@atelier/sdk/contracts";
-import type { ToolCompletion, ToolInvocationInfo } from "../shared/tool-result.ts";
+import type { ToolCompletion, ToolInvocationInfo } from "@atelier/sdk/contracts";
 import type { ImplementationContract, ToolContract } from "@atelier/sdk/contracts";
 import { reference, type ContractReference } from "@atelier/sdk/contracts";
 import type { FoldedObject } from "../session/fold.ts";

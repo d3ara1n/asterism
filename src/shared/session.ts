@@ -3,7 +3,7 @@ import { coreChannel } from "./core.ts";
 import { jsonSchema, toolOutcomeSchema, usageSchema } from "./model.ts";
 import { modelExpressionSchema, thinkingSchema } from "./configuration.ts";
 import { pointSchema, workbenchCommands, workbenchSnapshotSchema } from "./workbench.ts";
-import { toolInvocationSchema, toolRunningResultSchema } from "./tool-result.ts";
+import { toolInvocationSchema, toolRunningResultSchema } from "@atelier/sdk/contracts";
 
 const id = z.string().min(1).max(160);
 /** 会话树节点共有字段：父指针组织分支，agentId 标明归属代理（事件与通知可无归属）。 */
