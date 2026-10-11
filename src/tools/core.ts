@@ -24,7 +24,7 @@ export const ResourceList = defineTool({
   guidelines: [
     "Use this control when you need to discover authorized resource IDs, types and titles.",
     "Inspect a selected resource to obtain its live state and available tool definitions.",
-    "Only linked resources are listed; visibility on the workbench does not grant access.",
+    "Use this list to refresh resource availability when earlier resource references may be out of date.",
   ],
   argsSchema: z.strictObject({}).describe("No parameters; pass an empty object."),
 });
@@ -50,7 +50,7 @@ export const ResourceCall = defineTool({
     "Follow the selected tool's guidelines and shared args schema; target follows that resource implementation's schema.",
     "Omitting target is equivalent to null; this is valid only when the implementation accepts null.",
     jsonArgumentHint,
-    "A tool's availability does not bypass resource authorization. Use the outcome to decide whether to continue, correct arguments or ask the user to resolve the failure.",
+    "Use the outcome to decide whether to continue or correct the call. If access is denied, refresh the resource list; if the needed resource is no longer linked, ask the user to link it again.",
   ],
   argsSchema: z.strictObject({
     resource_id: z.string().min(1).describe("The opaque ID of a resource currently linked to this agent."),
