@@ -39,6 +39,6 @@
 - [x] 本地改动摘要已展示，用户明确授权提交与推送；提交及远端状态以 git 记录为准。
 - [x] GitHub 仓库已改为 `d3ara1n/atelier`，原仓库身份与历史保留，仍为私有；简介与 `package.json` 同步。
 - [x] 本地 origin 的 fetch / push 地址均为 `git@github.com:d3ara1n/atelier.git`，main 同步使用新地址。
-- [ ] 用户将本地文件夹由 `weft` 改为 `atelier`；源码、构建与数据位置不依赖绝对仓库路径。
+- [x] 本地文件夹已为 `atelier`，当前路径 `/Users/chien/Projects/atelier`；源码、构建与数据位置不依赖绝对仓库路径。
 
 全部完成后移入 `plans/archived/`，统一身份与数据布局的最终约定保留在 `docs/decisions.md` 和 `docs/architecture.md`。
