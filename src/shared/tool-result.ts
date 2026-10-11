@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { jsonSchema, type Json } from "./json.ts";
-import { contractReferenceSchema } from "./presentation.ts";
+import { jsonSchema, type Json } from "@atelier/sdk/contracts";
+import { contractReferenceSchema } from "@atelier/sdk/contracts";
 
 export const toolResourceSchema = z.strictObject({ id: z.string(), kind: z.string(), title: z.string() });
 /** 当次请求选中的身份；历史展示不能改用当前资源或当前实现。 */

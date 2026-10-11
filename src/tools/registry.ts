@@ -1,5 +1,5 @@
 import type { FoldedObject } from "../session/fold.ts";
-import { contractKey } from "../shared/presentation.ts";
+import { contractKey } from "@atelier/sdk/contracts";
 import type { ToolImplementation } from "./contract.ts";
 import { projectTool } from "./definition.ts";
 

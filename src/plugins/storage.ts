@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { z } from "zod";
 import type { CredentialVault } from "../configuration/credentials.ts";
-import { jsonSchema, type Json } from "../shared/json.ts";
+import { jsonSchema, type Json } from "@atelier/sdk/contracts";
 import { PluginApiError, type PluginConfig, type PluginSecrets } from "./contract.ts";
 
 /** 宿主托管目录名；插件目录其余部分归插件自由写入。 */

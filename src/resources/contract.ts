@@ -1,7 +1,7 @@
-import type { Json } from "../shared/json.ts";
-import type { DataContract, Presentation } from "../shared/presentation.ts";
-import { present } from "../shared/presentation.ts";
-import type { ResourceContract } from "../shared/module-contract.ts";
+import type { Json } from "@atelier/sdk/contracts";
+import type { DataContract, Presentation } from "@atelier/sdk/contracts";
+import { present } from "@atelier/sdk/contracts";
+import type { ResourceContract } from "@atelier/sdk/contracts";
 import type { LiveBlock } from "../shared/session.ts";
 import type { FoldedObject } from "../session/fold.ts";
 

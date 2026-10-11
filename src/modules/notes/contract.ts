@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { core } from "../plugin.ts";
-import { defineImplementation } from "../../shared/module-contract.ts";
+import { defineImplementation } from "@atelier/sdk/contracts";
 import { Read, Edit, Write } from "../../tools/declarations.ts";
 import { textReadSchema, textChangeSchema } from "../../tools/text-contract.ts";
 

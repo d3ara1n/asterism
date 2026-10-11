@@ -1,8 +1,8 @@
 import { jsonSchema, type Json, type ToolOutcome } from "../shared/model.ts";
 import { toolInvocationSchema, type ToolInvocationInfo } from "../shared/tool-result.ts";
-import { reference } from "../shared/presentation.ts";
+import { reference } from "@atelier/sdk/contracts";
 import type { ToolDeclaration } from "../model/contract.ts";
-import type { ToolContract } from "../shared/module-contract.ts";
+import type { ToolContract } from "@atelier/sdk/contracts";
 import type { CallResult, Invocation, PreparedResult } from "../tools/contract.ts";
 import { finishToolResult, resolveToolCompletion } from "../tools/result.ts";
 import { declareTool } from "../tools/definition.ts";

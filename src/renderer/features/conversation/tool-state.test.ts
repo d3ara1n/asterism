@@ -2,7 +2,7 @@ import { isValidElement } from "react";
 import { describe, expect, it } from "vitest";
 import type { LiveBlock, SessionNode } from "../../../shared/session";
 import { emptyCompletion } from "../../../shared/session";
-import { reference } from "../../../shared/presentation";
+import { reference } from "@atelier/sdk/contracts";
 import { DirectoryList } from "../../../modules/filesystem/contract";
 import filesystem from "../../../modules/filesystem/renderer";
 import { ViewRegistry, type ToolRenderProps } from "../../modules/registry";

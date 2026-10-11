@@ -1,0 +1,12 @@
+{
+  "name": "@atelier/sdk",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    "./contracts": "./src/contracts.ts"
+  },
+  "peerDependencies": {
+    "zod": "^4.6.5"
+  }
+}

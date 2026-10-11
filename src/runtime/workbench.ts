@@ -4,7 +4,7 @@ import type { ResourceRegistry } from "../resources/registry.ts";
 import { createResourceId } from "../resources/id.ts";
 import { foldWorkbench, type FoldedObject } from "../session/fold.ts";
 import { SessionError, type SessionTree } from "../session/tree.ts";
-import type { Json } from "../shared/json.ts";
+import type { Json } from "@atelier/sdk/contracts";
 import type { SessionNode } from "../shared/session.ts";
 import { workbenchSnapshotSchema, type WorkbenchCommand, type WorkbenchSnapshot, type Point, type Viewport } from "../shared/workbench.ts";
 

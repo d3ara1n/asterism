@@ -1,4 +1,4 @@
-import { jsonSchema, type Json } from "../shared/json.ts";
+import { jsonSchema, type Json } from "@atelier/sdk/contracts";
 import { toolCompletionSchema, toolOutcomeSchema, type ToolInvocationInfo, type ToolOutcome } from "../shared/tool-result.ts";
 import type { CallResult } from "./contract.ts";
 

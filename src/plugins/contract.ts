@@ -1,7 +1,7 @@
 import type { z } from "zod";
 import type { DatabaseSync } from "node:sqlite";
-import type { Json } from "../shared/json.ts";
-import type { PluginNamespace } from "../shared/plugin.ts";
+import type { Json } from "@atelier/sdk/contracts";
+import type { PluginNamespace } from "@atelier/sdk/contracts";
 import type { BlockCompletion, NewNode, SessionNode } from "../shared/session.ts";
 import type { FoldedObject } from "../session/fold.ts";
 import type { AgentCapabilities, ToolPolicy } from "../execution/capabilities.ts";

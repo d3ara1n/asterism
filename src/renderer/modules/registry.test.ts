@@ -1,8 +1,8 @@
 import { createElement, isValidElement } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { defineData, present, reference } from "../../shared/presentation";
-import type { Json } from "../../shared/json";
+import { defineData, present, reference } from "@atelier/sdk/contracts";
+import type { Json } from "@atelier/sdk/contracts";
 import { cardRenderer, toolRenderer, ViewRegistry, type ToolRenderProps } from "./registry";
 
 const data = defineData("test.text", 1, z.strictObject({ text: z.string() }));

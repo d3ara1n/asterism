@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { defineTool } from "../shared/module-contract.ts";
+import { defineTool } from "@atelier/sdk/contracts";
 import { editOperationSchema } from "./text-contract.ts";
 
 /** 内置共享工具；模块也可声明独特工具或引用其他模块导出的定义。 */

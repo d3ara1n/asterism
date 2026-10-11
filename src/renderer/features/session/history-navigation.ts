@@ -1,4 +1,4 @@
-import type { Json } from "../../../shared/json";
+import type { Json } from "@atelier/sdk/contracts";
 import type { SessionNode } from "../../../shared/session";
 import { selectable } from "../../../shared/session-path";
 import { t } from "../../shared/i18n";

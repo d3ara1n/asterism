@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { jsonSchema, type Json } from "../shared/json.ts";
-import type { ToolContract } from "../shared/module-contract.ts";
+import { jsonSchema, type Json } from "@atelier/sdk/contracts";
+import type { ToolContract } from "@atelier/sdk/contracts";
 
 export function schemaOf(schema: z.ZodType<Json>): Json {
   return jsonSchema.parse(z.toJSONSchema(schema));

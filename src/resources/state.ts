@@ -1,5 +1,5 @@
 import type { DatabaseSync } from "node:sqlite";
-import { jsonSchema, type Json } from "../shared/json.ts";
+import { jsonSchema, type Json } from "@atelier/sdk/contracts";
 
 /** 资源私有数据：按对象 ID 与键保存，会话只负责级联清理，不解释内容。 */
 export class ResourceStateStore {

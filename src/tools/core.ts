@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { coreId } from "../shared/core.ts";
-import { jsonSchema } from "../shared/json.ts";
-import { defineTool } from "../shared/module-contract.ts";
-import { contractReferenceSchema, defineData } from "../shared/presentation.ts";
+import { jsonSchema } from "@atelier/sdk/contracts";
+import { defineTool } from "@atelier/sdk/contracts";
+import { contractReferenceSchema, defineData } from "@atelier/sdk/contracts";
 import { jsonArgumentHint } from "./validation.ts";
 
 export const ResourceListResult = defineData(coreId("resource-list"), 1, z.strictObject({

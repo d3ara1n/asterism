@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { workbenchSnapshotSchema } from "../../../shared/workbench";
-import { defineData, present } from "../../../shared/presentation";
+import { defineData, present } from "@atelier/sdk/contracts";
 import { cardRenderer, ViewRegistry } from "../../modules/registry";
 import { workbenchNodes } from "./nodes";
 

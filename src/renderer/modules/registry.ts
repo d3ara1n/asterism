@@ -1,11 +1,11 @@
 import { createElement, type ComponentType, type ReactNode } from "react";
 import { Box } from "lucide-react";
 import { t } from "../shared/i18n";
-import type { Json } from "../../shared/json.ts";
+import type { Json } from "@atelier/sdk/contracts";
 import type { z } from "zod";
 import type { ToolInvocationInfo, ToolResult } from "../../shared/tool-result.ts";
-import { pluginOf } from "../../shared/plugin.ts";
-import { contractKey, reference, type ContractReference, type DataContract, type Presentation } from "../../shared/presentation.ts";
+import { pluginOf } from "@atelier/sdk/contracts";
+import { contractKey, reference, type ContractReference, type DataContract, type Presentation } from "@atelier/sdk/contracts";
 
 /** 类型级静态识别信息，不解析卡片数据，也不创建正文组件。 */
 export interface ResourceDescription {

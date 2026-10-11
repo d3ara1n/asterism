@@ -17,7 +17,7 @@ import { SubmissionIdentity } from "../features/session/controller";
 import { sessionController } from "../features/session/registry";
 import { s, useConfiguration } from "../features/configuration/state";
 import type { AgentSelection } from "../../shared/model";
-import type { Json } from "../../shared/json";
+import type { Json } from "@atelier/sdk/contracts";
 import { AddAgentDialog } from "../features/workbench/AddAgentDialog";
 import { AddNoteDialog } from "../features/workbench/AddNoteDialog";
 import { AddDirectoryDialog } from "../features/workbench/AddDirectoryDialog";

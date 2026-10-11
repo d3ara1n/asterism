@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import { pluginNamespace } from "../shared/plugin.ts";
-import { defineImplementation, defineTool } from "../shared/module-contract.ts";
+import { pluginNamespace } from "@atelier/sdk/contracts";
+import { defineImplementation, defineTool } from "@atelier/sdk/contracts";
 import { implement } from "../tools/contract.ts";
 import { definePlugin, defineModule, type PluginDefinition } from "./contract.ts";
 import { loadPlugins, type PluginHostServices } from "./loader.ts";

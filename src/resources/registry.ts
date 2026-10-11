@@ -1,6 +1,6 @@
-import { jsonSchema, type Json } from "../shared/json.ts";
-import { missingResourceContract, pluginOf } from "../shared/plugin.ts";
-import type { Presentation } from "../shared/presentation.ts";
+import { jsonSchema, type Json } from "@atelier/sdk/contracts";
+import { missingResourceContract, pluginOf } from "@atelier/sdk/contracts";
+import type { Presentation } from "@atelier/sdk/contracts";
 import type { FoldedObject } from "../session/fold.ts";
 import type { ContextFile, ResourceBackend, ResourceController } from "./contract.ts";
 

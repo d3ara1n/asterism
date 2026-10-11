@@ -1,14 +1,14 @@
 import type { CredentialVault } from "../configuration/credentials.ts";
 import { PluginStorage } from "./storage.ts";
 import type { PluginModels, RegistryView } from "./models.ts";
-import { belongsTo } from "../shared/plugin.ts";
-import { contractKey } from "../shared/presentation.ts";
+import { belongsTo } from "@atelier/sdk/contracts";
+import { contractKey } from "@atelier/sdk/contracts";
 import type { ResourceBackend } from "../resources/contract.ts";
 import type { ResourceStateStore } from "../resources/state.ts";
 import { ResourceRegistry } from "../resources/registry.ts";
 import type { ToolImplementation } from "../tools/contract.ts";
 import { ToolRegistry } from "../tools/registry.ts";
-import type { ToolContract } from "../shared/module-contract.ts";
+import type { ToolContract } from "@atelier/sdk/contracts";
 import { PluginApiError, type PluginContext, type PluginDefinition, type PluginLogger, type PluginSession, type PluginSessions } from "./contract.ts";
 
 export interface PluginHostServices {

@@ -1,8 +1,8 @@
 import { Boxes, ScanSearch, Wrench } from "lucide-react";
 import type { ReactNode } from "react";
 import { ResourceCall, ResourceInspectResult, ResourceListResult } from "../../../tools/core";
-import type { Json } from "../../../shared/json";
-import { contractKey } from "../../../shared/presentation";
+import type { Json } from "@atelier/sdk/contracts";
+import { contractKey } from "@atelier/sdk/contracts";
 import { toolRenderer, type ToolRenderProps, type ToolRenderer, type ToolView, type ViewRegistry } from "../../modules/registry";
 import { JsonView, useModuleViews } from "../../modules/views";
 import { t } from "../../shared/i18n";
