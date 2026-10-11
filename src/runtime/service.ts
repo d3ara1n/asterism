@@ -8,20 +8,29 @@ import { openDatabase } from "./storage.ts";
 import { ConfigurationService } from "../configuration/service.ts";
 import { SessionService } from "./sessions.ts";
 import type { PluginDefinition } from "../plugins/contract.ts";
+import { join } from "node:path";
+import { PackageList, PluginPackageError } from "../plugins/packages.ts";
 
 export class ApplicationError extends Error {
   constructor(readonly code: AppError["code"], message: string) { super(message); }
 }
 
 /** 应用组合根与会话索引；会话内容、操作和查询由 SessionService 拥有。 */
+export interface StartupPackage { source: string; enabled: boolean; id: string | null; status: "loaded" | "disabled" | "invalid" | "failed"; error: string | null; renderer: string | null }
+
 export class ApplicationService {
   readonly configuration: ConfigurationService;
   readonly sessions: SessionService;
   private readonly db: DatabaseSync;
-  private readonly packages: AppSnapshot["plugins"];
-  constructor(root: string, options: { packages?: AppSnapshot["plugins"]; protector?: SecretProtector; onConfigurationChanged?: () => void; onSessionChanged?: (event: SessionChanged) => void; adapterFactory?: (settings: ModelSettings) => ModelAdapter; plugins?: readonly PluginDefinition[]; onStream?: (event: { sessionId: string; objectId: string; channel: string; data: Uint8Array }) => void } = {}) {
+  private readonly packages: StartupPackage[];
+  private readonly list: PackageList;
+  private readonly started: string;
+  constructor(root: string, options: { packages?: StartupPackage[]; protector?: SecretProtector; onConfigurationChanged?: () => void; onSessionChanged?: (event: SessionChanged) => void; adapterFactory?: (settings: ModelSettings) => ModelAdapter; plugins?: readonly PluginDefinition[]; onStream?: (event: { sessionId: string; objectId: string; channel: string; data: Uint8Array }) => void } = {}) {
     this.db = openDatabase(root);
     this.packages = options.packages ?? [];
+    this.list = new PackageList(join(root, "plugins.json"));
+    this.started = JSON.stringify(this.list.read());
+    this.npmRoot = join(root, "plugins");
     try {
       const unavailable = async (): Promise<string> => { throw new Error("System credential protection is unavailable."); };
       this.configuration = new ConfigurationService(root, options.protector ?? { available: async () => false, encrypt: unavailable, decrypt: unavailable }, options.onConfigurationChanged);
@@ -33,10 +42,30 @@ export class ApplicationService {
     await this.sessions.close();
     this.db.close();
   }
+  private readonly npmRoot: string;
   execute(raw: unknown): AppSnapshot {
-    if (!commandSchema.safeParse(raw).success) throw new ApplicationError("invalid_request", "Invalid application command.");
+    const parsed = commandSchema.safeParse(raw);
+    if (!parsed.success) throw new ApplicationError("invalid_request", "Invalid application command.");
+    const command = parsed.data;
+    try {
+      if (command.type === "plugin.add") this.list.add({ source: { kind: "path", path: command.path } }, this.npmRoot);
+      else if (command.type === "plugin.enable") this.list.setEnabled(command.index, command.enabled);
+      else if (command.type === "plugin.remove") this.list.remove(command.index);
+    } catch (error) {
+      if (error instanceof PluginPackageError) throw new ApplicationError(error.code === "duplicate" ? "conflict" : "invalid_request", error.message);
+      throw error;
+    }
     const workspace = this.db.prepare("SELECT * FROM workspace LIMIT 1").get();
     const sessions = this.sessions.tree.list().map(session => ({ id: session.id, title: session.title, created_at: session.createdAt }));
-    return snapshotSchema.parse({ workspace, sessions, plugins: this.packages });
+    const current = this.list.read();
+    // 列表项按来源匹配本次启动结果；新加入或改动的项显示为待重启。
+    const plugins = current.map((entry, index) => {
+      const source = entry.source.kind === "path" ? entry.source.path : `${entry.source.name}@${entry.source.version}`;
+      const startup = this.packages.find(item => item.source === source);
+      const pending = !startup || startup.enabled !== entry.enabled;
+      return { index, source, enabled: entry.enabled, id: startup?.id ?? null, status: pending ? "pending" as const : startup.status,
+        error: pending ? null : startup.error, renderer: pending ? null : startup.renderer };
+    });
+    return snapshotSchema.parse({ workspace, sessions, plugins, restartRequired: JSON.stringify(current) !== this.started });
   }
 }

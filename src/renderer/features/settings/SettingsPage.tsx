@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
 import { AnimatePresence, LayoutGroup, motion } from "motion/react";
-import { ArrowLeft, Info, Palette, Cpu, PlugZap, Bot, type LucideProps } from "lucide-react";
+import { ArrowLeft, Info, Palette, Cpu, PlugZap, Bot, Puzzle, type LucideProps } from "lucide-react";
 import { applicationId } from "../../../shared/application";
 import { t } from "../../shared/i18n";
 import { Button } from "../../shared/ui/button";
@@ -17,6 +17,7 @@ import { ConfigurationStatus } from "../configuration/forms";
 import { ProvidersSettings } from "../configuration/ProvidersSettings";
 import { RolesSettings } from "../configuration/RolesSettings";
 import { AgentsSettings } from "../configuration/AgentsSettings";
+import { PluginsSettings } from "../plugins/PluginsSettings";
 
 /** 设置分类注册表：新增分类只需追加一项。仅列入有明确用途的分类。 */
 interface SettingsCategory { id: string; title: string; summary: string; icon: ComponentType<LucideProps>; content: () => ReactNode }
@@ -26,6 +27,7 @@ const categories: SettingsCategory[] = [
   { id: "providers", title: s("Providers", "提供商"), summary: s("Connections and available models", "连接与具体模型"), icon: PlugZap, content: () => <ProvidersSettings /> },
   { id: "roles", title: t.rolesTitle, summary: s("Reusable model roles", "可复用的模型角色"), icon: Cpu, content: () => <RolesSettings /> },
   { id: "agents", title: s("Agents", "代理"), summary: s("Prompts, tools, and delegation", "提示词、工具与委派配置"), icon: Bot, content: () => <AgentsSettings /> },
+  { id: "plugins", title: s("Plugins", "插件"), summary: s("Packages, status, and failures", "插件包、状态与失败原因"), icon: Puzzle, content: () => <PluginsSettings /> },
   { id: "about", title: t.aboutTitle, summary: t.aboutSummary, icon: Info, content: () => <>
     <p className="type-body py-4 text-muted-foreground">{t.aboutBody}</p>
     <Row label={t.aboutIdentity}><code className="text-xs">{applicationId}</code></Row>

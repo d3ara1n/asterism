@@ -723,3 +723,16 @@ describe("会话运行时", () => {
       .toEqual(["succeeded", "rejected"]);
   });
 });
+
+describe("插件包管理命令", () => {
+  it("添加无效路径失败；有效包进入列表并标为重启后生效", async () => {
+    const { service, root } = await setup();
+    expect(() => service.execute({ type: "plugin.add", path: join(root, "missing") })).toThrow(/No package.json/);
+    const dir = join(root, "pkg"); mkdirSync(dir);
+    writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "p", atelier: { id: "acme.p", api: { major: 1, minMinor: 0 } } }));
+    const added = service.execute({ type: "plugin.add", path: dir });
+    expect(added.plugins.map(p => [p.source, p.status, p.enabled])).toEqual([[dir, "pending", true]]);
+    expect(added.restartRequired).toBe(true);
+    expect(service.execute({ type: "plugin.remove", index: 0 }).restartRequired).toBe(false);
+  });
+});

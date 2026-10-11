@@ -12,7 +12,13 @@ export const objectStreamChannel = coreChannel("object-stream");
 export const pickDirectoryChannel = coreChannel("pick-directory");
 const id = z.string().uuid();
 /** 应用入口只读取工作区身份和会话摘要，不持有已打开会话的正文。 */
-export const commandSchema = z.strictObject({ type: z.literal("workspace.read") });
+export const commandSchema = z.discriminatedUnion("type", [
+  z.strictObject({ type: z.literal("workspace.read") }),
+  // 插件包管理：只改包列表，重启后生效；路径必须是含 Atelier 清单的包根。
+  z.strictObject({ type: z.literal("plugin.add"), path: z.string().min(1).max(4096) }),
+  z.strictObject({ type: z.literal("plugin.enable"), index: z.number().int().nonnegative(), enabled: z.boolean() }),
+  z.strictObject({ type: z.literal("plugin.remove"), index: z.number().int().nonnegative() }),
+]);
 export type Command = z.infer<typeof commandSchema>;
 export const runtimeStatusSchema = z.enum(["starting", "ready", "unavailable", "stopping"]);
 export type RuntimeStatus = z.infer<typeof runtimeStatusSchema>;
@@ -21,7 +27,9 @@ export const snapshotSchema = z.strictObject({
   sessions: z.array(z.strictObject({ id, title: z.string(), created_at: z.string() })),
   /** 插件包：启动时状态；renderer 为 atelier-plugin:// 下的入口路径。 */
   plugins: z.array(z.strictObject({ index: z.number().int().nonnegative(), id: z.string().nullable(), source: z.string(),
-    status: z.enum(["loaded", "disabled", "invalid", "failed"]), error: z.string().nullable(), renderer: z.string().nullable() })),
+    status: z.enum(["loaded", "disabled", "invalid", "failed", "pending"]), enabled: z.boolean(), error: z.string().nullable(), renderer: z.string().nullable() })),
+  /** 包列表与本次启动不同：需要重启生效。 */
+  restartRequired: z.boolean(),
 });
 export type AppSnapshot = z.infer<typeof snapshotSchema>;
 export const errorSchema = z.strictObject({ code: z.enum(["invalid_request", "not_found", "conflict", "unavailable", "internal"]), message: z.string() });
