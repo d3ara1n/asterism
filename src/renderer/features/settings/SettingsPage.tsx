@@ -12,7 +12,8 @@ import { fadeTransition, islandTransition } from "../../shared/weave/motion";
 import { Screen, useIsland, type IslandSpec } from "../../shared/weave/Screen";
 import { Row } from "./preview";
 import { AppearanceSettings } from "../appearance/AppearanceSettings";
-import { ConfigurationContext, s, useConfiguration } from "../configuration/state";
+import { ConfigurationContext, useConfiguration } from "../configuration/state";
+import { s } from "../../shared/i18n";
 import { ConfigurationStatus } from "../configuration/forms";
 import { ProvidersSettings } from "../configuration/ProvidersSettings";
 import { RolesSettings } from "../configuration/RolesSettings";
@@ -27,7 +28,7 @@ const categories: SettingsCategory[] = [
   { id: "providers", title: s("Providers", "提供商"), summary: s("Connections and available models", "连接与具体模型"), icon: PlugZap, content: () => <ProvidersSettings /> },
   { id: "roles", title: t.rolesTitle, summary: s("Reusable model roles", "可复用的模型角色"), icon: Cpu, content: () => <RolesSettings /> },
   { id: "agents", title: s("Agents", "代理"), summary: s("Prompts, tools, and delegation", "提示词、工具与委派配置"), icon: Bot, content: () => <AgentsSettings /> },
-  { id: "plugins", title: s("Plugins", "插件"), summary: s("Packages, status, and failures", "插件包、状态与失败原因"), icon: Puzzle, content: () => <PluginsSettings /> },
+  { id: "plugins", title: s("Plugins", "插件"), summary: s("Packages, status, and settings", "插件包、状态与配置"), icon: Puzzle, content: () => <PluginsSettings /> },
   { id: "about", title: t.aboutTitle, summary: t.aboutSummary, icon: Info, content: () => <>
     <p className="type-body py-4 text-muted-foreground">{t.aboutBody}</p>
     <Row label={t.aboutIdentity}><code className="text-xs">{applicationId}</code></Row>

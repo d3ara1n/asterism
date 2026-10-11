@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { emptyCompletion, type SessionBridge, type SessionChanged, type SessionCommand, type SessionResult, type SessionSnapshot, type SessionNode, type SessionProgress } from "../../../shared/session.ts";
-import { conversationTimeline, timelineKey } from "../../../shared/session-view.ts";
+import { type SessionBridge, type SessionChanged, type SessionCommand, type SessionResult, type SessionSnapshot, type SessionProgress } from "../../../shared/session.ts";
 import { SessionController, SubmissionIdentity } from "./controller.ts";
 
 function snapshot(revision: number, at: string | null = null): SessionSnapshot {
@@ -274,13 +273,4 @@ describe("会话视图所有权", () => {
     identity.accepted(); expect(identity.forInput({ text: "Hello" })).not.toBe(first);
   });
 
-  it("同一块从内存转入历史时展示身份不变，过渡快照不重复展示", () => {
-    const live = { id: "r:0", agentId: "a", responseId: "r", ordinal: 0, kind: "thinking" as const, text: "thinking", startedAt: 1000 };
-    const saved: SessionNode = { ...live, ...emptyCompletion, id: "saved-id", sessionId: "s", parentId: null, createdAt: "",
-      requestParentId: null, model: "p/m", complete: true, continuation: null, adapter: "test", scope: "s" };
-    const before = conversationTimeline([], null, "a", [live]);
-    const after = conversationTimeline([saved], saved.id, "a", [live]);
-    expect(before.map(timelineKey)).toEqual(after.map(timelineKey));
-    expect(after).toEqual([saved]);
-  });
 });

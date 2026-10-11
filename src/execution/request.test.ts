@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { defineData, defineResource, defineTool, defineImplementation, type ModelRunEvent, type ModelRunRequest } from "@atelier/sdk/contracts";
-import { implement } from "../tools/contract.ts";
+import { implement } from "../tools/testing.ts";
 import { ResourceRegistry } from "../resources/registry.ts";
 import { ToolRegistry } from "../tools/registry.ts";
 import { AgentCapabilities } from "./capabilities.ts";

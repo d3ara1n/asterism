@@ -3,7 +3,8 @@ import { externalWebUrl } from "../shared/links.ts";
 import { mkdirSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { objectStreamChannel, commandChannel, commandSchema, pickDirectoryChannel, statusChannel, type CommandResult } from "../shared/contracts.ts";
+import { commandChannel, commandSchema, pickDirectoryChannel, statusChannel, type CommandResult } from "../shared/contracts.ts";
+import { objectStreamChannel } from "../shared/object-stream.ts";
 import { RuntimeHost } from "./runtime-host.ts";
 import { applicationBrand, applicationDataDirectory, applicationId, applicationStorage } from "../shared/application.ts";
 import { followWindowAppearance, initialWindowAppearance } from "./window-appearance.ts";
@@ -11,6 +12,7 @@ import { applyThemeSource, serveAppearance } from "./appearance.ts";
 import { initialWindowState, trackWindowState } from "./window-state.ts";
 import { configurationChannel, configurationChangedChannel, configurationCommandSchema, type ConfigurationResult } from "../shared/configuration.ts";
 import { sessionChannel, sessionChangedChannel, sessionCommandSchema, type SessionResult } from "../shared/session.ts";
+import { pluginConfigurationChannel, pluginConfigurationCommandSchema, type PluginConfigurationResult } from "../shared/plugin-configuration.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 let window: BrowserWindow | null = null;
@@ -25,7 +27,7 @@ const runtime = new RuntimeHost(status => {
   if (window && !window.isDestroyed()) window.webContents.send(sessionChangedChannel, event);
 }, event => {
   // 高频二进制只转发给窗口，不经会话 IPC 或持久化。
-  if (window && !window.isDestroyed()) window.webContents.send(objectStreamChannel, event.sessionId, event.objectId, event.channel, event.data);
+  if (window && !window.isDestroyed()) window.webContents.send(objectStreamChannel, event);
 });
 
 function createWindow(): void {
@@ -60,6 +62,7 @@ function createWindow(): void {
   ipcMain.removeHandler(configurationChannel);
   ipcMain.removeHandler(sessionChannel);
   ipcMain.removeHandler(pickDirectoryChannel);
+  ipcMain.removeHandler(pluginConfigurationChannel);
   const trusted = (event: Electron.IpcMainInvokeEvent) => event.sender === current.webContents &&
     event.senderFrame === current.webContents.mainFrame && event.senderFrame?.url === allowedURL;
   const stopAppearance = serveAppearance(current, trusted, () => refreshAppearance());
@@ -68,6 +71,12 @@ function createWindow(): void {
     const parsed = sessionCommandSchema.safeParse(raw);
     if (!parsed.success) return { ok: false, error: { code: "invalid_request", message: "Invalid session command." } };
     return runtime.session(parsed.data);
+  });
+  ipcMain.handle(pluginConfigurationChannel, async (event, raw): Promise<PluginConfigurationResult> => {
+    if (!trusted(event)) return { ok: false, error: { code: "invalid_request", message: "Untrusted application frame." } };
+    const parsed = pluginConfigurationCommandSchema.safeParse(raw);
+    if (!parsed.success) return { ok: false, error: { code: "invalid_request", message: "Invalid plugin configuration command." } };
+    return runtime.configurePlugin(parsed.data);
   });
   // 只返回用户在系统窗口中选择的路径；渲染端不能借此读取文件。
   ipcMain.handle(pickDirectoryChannel, async event => {
@@ -94,7 +103,7 @@ function createWindow(): void {
     return runtime.configure(parsed.data);
   });
   current.on("closed", () => {
-    window = null; ipcMain.removeHandler(commandChannel); ipcMain.removeHandler(configurationChannel); ipcMain.removeHandler(sessionChannel); ipcMain.removeHandler(pickDirectoryChannel); stopAppearance();
+    window = null; ipcMain.removeHandler(commandChannel); ipcMain.removeHandler(configurationChannel); ipcMain.removeHandler(sessionChannel); ipcMain.removeHandler(pickDirectoryChannel); ipcMain.removeHandler(pluginConfigurationChannel); stopAppearance();
   });
   const loading = developmentURL ? current.loadURL(developmentURL) : current.loadFile(rendererFile);
   loading.catch(error => { console.error("Renderer initialization failed.", error); dialog.showErrorBox(applicationBrand.en, "The application window could not be loaded."); });

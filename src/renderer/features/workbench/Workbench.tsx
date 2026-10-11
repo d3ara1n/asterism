@@ -1,3 +1,4 @@
+import { RendererCatalogProvider } from "../../modules/object-context";
 import type { WorkbenchOperation } from "../session/controller";
 import { useCallback, useEffect, useLayoutEffect, useImperativeHandle, useMemo, useRef, useState, type ReactNode, type Ref } from "react";
 import { ReactFlow, ReactFlowProvider, Panel, useReactFlow, applyNodeChanges, applyEdgeChanges, type NodeChange, type EdgeChange, type Edge, MarkerType, ConnectionMode, type Connection, type IsValidConnection } from "@xyflow/react";
@@ -5,7 +6,7 @@ import { Crosshair, Maximize, Minus, Plus, RotateCcw } from "lucide-react";
 import { maximumViewportZoom, type WorkbenchSnapshot } from "../../../shared/workbench";
 import { useModuleViews } from "../../modules/views";
 import { t } from "../../shared/i18n";
-import { s } from "../configuration/state";
+import { s } from "../../shared/i18n";
 import { Button } from "../../shared/ui/button";
 import { Badge } from "../../shared/ui/badge";
 import { useIsland } from "../../shared/weave/Screen";
@@ -60,7 +61,7 @@ export function Workbench({ ref, controller, session, ready, busy, historical, r
   }), [open, canvas, controller]);
   useLayoutEffect(() => store.set(context), [store, context]);
 
-  return <WorkbenchContext.Provider value={context}>
+  return <RendererCatalogProvider ready={ready}><WorkbenchContext.Provider value={context}>
     <div className="relative h-full">
       <ReactFlowProvider><Canvas ref={canvasRef} session={session} run={run} writable={ready && !busy && !historical} /></ReactFlowProvider>
       {historical && <div role="status"
@@ -77,7 +78,7 @@ export function Workbench({ ref, controller, session, ready, busy, historical, r
         {busy ? t.statusBusy : ready ? t.statusReady : t.statusUnavailable}
       </Badge>
     </div>
-  </WorkbenchContext.Provider>;
+  </WorkbenchContext.Provider></RendererCatalogProvider>;
 }
 
 function Canvas({ ref, session, run, writable }: {
@@ -136,9 +137,9 @@ function Canvas({ ref, session, run, writable }: {
     });
   }, [edges]);
   const objects = useMemo(() => new Map(session.objects.map(o => [o.id, o])), [session.objects]);
-  // 终点只能是代理；起点是任意其他对象，含另一个代理。
+  // 终点由资源的静态接收声明决定；起点是任意其他对象。
   const isValidConnection: IsValidConnection = useCallback(c => !!c.source && !!c.target && c.source !== c.target
-    && objects.get(c.target)?.kind === "atelier.core/agent" && !session.links.some(l => l.agentId === c.target && l.resourceId === c.source), [objects, session.links]);
+    && !!objects.get(c.target) && registry.resource(objects.get(c.target)!.kind).receivesLinks === true && !session.links.some(l => l.agentId === c.target && l.resourceId === c.source), [objects, session.links, registry]);
   const onConnect = useCallback((c: Connection) => {
     void run({ type: "link.set", sessionId: latest.current.id, agentId: c.target, resourceId: c.source, linked: true });
   }, [run]);

@@ -1,34 +1,33 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import { pluginNamespace } from "@atelier/sdk/contracts";
+import { pluginNamespace, defineResource, jsonSchema } from "@atelier/sdk/contracts";
 import { defineImplementation, defineTool } from "@atelier/sdk/contracts";
-import { implement } from "../tools/contract.ts";
-import { definePlugin, defineModule, type PluginDefinition } from "./contract.ts";
+import { definePlugin, defineModule, implementTool, implementResource, type PluginDefinition, type Preparation } from "@atelier/sdk/runtime";
 import { loadPlugins, type PluginHostServices } from "./loader.ts";
 
-const services = { extensionsDirectory: "/unused", state: null as never, kindOf: () => null, sessions: null as never,
-  registry: null as never, models: null as never, log: () => {} } satisfies PluginHostServices;
+const services = { extensionsDirectory: "/unused", data: null as never, refOf: () => null, sessions: null as never,
+  models: null as never, log: () => {} } satisfies PluginHostServices;
 const args = z.strictObject({}).describe("No parameters.");
 const tool = (description: string) => defineTool({ name: "read", description, guidelines: [], argsSchema: args });
 function plugin(id: string, contract: ReturnType<typeof tool>, extra: ReturnType<typeof tool>[] = []): PluginDefinition {
   const ns = pluginNamespace(id);
   const resource = ns.resource("thing", z.object({}));
-  const impl = (name: string, t: ReturnType<typeof tool>) => implement(defineImplementation({
+  const impl = (name: string, t: ReturnType<typeof tool>) => implementTool(defineImplementation({
     ...ns.data(name, 1, z.null().describe("No result.")), resource, tool: t,
     targetSchema: z.null().describe("Whole resource."), effect: "read", execution: "parallel",
   }), { async call() { return { kind: "succeeded", data: null }; } });
   return definePlugin({ namespace: ns, version: "1.0.0", modules: [defineModule(() => ({
-    resources: [{ kind: resource.kind, project: () => ({ contract: { id: "x", version: 1 }, data: null }), inspect: async () => null, context: async () => [] }],
+    resources: [implementResource(resource, ns.data("view", 1, z.null()), { project: () => null, inspect: async () => null })],
     tools: [impl("thing.read", contract), ...extra.map((t, i) => impl(`thing.extra${i}`, t))],
   }))] });
 }
 
 describe("插件装配", () => {
   it("单个插件装配失败只禁用它本身", () => {
-    const broken = definePlugin({ namespace: pluginNamespace("acme.broken"), version: "1.0.0", modules: [() => { throw new Error("boom"); }] });
+    const broken = definePlugin({ namespace: pluginNamespace("acme.broken"), version: "1.0.0", modules: [defineModule(() => { throw new Error("boom"); })] });
     const loaded = loadPlugins([broken, plugin("acme.ok", tool("Read."))], services);
     expect(loaded.manifest.map(entry => [entry.id, entry.status])).toEqual([["acme.broken", "failed"], ["acme.ok", "loaded"]]);
-    expect(loaded.resources.controller("acme.ok/thing")).toBeUndefined();
+    expect(loaded.resources.controller("acme.ok/thing")?.create).toBeUndefined();
     expect(loaded.manifest[0]!.error).toBe("boom");
   });
   it("后装配的同名契约生效，绑定旧契约的实现下线，共享契约对象的实现保留", () => {
@@ -63,11 +62,12 @@ describe("插件缺席", () => {
 describe("命令准备", () => {
   it("按装配顺序串行：替换值传给后续准备者，拒绝终止整个命令", async () => {
     const seen: unknown[] = [];
-    const preparer = (id: string, kind: string, run: (command: unknown) => import("./contract.ts").Preparation) =>
+    const preparer = (id: string, kind: string, run: (command: unknown) => Preparation) =>
       definePlugin({ namespace: pluginNamespace(id), version: "1.0.0", modules: [defineModule(() => ({
-        preparers: [{ id: "p", kind, prepare: command => { seen.push(command); return run(command); } }] }))] });
+        preparers: [{ id: "p", resource: defineResource(kind, z.object({})), schema: jsonSchema,
+          prepare: command => { seen.push(command); return run(command); } }] }))] });
     const loaded = loadPlugins([
-      preparer("acme.a", "x/thing", () => ({ action: "replace", command: { text: "trimmed" } })),
+      preparer("acme.a", "x/thing", () => ({ action: "replace", input: { text: "trimmed" } })),
       preparer("acme.b", "x/thing", () => ({ action: "accept" })),
       preparer("acme.c", "x/other", () => ({ action: "reject", code: "no", message: "No." })),
     ], services);

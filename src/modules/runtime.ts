@@ -1,16 +1,17 @@
 /// <reference types="vite/client" />
-import { loadPlugins, type PluginHostServices, type LoadablePlugin, type LoadableModule } from "../plugins/loader.ts";
+import { definePlugin, type PluginDefinition, type PluginModule } from "@atelier/sdk/runtime";
+import { loadPlugins, type PluginHostServices } from "../plugins/loader.ts";
 import { core, coreVersion } from "./plugin.ts";
 
-const entries = import.meta.glob<LoadableModule>("./*/runtime.ts", { eager: true, import: "default" });
+const entries = import.meta.glob<PluginModule>("./*/runtime.ts", { eager: true, import: "default" });
 
 /** 内置功能插件：编译期收集后台模块入口；前端入口不会进入任务运行时的依赖图。 */
-export const corePlugin: LoadablePlugin = {
+export const corePlugin = definePlugin({
   namespace: core, version: coreVersion,
   modules: Object.keys(entries).sort().map(path => entries[path]!),
-};
+});
 
 /** 装配顺序：atelier.core 最先，外部插件包随后，按用户列表顺序。 */
-export function createModules(services: PluginHostServices, external: readonly LoadablePlugin[] = []) {
+export function createModules(services: PluginHostServices, external: readonly PluginDefinition[] = []) {
   return loadPlugins([corePlugin, ...external], services);
 }

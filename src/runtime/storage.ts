@@ -5,7 +5,7 @@ import { DatabaseSync } from "node:sqlite";
 import { sessionSchemaSql } from "../session/schema.ts";
 import { applicationBrand, applicationStorage } from "../shared/application.ts";
 
-const workspaceDatabaseVersion = 11;
+const workspaceDatabaseVersion = 13;
 
 export function openDatabase(root: string): DatabaseSync {
   mkdirSync(join(root, applicationStorage.databaseDirectory), { recursive: true });
@@ -31,11 +31,12 @@ export function openDatabase(root: string): DatabaseSync {
         id TEXT PRIMARY KEY, command_json TEXT NOT NULL,
         session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE
       ) STRICT;
-      -- 资源私有的可变状态，按对象与键划分；会话不解释其内容，也不进会话树。
-      CREATE TABLE resource_states (
-        object_id TEXT NOT NULL, key TEXT NOT NULL,
+      -- 当前会话数据；空 object_id 表示会话作用域，具型契约与时间轴独立。
+      CREATE TABLE session_data (
         session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
-        value_json TEXT NOT NULL, PRIMARY KEY(object_id, key)
+        object_id TEXT NOT NULL, contract_id TEXT NOT NULL,
+        version INTEGER NOT NULL CHECK(version > 0), data_json TEXT NOT NULL,
+        PRIMARY KEY(session_id, object_id, contract_id)
       ) STRICT;
       PRAGMA user_version = ${workspaceDatabaseVersion};
       COMMIT;`);

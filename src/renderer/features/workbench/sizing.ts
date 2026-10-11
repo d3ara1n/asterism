@@ -1,5 +1,5 @@
 import { maximumCardDimension, type CardSize } from "../../../shared/workbench";
-import type { CardAppearance } from "../../modules/registry";
+import type { CardAppearance } from "@atelier/sdk/renderer";
 import { fallbackCardHeight, fallbackCardWidth, minimumCardHeight, minimumCardWidth } from "./layout";
 
 export const fallbackCardAppearance: CardAppearance = { width: fallbackCardWidth, height: fallbackCardHeight };

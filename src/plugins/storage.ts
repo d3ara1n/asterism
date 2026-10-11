@@ -1,10 +1,11 @@
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { z } from "zod";
 import type { CredentialVault } from "../configuration/credentials.ts";
 import { jsonSchema, type Json } from "@atelier/sdk/contracts";
-import { PluginApiError, type PluginConfig, type PluginSecrets } from "./contract.ts";
+import { PluginApiError, validationMessage, type PluginConfig, type PluginSecrets } from "@atelier/sdk/runtime";
+import type { PluginConfiguration } from "../shared/plugin-configuration.ts";
 
 /** 宿主托管目录名；插件目录其余部分归插件自由写入。 */
 export const managedDirectory = ".atelier";
@@ -29,6 +30,11 @@ export class PluginStorage {
   readonly dir: string;
   private readonly managed: string;
   private database: DatabaseSync | null = null;
+  private settings: {
+    source: object; inputDefaults: string; schema: Json | null; defaults: Json;
+    read(): { value: Json; status: PluginConfiguration["status"] };
+    write(value: unknown): void;
+  } | null = null;
   constructor(extensionsDirectory: string, pluginId: string, private readonly vault: CredentialVault | null,
     private readonly warn: (message: string, error?: unknown) => void) {
     this.dir = join(extensionsDirectory, pluginId);
@@ -40,24 +46,53 @@ export class PluginStorage {
   }
 
   config<T extends Json>(schema: z.ZodType<T>, defaults: T): PluginConfig<T> {
+    const defaultInput = structuredClone(defaults);
+    const inputDefaults = JSON.stringify(defaultInput);
+    if (this.settings) {
+      if (this.settings.source !== schema || this.settings.inputDefaults !== inputDefaults)
+        throw new PluginApiError("invalid_argument", "A plugin has one configuration. Reuse the same schema and defaults.");
+      return { get: () => this.settings!.read().value as T, set: value => this.settings!.write(value) };
+    }
     const file = () => join(this.ensure(), "config.json");
-    const fallback = () => schema.parse(defaults);
-    return {
-      get: () => {
-        let raw: unknown;
-        try { raw = readJson(file()); } catch (error) { this.warn("Plugin configuration is unreadable; defaults are used.", error); return fallback(); }
-        if (raw === undefined) return fallback();
-        const parsed = schema.safeParse(raw);
-        if (parsed.success) return parsed.data;
-        this.warn("Plugin configuration does not match its schema; defaults are used.");
-        return fallback();
-      },
-      set: value => {
-        const parsed = schema.safeParse(value);
-        if (!parsed.success) throw new PluginApiError("invalid_argument", "The configuration does not match the plugin's schema.");
-        writeJson(file(), jsonSchema.parse(parsed.data));
-      },
+    const parsedDefaults = schema.safeParse(defaultInput);
+    if (!parsedDefaults.success) throw new PluginApiError("invalid_argument", validationMessage(parsedDefaults.error, "defaults"));
+    const fallback = () => jsonSchema.parse(schema.parse(structuredClone(defaultInput)));
+    const read = (): { value: Json; status: PluginConfiguration["status"] } => {
+      let raw: unknown;
+      try { raw = readJson(file()); }
+      catch (error) {
+        this.warn("Plugin configuration is unreadable; defaults are used.", error);
+        return { value: fallback(), status: "invalid" };
+      }
+      if (raw === undefined) return { value: fallback(), status: "defaults" };
+      const parsed = schema.safeParse(raw);
+      if (parsed.success) return { value: jsonSchema.parse(parsed.data), status: "saved" };
+      this.warn("Plugin configuration does not match its schema; defaults are used.");
+      return { value: fallback(), status: "invalid" };
     };
+    const write = (value: unknown) => {
+      const parsed = schema.safeParse(value);
+      if (!parsed.success) throw new PluginApiError("invalid_argument", validationMessage(parsed.error, "configuration"));
+      writeJson(file(), jsonSchema.parse(parsed.data));
+    };
+    let formSchema: Json | null = null;
+    try { formSchema = jsonSchema.parse(z.toJSONSchema(schema, { io: "input", unrepresentable: "any" })); }
+    catch { this.warn("Plugin configuration schema cannot be projected; the value editor is used."); }
+    this.settings = { source: schema, inputDefaults, schema: formSchema, defaults: jsonSchema.parse(parsedDefaults.data), read, write };
+    return { get: () => read().value as T, set: write };
+  }
+
+  configuration(id: string): PluginConfiguration | null {
+    return this.settings ? { id, schema: structuredClone(this.settings.schema),
+      defaults: structuredClone(this.settings.defaults), ...this.settings.read() } : null;
+  }
+  saveConfiguration(value: Json): void {
+    if (!this.settings) throw new PluginApiError("not_found", "The plugin has no configuration.");
+    this.settings.write(value);
+  }
+  resetConfiguration(): void {
+    if (!this.settings) throw new PluginApiError("not_found", "The plugin has no configuration.");
+    rmSync(join(this.managed, "config.json"), { force: true });
   }
 
   readonly secrets: PluginSecrets = {

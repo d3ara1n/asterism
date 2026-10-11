@@ -16,6 +16,7 @@ function parse<T>(schema: z.ZodType<T>, input: unknown, subject: string): T {
 export function implementResource<S extends Json, V extends Json, I extends Json = Json, C extends Json = Json>(
   resource: ResourceContract<S>, view: DataContract<V>, definition: {
     records?: readonly RecordContract[];
+    links?: ResourceContribution["links"];
     creation?: {
       schema: z.ZodType<I>;
       prepare?(input: NoInfer<I>, signal: AbortSignal): Promise<NoInfer<I>>;
@@ -33,7 +34,7 @@ export function implementResource<S extends Json, V extends Json, I extends Json
 ): ResourceContribution {
   const { creation, actions } = definition;
   return {
-    resource, records: [...definition.records ?? []],
+    resource, records: [...definition.records ?? []], links: definition.links,
     ...(creation ? { creation: {
       schema: creation.schema as z.ZodType<Json>,
       ...(creation.prepare ? { async prepare(input: Json, signal: AbortSignal) {

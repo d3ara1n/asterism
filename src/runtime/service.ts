@@ -7,9 +7,12 @@ import type { ModelAdapter } from "../model/contract.ts";
 import { openDatabase } from "./storage.ts";
 import { ConfigurationService } from "../configuration/service.ts";
 import { SessionService } from "./sessions.ts";
-import type { LoadablePlugin } from "../plugins/loader.ts";
+import type { PluginDefinition } from "@atelier/sdk/runtime";
 import { join } from "node:path";
 import { PackageList, PluginPackageError } from "../plugins/packages.ts";
+import { PluginApiError } from "@atelier/sdk/runtime";
+import { pluginConfigurationCommandSchema, type PluginConfigurationCommand, type PluginConfiguration } from "../shared/plugin-configuration.ts";
+import type { ObjectStreamPayload } from "../shared/object-stream.ts";
 
 export class ApplicationError extends Error {
   constructor(readonly code: AppError["code"], message: string) { super(message); }
@@ -25,7 +28,7 @@ export class ApplicationService {
   private readonly packages: StartupPackage[];
   private readonly list: PackageList;
   private readonly started: string;
-  constructor(root: string, options: { packages?: StartupPackage[]; protector?: SecretProtector; onConfigurationChanged?: () => void; onSessionChanged?: (event: SessionChanged) => void; adapterFactory?: (settings: ModelSettings) => ModelAdapter; plugins?: readonly LoadablePlugin[]; onStream?: (event: { sessionId: string; objectId: string; channel: string; data: Uint8Array }) => void } = {}) {
+  constructor(root: string, options: { packages?: StartupPackage[]; protector?: SecretProtector; onConfigurationChanged?: () => void; onSessionChanged?: (event: SessionChanged) => void; adapterFactory?: (settings: ModelSettings) => ModelAdapter; plugins?: readonly PluginDefinition[]; onStream?: (event: ObjectStreamPayload) => void } = {}) {
     this.db = openDatabase(root);
     this.packages = options.packages ?? [];
     this.list = new PackageList(join(root, "plugins.json"));
@@ -43,6 +46,16 @@ export class ApplicationService {
     this.db.close();
   }
   private readonly npmRoot: string;
+  configurePlugin(raw: PluginConfigurationCommand): PluginConfiguration[] {
+    const parsed = pluginConfigurationCommandSchema.safeParse(raw);
+    if (!parsed.success) throw new ApplicationError("invalid_request", "Invalid plugin configuration command.");
+    try { return this.sessions.configurePlugins(parsed.data); }
+    catch (error) {
+      if (error instanceof PluginApiError) throw new ApplicationError(
+        error.code === "invalid_argument" ? "invalid_request" : error.code === "not_found" ? "not_found" : "unavailable", error.message);
+      throw new ApplicationError("unavailable", "Plugin configuration could not be read or saved. Reload and retry.");
+    }
+  }
   execute(raw: unknown): AppSnapshot {
     const parsed = commandSchema.safeParse(raw);
     if (!parsed.success) throw new ApplicationError("invalid_request", "Invalid application command.");

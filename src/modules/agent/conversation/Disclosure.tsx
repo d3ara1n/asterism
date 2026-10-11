@@ -1,9 +1,9 @@
 import type { ReactNode } from "react";
 import { ChevronDown } from "lucide-react";
-import { cn } from "../../shared/utils";
-import { Button } from "../../shared/ui/button";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../../shared/ui/collapsible";
-import { Item } from "../../shared/ui/item";
+import { cn } from "../../../renderer/shared/utils";
+import { Button } from "../../../renderer/shared/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../../../renderer/shared/ui/collapsible";
+import { Item } from "../../../renderer/shared/ui/item";
 
 /** 思考与工具共用外壳；调用方拥有状态，标题点击区不受外层内边距挤压。 */
 export function Disclosure({ header, children, open, onOpenChange, expandable = true, pending = false }: {

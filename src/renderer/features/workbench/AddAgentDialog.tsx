@@ -6,8 +6,8 @@ import type { AgentSelection } from "../../../shared/model";
 import { Alert, AlertDescription } from "../../shared/ui/alert";
 import { Field, FieldLabel, FieldTitle } from "../../shared/ui/field";
 import { Input } from "../../shared/ui/input";
-import { ConfigurationChoice as Choice } from "../configuration/ConfigurationChoice";
-import { s } from "../configuration/state";
+import { ConfigurationChoice as Choice } from "../../shared/ConfigurationChoice";
+import { s } from "../../shared/i18n";
 import { t } from "../../shared/i18n";
 import { ResourceCreationDialog, type ResourceCreationDialogState } from "./ResourceCreationDialog";
 

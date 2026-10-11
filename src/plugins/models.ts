@@ -6,7 +6,11 @@ import type { ModelRunRequest, ModelRunResult, ModelTarget, StreamRequest } from
 import type { AgentCapabilities } from "../execution/capabilities.ts";
 import { modelReference, parseModelExpression, resolveProviderModel, type ConfigurationSnapshot, type ThinkingLevel } from "../shared/configuration.ts";
 import { modelExpression, modelScope, type ModelSettings } from "../shared/model.ts";
-import { PluginApiError } from "./contract.ts";
+import { PluginApiError } from "@atelier/sdk/runtime";
+import type { ModelServices } from "@atelier/sdk/runtime";
+import type { CatalogHost } from "./host.ts";
+import { AgentConfigurations } from "../modules/agent/configuration.ts";
+import { coreDeclarations } from "../execution/core.ts";
 import { coreId } from "../shared/core.ts";
 
 /** 模型目标：选择一个角色，可覆盖模型表达式或思考等级；未给出的沿用角色。 */
@@ -16,24 +20,18 @@ export class ModelTargetFailure extends PluginApiError {
   constructor(readonly reason: ModelTargetError, message: string) { super("unavailable", message); }
 }
 
-/** 插件可见的稳定目录视图：不含端点、凭据与兼容参数。 */
-export interface RegistryView {
-  roles(): { id: string; name: string; description: string; hidden: boolean; model: string | null; thinking: ThinkingLevel | null }[];
-  models(): { model: string; provider: string; name: string; contextWindow: number | null; capabilities: { reasoning: boolean; tools: boolean; images: boolean } }[];
-  agents(): { id: string; name: string; description: string; role: string | null; systemPrompt: string; tools: string[] | null;
-    excludeTools: string[] | null; timeout: number | null; maxTurns: number | null; maxCost: number | null }[];
-}
-export interface ResolvedTarget { settings: ModelSettings; adapter: ModelAdapter }
+interface ResolvedTarget { settings: ModelSettings; adapter: ModelAdapter }
 /** 内部 adapter 的一次调用输入；授权视图与资源环境取用不进入公开 SDK。 */
 export interface RunRequest extends ModelRunRequest {
   capabilities: AgentCapabilities;
   context: Promise<{ file: string; text: string }[]>;
 }
-export interface PluginModels {
-  /** 解析目标到实际模型与适配器；失败以 ModelTargetFailure 区分原因。 */
-  resolve(target: ModelTarget): Promise<ResolvedTarget>;
+export interface HostModels {
   stream(request: StreamRequest): AsyncIterable<ModelEvent>;
   run(request: RunRequest): Promise<ModelRunResult>;
+  validate: ModelServices["validate"];
+  roles: ModelServices["roles"];
+  list: ModelServices["list"];
 }
 
 /** 按角色与覆盖解析；模型不支持 reasoning 时思考归为 off。 */
@@ -51,7 +49,7 @@ export function resolveTarget(snapshot: ConfigurationSnapshot, target: ModelTarg
   return { ok: true, model, thinking: resolved.model.capabilities.reasoning ? thinking : "off" };
 }
 
-export function createModelServices(configuration: ConfigurationService, adapterFactory?: (settings: ModelSettings) => ModelAdapter): { registry: RegistryView; models: PluginModels } {
+export function createModelServices(configuration: ConfigurationService, adapterFactory?: (settings: ModelSettings) => ModelAdapter): { catalogs: CatalogHost; models: HostModels } {
   // 请求前刷新凭据可用性；目录读取同步取当前配置。
   const snapshot = async () => (await configuration.execute({ type: "read" })).snapshot;
   const current = () => configuration.current();
@@ -67,7 +65,7 @@ export function createModelServices(configuration: ConfigurationService, adapter
       ?? new AiSdkAdapter(() => credential ??= configuration.executionCredential(connection.id, connection.revision));
     return { settings, adapter };
   };
-  const registry: RegistryView = {
+  const catalog = {
     roles: () => current().roles.filter(role => role.enabled).map(role => ({ id: role.id, name: role.name, description: role.description,
       hidden: role.hidden, model: role.model, thinking: role.thinking })),
     models: () => {
@@ -75,11 +73,23 @@ export function createModelServices(configuration: ConfigurationService, adapter
       return config.models.filter(model => resolveProviderModel(config, modelReference(model))).map(model => ({ model: modelReference(model),
         provider: model.providerId, name: model.name, contextWindow: model.contextWindow, capabilities: { ...model.capabilities } }));
     },
-    agents: () => current().agents.filter(agent => agent.enabled).map(agent => ({ id: agent.id, name: agent.name, description: agent.description,
-      role: agent.modelRole, systemPrompt: agent.systemPrompt, tools: agent.tools, excludeTools: agent.excludeTools, timeout: agent.timeout, maxTurns: agent.maxTurns, maxCost: agent.maxCost })),
   };
-  return { registry, models: {
-    resolve,
+  return { catalogs: { get: contract => contract.id === AgentConfigurations.id
+    ? contract.schema.parse(structuredClone(current().agents)) : null }, models: {
+    roles: catalog.roles,
+    list: catalog.models,
+    async validate(request) {
+      request.signal.throwIfAborted();
+      const { target, system, messages } = structuredClone({ target: request.target, system: request.system, messages: request.messages });
+      const { settings, adapter } = await resolve(target);
+      request.signal.throwIfAborted();
+      try {
+        adapter.prepare({ settings, system, messages,
+          tools: settings.model.capabilities.tools ? coreDeclarations() : [] });
+      } catch (error) {
+        throw new PluginApiError("invalid_argument", error instanceof ModelFailure ? error.message : "The model request could not be prepared.");
+      }
+    },
     async *stream(request) {
       const { target, system, messages, tools } = structuredClone({
         target: request.target, system: request.system, messages: request.messages, tools: request.tools,

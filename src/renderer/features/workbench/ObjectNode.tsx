@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo } from "react";
+import { memo, useCallback, useEffect } from "react";
 import { Handle, NodeResizeControl, Position, useUpdateNodeInternals, type Node, type NodeProps } from "@xyflow/react";
 import { Grip } from "lucide-react";
 import { maximumCardDimension, type WorkbenchObject } from "../../../shared/workbench";
@@ -10,6 +10,7 @@ import { cardSize, fallbackCardAppearance } from "./sizing";
 import { defaultConnectionPorts, type ConnectionPort } from "./connections";
 import { ObjectActions } from "./ObjectActions";
 import { t } from "../../shared/i18n";
+import { useObjectContext } from "../../modules/object-context";
 
 export type ObjectNodeType = Node<{
   object: WorkbenchObject; collapsed: boolean;
@@ -28,18 +29,19 @@ export const ObjectNode = memo(function ObjectNode({ id, data, selected }: NodeP
   useEffect(() => { updateNodeInternals(id); }, [id, portLayout, updateNodeInternals]);
   const registry = useModuleViews();
   const descriptor = registry.resource(object.kind);
-  const view = useMemo(() => registry.card(object.presentation) ?? {
+  const context = useObjectContext(object);
+  const view = registry.card(object.presentation, context) ?? {
     ...fallbackCardAppearance,
     body: <div className="min-h-0 flex-1 select-text overflow-auto p-3"><JsonView value={object.presentation.data} /></div>,
     actions: undefined,
-  }, [registry, object]);
+  };
   const onObjectView = useCallback((patch: ViewPatch) => onView(object.id, patch), [onView, object.id]);
   return <>
-    {/* Loose 模式按拖动起点确定方向；四边端点均可发出，只有代理可接收。 */}
+    {/* Loose 模式按拖动起点确定方向；接收端由资源静态声明。 */}
     {ports.map(port => <Handle key={port.id} id={port.id} type="source"
       position={{ left: Position.Left, right: Position.Right, top: Position.Top, bottom: Position.Bottom }[port.side]}
       style={port.side === "left" || port.side === "right" ? { top: `${port.offset * 100}%` } : { left: `${port.offset * 100}%` }}
-      isConnectableEnd={object.kind === "atelier.core/agent"} />)}
+      isConnectableEnd={descriptor.receivesLinks === true} />)}
     <ObjectCard title={object.title} collapsed={collapsed} selected={!!selected} onView={onObjectView}
       icon={descriptor.icon} kind={descriptor.label}
       actions={<><SlotBoundary fallback={null}>{view.actions}</SlotBoundary><ObjectActions object={object} defaultSize={cardSize(view)} onView={onObjectView} /></>}>

@@ -1,10 +1,13 @@
 import { z } from "zod";
-import { defineRecord } from "@atelier/sdk/contracts";
 import { core } from "../plugin.ts";
 import { agentSelectionSchema } from "../../shared/model.ts";
 
 /** 代理是普通资源：创建事件只记录身份；模型选择等可变数据属于资源私有状态。 */
 export const Agent = core.resource("agent", z.object({}));
+export const AgentSelection = core.data("agent.selection", 1, z.strictObject({
+  selection: agentSelectionSchema, revision: z.number().int().nonnegative(),
+}));
+export const AgentSubmissions = core.data("agent.submissions", 1, z.record(z.string(), z.string()));
 export const AgentView = core.data("agent.card", 2, z.strictObject({
   agentId: z.string(),
   selection: agentSelectionSchema.nullable(),
@@ -23,5 +26,3 @@ export type AgentCommand = z.infer<typeof agentCommandSchema>;
 /** 创建代理资源时的初始数据。 */
 /** title 可选，不填时用 agent 配置名。 */
 export const agentCreateSchema = z.strictObject({ selection: agentSelectionSchema, title: z.string().trim().min(1).max(160).optional() });
-/** 用户发给代理的消息：公开记录契约，其他插件可导入以识别首条消息等。 */
-export const UserMessage = defineRecord(core.name("agent.user-message"), { version: 1, schema: z.object({ agentId: z.string(), text: z.string() }) });

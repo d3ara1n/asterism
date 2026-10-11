@@ -1,5 +1,5 @@
 import { FileText, BookOpen, FilePenLine, FilePlus2 } from "lucide-react";
-import { cardRenderer, toolRenderer, type RendererModule } from "../../renderer/modules/registry";
+import { cardRenderer, toolRenderer, type RendererModule } from "@atelier/sdk/renderer";
 import { t } from "../../renderer/shared/i18n";
 import { NoteView, NoteRead, NoteEdit, NoteWrite } from "./contract";
 import { TextReadBody, TextChangeBody } from "../text-view";

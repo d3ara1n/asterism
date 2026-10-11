@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Button } from "../../shared/ui/button";
 import { Field, FieldError, FieldLabel } from "../../shared/ui/field";
 import { Input } from "../../shared/ui/input";
-import { s } from "../configuration/state";
+import { s } from "../../shared/i18n";
 import { t } from "../../shared/i18n";
 import { ResourceCreationDialog, type ResourceCreationDialogState } from "./ResourceCreationDialog";
 

@@ -1,15 +1,16 @@
 import { useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import { Clock, TextCursorInput, Wrench } from "lucide-react";
-import { JsonView, useModuleViews } from "../../modules/views";
-import { t } from "../../shared/i18n";
-import { Alert, AlertDescription } from "../../shared/ui/alert";
-import { Badge } from "../../shared/ui/badge";
-import { Spinner } from "../../shared/ui/spinner";
+import { useRendererObject } from "@atelier/sdk/renderer";
+import { JsonView } from "../../../renderer/shared/json-view";
+import { t } from "../../../renderer/shared/i18n";
+import { Alert, AlertDescription } from "../../../renderer/shared/ui/alert";
+import { Badge } from "../../../renderer/shared/ui/badge";
+import { Spinner } from "../../../renderer/shared/ui/spinner";
 import { toolCallState, type ToolCallNode } from "./tool-state";
-import { DefaultToolBody, DefaultToolHeader, resolveToolView, ToolDetails, toolPreparation } from "./tool-views";
+import { DefaultToolBody, DefaultToolHeader, ToolDetails } from "../../../renderer/shared/tool-content";
 import { Disclosure } from "./Disclosure";
-import { ToolHeader } from "../../shared/tool-header";
+import { ToolHeader } from "../../../renderer/shared/tool-header";
 
 const labels = {
   running: t.toolRunning, partial: t.toolPartial, failed: t.toolFailed,
@@ -18,11 +19,11 @@ const labels = {
 
 /** 外壳只管理生命周期和展开；两个内容入口独立回退，更新和落库不重置展开。 */
 export function ToolCall({ node }: { node: ToolCallNode }) {
-  const registry = useModuleViews();
+  const { tools } = useRendererObject();
   const reducedMotion = useReducedMotion();
   const [open, setOpen] = useState(false);
   const state = toolCallState(node);
-  const view = state.props ? resolveToolView(state.props, registry) : null;
+  const view = state.props ? tools.resolve(state.props) : null;
   const result = state.props?.result;
   const diagnostic = result && ("error" in result ? result.error.message : "message" in result ? result.message : null);
   const error = result?.kind === "failed" || result?.kind === "rejected" || result?.kind === "unknown";
@@ -37,7 +38,7 @@ export function ToolCall({ node }: { node: ToolCallNode }) {
     <span className="inline-flex shrink-0" aria-hidden="true">{icon}</span>
     <span className="min-w-0 flex-1 text-left">
       {view ? view.header ?? <DefaultToolHeader props={view.props} label={view.label} />
-        : <ToolHeader label={state.phase === "incomplete" ? t.toolIncompleteRequest : toolPreparation(node.name)} />}
+        : <ToolHeader label={state.phase === "incomplete" ? t.toolIncompleteRequest : tools.preparation(node.name)} />}
     </span>
     {status && <Badge variant={error ? "destructive" : "secondary"}>{status}</Badge>}
     {state.phase === "settled" && result?.kind === "succeeded" && <span className="sr-only">{t.toolSucceeded}</span>}

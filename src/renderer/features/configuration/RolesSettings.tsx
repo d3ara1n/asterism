@@ -12,7 +12,8 @@ import { Button } from "../../shared/ui/button";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "../../shared/ui/field";
 import { useIsland } from "../../shared/weave/Screen";
 import { Editor, OverrideToggleField, TextField } from "./forms";
-import { s, useSettingsConfiguration } from "./state";
+import { useSettingsConfiguration } from "./state";
+import { s } from "../../shared/i18n";
 
 const FOLLOW = "__follow";
 const thinkingLabel = (level: ThinkingLevel) => ({ off: s("Off", "关闭"), minimal: s("Minimal", "极低"), low: s("Low", "低"), medium: s("Medium", "中"), high: s("High", "高"), xhigh: s("Extra high", "极高") })[level];

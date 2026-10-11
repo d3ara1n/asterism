@@ -1,8 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import type { ConfigurationCommand, ConfigurationResult, ConfigurationSnapshot } from "../../../shared/configuration";
-import { locale } from "../../shared/i18n";
 
-export const s = (en: string, zh: string): string => locale === "zh" ? zh : en;
 export function useConfiguration(active: boolean) {
   const [snapshot, setSnapshot] = useState<ConfigurationSnapshot | null>(null);
   const [error, setError] = useState<string | null>(null);

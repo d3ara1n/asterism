@@ -12,5 +12,5 @@
     "types": ["node"],
     "rootDir": "."
   },
-  "include": ["packages/sdk/src", "packages/sdk/examples", "src/shared", "src/runtime", "src/main", "src/preload", "src/session", "src/execution", "src/resources", "src/tools", "src/model", "src/configuration", "src/modules/*/runtime.ts", "*.config.ts"]
+  "include": ["packages/sdk/src", "packages/sdk/examples", "src/shared", "src/runtime", "src/main", "src/preload", "src/session", "src/execution", "src/resources", "src/tools", "src/model", "src/configuration", "src/plugins", "src/modules/*/*.ts", "*.config.ts"]
 }

@@ -4,6 +4,22 @@ import { configurationRequestSchema, configurationResponseSchema, configurationV
 import { ConfigurationError } from "../configuration/errors.ts";
 import { sessionRequestSchema, sessionResponseSchema, sessionVersion } from "../shared/session.ts";
 import { SessionError } from "../session/tree.ts";
+import { pluginConfigurationRequestSchema, pluginConfigurationResponseSchema, pluginConfigurationVersion } from "../shared/plugin-configuration.ts";
+
+export function dispatchPluginConfiguration(service: ApplicationService, raw: unknown): unknown | null {
+  const request = pluginConfigurationRequestSchema.safeParse(raw);
+  if (!request.success) return null;
+  const envelope = { kind: "plugin-configuration.response", version: pluginConfigurationVersion, id: request.data.id };
+  try {
+    return pluginConfigurationResponseSchema.parse({ ...envelope, result: { ok: true, configurations: service.configurePlugin(request.data.command) } });
+  } catch (error) {
+    const known = error instanceof ApplicationError;
+    if (!known) console.error("Plugin configuration command failed.");
+    return pluginConfigurationResponseSchema.parse({ ...envelope, result: { ok: false, error: {
+      code: known ? error.code : "internal", message: known ? error.message : "Plugin configuration could not be completed.",
+    } } });
+  }
+}
 
 /** 配置响应独立于工作台投影，保存设置不会重新加载当前会话。 */
 export async function dispatchConfiguration(service: ApplicationService, raw: unknown): Promise<unknown | null> {

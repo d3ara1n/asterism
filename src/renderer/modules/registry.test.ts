@@ -3,7 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { defineData, present, reference } from "@atelier/sdk/contracts";
 import type { Json } from "@atelier/sdk/contracts";
-import { cardRenderer, toolRenderer, ViewRegistry, type ToolRenderProps } from "./registry";
+import { cardRenderer, toolRenderer, type ToolRenderProps } from "@atelier/sdk/renderer";
+import { ViewRegistry } from "./registry";
 
 const data = defineData("test.text", 1, z.strictObject({ text: z.string() }));
 function Text({ data }: { data: { text: string } }) { return createElement("p", null, data.text); }

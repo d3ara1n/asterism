@@ -1,12 +1,22 @@
 import { contextBridge, ipcRenderer, webUtils } from "electron";
 import { applicationBrand } from "../shared/application.ts";
 import { desktopBridgeKey } from "../shared/core.ts";
-import { objectStreamChannel, commandChannel, pickDirectoryChannel, statusChannel, commandSchema, resultSchema, runtimeStatusSchema, type DesktopBridge } from "../shared/contracts.ts";
+import { commandChannel, pickDirectoryChannel, statusChannel, commandSchema, resultSchema, runtimeStatusSchema, type DesktopBridge } from "../shared/contracts.ts";
+import { objectStreamChannel, objectStreamSchema } from "../shared/object-stream.ts";
 import { configurationChannel, configurationChangedChannel, configurationCommandSchema, configurationResultSchema } from "../shared/configuration.ts";
 import { appearanceChangedChannel, appearanceGetChannel, appearancePatchSchema, appearanceSetChannel, parseAppearance } from "../shared/theme.ts";
 import { sessionChannel, sessionChangedChannel, sessionCommandSchema, sessionResultSchema, sessionChangedSchema } from "../shared/session.ts";
+import { pluginConfigurationChannel, pluginConfigurationCommandSchema, pluginConfigurationResultSchema } from "../shared/plugin-configuration.ts";
 
 const bridge: DesktopBridge = {
+  pluginConfiguration: {
+    async execute(command) {
+      const parsed = pluginConfigurationCommandSchema.safeParse(command);
+      if (!parsed.success) return { ok: false, error: { code: "invalid_request", message: "Invalid plugin configuration command." } };
+      try { return pluginConfigurationResultSchema.parse(await ipcRenderer.invoke(pluginConfigurationChannel, parsed.data)); }
+      catch { return { ok: false, error: { code: "unavailable", message: "The plugin configuration connection was lost. Reload before retrying." } }; }
+    },
+  },
   session: {
     async execute(command) {
       const parsed = sessionCommandSchema.safeParse(command);
@@ -58,8 +68,10 @@ const bridge: DesktopBridge = {
     catch { return { ok: false, error: { code: "unavailable", message: `The application connection was lost. Restart ${applicationBrand.en} and inspect the workspace before retrying.` } }; }
   },
   onObjectStream(sessionId, objectId, listener) {
-    const handler = (_event: Electron.IpcRendererEvent, s: unknown, o: unknown, channel: unknown, data: unknown) => {
-      if (s === sessionId && o === objectId && typeof channel === "string" && data instanceof Uint8Array) listener(channel, data);
+    const handler = (_event: Electron.IpcRendererEvent, raw: unknown) => {
+      const parsed = objectStreamSchema.safeParse(raw);
+      if (parsed.success && parsed.data.sessionId === sessionId && parsed.data.objectId === objectId)
+        listener(parsed.data.channel, parsed.data.data);
     };
     ipcRenderer.on(objectStreamChannel, handler);
     return () => ipcRenderer.removeListener(objectStreamChannel, handler);

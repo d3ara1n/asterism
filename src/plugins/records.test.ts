@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import { defineRecord, modelBlockSchema, type SessionRecord } from "@atelier/sdk/contracts";
+import { defineRecord, type SessionRecord } from "@atelier/sdk/contracts";
+import { Execution, ContextNotice } from "../modules/agent/records.ts";
 import { sessionView } from "./records.ts";
 import { emptyCompletion, type SessionNode } from "../shared/session.ts";
 
@@ -41,11 +42,17 @@ describe("共享时间轴的契约解码", () => {
       complete: true, continuation: { opaque: "resume" }, model: "p/m", adapter: "adapter", scope: "scope", text: "Answer",
       finishReason: "stop", providerResponseId: "remote",
     };
-    const Output = defineRecord("atelier.core/agent.text", { version: 1, schema: modelBlockSchema });
-    const decoded = sessionView("s", "Model", [node], [node]).records.first(Output, { scope: "path" });
+    const decoded = sessionView("s", "Model", [node], [node]).records.first(Execution, { scope: "path" });
     expect(decoded).toMatchObject({ status: "known", data: {
-      kind: "text", text: "Answer", requestParentId: null, continuation: { opaque: "resume" },
+      type: "block", block: { kind: "text", text: "Answer", requestParentId: null, continuation: { opaque: "resume" },
       source: { model: "p/m", adapter: "adapter", scope: "scope" }, completion: { finishReason: "stop", providerResponseId: "remote" },
-    } });
+    } } });
+  });
+  it("环境可见性经具型记录读取，原始事件身份与载荷保留", () => {
+    const node: SessionNode = { id: "event", sessionId: "s", parentId: null, createdAt: record.createdAt,
+      kind: "event", type: "resource_attached", version: 2, agentId: "a", data: { id: "directory" }, model: "A resource was linked." };
+    expect(sessionView("s", "", [node], [node]).records.first(ContextNotice, { scope: "path" })).toMatchObject({
+      status: "known", data: { text: node.model, recipient: "a", origin: { type: node.type, version: 2, data: node.data } },
+    });
   });
 });

@@ -1,7 +1,7 @@
 import { memo } from "react";
 import { Streamdown, type Components } from "streamdown";
 import { externalWebUrl } from "../../../shared/links";
-import { locale } from "../../shared/i18n";
+import { locale } from "../../../renderer/shared/i18n";
 
 const components: Components = {
   // 远程图片不自动发请求；保持现有 CSP，用户可以明确打开来源。

@@ -5,7 +5,7 @@ import * as ReactDomClient from "react-dom/client";
 import * as zod from "zod";
 import * as sdkContracts from "@atelier/sdk/contracts";
 import * as sdkRenderer from "@atelier/sdk/renderer";
-import type { RendererModule } from "./registry";
+import type { RendererModule } from "@atelier/sdk/renderer";
 
 /** 共享模块白名单：插件 bundle 的这些导入解析到宿主同一实例，保证只有一个 React。 */
 (globalThis as Record<string, unknown>).__atelierRendererModules = {

@@ -1,6 +1,6 @@
-import type { TimelineItem } from "../../../shared/session-view";
+import type { TimelineItem } from "./timeline";
 import type { ToolInvocationInfo } from "@atelier/sdk/contracts";
-import type { ToolRenderProps } from "../../modules/registry";
+import type { ToolRenderProps } from "@atelier/sdk/renderer";
 
 export type ToolCallNode = Extract<TimelineItem, { kind: "toolcall" }>;
 export interface ToolCallState {

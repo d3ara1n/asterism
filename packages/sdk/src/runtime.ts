@@ -1,5 +1,6 @@
 /** SDK runtime 入口：后台插件可用的通用服务接口；不含宿主内部类型与领域知识。 */
 import type { Json } from "./json.ts";
+import type { ResourceRef } from "./workspace.ts";
 export * from "./runtime-contracts.ts";
 export * from "./runtime-resources.ts";
 export type * from "./models.ts";
@@ -7,7 +8,7 @@ export { validationMessage, jsonArgumentHint } from "./tool-validation.ts";
 
 /** 插件 API 的稳定错误：code 供插件分支处理，message 用于日志。 */
 export class PluginApiError extends Error {
-  constructor(readonly code: "invalid_argument" | "foreign_resource" | "foreign_event" | "unavailable" | "rejected", message: string,
+  constructor(readonly code: "invalid_argument" | "foreign_resource" | "foreign_event" | "unavailable" | "rejected" | "conflict" | "not_found", message: string,
     /** rejected 时为准备者给出的业务原因码。 */
     readonly reason?: string) { super(message); }
 }
@@ -16,7 +17,7 @@ export interface PluginLogger {
   warn(message: string): void;
   error(message: string, error?: unknown): void;
 }
-/** 宿主托管配置：schema 校验，文件缺失或不合 schema 时回退默认值。 */
+/** 宿主托管配置：在模块 setup 声明，设置页按同一 schema 编辑；get 读取当前值。 */
 export interface PluginConfig<T extends Json> {
   get(): T;
   set(value: T): void;
@@ -33,5 +34,7 @@ export interface PluginStreams {
 }
 /** 宿主托管的进程内异步任务：同 key 运行中不重复启动，宿主关闭时取消；重启不补做。 */
 export interface PluginTasks {
-  start(key: string, run: (signal: AbortSignal) => Promise<void>, options?: { timeoutMs?: number }): boolean;
+  start(key: string, run: (signal: AbortSignal) => Promise<void>, options?: { timeoutMs?: number; object?: ResourceRef }): boolean;
+  cancel(key: string): void;
+  has(key: string): boolean;
 }

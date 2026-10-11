@@ -1,5 +1,5 @@
 import { ApplicationService } from "./service.ts";
-import { dispatch, dispatchConfiguration, dispatchSession } from "./dispatch.ts";
+import { dispatch, dispatchConfiguration, dispatchSession, dispatchPluginConfiguration } from "./dispatch.ts";
 import { protocolVersion } from "../shared/contracts.ts";
 import { SecretClient } from "./secret-client.ts";
 import { join } from "node:path";
@@ -31,6 +31,11 @@ try {
       return;
     }
     if (secrets.receive(data)) return;
+    if (data?.kind === "plugin-configuration.request") {
+      const response = dispatchPluginConfiguration(service, data);
+      if (response) port.postMessage(response);
+      return;
+    }
     if (data?.kind === "session.request") {
       void dispatchSession(service, data).then(response => { if (response) port.postMessage(response); });
       return;

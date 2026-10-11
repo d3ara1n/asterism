@@ -14,7 +14,8 @@ import { useIsland } from "../../shared/weave/Screen";
 import { cn } from "../../shared/utils";
 import { Section } from "../settings/preview";
 import { ChoiceField, Editor, NumberField, TextField } from "./forms";
-import { s, useSettingsConfiguration } from "./state";
+import { useSettingsConfiguration } from "./state";
+import { s } from "../../shared/i18n";
 
 const protocols = [
   { value: "openai-responses", label: "OpenAI Responses" }, { value: "openai-chat", label: "OpenAI Chat Completions" },

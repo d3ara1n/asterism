@@ -7,12 +7,12 @@ import * as runtimeModules from "../modules/runtime.ts";
 import { ApplicationService } from "../runtime/service.ts";
 import { Directory } from "../modules/filesystem/contract.ts";
 import { defineData, defineImplementation, defineTool } from "@atelier/sdk/contracts";
-import { implement } from "../tools/contract.ts";
+import { implement } from "../tools/testing.ts";
 import { ToolRegistry } from "../tools/registry.ts";
 import { AgentCapabilities, agentToolPolicy } from "../execution/capabilities.ts";
 import { executeCoreBatch, coreDeclarations } from "../execution/core.ts";
 import type { Json, ToolOutcome } from "../shared/model.ts";
-import type { FoldedObject } from "../session/fold.ts";
+import { foldWorkbench, type FoldedObject } from "../session/fold.ts";
 
 const roots: string[] = [];
 const services: ApplicationService[] = [];
@@ -47,7 +47,7 @@ function setup() {
   const { resources, tools } = modules;
   const scope = (linked: readonly FoldedObject[] = [resource], policy: Parameters<typeof agentToolPolicy>[0] = unrestricted) =>
     new AgentCapabilities(resources, tools, linked, agentToolPolicy(policy));
-  return { root, outside, resource, note, resources, tools, scope };
+  return { root, outside, resource, note, resources, tools, scope, service, sessionId };
 }
 async function invoke(capabilities: AgentCapabilities, name: string, args: Json): Promise<ToolOutcome> {
   const results: ToolOutcome[] = [];
@@ -57,6 +57,26 @@ async function invoke(capabilities: AgentCapabilities, name: string, args: Json)
 }
 
 describe("工具与资源的匹配及授权", () => {
+  it("请求捕获的目录和笔记在期间移除后仍能检查和写入，后续请求撤销访问", async () => {
+    const { service, sessionId, resource, scope } = setup();
+    await service.sessions.execute({ type: "resource.create", sessionId, kind: "atelier.core/note",
+      input: { title: "Captured note", content: "before" }, position: { x: 0, y: 0 } });
+    const note = foldWorkbench(service.sessions.tree.path(sessionId)).objects.find(object => object.title === "Captured note")!;
+    const captured = scope([resource, note]);
+    for (const object of [resource, note]) await service.sessions.execute({ type: "object.remove", sessionId, objectId: object.id });
+    expect(await invoke(captured, "resource_inspect", { resource_id: resource.id })).toMatchObject({
+      kind: "succeeded", data: { state: { title: "root", exists: true } },
+    });
+    expect(await invoke(captured, "resource_inspect", { resource_id: note.id })).toMatchObject({
+      kind: "succeeded", data: { state: { title: "Captured note", available: true } },
+    });
+    expect(await invoke(captured, "resource_call", { resource_id: note.id, tool: "write", args: { content: "after" } }))
+      .toMatchObject({ kind: "succeeded", data: { changed: true } });
+    expect(await invoke(captured, "resource_call", { resource_id: note.id, tool: "read", args: { anchored: false } }))
+      .toMatchObject({ kind: "succeeded", data: { rows: [{ content: "after" }] } });
+    expect(await invoke(scope([]), "resource_call", { resource_id: note.id, tool: "read", args: {} }))
+      .toMatchObject({ kind: "rejected", error: { code: "access_denied" } });
+  });
   it("目录列举限制在根内：拒绝 ..、绝对路径与指向外部的符号链接", async () => {
     const { root, outside, resource, scope } = setup();
     symlinkSync(outside, join(root, "link"));

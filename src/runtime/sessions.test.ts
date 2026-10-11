@@ -9,7 +9,7 @@ import { ModelFailure, type ModelAdapter, type ModelEvent, type ModelInput } fro
 import { sdkMessages } from "../model/ai-sdk.ts";
 import { sessionResultSchema, type SessionChanged, type SessionCommand, type SessionMutation } from "../shared/session.ts";
 import { dispatchSession } from "./dispatch.ts";
-import { sessionVersion } from "../shared/session.ts";
+import { sessionVersion, emptyCompletion } from "../shared/session.ts";
 import type { AgentSelection, Json } from "../shared/model.ts";
 import { projectForAgent } from "../session/projection.ts";
 import * as runtimeModules from "../modules/runtime.ts";
@@ -18,7 +18,7 @@ import { defineData } from "@atelier/sdk/contracts";
 import { defineImplementation, defineTool } from "@atelier/sdk/contracts";
 import { Directory } from "../modules/filesystem/contract.ts";
 import { Note } from "../modules/notes/contract.ts";
-import { implement } from "../tools/contract.ts";
+import { implement } from "../tools/testing.ts";
 import { ToolRegistry } from "../tools/registry.ts";
 import { foldWorkbench } from "../session/fold.ts";
 import { textReadSchema, textChangeSchema } from "../modules/shared/text-contract.ts";
@@ -60,6 +60,34 @@ async function settled(service: ApplicationService) {
 }
 
 describe("会话运行时", () => {
+  it("代理续接吸附退出自身创建分支时，游标、输入和去重数据整体回滚", async () => {
+    const { service, start } = await setup();
+    const first = await execute(service, start); await settled(service);
+    const sessionId = first.sessionId, agentId = agentOf(first);
+    const origin = service.sessions.tree.cursor(sessionId);
+    service.sessions.tree.append(sessionId, { ...emptyCompletion, kind: "thinking", agentId, text: "Unfinished reasoning",
+      responseId: "interrupted", requestParentId: origin, ordinal: 0, complete: true, model: start.model,
+      continuation: null, adapter: "ai-sdk-v7/2", scope: "scope" });
+    const created = await execute(service, { type: "resource.create", sessionId, kind: "atelier.core/agent",
+      input: { selection: { agent: start.agent, model: start.model, thinking: null } }, position: { x: 0, y: 0 } });
+    const second = created.workbench.objects.find(object => object.kind === "atelier.core/agent" && object.id !== agentId)!;
+    const before = service.sessions.tree.nodes(sessionId), cursor = service.sessions.tree.cursor(sessionId);
+    const command = agentCommand(sessionId, second.id, { type: "submit", submissionId: randomUUID(), text: "Second input" });
+    for (let retry = 0; retry < 2; retry++) await expect(service.sessions.execute(command)).rejects.toMatchObject({ code: "not_found" });
+    expect(service.sessions.tree.cursor(sessionId)).toBe(cursor);
+    expect(service.sessions.tree.nodes(sessionId)).toEqual(before);
+    expect(service.sessions.running).toBe(false);
+  });
+
+  it("同一代理相同 submission 的并发重试均受理且只保存一条输入", async () => {
+    const { service, start } = await setup();
+    const first = await execute(service, start); await settled(service);
+    const command = agentCommand(first.sessionId, agentOf(first), { type: "submit", submissionId: randomUUID(), text: "Concurrent retry" });
+    const receipts = await Promise.all([service.sessions.execute(command), service.sessions.execute(command)]);
+    expect(receipts).toEqual([{ kind: "accepted", sessionId: first.sessionId }, { kind: "accepted", sessionId: first.sessionId }]);
+    await settled(service);
+    expect(service.sessions.tree.nodes(first.sessionId).filter(node => node.kind === "message" && node.text === "Concurrent retry")).toHaveLength(1);
+  });
   it("重建会话数据库保留全局模型配置与用户覆盖", async () => {
     const { service, root, start } = await setup();
     await execute(service, start); await settled(service);
@@ -103,6 +131,9 @@ describe("会话运行时", () => {
     const write = await call("write", { content: "latest" });
     expect(textChangeSchema.parse(write.data).anchors).toEqual([]);
     expect(service.sessions.snapshot(sessionId).revision).toBeGreaterThan(created.revision);
+    const revision = service.sessions.snapshot(sessionId).revision;
+    expect(await call("write", { content: "latest" })).toMatchObject({ kind: "succeeded", data: { changed: false } });
+    expect(service.sessions.snapshot(sessionId).revision).toBe(revision);
     expect(service.sessions.tree.nodes(sessionId)).toEqual(nodes);
     expect(service.sessions.tree.cursor(sessionId)).toBe(cursor);
     const history = service.sessions.snapshot(sessionId, { kind: "history", nodeId });

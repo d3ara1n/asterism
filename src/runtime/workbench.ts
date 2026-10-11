@@ -16,7 +16,7 @@ export class SessionWorkbench {
     private readonly resources: ResourceRegistry,
     private readonly tools: (sessionId: string, agentId: string, resource: FoldedObject) => Json) {}
 
-  /** 通用资源创建：资源控制器给出标题并保存私有状态；创建事件只记录身份与类型。 */
+  /** 通用资源创建：资源贡献给出标题并保存对象数据；创建事件只记录身份与类型。 */
   create(sessionId: string, kind: string, input: Json, position: Point): string {
     return this.createWith(sessionId, kind, createResourceId(), input, position);
   }
@@ -46,8 +46,8 @@ export class SessionWorkbench {
         break;
       }
       case "link.set": {
-        // 终点必须是代理；起点是任意资源，包括另一个代理。
-        const agent = folded.objects.find(o => o.id === command.agentId && o.kind === "atelier.core/agent");
+        // 终点必须声明接收链接；起点是任意其他资源。
+        const agent = folded.objects.find(o => o.id === command.agentId && this.resources.receivesLinks(o.kind));
         const resource = folded.objects.find(o => o.id === command.resourceId);
         if (!agent || !resource) throw new SessionError("not_found", "Agent or resource does not belong to this session.");
         if (agent.id === resource.id) throw new SessionError("invalid_request", "An agent cannot be linked to itself.");

@@ -10,7 +10,7 @@ export interface ResourceSnapshot<S extends Json = Json> {
   readonly data: S;
 }
 export interface SessionSnapshot extends SessionView {
-  readonly position: { readonly nodeId: string | null };
+  readonly position: { readonly nodeId: string | null; readonly continuationId: string | null };
   readonly resources: {
     all(): readonly ResourceSnapshot[];
     get<S extends Json>(contract: ResourceContract<S>, id: string):

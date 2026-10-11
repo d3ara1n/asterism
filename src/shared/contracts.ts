@@ -4,11 +4,11 @@ import type { ConfigurationBridge } from "./configuration.ts";
 import type { DesktopPlatform } from "./desktop.ts";
 import type { AppearanceBridge } from "./theme.ts";
 import type { SessionBridge } from "./session.ts";
+import type { PluginConfigurationBridge } from "./plugin-configuration.ts";
 
 export const protocolVersion = 4;
 export const commandChannel = coreChannel("command");
 export const statusChannel = coreChannel("runtime-status");
-export const objectStreamChannel = coreChannel("object-stream");
 export const pickDirectoryChannel = coreChannel("pick-directory");
 const id = z.string().uuid();
 /** 应用入口只读取工作区身份和会话摘要，不持有已打开会话的正文。 */
@@ -51,6 +51,7 @@ export interface DesktopBridge {
   session: SessionBridge;
   configuration: ConfigurationBridge;
   appearance: AppearanceBridge;
+  pluginConfiguration: PluginConfigurationBridge;
   readonly platform: DesktopPlatform;
   /** 系统目录选择窗口；取消返回 null。 */
   pickDirectory(): Promise<string | null>;

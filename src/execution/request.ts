@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { ModelRunRequest, ModelRunResult, ModelRunEvent, ModelSource, ModelCompletion, ModelBlock } from "@atelier/sdk/contracts";
 import { modelExpression, modelScope, type ModelSettings, type ToolOutcome } from "../shared/model.ts";
 import { ModelFailure, type ModelAdapter } from "../model/contract.ts";
-import type { SystemPrompt } from "../model/system-prompt.ts";
+import type { SystemPrompt } from "@atelier/sdk/contracts";
 import type { ModelItem } from "../session/projection.ts";
 import { executeCoreBatch, coreDeclarations } from "./core.ts";
 import type { AgentCapabilities } from "./capabilities.ts";

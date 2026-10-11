@@ -2,7 +2,7 @@
 
 资源与工具在模型中平级；后端实现和对应 UI 在这里按功能共置。当前内置模块为 `notes/`、`filesystem/`、`agent/` 与提交后观察模块 `naming/`；命名只提供后台入口。
 
-后台贡献以 [公开 SDK](../../packages/sdk/README.md) 为准。`filesystem/` 已使用具名模块、内联 `creation` 和 `implementTool`；笔记、命名和 Agent 的迁移进度以 [插件计划](../../plans/todo-2026-10-12-plugin-system.md) 为准。
+后台与视图通过 [公开 SDK](../../packages/sdk/README.md) 消费宿主能力。四个内置模块使用具名模块与功能贡献；资源内联声明 `creation / actions`，工具使用 `implementTool`，命名使用提交后观察与托管任务，Agent 自己推动模型循环。
 
 `shared/` 存放 core 模块共用的工具契约、正文 schema 与算法，不提供独立模块入口，不依赖宿主实现。纯契约可由后台与 renderer 共用，正文算法只进入后台依赖图。
 
@@ -11,10 +11,10 @@
 | 文件 | 职责 |
 | --- | --- |
 | `contract.ts` | 纯 Zod 契约：资源状态、卡片数据、工具实现的 target/result 和稳定 ID/版本；过程产出与终结 data 共用 result schema |
-| `runtime.ts` | 默认导出 SDK 的 `defineModule(plugin => ...)`，提供资源与工具贡献；未迁模块暂用宿主内部工厂；可使用 Node |
+| `runtime.ts` | 默认导出 SDK 的 `defineModule(plugin => ...)`，提供资源、工具与具名生命周期贡献；可使用 Node |
 | `renderer.tsx` | 默认导出 RendererModule，声明静态资源展示描述，注册卡片内容、附加操作和工具 header/body，只依赖纯契约与前端代码 |
 
-`modules/plugin.ts` 声明内置插件 `atelier.core` 的命名空间，契约以 `core.resource` / `core.data` 短名声明并补全为 `atelier.core/<name>`；`modules/runtime.ts` 通过静态 glob 收集 SDK 模块与未迁的内部工厂，组成内置插件定义，经 `src/plugins/loader.ts` 两阶段装配，`modules/renderer.ts` 通过 Vite 静态 glob 收集视图入口。新增目录遵守入口约定即可进入构建；两个入口不要相互导入，也不要创建同时导出它们的 barrel。运行时不依赖 React，renderer 不导入 Node/数据库。外部插件包经 `src/plugins/packages.ts` 在启动时打包加载，与内置插件同一装配流程；不提供沙箱。
+`modules/plugin.ts` 声明内置插件 `atelier.core` 的命名空间，契约以 `core.resource` / `core.data` 短名声明并补全为 `atelier.core/<name>`；`modules/runtime.ts` 通过静态 glob 收集 SDK 模块，组成内置插件定义，经 `src/plugins/loader.ts` 两阶段装配，`modules/renderer.ts` 通过 Vite 静态 glob 收集视图入口。新增目录遵守入口约定即可进入构建；两个入口不要相互导入，也不要创建同时导出它们的 barrel。运行时不依赖 React，renderer 不导入 Node/数据库。外部插件包经 `src/plugins/packages.ts` 在启动时打包加载，与内置插件同一装配流程；不提供沙箱。
 
 资源创建与卡片行为通过 `resource.create` / `resource.command` 接入，SDK 资源由宿主 adapter 将 `creation / actions` 接到控制器，校验输入并执行；没有对应行为时拒绝命令。模型操作入口和资源授权独立于这些内部应用命令。SDK 的创建输入错误与 prepare 的参数拒绝映为应用的 `invalid_request`。
 
@@ -45,11 +45,11 @@ export const Search = defineTool({
 });
 ```
 
-`defineImplementation` 将共享工具、资源契约与实现的 target/result 关联；SDK 的 `implementTool` 推导 handler 的 data、target、args 和返回值类型。完整实现见 [目录契约](filesystem/contract.ts) 与 [目录后端](filesystem/runtime.ts)。未迁模块暂用宿主内部的 `implement`。
+`defineImplementation` 将共享工具、资源契约与实现的 target/result 关联；SDK 的 `implementTool` 推导 handler 的 data、target、args 和返回值类型。完整实现见 [目录契约](filesystem/contract.ts) 与 [目录后端](filesystem/runtime.ts)。
 
 `toModel` 可省略，默认使用 data；只在终结时生成并保存模型投影，自定义投影应保留结果契约的含义。非成功结局的模型投影还包含 kind、错误或说明。target 由 handler 直接解释：目录 list 使用 null 或 `{path}`，文件 read 使用 `{path, offset?, limit?}`，笔记 read 使用 null，其他模块可以使用 `{piece}` 等结构。内容范围属于定位，不强制所有资源采用行号；anchored 属于 read 自身的行为参数。无通用目标解析器，不在公共工具函数里维护资源类型分支。
 
-SDK handler 的 context 提供 `signal / object / publish(data)`，object 是绑定对象的公开门面；旧 handler 暂接收宿主的 resource。publish 发布当前完整产出，使用与最终 data 相同的 schema；快照通过校验后替换最近的产出，经会话进度送到 UI，不写历史或交给模型。尚未确定的字段用 schema 中明确的 null 或阶段联合表达，不使用 `Partial<最终成功结果>` 绕过校验。工具完成时返回 CallResult；成功/部分完成必须提供 data，失败/拒绝/取消/未知结局可省略 data 以保留最近产出，显式 null 则清空。终结后 publish 失效。
+SDK handler 的 context 提供 `signal / object / publish(data)`，object 是绑定对象的公开门面。publish 发布当前完整产出，使用与最终 data 相同的 schema；快照通过校验后替换最近的产出，经会话进度送到 UI，不写历史或交给模型。尚未确定的字段用 schema 中明确的 null 或阶段联合表达，不使用 `Partial<最终成功结果>` 绕过校验。工具完成时返回 CallResult；成功/部分完成必须提供 data，失败/拒绝/取消/未知结局可省略 data 以保留最近产出，显式 null 则清空。终结后 publish 失效。
 
 工具应在结束前收束自己的事件监听与子进程；回调失效不等于停止底层操作。运行时在异常路径保留最后合法产出，只读中止记 cancelled，无法确认写入影响记 unknown；不因为收到了 abort 信号就宣称写入已撤销。连续产出、终结与取消的完整用例见 [工具执行契约测试](../execution/core.test.ts)。
 
@@ -77,13 +77,13 @@ args、target、result schema 必须有非空的整体 description，声明 help
 
 SDK 资源内联声明 `creation / actions`。creation 先按 schema 校验并异步准备输入，再在宿主事务内创建资源，返回 `{title, data}`；对象状态与事件写入使用绑定对象的 `commit`，加入同一事务。actions 经外部 prepare 与资源自己的 prepare 后执行，由宿主检查当前路径、维护活动状态并在关闭时取消和等待收束。资源数据、对象状态和时间轴事件的写入限制见 SDK 说明。
 
-### 未迁模块的宿主接口
+笔记的不可变资源数据为 `{}`，当前正文由 `NoteContent` v1 声明，以 `object.get(NoteContent)` 读取，以 `object.commit` 中的 `writer.set` 保存。状态提交由宿主通知视图刷新，不追加正文历史；卡片与历史查看都显示当前值。空正文是有效状态，缺失或损坏的正文回退为不可用，工具拒绝覆盖。正文限制为 100,000 UTF-16 code units，由契约与工具验证共用同一上限。
 
-以下接口仅供尚未迁移的笔记、命名和 Agent 使用，不是插件作者入口。
+### 会话数据与 Agent
 
-可选 `controller` 负责创建、命令与活动状态。命令经异步准备后须在写入事务中执行会话传入的 `before`，重新确认对象仍在当前路径上。`activity.running` 报告仍会向会话树追加事件的对象 ID，包括代理与其他被捕获的资源；只引用外部状态的持续运行不计入。活动开始、结束经 `PluginSessions.progressChanged` 通知。会话仅在全部资源收束后允许回溯，移除对象也要求该对象收束。
+`session.get / commit` 与 `object.get / commit` 分别作用于当前会话数据与当前对象数据，数据按契约身份与版本保存到 `session_data`。当前值不随历史位置恢复；重建历史须消费不可变时间轴事件。插件目录的数据独立于会话生命周期。
 
-`PluginSessions.path` 读取当前路径；`PluginSessions.commit` 在同步事务中接收成型记录与 `plugin.state` 私有状态修改，提交后统一发布持久通知。回调内的 `PluginSessionWriter` 只提供追加、终态与取得续接路径，节点身份、父指针、游标和自动吸附均由会话管理；不向资源控制器暴露可修改的 `SessionTree`。流增量保存在代理执行侧，不作为时间轴记录提交。
+Agent 的选择和提交去重保存于对象数据，用户输入与执行输出保存为 `UserMessage / Execution / Notice` 记录；每次请求由 `agent/projection.ts` 重建消息。`agent/configuration.ts` 声明只读配置目录，应用级配置与用户覆盖仍由宿主保存。运行以对象绑定任务承载，取消与关闭由托管设施收束；会话仅在全部对象收束后允许回溯，移除对象也要求该对象收束。命名使用首条 `UserMessage`，通过 `models.stream` 和标题比较更新完成。
 
 ## 资源视图
 
@@ -99,7 +99,7 @@ header 按单行摘要设计，由 renderer 自行安排内容、排列和省略
 
 三个宿主固定入口在 `renderer/features/conversation/tool-views.tsx` 内置，不进入模块注册面。resource_call 的适配器将完整内层参数、选定实现身份和同一结果交给 ViewRegistry，直接采用二级工具的图标与两个视图入口；不新增外层折叠框。
 
-前端目录在应用根通过 ModuleViewsProvider 注入。卡片和对话只消费目录接口，不能导入模块总表，否则会形成“总表 → 代理卡片 → 对话 → 总表”的依赖环。
+前端目录在应用根通过 ModuleViewsProvider 注入。卡片通过 SDK 的 `useRendererObject` 读取会话记录、执行动作、创建资源、订阅对象流与读取通用进度；宿主控制器与原始节点不进入模块。`agent/conversation/` 拥有代理对话投影与呈现，公共控件与文案可从 `renderer/shared/` 复用。模块不能导入模块总表，避免注册依赖环。
 
 ## 历史
 

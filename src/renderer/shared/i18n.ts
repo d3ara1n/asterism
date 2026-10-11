@@ -440,3 +440,6 @@ const zh: Messages = {
 
 export const locale: Locale = typeof navigator !== "undefined" && navigator.language.toLowerCase().startsWith("zh") ? "zh" : "en";
 export const t: Messages = locale === "zh" ? zh : en;
+
+/** 在当前语言中选择一份文案。 */
+export const s = (en: string, zh: string): string => locale === "zh" ? zh : en;

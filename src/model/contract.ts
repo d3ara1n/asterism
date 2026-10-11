@@ -1,6 +1,6 @@
 import type { Json, ModelSettings } from "../shared/model.ts";
 import type { ModelItem } from "../session/projection.ts";
-import type { SystemPrompt } from "./system-prompt.ts";
+import type { SystemPrompt } from "@atelier/sdk/contracts";
 import type { ModelEvent } from "@atelier/sdk/contracts";
 
 export class ModelFailure extends Error {

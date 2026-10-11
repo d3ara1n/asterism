@@ -31,7 +31,8 @@ export const sessionNodeSchema = z.discriminatedUnion("kind", [
     outcome: toolOutcomeSchema.nullable() }).refine(node => node.complete === (node.outcome !== null),
     "A complete tool call must have an outcome; incomplete calls cannot have one."),
   // 重建工作台与上下文的对象事件；model 非空时作为文本投影给该代理。
-  z.strictObject({ ...base, kind: z.literal("event"), agentId: id.nullable(), type: id, data: jsonSchema, model: z.string().nullable() }),
+  z.strictObject({ ...base, kind: z.literal("event"), agentId: id.nullable(), type: id,
+    version: z.number().int().positive().optional(), data: jsonSchema, model: z.string().nullable() }),
   z.strictObject({ ...base, kind: z.literal("notice"), agentId: id.nullable(), level: z.enum(["info", "warning", "error"]),
     code: z.string(), message: z.string(),
     /** 无内容块的异常响应保留诊断资料，不伪造模型输出块。 */

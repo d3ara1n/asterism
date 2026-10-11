@@ -20,9 +20,9 @@ export default defineModule(() => ({
   resources: [implementResource(Directory, DirectoryView, {
     project: directory => ({ path: directory.path }),
     async inspect(directory, object) {
-      const decoded = object.session.snapshot().resources.get(Directory, object.ref.id);
-      if (decoded?.status !== "known") throw new PluginApiError("unavailable", "The directory is not available on this session path.");
-      const base = { type: Directory.kind, title: decoded.resource.title, path: directory.path };
+      const resource = object.snapshot();
+      if (!resource) throw new PluginApiError("unavailable", "The directory is not available on this session path.");
+      const base = { type: Directory.kind, title: resource.title, path: directory.path };
       try {
         const info = await stat(directory.path);
         return info.isDirectory() ? { ...base, exists: true }

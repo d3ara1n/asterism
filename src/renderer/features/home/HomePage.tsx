@@ -4,11 +4,12 @@ import { resolveProviderModel, thinkingSchema, type ConfigurationSnapshot, type 
 import { initialAgentSelection } from "../configuration/agent-selection";
 import { t } from "../../shared/i18n";
 import { Button } from "../../shared/ui/button";
-import { ConfigurationChoice as Choice } from "../configuration/ConfigurationChoice";
+import { ConfigurationChoice as Choice } from "../../shared/ConfigurationChoice";
 import { InputGroup, InputGroupAddon, InputGroupTextarea } from "../../shared/ui/input-group";
 import { Showcase, showcaseSpell } from "../showcase/Showcase";
 import { BrandMark } from "../../shared/ui/brand-mark";
-import { s, useConfiguration } from "../configuration/state";
+import { useConfiguration } from "../configuration/state";
+import { s } from "../../shared/i18n";
 import type { SessionCommand } from "../../../shared/session";
 
 export type StartInput = Omit<Extract<SessionCommand, { type: "start" }>, "type" | "submissionId">;

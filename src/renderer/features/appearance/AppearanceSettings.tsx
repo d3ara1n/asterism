@@ -1,7 +1,7 @@
 import { useState, type CSSProperties } from "react";
 import { Bot, FileText, Monitor, Moon, Sun } from "lucide-react";
 import { accentIds, codeFontSizes, grayIds, palettes, themeTokens, type AccentId, type CodeFontSize, type Appearance, type GrayId } from "../../../shared/theme";
-import { s } from "../configuration/state";
+import { s } from "../../shared/i18n";
 import { Section } from "../settings/preview";
 import { Button } from "../../shared/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../../shared/ui/dialog";

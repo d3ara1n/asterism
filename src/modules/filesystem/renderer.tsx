@@ -1,6 +1,6 @@
 import { Folder, ListTree, BookOpen, FilePenLine, FilePlus2 } from "lucide-react";
-import { cardRenderer, toolRenderer, type RendererModule } from "../../renderer/modules/registry";
-import { s } from "../../renderer/features/configuration/state";
+import { cardRenderer, toolRenderer, type RendererModule } from "@atelier/sdk/renderer";
+import { s } from "../../renderer/shared/i18n";
 import { t } from "../../renderer/shared/i18n";
 import { DirectoryView, DirectoryList, DirectoryRead, DirectoryEdit, DirectoryWrite } from "./contract";
 import { TextReadBody, TextChangeBody } from "../text-view";

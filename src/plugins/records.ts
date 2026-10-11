@@ -1,26 +1,20 @@
 import type { Json, RecordContract, RecordQuery, SessionRecord, SessionView } from "@atelier/sdk/contracts";
 import type { SessionNode } from "../shared/session.ts";
-import { coreId } from "../shared/core.ts";
-import type { ResourceRef, ResourceSnapshot, SessionSnapshot } from "@atelier/sdk/runtime";
+import { UserMessage, Execution, Notice, ContextNotice } from "../modules/agent/records.ts";
+import type { ResourceRef, ResourceSnapshot, SessionSnapshot } from "@atelier/sdk/contracts";
 import { foldWorkbench, type FoldedObject } from "../session/fold.ts";
-import { isBlockNode } from "../shared/session-path.ts";
+import { isBlockNode, snap } from "../shared/session-path.ts";
 
 /**
- * 现有存储格式到公开记录信封的固定映射：message 映为 core 用户消息，块与通知按 kind，
- * 资源事件以其 type 为契约 ID。版本表由当前存储格式决定，不从最新 schema 猜测。
+ * 宿主存储到公开记录信封的固定映射：用户消息、执行块与通知使用 core 契约。
+ * 可见环境事件携带原始领域身份和载荷；其他事件保留自己的身份与版本。
  */
-const legacy: Record<string, { id: string; version: number }> = {
-  message: { id: "atelier.core/agent.user-message", version: 1 },
-  thinking: { id: "atelier.core/agent.thinking", version: 1 },
-  text: { id: "atelier.core/agent.text", version: 1 },
-  toolcall: { id: "atelier.core/agent.toolcall", version: 1 },
-  notice: { id: coreId("notice"), version: 1 },
-};
 export function toRecord(node: SessionNode, sequence: number, kinds: ReadonlyMap<string, string> = new Map()): SessionRecord {
   const { id, sessionId, parentId, createdAt, kind, ...rest } = node;
   const owner = "agentId" in rest && typeof rest.agentId === "string" ? rest.agentId : null;
-  const contract = kind === "event" ? { id: node.type, version: 1 } : legacy[kind]!;
-  const data = (isBlockNode(node) ? {
+  const contract = isBlockNode(node) ? Execution : kind === "message" ? UserMessage : kind === "notice" ? Notice
+    : node.kind === "event" && node.model !== null ? ContextNotice : { id: node.kind === "event" ? node.type : "", version: node.kind === "event" ? node.version ?? 1 : 1 };
+  const data = (isBlockNode(node) ? { type: "block", block: {
     responseId: node.responseId, requestParentId: node.requestParentId, ordinal: node.ordinal,
     complete: node.complete, continuation: node.continuation,
     source: { model: node.model, adapter: node.adapter, scope: node.scope },
@@ -28,8 +22,11 @@ export function toRecord(node: SessionNode, sequence: number, kinds: ReadonlyMap
       rawFinishReason: node.rawFinishReason, providerResponseId: node.providerResponseId },
     ...(node.kind === "toolcall" ? { kind: node.kind, callId: node.callId, name: node.name,
       argumentsText: node.argumentsText, arguments: node.arguments, outcome: node.outcome } : { kind: node.kind, text: node.text }),
-  } : kind === "event" ? node.data : rest) as Json;
-  return freeze({ id, sessionId, parentId, sequence, createdAt, contract,
+  } } : node.kind === "event" && node.model !== null ? { text: node.model, recipient: node.agentId,
+    origin: { type: node.type, version: node.version ?? 1, data: node.data } }
+    : kind === "event" ? node.data : kind === "notice" ? { code: node.code, message: node.message, level: node.level,
+      ...(node.response ? { response: node.response } : {}) } : rest) as Json;
+  return freeze({ id, sessionId, parentId, sequence, createdAt, contract: { id: contract.id, version: contract.version },
     resource: owner ? { id: owner, kind: kinds.get(owner) ?? "atelier.core/agent" } : null, data: structuredClone(data) });
 }
 export function toRecords(nodes: readonly SessionNode[], all: readonly SessionNode[]): SessionRecord[] {
@@ -53,11 +50,12 @@ export function resourceSnapshot(ref: ResourceRef, resource: FoldedObject): Reso
   const { id: _id, type: _type, title: _title, ...data } = resource.data;
   return freeze({ ref: { ...ref }, title: resource.title, data: structuredClone(data) as Json });
 }
-export function sessionSnapshot(id: string, title: string, nodes: readonly SessionNode[], path: readonly SessionNode[]): SessionSnapshot {
+export function sessionSnapshot(id: string, title: string, nodes: readonly SessionNode[], path: readonly SessionNode[], canResume = true): SessionSnapshot {
   const resources = Object.freeze(foldWorkbench(path).objects.map(object =>
     resourceSnapshot({ sessionId: id, id: object.id, kind: object.kind }, object)));
   return {
-    ...sessionView(id, title, nodes, path), position: Object.freeze({ nodeId: path.at(-1)?.id ?? null }),
+    ...sessionView(id, title, nodes, path), position: Object.freeze({ nodeId: path.at(-1)?.id ?? null,
+      continuationId: path.length && canResume ? snap(nodes, path.at(-1)!.id) : path.at(-1)?.id ?? null }),
     resources: {
       all: () => resources,
       get(contract, objectId) {

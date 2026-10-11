@@ -1,38 +1,29 @@
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, Bot, Brain, Cpu, Info, LoaderCircle, Square, TriangleAlert } from "lucide-react";
 import type { AgentSelection } from "../../../shared/model";
-import { conversationTimeline, timelineKey, type TimelineItem } from "../../../shared/session-view";
-import { resolveModelRole, resolveProviderModel, thinkingSchema, type ThinkingLevel , modelReference } from "../../../shared/configuration";
-import type { AgentView } from "../session/registry";
-import type { AgentCommand } from "../../../modules/agent/contract";
-import { useSession, useSessionProgress } from "../session/state";
+import { conversationTimeline, timelineKey, type TimelineItem } from "./timeline";
+import { resolveModelRole, resolveProviderModel, thinkingSchema, type ThinkingLevel, modelReference } from "../../../shared/configuration";
+import type { AgentCommand } from "../contract";
+import { useRendererObject } from "@atelier/sdk/renderer";
+import { ModelConfiguration } from "../configuration";
 import { Markdown } from "./Markdown";
-import { s, useConfiguration } from "../configuration/state";
-import { ConfigurationChoice } from "../configuration/ConfigurationChoice";
-import { t } from "../../shared/i18n";
-import { Button } from "../../shared/ui/button";
-import { Badge } from "../../shared/ui/badge";
-import { Alert, AlertDescription } from "../../shared/ui/alert";
-import { PageState } from "../../shared/ui/page-state";
-import { InputGroup, InputGroupAddon, InputGroupTextarea } from "../../shared/ui/input-group";
+import { ConfigurationChoice } from "../../../renderer/shared/ConfigurationChoice";
+import { t, s } from "../../../renderer/shared/i18n";
+import { Button } from "../../../renderer/shared/ui/button";
+import { Badge } from "../../../renderer/shared/ui/badge";
+import { Alert, AlertDescription } from "../../../renderer/shared/ui/alert";
+import { PageState } from "../../../renderer/shared/ui/page-state";
+import { InputGroup, InputGroupAddon, InputGroupTextarea } from "../../../renderer/shared/ui/input-group";
 import { ToolCall } from "./ToolCall";
 import { ThinkingBlock } from "./ThinkingBlock";
 
-function useAgent(view: AgentView) {
-  const session = useSession(view.controller);
-  const progress = useSessionProgress(view.controller);
-  const { snapshot, historical } = session;
-  const timeline = useMemo(() => snapshot ? conversationTimeline(snapshot.nodes, snapshot.at, view.agentId, historical ? [] : progress.live) : [],
-    [snapshot, historical, view.agentId, progress.live]);
-  // 平级代理互不阻塞：只关心本代理是否在运行。
-  const agentRunning = progress.runningAgentIds.includes(view.agentId);
-  return { ...session, timeline, agentRunning, running: agentRunning };
-}
 
 /** 卡片标题栏中的执行状态；历史属于会话，入口在窗口标题栏。 */
-export function ConversationActions({ view, ready }: { view: AgentView; ready: boolean }) {
-  const { snapshot, historical } = useSession(view.controller);
-  const agentRunning = useSessionProgress(view.controller).runningAgentIds.includes(view.agentId);
+export function ConversationActions() {
+  const object = useRendererObject();
+  const { ready, historical } = object.view;
+  const snapshot = object.session.snapshot();
+  const agentRunning = object.activity.running;
   if (!snapshot) return null;
   return <>
     <Badge variant="secondary" role="status">{agentRunning && <LoaderCircle className="animate-spin" />}
@@ -41,13 +32,21 @@ export function ConversationActions({ view, ready }: { view: AgentView; ready: b
 }
 
 /** 代理卡片内容：当前路径的最终视图与输入区；没有分支感，回溯在会话历史中进行。 */
-export function Conversation({ view, selection, ready, draft, onDraftChange, onHome }: {
-  view: AgentView; selection: AgentSelection | null; ready: boolean; draft: string; onDraftChange: (value: string) => void; onHome: () => void;
-}) {
-  const { controller, agentId, submission } = view;
-  const { state, snapshot, timeline, agentRunning, running, historical } = useAgent(view);
-  const command = (value: AgentCommand) => controller.execute({ type: "resource.command", sessionId: controller.sessionId, objectId: agentId, command: value });
-  const { snapshot: configuration, error: configurationError } = useConfiguration(ready);
+export function Conversation({ selection }: { selection: AgentSelection | null }) {
+  const object = useRendererObject();
+  const { view: state, session, submissions: submission } = object;
+  const { ready, historical } = state;
+  const agentId = object.ref.id;
+  const snapshot = session.snapshot();
+  const agentRunning = object.activity.running;
+  const running = agentRunning;
+  const timeline = useMemo(() => snapshot ? conversationTimeline(snapshot, agentId, object.activity.blocks) : [], [snapshot, agentId, object.activity.blocks]);
+  const draft = object.draft.value;
+  const onDraftChange = object.draft.set;
+  const onHome = object.home;
+  const command = (value: AgentCommand) => object.invoke(value);
+  const configuration = object.catalogs.get(ModelConfiguration);
+  const configurationError = object.catalogs.error;
   const [selectionError, setSelectionError] = useState<string | null>(null);
   const [awayFromBottom, setAwayFromBottom] = useState(false);
   const follow = useRef(true);
@@ -57,7 +56,7 @@ export function Conversation({ view, selection, ready, draft, onDraftChange, onH
 
   if (!snapshot) return state.status === "loading" ? null : <div className="flex flex-1 items-center justify-center p-6">
     <PageState kind="error" title={t.unavailableTitle} body={state.error ?? t.unavailableBody}
-      action={<Button variant="secondary" size="sm" onClick={state.missing ? onHome : () => { void controller.refresh(); }}>{state.missing ? t.newConversation : t.retry}</Button>} />
+      action={<Button variant="secondary" size="sm" onClick={state.missing ? onHome : () => { void session.refresh(); }}>{state.missing ? t.newConversation : t.retry}</Button>} />
   </div>;
 
   const selectedAgent = configuration?.agents.find(a => a.id === selection?.agent && a.enabled);
@@ -87,7 +86,7 @@ export function Conversation({ view, selection, ready, draft, onDraftChange, onH
   return <>
     {historical && <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b px-4 py-2">
       <p className="type-caption">{s("Viewing saved history. Choose “Continue from here” in history to branch.", "正在查看已保存历史。在会话历史中选择“从此处继续”即可分叉。")}</p>
-      <Button variant="ghost" size="sm" onClick={controller.followCursor}>{t.backToLive}</Button>
+      <Button variant="ghost" size="sm" onClick={session.followLive}>{t.backToLive}</Button>
     </div>}
     <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
       <div ref={scroll} className="min-h-0 flex-1 select-text overflow-y-auto overscroll-contain" onScroll={event => {
@@ -131,7 +130,7 @@ export function Conversation({ view, selection, ready, draft, onDraftChange, onH
       </div>}
       {error && <Alert variant="destructive"><AlertDescription className="flex flex-wrap items-center gap-2">
         <span className="flex-1">{error}</span>
-        <Button variant="ghost" size="sm" onClick={() => { void controller.refresh(); }}>{s("Reload", "重新读取")}</Button>
+        <Button variant="ghost" size="sm" onClick={() => { void session.refresh(); }}>{s("Reload", "重新读取")}</Button>
       </AlertDescription></Alert>}
       {!historical && <form onSubmit={event => { event.preventDefault(); void send(); }}>
         <InputGroup>

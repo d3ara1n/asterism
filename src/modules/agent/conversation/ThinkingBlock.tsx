@@ -1,10 +1,11 @@
 import { memo, useEffect, useState } from "react";
 import { Brain } from "lucide-react";
-import type { TimelineItem } from "../../../shared/session-view";
-import { useAppearance } from "../appearance/state";
-import { t } from "../../shared/i18n";
-import { Badge } from "../../shared/ui/badge";
-import { Spinner } from "../../shared/ui/spinner";
+import type { TimelineItem } from "./timeline";
+import { useRendererObject } from "@atelier/sdk/renderer";
+import { ThinkingPreferences } from "../configuration";
+import { t } from "../../../renderer/shared/i18n";
+import { Badge } from "../../../renderer/shared/ui/badge";
+import { Spinner } from "../../../renderer/shared/ui/spinner";
 import { Markdown } from "./Markdown";
 import { advanceThinkingDisclosure, initialThinkingDisclosure, thinkingDuration } from "./thinking-state";
 import { Disclosure } from "./Disclosure";
@@ -14,7 +15,7 @@ type ThinkingNode = Extract<TimelineItem, { kind: "thinking" }>;
 /** 外壳的开合偏好与正文的过程/终结渲染相互独立。 */
 export function ThinkingBlock({ node }: { node: ThinkingNode }) {
   const streaming = !("complete" in node);
-  const preferences = useAppearance();
+  const preferences = useRendererObject().catalogs.get(ThinkingPreferences) ?? { thinkingAutoExpand: true, thinkingAutoCollapse: true };
   const [disclosure, setDisclosure] = useState(() => initialThinkingDisclosure(streaming, preferences));
   const next = advanceThinkingDisclosure(disclosure, streaming, preferences);
   if (next !== disclosure) setDisclosure(next);

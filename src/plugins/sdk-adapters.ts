@@ -10,7 +10,7 @@ import type { SdkContext } from "./sdk-context.ts";
 import { synchronous } from "./synchronous.ts";
 
 function address(host: PluginHostServices, resource: FoldedObject): ResourceRef {
-  const ref = host.refOf?.(resource.id);
+  const ref = host.refOf(resource.id);
   if (!ref || ref.kind !== resource.kind) throw new PluginApiError("unavailable", "The resource reference is not valid.");
   return ref;
 }
@@ -19,13 +19,24 @@ function snapshot(host: PluginHostServices, resource: FoldedObject): ResourceSna
 }
 export function adaptResource(contribution: ResourceContribution, sdk: SdkContext, host: PluginHostServices): ResourceBackend {
   const { resource, creation, actions } = contribution;
-  const running = new Map<string, { sessionId: string; controller: AbortController; done: Promise<void> }>();
+  const running = new Map<string, AbortController>();
+  const queued = new Map<string, { sessionId: string; done: Promise<void> }>();
   let closed = false;
   return {
     kind: resource.kind,
-    project: object => contribution.project(snapshot(host, object), sdk.object(address(host, object))),
-    inspect: object => contribution.inspect(snapshot(host, object), sdk.object(address(host, object))),
-    context: object => contribution.context?.(snapshot(host, object), sdk.object(address(host, object))) ?? Promise.resolve([]),
+    receivesLinks: contribution.links?.receive === true,
+    project: object => {
+      const captured = snapshot(host, object);
+      return contribution.project(captured, sdk.object(captured.ref, undefined, captured));
+    },
+    inspect: object => {
+      const captured = snapshot(host, object);
+      return contribution.inspect(captured, sdk.object(captured.ref, undefined, captured));
+    },
+    context: object => {
+      const captured = snapshot(host, object);
+      return contribution.context?.(captured, sdk.object(captured.ref, undefined, captured)) ?? Promise.resolve([]);
+    },
     controller: {
       ...(creation ? {
         async prepareCreate(input: unknown) {
@@ -43,7 +54,7 @@ export function adaptResource(contribution: ResourceContribution, sdk: SdkContex
         },
         create(sessionId: string, id: string, input: Json) {
           if (closed) throw new PluginApiError("unavailable", "The resource controller is closed.");
-          const scope = { active: true };
+          const scope = { active: true, provisional: true };
           try {
             let result!: { title: string; data: Json };
             synchronous(() => { result = creation.create(creation.schema.parse(input), sdk.object({ sessionId, id, kind: resource.kind }, scope)); return result; });
@@ -59,28 +70,51 @@ export function adaptResource(contribution: ResourceContribution, sdk: SdkContex
         validateCommand: (input: Json) => jsonSchema.parse(actions.schema.parse(input)),
         async prepareCommand(input: Json, ref: ResourceRef, signal: AbortSignal) {
           const parsed = actions.schema.parse(input);
-          const result = await actions.prepare?.(parsed, sdk.object(ref), signal);
+          const scope = { active: true, provisional: !host.refOf(ref.id) };
+          let result;
+          try { result = await actions.prepare?.(parsed, sdk.object(ref, scope), signal); }
+          finally { scope.active = false; }
           if (result?.action === "reject") throw new PluginApiError("rejected", result.message, result.code);
           return jsonSchema.parse(actions.schema.parse(result?.action === "replace" ? result.input : parsed));
         },
         async execute(context, raw, before) {
           if (closed) throw new PluginApiError("unavailable", "The resource controller is closed.");
-          if (running.has(context.resource.id)) throw new PluginApiError("unavailable", "An action is already running on this resource.");
-          before?.();
-          const ref = address(host, context.resource);
-          const controller = new AbortController();
-          const done = Promise.resolve().then(() => actions.execute(actions.schema.parse(raw), sdk.object(ref), controller.signal))
-            .finally(() => { running.delete(ref.id); host.sessions.progressChanged(ref.sessionId); });
-          running.set(ref.id, { sessionId: ref.sessionId, controller, done });
-          host.sessions.progressChanged(ref.sessionId);
+          const ref = { sessionId: context.sessionId, id: context.resource.id, kind: resource.kind };
+          const previous = queued.get(ref.id)?.done ?? Promise.resolve();
+          const done = previous.catch(() => {}).then(async () => {
+            if (closed) throw new PluginApiError("unavailable", "The resource controller is closed.");
+            const scope = { active: true, provisional: !host.refOf(ref.id), before };
+            if (host.refOf(ref.id)) before?.();
+            const controller = new AbortController();
+            running.set(ref.id, controller);
+            try { await actions.execute(actions.schema.parse(raw), sdk.object(ref, scope), controller.signal); }
+            finally { scope.active = false; running.delete(ref.id); }
+          })
+            .catch(error => {
+              if (error instanceof PluginApiError) throw new SessionError(
+                error.code === "invalid_argument" || error.code === "rejected" ? "invalid_request"
+                  : error.code === "conflict" || error.code === "not_found" ? error.code : "unavailable", error.message);
+              throw error;
+            })
+            .finally(() => {
+              if (queued.get(ref.id)?.done === done) queued.delete(ref.id);
+              if (host.refOf(ref.id)) host.sessions.progressChanged(ref.sessionId);
+            });
+          queued.set(ref.id, { sessionId: ref.sessionId, done });
+          if (host.refOf(ref.id)) host.sessions.progressChanged(ref.sessionId);
           await done;
         },
       } : {}),
-      activity: sessionId => ({ running: [...running].filter(([, run]) => run.sessionId === sessionId).map(([id]) => id), live: [] }),
+      ...(contribution.links?.receive ? { linkTools(sessionId: string, id: string, linked: FoldedObject) {
+        const policy = contribution.links?.tools?.(sdk.object({ sessionId, id, kind: resource.kind }));
+        const allowed = policy?.allow ? new Set(policy.allow) : null, excluded = new Set(policy?.exclude ?? []);
+        return host.sessions.capabilities([linked], name => (allowed === null || allowed.has(name)) && !excluded.has(name)).describe(linked.id);
+      } } : {}),
+      activity: sessionId => ({ running: [...queued].filter(([, action]) => action.sessionId === sessionId).map(([id]) => id), live: [] }),
       async close() {
         closed = true;
-        for (const run of running.values()) run.controller.abort();
-        await Promise.allSettled([...running.values()].map(run => run.done));
+        for (const controller of running.values()) controller.abort();
+        await Promise.allSettled([...queued.values()].map(action => action.done));
       },
     },
   };
@@ -90,6 +124,16 @@ export function adaptTool(contribution: ToolContribution, sdk: SdkContext, host:
   return {
     reference: reference(contract), resourceKind: contract.resource.kind, tool: contract.tool,
     effect: contract.effect, targetSchema: contract.targetSchema, resultSchema: contract.schema,
-    prepare: (resource, target, args) => contribution.prepare(snapshot(host, resource), sdk.object(address(host, resource)), target, args),
+    prepare(resource, target, args) {
+      const captured = snapshot(host, resource);
+      const scope = { active: false, execution: true };
+      const prepared = contribution.prepare(captured, sdk.object(captured.ref, scope, captured), target, args);
+      if (!("execute" in prepared)) return prepared;
+      return { ...prepared, async execute(signal, publish) {
+        scope.active = true;
+        try { return await prepared.execute(signal, publish); }
+        finally { scope.active = false; }
+      } };
+    },
   };
 }

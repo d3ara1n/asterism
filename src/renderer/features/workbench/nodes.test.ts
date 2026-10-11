@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { workbenchSnapshotSchema } from "../../../shared/workbench";
 import { defineData, present } from "@atelier/sdk/contracts";
-import { cardRenderer, ViewRegistry } from "../../modules/registry";
+import { cardRenderer } from "@atelier/sdk/renderer";
+import { ViewRegistry } from "../../modules/registry";
 import { workbenchNodes } from "./nodes";
 
 const contract = defineData("test.card", 1, z.null());

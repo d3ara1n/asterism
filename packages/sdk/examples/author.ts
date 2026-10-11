@@ -28,6 +28,13 @@ export const journalPlugin = definePlugin({
 export function annotate(plugin: PluginContext, sessionId: string, text: string) {
   plugin.session(sessionId).commit(writer => { writer.append(Annotation, { text }); });
 }
+const CurrentSummary = journal.data("summary", 2, z.strictObject({ text: z.string() }));
+/** 当前会话数据不进入时间轴；与对象数据及插件私有数据库分别保存。 */
+export function saveSummary(plugin: PluginContext, sessionId: string, text: string) {
+  const session = plugin.session(sessionId);
+  session.commit(writer => { writer.set(CurrentSummary, { text }); });
+  return session.get(CurrentSummary);
+}
 
 /** 场景二：独立资源的创建、状态、事件、动作与工具，不使用模型能力。 */
 const sample = pluginNamespace("example.counter");
@@ -39,6 +46,11 @@ const CountChanged = defineRecord(sample.name("count-changed"), {
 });
 const createInput = z.strictObject({ title: z.string() });
 const actionInput = z.strictObject({ amount: z.number().int() });
+const counterSettings = z.strictObject({
+  maxChange: z.number().int().min(1).max(100).meta({
+    title: "Maximum change", description: "Largest absolute increment accepted by a counter action.",
+  }),
+}).meta({ title: "Counter settings" });
 const Read = defineTool({
   name: "read_counter", description: "Read the current counter value.", guidelines: [],
   argsSchema: z.strictObject({}).describe("No arguments are required."),
@@ -55,41 +67,44 @@ function currentCount(object: ObjectContext) {
   return value;
 }
 export const counterPlugin = definePlugin({
-  namespace: sample, version: "0.0.1", modules: [defineModule(() => ({
-    resources: [implementResource(Counter, CounterView, {
-      records: [CountChanged],
-      creation: {
-        schema: createInput,
-        create(input, object) {
-          object.commit(writer => { writer.set(Count, { value: 0 }); });
-          return { title: input.title, data: {} };
+  namespace: sample, version: "0.0.1", modules: [defineModule(plugin => {
+    const settings = plugin.config(counterSettings, { maxChange: 10 });
+    return {
+      resources: [implementResource(Counter, CounterView, {
+        records: [CountChanged],
+        creation: {
+          schema: createInput,
+          create(input, object) {
+            object.commit(writer => { writer.set(Count, { value: 0 }); });
+            return { title: input.title, data: {} };
+          },
         },
-      },
-      actions: {
-        schema: actionInput,
-        prepare(input) {
-          return Math.abs(input.amount) > 10
-            ? { action: "reject", code: "change_too_large", message: "Change exceeds the limit." }
-            : { action: "accept" };
+        actions: {
+          schema: actionInput,
+          prepare(input) {
+            return Math.abs(input.amount) > settings.get().maxChange
+              ? { action: "reject", code: "change_too_large", message: "Change exceeds the limit." }
+              : { action: "accept" };
+          },
+          async execute(input, object) {
+            object.commit(writer => {
+              const value = currentCount(object).value + input.amount;
+              writer.set(Count, { value });
+              writer.append(CountChanged, { value });
+            });
+          },
         },
-        async execute(input, object) {
-          object.commit(writer => {
-            const value = currentCount(object).value + input.amount;
-            writer.set(Count, { value });
-            writer.append(CountChanged, { value });
-          });
+        project(_data, object) { return currentCount(object); },
+        async inspect(_data, object) { return currentCount(object); },
+      })],
+      tools: [implementTool(CounterRead, {
+        async call(_data, _target, _args, context) {
+          context.signal.throwIfAborted();
+          return { kind: "succeeded", data: currentCount(context.object) };
         },
-      },
-      project(_data, object) { return currentCount(object); },
-      async inspect(_data, object) { return currentCount(object); },
-    })],
-    tools: [implementTool(CounterRead, {
-      async call(_data, _target, _args, context) {
-        context.signal.throwIfAborted();
-        return { kind: "succeeded", data: currentCount(context.object) };
-      },
-    })],
-  }))],
+      })],
+    };
+  })],
 });
 
 /** 场景三：插件自己的 Agent 推动循环，context 每次从时间轴投影。 */
@@ -123,8 +138,8 @@ export function rejectInvalidUsage(plugin: PluginContext, object: ObjectContext)
   object.run({}, new AbortController().signal);
   // @ts-expect-error 不公开内部会话节点数组。
   object.session.nodes();
-  // @ts-expect-error 会话提交不能修改对象状态。
-  object.session.commit(writer => { writer.set(Count, { value: 1 }); });
+  // @ts-expect-error 会话数据也必须匹配持有的契约。
+  object.session.commit(writer => { writer.set(Count, { value: "wrong" }); });
   // @ts-expect-error 同步回调契约不接受 Promise。
   object.commit(async writer => { writer.set(Count, { value: 1 }); });
   const invalidObserver: SessionObserver = {

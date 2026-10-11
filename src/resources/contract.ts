@@ -1,7 +1,5 @@
 import type { Json } from "@atelier/sdk/contracts";
-import type { DataContract, Presentation } from "@atelier/sdk/contracts";
-import { present } from "@atelier/sdk/contracts";
-import type { ResourceContract } from "@atelier/sdk/contracts";
+import type { Presentation } from "@atelier/sdk/contracts";
 import type { LiveBlock } from "../shared/session.ts";
 import type { FoldedObject } from "../session/fold.ts";
 import type { ResourceRef } from "@atelier/sdk/runtime";
@@ -25,7 +23,7 @@ export interface ResourceController {
   /**
    * running 是仍可能向会话树追加事件的对象 ID，涵盖代理与其他被捕获的资源。
    * 外部状态的持续运行不计入；会话回溯与对象移除据此判断 settled。
-   * live 只包含代理的临时输出；活动开始与结束通过 PluginSessions.progressChanged 通知。
+   * live 只包含模型的临时输出；活动开始与结束由宿主发布进度通知。
    */
   activity?(sessionId: string): { running: string[]; live: LiveBlock[] };
   /** 本对象作为链接终点时，向它描述被链接资源的可用工具。 */
@@ -35,22 +33,9 @@ export interface ResourceController {
 /** 后台资源 adapter 的擦除接口；不会跨进程传递函数。 */
 export interface ResourceBackend {
   kind: string;
+  receivesLinks?: boolean;
   project(resource: FoldedObject): Presentation;
   inspect(resource: FoldedObject): Promise<Json>;
   context(resource: FoldedObject): Promise<ContextFile[]>;
   controller?: ResourceController;
-}
-export function implementResource<S extends Json, V extends Json>(contract: ResourceContract<S>, view: DataContract<V>, implementation: {
-  project(state: S, resource: FoldedObject): V;
-  inspect(state: S, resource: FoldedObject): Promise<Json>;
-  context?: (state: S, resource: FoldedObject) => Promise<ContextFile[]>;
-  controller?: ResourceController;
-}): ResourceBackend {
-  return {
-    kind: contract.kind,
-    project: resource => present(view, implementation.project(contract.stateSchema.parse(resource.data), resource)),
-    inspect: resource => implementation.inspect(contract.stateSchema.parse(resource.data), resource),
-    context: resource => implementation.context?.(contract.stateSchema.parse(resource.data), resource) ?? Promise.resolve([]),
-    ...(implementation.controller ? { controller: implementation.controller } : {}),
-  };
 }

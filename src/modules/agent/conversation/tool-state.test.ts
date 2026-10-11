@@ -1,19 +1,20 @@
 import { isValidElement } from "react";
 import { describe, expect, it } from "vitest";
-import type { LiveBlock, SessionNode } from "../../../shared/session";
-import { emptyCompletion } from "../../../shared/session";
+import type { ModelLiveBlock } from "@atelier/sdk/contracts";
+import type { TimelineItem } from "./timeline";
 import { reference } from "@atelier/sdk/contracts";
-import { DirectoryList } from "../../../modules/filesystem/contract";
-import filesystem from "../../../modules/filesystem/renderer";
-import { ViewRegistry, type ToolRenderProps } from "../../modules/registry";
+import { DirectoryList } from "../../filesystem/contract";
+import filesystem from "../../filesystem/renderer";
+import { ViewRegistry } from "../../../renderer/modules/registry";
+import type { ToolRenderProps } from "@atelier/sdk/renderer";
 import { toolCallState } from "./tool-state";
-import { resolveToolView, toolPreparation } from "./tool-views";
-import { t } from "../../shared/i18n";
+import { resolveToolView, toolPreparation } from "../../../renderer/features/conversation/tool-views";
+import { t } from "../../../renderer/shared/i18n";
 
 const args = { resource_id: "directory", tool: "list", target: { path: "src" }, args: {} };
 const invocation = { implementation: reference(DirectoryList), resource: { id: "directory", kind: "atelier.core/directory", title: "Saved title" }, startedAt: 100 };
-const live: Extract<LiveBlock, { kind: "toolcall" }> = {
-  id: "r:0", agentId: "a", responseId: "r", ordinal: 0, kind: "toolcall", name: "resource_call", argumentsText: "", arguments: null,
+const live: Extract<ModelLiveBlock, { kind: "toolcall" }> = {
+  id: "r:0", responseId: "r", ordinal: 0, kind: "toolcall", name: "resource_call", argumentsText: "", arguments: null,
   state: "input", invocation: null, result: null,
 };
 const data = { path: "src", entries: [{ name: "main.ts", type: "file" as const }], truncated: false };
@@ -54,9 +55,9 @@ describe("工具调用的展示投影", () => {
   });
 
   it("取消后的历史仍交给内部工具两个 renderer，资源身份取自保存结果", () => {
-    const node: Extract<SessionNode, { kind: "toolcall" }> = {
-      ...emptyCompletion, id: "saved", sessionId: "s", parentId: null, createdAt: "2026-10-01", agentId: "a", kind: "toolcall",
-      responseId: "r", requestParentId: null, ordinal: 0, complete: true, model: "p/m", adapter: "test", scope: "test", continuation: null,
+    const node: Extract<TimelineItem, { kind: "toolcall" }> = {
+      id: "saved", createdAt: "2026-10-01", usage: null, kind: "toolcall",
+      responseId: "r", requestParentId: null, ordinal: 0, complete: true, source: { model: "p/m", adapter: "test", scope: "test" }, continuation: null,
       callId: "c", name: "resource_call", argumentsText: "", arguments: args,
       outcome: { ...invocation, finishedAt: 300, kind: "cancelled", data, model: "Stopped", message: "Stopped." },
     };

@@ -2,8 +2,7 @@ import { createElement } from "react";
 import { Box } from "lucide-react";
 import { t } from "../shared/i18n";
 import { pluginOf, contractKey, type ContractReference, type Presentation } from "@atelier/sdk/contracts";
-import type { CardRenderer, CardView, ResourceDescription, RendererModule, ToolRenderProps, ToolRenderer, ToolView } from "@atelier/sdk/renderer";
-export * from "@atelier/sdk/renderer";
+import type { CardRenderer, CardView, ResourceDescription, RendererModule, RendererObjectContext, ToolRenderProps, ToolRenderer, ToolView } from "@atelier/sdk/renderer";
 
 function index<T extends { contract: ContractReference }>(entries: readonly T[]): ReadonlyMap<string, T> {
   const map = new Map<string, T>();
@@ -30,8 +29,8 @@ export class ViewRegistry {
     const plugin = pluginOf(kind);
     return this.resources.get(kind) ?? { kind, label: plugin ? t.kindMissing(plugin) : t.kindResource, icon: createElement(Box, { className: "size-4" }) };
   }
-  card(presentation: Presentation): CardView | null {
-    return this.cards.get(contractKey(presentation.contract))?.resolve(presentation.data) ?? null;
+  card(presentation: Presentation, context?: RendererObjectContext): CardView | null {
+    return this.cards.get(contractKey(presentation.contract))?.resolve(presentation.data, context) ?? null;
   }
   tool(contract: ContractReference | undefined, props: ToolRenderProps): ToolView | null {
     return contract ? this.tools.get(contractKey(contract))?.resolve(props) ?? null : null;

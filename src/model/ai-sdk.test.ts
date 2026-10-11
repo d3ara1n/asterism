@@ -4,7 +4,7 @@ import { AiSdkAdapter, sdkMessages } from "./ai-sdk.ts";
 import { modelScope } from "../shared/model.ts";
 import type { ModelInput, ModelEvent } from "./contract.ts";
 import { createProviderModel } from "./provider.ts";
-import { composeSystemPrompt, projectSystemPrompt } from "./system-prompt.ts";
+import { composeSystemPrompt, projectSystemPrompt } from "../modules/agent/system-prompt.ts";
 import { ResponseBuffer } from "../execution/response.ts";
 import type { NewNode } from "../shared/session.ts";
 

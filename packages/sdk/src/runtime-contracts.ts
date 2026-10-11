@@ -13,20 +13,24 @@ import type { ResourceRef, ResourceSnapshot, SessionSnapshot } from "./workspace
 export type { ResourceRef, ResourceSnapshot, SessionSnapshot } from "./workspace.ts";
 export interface SessionWriter {
   append<T extends Json>(contract: RecordContract<T>, data: NoInfer<T>): string;
-}
-export interface ObjectWriter extends SessionWriter {
   set<T extends Json>(contract: DataContract<T>, data: NoInfer<T>): void;
 }
+export type ObjectWriter = SessionWriter;
 export interface SessionHandle {
   readonly id: string;
   snapshot(): SessionSnapshot;
-  /** 只追加本插件声明的会话记录；回调和 writer 只在同步事务内有效。 */
+  get<T extends Json>(contract: DataContract<T>): T | null;
+  /** 将执行位置对齐到可继续的位置；查看快照不改变位置。 */
+  resume(): void;
+  /** 同步提交当前会话数据与本插件声明的事件。 */
   commit(work: (writer: SessionWriter) => undefined): void;
   readonly title: { get(): string; propose(text: string, options: { expected: string }): boolean };
 }
 export interface ObjectContext {
   readonly ref: ResourceRef;
   readonly session: SessionHandle;
+  /** 调用绑定的资源快照；普通对象入口读取当前路径，创建前为 null。 */
+  snapshot(): ResourceSnapshot | null;
   get<T extends Json>(contract: DataContract<T>): T | null;
   commit(work: (writer: ObjectWriter) => undefined): void;
   readonly streams: { publish(channel: string, data: Uint8Array): void };
@@ -40,6 +44,7 @@ export interface PluginContext {
   db(): DatabaseSync;
   readonly tasks: PluginTasks;
   readonly models: ModelServices;
+  readonly catalogs: { get<T extends Json>(contract: DataContract<T>): T | null };
   session(id: string): SessionHandle;
   object(ref: ResourceRef): ObjectContext;
 }
@@ -63,6 +68,7 @@ export interface ContextFile { readonly file: string; readonly text: string }
 export interface ResourceContribution {
   readonly resource: ResourceContract;
   readonly records: readonly RecordContract[];
+  readonly links?: { receive: boolean; tools?(object: ObjectContext): { allow?: readonly string[]; exclude?: readonly string[] } };
   readonly creation?: {
     schema: z.ZodType<Json>;
     prepare?(input: Json, signal: AbortSignal): Promise<Json>;

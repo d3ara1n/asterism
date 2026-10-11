@@ -16,7 +16,8 @@ import { useIsland } from "../../shared/weave/Screen";
 import { cn } from "../../shared/utils";
 import { Section } from "../settings/preview";
 import { Editor, OverrideNumberField } from "./forms";
-import { s, useSettingsConfiguration } from "./state";
+import { useSettingsConfiguration } from "./state";
+import { s } from "../../shared/i18n";
 
 type Base = Omit<AgentConfiguration, "id" | "revision" | "builtin">;
 const NONE = "__none";

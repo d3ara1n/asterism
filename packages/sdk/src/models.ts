@@ -78,6 +78,8 @@ export interface StreamRequest {
   signal: AbortSignal;
 }
 export interface ModelServices {
+  /** 检查显式请求输入与目标，不发送模型请求、不保存状态。 */
+  validate(request: Pick<StreamRequest, "target" | "system" | "messages" | "signal">): Promise<void>;
   stream(request: StreamRequest): AsyncIterable<ModelEvent>;
   /** 一次请求及其工具批次；不保存历史，不推动下一次请求。 */
   run(request: ModelRunRequest): Promise<ModelRunResult>;

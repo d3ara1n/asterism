@@ -1,6 +1,6 @@
-import type { AgentConfiguration } from "../shared/configuration.ts";
-import { applicationBrand } from "../shared/application.ts";
-import { coreId, coreNamespace } from "../shared/core.ts";
+import type { AgentConfiguration } from "../../shared/configuration.ts";
+import { applicationBrand } from "../../shared/application.ts";
+import { coreId, coreNamespace } from "../../shared/core.ts";
 import type { PromptBlock, SystemPrompt } from "@atelier/sdk/contracts";
 
 export type { PromptBlock, SystemPrompt } from "@atelier/sdk/contracts";

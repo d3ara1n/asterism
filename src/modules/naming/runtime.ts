@@ -1,4 +1,4 @@
-import { defineModule } from "../../plugins/contract.ts";
+import { defineModule } from "@atelier/sdk/runtime";
 import { coreId, coreNamespace } from "../../shared/core.ts";
 import { UserMessage } from "../agent/records.ts";
 
@@ -8,13 +8,13 @@ const instruction = "Generate a concise title (at most 8 words) for a conversati
 export default defineModule(plugin => ({
   observers: [{
     id: "session-naming",
-    committed({ sessionId, records, view, session }) {
+    committed({ records, snapshot, session }) {
       // 只认全会话最早的用户消息，且它属于本批次；其他代理输入与分支不重新命名。
-      const first = view.records.first(UserMessage, { scope: "session" });
+      const first = snapshot.records.first(UserMessage, { scope: "session" });
       if (first?.status !== "known" || !records.some(record => record.id === first.record.id)) return;
       const message = first.data;
-      const expected = view.title;
-      plugin.tasks.start(`naming:${sessionId}`, async signal => {
+      const expected = snapshot.title;
+      plugin.tasks.start(`naming:${session.id}`, async signal => {
         let text = "";
         for await (const event of plugin.models.stream({ target: { role: "utility" }, signal,
           system: { blocks: [{ id: coreId("session-naming"), kind: "system", from: coreNamespace, text: instruction }] },

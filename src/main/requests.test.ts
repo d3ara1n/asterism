@@ -1,10 +1,26 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ConfigurationRequests, RuntimeRequests } from "./requests.ts";
+import { ConfigurationRequests, RuntimeRequests, PluginConfigurationRequests } from "./requests.ts";
 import { configurationVersion } from "../shared/configuration.ts";
 import { protocolVersion } from "../shared/contracts.ts";
+import { pluginConfigurationVersion } from "../shared/plugin-configuration.ts";
 
 afterEach(() => vi.useRealTimers());
 describe("任务进程请求生命周期", () => {
+  it("插件配置只消费自己的响应，关闭时结算未完成保存且不重放", async () => {
+    const sent: { id: string }[] = [];
+    const requests = new PluginConfigurationRequests(message => sent.push(message as { id: string }), () => {});
+    const read = requests.execute({ type: "read" });
+    requests.receive({ kind: "configuration.response", version: configurationVersion, id: sent[0]!.id,
+      result: { ok: false, error: { code: "unavailable", message: "Wrong channel." } } });
+    requests.receive({ kind: "plugin-configuration.response", version: pluginConfigurationVersion, id: sent[0]!.id,
+      result: { ok: true, configurations: [] } });
+    expect(await read).toEqual({ ok: true, configurations: [] });
+    const save = requests.execute({ type: "save", id: "acme.plugin", value: false });
+    requests.close();
+    expect((await save).ok).toBe(false);
+    expect((await requests.execute({ type: "read" })).ok).toBe(false);
+    expect(sent).toHaveLength(2);
+  });
   it("配置请求使用独立响应类型，不接受工作台响应冒充", async () => {
     const sent: { id: string }[] = [];
     const requests = new ConfigurationRequests(message => sent.push(message as { id: string }), () => {});

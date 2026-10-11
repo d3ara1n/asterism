@@ -1,9 +1,45 @@
-/** SDK renderer 入口：卡片与工具视图的具型作者 helper；React 由宿主共享，不打进插件 bundle。 */
-import { createElement, type ComponentType, type ReactNode } from "react";
+/** SDK renderer 入口：卡片、工具视图与绑定对象的前端能力；React 由宿主共享。 */
+import { createContext, createElement, useContext, type ComponentType, type ReactNode } from "react";
 import type { z } from "zod";
 import type { Json } from "./json.ts";
 import type { ToolInvocationInfo, ToolResult } from "./tool-result.ts";
 import { reference, type ContractReference, type DataContract } from "./presentation.ts";
+import type { ResourceRef, SessionSnapshot } from "./workspace.ts";
+import type { ModelLiveBlock } from "./models.ts";
+
+export type RendererReceipt = { ok: true } | { ok: false; error: { code: string; message: string } };
+/** 绑定卡片对象的前端能力；宿主负责订阅、命令门禁和当前视图的一致性。 */
+export interface RendererObjectContext {
+  readonly ref: ResourceRef;
+  readonly view: {
+    ready: boolean; busy: boolean; historical: boolean; status: "loading" | "ready" | "error";
+    error: string | null; missing: boolean;
+  };
+  readonly session: {
+    snapshot(): SessionSnapshot | null;
+    subscribe(listener: () => void): () => void;
+    create(kind: string, input: Json, position: { x: number; y: number }): Promise<RendererReceipt>;
+    refresh(): Promise<void>;
+    followLive(): void;
+  };
+  invoke(command: Json): Promise<RendererReceipt>;
+  onStream(channel: string, listener: (data: Uint8Array) => void): () => void;
+  readonly activity: { running: boolean; blocks: readonly ModelLiveBlock[] };
+  readonly catalogs: { get<T extends Json>(contract: DataContract<T>): T | null; error: string | null };
+  readonly tools: {
+    resolve(props: ToolRenderProps): ToolView & { props: ToolRenderProps };
+    preparation(name: string): string;
+  };
+  readonly draft: { value: string; set(value: string): void };
+  readonly submissions: { forInput(value: Json): string; accepted(): void };
+  home(): void;
+}
+const ObjectContext = createContext<RendererObjectContext | null>(null);
+export function useRendererObject(): RendererObjectContext {
+  const object = useContext(ObjectContext);
+  if (!object) throw new Error("The renderer must be bound to an object.");
+  return object;
+}
 
 /** 类型级静态识别信息，不解析卡片数据，也不创建正文组件。 */
 export interface ResourceDescription {
@@ -12,6 +48,7 @@ export interface ResourceDescription {
   icon: ReactNode;
   /** 创建前可取用的默认卡片尺寸，与卡片 renderer 共用声明。 */
   card?: CardAppearance;
+  receivesLinks?: boolean;
 }
 export interface CardAppearance {
   /** 画布单位下的默认尺寸；用户覆盖由工作台保存。 */
@@ -26,7 +63,7 @@ export interface CardView extends CardAppearance {
 }
 export interface CardRenderer {
   contract: ContractReference;
-  resolve(data: Json): CardView | null;
+  resolve(data: Json, context?: RendererObjectContext): CardView | null;
 }
 export interface ToolRenderProps<D = Json, T = Json, A = Json> {
   phase: "ready" | "executing" | "settled";
@@ -58,11 +95,12 @@ export function cardRenderer<T extends Json>(
   definition: CardAppearance & { Body: ComponentType<{ data: T }>; Actions?: ComponentType<{ data: T }> },
 ): CardRenderer {
   const { Body, Actions, ...appearance } = definition;
-  return { contract: reference(contract), resolve(raw) {
+  return { contract: reference(contract), resolve(raw, context) {
     const parsed = contract.schema.safeParse(raw);
     if (!parsed.success) return null;
-    return { ...appearance, body: createElement(Body, { data: parsed.data }),
-      actions: Actions ? createElement(Actions, { data: parsed.data }) : undefined };
+    const bind = (node: ReactNode) => context ? createElement(ObjectContext.Provider, { value: context }, node) : node;
+    return { ...appearance, body: bind(createElement(Body, { data: parsed.data })),
+      actions: Actions ? bind(createElement(Actions, { data: parsed.data })) : undefined };
   } };
 }
 /** header/body 独立覆盖；过程态和终结态以同一个 schema 校验，空产出仍可渲染调用摘要。 */

@@ -23,6 +23,7 @@ export class ResourceRegistry {
   }
 
   has(kind: string): boolean { return this.backends.has(kind); }
+  receivesLinks(kind: string): boolean { return this.backends.get(kind)?.receivesLinks === true; }
   controller(kind: string): ResourceController | undefined { return this.backends.get(kind)?.controller; }
   controllers(): ResourceController[] { return [...this.backends.values()].flatMap(backend => backend.controller ? [backend.controller] : []); }
 

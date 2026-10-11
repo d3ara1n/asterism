@@ -11,7 +11,8 @@ import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "
 import { Textarea } from "../../shared/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../shared/ui/select";
 import { Switch } from "../../shared/ui/switch";
-import { s, useSettingsConfiguration } from "./state";
+import { useSettingsConfiguration } from "./state";
+import { s } from "../../shared/i18n";
 
 export function TextField({ label, value, onChange, multiline = false, required = false, hint, placeholder }: {
   label: string; value: string; onChange: (value: string) => void; multiline?: boolean; required?: boolean; hint?: string; placeholder?: string;

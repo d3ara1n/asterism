@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { composeSystemPrompt, projectSystemPrompt, type SystemPrompt } from "./system-prompt.ts";
+import { composeSystemPrompt, projectSystemPrompt, type SystemPrompt } from "../modules/agent/system-prompt.ts";
 
 describe("系统提示词的运行时组装与模型投影", () => {
   it("原始提示块保留独立来源，模型视图按声明顺序渲染并转义边界", () => {

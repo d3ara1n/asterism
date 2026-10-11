@@ -3,6 +3,7 @@ import { applicationBrand } from "../shared/application.ts";
 import { protocolVersion, runtimeMessageSchema, type Command, type CommandResult } from "../shared/contracts.ts";
 import { configurationVersion, configurationResponseSchema, type ConfigurationCommand, type ConfigurationResult } from "../shared/configuration.ts";
 import { sessionResponseSchema, sessionVersion, type SessionCommand, type SessionResult } from "../shared/session.ts";
+import { pluginConfigurationResponseSchema, pluginConfigurationVersion, type PluginConfigurationCommand, type PluginConfigurationResult } from "../shared/plugin-configuration.ts";
 
 /** 独立能力通道共用请求生命周期；只发送一次，断线不重放可能已提交的命令。 */
 class PendingRequests<C, R> {
@@ -59,6 +60,14 @@ export class SessionRequests extends PendingRequests<SessionCommand, SessionResu
   constructor(send: (message: unknown) => void, onTimeout: () => void, timeoutMs = 45_000) {
     super(send, onTimeout, (id, command) => ({ kind: "session.request", version: sessionVersion, id, command }), raw => {
       const parsed = sessionResponseSchema.safeParse(raw);
+      return parsed.success ? parsed.data : null;
+    }, message => ({ ok: false, error: { code: "unavailable", message } }), timeoutMs);
+  }
+}
+export class PluginConfigurationRequests extends PendingRequests<PluginConfigurationCommand, PluginConfigurationResult> {
+  constructor(send: (message: unknown) => void, onTimeout: () => void, timeoutMs = 15_000) {
+    super(send, onTimeout, (id, command) => ({ kind: "plugin-configuration.request", version: pluginConfigurationVersion, id, command }), raw => {
+      const parsed = pluginConfigurationResponseSchema.safeParse(raw);
       return parsed.success ? parsed.data : null;
     }, message => ({ ok: false, error: { code: "unavailable", message } }), timeoutMs);
   }
