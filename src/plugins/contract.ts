@@ -8,16 +8,9 @@ import type { AgentCapabilities, ToolPolicy } from "../execution/capabilities.ts
 import type { ContextFile, ResourceBackend } from "../resources/contract.ts";
 import type { ToolImplementation } from "../tools/contract.ts";
 import type { PluginModels, RegistryView } from "./models.ts";
+import type { PluginConfig, PluginLogger, PluginSecrets, PluginTasks } from "@atelier/sdk/runtime";
+export { PluginApiError, type PluginConfig, type PluginLogger, type PluginSecrets, type PluginTasks } from "@atelier/sdk/runtime";
 
-/** 插件 API 的稳定错误：code 供插件分支处理，message 用于日志。 */
-export class PluginApiError extends Error {
-  constructor(readonly code: "invalid_argument" | "foreign_resource" | "foreign_event" | "unavailable", message: string) { super(message); }
-}
-export interface PluginLogger {
-  info(message: string): void;
-  warn(message: string): void;
-  error(message: string, error?: unknown): void;
-}
 /** 资源状态属于会话数据；只能读写本插件资源类型的对象。 */
 export interface PluginResourceState {
   get(objectId: string, key: string): Json | null;
@@ -71,17 +64,6 @@ export interface PluginObjectState {
   get(key: string): Json | null;
   set(key: string, value: Json): void;
 }
-/** 宿主托管配置：schema 校验，文件缺失或不合 schema 时回退默认值。 */
-export interface PluginConfig<T extends Json> {
-  get(): T;
-  set(value: T): void;
-}
-/** 命名空间凭据：明文只在系统保护的 vault 中，插件目录只存引用。 */
-export interface PluginSecrets {
-  get(key: string): Promise<string | null>;
-  set(key: string, value: string): Promise<void>;
-  delete(key: string): Promise<void>;
-}
 /** 插件级 context：宿主按插件身份构造，身份不由插件自报。 */
 export interface PluginContext {
   readonly id: string;
@@ -102,9 +84,6 @@ export interface PluginContext {
   readonly models: PluginModels;
   /** 宿主托管的进程内异步任务：同 key 运行中不重复启动，宿主关闭时取消；重启不补做。 */
   readonly tasks: PluginTasks;
-}
-export interface PluginTasks {
-  start(key: string, run: (signal: AbortSignal) => Promise<void>, options?: { timeoutMs?: number }): boolean;
 }
 /** 最外层事务成功提交后的不可变批次；回滚不派发。 */
 export interface CommitEvent {

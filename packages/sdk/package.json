@@ -4,7 +4,8 @@
   "version": "0.1.0",
   "type": "module",
   "exports": {
-    "./contracts": "./src/contracts.ts"
+    "./contracts": "./src/contracts.ts",
+    "./runtime": "./src/runtime.ts"
   },
   "peerDependencies": {
     "zod": "^4.6.5"
