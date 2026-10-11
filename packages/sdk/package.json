@@ -5,9 +5,11 @@
   "type": "module",
   "exports": {
     "./contracts": "./src/contracts.ts",
-    "./runtime": "./src/runtime.ts"
+    "./runtime": "./src/runtime.ts",
+    "./renderer": "./src/renderer.ts"
   },
   "peerDependencies": {
-    "zod": "^4.6.5"
+    "zod": "^4.6.5",
+    "react": "^19.3.0"
   }
 }
