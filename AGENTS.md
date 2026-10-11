@@ -45,6 +45,7 @@
 | `docs/workbench.md` | 卡片、连线、执行段、时间导航 | 最终状态真值 |
 | `docs/design-system.md` | 已确认视觉、平台窗口、主题参数与组件约束 | 随设计决策同步 |
 | `docs/architecture.md` | 技术栈、进程职责、存储、安全边界 | 随技术决策同步 |
+| `docs/plugin-sdk.md` | 插件 SDK 接口、具型创建／动作、生命周期与功能组合；维护 SDK 或模块时读取 | 最终状态真值 |
 | `docs/decisions.md` | 已定原则、初版取舍、开放问题 | 最终状态真值，演进看 git log |
 | `docs/roadmap.md` | 实现顺序与验收场景 | 随实施推进更新 |
 | `docs/mcp-caching.md` | MCP 延迟加载与提示缓存调研 | 时点固化，接入时重新核验 |

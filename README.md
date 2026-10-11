@@ -78,6 +78,7 @@ npm run build
 | [时间线与恢复](docs/timeline.md) | 事件、检查点、历史查看、分叉与恢复 |
 | [工作台交互](docs/workbench.md) | 卡片、连线、执行段与时间导航 |
 | [技术架构](docs/architecture.md) | 桌面技术栈、进程职责、存储与扩展契约 |
+| [插件 SDK 与功能组合](docs/plugin-sdk.md) | 读写接口、具型创建／动作、运行生命周期与模块组合 |
 | [实施路线](docs/roadmap.md) | 实现顺序与验收场景 |
 | [决策与开放问题](docs/decisions.md) | 已定原则、初版取舍与待验证事项 |
 | [MCP 缓存调研](docs/mcp-caching.md) | 延迟加载与提示缓存的机制 |

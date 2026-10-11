@@ -2,15 +2,17 @@
 
 `@atelier/sdk` 定义宿主与插件共用的契约。宿主实现服务，插件贡献模块、资源、工具和具名生命周期成员。SDK 基础围绕工作台、会话与时间轴；读取其他领域的事件时，插件仍须引入该领域的纯契约。
 
+契约和组合规则见 [插件 SDK 与功能组合](../../docs/plugin-sdk.md)。本文是作者入口；代码迁移和验收状态以 [插件计划](../../plans/todo-2026-10-12-plugin-system.md) 的当前任务为准，未完成项不表示已交付。
+
 ## 入口
 
 | 入口 | 内容 |
 | --- | --- |
-| `@atelier/sdk/contracts` | JSON、数据／资源／工具／记录契约、工作台快照、模型协议类型；不依赖 Node 或 React |
-| `@atelier/sdk/runtime` | `definePlugin`、`defineModule`、`implementResource`、`implementTool` 与宿主服务接口；后台可使用 Node |
+| `@atelier/sdk/contracts` | JSON、数据／资源／创建／动作／工具／记录契约、工作台快照、模型协议类型；不依赖 Node 或 React |
+| `@atelier/sdk/runtime` | 插件／模块装配、资源／创建／动作／工具实现、读取／执行门面与宿主服务接口；后台可使用 Node |
 | `@atelier/sdk/renderer` | 卡片与工具视图的作者接口；React 由宿主共享 |
 
-后台默认导出 `definePlugin(...)`，模块用具名 `setup` 入口。插件只导入 SDK 和自己的依赖；宿主内部服务、资源控制器和物理会话节点不是外部 API。内置与外部模块使用同一套贡献接口。
+后台默认导出 `definePlugin(...)`，模块用具名 `setup` 作为装配入口。它取得宿主能力并向普通业务模块注入所需的窄接口，再返回功能贡献。插件只导入 SDK 和自己的依赖；宿主内部服务、资源控制器和物理会话节点不是外部 API。内置与外部模块使用同一套贡献接口。
 
 [后台作者用例与类型反例](examples/author.ts) 和 [前端作者用例](examples/renderer.ts) 直接引用公开 SDK，随项目 `npm run typecheck` 检查，只编译，不执行插件或请求模型。
 
@@ -43,15 +45,17 @@ export default definePlugin({ namespace: ns, version: "1.0.0", modules: [
 
 快照的路径、记录和不可变资源数据固定在读取时刻，`position.nodeId / continuationId` 分别给出当前位置与可续接位置。`session.get` 和 `object.get` 读取当前数据；数据按会话、对象作用域和具型契约隔离，随会话保存，不能据此恢复历史。数据与事件都保存契约版本；当前数据版本不匹配时明确不可用，事件按 `RecordContract.decode` 升级或保留 unknown。纯数据提交通知视图，不追加时间轴或触发事件观察者。插件私有目录与数据库用于插件自身数据，独立于这些会话数据。
 
-资源通过一个 `implementResource` 提供 `project / inspect / context`，内联可选的 `creation` 与 `actions`。创建先准备输入，再在宿主事务内执行 `create`。动作先执行外部 `CommandPreparer`，按装配顺序串行，然后进入资源自己的 `actions.prepare`；每次替换均按目标资源的 schema 重新校验。`actions.execute` 接收绑定对象与取消信号，宿主维护活动状态并在关闭时取消与等待收束。
+资源通过 `implementResource` 聚合 `project / inspect / context`、可选创建实现和动作实现集合。`defineCreation / defineAction` 在纯契约中声明身份、版本、关联资源与输入 schema，`implementCreation / implementAction` 绑定具型实现。外部准备者绑定具体动作，按装配顺序处理后进入资源自己的准备；替换只能改变同一动作的输入。输入 schema 只校验并保持 JSON 值，默认值、去空白和转换放在显式准备中，宿主命令模块统一调度校验和准备。
+
+投影、检查、环境读取、链接说明和准备取得 `ObjectReader`，其 `session` 也是只读接口。创建、动作和授权工具执行取得 `ObjectExecutor`，遵守已有事务与有效期。动作按对象排队，创建进入宿主事务；任务、动作和模型调用共用宿主内部的活动登记、取消与收束机制。
 
 工具通过 `implementTool` 消费 `ImplementationContract`，宿主将它适配到同一个工具目录和授权执行路径。参数、产出和过程发布经过 schema 校验；工具支持关系不构成授权。
 
-观察者消费提交时的固定快照；它产生的新提交按顺序排队，异常隔离。耗时任务用 `plugin.tasks.start`，以 key 去重并通过 `has / cancel` 查询和取消；可绑定本插件对象，使任务计入该对象的执行进度与收束检查。模块自己的设施在具名 `closing` 中收束。`plugin.catalogs.get` 按领域数据契约读取宿主提供的只读目录；应用的 Agent 配置目录由 core 声明，模型与角色目录由模型服务提供。
+观察者消费提交时的固定快照；它产生的新提交按顺序排队，异常隔离。耗时任务用 `plugin.tasks.start`，以 key 去重并通过 `has / cancel` 查询和取消；可绑定本插件对象，使任务计入该对象的执行进度与收束检查。成功 setup 的 `closing` 清理立即登记，后续装配失败或正常关闭均取消工作并等待、按逆序清理；setup 返回前失败自行清理尚未交付的设施。`plugin.catalogs.get` 按领域数据契约读取只读目录；Agent 配置目录由 core 声明，模型与角色目录由模型服务提供。
 
 ## 插件配置
 
-在模块 `setup` 中调用 `plugin.config(schema, defaults)` 声明本插件的一份配置，并保留返回的具型 `get / set` 对象。默认值须通过原始 schema 和 JSON 校验；重复调用须复用同一 schema 与默认值，模块共用这份配置。数据仍保存于插件目录的 `.atelier/config.json`，凭据通过 `secrets` 保存。
+在装配位置调用 `plugin.config(schema, defaults)` 声明本插件的一份配置，并向业务模块注入所需分组的当前值读取和更新接口。更新基于最新完整配置，不缓存整份旧值覆盖其他分组。默认值须通过原始 schema 和 JSON 校验；重复调用仍须复用同一 schema 与默认值。数据保存于插件目录的 `.atelier/config.json`，凭据通过 `secrets` 保存。
 
 设置页只展示已加载且声明了配置的插件，按插件分组。Zod 的 `.meta({ title, description })` 提供表单标题与字段说明；宿主使用输入 JSON Schema 选择字符串、数值、开关和枚举控件，必需的嵌套对象按字段分组。可选对象、数组、动态对象、联合、引用及不能投影的 schema 使用完整 JSON 值编辑，不推断另一套领域结构。所有保存仍由原始 Zod schema 校验，包括不能在 JSON Schema 表达的 refinement；失败保留草稿与原文件。
 
@@ -59,11 +63,11 @@ export default definePlugin({ namespace: ns, version: "1.0.0", modules: [
 
 ## 前端对象接口
 
-`cardRenderer` 校验卡片载荷并向 Body 与 Actions 注入对象环境，组件通过 `useRendererObject()` 取得它。`session.snapshot()` 提供具型记录与资源快照，`session.create` 创建资源，`invoke` 提交当前对象动作，`onStream` 订阅该对象的具名二进制通道。通道使用后台 publish 的短名，由宿主补全插件命名空间。`activity` 提供对象运行状态及临时模型块；历史查看不交付实时块。
+`cardRenderer` 校验卡片载荷并向 Body 与 Actions 注入对象环境，组件通过 `useRendererObject()` 取得基础对象接口。`session.snapshot()` 提供具型记录与资源快照，`session.create(CreationContract, input, position)` 创建资源，`invoke(ActionContract, input)` 调用当前对象动作。`onStream` 订阅对象二进制通道，短名由宿主补全插件命名空间。基础接口提供通用运行状态；临时模型块经专门接口按需取用，历史查看不交付实时块。
 
 二进制流的宿主信封由 main 与 preload 共用 Zod schema 校验，preload 按会话与对象筛选订阅。载荷保留 `Uint8Array`，支持空帧与具有偏移的视图，不转换为 JSON，也不写入时间轴；无效信封不交付插件。
 
-宿主协调读取、命令门禁和错误状态；`view`、草稿与提交身份随对象绑定，重试相同输入保留提交身份，受理后显式清除。`catalogs` 提供具型只读配置，`tools.resolve` 取得固定操作入口及资源工具的调用视图。资源后台的 `links.receive` 与前端静态描述的 `receivesLinks` 声明接收链接，授权仍由执行层检查真实链接。
+宿主协调读取、命令门禁和错误状态。模型进度、配置目录与工具展示通过具名的专门接口取得，共用已有宿主状态源。草稿和提交身份归交互模块，按会话与对象绑定并跨卡片重挂载保留；重试相同输入保留身份，受理后清除。导航显式注入。资源后台的 `links.receive` 与前端静态描述的 `receivesLinks` 声明接收链接，授权仍由执行层检查真实链接。
 
 ## 当前边界
 
@@ -77,7 +81,7 @@ export default definePlugin({ namespace: ns, version: "1.0.0", modules: [
 
 `models.run(request)` 是一次补全及该响应的完整资源工具批次。每次提供 `object / requestParentId / target / system / messages / signal / observer`，可提供工具筛选与缓存命中预期。宿主校验对象归属、当前路径与请求起点，按真实链接固定授权视图，并取用链接资源提供的环境文件追加到本次系统提示；工具筛选只收窄权限。同一对象并发 run 拒绝，运行期间对象和历史须遵守收束规则，关闭时取消并等待批次结束。
 
-具名 `ModelRunObserver.event` 同步收到 `block / completion / diagnostic / progress`。成型块与迟到终态分开交付，部分输出也有明确的完整性标志；临时进度不写历史。`modelRunRecordSchema` 提供可保存事件的共识载荷，插件用它声明自己的 RecordContract，并经 `ObjectContext.commit` 保存。run 不隐式保存输出，也不读取、保存或续接内部对话；终态的 ordinal 标出应绑定的最高序号块，空响应为 null。消费者失败时取消执行并收束工具，返回 `event_delivery`，不再调用该消费者。
+具名 `ModelRunObserver.event` 同步收到 `block / completion / diagnostic / progress`。成型块与迟到终态分开交付，部分输出也有明确的完整性标志；临时进度不写历史。`modelRunRecordSchema` 提供可保存事件的共识载荷，插件用它声明自己的 RecordContract，并经 `ObjectExecutor.commit` 保存。run 不隐式保存输出，也不读取、保存或续接内部对话；终态的 ordinal 标出应绑定的最高序号块，空响应为 null。消费者失败时取消执行并收束工具，返回 `event_delivery`，不再调用该消费者。
 
 返回结果包含终止原因、来源、终态和按模型调用顺序排列的工具结局。取消、失败与未知写入影响要求 Agent 停止自动继续。run 完成工具批次即返回，上层插件的 Agent 决定是否再次调用、维护轮数和预算，每次消息都从时间轴重新投影。Agent 可以持有非 context 状态；context 的唯一真值在时间轴，不能在 Agent 或 run 内保存另一份历史。
 

@@ -2,7 +2,7 @@
 
 资源与工具在模型中平级；后端实现和对应 UI 在这里按功能共置。当前内置模块为 `notes/`、`filesystem/`、`agent/` 与提交后观察模块 `naming/`；命名只提供后台入口。
 
-后台与视图通过 [公开 SDK](../../packages/sdk/README.md) 消费宿主能力。四个内置模块使用具名模块与功能贡献；资源内联声明 `creation / actions`，工具使用 `implementTool`，命名使用提交后观察与托管任务，Agent 自己推动模型循环。
+后台与视图通过 [公开 SDK](../../packages/sdk/README.md) 消费宿主能力，职责与组合约定见 [插件 SDK 与功能组合](../../docs/plugin-sdk.md)，迁移进度见 [插件计划](../../plans/todo-2026-10-12-plugin-system.md)。`setup` 是装配入口，业务模块用显式依赖组合；资源内联聚合具型创建与动作实现，工具使用 `implementTool`，命名使用提交后观察与托管任务，Agent 自己推动模型循环。
 
 `shared/` 存放 core 模块共用的工具契约、正文 schema 与算法，不提供独立模块入口，不依赖宿主实现。纯契约可由后台与 renderer 共用，正文算法只进入后台依赖图。
 
@@ -73,9 +73,11 @@ args、target、result schema 必须有非空的整体 description，声明 help
 
 ## 资源后台
 
-`implementResource` 注册状态投影 `project`、实时检查 `inspect` 和可选环境来源 `context`。project 返回卡片契约的数据；包装层生成 `{contract: {id, version}, data}`，经 IPC 发送给前端。SDK handler 接收资源 data 与 ObjectContext，目录 inspect 从公开会话快照取得对象标题，不读取物理会话节点。
+`implementResource` 注册状态投影 `project`、实时检查 `inspect` 和可选环境来源 `context`。project 返回卡片契约的数据；包装层生成 `{contract: {id, version}, data}`，经 IPC 发送给前端。SDK 的读取 handler 接收资源 data 与 ObjectReader，目录 inspect 从公开会话快照取得对象标题，不读取物理会话节点。
 
-SDK 资源内联声明 `creation / actions`。creation 先按 schema 校验并异步准备输入，再在宿主事务内创建资源，返回 `{title, data}`；对象状态与事件写入使用绑定对象的 `commit`，加入同一事务。actions 经外部 prepare 与资源自己的 prepare 后执行，由宿主检查当前路径、维护活动状态并在关闭时取消和等待收束。资源数据、对象状态和时间轴事件的写入限制见 SDK 说明。
+资源内联聚合一个可选创建实现和一组动作实现。纯契约声明稳定身份、版本、关联资源和输入 schema，前端持契约调用，宿主依据已注册声明校验和路由。创建先异步准备输入，再在宿主事务内同步返回 `{title, data}`；数据和事件通过执行门面的 `commit` 加入同一事务。动作经绑定具体契约的外部准备者和自身准备后按对象排队。输入 schema 只校验并保持 JSON 值，默认值、去空白和转换放在显式准备中，相邻适配层不重复解析。
+
+投影、检查、环境读取、链接说明与准备只取得 `ObjectReader`；创建、动作和授权工具执行取得 `ObjectExecutor`。读取门面的 session 也是只读。任务、动作与模型调用共用宿主内部运行生命周期，分别保留去重、排队和请求授权规则。具体有效期及提交约束见 SDK 说明。
 
 笔记的不可变资源数据为 `{}`，当前正文由 `NoteContent` v1 声明，以 `object.get(NoteContent)` 读取，以 `object.commit` 中的 `writer.set` 保存。状态提交由宿主通知视图刷新，不追加正文历史；卡片与历史查看都显示当前值。空正文是有效状态，缺失或损坏的正文回退为不可用，工具拒绝覆盖。正文限制为 100,000 UTF-16 code units，由契约与工具验证共用同一上限。
 
@@ -99,7 +101,7 @@ header 按单行摘要设计，由 renderer 自行安排内容、排列和省略
 
 三个宿主固定入口在 `renderer/features/conversation/tool-views.tsx` 内置，不进入模块注册面。resource_call 的适配器将完整内层参数、选定实现身份和同一结果交给 ViewRegistry，直接采用二级工具的图标与两个视图入口；不新增外层折叠框。
 
-前端目录在应用根通过 ModuleViewsProvider 注入。卡片通过 SDK 的 `useRendererObject` 读取会话记录、执行动作、创建资源、订阅对象流与读取通用进度；宿主控制器与原始节点不进入模块。`agent/conversation/` 拥有代理对话投影与呈现，公共控件与文案可从 `renderer/shared/` 复用。模块不能导入模块总表，避免注册依赖环。
+前端目录在应用根通过 ModuleViewsProvider 注入。基础对象接口提供读取、具型创建／动作、对象流与通用运行状态；模型进度、配置目录、工具展示经具名接口按需取得，共享已有宿主状态源。`agent/conversation/` 组合时间轴、输出跟随、消息输入、配置选择与交互协调；草稿和重试身份按会话／对象保留，导航显式注入。公共控件与文案可从 `renderer/shared/` 复用；模块不导入宿主控制器、物理节点或模块总表。
 
 ## 历史
 
