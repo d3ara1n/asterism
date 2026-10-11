@@ -3,7 +3,7 @@ import { implementResource } from "../../resources/contract.ts";
 import { implement } from "../../tools/contract.ts";
 import { defineModule } from "../../plugins/contract.ts";
 import { Note, NoteView, NoteRead, NoteEdit, NoteWrite } from "./contract.ts";
-import { TextError, readText, readToModel, editText, textChange, changeToModel } from "../../tools/text.ts";
+import { TextError, readText, readToModel, editText, textChange, changeToModel } from "../shared/text.ts";
 
 const MAX_NOTE_LENGTH = 100_000;
 const contentKey = "note.content";

@@ -21,6 +21,7 @@
 - [x] SDK 与宿主 adapter 主干：会话／对象快照、具型事件／状态同步提交、资源内联 creation／actions、工具贡献、提交后观察、prepare 与 closing 已接到宿主。公开接口不含 `SessionNode`、`FoldedObject` 或裸节点写入；未知记录保留，升级失败回退 unknown。沿用版本 1 的事件／状态存储和创建数据的现有对象编码；高版本写入明确拒绝，具体限制见 [SDK 说明](../packages/sdk/README.md)。纯事件／独立资源／工具适配与只依赖 SDK 的源码包已通过自动测试。
 - [x] 可选模型分支的单次执行：无状态 run 已接到公开 SDK，内置 Agent 自行推动多次调用，每次从时间轴重建消息；stream 用于命名等一次性补全。具型输出交付消费者保存，共识载荷 schema、模型来源、既有模型块与终态映射、对象活动／取消／关闭已实现；请求输入固定，消费者失败时批次仍收束，不增设独立环境、批次、记录或活动服务。
 - [ ] 内置消费者迁移：先迁普通资源与命名，再迁 Agent 的策略、配置、首页与视图，最终只消费 SDK；原有模型／代理配置和注册机制保留。旧 `plugin.state` 消费者迁到绑定对象的 context 后移除旧入口；core 的领域投影与旧 event.model 可见性改为具型记录消费，消除物理节点依赖；renderer 补齐创建、动作、事件读取、对象流订阅和通用执行进度。保留首页原子提交／幂等与现有链接规则，落实静态链接接收声明，不新增初始化服务或 UI 注册平台。记录与配置的存储格式在对应实施批次明确。
+  - [x] 目录后台：创建、project／inspect／context 与 list／read／edit／write 消费公开 SDK；共享正文契约与算法归 core 模块侧。沿用 `{path}` 创建数据、现有文件边界与工具结局；内置装配承接混合模块。下一批为笔记后台。
 - [ ] 插件配置表单：按 Zod schema 渲染设置页分组，接通 renderer 到 runtime 的配置通道。
 - [ ] 流通道的 main／preload 消息改用 Zod schema 校验。
 - [ ] 示例插件：验证仅依赖公开 SDK 的后台贡献、renderer 卡片、二进制流、`commands.invoke` 与 prepare 的完整链路。

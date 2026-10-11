@@ -1,4 +1,4 @@
-import type { CallResult } from "../../tools/contract.ts";
+import type { CallResult } from "@atelier/sdk/runtime";
 
 type Failure = Extract<CallResult<never>, { kind: "failed" | "rejected" }>;
 

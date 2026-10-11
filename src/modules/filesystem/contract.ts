@@ -1,8 +1,8 @@
 import { z } from "zod";
-import { core } from "../plugin.ts";
 import { defineImplementation } from "@atelier/sdk/contracts";
-import { List, Read, Edit, Write } from "../../tools/declarations.ts";
-import { textReadSchema, textChangeSchema } from "../../tools/text-contract.ts";
+import { core } from "../plugin.ts";
+import { List, Read, Edit, Write } from "../shared/declarations.ts";
+import { textReadSchema, textChangeSchema } from "../shared/text-contract.ts";
 
 export const Directory = core.resource("directory", z.object({ path: z.string() }));
 export const DirectoryView = core.data("directory.card", 1, z.strictObject({ path: z.string() }));

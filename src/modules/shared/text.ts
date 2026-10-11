@@ -5,7 +5,7 @@ import { computeLineHash } from "./hashline/hash.ts";
 import { hasFinalNewline, splitLines } from "./hashline/lines.ts";
 import type { ApplyFailure, Edit } from "./hashline/types.ts";
 import type { TextRead, TextChange } from "./text-contract.ts";
-import type { CallResult } from "./contract.ts";
+import type { CallResult } from "@atelier/sdk/runtime";
 
 const MAX_ANCHOR_LINES = 40;
 const MAX_ANCHOR_BYTES = 16 * 1024;

@@ -1,8 +1,8 @@
 import { z } from "zod";
-import { core } from "../plugin.ts";
 import { defineImplementation } from "@atelier/sdk/contracts";
-import { Read, Edit, Write } from "../../tools/declarations.ts";
-import { textReadSchema, textChangeSchema } from "../../tools/text-contract.ts";
+import { core } from "../plugin.ts";
+import { Read, Edit, Write } from "../shared/declarations.ts";
+import { textReadSchema, textChangeSchema } from "../shared/text-contract.ts";
 
 export const Note = core.resource("note", z.object({}));
 export const NoteView = core.data("note.card", 1, z.strictObject({ text: z.string().nullable() }));

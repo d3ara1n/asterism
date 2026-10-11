@@ -1,5 +1,5 @@
 import type { ToolResult } from "@atelier/sdk/contracts";
-import type { TextRead, TextChange } from "../tools/text-contract";
+import type { TextRead, TextChange } from "./shared/text-contract";
 import { t } from "../renderer/shared/i18n";
 
 /** 用户视图消费保存的正文和差异，不显示或重新生成模型用的锚点。 */

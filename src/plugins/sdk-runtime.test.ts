@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -10,6 +10,7 @@ import * as runtimeModules from "../modules/runtime.ts";
 import type { ToolRegistry } from "../tools/registry.ts";
 import { foldWorkbench } from "../session/fold.ts";
 import type { ModelAdapter, ModelInput } from "../model/contract.ts";
+import { Directory, DirectoryView } from "../modules/filesystem/contract.ts";
 
 const ns = pluginNamespace("test.counter");
 const Counter = ns.resource("counter", z.strictObject({}));
@@ -28,7 +29,7 @@ function open(plugins: PluginDefinition[], adapterFactory?: () => ModelAdapter) 
   const root = mkdtempSync(join(tmpdir(), "sdk-runtime-")); roots.push(root);
   const service = new ApplicationService(root, { plugins, adapterFactory }); services.push(service);
   const sessionId = service.sessions.tree.create("Counter");
-  return { service, sessionId };
+  return { root, service, sessionId };
 }
 async function configureModel(service: ApplicationService) {
   await service.configuration.execute({ type: "provider.save", id: null, credential: { action: "keep" },
@@ -79,6 +80,37 @@ async function create(service: ApplicationService, sessionId: string, input = 1)
 }
 
 describe("工作台 SDK 的宿主实现", () => {
+  it("内置目录经 SDK 创建，默认或自定标题和路径沿用原有事件与卡片格式", async () => {
+    const { root, service, sessionId } = open([]);
+    const directory = join(root, "directory"); mkdirSync(directory);
+    expect(service.sessions.plugins.find(plugin => plugin.id === "atelier.core")?.status).toBe("loaded");
+    for (const title of [undefined, "  Materials  "]) {
+      await service.sessions.execute({ type: "resource.create", sessionId, kind: Directory.kind,
+        input: { path: directory, ...(title ? { title } : {}) }, position: { x: 0, y: 0 } });
+    }
+    const snapshot = service.sessions.snapshot(sessionId);
+    const directories = snapshot.workbench.objects.filter(object => object.kind === Directory.kind);
+    expect(directories.map(object => object.title)).toEqual(["directory", "Materials"]);
+    expect(directories.map(object => object.presentation)).toEqual([
+      { contract: { id: DirectoryView.id, version: DirectoryView.version }, data: { path: directory } },
+      { contract: { id: DirectoryView.id, version: DirectoryView.version }, data: { path: directory } },
+    ]);
+    expect(service.sessions.tree.nodes(sessionId).filter(node => node.kind === "event" && node.type === "resource_created"))
+      .toMatchObject([{ data: { type: Directory.kind, title: "directory", path: directory } },
+        { data: { type: Directory.kind, title: "Materials", path: directory } }]);
+  });
+
+  it("目录创建的 schema 与路径拒绝映为 invalid_request，失败不留下对象或事件", async () => {
+    const { root, service, sessionId } = open([]);
+    const file = join(root, "file.txt"); writeFileSync(file, "text");
+    for (const input of [{ path: 42 }, { path: "relative" }, { path: join(root, "missing") }, { path: file }]) {
+      await expect(service.sessions.execute({ type: "resource.create", sessionId, kind: Directory.kind,
+        input, position: { x: 0, y: 0 } })).rejects.toMatchObject({ code: "invalid_request" });
+    }
+    expect(service.sessions.tree.nodes(sessionId)).toEqual([]);
+    expect(service.sessions.snapshot(sessionId).workbench.objects).toEqual([]);
+  });
+
   it("不依赖 Agent 的资源创建与事件、状态同事务，信封关联真实资源种类", async () => {
     const observed: SessionRecord[] = [];
     const c = counter({ observe: record => observed.push(record) });

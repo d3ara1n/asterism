@@ -9,7 +9,7 @@
 - append/prepend 不需要锚点；其他操作从 read 或 edit 结果取得锚点。
 - 纯核心不访问文件或存储；资源授权、串行修改、差异生成与实际保存由 Atelier 后端负责。
 
-正文工具契约见 [text-contract.ts](../text-contract.ts)，后端公共逻辑见 [text.ts](../text.ts)，正式行为与授权边界见 [运行时文档](../../../docs/runtime.md#原生正文工具)。
+正文工具契约见 [text-contract.ts](../text-contract.ts)，后端公共逻辑见 [text.ts](../text.ts)，正式行为与授权边界见 [运行时文档](../../../../docs/runtime.md#原生正文工具)。
 
 源包声明的 MIT 许可：
 

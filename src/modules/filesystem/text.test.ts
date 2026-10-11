@@ -1,37 +1,52 @@
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, rmSync, symlinkSync, chmodSync, statSync } from "node:fs";
+import * as fs from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { applyPatch } from "diff";
-import filesystem from "./runtime.ts";
-import { ResourceRegistry } from "../../resources/registry.ts";
-import { ToolRegistry } from "../../tools/registry.ts";
+import * as runtimeModules from "../runtime.ts";
+import { ApplicationService } from "../../runtime/service.ts";
 import { AgentCapabilities } from "../../execution/capabilities.ts";
 import { executeCoreBatch } from "../../execution/core.ts";
 import type { Json, ToolOutcome } from "../../shared/model.ts";
-import { textReadSchema, textChangeSchema } from "../../tools/text-contract.ts";
+import { textReadSchema, textChangeSchema } from "../shared/text-contract.ts";
 import { readTextFile, commitTextFile } from "./text-io.ts";
-import * as fs from "node:fs/promises";
 
 vi.mock("node:fs/promises", async importOriginal => {
   const actual = await importOriginal<typeof fs>();
   return { ...actual, rename: vi.fn(actual.rename), link: vi.fn(actual.link) };
 });
 const roots: string[] = [];
-afterEach(() => { vi.restoreAllMocks(); for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
+const services: ApplicationService[] = [];
+afterEach(async () => {
+  for (const service of services.splice(0)) await service.close();
+  vi.restoreAllMocks();
+  for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
+});
 function setup() {
   const root = mkdtempSync(join(tmpdir(), "core-text-")); roots.push(root);
   const directory = join(root, "directory"), outside = join(root, "outside");
   mkdirSync(directory); mkdirSync(outside);
-  const module = filesystem();
   const resource = { id: "directory", kind: "atelier.core/directory", title: "Directory", data: { path: directory } };
-  const capabilities = new AgentCapabilities(new ResourceRegistry(module.resources), new ToolRegistry(module.tools), [resource], () => true);
+  let modules!: ReturnType<typeof runtimeModules.createModules>;
+  const createModules = runtimeModules.createModules;
+  const capture = vi.spyOn(runtimeModules, "createModules").mockImplementation((...args) => {
+    modules = createModules(...args); return modules;
+  });
+  const service = new ApplicationService(join(root, "host")); services.push(service);
+  capture.mockRestore();
+  const sessionId = service.sessions.tree.create("Files");
+  for (const object of [resource, { ...resource, id: "other", title: "Other resource" }]) service.sessions.tree.append(sessionId, {
+    kind: "event", agentId: null, model: null, type: "resource_created",
+    data: { ...object.data, id: object.id, type: object.kind, title: object.title },
+  });
+  const capabilities = new AgentCapabilities(modules.resources, modules.tools, [resource], () => true);
   const call = async (tool: string, target: Json, args: Json = {}, cap = capabilities, signal = new AbortController().signal, resourceId = resource.id) => {
     const results: ToolOutcome[] = [];
     await executeCoreBatch([{ callId: "call", name: "resource_call", arguments: { resource_id: resourceId, tool, target, args } }], cap, signal, (_call, outcome) => results.push(outcome));
     return results[0];
   };
-  return { root, directory, outside, resource, module, call };
+  return { root, directory, outside, resource, modules, call };
 }
 
 // 在真实临时目录和执行边界验证授权、批次失败、并发与冲突，避免影响用户文件。
@@ -108,18 +123,18 @@ describe("目录正文工具", () => {
   });
 
   it("未链接或只读策略无法写入，工具可见性不会绕过授权", async () => {
-    const { directory, resource, module, call } = setup();
-    const unlinked = new AgentCapabilities(new ResourceRegistry(module.resources), new ToolRegistry(module.tools), [], () => true);
-    const readOnly = new AgentCapabilities(new ResourceRegistry(module.resources), new ToolRegistry(module.tools), [resource], name => name === "read" || name === "list");
+    const { directory, resource, modules, call } = setup();
+    const unlinked = new AgentCapabilities(modules.resources, modules.tools, [], () => true);
+    const readOnly = new AgentCapabilities(modules.resources, modules.tools, [resource], name => name === "read" || name === "list");
     expect(await call("write", { path: "new.txt" }, { content: "x" }, unlinked)).toMatchObject({ kind: "rejected", error: { code: "access_denied" } });
     expect(await call("write", { path: "new.txt" }, { content: "x" }, readOnly)).toMatchObject({ kind: "rejected", error: { code: "tool_unavailable" } });
     expect(readdirSync(directory)).toEqual([]);
   });
 
   it("不同资源指向同一文件的修改串行，两个 append 不丢失", async () => {
-    const { directory, module, resource, call } = setup();
+    const { directory, modules, resource, call } = setup();
     writeFileSync(join(directory, "text.txt"), "base\n");
-    const second = new AgentCapabilities(new ResourceRegistry(module.resources), new ToolRegistry(module.tools), [{ ...resource, id: "other", title: "Other resource" }], () => true);
+    const second = new AgentCapabilities(modules.resources, modules.tools, [{ ...resource, id: "other", title: "Other resource" }], () => true);
     const results = await Promise.all([
       call("edit", { path: "text.txt" }, { edits: [{ op: "append", body: ["first"] }] }),
       call("edit", { path: "text.txt" }, { edits: [{ op: "append", body: ["second"] }] }, second, undefined, "other"),

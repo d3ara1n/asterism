@@ -1,12 +1,12 @@
 import { mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { createModules } from "../modules/runtime.ts";
+import * as runtimeModules from "../modules/runtime.ts";
+import { ApplicationService } from "../runtime/service.ts";
 import { Directory } from "../modules/filesystem/contract.ts";
-import { defineData } from "@atelier/sdk/contracts";
-import { defineImplementation, defineTool } from "@atelier/sdk/contracts";
+import { defineData, defineImplementation, defineTool } from "@atelier/sdk/contracts";
 import { implement } from "../tools/contract.ts";
 import { ToolRegistry } from "../tools/registry.ts";
 import { AgentCapabilities, agentToolPolicy } from "../execution/capabilities.ts";
@@ -15,9 +15,14 @@ import type { Json, ToolOutcome } from "../shared/model.ts";
 import type { FoldedObject } from "../session/fold.ts";
 
 const roots: string[] = [];
+const services: ApplicationService[] = [];
 const signal = new AbortController().signal;
 const unrestricted = { tools: null, excludeTools: null };
-afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
+afterEach(async () => {
+  for (const service of services.splice(0)) await service.close();
+  vi.restoreAllMocks();
+  for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
+});
 function setup() {
   const base = mkdtempSync(join(tmpdir(), "core-res-")); roots.push(base);
   const root = join(base, "root");
@@ -27,7 +32,19 @@ function setup() {
   writeFileSync(join(root, "a.txt"), "hello"); writeFileSync(join(outside, "secret.txt"), "secret");
   const resource: FoldedObject = { id: "d1", kind: "atelier.core/directory", title: "root", data: { path: root } };
   const note: FoldedObject = { id: "n1", kind: "atelier.core/note", title: "Note", data: {} };
-  const { resources, tools } = createModules({ extensionsDirectory: join(base, "extensions"), state: null as never, kindOf: () => null, sessions: null as never, registry: null as never, models: null as never });
+  let modules!: ReturnType<typeof runtimeModules.createModules>;
+  const createModules = runtimeModules.createModules;
+  const capture = vi.spyOn(runtimeModules, "createModules").mockImplementation((...args) => {
+    modules = createModules(...args); return modules;
+  });
+  const service = new ApplicationService(join(base, "host")); services.push(service);
+  capture.mockRestore();
+  const sessionId = service.sessions.tree.create("Resources");
+  for (const object of [resource, note]) service.sessions.tree.append(sessionId, {
+    kind: "event", agentId: null, model: null, type: "resource_created",
+    data: { ...object.data, id: object.id, type: object.kind, title: object.title },
+  });
+  const { resources, tools } = modules;
   const scope = (linked: readonly FoldedObject[] = [resource], policy: Parameters<typeof agentToolPolicy>[0] = unrestricted) =>
     new AgentCapabilities(resources, tools, linked, agentToolPolicy(policy));
   return { root, outside, resource, note, resources, tools, scope };
@@ -126,6 +143,9 @@ describe("工具与资源的匹配及授权", () => {
   it("inspect 返回实时状态：目录被删后 exists 为 false；AGENTS.md 每次读取当前内容", async () => {
     const { root, resource, resources, scope } = setup();
     const capabilities = scope();
+    expect(await invoke(capabilities, "resource_inspect", { resource_id: resource.id })).toMatchObject({
+      kind: "succeeded", model: { state: { type: Directory.kind, title: "root", path: root, exists: true } },
+    });
     expect(await resources.context([resource])).toEqual([]);
     writeFileSync(join(root, "AGENTS.md"), "v1");
     expect((await resources.context([resource]))[0]?.text).toBe("v1");

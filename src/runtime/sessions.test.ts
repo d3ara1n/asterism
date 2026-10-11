@@ -21,7 +21,7 @@ import { Note } from "../modules/notes/contract.ts";
 import { implement } from "../tools/contract.ts";
 import { ToolRegistry } from "../tools/registry.ts";
 import { foldWorkbench } from "../session/fold.ts";
-import { textReadSchema, textChangeSchema } from "../tools/text-contract.ts";
+import { textReadSchema, textChangeSchema } from "../modules/shared/text-contract.ts";
 
 const roots: string[] = [];
 type Snap = { workbench: { objects: { id: string; kind: string; presentation: { data: unknown } }[] } };

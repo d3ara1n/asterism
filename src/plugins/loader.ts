@@ -20,7 +20,8 @@ import { adaptResource, adaptTool } from "./sdk-adapters.ts";
 import type { LiveBlock } from "../shared/session.ts";
 
 /** 旧工厂仅供尚未迁移的内置模块；外部包必须使用 SDK 的具名模块入口。 */
-export type LoadablePlugin = PluginDefinition | SdkPluginDefinition;
+export type LoadableModule = PluginDefinition["modules"][number] | SdkPluginDefinition["modules"][number];
+export type LoadablePlugin = Omit<PluginDefinition, "modules"> & { modules: readonly LoadableModule[] };
 
 export interface PluginHostServices {
   extensionsDirectory: string;

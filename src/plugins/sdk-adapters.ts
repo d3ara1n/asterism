@@ -1,5 +1,6 @@
 import { jsonSchema, reference, type Json } from "@atelier/sdk/contracts";
-import { PluginApiError, type ResourceContribution, type ResourceRef, type ToolContribution, type ResourceSnapshot } from "@atelier/sdk/runtime";
+import { PluginApiError, validationMessage, type ResourceContribution, type ResourceRef, type ToolContribution, type ResourceSnapshot } from "@atelier/sdk/runtime";
+import { SessionError } from "../session/tree.ts";
 import type { FoldedObject } from "../session/fold.ts";
 import type { ResourceBackend } from "../resources/contract.ts";
 import type { ToolImplementation } from "../tools/contract.ts";
@@ -28,8 +29,17 @@ export function adaptResource(contribution: ResourceContribution, sdk: SdkContex
     controller: {
       ...(creation ? {
         async prepareCreate(input: unknown) {
-          const parsed = creation.schema.parse(input);
-          return jsonSchema.parse(creation.schema.parse(creation.prepare ? await creation.prepare(parsed, AbortSignal.timeout(10_000)) : parsed));
+          const parsed = creation.schema.safeParse(input);
+          if (!parsed.success) throw new SessionError("invalid_request", validationMessage(parsed.error, "input"));
+          try {
+            const prepared = creation.prepare ? await creation.prepare(parsed.data, AbortSignal.timeout(10_000)) : parsed.data;
+            return jsonSchema.parse(creation.schema.parse(prepared));
+          } catch (error) {
+            if (error instanceof PluginApiError && (error.code === "invalid_argument" || error.code === "rejected")) {
+              throw new SessionError("invalid_request", error.message);
+            }
+            throw error;
+          }
         },
         create(sessionId: string, id: string, input: Json) {
           if (closed) throw new PluginApiError("unavailable", "The resource controller is closed.");
