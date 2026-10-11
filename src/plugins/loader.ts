@@ -22,6 +22,8 @@ export interface PluginHostServices {
   models: PluginModels;
   /** 插件凭据复用宿主 vault；缺失时 secrets 返回 unavailable。 */
   vault?: CredentialVault | null;
+  /** 对象二进制流的出口；缺失时丢弃。 */
+  stream?: (event: { sessionId: string; objectId: string; channel: string; data: Uint8Array }) => void;
   log?: (pluginId: string, level: "info" | "warn" | "error", message: string, error?: unknown) => void;
 }
 export interface PluginManifest {
@@ -113,6 +115,11 @@ function context(plugin: PluginDefinition, services: PluginHostServices, storage
   });
   return {
     id, dir: storage.dir, log, config: (schema, defaults) => storage.config(schema, defaults), secrets: storage.secrets, db: () => storage.db(), state, registry: services.registry, models: services.models, tasks,
+    streams: { publish: (sessionId, objectId, channel, data) => {
+      own(objectId);
+      if (!(data instanceof Uint8Array)) throw new PluginApiError("invalid_argument", "Stream data must be a Uint8Array.");
+      services.stream?.({ sessionId, objectId, channel: `${id}/${channel}`, data });
+    } },
     commands: { invoke: (sessionId, objectId, command) => services.sessions.invoke(sessionId, objectId, command) },
     session,
     object: (sessionId, objectId) => ({

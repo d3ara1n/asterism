@@ -8,6 +8,7 @@ import type { SessionBridge } from "./session.ts";
 export const protocolVersion = 4;
 export const commandChannel = coreChannel("command");
 export const statusChannel = coreChannel("runtime-status");
+export const objectStreamChannel = coreChannel("object-stream");
 export const pickDirectoryChannel = coreChannel("pick-directory");
 const id = z.string().uuid();
 /** 应用入口只读取工作区身份和会话摘要，不持有已打开会话的正文。 */
@@ -49,4 +50,6 @@ export interface DesktopBridge {
   pathForFile(file: File): string;
   execute(command: Command): Promise<CommandResult>;
   onStatus(listener: (status: RuntimeStatus) => void): () => void;
+  /** 对象二进制流：按会话与对象订阅，channel 带插件命名空间。 */
+  onObjectStream(sessionId: string, objectId: string, listener: (channel: string, data: Uint8Array) => void): () => void;
 }

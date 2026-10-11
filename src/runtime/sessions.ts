@@ -43,7 +43,8 @@ export class SessionService {
   private readonly prepare: (kind: string, command: Json, context: { sessionId: string; objectId: string; signal: AbortSignal }) => Promise<Json>;
   private readonly committed: (sessionId: string, nodes: SessionNode[]) => void;
   constructor(private readonly db: DatabaseSync, dataRoot: string, configuration: ConfigurationService,
-    private readonly changed: (event: SessionChanged) => void = () => {}, adapterFactory?: (settings: ModelSettings) => ModelAdapter, external: readonly PluginDefinition[] = []) {
+    private readonly changed: (event: SessionChanged) => void = () => {}, adapterFactory?: (settings: ModelSettings) => ModelAdapter, external: readonly PluginDefinition[] = [],
+    stream?: (event: { sessionId: string; objectId: string; channel: string; data: Uint8Array }) => void) {
     this.tree = new SessionTree(db);
     const host: PluginSessions = {
       path: sessionId => this.tree.path(sessionId),
@@ -80,7 +81,7 @@ export class SessionService {
       }
       return null;
     };
-    const modules = createModules({ extensionsDirectory: join(dataRoot, "extensions"), state: new ResourceStateStore(db), kindOf, vault: configuration.vault,
+    const modules = createModules({ extensionsDirectory: join(dataRoot, "extensions"), state: new ResourceStateStore(db), kindOf, vault: configuration.vault, stream,
       sessions: host, ...createModelServices(configuration, adapterFactory) }, external);
     this.resources = modules.resources;
     this.tools = modules.tools;

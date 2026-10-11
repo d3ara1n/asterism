@@ -86,6 +86,7 @@ export interface PluginContext {
   readonly models: PluginModels;
   /** 宿主托管的进程内异步任务：同 key 运行中不重复启动，宿主关闭时取消；重启不补做。 */
   readonly tasks: PluginTasks;
+  readonly streams: import("@atelier/sdk/runtime").PluginStreams;
   /** 跨插件协作统一走资源命令。 */
   readonly commands: { invoke(sessionId: string, objectId: string, command: Json): Promise<void> };
 }

@@ -9,6 +9,7 @@ import { configurationChangedSchema, configurationResponseSchema, type Configura
 import { secretRequestSchema } from "../shared/secrets.ts";
 import { handleSecretRequest } from "./secrets.ts";
 
+export interface ObjectStream { kind: "object.stream"; sessionId: string; objectId: string; channel: string; data: Uint8Array }
 export class RuntimeHost {
   private child: UtilityProcess | null = null;
   private requests: RuntimeRequests | null = null;
@@ -16,7 +17,8 @@ export class RuntimeHost {
   private sessionRequests: SessionRequests | null = null;
   private status: RuntimeStatus = "starting";
   constructor(private readonly onStatus: (status: RuntimeStatus) => void, private readonly onConfigurationChanged: () => void = () => {},
-    private readonly onSessionChanged: (event: SessionChanged) => void = () => {}) {}
+    private readonly onSessionChanged: (event: SessionChanged) => void = () => {},
+    private readonly onStream: (event: ObjectStream) => void = () => {}) {}
   private setStatus(status: RuntimeStatus): void { this.status = status; this.onStatus(status); }
 
   start(entry: string, root: string): Promise<void> {
@@ -77,6 +79,7 @@ export class RuntimeHost {
         }
         if (configurationChangedSchema.safeParse(raw).success) { this.onConfigurationChanged(); return; }
         if (configurationResponseSchema.safeParse(raw).success) { this.configurationRequests?.receive(raw); return; }
+        if (raw && typeof raw === "object" && (raw as { kind?: unknown }).kind === "object.stream") { this.onStream(raw as ObjectStream); return; }
         const session = sessionChangedSchema.safeParse(raw);
         if (session.success) { this.onSessionChanged(session.data); return; }
         if (sessionResponseSchema.safeParse(raw).success) { this.sessionRequests?.receive(raw); return; }

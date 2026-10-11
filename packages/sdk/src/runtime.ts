@@ -23,6 +23,10 @@ export interface PluginSecrets {
   set(key: string, value: string): Promise<void>;
   delete(key: string): Promise<void>;
 }
+/** 按对象的二进制流：高频数据（画面、音频）推送到该对象的视图；不进入会话记录，无订阅者时丢弃。 */
+export interface PluginStreams {
+  publish(sessionId: string, objectId: string, channel: string, data: Uint8Array): void;
+}
 /** 宿主托管的进程内异步任务：同 key 运行中不重复启动，宿主关闭时取消；重启不补做。 */
 export interface PluginTasks {
   start(key: string, run: (signal: AbortSignal) => Promise<void>, options?: { timeoutMs?: number }): boolean;

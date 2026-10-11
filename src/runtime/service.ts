@@ -19,13 +19,13 @@ export class ApplicationService {
   readonly sessions: SessionService;
   private readonly db: DatabaseSync;
   private readonly packages: AppSnapshot["plugins"];
-  constructor(root: string, options: { packages?: AppSnapshot["plugins"]; protector?: SecretProtector; onConfigurationChanged?: () => void; onSessionChanged?: (event: SessionChanged) => void; adapterFactory?: (settings: ModelSettings) => ModelAdapter; plugins?: readonly PluginDefinition[] } = {}) {
+  constructor(root: string, options: { packages?: AppSnapshot["plugins"]; protector?: SecretProtector; onConfigurationChanged?: () => void; onSessionChanged?: (event: SessionChanged) => void; adapterFactory?: (settings: ModelSettings) => ModelAdapter; plugins?: readonly PluginDefinition[]; onStream?: (event: { sessionId: string; objectId: string; channel: string; data: Uint8Array }) => void } = {}) {
     this.db = openDatabase(root);
     this.packages = options.packages ?? [];
     try {
       const unavailable = async (): Promise<string> => { throw new Error("System credential protection is unavailable."); };
       this.configuration = new ConfigurationService(root, options.protector ?? { available: async () => false, encrypt: unavailable, decrypt: unavailable }, options.onConfigurationChanged);
-      this.sessions = new SessionService(this.db, root, this.configuration, options.onSessionChanged, options.adapterFactory, options.plugins);
+      this.sessions = new SessionService(this.db, root, this.configuration, options.onSessionChanged, options.adapterFactory, options.plugins, options.onStream);
     } catch (error) { this.db.close(); throw error; }
   }
   async close(): Promise<void> {

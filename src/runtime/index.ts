@@ -22,7 +22,8 @@ try {
     source: item.entry.source.kind === "path" ? item.entry.source.path : `${item.entry.source.name}@${item.entry.source.version}`,
     status: item.status, error: item.error ?? null, renderer: item.status === "loaded" ? item.renderer ?? null : null }));
   service = new ApplicationService(root, { packages: listed, plugins: packages.flatMap(item => item.definition ? [item.definition] : []), protector: secrets, onConfigurationChanged: () => port.postMessage({ kind: "configuration.changed" }),
-    onSessionChanged: event => port.postMessage(event) });
+    onSessionChanged: event => port.postMessage(event),
+    onStream: event => port.postMessage({ kind: "object.stream", ...event }) });
   port.on("message", ({ data }) => {
     if (data?.kind === "shutdown") {
       secrets.close();

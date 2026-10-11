@@ -3,7 +3,7 @@ import { externalWebUrl } from "../shared/links.ts";
 import { mkdirSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { commandChannel, commandSchema, pickDirectoryChannel, statusChannel, type CommandResult } from "../shared/contracts.ts";
+import { objectStreamChannel, commandChannel, commandSchema, pickDirectoryChannel, statusChannel, type CommandResult } from "../shared/contracts.ts";
 import { RuntimeHost } from "./runtime-host.ts";
 import { applicationBrand, applicationDataDirectory, applicationId, applicationStorage } from "../shared/application.ts";
 import { followWindowAppearance, initialWindowAppearance } from "./window-appearance.ts";
@@ -23,6 +23,9 @@ const runtime = new RuntimeHost(status => {
   if (window && !window.isDestroyed()) window.webContents.send(configurationChangedChannel);
 }, event => {
   if (window && !window.isDestroyed()) window.webContents.send(sessionChangedChannel, event);
+}, event => {
+  // 高频二进制只转发给窗口，不经会话 IPC 或持久化。
+  if (window && !window.isDestroyed()) window.webContents.send(objectStreamChannel, event.sessionId, event.objectId, event.channel, event.data);
 });
 
 function createWindow(): void {
