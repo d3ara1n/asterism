@@ -66,6 +66,8 @@ class TaskHost implements PluginTasks {
 const defaultLog: NonNullable<PluginHostServices["log"]> = (pluginId, level, message, error) =>
   console[level](`[plugin ${pluginId}] ${message}`, ...(error === undefined ? [] : [error]));
 
+import { sessionView, toRecords } from "./records.ts";
+
 function context(plugin: PluginDefinition, services: PluginHostServices, storage: PluginStorage, tasks: PluginTasks): PluginContext {
   const id = plugin.namespace.id;
   const write = services.log ?? defaultLog;
@@ -88,6 +90,7 @@ function context(plugin: PluginDefinition, services: PluginHostServices, storage
     id: sessionId,
     path: () => services.sessions.path(sessionId),
     nodes: () => services.sessions.nodes(sessionId),
+    view: () => sessionView(sessionId, services.sessions.title(sessionId), services.sessions.nodes(sessionId), services.sessions.path(sessionId)),
     title: {
       get: () => services.sessions.title(sessionId),
       propose: (text, options) => services.sessions.proposeTitle(sessionId, text, options.expected),
@@ -193,8 +196,10 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
     committed: (sessionId, nodes) => {
       if (nodes.length === 0) return;
       const frozen = Object.freeze(nodes.map(node => Object.freeze(structuredClone(node))));
+      const records = toRecords(frozen, services.sessions.nodes(sessionId));
+      const view = sessionView(sessionId, services.sessions.title(sessionId), services.sessions.nodes(sessionId), services.sessions.path(sessionId));
       for (const entry of collected) for (const observer of entry.observers) {
-        try { observer.committed({ sessionId, nodes: frozen, session: entry.context.session(sessionId) }); }
+        try { observer.committed({ sessionId, nodes: frozen, records, view, session: entry.context.session(sessionId) }); }
         catch (error) { (services.log ?? defaultLog)(entry.plugin.namespace.id, "error", `Observer ${observer.id} failed.`, error); }
       }
     },

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { defineRecord } from "@atelier/sdk/contracts";
 import { core } from "../plugin.ts";
 import { agentSelectionSchema } from "../../shared/model.ts";
 
@@ -22,3 +23,5 @@ export type AgentCommand = z.infer<typeof agentCommandSchema>;
 /** 创建代理资源时的初始数据。 */
 /** title 可选，不填时用 agent 配置名。 */
 export const agentCreateSchema = z.strictObject({ selection: agentSelectionSchema, title: z.string().trim().min(1).max(160).optional() });
+/** 用户发给代理的消息：公开记录契约，其他插件可导入以识别首条消息等。 */
+export const UserMessage = defineRecord(core.name("agent.user-message"), { version: 1, schema: z.object({ agentId: z.string(), text: z.string() }) });

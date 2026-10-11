@@ -1,5 +1,6 @@
 import { defineModule } from "../../plugins/contract.ts";
 import { coreId, coreNamespace } from "../../shared/core.ts";
+import { UserMessage } from "../agent/records.ts";
 
 /** 会话命名：会话第一条用户消息提交后，由 utility 角色异步生成标题；失败保留原标题。 */
 const instruction = "Generate a concise title (at most 8 words) for a conversation that starts with the user's message below. Reply with the title only, without quotes or punctuation at the end.";
@@ -7,13 +8,12 @@ const instruction = "Generate a concise title (at most 8 words) for a conversati
 export default defineModule(plugin => ({
   observers: [{
     id: "session-naming",
-    committed({ sessionId, nodes, session }) {
-      const message = nodes.find(node => node.kind === "message");
-      if (!message || message.kind !== "message") return;
-      // 只认全会话最早的消息；其他代理输入与分支不重新命名。
-      const first = session.nodes().find(node => node.kind === "message");
-      if (first?.id !== message.id) return;
-      const expected = session.title.get();
+    committed({ sessionId, records, view, session }) {
+      // 只认全会话最早的用户消息，且它属于本批次；其他代理输入与分支不重新命名。
+      const first = view.records.first(UserMessage, { scope: "session" });
+      if (first?.status !== "known" || !records.some(record => record.id === first.record.id)) return;
+      const message = first.data;
+      const expected = view.title;
       plugin.tasks.start(`naming:${sessionId}`, async signal => {
         let text = "";
         for await (const event of plugin.models.stream({ target: { role: "utility" }, signal,

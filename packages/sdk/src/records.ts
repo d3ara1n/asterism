@@ -47,7 +47,7 @@ export interface RecordQuery { readonly scope: "path" | "session" }
 /** 固定在一次读取位置的会话视图；await 之后不切换到最新状态。 */
 export interface SessionView {
   readonly id: string;
-  readonly title: { readonly text: string; readonly version: number; readonly source: "provisional" | "automatic" | "user" };
+  readonly title: string;
   readonly records: {
     all(query: RecordQuery): readonly SessionRecord[];
     /** 最早一条匹配记录；不可解码时返回 unknown，不跳过。 */

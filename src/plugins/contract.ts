@@ -1,7 +1,7 @@
 import type { z } from "zod";
 import type { DatabaseSync } from "node:sqlite";
 import type { Json } from "@atelier/sdk/contracts";
-import type { PluginNamespace } from "@atelier/sdk/contracts";
+import type { PluginNamespace, SessionRecord, SessionView } from "@atelier/sdk/contracts";
 import type { BlockCompletion, NewNode, SessionNode } from "../shared/session.ts";
 import type { FoldedObject } from "../session/fold.ts";
 import type { AgentCapabilities, ToolPolicy } from "../execution/capabilities.ts";
@@ -52,6 +52,8 @@ export interface PluginSession {
   readonly id: string;
   path(): SessionNode[];
   nodes(): SessionNode[];
+  /** 固定在当前时刻的具型记录视图（会话全部记录与当前路径）。 */
+  view(): SessionView;
   readonly title: { get(): string; propose(text: string, options: { expected: string }): boolean };
   linked(objectId: string): FoldedObject[];
   /** 在 commit 回调外调用时自成一个事务；回调内请改用 writer.append。 */
@@ -108,6 +110,10 @@ export interface PluginTasks {
 export interface CommitEvent {
   readonly sessionId: string;
   readonly nodes: readonly SessionNode[];
+  /** 本批次的公开记录信封。 */
+  readonly records: readonly SessionRecord[];
+  /** 提交完成时固定的会话视图。 */
+  readonly view: SessionView;
   readonly session: PluginSession;
 }
 /** 提交后观察：只读，不能改写或拒绝已提交记录；异常只记日志。耗时工作交 plugin.tasks。 */
