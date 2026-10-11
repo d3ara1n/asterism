@@ -21,6 +21,8 @@ import { sessionCommandSchema, sessionSnapshotSchema, type SessionChanged, type 
   type SessionProgress, type SessionReply, type ViewPosition, type SessionNode } from "../shared/session.ts";
 import { sessionPath, snap } from "../shared/session-path.ts";
 import { SessionWorkbench } from "./workbench.ts";
+import { PluginApiError } from "@atelier/sdk/runtime";
+import type { Json } from "@atelier/sdk/contracts";
 
 const agentKind = Agent.kind;
 
@@ -38,6 +40,7 @@ export class SessionService {
   private readonly tools: ToolRegistry;
   readonly plugins: readonly PluginManifest[];
   private readonly closePlugins: () => Promise<void>;
+  private readonly prepare: (kind: string, command: Json, context: { sessionId: string; objectId: string; signal: AbortSignal }) => Promise<Json>;
   private readonly committed: (sessionId: string, nodes: SessionNode[]) => void;
   constructor(private readonly db: DatabaseSync, dataRoot: string, configuration: ConfigurationService,
     private readonly changed: (event: SessionChanged) => void = () => {}, adapterFactory?: (settings: ModelSettings) => ModelAdapter, external: readonly PluginDefinition[] = []) {
@@ -54,6 +57,7 @@ export class SessionService {
         return applied;
       },
       commit: (sessionId, work) => this.commit(sessionId, work),
+      invoke: (sessionId, objectId, command) => this.invoke(sessionId, objectId, command),
       progressChanged: sessionId => this.progressChanged(sessionId),
       changed: sessionId => this.notify(sessionId),
       linked: (path, objectId) => {
@@ -83,6 +87,7 @@ export class SessionService {
     this.plugins = modules.manifest;
     this.closePlugins = modules.close;
     this.committed = modules.committed;
+    this.prepare = modules.prepare;
     this.workbench = new SessionWorkbench(db, this.tree, this.resources,
       (sessionId, agentId, resource) => this.linkTools(sessionId, agentId, resource));
   }
@@ -146,6 +151,21 @@ export class SessionService {
       revision: this.revisions.get(sessionId) ?? 0, nodes, progress: this.progress(sessionId),
       workbench: this.workbench.project(sessionId, title, path) });
   }
+  /** 资源命令入口：事务外准备，执行时 before 在提交事务内重验对象仍在当前路径上。 */
+  private async invoke(sessionId: string, objectId: string, raw: Json): Promise<void> {
+    const resource = this.object(sessionId, objectId);
+    const controller = this.resources.controller(resource.kind);
+    if (!controller?.execute) throw new SessionError("invalid_request", "This resource has no actions.");
+    const command = await this.prepareCommand(resource.kind, raw, { sessionId, objectId });
+    await controller.execute({ sessionId, resource }, command, () => { this.object(sessionId, objectId); });
+  }
+  private async prepareCommand(kind: string, raw: Json, context: { sessionId: string; objectId: string }): Promise<Json> {
+    try { return await this.prepare(kind, raw, { ...context, signal: AbortSignal.timeout(10_000) }); }
+    catch (error) {
+      if (error instanceof PluginApiError && error.code === "rejected") throw new SessionError("invalid_request", error.message);
+      throw new SessionError("unavailable", "A plugin could not prepare this command.");
+    }
+  }
   private object(sessionId: string, objectId: string): FoldedObject {
     const object = foldWorkbench(this.tree.path(sessionId)).objects.find(o => o.id === objectId);
     if (!object) throw new SessionError("not_found", "Object not found on the current session path.");
@@ -167,8 +187,7 @@ export class SessionService {
         const resource = this.object(command.sessionId, command.objectId);
         const controller = this.resources.controller(resource.kind);
         if (!controller?.execute) throw new SessionError("invalid_request", "This resource has no actions.");
-        await controller.execute({ sessionId: command.sessionId, resource }, command.command,
-          () => { this.object(command.sessionId, command.objectId); });
+        await this.invoke(command.sessionId, command.objectId, command.command);
         return { kind: "accepted", sessionId: command.sessionId };
       }
       case "resource.create": {
@@ -225,7 +244,9 @@ export class SessionService {
       this.db.prepare("INSERT INTO session_submissions (id, command_json, session_id) VALUES (?, ?, ?)").run(command.submissionId, JSON.stringify(command), sessionId);
     };
     const resource: FoldedObject = { id: agentId, kind: agentKind, title: "", data: {} };
-    await agents.execute!({ sessionId, resource }, { type: "submit", submissionId: command.submissionId, text: command.text }, before);
+    // 首页首条输入同样经准备流水线；此时代理尚未创建，objectId 为将要创建的身份。
+    const submit = await this.prepareCommand(agentKind, { type: "submit", submissionId: command.submissionId, text: command.text }, { sessionId, objectId: agentId });
+    await agents.execute!({ sessionId, resource }, submit, before);
     return { kind: "accepted", sessionId };
   }
   async close(): Promise<void> {

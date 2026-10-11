@@ -33,6 +33,8 @@ export interface PluginSessions {
   /** 比较后更新标题：当前标题不等于 expected 时不写入并返回 false。 */
   proposeTitle(sessionId: string, text: string, expected: string): boolean;
   commit<T>(sessionId: string, work: (writer: PluginSessionWriter) => T): T;
+  /** 跨插件调用：按对象类型路由到资源控制器，经 prepare 流水线；返回即完成。 */
+  invoke(sessionId: string, objectId: string, command: Json): Promise<void>;
   /** 资源当前内容变化使持久视图失效，不追加事件。 */
   changed(sessionId: string): void;
   progressChanged(sessionId: string): void;
@@ -84,6 +86,8 @@ export interface PluginContext {
   readonly models: PluginModels;
   /** 宿主托管的进程内异步任务：同 key 运行中不重复启动，宿主关闭时取消；重启不补做。 */
   readonly tasks: PluginTasks;
+  /** 跨插件协作统一走资源命令。 */
+  readonly commands: { invoke(sessionId: string, objectId: string, command: Json): Promise<void> };
 }
 /** 最外层事务成功提交后的不可变批次；回滚不派发。 */
 export interface CommitEvent {
@@ -100,10 +104,19 @@ export interface SessionObserver {
   readonly id: string;
   committed(event: CommitEvent): void;
 }
+/** 命令进入前准备：事务外运行，可接受、替换输入或拒绝整个命令；不作用于已提交事实。 */
+export type Preparation = { action: "accept" } | { action: "replace"; command: Json } | { action: "reject"; code: string; message: string };
+export interface CommandPreparer {
+  readonly id: string;
+  /** 目标资源类型；可为其他插件的资源。 */
+  readonly kind: string;
+  prepare(command: Json, context: { sessionId: string; objectId: string; signal: AbortSignal }): Preparation | Promise<Preparation>;
+}
 export interface ModuleContribution {
   resources?: ResourceBackend[];
   tools?: ToolImplementation[];
   observers?: SessionObserver[];
+  preparers?: CommandPreparer[];
 }
 export type PluginModule = (plugin: PluginContext) => ModuleContribution;
 export interface PluginDefinition {

@@ -1,3 +1,4 @@
+import type { Json } from "@atelier/sdk/contracts";
 import type { CredentialVault } from "../configuration/credentials.ts";
 import { PluginStorage } from "./storage.ts";
 import type { PluginModels, RegistryView } from "./models.ts";
@@ -9,7 +10,7 @@ import { ResourceRegistry } from "../resources/registry.ts";
 import type { ToolImplementation } from "../tools/contract.ts";
 import { ToolRegistry } from "../tools/registry.ts";
 import type { ToolContract } from "@atelier/sdk/contracts";
-import { PluginApiError, type CommitEvent, type SessionObserver, type PluginContext, type PluginTasks, type PluginDefinition, type PluginLogger, type PluginSession, type PluginSessions } from "./contract.ts";
+import { PluginApiError, type CommitEvent, type CommandPreparer, type SessionObserver, type PluginContext, type PluginTasks, type PluginDefinition, type PluginLogger, type PluginSession, type PluginSessions } from "./contract.ts";
 
 export interface PluginHostServices {
   extensionsDirectory: string;
@@ -37,10 +38,12 @@ export interface LoadedPlugins {
   manifest: readonly PluginManifest[];
   /** 按装配顺序派发提交后通知；处理器异常隔离并记日志。 */
   committed(sessionId: string, nodes: readonly CommitEvent["nodes"][number][]): void;
+  /** 按装配顺序串行准备命令；拒绝以 PluginApiError(rejected) 抛出，替换值传给后续准备者。 */
+  prepare(kind: string, command: Json, context: { sessionId: string; objectId: string; signal: AbortSignal }): Promise<Json>;
   /** 取消托管任务并关闭插件托管数据库。 */
   close(): Promise<void>;
 }
-interface Collected { plugin: PluginDefinition; resources: ResourceBackend[]; tools: ToolImplementation[]; observers: SessionObserver[]; context: PluginContext; tasks: TaskHost }
+interface Collected { plugin: PluginDefinition; resources: ResourceBackend[]; tools: ToolImplementation[]; observers: SessionObserver[]; preparers: CommandPreparer[]; context: PluginContext; tasks: TaskHost }
 
 class TaskHost implements PluginTasks {
   private running = new Map<string, { controller: AbortController; done: Promise<void> }>();
@@ -110,6 +113,7 @@ function context(plugin: PluginDefinition, services: PluginHostServices, storage
   });
   return {
     id, dir: storage.dir, log, config: (schema, defaults) => storage.config(schema, defaults), secrets: storage.secrets, db: () => storage.db(), state, registry: services.registry, models: services.models, tasks,
+    commands: { invoke: (sessionId, objectId, command) => services.sessions.invoke(sessionId, objectId, command) },
     session,
     object: (sessionId, objectId) => ({
       objectId,
@@ -153,12 +157,13 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
       const write = services.log ?? defaultLog;
       const tasks = new TaskHost({ info: m => write(id, "info", m), warn: m => write(id, "warn", m), error: (m, e) => write(id, "error", m, e) });
       const plugged = context(plugin, services, storage, tasks);
-      const entry: Collected = { plugin, resources: [], tools: [], observers: [], context: plugged, tasks };
+      const entry: Collected = { plugin, resources: [], tools: [], observers: [], preparers: [], context: plugged, tasks };
       for (const module of plugin.modules) {
         const contribution = module(plugged);
         entry.resources.push(...contribution.resources ?? []);
         entry.tools.push(...contribution.tools ?? []);
         entry.observers.push(...contribution.observers ?? []);
+        entry.preparers.push(...contribution.preparers ?? []);
       }
       const observerIds = entry.observers.map(observer => observer.id);
       if (new Set(observerIds).size !== observerIds.length) throw new Error(`Plugin ${id} declares duplicate observers.`);
@@ -202,6 +207,19 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
         try { observer.committed({ sessionId, nodes: frozen, records, view, session: entry.context.session(sessionId) }); }
         catch (error) { (services.log ?? defaultLog)(entry.plugin.namespace.id, "error", `Observer ${observer.id} failed.`, error); }
       }
+    },
+    prepare: async (kind, command, context) => {
+      let current = command;
+      for (const entry of collected) for (const preparer of entry.preparers) {
+        if (preparer.kind !== kind) continue;
+        const result = await preparer.prepare(current, context);
+        if (result.action === "reject") throw new PluginApiError("rejected", result.message, result.code);
+        if (result.action === "replace") {
+          (services.log ?? defaultLog)(entry.plugin.namespace.id, "info", `Preparer ${preparer.id} replaced a ${kind} command.`);
+          current = result.command;
+        }
+      }
+      return current;
     },
     close: async () => {
       await Promise.allSettled(collected.map(entry => entry.tasks.close()));

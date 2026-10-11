@@ -59,3 +59,21 @@ describe("插件缺席", () => {
     expect(capabilities.resolve("x", "read", null, {})).toMatchObject({ kind: "rejected", error: { code: "implementation_missing" } });
   });
 });
+
+describe("命令准备", () => {
+  it("按装配顺序串行：替换值传给后续准备者，拒绝终止整个命令", async () => {
+    const seen: unknown[] = [];
+    const preparer = (id: string, kind: string, run: (command: unknown) => import("./contract.ts").Preparation) =>
+      definePlugin({ namespace: pluginNamespace(id), version: "1.0.0", modules: [defineModule(() => ({
+        preparers: [{ id: "p", kind, prepare: command => { seen.push(command); return run(command); } }] }))] });
+    const loaded = loadPlugins([
+      preparer("acme.a", "x/thing", () => ({ action: "replace", command: { text: "trimmed" } })),
+      preparer("acme.b", "x/thing", () => ({ action: "accept" })),
+      preparer("acme.c", "x/other", () => ({ action: "reject", code: "no", message: "No." })),
+    ], services);
+    const context = { sessionId: "s", objectId: "o", signal: new AbortController().signal };
+    await expect(loaded.prepare("x/thing", { text: " raw " }, context)).resolves.toEqual({ text: "trimmed" });
+    expect(seen).toEqual([{ text: " raw " }, { text: "trimmed" }]);
+    await expect(loaded.prepare("x/other", {}, context)).rejects.toMatchObject({ code: "rejected", reason: "no" });
+  });
+});
