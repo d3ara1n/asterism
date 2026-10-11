@@ -9,7 +9,7 @@ import { ResourceRegistry } from "../resources/registry.ts";
 import type { ToolImplementation } from "../tools/contract.ts";
 import { ToolRegistry } from "../tools/registry.ts";
 import type { ToolContract } from "@atelier/sdk/contracts";
-import { PluginApiError, type PluginContext, type PluginDefinition, type PluginLogger, type PluginSession, type PluginSessions } from "./contract.ts";
+import { PluginApiError, type CommitEvent, type SessionObserver, type PluginContext, type PluginTasks, type PluginDefinition, type PluginLogger, type PluginSession, type PluginSessions } from "./contract.ts";
 
 export interface PluginHostServices {
   extensionsDirectory: string;
@@ -35,15 +35,38 @@ export interface LoadedPlugins {
   resources: ResourceRegistry;
   tools: ToolRegistry;
   manifest: readonly PluginManifest[];
-  /** 关闭插件托管数据库。 */
-  close(): void;
+  /** 按装配顺序派发提交后通知；处理器异常隔离并记日志。 */
+  committed(sessionId: string, nodes: readonly CommitEvent["nodes"][number][]): void;
+  /** 取消托管任务并关闭插件托管数据库。 */
+  close(): Promise<void>;
 }
-interface Collected { plugin: PluginDefinition; resources: ResourceBackend[]; tools: ToolImplementation[] }
+interface Collected { plugin: PluginDefinition; resources: ResourceBackend[]; tools: ToolImplementation[]; observers: SessionObserver[]; context: PluginContext; tasks: TaskHost }
+
+class TaskHost implements PluginTasks {
+  private running = new Map<string, { controller: AbortController; done: Promise<void> }>();
+  private closed = false;
+  constructor(private readonly log: PluginLogger) {}
+  start(key: string, run: (signal: AbortSignal) => Promise<void>, options: { timeoutMs?: number } = {}): boolean {
+    if (this.closed || this.running.has(key)) return false;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(new Error("Task timed out.")), options.timeoutMs ?? 60_000);
+    const done = Promise.resolve().then(() => run(controller.signal))
+      .catch(error => { if (!controller.signal.aborted) this.log.error(`Task ${key} failed.`, error); })
+      .finally(() => { clearTimeout(timer); this.running.delete(key); });
+    this.running.set(key, { controller, done });
+    return true;
+  }
+  async close(): Promise<void> {
+    this.closed = true;
+    for (const task of this.running.values()) task.controller.abort();
+    await Promise.allSettled([...this.running.values()].map(task => task.done));
+  }
+}
 
 const defaultLog: NonNullable<PluginHostServices["log"]> = (pluginId, level, message, error) =>
   console[level](`[plugin ${pluginId}] ${message}`, ...(error === undefined ? [] : [error]));
 
-function context(plugin: PluginDefinition, services: PluginHostServices, storage: PluginStorage): PluginContext {
+function context(plugin: PluginDefinition, services: PluginHostServices, storage: PluginStorage, tasks: PluginTasks): PluginContext {
   const id = plugin.namespace.id;
   const write = services.log ?? defaultLog;
   const log: PluginLogger = {
@@ -64,6 +87,11 @@ function context(plugin: PluginDefinition, services: PluginHostServices, storage
   const session = (sessionId: string): PluginSession => ({
     id: sessionId,
     path: () => services.sessions.path(sessionId),
+    nodes: () => services.sessions.nodes(sessionId),
+    title: {
+      get: () => services.sessions.title(sessionId),
+      propose: (text, options) => services.sessions.proposeTitle(sessionId, text, options.expected),
+    },
     linked: (objectId: string) => services.sessions.linked(services.sessions.path(sessionId), objectId),
     emit: (type, data, options = {}) => {
       const qualified = plugin.namespace.name(type);
@@ -78,7 +106,7 @@ function context(plugin: PluginDefinition, services: PluginHostServices, storage
     context: linked => services.sessions.context(linked),
   });
   return {
-    id, dir: storage.dir, log, config: (schema, defaults) => storage.config(schema, defaults), secrets: storage.secrets, db: () => storage.db(), state, registry: services.registry, models: services.models,
+    id, dir: storage.dir, log, config: (schema, defaults) => storage.config(schema, defaults), secrets: storage.secrets, db: () => storage.db(), state, registry: services.registry, models: services.models, tasks,
     session,
     object: (sessionId, objectId) => ({
       objectId,
@@ -119,13 +147,18 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
       const storage = new PluginStorage(services.extensionsDirectory, id, services.vault ?? null,
         (message, error) => (services.log ?? defaultLog)(id, "warn", message, error));
       storages.push(storage);
-      const plugged = context(plugin, services, storage);
-      const entry: Collected = { plugin, resources: [], tools: [] };
+      const write = services.log ?? defaultLog;
+      const tasks = new TaskHost({ info: m => write(id, "info", m), warn: m => write(id, "warn", m), error: (m, e) => write(id, "error", m, e) });
+      const plugged = context(plugin, services, storage, tasks);
+      const entry: Collected = { plugin, resources: [], tools: [], observers: [], context: plugged, tasks };
       for (const module of plugin.modules) {
         const contribution = module(plugged);
         entry.resources.push(...contribution.resources ?? []);
         entry.tools.push(...contribution.tools ?? []);
+        entry.observers.push(...contribution.observers ?? []);
       }
+      const observerIds = entry.observers.map(observer => observer.id);
+      if (new Set(observerIds).size !== observerIds.length) throw new Error(`Plugin ${id} declares duplicate observers.`);
       validate(entry);
       const ownKinds = entry.resources.map(resource => resource.kind);
       const ownIdentities = entry.tools.map(tool => contractKey(tool.reference));
@@ -157,6 +190,17 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
     resources: new ResourceRegistry(collected.flatMap(entry => entry.resources)),
     tools: new ToolRegistry(active),
     manifest: Object.freeze(manifest.map(entry => Object.freeze(entry))),
-    close: () => { for (const storage of storages) storage.close(); },
+    committed: (sessionId, nodes) => {
+      if (nodes.length === 0) return;
+      const frozen = Object.freeze(nodes.map(node => Object.freeze(structuredClone(node))));
+      for (const entry of collected) for (const observer of entry.observers) {
+        try { observer.committed({ sessionId, nodes: frozen, session: entry.context.session(sessionId) }); }
+        catch (error) { (services.log ?? defaultLog)(entry.plugin.namespace.id, "error", `Observer ${observer.id} failed.`, error); }
+      }
+    },
+    close: async () => {
+      await Promise.allSettled(collected.map(entry => entry.tasks.close()));
+      for (const storage of storages) storage.close();
+    },
   };
 }

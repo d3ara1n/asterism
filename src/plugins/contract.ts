@@ -34,6 +34,11 @@ export interface PluginSessionWriter {
 /** 受控的会话外观：只读路径、同步事务提交与通知，不暴露会话树本身。 */
 export interface PluginSessions {
   path(sessionId: string): SessionNode[];
+  /** 会话全部节点，按提交序；不随游标变化。 */
+  nodes(sessionId: string): SessionNode[];
+  title(sessionId: string): string;
+  /** 比较后更新标题：当前标题不等于 expected 时不写入并返回 false。 */
+  proposeTitle(sessionId: string, text: string, expected: string): boolean;
   commit<T>(sessionId: string, work: (writer: PluginSessionWriter) => T): T;
   /** 资源当前内容变化使持久视图失效，不追加事件。 */
   changed(sessionId: string): void;
@@ -46,6 +51,8 @@ export interface PluginSessions {
 export interface PluginSession {
   readonly id: string;
   path(): SessionNode[];
+  nodes(): SessionNode[];
+  readonly title: { get(): string; propose(text: string, options: { expected: string }): boolean };
   linked(objectId: string): FoldedObject[];
   /** 在 commit 回调外调用时自成一个事务；回调内请改用 writer.append。 */
   emit(type: string, data: Json, options?: { agentId?: string | null; model?: string | null }): string;
@@ -91,10 +98,27 @@ export interface PluginContext {
   readonly registry: RegistryView;
   /** 按模型目标请求模型：stream 单次请求，run 封装宿主代理循环；均无状态。 */
   readonly models: PluginModels;
+  /** 宿主托管的进程内异步任务：同 key 运行中不重复启动，宿主关闭时取消；重启不补做。 */
+  readonly tasks: PluginTasks;
+}
+export interface PluginTasks {
+  start(key: string, run: (signal: AbortSignal) => Promise<void>, options?: { timeoutMs?: number }): boolean;
+}
+/** 最外层事务成功提交后的不可变批次；回滚不派发。 */
+export interface CommitEvent {
+  readonly sessionId: string;
+  readonly nodes: readonly SessionNode[];
+  readonly session: PluginSession;
+}
+/** 提交后观察：只读，不能改写或拒绝已提交记录；异常只记日志。耗时工作交 plugin.tasks。 */
+export interface SessionObserver {
+  readonly id: string;
+  committed(event: CommitEvent): void;
 }
 export interface ModuleContribution {
   resources?: ResourceBackend[];
   tools?: ToolImplementation[];
+  observers?: SessionObserver[];
 }
 export type PluginModule = (plugin: PluginContext) => ModuleContribution;
 export interface PluginDefinition {

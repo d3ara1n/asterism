@@ -3,3 +3,4 @@ export * from "./json.ts";
 export * from "./presentation.ts";
 export * from "./module-contract.ts";
 export * from "./plugin.ts";
+export * from "./records.ts";

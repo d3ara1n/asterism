@@ -117,6 +117,15 @@ export class SessionTree {
   head(sessionId: string): number {
     return Number((this.db.prepare("SELECT COALESCE(MAX(seq), 0) AS seq FROM session_nodes WHERE session_id = ?").get(sessionId) as { seq: number }).seq);
   }
+  /** 序号大于 seq 的已提交节点；提交后通知据此取本批记录。 */
+  since(sessionId: string, seq: number): SessionNode[] {
+    return (this.db.prepare("SELECT payload FROM session_nodes WHERE session_id = ? AND seq > ? ORDER BY seq").all(sessionId, seq) as { payload: string }[])
+      .map(row => sessionNodeSchema.parse(JSON.parse(row.payload)));
+  }
+  /** 标题比较后更新；不追加节点。 */
+  rename(sessionId: string, text: string, expected: string): boolean {
+    return Number(this.db.prepare("UPDATE sessions SET title = ? WHERE id = ? AND title = ?").run(text, sessionId, expected).changes) > 0;
+  }
   title(sessionId: string): string {
     const row = this.db.prepare("SELECT title FROM sessions WHERE id = ?").get(sessionId) as { title: string } | undefined;
     if (!row) throw new SessionError("not_found", "Session not found.");

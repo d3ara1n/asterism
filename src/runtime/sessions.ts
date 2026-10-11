@@ -17,7 +17,7 @@ import { ResourceStateStore } from "../resources/state.ts";
 import type { ToolRegistry } from "../tools/registry.ts";
 import type { ModelSettings } from "../shared/model.ts";
 import { sessionCommandSchema, sessionSnapshotSchema, type SessionChanged, type SessionCommand, type SessionSnapshot,
-  type SessionProgress, type SessionReply, type ViewPosition } from "../shared/session.ts";
+  type SessionProgress, type SessionReply, type ViewPosition, type SessionNode } from "../shared/session.ts";
 import { sessionPath, snap } from "../shared/session-path.ts";
 import { SessionWorkbench } from "./workbench.ts";
 
@@ -36,12 +36,22 @@ export class SessionService {
   private readonly resources: ResourceRegistry;
   private readonly tools: ToolRegistry;
   readonly plugins: readonly PluginManifest[];
-  private readonly closePlugins: () => void;
+  private readonly closePlugins: () => Promise<void>;
+  private readonly committed: (sessionId: string, nodes: SessionNode[]) => void;
   constructor(private readonly db: DatabaseSync, dataRoot: string, configuration: ConfigurationService,
     private readonly changed: (event: SessionChanged) => void = () => {}, adapterFactory?: (settings: ModelSettings) => ModelAdapter) {
     this.tree = new SessionTree(db);
     const host: PluginSessions = {
       path: sessionId => this.tree.path(sessionId),
+      nodes: sessionId => this.tree.nodes(sessionId),
+      title: sessionId => this.tree.title(sessionId),
+      proposeTitle: (sessionId, text, expected) => {
+        const title = text.replace(/\s+/gu, " ").trim().slice(0, 160);
+        if (!title || this.closed) return false;
+        const applied = this.transaction(() => this.tree.rename(sessionId, title, expected));
+        if (applied) this.notify(sessionId);
+        return applied;
+      },
       commit: (sessionId, work) => this.commit(sessionId, work),
       progressChanged: sessionId => this.progressChanged(sessionId),
       changed: sessionId => this.notify(sessionId),
@@ -71,6 +81,7 @@ export class SessionService {
     this.tools = modules.tools;
     this.plugins = modules.manifest;
     this.closePlugins = modules.close;
+    this.committed = modules.committed;
     this.workbench = new SessionWorkbench(db, this.tree, this.resources,
       (sessionId, agentId, resource) => this.linkTools(sessionId, agentId, resource));
   }
@@ -82,6 +93,7 @@ export class SessionService {
   }
   /** 单一写入者的同步提交区间：取父节点、记录事件与更新游标不可交错。 */
   private commit<T>(sessionId: string, work: (writer: SessionWriter) => T): T {
+    const head = this.tree.head(sessionId);
     const result = this.transaction(() => work({
       append: node => this.tree.append(sessionId, node).id,
       completeBlock: (blockId, completion) => this.tree.completeBlock(sessionId, blockId, completion),
@@ -94,6 +106,8 @@ export class SessionService {
       },
     }));
     this.notify(sessionId);
+    // 提交后派发：事务已结束，处理器不在写入事务内运行。
+    if (!this.closed) { const nodes = this.tree.since(sessionId, head); this.committed(sessionId, nodes); }
     return result;
   }
   /** 会话 settled：没有任何资源在活动；回溯只在此时允许。 */
@@ -216,6 +230,6 @@ export class SessionService {
   async close(): Promise<void> {
     this.closed = true;
     await Promise.allSettled(this.resources.controllers().map(controller => controller.close?.()));
-    this.closePlugins();
+    await this.closePlugins();
   }
 }
