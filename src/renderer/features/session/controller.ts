@@ -1,8 +1,9 @@
+import { CancelAgent } from "../../../modules/agent/contract.ts";
 import type { SessionBridge, SessionMutation, SessionResult, SessionSnapshot, SessionProgress, ViewPosition } from "../../../shared/session.ts";
 import { isLayoutCommand } from "../../../shared/workbench.ts";
 
 /** 资源命令中的取消在历史或同步中也允许，以便随时停止运行。 */
-const isCancel = (value: unknown) => typeof value === "object" && value !== null && (value as { type?: unknown }).type === "cancel";
+const isCancel = (value: unknown) => typeof value === "object" && value !== null && (value as { id?: unknown }).id === CancelAgent.id;
 export type SessionView = Omit<SessionSnapshot, "progress">;
 type SessionOperation = Exclude<SessionMutation, { type: "start" }>;
 /** 工作台可发出的变更：布局、链接、移除与资源创建/命令。 */
@@ -202,15 +203,4 @@ export class SessionController {
   }
   branchFrom = (nodeId: string | null): Promise<SessionResult> => this.execute({ type: "select", sessionId: this.sessionId, nodeId });
   mutate = async (command: WorkbenchOperation): Promise<boolean> => (await this.execute(command)).ok;
-}
-
-/** 重试相同输入复用提交身份；收到受理结果后下一次发送使用新身份。 */
-export class SubmissionIdentity {
-  private pending: { signature: string; id: string } | null = null;
-  forInput(value: unknown): string {
-    const signature = JSON.stringify(value);
-    if (this.pending?.signature !== signature) this.pending = { signature, id: crypto.randomUUID() };
-    return this.pending.id;
-  }
-  accepted(): void { this.pending = null; }
 }

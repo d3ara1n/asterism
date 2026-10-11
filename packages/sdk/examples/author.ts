@@ -1,15 +1,16 @@
+import { sample, Counter, Count, CounterView, CountChanged, CreateCounter, ChangeCount } from "./counter-contract.ts";
 /** SDK 作者用例与类型反例：只编译，不执行插件、数据库或真实模型请求。 */
 import { z } from "zod";
-import { pluginNamespace, defineRecord, defineTool, defineImplementation, modelRunRecordSchema, type ModelItem } from "@atelier/sdk/contracts";
+import { pluginNamespace, defineAction, resourceCall, defineRecord, defineTool, defineImplementation, modelRunRecordSchema, type ModelItem } from "@atelier/sdk/contracts";
 import {
-  defineModule, definePlugin, implementResource, implementTool,
-  type PluginContext, type ObjectContext, type SessionObserver, type SessionSnapshot, type ResourceRef,
+  defineModule, definePlugin, implementCreation, implementAction, implementPreparer, implementResource, implementTool,
+  type PluginContext, type ObjectReader, type ObjectExecutor, type SessionObserver, type SessionSnapshot, type ResourceRef,
 } from "@atelier/sdk/runtime";
 
 /** 场景一：只使用会话事件与生命周期，不需要资源、模型或 Agent。 */
 const journal = pluginNamespace("example.journal");
 const Annotation = defineRecord(journal.name("annotation"), {
-  version: 1, schema: z.strictObject({ text: z.string() }),
+  schema: z.strictObject({ text: z.string() }),
 });
 export const journalPlugin = definePlugin({
   namespace: journal, version: "0.0.1", modules: [defineModule(plugin => ({
@@ -28,7 +29,7 @@ export const journalPlugin = definePlugin({
 export function annotate(plugin: PluginContext, sessionId: string, text: string) {
   plugin.session(sessionId).commit(writer => { writer.append(Annotation, { text }); });
 }
-const CurrentSummary = journal.data("summary", 2, z.strictObject({ text: z.string() }));
+const CurrentSummary = journal.data("summary", z.strictObject({ text: z.string() }));
 /** 当前会话数据不进入时间轴；与对象数据及插件私有数据库分别保存。 */
 export function saveSummary(plugin: PluginContext, sessionId: string, text: string) {
   const session = plugin.session(sessionId);
@@ -37,34 +38,42 @@ export function saveSummary(plugin: PluginContext, sessionId: string, text: stri
 }
 
 /** 场景二：独立资源的创建、状态、事件、动作与工具，不使用模型能力。 */
-const sample = pluginNamespace("example.counter");
-const Counter = sample.resource("counter", z.strictObject({}));
-const Count = sample.data("count", 1, z.strictObject({ value: z.number().int() }));
-const CounterView = sample.data("card", 1, Count.schema);
-const CountChanged = defineRecord(sample.name("count-changed"), {
-  version: 1, schema: Count.schema,
-});
-const createInput = z.strictObject({ title: z.string() });
-const actionInput = z.strictObject({ amount: z.number().int() });
 const counterSettings = z.strictObject({
   maxChange: z.number().int().min(1).max(100).meta({
     title: "Maximum change", description: "Largest absolute increment accepted by a counter action.",
   }),
 }).meta({ title: "Counter settings" });
 const Read = defineTool({
-  name: "read_counter", description: "Read the current counter value.", guidelines: [],
+  id: "example.counter/read_counter", name: "read_counter", description: "Read the current counter value.", guidelines: [],
   argsSchema: z.strictObject({}).describe("No arguments are required."),
 });
 const CounterRead = defineImplementation({
-  ...sample.data("read", 1, Count.schema.describe("The current integer value.")),
+  ...sample.data("read", Count.schema.describe("The current integer value.")),
   resource: Counter, tool: Read,
   targetSchema: z.null().describe("Pass null to select this counter."),
   effect: "read", execution: "parallel",
 });
-function currentCount(object: ObjectContext) {
+function currentCount(object: ObjectReader) {
   const value = object.get(Count);
   if (value === null) throw new Error("Counter state is unavailable.");
   return value;
+}
+/** 功能模块只取得自己的设置读取能力；配置声明留在装配位置。 */
+function counterChange(limit: () => number) {
+  return implementAction(ChangeCount, {
+    prepare(input) {
+      return Math.abs(input.amount) > limit()
+        ? { action: "reject", code: "change_too_large", message: "Change exceeds the limit." }
+        : { action: "accept" };
+    },
+    async execute(input, object) {
+      object.commit(writer => {
+        const value = currentCount(object).value + input.amount;
+        writer.set(Count, { value });
+        writer.append(CountChanged, { value });
+      });
+    },
+  });
 }
 export const counterPlugin = definePlugin({
   namespace: sample, version: "0.0.1", modules: [defineModule(plugin => {
@@ -72,28 +81,13 @@ export const counterPlugin = definePlugin({
     return {
       resources: [implementResource(Counter, CounterView, {
         records: [CountChanged],
-        creation: {
-          schema: createInput,
+        creation: implementCreation(CreateCounter, {
           create(input, object) {
             object.commit(writer => { writer.set(Count, { value: 0 }); });
             return { title: input.title, data: {} };
           },
-        },
-        actions: {
-          schema: actionInput,
-          prepare(input) {
-            return Math.abs(input.amount) > settings.get().maxChange
-              ? { action: "reject", code: "change_too_large", message: "Change exceeds the limit." }
-              : { action: "accept" };
-          },
-          async execute(input, object) {
-            object.commit(writer => {
-              const value = currentCount(object).value + input.amount;
-              writer.set(Count, { value });
-              writer.append(CountChanged, { value });
-            });
-          },
-        },
+        }),
+        actions: [counterChange(() => settings.get().maxChange)],
         project(_data, object) { return currentCount(object); },
         async inspect(_data, object) { return currentCount(object); },
       })],
@@ -109,11 +103,11 @@ export const counterPlugin = definePlugin({
 
 /** 场景三：插件自己的 Agent 推动循环，context 每次从时间轴投影。 */
 const research = pluginNamespace("example.research");
-const Execution = defineRecord(research.name("execution"), { version: 1, schema: modelRunRecordSchema });
+const Execution = defineRecord(research.name("execution"), { schema: modelRunRecordSchema });
 export const modelRecordsModule = defineModule(() => ({ records: [Execution] }));
 /** 由领域插件根据自己的输入／执行事件构造投影，不保存在 Agent 或 run 中。 */
 declare function projectOwnContext(snapshot: SessionSnapshot, object: ResourceRef): ModelItem[];
-export async function modelWork(plugin: PluginContext, object: ObjectContext, signal: AbortSignal) {
+export async function modelWork(plugin: PluginContext, object: ObjectExecutor, signal: AbortSignal) {
   for (let request = 0; request < 8; request++) {
     const snapshot = object.session.snapshot();
     const result = await plugin.models.run({
@@ -131,7 +125,13 @@ export async function modelWork(plugin: PluginContext, object: ObjectContext, si
 }
 
 /** 反例依据：具型事件、同步提交／观察、显式模型输入与资源输入。 */
-export function rejectInvalidUsage(plugin: PluginContext, object: ObjectContext) {
+export function rejectInvalidUsage(plugin: PluginContext, object: ObjectExecutor, reader: ObjectReader) {
+  // @ts-expect-error 读取门面不能提交。
+  reader.commit(() => {});
+  // @ts-expect-error 嵌套 session 也不能续接或修改标题。
+  reader.session.resume();
+  // @ts-expect-error 只读标题不能比较更新。
+  reader.session.title.propose("New", { expected: "Old" });
   // @ts-expect-error 生命周期不是字符串事件总线。
   plugin.on("start", () => {});
   // @ts-expect-error 基础对象接口不承担模型执行。
@@ -156,4 +156,29 @@ export function rejectInvalidUsage(plugin: PluginContext, object: ObjectContext)
   });
   // @ts-expect-error 每次调用必须显式提供目标、提示、投影输入和事件消费者。
   plugin.models.run({ object: object.ref, signal: new AbortController().signal });
+}
+
+/** 外部准备者同样由所持动作契约推导输入，不重复声明 schema。 */
+export const counterLimit = implementPreparer(ChangeCount, {
+  id: "clamp-change",
+  prepare(input) { return { action: "replace", input: { amount: Math.max(-10, Math.min(10, input.amount)) } }; },
+});
+
+/** 调用与替换接收原始字符串，准备和执行接收 schema 转换后的数字。 */
+const FromText = defineAction(Counter, { id: sample.name("from-text"),
+  schema: z.string().regex(/^\d+$/u).transform(Number),
+});
+export const parsedAction = implementAction(FromText, {
+  prepare(value) { return value > 10 ? { action: "replace", input: "10" } : { action: "accept" }; },
+  async execute(value, object) { object.commit(writer => { writer.set(Count, { value }); }); },
+});
+export function parsedInputExamples() {
+  resourceCall(FromText, "5");
+  // @ts-expect-error 调用方提交原始输入，不能用解析结果代替。
+  resourceCall(FromText, 5);
+  implementPreparer(FromText, {
+    id: "invalid-replacement",
+    // @ts-expect-error replace 是新输入，必须符合原始输入类型。
+    prepare(value) { return { action: "replace", input: value }; },
+  });
 }

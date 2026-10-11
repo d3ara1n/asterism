@@ -8,8 +8,6 @@ import { modelReference, parseModelExpression, resolveProviderModel, type Config
 import { modelExpression, modelScope, type ModelSettings } from "../shared/model.ts";
 import { PluginApiError } from "@atelier/sdk/runtime";
 import type { ModelServices } from "@atelier/sdk/runtime";
-import type { CatalogHost } from "./host.ts";
-import { AgentConfigurations } from "../modules/agent/configuration.ts";
 import { coreDeclarations } from "../execution/core.ts";
 import { coreId } from "../shared/core.ts";
 
@@ -49,7 +47,7 @@ export function resolveTarget(snapshot: ConfigurationSnapshot, target: ModelTarg
   return { ok: true, model, thinking: resolved.model.capabilities.reasoning ? thinking : "off" };
 }
 
-export function createModelServices(configuration: ConfigurationService, adapterFactory?: (settings: ModelSettings) => ModelAdapter): { catalogs: CatalogHost; models: HostModels } {
+export function createModelServices(configuration: ConfigurationService, adapterFactory?: (settings: ModelSettings) => ModelAdapter): HostModels {
   // 请求前刷新凭据可用性；目录读取同步取当前配置。
   const snapshot = async () => (await configuration.execute({ type: "read" })).snapshot;
   const current = () => configuration.current();
@@ -74,8 +72,7 @@ export function createModelServices(configuration: ConfigurationService, adapter
         provider: model.providerId, name: model.name, contextWindow: model.contextWindow, capabilities: { ...model.capabilities } }));
     },
   };
-  return { catalogs: { get: contract => contract.id === AgentConfigurations.id
-    ? contract.schema.parse(structuredClone(current().agents)) : null }, models: {
+  return {
     roles: catalog.roles,
     list: catalog.models,
     async validate(request) {
@@ -114,5 +111,5 @@ export function createModelServices(configuration: ConfigurationService, adapter
       });
       return runModelRequest(request, environment);
     },
-  } };
+  };
 }

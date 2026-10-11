@@ -12,9 +12,9 @@ import { AgentCapabilities } from "./capabilities.ts";
 import { executeCoreBatch, type ToolObserver } from "./core.ts";
 
 const contract = defineImplementation({
-  ...defineData("test.stream", 1, z.strictObject({ text: z.string() }).describe("Current captured text.")),
+  ...defineData("test.stream", z.strictObject({ text: z.string() }).describe("Current captured text.")),
   resource: defineResource("test", z.strictObject({})),
-  tool: defineTool({ name: "stream", description: "Produce text.", guidelines: [], argsSchema: z.strictObject({}).describe("No parameters.") }),
+  tool: defineTool({ id: "test.tools/stream", name: "stream", description: "Produce text.", guidelines: [], argsSchema: z.strictObject({}).describe("No parameters.") }),
   targetSchema: z.null().describe("Use the resource."), effect: "read", execution: "parallel",
 });
 const resource = { id: "r", kind: "test", title: "At request start", data: {} };

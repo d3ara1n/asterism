@@ -10,7 +10,7 @@ import { cardSize, fallbackCardAppearance } from "./sizing";
 import { defaultConnectionPorts, type ConnectionPort } from "./connections";
 import { ObjectActions } from "./ObjectActions";
 import { t } from "../../shared/i18n";
-import { useObjectContext } from "../../modules/object-context";
+import { useObjectContext, ObjectServices } from "../../modules/object-context";
 
 export type ObjectNodeType = Node<{
   object: WorkbenchObject; collapsed: boolean;
@@ -44,8 +44,8 @@ export const ObjectNode = memo(function ObjectNode({ id, data, selected }: NodeP
       isConnectableEnd={descriptor.receivesLinks === true} />)}
     <ObjectCard title={object.title} collapsed={collapsed} selected={!!selected} onView={onObjectView}
       icon={descriptor.icon} kind={descriptor.label}
-      actions={<><SlotBoundary fallback={null}>{view.actions}</SlotBoundary><ObjectActions object={object} defaultSize={cardSize(view)} onView={onObjectView} /></>}>
-      <SlotBoundary key={JSON.stringify(object.presentation.contract)}>{view.body}</SlotBoundary>
+      actions={<><SlotBoundary fallback={null}><ObjectServices object={object}>{view.actions}</ObjectServices></SlotBoundary><ObjectActions object={object} defaultSize={cardSize(view)} onView={onObjectView} /></>}>
+      <SlotBoundary key={JSON.stringify(object.presentation.contract)}><ObjectServices object={object}>{view.body}</ObjectServices></SlotBoundary>
     </ObjectCard>
     {selected && !collapsed && <NodeResizeControl position="bottom-right"
       className="object-resize-handle nopan" minWidth={view.minWidth ?? minimumCardWidth}

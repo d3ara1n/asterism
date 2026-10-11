@@ -23,7 +23,7 @@ import { defineModule, definePlugin } from "@atelier/sdk/runtime";
 
 const ns = pluginNamespace("example.journal");
 const Entry = defineRecord(ns.name("entry"), {
-  version: 1, schema: z.object({ text: z.string() }),
+  schema: z.object({ text: z.string() }),
 });
 
 export default definePlugin({ namespace: ns, version: "1.0.0", modules: [
@@ -39,17 +39,51 @@ export default definePlugin({ namespace: ns, version: "1.0.0", modules: [
 
 ## 会话、资源与提交
 
-`plugin.session(id)` 提供固定快照、当前会话数据读写、同步提交、续接位置与标题比较更新。`plugin.object(ref)` 绑定本插件对象，提供当前对象数据读写、关联对象的事件提交和二进制流。引用只是地址，宿主每次检查真实归属、会话与有效性；普通写入还要求对象在当前路径上。资源创建中的对象门面由宿主提供，数据和事件写入加入创建事务。`object.snapshot()` 读取该调用绑定的资源身份、标题与数据；已授权工具使用捕获快照，执行期间保留对该对象的提交能力，结束后这项执行能力失效。
+`plugin.session(id)` 提供固定快照、当前会话数据读写、同步提交、续接位置与标题比较更新。`plugin.object(ref)` 绑定本插件对象，提供当前对象数据读写、关联对象的事件提交和二进制流。引用只是地址，宿主每次检查真实归属、会话与有效性；普通写入还要求对象在当前路径上。资源创建中的对象门面由宿主提供，数据和事件写入加入创建事务。`object.snapshot()` 读取该调用绑定的资源身份、标题与数据；已授权工具使用捕获快照，执行期间保留对该对象的提交能力，结束后对象提交、嵌套会话修改和流发布都失效。
 
 两种 `commit` 都可同时 `writer.set(DataContract, value)` 和 `writer.append(RecordContract, data)`：前者覆盖当前会话或对象数据，后者追加本插件声明过的记录。模块及资源的 `records` 声明决定可写记录，宿主使用声明的 schema 校验，填节点身份、父指针与对象关联。提交回调须同步完成；Promise 导致回滚，回调结束后的 writer 失效。嵌套同会话提交加入外层事务，失败的内层写入回滚，通知仅在最外层提交成功后派发。
 
-快照的路径、记录和不可变资源数据固定在读取时刻，`position.nodeId / continuationId` 分别给出当前位置与可续接位置。`session.get` 和 `object.get` 读取当前数据；数据按会话、对象作用域和具型契约隔离，随会话保存，不能据此恢复历史。数据与事件都保存契约版本；当前数据版本不匹配时明确不可用，事件按 `RecordContract.decode` 升级或保留 unknown。纯数据提交通知视图，不追加时间轴或触发事件观察者。插件私有目录与数据库用于插件自身数据，独立于这些会话数据。
+快照的路径、记录和不可变资源数据固定在读取时刻，`position.nodeId / continuationId` 分别给出当前位置与可续接位置。`session.get` 和 `object.get` 读取当前数据；数据按会话、对象作用域和具型契约隔离，随会话保存，不能据此恢复历史。数据契约使用 `ns.data(name, schema)`，记录使用 `defineRecord(id, { schema })`，均不要求手填版本。读取按所属类型的 schema 解码；兼容数据继续读取，不兼容数据明确不可用或保留 unknown。插件用自己的 schema 兼容旧形状并负责迁移，读取不修改原始记录。纯数据提交通知视图，不追加时间轴或触发事件观察者。
 
-资源通过 `implementResource` 聚合 `project / inspect / context`、可选创建实现和动作实现集合。`defineCreation / defineAction` 在纯契约中声明身份、版本、关联资源与输入 schema，`implementCreation / implementAction` 绑定具型实现。外部准备者绑定具体动作，按装配顺序处理后进入资源自己的准备；替换只能改变同一动作的输入。输入 schema 只校验并保持 JSON 值，默认值、去空白和转换放在显式准备中，宿主命令模块统一调度校验和准备。
+资源通过 `implementResource` 聚合 `project / inspect / context`、可选创建实现和动作实现集合。`defineCreation / defineAction` 在纯契约中声明身份、关联资源与输入 schema，`implementCreation / implementAction` 绑定具型实现。外部准备者通过 `implementPreparer` 绑定具体动作，按装配顺序处理后进入资源自己的准备；替换只能改变同一动作的输入。
+
+schema 支持默认值、去空白与转换。调用方提交 schema 的输入类型，准备与执行接收输出类型；两侧均为 JSON 值。每份新输入由宿主解析一次。创建与动作准备均返回 `accept / replace / reject`：接受沿用解析结果，替换提交新的原始输入并解析一次，拒绝终止处理。执行层不再解析。默认值示例和字符串转数字的类型反例见 [作者用例](examples/author.ts)。
 
 投影、检查、环境读取、链接说明和准备取得 `ObjectReader`，其 `session` 也是只读接口。创建、动作和授权工具执行取得 `ObjectExecutor`，遵守已有事务与有效期。动作按对象排队，创建进入宿主事务；任务、动作和模型调用共用宿主内部的活动登记、取消与收束机制。
 
 工具通过 `implementTool` 消费 `ImplementationContract`，宿主将它适配到同一个工具目录和授权执行路径。参数、产出和过程发布经过 schema 校验；工具支持关系不构成授权。
+
+`defineTool` 声明 `id / name / description / guidelines / argsSchema`；`name` 用于模型寻址，稳定 ID 用于标识。实现与外部准备者必须引用实际的工具／动作声明；重复引用同一记录声明允许，重新定义同 ID 的对象会冲突。工具名称覆盖与实例共享分别处理：不同身份的同名工具按插件列表取最后声明，同一声明的多个资源实现保持生效。宿主不以相同 ID 合并副本，也不做 schema 指纹或函数等价性检查。
+
+## 公开模块与共享实例
+
+提供方在 package.json 声明标准公共子路径，文件名由作者决定：
+
+```json
+{
+  "name": "@example/tools",
+  "exports": { "./public": "./src/public.ts" },
+  "atelier": {
+    "id": "example.tools",
+    "api": { "major": 2, "minMinor": 0 },
+    "runtime": "./src/runtime.ts"
+  }
+}
+```
+
+```ts
+// 提供方 src/public.ts；可以转导出内部模块已有的对象。
+export { Read, settings, service } from "./shared.ts";
+
+// 消费方：在 dependencies 或 peerDependencies 声明 @example/tools。
+import { Read, settings, service } from "@example/tools/public";
+```
+
+公共入口也可以用标准 node／browser／import／default 条件导出；types 可指向类型声明。TypeScript 沿正常包导出读取类型，宿主从已登记并启用的提供方解析实际源码。安装及版本范围求解由包管理器负责，本地开发可使用 workspace 或链接依赖；宿主不隐式安装其他包，也不读取消费者私有副本替代提供方。
+
+同一运行环境中，提供方内部引用与所有消费者取得同一个实际对象、函数或类，公共入口的 re-export 保留这种关系。配置与状态的公开形式由提供方决定；有生命周期的服务在提供方 setup 中初始化，消费者 setup 之后执行，关闭按相反顺序。模块顶层只应依赖模块本身已初始化的导出，不依赖尚未执行的插件 setup。缺失、禁用、重复公共包名、声明冲突和循环初始化依赖明确失败。
+
+后台与前端各有自己的模块实例；共享对象不跨进程。公共模块可以只提供导出而没有 runtime／renderer 入口，仍须登记并启用。通用跨进程通信继续独立设计。
 
 观察者消费提交时的固定快照；它产生的新提交按顺序排队，异常隔离。耗时任务用 `plugin.tasks.start`，以 key 去重并通过 `has / cancel` 查询和取消；可绑定本插件对象，使任务计入该对象的执行进度与收束检查。成功 setup 的 `closing` 清理立即登记，后续装配失败或正常关闭均取消工作并等待、按逆序清理；setup 返回前失败自行清理尚未交付的设施。`plugin.catalogs.get` 按领域数据契约读取只读目录；Agent 配置目录由 core 声明，模型与角色目录由模型服务提供。
 
@@ -67,13 +101,15 @@ export default definePlugin({ namespace: ns, version: "1.0.0", modules: [
 
 二进制流的宿主信封由 main 与 preload 共用 Zod schema 校验，preload 按会话与对象筛选订阅。载荷保留 `Uint8Array`，支持空帧与具有偏移的视图，不转换为 JSON，也不写入时间轴；无效信封不交付插件。
 
-宿主协调读取、命令门禁和错误状态。模型进度、配置目录与工具展示通过具名的专门接口取得，共用已有宿主状态源。草稿和提交身份归交互模块，按会话与对象绑定并跨卡片重挂载保留；重试相同输入保留身份，受理后清除。导航显式注入。资源后台的 `links.receive` 与前端静态描述的 `receivesLinks` 声明接收链接，授权仍由执行层检查真实链接。
+宿主协调读取、命令门禁和错误状态。模型进度、配置目录与工具展示分别通过 `useRendererModels / useRendererCatalogs / useRendererTools` 取得，共用已有宿主状态源；`useRendererNavigation` 提供导航，聚合视图将具体操作传给内容模块。草稿和提交身份归交互模块，按会话与对象绑定并跨卡片重挂载保留；重试相同输入保留身份，受理后清除。导航显式注入。资源后台的 `links.receive` 与前端静态描述的 `receivesLinks` 声明接收链接，授权仍由执行层检查真实链接。
 
-## 当前边界
+## 版本与当前边界
 
-资源创建数据必须是 JSON 对象，不能占用宿主的 `id / type / title` 字段。工作数据库格式为 13，当前会话数据保存于 `session_data`，事件保存独立的契约版本。core 消费具型用户消息、模型执行、通知与环境记录，存储编码由宿主负责；环境记录保留原事件身份与载荷。配置文件格式仍为 1。
+SDK 包版本为 `0.2.0`，插件清单要求 `api: { major: 2, minMinor: 0 }`。旧对象接口、原始 JSON 动作调用和领域契约 version 参数已移除，API 1 插件在加载前明确拒绝；构建产物按内容缓存。会话 IPC 版本为 10，工作数据库格式为 14，应用配置格式仍为 1。
 
-内置插件与打包验收、core 领域共识包、具型跨插件调用、共享实例、通信与包管理的后续能力见 [插件计划](../../plans/todo-2026-10-12-plugin-system.md)。core 领域共识包是确定延后的任务，不包含 core 运行时实例。
+资源创建数据必须是 JSON 对象，不能占用宿主的 `id / type / title` 字段。当前会话数据保存于 `session_data`，事件及工具结果保存稳定契约身份与原始数据。core 消费具型用户消息、模型执行、通知与环境记录，存储编码由宿主负责；环境记录保留原事件身份与载荷。
+
+内置插件与打包验收、core 领域共识包、通用跨插件调用、跨进程通信与包管理的后续能力见 [插件计划](../../plans/todo-2026-10-12-plugin-system.md)。core 领域共识包是确定延后的任务，不包含 core 运行时实例。
 
 ## 可选模型分支
 

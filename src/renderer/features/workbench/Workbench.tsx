@@ -1,3 +1,6 @@
+import { RendererNavigationProvider } from "@atelier/sdk/renderer";
+import { CreateDirectory } from "../../../modules/filesystem/contract";
+import { reference } from "@atelier/sdk/contracts";
 import { RendererCatalogProvider } from "../../modules/object-context";
 import type { WorkbenchOperation } from "../session/controller";
 import { useCallback, useEffect, useLayoutEffect, useImperativeHandle, useMemo, useRef, useState, type ReactNode, type Ref } from "react";
@@ -32,12 +35,12 @@ export interface WorkbenchHandle {
   canvas: WorkbenchCanvas;
 }
 
-type Props = WorkbenchEnvironment & { ref?: Ref<WorkbenchHandle> };
+type Props = WorkbenchEnvironment & { ref?: Ref<WorkbenchHandle>; onHome(): void };
 type Run = (command: WorkbenchOperation) => Promise<boolean>;
 type WorkbenchEdge = Edge<ConnectionEdge["data"]>;
 
 /** 工作台根浮岛：投影平级对象和关系；代理对话只是代理对象的卡片内容。 */
-export function Workbench({ ref, controller, session, ready, busy, historical, run, draft, onDraftChange, onHome }: Props) {
+export function Workbench({ ref, controller, session, ready, busy, historical, run, onHome }: Props) {
   const canvasRef = useRef<WorkbenchCanvas>(null);
   const canvas = useMemo<WorkbenchCanvas>(() => ({
     findPlacement: options => canvasRef.current?.findPlacement(options) ?? null,
@@ -45,8 +48,8 @@ export function Workbench({ ref, controller, session, ready, busy, historical, r
   }), []);
   // 按字段组装环境，只有字段真的变化时才通知卡片与面板浮岛。
   const context = useMemo<WorkbenchView>(
-    () => ({ controller, session, ready, busy, historical, run, draft, onDraftChange, onHome, canvas }),
-    [controller, session, ready, busy, historical, run, draft, onDraftChange, onHome, canvas]);
+    () => ({ controller, session, ready, busy, historical, run, canvas }),
+    [controller, session, ready, busy, historical, run, canvas]);
   const island = useIsland();
   const [store] = useState(() => new WorkbenchStore());
   const open = useCallback((id: string, label: string, render: () => ReactNode, origin: HTMLElement | null) => {
@@ -61,7 +64,7 @@ export function Workbench({ ref, controller, session, ready, busy, historical, r
   }), [open, canvas, controller]);
   useLayoutEffect(() => store.set(context), [store, context]);
 
-  return <RendererCatalogProvider ready={ready}><WorkbenchContext.Provider value={context}>
+  return <RendererNavigationProvider value={{ home: onHome }}><RendererCatalogProvider ready={ready}><WorkbenchContext.Provider value={context}>
     <div className="relative h-full">
       <ReactFlowProvider><Canvas ref={canvasRef} session={session} run={run} writable={ready && !busy && !historical} /></ReactFlowProvider>
       {historical && <div role="status"
@@ -78,7 +81,7 @@ export function Workbench({ ref, controller, session, ready, busy, historical, r
         {busy ? t.statusBusy : ready ? t.statusReady : t.statusUnavailable}
       </Badge>
     </div>
-  </WorkbenchContext.Provider></RendererCatalogProvider>;
+  </WorkbenchContext.Provider></RendererCatalogProvider></RendererNavigationProvider>;
 }
 
 function Canvas({ ref, session, run, writable }: {
@@ -157,7 +160,7 @@ function Canvas({ ref, session, run, writable }: {
     const origin = flow.screenToFlowPosition({ x: event.clientX, y: event.clientY });
     [...event.dataTransfer.files].forEach((file, index) => {
       const path = window.host.pathForFile(file);
-      if (path) void run({ type: "resource.create", sessionId: latest.current.id, kind: "atelier.core/directory", input: { path },
+      if (path) void run({ type: "resource.create", sessionId: latest.current.id, kind: "atelier.core/directory", creation: reference(CreateDirectory), input: { path },
         position: { x: origin.x + index * 32, y: origin.y + index * 32 } });
     });
   };

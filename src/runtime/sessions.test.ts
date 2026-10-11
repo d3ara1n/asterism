@@ -27,7 +27,9 @@ const roots: string[] = [];
 type Snap = { workbench: { objects: { id: string; kind: string; presentation: { data: unknown } }[] } };
 const agentOf = (snap: Snap) => snap.workbench.objects.find(o => o.kind === "atelier.core/agent")!.id;
 const selectionOf = (snap: Snap) => (snap.workbench.objects.find(o => o.kind === "atelier.core/agent")!.presentation.data as { selection: AgentSelection }).selection;
-const agentCommand = (sessionId: string, objectId: string, command: Json): SessionMutation => ({ type: "resource.command", sessionId, objectId, command });
+import { resourceCall } from "@atelier/sdk/contracts";
+import { agentAction, agentCommandSchema } from "../modules/agent/contract.ts";
+const agentCommand = (sessionId: string, objectId: string, command: Json): SessionMutation => ({ type: "resource.command", sessionId, objectId, command: resourceCall(agentAction(agentCommandSchema.parse(command)), agentCommandSchema.parse(command)) });
 const services = new Set<ApplicationService>();
 afterEach(async () => { vi.useRealTimers(); for (const s of services) await s.close(); services.clear(); vi.restoreAllMocks(); for (const r of roots.splice(0)) rmSync(r, { recursive: true, force: true }); });
 
@@ -68,7 +70,7 @@ describe("会话运行时", () => {
     service.sessions.tree.append(sessionId, { ...emptyCompletion, kind: "thinking", agentId, text: "Unfinished reasoning",
       responseId: "interrupted", requestParentId: origin, ordinal: 0, complete: true, model: start.model,
       continuation: null, adapter: "ai-sdk-v7/2", scope: "scope" });
-    const created = await execute(service, { type: "resource.create", sessionId, kind: "atelier.core/agent",
+    const created = await execute(service, { type: "resource.create", sessionId, kind: "atelier.core/agent", creation: { id: "atelier.core/agent.create" },
       input: { selection: { agent: start.agent, model: start.model, thinking: null } }, position: { x: 0, y: 0 } });
     const second = created.workbench.objects.find(object => object.kind === "atelier.core/agent" && object.id !== agentId)!;
     const before = service.sessions.tree.nodes(sessionId), cursor = service.sessions.tree.cursor(sessionId);
@@ -110,7 +112,7 @@ describe("会话运行时", () => {
     const { service, root, start } = await setup();
     const first = await execute(service, start); await settled(service);
     const sessionId = first.sessionId;
-    const created = await execute(service, { type: "resource.create", sessionId, kind: "atelier.core/note",
+    const created = await execute(service, { type: "resource.create", sessionId, kind: "atelier.core/note", creation: { id: "atelier.core/note.create" },
       input: { title: "Notebook", content: "first\nsecond" }, position: { x: 0, y: 0 } });
     const note = foldWorkbench(created.nodes).objects.find(object => object.kind === "atelier.core/note")!;
     const nodeId = created.cursor!;
@@ -151,9 +153,9 @@ describe("会话运行时", () => {
     const executing = new Promise<void>(resolve => { entered = resolve; });
     let publish!: (data: { text: string }) => void;
     const implementation = defineImplementation({
-      ...defineData("test.streaming", 1, z.strictObject({ text: z.string() }).describe("Captured output.")),
+      ...defineData("test.streaming", z.strictObject({ text: z.string() }).describe("Captured output.")),
       resource: Directory,
-      tool: defineTool({ name: "stream", description: "Stream output.", guidelines: [], argsSchema: z.strictObject({}).describe("No parameters.") }),
+      tool: defineTool({ id: "test.tools/stream", name: "stream", description: "Stream output.", guidelines: [], argsSchema: z.strictObject({}).describe("No parameters.") }),
       targetSchema: z.null().describe("Use the directory."), effect: "read", execution: "parallel",
     });
     const createModules = runtimeModules.createModules;
@@ -184,7 +186,7 @@ describe("会话运行时", () => {
     const { service, root, start } = await setup(model, event => events.push(event));
     const first = await execute(service, start); await settled(service);
     const sessionId = first.sessionId, agentId = agentOf(first);
-    const created = await execute(service, { type: "resource.create", sessionId, kind: "atelier.core/directory",
+    const created = await execute(service, { type: "resource.create", sessionId, kind: "atelier.core/directory", creation: { id: "atelier.core/directory.create" },
       input: { path: root, title: "Captured directory" }, position: { x: 0, y: 0 } });
     resourceId = created.workbench.objects.find(object => object.kind === "atelier.core/directory")!.id;
     await execute(service, { type: "link.set", sessionId, agentId, resourceId, linked: true });
@@ -214,7 +216,7 @@ describe("会话运行时", () => {
     const saved = snapshot.nodes.find(node => node.kind === "toolcall")!;
     expect(saved).toMatchObject({ complete: true, outcome: {
       kind: "cancelled", data: { text: "first\nsecond" }, model: { kind: "cancelled", data: "first\nsecond" },
-      implementation: { id: "test.streaming", version: 1 }, resource: { id: resourceId, kind: "atelier.core/directory", title: "Captured directory" },
+      implementation: { id: "test.streaming" }, resource: { id: resourceId, kind: "atelier.core/directory", title: "Captured directory" },
       startedAt: expect.any(Number), finishedAt: expect.any(Number),
     } });
     expect(snapshot.progress.live).toEqual([]);
@@ -235,7 +237,7 @@ describe("会话运行时", () => {
     const { service, start } = await setup();
     const first = await execute(service, start); await settled(service);
     const sessionId = first.sessionId;
-    const created = await execute(service, { type: "resource.create", sessionId, kind: "atelier.core/note", input: { title: "Saved note", content: "original" }, position: { x: 10, y: 20 } });
+    const created = await execute(service, { type: "resource.create", sessionId, kind: "atelier.core/note", creation: { id: "atelier.core/note.create" }, input: { title: "Saved note", content: "original" }, position: { x: 10, y: 20 } });
     const note = created.workbench.objects.find(object => object.kind === "atelier.core/note")!;
     const history = created.cursor!;
     const receipt = await service.sessions.execute({ type: "object.remove", sessionId, objectId: note.id });
@@ -265,7 +267,7 @@ describe("会话运行时", () => {
     const { service, root, start } = await setup();
     const first = await execute(service, start); await settled(service);
     const sessionId = first.sessionId, agentId = agentOf(first);
-    const created = await execute(service, { type: "resource.create", sessionId, kind: "atelier.core/note",
+    const created = await execute(service, { type: "resource.create", sessionId, kind: "atelier.core/note", creation: { id: "atelier.core/note.create" },
       input: { title: "Resizable note", content: "text" }, position: { x: 10, y: 20 } });
     const noteId = created.workbench.objects.find(object => object.kind === "atelier.core/note")!.id;
     const original = service.sessions.tree.nodes(sessionId), cursor = service.sessions.tree.cursor(sessionId);
@@ -387,17 +389,17 @@ describe("会话运行时", () => {
     mkdirSync(join(root, "files"));
     writeFileSync(join(root, "files", "a.txt"), "original");
     const first = await execute(service, start); await settled(service);
-    const created = await execute(service, { type: "resource.create", sessionId: first.sessionId, kind: "atelier.core/directory", input: { path: root }, position: { x: 0, y: 0 } });
+    const created = await execute(service, { type: "resource.create", sessionId: first.sessionId, kind: "atelier.core/directory", creation: { id: "atelier.core/directory.create" }, input: { path: root }, position: { x: 0, y: 0 } });
     const directory = created.workbench.objects.find(object => object.kind === "atelier.core/directory")!;
     expect(directory.id).toMatch(/^[A-Za-z0-9_-]{16}$/);
-    expect(directory.presentation).toEqual({ contract: { id: "atelier.core/directory.card", version: 1 }, data: { path: root } });
+    expect(directory.presentation).toEqual({ contract: { id: "atelier.core/directory.card" }, data: { path: root } });
     resourceId = directory.id;
     const agentId = agentOf(first);
     await execute(service, { type: "link.set", sessionId: first.sessionId, agentId: agentId, resourceId: resourceId, linked: true });
     await execute(service, agentCommand(first.sessionId, agentId, { type: "continue" })); await settled(service);
     const saved = service.sessions.tree.nodes(first.sessionId).find(node => node.kind === "toolcall");
     const listing = { path: "files", entries: [{ name: "a.txt", type: "file" }], truncated: false };
-    expect(saved).toMatchObject({ outcome: { kind: "succeeded", implementation: { id: "atelier.core/directory.list", version: 1 },
+    expect(saved).toMatchObject({ outcome: { kind: "succeeded", implementation: { id: "atelier.core/directory.list" },
       model: listing, data: listing } });
     writeFileSync(join(root, "files", "b.txt"), "changed");
     await execute(service, { type: "object.remove", sessionId: first.sessionId, objectId: resourceId });
@@ -434,7 +436,7 @@ describe("会话运行时", () => {
     const first = await execute(service, start); await settled(service);
     const sessionId = first.sessionId;
     const a = agentOf(first);
-    await execute(service, { type: "resource.create", sessionId, kind: "atelier.core/agent", input: { selection: selectionOf(first) }, position: { x: 600, y: 0 } });
+    await execute(service, { type: "resource.create", sessionId, kind: "atelier.core/agent", creation: { id: "atelier.core/agent.create" }, input: { selection: selectionOf(first) }, position: { x: 600, y: 0 } });
     const b = service.sessions.snapshot(sessionId).workbench.objects.find(o => o.kind === "atelier.core/agent" && o.id !== a)!.id;
     await execute(service, agentCommand(sessionId, a, { type: "submit", submissionId: randomUUID(), text: "To A" }));
     await execute(service, agentCommand(sessionId, b, { type: "submit", submissionId: randomUUID(), text: "To B" }));
@@ -487,7 +489,7 @@ describe("会话运行时", () => {
     const first = await execute(service, start); await settled(service);
     const sessionId = first.sessionId;
     const a = agentOf(first);
-    await execute(service, { type: "resource.create", sessionId, kind: "atelier.core/agent", input: { selection: selectionOf(first) }, position: { x: 600, y: 0 } });
+    await execute(service, { type: "resource.create", sessionId, kind: "atelier.core/agent", creation: { id: "atelier.core/agent.create" }, input: { selection: selectionOf(first) }, position: { x: 600, y: 0 } });
     const b = service.sessions.snapshot(sessionId).workbench.objects.find(o => o.id !== a)!.id;
     try {
       await execute(service, agentCommand(sessionId, a, { type: "submit", submissionId: randomUUID(), text: "To A" }));
@@ -518,7 +520,7 @@ describe("会话运行时", () => {
     const first = await execute(service, start); await settled(service);
     const sessionId = first.sessionId;
     const a = agentOf(first);
-    await execute(service, { type: "resource.create", sessionId, kind: "atelier.core/agent", input: { selection: selectionOf(first) }, position: { x: 600, y: 0 } });
+    await execute(service, { type: "resource.create", sessionId, kind: "atelier.core/agent", creation: { id: "atelier.core/agent.create" }, input: { selection: selectionOf(first) }, position: { x: 600, y: 0 } });
     const b = service.sessions.snapshot(sessionId).workbench.objects.find(o => o.id !== a)!.id;
     await execute(service, { type: "link.set", sessionId, agentId: a, resourceId: b, linked: true });
     await execute(service, { type: "link.set", sessionId, agentId: b, resourceId: a, linked: true });
@@ -568,12 +570,12 @@ describe("会话运行时", () => {
     const { service, root, start } = await setup();
     const first = await execute(service, start); await settled(service);
     const sessionId = first.sessionId;
-    const note = await execute(service, { type: "resource.create", sessionId, kind: "atelier.core/note", input: {}, position: { x: 0, y: 0 } });
+    const note = await execute(service, { type: "resource.create", sessionId, kind: "atelier.core/note", creation: { id: "atelier.core/note.create" }, input: {}, position: { x: 0, y: 0 } });
     capturedId = note.workbench.objects.find(o => o.kind === "atelier.core/note")!.id;
     expect(service.sessions.snapshot(sessionId).progress).toMatchObject({ runningAgentIds: [], unsettledObjectIds: [capturedId] });
     await expect(execute(service, { type: "select", sessionId, nodeId: first.cursor })).rejects.toMatchObject({ code: "conflict" });
     await expect(execute(service, { type: "object.remove", sessionId, objectId: capturedId })).rejects.toMatchObject({ code: "conflict" });
-    const directory = await execute(service, { type: "resource.create", sessionId, kind: "atelier.core/directory", input: { path: root }, position: { x: 0, y: 0 } });
+    const directory = await execute(service, { type: "resource.create", sessionId, kind: "atelier.core/directory", creation: { id: "atelier.core/directory.create" }, input: { path: root }, position: { x: 0, y: 0 } });
     await execute(service, { type: "object.remove", sessionId, objectId: directory.workbench.objects.find(o => o.kind === "atelier.core/directory")!.id });
     const id = capturedId;
     capturedId = "";
@@ -735,7 +737,7 @@ describe("会话运行时", () => {
     await settled(service);
     const sessionId = first.sessionId;
     const agentId = agentOf(first);
-    const created = await execute(service, { type: "resource.create", sessionId, kind: "atelier.core/directory", input: { path: root }, position: { x: 0, y: 0 } });
+    const created = await execute(service, { type: "resource.create", sessionId, kind: "atelier.core/directory", creation: { id: "atelier.core/directory.create" }, input: { path: root }, position: { x: 0, y: 0 } });
     resourceId = created.workbench.objects.find(object => object.kind === "atelier.core/directory")!.id;
     await execute(service, { type: "link.set", sessionId: sessionId, agentId: agentId, resourceId: resourceId, linked: true });
     await execute(service, agentCommand(sessionId, agentId, { type: "continue" }));
@@ -760,7 +762,7 @@ describe("插件包管理命令", () => {
     const { service, root } = await setup();
     expect(() => service.execute({ type: "plugin.add", path: join(root, "missing") })).toThrow(/No package.json/);
     const dir = join(root, "pkg"); mkdirSync(dir);
-    writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "p", atelier: { id: "acme.p", api: { major: 1, minMinor: 0 } } }));
+    writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "p", atelier: { id: "acme.p", api: { major: 2, minMinor: 0 } } }));
     const added = service.execute({ type: "plugin.add", path: dir });
     expect(added.plugins.map(p => [p.source, p.status, p.enabled])).toEqual([[dir, "pending", true]]);
     expect(added.restartRequired).toBe(true);

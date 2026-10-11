@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import { Clock, TextCursorInput, Wrench } from "lucide-react";
-import { useRendererObject } from "@atelier/sdk/renderer";
+import { useRendererTools } from "@atelier/sdk/renderer";
 import { JsonView } from "../../../renderer/shared/json-view";
 import { t } from "../../../renderer/shared/i18n";
 import { Alert, AlertDescription } from "../../../renderer/shared/ui/alert";
@@ -19,7 +19,7 @@ const labels = {
 
 /** 外壳只管理生命周期和展开；两个内容入口独立回退，更新和落库不重置展开。 */
 export function ToolCall({ node }: { node: ToolCallNode }) {
-  const { tools } = useRendererObject();
+  const tools = useRendererTools();
   const reducedMotion = useReducedMotion();
   const [open, setOpen] = useState(false);
   const state = toolCallState(node);

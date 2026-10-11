@@ -251,7 +251,7 @@ describe("AI SDK 适配契约", () => {
     const model = { kind: "cancelled", data: "Captured output", message: "Stopped." };
     const messages = sdkMessages({ ...input, messages: [{ kind: "result", callId: "cancelled", name: "resource_call",
       outcome: { kind: "cancelled", message: "Stopped.", data: { privateView: "GUI details" }, model,
-        implementation: { id: "test.hidden", version: 1 }, resource: { id: "r", kind: "directory", title: "GUI title" }, startedAt: 10, finishedAt: 20 } }] });
+        implementation: { id: "test.hidden" }, resource: { id: "r", kind: "directory", title: "GUI title" }, startedAt: 10, finishedAt: 20 } }] });
     expect(messages).toEqual([{ role: "tool", content: [{ type: "tool-result", toolCallId: "cancelled", toolName: "resource_call",
       output: { type: "error-json", value: model } }] }]);
   });

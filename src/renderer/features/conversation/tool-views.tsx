@@ -2,7 +2,6 @@ import { Boxes, ScanSearch, Wrench } from "lucide-react";
 import type { ReactNode } from "react";
 import { ResourceCall, ResourceInspectResult, ResourceListResult } from "../../../tools/core";
 import type { Json } from "@atelier/sdk/contracts";
-import { contractKey } from "@atelier/sdk/contracts";
 import { toolRenderer, type ToolRenderProps, type ToolRenderer, type ToolView } from "@atelier/sdk/renderer";
 import type { ViewRegistry } from "../../modules/registry";
 import { JsonView, useModuleViews } from "../../modules/views";
@@ -73,7 +72,7 @@ const inspect = toolRenderer(ResourceInspectResult, {
 export interface ResolvedToolView extends ToolView { props: ToolRenderProps }
 function fixed(renderer: ToolRenderer, props: ToolRenderProps, label: string, icon: ReactNode): ResolvedToolView {
   const identity = props.invocation.implementation;
-  const view = !identity || contractKey(identity) === contractKey(renderer.contract) ? renderer.resolve(props) : null;
+  const view = !identity || identity.id === renderer.contract.id ? renderer.resolve(props) : null;
   return { label, icon, ...view, props };
 }
 /** 固定入口自己的适配负责转交；公共外壳不认识资源工具协议。 */

@@ -1,4 +1,5 @@
 import type { Json } from "@atelier/sdk/contracts";
+import type { ParsedCall } from "../plugins/commands.ts";
 import type { Presentation } from "@atelier/sdk/contracts";
 import type { LiveBlock } from "../shared/session.ts";
 import type { FoldedObject } from "../session/fold.ts";
@@ -13,13 +14,13 @@ export interface ResourceCommandContext { sessionId: string; resource: FoldedObj
  */
 export interface ResourceController {
   /** 外部准备者按装配顺序执行后，进入资源自己的准备；每次替换按目标 schema 校验。 */
-  prepareCommand?(input: Json, ref: ResourceRef, signal: AbortSignal): Promise<Json>;
-  validateCommand?(input: Json): Json;
+  prepareCommand?(input: ParsedCall, ref: ResourceRef, signal: AbortSignal): Promise<ParsedCall>;
+  parseCommand?(input: unknown): ParsedCall;
   /** 校验创建输入（可异步读取配置或文件系统），结果再交给 create。 */
   prepareCreate?(input: unknown): Promise<Json>;
   /** 在创建事务内执行：返回标题与写入创建事件的不可变资源数据，可同时保存私有状态。 */
   create?(sessionId: string, objectId: string, input: Json): { title: string; data?: { [key: string]: Json } };
-  execute?(context: ResourceCommandContext, command: unknown, before?: () => void): Promise<void>;
+  execute?(context: ResourceCommandContext, command: ParsedCall, before?: () => void): Promise<void>;
   /**
    * running 是仍可能向会话树追加事件的对象 ID，涵盖代理与其他被捕获的资源。
    * 外部状态的持续运行不计入；会话回溯与对象移除据此判断 settled。

@@ -2,7 +2,7 @@ import type { z } from "zod";
 import type { Json } from "./json.ts";
 
 /** 会话记录的公开信封：宿主把存储格式映射为它，插件按契约解码，不依赖内部节点结构。 */
-export interface RecordRef { readonly id: string; readonly version: number }
+export interface RecordRef { readonly id: string }
 export interface SessionRecord {
   readonly id: string;
   readonly sessionId: string;
@@ -17,29 +17,21 @@ export interface SessionRecord {
 }
 export type Decoded<D> =
   | { readonly status: "known"; readonly record: SessionRecord; readonly data: D }
-  | { readonly status: "unknown"; readonly record: SessionRecord; readonly reason: "unsupported_version" | "invalid_data" };
+  | { readonly status: "unknown"; readonly record: SessionRecord; readonly reason: "invalid_data" };
 export interface RecordContract<D extends Json = Json> extends RecordRef {
   readonly schema: z.ZodType<D>;
-  /** 不属于该契约返回 null；旧版本经 upgrade 升到当前版本再校验。 */
+  /** 不属于该契约返回 null；兼容与转换由 schema 决定，失败保留原始记录。 */
   decode(record: SessionRecord): Decoded<D> | null;
 }
 export function defineRecord<D extends Json>(id: string, definition: {
-  version: number; schema: z.ZodType<D>; upgrade?: Readonly<Record<number, (data: Json) => Json>>;
+  schema: z.ZodType<D>;
 }): RecordContract<D> {
-  const { version, schema, upgrade = {} } = definition;
-  if (!Number.isInteger(version) || version < 1) throw new Error("Record contract versions must be positive integers.");
+  const { schema } = definition;
   return {
-    id, version, schema,
+    id, schema,
     decode(record) {
       if (record.contract.id !== id) return null;
-      let data = structuredClone(record.data);
-      for (let from = record.contract.version; from < version; from++) {
-        const step = upgrade[from];
-        if (!step) return { status: "unknown", record, reason: "unsupported_version" };
-        try { data = step(data); }
-        catch { return { status: "unknown", record, reason: "invalid_data" }; }
-      }
-      if (record.contract.version > version) return { status: "unknown", record, reason: "unsupported_version" };
+      const data = structuredClone(record.data);
       try {
         const parsed = schema.safeParse(data);
         return parsed.success ? { status: "known", record, data: parsed.data } : { status: "unknown", record, reason: "invalid_data" };

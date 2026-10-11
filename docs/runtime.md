@@ -49,9 +49,9 @@
 
 上述三个固定入口称一级工具，是协议 `tools` 中的工具，代表 Atelier 与工作台的操作界面；经 `resource_call` 使用的动态资源工具称二级工具，是模型完成实际任务的主要工具。层级描述调用关系，不表示产品中的重要性；可管理、可扩展的核心工具目录属于资源工具。一级视图由 Atelier 内置，resource_list/inspect 显示资源列表与详情，resource_call 的视图适配将摘要、正文和图标转交选定的二级工具。外壳显示实际工具的一层视图，不嵌套展示外围调用。
 
-资源与工具独立定义：资源契约描述类型与状态；工具契约统一规定 name、description、guidelines 与 args schema。description 说明能力和适用场景，guidelines 说明选定后的使用规则，参数 schema 说明字段语义，不另设 snippet。后端的工具实现声明自己支持的资源类型、target schema、result schema、读写副作用和调度策略，并提供 handler；实现不重复或覆写工具的 description/guidelines。同一工具可对应多个实现，用法与行为含义保持一致，资源实例不保存工具列表或白名单。
+资源与工具独立定义：资源契约描述类型与状态；工具契约统一规定 id、name、description、guidelines 与 args schema。id 是稳定标识，name 用于模型调用；description 说明能力和适用场景，guidelines 说明选定后的使用规则，参数 schema 说明字段语义，不另设 snippet。后端的工具实现声明自己支持的资源类型、target schema、result schema、读写副作用和调度策略，并提供 handler；实现不重复或覆写工具的 description/guidelines。同一工具可对应多个实现，用法与行为含义保持一致，资源实例不保存工具列表或白名单。
 
-target 是 `resource_call` 的定位参数，由选中的实现直接解释，不要求使用 path，也不引入通用目标解析层。定位可包含资源内部对象与内容范围：目录 list 接受 null 或 `{path}`，文件 read 接受 `{path, offset?, limit?}`，笔记 read 接受 null，游戏工具可接受 `{piece}`。不要求所有文本资源都采用行定位。args 始终遵循共享工具契约，target 与 result 随实现变化。三种 schema 都须有整体 description，字段说明随 schema 提供；target/result 的描述由实现解释定位规则与返回含义。注册器拒绝同名工具的 description、guidelines、args schema（含描述）或读写属性冲突，以及同一资源类型、工具名的多个当前实现。不同用法或行为应另定义工具。
+target 是 `resource_call` 的定位参数，由选中的实现直接解释，不要求使用 path，也不引入通用目标解析层。定位可包含资源内部对象与内容范围：目录 list 接受 null 或 `{path}`，文件 read 接受 `{path, offset?, limit?}`，笔记 read 接受 null，游戏工具可接受 `{piece}`。不要求所有文本资源都采用行定位。args 始终遵循共享工具契约，target 与 result 随实现变化。三种 schema 都须有整体 description，字段说明随 schema 提供；target/result 的描述由实现解释定位规则与返回含义。工具实现引用同一个实际声明对象，公共模块加载保证实例共享，不以相同 ID 合并独立副本；同名异契约先按插件装配顺序消解。注册器拒绝未消解的同名契约，以及同一资源类型、工具名的多个当前实现。不同声明占用同一 ID 明确报错，不同用法或行为应另定义工具。
 
 入口指导与 schema 描述明确要求直接传递符合 schema 的 JSON 值：对象保持为对象，null 保持为 null，不先编码成字符串。一级入口提供通用传参规则，共享工具定义提供操作用法，资源实现通过 target/result schema 提供定位与结果说明。
 
@@ -89,9 +89,9 @@ write 直接创建或覆盖完整正文，不要求锚点，也不返回新锚�
 
 工具结局为 succeeded / rejected / failed / cancelled / partial / unknown。每种结局均保存 `data` 与当次模型投影 `model`；终结不等于成功。工具显式返回最终结局，失败等分支省略 data 时保留最近合法产出，显式 null 则清空。执行中的只读操作抛出中止记 cancelled；写操作抛错或中止且无法确认影响时记 unknown，不宣称撤销副作用。开始前取消没有开始时间；正常返回的已知结局不被晚到的取消信号覆盖。终结后忽略迟到 publish。
 
-实现可提供 `toModel(data)`，只在终结时调用，默认使用结构化数据；非成功结局的模型投影同时包含结局、说明与有效产出。投影出错保留已知执行结局，向模型报告输出不可用，不绕过自定义投影发送原始数据。结局保存实际实现的 ID/版本、当次资源的身份/类型/名称及开始/结束时间，随 toolcall 节点内联保存。中间更新不追加历史，不触发下一次模型请求；内存产出不承诺进程崩溃后的恢复。
+实现可提供 `toModel(data)`，只在终结时调用，默认使用结构化数据；非成功结局的模型投影同时包含结局、说明与有效产出。投影出错保留已知执行结局，向模型报告输出不可用，不绕过自定义投影发送原始数据。结局保存实际实现的 ID、当次资源的身份/类型/名称及开始/结束时间，随 toolcall 节点内联保存。中间更新不追加历史，不触发下一次模型请求；内存产出不承诺进程崩溃后的恢复。
 
-前端按保存的实现 ID/版本选取调用视图。headerRenderer 与 bodyRenderer 分别可选，消费同一份调用信息与结果，各自回退默认摘要或原始数据正文。历史只消费当次保存的数据与身份，不重新访问资源或执行工具。找不到精确版本或数据不合契约时使用默认视图。视图与执行代码在同一功能模块内维护，通过纯契约关联，见 [资源扩展契约](architecture.md#资源扩展契约)。
+前端按保存的实现 ID选取调用视图。headerRenderer 与 bodyRenderer 分别可选，消费同一份调用信息与结果，各自回退默认摘要或原始数据正文。历史只消费当次保存的数据与身份，不重新访问资源或执行工具。找不到实现或数据不能由当前 schema 解码时使用默认视图。视图与执行代码在同一功能模块内维护，通过纯契约关联，见 [资源扩展契约](architecture.md#资源扩展契约)。
 
 ## 执行授权
 

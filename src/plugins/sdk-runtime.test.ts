@@ -4,8 +4,8 @@ import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { defineRecord, defineImplementation, defineTool, pluginNamespace, modelRunRecordSchema, type SessionRecord, type ModelRunEvent } from "@atelier/sdk/contracts";
-import { defineModule, definePlugin, implementResource, implementTool, type ObjectContext, type ObjectWriter, type PluginContext, type PluginDefinition } from "@atelier/sdk/runtime";
+import { defineCreation, defineAction, resourceCall, defineRecord, defineImplementation, defineTool, pluginNamespace, modelRunRecordSchema, type SessionRecord, type ModelRunEvent } from "@atelier/sdk/contracts";
+import { defineModule, definePlugin, implementCreation, implementAction, implementPreparer, implementResource, implementTool, type ObjectReader, type ObjectExecutor, type ObjectWriter, type PluginContext, type PluginDefinition } from "@atelier/sdk/runtime";
 import { ApplicationService } from "../runtime/service.ts";
 import * as runtimeModules from "../modules/runtime.ts";
 import type { ToolRegistry } from "../tools/registry.ts";
@@ -13,17 +13,19 @@ import { foldWorkbench } from "../session/fold.ts";
 import type { ModelAdapter, ModelInput } from "../model/contract.ts";
 import { Directory, DirectoryView } from "../modules/filesystem/contract.ts";
 import { Note, NoteContent } from "../modules/notes/contract.ts";
-import { Agent, agentCommandSchema } from "../modules/agent/contract.ts";
+import { Agent, SubmitAgentInput } from "../modules/agent/contract.ts";
 import { applicationStorage } from "../shared/application.ts";
 import { emptyCompletion } from "../shared/session.ts";
 import type { SessionDataStore } from "../session/data.ts";
 
 const ns = pluginNamespace("test.counter");
 const Counter = ns.resource("counter", z.strictObject({}));
-const State = ns.data("state", 1, z.number().int());
-const View = ns.data("view", 1, z.object({ value: z.number() }));
-const Changed = defineRecord(ns.name("changed"), { version: 1, schema: z.object({ value: z.number() }) });
-const Command = z.object({ amount: z.number().int() });
+const State = ns.data("state", z.number().int());
+const View = ns.data("view", z.object({ value: z.number() }));
+const Changed = defineRecord(ns.name("changed"), { schema: z.object({ value: z.number() }) });
+const Command = z.strictObject({ amount: z.number().int() });
+const CreateCounter = defineCreation(Counter, { id: ns.name("create"), schema: z.number().int() });
+const ChangeCount = defineAction(Counter, { id: ns.name("change"), schema: Command });
 const roots: string[] = [];
 const services: ApplicationService[] = [];
 afterEach(async () => {
@@ -46,15 +48,14 @@ async function configureModel(service: ApplicationService) {
   } });
   return { role: "default", model: result.savedId! };
 }
-function counter(options: { failCreate?: boolean; onCreate?: (object: ObjectContext) => void; afterCreate?: (object: ObjectContext) => void; afterAction?: (object: ObjectContext) => void; observe?: (record: SessionRecord, context: PluginContext) => void } = {}) {
+function counter(options: { onRead?: (object: ObjectReader) => void; failCreate?: boolean; onCreate?: (object: ObjectExecutor) => void; afterCreate?: (object: ObjectExecutor) => void; afterAction?: (object: ObjectExecutor) => void; observe?: (record: SessionRecord, context: PluginContext) => void } = {}) {
   let context!: PluginContext;
   const plugin = definePlugin({ namespace: ns, version: "1.0.0", modules: [defineModule(plugin => {
     context = plugin;
     return {
       resources: [implementResource(Counter, View, {
         records: [Changed],
-        creation: {
-          schema: z.number().int(),
+        creation: implementCreation(CreateCounter, {
           create(value, object) {
             options.onCreate?.(object);
             object.commit(writer => { writer.set(State, value); writer.append(Changed, { value }); });
@@ -62,9 +63,8 @@ function counter(options: { failCreate?: boolean; onCreate?: (object: ObjectCont
             if (options.failCreate) throw new Error("Creation failed.");
             return { title: "Counter", data: {} };
           },
-        },
-        actions: {
-          schema: Command,
+        }),
+        actions: [implementAction(ChangeCount, {
           prepare: input => ({ action: "replace", input: { amount: input.amount + 1 } }),
           async execute(input, object) {
             object.commit(writer => {
@@ -73,8 +73,8 @@ function counter(options: { failCreate?: boolean; onCreate?: (object: ObjectCont
             });
             options.afterAction?.(object);
           },
-        },
-        project: (_data, object) => ({ value: object.get(State)! }),
+        })],
+        project: (_data, object) => { options.onRead?.(object); return { value: object.get(State)! }; },
         inspect: async (_data, object) => ({ value: object.get(State)! }),
       })],
       observers: [{ id: "observe", committed(event) { for (const record of event.records) options.observe?.(record, plugin); } }],
@@ -83,11 +83,129 @@ function counter(options: { failCreate?: boolean; onCreate?: (object: ObjectCont
   return { plugin, context: () => context };
 }
 async function create(service: ApplicationService, sessionId: string, input = 1) {
-  await service.sessions.execute({ type: "resource.create", sessionId, kind: Counter.kind, input, position: { x: 0, y: 0 } });
+  await service.sessions.execute({ type: "resource.create", sessionId, kind: Counter.kind, creation: { id: "test.counter/create" }, input, position: { x: 0, y: 0 } });
   return service.sessions.snapshot(sessionId).workbench.objects.find(object => object.kind === Counter.kind)!.id;
 }
 
 describe("工作台 SDK 的宿主实现", () => {
+  it("读取门面不暴露对象或嵌套会话的修改能力", async () => {
+    let reader!: ObjectReader;
+    const c = counter({ onRead: value => { reader = value; } });
+    const { service, sessionId } = open([c.plugin]);
+    await create(service, sessionId);
+    service.sessions.snapshot(sessionId);
+    expect(reader.get(State)).toBe(1);
+    expect(reader).not.toHaveProperty("commit");
+    expect(reader).not.toHaveProperty("streams");
+    expect(reader.session).not.toHaveProperty("commit");
+    expect(reader.session).not.toHaveProperty("resume");
+    expect(reader.session.title).not.toHaveProperty("propose");
+  });
+  it("动作按宿主契约校验身份、资源归属和输入，拒绝不留下写入", async () => {
+    const c = counter();
+    const { service, sessionId } = open([c.plugin]);
+    const objectId = await create(service, sessionId);
+    const before = service.sessions.tree.nodes(sessionId).length;
+    for (const command of [
+      { ...resourceCall(ChangeCount, { amount: 1 }), id: "test.counter/missing" },
+      { id: SubmitAgentInput.id, input: { amount: 1 } },
+      { id: ChangeCount.id, input: { amount: "wrong" } },
+    ]) {
+      await expect(service.sessions.execute({ type: "resource.command", sessionId, objectId, command })).rejects.toMatchObject({ code: "invalid_request" });
+    }
+    expect(service.sessions.tree.nodes(sessionId)).toHaveLength(before);
+    expect(c.context().object({ sessionId, id: objectId, kind: Counter.kind }).get(State)).toBe(1);
+  });
+  it("创建输入只解析一次，准备接受后 create 使用转换结果", async () => {
+    const transform = vi.fn((value: number) => value + 1);
+    const contract = defineCreation(Counter, { id: ns.name("transform"), schema: z.number().transform(transform) });
+    const created = vi.fn(() => ({ title: "Counter", data: {} }));
+    const prepare = vi.fn(() => ({ action: "accept" as const }));
+    const plugin = definePlugin({ namespace: ns, version: "1", modules: [defineModule(() => ({
+      resources: [implementResource(Counter, View, {
+        creation: implementCreation(contract, { prepare, create: created }), project: () => ({ value: 0 }), inspect: async () => null,
+      })],
+    }))] });
+    const { service, sessionId } = open([plugin]);
+    await service.sessions.execute({ type: "resource.create", sessionId, kind: Counter.kind,
+      creation: { id: contract.id }, input: 0, position: { x: 0, y: 0 } });
+    expect(transform.mock.calls.map(([value]) => value)).toEqual([0]);
+    expect(prepare).toHaveBeenCalledWith(1, expect.any(AbortSignal));
+    expect(created).toHaveBeenCalledWith(1, expect.anything());
+  });
+  it("动作准备沿用解析结果，替换作为新输入只经资源所有者 schema 解析一次", async () => {
+    const transform = vi.fn((value: string) => Number(value) + 1);
+    const action = defineAction(Counter, { id: ns.name("transform"), schema: z.string().regex(/^\d+$/u).transform(transform) });
+    const seen: number[] = [], executed = vi.fn();
+    const c = counter();
+    const plugin = definePlugin({ ...c.plugin, modules: [defineModule(context => {
+      const contribution = c.plugin.modules[0]!.setup(context);
+      return { ...contribution, resources: contribution.resources!.map(resource => ({
+        ...resource, actions: [implementAction(action, {
+          prepare(value) { seen.push(value); return { action: "accept" }; },
+          async execute(value) { executed(value); },
+        })],
+      })) };
+    })] });
+    let replacement = "10";
+    const preparers = definePlugin({ namespace: pluginNamespace("test.prepare"), version: "1", modules: [defineModule(() => ({
+      preparers: [
+        implementPreparer(action, { id: "accept", prepare(value) { seen.push(value); return { action: "accept" }; } }),
+        implementPreparer(action, { id: "replace", prepare() { return { action: "replace" as const, input: replacement }; } }),
+        implementPreparer(action, { id: "after", prepare(value) { seen.push(value); return { action: "accept" }; } }),
+      ],
+    }))] });
+    const { service, sessionId } = open([plugin, preparers]);
+    const objectId = await create(service, sessionId);
+    const invoke = () => service.sessions.execute({ type: "resource.command", sessionId, objectId, command: resourceCall(action, "0") });
+    await invoke();
+    expect(seen).toEqual([1, 11, 11]);
+    expect(transform.mock.calls.map(([value]) => value)).toEqual(["0", "10"]);
+    expect(executed).toHaveBeenCalledExactlyOnceWith(11);
+    replacement = "invalid";
+    await expect(invoke()).rejects.toMatchObject({ code: "invalid_request" });
+    expect(executed).toHaveBeenCalledTimes(1);
+  });
+  it("记录可重复引用同一声明，独立副本即使 ID 相同也冲突", async () => {
+    const c = counter();
+    const plugin = definePlugin({ ...c.plugin, modules: [...c.plugin.modules, defineModule(() => ({ records: [Changed] }))] });
+    const { service, sessionId } = open([plugin]);
+    expect(service.sessions.plugins.find(entry => entry.id === ns.id)?.status).toBe("loaded");
+    const session = c.context().session(sessionId);
+    session.commit(writer => { writer.append(Changed, { value: 4 }); });
+    expect(session.snapshot().records.first(Changed, { scope: "path" })).toMatchObject({ status: "known", data: { value: 4 } });
+    const conflict = definePlugin({ ...c.plugin, modules: [...c.plugin.modules,
+      defineModule(() => ({ records: [defineRecord(Changed.id, { schema: Changed.schema })] })),
+    ] });
+    const other = open([conflict]);
+    expect(other.service.sessions.plugins.find(entry => entry.id === ns.id)?.status).toBe("failed");
+  });
+  it("关闭取消并等待在途准备，准备结束前不释放宿主设施", async () => {
+    const c = counter();
+    let preparationSignal!: AbortSignal;
+    let begin!: () => void, release!: () => void;
+    const started = new Promise<void>(resolve => { begin = resolve; });
+    const held = new Promise<void>(resolve => { release = resolve; });
+    const observer = definePlugin({ namespace: pluginNamespace("test.prepare-close"), version: "1", modules: [defineModule(() => ({
+      preparers: [{ id: "hold", contract: ChangeCount, async prepare(_input, _object, signal) {
+        preparationSignal = signal; begin(); await held; return { action: "accept" };
+      } }],
+    }))] });
+    const { service, sessionId } = open([c.plugin, observer]);
+    const objectId = await create(service, sessionId);
+    const invocation = service.sessions.execute({ type: "resource.command", sessionId, objectId, command: resourceCall(ChangeCount, { amount: 1 }) });
+    const rejected = expect(invocation).rejects.toThrow();
+    await started;
+    let closed = false;
+    const closing = service.close().then(() => { closed = true; });
+    services.splice(services.indexOf(service), 1);
+    expect(preparationSignal.aborted).toBe(true);
+    await Promise.resolve();
+    expect(closed).toBe(false);
+    release();
+    await Promise.all([closing, rejected]);
+    expect(closed).toBe(true);
+  });
   it("普通动作提交后续接退出自身分支，后续写入仍须检查当前路径", async () => {
     const c = counter({ afterAction: object => {
       object.session.resume();
@@ -98,7 +216,7 @@ describe("工作台 SDK 的宿主实现", () => {
       responseId: "interrupted", requestParentId: null, ordinal: 0, complete: true, model: "test/test",
       adapter: "test", scope: "test", continuation: null });
     const id = await create(service, sessionId, 1);
-    await expect(service.sessions.execute({ type: "resource.command", sessionId, objectId: id, command: { amount: 0 } }))
+    await expect(service.sessions.execute({ type: "resource.command", sessionId, objectId: id, command: resourceCall(ChangeCount, { amount: 0 }) }))
       .rejects.toMatchObject({ code: "unavailable" });
     expect(service.sessions.tree.cursor(sessionId)).toBeNull();
     expect(c.context().object({ sessionId, id, kind: Counter.kind }).get(State)).toBe(2);
@@ -106,7 +224,7 @@ describe("工作台 SDK 的宿主实现", () => {
   it("首页 prepare 不能将首条输入替换成不提交输入的动作", async () => {
     const namespace = pluginNamespace("test.first-input");
     const plugin = definePlugin({ namespace, version: "1", modules: [defineModule(() => ({
-      preparers: [{ id: "cancel", resource: Agent, schema: agentCommandSchema,
+      preparers: [{ id: "cancel", contract: SubmitAgentInput,
         prepare: () => ({ action: "replace", input: { type: "cancel" } }) }],
     }))] });
     const { service } = open([plugin]);
@@ -153,22 +271,24 @@ describe("工作台 SDK 的宿主实现", () => {
     expect(service.sessions.tree.nodes(sessionId)).toEqual(before);
     expect(observed).toEqual([]);
     expect(notifications).toEqual([]);
-    const foreign = pluginNamespace("other.plugin").data("state", 1, z.number());
+    const foreign = pluginNamespace("other.plugin").data("state", z.number());
     expect(() => session.commit(writer => { writer.set(foreign, 1); })).toThrow(/another plugin/);
   });
 
-  it("数据与事件保存声明版本，当前数据不冒充不同版本的值", async () => {
+  it("数据按实际形状读取，兼容声明继续读取，不兼容声明拒绝且不改写原值", async () => {
     const c = counter();
-    const nextState = ns.data("state", 2, z.number().int());
-    const nextRecord = defineRecord(ns.name("next"), { version: 2, schema: z.number() });
+    const nextState = ns.data("state", z.number().int());
+    const nextRecord = defineRecord(ns.name("next"), { schema: z.number() });
     const plugin = definePlugin({ ...c.plugin, modules: [...c.plugin.modules, defineModule(() => ({ records: [nextRecord] }))] });
     const { service, sessionId } = open([plugin]);
     const session = c.context().session(sessionId);
     session.commit(writer => { writer.set(nextState, 12); writer.append(nextRecord, 12); });
     expect(session.get(nextState)).toBe(12);
-    expect(() => session.get(State)).toThrow(/unavailable/);
+    expect(session.get(State)).toBe(12);
+    expect(() => session.get(ns.data("state", z.string()))).toThrow(/schema/);
+    expect(session.get(State)).toBe(12);
     expect(session.snapshot().records.first(nextRecord, { scope: "path" })).toMatchObject({
-      status: "known", data: 12, record: { contract: { id: nextRecord.id, version: 2 } },
+      status: "known", data: 12, record: { contract: { id: nextRecord.id } },
     });
   });
 
@@ -180,7 +300,7 @@ describe("工作台 SDK 的宿主实现", () => {
       data = args[0].data; modules = createModules(...args); return modules;
     });
     const { service, sessionId } = open([]);
-    await service.sessions.execute({ type: "resource.create", sessionId, kind: Note.kind, input: {}, position: { x: 0, y: 0 } });
+    await service.sessions.execute({ type: "resource.create", sessionId, kind: Note.kind, creation: { id: "atelier.core/note.create" }, input: {}, position: { x: 0, y: 0 } });
     const note = foldWorkbench(service.sessions.tree.path(sessionId)).objects.find(object => object.kind === Note.kind)!;
     expect(note.title).toBe("Untitled note");
     expect(data.get(sessionId, note.id, NoteContent.id)).toEqual({ text: "" });
@@ -202,13 +322,13 @@ describe("工作台 SDK 的宿主实现", () => {
 
   it("当前数据库格式保存笔记契约状态，不支持的版本拒绝打开并保留数据", async () => {
     const { root, service, sessionId } = open([]);
-    await service.sessions.execute({ type: "resource.create", sessionId, kind: Note.kind,
+    await service.sessions.execute({ type: "resource.create", sessionId, kind: Note.kind, creation: { id: "atelier.core/note.create" },
       input: { content: "Saved text" }, position: { x: 0, y: 0 } });
     await service.close(); services.splice(services.indexOf(service), 1);
     const file = join(root, applicationStorage.databaseDirectory, applicationStorage.databaseFile);
     const db = new DatabaseSync(file);
     try {
-      expect(db.prepare("PRAGMA user_version").get()).toMatchObject({ user_version: 13 });
+      expect(db.prepare("PRAGMA user_version").get()).toMatchObject({ user_version: 14 });
       expect(db.prepare("SELECT contract_id, data_json FROM session_data").all())
         .toMatchObject([{ contract_id: NoteContent.id, data_json: JSON.stringify({ text: "Saved text" }) }]);
       db.exec("PRAGMA user_version = 1");
@@ -227,15 +347,15 @@ describe("工作台 SDK 的宿主实现", () => {
     const directory = join(root, "directory"); mkdirSync(directory);
     expect(service.sessions.plugins.find(plugin => plugin.id === "atelier.core")?.status).toBe("loaded");
     for (const title of [undefined, "  Materials  "]) {
-      await service.sessions.execute({ type: "resource.create", sessionId, kind: Directory.kind,
+      await service.sessions.execute({ type: "resource.create", sessionId, kind: Directory.kind, creation: { id: "atelier.core/directory.create" },
         input: { path: directory, ...(title ? { title } : {}) }, position: { x: 0, y: 0 } });
     }
     const snapshot = service.sessions.snapshot(sessionId);
     const directories = snapshot.workbench.objects.filter(object => object.kind === Directory.kind);
     expect(directories.map(object => object.title)).toEqual(["directory", "Materials"]);
     expect(directories.map(object => object.presentation)).toEqual([
-      { contract: { id: DirectoryView.id, version: DirectoryView.version }, data: { path: directory } },
-      { contract: { id: DirectoryView.id, version: DirectoryView.version }, data: { path: directory } },
+      { contract: { id: DirectoryView.id }, data: { path: directory } },
+      { contract: { id: DirectoryView.id }, data: { path: directory } },
     ]);
     expect(service.sessions.tree.nodes(sessionId).filter(node => node.kind === "event" && node.type === "resource_created"))
       .toMatchObject([{ data: { type: Directory.kind, title: "directory", path: directory } },
@@ -246,7 +366,7 @@ describe("工作台 SDK 的宿主实现", () => {
     const { root, service, sessionId } = open([]);
     const file = join(root, "file.txt"); writeFileSync(file, "text");
     for (const input of [{ path: 42 }, { path: "relative" }, { path: join(root, "missing") }, { path: file }]) {
-      await expect(service.sessions.execute({ type: "resource.create", sessionId, kind: Directory.kind,
+      await expect(service.sessions.execute({ type: "resource.create", sessionId, kind: Directory.kind, creation: { id: "atelier.core/directory.create" },
         input, position: { x: 0, y: 0 } })).rejects.toMatchObject({ code: "invalid_request" });
     }
     expect(service.sessions.tree.nodes(sessionId)).toEqual([]);
@@ -276,30 +396,30 @@ describe("工作台 SDK 的宿主实现", () => {
     const order: number[] = [];
     let invalid = false;
     const prepare = definePlugin({ namespace: other, version: "1", modules: [defineModule(() => ({
-      preparers: [{ id: "double", resource: Counter, schema: z.object({ amount: z.union([z.number(), z.string()]) }), prepare(input) {
+      preparers: [{ id: "double", contract: ChangeCount, prepare(input) {
         const amount = Command.parse(input).amount; order.push(amount);
         return { action: "replace", input: { amount: invalid ? "bad" : amount * 2 } };
       } }],
     }))] });
     const { service, sessionId } = open([c.plugin, prepare]);
     const id = await create(service, sessionId);
-    await service.sessions.execute({ type: "resource.command", sessionId, objectId: id, command: { amount: 2 } });
+    await service.sessions.execute({ type: "resource.command", sessionId, objectId: id, command: resourceCall(ChangeCount, { amount: 2 }) });
     expect(order).toEqual([2]);
     expect(c.context().object({ sessionId, id, kind: Counter.kind }).get(State)).toBe(6);
     invalid = true;
-    await expect(service.sessions.execute({ type: "resource.command", sessionId, objectId: id, command: { amount: 2 } })).rejects.toThrow(/prepare/);
+    await expect(service.sessions.execute({ type: "resource.command", sessionId, objectId: id, command: resourceCall(ChangeCount, { amount: 2 }) })).rejects.toThrow(/input/);
     expect(c.context().object({ sessionId, id, kind: Counter.kind }).get(State)).toBe(6);
   });
 
   it("SDK 工具经同一个宿主目录调用，具型参数与产出在适配边界校验", async () => {
     const c = counter();
-    const tool = defineTool({ name: "counter_read", description: "Read the counter.", guidelines: [],
+    const tool = defineTool({ id: "test.tools/counter_read", name: "counter_read", description: "Read the counter.", guidelines: [],
       argsSchema: z.strictObject({}).describe("No arguments.") });
     const implementation = defineImplementation({
-      ...ns.data("read-result", 1, z.number().describe("The current counter value.")),
+      ...ns.data("read-result", z.number().describe("The current counter value.")),
       resource: Counter, tool, targetSchema: z.null().describe("The whole counter."), effect: "read", execution: "parallel",
     });
-    let toolObject!: ObjectContext;
+    let toolObject!: ObjectExecutor;
     const plugin = definePlugin({ ...c.plugin, modules: [...c.plugin.modules, defineModule(() => ({
       tools: [implementTool(implementation, { async call(_data, _target, _args, context) {
         toolObject = context.object;
@@ -323,10 +443,14 @@ describe("工作台 SDK 的宿主实现", () => {
     expect(await invocation.execute(new AbortController().signal, data => progress.push(data))).toEqual({ kind: "succeeded", data: 4 });
     expect(progress).toEqual([4]);
     expect(() => toolObject.commit(writer => { writer.set(State, 5); })).toThrow(/execution scope is closed/);
+    expect(() => toolObject.session.commit(writer => { writer.set(State, 5); })).toThrow(/execution scope is closed/);
+    expect(() => toolObject.session.resume()).toThrow(/execution scope is closed/);
+    expect(() => toolObject.session.title.propose("Late", { expected: "Counter" })).toThrow(/execution scope is closed/);
+    expect(() => toolObject.streams.publish("late", new Uint8Array())).toThrow(/execution scope is closed/);
   });
 
   it("创建失败回滚对象状态和记录；临时对象门面不能越过失败创建", async () => {
-    let provisional!: ObjectContext;
+    let provisional!: ObjectExecutor;
     const observed: SessionRecord[] = [];
     const c = counter({ failCreate: true, onCreate: object => { provisional = object; }, observe: record => observed.push(record) });
     const { service, sessionId } = open([c.plugin]);
@@ -345,13 +469,13 @@ describe("工作台 SDK 的宿主实现", () => {
     let escaped!: ObjectWriter;
     expect(() => object.commit(((writer: ObjectWriter) => {
       escaped = writer; writer.set(State, 99); writer.append(Changed, { value: 99 }); return Promise.resolve();
-    }) as unknown as Parameters<ObjectContext["commit"]>[0])).toThrow(/synchronously/);
+    }) as unknown as Parameters<ObjectExecutor["commit"]>[0])).toThrow(/synchronously/);
     expect(() => escaped.set(State, 123)).toThrow(/outside/);
     expect(object.get(State)).toBe(1);
     expect(service.sessions.tree.nodes(sessionId)).toHaveLength(count);
-    const forged = defineRecord(Changed.id, { version: 1, schema: z.object({ value: z.string() }) });
-    expect(() => object.commit(writer => { writer.append(forged, { value: "invalid" }); })).toThrow(/declared schema/);
-    const undeclared = defineRecord(ns.name("undeclared"), { version: 1, schema: z.number() });
+    const forged = defineRecord(Changed.id, { schema: z.object({ value: z.string() }) });
+    expect(() => object.commit(writer => { writer.append(forged, { value: "invalid" }); })).toThrow(/declared record contract instance/);
+    const undeclared = defineRecord(ns.name("undeclared"), { schema: z.number() });
     expect(() => object.commit(writer => { writer.append(undeclared, 1); })).toThrow(/did not declare/);
   });
 
@@ -372,8 +496,8 @@ describe("工作台 SDK 的宿主实现", () => {
 
   it("纯会话事件插件只声明自己的领域；观察者追加排队且保留原批次快照", () => {
     const eventNs = pluginNamespace("test.events");
-    const Input = defineRecord(eventNs.name("input"), { version: 1, schema: z.string() });
-    const Follow = defineRecord(eventNs.name("follow"), { version: 1, schema: z.string() });
+    const Input = defineRecord(eventNs.name("input"), { schema: z.string() });
+    const Follow = defineRecord(eventNs.name("follow"), { schema: z.string() });
     let context!: PluginContext;
     const seen: [string, number][] = [];
     const plugin = definePlugin({ namespace: eventNs, version: "1", modules: [defineModule(plugin => {
@@ -396,7 +520,7 @@ describe("工作台 SDK 的宿主实现", () => {
 
   it("公开 run 交付单次执行事件，由插件声明的记录保存；没有隐式历史或下一请求", async () => {
     const c = counter();
-    const Execution = defineRecord(ns.name("execution"), { version: 1, schema: modelRunRecordSchema });
+    const Execution = defineRecord(ns.name("execution"), { schema: modelRunRecordSchema });
     const plugin = definePlugin({ ...c.plugin, modules: [...c.plugin.modules, defineModule(() => ({ records: [Execution] }))] });
     const inputs: ModelInput[] = [];
     const { service, sessionId } = open([plugin], () => ({ version: "test-adapter", prepare(input) {
@@ -445,7 +569,7 @@ describe("工作台 SDK 的宿主实现", () => {
 
   it.each(["cancel", "close"] as const)("运行中的 SDK 请求受收束规则保护，%s 后部分内容可提交到时间轴", async mode => {
     const c = counter();
-    const Execution = defineRecord(ns.name("execution"), { version: 1, schema: modelRunRecordSchema });
+    const Execution = defineRecord(ns.name("execution"), { schema: modelRunRecordSchema });
     const plugin = definePlugin({ ...c.plugin, modules: [...c.plugin.modules, defineModule(() => ({ records: [Execution] }))] });
     const { service, sessionId } = open([plugin], () => ({ version: "test", prepare() {
       return { async *stream(signal) {

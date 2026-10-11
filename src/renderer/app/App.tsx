@@ -1,3 +1,7 @@
+import { CreateAgent } from "../../modules/agent/contract";
+import { CreateNote } from "../../modules/notes/contract";
+import { CreateDirectory } from "../../modules/filesystem/contract";
+import { reference } from "@atelier/sdk/contracts";
 import type { WorkbenchOperation } from "../features/session/controller";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { ArrowLeft, ChevronDown, Plus, History, House, KeyRound, ListTree, PanelLeft, Settings, X } from "lucide-react";
@@ -13,7 +17,7 @@ import { HomePage, type StartInput } from "../features/home/HomePage";
 import { Workbench, type WorkbenchHandle } from "../features/workbench/Workbench";
 import { WorkbenchSurface } from "../features/workbench/WorkbenchSurface";
 import { useModuleViews } from "../modules/views";
-import { SubmissionIdentity } from "../features/session/controller";
+import { SubmissionIdentity } from "../shared/submission";
 import { sessionController } from "../features/session/registry";
 import { useConfiguration } from "../features/configuration/state";
 import { s } from "../shared/i18n";
@@ -46,11 +50,8 @@ export function App({ controller }: { controller: ApplicationController }) {
   const [view, setView] = useState<MainView>({ kind: "home" });
   const [sidebarVisible, setSidebarVisible] = useState(true);
   const [draft, setDraft] = useState("");
-  const [conversationDrafts, setConversationDrafts] = useState<Record<string, string>>({});
   const [resourceCreation, setResourceCreation] = useState<ResourceCreation | null>(null);
   const start = useStart();
-  const agentDraft = useCallback((agentId: string) => conversationDrafts[agentId] ?? "", [conversationDrafts]);
-  const setAgentDraft = useCallback((agentId: string, value: string) => setConversationDrafts(drafts => ({ ...drafts, [agentId]: value })), []);
   // 每次导航递增；异步创建完成时据此判断用户是否已离开，不夺走当前视图。
   const navigation = useRef(0);
   const run = useCallback((command: WorkbenchOperation) => sessionController(command.sessionId).mutate(command), []);
@@ -120,7 +121,9 @@ export function App({ controller }: { controller: ApplicationController }) {
     const before = active.getSnapshot();
     const existing = new Set(before.snapshot?.workbench.objects.map(object => object.id));
     const token = navigation.current;
-    const result = await active.executeAndRead({ type: "resource.create", sessionId: placement.sessionId, kind, input, position: placement.position });
+    const contract = [CreateAgent, CreateNote, CreateDirectory].find(value => value.resource.kind === kind);
+    if (!contract) return false;
+    const result = await active.executeAndRead({ type: "resource.create", sessionId: placement.sessionId, kind, creation: reference(contract), input, position: placement.position });
     const after = active.getSnapshot();
     if (result.ok && after.status === "ready" && token === navigation.current
       && after.navigationVersion === before.navigationVersion && canvas === workbench.current?.canvas) {
@@ -186,7 +189,6 @@ export function App({ controller }: { controller: ApplicationController }) {
     </div> : undefined}>
     {session && active ? <Workbench key={session.id} ref={workbench} session={session} controller={active} historical={historical}
       ready={ready} busy={sessionBusy} run={run}
-      draft={agentDraft} onDraftChange={setAgentDraft}
       onHome={goHome} /> : null}
   </WorkbenchSurface>;
   const sidebar: IslandSpec = {

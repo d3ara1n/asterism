@@ -3,7 +3,7 @@ import { coreChannel } from "./core.ts";
 import { jsonSchema, toolOutcomeSchema, usageSchema } from "./model.ts";
 import { modelExpressionSchema, thinkingSchema } from "./configuration.ts";
 import { pointSchema, workbenchCommands, workbenchSnapshotSchema } from "./workbench.ts";
-import { toolInvocationSchema, toolRunningResultSchema } from "@atelier/sdk/contracts";
+import { resourceCallSchema, contractReferenceSchema, toolInvocationSchema, toolRunningResultSchema } from "@atelier/sdk/contracts";
 
 const id = z.string().min(1).max(160);
 /** 会话树节点共有字段：父指针组织分支，agentId 标明归属代理（事件与通知可无归属）。 */
@@ -32,7 +32,7 @@ export const sessionNodeSchema = z.discriminatedUnion("kind", [
     "A complete tool call must have an outcome; incomplete calls cannot have one."),
   // 重建工作台与上下文的对象事件；model 非空时作为文本投影给该代理。
   z.strictObject({ ...base, kind: z.literal("event"), agentId: id.nullable(), type: id,
-    version: z.number().int().positive().optional(), data: jsonSchema, model: z.string().nullable() }),
+    data: jsonSchema, model: z.string().nullable() }),
   z.strictObject({ ...base, kind: z.literal("notice"), agentId: id.nullable(), level: z.enum(["info", "warning", "error"]),
     code: z.string(), message: z.string(),
     /** 无内容块的异常响应保留诊断资料，不伪造模型输出块。 */
@@ -45,7 +45,7 @@ export type NewNode = SessionNode extends infer N ? N extends SessionNode ? Omit
 // ---- 会话能力接口 ----
 const uuid = z.string().uuid();
 const text = z.string().trim().min(1).max(100_000);
-export const sessionVersion = 9;
+export const sessionVersion = 10;
 export const viewPositionSchema = z.discriminatedUnion("kind", [
   z.strictObject({ kind: z.literal("live") }),
   z.strictObject({ kind: z.literal("history"), nodeId: id.nullable() }),
@@ -59,9 +59,9 @@ export const sessionCommandSchema = z.discriminatedUnion("type", [
   z.strictObject({ type: z.literal("read"), sessionId: id, position: viewPositionSchema }),
   z.strictObject({ type: z.literal("select"), sessionId: id, nodeId: id.nullable() }),
   // 资源卡片的行为入口：按对象类型路由到资源控制器，command 由该资源模块校验。
-  z.strictObject({ type: z.literal("resource.command"), sessionId: id, objectId: id, command: jsonSchema }),
+  z.strictObject({ type: z.literal("resource.command"), sessionId: id, objectId: id, command: resourceCallSchema }),
   // 向工作台添加资源；input 由该资源模块校验。
-  z.strictObject({ type: z.literal("resource.create"), sessionId: id, kind: id, input: jsonSchema, position: pointSchema }),
+  z.strictObject({ type: z.literal("resource.create"), sessionId: id, kind: id, creation: contractReferenceSchema, input: jsonSchema, position: pointSchema }),
   ...workbenchCommands,
 ]);
 export type SessionCommand = z.infer<typeof sessionCommandSchema>;

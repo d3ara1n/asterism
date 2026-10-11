@@ -1,6 +1,9 @@
+import { resourceCall } from "@atelier/sdk/contracts";
+import { ContinueAgent, CancelAgent } from "../../../modules/agent/contract.ts";
 import { describe, expect, it, vi } from "vitest";
 import { type SessionBridge, type SessionChanged, type SessionCommand, type SessionResult, type SessionSnapshot, type SessionProgress } from "../../../shared/session.ts";
-import { SessionController, SubmissionIdentity } from "./controller.ts";
+import { SessionController } from "./controller.ts";
+import { SubmissionIdentity } from "../../shared/submission.ts";
 
 function snapshot(revision: number, at: string | null = null): SessionSnapshot {
   return { sessionId: "s", title: "S", cursor: "current", at, seq: 4, revision, nodes: [],
@@ -35,7 +38,7 @@ describe("会话视图所有权", () => {
     const linked = snapshot(2); linked.workbench.links = [{ agentId: "a", resourceId: "n" }];
     requests[2]!.resolve(view(linked)); await flush();
     expect(settled).not.toHaveBeenCalled();
-    const continued = controller.execute({ type: "resource.command", sessionId: "s", objectId: "a", command: { type: "continue" } });
+    const continued = controller.execute({ type: "resource.command", sessionId: "s", objectId: "a", command: resourceCall(ContinueAgent, { type: "continue" }) });
     await flush(); requests[4]!.resolve(accepted); await continued;
     requests[3]!.resolve(view(linked)); await flush(); // 已被继续操作使之过时。
     expect(settled).not.toHaveBeenCalled();
@@ -75,7 +78,7 @@ describe("会话视图所有权", () => {
     const { controller, requests } = fixture(); const disconnect = controller.connect();
     requests[0]!.resolve(view(snapshot(1))); await flush();
     const command = { type: "resource.command" as const, sessionId: "s", objectId: "a",
-      command: { type: "configure", selection: { agent: "worker", model: "new", thinking: null } } };
+      command: { id: "atelier.core/agent.configure", input: { type: "configure", selection: { agent: "worker", model: "new", thinking: null } } } };
     const changed = controller.execute(command); await flush();
     requests[1]!.resolve(accepted); await changed;
     expect(controller.getSnapshot()).toMatchObject({ busy: false, status: "loading" });
@@ -89,7 +92,7 @@ describe("会话视图所有权", () => {
   it("就绪视图上同时入队的创建依次受理，后项等待前项的新投影", async () => {
     const { controller, requests } = fixture(); const disconnect = controller.connect();
     requests[0]!.resolve(view(snapshot(1))); await flush();
-    const create = (path: string) => ({ type: "resource.create" as const, sessionId: "s", kind: "directory", input: { path }, position: { x: 0, y: 0 } });
+    const create = (path: string) => ({ type: "resource.create" as const, sessionId: "s", kind: "directory", creation: { id: "directory/create" }, input: { path }, position: { x: 0, y: 0 } });
     const first = controller.execute(create("/first"));
     const second = controller.execute(create("/second"));
     await flush();
@@ -106,7 +109,7 @@ describe("会话视图所有权", () => {
   it("排队创建等待的重读失败时保留错误并拒绝后项", async () => {
     const { controller, requests } = fixture(); const disconnect = controller.connect();
     requests[0]!.resolve(view(snapshot(1))); await flush();
-    const command = { type: "resource.create" as const, sessionId: "s", kind: "note", input: {}, position: { x: 0, y: 0 } };
+    const command = { type: "resource.create" as const, sessionId: "s", kind: "note", creation: { id: "note/create" }, input: {}, position: { x: 0, y: 0 } };
     const first = controller.execute(command);
     const second = controller.execute(command);
     await flush(); requests[1]!.resolve(accepted); await first;
@@ -121,7 +124,7 @@ describe("会话视图所有权", () => {
   it.each(["history", "disconnect"] as const)("创建排队等待同步时 %s 不会留下挂起命令", async action => {
     const { controller, requests } = fixture(); const disconnect = controller.connect();
     requests[0]!.resolve(view(snapshot(1))); await flush();
-    const command = { type: "resource.create" as const, sessionId: "s", kind: "note", input: {}, position: { x: 0, y: 0 } };
+    const command = { type: "resource.create" as const, sessionId: "s", kind: "note", creation: { id: "note/create" }, input: {}, position: { x: 0, y: 0 } };
     const first = controller.execute(command);
     const second = controller.execute(command);
     await flush(); requests[1]!.resolve(accepted); await first; await flush();
@@ -153,7 +156,7 @@ describe("会话视图所有权", () => {
   it("操作错误由会话持有，后台重读不清除它，调用方可明确关闭", async () => {
     const { controller, requests } = fixture(); const disconnect = controller.connect();
     requests[0]!.resolve(view(snapshot(1))); await flush();
-    const failed = controller.execute({ type: "resource.create", sessionId: "s", kind: "directory", input: { path: "relative" }, position: { x: 0, y: 0 } }); await flush();
+    const failed = controller.execute({ type: "resource.create", sessionId: "s", kind: "directory", creation: { id: "directory/create" }, input: { path: "relative" }, position: { x: 0, y: 0 } }); await flush();
     requests[1]!.resolve({ ok: false, error: { code: "invalid_request", message: "Directory path must be absolute." } });
     expect((await failed).ok).toBe(false);
     requests[2]!.resolve(view(snapshot(1))); await flush();

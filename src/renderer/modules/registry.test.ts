@@ -6,7 +6,7 @@ import type { Json } from "@atelier/sdk/contracts";
 import { cardRenderer, toolRenderer, type ToolRenderProps } from "@atelier/sdk/renderer";
 import { ViewRegistry } from "./registry";
 
-const data = defineData("test.text", 1, z.strictObject({ text: z.string() }));
+const data = defineData("test.text", z.strictObject({ text: z.string() }));
 function Text({ data }: { data: { text: string } }) { return createElement("p", null, data.text); }
 function Header({ result }: ToolRenderProps<{ text: string }>) { return createElement("span", null, result?.data?.text); }
 function Body({ result }: ToolRenderProps<{ text: string }>) { return createElement("p", null, result?.data?.text); }
@@ -15,12 +15,12 @@ const card = cardRenderer(data, { width: 340, height: 200, Body: Text });
 const props = (value: Json): ToolRenderProps => ({ phase: "settled", name: "sample", target: null, args: {}, invocation: {}, result: { kind: "succeeded", data: value } });
 
 describe("视图契约分派", () => {
-  it("按精确身份与版本选择组件，数据通过 schema 才进入组件", () => {
+  it("按身份选择组件，数据通过 schema 才进入组件", () => {
     const registry = new ViewRegistry([{ resources: [], cards: [card], tools: [tool] }]);
     const node = registry.tool(reference(data), props({ text: "saved" }))?.body;
     expect(isValidElement(node) && node.type).toBe(Body);
     expect(registry.card(present(data, { text: "saved" }))?.width).toBe(340);
-    expect(registry.tool({ id: data.id, version: 2 }, props({ text: "saved" }))).toBeNull();
+    expect(registry.tool({ id: "unknown" }, props({ text: "saved" }))).toBeNull();
     expect(registry.tool(undefined, props({ text: "saved" }))).toBeNull();
     expect(registry.tool(reference(data), props({ text: 7 }))).toBeNull();
     expect(registry.card({ contract: reference(data), data: { text: 7 } })).toBeNull();
@@ -44,13 +44,14 @@ describe("视图契约分派", () => {
       }
     }
   });
-  it("拒绝重复注册；旧版本可以和新版本共同展示历史", () => {
+  it("拒绝重复注册；当前 schema 可自行兼容旧数据形状", () => {
     expect(() => new ViewRegistry([{ resources: [], cards: [card, card], tools: [] }])).toThrow("Duplicate renderer");
     expect(() => new ViewRegistry([{ resources: [], cards: [], tools: [tool, tool] }])).toThrow("Duplicate renderer");
-    const v2 = defineData(data.id, 2, z.strictObject({ content: z.string() }));
-    const registry = new ViewRegistry([{ resources: [], cards: [], tools: [tool, toolRenderer(v2, { bodyRenderer: () => null })] }]);
+    const current = defineData(data.id, z.union([z.strictObject({ content: z.string() }),
+      data.schema.transform(({ text }) => ({ content: text }))]));
+    const registry = new ViewRegistry([{ resources: [], cards: [], tools: [toolRenderer(current, { bodyRenderer: () => null })] }]);
     expect(registry.tool(reference(data), props({ text: "old" }))).not.toBeNull();
-    expect(registry.tool(reference(v2), props({ content: "new" }))).not.toBeNull();
+    expect(registry.tool(reference(current), props({ content: "new" }))).not.toBeNull();
   });
   it("资源识别不调用正文解析，缺少卡片或资源实例时仍可取得描述", () => {
     const resolve = vi.fn(() => null);

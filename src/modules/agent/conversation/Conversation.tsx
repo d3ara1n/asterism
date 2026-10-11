@@ -1,21 +1,18 @@
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
-import { ArrowDown, ArrowUp, Bot, Brain, Cpu, Info, LoaderCircle, Square, TriangleAlert } from "lucide-react";
+import { ConversationTimeline } from "./ConversationTimeline";
+import { MessageComposer } from "./Composer";
+import { AgentConfigurationPicker } from "./ConfigurationPicker";
+import { useOutputFollow } from "./output-follow";
+import { useMemo, useRef } from "react";
+import { ArrowDown, LoaderCircle } from "lucide-react";
 import type { AgentSelection } from "../../../shared/model";
-import { conversationTimeline, timelineKey, type TimelineItem } from "./timeline";
-import { resolveModelRole, resolveProviderModel, thinkingSchema, type ThinkingLevel, modelReference } from "../../../shared/configuration";
-import type { AgentCommand } from "../contract";
-import { useRendererObject } from "@atelier/sdk/renderer";
-import { ModelConfiguration } from "../configuration";
-import { Markdown } from "./Markdown";
-import { ConfigurationChoice } from "../../../renderer/shared/ConfigurationChoice";
+import { conversationTimeline } from "./timeline";
+import { useRendererObject, useRendererModels, useRendererCatalogs } from "@atelier/sdk/renderer";
+import { useAgentConversation } from "./interaction";
 import { t, s } from "../../../renderer/shared/i18n";
 import { Button } from "../../../renderer/shared/ui/button";
 import { Badge } from "../../../renderer/shared/ui/badge";
 import { Alert, AlertDescription } from "../../../renderer/shared/ui/alert";
 import { PageState } from "../../../renderer/shared/ui/page-state";
-import { InputGroup, InputGroupAddon, InputGroupTextarea } from "../../../renderer/shared/ui/input-group";
-import { ToolCall } from "./ToolCall";
-import { ThinkingBlock } from "./ThinkingBlock";
 
 
 /** 卡片标题栏中的执行状态；历史属于会话，入口在窗口标题栏。 */
@@ -32,56 +29,33 @@ export function ConversationActions() {
 }
 
 /** 代理卡片内容：当前路径的最终视图与输入区；没有分支感，回溯在会话历史中进行。 */
-export function Conversation({ selection }: { selection: AgentSelection | null }) {
+export function Conversation({ selection, onHome }: { selection: AgentSelection | null; onHome(): void }) {
   const object = useRendererObject();
-  const { view: state, session, submissions: submission } = object;
+  const { view: state, session } = object;
+  const interaction = useAgentConversation(object, selection !== null);
+  const models = useRendererModels();
+  const catalogs = useRendererCatalogs();
   const { ready, historical } = state;
   const agentId = object.ref.id;
   const snapshot = session.snapshot();
   const agentRunning = object.activity.running;
   const running = agentRunning;
-  const timeline = useMemo(() => snapshot ? conversationTimeline(snapshot, agentId, object.activity.blocks) : [], [snapshot, agentId, object.activity.blocks]);
-  const draft = object.draft.value;
-  const onDraftChange = object.draft.set;
-  const onHome = object.home;
-  const command = (value: AgentCommand) => object.invoke(value);
-  const configuration = object.catalogs.get(ModelConfiguration);
-  const configurationError = object.catalogs.error;
-  const [selectionError, setSelectionError] = useState<string | null>(null);
-  const [awayFromBottom, setAwayFromBottom] = useState(false);
-  const follow = useRef(true);
-  const scroll = useRef<HTMLDivElement>(null);
+  const timeline = useMemo(() => snapshot ? conversationTimeline(snapshot, agentId, models.blocks) : [], [snapshot, agentId, models.blocks]);
+  const configurationError = catalogs.error;
+  const { scroll, awayFromBottom, latest, onScroll } = useOutputFollow(timeline);
   const composer = useRef<HTMLTextAreaElement>(null);
-  useLayoutEffect(() => { if (follow.current && scroll.current) scroll.current.scrollTop = scroll.current.scrollHeight; }, [timeline]);
 
   if (!snapshot) return state.status === "loading" ? null : <div className="flex flex-1 items-center justify-center p-6">
     <PageState kind="error" title={t.unavailableTitle} body={state.error ?? t.unavailableBody}
       action={<Button variant="secondary" size="sm" onClick={state.missing ? onHome : () => { void session.refresh(); }}>{state.missing ? t.newConversation : t.retry}</Button>} />
   </div>;
 
-  const selectedAgent = configuration?.agents.find(a => a.id === selection?.agent && a.enabled);
-  const selectedModel = configuration ? resolveProviderModel(configuration, selection?.model ?? null)?.model : null;
-  const models = configuration?.models.filter(model => resolveProviderModel(configuration, modelReference(model))) ?? [];
-  const configure = async (next: AgentSelection) => {
-    const result = await command({ type: "configure", selection: next });
-    if (result.ok) setSelectionError(null);
-  };
-  const writable = ready && !state.busy && state.status === "ready" && !running && !historical && !!selection;
-  const configurable = ready && !state.busy && state.status === "ready";
-  const error = state.error ?? configurationError ?? selectionError;
-  const latest = () => { follow.current = true; setAwayFromBottom(false); if (scroll.current) scroll.current.scrollTop = scroll.current.scrollHeight; };
+  const error = state.error ?? configurationError ?? interaction.error;
   const send = async () => {
-    if (!writable || !draft.trim()) return;
-    const input = { agentId, text: draft.trim() };
-    const result = await command({ type: "submit", text: input.text, submissionId: submission.forInput(input) });
-    if (!result.ok) return;
-    submission.accepted(); onDraftChange(""); latest();
-    composer.current?.focus({ preventScroll: true });
+    if (!await interaction.send()) return;
+    latest(); composer.current?.focus({ preventScroll: true });
   };
-  const resume = async () => {
-    if (!writable) return;
-    await command({ type: "continue" }); latest();
-  };
+  const resume = async () => { await interaction.resume(); latest(); };
 
   return <>
     {historical && <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b px-4 py-2">
@@ -89,13 +63,9 @@ export function Conversation({ selection }: { selection: AgentSelection | null }
       <Button variant="ghost" size="sm" onClick={session.followLive}>{t.backToLive}</Button>
     </div>}
     <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
-      <div ref={scroll} className="min-h-0 flex-1 select-text overflow-y-auto overscroll-contain" onScroll={event => {
-        const element = event.currentTarget;
-        follow.current = element.scrollHeight - element.scrollTop - element.clientHeight < 80;
-        setAwayFromBottom(!follow.current);
-      }}>
+      <div ref={scroll} className="min-h-0 flex-1 select-text overflow-y-auto overscroll-contain" onScroll={onScroll}>
         <div className="space-y-4 p-4">
-          {timeline.map(node => <NodeView key={timelineKey(node)} node={node} />)}
+          <ConversationTimeline items={timeline} />
           {agentRunning && !historical && <p role="status" className="type-caption flex items-center gap-2"><LoaderCircle className="size-3 animate-spin" />{s("The agent is working…", "代理正在执行…")}</p>}
           {!timeline.length && !running && <p className="type-caption">{s("Send a message to begin.", "发送消息开始对话。")}</p>}
         </div>
@@ -107,76 +77,15 @@ export function Conversation({ selection }: { selection: AgentSelection | null }
       </div>}
     </div>
     <footer className="shrink-0 space-y-3 border-t p-3">
-      {!historical && selection && <div className="flex min-w-0 flex-wrap items-center gap-0.5">
-        <ConfigurationChoice icon={<Bot />} label={t.agent} value={selectedAgent?.name ?? s("Unavailable agent", "代理不可用")}
-          selected={selection.agent} disabled={!configurable || !configuration}
-          options={configuration?.agents.filter(a => a.enabled).map(a => ({ value: a.id, label: a.name })) ?? []}
-          onSelect={id => {
-            if (!configuration) return;
-            const next = configuration.agents.find(item => item.id === id)!;
-            const defaults = resolveModelRole(configuration, next.modelRole ?? "default", { model: selection.model, thinking: selection.thinking });
-            if (defaults.error || !defaults.model) { setSelectionError(s("This agent's default model is unavailable. Select an available model or update settings.", "此代理的默认模型不可用，请先选择可用模型或修改设置。")); return; }
-            void configure({ agent: id, model: defaults.model, thinking: defaults.thinking });
-          }} />
-        <ConfigurationChoice icon={<Cpu />} label={t.model} value={selectedModel?.name ?? s("Unavailable model", "模型不可用")}
-          selected={selection.model} disabled={!configurable || !models.length}
-          options={models.map(model => ({ value: modelReference(model), label: `${configuration?.providers.find(p => p.id === model.providerId)?.name ?? ""} / ${model.name}` }))}
-          onSelect={id => { void configure({ ...selection, model: id }); }} />
-        <ConfigurationChoice icon={<Brain />} label={s("Thinking level", "思考等级")} value={selectedModel?.capabilities.reasoning ? selection.thinking ?? s("Default", "默认") : s("Off", "关闭")}
-          selected={selectedModel?.capabilities.reasoning ? selection.thinking ?? "__default" : "off"} disabled={!configurable || !selectedModel?.capabilities.reasoning}
-          options={[{ value: "__default", label: s("Default", "默认") }, ...thinkingSchema.options.map(level => ({ value: level, label: level }))]}
-          onSelect={value => { void configure({ ...selection, thinking: value === "__default" ? null : value as ThinkingLevel }); }} />
-        {running && <span className="type-caption">{s("Changes apply to the next request", "修改于下一次请求生效")}</span>}
-      </div>}
+      {!historical && selection && <AgentConfigurationPicker selection={selection} disabled={!interaction.configurable}
+        running={running} onChange={interaction.configure} onError={interaction.setError} />}
       {error && <Alert variant="destructive"><AlertDescription className="flex flex-wrap items-center gap-2">
         <span className="flex-1">{error}</span>
         <Button variant="ghost" size="sm" onClick={() => { void session.refresh(); }}>{s("Reload", "重新读取")}</Button>
       </AlertDescription></Alert>}
-      {!historical && <form onSubmit={event => { event.preventDefault(); void send(); }}>
-        <InputGroup>
-          <InputGroupTextarea ref={composer} rows={3} maxLength={100_000} value={draft} disabled={state.busy}
-            onChange={event => onDraftChange(event.target.value)} aria-label={s("Message the agent", "向代理发送消息")}
-            placeholder={running ? s("Draft your next message…", "可以先写下一条消息…") : s("Continue the conversation…", "继续对话…")}
-            onKeyDown={event => {
-              if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
-              event.preventDefault(); event.currentTarget.form?.requestSubmit();
-            }} />
-          <InputGroupAddon align="block-end" className="justify-between">
-            <span className="type-caption">{s("Enter to send · Shift + Enter for a new line", "Enter 发送 · Shift + Enter 换行")}</span>
-            {running ? <Button type="button" size="sm" variant="secondary" disabled={state.busy || !ready}
-              onClick={() => { void command({ type: "cancel" }); }}><Square />{s("Stop", "停止")}</Button>
-              : <div className="flex gap-1">
-                <Button type="button" size="sm" variant="ghost" disabled={!writable} onClick={() => { void resume(); }}>{s("Continue", "继续执行")}</Button>
-                <Button type="submit" size="icon-sm" disabled={!writable || !draft.trim()} aria-label={t.sendMessage} title={t.sendMessage}><ArrowUp /></Button>
-              </div>}
-          </InputGroupAddon>
-        </InputGroup>
-      </form>}
+      {!historical && <MessageComposer draft={interaction.draft} onDraftChange={interaction.setDraft} inputRef={composer}
+        busy={state.busy} ready={ready} running={running} writable={interaction.writable} onSend={send}
+        onCancel={interaction.cancel} onContinue={resume} />}
     </footer>
   </>;
-}
-
-function NodeView({ node }: { node: TimelineItem }) {
-  const usage = "usage" in node ? node.usage : node.kind === "notice" ? node.response?.usage : null;
-  return <div className="flex flex-col gap-1">
-    <NodeContent node={node} />
-    {usage && <p className="type-caption">
-      {s("Input", "输入")} {usage.input ?? "—"} · {s("Output", "输出")} {usage.output ?? "—"} · {s("Cached", "缓存读取")} {usage.cacheRead ?? "—"}
-    </p>}
-  </div>;
-}
-function NodeContent({ node }: { node: TimelineItem }) {
-  const incomplete = "complete" in node && !node.complete;
-  const streaming = (node.kind === "text" || node.kind === "thinking") && !("complete" in node);
-  const tag = incomplete ? <Badge variant="outline">{s("Incomplete", "未完成")}</Badge> : null;
-  switch (node.kind) {
-    case "message": return <article className="space-y-2"><p className="type-label">{s("You", "你")}</p>
-      <div className="rounded-md bg-muted px-3 py-2"><Markdown>{node.text}</Markdown></div></article>;
-    case "text": return <article className="space-y-1">{tag}<Markdown streaming={streaming}>{node.text}</Markdown></article>;
-    case "thinking": return node.text.trim() ? <ThinkingBlock node={node} /> : null;
-    case "toolcall": return <ToolCall node={node} />;
-    case "notice": return <Alert variant={node.level === "error" ? "destructive" : "default"}>
-      {node.level === "error" ? <TriangleAlert /> : <Info />}<AlertDescription>{node.message}</AlertDescription></Alert>;
-    default: return null;
-  }
 }

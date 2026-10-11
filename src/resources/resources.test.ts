@@ -59,7 +59,7 @@ async function invoke(capabilities: AgentCapabilities, name: string, args: Json)
 describe("工具与资源的匹配及授权", () => {
   it("请求捕获的目录和笔记在期间移除后仍能检查和写入，后续请求撤销访问", async () => {
     const { service, sessionId, resource, scope } = setup();
-    await service.sessions.execute({ type: "resource.create", sessionId, kind: "atelier.core/note",
+    await service.sessions.execute({ type: "resource.create", sessionId, kind: "atelier.core/note", creation: { id: "atelier.core/note.create" },
       input: { title: "Captured note", content: "before" }, position: { x: 0, y: 0 } });
     const note = foldWorkbench(service.sessions.tree.path(sessionId)).objects.find(object => object.title === "Captured note")!;
     const captured = scope([resource, note]);
@@ -187,8 +187,8 @@ describe("工具与资源的匹配及授权", () => {
   it.each(["read", "write"] as const)("独立的 %s 工具抛错按自身副作用分类", async effect => {
     const { resource, resources } = setup();
     const contract = defineImplementation({
-      ...defineData("test.broken", 1, z.null().describe("No result.")), resource: Directory,
-      tool: defineTool({ name: "broken", description: "Fails.", guidelines: [], argsSchema: z.strictObject({}).describe("No parameters.") }),
+      ...defineData("test.broken", z.null().describe("No result.")), resource: Directory,
+      tool: defineTool({ id: "test.tools/broken", name: "broken", description: "Fails.", guidelines: [], argsSchema: z.strictObject({}).describe("No parameters.") }),
       targetSchema: z.null().describe("Select the whole resource."), effect, execution: "parallel",
     });
     const tools = new ToolRegistry([implement(contract, {
@@ -196,7 +196,7 @@ describe("工具与资源的匹配及授权", () => {
     })]);
     const capabilities = new AgentCapabilities(resources, tools, [resource], () => true);
     expect(await invoke(capabilities, "resource_call", { resource_id: resource.id, tool: "broken", args: {} }))
-      .toMatchObject({ kind: effect === "read" ? "failed" : "unknown", implementation: { id: "test.broken", version: 1 } });
+      .toMatchObject({ kind: effect === "read" ? "failed" : "unknown", implementation: { id: "test.broken" } });
   });
 
   it("外部白名单不改变支持关系；摘要、inspect 和调用使用同一份筛选结果", async () => {
@@ -264,7 +264,7 @@ describe("工具与资源的匹配及授权", () => {
       arguments: { resource_id: resource.id, tool: "list", args: {} } }],
     scope(), controller.signal, (_call, result) => results.push(result));
     expect(results).toMatchObject([{
-      kind: "cancelled", message: "The operation was not started.", implementation: { id: "atelier.core/directory.list", version: 1 },
+      kind: "cancelled", message: "The operation was not started.", implementation: { id: "atelier.core/directory.list" },
       data: null, model: { kind: "cancelled", data: null, message: "The operation was not started." },
     }]);
     expect(results[0]).not.toHaveProperty("startedAt");
@@ -274,8 +274,8 @@ describe("工具与资源的匹配及授权", () => {
     const { resource, resources } = setup();
     const order: string[] = [];
     const contract = defineImplementation({
-      ...defineData("test.work", 1, z.string().describe("The completed work ID.")), resource: Directory,
-      tool: defineTool({ name: "work", description: "Work.", guidelines: [], argsSchema: z.strictObject({ id: z.string() }).describe("Identify the work.") }),
+      ...defineData("test.work", z.string().describe("The completed work ID.")), resource: Directory,
+      tool: defineTool({ id: "test.tools/work", name: "work", description: "Work.", guidelines: [], argsSchema: z.strictObject({ id: z.string() }).describe("Identify the work.") }),
       targetSchema: z.null().describe("Select the whole resource."), effect: "read", execution,
     });
     const tools = new ToolRegistry([implement(contract, {

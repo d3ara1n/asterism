@@ -10,7 +10,7 @@
 
 | 文件 | 职责 |
 | --- | --- |
-| `contract.ts` | 纯 Zod 契约：资源状态、卡片数据、工具实现的 target/result 和稳定 ID/版本；过程产出与终结 data 共用 result schema |
+| `contract.ts` | 纯 Zod 契约：资源状态、卡片数据、工具实现的 target/result 和稳定 ID；过程产出与终结 data 共用 result schema |
 | `runtime.ts` | 默认导出 SDK 的 `defineModule(plugin => ...)`，提供资源、工具与具名生命周期贡献；可使用 Node |
 | `renderer.tsx` | 默认导出 RendererModule，声明静态资源展示描述，注册卡片内容、附加操作和工具 header/body，只依赖纯契约与前端代码 |
 
@@ -20,7 +20,7 @@
 
 ## 工具契约与实现
 
-工具通过 `defineTool({ name, description, guidelines, argsSchema })` 定义。`description` 说明能力与适用场景，供模型挑选；`guidelines` 说明选定后的使用规则、示例和跨工具配合，允许为空数组；`argsSchema` 固定操作参数及其含义。不另设 snippet。
+工具通过 `defineTool({ id, name, description, guidelines, argsSchema })` 定义。`id` 是稳定标识，`name` 用于模型调用；`description` 说明能力与适用场景，供模型挑选；`guidelines` 说明选定后的使用规则、示例和跨工具配合，允许为空数组；`argsSchema` 固定操作参数及其含义。不另设 snippet。
 
 `shared/declarations.ts` 是内置共享定义的位置，包含 `List / Read / Edit / Write`；`shared/text-contract.ts` 声明正文载荷，`shared/text.ts` 与 `shared/hashline/` 实现正文操作。模块可在自己的纯契约文件声明独特工具，也可导出给其他模块引用；多个模块共用的契约可抽到共享库，不必修改 Atelier 内置定义。相同工具复用同一份完整契约；用法或行为含义不同就定义另一工具，不在实现中覆写 description 或 guidelines。
 
@@ -33,6 +33,7 @@ import { z } from "zod";
 import { defineTool } from "@atelier/sdk/contracts";
 
 export const Search = defineTool({
+  id: "example.search/search",
   name: "search",
   description: "Find entries containing the supplied text.",
   guidelines: [
@@ -55,7 +56,7 @@ SDK handler 的 context 提供 `signal / object / publish(data)`，object 是绑
 
 args、target、result schema 必须有非空的整体 description，声明 helper 在定义时检查；各字段也应说明类型、定位基准、空值、限制与结果含义，描述随 JSON Schema 投影。target/result 的说明由资源实现提供，不重复共享工具用法。
 
-注册边界负责校验资源状态、target、args 和返回数据。一个资源类型与工具名只能有一个当前实现；同名工具的 description、guidelines、args schema（含描述）及读写属性必须一致，target/result 可以不同。实现有独立 ID/版本；更改已保存结果的形状或含义时增加版本。读写副作用与并行/顺序策略属于执行信息，调度器据此执行和分类失败。
+注册边界负责校验资源状态、target、args 和返回数据。一个资源类型与工具名只能有一个当前实现；共享工具必须引用同一个声明对象，不同声明占用同一 ID 明确冲突。外部插件通过标准 `<包名>/public` 导入公开声明，宿主模块图保证真实共享，不能复制声明冒充。装配按名称选择最终契约，不同身份的旧实现停用；target/result 可以随实现变化。实现有独立 ID，结果兼容性由消费方 schema 决定。读写副作用与并行/顺序策略属于执行信息，调度器据此执行和分类失败。
 
 外部授权位于 `execution/`：请求开始时按已链接资源匹配工具，再应用 agent.tools/excludeTools。资源实例不持有工具白名单。宿主固定入口 resource_list/inspect/call 不注册到工具目录。
 
@@ -73,17 +74,17 @@ args、target、result schema 必须有非空的整体 description，声明 help
 
 ## 资源后台
 
-`implementResource` 注册状态投影 `project`、实时检查 `inspect` 和可选环境来源 `context`。project 返回卡片契约的数据；包装层生成 `{contract: {id, version}, data}`，经 IPC 发送给前端。SDK 的读取 handler 接收资源 data 与 ObjectReader，目录 inspect 从公开会话快照取得对象标题，不读取物理会话节点。
+`implementResource` 注册状态投影 `project`、实时检查 `inspect` 和可选环境来源 `context`。project 返回卡片契约的数据；包装层生成 `{contract: {id}, data}`，经 IPC 发送给前端。SDK 的读取 handler 接收资源 data 与 ObjectReader，目录 inspect 从公开会话快照取得对象标题，不读取物理会话节点。
 
-资源内联聚合一个可选创建实现和一组动作实现。纯契约声明稳定身份、版本、关联资源和输入 schema，前端持契约调用，宿主依据已注册声明校验和路由。创建先异步准备输入，再在宿主事务内同步返回 `{title, data}`；数据和事件通过执行门面的 `commit` 加入同一事务。动作经绑定具体契约的外部准备者和自身准备后按对象排队。输入 schema 只校验并保持 JSON 值，默认值、去空白和转换放在显式准备中，相邻适配层不重复解析。
+资源内联聚合一个可选创建实现和一组动作实现。纯契约声明稳定身份、关联资源和输入 schema，前端持契约调用，宿主依据已注册声明解析和路由。创建先准备输入，再在宿主事务内同步返回 `{title, data}`；数据和事件通过执行门面的 `commit` 加入同一事务。动作经绑定具体契约的外部准备者和自身准备后按对象排队。schema 支持默认值与转换，准备和执行消费解析结果；创建与动作准备均使用接受／替换／拒绝，接受沿用结果，替换提交新的原始输入并解析一次，执行层不重复解析。
 
 投影、检查、环境读取、链接说明与准备只取得 `ObjectReader`；创建、动作和授权工具执行取得 `ObjectExecutor`。读取门面的 session 也是只读。任务、动作与模型调用共用宿主内部运行生命周期，分别保留去重、排队和请求授权规则。具体有效期及提交约束见 SDK 说明。
 
-笔记的不可变资源数据为 `{}`，当前正文由 `NoteContent` v1 声明，以 `object.get(NoteContent)` 读取，以 `object.commit` 中的 `writer.set` 保存。状态提交由宿主通知视图刷新，不追加正文历史；卡片与历史查看都显示当前值。空正文是有效状态，缺失或损坏的正文回退为不可用，工具拒绝覆盖。正文限制为 100,000 UTF-16 code units，由契约与工具验证共用同一上限。
+笔记的不可变资源数据为 `{}`，当前正文由 `NoteContent` 声明，以 `object.get(NoteContent)` 读取，以 `object.commit` 中的 `writer.set` 保存。状态提交由宿主通知视图刷新，不追加正文历史；卡片与历史查看都显示当前值。空正文是有效状态，缺失或损坏的正文回退为不可用，工具拒绝覆盖。正文限制为 100,000 UTF-16 code units，由契约与工具验证共用同一上限。
 
 ### 会话数据与 Agent
 
-`session.get / commit` 与 `object.get / commit` 分别作用于当前会话数据与当前对象数据，数据按契约身份与版本保存到 `session_data`。当前值不随历史位置恢复；重建历史须消费不可变时间轴事件。插件目录的数据独立于会话生命周期。
+`session.get / commit` 与 `object.get / commit` 分别作用于当前会话数据与当前对象数据，数据按契约身份保存到 `session_data`，读取由 schema 判断兼容性；不维护手填数据版本。当前值不随历史位置恢复；重建历史须消费不可变时间轴事件。插件目录的数据独立于会话生命周期。
 
 Agent 的选择和提交去重保存于对象数据，用户输入与执行输出保存为 `UserMessage / Execution / Notice` 记录；每次请求由 `agent/projection.ts` 重建消息。`agent/configuration.ts` 声明只读配置目录，应用级配置与用户覆盖仍由宿主保存。运行以对象绑定任务承载，取消与关闭由托管设施收束；会话仅在全部对象收束后允许回溯，移除对象也要求该对象收束。命名使用首条 `UserMessage`，通过 `models.stream` 和标题比较更新完成。
 
@@ -105,8 +106,8 @@ header 按单行摘要设计，由 renderer 自行安排内容、排列和省略
 
 ## 历史
 
-工具的所有终结结局保存实际实现的 ID/版本、请求边界内的资源身份/类型/名称、执行时间及当次 data/model。历史模型投影读取保存的 model；用户视图按实现 ID/版本读取组件并展示保存的 data，包括取消或失败前的有效产出。资源已删除或文件已变化，都不触发重新执行或重新读文件。中间快照只在内存中维护，不承诺进程崩溃后的产出恢复。
+工具的所有终结结局保存实际实现的 ID、请求边界内的资源身份/类型/名称、执行时间及当次 data/model。历史模型投影读取保存的 model；用户视图按实现 ID读取组件并展示保存的 data，包括取消或失败前的有效产出。资源已删除或文件已变化，都不触发重新执行或重新读文件。中间快照只在内存中维护，不承诺进程崩溃后的产出恢复。
 
-renderer 可同时注册同一 ID 的多个版本以展示历史；当前执行目录只注册一个适用实现。缺失精确版本或数据不合契约时，宿主显示原始数据。函数、React 组件和后端实例不会进入持久化或 IPC。
+renderer 按实现 ID 注册，并用自身 schema 解码历史数据；兼容旧形状由该 schema 负责，不兼容时宿主显示原始数据。函数、React 组件和后端实例不会进入持久化或 IPC。
 
 卡片视图按资源自身的历史能力投影；目录仍是路径引用，卡片不是文件系统快照。工具结果的当次数据与资源当前内容分别处理。

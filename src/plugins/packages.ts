@@ -1,5 +1,4 @@
-import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { z } from "zod";
@@ -7,9 +6,11 @@ import * as zod from "zod";
 import * as sdkContracts from "@atelier/sdk/contracts";
 import * as sdkRuntime from "@atelier/sdk/runtime";
 import type { PluginDefinition } from "@atelier/sdk/runtime";
+import type { Plugin } from "esbuild";
+import { compileModules, packageModule, type PackageModule } from "./package-modules.ts";
 
 /** SDK 主版本；插件清单的 api.major 必须相同，minMinor 不得高于宿主。 */
-export const sdkApi = { major: 1, minor: 0 } as const;
+export const sdkApi = { major: 2, minor: 0 } as const;
 
 /** 插件包清单：package.json 的 atelier 字段；源码与发布产物读同一份。 */
 export const manifestSchema = z.strictObject({
@@ -96,8 +97,8 @@ export class PackageList {
 }
 
 /**
- * 共享模块白名单：插件 bundle 中这些导入解析到宿主已加载的同一实例，
- * 其余依赖由 esbuild 从包目录解析并打进 bundle。
+ * 宿主共享模块：这些导入转发到已加载实例；
+ * 插件公共模块及其他依赖由 package-modules 构建为 ESM 图。
  */
 const shared: Record<string, Record<string, unknown>> = {
   zod: zod as Record<string, unknown>,
@@ -106,56 +107,11 @@ const shared: Record<string, Record<string, unknown>> = {
 };
 const sharedGlobal = "__atelierSharedModules";
 (globalThis as Record<string, unknown>)[sharedGlobal] = shared;
-function sharedModuleSource(id: string, table: Record<string, Record<string, unknown>> = shared): string {
-  const names = Object.keys(table[id]!).filter(name => name !== "default" && /^[A-Za-z_$][\w$]*$/u.test(name));
+function sharedModuleSource(id: string): string {
+  const names = Object.keys(shared[id]!).filter(name => name !== "default" && /^[A-Za-z_$][\w$]*$/u.test(name));
   return [`const m = globalThis[${JSON.stringify(sharedGlobal)}][${JSON.stringify(id)}];`,
     `export default m.default ?? m;`, ...names.map((name, index) =>
       `const shared${index} = m[${JSON.stringify(name)}]; export { shared${index} as ${name} };`)].join("\n");
-}
-
-/** 内容哈希：源码文件（含 lockfile）、宿主 SDK 版本与共享导出；跳过 node_modules 与 .git。 */
-function sourceHash(root: string, compiler: string, bindings = ""): string {
-  const hash = createHash("sha256").update(`${compiler}\0${sdkApi.major}.${sdkApi.minor}\0${bindings}\0`);
-  const walk = (directory: string) => {
-    for (const name of readdirSync(directory).sort()) {
-      if (name === "node_modules" || name === ".git") continue;
-      const path = join(directory, name);
-      const stat = statSync(path);
-      if (stat.isDirectory()) walk(path);
-      else hash.update(relative(root, path)).update("\0").update(readFileSync(path)).update("\0");
-    }
-  };
-  walk(root);
-  return hash.digest("hex").slice(0, 32);
-}
-
-/** 启动时打包后台入口并按内容缓存；不监听文件，改动后重启生效。 */
-export async function buildRuntime(root: string, manifest: PluginPackageManifest, cacheRoot: string): Promise<string> {
-  if (!manifest.runtime) throw new PluginPackageError("invalid_entry", `Plugin ${manifest.id} has no runtime entry.`);
-  const esbuild = await import("esbuild");
-  const directory = join(cacheRoot, manifest.id, sourceHash(root, esbuild.version, Object.keys(shared).map(id => sharedModuleSource(id)).join("\n")));
-  const outfile = join(directory, "runtime.mjs");
-  if (existsSync(outfile)) return outfile;
-  mkdirSync(directory, { recursive: true });
-  try {
-    await esbuild.build({
-      entryPoints: [resolve(root, manifest.runtime)], absWorkingDir: root, outfile, bundle: true,
-      platform: "node", format: "esm", target: "node22", sourcemap: "linked", logLevel: "silent",
-      // Node 内置与原生 addon 保持外部；原生 addon 需作者自行按 Electron ABI 编译。
-      external: ["*.node"], packages: undefined,
-      banner: { js: "import { createRequire as __atelierCreateRequire } from 'node:module'; const require = __atelierCreateRequire(import.meta.url);" },
-      plugins: [{
-        name: "atelier-shared",
-        setup(build) {
-          build.onResolve({ filter: /.*/ }, args => args.path in shared ? { path: args.path, namespace: "atelier-shared" } : undefined);
-          build.onLoad({ filter: /.*/, namespace: "atelier-shared" }, args => ({ contents: sharedModuleSource(args.path), loader: "js" }));
-        },
-      }],
-    });
-  } catch (error) {
-    throw new PluginPackageError("build_failed", `Plugin ${manifest.id} failed to build: ${error instanceof Error ? error.message : String(error)}`);
-  }
-  return outfile;
 }
 
 /** renderer 共享模块：由宿主页面在 window.__atelierRendererModules 提供同一实例。 */
@@ -165,33 +121,15 @@ function rendererModuleSource(id: string): string {
   return `const m = globalThis.__atelierRendererModules[${JSON.stringify(id)}]; module.exports = m;`;
 }
 
-/** 打包前端入口为单个 ESM；返回相对缓存根的路径，经 atelier-plugin:// 提供。 */
-export async function buildRenderer(root: string, manifest: PluginPackageManifest, cacheRoot: string): Promise<string> {
-  if (!manifest.renderer) throw new PluginPackageError("invalid_entry", `Plugin ${manifest.id} has no renderer entry.`);
-  const esbuild = await import("esbuild");
-  const hash = sourceHash(root, esbuild.version);
-  const directory = join(cacheRoot, manifest.id, hash);
-  const outfile = join(directory, "renderer.mjs");
-  if (!existsSync(outfile)) {
-    mkdirSync(directory, { recursive: true });
-    try {
-      await esbuild.build({
-        entryPoints: [resolve(root, manifest.renderer)], absWorkingDir: root, outfile, bundle: true,
-        platform: "browser", format: "esm", target: "chrome130", sourcemap: "linked", logLevel: "silent", jsx: "automatic",
-        loader: { ".png": "file", ".jpg": "file", ".svg": "file", ".wasm": "file", ".woff2": "file", ".mp3": "file", ".ogg": "file" },
-        plugins: [{
-          name: "atelier-renderer-shared",
-          setup(build) {
-            build.onResolve({ filter: /.*/ }, args => rendererShared.includes(args.path) ? { path: args.path, namespace: "atelier-shared" } : undefined);
-            build.onLoad({ filter: /.*/, namespace: "atelier-shared" }, args => ({ contents: rendererModuleSource(args.path), loader: "js" }));
-          },
-        }],
-      });
-    } catch (error) {
-      throw new PluginPackageError("build_failed", `Plugin ${manifest.id} renderer failed to build: ${error instanceof Error ? error.message : String(error)}`);
-    }
-  }
-  return `${manifest.id}/${hash}/renderer.mjs`;
+/** 宿主库保留既有实例；插件公共模块通过同一 ESM 图共享。 */
+function hostModules(realm: "runtime" | "renderer"): Plugin {
+  return { name: "atelier-host-modules", setup(build) {
+    build.onResolve({ filter: /.*/ }, args => (realm === "runtime" ? args.path in shared : rendererShared.includes(args.path))
+      ? { path: args.path, namespace: "atelier-host" } : undefined);
+    build.onLoad({ filter: /.*/, namespace: "atelier-host" }, args => ({
+      contents: realm === "runtime" ? sharedModuleSource(args.path) : rendererModuleSource(args.path), loader: "js",
+    }));
+  } };
 }
 
 export interface ResolvedPackage {
@@ -205,7 +143,7 @@ export interface ResolvedPackage {
   renderer?: string;
 }
 
-/** 读取列表、校验清单与冲突、打包并导入启用的插件；单个失败只禁用该包。 */
+/** 读取列表、校验清单与冲突、打包并导入启用的插件；失败传播给依赖方。 */
 export async function loadPackages(list: PackageList, npmRoot: string, cacheRoot: string, reserved: readonly string[]): Promise<ResolvedPackage[]> {
   const result: ResolvedPackage[] = [];
   const ids = new Map<string, number>();
@@ -219,27 +157,58 @@ export async function loadPackages(list: PackageList, npmRoot: string, cacheRoot
       result.push({ entry, root, manifest: null, status: "invalid", error: error instanceof Error ? error.message : String(error) });
     }
   }
+  const modules: PackageModule[] = [];
   for (const item of result) {
-    if (item.status !== "loaded" || !item.manifest) continue;
+    if (!item.manifest) continue;
     const id = item.manifest.id;
     try {
-      if (reserved.includes(id)) throw new PluginPackageError("duplicate", `Plugin ID ${id} is reserved by a built-in plugin.`);
-      if ((ids.get(id) ?? 0) > 1) throw new PluginPackageError("duplicate", `Plugin ${id} is added more than once; disable one of them.`);
-      if (item.manifest.renderer) item.renderer = await buildRenderer(item.root, item.manifest, cacheRoot);
-      if (!item.manifest.runtime) continue;
-      const file = await buildRuntime(item.root, item.manifest, cacheRoot);
+      if (item.status === "loaded" && (reserved.includes(id) || (ids.get(id) ?? 0) > 1))
+        throw new PluginPackageError("duplicate", `Plugin ID ${id} is reserved or registered more than once.`);
+      modules.push(packageModule(item.root, item.manifest));
+    } catch (error) {
+      item.status = "failed"; item.error = error instanceof Error ? error.message : String(error);
+    }
+  }
+  const compiled = await compileModules(modules, new Set(result.filter(item => item.status === "loaded").map(item => item.manifest!.id)), cacheRoot, hostModules);
+  for (const item of result) {
+    if (item.status !== "loaded") continue;
+    const id = item.manifest!.id;
+    try {
+      if (compiled.failures.has(id)) throw new PluginPackageError("build_failed", compiled.failures.get(id)!);
+      const renderer = compiled.renderer.get(id);
+      if (renderer) item.renderer = relative(cacheRoot, renderer).split("\\").join("/");
+      const file = compiled.runtime.get(id);
+      if (!file) continue;
       const module = await import(pathToFileURL(file).href) as { default?: unknown };
       const definition = module.default as PluginDefinition | undefined;
       if (!definition || typeof definition !== "object" || !Array.isArray(definition.modules) || definition.namespace?.id !== id
         || typeof definition.version !== "string" || !definition.version.trim()
-        || definition.modules.some(module => !module || typeof module !== "object" || typeof module.setup !== "function")) {
+        || definition.modules.some(module => !module || typeof module.setup !== "function"))
         throw new PluginPackageError("invalid_entry", `Runtime entry of ${id} must default-export definePlugin(...) with namespace ${id}.`);
-      }
       item.definition = definition;
     } catch (error) {
-      item.status = "failed";
-      item.error = error instanceof Error ? error.message : String(error);
+      item.status = "failed"; item.error = error instanceof Error ? error.message : String(error);
     }
   }
+  // 导入失败同样传播给依赖方；不让消费者拿着失败提供方的公共服务进入 setup。
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const item of result) if (item.status === "loaded") {
+      const failed = [...compiled.dependencies.get(item.manifest!.id) ?? []].find(id => result.some(provider => provider.manifest?.id === id && provider.status !== "loaded"));
+      if (failed) {
+        item.status = "failed"; item.error = `Public dependency ${failed} is unavailable.`;
+        delete item.definition; delete item.renderer; changed = true;
+      }
+    }
+  }
+  // 纯公共包没有 setup；穿透其依赖，使真正的服务提供方先初始化。
+  const dependenciesOf = (id: string, visited = new Set<string>()): string[] => {
+    if (visited.has(id)) return [];
+    visited.add(id);
+    return [...compiled.runtimeDependencies.get(id) ?? []].flatMap(dependency =>
+      result.some(item => item.manifest?.id === dependency && item.definition) ? [dependency] : dependenciesOf(dependency, visited));
+  };
+  for (const item of result) if (item.definition) item.definition = { ...item.definition, dependencies: dependenciesOf(item.manifest!.id) };
   return result;
 }

@@ -12,10 +12,7 @@ export interface WorkbenchEnvironment {
   busy: boolean;
   historical: boolean;
   run: (command: WorkbenchOperation) => Promise<boolean>;
-  /** 代理对话草稿由应用层按代理对象保存；同一会话的多个代理互不共享。 */
-  draft: (agentId: string) => string;
-  onDraftChange: (agentId: string, value: string) => void;
-  onHome: () => void;
+
 }
 export type WorkbenchView = WorkbenchEnvironment & {
   canvas: WorkbenchCanvas;

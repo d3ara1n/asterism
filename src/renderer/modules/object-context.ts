@@ -1,33 +1,31 @@
-import { createContext, createElement, useCallback, useContext, useMemo, type ReactNode } from "react";
-import type { RendererObjectContext } from "@atelier/sdk/renderer";
-import { pluginOf } from "@atelier/sdk/contracts";
+import { createElement, useCallback, useMemo, type ReactNode } from "react";
+import { RendererCatalogsProvider, RendererModelsProvider, RendererToolsProvider, type RendererCatalogs, type RendererObjectContext } from "@atelier/sdk/renderer";
+import { pluginOf, resourceCall, reference } from "@atelier/sdk/contracts";
 import type { WorkbenchObject } from "../../shared/workbench";
 import { ModelConfiguration, ThinkingPreferences } from "../../modules/agent/configuration";
 import { sessionSnapshot } from "../../plugins/records";
 import { sessionPath } from "../../shared/session-path";
 import { useWorkbench } from "../features/workbench/context";
 import { useSession, useSessionProgress } from "../features/session/state";
-import { objectSubmission } from "../features/session/registry";
 import { useConfiguration } from "../features/configuration/state";
 import { useAppearance } from "../features/appearance/state";
 import { resolveToolView, toolPreparation } from "../features/conversation/tool-views";
 import { useModuleViews } from "./views";
 
-const Catalogs = createContext<RendererObjectContext["catalogs"] | null>(null);
 export function RendererCatalogProvider({ ready, children }: { ready: boolean; children: ReactNode }) {
   const configuration = useConfiguration(ready);
   const appearance = useAppearance();
-  const value = useMemo<RendererObjectContext["catalogs"]>(() => ({
+  const value = useMemo<RendererCatalogs>(() => ({
     error: configuration.error,
     get(contract) {
-      const raw = contract.id === ModelConfiguration.id && contract.version === ModelConfiguration.version ? configuration.snapshot
-        : contract.id === ThinkingPreferences.id && contract.version === ThinkingPreferences.version
+      const raw = Object.is(contract, ModelConfiguration) ? configuration.snapshot
+        : Object.is(contract, ThinkingPreferences)
           ? { thinkingAutoExpand: appearance.thinkingAutoExpand, thinkingAutoCollapse: appearance.thinkingAutoCollapse } : null;
       const parsed = contract.schema.safeParse(raw);
       return parsed.success ? parsed.data : null;
     },
   }), [configuration.error, configuration.snapshot, appearance.thinkingAutoExpand, appearance.thinkingAutoCollapse]);
-  return createElement(Catalogs.Provider, { value }, children);
+  return createElement(RendererCatalogsProvider, { value }, children);
 }
 
 /** 宿主把协调后的会话视图和对象能力交给 SDK 卡片，不暴露控制器或物理节点。 */
@@ -36,12 +34,8 @@ export function useObjectContext(object: WorkbenchObject): RendererObjectContext
   const { controller } = workbench;
   const { state, snapshot, historical } = useSession(controller);
   const progress = useSessionProgress(controller);
-  const catalogs = useContext(Catalogs);
-  if (!catalogs) throw new Error("Renderer catalogs must be provided by the workbench.");
-  const registry = useModuleViews();
   const records = useMemo(() => snapshot
     ? sessionSnapshot(snapshot.sessionId, snapshot.title, snapshot.nodes, sessionPath(snapshot.nodes, snapshot.at), false) : null, [snapshot]);
-  const blocks = useMemo(() => historical ? [] : progress.live.filter(block => block.agentId === object.id), [historical, progress.live, object.id]);
   const onStream = useCallback<RendererObjectContext["onStream"]>((channel, listener) =>
     window.host.onObjectStream(controller.sessionId, object.id, (name, data) => {
       if (name === `${pluginOf(object.kind)}/${channel}`) listener(data);
@@ -51,19 +45,24 @@ export function useObjectContext(object: WorkbenchObject): RendererObjectContext
     view: { ready: workbench.ready, busy: state.busy, historical, status: state.status, error: state.error, missing: state.missing },
     session: {
       snapshot: () => records, subscribe: controller.subscribe,
-      create: (kind, input, position) => controller.executeAndRead({ type: "resource.create", sessionId: controller.sessionId, kind, input, position }),
+      create: (contract, input, position) => controller.executeAndRead({ type: "resource.create", sessionId: controller.sessionId, kind: contract.resource.kind, creation: reference(contract), input, position }),
       refresh: controller.refresh, followLive: controller.followCursor,
     },
-    invoke: command => controller.execute({ type: "resource.command", sessionId: controller.sessionId, objectId: object.id, command }),
+    invoke: (contract, input) => controller.execute({ type: "resource.command", sessionId: controller.sessionId, objectId: object.id, command: resourceCall(contract, input) }),
     onStream,
     activity: {
       running: progress.unsettledObjectIds.includes(object.id),
-      blocks,
     },
-    catalogs,
-    tools: { resolve: props => resolveToolView(props, registry), preparation: toolPreparation },
-    draft: { value: workbench.draft(object.id), set: value => workbench.onDraftChange(object.id, value) },
-    submissions: objectSubmission(controller.sessionId, object.id),
-    home: workbench.onHome,
   };
+}
+
+/** 专门能力按对象绑定，读取与基础对象接口相同的宿主状态源。 */
+export function ObjectServices({ object, children }: { object: WorkbenchObject; children: ReactNode }) {
+  const { controller } = useWorkbench();
+  const { historical } = useSession(controller);
+  const progress = useSessionProgress(controller);
+  const registry = useModuleViews();
+  const models = useMemo(() => ({ blocks: historical ? [] : progress.live.filter(block => block.agentId === object.id) }), [historical, progress.live, object.id]);
+  const tools = useMemo(() => ({ resolve: (props: Parameters<typeof resolveToolView>[0]) => resolveToolView(props, registry), preparation: toolPreparation }), [registry]);
+  return createElement(RendererModelsProvider, { value: models }, createElement(RendererToolsProvider, { value: tools }, children));
 }

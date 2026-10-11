@@ -5,10 +5,10 @@ import { defineTool } from "@atelier/sdk/contracts";
 import { contractReferenceSchema, defineData } from "@atelier/sdk/contracts";
 import { jsonArgumentHint } from "./validation.ts";
 
-export const ResourceListResult = defineData(coreId("resource-list"), 1, z.strictObject({
+export const ResourceListResult = defineData(coreId("resource-list"), z.strictObject({
   resources: z.array(z.strictObject({ resource_id: z.string(), type: z.string(), title: z.string() })),
 }));
-export const ResourceInspectResult = defineData(coreId("resource-inspect"), 1, z.strictObject({
+export const ResourceInspectResult = defineData(coreId("resource-inspect"), z.strictObject({
   resource_id: z.string(),
   state: jsonSchema,
   tools: z.array(z.strictObject({
@@ -19,6 +19,7 @@ export const ResourceInspectResult = defineData(coreId("resource-inspect"), 1, z
 
 /** 固定入口共用工具契约，但由执行层装配，不注册到可扩展的资源工具目录。 */
 export const ResourceList = defineTool({
+  id: "core.tool.resource_list",
   name: "resource_list",
   description: "List resources currently linked to you.",
   guidelines: [
@@ -30,6 +31,7 @@ export const ResourceList = defineTool({
 });
 
 export const ResourceInspect = defineTool({
+  id: "core.tool.resource_inspect",
   name: "resource_inspect",
   description: "Inspect a linked resource's live state and available tools.",
   guidelines: [
@@ -43,6 +45,7 @@ export const ResourceInspect = defineTool({
 });
 
 export const ResourceCall = defineTool({
+  id: "core.tool.resource_call",
   name: "resource_call",
   description: "Use an available tool on a linked resource.",
   guidelines: [

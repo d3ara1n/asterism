@@ -14,7 +14,7 @@ export interface PluginNamespace {
   readonly id: string;
   name(short: string): string;
   resource<S extends Json>(name: string, stateSchema: z.ZodType<S>): ResourceContract<S>;
-  data<T extends Json>(name: string, version: number, schema: z.ZodType<T>): DataContract<T>;
+  data<T extends Json>(name: string, schema: z.ZodType<T>): DataContract<T>;
 }
 export function pluginNamespace(id: string): PluginNamespace {
   if (!pluginIdPattern.test(id)) throw new Error(`Invalid plugin ID: ${id}`);
@@ -25,7 +25,7 @@ export function pluginNamespace(id: string): PluginNamespace {
   return {
     id, name,
     resource: (short, stateSchema) => defineResource(name(short), stateSchema),
-    data: (short, version, schema) => defineData(name(short), version, schema),
+    data: (short, schema) => defineData(name(short), schema),
   };
 }
 export function belongsTo(pluginId: string, qualified: string): boolean {
@@ -37,4 +37,4 @@ export function pluginOf(qualified: string): string | null {
   return index > 0 ? qualified.slice(0, index) : null;
 }
 /** 实现缺失的资源投影：保留原始数据与来源插件，供界面回退展示。 */
-export const missingResourceContract = { id: "atelier.core/missing-resource", version: 1 } as const;
+export const missingResourceContract = { id: "atelier.core/missing-resource" } as const;

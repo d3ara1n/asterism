@@ -8,18 +8,18 @@ import { ToolRegistry } from "./registry.ts";
 import { finishToolResult } from "./result.ts";
 
 const Sample = defineTool({
-  name: "sample",
+  id: "test.tools/sample", name: "sample",
   description: "Obtain a sample from the selected target.",
   guidelines: ["Select the target using its implementation schema."],
   argsSchema: z.strictObject({}).describe("No operation parameters."),
 });
 const TextSample = defineImplementation({
-  ...defineData("test.text.sample", 1, z.strictObject({ text: z.string() }).describe("The sampled text.")),
+  ...defineData("test.text.sample", z.strictObject({ text: z.string() }).describe("The sampled text.")),
   resource: defineResource("text", z.strictObject({})), tool: Sample,
   targetSchema: z.null().describe("Sample the whole text resource."), effect: "read", execution: "parallel",
 });
 const CollectionSample = defineImplementation({
-  ...defineData("test.collection.sample", 1, z.strictObject({ item: z.string(), text: z.string() }).describe("The sampled item and its text.")),
+  ...defineData("test.collection.sample", z.strictObject({ item: z.string(), text: z.string() }).describe("The sampled item and its text.")),
   resource: defineResource("collection", z.strictObject({})), tool: Sample,
   targetSchema: z.strictObject({ item: z.string() }).describe("Select one item in the collection."), effect: "read", execution: "parallel",
 });
@@ -42,14 +42,13 @@ describe("工具定义与实现注册边界", () => {
     expect(() => new ToolRegistry([text, { ...collection, resourceKind: "text" }])).toThrow("Duplicate tool implementation");
   });
 
-  it("同名工具不能改变描述、指导、参数或读写属性", () => {
+  it("共享实际声明对象，独立副本即使 ID 相同也冲突", () => {
+    const copy = defineTool({ ...Sample, argsSchema: z.strictObject({}).describe("No operation parameters.") });
+    expect(copy).not.toBe(Sample);
+    expect(() => new ToolRegistry([text, { ...collection, tool: copy }])).toThrow("Conflicting tool contract");
     for (const tool of [
-      defineTool({ ...Sample, description: "A different operation." }),
-      defineTool({ ...Sample, guidelines: ["Use different rules."] }),
-      defineTool({ ...Sample, argsSchema: z.strictObject({ count: z.number() }).describe("Sample count.") }),
-      defineTool({ ...Sample, argsSchema: z.strictObject({}).describe("A different parameter meaning.") }),
+      defineTool({ ...Sample, id: "test.tools/other" }),
     ]) expect(() => new ToolRegistry([text, { ...collection, tool }])).toThrow("Conflicting tool contract");
-    expect(() => new ToolRegistry([text, { ...collection, effect: "write" }])).toThrow("Conflicting tool contract");
   });
 
   it("声明时要求 args、target 与 result 的整体描述", () => {
@@ -60,7 +59,7 @@ describe("工具定义与实现注册边界", () => {
 
   it("两层模型投影都保留定义的指导与参数字段说明", () => {
     const Find = defineTool({
-      name: "find", description: "Find matching items.", guidelines: ["Supply a query before searching."],
+      id: "test.tools/find", name: "find", description: "Find matching items.", guidelines: ["Supply a query before searching."],
       argsSchema: z.strictObject({ query: z.string().describe("The text to match.") }).describe("Search parameters."),
     });
     const resourceDefinition = projectTool(Find);
@@ -76,9 +75,9 @@ describe("工具定义与实现注册边界", () => {
 
   it("target 可以是方块定位，handler 与模型投影按各自契约执行", async () => {
     const contract = defineImplementation({
-      ...defineData("test.game.move", 1, z.strictObject({ x: z.number().nonnegative(), piece: z.string() }).describe("The moved piece and its new position.")),
+      ...defineData("test.game.move", z.strictObject({ x: z.number().nonnegative(), piece: z.string() }).describe("The moved piece and its new position.")),
       resource: defineResource("game", z.object({ origin: z.number() })),
-      tool: defineTool({ name: "move", description: "Move a piece.", guidelines: ["Supply a displacement."],
+      tool: defineTool({ id: "test.tools/move", name: "move", description: "Move a piece.", guidelines: ["Supply a displacement."],
         argsSchema: z.strictObject({ delta: z.number().describe("Displacement from the origin.") }).describe("Movement parameters.") }),
       targetSchema: z.strictObject({ piece: z.string().describe("The piece identifier.") }).describe("Select a piece on the board."),
       effect: "write", execution: "sequential",
@@ -97,7 +96,7 @@ describe("工具定义与实现注册边界", () => {
         { implementation: prepared.implementation }, null, prepared.toModel));
     };
     expect(await invoke(1)).toEqual({ kind: "succeeded", data: { x: 3, piece: "T" },
-      model: "Moved T to 3", implementation: { id: "test.game.move", version: 1 } });
+      model: "Moved T to 3", implementation: { id: "test.game.move" } });
     expect(implementation.prepare(resource, { path: "T" }, { delta: 1 })).toMatchObject({ kind: "rejected" });
     expect(implementation.prepare(resource, { piece: "T" }, { delta: "1" })).toMatchObject({ kind: "rejected" });
     expect(implementation.prepare({ ...resource, data: {} }, { piece: "T" }, { delta: 1 })).toMatchObject({ kind: "failed" });

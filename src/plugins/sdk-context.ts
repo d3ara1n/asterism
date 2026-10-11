@@ -1,5 +1,6 @@
 import { belongsTo, jsonSchema, type DataContract, type Json, type RecordContract } from "@atelier/sdk/contracts";
-import { PluginApiError, type ObjectContext, type PluginContext, type ResourceRef, type ResourceSnapshot, type SessionHandle, type ObjectWriter } from "@atelier/sdk/runtime";
+import { PluginApiError, type ObjectReader, type ObjectExecutor, type PluginContext, type ResourceRef, type ResourceSnapshot, type SessionExecutor, type ObjectWriter } from "@atelier/sdk/runtime";
+import type { RunGroup } from "./lifecycle.ts";
 import type { ObjectScope } from "./host.ts";
 import { appendRecord } from "./record-writer.ts";
 import type { PluginHostServices } from "./loader.ts";
@@ -9,11 +10,10 @@ import { synchronous } from "./synchronous.ts";
 import type { LiveBlock } from "../shared/session.ts";
 
 type PluginServices = Pick<PluginContext, "id" | "dir" | "log" | "config" | "secrets" | "db" | "tasks">;
-export function createSdkContext(internal: PluginServices, host: PluginHostServices) {
+export function createSdkContext(internal: PluginServices, host: PluginHostServices, modelRuns: RunGroup) {
   const records = new Map<string, RecordContract>();
-  const running = new Map<string, { sessionId: string; controller: AbortController; done: Promise<unknown>; live: LiveBlock[] }>();
+  const running = new Map<string, { sessionId: string; live: LiveBlock[] }>();
   let available = true;
-  let closing = false;
   const checkAvailable = () => {
     if (!available) throw new PluginApiError("unavailable", "The plugin is not available.");
   };
@@ -34,26 +34,30 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
     checkAvailable(); checkData(contract);
     host.sessions.title(id);
     let raw: Json | null;
-    try { raw = host.data.get(id, objectId, contract.id, contract.version); }
+    try { raw = host.data.get(id, objectId, contract.id); }
     catch { throw new PluginApiError("unavailable", "The stored session data is unavailable."); }
     if (raw === null) return null;
     const parsed = contract.schema.safeParse(raw);
     if (!parsed.success) throw new PluginApiError("unavailable", "The stored session data does not match its contract schema.");
     return parsed.data;
   };
-  const session = (id: string, objectId?: string): SessionHandle => ({
+  const checkExecution = (scope?: ObjectScope) => {
+    checkAvailable();
+    if (scope?.execution && !scope.active) throw new PluginApiError("unavailable", "The tool execution scope is closed.");
+  };
+  const session = (id: string, objectId?: string, checkMutation = checkAvailable): SessionExecutor => ({
     id,
     get: contract => readData(id, null, contract),
-    resume: () => { checkAvailable(); host.sessions.resume(id, objectId); },
+    resume: () => { checkMutation(); host.sessions.resume(id, objectId); },
     snapshot() {
       checkAvailable();
       return sessionSnapshot(id, host.sessions.title(id), host.sessions.nodes(id), host.sessions.path(id), host.sessions.canResume(id, objectId));
     },
     title: {
       get: () => { checkAvailable(); return host.sessions.title(id); },
-      propose: (text, options) => { checkAvailable(); return host.sessions.proposeTitle(id, text, options.expected); },
+      propose: (text, options) => { checkMutation(); return host.sessions.proposeTitle(id, text, options.expected); },
     },
-    commit: work => commit(id, work),
+    commit: work => { checkMutation(); commit(id, work); },
   });
   function commit(id: string, work: (writer: ObjectWriter) => unknown, ref?: ResourceRef, scope?: ObjectScope): void {
     checkAvailable();
@@ -76,8 +80,8 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
             const declared = records.get(contract.id);
             if (!declared || !belongsTo(internal.id, contract.id))
               throw new PluginApiError("foreign_event", "The plugin did not declare this record contract.");
-            if (contract.version !== declared.version)
-              throw new PluginApiError("invalid_argument", "The record version does not match its declaration.");
+            if (contract !== declared)
+              throw new PluginApiError("invalid_argument", "Use the declared record contract instance.");
             const parsed = declared.schema.safeParse(data);
             if (!parsed.success) throw new PluginApiError("invalid_argument", "The record does not match its declared schema.");
             return appendRecord(writer, declared, jsonSchema.parse(parsed.data), ref);
@@ -87,17 +91,19 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
             checkData(contract);
             const parsed = contract.schema.safeParse(data);
             if (!parsed.success) throw new PluginApiError("invalid_argument", "The data does not match its contract schema.");
-            host.data.set(id, ref?.id ?? null, contract.id, jsonSchema.parse(parsed.data), contract.version);
+            host.data.set(id, ref?.id ?? null, contract.id, jsonSchema.parse(parsed.data));
           },
         }));
       } finally { active = false; }
     });
   }
-  const object = (address: ResourceRef, scope?: ObjectScope, captured?: ResourceSnapshot): ObjectContext => {
+  const object = (address: ResourceRef, scope?: ObjectScope, captured?: ResourceSnapshot): ObjectExecutor => {
     const ref = Object.freeze({ ...address });
     checkRef(ref, scope?.active && scope.provisional);
     return {
-      ref, session: session(ref.sessionId, ref.id),
+      ref, session: session(ref.sessionId, ref.id, () => {
+        checkExecution(scope); checkRef(ref, scope?.active && scope.provisional);
+      }),
       snapshot() {
         checkRef(ref, scope?.active && scope.provisional);
         if (captured) return captured;
@@ -114,11 +120,21 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
       },
       commit: work => commit(ref.sessionId, work, ref, scope),
       streams: { publish(channel, data) {
+        checkExecution(scope);
         own(ref.kind); checkRef(ref, scope?.active && scope.provisional);
         if (!(data instanceof Uint8Array)) throw new PluginApiError("invalid_argument", "Stream data must be a Uint8Array.");
         host.stream?.({ sessionId: ref.sessionId, objectId: ref.id, channel: `${internal.id}/${channel}`, data });
       } },
     };
+  };
+  const reader = (address: ResourceRef, scope?: ObjectScope, captured?: ResourceSnapshot): ObjectReader => {
+    const source = object(address, scope, captured);
+    const session = source.session;
+    return Object.freeze({
+      ref: source.ref, snapshot: source.snapshot, get: source.get,
+      session: Object.freeze({ id: session.id, snapshot: session.snapshot, get: session.get,
+        title: Object.freeze({ get: session.title.get }) }),
+    });
   };
   const context: PluginContext = {
     id: internal.id, dir: internal.dir, log: internal.log,
@@ -138,7 +154,7 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
       validate: request => { checkAvailable(); return host.models.validate(request); },
       stream: request => { checkAvailable(); return host.models.stream(request); },
       run(request) {
-        if (closing) throw new PluginApiError("unavailable", "The plugin is closing.");
+        if (modelRuns.closed) throw new PluginApiError("unavailable", "The plugin is closing.");
         const ref = Object.freeze({ ...request.object });
         own(ref.kind); checkRef(ref);
         if (running.has(ref.id)) throw new PluginApiError("unavailable", "A model request is already running on this resource.");
@@ -154,11 +170,10 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
         const excluded = new Set(tools?.exclude ?? []);
         const linked = host.sessions.linked(path, ref.id);
         const capabilities = host.sessions.capabilities(linked, name => (allowed === null || allowed.has(name)) && !excluded.has(name));
-        const controller = new AbortController();
         let progressTimer: ReturnType<typeof setTimeout> | undefined;
         const receive = request.observer.event.bind(request.observer);
-        const done = host.models.run({ object: ref, target, system, messages, tools, cache, requestParentId: request.requestParentId,
-          signal: AbortSignal.any([request.signal, controller.signal]), capabilities, context: host.sessions.context(linked),
+        const work = modelRuns.start(signal => host.models.run({ object: ref, target, system, messages, tools, cache, requestParentId: request.requestParentId,
+          signal, capabilities, context: host.sessions.context(linked),
           observer: { event(event) {
             if (event.type === "progress") {
               const run = running.get(ref.id);
@@ -167,8 +182,9 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
             }
             return receive(event);
           } },
-        }).finally(() => { clearTimeout(progressTimer); running.delete(ref.id); host.sessions.progressChanged(ref.sessionId); });
-        running.set(ref.id, { sessionId: ref.sessionId, controller, done, live: [] });
+        }), { object: ref, signal: request.signal });
+        const done = work.done.finally(() => { clearTimeout(progressTimer); running.delete(ref.id); host.sessions.progressChanged(ref.sessionId); });
+        running.set(ref.id, { sessionId: ref.sessionId, live: [] });
         host.sessions.progressChanged(ref.sessionId);
         return done;
       },
@@ -179,23 +195,18 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
     object: ref => { own(ref.kind); return object(ref); },
   };
   return {
-    context, object,
+    context, object, reader,
     declare(contract: RecordContract) {
       if (!belongsTo(internal.id, contract.id)) throw new PluginApiError("foreign_event", "The record contract belongs to another plugin.");
       const existing = records.get(contract.id);
-      if (existing && existing !== contract) throw new Error(`Conflicting record contracts: ${contract.id}`);
-      records.set(contract.id, contract);
+      if (existing && existing !== contract) throw new Error(`Conflicting record contracts: ${contract.id}. Import the same declaration.`);
+      if (!existing) records.set(contract.id, contract);
     },
     activity: (sessionId: string) => {
       const active = [...running].filter(([, run]) => run.sessionId === sessionId);
       return { running: active.map(([id]) => id), live: active.flatMap(([, run]) => run.live) };
     },
-    disable: () => { available = false; for (const run of running.values()) run.controller.abort(); },
-    async close() {
-      closing = true;
-      for (const run of running.values()) run.controller.abort();
-      await Promise.allSettled([...running.values()].map(run => run.done));
-    },
+    disable: () => { available = false; modelRuns.stop(); },
   };
 }
 export type SdkContext = ReturnType<typeof createSdkContext>;

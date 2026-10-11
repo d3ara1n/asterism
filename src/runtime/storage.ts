@@ -5,7 +5,7 @@ import { DatabaseSync } from "node:sqlite";
 import { sessionSchemaSql } from "../session/schema.ts";
 import { applicationBrand, applicationStorage } from "../shared/application.ts";
 
-const workspaceDatabaseVersion = 13;
+const workspaceDatabaseVersion = 14;
 
 export function openDatabase(root: string): DatabaseSync {
   mkdirSync(join(root, applicationStorage.databaseDirectory), { recursive: true });
@@ -35,7 +35,7 @@ export function openDatabase(root: string): DatabaseSync {
       CREATE TABLE session_data (
         session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
         object_id TEXT NOT NULL, contract_id TEXT NOT NULL,
-        version INTEGER NOT NULL CHECK(version > 0), data_json TEXT NOT NULL,
+        data_json TEXT NOT NULL,
         PRIMARY KEY(session_id, object_id, contract_id)
       ) STRICT;
       PRAGMA user_version = ${workspaceDatabaseVersion};

@@ -9,7 +9,7 @@ function deferred() {
 }
 const snapshot = (size: CardSize | null): WorkbenchSnapshot => workbenchSnapshotSchema.parse({
   id: "00000000-0000-4000-8000-000000000001", title: "Test",
-  objects: [{ id: "a", kind: "test", title: "Card", presentation: { contract: { id: "test", version: 1 }, data: null } }],
+  objects: [{ id: "a", kind: "test", title: "Card", presentation: { contract: { id: "test" }, data: null } }],
   views: [{ objectId: "a", position: { x: 0, y: 0 }, hidden: false, collapsed: false, size }],
   viewport: { x: 0, y: 0, zoom: 1 }, links: [],
 });

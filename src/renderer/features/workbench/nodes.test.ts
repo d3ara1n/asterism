@@ -6,7 +6,7 @@ import { cardRenderer } from "@atelier/sdk/renderer";
 import { ViewRegistry } from "../../modules/registry";
 import { workbenchNodes } from "./nodes";
 
-const contract = defineData("test.card", 1, z.null());
+const contract = defineData("test.card", z.null());
 const registry = new ViewRegistry([{ resources: [], tools: [], cards: [cardRenderer(contract, {
   width: 560, height: 640, minWidth: 480, minHeight: 480, Body: () => null,
 })] }]);

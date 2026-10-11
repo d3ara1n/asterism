@@ -24,10 +24,13 @@
 | `features/workbench/context.ts` | 工作台向卡片与更深浮岛提供的环境 |
 | `features/workbench/nodes.ts` / `size-intents.ts` | 工作台节点投影，协调后台布局与本地拖动；尺寸意图在对应命令受理后的读取完成后确认 |
 | `features/workbench/placement.ts` | 按新卡片尺寸和已有卡片实际边界求离指定中心最近的空位，不重排已有卡片 |
-| `features/session/registry.ts` | 会话共享控制器与各对象提交身份 |
+| `features/session/registry.ts` | 会话共享控制器 |
 | `features/workbench/ResourceCreationDialog.tsx` / `Add*Dialog.tsx` | 添加代理、笔记与目录；共用布局、提交门禁与错误展示，名称校验按资源处理；目录可填写路径、系统选择或拖入 |
 | `features/workbench/AccessPanel.tsx` | 授权浮岛，按代理／资源查看有向链接，受理后的读取结束即显示实际状态 |
-| `../modules/agent/conversation/Conversation.tsx` | 代理连续对话、工具过程、停止/继续；块从生成到保存保持同一组件 |
+| `../modules/agent/conversation/Conversation.tsx` | 聚合时间轴、跟随、输入、配置与交互；块从生成到保存保持同一组件 |
+| `../modules/agent/conversation/ConversationTimeline.tsx` / `output-follow.ts` | 条目展示与滚动跟随，各自消费数据或明确意图 |
+| `../modules/agent/conversation/Composer.tsx` / `ConfigurationPicker.tsx` | 消息输入与 Agent 配置选择 |
+| `../modules/agent/conversation/interaction.ts` / `shared/submission.ts` | 按会话／对象保留草稿和提交身份，协调受理、重试、继续与停止；首页复用提交身份机制 |
 | `../modules/agent/conversation/Disclosure.tsx` | 思考与工具共用的折叠外壳；统一边框、标题点击区、正文间距和展开箭头 |
 | `../modules/agent/conversation/ToolCall.tsx` / `tool-state.ts` | 工具生命周期与展示状态投影；填充不可展开、运行产出更新、终结保持展开状态 |
 | `../modules/agent/conversation/ThinkingBlock.tsx` / `thinking-state.ts` | 思考 header 计时与 body 尾部窗口；自动开合偏好与内容渲染独立，结束后显示全文 |
@@ -37,7 +40,7 @@
 | `features/session/state.ts` | 持久视图与进度的独立 React 订阅 |
 | `../modules/agent/conversation/Markdown.tsx` | Streamdown 流式 Markdown 配置，复用库的解析与控件 |
 | `modules/registry.ts` / `views.tsx` | 静态资源展示描述与按版本分派的卡片／工具 header/body；应用根注入注册目录 |
-| `modules/object-context.ts` | 宿主实现 SDK 卡片对象接口：具型记录、创建／动作、对象流、进度、草稿及提交身份；工作台集中读取配置目录 |
+| `modules/object-context.ts` | 宿主实现基础对象接口；通过专门 provider 提供配置目录、模型块与工具展示，共用原有状态源 |
 | `../modules/*/renderer.tsx` | 资源模块的具体卡片、附加操作和工具视图，与后端共用纯契约 |
 | `features/configuration/` | 提供商/模型角色/agent 配置表单及共享读取入口 |
 | `features/plugins/PluginsSettings.tsx` | 插件包管理、当前运行插件的配置读取及命令队列 |
@@ -59,7 +62,7 @@
 - 发送入口使用 `session.start`，由运行时生成 Session/agent/输入身份。初始标题取首条输入前 72 字符，配置了模型的 utility 角色异步命名，失败时保留初始标题。创建期间用户若已导航，晚到结果只刷新列表，不夺回焦点或视图。
 - 会话导航立即切换，不等待首份投影。工作台底板与外观纹理先入场，投影返回后填入内容，保持同一页面过渡；读取期间不展示独立加载画面，失败时在工作台内保留错误与重试入口。
 - 代理对象的卡片内部使用连续阅读区与底部输入区，卡片位于 React Flow 工作台。正文、思考和摘要交给 Streamdown；工具结果使用结构化用户数据展示，不向模型回传 GUI 状态。Enter 发送、Shift+Enter 换行；中文输入法确认不会触发发送。
-- 资源卡片由模块的展示契约分派，工作台不判断具体资源种类如何绘制。工具 headerRenderer/bodyRenderer 独立可选，消费同一份调用与结果，过程态和终结态共用 data 契约。历史按保存的实现 ID/版本、当次资源身份和 data 渲染，缺失或不兼容时使用默认摘要/原始数据正文；不重新访问文件或当前资源。模块前端入口与后台入口分别编译，跨 IPC 只传身份和数据。
+- 资源卡片由模块的展示契约分派，工作台不判断具体资源种类如何绘制。工具 headerRenderer/bodyRenderer 独立可选，消费同一份调用与结果，过程态和终结态共用 data 契约。历史按保存的实现 ID、当次资源身份和 data 渲染，缺失或不兼容时使用默认摘要/原始数据正文；不重新访问文件或当前资源。模块前端入口与后台入口分别编译，跨 IPC 只传身份和数据。
 - 模型执行独立于组件生命周期。会话模块先订阅再查询，合并持久变化通知，以视图修订拒绝过时结果；查看位置变化或命令执行使旧在途查询失效。返回首页、切换会话或设置只改变视图，不自动取消模型。应用列表刷新不读取或覆盖任何会话正文。
 - 进度单独订阅，显示正在生成的正文、思考，以及填充、待执行或执行中的工具。块以 `responseId + ordinal` 保持展示身份，保存后由同一组件接替数据；进度若依赖尚未取得的持久修订，先保留原块再读取。历史查看不展示 live，不把它作为分支位置；画布布局不消费进度，绑定对象的 SDK 卡片独立订阅。
 - 工具参数填充只显示内置提示、虚线边框与脉动图标，不解析部分 JSON 或提供展开；等待调度使用静态等待图标。执行中切换实线与运行图标，有产出后可展开。所有终结结果（包括失败/取消/未知）都可展示保存的有效产出，外壳负责错误说明；新产出与落库不重置展开。固定资源入口由 Atelier 提供视图，resource_call 自己转交二级工具，外壳不判断具体工具。

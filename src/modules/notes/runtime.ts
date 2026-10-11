@@ -1,31 +1,25 @@
-import { z } from "zod";
-import { defineModule, implementResource, implementTool, PluginApiError, type ObjectContext, type CallResult } from "@atelier/sdk/runtime";
-import { Note, NoteContent, NoteView, NoteRead, NoteEdit, NoteWrite, MAX_NOTE_LENGTH } from "./contract.ts";
+import { defineModule, implementResource, implementCreation, implementTool, PluginApiError, type ObjectReader, type ObjectExecutor, type CallResult } from "@atelier/sdk/runtime";
+import { Note, CreateNote, NoteContent, NoteView, NoteRead, NoteEdit, NoteWrite, MAX_NOTE_LENGTH } from "./contract.ts";
 import { TextError, readText, readToModel, editText, textChange, changeToModel } from "../shared/text.ts";
 
-const noteCreateSchema = z.strictObject({
-  title: z.string().trim().min(1).max(160).default("Untitled note"),
-  content: z.string().max(MAX_NOTE_LENGTH).default(""),
-});
-
-function currentContent(object: ObjectContext) {
+function currentContent(object: ObjectReader) {
   try { return object.get(NoteContent); }
   catch (error) {
     if (error instanceof PluginApiError && error.code === "unavailable") return null;
     throw error;
   }
 }
-function requireText(object: ObjectContext): string {
+function requireText(object: ObjectReader): string {
   const content = currentContent(object);
   if (content === null) throw new TextError("note_unavailable", "This note's current content is unavailable. Ask the user to restore or recreate the note; do not overwrite it by assuming empty content.");
   return content.text;
 }
-function titleOf(object: ObjectContext): string {
+function titleOf(object: ObjectReader): string {
   const resource = object.snapshot();
   if (!resource) throw new PluginApiError("unavailable", "The note is not available on this session path.");
   return resource.title;
 }
-function save(object: ObjectContext, text: string): void {
+function save(object: ObjectExecutor, text: string): void {
   object.commit(writer => { writer.set(NoteContent, { text }); });
 }
 function validateNoteText(text: string): void {
@@ -40,13 +34,12 @@ function mutationFailure(error: unknown, signal: AbortSignal, operation: string)
 /** 笔记只保存当前可变正文；任何历史位置的卡片与读取都取用此状态。 */
 export default defineModule(() => ({
   resources: [implementResource(Note, NoteView, {
-    creation: {
-      schema: noteCreateSchema,
+    creation: implementCreation(CreateNote, {
       create({ title, content }, object) {
         save(object, content);
         return { title, data: {} };
       },
-    },
+    }),
     project: (_data, object) => ({ text: currentContent(object)?.text ?? null }),
     async inspect(_data, object) {
       const content = currentContent(object);

@@ -46,7 +46,7 @@ describe("工具调用的展示投影", () => {
     expect(view.props).toMatchObject({ name: "list", target: { path: "src" }, args: {}, result: { kind: "running", data } });
     expect(isValidElement<ToolRenderProps>(view.header) && view.header.props.invocation.resource?.title).toBe("Saved title");
     expect(isValidElement<ToolRenderProps>(view.body) && view.body.props.result).toEqual({ kind: "running", data });
-    const missing = resolveToolView({ ...state.props!, invocation: { ...invocation, implementation: { id: "missing", version: 2 } } }, registry);
+    const missing = resolveToolView({ ...state.props!, invocation: { ...invocation, implementation: { id: "missing" } } }, registry);
     expect(missing.props.name).toBe("list");
     expect(missing.header).toBeUndefined();
     expect(missing.body).toBeUndefined();

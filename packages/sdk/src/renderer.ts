@@ -1,11 +1,12 @@
 /** SDK renderer 入口：卡片、工具视图与绑定对象的前端能力；React 由宿主共享。 */
 import { createContext, createElement, useContext, type ComponentType, type ReactNode } from "react";
 import type { z } from "zod";
+import type { ActionContract, CreationContract } from "./commands.ts";
 import type { Json } from "./json.ts";
 import type { ToolInvocationInfo, ToolResult } from "./tool-result.ts";
 import { reference, type ContractReference, type DataContract } from "./presentation.ts";
 import type { ResourceRef, SessionSnapshot } from "./workspace.ts";
-import type { ModelLiveBlock } from "./models.ts";
+export * from "./renderer-services.ts";
 
 export type RendererReceipt = { ok: true } | { ok: false; error: { code: string; message: string } };
 /** 绑定卡片对象的前端能力；宿主负责订阅、命令门禁和当前视图的一致性。 */
@@ -18,21 +19,13 @@ export interface RendererObjectContext {
   readonly session: {
     snapshot(): SessionSnapshot | null;
     subscribe(listener: () => void): () => void;
-    create(kind: string, input: Json, position: { x: number; y: number }): Promise<RendererReceipt>;
+    create<I, O extends Json>(contract: CreationContract<I, Json, O>, input: NoInfer<I> & Json, position: { x: number; y: number }): Promise<RendererReceipt>;
     refresh(): Promise<void>;
     followLive(): void;
   };
-  invoke(command: Json): Promise<RendererReceipt>;
+  invoke<I, O extends Json>(contract: ActionContract<I, O>, input: NoInfer<I> & Json): Promise<RendererReceipt>;
   onStream(channel: string, listener: (data: Uint8Array) => void): () => void;
-  readonly activity: { running: boolean; blocks: readonly ModelLiveBlock[] };
-  readonly catalogs: { get<T extends Json>(contract: DataContract<T>): T | null; error: string | null };
-  readonly tools: {
-    resolve(props: ToolRenderProps): ToolView & { props: ToolRenderProps };
-    preparation(name: string): string;
-  };
-  readonly draft: { value: string; set(value: string): void };
-  readonly submissions: { forInput(value: Json): string; accepted(): void };
-  home(): void;
+  readonly activity: { running: boolean };
 }
 const ObjectContext = createContext<RendererObjectContext | null>(null);
 export function useRendererObject(): RendererObjectContext {

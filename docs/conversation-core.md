@@ -30,7 +30,7 @@ Session 是时间轴的单一写入者。成型记录、终态元数据、对象
 
 ## 工具结局
 
-工具契约统一 description、guidelines 与 args schema，后端实现分别声明含描述的 target/result schema、读写副作用、顺序/并行策略与执行器，不重复工具使用指导。选定实现后，结局携带该实现的 ID 与版本。结局为：
+工具契约统一 description、guidelines 与 args schema，后端实现分别声明含描述的 target/result schema、读写副作用、顺序/并行策略与执行器，不重复工具使用指导。选定实现后，结局携带该实现的稳定 ID。结局为：
 
 - succeeded：已知成功。
 - rejected：工具策略、参数或授权拒绝。
@@ -43,7 +43,7 @@ Session 是时间轴的单一写入者。成型记录、终态元数据、对象
 
 所有结局都保存 `data` 与 `model`。过程态为 `{kind: "running", data}`，与终结态共用实现的 result schema；`publish(data)` 以完整产出替换最近的合法快照，不合契约的数据不能覆盖有效产出。无产出用 null 表示。失败、取消、未知等结局省略 data 时采用最近产出，显式 null 清空。工具终结后发布回调失效。
 
-`model` 只在终结时由可选 `toModel(data)` 投影；成功默认等于 data，其余结局还包装 kind、错误或说明。模型适配器只消费保存的 model，不能将 GUI 数据、资源标题或执行时间当作错误对象一起发送。结局同时保存实际实现 ID/版本、请求边界内的资源身份/类型/名称、开始与结束时间。UI 的 headerRenderer/bodyRenderer 接收同一份调用和结果，分别可选；历史按精确实现版本渲染，缺失或数据不兼容时使用默认视图。
+`model` 只在终结时由可选 `toModel(data)` 投影；成功默认等于 data，其余结局还包装 kind、错误或说明。模型适配器只消费保存的 model，不能将 GUI 数据、资源标题或执行时间当作错误对象一起发送。结局同时保存实际实现 ID、请求边界内的资源身份/类型/名称、开始与结束时间。UI 的 headerRenderer/bodyRenderer 接收同一份调用和结果，分别可选；历史按实现身份选择视图并经其 schema 解码，缺失或数据不兼容时使用默认视图。
 
 ## 执行循环
 

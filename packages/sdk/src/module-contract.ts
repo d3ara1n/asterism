@@ -1,12 +1,12 @@
 import type { z } from "zod";
 import type { Json } from "./json.ts";
-import type { DataContract } from "./presentation.ts";
+import { contractReferenceSchema, type ContractReference, type DataContract } from "./presentation.ts";
 
 export interface ResourceContract<S extends Json = Json> {
   kind: string;
   stateSchema: z.ZodType<S>;
 }
-export interface ToolContract<A extends Json = Json> {
+export interface ToolContract<A extends Json = Json> extends ContractReference {
   name: string;
   description: string;
   guidelines: readonly string[];
@@ -30,7 +30,7 @@ export function defineTool<A extends Json>(definition: ToolContract<A>): ToolCon
   if (!definition.name.trim() || !definition.description.trim()) throw new Error("Tool name and description must not be empty.");
   if (definition.guidelines.some(guideline => !guideline.trim())) throw new Error(`Empty tool guideline: ${definition.name}`);
   requireDescription(definition.argsSchema, `${definition.name}.args`);
-  return { ...definition, guidelines: [...definition.guidelines] };
+  return { ...definition, ...contractReferenceSchema.parse({ id: definition.id }), guidelines: [...definition.guidelines] };
 }
 export function defineImplementation<S extends Json, T extends Json, A extends Json, O extends Json>(
   definition: ImplementationContract<S, T, A, O>,

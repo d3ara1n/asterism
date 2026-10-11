@@ -1,10 +1,11 @@
+import type { ActionContract, CreationContract } from "./commands.ts";
 import type { z } from "zod";
 import { jsonSchema, type Json } from "./json.ts";
 import type { ResourceContract, ImplementationContract } from "./module-contract.ts";
 import type { RecordContract } from "./records.ts";
 import { reference, present, type DataContract } from "./presentation.ts";
 import { PluginApiError } from "./runtime.ts";
-import type { ContextFile, ObjectContext, ResourceContribution, ToolContribution, Preparation, CallResult } from "./runtime-contracts.ts";
+import type { ContextFile, ObjectReader, ObjectExecutor, CreationContribution, ActionContribution, CommandPreparer, ResourceContribution, ToolContribution, Preparation, CallResult } from "./runtime-contracts.ts";
 import { validationMessage, jsonArgumentHint } from "./tool-validation.ts";
 
 function parse<T>(schema: z.ZodType<T>, input: unknown, subject: string): T {
@@ -12,48 +13,39 @@ function parse<T>(schema: z.ZodType<T>, input: unknown, subject: string): T {
   if (!result.success) throw new PluginApiError("invalid_argument", validationMessage(result.error, subject));
   return result.data;
 }
-/** 具型实现进入共享贡献接口时才擦除类型；JSON/schema 校验不依赖宿主注册表。 */
-export function implementResource<S extends Json, V extends Json, I extends Json = Json, C extends Json = Json>(
+/** 创建与动作在宿主完成校验后调用；类型只在贡献装配处擦除。 */
+export function implementCreation<I, S extends Json, O extends Json>(contract: CreationContract<I, S, O>, definition: {
+  prepare?(input: NoInfer<O>, signal: AbortSignal): Preparation<NoInfer<I> & Json> | Promise<Preparation<NoInfer<I> & Json>>;
+  create(input: NoInfer<O>, object: ObjectExecutor): { title: string; data: NoInfer<S> };
+}): CreationContribution {
+  return { contract, ...definition } as CreationContribution;
+}
+export function implementAction<I, O extends Json>(contract: ActionContract<I, O>, definition: {
+  prepare?(input: NoInfer<O>, object: ObjectReader, signal: AbortSignal): Preparation<NoInfer<I> & Json> | Promise<Preparation<NoInfer<I> & Json>>;
+  execute(input: NoInfer<O>, object: ObjectExecutor, signal: AbortSignal): Promise<void>;
+}): ActionContribution {
+  return { contract, ...definition } as ActionContribution;
+}
+export function implementPreparer<I, O extends Json>(contract: ActionContract<I, O>, definition: {
+  id: string;
+  prepare(input: NoInfer<O>, object: ObjectReader, signal: AbortSignal): Preparation<NoInfer<I> & Json> | Promise<Preparation<NoInfer<I> & Json>>;
+}): CommandPreparer {
+  return { contract, ...definition } as CommandPreparer;
+}
+export function implementResource<S extends Json, V extends Json>(
   resource: ResourceContract<S>, view: DataContract<V>, definition: {
     records?: readonly RecordContract[];
     links?: ResourceContribution["links"];
-    creation?: {
-      schema: z.ZodType<I>;
-      prepare?(input: NoInfer<I>, signal: AbortSignal): Promise<NoInfer<I>>;
-      create(input: NoInfer<I>, object: ObjectContext): { title: string; data: NoInfer<S> };
-    };
-    actions?: {
-      schema: z.ZodType<C>;
-      prepare?(input: NoInfer<C>, object: ObjectContext, signal: AbortSignal): Preparation<NoInfer<C>> | Promise<Preparation<NoInfer<C>>>;
-      execute(input: NoInfer<C>, object: ObjectContext, signal: AbortSignal): Promise<void>;
-    };
-    project(data: NoInfer<S>, object: ObjectContext): NoInfer<V>;
-    inspect(data: NoInfer<S>, object: ObjectContext): Promise<Json>;
-    context?(data: NoInfer<S>, object: ObjectContext): Promise<ContextFile[]>;
+    creation?: CreationContribution;
+    actions?: readonly ActionContribution[];
+    project(data: NoInfer<S>, object: ObjectReader): NoInfer<V>;
+    inspect(data: NoInfer<S>, object: ObjectReader): Promise<Json>;
+    context?(data: NoInfer<S>, object: ObjectReader): Promise<ContextFile[]>;
   },
 ): ResourceContribution {
-  const { creation, actions } = definition;
   return {
     resource, records: [...definition.records ?? []], links: definition.links,
-    ...(creation ? { creation: {
-      schema: creation.schema as z.ZodType<Json>,
-      ...(creation.prepare ? { async prepare(input: Json, signal: AbortSignal) {
-        return jsonSchema.parse(parse(creation.schema, await creation.prepare!(parse(creation.schema, input, "input"), signal), "input"));
-      } } : {}),
-      create(input: Json, object: ObjectContext) {
-        const result = creation.create(parse(creation.schema, input, "input"), object);
-        return { title: result.title, data: jsonSchema.parse(parse(resource.stateSchema, result.data, "resource")) };
-      },
-    } } : {}),
-    ...(actions ? { actions: {
-      schema: actions.schema as z.ZodType<Json>,
-      ...(actions.prepare ? { async prepare(input: Json, object: ObjectContext, signal: AbortSignal): Promise<Preparation> {
-        const result = await actions.prepare!(parse(actions.schema, input, "input"), object, signal);
-        return result.action === "replace"
-          ? { action: "replace", input: jsonSchema.parse(parse(actions.schema, result.input, "input")) } : result;
-      } } : {}),
-      execute: (input: Json, object: ObjectContext, signal: AbortSignal) => actions.execute(parse(actions.schema, input, "input"), object, signal),
-    } } : {}),
+    creation: definition.creation, actions: definition.actions,
     project: (snapshot, object) => present(view, definition.project(parse(resource.stateSchema, snapshot.data, "resource"), object)),
     inspect: async (snapshot, object) => jsonSchema.parse(await definition.inspect(parse(resource.stateSchema, snapshot.data, "resource"), object)),
     context: async (snapshot, object) => definition.context?.(parse(resource.stateSchema, snapshot.data, "resource"), object) ?? [],
@@ -62,7 +54,7 @@ export function implementResource<S extends Json, V extends Json, I extends Json
 export function implementTool<S extends Json, T extends Json, A extends Json, D extends Json>(
   contract: ImplementationContract<S, T, A, D>, definition: {
     call(data: S, target: T, args: A, context: {
-      object: ObjectContext; signal: AbortSignal; publish(data: NoInfer<D>): void;
+      object: ObjectExecutor; signal: AbortSignal; publish(data: NoInfer<D>): void;
     }): Promise<CallResult<NoInfer<D>>>;
     toModel?(data: D): Json;
   },

@@ -1,14 +1,11 @@
 import { readdir, readFile, stat } from "node:fs/promises";
 import { basename, isAbsolute } from "node:path";
-import { z } from "zod";
-import { defineModule, implementResource, implementTool, PluginApiError, type CallResult } from "@atelier/sdk/runtime";
+import { defineModule, implementResource, implementCreation, implementTool, PluginApiError, type CallResult } from "@atelier/sdk/runtime";
 import { TextError, readText, readToModel, editText, textChange, changeToModel } from "../shared/text.ts";
-import { Directory, DirectoryView, DirectoryList, DirectoryRead, DirectoryEdit, DirectoryWrite } from "./contract.ts";
+import { Directory, CreateDirectory, DirectoryView, DirectoryList, DirectoryRead, DirectoryEdit, DirectoryWrite } from "./contract.ts";
 import { withinDirectory, writableTarget } from "./paths.ts";
 import { failed, filesystemFailure } from "./errors.ts";
 import { readTextFile, withFileMutation, commitTextFile, validateTextSize, UnconfirmedWriteError } from "./text-io.ts";
-
-const directoryCreateSchema = z.strictObject({ path: z.string().min(1).max(4096), title: z.string().trim().min(1).max(160).optional() });
 
 function textFailure(error: unknown, signal: AbortSignal, operation: string): CallResult<never> {
   if (error instanceof UnconfirmedWriteError) return { kind: "unknown", message: error.message };
@@ -32,20 +29,19 @@ export default defineModule(() => ({
         return { ...base, exists: failure.error.code === "resource_not_found" || failure.error.code === "resource_not_directory" ? false : null, error: failure.error };
       }
     },
-    creation: {
-      schema: directoryCreateSchema,
+    creation: implementCreation(CreateDirectory, {
       /** 拖入与对话框共用；title 可选，不填用 basename。只接受存在的绝对目录路径。 */
-      async prepare({ path, title }, signal) {
+      async prepare({ path }, signal) {
         signal.throwIfAborted();
         if (!isAbsolute(path)) throw new PluginApiError("invalid_argument", "Directory path must be absolute.");
         if (!(await stat(path).catch(() => null))?.isDirectory()) throw new PluginApiError("invalid_argument", "The path is not an existing directory.");
         signal.throwIfAborted();
-        return { path, ...(title ? { title } : {}) };
+        return { action: "accept" };
       },
       create({ path, title }) {
         return { title: title ?? (basename(path) || path), data: { path } };
       },
-    },
+    }),
     async context(directory) {
       const file = await withinDirectory(directory.path, "AGENTS.md").catch(() => null);
       if (!file) return [];

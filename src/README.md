@@ -16,7 +16,7 @@
 | `execution/` | 单次模型请求与工具批次、流块状态机、请求能力视图、外部工具策略与固定宿主操作入口；外层循环归插件 Agent | model、resources、tools、存储格式 adapter |
 | `resources/` | 资源身份生成、后台契约、注册目录、卡片投影与环境聚合 | shared、session 对象类型、Nano ID |
 | `tools/` | 两层共用的工具定义投影、实现注册与产出校验、终结模型投影、支持关系；不持有外部授权策略 | shared、session 对象类型 |
-| `plugins/` | 包加载、配置／凭据／任务托管、公开 SDK 的会话与对象门面、资源与工具 adapter、提交后派发 | SDK、session、resources、tools |
+| `plugins/` | 包与公共模块图加载、配置／凭据托管、读取／执行门面、具型命令校验、共享运行生命周期、资源／工具适配、core 存储与目录适配、提交后派发 | SDK、session、resources、tools |
 | `modules/` | core 的资源、代理、命名与视图；`modules/shared/` 承接共享工具契约和正文算法，见目录 README | 后台/前端分入口；宿主能力通过公开 SDK 消费，公共视觉复用 renderer/shared |
 | `renderer/` | 应用视图、视图注册机制、React Flow、用户意图 | shared、modules 前端入口、React 与 UI 库；不访问 Node/数据库 |
 
@@ -26,7 +26,7 @@
 
 会话命令先由 Zod 校验，再交运行时单一写入者处理。业务创建、查询索引与初始视图处于同一事务；正文引用只在内容文件成功落盘后进入事件。命令返回受理结果，读取返回指定位置的会话树与工作台投影，UI 将其映射为画布和代理对话。
 
-路径遍历、块识别和合法续接判断统一位于 `shared/session-path.ts`，运行时与 renderer 共用。`execution/request.ts` 完成一次补全及工具批次，`execution/response.ts` 只持有该响应的临时流状态；具型块与终态交消费方提交到时间轴。内置 Agent 在 `modules/agent/runtime.ts` 推动外层循环，每次从时间轴重新投影，`plugins/record-writer.ts` 与 `plugins/records.ts` 承接宿主存储编码。未完成输出经 `session.progress` 的 `live` 字段提供给界面，不写入存储；完整读取携带当前进度以恢复连接。数据库结构只在运行时建库，仓储构造不隐式建表。
+路径遍历、块识别和合法续接判断统一位于 `shared/session-path.ts`，运行时与 renderer 共用。`execution/request.ts` 完成一次补全及工具批次，`execution/response.ts` 只持有该响应的临时流状态；具型块与终态交消费方提交到时间轴。内置 Agent 由 `modules/agent/runtime.ts` 装配，`selection.ts` 解析选择与策略，`admission.ts` 原子受理输入，`loop.ts` 每次从时间轴重新投影并推动下一请求。`plugins/record-writer.ts` 与 `plugins/records.ts` 处理通用信封，`core-record-writer.ts / core-records.ts` 集中 core 与物理格式的映射。未完成输出经 `session.progress` 的 `live` 字段提供给界面，不写入存储；完整读取携带当前进度以恢复连接。数据库结构只在运行时建库，仓储构造不隐式建表。
 
 块的 `requestParentId` 记录请求使用的路径末端；`modules/agent/projection.ts` 按具型记录在该位置后组合响应，把期间事件留在响应外。终态通过 `SessionTree.completeBlock` 只追加一次并绑定到最高序号块，读取时合并可空字段，原始节点不变。`SessionTree.select` 将选择审计与游标更新原子提交，`cursorSelections` 可读取日志。`seq` 只计节点追加，视图同步使用独立 `revision`，涵盖计量、游标、配置选择和布局变化。
 

@@ -4,6 +4,7 @@ import { editOperationSchema } from "./text-contract.ts";
 
 /** 内置共享工具；模块也可声明独特工具或引用其他模块导出的定义。 */
 export const List = defineTool({
+  id: "atelier.core/tool.list",
   name: "list",
   description: "List the entries in a container to discover its contents and entry types.",
   guidelines: [
@@ -15,6 +16,7 @@ export const List = defineTool({
 });
 
 export const Read = defineTool({
+  id: "atelier.core/tool.read",
   name: "read",
   description: "Read the selected text content, with edit anchors by default.",
   guidelines: [
@@ -29,6 +31,7 @@ export const Read = defineTool({
 });
 
 export const Edit = defineTool({
+  id: "atelier.core/tool.edit",
   name: "edit",
   description: "Apply a batch of line-anchored text edits to an existing target, and return the actual diff and fresh anchors.",
   guidelines: [
@@ -46,6 +49,7 @@ export const Edit = defineTool({
 });
 
 export const Write = defineTool({
+  id: "atelier.core/tool.write",
   name: "write",
   description: "Write the complete text to a target, creating it where supported or overwriting its existing content.",
   guidelines: [

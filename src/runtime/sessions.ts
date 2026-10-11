@@ -7,8 +7,9 @@ import { SessionError, SessionTree } from "../session/tree.ts";
 import { foldWorkbench, type FoldedObject } from "../session/fold.ts";
 import { AgentCapabilities } from "../execution/capabilities.ts";
 import { createModules } from "../modules/runtime.ts";
+import { createCoreCatalogs } from "../plugins/core-catalogs.ts";
 import { createModelServices } from "../plugins/models.ts";
-import { Agent, agentCommandSchema } from "../modules/agent/contract.ts";
+import { Agent, CreateAgent, SubmitAgentInput } from "../modules/agent/contract.ts";
 import type { SessionHost, SessionHostWriter as SessionWriter } from "../plugins/host.ts";
 import type { PluginManifest } from "../plugins/loader.ts";
 import type { ResourceRef, PluginDefinition } from "@atelier/sdk/runtime";
@@ -22,8 +23,9 @@ import { sessionCommandSchema, sessionSnapshotSchema, type SessionChanged, type 
 import { sessionPath, snap } from "../shared/session-path.ts";
 import { SessionWorkbench } from "./workbench.ts";
 import { PluginApiError } from "@atelier/sdk/runtime";
-import type { Json } from "@atelier/sdk/contracts";
+import { resourceCall, type ResourceCall, type Json } from "@atelier/sdk/contracts";
 import type { LoadedPlugins } from "../plugins/loader.ts";
+import type { ParsedCall } from "../plugins/commands.ts";
 import type { ObjectStreamPayload } from "../shared/object-stream.ts";
 
 const agentKind = Agent.kind;
@@ -43,7 +45,7 @@ export class SessionService {
   readonly plugins: readonly PluginManifest[];
   readonly configurePlugins: LoadedPlugins["configure"];
   private readonly closePlugins: () => Promise<void>;
-  private readonly prepare: (kind: string, command: Json, context: { sessionId: string; objectId: string; signal: AbortSignal }) => Promise<Json>;
+  private readonly prepare: LoadedPlugins["prepare"];
   private readonly committed: (sessionId: string, nodes: SessionNode[]) => void;
   private readonly modelActivity: (sessionId: string) => { running: string[]; live: LiveBlock[] };
   constructor(private readonly db: DatabaseSync, dataRoot: string, configuration: ConfigurationService,
@@ -92,7 +94,7 @@ export class SessionService {
       return null;
     };
     const modules = createModules({ extensionsDirectory: join(dataRoot, "extensions"), data: new SessionDataStore(db), refOf, vault: configuration.vault, stream,
-      sessions: host, ...createModelServices(configuration, adapterFactory) }, external);
+      sessions: host, models: createModelServices(configuration, adapterFactory), catalogs: createCoreCatalogs(configuration) }, external);
     this.resources = modules.resources;
     this.tools = modules.tools;
     this.plugins = modules.manifest;
@@ -184,14 +186,14 @@ export class SessionService {
       workbench: this.workbench.project(sessionId, title, path) });
   }
   /** 资源命令入口：事务外准备，执行时 before 在提交事务内重验对象仍在当前路径上。 */
-  private async invoke(sessionId: string, objectId: string, raw: Json): Promise<void> {
+  private async invoke(sessionId: string, objectId: string, raw: ResourceCall): Promise<void> {
     const resource = this.object(sessionId, objectId);
     const controller = this.resources.controller(resource.kind);
     if (!controller?.execute) throw new SessionError("invalid_request", "This resource has no actions.");
     const command = await this.prepareCommand(resource.kind, raw, { sessionId, objectId });
     await controller.execute({ sessionId, resource }, command, () => { this.object(sessionId, objectId); });
   }
-  private async prepareCommand(kind: string, raw: Json, context: { sessionId: string; objectId: string }): Promise<Json> {
+  private async prepareCommand(kind: string, raw: ResourceCall, context: { sessionId: string; objectId: string }): Promise<ParsedCall> {
     try { return await this.prepare(kind, raw, { ...context, signal: AbortSignal.timeout(10_000) }); }
     catch (error) {
       if (error instanceof PluginApiError) throw new SessionError(
@@ -227,7 +229,7 @@ export class SessionService {
       case "resource.create": {
         this.tree.cursor(command.sessionId);
         const controller = this.resources.controller(command.kind);
-        const input = controller?.prepareCreate ? await controller.prepareCreate(command.input) : command.input;
+        const input = controller?.prepareCreate ? await controller.prepareCreate({ ...command.creation, input: command.input }) : command.input;
         this.commit(command.sessionId, () => this.workbench.create(command.sessionId, command.kind, input, command.position));
         return { kind: "accepted", sessionId: command.sessionId };
       }
@@ -269,7 +271,7 @@ export class SessionService {
     const prior = existing(); if (prior) return prior;
     const agents = this.resources.controller(agentKind)!;
     const selection = { agent: command.agent, model: command.model, thinking: command.thinking };
-    const input = await agents.prepareCreate!({ selection });
+    const input = await agents.prepareCreate!(resourceCall(CreateAgent, { selection }));
     const again = existing(); if (again) return again;
     const sessionId = randomUUID();
     const agentId = createResourceId();
@@ -280,14 +282,12 @@ export class SessionService {
     };
     const resource: FoldedObject = { id: agentId, kind: agentKind, title: "", data: {} };
     // 首页首条输入同样经准备流水线；此时代理尚未创建，objectId 为将要创建的身份。
-    const submit = await this.prepareCommand(agentKind, { type: "submit", submissionId: command.submissionId, text: command.text }, { sessionId, objectId: agentId });
-    if (agentCommandSchema.parse(submit).type !== "submit") throw new SessionError("invalid_request", "The first input must remain a submit command.");
+    const submit = await this.prepareCommand(agentKind, resourceCall(SubmitAgentInput, { type: "submit", submissionId: command.submissionId, text: command.text }), { sessionId, objectId: agentId });
     await agents.execute!({ sessionId, resource }, submit, before);
     return { kind: "accepted", sessionId };
   }
   async close(): Promise<void> {
     this.closed = true;
-    await Promise.allSettled(this.resources.controllers().map(controller => controller.close?.()));
     await this.closePlugins();
     this.writesClosed = true;
   }

@@ -37,9 +37,9 @@ async function execute(request: ModelRunRequest, adapter: ModelAdapter, capabili
   return runModelRequest(request, Promise.resolve({ adapter, settings, capabilities, system: request.system, messages: request.messages }));
 }
 const resource = { id: "r", kind: "example.resource/item", title: "Item", data: {} };
-const write = defineImplementation({ ...defineData("example.resource/write", 1, z.number().describe("Current value.")),
+const write = defineImplementation({ ...defineData("example.resource/write", z.number().describe("Current value.")),
   resource: defineResource(resource.kind, z.object({})),
-  tool: defineTool({ name: "write", description: "Write a value.", guidelines: [], argsSchema: z.object({}).describe("No arguments.") }),
+  tool: defineTool({ id: "test.tools/write", name: "write", description: "Write a value.", guidelines: [], argsSchema: z.object({}).describe("No arguments.") }),
   targetSchema: z.null().describe("The whole item."), effect: "write", execution: "sequential" });
 
 describe("无状态的单次模型执行", () => {
