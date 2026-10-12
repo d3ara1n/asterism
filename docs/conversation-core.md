@@ -25,7 +25,7 @@ block 通过 response_id 关联，response 由消费者投影，不设独立 res
 ```ts
 type ModelInputPart =
   | { kind: "text"; text: string }
-  | { kind: "image" | "audio" | "video"; file: ContentRef; mediaType: string; filename?: string };
+  | { kind: "file"; file: ContentRef; mediaType: string; filename?: string };
 ```
 
 纯文字也使用 text 部件。文件身份复用宿主 ContentRef，MIME 和可选文件名属于消费元数据；协议不接受路径、URL、base64 或字节本体。系统提示沿用纯文字 PromptBlock，输出与工具结果保持原契约。
