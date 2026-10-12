@@ -1,6 +1,8 @@
 import { RendererNavigationProvider } from "@atelier/sdk/renderer";
-import { CreateDirectory } from "../../../modules/filesystem/contract";
-import { reference } from "@atelier/sdk/contracts";
+import type { DropItem } from "@atelier/sdk/renderer";
+import type { Point } from "../../../shared/workbench";
+import { dragKinds, snapshotDrop } from "../creation/snapshot";
+import type { DragKind } from "../creation/routing";
 import { RendererCatalogProvider } from "../../modules/object-context";
 import type { WorkbenchOperation } from "../session/controller";
 import { useCallback, useEffect, useLayoutEffect, useImperativeHandle, useMemo, useRef, useState, type ReactNode, type Ref } from "react";
@@ -35,12 +37,13 @@ export interface WorkbenchHandle {
   canvas: WorkbenchCanvas;
 }
 
-type Props = WorkbenchEnvironment & { ref?: Ref<WorkbenchHandle>; onHome(): void };
+type DropHandlers = { canDrop(kinds: readonly DragKind[]): boolean; onDropItems(items: readonly DropItem[], origin: Point): void };
+type Props = WorkbenchEnvironment & DropHandlers & { ref?: Ref<WorkbenchHandle>; onHome(): void };
 type Run = (command: WorkbenchOperation) => Promise<boolean>;
 type WorkbenchEdge = Edge<ConnectionEdge["data"]>;
 
 /** 工作台根浮岛：投影平级对象和关系；代理对话只是代理对象的卡片内容。 */
-export function Workbench({ ref, controller, session, ready, busy, historical, run, onHome }: Props) {
+export function Workbench({ ref, controller, session, ready, busy, historical, run, onHome, canDrop, onDropItems }: Props) {
   const canvasRef = useRef<WorkbenchCanvas>(null);
   const canvas = useMemo<WorkbenchCanvas>(() => ({
     findPlacement: options => canvasRef.current?.findPlacement(options) ?? null,
@@ -66,14 +69,14 @@ export function Workbench({ ref, controller, session, ready, busy, historical, r
 
   return <RendererNavigationProvider value={{ home: onHome }}><RendererCatalogProvider ready={ready}><WorkbenchContext.Provider value={context}>
     <div className="relative h-full">
-      <ReactFlowProvider><Canvas ref={canvasRef} session={session} run={run} writable={ready && !busy && !historical} /></ReactFlowProvider>
+      <ReactFlowProvider><Canvas ref={canvasRef} session={session} run={run} writable={ready && !busy && !historical} canDrop={canDrop} onDropItems={onDropItems} /></ReactFlowProvider>
       {historical && <div role="status"
         className="surface-floating absolute bottom-[var(--overlay-inset)] left-1/2 z-10 flex -translate-x-1/2 items-center gap-3 whitespace-nowrap p-1 pl-3 text-sm">
         <span>{t.viewingHistory}</span>
         <Button size="sm" onClick={controller.followCursor}>{t.backToLive}</Button>
       </div>}
       {session.objects.length === 0 && <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-        <p className="type-caption">{s("Use Add, or drop folders here.", "使用「添加」，或把文件夹拖到这里。")}</p>
+        <p className="type-caption">{s("Use Add, or drop content here.", "使用「添加」，或把内容拖到这里。")}</p>
       </div>}
       {/* 忙碌/就绪频繁切换不播报；仅不可用时作为提示。 */}
       <Badge variant="outline" role={!busy && !ready ? "alert" : undefined}
@@ -84,7 +87,7 @@ export function Workbench({ ref, controller, session, ready, busy, historical, r
   </WorkbenchContext.Provider></RendererCatalogProvider></RendererNavigationProvider>;
 }
 
-function Canvas({ ref, session, run, writable }: {
+function Canvas({ ref, session, run, writable, canDrop, onDropItems }: DropHandlers & {
   ref?: Ref<WorkbenchCanvas>; session: WorkbenchSnapshot; run: Run; writable: boolean;
 }) {
   const flow = useReactFlow();
@@ -152,17 +155,13 @@ function Canvas({ ref, session, run, writable }: {
       void run({ type: "link.set", sessionId: latest.current.id, ...link, linked: false });
     }
   }, [run]);
-  // 拖入文件夹：主进程只接收绝对路径，由目录模块校验是否为已存在目录。
+  // 拖入内容：放下时同步快照，再交给宿主创建协调器仲裁。
   const onDrop = (event: React.DragEvent) => {
     setDropping(false);
-    if (!writable || !event.dataTransfer.files.length) return;
+    if (!writable || !canDrop(dragKinds(event.dataTransfer))) return;
     event.preventDefault();
-    const origin = flow.screenToFlowPosition({ x: event.clientX, y: event.clientY });
-    [...event.dataTransfer.files].forEach((file, index) => {
-      const path = window.host.pathForFile(file);
-      if (path) void run({ type: "resource.create", sessionId: latest.current.id, kind: "atelier.core/directory", creation: reference(CreateDirectory), input: { path },
-        position: { x: origin.x + index * 32, y: origin.y + index * 32 } });
-    });
+    const items = snapshotDrop(event.dataTransfer);
+    if (items.length) onDropItems(items, flow.screenToFlowPosition({ x: event.clientX, y: event.clientY }));
   };
   const onNodesChange = useCallback((changes: NodeChange<ObjectNodeType>[]) => {
     setNodes(current => applyNodeChanges(changes, current));
@@ -178,7 +177,7 @@ function Canvas({ ref, session, run, writable }: {
       }
     }
   }, [run, toNodes, onView]);
-  return <div ref={viewportElement} className="relative h-full" onDragOver={event => { if (writable && event.dataTransfer.types.includes("Files")) { event.preventDefault(); setDropping(true); } }}
+  return <div ref={viewportElement} className="relative h-full" onDragOver={event => { if (writable && canDrop(dragKinds(event.dataTransfer))) { event.preventDefault(); setDropping(true); } }}
     onDragLeave={event => { if (event.currentTarget === event.target) setDropping(false); }} onDrop={onDrop}>
   {dropping && <div className="pointer-events-none absolute inset-2 z-20 flex items-center justify-center rounded-lg border-2 border-dashed border-primary bg-primary/5">
     <p className="type-body">{s("Drop to add as resources", "松开以添加为资源")}</p></div>}

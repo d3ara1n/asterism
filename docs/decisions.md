@@ -180,4 +180,5 @@ provider tools 只暴露固定宿主操作入口；动态资源实例通过消�
 - 配色、圆角、密度（紧凑/标准/宽松）与画布纹理属于用户可选主题；密度以 token 统一缩放，不在调用处写死尺寸。亮暗模式（跟随系统/浅色/深色）、主题色与灰色为独立设置，色值取自 `@radix-ui/colors` 的亮暗 12 级色阶；命名调色板只是主题色 + 灰色的推荐组合，选择时写入两项，不进存储、无选中态。切换任何一项只改变 token 的值，不改变 token 名。
 - 字体设置分界面字体与代码字体两项，存家族名，`null` 为系统默认；候选来自 Chromium Local Font Access API（`queryLocalFonts`），主进程仅对受信主框架放行 `local-fonts` 权限，其余权限一律拒绝。选择控件为 shadcn Popover + Command（依赖 `cmdk`）组合的 `FontPicker`；代码字体默认只列经 canvas 测宽判定的等宽字体，可切换显示全部。界面字号由密度决定，不另设；代码字号单独可选（11–18px 或跟随）。
 - 外观设置为非敏感应用设置，由主进程经 electron-store 存于 userData 下的 `appearance.json`，读出后以 Zod 逐项回退默认值；renderer 经 IPC 读写并把 token 写到 `:root`。
-- 持久化的本地数据分三类：设置（用户可见可改，如外观）、界面状态（应用顺手记录、不出现在设置页，如窗口尺寸与位置、侧栏宽度、「不再提示」）、任务视图状态（视口与卡片位置、尺寸，独立于任务历史，存 SQLite）。界面状态统一存于 userData 下的 `ui-state.json`，键与 schema 在 `src/shared/ui-state.ts` 登记，单项损坏回退默认、不做迁移；由主进程读写，renderer 首次需要时再开放仅限登记键的 IPC。
+- 持久化的本地数据分三类：设置（用户可见可改，如外观）、界面状态（应用顺手记录、不出现在设置页，如窗口尺寸与位置、侧栏宽度、「不再提示」）、任务视图状态（视口与卡片位置、尺寸，独立于任务历史，存 SQLite）。界面状态统一存于 userData 下的 `ui-state.json`，键与 schema 在 `src/shared/ui-state.ts` 登记，单项损坏回退默认、不做迁移；由主进程读写。renderer 只能经受控 IPC 读写 `preferences` 容器，键限于宿主路由记忆 `creation-route/` 与按插件隔离的 `plugin/<pluginId>/` 前缀。
+- 资源创建入口由插件在 renderer 声明（菜单与拖放同一原语），宿主仲裁候选并持有跨插件路由记忆；插件不拦截拖放事件，也不取得可写会话。详见插件 SDK。

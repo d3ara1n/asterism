@@ -46,7 +46,7 @@ export function adaptResource(contribution: ResourceContribution, sdk: SdkContex
     },
     controller: {
       ...(creation ? {
-        async prepareCreate(input: unknown) {
+        async prepareCreate(input: unknown, request?: AbortSignal) {
           try {
             const parsed = parseCall(creation.contract, resourceCallSchema.parse(input)).value;
             return await runs.start(async signal => {
@@ -54,7 +54,7 @@ export function adaptResource(contribution: ResourceContribution, sdk: SdkContex
               const prepared = applyPreparation(creation.contract, parsed, await creation.prepare?.(parsed, signal));
               signal.throwIfAborted();
               return prepared;
-            }, { timeoutMs: 10_000 }).done;
+            }, { timeoutMs: 10_000, signal: request }).done;
           } catch (error) {
             if (error instanceof PluginApiError && (error.code === "invalid_argument" || error.code === "rejected")) {
               throw new SessionError("invalid_request", error.message);

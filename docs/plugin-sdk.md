@@ -127,6 +127,18 @@ core 的用户输入、模型执行和通知与宿主物理会话格式的映射
 
 模型执行仍只完成一次补全及完整工具批次；Agent 持有非 context 状态，时间轴是 context 唯一真值。循环依赖明确的请求执行、领域投影和记录保存接口。命名模块继续按现有规模保持内聚，真实复用或独立变化出现时再拆分其内部业务模块。
 
+## 创建入口
+
+添加菜单与拖放共用一个原语：renderer 模块在 `creations` 中声明 `creationEntry(CreationContract, { id, label, icon?, group?, triggers, InputView? })`。入口是前端贡献，只负责产出创建输入；之后统一进入创建契约的解析、准备与宿主事务。同一契约可以有多个入口（空白、导入、URL 等），一个入口可以同时声明菜单与拖放来源。
+
+- `triggers.menu`：无载荷来源，可带 `initialInput`。
+- `triggers.drop`：`accepts` 为声明式条件（文件扩展名／MIME／是否目录、URL scheme、文本），悬停时宿主只按类别同步判断，不调用插件函数；放下后宿主先从 DataTransfer 读出 `DropItem` 快照（文件路径经桌面桥解析），再调用 `toInput(item)`，返回 null 表示拒绝。
+- `InputView`：任意插件组件（表单、预览等），只接收 `{ source, initialInput?, busy, resolve, cancel }`，不取得可写会话；缺省时由来源直接产出输入，菜单来源此时必须提供 `initialInput`。
+
+宿主创建协调器负责：候选仲裁、输入视图外壳与错误边界、放置位置、提交、等待与取消。0 个候选不受理，1 个直接进入，多个由用户选择并可记住。多项拖入逐项路由。联网等异步业务判断放在创建契约的 `prepare`；创建请求带请求身份，用户可在准备阶段取消，已进入事务的创建不受影响。
+
+路由记忆归宿主所有，键由宿主规范化并带版本，按扩展名 > MIME > URL scheme > 类别取最具体判别项（如 `creation-route/v1/drop:file/ext:.pdf`），值为全局入口 ID；只在记忆的入口仍属当前候选时命中，否则清理并重新选择。插件自有偏好经 `useRendererPreferences()` 读写，宿主按插件隔离在 `plugin/<pluginId>/` 下，读取按调用方 schema 校验。
+
 ## 前端组合
 
 前端基础对象接口提供对象身份、视图状态、会话读取与刷新、具型创建／动作、对象流订阅和通用运行状态。模型块、工具展示、配置目录分别通过具名的专门接口按需取用，共享宿主已有状态源，不为拆分接口复制状态或订阅真值。
@@ -134,6 +146,19 @@ core 的用户输入、模型执行和通知与宿主物理会话格式的映射
 草稿与提交身份由交互模块管理，按会话和对象绑定并跨卡片重挂载保留；相同输入重试保留身份，受理成功后清除。导航通过显式界面依赖提供。普通资源无需取得模型、对话草稿或 Agent 提交知识。
 
 Agent 对话由时间轴展示、输出跟随、消息输入、配置选择、Agent 交互协调组成。展示模块消费投影后的条目和明确的操作意图；交互协调负责受理结果、去重身份、发送后清理、继续与停止。只读对话与完整 Agent 对话复用同一套展示模块，差异在组合位置表达，不向单个组件累加控制全部功能的开关。
+
+## 创建入口
+
+添加菜单与拖放共用一个原语：renderer 模块的 `creations` 声明 `CreationEntry`，由 `creationEntry(CreationContract, { id, label, icon?, description?, group?, triggers, InputView? })` 构造。入口只负责产出创建输入，之后进入同一条准备与宿主创建事务；后台 `CreationContract` 不变。
+
+- `id` 使用声明插件的命名空间，全局唯一；同一契约可以有多个入口（空白、导入、URL 等）。
+- `triggers.menu` 是无载荷来源，可带 `initialInput`；`triggers.drop` 由声明式 `accepts`（文件扩展名／MIME／目录、URL scheme、文本）与 `toInput(item)` 组成，`toInput` 返回 `null` 表示拒绝。一个入口可同时声明两种来源。
+- `InputView` 是任意插件组件（表单、预览等），只接收 `{ source, initialInput?, busy, resolve, cancel }`，不取得可写会话。缺省时由来源直接产出输入。
+- 拖拽悬停只按 `accepts` 的类别同步判断，不调用插件函数；放下时宿主先把 DataTransfer 读成 `DropItem` 快照（文件路径经桌面桥解析），再精确匹配与调用 `toInput`。
+
+宿主创建协调器负责仲裁、输入视图外壳、放置位置、提交、等待、取消与错误展示。无候选不显示可放置状态，单个候选直接进入，多个候选弹出选择并可记住；多项拖入逐项路由。网络或文件读取放在创建的 `prepare`，请求带身份，用户可在准备阶段取消。
+
+路由记忆由宿主持有：键为宿主规范化、带版本的判别项（`creation-route/v1/drop:file/ext:.pdf`，优先级扩展名 > MIME > URL scheme > 类别），值为入口 `id`；只有记忆的入口仍在当前候选中才命中，否则清理并重新选择。插件自有偏好经 `useRendererPreferences()` 读写，宿主按插件隔离键并由调用方 schema 校验。
 
 ## 验证接口
 

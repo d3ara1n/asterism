@@ -1,26 +1,27 @@
 import { useRef, useState } from "react";
-import { Field, FieldError, FieldLabel } from "../../shared/ui/field";
-import { Input } from "../../shared/ui/input";
-import { Textarea } from "../../shared/ui/textarea";
-import { t } from "../../shared/i18n";
-import { ResourceCreationDialog, type ResourceCreationDialogState } from "./ResourceCreationDialog";
+import type { CreationInputProps } from "@atelier/sdk/renderer";
+import { Field, FieldError, FieldLabel } from "../../renderer/shared/ui/field";
+import { Input } from "../../renderer/shared/ui/input";
+import { Textarea } from "../../renderer/shared/ui/textarea";
+import { CreationForm } from "../../renderer/shared/creation-form";
+import { t } from "../../renderer/shared/i18n";
 
-/** 笔记在提交时检查名称；当前卡片只读，正文在此填写。 */
-export function AddNoteDialog({ onCreate, ...dialog }: ResourceCreationDialogState & {
-  onCreate: (input: { title: string; content: string }) => Promise<boolean>;
-}) {
+type Value = { title: string; content: string };
+
+/** 笔记在提交时检查名称；拖入文本时正文预填。 */
+export function NoteInput({ initialInput, busy, resolve, cancel }: CreationInputProps<Partial<Value>>) {
   const titleInput = useRef<HTMLInputElement>(null);
-  const [title, setTitle] = useState("");
-  const [content, setContent] = useState("");
+  const [title, setTitle] = useState(initialInput?.title ?? "");
+  const [content, setContent] = useState(initialInput?.content ?? "");
   const [titleError, setTitleError] = useState<string | null>(null);
-  return <ResourceCreationDialog {...dialog} title={t.createNoteTitle} description={t.createNoteDescription}
+  return <CreationForm busy={busy} onCancel={cancel}
     validate={() => {
       if (title.trim()) return true;
       setTitleError(t.nameRequired);
       titleInput.current?.focus();
       return false;
     }}
-    onCreate={() => onCreate({ title: title.trim(), content })}>
+    onSubmit={() => resolve({ title: title.trim(), content })}>
     <Field data-invalid={!!titleError}>
       <FieldLabel htmlFor="note-title">{t.name}</FieldLabel>
       <Input ref={titleInput} id="note-title" autoFocus required maxLength={160} value={title}
@@ -33,5 +34,5 @@ export function AddNoteDialog({ onCreate, ...dialog }: ResourceCreationDialogSta
       <Textarea id="note-content" className="field-sizing-fixed max-h-[40dvh]" maxLength={100_000} rows={7}
         value={content} onChange={e => setContent(e.target.value)} />
     </Field>
-  </ResourceCreationDialog>;
+  </CreationForm>;
 }

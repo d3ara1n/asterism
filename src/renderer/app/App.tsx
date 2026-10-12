@@ -1,7 +1,3 @@
-import { CreateAgent } from "../../modules/agent/contract";
-import { CreateNote } from "../../modules/notes/contract";
-import { CreateDirectory } from "../../modules/filesystem/contract";
-import { reference } from "@atelier/sdk/contracts";
 import type { WorkbenchOperation } from "../features/session/controller";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { ArrowLeft, ChevronDown, Plus, History, House, KeyRound, ListTree, PanelLeft, Settings, X } from "lucide-react";
@@ -16,16 +12,10 @@ import { SettingsPage } from "../features/settings/SettingsPage";
 import { HomePage, type StartInput } from "../features/home/HomePage";
 import { Workbench, type WorkbenchHandle } from "../features/workbench/Workbench";
 import { WorkbenchSurface } from "../features/workbench/WorkbenchSurface";
-import { useModuleViews } from "../modules/views";
+import { useCreationCoordinator } from "../features/creation/coordinator";
 import { SubmissionIdentity } from "../shared/submission";
 import { sessionController } from "../features/session/registry";
-import { useConfiguration } from "../features/configuration/state";
 import { s } from "../shared/i18n";
-import type { AgentSelection } from "../../shared/model";
-import type { Json } from "@atelier/sdk/contracts";
-import { AddAgentDialog } from "../features/workbench/AddAgentDialog";
-import { AddNoteDialog } from "../features/workbench/AddNoteDialog";
-import { AddDirectoryDialog } from "../features/workbench/AddDirectoryDialog";
 import { Titlebar, Window } from "./Window";
 import { Sidebar } from "./Sidebar";
 import { Space } from "../shared/weave/Space";
@@ -36,12 +26,10 @@ import { islandTransition } from "../shared/weave/motion";
 /** 主屏包含侧栏与首页/工作台；设置为左侧独立屏，切换时主屏整体平移。 */
 type MainView = { kind: "home" } | { kind: "conversation"; sessionId: string };
 type PageId = "settings" | "main";
-type ResourceCreation = { kind: "atelier.core/agent" | "atelier.core/note" | "atelier.core/directory"; sessionId: string };
 const idleSubscribe = () => () => {};
 const noSession = () => null;
 
 export function App({ controller }: { controller: ApplicationController }) {
-  const moduleViews = useModuleViews();
   const state = useSyncExternalStore(controller.subscribe, controller.getSnapshot);
   const workbench = useRef<WorkbenchHandle>(null);
   const returnFocus = useRef<HTMLElement | null>(null);
@@ -50,7 +38,6 @@ export function App({ controller }: { controller: ApplicationController }) {
   const [view, setView] = useState<MainView>({ kind: "home" });
   const [sidebarVisible, setSidebarVisible] = useState(true);
   const [draft, setDraft] = useState("");
-  const [resourceCreation, setResourceCreation] = useState<ResourceCreation | null>(null);
   const start = useStart();
   // 每次导航递增；异步创建完成时据此判断用户是否已离开，不夺走当前视图。
   const navigation = useRef(0);
@@ -89,7 +76,7 @@ export function App({ controller }: { controller: ApplicationController }) {
   });
   const navigate = (next: MainView) => {
     navigation.current++;
-    setView(next); setPage("main"); setResourceCreation(null);
+    setView(next); setPage("main");
     controller.clearError();
     focusMain();
   };
@@ -108,44 +95,10 @@ export function App({ controller }: { controller: ApplicationController }) {
     if (token === navigation.current) openSession(created);
     void controller.refresh();
   };
-  /** 表单绑定会话；提交时按最新画布寻找空位，避免使用过时的位置。 */
-  const openResourceCreation = (kind: ResourceCreation["kind"]) => {
-    if (active && writable) { active.clearError(); setResourceCreation({ kind, sessionId: active.sessionId }); }
-  };
-  const createResource = async (input: Json) => {
-    if (!active || !resourceCreation || active.sessionId !== resourceCreation.sessionId) return false;
-    const { kind } = resourceCreation;
-    const canvas = workbench.current?.canvas;
-    const placement = canvas?.findPlacement({ kind });
-    if (!canvas || !placement || placement.sessionId !== active.sessionId) return false;
-    const before = active.getSnapshot();
-    const existing = new Set(before.snapshot?.workbench.objects.map(object => object.id));
-    const token = navigation.current;
-    const contract = [CreateAgent, CreateNote, CreateDirectory].find(value => value.resource.kind === kind);
-    if (!contract) return false;
-    const result = await active.executeAndRead({ type: "resource.create", sessionId: placement.sessionId, kind, creation: reference(contract), input, position: placement.position });
-    const after = active.getSnapshot();
-    if (result.ok && after.status === "ready" && token === navigation.current
-      && after.navigationVersion === before.navigationVersion && canvas === workbench.current?.canvas) {
-      // 受理结果不携带对象身份，从命令之后的真实投影识别新增对象。
-      const created = after.snapshot?.workbench.objects.filter(object => !existing.has(object.id) && object.kind === kind) ?? [];
-      if (created.length === 1) void canvas.focusObjects([...placement.selectedObjectIds, created[0]!.id]);
-    }
-    return result.ok;
-  };
-  // 迟到的回调只能关闭它所属的创建表单。
-  const closeResourceCreation = () => setResourceCreation(current => current === resourceCreation ? null : current);
-  const creationDialog = {
-    busy: sessionBusy,
-    error: sessionState?.error,
-    onClose: closeResourceCreation,
-    onRetry: sessionState?.status === "error" ? () => { void active?.refresh(); } : undefined,
-  };
-  const addDirectory = () => openResourceCreation("atelier.core/directory");
-  const configuration = useConfiguration(ready);
-  const addAgent = () => openResourceCreation("atelier.core/agent");
-  const createAgent = (selection: AgentSelection, title?: string) => createResource({ selection, ...(title ? { title } : {}) });
-  const addNote = () => openResourceCreation("atelier.core/note");
+  const creation = useCreationCoordinator({ controller: active, canvas: () => workbench.current?.canvas ?? null, writable, ready });
+  const menuGroup = (group: "agents" | "resources") => creation.menu.filter(entry => (entry.group ?? "resources") === group)
+    .map(entry => <DropdownMenuItem key={entry.id} onSelect={() => creation.open(entry)}>{entry.icon}{entry.label}{entry.InputView ? "…" : ""}</DropdownMenuItem>);
+  const agentItems = menuGroup("agents"), resourceItems = menuGroup("resources");
   const hideSidebar = () => {
     setSidebarVisible(false);
     requestAnimationFrame(() => sidebarToggle.current?.focus({ preventScroll: true }));
@@ -170,12 +123,9 @@ export function App({ controller }: { controller: ApplicationController }) {
     <DropdownMenu modal={false}><DropdownMenuTrigger asChild>
       <Button variant="ghost" size="sm" disabled={!writable} aria-label={s("Add to workbench", "添加到工作台")}><Plus /><span className="toolbar-label">{s("Add", "添加")}</span><ChevronDown className="text-muted-foreground" /></Button>
     </DropdownMenuTrigger><DropdownMenuContent align="end">
-      <DropdownMenuLabel>{s("Agents", "代理")}</DropdownMenuLabel>
-      <DropdownMenuItem onSelect={addAgent}>{moduleViews.resource("atelier.core/agent").icon}{moduleViews.resource("atelier.core/agent").label}…</DropdownMenuItem>
-      <DropdownMenuSeparator />
-      <DropdownMenuLabel>{s("Resources", "资源")}</DropdownMenuLabel>
-      <DropdownMenuItem onSelect={addNote}>{moduleViews.resource("atelier.core/note").icon}{moduleViews.resource("atelier.core/note").label}…</DropdownMenuItem>
-      <DropdownMenuItem onSelect={addDirectory}>{moduleViews.resource("atelier.core/directory").icon}{moduleViews.resource("atelier.core/directory").label}…</DropdownMenuItem>
+      {agentItems.length > 0 && <><DropdownMenuLabel>{s("Agents", "代理")}</DropdownMenuLabel>{agentItems}</>}
+      {agentItems.length > 0 && resourceItems.length > 0 && <DropdownMenuSeparator />}
+      {resourceItems.length > 0 && <><DropdownMenuLabel>{s("Resources", "资源")}</DropdownMenuLabel>{resourceItems}</>}
     </DropdownMenuContent></DropdownMenu>
     <Button variant="ghost" size="sm" onClick={event => workbench.current?.togglePanel("access", event.currentTarget)} aria-label={t.accessLabel}><KeyRound /><span className="toolbar-label">{t.access}</span></Button>
     <Button variant="ghost" size="sm" onClick={event => workbench.current?.togglePanel("objects", event.currentTarget)} aria-label={t.objects}><ListTree /><span className="toolbar-label">{t.objects}</span></Button>
@@ -189,7 +139,7 @@ export function App({ controller }: { controller: ApplicationController }) {
     </div> : undefined}>
     {session && active ? <Workbench key={session.id} ref={workbench} session={session} controller={active} historical={historical}
       ready={ready} busy={sessionBusy} run={run}
-      onHome={goHome} /> : null}
+      onHome={goHome} canDrop={creation.canDrop} onDropItems={creation.drop} /> : null}
   </WorkbenchSurface>;
   const sidebar: IslandSpec = {
     id: "navigation", label: t.appNavigation, width: { min: 224, max: 224 },
@@ -223,15 +173,13 @@ export function App({ controller }: { controller: ApplicationController }) {
           content: <Screen label={t.appNavigation} leading={sidebarVisible ? [sidebar] : []} root={main} resetKey={view.kind === "conversation" ? view.sessionId : "home"} className="h-full" /> },
       ]} />
     </Window>
-    {error && !resourceCreation && <Alert variant="destructive" className="fixed bottom-4 left-1/2 z-[60] w-[min(560px,calc(100%-32px))] -translate-x-1/2 flex items-start gap-3 shadow-md">
+    {error && <Alert variant="destructive" className="fixed bottom-4 left-1/2 z-[60] w-[min(560px,calc(100%-32px))] -translate-x-1/2 flex items-start gap-3 shadow-md">
       <AlertDescription className="flex-1">{error}</AlertDescription>
       {sessionState?.status === "error" && <Button variant="ghost" size="sm" onClick={() => { void active?.refresh(); }}>{t.retry}</Button>}
       {(state.error || sessionState?.status !== "error") && <Button variant="ghost" size="icon-xs" aria-label={t.dismissError} title={t.dismissError}
         onClick={state.error ? controller.clearError : active?.clearError}><X /></Button>}
     </Alert>}
-    {resourceCreation?.kind === "atelier.core/agent" && <AddAgentDialog {...creationDialog} configuration={configuration.snapshot} error={sessionState?.error ?? configuration.error} onCreate={createAgent} />}
-    {resourceCreation?.kind === "atelier.core/note" && <AddNoteDialog {...creationDialog} onCreate={createResource} />}
-    {resourceCreation?.kind === "atelier.core/directory" && <AddDirectoryDialog {...creationDialog} onCreate={createResource} />}
+    {creation.element}
   </>;
 }
 

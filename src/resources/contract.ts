@@ -17,7 +17,7 @@ export interface ResourceController {
   prepareCommand?(input: ParsedCall, ref: ResourceRef, signal: AbortSignal): Promise<ParsedCall>;
   parseCommand?(input: unknown): ParsedCall;
   /** 校验创建输入（可异步读取配置或文件系统），结果再交给 create。 */
-  prepareCreate?(input: unknown): Promise<Json>;
+  prepareCreate?(input: unknown, signal?: AbortSignal): Promise<Json>;
   /** 在创建事务内执行：返回标题与写入创建事件的不可变资源数据，可同时保存私有状态。 */
   create?(sessionId: string, objectId: string, input: Json): { title: string; data?: { [key: string]: Json } };
   execute?(context: ResourceCommandContext, command: ParsedCall, before?: () => void): Promise<void>;

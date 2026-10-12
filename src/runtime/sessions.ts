@@ -229,10 +229,25 @@ export class SessionService {
       case "resource.create": {
         this.tree.cursor(command.sessionId);
         const controller = this.resources.controller(command.kind);
-        const input = controller?.prepareCreate ? await controller.prepareCreate({ ...command.creation, input: command.input }) : command.input;
+        const abort = new AbortController();
+        if (command.requestId) {
+          if (this.creating.has(command.requestId)) throw new SessionError("conflict", "This creation request is already running.");
+          this.creating.set(command.requestId, abort);
+        }
+        let input: Json;
+        try {
+          input = controller?.prepareCreate ? await controller.prepareCreate({ ...command.creation, input: command.input }, abort.signal) : command.input;
+        } catch (error) {
+          if (abort.signal.aborted) throw new SessionError("conflict", "The creation was cancelled.");
+          throw error;
+        } finally { if (command.requestId) this.creating.delete(command.requestId); }
+        if (abort.signal.aborted) throw new SessionError("conflict", "The creation was cancelled.");
         this.commit(command.sessionId, () => this.workbench.create(command.sessionId, command.kind, input, command.position));
         return { kind: "accepted", sessionId: command.sessionId };
       }
+      case "resource.create.cancel":
+        this.creating.get(command.requestId)?.abort();
+        return { kind: "accepted", sessionId: command.sessionId };
       default: {
         if (command.type === "object.remove") {
           const target = this.object(command.sessionId, command.objectId);
@@ -248,6 +263,8 @@ export class SessionService {
   }
   /** 首页组合入口：建立会话、创建第一个代理资源，并以代理自己的 submit 发送首条输入，整体原子提交。 */
   private starting = new Map<string, Promise<SessionReply>>();
+  /** 准备中的创建请求；取消只中止准备，不回滚已提交的事务。 */
+  private creating = new Map<string, AbortController>();
   /** 同一提交身份的并发首页发送共享一次执行。 */
   private start(command: Extract<SessionCommand, { type: "start" }>): Promise<SessionReply> {
     const pending = this.starting.get(command.submissionId);

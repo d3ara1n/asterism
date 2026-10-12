@@ -10,6 +10,7 @@ import { applicationBrand, applicationDataDirectory, applicationId, applicationS
 import { followWindowAppearance, initialWindowAppearance } from "./window-appearance.ts";
 import { applyThemeSource, serveAppearance } from "./appearance.ts";
 import { initialWindowState, trackWindowState } from "./window-state.ts";
+import { servePreferences } from "./ui-state.ts";
 import { configurationChannel, configurationChangedChannel, configurationCommandSchema, type ConfigurationResult } from "../shared/configuration.ts";
 import { sessionChannel, sessionChangedChannel, sessionCommandSchema, type SessionResult } from "../shared/session.ts";
 import { pluginConfigurationChannel, pluginConfigurationCommandSchema, type PluginConfigurationResult } from "../shared/plugin-configuration.ts";
@@ -66,6 +67,7 @@ function createWindow(): void {
   const trusted = (event: Electron.IpcMainInvokeEvent) => event.sender === current.webContents &&
     event.senderFrame === current.webContents.mainFrame && event.senderFrame?.url === allowedURL;
   const stopAppearance = serveAppearance(current, trusted, () => refreshAppearance());
+  const stopPreferences = servePreferences(trusted);
   ipcMain.handle(sessionChannel, async (event, raw): Promise<SessionResult> => {
     if (!trusted(event)) return { ok: false, error: { code: "invalid_request", message: "Untrusted application frame." } };
     const parsed = sessionCommandSchema.safeParse(raw);
@@ -103,7 +105,7 @@ function createWindow(): void {
     return runtime.configure(parsed.data);
   });
   current.on("closed", () => {
-    window = null; ipcMain.removeHandler(commandChannel); ipcMain.removeHandler(configurationChannel); ipcMain.removeHandler(sessionChannel); ipcMain.removeHandler(pickDirectoryChannel); ipcMain.removeHandler(pluginConfigurationChannel); stopAppearance();
+    window = null; ipcMain.removeHandler(commandChannel); ipcMain.removeHandler(configurationChannel); ipcMain.removeHandler(sessionChannel); ipcMain.removeHandler(pickDirectoryChannel); ipcMain.removeHandler(pluginConfigurationChannel); stopAppearance(); stopPreferences();
   });
   const loading = developmentURL ? current.loadURL(developmentURL) : current.loadFile(rendererFile);
   loading.catch(error => { console.error("Renderer initialization failed.", error); dialog.showErrorBox(applicationBrand.en, "The application window could not be loaded."); });

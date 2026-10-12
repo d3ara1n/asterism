@@ -6,6 +6,7 @@ import { objectStreamChannel, objectStreamSchema } from "../shared/object-stream
 import { configurationChannel, configurationChangedChannel, configurationCommandSchema, configurationResultSchema } from "../shared/configuration.ts";
 import { appearanceChangedChannel, appearanceGetChannel, appearancePatchSchema, appearanceSetChannel, parseAppearance } from "../shared/theme.ts";
 import { sessionChannel, sessionChangedChannel, sessionCommandSchema, sessionResultSchema, sessionChangedSchema } from "../shared/session.ts";
+import { preferencesGetChannel, preferencesSetChannel, preferenceWriteSchema, uiStateSchemas } from "../shared/ui-state.ts";
 import { pluginConfigurationChannel, pluginConfigurationCommandSchema, pluginConfigurationResultSchema } from "../shared/plugin-configuration.ts";
 
 const bridge: DesktopBridge = {
@@ -53,6 +54,18 @@ const bridge: DesktopBridge = {
       const handler = () => listener();
       ipcRenderer.on(configurationChangedChannel, handler);
       return () => ipcRenderer.removeListener(configurationChangedChannel, handler);
+    },
+  },
+  preferences: {
+    async read() {
+      const raw = await ipcRenderer.invoke(preferencesGetChannel).catch(() => ({}));
+      const parsed = uiStateSchemas.preferences.safeParse(raw);
+      return parsed.success ? parsed.data : {};
+    },
+    async write(key, value) {
+      const parsed = preferenceWriteSchema.safeParse({ key, value });
+      if (!parsed.success) return false;
+      return (await ipcRenderer.invoke(preferencesSetChannel, parsed.data).catch(() => false)) === true;
     },
   },
   async pickDirectory() {

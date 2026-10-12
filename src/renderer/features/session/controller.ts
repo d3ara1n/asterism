@@ -201,6 +201,10 @@ export class SessionController {
       void this.read();
     }
   }
+  /** 取消准备中的创建：绕过命令队列，否则会排在被取消的创建之后。 */
+  cancelCreation = async (requestId: string): Promise<void> => {
+    await this.bridge.execute({ type: "resource.create.cancel", sessionId: this.sessionId, requestId }).catch(() => undefined);
+  };
   branchFrom = (nodeId: string | null): Promise<SessionResult> => this.execute({ type: "select", sessionId: this.sessionId, nodeId });
   mutate = async (command: WorkbenchOperation): Promise<boolean> => (await this.execute(command)).ok;
 }

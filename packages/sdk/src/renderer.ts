@@ -7,6 +7,8 @@ import type { ToolInvocationInfo, ToolResult } from "./tool-result.ts";
 import { reference, type ContractReference, type DataContract } from "./presentation.ts";
 import type { ResourceRef, SessionSnapshot } from "./workspace.ts";
 export * from "./renderer-services.ts";
+export * from "./renderer-creation.ts";
+import type { CreationEntry } from "./renderer-creation.ts";
 
 export type RendererReceipt = { ok: true } | { ok: false; error: { code: string; message: string } };
 /** 绑定卡片对象的前端能力；宿主负责订阅、命令门禁和当前视图的一致性。 */
@@ -80,6 +82,8 @@ export interface RendererModule {
   resources: ResourceDescription[];
   cards: CardRenderer[];
   tools: ToolRenderer[];
+  /** 创建入口：菜单与拖放由宿主统一仲裁，最终都走所绑定的创建契约。 */
+  creations?: CreationEntry[];
 }
 
 /** 类型擦除只发生在注册边界；组件接收到的是已通过契约校验的数据。 */

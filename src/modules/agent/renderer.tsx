@@ -1,5 +1,7 @@
 import { Bot } from "lucide-react";
-import { cardRenderer, useRendererNavigation, type RendererModule } from "@atelier/sdk/renderer";
+import { CreateAgent } from "./contract";
+import { AgentInput } from "./creation";
+import { creationEntry, cardRenderer, useRendererNavigation, type RendererModule } from "@atelier/sdk/renderer";
 import { t } from "../../renderer/shared/i18n";
 import { Conversation, ConversationActions } from "./conversation/Conversation";
 import { AgentView } from "./contract";
@@ -14,6 +16,7 @@ export default {
     Actions: ConversationActions,
   })],
   tools: [],
+  creations: [creationEntry(CreateAgent, { id: "atelier.core/agent.configured", label: t.kindAgent, icon: <Bot className="size-4" />, group: "agents", InputView: AgentInput, triggers: { menu: {} } })],
 } satisfies RendererModule;
 
 function AgentBody({ data }: { data: { selection: import("../../shared/model").AgentSelection | null } }) {

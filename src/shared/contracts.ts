@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { Json } from "@atelier/sdk/contracts";
 import { coreChannel } from "./core.ts";
 import type { ConfigurationBridge } from "./configuration.ts";
 import type { DesktopPlatform } from "./desktop.ts";
@@ -52,6 +53,8 @@ export interface DesktopBridge {
   configuration: ConfigurationBridge;
   appearance: AppearanceBridge;
   pluginConfiguration: PluginConfigurationBridge;
+  /** 受控偏好容器：只能读写 preferences 内宿主规定前缀的键。 */
+  preferences: { read(): Promise<Record<string, Json>>; write(key: string, value: Json | null): Promise<boolean> };
   readonly platform: DesktopPlatform;
   /** 系统目录选择窗口；取消返回 null。 */
   pickDirectory(): Promise<string | null>;

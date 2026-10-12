@@ -12,6 +12,7 @@ import { ModuleViewsProvider } from "./modules/views";
 import { builtinViews } from "../modules/renderer";
 import { ViewRegistry } from "./modules/registry";
 import { loadPluginRenderers } from "./modules/plugins";
+import { loadPreferences } from "./features/creation/preferences";
 
 document.documentElement.lang = locale === "zh" ? "zh-CN" : "en";
 
@@ -27,6 +28,7 @@ for (const module of modules) {
   catch (error) { console.error("Plugin views conflict with existing views and were skipped.", error); }
 }
 const moduleViews = new ViewRegistry(accepted);
+await loadPreferences();
 createRoot(document.getElementById("root")!).render(<StrictMode><ErrorBoundary><MotionConfig reducedMotion="user"><TooltipProvider>
   <ModuleViewsProvider registry={moduleViews}><App controller={controller} /></ModuleViewsProvider>
 </TooltipProvider></MotionConfig></ErrorBoundary></StrictMode>);

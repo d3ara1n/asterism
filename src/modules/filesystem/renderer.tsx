@@ -1,5 +1,7 @@
 import { Folder, ListTree, BookOpen, FilePenLine, FilePlus2 } from "lucide-react";
-import { cardRenderer, toolRenderer, type RendererModule } from "@atelier/sdk/renderer";
+import { CreateDirectory } from "./contract";
+import { DirectoryInput } from "./creation";
+import { creationEntry, cardRenderer, toolRenderer, type RendererModule } from "@atelier/sdk/renderer";
 import { s } from "../../renderer/shared/i18n";
 import { t } from "../../renderer/shared/i18n";
 import { DirectoryView, DirectoryList, DirectoryRead, DirectoryEdit, DirectoryWrite } from "./contract";
@@ -56,4 +58,6 @@ export default {
       },
     }),
   ],
+  creations: [creationEntry(CreateDirectory, { id: "atelier.core/directory.local", label: s("Directory", "目录"), icon: <Folder className="size-4" />, group: "resources", InputView: DirectoryInput,
+    triggers: { menu: {}, drop: { accepts: { files: { directories: true } }, toInput: item => item.kind === "file" && item.directory ? { path: item.path } : null } } })],
 } satisfies RendererModule;

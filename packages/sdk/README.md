@@ -10,7 +10,7 @@
 | --- | --- |
 | `@atelier/sdk/contracts` | JSON、数据／资源／创建／动作／工具／记录契约、工作台快照、模型协议类型；不依赖 Node 或 React |
 | `@atelier/sdk/runtime` | 插件／模块装配、资源／创建／动作／工具实现、读取／执行门面与宿主服务接口；后台可使用 Node |
-| `@atelier/sdk/renderer` | 卡片与工具视图的作者接口；React 由宿主共享 |
+| `@atelier/sdk/renderer` | 卡片、工具视图、创建入口（`creationEntry`）与插件偏好的作者接口；React 由宿主共享 |
 
 后台默认导出 `definePlugin(...)`，模块用具名 `setup` 作为装配入口。它取得宿主能力并向普通业务模块注入所需的窄接口，再返回功能贡献。插件只导入 SDK 和自己的依赖；宿主内部服务、资源控制器和物理会话节点不是外部 API。内置与外部模块使用同一套贡献接口。
 

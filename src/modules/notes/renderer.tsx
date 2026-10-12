@@ -1,5 +1,7 @@
 import { FileText, BookOpen, FilePenLine, FilePlus2 } from "lucide-react";
-import { cardRenderer, toolRenderer, type RendererModule } from "@atelier/sdk/renderer";
+import { CreateNote } from "./contract";
+import { NoteInput } from "./creation";
+import { creationEntry, cardRenderer, toolRenderer, type RendererModule } from "@atelier/sdk/renderer";
 import { t } from "../../renderer/shared/i18n";
 import { NoteView, NoteRead, NoteEdit, NoteWrite } from "./contract";
 import { TextReadBody, TextChangeBody } from "../text-view";
@@ -39,4 +41,6 @@ export default {
       bodyRenderer: TextChangeBody,
     }),
   ],
+  creations: [creationEntry(CreateNote, { id: "atelier.core/note.blank", label: t.kindNote, icon: <FileText className="size-4" />, group: "resources", InputView: NoteInput,
+    triggers: { menu: {}, drop: { accepts: { text: true }, toInput: item => item.kind === "text" ? { title: item.text.split("\n")[0]!.trim().slice(0, 160) || "Untitled note", content: item.text.slice(0, 100_000) } : null } } })],
 } satisfies RendererModule;

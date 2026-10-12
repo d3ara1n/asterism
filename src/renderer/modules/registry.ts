@@ -2,7 +2,7 @@ import { createElement } from "react";
 import { Box } from "lucide-react";
 import { t } from "../shared/i18n";
 import { pluginOf, type ContractReference, type Presentation } from "@atelier/sdk/contracts";
-import type { CardRenderer, CardView, ResourceDescription, RendererModule, RendererObjectContext, ToolRenderProps, ToolRenderer, ToolView } from "@atelier/sdk/renderer";
+import type { CardRenderer, CardView, CreationEntry, ResourceDescription, RendererModule, RendererObjectContext, ToolRenderProps, ToolRenderer, ToolView } from "@atelier/sdk/renderer";
 
 function index<T extends { contract: ContractReference }>(entries: readonly T[]): ReadonlyMap<string, T> {
   const map = new Map<string, T>();
@@ -17,6 +17,8 @@ export class ViewRegistry {
   private readonly resources = new Map<string, ResourceDescription>();
   private readonly cards: ReadonlyMap<string, CardRenderer>;
   private readonly tools: ReadonlyMap<string, ToolRenderer>;
+  /** 创建入口单独索引，按装配顺序保留，供菜单与拖放仲裁使用。 */
+  readonly creations: readonly CreationEntry[];
   constructor(modules: readonly RendererModule[]) {
     for (const resource of modules.flatMap(module => module.resources)) {
       if (this.resources.has(resource.kind)) throw new Error(`Duplicate resource description: ${resource.kind}`);
@@ -24,10 +26,21 @@ export class ViewRegistry {
     }
     this.cards = index(modules.flatMap(module => module.cards));
     this.tools = index(modules.flatMap(module => module.tools));
+    const creations = modules.flatMap(module => module.creations ?? []);
+    const ids = new Set<string>();
+    for (const entry of creations) {
+      if (!pluginOf(entry.id)) throw new Error(`Creation entry needs a namespaced ID: ${entry.id}`);
+      if (ids.has(entry.id)) throw new Error(`Duplicate creation entry: ${entry.id}`);
+      ids.add(entry.id);
+    }
+    this.creations = creations;
   }
   resource(kind: string): ResourceDescription {
     const plugin = pluginOf(kind);
     return this.resources.get(kind) ?? { kind, label: plugin ? t.kindMissing(plugin) : t.kindResource, icon: createElement(Box, { className: "size-4" }) };
+  }
+  creation(id: string): CreationEntry | undefined {
+    return this.creations.find(entry => entry.id === id);
   }
   card(presentation: Presentation, context?: RendererObjectContext): CardView | null {
     return this.cards.get(presentation.contract.id)?.resolve(presentation.data, context) ?? null;

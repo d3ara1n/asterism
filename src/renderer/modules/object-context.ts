@@ -1,5 +1,5 @@
 import { createElement, useCallback, useMemo, type ReactNode } from "react";
-import { RendererCatalogsProvider, RendererModelsProvider, RendererToolsProvider, type RendererCatalogs, type RendererObjectContext } from "@atelier/sdk/renderer";
+import { RendererCatalogsProvider, RendererModelsProvider, RendererPreferencesProvider, RendererToolsProvider, type RendererCatalogs, type RendererObjectContext } from "@atelier/sdk/renderer";
 import { pluginOf, resourceCall, reference } from "@atelier/sdk/contracts";
 import type { WorkbenchObject } from "../../shared/workbench";
 import { ModelConfiguration, ThinkingPreferences } from "../../modules/agent/configuration";
@@ -11,6 +11,7 @@ import { useConfiguration } from "../features/configuration/state";
 import { useAppearance } from "../features/appearance/state";
 import { resolveToolView, toolPreparation } from "../features/conversation/tool-views";
 import { useModuleViews } from "./views";
+import { pluginPreferences } from "../features/creation/preferences";
 
 export function RendererCatalogProvider({ ready, children }: { ready: boolean; children: ReactNode }) {
   const configuration = useConfiguration(ready);
@@ -64,5 +65,7 @@ export function ObjectServices({ object, children }: { object: WorkbenchObject; 
   const registry = useModuleViews();
   const models = useMemo(() => ({ blocks: historical ? [] : progress.live.filter(block => block.agentId === object.id) }), [historical, progress.live, object.id]);
   const tools = useMemo(() => ({ resolve: (props: Parameters<typeof resolveToolView>[0]) => resolveToolView(props, registry), preparation: toolPreparation }), [registry]);
-  return createElement(RendererModelsProvider, { value: models }, createElement(RendererToolsProvider, { value: tools }, children));
+  const preferences = useMemo(() => pluginPreferences(pluginOf(object.kind) ?? "unknown"), [object.kind]);
+  return createElement(RendererModelsProvider, { value: models }, createElement(RendererToolsProvider, { value: tools },
+    createElement(RendererPreferencesProvider, { value: preferences }, children)));
 }
