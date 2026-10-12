@@ -6,7 +6,7 @@ import { Button } from "../../../renderer/shared/ui/button";
 import { Attachment, AttachmentGroup, AttachmentMedia, AttachmentContent, AttachmentTitle, AttachmentDescription,
   AttachmentActions, AttachmentAction } from "../../../renderer/shared/ui/attachment";
 import { mediaMessages } from "../../messages/media";
-import { inputMediaTypes } from "../../../shared/model-media";
+import { previewsAsImage } from "../../../shared/model-media";
 import type { MessageDraft } from "./draft";
 
 export function FilePreview({ part, content, onRemove, disabled }: {
@@ -18,14 +18,14 @@ export function FilePreview({ part, content, onRemove, disabled }: {
   useEffect(() => {
     setPreview({});
     let active = true, url: string | undefined;
-    if (part.mediaType.startsWith("image/")) void content.read({ "$atelier.content": id }).then(bytes => {
+    if (previewsAsImage(part.mediaType)) void content.read({ "$atelier.content": id }).then(bytes => {
       if (!active) return;
       url = URL.createObjectURL(new Blob([Uint8Array.from(bytes).buffer], { type: part.mediaType }));
       setPreview({ url });
     }).catch(() => { if (active) setPreview({ failed: true }); });
     return () => { active = false; if (url) URL.revokeObjectURL(url); };
   }, [id, part.mediaType, content]);
-  return <Attachment state={preview.failed ? "error" : "done"} orientation={part.mediaType.startsWith("image/") ? "vertical" : "horizontal"} className="max-w-48">
+  return <Attachment state={preview.failed ? "error" : "done"} orientation={previewsAsImage(part.mediaType) ? "vertical" : "horizontal"} className="max-w-48">
     <AttachmentMedia variant={preview.url ? "image" : "icon"}>
       {preview.url ? <img src={preview.url} alt={part.filename ?? part.mediaType}
         onError={() => setPreview({ failed: true })} /> : <FileIcon />}
@@ -55,7 +55,7 @@ export function AttachFiles({ draft, disabled }: { draft: MessageDraft; disabled
   const input = useRef<HTMLInputElement>(null);
   const i18n = useI18n();
   return <div className="flex min-w-0 items-center gap-1">
-    <input ref={input} type="file" multiple accept={inputMediaTypes.join(",")} className="hidden" disabled={disabled || state.uploading}
+    <input ref={input} type="file" multiple className="hidden" disabled={disabled || state.uploading}
       onChange={event => { const files = Array.from(event.target.files ?? []); event.target.value = ""; void draft.add(files); }} />
     <Button type="button" variant="ghost" size="icon-sm" disabled={disabled || state.uploading} onClick={() => input.current?.click()}
       aria-label={i18n.text(mediaMessages.attach)} title={i18n.text(mediaMessages.attach)}><Paperclip /></Button>

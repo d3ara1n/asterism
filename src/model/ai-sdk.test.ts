@@ -11,7 +11,7 @@ import type { NewNode } from "../shared/session.ts";
 const input: ModelInput = {
   settings: { provider: { id: "p", revision: 1, name: "Provider", enabled: true, baseUrl: "https://example.invalid", protocol: "anthropic", auth: "api_key" },
     model: { revision: 1, name: "Model", modelId: "test", providerId: "p", enabled: true, contextWindow: null,
-      capabilities: { reasoning: true, tools: true, inputMediaTypes: [] }, generation: { temperature: 0.2, topP: null, maxOutputTokens: 1000 } }, thinking: "low" },
+      capabilities: { reasoning: true, tools: true }, generation: { temperature: 0.2, topP: null, maxOutputTokens: 1000 } }, thinking: "low" },
   system: composeSystemPrompt({ id: "worker", systemPrompt: "System" }), messages: [{ kind: "input", parts: [{ kind: "text", text: "Read" }] }],
   tools: [{ name: "read", description: "Read", parameters: { type: "object", properties: { resource_id: { type: "string" } }, required: ["resource_id"] } }],
 };
@@ -146,9 +146,8 @@ describe("AI SDK 适配契约", () => {
     ]);
   });
 
-  it.each(["openai-chat", "openai-responses", "anthropic"] as const)("真实 %s provider 编码图文与 PDF 并解码流，无鉴权头且禁止重定向", async protocol => {
+  it.each(["openai-chat", "openai-responses", "anthropic"] as const)("真实 %s provider 编码图文并解码流，无鉴权头且禁止重定向", async protocol => {
     const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jX1kAAAAASUVORK5CYII=", "base64");
-    const pdf = Buffer.from("%PDF-1.7\n%%EOF");
     const response = { id: "response-1", model: "test", created_at: 0 };
     const frames = protocol === "openai-chat" ? [
       { id: "response-1", created: 0, model: "test", choices: [{ index: 0, delta: { role: "assistant", content: "Hello" }, finish_reason: null }] },
@@ -182,33 +181,24 @@ describe("AI SDK 适配契约", () => {
       const content = messages.find(message => message.role === "user")!.content;
       if (protocol === "anthropic") expect(content).toMatchObject([
         { type: "text", text: "Read" },
-        { type: "image", source: { type: "base64", media_type: "image/png", data: png.toString("base64") } },
-        { type: "text", text: "Then read the PDF." },
-        { type: "document", source: { type: "base64", media_type: "application/pdf", data: pdf.toString("base64") }, title: "scan.pdf" },
+        { type: "image", source: { type: "base64", media_type: "image/png", data: png.toString("base64") } }
       ]);
       else if (protocol === "openai-responses") expect(content).toMatchObject([
         { type: "input_text", text: "Read" },
         { type: "input_image", image_url: `data:image/png;base64,${png.toString("base64")}` },
-        { type: "input_text", text: "Then read the PDF." },
-        { type: "input_file", filename: "scan.pdf", file_data: `data:application/pdf;base64,${pdf.toString("base64")}` },
       ]);
       else expect(content).toMatchObject([
         { type: "text", text: "Read" },
-        { type: "image_url", image_url: { url: `data:image/png;base64,${png.toString("base64")}` } },
-        { type: "text", text: "Then read the PDF." },
-        { type: "file", file: { filename: "scan.pdf", file_data: `data:application/pdf;base64,${pdf.toString("base64")}` } },
+        { type: "image_url", image_url: { url: `data:image/png;base64,${png.toString("base64")}` } }
       ]);
       return new Response(frames.map(frame => `data: ${JSON.stringify(frame)}\n\n`).join("") + (protocol === "openai-chat" ? "data: [DONE]\n\n" : ""), { headers: { "content-type": "text/event-stream" } });
     };
     const current = structuredClone(input);
     current.settings.provider.protocol = protocol; current.settings.provider.auth = "none"; current.settings.thinking = "off";
     current.settings.model.capabilities.reasoning = false;
-    current.settings.model.capabilities.inputMediaTypes = ["image/png", "application/pdf"];
     current.messages = [{ kind: "input", parts: [
       { kind: "text", text: "Read" },
       { kind: "file", mediaType: "image/png", data: png },
-      { kind: "text", text: "Then read the PDF." },
-      { kind: "file", mediaType: "application/pdf", filename: "scan.pdf", data: pdf },
     ] }];
     const adapter = new AiSdkAdapter(async () => { throw new Error("Anonymous execution must not read credentials"); },
       (value, key) => createProviderModel(value.settings.provider, value.settings.model, key, transport));

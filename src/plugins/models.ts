@@ -97,7 +97,7 @@ export function createModelServices(configuration: ConfigurationService, adapter
         content = capture(messages, options?.content);
         const { settings, adapter } = await resolve(target);
         request.signal.throwIfAborted();
-        validateInput(messages, settings, content);
+        validateInput(messages, content);
         adapter.validate({ settings, system, messages,
           tools: settings.model.capabilities.tools ? coreDeclarations() : [] });
       } catch (error) {
@@ -115,7 +115,7 @@ export function createModelServices(configuration: ConfigurationService, adapter
       const content = capture(messages, options?.content);
       try {
         const { settings, adapter } = await resolve(target);
-        const resolvedMessages = await resolveInput(messages, settings, content, request.signal);
+        const resolvedMessages = await resolveInput(messages, content, request.signal);
         const source = { model: modelExpression(settings), adapter: adapter.version, scope: modelScope(settings) };
         for await (const event of adapter.prepare({ settings, system, messages: resolvedMessages,
           tools: settings.model.capabilities.tools ? tools ?? [] : [] }).stream(request.signal)) {
@@ -131,7 +131,7 @@ export function createModelServices(configuration: ConfigurationService, adapter
       try { request.signal.throwIfAborted(); content = capture(messages, request.content); captured = Promise.resolve(); }
       catch (error) { captured = Promise.reject(error); }
       const environment = Promise.all([resolve(target), request.context, captured]).then(async ([resolved, context]) => ({
-        ...resolved, capabilities: request.capabilities, messages: await resolveInput(messages, resolved.settings, content, request.signal),
+        ...resolved, capabilities: request.capabilities, messages: await resolveInput(messages, content, request.signal),
         system: { blocks: [...system.blocks, ...context.map((file, index) => ({
           id: coreId(`context.${index}`), kind: "context" as const, ...file,
         }))] },

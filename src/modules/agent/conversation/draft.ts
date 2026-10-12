@@ -1,11 +1,10 @@
 import type { ModelFilePart, ModelInputPart, UiText } from "@atelier/sdk/contracts";
 import type { RendererContentInput } from "@atelier/sdk/renderer";
-import { inputMediaTypes, modelInputLimits } from "../../../shared/model-media.ts";
+import { fileMediaType, modelInputLimits } from "../../../shared/model-media.ts";
 import { mediaMessages } from "../../messages/media.ts";
 
 interface DraftFile { part: ModelFilePart; size: number }
 interface DraftState { text: string; files: readonly DraftFile[]; uploading: boolean; error: UiText | null }
-const extensions: Record<string, string> = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", gif: "image/gif", webp: "image/webp", pdf: "application/pdf" };
 
 /** 草稿属于交互模块，独立于 Composer 挂载；内容资格只随提交信封传递。 */
 export function createMessageDraft(createContent: () => RendererContentInput) {
@@ -28,10 +27,9 @@ export function createMessageDraft(createContent: () => RendererContentInput) {
       try {
         for (const file of files) {
           controller.signal.throwIfAborted();
-          const mediaType = file.type || extensions[file.name.split(".").at(-1)?.toLowerCase() ?? ""] || "";
-          if (!inputMediaTypes.some(type => type === mediaType)) { change({ error: mediaMessages.unsupported }); break; }
-          const sizeLimit = mediaType.startsWith("image/") ? modelInputLimits.image : modelInputLimits.file;
-          if (state.files.length >= modelInputLimits.files || file.size > sizeLimit
+          // 如实标注 MIME；文件怎么用由服务端决定。
+          const mediaType = fileMediaType(file);
+          if (state.files.length >= modelInputLimits.files || file.size > modelInputLimits.file
             || state.files.reduce((total, value) => total + value.size, file.size) > modelInputLimits.total) {
             change({ error: mediaMessages.limit }); break;
           }

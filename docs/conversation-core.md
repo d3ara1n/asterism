@@ -25,14 +25,14 @@ block 通过 response_id 关联，response 由消费者投影，不设独立 res
 ```ts
 type ModelInputPart =
   | { kind: "text"; text: string }
-  | { kind: "file"; file: ContentRef; mediaType: string; filename?: string };
+  | { kind: "image" | "audio" | "video"; file: ContentRef; mediaType: string; filename?: string };
 ```
 
 纯文字也使用 text 部件。文件身份复用宿主 ContentRef，MIME 和可选文件名属于消费元数据；协议不接受路径、URL、base64 或字节本体。系统提示沿用纯文字 PromptBlock，输出与工具结果保持原契约。
 
 `models.validate(request, { content })` 和 `models.stream(request, { content })` 接收已有的宿主 ContentReader；含文件时不得省略，也不按 ID 全局查找。准备阶段的 content 包含本次输入尝试及合法对象内容。纯文字调用无需 content。`models.run` 根据既有 object/requestParentId 捕获本对象当前数据和本次路径的记录依赖，不接收外部 reader 覆盖。内容读取资格不授予工具访问或跨对象共享权。
 
-三个入口共用输入检查。validate 检查目标、续接、MIME 能力、内容归属、封存状态和长度，不发送请求或全量读取字节；实际请求重新检查并读取、校验内容完整性，然后由适配器编码。模型能力由 `inputMediaTypes` 声明，与协议已实现的编码支持共同决定可发送类型；端点仍可能拒绝实际文件。
+三个入口共用输入检查。validate 检查目标、续接、内容归属、封存状态和长度，不发送请求或全量读取字节；实际请求重新检查并读取、校验内容完整性，然后由适配器编码。客户端只区分文字与文件：文件以 ContentRef 引用不可变内容，连同如实识别的 mediaType 发送，不判断模态、不按格式拦截；端点是否接受由服务端反馈。界面预览等展示判断由 mediaType 派生，不构成模型能力。
 
 请求在首次异步等待前固定引用与内容资格，独立占用持续到请求收束，run 包括工具批次。关闭草稿不破坏已捕获请求，取消模型不关闭调用方草稿；流失败、调用方提前关闭和宿主关闭均收束实际使用。限额见 `src/shared/model-media.ts`：图片 5 MiB、其他首期文件 16 MiB、整次请求最多 20 个文件且原始文件总量不超过 20 MiB，重复出现按编码次数累计。超限明确拒绝，不自动降级、拆页或转码。
 

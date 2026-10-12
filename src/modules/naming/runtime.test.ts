@@ -36,7 +36,7 @@ async function open(stream: (request: StreamRequest) => AsyncIterable<ModelEvent
     })] }, ...external,
   ], { ...host, models: { ...host.models,
     list: () => [{ model: "test/model", provider: "test", name: "Test", contextWindow: null,
-      capabilities: { tools: false, reasoning: false, inputMediaTypes: [] } }],
+      capabilities: { tools: false, reasoning: false } }],
     roles: () => [{ id: "utility", name: "Utility", description: "Naming", hidden: true, model: "test/model", thinking: null }],
     stream: request => { requests.push(request); return stream(request); },
   } }));

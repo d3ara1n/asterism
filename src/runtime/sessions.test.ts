@@ -48,7 +48,7 @@ async function setup(model: ModelAdapter = adapter(), onSessionChanged?: (event:
     value: { id: "test", name: "Test", protocol: "openai-responses", baseUrl: "https://example.invalid/v1", enabled: true, auth: "none" }, credential: { action: "keep" } });
   const { savedId: modelId } = await service.configuration.execute({ type: "model.save", id: null,
     value: { providerId: providerId!, name: "Test", modelId: "test", enabled: true, contextWindow: null,
-      capabilities: { tools: true, reasoning: false, inputMediaTypes: [] }, generation: { temperature: null, topP: null, maxOutputTokens: null } } });
+      capabilities: { tools: true, reasoning: false }, generation: { temperature: null, topP: null, maxOutputTokens: null } } });
   const start: Extract<SessionCommand, { type: "start" }> = { type: "start", submissionId: randomUUID(), agent: "worker", model: modelId!, thinking: null, parts: [{ kind: "text", text: "First" }] };
   return { service, root, start };
 }
@@ -73,9 +73,9 @@ describe("会话运行时", () => {
     const { service, start, root } = await setup(model); currentService = service;
     const { revision: _revision, ...configured } = service.configuration.current().models[0]!;
     await service.configuration.execute({ type: "model.save", id: start.model,
-      value: { ...configured, capabilities: { ...configured.capabilities, inputMediaTypes: ["image/png", "application/pdf"] } } });
+      value: { ...configured, capabilities: { ...configured.capabilities } } });
     const store = service.sessions.content, draft = service.sessions.openContentInput(startAgentContentTarget);
-    const png = new Uint8Array([1, 2, 3]), pdf = new Uint8Array([4, 5, 6]);
+    const png = new Uint8Array([1, 2, 3]), webp = new Uint8Array([4, 5, 6]);
     const file = await store.writer({ scope: draft }).stage(png);
     const firstInput = { ...start, parts: [{ kind: "file" as const, file, mediaType: "image/png", filename: "first.png" }], contentScopeId: draft.id };
     const first = await execute(service, firstInput); await settled(service);
@@ -86,18 +86,18 @@ describe("会话运行时", () => {
     expect(origin).toMatchObject({ parts: firstInput.parts });
     expect(inputs[0]!.messages).toEqual([{ kind: "input", parts: [{ kind: "file", data: png, mediaType: "image/png", filename: "first.png" }] }]);
     const next = service.sessions.openContentInput({ sessionId: first.sessionId, objectId: agentId, contractId: SubmitAgentInput.id, resourceKind: SubmitAgentInput.resource.kind });
-    const other = await store.writer({ scope: next }).stage(pdf);
-    const parts: ModelInputPart[] = [{ kind: "text", text: "Compare" }, { kind: "file" as const, file: other, mediaType: "application/pdf" }, { kind: "text" as const, text: "with the screenshot" }];
+    const other = await store.writer({ scope: next }).stage(webp);
+    const parts: ModelInputPart[] = [{ kind: "text", text: "Compare" }, { kind: "file" as const, file: other, mediaType: "image/webp" }, { kind: "text" as const, text: "with the screenshot" }];
     await service.sessions.execute({ type: "resource.command", sessionId: first.sessionId, objectId: agentId,
       command: resourceCall(SubmitAgentInput, { type: "submit", submissionId: randomUUID(), parts }), contentScopeId: next.id });
     await settled(service); await next.close();
     expect(inputs.at(-1)!.messages.at(-1)).toEqual({ kind: "input", parts: [
-      { kind: "text", text: "Compare" }, { kind: "file", data: pdf, mediaType: "application/pdf" }, { kind: "text", text: "with the screenshot" },
+      { kind: "text", text: "Compare" }, { kind: "file", data: webp, mediaType: "image/webp" }, { kind: "text", text: "with the screenshot" },
     ] });
     const originalNodes = service.sessions.tree.nodes(first.sessionId);
     await service.sessions.execute({ type: "select", sessionId: first.sessionId, nodeId: origin.id });
     await expect(service.sessions.execute({ type: "resource.command", sessionId: first.sessionId, objectId: agentId,
-      command: resourceCall(SubmitAgentInput, { type: "submit", submissionId: randomUUID(), parts: [{ kind: "file", file: other, mediaType: "application/pdf" }] }) })).rejects.toThrow("does not belong");
+      command: resourceCall(SubmitAgentInput, { type: "submit", submissionId: randomUUID(), parts: [{ kind: "file", file: other, mediaType: "image/webp" }] }) })).rejects.toThrow("does not belong");
     await execute(service, agentCommand(first.sessionId, agentId, { type: "submit", submissionId: randomUUID(), parts: [{ kind: "text", text: "Branch" }] }));
     await settled(service);
     const saved = service.sessions.tree.nodes(first.sessionId);
@@ -119,7 +119,7 @@ describe("会话运行时", () => {
     expect(await service.sessions.content.reader({ scope: draft }).read(file)).toEqual(new Uint8Array([1]));
     const { revision: _revision, ...configured } = service.configuration.current().models[0]!;
     await service.configuration.execute({ type: "model.save", id: start.model,
-      value: { ...configured, capabilities: { ...configured.capabilities, inputMediaTypes: ["image/png"] } } });
+      value: { ...configured, capabilities: { ...configured.capabilities } } });
     await service.sessions.execute(input); await settled(service);
     expect(service.sessions.tree.list()).toHaveLength(1);
   });

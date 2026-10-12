@@ -29,7 +29,7 @@ async function addModel(service: ConfigurationService, auth: "none" | "api_key" 
     credential: auth === "none" ? { action: "keep" } : { action: "replace", value: "test-key-not-for-network" } });
   const model = await service.execute({ type: "model.save", id: null, value: {
     providerId: provider.savedId!, name: "Test model", modelId: "test-model", enabled: true, contextWindow: 32000,
-    capabilities: { reasoning: false, tools: true, inputMediaTypes: [] }, generation: { temperature: null, topP: null, maxOutputTokens: null },
+    capabilities: { reasoning: false, tools: true }, generation: { temperature: null, topP: null, maxOutputTokens: null },
   } });
   return { providerId: provider.savedId!, modelId: model.savedId!, snapshot: model.snapshot };
 }

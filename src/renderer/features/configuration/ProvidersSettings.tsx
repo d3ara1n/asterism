@@ -1,4 +1,3 @@
-import { inputMediaTypes, supportedInputMediaTypes } from "../../../shared/model-media";
 import { Plus, Zap, Search, ExternalLink, ChevronDown } from "lucide-react";
 import { useMemo, useState } from "react";
 
@@ -313,7 +312,7 @@ function ModelEditor({ initialId, providerId }: { initialId: string | null; prov
   const provider = snapshot?.providers.find(item => item.id === providerId);
   const [value, setValue] = useState<ModelValue>(() => current ? modelValue(current) : {
     providerId, name: "", modelId: "", enabled: true, contextWindow: null,
-    capabilities: { reasoning: false, tools: true, inputMediaTypes: [] }, generation: { temperature: null, topP: null, maxOutputTokens: null } });
+    capabilities: { reasoning: false, tools: true }, generation: { temperature: null, topP: null, maxOutputTokens: null } });
   const [advanced, setAdvanced] = useState(false);
   const set = <K extends keyof ModelValue>(field: K, next: ModelValue[K]) => setValue(previous => ({ ...previous, [field]: next }));
   // 与提供商一致：名称在前并生成 ID；手动改过 ID 或编辑已有模型时不再覆盖。
@@ -348,18 +347,6 @@ function ModelEditor({ initialId, providerId }: { initialId: string | null; prov
             <Field key={key} orientation="horizontal">
               <Checkbox id={`capability-${key}`} checked={value.capabilities[key]} onCheckedChange={next => set("capabilities", { ...value.capabilities, [key]: next === true })} />
               <FieldLabel htmlFor={`capability-${key}`} className="font-normal">{label}</FieldLabel>
-            </Field>)}
-        </FieldGroup>
-      </FieldSet>
-      <FieldSet><FieldLegend variant="label">{i18n.formatMessage(providersMessages.fileInput)}</FieldLegend>
-        <FieldGroup data-slot="checkbox-group" className="gap-3">
-          {inputMediaTypes.filter(type => !provider || supportedInputMediaTypes(provider.protocol).includes(type)).map(mediaType =>
-            <Field key={mediaType} orientation="horizontal">
-              <Checkbox id={`media-${mediaType}`} checked={value.capabilities.inputMediaTypes.includes(mediaType)}
-                onCheckedChange={checked => set("capabilities", { ...value.capabilities, inputMediaTypes: checked === true
-                  ? inputMediaTypes.filter(type => type === mediaType || value.capabilities.inputMediaTypes.includes(type))
-                  : value.capabilities.inputMediaTypes.filter(type => type !== mediaType) })} />
-              <FieldLabel htmlFor={`media-${mediaType}`} className="font-normal">{mediaType.split("/")[1]!.toUpperCase()}</FieldLabel>
             </Field>)}
         </FieldGroup>
       </FieldSet>

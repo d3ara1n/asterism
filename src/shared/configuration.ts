@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { mediaTypeSchema } from "@atelier/sdk/contracts";
 import { coreChannel } from "./core.ts";
 
 export const configurationChannel = coreChannel("configuration");
@@ -40,7 +39,8 @@ export const providerSchema = providerInputSchema.extend({ revision, credentialS
 export const modelInputSchema = z.strictObject({
   providerId: providerIdSchema, name, modelId: serverModelId, enabled: z.boolean(),
   contextWindow: z.number().int().positive().nullable(),
-  capabilities: z.strictObject({ reasoning: z.boolean(), tools: z.boolean(), inputMediaTypes: z.array(mediaTypeSchema).max(64).refine(types => new Set(types).size === types.length) }),
+  // 只保留改变请求内容的能力；文件是否被接受由服务端决定。
+  capabilities: z.strictObject({ reasoning: z.boolean(), tools: z.boolean() }),
   generation: z.strictObject({
     temperature: z.number().min(0).max(2).nullable(), topP: z.number().min(0).max(1).nullable(),
     maxOutputTokens: z.number().int().positive().nullable(),

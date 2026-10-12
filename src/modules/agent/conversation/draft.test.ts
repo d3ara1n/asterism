@@ -20,9 +20,9 @@ describe("消息文件草稿", () => {
     draft.accepted();
     expect(draft.parts()).toEqual([]);
     expect(closed).toBe(1);
-    await draft.add([new File(["pdf"], "scan.pdf")]);
+    await draft.add([new File(["webp"], "scan.webp")]);
     expect(scopes).toBe(2);
-    expect(draft.parts()).toEqual([{ kind: "file", file: ref, mediaType: "application/pdf", filename: "scan.pdf" }]);
+    expect(draft.parts()).toEqual([{ kind: "file", file: ref, mediaType: "image/webp", filename: "scan.webp" }]);
     await draft.close();
   });
   it("上传取消后迟到结果不进入待发送消息，正文保留且可以再次上传", async () => {

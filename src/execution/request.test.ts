@@ -13,7 +13,7 @@ import type { ModelSettings } from "../shared/model.ts";
 const settings: ModelSettings = {
   provider: { id: "p", revision: 1, name: "Provider", enabled: true, baseUrl: "https://example.invalid", protocol: "openai-responses", auth: "none" },
   model: { revision: 1, name: "Model", modelId: "test", providerId: "p", enabled: true, contextWindow: 4000,
-    capabilities: { reasoning: false, tools: true, inputMediaTypes: [] }, generation: { temperature: null, topP: null, maxOutputTokens: null } }, thinking: "off",
+    capabilities: { reasoning: false, tools: true }, generation: { temperature: null, topP: null, maxOutputTokens: null } }, thinking: "off",
 };
 const empty = () => new AgentCapabilities(new ResourceRegistry([]), new ToolRegistry([]), [], () => true);
 const text: ModelEvent[] = [
@@ -35,7 +35,7 @@ function model(events: ModelEvent[], prepare = () => {}): ModelAdapter {
   return { validate() {}, version: "test-adapter", prepare() { prepare(); return { async *stream() { yield* events; } }; } };
 }
 async function execute(request: ModelRunRequest, adapter: ModelAdapter, capabilities = empty()) {
-  return runModelRequest(request, Promise.resolve({ adapter, settings, capabilities, system: request.system, messages: await resolveInput(request.messages, settings, undefined, request.signal) }));
+  return runModelRequest(request, Promise.resolve({ adapter, settings, capabilities, system: request.system, messages: await resolveInput(request.messages, undefined, request.signal) }));
 }
 const resource = { id: "r", kind: "example.resource/item", title: "Item", data: {} };
 const write = defineImplementation({ ...defineData("example.resource/write", z.number().describe("Current value.")),

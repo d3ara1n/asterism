@@ -157,7 +157,7 @@ SDK 包版本为 `0.8.0`，宿主提供 API 5.0；插件声明 `api: { major: 5,
 
 ## 可选模型分支
 
-模型输入及 context 均使用 `parts: ModelInputPart[]`，文字为 `{ kind: "text", text }`，文件为 `{ kind: "file", file: ContentRef, mediaType, filename? }`。输入不携带字节或路径。`models.validate(request, { content })` 和 `models.stream(request, { content })` 接收准备阶段、对象或会话已有的宿主 ContentReader；含文件时必须提供，纯文字可省略。模型消息与运行时门面分别传递，内容资格不进入持久消息。可编译示例见 [模型输入](examples/model-input.ts)。
+模型输入及 context 均使用 `parts: ModelInputPart[]`，文字为 `{ kind: "text", text }`，文件为 `{ kind: "file", file: ContentRef, mediaType, filename? }`；mediaType 如实标注，不建模输入模态。输入不携带字节或路径。`models.validate(request, { content })` 和 `models.stream(request, { content })` 接收准备阶段、对象或会话已有的宿主 ContentReader；含文件时必须提供，纯文字可省略。模型消息与运行时门面分别传递，内容资格不进入持久消息。可编译示例见 [模型输入](examples/model-input.ts)。
 
 validate 检查目标、续接、文件类型、归属与大小，不读取全部字节。实际请求独立捕获资格与内容占用、重新检查并读取字节；调用方须消费或关闭流，宿主关闭也会收束流。请求不关闭借来的 content，草稿关闭不撤销已经捕获的请求。
 

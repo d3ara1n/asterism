@@ -277,7 +277,7 @@ describe("模型消费不可变内容", () => {
     await f.service.configuration.execute({ type: "provider.save", id: null,
       value: { id: "media", name: "Media", protocol: "openai-responses", baseUrl: "https://example.invalid", enabled: true, auth: "none" }, credential: { action: "keep" } });
     await f.service.configuration.execute({ type: "model.save", id: null, value: { providerId: "media", name: "Model", modelId: "model", enabled: true, contextWindow: null,
-      capabilities: { reasoning: false, tools: false, inputMediaTypes: ["image/png"] }, generation: { temperature: null, topP: null, maxOutputTokens: null } } });
+      capabilities: { reasoning: false, tools: false }, generation: { temperature: null, topP: null, maxOutputTokens: null } } });
   }
   const adapter = (seen: ModelInput[]): ModelAdapter => ({ version: "media-test", validate() {}, prepare(input) {
     seen.push(input); return { async *stream() {
@@ -340,17 +340,16 @@ describe("模型消费不可变内容", () => {
     } finally { release(); await iterator.return?.(); spy.mockRestore(); }
   });
 
-  it("validate 只读元数据；文件损坏在请求读取时失败，MIME 与大小独立检查", async () => {
+  it("validate 只读元数据；文件损坏在请求读取时失败，大小独立检查", async () => {
     const seen: ModelInput[] = [], f = fixture({ adapter: adapter(seen) }); await configure(f);
     const draft = f.input(), file = await f.store.writer({ scope: draft }).stage(bytes("intact"));
     const id = await f.create(file, draft.id), content = f.object(id).content;
     writeFileSync(join(f.root, applicationStorage.contentDirectory, "sealed", file["$atelier.content"]), bytes("broken"));
     await f.context.models.validate(request(file), { content });
     await expect((async () => { for await (const _ of f.context.models.stream(request(file), { content })) {} })()).rejects.toMatchObject({ code: "content_unavailable" });
-    await expect(f.context.models.validate(request(file, "application/pdf"), { content })).rejects.toMatchObject({ reason: "unsupported_content" });
     // 使用同一对象的动作草稿建立合法归属，避免把越权误当成大小校验。
     const actionDraft = f.service.sessions.openContentInput({ sessionId: f.sessionId, objectId: id, resourceKind: Document.kind, contractId: Replace.id });
-    const large = await f.store.writer({ scope: actionDraft }).stage(new Uint8Array(modelInputLimits.image + 1));
+    const large = await f.store.writer({ scope: actionDraft }).stage(new Uint8Array(modelInputLimits.file + 1));
     await f.replace(id, { file: large }, actionDraft.id);
     await expect(f.context.models.validate(request(large), { content: f.object(id).content })).rejects.toMatchObject({ reason: "content_limit" });
     expect(seen).toHaveLength(0);

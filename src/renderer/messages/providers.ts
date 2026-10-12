@@ -1,7 +1,7 @@
 import { defineMessages, pluginNamespace } from "@atelier/sdk/contracts";
 
 export const providersMessages = pluginNamespace("atelier.host").messages("en", defineMessages({
-  fileInput: { id: "model_file_input", defaultMessage: "File input" },
+  image: { id: "model_modality_image", defaultMessage: "Image" },
   disabled: {
     id: "features_configuration_ProvidersSettings_1",
     defaultMessage: "Disabled",

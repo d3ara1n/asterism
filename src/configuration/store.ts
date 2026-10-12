@@ -8,7 +8,6 @@ import { agentOverridesSchema, modelReference, modelRoleOverridesSchema, modelSc
 import { defaultAgents, defaultRoles } from "./defaults.ts";
 import { ConfigurationError } from "./errors.ts";
 import { normalizeOverrides, resolveAgentConfiguration, resolveRoleConfiguration } from "./layers.ts";
-import { supportedInputMediaTypes } from "../shared/model-media.ts";
 
 const identity = { id: z.string().min(1).max(160), revision: z.number().int().positive() };
 const storedProviderSchema = providerInputSchema.extend({ revision: identity.revision, credentialRef: z.string().uuid().nullable() });
@@ -44,11 +43,6 @@ type ConfigurationSave =
 
 function validate(raw: unknown): ConfigurationDocument {
   const document = documentSchema.parse(raw);
-  for (const model of document.models) {
-    const provider = document.providers.find(value => value.id === model.providerId);
-    if (provider && model.capabilities.inputMediaTypes.some(type => !supportedInputMediaTypes(provider.protocol).includes(type)))
-      throw new ConfigurationError("invalid_request", "The provider protocol does not support the selected file input types.");
-  }
   for (const role of document.roles) {
     if (!role.builtin && !role.overrides.name?.trim()) throw new ConfigurationError("invalid_request", "Custom configurations require a name.");
     resolveRoleConfiguration(role);

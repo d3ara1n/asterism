@@ -16,7 +16,7 @@ export async function describeFile(models: ModelServices, content: ContentScope,
 }
 
 export function inputTypeExamples(ref: ContentRef): ModelInputPart[] {
-  const valid: ModelInputPart = { kind: "file", file: ref, mediaType: "application/pdf" };
+  const valid: ModelInputPart = { kind: "file", file: ref, mediaType: "image/png" };
   // @ts-expect-error 模型消息只携带内容引用，不接受字节本体。
   const bytes: ModelInputPart = { kind: "file", file: new Uint8Array(), mediaType: "image/png" };
   // @ts-expect-error 路径不构成内容身份或读取资格。

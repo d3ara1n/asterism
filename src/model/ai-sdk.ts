@@ -3,7 +3,6 @@ import { jsonSchema, modelScope, unauthenticatedApiKey, type Json, type Usage } 
 import { ModelFailure, type ModelAdapter, type ModelEvent, type ModelInput, type PreparedModel, type ModelValidationInput } from "./contract.ts";
 import { createProviderModel, validateProviderTransport } from "./provider.ts";
 import { projectSystemPrompt } from "../modules/agent/system-prompt.ts";
-import { assertInputMediaType } from "./input.ts";
 
 const adapterVersion = "ai-sdk-v7/3";
 function validateContinuation(item: { adapter: string; scope: string }, scope: string): void {
@@ -56,6 +55,7 @@ export function sdkMessages(input: ModelInput): ModelMessage[] {
   for (const item of input.messages) {
     if (item.kind === "input" || item.kind === "context") messages.push({ role: "user", content: item.parts.map(part =>
       part.kind === "text" ? { type: "text" as const, text: part.text }
+        // 各模态统一按 AI SDK 文件部件发送，mediaType 为编码标签；端点是否接受由服务端反馈。
         : { type: "file" as const, data: part.data, mediaType: part.mediaType, ...(part.filename ? { filename: part.filename } : {}) }) });
     if (item.kind === "output") {
       validateContinuation(item, scope);
@@ -88,8 +88,6 @@ export class AiSdkAdapter implements ModelAdapter {
     validateProviderTransport(input.settings.provider);
     providerOptions(input);
     const scope = modelScope(input.settings);
-    for (const item of input.messages) if (item.kind === "input" || item.kind === "context")
-      for (const part of item.parts) if (part.kind === "file") assertInputMediaType(input.settings, part.mediaType);
     for (const item of input.messages) if (item.kind === "output") validateContinuation(item, scope);
   }
   prepare(input: ModelInput): PreparedModel {
