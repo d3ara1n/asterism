@@ -9,7 +9,7 @@ export default defineConfig({
   main: {
     build: {
       outDir: resolve("dist/main"),
-      rollupOptions: {
+      rolldownOptions: {
         input: { index: resolve("src/main/index.ts"), runtime: resolve("src/runtime/index.ts") },
         output: { format: "es", entryFileNames: "[name].js" },
       },
@@ -19,7 +19,7 @@ export default defineConfig({
     build: {
       outDir: resolve("dist/preload"),
       externalizeDeps: false,
-      rollupOptions: {
+      rolldownOptions: {
         input: resolve("src/preload/index.ts"),
         output: { format: "cjs", entryFileNames: "index.cjs" },
       },
@@ -45,6 +45,6 @@ export default defineConfig({
       },
     ],
     server: { host: "127.0.0.1" },
-    build: { outDir: resolve("dist/renderer"), minify: true, rollupOptions: { input: resolve("src/renderer/index.html") } },
+    build: { outDir: resolve("dist/renderer"), minify: true, rolldownOptions: { input: resolve("src/renderer/index.html") } },
   },
 });

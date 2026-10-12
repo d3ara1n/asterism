@@ -170,7 +170,11 @@ export class AiSdkAdapter implements ModelAdapter {
           // SDK 会为解析/目录错误合成结果；正式拒绝由工坊记录，避免保存 SDK 错误对象。
           if (!event.providerExecuted && rejectedBySdk.has(event.toolCallId)) break;
           throw new ModelFailure("unsupported_content", "The provider returned an unexpected tool result.");
-        case "file": case "reasoning-file": case "custom": case "tool-result":
+        // custom 是 provider 扩展元数据（如 Anthropic message_start 的早期用量），非正文内容；
+        // 用量与续接已在 finish 与 pickContinuation 白名单收束，无需处理。
+        case "custom": break;
+        case "file": case "reasoning-file": case "tool-result":
+          throw new ModelFailure("unsupported_content", "The provider returned unsupported response content.");
           throw new ModelFailure("unsupported_content", "The provider returned unsupported response content.");
         case "finish": {
           const u = event.totalUsage;
