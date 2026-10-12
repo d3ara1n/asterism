@@ -1,20 +1,20 @@
 /** SDK renderer 入口：卡片、工具视图与绑定对象的前端能力；React 由宿主共享。 */
 import { createContext, createElement, useContext, type ComponentType, type ReactNode } from "react";
-import type { z } from "zod";
 import type { UiText } from "./i18n.ts";
 export * from "./renderer-i18n.ts";
 import type { ActionContract, CreationContract } from "./commands.ts";
 import type { Json } from "./json.ts";
-import type { ToolInvocationInfo, ToolResult } from "./tool-result.ts";
 import { reference, type ContractReference, type DataContract } from "./presentation.ts";
 import type { ResourceRef, SessionSnapshot } from "./workspace.ts";
 export * from "./renderer-services.ts";
 export * from "./renderer-creation.ts";
+export * from "./renderer-tools.ts";
 export type * from "./renderer-content.ts";
 import type { RendererContentInput, RendererInputOptions } from "./renderer-content.ts";
 import type { ContentReader } from "./content-runtime.ts";
 export type { ContentReader } from "./content-runtime.ts";
 import type { CreationEntry } from "./renderer-creation.ts";
+import type { ToolRenderer } from "./renderer-tools.ts";
 
 export type RendererReceipt = { ok: true } | { ok: false; error: { code: string; message: string; display?: UiText } };
 /** 绑定卡片对象的前端能力；宿主负责订阅、命令门禁和当前视图的一致性。 */
@@ -68,24 +68,6 @@ export interface CardRenderer {
   contract: ContractReference;
   resolve(data: Json, context?: RendererObjectContext): CardView | null;
 }
-export interface ToolRenderProps<D = Json, T = Json, A = Json> {
-  phase: "ready" | "executing" | "settled";
-  name: string;
-  target: T;
-  args: A;
-  invocation: ToolInvocationInfo;
-  result: ToolResult<D> | null;
-}
-export interface ToolView {
-  label?: UiText;
-  icon?: ReactNode;
-  header?: ReactNode;
-  body?: ReactNode;
-}
-export interface ToolRenderer {
-  contract: ContractReference;
-  resolve(props: ToolRenderProps): ToolView | null;
-}
 export interface RendererModule {
   resources: ResourceDescription[];
   cards: CardRenderer[];
@@ -106,34 +88,5 @@ export function cardRenderer<T extends Json>(
     const bind = (node: ReactNode) => context ? createElement(ObjectContext.Provider, { value: context }, node) : node;
     return { ...appearance, body: bind(createElement(Body, { data: parsed.data })),
       actions: Actions ? bind(createElement(Actions, { data: parsed.data })) : undefined };
-  } };
-}
-/** header/body 独立覆盖；过程态和终结态以同一个 schema 校验，空产出仍可渲染调用摘要。 */
-export function toolRenderer<D extends Json, T extends Json = Json, A extends Json = Json>(
-  contract: DataContract<D> & { targetSchema?: z.ZodType<T>; tool?: { argsSchema: z.ZodType<A> } },
-  definition: {
-    label?: UiText;
-    icon?: ReactNode;
-    headerRenderer?: ComponentType<ToolRenderProps<D, T, A>>;
-    bodyRenderer?: ComponentType<ToolRenderProps<D, T, A>>;
-  },
-): ToolRenderer {
-  return { contract: reference(contract), resolve(props) {
-    const data = props.result?.data;
-    const parsed = data === null || data === undefined ? null : contract.schema.safeParse(data);
-    if (parsed && !parsed.success) return null;
-    const target = contract.targetSchema?.safeParse(props.target);
-    const args = contract.tool?.argsSchema.safeParse(props.args);
-    if (target && !target.success || args && !args.success) return null;
-    // 无参数 schema 的纯数据契约保留 JSON 参数；实现契约在上面完成校验。
-    const typed: ToolRenderProps<D, T, A> = {
-      ...props, target: (target ? target.data : props.target) as T, args: (args ? args.data : props.args) as A,
-      result: props.result ? { ...props.result, data: parsed?.data ?? null } : null,
-    };
-    return {
-      label: definition.label, icon: definition.icon,
-      header: definition.headerRenderer ? createElement(definition.headerRenderer, typed) : undefined,
-      body: definition.bodyRenderer ? createElement(definition.bodyRenderer, typed) : undefined,
-    };
   } };
 }

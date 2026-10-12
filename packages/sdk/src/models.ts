@@ -45,6 +45,7 @@ export type ModelBlock = {
 export type ModelLiveBlock = { id: string; responseId: string; ordinal: number } & (
   | { kind: "text"; text: string }
   | { kind: "thinking"; text: string; startedAt: number }
+  /** input 阶段的 arguments 是宽容解析的展示预览，不能用于执行；其余阶段为完整参数。 */
   | { kind: "toolcall"; name: string; argumentsText: string; arguments: Json; state: "input" | "ready" | "executing";
       invocation: ToolInvocationInfo | null; result: Extract<ToolResult, { kind: "running" }> | null }
 );

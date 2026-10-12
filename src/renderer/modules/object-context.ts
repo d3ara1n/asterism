@@ -2,7 +2,7 @@ import { createElement, useCallback, useMemo, type ReactNode } from "react";
 import { RendererCatalogsProvider, RendererModelsProvider, RendererPreferencesProvider, RendererToolsProvider, type RendererCatalogs, type RendererObjectContext } from "@atelier/sdk/renderer";
 import { pluginOf, resourceCall, reference } from "@atelier/sdk/contracts";
 import type { WorkbenchObject } from "../../shared/workbench";
-import { ModelConfiguration, ThinkingPreferences } from "../../modules/agent/configuration";
+import { ModelConfiguration, ThinkingPreferences, ToolPreferences } from "../../modules/agent/configuration";
 import { sessionSnapshot } from "../../plugins/records";
 import { sessionPath } from "../../shared/session-path";
 import { useWorkbench } from "../features/workbench/context";
@@ -22,11 +22,14 @@ export function RendererCatalogProvider({ ready, children }: { ready: boolean; c
     get(contract) {
       const raw = Object.is(contract, ModelConfiguration) ? configuration.snapshot
         : Object.is(contract, ThinkingPreferences)
-          ? { thinkingAutoExpand: appearance.thinkingAutoExpand, thinkingAutoCollapse: appearance.thinkingAutoCollapse } : null;
+          ? { thinkingAutoExpand: appearance.thinkingAutoExpand, thinkingAutoCollapse: appearance.thinkingAutoCollapse }
+          : Object.is(contract, ToolPreferences)
+            ? { toolInputAutoExpand: appearance.toolInputAutoExpand, toolInputAutoCollapse: appearance.toolInputAutoCollapse } : null;
       const parsed = contract.schema.safeParse(raw);
       return parsed.success ? parsed.data : null;
     },
-  }), [configuration.error, configuration.snapshot, appearance.thinkingAutoExpand, appearance.thinkingAutoCollapse]);
+  }), [configuration.error, configuration.snapshot, appearance.thinkingAutoExpand, appearance.thinkingAutoCollapse,
+    appearance.toolInputAutoExpand, appearance.toolInputAutoCollapse]);
   return createElement(RendererCatalogsProvider, { value }, children);
 }
 

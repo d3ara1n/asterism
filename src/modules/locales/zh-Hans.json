@@ -36,6 +36,8 @@
   "toolTextRead": "读取正文",
   "toolTextEdit": "编辑正文",
   "toolTextWrite": "写入正文",
+  "toolTextCharacters": "{count, number} 字",
+  "toolTextEdits": "{count, plural, other {# 项编辑}}",
   "toolTextLines": "{shown} / {total} 行",
   "toolTextMore": "第 {line} 行起仍有未显示内容。",
   "toolTextNoFinalNewline": "末尾没有换行。",

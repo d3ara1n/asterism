@@ -13,7 +13,7 @@ import { localeSchema } from "@atelier/sdk/contracts";
 import type { TranslationCatalog } from "../shared/i18n.ts";
 
 /** SDK API 版本；插件清单的 api.major 必须相同，minMinor 不得高于宿主。 */
-export const sdkApi = { major: 3, minor: 0 } as const;
+export const sdkApi = { major: 4, minor: 0 } as const;
 
 /** 插件包清单：package.json 的 atelier 字段；源码与发布产物读同一份。 */
 export const manifestSchema = z.strictObject({

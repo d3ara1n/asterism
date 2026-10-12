@@ -103,8 +103,8 @@
   .type-caption { @apply text-xs leading-relaxed text-muted-foreground; }
   .type-label { @apply text-xs font-medium text-muted-foreground; }
 
-  /* 实时思考只展示尾部；底对齐随排版自然上移，全文仍保留到终结后阅读。 */
-  .thinking-preview {
+  /* 流式预览只展示尾部；底对齐随排版自然上移。 */
+  .thinking-preview, .tool-input-preview {
     @apply flex h-32 flex-col justify-end overflow-hidden;
     mask-image: linear-gradient(to bottom, transparent, black 1.5rem);
   }

@@ -1,5 +1,6 @@
 import { ModelFailure, type ModelEvent, type StreamPart } from "../model/contract.ts";
-import type { Json, ToolOutcome } from "../shared/model.ts";
+import { parsePartialJson } from "ai";
+import { jsonSchema, type Json, type ToolOutcome } from "../shared/model.ts";
 import type { ToolInvocationInfo, ToolResult } from "@atelier/sdk/contracts";
 import { emptyCompletion, type BlockCompletion, type LiveBlock, type NewNode } from "../shared/session.ts";
 
@@ -9,6 +10,8 @@ type BufferedBlock = {
   text: string;
   startedAt: number;
   arguments: Json;
+  previewArguments: Json;
+  previewText: string;
   continuation: Json;
   done: boolean;
   savedId: string | null;
@@ -39,7 +42,7 @@ export class ResponseBuffer {
         throw new ModelFailure("protocol", "The provider started a duplicate response block.");
       }
       if (event.part.kind === "toolcall") this.callIds.add(event.part.callId);
-      this.blocks.set(event.part.id, { part: event.part, ordinal: this.blocks.size, text: "", startedAt: Date.now(), arguments: null, continuation: null,
+      this.blocks.set(event.part.id, { part: event.part, ordinal: this.blocks.size, text: "", startedAt: Date.now(), arguments: null, previewArguments: null, previewText: "", continuation: null,
         done: false, savedId: null, executing: false, invocation: null, result: null });
       return;
     }
@@ -66,12 +69,33 @@ export class ResponseBuffer {
     return [...this.blocks.values()].filter((block): block is LiveCall => block.part.kind === "toolcall");
   }
 
+  isToolInput(partId: string): boolean {
+    const block = this.blocks.get(partId);
+    return block?.part.kind === "toolcall" && !block.done;
+  }
+
+  /** 宽容解析只用于即时展示，不能覆盖执行参数或未完成历史的参数。 */
+  async preview(identity: (name: string, args: Json) => ToolInvocationInfo): Promise<void> {
+    for (const block of this.calls()) {
+      if (block.savedId || block.executing) continue;
+      if (!block.done && block.previewText !== block.text) {
+        const text = block.text;
+        const parsed = await parsePartialJson(text);
+        if (block.done || block.savedId || text !== block.text) continue;
+        block.previewText = text;
+        const preview = jsonSchema.safeParse(parsed.value);
+        block.previewArguments = preview.success ? preview.data : null;
+      }
+      block.invocation = identity(block.part.name, block.done ? block.arguments : block.previewArguments);
+    }
+  }
+
   live(): LiveBlock[] {
     return [...this.blocks.values()].filter(block => !block.savedId).map(block => {
       const base = { id: `${this.identity.responseId}:${block.ordinal}`, agentId: this.identity.agentId,
         responseId: this.identity.responseId, ordinal: block.ordinal };
       return block.part.kind === "toolcall"
-        ? { ...base, kind: "toolcall", name: block.part.name, argumentsText: block.text, arguments: block.arguments,
+        ? { ...base, kind: "toolcall", name: block.part.name, argumentsText: block.text, arguments: block.done ? block.arguments : block.previewArguments,
           state: block.executing ? "executing" : block.done ? "ready" : "input", invocation: block.invocation, result: block.result }
         : block.part.kind === "thinking" ? { ...base, kind: "thinking", text: block.text, startedAt: block.startedAt }
           : { ...base, kind: "text", text: block.text };

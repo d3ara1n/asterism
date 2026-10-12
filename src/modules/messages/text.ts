@@ -1,6 +1,14 @@
 import { defineMessages, pluginNamespace } from "@atelier/sdk/contracts";
 
 export const textMessages = pluginNamespace("atelier.core").messages("en", defineMessages({
+  toolTextCharacters: {
+    id: "toolTextCharacters",
+    defaultMessage: "{count, number} characters",
+  },
+  toolTextEdits: {
+    id: "toolTextEdits",
+    defaultMessage: "{count, plural, one {# edit} other {# edits}}",
+  },
   contentUnavailable: {
     id: "contentUnavailable",
     defaultMessage: "Saved content is unavailable.",

@@ -67,7 +67,7 @@ schema 支持默认值、去空白与转换。调用方提交 schema 的输入�
   "exports": { "./public": "./src/public.ts" },
   "atelier": {
     "id": "example.tools",
-    "api": { "major": 3, "minMinor": 0 },
+    "api": { "major": 4, "minMinor": 0 },
     "runtime": "./src/runtime.ts"
   }
 }
@@ -103,6 +103,19 @@ import { Read, settings, service } from "@example/tools/public";
 
 `cardRenderer` 校验卡片载荷并向 Body 与 Actions 注入对象环境，组件通过 `useRendererObject()` 取得基础对象接口。`session.snapshot()` 提供具型记录与资源快照，`session.create(CreationContract, input, position)` 创建资源，`invoke(ActionContract, input)` 调用当前对象动作。`onStream` 订阅对象二进制通道，短名由宿主补全插件命名空间。基础接口提供通用运行状态；临时模型块经专门接口按需取用，历史查看不交付实时块。
 
+`toolRenderer` 的 input、execution、result 是三个平行可选入口，每个都使用 `{ headerRenderer?, bodyRenderer? }`。例如三态共用组件时：
+
+```ts
+const view = { headerRenderer: Header, bodyRenderer: Body };
+toolRenderer(WriteContract, {
+  label: "Write", input: view, execution: view, result: view,
+});
+```
+
+组件可用 `ToolRenderProps<D, T, A>` 覆盖三态，或使用 `ToolInputRenderProps / ToolExecutionRenderProps / ToolResultRenderProps` 定义单阶段组件。input 收到部分 JSON 和 `result: null`，字段读取必须检查类型；execution 接收已校验参数，phase 为 ready/executing；result 的 phase 为 settled，结果必为终结结局。完整参数与执行产出继续通过契约校验。省略 input 时显示静态准备提示；execution/result 缺少入口时独立回退，不隐式复用其他阶段。详见 [视图契约](../../docs/plugin-sdk.md#工具视图)。
+
+[可编译的作者示例与类型反例](examples/tool-renderer.ts) 验证跨阶段复用、部分参数与结局收窄。内置 [目录视图](../../src/modules/filesystem/renderer.tsx) 和 [正文视图](../../src/modules/text-view.tsx) 共用三态声明，header 保留路径及字数，body 按 phase 展示尾部或结果。开合与高度上限由宿主管理；视图尽可能保持目标、数量和样式连续，逐步补充内容。
+
 二进制流的宿主信封由 main 与 preload 共用 Zod schema 校验，preload 按会话与对象筛选订阅。载荷保留 `Uint8Array`，支持空帧与具有偏移的视图，不转换为 JSON，也不写入时间轴；无效信封不交付插件。
 
 宿主协调读取、命令门禁和错误状态。模型进度、配置目录与工具展示分别通过 `useRendererModels / useRendererCatalogs / useRendererTools` 取得，共用已有宿主状态源；`useRendererNavigation` 提供导航，聚合视图将具体操作传给内容模块。草稿和提交身份归交互模块，按会话与对象绑定并跨卡片重挂载保留；重试相同输入保留身份，受理后清除。导航显式注入。资源后台的 `links.receive` 与前端静态描述的 `receivesLinks` 声明接收链接，授权仍由执行层检查真实链接。
@@ -136,7 +149,7 @@ ResourceDescription、ToolView、CreationEntry 的 label／description 接收 Ui
 
 ## 版本与当前边界
 
-SDK 包版本为 `0.6.0`，宿主提供 API 3.0；插件声明 `api: { major: 3, minMinor: 0 }`，其他主版本在加载前拒绝。应用 IPC 版本为 5，会话 IPC 为 13，内容 IPC 为 1，应用配置与插件配置 IPC 均为 2；工作数据库格式为 15，应用配置文件格式仍为 1。
+SDK 包版本为 `0.7.0`，宿主提供 API 4.0；插件声明 `api: { major: 4, minMinor: 0 }`，其他主版本在加载前拒绝。应用 IPC 版本为 5，会话 IPC 为 13，内容 IPC 为 1，应用配置与插件配置 IPC 均为 2；工作数据库格式为 15，应用配置文件格式仍为 1。
 
 资源创建数据必须是 JSON 对象，不能占用宿主的 `id / type / title` 字段。当前会话数据保存于 `session_data`，事件及工具结果保存稳定契约身份与原始数据。core 消费具型用户消息、模型执行、通知与环境记录，存储编码由宿主负责；环境记录保留原事件身份与载荷。
 

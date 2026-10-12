@@ -17,6 +17,32 @@ const call: ModelEvent = { type: "part.start", part: { id: "c", kind: "toolcall"
 const finish: ModelEvent = { type: "finish", reason: "stop", usage: null };
 
 describe("响应块状态机", () => {
+  it("部分 JSON 仅成为预览，未完成转义暂缓显示，取消不保存修复后的参数", async () => {
+    const { response, nodes } = setup();
+    response.accept(call);
+    response.accept({ type: "part.delta", partId: "c", delta: '{"target":{"path":"src/comp' });
+    await response.preview(() => ({}));
+    expect(response.live()[0]).toMatchObject({ state: "input", arguments: { target: { path: "src/comp" } } });
+    expect(response.calls()[0]!.arguments).toBeNull();
+    response.accept({ type: "part.delta", partId: "c", delta: 'onent.ts"},"args":{"content":"hello\\nworld\\u4' });
+    await response.preview(() => ({}));
+    expect(response.live()[0]).toMatchObject({ arguments: { args: { content: "hello\nworld" } } });
+    response.interrupt();
+    expect(nodes[0]).toMatchObject({ complete: false, arguments: null, outcome: null });
+  });
+
+  it("交错调用各自保留预览，完整参数取终结事件，不取修复结果", async () => {
+    const { response } = setup();
+    response.accept(call);
+    response.accept({ type: "part.start", part: { id: "other", kind: "toolcall", callId: "other", name: "write" } });
+    response.accept({ type: "part.delta", partId: "c", delta: '{"path":"first' });
+    response.accept({ type: "part.delta", partId: "other", delta: '{"content":"second' });
+    await response.preview(() => ({}));
+    expect(response.live().map(block => block.kind === "toolcall" && block.arguments)).toEqual([{ path: "first" }, { content: "second" }]);
+    response.accept({ type: "part.end", partId: "c", arguments: { path: "first.txt" } });
+    expect(response.live()[0]).toMatchObject({ state: "ready", arguments: { path: "first.txt" } });
+    expect(response.calls()[0]!.arguments).toEqual({ path: "first.txt" });
+  });
   it("即时思考携带运行时块起点，读取和增量不会重新计时；结束后保留全文", () => {
     const clock = vi.spyOn(Date, "now").mockReturnValue(1000);
     try {

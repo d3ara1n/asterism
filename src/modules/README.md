@@ -94,13 +94,15 @@ Agent 的选择和提交去重保存于对象数据，用户输入与执行输�
 
 `cardRenderer(DirectoryView, …)` 使用卡片契约推导 data 类型。卡片提供默认 width/height、可选 minWidth/minHeight、Body 和可选 Actions；宽高使用画布单位，未声明下限时使用公共下限。工作台统一处理缩放、尺寸覆盖和保存，ObjectCard 处理框架、标题栏拖动、折叠与关闭，ObjectActions 提供尺寸预设、恢复默认与对象移除入口。模块不重建这套外壳。Body 使用可伸缩的内容区，溢出时在内部滚动；媒体视图可在内容区按比例适配，外框尺寸不强制锁定比例。
 
-`RendererModule.tools` 注册 `toolRenderer(DirectoryList, { label, icon, headerRenderer?, bodyRenderer? })`。两个 renderer 是独立可选的 React 组件，接收同一份 `ToolRenderProps`：phase、name、target、args、invocation 与 result；实现契约推导并校验 target、args、data 类型。result 为 null 表示尚未执行；运行中为 `{kind: "running", data}`，终结后沿用 data 并携带具体结局。invocation 包含当次资源身份与可用的开始/结束时间。header 可只依据调用信息渲染，也可随 data 更新；只输出摘要内容，不嵌套按钮等交互控件。
+`RendererModule.tools` 注册 `toolRenderer(DirectoryList, { label, icon, input?, execution?, result? })`。三态同级，各自提供独立可选的 headerRenderer/bodyRenderer React 组件；同一组件或阶段声明可直接复用。`ToolRenderProps<D, T, A>` 是 input、execution、result 的可辨识联合，公共字段为 phase、name、target、args、invocation 与 result。填充期 target/args 是部分 JSON；其余阶段由实现契约推导并校验参数与 data。等待调度和执行共用 execution，终结视图仅接收终结结局。header 只输出摘要，不嵌套交互控件；完整类型和回退规则见 [SDK 视图契约](../../docs/plugin-sdk.md#工具视图)。
 
-缺少 headerRenderer 时显示工具名称与资源，缺少 bodyRenderer 时显示原始数据。两个入口互不影响。外壳控制状态图标、异常标识、展开与调用详情；过程数据更新和最终保存不重置展开。参数填充期间不调用专用 renderer，使用内置提示；执行中尚无产出时不能展开，终结后可查看空结果或失败原因。
+填充阶段可省略，保留静态准备提示；填充有 header 而没有 body 时只更新摘要。执行与结果缺失的阶段或单个入口独立回退默认摘要和产出正文，不跨阶段借用。目录与笔记共用 `text-view.tsx` 的 textReadViews/textWriteViews/textEditViews，通过普通对象组合注册。外壳控制状态图标、异常标识、展开与调用详情；填充时展开和填充结束后折叠由两项设置分别控制，只在阶段切换时作用，执行、结果更新和保存不重置手动选择。
 
 header 按单行摘要设计，由 renderer 自行安排内容、排列和省略；这是设计规范，外壳不设置高度上限或强制裁切。工具 header 可复用 `renderer/shared/tool-header.tsx` 的 ToolHeader，组合操作名、可收缩的资源名称或路径及右侧摘要；长文本末尾省略，数量与类型不换行。header 不嵌套交互控件，正文渲染独立。
 
-三个宿主固定入口在 `renderer/features/conversation/tool-views.tsx` 内置，不进入模块注册面。resource_call 的适配器将完整内层参数、选定实现身份和同一结果交给 ViewRegistry，直接采用二级工具的图标与两个视图入口；不新增外层折叠框。
+填充、执行、结果三态尽可能逐步增加内容，沿用已显示的目标、数量和相同元素的样式。允许按语义调整正文，如 write 填充期间展示限量的尾部文本，结束后显示实际 diff，但路径与输入字数持续保留。外壳限制展开区的纵向高度，视图还应限制长载荷的 DOM 渲染量。详见 [设计系统](../../docs/design-system.md#对话过程视图)。
+
+三个宿主固定入口在 `renderer/features/conversation/tool-views.tsx` 内置，不进入模块注册面。resource_call 的适配器将内层参数、选定实现身份和同一结果交给 ViewRegistry，填充时允许参数不完整，其余阶段使用完整调用；采用二级工具的三态视图，不新增外层折叠框。
 
 前端目录在应用根通过 ModuleViewsProvider 注入。基础对象接口提供读取、具型创建／动作、对象流与通用运行状态；模型进度、配置目录、工具展示经具名接口按需取得，共享已有宿主状态源。`agent/conversation/` 组合时间轴、输出跟随、消息输入、配置选择与交互协调；草稿和重试身份按会话／对象保留，导航显式注入。公共控件与文案可从 `renderer/shared/` 复用；模块不导入宿主控制器、物理节点或模块总表。
 

@@ -1,4 +1,4 @@
-import { useI18n, useRendererTools } from "@atelier/sdk/renderer";
+import { useI18n, useRendererTools, useRendererCatalogs } from "@atelier/sdk/renderer";
 import { TextCursorInput, Clock, Wrench } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import { useState } from "react";
@@ -11,7 +11,8 @@ import { Badge } from "../../../renderer/shared/ui/badge";
 import { Spinner } from "../../../renderer/shared/ui/spinner";
 import { toolsMessages } from "../../messages/tools";
 import { Disclosure } from "./Disclosure";
-import { toolCallState, type ToolCallNode } from "./tool-state";
+import { advanceToolDisclosure, initialToolDisclosure, toolCallState, type ToolCallNode } from "./tool-state";
+import { ToolPreferences } from "../configuration";
 
 const labels = {
   running: toolsMessages.toolRunning, partial: toolsMessages.toolPartial, failed: toolsMessages.toolFailed,
@@ -23,9 +24,14 @@ export function ToolCall({ node }: { node: ToolCallNode }) {
   const i18n = useI18n();
   const tools = useRendererTools();
   const reducedMotion = useReducedMotion();
-  const [open, setOpen] = useState(false);
   const state = toolCallState(node);
+  const preferences = useRendererCatalogs().get(ToolPreferences) ?? { toolInputAutoExpand: true, toolInputAutoCollapse: true };
+  const filling = state.phase === "input";
   const view = state.props ? tools.resolve(state.props) : null;
+  const hasInputBody = filling && view?.body !== undefined && view.body !== null;
+  const [disclosure, setDisclosure] = useState(() => initialToolDisclosure(filling, preferences, hasInputBody));
+  const next = advanceToolDisclosure(disclosure, filling, preferences, hasInputBody);
+  if (next !== disclosure) setDisclosure(next);
   const result = state.props?.result;
   const diagnostic = result && ("error" in result ? result.error.message : "message" in result ? result.message : null);
   const error = result?.kind === "failed" || result?.kind === "rejected" || result?.kind === "unknown";
@@ -39,16 +45,19 @@ export function ToolCall({ node }: { node: ToolCallNode }) {
   const header = <>
     <span className="inline-flex shrink-0" aria-hidden="true">{icon}</span>
     <span className="min-w-0 flex-1 text-left">
-      {view ? view.header ?? <DefaultToolHeader props={view.props} label={view.label} />
+      {view && (!filling || view.header !== undefined || view.body !== undefined || view.label !== undefined) ? view.header ?? <DefaultToolHeader props={view.props} label={view.label} />
         : <ToolHeader label={state.phase === "incomplete" ? i18n.formatMessage(toolsMessages.toolIncompleteRequest) : tools.preparation(node.name)} />}
     </span>
     {status && <Badge variant={error ? "destructive" : "secondary"}>{status}</Badge>}
     {state.phase === "settled" && result?.kind === "succeeded" && <span className="sr-only">{i18n.formatMessage(toolsMessages.toolSucceeded)}</span>}
   </>;
-  return <Disclosure header={header} open={open} onOpenChange={setOpen} expandable={state.expandable}
+  return <Disclosure header={header} open={next.open} onOpenChange={open => setDisclosure({ ...next, open })} expandable={!filling || hasInputBody}
     pending={state.phase === "input" || state.phase === "ready"}>
-    {view && (view.body ?? <DefaultToolBody {...view.props} />)}
-    {diagnostic && <Alert variant={error ? "destructive" : "default"}><AlertDescription className="whitespace-pre-wrap">{diagnostic}</AlertDescription></Alert>}
-    <ToolDetails label={i18n.formatMessage(toolsMessages.toolCallDetails)}><JsonView value={{ tool: node.name, arguments: node.arguments }} /></ToolDetails>
+    <div className="max-h-80 space-y-3 overflow-auto">
+      {view && (view.body ?? (!filling && <DefaultToolBody {...view.props} />))}
+      {diagnostic && <Alert variant={error ? "destructive" : "default"}><AlertDescription className="whitespace-pre-wrap">{diagnostic}</AlertDescription></Alert>}
+      {!filling && <ToolDetails label={i18n.formatMessage(toolsMessages.toolCallDetails)}><JsonView
+        value={{ tool: node.name, arguments: node.arguments ?? node.argumentsText }} /></ToolDetails>}
+    </div>
   </Disclosure>;
 }

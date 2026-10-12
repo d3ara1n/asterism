@@ -9,13 +9,12 @@ describe("parseAppearance", () => {
   it("单项损坏只回退该项", () => {
     expect(parseAppearance({ accent: "blue", density: "huge" })).toEqual({ ...defaultAppearance, accent: "blue" });
   });
-  it("思考开合偏好分别保存，缺失或损坏时保留默认的自动展开与折叠", () => {
-    expect(parseAppearance({ thinkingAutoExpand: false, thinkingAutoCollapse: false })).toMatchObject({
-      thinkingAutoExpand: false, thinkingAutoCollapse: false,
-    });
-    expect(parseAppearance({ thinkingAutoExpand: false, thinkingAutoCollapse: "invalid" })).toMatchObject({
-      thinkingAutoExpand: false, thinkingAutoCollapse: true,
-    });
+  it.each([
+    ["thinkingAutoExpand", "thinkingAutoCollapse"],
+    ["toolInputAutoExpand", "toolInputAutoCollapse"],
+  ])("%s 与 %s 分别保存，缺失或损坏时保留默认值", (expand, collapse) => {
+    expect(parseAppearance({ [expand]: false, [collapse]: false })).toMatchObject({ [expand]: false, [collapse]: false });
+    expect(parseAppearance({ [expand]: false, [collapse]: "invalid" })).toMatchObject({ [expand]: false, [collapse]: true });
   });
 });
 

@@ -7,6 +7,7 @@ import { z } from "zod";
 import { defineCreation, defineAction, resourceCall, defineRecord, defineImplementation, defineTool, pluginNamespace, modelRunRecordSchema, type SessionRecord, type ModelRunEvent } from "@atelier/sdk/contracts";
 import { defineModule, definePlugin, implementCreation, implementAction, implementPreparer, implementResource, implementTool, type ObjectReader, type ObjectExecutor, type ObjectWriter, type PluginContext, type PluginDefinition } from "@atelier/sdk/runtime";
 import { ApplicationService } from "../runtime/service.ts";
+import { DatabaseVersionError } from "../runtime/storage.ts";
 import * as runtimeModules from "../modules/runtime.ts";
 import type { ToolRegistry } from "../tools/registry.ts";
 import { foldWorkbench } from "../session/fold.ts";
@@ -333,7 +334,7 @@ describe("工作台 SDK 的宿主实现", () => {
         .toMatchObject([{ contract_id: NoteContent.id, data_json: JSON.stringify({ text: "Saved text" }) }]);
       db.exec("PRAGMA user_version = 1");
     } finally { db.close(); }
-    expect(() => new ApplicationService(root)).toThrow("Recreate the development data");
+    expect(() => new ApplicationService(root)).toThrow(DatabaseVersionError);
     const unchanged = new DatabaseSync(file);
     try {
       expect(unchanged.prepare("PRAGMA user_version").get()).toMatchObject({ user_version: 1 });

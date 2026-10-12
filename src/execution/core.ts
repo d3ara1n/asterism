@@ -48,6 +48,15 @@ export function coreDeclarations(): ToolDeclaration[] {
   return actions.map(({ tool }) => declareTool(tool));
 }
 
+/** 填充期的身份提示取自捕获目录，完整调用仍由批次独立校验。 */
+export function previewCoreCall(name: string, args: Json, capabilities: AgentCapabilities): ToolInvocationInfo {
+  if (!args || typeof args !== "object" || Array.isArray(args)) return {};
+  if (typeof args.resource_id !== "string") return {};
+  if (name === "resource_inspect") return capabilities.identity(args.resource_id);
+  return name === "resource_call" && typeof args.tool === "string"
+    ? capabilities.preview(args.resource_id, args.tool) : {};
+}
+
 /** 批次先解析实际资源工具，再按其执行策略调度；发布快照不改变批次的模型交付边界。 */
 export async function executeCoreBatch(calls: readonly PendingCall[], capabilities: AgentCapabilities | null,
   signal: AbortSignal, settle: (call: PendingCall, outcome: ToolOutcome) => void,

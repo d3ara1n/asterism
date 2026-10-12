@@ -4,7 +4,7 @@ import { modelExpression, modelScope, type ModelSettings, type ToolOutcome } fro
 import { ModelFailure, type ModelAdapter } from "../model/contract.ts";
 import type { SystemPrompt } from "@atelier/sdk/contracts";
 import type { ModelItem } from "../session/projection.ts";
-import { executeCoreBatch, coreDeclarations } from "./core.ts";
+import { executeCoreBatch, coreDeclarations, previewCoreCall } from "./core.ts";
 import type { AgentCapabilities } from "./capabilities.ts";
 import { ResponseBuffer } from "./response.ts";
 import { synchronous } from "../plugins/synchronous.ts";
@@ -54,11 +54,28 @@ export async function runModelRequest(request: ModelRunRequest, environment: Pro
         ordinal: ordinal === null ? null : Number(ordinal), completion: terminal });
     });
     const progress = () => emit({ type: "progress", blocks: response.live().map(({ agentId: _agentId, ...block }) => block) });
+    // 合并工具参数的高频解析；正文与思考仍即时发布，计时器不越过响应生命周期。
+    let progressTimer: ReturnType<typeof setTimeout> | undefined;
+    let pendingProgress = Promise.resolve();
+    const flushProgress = () => {
+      clearTimeout(progressTimer);
+      progressTimer = undefined;
+      pendingProgress = pendingProgress.then(async () => {
+        await response.preview((name, args) => previewCoreCall(name, args, capabilities));
+        progress();
+      });
+      return pendingProgress;
+    };
     try {
       for await (const event of prepared.stream(signal)) {
         signal.throwIfAborted();
         response.accept(event);
-        progress();
+        if (event.type === "part.delta") {
+          if (response.isToolInput(event.partId)) progressTimer ??= setTimeout(() => {
+            void flushProgress().catch(error => controller.abort(error));
+          }, 50);
+          else progress();
+        } else await flushProgress();
       }
       signal.throwIfAborted();
       const finish = response.finish;
@@ -83,7 +100,10 @@ export async function runModelRequest(request: ModelRunRequest, environment: Pro
       if ([...outcomes.values()].some(outcome => outcome.kind === "unknown"))
         throw new ModelFailure("unknown_outcome", "A tool outcome is unknown. Automatic continuation stopped.");
       signal.throwIfAborted();
-    } finally { response.close(); }
+    } finally {
+      try { await flushProgress(); }
+      finally { response.close(); }
+    }
   } catch (error) {
     if (deliveryFailed) termination = { reason: "failed", code: "event_delivery" };
     else if (request.signal.aborted) {

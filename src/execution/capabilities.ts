@@ -43,6 +43,12 @@ export class AgentCapabilities {
     return resource ? { resource: { id: resource.id, kind: resource.kind, title: resource.title } } : {};
   }
 
+  /** 仅查找本次请求内的展示身份；不解析参数、不准备或执行工具。 */
+  preview(id: string, name: string): ToolInvocationInfo {
+    const implementation = this.linked.get(id)?.tools.find(tool => tool.tool.name === name);
+    return { ...this.identity(id), ...(implementation ? { implementation: implementation.reference } : {}) };
+  }
+
   async inspect(id: string): Promise<PreparedResult> {
     const target = this.linked.get(id);
     if (!target) return denied();

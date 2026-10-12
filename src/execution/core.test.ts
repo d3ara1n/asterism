@@ -9,7 +9,7 @@ import type { CallResult } from "@atelier/sdk/runtime";
 import { ToolRegistry } from "../tools/registry.ts";
 import { ResourceRegistry } from "../resources/registry.ts";
 import { AgentCapabilities } from "./capabilities.ts";
-import { executeCoreBatch, type ToolObserver } from "./core.ts";
+import { executeCoreBatch, previewCoreCall, type ToolObserver } from "./core.ts";
 
 const contract = defineImplementation({
   ...defineData("test.stream", z.strictObject({ text: z.string() }).describe("Current captured text.")),
@@ -33,6 +33,20 @@ async function run(handler: Handler, options: { effect?: "read" | "write"; signa
 }
 
 describe("工具产出与终结", () => {
+  it("预览只查捕获目录，不准备或执行；未知资源和被策略排除的工具无实现身份", () => {
+    const tool = implement(contract, { call: async () => ({ kind: "succeeded", data: { text: "" } }) });
+    const prepare = vi.spyOn(tool, "prepare");
+    const snapshot = { ...resource };
+    const capabilities = new AgentCapabilities(new ResourceRegistry([]), new ToolRegistry([tool]), [snapshot], () => true);
+    snapshot.title = "Changed later";
+    expect(previewCoreCall("resource_call", call.arguments, capabilities)).toEqual({
+      implementation: reference(contract), resource: { id: "r", kind: "test", title: "At request start" },
+    });
+    expect(previewCoreCall("resource_call", { ...call.arguments, resource_id: "unknown" }, capabilities)).toEqual({});
+    const denied = new AgentCapabilities(new ResourceRegistry([]), new ToolRegistry([tool]), [resource], () => false);
+    expect(previewCoreCall("resource_call", call.arguments, denied).implementation).toBeUndefined();
+    expect(prepare).not.toHaveBeenCalled();
+  });
   it("publish 是独立快照，只在终结时投影模型；终结后的回调失效", async () => {
     const updates: Json[] = [];
     const order: string[] = [];

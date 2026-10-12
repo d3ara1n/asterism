@@ -3,7 +3,7 @@ import { z } from "zod";
 import { coreChannel } from "./core.ts";
 
 /**
- * 外观设置：主题、字体、画布纹理与思考展示偏好。主题色值来自 Radix Colors，renderer 写入 :root 的 CSS 变量，
+ * 外观设置：主题、字体、画布纹理与过程展示偏好。主题色值来自 Radix Colors，renderer 写入 :root 的 CSS 变量，
  * 组件消费 shadcn 语义 token。存储由主进程经 electron-store 落在平台用户数据目录。
  */
 export const modes = ["system", "light", "dark"] as const;
@@ -43,10 +43,12 @@ export const appearanceSchema = z.object({
   codeFontSize: z.number().int().min(codeFontSizes[0]).max(codeFontSizes[codeFontSizes.length - 1]).nullable().default(null).catch(null),
   thinkingAutoExpand: z.boolean().catch(true),
   thinkingAutoCollapse: z.boolean().catch(true),
+  toolInputAutoExpand: z.boolean().catch(true),
+  toolInputAutoCollapse: z.boolean().catch(true),
 });
 export type Appearance = z.infer<typeof appearanceSchema>;
 export const defaultAppearance: Appearance = { mode: "system", accent: "jade", gray: "sage", density: "standard", radius: "md", canvas: "dots", uiFont: null, codeFont: null, codeFontSize: null,
-  thinkingAutoExpand: true, thinkingAutoCollapse: true };
+  thinkingAutoExpand: true, thinkingAutoCollapse: true, toolInputAutoExpand: true, toolInputAutoCollapse: true };
 
 /** 读取的原始数据不可信：逐项回退到默认值，不因单项损坏丢弃整份设置。 */
 export function parseAppearance(raw: unknown): Appearance {

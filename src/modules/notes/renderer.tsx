@@ -1,10 +1,9 @@
 import { useI18n, creationEntry, cardRenderer, toolRenderer, type RendererModule } from "@atelier/sdk/renderer";
 import { FileText, BookOpen, FilePenLine, FilePlus2 } from "lucide-react";
 
-import { ToolHeader } from "../../renderer/shared/tool-header";
 import { commonMessages } from "../messages/common";
 import { textMessages } from "../messages/text";
-import { TextReadBody, TextChangeBody } from "../text-view";
+import { textReadViews, textWriteViews, textEditViews } from "../text-view";
 import { CreateNote, NoteView, NoteRead, NoteEdit, NoteWrite } from "./contract";
 import { NoteInput } from "./creation";
 
@@ -22,24 +21,15 @@ export default {
   tools: [
     toolRenderer(NoteRead, {
       label: textMessages.toolTextRead, icon: <BookOpen className="size-3.5" />,
-      headerRenderer: ({ invocation, result }) => { const i18n = useI18n(); return <ToolHeader label={i18n.formatMessage(textMessages.toolTextRead)}
-        subject={invocation.resource?.title}
-        meta={result?.data && i18n.formatMessage(textMessages.toolTextLines, { shown: result.data.rows.length, total: result.data.totalLines })} />; },
-      bodyRenderer: TextReadBody,
+      ...textReadViews,
     }),
     toolRenderer(NoteEdit, {
       label: textMessages.toolTextEdit, icon: <FilePenLine className="size-3.5" />,
-      headerRenderer: ({ invocation, result }) => { const i18n = useI18n(); return <ToolHeader label={i18n.formatMessage(textMessages.toolTextEdit)}
-        subject={invocation.resource?.title}
-        meta={result?.data && <>+{result.data.added} −{result.data.removed}</>} />; },
-      bodyRenderer: TextChangeBody,
+      ...textEditViews,
     }),
     toolRenderer(NoteWrite, {
       label: textMessages.toolTextWrite, icon: <FilePlus2 className="size-3.5" />,
-      headerRenderer: ({ invocation, result }) => { const i18n = useI18n(); return <ToolHeader label={i18n.formatMessage(textMessages.toolTextWrite)}
-        subject={invocation.resource?.title}
-        meta={result?.data && <>+{result.data.added} −{result.data.removed}</>} />; },
-      bodyRenderer: TextChangeBody,
+      ...textWriteViews,
     }),
   ],
   creations: [creationEntry(CreateNote, { id: "atelier.core/note.blank", label: commonMessages.kindNote, icon: <FileText className="size-4" />, group: "resources", InputView: NoteInput,

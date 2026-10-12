@@ -118,6 +118,22 @@ SDK helper 负责具型声明与实现包装，宿主命令模块负责解析、
 
 core 的用户输入、模型执行和通知与宿主物理会话格式的映射属于明确的 core 存储适配模块。通用插件门面不继续积累领域分支；物理存储不作为插件公开接口。公共模块提供同进程共享实例；core 领域共识包的发布、通用后台跨插件调用与跨进程通信按各自计划推进。
 
+## 工具视图
+
+工具通过 `toolRenderer(contract, { label?, icon?, input?, execution?, result? })` 声明三态视图。三个入口平行且可选，均为 `ToolPhaseView<Props>`，分别包含可选 `headerRenderer / bodyRenderer`。两个组件收到同一份阶段数据；共享组件或视图声明可直接用于多个阶段，不要求为每个阶段复制组件。
+
+| 入口 | Props | 阶段与数据 |
+| --- | --- | --- |
+| input | ToolInputRenderProps | phase 为 input，target/args 是部分 JSON，result 为 null |
+| execution | ToolExecutionRenderProps | phase 为 ready 或 executing，target/args 已校验，result 为 null 或 running 产出 |
+| result | ToolResultRenderProps | phase 为 settled，完整调用参数与终结结局，data 可为 null |
+
+`ToolRenderProps<D, T, A>` 是三种 Props 的可辨识联合，供跨阶段组件复用；根据 phase 收窄后，完整参数与终结结局保留准确类型。填充参数的字段可能缺失、类型错误或只收到字符串前缀，视图自行安全读取，不以 `Partial<已校验参数>` 冒充有效数据。等待调度归 execution，不表示已经开始执行。执行产出和结果由同一 result schema 校验。
+
+未声明 input 时使用静态填充提示；声明填充视图后，缺少 header 时使用工具默认摘要，缺少 body 时不提供填充展开。execution/result 缺少阶段或单个入口时分别回退默认摘要和产出正文，不跨阶段借用视图。SDK 为 0.7.0，宿主 API 为 4.0；不兼容的插件在加载前拒绝。
+
+三态的样式与内容归工具，宿主控制开合设置、阶段图标、异常和统一高度上限。视图应尽可能保留已出现的路径、数量和相同元素的样式，逐步补充信息；允许按内容语义切换正文形态，例如生成中的 write 尾部预览与终结后的实际 diff。完整约定见 [设计系统](design-system.md#对话过程视图)，可编译的作者示例和类型反例见 [tool-renderer.ts](../packages/sdk/examples/tool-renderer.ts)。
+
 ## 界面文案与语言环境
 
 公共展示字段接受 `UiText`：普通字符串原样显示，具归属消息描述支持可选翻译。`ns.messages(sourceLocale, defineMessages(...))` 在纯契约中绑定来源，跨公共模块引用与 IPC 保持 owner；宿主显示时格式化，不在静态注册时固定语言。`useI18n()` 是应用级展示能力，创建入口和无对象组件也能使用；不向插件暴露可修改全局语言或目录的引擎。

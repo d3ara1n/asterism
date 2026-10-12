@@ -8,3 +8,6 @@ export const ModelConfiguration = core.data("model.configuration", configuration
 export const ThinkingPreferences = core.data("thinking.preferences", z.strictObject({
   thinkingAutoExpand: z.boolean(), thinkingAutoCollapse: z.boolean(),
 }));
+export const ToolPreferences = core.data("tool.preferences", z.strictObject({
+  toolInputAutoExpand: z.boolean(), toolInputAutoCollapse: z.boolean(),
+}));

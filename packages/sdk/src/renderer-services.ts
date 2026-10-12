@@ -2,7 +2,7 @@ import { createContext, useContext } from "react";
 import type { Json } from "./json.ts";
 import type { DataContract } from "./presentation.ts";
 import type { ModelLiveBlock } from "./models.ts";
-import type { ToolRenderProps, ToolView } from "./renderer.ts";
+import type { ToolRenderProps, ToolView } from "./renderer-tools.ts";
 
 export interface RendererCatalogs { get<T extends Json>(contract: DataContract<T>): T | null; error: UiText | null }
 export interface RendererTools {
