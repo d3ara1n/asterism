@@ -114,7 +114,7 @@ toolRenderer(WriteContract, {
 
 组件可用 `ToolRenderProps<D, T, A>` 覆盖三态，或使用 `ToolInputRenderProps / ToolExecutionRenderProps / ToolResultRenderProps` 定义单阶段组件。input 收到部分 JSON 和 `result: null`，字段读取必须检查类型；execution 接收已校验参数，phase 为 ready/executing；result 的 phase 为 settled，结果必为终结结局。完整参数与执行产出继续通过契约校验。省略 input 时显示静态准备提示；execution/result 缺少入口时独立回退，不隐式复用其他阶段。详见 [视图契约](../../docs/plugin-sdk.md#工具视图)。
 
-[可编译的作者示例与类型反例](examples/tool-renderer.ts) 验证跨阶段复用、部分参数与结局收窄。内置 [目录视图](../../src/modules/filesystem/renderer.tsx) 和 [正文视图](../../src/modules/text-view.tsx) 共用三态声明，header 保留路径及字数，body 按 phase 展示尾部或结果。开合与高度上限由宿主管理；视图尽可能保持目标、数量和样式连续，逐步补充内容。
+[可编译的作者示例与类型反例](examples/tool-renderer.ts) 验证跨阶段复用、部分参数与结局收窄。内置 [目录视图](../../src/modules/filesystem/renderer.tsx) 和 [正文视图](../../src/modules/text-view.tsx) 共用三态声明，header 保留路径及字数，body 按 phase 展示尾部或结果。宿主管理开合与原始详情，工具外壳不限高，body 提供方自行控制局部高度、滚动、分页、截取与渲染量；视图尽可能保持目标、数量和样式连续，逐步补充内容。内置插件的 120 行正文预算不作为 SDK 对外部插件的强制要求。
 
 二进制流的宿主信封由 main 与 preload 共用 Zod schema 校验，preload 按会话与对象筛选订阅。载荷保留 `Uint8Array`，支持空帧与具有偏移的视图，不转换为 JSON，也不写入时间轴；无效信封不交付插件。
 

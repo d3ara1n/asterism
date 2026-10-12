@@ -3,8 +3,11 @@ import { toolsMessages } from "./messages/tools";
 import { useI18n, type ToolRenderProps, type ToolRendererDefinition } from "@atelier/sdk/renderer";
 import type { Json, ToolResult } from "@atelier/sdk/contracts";
 import { useMemo } from "react";
+import { FileDiff, type FileDiffOptions } from "@pierre/diffs/react";
 import type { TextRead, TextChange } from "./shared/text-contract";
 import { inputField, inputText, characterCount, toolTextTail } from "./shared/tool-preview";
+import { TOOL_BODY_LINE_LIMIT, diffBodyPreview, textBodyPreview } from "./shared/tool-body";
+import { CodeRows, codeViewOptions } from "./code-view";
 import { ToolHeader } from "../renderer/shared/tool-header";
 
 /** 三态复用摘要结构，已有路径、输入数量在执行和结束时继续保留。 */
@@ -38,9 +41,11 @@ function TextEditHeader({ target, args, invocation, result }: ToolRenderProps<Te
       {Array.isArray(edits) && i18n.formatMessage(textMessages.toolTextEdits, { count: edits.length })}</>} />;
 }
 
-function InputTail({ text }: { text: string }) {
+function InputTail({ text, filename }: { text: string; filename?: string }) {
+  const tail = toolTextTail(text).split("\n");
+  const firstLine = text.split("\n").length - tail.length + 1;
   return <div className="tool-input-preview" aria-live="off">
-    <pre className="min-w-0 shrink-0 whitespace-pre-wrap break-words type-code">{toolTextTail(text)}</pre>
+    <div className="min-w-0 shrink-0"><CodeRows rows={tail.map((content, index) => ({ line: firstLine + index, content }))} filename={filename} /></div>
   </div>;
 }
 function EditPreview({ args }: { args: Json }) {
@@ -57,24 +62,24 @@ function EditPreview({ args }: { args: Json }) {
 }
 function TextWriteBody(props: ToolRenderProps<TextChange>) {
   const content = inputText(props.args, "content");
-  if (props.phase === "input") return <InputTail text={content ?? ""} />;
+  const filename = inputText(props.target, "path");
+  if (props.phase === "input") return <InputTail text={content ?? ""} filename={filename} />;
+  if (props.result?.kind === "succeeded" && content !== undefined) return <TextBodyPreview text={content} filename={filename} />;
   return props.result?.data ? <TextChangeBody result={props.result} />
-    : content !== undefined ? <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words type-code">{content}</pre> : null;
+    : content !== undefined ? <TextBodyPreview text={content} filename={filename} /> : null;
 }
 function TextEditBody(props: ToolRenderProps<TextChange>) {
   return props.result?.data ? <TextChangeBody result={props.result} /> : <EditPreview args={props.args} />;
 }
 
 /** 用户视图消费保存的正文和差异，不显示或重新生成模型用的锚点。 */
-function TextReadBody({ result }: { result: ToolResult<TextRead> | null }) {
+function TextReadBody({ result, target }: ToolRenderProps<TextRead>) {
   const i18n = useI18n();
   const data = result?.data;
+  const rows = data?.rows.slice(0, TOOL_BODY_LINE_LIMIT);
   return data ? <div className="flex flex-col gap-2">
-    <div className="max-h-80 overflow-auto type-code">{data.rows.map(row =>
-      <div key={row.line} className="flex gap-3">
-        <span className="shrink-0 select-none text-muted-foreground">{row.line}</span>
-        <pre className="min-w-0 whitespace-pre-wrap break-words">{row.content || " "}</pre>
-      </div>)}</div>
+    <CodeRows rows={rows ?? []} filename={inputText(target, "path")} />
+    <OmittedLines count={data.rows.length - (rows?.length ?? 0)} />
     {data.noFinalNewline && <p className="type-caption">{i18n.formatMessage(textMessages.toolTextNoFinalNewline)}</p>}
     {data.nextOffset !== null && <p className="type-caption">{i18n.formatMessage(textMessages.toolTextMore, { line: data.nextOffset })}</p>}
   </div> : null;
@@ -83,10 +88,35 @@ function TextChangeBody({ result }: { result: ToolResult<TextChange> | null }) {
   const i18n = useI18n();
   const data = result?.data;
   return data ? data.diff
-    ? <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words type-code">{data.diff}</pre>
+    ? <DiffBodyPreview diff={data.diff} />
     : <p className="type-caption">{data.changed ? i18n.formatMessage(toolsMessages.toolNoOutput) : i18n.formatMessage(textMessages.toolTextUnchanged)}</p>
     : null;
 }
+
+function OmittedLines({ count }: { count: number }) {
+  const i18n = useI18n();
+  return count > 0 ? <p className="type-caption">{i18n.formatMessage(textMessages.toolTextPreviewOmitted, { count })}</p> : null;
+}
+function TextBodyPreview({ text, filename }: { text: string; filename?: string }) {
+  const preview = useMemo(() => textBodyPreview(text), [text]);
+  return <div className="space-y-2">
+    <CodeRows rows={preview.rows} filename={filename} />
+    <OmittedLines count={preview.omitted} />
+  </div>;
+}
+function DiffBodyPreview({ diff }: { diff: string }) {
+  const preview = useMemo(() => diffBodyPreview(diff), [diff]);
+  if (!preview) return <TextBodyPreview text={diff} />;
+  return <div className="space-y-2">
+    <FileDiff fileDiff={preview.fileDiff} options={diffViewOptions} className="pierre-code type-code" disableWorkerPool />
+    <OmittedLines count={preview.omitted} />
+  </div>;
+}
+
+const diffViewOptions = {
+  ...codeViewOptions, diffStyle: "unified", diffIndicators: "bars", lineDiffType: "none",
+  hunkSeparators: "simple", expandUnchanged: false,
+} as const satisfies FileDiffOptions<undefined, undefined>;
 
 const readView = { headerRenderer: TextReadHeader, bodyRenderer: TextReadBody };
 const writeView = { headerRenderer: TextWriteHeader, bodyRenderer: TextWriteBody };

@@ -83,8 +83,14 @@ export function textChange(before: string, after: string, label: string, touched
     anchors, anchorsTruncated: anchors.length < indices.length,
   };
 }
-export function changeToModel(data: TextChange): string {
-  // 历史保留完整 diff，模型输出按完整行截断并明确提示。
+function changeSummary(data: TextChange): string {
+  return data.changed ? `Content saved (+${data.added} -${data.removed}).` : "Content was already identical; no change was needed.";
+}
+export function writeToModel(data: TextChange): string {
+  return changeSummary(data);
+}
+export function editToModel(data: TextChange): string {
+  // 历史保留完整 diff；模型收到有界 diff 与可继续编辑的新锚点。
   const diffLines: string[] = [];
   let bytes = 0;
   for (const line of data.diff.split("\n")) {
@@ -94,7 +100,7 @@ export function changeToModel(data: TextChange): string {
   }
   const diff = diffLines.join("\n");
   return [
-    data.changed ? `Content saved (+${data.added} -${data.removed}).` : "Content was already identical; no change was needed.",
+    changeSummary(data),
     diff,
     ...(diff !== data.diff ? ["Diff output was truncated; the full diff is saved in the tool result. Read the target to inspect its current content."] : []),
     ...(data.anchors.length ? ["Updated anchors (use for the next edit):", ...data.anchors.map(row => `${row.line}#${row.hash}│${row.content}`)] : []),

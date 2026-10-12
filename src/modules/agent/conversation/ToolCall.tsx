@@ -4,7 +4,7 @@ import { motion, useReducedMotion } from "motion/react";
 import { useState } from "react";
 
 import { JsonView } from "../../../renderer/shared/json-view";
-import { DefaultToolHeader, DefaultToolBody, ToolDetails } from "../../../renderer/shared/tool-content";
+import { DefaultToolHeader, DefaultToolBody, ToolDetailsSwitcher } from "../../../renderer/shared/tool-content";
 import { ToolHeader } from "../../../renderer/shared/tool-header";
 import { Alert, AlertDescription } from "../../../renderer/shared/ui/alert";
 import { Badge } from "../../../renderer/shared/ui/badge";
@@ -33,6 +33,8 @@ export function ToolCall({ node }: { node: ToolCallNode }) {
   const next = advanceToolDisclosure(disclosure, filling, preferences, hasInputBody);
   if (next !== disclosure) setDisclosure(next);
   const result = state.props?.result;
+  const outcome = "outcome" in node ? node.outcome : null;
+  const hasResultDetails = outcome && outcome.data !== null && outcome.model.every(part => part.kind === "text");
   const diagnostic = result && ("error" in result ? result.error.message : "message" in result ? result.message : null);
   const error = result?.kind === "failed" || result?.kind === "rejected" || result?.kind === "unknown";
   const status = state.phase === "ready" ? i18n.formatMessage(toolsMessages.toolWaiting) : state.phase === "incomplete" ? i18n.formatMessage(toolsMessages.toolIncomplete)
@@ -53,11 +55,15 @@ export function ToolCall({ node }: { node: ToolCallNode }) {
   </>;
   return <Disclosure header={header} open={next.open} onOpenChange={open => setDisclosure({ ...next, open })} expandable={!filling || hasInputBody}
     pending={state.phase === "input" || state.phase === "ready"}>
-    <div className="max-h-80 space-y-3 overflow-auto">
+    <div className="space-y-3">
       {view && (view.body ?? (!filling && <DefaultToolBody {...view.props} />))}
       {diagnostic && <Alert variant={error ? "destructive" : "default"}><AlertDescription className="whitespace-pre-wrap">{diagnostic}</AlertDescription></Alert>}
-      {!filling && <ToolDetails label={i18n.formatMessage(toolsMessages.toolCallDetails)}><JsonView
-        value={{ tool: node.name, arguments: node.arguments ?? node.argumentsText }} /></ToolDetails>}
+      {!filling && <ToolDetailsSwitcher items={[
+        { value: "call", label: i18n.formatMessage(toolsMessages.toolCallDetails),
+          render: () => <JsonView value={{ tool: node.name, arguments: node.arguments ?? node.argumentsText }} /> },
+        ...(hasResultDetails ? [{ value: "result", label: i18n.formatMessage(toolsMessages.toolResultDetails),
+          render: () => <JsonView value={JSON.stringify(outcome.data, null, 2)} /> }] : []),
+      ]} />}
     </div>
   </Disclosure>;
 }

@@ -7,6 +7,7 @@ import { filesystemMessages } from "../messages/filesystem";
 import { textMessages } from "../messages/text";
 import { textReadViews, textWriteViews, textEditViews } from "../text-view";
 import { inputText } from "../shared/tool-preview";
+import { TOOL_BODY_LINE_LIMIT } from "../shared/tool-body";
 import { CreateDirectory, DirectoryView, DirectoryList, DirectoryRead, DirectoryEdit, DirectoryWrite, DirectorySee } from "./contract";
 import { FilePreview } from "../agent/conversation/Files";
 import { DirectoryInput } from "./creation";
@@ -27,8 +28,9 @@ function ListBody({ result }: ListProps) {
   return data ? <div className="flex flex-col gap-2">
     <p className="type-caption break-all">{data.path}</p>
     {!data.entries.length && <p className="type-caption">{i18n.formatMessage(filesystemMessages.toolDirectoryEmpty)}</p>}
-    <ul className="max-h-80 overflow-auto type-code">{data.entries.map(entry =>
+    <ul className="type-code">{data.entries.slice(0, TOOL_BODY_LINE_LIMIT).map(entry =>
       <li key={entry.name} className="break-all">{entry.name}{entry.type === "directory" ? "/" : ""}</li>)}</ul>
+    {data.entries.length > TOOL_BODY_LINE_LIMIT && <p className="type-caption">{i18n.formatMessage(textMessages.toolTextPreviewOmitted, { count: data.entries.length - TOOL_BODY_LINE_LIMIT })}</p>}
     {data.truncated && <p className="type-caption">{i18n.formatMessage(filesystemMessages.toolDirectoryTruncated)}</p>}
   </div> : null;
 }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { applyPatch } from "diff";
 import { Read, Edit, Write } from "./declarations.ts";
-import { readText, readToModel, editText, textChange, changeToModel } from "./text.ts";
+import { readText, readToModel, editText, textChange, writeToModel, editToModel } from "./text.ts";
 
 // 预期来自工具契约：定位不进 args、失败整批不写、锚点指向完整正文、编辑保留原始换行。
 describe("正文工具契约", () => {
@@ -82,12 +82,20 @@ describe("正文工具契约", () => {
     expect(applyPatch(before, change.diff)).toBe("a\nB\n");
   });
 
-  it("大结果明确限制模型 diff 与新锚点，不截断后假装完整", () => {
+  it("edit 的模型 diff 和新锚点有独立预算，write 保留简述", () => {
     const after = Array.from({ length: 50 }, (_, i) => `${i} ${"x".repeat(2000)}`).join("\n");
     const change = textChange("", after, "text.txt", Array.from({ length: 50 }, (_, i) => i));
     expect(change.anchorsTruncated).toBe(true);
-    expect(Buffer.byteLength(changeToModel(change))).toBeLessThan(84 * 1024);
-    expect(changeToModel(change)).toContain("Diff output was truncated");
+    expect(Buffer.byteLength(editToModel(change))).toBeLessThan(84 * 1024);
+    expect(editToModel(change)).toContain("Diff output was truncated");
+    expect(editToModel(change)).toContain("Updated anchors (use for the next edit):");
+    expect(editToModel(change)).toContain("Some updated anchors were omitted");
+    expect(writeToModel(change)).toBe("Content saved (+50 -0).");
+    expect(writeToModel(textChange(after, after, "text.txt"))).toBe("Content was already identical; no change was needed.");
     expect(applyPatch("", change.diff)).toBe(after);
+  });
+  it("用户正文预览预算不限制 read 返回给模型的内容", () => {
+    const text = Array.from({ length: 200 }, (_, index) => `line ${index + 1}`).join("\n");
+    expect(readToModel(readText(text, false))).toContain("200│line 200");
   });
 });

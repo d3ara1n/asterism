@@ -218,6 +218,16 @@
   .settings-detail { @apply absolute inset-x-0 top-0 max-h-full overflow-y-auto overscroll-contain; }
 }
 .react-flow__attribution { background: transparent !important; font-size: 9px !important; }
+/* Pierre 自行绘制差异与语法颜色；宿主只接入公共字体、字号与紧凑间距。 */
+.pierre-code {
+  display: block;
+  min-width: 0;
+  --diffs-font-family: var(--font-mono);
+  --diffs-font-size: var(--code-font-size, 1em);
+  --diffs-line-height: 1.5em;
+  --diffs-gap-inline: 0.375rem;
+  --diffs-min-number-column-width: 3ch;
+}
 .react-flow__edge-text { fill: var(--muted-foreground); font-family: var(--font-sans); font-size: 10px; }
 .react-flow__edge-textbg { fill: var(--background); }
 .react-flow__handle { width: 7px; height: 7px; background: var(--primary); border: 2px solid var(--card); }

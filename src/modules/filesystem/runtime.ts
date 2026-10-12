@@ -1,7 +1,7 @@
 import { readdir, readFile, stat } from "node:fs/promises";
 import { basename, isAbsolute } from "node:path";
 import { defineModule, implementResource, implementCreation, implementTool, PluginApiError, type CallResult } from "@atelier/sdk/runtime";
-import { TextError, readText, readToModel, editText, textChange, changeToModel } from "../shared/text.ts";
+import { TextError, readText, readToModel, editText, textChange, writeToModel, editToModel } from "../shared/text.ts";
 import { Directory, CreateDirectory, DirectoryView, DirectoryList, DirectoryRead, DirectoryEdit, DirectoryWrite, DirectorySee } from "./contract.ts";
 import { readImageFile } from "./image-io.ts";
 import { withinDirectory, writableTarget } from "./paths.ts";
@@ -95,7 +95,7 @@ export default defineModule(() => ({
           });
         } catch (error) { return textFailure(error, signal, "Edit target file"); }
       },
-      toModel: data => `${data.path}\n${changeToModel(data)}`,
+      toModel: data => `${data.path}\n${editToModel(data)}`,
     }),
     implementTool(DirectoryWrite, {
       async call(directory, target, args, { signal }) {
@@ -121,7 +121,7 @@ export default defineModule(() => ({
           });
         } catch (error) { return textFailure(error, signal, "Write target file"); }
       },
-      toModel: data => `${data.path}${data.created ? " (created)" : ""}\n${changeToModel(data)}`,
+      toModel: data => `${data.path}${data.created ? " (created)" : ""}: ${writeToModel(data)}`,
     }),
     implementTool(DirectorySee, {
       async call(directory, target, _args, { object, signal }) {

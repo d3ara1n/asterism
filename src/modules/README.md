@@ -4,7 +4,7 @@
 
 后台与视图通过 [公开 SDK](../../packages/sdk/README.md) 消费宿主能力，职责与组合约定见 [插件 SDK 与功能组合](../../docs/plugin-sdk.md)，迁移进度见 [插件计划](../../plans/todo-2026-10-12-plugin-system.md)。`setup` 是装配入口，业务模块用显式依赖组合；资源内联聚合具型创建与动作实现，工具使用 `implementTool`，命名使用提交后观察与托管任务，Agent 自己推动模型循环。
 
-`shared/` 存放 core 模块共用的工具契约、正文 schema 与算法，不提供独立模块入口，不依赖宿主实现。纯契约可由后台与 renderer 共用，正文算法只进入后台依赖图。
+`shared/` 存放 core 模块共用的工具契约、正文 schema、后台算法与前端预览投影，不提供独立模块入口，不依赖宿主实现。纯契约可由后台与 renderer 共用，`text.ts` 与正文编辑算法只进入后台依赖图，`tool-body.ts` 的预览预算与差异投影只进入 renderer。
 
 ## 三个入口
 
@@ -48,7 +48,7 @@ export const Search = defineTool({
 
 `defineImplementation` 将共享工具、资源契约与实现的 target/result 关联；SDK 的 `implementTool` 推导 handler 的 data、target、args 和返回值类型。完整实现见 [目录契约](filesystem/contract.ts) 与 [目录后端](filesystem/runtime.ts)。
 
-`toModel` 可省略，默认使用 data；只在终结时生成并保存模型投影，自定义投影应保留结果契约的含义。非成功结局的模型投影还包含 kind、错误或说明。target 由 handler 直接解释：目录 list 使用 null 或 `{path}`，文件 read 使用 `{path, offset?, limit?}`，笔记 read 使用 null，其他模块可以使用 `{piece}` 等结构。内容范围属于定位，不强制所有资源采用行号；anchored 属于 read 自身的行为参数。无通用目标解析器，不在公共工具函数里维护资源类型分支。
+`toModel` 可省略，默认使用 data；只在终结时生成并保存模型投影，自定义投影应保留结果契约的含义。内置 edit 使用 `editToModel` 返回成功摘要、实际 diff 与可供后续编辑的新锚点；diff 与锚点分别按自身预算截取，省略时明确提示。write 使用 `writeToModel` 只返回一句确认，带路径、创建状态或增删数量等少量信息；完整 diff 留在历史和用户视图，不回传模型，后续需要锚点时 read。失败保留详细原因与修正提示；read/list 继续返回取材结果，不套用用户视图的 120 行预算。非成功结局的模型投影还包含 kind、错误或说明。target 由 handler 直接解释：目录 list 使用 null 或 `{path}`，文件 read 使用 `{path, offset?, limit?}`，笔记 read 使用 null，其他模块可以使用 `{piece}` 等结构。内容范围属于定位，不强制所有资源采用行号；anchored 属于 read 自身的行为参数。无通用目标解析器，不在公共工具函数里维护资源类型分支。
 
 SDK handler 的 context 提供 `signal / object / publish(data)`，object 是绑定对象的公开门面。publish 发布当前完整产出，使用与最终 data 相同的 schema；快照通过校验后替换最近的产出，经会话进度送到 UI，不写历史或交给模型。尚未确定的字段用 schema 中明确的 null 或阶段联合表达，不使用 `Partial<最终成功结果>` 绕过校验。工具完成时返回 CallResult；成功/部分完成必须提供 data，失败/拒绝/取消/未知结局可省略 data 以保留最近产出，显式 null 则清空。终结后 publish 失效。
 
@@ -96,11 +96,15 @@ Agent 的选择和提交去重保存于对象数据，用户输入与执行输�
 
 `RendererModule.tools` 注册 `toolRenderer(DirectoryList, { label, icon, input?, execution?, result? })`。三态同级，各自提供独立可选的 headerRenderer/bodyRenderer React 组件；同一组件或阶段声明可直接复用。`ToolRenderProps<D, T, A>` 是 input、execution、result 的可辨识联合，公共字段为 phase、name、target、args、invocation 与 result。填充期 target/args 是部分 JSON；其余阶段由实现契约推导并校验参数与 data。等待调度和执行共用 execution，终结视图仅接收终结结局。header 只输出摘要，不嵌套交互控件；完整类型和回退规则见 [SDK 视图契约](../../docs/plugin-sdk.md#工具视图)。
 
-填充阶段可省略，保留静态准备提示；填充有 header 而没有 body 时只更新摘要。执行与结果缺失的阶段或单个入口独立回退默认摘要和产出正文，不跨阶段借用。目录与笔记共用 `text-view.tsx` 的 textReadViews/textWriteViews/textEditViews，通过普通对象组合注册。外壳控制状态图标、异常标识、展开与调用详情；填充时展开和填充结束后折叠由两项设置分别控制，只在阶段切换时作用，执行、结果更新和保存不重置手动选择。
+填充阶段可省略，保留静态准备提示；填充有 header 而没有 body 时只更新摘要。执行与结果缺失的阶段或单个入口独立回退默认摘要和产出正文，不跨阶段借用。目录与笔记共用 `text-view.tsx` 的 textReadViews/textWriteViews/textEditViews，通过普通对象组合注册。外壳控制状态图标、异常标识、展开与调用／结果详情；详情共用默认不选中的单选切换，文件结果隐藏结果详情。填充时展开和填充结束后折叠由两项设置分别控制，只在阶段切换时作用，执行、结果更新和保存不重置手动选择。
 
 header 按单行摘要设计，由 renderer 自行安排内容、排列和省略；这是设计规范，外壳不设置高度上限或强制裁切。工具 header 可复用 `renderer/shared/tool-header.tsx` 的 ToolHeader，组合操作名、可收缩的资源名称或路径及右侧摘要；长文本末尾省略，数量与类型不换行。header 不嵌套交互控件，正文渲染独立。
 
-填充、执行、结果三态尽可能逐步增加内容，沿用已显示的目标、数量和相同元素的样式。允许按语义调整正文，如 write 填充期间展示限量的尾部文本，结束后显示实际 diff，但路径与输入字数持续保留。外壳限制展开区的纵向高度，视图还应限制长载荷的 DOM 渲染量。详见 [设计系统](../../docs/design-system.md#对话过程视图)。
+填充、执行、结果三态尽可能逐步增加内容，沿用已显示的目标、数量和相同元素的样式。允许按语义调整正文，如 write 填充期间展示限量的尾部文本，成功写入后显示代码正文，但路径与输入字数持续保留。外壳不限高，body 提供方自行控制局部高度、滚动、分页、截取与 DOM 渲染量。
+
+内置插件正文每次调用最多展示 120 个逻辑行，由 `shared/tool-body.ts` 的预算常量与各 body 实施；read、write 与目录列表按顺序截取。edit 的结果按已保存 diff 的实际编辑点分段，增删行有颜色，显示修改前后绝对行号，远处片段之间以省略分隔；不展开中间未改正文，不展示原始补丁头。所有 diff 片段的上下文、删除与新增行合计最多 120 行，行号、分隔与换行注记不占正文预算。read/write 的代码按可识别语言着色，edit 只要求 diff 着色。省略只发生在正文预览，完整参数与结果仍可通过原始详情查看，模型投影与持久记录保持各自契约。这是 `atelier.core` 自身的开发约定，不约束外部插件；正式视觉与展示规则见 [设计系统](../../docs/design-system.md#对话过程视图)。
+
+edit 的差异视图交给 Pierre Diffs 的 FileDiff，使用 stacked 展示（API 的 `unified`），原生单列行号、增删颜色和简单片段分隔。`shared/tool-body.ts` 解析已保存的 diff，按总预算选取真实行并保留绝对位置，再由 `parsePatchFiles` 生成预览元数据；解析失败时回退有界原文预览。read/write 复用 `code-view.tsx` 的原生 File 代码视图，交给库按文件名与扩展名识别语法，未知类型或没有文件名时使用普通文本。片段为连续行，绝对起始行号通过公开 `onPostRender` 回调映射到现有行号标签。两类视图使用 Pierre 亮暗主题与 JavaScript 正则引擎，字体和字号沿用公共代码 token。
 
 三个宿主固定入口在 `renderer/features/conversation/tool-views.tsx` 内置，不进入模块注册面。resource_call 的适配器将内层参数、选定实现身份和同一结果交给 ViewRegistry，填充时允许参数不完整，其余阶段使用完整调用；采用二级工具的三态视图，不新增外层折叠框。
 

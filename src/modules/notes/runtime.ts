@@ -1,6 +1,6 @@
 import { defineModule, implementResource, implementCreation, implementTool, PluginApiError, type ObjectReader, type ObjectExecutor, type CallResult } from "@atelier/sdk/runtime";
 import { Note, CreateNote, NoteContent, NoteView, NoteRead, NoteEdit, NoteWrite, MAX_NOTE_LENGTH } from "./contract.ts";
-import { TextError, readText, readToModel, editText, textChange, changeToModel } from "../shared/text.ts";
+import { TextError, readText, readToModel, editText, textChange, writeToModel, editToModel } from "../shared/text.ts";
 
 function currentContent(object: ObjectReader) {
   try { return object.get(NoteContent); }
@@ -70,7 +70,7 @@ export default defineModule(() => ({
           return { kind: "succeeded", data };
         } catch (error) { return mutationFailure(error, signal, "Note editing"); }
       },
-      toModel: changeToModel,
+      toModel: editToModel,
     }),
     implementTool(NoteWrite, {
       async call(_data, _target, args, { object, signal }) {
@@ -84,7 +84,7 @@ export default defineModule(() => ({
           return { kind: "succeeded", data };
         } catch (error) { return mutationFailure(error, signal, "Note writing"); }
       },
-      toModel: changeToModel,
+      toModel: writeToModel,
     }),
   ],
 }));

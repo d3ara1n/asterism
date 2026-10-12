@@ -45,6 +45,10 @@ export const toolsMessages = pluginNamespace("atelier.core").messages("en", defi
     id: "toolCallDetails",
     defaultMessage: "Call details",
   },
+  toolResultDetails: {
+    id: "toolResultDetails",
+    defaultMessage: "Result details",
+  },
   toolNoOutput: {
     id: "toolNoOutput",
     defaultMessage: "No output was produced.",

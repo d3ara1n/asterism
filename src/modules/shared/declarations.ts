@@ -56,7 +56,7 @@ export const Write = defineTool({
     "Pass the complete desired content in args.content, including exactly the intended line endings and final newline.",
     "Select an existing note with target:null, or a file with target:{\"path\":\"docs/new.md\"}. File write can create missing parent directories within the linked directory.",
     "write requires no anchors and returns none. Use edit for local changes to content you have read; use read after write if you need anchors.",
-    "An existing target is overwritten. A write with identical content succeeds with changed:false.",
+    "An existing target is overwritten. Success returns a brief confirmation; identical content reports that no change was needed.",
   ],
   argsSchema: z.strictObject({
     content: z.string().describe("The complete new UTF-8 text. Empty content clears the target; do not include displayed line numbers or hashes."),

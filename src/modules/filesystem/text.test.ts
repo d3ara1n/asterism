@@ -71,17 +71,26 @@ describe("目录正文工具", () => {
     writeFileSync(file, "a\r\nb\nc"); chmodSync(file, 0o755);
     const read = textReadSchema.strip().parse((await call("read", { path: "text.txt" })).data);
     const a = (i: number) => ({ line: read.rows[i].line, hash: read.rows[i].hash! });
-    expect(await call("edit", { path: "text.txt" }, { edits: [
+    const rejected = await call("edit", { path: "text.txt" }, { edits: [
       { op: "replace", anchor: a(0), body: ["A"] }, { op: "replace", anchor: { line: 2, hash: "0000" }, body: ["B"] },
-    ] })).toMatchObject({ kind: "rejected", error: { code: "anchor_mismatch" } });
+    ] });
+    expect(rejected).toMatchObject({ kind: "rejected", error: { code: "anchor_mismatch" } });
+    expect(JSON.stringify(rejected.model)).toContain("edits[1].anchor");
+    expect(JSON.stringify(rejected.model)).toContain("no changes were written");
     expect(readFileSync(file, "utf8")).toBe("a\r\nb\nc");
     const edited = await call("edit", { path: "text.txt" }, { edits: [{ op: "replace", anchor: a(1), body: ["B"] }] });
     expect(edited.kind).toBe("succeeded");
+    const modelText = edited.model.flatMap(part => part.kind === "text" ? [part.text] : []).join("\n");
+    expect(modelText).toContain("Content saved (+1 -1).");
+    expect(modelText).toContain("+B");
+    const nextAnchor = /^(\d+)#([0-9A-HJKMNP-TV-Z]{4})│B$/m.exec(modelText);
+    expect(nextAnchor).not.toBeNull();
     const change = textChangeSchema.strip().parse(edited.data);
     expect(applyPatch("a\r\nb\nc", change.diff)).toBe("a\r\nB\nc");
     expect(readFileSync(file, "utf8")).toBe("a\r\nB\nc");
     expect(statSync(file).mode & 0o777).toBe(0o755);
-    expect(await call("edit", { path: "text.txt" }, { edits: [{ op: "insert_after", anchor: { line: 2, hash: change.anchors[0].hash! }, body: ["new"] }] })).toMatchObject({ kind: "succeeded" });
+    expect(await call("edit", { path: "text.txt" }, { edits: [{ op: "insert_after",
+      anchor: { line: Number(nextAnchor![1]), hash: nextAnchor![2] }, body: ["new"] }] })).toMatchObject({ kind: "succeeded" });
     expect(readFileSync(file, "utf8")).toBe("a\r\nB\nnew\r\nc");
     expect(readdirSync(directory)).toEqual(["text.txt"]);
   });
@@ -92,6 +101,7 @@ describe("目录正文工具", () => {
     expect(readFileSync(join(directory, "nested/empty.txt"), "utf8")).toBe("");
     const created = await call("write", { path: "nested/text.txt" }, { content: "正文\r\nlast" });
     expect(created).toMatchObject({ kind: "succeeded", data: { created: true, anchors: [] } });
+    expect(created.model).toEqual([{ kind: "text", text: "nested/text.txt (created): Content saved (+2 -0)." }]);
     const overwritten = await call("write", { path: "nested/text.txt" }, { content: "new\n" });
     expect(overwritten).toMatchObject({ kind: "succeeded", data: { created: false, anchors: [] } });
     expect(applyPatch("正文\r\nlast", textChangeSchema.strip().parse(overwritten.data).diff)).toBe("new\n");

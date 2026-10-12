@@ -41,4 +41,8 @@ export const textMessages = pluginNamespace("atelier.core").messages("en", defin
     id: "toolTextUnchanged",
     defaultMessage: "Content is unchanged.",
   },
+  toolTextPreviewOmitted: {
+    id: "toolTextPreviewOmitted",
+    defaultMessage: "{count, plural, one {# additional line is omitted from this preview.} other {# additional lines are omitted from this preview.}}",
+  },
 }));
