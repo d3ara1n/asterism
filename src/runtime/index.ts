@@ -5,6 +5,7 @@ import { SecretClient } from "./secret-client.ts";
 import { join } from "node:path";
 import { PackageList, loadPackages } from "../plugins/packages.ts";
 import { core } from "../modules/plugin.ts";
+import { DatabaseVersionError } from "./storage.ts";
 
 // 任务进程只接收主进程给出的应用数据根目录，不接受 renderer 文件路径。
 const port = process.parentPort;
@@ -54,6 +55,8 @@ try {
   port.postMessage({ kind: "ready", version: protocolVersion });
 } catch (error) {
   console.error("Task runtime initialization failed.", error);
-  port.postMessage({ kind: "fatal", message: "The workspace could not be opened. Check the application logs." });
+  port.postMessage(error instanceof DatabaseVersionError
+    ? { kind: "fatal", reason: "database_version", message: error.message, directory: error.directory }
+    : { kind: "fatal", reason: "unknown", message: "The workspace could not be opened. Check the application logs." });
   process.exitCode = 1;
 }

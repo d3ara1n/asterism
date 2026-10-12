@@ -8,6 +8,13 @@ import { contentSchemaSql } from "./content-store.ts";
 
 const workspaceDatabaseVersion = 15;
 
+/** 开发期库格式不符：发布前不迁移，提示开发者删除 db 目录重建。 */
+export class DatabaseVersionError extends Error {
+  constructor(readonly directory: string, found: number) {
+    super(`Workspace database format ${found} does not match this build (${workspaceDatabaseVersion}). Delete ${directory} and restart to recreate development data.`);
+  }
+}
+
 export function openDatabase(root: string): DatabaseSync {
   mkdirSync(join(root, applicationStorage.databaseDirectory), { recursive: true });
   const db = new DatabaseSync(join(root, applicationStorage.databaseDirectory, applicationStorage.databaseFile));
@@ -42,7 +49,7 @@ export function openDatabase(root: string): DatabaseSync {
       ${contentSchemaSql}
       PRAGMA user_version = ${workspaceDatabaseVersion};
       COMMIT;`);
-    else if (version !== workspaceDatabaseVersion) throw new Error(`This workspace database format is not supported by this build of ${applicationBrand.en}. Recreate the development data before restarting.`);
+    else if (version !== workspaceDatabaseVersion) throw new DatabaseVersionError(join(root, applicationStorage.databaseDirectory), version);
     if (!db.prepare("SELECT id FROM workspace LIMIT 1").get()) {
       db.prepare("INSERT INTO workspace VALUES (?, ?)").run(randomUUID(), "Personal workspace");
     }

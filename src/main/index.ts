@@ -172,7 +172,13 @@ if (!app.requestSingleInstanceLock()) {
     try { await runtime.start(join(here, "runtime.js"), dataRoot); }
     catch (error) {
       console.error("Application startup failed.", error);
-      dialog.showErrorBox(applicationBrand.en, error instanceof Error ? error.message : startupText(startupMessages.workspaceOpenFailed, () => readLanguage().locale));
+      const { reason, directory } = error as { reason?: string; directory?: string };
+      if (reason === "database_version" && directory) {
+        // 开发者机制，文案不本地化；正式版由迁移机制处理。
+        const { response } = await dialog.showMessageBox({ type: "error", title: applicationBrand.en, message: "Development data format mismatch",
+          detail: error instanceof Error ? error.message : "", buttons: ["Open Data Folder", "OK"], defaultId: 0 });
+        if (response === 0) await shell.openPath(directory);
+      } else dialog.showErrorBox(applicationBrand.en, error instanceof Error ? error.message : startupText(startupMessages.workspaceOpenFailed, () => readLanguage().locale));
     }
     if (!quitting) createWindow();
     app.on("activate", () => { if (!quitting && BrowserWindow.getAllWindows().length === 0) createWindow(); });

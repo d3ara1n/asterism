@@ -117,7 +117,7 @@ export class RuntimeHost {
           this.contentRequests?.close();
           this.sessionRequests?.close();
           child.kill();
-          reject(new Error(parsed.data.message));
+          reject(Object.assign(new Error(parsed.data.message), { reason: parsed.data.reason, directory: parsed.data.directory }));
         } else this.requests?.receive(raw);
       });
       child.once("exit", code => {

@@ -49,7 +49,8 @@ export const responseSchema = z.strictObject({ version: z.literal(protocolVersio
 export const runtimeMessageSchema = z.discriminatedUnion("kind", [
   z.strictObject({ kind: z.literal("ready"), version: z.literal(protocolVersion) }),
   z.strictObject({ kind: z.literal("response"), ...responseSchema.shape }),
-  z.strictObject({ kind: z.literal("fatal"), message: z.string() }),
+  // reason 为启动失败类别，main 按类别选择提示；迁移上线时扩展类别值，不改消息形状。
+  z.strictObject({ kind: z.literal("fatal"), message: z.string(), reason: z.enum(["database_version", "unknown"]), directory: z.string().optional() }),
 ]);
 export type RuntimeMessage = z.infer<typeof runtimeMessageSchema>;
 export interface DesktopBridge {
