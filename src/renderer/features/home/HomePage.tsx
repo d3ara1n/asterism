@@ -1,5 +1,7 @@
 import { ArrowUp, Bot, Cpu, Brain, Settings } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import type { MessageDraft } from "../../../modules/agent/conversation/draft";
+import { AttachFiles, DraftFiles, fileInputEvents } from "../../../modules/agent/conversation/Files";
 
 import { resolveProviderModel, thinkingSchema, type ConfigurationSnapshot, type ThinkingLevel, modelReference } from "../../../shared/configuration";
 import type { SessionCommand } from "../../../shared/session";
@@ -15,16 +17,17 @@ import { initialAgentSelection } from "../configuration/agent-selection";
 import { useConfiguration } from "../configuration/state";
 import { Showcase, showcaseSpell } from "../showcase/Showcase";
 
-export type StartInput = Omit<Extract<SessionCommand, { type: "start" }>, "type" | "submissionId">;
+export type StartInput = Omit<Extract<SessionCommand, { type: "start" }>, "type" | "submissionId" | "contentScopeId">;
 
 /** 应用级草稿入口；取用配置填入选择，但不订阅角色变化去刷新已选 agent 的默认值。 */
 const thinkingLabels = { off: commonMessages.thinkingOff, minimal: commonMessages.thinkingMinimal, low: commonMessages.thinkingLow, medium: commonMessages.thinkingMedium, high: commonMessages.thinkingHigh, xhigh: commonMessages.thinkingXhigh };
 
-export function HomePage({ active, draft, onDraftChange, onSettings, ready, busy, submitError, onStart }: {
-  active: boolean; draft: string; onDraftChange: (value: string) => void; onSettings: () => void;
+export function HomePage({ active, draft, onSettings, ready, busy, submitError, onStart }: {
+  active: boolean; draft: MessageDraft; onSettings: () => void;
   ready: boolean; busy: boolean; submitError: import("@atelier/sdk/contracts").UiText | null; onStart: (input: StartInput) => Promise<void>;
 }) {
   const i18n = useI18n();
+  const inputState = useSyncExternalStore(draft.subscribe, draft.getSnapshot);
   const { snapshot, error } = useConfiguration(active);
   const initialized = useRef(false);
   const [agentId, setAgentId] = useState<string | null>(null);
@@ -51,29 +54,31 @@ export function HomePage({ active, draft, onDraftChange, onSettings, ready, busy
   const model = snapshot ? resolveProviderModel(snapshot, modelId)?.model : null;
   const agent = snapshot?.agents.find(item => item.id === agentId && item.enabled);
   const unavailable = snapshot && ((agentId && !agent) || (modelId && !model)) ? i18n.formatMessage(homeMessages.configurationUnavailable) : null;
-  const canSend = ready && !busy && !!agent && !!model && !!draft.trim() && !unavailable;
+  const canSend = ready && !busy && !inputState.uploading && !!agent && !!model && (!!inputState.text.trim() || !!inputState.files.length) && !unavailable;
   return <div className="home-page"><div className="home-content">
     <header className="mb-8 flex flex-col items-center text-center">
       <BrandMark className="mb-4 size-12 text-primary" /><h1 className="type-page">{i18n.formatMessage(appMessages.appName)}</h1>
       <p className="type-body mt-2 text-muted-foreground">{i18n.formatMessage(homeMessages.homePrompt)}</p>
     </header>
     {/* 两层输入区：亮色输入表面在上，灰色选项托盘挂在下方；选项为紧凑的幽灵按钮 + 菜单，不用表单下拉框。 */}
-    <form onSubmit={event => {
+    <form {...fileInputEvents(draft, busy || !ready)} onSubmit={event => {
       event.preventDefault();
-      if (canSend) void onStart({ agent: agent!.id, model: modelReference(model!), thinking, text: draft.trim() });
+      if (canSend) void onStart({ agent: agent!.id, model: modelReference(model!), thinking, parts: draft.parts() });
     }} aria-label={i18n.formatMessage(commonMessages.newConversation)} className="rounded-xl border bg-muted">
+      <DraftFiles draft={draft} disabled={busy} />
       <InputGroup className="rounded-xl border-0 border-b bg-card shadow-none">
         <label htmlFor="home-message" className="sr-only">{i18n.formatMessage(homeMessages.firstMessage)}</label>
         <InputGroupTextarea id="home-message" className="min-h-32 px-4 py-4" rows={4} maxLength={100_000}
-          placeholder={i18n.formatMessage(homeMessages.homePlaceholder)} value={draft} disabled={busy} onChange={event => onDraftChange(event.target.value)} aria-describedby="home-availability"
+          placeholder={i18n.formatMessage(homeMessages.homePlaceholder)} value={inputState.text} disabled={busy} onChange={event => draft.setText(event.target.value)} aria-describedby="home-availability"
           onKeyDown={event => {
             // 彩蛋：完整输入口令后回车打开组件展示，不进入命令系统。
             if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
             event.preventDefault();
-            if (draft.trim() === showcaseSpell) { onDraftChange(""); setShowcase(true); }
+            if (inputState.text.trim() === showcaseSpell) { draft.setText(""); setShowcase(true); }
             else event.currentTarget.form?.requestSubmit();
           }} />
-        <InputGroupAddon align="block-end" className="justify-end">
+        <InputGroupAddon align="block-end" className="justify-between">
+          <AttachFiles draft={draft} disabled={busy || !ready} />
           <Button size="icon-sm" className="rounded-full" aria-label={i18n.formatMessage(commonMessages.sendMessage)} title={i18n.formatMessage(commonMessages.sendMessage)} type="submit" disabled={!canSend} aria-describedby="home-availability"><ArrowUp /></Button>
         </InputGroupAddon>
       </InputGroup>

@@ -130,7 +130,7 @@ core 的用户输入、模型执行和通知与宿主物理会话格式的映射
 
 `ToolRenderProps<D, T, A>` 是三种 Props 的可辨识联合，供跨阶段组件复用；根据 phase 收窄后，完整参数与终结结局保留准确类型。填充参数的字段可能缺失、类型错误或只收到字符串前缀，视图自行安全读取，不以 `Partial<已校验参数>` 冒充有效数据。等待调度归 execution，不表示已经开始执行。执行产出和结果由同一 result schema 校验。
 
-未声明 input 时使用静态填充提示；声明填充视图后，缺少 header 时使用工具默认摘要，缺少 body 时不提供填充展开。execution/result 缺少阶段或单个入口时分别回退默认摘要和产出正文，不跨阶段借用视图。SDK 为 0.7.0，宿主 API 为 4.0；不兼容的插件在加载前拒绝。
+未声明 input 时使用静态填充提示；声明填充视图后，缺少 header 时使用工具默认摘要，缺少 body 时不提供填充展开。execution/result 缺少阶段或单个入口时分别回退默认摘要和产出正文，不跨阶段借用视图。SDK 为 0.8.0，宿主 API 为 5.0；不兼容的插件在加载前拒绝。
 
 三态的样式与内容归工具，宿主控制开合设置、阶段图标、异常和统一高度上限。视图应尽可能保留已出现的路径、数量和相同元素的样式，逐步补充信息；允许按内容语义切换正文形态，例如生成中的 write 尾部预览与终结后的实际 diff。完整约定见 [设计系统](design-system.md#对话过程视图)，可编译的作者示例和类型反例见 [tool-renderer.ts](../packages/sdk/examples/tool-renderer.ts)。
 
@@ -191,6 +191,14 @@ Agent 对话由时间轴展示、输出跟随、消息输入、配置选择、Ag
 | 前端 `toInput(item, content)`、`InputView` 的 `content`、`object.input(contract)` | 草稿，可上传 | 绑定该创建／动作契约 |
 
 前端创建入口由宿主提供草稿并管理关闭。卡片动作用 `object.input(contract)` 取得草稿，`invoke(contract, input, { content: draft })` 携带资格；命令成功后宿主关闭草稿，失败保留可重试，放弃时调用 `close`。暂存结果只有写入提交后的数据或事件才持久保留；字符串化或写入私有文件不建立依赖。
+
+## 模型输入
+
+模型输入与 context 使用有序 ModelInputPart：文字为 `{ kind: "text", text }`，文件为 `{ kind: "file", file: ContentRef, mediaType, filename? }`。声明与 schema 从 contracts 导出，调用示例见 [模型文件输入](../packages/sdk/examples/model-input.ts)。输入不携带字节或读取门面。
+
+`models.validate(request, { content })` 与 `models.stream(request, { content })` 复用 prepare、对象或会话已有的 ContentReader；包含文件时须提供合法宿主门面，纯文字可省略。validate 只检查元数据和协议条件，实际请求重新取用并读取字节。`models.run` 根据 object/requestParentId 固定对象当前数据和历史路径资格，不提供外部 reader 覆盖。SDK 不增加模型专用上传器、resolver 或公开内容占用管理。
+
+宿主为请求独立保留所用内容，结束时释放；调用方应消费或关闭 stream。模型失败与取消不关闭借来的 content，输入作用域关闭也不撤销已经捕获的请求。模型服务不自动保存用户消息；内置 Agent 在调用前通过用户消息记录建立时间轴事实和内容依赖。完整约定见 [会话核心](conversation-core.md#用户输入与文件)。
 
 ## 验证接口
 

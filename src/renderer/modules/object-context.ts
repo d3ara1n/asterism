@@ -45,9 +45,11 @@ export function useObjectContext(object: WorkbenchObject): RendererObjectContext
     window.host.onObjectStream(controller.sessionId, object.id, (name, data) => {
       if (name === `${pluginOf(object.kind)}/${channel}`) listener(data);
     }), [controller.sessionId, object.id, object.kind]);
+  const content = useMemo(() => contentReader(() => ({ sessionId: controller.sessionId, objectId: object.id, nodeId: snapshot?.at ?? null })),
+    [controller.sessionId, object.id, snapshot?.at]);
   return {
     ref: { sessionId: controller.sessionId, id: object.id, kind: object.kind },
-    content: contentReader(() => ({ sessionId: controller.sessionId, objectId: object.id, nodeId: snapshot?.at ?? null })),
+    content,
     input: contract => contentInput({ sessionId: controller.sessionId, resourceKind: contract.resource.kind, contractId: contract.id,
       ...(contract.kind === "action" ? { objectId: object.id } : {}) }),
     view: { ready: workbench.ready, busy: state.busy, historical, status: state.status, error: state.error, missing: state.missing },

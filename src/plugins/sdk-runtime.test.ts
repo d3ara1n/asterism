@@ -45,7 +45,7 @@ async function configureModel(service: ApplicationService) {
     value: { id: "test", name: "Test", protocol: "openai-responses", baseUrl: "https://example.invalid", auth: "none", enabled: true } });
   const result = await service.configuration.execute({ type: "model.save", id: null, value: {
     providerId: "test", name: "Test", modelId: "test", enabled: true, contextWindow: null,
-    capabilities: { tools: true, reasoning: false, images: false }, generation: { temperature: null, topP: null, maxOutputTokens: null },
+    capabilities: { tools: true, reasoning: false, inputMediaTypes: [] }, generation: { temperature: null, topP: null, maxOutputTokens: null },
   } });
   return { role: "default", model: result.savedId! };
 }
@@ -232,7 +232,7 @@ describe("工作台 SDK 的宿主实现", () => {
     const target = await configureModel(service);
     const before = service.sessions.tree.list();
     await expect(service.sessions.execute({ type: "start", submissionId: crypto.randomUUID(),
-      agent: "worker", model: target.model, thinking: null, text: "First" })).rejects.toMatchObject({ code: "invalid_request" });
+      agent: "worker", model: target.model, thinking: null, parts: [{ kind: "text", text: "First" }] })).rejects.toMatchObject({ code: "invalid_request" });
     expect(service.sessions.tree.list()).toEqual(before);
     expect(service.sessions.running).toBe(false);
   });
@@ -329,7 +329,7 @@ describe("工作台 SDK 的宿主实现", () => {
     const file = join(root, applicationStorage.databaseDirectory, applicationStorage.databaseFile);
     const db = new DatabaseSync(file);
     try {
-      expect(db.prepare("PRAGMA user_version").get()).toMatchObject({ user_version: 15 });
+      expect(db.prepare("PRAGMA user_version").get()).toMatchObject({ user_version: 16 });
       expect(db.prepare("SELECT contract_id, data_json FROM session_data").all())
         .toMatchObject([{ contract_id: NoteContent.id, data_json: JSON.stringify({ text: "Saved text" }) }]);
       db.exec("PRAGMA user_version = 1");
@@ -559,7 +559,7 @@ describe("工作台 SDK 的宿主实现", () => {
     const Execution = defineRecord(ns.name("execution"), { schema: modelRunRecordSchema });
     const plugin = definePlugin({ ...c.plugin, modules: [...c.plugin.modules, defineModule(() => ({ records: [Execution] }))] });
     const inputs: ModelInput[] = [];
-    const { service, sessionId } = open([plugin], () => ({ version: "test-adapter", prepare(input) {
+    const { service, sessionId } = open([plugin], () => ({ validate() {}, version: "test-adapter", prepare(input) {
       inputs.push(structuredClone(input));
       return { async *stream() {
         yield { type: "part.start", part: { id: "c", kind: "toolcall", callId: "c", name: "resource_list" } };
@@ -572,7 +572,7 @@ describe("工作台 SDK 的宿主实现", () => {
     const object = c.context().object({ sessionId, id, kind: Counter.kind });
     const before = object.session.snapshot();
     const result = await c.context().models.run({ object: object.ref, requestParentId: before.position.nodeId,
-      target, system: { blocks: [] }, messages: [{ kind: "input", text: "First projection" }], signal: new AbortController().signal,
+      target, system: { blocks: [] }, messages: [{ kind: "input", parts: [{ kind: "text", text: "First projection" }] }], signal: new AbortController().signal,
       observer: { event(event) { if (event.type !== "progress") object.commit(writer => { writer.append(Execution, modelRunRecordSchema.parse(event)); }); } },
     });
     expect(result).toMatchObject({ reason: "completed", tools: [{ kind: "succeeded" }], source: { adapter: "test-adapter" } });
@@ -581,23 +581,23 @@ describe("工作台 SDK 的宿主实现", () => {
     expect(service.sessions.tree.nodes(sessionId).every(node => node.kind === "event")).toBe(true);
     const count = service.sessions.tree.nodes(sessionId).length;
     await c.context().models.run({ object: object.ref, requestParentId: object.session.snapshot().position.nodeId,
-      target, system: { blocks: [] }, messages: [{ kind: "input", text: "Second projection" }], signal: new AbortController().signal,
+      target, system: { blocks: [] }, messages: [{ kind: "input", parts: [{ kind: "text", text: "Second projection" }] }], signal: new AbortController().signal,
       observer: { event() {} },
     });
-    expect(inputs.map(input => input.messages)).toEqual([[{ kind: "input", text: "First projection" }], [{ kind: "input", text: "Second projection" }]]);
+    expect(inputs.map(input => input.messages)).toEqual([[{ kind: "input", parts: [{ kind: "text", text: "First projection" }] }], [{ kind: "input", parts: [{ kind: "text", text: "Second projection" }] }]]);
     expect(service.sessions.tree.nodes(sessionId)).toHaveLength(count);
     const streamRequest = {
-      target, system: { blocks: [] }, messages: [{ kind: "input" as const, text: "Generate a title" }], signal: new AbortController().signal,
+      target, system: { blocks: [] }, messages: [{ kind: "input" as const, parts: [{ kind: "text" as const, text: "Generate a title" }] }], signal: new AbortController().signal,
     };
     const stream = [];
     const iterable = c.context().models.stream(streamRequest);
     const first = iterable[Symbol.asyncIterator]().next();
-    streamRequest.messages[0]!.text = "Changed after the request began";
+    streamRequest.messages[0]!.parts[0]!.text = "Changed after the request began";
     const head = await first;
     if (!head.done) stream.push(head.value);
     for await (const event of iterable) stream.push(event);
     expect(inputs[2]!.tools).toEqual([]);
-    expect(inputs[2]!.messages).toEqual([{ kind: "input", text: "Generate a title" }]);
+    expect(inputs[2]!.messages).toEqual([{ kind: "input", parts: [{ kind: "text" as const, text: "Generate a title" }] }]);
     expect(stream.at(-1)).toMatchObject({ type: "finish", source: { adapter: "test-adapter" } });
     expect(service.sessions.tree.nodes(sessionId)).toHaveLength(count);
     expect(service.sessions.running).toBe(false);
@@ -607,7 +607,7 @@ describe("工作台 SDK 的宿主实现", () => {
     const c = counter();
     const Execution = defineRecord(ns.name("execution"), { schema: modelRunRecordSchema });
     const plugin = definePlugin({ ...c.plugin, modules: [...c.plugin.modules, defineModule(() => ({ records: [Execution] }))] });
-    const { service, sessionId } = open([plugin], () => ({ version: "test", prepare() {
+    const { service, sessionId } = open([plugin], () => ({ validate() {}, version: "test", prepare() {
       return { async *stream(signal) {
         yield { type: "part.start", part: { id: "t", kind: "text" } };
         yield { type: "part.delta", partId: "t", delta: "Partial" };

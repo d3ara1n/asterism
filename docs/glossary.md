@@ -49,6 +49,8 @@
 | 资源身份 | resource_id | 稳定身份，不等于路径或 URL |
 | 不可变内容 | immutable content | 由宿主封存的完整字节，不是独立工作台对象；资源与记录可引用 |
 | 内容引用值 | content reference / ContentRef | SDK 保留 JSON 值，表示稳定内容身份；本身不保证持久保留，也不授予访问 |
+| 输入部件 | input part / ModelInputPart | 模型输入的有序单元；text 承载文字，file 携带 ContentRef、MIME 与可选文件名，顺序随用户消息保存在时间轴 |
+| 附件 | attachment | 用户界面中的文件输入与展示；底层是消息的 file 部件，不自动创建工作台资源 |
 | 内容占用 | content lease | 草稿、执行尝试或活动读取对内容的临时保留；真实使用结束后由宿主释放 |
 | 操作 | operation | 对资源的执行记录：目标、参数、状态、实际结果与关联资源 |
 | 视图 | view | 对象的呈现；同一对象可有多个视图 |

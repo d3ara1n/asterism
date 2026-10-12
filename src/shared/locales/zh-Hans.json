@@ -1,4 +1,5 @@
 {
+  "model_file_input": "文件输入",
   "appName": "工坊",
   "menu": "工坊菜单",
   "menuSettings": "设置",
@@ -381,7 +382,6 @@
   "features_configuration_ProvidersSettings_79": "能力",
   "features_configuration_ProvidersSettings_80": "支持思考",
   "features_configuration_ProvidersSettings_81": "支持工具调用",
-  "features_configuration_ProvidersSettings_82": "支持图片输入",
   "features_configuration_ProvidersSettings_83": "被引用",
   "features_configuration_ProvidersSettings_84": "使用此模型的角色",
   "features_configuration_ProvidersSettings_85": "没有角色使用此模型。",

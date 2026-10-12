@@ -37,10 +37,10 @@ export function projectForAgent(snapshot: Pick<SessionSnapshot, "records">, agen
   emit(null);
   for (const record of path) {
     const message = UserMessage.decode(record);
-    if (message?.status === "known" && message.data.agentId === agentId) out.push({ kind: "input", text: message.data.text });
+    if (message?.status === "known" && message.data.agentId === agentId) out.push({ kind: "input", parts: message.data.parts });
     const context = ContextNotice.decode(record);
     if (context?.status === "known" && (context.data.recipient === null || context.data.recipient === agentId))
-      out.push({ kind: "context", text: context.data.text });
+      out.push({ kind: "context", parts: [{ kind: "text", text: context.data.text }] });
     emit(record.id);
   }
   return out;

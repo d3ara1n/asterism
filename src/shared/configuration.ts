@@ -1,9 +1,10 @@
 import { z } from "zod";
+import { mediaTypeSchema } from "@atelier/sdk/contracts";
 import { coreChannel } from "./core.ts";
 
 export const configurationChannel = coreChannel("configuration");
 export const configurationChangedChannel = coreChannel("configuration-changed");
-export const configurationVersion = 2;
+export const configurationVersion = 3;
 const id = z.string().min(1).max(160);
 const name = z.string().trim().min(1).max(160);
 const revision = z.number().int().positive();
@@ -39,7 +40,7 @@ export const providerSchema = providerInputSchema.extend({ revision, credentialS
 export const modelInputSchema = z.strictObject({
   providerId: providerIdSchema, name, modelId: serverModelId, enabled: z.boolean(),
   contextWindow: z.number().int().positive().nullable(),
-  capabilities: z.strictObject({ reasoning: z.boolean(), tools: z.boolean(), images: z.boolean() }),
+  capabilities: z.strictObject({ reasoning: z.boolean(), tools: z.boolean(), inputMediaTypes: z.array(mediaTypeSchema).max(64).refine(types => new Set(types).size === types.length) }),
   generation: z.strictObject({
     temperature: z.number().min(0).max(2).nullable(), topP: z.number().min(0).max(1).nullable(),
     maxOutputTokens: z.number().int().positive().nullable(),

@@ -9,7 +9,7 @@ export function appendCoreRecord(writer: SessionHostWriter, contract: RecordCont
   if (contract.id === UserMessage.id) {
     const message = UserMessage.schema.parse(data);
     if (!resource || message.agentId !== resource.id) throw new Error("The message resource does not match its author.");
-    return writer.append({ kind: "message", agentId: resource.id, text: message.text });
+    return writer.append({ kind: "message", agentId: resource.id, parts: message.parts });
   }
   if (contract.id === Notice.id) {
     return writer.append({ kind: "notice", agentId: resource?.id ?? null, ...Notice.schema.parse(data) });

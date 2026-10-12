@@ -10,6 +10,8 @@ import { PluginApiError } from "@atelier/sdk/runtime";
 import type { ModelServices } from "@atelier/sdk/runtime";
 import { coreDeclarations } from "../execution/core.ts";
 import { coreId } from "../shared/core.ts";
+import { inputReferences, validateInput, resolveInput, type ModelContent } from "../model/input.ts";
+import type { ModelItem } from "@atelier/sdk/contracts";
 
 /** 模型目标：选择一个角色，可覆盖模型表达式或思考等级；未给出的沿用角色。 */
 export type { ModelTarget, StreamRequest } from "@atelier/sdk/contracts";
@@ -23,11 +25,13 @@ interface ResolvedTarget { settings: ModelSettings; adapter: ModelAdapter }
 export interface RunRequest extends ModelRunRequest {
   capabilities: AgentCapabilities;
   context: Promise<{ file: string; text: string }[]>;
+  content?: HostInputOptions["content"];
 }
+interface HostInputOptions { content?: (messages: readonly ModelItem[]) => ModelContent | undefined }
 export interface HostModels {
-  stream(request: StreamRequest): AsyncIterable<ModelEvent>;
+  stream(request: StreamRequest, options?: HostInputOptions): AsyncIterable<ModelEvent>;
   run(request: RunRequest): Promise<ModelRunResult>;
-  validate: ModelServices["validate"];
+  validate(request: Parameters<ModelServices["validate"]>[0], options?: HostInputOptions): Promise<void>;
   roles: ModelServices["roles"];
   list: ModelServices["list"];
 }
@@ -72,36 +76,62 @@ export function createModelServices(configuration: ConfigurationService, adapter
         provider: model.providerId, name: model.name, contextWindow: model.contextWindow, capabilities: { ...model.capabilities } }));
     },
   };
+  const capture = (messages: readonly ModelItem[], source?: HostInputOptions["content"]) => {
+    if (!inputReferences(messages).length) return undefined;
+    if (!source) throw new ModelFailure("content_scope", "The model input requires an authorized content reader.");
+    try { return source(messages); }
+    catch (error) {
+      if (error instanceof ModelFailure) throw error;
+      throw new ModelFailure(error instanceof PluginApiError && error.code === "foreign_resource" ? "content_scope" : "content_unavailable",
+        error instanceof Error ? error.message : "The model input content is unavailable.");
+    }
+  };
   return {
     roles: catalog.roles,
     list: catalog.models,
-    async validate(request) {
+    async validate(request, options) {
       request.signal.throwIfAborted();
       const { target, system, messages } = structuredClone({ target: request.target, system: request.system, messages: request.messages });
-      const { settings, adapter } = await resolve(target);
-      request.signal.throwIfAborted();
+      let content: ModelContent | undefined;
       try {
-        adapter.prepare({ settings, system, messages,
+        content = capture(messages, options?.content);
+        const { settings, adapter } = await resolve(target);
+        request.signal.throwIfAborted();
+        validateInput(messages, settings, content);
+        adapter.validate({ settings, system, messages,
           tools: settings.model.capabilities.tools ? coreDeclarations() : [] });
       } catch (error) {
-        throw new PluginApiError("invalid_argument", error instanceof ModelFailure ? error.message : "The model request could not be prepared.");
-      }
+        if (error instanceof PluginApiError) throw error;
+        if (request.signal.aborted) throw error;
+        throw new PluginApiError("invalid_argument", error instanceof ModelFailure ? error.message : "The model request could not be prepared.",
+          error instanceof ModelFailure ? error.code : undefined);
+      } finally { await content?.close(); }
     },
-    async *stream(request) {
+    async *stream(request, options) {
+      request.signal.throwIfAborted();
       const { target, system, messages, tools } = structuredClone({
         target: request.target, system: request.system, messages: request.messages, tools: request.tools,
       });
-      const { settings, adapter } = await resolve(target);
-      const source = { model: modelExpression(settings), adapter: adapter.version, scope: modelScope(settings) };
-      for await (const event of adapter.prepare({ settings, system, messages,
-        tools: settings.model.capabilities.tools ? tools ?? [] : [] }).stream(request.signal)) {
-        yield event.type === "finish" ? { ...event, source } : event;
-      }
+      const content = capture(messages, options?.content);
+      try {
+        const { settings, adapter } = await resolve(target);
+        const resolvedMessages = await resolveInput(messages, settings, content, request.signal);
+        const source = { model: modelExpression(settings), adapter: adapter.version, scope: modelScope(settings) };
+        for await (const event of adapter.prepare({ settings, system, messages: resolvedMessages,
+          tools: settings.model.capabilities.tools ? tools ?? [] : [] }).stream(request.signal)) {
+          request.signal.throwIfAborted();
+          yield event.type === "finish" ? { ...event, source } : event;
+        }
+      } finally { await content?.close(); }
     },
     run(request) {
       const { system, messages, target } = structuredClone({ system: request.system, messages: request.messages, target: request.target });
-      const environment = Promise.all([resolve(target), request.context]).then(([resolved, context]) => ({
-        ...resolved, capabilities: request.capabilities, messages,
+      let content: ModelContent | undefined;
+      let captured: Promise<void>;
+      try { request.signal.throwIfAborted(); content = capture(messages, request.content); captured = Promise.resolve(); }
+      catch (error) { captured = Promise.reject(error); }
+      const environment = Promise.all([resolve(target), request.context, captured]).then(async ([resolved, context]) => ({
+        ...resolved, capabilities: request.capabilities, messages: await resolveInput(messages, resolved.settings, content, request.signal),
         system: { blocks: [...system.blocks, ...context.map((file, index) => ({
           id: coreId(`context.${index}`), kind: "context" as const, ...file,
         }))] },
@@ -109,7 +139,7 @@ export function createModelServices(configuration: ConfigurationService, adapter
         if (error instanceof ModelTargetFailure) throw new ModelFailure(error.reason, error.message);
         throw error;
       });
-      return runModelRequest(request, environment);
+      return runModelRequest(request, environment).finally(() => content?.close());
     },
   };
 }

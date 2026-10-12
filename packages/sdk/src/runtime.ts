@@ -11,7 +11,7 @@ export { validationMessage, jsonArgumentHint } from "./tool-validation.ts";
 /** 插件 API 的稳定错误：code 供插件分支处理，message 用于日志。 */
 export class PluginApiError extends Error {
   constructor(readonly code: "invalid_argument" | "foreign_resource" | "foreign_event" | "unavailable" | "rejected" | "conflict" | "not_found", message: string,
-    /** rejected 时为准备者给出的业务原因码。 */
+    /** 准备拒绝或模型输入预检的业务原因码。 */
     readonly reason?: string, readonly display?: UiText) { super(message); }
 }
 export interface PluginLogger {

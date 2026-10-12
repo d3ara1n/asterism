@@ -90,7 +90,7 @@ export function Conversation({ selection, onHome }: { selection: AgentSelection 
         <span className="flex-1">{i18n.text(error)}</span>
         <Button variant="ghost" size="sm" onClick={() => { void session.refresh(); }}>{i18n.formatMessage(conversationMessages.reload)}</Button>
       </AlertDescription></Alert>}
-      {!historical && <MessageComposer draft={interaction.draft} onDraftChange={interaction.setDraft} inputRef={composer}
+      {!historical && <MessageComposer draft={interaction.draft} inputRef={composer}
         busy={state.busy} ready={ready} running={running} writable={interaction.writable} onSend={send}
         onCancel={interaction.cancel} onContinue={resume} />}
     </footer>

@@ -19,8 +19,13 @@ export const contentSchemaSql = `
   ) STRICT;
   CREATE INDEX content_roots_content ON content_roots(content_id);
 `;
-export interface ContentAccess { sessionId?: string; objectId?: string; scope?: ContentLease; recordIds?: ReadonlySet<string>; check?(): void }
+export interface ContentAccess { owner?: string; sessionId?: string; objectId?: string; scope?: ContentLease; recordIds?: ReadonlySet<string>; check?(): void }
 export interface ContentTarget { contractId: string; resourceKind: string; sessionId?: string; objectId?: string }
+export interface CapturedContent {
+  reader: ContentReader;
+  sizes: ReadonlyMap<string, number>;
+  close(): Promise<void>;
+}
 interface Stored { id: string; size: number; digest: string }
 interface Upload { id: string; scope: ContentLease; file: FileHandle; path: string; size: number; hash: Hash; tail: Promise<unknown>; sealed: boolean }
 const unavailable = (message: string): never => { throw new PluginApiError("unavailable", message); };
@@ -76,6 +81,7 @@ export class ContentLease {
 
 /** 文件先封存，事务仅登记引用；单一运行时串行协调引用与回收。 */
 export class ContentStore {
+  private readonly readers = new WeakMap<ContentReader["read"], ContentAccess>();
   private readonly pins = new Map<string, number>();
   private readonly leases = new Map<string, ContentLease>();
   private readonly uploads = new Map<string, Upload>();
@@ -156,6 +162,24 @@ export class ContentStore {
     throw new PluginApiError("foreign_resource", "The content does not belong to this input or object.");
   }
   validate(value: Json, access: ContentAccess): void { for (const ref of contentReferences(value)) this.assert(ref, access); }
+  /** 在首次异步等待前检查并保留整批内容，后续读取不借用输入草稿的生命周期。 */
+  capture(refs: readonly ContentRef[], access: ContentAccess): CapturedContent {
+    const sizes = new Map<string, number>();
+    const scope = this.scope();
+    try {
+      for (const ref of refs) {
+        const row = this.assert(ref, access);
+        scope.add(row.id); sizes.set(row.id, row.size);
+      }
+      return { reader: this.reader({ scope }), sizes, close: () => scope.close() };
+    } catch (error) { void scope.close(); throw error; }
+  }
+  captureReader(refs: readonly ContentRef[], reader: ContentReader | undefined, owner: string): CapturedContent {
+    const access = reader && this.readers.get(reader.read);
+    if (!access || access.owner !== owner)
+      throw new PluginApiError("foreign_resource", "Use a content reader from the current plugin context.");
+    return this.capture(refs, access);
+  }
   /** 在所属事务内登记根；会话与对象取自访问域，避免两处重复传递。 */
   bind(access: ContentAccess & { sessionId: string }, root: { kind: "data" | "record"; id: string }, value: Json): void {
     const refs = contentReferences(value), sessionId = access.sessionId, objectId = access.objectId ?? "";
@@ -260,7 +284,7 @@ export class ContentStore {
     } finally { await file.close(); }
   }
   reader(access: ContentAccess): ContentReader {
-    return {
+    const reader: ContentReader = {
       read: (ref, range) => {
         const row = this.assert(ref, access), part = this.range(row, range);
         if (part.length > contentLimits.read) invalid("Use a content stream or bounded range for large content.");
@@ -271,6 +295,8 @@ export class ContentStore {
       },
       open: (ref, range) => this.stream(ref, access, range),
     };
+    this.readers.set(reader.read, access);
+    return reader;
   }
   private async *stream(ref: ContentRef, access: ContentAccess, range?: ContentRange): AsyncIterable<Uint8Array> {
     const row = this.assert(ref, access), part = this.range(row, range); this.pin(row.id);

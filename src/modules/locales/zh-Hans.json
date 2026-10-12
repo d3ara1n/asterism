@@ -1,4 +1,12 @@
 {
+  "agent_media_attach": "添加文件",
+  "agent_media_remove": "移除文件",
+  "agent_media_uploading": "正在添加文件…",
+  "agent_media_cancel": "取消上传",
+  "agent_media_unavailable": "预览不可用",
+  "agent_media_unsupported": "请选择 JPEG、PNG、GIF、WebP 图片或 PDF 文件。",
+  "agent_media_limit": "文件数量或大小超过消息限额。",
+  "agent_media_failed": "无法添加文件，请重试。",
   "newConversation": "新会话",
   "model": "模型",
   "sendMessage": "发送消息",

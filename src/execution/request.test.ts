@@ -5,6 +5,7 @@ import { implement } from "../tools/testing.ts";
 import { ResourceRegistry } from "../resources/registry.ts";
 import { ToolRegistry } from "../tools/registry.ts";
 import { AgentCapabilities } from "./capabilities.ts";
+import { resolveInput } from "../model/input.ts";
 import { runModelRequest } from "./request.ts";
 import type { ModelAdapter, ModelEvent } from "../model/contract.ts";
 import type { ModelSettings } from "../shared/model.ts";
@@ -12,7 +13,7 @@ import type { ModelSettings } from "../shared/model.ts";
 const settings: ModelSettings = {
   provider: { id: "p", revision: 1, name: "Provider", enabled: true, baseUrl: "https://example.invalid", protocol: "openai-responses", auth: "none" },
   model: { revision: 1, name: "Model", modelId: "test", providerId: "p", enabled: true, contextWindow: 4000,
-    capabilities: { reasoning: false, tools: true, images: false }, generation: { temperature: null, topP: null, maxOutputTokens: null } }, thinking: "off",
+    capabilities: { reasoning: false, tools: true, inputMediaTypes: [] }, generation: { temperature: null, topP: null, maxOutputTokens: null } }, thinking: "off",
 };
 const empty = () => new AgentCapabilities(new ResourceRegistry([]), new ToolRegistry([]), [], () => true);
 const text: ModelEvent[] = [
@@ -27,14 +28,14 @@ const calls = (ids: string[], name = "resource_list", args = {}) => [
 ];
 function input(events: ModelRunEvent[], extra: Partial<ModelRunRequest> = {}): ModelRunRequest {
   return { object: { id: "a", sessionId: "s", kind: "example.agent/worker" }, requestParentId: "origin",
-    target: { role: "default" }, system: { blocks: [] }, messages: [{ kind: "input", text: "Input" }],
+    target: { role: "default" }, system: { blocks: [] }, messages: [{ kind: "input", parts: [{ kind: "text", text: "Input" }] }],
     signal: new AbortController().signal, observer: { event(event) { events.push(event); } }, ...extra };
 }
 function model(events: ModelEvent[], prepare = () => {}): ModelAdapter {
-  return { version: "test-adapter", prepare() { prepare(); return { async *stream() { yield* events; } }; } };
+  return { validate() {}, version: "test-adapter", prepare() { prepare(); return { async *stream() { yield* events; } }; } };
 }
 async function execute(request: ModelRunRequest, adapter: ModelAdapter, capabilities = empty()) {
-  return runModelRequest(request, Promise.resolve({ adapter, settings, capabilities, system: request.system, messages: request.messages }));
+  return runModelRequest(request, Promise.resolve({ adapter, settings, capabilities, system: request.system, messages: await resolveInput(request.messages, settings, undefined, request.signal) }));
 }
 const resource = { id: "r", kind: "example.resource/item", title: "Item", data: {} };
 const write = defineImplementation({ ...defineData("example.resource/write", z.number().describe("Current value.")),
@@ -50,7 +51,7 @@ describe("无状态的单次模型执行", () => {
       const tool = implement(write, { async call() { executions++; return { kind: "succeeded", data: 1 }; } });
       const capabilities = new AgentCapabilities(new ResourceRegistry([]), new ToolRegistry([tool]), [resource], () => true);
       const events: ModelRunEvent[] = [];
-      const adapter: ModelAdapter = { version: "test", prepare() { return { async *stream() {
+      const adapter: ModelAdapter = { validate() {}, version: "test", prepare() { return { async *stream() {
         yield { type: "part.start", part: { id: "c", kind: "toolcall", callId: "c", name: "resource_call" } } as const;
         yield { type: "part.delta", partId: "c", delta: '{"resource_id":"r","tool":"write","args":{"content":"正在生成' } as const;
         await new Promise(resolve => setTimeout(resolve, 80));
@@ -91,7 +92,7 @@ describe("无状态的单次模型执行", () => {
   it("工具批次结束即返回，不隐式发起下一请求，另一次调用只使用显式输入", async () => {
     let requests = 0;
     const seen: unknown[] = [];
-    const adapter: ModelAdapter = { version: "test", prepare(request) {
+    const adapter: ModelAdapter = { validate() {}, version: "test", prepare(request) {
       requests++; seen.push(structuredClone(request.messages));
       return { async *stream() { yield* calls(["list"]); } };
     } };
@@ -101,8 +102,8 @@ describe("无状态的单次模型执行", () => {
     expect(first).toMatchObject({ reason: "completed", tools: [{ kind: "succeeded", data: { resources: [] } }] });
     expect(events.filter(event => event.type === "block")).toHaveLength(1);
     expect(events.find(event => event.type === "completion")).toMatchObject({ ordinal: 0, requestParentId: "origin" });
-    await execute(input([], { messages: [{ kind: "input", text: "New projection" }] }), adapter);
-    expect(seen).toEqual([[{ kind: "input", text: "Input" }], [{ kind: "input", text: "New projection" }]]);
+    await execute(input([], { messages: [{ kind: "input", parts: [{ kind: "text", text: "New projection" }] }] }), adapter);
+    expect(seen).toEqual([[{ kind: "input", parts: [{ kind: "text", text: "Input" }] }], [{ kind: "input", parts: [{ kind: "text", text: "New projection" }] }]]);
   });
 
   it("截断响应只交付未完成审计块，保留已报告终态，不执行工具", async () => {

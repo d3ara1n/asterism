@@ -3,7 +3,7 @@ import { emptyCompletion, type SessionNode } from "../../../shared/session";
 import { arrivedBranch, branchContains, historyBranches, viewedBranch } from "./history-branches";
 
 const message = (id: string, parentId: string | null): SessionNode => ({
-  id, parentId, sessionId: "s", createdAt: "2026-10-10T10:00:00Z", kind: "message", agentId: "a", text: id,
+  id, parentId, sessionId: "s", createdAt: "2026-10-10T10:00:00Z", kind: "message", agentId: "a", parts: [{ kind: "text", text: id }],
 });
 const interrupted = (id: string, parentId: string): SessionNode => ({
   ...message(id, parentId), ...emptyCompletion, kind: "text", text: "Partial", agentId: "a",

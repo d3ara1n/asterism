@@ -1,4 +1,5 @@
 import { defineModule, type ModelServices } from "@atelier/sdk/runtime";
+import { inputSummary } from "../../shared/model-input.ts";
 import type { SessionSnapshot } from "@atelier/sdk/contracts";
 import { coreId, coreNamespace } from "../../shared/core.ts";
 import { UserMessage } from "../agent/records.ts";
@@ -14,7 +15,7 @@ async function generateTitle(models: Pick<ModelServices, "stream">, prompt: stri
   for await (const event of models.stream({
     target: { role: "utility" }, signal,
     system: { blocks: [{ id: coreId("session-naming"), kind: "system", from: coreNamespace, text: namingInstruction }] },
-    messages: [{ kind: "input", text: prompt }],
+    messages: [{ kind: "input", parts: [{ kind: "text", text: prompt }] }],
   })) {
     signal.throwIfAborted();
     if (event.type === "part.start" && event.part.kind === "text") textParts.add(event.part.id);
@@ -52,7 +53,7 @@ export default defineModule(plugin => ({
       if (previous?.status === "unknown" || previous?.data.messageId === message.record.id) return;
       if (!plugin.models.roles().some(role => role.id === "utility" && role.model !== null)) return;
       const expected = snapshot.title, nameId = named?.record.id ?? null;
-      const prompt = namingPrompt(level === "initial" ? [{ user: message.data.text }]
+      const prompt = namingPrompt(level === "initial" ? [{ user: inputSummary(message.data.parts) }]
         : collectTurns(snapshot.records.all({ scope: "path" })));
       let attemptId: string;
       const isCurrent = (view: SessionSnapshot) => view.title === expected &&

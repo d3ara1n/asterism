@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { coreChannel } from "./core.ts";
+import { userInputPartsSchema } from "./model-input.ts";
+import { modelInputPartsSchema } from "@atelier/sdk/contracts";
 import { jsonSchema, toolOutcomeSchema, usageSchema } from "./model.ts";
 import { modelExpressionSchema, thinkingSchema } from "./configuration.ts";
 import { pointSchema, workbenchCommands, workbenchSnapshotSchema } from "./workbench.ts";
@@ -23,7 +25,7 @@ const block = { ...base, agentId: id, responseId: id, ordinal: z.number().int().
   continuation: jsonSchema, adapter: z.string(), scope: z.string() };
 
 export const sessionNodeSchema = z.discriminatedUnion("kind", [
-  z.strictObject({ ...base, kind: z.literal("message"), agentId: id, text: z.string() }),
+  z.strictObject({ ...base, kind: z.literal("message"), agentId: id, parts: modelInputPartsSchema }),
   z.strictObject({ ...block, kind: z.literal("thinking"), text: z.string() }),
   z.strictObject({ ...block, kind: z.literal("text"), text: z.string() }),
   // toolcall 与结果同一节点：只有得到结果才 complete；未完成的填充以 complete=false 留作审计。
@@ -44,8 +46,7 @@ export type NewNode = SessionNode extends infer N ? N extends SessionNode ? Omit
 
 // ---- 会话能力接口 ----
 const uuid = z.string().uuid();
-const text = z.string().trim().min(1).max(100_000);
-export const sessionVersion = 13;
+export const sessionVersion = 14;
 export const viewPositionSchema = z.discriminatedUnion("kind", [
   z.strictObject({ kind: z.literal("live") }),
   z.strictObject({ kind: z.literal("history"), nodeId: id.nullable() }),
@@ -55,7 +56,7 @@ export const sessionChannel = coreChannel("session");
 export const sessionChangedChannel = coreChannel("session-changed");
 export const sessionCommandSchema = z.discriminatedUnion("type", [
   // 首页组合入口：建立会话、创建第一个代理资源并向它提交首条输入。
-  z.strictObject({ type: z.literal("start"), submissionId: uuid, agent: id, model: modelExpressionSchema, thinking: thinkingSchema.nullable(), text }),
+  z.strictObject({ type: z.literal("start"), submissionId: uuid, agent: id, model: modelExpressionSchema, thinking: thinkingSchema.nullable(), parts: userInputPartsSchema, contentScopeId: uuid.optional() }),
   z.strictObject({ type: z.literal("read"), sessionId: id, position: viewPositionSchema }),
   z.strictObject({ type: z.literal("select"), sessionId: id, nodeId: id.nullable() }),
   // 资源卡片的行为入口：按对象类型路由到资源控制器，command 由该资源模块校验。

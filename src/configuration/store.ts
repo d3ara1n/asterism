@@ -8,6 +8,7 @@ import { agentOverridesSchema, modelReference, modelRoleOverridesSchema, modelSc
 import { defaultAgents, defaultRoles } from "./defaults.ts";
 import { ConfigurationError } from "./errors.ts";
 import { normalizeOverrides, resolveAgentConfiguration, resolveRoleConfiguration } from "./layers.ts";
+import { supportedInputMediaTypes } from "../shared/model-media.ts";
 
 const identity = { id: z.string().min(1).max(160), revision: z.number().int().positive() };
 const storedProviderSchema = providerInputSchema.extend({ revision: identity.revision, credentialRef: z.string().uuid().nullable() });
@@ -16,7 +17,7 @@ const storedAgentSchema = z.strictObject({ ...identity, builtin: z.boolean(), ov
 /** 模型以 `<providerId>/<modelId>` 识别，其余以 id 识别。 */
 const keyOf = (item: { id: string } | { providerId: string; modelId: string }): string => "id" in item ? item.id : modelReference(item);
 const documentSchema = z.strictObject({
-  version: z.literal(1),
+  version: z.literal(2),
   providers: z.array(storedProviderSchema), models: z.array(modelSchema),
   roles: z.array(storedRoleSchema), agents: z.array(storedAgentSchema),
 }).superRefine((document, context) => {
@@ -43,6 +44,11 @@ type ConfigurationSave =
 
 function validate(raw: unknown): ConfigurationDocument {
   const document = documentSchema.parse(raw);
+  for (const model of document.models) {
+    const provider = document.providers.find(value => value.id === model.providerId);
+    if (provider && model.capabilities.inputMediaTypes.some(type => !supportedInputMediaTypes(provider.protocol).includes(type)))
+      throw new ConfigurationError("invalid_request", "The provider protocol does not support the selected file input types.");
+  }
   for (const role of document.roles) {
     if (!role.builtin && !role.overrides.name?.trim()) throw new ConfigurationError("invalid_request", "Custom configurations require a name.");
     resolveRoleConfiguration(role);
@@ -75,7 +81,7 @@ export class ConfigurationStore {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw new ConfigurationError("unavailable", "The application configuration could not be read.");
       // 只有文件不存在才初始化；已有文件中的删除状态不会重新播种。
       this.document = {
-        version: 1, providers: [], models: [],
+        version: 2, providers: [], models: [],
         roles: defaultRoles.map(({ id, builtin }) => ({ id, builtin, revision: 1, overrides: {} })),
         agents: defaultAgents.map(({ id, builtin }) => ({ id, builtin, revision: 1, overrides: {} })),
       };

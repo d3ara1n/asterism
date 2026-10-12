@@ -10,7 +10,7 @@ function configuration(): ConfigurationSnapshot {
     providers: [{ id: "p", revision: 1, name: "Test", protocol: "openai-responses", baseUrl: "https://example.invalid",
       enabled: true, auth: "none", credentialState: "not_required" }],
     models: [{ revision: 1, providerId: "p", name: "Test", modelId: "test", enabled: true, contextWindow: null,
-      capabilities: { reasoning: true, tools: true, images: false }, generation: { temperature: null, topP: null, maxOutputTokens: null } }],
+      capabilities: { reasoning: true, tools: true, inputMediaTypes: [] }, generation: { temperature: null, topP: null, maxOutputTokens: null } }],
     defaults: { agents: {}, roles: {} }, overrides: { agents: {}, roles: {} }, tests: [], credentialStorageAvailable: false,
   };
 }

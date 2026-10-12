@@ -6,7 +6,7 @@
 
 | 节点 | 数据 |
 | --- | --- |
-| message | 目标 agent_id、用户正文；首批仅文本 |
+| message | 目标 agent_id、有序输入 parts；文字和文件引用随同一条用户消息保存 |
 | thinking / text | agent_id、response_id、request_parent_id、序号、正文、complete、续接资料与可空终态元数据 |
 | toolcall | 同上请求身份与元数据，加本地/provider 调用 ID、工具名、参数与结局 |
 | event | 类型与小载荷；大内容保存到宿主内容存储后以 SDK 内容引用值关联 |
@@ -15,6 +15,26 @@
 block 通过 response_id 关联，response 由消费者投影，不设独立 response_end 节点。每个块携带 request_parent_id 和请求计算结果（adapter、模型表达式 `<providerId>/<modelId>[:<thinking>]`、协议作用域），以及可空的 usage、finishReason、rawFinishReason、providerResponseId。终态仅归属响应中序号最大的实际块，不能复制到各块；数据库通过唯一约束阻止重复计量。系统提示词、角色正文、工具目录、模型参数和完整请求不持久化。
 
 续接资料保存为带适配版本的块级不透明字段：保留 Anthropic signature/redactedData，以及 OpenAI itemId/reasoningEncryptedContent/phase 白名单。不保存原始 HTTP、凭据、响应头或未筛选的 provider metadata。
+
+## 用户输入与文件
+
+用户输入先作为 `UserMessage` 写入时间轴，再投影为 `ModelItem.kind = "input"`。纯文件消息同样形成一个 message 节点，文件不必成为工作台对象；同条消息中的文字、文件及其顺序原样保存。引用依赖与消息在同一事务提交，模型请求不另存一份上下文。
+
+输入与 context 的消息正文统一为有序 `parts`：
+
+```ts
+type ModelInputPart =
+  | { kind: "text"; text: string }
+  | { kind: "file"; file: ContentRef; mediaType: string; filename?: string };
+```
+
+纯文字也使用 text 部件。文件身份复用宿主 ContentRef，MIME 和可选文件名属于消费元数据；协议不接受路径、URL、base64 或字节本体。系统提示沿用纯文字 PromptBlock，输出与工具结果保持原契约。
+
+`models.validate(request, { content })` 和 `models.stream(request, { content })` 接收已有的宿主 ContentReader；含文件时不得省略，也不按 ID 全局查找。准备阶段的 content 包含本次输入尝试及合法对象内容。纯文字调用无需 content。`models.run` 根据既有 object/requestParentId 捕获本对象当前数据和本次路径的记录依赖，不接收外部 reader 覆盖。内容读取资格不授予工具访问或跨对象共享权。
+
+三个入口共用输入检查。validate 检查目标、续接、MIME 能力、内容归属、封存状态和长度，不发送请求或全量读取字节；实际请求重新检查并读取、校验内容完整性，然后由适配器编码。模型能力由 `inputMediaTypes` 声明，与协议已实现的编码支持共同决定可发送类型；端点仍可能拒绝实际文件。
+
+请求在首次异步等待前固定引用与内容资格，独立占用持续到请求收束，run 包括工具批次。关闭草稿不破坏已捕获请求，取消模型不关闭调用方草稿；流失败、调用方提前关闭和宿主关闭均收束实际使用。限额见 `src/shared/model-media.ts`：图片 5 MiB、其他首期文件 16 MiB、整次请求最多 20 个文件且原始文件总量不超过 20 MiB，重复出现按编码次数累计。超限明确拒绝，不自动降级、拆页或转码。
 
 ## 写入时机
 
@@ -67,7 +87,7 @@ context 唯一真值在时间轴。Agent 可以持有选择、计数、取消与
 
 三协议使用已安装 AI SDK：OpenAI Responses、OpenAI Chat Completions、Anthropic Messages。工具定义不提供 SDK execute；关闭隐式重试与流重试。带凭据的远程端点要求 HTTPS，无鉴权模式去除认证头，禁止自动重定向。每个 SDK 调用只进行一个模型步骤，由工坊执行后续循环。OpenAI Responses 使用 store:false 并请求 encrypted reasoning。
 
-直接续接要求 provider、协议、端点、模型标识和适配版本兼容；不兼容时在提交前明确失败。图片与服务端工具暂不支持。
+直接续接要求 provider、协议、端点、模型标识和适配版本兼容；不兼容时在提交前明确失败。用户输入支持 JPEG、PNG、GIF、WebP 与 PDF，经 AI SDK FilePart 编码为三协议的原生图片／文件输入；服务端工具、工具结果媒体及模型生成媒体暂不支持。
 
 Responses 模型声明的思考能力显式传给 SDK，不依赖 SDK 的 OpenAI 模型名称识别；声明思考能力时，开启、关闭与等级参数均传到请求中。模型声明思考能力且未关闭思考时，显式请求可见摘要，包括采用默认思考等级的情况；加密推理资料独立用于续接。代理页面只展示含可见正文的思考块，空块仍保留在历史与模型投影中，不显示空折叠项。
 
@@ -77,7 +97,7 @@ DeepSeek 官方端点 `api.deepseek.com` 的 Responses 返回 `response.reasonin
 
 ## 前端能力接口
 
-`window.host.session` 提供 `execute` 与 `onChanged`，IPC 版本为 9。资源与布局命令也属于此会话入口。应用通道只读取工作区身份和会话列表，不持有已打开会话的正文。
+`window.host.session` 提供 `execute` 与 `onChanged`，IPC 版本为 14。资源与布局命令也属于此会话入口。应用通道只读取工作区身份和会话列表，不持有已打开会话的正文。
 
 | 命令 | 行为 |
 | --- | --- |
@@ -90,7 +110,7 @@ DeepSeek 官方端点 `api.deepseek.com` 的 Responses 返回 `response.reasonin
 | `link.set` | 变更指定会话的资源关系，事务提交后通知 |
 | `view.set` / `viewport.set` | 保存当前布局，不修改历史；历史查看期间也可调整 |
 
-命令返回 `accepted` 与会话身份，不附带展示数据；`read` 返回 `view`。start/submit 的 submissionId 为 UUID，相同身份与内容重复提交只返回已有会话身份，内容不同返回 conflict。
+命令返回 `accepted` 与会话身份，不附带展示数据；`read` 返回 `view`。start/submit 的 submissionId 为 UUID，相同身份与内容重复提交只返回已有会话身份，内容不同返回 conflict。业务身份包含 parts 的引用、元数据和顺序，不包含临时内容信封身份。首页 start 已有受理回执时，重试可省略原内容信封，不要求原草稿仍有效；尚未受理的输入仍须通过内容资格检查。
 
 `resource.create` 的受理回执表示对象创建事件、资源私有状态与初始布局已提交；前端随后读取新投影以更新画面。后端的串行事务保证时间轴写入顺序，前端的投影同步保证后续意图使用已确认的展示状态，两者职责不同。
 

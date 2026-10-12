@@ -1,3 +1,4 @@
+import { inputSummary } from "../../../shared/model-input";
 import type { Json } from "@atelier/sdk/contracts";
 
 import type { SessionNode } from "../../../shared/session";
@@ -56,7 +57,7 @@ export function historyEntries(nodes: readonly SessionNode[], typeLabel: (kind: 
     let resourceId: unknown = node.agentId;
     const sessionEvent = node.kind === "event" && workbenchEvents.has(node.type) || node.kind === "notice" && node.agentId === null;
     switch (node.kind) {
-      case "message": label = getI18n().formatMessage(historyMessages.eventInput, { text: node.text }); break;
+      case "message": label = getI18n().formatMessage(historyMessages.eventInput, { text: inputSummary(node.parts) }); break;
       case "thinking": label = getI18n().formatMessage(historyMessages.eventThinking, { text: node.text }); break;
       case "text": label = node.text; break;
       case "notice": label = node.message; break;

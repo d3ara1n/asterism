@@ -27,8 +27,8 @@ const roots: string[] = [];
 type Snap = { workbench: { objects: { id: string; kind: string; presentation: { data: unknown } }[] } };
 const agentOf = (snap: Snap) => snap.workbench.objects.find(o => o.kind === "atelier.core/agent")!.id;
 const selectionOf = (snap: Snap) => (snap.workbench.objects.find(o => o.kind === "atelier.core/agent")!.presentation.data as { selection: AgentSelection }).selection;
-import { resourceCall } from "@atelier/sdk/contracts";
-import { agentAction, agentCommandSchema } from "../modules/agent/contract.ts";
+import { resourceCall, modelInputText, type ModelInputPart } from "@atelier/sdk/contracts";
+import { agentAction, agentCommandSchema, startAgentContentTarget, SubmitAgentInput } from "../modules/agent/contract.ts";
 const agentCommand = (sessionId: string, objectId: string, command: Json): SessionMutation => ({ type: "resource.command", sessionId, objectId, command: resourceCall(agentAction(agentCommandSchema.parse(command)), agentCommandSchema.parse(command)) });
 const services = new Set<ApplicationService>();
 afterEach(async () => { vi.useRealTimers(); for (const s of services) await s.close(); services.clear(); vi.restoreAllMocks(); for (const r of roots.splice(0)) rmSync(r, { recursive: true, force: true }); });
@@ -37,7 +37,7 @@ function reply(textValue = "Hello"): ModelEvent[] {
   return [{ type: "part.start", part: { id: "t", kind: "text" } }, { type: "part.delta", partId: "t", delta: textValue },
     { type: "part.end", partId: "t" }, { type: "finish", reason: "stop", usage: null }];
 }
-const adapter = (prepare?: () => void): ModelAdapter => ({ version: "ai-sdk-v7/2", prepare: input => {
+const adapter = (prepare?: () => void): ModelAdapter => ({ validate() {}, version: "ai-sdk-v7/3", prepare: input => {
   sdkMessages(input); prepare?.();
   return { async *stream() { yield* reply(); } };
 } });
@@ -48,8 +48,8 @@ async function setup(model: ModelAdapter = adapter(), onSessionChanged?: (event:
     value: { id: "test", name: "Test", protocol: "openai-responses", baseUrl: "https://example.invalid/v1", enabled: true, auth: "none" }, credential: { action: "keep" } });
   const { savedId: modelId } = await service.configuration.execute({ type: "model.save", id: null,
     value: { providerId: providerId!, name: "Test", modelId: "test", enabled: true, contextWindow: null,
-      capabilities: { tools: true, reasoning: false, images: false }, generation: { temperature: null, topP: null, maxOutputTokens: null } } });
-  const start: Extract<SessionCommand, { type: "start" }> = { type: "start", submissionId: randomUUID(), agent: "worker", model: modelId!, thinking: null, text: "First" };
+      capabilities: { tools: true, reasoning: false, inputMediaTypes: [] }, generation: { temperature: null, topP: null, maxOutputTokens: null } } });
+  const start: Extract<SessionCommand, { type: "start" }> = { type: "start", submissionId: randomUUID(), agent: "worker", model: modelId!, thinking: null, parts: [{ kind: "text", text: "First" }] };
   return { service, root, start };
 }
 async function execute(service: ApplicationService, command: SessionMutation | { type: "read"; sessionId: string }) {
@@ -62,6 +62,67 @@ async function settled(service: ApplicationService) {
 }
 
 describe("会话运行时", () => {
+  it("首页纯文件先进入时间轴；后续图文顺序、重开和历史分叉保留内容资格", async () => {
+    const inputs: ModelInput[] = [];
+    let currentService!: ApplicationService;
+    const model: ModelAdapter = { version: "ai-sdk-v7/3", validate() {}, prepare(input) {
+      // Provider 准备前，用户输入已经作为消息记录提交。
+      expect(currentService.sessions.tree.list().some(session => currentService.sessions.tree.path(session.id).some(node => node.kind === "message"))).toBe(true);
+      inputs.push(input); return { async *stream() { yield* reply(); } };
+    } };
+    const { service, start, root } = await setup(model); currentService = service;
+    const { revision: _revision, ...configured } = service.configuration.current().models[0]!;
+    await service.configuration.execute({ type: "model.save", id: start.model,
+      value: { ...configured, capabilities: { ...configured.capabilities, inputMediaTypes: ["image/png", "application/pdf"] } } });
+    const store = service.sessions.content, draft = service.sessions.openContentInput(startAgentContentTarget);
+    const png = new Uint8Array([1, 2, 3]), pdf = new Uint8Array([4, 5, 6]);
+    const file = await store.writer({ scope: draft }).stage(png);
+    const firstInput = { ...start, parts: [{ kind: "file" as const, file, mediaType: "image/png", filename: "first.png" }], contentScopeId: draft.id };
+    const first = await execute(service, firstInput); await settled(service);
+    await draft.close();
+    // 已受理重试不再需要有效草稿，临时 scope 不属于业务幂等身份。
+    expect((await execute(service, { ...firstInput, contentScopeId: undefined })).sessionId).toBe(first.sessionId);
+    const agentId = agentOf(first), origin = first.nodes.find(node => node.kind === "message")!;
+    expect(origin).toMatchObject({ parts: firstInput.parts });
+    expect(inputs[0]!.messages).toEqual([{ kind: "input", parts: [{ kind: "file", data: png, mediaType: "image/png", filename: "first.png" }] }]);
+    const next = service.sessions.openContentInput({ sessionId: first.sessionId, objectId: agentId, contractId: SubmitAgentInput.id, resourceKind: SubmitAgentInput.resource.kind });
+    const other = await store.writer({ scope: next }).stage(pdf);
+    const parts: ModelInputPart[] = [{ kind: "text", text: "Compare" }, { kind: "file" as const, file: other, mediaType: "application/pdf" }, { kind: "text" as const, text: "with the screenshot" }];
+    await service.sessions.execute({ type: "resource.command", sessionId: first.sessionId, objectId: agentId,
+      command: resourceCall(SubmitAgentInput, { type: "submit", submissionId: randomUUID(), parts }), contentScopeId: next.id });
+    await settled(service); await next.close();
+    expect(inputs.at(-1)!.messages.at(-1)).toEqual({ kind: "input", parts: [
+      { kind: "text", text: "Compare" }, { kind: "file", data: pdf, mediaType: "application/pdf" }, { kind: "text", text: "with the screenshot" },
+    ] });
+    const originalNodes = service.sessions.tree.nodes(first.sessionId);
+    await service.sessions.execute({ type: "select", sessionId: first.sessionId, nodeId: origin.id });
+    await expect(service.sessions.execute({ type: "resource.command", sessionId: first.sessionId, objectId: agentId,
+      command: resourceCall(SubmitAgentInput, { type: "submit", submissionId: randomUUID(), parts: [{ kind: "file", file: other, mediaType: "application/pdf" }] }) })).rejects.toThrow("does not belong");
+    await execute(service, agentCommand(first.sessionId, agentId, { type: "submit", submissionId: randomUUID(), parts: [{ kind: "text", text: "Branch" }] }));
+    await settled(service);
+    const saved = service.sessions.tree.nodes(first.sessionId);
+    expect(saved.slice(0, originalNodes.length)).toEqual(originalNodes);
+    await service.close(); services.delete(service);
+    const reopened = new ApplicationService(root, { adapterFactory: () => adapter() }); services.add(reopened);
+    expect(reopened.sessions.tree.nodes(first.sessionId)).toEqual(saved);
+    expect(await reopened.sessions.content.reader({ sessionId: first.sessionId, objectId: agentId,
+      recordIds: new Set(reopened.sessions.tree.path(first.sessionId).map(node => node.id)) }).read(file)).toEqual(png);
+  });
+
+  it("首页准备失败不创建会话、不消耗文件草稿；修正输入后可以重试", async () => {
+    const { service, start } = await setup();
+    const draft = service.sessions.openContentInput(startAgentContentTarget);
+    const file = await service.sessions.content.writer({ scope: draft }).stage(new Uint8Array([1]));
+    const input = { ...start, contentScopeId: draft.id, parts: [{ kind: "file" as const, file, mediaType: "image/png" }] };
+    await expect(service.sessions.execute({ ...input, agent: "missing" })).rejects.toThrow();
+    expect(service.sessions.tree.list()).toEqual([]);
+    expect(await service.sessions.content.reader({ scope: draft }).read(file)).toEqual(new Uint8Array([1]));
+    const { revision: _revision, ...configured } = service.configuration.current().models[0]!;
+    await service.configuration.execute({ type: "model.save", id: start.model,
+      value: { ...configured, capabilities: { ...configured.capabilities, inputMediaTypes: ["image/png"] } } });
+    await service.sessions.execute(input); await settled(service);
+    expect(service.sessions.tree.list()).toHaveLength(1);
+  });
   it("代理续接吸附退出自身创建分支时，游标、输入和去重数据整体回滚", async () => {
     const { service, start } = await setup();
     const first = await execute(service, start); await settled(service);
@@ -69,12 +130,12 @@ describe("会话运行时", () => {
     const origin = service.sessions.tree.cursor(sessionId);
     service.sessions.tree.append(sessionId, { ...emptyCompletion, kind: "thinking", agentId, text: "Unfinished reasoning",
       responseId: "interrupted", requestParentId: origin, ordinal: 0, complete: true, model: start.model,
-      continuation: null, adapter: "ai-sdk-v7/2", scope: "scope" });
+      continuation: null, adapter: "ai-sdk-v7/3", scope: "scope" });
     const created = await execute(service, { type: "resource.create", sessionId, kind: "atelier.core/agent", creation: { id: "atelier.core/agent.create" },
       input: { selection: { agent: start.agent, model: start.model, thinking: null } }, position: { x: 0, y: 0 } });
     const second = created.workbench.objects.find(object => object.kind === "atelier.core/agent" && object.id !== agentId)!;
     const before = service.sessions.tree.nodes(sessionId), cursor = service.sessions.tree.cursor(sessionId);
-    const command = agentCommand(sessionId, second.id, { type: "submit", submissionId: randomUUID(), text: "Second input" });
+    const command = agentCommand(sessionId, second.id, { type: "submit", submissionId: randomUUID(), parts: [{ kind: "text", text: "Second input" }] });
     for (let retry = 0; retry < 2; retry++) await expect(service.sessions.execute(command)).rejects.toMatchObject({ code: "not_found" });
     expect(service.sessions.tree.cursor(sessionId)).toBe(cursor);
     expect(service.sessions.tree.nodes(sessionId)).toEqual(before);
@@ -84,11 +145,11 @@ describe("会话运行时", () => {
   it("同一代理相同 submission 的并发重试均受理且只保存一条输入", async () => {
     const { service, start } = await setup();
     const first = await execute(service, start); await settled(service);
-    const command = agentCommand(first.sessionId, agentOf(first), { type: "submit", submissionId: randomUUID(), text: "Concurrent retry" });
+    const command = agentCommand(first.sessionId, agentOf(first), { type: "submit", submissionId: randomUUID(), parts: [{ kind: "text", text: "Concurrent retry" }] });
     const receipts = await Promise.all([service.sessions.execute(command), service.sessions.execute(command)]);
     expect(receipts).toEqual([{ kind: "accepted", sessionId: first.sessionId }, { kind: "accepted", sessionId: first.sessionId }]);
     await settled(service);
-    expect(service.sessions.tree.nodes(first.sessionId).filter(node => node.kind === "message" && node.text === "Concurrent retry")).toHaveLength(1);
+    expect(service.sessions.tree.nodes(first.sessionId).filter(node => node.kind === "message" && modelInputText(node.parts) === "Concurrent retry")).toHaveLength(1);
   });
   it("重建会话数据库保留全局模型配置与用户覆盖", async () => {
     const { service, root, start } = await setup();
@@ -175,7 +236,7 @@ describe("会话运行时", () => {
       })]),
     }));
     let resourceId = "", requests = 0;
-    const model: ModelAdapter = { version: "ai-sdk-v7/2", prepare: () => ({ async *stream() {
+    const model: ModelAdapter = { validate() {}, version: "ai-sdk-v7/3", prepare: () => ({ async *stream() {
       if (++requests === 2) {
         yield { type: "part.start", part: { id: "c", kind: "toolcall", callId: "stream-call", name: "resource_call" } };
         yield { type: "part.end", partId: "c", arguments: { resource_id: resourceId, tool: "stream", args: {} } };
@@ -302,7 +363,7 @@ describe("会话运行时", () => {
     const gate = new Promise<void>(resolve => { release = resolve; });
     const started = new Promise<void>(resolve => { entered = resolve; });
     const events: SessionChanged[] = [];
-    const model: ModelAdapter = { version: "ai-sdk-v7/2", prepare: () => ({ async *stream() {
+    const model: ModelAdapter = { validate() {}, version: "ai-sdk-v7/3", prepare: () => ({ async *stream() {
       yield { type: "part.start", part: { id: "t", kind: "text" } };
       yield { type: "part.delta", partId: "t", delta: "Live" };
       entered(); await gate;
@@ -330,7 +391,7 @@ describe("会话运行时", () => {
     const gate = new Promise<void>(resolve => { release = resolve; });
     const saved = new Promise<void>(resolve => { entered = resolve; });
     const usage = { input: 12, output: 3, total: 15, reasoning: 1, cacheRead: 4, cacheWrite: 0 };
-    const model: ModelAdapter = { version: "ai-sdk-v7/2", prepare: () => ({ async *stream() {
+    const model: ModelAdapter = { validate() {}, version: "ai-sdk-v7/3", prepare: () => ({ async *stream() {
       yield* reply("Saved text").slice(0, -1);
       entered();
       await gate;
@@ -363,7 +424,7 @@ describe("会话运行时", () => {
   });
 
   it("无块响应保存诊断与已报告的计量，不伪造文本或计量节点", async () => {
-    const model: ModelAdapter = { version: "ai-sdk-v7/2", prepare: () => ({ async *stream() {
+    const model: ModelAdapter = { validate() {}, version: "ai-sdk-v7/3", prepare: () => ({ async *stream() {
       yield { type: "finish", reason: "stop", responseId: "empty-response",
         usage: { input: 2, output: 0, total: 2, reasoning: null, cacheRead: null, cacheWrite: null } };
     } }) };
@@ -378,7 +439,7 @@ describe("会话运行时", () => {
   it("工具结果保存实现版本与当次数据；资源移除、文件改变和重开不影响历史", async () => {
     let resourceId = "";
     let calls = 0;
-    const model: ModelAdapter = { version: "ai-sdk-v7/2", prepare: () => ({ async *stream() {
+    const model: ModelAdapter = { validate() {}, version: "ai-sdk-v7/3", prepare: () => ({ async *stream() {
       if (++calls === 2) {
         yield { type: "part.start", part: { id: "c", kind: "toolcall", callId: "list-directory", name: "resource_call" } };
         yield { type: "part.end", partId: "c", arguments: { resource_id: resourceId, tool: "list", target: { path: "files" }, args: {} } };
@@ -417,7 +478,7 @@ describe("会话运行时", () => {
     expect(snap.nodes.map(n => n.kind)).toEqual(["event", "message", "text"]);
     expect(snap.workbench.objects.filter(o => o.kind === "atelier.core/agent")).toHaveLength(1);
     expect(agentOf(snap)).toMatch(/^[A-Za-z0-9_-]{16}$/);
-    await expect(execute(service, { ...start, text: "Other" })).rejects.toThrow("different input");
+    await expect(execute(service, { ...start, parts: [{ kind: "text", text: "Other" }] })).rejects.toThrow("different input");
     await service.close(); services.delete(service);
     const reopened = new ApplicationService(root, { adapterFactory: () => adapter() }); services.add(reopened);
     expect((await execute(reopened, { type: "read", sessionId: a.sessionId })).nodes).toEqual(snap.nodes);
@@ -428,7 +489,7 @@ describe("会话运行时", () => {
     const gate = new Promise<void>(r => { release = r; });
     const inputs: ModelInput[] = [];
     let calls = 0;
-    const model: ModelAdapter = { version: "ai-sdk-v7/2", prepare: input => { inputs.push(input); return { async *stream() {
+    const model: ModelAdapter = { validate() {}, version: "ai-sdk-v7/3", prepare: input => { inputs.push(input); return { async *stream() {
       if (++calls === 2) await gate;
       yield* reply(`R${calls}`);
     } }; } };
@@ -438,11 +499,11 @@ describe("会话运行时", () => {
     const a = agentOf(first);
     await execute(service, { type: "resource.create", sessionId, kind: "atelier.core/agent", creation: { id: "atelier.core/agent.create" }, input: { selection: selectionOf(first) }, position: { x: 600, y: 0 } });
     const b = service.sessions.snapshot(sessionId).workbench.objects.find(o => o.kind === "atelier.core/agent" && o.id !== a)!.id;
-    await execute(service, agentCommand(sessionId, a, { type: "submit", submissionId: randomUUID(), text: "To A" }));
-    await execute(service, agentCommand(sessionId, b, { type: "submit", submissionId: randomUUID(), text: "To B" }));
+    await execute(service, agentCommand(sessionId, a, { type: "submit", submissionId: randomUUID(), parts: [{ kind: "text", text: "To A" }] }));
+    await execute(service, agentCommand(sessionId, b, { type: "submit", submissionId: randomUUID(), parts: [{ kind: "text", text: "To B" }] }));
     await expect(execute(service, agentCommand(sessionId, a, { type: "continue" }))).rejects.toThrow("running");
     release(); await settled(service);
-    const texts = (input: ModelInput) => input.messages.flatMap(m => m.kind === "input" ? [m.text] : []);
+    const texts = (input: ModelInput) => input.messages.flatMap(m => m.kind === "input" ? [modelInputText(m.parts)] : []);
     // 提交时先预检（prepare）再真正请求；按最后一次含该输入的请求核对各代理投影。
     const sent = inputs.map(texts);
     expect(sent.filter(m => m.includes("To A")).at(-1)).toEqual(["First", "To A"]);
@@ -455,19 +516,19 @@ describe("会话运行时", () => {
     let release!: () => void;
     const gate = new Promise<void>(r => { release = r; });
     let calls = 0;
-    const slow: ModelAdapter = { version: "ai-sdk-v7/2", prepare: () => ({ async *stream() { if (++calls === 2) await gate; yield* reply(); } }) };
+    const slow: ModelAdapter = { validate() {}, version: "ai-sdk-v7/3", prepare: () => ({ async *stream() { if (++calls === 2) await gate; yield* reply(); } }) };
     const { service, start } = await setup(slow);
     const first = await execute(service, start); await settled(service);
     const before = await execute(service, { type: "read", sessionId: first.sessionId });
     const agentId = agentOf(before);
     const message = before.nodes.find(n => n.kind === "message")!;
     await execute(service, { type: "select", sessionId: first.sessionId, nodeId: message.id });
-    await execute(service, agentCommand(first.sessionId, agentId, { type: "submit", submissionId: randomUUID(), text: "Branch" }));
+    await execute(service, agentCommand(first.sessionId, agentId, { type: "submit", submissionId: randomUUID(), parts: [{ kind: "text", text: "Branch" }] }));
     await expect(execute(service, { type: "select", sessionId: first.sessionId, nodeId: message.id })).rejects.toThrow("settle");
     release(); await settled(service);
     const after = await execute(service, { type: "read", sessionId: first.sessionId });
     expect(after.nodes.slice(0, before.nodes.length)).toEqual(before.nodes);
-    expect(after.nodes.find(n => n.kind === "message" && n.text === "Branch")!.parentId).toBe(message.id);
+    expect(after.nodes.find(n => n.kind === "message" && modelInputText(n.parts) === "Branch")!.parentId).toBe(message.id);
   });
 
   it("其他代理在 thinking 后发送时沿同一路径追加，不回溯或拆开响应", async () => {
@@ -476,7 +537,7 @@ describe("会话运行时", () => {
     const gate = new Promise<void>(resolve => { release = resolve; });
     const thinkingSaved = new Promise<void>(resolve => { markThinking = resolve; });
     let calls = 0;
-    const model: ModelAdapter = { version: "ai-sdk-v7/2", prepare: () => ({ async *stream() {
+    const model: ModelAdapter = { validate() {}, version: "ai-sdk-v7/3", prepare: () => ({ async *stream() {
       if (++calls === 2) {
         yield { type: "part.start", part: { id: "r", kind: "thinking" } };
         yield { type: "part.delta", partId: "r", delta: "Reasoning" };
@@ -492,13 +553,13 @@ describe("会话运行时", () => {
     await execute(service, { type: "resource.create", sessionId, kind: "atelier.core/agent", creation: { id: "atelier.core/agent.create" }, input: { selection: selectionOf(first) }, position: { x: 600, y: 0 } });
     const b = service.sessions.snapshot(sessionId).workbench.objects.find(o => o.id !== a)!.id;
     try {
-      await execute(service, agentCommand(sessionId, a, { type: "submit", submissionId: randomUUID(), text: "To A" }));
+      await execute(service, agentCommand(sessionId, a, { type: "submit", submissionId: randomUUID(), parts: [{ kind: "text", text: "To A" }] }));
       await thinkingSaved;
       const thinking = service.sessions.tree.path(sessionId).at(-1)!;
       expect(thinking.kind).toBe("thinking");
-      await execute(service, agentCommand(sessionId, b, { type: "submit", submissionId: randomUUID(), text: "To B" }));
+      await execute(service, agentCommand(sessionId, b, { type: "submit", submissionId: randomUUID(), parts: [{ kind: "text", text: "To B" }] }));
       expect(service.sessions.tree.path(sessionId)).toContainEqual(thinking);
-      expect(service.sessions.tree.nodes(sessionId).find(n => n.kind === "message" && n.text === "To B")?.parentId).toBe(thinking.id);
+      expect(service.sessions.tree.nodes(sessionId).find(n => n.kind === "message" && modelInputText(n.parts) === "To B")?.parentId).toBe(thinking.id);
       expect(service.sessions.tree.cursorSelections(sessionId)).toEqual([]);
     } finally { release(); }
     await settled(service);
@@ -512,7 +573,7 @@ describe("会话运行时", () => {
     const gate = new Promise<void>(resolve => { release = resolve; });
     const started = new Promise<void>(resolve => { entered = resolve; });
     let calls = 0;
-    const model: ModelAdapter = { version: "ai-sdk-v7/2", prepare: () => ({ async *stream() {
+    const model: ModelAdapter = { validate() {}, version: "ai-sdk-v7/3", prepare: () => ({ async *stream() {
       if (++calls === 2) { entered(); await gate; }
       yield* reply();
     } }) };
@@ -546,7 +607,7 @@ describe("会话运行时", () => {
     let release!: () => void;
     const gate = new Promise<void>(resolve => { release = resolve; });
     vi.spyOn(service.configuration, "execute").mockImplementationOnce(async command => { await gate; return read(command); });
-    const command: Json = type === "submit" ? { type, submissionId: randomUUID(), text: "Too late" }
+    const command: Json = type === "submit" ? { type, submissionId: randomUUID(), parts: [{ kind: "text", text: "Too late" }] }
       : { type, selection: selectionOf(first) };
     const pending = execute(service, agentCommand(sessionId, agentId, command));
     const rejected = expect(pending).rejects.toMatchObject({ code: "not_found" });
@@ -595,7 +656,7 @@ describe("会话运行时", () => {
   it("取消时已收到的部分正文以不完整块留档，不进入可续接路径", async () => {
     let markStreamed!: () => void;
     const streamed = { promise: new Promise<void>(r => { markStreamed = r; }) };
-    const partial: ModelAdapter = { version: "ai-sdk-v7/2", prepare: () => ({ async *stream(signal) {
+    const partial: ModelAdapter = { validate() {}, version: "ai-sdk-v7/3", prepare: () => ({ async *stream(signal) {
       yield { type: "part.start", part: { id: "t", kind: "text" } } as const;
       yield { type: "part.delta", partId: "t", delta: "Half" } as const;
       markStreamed();
@@ -630,7 +691,7 @@ describe("会话运行时", () => {
 
   it("异常流的未结束调用只留档，不执行且不发起后续请求", async () => {
     let requests = 0;
-    const broken: ModelAdapter = { version: "ai-sdk-v7/2", prepare: () => ({ async *stream() {
+    const broken: ModelAdapter = { validate() {}, version: "ai-sdk-v7/3", prepare: () => ({ async *stream() {
       requests++;
       yield { type: "part.start", part: { id: "c", kind: "toolcall", callId: "c1", name: "resource_list" } };
       yield { type: "part.delta", partId: "c", delta: "{}" };
@@ -648,7 +709,7 @@ describe("会话运行时", () => {
   it("continue 自动退到 thinking 前的合法位置，原记录仍保留", async () => {
     let requests = 0;
     const inputs: string[][] = [];
-    const model: ModelAdapter = { version: "ai-sdk-v7/2", prepare: input => {
+    const model: ModelAdapter = { validate() {}, version: "ai-sdk-v7/3", prepare: input => {
       inputs.push(input.messages.map(item => item.kind));
       return { async *stream() {
         if (++requests === 1) {
@@ -680,7 +741,7 @@ describe("会话运行时", () => {
     const started = new Promise<void>(resolve => { entered = resolve; });
     const systems: string[] = [];
     let requests = 0;
-    const model: ModelAdapter = { version: "ai-sdk-v7/2", prepare: input => {
+    const model: ModelAdapter = { validate() {}, version: "ai-sdk-v7/3", prepare: input => {
       systems.push(JSON.stringify(input.system));
       return { async *stream() {
         if (++requests === 1) {
@@ -712,7 +773,7 @@ describe("会话运行时", () => {
     const gate = new Promise<void>(resolve => { release = resolve; });
     const started = new Promise<void>(resolve => { entered = resolve; });
     const inputs: ModelInput[] = [];
-    const model: ModelAdapter = { version: "ai-sdk-v7/2", prepare: input => {
+    const model: ModelAdapter = { validate() {}, version: "ai-sdk-v7/3", prepare: input => {
       inputs.push(input);
       return { async *stream() {
         const request = ++requests;
@@ -751,7 +812,7 @@ describe("会话运行时", () => {
     const sent = sdkMessages(inputs.at(-3)!);
     expect(sdkMessages(nextInput).slice(0, sent.length)).toEqual(sent);
     expect(nextInput.messages.slice(-3).map(item => item.kind)).toEqual(["output", "result", "context"]);
-    expect(nextInput.messages.at(-1)).toMatchObject({ kind: "context", text: expect.stringContaining("no longer linked") });
+    expect(nextInput.messages.at(-1)).toMatchObject({ kind: "context", parts: [{ kind: "text", text: expect.stringContaining("no longer linked") }] });
     expect(service.sessions.tree.nodes(sessionId).filter(node => node.kind === "toolcall").map(node => node.outcome?.kind))
       .toEqual(["succeeded", "rejected"]);
   });
@@ -762,7 +823,7 @@ describe("插件包管理命令", () => {
     const { service, root } = await setup();
     expect(() => service.execute({ type: "plugin.add", path: join(root, "missing") })).toThrow(/No package.json/);
     const dir = join(root, "pkg"); mkdirSync(dir);
-    writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "p", atelier: { id: "acme.p", api: { major: 4, minMinor: 0 } } }));
+    writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "p", atelier: { id: "acme.p", api: { major: 5, minMinor: 0 } } }));
     const added = service.execute({ type: "plugin.add", path: dir });
     expect(added.plugins.map(p => [p.source, p.status, p.enabled])).toEqual([[dir, "pending", true]]);
     expect(added.restartRequired).toBe(true);

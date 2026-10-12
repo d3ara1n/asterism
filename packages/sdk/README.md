@@ -67,7 +67,7 @@ schema 支持默认值、去空白与转换。调用方提交 schema 的输入�
   "exports": { "./public": "./src/public.ts" },
   "atelier": {
     "id": "example.tools",
-    "api": { "major": 4, "minMinor": 0 },
+    "api": { "major": 5, "minMinor": 0 },
     "runtime": "./src/runtime.ts"
   }
 }
@@ -149,7 +149,7 @@ ResourceDescription、ToolView、CreationEntry 的 label／description 接收 Ui
 
 ## 版本与当前边界
 
-SDK 包版本为 `0.7.0`，宿主提供 API 4.0；插件声明 `api: { major: 4, minMinor: 0 }`，其他主版本在加载前拒绝。应用 IPC 版本为 5，会话 IPC 为 13，内容 IPC 为 1，应用配置与插件配置 IPC 均为 2；工作数据库格式为 15，应用配置文件格式仍为 1。
+SDK 包版本为 `0.8.0`，宿主提供 API 5.0；插件声明 `api: { major: 5, minMinor: 0 }`，其他主版本在加载前拒绝。应用 IPC 版本为 5，会话 IPC 为 14，内容 IPC 为 2，应用配置 IPC 为 3，插件配置 IPC 为 2；工作数据库格式为 16，应用配置文件格式为 2。
 
 资源创建数据必须是 JSON 对象，不能占用宿主的 `id / type / title` 字段。当前会话数据保存于 `session_data`，事件及工具结果保存稳定契约身份与原始数据。core 消费具型用户消息、模型执行、通知与环境记录，存储编码由宿主负责；环境记录保留原事件身份与载荷。
 
@@ -157,9 +157,13 @@ SDK 包版本为 `0.7.0`，宿主提供 API 4.0；插件声明 `api: { major: 4,
 
 ## 可选模型分支
 
+模型输入及 context 均使用 `parts: ModelInputPart[]`，文字为 `{ kind: "text", text }`，文件为 `{ kind: "file", file: ContentRef, mediaType, filename? }`。输入不携带字节或路径。`models.validate(request, { content })` 和 `models.stream(request, { content })` 接收准备阶段、对象或会话已有的宿主 ContentReader；含文件时必须提供，纯文字可省略。模型消息与运行时门面分别传递，内容资格不进入持久消息。可编译示例见 [模型输入](examples/model-input.ts)。
+
+validate 检查目标、续接、文件类型、归属与大小，不读取全部字节。实际请求独立捕获资格与内容占用、重新检查并读取字节；调用方须消费或关闭流，宿主关闭也会收束流。请求不关闭借来的 content，草稿关闭不撤销已经捕获的请求。
+
 `models.roles / list` 读取模型与角色目录。`models.validate` 检查目标与显式输入能否准备，不发送请求或写入数据。`models.stream` 提供一次补全，只消费显式输入并交付协议事件；终态附带实际模型、适配版本与协议作用域。会话命名使用 stream，无须对象或资源工具执行。
 
-`models.run(request)` 是一次补全及该响应的完整资源工具批次。每次提供 `object / requestParentId / target / system / messages / signal / observer`，可提供工具筛选与缓存命中预期。宿主校验对象归属、当前路径与请求起点，按真实链接固定授权视图，并取用链接资源提供的环境文件追加到本次系统提示；工具筛选只收窄权限。同一对象并发 run 拒绝，运行期间对象和历史须遵守收束规则，关闭时取消并等待批次结束。
+`models.run(request)` 是一次补全及该响应的完整资源工具批次。每次提供 `object / requestParentId / target / system / messages / signal / observer`，可提供工具筛选与缓存命中预期。宿主校验对象归属、当前路径与请求起点，按本对象当前数据和请求路径记录解析 file 部件，不接收外部 content 覆盖；按真实链接固定授权视图，并取用链接资源提供的环境文件追加到本次系统提示；工具筛选只收窄权限。同一对象并发 run 拒绝，运行期间对象和历史须遵守收束规则，关闭时取消并等待批次结束。
 
 具名 `ModelRunObserver.event` 同步收到 `block / completion / diagnostic / progress`。成型块与迟到终态分开交付，部分输出也有明确的完整性标志；临时进度不写历史。`modelRunRecordSchema` 提供可保存事件的共识载荷，插件用它声明自己的 RecordContract，并经 `ObjectExecutor.commit` 保存。run 不隐式保存输出，也不读取、保存或续接内部对话；终态的 ordinal 标出应绑定的最高序号块，空响应为 null。消费者失败时取消执行并收束工具，返回 `event_delivery`，不再调用该消费者。
 

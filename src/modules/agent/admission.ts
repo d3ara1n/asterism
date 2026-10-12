@@ -1,4 +1,4 @@
-import { PluginApiError, type ModelServices, type ObjectReader, type ObjectExecutor } from "@atelier/sdk/runtime";
+import { PluginApiError, type ModelServices, type ObjectReader, type ObjectExecutor, type ContentReader } from "@atelier/sdk/runtime";
 import { AgentSelection, AgentSubmissions, type AgentCommand } from "./contract.ts";
 import { UserMessage } from "./records.ts";
 import { selectionOf, type AgentSelectionService } from "./selection.ts";
@@ -19,15 +19,15 @@ export function createAdmission(deps: { selection: AgentSelectionService; valida
     if (deps.running(object)) throw new PluginApiError("conflict", "This agent is running. Cancel or wait for it to finish.");
   };
   return {
-    async prepare(command: Input, object: ObjectReader, signal: AbortSignal): Promise<void> {
+    async prepare(command: Input, object: ObjectReader, signal: AbortSignal, content: ContentReader): Promise<void> {
       if (duplicate(object, command)) return;
       idle(object);
       const current = object.get(AgentSelection);
       if (current) {
         const agent = deps.selection.agent(current.selection), snapshot = object.session.snapshot();
         const messages = projectForAgent(snapshot, object.ref.id, snapshot.position.continuationId);
-        if (command.type === "submit") messages.push({ kind: "input", text: command.text });
-        await deps.validate({ target: deps.selection.target(current.selection), system: composeSystemPrompt(agent), messages, signal });
+        if (command.type === "submit") messages.push({ kind: "input", parts: command.parts });
+        await deps.validate({ target: deps.selection.target(current.selection), system: composeSystemPrompt(agent), messages, signal }, { content });
       }
     },
     accept(command: Input, object: ObjectExecutor): boolean {
@@ -38,7 +38,7 @@ export function createAdmission(deps: { selection: AgentSelectionService; valida
         if (!object.snapshot()) throw new PluginApiError("not_found", "The agent is not on the continuation path.");
         selectionOf(object);
         if (command.type === "submit") {
-          writer.append(UserMessage, { agentId: object.ref.id, text: command.text });
+          writer.append(UserMessage, { agentId: object.ref.id, parts: command.parts });
           writer.set(AgentSubmissions, { ...object.get(AgentSubmissions) ?? {}, [command.submissionId]: JSON.stringify(command) });
         }
       });

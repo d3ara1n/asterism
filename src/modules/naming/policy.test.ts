@@ -8,7 +8,7 @@ function record(id: string, contract: string, data: SessionRecord["data"], agent
   return { id, sessionId: "s", parentId: null, sequence: 0, createdAt: "2026-10-12T00:00:00Z",
     contract: { id: contract }, resource: { id: agentId, kind: "atelier.core/agent" }, data };
 }
-const input = (id: string, agentId: string, text: string) => record(id, UserMessage.id, { agentId, text }, agentId);
+const input = (id: string, agentId: string, text: string) => record(id, UserMessage.id, { agentId, parts: [{ kind: "text", text }] }, agentId);
 function output(id: string, agentId: string, origin: string, text: string, extra: Partial<ModelBlock> = {}) {
   return record(id, Execution.id, jsonSchema.parse({ type: "block", block: {
     kind: "text", text, responseId: id, requestParentId: origin, ordinal: 0, complete: true,

@@ -1,3 +1,4 @@
+import { inputSummary } from "../../shared/model-input.ts";
 import type { SessionRecord } from "@atelier/sdk/contracts";
 import { Execution, UserMessage } from "../agent/records.ts";
 
@@ -18,7 +19,7 @@ export function collectTurns(records: readonly SessionRecord[]): NamingTurn[] {
   for (const [position, record] of records.entries()) {
     const input = UserMessage.decode(record);
     if (input?.status === "known") {
-      const turn: NamingTurn = { user: input.data.text };
+      const turn: NamingTurn = { user: inputSummary(input.data.parts) };
       turns.push(turn);
       const agentInputs = inputs.get(input.data.agentId) ?? [];
       agentInputs.push({ position, turn }); inputs.set(input.data.agentId, agentInputs);

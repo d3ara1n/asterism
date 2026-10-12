@@ -1,4 +1,4 @@
-import { resourceCall, type ResourceCall, type Json } from "@atelier/sdk/contracts";
+import { resourceCall, type ResourceCall, type Json, type ModelInputPart } from "@atelier/sdk/contracts";
 import type { ResourceRef, PluginDefinition } from "@atelier/sdk/runtime";
 import { PluginApiError } from "@atelier/sdk/runtime";
 import { randomUUID } from "node:crypto";
@@ -8,7 +8,11 @@ import type { DatabaseSync } from "node:sqlite";
 import type { ConfigurationService } from "../configuration/service.ts";
 import { AgentCapabilities } from "../execution/capabilities.ts";
 import type { ModelAdapter } from "../model/contract.ts";
-import { Agent, CreateAgent, SubmitAgentInput } from "../modules/agent/contract.ts";
+import { Agent, CreateAgent, SubmitAgentInput, startAgentContentTarget, type AgentCommand } from "../modules/agent/contract.ts";
+import { createSelection } from "../modules/agent/selection.ts";
+import { composeSystemPrompt } from "../modules/agent/system-prompt.ts";
+import { inputReferences } from "../model/input.ts";
+import { inputSummary } from "../shared/model-input.ts";
 import { createModules } from "../modules/runtime.ts";
 import type { ParsedCall } from "../plugins/commands.ts";
 import { createCoreCatalogs } from "../plugins/core-catalogs.ts";
@@ -20,7 +24,7 @@ import type { ResourceRegistry } from "../resources/registry.ts";
 import { SessionDataStore } from "../session/data.ts";
 import { foldWorkbench, type FoldedObject } from "../session/fold.ts";
 import { SessionError, SessionTree } from "../session/tree.ts";
-import type { ModelSettings } from "../shared/model.ts";
+import type { ModelSettings, AgentSelection } from "../shared/model.ts";
 import type { ObjectStreamPayload } from "../shared/object-stream.ts";
 import { sessionPath, snap } from "../shared/session-path.ts";
 import { sessionCommandSchema, sessionSnapshotSchema, type SessionChanged, type SessionCommand, type SessionSnapshot, type SessionProgress, type SessionReply, type ViewPosition, type SessionNode, type LiveBlock } from "../shared/session.ts";
@@ -31,6 +35,7 @@ import { ContentStore, type ContentLease, type ContentTarget } from "./content-s
 import { applicationStorage } from "../shared/application.ts";
 
 const agentKind = Agent.kind;
+const startIdentity = ({ contentScopeId: _scope, ...input }: Extract<SessionCommand, { type: "start" }>) => JSON.stringify(input);
 
 /**
  * 会话入口：只拥有会话树、工作台对象与连线事件、布局和通知。
@@ -51,6 +56,7 @@ export class SessionService {
   private readonly prepare: LoadedPlugins["prepare"];
   private readonly committed: (sessionId: string, nodes: SessionNode[]) => void;
   private readonly modelActivity: (sessionId: string) => { running: string[]; live: LiveBlock[] };
+  private readonly validateInitialInput: (selection: AgentSelection, parts: ModelInputPart[], content: ContentLease) => Promise<void>;
   constructor(private readonly db: DatabaseSync, dataRoot: string, configuration: ConfigurationService,
     private readonly changed: (event: SessionChanged) => void = () => {}, adapterFactory?: (settings: ModelSettings) => ModelAdapter, external: readonly PluginDefinition[] = [],
     stream?: (event: ObjectStreamPayload) => void) {
@@ -102,8 +108,21 @@ export class SessionService {
       }
       return null;
     };
+    const models = createModelServices(configuration, adapterFactory);
+    const selection = createSelection({ agents: () => configuration.current().agents, models: models.list });
+    // 首条 submit 准备时对象尚未创建；组合入口用已经准备好的选择执行同一模型预检。
+    this.validateInitialInput = async (value, parts, content) => {
+      try {
+        await models.validate({ target: selection.target(value), system: composeSystemPrompt(selection.agent(value)),
+          messages: [{ kind: "input", parts }], signal: AbortSignal.timeout(10_000) },
+        { content: messages => this.content.capture(inputReferences(messages), { scope: content }) });
+      } catch (error) {
+        if (error instanceof PluginApiError) throw sessionPluginError(error);
+        throw error;
+      }
+    };
     const modules = createModules({ extensionsDirectory: join(dataRoot, "extensions"), data: new SessionDataStore(db), content: this.content, refOf, vault: configuration.vault, stream,
-      sessions: host, models: createModelServices(configuration, adapterFactory), catalogs: createCoreCatalogs(configuration) }, external);
+      sessions: host, models, catalogs: createCoreCatalogs(configuration) }, external);
     this.resources = modules.resources;
     this.tools = modules.tools;
     this.plugins = modules.manifest;
@@ -283,6 +302,11 @@ export class SessionService {
   /** 输入只绑定已装配契约；不提前创建对象或授予其他资源访问。 */
   openContentInput(target: ContentTarget): ContentLease {
     if (this.closed) throw new SessionError("unavailable", "The session service is closed.");
+    if (target.contractId === startAgentContentTarget.contractId) {
+      if (target.resourceKind !== agentKind || target.sessionId !== undefined || target.objectId !== undefined)
+        throw new SessionError("invalid_request", "The content input does not match a new conversation.");
+      return this.content.scope(target);
+    }
     const controller = this.resources.controller(target.resourceKind);
     if (target.objectId) {
       if (!target.sessionId || this.object(target.sessionId, target.objectId).kind !== target.resourceKind
@@ -299,7 +323,7 @@ export class SessionService {
     const pending = this.starting.get(command.submissionId);
     if (pending) return pending.then(reply => {
       if (this.db.prepare("SELECT command_json FROM session_submissions WHERE id = ?").get(command.submissionId) &&
-        (this.db.prepare("SELECT command_json FROM session_submissions WHERE id = ?").get(command.submissionId) as { command_json: string }).command_json !== JSON.stringify(command))
+        (this.db.prepare("SELECT command_json FROM session_submissions WHERE id = ?").get(command.submissionId) as { command_json: string }).command_json !== startIdentity(command))
         throw new SessionError("conflict", "This submission ID was already used for different input.");
       return reply;
     });
@@ -311,30 +335,36 @@ export class SessionService {
     const existing = () => {
       const row = this.db.prepare("SELECT session_id, command_json FROM session_submissions WHERE id = ?").get(command.submissionId) as { session_id: string; command_json: string } | undefined;
       if (!row) return null;
-      if (row.command_json !== JSON.stringify(command)) throw new SessionError("conflict", "This submission ID was already used for different input.");
+      if (row.command_json !== startIdentity(command)) throw new SessionError("conflict", "This submission ID was already used for different input.");
       return { kind: "accepted" as const, sessionId: row.session_id };
     };
     const prior = existing(); if (prior) return prior;
-    const agents = this.resources.controller(agentKind)!;
-    const selection = { agent: command.agent, model: command.model, thinking: command.thinking };
-    const input = await agents.prepareCreate!(resourceCall(CreateAgent, { selection }));
-    const again = existing(); if (again) return again;
-    const sessionId = randomUUID();
-    const agentId = createResourceId();
-    const before = () => {
-      this.tree.create(command.text.slice(0, 72), sessionId);
-      this.workbench.createWith(sessionId, agentKind, agentId, input, { x: 48, y: 48 });
-      this.db.prepare("INSERT INTO session_submissions (id, command_json, session_id) VALUES (?, ?, ?)").run(command.submissionId, JSON.stringify(command), sessionId);
-    };
-    const resource: FoldedObject = { id: agentId, kind: agentKind, title: "", data: {} };
-    // 首页首条输入同样经准备流水线；此时代理尚未创建，objectId 为将要创建的身份。
-    const submit = await this.prepareCommand(agentKind, resourceCall(SubmitAgentInput, { type: "submit", submissionId: command.submissionId, text: command.text }), { sessionId, objectId: agentId });
-    await agents.execute!({ sessionId, resource }, submit, before);
-    return { kind: "accepted", sessionId };
+    const content = this.content.fork(command.contentScopeId, startAgentContentTarget);
+    try {
+      const agents = this.resources.controller(agentKind)!;
+      const selection = { agent: command.agent, model: command.model, thinking: command.thinking };
+      const input = await agents.prepareCreate!(resourceCall(CreateAgent, { selection }));
+      const again = existing(); if (again) return again;
+      const sessionId = randomUUID();
+      const agentId = createResourceId();
+      const before = () => {
+        this.tree.create(inputSummary(command.parts).slice(0, 72), sessionId);
+        this.workbench.createWith(sessionId, agentKind, agentId, input, { x: 48, y: 48 });
+        this.db.prepare("INSERT INTO session_submissions (id, command_json, session_id) VALUES (?, ?, ?)").run(command.submissionId, startIdentity(command), sessionId);
+      };
+      const resource: FoldedObject = { id: agentId, kind: agentKind, title: "", data: {} };
+      // 首页首条输入同样经准备流水线；此时代理尚未创建，objectId 为将要创建的身份。
+      const submit = await this.prepareCommand(agentKind, resourceCall(SubmitAgentInput, { type: "submit", submissionId: command.submissionId, parts: command.parts }), { sessionId, objectId: agentId, content });
+      await this.validateInitialInput((input as { selection: AgentSelection }).selection,
+        (submit.value as Extract<AgentCommand, { type: "submit" }>).parts, content);
+      await agents.execute!({ sessionId, resource }, submit, before);
+      return { kind: "accepted", sessionId };
+    } finally { await content.close(); }
   }
   async close(): Promise<void> {
     this.closed = true;
     await this.closePlugins();
+    await Promise.allSettled([...this.starting.values()]);
     await this.content.close();
     this.writesClosed = true;
   }

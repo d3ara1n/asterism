@@ -1,19 +1,25 @@
 import { jsonSchema as sdkJsonSchema, streamText, tool, type ModelMessage, type ToolSet, type AssistantModelMessage, type LanguageModel } from "ai";
 import { jsonSchema, modelScope, unauthenticatedApiKey, type Json, type Usage } from "../shared/model.ts";
-import { ModelFailure, type ModelAdapter, type ModelEvent, type ModelInput, type PreparedModel } from "./contract.ts";
+import { ModelFailure, type ModelAdapter, type ModelEvent, type ModelInput, type PreparedModel, type ModelValidationInput } from "./contract.ts";
 import { createProviderModel, validateProviderTransport } from "./provider.ts";
 import { projectSystemPrompt } from "../modules/agent/system-prompt.ts";
+import { assertInputMediaType } from "./input.ts";
 
+const adapterVersion = "ai-sdk-v7/3";
+function validateContinuation(item: { adapter: string; scope: string }, scope: string): void {
+  if (item.adapter !== adapterVersion) throw new ModelFailure("replay_version", "The saved response needs a compatible protocol adapter.");
+  if (item.scope !== scope) throw new ModelFailure("model_switch", "Cross-model continuation is not supported yet. Start from a history position before the model output.");
+}
 function json(value: unknown): Json { return jsonSchema.parse(JSON.parse(JSON.stringify(value))); }
-function usesPlainResponseReasoning(input: ModelInput): boolean {
+function usesPlainResponseReasoning(input: ModelValidationInput): boolean {
   const { provider } = input.settings;
   return provider.protocol === "openai-responses" && new URL(provider.baseUrl).hostname === "api.deepseek.com";
 }
-function reasoningFor(input: ModelInput) {
+function reasoningFor(input: ModelValidationInput) {
   const thinking = input.settings.model.capabilities.reasoning ? input.settings.thinking : null;
   return thinking === "off" ? "none" as const : thinking ?? undefined;
 }
-function providerOptions(input: ModelInput): Record<string, Record<string, Json>> {
+function providerOptions(input: ModelValidationInput): Record<string, Record<string, Json>> {
   const { provider, thinking, model } = input.settings;
   if (thinking && thinking !== "off" && !model.capabilities.reasoning) throw new ModelFailure("unsupported_thinking", "This model does not support thinking.");
   if (provider.protocol === "anthropic") {
@@ -48,10 +54,11 @@ export function sdkMessages(input: ModelInput): ModelMessage[] {
   const scope = modelScope(input.settings);
   const plainReasoning = usesPlainResponseReasoning(input);
   for (const item of input.messages) {
-    if (item.kind === "input" || item.kind === "context") messages.push({ role: "user", content: item.text });
+    if (item.kind === "input" || item.kind === "context") messages.push({ role: "user", content: item.parts.map(part =>
+      part.kind === "text" ? { type: "text" as const, text: part.text }
+        : { type: "file" as const, data: part.data, mediaType: part.mediaType, ...(part.filename ? { filename: part.filename } : {}) }) });
     if (item.kind === "output") {
-      if (item.adapter !== "ai-sdk-v7/2") throw new ModelFailure("replay_version", "The saved response needs a compatible protocol adapter.");
-      if (item.scope !== scope) throw new ModelFailure("model_switch", "Cross-model continuation is not supported yet. Start from a history position before the model output.");
+      validateContinuation(item, scope);
       messages.push({ role: "assistant", content: item.parts.map(p => {
         // DeepSeek 将 reasoning.content 合入相邻 assistant 正文，不支持 summary/encrypted_content 输入。
         const plainThinking = plainReasoning && p.kind === "thinking";
@@ -74,11 +81,19 @@ export function sdkMessages(input: ModelInput): ModelMessage[] {
   return messages;
 }
 export class AiSdkAdapter implements ModelAdapter {
-  readonly version = "ai-sdk-v7/2";
+  readonly version = adapterVersion;
   constructor(private readonly readCredential: (providerId: string) => Promise<string | null>,
     private readonly languageModelFactory?: (input: ModelInput, key: string) => LanguageModel) {}
-  prepare(input: ModelInput): PreparedModel {
+  validate(input: ModelValidationInput): void {
     validateProviderTransport(input.settings.provider);
+    providerOptions(input);
+    const scope = modelScope(input.settings);
+    for (const item of input.messages) if (item.kind === "input" || item.kind === "context")
+      for (const part of item.parts) if (part.kind === "file") assertInputMediaType(input.settings, part.mediaType);
+    for (const item of input.messages) if (item.kind === "output") validateContinuation(item, scope);
+  }
+  prepare(input: ModelInput): PreparedModel {
+    this.validate(input);
     const messages = sdkMessages(input);
     const system = projectSystemPrompt(input.system);
     const options = providerOptions(input);
@@ -174,7 +189,6 @@ export class AiSdkAdapter implements ModelAdapter {
         // 用量与续接已在 finish 与 pickContinuation 白名单收束，无需处理。
         case "custom": break;
         case "file": case "reasoning-file": case "tool-result":
-          throw new ModelFailure("unsupported_content", "The provider returned unsupported response content.");
           throw new ModelFailure("unsupported_content", "The provider returned unsupported response content.");
         case "finish": {
           const u = event.totalUsage;

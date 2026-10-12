@@ -9,6 +9,7 @@ import { sessionSnapshot, resourceSnapshot } from "./records.ts";
 import { synchronous } from "./synchronous.ts";
 import type { LiveBlock } from "../shared/session.ts";
 import type { ContentLease } from "../runtime/content-store.ts";
+import { inputReferences } from "../model/input.ts";
 
 type PluginServices = Pick<PluginContext, "id" | "dir" | "log" | "config" | "secrets" | "db" | "tasks">;
 export function createSdkContext(internal: PluginServices, host: PluginHostServices, modelRuns: RunGroup) {
@@ -50,7 +51,7 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
   const access = (sessionId?: string, objectId?: string, scope?: ObjectScope) => {
     const established = !!sessionId && !scope?.provisional;
     const recordIds = established ? new Set(host.sessions.path(sessionId!).map(node => node.id)) : new Set<string>();
-    return { sessionId, objectId, recordIds, get scope() { return scope?.content; }, check: () => {
+    return { owner: internal.id, sessionId, objectId, recordIds, get scope() { return scope?.content; }, check: () => {
       checkAvailable();
       if (scope && !scope.active) throw new PluginApiError("unavailable", "The content execution is closed.");
     } };
@@ -183,8 +184,18 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
     },
     catalogs: { get: contract => { checkAvailable(); return host.catalogs?.get(contract) ?? null; } },
     models: {
-      validate: request => { checkAvailable(); return host.models.validate(request); },
-      stream: request => { checkAvailable(); return host.models.stream(request); },
+      validate: (request, options) => {
+        checkAvailable();
+        return modelRuns.start(signal => host.models.validate({ ...request, signal }, {
+          content: messages => host.content?.captureReader(inputReferences(messages), options?.content, internal.id),
+        }), { signal: request.signal, affectsHistory: false }).done;
+      },
+      stream: (request, options) => {
+        checkAvailable();
+        return modelRuns.iterate(signal => host.models.stream({ ...request, signal }, {
+          content: messages => host.content?.captureReader(inputReferences(messages), options?.content, internal.id),
+        }), request.signal);
+      },
       run(request) {
         if (modelRuns.closed) throw new PluginApiError("unavailable", "The plugin is closing.");
         const ref = Object.freeze({ ...request.object });
@@ -206,6 +217,8 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
         const receive = request.observer.event.bind(request.observer);
         const work = modelRuns.start(signal => host.models.run({ object: ref, target, system, messages, tools, cache, requestParentId: request.requestParentId,
           signal, capabilities, context: host.sessions.context(linked),
+          content: messages => host.content?.capture(inputReferences(messages), { owner: internal.id, sessionId: ref.sessionId,
+            objectId: ref.id, recordIds: new Set(path.map(node => node.id)), check: checkAvailable }),
           observer: { event(event) {
             if (event.type === "progress") {
               const run = running.get(ref.id);

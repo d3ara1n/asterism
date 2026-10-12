@@ -36,7 +36,7 @@ async function open(stream: (request: StreamRequest) => AsyncIterable<ModelEvent
     })] }, ...external,
   ], { ...host, models: { ...host.models,
     list: () => [{ model: "test/model", provider: "test", name: "Test", contextWindow: null,
-      capabilities: { tools: false, reasoning: false, images: false } }],
+      capabilities: { tools: false, reasoning: false, inputMediaTypes: [] } }],
     roles: () => [{ id: "utility", name: "Utility", description: "Naming", hidden: true, model: "test/model", thinking: null }],
     stream: request => { requests.push(request); return stream(request); },
   } }));
@@ -50,11 +50,11 @@ async function open(stream: (request: StreamRequest) => AsyncIterable<ModelEvent
   const session = context.session(sessionId);
   const submit = (text: string) => {
     let id!: string;
-    object.commit(writer => { id = writer.append(UserMessage, { agentId, text }); });
+    object.commit(writer => { id = writer.append(UserMessage, { agentId, parts: [{ kind: "text", text }] }); });
     return id;
   };
   const submitBatch = (texts: string[]) => {
-    object.commit(writer => { for (const text of texts) writer.append(UserMessage, { agentId, text }); });
+    object.commit(writer => { for (const text of texts) writer.append(UserMessage, { agentId, parts: [{ kind: "text", text }] }); });
   };
   const reply = (text: string) => {
     const origin = session.snapshot().position.nodeId;
@@ -76,8 +76,8 @@ describe("两级自动命名", () => {
     const test = await open(() => title("Opening title"));
     test.submitBatch(["Opening request", "Additional request"]); await test.idle();
     expect(test.requests).toHaveLength(1);
-    expect(test.requests[0]!.messages[0]).toMatchObject({ text: expect.stringContaining("User: Opening request") });
-    expect(test.requests[0]!.messages[0]).toMatchObject({ text: expect.not.stringContaining("User: Additional request") });
+    expect(test.requests[0]!.messages[0]).toMatchObject({ parts: [{ kind: "text", text: expect.stringContaining("User: Opening request") }] });
+    expect(test.requests[0]!.messages[0]).toMatchObject({ parts: [{ kind: "text", text: expect.not.stringContaining("User: Additional request") }] });
     expect(test.session.snapshot().records.last(SessionNamed, { scope: "session" })).toMatchObject({ data: { source: "initial" } });
   });
 
@@ -91,8 +91,8 @@ describe("两级自动命名", () => {
     for (let i = 2; i <= 5; i++) { test.submit(`请求 ${i}`); if (i < 5) test.reply(`完成 ${i}`); }
     await test.idle();
     expect(test.requests).toHaveLength(2);
-    expect(test.requests[1]!.messages[0]).toMatchObject({ text: expect.stringContaining("找到了 token 过期原因") });
-    expect(test.requests[1]!.messages[0]).toMatchObject({ text: expect.stringContaining("User: 请求 5") });
+    expect(test.requests[1]!.messages[0]).toMatchObject({ parts: [{ kind: "text", text: expect.stringContaining("找到了 token 过期原因") }] });
+    expect(test.requests[1]!.messages[0]).toMatchObject({ parts: [{ kind: "text", text: expect.stringContaining("User: 请求 5") }] });
     const snapshot = test.session.snapshot();
     expect(snapshot.records.query(SessionNamed, { scope: "session" }).map(value => value.status === "known" && value.data))
       .toEqual([{ title: "修复登录", source: "initial" }, { title: "完善 token 刷新", source: "refined" }]);

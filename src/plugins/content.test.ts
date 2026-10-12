@@ -1,7 +1,7 @@
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { contentRefSchema, defineAction, defineCreation, defineRecord, pluginNamespace, resourceCall, type ContentRef } from "@atelier/sdk/contracts";
 import { defineModule, definePlugin, implementAction, implementCreation, implementPreparer, implementResource, type ContentScope, type PluginContext } from "@atelier/sdk/runtime";
@@ -10,6 +10,10 @@ import { contentReferences, contentLimits } from "../runtime/content-store.ts";
 import { dispatchContent } from "../runtime/dispatch.ts";
 import { contentResponseSchema, contentVersion } from "../shared/content.ts";
 import { randomUUID } from "node:crypto";
+import type { ModelAdapter, ModelInput } from "../model/contract.ts";
+import type { StreamRequest } from "@atelier/sdk/contracts";
+import { modelInputLimits } from "../shared/model-media.ts";
+import { applicationStorage } from "../shared/application.ts";
 
 const ns = pluginNamespace("test.content");
 const Document = ns.resource("document", z.object({ original: contentRefSchema.optional() }));
@@ -24,7 +28,7 @@ afterEach(async () => {
   for (const service of services.splice(0)) await service.close();
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
-function fixture(options: { prepare?: (content: ContentScope, signal: AbortSignal) => Promise<void>; extra?: ReturnType<typeof definePlugin>[] } = {}) {
+function fixture(options: { prepare?: (content: ContentScope, signal: AbortSignal) => Promise<void>; extra?: ReturnType<typeof definePlugin>[]; adapter?: ModelAdapter } = {}) {
   const root = mkdtempSync(join(tmpdir(), "atelier-content-")); roots.push(root);
   let context!: PluginContext;
   const plugin = definePlugin({ namespace: ns, version: "1", modules: [defineModule(value => {
@@ -57,7 +61,7 @@ function fixture(options: { prepare?: (content: ContentScope, signal: AbortSigna
       inspect: async (_data, object) => object.get(Current),
     })] };
   })] });
-  const service = new ApplicationService(root, { plugins: [plugin, ...options.extra ?? []] }); services.push(service);
+  const service = new ApplicationService(root, { plugins: [plugin, ...options.extra ?? []], adapterFactory: options.adapter ? () => options.adapter! : undefined }); services.push(service);
   const sessionId = service.sessions.tree.create("Content");
   const store = service.sessions.content;
   const input = () => service.sessions.openContentInput({ contractId: Create.id, resourceKind: Document.kind, sessionId });
@@ -68,7 +72,7 @@ function fixture(options: { prepare?: (content: ContentScope, signal: AbortSigna
   const object = (id: string) => context.object({ sessionId, id, kind: Document.kind });
   const replace = (id: string, value: z.input<typeof Replace.schema>, scopeId?: string) => service.sessions.execute({ type: "resource.command", sessionId, objectId: id,
     command: resourceCall(Replace, value), contentScopeId: scopeId });
-  return { root, service, sessionId, store, input, create, object, replace };
+  return { root, service, sessionId, store, input, create, object, replace, context };
 }
 const bytes = (text: string) => new TextEncoder().encode(text);
 const text = (data: Uint8Array) => new TextDecoder().decode(data);
@@ -259,5 +263,96 @@ describe("宿主不可变内容", () => {
     await f.service.content.execute({ type: "input.close", scopeId: opened.scopeId });
     expect(await f.object(id).content.read(sealed.ref)).toEqual(new Uint8Array());
     expect(contentResponseSchema.safeParse({ kind: "content.response", version: contentVersion, id: randomUUID(), result: { ok: true, reply: sealed } }).success).toBe(true);
+  });
+});
+
+/** 预期来自内容授权和请求边界：文件须可读，临时输入与请求分别保留。 */
+describe("模型消费不可变内容", () => {
+  const request = (file: ContentRef, mediaType = "image/png") => ({
+    target: { role: "default", model: "media/model" }, system: { blocks: [] },
+    messages: [{ kind: "input", parts: [{ kind: "file", file, mediaType, filename: "input.png" }] }],
+    signal: new AbortController().signal,
+  } satisfies StreamRequest);
+  async function configure(f: ReturnType<typeof fixture>) {
+    await f.service.configuration.execute({ type: "provider.save", id: null,
+      value: { id: "media", name: "Media", protocol: "openai-responses", baseUrl: "https://example.invalid", enabled: true, auth: "none" }, credential: { action: "keep" } });
+    await f.service.configuration.execute({ type: "model.save", id: null, value: { providerId: "media", name: "Model", modelId: "model", enabled: true, contextWindow: null,
+      capabilities: { reasoning: false, tools: false, inputMediaTypes: ["image/png"] }, generation: { temperature: null, topP: null, maxOutputTokens: null } } });
+  }
+  const adapter = (seen: ModelInput[]): ModelAdapter => ({ version: "media-test", validate() {}, prepare(input) {
+    seen.push(input); return { async *stream() {
+      yield { type: "part.start" as const, part: { id: "t", kind: "text" as const } };
+      yield { type: "part.delta" as const, partId: "t", delta: "Done" };
+      yield { type: "part.end" as const, partId: "t" };
+      yield { type: "finish" as const, reason: "stop", usage: null };
+    } };
+  } });
+
+  it("创建前 prepare 可校验和发送临时内容；提前关闭模型流不消耗调用方输入", async () => {
+    const seen: ModelInput[] = [];
+    let ref!: ContentRef;
+    const f = fixture({ adapter: adapter(seen), async prepare(content) {
+      await f.context.models.validate(request(ref), { content });
+      expect(seen).toHaveLength(0);
+      for await (const event of f.context.models.stream(request(ref), { content })) { expect(event.type).toBe("part.start"); break; }
+      expect(text(await content.read(ref))).toBe("temporary");
+    } });
+    await configure(f);
+    const draft = f.input(); ref = await f.store.writer({ scope: draft }).stage(bytes("temporary"));
+    await f.create(ref, draft.id);
+    expect(seen[0]!.messages).toEqual([{ kind: "input", parts: [{ kind: "file", data: bytes("temporary"), mediaType: "image/png", filename: "input.png" }] }]);
+    expect(text(await f.store.reader({ scope: draft }).read(ref))).toBe("temporary");
+  });
+
+  it("无门面、伪造门面及其他对象引用在发送前拒绝；run 只取自身内容", async () => {
+    const seen: ModelInput[] = [], f = fixture({ adapter: adapter(seen) }); await configure(f);
+    const draft = f.input(), file = await f.store.writer({ scope: draft }).stage(bytes("first"));
+    const a = await f.create(file, draft.id);
+    const second = f.input(), other = await f.store.writer({ scope: second }).stage(bytes("second"));
+    const b = await f.create(other, second.id);
+    const models = f.context.models;
+    await expect(models.validate(request(file))).rejects.toMatchObject({ reason: "content_scope" });
+    await expect(models.validate(request(file), { content: { read: async () => bytes("fake"), async *open() {} } })).rejects.toMatchObject({ reason: "content_scope" });
+    await expect(models.validate(request(file), { content: f.object(b).content })).rejects.toMatchObject({ reason: "content_scope" });
+    const denied = await models.run({ ...request(file), object: f.object(b).ref, requestParentId: f.service.sessions.tree.cursor(f.sessionId), observer: { event() {} } });
+    expect(denied).toMatchObject({ reason: "failed", code: "content_scope" });
+    expect(seen).toHaveLength(0);
+    const accepted = await models.run({ ...request(file), object: f.object(a).ref, requestParentId: f.service.sessions.tree.cursor(f.sessionId), observer: { event() {} } });
+    expect(accepted.reason).toBe("completed");
+    expect(seen).toHaveLength(1);
+  });
+
+  it("请求开始后替换最后一个当前根仍能读取；请求关闭后释放占用", async () => {
+    const seen: ModelInput[] = [], f = fixture({ adapter: adapter(seen) }); await configure(f);
+    const draft = f.input(), file = await f.store.writer({ scope: draft }).stage(bytes("captured"));
+    const id = await f.create(file, draft.id); await draft.close();
+    const execute = f.service.configuration.execute.bind(f.service.configuration);
+    let release!: () => void; const gate = new Promise<void>(resolve => { release = resolve; });
+    const spy = vi.spyOn(f.service.configuration, "execute").mockImplementationOnce(async command => { await gate; return execute(command); });
+    const iterator = f.context.models.stream(request(file), { content: f.object(id).content })[Symbol.asyncIterator]();
+    const first = iterator.next();
+    try {
+      await f.replace(id, { file: null }); f.store.collect();
+      release(); await first;
+      expect(seen[0]!.messages).toMatchObject([{ parts: [{ data: bytes("captured") }] }]);
+      await iterator.return?.(); f.store.collect();
+      expect(() => f.store.reader({ sessionId: f.sessionId, objectId: id }).read(file)).toThrow("unavailable");
+    } finally { release(); await iterator.return?.(); spy.mockRestore(); }
+  });
+
+  it("validate 只读元数据；文件损坏在请求读取时失败，MIME 与大小独立检查", async () => {
+    const seen: ModelInput[] = [], f = fixture({ adapter: adapter(seen) }); await configure(f);
+    const draft = f.input(), file = await f.store.writer({ scope: draft }).stage(bytes("intact"));
+    const id = await f.create(file, draft.id), content = f.object(id).content;
+    writeFileSync(join(f.root, applicationStorage.contentDirectory, "sealed", file["$atelier.content"]), bytes("broken"));
+    await f.context.models.validate(request(file), { content });
+    await expect((async () => { for await (const _ of f.context.models.stream(request(file), { content })) {} })()).rejects.toMatchObject({ code: "content_unavailable" });
+    await expect(f.context.models.validate(request(file, "application/pdf"), { content })).rejects.toMatchObject({ reason: "unsupported_content" });
+    // 使用同一对象的动作草稿建立合法归属，避免把越权误当成大小校验。
+    const actionDraft = f.service.sessions.openContentInput({ sessionId: f.sessionId, objectId: id, resourceKind: Document.kind, contractId: Replace.id });
+    const large = await f.store.writer({ scope: actionDraft }).stage(new Uint8Array(modelInputLimits.image + 1));
+    await f.replace(id, { file: large }, actionDraft.id);
+    await expect(f.context.models.validate(request(large), { content: f.object(id).content })).rejects.toMatchObject({ reason: "content_limit" });
+    expect(seen).toHaveLength(0);
   });
 });

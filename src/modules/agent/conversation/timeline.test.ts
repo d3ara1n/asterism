@@ -17,7 +17,7 @@ describe("代理的具型记录视图", () => {
   });
 
   it("挂在当前路径的未完成块保留，其他分支与代理隐藏；空响应通知保留用量", () => {
-    const message: SessionNode = { ...base, id: "input", parentId: null, kind: "message", text: "Question" };
+    const message: SessionNode = { ...base, id: "input", parentId: null, kind: "message", parts: [{ kind: "text", text: "Question" }] };
     const block: SessionNode = { ...base, ...emptyCompletion, id: "partial", parentId: message.id, kind: "text", text: "Partial",
       responseId: "r", ordinal: 0, requestParentId: message.id, model: "p/m", complete: false, continuation: null, adapter: "test", scope: "s" };
     const notice: SessionNode = { ...base, id: "notice", parentId: message.id, kind: "notice", code: "empty_response", message: "Empty", level: "error",

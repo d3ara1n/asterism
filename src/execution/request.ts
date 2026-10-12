@@ -3,7 +3,7 @@ import type { ModelRunRequest, ModelRunResult, ModelRunEvent, ModelSource, Model
 import { modelExpression, modelScope, type ModelSettings, type ToolOutcome } from "../shared/model.ts";
 import { ModelFailure, type ModelAdapter } from "../model/contract.ts";
 import type { SystemPrompt } from "@atelier/sdk/contracts";
-import type { ModelItem } from "../session/projection.ts";
+import type { ResolvedModelItem } from "../model/contract.ts";
 import { executeCoreBatch, coreDeclarations, previewCoreCall } from "./core.ts";
 import type { AgentCapabilities } from "./capabilities.ts";
 import { ResponseBuffer } from "./response.ts";
@@ -14,7 +14,7 @@ export interface ModelExecutionEnvironment {
   settings: ModelSettings;
   capabilities: AgentCapabilities;
   system: SystemPrompt;
-  messages: ModelItem[];
+  messages: ResolvedModelItem[];
 }
 /** 一次补全及完整工具批次。缓冲只在此次调用内存在，输出交给消费者，不接触时间轴。 */
 export async function runModelRequest(request: ModelRunRequest, environment: Promise<ModelExecutionEnvironment>): Promise<ModelRunResult> {

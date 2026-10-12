@@ -1,10 +1,13 @@
 import { defineCreation, defineAction, type ActionContract } from "@atelier/sdk/contracts";
 import { z } from "zod";
 import { core } from "../plugin.ts";
+import { userInputPartsSchema } from "../../shared/model-input.ts";
 import { agentSelectionSchema } from "../../shared/model.ts";
 
 /** 代理是普通资源：创建事件只记录身份；模型选择等可变数据属于资源私有状态。 */
 export const Agent = core.resource("agent", z.object({}));
+/** 首页首次提交的宿主草稿目标；不属于可路由到已有对象的动作。 */
+export const startAgentContentTarget = { contractId: core.name("session.start"), resourceKind: Agent.kind } as const;
 export const AgentSelection = core.data("agent.selection", z.strictObject({
   selection: agentSelectionSchema, revision: z.number().int().nonnegative(),
 }));
@@ -15,10 +18,9 @@ export const AgentView = core.data("agent.card", z.strictObject({
   selectionRevision: z.number().int().nonnegative(),
 }));
 
-const text = z.string().trim().min(1).max(100_000);
 /** 代理卡片发出的资源命令；由代理控制器执行，会话只负责路由与记录事件。 */
 export const agentCommandSchema = z.discriminatedUnion("type", [
-  z.strictObject({ type: z.literal("submit"), submissionId: z.string().uuid(), text }),
+  z.strictObject({ type: z.literal("submit"), submissionId: z.string().uuid(), parts: userInputPartsSchema }),
   z.strictObject({ type: z.literal("continue") }),
   z.strictObject({ type: z.literal("configure"), selection: agentSelectionSchema }),
   z.strictObject({ type: z.literal("cancel") }),

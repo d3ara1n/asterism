@@ -79,8 +79,8 @@ describe("历史导航契约", () => {
       node("3", "2", { ...block, kind: "toolcall", ordinal: 1, callId: "call", name: "resource_call", argumentsText: "{}",
         arguments: { resource_id: "n", tool: "read", target: { path: "input.md" }, args: {} }, outcome: { kind: "succeeded", data: null, model: null } }),
       node("4", "3", { ...block, kind: "text", ordinal: 2, complete: false, text: "Interrupted" }),
-      node("5", "4", { kind: "message", agentId: "a", text: "Continue" }),
-      node("6", "1", { kind: "message", agentId: "a", text: "Another branch" }),
+      node("5", "4", { kind: "message", agentId: "a", parts: [{ kind: "text", text: "Continue" }] }),
+      node("6", "1", { kind: "message", agentId: "a", parts: [{ kind: "text", text: "Another branch" }] }),
     ];
     expect(historyEntries(nodes, label).map(entry => entry.node.id)).toEqual(["1", "2", "3", "5", "6"]);
     expect(historyEntries(nodes, label)[2].label).toBe("read · input.md");

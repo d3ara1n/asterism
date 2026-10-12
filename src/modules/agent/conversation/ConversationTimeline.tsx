@@ -1,4 +1,4 @@
-import { useI18n } from "@atelier/sdk/renderer";
+import { useI18n, useRendererObject } from "@atelier/sdk/renderer";
 import { TriangleAlert, Info } from "lucide-react";
 
 import { Alert, AlertDescription } from "../../../renderer/shared/ui/alert";
@@ -8,6 +8,7 @@ import { Markdown } from "./Markdown";
 import { ThinkingBlock } from "./ThinkingBlock";
 import { timelineKey, type TimelineItem } from "./timeline";
 import { ToolCall } from "./ToolCall";
+import { FilePreview } from "./Files";
 
 export function ConversationTimeline({ items }: { items: readonly TimelineItem[] }) {
 
@@ -26,12 +27,15 @@ function NodeView({ node }: { node: TimelineItem }) {
 }
 function NodeContent({ node }: { node: TimelineItem }) {
   const i18n = useI18n();
+  const object = useRendererObject();
   const incomplete = "complete" in node && !node.complete;
   const streaming = (node.kind === "text" || node.kind === "thinking") && !("complete" in node);
   const tag = incomplete ? <Badge variant="outline">{i18n.formatMessage(conversationMessages.incomplete)}</Badge> : null;
   switch (node.kind) {
     case "message": return <article className="space-y-2"><p className="type-label">{i18n.formatMessage(conversationMessages.you)}</p>
-      <div className="rounded-md bg-muted px-3 py-2"><Markdown>{node.text}</Markdown></div></article>;
+      <div className="space-y-2 rounded-md bg-muted px-3 py-2">{node.parts.map((part, index) =>
+        part.kind === "text" ? <Markdown key={index}>{part.text}</Markdown>
+          : <FilePreview key={index} part={part} content={object.content} />)}</div></article>;
     case "text": return <article className="space-y-1">{tag}<Markdown streaming={streaming}>{node.text}</Markdown></article>;
     case "thinking": return node.text.trim() ? <ThinkingBlock node={node} /> : null;
     case "toolcall": return <ToolCall node={node} />;

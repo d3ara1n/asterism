@@ -13,7 +13,7 @@ const thinking = (agentId: string, responseId: string, ordinal: number): Extract
 const call = (agentId: string, responseId: string, ordinal: number, callId: string): Extract<NewNode, { kind: "toolcall" }> =>
   ({ ...blk, kind: "toolcall", agentId, responseId, ordinal, callId, name: "read", argumentsText: "{}", arguments: {},
     outcome: { kind: "succeeded", model: callId, data: null } });
-const msg = (agentId: string, t: string): NewNode => ({ kind: "message", agentId, text: t });
+const msg = (agentId: string, t: string): NewNode => ({ kind: "message", agentId, parts: [{ kind: "text", text: t }] });
 const attached = (agentId: string | null, r: string): NewNode => ({ kind: "event", agentId, type: "resource_attached", data: { id: r }, model: `${r} attached` });
 const completion = { usage: { input: 5, output: 3, total: 8, cacheRead: 2, cacheWrite: null, reasoning: 1 },
   finishReason: "stop", rawFinishReason: "end_turn", providerResponseId: "server-1" };
@@ -119,11 +119,11 @@ describe("会话级扁平树", () => {
     expect(final.slice(next.length).map(item => item.kind)).toEqual(["output", "context"]);
     expect(tree.path(s).map(node => node.id).indexOf(during.id)).toBeLessThan(tree.path(s).map(node => node.id).indexOf(tool.id));
     const viewed = projectForAgent(tree.path(s, during.id), "a");
-    expect(viewed.at(-1)).toMatchObject({ kind: "context", text: "during attached" });
+    expect(viewed.at(-1)).toMatchObject({ kind: "context", parts: [{ kind: "text", text: "during attached" }] });
     tree.select(s, during.id);
     tree.append(s, { ...text("a", "branch", 0, "new answer"), requestParentId: during.id });
     expect(projectForAgent(tree.path(s), "a").slice(0, viewed.length)).toEqual(viewed);
-    expect(projectForAgent(tree.path(s), "a").some(item => item.kind === "context" && item.text === "later attached")).toBe(false);
+    expect(projectForAgent(tree.path(s), "a").some(item => item.kind === "context" && item.parts.some(part => part.kind === "text" && part.text === "later attached"))).toBe(false);
     expect(tree.nodes(s).some(node => node.id === later.id)).toBe(true);
   });
 
@@ -156,7 +156,7 @@ describe("会话级扁平树", () => {
     const partial = tree.append(s, text("a", "r1", 0, "half", false));
     expect(tree.path(s).some(n => n.id === partial.id)).toBe(false);
     expect(() => tree.select(s, partial.id)).toThrow("Incomplete");
-    expect(projectForAgent(tree.path(s), "a")).toEqual([{ kind: "input", text: "hi" }]);
+    expect(projectForAgent(tree.path(s), "a")).toEqual([{ kind: "input", parts: [{ kind: "text", text: "hi" }] }]);
   });
 
   it("停在 thinking 之后选择时吸附到其之前", () => {

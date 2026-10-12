@@ -11,6 +11,10 @@ import { Workbench, type WorkbenchHandle } from "../features/workbench/Workbench
 import { Sidebar } from "./Sidebar";
 
 import { HomePage, type StartInput } from "../features/home/HomePage";
+import { createMessageDraft } from "../../modules/agent/conversation/draft";
+import { startAgentContentTarget } from "../../modules/agent/contract";
+import { contentInput, contentScopeId } from "../features/creation/content";
+import type { RendererContentInput } from "@atelier/sdk/renderer";
 import { Window, Titlebar } from "./Window";
 
 import { Space } from "../shared/weave/Space";
@@ -53,7 +57,7 @@ export function App({ controller }: { controller: ApplicationController }) {
   const [page, setPage] = useState<PageId>("main");
   const [view, setView] = useState<MainView>({ kind: "home" });
   const [sidebarVisible, setSidebarVisible] = useState(true);
-  const [draft, setDraft] = useState("");
+  const [draft] = useState(() => createMessageDraft(() => contentInput(startAgentContentTarget)));
   const start = useStart();
   // 每次导航递增；异步创建完成时据此判断用户是否已离开，不夺走当前视图。
   const navigation = useRef(0);
@@ -105,9 +109,9 @@ export function App({ controller }: { controller: ApplicationController }) {
   const startConversation = async (input: StartInput) => {
     if (!ready) return;
     const token = navigation.current;
-    const created = await start.submit(input);
+    const created = await start.submit(input, draft.content());
     if (!created) return;
-    setDraft("");
+    draft.accepted();
     if (token === navigation.current) openSession(created);
     void controller.refresh();
   };
@@ -172,7 +176,7 @@ export function App({ controller }: { controller: ApplicationController }) {
       {view.kind === "home"
         ? <motion.div key="home" className="h-full" initial={{ opacity: 0, scale: 1.04 }} animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 1.04 }} transition={islandTransition}>
-          <HomePage active={!inSettings} draft={draft} onDraftChange={setDraft} onSettings={() => go("settings")}
+          <HomePage active={!inSettings} draft={draft} onSettings={() => go("settings")}
             ready={ready} busy={start.busy} submitError={start.error} onStart={startConversation} /></motion.div>
         : <motion.div key="conversation" className="h-full" initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.96 }} transition={islandTransition}>
@@ -206,14 +210,16 @@ function useStart() {
   const pending = useRef(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<UiText | null>(null);
-  const submit = async (input: StartInput): Promise<string | null> => {
+  const submit = async (input: StartInput, content: RendererContentInput): Promise<string | null> => {
     if (pending.current) return null;
     pending.current = true; setBusy(true); setError(null);
     try {
-      const result = await window.host.session.execute({ type: "start", ...input, submissionId: identity.current.forInput(input) });
+      const result = await window.host.session.execute({ type: "start", ...input, submissionId: identity.current.forInput(input),
+        contentScopeId: await contentScopeId(content, startAgentContentTarget) });
       if (!result.ok) { setError(errorDisplay(result.error)); return null; }
       if (result.reply.kind !== "accepted") throw new Error("Invalid session receipt.");
       identity.current.accepted();
+      await content.close();
       return result.reply.sessionId;
     } catch {
       setError(appMessages.connectionLost);

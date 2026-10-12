@@ -1,5 +1,7 @@
 /** 模型协议共识：不依赖资源实现、代理配置或宿主适配器。 */
 import type { Json } from "./json.ts";
+import type { ModelInputPart } from "./model-input.ts";
+import type { ContentReader } from "./content-runtime.ts";
 import type { ToolOutcome, ToolInvocationInfo, ToolResult } from "./tool-result.ts";
 import type { ResourceRef } from "./workspace.ts";
 
@@ -14,7 +16,7 @@ export type ModelPart =
   | { kind: "thinking" | "text"; text: string; continuation: Json }
   | { kind: "toolcall"; callId: string; name: string; arguments: Json; continuation: Json };
 export type ModelItem =
-  | { kind: "input" | "context"; text: string }
+  | { kind: "input" | "context"; parts: readonly ModelInputPart[] }
   | { kind: "output"; parts: ModelPart[]; scope: string; adapter: string }
   | { kind: "result"; callId: string; name: string; outcome: ToolOutcome };
 export interface Usage {
@@ -78,12 +80,13 @@ export interface StreamRequest {
   tools?: { name: string; description: string; parameters: Json }[];
   signal: AbortSignal;
 }
+export interface ModelInputOptions { content?: ContentReader }
 export interface ModelServices {
   /** 检查显式请求输入与目标，不发送模型请求、不保存状态。 */
-  validate(request: Pick<StreamRequest, "target" | "system" | "messages" | "signal">): Promise<void>;
-  stream(request: StreamRequest): AsyncIterable<ModelEvent>;
+  validate(request: Pick<StreamRequest, "target" | "system" | "messages" | "signal">, options?: ModelInputOptions): Promise<void>;
+  stream(request: StreamRequest, options?: ModelInputOptions): AsyncIterable<ModelEvent>;
   /** 一次请求及其工具批次；不保存历史，不推动下一次请求。 */
   run(request: ModelRunRequest): Promise<ModelRunResult>;
   roles(): readonly { id: string; name: string; description: string; hidden: boolean; model: string | null; thinking: ThinkingLevel | null }[];
-  list(): readonly { model: string; provider: string; name: string; contextWindow: number | null; capabilities: { reasoning: boolean; tools: boolean; images: boolean } }[];
+  list(): readonly { model: string; provider: string; name: string; contextWindow: number | null; capabilities: { reasoning: boolean; tools: boolean; inputMediaTypes: readonly string[] } }[];
 }

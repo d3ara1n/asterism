@@ -14,7 +14,7 @@
 | `runtime/content-store.ts`、`runtime/content-transfer.ts` | 不可变字节、临时占用与持久依赖；桌面分块传输和读取占用 | SDK 内容契约、SQLite、Node 文件系统；不解释领域格式 |
 | `configuration/` | 全局配置 JSON、密文凭据、连接测试与默认角色，见目录 README | shared、Node 文件系统、模型 SDK；不依赖 Electron 或数据库 |
 | `session/` | 会话级扁平树、游标与吸附、模型投影、工作台折叠 | shared、SDK 纯契约、Node SQLite；不依赖 UI 或插件运行时 |
-| `model/` | 单次请求契约、三协议 SDK 适配与续接资料 | shared、session、AI SDK |
+| `model/` | 单次请求契约、文件输入检查与解析、三协议 SDK 适配与续接资料 | shared、session、AI SDK |
 | `execution/` | 单次模型请求与工具批次、流块状态机、请求能力视图、外部工具策略与固定宿主操作入口；外层循环归插件 Agent | model、resources、tools、存储格式 adapter |
 | `resources/` | 资源身份生成、后台契约、注册目录、卡片投影与环境聚合 | shared、session 对象类型、Nano ID |
 | `tools/` | 两层共用的工具定义投影、实现注册与产出校验、终结模型投影、支持关系；不持有外部授权策略 | shared、session 对象类型 |

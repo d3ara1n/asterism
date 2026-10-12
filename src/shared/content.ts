@@ -3,7 +3,7 @@ import { contentRefSchema } from "@atelier/sdk/contracts";
 import { coreChannel } from "./core.ts";
 
 export const contentChannel = coreChannel("content");
-export const contentVersion = 1;
+export const contentVersion = 2;
 /** 单块传输上限；分块确认形成背压。 */
 export const contentChunkSize = 1024 * 1024;
 /** 单次 read 上限；更大内容用 open 或范围读取。 */

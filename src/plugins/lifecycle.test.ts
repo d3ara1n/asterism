@@ -3,6 +3,29 @@ import { RunLifecycle } from "./lifecycle.ts";
 
 const object = { sessionId: "session", id: "object", kind: "test.resource/object" };
 describe("共享运行生命周期", () => {
+  it.each(["return", "close"] as const)("流暂停消费时 %s 关闭真实迭代器，等待清理但不取消调用方信号", async mode => {
+    const lifecycle = new RunLifecycle(() => {}), models = lifecycle.group("model");
+    const caller = new AbortController();
+    let release!: () => void, cleaned = false, starts = 0;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    const stream = models.iterate(async function* () {
+      starts++;
+      try { yield 1; yield 2; }
+      finally { await gate; cleaned = true; }
+    }, caller.signal);
+    const iterator = stream[Symbol.asyncIterator]();
+    expect(await iterator.next()).toEqual({ done: false, value: 1 });
+    expect(stream[Symbol.asyncIterator]()).toBe(iterator);
+    const closing = mode === "return" ? iterator.return!() : lifecycle.close();
+    await Promise.resolve();
+    expect(cleaned).toBe(false);
+    release(); await closing;
+    expect(cleaned).toBe(true);
+    expect(caller.signal.aborted).toBe(false);
+    expect(await iterator.next()).toMatchObject({ done: true });
+    expect(starts).toBe(1);
+    await lifecycle.close();
+  });
   it("关闭先传播所有取消，活动直到实际结束才移除，关闭后不再受理", async () => {
     const lifecycle = new RunLifecycle(() => {});
     const task = lifecycle.group("task"), model = lifecycle.group("model");
