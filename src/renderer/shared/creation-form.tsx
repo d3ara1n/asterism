@@ -1,9 +1,12 @@
-import { useRef, useState, type ReactNode } from "react";
-import { Button } from "./ui/button";
+import { FieldSet, FieldGroup } from "./ui/field";
+
 import { DialogFooter } from "./ui/dialog";
-import { FieldGroup, FieldSet } from "./ui/field";
+import { Button } from "./ui/button";
 import { Spinner } from "./ui/spinner";
-import { t } from "./i18n";
+import { useRef, useState, type ReactNode } from "react";
+
+import { commonMessages } from "../messages/common";
+import { useI18n } from "./i18n";
 
 /**
  * 内置创建视图共用的表单与提交门禁；外壳（标题、错误、关闭）由宿主创建协调器提供。
@@ -17,6 +20,7 @@ export function CreationForm({ busy, disabled, validate, onSubmit, onCancel, chi
   onCancel: () => void;
   children: ReactNode;
 }) {
+  const i18n = useI18n();
   const pending = useRef(false);
   const [submitting, setSubmitting] = useState(false);
   const blocked = busy || submitting;
@@ -33,9 +37,9 @@ export function CreationForm({ busy, disabled, validate, onSubmit, onCancel, chi
       <FieldGroup>{children}</FieldGroup>
     </FieldSet>
     <DialogFooter>
-      <Button type="button" variant="ghost" onClick={onCancel}>{t.cancel}</Button>
+      <Button type="button" variant="ghost" onClick={onCancel}>{i18n.formatMessage(commonMessages.cancel)}</Button>
       <Button disabled={blocked || disabled} aria-busy={blocked}>
-        {blocked && <Spinner aria-hidden="true" />}{blocked ? t.creating : t.create}
+        {blocked && <Spinner aria-hidden="true" />}{blocked ? i18n.formatMessage(commonMessages.creating) : i18n.formatMessage(commonMessages.create)}
       </Button>
     </DialogFooter>
   </form>;

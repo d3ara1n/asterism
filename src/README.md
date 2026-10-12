@@ -7,6 +7,7 @@
 | 目录 | 职责 | 依赖方向 |
 | --- | --- | --- |
 | `shared/` | 版本化命令、投影与传输校验 | Zod 与 SDK 纯契约，不依赖任何进程或 UI |
+| `shared/i18n.ts`、`shared/language.ts` | FormatJS 消息格式化、语言匹配与展示传输；不读写业务数据 | FormatJS 与 SDK 纯契约 |
 | `main/` | Electron 窗口、单实例锁、数据目录、运行时生命周期、可信 IPC 路由 | shared，不调用数据库 |
 | `preload/` | 沙箱桥，受控命令与状态订阅 | shared，只暴露 `window.host` |
 | `runtime/` | 应用组合与列表；会话命令、历史查询、资源与布局、执行进度；SQLite、对象存储与私有凭据客户端 | shared、session、configuration、modules 后台入口、Node API |
@@ -43,12 +44,15 @@ FROM session_usage WHERE session_id = ? GROUP BY model;
 
 插件配置经独立 `plugin-configuration` 通道读写，不加载会话。对象二进制流经 `shared/object-stream.ts` 的同一信封从任务进程送至 main、preload；两端用 Zod 校验后交付，preload 按会话与对象筛选订阅，不写入事件或转换正文。
 
+语言偏好由 `main/language.ts` 管理，保存于 `language.json`；`preload` 只暴露语言读取、选择与订阅。插件静态目录由 `plugins/catalogs.ts` 在启动时读取，带 owner、规范化语言和内容修订，通过应用列表快照交付 renderer，包括没有前端入口的包。源消息按功能分别位于 `renderer/messages/` 与 `modules/messages/`，声明使用语义化引用名，目录按稳定的 owner/id 寻址；宿主译文在 `shared/locales/`，内置插件译文在 `modules/locales/`。会话准备与执行的插件错误统一由 `runtime/plugin-errors.ts` 适配，SDK 声明与作者路径见 [公共 i18n](../docs/i18n.md)。
+
 ## 开发与验证
 
 - `npm run dev`：构建并运行 Electron，renderer 使用 Vite HMR。
 - `npm run typecheck`：分别检查 Node 进程代码与 renderer。
 - `npm test`：历史契约、应用事务与持久化、进程请求生命周期。
 - `npm run build`：仅构建，不启动应用。
+- `npm run i18n:extract` / `npm run i18n:check`：官方抽取、ICU／参数和翻译覆盖检查；可追加外部插件包根。
 - `npm run package` / `npm run make`：构建后交给 Forge 打包，ZIP maker 支持三平台；当前只验证本机 macOS arm64 包内容。
 
 GUI 由用户验证。测试使用独立临时数据库，结束后清理；不访问 Electron 的真实应用数据目录。

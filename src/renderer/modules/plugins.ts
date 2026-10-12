@@ -2,6 +2,7 @@ import * as React from "react";
 import * as ReactJsx from "react/jsx-runtime";
 import * as ReactDom from "react-dom";
 import * as ReactDomClient from "react-dom/client";
+import * as ReactIntl from "react-intl";
 import * as zod from "zod";
 import * as sdkContracts from "@atelier/sdk/contracts";
 import * as sdkRenderer from "@atelier/sdk/renderer";
@@ -11,6 +12,7 @@ import type { RendererModule } from "@atelier/sdk/renderer";
 (globalThis as Record<string, unknown>).__atelierRendererModules = {
   react: React, "react/jsx-runtime": ReactJsx, "react-dom": ReactDom, "react-dom/client": ReactDomClient,
   zod, "@atelier/sdk/contracts": sdkContracts, "@atelier/sdk/renderer": sdkRenderer,
+  "react-intl": ReactIntl,
 };
 
 export interface PluginRendererFailure { id: string; error: string }

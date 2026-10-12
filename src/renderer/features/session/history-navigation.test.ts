@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
+
 import { emptyCompletion, type NewNode, type SessionNode } from "../../../shared/session";
+import { historyMessages } from "../../messages/history";
+import { getI18n } from "../../shared/i18n";
 import { historyBefore, historyEntries, historyResources, historyResourceViews, matchesHistoryView } from "./history-navigation";
-import { t } from "../../shared/i18n";
 
 const block = { ...emptyCompletion, agentId: "a", responseId: "r", ordinal: 0, requestParentId: null,
   complete: true, model: "test", continuation: null, adapter: "test", scope: "test" };
@@ -66,7 +68,7 @@ describe("历史导航契约", () => {
     ];
     const entries = historyEntries(nodes, label);
     expect(historyResources(nodes).get("n")).toEqual({ id: "n", kind: "note", title: "Old note" });
-    expect(entries[1].label).toBe(t.eventRemoved("Old note"));
+    expect(entries[1].label).toBe(getI18n().formatMessage(historyMessages.eventRemoved, { title: "Old note" }));
     expect(entries[2].scope).toBe("resource");
     expect(entries[2].resource?.title).toBe("Old note");
   });

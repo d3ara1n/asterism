@@ -1,7 +1,9 @@
 import type { Json } from "@atelier/sdk/contracts";
+
 import type { SessionNode } from "../../../shared/session";
 import { selectable } from "../../../shared/session-path";
-import { t } from "../../shared/i18n";
+import { historyMessages } from "../../messages/history";
+import { getI18n } from "../../shared/i18n";
 
 export type HistoryResource = { id: string; kind: string; title: string };
 export type HistoryEntry = { node: SessionNode; label: string; scope: "session" | "resource"; resource: HistoryResource | null };
@@ -39,7 +41,7 @@ export function historyResources(nodes: readonly SessionNode[]): Map<string, His
     if (node.kind !== "event" || node.type !== "resource_created") continue;
     const data = record(node.data);
     if (typeof data.id === "string" && typeof data.type === "string") {
-      result.set(data.id, { id: data.id, kind: data.type, title: typeof data.title === "string" ? data.title : t.unknownResource });
+      result.set(data.id, { id: data.id, kind: data.type, title: typeof data.title === "string" ? data.title : getI18n().formatMessage(historyMessages.unknownResource) });
     }
   }
   return result;
@@ -48,14 +50,14 @@ export function historyResources(nodes: readonly SessionNode[]): Map<string, His
 /** 保持输入的追加次序和节点身份；不按 response、时间戳或来源重新排序。 */
 export function historyEntries(nodes: readonly SessionNode[], typeLabel: (kind: string) => string): HistoryEntry[] {
   const resources = historyResources(nodes);
-  const name = (id: unknown) => typeof id === "string" ? resources.get(id)?.title ?? t.unknownResource : t.unknownResource;
+  const name = (id: unknown) => typeof id === "string" ? resources.get(id)?.title ?? getI18n().formatMessage(historyMessages.unknownResource) : getI18n().formatMessage(historyMessages.unknownResource);
   return nodes.filter(selectable).map(node => {
     let label: string;
     let resourceId: unknown = node.agentId;
     const sessionEvent = node.kind === "event" && workbenchEvents.has(node.type) || node.kind === "notice" && node.agentId === null;
     switch (node.kind) {
-      case "message": label = t.eventInput(node.text); break;
-      case "thinking": label = t.eventThinking(node.text); break;
+      case "message": label = getI18n().formatMessage(historyMessages.eventInput, { text: node.text }); break;
+      case "thinking": label = getI18n().formatMessage(historyMessages.eventThinking, { text: node.text }); break;
       case "text": label = node.text; break;
       case "notice": label = node.message; break;
       case "toolcall": {
@@ -69,11 +71,11 @@ export function historyEntries(nodes: readonly SessionNode[], typeLabel: (kind: 
         const data = record(node.data), title = name(data.id ?? data.resourceId);
         resourceId = node.agentId ?? data.resourceId ?? data.id;
         switch (node.type) {
-          case "resource_created": label = t.eventCreated(typeLabel(String(data.type ?? "")), title); break;
-          case "object_added": label = t.eventAdded(title); break;
-          case "object_removed": label = t.eventRemoved(title); break;
-          case "resource_attached": label = t.eventLinked(title, name(node.agentId)); break;
-          case "resource_detached": label = t.eventDetached(title, name(node.agentId)); break;
+          case "resource_created": label = getI18n().formatMessage(historyMessages.eventCreated, { kind: typeLabel(String(data.type ?? "")), title: title }); break;
+          case "object_added": label = getI18n().formatMessage(historyMessages.eventAdded, { title: title }); break;
+          case "object_removed": label = getI18n().formatMessage(historyMessages.eventRemoved, { title: title }); break;
+          case "resource_attached": label = getI18n().formatMessage(historyMessages.eventLinked, { resource: title, agent: name(node.agentId) }); break;
+          case "resource_detached": label = getI18n().formatMessage(historyMessages.eventDetached, { resource: title, agent: name(node.agentId) }); break;
           default: label = node.type;
         }
       }

@@ -1,21 +1,25 @@
+import type { UiText } from "@atelier/sdk/contracts";
+import type { PluginDefinition } from "@atelier/sdk/runtime";
+import { PluginApiError } from "@atelier/sdk/runtime";
+import { join } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
+
+import { ConfigurationService } from "../configuration/service.ts";
+import type { ModelAdapter } from "../model/contract.ts";
+import { PackageList, PluginPackageError } from "../plugins/packages.ts";
 import { commandSchema, snapshotSchema, type AppSnapshot, type AppError } from "../shared/contracts.ts";
+import type { TranslationCatalog } from "../shared/i18n.ts";
+import type { ModelSettings } from "../shared/model.ts";
+import type { ObjectStreamPayload } from "../shared/object-stream.ts";
+import { pluginConfigurationCommandSchema, type PluginConfigurationCommand, type PluginConfiguration } from "../shared/plugin-configuration.ts";
 import type { SecretProtector } from "../shared/secrets.ts";
 import type { SessionChanged } from "../shared/session.ts";
-import type { ModelSettings } from "../shared/model.ts";
-import type { ModelAdapter } from "../model/contract.ts";
-import { openDatabase } from "./storage.ts";
-import { ConfigurationService } from "../configuration/service.ts";
+import { pluginErrorDisplay } from "./plugin-errors.ts";
 import { SessionService } from "./sessions.ts";
-import type { PluginDefinition } from "@atelier/sdk/runtime";
-import { join } from "node:path";
-import { PackageList, PluginPackageError } from "../plugins/packages.ts";
-import { PluginApiError } from "@atelier/sdk/runtime";
-import { pluginConfigurationCommandSchema, type PluginConfigurationCommand, type PluginConfiguration } from "../shared/plugin-configuration.ts";
-import type { ObjectStreamPayload } from "../shared/object-stream.ts";
+import { openDatabase } from "./storage.ts";
 
 export class ApplicationError extends Error {
-  constructor(readonly code: AppError["code"], message: string) { super(message); }
+  constructor(readonly code: AppError["code"], message: string, readonly display?: UiText) { super(message); }
 }
 
 /** 应用组合根与会话索引；会话内容、操作和查询由 SessionService 拥有。 */
@@ -28,7 +32,7 @@ export class ApplicationService {
   private readonly packages: StartupPackage[];
   private readonly list: PackageList;
   private readonly started: string;
-  constructor(root: string, options: { packages?: StartupPackage[]; protector?: SecretProtector; onConfigurationChanged?: () => void; onSessionChanged?: (event: SessionChanged) => void; adapterFactory?: (settings: ModelSettings) => ModelAdapter; plugins?: readonly PluginDefinition[]; onStream?: (event: ObjectStreamPayload) => void } = {}) {
+  constructor(root: string, private readonly options: { catalogs?: TranslationCatalog[]; packages?: StartupPackage[]; protector?: SecretProtector; onConfigurationChanged?: () => void; onSessionChanged?: (event: SessionChanged) => void; adapterFactory?: (settings: ModelSettings) => ModelAdapter; plugins?: readonly PluginDefinition[]; onStream?: (event: ObjectStreamPayload) => void } = {}) {
     this.db = openDatabase(root);
     this.packages = options.packages ?? [];
     this.list = new PackageList(join(root, "plugins.json"));
@@ -52,7 +56,7 @@ export class ApplicationService {
     try { return this.sessions.configurePlugins(parsed.data); }
     catch (error) {
       if (error instanceof PluginApiError) throw new ApplicationError(
-        error.code === "invalid_argument" ? "invalid_request" : error.code === "not_found" ? "not_found" : "unavailable", error.message);
+        error.reason ?? (error.code === "invalid_argument" ? "invalid_request" : error.code === "not_found" ? "not_found" : "unavailable"), error.message, pluginErrorDisplay(error));
       throw new ApplicationError("unavailable", "Plugin configuration could not be read or saved. Reload and retry.");
     }
   }
@@ -79,6 +83,6 @@ export class ApplicationService {
       return { index, source, enabled: entry.enabled, id: startup?.id ?? null, status: pending ? "pending" as const : startup.status,
         error: pending ? null : startup.error, renderer: pending ? null : startup.renderer };
     });
-    return snapshotSchema.parse({ workspace, sessions, plugins, restartRequired: JSON.stringify(current) !== this.started });
+    return snapshotSchema.parse({ workspace, sessions, plugins, catalogs: this.options.catalogs ?? [], restartRequired: JSON.stringify(current) !== this.started });
   }
 }

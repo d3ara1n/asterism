@@ -1,11 +1,15 @@
-import { cn } from "../utils"
-import { Loader2Icon } from "lucide-react"
+import { useI18n } from "@atelier/sdk/renderer";
+import { Loader2Icon } from "lucide-react";
+
+import { commonMessages } from "../../messages/common";
+import { cn } from "../utils";
 
 function Spinner({ className, ...props }: React.ComponentProps<"svg">) {
+  const i18n = useI18n()
   return (
     <Loader2Icon
       role="status"
-      aria-label="Loading"
+      aria-label={i18n.text(commonMessages.loading)}
       className={cn("size-4 animate-spin", className)}
       {...props}
     />

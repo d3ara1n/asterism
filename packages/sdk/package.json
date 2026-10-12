@@ -1,7 +1,7 @@
 {
   "name": "@atelier/sdk",
   "private": true,
-  "version": "0.3.0",
+  "version": "0.4.0",
   "type": "module",
   "exports": {
     "./contracts": "./src/contracts.ts",
@@ -10,6 +10,12 @@
   },
   "peerDependencies": {
     "zod": "^4.6.5",
-    "react": "^19.3.0"
+    "react": "^19.3.0",
+    "react-intl": "^12.1.4"
+  },
+  "peerDependenciesMeta": {
+    "react-intl": {
+      "optional": true
+    }
   }
 }

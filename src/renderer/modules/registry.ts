@@ -1,8 +1,9 @@
-import { createElement } from "react";
-import { Box } from "lucide-react";
-import { t } from "../shared/i18n";
-import { pluginOf, type ContractReference, type Presentation } from "@atelier/sdk/contracts";
+import { pluginOf, withValues, type ContractReference, type Presentation } from "@atelier/sdk/contracts";
 import type { CardRenderer, CardView, CreationEntry, ResourceDescription, RendererModule, RendererObjectContext, ToolRenderProps, ToolRenderer, ToolView } from "@atelier/sdk/renderer";
+import { Box } from "lucide-react";
+import { createElement } from "react";
+
+import { objectsMessages } from "../messages/objects";
 
 function index<T extends { contract: ContractReference }>(entries: readonly T[]): ReadonlyMap<string, T> {
   const map = new Map<string, T>();
@@ -37,7 +38,7 @@ export class ViewRegistry {
   }
   resource(kind: string): ResourceDescription {
     const plugin = pluginOf(kind);
-    return this.resources.get(kind) ?? { kind, label: plugin ? t.kindMissing(plugin) : t.kindResource, icon: createElement(Box, { className: "size-4" }) };
+    return this.resources.get(kind) ?? { kind, label: plugin ? withValues(objectsMessages.kindMissing, { plugin }) : objectsMessages.kindResource, icon: createElement(Box, { className: "size-4" }) };
   }
   creation(id: string): CreationEntry | undefined {
     return this.creations.find(entry => entry.id === id);

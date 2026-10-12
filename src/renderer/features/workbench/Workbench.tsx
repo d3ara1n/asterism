@@ -1,32 +1,35 @@
-import { RendererNavigationProvider } from "@atelier/sdk/renderer";
-import type { DropItem } from "@atelier/sdk/renderer";
-import type { Point } from "../../../shared/workbench";
-import { dragKinds, snapshotDrop } from "../creation/snapshot";
-import type { DragKind } from "../creation/routing";
-import { RendererCatalogProvider } from "../../modules/object-context";
-import type { WorkbenchOperation } from "../session/controller";
-import { useCallback, useEffect, useLayoutEffect, useImperativeHandle, useMemo, useRef, useState, type ReactNode, type Ref } from "react";
-import { ReactFlow, ReactFlowProvider, Panel, useReactFlow, applyNodeChanges, applyEdgeChanges, type NodeChange, type EdgeChange, type Edge, MarkerType, ConnectionMode, type Connection, type IsValidConnection } from "@xyflow/react";
+import { RendererNavigationProvider, type DropItem } from "@atelier/sdk/renderer";
+import { ReactFlowProvider, ReactFlow, Panel, useReactFlow, applyNodeChanges, applyEdgeChanges, MarkerType, ConnectionMode, type NodeChange, type EdgeChange, type Edge, type Connection, type IsValidConnection } from "@xyflow/react";
 import { Crosshair, Maximize, Minus, Plus, RotateCcw } from "lucide-react";
-import { maximumViewportZoom, type WorkbenchSnapshot } from "../../../shared/workbench";
+import { useCallback, useEffect, useLayoutEffect, useImperativeHandle, useMemo, useRef, useState, type ReactNode, type Ref } from "react";
+
+import { maximumViewportZoom, type Point, type WorkbenchSnapshot } from "../../../shared/workbench";
+import { accessMessages } from "../../messages/access";
+import { commonMessages } from "../../messages/common";
+import { historyMessages } from "../../messages/history";
+import { objectsMessages } from "../../messages/objects";
+import { workbenchMessages } from "../../messages/workbench";
+import { RendererCatalogProvider } from "../../modules/object-context";
 import { useModuleViews } from "../../modules/views";
-import { t } from "../../shared/i18n";
-import { s } from "../../shared/i18n";
-import { Button } from "../../shared/ui/button";
+import { useI18n } from "../../shared/i18n";
 import { Badge } from "../../shared/ui/badge";
+import { Button } from "../../shared/ui/button";
 import { useIsland } from "../../shared/weave/Screen";
 import { useScheme } from "../appearance/state";
-import { WorkbenchBackground } from "./WorkbenchSurface";
+import type { DragKind } from "../creation/routing";
+import { dragKinds, snapshotDrop } from "../creation/snapshot";
+import type { WorkbenchOperation } from "../session/controller";
 import { SessionHistoryPanel } from "../session/History";
-import { ObjectNode, type ObjectNodeType } from "./ObjectNode";
-import { IconAction, type ViewPatch } from "./ObjectCard";
-import { ObjectsPanel } from "./ObjectsPanel";
 import { AccessPanel } from "./AccessPanel";
 import { useWorkbenchCanvas, type WorkbenchCanvas } from "./canvas";
-import { workbenchNodes } from "./nodes";
-import { confirmCardSizes, saveCardSize, type SizeIntent } from "./size-intents";
 import { layoutConnections, type ConnectionEdge } from "./connections";
-import { WorkbenchContext, WorkbenchScope, WorkbenchStore, useWorkbench, type WorkbenchEnvironment, type WorkbenchView } from "./context";
+import { WorkbenchScope, WorkbenchContext, WorkbenchStore, useWorkbench, type WorkbenchEnvironment, type WorkbenchView } from "./context";
+import { workbenchNodes } from "./nodes";
+import { IconAction, type ViewPatch } from "./ObjectCard";
+import { ObjectNode, type ObjectNodeType } from "./ObjectNode";
+import { ObjectsPanel } from "./ObjectsPanel";
+import { confirmCardSizes, saveCardSize, type SizeIntent } from "./size-intents";
+import { WorkbenchBackground } from "./WorkbenchSurface";
 
 const nodeTypes = { object: ObjectNode };
 export type PanelKind = "objects" | "history" | "access";
@@ -44,6 +47,7 @@ type WorkbenchEdge = Edge<ConnectionEdge["data"]>;
 
 /** 工作台根浮岛：投影平级对象和关系；代理对话只是代理对象的卡片内容。 */
 export function Workbench({ ref, controller, session, ready, busy, historical, run, onHome, canDrop, onDropItems }: Props) {
+  const i18n = useI18n();
   const canvasRef = useRef<WorkbenchCanvas>(null);
   const canvas = useMemo<WorkbenchCanvas>(() => ({
     findPlacement: options => canvasRef.current?.findPlacement(options) ?? null,
@@ -55,13 +59,13 @@ export function Workbench({ ref, controller, session, ready, busy, historical, r
     [controller, session, ready, busy, historical, run, canvas]);
   const island = useIsland();
   const [store] = useState(() => new WorkbenchStore());
-  const open = useCallback((id: string, label: string, render: () => ReactNode, origin: HTMLElement | null) => {
+  const open = useCallback((id: string, label: import("@atelier/sdk/contracts").UiText, render: () => ReactNode, origin: HTMLElement | null) => {
     if (island.child === id) island.closeChild();
     // 面板浮岛在工作台子树之外渲染，经 WorkbenchScope 取得同一份环境。
     else island.open({ id, label, width: { min: 320, max: 400 }, origin, render: () => <WorkbenchScope store={store}>{render()}</WorkbenchScope> });
   }, [island, store]);
   useImperativeHandle(ref, () => ({
-    togglePanel: (kind, origin) => open(`workbench-${kind}`, ({ objects: t.objects, history: t.history, access: t.accessLabel })[kind],
+    togglePanel: (kind, origin) => open(`workbench-${kind}`, ({ objects: i18n.formatMessage(objectsMessages.objects), history: i18n.formatMessage(historyMessages.history), access: i18n.formatMessage(accessMessages.accessLabel) })[kind],
       () => kind === "objects" ? <ObjectsPanel /> : kind === "access" ? <AccessPanel /> : <SessionHistoryPanel controller={controller} />, origin),
     canvas,
   }), [open, canvas, controller]);
@@ -72,16 +76,16 @@ export function Workbench({ ref, controller, session, ready, busy, historical, r
       <ReactFlowProvider><Canvas ref={canvasRef} session={session} run={run} writable={ready && !busy && !historical} canDrop={canDrop} onDropItems={onDropItems} /></ReactFlowProvider>
       {historical && <div role="status"
         className="surface-floating absolute bottom-[var(--overlay-inset)] left-1/2 z-10 flex -translate-x-1/2 items-center gap-3 whitespace-nowrap p-1 pl-3 text-sm">
-        <span>{t.viewingHistory}</span>
-        <Button size="sm" onClick={controller.followCursor}>{t.backToLive}</Button>
+        <span>{i18n.formatMessage(commonMessages.viewingHistory)}</span>
+        <Button size="sm" onClick={controller.followCursor}>{i18n.formatMessage(commonMessages.backToLive)}</Button>
       </div>}
       {session.objects.length === 0 && <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-        <p className="type-caption">{s("Use Add, or drop content here.", "使用「添加」，或把内容拖到这里。")}</p>
+        <p className="type-caption">{i18n.formatMessage(workbenchMessages.emptyHint)}</p>
       </div>}
       {/* 忙碌/就绪频繁切换不播报；仅不可用时作为提示。 */}
       <Badge variant="outline" role={!busy && !ready ? "alert" : undefined}
         className="absolute left-[var(--overlay-inset)] top-[var(--overlay-inset)] z-10 bg-card text-muted-foreground">
-        {busy ? t.statusBusy : ready ? t.statusReady : t.statusUnavailable}
+        {busy ? i18n.formatMessage(commonMessages.statusBusy) : ready ? i18n.formatMessage(commonMessages.statusReady) : i18n.formatMessage(commonMessages.statusUnavailable)}
       </Badge>
     </div>
   </WorkbenchContext.Provider></RendererCatalogProvider></RendererNavigationProvider>;
@@ -90,6 +94,7 @@ export function Workbench({ ref, controller, session, ready, busy, historical, r
 function Canvas({ ref, session, run, writable, canDrop, onDropItems }: DropHandlers & {
   ref?: Ref<WorkbenchCanvas>; session: WorkbenchSnapshot; run: Run; writable: boolean;
 }) {
+  const i18n = useI18n();
   const flow = useReactFlow();
   const registry = useModuleViews();
   const { controller } = useWorkbench();
@@ -180,7 +185,7 @@ function Canvas({ ref, session, run, writable, canDrop, onDropItems }: DropHandl
   return <div ref={viewportElement} className="relative h-full" onDragOver={event => { if (writable && canDrop(dragKinds(event.dataTransfer))) { event.preventDefault(); setDropping(true); } }}
     onDragLeave={event => { if (event.currentTarget === event.target) setDropping(false); }} onDrop={onDrop}>
   {dropping && <div className="pointer-events-none absolute inset-2 z-20 flex items-center justify-center rounded-lg border-2 border-dashed border-primary bg-primary/5">
-    <p className="type-body">{s("Drop to add as resources", "松开以添加为资源")}</p></div>}
+    <p className="type-body">{i18n.formatMessage(workbenchMessages.dropHint)}</p></div>}
   <ReactFlow<ObjectNodeType, WorkbenchEdge>
     colorMode={scheme} nodes={canvasNodes} edges={edges} nodeTypes={nodeTypes} onNodesChange={onNodesChange}
     defaultViewport={session.viewport} minZoom={minZoom} maxZoom={maximumViewportZoom}
@@ -196,6 +201,7 @@ function Canvas({ ref, session, run, writable, canDrop, onDropItems }: DropHandl
 }
 
 function ViewControls({ session, run, canvas, objects, selected }: { session: WorkbenchSnapshot; run: Run; canvas: WorkbenchCanvas; objects: string[]; selected: string[] }) {
+  const i18n = useI18n();
   const flow = useReactFlow();
   const move = async (action: () => Promise<boolean>) => {
     await action();
@@ -204,14 +210,14 @@ function ViewControls({ session, run, canvas, objects, selected }: { session: Wo
   };
   // 所有对象平级：定位当前选中的卡片，而非某个“主”代理。
   const controls = [
-    [t.zoomIn, Plus, () => move(() => flow.zoomIn())],
-    [t.resetZoom, RotateCcw, () => move(() => flow.zoomTo(1))],
-    [t.zoomOut, Minus, () => move(() => flow.zoomOut())],
-    [t.fitObjects, Maximize, () => canvas.focusObjects(objects)],
-    ...(selected.length ? [[t.focusSelection, Crosshair, () => canvas.focusObjects(selected)] as const] : []),
+    [i18n.formatMessage(commonMessages.zoomIn), Plus, () => move(() => flow.zoomIn())],
+    [i18n.formatMessage(commonMessages.resetZoom), RotateCcw, () => move(() => flow.zoomTo(1))],
+    [i18n.formatMessage(commonMessages.zoomOut), Minus, () => move(() => flow.zoomOut())],
+    [i18n.formatMessage(commonMessages.fitObjects), Maximize, () => canvas.focusObjects(objects)],
+    ...(selected.length ? [[i18n.formatMessage(objectsMessages.focusSelection), Crosshair, () => canvas.focusObjects(selected)] as const] : []),
   ] as const;
   return <Panel position="bottom-right" className="surface flex flex-col p-0.5">
-    {controls.map(([label, Icon, action]) =>
-      <IconAction key={label} label={label} size="icon-sm" onClick={() => { void action(); }}><Icon /></IconAction>)}
+    {controls.map(([label, Icon, action], index) =>
+      <IconAction key={index} label={label} size="icon-sm" onClick={() => { void action(); }}><Icon /></IconAction>)}
   </Panel>;
 }

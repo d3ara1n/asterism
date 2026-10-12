@@ -1,8 +1,9 @@
+import { type UiText, type ResourceRef } from "@atelier/sdk/contracts";
 import type { RendererObjectContext } from "@atelier/sdk/renderer";
 import { agentAction, type AgentCommand } from "../contract";
 import type { AgentSelection } from "../../../shared/model";
 import { useState, useSyncExternalStore } from "react";
-import type { ResourceRef } from "@atelier/sdk/contracts";
+
 import { SubmissionIdentity } from "../../../renderer/shared/submission";
 
 /** 交互状态随会话／对象保留，卡片重挂载不丢失草稿或重试身份。 */
@@ -28,7 +29,7 @@ export function useAgentInteraction(ref: ResourceRef) {
 /** 将草稿、重试身份和受理结果组合为 Agent 的交互意图。 */
 export function useAgentConversation(object: RendererObjectContext, hasSelection: boolean) {
   const { draft, setDraft, submission } = useAgentInteraction(object.ref);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<UiText | null>(null);
   const command = (value: AgentCommand) => object.invoke(agentAction(value), value);
   const { ready, busy, historical, status } = object.view;
   const writable = ready && !busy && status === "ready" && !object.activity.running && !historical && hasSelection;

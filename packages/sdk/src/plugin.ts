@@ -1,5 +1,6 @@
 import type { z } from "zod";
 import type { Json } from "./json.ts";
+import { bindMessages, type SourceMessage, type UiMessage } from "./i18n.ts";
 import { defineData, type DataContract } from "./presentation.ts";
 import { defineResource, type ResourceContract } from "./module-contract.ts";
 
@@ -12,6 +13,7 @@ const shortNamePattern = /^[a-z0-9][a-z0-9._-]*$/u;
  */
 export interface PluginNamespace {
   readonly id: string;
+  messages<T extends Record<string, SourceMessage>>(sourceLocale: string, definitions: T): { readonly [K in keyof T]: UiMessage };
   name(short: string): string;
   resource<S extends Json>(name: string, stateSchema: z.ZodType<S>): ResourceContract<S>;
   data<T extends Json>(name: string, schema: z.ZodType<T>): DataContract<T>;
@@ -24,6 +26,7 @@ export function pluginNamespace(id: string): PluginNamespace {
   };
   return {
     id, name,
+    messages: (sourceLocale, definitions) => bindMessages(id, sourceLocale, definitions),
     resource: (short, stateSchema) => defineResource(name(short), stateSchema),
     data: (short, schema) => defineData(name(short), schema),
   };

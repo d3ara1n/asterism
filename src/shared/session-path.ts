@@ -1,7 +1,8 @@
 import type { BlockNode, SessionNode } from "./session.ts";
+import type { UiText } from "@atelier/sdk/contracts";
 
 export class SessionError extends Error {
-  constructor(readonly code: "not_found" | "conflict" | "invalid_request" | "unavailable", message: string) {
+  constructor(readonly code: string, message: string, readonly display?: UiText) {
     super(message);
   }
 }

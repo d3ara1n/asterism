@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer, webUtils } from "electron";
+import { languageGetChannel, languageSetChannel, languageChangedChannel, languagePreferenceSchema, languageStateSchema } from "../shared/language.ts";
 import { applicationBrand } from "../shared/application.ts";
 import { desktopBridgeKey } from "../shared/core.ts";
 import { commandChannel, pickDirectoryChannel, statusChannel, commandSchema, resultSchema, runtimeStatusSchema, type DesktopBridge } from "../shared/contracts.ts";
@@ -10,6 +11,17 @@ import { preferencesGetChannel, preferencesSetChannel, preferenceWriteSchema, ui
 import { pluginConfigurationChannel, pluginConfigurationCommandSchema, pluginConfigurationResultSchema } from "../shared/plugin-configuration.ts";
 
 const bridge: DesktopBridge = {
+  language: {
+    async get() { return languageStateSchema.parse(await ipcRenderer.invoke(languageGetChannel)); },
+    async set(preference) { return languageStateSchema.parse(await ipcRenderer.invoke(languageSetChannel, languagePreferenceSchema.parse(preference))); },
+    onChanged(listener) {
+      const handler = (_event: Electron.IpcRendererEvent, raw: unknown) => {
+        const parsed = languageStateSchema.safeParse(raw); if (parsed.success) listener(parsed.data);
+      };
+      ipcRenderer.on(languageChangedChannel, handler);
+      return () => ipcRenderer.removeListener(languageChangedChannel, handler);
+    },
+  },
   pluginConfiguration: {
     async execute(command) {
       const parsed = pluginConfigurationCommandSchema.safeParse(command);

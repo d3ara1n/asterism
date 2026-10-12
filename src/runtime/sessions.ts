@@ -1,32 +1,32 @@
-import { join } from "node:path";
-import { randomUUID } from "node:crypto";
-import type { DatabaseSync } from "node:sqlite";
-import type { ConfigurationService } from "../configuration/service.ts";
-import type { ModelAdapter } from "../model/contract.ts";
-import { SessionError, SessionTree } from "../session/tree.ts";
-import { foldWorkbench, type FoldedObject } from "../session/fold.ts";
-import { AgentCapabilities } from "../execution/capabilities.ts";
-import { createModules } from "../modules/runtime.ts";
-import { createCoreCatalogs } from "../plugins/core-catalogs.ts";
-import { createModelServices } from "../plugins/models.ts";
-import { Agent, CreateAgent, SubmitAgentInput } from "../modules/agent/contract.ts";
-import type { SessionHost, SessionHostWriter as SessionWriter } from "../plugins/host.ts";
-import type { PluginManifest } from "../plugins/loader.ts";
-import type { ResourceRef, PluginDefinition } from "@atelier/sdk/runtime";
-import type { ResourceRegistry } from "../resources/registry.ts";
-import { createResourceId } from "../resources/id.ts";
-import { SessionDataStore } from "../session/data.ts";
-import type { ToolRegistry } from "../tools/registry.ts";
-import type { ModelSettings } from "../shared/model.ts";
-import { sessionCommandSchema, sessionSnapshotSchema, type SessionChanged, type SessionCommand, type SessionSnapshot,
-  type SessionProgress, type SessionReply, type ViewPosition, type SessionNode, type LiveBlock } from "../shared/session.ts";
-import { sessionPath, snap } from "../shared/session-path.ts";
-import { SessionWorkbench } from "./workbench.ts";
-import { PluginApiError } from "@atelier/sdk/runtime";
 import { resourceCall, type ResourceCall, type Json } from "@atelier/sdk/contracts";
-import type { LoadedPlugins } from "../plugins/loader.ts";
+import type { ResourceRef, PluginDefinition } from "@atelier/sdk/runtime";
+import { PluginApiError } from "@atelier/sdk/runtime";
+import { randomUUID } from "node:crypto";
+import { join } from "node:path";
+import type { DatabaseSync } from "node:sqlite";
+
+import type { ConfigurationService } from "../configuration/service.ts";
+import { AgentCapabilities } from "../execution/capabilities.ts";
+import type { ModelAdapter } from "../model/contract.ts";
+import { Agent, CreateAgent, SubmitAgentInput } from "../modules/agent/contract.ts";
+import { createModules } from "../modules/runtime.ts";
 import type { ParsedCall } from "../plugins/commands.ts";
+import { createCoreCatalogs } from "../plugins/core-catalogs.ts";
+import type { SessionHost, SessionHostWriter as SessionWriter } from "../plugins/host.ts";
+import type { PluginManifest, LoadedPlugins } from "../plugins/loader.ts";
+import { createModelServices } from "../plugins/models.ts";
+import { createResourceId } from "../resources/id.ts";
+import type { ResourceRegistry } from "../resources/registry.ts";
+import { SessionDataStore } from "../session/data.ts";
+import { foldWorkbench, type FoldedObject } from "../session/fold.ts";
+import { SessionError, SessionTree } from "../session/tree.ts";
+import type { ModelSettings } from "../shared/model.ts";
 import type { ObjectStreamPayload } from "../shared/object-stream.ts";
+import { sessionPath, snap } from "../shared/session-path.ts";
+import { sessionCommandSchema, sessionSnapshotSchema, type SessionChanged, type SessionCommand, type SessionSnapshot, type SessionProgress, type SessionReply, type ViewPosition, type SessionNode, type LiveBlock } from "../shared/session.ts";
+import type { ToolRegistry } from "../tools/registry.ts";
+import { sessionPluginError } from "./plugin-errors.ts";
+import { SessionWorkbench } from "./workbench.ts";
 
 const agentKind = Agent.kind;
 
@@ -201,9 +201,7 @@ export class SessionService {
   private async prepareCommand(kind: string, raw: ResourceCall, context: { sessionId: string; objectId: string }): Promise<ParsedCall> {
     try { return await this.prepare(kind, raw, { ...context, signal: AbortSignal.timeout(10_000) }); }
     catch (error) {
-      if (error instanceof PluginApiError) throw new SessionError(
-        error.code === "invalid_argument" || error.code === "rejected" ? "invalid_request"
-          : error.code === "conflict" || error.code === "not_found" ? error.code : "unavailable", error.message);
+      if (error instanceof PluginApiError) throw sessionPluginError(error);
       throw new SessionError("unavailable", "A plugin could not prepare this command.");
     }
   }

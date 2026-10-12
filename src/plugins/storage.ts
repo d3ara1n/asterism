@@ -3,7 +3,8 @@ import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { z } from "zod";
 import type { CredentialVault } from "../configuration/credentials.ts";
-import { jsonSchema, type Json } from "@atelier/sdk/contracts";
+import { jsonSchema, configurationPresentationSchema, type Json, type PluginConfigOptions, type ConfigurationPresentation } from "@atelier/sdk/contracts";
+import { projectConfigurationPresentation } from "../shared/configuration-presentation.ts";
 import { PluginApiError, validationMessage, type PluginConfig, type PluginSecrets } from "@atelier/sdk/runtime";
 import type { PluginConfiguration } from "../shared/plugin-configuration.ts";
 
@@ -31,7 +32,7 @@ export class PluginStorage {
   private readonly managed: string;
   private database: DatabaseSync | null = null;
   private settings: {
-    source: object; inputDefaults: string; schema: Json | null; defaults: Json;
+    source: object; inputDefaults: string; schema: Json | null; defaults: Json; presentation?: ConfigurationPresentation;
     read(): { value: Json; status: PluginConfiguration["status"] };
     write(value: unknown): void;
   } | null = null;
@@ -45,7 +46,7 @@ export class PluginStorage {
     return this.managed;
   }
 
-  config<T extends Json>(schema: z.ZodType<T>, defaults: T): PluginConfig<T> {
+  config<T extends Json>(schema: z.ZodType<T>, defaults: T, options?: PluginConfigOptions): PluginConfig<T> {
     const defaultInput = structuredClone(defaults);
     const inputDefaults = JSON.stringify(defaultInput);
     if (this.settings) {
@@ -78,13 +79,14 @@ export class PluginStorage {
     let formSchema: Json | null = null;
     try { formSchema = jsonSchema.parse(z.toJSONSchema(schema, { io: "input", unrepresentable: "any" })); }
     catch { this.warn("Plugin configuration schema cannot be projected; the value editor is used."); }
-    this.settings = { source: schema, inputDefaults, schema: formSchema, defaults: jsonSchema.parse(parsedDefaults.data), read, write };
+    const presentation = projectConfigurationPresentation(formSchema, options?.presentation, this.warn);
+    this.settings = { source: schema, inputDefaults, schema: formSchema, defaults: jsonSchema.parse(parsedDefaults.data), presentation, read, write };
     return { get: () => read().value as T, set: write };
   }
 
   configuration(id: string): PluginConfiguration | null {
     return this.settings ? { id, schema: structuredClone(this.settings.schema),
-      defaults: structuredClone(this.settings.defaults), ...this.settings.read() } : null;
+      defaults: structuredClone(this.settings.defaults), ...(this.settings.presentation ? { presentation: configurationPresentationSchema.parse(this.settings.presentation) } : {}), ...this.settings.read() } : null;
   }
   saveConfiguration(value: Json): void {
     if (!this.settings) throw new PluginApiError("not_found", "The plugin has no configuration.");

@@ -1,7 +1,11 @@
+import { motion, AnimatePresence } from "motion/react";
+
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import type { UiText } from "@atelier/sdk/contracts";
+import { useI18n } from "@atelier/sdk/renderer";
 import { windowGeometry } from "../../../shared/desktop";
 import { cn } from "../utils";
-import { AnimatePresence, motion } from "motion/react";
+
 import { fadeTransition, islandTransition } from "./motion";
 import { closeIsland, focusIsland, follow, layout, openIsland, type IslandWidth } from "./model";
 
@@ -9,7 +13,7 @@ import { closeIsland, focusIsland, follow, layout, openIsland, type IslandWidth 
 export interface IslandSpec {
   id: string;
   width: IslandWidth;
-  label: string;
+  label: UiText;
   render: () => ReactNode;
   /** false 时浮岛无底板，内容直接位于窗口材质上。 */
   surface?: boolean;
@@ -50,7 +54,6 @@ export function useCloseGuard(guard: CloseGuard | null) {
   latest.current = guard;
   useEffect(() => island.guard(() => latest.current ? latest.current() : true), [island]);
 }
-
 
 /**
  * 一屏：可声明位于根浮岛左侧的受控浮岛；根右侧更深的浮岛由 open/close 管理。
@@ -180,6 +183,7 @@ export function Screen({ label, root, leading, className, resetKey }: {
 function Island({ ref, spec, width, x, hidden, peek, focused, api, onFocus }: {
   ref?: React.Ref<HTMLElement>; spec: IslandSpec; width: number; x: number; hidden: boolean; peek: boolean; focused: boolean; api: IslandApi; onFocus: () => void;
 }) {
+  const i18n = useI18n();
   const element = useRef<HTMLElement>(null);
   // 由内容打开的浮岛挂载后接收焦点。
   useEffect(() => { if (spec.origin) element.current?.focus({ preventScroll: true }); }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -195,7 +199,7 @@ function Island({ ref, spec, width, x, hidden, peek, focused, api, onFocus }: {
   // 原地展开：在目标位置左侧轻微位移淡入；位置与宽度变化由 Motion 从当前值过渡。
   return <motion.section ref={node => { element.current = node; if (typeof ref === "function") ref(node); else if (ref) ref.current = node; }}
     initial={{ opacity: 0, x: x - 16, scale: 0.98, width }} animate={{ opacity: 1, x, scale: 1, width }} exit={{ opacity: 0, scale: 0.98, transition: fadeTransition }}
-    transition={islandTransition} data-island={spec.id} tabIndex={-1} aria-label={spec.label}
+    transition={islandTransition} data-island={spec.id} tabIndex={-1} aria-label={i18n.text(spec.label)}
     inert={hidden} aria-hidden={hidden || undefined} data-peek={peek || undefined} data-focused={focused || undefined}
     data-surface={spec.surface !== false || undefined}
     className="island"

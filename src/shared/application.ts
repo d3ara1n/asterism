@@ -16,6 +16,7 @@ export const applicationStorage = {
   credentialsDirectory: "credentials",
   configurationFile: "configuration.json",
   appearanceStore: "appearance",
+  languageStore: "language",
   uiStateStore: "ui-state",
   chromiumDirectory: "chromium",
   logsDirectory: "logs",

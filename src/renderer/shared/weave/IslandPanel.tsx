@@ -1,7 +1,9 @@
-import type { ReactNode, Ref } from "react";
-import { X } from "lucide-react";
 import { Button } from "../ui/button";
-import { t } from "../i18n";
+import { X } from "lucide-react";
+import type { ReactNode, Ref } from "react";
+
+import { commonMessages } from "../../messages/common";
+import { useI18n } from "../i18n";
 import { useIsland } from "./Screen";
 
 /**
@@ -13,6 +15,7 @@ export function IslandPanel({ title, description, action, toolbar, compact, cont
   title: string; description?: string; action?: ReactNode; toolbar?: ReactNode;
   compact?: boolean; contentRef?: Ref<HTMLDivElement>; children: ReactNode;
 }) {
+  const i18n = useI18n();
   const island = useIsland();
   return <div className="island-panel">
     <header className="island-panel-header">
@@ -21,7 +24,7 @@ export function IslandPanel({ title, description, action, toolbar, compact, cont
         {description && <p className="type-caption truncate">{description}</p>}
       </div>
       {action}
-      <Button variant="ghost" size="icon-sm" aria-label={t.close} title={t.close} onClick={() => void island.close()}><X /></Button>
+      <Button variant="ghost" size="icon-sm" aria-label={i18n.formatMessage(commonMessages.close)} title={i18n.formatMessage(commonMessages.close)} onClick={() => void island.close()}><X /></Button>
     </header>
     {toolbar && <div className="shrink-0 space-y-2 border-b px-3 py-3">{toolbar}</div>}
     <div ref={contentRef} className={`island-panel-content${compact ? " px-2 py-2" : ""}`}>{children}</div>

@@ -1,6 +1,8 @@
 /** SDK renderer 入口：卡片、工具视图与绑定对象的前端能力；React 由宿主共享。 */
 import { createContext, createElement, useContext, type ComponentType, type ReactNode } from "react";
 import type { z } from "zod";
+import type { UiText } from "./i18n.ts";
+export * from "./renderer-i18n.ts";
 import type { ActionContract, CreationContract } from "./commands.ts";
 import type { Json } from "./json.ts";
 import type { ToolInvocationInfo, ToolResult } from "./tool-result.ts";
@@ -10,13 +12,13 @@ export * from "./renderer-services.ts";
 export * from "./renderer-creation.ts";
 import type { CreationEntry } from "./renderer-creation.ts";
 
-export type RendererReceipt = { ok: true } | { ok: false; error: { code: string; message: string } };
+export type RendererReceipt = { ok: true } | { ok: false; error: { code: string; message: string; display?: UiText } };
 /** 绑定卡片对象的前端能力；宿主负责订阅、命令门禁和当前视图的一致性。 */
 export interface RendererObjectContext {
   readonly ref: ResourceRef;
   readonly view: {
     ready: boolean; busy: boolean; historical: boolean; status: "loading" | "ready" | "error";
-    error: string | null; missing: boolean;
+    error: UiText | null; missing: boolean;
   };
   readonly session: {
     snapshot(): SessionSnapshot | null;
@@ -39,7 +41,7 @@ export function useRendererObject(): RendererObjectContext {
 /** 类型级静态识别信息，不解析卡片数据，也不创建正文组件。 */
 export interface ResourceDescription {
   kind: string;
-  label: string;
+  label: UiText;
   icon: ReactNode;
   /** 创建前可取用的默认卡片尺寸，与卡片 renderer 共用声明。 */
   card?: CardAppearance;
@@ -69,7 +71,7 @@ export interface ToolRenderProps<D = Json, T = Json, A = Json> {
   result: ToolResult<D> | null;
 }
 export interface ToolView {
-  label?: string;
+  label?: UiText;
   icon?: ReactNode;
   header?: ReactNode;
   body?: ReactNode;
@@ -104,7 +106,7 @@ export function cardRenderer<T extends Json>(
 export function toolRenderer<D extends Json, T extends Json = Json, A extends Json = Json>(
   contract: DataContract<D> & { targetSchema?: z.ZodType<T>; tool?: { argsSchema: z.ZodType<A> } },
   definition: {
-    label?: string;
+    label?: UiText;
     icon?: ReactNode;
     headerRenderer?: ComponentType<ToolRenderProps<D, T, A>>;
     bodyRenderer?: ComponentType<ToolRenderProps<D, T, A>>;

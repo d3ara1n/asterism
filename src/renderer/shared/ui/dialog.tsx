@@ -1,11 +1,14 @@
+import type { UiText } from "@atelier/sdk/contracts";
+import { useI18n } from "@atelier/sdk/renderer";
+import { XIcon } from "lucide-react";
+import { Dialog as DialogPrimitive } from "radix-ui";
+import * as React from "react";
+
+import { commonMessages } from "../../messages/common";
+import { cn } from "../utils";
+import { Button } from "./button";
+
 "use client"
-
-import * as React from "react"
-import { cn } from "../utils"
-import { XIcon } from "lucide-react"
-import { Dialog as DialogPrimitive } from "radix-ui"
-
-import { Button } from "./button"
 
 function Dialog({
   ...props
@@ -51,10 +54,13 @@ function DialogContent({
   className,
   children,
   showCloseButton = true,
+  closeLabel = commonMessages.close,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
+  closeLabel?: UiText
 }) {
+  const i18n = useI18n()
   return (
     <DialogPortal data-slot="dialog-portal">
       <DialogOverlay />
@@ -73,7 +79,7 @@ function DialogContent({
             className="absolute top-4 right-4 rounded-xs opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
           >
             <XIcon />
-            <span className="sr-only">Close</span>
+            <span className="sr-only">{i18n.text(closeLabel)}</span>
           </DialogPrimitive.Close>
         )}
       </DialogPrimitive.Content>
@@ -99,6 +105,7 @@ function DialogFooter({
 }: React.ComponentProps<"div"> & {
   showCloseButton?: boolean
 }) {
+  const i18n = useI18n()
   return (
     <div
       data-slot="dialog-footer"
@@ -111,7 +118,7 @@ function DialogFooter({
       {children}
       {showCloseButton && (
         <DialogPrimitive.Close asChild>
-          <Button variant="outline">Close</Button>
+          <Button variant="outline">{i18n.text(commonMessages.close)}</Button>
         </DialogPrimitive.Close>
       )}
     </div>

@@ -18,6 +18,6 @@ export function parseCall(contract: InputContract, call: ResourceCall): ParsedCa
 }
 /** 接受沿用解析结果；只有显式替换才产生需要重新解析的新输入。 */
 export function applyPreparation(contract: InputContract, value: Json, result?: Preparation): Json {
-  if (result?.action === "reject") throw new PluginApiError("rejected", result.message, result.code);
+  if (result?.action === "reject") throw new PluginApiError("rejected", result.message, result.code, result.display);
   return result?.action === "replace" ? parseInput(contract, result.input) : value;
 }

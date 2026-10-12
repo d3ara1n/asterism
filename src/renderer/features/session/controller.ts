@@ -1,4 +1,6 @@
 import { CancelAgent } from "../../../modules/agent/contract.ts";
+import type { UiText } from "@atelier/sdk/contracts";
+import { errorDisplay } from "../../../shared/error-display.ts";
 import type { SessionBridge, SessionMutation, SessionResult, SessionSnapshot, SessionProgress, ViewPosition } from "../../../shared/session.ts";
 import { isLayoutCommand } from "../../../shared/workbench.ts";
 
@@ -9,7 +11,7 @@ type SessionOperation = Exclude<SessionMutation, { type: "start" }>;
 /** 工作台可发出的变更：布局、链接、移除与资源创建/命令。 */
 export type WorkbenchOperation = Exclude<SessionOperation, { type: "select" }>;
 export type SessionViewState = {
-  snapshot: SessionView | null; position: ViewPosition; status: "loading" | "ready" | "error"; busy: boolean; error: string | null; missing: boolean;
+  snapshot: SessionView | null; position: ViewPosition; status: "loading" | "ready" | "error"; busy: boolean; error: UiText | null; missing: boolean;
   /** 显式导航意图的代次；离开再返回同一位置也会递增。 */
   navigationVersion: number;
 };
@@ -87,7 +89,7 @@ export class SessionController {
   /** 完整读取用于打开、历史定位与持久变化；同一位置的密集通知合并读取。 */
   clearError = (): void => this.update({ error: null });
   refresh = (): Promise<void> => { this.update({ status: "loading", error: null }); return this.read(); };
-  private readFailed(message: string, missing = false): void {
+  private readFailed(message: UiText, missing = false): void {
     // 失败不提交导航目标；旧画面保持完整，重新读取成功前不接受基于旧数据的领域变更。
     this.requestedPosition = this.state.position;
     this.update({ status: "error", error: message, missing });
@@ -104,7 +106,7 @@ export class SessionController {
         const result = await this.bridge.execute({ type: "read", sessionId: this.sessionId, position });
         if (generation !== this.generation) return;
         if (!result.ok) {
-          this.readFailed(result.error.message, result.error.code === "not_found");
+          this.readFailed(errorDisplay(result.error), result.error.code === "not_found");
           break;
         }
         if (result.reply.kind !== "view" || result.reply.snapshot.sessionId !== this.sessionId) throw new Error("Invalid session view response.");
@@ -165,15 +167,16 @@ export class SessionController {
     });
   }
   private async perform(command: SessionOperation, onAccepted?: () => void): Promise<SessionResult> {
-    const reject = (code: "conflict" | "invalid_request", message: string): SessionResult => {
-      this.update({ error: message }); return { ok: false, error: { code, message } };
+    const reject = (code: "conflict" | "invalid_request", message: string, display?: UiText): SessionResult => {
+      const error = { code, message, ...(display !== undefined ? { display } : {}) };
+      this.update({ error: errorDisplay(error) }); return { ok: false, error };
     };
     if (command.sessionId !== this.sessionId) return reject("invalid_request", "The command belongs to another session.");
     if (this.requestedPosition.kind === "history" && !isLayoutCommand(command) && command.type !== "select" && !(command.type === "resource.command" && isCancel(command.command))) {
       return reject("conflict", "History is read-only. Continue from this position before making changes.");
     }
     if (this.state.status !== "ready" && !isLayoutCommand(command) && command.type !== "select" && !(command.type === "resource.command" && isCancel(command.command))) {
-      return reject("conflict", this.state.error ?? "Wait for the session view to synchronize before making changes.");
+      return reject("conflict", "Wait for the session view to synchronize before making changes.", this.state.error ?? undefined);
     }
     const position = this.requestedPosition;
     // 在途读取可能早于本次变更；命令完成后统一重新读取当前目标位置。
@@ -183,7 +186,7 @@ export class SessionController {
     this.update(quiet ? { error: null } : { busy: true, status: "loading", error: null });
     try {
       const result = await this.bridge.execute(command);
-      if (!result.ok) this.update({ error: result.error.message });
+      if (!result.ok) this.update({ error: errorDisplay(result.error) });
       else {
         if (result.reply.kind !== "accepted" || result.reply.sessionId !== this.sessionId) throw new Error("Invalid session receipt.");
         if (command.type === "select" && this.requestedPosition === position) {
@@ -195,7 +198,7 @@ export class SessionController {
       return result;
     } catch {
       const result: SessionResult = { ok: false, error: { code: "unavailable", message: "The session connection was lost. Reload before retrying." } };
-      this.update({ error: result.error.message }); return result;
+      this.update({ error: errorDisplay(result.error) }); return result;
     } finally {
       if (!quiet) this.update({ busy: false });
       void this.read();

@@ -1,10 +1,16 @@
-import { memo, type ReactNode } from "react";
-import { ChevronDown, ChevronRight, X } from "lucide-react";
+import { Tooltip, TooltipTrigger, TooltipContent } from "../../shared/ui/tooltip";
+
 import { Button } from "../../shared/ui/button";
+
 import { Card } from "../../shared/ui/card";
-import { Tooltip, TooltipContent, TooltipTrigger } from "../../shared/ui/tooltip";
+import { ChevronRight, ChevronDown, X } from "lucide-react";
+
+import { commonMessages } from "../../messages/common";
+import { useI18n } from "../../shared/i18n";
+import { memo, type ReactNode } from "react";
+
 import { cn } from "../../shared/utils";
-import { t } from "../../shared/i18n";
+
 import type { CardSize } from "../../../shared/workbench";
 
 /** 卡片拖动柄选择器；画布只认它，卡片内容不感知拖动。 */
@@ -17,6 +23,7 @@ export function IconAction({ label, onClick, expanded, size = "icon-xs", childre
   label: string; onClick: () => void; expanded?: boolean;
   size?: "icon-xs" | "icon-sm"; children: ReactNode;
 }) {
+
   return <Tooltip>
     <TooltipTrigger asChild>
       <Button variant="ghost" size={size} aria-label={label} aria-expanded={expanded} onClick={onClick}>{children}</Button>
@@ -34,7 +41,8 @@ export const ObjectCard = memo(function ObjectCard({ icon, kind, title, actions,
   collapsed: boolean; selected: boolean;
   onView: (patch: ViewPatch) => void; children: ReactNode;
 }) {
-  const toggleLabel = collapsed ? t.expand : t.collapse;
+  const i18n = useI18n();
+  const toggleLabel = collapsed ? i18n.formatMessage(commonMessages.expand) : i18n.formatMessage(commonMessages.collapse);
   return <Card className={cn("w-full gap-0 overflow-hidden py-0", !collapsed && "h-full", selected && "border-ring")}>
     <header className="card-drag-handle flex shrink-0 cursor-grab items-center gap-2 p-3 active:cursor-grabbing">
       <span className="text-muted-foreground" aria-hidden="true">{icon}</span>
@@ -47,7 +55,7 @@ export const ObjectCard = memo(function ObjectCard({ icon, kind, title, actions,
         <IconAction label={toggleLabel} expanded={!collapsed} onClick={() => onView({ collapsed: !collapsed })}>
           {collapsed ? <ChevronRight /> : <ChevronDown />}
         </IconAction>
-        <IconAction label={t.closeView} onClick={() => onView({ hidden: true })}><X /></IconAction>
+        <IconAction label={i18n.formatMessage(commonMessages.closeView)} onClick={() => onView({ hidden: true })}><X /></IconAction>
       </div>
     </header>
     {!collapsed && <div className="nodrag nopan nowheel flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden border-t">{children}</div>}

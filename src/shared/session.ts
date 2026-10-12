@@ -45,7 +45,7 @@ export type NewNode = SessionNode extends infer N ? N extends SessionNode ? Omit
 // ---- 会话能力接口 ----
 const uuid = z.string().uuid();
 const text = z.string().trim().min(1).max(100_000);
-export const sessionVersion = 11;
+export const sessionVersion = 12;
 export const viewPositionSchema = z.discriminatedUnion("kind", [
   z.strictObject({ kind: z.literal("live") }),
   z.strictObject({ kind: z.literal("history"), nodeId: id.nullable() }),
@@ -100,10 +100,10 @@ export const sessionReplySchema = z.discriminatedUnion("kind", [
   z.strictObject({ kind: z.literal("accepted"), sessionId: id }),
 ]);
 export type SessionReply = z.infer<typeof sessionReplySchema>;
-const errorCode = z.enum(["invalid_request", "not_found", "conflict", "unavailable", "internal"]);
+const errorCode = z.string().min(1);
 export const sessionResultSchema = z.discriminatedUnion("ok", [
   z.strictObject({ ok: z.literal(true), reply: sessionReplySchema }),
-  z.strictObject({ ok: z.literal(false), error: z.strictObject({ code: errorCode, message: z.string() }) }),
+  z.strictObject({ ok: z.literal(false), error: z.strictObject({ code: errorCode, message: z.string(), display: uiTextSchema.optional() }) }),
 ]);
 export type SessionResult = z.infer<typeof sessionResultSchema>;
 export const sessionRequestSchema = z.strictObject({ kind: z.literal("session.request"), version: z.literal(sessionVersion), id: uuid, command: sessionCommandSchema });
@@ -117,3 +117,4 @@ export interface SessionBridge {
   execute(command: SessionCommand): Promise<SessionResult>;
   onChanged(listener: (event: SessionChanged) => void): () => void;
 }
+import { uiTextSchema } from "@atelier/sdk/contracts";

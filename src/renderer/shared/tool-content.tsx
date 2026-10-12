@@ -1,10 +1,12 @@
-import type { ReactNode } from "react";
 import type { ToolRenderProps } from "@atelier/sdk/renderer";
+import type { ReactNode } from "react";
+
+import { toolsMessages } from "../messages/tools";
+import { useI18n } from "./i18n";
 import { JsonView } from "./json-view";
 import { ToolHeader } from "./tool-header";
-import { t } from "./i18n";
 import { Button } from "./ui/button";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./ui/collapsible";
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "./ui/collapsible";
 
 export function ToolDetails({ label, children }: { label: string; children: ReactNode }) {
   return <Collapsible>
@@ -12,9 +14,11 @@ export function ToolDetails({ label, children }: { label: string; children: Reac
     <CollapsibleContent className="space-y-2 pt-2">{children}</CollapsibleContent>
   </Collapsible>;
 }
-export function DefaultToolHeader({ props, label }: { props: ToolRenderProps; label?: string }) {
-  return <ToolHeader label={label ?? props.name} subject={props.invocation.resource?.title} />;
+export function DefaultToolHeader({ props, label }: { props: ToolRenderProps; label?: import("@atelier/sdk/contracts").UiText }) {
+  const i18n = useI18n();
+  return <ToolHeader label={label === undefined ? props.name : i18n.text(label)} subject={props.invocation.resource?.title} />;
 }
 export function DefaultToolBody({ result }: ToolRenderProps) {
-  return result?.data !== null && result?.data !== undefined ? <JsonView value={result.data} /> : <p className="type-caption">{t.toolNoOutput}</p>;
+  const i18n = useI18n();
+  return result?.data !== null && result?.data !== undefined ? <JsonView value={result.data} /> : <p className="type-caption">{i18n.formatMessage(toolsMessages.toolNoOutput)}</p>;
 }

@@ -68,12 +68,12 @@ export interface AppearanceBridge {
 }
 
 /** 命名调色板：主题色与灰色的推荐组合，只是快捷写入 accent + gray，不进存储、无选中态。 */
-export const palettes: readonly { id: string; name: [en: string, zh: string]; accent: AccentId; gray: GrayId }[] = [
-  { id: "tundra", name: ["Tundra", "苔原"], accent: "jade", gray: "sage" },
-  { id: "sky", name: ["Clear sky", "晴空"], accent: "blue", gray: "slate" },
-  { id: "terracotta", name: ["Terracotta", "陶土"], accent: "orange", gray: "sand" },
-  { id: "dusk", name: ["Dusk", "暮紫"], accent: "violet", gray: "mauve" },
-  { id: "ink", name: ["Ink", "墨白"], accent: "indigo", gray: "gray" },
+export const palettes: readonly { id: string; accent: AccentId; gray: GrayId }[] = [
+  { id: "tundra", accent: "jade", gray: "sage" },
+  { id: "sky", accent: "blue", gray: "slate" },
+  { id: "terracotta", accent: "orange", gray: "sand" },
+  { id: "dusk", accent: "violet", gray: "mauve" },
+  { id: "ink", accent: "indigo", gray: "gray" },
 ];
 
 /** 原始层：Radix Colors 12 级色阶，下标 1–12；亮暗两套同级用途相同。 */

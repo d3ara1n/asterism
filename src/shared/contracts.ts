@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { uiTextSchema } from "@atelier/sdk/contracts";
+import { translationCatalogSchema, type LanguageBridge } from "./language.ts";
 import type { Json } from "@atelier/sdk/contracts";
 import { coreChannel } from "./core.ts";
 import type { ConfigurationBridge } from "./configuration.ts";
@@ -7,7 +9,7 @@ import type { AppearanceBridge } from "./theme.ts";
 import type { SessionBridge } from "./session.ts";
 import type { PluginConfigurationBridge } from "./plugin-configuration.ts";
 
-export const protocolVersion = 4;
+export const protocolVersion = 5;
 export const commandChannel = coreChannel("command");
 export const statusChannel = coreChannel("runtime-status");
 export const pickDirectoryChannel = coreChannel("pick-directory");
@@ -31,9 +33,10 @@ export const snapshotSchema = z.strictObject({
     status: z.enum(["loaded", "disabled", "invalid", "failed", "pending"]), enabled: z.boolean(), error: z.string().nullable(), renderer: z.string().nullable() })),
   /** 包列表与本次启动不同：需要重启生效。 */
   restartRequired: z.boolean(),
+  catalogs: z.array(translationCatalogSchema).optional(),
 });
 export type AppSnapshot = z.infer<typeof snapshotSchema>;
-export const errorSchema = z.strictObject({ code: z.enum(["invalid_request", "not_found", "conflict", "unavailable", "internal"]), message: z.string() });
+export const errorSchema = z.strictObject({ code: z.string().min(1), message: z.string(), display: uiTextSchema.optional() });
 export type AppError = z.infer<typeof errorSchema>;
 export const resultSchema = z.discriminatedUnion("ok", [
   z.strictObject({ ok: z.literal(true), snapshot: snapshotSchema }),
@@ -49,6 +52,7 @@ export const runtimeMessageSchema = z.discriminatedUnion("kind", [
 ]);
 export type RuntimeMessage = z.infer<typeof runtimeMessageSchema>;
 export interface DesktopBridge {
+  language: LanguageBridge;
   session: SessionBridge;
   configuration: ConfigurationBridge;
   appearance: AppearanceBridge;

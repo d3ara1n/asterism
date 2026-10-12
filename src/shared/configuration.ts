@@ -3,7 +3,7 @@ import { coreChannel } from "./core.ts";
 
 export const configurationChannel = coreChannel("configuration");
 export const configurationChangedChannel = coreChannel("configuration-changed");
-export const configurationVersion = 1;
+export const configurationVersion = 2;
 const id = z.string().min(1).max(160);
 const name = z.string().trim().min(1).max(160);
 const revision = z.number().int().positive();
@@ -97,7 +97,7 @@ export const configurationCommandSchema = z.discriminatedUnion("type", [
   z.strictObject({ type: z.literal("test.cancel"), id }),
 ]);
 export const configurationErrorSchema = z.strictObject({
-  code: z.enum(["invalid_request", "not_found", "conflict", "unavailable", "internal"]), message: z.string(),
+  code: z.enum(["invalid_request", "not_found", "conflict", "unavailable", "internal"]), message: z.string(), display: uiTextSchema.optional(),
 });
 export const configurationResultSchema = z.discriminatedUnion("ok", [
   z.strictObject({ ok: z.literal(true), snapshot: configurationSnapshotSchema, savedId: z.string().max(321).nullable() }),
@@ -147,3 +147,4 @@ export function resolveModelRole(snapshot: ConfigurationSnapshot, roleId: string
   if (model === null) return { model, thinking, error: null };
   return { model, thinking, error: resolveProviderModel(snapshot, model) ? null : "model_unavailable" };
 }
+import { uiTextSchema } from "@atelier/sdk/contracts";

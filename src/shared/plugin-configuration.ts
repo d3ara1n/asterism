@@ -1,12 +1,13 @@
 import { z } from "zod";
-import { jsonSchema } from "@atelier/sdk/contracts";
+import { jsonSchema, configurationPresentationSchema, uiTextSchema } from "@atelier/sdk/contracts";
 import { coreChannel } from "./core.ts";
 
-export const pluginConfigurationVersion = 1;
+export const pluginConfigurationVersion = 2;
 export const pluginConfigurationChannel = coreChannel("plugin-configuration");
 const id = z.string().min(1).max(160);
 export const pluginConfigurationSchema = z.strictObject({
   id, schema: jsonSchema.nullable(), defaults: jsonSchema, value: jsonSchema,
+  presentation: configurationPresentationSchema.optional(),
   status: z.enum(["saved", "defaults", "invalid"]),
 });
 export type PluginConfiguration = z.infer<typeof pluginConfigurationSchema>;
@@ -19,7 +20,7 @@ export type PluginConfigurationCommand = z.infer<typeof pluginConfigurationComma
 export const pluginConfigurationResultSchema = z.discriminatedUnion("ok", [
   z.strictObject({ ok: z.literal(true), configurations: z.array(pluginConfigurationSchema) }),
   z.strictObject({ ok: z.literal(false), error: z.strictObject({
-    code: z.enum(["invalid_request", "not_found", "unavailable", "internal"]), message: z.string(),
+    code: z.string().min(1), message: z.string(), display: uiTextSchema.optional(),
   }) }),
 ]);
 export type PluginConfigurationResult = z.infer<typeof pluginConfigurationResultSchema>;

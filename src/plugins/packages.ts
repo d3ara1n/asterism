@@ -8,9 +8,12 @@ import * as sdkRuntime from "@atelier/sdk/runtime";
 import type { PluginDefinition } from "@atelier/sdk/runtime";
 import type { Plugin } from "esbuild";
 import { compileModules, packageModule, type PackageModule } from "./package-modules.ts";
+import { loadCatalogs } from "./catalogs.ts";
+import { localeSchema } from "@atelier/sdk/contracts";
+import type { TranslationCatalog } from "../shared/i18n.ts";
 
 /** SDK API 版本；插件清单的 api.major 必须相同，minMinor 不得高于宿主。 */
-export const sdkApi = { major: 2, minor: 1 } as const;
+export const sdkApi = { major: 2, minor: 2 } as const;
 
 /** 插件包清单：package.json 的 atelier 字段；源码与发布产物读同一份。 */
 export const manifestSchema = z.strictObject({
@@ -18,6 +21,12 @@ export const manifestSchema = z.strictObject({
   api: z.strictObject({ major: z.number().int().nonnegative(), minMinor: z.number().int().nonnegative() }),
   runtime: z.string().min(1).optional(),
   renderer: z.string().min(1).optional(),
+  i18n: z.strictObject({ catalogs: z.record(z.string().refine(value => localeSchema.safeParse(value).success, "Invalid language tag."), z.string().min(1)) }).superRefine((value, context) => {
+    const locales = Object.keys(value.catalogs).flatMap(tag => {
+      const parsed = localeSchema.safeParse(tag); return parsed.success ? [parsed.data] : [];
+    });
+    if (new Set(locales).size !== locales.length) context.addIssue({ code: "custom", message: "Duplicate catalog locale." });
+  }).optional(),
 });
 export type PluginPackageManifest = z.infer<typeof manifestSchema>;
 
@@ -115,7 +124,7 @@ function sharedModuleSource(id: string): string {
 }
 
 /** renderer 共享模块：由宿主页面在 window.__atelierRendererModules 提供同一实例。 */
-export const rendererShared: readonly string[] = ["react", "react/jsx-runtime", "react-dom", "react-dom/client", "zod", "@atelier/sdk/contracts", "@atelier/sdk/renderer"];
+export const rendererShared: readonly string[] = ["react", "react/jsx-runtime", "react-dom", "react-dom/client", "react-intl", "zod", "@atelier/sdk/contracts", "@atelier/sdk/renderer"];
 function rendererModuleSource(id: string): string {
   // CJS 形态转发：esbuild 的互操作让具名导入按属性读取同一实例。
   return `const m = globalThis.__atelierRendererModules[${JSON.stringify(id)}]; module.exports = m;`;
@@ -133,6 +142,7 @@ function hostModules(realm: "runtime" | "renderer"): Plugin {
 }
 
 export interface ResolvedPackage {
+  catalogs?: TranslationCatalog[];
   entry: PackageEntry;
   root: string;
   manifest: PluginPackageManifest | null;
@@ -210,5 +220,7 @@ export async function loadPackages(list: PackageList, npmRoot: string, cacheRoot
       result.some(item => item.manifest?.id === dependency && item.definition) ? [dependency] : dependenciesOf(dependency, visited));
   };
   for (const item of result) if (item.definition) item.definition = { ...item.definition, dependencies: dependenciesOf(item.manifest!.id) };
+  for (const item of result) if (item.status === "loaded" && item.manifest?.i18n)
+    item.catalogs = loadCatalogs(item.root, item.manifest.id, item.manifest.i18n.catalogs);
   return result;
 }

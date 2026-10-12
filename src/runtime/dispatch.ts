@@ -1,10 +1,13 @@
-import { protocolVersion, requestSchema, type RuntimeMessage } from "../shared/contracts.ts";
-import { ApplicationError, type ApplicationService } from "./service.ts";
-import { configurationRequestSchema, configurationResponseSchema, configurationVersion } from "../shared/configuration.ts";
+import { PluginApiError } from "@atelier/sdk/runtime";
+
 import { ConfigurationError } from "../configuration/errors.ts";
-import { sessionRequestSchema, sessionResponseSchema, sessionVersion } from "../shared/session.ts";
 import { SessionError } from "../session/tree.ts";
+import { configurationRequestSchema, configurationResponseSchema, configurationVersion } from "../shared/configuration.ts";
+import { protocolVersion, requestSchema, type RuntimeMessage } from "../shared/contracts.ts";
 import { pluginConfigurationRequestSchema, pluginConfigurationResponseSchema, pluginConfigurationVersion } from "../shared/plugin-configuration.ts";
+import { sessionRequestSchema, sessionResponseSchema, sessionVersion } from "../shared/session.ts";
+import { sessionPluginError } from "./plugin-errors.ts";
+import { ApplicationError, type ApplicationService } from "./service.ts";
 
 export function dispatchPluginConfiguration(service: ApplicationService, raw: unknown): unknown | null {
   const request = pluginConfigurationRequestSchema.safeParse(raw);
@@ -16,7 +19,7 @@ export function dispatchPluginConfiguration(service: ApplicationService, raw: un
     const known = error instanceof ApplicationError;
     if (!known) console.error("Plugin configuration command failed.");
     return pluginConfigurationResponseSchema.parse({ ...envelope, result: { ok: false, error: {
-      code: known ? error.code : "internal", message: known ? error.message : "Plugin configuration could not be completed.",
+      code: known ? error.code : "internal", message: known ? error.message : "Plugin configuration could not be completed.", ...(known && error.display !== undefined ? { display: error.display } : {}),
     } } });
   }
 }
@@ -33,7 +36,7 @@ export async function dispatchConfiguration(service: ApplicationService, raw: un
     const known = error instanceof ConfigurationError;
     if (!known) console.error("Configuration command failed.");
     return { ...envelope, result: { ok: false, error: {
-      code: known ? error.code : "internal", message: known ? error.message : "The configuration command could not be completed. Reload settings before retrying.",
+      code: known ? error.code : "internal", message: known ? error.message : "The configuration command could not be completed. Reload settings before retrying.", ...(known && error.display !== undefined ? { display: error.display } : {}),
     } } };
   }
 }
@@ -46,10 +49,11 @@ export async function dispatchSession(service: ApplicationService, raw: unknown)
     const reply = await service.sessions.execute(command);
     return sessionResponseSchema.parse({ kind: "session.response", version: sessionVersion, id, result: { ok: true, reply } });
   } catch (error) {
-    const known = error instanceof SessionError || error instanceof ConfigurationError;
+    const failure = error instanceof PluginApiError ? sessionPluginError(error) : error;
+    const known = failure instanceof SessionError || failure instanceof ConfigurationError;
     if (!known) console.error("Session command failed.");
     return sessionResponseSchema.parse({ kind: "session.response", version: sessionVersion, id, result: { ok: false,
-      error: { code: known ? error.code : "internal", message: known ? error.message : "The session command could not be completed." } } });
+      error: { code: known ? failure.code : "internal", message: known ? failure.message : "The session command could not be completed.", ...(known && failure.display !== undefined ? { display: failure.display } : {}) } } });
   }
 }
 
@@ -67,6 +71,7 @@ export function dispatch(service: ApplicationService, raw: unknown): RuntimeMess
       result: { ok: false, error: {
         code: known ? error.code : "internal",
         message: known ? error.message : "The command could not be completed. Reload the workspace before trying again.",
+        ...(known && error.display !== undefined ? { display: error.display } : {}),
       } },
     };
   }

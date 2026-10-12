@@ -47,8 +47,8 @@ export interface CreationEntry<I = Json> {
   /** 全局稳定身份，使用声明插件的命名空间；路由记忆以它为值。 */
   readonly id: string;
   readonly contract: CreationContract<I, Json, Json>;
-  readonly label: string;
-  readonly description?: string;
+  readonly label: UiText;
+  readonly description?: UiText;
   readonly icon?: ReactNode;
   /** 菜单分组；未声明归入资源。 */
   readonly group?: "agents" | "resources";
@@ -76,3 +76,4 @@ export function useRendererPreferences(): RendererPreferences {
   if (!value) throw new Error("Renderer preferences must be provided by the host.");
   return value;
 }
+import type { UiText } from "./i18n.ts";

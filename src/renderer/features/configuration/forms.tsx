@@ -1,22 +1,25 @@
-import { useId, useState, type ReactNode } from "react";
 import { RotateCcw, Trash2 } from "lucide-react";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "../../shared/ui/alert-dialog";
+import { useId, useState, type ReactNode } from "react";
+
+import { formsMessages } from "../../messages/forms";
+import { useI18n } from "../../shared/i18n";
 import { Alert, AlertDescription } from "../../shared/ui/alert";
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "../../shared/ui/alert-dialog";
 import { Button } from "../../shared/ui/button";
+import { Field, FieldLabel, FieldDescription } from "../../shared/ui/field";
+import { Input } from "../../shared/ui/input";
+import { InputGroup, InputGroupInput, InputGroupAddon, InputGroupButton } from "../../shared/ui/input-group";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "../../shared/ui/select";
+import { Switch } from "../../shared/ui/switch";
+import { Textarea } from "../../shared/ui/textarea";
 import { IslandPanel } from "../../shared/weave/IslandPanel";
 import { useCloseGuard } from "../../shared/weave/Screen";
-import { Field, FieldDescription, FieldLabel } from "../../shared/ui/field";
-import { Input } from "../../shared/ui/input";
-import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "../../shared/ui/input-group";
-import { Textarea } from "../../shared/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../shared/ui/select";
-import { Switch } from "../../shared/ui/switch";
 import { useSettingsConfiguration } from "./state";
-import { s } from "../../shared/i18n";
 
 export function TextField({ label, value, onChange, multiline = false, required = false, hint, placeholder }: {
   label: string; value: string; onChange: (value: string) => void; multiline?: boolean; required?: boolean; hint?: string; placeholder?: string;
 }) {
+
   const id = useId();
   return <Field><FieldLabel htmlFor={id}>{label}</FieldLabel>
     {multiline ? <Textarea id={id} value={value} placeholder={placeholder} onChange={event => onChange(event.target.value)} required={required} rows={5} />
@@ -28,30 +31,33 @@ export function NumberField({ label, value, onChange, min = 0, max, integer = fa
   label: string; value: number | null; onChange: (value: number | null) => void; min?: number; max?: number; integer?: boolean;
   placeholder?: string; onReset?: () => void; onClear?: () => void; clearLabel?: string;
 }) {
+  const i18n = useI18n();
   const id = useId();
   // InputGroup 组合：去掉原生步进箭头，恢复/清除作为输入框内的附加按钮。
   return <Field><FieldLabel htmlFor={id}>{label}</FieldLabel><InputGroup>
     <InputGroupInput id={id} type="number" inputMode={integer ? "numeric" : "decimal"} value={value ?? ""} min={min} max={max} step={integer ? 1 : "any"}
       className="[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-      placeholder={placeholder ?? s("Default", "默认")} onChange={event => onChange(event.target.value === "" ? null : Number(event.target.value))} />
+      placeholder={placeholder ?? i18n.formatMessage(formsMessages.default)} onChange={event => onChange(event.target.value === "" ? null : Number(event.target.value))} />
     {(onReset || onClear) && <InputGroupAddon align="inline-end">
-      {onReset && <InputGroupButton onClick={onReset}>{s("Use built-in", "使用内置值")}</InputGroupButton>}
+      {onReset && <InputGroupButton onClick={onReset}>{i18n.formatMessage(formsMessages.useBuiltin)}</InputGroupButton>}
       {onClear && <InputGroupButton onClick={onClear}>{clearLabel}</InputGroupButton>}
     </InputGroupAddon>}
   </InputGroup></Field>;
 }
 export function ToggleField({ label, value, onChange }: { label: string; value: boolean; onChange: (value: boolean) => void }) {
+
   const id = useId();
   return <Field orientation="horizontal"><FieldLabel htmlFor={id}>{label}</FieldLabel><Switch id={id} checked={value} onCheckedChange={onChange} /></Field>;
 }
 export function ChoiceField({ label, value, onChange, options, empty }: {
   label: string; value: string | null; onChange: (value: string | null) => void; options: { value: string; label: string; disabled?: boolean }[]; empty?: string;
 }) {
+  const i18n = useI18n();
   const id = useId();
   return <Field><FieldLabel htmlFor={id}>{label}</FieldLabel><Select value={value ?? "__none"} onValueChange={next => onChange(next === "__none" ? null : next)}>
     <SelectTrigger id={id}><SelectValue /></SelectTrigger><SelectContent>
       {empty && <SelectItem value="__none">{empty}</SelectItem>}
-      {value && !options.some(option => option.value === value) && <SelectItem value={value} disabled>{s("Unavailable", "不可用")} · {value}</SelectItem>}
+      {value && !options.some(option => option.value === value) && <SelectItem value={value} disabled>{i18n.formatMessage(formsMessages.unavailable)} · {value}</SelectItem>}
       {options.map(option => <SelectItem key={option.value} value={option.value} disabled={option.disabled}>{option.label}</SelectItem>)}
     </SelectContent></Select></Field>;
 }
@@ -61,15 +67,17 @@ export function OverrideChoiceField({ value, inherited, onChange, ...props }: {
   label: string; value: string | null | undefined; inherited: string | null; onChange: (value: string | null | undefined) => void;
   options: { value: string; label: string; disabled?: boolean }[]; empty?: string;
 }) {
+  const i18n = useI18n();
   const inheritedLabel = props.options.find(option => option.value === inherited)?.label ?? inherited ?? props.empty;
   return <ChoiceField {...props} value={value === undefined ? "__inherit" : value}
-    options={[{ value: "__inherit", label: `${s("Built-in", "内置")} · ${inheritedLabel ?? ""}` }, ...props.options]}
+    options={[{ value: "__inherit", label: `${i18n.formatMessage(formsMessages.builtin)} · ${inheritedLabel ?? ""}` }, ...props.options]}
     onChange={next => onChange(next === "__inherit" ? undefined : next)} />;
 }
 /** 开关显示生效值；与内置值不同才写覆盖，并给出“已修改 · 恢复”。 */
 export function OverrideToggleField({ value, inherited, onChange, label, hint }: {
   label: string; value: boolean | undefined; inherited: boolean; onChange: (value: boolean | undefined) => void; hint?: string;
 }) {
+  const i18n = useI18n();
   const id = useId();
   const effective = value ?? inherited;
   const modified = value !== undefined && value !== inherited;
@@ -77,7 +85,7 @@ export function OverrideToggleField({ value, inherited, onChange, label, hint }:
     <div className="flex min-w-0 flex-1 flex-col gap-1">
       <FieldLabel htmlFor={id}>{label}</FieldLabel>
       {hint && <FieldDescription>{hint}</FieldDescription>}
-      {modified && <span className="type-caption">{s("Modified", "已修改")} · <button type="button" className="underline-offset-2 hover:underline" onClick={() => onChange(undefined)}>{s("Restore", "恢复")}</button></span>}
+      {modified && <span className="type-caption">{i18n.formatMessage(formsMessages.modified)} · <button type="button" className="underline-offset-2 hover:underline" onClick={() => onChange(undefined)}>{i18n.formatMessage(formsMessages.restore)}</button></span>}
     </div>
     <Switch id={id} checked={effective} onCheckedChange={next => onChange(next === inherited ? undefined : next)} />
   </Field>;
@@ -86,8 +94,9 @@ export function OverrideNumberField({ value, inherited, onChange, empty, ...prop
   label: string; value: number | null | undefined; inherited: number | null; onChange: (value: number | null | undefined) => void;
   empty: string; min?: number; max?: number; integer?: boolean;
 }) {
+  const i18n = useI18n();
   return <NumberField {...props} value={value ?? null}
-    placeholder={value === null ? empty : `${s("Built-in", "内置")} · ${inherited ?? empty}`}
+    placeholder={value === null ? empty : `${i18n.formatMessage(formsMessages.builtinList)} · ${inherited ?? empty}`}
     onChange={next => onChange(next ?? undefined)}
     onReset={value !== undefined ? () => onChange(undefined) : undefined}
     onClear={value !== null ? () => onChange(null) : undefined} clearLabel={empty} />;
@@ -96,12 +105,13 @@ export function OverrideNumberField({ value, inherited, onChange, empty, ...prop
 export function OverrideListField({ label, value, inherited, onChange, empty, hint }: {
   label: string; value: string[] | undefined; inherited: string[]; onChange: (value: string[] | undefined) => void; empty: string; hint?: string;
 }) {
+  const i18n = useI18n();
   return <>
     <OverrideChoiceField label={label} value={value === undefined ? undefined : value.length ? "list" : "none"}
       inherited={inherited.length ? inherited.join(" · ") : "none"}
-      options={[{ value: "none", label: empty }, { value: "list", label: s("Custom list", "自定义列表") }]}
+      options={[{ value: "none", label: empty }, { value: "list", label: i18n.formatMessage(formsMessages.customList) }]}
       onChange={next => onChange(next === undefined ? undefined : next === "none" ? [] : [...(inherited.length ? inherited : [""])])} />
-    {value !== undefined && value.length > 0 && <TextField label={s("Items (one per line)", "列表项（每行一项）")}
+    {value !== undefined && value.length > 0 && <TextField label={i18n.formatMessage(formsMessages.items)}
       value={value.join("\n")} placeholder={inherited.join("\n")} onChange={next => onChange(next.split("\n"))} multiline hint={hint} />}
   </>;
 }
@@ -111,6 +121,7 @@ export function OverrideListField({ label, value, inherited, onChange, empty, hi
  */
 export interface RemoveAction { title: string; description: string; onConfirm: () => void }
 export function Editor({ title, description, form, dirty, remove, restore, children }: { title: string; description?: string; form: string; dirty?: boolean; remove?: RemoveAction; restore?: () => void; children: ReactNode }) {
+  const i18n = useI18n();
   const { busy } = useSettingsConfiguration();
   const [asking, setAsking] = useState<((discard: boolean) => void) | null>(null);
   const [removing, setRemoving] = useState(false);
@@ -118,9 +129,9 @@ export function Editor({ title, description, form, dirty, remove, restore, child
   const answer = (discard: boolean) => { asking?.(discard); setAsking(null); };
   return <IslandPanel title={title} description={description}
     action={<>
-      {restore && <Button type="button" variant="ghost" size="icon-sm" aria-label={s("Restore all built-in values", "全部恢复内置值")} title={s("Restore all built-in values", "全部恢复内置值")} disabled={busy} onClick={restore}><RotateCcw /></Button>}
-      {remove && <Button type="button" variant="ghost" size="icon-sm" className="text-destructive" aria-label={s("Delete", "删除")} title={s("Delete", "删除")} disabled={busy} onClick={() => setRemoving(true)}><Trash2 /></Button>}
-      <Button type="submit" form={form} size="sm" disabled={busy || dirty === false}>{busy ? s("Saving…", "正在保存…") : s("Save", "保存")}</Button>
+      {restore && <Button type="button" variant="ghost" size="icon-sm" aria-label={i18n.formatMessage(formsMessages.restoreAll)} title={i18n.formatMessage(formsMessages.restoreAllLabel)} disabled={busy} onClick={restore}><RotateCcw /></Button>}
+      {remove && <Button type="button" variant="ghost" size="icon-sm" className="text-destructive" aria-label={i18n.formatMessage(formsMessages.deleteLabel)} title={i18n.formatMessage(formsMessages.deleteButton)} disabled={busy} onClick={() => setRemoving(true)}><Trash2 /></Button>}
+      <Button type="submit" form={form} size="sm" disabled={busy || dirty === false}>{busy ? i18n.formatMessage(formsMessages.saving) : i18n.formatMessage(formsMessages.save)}</Button>
     </>}>
     <ConfigurationStatus />{children}
     {remove && <AlertDialog open={removing} onOpenChange={setRemoving}>
@@ -130,20 +141,20 @@ export function Editor({ title, description, form, dirty, remove, restore, child
           <AlertDialogDescription>{remove.description}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>{s("Cancel", "取消")}</AlertDialogCancel>
-          <AlertDialogAction variant="destructive" onClick={remove.onConfirm}>{s("Delete", "删除")}</AlertDialogAction>
+          <AlertDialogCancel>{i18n.formatMessage(formsMessages.cancel)}</AlertDialogCancel>
+          <AlertDialogAction variant="destructive" onClick={remove.onConfirm}>{i18n.formatMessage(formsMessages.delete)}</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>}
     <AlertDialog open={asking !== null} onOpenChange={open => { if (!open) answer(false); }}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>{s("Discard unsaved changes?", "放弃未保存的修改？")}</AlertDialogTitle>
-          <AlertDialogDescription>{s("Changes in “{title}” have not been saved.", "「{title}」中的修改尚未保存。").replace("{title}", title)}</AlertDialogDescription>
+          <AlertDialogTitle>{i18n.formatMessage(formsMessages.discardTitle)}</AlertDialogTitle>
+          <AlertDialogDescription>{i18n.formatMessage(formsMessages.discardDescription, { title })}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>{s("Keep editing", "继续编辑")}</AlertDialogCancel>
-          <AlertDialogAction variant="destructive" onClick={() => answer(true)}>{s("Discard", "放弃")}</AlertDialogAction>
+          <AlertDialogCancel>{i18n.formatMessage(formsMessages.keepEditing)}</AlertDialogCancel>
+          <AlertDialogAction variant="destructive" onClick={() => answer(true)}>{i18n.formatMessage(formsMessages.discard)}</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
@@ -151,16 +162,18 @@ export function Editor({ title, description, form, dirty, remove, restore, child
 }
 /** 次要的删除操作随表单内容放在末尾。 */
 export function SaveActions({ onRemove, cannotRemove = false, onReset }: { onRemove?: () => void; cannotRemove?: boolean; onReset?: () => void }) {
+  const i18n = useI18n();
   const { busy } = useSettingsConfiguration();
   if (!onRemove && !cannotRemove && !onReset) return null;
   return <div className="mt-5 flex items-center gap-3">
-    {onRemove && <Button type="button" variant="ghost" className="-ml-2 text-destructive" disabled={busy || cannotRemove} onClick={onRemove}>{s("Delete", "删除")}</Button>}
-    {cannotRemove && <span className="type-caption">{s("Built-in role", "内置角色")}</span>}
-    {onReset && <Button type="button" variant="ghost" disabled={busy} onClick={onReset}>{s("Restore built-in values", "恢复内置值")}</Button>}
+    {onRemove && <Button type="button" variant="ghost" className="-ml-2 text-destructive" disabled={busy || cannotRemove} onClick={onRemove}>{i18n.formatMessage(formsMessages.confirmDelete)}</Button>}
+    {cannotRemove && <span className="type-caption">{i18n.formatMessage(formsMessages.builtinRole)}</span>}
+    {onReset && <Button type="button" variant="ghost" disabled={busy} onClick={onReset}>{i18n.formatMessage(formsMessages.restoreBuiltin)}</Button>}
   </div>;
 }
 export function ConfigurationStatus() {
+  const i18n = useI18n();
   const { snapshot, error, load } = useSettingsConfiguration();
-  if (error) return <Alert variant="destructive" className="mb-4"><AlertDescription>{error}<Button variant="outline" size="sm" className="mt-2" onClick={() => void load()}>{s("Reload", "重新读取")}</Button></AlertDescription></Alert>;
-  return !snapshot ? <p role="status" className="type-caption py-4">{s("Loading configuration…", "正在读取配置…")}</p> : null;
+  if (error) return <Alert variant="destructive" className="mb-4"><AlertDescription>{i18n.text(error)}<Button variant="outline" size="sm" className="mt-2" onClick={() => void load()}>{i18n.formatMessage(formsMessages.reload)}</Button></AlertDescription></Alert>;
+  return !snapshot ? <p role="status" className="type-caption py-4">{i18n.formatMessage(formsMessages.loading)}</p> : null;
 }

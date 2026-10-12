@@ -1,19 +1,21 @@
-import { memo, useEffect, useState } from "react";
+import { useI18n, useRendererCatalogs } from "@atelier/sdk/renderer";
 import { Brain } from "lucide-react";
-import type { TimelineItem } from "./timeline";
-import { useRendererCatalogs } from "@atelier/sdk/renderer";
-import { ThinkingPreferences } from "../configuration";
-import { t } from "../../../renderer/shared/i18n";
+import { memo, useEffect, useState } from "react";
+
 import { Badge } from "../../../renderer/shared/ui/badge";
 import { Spinner } from "../../../renderer/shared/ui/spinner";
+import { thinkingMessages } from "../../messages/thinking";
+import { ThinkingPreferences } from "../configuration";
+import { Disclosure } from "./Disclosure";
 import { Markdown } from "./Markdown";
 import { advanceThinkingDisclosure, initialThinkingDisclosure, thinkingDuration } from "./thinking-state";
-import { Disclosure } from "./Disclosure";
+import type { TimelineItem } from "./timeline";
 
 type ThinkingNode = Extract<TimelineItem, { kind: "thinking" }>;
 
 /** 外壳的开合偏好与正文的过程/终结渲染相互独立。 */
 export function ThinkingBlock({ node }: { node: ThinkingNode }) {
+
   const streaming = !("complete" in node);
   const preferences = useRendererCatalogs().get(ThinkingPreferences) ?? { thinkingAutoExpand: true, thinkingAutoCollapse: true };
   const [disclosure, setDisclosure] = useState(() => initialThinkingDisclosure(streaming, preferences));
@@ -34,6 +36,7 @@ export function ThinkingBlock({ node }: { node: ThinkingNode }) {
 function ThinkingHeader({ streaming, startedAt, endedAt, interrupted }: {
   streaming: boolean; startedAt: number | null; endedAt: number | null; interrupted: boolean;
 }) {
+  const i18n = useI18n();
   const [now, setNow] = useState(Date.now);
   useEffect(() => {
     if (!streaming || startedAt === null) return;
@@ -46,13 +49,14 @@ function ThinkingHeader({ streaming, startedAt, endedAt, interrupted }: {
     <span className="inline-flex shrink-0" aria-hidden="true">
       {streaming ? <Spinner className="size-3.5 motion-reduce:animate-none" /> : <Brain className="size-3.5" />}
     </span>
-    <span className="min-w-0 flex-1 truncate text-left">{streaming ? t.thinkingActive : t.thinkingTitle}</span>
-    {duration && <span role="timer" aria-live="off" aria-label={t.thinkingElapsed(duration)} className="shrink-0 whitespace-nowrap type-caption tabular-nums">{duration}</span>}
-    {interrupted && <Badge variant="outline">{t.thinkingInterrupted}</Badge>}
+    <span className="min-w-0 flex-1 truncate text-left">{streaming ? i18n.formatMessage(thinkingMessages.thinkingActive) : i18n.formatMessage(thinkingMessages.thinkingTitle)}</span>
+    {duration && <span role="timer" aria-live="off" aria-label={i18n.formatMessage(thinkingMessages.thinkingElapsed, { duration: duration })} className="shrink-0 whitespace-nowrap type-caption tabular-nums">{duration}</span>}
+    {interrupted && <Badge variant="outline">{i18n.formatMessage(thinkingMessages.thinkingInterrupted)}</Badge>}
   </>;
 }
 
 const ThinkingBody = memo(function ThinkingBody({ streaming, text }: { streaming: boolean; text: string }) {
+
   return streaming
     ? <div className="thinking-preview" inert aria-hidden="true">
       <div className="min-w-0 shrink-0"><Markdown streaming>{text}</Markdown></div>

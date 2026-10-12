@@ -1,11 +1,18 @@
-import { useState } from "react";
-import { MoreHorizontal, RotateCcw, Scaling, Trash2 } from "lucide-react";
-import { maximumCardDimension, type CardSize, type WorkbenchObject } from "../../../shared/workbench";
-import { t } from "../../shared/i18n";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent, DropdownMenuItem, DropdownMenuSeparator } from "../../shared/ui/dropdown-menu";
+
 import { Button } from "../../shared/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent } from "../../shared/ui/dropdown-menu";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "../../shared/ui/alert-dialog";
+import { MoreHorizontal, Scaling, RotateCcw, Trash2 } from "lucide-react";
+
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "../../shared/ui/alert-dialog";
+
 import { Spinner } from "../../shared/ui/spinner";
+import { commonMessages } from "../../messages/common";
+import { objectsMessages } from "../../messages/objects";
+import { useI18n } from "../../shared/i18n";
+import { useState } from "react";
+
+import { maximumCardDimension, type CardSize, type WorkbenchObject } from "../../../shared/workbench";
+
 import { useSession, useSessionProgress } from "../session/state";
 import { useWorkbench } from "./context";
 import type { ViewPatch } from "./ObjectCard";
@@ -14,27 +21,29 @@ import type { ViewPatch } from "./ObjectCard";
 export function ObjectActions({ object, defaultSize, onView }: {
   object: WorkbenchObject; defaultSize: CardSize; onView: (patch: ViewPatch) => void;
 }) {
+  const i18n = useI18n();
   const { ready, busy, historical } = useWorkbench();
   const [open, setOpen] = useState(false);
-  return <><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon-xs" aria-label={t.objectActions}><MoreHorizontal /></Button></DropdownMenuTrigger>
+  return <><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon-xs" aria-label={i18n.formatMessage(objectsMessages.objectActions)}><MoreHorizontal /></Button></DropdownMenuTrigger>
     <DropdownMenuContent align="end">
-      <DropdownMenuSub><DropdownMenuSubTrigger><Scaling />{t.cardSize}</DropdownMenuSubTrigger>
+      <DropdownMenuSub><DropdownMenuSubTrigger><Scaling />{i18n.formatMessage(objectsMessages.cardSize)}</DropdownMenuSubTrigger>
         <DropdownMenuSubContent>
-          {[{ label: t.cardSizeLarge, scale: 1.5 }, { label: t.cardSizeExtraLarge, scale: 2 }].map(({ label, scale }) =>
-            <DropdownMenuItem key={label} onSelect={() => onView({ size: {
+          {[{ label: i18n.formatMessage(objectsMessages.cardSizeLarge), scale: 1.5 }, { label: i18n.formatMessage(objectsMessages.cardSizeExtraLarge), scale: 2 }].map(({ label, scale }) =>
+            <DropdownMenuItem key={scale} onSelect={() => onView({ size: {
               width: Math.min(maximumCardDimension, Math.round(defaultSize.width * scale)),
               height: Math.min(maximumCardDimension, Math.round(defaultSize.height * scale)),
             } })}>{label}</DropdownMenuItem>)}
           <DropdownMenuSeparator />
-          <DropdownMenuItem onSelect={() => onView({ size: null })}><RotateCcw />{t.restoreCardSize}</DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => onView({ size: null })}><RotateCcw />{i18n.formatMessage(objectsMessages.restoreCardSize)}</DropdownMenuItem>
         </DropdownMenuSubContent>
       </DropdownMenuSub>
       <DropdownMenuSeparator />
-      <DropdownMenuItem disabled={!ready || busy || historical} onSelect={() => setOpen(true)}><Trash2 />{t.removeObject(object.title)}…</DropdownMenuItem>
+      <DropdownMenuItem disabled={!ready || busy || historical} onSelect={() => setOpen(true)}><Trash2 />{i18n.formatMessage(objectsMessages.removeObject, { title: object.title })}…</DropdownMenuItem>
     </DropdownMenuContent>
   </DropdownMenu>{open && <RemoveObject object={object} onClose={() => setOpen(false)} />}</>;
 }
 function RemoveObject({ object, onClose }: { object: WorkbenchObject; onClose: () => void }) {
+  const i18n = useI18n();
   const { controller, session, ready, busy, historical, run } = useWorkbench();
   const progress = useSessionProgress(controller);
   const { state } = useSession(controller);
@@ -42,11 +51,11 @@ function RemoveObject({ object, onClose }: { object: WorkbenchObject; onClose: (
   const unsettled = progress.unsettledObjectIds.includes(object.id);
   const disabled = !ready || busy || historical || saving || unsettled;
   return <AlertDialog open onOpenChange={open => { if (!open && !saving) onClose(); }}><AlertDialogContent>
-    <AlertDialogHeader><AlertDialogTitle>{t.removeObjectTitle}</AlertDialogTitle><AlertDialogDescription>{t.removeObjectDescription(object.title)}</AlertDialogDescription></AlertDialogHeader>
-    {unsettled && <p className="type-caption">{t.objectStillActive}</p>}
-    {state.error && <p className="type-caption" role="alert">{state.error}</p>}
-    <AlertDialogFooter><AlertDialogCancel disabled={saving}>{t.cancel}</AlertDialogCancel><AlertDialogAction variant="destructive" disabled={disabled} aria-busy={saving}
+    <AlertDialogHeader><AlertDialogTitle>{i18n.formatMessage(objectsMessages.removeObjectTitle)}</AlertDialogTitle><AlertDialogDescription>{i18n.formatMessage(objectsMessages.removeObjectDescription, { title: object.title })}</AlertDialogDescription></AlertDialogHeader>
+    {unsettled && <p className="type-caption">{i18n.formatMessage(objectsMessages.objectStillActive)}</p>}
+    {state.error && <p className="type-caption" role="alert">{i18n.text(state.error)}</p>}
+    <AlertDialogFooter><AlertDialogCancel disabled={saving}>{i18n.formatMessage(commonMessages.cancel)}</AlertDialogCancel><AlertDialogAction variant="destructive" disabled={disabled} aria-busy={saving}
       onClick={event => { event.preventDefault(); setSaving(true); void run({ type: "object.remove", sessionId: session.id, objectId: object.id })
-        .then(saved => { if (saved) onClose(); }).finally(() => setSaving(false)); }}>{saving && <Spinner />}{t.remove}</AlertDialogAction></AlertDialogFooter>
+        .then(saved => { if (saved) onClose(); }).finally(() => setSaving(false)); }}>{saving && <Spinner />}{i18n.formatMessage(commonMessages.remove)}</AlertDialogAction></AlertDialogFooter>
   </AlertDialogContent></AlertDialog>;
 }

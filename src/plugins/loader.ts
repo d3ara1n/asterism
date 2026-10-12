@@ -132,7 +132,7 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
       const storage = new PluginStorage(services.extensionsDirectory, id, services.vault ?? null, log.warn);
       const lifecycle = new RunLifecycle(sessionId => services.sessions.progressChanged(sessionId)); lifecycles.push(lifecycle);
       const taskHost = new TaskHost(log, lifecycle.group("task"));
-      const sdk = createSdkContext({ id, dir: storage.dir, log, config: (schema, defaults) => storage.config(schema, defaults),
+      const sdk = createSdkContext({ id, dir: storage.dir, log, config: (schema, defaults, options) => storage.config(schema, defaults, options),
         secrets: storage.secrets, db: () => storage.db(), tasks: taskHost }, services, lifecycle.group("model"));
       const resources: ResourceBackend[] = [], tools: ToolImplementation[] = [], observers: SessionObserver[] = [], preparers: CommandPreparer[] = [];
       const actions: ActionContract<unknown>[] = [];

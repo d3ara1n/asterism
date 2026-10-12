@@ -1,5 +1,6 @@
 /** SDK runtime 入口：后台插件可用的通用服务接口；不含宿主内部类型与领域知识。 */
 import type { Json } from "./json.ts";
+import type { UiText } from "./i18n.ts";
 import type { ResourceRef } from "./workspace.ts";
 export * from "./runtime-contracts.ts";
 export * from "./runtime-resources.ts";
@@ -10,7 +11,7 @@ export { validationMessage, jsonArgumentHint } from "./tool-validation.ts";
 export class PluginApiError extends Error {
   constructor(readonly code: "invalid_argument" | "foreign_resource" | "foreign_event" | "unavailable" | "rejected" | "conflict" | "not_found", message: string,
     /** rejected 时为准备者给出的业务原因码。 */
-    readonly reason?: string) { super(message); }
+    readonly reason?: string, readonly display?: UiText) { super(message); }
 }
 export interface PluginLogger {
   info(message: string): void;

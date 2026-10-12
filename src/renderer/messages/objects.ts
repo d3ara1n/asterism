@@ -1,0 +1,88 @@
+import { defineMessages, pluginNamespace } from "@atelier/sdk/contracts";
+
+export const objectsMessages = pluginNamespace("atelier.host").messages("en", defineMessages({
+  objectActions: {
+    id: "objectActions",
+    defaultMessage: "Object actions",
+  },
+  objects: {
+    id: "objects",
+    defaultMessage: "Objects",
+  },
+  noObjectsHistorical: {
+    id: "noObjectsHistorical",
+    defaultMessage: "No objects existed here yet.",
+  },
+  noObjects: {
+    id: "noObjects",
+    defaultMessage: "There are no objects in this conversation.",
+  },
+  kindResource: {
+    id: "kindResource",
+    defaultMessage: "Resource",
+  },
+  kindMissing: {
+    id: "kindMissing",
+    defaultMessage: "Unavailable ({plugin} not installed or disabled)",
+  },
+  focusSelection: {
+    id: "focusSelection",
+    defaultMessage: "Focus selection",
+  },
+  cardSize: {
+    id: "cardSize",
+    defaultMessage: "Card size",
+  },
+  resizeCard: {
+    id: "resizeCard",
+    defaultMessage: "Drag to resize",
+  },
+  cardSizeLarge: {
+    id: "cardSizeLarge",
+    defaultMessage: "Large",
+  },
+  cardSizeExtraLarge: {
+    id: "cardSizeExtraLarge",
+    defaultMessage: "Extra large",
+  },
+  restoreCardSize: {
+    id: "restoreCardSize",
+    defaultMessage: "Restore default size",
+  },
+  removeObjectTitle: {
+    id: "removeObjectTitle",
+    defaultMessage: "Remove this object?",
+  },
+  removeObjectDescription: {
+    id: "removeObjectDescription",
+    defaultMessage: "“{title}” will be removed from this session. Its card and links are removed too.",
+  },
+  removeObject: {
+    id: "removeObject",
+    defaultMessage: "Remove {title}",
+  },
+  searchObjects: {
+    id: "searchObjects",
+    defaultMessage: "Find an object",
+  },
+  searchResources: {
+    id: "searchResources",
+    defaultMessage: "Find a resource",
+  },
+  hiddenObjects: {
+    id: "hiddenObjects",
+    defaultMessage: "Hidden",
+  },
+  cardHidden: {
+    id: "cardHidden",
+    defaultMessage: "Card hidden",
+  },
+  locateObject: {
+    id: "locateObject",
+    defaultMessage: "Locate {title}",
+  },
+  objectStillActive: {
+    id: "objectStillActive",
+    defaultMessage: "Wait for this object’s activity to finish before removing it.",
+  },
+}));

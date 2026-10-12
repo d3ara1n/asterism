@@ -1,32 +1,39 @@
+import { JsonView, useModuleViews } from "../../modules/views";
 import { Boxes, ScanSearch, Wrench } from "lucide-react";
+import { ToolHeader } from "../../shared/tool-header";
+import { ItemGroup, Item, ItemMedia, ItemContent, ItemTitle, ItemDescription } from "../../shared/ui/item";
+
+import { ToolDetails } from "../../shared/tool-content";
+
+import { toolsMessages } from "../../messages/tools";
+import { getI18n, useI18n } from "../../shared/i18n";
+
 import type { ReactNode } from "react";
 import { ResourceCall, ResourceInspectResult, ResourceListResult } from "../../../tools/core";
 import type { Json } from "@atelier/sdk/contracts";
 import { toolRenderer, type ToolRenderProps, type ToolRenderer, type ToolView } from "@atelier/sdk/renderer";
 import type { ViewRegistry } from "../../modules/registry";
-import { JsonView, useModuleViews } from "../../modules/views";
-import { t } from "../../shared/i18n";
-import { ToolDetails } from "../../shared/tool-content";
-import { Item, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "../../shared/ui/item";
-import { ToolHeader } from "../../shared/tool-header";
 
 /** 状态字段可能来自任何资源；常规标量直接阅读，复合值保留完整数据。 */
 function ResourceFields({ value }: { value: Json }) {
+
   if (value === null || typeof value !== "object" || Array.isArray(value)) return <JsonView value={value} />;
   return <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-2 type-caption">
     {Object.entries(value).map(([key, field]) => <Field key={key} name={key} value={field} />)}
   </dl>;
 }
 function Field({ name, value }: { name: string; value: Json }) {
+
   return <><dt className="break-all">{name}</dt><dd className="min-w-0 whitespace-pre-wrap break-words">
     {value !== null && typeof value === "object" ? <JsonView value={value} /> : String(value ?? "—")}
   </dd></>;
 }
 const list = toolRenderer(ResourceListResult, {
-  label: t.toolResourceList, icon: <Boxes className="size-3.5" />,
-  headerRenderer: ({ result }) => <ToolHeader label={t.toolResourceList}
-    meta={result?.data && t.toolResourceCount(result.data.resources.length)} />,
+  label: toolsMessages.toolResourceList, icon: <Boxes className="size-3.5" />,
+  headerRenderer: ({ result }) => { const i18n = useI18n(); return <ToolHeader label={i18n.formatMessage(toolsMessages.toolResourceList)}
+    meta={result?.data && i18n.formatMessage(toolsMessages.toolResourceCount, { count: result.data.resources.length })} />; },
   bodyRenderer: function ResourceListBody({ result }) {
+  const i18n = useI18n();
     const registry = useModuleViews();
     if (!result?.data) return null;
     return result.data.resources.length ? <ItemGroup>
@@ -34,63 +41,64 @@ const list = toolRenderer(ResourceListResult, {
         const description = registry.resource(resource.type);
         return <Item key={resource.resource_id} size="sm">
           <ItemMedia>{description.icon}</ItemMedia>
-          <ItemContent><ItemTitle className="break-all">{resource.title}</ItemTitle><ItemDescription>{description.label}</ItemDescription></ItemContent>
+          <ItemContent><ItemTitle className="break-all">{resource.title}</ItemTitle><ItemDescription>{i18n.text(description.label)}</ItemDescription></ItemContent>
         </Item>;
       })}
-    </ItemGroup> : <p className="type-caption">{t.toolNoResources}</p>;
+    </ItemGroup> : <p className="type-caption">{i18n.formatMessage(toolsMessages.toolNoResources)}</p>;
   },
 });
 const inspect = toolRenderer(ResourceInspectResult, {
-  label: t.toolResourceInspect, icon: <ScanSearch className="size-3.5" />,
+  label: toolsMessages.toolResourceInspect, icon: <ScanSearch className="size-3.5" />,
   headerRenderer: function InspectHeader({ invocation }) {
+  const i18n = useI18n();
     const registry = useModuleViews();
     const resource = invocation.resource;
-    return <ToolHeader label={t.toolResourceInspect} subject={resource?.title}
-      meta={resource && registry.resource(resource.kind).label} />;
+    return <ToolHeader label={i18n.formatMessage(toolsMessages.toolResourceInspect)} subject={resource?.title}
+      meta={resource && i18n.text(registry.resource(resource.kind).label)} />;
   },
-  bodyRenderer: ({ result }) => result?.data ? <div className="space-y-4">
-    <section className="space-y-2"><p className="type-label">{t.toolResourceState}</p><ResourceFields value={result.data.state} /></section>
+  bodyRenderer: ({ result }) => { const i18n = useI18n(); return result?.data ? <div className="space-y-4">
+    <section className="space-y-2"><p className="type-label">{i18n.formatMessage(toolsMessages.toolResourceState)}</p><ResourceFields value={result.data.state} /></section>
     <section className="space-y-2">
-      <p className="type-label">{t.toolAvailableTools}</p>
-      {!result.data.tools.length && <p className="type-caption">{t.toolNoTools}</p>}
+      <p className="type-label">{i18n.formatMessage(toolsMessages.toolAvailableTools)}</p>
+      {!result.data.tools.length && <p className="type-caption">{i18n.formatMessage(toolsMessages.toolNoTools)}</p>}
       <ItemGroup>{result.data.tools.map(tool => <Item key={tool.name} size="sm" className="px-0">
         <ItemContent>
           <ItemTitle>{tool.name}</ItemTitle>
           <ItemDescription className="line-clamp-none">{tool.description}</ItemDescription>
-          <ToolDetails label={t.toolUsageDetails}>
+          <ToolDetails label={i18n.formatMessage(toolsMessages.toolUsageDetails)}>
             {!!tool.guidelines.length && <ul className="list-disc space-y-1 pl-4 type-caption">{tool.guidelines.map((line, index) => <li key={index}>{line}</li>)}</ul>}
-            <p className="type-label">{t.toolArguments}</p><JsonView value={tool.args} />
-            <p className="type-label">{t.toolTarget}</p><JsonView value={tool.target} />
-            <p className="type-label">{t.toolResultSchema}</p><JsonView value={tool.result} />
+            <p className="type-label">{i18n.formatMessage(toolsMessages.toolArguments)}</p><JsonView value={tool.args} />
+            <p className="type-label">{i18n.formatMessage(toolsMessages.toolTarget)}</p><JsonView value={tool.target} />
+            <p className="type-label">{i18n.formatMessage(toolsMessages.toolResultSchema)}</p><JsonView value={tool.result} />
           </ToolDetails>
         </ItemContent>
       </Item>)}</ItemGroup>
     </section>
-  </div> : null,
+  </div> : null; },
 });
 
 export interface ResolvedToolView extends ToolView { props: ToolRenderProps }
-function fixed(renderer: ToolRenderer, props: ToolRenderProps, label: string, icon: ReactNode): ResolvedToolView {
+function fixed(renderer: ToolRenderer, props: ToolRenderProps, label: import("@atelier/sdk/contracts").UiText, icon: ReactNode): ResolvedToolView {
   const identity = props.invocation.implementation;
   const view = !identity || identity.id === renderer.contract.id ? renderer.resolve(props) : null;
   return { label, icon, ...view, props };
 }
 /** 固定入口自己的适配负责转交；公共外壳不认识资源工具协议。 */
 const builtinViews = new Map<string, {
-  preparation: string;
+  preparation: import("@atelier/sdk/contracts").UiText;
   render(props: ToolRenderProps, registry: ViewRegistry): ResolvedToolView;
 }>([
-  ["resource_list", { preparation: t.toolPreparingList, render: props => fixed(list, props, t.toolResourceList, <Boxes className="size-3.5" />) }],
-  ["resource_inspect", { preparation: t.toolPreparingInspect, render: props => fixed(inspect, props, t.toolResourceInspect, <ScanSearch className="size-3.5" />) }],
-  ["resource_call", { preparation: t.toolPreparing, render(props, registry) {
+  ["resource_list", { preparation: toolsMessages.toolPreparingList, render: props => fixed(list, props, toolsMessages.toolResourceList, <Boxes className="size-3.5" />) }],
+  ["resource_inspect", { preparation: toolsMessages.toolPreparingInspect, render: props => fixed(inspect, props, toolsMessages.toolResourceInspect, <ScanSearch className="size-3.5" />) }],
+  ["resource_call", { preparation: toolsMessages.toolPreparing, render(props, registry) {
     const parsed = ResourceCall.argsSchema.safeParse(props.args);
-    if (!parsed.success) return { props, label: t.toolResourceCall };
+    if (!parsed.success) return { props, label: toolsMessages.toolResourceCall };
     const inner = { ...props, name: parsed.data.tool, target: parsed.data.target, args: parsed.data.args };
     return { props: inner, ...registry.tool(props.invocation.implementation, inner) };
   } }],
 ]);
 export function toolPreparation(name: string): string {
-  return builtinViews.get(name)?.preparation ?? t.toolPreparing;
+  return getI18n().text(builtinViews.get(name)?.preparation ?? toolsMessages.toolPreparing);
 }
 export function resolveToolView(props: ToolRenderProps, registry: ViewRegistry): ResolvedToolView {
   return builtinViews.get(props.name)?.render(props, registry) ?? { props, icon: <Wrench className="size-3.5" /> };

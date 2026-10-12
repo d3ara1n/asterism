@@ -1,9 +1,12 @@
 import { resourceCall } from "@atelier/sdk/contracts";
-import { ContinueAgent, CancelAgent } from "../../../modules/agent/contract.ts";
+import { ContinueAgent } from "../../../modules/agent/contract.ts";
 import { describe, expect, it, vi } from "vitest";
 import { type SessionBridge, type SessionChanged, type SessionCommand, type SessionResult, type SessionSnapshot, type SessionProgress } from "../../../shared/session.ts";
 import { SessionController } from "./controller.ts";
 import { SubmissionIdentity } from "../../shared/submission.ts";
+import { startLanguage, getI18n } from "../../shared/i18n.ts";
+import { pluginNamespace, defineMessages } from "@atelier/sdk/contracts";
+import type { LanguageState } from "../../../shared/language.ts";
 
 function snapshot(revision: number, at: string | null = null): SessionSnapshot {
   return { sessionId: "s", title: "S", cursor: "current", at, seq: 4, revision, nodes: [],
@@ -25,6 +28,28 @@ function fixture() {
   const progress = (progress: SessionProgress) => listener?.({ kind: "session.progress", sessionId: "s", progress });
   return { controller, requests, notify, progress };
 }
+
+it("语言切换刷新静态文案，保留会话投影、活动与草稿提交身份且不重读会话", async () => {
+  const { controller, requests } = fixture(), disconnect = controller.connect();
+  const initial = snapshot(1); initial.progress.runningAgentIds = ["agent"];
+  requests[0]!.resolve(view(initial)); await flush();
+  const state = controller.getSnapshot(), progress = controller.getProgress();
+  const submission = new SubmissionIdentity(), input = { text: "Unsaved draft" }, id = submission.forInput(input);
+  const label = pluginNamespace("example.counter").messages("en", defineMessages({ title: { id: "title", defaultMessage: "Counter" } })).title;
+  let changed: (value: LanguageState) => void = () => {};
+  const english: LanguageState = { preference: "en", locale: "en", interfaceLocale: "en" };
+  const stop = await startLanguage([{ owner: "example.counter", locale: "zh-Hans", revision: "1", messages: { title: "计数器" } }], {
+    get: async () => english, set: async () => english, onChanged: listener => { changed = listener; return () => { changed = () => {}; }; },
+  });
+  try {
+    expect(getI18n().text(label)).toBe("Counter");
+    changed({ preference: "zh-Hans", locale: "zh-Hans", interfaceLocale: "zh-Hans" });
+    expect(getI18n().text(label)).toBe("计数器");
+    expect(controller.getSnapshot()).toBe(state); expect(controller.getProgress()).toBe(progress);
+    expect(progress.runningAgentIds).toEqual(["agent"]); expect(submission.forInput(input)).toBe(id);
+    expect(input.text).toBe("Unsaved draft"); expect(requests).toHaveLength(1);
+  } finally { changed(english); stop(); disconnect(); }
+});
 
 describe("会话视图所有权", () => {
   it("观察命令等待受理后的读取，后续命令覆盖链接结果也能结束等待", async () => {
@@ -53,7 +78,7 @@ describe("会话视图所有权", () => {
     requests[0]!.resolve(view(snapshot(1))); await flush();
     const saved = controller.executeAndRead({ type: "link.set", sessionId: "s", agentId: "a", resourceId: "n", linked: true });
     await flush(); requests[1]!.resolve(accepted); await flush();
-    if (action === "error") requests[2]!.resolve({ ok: false, error: { code: "unavailable", message: "Read failed." } });
+    if (action === "error") requests[2]!.resolve({ ok: false, error: { code: "unavailable", message: "Read failed.", display: "Read failed." } });
     else disconnect();
     expect((await saved).ok).toBe(true); // 受理结果与查询失败分别表达。
     if (action === "error") expect(controller.getSnapshot()).toMatchObject({ status: "error", error: "Read failed." });
@@ -113,7 +138,7 @@ describe("会话视图所有权", () => {
     const first = controller.execute(command);
     const second = controller.execute(command);
     await flush(); requests[1]!.resolve(accepted); await first;
-    requests[2]!.resolve({ ok: false, error: { code: "unavailable", message: "Read failed." } });
+    requests[2]!.resolve({ ok: false, error: { code: "unavailable", message: "Read failed.", display: "Read failed." } });
     expect((await second).ok).toBe(false);
     expect(requests.filter(r => r.command.type === "resource.create")).toHaveLength(1);
     expect(controller.getSnapshot().status).toBe("error");
@@ -142,7 +167,7 @@ describe("会话视图所有权", () => {
       controller.inspect("history"); requests.at(-1)!.resolve(view(snapshot(1, "history"))); await flush();
       controller.followCursor();
     } else controller.inspect("history");
-    requests.at(-1)!.resolve({ ok: false, error: { code: "unavailable", message: "Read failed." } }); await flush();
+    requests.at(-1)!.resolve({ ok: false, error: { code: "unavailable", message: "Read failed.", display: "Read failed." } }); await flush();
     expect(controller.getSnapshot()).toMatchObject({ status: "error", position: historical ? { kind: "history", nodeId: "history" } : { kind: "live" } });
     expect((await controller.mutate({ type: "object.remove", sessionId: "s", objectId: "note" }))).toBe(false);
     void controller.refresh();
@@ -157,7 +182,7 @@ describe("会话视图所有权", () => {
     const { controller, requests } = fixture(); const disconnect = controller.connect();
     requests[0]!.resolve(view(snapshot(1))); await flush();
     const failed = controller.execute({ type: "resource.create", sessionId: "s", kind: "directory", creation: { id: "directory/create" }, input: { path: "relative" }, position: { x: 0, y: 0 } }); await flush();
-    requests[1]!.resolve({ ok: false, error: { code: "invalid_request", message: "Directory path must be absolute." } });
+    requests[1]!.resolve({ ok: false, error: { code: "invalid_request", message: "Directory path must be absolute.", display: "Directory path must be absolute." } });
     expect((await failed).ok).toBe(false);
     requests[2]!.resolve(view(snapshot(1))); await flush();
     expect(controller.getSnapshot()).toMatchObject({ status: "ready", error: "Directory path must be absolute." });

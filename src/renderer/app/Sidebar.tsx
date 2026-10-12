@@ -1,8 +1,13 @@
-import { House, MessageSquare, PanelLeftClose, Settings } from "lucide-react";
-import type { AppSnapshot, RuntimeStatus } from "../../shared/contracts";
-import { t } from "../shared/i18n";
-import { Button } from "../shared/ui/button";
 import { BrandMark } from "../shared/ui/brand-mark";
+import { Button } from "../shared/ui/button";
+import { PanelLeftClose, House, MessageSquare, Settings } from "lucide-react";
+
+import { appMessages } from "../messages/app";
+import { commonMessages } from "../messages/common";
+import { settingsMessages } from "../messages/settings";
+import { useI18n } from "../shared/i18n";
+
+import type { AppSnapshot, RuntimeStatus } from "../../shared/contracts";
 
 /** 应用导航只消费会话摘要；选择会话后由应用层显式加载工作台。 */
 export function Sidebar({ snapshot, status, busy, selectedSessionId, homeActive, onHome, onSession, onSettings, onHide, onRetry }: {
@@ -10,30 +15,31 @@ export function Sidebar({ snapshot, status, busy, selectedSessionId, homeActive,
   homeActive: boolean; onHome: () => void; onSession: (id: string) => void;
   onSettings: () => void; onHide: () => void; onRetry: () => void;
 }) {
-  return <aside id="app-sidebar" className="app-sidebar" aria-label={t.appNavigation}>
+  const i18n = useI18n();
+  return <aside id="app-sidebar" className="app-sidebar" aria-label={i18n.formatMessage(appMessages.appNavigation)}>
     <header className="flex items-center justify-between gap-2 px-2 pb-5 pt-1">
-      <span className="flex items-center gap-2 text-sm font-semibold"><BrandMark className="size-5 text-primary" />{t.appName}</span>
-      <Button variant="ghost" size="icon-xs" aria-label={t.hideSidebar} title={t.hideSidebar} onClick={onHide}><PanelLeftClose /></Button>
+      <span className="flex items-center gap-2 text-sm font-semibold"><BrandMark className="size-5 text-primary" />{i18n.formatMessage(appMessages.appName)}</span>
+      <Button variant="ghost" size="icon-xs" aria-label={i18n.formatMessage(appMessages.hideSidebar)} title={i18n.formatMessage(appMessages.hideSidebar)} onClick={onHide}><PanelLeftClose /></Button>
     </header>
-    <nav className="flex flex-col gap-1" aria-label={t.mainViews}>
-      <Button variant={homeActive ? "secondary" : "ghost"} className="w-full justify-start disabled:opacity-100" aria-current={homeActive ? "page" : undefined} disabled={homeActive} onClick={onHome}><House />{t.home}</Button>
+    <nav className="flex flex-col gap-1" aria-label={i18n.formatMessage(appMessages.mainViews)}>
+      <Button variant={homeActive ? "secondary" : "ghost"} className="w-full justify-start disabled:opacity-100" aria-current={homeActive ? "page" : undefined} disabled={homeActive} onClick={onHome}><House />{i18n.formatMessage(commonMessages.home)}</Button>
     </nav>
     <section className="mt-6 flex min-h-0 flex-1 flex-col" aria-labelledby="conversation-list-title">
-      <h2 id="conversation-list-title" className="type-label mb-2 px-2">{t.conversations}</h2>
+      <h2 id="conversation-list-title" className="type-label mb-2 px-2">{i18n.formatMessage(commonMessages.conversations)}</h2>
       <div className="min-h-0 flex-1 overflow-y-auto">
         {snapshot?.sessions.map(session => <Button key={session.id} variant={selectedSessionId === session.id ? "secondary" : "ghost"} className="w-full justify-start"
           aria-current={selectedSessionId === session.id ? "page" : undefined} disabled={busy || status !== "ready"}
           onClick={() => onSession(session.id)} title={session.title}>
           <MessageSquare className="text-muted-foreground" /><span className="truncate">{session.title}</span>
         </Button>)}
-        {snapshot?.sessions.length === 0 && <p className="type-caption px-2 py-3">{t.noConversations}</p>}
-        {!snapshot && status !== "unavailable" && <p role="status" className="type-caption px-2 py-3">{t.loadingConversations}</p>}
-        {status === "unavailable" && <p role="status" className="type-caption px-2 py-3">{t.statusUnavailable}</p>}
-        {!snapshot && !busy && status !== "unavailable" && <Button variant="ghost" size="sm" onClick={onRetry}>{t.retry}</Button>}
+        {snapshot?.sessions.length === 0 && <p className="type-caption px-2 py-3">{i18n.formatMessage(appMessages.noConversations)}</p>}
+        {!snapshot && status !== "unavailable" && <p role="status" className="type-caption px-2 py-3">{i18n.formatMessage(appMessages.loadingConversations)}</p>}
+        {status === "unavailable" && <p role="status" className="type-caption px-2 py-3">{i18n.formatMessage(commonMessages.statusUnavailable)}</p>}
+        {!snapshot && !busy && status !== "unavailable" && <Button variant="ghost" size="sm" onClick={onRetry}>{i18n.formatMessage(commonMessages.retry)}</Button>}
       </div>
     </section>
     <footer className="mt-3 border-t pt-2">
-      <Button variant="ghost" className="w-full justify-start" onClick={onSettings}><Settings />{t.settings}</Button>
+      <Button variant="ghost" className="w-full justify-start" onClick={onSettings}><Settings />{i18n.formatMessage(settingsMessages.settings)}</Button>
     </footer>
   </aside>;
 }

@@ -33,14 +33,14 @@ describe("插件包", () => {
     const dir = temp(); pkg(dir, { id: "acme.x", api: { major: 1, minMinor: 0 } });
     expect(() => readManifest(dir)).toThrow(/requires SDK API 1.0/);
   });
-  it("API 2.1 接受新增查询能力与旧插件，拒绝要求更高小版本的插件", () => {
+  it("API 2.2 接受新增查询能力与旧插件，拒绝要求更高小版本的插件", () => {
     const dir = temp();
-    for (const minMinor of [0, 1]) {
+    for (const minMinor of [0, 1, 2]) {
       pkg(dir, { id: "acme.x", api: { major: 2, minMinor } });
       expect(readManifest(dir).api).toEqual({ major: 2, minMinor });
     }
-    pkg(dir, { id: "acme.x", api: { major: 2, minMinor: 2 } });
-    expect(() => readManifest(dir)).toThrow(/host provides 2.1/);
+    pkg(dir, { id: "acme.x", api: { major: 2, minMinor: 3 } });
+    expect(() => readManifest(dir)).toThrow(/host provides 2.2/);
   });
   it("源码包经 esbuild 打包导入，SDK 解析到宿主实例；禁用与重复 ID 不加载", async () => {
     const data = temp(); const a = temp(); const b = temp(); const c = temp();

@@ -14,10 +14,10 @@ import { Textarea } from "../../shared/ui/textarea";
 /** 隐藏口令，在首页输入框完整输入后回车触发；纯前端彩蛋，不进入命令系统。 */
 export const showcaseSpell = "/gamemode 1";
 
-/** 组件展示：只读，集中查看当前主题下公共控件的各种状态。 */
+/** 开发者组件展示：只读校验控件与主题，样例文案不进入本地化目录。 */
 export function Showcase({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   return <Dialog open={open} onOpenChange={onOpenChange}>
-    <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-3xl">
+    <DialogContent closeLabel="Close" className="max-h-[85vh] overflow-y-auto sm:max-w-3xl">
       <DialogHeader><DialogTitle>Creative mode</DialogTitle><DialogDescription>Components under the current theme.</DialogDescription></DialogHeader>
       <Section title="Button">
         {(["default", "secondary", "outline", "ghost", "destructive", "link"] as const).map(variant => <Button key={variant} size="sm" variant={variant}>{variant}</Button>)}

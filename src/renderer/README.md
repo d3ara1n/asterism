@@ -48,10 +48,11 @@
 | `features/configuration/forms.tsx` | 配置编辑器与字段公共入口；文本 placeholder、内置选择、显式空值与恢复操作在此复用 |
 | `shared/ConfigurationChoice.tsx` | 首页与会话输入托盘共用的紧凑配置菜单 |
 | `features/configuration/agent-selection.ts` | 首页与添加代理共用的创建前默认选择解析 |
-| `features/settings/` | 设置屏与分类注册表，通用偏好仍为预览 |
+| `features/settings/` | 设置屏与分类注册表；LanguageSettings 消费主进程语言设置，layout 提供共享分组与设置行 |
 | `shared/weave/` | Space 屏间平移、Screen 浮岛、布局模型与动效 |
 | `shared/ui/` | 本地维护的 shadcn/ui Radix 控件 |
-| `shared/i18n.ts` | 按系统语言显示单语文案 |
+| `shared/i18n.ts` | 应用级语言订阅与共享 React context，SDK hook 与宿主使用同一格式化环境 |
+| `messages/`、`../shared/locales/` | 按功能组织的宿主默认消息与共享的简体中文目录；使用语义化引用名，保留稳定消息 ID；内置插件独立持有自己的消息 |
 | `shared/tool-header.tsx` | 可复用的工具单行标题，名称与路径末尾省略，数量和类型等摘要保留右侧 |
 | `styles.css` | Tailwind、主题 token、窗口与编织布局、Streamdown 与功能模块样式扫描 |
 
@@ -74,6 +75,7 @@
 - 会话视图状态为 loading/ready/error，命令受理后仍须等新投影就绪才恢复配置等领域操作。导航失败放弃未发布目标并保留原视图，重读成功后恢复就绪。会话错误在工作台独立提示，模态操作在对话框内提示，不依赖代理卡片展开。
 - Sidebar 继续通过 `Screen.leading` 参与浮岛布局。设置是独立屏，侧栏和首页/会话同属主屏；切换设置整屏平移。窄窗口保持控件可访问，窗口当前最小为 800×600。
 - 配色、圆角和密度消费共享主题；正文渲染复用库与语义 token，不自行实现 Markdown 解析器。图标使用 lucide-react，动效使用 Motion，普通控件复用 shadcn/ui。
+- 本地化唯一消费者是普通用户；开发者组件展示、仅开发模式诊断、代码／协议与模型内容不进入翻译目录。语言变化只更新展示 context；面向用户的组件与静态贡献在显示时消费 UiText，不以译后标签或语言作为业务组件 key。配置、JSON 编辑文本、草稿、提交身份与任务沿用已有生命周期，模型上下文和历史正文不翻译。应用自有菜单随界面切换；Electron 默认菜单不在本轮接管范围。
 - 设置中的角色与代理编辑器只编辑用户覆盖，使用配置能力返回的内置基准展示继承值，不把完整生效配置回填并保存。文本留空恢复内置；列表清空和布尔关闭通过明确选项表达。恢复内置值是草稿操作，保存后生效；已有对话从下一次模型请求采用新配置。会话和首页共用 ConfigurationChoice；当前选择与历史消息分别管理，历史查看不恢复旧环境。
 
 ## 后续范围

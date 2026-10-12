@@ -75,7 +75,7 @@ Window          平台差异、拖动区域、窗口几何变量
 
 ## 文字、图标与控件
 
-- 界面按系统语言单语显示（中文或英文），文案集中于 `shared/i18n.ts`；窄窗口时顶栏按钮只留图标。
+- 面向普通用户的界面按用户选择或系统语言单语显示，不并排双语；宿主与内置插件提供英文、简体中文。本地化按内容的消费者判定，开发者展示、原始诊断、代码／协议与模型内容保留原文；普通用户可见的技术载荷不自动成为翻译对象。范围、普通字符串与可选消息描述、动态切换和插件文案归属遵循 [公共 i18n](i18n.md)，实施状态见对应计划；窄窗口时顶栏按钮只留图标。
 - 对话框描述只提供当前操作的填写引导或特有行为说明，不重复资源创建与授权等通用性质；同类表单使用一致的语气与结构。
 - 字号五级：`type-page`、`type-section`、`type-body`、`type-caption`、`type-label`。
 - 字体只有两个 token：`--font-sans`（界面）与 `--font-mono`（代码）。用户在外观设置选择的本机字体置于默认回退栈之前；Markdown 正文沿用界面字体，代码块与行内代码沿用代码字体，不单独设置。界面字号即密度；代码另有字号 `--code-font-size`（11–18px，未设置时跟随所在文字），代码文字统一用 `type-code`。
@@ -94,7 +94,7 @@ Window          平台差异、拖动区域、窗口几何变量
 | 窗口布局与原生控件留白 | `src/renderer/app/Window.tsx` |
 | 受管空间、屏与浮岛编织 | `src/renderer/shared/weave/` |
 | 动效时长与曲线 | `styles.css` 的 `--motion-*`，Motion 侧镜像于 `shared/weave/motion.ts` |
-| 界面文案 | `src/renderer/shared/i18n.ts` |
+| 界面文案 | [公共 i18n 契约](i18n.md)；宿主与各插件各自持有消息声明和目录 |
 | 主进程和 renderer 共用的窗口尺寸 | `src/shared/desktop.ts` |
 | 平台材质、实色回退与系统偏好监听 | `src/main/window-appearance.ts` |
 | shadcn/ui 组件配置 | `components.json` |

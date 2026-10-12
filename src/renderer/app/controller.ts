@@ -1,7 +1,10 @@
-import { t } from "../shared/i18n";
-import type { AppSnapshot, DesktopBridge, RuntimeStatus } from "../../shared/contracts";
+import type { UiText } from "@atelier/sdk/contracts";
 
-export type ApplicationState = { snapshot: AppSnapshot | null; busy: boolean; error: string | null; status: RuntimeStatus };
+import type { AppSnapshot, DesktopBridge, RuntimeStatus } from "../../shared/contracts";
+import { errorDisplay } from "../../shared/error-display";
+import { commonMessages } from "../messages/common";
+
+export type ApplicationState = { snapshot: AppSnapshot | null; busy: boolean; error: UiText | null; status: RuntimeStatus };
 /** 应用只管理列表和连接状态；刷新列表不能改变会话视图或导航。 */
 export class ApplicationController {
   private state: ApplicationState = { snapshot: null, busy: false, error: null, status: "starting" };
@@ -16,7 +19,7 @@ export class ApplicationController {
     this.listeners.forEach(listener => listener());
   }
   connect(): () => void {
-    const unsubscribe = this.bridge.onStatus(status => this.update({ status, ...(status === "unavailable" ? { error: t.runtimeStopped } : {}) }));
+    const unsubscribe = this.bridge.onStatus(status => this.update({ status, ...(status === "unavailable" ? { error: commonMessages.runtimeStopped } : {}) }));
     void this.refresh();
     return unsubscribe;
   }
@@ -30,9 +33,9 @@ export class ApplicationController {
         this.dirty = false;
         const result = await this.bridge.execute({ type: "workspace.read" });
         if (result.ok) this.update({ snapshot: result.snapshot, status: "ready" });
-        else this.update({ error: result.error.message, ...(result.error.code === "unavailable" ? { status: "unavailable" as const } : {}) });
+        else this.update({ error: errorDisplay(result.error), ...(result.error.code === "unavailable" ? { status: "unavailable" as const } : {}) });
       } while (this.dirty);
-    } catch { this.update({ status: "unavailable", error: t.connectionLost }); }
+    } catch { this.update({ status: "unavailable", error: commonMessages.connectionLost }); }
     finally { this.reading = false; this.update({ busy: false }); }
   };
 }

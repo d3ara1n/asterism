@@ -11,6 +11,9 @@ import { followWindowAppearance, initialWindowAppearance } from "./window-appear
 import { applyThemeSource, serveAppearance } from "./appearance.ts";
 import { initialWindowState, trackWindowState } from "./window-state.ts";
 import { servePreferences } from "./ui-state.ts";
+import { serveLanguage, readLanguage } from "./language.ts";
+import { startupText } from "./startup-text.ts";
+import { startupMessages } from "../shared/error-display.ts";
 import { configurationChannel, configurationChangedChannel, configurationCommandSchema, type ConfigurationResult } from "../shared/configuration.ts";
 import { sessionChannel, sessionChangedChannel, sessionCommandSchema, type SessionResult } from "../shared/session.ts";
 import { pluginConfigurationChannel, pluginConfigurationCommandSchema, type PluginConfigurationResult } from "../shared/plugin-configuration.ts";
@@ -68,6 +71,7 @@ function createWindow(): void {
     event.senderFrame === current.webContents.mainFrame && event.senderFrame?.url === allowedURL;
   const stopAppearance = serveAppearance(current, trusted, () => refreshAppearance());
   const stopPreferences = servePreferences(trusted);
+  const stopLanguage = serveLanguage(current, trusted);
   ipcMain.handle(sessionChannel, async (event, raw): Promise<SessionResult> => {
     if (!trusted(event)) return { ok: false, error: { code: "invalid_request", message: "Untrusted application frame." } };
     const parsed = sessionCommandSchema.safeParse(raw);
@@ -105,10 +109,10 @@ function createWindow(): void {
     return runtime.configure(parsed.data);
   });
   current.on("closed", () => {
-    window = null; ipcMain.removeHandler(commandChannel); ipcMain.removeHandler(configurationChannel); ipcMain.removeHandler(sessionChannel); ipcMain.removeHandler(pickDirectoryChannel); ipcMain.removeHandler(pluginConfigurationChannel); stopAppearance(); stopPreferences();
+    window = null; ipcMain.removeHandler(commandChannel); ipcMain.removeHandler(configurationChannel); ipcMain.removeHandler(sessionChannel); ipcMain.removeHandler(pickDirectoryChannel); ipcMain.removeHandler(pluginConfigurationChannel); stopAppearance(); stopPreferences(); stopLanguage();
   });
   const loading = developmentURL ? current.loadURL(developmentURL) : current.loadFile(rendererFile);
-  loading.catch(error => { console.error("Renderer initialization failed.", error); dialog.showErrorBox(applicationBrand.en, "The application window could not be loaded."); });
+  loading.catch(error => { console.error("Renderer initialization failed.", error); dialog.showErrorBox(applicationBrand.en, startupText(startupMessages.windowLoadFailed, () => readLanguage().locale)); });
 }
 
 // 插件产物协议：只读提供启动时打包的插件缓存目录，不访问其他路径。
@@ -154,7 +158,7 @@ if (!app.requestSingleInstanceLock()) {
     try { await runtime.start(join(here, "runtime.js"), dataRoot); }
     catch (error) {
       console.error("Application startup failed.", error);
-      dialog.showErrorBox(applicationBrand.en, error instanceof Error ? error.message : "The workspace could not be opened.");
+      dialog.showErrorBox(applicationBrand.en, error instanceof Error ? error.message : startupText(startupMessages.workspaceOpenFailed, () => readLanguage().locale));
     }
     if (!quitting) createWindow();
     app.on("activate", () => { if (!quitting && BrowserWindow.getAllWindows().length === 0) createWindow(); });

@@ -105,9 +105,36 @@ import { Read, settings, service } from "@example/tools/public";
 
 宿主协调读取、命令门禁和错误状态。模型进度、配置目录与工具展示分别通过 `useRendererModels / useRendererCatalogs / useRendererTools` 取得，共用已有宿主状态源；`useRendererNavigation` 提供导航，聚合视图将具体操作传给内容模块。草稿和提交身份归交互模块，按会话与对象绑定并跨卡片重挂载保留；重试相同输入保留身份，受理后清除。导航显式注入。资源后台的 `links.receive` 与前端静态描述的 `receivesLinks` 声明接收链接，授权仍由执行层检查真实链接。
 
+## 可选界面本地化
+
+本地化唯一消费者是普通用户；按内容服务谁判断，不按代码所在位置或是否显示在窗口中判断。用户操作、说明、状态与恢复建议采用本机制，日志、异常栈、开发工具、协议标识与模型提示／工具协议使用原文，不维护译文。配置表单的说明面向普通用户；其中的提示词、原始 JSON 和用户正文保持原值。完整范围见 [消费者与本地化范围](../../docs/i18n.md#消费者与本地化范围)。
+
+普通字符串原样显示，单语言插件无需目录或翻译初始化。需要翻译时，用纯 contracts 入口声明默认文案；消息 ID 为插件内部的稳定键，namespace 在声明时绑定 owner 与来源语言：
+
+```ts
+import { defineMessages, pluginNamespace, withValues } from "@atelier/sdk/contracts";
+
+const ns = pluginNamespace("example.counter");
+export const messages = ns.messages("en", defineMessages({
+  title: { id: "counter.title", defaultMessage: "Counter" },
+  items: { id: "counter.items", defaultMessage: "{count, plural, one {# item} other {# items}}" },
+  limit: { id: "counter.limit", defaultMessage: "Limit" },
+}));
+const label = messages.title; // 也可以继续使用普通字符串 "Counter"。
+const summary = withValues(messages.items, { count: 3 });
+```
+
+ResourceDescription、ToolView、CreationEntry 的 label／description 接收 UiText；静态声明直接保存描述，组件在 render 中用 `const i18n = useI18n()` 后调用 `i18n.text(label)` 或 `i18n.formatMessage(messages.items, {count: 3})`。hook 来自 `@atelier/sdk/renderer`，不要求绑定卡片对象。数字和日期接口遵循有效地区语言；ICU 内的格式化遵循实际文案语言。富文本使用 `UiFormattedMessage`，映射函数只留在 React 中，不放进 UiText 或 IPC。
+
+翻译目录在包的 `atelier.i18n.catalogs` 中显式列出，例如 `{ "zh-Hans": "./locales/zh-Hans.json" }`；目录内容为 `{ "counter.title": "计数器" }`。无需源语言目录，部分翻译逐条回退默认文案。公共导出的消息保留提供方 owner；没有 renderer 的包也能交付静态目录。React 与 react-intl context 由宿主提供共享实例，插件不初始化另一套全局语言状态。
+
+后台配置可用第三个可选参数：`plugin.config(schema, defaults, { presentation: { fields: { "/limit": { title: messages.limit } } } })`。固定对象字段使用 JSON Pointer，根为 `""`，`/` 与 `~` 分别转义为 `~1` 与 `~0`；数组和动态字段继续整体 JSON 编辑。展示映射不改变后台校验，语言切换也不重读配置或重置草稿。错误的 code 用于分支，英文 message 用于诊断，可选 display 持有 UiText；准备拒绝的业务原因码与 display 会进入命令回执，已有纯字符串提示仍有效。
+
+完整纯声明与后台配置用例见 [i18n 作者示例](examples/i18n.ts)，语言与回退契约见 [公共 i18n](../../docs/i18n.md)。项目的 `npm run i18n:extract -- /path/to/plugin` 用真实 FormatJS CLI 抽取标准声明到插件根的 `.i18n/`，`npm run i18n:check -- /path/to/plugin` 检查 ICU、参数及冲突并报告覆盖率；未翻译条目不使外部插件失败。保持 defaultMessage 在交付物中，默认文案始终提供可读回退。
+
 ## 版本与当前边界
 
-SDK 包版本为 `0.3.0`，宿主提供 API 2.1；使用 `records.last` 或提交内标题更新的插件声明 `api: { major: 2, minMinor: 1 }`。API 2.0 插件仍可加载，API 1 插件在加载前明确拒绝；构建产物按内容缓存。会话 IPC 版本为 11，工作数据库格式为 14，应用配置格式仍为 1。
+SDK 包版本为 `0.4.0`，宿主提供 API 2.2；使用消息声明、UiText、useI18n、配置 presentation 或错误 display 的插件声明 `api: { major: 2, minMinor: 2 }`。使用 `records.last` 或提交内标题更新需要 API 2.1，API 2.0 插件仍可加载，API 1 插件在加载前明确拒绝；构建产物按内容缓存。应用 IPC 版本为 5，会话 IPC 为 12，应用配置与插件配置 IPC 均为 2；工作数据库格式仍为 14，应用配置文件格式仍为 1。
 
 资源创建数据必须是 JSON 对象，不能占用宿主的 `id / type / title` 字段。当前会话数据保存于 `session_data`，事件及工具结果保存稳定契约身份与原始数据。core 消费具型用户消息、模型执行、通知与环境记录，存储编码由宿主负责；环境记录保留原事件身份与载荷。
 

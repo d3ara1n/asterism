@@ -1,15 +1,14 @@
 import { isValidElement } from "react";
 import { describe, expect, it } from "vitest";
-import type { ModelLiveBlock } from "@atelier/sdk/contracts";
+import { reference, type ModelLiveBlock } from "@atelier/sdk/contracts";
 import type { TimelineItem } from "./timeline";
-import { reference } from "@atelier/sdk/contracts";
+
 import { DirectoryList } from "../../filesystem/contract";
 import filesystem from "../../filesystem/renderer";
 import { ViewRegistry } from "../../../renderer/modules/registry";
 import type { ToolRenderProps } from "@atelier/sdk/renderer";
 import { toolCallState } from "./tool-state";
 import { resolveToolView, toolPreparation } from "../../../renderer/features/conversation/tool-views";
-import { t } from "../../../renderer/shared/i18n";
 
 const args = { resource_id: "directory", tool: "list", target: { path: "src" }, args: {} };
 const invocation = { implementation: reference(DirectoryList), resource: { id: "directory", kind: "atelier.core/directory", title: "Saved title" }, startedAt: 100 };
@@ -27,7 +26,7 @@ describe("工具调用的展示投影", () => {
     expect(view.props).toBe(props);
     expect(view.header).toBeUndefined();
     expect(view.body).toBeUndefined();
-    expect(toolPreparation(name)).toBe(t.toolPreparing);
+    expect(toolPreparation(name)).toBe("Preparing resource operation…");
   });
 
   it("填充不解析参数也不可展开；等待不伪装执行；有运行产出后才可展开", () => {

@@ -1,25 +1,29 @@
-import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
-import { pluginOf, reference, type Json } from "@atelier/sdk/contracts";
+import { pluginOf, reference, type Json, type UiText } from "@atelier/sdk/contracts";
 import { RendererPreferencesProvider, type CreationEntry, type CreationSource, type DropItem } from "@atelier/sdk/renderer";
-import type { SessionController } from "../session/controller";
-import type { WorkbenchCanvas } from "../workbench/canvas";
+import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
+
+import { errorDisplay } from "../../../shared/error-display.ts";
 import type { Point } from "../../../shared/workbench";
-import { useModuleViews } from "../../modules/views";
-import { SlotBoundary } from "../../modules/SlotBoundary";
+import { commonMessages } from "../../messages/common";
+import { creationMessages } from "../../messages/creation";
 import { RendererCatalogProvider } from "../../modules/object-context";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "../../shared/ui/dialog";
+import { SlotBoundary } from "../../modules/SlotBoundary";
+import { useModuleViews } from "../../modules/views";
+import { useI18n } from "../../shared/i18n";
 import { Alert, AlertDescription } from "../../shared/ui/alert";
 import { Button } from "../../shared/ui/button";
 import { Checkbox } from "../../shared/ui/checkbox";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "../../shared/ui/dialog";
 import { Label } from "../../shared/ui/label";
 import { Spinner } from "../../shared/ui/spinner";
-import { s, t } from "../../shared/i18n";
-import { canDropKind, dropCandidates, rememberedEntry, routeKey, type DragKind } from "./routing";
+import type { SessionController } from "../session/controller";
+import type { WorkbenchCanvas } from "../workbench/canvas";
 import { pluginPreferences, readPreference, writePreference } from "./preferences";
+import { canDropKind, dropCandidates, rememberedEntry, routeKey, type DragKind } from "./routing";
 
 type InputState = { entry: CreationEntry; source: CreationSource; position: Point | null; done: (ok: boolean) => void };
 type ChoiceState = { item: DropItem; candidates: CreationEntry[]; key: string; done: (entry: CreationEntry | null) => void };
-type RunningState = { label: string; requestId: string; sessionId: string };
+type RunningState = { label: import("@atelier/sdk/contracts").UiText; requestId: string; sessionId: string };
 
 export interface CreationCoordinator {
   /** 菜单入口，按装配顺序。 */
@@ -37,11 +41,12 @@ export interface CreationCoordinator {
 export function useCreationCoordinator({ controller, canvas, writable, ready }: {
   controller: SessionController | null; canvas: () => WorkbenchCanvas | null; writable: boolean; ready: boolean;
 }): CreationCoordinator {
+  const i18n = useI18n();
   const registry = useModuleViews();
   const [input, setInput] = useState<InputState | null>(null);
   const [choice, setChoice] = useState<ChoiceState | null>(null);
   const [running, setRunning] = useState<RunningState | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<UiText | null>(null);
   const [busy, setBusy] = useState(false);
   const latest = useRef({ controller, writable });
   latest.current = { controller, writable };
@@ -52,14 +57,14 @@ export function useCreationCoordinator({ controller, canvas, writable, ready }: 
     if (!active) return false;
     const kind = entry.contract.resource.kind;
     const placement = position ?? canvas()?.findPlacement({ kind })?.position ?? null;
-    if (!placement) { setError(s("The workbench is not ready. Try again.", "工作台尚未就绪，请重试。")); return false; }
+    if (!placement) { setError(creationMessages.workbenchNotReady); return false; }
     const requestId = crypto.randomUUID();
     setError(null); setBusy(true);
     setRunning({ label: entry.label, requestId, sessionId: active.sessionId });
     try {
       const result = await active.executeAndRead({ type: "resource.create", sessionId: active.sessionId, kind,
         creation: reference(entry.contract), input: value, position: placement, requestId });
-      if (!result.ok) setError(result.error.message);
+      if (!result.ok) setError(errorDisplay(result.error));
       return result.ok;
     } finally {
       setBusy(false);
@@ -123,10 +128,10 @@ export function useCreationCoordinator({ controller, canvas, writable, ready }: 
     {input && View && <Dialog open onOpenChange={next => { if (!next) closeInput(false); }}>
       <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{input.entry.label}</DialogTitle>
-          <DialogDescription className={input.entry.description ? undefined : "sr-only"}>{input.entry.description ?? input.entry.label}</DialogDescription>
+          <DialogTitle>{i18n.text(input.entry.label)}</DialogTitle>
+          <DialogDescription className={input.entry.description ? undefined : "sr-only"}>{i18n.text(input.entry.description ?? input.entry.label)}</DialogDescription>
         </DialogHeader>
-        {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
+        {error && <Alert variant="destructive"><AlertDescription>{i18n.text(error)}</AlertDescription></Alert>}
         <RendererCatalogProvider ready={ready}>
           <SlotBoundary><RendererPreferencesProvider value={pluginPreferences(pluginOf(input.entry.id)!)}>
             <View source={input.source} busy={busy || !writable}
@@ -147,8 +152,8 @@ export function useCreationCoordinator({ controller, canvas, writable, ready }: 
       setChoice(null); choice.done(entry);
     }} />}
     {running && !input && <div role="status" className="surface-floating fixed bottom-4 left-1/2 z-[60] flex -translate-x-1/2 items-center gap-3 p-1 pl-3 text-sm">
-      <Spinner aria-hidden="true" /><span>{s(`Adding ${running.label}…`, `正在添加${running.label}…`)}</span>
-      <Button size="sm" variant="ghost" onClick={cancelRunning}>{t.cancel}</Button>
+      <Spinner aria-hidden="true" /><span>{i18n.formatMessage(creationMessages.adding, { running_label: i18n.text(running.label) })}</span>
+      <Button size="sm" variant="ghost" onClick={cancelRunning}>{i18n.formatMessage(commonMessages.cancel)}</Button>
     </div>}
   </>;
   return { menu, open, canDrop, drop, element };
@@ -156,25 +161,26 @@ export function useCreationCoordinator({ controller, canvas, writable, ready }: 
 
 /** 多个入口受理同一拖入项时由用户选择，可记住此类内容的选择。 */
 function RouteChooser({ choice, onDone }: { choice: ChoiceState; onDone: (entry: CreationEntry | null, remember: boolean) => void }) {
+  const i18n = useI18n();
   const [remember, setRemember] = useState(false);
-  const subject = choice.item.kind === "file" ? choice.item.name : choice.item.kind === "url" ? choice.item.url : s("Text", "文本");
+  const subject = choice.item.kind === "file" ? choice.item.name : choice.item.kind === "url" ? choice.item.url : i18n.formatMessage(creationMessages.text);
   return <Dialog open onOpenChange={next => { if (!next) onDone(null, false); }}>
     <DialogContent>
       <DialogHeader>
-        <DialogTitle>{s("Add as…", "添加为…")}</DialogTitle>
+        <DialogTitle>{i18n.formatMessage(creationMessages.addAs)}</DialogTitle>
         <DialogDescription className="break-all">{subject}</DialogDescription>
       </DialogHeader>
       <div className="flex flex-col gap-1">
         {choice.candidates.map(entry => <Button key={entry.id} variant="ghost" className="justify-start" onClick={() => onDone(entry, remember)}>
-          {entry.icon}<span>{entry.label}</span>
+          {entry.icon}<span>{i18n.text(entry.label)}</span>
         </Button>)}
       </div>
       <DialogFooter className="items-center sm:justify-between">
         <div className="flex items-center gap-2">
           <Checkbox id="creation-route-remember" checked={remember} onCheckedChange={value => setRemember(value === true)} />
-          <Label htmlFor="creation-route-remember">{s("Remember for this type", "此类内容记住选择")}</Label>
+          <Label htmlFor="creation-route-remember">{i18n.formatMessage(creationMessages.rememberType)}</Label>
         </div>
-        <Button variant="ghost" onClick={() => onDone(null, false)}>{t.cancel}</Button>
+        <Button variant="ghost" onClick={() => onDone(null, false)}>{i18n.formatMessage(commonMessages.cancel)}</Button>
       </DialogFooter>
     </DialogContent>
   </Dialog>;

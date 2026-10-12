@@ -138,7 +138,7 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
   };
   const context: PluginContext = {
     id: internal.id, dir: internal.dir, log: internal.log,
-    config: (schema, defaults) => { checkAvailable(); return internal.config(schema, defaults); },
+    config: (schema, defaults, options) => { checkAvailable(); return internal.config(schema, defaults, options); },
     secrets: internal.secrets, db: () => { checkAvailable(); return internal.db(); },
     tasks: {
       start(key, run, options) {

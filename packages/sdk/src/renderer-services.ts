@@ -4,7 +4,7 @@ import type { DataContract } from "./presentation.ts";
 import type { ModelLiveBlock } from "./models.ts";
 import type { ToolRenderProps, ToolView } from "./renderer.ts";
 
-export interface RendererCatalogs { get<T extends Json>(contract: DataContract<T>): T | null; error: string | null }
+export interface RendererCatalogs { get<T extends Json>(contract: DataContract<T>): T | null; error: UiText | null }
 export interface RendererTools {
   resolve(props: ToolRenderProps): ToolView & { props: ToolRenderProps };
   preparation(name: string): string;
@@ -27,3 +27,4 @@ export function useRendererCatalogs(): RendererCatalogs { return required(useCon
 export function useRendererTools(): RendererTools { return required(useContext(Tools), "tools"); }
 export function useRendererModels(): RendererModels { return required(useContext(Models), "models"); }
 export function useRendererNavigation(): RendererNavigation { return required(useContext(Navigation), "navigation"); }
+import type { UiText } from "./i18n.ts";
