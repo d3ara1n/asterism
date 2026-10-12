@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { defineRecord, type SessionRecord } from "@atelier/sdk/contracts";
 import { Execution, ContextNotice } from "../modules/agent/records.ts";
@@ -46,6 +46,25 @@ describe("共享时间轴的契约解码", () => {
       type: "block", block: { kind: "text", text: "Answer", requestParentId: null, continuation: { opaque: "resume" },
       source: { model: "p/m", adapter: "adapter", scope: "scope" }, completion: { finishReason: "stop", providerResponseId: "remote" },
     } } });
+  });
+  it("具型 last 按范围索引仅解码目标；最新坏记录不回退，固定快照不受后续追加影响", () => {
+    const node = { id: "first", sessionId: "s", parentId: null, createdAt: record.createdAt, kind: "event" as const,
+      type: contract.id, data: { value: 1 }, agentId: null, model: null };
+    const branch = { ...node, id: "branch", parentId: node.id, data: { value: "bad" } };
+    const unrelated = Array.from({ length: 1000 }, (_, i) => ({ ...node, id: `noise-${i}`, type: "other/noise" }));
+    const nodes = [node, ...unrelated, branch];
+    const view = sessionView("s", "Indexed", nodes, [node]);
+    const decode = vi.spyOn(contract, "decode");
+    expect(view.records.last(contract, { scope: "session" })).toMatchObject({ status: "unknown", record: { id: "branch" } });
+    expect(decode).toHaveBeenCalledTimes(1);
+    expect(view.records.last(contract, { scope: "path" })).toMatchObject({ status: "known", data: { value: 1 } });
+    expect(decode).toHaveBeenCalledTimes(2);
+    expect(view.records.first(contract, { scope: "session" })).toMatchObject({ status: "known", record: { id: "first" } });
+    expect(decode).toHaveBeenCalledTimes(3);
+    expect(view.records.last(Execution, { scope: "session" })).toBeNull();
+    nodes.push({ ...node, id: "later" });
+    expect(view.records.last(contract, { scope: "session" })?.record.id).toBe("branch");
+    decode.mockRestore();
   });
   it("环境可见性经具型记录读取，原始事件身份与载荷保留", () => {
     const node: SessionNode = { id: "event", sessionId: "s", parentId: null, createdAt: record.createdAt,

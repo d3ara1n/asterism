@@ -518,6 +518,41 @@ describe("工作台 SDK 的宿主实现", () => {
     expect(service.sessions.tree.nodes(sessionId)).toHaveLength(2);
   });
 
+  it("标题比较更新与来源事件同事务生效，后续异常回滚且观察者只看到一致状态", () => {
+    const seen: [string, number][] = [];
+    const c = counter({ observe: (record, plugin) => {
+      const changed = Changed.decode(record);
+      if (changed?.status === "known") seen.push([plugin.session(record.sessionId).title.get(), changed.data.value]);
+    } });
+    const { service, sessionId } = open([c.plugin]);
+    const session = c.context().session(sessionId);
+    expect(() => session.commit(writer => {
+      expect(session.title.propose("Rolled back", { expected: "Counter" })).toBe(true);
+      writer.append(Changed, { value: 1 });
+      throw new Error("Reject this commit.");
+    })).toThrow("Reject this commit.");
+    expect(session.title.get()).toBe("Counter");
+    expect(session.snapshot().records.last(Changed, { scope: "session" })).toBeNull();
+    expect(seen).toEqual([]);
+    session.commit(writer => {
+      expect(session.title.propose("Applied", { expected: "Counter" })).toBe(true);
+      writer.append(Changed, { value: 2 });
+    });
+    expect(session.title.get()).toBe("Applied");
+    expect(session.snapshot().records.last(Changed, { scope: "session" })).toMatchObject({ data: { value: 2 } });
+    expect(seen).toEqual([["Applied", 2]]);
+    session.commit(writer => {
+      if (session.title.propose("Stale", { expected: "Counter" })) writer.append(Changed, { value: 3 });
+    });
+    expect(session.title.get()).toBe("Applied");
+    expect(session.snapshot().records.query(Changed, { scope: "session" })).toHaveLength(1);
+    const other = service.sessions.tree.create("Other");
+    expect(() => session.commit(() => {
+      c.context().session(other).title.propose("Foreign", { expected: "Other" });
+    })).toThrow(/cannot rename another session/);
+    expect(c.context().session(other).title.get()).toBe("Other");
+  });
+
   it("公开 run 交付单次执行事件，由插件声明的记录保存；没有隐式历史或下一请求", async () => {
     const c = counter();
     const Execution = defineRecord(ns.name("execution"), { schema: modelRunRecordSchema });

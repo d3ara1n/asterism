@@ -48,6 +48,8 @@ export interface SessionView {
     all(query: RecordQuery): readonly SessionRecord[];
     /** 最早一条匹配记录；不可解码时返回 unknown，不跳过。 */
     first<D extends Json>(contract: RecordContract<D>, query: RecordQuery): Decoded<D> | null;
+    /** 最新一条匹配记录；按契约索引定位，仅解码该记录；不可解码时返回 unknown，不回退。 */
+    last<D extends Json>(contract: RecordContract<D>, query: RecordQuery): Decoded<D> | null;
     query<D extends Json>(contract: RecordContract<D>, query: RecordQuery): Decoded<D>[];
   };
 }

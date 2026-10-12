@@ -18,6 +18,7 @@ export interface SessionReader {
 export interface SessionExecutor extends SessionReader {
   resume(): void;
   commit(work: (writer: SessionWriter) => undefined): void;
+  /** propose 可在同步 commit 内调用，与该次数据／事件写入原子生效；false 表示标题未应用。 */
   readonly title: SessionReader["title"] & { propose(text: string, options: { expected: string }): boolean };
 }
 export interface ObjectReader {

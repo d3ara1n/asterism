@@ -1,4 +1,4 @@
-import type { Json, RecordContract, RecordQuery, SessionRecord, SessionView } from "@atelier/sdk/contracts";
+import type { Decoded, Json, RecordContract, RecordQuery, SessionRecord, SessionView } from "@atelier/sdk/contracts";
 import type { SessionNode } from "../shared/session.ts";
 import { decodeCoreRecord } from "./core-records.ts";
 import type { ResourceRef, ResourceSnapshot, SessionSnapshot } from "@atelier/sdk/contracts";
@@ -55,9 +55,29 @@ export function sessionSnapshot(id: string, title: string, nodes: readonly Sessi
 export function sessionView(id: string, title: string, nodes: readonly SessionNode[], path: readonly SessionNode[]): SessionView {
   const session = Object.freeze(toRecords(nodes, nodes));
   const onPath = new Set(path.map(node => node.id));
-  const pathRecords = Object.freeze(session.filter(record => onPath.has(record.id)));
+  const pathRecords: SessionRecord[] = [];
+  const sessionFirst = new Map<string, SessionRecord>(), sessionLast = new Map<string, SessionRecord>();
+  const pathFirst = new Map<string, SessionRecord>(), pathLast = new Map<string, SessionRecord>();
+  const index = (record: SessionRecord, first: Map<string, SessionRecord>, last: Map<string, SessionRecord>) => {
+    if (!first.has(record.contract.id)) first.set(record.contract.id, record);
+    last.set(record.contract.id, record);
+  };
+  // 固定快照只建一次首尾索引；高频查询不遍历历史，也不解码无关或较早记录。
+  for (const record of session) {
+    index(record, sessionFirst, sessionLast);
+    if (onPath.has(record.id)) { pathRecords.push(record); index(record, pathFirst, pathLast); }
+  }
+  Object.freeze(pathRecords);
   const all = (query: RecordQuery) => query.scope === "session" ? session : pathRecords;
   const query = <D extends Json>(contract: RecordContract<D>, q: RecordQuery) =>
     all(q).flatMap(record => { const decoded = contract.decode(record); return decoded ? [decoded] : []; });
-  return { id, title, records: { all, first: (contract, q) => query(contract, q)[0] ?? null, query } };
+  const lookup = <D extends Json>(contract: RecordContract<D>, q: RecordQuery,
+    sessionIndex: Map<string, SessionRecord>, pathIndex: Map<string, SessionRecord>): Decoded<D> | null => {
+    const record = (q.scope === "session" ? sessionIndex : pathIndex).get(contract.id);
+    return record ? contract.decode(record) : null;
+  };
+  return { id, title, records: { all, query,
+    first: (contract, q) => lookup(contract, q, sessionFirst, pathFirst),
+    last: (contract, q) => lookup(contract, q, sessionLast, pathLast),
+  } };
 }

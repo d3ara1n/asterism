@@ -59,6 +59,11 @@ export class SessionService {
       proposeTitle: (sessionId, text, expected) => {
         const title = text.replace(/\s+/gu, " ").trim().slice(0, 160);
         if (!title || this.closed) return false;
+        // 插件可在同步提交内同时应用标题与追加来源事件，失败时由外层事务一起回滚。
+        if (this.committing) {
+          if (this.committing.sessionId !== sessionId) throw new SessionError("conflict", "A commit cannot rename another session.");
+          return this.tree.rename(sessionId, title, expected);
+        }
         const applied = this.transaction(() => this.tree.rename(sessionId, title, expected));
         if (applied) this.notify(sessionId);
         return applied;

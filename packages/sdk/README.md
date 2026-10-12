@@ -45,6 +45,8 @@ export default definePlugin({ namespace: ns, version: "1.0.0", modules: [
 
 快照的路径、记录和不可变资源数据固定在读取时刻，`position.nodeId / continuationId` 分别给出当前位置与可续接位置。`session.get` 和 `object.get` 读取当前数据；数据按会话、对象作用域和具型契约隔离，随会话保存，不能据此恢复历史。数据契约使用 `ns.data(name, schema)`，记录使用 `defineRecord(id, { schema })`，均不要求手填版本。读取按所属类型的 schema 解码；兼容数据继续读取，不兼容数据明确不可用或保留 unknown。插件用自己的 schema 兼容旧形状并负责迁移，读取不修改原始记录。纯数据提交通知视图，不追加时间轴或触发事件观察者。
 
+`snapshot.records.first(Contract, {scope}) / last(Contract, {scope})` 按固定快照的契约首尾索引定位，只解码目标记录；返回 null／known／unknown，损坏的首尾记录不跳过。`query` 解码所有匹配记录，`all` 提供原始信封。`scope` 为 `path` 或 `session`。`session.title.propose(text, {expected})` 可在同步 `commit` 内调用，与本次事件／数据一起提交或回滚；需记录标题来源的插件自行声明记录并在标题应用成功后追加。
+
 资源通过 `implementResource` 聚合 `project / inspect / context`、可选创建实现和动作实现集合。`defineCreation / defineAction` 在纯契约中声明身份、关联资源与输入 schema，`implementCreation / implementAction` 绑定具型实现。外部准备者通过 `implementPreparer` 绑定具体动作，按装配顺序处理后进入资源自己的准备；替换只能改变同一动作的输入。
 
 schema 支持默认值、去空白与转换。调用方提交 schema 的输入类型，准备与执行接收输出类型；两侧均为 JSON 值。每份新输入由宿主解析一次。创建与动作准备均返回 `accept / replace / reject`：接受沿用解析结果，替换提交新的原始输入并解析一次，拒绝终止处理。执行层不再解析。默认值示例和字符串转数字的类型反例见 [作者用例](examples/author.ts)。
@@ -105,7 +107,7 @@ import { Read, settings, service } from "@example/tools/public";
 
 ## 版本与当前边界
 
-SDK 包版本为 `0.2.0`，插件清单要求 `api: { major: 2, minMinor: 0 }`。旧对象接口、原始 JSON 动作调用和领域契约 version 参数已移除，API 1 插件在加载前明确拒绝；构建产物按内容缓存。会话 IPC 版本为 10，工作数据库格式为 14，应用配置格式仍为 1。
+SDK 包版本为 `0.3.0`，宿主提供 API 2.1；使用 `records.last` 或提交内标题更新的插件声明 `api: { major: 2, minMinor: 1 }`。API 2.0 插件仍可加载，API 1 插件在加载前明确拒绝；构建产物按内容缓存。会话 IPC 版本为 11，工作数据库格式为 14，应用配置格式仍为 1。
 
 资源创建数据必须是 JSON 对象，不能占用宿主的 `id / type / title` 字段。当前会话数据保存于 `session_data`，事件及工具结果保存稳定契约身份与原始数据。core 消费具型用户消息、模型执行、通知与环境记录，存储编码由宿主负责；环境记录保留原事件身份与载荷。
 

@@ -9,8 +9,8 @@ import type { PluginDefinition } from "@atelier/sdk/runtime";
 import type { Plugin } from "esbuild";
 import { compileModules, packageModule, type PackageModule } from "./package-modules.ts";
 
-/** SDK 主版本；插件清单的 api.major 必须相同，minMinor 不得高于宿主。 */
-export const sdkApi = { major: 2, minor: 0 } as const;
+/** SDK API 版本；插件清单的 api.major 必须相同，minMinor 不得高于宿主。 */
+export const sdkApi = { major: 2, minor: 1 } as const;
 
 /** 插件包清单：package.json 的 atelier 字段；源码与发布产物读同一份。 */
 export const manifestSchema = z.strictObject({

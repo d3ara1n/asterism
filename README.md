@@ -75,6 +75,7 @@ npm run build
 | [对象模型](docs/object-model.md) | Workspace、Session、资源、操作、关系与视图 |
 | [运行时与上下文](docs/runtime.md) | 执行轮次、资源绑定、工具、权限与模型输入 |
 | [模型与代理配置](docs/model-configuration.md) | 提供商、模型角色、代理配置及对话模型覆盖 |
+| [自动会话命名](docs/session-naming.md) | 两级自动命名、标题来源事件与异步更新保护 |
 | [时间线与恢复](docs/timeline.md) | 事件、检查点、历史查看、分叉与恢复 |
 | [工作台交互](docs/workbench.md) | 卡片、连线、执行段与时间导航 |
 | [技术架构](docs/architecture.md) | 桌面技术栈、进程职责、存储与扩展契约 |

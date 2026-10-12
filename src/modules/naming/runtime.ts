@@ -1,29 +1,76 @@
-import { defineModule } from "@atelier/sdk/runtime";
+import { defineModule, type ModelServices } from "@atelier/sdk/runtime";
+import type { SessionSnapshot } from "@atelier/sdk/contracts";
 import { coreId, coreNamespace } from "../../shared/core.ts";
 import { UserMessage } from "../agent/records.ts";
+import { NamingAttempt, SessionNamed } from "./records.ts";
+import { cleanTitle, collectTurns, namingInstruction, namingPrompt, renameCheckpoints } from "./policy.ts";
 
-/** 会话命名：会话第一条用户消息提交后，由 utility 角色异步生成标题；失败保留原标题。 */
-const instruction = "Generate a concise title (at most 8 words) for a conversation that starts with the user's message below. Reply with the title only, without quotes or punctuation at the end.";
+const timeoutMs = 10_000;
+const responseLimit = 4000;
 
+async function generateTitle(models: Pick<ModelServices, "stream">, prompt: string, signal: AbortSignal): Promise<string> {
+  let text = "", finished = false;
+  const textParts = new Set<string>();
+  for await (const event of models.stream({
+    target: { role: "utility" }, signal,
+    system: { blocks: [{ id: coreId("session-naming"), kind: "system", from: coreNamespace, text: namingInstruction }] },
+    messages: [{ kind: "input", text: prompt }],
+  })) {
+    signal.throwIfAborted();
+    if (event.type === "part.start" && event.part.kind === "text") textParts.add(event.part.id);
+    if (event.type === "part.delta" && textParts.has(event.partId)) {
+      text += event.delta;
+      if (text.length > responseLimit) throw new Error("The naming response exceeded its output limit.");
+    }
+    if (event.type === "finish") {
+      if (event.reason !== "stop") throw new Error(`The naming response did not finish normally (${event.reason}).`);
+      finished = true;
+    }
+  }
+  signal.throwIfAborted();
+  const title = cleanTitle(text);
+  if (!finished || !title) throw new Error("The naming response did not contain a complete title.");
+  return title;
+}
+
+/** 用户消息触发两级自动命名；助手输出只作为材料，命名事件不进入模型对话。 */
 export default defineModule(plugin => ({
+  records: [SessionNamed, NamingAttempt],
   observers: [{
     id: "session-naming",
     committed({ records, snapshot, session }) {
-      // 只认全会话最早的用户消息，且它属于本批次；其他代理输入与分支不重新命名。
+      const latest = snapshot.records.last(UserMessage, { scope: "path" });
+      if (latest?.status !== "known" || !records.some(record => record.id === latest.record.id)) return;
+      const named = snapshot.records.last(SessionNamed, { scope: "session" });
+      if (named?.status === "unknown" || named?.data.source === "user" || (named && named.data.title !== snapshot.title)) return;
       const first = snapshot.records.first(UserMessage, { scope: "session" });
-      if (first?.status !== "known" || !records.some(record => record.id === first.record.id)) return;
-      const message = first.data;
-      const expected = snapshot.title;
-      plugin.tasks.start(`naming:${session.id}`, async signal => {
-        let text = "";
-        for await (const event of plugin.models.stream({ target: { role: "utility" }, signal,
-          system: { blocks: [{ id: coreId("session-naming"), kind: "system", from: coreNamespace, text: instruction }] },
-          messages: [{ kind: "input", text: message.text.slice(0, 4000) }] })) {
-          if (event.type === "part.delta") text += event.delta;
-        }
-        const title = text.trim().replace(/^["'“”]+|["'“”。.]+$/gu, "").trim();
-        if (title && !signal.aborted) session.title.propose(title, { expected });
-      }, { timeoutMs: 30_000 });
+      const initial = first?.status === "known" && records.some(record => record.id === first.record.id);
+      const message = initial ? first : latest;
+      const level = initial ? "initial" : "refined";
+      if (level === "refined" && !renameCheckpoints.has(snapshot.records.query(UserMessage, { scope: "path" }).length)) return;
+      const previous = snapshot.records.last(NamingAttempt, { scope: "session" });
+      if (previous?.status === "unknown" || previous?.data.messageId === message.record.id) return;
+      if (!plugin.models.roles().some(role => role.id === "utility" && role.model !== null)) return;
+      const expected = snapshot.title, nameId = named?.record.id ?? null;
+      const prompt = namingPrompt(level === "initial" ? [{ user: message.data.text }]
+        : collectTurns(snapshot.records.all({ scope: "path" })));
+      let attemptId: string;
+      const isCurrent = (view: SessionSnapshot) => view.title === expected &&
+        view.records.last(NamingAttempt, { scope: "session" })?.record.id === attemptId &&
+        (view.records.last(SessionNamed, { scope: "session" })?.record.id ?? null) === nameId &&
+        view.records.last(UserMessage, { scope: "path" })?.record.id === latest.record.id;
+      const started = plugin.tasks.start(`naming:${session.id}:${message.record.id}`, async signal => {
+        if (!isCurrent(session.snapshot())) return;
+        const title = await generateTitle(plugin.models, prompt, signal);
+        if (!isCurrent(session.snapshot())) return;
+        // 比较更新与来源事件加入同一事务；事件保存实际生效标题，原历史保持不变。
+        session.commit(writer => {
+          if (session.title.propose(title, { expected })) writer.append(SessionNamed, { title: session.title.get(), source: level });
+        });
+      }, { timeoutMs });
+      if (started) session.commit(writer => {
+        attemptId = writer.append(NamingAttempt, { messageId: message.record.id, level });
+      });
     },
   }],
 }));

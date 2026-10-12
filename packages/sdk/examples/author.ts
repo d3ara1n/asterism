@@ -29,6 +29,10 @@ export const journalPlugin = definePlugin({
 export function annotate(plugin: PluginContext, sessionId: string, text: string) {
   plugin.session(sessionId).commit(writer => { writer.append(Annotation, { text }); });
 }
+/** 最新具型记录按契约索引定位；unknown 保留给领域消费者处理。 */
+export function latestAnnotation(plugin: PluginContext, sessionId: string) {
+  return plugin.session(sessionId).snapshot().records.last(Annotation, { scope: "session" });
+}
 const CurrentSummary = journal.data("summary", z.strictObject({ text: z.string() }));
 /** 当前会话数据不进入时间轴；与对象数据及插件私有数据库分别保存。 */
 export function saveSummary(plugin: PluginContext, sessionId: string, text: string) {

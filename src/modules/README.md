@@ -86,7 +86,7 @@ args、target、result schema 必须有非空的整体 description，声明 help
 
 `session.get / commit` 与 `object.get / commit` 分别作用于当前会话数据与当前对象数据，数据按契约身份保存到 `session_data`，读取由 schema 判断兼容性；不维护手填数据版本。当前值不随历史位置恢复；重建历史须消费不可变时间轴事件。插件目录的数据独立于会话生命周期。
 
-Agent 的选择和提交去重保存于对象数据，用户输入与执行输出保存为 `UserMessage / Execution / Notice` 记录；每次请求由 `agent/projection.ts` 重建消息。`agent/configuration.ts` 声明只读配置目录，应用级配置与用户覆盖仍由宿主保存。运行以对象绑定任务承载，取消与关闭由托管设施收束；会话仅在全部对象收束后允许回溯，移除对象也要求该对象收束。命名使用首条 `UserMessage`，通过 `models.stream` 和标题比较更新完成。
+Agent 的选择和提交去重保存于对象数据，用户输入与执行输出保存为 `UserMessage / Execution / Notice` 记录；每次请求由 `agent/projection.ts` 重建消息。`agent/configuration.ts` 声明只读配置目录，应用级配置与用户覆盖仍由宿主保存。运行以对象绑定任务承载，取消与关闭由托管设施收束；会话仅在全部对象收束后允许回溯，移除对象也要求该对象收束。命名依赖同插件的 Agent 契约，用户消息触发两级自动命名；标题与来源事件同事务保存，规则见 [自动会话命名](../../docs/session-naming.md)。
 
 ## 资源视图
 
