@@ -2,13 +2,15 @@ import { createContext, useContext, type ComponentType, type ReactNode } from "r
 import type { z } from "zod";
 import type { CreationContract } from "./commands.ts";
 import type { Json } from "./json.ts";
+import type { RendererContentInput } from "./renderer-content.ts";
 
 /**
  * 拖入内容的宿主快照：放下时由宿主从 DataTransfer 读出，事件结束后仍然有效。
  * 文件路径由宿主经桌面桥解析，插件不能伪造。
  */
 export type DropItem =
-  | { readonly kind: "file"; readonly path: string; readonly name: string; readonly mime: string; readonly directory: boolean }
+  /** 本机拖入带宿主解析的 path；剪贴板图片等无路径来源只有 file 字节。 */
+  | { readonly kind: "file"; readonly file: File; readonly name: string; readonly mime: string; readonly directory: boolean; readonly path?: string }
   | { readonly kind: "url"; readonly url: string }
   | { readonly kind: "text"; readonly text: string };
 
@@ -17,7 +19,8 @@ export type DropItem =
  * 扩展名含前导点、小写；MIME 支持 `image/*` 形式的通配。
  */
 export interface DropAccepts {
-  readonly files?: { readonly directories?: boolean; readonly extensions?: readonly string[]; readonly mime?: readonly string[] };
+  /** requiresPath 只受理带本机路径的条目；directories 隐含需要路径。 */
+  readonly files?: { readonly requiresPath?: boolean; readonly directories?: boolean; readonly extensions?: readonly string[]; readonly mime?: readonly string[] };
   readonly urls?: { readonly schemes?: readonly string[] };
   readonly text?: boolean;
 }
@@ -39,6 +42,7 @@ export interface CreationInputProps<I = Json> {
   readonly source: CreationSource;
   readonly initialInput?: I;
   readonly busy: boolean;
+  readonly content: RendererContentInput;
   resolve(input: I): Promise<boolean>;
   cancel(): void;
 }
@@ -54,7 +58,7 @@ export interface CreationEntry<I = Json> {
   readonly group?: "agents" | "resources";
   readonly triggers: {
     readonly menu?: { readonly initialInput?: I };
-    readonly drop?: { readonly accepts: DropAccepts; toInput(item: DropItem): I | null };
+    readonly drop?: { readonly accepts: DropAccepts; toInput(item: DropItem, content: RendererContentInput): I | null | Promise<I | null> };
   };
   /** 缺省时由触发来源直接产出输入；菜单来源此时必须提供 initialInput。 */
   readonly InputView?: ComponentType<CreationInputProps<I>>;

@@ -16,10 +16,9 @@ export function snapshotDrop(transfer: DataTransfer): DropItem[] {
     for (const item of entries) {
       const file = item.getAsFile();
       if (!file) continue;
-      const path = window.host.pathForFile(file);
-      if (!path) continue;
-      const directory = item.webkitGetAsEntry()?.isDirectory === true;
-      items.push({ kind: "file", path, name: file.name, mime: directory ? "" : file.type, directory });
+      const path = window.host.pathForFile(file) || undefined;
+      const directory = !!path && item.webkitGetAsEntry()?.isDirectory === true;
+      items.push({ kind: "file", file, name: file.name, mime: directory ? "" : file.type, directory, ...(path ? { path } : {}) });
     }
     return items;
   }

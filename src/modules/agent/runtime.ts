@@ -31,11 +31,11 @@ export default defineModule(plugin => {
       },
       actions: [
         implementAction(SubmitAgentInput, {
-          async prepare(input, object, signal) { await admission.prepare(input, object, signal); return { action: "accept" }; },
+          async prepare(input, { object, signal }) { await admission.prepare(input, object, signal); return { action: "accept" }; },
           async execute(input, object) { if (admission.accept(input, object)) loop.start(object); },
         }),
         implementAction(ContinueAgent, {
-          async prepare(input, object, signal) { await admission.prepare(input, object, signal); return { action: "accept" }; },
+          async prepare(input, { object, signal }) { await admission.prepare(input, object, signal); return { action: "accept" }; },
           async execute(input, object) { if (admission.accept(input, object)) loop.start(object); },
         }),
         implementAction(ConfigureAgent, { async execute(input, object) {

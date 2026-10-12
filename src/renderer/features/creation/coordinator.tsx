@@ -1,6 +1,6 @@
 import { pluginOf, reference, type Json, type UiText } from "@atelier/sdk/contracts";
-import { RendererPreferencesProvider, type CreationEntry, type CreationSource, type DropItem } from "@atelier/sdk/renderer";
-import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
+import { RendererPreferencesProvider, type CreationEntry, type CreationSource, type DropItem, type RendererContentInput } from "@atelier/sdk/renderer";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { errorDisplay } from "../../../shared/error-display.ts";
 import type { Point } from "../../../shared/workbench";
@@ -20,10 +20,11 @@ import type { SessionController } from "../session/controller";
 import type { WorkbenchCanvas } from "../workbench/canvas";
 import { pluginPreferences, readPreference, writePreference } from "./preferences";
 import { canDropKind, dropCandidates, rememberedEntry, routeKey, type DragKind } from "./routing";
+import { contentInput, contentScopeId } from "./content";
 
-type InputState = { entry: CreationEntry; source: CreationSource; position: Point | null; done: (ok: boolean) => void };
+type InputState = { entry: CreationEntry; source: CreationSource; initialInput?: Json; content: RendererContentInput; position: Point | null; done: (ok: boolean) => void };
 type ChoiceState = { item: DropItem; candidates: CreationEntry[]; key: string; done: (entry: CreationEntry | null) => void };
-type RunningState = { label: import("@atelier/sdk/contracts").UiText; requestId: string; sessionId: string };
+type RunningState = { label: import("@atelier/sdk/contracts").UiText; requestId: string; sessionId: string; content?: RendererContentInput };
 
 export interface CreationCoordinator {
   /** 菜单入口，按装配顺序。 */
@@ -48,11 +49,16 @@ export function useCreationCoordinator({ controller, canvas, writable, ready }: 
   const [running, setRunning] = useState<RunningState | null>(null);
   const [error, setError] = useState<UiText | null>(null);
   const [busy, setBusy] = useState(false);
+  const drafts = useRef(new Set<RendererContentInput>());
+  const submitting = useRef(new Set<RendererContentInput>());
+  const inputGeneration = useRef(0);
+  useEffect(() => () => { inputGeneration.current++; for (const draft of drafts.current) void draft.close(); drafts.current.clear(); }, []);
   const latest = useRef({ controller, writable });
   latest.current = { controller, writable };
 
   /** 提交一次创建；带请求身份，准备阶段可由用户取消。 */
-  const create = useCallback(async (entry: CreationEntry, value: Json, position: Point | null): Promise<boolean> => {
+  const create = useCallback(async (entry: CreationEntry, value: Json, position: Point | null, content: RendererContentInput): Promise<boolean> => {
+    if (submitting.current.has(content)) return false;
     const active = latest.current.controller;
     if (!active) return false;
     const kind = entry.contract.resource.kind;
@@ -61,30 +67,61 @@ export function useCreationCoordinator({ controller, canvas, writable, ready }: 
     const requestId = crypto.randomUUID();
     setError(null); setBusy(true);
     setRunning({ label: entry.label, requestId, sessionId: active.sessionId });
+    submitting.current.add(content);
     try {
+      const scopeId = await contentScopeId(content, { sessionId: active.sessionId, resourceKind: kind, contractId: entry.contract.id });
       const result = await active.executeAndRead({ type: "resource.create", sessionId: active.sessionId, kind,
-        creation: reference(entry.contract), input: value, position: placement, requestId });
+        creation: reference(entry.contract), input: value, position: placement, requestId, contentScopeId: scopeId });
       if (!result.ok) setError(errorDisplay(result.error));
       return result.ok;
+    } catch (error) {
+      setError(errorDisplay({ code: "unavailable", message: error instanceof Error ? error.message : "Content input is unavailable." }));
+      return false;
     } finally {
+      submitting.current.delete(content);
       setBusy(false);
       setRunning(current => current?.requestId === requestId ? null : current);
     }
   }, [canvas]);
   // 取消绕过会话命令队列：队列正被这次创建占用。
   const cancelRunning = useCallback(() => {
-    if (running) void window.host.session.execute({ type: "resource.create.cancel", sessionId: running.sessionId, requestId: running.requestId });
+    if (running?.content) { inputGeneration.current++; void running.content.close(); }
+    else if (running) void window.host.session.execute({ type: "resource.create.cancel", sessionId: running.sessionId, requestId: running.requestId });
   }, [running]);
 
-  const collect = useCallback((entry: CreationEntry, source: CreationSource, position: Point | null) =>
-    new Promise<boolean>(done => { setError(null); setInput({ entry, source, position, done }); }), []);
+  const collect = useCallback((entry: CreationEntry, source: CreationSource, position: Point | null, content: RendererContentInput, initialInput?: Json) =>
+    new Promise<boolean>(done => { setError(null); setInput(previous => {
+      previous?.done(false);
+      return { entry, source, position, content, initialInput, done };
+    }); }), []);
 
   /** 有输入视图时打开外壳，否则由来源直接产出输入。 */
   const start = useCallback(async (entry: CreationEntry, source: CreationSource, position: Point | null) => {
-    if (entry.InputView) return collect(entry, source, position);
-    const value = source.kind === "menu" ? entry.triggers.menu?.initialInput : entry.triggers.drop?.toInput(source.item);
-    if (value === undefined || value === null) return false;
-    return create(entry, value as Json, position);
+    const active = latest.current.controller;
+    if (!active) return false;
+    const generation = ++inputGeneration.current;
+    const requestId = crypto.randomUUID();
+    const content = contentInput({ sessionId: active.sessionId, resourceKind: entry.contract.resource.kind, contractId: entry.contract.id });
+    drafts.current.add(content);
+    try {
+      setError(null); setBusy(true);
+      setRunning({ label: entry.label, sessionId: active.sessionId, requestId, content });
+      const value = source.kind === "menu" ? entry.triggers.menu?.initialInput : await entry.triggers.drop?.toInput(source.item, content);
+      setRunning(current => current?.requestId === requestId ? null : current);
+      if (generation === inputGeneration.current) setBusy(false);
+      if (generation !== inputGeneration.current || latest.current.controller?.sessionId !== active.sessionId || !latest.current.writable) return false;
+      if (entry.InputView) return await collect(entry, source, position, content, value ?? undefined);
+      if (value === undefined || value === null) return false;
+      return await create(entry, value as Json, position, content);
+    } catch (error) {
+      if (generation === inputGeneration.current)
+        setError(errorDisplay({ code: "unavailable", message: error instanceof Error ? error.message : "Content input is unavailable." }));
+      return false;
+    } finally {
+      setRunning(current => current?.requestId === requestId ? null : current);
+      if (generation === inputGeneration.current || drafts.current.size === 1) setBusy(false);
+      drafts.current.delete(content); await content.close();
+    }
   }, [collect, create]);
 
   const choose = useCallback((item: DropItem, candidates: CreationEntry[]) => {
@@ -134,12 +171,11 @@ export function useCreationCoordinator({ controller, canvas, writable, ready }: 
         {error && <Alert variant="destructive"><AlertDescription>{i18n.text(error)}</AlertDescription></Alert>}
         <RendererCatalogProvider ready={ready}>
           <SlotBoundary><RendererPreferencesProvider value={pluginPreferences(pluginOf(input.entry.id)!)}>
-            <View source={input.source} busy={busy || !writable}
-              initialInput={input.source.kind === "menu" ? input.entry.triggers.menu?.initialInput
-                : input.entry.triggers.drop?.toInput(input.source.item) ?? undefined}
+            <View source={input.source} busy={busy || !writable} content={input.content}
+              initialInput={input.initialInput}
               resolve={async value => {
-                const ok = await create(input.entry, value, input.position);
-                if (ok) { setInput(null); input.done(true); }
+                const ok = await create(input.entry, value, input.position, input.content);
+                if (ok) { setInput(current => current?.content === input.content ? null : current); input.done(true); }
                 return ok;
               }}
               cancel={() => closeInput(false)} />
@@ -155,6 +191,10 @@ export function useCreationCoordinator({ controller, canvas, writable, ready }: 
       <Spinner aria-hidden="true" /><span>{i18n.formatMessage(creationMessages.adding, { running_label: i18n.text(running.label) })}</span>
       <Button size="sm" variant="ghost" onClick={cancelRunning}>{i18n.formatMessage(commonMessages.cancel)}</Button>
     </div>}
+    {error && !input && !running && <Alert variant="destructive" className="surface-floating fixed bottom-4 left-1/2 z-[60] flex w-auto max-w-lg -translate-x-1/2 items-center gap-3">
+      <AlertDescription>{i18n.text(error)}</AlertDescription>
+      <Button size="sm" variant="ghost" onClick={() => setError(null)}>{i18n.formatMessage(commonMessages.dismissError)}</Button>
+    </Alert>}
   </>;
   return { menu, open, canDrop, drop, element };
 }

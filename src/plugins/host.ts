@@ -3,6 +3,7 @@ import type { NewNode, SessionNode, BlockCompletion } from "../shared/session.ts
 import type { FoldedObject } from "../session/fold.ts";
 import type { AgentCapabilities, ToolPolicy } from "../execution/capabilities.ts";
 import type { ContextFile } from "../resources/contract.ts";
+import type { ContentLease } from "../runtime/content-store.ts";
 
 /** 宿主内部的存储与执行接口；插件只接收 SDK 门面。 */
 export interface SessionHostWriter {
@@ -28,6 +29,7 @@ export interface CatalogHost {
 }
 export interface ObjectScope {
   active: boolean;
+  content?: ContentLease;
   provisional?: boolean;
   /** 宿主已授权的工具执行，仅在调用期间允许提交捕获对象的数据。 */
   execution?: boolean;

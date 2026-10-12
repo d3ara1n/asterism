@@ -45,7 +45,7 @@ export type NewNode = SessionNode extends infer N ? N extends SessionNode ? Omit
 // ---- 会话能力接口 ----
 const uuid = z.string().uuid();
 const text = z.string().trim().min(1).max(100_000);
-export const sessionVersion = 12;
+export const sessionVersion = 13;
 export const viewPositionSchema = z.discriminatedUnion("kind", [
   z.strictObject({ kind: z.literal("live") }),
   z.strictObject({ kind: z.literal("history"), nodeId: id.nullable() }),
@@ -59,11 +59,11 @@ export const sessionCommandSchema = z.discriminatedUnion("type", [
   z.strictObject({ type: z.literal("read"), sessionId: id, position: viewPositionSchema }),
   z.strictObject({ type: z.literal("select"), sessionId: id, nodeId: id.nullable() }),
   // 资源卡片的行为入口：按对象类型路由到资源控制器，command 由该资源模块校验。
-  z.strictObject({ type: z.literal("resource.command"), sessionId: id, objectId: id, command: resourceCallSchema }),
+  z.strictObject({ type: z.literal("resource.command"), sessionId: id, objectId: id, command: resourceCallSchema, contentScopeId: uuid.optional() }),
   // 向工作台添加资源；input 由该资源模块校验。
   z.strictObject({ type: z.literal("resource.create"), sessionId: id, kind: id, creation: contractReferenceSchema, input: jsonSchema, position: pointSchema,
     /** 请求身份：准备阶段可凭它取消。 */
-    requestId: uuid.optional() }),
+    requestId: uuid.optional(), contentScopeId: uuid.optional() }),
   // 取消仍在准备中的创建；已进入事务或不存在的请求不受影响。
   z.strictObject({ type: z.literal("resource.create.cancel"), sessionId: id, requestId: uuid }),
   ...workbenchCommands,

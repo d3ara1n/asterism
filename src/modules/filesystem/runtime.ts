@@ -31,7 +31,7 @@ export default defineModule(() => ({
     },
     creation: implementCreation(CreateDirectory, {
       /** 拖入与对话框共用；title 可选，不填用 basename。只接受存在的绝对目录路径。 */
-      async prepare({ path }, signal) {
+      async prepare({ path }, { signal }) {
         signal.throwIfAborted();
         if (!isAbsolute(path)) throw new PluginApiError("invalid_argument", "Directory path must be absolute.");
         if (!(await stat(path).catch(() => null))?.isDirectory()) throw new PluginApiError("invalid_argument", "The path is not an existing directory.");

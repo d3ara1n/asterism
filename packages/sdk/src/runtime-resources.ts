@@ -5,7 +5,7 @@ import type { ResourceContract, ImplementationContract } from "./module-contract
 import type { RecordContract } from "./records.ts";
 import { reference, present, type DataContract } from "./presentation.ts";
 import { PluginApiError } from "./runtime.ts";
-import type { ContextFile, ObjectReader, ObjectExecutor, CreationContribution, ActionContribution, CommandPreparer, ResourceContribution, ToolContribution, Preparation, CallResult } from "./runtime-contracts.ts";
+import type { ContextFile, ObjectReader, ObjectExecutor, CreationContribution, ActionContribution, CommandPreparer, CreationPreparation, ActionPreparation, ExternalPreparation, ResourceContribution, ToolContribution, Preparation, CallResult } from "./runtime-contracts.ts";
 import { validationMessage, jsonArgumentHint } from "./tool-validation.ts";
 
 function parse<T>(schema: z.ZodType<T>, input: unknown, subject: string): T {
@@ -15,20 +15,20 @@ function parse<T>(schema: z.ZodType<T>, input: unknown, subject: string): T {
 }
 /** 创建与动作在宿主完成校验后调用；类型只在贡献装配处擦除。 */
 export function implementCreation<I, S extends Json, O extends Json>(contract: CreationContract<I, S, O>, definition: {
-  prepare?(input: NoInfer<O>, signal: AbortSignal): Preparation<NoInfer<I> & Json> | Promise<Preparation<NoInfer<I> & Json>>;
+  prepare?(input: NoInfer<O>, context: CreationPreparation): Preparation<NoInfer<I> & Json> | Promise<Preparation<NoInfer<I> & Json>>;
   create(input: NoInfer<O>, object: ObjectExecutor): { title: string; data: NoInfer<S> };
 }): CreationContribution {
   return { contract, ...definition } as CreationContribution;
 }
 export function implementAction<I, O extends Json>(contract: ActionContract<I, O>, definition: {
-  prepare?(input: NoInfer<O>, object: ObjectReader, signal: AbortSignal): Preparation<NoInfer<I> & Json> | Promise<Preparation<NoInfer<I> & Json>>;
+  prepare?(input: NoInfer<O>, context: ActionPreparation): Preparation<NoInfer<I> & Json> | Promise<Preparation<NoInfer<I> & Json>>;
   execute(input: NoInfer<O>, object: ObjectExecutor, signal: AbortSignal): Promise<void>;
 }): ActionContribution {
   return { contract, ...definition } as ActionContribution;
 }
 export function implementPreparer<I, O extends Json>(contract: ActionContract<I, O>, definition: {
   id: string;
-  prepare(input: NoInfer<O>, object: ObjectReader, signal: AbortSignal): Preparation<NoInfer<I> & Json> | Promise<Preparation<NoInfer<I> & Json>>;
+  prepare(input: NoInfer<O>, context: ExternalPreparation): Preparation<NoInfer<I> & Json> | Promise<Preparation<NoInfer<I> & Json>>;
 }): CommandPreparer {
   return { contract, ...definition } as CommandPreparer;
 }

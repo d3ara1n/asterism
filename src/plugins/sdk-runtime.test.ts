@@ -130,7 +130,7 @@ describe("工作台 SDK 的宿主实现", () => {
     await service.sessions.execute({ type: "resource.create", sessionId, kind: Counter.kind,
       creation: { id: contract.id }, input: 0, position: { x: 0, y: 0 } });
     expect(transform.mock.calls.map(([value]) => value)).toEqual([0]);
-    expect(prepare).toHaveBeenCalledWith(1, expect.any(AbortSignal));
+    expect(prepare).toHaveBeenCalledWith(1, { signal: expect.any(AbortSignal), content: expect.objectContaining({ read: expect.any(Function), stage: expect.any(Function) }) });
     expect(created).toHaveBeenCalledWith(1, expect.anything());
   });
   it("动作准备沿用解析结果，替换作为新输入只经资源所有者 schema 解析一次", async () => {
@@ -187,7 +187,7 @@ describe("工作台 SDK 的宿主实现", () => {
     const started = new Promise<void>(resolve => { begin = resolve; });
     const held = new Promise<void>(resolve => { release = resolve; });
     const observer = definePlugin({ namespace: pluginNamespace("test.prepare-close"), version: "1", modules: [defineModule(() => ({
-      preparers: [{ id: "hold", contract: ChangeCount, async prepare(_input, _object, signal) {
+      preparers: [{ id: "hold", contract: ChangeCount, async prepare(_input, { signal }) {
         preparationSignal = signal; begin(); await held; return { action: "accept" };
       } }],
     }))] });
@@ -328,7 +328,7 @@ describe("工作台 SDK 的宿主实现", () => {
     const file = join(root, applicationStorage.databaseDirectory, applicationStorage.databaseFile);
     const db = new DatabaseSync(file);
     try {
-      expect(db.prepare("PRAGMA user_version").get()).toMatchObject({ user_version: 14 });
+      expect(db.prepare("PRAGMA user_version").get()).toMatchObject({ user_version: 15 });
       expect(db.prepare("SELECT contract_id, data_json FROM session_data").all())
         .toMatchObject([{ contract_id: NoteContent.id, data_json: JSON.stringify({ text: "Saved text" }) }]);
       db.exec("PRAGMA user_version = 1");

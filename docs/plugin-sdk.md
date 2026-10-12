@@ -59,7 +59,7 @@
 - `implementResource` 聚合一个可选的创建实现和一组动作实现，以及投影、检查、环境来源和记录声明。动作实现可以独立开发、组合；同一业务操作的参数分支可以继续使用联合类型。
 - `implementPreparer(ActionContract, { id, prepare })` 构造 `CommandPreparer`，由动作契约推导输入，取得只读对象与取消信号，返回接受、替换或拒绝。
 
-前端调用 `object.invoke(ActionContract, input)` 和 `session.create(CreationContract, input, position)`。参数由契约推导；传输只包含契约身份、目标和 JSON 输入，不发送 schema 或函数。宿主按已装配声明验证契约与真实资源类型，拒绝未知或冲突的路由。宿主校验使用自己的声明，不信任调用者提供的契约对象。
+前端调用 `object.invoke(ActionContract, input)` 和 `session.create(CreationContract, input, position)`。参数由契约推导；传输包含契约身份、目标和 JSON 输入，可附带宿主管理的内容作用域身份，不发送 schema 或函数。宿主按已装配声明验证契约与真实资源类型，拒绝未知或冲突的路由。宿主校验使用自己的声明，不信任调用者提供的契约对象。
 
 资源类型拥有的动作保持内联装配，不另设全局动作目录。首页的首次提交仍由宿主协调会话、Agent 创建、首条输入与幂等身份的整体原子提交；领域动作负责输入受理，不能通过准备替换动作身份来绕过首次提交语义。准备者只能替换所绑定动作的输入。
 
@@ -93,7 +93,7 @@ session.create(CreateCounter, { title: "Counter" }, position);
 4. 将解析结果交给对象队列，执行层直接使用，不再套用输入 schema；执行前再次检查真实对象和当前路径等执行条件。
 5. 创建在准备成功后进入宿主事务，创建资源及其初始数据和事件。
 
-准备阶段只读取，不通过所交付门面提交数据。业务执行仍须在最终修改处检查冲突和幂等，不能将异步准备的检查结果视为永久有效。拒绝不会因为准备门面而留下会话数据或事件写入。
+准备阶段不通过所交付门面提交数据。资源自身准备可通过窄内容上下文暂存计算结果，外部准备者仅读取；暂存不建立持久引用。业务执行仍须在最终修改处检查冲突和幂等，不能将异步准备的检查结果视为永久有效。拒绝不会因为准备门面而留下会话数据或事件写入。
 
 SDK helper 负责具型声明与实现包装，宿主命令模块负责解析、路由与准备的调度。宿主内部的解析结果与传输信封分开表示，防止相邻适配层把解析结果误当新输入。例如字符串转数字的动作，调用与 `replace` 提供字符串，准备与执行接收数字；`accept` 不会再触发转换。
 
@@ -139,11 +139,13 @@ core 的用户输入、模型执行和通知与宿主物理会话格式的映射
 
 ## 创建入口
 
-添加菜单与拖放共用一个原语：renderer 模块在 `creations` 中声明 `creationEntry(CreationContract, { id, label, icon?, group?, triggers, InputView? })`。入口是前端贡献，只负责产出创建输入；之后统一进入创建契约的解析、准备与宿主事务。同一契约可以有多个入口（空白、导入、URL 等），一个入口可以同时声明菜单与拖放来源。
+添加菜单与拖放共用一个原语：renderer 模块在 `creations` 中声明 `creationEntry(CreationContract, { id, label, icon?, description?, group?, triggers, InputView? })`。入口 ID 使用插件命名空间，全局唯一；入口只负责产出创建输入，之后统一进入解析、准备与宿主事务。同一契约可以有多个入口，一个入口可以同时声明菜单与拖放来源。
 
 - `triggers.menu`：无载荷来源，可带 `initialInput`。
-- `triggers.drop`：`accepts` 为声明式条件（文件扩展名／MIME／是否目录、URL scheme、文本），悬停时宿主只按类别同步判断，不调用插件函数；放下后宿主先从 DataTransfer 读出 `DropItem` 快照（文件路径经桌面桥解析），再调用 `toInput(item)`，返回 null 表示拒绝。
-- `InputView`：任意插件组件（表单、预览等），只接收 `{ source, initialInput?, busy, resolve, cancel }`，不取得可写会话；缺省时由来源直接产出输入，菜单来源此时必须提供 `initialInput`。
+- `triggers.drop`：`accepts` 为声明式条件（文件的扩展名／MIME／目录、URL scheme、文本）。悬停只按类别同步判断；放下后宿主读取 `DropItem` 快照。文件统一为 `kind: "file"`，总带 `file: File`，本机路径由桌面桥解析为可选 `path`；剪贴板图片等无路径文件同属此类。需要路径的入口声明 `files.requiresPath`，目录入口隐含需要路径。
+- `toInput(item, content)` 可异步上传 File／Blob，只在入口开始时调用一次，返回 null 表示拒绝；输入视图取得已计算的初始输入。
+- `InputView` 接收 `{ source, initialInput?, busy, content, resolve, cancel }`，不取得可写会话。`content` 是绑定创建契约的输入草稿；resolve 自动附带作用域，失败保留草稿，成功或取消后关闭。缺省输入视图时由来源直接产出输入，菜单来源须提供 `initialInput`。
+- 工作台粘贴图片复用无路径字节文件的路由；文本编辑控件保留自身粘贴行为。
 
 宿主创建协调器负责：候选仲裁、输入视图外壳与错误边界、放置位置、提交、等待与取消。0 个候选不受理，1 个直接进入，多个由用户选择并可记住。多项拖入逐项路由。联网等异步业务判断放在创建契约的 `prepare`；创建请求带请求身份，用户可在准备阶段取消，已进入事务的创建不受影响。
 
@@ -157,18 +159,22 @@ core 的用户输入、模型执行和通知与宿主物理会话格式的映射
 
 Agent 对话由时间轴展示、输出跟随、消息输入、配置选择、Agent 交互协调组成。展示模块消费投影后的条目和明确的操作意图；交互协调负责受理结果、去重身份、发送后清理、继续与停止。只读对话与完整 Agent 对话复用同一套展示模块，差异在组合位置表达，不向单个组件累加控制全部功能的开关。
 
-## 创建入口
+## 不可变内容
 
-添加菜单与拖放共用一个原语：renderer 模块的 `creations` 声明 `CreationEntry`，由 `creationEntry(CreationContract, { id, label, icon?, description?, group?, triggers, InputView? })` 构造。入口只负责产出创建输入，之后进入同一条准备与宿主创建事务；后台 `CreationContract` 不变。
+字节内容以 SDK 保留 JSON 值 `ContentRef` 嵌入普通 schema（`contentRefSchema`）。宿主扫描最终写入值，自动与当前数据、记录或创建事件同事务登记依赖，作者不填附件清单。引用本身不授予读取或保留权；资格由宿主按当前作用域裁定。宿主机制见 [不可变内容](content.md)。
 
-- `id` 使用声明插件的命名空间，全局唯一；同一契约可以有多个入口（空白、导入、URL 等）。
-- `triggers.menu` 是无载荷来源，可带 `initialInput`；`triggers.drop` 由声明式 `accepts`（文件扩展名／MIME／目录、URL scheme、文本）与 `toInput(item)` 组成，`toInput` 返回 `null` 表示拒绝。一个入口可同时声明两种来源。
-- `InputView` 是任意插件组件（表单、预览等），只接收 `{ source, initialInput?, busy, resolve, cancel }`，不取得可写会话。缺省时由来源直接产出输入。
-- 拖拽悬停只按 `accepts` 的类别同步判断，不调用插件函数；放下时宿主先把 DataTransfer 读成 `DropItem` 快照（文件路径经桌面桥解析），再精确匹配与调用 `toInput`。
+凡能取得 `content` 的地方形状一致：`read(ref, range?)` 有界读取，`open(ref, range?)` 流式读取，可写处另有 `stage(bytes | AsyncIterable)`。
 
-宿主创建协调器负责仲裁、输入视图外壳、放置位置、提交、等待、取消与错误展示。无候选不显示可放置状态，单个候选直接进入，多个候选弹出选择并可记住；多项拖入逐项路由。网络或文件读取放在创建的 `prepare`，请求带身份，用户可在准备阶段取消。
+| 位置 | content | 范围 |
+| --- | --- | --- |
+| 创建／资源动作 `prepare(input, { signal, content, object? })` | 可暂存 | 本次输入与对象已有内容 |
+| 外部准备者 `prepare(input, { signal, object, content })` | 只读 | 同上 |
+| `create` / `execute` 的 `object.content` | 可暂存 | 本对象当前数据与可见历史 |
+| `object.session.content` | 只读 | 会话级根 |
+| 前端 `object.content` | 只读 | 本对象当前视图位置 |
+| 前端 `toInput(item, content)`、`InputView` 的 `content`、`object.input(contract)` | 草稿，可上传 | 绑定该创建／动作契约 |
 
-路由记忆由宿主持有：键为宿主规范化、带版本的判别项（`creation-route/v1/drop:file/ext:.pdf`，优先级扩展名 > MIME > URL scheme > 类别），值为入口 `id`；只有记忆的入口仍在当前候选中才命中，否则清理并重新选择。插件自有偏好经 `useRendererPreferences()` 读写，宿主按插件隔离键并由调用方 schema 校验。
+前端创建入口由宿主提供草稿并管理关闭。卡片动作用 `object.input(contract)` 取得草稿，`invoke(contract, input, { content: draft })` 携带资格；命令成功后宿主关闭草稿，失败保留可重试，放弃时调用 `close`。暂存结果只有写入提交后的数据或事件才持久保留；字符串化或写入私有文件不建立依赖。
 
 ## 验证接口
 

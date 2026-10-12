@@ -10,12 +10,18 @@ import { reference, type ContractReference, type DataContract } from "./presenta
 import type { ResourceRef, SessionSnapshot } from "./workspace.ts";
 export * from "./renderer-services.ts";
 export * from "./renderer-creation.ts";
+export type * from "./renderer-content.ts";
+import type { RendererContentInput, RendererInputOptions } from "./renderer-content.ts";
+import type { ContentReader } from "./content-runtime.ts";
+export type { ContentReader } from "./content-runtime.ts";
 import type { CreationEntry } from "./renderer-creation.ts";
 
 export type RendererReceipt = { ok: true } | { ok: false; error: { code: string; message: string; display?: UiText } };
 /** 绑定卡片对象的前端能力；宿主负责订阅、命令门禁和当前视图的一致性。 */
 export interface RendererObjectContext {
   readonly ref: ResourceRef;
+  readonly content: ContentReader;
+  input<I, O extends Json>(contract: ActionContract<I, O> | CreationContract<I, Json, O>): RendererContentInput;
   readonly view: {
     ready: boolean; busy: boolean; historical: boolean; status: "loading" | "ready" | "error";
     error: UiText | null; missing: boolean;
@@ -23,11 +29,11 @@ export interface RendererObjectContext {
   readonly session: {
     snapshot(): SessionSnapshot | null;
     subscribe(listener: () => void): () => void;
-    create<I, O extends Json>(contract: CreationContract<I, Json, O>, input: NoInfer<I> & Json, position: { x: number; y: number }): Promise<RendererReceipt>;
+    create<I, O extends Json>(contract: CreationContract<I, Json, O>, input: NoInfer<I> & Json, position: { x: number; y: number }, options?: RendererInputOptions): Promise<RendererReceipt>;
     refresh(): Promise<void>;
     followLive(): void;
   };
-  invoke<I, O extends Json>(contract: ActionContract<I, O>, input: NoInfer<I> & Json): Promise<RendererReceipt>;
+  invoke<I, O extends Json>(contract: ActionContract<I, O>, input: NoInfer<I> & Json, options?: RendererInputOptions): Promise<RendererReceipt>;
   onStream(channel: string, listener: (data: Uint8Array) => void): () => void;
   readonly activity: { running: boolean };
 }

@@ -19,10 +19,12 @@ import { adaptResource, adaptTool } from "./sdk-adapters.ts";
 import type { ParsedCall } from "./commands.ts";
 import type { PluginConfiguration, PluginConfigurationCommand } from "../shared/plugin-configuration.ts";
 import type { ObjectStreamPayload } from "../shared/object-stream.ts";
+import type { ContentStore, ContentLease } from "../runtime/content-store.ts";
 
 export interface PluginHostServices {
   extensionsDirectory: string;
   data: SessionDataStore;
+  content?: ContentStore;
   refOf(objectId: string): ResourceRef | null;
   sessions: SessionHost;
   catalogs?: CatalogHost;
@@ -42,7 +44,7 @@ export interface LoadedPlugins {
   tools: ToolRegistry;
   manifest: readonly PluginManifest[];
   committed(sessionId: string, nodes: readonly SessionNode[]): void;
-  prepare(kind: string, command: ResourceCall, context: { sessionId: string; objectId: string; signal: AbortSignal }): Promise<ParsedCall>;
+  prepare(kind: string, command: ResourceCall, context: { sessionId: string; objectId: string; signal: AbortSignal; content?: ContentLease }): Promise<ParsedCall>;
   close(): Promise<void>;
 }
 interface Collected {
@@ -280,20 +282,21 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
       const controller = resources.controller(kind), ref = { sessionId: context.sessionId, id: context.objectId, kind };
       if (!controller?.parseCommand) throw new PluginApiError("invalid_argument", "This resource has no actions.");
       let current = controller.parseCommand(command);
+      current.content = context.content;
       for (const entry of collected) for (const preparer of entry.preparers) {
         if (preparer.contract.resource.kind !== kind || preparer.contract.id !== current.id) continue;
-        const scope = { active: true, provisional: !services.refOf(ref.id) };
+        const scope = { active: true, provisional: !services.refOf(ref.id), content: context.content };
         let result;
         try { result = await entry.preparations.start(async signal => {
           signal.throwIfAborted();
-          const result = await preparer.prepare(current.value, entry.sdk.reader(ref, scope), signal);
+          const result = await preparer.prepare(current.value, { signal, object: entry.sdk.reader(ref, scope), content: entry.sdk.reader(ref, scope).content });
           signal.throwIfAborted();
           return result;
         }, { object: ref, signal: context.signal, affectsHistory: false }).done; }
         finally { scope.active = false; }
         if (result.action === "reject") throw new PluginApiError("rejected", result.message, result.code);
         if (result.action === "replace") {
-          current = controller.parseCommand({ id: current.id, input: result.input });
+          current = { ...controller.parseCommand({ id: current.id, input: result.input }), content: context.content };
         }
       }
       return controller.prepareCommand ? controller.prepareCommand(current, ref, context.signal) : current;

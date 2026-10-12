@@ -60,9 +60,9 @@ npm run build
 
 工作数据与应用配置保存到本设备的 Electron 数据目录，源码目录和安装目录不承担数据存储。开发版使用 `appData/dev.dearain.atelier-development`，发布版使用 `appData/dev.dearain.atelier`；两者由固定应用身份生成，不随显示名称或仓库文件夹变化。正式应用标识为 `dev.dearain.atelier`。
 
-全局模型与代理配置保存在 `configuration.json`，外观在 `appearance.json`，界面语言在 `language.json`，窗口状态在 `ui-state.json`，密钥独立加密保存于 `credentials/`。设置中的「通用」支持跟随系统、英文和简体中文，切换只更新界面展示。工作数据库为 `db/workspace.sqlite`，不可变正文位于 `objects/`，运行日志位于 `logs/runtime.log`，Chromium 数据位于 `chromium/`。重建会话数据库不重置全局配置；关闭最后一个窗口会退出应用和任务进程。
+全局模型与代理配置保存在 `configuration.json`，外观在 `appearance.json`，界面语言在 `language.json`，窗口状态在 `ui-state.json`，密钥独立加密保存于 `credentials/`。设置中的「通用」支持跟随系统、英文和简体中文，切换只更新界面展示。工作数据库为 `db/workspace.sqlite`，不可变正文位于 `objects/`，插件内容位于 `content/`，运行日志位于 `logs/runtime.log`，Chromium 数据位于 `chromium/`。重建会话数据库不重置全局配置；关闭最后一个窗口会退出应用和任务进程。
 
-当前工作数据库版本为 14，配置文件版本为 1。开发前期只支持当前格式，不提供旧数据兼容或迁移；版本不符时明确报错，关闭应用后清理并重新初始化开发数据。
+当前工作数据库版本为 15，配置文件版本为 1。开发前期只支持当前格式，不提供旧数据兼容或迁移；版本不符时明确报错，关闭应用后清理并重新初始化开发数据。
 
 笔记只持有当前正文，历史位置也显示其最新内容。目录工具对外部文件的修改不会随会话历史回溯恢复。完整的存储与副作用约定见 [技术架构](docs/architecture.md) 和 [运行时](docs/runtime.md)。
 
@@ -80,6 +80,7 @@ npm run build
 | [工作台交互](docs/workbench.md) | 卡片、连线、执行段与时间导航 |
 | [技术架构](docs/architecture.md) | 桌面技术栈、进程职责、存储与扩展契约 |
 | [插件 SDK 与功能组合](docs/plugin-sdk.md) | 读写接口、具型创建／动作、运行生命周期与模块组合 |
+| [不可变内容与导入](docs/content.md) | 字节暂存、SDK 内容引用、事务保留与回收 |
 | [公共 i18n](docs/i18n.md) | 语言环境、插件可选本地化、消息归属与展示契约 |
 | [实施路线](docs/roadmap.md) | 实现顺序与验收场景 |
 | [决策与开放问题](docs/decisions.md) | 已定原则、初版取舍与待验证事项 |

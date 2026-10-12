@@ -27,6 +27,8 @@ import { sessionCommandSchema, sessionSnapshotSchema, type SessionChanged, type 
 import type { ToolRegistry } from "../tools/registry.ts";
 import { sessionPluginError } from "./plugin-errors.ts";
 import { SessionWorkbench } from "./workbench.ts";
+import { ContentStore, type ContentLease, type ContentTarget } from "./content-store.ts";
+import { applicationStorage } from "../shared/application.ts";
 
 const agentKind = Agent.kind;
 
@@ -39,6 +41,7 @@ export class SessionService {
   private progressVersions = new Map<string, number>();
   private closed = false;
   readonly tree: SessionTree;
+  readonly content: ContentStore;
   private readonly workbench: SessionWorkbench;
   private readonly resources: ResourceRegistry;
   private readonly tools: ToolRegistry;
@@ -52,6 +55,7 @@ export class SessionService {
     private readonly changed: (event: SessionChanged) => void = () => {}, adapterFactory?: (settings: ModelSettings) => ModelAdapter, external: readonly PluginDefinition[] = [],
     stream?: (event: ObjectStreamPayload) => void) {
     this.tree = new SessionTree(db);
+    this.content = new ContentStore(db, join(dataRoot, applicationStorage.contentDirectory));
     const host: SessionHost = {
       path: sessionId => this.tree.path(sessionId),
       nodes: sessionId => this.tree.nodes(sessionId),
@@ -98,7 +102,7 @@ export class SessionService {
       }
       return null;
     };
-    const modules = createModules({ extensionsDirectory: join(dataRoot, "extensions"), data: new SessionDataStore(db), refOf, vault: configuration.vault, stream,
+    const modules = createModules({ extensionsDirectory: join(dataRoot, "extensions"), data: new SessionDataStore(db), content: this.content, refOf, vault: configuration.vault, stream,
       sessions: host, models: createModelServices(configuration, adapterFactory), catalogs: createCoreCatalogs(configuration) }, external);
     this.resources = modules.resources;
     this.tools = modules.tools;
@@ -109,7 +113,7 @@ export class SessionService {
     this.prepare = modules.prepare;
     this.modelActivity = modules.activity;
     this.workbench = new SessionWorkbench(db, this.tree, this.resources,
-      (sessionId, agentId, resource) => this.linkTools(sessionId, agentId, resource));
+      (sessionId, agentId, resource) => this.linkTools(sessionId, agentId, resource), this.content);
   }
   get running(): boolean { return this.tree.list().some(session => !this.settled(session.id)); }
   private transaction<T>(work: () => T): T {
@@ -191,14 +195,17 @@ export class SessionService {
       workbench: this.workbench.project(sessionId, title, path) });
   }
   /** 资源命令入口：事务外准备，执行时 before 在提交事务内重验对象仍在当前路径上。 */
-  private async invoke(sessionId: string, objectId: string, raw: ResourceCall): Promise<void> {
+  private async invoke(sessionId: string, objectId: string, raw: ResourceCall, inputScopeId?: string): Promise<void> {
     const resource = this.object(sessionId, objectId);
     const controller = this.resources.controller(resource.kind);
     if (!controller?.execute) throw new SessionError("invalid_request", "This resource has no actions.");
-    const command = await this.prepareCommand(resource.kind, raw, { sessionId, objectId });
-    await controller.execute({ sessionId, resource }, command, () => { this.object(sessionId, objectId); });
+    const content = this.content.fork(inputScopeId, { sessionId, objectId, resourceKind: resource.kind, contractId: raw.id });
+    try {
+      const command = await this.prepareCommand(resource.kind, raw, { sessionId, objectId, content });
+      await controller.execute({ sessionId, resource }, command, () => { this.object(sessionId, objectId); });
+    } finally { await content.close(); }
   }
-  private async prepareCommand(kind: string, raw: ResourceCall, context: { sessionId: string; objectId: string }): Promise<ParsedCall> {
+  private async prepareCommand(kind: string, raw: ResourceCall, context: { sessionId: string; objectId: string; content?: ContentLease }): Promise<ParsedCall> {
     try { return await this.prepare(kind, raw, { ...context, signal: AbortSignal.timeout(10_000) }); }
     catch (error) {
       if (error instanceof PluginApiError) throw sessionPluginError(error);
@@ -226,30 +233,35 @@ export class SessionService {
         const resource = this.object(command.sessionId, command.objectId);
         const controller = this.resources.controller(resource.kind);
         if (!controller?.execute) throw new SessionError("invalid_request", "This resource has no actions.");
-        await this.invoke(command.sessionId, command.objectId, command.command);
+        await this.invoke(command.sessionId, command.objectId, command.command, command.contentScopeId);
         return { kind: "accepted", sessionId: command.sessionId };
       }
       case "resource.create": {
         this.tree.cursor(command.sessionId);
         const controller = this.resources.controller(command.kind);
         const abort = new AbortController();
-        if (command.requestId) {
-          if (this.creating.has(command.requestId)) throw new SessionError("conflict", "This creation request is already running.");
-          this.creating.set(command.requestId, abort);
-        }
-        let input: Json;
+        const requestKey = command.requestId ? `${command.sessionId}/${command.requestId}` : undefined;
+        if (requestKey && this.creating.has(requestKey)) throw new SessionError("conflict", "This creation request is already running.");
+        const content = this.content.fork(command.contentScopeId, { sessionId: command.sessionId, resourceKind: command.kind, contractId: command.creation.id });
+        if (requestKey) this.creating.set(requestKey, abort);
+        const cancelContent = () => content.controller.abort();
+        abort.signal.addEventListener("abort", cancelContent, { once: true });
         try {
-          input = controller?.prepareCreate ? await controller.prepareCreate({ ...command.creation, input: command.input }, abort.signal) : command.input;
+          const input = controller?.prepareCreate ? await controller.prepareCreate({ ...command.creation, input: command.input }, abort.signal, content) : command.input;
+          if (abort.signal.aborted) throw new SessionError("conflict", "The creation was cancelled.");
+          this.commit(command.sessionId, () => this.workbench.create(command.sessionId, command.kind, input, command.position, content));
+          return { kind: "accepted", sessionId: command.sessionId };
         } catch (error) {
           if (abort.signal.aborted) throw new SessionError("conflict", "The creation was cancelled.");
           throw error;
-        } finally { if (command.requestId) this.creating.delete(command.requestId); }
-        if (abort.signal.aborted) throw new SessionError("conflict", "The creation was cancelled.");
-        this.commit(command.sessionId, () => this.workbench.create(command.sessionId, command.kind, input, command.position));
-        return { kind: "accepted", sessionId: command.sessionId };
+        } finally {
+          abort.signal.removeEventListener("abort", cancelContent);
+          if (requestKey) this.creating.delete(requestKey);
+          await content.close();
+        }
       }
       case "resource.create.cancel":
-        this.creating.get(command.requestId)?.abort();
+        this.creating.get(`${command.sessionId}/${command.requestId}`)?.abort();
         return { kind: "accepted", sessionId: command.sessionId };
       default: {
         if (command.type === "object.remove") {
@@ -268,6 +280,20 @@ export class SessionService {
   private starting = new Map<string, Promise<SessionReply>>();
   /** 准备中的创建请求；取消只中止准备，不回滚已提交的事务。 */
   private creating = new Map<string, AbortController>();
+  /** 输入只绑定已装配契约；不提前创建对象或授予其他资源访问。 */
+  openContentInput(target: ContentTarget): ContentLease {
+    if (this.closed) throw new SessionError("unavailable", "The session service is closed.");
+    const controller = this.resources.controller(target.resourceKind);
+    if (target.objectId) {
+      if (!target.sessionId || this.object(target.sessionId, target.objectId).kind !== target.resourceKind
+        || !controller?.actionIds?.includes(target.contractId))
+        throw new SessionError("invalid_request", "The content input does not match this object action.");
+    } else {
+      if (controller?.creationId !== target.contractId) throw new SessionError("invalid_request", "Unknown content creation contract.");
+      if (target.sessionId) this.tree.cursor(target.sessionId);
+    }
+    return this.content.scope(target);
+  }
   /** 同一提交身份的并发首页发送共享一次执行。 */
   private start(command: Extract<SessionCommand, { type: "start" }>): Promise<SessionReply> {
     const pending = this.starting.get(command.submissionId);
@@ -309,6 +335,7 @@ export class SessionService {
   async close(): Promise<void> {
     this.closed = true;
     await this.closePlugins();
+    await this.content.close();
     this.writesClosed = true;
   }
 }

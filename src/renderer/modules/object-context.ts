@@ -12,6 +12,7 @@ import { useAppearance } from "../features/appearance/state";
 import { resolveToolView, toolPreparation } from "../features/conversation/tool-views";
 import { useModuleViews } from "./views";
 import { pluginPreferences } from "../features/creation/preferences";
+import { contentInput, contentReader, contentCommand } from "../features/creation/content";
 
 export function RendererCatalogProvider({ ready, children }: { ready: boolean; children: ReactNode }) {
   const configuration = useConfiguration(ready);
@@ -43,13 +44,20 @@ export function useObjectContext(object: WorkbenchObject): RendererObjectContext
     }), [controller.sessionId, object.id, object.kind]);
   return {
     ref: { sessionId: controller.sessionId, id: object.id, kind: object.kind },
+    content: contentReader(() => ({ sessionId: controller.sessionId, objectId: object.id, nodeId: snapshot?.at ?? null })),
+    input: contract => contentInput({ sessionId: controller.sessionId, resourceKind: contract.resource.kind, contractId: contract.id,
+      ...(contract.kind === "action" ? { objectId: object.id } : {}) }),
     view: { ready: workbench.ready, busy: state.busy, historical, status: state.status, error: state.error, missing: state.missing },
     session: {
       snapshot: () => records, subscribe: controller.subscribe,
-      create: (contract, input, position) => controller.executeAndRead({ type: "resource.create", sessionId: controller.sessionId, kind: contract.resource.kind, creation: reference(contract), input, position }),
+      create: (contract, input, position, options) => contentCommand(options?.content,
+        { sessionId: controller.sessionId, resourceKind: contract.resource.kind, contractId: contract.id },
+        contentScopeId => controller.executeAndRead({ type: "resource.create", sessionId: controller.sessionId, kind: contract.resource.kind, creation: reference(contract), input, position, contentScopeId })),
       refresh: controller.refresh, followLive: controller.followCursor,
     },
-    invoke: (contract, input) => controller.execute({ type: "resource.command", sessionId: controller.sessionId, objectId: object.id, command: resourceCall(contract, input) }),
+    invoke: (contract, input, options) => contentCommand(options?.content,
+      { sessionId: controller.sessionId, objectId: object.id, resourceKind: contract.resource.kind, contractId: contract.id },
+      contentScopeId => controller.execute({ type: "resource.command", sessionId: controller.sessionId, objectId: object.id, command: resourceCall(contract, input), contentScopeId })),
     onStream,
     activity: {
       running: progress.unsettledObjectIds.includes(object.id),

@@ -11,3 +11,4 @@ export * from "./model-records.ts";
 export { validationMessage, jsonArgumentHint } from "./tool-validation.ts";
 export * from "./commands.ts";
 export * from "./i18n.ts";
+export * from "./content.ts";

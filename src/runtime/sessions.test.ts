@@ -762,7 +762,7 @@ describe("插件包管理命令", () => {
     const { service, root } = await setup();
     expect(() => service.execute({ type: "plugin.add", path: join(root, "missing") })).toThrow(/No package.json/);
     const dir = join(root, "pkg"); mkdirSync(dir);
-    writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "p", atelier: { id: "acme.p", api: { major: 2, minMinor: 0 } } }));
+    writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "p", atelier: { id: "acme.p", api: { major: 3, minMinor: 0 } } }));
     const added = service.execute({ type: "plugin.add", path: dir });
     expect(added.plugins.map(p => [p.source, p.status, p.enabled])).toEqual([[dir, "pending", true]]);
     expect(added.restartRequired).toBe(true);

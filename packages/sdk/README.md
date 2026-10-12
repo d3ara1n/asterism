@@ -67,7 +67,7 @@ schema 支持默认值、去空白与转换。调用方提交 schema 的输入�
   "exports": { "./public": "./src/public.ts" },
   "atelier": {
     "id": "example.tools",
-    "api": { "major": 2, "minMinor": 0 },
+    "api": { "major": 3, "minMinor": 0 },
     "runtime": "./src/runtime.ts"
   }
 }
@@ -98,6 +98,8 @@ import { Read, settings, service } from "@example/tools/public";
 配置读取、保存与恢复默认使用独立 IPC，不重读会话或重启插件。`get()` 读取当前值；插件若自行缓存值，更新时机由它负责。恢复默认先修改界面草稿，保存时移除配置文件并取用声明默认值；不清理插件数据库、凭据或其他文件。损坏文件读取时保留并显示默认值，界面说明这一状态，明确保存或恢复后才替换。作者用例见 `examples/author.ts` 的 Counter 配置。
 
 ## 前端对象接口
+
+内容能力以 `contentRefSchema` 嵌入业务 schema，宿主从最终写入值自动登记依赖。准备统一为 `prepare(input, { signal, content, object? })`；执行与创建中的 `object.content` 可读取与 `stage`，外部准备者与会话门面只读。前端拖放文件统一为 `DropItem.kind: "file"`（`file` 必有，`path` 可选，需路径时声明 `requiresPath`）；`toInput(item, content)` 与 `InputView` 取得宿主管理的草稿，卡片动作通过 `object.input(contract)` 与 `{ content: draft }` 携带，成功后宿主关闭草稿。用法总表见 [插件 SDK](../../docs/plugin-sdk.md#不可变内容)，作者示例见 [内容契约声明](examples/content-contract.ts)、[后台实现](examples/content-author.ts)、[前端入口](examples/content-renderer.ts)。
 
 `cardRenderer` 校验卡片载荷并向 Body 与 Actions 注入对象环境，组件通过 `useRendererObject()` 取得基础对象接口。`session.snapshot()` 提供具型记录与资源快照，`session.create(CreationContract, input, position)` 创建资源，`invoke(ActionContract, input)` 调用当前对象动作。`onStream` 订阅对象二进制通道，短名由宿主补全插件命名空间。基础接口提供通用运行状态；临时模型块经专门接口按需取用，历史查看不交付实时块。
 
@@ -134,7 +136,7 @@ ResourceDescription、ToolView、CreationEntry 的 label／description 接收 Ui
 
 ## 版本与当前边界
 
-SDK 包版本为 `0.4.0`，宿主提供 API 2.2；使用消息声明、UiText、useI18n、配置 presentation 或错误 display 的插件声明 `api: { major: 2, minMinor: 2 }`。使用 `records.last` 或提交内标题更新需要 API 2.1，API 2.0 插件仍可加载，API 1 插件在加载前明确拒绝；构建产物按内容缓存。应用 IPC 版本为 5，会话 IPC 为 12，应用配置与插件配置 IPC 均为 2；工作数据库格式仍为 14，应用配置文件格式仍为 1。
+SDK 包版本为 `0.6.0`，宿主提供 API 3.0；插件声明 `api: { major: 3, minMinor: 0 }`，其他主版本在加载前拒绝。应用 IPC 版本为 5，会话 IPC 为 13，内容 IPC 为 1，应用配置与插件配置 IPC 均为 2；工作数据库格式为 15，应用配置文件格式仍为 1。
 
 资源创建数据必须是 JSON 对象，不能占用宿主的 `id / type / title` 字段。当前会话数据保存于 `session_data`，事件及工具结果保存稳定契约身份与原始数据。core 消费具型用户消息、模型执行、通知与环境记录，存储编码由宿主负责；环境记录保留原事件身份与载荷。
 

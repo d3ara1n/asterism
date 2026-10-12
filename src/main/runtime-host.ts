@@ -3,13 +3,14 @@ import { applicationBrand, applicationStorage } from "../shared/application.ts";
 import { createWriteStream, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { runtimeMessageSchema, type Command, type CommandResult, type RuntimeStatus } from "../shared/contracts.ts";
-import { ConfigurationRequests, SessionRequests, RuntimeRequests, PluginConfigurationRequests } from "./requests.ts";
+import { ConfigurationRequests, SessionRequests, RuntimeRequests, PluginConfigurationRequests, ContentRequests } from "./requests.ts";
 import { sessionChangedSchema, sessionResponseSchema, type SessionChanged, type SessionCommand, type SessionResult } from "../shared/session.ts";
 import { configurationChangedSchema, configurationResponseSchema, type ConfigurationCommand, type ConfigurationResult } from "../shared/configuration.ts";
 import { secretRequestSchema } from "../shared/secrets.ts";
 import { handleSecretRequest } from "./secrets.ts";
 import { pluginConfigurationResponseSchema, type PluginConfigurationCommand, type PluginConfigurationResult } from "../shared/plugin-configuration.ts";
 import { objectStreamSchema, type ObjectStream } from "../shared/object-stream.ts";
+import { contentResponseSchema, type ContentCommand, type ContentResult } from "../shared/content.ts";
 
 export class RuntimeHost {
   private child: UtilityProcess | null = null;
@@ -17,6 +18,7 @@ export class RuntimeHost {
   private configurationRequests: ConfigurationRequests | null = null;
   private sessionRequests: SessionRequests | null = null;
   private pluginConfigurationRequests: PluginConfigurationRequests | null = null;
+  private contentRequests: ContentRequests | null = null;
   private status: RuntimeStatus = "starting";
   constructor(private readonly onStatus: (status: RuntimeStatus) => void, private readonly onConfigurationChanged: () => void = () => {},
     private readonly onSessionChanged: (event: SessionChanged) => void = () => {},
@@ -37,6 +39,9 @@ export class RuntimeHost {
       return Promise.reject(error);
     }
     this.child = child;
+    this.contentRequests = new ContentRequests(message => child.postMessage(message), () => {
+      this.setStatus("unavailable"); child.kill();
+    });
     child.stdout?.pipe(log, { end: false });
     child.stderr?.pipe(log, { end: false });
     this.requests = new RuntimeRequests(message => child.postMessage(message), () => {
@@ -61,6 +66,7 @@ export class RuntimeHost {
         this.requests?.close();
         this.configurationRequests?.close();
         this.pluginConfigurationRequests?.close();
+        this.contentRequests?.close();
         this.sessionRequests?.close();
         child.kill();
         reject(new Error("Task runtime initialization timed out."));
@@ -71,6 +77,7 @@ export class RuntimeHost {
         this.requests?.close();
         this.configurationRequests?.close();
         this.pluginConfigurationRequests?.close();
+        this.contentRequests?.close();
         this.sessionRequests?.close();
         this.setStatus("unavailable");
         child.kill();
@@ -86,6 +93,7 @@ export class RuntimeHost {
           return;
         }
         if (configurationChangedSchema.safeParse(raw).success) { this.onConfigurationChanged(); return; }
+        if (contentResponseSchema.safeParse(raw).success) { this.contentRequests?.receive(raw); return; }
         if (configurationResponseSchema.safeParse(raw).success) { this.configurationRequests?.receive(raw); return; }
         if (pluginConfigurationResponseSchema.safeParse(raw).success) { this.pluginConfigurationRequests?.receive(raw); return; }
         const stream = objectStreamSchema.safeParse(raw);
@@ -106,6 +114,7 @@ export class RuntimeHost {
           this.requests?.close();
           this.configurationRequests?.close();
           this.pluginConfigurationRequests?.close();
+          this.contentRequests?.close();
           this.sessionRequests?.close();
           child.kill();
           reject(new Error(parsed.data.message));
@@ -118,6 +127,7 @@ export class RuntimeHost {
         this.requests?.close();
         this.configurationRequests?.close();
         this.pluginConfigurationRequests?.close();
+        this.contentRequests?.close();
         this.sessionRequests?.close();
         if (this.status !== "stopping") this.setStatus("unavailable");
         reject(new Error("Task runtime exited with code " + code));
@@ -151,12 +161,19 @@ export class RuntimeHost {
     });
     return this.pluginConfigurationRequests.execute(command);
   }
+  content(command: ContentCommand): Promise<ContentResult> {
+    if (this.status !== "ready" || !this.contentRequests) return Promise.resolve({
+      ok: false, error: { code: "unavailable", message: "Content transfer is unavailable." },
+    });
+    return this.contentRequests.execute(command);
+  }
 
   stop(): Promise<void> {
     this.setStatus("stopping");
     this.requests?.close(`${applicationBrand.en} is shutting down.`);
     this.configurationRequests?.close(`${applicationBrand.en} is shutting down.`);
     this.pluginConfigurationRequests?.close(`${applicationBrand.en} is shutting down.`);
+    this.contentRequests?.close(`${applicationBrand.en} is shutting down.`);
     this.sessionRequests?.close(`${applicationBrand.en} is shutting down.`);
     const child = this.child;
     if (!child) return Promise.resolve();

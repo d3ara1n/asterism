@@ -25,7 +25,7 @@
 | `features/workbench/nodes.ts` / `size-intents.ts` | 工作台节点投影，协调后台布局与本地拖动；尺寸意图在对应命令受理后的读取完成后确认 |
 | `features/workbench/placement.ts` | 按新卡片尺寸和已有卡片实际边界求离指定中心最近的空位，不重排已有卡片 |
 | `features/session/registry.ts` | 会话共享控制器 |
-| `features/creation/` | 创建协调器：菜单与拖放入口的仲裁、路由记忆、插件输入视图外壳、放置、提交与取消；内置资源的输入视图位于各模块 `creation.tsx` |
+| `features/creation/` | 创建协调器：菜单、拖放与无路径图片粘贴的仲裁、路由记忆、异步输入、内容草稿、放置、提交与取消；`content.ts` 隐藏内容分块与读取协议，供创建及对象动作复用 |
 | `features/workbench/AccessPanel.tsx` | 授权浮岛，按代理／资源查看有向链接，受理后的读取结束即显示实际状态 |
 | `../modules/agent/conversation/Conversation.tsx` | 聚合时间轴、跟随、输入、配置与交互；块从生成到保存保持同一组件 |
 | `../modules/agent/conversation/ConversationTimeline.tsx` / `output-follow.ts` | 条目展示与滚动跟随，各自消费数据或明确意图 |

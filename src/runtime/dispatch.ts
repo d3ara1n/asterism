@@ -8,6 +8,22 @@ import { pluginConfigurationRequestSchema, pluginConfigurationResponseSchema, pl
 import { sessionRequestSchema, sessionResponseSchema, sessionVersion } from "../shared/session.ts";
 import { sessionPluginError } from "./plugin-errors.ts";
 import { ApplicationError, type ApplicationService } from "./service.ts";
+import { contentRequestSchema, contentResponseSchema, contentVersion } from "../shared/content.ts";
+
+export async function dispatchContent(service: ApplicationService, raw: unknown): Promise<unknown | null> {
+  const parsed = contentRequestSchema.safeParse(raw);
+  if (!parsed.success) return null;
+  const envelope = { kind: "content.response", version: contentVersion, id: parsed.data.id };
+  try {
+    return contentResponseSchema.parse({ ...envelope, result: { ok: true, reply: await service.content.execute(parsed.data.command) } });
+  } catch (error) {
+    const known = error instanceof PluginApiError || error instanceof SessionError;
+    if (!known) console.error("Content transfer failed.");
+    return contentResponseSchema.parse({ ...envelope, result: { ok: false, error: {
+      code: known ? error.code : "internal", message: known ? error.message : "Content transfer could not be completed.",
+    } } });
+  }
+}
 
 export function dispatchPluginConfiguration(service: ApplicationService, raw: unknown): unknown | null {
   const request = pluginConfigurationRequestSchema.safeParse(raw);

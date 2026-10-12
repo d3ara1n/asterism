@@ -17,6 +17,7 @@ import type { SessionChanged } from "../shared/session.ts";
 import { pluginErrorDisplay } from "./plugin-errors.ts";
 import { SessionService } from "./sessions.ts";
 import { openDatabase } from "./storage.ts";
+import { ContentTransferService } from "./content-transfer.ts";
 
 export class ApplicationError extends Error {
   constructor(readonly code: AppError["code"], message: string, readonly display?: UiText) { super(message); }
@@ -28,6 +29,7 @@ export interface StartupPackage { source: string; enabled: boolean; id: string |
 export class ApplicationService {
   readonly configuration: ConfigurationService;
   readonly sessions: SessionService;
+  readonly content: ContentTransferService;
   private readonly db: DatabaseSync;
   private readonly packages: StartupPackage[];
   private readonly list: PackageList;
@@ -42,11 +44,12 @@ export class ApplicationService {
       const unavailable = async (): Promise<string> => { throw new Error("System credential protection is unavailable."); };
       this.configuration = new ConfigurationService(root, options.protector ?? { available: async () => false, encrypt: unavailable, decrypt: unavailable }, options.onConfigurationChanged);
       this.sessions = new SessionService(this.db, root, this.configuration, options.onSessionChanged, options.adapterFactory, options.plugins, options.onStream);
+      this.content = new ContentTransferService(this.sessions);
     } catch (error) { this.db.close(); throw error; }
   }
   async close(): Promise<void> {
     this.configuration.close();
-    await this.sessions.close();
+    await Promise.all([this.sessions.close(), this.content.close()]);
     this.db.close();
   }
   private readonly npmRoot: string;

@@ -13,6 +13,7 @@ import type { ModelServices } from "./models.ts";
 import type { ResourceRef, ResourceSnapshot, SessionSnapshot } from "./workspace.ts";
 import type { ActionContract, CreationContract } from "./commands.ts";
 import type { ObjectReader, ObjectExecutor, SessionExecutor } from "./objects.ts";
+import type { ContentReader, ContentScope } from "./content-runtime.ts";
 export type * from "./objects.ts";
 export type { ResourceRef, ResourceSnapshot, SessionSnapshot } from "./workspace.ts";
 
@@ -39,20 +40,24 @@ export type Preparation<C extends Json = Json> =
   | { action: "accept" }
   | { action: "replace"; input: C }
   | { action: "reject"; code: string; message: string; display?: UiText };
+/** 准备上下文：资源自身准备可读写本次作用域内容，外部准备者只读；均不修改会话数据。 */
+export interface CreationPreparation { readonly signal: AbortSignal; readonly content: ContentScope }
+export interface ActionPreparation extends CreationPreparation { readonly object: ObjectReader }
+export interface ExternalPreparation { readonly signal: AbortSignal; readonly object: ObjectReader; readonly content: ContentReader }
 export interface CommandPreparer<O extends Json = Json, I = unknown> {
   readonly id: string;
   readonly contract: ActionContract<I, O>;
-  prepare(input: O, object: ObjectReader, signal: AbortSignal): Preparation<I & Json> | Promise<Preparation<I & Json>>;
+  prepare(input: O, context: ExternalPreparation): Preparation<I & Json> | Promise<Preparation<I & Json>>;
 }
 export interface ContextFile { readonly file: string; readonly text: string }
 export interface CreationContribution {
   readonly contract: CreationContract<unknown>;
-  prepare?(input: Json, signal: AbortSignal): Preparation | Promise<Preparation>;
+  prepare?(input: Json, context: CreationPreparation): Preparation | Promise<Preparation>;
   create(input: Json, object: ObjectExecutor): { title: string; data: Json };
 }
 export interface ActionContribution {
   readonly contract: ActionContract<unknown>;
-  prepare?(input: Json, object: ObjectReader, signal: AbortSignal): Preparation | Promise<Preparation>;
+  prepare?(input: Json, context: ActionPreparation): Preparation | Promise<Preparation>;
   execute(input: Json, object: ObjectExecutor, signal: AbortSignal): Promise<void>;
 }
 export interface ResourceContribution {

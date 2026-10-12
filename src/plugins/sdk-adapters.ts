@@ -10,6 +10,8 @@ import type { SdkContext } from "./sdk-context.ts";
 import type { RunGroup } from "./lifecycle.ts";
 import { parseCall, applyPreparation, type ParsedCall } from "./commands.ts";
 import { synchronous } from "./synchronous.ts";
+import type { ObjectScope } from "./host.ts";
+import type { ContentLease } from "../runtime/content-store.ts";
 
 function address(host: PluginHostServices, resource: FoldedObject): ResourceRef {
   const ref = host.refOf(resource.id);
@@ -45,13 +47,16 @@ export function adaptResource(contribution: ResourceContribution, sdk: SdkContex
       return contribution.context?.(captured, sdk.reader(captured.ref, undefined, captured)) ?? Promise.resolve([]);
     },
     controller: {
+      creationId: creation?.contract.id,
+      actionIds: [...actions.keys()],
       ...(creation ? {
-        async prepareCreate(input: unknown, request?: AbortSignal) {
+        async prepareCreate(input: unknown, request?: AbortSignal, content?: ContentLease) {
           try {
             const parsed = parseCall(creation.contract, resourceCallSchema.parse(input)).value;
             return await runs.start(async signal => {
               signal.throwIfAborted();
-              const prepared = applyPreparation(creation.contract, parsed, await creation.prepare?.(parsed, signal));
+              const prepared = applyPreparation(creation.contract, parsed, await creation.prepare?.(parsed, { signal, content: sdk.content(content, undefined, signal) }));
+              host.content?.validate(prepared, { scope: content });
               signal.throwIfAborted();
               return prepared;
             }, { timeoutMs: 10_000, signal: request }).done;
@@ -62,9 +67,9 @@ export function adaptResource(contribution: ResourceContribution, sdk: SdkContex
             throw error;
           }
         },
-        create(sessionId: string, id: string, input: Json) {
+        create(sessionId: string, id: string, input: Json, content?: ContentLease) {
           if (runs.closed) throw new PluginApiError("unavailable", "The resource controller is closed.");
-          const scope = { active: true, provisional: true };
+          const scope = { active: true, provisional: true, content };
           try {
             let result!: { title: string; data: Json };
             synchronous(() => { result = creation.create(input, sdk.object({ sessionId, id, kind: resource.kind }, scope)); return result; });
@@ -83,16 +88,19 @@ export function adaptResource(contribution: ResourceContribution, sdk: SdkContex
         },
         async prepareCommand(call: ParsedCall, ref: ResourceRef, signal: AbortSignal) {
           const action = actionFor(call);
-          const scope = { active: true, provisional: !host.refOf(ref.id) };
+          const scope = { active: true, provisional: !host.refOf(ref.id), content: call.content };
           let result;
           try { result = await runs.start(async preparationSignal => {
             preparationSignal.throwIfAborted();
-            const result = await action.prepare?.(call.value, sdk.reader(ref, scope), preparationSignal);
+            const result = await action.prepare?.(call.value, { signal: preparationSignal, object: sdk.reader(ref, scope), content: sdk.content(call.content, ref, preparationSignal) });
             preparationSignal.throwIfAborted();
             return result;
           }, { object: ref, signal, affectsHistory: false }).done; }
           finally { scope.active = false; }
-          return { ...call, value: applyPreparation(action.contract, call.value, result) };
+          const value = applyPreparation(action.contract, call.value, result);
+          host.content?.validate(value, { scope: call.content, sessionId: ref.sessionId, objectId: ref.id,
+            recordIds: new Set(host.refOf(ref.id) ? host.sessions.path(ref.sessionId).map(node => node.id) : []) });
+          return { ...call, value };
         },
         async execute(context, raw, before) {
           if (runs.closed) throw new PluginApiError("unavailable", "The resource controller is closed.");
@@ -102,7 +110,8 @@ export function adaptResource(contribution: ResourceContribution, sdk: SdkContex
             await previous.catch(() => {});
             signal.throwIfAborted();
             if (runs.closed) throw new PluginApiError("unavailable", "The resource controller is closed.");
-            const scope = { active: true, provisional: !host.refOf(ref.id), before };
+            const scope = { active: true, provisional: !host.refOf(ref.id), before, content: raw.content };
+            sdk.linkAbort(raw.content, signal);
             if (host.refOf(ref.id)) before?.();
             try { await actionFor(raw).execute(raw.value, sdk.object(ref, scope), signal); }
             finally { scope.active = false; }
@@ -141,13 +150,15 @@ export function adaptTool(contribution: ToolContribution, sdk: SdkContext, host:
     effect: contract.effect, targetSchema: contract.targetSchema, resultSchema: contract.schema,
     prepare(resource, target, args) {
       const captured = snapshot(host, resource);
-      const scope = { active: false, execution: true };
+      const scope: ObjectScope = { active: false, execution: true };
       const prepared = contribution.prepare(captured, sdk.object(captured.ref, scope, captured), target, args);
       if (!("execute" in prepared)) return prepared;
       return { ...prepared, async execute(signal, publish) {
         scope.active = true;
+        scope.content = host.content?.scope();
+        sdk.linkAbort(scope.content, signal);
         try { return await prepared.execute(signal, publish); }
-        finally { scope.active = false; }
+        finally { scope.active = false; await scope.content?.close(); }
       } };
     },
   };

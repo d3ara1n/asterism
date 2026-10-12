@@ -17,6 +17,7 @@ import { startupMessages } from "../shared/error-display.ts";
 import { configurationChannel, configurationChangedChannel, configurationCommandSchema, type ConfigurationResult } from "../shared/configuration.ts";
 import { sessionChannel, sessionChangedChannel, sessionCommandSchema, type SessionResult } from "../shared/session.ts";
 import { pluginConfigurationChannel, pluginConfigurationCommandSchema, type PluginConfigurationResult } from "../shared/plugin-configuration.ts";
+import { contentChannel, contentCommandSchema, type ContentResult } from "../shared/content.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 let window: BrowserWindow | null = null;
@@ -67,11 +68,22 @@ function createWindow(): void {
   ipcMain.removeHandler(sessionChannel);
   ipcMain.removeHandler(pickDirectoryChannel);
   ipcMain.removeHandler(pluginConfigurationChannel);
+  ipcMain.removeHandler(contentChannel);
   const trusted = (event: Electron.IpcMainInvokeEvent) => event.sender === current.webContents &&
     event.senderFrame === current.webContents.mainFrame && event.senderFrame?.url === allowedURL;
   const stopAppearance = serveAppearance(current, trusted, () => refreshAppearance());
   const stopPreferences = servePreferences(trusted);
   const stopLanguage = serveLanguage(current, trusted);
+  ipcMain.handle(contentChannel, async (event, raw): Promise<ContentResult> => {
+    if (!trusted(event)) return { ok: false, error: { code: "invalid_request", message: "Untrusted application frame." } };
+    const parsed = contentCommandSchema.safeParse(raw);
+    if (!parsed.success) return { ok: false, error: { code: "invalid_request", message: "Invalid content command." } };
+    return runtime.content(parsed.data);
+  });
+  current.webContents.on("render-process-gone", () => { void runtime.content({ type: "reset" }); });
+  current.webContents.on("did-start-navigation", (_event, _url, inPlace, mainFrame) => {
+    if (mainFrame && !inPlace) void runtime.content({ type: "reset" });
+  });
   ipcMain.handle(sessionChannel, async (event, raw): Promise<SessionResult> => {
     if (!trusted(event)) return { ok: false, error: { code: "invalid_request", message: "Untrusted application frame." } };
     const parsed = sessionCommandSchema.safeParse(raw);
@@ -109,6 +121,8 @@ function createWindow(): void {
     return runtime.configure(parsed.data);
   });
   current.on("closed", () => {
+    ipcMain.removeHandler(contentChannel);
+    void runtime.content({ type: "reset" });
     window = null; ipcMain.removeHandler(commandChannel); ipcMain.removeHandler(configurationChannel); ipcMain.removeHandler(sessionChannel); ipcMain.removeHandler(pickDirectoryChannel); ipcMain.removeHandler(pluginConfigurationChannel); stopAppearance(); stopPreferences(); stopLanguage();
   });
   const loading = developmentURL ? current.loadURL(developmentURL) : current.loadFile(rendererFile);

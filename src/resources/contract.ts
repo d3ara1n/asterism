@@ -4,6 +4,7 @@ import type { Presentation } from "@atelier/sdk/contracts";
 import type { LiveBlock } from "../shared/session.ts";
 import type { FoldedObject } from "../session/fold.ts";
 import type { ResourceRef } from "@atelier/sdk/runtime";
+import type { ContentLease } from "../runtime/content-store.ts";
 
 export interface ContextFile { file: string; text: string }
 export interface ResourceCommandContext { sessionId: string; resource: FoldedObject }
@@ -13,13 +14,15 @@ export interface ResourceCommandContext { sessionId: string; resource: FoldedObj
  * 或供组合入口（如首页）原子创建会话与对象；异步准备后也必须执行此检查。
  */
 export interface ResourceController {
+  creationId?: string;
+  actionIds?: readonly string[];
   /** 外部准备者按装配顺序执行后，进入资源自己的准备；每次替换按目标 schema 校验。 */
   prepareCommand?(input: ParsedCall, ref: ResourceRef, signal: AbortSignal): Promise<ParsedCall>;
   parseCommand?(input: unknown): ParsedCall;
   /** 校验创建输入（可异步读取配置或文件系统），结果再交给 create。 */
-  prepareCreate?(input: unknown, signal?: AbortSignal): Promise<Json>;
+  prepareCreate?(input: unknown, signal?: AbortSignal, content?: ContentLease): Promise<Json>;
   /** 在创建事务内执行：返回标题与写入创建事件的不可变资源数据，可同时保存私有状态。 */
-  create?(sessionId: string, objectId: string, input: Json): { title: string; data?: { [key: string]: Json } };
+  create?(sessionId: string, objectId: string, input: Json, content?: ContentLease): { title: string; data?: { [key: string]: Json } };
   execute?(context: ResourceCommandContext, command: ParsedCall, before?: () => void): Promise<void>;
   /**
    * running 是仍可能向会话树追加事件的对象 ID，涵盖代理与其他被捕获的资源。

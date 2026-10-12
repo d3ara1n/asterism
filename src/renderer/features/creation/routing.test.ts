@@ -2,11 +2,19 @@ import { describe, expect, it } from "vitest";
 import type { CreationEntry, DropAccepts, DropItem } from "@atelier/sdk/renderer";
 import { acceptsItem, dropCandidates, rememberedEntry, routeKey } from "./routing";
 
-const file = (name: string, mime = "", directory = false): DropItem => ({ kind: "file", path: `/tmp/${name}`, name, mime, directory });
+const file = (name: string, mime = "", directory = false): DropItem => ({ kind: "file", file: new File([], name), path: `/tmp/${name}`, name, mime, directory });
 const entry = (id: string, accepts: DropAccepts): CreationEntry =>
   ({ id, label: id, triggers: { drop: { accepts, toInput: () => null } } }) as unknown as CreationEntry;
 
 describe("拖放声明式匹配", () => {
+  it("无路径文件不交付 requiresPath 或目录入口，路由记忆与路径来源独立", () => {
+    const item: DropItem = { kind: "file", file: new File([new Uint8Array([1])], "paste.png", { type: "image/png" }), name: "paste.png", mime: "image/png", directory: false };
+    expect(acceptsItem({ files: { mime: ["image/*"], requiresPath: true } }, item)).toBe(false);
+    expect(acceptsItem({ files: { directories: true } }, item)).toBe(false);
+    expect(acceptsItem({ files: { mime: ["image/*"] } }, item)).toBe(true);
+    expect(acceptsItem({ files: { extensions: [".pdf"] } }, item)).toBe(false);
+    expect(routeKey(item)).not.toBe(routeKey(file("paste.png", "image/png")));
+  });
   it("目录只由显式声明 directories 的入口受理，普通文件入口不误收目录", () => {
     expect(acceptsItem({ files: { directories: true } }, file("project", "", true))).toBe(true);
     expect(acceptsItem({ files: {} }, file("project", "", true))).toBe(false);

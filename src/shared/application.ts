@@ -13,6 +13,7 @@ export const applicationStorage = {
   databaseDirectory: "db",
   databaseFile: "workspace.sqlite",
   objectsDirectory: "objects",
+  contentDirectory: "content",
   credentialsDirectory: "credentials",
   configurationFile: "configuration.json",
   appearanceStore: "appearance",

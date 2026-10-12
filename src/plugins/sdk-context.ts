@@ -1,5 +1,5 @@
 import { belongsTo, jsonSchema, type DataContract, type Json, type RecordContract } from "@atelier/sdk/contracts";
-import { PluginApiError, type ObjectReader, type ObjectExecutor, type PluginContext, type ResourceRef, type ResourceSnapshot, type SessionExecutor, type ObjectWriter } from "@atelier/sdk/runtime";
+import { PluginApiError, type ContentReader, type ContentScope, type ObjectReader, type ObjectExecutor, type PluginContext, type ResourceRef, type ResourceSnapshot, type SessionExecutor, type ObjectWriter } from "@atelier/sdk/runtime";
 import type { RunGroup } from "./lifecycle.ts";
 import type { ObjectScope } from "./host.ts";
 import { appendRecord } from "./record-writer.ts";
@@ -8,6 +8,7 @@ import { foldWorkbench } from "../session/fold.ts";
 import { sessionSnapshot, resourceSnapshot } from "./records.ts";
 import { synchronous } from "./synchronous.ts";
 import type { LiveBlock } from "../shared/session.ts";
+import type { ContentLease } from "../runtime/content-store.ts";
 
 type PluginServices = Pick<PluginContext, "id" | "dir" | "log" | "config" | "secrets" | "db" | "tasks">;
 export function createSdkContext(internal: PluginServices, host: PluginHostServices, modelRuns: RunGroup) {
@@ -45,8 +46,32 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
     checkAvailable();
     if (scope?.execution && !scope.active) throw new PluginApiError("unavailable", "The tool execution scope is closed.");
   };
-  const session = (id: string, objectId?: string, checkMutation = checkAvailable): SessionExecutor => ({
+  /** 内容访问域：已建立对象取当前路径上的记录根；尚未建立身份的对象只有本次作用域。 */
+  const access = (sessionId?: string, objectId?: string, scope?: ObjectScope) => {
+    const established = !!sessionId && !scope?.provisional;
+    const recordIds = established ? new Set(host.sessions.path(sessionId!).map(node => node.id)) : new Set<string>();
+    return { sessionId, objectId, recordIds, get scope() { return scope?.content; }, check: () => {
+      checkAvailable();
+      if (scope && !scope.active) throw new PluginApiError("unavailable", "The content execution is closed.");
+    } };
+  };
+  const unavailable = async (): Promise<never> => { throw new PluginApiError("unavailable", "Content storage is unavailable."); };
+  const missing: ContentScope = Object.freeze({ read: unavailable, async *open() { await unavailable(); }, stage: unavailable });
+  const readOnly = (source: ContentReader): ContentReader => Object.freeze({ read: source.read, open: source.open });
+  /** 取消信号传到内容占用，等待中的传输随之中止。 */
+  const linkAbort = (lease: ContentLease | undefined, signal: AbortSignal) => {
+    if (!lease) return;
+    if (signal.aborted) lease.controller.abort();
+    else signal.addEventListener("abort", () => lease.controller.abort(), { once: true });
+  };
+  const content = (lease?: ContentLease, ref?: ResourceRef, signal?: AbortSignal): ContentScope => {
+    if (signal) linkAbort(lease, signal);
+    const context = access(ref?.sessionId, ref?.id, lease || ref ? { active: true, content: lease, provisional: !ref || !host.refOf(ref.id) } : undefined);
+    return host.content?.writer(context) ?? missing;
+  };
+  const session = (id: string, objectId?: string, checkMutation = checkAvailable, scope?: ObjectScope): SessionExecutor => ({
     id,
+    content: readOnly(host.content?.reader(access(id, undefined, scope)) ?? missing),
     get: contract => readData(id, null, contract),
     resume: () => { checkMutation(); host.sessions.resume(id, objectId); },
     snapshot() {
@@ -57,7 +82,7 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
       get: () => { checkAvailable(); return host.sessions.title(id); },
       propose: (text, options) => { checkMutation(); return host.sessions.proposeTitle(id, text, options.expected); },
     },
-    commit: work => { checkMutation(); commit(id, work); },
+    commit: work => { checkMutation(); commit(id, work, undefined, scope); },
   });
   function commit(id: string, work: (writer: ObjectWriter) => unknown, ref?: ResourceRef, scope?: ObjectScope): void {
     checkAvailable();
@@ -84,14 +109,19 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
               throw new PluginApiError("invalid_argument", "Use the declared record contract instance.");
             const parsed = declared.schema.safeParse(data);
             if (!parsed.success) throw new PluginApiError("invalid_argument", "The record does not match its declared schema.");
-            return appendRecord(writer, declared, jsonSchema.parse(parsed.data), ref);
+            const value = jsonSchema.parse(parsed.data);
+            const recordId = appendRecord(writer, declared, value, ref);
+            host.content?.bind({ ...access(id, ref?.id, scope), sessionId: id }, { kind: "record", id: recordId }, value);
+            return recordId;
           },
           set(contract, data) {
             check();
             checkData(contract);
             const parsed = contract.schema.safeParse(data);
             if (!parsed.success) throw new PluginApiError("invalid_argument", "The data does not match its contract schema.");
-            host.data.set(id, ref?.id ?? null, contract.id, jsonSchema.parse(parsed.data));
+            const value = jsonSchema.parse(parsed.data);
+            host.content?.bind({ ...access(id, ref?.id, scope), sessionId: id }, { kind: "data", id: contract.id }, value);
+            host.data.set(id, ref?.id ?? null, contract.id, value);
           },
         }));
       } finally { active = false; }
@@ -101,9 +131,10 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
     const ref = Object.freeze({ ...address });
     checkRef(ref, scope?.active && scope.provisional);
     return {
-      ref, session: session(ref.sessionId, ref.id, () => {
+      ref, content: host.content?.writer(access(ref.sessionId, ref.id, scope)) ?? content(),
+      session: session(ref.sessionId, ref.id, () => {
         checkExecution(scope); checkRef(ref, scope?.active && scope.provisional);
-      }),
+      }, scope),
       snapshot() {
         checkRef(ref, scope?.active && scope.provisional);
         if (captured) return captured;
@@ -132,7 +163,8 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
     const session = source.session;
     return Object.freeze({
       ref: source.ref, snapshot: source.snapshot, get: source.get,
-      session: Object.freeze({ id: session.id, snapshot: session.snapshot, get: session.get,
+      content: Object.freeze({ read: source.content.read, open: source.content.open }),
+      session: Object.freeze({ id: session.id, content: session.content, snapshot: session.snapshot, get: session.get,
         title: Object.freeze({ get: session.title.get }) }),
     });
   };
@@ -195,7 +227,7 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
     object: ref => { own(ref.kind); return object(ref); },
   };
   return {
-    context, object, reader,
+    context, object, reader, content, linkAbort,
     declare(contract: RecordContract) {
       if (!belongsTo(internal.id, contract.id)) throw new PluginApiError("foreign_event", "The record contract belongs to another plugin.");
       const existing = records.get(contract.id);

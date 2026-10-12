@@ -1,10 +1,11 @@
 import { jsonSchema, type ActionContract, type CreationContract, type ContractReference, type Json, type ResourceCall } from "@atelier/sdk/contracts";
 import { deepFreeze } from "../shared/immutable.ts";
 import { PluginApiError, validationMessage, type Preparation } from "@atelier/sdk/runtime";
+import type { ContentLease } from "../runtime/content-store.ts";
 
 type InputContract = ActionContract<unknown> | CreationContract<unknown>;
 /** 宿主内部的解析结果不复用传输信封，避免将 value 再当作原始 input。 */
-export interface ParsedCall extends ContractReference { value: Json }
+export interface ParsedCall extends ContractReference { value: Json; content?: ContentLease }
 
 export function parseInput(contract: InputContract, input: Json): Json {
   const parsed = contract.schema.safeParse(input);

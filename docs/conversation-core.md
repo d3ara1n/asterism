@@ -9,7 +9,7 @@
 | message | 目标 agent_id、用户正文；首批仅文本 |
 | thinking / text | agent_id、response_id、request_parent_id、序号、正文、complete、续接资料与可空终态元数据 |
 | toolcall | 同上请求身份与元数据，加本地/provider 调用 ID、工具名、参数与结局 |
-| event | 类型与小载荷；大内容存 `objects/<hash>` 后引用 |
+| event | 类型与小载荷；大内容保存到宿主内容存储后以 SDK 内容引用值关联 |
 | notice | 来源对象、级别、类型、消息 |
 
 block 通过 response_id 关联，response 由消费者投影，不设独立 response_end 节点。每个块携带 request_parent_id 和请求计算结果（adapter、模型表达式 `<providerId>/<modelId>[:<thinking>]`、协议作用域），以及可空的 usage、finishReason、rawFinishReason、providerResponseId。终态仅归属响应中序号最大的实际块，不能复制到各块；数据库通过唯一约束阻止重复计量。系统提示词、角色正文、工具目录、模型参数和完整请求不持久化。

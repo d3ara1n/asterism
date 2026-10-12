@@ -7,6 +7,7 @@ import { SessionError, type SessionTree } from "../session/tree.ts";
 import type { Json } from "@atelier/sdk/contracts";
 import type { SessionNode } from "../shared/session.ts";
 import { workbenchSnapshotSchema, type WorkbenchCommand, type WorkbenchSnapshot, type Point, type Viewport } from "../shared/workbench.ts";
+import type { ContentStore, ContentLease } from "./content-store.ts";
 
 type ViewRow = { object_id: string; x: number; y: number; hidden: number; collapsed: number; width: number | null; height: number | null };
 
@@ -14,17 +15,19 @@ type ViewRow = { object_id: string; x: number; y: number; hidden: number; collap
 export class SessionWorkbench {
   constructor(private readonly db: DatabaseSync, private readonly tree: SessionTree,
     private readonly resources: ResourceRegistry,
-    private readonly tools: (sessionId: string, agentId: string, resource: FoldedObject) => Json) {}
+    private readonly tools: (sessionId: string, agentId: string, resource: FoldedObject) => Json,
+    private readonly content?: ContentStore) {}
 
   /** 通用资源创建：资源贡献给出标题并保存对象数据；创建事件只记录身份与类型。 */
-  create(sessionId: string, kind: string, input: Json, position: Point): string {
-    return this.createWith(sessionId, kind, createResourceId(), input, position);
+  create(sessionId: string, kind: string, input: Json, position: Point, content?: ContentLease): string {
+    return this.createWith(sessionId, kind, createResourceId(), input, position, content);
   }
-  createWith(sessionId: string, kind: string, id: string, input: Json, position: Point): string {
+  createWith(sessionId: string, kind: string, id: string, input: Json, position: Point, content?: ContentLease): string {
     const controller = this.resources.controller(kind);
     if (!controller?.create) throw new SessionError("invalid_request", "This resource type cannot be created here.");
-    const { title, data } = controller.create(sessionId, id, input);
-    this.tree.append(sessionId, { kind: "event", agentId: null, type: "resource_created", data: { ...data, id, type: kind, title }, model: null });
+    const { title, data } = controller.create(sessionId, id, input, content);
+    const node = this.tree.append(sessionId, { kind: "event", agentId: null, type: "resource_created", data: { ...data, id, type: kind, title }, model: null });
+    this.content?.bind({ sessionId, objectId: id, scope: content }, { kind: "record", id: node.id }, data ?? {});
     this.addView(sessionId, id, position);
     return id;
   }

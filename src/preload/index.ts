@@ -9,8 +9,17 @@ import { appearanceChangedChannel, appearanceGetChannel, appearancePatchSchema, 
 import { sessionChannel, sessionChangedChannel, sessionCommandSchema, sessionResultSchema, sessionChangedSchema } from "../shared/session.ts";
 import { preferencesGetChannel, preferencesSetChannel, preferenceWriteSchema, uiStateSchemas } from "../shared/ui-state.ts";
 import { pluginConfigurationChannel, pluginConfigurationCommandSchema, pluginConfigurationResultSchema } from "../shared/plugin-configuration.ts";
+import { contentChannel, contentCommandSchema, contentResultSchema } from "../shared/content.ts";
 
 const bridge: DesktopBridge = {
+  content: {
+    async execute(command) {
+      const parsed = contentCommandSchema.safeParse(command);
+      if (!parsed.success) return { ok: false, error: { code: "invalid_request", message: "Invalid content command." } };
+      try { return contentResultSchema.parse(await ipcRenderer.invoke(contentChannel, parsed.data)); }
+      catch { return { ok: false, error: { code: "unavailable", message: "The content connection was lost." } }; }
+    },
+  },
   language: {
     async get() { return languageStateSchema.parse(await ipcRenderer.invoke(languageGetChannel)); },
     async set(preference) { return languageStateSchema.parse(await ipcRenderer.invoke(languageSetChannel, languagePreferenceSchema.parse(preference))); },

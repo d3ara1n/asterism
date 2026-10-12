@@ -32,6 +32,7 @@ export function acceptsItem(accepts: DropAccepts, item: DropItem): boolean {
     case "file": {
       const files = accepts.files;
       if (!files) return false;
+      if (!item.path && (files.requiresPath || files.directories)) return false;
       if (item.directory) return files.directories === true;
       const filtered = !!files.extensions?.length || !!files.mime?.length;
       if (!filtered) return files.directories !== true;
@@ -62,10 +63,11 @@ export function routeKey(item: DropItem): string {
   switch (item.kind) {
     case "file": {
       if (item.directory) return `${prefix}:file/directory`;
+      const origin = item.path ? "file" : "bytes";
       const ext = extensionOf(item.name);
-      if (ext) return `${prefix}:file/ext:${ext}`;
-      if (item.mime) return `${prefix}:file/mime:${item.mime.toLowerCase()}`;
-      return `${prefix}:file/other`;
+      if (ext) return `${prefix}:${origin}/ext:${ext}`;
+      if (item.mime) return `${prefix}:${origin}/mime:${item.mime.toLowerCase()}`;
+      return `${prefix}:${origin}/other`;
     }
     case "url": return `${prefix}:url/scheme:${schemeOf(item.url) ?? "unknown"}`;
     case "text": return `${prefix}:text`;

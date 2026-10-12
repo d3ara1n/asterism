@@ -60,5 +60,5 @@ export default {
     }),
   ],
   creations: [creationEntry(CreateDirectory, { id: "atelier.core/directory.local", label: filesystemMessages.directoryLabel, icon: <Folder className="size-4" />, group: "resources", InputView: DirectoryInput,
-    triggers: { menu: {}, drop: { accepts: { files: { directories: true } }, toInput: item => item.kind === "file" && item.directory ? { path: item.path } : null } } })],
+    triggers: { menu: {}, drop: { accepts: { files: { directories: true } }, toInput: item => item.kind === "file" && item.directory && item.path ? { path: item.path } : null } } })],
 } satisfies RendererModule;

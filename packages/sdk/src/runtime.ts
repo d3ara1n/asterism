@@ -4,6 +4,7 @@ import type { UiText } from "./i18n.ts";
 import type { ResourceRef } from "./workspace.ts";
 export * from "./runtime-contracts.ts";
 export * from "./runtime-resources.ts";
+export type * from "./content-runtime.ts";
 export type * from "./models.ts";
 export { validationMessage, jsonArgumentHint } from "./tool-validation.ts";
 

@@ -4,8 +4,9 @@ import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { sessionSchemaSql } from "../session/schema.ts";
 import { applicationBrand, applicationStorage } from "../shared/application.ts";
+import { contentSchemaSql } from "./content-store.ts";
 
-const workspaceDatabaseVersion = 14;
+const workspaceDatabaseVersion = 15;
 
 export function openDatabase(root: string): DatabaseSync {
   mkdirSync(join(root, applicationStorage.databaseDirectory), { recursive: true });
@@ -38,6 +39,7 @@ export function openDatabase(root: string): DatabaseSync {
         data_json TEXT NOT NULL,
         PRIMARY KEY(session_id, object_id, contract_id)
       ) STRICT;
+      ${contentSchemaSql}
       PRAGMA user_version = ${workspaceDatabaseVersion};
       COMMIT;`);
     else if (version !== workspaceDatabaseVersion) throw new Error(`This workspace database format is not supported by this build of ${applicationBrand.en}. Recreate the development data before restarting.`);

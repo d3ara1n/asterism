@@ -17,6 +17,7 @@ import { Button } from "../../shared/ui/button";
 import { useIsland } from "../../shared/weave/Screen";
 import { useScheme } from "../appearance/state";
 import type { DragKind } from "../creation/routing";
+import { dropCandidates } from "../creation/routing";
 import { dragKinds, snapshotDrop } from "../creation/snapshot";
 import type { WorkbenchOperation } from "../session/controller";
 import { SessionHistoryPanel } from "../session/History";
@@ -183,6 +184,15 @@ function Canvas({ ref, session, run, writable, canDrop, onDropItems }: DropHandl
     }
   }, [run, toNodes, onView]);
   return <div ref={viewportElement} className="relative h-full" onDragOver={event => { if (writable && canDrop(dragKinds(event.dataTransfer))) { event.preventDefault(); setDropping(true); } }}
+    tabIndex={-1}
+    onPaste={event => {
+      if (!writable || event.defaultPrevented || (event.target instanceof Element && event.target.closest("input, textarea, [contenteditable=true]"))) return;
+      const items = snapshotDrop(event.clipboardData).filter(item => item.kind === "file" && !item.path && dropCandidates(registry.creations, item).length > 0);
+      if (!items.length) return;
+      event.preventDefault();
+      const bounds = event.currentTarget.getBoundingClientRect();
+      onDropItems(items, flow.screenToFlowPosition({ x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 }));
+    }}
     onDragLeave={event => { if (event.currentTarget === event.target) setDropping(false); }} onDrop={onDrop}>
   {dropping && <div className="pointer-events-none absolute inset-2 z-20 flex items-center justify-center rounded-lg border-2 border-dashed border-primary bg-primary/5">
     <p className="type-body">{i18n.formatMessage(workbenchMessages.dropHint)}</p></div>}
