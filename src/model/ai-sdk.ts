@@ -1,6 +1,6 @@
-import { jsonSchema as sdkJsonSchema, streamText, tool, type ModelMessage, type ToolSet, type AssistantModelMessage, type LanguageModel } from "ai";
+import { jsonSchema as sdkJsonSchema, streamText, tool, type ModelMessage, type ToolResultPart, type ToolSet, type AssistantModelMessage, type LanguageModel } from "ai";
 import { jsonSchema, modelScope, unauthenticatedApiKey, type Json, type Usage } from "../shared/model.ts";
-import { ModelFailure, type ModelAdapter, type ModelEvent, type ModelInput, type PreparedModel, type ModelValidationInput } from "./contract.ts";
+import { ModelFailure, type ModelAdapter, type ModelEvent, type ModelInput, type ResolvedInputPart, type PreparedModel, type ModelValidationInput } from "./contract.ts";
 import { createProviderModel, validateProviderTransport } from "./provider.ts";
 import { projectSystemPrompt } from "../modules/agent/system-prompt.ts";
 
@@ -52,6 +52,15 @@ export function sdkMessages(input: ModelInput): ModelMessage[] {
   const messages: ModelMessage[] = [];
   const scope = modelScope(input.settings);
   const plainReasoning = usesPlainResponseReasoning(input);
+  const chat = input.settings.provider.protocol === "openai-chat";
+  const attachments: Extract<ResolvedInputPart, { kind: "file" }>[] = [];
+  /** Chat Completions 的 tool 消息只能是文字；本批工具文件在其后的一条 user 消息中如实发送。 */
+  const flushAttachments = () => {
+    if (!attachments.length) return;
+    messages.push({ role: "user", content: [{ type: "text", text: "Files attached from the preceding tool results:" },
+      ...attachments.map(file => ({ type: "file" as const, data: file.data, mediaType: file.mediaType, ...(file.filename ? { filename: file.filename } : {}) }))] });
+    attachments.length = 0;
+  };
   for (const item of input.messages) {
     if (item.kind === "input" || item.kind === "context") messages.push({ role: "user", content: item.parts.map(part =>
       part.kind === "text" ? { type: "text" as const, text: part.text }
@@ -67,17 +76,26 @@ export function sdkMessages(input: ModelInput): ModelMessage[] {
           : { type: p.kind === "text" || plainThinking ? "text" as const : "reasoning" as const, text: p.text, providerOptions };
       }) } as AssistantModelMessage);
     }
+    if (item.kind !== "result") flushAttachments();
     if (item.kind === "result") {
-      const outcome = item.outcome;
-      const output = outcome.kind === "succeeded" || outcome.kind === "partial"
-        ? { type: "json" as const, value: outcome.model }
-        : { type: "error-json" as const, value: outcome.model };
+      const files = item.parts.filter(part => part.kind === "file");
+      const text = item.parts.flatMap(part => part.kind === "text" ? [part.text] : []).join("\n");
+      // 文字只序列化一次：纯文字用 text/error-text；Chat 的 content 会被整体再序列化，文件改由紧随的 user 消息携带。
+      let output: ToolResultPart["output"];
+      if (!files.length || chat) {
+        const notice = files.length ? `[${files.length} file(s) attached in the following user message: ${files.map(file => file.filename ?? file.mediaType).join(", ")}]` : "";
+        const value = [text, notice].filter(Boolean).join("\n");
+        output = item.error ? { type: "error-text", value } : { type: "text", value };
+        attachments.push(...files);
+      } else output = { type: "content", value: item.parts.map(part => part.kind === "text" ? { type: "text" as const, text: part.text }
+        : { type: "file" as const, data: { type: "data" as const, data: part.data }, mediaType: part.mediaType, ...(part.filename ? { filename: part.filename } : {}) }) };
       const part = { type: "tool-result" as const, toolCallId: item.callId, toolName: item.name, output };
       const previous = messages.at(-1);
       if (previous?.role === "tool") previous.content.push(part);
       else messages.push({ role: "tool", content: [part] });
     }
   }
+  flushAttachments();
   return messages;
 }
 export class AiSdkAdapter implements ModelAdapter {

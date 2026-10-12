@@ -49,11 +49,16 @@ function setup() {
     new AgentCapabilities(resources, tools, linked, agentToolPolicy(policy));
   return { root, outside, resource, note, resources, tools, scope, service, sessionId };
 }
-async function invoke(capabilities: AgentCapabilities, name: string, args: Json): Promise<ToolOutcome> {
+/** 成功结果的模型投影是一次序列化的 JSON 文本；断言时解析回结构，非成功结局保留文字。 */
+const decode = (text: string): Json => { try { return JSON.parse(text) as Json; } catch { return text; } };
+type Decoded = ToolOutcome extends infer O ? O extends ToolOutcome ? Omit<O, "model"> & { model: Json } : never : never;
+async function invoke(capabilities: AgentCapabilities, name: string, args: Json): Promise<Decoded> {
   const results: ToolOutcome[] = [];
   await executeCoreBatch([{ callId: "call", name, arguments: args }], capabilities, signal, (_call, outcome) => results.push(outcome));
   expect(results).toHaveLength(1);
-  return results[0]!;
+  const outcome = results[0]!;
+  const text = outcome.model.flatMap(part => part.kind === "text" ? [part.text] : []).join("\n");
+  return { ...outcome, model: decode(text) } as Decoded;
 }
 
 describe("工具与资源的匹配及授权", () => {
@@ -265,7 +270,7 @@ describe("工具与资源的匹配及授权", () => {
     scope(), controller.signal, (_call, result) => results.push(result));
     expect(results).toMatchObject([{
       kind: "cancelled", message: "The operation was not started.", implementation: { id: "atelier.core/directory.list" },
-      data: null, model: { kind: "cancelled", data: null, message: "The operation was not started." },
+      data: null, model: [{ kind: "text", text: "cancelled: The operation was not started." }],
     }]);
     expect(results[0]).not.toHaveProperty("startedAt");
   });

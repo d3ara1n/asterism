@@ -261,18 +261,31 @@ describe("AI SDK 适配契约", () => {
     const thinking = events.find(e => e.type === "part.end" && e.partId === "thinking:r");
     if (thinking?.type !== "part.end") throw new Error("Missing thinking completion.");
     const next = sdkMessages({ ...input, messages: [...input.messages, { kind: "output", parts: [{ kind: "thinking", text: "Think", continuation: thinking.continuation ?? null }, { kind: "toolcall", callId: "call-1", name: "read", arguments: { resource_id: "note" }, continuation: null }], scope: modelScope(input.settings), adapter: adapter.version },
-      { kind: "result", callId: "call-1", name: "read", outcome: { kind: "succeeded", model: "Note text", data: { userOnly: "detail" } } }] });
+      { kind: "result", callId: "call-1", name: "read", error: false, parts: [{ kind: "text", text: "Note text" }] }] });
     expect(next.map(m => m.role)).toEqual(["user", "assistant", "tool"]);
     expect(JSON.stringify(next)).toContain("signature-value"); expect(JSON.stringify(next)).not.toContain("userOnly");
   });
 
-  it("失败工具也只发送保存的模型投影，不泄漏界面产出、资源名称或执行元数据", () => {
-    const model = { kind: "cancelled", data: "Captured output", message: "Stopped." };
-    const messages = sdkMessages({ ...input, messages: [{ kind: "result", callId: "cancelled", name: "resource_call",
-      outcome: { kind: "cancelled", message: "Stopped.", data: { privateView: "GUI details" }, model,
-        implementation: { id: "test.hidden" }, resource: { id: "r", kind: "directory", title: "GUI title" }, startedAt: 10, finishedAt: 20 } }] });
+  it("失败工具只发送文字投影，文字不二次序列化", () => {
+    const text = 'cancelled: Stopped.\n{"partial":"Captured output"}';
+    const messages = sdkMessages({ ...input, messages: [{ kind: "result", callId: "cancelled", name: "resource_call", error: true, parts: [{ kind: "text", text }] }] });
     expect(messages).toEqual([{ role: "tool", content: [{ type: "tool-result", toolCallId: "cancelled", toolName: "resource_call",
-      output: { type: "error-json", value: model } }] }]);
+      output: { type: "error-text", value: text } }] }]);
+  });
+
+  it.each(["anthropic", "openai-responses", "openai-chat"] as const)("%s 工具结果文件如实交出；Chat 的 tool 消息只含文字与说明，文件随后续 user 消息", protocol => {
+    const png = new Uint8Array([1, 2, 3]);
+    const current = structuredClone(input); current.settings.provider.protocol = protocol;
+    const messages = sdkMessages({ ...current, messages: [{ kind: "result", callId: "see", name: "resource_call", error: false,
+      parts: [{ kind: "text", text: "a.png (image/png, 3 bytes)" }, { kind: "file", data: png, mediaType: "image/png", filename: "a.png" }] }] });
+    if (protocol !== "openai-chat") {
+      expect(messages).toEqual([{ role: "tool", content: [{ type: "tool-result", toolCallId: "see", toolName: "resource_call", output: { type: "content", value: [
+        { type: "text", text: "a.png (image/png, 3 bytes)" }, { type: "file", data: { type: "data", data: png }, mediaType: "image/png", filename: "a.png" }] } }] }]);
+      return;
+    }
+    expect(messages).toHaveLength(2);
+    expect(messages[0]).toMatchObject({ role: "tool", content: [{ output: { type: "text", value: expect.stringContaining("attached in the following user message: a.png") } }] });
+    expect(messages[1]).toMatchObject({ role: "user", content: [{ type: "text" }, { type: "file", data: png, mediaType: "image/png", filename: "a.png" }] });
   });
 
   it("provider 错误脱敏且不自动重试；跨模型续接明确拒绝", async () => {

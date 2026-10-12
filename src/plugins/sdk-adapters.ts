@@ -153,12 +153,17 @@ export function adaptTool(contribution: ToolContribution, sdk: SdkContext, host:
       const scope: ObjectScope = { active: false, execution: true };
       const prepared = contribution.prepare(captured, sdk.object(captured.ref, scope, captured), target, args);
       if (!("execute" in prepared)) return prepared;
-      return { ...prepared, async execute(signal, publish) {
+      return { ...prepared, async execute(signal, publish, handover?: ContentLease) {
         scope.active = true;
         scope.content = host.content?.scope();
         sdk.linkAbort(scope.content, signal);
         try { return await prepared.execute(signal, publish); }
-        finally { scope.active = false; await scope.content?.close(); }
+        finally {
+          scope.active = false;
+          // 暂存内容交接给请求占用，直到结果记录在同一事务登记内容根；未提交时随请求一起回收。
+          if (handover && scope.content && !handover.closed) for (const id of scope.content.refs) handover.add(id);
+          await scope.content?.close();
+        }
       } };
     },
   };

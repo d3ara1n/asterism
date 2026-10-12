@@ -194,7 +194,7 @@ Agent 对话由时间轴展示、输出跟随、消息输入、配置选择、Ag
 
 ## 模型输入
 
-模型输入与 context 使用有序 ModelInputPart：文字为 `{ kind: "text", text }`，文件为 `{ kind: "file", file: ContentRef, mediaType, filename? }`；mediaType 如实标注，不建模输入模态。声明与 schema 从 contracts 导出，调用示例见 [模型文件输入](../packages/sdk/examples/model-input.ts)。输入不携带字节或读取门面。
+模型输入与 context 使用有序 ModelInputPart：文字为 `{ kind: "text", text }`，文件为 `{ kind: "file", file: ContentRef, mediaType, filename? }`；mediaType 如实标注，不建模输入模态。工具实现的 `toModel(data)` 可返回字符串或同形 parts，文件引用执行期 `object.content.stage` 暂存的内容，宿主随结果记录登记根；声明与 schema 从 contracts 导出，调用示例见 [模型文件输入](../packages/sdk/examples/model-input.ts)。输入不携带字节或读取门面。
 
 `models.validate(request, { content })` 与 `models.stream(request, { content })` 复用 prepare、对象或会话已有的 ContentReader；包含文件时须提供合法宿主门面，纯文字可省略。validate 只检查元数据和协议条件，实际请求重新取用并读取字节。`models.run` 根据 object/requestParentId 固定对象当前数据和历史路径资格，不提供外部 reader 覆盖。SDK 不增加模型专用上传器、resolver 或公开内容占用管理。
 

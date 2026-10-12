@@ -8,6 +8,7 @@ import { executeCoreBatch, coreDeclarations, previewCoreCall } from "./core.ts";
 import type { AgentCapabilities } from "./capabilities.ts";
 import { ResponseBuffer } from "./response.ts";
 import { synchronous } from "../plugins/synchronous.ts";
+import type { ContentLease } from "../runtime/content-store.ts";
 
 export interface ModelExecutionEnvironment {
   adapter: ModelAdapter;
@@ -17,7 +18,7 @@ export interface ModelExecutionEnvironment {
   messages: ResolvedModelItem[];
 }
 /** 一次补全及完整工具批次。缓冲只在此次调用内存在，输出交给消费者，不接触时间轴。 */
-export async function runModelRequest(request: ModelRunRequest, environment: Promise<ModelExecutionEnvironment>): Promise<ModelRunResult> {
+export async function runModelRequest(request: ModelRunRequest, environment: Promise<ModelExecutionEnvironment>, handover?: ContentLease): Promise<ModelRunResult> {
   const controller = new AbortController();
   const signal = AbortSignal.any([request.signal, controller.signal]);
   let deliveryFailed = false;
@@ -92,7 +93,7 @@ export async function runModelRequest(request: ModelRunRequest, environment: Pro
           prepared(call, info) { response.prepare(byCall.get(call.callId)!, info); progress(); },
           started(call, info) { response.start(byCall.get(call.callId)!, info); progress(); },
           published(call, data) { response.publish(byCall.get(call.callId)!, data); progress(); },
-        });
+        }, handover);
       if (request.cache?.expectHit && finish.usage?.cacheRead === 0 && (finish.usage.input ?? 0) > 2048)
         diagnostic("cache_miss", "The provider reported no cached input for this request.", "warning");
       if (settings.model.contextWindow && (finish.usage?.input ?? 0) > settings.model.contextWindow * 0.8)

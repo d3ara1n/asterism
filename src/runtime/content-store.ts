@@ -73,7 +73,7 @@ export class ContentLease {
       await this.store.abortScope(this);
       for (const release of [...this.readers]) release();
       for (const id of this.refs) this.store.unpin(id);
-      this.refs.clear(); this.store.forget(this);
+      this.refs.clear(); this.store.forget(this); this.store.releaseHandover(this);
     })();
     return this.closing;
   }
@@ -86,6 +86,16 @@ export class ContentStore {
   private readonly leases = new Map<string, ContentLease>();
   private readonly uploads = new Map<string, Upload>();
   private readonly candidates = new Set<string>();
+  /** 工具执行暂存的内容在结果记录登记根之前由对象的请求占用持有；只对同一对象的提交可见。 */
+  private readonly handovers = new Map<string, ContentLease>();
+  handover(sessionId: string, objectId: string): ContentLease {
+    const key = `${sessionId}\0${objectId}`, lease = this.scope();
+    this.handovers.set(key, lease);
+    return lease;
+  }
+  releaseHandover(lease: ContentLease): void {
+    for (const [key, value] of this.handovers) if (value === lease) this.handovers.delete(key);
+  }
   private collecting = false;
   private closed = false;
   constructor(private readonly db: DatabaseSync, private readonly root: string) {
@@ -154,6 +164,7 @@ export class ContentStore {
     access.check?.(); access.scope?.check();
     const row = this.stored(ref);
     if (access.scope?.refs.has(row.id)) return row;
+    if (access.sessionId && this.handovers.get(`${access.sessionId}\0${access.objectId ?? ""}`)?.refs.has(row.id)) return row;
     if (access.sessionId) {
       const roots = this.db.prepare("SELECT kind, root_id FROM content_roots WHERE session_id = ? AND object_id = ? AND content_id = ?")
         .all(access.sessionId, access.objectId ?? "", row.id) as { kind: string; root_id: string }[];

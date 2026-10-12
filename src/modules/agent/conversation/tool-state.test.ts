@@ -59,7 +59,7 @@ describe("工具调用的展示投影", () => {
       id: "saved", createdAt: "2026-10-01", usage: null, kind: "toolcall",
       responseId: "r", requestParentId: null, ordinal: 0, complete: true, source: { model: "p/m", adapter: "test", scope: "test" }, continuation: null,
       callId: "c", name: "resource_call", argumentsText: "", arguments: args,
-      outcome: { ...invocation, finishedAt: 300, kind: "cancelled", data, model: "Stopped", message: "Stopped." },
+      outcome: { ...invocation, finishedAt: 300, kind: "cancelled", data, model: [{ kind: "text", text: "Stopped" }], message: "Stopped." },
     };
     const state = toolCallState(node);
     expect(state).toMatchObject({ phase: "settled", props: { invocation, result: { kind: "cancelled", data } } });

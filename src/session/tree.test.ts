@@ -12,7 +12,7 @@ const thinking = (agentId: string, responseId: string, ordinal: number): Extract
   ({ ...blk, kind: "thinking", agentId, responseId, ordinal, text: "…" });
 const call = (agentId: string, responseId: string, ordinal: number, callId: string): Extract<NewNode, { kind: "toolcall" }> =>
   ({ ...blk, kind: "toolcall", agentId, responseId, ordinal, callId, name: "read", argumentsText: "{}", arguments: {},
-    outcome: { kind: "succeeded", model: callId, data: null } });
+    outcome: { kind: "succeeded", model: [{ kind: "text", text: callId }], data: null } });
 const msg = (agentId: string, t: string): NewNode => ({ kind: "message", agentId, parts: [{ kind: "text", text: t }] });
 const attached = (agentId: string | null, r: string): NewNode => ({ kind: "event", agentId, type: "resource_attached", data: { id: r }, model: `${r} attached` });
 const completion = { usage: { input: 5, output: 3, total: 8, cacheRead: 2, cacheWrite: null, reasoning: 1 },

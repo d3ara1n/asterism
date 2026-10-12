@@ -2,7 +2,8 @@ import { readdir, readFile, stat } from "node:fs/promises";
 import { basename, isAbsolute } from "node:path";
 import { defineModule, implementResource, implementCreation, implementTool, PluginApiError, type CallResult } from "@atelier/sdk/runtime";
 import { TextError, readText, readToModel, editText, textChange, changeToModel } from "../shared/text.ts";
-import { Directory, CreateDirectory, DirectoryView, DirectoryList, DirectoryRead, DirectoryEdit, DirectoryWrite } from "./contract.ts";
+import { Directory, CreateDirectory, DirectoryView, DirectoryList, DirectoryRead, DirectoryEdit, DirectoryWrite, DirectorySee } from "./contract.ts";
+import { readImageFile } from "./image-io.ts";
 import { withinDirectory, writableTarget } from "./paths.ts";
 import { failed, filesystemFailure } from "./errors.ts";
 import { readTextFile, withFileMutation, commitTextFile, validateTextSize, UnconfirmedWriteError } from "./text-io.ts";
@@ -121,6 +122,17 @@ export default defineModule(() => ({
         } catch (error) { return textFailure(error, signal, "Write target file"); }
       },
       toModel: data => `${data.path}${data.created ? " (created)" : ""}\n${changeToModel(data)}`,
+    }),
+    implementTool(DirectorySee, {
+      async call(directory, target, _args, { object, signal }) {
+        try {
+          const image = await readImageFile(directory.path, target.path, signal);
+          const ref = await object.content.stage(image.bytes);
+          return { kind: "succeeded", data: { path: target.path, mediaType: image.mediaType, size: image.bytes.length, image: ref } };
+        } catch (error) { return textFailure(error, signal, "View target image"); }
+      },
+      toModel: data => [{ kind: "text", text: `${data.path} (${data.mediaType}, ${data.size} bytes)` },
+        { kind: "file", file: data.image, mediaType: data.mediaType, filename: basename(data.path) }],
     }),
   ],
 }));

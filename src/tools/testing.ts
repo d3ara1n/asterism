@@ -1,12 +1,12 @@
 /** 执行器测试只需资源 data 与工具 handler；校验和终结仍使用真实 SDK 实现。 */
 import { implementTool, type ObjectExecutor, type CallResult } from "@atelier/sdk/runtime";
-import { reference, type Json, type ImplementationContract } from "@atelier/sdk/contracts";
+import { reference, type Json, type ImplementationContract, type ToolModelOutput } from "@atelier/sdk/contracts";
 import { resourceSnapshot } from "../plugins/records.ts";
 import type { ToolImplementation } from "./contract.ts";
 
 export function implement<S extends Json, T extends Json, A extends Json, D extends Json>(
   contract: ImplementationContract<S, T, A, D>,
-  definition: { call(data: S, target: T, args: A, context: { signal: AbortSignal; publish(data: NoInfer<D>): void }): Promise<CallResult<NoInfer<D>>>; toModel?(data: D): Json },
+  definition: { call(data: S, target: T, args: A, context: { signal: AbortSignal; publish(data: NoInfer<D>): void }): Promise<CallResult<NoInfer<D>>>; toModel?(data: D): ToolModelOutput },
 ): ToolImplementation {
   const contribution = implementTool(contract, definition);
   return {

@@ -51,9 +51,10 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
   const access = (sessionId?: string, objectId?: string, scope?: ObjectScope) => {
     const established = !!sessionId && !scope?.provisional;
     const recordIds = established ? new Set(host.sessions.path(sessionId!).map(node => node.id)) : new Set<string>();
-    return { owner: internal.id, sessionId, objectId, recordIds, get scope() { return scope?.content; }, check: () => {
+    // 动作作用域结束后对象仍按自身记录根与请求交接读取；工具执行作用域关闭后严格拒绝。
+    return { owner: internal.id, sessionId, objectId, recordIds, get scope() { return scope?.active ? scope.content : undefined; }, check: () => {
       checkAvailable();
-      if (scope && !scope.active) throw new PluginApiError("unavailable", "The content execution is closed.");
+      if (scope?.execution && !scope.active) throw new PluginApiError("unavailable", "The content execution is closed.");
     } };
   };
   const unavailable = async (): Promise<never> => { throw new PluginApiError("unavailable", "Content storage is unavailable."); };
@@ -219,6 +220,7 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
           signal, capabilities, context: host.sessions.context(linked),
           content: messages => host.content?.capture(inputReferences(messages), { owner: internal.id, sessionId: ref.sessionId,
             objectId: ref.id, recordIds: new Set(path.map(node => node.id)), check: checkAvailable }),
+          handover: () => host.content?.handover(ref.sessionId, ref.id),
           observer: { event(event) {
             if (event.type === "progress") {
               const run = running.get(ref.id);

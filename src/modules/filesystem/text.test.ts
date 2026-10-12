@@ -57,10 +57,10 @@ describe("目录正文工具", () => {
     const result = await call("read", { path: "text.txt", offset: 2, limit: 1 });
     expect(result.kind).toBe("succeeded");
     expect(textReadSchema.strip().parse(result.data)).toMatchObject({ fromLine: 2, rows: [{ line: 2, content: "b", hash: expect.any(String) }], nextOffset: 3 });
-    expect(result.model).toContain("2#");
+    expect(JSON.stringify(result.model)).toContain("2#");
     const unanchored = await call("read", { path: "text.txt" }, { anchored: false });
     expect(textReadSchema.strip().parse(unanchored.data).rows.every(row => row.hash === null)).toBe(true);
-    expect(unanchored.model).not.toContain("#");
+    expect(JSON.stringify(unanchored.model)).not.toContain("#");
     expect(await call("read", { path: "text.txt" }, { offset: 2 })).toMatchObject({ kind: "rejected", error: { code: "invalid_arguments" } });
     expect(await call("read", { path: "text.txt", offset: 9 })).toMatchObject({ kind: "rejected", error: { code: "line_out_of_range" } });
   });
@@ -120,6 +120,17 @@ describe("目录正文工具", () => {
     expect(await call("read", { path: "binary" })).toMatchObject({ kind: "rejected", error: { code: "unsupported_text" } });
     expect(await call("write", { path: "binary" }, { content: "x" })).toMatchObject({ kind: "rejected", error: { code: "unsupported_text" } });
     expect(await call("read", { path: "." })).toMatchObject({ kind: "failed", error: { code: "not_file" } });
+  });
+
+  it("see 按文件头识别图片并以文件部件交给模型；非图片拒绝，不按扩展名判断", async () => {
+    const { directory, call } = setup();
+    const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jX1kAAAAASUVORK5CYII=", "base64");
+    writeFileSync(join(directory, "shot.dat"), png);
+    writeFileSync(join(directory, "fake.png"), "not an image");
+    const seen = await call("see", { path: "shot.dat" });
+    expect(seen).toMatchObject({ kind: "succeeded", data: { path: "shot.dat", mediaType: "image/png", size: png.length } });
+    expect(seen!.model).toMatchObject([{ kind: "text" }, { kind: "file", mediaType: "image/png", filename: "shot.dat" }]);
+    expect(await call("see", { path: "fake.png" })).toMatchObject({ kind: "rejected", error: { code: "unsupported_image" } });
   });
 
   it("未链接或只读策略无法写入，工具可见性不会绕过授权", async () => {

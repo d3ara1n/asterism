@@ -3,6 +3,8 @@ import { z } from "zod";
 import { defineData, reference } from "@atelier/sdk/contracts";
 import { defineImplementation, defineResource, defineTool } from "@atelier/sdk/contracts";
 import type { Json, ToolOutcome } from "../shared/model.ts";
+import type { ToolModelOutput } from "@atelier/sdk/contracts";
+const text = (outcome: ToolOutcome) => outcome.model.flatMap(part => part.kind === "text" ? [part.text] : []).join("\n");
 import type { ToolInvocationInfo } from "@atelier/sdk/contracts";
 import { implement } from "../tools/testing.ts";
 import type { CallResult } from "@atelier/sdk/runtime";
@@ -21,7 +23,7 @@ const resource = { id: "r", kind: "test", title: "At request start", data: {} };
 const call = { callId: "c", name: "resource_call", arguments: { resource_id: "r", tool: "stream", args: {} } };
 type Data = { text: string };
 type Handler = (context: { signal: AbortSignal; publish(data: Data): void }) => Promise<CallResult<Data>>;
-async function run(handler: Handler, options: { effect?: "read" | "write"; signal?: AbortSignal; observer?: ToolObserver; toModel?: (data: Data) => Json } = {}) {
+async function run(handler: Handler, options: { effect?: "read" | "write"; signal?: AbortSignal; observer?: ToolObserver; toModel?: (data: Data) => ToolModelOutput } = {}) {
   const tool = implement({ ...contract, effect: options.effect ?? "read" }, {
     call: async (_state, _target, _args, context) => handler(context), toModel: options.toModel,
   });
@@ -70,7 +72,7 @@ describe("工具产出与终结", () => {
     } });
     expect(order).toEqual(["prepared", "started", "published", "published"]);
     expect(waiting[0]).not.toHaveProperty("startedAt");
-    expect(outcome).toMatchObject({ kind: "succeeded", data: { text: "final" }, model: "final", implementation: reference(contract),
+    expect(outcome).toMatchObject({ kind: "succeeded", data: { text: "final" }, model: [{ kind: "text", text: "final" }], implementation: reference(contract),
       resource: { id: "r", kind: "test", title: resource.title }, startedAt: expect.any(Number), finishedAt: expect.any(Number) });
     expect(toModel).toHaveBeenCalledTimes(1);
     expect(() => late({ text: 4 } as never)).not.toThrow();
@@ -84,20 +86,27 @@ describe("工具产出与终结", () => {
     { kind: "unknown", message: "Effects are unknown." },
   ] as const)("$kind 保留最近的合法产出，模型投影包含结局和产出", async completion => {
     const outcome = await run(async ({ publish }) => { publish({ text: "captured" }); return completion; }, { toModel: data => data.text });
-    expect(outcome).toMatchObject({ ...completion, data: { text: "captured" }, model: { ...completion, data: "captured" } });
+    expect(outcome).toMatchObject({ ...completion, data: { text: "captured" } });
+    expect(text(outcome)).toContain(completion.kind);
+    expect(text(outcome)).toContain("error" in completion ? completion.error!.message : completion.message);
+    expect(text(outcome)).toContain("captured");
   });
 
   it("部分完成明确保存最终产出；显式 null 可以清空过期的过程产出", async () => {
-    expect(await run(async ({ publish }) => {
+    await run(async ({ publish }) => {
       publish({ text: "preliminary" });
       return { kind: "partial", data: { text: "committed portion" }, message: "Only some work completed." };
-    })).toMatchObject({ kind: "partial", data: { text: "committed portion" }, model: {
-      kind: "partial", data: { text: "committed portion" }, message: "Only some work completed.",
-    } });
-    expect(await run(async ({ publish }) => {
+    }).then(outcome => {
+      expect(outcome).toMatchObject({ kind: "partial", data: { text: "committed portion" } });
+      expect(text(outcome)).toContain("Only some work completed.");
+      expect(text(outcome)).toContain("committed portion");
+    });
+    const cleared = await run(async ({ publish }) => {
       publish({ text: "invalidated preview" });
       return { kind: "failed", data: null, error: { code: "invalidated", message: "Preview is no longer valid." } };
-    })).toMatchObject({ data: null, model: { data: null } });
+    });
+    expect(cleared).toMatchObject({ data: null });
+    expect(text(cleared)).not.toContain("invalidated preview");
   });
 
   it.each(["read", "write"] as const)("%s 执行中抛出中止时保留产出，不能把未知写入伪装成已撤销", async effect => {
@@ -109,7 +118,8 @@ describe("工具产出与终结", () => {
       return { kind: "succeeded", data: { text: "unreachable" } };
     }, { effect, signal: controller.signal });
     expect(outcome).toMatchObject({ kind: effect === "read" ? "cancelled" : "unknown", data: { text: "before abort" } });
-    expect(outcome.model).toMatchObject({ kind: outcome.kind, data: { text: "before abort" } });
+    expect(text(outcome)).toContain(outcome.kind);
+    expect(text(outcome)).toContain("before abort");
   });
 
   it.each(["publish", "return"] as const)("%s 的不合法数据不会覆盖之前的有效快照", async where => {
@@ -131,13 +141,14 @@ describe("工具产出与终结", () => {
     });
     expect(outcome).toMatchObject({
       kind: "failed", data: preview ? { text: "preview only" } : null,
-      model: { kind: "failed", data: preview ? { text: "preview only" } : null },
     });
+    expect(text(outcome).includes("preview only")).toBe(preview);
   });
 
   it("模型投影失败保留已知执行结局，不绕过投影发送原始数据", async () => {
     const outcome = await run(async () => ({ kind: "succeeded", data: { text: "UI only" } }), { effect: "write", toModel() { throw new Error("Internal exception"); } });
-    expect(outcome).toMatchObject({ kind: "succeeded", data: { text: "UI only" }, model: { error: { code: "result_projection_failed" } } });
+    expect(outcome).toMatchObject({ kind: "succeeded", data: { text: "UI only" }, });
+    expect(text(outcome)).toContain("could not be prepared for the model");
     expect(JSON.stringify(outcome.model)).not.toContain("UI only");
     expect(JSON.stringify(outcome)).not.toContain("Internal exception");
   });

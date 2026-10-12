@@ -20,7 +20,7 @@ describe("历史导航契约", () => {
       node("4", "3", { ...block, kind: "text", text: "A output" }),
       node("5", "4", { kind: "event", type: "resource_attached", agentId: "a", data: { id: "n" }, model: null }),
       node("6", "5", { ...block, kind: "toolcall", ordinal: 1, callId: "call", name: "resource_call", argumentsText: "{}",
-        arguments: { resource_id: "n", tool: "read", args: {} }, outcome: { kind: "succeeded", data: null, model: null } }),
+        arguments: { resource_id: "n", tool: "read", args: {} }, outcome: { kind: "succeeded", data: null, model: [{ kind: "text", text: "null" }] } }),
       node("7", "6", { ...block, kind: "text", agentId: "b", text: "B output" }),
       node("8", "7", { kind: "notice", agentId: null, level: "info", code: "session", message: "Session notice" }),
     ];
@@ -77,7 +77,7 @@ describe("历史导航契约", () => {
       node("1", null, created("a", "A")),
       node("2", "1", { ...block, kind: "thinking", text: "Reasoning" }),
       node("3", "2", { ...block, kind: "toolcall", ordinal: 1, callId: "call", name: "resource_call", argumentsText: "{}",
-        arguments: { resource_id: "n", tool: "read", target: { path: "input.md" }, args: {} }, outcome: { kind: "succeeded", data: null, model: null } }),
+        arguments: { resource_id: "n", tool: "read", target: { path: "input.md" }, args: {} }, outcome: { kind: "succeeded", data: null, model: [{ kind: "text", text: "null" }] } }),
       node("4", "3", { ...block, kind: "text", ordinal: 2, complete: false, text: "Interrupted" }),
       node("5", "4", { kind: "message", agentId: "a", parts: [{ kind: "text", text: "Continue" }] }),
       node("6", "1", { kind: "message", agentId: "a", parts: [{ kind: "text", text: "Another branch" }] }),

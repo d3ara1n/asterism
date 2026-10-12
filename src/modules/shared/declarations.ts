@@ -62,3 +62,14 @@ export const Write = defineTool({
     content: z.string().describe("The complete new UTF-8 text. Empty content clears the target; do not include displayed line numbers or hashes."),
   }).describe("Full replacement text without edit anchors. The implementation specifies its content size limit."),
 });
+
+export const See = defineTool({
+  id: "atelier.core/tool.see",
+  name: "see",
+  description: "View an image so its pixels are attached to the tool result for you to inspect.",
+  guidelines: [
+    "Use see for images (PNG, JPEG, GIF, WebP); use read for text. Other binary formats are rejected.",
+    "Select the image with the implementation's target schema, e.g. target:{\"path\":\"docs/screenshot.png\"}, and pass args:{}.",
+  ],
+  argsSchema: z.strictObject({}).describe("Viewing takes no operation parameters; pass an empty object."),
+});

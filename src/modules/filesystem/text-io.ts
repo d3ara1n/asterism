@@ -22,7 +22,7 @@ export function validateTextSize(text: string): void {
 }
 function decodeText(bytes: Buffer): string {
   if (!isUtf8(bytes) || bytes.subarray(0, 5).toString("ascii") === "%PDF-" || bytes.some(byte => byte < 9 || (byte > 13 && byte < 32))) {
-    throw new TextError("unsupported_text", "The target is binary or is not UTF-8 text. Select a UTF-8 text file; this tool cannot decode images, PDFs or other binary formats.");
+    throw new TextError("unsupported_text", "The target is binary or is not UTF-8 text. Select a UTF-8 text file; use see for images; PDFs and other binary formats are unsupported.");
   }
   return bytes.toString("utf8");
 }

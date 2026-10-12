@@ -69,8 +69,8 @@ describe("响应块状态机", () => {
     const usage = { input: 5, output: 2, total: 7, reasoning: null, cacheRead: null, cacheWrite: null };
     response.accept({ type: "finish", reason: "tool-calls", usage, responseId: "remote", rawFinishReason: "tool_use" });
     const [first, last] = response.calls();
-    response.settle(last!, { kind: "succeeded", model: null, data: null });
-    response.settle(first!, { kind: "cancelled", message: "Cancelled.", data: null, model: { kind: "cancelled", message: "Cancelled.", data: null } });
+    response.settle(last!, { kind: "succeeded", model: [{ kind: "text", text: "null" }], data: null });
+    response.settle(first!, { kind: "cancelled", message: "Cancelled.", data: null, model: [{ kind: "text", text: "cancelled: Cancelled." }] });
     response.close();
     response.close();
     expect(nodes.map(node => "ordinal" in node && node.ordinal)).toEqual([1, 0]);
@@ -118,7 +118,7 @@ describe("响应块状态机", () => {
     expect(response.live()).toEqual([expect.objectContaining({ kind: "toolcall", state: "ready" })]);
     response.start(response.calls()[0]!);
     expect(response.live()[0]).toMatchObject({ state: "executing" });
-    response.settle(response.calls()[0]!, { kind: "cancelled", message: "Stopped.", data: null, model: { kind: "cancelled", message: "Stopped.", data: null } });
+    response.settle(response.calls()[0]!, { kind: "cancelled", message: "Stopped.", data: null, model: [{ kind: "text", text: "cancelled: Stopped." }] });
     response.interrupt();
     expect(response.live()).toEqual([]);
     expect(nodes).toHaveLength(2);

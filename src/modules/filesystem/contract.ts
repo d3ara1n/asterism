@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { defineImplementation, defineCreation } from "@atelier/sdk/contracts";
+import { defineImplementation, defineCreation, contentRefSchema } from "@atelier/sdk/contracts";
 import { core } from "../plugin.ts";
-import { List, Read, Edit, Write } from "../shared/declarations.ts";
+import { List, Read, Edit, Write, See } from "../shared/declarations.ts";
 import { textReadSchema, textChangeSchema } from "../shared/text-contract.ts";
 
 export const Directory = core.resource("directory", z.object({ path: z.string() }));
@@ -53,4 +53,14 @@ export const DirectoryWrite = defineImplementation({
     created: z.boolean().describe("True when this call created the target file; false when it already existed."),
   }).describe("The written file's actual diff and creation status; write never returns edit anchors. Full content is limited to 8 MiB.")),
   resource: Directory, tool: Write, targetSchema: fileTarget, effect: "write", execution: "sequential",
+});
+export const DirectorySee = defineImplementation({
+  ...core.data("directory.see", z.strictObject({
+    path: filePath, mediaType: z.string().describe("The image MIME type detected from the file signature."),
+    size: z.number().int().nonnegative().describe("Image size in bytes."),
+    image: contentRefSchema.describe("Immutable content captured when the image was viewed."),
+  }).describe("The viewed image, attached to the result for the model.")),
+  resource: Directory, tool: See,
+  targetSchema: z.strictObject({ path: filePath }).describe("Select one image with {\"path\":\"relative/image.png\"}. Images are limited to 5 MiB."),
+  effect: "read", execution: "parallel",
 });

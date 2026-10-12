@@ -1,4 +1,5 @@
 import type { ConfigurationService } from "../configuration/service.ts";
+import type { ContentLease } from "../runtime/content-store.ts";
 import { AiSdkAdapter } from "../model/ai-sdk.ts";
 import { ModelFailure, type ModelAdapter, type ModelEvent } from "../model/contract.ts";
 import { runModelRequest } from "../execution/request.ts";
@@ -26,6 +27,8 @@ export interface RunRequest extends ModelRunRequest {
   capabilities: AgentCapabilities;
   context: Promise<{ file: string; text: string }[]>;
   content?: HostInputOptions["content"];
+  /** 工具暂存内容的交接占用；结果记录登记内容根前保持可读，请求结束后释放。 */
+  handover?: () => ContentLease | undefined;
 }
 interface HostInputOptions { content?: (messages: readonly ModelItem[]) => ModelContent | undefined }
 export interface HostModels {
@@ -139,7 +142,8 @@ export function createModelServices(configuration: ConfigurationService, adapter
         if (error instanceof ModelTargetFailure) throw new ModelFailure(error.reason, error.message);
         throw error;
       });
-      return runModelRequest(request, environment).finally(() => content?.close());
+      const handover = request.handover?.();
+      return runModelRequest(request, environment, handover).finally(() => Promise.all([content?.close(), handover?.close()]));
     },
   };
 }

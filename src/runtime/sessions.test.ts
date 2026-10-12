@@ -276,7 +276,7 @@ describe("会话运行时", () => {
     const snapshot = service.sessions.snapshot(sessionId);
     const saved = snapshot.nodes.find(node => node.kind === "toolcall")!;
     expect(saved).toMatchObject({ complete: true, outcome: {
-      kind: "cancelled", data: { text: "first\nsecond" }, model: { kind: "cancelled", data: "first\nsecond" },
+      kind: "cancelled", data: { text: "first\nsecond" }, model: [{ kind: "text", text: "cancelled: Operation execution was cancelled." }, { kind: "text", text: "first\nsecond" }],
       implementation: { id: "test.streaming" }, resource: { id: resourceId, kind: "atelier.core/directory", title: "Captured directory" },
       startedAt: expect.any(Number), finishedAt: expect.any(Number),
     } });
@@ -289,7 +289,7 @@ describe("会话运行时", () => {
     const history = reopened.sessions.snapshot(sessionId);
     expect(history.nodes.find(node => node.id === saved.id)).toEqual(saved);
     expect(projectForAgent(history.nodes, agentId).find(item => item.kind === "result")).toMatchObject({
-      outcome: { kind: "cancelled", model: { data: "first\nsecond" } },
+      outcome: { kind: "cancelled", model: [{ kind: "text" }, { kind: "text", text: "first\nsecond" }] },
     });
     expect(history.progress.live).toEqual([]);
   });
@@ -436,6 +436,40 @@ describe("会话运行时", () => {
     expect(nodes.at(-1)).toMatchObject({ code: "empty_response", response: { providerResponseId: "empty-response", usage: { total: 2 } } });
   });
 
+  it("目录 see 的图片随代理工具结果落库，下一次请求作为文件部件发送，重开仍可读取", async () => {
+    let resourceId = "";
+    const seen: ModelInput[] = [];
+    const model: ModelAdapter = { validate() {}, version: "ai-sdk-v7/3", prepare: input => { seen.push(input); return { async *stream() {
+      if (seen.length === 2) {
+        yield { type: "part.start", part: { id: "c", kind: "toolcall", callId: "see-image", name: "resource_call" } };
+        yield { type: "part.end", partId: "c", arguments: { resource_id: resourceId, tool: "see", target: { path: "shot.png" }, args: {} } };
+        yield { type: "finish", reason: "tool-calls", usage: null };
+      } else yield* reply();
+    } }; } };
+    const { service, root, start } = await setup(model);
+    const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jX1kAAAAASUVORK5CYII=", "base64");
+    writeFileSync(join(root, "shot.png"), png);
+    const first = await execute(service, start); await settled(service);
+    const created = await execute(service, { type: "resource.create", sessionId: first.sessionId, kind: "atelier.core/directory", creation: { id: "atelier.core/directory.create" }, input: { path: root }, position: { x: 0, y: 0 } });
+    resourceId = created.workbench.objects.find(object => object.kind === "atelier.core/directory")!.id;
+    const agentId = agentOf(first);
+    await execute(service, { type: "link.set", sessionId: first.sessionId, agentId, resourceId, linked: true });
+    await execute(service, agentCommand(first.sessionId, agentId, { type: "continue" })); await settled(service);
+    const nodes = service.sessions.tree.nodes(first.sessionId);
+    expect(nodes.filter(node => node.kind === "notice")).toEqual([]);
+    const saved = nodes.find(node => node.kind === "toolcall");
+    expect(saved).toMatchObject({ outcome: { kind: "succeeded", model: [{ kind: "text" }, { kind: "file", mediaType: "image/png", filename: "shot.png" }] } });
+    expect(seen).toHaveLength(3);
+    const result = seen[2]!.messages.find(item => item.kind === "result");
+    expect(result).toMatchObject({ kind: "result", parts: [{ kind: "text" }, { kind: "file", mediaType: "image/png", data: new Uint8Array(png) }] });
+    await service.close(); services.delete(service);
+    const reopened = new ApplicationService(root); services.add(reopened);
+    const outcome = reopened.sessions.tree.nodes(first.sessionId).find(node => node.kind === "toolcall")!;
+    const file = (outcome as { outcome: { model: { kind: string; file?: { "$atelier.content": string } }[] } }).outcome.model.find(part => part.kind === "file")!.file!;
+    expect(await reopened.sessions.content.reader({ sessionId: first.sessionId, objectId: agentId,
+      recordIds: new Set(reopened.sessions.tree.path(first.sessionId).map(node => node.id)) }).read(file)).toEqual(new Uint8Array(png));
+  });
+
   it("工具结果保存实现版本与当次数据；资源移除、文件改变和重开不影响历史", async () => {
     let resourceId = "";
     let calls = 0;
@@ -461,7 +495,7 @@ describe("会话运行时", () => {
     const saved = service.sessions.tree.nodes(first.sessionId).find(node => node.kind === "toolcall");
     const listing = { path: "files", entries: [{ name: "a.txt", type: "file" }], truncated: false };
     expect(saved).toMatchObject({ outcome: { kind: "succeeded", implementation: { id: "atelier.core/directory.list" },
-      model: listing, data: listing } });
+      model: [{ kind: "text", text: JSON.stringify(listing) }], data: listing } });
     writeFileSync(join(root, "files", "b.txt"), "changed");
     await execute(service, { type: "object.remove", sessionId: first.sessionId, objectId: resourceId });
     await service.close(); services.delete(service);

@@ -13,6 +13,10 @@ export const filesystemMessages = pluginNamespace("atelier.core").messages("en",
     id: "toolDirectoryList",
     defaultMessage: "List directory",
   },
+  toolDirectorySee: {
+    id: "toolDirectorySee",
+    defaultMessage: "View image",
+  },
   toolEntryCount: {
     id: "toolEntryCount",
     defaultMessage: "{count, plural, one {#{truncated, select, true {+} other {}} entry} other {#{truncated, select, true {+} other {}} entries}}",

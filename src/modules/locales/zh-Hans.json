@@ -37,6 +37,7 @@
   "toolCallDetails": "调用详情",
   "toolNoOutput": "此次操作没有产出内容。",
   "toolDirectoryList": "列出目录",
+  "toolDirectorySee": "查看图片",
   "toolEntryCount": "{count}{truncated, select, true {+} other {}} 项",
   "toolDirectoryEmpty": "此目录为空。",
   "toolDirectoryTruncated": "仅显示前 500 项。",

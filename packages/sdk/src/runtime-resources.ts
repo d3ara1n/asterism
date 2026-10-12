@@ -1,6 +1,7 @@
 import type { ActionContract, CreationContract } from "./commands.ts";
 import type { z } from "zod";
 import { jsonSchema, type Json } from "./json.ts";
+import type { ToolModelOutput } from "./tool-result.ts";
 import type { ResourceContract, ImplementationContract } from "./module-contract.ts";
 import type { RecordContract } from "./records.ts";
 import { reference, present, type DataContract } from "./presentation.ts";
@@ -56,7 +57,7 @@ export function implementTool<S extends Json, T extends Json, A extends Json, D 
     call(data: S, target: T, args: A, context: {
       object: ObjectExecutor; signal: AbortSignal; publish(data: NoInfer<D>): void;
     }): Promise<CallResult<NoInfer<D>>>;
-    toModel?(data: D): Json;
+    toModel?(data: D): ToolModelOutput;
   },
 ): ToolContribution {
   const identity = reference(contract);
@@ -78,7 +79,8 @@ export function implementTool<S extends Json, T extends Json, A extends Json, D 
         ].join("\n") } };
       return {
         effect: contract.effect, execution: contract.execution, implementation: identity,
-        toModel: data => jsonSchema.parse(definition.toModel ? definition.toModel(contract.schema.parse(data)) : data),
+        // 未声明投影时以 JSON 文本交给模型；字符串与部件原样保留，不二次序列化。
+        toModel: data => definition.toModel ? definition.toModel(contract.schema.parse(data)) : JSON.stringify(data),
         async execute(signal, publish) {
           let active = true;
           const snapshot = (data: unknown) => jsonSchema.parse(contract.schema.parse(data));

@@ -1,13 +1,14 @@
-import { useI18n, creationEntry, cardRenderer, toolRenderer, type RendererModule, type ToolRenderProps } from "@atelier/sdk/renderer";
+import { useI18n, useRendererObject, creationEntry, cardRenderer, toolRenderer, type RendererModule, type ToolRenderProps } from "@atelier/sdk/renderer";
 import type { z } from "zod";
-import { Folder, BookOpen, FilePenLine, FilePlus2, ListTree } from "lucide-react";
+import { Eye, Folder, BookOpen, FilePenLine, FilePlus2, ListTree } from "lucide-react";
 
 import { ToolHeader } from "../../renderer/shared/tool-header";
 import { filesystemMessages } from "../messages/filesystem";
 import { textMessages } from "../messages/text";
 import { textReadViews, textWriteViews, textEditViews } from "../text-view";
 import { inputText } from "../shared/tool-preview";
-import { CreateDirectory, DirectoryView, DirectoryList, DirectoryRead, DirectoryEdit, DirectoryWrite } from "./contract";
+import { CreateDirectory, DirectoryView, DirectoryList, DirectoryRead, DirectoryEdit, DirectoryWrite, DirectorySee } from "./contract";
+import { FilePreview } from "../agent/conversation/Files";
 import { DirectoryInput } from "./creation";
 
 const appearance = { width: 340, height: 200, minWidth: 280, minHeight: 160 };
@@ -31,6 +32,19 @@ function ListBody({ result }: ListProps) {
     {data.truncated && <p className="type-caption">{i18n.formatMessage(filesystemMessages.toolDirectoryTruncated)}</p>}
   </div> : null;
 }
+type SeeProps = ToolRenderProps<z.infer<typeof DirectorySee.schema>>;
+function SeeHeader({ target, invocation }: SeeProps) {
+  const i18n = useI18n();
+  return <ToolHeader label={i18n.formatMessage(filesystemMessages.toolDirectorySee)} monospace
+    subject={[invocation.resource?.title, inputText(target, "path")].filter(Boolean).join(" / ")} />;
+}
+/** 结果图片复用附件预览，按对象当前路径上的记录根读取。 */
+function SeeBody({ result }: SeeProps) {
+  const object = useRendererObject();
+  const data = result?.data;
+  return data ? <FilePreview part={{ kind: "file", file: data.image, mediaType: data.mediaType, filename: data.path }} content={object.content} /> : null;
+}
+const seeView = { headerRenderer: SeeHeader, bodyRenderer: SeeBody };
 const listView = { headerRenderer: ListHeader, bodyRenderer: ListBody };
 
 export default {
@@ -53,6 +67,10 @@ export default {
     toolRenderer(DirectoryWrite, {
       label: textMessages.toolTextWrite, icon: <FilePlus2 className="size-3.5" />,
       ...textWriteViews,
+    }),
+    toolRenderer(DirectorySee, {
+      label: filesystemMessages.toolDirectorySee, icon: <Eye className="size-3.5" />,
+      input: { headerRenderer: SeeHeader }, execution: { headerRenderer: SeeHeader }, result: seeView,
     }),
     toolRenderer(DirectoryList, {
       label: filesystemMessages.toolDirectoryList,

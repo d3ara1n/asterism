@@ -7,7 +7,7 @@ import type { PluginNamespace } from "./plugin.ts";
 import type { ResourceContract, ImplementationContract } from "./module-contract.ts";
 import type { DataContract, Presentation } from "./presentation.ts";
 import type { RecordContract, SessionRecord } from "./records.ts";
-import type { ToolCompletion, ToolInvocationInfo } from "./tool-result.ts";
+import type { ToolCompletion, ToolInvocationInfo, ToolModelOutput } from "./tool-result.ts";
 import type { PluginConfig, PluginLogger, PluginSecrets, PluginTasks } from "./runtime.ts";
 import type { ModelServices } from "./models.ts";
 import type { ResourceRef, ResourceSnapshot, SessionSnapshot } from "./workspace.ts";
@@ -80,7 +80,7 @@ export interface ToolInvocation extends ToolInvocationInfo {
   effect: "read" | "write";
   execution: "parallel" | "sequential";
   execute(signal: AbortSignal, publish?: (data: Json) => void): Promise<CallResult>;
-  toModel?(data: Json): Json;
+  toModel?(data: Json): ToolModelOutput;
 }
 export interface ToolContribution {
   readonly contract: ImplementationContract<Json, Json, Json, Json>;

@@ -96,7 +96,7 @@ describe("工具定义与实现注册边界", () => {
         { implementation: prepared.implementation }, null, prepared.toModel));
     };
     expect(await invoke(1)).toEqual({ kind: "succeeded", data: { x: 3, piece: "T" },
-      model: "Moved T to 3", implementation: { id: "test.game.move" } });
+      model: [{ kind: "text", text: "Moved T to 3" }], implementation: { id: "test.game.move" } });
     expect(implementation.prepare(resource, { path: "T" }, { delta: 1 })).toMatchObject({ kind: "rejected" });
     expect(implementation.prepare(resource, { piece: "T" }, { delta: "1" })).toMatchObject({ kind: "rejected" });
     expect(implementation.prepare({ ...resource, data: {} }, { piece: "T" }, { delta: 1 })).toMatchObject({ kind: "failed" });

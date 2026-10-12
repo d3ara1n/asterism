@@ -9,6 +9,7 @@ import { declareTool } from "../tools/definition.ts";
 import { jsonArgumentHint, validationMessage } from "../tools/validation.ts";
 import { ResourceCall, ResourceInspect, ResourceList, ResourceInspectResult, ResourceListResult } from "../tools/core.ts";
 import type { AgentCapabilities } from "./capabilities.ts";
+import type { ContentLease } from "../runtime/content-store.ts";
 
 /** 宿主固定操作入口；只在 provider 协议中表示为 tools，不属于资源工具目录。 */
 interface CoreAction {
@@ -60,7 +61,7 @@ export function previewCoreCall(name: string, args: Json, capabilities: AgentCap
 /** 批次先解析实际资源工具，再按其执行策略调度；发布快照不改变批次的模型交付边界。 */
 export async function executeCoreBatch(calls: readonly PendingCall[], capabilities: AgentCapabilities | null,
   signal: AbortSignal, settle: (call: PendingCall, outcome: ToolOutcome) => void,
-  observer: ToolObserver = {}): Promise<void> {
+  observer: ToolObserver = {}, handover?: ContentLease): Promise<void> {
   const resolved = calls.map(call => {
     let result: Invocation | PreparedResult;
     const action = actions.find(action => action.tool.name === call.name);
@@ -93,7 +94,7 @@ export async function executeCoreBatch(calls: readonly PendingCall[], capabiliti
         if (!active) return;
         latest = jsonSchema.parse(data);
         observer.published?.(call, latest);
-      });
+      }, handover);
       // 在执行边界校验终结数据；schema 错误也必须收束并保留之前的合法产出。
       completion = resolveToolCompletion(completion, latest);
     } catch {

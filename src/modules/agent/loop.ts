@@ -29,6 +29,12 @@ export function createAgentLoop(deps: { selection: AgentSelectionService; tasks:
                 if (event.type !== "progress") object.commit(writer => { writer.append(Execution, event); });
               } },
             });
+            // 事件提交失败时请求已中止且无法写入诊断；在循环层补一条可见通知，避免静默停止。
+            if (result.reason === "failed" && result.code === "event_delivery") {
+              object.commit(writer => { writer.append(Notice, { level: "error", code: "event_delivery",
+                message: "The model response could not be saved to the timeline. Execution stopped." }); });
+              return;
+            }
             if (result.reason !== "completed" || result.tools.length === 0) return;
           }
         } catch (error) {

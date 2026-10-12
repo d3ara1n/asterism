@@ -28,7 +28,7 @@ type ModelInputPart =
   | { kind: "file"; file: ContentRef; mediaType: string; filename?: string };
 ```
 
-纯文字也使用 text 部件。文件身份复用宿主 ContentRef，MIME 和可选文件名属于消费元数据；协议不接受路径、URL、base64 或字节本体。系统提示沿用纯文字 PromptBlock，输出与工具结果保持原契约。
+纯文字也使用 text 部件。文件身份复用宿主 ContentRef，MIME 和可选文件名属于消费元数据；协议不接受路径、URL、base64 或字节本体。系统提示沿用纯文字 PromptBlock；工具结果的模型投影复用同一 parts 形状。
 
 `models.validate(request, { content })` 和 `models.stream(request, { content })` 接收已有的宿主 ContentReader；含文件时不得省略，也不按 ID 全局查找。准备阶段的 content 包含本次输入尝试及合法对象内容。纯文字调用无需 content。`models.run` 根据既有 object/requestParentId 捕获本对象当前数据和本次路径的记录依赖，不接收外部 reader 覆盖。内容读取资格不授予工具访问或跨对象共享权。
 
@@ -63,7 +63,7 @@ Session 是时间轴的单一写入者。成型记录、终态元数据、对象
 
 所有结局都保存 `data` 与 `model`。过程态为 `{kind: "running", data}`，与终结态共用实现的 result schema；`publish(data)` 以完整产出替换最近的合法快照，不合契约的数据不能覆盖有效产出。无产出用 null 表示。失败、取消、未知等结局省略 data 时采用最近产出，显式 null 清空。工具终结后发布回调失效。
 
-`model` 只在终结时由可选 `toModel(data)` 投影；成功默认等于 data，其余结局还包装 kind、错误或说明。模型适配器只消费保存的 model，不能将 GUI 数据、资源标题或执行时间当作错误对象一起发送。结局同时保存实际实现 ID、请求边界内的资源身份/类型/名称、开始与结束时间。UI 的 headerRenderer/bodyRenderer 接收同一份调用和结果，分别可选；历史按实现身份选择视图并经其 schema 解码，缺失或数据不兼容时使用默认视图。
+`model` 是 `text | file` 部件，只在终结时由可选 `toModel(data)` 投影；未声明时 data 以 JSON 文本作为一个文字部件，其余结局以文字说明 kind、错误或说明并附有效产出，文件只随成功与部分成功保存。模型适配器只消费保存的 model，不能将 GUI 数据、资源标题或执行时间当作错误对象一起发送。结局同时保存实际实现 ID、请求边界内的资源身份/类型/名称、开始与结束时间。UI 的 headerRenderer/bodyRenderer 接收同一份调用和结果，分别可选；历史按实现身份选择视图并经其 schema 解码，缺失或数据不兼容时使用默认视图。
 
 ## 执行循环
 
@@ -87,7 +87,7 @@ context 唯一真值在时间轴。Agent 可以持有选择、计数、取消与
 
 三协议使用已安装 AI SDK：OpenAI Responses、OpenAI Chat Completions、Anthropic Messages。工具定义不提供 SDK execute；关闭隐式重试与流重试。带凭据的远程端点要求 HTTPS，无鉴权模式去除认证头，禁止自动重定向。每个 SDK 调用只进行一个模型步骤，由工坊执行后续循环。OpenAI Responses 使用 store:false 并请求 encrypted reasoning。
 
-直接续接要求 provider、协议、端点、模型标识和适配版本兼容；不兼容时在提交前明确失败。用户输入支持 JPEG、PNG、GIF、WebP 与 PDF，经 AI SDK FilePart 编码为三协议的原生图片／文件输入；服务端工具、工具结果媒体及模型生成媒体暂不支持。
+直接续接要求 provider、协议、端点、模型标识和适配版本兼容；不兼容时在提交前明确失败。用户输入与工具结果的文件按 mediaType 如实编码：Responses 与 Anthropic 走 SDK 工具结果 content 输出，协议不支持的类型由 SDK 处理，客户端不补丁；Chat Completions 的 tool 消息只放文字并注明附件，文件在紧随的一条 user 消息中发送。纯文字结果用 text／error-text 形态，避免二次序列化。服务端工具与模型生成媒体暂不支持。
 
 Responses 模型声明的思考能力显式传给 SDK，不依赖 SDK 的 OpenAI 模型名称识别；声明思考能力时，开启、关闭与等级参数均传到请求中。模型声明思考能力且未关闭思考时，显式请求可见摘要，包括采用默认思考等级的情况；加密推理资料独立用于续接。代理页面只展示含可见正文的思考块，空块仍保留在历史与模型投影中，不显示空折叠项。
 
