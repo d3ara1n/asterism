@@ -241,16 +241,4 @@ export const agentsMessages = pluginNamespace("atelier.host").messages("en", def
     id: "features_configuration_AgentsSettings_60",
     defaultMessage: "Runtime default (32)",
   },
-  costLimit: {
-    id: "features_configuration_AgentsSettings_61",
-    defaultMessage: "Cost limit (USD)",
-  },
-  costLimitPlaceholder: {
-    id: "features_configuration_AgentsSettings_62",
-    defaultMessage: "No limit",
-  },
-  costLimitHint: {
-    id: "features_configuration_AgentsSettings_63",
-    defaultMessage: "Cost tracking is not connected yet; setting a limit currently prevents execution.",
-  },
 }));

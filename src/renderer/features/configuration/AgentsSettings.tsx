@@ -286,10 +286,6 @@ function AgentEditor({ initialId }: { initialId: string | null }) {
       {advanced && <FieldGroup className="mt-3">
         <OverrideNumberField label={i18n.formatMessage(agentsMessages.timeout)} value={draft.timeout} inherited={base.timeout} onChange={next => set("timeout", next)} min={1} max={86_400} integer empty={i18n.formatMessage(agentsMessages.timeoutPlaceholder)} />
         <OverrideNumberField label={i18n.formatMessage(agentsMessages.maximumRequests)} value={draft.maxTurns} inherited={base.maxTurns} onChange={next => set("maxTurns", next)} min={1} integer empty={i18n.formatMessage(agentsMessages.maximumRequestsPlaceholder)} />
-        <div className="flex flex-col gap-2">
-          <OverrideNumberField label={i18n.formatMessage(agentsMessages.costLimit)} value={draft.maxCost} inherited={base.maxCost} onChange={next => set("maxCost", next)} min={0.001} empty={i18n.formatMessage(agentsMessages.costLimitPlaceholder)} />
-          <p className="type-caption">{i18n.formatMessage(agentsMessages.costLimitHint)}</p>
-        </div>
       </FieldGroup>}
 
     </fieldset></form>

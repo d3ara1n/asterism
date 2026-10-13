@@ -24,8 +24,7 @@ export const defaultAgents: Omit<AgentConfiguration, "revision">[] = [
       "researcher"
     ],
     "timeout": 2400,
-    "maxTurns": null,
-    "maxCost": null
+    "maxTurns": null
   },
   {
     "id": "explorer",
@@ -54,8 +53,7 @@ export const defaultAgents: Omit<AgentConfiguration, "revision">[] = [
     "excludeTools": null,
     "subagentRoles": null,
     "timeout": 900,
-    "maxTurns": null,
-    "maxCost": null
+    "maxTurns": null
   },
   {
     "id": "reviewer",
@@ -85,8 +83,7 @@ export const defaultAgents: Omit<AgentConfiguration, "revision">[] = [
       "researcher"
     ],
     "timeout": 3600,
-    "maxTurns": null,
-    "maxCost": null
+    "maxTurns": null
   },
   {
     "id": "researcher",
@@ -120,8 +117,7 @@ export const defaultAgents: Omit<AgentConfiguration, "revision">[] = [
       "explorer"
     ],
     "timeout": 2400,
-    "maxTurns": null,
-    "maxCost": null
+    "maxTurns": null
   },
   {
     "id": "advisor",
@@ -154,8 +150,7 @@ export const defaultAgents: Omit<AgentConfiguration, "revision">[] = [
       "researcher"
     ],
     "timeout": 1800,
-    "maxTurns": null,
-    "maxCost": null
+    "maxTurns": null
   }
 ];
 
