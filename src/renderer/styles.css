@@ -217,6 +217,12 @@
   .settings-card { @apply rounded-xl text-left outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50; }
   .settings-detail { @apply absolute inset-x-0 top-0 max-h-full overflow-y-auto overscroll-contain; }
 }
+/* 启动屏：静态 HTML，React 挂载时替换；只使用主题 token。 */
+.startup-screen { display: flex; height: 100%; flex-direction: column; align-items: center; justify-content: center; gap: 0.75rem; color: var(--muted-foreground); font-family: var(--font-sans); font-size: 0.8125rem; }
+.startup-indicator { width: 1.25rem; height: 1.25rem; border-radius: 9999px; border: 2px solid var(--border); border-top-color: var(--muted-foreground); animation: startup-spin 0.8s linear infinite; }
+.startup-stage { margin: 0; min-height: 1.25em; }
+@keyframes startup-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .startup-indicator { animation-duration: 2.4s; } }
 .react-flow__attribution { background: transparent !important; font-size: 9px !important; }
 /* Pierre 自行绘制差异与语法颜色；宿主只接入公共字体、字号与紧凑间距。 */
 .pierre-code {

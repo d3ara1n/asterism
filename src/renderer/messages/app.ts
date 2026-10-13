@@ -5,6 +5,14 @@ export const appMessages = pluginNamespace("atelier.host").messages("en", define
     id: "appName",
     defaultMessage: "Atelier",
   },
+  startupPlugins: {
+    id: "startupPlugins",
+    defaultMessage: "Loading plugins…",
+  },
+  startupEnvironment: {
+    id: "startupEnvironment",
+    defaultMessage: "Initializing environment…",
+  },
   menu: {
     id: "menu",
     defaultMessage: "Atelier menu",

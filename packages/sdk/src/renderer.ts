@@ -74,6 +74,12 @@ export interface RendererModule {
   tools: ToolRenderer[];
   /** 创建入口：菜单与拖放由宿主统一仲裁，最终都走所绑定的创建契约。 */
   creations?: CreationEntry[];
+  /** 启动准备：宿主在首屏前并行调用，模块自行初始化内部资源；超时或失败只记录，不阻止启动。 */
+  prepare?(context: RendererPrepareContext): Promise<void>;
+}
+export interface RendererPrepareContext {
+  /** 宿主放弃等待（超时或关闭）时触发；模块应尽快停止。 */
+  readonly signal: AbortSignal;
 }
 
 /** 类型擦除只发生在注册边界；组件接收到的是已通过契约校验的数据。 */

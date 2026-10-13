@@ -1,6 +1,8 @@
 {
   "model_modality_image": "图片",
   "appName": "工坊",
+  "startupPlugins": "正在加载插件…",
+  "startupEnvironment": "正在初始化环境…",
   "menu": "工坊菜单",
   "menuSettings": "设置",
   "workspaceNavigation": "工作区导航",

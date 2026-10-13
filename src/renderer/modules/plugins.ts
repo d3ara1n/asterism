@@ -26,7 +26,8 @@ export async function loadPluginRenderers(entries: readonly { id: string; render
       const loaded = await import(/* @vite-ignore */ `atelier-plugin://${entry.renderer}`) as { default?: RendererModule };
       const module = loaded.default;
       if (!module || !Array.isArray(module.resources) || !Array.isArray(module.cards) || !Array.isArray(module.tools)
-        || (module.creations !== undefined && !Array.isArray(module.creations))) {
+        || (module.creations !== undefined && !Array.isArray(module.creations))
+        || (module.prepare !== undefined && typeof module.prepare !== "function")) {
         throw new Error("The renderer entry must default-export { resources, cards, tools }.");
       }
       modules.push(module);

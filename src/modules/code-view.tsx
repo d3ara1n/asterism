@@ -1,12 +1,6 @@
 import { useMemo } from "react";
 import { File, type FileOptions } from "@pierre/diffs/react";
-import type { BaseCodeOptions } from "@pierre/diffs";
-
-export const codeViewOptions: BaseCodeOptions = {
-  theme: { light: "pierre-light", dark: "pierre-dark" },
-  themeType: "system", preferredHighlighter: "shiki-js",
-  disableFileHeader: true, overflow: "wrap",
-};
+import { codeViewOptions } from "./shared/code-view";
 
 /** 正文提供方交付连续片段；通过公开回调把行号标签投影到片段的绝对位置。 */
 export function CodeRows({ rows, filename }: { rows: readonly { line: number; content: string }[]; filename?: string }) {

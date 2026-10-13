@@ -3,6 +3,7 @@ import { FileText, BookOpen, FilePenLine, FilePlus2 } from "lucide-react";
 
 import { commonMessages } from "../messages/common";
 import { textMessages } from "../messages/text";
+import { prepareCodeView } from "../shared/code-view";
 import { textReadViews, textWriteViews, textEditViews } from "../text-view";
 import { CreateNote, NoteView, NoteRead, NoteEdit, NoteWrite } from "./contract";
 import { NoteInput } from "./creation";
@@ -10,6 +11,7 @@ import { NoteInput } from "./creation";
 const appearance = { width: 340, height: 320, minWidth: 280, minHeight: 160 };
 
 export default {
+  prepare: prepareCodeView,
   resources: [{ kind: "atelier.core/note", label: commonMessages.kindNote, icon: <FileText className="size-4" />, card: appearance }],
   cards: [cardRenderer(NoteView, {
     ...appearance,

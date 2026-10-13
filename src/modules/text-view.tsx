@@ -7,7 +7,8 @@ import { FileDiff, type FileDiffOptions } from "@pierre/diffs/react";
 import type { TextRead, TextChange } from "./shared/text-contract";
 import { inputField, inputText, characterCount, toolTextTail } from "./shared/tool-preview";
 import { TOOL_BODY_LINE_LIMIT, diffBodyPreview, textBodyPreview } from "./shared/tool-body";
-import { CodeRows, codeViewOptions } from "./code-view";
+import { CodeRows } from "./code-view";
+import { codeViewOptions } from "./shared/code-view";
 import { ToolHeader } from "../renderer/shared/tool-header";
 
 /** 三态复用摘要结构，已有路径、输入数量在执行和结束时继续保留。 */

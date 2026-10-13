@@ -106,6 +106,8 @@ header 按单行摘要设计，由 renderer 自行安排内容、排列和省略
 
 edit 的差异视图交给 Pierre Diffs 的 FileDiff，使用 stacked 展示（API 的 `unified`），原生单列行号、增删颜色和简单片段分隔。`shared/tool-body.ts` 解析已保存的 diff，按总预算选取真实行并保留绝对位置，再由 `parsePatchFiles` 生成预览元数据；解析失败时回退有界原文预览。read/write 复用 `code-view.tsx` 的原生 File 代码视图，交给库按文件名与扩展名识别语法，未知类型或没有文件名时使用普通文本。片段为连续行，绝对起始行号通过公开 `onPostRender` 回调映射到现有行号标签。两类视图使用 Pierre 亮暗主题与 JavaScript 正则引擎，字体和字号沿用公共代码 token。
 
+`shared/code-view.ts` 维护公共展示选项与 `prepareCodeView`。filesystem 与 notes 的 renderer 模块以它作为启动准备，在首屏前把两套主题与常用语法挂到库的共享高亮器；File 与 FileDiff 首次渲染即同步产出正文，其余语言由库在首次使用时补齐着色。
+
 三个宿主固定入口在 `renderer/features/conversation/tool-views.tsx` 内置，不进入模块注册面。resource_call 的适配器将内层参数、选定实现身份和同一结果交给 ViewRegistry，填充时允许参数不完整，其余阶段使用完整调用；采用二级工具的三态视图，不新增外层折叠框。
 
 前端目录在应用根通过 ModuleViewsProvider 注入。基础对象接口提供读取、具型创建／动作、对象流与通用运行状态；模型进度、配置目录、工具展示经具名接口按需取得，共享已有宿主状态源。`agent/conversation/` 组合时间轴、输出跟随、消息输入、配置选择与交互协调；草稿和重试身份按会话／对象保留，导航显式注入。公共控件与文案可从 `renderer/shared/` 复用；模块不导入宿主控制器、物理节点或模块总表。

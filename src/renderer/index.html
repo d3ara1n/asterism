@@ -7,7 +7,10 @@
     <title>%APPLICATION_TITLE%</title>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root"><div class="startup-screen" role="status" aria-live="polite">
+      <div class="startup-indicator" aria-hidden="true"></div>
+      <p id="startup-stage" class="startup-stage"></p>
+    </div></div>
     <script type="module" src="/main.tsx"></script>
   </body>
 </html>

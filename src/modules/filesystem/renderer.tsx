@@ -5,6 +5,7 @@ import { Eye, Folder, BookOpen, FilePenLine, FilePlus2, ListTree } from "lucide-
 import { ToolHeader } from "../../renderer/shared/tool-header";
 import { filesystemMessages } from "../messages/filesystem";
 import { textMessages } from "../messages/text";
+import { prepareCodeView } from "../shared/code-view";
 import { textReadViews, textWriteViews, textEditViews } from "../text-view";
 import { inputText } from "../shared/tool-preview";
 import { TOOL_BODY_LINE_LIMIT } from "../shared/tool-body";
@@ -50,6 +51,7 @@ const seeView = { headerRenderer: SeeHeader, bodyRenderer: SeeBody };
 const listView = { headerRenderer: ListHeader, bodyRenderer: ListBody };
 
 export default {
+  prepare: prepareCodeView,
   resources: [{ kind: "atelier.core/directory", label: filesystemMessages.directory, icon: <Folder className="size-4" />, card: appearance }],
   cards: [cardRenderer(DirectoryView, {
     ...appearance,
