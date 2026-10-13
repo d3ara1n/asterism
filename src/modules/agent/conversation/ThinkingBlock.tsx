@@ -15,15 +15,16 @@ type ThinkingNode = Extract<TimelineItem, { kind: "thinking" }>;
 
 /** 外壳的开合偏好与正文的过程/终结渲染相互独立。 */
 export function ThinkingBlock({ node }: { node: ThinkingNode }) {
-
-  const streaming = !("complete" in node);
+  const streaming = "endedAt" in node && node.endedAt === null;
   const preferences = useRendererConfig(CoreSettings);
   const [disclosure, setDisclosure] = useState(() => initialThinkingDisclosure(streaming, preferences));
   const next = advanceThinkingDisclosure(disclosure, streaming, preferences);
   if (next !== disclosure) setDisclosure(next);
   // 同一块落库保留本次实时计时；历史没有保存起点时不补造耗时。
   const [startedAt] = useState(() => "startedAt" in node ? node.startedAt : null);
-  const endedAt = "createdAt" in node ? Date.parse(node.createdAt) : null;
+  const finished = "endedAt" in node ? node.endedAt : Date.parse(node.createdAt);
+  const [endedAt, setEndedAt] = useState(finished);
+  if (endedAt === null && finished !== null) setEndedAt(finished);
   const interrupted = "complete" in node && !node.complete;
 
   return <Disclosure open={next.open} onOpenChange={open => setDisclosure({ streaming, open })}
@@ -56,7 +57,6 @@ function ThinkingHeader({ streaming, startedAt, endedAt, interrupted }: {
 }
 
 const ThinkingBody = memo(function ThinkingBody({ streaming, text }: { streaming: boolean; text: string }) {
-
   return streaming
     ? <div className="thinking-preview" inert aria-hidden="true">
       <div className="min-w-0 shrink-0"><Markdown streaming>{text}</Markdown></div>

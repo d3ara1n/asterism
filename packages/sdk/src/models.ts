@@ -38,24 +38,24 @@ export type ModelCompletion = {
 /** 成型响应块；不是会话节点，时间轴身份和保存由消费者提供。 */
 export type ModelBlock = {
   responseId: string; requestParentId: string | null; ordinal: number; complete: boolean; continuation: Json; source: ModelSource;
-  /** 已保存记录的读取映射可以合并终态；执行期间终态以 completion 事件另行交付。 */
+  /** 终态随响应最高序号的实际块一次交付；其他块为 null。 */
   completion?: ModelCompletion | null;
 } & (
   | { kind: "thinking" | "text"; text: string }
   | { kind: "toolcall"; callId: string; name: string; argumentsText: string; arguments: Json; outcome: ToolOutcome | null }
 );
 export type ModelLiveBlock = { id: string; responseId: string; ordinal: number } & (
-  | { kind: "text"; text: string }
-  | { kind: "thinking"; text: string; startedAt: number }
+  | { kind: "text"; text: string; endedAt: number | null }
+  | { kind: "thinking"; text: string; startedAt: number; endedAt: number | null }
   /** input 阶段的 arguments 是宽容解析的展示预览，不能用于执行；其余阶段为完整参数。 */
   | { kind: "toolcall"; name: string; argumentsText: string; arguments: Json; state: "input" | "ready" | "executing";
       invocation: ToolInvocationInfo | null; result: Extract<ToolResult, { kind: "running" }> | null }
 );
 export type ModelRunEvent =
   | { type: "block"; block: ModelBlock }
-  | { type: "completion"; responseId: string; requestParentId: string | null; source: ModelSource; ordinal: number | null; completion: ModelCompletion }
   | { type: "progress"; blocks: readonly ModelLiveBlock[] }
-  | { type: "diagnostic"; code: string; message: string; level: "error" | "warning" };
+  | { type: "diagnostic"; code: string; message: string; level: "error" | "warning";
+      response?: ModelCompletion & { responseId: string; requestParentId: string | null; source: ModelSource } };
 /** 同步交付执行事件；消费者保存成型记录，异常将停止执行，返回后不再交付。 */
 export interface ModelRunObserver { event(event: ModelRunEvent): undefined }
 export interface ModelRunRequest {

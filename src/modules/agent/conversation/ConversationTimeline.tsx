@@ -29,7 +29,7 @@ function NodeContent({ node }: { node: TimelineItem }) {
   const i18n = useI18n();
   const object = useRendererObject();
   const incomplete = "complete" in node && !node.complete;
-  const streaming = (node.kind === "text" || node.kind === "thinking") && !("complete" in node);
+  const streaming = (node.kind === "text" || node.kind === "thinking") && "endedAt" in node && node.endedAt === null;
   const tag = incomplete ? <Badge variant="outline">{i18n.formatMessage(conversationMessages.incomplete)}</Badge> : null;
   switch (node.kind) {
     case "message": return <article className="space-y-2"><p className="type-label">{i18n.formatMessage(conversationMessages.you)}</p>

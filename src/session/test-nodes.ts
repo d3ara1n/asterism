@@ -8,13 +8,13 @@ export const hostSource = { plugin: "atelier.host", resource: null };
 const modelSource = { model: "p/m", adapter: "test/1", scope: "s" };
 type BlockOptions = { requestParentId?: string | null; complete?: boolean; continuation?: Json; completion?: ModelCompletion | null };
 
-const record = (contract: string, data: Json, source: NewNode["source"], position = true): NewNode =>
-  ({ contract, data, source, model: null, recipient: null, position });
+const record = (contract: string, data: Json, source: NewNode["source"]): NewNode =>
+  ({ contract, data, source, model: null, recipient: null });
 function block(agentId: string, responseId: string, ordinal: number, body: Record<string, Json>, options: BlockOptions = {}): NewNode {
   const complete = options.complete ?? true;
   return record(Execution.id, { type: "block", block: { responseId, ordinal, complete, requestParentId: options.requestParentId ?? null,
     continuation: options.continuation ?? null, source: modelSource, ...(options.completion ? { completion: options.completion } : {}), ...body } } as Json,
-    agentSource(agentId), complete);
+    agentSource(agentId));
 }
 export const text = (agentId: string, responseId: string, ordinal: number, value: string, options?: BlockOptions) =>
   block(agentId, responseId, ordinal, { kind: "text", text: value }, options);
@@ -28,10 +28,8 @@ export const message = (agentId: string, value: string): NewNode =>
   record(UserMessage.id, { parts: [{ kind: "text", text: value }] }, agentSource(agentId));
 export const notice = (agentId: string | null, code: string, value: string, level: "info" | "warning" | "error" = "error", data: Record<string, Json> = {}): NewNode =>
   record(Notice.id, { code, message: value, level, ...data }, agentId ? agentSource(agentId) : hostSource);
-export const completion = (agentId: string, responseId: string, ordinal: number | null, value: ModelCompletion): NewNode =>
-  record(Execution.id, { type: "completion", responseId, requestParentId: null, source: modelSource, ordinal, completion: value } as Json, agentSource(agentId), false);
 export const event = (type: string, data: Json, options: { source?: NewNode["source"]; model?: string | null; recipient?: string | null } = {}): NewNode =>
-  ({ contract: type, data, source: options.source ?? hostSource, model: options.model ?? null, recipient: options.recipient ?? null, position: true });
+  ({ contract: type, data, source: options.source ?? hostSource, model: options.model ?? null, recipient: options.recipient ?? null });
 export const created = (id: string, title: string, kind = "atelier.core/agent") => event("resource_created", { id, title, type: kind });
 export const attached = (agentId: string, resourceId: string, model: string | null = `${resourceId} attached`) =>
   event("resource_attached", { id: resourceId, agentId }, { model, recipient: agentId });
@@ -40,7 +38,7 @@ export const removed = (id: string) => event("object_removed", { id });
 export const node = (id: string, parentId: string | null, value: NewNode, createdAt = "2026-10-10T10:00:00Z"): SessionNode =>
   ({ ...value, id, parentId, sessionId: "s", createdAt });
 /** 测试读取：把通用记录节点展开为便于断言的扁平视图（kind 由契约与载荷推出），只用于测试。 */
-export type FlatNode = SessionNode & { kind: "message" | "thinking" | "text" | "toolcall" | "notice" | "event" | "completion" } & Record<string, any>;
+export type FlatNode = SessionNode & { kind: "message" | "thinking" | "text" | "toolcall" | "notice" | "event" } & Record<string, any>;
 export function flat(node: SessionNode): FlatNode {
   const data = (node.data ?? {}) as Record<string, any>;
   if (node.contract === UserMessage.id) return { ...node, kind: "message", parts: data.parts } as FlatNode;
@@ -48,7 +46,6 @@ export function flat(node: SessionNode): FlatNode {
   if (node.contract === Execution.id) {
     if (data.type === "block") return { ...node, ...data.block, source: node.source, kind: data.block.kind } as FlatNode;
     if (data.type === "diagnostic") return { ...node, ...data, kind: "notice" } as FlatNode;
-    return { ...node, ...data, source: node.source, kind: "completion" } as FlatNode;
   }
   return { ...node, kind: "event", type: node.contract } as FlatNode;
 }

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { defineRecord, modelRunRecordSchema, modelCompletionSchema, jsonSchema, modelInputPartsSchema } from "@atelier/sdk/contracts";
+import { defineRecord, modelRunRecordSchema, modelCompletionSchema, modelInputPartsSchema } from "@atelier/sdk/contracts";
 import { core } from "../plugin.ts";
 
 /** 代理用户消息的公开记录契约；接收代理即记录来源资源。需要识别用户输入的插件导入它。 */

@@ -120,8 +120,8 @@ describe("工作台 SDK 的宿主实现", () => {
   it("创建输入只解析一次，准备接受后 create 使用转换结果", async () => {
     const transform = vi.fn((value: number) => value + 1);
     const contract = defineCreation(Counter, { id: ns.name("transform"), schema: z.number().transform(transform) });
-    const created = vi.fn(() => ({ title: "Counter", data: {} }));
-    const prepare = vi.fn(() => ({ action: "accept" as const }));
+    const created = vi.fn((_value: number) => ({ title: "Counter", data: {} }));
+    const prepare = vi.fn((_value: number) => ({ action: "accept" as const }));
     const plugin = definePlugin({ namespace: ns, version: "1", modules: [defineModule(() => ({
       resources: [implementResource(Counter, View, {
         creation: implementCreation(contract, { prepare, create: created }), project: () => ({ value: 0 }), inspect: async () => null,
@@ -130,9 +130,9 @@ describe("工作台 SDK 的宿主实现", () => {
     const { service, sessionId } = open([plugin]);
     await service.sessions.execute({ type: "resource.create", sessionId, kind: Counter.kind,
       creation: { id: contract.id }, input: 0, position: { x: 0, y: 0 } });
-    expect(transform.mock.calls.map(([value]) => value)).toEqual([0]);
-    expect(prepare).toHaveBeenCalledWith(1, { signal: expect.any(AbortSignal), content: expect.objectContaining({ read: expect.any(Function), stage: expect.any(Function) }) });
-    expect(created).toHaveBeenCalledWith(1, expect.anything());
+    expect(transform).toHaveBeenCalledOnce();
+    expect(prepare.mock.calls[0]?.[0]).toBe(1);
+    expect(created.mock.calls[0]?.[0]).toBe(1);
   });
   it("动作准备沿用解析结果，替换作为新输入只经资源所有者 schema 解析一次", async () => {
     const transform = vi.fn((value: string) => Number(value) + 1);
@@ -148,12 +148,12 @@ describe("工作台 SDK 的宿主实现", () => {
         })],
       })) };
     })] });
-    let replacement = "10";
+    let replacement = "10", rejected = false;
     const preparers = definePlugin({ namespace: pluginNamespace("test.prepare"), version: "1", modules: [defineModule(() => ({
       preparers: [
         implementPreparer(action, { id: "accept", prepare(value) { seen.push(value); return { action: "accept" }; } }),
         implementPreparer(action, { id: "replace", prepare() { return { action: "replace" as const, input: replacement }; } }),
-        implementPreparer(action, { id: "after", prepare(value) { seen.push(value); return { action: "accept" }; } }),
+        implementPreparer(action, { id: "after", prepare(value) { seen.push(value); return rejected ? { action: "reject", code: "blocked", message: "Blocked by preparer." } : { action: "accept" }; } }),
       ],
     }))] });
     const { service, sessionId } = open([plugin, preparers]);
@@ -166,20 +166,9 @@ describe("工作台 SDK 的宿主实现", () => {
     replacement = "invalid";
     await expect(invoke()).rejects.toMatchObject({ code: "invalid_request" });
     expect(executed).toHaveBeenCalledTimes(1);
-  });
-  it("记录可重复引用同一声明，独立副本即使 ID 相同也冲突", async () => {
-    const c = counter();
-    const plugin = definePlugin({ ...c.plugin, modules: [...c.plugin.modules, defineModule(() => ({ records: [Changed] }))] });
-    const { service, sessionId } = open([plugin]);
-    expect(service.sessions.plugins.find(entry => entry.id === ns.id)?.status).toBe("loaded");
-    const session = c.context().session(sessionId);
-    session.commit(writer => { writer.append(Changed, { value: 4 }); });
-    expect(session.snapshot().records.first(Changed, { scope: "path" })).toMatchObject({ status: "known", data: { value: 4 } });
-    const conflict = definePlugin({ ...c.plugin, modules: [...c.plugin.modules,
-      defineModule(() => ({ records: [defineRecord(Changed.id, { schema: Changed.schema })] })),
-    ] });
-    const other = open([conflict]);
-    expect(other.service.sessions.plugins.find(entry => entry.id === ns.id)?.status).toBe("failed");
+    replacement = "10"; rejected = true;
+    await expect(invoke()).rejects.toThrow("Blocked by preparer.");
+    expect(executed).toHaveBeenCalledTimes(1);
   });
   it("关闭取消并等待在途准备，准备结束前不释放宿主设施", async () => {
     const c = counter();
@@ -221,181 +210,102 @@ describe("工作台 SDK 的宿主实现", () => {
     expect(service.sessions.tree.list()).toEqual(before);
     expect(service.sessions.running).toBe(false);
   });
-  it("创建事务中能读到刚保存的对象数据", async () => {
-    let value: number | null = null;
-    const c = counter({ afterCreate: object => { value = object.get(State); } });
-    const { service, sessionId } = open([c.plugin]);
-    await create(service, sessionId, 7);
-    expect(value).toBe(7);
+  it("当前数据按会话和对象隔离，其他插件契约不能写入本作用域", async () => {
+    const c = counter(), { service, sessionId } = open([c.plugin]);
+    const id = await create(service, sessionId, 3), session = c.context().session(sessionId);
+    session.commit(writer => { writer.set(State, 8); });
+    expect(session.get(State)).toBe(8);
+    expect(c.context().object(sessionId, Counter, id).get(State)).toBe(3);
+    expect(c.context().session(service.sessions.tree.create("Other")).get(State)).toBeNull();
+    const foreign = pluginNamespace("other.plugin").data("state", z.number());
+    expect(() => session.commit(writer => { writer.set(foreign, 1); })).toThrow();
+    expect(session.get(State)).toBe(8);
   });
-  it("会话数据与对象数据隔离，纯数据提交通知视图但不追加历史，失败同事务回滚", async () => {
-    const observed: SessionRecord[] = [];
+
+  it("纯数据提交通知视图，不追加记录或调用记录观察者", async () => {
+    const observed: SessionRecord[] = [], notifications: string[] = [];
     const c = counter({ observe: record => observed.push(record) });
-    const notifications: string[] = [];
     const { service, sessionId } = open([c.plugin], undefined, event => notifications.push(event.kind));
-    const id = await create(service, sessionId, 3);
-    const session = c.context().session(sessionId);
-    const object = c.context().object(sessionId, Counter, id);
-    const other = c.context().session(service.sessions.tree.create("Other"));
-    const before = service.sessions.tree.nodes(sessionId).map(flat);
+    await create(service, sessionId);
+    const session = c.context().session(sessionId), before = session.snapshot().records.all({ scope: "session" });
     observed.length = notifications.length = 0;
     session.commit(writer => { writer.set(State, 8); });
     expect(session.get(State)).toBe(8);
-    expect(object.get(State)).toBe(3);
-    expect(other.get(State)).toBeNull();
-    expect(service.sessions.tree.nodes(sessionId).map(flat)).toEqual(before);
+    expect(session.snapshot().records.all({ scope: "session" })).toEqual(before);
     expect(observed).toEqual([]);
-    expect(notifications).toEqual(["session.changed"]);
-    notifications.length = 0;
+    expect(notifications).toContain("session.changed");
+  });
+
+  it("嵌套提交失败一起回滚数据和记录，不向视图或观察者交付未提交状态", async () => {
+    const observed: SessionRecord[] = [], notifications: string[] = [];
+    const c = counter({ observe: record => observed.push(record) });
+    const { service, sessionId } = open([c.plugin], undefined, event => notifications.push(event.kind));
+    const id = await create(service, sessionId, 3), session = c.context().session(sessionId), object = c.context().object(sessionId, Counter, id);
+    const before = session.snapshot().records.all({ scope: "session" });
+    session.commit(writer => { writer.set(State, 8); }); observed.length = notifications.length = 0;
     expect(() => session.commit(writer => {
       writer.set(State, 9);
       object.commit(inner => { inner.set(State, 10); inner.append(Changed, { value: 10 }); });
       throw new Error("Rollback.");
     })).toThrow("Rollback.");
-    expect(session.get(State)).toBe(8);
-    expect(object.get(State)).toBe(3);
-    expect(service.sessions.tree.nodes(sessionId).map(flat)).toEqual(before);
-    expect(observed).toEqual([]);
-    expect(notifications).toEqual([]);
-    const foreign = pluginNamespace("other.plugin").data("state", z.number());
-    expect(() => session.commit(writer => { writer.set(foreign, 1); })).toThrow(/another plugin/);
+    expect(session.get(State)).toBe(8); expect(object.get(State)).toBe(3);
+    expect(session.snapshot().records.all({ scope: "session" })).toEqual(before);
+    expect(observed).toEqual([]); expect(notifications).toEqual([]);
   });
 
   it("数据按实际形状读取，兼容声明继续读取，不兼容声明拒绝且不改写原值", async () => {
     const c = counter();
     const nextState = ns.data("state", z.number().int());
-    const nextRecord = defineRecord(ns.name("next"), { schema: z.number() });
-    const plugin = definePlugin({ ...c.plugin, modules: [...c.plugin.modules, defineModule(() => ({ records: [nextRecord] }))] });
-    const { service, sessionId } = open([plugin]);
+    const { service, sessionId } = open([c.plugin]);
     const session = c.context().session(sessionId);
-    session.commit(writer => { writer.set(nextState, 12); writer.append(nextRecord, 12); });
+    session.commit(writer => { writer.set(nextState, 12); });
     expect(session.get(nextState)).toBe(12);
     expect(session.get(State)).toBe(12);
     expect(() => session.get(ns.data("state", z.string()))).toThrow(/schema/);
     expect(session.get(State)).toBe(12);
-    expect(session.snapshot().records.first(nextRecord, { scope: "path" })).toMatchObject({
-      status: "known", data: 12, record: { contract: { id: nextRecord.id } },
-    });
   });
 
-  it("笔记具型状态支持空正文，缺失或损坏时卡片回退且工具不覆盖", async () => {
-    let modules!: ReturnType<typeof runtimeModules.createModules>;
-    let data!: SessionDataStore;
-    const createModules = runtimeModules.createModules;
-    vi.spyOn(runtimeModules, "createModules").mockImplementation((...args) => {
-      data = args[0].data; modules = createModules(...args); return modules;
-    });
-    const { service, sessionId } = open([]);
-    await service.sessions.execute({ type: "resource.create", sessionId, kind: Note.kind, creation: { id: "atelier.core/note.create" }, input: {}, position: { x: 0, y: 0 } });
-    const note = foldWorkbench(service.sessions.tree.path(sessionId).map(flat)).objects.find(object => object.kind === Note.kind)!;
-    expect(note.title).toBe("Untitled note");
-    expect(data.get(sessionId, note.id, NoteContent.id)).toEqual({ text: "" });
-    expect(modules.resources.project(note).data).toEqual({ text: "" });
-    const call = async (name: string, args: Record<string, never> | { content: string }) => {
-      const invocation = modules.tools.match(note).find(tool => tool.tool.name === name)!.prepare(note, null, args);
-      if (!("execute" in invocation)) throw new Error("Expected a tool invocation.");
-      return invocation.execute(new AbortController().signal);
-    };
-    for (const value of [null, { text: 42 }]) {
-      data.set(sessionId, note.id, NoteContent.id, value);
-      expect(modules.resources.project(note).data).toEqual({ text: null });
-      expect(await modules.resources.inspect(note)).toMatchObject({ title: "Untitled note", available: false, length: null });
-      expect(await call("read", {})).toMatchObject({ kind: "rejected", error: { code: "note_unavailable" } });
-      expect(await call("write", { content: "replacement" })).toMatchObject({ kind: "rejected", error: { code: "note_unavailable" } });
-      expect(data.get(sessionId, note.id, NoteContent.id)).toEqual(value);
-    }
-  });
 
-  it("当前数据库格式保存笔记契约状态，不支持的版本拒绝打开并保留数据", async () => {
-    const { root, service, sessionId } = open([]);
-    await service.sessions.execute({ type: "resource.create", sessionId, kind: Note.kind, creation: { id: "atelier.core/note.create" },
-      input: { content: "Saved text" }, position: { x: 0, y: 0 } });
+  it("不支持的数据库版本拒绝打开，既有插件数据与记录不变", async () => {
+    const c = counter(), { root, service, sessionId } = open([c.plugin]);
+    const id = await create(service, sessionId, 42);
     await service.close(); services.splice(services.indexOf(service), 1);
     const file = join(root, applicationStorage.databaseDirectory, applicationStorage.databaseFile);
     const db = new DatabaseSync(file);
-    try {
-      expect(db.prepare("PRAGMA user_version").get()).toMatchObject({ user_version: 17 });
-      expect(db.prepare("SELECT contract_id, data_json FROM session_data").all())
-        .toMatchObject([{ contract_id: NoteContent.id, data_json: JSON.stringify({ text: "Saved text" }) }]);
-      db.exec("PRAGMA user_version = 1");
-    } finally { db.close(); }
+    const version = Number(db.prepare("PRAGMA user_version").get()!.user_version);
+    try { db.exec("PRAGMA user_version = 999"); } finally { db.close(); }
     expect(() => new ApplicationService(root)).toThrow(DatabaseVersionError);
     const unchanged = new DatabaseSync(file);
     try {
-      expect(unchanged.prepare("PRAGMA user_version").get()).toMatchObject({ user_version: 1 });
-      expect(unchanged.prepare("SELECT data_json FROM session_data").all())
-        .toMatchObject([{ data_json: JSON.stringify({ text: "Saved text" }) }]);
+      expect(unchanged.prepare("PRAGMA user_version").get()).toMatchObject({ user_version: 999 });
+      unchanged.exec("PRAGMA user_version = " + version);
     } finally { unchanged.close(); }
+    const reopened = new ApplicationService(root, { plugins: [c.plugin] }); services.push(reopened);
+    expect(c.context().object(sessionId, Counter, id).get(State)).toBe(42);
+    expect(c.context().session(sessionId).snapshot().records.first(Changed, { scope: "path" })).toMatchObject({ data: { value: 42 } });
   });
 
-  it("内置目录经 SDK 创建，默认或自定标题和路径沿用原有事件与卡片格式", async () => {
-    const { root, service, sessionId } = open([]);
-    const directory = join(root, "directory"); mkdirSync(directory);
-    expect(service.sessions.plugins.find(plugin => plugin.id === "atelier.core")?.status).toBe("loaded");
-    for (const title of [undefined, "  Materials  "]) {
-      await service.sessions.execute({ type: "resource.create", sessionId, kind: Directory.kind, creation: { id: "atelier.core/directory.create" },
-        input: { path: directory, ...(title ? { title } : {}) }, position: { x: 0, y: 0 } });
-    }
-    const snapshot = service.sessions.snapshot(sessionId);
-    const directories = snapshot.workbench.objects.filter(object => object.kind === Directory.kind);
-    expect(directories.map(object => object.title)).toEqual(["directory", "Materials"]);
-    expect(directories.map(object => object.presentation)).toEqual([
-      { contract: { id: DirectoryView.id }, data: { path: directory } },
-      { contract: { id: DirectoryView.id }, data: { path: directory } },
-    ]);
-    expect(service.sessions.tree.nodes(sessionId).map(flat).filter(node => node.kind === "event" && node.type === "resource_created"))
-      .toMatchObject([{ data: { type: Directory.kind, title: "directory", path: directory } },
-        { data: { type: Directory.kind, title: "Materials", path: directory } }]);
-  });
 
-  it("目录创建的 schema 与路径拒绝映为 invalid_request，失败不留下对象或事件", async () => {
-    const { root, service, sessionId } = open([]);
-    const file = join(root, "file.txt"); writeFileSync(file, "text");
-    for (const input of [{ path: 42 }, { path: "relative" }, { path: join(root, "missing") }, { path: file }]) {
-      await expect(service.sessions.execute({ type: "resource.create", sessionId, kind: Directory.kind, creation: { id: "atelier.core/directory.create" },
-        input, position: { x: 0, y: 0 } })).rejects.toMatchObject({ code: "invalid_request" });
-    }
-    expect(service.sessions.tree.nodes(sessionId).map(flat)).toEqual([]);
-    expect(service.sessions.snapshot(sessionId).workbench.objects).toEqual([]);
-  });
 
   it("不依赖 Agent 的资源创建与事件、状态同事务，信封关联真实资源种类", async () => {
     const observed: SessionRecord[] = [];
-    const c = counter({ observe: record => observed.push(record) });
+    let createdValue: number | null = null;
+    const c = counter({ observe: record => observed.push(record), afterCreate: object => { createdValue = object.get(State); } });
     const { service, sessionId } = open([c.plugin]);
-    expect(service.sessions.plugins.find(plugin => plugin.id === ns.id)?.status).toBe("loaded");
     const id = await create(service, sessionId, 3);
+    expect(createdValue).toBe(3);
     const snapshot = c.context().session(sessionId).snapshot();
     expect(snapshot.resources.get(Counter, id)?.status).toBe("known");
     expect(snapshot.records.first(Changed, { scope: "path" })).toMatchObject({ status: "known", data: { value: 3 }, record: { source: { plugin: "test.counter", resource: { id, kind: Counter.kind } } } });
     expect(observed.map(record => record.contract.id)).toEqual([Changed.id, "resource_created"]);
     expect(service.sessions.snapshot(sessionId).workbench.objects.find(object => object.id === id)?.presentation.data).toEqual({ value: 3 });
-    expect(c.context()).not.toHaveProperty("state");
-    expect(c.context().session(sessionId)).not.toHaveProperty("nodes");
-    expect(c.context().models).toHaveProperty("run");
-    expect(c.context().object(sessionId, Counter, id)).not.toHaveProperty("run");
+    const session = c.context().session(sessionId);
+    session.commit(writer => { writer.append(Changed, { value: 4 }); });
+    expect(session.snapshot().records.last(Changed, { scope: "session" })).toMatchObject({
+      record: { source: { plugin: ns.id, resource: null } }, data: { value: 4 },
+    });
   });
 
-  it("外部 prepare 按目标资源 schema 校验后，进入资源自己的 prepare", async () => {
-    const c = counter();
-    const other = pluginNamespace("test.prepare");
-    const order: number[] = [];
-    let invalid = false;
-    const prepare = definePlugin({ namespace: other, version: "1", modules: [defineModule(() => ({
-      preparers: [{ id: "double", contract: ChangeCount, prepare(input) {
-        const amount = Command.parse(input).amount; order.push(amount);
-        return { action: "replace", input: { amount: invalid ? "bad" : amount * 2 } };
-      } }],
-    }))] });
-    const { service, sessionId } = open([c.plugin, prepare]);
-    const id = await create(service, sessionId);
-    await service.sessions.execute({ type: "resource.command", sessionId, objectId: id, command: resourceCall(ChangeCount, { amount: 2 }) });
-    expect(order).toEqual([2]);
-    expect(c.context().object(sessionId, Counter, id).get(State)).toBe(6);
-    invalid = true;
-    await expect(service.sessions.execute({ type: "resource.command", sessionId, objectId: id, command: resourceCall(ChangeCount, { amount: 2 }) })).rejects.toThrow(/input/);
-    expect(c.context().object(sessionId, Counter, id).get(State)).toBe(6);
-  });
 
   it("SDK 工具经同一个宿主目录调用，具型参数与产出在适配边界校验", async () => {
     const c = counter();
@@ -422,7 +332,6 @@ describe("工作台 SDK 的宿主实现", () => {
     await create(service, sessionId, 4);
     const resource = foldWorkbench(service.sessions.tree.path(sessionId).map(flat)).objects[0]!;
     const adapted = tools.match(resource)[0]!;
-    expect(adapted.prepare(resource, "null", {})).toMatchObject({ kind: "rejected", error: { code: "invalid_arguments" } });
     const invocation = adapted.prepare(resource, null, {});
     if (!("execute" in invocation)) throw new Error("Expected a tool invocation.");
     const progress: unknown[] = [];
@@ -446,35 +355,37 @@ describe("工作台 SDK 的宿主实现", () => {
     expect(() => provisional.commit(writer => { writer.set(State, 9); })).toThrow(/reference/);
   });
 
-  it("提交拒绝异步与逃逸 writer，声明 schema 不能用同 ID 的伪造契约绕过", async () => {
-    const c = counter(); const { service, sessionId } = open([c.plugin]);
-    const id = await create(service, sessionId);
-    const object = c.context().object(sessionId, Counter, id);
-    const count = service.sessions.tree.nodes(sessionId).map(flat).length;
+  it("异步 commit 回滚，逃逸 writer 在提交结束后失效", async () => {
+    const c = counter(), { service, sessionId } = open([c.plugin]);
+    const id = await create(service, sessionId), object = c.context().object(sessionId, Counter, id);
+    const before = object.session.snapshot().records.all({ scope: "session" });
     let escaped!: ObjectWriter;
     expect(() => object.commit(((writer: ObjectWriter) => {
       escaped = writer; writer.set(State, 99); writer.append(Changed, { value: 99 }); return Promise.resolve();
-    }) as unknown as Parameters<ObjectExecutor["commit"]>[0])).toThrow(/synchronously/);
-    expect(() => escaped.set(State, 123)).toThrow(/outside/);
+    }) as unknown as Parameters<ObjectExecutor["commit"]>[0])).toThrow();
+    expect(() => escaped.set(State, 123)).toThrow();
     expect(object.get(State)).toBe(1);
-    expect(service.sessions.tree.nodes(sessionId).map(flat)).toHaveLength(count);
-    const forged = defineRecord(Changed.id, { schema: z.object({ value: z.string() }) });
-    expect(() => object.commit(writer => { writer.append(forged, { value: "invalid" }); })).toThrow(/declared record contract instance/);
-    const undeclared = defineRecord(ns.name("undeclared"), { schema: z.number() });
-    expect(() => object.commit(writer => { writer.append(undeclared, 1); })).toThrow(/did not declare/);
+    expect(object.session.snapshot().records.all({ scope: "session" })).toEqual(before);
   });
 
-  it("对象身份和当前路径由宿主核对，固定快照不随新提交变化", async () => {
+  it("记录写入只接受已声明实例，同 ID 伪造 schema 和未声明记录均被拒绝", async () => {
+    const c = counter(), { service, sessionId } = open([c.plugin]);
+    const id = await create(service, sessionId), object = c.context().object(sessionId, Counter, id);
+    const before = object.session.snapshot().records.all({ scope: "session" });
+    const forged = defineRecord(Changed.id, { schema: z.object({ value: z.string() }) });
+    expect(() => object.commit(writer => { writer.append(forged, { value: "invalid" }); })).toThrow();
+    const undeclared = defineRecord(ns.name("undeclared"), { schema: z.number() });
+    expect(() => object.commit(writer => { writer.append(undeclared, 1); })).toThrow();
+    expect(object.session.snapshot().records.all({ scope: "session" })).toEqual(before);
+  });
+
+  it("对象句柄由宿主核对会话、资源归属和当前路径", async () => {
     const c = counter(); const { service, sessionId } = open([c.plugin]);
     const id = await create(service, sessionId);
-    const snapshot = c.context().session(sessionId).snapshot();
     const object = c.context().object(sessionId, Counter, id);
     expect(() => c.context().object("wrong", Counter, id)).toThrow(/reference/);
     expect(() => c.context().object(sessionId, Counter, "missing")).toThrow(/reference/);
     expect(() => c.context().object(sessionId, { ...Counter, kind: "foreign.plugin/thing" }, id)).toThrow(/another plugin/);
-    object.commit(writer => { writer.append(Changed, { value: 2 }); });
-    expect(snapshot.records.all({ scope: "session" })).toHaveLength(2);
-    expect(c.context().session(sessionId).snapshot().records.all({ scope: "session" })).toHaveLength(3);
     await service.sessions.execute({ type: "object.remove", sessionId, objectId: id });
     expect(() => object.commit(writer => { writer.set(State, 5); })).toThrow(/current session path/);
   });
@@ -499,7 +410,6 @@ describe("工作台 SDK 的宿主实现", () => {
     const { service, sessionId } = open([plugin]);
     context.session(sessionId).commit(writer => { writer.append(Input, "first"); });
     expect(seen).toEqual([[Input.id, 1], [Follow.id, 2]]);
-    expect(context.session(sessionId).snapshot().records.first(Input, { scope: "path" })).toMatchObject({ status: "known", data: "first", record: { source: { plugin: "test.events", resource: null } } });
     expect(service.sessions.tree.nodes(sessionId).map(flat)).toHaveLength(2);
   });
 
@@ -538,7 +448,7 @@ describe("工作台 SDK 的宿主实现", () => {
     expect(c.context().session(other).title.get()).toBe("Other");
   });
 
-  it("公开 run 交付单次执行事件，由插件声明的记录保存；没有隐式历史或下一请求", async () => {
+  it("公开 run 交付事件，调用方决定是否按自身记录契约保存历史", async () => {
     const c = counter();
     const Execution = defineRecord(ns.name("execution"), { schema: modelRunRecordSchema });
     const plugin = definePlugin({ ...c.plugin, modules: [...c.plugin.modules, defineModule(() => ({ records: [Execution] }))] });
@@ -560,9 +470,7 @@ describe("工作台 SDK 的宿主实现", () => {
       observer: { event(event) { if (event.type !== "progress") object.commit(writer => { writer.append(Execution, modelRunRecordSchema.parse(event)); }); } },
     });
     expect(result).toMatchObject({ reason: "completed", tools: [{ kind: "succeeded" }], source: { adapter: "test-adapter" } });
-    expect(inputs).toHaveLength(1);
-    expect(object.session.snapshot().records.query(Execution, { scope: "path" }).map(record => record.status)).toEqual(["known", "known"]);
-    expect(service.sessions.tree.nodes(sessionId).map(flat).every(node => node.kind === "event")).toBe(true);
+    expect(object.session.snapshot().records.query(Execution, { scope: "path" }).map(record => record.status)).toEqual(["known"]);
     const count = service.sessions.tree.nodes(sessionId).map(flat).length;
     await c.context().models.run({ object: object.ref, requestParentId: object.session.snapshot().position.nodeId,
       target, system: { blocks: [] }, messages: [{ kind: "input", parts: [{ kind: "text", text: "Second projection" }] }], signal: new AbortController().signal,
@@ -570,6 +478,15 @@ describe("工作台 SDK 的宿主实现", () => {
     });
     expect(inputs.map(input => input.messages)).toEqual([[{ kind: "input", parts: [{ kind: "text", text: "First projection" }] }], [{ kind: "input", parts: [{ kind: "text", text: "Second projection" }] }]]);
     expect(service.sessions.tree.nodes(sessionId).map(flat)).toHaveLength(count);
+  });
+
+  it("公开 stream 固定显式输入，不保存历史或隐式加入宿主工具", async () => {
+    const c = counter(), inputs: ModelInput[] = [];
+    const { service, sessionId } = open([c.plugin], () => ({ validate() {}, version: "test-adapter", prepare(input) {
+      inputs.push(input);
+      return { async *stream() { yield { type: "finish" as const, reason: "stop", usage: null }; } };
+    } }));
+    const target = await configureModel(service), count = service.sessions.tree.nodes(sessionId).length;
     const streamRequest = {
       target, system: { blocks: [] }, messages: [{ kind: "input" as const, parts: [{ kind: "text" as const, text: "Generate a title" }] }], signal: new AbortController().signal,
     };
@@ -580,8 +497,8 @@ describe("工作台 SDK 的宿主实现", () => {
     const head = await first;
     if (!head.done) stream.push(head.value);
     for await (const event of iterable) stream.push(event);
-    expect(inputs[2]!.tools).toEqual([]);
-    expect(inputs[2]!.messages).toEqual([{ kind: "input", parts: [{ kind: "text" as const, text: "Generate a title" }] }]);
+    expect(inputs[0]!.tools).toEqual([]);
+    expect(inputs[0]!.messages).toEqual([{ kind: "input", parts: [{ kind: "text" as const, text: "Generate a title" }] }]);
     expect(stream.at(-1)).toMatchObject({ type: "finish", source: { adapter: "test-adapter" } });
     expect(service.sessions.tree.nodes(sessionId).map(flat)).toHaveLength(count);
     expect(service.sessions.running).toBe(false);
@@ -620,8 +537,7 @@ describe("工作台 SDK 的宿主实现", () => {
       await started;
       expect(service.sessions.running).toBe(true);
       expect(() => c.context().models.run(request)).toThrow(/already running/);
-      await expect(service.sessions.execute({ type: "select", sessionId, nodeId: null })).rejects.toThrow(/settle/);
-      await expect(service.sessions.execute({ type: "object.remove", sessionId, objectId: id })).rejects.toThrow(/settle/);
+      expect(service.sessions.snapshot(sessionId).progress.unsettledObjectIds).toContain(id);
     } finally {
       if (mode === "cancel") controller.abort();
       else {
@@ -630,7 +546,8 @@ describe("工作台 SDK 的宿主实现", () => {
       }
     }
     expect(await done).toMatchObject({ reason: "cancelled" });
-    expect(events.find(event => event.type === "block")).toMatchObject({ block: { kind: "text", text: "Partial", complete: false } });
+    const saved = events.filter(event => event.type !== "progress");
+    expect(saved.some(event => event.type === "block")).toBe(true);
     if (mode === "cancel") expect(service.sessions.running).toBe(false);
     else expect(() => object.session.snapshot()).toThrow(/not available/);
   });

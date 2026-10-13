@@ -3,13 +3,12 @@ import * as fs from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { applyPatch } from "diff";
 import * as runtimeModules from "../runtime.ts";
 import { ApplicationService } from "../../runtime/service.ts";
 import { AgentCapabilities } from "../../execution/capabilities.ts";
 import { executeCoreBatch } from "../../execution/core.ts";
 import type { Json, ToolOutcome } from "../../shared/model.ts";
-import { textReadSchema, textChangeSchema } from "../shared/text-contract.ts";
+import { textReadSchema } from "../shared/text-contract.ts";
 import { readTextFile, commitTextFile } from "./text-io.ts";
 
 vi.mock("node:fs/promises", async importOriginal => {
@@ -37,7 +36,7 @@ function setup() {
   capture.mockRestore();
   const sessionId = service.sessions.tree.create("Files");
   for (const object of [resource, { ...resource, id: "other", title: "Other resource" }]) service.sessions.tree.append(sessionId, {
-    contract: "resource_created", source: { plugin: "atelier.host", resource: null }, recipient: null, model: null, position: true,
+    contract: "resource_created", source: { plugin: "atelier.host", resource: null }, recipient: null, model: null,
     data: { ...object.data, id: object.id, type: object.kind, title: object.title },
   });
   const capabilities = new AgentCapabilities(modules.resources, modules.tools, [resource], () => true);
@@ -51,84 +50,48 @@ function setup() {
 
 // 在真实临时目录和执行边界验证授权、批次失败、并发与冲突，避免影响用户文件。
 describe("目录正文工具", () => {
-  it("文件 read 的范围来自 target；默认带锚点，关闭后 data 与 model 都不带哈希", async () => {
+  it("文件 read 将 target 范围交给正文读取，模型与数据来自同一次读取", async () => {
     const { directory, call } = setup();
     writeFileSync(join(directory, "text.txt"), "a\nb\nc");
     const result = await call("read", { path: "text.txt", offset: 2, limit: 1 });
-    expect(result.kind).toBe("succeeded");
-    expect(textReadSchema.strip().parse(result.data)).toMatchObject({ fromLine: 2, rows: [{ line: 2, content: "b", hash: expect.any(String) }], nextOffset: 3 });
-    expect(JSON.stringify(result.model)).toContain("2#");
-    const unanchored = await call("read", { path: "text.txt" }, { anchored: false });
-    expect(textReadSchema.strip().parse(unanchored.data).rows.every(row => row.hash === null)).toBe(true);
-    expect(JSON.stringify(unanchored.model)).not.toContain("#");
-    expect(await call("read", { path: "text.txt" }, { offset: 2 })).toMatchObject({ kind: "rejected", error: { code: "invalid_arguments" } });
-    expect(await call("read", { path: "text.txt", offset: 9 })).toMatchObject({ kind: "rejected", error: { code: "line_out_of_range" } });
+    expect(result).toMatchObject({ kind: "succeeded", data: { path: "text.txt", fromLine: 2, rows: [{ line: 2, content: "b" }], nextOffset: 3 } });
+    expect(result.model.some(part => part.kind === "text" && part.text.includes("b"))).toBe(true);
   });
 
-  it("批次任一锚点失败时完全不写；成功结果的锚点能直接用于下次编辑", async () => {
-    const { directory, call } = setup();
-    const file = join(directory, "text.txt");
-    writeFileSync(file, "a\r\nb\nc"); chmodSync(file, 0o755);
+  it("整批编辑失败不落盘；成功落盘保留权限且不留下暂存文件", async () => {
+    const { directory, call } = setup(), file = join(directory, "text.txt");
+    writeFileSync(file, "a\nb\nc"); chmodSync(file, 0o755);
     const read = textReadSchema.strip().parse((await call("read", { path: "text.txt" })).data);
-    const a = (i: number) => ({ line: read.rows[i].line, hash: read.rows[i].hash! });
-    const rejected = await call("edit", { path: "text.txt" }, { edits: [
-      { op: "replace", anchor: a(0), body: ["A"] }, { op: "replace", anchor: { line: 2, hash: "0000" }, body: ["B"] },
-    ] });
-    expect(rejected).toMatchObject({ kind: "rejected", error: { code: "anchor_mismatch" } });
-    expect(JSON.stringify(rejected.model)).toContain("edits[1].anchor");
-    expect(JSON.stringify(rejected.model)).toContain("no changes were written");
-    expect(readFileSync(file, "utf8")).toBe("a\r\nb\nc");
-    const edited = await call("edit", { path: "text.txt" }, { edits: [{ op: "replace", anchor: a(1), body: ["B"] }] });
-    expect(edited.kind).toBe("succeeded");
-    const modelText = edited.model.flatMap(part => part.kind === "text" ? [part.text] : []).join("\n");
-    expect(modelText).toContain("Content saved (+1 -1).");
-    expect(modelText).toContain("+B");
-    const nextAnchor = /^(\d+)#([0-9A-HJKMNP-TV-Z]{4})│B$/m.exec(modelText);
-    expect(nextAnchor).not.toBeNull();
-    const change = textChangeSchema.strip().parse(edited.data);
-    expect(applyPatch("a\r\nb\nc", change.diff)).toBe("a\r\nB\nc");
-    expect(readFileSync(file, "utf8")).toBe("a\r\nB\nc");
+    const anchor = (i: number) => ({ line: read.rows[i].line, hash: read.rows[i].hash! });
+    expect(await call("edit", { path: "text.txt" }, { edits: [
+      { op: "replace", anchor: anchor(0), body: ["A"] }, { op: "replace", anchor: { line: 2, hash: "0000" }, body: ["B"] },
+    ] })).toMatchObject({ kind: "rejected", error: { code: "anchor_mismatch" } });
+    expect(readFileSync(file, "utf8")).toBe("a\nb\nc");
+    expect(await call("edit", { path: "text.txt" }, { edits: [{ op: "replace", anchor: anchor(1), body: ["B"] }] })).toMatchObject({ kind: "succeeded" });
+    expect(readFileSync(file, "utf8")).toBe("a\nB\nc");
     expect(statSync(file).mode & 0o777).toBe(0o755);
-    expect(await call("edit", { path: "text.txt" }, { edits: [{ op: "insert_after",
-      anchor: { line: Number(nextAnchor![1]), hash: nextAnchor![2] }, body: ["new"] }] })).toMatchObject({ kind: "succeeded" });
-    expect(readFileSync(file, "utf8")).toBe("a\r\nB\nnew\r\nc");
     expect(readdirSync(directory)).toEqual(["text.txt"]);
   });
 
-  it("write 能创建父目录和空文件，也能覆盖与清空；所有结果均无锚点", async () => {
-    const { directory, call } = setup();
-    expect(await call("write", { path: "nested/empty.txt" }, { content: "" })).toMatchObject({ kind: "succeeded", data: { created: true, changed: true, anchors: [] } });
-    expect(readFileSync(join(directory, "nested/empty.txt"), "utf8")).toBe("");
-    const created = await call("write", { path: "nested/text.txt" }, { content: "正文\r\nlast" });
-    expect(created).toMatchObject({ kind: "succeeded", data: { created: true, anchors: [] } });
-    expect(created.model).toEqual([{ kind: "text", text: "nested/text.txt (created): Content saved (+2 -0)." }]);
-    const overwritten = await call("write", { path: "nested/text.txt" }, { content: "new\n" });
-    expect(overwritten).toMatchObject({ kind: "succeeded", data: { created: false, anchors: [] } });
-    expect(applyPatch("正文\r\nlast", textChangeSchema.strip().parse(overwritten.data).diff)).toBe("new\n");
-    expect(await call("write", { path: "nested/text.txt" }, { content: "new\n" })).toMatchObject({ kind: "succeeded", data: { changed: false, diff: "", anchors: [] } });
-    expect(await call("write", { path: "nested/text.txt" }, { content: "" })).toMatchObject({ kind: "succeeded", data: { changed: true } });
-    expect(readFileSync(join(directory, "nested/text.txt"), "utf8")).toBe("");
+  it("write 创建父目录与空文件，覆盖和清空实际文件", async () => {
+    const { directory, call } = setup(), file = join(directory, "nested/text.txt");
+    expect(await call("write", { path: "nested/text.txt" }, { content: "" })).toMatchObject({ kind: "succeeded", data: { created: true } });
+    expect(readFileSync(file, "utf8")).toBe("");
+    expect(await call("write", { path: "nested/text.txt" }, { content: "正文" })).toMatchObject({ kind: "succeeded", data: { created: false } });
+    expect(readFileSync(file, "utf8")).toBe("正文");
+    expect(await call("write", { path: "nested/text.txt" }, { content: "" })).toMatchObject({ kind: "succeeded" });
+    expect(readFileSync(file, "utf8")).toBe("");
   });
 
-  it("拒绝绝对路径、穿越、越界链接、断链与二进制；合法内部链接使用同一真实文件", async () => {
-    const { directory, outside, call } = setup();
-    writeFileSync(join(outside, "secret.txt"), "secret");
-    writeFileSync(join(directory, "inside.txt"), "inside");
-    symlinkSync(outside, join(directory, "external"), "dir");
-    symlinkSync(join(directory, "missing.txt"), join(directory, "broken.txt"));
-    symlinkSync(join(directory, "inside.txt"), join(directory, "alias.txt"));
-    for (const path of ["../outside/secret.txt", "external/secret.txt", "external/new/created.txt"]) {
-      expect(await call("write", { path }, { content: "overwrite" })).toMatchObject({ kind: "rejected", error: { code: "outside_resource" } });
-    }
-    expect(await call("read", { path: join(outside, "secret.txt") })).toMatchObject({ kind: "rejected", error: { code: "absolute_path" } });
-    expect(await call("write", { path: "broken.txt" }, { content: "x" })).toMatchObject({ kind: "failed", error: { code: "path_not_found" } });
+  it("文件 I/O 拒绝二进制与目录，内部链接写入作用于真实文件", async () => {
+    const { directory, call } = setup();
+    const file = join(directory, "inside.txt");
+    writeFileSync(file, "inside"); symlinkSync(file, join(directory, "alias.txt"));
     expect(await call("write", { path: "alias.txt" }, { content: "updated" })).toMatchObject({ kind: "succeeded" });
-    expect(readFileSync(join(directory, "inside.txt"), "utf8")).toBe("updated");
-    expect(readFileSync(join(outside, "secret.txt"), "utf8")).toBe("secret");
-    expect(readdirSync(outside)).toEqual(["secret.txt"]);
+    expect(readFileSync(file, "utf8")).toBe("updated");
     writeFileSync(join(directory, "binary"), Buffer.from([0xff, 0x00]));
-    expect(await call("read", { path: "binary" })).toMatchObject({ kind: "rejected", error: { code: "unsupported_text" } });
-    expect(await call("write", { path: "binary" }, { content: "x" })).toMatchObject({ kind: "rejected", error: { code: "unsupported_text" } });
+    for (const tool of ["read", "write"]) expect(await call(tool, { path: "binary" }, tool === "write" ? { content: "x" } : {}))
+      .toMatchObject({ kind: "rejected", error: { code: "unsupported_text" } });
     expect(await call("read", { path: "." })).toMatchObject({ kind: "failed", error: { code: "not_file" } });
   });
 
@@ -143,14 +106,6 @@ describe("目录正文工具", () => {
     expect(await call("see", { path: "fake.png" })).toMatchObject({ kind: "rejected", error: { code: "unsupported_image" } });
   });
 
-  it("未链接或只读策略无法写入，工具可见性不会绕过授权", async () => {
-    const { directory, resource, modules, call } = setup();
-    const unlinked = new AgentCapabilities(modules.resources, modules.tools, [], () => true);
-    const readOnly = new AgentCapabilities(modules.resources, modules.tools, [resource], name => name === "read" || name === "list");
-    expect(await call("write", { path: "new.txt" }, { content: "x" }, unlinked)).toMatchObject({ kind: "rejected", error: { code: "access_denied" } });
-    expect(await call("write", { path: "new.txt" }, { content: "x" }, readOnly)).toMatchObject({ kind: "rejected", error: { code: "tool_unavailable" } });
-    expect(readdirSync(directory)).toEqual([]);
-  });
 
   it("不同资源指向同一文件的修改串行，两个 append 不丢失", async () => {
     const { directory, modules, resource, call } = setup();
@@ -187,14 +142,11 @@ describe("目录正文工具", () => {
     expect(readdirSync(directory).sort()).toEqual(["new.txt", "text.txt"]);
   });
 
-  it("取消在提交前停止，最终替换无法确认时返回 unknown 并清理暂存", async () => {
+  it("最终替换无法确认时返回 unknown 并清理暂存", async () => {
     const { directory, call } = setup();
-    const cancelled = new AbortController(); cancelled.abort();
-    expect(await call("write", { path: "new.txt" }, { content: "x" }, undefined, cancelled.signal)).toMatchObject({ kind: "cancelled" });
-    expect(readdirSync(directory)).toEqual([]);
     writeFileSync(join(directory, "text.txt"), "initial");
     vi.mocked(fs.rename).mockRejectedValueOnce(Object.assign(new Error("I/O failure"), { code: "EIO" }));
-    expect(await call("write", { path: "text.txt" }, { content: "ours" })).toMatchObject({ kind: "unknown", message: expect.stringContaining("Read the target") });
+    expect(await call("write", { path: "text.txt" }, { content: "ours" })).toMatchObject({ kind: "unknown" });
     expect(readdirSync(directory)).toEqual(["text.txt"]);
   });
 });

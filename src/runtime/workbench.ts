@@ -29,7 +29,7 @@ export class SessionWorkbench {
     const controller = this.resources.controller(kind);
     if (!controller?.create) throw new SessionError("invalid_request", "This resource type cannot be created here.");
     const { title, data } = controller.create(sessionId, id, input, content);
-    const node = this.tree.append(sessionId, { source: host, position: true, recipient: null, contract: "resource_created", data: { ...data, id, type: kind, title }, model: null });
+    const node = this.tree.append(sessionId, { source: host, recipient: null, contract: "resource_created", data: { ...data, id, type: kind, title }, model: null });
     this.content?.bind({ sessionId, objectId: id, scope: content }, { kind: "record", id: node.id }, data ?? {});
     this.addView(sessionId, id, position);
     return id;
@@ -45,10 +45,10 @@ export class SessionWorkbench {
         // 代理同样是资源：入向与出向链接都解除。
         for (const link of folded.links.filter(l => l.resourceId === target.id || l.agentId === target.id)) {
           const resource = folded.objects.find(o => o.id === link.resourceId)!;
-          tree.append(command.sessionId, { source: host, position: true, recipient: link.agentId, contract: "resource_detached", data: { id: resource.id, agentId: link.agentId },
+          tree.append(command.sessionId, { source: host, recipient: link.agentId, contract: "resource_detached", data: { id: resource.id, agentId: link.agentId },
             model: link.agentId === target.id ? null : `Resource "${resource.title}" (resource_id: ${resource.id}) is no longer linked to you.` });
         }
-        tree.append(command.sessionId, { source: host, position: true, recipient: null, contract: "object_removed", data: { id: target.id }, model: null });
+        tree.append(command.sessionId, { source: host, recipient: null, contract: "object_removed", data: { id: target.id }, model: null });
         break;
       }
       case "link.set": {
@@ -58,7 +58,7 @@ export class SessionWorkbench {
         if (!agent || !resource) throw new SessionError("not_found", "Agent or resource does not belong to this session.");
         if (agent.id === resource.id) throw new SessionError("invalid_request", "An agent cannot be linked to itself.");
         if (folded.links.some(l => l.agentId === agent.id && l.resourceId === resource.id) === command.linked) break;
-        tree.append(command.sessionId, { source: host, position: true, recipient: agent.id, contract: command.linked ? "resource_attached" : "resource_detached",
+        tree.append(command.sessionId, { source: host, recipient: agent.id, contract: command.linked ? "resource_attached" : "resource_detached",
           data: { id: resource.id, agentId: agent.id }, model: command.linked
             ? `Resource "${resource.title}" (type: ${resource.kind}, resource_id: ${resource.id}) is now linked to you. Tools: ${JSON.stringify(this.tools(command.sessionId, agent.id, resource))}. Call them with resource_call.`
             : `Resource "${resource.title}" (resource_id: ${resource.id}) is no longer linked to you.` });

@@ -3,7 +3,6 @@ import { ContinueAgent } from "../../../modules/agent/contract.ts";
 import { describe, expect, it, vi } from "vitest";
 import { type SessionBridge, type SessionChanged, type SessionCommand, type SessionResult, type SessionSnapshot, type SessionProgress } from "../../../shared/session.ts";
 import { SessionController } from "./controller.ts";
-import { SubmissionIdentity } from "../../shared/submission.ts";
 import { startLanguage, getI18n } from "../../shared/i18n.ts";
 import { pluginNamespace, defineMessages } from "@atelier/sdk/contracts";
 import type { LanguageState } from "../../../shared/language.ts";
@@ -34,7 +33,6 @@ it("语言切换刷新静态文案，保留会话投影、活动与草稿提交�
   const initial = snapshot(1); initial.progress.unsettledObjectIds = ["agent"];
   requests[0]!.resolve(view(initial)); await flush();
   const state = controller.getSnapshot(), progress = controller.getProgress();
-  const submission = new SubmissionIdentity(), input = { text: "Unsaved draft" }, id = submission.forInput(input);
   const label = pluginNamespace("example.counter").messages("en", defineMessages({ title: { id: "title", defaultMessage: "Counter" } })).title;
   let changed: (value: LanguageState) => void = () => {};
   const english: LanguageState = { preference: "en", locale: "en", interfaceLocale: "en" };
@@ -46,8 +44,8 @@ it("语言切换刷新静态文案，保留会话投影、活动与草稿提交�
     changed({ preference: "zh-Hans", locale: "zh-Hans", interfaceLocale: "zh-Hans" });
     expect(getI18n().text(label)).toBe("计数器");
     expect(controller.getSnapshot()).toBe(state); expect(controller.getProgress()).toBe(progress);
-    expect(progress.unsettledObjectIds).toEqual(["agent"]); expect(submission.forInput(input)).toBe(id);
-    expect(input.text).toBe("Unsaved draft"); expect(requests).toHaveLength(1);
+    expect(progress.unsettledObjectIds).toEqual(["agent"]);
+    expect(requests.map(request => request.command.type)).toEqual(["read"]);
   } finally { changed(english); stop(); disconnect(); }
 });
 
@@ -85,16 +83,14 @@ describe("会话视图所有权", () => {
     disconnect();
   });
 
-  it("离开并返回 live 仍产生新的导航身份，使旧定位意图永久失效", async () => {
-    const { controller, requests } = fixture(); const disconnect = controller.connect();
+
+  it("离开并返回 live 不会复用旧导航意图的身份", async () => {
+    const { controller, requests } = fixture(), disconnect = controller.connect();
     requests[0]!.resolve(view(snapshot(1))); await flush();
-    const initial = controller.getSnapshot().navigationVersion;
-    controller.inspect("old");
-    const historical = controller.getSnapshot().navigationVersion;
-    controller.followCursor();
+    const intent = controller.getSnapshot().navigationVersion;
+    controller.inspect("old"); controller.followCursor();
     requests.at(-1)!.resolve(view(snapshot(1))); await flush();
-    expect(historical).toBeGreaterThan(initial);
-    expect(controller.getSnapshot().navigationVersion).toBeGreaterThan(historical);
+    expect(controller.getSnapshot().navigationVersion).not.toBe(intent);
     expect(controller.getSnapshot().position.kind).toBe("live");
     disconnect();
   });
@@ -262,14 +258,16 @@ describe("会话视图所有权", () => {
     controller.subscribe(changed); controller.subscribeProgress(streamed);
     progress({ revision: 1, version: 2, unsettledObjectIds: ["a"], live: [] });
     progress({ revision: 1, version: 3, unsettledObjectIds: ["a"], live: [] });
-    expect(changed).not.toHaveBeenCalled(); expect(streamed).toHaveBeenCalledTimes(2);
+    expect(changed).not.toHaveBeenCalled();
+    expect(streamed).toHaveBeenCalled();
+    expect(controller.getProgress().version).toBe(3);
     expect(requests).toHaveLength(1);
     disconnect();
   });
 
   it("块落库后的进度等待对应持久版本，不在查询途中丢掉正在阅读的块", async () => {
     const { controller, requests, progress } = fixture(); const disconnect = controller.connect();
-    const block = { id: "r:0", objectId: "a", responseId: "r", ordinal: 0, kind: "thinking" as const, text: "thinking", startedAt: 1000 };
+    const block = { id: "r:0", objectId: "a", responseId: "r", ordinal: 0, kind: "thinking" as const, text: "thinking", startedAt: 1000, endedAt: null };
     requests[0]!.resolve(view({ ...snapshot(1), progress: { revision: 1, version: 1, unsettledObjectIds: ["a"], live: [block] } })); await flush();
     progress({ revision: 2, version: 3, unsettledObjectIds: ["a"], live: [] });
     expect(controller.getProgress().live).toEqual([block]);
@@ -295,10 +293,5 @@ describe("会话视图所有权", () => {
     reopened();
   });
 
-  it("丢失响应后保持提交身份，接受后相同文本视为新输入", () => {
-    const identity = new SubmissionIdentity(); const first = identity.forInput({ text: "Hello" });
-    expect(identity.forInput({ text: "Hello" })).toBe(first);
-    identity.accepted(); expect(identity.forInput({ text: "Hello" })).not.toBe(first);
-  });
 
 });

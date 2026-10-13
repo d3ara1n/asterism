@@ -7,10 +7,6 @@ export class SessionError extends Error {
   }
 }
 
-export function selectable(node: SessionNode): boolean {
-  return node.position;
-}
-
 /** 根到 at 的祖先路径；运行时与渲染进程共享校验和遍历规则。 */
 export function sessionPath(nodes: readonly SessionNode[], at: string | null): SessionNode[] {
   const byId = new Map(nodes.map(node => [node.id, node]));

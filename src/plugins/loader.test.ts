@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import { pluginNamespace, defineAction, resourceCall, jsonSchema } from "@atelier/sdk/contracts";
+import { pluginNamespace, defineAction, resourceCall, jsonSchema, defineRecord } from "@atelier/sdk/contracts";
 import { defineImplementation, defineTool } from "@atelier/sdk/contracts";
 import { definePlugin, defineModule, implementTool, implementResource, implementAction, type PluginDefinition, type Preparation } from "@atelier/sdk/runtime";
 import { loadPlugins, type PluginHostServices } from "./loader.ts";
@@ -23,6 +23,18 @@ function plugin(id: string, contract: ReturnType<typeof tool>, extra: ReturnType
 }
 
 describe("插件装配", () => {
+  it("记录可复用同一声明，独立副本即使 ID 相同也使装配失败", async () => {
+    const ns = pluginNamespace("test.records"), record = defineRecord(ns.name("record"), { schema: z.number() });
+    const plugin = (other: typeof record) => definePlugin({ namespace: ns, version: "1", modules: [
+      defineModule(() => ({ records: [record] })), defineModule(() => ({ records: [other] })),
+    ] });
+    const shared = loadPlugins([plugin(record)], services);
+    const conflict = loadPlugins([plugin(defineRecord(record.id, { schema: record.schema }))], services);
+    try {
+      expect(shared.manifest[0]?.status).toBe("loaded");
+      expect(conflict.manifest[0]?.status).toBe("failed");
+    } finally { await shared.close(); await conflict.close(); }
+  });
   it("单个插件装配失败只禁用它本身", () => {
     const broken = definePlugin({ namespace: pluginNamespace("acme.broken"), version: "1.0.0", modules: [defineModule(() => { throw new Error("boom"); })] });
     const loaded = loadPlugins([broken, plugin("acme.ok", tool("Read."))], services);

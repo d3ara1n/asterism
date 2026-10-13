@@ -5,7 +5,6 @@ import type { ViewRegistry } from "../../modules/registry";
 import type { Json } from "@atelier/sdk/contracts";
 
 import type { SessionNode } from "../../../shared/session";
-import { selectable } from "../../../shared/session-path";
 import { historyMessages } from "../../messages/history";
 import { getI18n } from "../../shared/i18n";
 
@@ -61,7 +60,7 @@ export function historyEntries(nodes: readonly SessionNode[], views: Pick<ViewRe
     text: value => i18n.text(value),
     describe: item => views.record(item, context),
   };
-  return nodes.filter(selectable).map(node => {
+  return nodes.map(node => {
     const item = records.get(node.id)!;
     const view = views.record(item, context);
     // 来源只看记录归属：有归属对象是资源记录，否则是会话级记录；宿主不认识具体契约。
@@ -72,16 +71,7 @@ export function historyEntries(nodes: readonly SessionNode[], views: Pick<ViewRe
   });
 }
 
-/** “之前”沿真实父链定位，跳过契约明确不可查看的不完整块，不受列表过滤影响。 */
+/** “之前”定位真实父节点，不受列表过滤影响。 */
 export function historyBefore(nodes: readonly SessionNode[], node: SessionNode): string | null {
-  const byId = new Map(nodes.map(item => [item.id, item]));
-  let id = node.parentId;
-  const seen = new Set<string>();
-  while (id !== null) {
-    const parent = byId.get(id);
-    if (!parent || seen.has(id)) return null;
-    if (selectable(parent)) return id;
-    seen.add(id); id = parent.parentId;
-  }
-  return null;
+  return nodes.some(parent => parent.id === node.parentId) ? node.parentId : null;
 }

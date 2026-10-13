@@ -1,9 +1,7 @@
 import { randomUUID } from "node:crypto";
-import type { ModelRunRequest, ModelRunResult, ModelRunEvent, ModelSource, ModelCompletion } from "@atelier/sdk/contracts";
+import type { ModelRunRequest, ModelRunResult, ModelRunEvent, ModelSource, ModelCompletion, SystemPrompt } from "@atelier/sdk/contracts";
 import { modelExpression, modelScope, type ModelSettings, type ToolOutcome } from "../shared/model.ts";
-import { ModelFailure, type ModelAdapter } from "../model/contract.ts";
-import type { SystemPrompt } from "@atelier/sdk/contracts";
-import type { ResolvedModelItem } from "../model/contract.ts";
+import { ModelFailure, type ModelAdapter, type ResolvedModelItem } from "../model/contract.ts";
 import { executeCoreBatch, coreDeclarations, previewCoreCall } from "./core.ts";
 import type { AgentCapabilities } from "./capabilities.ts";
 import { ResponseBuffer } from "./response.ts";
@@ -41,14 +39,9 @@ export async function runModelRequest(request: ModelRunRequest, environment: Pro
     source = { model: modelExpression(settings), adapter: adapter.version, scope: modelScope(settings) };
     responseId = randomUUID();
     const prepared = adapter.prepare({ settings, system, messages, tools: settings.model.capabilities.tools ? coreDeclarations() : [] });
-    // 平台只交付成型块与终态；保存、分组与投影由执行体负责。块身份仅在本次调用内使用。
+    // 平台只交付准备完整的块，终态随最高序号块保存；分组与投影由执行体负责。
     const response = new ResponseBuffer({ responseId, requestParentId: request.requestParentId, source }, block => {
       emit({ type: "block", block });
-      return String(block.ordinal);
-    }, (ordinal, terminal) => {
-      completion = terminal;
-      emit({ type: "completion", responseId: responseId!, requestParentId: request.requestParentId, source: source!,
-        ordinal: ordinal === null ? null : Number(ordinal), completion: terminal });
     });
     const progress = () => emit({ type: "progress", blocks: response.live() });
     // 合并工具参数的高频解析；正文与思考仍即时发布，计时器不越过响应生命周期。
@@ -77,6 +70,7 @@ export async function runModelRequest(request: ModelRunRequest, environment: Pro
       signal.throwIfAborted();
       const finish = response.finish;
       if (!finish) throw new ModelFailure("interrupted", "The model stream ended without a terminal response.");
+      if (response.empty) throw new ModelFailure("empty_response", "The model response ended without any content blocks.");
       if (!["stop", "tool-calls"].includes(finish.reason)) throw new ModelFailure("incomplete", "The model response did not finish normally. No tools were executed.");
       const calls = response.calls();
       callIds = calls.map(call => call.part.callId);
@@ -99,7 +93,7 @@ export async function runModelRequest(request: ModelRunRequest, environment: Pro
       signal.throwIfAborted();
     } finally {
       try { await flushProgress(); }
-      finally { response.close(); }
+      finally { response.close(); completion = response.completion; }
     }
   } catch (error) {
     if (deliveryFailed) termination = { reason: "failed", code: "event_delivery" };
@@ -107,7 +101,9 @@ export async function runModelRequest(request: ModelRunRequest, environment: Pro
       diagnostic("cancelled", "Execution was cancelled.", "warning"); termination = { reason: "cancelled" };
     } else {
       const code = error instanceof ModelFailure ? error.code : "execution_failed";
-      diagnostic(code, error instanceof ModelFailure ? error.message : "Execution could not be completed.");
+      emit({ type: "diagnostic", code, message: error instanceof ModelFailure ? error.message : "Execution could not be completed.", level: "error",
+        ...(code === "empty_response" && completion && responseId && source
+          ? { response: { ...completion, responseId, requestParentId: request.requestParentId, source } } : {}) });
       termination = { reason: "failed", code };
     }
   } finally { emit({ type: "progress", blocks: [] }); }

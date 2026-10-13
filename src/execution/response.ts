@@ -1,21 +1,19 @@
-import type { ModelBlock, ModelSource } from "@atelier/sdk/contracts";
+import type { ModelBlock, ModelSource, ModelCompletion, ModelLiveBlock, ToolInvocationInfo, ToolResult } from "@atelier/sdk/contracts";
 import { ModelFailure, type ModelEvent, type StreamPart } from "../model/contract.ts";
 import { parsePartialJson } from "ai";
 import { jsonSchema, type Json, type ToolOutcome } from "../shared/model.ts";
-import type { ToolInvocationInfo, ToolResult } from "@atelier/sdk/contracts";
-import type { ModelCompletion, ModelLiveBlock } from "@atelier/sdk/contracts";
 
 type BufferedBlock = {
   part: StreamPart;
   ordinal: number;
   text: string;
   startedAt: number;
+  endedAt: number | null;
   arguments: Json;
   previewArguments: Json;
   previewText: string;
   continuation: Json;
-  done: boolean;
-  savedId: string | null;
+  emitted: boolean;
   executing: boolean;
   invocation: ToolInvocationInfo | null;
   result: Extract<ToolResult, { kind: "running" }> | null;
@@ -31,9 +29,16 @@ export class ResponseBuffer {
 
   constructor(
     private readonly identity: { responseId: string; requestParentId: string | null; source: ModelSource },
-    private readonly append: (block: ModelBlock) => string,
-    private readonly complete: (blockId: string | null, completion: ModelCompletion) => void,
+    private readonly onBlock: (block: ModelBlock) => void,
   ) {}
+
+  get empty(): boolean { return this.blocks.size === 0; }
+  get completion(): ModelCompletion | null {
+    return this.finish ? {
+      usage: this.finish.usage, finishReason: this.finish.reason,
+      rawFinishReason: this.finish.rawFinishReason ?? null, providerResponseId: this.finish.responseId ?? null,
+    } : null;
+  }
 
   accept(event: ModelEvent): void {
     if (this.finalized) throw new ModelFailure("protocol", "The response is already closed.");
@@ -44,26 +49,27 @@ export class ResponseBuffer {
       }
       if (event.part.kind === "toolcall") this.callIds.add(event.part.callId);
       this.blocks.set(event.part.id, { part: event.part, ordinal: this.blocks.size, text: "", startedAt: Date.now(), arguments: null, previewArguments: null, previewText: "", continuation: null,
-        done: false, savedId: null, executing: false, invocation: null, result: null });
+        endedAt: null, emitted: false, executing: false, invocation: null, result: null });
       return;
     }
     if (event.type === "finish") {
       this.finish = event;
-      if ([...this.blocks.values()].some(block => !block.done)) {
+      if ([...this.blocks.values()].some(block => block.endedAt === null)) {
         throw new ModelFailure("incomplete", "The model response ended with incomplete blocks. No tools were executed.");
       }
+      // 终态到达后，正文与计量一同提交；工具块继续等待各自结局。
+      for (const block of this.blocks.values()) if (block.part.kind !== "toolcall") this.emitBlock(block, true);
       return;
     }
     const block = this.blocks.get(event.partId);
-    if (!block || block.done) throw new ModelFailure("protocol", "The provider updated an inactive response block.");
+    if (!block || block.endedAt !== null) throw new ModelFailure("protocol", "The provider updated an inactive response block.");
     if (event.type === "part.delta") {
       block.text += event.delta;
       return;
     }
     block.arguments = event.arguments ?? null;
     block.continuation = event.continuation ?? null;
-    block.done = true;
-    if (block.part.kind !== "toolcall") this.save(block, true);
+    block.endedAt = Date.now();
   }
 
   calls(): LiveCall[] {
@@ -72,39 +78,39 @@ export class ResponseBuffer {
 
   isToolInput(partId: string): boolean {
     const block = this.blocks.get(partId);
-    return block?.part.kind === "toolcall" && !block.done;
+    return block?.part.kind === "toolcall" && block.endedAt === null;
   }
 
   /** 宽容解析只用于即时展示，不能覆盖执行参数或未完成历史的参数。 */
   async preview(identity: (name: string, args: Json) => ToolInvocationInfo): Promise<void> {
     for (const block of this.calls()) {
-      if (block.savedId || block.executing) continue;
-      if (!block.done && block.previewText !== block.text) {
+      if (block.emitted || block.executing) continue;
+      if (block.endedAt === null && block.previewText !== block.text) {
         const text = block.text;
         const parsed = await parsePartialJson(text);
-        if (block.done || block.savedId || text !== block.text) continue;
+        if (block.endedAt !== null || block.emitted || text !== block.text) continue;
         block.previewText = text;
         const preview = jsonSchema.safeParse(parsed.value);
         block.previewArguments = preview.success ? preview.data : null;
       }
-      block.invocation = identity(block.part.name, block.done ? block.arguments : block.previewArguments);
+      block.invocation = identity(block.part.name, block.endedAt !== null ? block.arguments : block.previewArguments);
     }
   }
 
   live(): ModelLiveBlock[] {
-    return [...this.blocks.values()].filter(block => !block.savedId).map(block => {
+    return [...this.blocks.values()].filter(block => !block.emitted).map(block => {
       const base = { id: `${this.identity.responseId}:${block.ordinal}`,
         responseId: this.identity.responseId, ordinal: block.ordinal };
       return block.part.kind === "toolcall"
-        ? { ...base, kind: "toolcall", name: block.part.name, argumentsText: block.text, arguments: block.done ? block.arguments : block.previewArguments,
-          state: block.executing ? "executing" : block.done ? "ready" : "input", invocation: block.invocation, result: block.result }
-        : block.part.kind === "thinking" ? { ...base, kind: "thinking", text: block.text, startedAt: block.startedAt }
-          : { ...base, kind: "text", text: block.text };
+        ? { ...base, kind: "toolcall", name: block.part.name, argumentsText: block.text, arguments: block.endedAt !== null ? block.arguments : block.previewArguments,
+          state: block.executing ? "executing" : block.endedAt !== null ? "ready" : "input", invocation: block.invocation, result: block.result }
+        : block.part.kind === "thinking" ? { ...base, kind: "thinking", text: block.text, startedAt: block.startedAt, endedAt: block.endedAt }
+          : { ...base, kind: "text", text: block.text, endedAt: block.endedAt };
     });
   }
 
   settle(call: LiveCall, outcome: ToolOutcome): void {
-    this.save(call, true, outcome);
+    this.emitBlock(call, true, outcome);
   }
 
   prepare(call: LiveCall, info: ToolInvocationInfo): void {
@@ -118,34 +124,26 @@ export class ResponseBuffer {
   }
 
   publish(call: LiveCall, data: Json): void {
-    if (this.finalized || call.savedId || !call.executing) return;
+    if (this.finalized || call.emitted || !call.executing) return;
     call.result = { kind: "running", data };
   }
 
-  /** 未执行的调用和未结束的块只留审计记录，已保存的块不重复追加。 */
-  interrupt(): void {
-    for (const block of this.blocks.values()) if (!block.savedId) this.save(block, false);
-  }
-
-  /** 保留所有收到的块后，将终态归属到响应序号最大的实际块，重复关闭不重复计量。 */
+  /** 收束剩余块；未结束的正文与未执行调用在块内标记不完整，不另发终态记录。 */
   close(): void {
     if (this.finalized) return;
-    this.interrupt();
-    if (this.finish) {
-      const last = [...this.blocks.values()].at(-1);
-      this.complete(last?.savedId ?? null, {
-        usage: this.finish.usage, finishReason: this.finish.reason,
-        rawFinishReason: this.finish.rawFinishReason ?? null, providerResponseId: this.finish.responseId ?? null,
-      });
+    for (const block of this.blocks.values()) {
+      if (!block.emitted) this.emitBlock(block, block.part.kind !== "toolcall" && block.endedAt !== null);
     }
     this.finalized = true;
   }
 
-  private save(block: BufferedBlock, complete: boolean, outcome: ToolOutcome | null = null): void {
-    if (block.savedId) throw new ModelFailure("protocol", "The response block is already saved.");
-    const common = { ...this.identity, ordinal: block.ordinal, complete, continuation: block.continuation };
-    block.savedId = this.append(block.part.kind === "toolcall"
+  private emitBlock(block: BufferedBlock, complete: boolean, outcome: ToolOutcome | null = null): void {
+    if (block.emitted) throw new ModelFailure("protocol", "The response block has already been emitted.");
+    const common = { ...this.identity, ordinal: block.ordinal, complete, continuation: block.continuation,
+      completion: block.ordinal === this.blocks.size - 1 ? this.completion : null };
+    this.onBlock(block.part.kind === "toolcall"
       ? { ...common, kind: "toolcall" as const, callId: block.part.callId, name: block.part.name, argumentsText: block.text, arguments: block.arguments, outcome }
-      : { ...common, kind: block.part.kind, text: block.text } as ModelBlock);
+      : { ...common, kind: block.part.kind, text: block.text });
+    block.emitted = true;
   }
 }

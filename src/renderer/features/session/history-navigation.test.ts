@@ -71,7 +71,7 @@ describe("历史导航契约", () => {
     expect(entries[2].scope).toBe("resource");
     expect(entries[2].resource?.title).toBe("Old note");
   });
-  it("查看之前使用真实父链，不使用过滤后的上一行，并跳过不可选择的不完整块", () => {
+  it("不完整块也是历史位置，查看之前使用真实父节点而非过滤后的上一行", () => {
     const nodes = [
       node("1", null, created("a", "A")),
       node("2", "1", thinking("a", "r", 0, "Reasoning")),
@@ -80,10 +80,10 @@ describe("历史导航契约", () => {
       node("5", "4", message("a", "Continue")),
       node("6", "1", message("a", "Another branch")),
     ];
-    expect(historyEntries(nodes, label).map(entry => entry.node.id)).toEqual(["1", "2", "3", "5", "6"]);
+    expect(historyEntries(nodes, label).map(entry => entry.node.id)).toEqual(["1", "2", "3", "4", "5", "6"]);
     expect(historyEntries(nodes, label)[2].label).toBe("read · input.md");
     expect(historyBefore(nodes, nodes[2])).toBe("2");
-    expect(historyBefore(nodes, nodes[4])).toBe("3");
+    expect(historyBefore(nodes, nodes[4])).toBe("4");
     expect(historyBefore(nodes, nodes[5])).toBe("1");
     expect(historyBefore(nodes, nodes[0])).toBeNull();
   });

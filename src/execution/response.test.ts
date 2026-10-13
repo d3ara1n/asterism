@@ -1,15 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
-import type { ModelBlock, ModelCompletion } from "@atelier/sdk/contracts";
+import type { ModelBlock } from "@atelier/sdk/contracts";
 import type { ModelEvent } from "../model/contract.ts";
 import { ResponseBuffer } from "./response.ts";
 
 function setup() {
   const nodes: ModelBlock[] = [];
-  const completions: { id: string | null; data: ModelCompletion }[] = [];
-  return { nodes, completions, response: new ResponseBuffer(
+  return { nodes, response: new ResponseBuffer(
     { responseId: "r", requestParentId: null, source: { model: "p/m", adapter: "test", scope: "s" } },
-    node => { nodes.push(node); return `block-${nodes.length}`; },
-    (id, data) => completions.push({ id, data }),
+    node => { nodes.push(node); },
   ) };
 }
 const start: ModelEvent = { type: "part.start", part: { id: "t", kind: "text" } };
@@ -27,7 +25,7 @@ describe("响应块状态机", () => {
     response.accept({ type: "part.delta", partId: "c", delta: 'onent.ts"},"args":{"content":"hello\\nworld\\u4' });
     await response.preview(() => ({}));
     expect(response.live()[0]).toMatchObject({ arguments: { args: { content: "hello\nworld" } } });
-    response.interrupt();
+    response.close();
     expect(nodes[0]).toMatchObject({ complete: false, arguments: null, outcome: null });
   });
 
@@ -55,13 +53,16 @@ describe("响应块状态机", () => {
       response.accept({ type: "part.delta", partId: "thought", delta: " second" });
       expect(response.live()[0]).toMatchObject({ text: "First second", startedAt: 1000 });
       response.accept({ type: "part.end", partId: "thought" });
+      expect(response.live()[0]).toMatchObject({ startedAt: 1000, endedAt: 9000 });
+      expect(nodes).toEqual([]);
+      response.accept(finish);
       expect(response.live()).toEqual([]);
       expect(nodes[0]).toMatchObject({ kind: "thinking", text: "First second", complete: true });
     } finally { clock.mockRestore(); }
   });
 
   it("终态归属最高序号块，和并行工具完成顺序无关；关闭只计量一次", () => {
-    const { response, nodes, completions } = setup();
+    const { response, nodes } = setup();
     response.accept(call);
     response.accept({ type: "part.end", partId: "c", arguments: {} });
     response.accept({ type: "part.start", part: { id: "c2", kind: "toolcall", callId: "c2", name: "read" } });
@@ -74,24 +75,26 @@ describe("响应块状态机", () => {
     response.close();
     response.close();
     expect(nodes.map(node => "ordinal" in node && node.ordinal)).toEqual([1, 0]);
-    expect(completions).toEqual([{ id: "block-1", data: {
+    expect(nodes[0]!.completion).toEqual({
       usage, finishReason: "tool-calls", rawFinishReason: "tool_use", providerResponseId: "remote",
-    } }]);
+    });
+    expect(nodes[1]!.completion).toBeNull();
+    expect(nodes.reduce((sum, block) => sum + (block.completion?.usage?.total ?? 0), 0)).toBe(7);
   });
 
   it("异常流的已报告用量仍保存；未报告终态不虚构计量", () => {
-    const { response, completions } = setup();
+    const { response, nodes } = setup();
     response.accept(start);
     response.accept({ type: "part.delta", partId: "t", delta: "partial" });
     expect(() => response.accept(finish)).toThrow("incomplete blocks");
     response.close();
-    expect(completions).toEqual([{ id: "block-1", data: {
+    expect(nodes[0]).toMatchObject({ complete: false, completion: {
       usage: null, finishReason: "stop", rawFinishReason: null, providerResponseId: null,
-    } }]);
+    } });
     const interrupted = setup();
     interrupted.response.accept(start);
     interrupted.response.close();
-    expect(interrupted.completions).toEqual([]);
+    expect(interrupted.nodes[0]!.completion).toBeNull();
     expect(() => interrupted.response.accept(start)).toThrow("already closed");
   });
 
@@ -100,26 +103,26 @@ describe("响应块状态机", () => {
     response.accept(call);
     response.accept({ type: "part.delta", partId: "c", delta: "{\"path\":" });
     expect(() => response.accept(finish)).toThrow("incomplete blocks");
-    expect(response.finish).toEqual(finish);
-    response.interrupt();
+    response.close();
     expect(nodes).toEqual([expect.objectContaining({ kind: "toolcall", argumentsText: "{\"path\":", complete: false, outcome: null })]);
   });
 
-  it("文本块结束即保存，工具取得结局才保存；中断不重复追加", () => {
+  it("正文等待终态一起保存，工具取得结局才保存；中断不重复追加", () => {
     const { response, nodes } = setup();
     response.accept(start);
     response.accept({ type: "part.delta", partId: "t", delta: "hello" });
     response.accept({ type: "part.end", partId: "t" });
-    expect(nodes).toEqual([expect.objectContaining({ kind: "text", text: "hello", complete: true })]);
+    expect(nodes).toEqual([]);
+    expect(response.live()).toEqual([expect.objectContaining({ kind: "text", text: "hello" })]);
     response.accept(call);
     response.accept({ type: "part.end", partId: "c", arguments: {} });
     response.accept(finish);
-    expect(nodes).toHaveLength(1);
+    expect(nodes).toEqual([expect.objectContaining({ kind: "text", text: "hello", complete: true, completion: null })]);
     expect(response.live()).toEqual([expect.objectContaining({ kind: "toolcall", state: "ready" })]);
     response.start(response.calls()[0]!);
     expect(response.live()[0]).toMatchObject({ state: "executing" });
     response.settle(response.calls()[0]!, { kind: "cancelled", message: "Stopped.", data: null, model: [{ kind: "text", text: "cancelled: Stopped." }] });
-    response.interrupt();
+    response.close();
     expect(response.live()).toEqual([]);
     expect(nodes).toHaveLength(2);
     expect(nodes[1]).toMatchObject({ kind: "toolcall", complete: true, outcome: { kind: "cancelled" } });

@@ -56,17 +56,17 @@ describe("历史分支 Tab 契约", () => {
     expect(viewedBranch(tree, null)).toBe(main);
   });
 
-  it("不完整块保留结构归属，但跳转与共享起点使用可查看祖先", () => {
+  it("不完整块同样可查看，分叉使用它自身作为共享起点", () => {
     const tree = historyBranches([
       message("A", null), interrupted("partial", "A"), message("B", "partial"),
       message("D", "partial"), interrupted("tail", "D"),
     ]);
     const [main, child] = tree.branches;
-    expect([...main!.nodeIds]).toEqual(["A", "B"]);
-    expect([...child!.nodeIds]).toEqual(["A", "D"]);
-    expect(child).toMatchObject({ forkId: "A", tip: "D" });
+    expect([...main!.nodeIds]).toEqual(["A", "partial", "B"]);
+    expect([...child!.nodeIds]).toEqual(["partial", "D", "tail"]);
+    expect(child).toMatchObject({ forkId: "partial", tip: "tail" });
     expect(tree.owner.get("tail")).toBe(child);
-    expect(branchContains(child!, "tail")).toBe(false);
+    expect(branchContains(child!, "tail")).toBe(true);
   });
 
   it("只有同次成功导航可选中新 Tab，失败或离开再返回相同节点不能复活旧意图", () => {

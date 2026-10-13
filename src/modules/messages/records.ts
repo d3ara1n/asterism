@@ -5,8 +5,4 @@ export const recordMessages = pluginNamespace("atelier.core").messages("en", def
     id: "recordSessionNamed",
     defaultMessage: "Named the session: {title}",
   },
-  recordModelResponse: {
-    id: "recordModelResponse",
-    defaultMessage: "Model response finished",
-  },
 }));

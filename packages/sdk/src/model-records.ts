@@ -21,10 +21,9 @@ export const modelBlockSchema = z.discriminatedUnion("kind", [
     argumentsText: z.string(), arguments: jsonSchema, outcome: toolOutcomeSchema.nullable() })
     .refine(data => data.complete === (data.outcome !== null), "Complete tool calls must have an outcome."),
 ]);
-/** 成型块、迟到终态与诊断可以保存；临时进度不属于历史记录。 */
+/** 终态内含于成型块；无块响应在诊断中保留来源与计量。临时进度不属于历史记录。 */
 export const modelRunRecordSchema = z.discriminatedUnion("type", [
   z.strictObject({ type: z.literal("block"), block: modelBlockSchema }),
-  z.strictObject({ type: z.literal("completion"), responseId: id, requestParentId: id.nullable(), source: modelSourceSchema,
-    ordinal: z.number().int().nonnegative().nullable(), completion: modelCompletionSchema }),
-  z.strictObject({ type: z.literal("diagnostic"), code: z.string(), message: z.string(), level: z.enum(["error", "warning"]) }),
+  z.strictObject({ type: z.literal("diagnostic"), code: z.string(), message: z.string(), level: z.enum(["error", "warning"]),
+    response: modelCompletionSchema.extend({ responseId: id, requestParentId: id.nullable(), source: modelSourceSchema }).optional() }),
 ]);

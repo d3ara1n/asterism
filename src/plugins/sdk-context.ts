@@ -2,7 +2,6 @@ import { belongsTo, jsonSchema, type DataContract, type Json, type RecordContrac
 import { PluginApiError, type ContentReader, type ContentScope, type ObjectReader, type ObjectExecutor, type PluginContext, type ResourceRef, type ResourceSnapshot, type SessionExecutor, type ObjectWriter } from "@atelier/sdk/runtime";
 import type { RunGroup } from "./lifecycle.ts";
 import type { ObjectScope } from "./host.ts";
-import { appendRecord } from "./record-writer.ts";
 import type { PluginHostServices } from "./loader.ts";
 import { foldWorkbench } from "../session/fold.ts";
 import { sessionSnapshot, resourceSnapshot } from "./records.ts";
@@ -101,7 +100,7 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
       };
       try {
         synchronous(() => work({
-          append(contract, data, options) {
+          append(contract, data) {
             check();
             const declared = records.get(contract.id);
             if (!declared || !belongsTo(internal.id, contract.id))
@@ -112,7 +111,8 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
             if (!parsed.success) throw new PluginApiError("invalid_argument", "The record does not match its declared schema.");
             const value = jsonSchema.parse(parsed.data);
             // 来源由写入通道打戳：插件身份来自操作柄，资源来自已校验的对象引用。
-            const recordId = appendRecord(writer, declared, value, { plugin: internal.id, resource: ref ? { id: ref.id, kind: ref.kind } : null }, options);
+            const recordId = writer.append({ contract: declared.id, data: value, model: null, recipient: null,
+              source: { plugin: internal.id, resource: ref ? { id: ref.id, kind: ref.kind } : null } });
             host.content?.bind({ ...access(id, ref?.id, scope), sessionId: id }, { kind: "record", id: recordId }, value);
             return recordId;
           },

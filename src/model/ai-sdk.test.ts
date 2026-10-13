@@ -91,7 +91,7 @@ describe("AI SDK 适配契约", () => {
     const nodes: ModelBlock[] = [];
     const buffer = new ResponseBuffer({ responseId: "r", requestParentId: null,
       source: { model: "p/m:medium", adapter: adapter.version, scope: modelScope(current.settings) } },
-      node => { nodes.push(node); return `block-${nodes.length}`; }, () => {});
+      node => { nodes.push(node); });
     const liveText: string[] = [];
     for await (const event of adapter.prepare(current).stream(new AbortController().signal)) {
       buffer.accept(event);

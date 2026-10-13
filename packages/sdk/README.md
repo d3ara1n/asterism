@@ -149,7 +149,7 @@ ResourceDescription、ToolView、CreationEntry 的 label／description 接收 Ui
 
 ## 版本与当前边界
 
-SDK 包版本为 `0.8.0`，宿主提供 API 5.0；插件声明 `api: { major: 5, minMinor: 0 }`，其他主版本在加载前拒绝。应用 IPC 版本为 5，会话 IPC 为 14，内容 IPC 为 2，应用配置 IPC 为 3，插件配置 IPC 为 2；工作数据库格式为 16，应用配置文件格式为 2。
+SDK 包版本为 `0.8.0`，宿主提供 API 5.0；插件声明 `api: { major: 5, minMinor: 0 }`，其他主版本在加载前拒绝。应用 IPC 版本为 5，会话 IPC 为 16，内容 IPC 为 2，应用配置 IPC 为 3，插件配置 IPC 为 2；工作数据库格式为 18，应用配置文件格式为 2。
 
 资源创建数据必须是 JSON 对象，不能占用宿主的 `id / type / title` 字段。当前会话数据保存于 `session_data`，事件及工具结果保存稳定契约身份与原始数据。core 消费具型用户消息、模型执行、通知与环境记录，存储编码由宿主负责；环境记录保留原事件身份与载荷。
 
@@ -165,7 +165,7 @@ validate 检查目标、续接、文件类型、归属与大小，不读取全�
 
 `models.run(request)` 是一次补全及该响应的完整资源工具批次。每次提供 `object / requestParentId / target / system / messages / signal / observer`，可提供工具筛选与缓存命中预期。宿主校验对象归属、当前路径与请求起点，按本对象当前数据和请求路径记录解析 file 部件，不接收外部 content 覆盖；按真实链接固定授权视图，并取用链接资源提供的环境文件追加到本次系统提示；工具筛选只收窄权限。同一对象并发 run 拒绝，运行期间对象和历史须遵守收束规则，关闭时取消并等待批次结束。
 
-具名 `ModelRunObserver.event` 同步收到 `block / completion / diagnostic / progress`。成型块与迟到终态分开交付，部分输出也有明确的完整性标志；临时进度不写历史。`modelRunRecordSchema` 提供可保存事件的共识载荷，插件用它声明自己的 RecordContract，并经 `ObjectExecutor.commit` 保存。run 不隐式保存输出，也不读取、保存或续接内部对话；终态的 ordinal 标出应绑定的最高序号块，空响应为 null。消费者失败时取消执行并收束工具，返回 `event_delivery`，不再调用该消费者。
+具名 `ModelRunObserver.event` 同步收到 `block / diagnostic / progress`。正文等响应终态齐全后交付，工具块等取得工具结局后交付；终态直接保存在最高 ordinal 块的 `completion` 字段中，不另发 completion 事件。异常收束时也保留已收到的块，不完整内容由 `complete=false` 标记，未报告的终态不补造；无块响应的来源与计量保存在 `empty_response` 诊断内。临时进度不写历史。`modelRunRecordSchema` 提供可保存事件的共识载荷，插件用它声明自己的 RecordContract，并经 `ObjectExecutor.commit` 保存；所有 append 都由宿主沿当前游标原子追加并推进游标，无 audit 选项。run 不隐式保存输出，也不读取、保存或续接内部对话。消费者失败时取消执行并收束工具，返回 `event_delivery`，不再调用该消费者。
 
 返回结果包含终止原因、来源、终态和按模型调用顺序排列的工具结局。取消、失败与未知写入影响要求 Agent 停止自动继续。run 完成工具批次即返回，上层插件的 Agent 决定是否再次调用、维护轮数和预算，每次消息都从时间轴重新投影。Agent 可以持有非 context 状态；context 的唯一真值在时间轴，不能在 Agent 或 run 内保存另一份历史。
 

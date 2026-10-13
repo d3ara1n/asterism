@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import { sessionNodeSchema, type NewNode, type SessionNode } from "../shared/session.ts";
-import { SessionError, selectable, sessionPath } from "../shared/session-path.ts";
+import { SessionError, sessionPath } from "../shared/session-path.ts";
 export { SessionError } from "../shared/session-path.ts";
 
 export type CursorSelection = {
@@ -36,7 +36,7 @@ export class SessionTree {
       .map(r => sessionNodeSchema.parse(JSON.parse(r.payload)));
   }
 
-  /** 在游标后追加通用记录；宿主不解释载荷。position 为 false 的审计记录不移动游标。 */
+  /** 在当前游标后追加通用记录并推进游标；宿主不解释载荷。 */
   append(sessionId: string, node: NewNode): SessionNode {
     const parentId = this.cursor(sessionId);
     const full = sessionNodeSchema.parse({ ...node, id: randomUUID(), sessionId, parentId, createdAt: new Date().toISOString() });
@@ -45,7 +45,7 @@ export class SessionTree {
     try {
       this.db.prepare("INSERT INTO session_nodes (id, session_id, parent_id, payload) VALUES (?, ?, ?, ?)")
         .run(full.id, sessionId, parentId, JSON.stringify(full));
-      if (selectable(full)) this.db.prepare("UPDATE sessions SET cursor = ? WHERE id = ?").run(full.id, sessionId);
+      this.db.prepare("UPDATE sessions SET cursor = ? WHERE id = ?").run(full.id, sessionId);
       this.db.exec("RELEASE append_session_node");
     } catch (error) {
       this.db.exec("ROLLBACK TO append_session_node; RELEASE append_session_node");
@@ -54,11 +54,10 @@ export class SessionTree {
     return full;
   }
 
-  /** 选择历史位置；调用方须保证会话 settled。任何完整节点都可作为位置，不吸附。 */
+  /** 选择历史位置；调用方须保证会话 settled。所有节点都可作为位置，不吸附。 */
   select(sessionId: string, nodeId: string | null): string | null {
     const from = this.cursor(sessionId);
     const target = nodeId === null ? null : sessionPath(this.nodes(sessionId), nodeId).at(-1)!;
-    if (target && !selectable(target)) throw new SessionError("invalid_request", "Audit-only records cannot be selected.");
     this.db.exec("SAVEPOINT select_session_cursor");
     try {
       this.db.prepare(`INSERT INTO cursor_selections (session_id, from_id, requested_id, selected_id, reason, recorded_at)

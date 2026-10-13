@@ -28,7 +28,7 @@
 
 会话命令先由 Zod 校验，再交运行时单一写入者处理。业务创建、查询索引与初始视图处于同一事务；正文引用只在内容文件成功落盘后进入事件。命令返回受理结果，读取返回指定位置的会话树与工作台投影，UI 将其映射为画布和代理对话。
 
-路径遍历与可选位置判断位于 `shared/session-path.ts`，运行时与 renderer 共用；宿主不判断续接点。会话节点是通用记录（契约、来源、载荷、模型可见文本、接收者、position），宿主不解释载荷。`execution/request.ts` 完成一次补全及工具批次，`execution/response.ts` 只持有该响应的临时流状态；成型块与终态以事件交给执行体，由其作为自身记录提交。内置 Agent 由 `modules/agent/runtime.ts` 装配，`selection.ts` 解析选择与策略，`admission.ts` 原子受理输入，`loop.ts` 每次从时间轴重新投影并推动下一请求；`projection.ts` 负责响应分组、事件后置与上下文末尾截取。`plugins/record-writer.ts` 与 `plugins/records.ts` 处理通用信封与来源打戳。未完成输出经 `session.progress` 的 `live` 字段按 `objectId` 提供给界面，不写入存储。数据库结构只在运行时建库，仓储构造不隐式建表。
+路径遍历位于 `shared/session-path.ts`，运行时与 renderer 共用；所有入树记录均推进游标且可查看，宿主不判断续接点。会话节点是通用记录（契约、来源、载荷、模型可见文本、接收者），宿主不解释载荷。`execution/request.ts` 完成一次补全及工具批次，`execution/response.ts` 只持有该响应的临时流状态；正文在终态到达后交付，工具块在取得结局后交付；终态内含于最高序号块，由执行体作为自身记录一次提交。内置 Agent 由 `modules/agent/runtime.ts` 装配，`selection.ts` 解析选择与策略，`admission.ts` 原子受理输入，`loop.ts` 每次从时间轴重新投影并推动下一请求；`projection.ts` 负责响应分组、事件后置与上下文末尾截取。`plugins/sdk-context.ts` 在具型写入入口统一校验与来源打戳，`plugins/records.ts` 直接映射通用记录信封。在途输出经 `session.progress` 的 `live` 字段按 `objectId` 提供给界面；异常收束时仍将已收到的内容保存为块，以完整性字段供审计。数据库结构只在运行时建库，仓储构造不隐式建表。
 
 `SessionTree.select` 将选择审计与游标更新原子提交，`cursorSelections` 可读取日志。`seq` 只计节点追加，视图同步使用独立 `revision`。
 

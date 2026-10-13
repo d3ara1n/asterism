@@ -13,18 +13,18 @@ export const recordSourceSchema = z.strictObject({ plugin: id, resource: z.stric
 export type RecordSource = z.infer<typeof recordSourceSchema>;
 /**
  * 会话树节点即通用记录：契约身份、宿主打戳的来源与不透明载荷；宿主不解释 data。
- * model 非空时作为文本投影给 recipient（null 为全部执行体）；position 为 false 的审计记录不可作为查看或继续位置。
+ * model 非空时作为文本投影给 recipient（null 为全部执行体）；每条记录都进入路径并推进游标。
  */
 export const sessionNodeSchema = z.strictObject({
   id, sessionId: id, parentId: id.nullable(), createdAt: z.string(), source: recordSourceSchema,
-  contract: id, data: jsonSchema, model: z.string().nullable(), recipient: id.nullable(), position: z.boolean(),
+  contract: id, data: jsonSchema, model: z.string().nullable(), recipient: id.nullable(),
 });
 export type SessionNode = z.infer<typeof sessionNodeSchema>;
 export type NewNode = Omit<SessionNode, "id" | "sessionId" | "parentId" | "createdAt">;
 
 // ---- 会话能力接口 ----
 const uuid = z.string().uuid();
-export const sessionVersion = 15;
+export const sessionVersion = 16;
 export const viewPositionSchema = z.discriminatedUnion("kind", [
   z.strictObject({ kind: z.literal("live") }),
   z.strictObject({ kind: z.literal("history"), nodeId: id.nullable() }),
@@ -52,8 +52,8 @@ export type SessionMutation = Exclude<SessionCommand, { type: "read" }>;
 /** 仅在运行时存在的输出投影；没有父指针，不属于可选择的历史节点。 */
 const liveBase = { id, objectId: id, responseId: id, ordinal: z.number().int().nonnegative() };
 export const liveBlockSchema = z.discriminatedUnion("kind", [
-  z.strictObject({ ...liveBase, kind: z.literal("text"), text: z.string() }),
-  z.strictObject({ ...liveBase, kind: z.literal("thinking"), text: z.string(), startedAt: z.number().nonnegative() }),
+  z.strictObject({ ...liveBase, kind: z.literal("text"), text: z.string(), endedAt: z.number().nonnegative().nullable() }),
+  z.strictObject({ ...liveBase, kind: z.literal("thinking"), text: z.string(), startedAt: z.number().nonnegative(), endedAt: z.number().nonnegative().nullable() }),
   z.strictObject({ ...liveBase, kind: z.literal("toolcall"), name: id, argumentsText: z.string(),
     arguments: jsonSchema, state: z.enum(["input", "ready", "executing"]),
     invocation: toolInvocationSchema.nullable(), result: toolRunningResultSchema.nullable() }),
@@ -69,7 +69,7 @@ export const sessionProgressSchema = z.strictObject({
   unsettledObjectIds: z.array(id),
 });
 export type SessionProgress = z.infer<typeof sessionProgressSchema>;
-/** 同次读取固定路径与对象投影；seq 是节点序号，revision 还涵盖计量、选择与布局。 */
+/** 同次读取固定路径与对象投影；seq 是节点序号，revision 还涵盖选择、对象数据与布局。 */
 export const sessionSnapshotSchema = z.strictObject({
   sessionId: id, title: z.string(), cursor: id.nullable(), at: id.nullable(), seq: revision, revision,
   nodes: z.array(sessionNodeSchema),
