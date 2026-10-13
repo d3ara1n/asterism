@@ -23,6 +23,11 @@ export const journalPlugin = definePlugin({
           if (entry?.status === "known") plugin.log.info("Annotation committed.");
         }
       },
+      cursorChanged({ snapshot, session }) {
+        const annotation = snapshot.records.last(Annotation, { scope: "path" });
+        if (annotation?.status !== "known") return;
+        session.commit(writer => { writer.set(CurrentSummary, { text: annotation.data.text }); });
+      },
     } satisfies SessionObserver],
   }))],
 });
@@ -133,8 +138,8 @@ export async function modelWork(plugin: PluginContext, object: ObjectExecutor, s
 export function rejectInvalidUsage(plugin: PluginContext, object: ObjectExecutor, reader: ObjectReader) {
   // @ts-expect-error 读取门面不能提交。
   reader.commit(() => {});
-  // @ts-expect-error 只读标题不能比较更新。
-  reader.session.title.propose("New", { expected: "Old" });
+  // @ts-expect-error 只读标题不能写入。
+  reader.session.title.set("New");
   // @ts-expect-error 生命周期不是字符串事件总线。
   plugin.on("start", () => {});
   // @ts-expect-error 基础对象接口不承担模型执行。

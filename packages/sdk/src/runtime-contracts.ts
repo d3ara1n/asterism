@@ -37,7 +37,16 @@ export interface SessionCommitted {
   readonly records: readonly SessionRecord[];
   readonly session: SessionExecutor;
 }
-export interface SessionObserver { readonly id: string; committed(event: SessionCommitted): undefined }
+/** 执行游标变化后的固定快照；正常追加与历史选择使用同一形状。 */
+export interface SessionCursorChanged {
+  readonly snapshot: SessionSnapshot;
+  readonly session: SessionExecutor;
+}
+export interface SessionObserver {
+  readonly id: string;
+  committed?(event: SessionCommitted): undefined;
+  cursorChanged?(event: SessionCursorChanged): undefined;
+}
 export type Preparation<C extends Json = Json> =
   | { action: "accept" }
   | { action: "replace"; input: C }

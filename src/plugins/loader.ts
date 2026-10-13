@@ -45,7 +45,8 @@ export interface LoadedPlugins {
   resources: ResourceRegistry;
   tools: ToolRegistry;
   manifest: readonly PluginManifest[];
-  committed(sessionId: string, nodes: readonly SessionNode[]): void;
+  /** 提交后派发观察；队列排空后对涉及的会话各调用一次 publish。 */
+  afterCommit(sessionId: string, change: { records: readonly SessionNode[]; cursorChanged: boolean }, publish: (sessionId: string) => void): void;
   prepare(kind: string, command: ResourceCall, context: { sessionId: string; objectId: string; signal: AbortSignal; content?: ContentLease }): Promise<ParsedCall>;
   close(): Promise<void>;
 }
@@ -238,8 +239,10 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
     }
   }
   const resources = new ResourceRegistry(collected.flatMap(entry => entry.resources));
-  type Notification = { sessionId: string; snapshot: ReturnType<typeof sessionSnapshot>; records: ReturnType<typeof toRecords> };
+  type Notification = { sessionId: string; snapshot: ReturnType<typeof sessionSnapshot>; records: ReturnType<typeof toRecords>; cursorChanged: boolean };
   const notifications: Notification[] = [];
+  const touched = new Set<string>();
+  const observers = collected.flatMap(entry => entry.observers);
   let dispatching = false;
   let closed = false;
   let closing: Promise<void> | undefined;
@@ -263,22 +266,37 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
         live: model.flatMap(run => run.live) };
     },
     resources, tools: new ToolRegistry(active), manifest: Object.freeze(manifest.map(entry => Object.freeze(entry))),
-    committed(sessionId, nodes) {
-      if (!nodes.length) return;
-      const all = services.sessions.nodes(sessionId);
-      notifications.push({ sessionId, records: toRecords(nodes, all),
-        snapshot: sessionSnapshot(sessionId, services.sessions.title(sessionId), all, services.sessions.path(sessionId)) });
+    afterCommit(sessionId, { records: nodes, cursorChanged }, publish) {
+      touched.add(sessionId);
+      const observed = (nodes.length > 0 && observers.some(observer => observer.committed))
+        || (cursorChanged && observers.some(observer => observer.cursorChanged));
+      if (observed) {
+        // 快照固定在本次提交时刻，后续排队的提交不改写它。
+        const all = services.sessions.nodes(sessionId);
+        notifications.push({ sessionId, records: toRecords(nodes, all), cursorChanged,
+          snapshot: sessionSnapshot(sessionId, services.sessions.title(sessionId), all, services.sessions.path(sessionId)) });
+      }
       if (dispatching) return;
       dispatching = true;
       try {
         while (notifications.length) {
           const event = notifications.shift()!;
           for (const entry of collected) for (const observer of entry.observers) {
-            try { synchronous(() => observer.committed({ records: event.records, snapshot: event.snapshot, session: entry.sdk.context.session(event.sessionId) })); }
-            catch (error) { (services.log ?? defaultLog)(entry.plugin.namespace.id, "error", `Observer ${observer.id} failed.`, error); }
+            const session = entry.sdk.context.session(event.sessionId);
+            const run = (name: string, call: () => undefined) => {
+              try { synchronous(call); }
+              catch (error) { (services.log ?? defaultLog)(entry.plugin.namespace.id, "error", `Observer ${observer.id} ${name} callback failed.`, error); }
+            };
+            if (event.records.length && observer.committed) run("committed", () => observer.committed!({ records: event.records, snapshot: event.snapshot, session }));
+            if (event.cursorChanged && observer.cursorChanged) run("cursorChanged", () => observer.cursorChanged!({ snapshot: event.snapshot, session }));
           }
         }
-      } finally { dispatching = false; }
+      } finally {
+        dispatching = false;
+        const ids = [...touched];
+        touched.clear();
+        for (const id of ids) publish(id);
+      }
     },
     async prepare(kind, command, context) {
       if (closed) throw new PluginApiError("unavailable", "Plugins are closing.");

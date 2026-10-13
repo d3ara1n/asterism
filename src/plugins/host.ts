@@ -14,7 +14,7 @@ export interface SessionHost {
   path(sessionId: string): SessionNode[];
   nodes(sessionId: string): SessionNode[];
   title(sessionId: string): string;
-  proposeTitle(sessionId: string, text: string, expected: string): boolean;
+  setTitle(sessionId: string, text: string): void;
   commit<T>(sessionId: string, work: (writer: SessionHostWriter) => T): T;
   /** 会话内除 objectId 外没有在途活动；用于历史选择前的收束检查。 */
   idle(sessionId: string, objectId?: string): boolean;

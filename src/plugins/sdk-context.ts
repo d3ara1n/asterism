@@ -80,7 +80,7 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
     },
     title: {
       get: () => { checkAvailable(); return host.sessions.title(id); },
-      propose: (text, options) => { checkMutation(); return host.sessions.proposeTitle(id, text, options.expected); },
+      set: text => { checkMutation(); host.sessions.setTitle(id, text); },
     },
     commit: work => { checkMutation(); commit(id, work, undefined, scope); },
   });

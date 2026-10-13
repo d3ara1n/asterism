@@ -54,7 +54,7 @@ export class SessionService {
   readonly configurePlugins: LoadedPlugins["configure"];
   private readonly closePlugins: () => Promise<void>;
   private readonly prepare: LoadedPlugins["prepare"];
-  private readonly committed: (sessionId: string, nodes: SessionNode[]) => void;
+  private readonly afterCommit: LoadedPlugins["afterCommit"];
   private readonly modelActivity: (sessionId: string) => { running: string[]; live: LiveBlock[] };
   private readonly validateInitialInput: (selection: AgentSelection, parts: ModelInputPart[], content: ContentLease) => Promise<void>;
   constructor(private readonly db: DatabaseSync, dataRoot: string, configuration: ConfigurationService,
@@ -66,17 +66,11 @@ export class SessionService {
       path: sessionId => this.tree.path(sessionId),
       nodes: sessionId => this.tree.nodes(sessionId),
       title: sessionId => this.tree.title(sessionId),
-      proposeTitle: (sessionId, text, expected) => {
+      setTitle: (sessionId, text) => {
         const title = text.replace(/\s+/gu, " ").trim().slice(0, 160);
-        if (!title || this.closed) return false;
-        // 插件可在同步提交内同时应用标题与追加来源事件，失败时由外层事务一起回滚。
-        if (this.committing) {
-          if (this.committing.sessionId !== sessionId) throw new SessionError("conflict", "A commit cannot rename another session.");
-          return this.tree.rename(sessionId, title, expected);
-        }
-        const applied = this.transaction(() => this.tree.rename(sessionId, title, expected));
-        if (applied) this.notify(sessionId);
-        return applied;
+        // 空标题无意义，直接忽略；在提交内随外层事务生效，否则作为一次独立提交。
+        if (!title || this.closed || title === this.tree.title(sessionId)) return;
+        this.commit(sessionId, () => this.tree.setTitle(sessionId, title));
       },
       commit: (sessionId, work) => this.commit(sessionId, work),
       idle: (sessionId, objectId) => this.modelActivity(sessionId).running.length === 0
@@ -121,7 +115,7 @@ export class SessionService {
     this.plugins = modules.manifest;
     this.configurePlugins = modules.configure;
     this.closePlugins = modules.close;
-    this.committed = modules.committed;
+    this.afterCommit = modules.afterCommit;
     this.prepare = modules.prepare;
     this.modelActivity = modules.activity;
     this.workbench = new SessionWorkbench(db, this.tree, this.resources,
@@ -150,7 +144,7 @@ export class SessionService {
         throw error;
       }
     }
-    const head = this.tree.head(sessionId);
+    const head = this.tree.head(sessionId), before = this.tree.position(sessionId);
     const writer: SessionWriter = {
       append: node => this.tree.append(sessionId, node).id,
       nodes: () => this.tree.nodes(sessionId),
@@ -160,9 +154,10 @@ export class SessionService {
       try { return work(writer); }
       finally { this.committing = null; }
     });
-    this.notify(sessionId);
-    // 提交后派发：事务已结束，处理器不在写入事务内运行。
-    if (!this.closed) { const nodes = this.tree.since(sessionId, head); this.committed(sessionId, nodes); }
+    // 提交后交给插件派发队列；观察者内的提交排队，队列清空后每个会话通知界面一次。
+    const change = { records: this.tree.since(sessionId, head), cursorChanged: before !== this.tree.position(sessionId) };
+    if (this.closed) this.notify(sessionId);
+    else this.afterCommit(sessionId, change, id => this.notify(id));
     return result;
   }
   /** 会话 settled：没有任何资源在活动；回溯只在此时允许。 */

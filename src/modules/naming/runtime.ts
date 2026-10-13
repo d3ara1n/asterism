@@ -42,8 +42,8 @@ export default defineModule(plugin => ({
     committed({ records, snapshot, session }) {
       const latest = snapshot.records.last(UserMessage, { scope: "path" });
       if (latest?.status !== "known" || !records.some(record => record.id === latest.record.id)) return;
-      const named = snapshot.records.last(SessionNamed, { scope: "session" });
-      if (named?.status === "unknown" || named?.data.source === "user" || (named && named.data.title !== snapshot.title)) return;
+      const named = snapshot.records.last(SessionNamed, { scope: "path" });
+      if (named?.status === "unknown" || named?.data.source === "user") return;
       const first = snapshot.records.first(UserMessage, { scope: "session" });
       const initial = first?.status === "known" && records.some(record => record.id === first.record.id);
       const message = initial ? first : latest;
@@ -52,23 +52,30 @@ export default defineModule(plugin => ({
       if (named?.status === "known" && named.data.auto?.messageId === message.record.id) return;
       const model = plugin.models.roles().find(role => role.id === "utility")?.model ?? null;
       if (model === null) return;
-      const expected = snapshot.title, nameId = named?.record.id ?? null;
+      const nameId = named?.record.id ?? null;
       const prompt = namingPrompt(level === "initial" ? [{ user: inputSummary(message.data.parts) }]
         : collectTurns(snapshot.records.all({ scope: "path" })));
-      // 过时判断只读命名事件、标题与最新输入；较新的生效命名或输入使在途结果失效。
-      const isCurrent = (view: SessionSnapshot) => view.title === expected &&
-        (view.records.last(SessionNamed, { scope: "session" })?.record.id ?? null) === nameId &&
+      // 命名依据只来自当前路径，标题同步与观察者顺序不参与过时判断。
+      const isCurrent = (view: SessionSnapshot) =>
+        (view.records.last(SessionNamed, { scope: "path" })?.record.id ?? null) === nameId &&
         view.records.last(UserMessage, { scope: "path" })?.record.id === latest.record.id;
       plugin.tasks.start(`naming:${session.id}:${message.record.id}`, async signal => {
         if (!isCurrent(session.snapshot())) return;
         const title = await generateTitle(plugin.models, prompt, signal);
-        if (!isCurrent(session.snapshot())) return;
-        // 比较更新与命名事件加入同一事务；事件保存实际生效标题，原历史保持不变。
+        // 检查与追加在同一同步提交中完成；标题由游标观察者独立同步。
         session.commit(writer => {
-          if (session.title.propose(title, { expected })) writer.append(SessionNamed, {
-            title: session.title.get(), source: "auto", auto: { level, messageId: message.record.id, model } });
+          if (isCurrent(session.snapshot())) writer.append(SessionNamed, {
+            title, source: "auto", auto: { level, messageId: message.record.id, model } });
         });
       }, { timeoutMs });
+    },
+    cursorChanged({ snapshot, session }) {
+      // 标题 = 当前分支最后一次命名，否则为当前分支首条输入的截断；两者都没有时保持不变。
+      const named = snapshot.records.last(SessionNamed, { scope: "path" });
+      if (named?.status === "unknown") return;
+      const first = named ? null : snapshot.records.first(UserMessage, { scope: "path" });
+      const title = named?.data.title ?? (first?.status === "known" ? inputSummary(first.data.parts).slice(0, 72) : null);
+      if (title !== null) session.title.set(title);
     },
   }],
 }));

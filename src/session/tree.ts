@@ -86,9 +86,13 @@ export class SessionTree {
     return (this.db.prepare("SELECT payload FROM session_nodes WHERE session_id = ? AND seq > ? ORDER BY seq").all(sessionId, seq) as { payload: string }[])
       .map(row => sessionNodeSchema.parse(JSON.parse(row.payload)));
   }
-  /** 标题比较后更新；不追加节点。 */
-  rename(sessionId: string, text: string, expected: string): boolean {
-    return Number(this.db.prepare("UPDATE sessions SET title = ? WHERE id = ? AND title = ?").run(text, sessionId, expected).changes) > 0;
+  /** 覆盖会话标题；不追加节点。 */
+  setTitle(sessionId: string, text: string): void {
+    this.db.prepare("UPDATE sessions SET title = ? WHERE id = ?").run(text, sessionId);
+  }
+  /** 执行游标；会话尚未创建时为 undefined，供提交前后比较。 */
+  position(sessionId: string): string | null | undefined {
+    return (this.db.prepare("SELECT cursor FROM sessions WHERE id = ?").get(sessionId) as { cursor: string | null } | undefined)?.cursor;
   }
   title(sessionId: string): string {
     const row = this.db.prepare("SELECT title FROM sessions WHERE id = ?").get(sessionId) as { title: string } | undefined;

@@ -97,7 +97,7 @@ describe("工作台 SDK 的宿主实现", () => {
     expect(reader).not.toHaveProperty("streams");
     expect(reader.session).not.toHaveProperty("commit");
     expect(reader.session).not.toHaveProperty("resume");
-    expect(reader.session.title).not.toHaveProperty("propose");
+    expect(reader.session.title).not.toHaveProperty("set");
   });
   it("动作按宿主契约校验身份、资源归属和输入，拒绝不留下写入", async () => {
     const c = counter();
@@ -332,7 +332,7 @@ describe("工作台 SDK 的宿主实现", () => {
     expect(progress).toEqual([4]);
     expect(() => toolObject.commit(writer => { writer.set(State, 5); })).toThrow();
     expect(() => toolObject.session.commit(writer => { writer.set(State, 5); })).toThrow();
-    expect(() => toolObject.session.title.propose("Late", { expected: "Counter" })).toThrow();
+    expect(() => toolObject.session.title.set("Late")).toThrow();
     expect(() => toolObject.streams.publish("late", new Uint8Array())).toThrow();
   });
 
@@ -389,6 +389,7 @@ describe("工作台 SDK 的宿主实现", () => {
     const Follow = defineRecord(eventNs.name("follow"), { schema: z.string() });
     let context!: PluginContext;
     const seen: [string, number][] = [];
+    const positions: number[] = [];
     const plugin = definePlugin({ namespace: eventNs, version: "1", modules: [defineModule(plugin => {
       context = plugin;
       return { records: [Input, Follow], observers: [
@@ -397,16 +398,80 @@ describe("工作台 SDK 的宿主实现", () => {
         } },
         { id: "read", committed(event) {
           seen.push([event.records[0]!.contract.id, event.snapshot.records.all({ scope: "session" }).length]);
+        }, cursorChanged(event) {
+          positions.push(event.snapshot.records.all({ scope: "path" }).length);
         } },
       ] };
     })] });
     const { service, sessionId } = open([plugin]);
     context.session(sessionId).commit(writer => { writer.append(Input, "first"); });
     expect(seen).toEqual([[Input.id, 1], [Follow.id, 2]]);
+    expect(positions).toEqual([1, 2]);
     expect(service.sessions.tree.nodes(sessionId).map(flat)).toHaveLength(2);
   });
 
-  it("标题比较更新与来源事件同事务生效，后续异常回滚且观察者只看到一致状态", () => {
+  // 预期来自游标观察契约：追加与历史选择统一通知最终路径，纯数据／标题写入和查看不通知。
+  it("游标观察与记录提交独立，批量与嵌套提交只通知最终位置，回滚不通知", async () => {
+    const eventNs = pluginNamespace("test.cursor");
+    const Entry = defineRecord(eventNs.name("entry"), { schema: z.string() });
+    const Current = eventNs.data("current", z.number());
+    let context!: PluginContext;
+    const commits: string[][] = [], paths: string[][] = [], published: string[] = [];
+    const plugin = definePlugin({ namespace: eventNs, version: "1", modules: [defineModule(plugin => {
+      context = plugin;
+      return { records: [Entry], observers: [{
+        id: "cursor",
+        committed(event) { commits.push(event.records.map(record => record.id)); },
+        cursorChanged(event) {
+          expect(event).not.toHaveProperty("records");
+          const path = event.snapshot.records.all({ scope: "path" }).map(record => record.id);
+          paths.push(path);
+          event.session.title.set(`Position ${path.length}`);
+        },
+      }] };
+    })] });
+    let current!: ApplicationService;
+    const { service, sessionId } = open([plugin], undefined, event => {
+      if (event.kind === "session.changed") published.push(current.sessions.tree.title(event.sessionId));
+    });
+    current = service;
+    const session = context.session(sessionId);
+    const ids: string[] = [];
+    session.commit(writer => {
+      ids.push(writer.append(Entry, "first"));
+      session.commit(nested => { ids.push(nested.append(Entry, "second")); });
+      ids.push(writer.append(Entry, "third"));
+    });
+    expect(commits).toEqual([ids]);
+    expect(paths).toEqual([ids]);
+    expect(published).toEqual(["Position 3"]);
+    const first = ids[0]!;
+    service.sessions.snapshot(sessionId, { kind: "history", nodeId: first });
+    session.commit(writer => { writer.set(Current, 1); });
+    session.title.set("Current title");
+    expect(paths).toHaveLength(1);
+    expect(commits).toHaveLength(1);
+    expect(() => session.commit(writer => {
+      writer.append(Entry, "rolled back");
+      throw new Error("Rollback");
+    })).toThrow("Rollback");
+    expect(paths).toHaveLength(1);
+    expect(commits).toHaveLength(1);
+    await service.sessions.execute({ type: "select", sessionId, nodeId: first });
+    expect(paths).toEqual([ids, [first]]);
+    expect(commits).toHaveLength(1);
+    expect(published.at(-1)).toBe("Position 1");
+    await service.sessions.execute({ type: "select", sessionId, nodeId: first });
+    expect(paths).toHaveLength(2);
+    let branch!: string;
+    session.commit(writer => { branch = writer.append(Entry, "branch"); });
+    expect(paths.at(-1)).toEqual([first, branch]);
+    await service.sessions.execute({ type: "select", sessionId, nodeId: null });
+    expect(paths.at(-1)).toEqual([]);
+    expect(commits).toEqual([ids, [branch]]);
+  });
+
+  it("提交内写入的标题与事件同事务生效，后续异常回滚且观察者只看到一致状态", () => {
     const seen: [string, number][] = [];
     const c = counter({ observe: (record, plugin) => {
       const changed = Changed.decode(record);
@@ -415,7 +480,7 @@ describe("工作台 SDK 的宿主实现", () => {
     const { service, sessionId } = open([c.plugin]);
     const session = c.context().session(sessionId);
     expect(() => session.commit(writer => {
-      expect(session.title.propose("Rolled back", { expected: "Counter" })).toBe(true);
+      session.title.set("Rolled back");
       writer.append(Changed, { value: 1 });
       throw new Error("Reject this commit.");
     })).toThrow("Reject this commit.");
@@ -423,20 +488,15 @@ describe("工作台 SDK 的宿主实现", () => {
     expect(session.snapshot().records.last(Changed, { scope: "session" })).toBeNull();
     expect(seen).toEqual([]);
     session.commit(writer => {
-      expect(session.title.propose("Applied", { expected: "Counter" })).toBe(true);
+      session.title.set("Applied");
       writer.append(Changed, { value: 2 });
     });
     expect(session.title.get()).toBe("Applied");
     expect(session.snapshot().records.last(Changed, { scope: "session" })).toMatchObject({ data: { value: 2 } });
     expect(seen).toEqual([["Applied", 2]]);
-    session.commit(writer => {
-      if (session.title.propose("Stale", { expected: "Counter" })) writer.append(Changed, { value: 3 });
-    });
-    expect(session.title.get()).toBe("Applied");
-    expect(session.snapshot().records.query(Changed, { scope: "session" })).toHaveLength(1);
     const other = service.sessions.tree.create("Other");
     expect(() => session.commit(() => {
-      c.context().session(other).title.propose("Foreign", { expected: "Other" });
+      c.context().session(other).title.set("Foreign");
     })).toThrow();
     expect(c.context().session(other).title.get()).toBe("Other");
   });

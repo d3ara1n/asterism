@@ -39,13 +39,17 @@ export default definePlugin({ namespace: ns, version: "1.0.0", modules: [
 
 ## 会话、资源与提交
 
-`plugin.session(id)` 提供固定快照、当前会话数据读写、同步提交、续接位置与标题比较更新。`plugin.object(ref)` 绑定本插件对象，提供当前对象数据读写、关联对象的事件提交和二进制流。引用只是地址，宿主每次检查真实归属、会话与有效性；普通写入还要求对象在当前路径上。资源创建中的对象门面由宿主提供，数据和事件写入加入创建事务。`object.snapshot()` 读取该调用绑定的资源身份、标题与数据；已授权工具使用捕获快照，执行期间保留对该对象的提交能力，结束后对象提交、嵌套会话修改和流发布都失效。
+`plugin.session(id)` 提供固定快照、当前会话数据读写、同步提交、续接位置与标题覆盖。`plugin.object(ref)` 绑定本插件对象，提供当前对象数据读写、关联对象的事件提交和二进制流。引用只是地址，宿主每次检查真实归属、会话与有效性；普通写入还要求对象在当前路径上。资源创建中的对象门面由宿主提供，数据和事件写入加入创建事务。`object.snapshot()` 读取该调用绑定的资源身份、标题与数据；已授权工具使用捕获快照，执行期间保留对该对象的提交能力，结束后对象提交、嵌套会话修改和流发布都失效。
 
 两种 `commit` 都可同时 `writer.set(DataContract, value)` 和 `writer.append(RecordContract, data)`：前者覆盖当前会话或对象数据，后者追加本插件声明过的记录。模块及资源的 `records` 声明决定可写记录，宿主使用声明的 schema 校验，填节点身份、父指针与对象关联。提交回调须同步完成；Promise 导致回滚，回调结束后的 writer 失效。嵌套同会话提交加入外层事务，失败的内层写入回滚，通知仅在最外层提交成功后派发。
 
 快照的路径、记录和不可变资源数据固定在读取时刻，`position.nodeId` 给出当前位置；执行体投影上下文时自行截取合理位置。`session.get` 和 `object.get` 读取当前数据；数据按会话、对象作用域和具型契约隔离，随会话保存，不能据此恢复历史。数据契约使用 `ns.data(name, schema)`，记录使用 `defineRecord(id, { schema })`，均不要求手填版本。读取按所属类型的 schema 解码；兼容数据继续读取，不兼容数据明确不可用或保留 unknown。插件用自己的 schema 兼容旧形状并负责迁移，读取不修改原始记录。纯数据提交通知视图，不追加时间轴或触发事件观察者。
 
-`snapshot.records.first(Contract, {scope}) / last(Contract, {scope})` 按固定快照的契约首尾索引定位，只解码目标记录；返回 null／known／unknown，损坏的首尾记录不跳过。`query` 解码所有匹配记录，`all` 提供原始信封。`scope` 为 `path` 或 `session`。`session.title.propose(text, {expected})` 可在同步 `commit` 内调用，与本次事件／数据一起提交或回滚；需记录标题来源的插件自行声明记录并在标题应用成功后追加。
+`snapshot.records.first(Contract, {scope}) / last(Contract, {scope})` 按固定快照的契约首尾索引定位，只解码目标记录；返回 null／known／unknown，损坏的首尾记录不跳过。`query` 解码所有匹配记录，`all` 提供原始信封。`scope` 为 `path` 或 `session`。`session.title.set(text)` 直接覆盖标题，在 `commit` 内调用时随该次提交生效；宿主不解释或自动追加命名来源事件。
+
+`SessionObserver` 的 `committed` 与 `cursorChanged` 是独立可选入口。前者接收新增记录与固定快照，只在记录提交时调用；后者接收固定快照与会话门面，只在执行游标变化时调用，正常追加、回溯与分叉选择使用同一形状。一次外层事务只通知最终位置，回滚、选择相同位置、纯数据／标题写入、布局与只读查看不触发游标观察。两个入口同步执行，观察者内的后续提交排队派发；快照不随派生值同步改变，也不应依赖观察者先后顺序。
+
+需要保存历史派生当前值的模块可以在 `cursorChanged` 中按当前路径重建。例如命名模块只提交自身命名事件，再按当前路径最后一条事件同步标题；上下文等即时投影无需维护派生当前值。观察失败只记录日志；队列清空后发布界面变化通知。
 
 资源通过 `implementResource` 聚合 `project / inspect / context`、可选创建实现和动作实现集合。`defineCreation / defineAction` 在纯契约中声明身份、关联资源与输入 schema，`implementCreation / implementAction` 绑定具型实现。外部准备者通过 `implementPreparer` 绑定具体动作，按装配顺序处理后进入资源自己的准备；替换只能改变同一动作的输入。
 

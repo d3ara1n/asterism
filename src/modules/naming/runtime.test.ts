@@ -100,7 +100,7 @@ describe("两级自动命名", () => {
       node.contract === SessionNamed.id).every(node => node.model === null)).toBe(true);
   });
 
-  it("用户命名即使文字相同也阻止在途结果和后续自动命名，跨分支仍保护会话标题", async () => {
+  it("用户同名事件阻止在途结果和当前路径的自动命名，旁支不继承保护", async () => {
     let release!: () => void;
     const held = new Promise<void>(resolve => { release = resolve; });
     const test = await open(async function* () { await held; yield* title("Automatic"); });
@@ -108,29 +108,35 @@ describe("两级自动命名", () => {
     try {
       await vi.waitFor(() => expect(test.requests).toHaveLength(1));
       test.session.commit(writer => {
-        test.session.title.propose("Temporary", { expected: "Temporary" });
-        writer.append(SessionNamed, { title: "Temporary", source: "user" });
+        writer.append(SessionNamed, { title: "First", source: "user" });
       });
     } finally { release(); }
     await test.idle();
-    expect(test.session.title.get()).toBe("Temporary");
+    expect(test.session.title.get()).toBe("First");
+    const manual = test.session.snapshot().records.last(SessionNamed, { scope: "path" })!.record;
+    for (let i = 2; i <= 5; i++) test.submit(`Protected ${i}`);
+    await test.idle();
+    expect(test.requests).toHaveLength(1);
     await test.service.sessions.execute({ type: "select", sessionId: test.sessionId, nodeId: first });
     for (let i = 2; i <= 5; i++) test.submit(`Branch ${i}`);
     await test.idle();
-    expect(test.requests).toHaveLength(1);
-    expect(test.session.snapshot().records.last(SessionNamed, { scope: "session" })).toMatchObject({ data: { source: "user" } });
+    expect(test.requests).toHaveLength(2);
+    expect(test.session.title.get()).toBe("Automatic");
+    expect(test.session.snapshot().records.last(SessionNamed, { scope: "path" })).toMatchObject({ data: { source: "auto" } });
+    await test.service.sessions.execute({ type: "select", sessionId: test.sessionId, nodeId: manual.id });
+    expect(test.session.title.get()).toBe("First");
+    expect(test.requests).toHaveLength(2);
   });
 
   it("任务等待启动时已被用户同名命名，短路且不发送模型请求", async () => {
     const test = await open(() => title("Automatic"));
     test.submit("First");
     test.session.commit(writer => {
-      test.session.title.propose("Temporary", { expected: "Temporary" });
-      writer.append(SessionNamed, { title: "Temporary", source: "user" });
+      writer.append(SessionNamed, { title: "First", source: "user" });
     });
     await test.idle();
     expect(test.requests).toHaveLength(0);
-    expect(test.session.title.get()).toBe("Temporary");
+    expect(test.session.title.get()).toBe("First");
     expect(test.session.snapshot().records.query(SessionNamed, { scope: "session" })).toHaveLength(1);
   });
 
@@ -157,11 +163,63 @@ describe("两级自动命名", () => {
     let calls = 0;
     const test = await open(() => ++calls === 1 ? title("Incomplete", reason) : title("Later title"));
     test.submit("First"); await test.idle();
-    expect(test.session.title.get()).toBe("Temporary");
+    expect(test.session.title.get()).toBe("First");
     expect(test.session.snapshot().records.last(SessionNamed, { scope: "session" })).toBeNull();
     for (let i = 2; i <= 5; i++) test.submit(`Request ${i}`);
     await test.idle();
     expect(test.session.title.get()).toBe("Later title");
     expect(log).toHaveBeenCalled();
+  });
+
+  // 预期来自命名回溯规则：标题取执行路径最新命名；没有命名时取当前分支首条输入的 72 单位截断，两者都没有时保持不变。
+  it("仅追加命名事件即可更新标题，查看不更新，回溯与分支切换不追加恢复事件", async () => {
+    const test = await open(() => title("Generated"));
+    const opening = `  ${"首条用户消息".repeat(20)}  `;
+    const fallback = "首条用户消息".repeat(20).slice(0, 72);
+    const first = test.submit(opening);
+    expect(test.session.title.get()).toBe(fallback);
+    await test.idle();
+    const generated = test.session.snapshot().records.last(SessionNamed, { scope: "path" })!.record;
+    let manual!: string;
+    test.session.commit(writer => { manual = writer.append(SessionNamed, { title: "Manual", source: "user" }); });
+    expect(test.session.title.get()).toBe("Manual");
+    const original = test.service.sessions.tree.nodes(test.sessionId);
+    const select = (nodeId: string | null) => test.service.sessions.execute({ type: "select", sessionId: test.sessionId, nodeId });
+    const historical = test.service.sessions.snapshot(test.sessionId, { kind: "history", nodeId: first });
+    expect(historical.title).toBe("Manual");
+    expect(test.session.snapshot().position.nodeId).toBe(manual);
+    await select(generated.id);
+    expect(test.session.title.get()).toBe("Generated");
+    await select(first);
+    expect(test.session.title.get()).toBe(fallback);
+    await select(null);
+    expect(test.session.title.get()).toBe(fallback);
+    expect(test.service.sessions.tree.nodes(test.sessionId)).toEqual(original);
+    await select(first);
+    let branch!: string;
+    test.session.commit(writer => { branch = writer.append(SessionNamed, { title: "Branch", source: "user" }); });
+    expect(test.session.title.get()).toBe("Branch");
+    await select(manual);
+    expect(test.session.title.get()).toBe("Manual");
+    await select(branch);
+    expect(test.session.title.get()).toBe("Branch");
+    expect(test.service.sessions.tree.nodes(test.sessionId)).toHaveLength(original.length + 1);
+    expect(test.requests).toHaveLength(1);
+    expect(test.service.execute({ type: "workspace.read" }).sessions.find(session => session.id === test.sessionId)?.title).toBe("Branch");
+  });
+
+  it("命名请求期间回溯到不含触发输入的位置，迟到结果不进入新路径", async () => {
+    let release!: () => void;
+    const held = new Promise<void>(resolve => { release = resolve; });
+    const test = await open(async function* () { await held; yield* title("Stale"); });
+    test.submit("First");
+    try {
+      await vi.waitFor(() => expect(test.requests).toHaveLength(1));
+      await test.service.sessions.execute({ type: "select", sessionId: test.sessionId, nodeId: null });
+    } finally { release(); }
+    await test.idle();
+    expect(test.session.snapshot().position.nodeId).toBeNull();
+    expect(test.session.title.get()).toBe("First");
+    expect(test.session.snapshot().records.query(SessionNamed, { scope: "session" })).toEqual([]);
   });
 });
