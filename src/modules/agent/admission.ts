@@ -25,7 +25,7 @@ export function createAdmission(deps: { selection: AgentSelectionService; valida
       const current = object.get(AgentSelection);
       if (current) {
         const agent = deps.selection.agent(current.selection), snapshot = object.session.snapshot();
-        const messages = projectForAgent(snapshot, object.ref.id, snapshot.position.continuationId);
+        const messages = projectForAgent(snapshot, object.ref.id);
         if (command.type === "submit") messages.push({ kind: "input", parts: command.parts });
         await deps.validate({ target: deps.selection.target(current.selection), system: composeSystemPrompt(agent), messages, signal }, { content });
       }
@@ -34,7 +34,6 @@ export function createAdmission(deps: { selection: AgentSelectionService; valida
       if (duplicate(object, command)) return false;
       idle(object);
       object.commit(writer => {
-        object.session.resume();
         if (!object.snapshot()) throw new PluginApiError("not_found", "The agent is not on the continuation path.");
         selectionOf(object);
         if (command.type === "submit") {

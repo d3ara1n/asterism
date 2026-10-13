@@ -41,14 +41,9 @@ export const appearanceSchema = z.object({
   codeFont: fontFamilySchema.catch(null),
   /** 代码字号（px），null 跟随所在界面文字。 */
   codeFontSize: z.number().int().min(codeFontSizes[0]).max(codeFontSizes[codeFontSizes.length - 1]).nullable().default(null).catch(null),
-  thinkingAutoExpand: z.boolean().catch(true),
-  thinkingAutoCollapse: z.boolean().catch(true),
-  toolInputAutoExpand: z.boolean().catch(true),
-  toolInputAutoCollapse: z.boolean().catch(true),
 });
 export type Appearance = z.infer<typeof appearanceSchema>;
-export const defaultAppearance: Appearance = { mode: "system", accent: "jade", gray: "sage", density: "standard", radius: "md", canvas: "dots", uiFont: null, codeFont: null, codeFontSize: null,
-  thinkingAutoExpand: true, thinkingAutoCollapse: true, toolInputAutoExpand: true, toolInputAutoCollapse: true };
+export const defaultAppearance: Appearance = { mode: "system", accent: "jade", gray: "sage", density: "standard", radius: "md", canvas: "dots", uiFont: null, codeFont: null, codeFontSize: null };
 
 /** 读取的原始数据不可信：逐项回退到默认值，不因单项损坏丢弃整份设置。 */
 export function parseAppearance(raw: unknown): Appearance {

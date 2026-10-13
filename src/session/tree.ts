@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
-import { completionSchema, sessionNodeSchema, type BlockCompletion, type NewNode, type SessionNode } from "../shared/session.ts";
-import { SessionError, isBlockNode, selectable, sessionPath, snap } from "../shared/session-path.ts";
+import { sessionNodeSchema, type NewNode, type SessionNode } from "../shared/session.ts";
+import { SessionError, selectable, sessionPath } from "../shared/session-path.ts";
 export { SessionError } from "../shared/session-path.ts";
 
 export type CursorSelection = {
@@ -9,7 +9,7 @@ export type CursorSelection = {
   fromId: string | null;
   requestedId: string | null;
   selectedId: string | null;
-  reason: "user" | "continuation";
+  reason: "user";
   recordedAt: string;
 };
 
@@ -32,40 +32,19 @@ export class SessionTree {
   }
   nodes(sessionId: string): SessionNode[] {
     this.cursor(sessionId);
-    return (this.db.prepare(`SELECT n.payload, c.payload AS completion FROM session_nodes n
-      LEFT JOIN block_completions c ON c.block_id = n.id WHERE n.session_id = ? ORDER BY n.seq`)
-      .all(sessionId) as { payload: string; completion: string | null }[])
-      .map(r => sessionNodeSchema.parse({ ...JSON.parse(r.payload), ...(r.completion ? JSON.parse(r.completion) : {}) }));
+    return (this.db.prepare("SELECT payload FROM session_nodes WHERE session_id = ? ORDER BY seq").all(sessionId) as { payload: string }[])
+      .map(r => sessionNodeSchema.parse(JSON.parse(r.payload)));
   }
 
-  /** 在游标后追加；不完整 block 不移动游标，它不是可续接位置。 */
+  /** 在游标后追加通用记录；宿主不解释载荷。position 为 false 的审计记录不移动游标。 */
   append(sessionId: string, node: NewNode): SessionNode {
     const parentId = this.cursor(sessionId);
     const full = sessionNodeSchema.parse({ ...node, id: randomUUID(), sessionId, parentId, createdAt: new Date().toISOString() });
-    if (isBlockNode(full)) {
-      if (full.finishReason !== null || full.usage !== null || full.rawFinishReason !== null || full.providerResponseId !== null) {
-        throw new SessionError("invalid_request", "Terminal metadata must be appended through completeBlock.");
-      }
-      const previous = this.db.prepare("SELECT payload FROM session_nodes WHERE session_id = ? AND response_id = ? LIMIT 1")
-        .get(sessionId, full.responseId) as { payload: string } | undefined;
-      if (previous) {
-        const first = sessionNodeSchema.parse(JSON.parse(previous.payload));
-        if (!isBlockNode(first) || first.source.resource?.id !== full.source.resource?.id || first.requestParentId !== full.requestParentId
-          || first.model !== full.model || first.scope !== full.scope || first.adapter !== full.adapter) {
-          throw new SessionError("invalid_request", "Response blocks must share the same request identity.");
-        }
-      } else if (full.requestParentId !== null && !this.path(sessionId).some(item => item.id === full.requestParentId)) {
-        throw new SessionError("invalid_request", "The request origin must be on the current session path.");
-      }
-      if (this.db.prepare("SELECT 1 FROM block_completions WHERE session_id = ? AND response_id = ?").get(sessionId, full.responseId)) {
-        throw new SessionError("conflict", "The response is already finalized.");
-      }
-    }
     // savepoint 可嵌在应用事务中；节点与游标要么同时保存，要么同时回退。
     this.db.exec("SAVEPOINT append_session_node");
     try {
-      this.db.prepare("INSERT INTO session_nodes (id, session_id, parent_id, kind, payload) VALUES (?, ?, ?, ?, ?)")
-        .run(full.id, sessionId, parentId, full.kind, JSON.stringify(full));
+      this.db.prepare("INSERT INTO session_nodes (id, session_id, parent_id, payload) VALUES (?, ?, ?, ?)")
+        .run(full.id, sessionId, parentId, JSON.stringify(full));
       if (selectable(full)) this.db.prepare("UPDATE sessions SET cursor = ? WHERE id = ?").run(full.id, sessionId);
       this.db.exec("RELEASE append_session_node");
     } catch (error) {
@@ -75,36 +54,22 @@ export class SessionTree {
     return full;
   }
 
-  /** 选择历史位置；调用方须保证会话 settled。位置会吸附到合法续接点。 */
-  select(sessionId: string, nodeId: string | null, reason: "user" | "continuation" = "user"): string | null {
-    const nodes = this.nodes(sessionId);
+  /** 选择历史位置；调用方须保证会话 settled。任何完整节点都可作为位置，不吸附。 */
+  select(sessionId: string, nodeId: string | null): string | null {
     const from = this.cursor(sessionId);
-    const target = nodeId === null ? null : snap(nodes, nodeId);
+    const target = nodeId === null ? null : sessionPath(this.nodes(sessionId), nodeId).at(-1)!;
+    if (target && !selectable(target)) throw new SessionError("invalid_request", "Audit-only records cannot be selected.");
     this.db.exec("SAVEPOINT select_session_cursor");
     try {
       this.db.prepare(`INSERT INTO cursor_selections (session_id, from_id, requested_id, selected_id, reason, recorded_at)
-        VALUES (?, ?, ?, ?, ?, ?)`).run(sessionId, from, nodeId, target, reason, new Date().toISOString());
-      this.db.prepare("UPDATE sessions SET cursor = ? WHERE id = ?").run(target, sessionId);
+        VALUES (?, ?, ?, ?, ?, ?)`).run(sessionId, from, nodeId, target?.id ?? null, "user", new Date().toISOString());
+      this.db.prepare("UPDATE sessions SET cursor = ? WHERE id = ?").run(target?.id ?? null, sessionId);
       this.db.exec("RELEASE select_session_cursor");
     } catch (error) {
       this.db.exec("ROLLBACK TO select_session_cursor; RELEASE select_session_cursor");
       throw error;
     }
-    return target;
-  }
-
-  /** 终态元数据只追加一次；不更新原始块，不改变父指针或游标。 */
-  completeBlock(sessionId: string, blockId: string, raw: BlockCompletion): void {
-    const completion = completionSchema.parse(raw);
-    const row = this.db.prepare("SELECT payload FROM session_nodes WHERE session_id = ? AND id = ?")
-      .get(sessionId, blockId) as { payload: string } | undefined;
-    const node = row ? sessionNodeSchema.parse(JSON.parse(row.payload)) : null;
-    if (!node || !isBlockNode(node)) throw new SessionError("invalid_request", "Terminal metadata requires a saved response block.");
-    const last = this.db.prepare("SELECT id FROM session_nodes WHERE session_id = ? AND response_id = ? ORDER BY ordinal DESC LIMIT 1")
-      .get(sessionId, node.responseId) as { id: string };
-    if (last.id !== blockId) throw new SessionError("invalid_request", "Terminal metadata belongs to the last response block.");
-    this.db.prepare(`INSERT INTO block_completions (block_id, session_id, response_id, recorded_at, payload)
-      VALUES (?, ?, ?, ?, ?)`).run(blockId, sessionId, node.responseId, new Date().toISOString(), JSON.stringify(completion));
+    return target?.id ?? null;
   }
 
   cursorSelections(sessionId: string): CursorSelection[] {

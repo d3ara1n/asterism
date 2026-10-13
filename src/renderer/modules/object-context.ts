@@ -2,13 +2,12 @@ import { createElement, useCallback, useMemo, type ReactNode } from "react";
 import { RendererCatalogsProvider, RendererModelsProvider, RendererPreferencesProvider, RendererToolsProvider, type RendererCatalogs, type RendererObjectContext } from "@atelier/sdk/renderer";
 import { pluginOf, resourceCall, reference } from "@atelier/sdk/contracts";
 import type { WorkbenchObject } from "../../shared/workbench";
-import { ModelConfiguration, ThinkingPreferences, ToolPreferences } from "../../modules/agent/configuration";
+import { ModelConfiguration } from "../../modules/agent/configuration";
 import { sessionSnapshot } from "../../plugins/records";
 import { sessionPath } from "../../shared/session-path";
 import { useWorkbench } from "../features/workbench/context";
 import { useSession, useSessionProgress } from "../features/session/state";
 import { useConfiguration } from "../features/configuration/state";
-import { useAppearance } from "../features/appearance/state";
 import { resolveToolView, toolPreparation } from "../features/conversation/tool-views";
 import { useModuleViews } from "./views";
 import { pluginPreferences } from "../features/creation/preferences";
@@ -16,20 +15,14 @@ import { contentInput, contentReader, contentCommand } from "../features/creatio
 
 export function RendererCatalogProvider({ ready, children }: { ready: boolean; children: ReactNode }) {
   const configuration = useConfiguration(ready);
-  const appearance = useAppearance();
   const value = useMemo<RendererCatalogs>(() => ({
     error: configuration.error,
     get(contract) {
-      const raw = Object.is(contract, ModelConfiguration) ? configuration.snapshot
-        : Object.is(contract, ThinkingPreferences)
-          ? { thinkingAutoExpand: appearance.thinkingAutoExpand, thinkingAutoCollapse: appearance.thinkingAutoCollapse }
-          : Object.is(contract, ToolPreferences)
-            ? { toolInputAutoExpand: appearance.toolInputAutoExpand, toolInputAutoCollapse: appearance.toolInputAutoCollapse } : null;
+      const raw = Object.is(contract, ModelConfiguration) ? configuration.snapshot : null;
       const parsed = contract.schema.safeParse(raw);
       return parsed.success ? parsed.data : null;
     },
-  }), [configuration.error, configuration.snapshot, appearance.thinkingAutoExpand, appearance.thinkingAutoCollapse,
-    appearance.toolInputAutoExpand, appearance.toolInputAutoCollapse]);
+  }), [configuration.error, configuration.snapshot]);
   return createElement(RendererCatalogsProvider, { value }, children);
 }
 
@@ -40,7 +33,7 @@ export function useObjectContext(object: WorkbenchObject): RendererObjectContext
   const { state, snapshot, historical } = useSession(controller);
   const progress = useSessionProgress(controller);
   const records = useMemo(() => snapshot
-    ? sessionSnapshot(snapshot.sessionId, snapshot.title, snapshot.nodes, sessionPath(snapshot.nodes, snapshot.at), false) : null, [snapshot]);
+    ? sessionSnapshot(snapshot.sessionId, snapshot.title, snapshot.nodes, sessionPath(snapshot.nodes, snapshot.at)) : null, [snapshot]);
   const onStream = useCallback<RendererObjectContext["onStream"]>((channel, listener) =>
     window.host.onObjectStream(controller.sessionId, object.id, (name, data) => {
       if (name === `${pluginOf(object.kind)}/${channel}`) listener(data);
@@ -76,7 +69,7 @@ export function ObjectServices({ object, children }: { object: WorkbenchObject; 
   const { historical } = useSession(controller);
   const progress = useSessionProgress(controller);
   const registry = useModuleViews();
-  const models = useMemo(() => ({ blocks: historical ? [] : progress.live.filter(block => block.agentId === object.id) }), [historical, progress.live, object.id]);
+  const models = useMemo(() => ({ blocks: historical ? [] : progress.live.filter(block => block.objectId === object.id) }), [historical, progress.live, object.id]);
   const tools = useMemo(() => ({ resolve: (props: Parameters<typeof resolveToolView>[0]) => resolveToolView(props, registry), preparation: toolPreparation }), [registry]);
   const preferences = useMemo(() => pluginPreferences(pluginOf(object.kind) ?? "unknown"), [object.kind]);
   return createElement(RendererModelsProvider, { value: models }, createElement(RendererToolsProvider, { value: tools },

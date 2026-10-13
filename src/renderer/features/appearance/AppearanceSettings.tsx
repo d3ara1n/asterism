@@ -152,34 +152,6 @@ export function AppearanceSettings() {
       </SwatchGroup>
     </Section>
 
-    <Section title={i18n.formatMessage(commonMessages.thinkingTitle)} hint={i18n.formatMessage(appearanceMessages.thinkingPreviewHint)}>
-      <ItemGroup className="surface">
-        <Row label={i18n.formatMessage(appearanceMessages.thinkingAutoExpand)} hint={i18n.formatMessage(appearanceMessages.thinkingAutoExpandHint)}>
-          <Switch checked={appearance.thinkingAutoExpand} aria-label={i18n.formatMessage(appearanceMessages.thinkingAutoExpand)}
-            onCheckedChange={thinkingAutoExpand => void updateAppearance({ thinkingAutoExpand })} />
-        </Row>
-        <ItemSeparator />
-        <Row label={i18n.formatMessage(appearanceMessages.thinkingAutoCollapse)} hint={i18n.formatMessage(appearanceMessages.thinkingAutoCollapseHint)}>
-          <Switch checked={appearance.thinkingAutoCollapse} aria-label={i18n.formatMessage(appearanceMessages.thinkingAutoCollapse)}
-            onCheckedChange={thinkingAutoCollapse => void updateAppearance({ thinkingAutoCollapse })} />
-        </Row>
-      </ItemGroup>
-    </Section>
-
-    <Section title={i18n.formatMessage(appearanceMessages.toolInputTitle)} hint={i18n.formatMessage(appearanceMessages.toolInputPreviewHint)}>
-      <ItemGroup className="surface">
-        <Row label={i18n.formatMessage(appearanceMessages.toolInputAutoExpand)} hint={i18n.formatMessage(appearanceMessages.toolInputAutoExpandHint)}>
-          <Switch checked={appearance.toolInputAutoExpand} aria-label={i18n.formatMessage(appearanceMessages.toolInputAutoExpand)}
-            onCheckedChange={toolInputAutoExpand => void updateAppearance({ toolInputAutoExpand })} />
-        </Row>
-        <ItemSeparator />
-        <Row label={i18n.formatMessage(appearanceMessages.toolInputAutoCollapse)} hint={i18n.formatMessage(appearanceMessages.toolInputAutoCollapseHint)}>
-          <Switch checked={appearance.toolInputAutoCollapse} aria-label={i18n.formatMessage(appearanceMessages.toolInputAutoCollapse)}
-            onCheckedChange={toolInputAutoCollapse => void updateAppearance({ toolInputAutoCollapse })} />
-        </Row>
-      </ItemGroup>
-    </Section>
-
     <PaletteDialog open={picking} onOpenChange={setPicking} appearance={appearance} />
   </div>;
 }

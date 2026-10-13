@@ -1,6 +1,7 @@
 import { ArrowUp, Bot, Cpu, Brain, Settings } from "lucide-react";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { MessageDraft } from "../../../modules/agent/conversation/draft";
+import { defaultAgentPreset } from "../../../modules/agent/contract";
 import { AttachFiles, DraftFiles, fileInputEvents } from "../../../modules/agent/conversation/Files";
 
 import { resolveProviderModel, thinkingSchema, type ConfigurationSnapshot, type ThinkingLevel, modelReference } from "../../../shared/configuration";
@@ -45,7 +46,8 @@ export function HomePage({ active, draft, onSettings, ready, busy, submitError, 
     if (!snapshot) return;
     if (!initialized.current) {
       initialized.current = true;
-      selectAgent("worker", snapshot);
+      // 首页发起的唯一领域例外：默认选择内置 agent 预设。
+      selectAgent(defaultAgentPreset, snapshot);
       return;
     }
   }, [snapshot]);

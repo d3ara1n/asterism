@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { z } from "zod";
 import type { CredentialVault } from "../configuration/credentials.ts";
-import { jsonSchema, configurationPresentationSchema, type Json, type PluginConfigOptions, type ConfigurationPresentation } from "@atelier/sdk/contracts";
+import { jsonSchema, configurationPresentationSchema, type Json, type ConfigContract, type ConfigurationPresentation } from "@atelier/sdk/contracts";
 import { projectConfigurationPresentation } from "../shared/configuration-presentation.ts";
 import { PluginApiError, validationMessage, type PluginConfig, type PluginSecrets } from "@atelier/sdk/runtime";
 import type { PluginConfiguration } from "../shared/plugin-configuration.ts";
@@ -32,7 +32,7 @@ export class PluginStorage {
   private readonly managed: string;
   private database: DatabaseSync | null = null;
   private settings: {
-    source: object; inputDefaults: string; schema: Json | null; defaults: Json; presentation?: ConfigurationPresentation;
+    source: object; schema: Json | null; defaults: Json; presentation?: ConfigurationPresentation;
     read(): { value: Json; status: PluginConfiguration["status"] };
     write(value: unknown): void;
   } | null = null;
@@ -46,42 +46,55 @@ export class PluginStorage {
     return this.managed;
   }
 
-  config<T extends Json>(schema: z.ZodType<T>, defaults: T, options?: PluginConfigOptions): PluginConfig<T> {
-    const defaultInput = structuredClone(defaults);
-    const inputDefaults = JSON.stringify(defaultInput);
-    if (this.settings) {
-      if (this.settings.source !== schema || this.settings.inputDefaults !== inputDefaults)
-        throw new PluginApiError("invalid_argument", "A plugin has one configuration. Reuse the same schema and defaults.");
-      return { get: () => this.settings!.read().value as T, set: value => this.settings!.write(value) };
-    }
-    const file = () => join(this.ensure(), "config.json");
-    const parsedDefaults = schema.safeParse(defaultInput);
-    if (!parsedDefaults.success) throw new PluginApiError("invalid_argument", validationMessage(parsedDefaults.error, "defaults"));
-    const fallback = () => jsonSchema.parse(schema.parse(structuredClone(defaultInput)));
-    const read = (): { value: Json; status: PluginConfiguration["status"] } => {
-      let raw: unknown;
-      try { raw = readJson(file()); }
-      catch (error) {
-        this.warn("Plugin configuration is unreadable; defaults are used.", error);
+  /** 一个插件一份配置契约；后台句柄、设置页与渲染层读取共用同一份值与变更通知。 */
+  config<T extends Json>(contract: ConfigContract<T>): PluginConfig<T> {
+    if (this.settings && this.settings.source !== contract)
+      throw new PluginApiError("invalid_argument", "A plugin has one configuration. Import the same contract.");
+    if (!this.settings) {
+      const file = () => join(this.ensure(), "config.json");
+      const fallback = () => jsonSchema.parse(contract.schema.parse(structuredClone(contract.defaults)));
+      const read = (): { value: Json; status: PluginConfiguration["status"] } => {
+        let raw: unknown;
+        try { raw = readJson(file()); }
+        catch (error) {
+          this.warn("Plugin configuration is unreadable; defaults are used.", error);
+          return { value: fallback(), status: "invalid" };
+        }
+        if (raw === undefined) return { value: fallback(), status: "defaults" };
+        const parsed = contract.schema.safeParse(raw);
+        if (parsed.success) return { value: jsonSchema.parse(parsed.data), status: "saved" };
+        this.warn("Plugin configuration does not match its schema; defaults are used.");
         return { value: fallback(), status: "invalid" };
-      }
-      if (raw === undefined) return { value: fallback(), status: "defaults" };
-      const parsed = schema.safeParse(raw);
-      if (parsed.success) return { value: jsonSchema.parse(parsed.data), status: "saved" };
-      this.warn("Plugin configuration does not match its schema; defaults are used.");
-      return { value: fallback(), status: "invalid" };
+      };
+      const write = (value: unknown) => {
+        const parsed = contract.schema.safeParse(value);
+        if (!parsed.success) throw new PluginApiError("invalid_argument", validationMessage(parsed.error, "configuration"));
+        writeJson(file(), jsonSchema.parse(parsed.data));
+        this.changed();
+      };
+      let formSchema: Json | null = null;
+      try { formSchema = jsonSchema.parse(z.toJSONSchema(contract.schema, { io: "input", unrepresentable: "any" })); }
+      catch { this.warn("Plugin configuration schema cannot be projected; the value editor is used."); }
+      const presentation = projectConfigurationPresentation(formSchema, contract.presentation, this.warn);
+      this.settings = { source: contract, schema: formSchema, defaults: fallback(), presentation, read, write };
+    }
+    const settings = this.settings!;
+    return {
+      get: () => settings.read().value as T,
+      update: next => settings.write(next(settings.read().value as T)),
+      subscribe: listener => {
+        const notify = () => { try { listener(settings.read().value as T); } catch (error) { this.warn("A configuration listener failed.", error); } };
+        this.listeners.add(notify);
+        return () => { this.listeners.delete(notify); };
+      },
     };
-    const write = (value: unknown) => {
-      const parsed = schema.safeParse(value);
-      if (!parsed.success) throw new PluginApiError("invalid_argument", validationMessage(parsed.error, "configuration"));
-      writeJson(file(), jsonSchema.parse(parsed.data));
-    };
-    let formSchema: Json | null = null;
-    try { formSchema = jsonSchema.parse(z.toJSONSchema(schema, { io: "input", unrepresentable: "any" })); }
-    catch { this.warn("Plugin configuration schema cannot be projected; the value editor is used."); }
-    const presentation = projectConfigurationPresentation(formSchema, options?.presentation, this.warn);
-    this.settings = { source: schema, inputDefaults, schema: formSchema, defaults: jsonSchema.parse(parsedDefaults.data), presentation, read, write };
-    return { get: () => read().value as T, set: write };
+  }
+  /** 宿主观察配置变更：设置页保存、恢复默认与后台 update 都经此广播给渲染层与后台订阅者。 */
+  onChanged: () => void = () => {};
+  private readonly listeners = new Set<() => void>();
+  private changed(): void {
+    for (const listener of [...this.listeners]) listener();
+    this.onChanged();
   }
 
   configuration(id: string): PluginConfiguration | null {
@@ -95,6 +108,7 @@ export class PluginStorage {
   resetConfiguration(): void {
     if (!this.settings) throw new PluginApiError("not_found", "The plugin has no configuration.");
     rmSync(join(this.managed, "config.json"), { force: true });
+    this.changed();
   }
 
   readonly secrets: PluginSecrets = {

@@ -1,22 +1,14 @@
 import type { Decoded, Json, RecordContract, RecordQuery, SessionRecord, SessionView } from "@atelier/sdk/contracts";
 import type { SessionNode } from "../shared/session.ts";
-import { decodeCoreRecord } from "./core-records.ts";
 import type { ResourceRef, ResourceSnapshot, SessionSnapshot } from "@atelier/sdk/contracts";
 import { foldWorkbench, type FoldedObject } from "../session/fold.ts";
-import { snap } from "../shared/session-path.ts";
 import { deepFreeze } from "../shared/immutable.ts";
 
-/**
- * 宿主存储到公开记录信封的固定映射：用户消息、执行块与通知使用 core 契约。
- * 来源原样取自节点，由写入通道打戳；宿主不推断归属。
- */
+/** 存储节点到公开记录信封的直接映射：契约、来源、载荷与模型可见文本原样取自节点，宿主不解释。 */
 export function toRecord(node: SessionNode, sequence: number): SessionRecord {
-  const { id, sessionId, parentId, createdAt, source, kind: _kind, ...rest } = node;
-  const decoded = decodeCoreRecord(node);
-  const contract = decoded?.contract ?? { id: node.kind === "event" ? node.type : "" };
-  const data = decoded ? decoded.data : node.kind === "event" ? node.data : rest as Json;
-  return deepFreeze({ id, sessionId, parentId, sequence, createdAt, contract: { id: contract.id },
-    source: structuredClone(source), data: structuredClone(data) });
+  const { id, sessionId, parentId, createdAt, source, contract, data, model, recipient } = node;
+  return deepFreeze({ id, sessionId, parentId, sequence, createdAt, contract: { id: contract },
+    source: structuredClone(source), data: structuredClone(data), context: model === null ? null : { text: model, recipient } });
 }
 export function toRecords(nodes: readonly SessionNode[], all: readonly SessionNode[]): SessionRecord[] {
   const order = new Map(all.map((node, index) => [node.id, index + 1]));
@@ -26,12 +18,11 @@ export function resourceSnapshot(ref: ResourceRef, resource: FoldedObject): Reso
   const { id: _id, type: _type, title: _title, ...data } = resource.data;
   return deepFreeze({ ref: { ...ref }, title: resource.title, data: structuredClone(data) as Json });
 }
-export function sessionSnapshot(id: string, title: string, nodes: readonly SessionNode[], path: readonly SessionNode[], canResume = true): SessionSnapshot {
+export function sessionSnapshot(id: string, title: string, nodes: readonly SessionNode[], path: readonly SessionNode[]): SessionSnapshot {
   const resources = Object.freeze(foldWorkbench(path).objects.map(object =>
     resourceSnapshot({ sessionId: id, id: object.id, kind: object.kind }, object)));
   return {
-    ...sessionView(id, title, nodes, path), position: Object.freeze({ nodeId: path.at(-1)?.id ?? null,
-      continuationId: path.length && canResume ? snap(nodes, path.at(-1)!.id) : path.at(-1)?.id ?? null }),
+    ...sessionView(id, title, nodes, path), position: Object.freeze({ nodeId: path.at(-1)?.id ?? null }),
     resources: {
       all: () => resources,
       get(contract, objectId) {

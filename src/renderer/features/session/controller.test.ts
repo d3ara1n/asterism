@@ -11,7 +11,7 @@ import type { LanguageState } from "../../../shared/language.ts";
 function snapshot(revision: number, at: string | null = null): SessionSnapshot {
   return { sessionId: "s", title: "S", cursor: "current", at, seq: 4, revision, nodes: [],
     workbench: { id: "s", title: "S", objects: [], links: [], views: [], viewport: { x: 0, y: 0, zoom: 1 } },
-    progress: { revision, version: revision, runningAgentIds: [], unsettledObjectIds: [], live: [] } };
+    progress: { revision, version: revision, unsettledObjectIds: [], live: [] } };
 }
 const accepted: SessionResult = { ok: true, reply: { kind: "accepted", sessionId: "s" } };
 const view = (snapshot: SessionSnapshot): SessionResult => ({ ok: true, reply: { kind: "view", snapshot } });
@@ -31,7 +31,7 @@ function fixture() {
 
 it("语言切换刷新静态文案，保留会话投影、活动与草稿提交身份且不重读会话", async () => {
   const { controller, requests } = fixture(), disconnect = controller.connect();
-  const initial = snapshot(1); initial.progress.runningAgentIds = ["agent"];
+  const initial = snapshot(1); initial.progress.unsettledObjectIds = ["agent"];
   requests[0]!.resolve(view(initial)); await flush();
   const state = controller.getSnapshot(), progress = controller.getProgress();
   const submission = new SubmissionIdentity(), input = { text: "Unsaved draft" }, id = submission.forInput(input);
@@ -46,7 +46,7 @@ it("语言切换刷新静态文案，保留会话投影、活动与草稿提交�
     changed({ preference: "zh-Hans", locale: "zh-Hans", interfaceLocale: "zh-Hans" });
     expect(getI18n().text(label)).toBe("计数器");
     expect(controller.getSnapshot()).toBe(state); expect(controller.getProgress()).toBe(progress);
-    expect(progress.runningAgentIds).toEqual(["agent"]); expect(submission.forInput(input)).toBe(id);
+    expect(progress.unsettledObjectIds).toEqual(["agent"]); expect(submission.forInput(input)).toBe(id);
     expect(input.text).toBe("Unsaved draft"); expect(requests).toHaveLength(1);
   } finally { changed(english); stop(); disconnect(); }
 });
@@ -260,8 +260,8 @@ describe("会话视图所有权", () => {
     requests[0]!.resolve(view(snapshot(1))); await flush();
     const changed = vi.fn(); const streamed = vi.fn();
     controller.subscribe(changed); controller.subscribeProgress(streamed);
-    progress({ revision: 1, version: 2, runningAgentIds: ["a"], unsettledObjectIds: ["a"], live: [] });
-    progress({ revision: 1, version: 3, runningAgentIds: ["a"], unsettledObjectIds: ["a"], live: [] });
+    progress({ revision: 1, version: 2, unsettledObjectIds: ["a"], live: [] });
+    progress({ revision: 1, version: 3, unsettledObjectIds: ["a"], live: [] });
     expect(changed).not.toHaveBeenCalled(); expect(streamed).toHaveBeenCalledTimes(2);
     expect(requests).toHaveLength(1);
     disconnect();
@@ -269,14 +269,14 @@ describe("会话视图所有权", () => {
 
   it("块落库后的进度等待对应持久版本，不在查询途中丢掉正在阅读的块", async () => {
     const { controller, requests, progress } = fixture(); const disconnect = controller.connect();
-    const block = { id: "r:0", agentId: "a", responseId: "r", ordinal: 0, kind: "thinking" as const, text: "thinking", startedAt: 1000 };
-    requests[0]!.resolve(view({ ...snapshot(1), progress: { revision: 1, version: 1, runningAgentIds: ["a"], unsettledObjectIds: ["a"], live: [block] } })); await flush();
-    progress({ revision: 2, version: 3, runningAgentIds: ["a"], unsettledObjectIds: ["a"], live: [] });
+    const block = { id: "r:0", objectId: "a", responseId: "r", ordinal: 0, kind: "thinking" as const, text: "thinking", startedAt: 1000 };
+    requests[0]!.resolve(view({ ...snapshot(1), progress: { revision: 1, version: 1, unsettledObjectIds: ["a"], live: [block] } })); await flush();
+    progress({ revision: 2, version: 3, unsettledObjectIds: ["a"], live: [] });
     expect(controller.getProgress().live).toEqual([block]);
     expect(requests).toHaveLength(2);
     requests[1]!.resolve(view(snapshot(2))); await flush();
     expect(controller.getProgress()).toMatchObject({ version: 3, live: [] });
-    progress({ revision: 1, version: 1, runningAgentIds: ["a"], unsettledObjectIds: ["a"], live: [block] });
+    progress({ revision: 1, version: 1, unsettledObjectIds: ["a"], live: [block] });
     expect(controller.getProgress().live).toEqual([]);
     disconnect();
   });

@@ -56,9 +56,9 @@ describe("插件目录与展示 IPC", () => {
       const ns = pluginNamespace('example.backend');
       const messages = ns.messages('en', defineMessages({ limit: { id: 'limit', defaultMessage: 'Limit' } }));
       export default definePlugin({namespace: ns, version: '1', modules: [defineModule(plugin => {
-        plugin.config(z.object({limit: z.number().max(10)}).superRefine(value => {
+        plugin.config(ns.config(z.object({limit: z.number().max(10)}).superRefine(value => {
           if (value.limit > 5) throw new PluginApiError('rejected', 'The limit exceeds the policy.', 'policy_limit', messages.limit);
-        }), {limit: 3}, {presentation: {fields: {'/limit': {title: messages.limit}}}}); return {};
+        }), {limit: 3}, {presentation: {fields: {'/limit': {title: messages.limit}}}})); return {};
       })]});`);
     writeFileSync(join(root, "locales/zh.json"), JSON.stringify({ limit: "上限", broken: "{bad" }));
     const list = new PackageList(join(data, "plugins.json")); list.add({ source: { kind: "path", path: root } }, data);
@@ -67,18 +67,18 @@ describe("插件目录与展示 IPC", () => {
     const service = new ApplicationService(data, { plugins: [item!.definition!], catalogs: item!.catalogs }); services.push(service);
     const reply = pluginConfigurationResponseSchema.parse(dispatchPluginConfiguration(service, { kind: "plugin-configuration.request", version: pluginConfigurationVersion, id: randomUUID(), command: { type: "read" } })).result;
     if (!reply.ok) throw new Error("Configuration read failed.");
-    const title = reply.configurations[0]!.presentation!.fields["/limit"]!.title!;
+    const title = reply.configurations.find(item => item.id === "example.backend")!.presentation!.fields["/limit"]!.title!;
     expect(title).toMatchObject({ owner: "example.backend", sourceLocale: "en", defaultMessage: "Limit" });
     expect(new MessageFormatter("zh-Hans", item!.catalogs).text(title)).toBe("上限");
     expect(new MessageFormatter("en", item!.catalogs).text(title)).toBe("Limit");
-    expect(reply.configurations[0]!.value).toEqual({ limit: 3 });
-    expect(service.configurePlugin({ type: "read" })[0]!.schema).toMatchObject({ properties: { limit: { maximum: 10 } } });
+    expect(reply.configurations.find(item => item.id === "example.backend")!.value).toEqual({ limit: 3 });
+    expect(service.configurePlugin({ type: "read" }).find(item => item.id === "example.backend")!.schema).toMatchObject({ properties: { limit: { maximum: 10 } } });
     const rejected = pluginConfigurationResponseSchema.parse(dispatchPluginConfiguration(service, {
       kind: "plugin-configuration.request", version: pluginConfigurationVersion, id: randomUUID(),
       command: { type: "save", id: "example.backend", value: { limit: 8 } },
     })).result;
     expect(rejected).toEqual({ ok: false, error: { code: "policy_limit", message: "The limit exceeds the policy.", display: title } });
-    expect(service.configurePlugin({ type: "read" })[0]!.value).toEqual({ limit: 3 });
+    expect(service.configurePlugin({ type: "read" }).find(item => item.id === "example.backend")!.value).toEqual({ limit: 3 });
     writeFileSync(join(root, "locales/zh.json"), JSON.stringify({ limit: "最大数量" }));
     const [next] = await loadPackages(list, data, join(data, "cache"), []);
     expect(next!.catalogs![0]!.revision).not.toBe(item!.catalogs![0]!.revision);

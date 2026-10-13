@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { ModelRunRequest, ModelRunResult, ModelRunEvent, ModelSource, ModelCompletion, ModelBlock } from "@atelier/sdk/contracts";
+import type { ModelRunRequest, ModelRunResult, ModelRunEvent, ModelSource, ModelCompletion } from "@atelier/sdk/contracts";
 import { modelExpression, modelScope, type ModelSettings, type ToolOutcome } from "../shared/model.ts";
 import { ModelFailure, type ModelAdapter } from "../model/contract.ts";
 import type { SystemPrompt } from "@atelier/sdk/contracts";
@@ -18,7 +18,7 @@ export interface ModelExecutionEnvironment {
   messages: ResolvedModelItem[];
 }
 /** 一次补全及完整工具批次。缓冲只在此次调用内存在，输出交给消费者，不接触时间轴。 */
-export async function runModelRequest(request: ModelRunRequest & { plugin: string }, environment: Promise<ModelExecutionEnvironment>, handover?: ContentLease): Promise<ModelRunResult> {
+export async function runModelRequest(request: ModelRunRequest, environment: Promise<ModelExecutionEnvironment>, handover?: ContentLease): Promise<ModelRunResult> {
   const controller = new AbortController();
   const signal = AbortSignal.any([request.signal, controller.signal]);
   let deliveryFailed = false;
@@ -40,21 +40,17 @@ export async function runModelRequest(request: ModelRunRequest & { plugin: strin
     signal.throwIfAborted();
     source = { model: modelExpression(settings), adapter: adapter.version, scope: modelScope(settings) };
     responseId = randomUUID();
-    const identity = { source: { plugin: request.plugin, resource: { id: request.object.id, kind: request.object.kind } }, responseId, requestParentId: request.requestParentId, model: source.model, adapter: source.adapter, scope: source.scope };
     const prepared = adapter.prepare({ settings, system, messages, tools: settings.model.capabilities.tools ? coreDeclarations() : [] });
-    const response = new ResponseBuffer(identity, node => {
-      if (node.kind !== "thinking" && node.kind !== "text" && node.kind !== "toolcall") throw new ModelFailure("protocol", "Unexpected response block.");
-      const { source: _source, model: _model, adapter: _adapter, scope: _scope,
-        usage: _usage, finishReason: _finishReason, rawFinishReason: _raw, providerResponseId: _provider, ...block } = node;
-      emit({ type: "block", block: { ...block, source: source! } as ModelBlock });
-      // 响应状态机只需本次调用内的块身份；不保存或获取时间轴节点 ID。
-      return String(node.ordinal);
+    // 平台只交付成型块与终态；保存、分组与投影由执行体负责。块身份仅在本次调用内使用。
+    const response = new ResponseBuffer({ responseId, requestParentId: request.requestParentId, source }, block => {
+      emit({ type: "block", block });
+      return String(block.ordinal);
     }, (ordinal, terminal) => {
       completion = terminal;
       emit({ type: "completion", responseId: responseId!, requestParentId: request.requestParentId, source: source!,
         ordinal: ordinal === null ? null : Number(ordinal), completion: terminal });
     });
-    const progress = () => emit({ type: "progress", blocks: response.live().map(({ agentId: _agentId, ...block }) => block) });
+    const progress = () => emit({ type: "progress", blocks: response.live() });
     // 合并工具参数的高频解析；正文与思考仍即时发布，计时器不越过响应生命周期。
     let progressTimer: ReturnType<typeof setTimeout> | undefined;
     let pendingProgress = Promise.resolve();

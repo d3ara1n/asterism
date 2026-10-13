@@ -47,6 +47,7 @@ const counterSettings = z.strictObject({
     title: "Maximum change", description: "Largest absolute increment accepted by a counter action.",
   }),
 }).meta({ title: "Counter settings" });
+const CounterConfig = sample.config(counterSettings, { maxChange: 10 });
 const Read = defineTool({
   id: "example.counter/read_counter", name: "read_counter", description: "Read the current counter value.", guidelines: [],
   argsSchema: z.strictObject({}).describe("No arguments are required."),
@@ -81,7 +82,7 @@ function counterChange(limit: () => number) {
 }
 export const counterPlugin = definePlugin({
   namespace: sample, version: "0.0.1", modules: [defineModule(plugin => {
-    const settings = plugin.config(counterSettings, { maxChange: 10 });
+    const settings = plugin.config(CounterConfig);
     return {
       resources: [implementResource(Counter, CounterView, {
         records: [CountChanged],
@@ -132,8 +133,6 @@ export async function modelWork(plugin: PluginContext, object: ObjectExecutor, s
 export function rejectInvalidUsage(plugin: PluginContext, object: ObjectExecutor, reader: ObjectReader) {
   // @ts-expect-error 读取门面不能提交。
   reader.commit(() => {});
-  // @ts-expect-error 嵌套 session 也不能续接或修改标题。
-  reader.session.resume();
   // @ts-expect-error 只读标题不能比较更新。
   reader.session.title.propose("New", { expected: "Old" });
   // @ts-expect-error 生命周期不是字符串事件总线。

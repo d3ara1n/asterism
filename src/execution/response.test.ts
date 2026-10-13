@@ -1,13 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
-import type { BlockCompletion, NewNode } from "../shared/session.ts";
+import type { ModelBlock, ModelCompletion } from "@atelier/sdk/contracts";
 import type { ModelEvent } from "../model/contract.ts";
 import { ResponseBuffer } from "./response.ts";
 
 function setup() {
-  const nodes: NewNode[] = [];
-  const completions: { id: string | null; data: BlockCompletion }[] = [];
+  const nodes: ModelBlock[] = [];
+  const completions: { id: string | null; data: ModelCompletion }[] = [];
   return { nodes, completions, response: new ResponseBuffer(
-    { source: { plugin: "atelier.core", resource: { id: "a", kind: "atelier.core/agent" } }, responseId: "r", requestParentId: null, model: "p/m", adapter: "test", scope: "s" },
+    { responseId: "r", requestParentId: null, source: { model: "p/m", adapter: "test", scope: "s" } },
     node => { nodes.push(node); return `block-${nodes.length}`; },
     (id, data) => completions.push({ id, data }),
   ) };

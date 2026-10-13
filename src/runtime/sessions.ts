@@ -26,7 +26,7 @@ import { foldWorkbench, type FoldedObject } from "../session/fold.ts";
 import { SessionError, SessionTree } from "../session/tree.ts";
 import type { ModelSettings, AgentSelection } from "../shared/model.ts";
 import type { ObjectStreamPayload } from "../shared/object-stream.ts";
-import { sessionPath, snap } from "../shared/session-path.ts";
+import { sessionPath } from "../shared/session-path.ts";
 import { sessionCommandSchema, sessionSnapshotSchema, type SessionChanged, type SessionCommand, type SessionSnapshot, type SessionProgress, type SessionReply, type ViewPosition, type SessionNode, type LiveBlock } from "../shared/session.ts";
 import type { ToolRegistry } from "../tools/registry.ts";
 import { sessionPluginError } from "./plugin-errors.ts";
@@ -59,7 +59,7 @@ export class SessionService {
   private readonly validateInitialInput: (selection: AgentSelection, parts: ModelInputPart[], content: ContentLease) => Promise<void>;
   constructor(private readonly db: DatabaseSync, dataRoot: string, configuration: ConfigurationService,
     private readonly changed: (event: SessionChanged) => void = () => {}, adapterFactory?: (settings: ModelSettings) => ModelAdapter, external: readonly PluginDefinition[] = [],
-    stream?: (event: ObjectStreamPayload) => void) {
+    stream?: (event: ObjectStreamPayload) => void, configurationChanged?: (pluginId: string) => void) {
     this.tree = new SessionTree(db);
     this.content = new ContentStore(db, join(dataRoot, applicationStorage.contentDirectory));
     const host: SessionHost = {
@@ -79,14 +79,7 @@ export class SessionService {
         return applied;
       },
       commit: (sessionId, work) => this.commit(sessionId, work),
-      resume: (sessionId, objectId) => {
-        if (!host.canResume(sessionId, objectId)) return;
-        this.commit(sessionId, () => {
-          const cursor = this.tree.cursor(sessionId);
-          if (cursor !== null && snap(this.tree.nodes(sessionId), cursor) !== cursor) this.tree.select(sessionId, cursor, "continuation");
-        });
-      },
-      canResume: (sessionId, objectId) => this.modelActivity(sessionId).running.length === 0
+      idle: (sessionId, objectId) => this.modelActivity(sessionId).running.length === 0
         && !this.resources.controllers().some(controller => controller.activity?.(sessionId).running.some(id => id !== objectId)),
       progressChanged: sessionId => this.progressChanged(sessionId),
       linked: (path, objectId) => {
@@ -101,7 +94,7 @@ export class SessionService {
       const sessionIds = this.tree.list().map(session => session.id);
       for (const sessionId of sessionIds) {
         for (const node of this.tree.nodes(sessionId)) {
-          if (node.kind !== "event" || node.type !== "resource_created") continue;
+          if (node.contract !== "resource_created") continue;
           const data = node.data as { id?: unknown; type?: unknown };
           if (data.id === objectId) return { sessionId, id: objectId, kind: String(data.type) };
         }
@@ -121,7 +114,7 @@ export class SessionService {
         throw error;
       }
     };
-    const modules = createModules({ extensionsDirectory: join(dataRoot, "extensions"), data: new SessionDataStore(db), content: this.content, refOf, vault: configuration.vault, stream,
+    const modules = createModules({ extensionsDirectory: join(dataRoot, "extensions"), data: new SessionDataStore(db), content: this.content, refOf, vault: configuration.vault, stream, configurationChanged,
       sessions: host, models, catalogs: createCoreCatalogs(configuration) }, external);
     this.resources = modules.resources;
     this.tools = modules.tools;
@@ -161,7 +154,6 @@ export class SessionService {
     const writer: SessionWriter = {
       append: node => this.tree.append(sessionId, node).id,
       nodes: () => this.tree.nodes(sessionId),
-      completeBlock: (blockId, completion) => this.tree.completeBlock(sessionId, blockId, completion),
     };
     const result = this.transaction(() => {
       this.committing = { sessionId, writer };
@@ -188,10 +180,6 @@ export class SessionService {
     const activity = [...this.resources.controllers().map(controller => controller.activity?.(sessionId) ?? { running: [], live: [] }), this.modelActivity(sessionId)];
     return { revision: this.revisions.get(sessionId) ?? 0, version: this.progressVersions.get(sessionId) ?? 0,
       unsettledObjectIds: [...new Set(activity.flatMap(a => a.running))],
-      runningAgentIds: [...new Set(activity.flatMap(value => value.running))].filter(id =>
-        this.tree.nodes(sessionId).some(node => node.kind === "event" && node.type === "resource_created"
-          && node.data !== null && typeof node.data === "object" && !Array.isArray(node.data)
-          && node.data.id === id && node.data.type === agentKind)),
       live: activity.flatMap(a => a.live) };
   }
   private progressChanged(sessionId: string): void {
@@ -331,6 +319,7 @@ export class SessionService {
     this.starting.set(command.submissionId, run);
     return run;
   }
+  /** 唯一领域例外：首页发起指名内置 agent，经正规创建与动作接口建立代理并提交首条输入。 */
   private async startOnce(command: Extract<SessionCommand, { type: "start" }>): Promise<SessionReply> {
     const existing = () => {
       const row = this.db.prepare("SELECT session_id, command_json FROM session_submissions WHERE id = ?").get(command.submissionId) as { session_id: string; command_json: string } | undefined;

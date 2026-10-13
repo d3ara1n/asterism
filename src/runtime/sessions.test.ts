@@ -9,7 +9,8 @@ import { ModelFailure, type ModelAdapter, type ModelEvent, type ModelInput } fro
 import { sdkMessages } from "../model/ai-sdk.ts";
 import { sessionResultSchema, type SessionChanged, type SessionCommand, type SessionMutation } from "../shared/session.ts";
 import { dispatchSession } from "./dispatch.ts";
-import { sessionVersion, emptyCompletion } from "../shared/session.ts";
+import { sessionVersion } from "../shared/session.ts";
+import { flat } from "../session/test-nodes.ts";
 import type { AgentSelection, Json } from "../shared/model.ts";
 import { projectForAgent } from "../session/projection.ts";
 import * as runtimeModules from "../modules/runtime.ts";
@@ -67,7 +68,7 @@ describe("会话运行时", () => {
     let currentService!: ApplicationService;
     const model: ModelAdapter = { version: "ai-sdk-v7/3", validate() {}, prepare(input) {
       // Provider 准备前，用户输入已经作为消息记录提交。
-      expect(currentService.sessions.tree.list().some(session => currentService.sessions.tree.path(session.id).some(node => node.kind === "message"))).toBe(true);
+      expect(currentService.sessions.tree.list().some(session => currentService.sessions.tree.path(session.id).map(flat).some(node => node.kind === "message"))).toBe(true);
       inputs.push(input); return { async *stream() { yield* reply(); } };
     } };
     const { service, start, root } = await setup(model); currentService = service;
@@ -82,7 +83,7 @@ describe("会话运行时", () => {
     await draft.close();
     // 已受理重试不再需要有效草稿，临时 scope 不属于业务幂等身份。
     expect((await execute(service, { ...firstInput, contentScopeId: undefined })).sessionId).toBe(first.sessionId);
-    const agentId = agentOf(first), origin = first.nodes.find(node => node.kind === "message")!;
+    const agentId = agentOf(first), origin = first.nodes.map(flat).find(node => node.kind === "message")!;
     expect(origin).toMatchObject({ parts: firstInput.parts });
     expect(inputs[0]!.messages).toEqual([{ kind: "input", parts: [{ kind: "file", data: png, mediaType: "image/png", filename: "first.png" }] }]);
     const next = service.sessions.openContentInput({ sessionId: first.sessionId, objectId: agentId, contractId: SubmitAgentInput.id, resourceKind: SubmitAgentInput.resource.kind });
@@ -94,19 +95,19 @@ describe("会话运行时", () => {
     expect(inputs.at(-1)!.messages.at(-1)).toEqual({ kind: "input", parts: [
       { kind: "text", text: "Compare" }, { kind: "file", data: webp, mediaType: "image/webp" }, { kind: "text", text: "with the screenshot" },
     ] });
-    const originalNodes = service.sessions.tree.nodes(first.sessionId);
+    const originalNodes = service.sessions.tree.nodes(first.sessionId).map(flat);
     await service.sessions.execute({ type: "select", sessionId: first.sessionId, nodeId: origin.id });
     await expect(service.sessions.execute({ type: "resource.command", sessionId: first.sessionId, objectId: agentId,
       command: resourceCall(SubmitAgentInput, { type: "submit", submissionId: randomUUID(), parts: [{ kind: "file", file: other, mediaType: "image/webp" }] }) })).rejects.toThrow("does not belong");
     await execute(service, agentCommand(first.sessionId, agentId, { type: "submit", submissionId: randomUUID(), parts: [{ kind: "text", text: "Branch" }] }));
     await settled(service);
-    const saved = service.sessions.tree.nodes(first.sessionId);
+    const saved = service.sessions.tree.nodes(first.sessionId).map(flat);
     expect(saved.slice(0, originalNodes.length)).toEqual(originalNodes);
     await service.close(); services.delete(service);
     const reopened = new ApplicationService(root, { adapterFactory: () => adapter() }); services.add(reopened);
-    expect(reopened.sessions.tree.nodes(first.sessionId)).toEqual(saved);
+    expect(reopened.sessions.tree.nodes(first.sessionId).map(flat)).toEqual(saved);
     expect(await reopened.sessions.content.reader({ sessionId: first.sessionId, objectId: agentId,
-      recordIds: new Set(reopened.sessions.tree.path(first.sessionId).map(node => node.id)) }).read(file)).toEqual(png);
+      recordIds: new Set(reopened.sessions.tree.path(first.sessionId).map(flat).map(node => node.id)) }).read(file)).toEqual(png);
   });
 
   it("首页准备失败不创建会话、不消耗文件草稿；修正输入后可以重试", async () => {
@@ -123,25 +124,6 @@ describe("会话运行时", () => {
     await service.sessions.execute(input); await settled(service);
     expect(service.sessions.tree.list()).toHaveLength(1);
   });
-  it("代理续接吸附退出自身创建分支时，游标、输入和去重数据整体回滚", async () => {
-    const { service, start } = await setup();
-    const first = await execute(service, start); await settled(service);
-    const sessionId = first.sessionId, agentId = agentOf(first);
-    const origin = service.sessions.tree.cursor(sessionId);
-    service.sessions.tree.append(sessionId, { ...emptyCompletion, kind: "thinking", source: { plugin: "atelier.core", resource: { id: agentId, kind: "atelier.core/agent" } }, text: "Unfinished reasoning",
-      responseId: "interrupted", requestParentId: origin, ordinal: 0, complete: true, model: start.model,
-      continuation: null, adapter: "ai-sdk-v7/3", scope: "scope" });
-    const created = await execute(service, { type: "resource.create", sessionId, kind: "atelier.core/agent", creation: { id: "atelier.core/agent.create" },
-      input: { selection: { agent: start.agent, model: start.model, thinking: null } }, position: { x: 0, y: 0 } });
-    const second = created.workbench.objects.find(object => object.kind === "atelier.core/agent" && object.id !== agentId)!;
-    const before = service.sessions.tree.nodes(sessionId), cursor = service.sessions.tree.cursor(sessionId);
-    const command = agentCommand(sessionId, second.id, { type: "submit", submissionId: randomUUID(), parts: [{ kind: "text", text: "Second input" }] });
-    for (let retry = 0; retry < 2; retry++) await expect(service.sessions.execute(command)).rejects.toMatchObject({ code: "not_found" });
-    expect(service.sessions.tree.cursor(sessionId)).toBe(cursor);
-    expect(service.sessions.tree.nodes(sessionId)).toEqual(before);
-    expect(service.sessions.running).toBe(false);
-  });
-
   it("同一代理相同 submission 的并发重试均受理且只保存一条输入", async () => {
     const { service, start } = await setup();
     const first = await execute(service, start); await settled(service);
@@ -149,7 +131,7 @@ describe("会话运行时", () => {
     const receipts = await Promise.all([service.sessions.execute(command), service.sessions.execute(command)]);
     expect(receipts).toEqual([{ kind: "accepted", sessionId: first.sessionId }, { kind: "accepted", sessionId: first.sessionId }]);
     await settled(service);
-    expect(service.sessions.tree.nodes(first.sessionId).filter(node => node.kind === "message" && modelInputText(node.parts) === "Concurrent retry")).toHaveLength(1);
+    expect(service.sessions.tree.nodes(first.sessionId).map(flat).filter(node => node.kind === "message" && modelInputText(node.parts) === "Concurrent retry")).toHaveLength(1);
   });
   it("重建会话数据库保留全局模型配置与用户覆盖", async () => {
     const { service, root, start } = await setup();
@@ -175,9 +157,9 @@ describe("会话运行时", () => {
     const sessionId = first.sessionId;
     const created = await execute(service, { type: "resource.create", sessionId, kind: "atelier.core/note", creation: { id: "atelier.core/note.create" },
       input: { title: "Notebook", content: "first\nsecond" }, position: { x: 0, y: 0 } });
-    const note = foldWorkbench(created.nodes).objects.find(object => object.kind === "atelier.core/note")!;
+    const note = foldWorkbench(created.nodes.map(flat)).objects.find(object => object.kind === "atelier.core/note")!;
     const nodeId = created.cursor!;
-    const nodes = service.sessions.tree.nodes(sessionId), cursor = service.sessions.tree.cursor(sessionId);
+    const nodes = service.sessions.tree.nodes(sessionId).map(flat), cursor = service.sessions.tree.cursor(sessionId);
     const call = async (name: string, args: Json, target: Json = null) => {
       const implementation = tools.match(note).find(tool => tool.tool.name === name)!;
       const invocation = implementation.prepare(note, target, args);
@@ -197,7 +179,7 @@ describe("会话运行时", () => {
     const revision = service.sessions.snapshot(sessionId).revision;
     expect(await call("write", { content: "latest" })).toMatchObject({ kind: "succeeded", data: { changed: false } });
     expect(service.sessions.snapshot(sessionId).revision).toBe(revision);
-    expect(service.sessions.tree.nodes(sessionId)).toEqual(nodes);
+    expect(service.sessions.tree.nodes(sessionId).map(flat)).toEqual(nodes);
     expect(service.sessions.tree.cursor(sessionId)).toBe(cursor);
     const history = service.sessions.snapshot(sessionId, { kind: "history", nodeId });
     expect(history.workbench.objects.find(object => object.id === note.id)?.presentation.data).toEqual({ text: "latest" });
@@ -256,7 +238,7 @@ describe("会话运行时", () => {
       await execute(service, agentCommand(sessionId, agentId, { type: "continue" }));
       await executing;
       const running = service.sessions.snapshot(sessionId);
-      expect(running.nodes.some(node => node.kind === "toolcall")).toBe(false);
+      expect(running.nodes.map(flat).some(node => node.kind === "toolcall")).toBe(false);
       expect(running.progress.live).toEqual([expect.objectContaining({
         kind: "toolcall", state: "executing", result: { kind: "running", data: { text: "first" } },
         invocation: expect.objectContaining({ resource: { id: resourceId, kind: "atelier.core/directory", title: "Captured directory" } }),
@@ -274,7 +256,7 @@ describe("会话运行时", () => {
       vi.useRealTimers();
     }
     const snapshot = service.sessions.snapshot(sessionId);
-    const saved = snapshot.nodes.find(node => node.kind === "toolcall")!;
+    const saved = snapshot.nodes.map(flat).find(node => node.kind === "toolcall")!;
     expect(saved).toMatchObject({ complete: true, outcome: {
       kind: "cancelled", data: { text: "first\nsecond" }, model: [{ kind: "text", text: "cancelled: Operation execution was cancelled." }, { kind: "text", text: "first\nsecond" }],
       implementation: { id: "test.streaming" }, resource: { id: resourceId, kind: "atelier.core/directory", title: "Captured directory" },
@@ -282,13 +264,13 @@ describe("会话运行时", () => {
     } });
     expect(snapshot.progress.live).toEqual([]);
     publish({ text: "too late" });
-    expect(service.sessions.snapshot(sessionId).nodes.find(node => node.id === saved.id)).toEqual(saved);
+    expect(service.sessions.snapshot(sessionId).nodes.map(flat).find(node => node.id === saved.id)).toEqual(saved);
     await execute(service, { type: "object.remove", sessionId, objectId: resourceId });
     await service.close(); services.delete(service);
     const reopened = new ApplicationService(root); services.add(reopened);
     const history = reopened.sessions.snapshot(sessionId);
-    expect(history.nodes.find(node => node.id === saved.id)).toEqual(saved);
-    expect(projectForAgent(history.nodes, agentId).find(item => item.kind === "result")).toMatchObject({
+    expect(history.nodes.map(flat).find(node => node.id === saved.id)).toEqual(saved);
+    expect(projectForAgent(history.nodes.map(flat), agentId).find(item => item.kind === "result")).toMatchObject({
       outcome: { kind: "cancelled", model: [{ kind: "text" }, { kind: "text", text: "first\nsecond" }] },
     });
     expect(history.progress.live).toEqual([]);
@@ -308,13 +290,13 @@ describe("会话运行时", () => {
     expect(selected.at).toBe(history);
     expect(selected.workbench.objects.map(object => object.id)).toContain(note.id);
     expect(service.sessions.snapshot(sessionId).workbench.objects.map(object => object.id)).not.toContain(note.id);
-    const original = service.sessions.tree.nodes(sessionId);
+    const original = service.sessions.tree.nodes(sessionId).map(flat);
     await service.sessions.execute({ type: "view.set", sessionId, objectId: note.id, collapsed: true });
     const viewed = service.sessions.snapshot(sessionId, { kind: "history", nodeId: history });
     expect(viewed.workbench.views.find(item => item.objectId === note.id)?.collapsed).toBe(true);
     expect(viewed.revision).toBeGreaterThan(selected.revision);
     expect(viewed.seq).toBe(selected.seq);
-    expect(service.sessions.tree.nodes(sessionId)).toEqual(original);
+    expect(service.sessions.tree.nodes(sessionId).map(flat)).toEqual(original);
     expect(service.sessions.tree.cursor(sessionId)).toBe(currentCursor);
     expect(service.sessions.tree.cursorSelections(sessionId)).toEqual([]);
     expect(service.execute({ type: "workspace.read" })).not.toHaveProperty("session");
@@ -331,7 +313,7 @@ describe("会话运行时", () => {
     const created = await execute(service, { type: "resource.create", sessionId, kind: "atelier.core/note", creation: { id: "atelier.core/note.create" },
       input: { title: "Resizable note", content: "text" }, position: { x: 10, y: 20 } });
     const noteId = created.workbench.objects.find(object => object.kind === "atelier.core/note")!.id;
-    const original = service.sessions.tree.nodes(sessionId), cursor = service.sessions.tree.cursor(sessionId);
+    const original = service.sessions.tree.nodes(sessionId).map(flat), cursor = service.sessions.tree.cursor(sessionId);
     for (const objectId of [agentId, noteId]) {
       await execute(service, { type: "view.set", sessionId, objectId, size: { width: 900, height: 1000 } });
       await execute(service, { type: "view.set", sessionId, objectId, collapsed: true });
@@ -342,8 +324,8 @@ describe("会话运行时", () => {
       expect(history.workbench.views.find(view => view.objectId === objectId))
         .toMatchObject({ size: { width: 900, height: 1000 }, collapsed: true, position: { x: 30, y: 40 } });
     }
-    expect(history.nodes).toEqual(created.nodes);
-    expect(service.sessions.tree.nodes(sessionId)).toEqual(original);
+    expect(history.nodes.map(flat)).toEqual(created.nodes.map(flat));
+    expect(service.sessions.tree.nodes(sessionId).map(flat)).toEqual(original);
     expect(service.sessions.tree.cursor(sessionId)).toBe(cursor);
     await service.close(); services.delete(service);
     const reopened = new ApplicationService(root); services.add(reopened);
@@ -354,7 +336,7 @@ describe("会话运行时", () => {
       .toMatchObject({ size: null, collapsed: false, position: { x: 30, y: 40 } });
     expect(reopened.sessions.snapshot(sessionId).workbench.views.find(view => view.objectId === noteId)?.size)
       .toEqual({ width: 900, height: 1000 });
-    expect(reopened.sessions.tree.nodes(sessionId)).toEqual(original);
+    expect(reopened.sessions.tree.nodes(sessionId).map(flat)).toEqual(original);
   });
 
   it("正文增量发布独立进度，持久节点和终态才使会话视图失效", async () => {
@@ -380,8 +362,8 @@ describe("会话运行时", () => {
         progress: expect.objectContaining({ live: [expect.objectContaining({ text: "Live" })] }) })]);
       release(); await settled(service);
       expect(events.some(event => event.kind === "session.changed")).toBe(true);
-      expect(events.at(-1)).toMatchObject({ kind: "session.progress", progress: { runningAgentIds: [], live: [] } });
-      expect(service.sessions.snapshot(first.sessionId).nodes.some(node => node.kind === "text" && node.complete)).toBe(true);
+      expect(events.at(-1)).toMatchObject({ kind: "session.progress", progress: { live: [] } });
+      expect(service.sessions.snapshot(first.sessionId).nodes.map(flat).some(node => node.kind === "text" && node.complete)).toBe(true);
     } finally { release(); vi.useRealTimers(); }
   });
 
@@ -401,19 +383,18 @@ describe("会话运行时", () => {
     const first = await execute(service, start);
     await saved;
     const before = service.sessions.snapshot(first.sessionId);
-    const block = before.nodes.find(node => node.kind === "text")!;
+    const block = before.nodes.map(flat).find(node => node.kind === "text")!;
     release();
-    expect(block).toMatchObject({ usage: null, finishReason: null });
-    expect(before.nodes.map(node => node.kind)).toEqual(["event", "message", "text"]);
+    expect(before.nodes.map(flat).map(node => node.kind)).toEqual(["event", "message", "text"]);
     await settled(service);
     const after = service.sessions.snapshot(first.sessionId);
-    expect(after.seq).toBe(before.seq);
     expect(after.cursor).toBe(before.cursor);
-    expect(after.nodes.find(node => node.id === block.id)).toMatchObject({
-      ...block, usage, finishReason: "stop", rawFinishReason: "end_turn", providerResponseId: "provider-response",
-    });
-    const input = after.nodes.find(node => node.kind === "message")!;
-    expect(after.nodes.find(node => node.id === block.id)).toMatchObject({ requestParentId: input.id });
+    // 终态是执行体的独立审计记录：原块不变，计量随后追加且不移动游标。
+    expect(after.nodes.map(flat).find(node => node.id === block.id)).toEqual(block);
+    expect(after.nodes.map(flat).at(-1)).toMatchObject({ kind: "completion", position: false, ordinal: block.ordinal,
+      completion: { usage, finishReason: "stop", rawFinishReason: "end_turn", providerResponseId: "provider-response" } });
+    const input = after.nodes.map(flat).find(node => node.kind === "message")!;
+    expect(after.nodes.map(flat).find(node => node.id === block.id)).toMatchObject({ requestParentId: input.id });
     await execute(service, { type: "select", sessionId: first.sessionId, nodeId: input.id });
     await service.close(); services.delete(service);
     const reopened = new ApplicationService(root); services.add(reopened);
@@ -432,8 +413,8 @@ describe("会话运行时", () => {
     const first = await execute(service, start);
     await settled(service);
     const nodes = service.sessions.snapshot(first.sessionId).nodes;
-    expect(nodes.map(node => node.kind)).toEqual(["event", "message", "notice"]);
-    expect(nodes.at(-1)).toMatchObject({ code: "empty_response", response: { providerResponseId: "empty-response", usage: { total: 2 } } });
+    expect(nodes.map(flat).map(node => node.kind)).toEqual(["event", "message", "completion"]);
+    expect(flat(nodes.at(-1)!)).toMatchObject({ ordinal: null, completion: { providerResponseId: "empty-response", usage: { total: 2 } } });
   });
 
   it("目录 see 的图片随代理工具结果落库，下一次请求作为文件部件发送，重开仍可读取", async () => {
@@ -455,7 +436,7 @@ describe("会话运行时", () => {
     const agentId = agentOf(first);
     await execute(service, { type: "link.set", sessionId: first.sessionId, agentId, resourceId, linked: true });
     await execute(service, agentCommand(first.sessionId, agentId, { type: "continue" })); await settled(service);
-    const nodes = service.sessions.tree.nodes(first.sessionId);
+    const nodes = service.sessions.tree.nodes(first.sessionId).map(flat);
     expect(nodes.filter(node => node.kind === "notice")).toEqual([]);
     const saved = nodes.find(node => node.kind === "toolcall");
     expect(saved).toMatchObject({ outcome: { kind: "succeeded", model: [{ kind: "text" }, { kind: "file", mediaType: "image/png", filename: "shot.png" }] } });
@@ -464,10 +445,10 @@ describe("会话运行时", () => {
     expect(result).toMatchObject({ kind: "result", parts: [{ kind: "text" }, { kind: "file", mediaType: "image/png", data: new Uint8Array(png) }] });
     await service.close(); services.delete(service);
     const reopened = new ApplicationService(root); services.add(reopened);
-    const outcome = reopened.sessions.tree.nodes(first.sessionId).find(node => node.kind === "toolcall")!;
-    const file = (outcome as { outcome: { model: { kind: string; file?: { "$atelier.content": string } }[] } }).outcome.model.find(part => part.kind === "file")!.file!;
+    const outcome = reopened.sessions.tree.nodes(first.sessionId).map(flat).find(node => node.kind === "toolcall")!;
+    const file = (outcome as unknown as { outcome: { model: { kind: string; file?: { "$atelier.content": string } }[] } }).outcome.model.find(part => part.kind === "file")!.file!;
     expect(await reopened.sessions.content.reader({ sessionId: first.sessionId, objectId: agentId,
-      recordIds: new Set(reopened.sessions.tree.path(first.sessionId).map(node => node.id)) }).read(file)).toEqual(new Uint8Array(png));
+      recordIds: new Set(reopened.sessions.tree.path(first.sessionId).map(flat).map(node => node.id)) }).read(file)).toEqual(new Uint8Array(png));
   });
 
   it("工具结果保存实现版本与当次数据；资源移除、文件改变和重开不影响历史", async () => {
@@ -492,7 +473,7 @@ describe("会话运行时", () => {
     const agentId = agentOf(first);
     await execute(service, { type: "link.set", sessionId: first.sessionId, agentId: agentId, resourceId: resourceId, linked: true });
     await execute(service, agentCommand(first.sessionId, agentId, { type: "continue" })); await settled(service);
-    const saved = service.sessions.tree.nodes(first.sessionId).find(node => node.kind === "toolcall");
+    const saved = service.sessions.tree.nodes(first.sessionId).map(flat).find(node => node.kind === "toolcall");
     const listing = { path: "files", entries: [{ name: "a.txt", type: "file" }], truncated: false };
     expect(saved).toMatchObject({ outcome: { kind: "succeeded", implementation: { id: "atelier.core/directory.list" },
       model: [{ kind: "text", text: JSON.stringify(listing) }], data: listing } });
@@ -500,7 +481,7 @@ describe("会话运行时", () => {
     await execute(service, { type: "object.remove", sessionId: first.sessionId, objectId: resourceId });
     await service.close(); services.delete(service);
     const reopened = new ApplicationService(root); services.add(reopened);
-    expect(reopened.sessions.tree.nodes(first.sessionId).find(node => node.kind === "toolcall")).toEqual(saved);
+    expect(reopened.sessions.tree.nodes(first.sessionId).map(flat).find(node => node.kind === "toolcall")).toEqual(saved);
   });
 
   it("首次提交原子创建会话与代理；重复提交幂等，重开读取相同树", async () => {
@@ -509,7 +490,7 @@ describe("会话运行时", () => {
     expect(a.sessionId).toBe(b.sessionId);
     await settled(service);
     const snap = await execute(service, { type: "read", sessionId: a.sessionId });
-    expect(snap.nodes.map(n => n.kind)).toEqual(["event", "message", "text"]);
+    expect(snap.nodes.map(flat).map(n => n.kind)).toEqual(["event", "message", "text", "completion"]);
     expect(snap.workbench.objects.filter(o => o.kind === "atelier.core/agent")).toHaveLength(1);
     expect(agentOf(snap)).toMatch(/^[A-Za-z0-9_-]{16}$/);
     await expect(execute(service, { ...start, parts: [{ kind: "text", text: "Other" }] })).rejects.toThrow("different input");
@@ -542,7 +523,7 @@ describe("会话运行时", () => {
     const sent = inputs.map(texts);
     expect(sent.filter(m => m.includes("To A")).at(-1)).toEqual(["First", "To A"]);
     expect(sent.filter(m => m.includes("To B")).at(-1)).toEqual(["To B"]);
-    const path = service.sessions.tree.path(sessionId);
+    const path = service.sessions.tree.path(sessionId).map(flat);
     expect(path.filter(n => n.kind === "message").map(n => n.source.resource?.id)).toEqual([a, a, b]);
   });
 
@@ -555,14 +536,14 @@ describe("会话运行时", () => {
     const first = await execute(service, start); await settled(service);
     const before = await execute(service, { type: "read", sessionId: first.sessionId });
     const agentId = agentOf(before);
-    const message = before.nodes.find(n => n.kind === "message")!;
+    const message = before.nodes.map(flat).find(n => n.kind === "message")!;
     await execute(service, { type: "select", sessionId: first.sessionId, nodeId: message.id });
     await execute(service, agentCommand(first.sessionId, agentId, { type: "submit", submissionId: randomUUID(), parts: [{ kind: "text", text: "Branch" }] }));
     await expect(execute(service, { type: "select", sessionId: first.sessionId, nodeId: message.id })).rejects.toThrow("settle");
     release(); await settled(service);
     const after = await execute(service, { type: "read", sessionId: first.sessionId });
-    expect(after.nodes.slice(0, before.nodes.length)).toEqual(before.nodes);
-    expect(after.nodes.find(n => n.kind === "message" && modelInputText(n.parts) === "Branch")!.parentId).toBe(message.id);
+    expect(after.nodes.map(flat).slice(0, before.nodes.map(flat).length)).toEqual(before.nodes.map(flat));
+    expect(after.nodes.map(flat).find(n => n.kind === "message" && modelInputText(n.parts) === "Branch")!.parentId).toBe(message.id);
   });
 
   it("其他代理在 thinking 后发送时沿同一路径追加，不回溯或拆开响应", async () => {
@@ -589,15 +570,15 @@ describe("会话运行时", () => {
     try {
       await execute(service, agentCommand(sessionId, a, { type: "submit", submissionId: randomUUID(), parts: [{ kind: "text", text: "To A" }] }));
       await thinkingSaved;
-      const thinking = service.sessions.tree.path(sessionId).at(-1)!;
+      const thinking = service.sessions.tree.path(sessionId).map(flat).at(-1)!;
       expect(thinking.kind).toBe("thinking");
       await execute(service, agentCommand(sessionId, b, { type: "submit", submissionId: randomUUID(), parts: [{ kind: "text", text: "To B" }] }));
-      expect(service.sessions.tree.path(sessionId)).toContainEqual(thinking);
-      expect(service.sessions.tree.nodes(sessionId).find(n => n.kind === "message" && modelInputText(n.parts) === "To B")?.parentId).toBe(thinking.id);
+      expect(service.sessions.tree.path(sessionId).map(flat)).toContainEqual(thinking);
+      expect(service.sessions.tree.nodes(sessionId).map(flat).find(n => n.kind === "message" && modelInputText(n.parts) === "To B")?.parentId).toBe(thinking.id);
       expect(service.sessions.tree.cursorSelections(sessionId)).toEqual([]);
     } finally { release(); }
     await settled(service);
-    const lastOutput = projectForAgent(service.sessions.tree.path(sessionId), a).filter(item => item.kind === "output").at(-1)!;
+    const lastOutput = projectForAgent(service.sessions.tree.path(sessionId).map(flat), a).filter(item => item.kind === "output").at(-1)!;
     expect(lastOutput.parts.map(part => part.kind)).toEqual(["thinking", "text"]);
   });
 
@@ -647,9 +628,9 @@ describe("会话运行时", () => {
     const rejected = expect(pending).rejects.toMatchObject({ code: "not_found" });
     try {
       await execute(service, { type: "object.remove", sessionId, objectId: agentId });
-      const nodes = service.sessions.tree.nodes(sessionId);
+      const nodes = service.sessions.tree.nodes(sessionId).map(flat);
       release(); await rejected;
-      expect(service.sessions.tree.nodes(sessionId)).toEqual(nodes);
+      expect(service.sessions.tree.nodes(sessionId).map(flat)).toEqual(nodes);
       expect(service.sessions.running).toBe(false);
     } finally { release(); }
   });
@@ -667,7 +648,7 @@ describe("会话运行时", () => {
     const sessionId = first.sessionId;
     const note = await execute(service, { type: "resource.create", sessionId, kind: "atelier.core/note", creation: { id: "atelier.core/note.create" }, input: {}, position: { x: 0, y: 0 } });
     capturedId = note.workbench.objects.find(o => o.kind === "atelier.core/note")!.id;
-    expect(service.sessions.snapshot(sessionId).progress).toMatchObject({ runningAgentIds: [], unsettledObjectIds: [capturedId] });
+    expect(service.sessions.snapshot(sessionId).progress).toMatchObject({ unsettledObjectIds: [capturedId] });
     await expect(execute(service, { type: "select", sessionId, nodeId: first.cursor })).rejects.toMatchObject({ code: "conflict" });
     await expect(execute(service, { type: "object.remove", sessionId, objectId: capturedId })).rejects.toMatchObject({ code: "conflict" });
     const directory = await execute(service, { type: "resource.create", sessionId, kind: "atelier.core/directory", creation: { id: "atelier.core/directory.create" }, input: { path: root }, position: { x: 0, y: 0 } });
@@ -683,8 +664,8 @@ describe("会话运行时", () => {
     const { service, start } = await setup(adapter(() => { if (++n === 1) throw new ModelFailure("prepare_failed", "Cannot prepare."); }));
     const s = await execute(service, start); await settled(service);
     const snap = await execute(service, { type: "read", sessionId: s.sessionId });
-    expect(snap.nodes.some(x => x.kind === "text")).toBe(false);
-    expect(snap.nodes.at(-1)).toMatchObject({ kind: "notice", level: "error", code: "prepare_failed" });
+    expect(snap.nodes.map(flat).some(x => x.kind === "text")).toBe(false);
+    expect(snap.nodes.map(flat).at(-1)).toMatchObject({ kind: "notice", level: "error", code: "prepare_failed" });
   });
 
   it("取消时已收到的部分正文以不完整块留档，不进入可续接路径", async () => {
@@ -701,11 +682,11 @@ describe("会话运行时", () => {
     await streamed.promise;
     const running = await execute(service, { type: "read", sessionId: s.sessionId });
     expect(running.progress.live).toEqual([expect.objectContaining({ kind: "text", text: "Half" })]);
-    expect(running.nodes.some(node => node.kind === "text")).toBe(false);
+    expect(running.nodes.map(flat).some(node => node.kind === "text")).toBe(false);
     await execute(service, agentCommand(s.sessionId, agentOf(s), { type: "cancel" }));
     await settled(service);
     const snap = await execute(service, { type: "read", sessionId: s.sessionId });
-    const half = snap.nodes.find(x => x.kind === "text");
+    const half = snap.nodes.map(flat).find(x => x.kind === "text");
     expect(half).toMatchObject({ text: "Half", complete: false });
     expect(snap.cursor).not.toBe(half!.id);
     expect(snap.progress.live).toEqual([]);
@@ -735,37 +716,9 @@ describe("会话运行时", () => {
     const first = await execute(service, start);
     await settled(service);
     expect(requests).toBe(1);
-    const nodes = service.sessions.tree.nodes(first.sessionId);
+    const nodes = service.sessions.tree.nodes(first.sessionId).map(flat);
     expect(nodes.find(n => n.kind === "toolcall")).toMatchObject({ complete: false, outcome: null });
     expect(nodes.at(-1)).toMatchObject({ kind: "notice", code: "incomplete" });
-  });
-
-  it("continue 自动退到 thinking 前的合法位置，原记录仍保留", async () => {
-    let requests = 0;
-    const inputs: string[][] = [];
-    const model: ModelAdapter = { validate() {}, version: "ai-sdk-v7/3", prepare: input => {
-      inputs.push(input.messages.map(item => item.kind));
-      return { async *stream() {
-        if (++requests === 1) {
-          yield { type: "part.start", part: { id: "t", kind: "thinking" } } as const;
-          yield { type: "part.end", partId: "t" } as const;
-          yield { type: "finish", reason: "length", usage: null } as const;
-        } else yield* reply();
-      } };
-    } };
-    const { service, start } = await setup(model);
-    const first = await execute(service, start);
-    await settled(service);
-    const before = service.sessions.tree.nodes(first.sessionId);
-    await execute(service, agentCommand(first.sessionId, agentOf(first), { type: "continue" }));
-    await settled(service);
-    expect(inputs.slice(-2)).toEqual([["input"], ["input"]]);
-    expect(service.sessions.tree.nodes(first.sessionId).slice(0, before.length)).toEqual(before);
-    expect(service.sessions.tree.path(first.sessionId).map(n => n.kind)).toEqual(["event", "message", "text"]);
-    expect(service.sessions.tree.cursorSelections(first.sessionId)).toEqual([expect.objectContaining({
-      fromId: before.at(-1)!.id, requestedId: before.at(-1)!.id,
-      selectedId: before.find(node => node.kind === "message")!.id, reason: "continuation",
-    })]);
   });
 
   it("运行中修改代理配置在下一模型请求生效", async () => {
@@ -847,7 +800,7 @@ describe("会话运行时", () => {
     expect(sdkMessages(nextInput).slice(0, sent.length)).toEqual(sent);
     expect(nextInput.messages.slice(-3).map(item => item.kind)).toEqual(["output", "result", "context"]);
     expect(nextInput.messages.at(-1)).toMatchObject({ kind: "context", parts: [{ kind: "text", text: expect.stringContaining("no longer linked") }] });
-    expect(service.sessions.tree.nodes(sessionId).filter(node => node.kind === "toolcall").map(node => node.outcome?.kind))
+    expect(service.sessions.tree.nodes(sessionId).map(flat).filter(node => node.kind === "toolcall").map(node => node.outcome?.kind))
       .toEqual(["succeeded", "rejected"]);
   });
 });

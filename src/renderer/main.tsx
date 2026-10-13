@@ -4,6 +4,7 @@ import { ErrorBoundary } from "./app/ErrorBoundary";
 import { MotionConfig } from "motion/react";
 import { TooltipProvider } from "./shared/ui/tooltip";
 import { ModuleViewsProvider } from "./modules/views";
+import { HostConfigsProvider } from "./modules/configs";
 import { App } from "./app/App";
 
 import { createRoot } from "react-dom/client";
@@ -40,5 +41,5 @@ const moduleViews = new ViewRegistry(accepted);
 showStartupStage(getI18n().formatMessage(appMessages.startupEnvironment));
 await Promise.all([prepareModules(accepted), loadPreferences()]);
 createRoot(document.getElementById("root")!).render(<StrictMode><HostI18nProvider><ErrorBoundary><MotionConfig reducedMotion="user"><TooltipProvider>
-  <ModuleViewsProvider registry={moduleViews}><App controller={controller} /></ModuleViewsProvider>
+  <HostConfigsProvider><ModuleViewsProvider registry={moduleViews}><App controller={controller} /></ModuleViewsProvider></HostConfigsProvider>
 </TooltipProvider></MotionConfig></ErrorBoundary></HostI18nProvider></StrictMode>);

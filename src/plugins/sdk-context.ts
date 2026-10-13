@@ -75,10 +75,9 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
     id,
     content: readOnly(host.content?.reader(access(id, undefined, scope)) ?? missing),
     get: contract => readData(id, null, contract),
-    resume: () => { checkMutation(); host.sessions.resume(id, objectId); },
     snapshot() {
       checkAvailable();
-      return sessionSnapshot(id, host.sessions.title(id), host.sessions.nodes(id), host.sessions.path(id), host.sessions.canResume(id, objectId));
+      return sessionSnapshot(id, host.sessions.title(id), host.sessions.nodes(id), host.sessions.path(id));
     },
     title: {
       get: () => { checkAvailable(); return host.sessions.title(id); },
@@ -102,7 +101,7 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
       };
       try {
         synchronous(() => work({
-          append(contract, data) {
+          append(contract, data, options) {
             check();
             const declared = records.get(contract.id);
             if (!declared || !belongsTo(internal.id, contract.id))
@@ -113,7 +112,7 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
             if (!parsed.success) throw new PluginApiError("invalid_argument", "The record does not match its declared schema.");
             const value = jsonSchema.parse(parsed.data);
             // 来源由写入通道打戳：插件身份来自操作柄，资源来自已校验的对象引用。
-            const recordId = appendRecord(writer, declared, value, { plugin: internal.id, resource: ref ? { id: ref.id, kind: ref.kind } : null });
+            const recordId = appendRecord(writer, declared, value, { plugin: internal.id, resource: ref ? { id: ref.id, kind: ref.kind } : null }, options);
             host.content?.bind({ ...access(id, ref?.id, scope), sessionId: id }, { kind: "record", id: recordId }, value);
             return recordId;
           },
@@ -173,7 +172,11 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
   };
   const context: PluginContext = {
     id: internal.id, dir: internal.dir, log: internal.log,
-    config: (schema, defaults, options) => { checkAvailable(); return internal.config(schema, defaults, options); },
+    config: contract => {
+      checkAvailable();
+      if (contract.plugin !== internal.id) throw new PluginApiError("foreign_resource", "The configuration belongs to another plugin.");
+      return internal.config(contract);
+    },
     secrets: internal.secrets, db: () => { checkAvailable(); return internal.db(); },
     tasks: {
       start(key, run, options) {
@@ -225,7 +228,7 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
           observer: { event(event) {
             if (event.type === "progress") {
               const run = running.get(ref.id);
-              if (run) run.live = event.blocks.map(block => ({ ...structuredClone(block), agentId: ref.id }));
+              if (run) run.live = event.blocks.map(block => ({ ...structuredClone(block), objectId: ref.id }));
               progressTimer ??= setTimeout(() => { progressTimer = undefined; host.sessions.progressChanged(ref.sessionId); }, 32);
             }
             return receive(event);

@@ -43,7 +43,7 @@ export default definePlugin({ namespace: ns, version: "1.0.0", modules: [
 
 两种 `commit` 都可同时 `writer.set(DataContract, value)` 和 `writer.append(RecordContract, data)`：前者覆盖当前会话或对象数据，后者追加本插件声明过的记录。模块及资源的 `records` 声明决定可写记录，宿主使用声明的 schema 校验，填节点身份、父指针与对象关联。提交回调须同步完成；Promise 导致回滚，回调结束后的 writer 失效。嵌套同会话提交加入外层事务，失败的内层写入回滚，通知仅在最外层提交成功后派发。
 
-快照的路径、记录和不可变资源数据固定在读取时刻，`position.nodeId / continuationId` 分别给出当前位置与可续接位置。`session.get` 和 `object.get` 读取当前数据；数据按会话、对象作用域和具型契约隔离，随会话保存，不能据此恢复历史。数据契约使用 `ns.data(name, schema)`，记录使用 `defineRecord(id, { schema })`，均不要求手填版本。读取按所属类型的 schema 解码；兼容数据继续读取，不兼容数据明确不可用或保留 unknown。插件用自己的 schema 兼容旧形状并负责迁移，读取不修改原始记录。纯数据提交通知视图，不追加时间轴或触发事件观察者。
+快照的路径、记录和不可变资源数据固定在读取时刻，`position.nodeId` 给出当前位置；执行体投影上下文时自行截取合理位置。`session.get` 和 `object.get` 读取当前数据；数据按会话、对象作用域和具型契约隔离，随会话保存，不能据此恢复历史。数据契约使用 `ns.data(name, schema)`，记录使用 `defineRecord(id, { schema })`，均不要求手填版本。读取按所属类型的 schema 解码；兼容数据继续读取，不兼容数据明确不可用或保留 unknown。插件用自己的 schema 兼容旧形状并负责迁移，读取不修改原始记录。纯数据提交通知视图，不追加时间轴或触发事件观察者。
 
 `snapshot.records.first(Contract, {scope}) / last(Contract, {scope})` 按固定快照的契约首尾索引定位，只解码目标记录；返回 null／known／unknown，损坏的首尾记录不跳过。`query` 解码所有匹配记录，`all` 提供原始信封。`scope` 为 `path` 或 `session`。`session.title.propose(text, {expected})` 可在同步 `commit` 内调用，与本次事件／数据一起提交或回滚；需记录标题来源的插件自行声明记录并在标题应用成功后追加。
 
@@ -91,7 +91,7 @@ import { Read, settings, service } from "@example/tools/public";
 
 ## 插件配置
 
-在装配位置调用 `plugin.config(schema, defaults)` 声明本插件的一份配置，并向业务模块注入所需分组的当前值读取和更新接口。更新基于最新完整配置，不缓存整份旧值覆盖其他分组。默认值须通过原始 schema 和 JSON 校验；重复调用仍须复用同一 schema 与默认值。数据保存于插件目录的 `.atelier/config.json`，凭据通过 `secrets` 保存。
+在纯契约中用 `ns.config(schema, defaults)` 声明本插件唯一的配置契约，后台以 `plugin.config(contract)` 取得 `get / update / subscribe`，前端以 `useRendererConfig(contract)` 读取；装配位置向业务模块注入所需分组的当前值读取和更新接口。更新基于最新完整配置，不缓存整份旧值覆盖其他分组。默认值须通过原始 schema 和 JSON 校验；重复调用须传入同一契约实例。数据保存于插件目录的 `.atelier/config.json`，凭据通过 `secrets` 保存。
 
 设置页只展示已加载且声明了配置的插件，按插件分组。Zod 的 `.meta({ title, description })` 提供表单标题与字段说明；宿主使用输入 JSON Schema 选择字符串、数值、开关和枚举控件，必需的嵌套对象按字段分组。可选对象、数组、动态对象、联合、引用及不能投影的 schema 使用完整 JSON 值编辑，不推断另一套领域结构。所有保存仍由原始 Zod schema 校验，包括不能在 JSON Schema 表达的 refinement；失败保留草稿与原文件。
 
@@ -143,7 +143,7 @@ ResourceDescription、ToolView、CreationEntry 的 label／description 接收 Ui
 
 翻译目录在包的 `atelier.i18n.catalogs` 中显式列出，例如 `{ "zh-Hans": "./locales/zh-Hans.json" }`；目录内容为 `{ "counter.title": "计数器" }`。无需源语言目录，部分翻译逐条回退默认文案。公共导出的消息保留提供方 owner；没有 renderer 的包也能交付静态目录。React 与 react-intl context 由宿主提供共享实例，插件不初始化另一套全局语言状态。
 
-后台配置可用第三个可选参数：`plugin.config(schema, defaults, { presentation: { fields: { "/limit": { title: messages.limit } } } })`。固定对象字段使用 JSON Pointer，根为 `""`，`/` 与 `~` 分别转义为 `~1` 与 `~0`；数组和动态字段继续整体 JSON 编辑。展示映射不改变后台校验，语言切换也不重读配置或重置草稿。错误的 code 用于分支，英文 message 用于诊断，可选 display 持有 UiText；准备拒绝的业务原因码与 display 会进入命令回执，已有纯字符串提示仍有效。
+配置契约可用第三个可选参数：`ns.config(schema, defaults, { presentation: { fields: { "/limit": { title: messages.limit } } } })`。固定对象字段使用 JSON Pointer，根为 `""`，`/` 与 `~` 分别转义为 `~1` 与 `~0`；数组和动态字段继续整体 JSON 编辑。展示映射不改变后台校验，语言切换也不重读配置或重置草稿。错误的 code 用于分支，英文 message 用于诊断，可选 display 持有 UiText；准备拒绝的业务原因码与 display 会进入命令回执，已有纯字符串提示仍有效。
 
 完整纯声明与后台配置用例见 [i18n 作者示例](examples/i18n.ts)，语言与回退契约见 [公共 i18n](../../docs/i18n.md)。项目的 `npm run i18n:extract -- /path/to/plugin` 用真实 FormatJS CLI 抽取标准声明到插件根的 `.i18n/`，`npm run i18n:check -- /path/to/plugin` 检查 ICU、参数及冲突并报告覆盖率；未翻译条目不使外部插件失败。保持 defaultMessage 在交付物中，默认文案始终提供可读回退。
 

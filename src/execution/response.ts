@@ -1,9 +1,9 @@
-import type { RecordSource } from "@atelier/sdk/contracts";
+import type { ModelBlock, ModelSource } from "@atelier/sdk/contracts";
 import { ModelFailure, type ModelEvent, type StreamPart } from "../model/contract.ts";
 import { parsePartialJson } from "ai";
 import { jsonSchema, type Json, type ToolOutcome } from "../shared/model.ts";
 import type { ToolInvocationInfo, ToolResult } from "@atelier/sdk/contracts";
-import { emptyCompletion, type BlockCompletion, type LiveBlock, type NewNode } from "../shared/session.ts";
+import type { ModelCompletion, ModelLiveBlock } from "@atelier/sdk/contracts";
 
 type BufferedBlock = {
   part: StreamPart;
@@ -30,9 +30,9 @@ export class ResponseBuffer {
   private finalized = false;
 
   constructor(
-    private readonly identity: { source: RecordSource; responseId: string; requestParentId: string | null; model: string; adapter: string; scope: string },
-    private readonly append: (node: NewNode) => string,
-    private readonly complete: (blockId: string | null, completion: BlockCompletion) => void,
+    private readonly identity: { responseId: string; requestParentId: string | null; source: ModelSource },
+    private readonly append: (block: ModelBlock) => string,
+    private readonly complete: (blockId: string | null, completion: ModelCompletion) => void,
   ) {}
 
   accept(event: ModelEvent): void {
@@ -91,9 +91,9 @@ export class ResponseBuffer {
     }
   }
 
-  live(): LiveBlock[] {
+  live(): ModelLiveBlock[] {
     return [...this.blocks.values()].filter(block => !block.savedId).map(block => {
-      const base = { id: `${this.identity.responseId}:${block.ordinal}`, agentId: this.identity.source.resource!.id,
+      const base = { id: `${this.identity.responseId}:${block.ordinal}`,
         responseId: this.identity.responseId, ordinal: block.ordinal };
       return block.part.kind === "toolcall"
         ? { ...base, kind: "toolcall", name: block.part.name, argumentsText: block.text, arguments: block.done ? block.arguments : block.previewArguments,
@@ -143,9 +143,9 @@ export class ResponseBuffer {
 
   private save(block: BufferedBlock, complete: boolean, outcome: ToolOutcome | null = null): void {
     if (block.savedId) throw new ModelFailure("protocol", "The response block is already saved.");
-    const common = { ...this.identity, ...emptyCompletion, ordinal: block.ordinal, complete, continuation: block.continuation };
+    const common = { ...this.identity, ordinal: block.ordinal, complete, continuation: block.continuation };
     block.savedId = this.append(block.part.kind === "toolcall"
-      ? { ...common, kind: "toolcall", callId: block.part.callId, name: block.part.name, argumentsText: block.text, arguments: block.arguments, outcome }
-      : { ...common, kind: block.part.kind, text: block.text });
+      ? { ...common, kind: "toolcall" as const, callId: block.part.callId, name: block.part.name, argumentsText: block.text, arguments: block.arguments, outcome }
+      : { ...common, kind: block.part.kind, text: block.text } as ModelBlock);
   }
 }

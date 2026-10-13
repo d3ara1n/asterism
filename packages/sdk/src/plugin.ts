@@ -3,6 +3,8 @@ import type { Json } from "./json.ts";
 import { bindMessages, type SourceMessage, type UiMessage } from "./i18n.ts";
 import { defineData, type DataContract } from "./presentation.ts";
 import { defineResource, type ResourceContract } from "./module-contract.ts";
+import { defineConfig, type ConfigContract } from "./config.ts";
+import type { ConfigurationPresentation } from "./i18n.ts";
 
 const pluginIdPattern = /^[a-z0-9][a-z0-9-]*(?:\.[a-z0-9][a-z0-9-]*)+$/u;
 const shortNamePattern = /^[a-z0-9][a-z0-9._-]*$/u;
@@ -17,6 +19,8 @@ export interface PluginNamespace {
   name(short: string): string;
   resource<S extends Json>(name: string, stateSchema: z.ZodType<S>): ResourceContract<S>;
   data<T extends Json>(name: string, schema: z.ZodType<T>): DataContract<T>;
+  /** 插件唯一的用户配置契约。 */
+  config<T extends Json>(schema: z.ZodType<T>, defaults: NoInfer<T>, options?: { presentation?: ConfigurationPresentation }): ConfigContract<T>;
 }
 export function pluginNamespace(id: string): PluginNamespace {
   if (!pluginIdPattern.test(id)) throw new Error(`Invalid plugin ID: ${id}`);
@@ -29,6 +33,7 @@ export function pluginNamespace(id: string): PluginNamespace {
     messages: (sourceLocale, definitions) => bindMessages(id, sourceLocale, definitions),
     resource: (short, stateSchema) => defineResource(name(short), stateSchema),
     data: (short, schema) => defineData(name(short), schema),
+    config: (schema, defaults, options) => defineConfig(id, schema, defaults, options),
   };
 }
 export function belongsTo(pluginId: string, qualified: string): boolean {

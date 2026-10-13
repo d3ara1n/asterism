@@ -4,6 +4,9 @@ import { coreChannel } from "./core.ts";
 
 export const pluginConfigurationVersion = 2;
 export const pluginConfigurationChannel = coreChannel("plugin-configuration");
+export const pluginConfigurationChangedChannel = coreChannel("plugin-configuration-changed");
+/** 某插件配置的当前值已变化；接收方重读配置，不携带值。 */
+export const pluginConfigurationChangedSchema = z.strictObject({ kind: z.literal("plugin-configuration.changed"), id: z.string().min(1).max(160) });
 const id = z.string().min(1).max(160);
 export const pluginConfigurationSchema = z.strictObject({
   id, schema: jsonSchema.nullable(), defaults: jsonSchema, value: jsonSchema,
@@ -30,4 +33,5 @@ export const pluginConfigurationResponseSchema = z.strictObject({ kind: z.litera
   version: z.literal(pluginConfigurationVersion), id: z.string().uuid(), result: pluginConfigurationResultSchema });
 export interface PluginConfigurationBridge {
   execute(command: PluginConfigurationCommand): Promise<PluginConfigurationResult>;
+  onChanged(listener: (pluginId: string) => void): () => void;
 }

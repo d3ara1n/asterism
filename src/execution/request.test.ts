@@ -35,7 +35,7 @@ function model(events: ModelEvent[], prepare = () => {}): ModelAdapter {
   return { validate() {}, version: "test-adapter", prepare() { prepare(); return { async *stream() { yield* events; } }; } };
 }
 async function execute(request: ModelRunRequest, adapter: ModelAdapter, capabilities = empty()) {
-  return runModelRequest({ ...request, plugin: "example.agent" }, Promise.resolve({ adapter, settings, capabilities, system: request.system, messages: await resolveInput(request.messages, undefined, request.signal) }));
+  return runModelRequest(request, Promise.resolve({ adapter, settings, capabilities, system: request.system, messages: await resolveInput(request.messages, undefined, request.signal) }));
 }
 const resource = { id: "r", kind: "example.resource/item", title: "Item", data: {} };
 const write = defineImplementation({ ...defineData("example.resource/write", z.number().describe("Current value.")),

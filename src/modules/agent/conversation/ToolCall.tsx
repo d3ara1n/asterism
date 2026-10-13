@@ -1,4 +1,4 @@
-import { useI18n, useRendererTools, useRendererCatalogs } from "@atelier/sdk/renderer";
+import { useI18n, useRendererTools, useRendererConfig } from "@atelier/sdk/renderer";
 import { TextCursorInput, Clock, Wrench } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import { useState } from "react";
@@ -12,7 +12,7 @@ import { Spinner } from "../../../renderer/shared/ui/spinner";
 import { toolsMessages } from "../../messages/tools";
 import { Disclosure } from "./Disclosure";
 import { advanceToolDisclosure, initialToolDisclosure, toolCallState, type ToolCallNode } from "./tool-state";
-import { ToolPreferences } from "../configuration";
+import { CoreSettings } from "../../settings/contract";
 
 const labels = {
   running: toolsMessages.toolRunning, partial: toolsMessages.toolPartial, failed: toolsMessages.toolFailed,
@@ -25,7 +25,7 @@ export function ToolCall({ node }: { node: ToolCallNode }) {
   const tools = useRendererTools();
   const reducedMotion = useReducedMotion();
   const state = toolCallState(node);
-  const preferences = useRendererCatalogs().get(ToolPreferences) ?? { toolInputAutoExpand: true, toolInputAutoCollapse: true };
+  const preferences = useRendererConfig(CoreSettings);
   const filling = state.phase === "input";
   const view = state.props ? tools.resolve(state.props) : null;
   const hasInputBody = filling && view?.body !== undefined && view.body !== null;

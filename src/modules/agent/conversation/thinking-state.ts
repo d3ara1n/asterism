@@ -1,6 +1,5 @@
-import type { Appearance } from "../../../shared/theme";
 
-type Preferences = Pick<Appearance, "thinkingAutoExpand" | "thinkingAutoCollapse">;
+type Preferences = { thinkingAutoExpand: boolean; thinkingAutoCollapse: boolean };
 export interface ThinkingDisclosure { streaming: boolean; open: boolean }
 
 export function initialThinkingDisclosure(streaming: boolean, preferences: Preferences): ThinkingDisclosure {

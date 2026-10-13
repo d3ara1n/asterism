@@ -109,10 +109,6 @@ export const historyMessages = pluginNamespace("atelier.host").messages("en", de
     id: "continueDescription",
     defaultMessage: "All agents will use this session path. Existing descendants are kept. External resource contents are not restored.",
   },
-  continueAdjusted: {
-    id: "continueAdjusted",
-    defaultMessage: "This position cannot be used to continue. The nearest valid ancestor shown below will be used.",
-  },
   continueConfirm: {
     id: "continueConfirm",
     defaultMessage: "Use this position",

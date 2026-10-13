@@ -1,7 +1,6 @@
 import { CircleDot, History, Eye, PanelsTopLeft, MoreHorizontal, ArrowUpLeft, GitBranch, ChevronDown, Layers, Check } from "lucide-react";
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 
-import { snap } from "../../../shared/session-path";
 import { commonMessages } from "../../messages/common";
 import { historyMessages } from "../../messages/history";
 import { useModuleViews } from "../../modules/views";
@@ -214,12 +213,11 @@ function ContinueAction({ controller }: { controller: SessionController }) {
   const unsettled = progress.unsettledObjectIds.length > 0;
   const wait = i18n.formatMessage(historyMessages.waitForResources, { names: progress.unsettledObjectIds.map(id => resources.get(id)?.title ?? i18n.formatMessage(historyMessages.unknownResource)).join(", ") });
   const disabled = saving || unsettled || state.busy || state.status !== "ready";
-  const actual = target?.id ? snap(snapshot.nodes, target.id) : null;
+  const actual = target?.id ?? null;
   const actualEntry = target ? historyEntries(snapshot.nodes, registry).find(entry => entry.node.id === actual) : undefined;
   return <><span title={unsettled ? wait : i18n.formatMessage(historyMessages.continueFromHere)}><Button size="xs" disabled={!historical || disabled} onClick={() => setTarget({ id: snapshot.at })}><GitBranch />{i18n.formatMessage(historyMessages.continueFromHere)}</Button></span>
     <AlertDialog open={target !== null} onOpenChange={open => { if (!open && !saving) setTarget(null); }}><AlertDialogContent>
       <AlertDialogHeader><AlertDialogTitle>{i18n.formatMessage(historyMessages.continueTitle)}</AlertDialogTitle><AlertDialogDescription>{i18n.formatMessage(historyMessages.continueDescription)}</AlertDialogDescription></AlertDialogHeader>
-      {target && actual !== target.id && <p className="type-caption">{i18n.formatMessage(historyMessages.continueAdjusted)}</p>}
       <p className="type-body break-words">{actualEntry?.label ?? i18n.formatMessage(historyMessages.historyStart)}</p>
       {unsettled && <p className="type-caption">{wait}</p>}
       {state.error && <p className="type-caption" role="alert">{i18n.text(state.error)}</p>}

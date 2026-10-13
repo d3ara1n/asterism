@@ -1,9 +1,9 @@
 import { recordRenderer, type RecordRenderer } from "@atelier/sdk/renderer";
-import { Brain, MessageSquareText, User, Wrench, TriangleAlert, Info, Workflow } from "lucide-react";
+import { Brain, MessageSquareText, User, Wrench, TriangleAlert, Info } from "lucide-react";
 
 import { inputSummary } from "../../shared/model-input";
 import { recordMessages } from "../messages/records";
-import { Execution, UserMessage, Notice, ContextNotice } from "./records";
+import { Execution, UserMessage, Notice } from "./records";
 
 /** 代理记录的历史行：以样式区分用户、思考与输出，不依赖文字前缀。 */
 const RowText = ({ label, className }: { label: string; className?: string }) => <span className={`block truncate leading-5 ${className ?? ""}`}>{label}</span>;
@@ -34,11 +34,5 @@ export const agentRecordViews: RecordRenderer[] = [
   recordRenderer(Notice, {
     icon: data => data.level === "info" ? <Info className="size-4" /> : <TriangleAlert className="size-4" />,
     label: data => data.message,
-  }),
-  recordRenderer(ContextNotice, {
-    icon: <Workflow className="size-4" />,
-    // 投影给模型的工作台事件借用原事件的视图；没有原事件时显示投影文本。
-    label: (data, ctx, source) => (data.origin
-      && ctx.describe({ ...source, contract: { id: data.origin.type }, data: data.origin.data })?.label) || data.text,
   }),
 ];

@@ -6,6 +6,8 @@ import { agentSelectionSchema } from "../../shared/model.ts";
 
 /** 代理是普通资源：创建事件只记录身份；模型选择等可变数据属于资源私有状态。 */
 export const Agent = core.resource("agent", z.object({}));
+/** 首页发起时默认选用的内置代理预设。 */
+export const defaultAgentPreset = "worker";
 /** 首页首次提交的宿主草稿目标；不属于可路由到已有对象的动作。 */
 export const startAgentContentTarget = { contractId: core.name("session.start"), resourceKind: Agent.kind } as const;
 export const AgentSelection = core.data("agent.selection", z.strictObject({

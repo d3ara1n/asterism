@@ -16,7 +16,7 @@ import { Directory, DirectoryView } from "../modules/filesystem/contract.ts";
 import { Note, NoteContent } from "../modules/notes/contract.ts";
 import { Agent, SubmitAgentInput } from "../modules/agent/contract.ts";
 import { applicationStorage } from "../shared/application.ts";
-import { emptyCompletion } from "../shared/session.ts";
+import { flat } from "../session/test-nodes.ts";
 import type { SessionDataStore } from "../session/data.ts";
 
 const ns = pluginNamespace("test.counter");
@@ -106,7 +106,7 @@ describe("工作台 SDK 的宿主实现", () => {
     const c = counter();
     const { service, sessionId } = open([c.plugin]);
     const objectId = await create(service, sessionId);
-    const before = service.sessions.tree.nodes(sessionId).length;
+    const before = service.sessions.tree.nodes(sessionId).map(flat).length;
     for (const command of [
       { ...resourceCall(ChangeCount, { amount: 1 }), id: "test.counter/missing" },
       { id: SubmitAgentInput.id, input: { amount: 1 } },
@@ -114,7 +114,7 @@ describe("工作台 SDK 的宿主实现", () => {
     ]) {
       await expect(service.sessions.execute({ type: "resource.command", sessionId, objectId, command })).rejects.toMatchObject({ code: "invalid_request" });
     }
-    expect(service.sessions.tree.nodes(sessionId)).toHaveLength(before);
+    expect(service.sessions.tree.nodes(sessionId).map(flat)).toHaveLength(before);
     expect(c.context().object(sessionId, Counter, objectId).get(State)).toBe(1);
   });
   it("创建输入只解析一次，准备接受后 create 使用转换结果", async () => {
@@ -207,21 +207,6 @@ describe("工作台 SDK 的宿主实现", () => {
     await Promise.all([closing, rejected]);
     expect(closed).toBe(true);
   });
-  it("普通动作提交后续接退出自身分支，后续写入仍须检查当前路径", async () => {
-    const c = counter({ afterAction: object => {
-      object.session.resume();
-      object.commit(writer => { writer.set(State, 9); });
-    } });
-    const { service, sessionId } = open([c.plugin]);
-    service.sessions.tree.append(sessionId, { ...emptyCompletion, kind: "thinking", source: { plugin: "atelier.core", resource: { id: "agent", kind: "atelier.core/agent" } }, text: "Reasoning",
-      responseId: "interrupted", requestParentId: null, ordinal: 0, complete: true, model: "test/test",
-      adapter: "test", scope: "test", continuation: null });
-    const id = await create(service, sessionId, 1);
-    await expect(service.sessions.execute({ type: "resource.command", sessionId, objectId: id, command: resourceCall(ChangeCount, { amount: 0 }) }))
-      .rejects.toMatchObject({ code: "unavailable" });
-    expect(service.sessions.tree.cursor(sessionId)).toBeNull();
-    expect(c.context().object(sessionId, Counter, id).get(State)).toBe(2);
-  });
   it("首页 prepare 不能将首条输入替换成不提交输入的动作", async () => {
     const namespace = pluginNamespace("test.first-input");
     const plugin = definePlugin({ namespace, version: "1", modules: [defineModule(() => ({
@@ -252,13 +237,13 @@ describe("工作台 SDK 的宿主实现", () => {
     const session = c.context().session(sessionId);
     const object = c.context().object(sessionId, Counter, id);
     const other = c.context().session(service.sessions.tree.create("Other"));
-    const before = service.sessions.tree.nodes(sessionId);
+    const before = service.sessions.tree.nodes(sessionId).map(flat);
     observed.length = notifications.length = 0;
     session.commit(writer => { writer.set(State, 8); });
     expect(session.get(State)).toBe(8);
     expect(object.get(State)).toBe(3);
     expect(other.get(State)).toBeNull();
-    expect(service.sessions.tree.nodes(sessionId)).toEqual(before);
+    expect(service.sessions.tree.nodes(sessionId).map(flat)).toEqual(before);
     expect(observed).toEqual([]);
     expect(notifications).toEqual(["session.changed"]);
     notifications.length = 0;
@@ -269,7 +254,7 @@ describe("工作台 SDK 的宿主实现", () => {
     })).toThrow("Rollback.");
     expect(session.get(State)).toBe(8);
     expect(object.get(State)).toBe(3);
-    expect(service.sessions.tree.nodes(sessionId)).toEqual(before);
+    expect(service.sessions.tree.nodes(sessionId).map(flat)).toEqual(before);
     expect(observed).toEqual([]);
     expect(notifications).toEqual([]);
     const foreign = pluginNamespace("other.plugin").data("state", z.number());
@@ -302,7 +287,7 @@ describe("工作台 SDK 的宿主实现", () => {
     });
     const { service, sessionId } = open([]);
     await service.sessions.execute({ type: "resource.create", sessionId, kind: Note.kind, creation: { id: "atelier.core/note.create" }, input: {}, position: { x: 0, y: 0 } });
-    const note = foldWorkbench(service.sessions.tree.path(sessionId)).objects.find(object => object.kind === Note.kind)!;
+    const note = foldWorkbench(service.sessions.tree.path(sessionId).map(flat)).objects.find(object => object.kind === Note.kind)!;
     expect(note.title).toBe("Untitled note");
     expect(data.get(sessionId, note.id, NoteContent.id)).toEqual({ text: "" });
     expect(modules.resources.project(note).data).toEqual({ text: "" });
@@ -329,7 +314,7 @@ describe("工作台 SDK 的宿主实现", () => {
     const file = join(root, applicationStorage.databaseDirectory, applicationStorage.databaseFile);
     const db = new DatabaseSync(file);
     try {
-      expect(db.prepare("PRAGMA user_version").get()).toMatchObject({ user_version: 16 });
+      expect(db.prepare("PRAGMA user_version").get()).toMatchObject({ user_version: 17 });
       expect(db.prepare("SELECT contract_id, data_json FROM session_data").all())
         .toMatchObject([{ contract_id: NoteContent.id, data_json: JSON.stringify({ text: "Saved text" }) }]);
       db.exec("PRAGMA user_version = 1");
@@ -358,7 +343,7 @@ describe("工作台 SDK 的宿主实现", () => {
       { contract: { id: DirectoryView.id }, data: { path: directory } },
       { contract: { id: DirectoryView.id }, data: { path: directory } },
     ]);
-    expect(service.sessions.tree.nodes(sessionId).filter(node => node.kind === "event" && node.type === "resource_created"))
+    expect(service.sessions.tree.nodes(sessionId).map(flat).filter(node => node.kind === "event" && node.type === "resource_created"))
       .toMatchObject([{ data: { type: Directory.kind, title: "directory", path: directory } },
         { data: { type: Directory.kind, title: "Materials", path: directory } }]);
   });
@@ -370,7 +355,7 @@ describe("工作台 SDK 的宿主实现", () => {
       await expect(service.sessions.execute({ type: "resource.create", sessionId, kind: Directory.kind, creation: { id: "atelier.core/directory.create" },
         input, position: { x: 0, y: 0 } })).rejects.toMatchObject({ code: "invalid_request" });
     }
-    expect(service.sessions.tree.nodes(sessionId)).toEqual([]);
+    expect(service.sessions.tree.nodes(sessionId).map(flat)).toEqual([]);
     expect(service.sessions.snapshot(sessionId).workbench.objects).toEqual([]);
   });
 
@@ -435,7 +420,7 @@ describe("工作台 SDK 的宿主实现", () => {
     });
     const { service, sessionId } = open([plugin]);
     await create(service, sessionId, 4);
-    const resource = foldWorkbench(service.sessions.tree.path(sessionId)).objects[0]!;
+    const resource = foldWorkbench(service.sessions.tree.path(sessionId).map(flat)).objects[0]!;
     const adapted = tools.match(resource)[0]!;
     expect(adapted.prepare(resource, "null", {})).toMatchObject({ kind: "rejected", error: { code: "invalid_arguments" } });
     const invocation = adapted.prepare(resource, null, {});
@@ -445,7 +430,6 @@ describe("工作台 SDK 的宿主实现", () => {
     expect(progress).toEqual([4]);
     expect(() => toolObject.commit(writer => { writer.set(State, 5); })).toThrow(/execution scope is closed/);
     expect(() => toolObject.session.commit(writer => { writer.set(State, 5); })).toThrow(/execution scope is closed/);
-    expect(() => toolObject.session.resume()).toThrow(/execution scope is closed/);
     expect(() => toolObject.session.title.propose("Late", { expected: "Counter" })).toThrow(/execution scope is closed/);
     expect(() => toolObject.streams.publish("late", new Uint8Array())).toThrow(/execution scope is closed/);
   });
@@ -456,7 +440,7 @@ describe("工作台 SDK 的宿主实现", () => {
     const c = counter({ failCreate: true, onCreate: object => { provisional = object; }, observe: record => observed.push(record) });
     const { service, sessionId } = open([c.plugin]);
     await expect(create(service, sessionId)).rejects.toThrow("Creation failed.");
-    expect(service.sessions.tree.nodes(sessionId)).toEqual([]);
+    expect(service.sessions.tree.nodes(sessionId).map(flat)).toEqual([]);
     expect(observed).toEqual([]);
     expect(() => provisional.get(State)).toThrow(/reference/);
     expect(() => provisional.commit(writer => { writer.set(State, 9); })).toThrow(/reference/);
@@ -466,14 +450,14 @@ describe("工作台 SDK 的宿主实现", () => {
     const c = counter(); const { service, sessionId } = open([c.plugin]);
     const id = await create(service, sessionId);
     const object = c.context().object(sessionId, Counter, id);
-    const count = service.sessions.tree.nodes(sessionId).length;
+    const count = service.sessions.tree.nodes(sessionId).map(flat).length;
     let escaped!: ObjectWriter;
     expect(() => object.commit(((writer: ObjectWriter) => {
       escaped = writer; writer.set(State, 99); writer.append(Changed, { value: 99 }); return Promise.resolve();
     }) as unknown as Parameters<ObjectExecutor["commit"]>[0])).toThrow(/synchronously/);
     expect(() => escaped.set(State, 123)).toThrow(/outside/);
     expect(object.get(State)).toBe(1);
-    expect(service.sessions.tree.nodes(sessionId)).toHaveLength(count);
+    expect(service.sessions.tree.nodes(sessionId).map(flat)).toHaveLength(count);
     const forged = defineRecord(Changed.id, { schema: z.object({ value: z.string() }) });
     expect(() => object.commit(writer => { writer.append(forged, { value: "invalid" }); })).toThrow(/declared record contract instance/);
     const undeclared = defineRecord(ns.name("undeclared"), { schema: z.number() });
@@ -516,7 +500,7 @@ describe("工作台 SDK 的宿主实现", () => {
     context.session(sessionId).commit(writer => { writer.append(Input, "first"); });
     expect(seen).toEqual([[Input.id, 1], [Follow.id, 2]]);
     expect(context.session(sessionId).snapshot().records.first(Input, { scope: "path" })).toMatchObject({ status: "known", data: "first", record: { source: { plugin: "test.events", resource: null } } });
-    expect(service.sessions.tree.nodes(sessionId)).toHaveLength(2);
+    expect(service.sessions.tree.nodes(sessionId).map(flat)).toHaveLength(2);
   });
 
   it("标题比较更新与来源事件同事务生效，后续异常回滚且观察者只看到一致状态", () => {
@@ -578,14 +562,14 @@ describe("工作台 SDK 的宿主实现", () => {
     expect(result).toMatchObject({ reason: "completed", tools: [{ kind: "succeeded" }], source: { adapter: "test-adapter" } });
     expect(inputs).toHaveLength(1);
     expect(object.session.snapshot().records.query(Execution, { scope: "path" }).map(record => record.status)).toEqual(["known", "known"]);
-    expect(service.sessions.tree.nodes(sessionId).every(node => node.kind === "event")).toBe(true);
-    const count = service.sessions.tree.nodes(sessionId).length;
+    expect(service.sessions.tree.nodes(sessionId).map(flat).every(node => node.kind === "event")).toBe(true);
+    const count = service.sessions.tree.nodes(sessionId).map(flat).length;
     await c.context().models.run({ object: object.ref, requestParentId: object.session.snapshot().position.nodeId,
       target, system: { blocks: [] }, messages: [{ kind: "input", parts: [{ kind: "text", text: "Second projection" }] }], signal: new AbortController().signal,
       observer: { event() {} },
     });
     expect(inputs.map(input => input.messages)).toEqual([[{ kind: "input", parts: [{ kind: "text", text: "First projection" }] }], [{ kind: "input", parts: [{ kind: "text", text: "Second projection" }] }]]);
-    expect(service.sessions.tree.nodes(sessionId)).toHaveLength(count);
+    expect(service.sessions.tree.nodes(sessionId).map(flat)).toHaveLength(count);
     const streamRequest = {
       target, system: { blocks: [] }, messages: [{ kind: "input" as const, parts: [{ kind: "text" as const, text: "Generate a title" }] }], signal: new AbortController().signal,
     };
@@ -599,7 +583,7 @@ describe("工作台 SDK 的宿主实现", () => {
     expect(inputs[2]!.tools).toEqual([]);
     expect(inputs[2]!.messages).toEqual([{ kind: "input", parts: [{ kind: "text" as const, text: "Generate a title" }] }]);
     expect(stream.at(-1)).toMatchObject({ type: "finish", source: { adapter: "test-adapter" } });
-    expect(service.sessions.tree.nodes(sessionId)).toHaveLength(count);
+    expect(service.sessions.tree.nodes(sessionId).map(flat)).toHaveLength(count);
     expect(service.sessions.running).toBe(false);
   });
 

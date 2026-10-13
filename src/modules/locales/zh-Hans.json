@@ -107,5 +107,9 @@
   "thinkingHigh": "高",
   "thinkingXhigh": "极高",
   "recordModelResponse": "模型响应结束",
-  "recordSessionNamed": "会话命名为「{title}」"
+  "recordSessionNamed": "会话命名为「{title}」",
+  "settings.thinkingAutoExpand": "思考时自动展开",
+  "settings.thinkingAutoCollapse": "思考结束后自动折叠",
+  "settings.toolInputAutoExpand": "工具填充时自动展开",
+  "settings.toolInputAutoCollapse": "工具填充结束后自动折叠"
 }

@@ -6,7 +6,7 @@ import type { ModelInput, ModelEvent } from "./contract.ts";
 import { createProviderModel } from "./provider.ts";
 import { composeSystemPrompt, projectSystemPrompt } from "../modules/agent/system-prompt.ts";
 import { ResponseBuffer } from "../execution/response.ts";
-import type { NewNode } from "../shared/session.ts";
+import type { ModelBlock } from "@atelier/sdk/contracts";
 
 const input: ModelInput = {
   settings: { provider: { id: "p", revision: 1, name: "Provider", enabled: true, baseUrl: "https://example.invalid", protocol: "anthropic", auth: "api_key" },
@@ -88,9 +88,9 @@ describe("AI SDK 适配契约", () => {
     };
     const adapter = new AiSdkAdapter(async () => "synthetic-key",
       (value, key) => createProviderModel(value.settings.provider, value.settings.model, key, transport));
-    const nodes: NewNode[] = [];
-    const buffer = new ResponseBuffer({ source: { plugin: "atelier.core", resource: { id: "a", kind: "atelier.core/agent" } }, responseId: "r", requestParentId: null, model: "p/m:medium",
-      adapter: adapter.version, scope: modelScope(current.settings) },
+    const nodes: ModelBlock[] = [];
+    const buffer = new ResponseBuffer({ responseId: "r", requestParentId: null,
+      source: { model: "p/m:medium", adapter: adapter.version, scope: modelScope(current.settings) } },
       node => { nodes.push(node); return `block-${nodes.length}`; }, () => {});
     const liveText: string[] = [];
     for await (const event of adapter.prepare(current).stream(new AbortController().signal)) {

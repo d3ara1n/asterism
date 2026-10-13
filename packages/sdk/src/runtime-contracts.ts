@@ -1,6 +1,7 @@
 /** 插件与宿主共用的后台接口；存储、事务和授权由宿主实现。 */
 import type { z } from "zod";
-import type { PluginConfigOptions, UiText } from "./i18n.ts";
+import type { UiText } from "./i18n.ts";
+import type { ConfigContract } from "./config.ts";
 import type { DatabaseSync } from "node:sqlite";
 import type { Json } from "./json.ts";
 import type { PluginNamespace } from "./plugin.ts";
@@ -21,7 +22,7 @@ export interface PluginContext {
   readonly id: string;
   readonly dir: string;
   readonly log: PluginLogger;
-  config<T extends Json>(schema: z.ZodType<T>, defaults: T, options?: PluginConfigOptions): PluginConfig<T>;
+  config<T extends Json>(contract: ConfigContract<T>): PluginConfig<T>;
   readonly secrets: PluginSecrets;
   db(): DatabaseSync;
   readonly tasks: PluginTasks;

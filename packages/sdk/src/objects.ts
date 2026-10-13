@@ -6,7 +6,8 @@ import type { ContentReader, ContentScope } from "./content-runtime.ts";
 
 /** 同步事务中的数据与事件写入；宿主限制 writer 的调用有效期。 */
 export interface SessionWriter {
-  append<T extends Json>(contract: RecordContract<T>, data: NoInfer<T>): string;
+  /** audit 记录只供审计（如中断的不完整输出），不作为查看或继续位置。 */
+  append<T extends Json>(contract: RecordContract<T>, data: NoInfer<T>, options?: { audit?: boolean }): string;
   set<T extends Json>(contract: DataContract<T>, data: NoInfer<T>): void;
 }
 export type ObjectWriter = SessionWriter;
@@ -18,7 +19,6 @@ export interface SessionReader {
   readonly title: { get(): string };
 }
 export interface SessionExecutor extends SessionReader {
-  resume(): void;
   commit(work: (writer: SessionWriter) => undefined): void;
   /** propose 可在同步 commit 内调用，与该次数据／事件写入原子生效；false 表示标题未应用。 */
   readonly title: SessionReader["title"] & { propose(text: string, options: { expected: string }): boolean };

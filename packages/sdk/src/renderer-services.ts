@@ -1,6 +1,7 @@
 import { createContext, useContext } from "react";
 import type { Json } from "./json.ts";
 import type { DataContract } from "./presentation.ts";
+import type { ConfigContract } from "./config.ts";
 import type { ModelLiveBlock } from "./models.ts";
 import type { ToolRenderProps, ToolView } from "./renderer-tools.ts";
 
@@ -28,3 +29,11 @@ export function useRendererTools(): RendererTools { return required(useContext(T
 export function useRendererModels(): RendererModels { return required(useContext(Models), "models"); }
 export function useRendererNavigation(): RendererNavigation { return required(useContext(Navigation), "navigation"); }
 import type { UiText } from "./i18n.ts";
+
+/** 渲染层读取插件配置：宿主按契约解码，设置页保存后随变更通知更新；只能读取本插件的配置。 */
+export interface RendererConfigs { get<T extends Json>(contract: ConfigContract<T>): { value: T; status: "saved" | "defaults" | "invalid" } }
+const Configs = createContext<RendererConfigs | null>(null);
+export const RendererConfigsProvider = Configs.Provider;
+export function useRendererConfig<T extends Json>(contract: ConfigContract<T>): T {
+  return required(useContext(Configs), "configs").get(contract).value;
+}

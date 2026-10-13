@@ -31,6 +31,8 @@ export interface PluginHostServices {
   models: HostModels;
   vault?: CredentialVault | null;
   stream?: (event: ObjectStreamPayload) => void;
+  /** 插件配置变更：设置页保存、恢复默认与后台 update 都经此通知。 */
+  configurationChanged?: (pluginId: string) => void;
   log?: (pluginId: string, level: "info" | "warn" | "error", message: string, error?: unknown) => void;
 }
 export interface PluginManifest {
@@ -132,9 +134,10 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
       const log: PluginLogger = { info: message => write(id, "info", message), warn: message => write(id, "warn", message),
         error: (message, error) => write(id, "error", message, error) };
       const storage = new PluginStorage(services.extensionsDirectory, id, services.vault ?? null, log.warn);
+      storage.onChanged = () => services.configurationChanged?.(id);
       const lifecycle = new RunLifecycle(sessionId => services.sessions.progressChanged(sessionId)); lifecycles.push(lifecycle);
       const taskHost = new TaskHost(log, lifecycle.group("task"));
-      const sdk = createSdkContext({ id, dir: storage.dir, log, config: (schema, defaults, options) => storage.config(schema, defaults, options),
+      const sdk = createSdkContext({ id, dir: storage.dir, log, config: contract => storage.config(contract),
         secrets: storage.secrets, db: () => storage.db(), tasks: taskHost }, services, lifecycle.group("model"));
       const resources: ResourceBackend[] = [], tools: ToolImplementation[] = [], observers: SessionObserver[] = [], preparers: CommandPreparer[] = [];
       const actions: ActionContract<unknown>[] = [];

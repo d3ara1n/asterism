@@ -97,8 +97,8 @@ describe("两级自动命名", () => {
       .toMatchObject([{ title: "修复登录", source: "auto", auto: { level: "initial", model: "test/model" } },
         { title: "完善 token 刷新", source: "auto", auto: { level: "refined", model: "test/model" } }]);
     expect(test.session.title.get()).toBe("完善 token 刷新");
-    expect(test.service.sessions.tree.nodes(test.sessionId).filter(node => node.kind === "event" &&
-      node.type === SessionNamed.id).every(node => node.kind === "event" && node.model === null)).toBe(true);
+    expect(test.service.sessions.tree.nodes(test.sessionId).filter(node =>
+      node.contract === SessionNamed.id).every(node => node.model === null)).toBe(true);
     const projected = projectForAgent(snapshot, test.agentId);
     expect(JSON.stringify(projected)).not.toContain("完善 token 刷新");
     expect(JSON.stringify(projected)).not.toContain("session.named");

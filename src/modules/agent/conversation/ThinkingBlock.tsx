@@ -1,11 +1,11 @@
-import { useI18n, useRendererCatalogs } from "@atelier/sdk/renderer";
+import { useI18n, useRendererConfig } from "@atelier/sdk/renderer";
 import { Brain } from "lucide-react";
 import { memo, useEffect, useState } from "react";
 
 import { Badge } from "../../../renderer/shared/ui/badge";
 import { Spinner } from "../../../renderer/shared/ui/spinner";
 import { thinkingMessages } from "../../messages/thinking";
-import { ThinkingPreferences } from "../configuration";
+import { CoreSettings } from "../../settings/contract";
 import { Disclosure } from "./Disclosure";
 import { Markdown } from "./Markdown";
 import { advanceThinkingDisclosure, initialThinkingDisclosure, thinkingDuration } from "./thinking-state";
@@ -17,7 +17,7 @@ type ThinkingNode = Extract<TimelineItem, { kind: "thinking" }>;
 export function ThinkingBlock({ node }: { node: ThinkingNode }) {
 
   const streaming = !("complete" in node);
-  const preferences = useRendererCatalogs().get(ThinkingPreferences) ?? { thinkingAutoExpand: true, thinkingAutoCollapse: true };
+  const preferences = useRendererConfig(CoreSettings);
   const [disclosure, setDisclosure] = useState(() => initialThinkingDisclosure(streaming, preferences));
   const next = advanceThinkingDisclosure(disclosure, streaming, preferences);
   if (next !== disclosure) setDisclosure(next);

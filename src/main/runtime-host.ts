@@ -8,7 +8,7 @@ import { sessionChangedSchema, sessionResponseSchema, type SessionChanged, type 
 import { configurationChangedSchema, configurationResponseSchema, type ConfigurationCommand, type ConfigurationResult } from "../shared/configuration.ts";
 import { secretRequestSchema } from "../shared/secrets.ts";
 import { handleSecretRequest } from "./secrets.ts";
-import { pluginConfigurationResponseSchema, type PluginConfigurationCommand, type PluginConfigurationResult } from "../shared/plugin-configuration.ts";
+import { pluginConfigurationChangedSchema, pluginConfigurationResponseSchema, type PluginConfigurationCommand, type PluginConfigurationResult } from "../shared/plugin-configuration.ts";
 import { objectStreamSchema, type ObjectStream } from "../shared/object-stream.ts";
 import { contentResponseSchema, type ContentCommand, type ContentResult } from "../shared/content.ts";
 
@@ -22,7 +22,8 @@ export class RuntimeHost {
   private status: RuntimeStatus = "starting";
   constructor(private readonly onStatus: (status: RuntimeStatus) => void, private readonly onConfigurationChanged: () => void = () => {},
     private readonly onSessionChanged: (event: SessionChanged) => void = () => {},
-    private readonly onStream: (event: ObjectStream) => void = () => {}) {}
+    private readonly onStream: (event: ObjectStream) => void = () => {},
+    private readonly onPluginConfigurationChanged: (pluginId: string) => void = () => {}) {}
   private setStatus(status: RuntimeStatus): void { this.status = status; this.onStatus(status); }
 
   start(entry: string, root: string): Promise<void> {
@@ -93,6 +94,8 @@ export class RuntimeHost {
           return;
         }
         if (configurationChangedSchema.safeParse(raw).success) { this.onConfigurationChanged(); return; }
+        const pluginChanged = pluginConfigurationChangedSchema.safeParse(raw);
+        if (pluginChanged.success) { this.onPluginConfigurationChanged(pluginChanged.data.id); return; }
         if (contentResponseSchema.safeParse(raw).success) { this.contentRequests?.receive(raw); return; }
         if (configurationResponseSchema.safeParse(raw).success) { this.configurationRequests?.receive(raw); return; }
         if (pluginConfigurationResponseSchema.safeParse(raw).success) { this.pluginConfigurationRequests?.receive(raw); return; }

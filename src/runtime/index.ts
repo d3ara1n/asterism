@@ -24,6 +24,7 @@ try {
     status: item.status, error: item.error ?? null, renderer: item.status === "loaded" ? item.renderer ?? null : null }));
   service = new ApplicationService(root, { catalogs: packages.flatMap(item => item.catalogs ?? []), packages: listed, plugins: packages.flatMap(item => item.definition ? [item.definition] : []), protector: secrets, onConfigurationChanged: () => port.postMessage({ kind: "configuration.changed" }),
     onSessionChanged: event => port.postMessage(event),
+    onPluginConfigurationChanged: id => port.postMessage({ kind: "plugin-configuration.changed", id }),
     onStream: event => port.postMessage({ kind: "object.stream", ...event }) });
   port.on("message", ({ data }) => {
     if (data?.kind === "shutdown") {

@@ -41,7 +41,7 @@ export function historyResourceViews(entries: readonly HistoryEntry[]): Array<{ 
 export function historyResources(nodes: readonly SessionNode[]): Map<string, HistoryResource> {
   const result = new Map<string, HistoryResource>();
   for (const node of nodes) {
-    if (node.kind !== "event" || node.type !== "resource_created") continue;
+    if (node.contract !== "resource_created") continue;
     const data = record(node.data);
     if (typeof data.id === "string" && typeof data.type === "string") {
       result.set(data.id, { id: data.id, kind: data.type, title: typeof data.title === "string" ? data.title : getI18n().formatMessage(historyMessages.unknownResource) });

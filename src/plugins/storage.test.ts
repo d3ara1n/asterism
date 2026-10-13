@@ -1,3 +1,4 @@
+import { defineConfig } from "@atelier/sdk/contracts";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -31,17 +32,14 @@ function setup() {
 }
 
 describe("插件托管存储", () => {
-  it("配置声明复用同一 schema 和默认值，默认值与界面快照不反向修改声明", () => {
+  it("一个插件一份配置契约，默认值与界面快照不反向修改声明", () => {
     const { open } = setup();
     const storage = open("acme.settings");
-    const schema = z.strictObject({ limit: z.number().int().min(1) }).meta({ title: "Limits" });
-    const defaults = { limit: 5 };
-    const config = storage.config(schema, defaults);
-    defaults.limit = 99;
+    const contract = defineConfig("acme.settings", z.strictObject({ limit: z.number().int().min(1) }).meta({ title: "Limits" }), { limit: 5 });
+    const config = storage.config(contract);
     expect(config.get()).toEqual({ limit: 5 });
-    expect(storage.config(schema, { limit: 5 }).get()).toEqual({ limit: 5 });
-    expect(() => storage.config(schema, { limit: 6 })).toThrow(/one configuration/);
-    expect(() => storage.config(z.strictObject({ limit: z.number() }), { limit: 5 })).toThrow(/same schema/);
+    expect(storage.config(contract).get()).toEqual({ limit: 5 });
+    expect(() => storage.config(defineConfig("acme.settings", z.strictObject({ limit: z.number() }), { limit: 5 }))).toThrow(/one configuration/);
     const snapshot = storage.configuration("acme.settings")!;
     expect(snapshot).toMatchObject({ id: "acme.settings", schema: { title: "Limits" }, defaults: { limit: 5 }, value: { limit: 5 }, status: "defaults" });
     (snapshot.defaults as { limit: number }).limit = 123;
@@ -52,7 +50,7 @@ describe("插件托管存储", () => {
     const storage = open("acme.settings");
     const schema = z.strictObject({ lower: z.number(), upper: z.number() })
       .refine(value => value.lower <= value.upper, { path: ["upper"], message: "Upper must not be below lower." });
-    const config = storage.config(schema, { lower: 1, upper: 2 });
+    const config = storage.config(defineConfig("acme.settings", schema, { lower: 1, upper: 2 }));
     config.get();
     const file = join(storage.dir, managedDirectory, "config.json");
     writeFileSync(file, "{broken");
@@ -68,17 +66,34 @@ describe("插件托管存储", () => {
     expect(existsSync(join(storage.dir, managedDirectory, "db.sqlite"))).toBe(true);
     expect(config.get()).toEqual({ lower: 1, upper: 2 });
   });
-  it("配置不合 schema 时回退默认值并告警，写入非法值被拒绝", () => {
+  it("配置不合 schema 时回退默认值并告警，更新基于当前值，非法值被拒绝", () => {
     const { open, warnings } = setup();
     const storage = open("acme.a");
-    const config = storage.config(z.strictObject({ limit: z.number().int() }), { limit: 5 });
+    const config = storage.config(defineConfig("acme.a", z.strictObject({ limit: z.number().int() }), { limit: 5 }));
     expect(config.get()).toEqual({ limit: 5 });
     writeFileSync(join(storage.dir, managedDirectory, "config.json"), JSON.stringify({ limit: "many" }));
     expect(config.get()).toEqual({ limit: 5 });
     expect(warnings).toHaveLength(1);
-    expect(() => config.set({ limit: 1.5 })).toThrow(expect.objectContaining({ code: "invalid_argument" }));
-    config.set({ limit: 9 });
+    expect(() => config.update(() => ({ limit: 1.5 }))).toThrow(expect.objectContaining({ code: "invalid_argument" }));
+    config.update(value => ({ limit: value.limit + 4 }));
     expect(config.get()).toEqual({ limit: 9 });
+  });
+  it("设置页保存、恢复与后台更新都通知订阅者和宿主，退订后不再通知", () => {
+    const { open } = setup();
+    const storage = open("acme.a");
+    const hosted: number[] = [];
+    storage.onChanged = () => hosted.push(1);
+    const config = storage.config(defineConfig("acme.a", z.strictObject({ limit: z.number() }), { limit: 1 }));
+    const seen: number[] = [];
+    const stop = config.subscribe(value => seen.push(value.limit));
+    storage.saveConfiguration({ limit: 2 });
+    config.update(() => ({ limit: 3 }));
+    storage.resetConfiguration();
+    expect(seen).toEqual([2, 3, 1]);
+    expect(hosted).toHaveLength(3);
+    stop();
+    storage.saveConfiguration({ limit: 4 });
+    expect(seen).toEqual([2, 3, 1]);
   });
 
   it("两个插件的同名凭据互不可见，插件目录不存明文", async () => {

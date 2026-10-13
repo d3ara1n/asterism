@@ -1,11 +1,10 @@
 import type { SessionRecord, ModelBlock, ModelItem, ModelPart } from "@atelier/sdk/contracts";
 import { PluginApiError, type SessionSnapshot } from "@atelier/sdk/runtime";
-import { Execution, UserMessage, ContextNotice } from "./records.ts";
+import { Execution, UserMessage } from "./records.ts";
 
 /** 按请求起点组合响应，事件顺序不改变；上下文只从当前时间轴读取。 */
-export function projectForAgent(snapshot: Pick<SessionSnapshot, "records">, agentId: string, at?: string | null): ModelItem[] {
-  const records = snapshot.records.all({ scope: "path" });
-  const path = at === undefined ? records : at === null ? [] : records.slice(0, records.findIndex(record => record.id === at) + 1);
+export function projectForAgent(snapshot: Pick<SessionSnapshot, "records">, agentId: string): ModelItem[] {
+  const path = snapshot.records.all({ scope: "path" });
   const positions = new Map(path.map((record, index) => [record.id, index]));
   const responses = new Map<string, { record: SessionRecord; block: ModelBlock }[]>();
   for (const record of path) {
@@ -29,7 +28,10 @@ export function projectForAgent(snapshot: Pick<SessionSnapshot, "records">, agen
   const emit = (origin: string | null) => {
     for (const blocks of after.get(origin) ?? []) {
       const first = blocks[0]!.block;
-      out.push({ kind: "output", scope: first.source.scope, adapter: first.source.adapter, parts: blocks.map(({ block }) => part(block)) });
+      // 唯一的上下文截取规则：记录可能因回溯、断网或取消停在思考之后，末尾思考不作为模型输出结尾。
+      const parts = blocks.map(({ block }) => part(block));
+      while (parts.at(-1)?.kind === "thinking") parts.pop();
+      if (parts.length) out.push({ kind: "output", scope: first.source.scope, adapter: first.source.adapter, parts });
       for (const { block } of blocks) if (block.kind === "toolcall" && block.outcome)
         out.push({ kind: "result", callId: block.callId, name: block.name, outcome: block.outcome });
     }
@@ -38,9 +40,10 @@ export function projectForAgent(snapshot: Pick<SessionSnapshot, "records">, agen
   for (const record of path) {
     const message = UserMessage.decode(record);
     if (message?.status === "known" && record.source.resource?.id === agentId) out.push({ kind: "input", parts: message.data.parts });
-    const context = ContextNotice.decode(record);
-    if (context?.status === "known" && (context.data.recipient === null || context.data.recipient === agentId))
-      out.push({ kind: "context", parts: [{ kind: "text", text: context.data.text }] });
+    // 平台公开的模型可见文本：任何记录可携带，按接收者投影。
+    const context = record.context;
+    if (context && (context.recipient === null || context.recipient === agentId))
+      out.push({ kind: "context", parts: [{ kind: "text", text: context.text }] });
     emit(record.id);
   }
   return out;

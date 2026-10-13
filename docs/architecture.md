@@ -30,7 +30,7 @@
 - React Flow 只维护节点、端点和连线的视图投影，不拥有对象、授权或任务历史。其核心不提供自动布局算法，布局引擎与手动位置保留策略须单独验证，见 [布局验证立案](../plans/todo-2026-09-18-workbench-layout.md)。
 - Monaco 只在需要编辑或查看 diff 时挂载，不为每张文件卡片常驻编辑器。流式内容更新应局限于相关视图，不因每个文本增量重算整张画布布局。
 - Vercel AI SDK 用于模型请求、流式响应和工具协议适配。可复用执行辅助能力，但所有工具执行仍经过工坊的授权与事件记录；不引入另一套 agent 框架会话或检查点作为任务历史真值。
-- 模型接入上层封装支持扩展协议；协议差异集中于适配边界。工坊 transcript 为会话级扁平节点树，thinking、text 和 toolcall 平铺保存，通过 response_id 关联；响应由消费者归组投影。能力层负责执行、错误、工具结果与实际模型输入，向界面提供查询、订阅和操作接口；界面独立决定展示与聚合。适配层构造目标协议要求的消息分组。具体契约见 [会话与代理能力](conversation-core.md)。
+- 模型接入上层封装支持扩展协议；协议差异集中于适配边界。工坊 transcript 为会话级扁平的通用记录树；执行体插件（core 代理即其一）以自己的记录契约保存输出块，按自身规则归组与投影，宿主不认识块结构。能力层负责执行、错误、工具结果与实际模型输入，向界面提供查询、订阅和操作接口；界面独立决定展示与聚合。适配层构造目标协议要求的消息分组。具体契约见 [会话与代理能力](conversation-core.md)。
 - electron-vite 负责代码构建，Electron Forge 负责打包分发；二者减少工程配置，不接管运行时职责。版本、进程入口与打包产物验证见 [工程工具立案](../plans/todo-2026-09-18-desktop-tooling.md)。
 
 ## 模型兼容边界
@@ -104,8 +104,7 @@ renderer 的 `features/session/` 拥有会话查看位置、读取协调、历�
 - 大内容记录稳定引用及完整性信息；文件落盘与数据库索引需处理崩溃中间态。
 - 宿主存储与协议格式独立版本化；插件领域数据由所属类型的 schema 判断兼容性，迁移归插件。
 - 当前视图状态与业务事件分开。
-- `session_nodes` 保存 `seq`、`id`、`session_id`、`parent_id`、`kind` 与不可变 JSON `payload`；`response_id`、`ordinal` 为生成列并有响应内唯一序号约束。每个载荷含记录来源 `source: { plugin, resource }`；块载荷另含请求起点、正文、完成状态、时间与协议来源。用量视图按 `source.resource.id` 归属代理。检查点格式未定。
-- `block_completions` 只追加一次终态元数据，外键绑定实际块，响应身份唯一；查询时合并，不更新节点。`session_blocks` 提供块与计量的 SQL 视图，`session_usage` 合并块计量及无内容块异常 notice 的计量，便于按会话/代理/模型筛选汇总。
+- `session_nodes` 保存 `seq`、`id`、`session_id`、`parent_id`、`kind`（通用记录或工作台事件）与不可变 JSON `payload`；载荷含记录来源 `source: { plugin, resource }`、契约身份与数据。宿主不为任何执行体的输出建列、约束或视图；响应分组、终态与用量由执行体插件在自己的记录中表达。检查点格式未定。
 - `cursor_selections` 追加历史选择审计，保存原位置、请求位置、实际位置、原因和时间；与 `sessions.cursor` 更新处于同一事务。选择日志不属于消息路径。
 - 应用数据统一位于 Electron `app.getPath('userData')` 下：发布为 `appData/dev.dearain.atelier`，开发为 `appData/dev.dearain.atelier-development`。两个目录都在获取单实例锁前创建并显式设置，固定身份不随品牌显示名称变化；不写入源码仓库或安装目录。外观与窗口状态显式以同一根目录构造 electron-store，任务进程只接受主进程传入的数据根。
 - Chromium 的 cookie、缓存等会话数据使用独立的 `sessionData` 路径，不与应用数据混放。
@@ -230,7 +229,7 @@ core 自行实现 Agent、Note、Directory 等领域功能，资源与事件契�
 
 plugin api 是稳定包装层，不承诺可序列化，不向插件暴露宿主注册表。当前会话／对象数据与时间轴事件分别保存，前者不随历史位置恢复，后者用于重建历史；插件目录为 `<data>/extensions/<pluginId>/`，其中 `.atelier/` 由宿主管理，凭据明文经 secrets 机制读取。
 
-插件配置由装配位置通过 `plugin.config(schema, defaults)` 声明，每个插件对应一份 `.atelier/config.json`。装配位置向业务模块注入各自所需的当前值读取和更新接口，更新基于最新完整配置。宿主保存原始 Zod schema 与配置对象，向设置页投影输入 JSON Schema、默认值、当前值与读取状态；凭据和插件数据库不进入配置响应。独立 `plugin-configuration` 通道按插件身份提供读取／保存／恢复，沿用可信 frame 检查和双向校验；恢复默认先改草稿再保存。
+插件配置：插件在纯契约中以 `ns.config(schema, defaults, { presentation })` 声明唯一一份配置契约，前后台共享；后台 `plugin.config(contract)` 返回 `get / update / subscribe`，前端 `useRendererConfig(contract)` 读取当前值；宿主负责存储、校验、设置页与前后台变更通知。偏好（上次选择等）不属于配置，每个插件对应一份 `.atelier/config.json`。装配位置向业务模块注入各自所需的当前值读取和更新接口，更新基于最新完整配置。宿主保存原始 Zod schema 与配置对象，向设置页投影输入 JSON Schema、默认值、当前值与读取状态；凭据和插件数据库不进入配置响应。独立 `plugin-configuration` 通道按插件身份提供读取／保存／恢复，沿用可信 frame 检查和双向校验；恢复默认先改草稿再保存。
 
 工具名称覆盖按用户插件列表顺序解析，绑定被覆盖声明的实现下线，同一声明对象的多个实现保留。公共依赖决定初始化与清理顺序，不改变覆盖顺序。声明冲突、越出命名空间的贡献或模块抛错使该插件装配失败，依赖它的插件不可用；成功 setup 的清理责任立即登记，后续失败取消该插件工作并逆序清理，等待收束后释放托管存储。任务、动作和模型调用共用宿主内部生命周期机制，各自保留去重、排队和请求授权规则。
 

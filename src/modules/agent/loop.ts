@@ -26,7 +26,9 @@ export function createAgentLoop(deps: { selection: AgentSelectionService; tasks:
             const result = await deps.run({ object: object.ref, requestParentId: snapshot.position.nodeId,
               target: deps.selection.target(selection), system: composeSystemPrompt(agent), messages: projectForAgent(snapshot, object.ref.id), signal,
               tools: deps.selection.tools(agent), cache: { expectHit: request > 0 }, observer: { event(event) {
-                if (event.type !== "progress") object.commit(writer => { writer.append(Execution, event); });
+                if (event.type !== "progress") object.commit(writer => { writer.append(Execution, event,
+                  // 未完成块与迟到终态只留审计，不作为查看或继续位置。
+                  { audit: event.type === "completion" || (event.type === "block" && !event.block.complete) }); });
               } },
             });
             // 事件提交失败时请求已中止且无法写入诊断；在循环层补一条可见通知，避免静默停止。

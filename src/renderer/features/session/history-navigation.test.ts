@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { emptyCompletion, type NewNode, type SessionNode } from "../../../shared/session";
+import { node, created as make, text, thinking, call, message, notice, event, attached, removed, hostSource, agentSource } from "../../../session/test-nodes";
 import { historyMessages } from "../../messages/history";
 import { getI18n } from "../../shared/i18n";
 import { ViewRegistry } from "../../modules/registry";
@@ -8,10 +8,7 @@ import { builtinViews } from "../../../modules/renderer";
 import { workbenchRecordViews } from "../workbench/records";
 import { historyBefore, historyEntries, historyResources, historyResourceViews, matchesHistoryView } from "./history-navigation";
 
-const block = { ...emptyCompletion, source: { plugin: "atelier.core", resource: { id: "a", kind: "atelier.core/agent" } }, responseId: "r", ordinal: 0, requestParentId: null,
-  complete: true, model: "test", continuation: null, adapter: "test", scope: "test" };
-const node = (id: string, parentId: string | null, value: NewNode): SessionNode => ({ ...value, id, parentId, sessionId: "s", createdAt: "2026-10-10T10:00:00Z" });
-const created = (id: string, title: string, kind = "agent"): NewNode => ({ kind: "event", type: "resource_created", source: { plugin: "atelier.host", resource: null }, recipient: null, data: { id, title, type: kind }, model: null });
+const created = (id: string, title: string, kind = "agent") => make(id, title, kind);
 const label = new ViewRegistry([...builtinViews, workbenchRecordViews]);
 
 describe("历史导航契约", () => {
@@ -20,12 +17,11 @@ describe("历史导航契约", () => {
       node("1", null, created("a", "Same name")),
       node("2", "1", created("b", "Same name")),
       node("3", "2", created("n", "Read target", "note")),
-      node("4", "3", { ...block, kind: "text", text: "A output" }),
-      node("5", "4", { kind: "event", type: "resource_attached", source: { plugin: "atelier.host", resource: null }, recipient: "a", data: { id: "n", agentId: "a" }, model: null }),
-      node("6", "5", { ...block, kind: "toolcall", ordinal: 1, callId: "call", name: "resource_call", argumentsText: "{}",
-        arguments: { resource_id: "n", tool: "read", args: {} }, outcome: { kind: "succeeded", data: null, model: [{ kind: "text", text: "null" }] } }),
-      node("7", "6", { ...block, kind: "text", source: { plugin: "atelier.core", resource: { id: "b", kind: "atelier.core/agent" } }, text: "B output" }),
-      node("8", "7", { kind: "notice", source: { plugin: "atelier.host", resource: null }, level: "info", code: "session", message: "Session notice" }),
+      node("4", "3", text("a", "r", 0, "A output")),
+      node("5", "4", attached("a", "n", null)),
+      node("6", "5", call("a", "r", 1, "call", { name: "resource_call", arguments: { resource_id: "n", tool: "read", args: {} } })),
+      node("7", "6", text("b", "r", 0, "B output")),
+      node("8", "7", notice(null, "session", "Session notice", "info")),
     ];
     const entries = historyEntries(nodes, label);
     expect(entries.filter(entry => matchesHistoryView(entry, { kind: "resource", resourceId: "a" })).map(entry => entry.node.id)).toEqual(["4", "6"]);
@@ -39,8 +35,8 @@ describe("历史导航契约", () => {
   it("已移除、其他分支与非代理资源的自发事件仍可作为视图来源", () => {
     const nodes = [
       node("1", null, created("r", "Game", "board")),
-      node("2", "1", { kind: "event", type: "object_removed", source: { plugin: "atelier.host", resource: null }, recipient: null, data: { id: "r" }, model: null }),
-      node("3", "1", { kind: "event", type: "board.move", source: { plugin: "example.board", resource: { id: "r", kind: "board" } }, recipient: null, data: {}, model: null }),
+      node("2", "1", removed("r")),
+      node("3", "1", event("board.move", {}, { source: { plugin: "example.board", resource: { id: "r", kind: "board" } } })),
     ];
     const entries = historyEntries(nodes, label);
     expect(historyResourceViews(entries)).toEqual([{ resource: { id: "r", kind: "board", title: "Game" }, count: 1 }]);
@@ -50,10 +46,10 @@ describe("历史导航契约", () => {
   it("同一响应穿插工作台事件与另一代理输出时保持独立落点和追加顺序", () => {
     const nodes = [
       node("1", null, created("a", "Alpha")),
-      node("2", "1", { ...block, kind: "text", text: "First\nparagraph" }),
+      node("2", "1", text("a", "r", 0, "First\nparagraph")),
       node("3", "2", created("b", "Beta")),
-      node("4", "3", { ...block, kind: "text", source: { plugin: "atelier.core", resource: { id: "b", kind: "atelier.core/agent" } }, responseId: "other", text: "Interleaved" }),
-      node("5", "4", { ...block, kind: "text", ordinal: 1, text: "Second paragraph" }),
+      node("4", "3", text("b", "other", 0, "Interleaved")),
+      node("5", "4", text("a", "r", 1, "Second paragraph")),
     ];
     nodes[4].createdAt = "2026-10-09T10:00:00Z"; // 时钟时间不参与导航排序。
     const entries = historyEntries(nodes, label);
@@ -66,8 +62,8 @@ describe("历史导航契约", () => {
   it("移除对象与另一分支不丢失资源身份；资源自发事件沿自己的身份解析", () => {
     const nodes = [
       node("1", null, created("n", "Old note", "note")),
-      node("2", "1", { kind: "event", type: "object_removed", source: { plugin: "atelier.host", resource: null }, recipient: null, data: { id: "n" }, model: null }),
-      node("3", "1", { kind: "event", type: "custom.saved", source: { plugin: "example.custom", resource: { id: "n", kind: "note" } }, recipient: null, data: {}, model: null }),
+      node("2", "1", removed("n")),
+      node("3", "1", event("custom.saved", {}, { source: { plugin: "example.custom", resource: { id: "n", kind: "note" } } })),
     ];
     const entries = historyEntries(nodes, label);
     expect(historyResources(nodes).get("n")).toEqual({ id: "n", kind: "note", title: "Old note" });
@@ -78,12 +74,11 @@ describe("历史导航契约", () => {
   it("查看之前使用真实父链，不使用过滤后的上一行，并跳过不可选择的不完整块", () => {
     const nodes = [
       node("1", null, created("a", "A")),
-      node("2", "1", { ...block, kind: "thinking", text: "Reasoning" }),
-      node("3", "2", { ...block, kind: "toolcall", ordinal: 1, callId: "call", name: "resource_call", argumentsText: "{}",
-        arguments: { resource_id: "n", tool: "read", target: { path: "input.md" }, args: {} }, outcome: { kind: "succeeded", data: null, model: [{ kind: "text", text: "null" }] } }),
-      node("4", "3", { ...block, kind: "text", ordinal: 2, complete: false, text: "Interrupted" }),
-      node("5", "4", { kind: "message", source: { plugin: "atelier.core", resource: { id: "a", kind: "atelier.core/agent" } }, parts: [{ kind: "text", text: "Continue" }] }),
-      node("6", "1", { kind: "message", source: { plugin: "atelier.core", resource: { id: "a", kind: "atelier.core/agent" } }, parts: [{ kind: "text", text: "Another branch" }] }),
+      node("2", "1", thinking("a", "r", 0, "Reasoning")),
+      node("3", "2", call("a", "r", 1, "call", { name: "resource_call", arguments: { resource_id: "n", tool: "read", target: { path: "input.md" }, args: {} } })),
+      node("4", "3", text("a", "r", 2, "Interrupted", { complete: false })),
+      node("5", "4", message("a", "Continue")),
+      node("6", "1", message("a", "Another branch")),
     ];
     expect(historyEntries(nodes, label).map(entry => entry.node.id)).toEqual(["1", "2", "3", "5", "6"]);
     expect(historyEntries(nodes, label)[2].label).toBe("read · input.md");

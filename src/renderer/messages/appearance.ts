@@ -1,50 +1,6 @@
 import { defineMessages, pluginNamespace } from "@atelier/sdk/contracts";
 
 export const appearanceMessages = pluginNamespace("atelier.host").messages("en", defineMessages({
-  toolInputTitle: {
-    id: "toolInputTitle",
-    defaultMessage: "Tool input",
-  },
-  toolInputPreviewHint: {
-    id: "toolInputPreviewHint",
-    defaultMessage: "Supported tools show their input as it is generated.",
-  },
-  toolInputAutoExpand: {
-    id: "toolInputAutoExpand",
-    defaultMessage: "Expand while generating tool input",
-  },
-  toolInputAutoExpandHint: {
-    id: "toolInputAutoExpandHint",
-    defaultMessage: "Automatically open tool input previews. You can still close each block manually.",
-  },
-  toolInputAutoCollapse: {
-    id: "toolInputAutoCollapse",
-    defaultMessage: "Collapse when tool input ends",
-  },
-  toolInputAutoCollapseHint: {
-    id: "toolInputAutoCollapseHint",
-    defaultMessage: "Close the preview when input finishes or is interrupted. You can expand it again during execution.",
-  },
-  thinkingAutoExpand: {
-    id: "thinkingAutoExpand",
-    defaultMessage: "Expand while thinking",
-  },
-  thinkingAutoExpandHint: {
-    id: "thinkingAutoExpandHint",
-    defaultMessage: "Automatically open new thinking blocks. You can still close each block manually.",
-  },
-  thinkingAutoCollapse: {
-    id: "thinkingAutoCollapse",
-    defaultMessage: "Collapse when thinking ends",
-  },
-  thinkingAutoCollapseHint: {
-    id: "thinkingAutoCollapseHint",
-    defaultMessage: "Automatically close the block when thinking finishes or is interrupted.",
-  },
-  thinkingPreviewHint: {
-    id: "thinkingPreviewHint",
-    defaultMessage: "While thinking, a small window follows the latest content. Afterward, expand to read the full text.",
-  },
   jade: {
     id: "features_appearance_AppearanceSettings_1",
     defaultMessage: "Jade",

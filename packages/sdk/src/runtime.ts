@@ -19,10 +19,11 @@ export interface PluginLogger {
   warn(message: string): void;
   error(message: string, error?: unknown): void;
 }
-/** 宿主托管配置：在模块 setup 声明，设置页按同一 schema 编辑；get 读取当前值。 */
+/** 宿主托管配置的后台句柄：get 每次取当前值；update 基于最新完整配置；subscribe 接收设置页或其他模块的变更。 */
 export interface PluginConfig<T extends Json> {
   get(): T;
-  set(value: T): void;
+  update(next: (current: T) => T): void;
+  subscribe(listener: (value: T) => void): () => void;
 }
 /** 命名空间凭据：明文只在系统保护的 vault 中，插件目录只存引用。 */
 export interface PluginSecrets {

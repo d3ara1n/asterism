@@ -16,7 +16,7 @@ import { startupText } from "./startup-text.ts";
 import { startupMessages } from "../shared/error-display.ts";
 import { configurationChannel, configurationChangedChannel, configurationCommandSchema, type ConfigurationResult } from "../shared/configuration.ts";
 import { sessionChannel, sessionChangedChannel, sessionCommandSchema, type SessionResult } from "../shared/session.ts";
-import { pluginConfigurationChannel, pluginConfigurationCommandSchema, type PluginConfigurationResult } from "../shared/plugin-configuration.ts";
+import { pluginConfigurationChangedChannel, pluginConfigurationChannel, pluginConfigurationCommandSchema, type PluginConfigurationResult } from "../shared/plugin-configuration.ts";
 import { contentChannel, contentCommandSchema, type ContentResult } from "../shared/content.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -33,6 +33,8 @@ const runtime = new RuntimeHost(status => {
 }, event => {
   // 高频二进制只转发给窗口，不经会话 IPC 或持久化。
   if (window && !window.isDestroyed()) window.webContents.send(objectStreamChannel, event);
+}, pluginId => {
+  if (window && !window.isDestroyed()) window.webContents.send(pluginConfigurationChangedChannel, pluginId);
 });
 
 function createWindow(): void {

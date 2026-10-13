@@ -22,6 +22,8 @@ export interface SessionRecord {
   readonly contract: RecordRef;
   /** 写入者；宿主按写入通道打戳，关联对象属于 data。 */
   readonly source: RecordSource;
+  /** 平台写入的模型可见文本：执行体投影上下文时取用；recipient 为 null 表示所有执行体。 */
+  readonly context: { readonly text: string; readonly recipient: string | null } | null;
   readonly data: Json;
 }
 export type Decoded<D> =

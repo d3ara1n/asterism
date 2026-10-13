@@ -8,7 +8,7 @@ import { configurationChannel, configurationChangedChannel, configurationCommand
 import { appearanceChangedChannel, appearanceGetChannel, appearancePatchSchema, appearanceSetChannel, parseAppearance } from "../shared/theme.ts";
 import { sessionChannel, sessionChangedChannel, sessionCommandSchema, sessionResultSchema, sessionChangedSchema } from "../shared/session.ts";
 import { preferencesGetChannel, preferencesSetChannel, preferenceWriteSchema, uiStateSchemas } from "../shared/ui-state.ts";
-import { pluginConfigurationChannel, pluginConfigurationCommandSchema, pluginConfigurationResultSchema } from "../shared/plugin-configuration.ts";
+import { pluginConfigurationChangedChannel, pluginConfigurationChannel, pluginConfigurationCommandSchema, pluginConfigurationResultSchema } from "../shared/plugin-configuration.ts";
 import { contentChannel, contentCommandSchema, contentResultSchema } from "../shared/content.ts";
 
 const bridge: DesktopBridge = {
@@ -37,6 +37,11 @@ const bridge: DesktopBridge = {
       if (!parsed.success) return { ok: false, error: { code: "invalid_request", message: "Invalid plugin configuration command." } };
       try { return pluginConfigurationResultSchema.parse(await ipcRenderer.invoke(pluginConfigurationChannel, parsed.data)); }
       catch { return { ok: false, error: { code: "unavailable", message: "The plugin configuration connection was lost. Reload before retrying." } }; }
+    },
+    onChanged(listener) {
+      const handler = (_event: Electron.IpcRendererEvent, id: unknown) => { if (typeof id === "string") listener(id); };
+      ipcRenderer.on(pluginConfigurationChangedChannel, handler);
+      return () => ipcRenderer.removeListener(pluginConfigurationChangedChannel, handler);
     },
   },
   session: {

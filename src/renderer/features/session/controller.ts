@@ -16,7 +16,7 @@ export type SessionViewState = {
   navigationVersion: number;
 };
 const live: ViewPosition = { kind: "live" };
-const emptyProgress: SessionProgress = { revision: 0, version: 0, runningAgentIds: [], unsettledObjectIds: [], live: [] };
+const emptyProgress: SessionProgress = { revision: 0, version: 0, unsettledObjectIds: [], live: [] };
 
 /** 一个会话的查看位置、协调投影与操作入口。进度单独订阅，调用方不编排历史查询。 */
 export class SessionController {

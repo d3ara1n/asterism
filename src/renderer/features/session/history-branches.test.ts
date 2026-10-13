@@ -1,14 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { emptyCompletion, type SessionNode } from "../../../shared/session";
+import type { SessionNode } from "../../../shared/session";
+import { node, message as input, text } from "../../../session/test-nodes";
 import { arrivedBranch, branchContains, historyBranches, viewedBranch } from "./history-branches";
 
-const message = (id: string, parentId: string | null): SessionNode => ({
-  id, parentId, sessionId: "s", createdAt: "2026-10-10T10:00:00Z", kind: "message", source: { plugin: "atelier.core", resource: { id: "a", kind: "atelier.core/agent" } }, parts: [{ kind: "text", text: id }],
-});
-const interrupted = (id: string, parentId: string): SessionNode => ({
-  ...message(id, parentId), ...emptyCompletion, kind: "text", text: "Partial", source: { plugin: "atelier.core", resource: { id: "a", kind: "atelier.core/agent" } },
-  complete: false, responseId: "r", ordinal: 0, requestParentId: parentId, model: "test", continuation: null, adapter: "test", scope: "test",
-});
+const message = (id: string, parentId: string | null): SessionNode => node(id, parentId, input("a", id));
+const interrupted = (id: string, parentId: string): SessionNode => node(id, parentId, text("a", "r", 0, "Partial", { complete: false, requestParentId: parentId }));
 
 describe("历史分支 Tab 契约", () => {
   it("A-C-B 保留原后续，C-D 共享 C 并双向定位，不复制 A", () => {

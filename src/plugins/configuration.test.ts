@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { z } from "zod";
-import { pluginNamespace } from "@atelier/sdk/contracts";
+import { defineConfig, pluginNamespace } from "@atelier/sdk/contracts";
 import { defineModule, definePlugin, type PluginConfig } from "@atelier/sdk/runtime";
 import { ApplicationService } from "../runtime/service.ts";
 import { dispatchPluginConfiguration } from "../runtime/dispatch.ts";
@@ -23,7 +23,7 @@ describe("插件配置的 SDK 与 IPC 接入", () => {
     const defaults = { limit: 1, enabled: true, label: "Initial" };
     const handles = new Map<string, PluginConfig<z.infer<typeof schema>>>();
     const plugins = ["acme.a", "acme.b", "acme.none"].map(id => definePlugin({ namespace: pluginNamespace(id), version: "1", modules: [defineModule(plugin => {
-      if (id !== "acme.none") handles.set(id, plugin.config(schema, defaults));
+      if (id !== "acme.none") handles.set(id, plugin.config(defineConfig(id, schema, defaults)));
       return {};
     })] }));
     const root = mkdtempSync(join(tmpdir(), "plugin-config-")); roots.push(root);
@@ -31,7 +31,8 @@ describe("插件配置的 SDK 与 IPC 接入", () => {
     const request = (command: unknown) => pluginConfigurationResponseSchema.parse(dispatchPluginConfiguration(service, {
       kind: "plugin-configuration.request", version: pluginConfigurationVersion, id: randomUUID(), command,
     })).result;
-    const read = request({ type: "read" });
+    const own = (result: ReturnType<typeof request>) => result.ok ? { ...result, configurations: result.configurations.filter(item => item.id.startsWith("acme.")) } : result;
+    const read = own(request({ type: "read" }));
     expect(read).toMatchObject({ ok: true, configurations: [
       { id: "acme.a", schema: { title: "Example settings", properties: { limit: { title: "Limit" } } }, value: defaults, status: "defaults" },
       { id: "acme.b", value: defaults, status: "defaults" },
@@ -46,14 +47,14 @@ describe("插件配置的 SDK 与 IPC 接入", () => {
     expect(handles.get("acme.a")!.get()).toEqual(saved);
     expect(request({ type: "save", id: "missing.plugin", value: {} })).toMatchObject({ ok: false, error: { code: "not_found" } });
     expect(request({ type: "save", id: "acme.none", value: {} })).toMatchObject({ ok: false, error: { code: "not_found" } });
-    handles.get("acme.b")!.set({ ...defaults, limit: 4 });
-    expect(request({ type: "read" })).toMatchObject({ ok: true, configurations: [
+    handles.get("acme.b")!.update(() => ({ ...defaults, limit: 4 }));
+    expect(own(request({ type: "read" }))).toMatchObject({ ok: true, configurations: [
       { id: "acme.a", value: saved }, { id: "acme.b", value: { limit: 4 } },
     ] });
     await service.close(); services.splice(services.indexOf(service), 1);
     const reopened = new ApplicationService(root, { plugins }); services.push(reopened);
     expect(handles.get("acme.a")!.get()).toEqual(saved);
-    expect(reopened.configurePlugin({ type: "reset", id: "acme.a" })).toMatchObject([
+    expect(reopened.configurePlugin({ type: "reset", id: "acme.a" }).filter(item => item.id.startsWith("acme."))).toMatchObject([
       { id: "acme.a", value: defaults, status: "defaults" }, { id: "acme.b", value: { limit: 4 }, status: "saved" },
     ]);
     await reopened.close(); services.splice(services.indexOf(reopened), 1);

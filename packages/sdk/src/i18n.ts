@@ -80,7 +80,3 @@ export const configurationPresentationSchema = z.strictObject({
     })).optional(),
   })),
 });
-
-export interface PluginConfigOptions {
-  presentation?: ConfigurationPresentation;
-}

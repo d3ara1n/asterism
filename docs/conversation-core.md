@@ -7,12 +7,12 @@
 | 节点 | 数据 |
 | --- | --- |
 | message | 来源为接收代理资源、有序输入 parts；文字和文件引用随同一条用户消息保存 |
-| thinking / text | 来源为所属代理资源、response_id、request_parent_id、序号、正文、complete、续接资料与可空终态元数据 |
+| thinking / text | core 代理的 `Execution` 记录载荷：response_id、request_parent_id、序号、正文、complete、续接资料与可空终态元数据，由代理插件自行解释 |
 | toolcall | 同上请求身份与元数据，加本地/provider 调用 ID、工具名、参数与结局 |
 | event | 类型与小载荷；大内容保存到宿主内容存储后以 SDK 内容引用值关联 |
 | notice | 来源对象、级别、类型、消息 |
 
-block 通过 response_id 关联，response 由消费者投影，不设独立 response_end 节点。每个块携带 request_parent_id 和请求计算结果（adapter、模型表达式 `<providerId>/<modelId>[:<thinking>]`、协议作用域），以及可空的 usage、finishReason、rawFinishReason、providerResponseId。终态仅归属响应中序号最大的实际块，不能复制到各块；数据库通过唯一约束阻止重复计量。系统提示词、角色正文、工具目录、模型参数和完整请求不持久化。
+以下块字段均属 core 代理插件的记录载荷，宿主只按通用记录保存、不建索引或约束。block 通过 response_id 关联，response 由代理投影，不设独立 response_end 节点。每个块携带 request_parent_id 和请求计算结果（adapter、模型表达式 `<providerId>/<modelId>[:<thinking>]`、协议作用域），以及可空的 usage、finishReason、rawFinishReason、providerResponseId。终态仅归属响应中序号最大的实际块，不能复制到各块；数据库通过唯一约束阻止重复计量。系统提示词、角色正文、工具目录、模型参数和完整请求不持久化。
 
 续接资料保存为带适配版本的块级不透明字段：保留 Anthropic signature/redactedData，以及 OpenAI itemId/reasoningEncryptedContent/phase 白名单。不保存原始 HTTP、凭据、响应头或未筛选的 provider metadata。
 
@@ -105,7 +105,7 @@ DeepSeek 官方端点 `api.deepseek.com` 的 Responses 返回 `response.reasonin
 | `resource.command` | 路由到对象所属资源控制器；代理命令为 `submit`（追加消息并执行，仅本代理运行中返回 conflict）、`continue`、`configure`（修改资源私有选择，下一请求生效）、`cancel`（只停止该代理） |
 | `resource.create` | 由资源模块校验 input 并创建对象：代理需显式选择，笔记可空正文，目录须为存在的绝对路径 |
 | `read` | 指定跟随游标或历史位置；同次读取返回会话树、实际查看节点、代理选择、工作台投影和当前进度 |
-| `select` | 会话所有被捕获的资源均 settled 时选择位置；记录原位置、请求位置和吸附后的实际位置，与游标更新同事务提交，不追加模型可见节点 |
+| `select` | 会话所有被捕获的资源均 settled 时选择位置；记录原位置与所选位置，与游标更新同事务提交，不追加模型可见节点，不吸附 |
 | `object.remove` | 对象 settled 后移除，并解除全部入向、出向链接；未收束时返回 conflict，不隐式取消活动 |
 | `link.set` | 变更指定会话的资源关系，事务提交后通知 |
 | `view.set` / `viewport.set` | 保存当前布局，不修改历史；历史查看期间也可调整 |
