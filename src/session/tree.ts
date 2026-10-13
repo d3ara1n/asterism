@@ -50,7 +50,7 @@ export class SessionTree {
         .get(sessionId, full.responseId) as { payload: string } | undefined;
       if (previous) {
         const first = sessionNodeSchema.parse(JSON.parse(previous.payload));
-        if (!isBlockNode(first) || first.agentId !== full.agentId || first.requestParentId !== full.requestParentId
+        if (!isBlockNode(first) || first.source.resource?.id !== full.source.resource?.id || first.requestParentId !== full.requestParentId
           || first.model !== full.model || first.scope !== full.scope || first.adapter !== full.adapter) {
           throw new SessionError("invalid_request", "Response blocks must share the same request identity.");
         }

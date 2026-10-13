@@ -2,9 +2,9 @@ import { z } from "zod";
 import { defineRecord, modelRunRecordSchema, modelCompletionSchema, jsonSchema, modelInputPartsSchema } from "@atelier/sdk/contracts";
 import { core } from "../plugin.ts";
 
-/** 代理用户消息的公开记录契约；需要识别用户输入的插件导入它。 */
+/** 代理用户消息的公开记录契约；接收代理即记录来源资源。需要识别用户输入的插件导入它。 */
 export const UserMessage = defineRecord(core.name("agent.user-message"), {
-  schema: z.object({ agentId: z.string(), parts: modelInputPartsSchema }),
+  schema: z.object({ parts: modelInputPartsSchema }),
 });
 export const Execution = defineRecord(core.name("agent.execution"), { schema: modelRunRecordSchema });
 export const Notice = defineRecord(core.name("agent.notice"), {

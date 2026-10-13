@@ -6,8 +6,8 @@
 
 | 节点 | 数据 |
 | --- | --- |
-| message | 目标 agent_id、有序输入 parts；文字和文件引用随同一条用户消息保存 |
-| thinking / text | agent_id、response_id、request_parent_id、序号、正文、complete、续接资料与可空终态元数据 |
+| message | 来源为接收代理资源、有序输入 parts；文字和文件引用随同一条用户消息保存 |
+| thinking / text | 来源为所属代理资源、response_id、request_parent_id、序号、正文、complete、续接资料与可空终态元数据 |
 | toolcall | 同上请求身份与元数据，加本地/provider 调用 ID、工具名、参数与结局 |
 | event | 类型与小载荷；大内容保存到宿主内容存储后以 SDK 内容引用值关联 |
 | notice | 来源对象、级别、类型、消息 |

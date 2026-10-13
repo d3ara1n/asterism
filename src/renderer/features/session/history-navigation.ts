@@ -6,14 +6,12 @@ import type { Json } from "@atelier/sdk/contracts";
 
 import type { SessionNode } from "../../../shared/session";
 import { selectable } from "../../../shared/session-path";
-import { workbenchRecords } from "../../../shared/workbench-records";
 import { historyMessages } from "../../messages/history";
 import { getI18n } from "../../shared/i18n";
 
 export type HistoryResource = { id: string; kind: string; title: string };
 export type HistoryEntry = { node: SessionNode; label: string; icon?: ReactNode; row?: (label: string) => ReactNode; scope: "session" | "resource"; resource: HistoryResource | null };
-export type HistoryView = { kind: "all" | "workbench" | "resources" } | { kind: "resource"; resourceId: string };
-const workbenchEvents = new Set<string>(workbenchRecords.map(contract => contract.id));
+export type HistoryView = { kind: "all" | "session" | "resources" } | { kind: "resource"; resourceId: string };
 const record = (value: Json): Record<string, Json> => value !== null && typeof value === "object" && !Array.isArray(value) ? value : {};
 const snippet = (value: string) => value.slice(0, 500).replace(/\s+/gu, " ").trim() || "…";
 
@@ -21,7 +19,7 @@ const snippet = (value: string) => value.slice(0, 500).replace(/\s+/gu, " ").tri
 export function matchesHistoryView(entry: HistoryEntry, view: HistoryView): boolean {
   switch (view.kind) {
     case "all": return true;
-    case "workbench": return entry.scope === "session" && entry.node.kind === "event";
+    case "session": return entry.scope === "session";
     case "resources": return entry.scope === "resource";
     case "resource": return entry.scope === "resource" && entry.resource?.id === view.resourceId;
   }
@@ -66,12 +64,11 @@ export function historyEntries(nodes: readonly SessionNode[], views: Pick<ViewRe
   return nodes.filter(selectable).map(node => {
     const item = records.get(node.id)!;
     const view = views.record(item, context);
-    const data = node.kind === "event" ? record(node.data) : {};
-    const resourceId: unknown = node.kind === "event" ? node.agentId ?? data.resourceId ?? data.id : node.agentId;
-    const sessionEvent = node.kind === "event" && workbenchEvents.has(node.type) || node.kind === "notice" && node.agentId === null;
+    // 来源只看记录归属：有归属对象是资源记录，否则是会话级记录；宿主不认识具体契约。
+    const owner = item.source.resource?.id ?? null;
     const label = view ? i18n.text(view.label) : i18n.formatMessage(historyMessages.unknownRecord, { id: item.contract.id });
-    return { node, label: snippet(label), icon: view?.icon, row: view?.row, scope: sessionEvent ? "session" : "resource",
-      resource: !sessionEvent && typeof resourceId === "string" ? resources.get(resourceId) ?? null : null };
+    return { node, label: snippet(label), icon: view?.icon, row: view?.row, scope: owner ? "resource" : "session",
+      resource: owner ? resources.get(owner) ?? null : null };
   });
 }
 

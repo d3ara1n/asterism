@@ -13,8 +13,8 @@ export function timelineKey(item: TimelineItem): string {
 }
 function item(record: SessionRecord, agentId: string): TimelineItem | null {
   const notice = Notice.decode(record);
-  if (notice?.status === "known" && (record.resource === null || record.resource.id === agentId)) return { kind: "notice", id: record.id, ...notice.data };
-  if (record.resource?.id !== agentId) return null;
+  if (notice?.status === "known" && (record.source.resource === null || record.source.resource.id === agentId)) return { kind: "notice", id: record.id, ...notice.data };
+  if (record.source.resource?.id !== agentId) return null;
   const message = UserMessage.decode(record);
   if (message?.status === "known") return { kind: "message", id: record.id, parts: message.data.parts };
   const execution = Execution.decode(record);

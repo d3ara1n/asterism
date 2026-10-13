@@ -10,7 +10,7 @@ export function foldWorkbench(path: readonly SessionNode[]): FoldedState {
   for (const node of path) {
     if (node.kind !== "event") continue;
     const d = (node.data ?? {}) as Record<string, unknown>;
-    const id = String(d.id ?? d.resourceId ?? "");
+    const id = String(d.id ?? "");
     switch (node.type) {
       // 代理与其他资源同为 resource_created；类型只由 data.type 区分。
       case "resource_created": {
@@ -19,8 +19,9 @@ export function foldWorkbench(path: readonly SessionNode[]): FoldedState {
         break;
       }
       case "object_removed": objects.delete(id); for (const [k, l] of links) if (l.agentId === id || l.resourceId === id) links.delete(k); break;
-      case "resource_attached": if (node.agentId) links.set(`${node.agentId}:${id}`, { agentId: node.agentId, resourceId: id }); break;
-      case "resource_detached": if (node.agentId) links.delete(`${node.agentId}:${id}`); break;
+      // 链接事件的代理是关联对象，保存在载荷中；来源是宿主工作台。
+      case "resource_attached": if (typeof d.agentId === "string") links.set(`${d.agentId}:${id}`, { agentId: d.agentId, resourceId: id }); break;
+      case "resource_detached": if (typeof d.agentId === "string") links.delete(`${d.agentId}:${id}`); break;
     }
   }
   return { objects: [...objects.values()], links: [...links.values()] };

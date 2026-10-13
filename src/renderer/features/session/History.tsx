@@ -128,7 +128,7 @@ export function SessionHistoryPanel({ controller }: { controller: SessionControl
         {visible.map(entry => {
           const { node, resource } = entry;
           const descriptor = registry.resource(resource?.kind ?? "");
-          const source = entry.scope === "session" ? `${i18n.formatMessage(historyMessages.sessionEvents)} · ${i18n.formatMessage(commonMessages.workbench)}` : `${i18n.text(descriptor.label)} · ${resource?.title ?? i18n.formatMessage(historyMessages.unknownResource)}`;
+          const source = entry.scope === "session" ? i18n.formatMessage(historyMessages.sessionEvents) : `${i18n.text(descriptor.label)} · ${resource?.title ?? i18n.formatMessage(historyMessages.unknownResource)}`;
           const active = snapshot.at === node.id;
           return <div key={node.id} data-inspected={active}>
             <div className="flex items-center gap-0.5">
@@ -175,7 +175,7 @@ function HistoryViewPicker({ entries, value, onChange }: { entries: HistoryEntry
   const sources = useMemo(() => historyResourceViews(entries), [entries]);
   const presets = [
     { kind: "all" as const, label: i18n.formatMessage(historyMessages.historyAllRecords), icon: <History className="size-4" /> },
-    { kind: "workbench" as const, label: i18n.formatMessage(historyMessages.historyWorkbenchEvents), icon: <PanelsTopLeft className="size-4" /> },
+    { kind: "session" as const, label: i18n.formatMessage(historyMessages.historySessionEvents), icon: <PanelsTopLeft className="size-4" /> },
     { kind: "resources" as const, label: i18n.formatMessage(historyMessages.historyAllResourceEvents), icon: <Layers className="size-4" /> },
   ];
   const resource = value.kind === "resource" ? sources.find(source => source.resource.id === value.resourceId)?.resource : undefined;

@@ -18,7 +18,7 @@ export interface ModelExecutionEnvironment {
   messages: ResolvedModelItem[];
 }
 /** 一次补全及完整工具批次。缓冲只在此次调用内存在，输出交给消费者，不接触时间轴。 */
-export async function runModelRequest(request: ModelRunRequest, environment: Promise<ModelExecutionEnvironment>, handover?: ContentLease): Promise<ModelRunResult> {
+export async function runModelRequest(request: ModelRunRequest & { plugin: string }, environment: Promise<ModelExecutionEnvironment>, handover?: ContentLease): Promise<ModelRunResult> {
   const controller = new AbortController();
   const signal = AbortSignal.any([request.signal, controller.signal]);
   let deliveryFailed = false;
@@ -40,11 +40,11 @@ export async function runModelRequest(request: ModelRunRequest, environment: Pro
     signal.throwIfAborted();
     source = { model: modelExpression(settings), adapter: adapter.version, scope: modelScope(settings) };
     responseId = randomUUID();
-    const identity = { agentId: request.object.id, responseId, requestParentId: request.requestParentId, model: source.model, adapter: source.adapter, scope: source.scope };
+    const identity = { source: { plugin: request.plugin, resource: { id: request.object.id, kind: request.object.kind } }, responseId, requestParentId: request.requestParentId, model: source.model, adapter: source.adapter, scope: source.scope };
     const prepared = adapter.prepare({ settings, system, messages, tools: settings.model.capabilities.tools ? coreDeclarations() : [] });
     const response = new ResponseBuffer(identity, node => {
       if (node.kind !== "thinking" && node.kind !== "text" && node.kind !== "toolcall") throw new ModelFailure("protocol", "Unexpected response block.");
-      const { agentId: _agentId, model: _model, adapter: _adapter, scope: _scope,
+      const { source: _source, model: _model, adapter: _adapter, scope: _scope,
         usage: _usage, finishReason: _finishReason, rawFinishReason: _raw, providerResponseId: _provider, ...block } = node;
       emit({ type: "block", block: { ...block, source: source! } as ModelBlock });
       // 响应状态机只需本次调用内的块身份；不保存或获取时间轴节点 ID。

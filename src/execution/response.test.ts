@@ -7,7 +7,7 @@ function setup() {
   const nodes: NewNode[] = [];
   const completions: { id: string | null; data: BlockCompletion }[] = [];
   return { nodes, completions, response: new ResponseBuffer(
-    { agentId: "a", responseId: "r", requestParentId: null, model: "p/m", adapter: "test", scope: "s" },
+    { source: { plugin: "atelier.core", resource: { id: "a", kind: "atelier.core/agent" } }, responseId: "r", requestParentId: null, model: "p/m", adapter: "test", scope: "s" },
     node => { nodes.push(node); return `block-${nodes.length}`; },
     (id, data) => completions.push({ id, data }),
   ) };

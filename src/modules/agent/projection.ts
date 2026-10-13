@@ -9,7 +9,7 @@ export function projectForAgent(snapshot: Pick<SessionSnapshot, "records">, agen
   const positions = new Map(path.map((record, index) => [record.id, index]));
   const responses = new Map<string, { record: SessionRecord; block: ModelBlock }[]>();
   for (const record of path) {
-    if (record.resource?.id !== agentId) continue;
+    if (record.source.resource?.id !== agentId) continue;
     const decoded = Execution.decode(record);
     if (decoded?.status !== "known" || decoded.data.type !== "block" || !decoded.data.block.complete) continue;
     const block = decoded.data.block;
@@ -37,7 +37,7 @@ export function projectForAgent(snapshot: Pick<SessionSnapshot, "records">, agen
   emit(null);
   for (const record of path) {
     const message = UserMessage.decode(record);
-    if (message?.status === "known" && message.data.agentId === agentId) out.push({ kind: "input", parts: message.data.parts });
+    if (message?.status === "known" && record.source.resource?.id === agentId) out.push({ kind: "input", parts: message.data.parts });
     const context = ContextNotice.decode(record);
     if (context?.status === "known" && (context.data.recipient === null || context.data.recipient === agentId))
       out.push({ kind: "context", parts: [{ kind: "text", text: context.data.text }] });

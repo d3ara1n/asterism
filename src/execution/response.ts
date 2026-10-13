@@ -1,3 +1,4 @@
+import type { RecordSource } from "@atelier/sdk/contracts";
 import { ModelFailure, type ModelEvent, type StreamPart } from "../model/contract.ts";
 import { parsePartialJson } from "ai";
 import { jsonSchema, type Json, type ToolOutcome } from "../shared/model.ts";
@@ -29,7 +30,7 @@ export class ResponseBuffer {
   private finalized = false;
 
   constructor(
-    private readonly identity: { agentId: string; responseId: string; requestParentId: string | null; model: string; adapter: string; scope: string },
+    private readonly identity: { source: RecordSource; responseId: string; requestParentId: string | null; model: string; adapter: string; scope: string },
     private readonly append: (node: NewNode) => string,
     private readonly complete: (blockId: string | null, completion: BlockCompletion) => void,
   ) {}
@@ -92,7 +93,7 @@ export class ResponseBuffer {
 
   live(): LiveBlock[] {
     return [...this.blocks.values()].filter(block => !block.savedId).map(block => {
-      const base = { id: `${this.identity.responseId}:${block.ordinal}`, agentId: this.identity.agentId,
+      const base = { id: `${this.identity.responseId}:${block.ordinal}`, agentId: this.identity.source.resource!.id,
         responseId: this.identity.responseId, ordinal: block.ordinal };
       return block.part.kind === "toolcall"
         ? { ...base, kind: "toolcall", name: block.part.name, argumentsText: block.text, arguments: block.done ? block.arguments : block.previewArguments,

@@ -112,7 +112,8 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
             const parsed = declared.schema.safeParse(data);
             if (!parsed.success) throw new PluginApiError("invalid_argument", "The record does not match its declared schema.");
             const value = jsonSchema.parse(parsed.data);
-            const recordId = appendRecord(writer, declared, value, ref);
+            // 来源由写入通道打戳：插件身份来自操作柄，资源来自已校验的对象引用。
+            const recordId = appendRecord(writer, declared, value, { plugin: internal.id, resource: ref ? { id: ref.id, kind: ref.kind } : null });
             host.content?.bind({ ...access(id, ref?.id, scope), sessionId: id }, { kind: "record", id: recordId }, value);
             return recordId;
           },
@@ -216,7 +217,7 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
         const capabilities = host.sessions.capabilities(linked, name => (allowed === null || allowed.has(name)) && !excluded.has(name));
         let progressTimer: ReturnType<typeof setTimeout> | undefined;
         const receive = request.observer.event.bind(request.observer);
-        const work = modelRuns.start(signal => host.models.run({ object: ref, target, system, messages, tools, cache, requestParentId: request.requestParentId,
+        const work = modelRuns.start(signal => host.models.run({ plugin: internal.id, object: ref, target, system, messages, tools, cache, requestParentId: request.requestParentId,
           signal, capabilities, context: host.sessions.context(linked),
           content: messages => host.content?.capture(inputReferences(messages), { owner: internal.id, sessionId: ref.sessionId,
             objectId: ref.id, recordIds: new Set(path.map(node => node.id)), check: checkAvailable }),
@@ -239,7 +240,7 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
       list: () => { checkAvailable(); return host.models.list(); },
     },
     session,
-    object: ref => { own(ref.kind); return object(ref); },
+    object: (sessionId, contract, id) => { own(contract.kind); return object({ sessionId, id, kind: contract.kind }); },
   };
   return {
     context, object, reader, content, linkAbort,

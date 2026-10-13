@@ -89,7 +89,7 @@ describe("AI SDK 适配契约", () => {
     const adapter = new AiSdkAdapter(async () => "synthetic-key",
       (value, key) => createProviderModel(value.settings.provider, value.settings.model, key, transport));
     const nodes: NewNode[] = [];
-    const buffer = new ResponseBuffer({ agentId: "a", responseId: "r", requestParentId: null, model: "p/m:medium",
+    const buffer = new ResponseBuffer({ source: { plugin: "atelier.core", resource: { id: "a", kind: "atelier.core/agent" } }, responseId: "r", requestParentId: null, model: "p/m:medium",
       adapter: adapter.version, scope: modelScope(current.settings) },
       node => { nodes.push(node); return `block-${nodes.length}`; }, () => {});
     const liveText: string[] = [];

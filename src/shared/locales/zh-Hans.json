@@ -87,7 +87,7 @@
   "searchHistory": "查找文本、工具或资源",
   "historyView": "历史视图",
   "historyAllRecords": "全部记录",
-  "historyWorkbenchEvents": "工作台事件",
+  "historySessionEvents": "会话事件",
   "historyAllResourceEvents": "全部资源事件",
   "historySources": "事件来源",
   "searchHistoryViews": "查找视图或资源",

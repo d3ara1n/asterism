@@ -6,6 +6,9 @@ import { foldWorkbench, type FoldedObject } from "../session/fold.ts";
 import { SessionError, type SessionTree } from "../session/tree.ts";
 import type { Json } from "@atelier/sdk/contracts";
 import type { SessionNode } from "../shared/session.ts";
+
+/** 宿主工作台写入的会话级来源。 */
+const host = { plugin: "atelier.host", resource: null } as const;
 import { workbenchSnapshotSchema, type WorkbenchCommand, type WorkbenchSnapshot, type Point, type Viewport } from "../shared/workbench.ts";
 import type { ContentStore, ContentLease } from "./content-store.ts";
 
@@ -26,7 +29,7 @@ export class SessionWorkbench {
     const controller = this.resources.controller(kind);
     if (!controller?.create) throw new SessionError("invalid_request", "This resource type cannot be created here.");
     const { title, data } = controller.create(sessionId, id, input, content);
-    const node = this.tree.append(sessionId, { kind: "event", agentId: null, type: "resource_created", data: { ...data, id, type: kind, title }, model: null });
+    const node = this.tree.append(sessionId, { kind: "event", source: host, recipient: null, type: "resource_created", data: { ...data, id, type: kind, title }, model: null });
     this.content?.bind({ sessionId, objectId: id, scope: content }, { kind: "record", id: node.id }, data ?? {});
     this.addView(sessionId, id, position);
     return id;
@@ -42,10 +45,10 @@ export class SessionWorkbench {
         // 代理同样是资源：入向与出向链接都解除。
         for (const link of folded.links.filter(l => l.resourceId === target.id || l.agentId === target.id)) {
           const resource = folded.objects.find(o => o.id === link.resourceId)!;
-          tree.append(command.sessionId, { kind: "event", agentId: link.agentId, type: "resource_detached", data: { id: resource.id },
+          tree.append(command.sessionId, { kind: "event", source: host, recipient: link.agentId, type: "resource_detached", data: { id: resource.id, agentId: link.agentId },
             model: link.agentId === target.id ? null : `Resource "${resource.title}" (resource_id: ${resource.id}) is no longer linked to you.` });
         }
-        tree.append(command.sessionId, { kind: "event", agentId: null, type: "object_removed", data: { id: target.id }, model: null });
+        tree.append(command.sessionId, { kind: "event", source: host, recipient: null, type: "object_removed", data: { id: target.id }, model: null });
         break;
       }
       case "link.set": {
@@ -55,8 +58,8 @@ export class SessionWorkbench {
         if (!agent || !resource) throw new SessionError("not_found", "Agent or resource does not belong to this session.");
         if (agent.id === resource.id) throw new SessionError("invalid_request", "An agent cannot be linked to itself.");
         if (folded.links.some(l => l.agentId === agent.id && l.resourceId === resource.id) === command.linked) break;
-        tree.append(command.sessionId, { kind: "event", agentId: agent.id, type: command.linked ? "resource_attached" : "resource_detached",
-          data: { id: resource.id }, model: command.linked
+        tree.append(command.sessionId, { kind: "event", source: host, recipient: agent.id, type: command.linked ? "resource_attached" : "resource_detached",
+          data: { id: resource.id, agentId: agent.id }, model: command.linked
             ? `Resource "${resource.title}" (type: ${resource.kind}, resource_id: ${resource.id}) is now linked to you. Tools: ${JSON.stringify(this.tools(command.sessionId, agent.id, resource))}. Call them with resource_call.`
             : `Resource "${resource.title}" (resource_id: ${resource.id}) is no longer linked to you.` });
         break;

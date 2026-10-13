@@ -8,25 +8,19 @@ import { deepFreeze } from "../shared/immutable.ts";
 
 /**
  * 宿主存储到公开记录信封的固定映射：用户消息、执行块与通知使用 core 契约。
- * 可见环境事件携带原始领域身份和载荷；其他事件保留自己的契约身份。
+ * 来源原样取自节点，由写入通道打戳；宿主不推断归属。
  */
-export function toRecord(node: SessionNode, sequence: number, kinds: ReadonlyMap<string, string> = new Map()): SessionRecord {
-  const { id, sessionId, parentId, createdAt, kind, ...rest } = node;
-  const owner = "agentId" in rest && typeof rest.agentId === "string" ? rest.agentId : null;
+export function toRecord(node: SessionNode, sequence: number): SessionRecord {
+  const { id, sessionId, parentId, createdAt, source, kind: _kind, ...rest } = node;
   const decoded = decodeCoreRecord(node);
   const contract = decoded?.contract ?? { id: node.kind === "event" ? node.type : "" };
   const data = decoded ? decoded.data : node.kind === "event" ? node.data : rest as Json;
   return deepFreeze({ id, sessionId, parentId, sequence, createdAt, contract: { id: contract.id },
-    resource: owner ? { id: owner, kind: kinds.get(owner) ?? "atelier.core/agent" } : null, data: structuredClone(data) });
+    source: structuredClone(source), data: structuredClone(data) });
 }
 export function toRecords(nodes: readonly SessionNode[], all: readonly SessionNode[]): SessionRecord[] {
   const order = new Map(all.map((node, index) => [node.id, index + 1]));
-  const kinds = new Map<string, string>();
-  for (const node of all) if (node.kind === "event" && node.type === "resource_created") {
-    const data = node.data as { id?: unknown; type?: unknown };
-    if (typeof data.id === "string" && typeof data.type === "string") kinds.set(data.id, data.type);
-  }
-  return nodes.map(node => toRecord(node, order.get(node.id) ?? 0, kinds));
+  return nodes.map(node => toRecord(node, order.get(node.id) ?? 0));
 }
 export function resourceSnapshot(ref: ResourceRef, resource: FoldedObject): ResourceSnapshot {
   const { id: _id, type: _type, title: _title, ...data } = resource.data;

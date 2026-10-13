@@ -12,7 +12,7 @@
 | event | 资源创建、加入/移除工作台、链接/断开、对象自身事件等 |
 | notice | 通知：错误、缓存过期、预算提示等，带级别 |
 
-节点类型可扩展。代理产生的节点带 `agent_id`；同一次模型响应的块共享本地生成的 `response_id`，toolcall 带其在响应中的序号。response 是按 response_id 归组得到的消费者投影，不是独立历史节点，不设 response_end。用量与结束原因作为 block 的可空元数据；响应总计量仅归属一个 block，其他块不重复保存总量。协议续接资料（Anthropic signature、OpenAI itemId/encrypted reasoning）作为块级不透明字段，带适配器版本，仅由对应适配器读取。
+节点类型可扩展。每个节点带宿主写入的来源 `source: { plugin, resource }`：`plugin` 是写入通道所属插件身份（宿主工作台为 `atelier.host`），由宿主按操作柄打戳，插件不能填写，界面不显示、供诊断；`resource` 是经具名资源契约引用并由宿主校验（所属插件、会话内存在、类型一致）的发出资源，为 null 表示会话级记录。来源只表示谁发出记录；被链接的代理等关联对象属于各契约的载荷。代理产生的 message 与块以该代理资源为来源；同一次模型响应的块共享本地生成的 `response_id`，toolcall 带其在响应中的序号。response 是按 response_id 归组得到的消费者投影，不是独立历史节点，不设 response_end。用量与结束原因作为 block 的可空元数据；响应总计量仅归属一个 block，其他块不重复保存总量。协议续接资料（Anthropic signature、OpenAI itemId/encrypted reasoning）作为块级不透明字段，带适配器版本，仅由对应适配器读取。
 
 每个块保存 `request_parent_id`，指向本次请求取用的会话路径末端，空值表示起点。它与记录真实追加顺序的 `parent_id` 职责不同；同一响应的所有块共享请求起点和协议来源。
 
@@ -38,7 +38,7 @@
 
 链接通知（如“resource X connected”）既减少模型频繁查询资源列表，也用于回溯时重建链接；加入或移除工作台等事件只重建视图，不投影给模型。系统提示词不来自会话树。
 
-会话标题是当前值，命名来源与尝试通过普通插件事件忠实记录，每次生效命名追加新事件，旧记录保持不变。命名事件的 model 为 null，不进入模型消息；规则见 [自动会话命名](session-naming.md)。具型首尾查询见 [插件 SDK](plugin-sdk.md#对象读取与执行)。
+会话标题是当前值，每次生效命名追加一条会话级命名事件，旧记录保持不变；不另记命名尝试。命名事件的 model 为 null，不进入模型消息；规则见 [自动会话命名](session-naming.md)。具型首尾查询见 [插件 SDK](plugin-sdk.md#对象读取与执行)。
 
 ## 回溯与分叉
 

@@ -21,7 +21,7 @@ export const sessionSchemaSql = `
     FOREIGN KEY(block_id, session_id, response_id) REFERENCES session_nodes(id, session_id, response_id));
   CREATE VIEW session_blocks AS
     SELECT n.id, n.session_id, n.parent_id, n.seq, n.kind, n.response_id, n.ordinal,
-      json_extract(n.payload, '$.agentId') AS agent_id,
+      json_extract(n.payload, '$.source.resource.id') AS agent_id,
       json_extract(n.payload, '$.requestParentId') AS request_parent_id,
       json_extract(n.payload, '$.model') AS model,
       json_extract(c.payload, '$.usage') AS usage,
@@ -33,7 +33,7 @@ export const sessionSchemaSql = `
   CREATE VIEW session_usage AS
     SELECT id, session_id, agent_id, response_id, model, usage FROM session_blocks WHERE usage IS NOT NULL
     UNION ALL
-    SELECT id, session_id, json_extract(payload, '$.agentId'),
+    SELECT id, session_id, json_extract(payload, '$.source.resource.id'),
       json_extract(payload, '$.response.responseId'), json_extract(payload, '$.response.model'),
       json_extract(payload, '$.response.usage')
     FROM session_nodes WHERE kind = 'notice' AND json_type(payload, '$.response.usage') = 'object';

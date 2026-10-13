@@ -25,9 +25,9 @@ provider 的 `stop_reason=end_turn` 等终态只表示 request 的协议结局�
 - 控制器读取当前 agent 配置、模型选择与本代理已链接的资源，组装系统提示词与工具目录。
 - 控制器从会话树按本代理的可见性投影上下文，驱动模型与工具循环。
 - 控制器对资源的使用（例如读取已链接目录中的 AGENTS.md）不经过模型，也不走 `resource_call`。
-- 代理产生的 message、thinking、text、toolcall 节点平铺在会话树上，按 `agent_id` 归属。
+- 代理产生的 message、thinking、text、toolcall 节点平铺在会话树上，来源为该代理资源（`source.resource`）。
 
-事件以 `model: string | null` 显式提供模型正文：为 null 时不进入模型上下文；非空时仅投影该正文，不直接发送事件类型或 data。`agentId` 指定接收代理，为 null 时向所有代理投影，仍须满足 model 非空。资源创建与对象移除事件的 model 为 null；链接与解绑通知只发给受影响的代理。
+事件以 `model: string | null` 显式提供模型正文：为 null 时不进入模型上下文；非空时仅投影该正文，不直接发送事件类型或 data。接收代理由事件契约在载荷中声明（如链接事件的 `agentId`），不复用记录来源；未声明接收者时向所有代理投影，仍须满足 model 非空。资源创建与对象移除事件的 model 为 null；链接与解绑通知只发给受影响的代理。
 
 ## 环境与系统提示词
 

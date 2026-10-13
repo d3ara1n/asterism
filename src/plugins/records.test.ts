@@ -7,7 +7,7 @@ import { emptyCompletion, type SessionNode } from "../shared/session.ts";
 
 const contract = defineRecord("example.plugin/value", { schema: z.object({ value: z.number() }) });
 const record: SessionRecord = { id: "r", sessionId: "s", parentId: null, sequence: 1, createdAt: "2026-10-11T00:00:00Z",
-  contract: { id: contract.id }, resource: null, data: { value: 1 } };
+  contract: { id: contract.id }, source: { plugin: "example.plugin", resource: null }, data: { value: 1 } };
 
 describe("共享时间轴的契约解码", () => {
   it("按领域身份和实际形状解码，不合 schema 的数据返回 unknown 并保留原始记录", () => {
@@ -26,7 +26,7 @@ describe("共享时间轴的契约解码", () => {
   });
   it("具型 first 不跳过坏记录；通用读取仍可获取整条时间轴和原始 payload", () => {
     const node = { id: "r", sessionId: "s", parentId: null, createdAt: record.createdAt, kind: "event" as const,
-      type: contract.id, data: { value: "bad" }, agentId: null, model: null };
+      type: contract.id, data: { value: "bad" }, source: { plugin: "atelier.host", resource: null }, model: null, recipient: null };
     const second = { ...node, id: "r2", parentId: node.id, data: { value: 2 } };
     const view = sessionView("s", "Timeline", [node, second], [node, second]);
     expect(view.records.first(contract, { scope: "path" })).toMatchObject({ status: "unknown", record: { id: "r" } });
@@ -37,7 +37,7 @@ describe("共享时间轴的契约解码", () => {
   it("既有物理模型块映为共识载荷，来源、请求起点、续接与迟到终态完整保留", () => {
     const node: SessionNode = {
       id: "block", sessionId: "s", parentId: null, createdAt: record.createdAt,
-      ...emptyCompletion, kind: "text", agentId: "a", responseId: "response", requestParentId: null, ordinal: 0,
+      ...emptyCompletion, kind: "text", source: { plugin: "atelier.core", resource: { id: "a", kind: "atelier.core/agent" } }, responseId: "response", requestParentId: null, ordinal: 0,
       complete: true, continuation: { opaque: "resume" }, model: "p/m", adapter: "adapter", scope: "scope", text: "Answer",
       finishReason: "stop", providerResponseId: "remote",
     };
@@ -49,7 +49,7 @@ describe("共享时间轴的契约解码", () => {
   });
   it("具型 last 按范围索引仅解码目标；最新坏记录不回退，固定快照不受后续追加影响", () => {
     const node = { id: "first", sessionId: "s", parentId: null, createdAt: record.createdAt, kind: "event" as const,
-      type: contract.id, data: { value: 1 }, agentId: null, model: null };
+      type: contract.id, data: { value: 1 }, source: { plugin: "atelier.host", resource: null }, model: null, recipient: null };
     const branch = { ...node, id: "branch", parentId: node.id, data: { value: "bad" } };
     const unrelated = Array.from({ length: 1000 }, (_, i) => ({ ...node, id: `noise-${i}`, type: "other/noise" }));
     const nodes = [node, ...unrelated, branch];
@@ -68,7 +68,7 @@ describe("共享时间轴的契约解码", () => {
   });
   it("环境可见性经具型记录读取，原始事件身份与载荷保留", () => {
     const node: SessionNode = { id: "event", sessionId: "s", parentId: null, createdAt: record.createdAt,
-      kind: "event", type: "resource_attached", agentId: "a", data: { id: "directory" }, model: "A resource was linked." };
+      kind: "event", type: "resource_attached", source: { plugin: "atelier.host", resource: null }, recipient: "a", data: { id: "directory", source: { plugin: "atelier.core", resource: { id: "a", kind: "atelier.core/agent" } } }, model: "A resource was linked." };
     expect(sessionView("s", "", [node], [node]).records.first(ContextNotice, { scope: "path" })).toMatchObject({
       status: "known", data: { text: node.model, recipient: "a", origin: { type: node.type, data: node.data } },
     });

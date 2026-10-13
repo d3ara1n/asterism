@@ -10,7 +10,7 @@ import { loadPlugins } from "../../plugins/loader.ts";
 import { Agent, CreateAgent } from "../agent/contract.ts";
 import { Execution, UserMessage } from "../agent/records.ts";
 import { projectForAgent } from "../agent/projection.ts";
-import { NamingAttempt, SessionNamed } from "./records.ts";
+import { SessionNamed } from "./records.ts";
 
 const roots: string[] = [], services: ApplicationService[] = [];
 afterEach(async () => {
@@ -46,15 +46,15 @@ async function open(stream: (request: StreamRequest) => AsyncIterable<ModelEvent
   await service.sessions.execute({ type: "resource.create", sessionId, kind: Agent.kind,
     creation: { id: CreateAgent.id }, input: { selection: { agent: "worker", model: "test/model", thinking: null } }, position: { x: 0, y: 0 } });
   const agentId = service.sessions.snapshot(sessionId).workbench.objects[0]!.id;
-  const object = context.object({ sessionId, id: agentId, kind: Agent.kind });
+  const object = context.object(sessionId, Agent, agentId);
   const session = context.session(sessionId);
   const submit = (text: string) => {
     let id!: string;
-    object.commit(writer => { id = writer.append(UserMessage, { agentId, parts: [{ kind: "text", text }] }); });
-    return id;
+    object.commit(writer => { id = writer.append(UserMessage, { parts: [{ kind: "text", text }] }); });
+    messages.push(id); return id;
   };
   const submitBatch = (texts: string[]) => {
-    object.commit(writer => { for (const text of texts) writer.append(UserMessage, { agentId, parts: [{ kind: "text", text }] }); });
+    object.commit(writer => { for (const text of texts) messages.push(writer.append(UserMessage, { parts: [{ kind: "text", text }] })); });
   };
   const reply = (text: string) => {
     const origin = session.snapshot().position.nodeId;
@@ -63,10 +63,9 @@ async function open(stream: (request: StreamRequest) => AsyncIterable<ModelEvent
       continuation: null, source: { model: "test", adapter: "test", scope: "test" },
     } }); });
   };
+  const messages: string[] = [];
   const idle = async () => { await vi.waitFor(() => {
-    for (const attempt of session.snapshot().records.query(NamingAttempt, { scope: "session" })) {
-      if (attempt.status === "known") expect(context.tasks.has(`naming:${sessionId}:${attempt.data.messageId}`)).toBe(false);
-    }
+    for (const id of messages) expect(context.tasks.has(`naming:${sessionId}:${id}`)).toBe(false);
   }); };
   return { context, service, session, sessionId, agentId, requests, submit, submitBatch, reply, idle };
 }
@@ -78,7 +77,7 @@ describe("两级自动命名", () => {
     expect(test.requests).toHaveLength(1);
     expect(test.requests[0]!.messages[0]).toMatchObject({ parts: [{ kind: "text", text: expect.stringContaining("User: Opening request") }] });
     expect(test.requests[0]!.messages[0]).toMatchObject({ parts: [{ kind: "text", text: expect.not.stringContaining("User: Additional request") }] });
-    expect(test.session.snapshot().records.last(SessionNamed, { scope: "session" })).toMatchObject({ data: { source: "initial" } });
+    expect(test.session.snapshot().records.last(SessionNamed, { scope: "session" })).toMatchObject({ data: { source: "auto", auto: { level: "initial", model: "test/model" } } });
   });
 
   it("只在用户输入节点命名，二级包含已有收尾回复，来源事件只追加且不发送模型", async () => {
@@ -95,10 +94,11 @@ describe("两级自动命名", () => {
     expect(test.requests[1]!.messages[0]).toMatchObject({ parts: [{ kind: "text", text: expect.stringContaining("User: 请求 5") }] });
     const snapshot = test.session.snapshot();
     expect(snapshot.records.query(SessionNamed, { scope: "session" }).map(value => value.status === "known" && value.data))
-      .toEqual([{ title: "修复登录", source: "initial" }, { title: "完善 token 刷新", source: "refined" }]);
+      .toMatchObject([{ title: "修复登录", source: "auto", auto: { level: "initial", model: "test/model" } },
+        { title: "完善 token 刷新", source: "auto", auto: { level: "refined", model: "test/model" } }]);
     expect(test.session.title.get()).toBe("完善 token 刷新");
     expect(test.service.sessions.tree.nodes(test.sessionId).filter(node => node.kind === "event" &&
-      [SessionNamed.id, NamingAttempt.id].includes(node.type)).every(node => node.kind === "event" && node.model === null)).toBe(true);
+      node.type === SessionNamed.id).every(node => node.kind === "event" && node.model === null)).toBe(true);
     const projected = projectForAgent(snapshot, test.agentId);
     expect(JSON.stringify(projected)).not.toContain("完善 token 刷新");
     expect(JSON.stringify(projected)).not.toContain("session.named");

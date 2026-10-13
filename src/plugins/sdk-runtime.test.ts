@@ -115,7 +115,7 @@ describe("工作台 SDK 的宿主实现", () => {
       await expect(service.sessions.execute({ type: "resource.command", sessionId, objectId, command })).rejects.toMatchObject({ code: "invalid_request" });
     }
     expect(service.sessions.tree.nodes(sessionId)).toHaveLength(before);
-    expect(c.context().object({ sessionId, id: objectId, kind: Counter.kind }).get(State)).toBe(1);
+    expect(c.context().object(sessionId, Counter, objectId).get(State)).toBe(1);
   });
   it("创建输入只解析一次，准备接受后 create 使用转换结果", async () => {
     const transform = vi.fn((value: number) => value + 1);
@@ -213,14 +213,14 @@ describe("工作台 SDK 的宿主实现", () => {
       object.commit(writer => { writer.set(State, 9); });
     } });
     const { service, sessionId } = open([c.plugin]);
-    service.sessions.tree.append(sessionId, { ...emptyCompletion, kind: "thinking", agentId: "agent", text: "Reasoning",
+    service.sessions.tree.append(sessionId, { ...emptyCompletion, kind: "thinking", source: { plugin: "atelier.core", resource: { id: "agent", kind: "atelier.core/agent" } }, text: "Reasoning",
       responseId: "interrupted", requestParentId: null, ordinal: 0, complete: true, model: "test/test",
       adapter: "test", scope: "test", continuation: null });
     const id = await create(service, sessionId, 1);
     await expect(service.sessions.execute({ type: "resource.command", sessionId, objectId: id, command: resourceCall(ChangeCount, { amount: 0 }) }))
       .rejects.toMatchObject({ code: "unavailable" });
     expect(service.sessions.tree.cursor(sessionId)).toBeNull();
-    expect(c.context().object({ sessionId, id, kind: Counter.kind }).get(State)).toBe(2);
+    expect(c.context().object(sessionId, Counter, id).get(State)).toBe(2);
   });
   it("首页 prepare 不能将首条输入替换成不提交输入的动作", async () => {
     const namespace = pluginNamespace("test.first-input");
@@ -250,7 +250,7 @@ describe("工作台 SDK 的宿主实现", () => {
     const { service, sessionId } = open([c.plugin], undefined, event => notifications.push(event.kind));
     const id = await create(service, sessionId, 3);
     const session = c.context().session(sessionId);
-    const object = c.context().object({ sessionId, id, kind: Counter.kind });
+    const object = c.context().object(sessionId, Counter, id);
     const other = c.context().session(service.sessions.tree.create("Other"));
     const before = service.sessions.tree.nodes(sessionId);
     observed.length = notifications.length = 0;
@@ -382,13 +382,13 @@ describe("工作台 SDK 的宿主实现", () => {
     const id = await create(service, sessionId, 3);
     const snapshot = c.context().session(sessionId).snapshot();
     expect(snapshot.resources.get(Counter, id)?.status).toBe("known");
-    expect(snapshot.records.first(Changed, { scope: "path" })).toMatchObject({ status: "known", data: { value: 3 }, record: { resource: { id, kind: Counter.kind } } });
+    expect(snapshot.records.first(Changed, { scope: "path" })).toMatchObject({ status: "known", data: { value: 3 }, record: { source: { plugin: "test.counter", resource: { id, kind: Counter.kind } } } });
     expect(observed.map(record => record.contract.id)).toEqual([Changed.id, "resource_created"]);
     expect(service.sessions.snapshot(sessionId).workbench.objects.find(object => object.id === id)?.presentation.data).toEqual({ value: 3 });
     expect(c.context()).not.toHaveProperty("state");
     expect(c.context().session(sessionId)).not.toHaveProperty("nodes");
     expect(c.context().models).toHaveProperty("run");
-    expect(c.context().object({ sessionId, id, kind: Counter.kind })).not.toHaveProperty("run");
+    expect(c.context().object(sessionId, Counter, id)).not.toHaveProperty("run");
   });
 
   it("外部 prepare 按目标资源 schema 校验后，进入资源自己的 prepare", async () => {
@@ -406,10 +406,10 @@ describe("工作台 SDK 的宿主实现", () => {
     const id = await create(service, sessionId);
     await service.sessions.execute({ type: "resource.command", sessionId, objectId: id, command: resourceCall(ChangeCount, { amount: 2 }) });
     expect(order).toEqual([2]);
-    expect(c.context().object({ sessionId, id, kind: Counter.kind }).get(State)).toBe(6);
+    expect(c.context().object(sessionId, Counter, id).get(State)).toBe(6);
     invalid = true;
     await expect(service.sessions.execute({ type: "resource.command", sessionId, objectId: id, command: resourceCall(ChangeCount, { amount: 2 }) })).rejects.toThrow(/input/);
-    expect(c.context().object({ sessionId, id, kind: Counter.kind }).get(State)).toBe(6);
+    expect(c.context().object(sessionId, Counter, id).get(State)).toBe(6);
   });
 
   it("SDK 工具经同一个宿主目录调用，具型参数与产出在适配边界校验", async () => {
@@ -465,7 +465,7 @@ describe("工作台 SDK 的宿主实现", () => {
   it("提交拒绝异步与逃逸 writer，声明 schema 不能用同 ID 的伪造契约绕过", async () => {
     const c = counter(); const { service, sessionId } = open([c.plugin]);
     const id = await create(service, sessionId);
-    const object = c.context().object({ sessionId, id, kind: Counter.kind });
+    const object = c.context().object(sessionId, Counter, id);
     const count = service.sessions.tree.nodes(sessionId).length;
     let escaped!: ObjectWriter;
     expect(() => object.commit(((writer: ObjectWriter) => {
@@ -484,10 +484,10 @@ describe("工作台 SDK 的宿主实现", () => {
     const c = counter(); const { service, sessionId } = open([c.plugin]);
     const id = await create(service, sessionId);
     const snapshot = c.context().session(sessionId).snapshot();
-    const object = c.context().object({ sessionId, id, kind: Counter.kind });
-    expect(() => c.context().object({ sessionId: "wrong", id, kind: Counter.kind })).toThrow(/reference/);
-    expect(() => c.context().object({ sessionId, id: "missing", kind: Counter.kind })).toThrow(/reference/);
-    expect(() => c.context().object({ sessionId, id, kind: "foreign.plugin/thing" })).toThrow(/another plugin/);
+    const object = c.context().object(sessionId, Counter, id);
+    expect(() => c.context().object("wrong", Counter, id)).toThrow(/reference/);
+    expect(() => c.context().object(sessionId, Counter, "missing")).toThrow(/reference/);
+    expect(() => c.context().object(sessionId, { ...Counter, kind: "foreign.plugin/thing" }, id)).toThrow(/another plugin/);
     object.commit(writer => { writer.append(Changed, { value: 2 }); });
     expect(snapshot.records.all({ scope: "session" })).toHaveLength(2);
     expect(c.context().session(sessionId).snapshot().records.all({ scope: "session" })).toHaveLength(3);
@@ -515,7 +515,7 @@ describe("工作台 SDK 的宿主实现", () => {
     const { service, sessionId } = open([plugin]);
     context.session(sessionId).commit(writer => { writer.append(Input, "first"); });
     expect(seen).toEqual([[Input.id, 1], [Follow.id, 2]]);
-    expect(context.session(sessionId).snapshot().records.first(Input, { scope: "path" })).toMatchObject({ status: "known", data: "first", record: { resource: null } });
+    expect(context.session(sessionId).snapshot().records.first(Input, { scope: "path" })).toMatchObject({ status: "known", data: "first", record: { source: { plugin: "test.events", resource: null } } });
     expect(service.sessions.tree.nodes(sessionId)).toHaveLength(2);
   });
 
@@ -569,7 +569,7 @@ describe("工作台 SDK 的宿主实现", () => {
     } }));
     const target = await configureModel(service);
     const id = await create(service, sessionId);
-    const object = c.context().object({ sessionId, id, kind: Counter.kind });
+    const object = c.context().object(sessionId, Counter, id);
     const before = object.session.snapshot();
     const result = await c.context().models.run({ object: object.ref, requestParentId: before.position.nodeId,
       target, system: { blocks: [] }, messages: [{ kind: "input", parts: [{ kind: "text", text: "First projection" }] }], signal: new AbortController().signal,
@@ -618,7 +618,7 @@ describe("工作台 SDK 的宿主实现", () => {
     const target = await configureModel(service);
     const id = await create(service, sessionId);
     const ref = { sessionId, id, kind: Counter.kind };
-    const object = c.context().object(ref);
+    const object = c.context().object(sessionId, Counter, id);
     const controller = new AbortController();
     const events: ModelRunEvent[] = [];
     let ready!: () => void;

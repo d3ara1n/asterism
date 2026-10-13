@@ -103,7 +103,7 @@
 
 模型接入为 Vercel AI SDK，MCP 接入为官方 TypeScript SDK。运行时拥有任务历史与授权，接入层不拥有会话真值；不以完整 agent 框架替代工坊的历史、资源和授权内核。
 
-模型接入的上层封装须支持继续扩展协议，首批围绕 OpenAI 与 Anthropic 协议。每个 Session 有唯一的只追加扁平会话树：message、thinking、text、toolcall（带结果）、event、notice 平级节点；代理块带 agent_id 与 response_id，不完整块以 complete=false 落库但不发给模型。对话是代理从树上的即时投影，不单独存储；模型投影按响应归组并把响应期间的事件延后。会话所有被捕获的资源 settled 才可回溯，继续点不得使投影以 thinking 结尾。具体契约见 [会话树](timeline.md) 与 [会话与代理能力](conversation-core.md)。
+模型接入的上层封装须支持继续扩展协议，首批围绕 OpenAI 与 Anthropic 协议。每个 Session 有唯一的只追加扁平会话树：message、thinking、text、toolcall（带结果）、event、notice 平级节点；代理块以所属代理资源为来源并带 response_id，不完整块以 complete=false 落库但不发给模型。对话是代理从树上的即时投影，不单独存储；模型投影按响应归组并把响应期间的事件延后。会话所有被捕获的资源 settled 才可回溯，继续点不得使投影以 thinking 结尾。具体契约见 [会话树](timeline.md) 与 [会话与代理能力](conversation-core.md)。
 
 模型与端点的协议差异由可组合的兼容包集中处理请求编码、响应解码与历史续接，避免在通用路径散布品牌、域名或模型名称条件链。提供商连接可设置默认组合及选项，具体模型继承并覆盖；内置目录提供推荐，用户可为自定义与中转端点显式选择。同一请求使用统一解析后的组合，不同格式策略可跨模型复用。该方向已确认，本次不实施；配置、组合契约与现有 DeepSeek 专用分支的迁移见 [模型兼容计划](../plans/todo-2026-10-10-model-compatibility.md)。
 

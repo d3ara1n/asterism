@@ -37,7 +37,7 @@ function setup() {
   capture.mockRestore();
   const sessionId = service.sessions.tree.create("Files");
   for (const object of [resource, { ...resource, id: "other", title: "Other resource" }]) service.sessions.tree.append(sessionId, {
-    kind: "event", agentId: null, model: null, type: "resource_created",
+    kind: "event", source: { plugin: "atelier.host", resource: null }, recipient: null, model: null, type: "resource_created",
     data: { ...object.data, id: object.id, type: object.kind, title: object.title },
   });
   const capabilities = new AgentCapabilities(modules.resources, modules.tools, [resource], () => true);

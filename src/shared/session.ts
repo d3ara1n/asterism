@@ -8,8 +8,11 @@ import { pointSchema, workbenchCommands, workbenchSnapshotSchema } from "./workb
 import { resourceCallSchema, contractReferenceSchema, toolInvocationSchema, toolRunningResultSchema } from "@atelier/sdk/contracts";
 
 const id = z.string().min(1).max(160);
-/** 会话树节点共有字段：父指针组织分支，agentId 标明归属代理（事件与通知可无归属）。 */
-const base = { id, sessionId: id, parentId: id.nullable(), createdAt: z.string() };
+/** 记录来源：plugin 由宿主按写入通道打戳；resource 为经校验的发出资源，null 表示会话级记录。 */
+export const recordSourceSchema = z.strictObject({ plugin: id, resource: z.strictObject({ id, kind: id }).nullable() });
+export type RecordSource = z.infer<typeof recordSourceSchema>;
+/** 会话树节点共有字段：父指针组织分支，source 标明写入者；关联对象属于各节点载荷。 */
+const base = { id, sessionId: id, parentId: id.nullable(), createdAt: z.string(), source: recordSourceSchema };
 export const completionSchema = z.strictObject({
   usage: usageSchema.nullable(), finishReason: z.string(),
   rawFinishReason: z.string().nullable(), providerResponseId: z.string().nullable(),
@@ -17,7 +20,7 @@ export const completionSchema = z.strictObject({
 export type BlockCompletion = z.infer<typeof completionSchema>;
 export const emptyCompletion = { usage: null, finishReason: null, rawFinishReason: null, providerResponseId: null } as const;
 /** 同一次模型响应的 block 共享 responseId，ordinal 为其在响应内的顺序；投影按此重组。 */
-const block = { ...base, agentId: id, responseId: id, ordinal: z.number().int().nonnegative(), complete: z.boolean(),
+const block = { ...base, responseId: id, ordinal: z.number().int().nonnegative(), complete: z.boolean(),
   requestParentId: id.nullable(), model: z.string(),
   usage: usageSchema.nullable(), finishReason: z.string().nullable(),
   rawFinishReason: z.string().nullable(), providerResponseId: z.string().nullable(),
@@ -25,17 +28,17 @@ const block = { ...base, agentId: id, responseId: id, ordinal: z.number().int().
   continuation: jsonSchema, adapter: z.string(), scope: z.string() };
 
 export const sessionNodeSchema = z.discriminatedUnion("kind", [
-  z.strictObject({ ...base, kind: z.literal("message"), agentId: id, parts: modelInputPartsSchema }),
+  z.strictObject({ ...base, kind: z.literal("message"), parts: modelInputPartsSchema }),
   z.strictObject({ ...block, kind: z.literal("thinking"), text: z.string() }),
   z.strictObject({ ...block, kind: z.literal("text"), text: z.string() }),
   // toolcall 与结果同一节点：只有得到结果才 complete；未完成的填充以 complete=false 留作审计。
   z.strictObject({ ...block, kind: z.literal("toolcall"), callId: id, name: id, argumentsText: z.string(), arguments: jsonSchema,
     outcome: toolOutcomeSchema.nullable() }).refine(node => node.complete === (node.outcome !== null),
     "A complete tool call must have an outcome; incomplete calls cannot have one."),
-  // 重建工作台与上下文的对象事件；model 非空时作为文本投影给该代理。
-  z.strictObject({ ...base, kind: z.literal("event"), agentId: id.nullable(), type: id,
-    data: jsonSchema, model: z.string().nullable() }),
-  z.strictObject({ ...base, kind: z.literal("notice"), agentId: id.nullable(), level: z.enum(["info", "warning", "error"]),
+  // 重建工作台与上下文的对象事件；model 非空时作为文本投影给 recipient（null 为全部代理）。
+  z.strictObject({ ...base, kind: z.literal("event"), type: id,
+    data: jsonSchema, model: z.string().nullable(), recipient: id.nullable() }),
+  z.strictObject({ ...base, kind: z.literal("notice"), level: z.enum(["info", "warning", "error"]),
     code: z.string(), message: z.string(),
     /** 无内容块的异常响应保留诊断资料，不伪造模型输出块。 */
     response: completionSchema.extend({ responseId: id, requestParentId: id.nullable(), model: z.string() }).optional() }),

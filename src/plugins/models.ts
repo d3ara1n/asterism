@@ -24,6 +24,9 @@ export class ModelTargetFailure extends PluginApiError {
 interface ResolvedTarget { settings: ModelSettings; adapter: ModelAdapter }
 /** 内部 adapter 的一次调用输入；授权视图与资源环境取用不进入公开 SDK。 */
 export interface RunRequest extends ModelRunRequest {
+  /** 宿主打戳的写入插件身份，用于响应块来源。 */
+  /** 发起请求的插件身份，由宿主填写；用于响应块来源打戳。 */
+  plugin: string;
   capabilities: AgentCapabilities;
   context: Promise<{ file: string; text: string }[]>;
   content?: HostInputOptions["content"];

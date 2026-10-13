@@ -104,7 +104,7 @@ renderer 的 `features/session/` 拥有会话查看位置、读取协调、历�
 - 大内容记录稳定引用及完整性信息；文件落盘与数据库索引需处理崩溃中间态。
 - 宿主存储与协议格式独立版本化；插件领域数据由所属类型的 schema 判断兼容性，迁移归插件。
 - 当前视图状态与业务事件分开。
-- `session_nodes` 保存 `seq`、`id`、`session_id`、`parent_id`、`kind` 与不可变 JSON `payload`；`response_id`、`ordinal` 为生成列并有响应内唯一序号约束。块载荷含请求起点、代理身份、正文、完成状态、时间与协议来源。检查点格式未定。
+- `session_nodes` 保存 `seq`、`id`、`session_id`、`parent_id`、`kind` 与不可变 JSON `payload`；`response_id`、`ordinal` 为生成列并有响应内唯一序号约束。每个载荷含记录来源 `source: { plugin, resource }`；块载荷另含请求起点、正文、完成状态、时间与协议来源。用量视图按 `source.resource.id` 归属代理。检查点格式未定。
 - `block_completions` 只追加一次终态元数据，外键绑定实际块，响应身份唯一；查询时合并，不更新节点。`session_blocks` 提供块与计量的 SQL 视图，`session_usage` 合并块计量及无内容块异常 notice 的计量，便于按会话/代理/模型筛选汇总。
 - `cursor_selections` 追加历史选择审计，保存原位置、请求位置、实际位置、原因和时间；与 `sessions.cursor` 更新处于同一事务。选择日志不属于消息路径。
 - 应用数据统一位于 Electron `app.getPath('userData')` 下：发布为 `appData/dev.dearain.atelier`，开发为 `appData/dev.dearain.atelier-development`。两个目录都在获取单实例锁前创建并显式设置，固定身份不随品牌显示名称变化；不写入源码仓库或安装目录。外观与窗口状态显式以同一根目录构造 electron-store，任务进程只接受主进程传入的数据根。

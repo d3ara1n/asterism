@@ -38,7 +38,7 @@ export function createAdmission(deps: { selection: AgentSelectionService; valida
         if (!object.snapshot()) throw new PluginApiError("not_found", "The agent is not on the continuation path.");
         selectionOf(object);
         if (command.type === "submit") {
-          writer.append(UserMessage, { agentId: object.ref.id, parts: command.parts });
+          writer.append(UserMessage, { parts: command.parts });
           writer.set(AgentSubmissions, { ...object.get(AgentSubmissions) ?? {}, [command.submissionId]: JSON.stringify(command) });
         }
       });

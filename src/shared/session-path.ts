@@ -34,9 +34,10 @@ export function continuable(path: readonly SessionNode[]): boolean {
   const last = new Map<string, BlockNode>();
   for (const node of path) {
     if (!isBlockNode(node) || !node.complete) continue;
-    const previous = last.get(node.agentId);
+    const owner = node.source.resource?.id ?? "";
+    const previous = last.get(owner);
     if (!previous || previous.responseId !== node.responseId || previous.ordinal < node.ordinal) {
-      last.set(node.agentId, node);
+      last.set(owner, node);
     }
   }
   return [...last.values()].every(node => node.kind !== "thinking");

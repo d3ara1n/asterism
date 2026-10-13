@@ -128,7 +128,7 @@ describe("会话运行时", () => {
     const first = await execute(service, start); await settled(service);
     const sessionId = first.sessionId, agentId = agentOf(first);
     const origin = service.sessions.tree.cursor(sessionId);
-    service.sessions.tree.append(sessionId, { ...emptyCompletion, kind: "thinking", agentId, text: "Unfinished reasoning",
+    service.sessions.tree.append(sessionId, { ...emptyCompletion, kind: "thinking", source: { plugin: "atelier.core", resource: { id: agentId, kind: "atelier.core/agent" } }, text: "Unfinished reasoning",
       responseId: "interrupted", requestParentId: origin, ordinal: 0, complete: true, model: start.model,
       continuation: null, adapter: "ai-sdk-v7/3", scope: "scope" });
     const created = await execute(service, { type: "resource.create", sessionId, kind: "atelier.core/agent", creation: { id: "atelier.core/agent.create" },
@@ -543,7 +543,7 @@ describe("会话运行时", () => {
     expect(sent.filter(m => m.includes("To A")).at(-1)).toEqual(["First", "To A"]);
     expect(sent.filter(m => m.includes("To B")).at(-1)).toEqual(["To B"]);
     const path = service.sessions.tree.path(sessionId);
-    expect(path.filter(n => n.kind === "message").map(n => n.agentId)).toEqual([a, a, b]);
+    expect(path.filter(n => n.kind === "message").map(n => n.source.resource?.id)).toEqual([a, a, b]);
   });
 
   it("选择旧位置后发送形成新分支，旧分支保留；运行中不能选择", async () => {

@@ -25,9 +25,9 @@ export const historyMessages = pluginNamespace("atelier.host").messages("en", de
     id: "historyAllRecords",
     defaultMessage: "All records",
   },
-  historyWorkbenchEvents: {
-    id: "historyWorkbenchEvents",
-    defaultMessage: "Workbench events",
+  historySessionEvents: {
+    id: "historySessionEvents",
+    defaultMessage: "Session events",
   },
   historyAllResourceEvents: {
     id: "historyAllResourceEvents",

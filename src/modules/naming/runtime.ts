@@ -3,7 +3,7 @@ import { inputSummary } from "../../shared/model-input.ts";
 import type { SessionSnapshot } from "@atelier/sdk/contracts";
 import { coreId, coreNamespace } from "../../shared/core.ts";
 import { UserMessage } from "../agent/records.ts";
-import { NamingAttempt, SessionNamed } from "./records.ts";
+import { SessionNamed } from "./records.ts";
 import { cleanTitle, collectTurns, namingInstruction, namingPrompt, renameCheckpoints } from "./policy.ts";
 
 const timeoutMs = 10_000;
@@ -36,7 +36,7 @@ async function generateTitle(models: Pick<ModelServices, "stream">, prompt: stri
 
 /** 用户消息触发两级自动命名；助手输出只作为材料，命名事件不进入模型对话。 */
 export default defineModule(plugin => ({
-  records: [SessionNamed, NamingAttempt],
+  records: [SessionNamed],
   observers: [{
     id: "session-naming",
     committed({ records, snapshot, session }) {
@@ -49,29 +49,26 @@ export default defineModule(plugin => ({
       const message = initial ? first : latest;
       const level = initial ? "initial" : "refined";
       if (level === "refined" && !renameCheckpoints.has(snapshot.records.query(UserMessage, { scope: "path" }).length)) return;
-      const previous = snapshot.records.last(NamingAttempt, { scope: "session" });
-      if (previous?.status === "unknown" || previous?.data.messageId === message.record.id) return;
-      if (!plugin.models.roles().some(role => role.id === "utility" && role.model !== null)) return;
+      if (named?.status === "known" && named.data.auto?.messageId === message.record.id) return;
+      const model = plugin.models.roles().find(role => role.id === "utility")?.model ?? null;
+      if (model === null) return;
       const expected = snapshot.title, nameId = named?.record.id ?? null;
       const prompt = namingPrompt(level === "initial" ? [{ user: inputSummary(message.data.parts) }]
         : collectTurns(snapshot.records.all({ scope: "path" })));
-      let attemptId: string;
+      // 过时判断只读命名事件、标题与最新输入；较新的生效命名或输入使在途结果失效。
       const isCurrent = (view: SessionSnapshot) => view.title === expected &&
-        view.records.last(NamingAttempt, { scope: "session" })?.record.id === attemptId &&
         (view.records.last(SessionNamed, { scope: "session" })?.record.id ?? null) === nameId &&
         view.records.last(UserMessage, { scope: "path" })?.record.id === latest.record.id;
-      const started = plugin.tasks.start(`naming:${session.id}:${message.record.id}`, async signal => {
+      plugin.tasks.start(`naming:${session.id}:${message.record.id}`, async signal => {
         if (!isCurrent(session.snapshot())) return;
         const title = await generateTitle(plugin.models, prompt, signal);
         if (!isCurrent(session.snapshot())) return;
-        // 比较更新与来源事件加入同一事务；事件保存实际生效标题，原历史保持不变。
+        // 比较更新与命名事件加入同一事务；事件保存实际生效标题，原历史保持不变。
         session.commit(writer => {
-          if (session.title.propose(title, { expected })) writer.append(SessionNamed, { title: session.title.get(), source: level });
+          if (session.title.propose(title, { expected })) writer.append(SessionNamed, {
+            title: session.title.get(), source: "auto", auto: { level, messageId: message.record.id, model } });
         });
       }, { timeoutMs });
-      if (started) session.commit(writer => {
-        attemptId = writer.append(NamingAttempt, { messageId: message.record.id, level });
-      });
     },
   }],
 }));

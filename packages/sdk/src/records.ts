@@ -3,6 +3,15 @@ import type { Json } from "./json.ts";
 
 /** 会话记录的公开信封：宿主把存储格式映射为它，插件按契约解码，不依赖内部节点结构。 */
 export interface RecordRef { readonly id: string }
+/**
+ * 记录来源：plugin 由宿主按写入通道的插件身份打戳，插件不能填写，仅供诊断；
+ * resource 是经具名资源契约引用并由宿主校验的发出资源，null 表示会话级记录。
+ * 被链接的代理等关联对象属于各契约载荷，不借用来源。
+ */
+export interface RecordSource {
+  readonly plugin: string;
+  readonly resource: { readonly id: string; readonly kind: string } | null;
+}
 export interface SessionRecord {
   readonly id: string;
   readonly sessionId: string;
@@ -11,8 +20,8 @@ export interface SessionRecord {
   readonly sequence: number;
   readonly createdAt: string;
   readonly contract: RecordRef;
-  /** 关联对象；不预设发送者或执行者。 */
-  readonly resource: { readonly id: string; readonly kind: string } | null;
+  /** 写入者；宿主按写入通道打戳，关联对象属于 data。 */
+  readonly source: RecordSource;
   readonly data: Json;
 }
 export type Decoded<D> =

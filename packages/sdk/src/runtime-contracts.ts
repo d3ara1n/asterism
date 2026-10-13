@@ -28,7 +28,8 @@ export interface PluginContext {
   readonly models: ModelServices;
   readonly catalogs: { get<T extends Json>(contract: DataContract<T>): T | null };
   session(id: string): SessionExecutor;
-  object(ref: ResourceRef): ObjectExecutor;
+  /** 以具名资源契约取得对象操作柄；宿主校验契约属于本插件、对象存在且类型一致，写入记录以此打戳。 */
+  object<S extends Json>(sessionId: string, contract: ResourceContract<S>, id: string): ObjectExecutor;
 }
 export interface SessionCommitted {
   readonly snapshot: SessionSnapshot;

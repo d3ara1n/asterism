@@ -69,7 +69,7 @@ function fixture(options: { prepare?: (content: ContentScope, signal: AbortSigna
     await service.sessions.execute({ type: "resource.create", sessionId, kind: Document.kind, creation: { id: Create.id }, input: { file, ...rest }, contentScopeId: scopeId, position: { x: 0, y: 0 } });
     return service.sessions.snapshot(sessionId).workbench.objects.at(-1)!.id;
   };
-  const object = (id: string) => context.object({ sessionId, id, kind: Document.kind });
+  const object = (id: string) => context.object(sessionId, Document, id);
   const replace = (id: string, value: z.input<typeof Replace.schema>, scopeId?: string) => service.sessions.execute({ type: "resource.command", sessionId, objectId: id,
     command: resourceCall(Replace, value), contentScopeId: scopeId });
   return { root, service, sessionId, store, input, create, object, replace, context };
