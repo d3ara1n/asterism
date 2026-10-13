@@ -8,14 +8,18 @@ import { settingsMessages } from "../messages/settings";
 import { useI18n } from "../shared/i18n";
 
 import type { AppSnapshot, RuntimeStatus } from "../../shared/contracts";
+import type { SessionResult } from "../../shared/session";
+import { SessionActions } from "./SessionActions";
 
 /** 应用导航只消费会话摘要；选择会话后由应用层显式加载工作台。 */
-export function Sidebar({ snapshot, status, busy, selectedSessionId, homeActive, onHome, onSession, onSettings, onHide, onRetry }: {
+export function Sidebar({ snapshot, status, busy, selectedSessionId, renameDisabledSessionId, homeActive, onHome, onSession, onRename, onSettings, onHide, onRetry }: {
   snapshot: AppSnapshot | null; status: RuntimeStatus; busy: boolean; selectedSessionId: string | null;
+  renameDisabledSessionId: string | null; onRename: (sessionId: string, title: string) => Promise<SessionResult>;
   homeActive: boolean; onHome: () => void; onSession: (id: string) => void;
   onSettings: () => void; onHide: () => void; onRetry: () => void;
 }) {
   const i18n = useI18n();
+  const disabled = busy || status !== "ready";
   return <aside id="app-sidebar" className="app-sidebar" aria-label={i18n.formatMessage(appMessages.appNavigation)}>
     <header className="flex items-center justify-between gap-2 px-2 pb-5 pt-1">
       <span className="flex items-center gap-2 text-sm font-semibold"><BrandMark className="size-5 text-primary" />{i18n.formatMessage(appMessages.appName)}</span>
@@ -27,11 +31,15 @@ export function Sidebar({ snapshot, status, busy, selectedSessionId, homeActive,
     <section className="mt-6 flex min-h-0 flex-1 flex-col" aria-labelledby="conversation-list-title">
       <h2 id="conversation-list-title" className="type-label mb-2 px-2">{i18n.formatMessage(commonMessages.conversations)}</h2>
       <div className="min-h-0 flex-1 overflow-y-auto">
-        {snapshot?.sessions.map(session => <Button key={session.id} variant={selectedSessionId === session.id ? "secondary" : "ghost"} className="w-full justify-start"
-          aria-current={selectedSessionId === session.id ? "page" : undefined} disabled={busy || status !== "ready"}
-          onClick={() => onSession(session.id)} title={session.title}>
-          <MessageSquare className="text-muted-foreground" /><span className="truncate">{session.title}</span>
-        </Button>)}
+        {snapshot?.sessions.map(session => <div key={session.id} className="group/session relative">
+          <Button variant={selectedSessionId === session.id ? "secondary" : "ghost"} className="w-full justify-start pr-9"
+            aria-current={selectedSessionId === session.id ? "page" : undefined} disabled={disabled}
+            onClick={() => onSession(session.id)} title={session.title}>
+            <MessageSquare className="text-muted-foreground" /><span className="truncate">{session.title}</span>
+          </Button>
+          <SessionActions title={session.title} disabled={disabled} renameDisabled={renameDisabledSessionId === session.id}
+            onRename={title => onRename(session.id, title)} />
+        </div>)}
         {snapshot?.sessions.length === 0 && <p className="type-caption px-2 py-3">{i18n.formatMessage(appMessages.noConversations)}</p>}
         {!snapshot && status !== "unavailable" && <p role="status" className="type-caption px-2 py-3">{i18n.formatMessage(appMessages.loadingConversations)}</p>}
         {status === "unavailable" && <p role="status" className="type-caption px-2 py-3">{i18n.formatMessage(commonMessages.statusUnavailable)}</p>}

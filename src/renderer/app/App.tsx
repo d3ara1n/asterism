@@ -106,6 +106,10 @@ export function App({ controller }: { controller: ApplicationController }) {
   const openSession = (sessionId: string) => {
     navigate({ kind: "conversation", sessionId });
   };
+  const renameSession = (sessionId: string, title: string) => {
+    const command = { type: "rename" as const, sessionId, title };
+    return active?.sessionId === sessionId ? active.executeAndRead(command) : window.host.session.execute(command);
+  };
   const startConversation = async (input: StartInput) => {
     if (!ready) return;
     const token = navigation.current;
@@ -165,6 +169,8 @@ export function App({ controller }: { controller: ApplicationController }) {
     id: "navigation", label: i18n.formatMessage(appMessages.appNavigation), width: { min: 224, max: 224 },
     render: () => <Sidebar snapshot={snapshot} status={state.status} busy={state.busy}
       selectedSessionId={view.kind === "conversation" ? view.sessionId : null}
+      renameDisabledSessionId={active && !writable ? active.sessionId : null}
+      onRename={renameSession}
       homeActive={view.kind === "home"}
       onHome={goHome} onSession={openSession} onSettings={() => go("settings")} onHide={hideSidebar}
       onRetry={() => { void controller.refresh(); }} />,

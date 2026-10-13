@@ -8,7 +8,7 @@ import { isLayoutCommand } from "../../../shared/workbench.ts";
 const isCancel = (value: unknown) => typeof value === "object" && value !== null && (value as { id?: unknown }).id === CancelAgent.id;
 export type SessionView = Omit<SessionSnapshot, "progress">;
 type SessionOperation = Exclude<SessionMutation, { type: "start" }>;
-/** 工作台可发出的变更：布局、链接、移除与资源创建/命令。 */
+/** 会话界面可发出的变更：命名、布局、链接、移除与资源创建/命令。 */
 export type WorkbenchOperation = Exclude<SessionOperation, { type: "select" }>;
 export type SessionViewState = {
   snapshot: SessionView | null; position: ViewPosition; status: "loading" | "ready" | "error"; busy: boolean; error: UiText | null; missing: boolean;

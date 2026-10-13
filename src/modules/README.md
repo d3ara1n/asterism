@@ -1,6 +1,6 @@
 # 功能模块
 
-资源与工具在模型中平级；后端实现和对应 UI 在这里按功能共置。当前内置模块为 `notes/`、`filesystem/`、`agent/` 与提交后观察模块 `naming/`；命名只提供后台入口。
+资源与工具在模型中平级；后端实现和对应 UI 在这里按功能共置。当前内置模块为 `notes/`、`filesystem/`、`agent/` 与命名模块 `naming/`；命名提供后台接口、会话观察与历史记录视图，人工命名 UI 由应用组合层接入。
 
 后台与视图通过 [公开 SDK](../../packages/sdk/README.md) 消费宿主能力，职责与组合约定见 [插件 SDK 与功能组合](../../docs/plugin-sdk.md)，迁移进度见 [插件计划](../../plans/todo-2026-10-12-plugin-system.md)。`setup` 是装配入口，业务模块用显式依赖组合；资源内联聚合具型创建与动作实现，工具使用 `implementTool`，命名使用提交后观察与托管任务，Agent 自己推动模型循环。
 
@@ -11,10 +11,10 @@
 | 文件 | 职责 |
 | --- | --- |
 | `contract.ts` | 纯 Zod 契约：资源状态、卡片数据、工具实现的 target/result 和稳定 ID；过程产出与终结 data 共用 result schema |
-| `runtime.ts` | 默认导出 SDK 的 `defineModule(plugin => ...)`，提供资源、工具与具名生命周期贡献；可使用 Node |
+| `runtime.ts` | 导出 SDK 模块或供组合层显式创建的模块工厂，提供资源、工具与具名生命周期贡献；可使用 Node |
 | `renderer.tsx` | 默认导出 RendererModule，声明静态资源展示描述，注册卡片内容、附加操作和工具 header/body，只依赖纯契约与前端代码 |
 
-`modules/plugin.ts` 声明内置插件 `atelier.core` 的命名空间，契约以 `core.resource` / `core.data` 短名声明并补全为 `atelier.core/<name>`；`modules/runtime.ts` 通过静态 glob 收集 SDK 模块，组成内置插件定义，经 `src/plugins/loader.ts` 两阶段装配，`modules/renderer.ts` 通过 Vite 静态 glob 收集视图入口。新增目录遵守入口约定即可进入构建；两个入口不要相互导入，也不要创建同时导出它们的 barrel。运行时不依赖 React，renderer 不导入 Node/数据库。外部插件包经 `src/plugins/packages.ts` 在启动时打包加载，与内置插件同一装配流程；不提供沙箱。
+`modules/plugin.ts` 声明内置插件 `atelier.core` 的命名空间，契约以 `core.resource` / `core.data` 短名声明并补全为 `atelier.core/<name>`；`modules/runtime.ts` 通过静态 glob 收集默认 SDK 模块，并显式创建命名模块以连接其公开接口，每次组合独立的内置插件定义，经 `src/plugins/loader.ts` 两阶段装配。`modules/renderer.ts` 通过 Vite 静态 glob 收集视图入口。两个入口不要相互导入，也不要创建同时导出它们的 barrel。运行时不依赖 React，renderer 不导入 Node/数据库。外部插件包经 `src/plugins/packages.ts` 在启动时打包加载，与内置插件同一装配流程；不提供沙箱。
 
 资源创建与卡片行为通过 `resource.create` / `resource.command` 接入，SDK 资源由宿主 adapter 将 `creation / actions` 接到控制器，校验输入并执行；没有对应行为时拒绝命令。模型操作入口和资源授权独立于这些内部应用命令。SDK 的创建输入错误与 prepare 的参数拒绝映为应用的 `invalid_request`。
 
@@ -86,7 +86,7 @@ args、target、result schema 必须有非空的整体 description，声明 help
 
 `session.get / commit` 与 `object.get / commit` 分别作用于当前会话数据与当前对象数据，数据按契约身份保存到 `session_data`，读取由 schema 判断兼容性；不维护手填数据版本。当前值不随历史位置恢复；重建历史须消费不可变时间轴事件。插件目录的数据独立于会话生命周期。
 
-Agent 的选择和提交去重保存于对象数据，用户输入与执行输出保存为 `UserMessage / Execution / Notice` 记录；每次请求由 `agent/projection.ts` 重建消息。`agent/configuration.ts` 声明只读配置目录，应用级配置与用户覆盖仍由宿主保存。运行以对象绑定任务承载，取消与关闭由托管设施收束；会话仅在全部对象收束后允许回溯，移除对象也要求该对象收束。命名依赖同插件的 Agent 契约，用户消息触发两级自动命名；标题与来源事件同事务保存，规则见 [自动会话命名](../../docs/session-naming.md)。
+Agent 的选择和提交去重保存于对象数据，用户输入与执行输出保存为 `UserMessage / Execution / Notice` 记录；每次请求由 `agent/projection.ts` 重建消息。`agent/configuration.ts` 声明只读配置目录，应用级配置与用户覆盖仍由宿主保存。运行以对象绑定任务承载，取消与关闭由托管设施收束；会话仅在全部对象收束后允许回溯，移除对象也要求该对象收束。命名依赖同插件的 Agent 契约，用户消息触发两级自动命名；人工与自动命名只追加来源事件，游标观察者按当前路径同步标题，规则见 [会话命名](../../docs/session-naming.md)。
 
 ## 资源视图
 

@@ -73,4 +73,24 @@ export const appMessages = pluginNamespace("atelier.host").messages("en", define
     id: "app_App_5",
     defaultMessage: "The connection was lost. Retry the same message to recover the submitted conversation.",
   },
+  renameConversation: {
+    id: "conversation.rename",
+    defaultMessage: "Rename conversation",
+  },
+  renameConversationDescription: {
+    id: "conversation.rename.description",
+    defaultMessage: "Choose a title to keep instead of automatic suggestions.",
+  },
+  conversationTitle: {
+    id: "conversation.title",
+    defaultMessage: "Title",
+  },
+  conversationActions: {
+    id: "conversation.actions",
+    defaultMessage: "Actions for {title}",
+  },
+  moreActions: {
+    id: "conversation.moreActions",
+    defaultMessage: "More actions",
+  },
 }));

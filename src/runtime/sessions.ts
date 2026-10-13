@@ -11,6 +11,7 @@ import type { ModelAdapter } from "../model/contract.ts";
 import { Agent, CreateAgent, SubmitAgentInput, startAgentContentTarget, type AgentCommand } from "../modules/agent/contract.ts";
 import { createSelection } from "../modules/agent/selection.ts";
 import { composeSystemPrompt } from "../modules/agent/system-prompt.ts";
+import type { NamingApi } from "../modules/naming/runtime.ts";
 import { inputReferences } from "../model/input.ts";
 import { inputSummary } from "../shared/model-input.ts";
 import { createModules } from "../modules/runtime.ts";
@@ -38,7 +39,7 @@ const agentKind = Agent.kind;
 const startIdentity = ({ contentScopeId: _scope, ...input }: Extract<SessionCommand, { type: "start" }>) => JSON.stringify(input);
 
 /**
- * 会话入口：只拥有会话树、工作台对象与连线事件、布局和通知。
+ * 会话应用入口：组合内置领域接口，并提供会话树、工作台事件、布局和通知机制。
  * 资源行为（含代理的提交、运行、配置）由各资源控制器负责，会话按对象类型路由命令。
  */
 export class SessionService {
@@ -53,6 +54,7 @@ export class SessionService {
   readonly plugins: readonly PluginManifest[];
   readonly configurePlugins: LoadedPlugins["configure"];
   private readonly closePlugins: () => Promise<void>;
+  private readonly naming: NamingApi;
   private readonly prepare: LoadedPlugins["prepare"];
   private readonly afterCommit: LoadedPlugins["afterCommit"];
   private readonly modelActivity: (sessionId: string) => { running: string[]; live: LiveBlock[] };
@@ -115,6 +117,7 @@ export class SessionService {
     this.plugins = modules.manifest;
     this.configurePlugins = modules.configure;
     this.closePlugins = modules.close;
+    this.naming = modules.naming;
     this.afterCommit = modules.afterCommit;
     this.prepare = modules.prepare;
     this.modelActivity = modules.activity;
@@ -231,6 +234,13 @@ export class SessionService {
         this.commit(command.sessionId, () => this.tree.select(command.sessionId, command.nodeId));
         return { kind: "accepted", sessionId: command.sessionId };
       case "start": return this.start(command);
+      case "rename":
+        try { this.naming.nameByUser(command.sessionId, command.title); }
+        catch (error) {
+          if (error instanceof PluginApiError) throw sessionPluginError(error);
+          throw error;
+        }
+        return { kind: "accepted", sessionId: command.sessionId };
       case "resource.command": {
         const resource = this.object(command.sessionId, command.objectId);
         const controller = this.resources.controller(resource.kind);

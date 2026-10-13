@@ -34,48 +34,64 @@ async function generateTitle(models: Pick<ModelServices, "stream">, prompt: stri
   return title;
 }
 
-/** 用户消息触发两级自动命名；助手输出只作为材料，命名事件不进入模型对话。 */
-export default defineModule(plugin => ({
-  records: [SessionNamed],
-  observers: [{
-    id: "session-naming",
-    committed({ records, snapshot, session }) {
-      const latest = snapshot.records.last(UserMessage, { scope: "path" });
-      if (latest?.status !== "known" || !records.some(record => record.id === latest.record.id)) return;
-      const named = snapshot.records.last(SessionNamed, { scope: "path" });
-      if (named?.status === "unknown" || named?.data.source === "user") return;
-      const first = snapshot.records.first(UserMessage, { scope: "session" });
-      const initial = first?.status === "known" && records.some(record => record.id === first.record.id);
-      const message = initial ? first : latest;
-      const level = initial ? "initial" : "refined";
-      if (level === "refined" && !renameCheckpoints.has(snapshot.records.query(UserMessage, { scope: "path" }).length)) return;
-      if (named?.status === "known" && named.data.auto?.messageId === message.record.id) return;
-      const model = plugin.models.roles().find(role => role.id === "utility")?.model ?? null;
-      if (model === null) return;
-      const nameId = named?.record.id ?? null;
-      const prompt = namingPrompt(level === "initial" ? [{ user: inputSummary(message.data.parts) }]
-        : collectTurns(snapshot.records.all({ scope: "path" })));
-      // 命名依据只来自当前路径，标题同步与观察者顺序不参与过时判断。
-      const isCurrent = (view: SessionSnapshot) =>
-        (view.records.last(SessionNamed, { scope: "path" })?.record.id ?? null) === nameId &&
-        view.records.last(UserMessage, { scope: "path" })?.record.id === latest.record.id;
-      plugin.tasks.start(`naming:${session.id}:${message.record.id}`, async signal => {
-        if (!isCurrent(session.snapshot())) return;
-        const title = await generateTitle(plugin.models, prompt, signal);
-        // 检查与追加在同一同步提交中完成；标题由游标观察者独立同步。
-        session.commit(writer => {
-          if (isCurrent(session.snapshot())) writer.append(SessionNamed, {
-            title, source: "auto", auto: { level, messageId: message.record.id, model } });
+export interface NamingApi {
+  nameByUser(sessionId: string, title: string): void;
+}
+
+/** 在实际插件 setup 中交付具身份的接口；连接的清理由模块生命周期负责。 */
+export function createNamingModule(connect: (api: NamingApi) => () => void) {
+  return defineModule(plugin => {
+    const disconnect = connect({
+      nameByUser(sessionId, title) {
+        plugin.session(sessionId).commit(writer => {
+          writer.append(SessionNamed, { title: title.replace(/\s+/gu, " ").trim(), source: "user" });
         });
-      }, { timeoutMs });
-    },
-    cursorChanged({ snapshot, session }) {
-      // 标题 = 当前分支最后一次命名，否则为当前分支首条输入的截断；两者都没有时保持不变。
-      const named = snapshot.records.last(SessionNamed, { scope: "path" });
-      if (named?.status === "unknown") return;
-      const first = named ? null : snapshot.records.first(UserMessage, { scope: "path" });
-      const title = named?.data.title ?? (first?.status === "known" ? inputSummary(first.data.parts).slice(0, 72) : null);
-      if (title !== null) session.title.set(title);
-    },
-  }],
-}));
+      },
+    });
+    return {
+      records: [SessionNamed],
+      observers: [{
+        id: "session-naming",
+        committed({ records, snapshot, session }) {
+          const latest = snapshot.records.last(UserMessage, { scope: "path" });
+          if (latest?.status !== "known" || !records.some(record => record.id === latest.record.id)) return;
+          const named = snapshot.records.last(SessionNamed, { scope: "path" });
+          if (named?.status === "unknown" || named?.data.source === "user") return;
+          const first = snapshot.records.first(UserMessage, { scope: "session" });
+          const initial = first?.status === "known" && records.some(record => record.id === first.record.id);
+          const message = initial ? first : latest;
+          const level = initial ? "initial" : "refined";
+          if (level === "refined" && !renameCheckpoints.has(snapshot.records.query(UserMessage, { scope: "path" }).length)) return;
+          if (named?.status === "known" && named.data.auto?.messageId === message.record.id) return;
+          const model = plugin.models.roles().find(role => role.id === "utility")?.model ?? null;
+          if (model === null) return;
+          const nameId = named?.record.id ?? null;
+          const prompt = namingPrompt(level === "initial" ? [{ user: inputSummary(message.data.parts) }]
+            : collectTurns(snapshot.records.all({ scope: "path" })));
+          // 命名依据只来自当前路径，标题同步与观察者顺序不参与过时判断。
+          const isCurrent = (view: SessionSnapshot) =>
+            (view.records.last(SessionNamed, { scope: "path" })?.record.id ?? null) === nameId &&
+            view.records.last(UserMessage, { scope: "path" })?.record.id === latest.record.id;
+          plugin.tasks.start(`naming:${session.id}:${message.record.id}`, async signal => {
+            if (!isCurrent(session.snapshot())) return;
+            const title = await generateTitle(plugin.models, prompt, signal);
+            // 检查与追加在同一同步提交中完成；标题由游标观察者独立同步。
+            session.commit(writer => {
+              if (isCurrent(session.snapshot())) writer.append(SessionNamed, {
+                title, source: "auto", auto: { level, messageId: message.record.id, model } });
+            });
+          }, { timeoutMs });
+        },
+        cursorChanged({ snapshot, session }) {
+          // 标题 = 当前分支最后一次命名，否则为当前分支首条输入的截断；两者都没有时保持不变。
+          const named = snapshot.records.last(SessionNamed, { scope: "path" });
+          if (named?.status === "unknown") return;
+          const first = named ? null : snapshot.records.first(UserMessage, { scope: "path" });
+          const title = named?.data.title ?? (first?.status === "known" ? inputSummary(first.data.parts).slice(0, 72) : null);
+          if (title !== null) session.title.set(title);
+        },
+      }],
+      async closing() { disconnect(); },
+    };
+  });
+}

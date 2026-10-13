@@ -24,7 +24,7 @@ export type NewNode = Omit<SessionNode, "id" | "sessionId" | "parentId" | "creat
 
 // ---- 会话能力接口 ----
 const uuid = z.string().uuid();
-export const sessionVersion = 16;
+export const sessionVersion = 17;
 export const viewPositionSchema = z.discriminatedUnion("kind", [
   z.strictObject({ kind: z.literal("live") }),
   z.strictObject({ kind: z.literal("history"), nodeId: id.nullable() }),
@@ -37,6 +37,8 @@ export const sessionCommandSchema = z.discriminatedUnion("type", [
   z.strictObject({ type: z.literal("start"), submissionId: uuid, agent: id, model: modelExpressionSchema, thinking: thinkingSchema.nullable(), parts: userInputPartsSchema, contentScopeId: uuid.optional() }),
   z.strictObject({ type: z.literal("read"), sessionId: id, position: viewPositionSchema }),
   z.strictObject({ type: z.literal("select"), sessionId: id, nodeId: id.nullable() }),
+  // 应用组合入口：将人工命名交给内置命名模块追加领域记录。
+  z.strictObject({ type: z.literal("rename"), sessionId: id, title: z.string().max(160).refine(value => value.trim().length > 0) }),
   // 资源卡片的行为入口：按对象类型路由到资源控制器，command 由该资源模块校验。
   z.strictObject({ type: z.literal("resource.command"), sessionId: id, objectId: id, command: resourceCallSchema, contentScopeId: uuid.optional() }),
   // 向工作台添加资源；input 由该资源模块校验。
