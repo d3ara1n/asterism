@@ -44,7 +44,7 @@
 - [x] SDK 平行提供 input/execution/result，每阶段使用相同的 headerRenderer/bodyRenderer 结构；ToolRenderProps 按 phase 区分部分 JSON、已校验参数与终结结局，等待调度归 execution。
 - [x] 统一阶段分派和独立回退；目录、笔记与宿主固定入口共用同一机制，正文工具复用三态声明，移除顶层视图接口和重复填充组件。当前 SDK 版本见上方版本表，旧主版本在装配前拒绝。
 - [x] 作者示例与类型反例、阶段分派、部分参数隔离、自动开合、合并更新与中断收束验证；设计、作者文档与模块指南同步。
-- [ ] GUI 与真实参数流验收统一由 [模型接入计划第 9 节](todo-2026-10-01-model-protocol-storage.md#9-第一批交付与验收) 跟踪。
+- [x] GUI 与真实参数流验收已由用户确认（2026-10-13），记录见 [模型接入计划第 9 节](archived/todo-2026-10-01-model-protocol-storage.md#9-第一批交付与验收)。
 
 ## 已完成
 

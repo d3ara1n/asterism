@@ -2,7 +2,7 @@
 
 > 调研日期：2026-10-01。固定源码快照的静态调查，未运行这些项目的测试，也不代表全部发布版本的行为。第 1—5 节为源码事实，第 6 节列出工坊采用的边界；当前实现契约见 `conversation-core.md`。
 >
-> 已确认方向：Vercel AI SDK 作为模型适配基线，上层能扩展更多协议；工坊拥有可扩展的对话记录（transcript），组织用户消息、助手消息、思考与工具过程。实施任务见 [模型协议与存储立案](../plans/todo-2026-10-01-model-protocol-storage.md)。
+> 已确认方向：Vercel AI SDK 作为模型适配基线，上层能扩展更多协议；工坊拥有可扩展的对话记录（transcript），组织用户消息、助手消息、思考与工具过程。实施任务见 [模型协议与存储立案](../plans/archived/todo-2026-10-01-model-protocol-storage.md)。
 
 ## 1. 范围与源码版本
 
@@ -137,4 +137,4 @@ type AgentMessage = Message | CustomAgentMessages[keyof CustomAgentMessages];
 
 ## 7. 调查限制
 
-固定源码调查没有完整核验所有 UI/CLI 路由、fork/compaction 情形及 provider 兼容性。OpenCode V2 未完成项不当作已交付能力；Cline 持久化文档需和实际 writer/codec 联合解释。前五节的源码调查不代表真实端点或第三方项目性能、崩溃恢复已经运行验证。工坊自身实现与测试状态见 [模型接入计划](../plans/todo-2026-10-01-model-protocol-storage.md)。
+固定源码调查没有完整核验所有 UI/CLI 路由、fork/compaction 情形及 provider 兼容性。OpenCode V2 未完成项不当作已交付能力；Cline 持久化文档需和实际 writer/codec 联合解释。前五节的源码调查不代表真实端点或第三方项目性能、崩溃恢复已经运行验证。工坊自身实现与测试状态见 [模型接入计划](../plans/archived/todo-2026-10-01-model-protocol-storage.md)。

@@ -38,6 +38,6 @@
 
 ## 关联
 
-- 模型图片／文件输入与 provider 编码已接通，专项端点与 GUI 验收见 [模型内容输入计划](todo-2026-10-12-model-media-input.md)。
+- 模型图片／文件输入与 provider 编码已接通，专项端点与 GUI 验收已完成，记录见 [模型内容输入计划](archived/todo-2026-10-12-model-media-input.md)。
 - `plans/todo-2026-10-12-plugin-system.md`：包管理与插件卸载；会话内容不随插件私有目录删除。
 - `docs/runtime.md`：资源授权与请求边界；内容 ID 不绕过工具执行授权。

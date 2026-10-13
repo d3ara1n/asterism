@@ -2,7 +2,7 @@
 
 这是正式桌面应用，不依赖固定场景或浏览器内存演示。
 
-首页、侧栏与三类真实配置已实现并验收。提供商保存/测试、模型角色和 agent 配置能力见 `configuration/README.md`；单代理核心与会话 IPC 已实现，契约见 [会话与单代理能力](../docs/conversation-core.md)，首页发送与代理对话视图已消费会话接口，真实端点与 GUI 验收按 [模型接入计划](../plans/todo-2026-10-01-model-protocol-storage.md) 推进。
+首页、侧栏与三类真实配置已实现并验收。提供商保存/测试、模型角色和 agent 配置能力见 `configuration/README.md`；单代理核心与会话 IPC 已实现，契约见 [会话与单代理能力](../docs/conversation-core.md)，首页发送与代理对话视图已消费会话接口，真实端点与 GUI 验收已确认（2026-10-13），实施记录见 [模型接入计划](../plans/archived/todo-2026-10-01-model-protocol-storage.md)。
 
 | 目录 | 职责 | 依赖方向 |
 | --- | --- | --- |

@@ -83,7 +83,7 @@
 
 ## 后续范围
 
-真实模型与 GUI 验收、utility 命名、自动压缩与资源种类见 [模型接入计划](../../plans/todo-2026-10-01-model-protocol-storage.md)。资源编辑、目录 IO、多代理、恢复与长历史性能见 [运行时能力计划](../../plans/todo-2026-10-01-runtime-capabilities.md)，画布自动布局见 [布局计划](../../plans/todo-2026-09-18-workbench-layout.md)。
+真实模型与 GUI 验收、utility 命名与资源种类的实施记录见 [模型接入计划](../../plans/archived/todo-2026-10-01-model-protocol-storage.md)（已归档）。自动压缩见 [压缩计划](../../plans/todo-2026-10-13-context-compression.md)，跨模型续接见 [桥接计划](../../plans/todo-2026-10-13-cross-model-continuation.md)。资源编辑、目录 IO、多代理、恢复与长历史性能见 [运行时能力计划](../../plans/todo-2026-10-01-runtime-capabilities.md)，画布自动布局见 [布局计划](../../plans/todo-2026-09-18-workbench-layout.md)。
 
 ## 验证
 
