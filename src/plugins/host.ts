@@ -19,7 +19,7 @@ export interface SessionHost {
   title(sessionId: string): string;
   setTitle(sessionId: string, text: string): void;
   commit<T>(sessionId: string, work: (writer: SessionHostWriter) => T): T;
-  /** 会话内除 objectId 外没有在途活动；用于历史选择前的收束检查。 */
+  /** 会话内除 objectId 外没有在途活动；用于显式游标选择前的收束检查。 */
   idle(sessionId: string, objectId?: string): boolean;
   progressChanged(sessionId: string): void;
   linked(sessionId: string, objectId: string): FoldedObject[];

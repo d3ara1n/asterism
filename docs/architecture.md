@@ -104,8 +104,8 @@ renderer 的 `features/session/` 拥有当前会话的读取协调、历史面�
 - 大内容记录稳定引用及完整性信息；文件落盘与数据库索引需处理崩溃中间态。
 - 宿主存储与协议格式独立版本化；插件领域数据由所属类型的 schema 判断兼容性，迁移归插件。
 - 当前视图状态与业务事件分开。
-- `session_nodes` 保存 `seq`、`id`、`session_id`、`parent_id`、`kind`（通用记录或工作台事件）与不可变 JSON `payload`；载荷含记录来源 `source: { plugin, resource }`、契约身份与数据。宿主不为任何执行体的输出建列、约束或视图；响应分组、终态与用量由执行体插件在自己的记录中表达。检查点格式未定。
-- `cursor_selections` 追加历史选择审计，保存原位置、请求位置、实际位置、原因和时间；与 `sessions.cursor` 更新处于同一事务。选择日志不属于消息路径。
+- `session_nodes` 保存 `seq`、`id`、`session_id`、`parent_id` 与不可变 JSON `payload`，`contract` 为从载荷提取契约身份的虚拟生成列；载荷含记录来源 `source: { plugin, resource }`、契约身份与数据，工作台事件也按具名契约保存。宿主不为任何执行体的输出建列、约束或视图；响应分组、终态与用量由执行体插件在自己的记录中表达。检查点格式未定。
+- `cursor_selections` 追加显式执行游标选择的审计，保存原位置、请求位置、实际位置、原因和时间；与 `sessions.cursor` 更新处于同一事务。历史面板候选选择不写日志；选择日志不属于会话树或时间线，也不进入模型上下文。
 - 应用数据统一位于 Electron `app.getPath('userData')` 下：发布为 `appData/dev.dearain.atelier`，开发为 `appData/dev.dearain.atelier-development`。两个目录都在获取单实例锁前创建并显式设置，固定身份不随品牌显示名称变化；不写入源码仓库或安装目录。外观与窗口状态显式以同一根目录构造 electron-store，任务进程只接受主进程传入的数据根。
 - Chromium 的 cookie、缓存等会话数据使用独立的 `sessionData` 路径，不与应用数据混放。
 - 不把 API key 写入事件或模型请求记录。完整请求留存与保留期限未定，不默认永久保存全部原始内容。

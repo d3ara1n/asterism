@@ -9,6 +9,7 @@ export interface ResourceSnapshot<S extends Json = Json> {
   readonly title: string;
   readonly data: S;
 }
+/** 固定时间线末端与会话读取上界的只读观察柄，区别于宿主 IPC 的全树及工作台投影。 */
 export interface SessionSnapshot extends SessionView {
   readonly position: { readonly nodeId: string | null };
   readonly resources: {

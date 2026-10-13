@@ -37,7 +37,7 @@ export interface SessionCommitted {
   readonly records: readonly SessionRecord[];
   readonly session: SessionExecutor;
 }
-/** 执行游标变化后的固定快照；正常追加与历史选择使用同一形状。 */
+/** 执行游标变化后的固定快照；正常追加与显式游标选择使用同一形状，面板候选选择不触发。 */
 export interface SessionCursorChanged {
   readonly snapshot: SessionSnapshot;
   readonly session: SessionExecutor;

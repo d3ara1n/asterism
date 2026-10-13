@@ -66,7 +66,7 @@ export const sessionProgressSchema = z.strictObject({
   unsettledObjectIds: z.array(id),
 });
 export type SessionProgress = z.infer<typeof sessionProgressSchema>;
-/** 同次读取固定路径与对象投影；seq 是节点序号，revision 还涵盖选择、对象数据与布局。 */
+/** 同次交付完整会话树、执行游标与当前时间线的工作台投影；区别于 SDK 观察柄。seq 只计节点，revision 还涵盖游标选择、对象数据与布局。 */
 export const sessionSnapshotSchema = z.strictObject({
   sessionId: id, title: z.string(), cursor: id.nullable(), seq: revision, revision,
   nodes: z.array(sessionNodeSchema),

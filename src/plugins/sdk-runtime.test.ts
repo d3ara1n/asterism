@@ -410,7 +410,7 @@ describe("工作台 SDK 的宿主实现", () => {
     expect(service.sessions.tree.nodes(sessionId).map(flat)).toHaveLength(2);
   });
 
-  // 预期来自游标观察契约：追加与历史选择统一通知最终路径，纯数据／标题写入和查看不通知。
+  // 预期来自游标观察契约：追加与显式游标选择统一通知最终时间线，纯数据／标题写入和只读查询不通知。
   it("游标观察与记录提交独立，批量与嵌套提交只通知最终位置，回滚不通知", async () => {
     const eventNs = pluginNamespace("test.cursor");
     const Entry = defineRecord(eventNs.name("entry"), { schema: z.string() });
