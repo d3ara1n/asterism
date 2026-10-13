@@ -51,7 +51,7 @@ export function defineRecord<D extends Json>(id: string, definition: {
   };
 }
 export interface RecordQuery { readonly scope: "path" | "session" }
-/** 固定在一次读取位置的会话视图；await 之后不切换到最新状态。 */
+/** 固定在一次读取位置的观察柄；按需读取记录，await 之后不切换到最新状态。 */
 export interface SessionView {
   readonly id: string;
   readonly title: string;
@@ -59,7 +59,7 @@ export interface SessionView {
     all(query: RecordQuery): readonly SessionRecord[];
     /** 最早一条匹配记录；不可解码时返回 unknown，不跳过。 */
     first<D extends Json>(contract: RecordContract<D>, query: RecordQuery): Decoded<D> | null;
-    /** 最新一条匹配记录；按契约索引定位，仅解码该记录；不可解码时返回 unknown，不回退。 */
+    /** 最新一条匹配记录；按范围和契约定位，仅解码该记录；不可解码时返回 unknown，不回退。 */
     last<D extends Json>(contract: RecordContract<D>, query: RecordQuery): Decoded<D> | null;
     query<D extends Json>(contract: RecordContract<D>, query: RecordQuery): Decoded<D>[];
   };

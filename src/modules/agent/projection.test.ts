@@ -1,13 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { projectForAgent } from "./projection.ts";
 import { sessionView } from "../../plugins/records.ts";
+import { nodeView } from "../../session/view.ts";
 import { attached, call, event, message, node, text, thinking } from "../../session/test-nodes.ts";
 import type { NewNode, SessionNode } from "../../shared/session.ts";
 
 function records(...values: NewNode[]): SessionNode[] {
   return values.map((value, index) => node(String(index), index ? String(index - 1) : null, value));
 }
-const project = (path: SessionNode[], agent = "a") => projectForAgent(sessionView("s", "", path, path), agent);
+const project = (path: SessionNode[], agent = "a") => projectForAgent(sessionView(nodeView("s", "", path, path.at(-1)?.id ?? null)), agent);
 
 // 预期来自时间线投影契约；存储、路径选择和通用信封转换由各自边界守护。
 describe("代理模型投影", () => {

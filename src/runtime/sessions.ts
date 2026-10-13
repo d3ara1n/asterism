@@ -65,8 +65,9 @@ export class SessionService {
     this.tree = new SessionTree(db);
     this.content = new ContentStore(db, join(dataRoot, applicationStorage.contentDirectory));
     const host: SessionHost = {
+      view: sessionId => this.tree.view(sessionId),
+      sequences: (sessionId, nodes) => this.tree.sequences(sessionId, nodes),
       path: sessionId => this.tree.path(sessionId),
-      nodes: sessionId => this.tree.nodes(sessionId),
       title: sessionId => this.tree.title(sessionId),
       setTitle: (sessionId, text) => {
         const title = text.replace(/\s+/gu, " ").trim().slice(0, 160);

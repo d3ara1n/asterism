@@ -1,4 +1,4 @@
-import { belongsTo, type ActionContract, type Json, type ResourceCall, type ToolContract } from "@atelier/sdk/contracts";
+import { belongsTo, type ActionContract, type Json, type ResourceCall, type SessionRecord, type SessionSnapshot, type ToolContract } from "@atelier/sdk/contracts";
 import { PluginApiError, type PluginDefinition, type PluginContext, type PluginLogger, type PluginTasks,
   type ResourceRef, type SessionObserver, type CommandPreparer, type ModuleContribution } from "@atelier/sdk/runtime";
 import type { CredentialVault } from "../configuration/credentials.ts";
@@ -12,7 +12,7 @@ import { RunLifecycle, type RunGroup, type RunningWork } from "./lifecycle.ts";
 import { PluginStorage } from "./storage.ts";
 import type { HostModels } from "./models.ts";
 import type { CatalogHost, SessionHost } from "./host.ts";
-import { toRecords, sessionSnapshot } from "./records.ts";
+import { toRecord, sessionSnapshot } from "./records.ts";
 import { createSdkContext, type SdkContext } from "./sdk-context.ts";
 import { synchronous } from "./synchronous.ts";
 import { adaptResource, adaptTool } from "./sdk-adapters.ts";
@@ -239,7 +239,7 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
     }
   }
   const resources = new ResourceRegistry(collected.flatMap(entry => entry.resources));
-  type Notification = { sessionId: string; snapshot: ReturnType<typeof sessionSnapshot>; records: ReturnType<typeof toRecords>; cursorChanged: boolean };
+  type Notification = { sessionId: string; snapshot: SessionSnapshot; records: SessionRecord[]; cursorChanged: boolean };
   const notifications: Notification[] = [];
   const touched = new Set<string>();
   const observers = collected.flatMap(entry => entry.observers);
@@ -272,9 +272,9 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
         || (cursorChanged && observers.some(observer => observer.cursorChanged));
       if (observed) {
         // 快照固定在本次提交时刻，后续排队的提交不改写它。
-        const all = services.sessions.nodes(sessionId);
-        notifications.push({ sessionId, records: toRecords(nodes, all), cursorChanged,
-          snapshot: sessionSnapshot(sessionId, services.sessions.title(sessionId), all, services.sessions.path(sessionId)) });
+        const sequences = services.sessions.sequences(sessionId, nodes);
+        notifications.push({ sessionId, records: nodes.map((node, index) => toRecord(node, sequences[index]!)), cursorChanged,
+          snapshot: sessionSnapshot(services.sessions.view(sessionId)) });
       }
       if (dispatching) return;
       dispatching = true;

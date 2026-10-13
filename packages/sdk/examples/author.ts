@@ -34,7 +34,7 @@ export const journalPlugin = definePlugin({
 export function annotate(plugin: PluginContext, sessionId: string, text: string) {
   plugin.session(sessionId).commit(writer => { writer.append(Annotation, { text }); });
 }
-/** 最新具型记录按契约索引定位；unknown 保留给领域消费者处理。 */
+/** 最新具型记录按范围和契约定位；unknown 保留给领域消费者处理。 */
 export function latestAnnotation(plugin: PluginContext, sessionId: string) {
   return plugin.session(sessionId).snapshot().records.last(Annotation, { scope: "session" });
 }

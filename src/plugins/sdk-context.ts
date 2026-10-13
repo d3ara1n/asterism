@@ -47,11 +47,13 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
     if (scope?.execution && !scope.active) throw new PluginApiError("unavailable", "The tool execution scope is closed.");
   };
   /** 内容访问域：已建立对象取当前路径上的记录根；尚未建立身份的对象只有本次作用域。 */
-  const access = (sessionId?: string, objectId?: string, scope?: ObjectScope) => {
+  const access = <S extends string | undefined>(sessionId: S, objectId?: string, scope?: ObjectScope) => {
     const established = !!sessionId && !scope?.provisional;
-    const recordIds = established ? new Set(host.sessions.path(sessionId!).map(node => node.id)) : new Set<string>();
+    const view = established ? host.sessions.view(sessionId!) : undefined;
     // 动作作用域结束后对象仍按自身记录根与请求交接读取；工具执行作用域关闭后严格拒绝。
-    return { owner: internal.id, sessionId, objectId, recordIds, get scope() { return scope?.active ? scope.content : undefined; }, check: () => {
+    return { owner: internal.id, sessionId, objectId,
+      get recordIds() { return new Set(view?.pathIds()); },
+      get scope() { return scope?.active ? scope.content : undefined; }, check: () => {
       checkAvailable();
       if (scope?.execution && !scope.active) throw new PluginApiError("unavailable", "The content execution is closed.");
     } };
@@ -76,7 +78,7 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
     get: contract => readData(id, null, contract),
     snapshot() {
       checkAvailable();
-      return sessionSnapshot(id, host.sessions.title(id), host.sessions.nodes(id), host.sessions.path(id));
+      return sessionSnapshot(host.sessions.view(id));
     },
     title: {
       get: () => { checkAvailable(); return host.sessions.title(id); },
@@ -113,7 +115,7 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
             // 来源由写入通道打戳：插件身份来自操作柄，资源来自已校验的对象引用。
             const recordId = writer.append({ contract: declared.id, data: value, model: null, recipient: null,
               source: { plugin: internal.id, resource: ref ? { id: ref.id, kind: ref.kind } : null } });
-            host.content?.bind({ ...access(id, ref?.id, scope), sessionId: id }, { kind: "record", id: recordId }, value);
+            host.content?.bind(access(id, ref?.id, scope), { kind: "record", id: recordId }, value);
             return recordId;
           },
           set(contract, data) {
@@ -122,7 +124,7 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
             const parsed = contract.schema.safeParse(data);
             if (!parsed.success) throw new PluginApiError("invalid_argument", "The data does not match its contract schema.");
             const value = jsonSchema.parse(parsed.data);
-            host.content?.bind({ ...access(id, ref?.id, scope), sessionId: id }, { kind: "data", id: contract.id }, value);
+            host.content?.bind(access(id, ref?.id, scope), { kind: "data", id: contract.id }, value);
             host.data.set(id, ref?.id ?? null, contract.id, value);
           },
         }));

@@ -4,7 +4,7 @@ import { pluginOf, resourceCall, reference } from "@atelier/sdk/contracts";
 import type { WorkbenchObject } from "../../shared/workbench";
 import { ModelConfiguration } from "../../modules/agent/configuration";
 import { sessionSnapshot } from "../../plugins/records";
-import { sessionPath } from "../../shared/session-path";
+import { nodeView } from "../../session/view";
 import { useWorkbench } from "../features/workbench/context";
 import { useSession, useSessionProgress } from "../features/session/state";
 import { useConfiguration } from "../features/configuration/state";
@@ -33,7 +33,7 @@ export function useObjectContext(object: WorkbenchObject): RendererObjectContext
   const { state, snapshot, historical } = useSession(controller);
   const progress = useSessionProgress(controller);
   const records = useMemo(() => snapshot
-    ? sessionSnapshot(snapshot.sessionId, snapshot.title, snapshot.nodes, sessionPath(snapshot.nodes, snapshot.at)) : null, [snapshot]);
+    ? sessionSnapshot(nodeView(snapshot.sessionId, snapshot.title, snapshot.nodes, snapshot.at)) : null, [snapshot]);
   const onStream = useCallback<RendererObjectContext["onStream"]>((channel, listener) =>
     window.host.onObjectStream(controller.sessionId, object.id, (name, data) => {
       if (name === `${pluginOf(object.kind)}/${channel}`) listener(data);

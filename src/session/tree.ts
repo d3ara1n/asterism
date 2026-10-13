@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import { sessionNodeSchema, type NewNode, type SessionNode } from "../shared/session.ts";
-import { SessionError, sessionPath } from "../shared/session-path.ts";
+import { SessionError } from "../shared/session-path.ts";
+import type { NodeQuery, NodeView, SequencedNode } from "./view.ts";
 export { SessionError } from "../shared/session-path.ts";
 
 export type CursorSelection = {
@@ -12,6 +13,8 @@ export type CursorSelection = {
   reason: "user";
   recordedAt: string;
 };
+
+type NodeIndex = { id: string; seq: number; contract: string };
 
 /** 会话级扁平事件树：节点只追加，sessions.cursor 保存当前路径的末端。 */
 export class SessionTree {
@@ -36,6 +39,82 @@ export class SessionTree {
       .map(r => sessionNodeSchema.parse(JSON.parse(r.payload)));
   }
 
+  /** 节点不可变：固定末端与追加上界即可延后读取，无需持有事务或复制历史。 */
+  view(sessionId: string): NodeView {
+    const row = this.db.prepare("SELECT title, cursor FROM sessions WHERE id = ?").get(sessionId) as
+      { title: string; cursor: string | null } | undefined;
+    if (!row) throw new SessionError("not_found", "Session not found.");
+    const upperSeq = this.head(sessionId);
+    return { id: sessionId, title: row.title, nodeId: row.cursor,
+      pathIds: () => Array.from(this.ancestors(sessionId, row.cursor, upperSeq), entry => entry.id).reverse(),
+      read: query => this.readView(sessionId, row.cursor, upperSeq, query) };
+  }
+
+  /** 沿父指针逐个交付结构字段；last 命中即可停止，不搬运无关正文。 */
+  private *ancestors(sessionId: string, nodeId: string | null, upperSeq: number): Iterable<NodeIndex> {
+    const read = this.db.prepare("SELECT id, parent_id, seq, contract FROM session_nodes WHERE session_id = ? AND id = ?");
+    let before = upperSeq + 1;
+    for (let id = nodeId; id !== null;) {
+      const entry = read.get(sessionId, id) as (NodeIndex & { parent_id: string | null }) | undefined;
+      if (!entry) throw new SessionError("not_found", "Session node not found.");
+      if (entry.seq >= before) throw new SessionError("conflict", "Session ancestry is outside its append order.");
+      yield entry;
+      id = entry.parent_id;
+      before = entry.seq;
+    }
+  }
+
+  private readNodes(entries: Iterable<{ id: string }>): SessionNode[] {
+    const read = this.db.prepare("SELECT payload FROM session_nodes WHERE id = ?");
+    return Array.from(entries, ({ id }) => {
+      const row = read.get(id) as { payload: string } | undefined;
+      if (!row) throw new SessionError("not_found", "Session node not found.");
+      return sessionNodeSchema.parse(JSON.parse(row.payload));
+    });
+  }
+
+  private readView(sessionId: string, nodeId: string | null, upperSeq: number, query: NodeQuery): SequencedNode[] {
+    const backwards = query.scope === "path" || query.edge === "last";
+    const entries = query.scope === "path" ? this.ancestors(sessionId, nodeId, upperSeq)
+      : this.db.prepare(`SELECT id, seq, contract FROM session_nodes
+          WHERE session_id = ? AND seq <= ? ORDER BY seq ${backwards ? "DESC" : "ASC"}`)
+        .iterate(sessionId, upperSeq) as Iterable<NodeIndex>;
+    const selected: NodeIndex[] = [];
+    for (const entry of entries) {
+      if (query.contracts && !query.contracts.includes(entry.contract)) continue;
+      if (query.edge) {
+        selected[0] = entry;
+        if ((query.edge === "last") === backwards) break;
+      } else selected.push(entry);
+    }
+    if (backwards) selected.reverse();
+    if (!selected.length) return [];
+    const sequences = this.numberSequences(sessionId, selected.map(entry => entry.seq));
+    return this.readNodes(selected).map((node, index) => ({ node, sequence: sequences[index]! }));
+  }
+
+  /** 输入按追加顺序排列；只数互不重叠的索引区间，不读取其他记录的正文。 */
+  private numberSequences(sessionId: string, positions: readonly number[]): number[] {
+    const count = this.db.prepare("SELECT COUNT(*) AS count FROM session_nodes WHERE session_id = ? AND seq > ? AND seq <= ?");
+    let previous = 0, sequence = 0;
+    return positions.map(position => {
+      sequence += Number((count.get(sessionId, previous, position) as { count: number }).count);
+      previous = position;
+      return sequence;
+    });
+  }
+
+  /** 本批提交的记录已有正文，仅补齐会话内顺序。 */
+  sequences(sessionId: string, nodes: readonly SessionNode[]): number[] {
+    if (!nodes.length) return [];
+    const position = this.db.prepare("SELECT seq FROM session_nodes WHERE session_id = ? AND id = ?");
+    return this.numberSequences(sessionId, nodes.map(node => {
+      const row = position.get(sessionId, node.id) as { seq: number } | undefined;
+      if (!row) throw new SessionError("not_found", "Session node not found.");
+      return row.seq;
+    }));
+  }
+
   /** 在当前游标后追加通用记录并推进游标；宿主不解释载荷。 */
   append(sessionId: string, node: NewNode): SessionNode {
     const parentId = this.cursor(sessionId);
@@ -57,18 +136,19 @@ export class SessionTree {
   /** 选择历史位置；调用方须保证会话 settled。所有节点都可作为位置，不吸附。 */
   select(sessionId: string, nodeId: string | null): string | null {
     const from = this.cursor(sessionId);
-    const target = nodeId === null ? null : sessionPath(this.nodes(sessionId), nodeId).at(-1)!;
+    if (nodeId !== null && !this.db.prepare("SELECT 1 FROM session_nodes WHERE session_id = ? AND id = ?").get(sessionId, nodeId))
+      throw new SessionError("not_found", "Session node not found.");
     this.db.exec("SAVEPOINT select_session_cursor");
     try {
       this.db.prepare(`INSERT INTO cursor_selections (session_id, from_id, requested_id, selected_id, reason, recorded_at)
-        VALUES (?, ?, ?, ?, ?, ?)`).run(sessionId, from, nodeId, target?.id ?? null, "user", new Date().toISOString());
-      this.db.prepare("UPDATE sessions SET cursor = ? WHERE id = ?").run(target?.id ?? null, sessionId);
+        VALUES (?, ?, ?, ?, ?, ?)`).run(sessionId, from, nodeId, nodeId, "user", new Date().toISOString());
+      this.db.prepare("UPDATE sessions SET cursor = ? WHERE id = ?").run(nodeId, sessionId);
       this.db.exec("RELEASE select_session_cursor");
     } catch (error) {
       this.db.exec("ROLLBACK TO select_session_cursor; RELEASE select_session_cursor");
       throw error;
     }
-    return target?.id ?? null;
+    return nodeId;
   }
 
   cursorSelections(sessionId: string): CursorSelection[] {
@@ -99,5 +179,8 @@ export class SessionTree {
     if (!row) throw new SessionError("not_found", "Session not found.");
     return row.title;
   }
-  path(sessionId: string, at: string | null = this.cursor(sessionId)): SessionNode[] { return sessionPath(this.nodes(sessionId), at); }
+  path(sessionId: string, at?: string | null): SessionNode[] {
+    const cursor = this.cursor(sessionId);
+    return this.readNodes(this.ancestors(sessionId, at === undefined ? cursor : at, this.head(sessionId))).reverse();
+  }
 }

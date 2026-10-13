@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import type { RecordRenderContext } from "@atelier/sdk/renderer";
-import { toRecords } from "../../../plugins/records";
+import { toRecord } from "../../../plugins/records";
 import type { ViewRegistry } from "../../modules/registry";
 import type { Json } from "@atelier/sdk/contracts";
 
@@ -53,15 +53,14 @@ export function historyResources(nodes: readonly SessionNode[]): Map<string, His
 export function historyEntries(nodes: readonly SessionNode[], views: Pick<ViewRegistry, "record" | "resource">): HistoryEntry[] {
   const resources = historyResources(nodes);
   const i18n = getI18n();
-  const records = new Map(toRecords(nodes, nodes).map(item => [item.id, item]));
   const context: RecordRenderContext = {
     resourceTitle: id => resources.get(id)?.title ?? i18n.formatMessage(historyMessages.unknownResource),
     resourceLabel: kind => views.resource(kind).label,
     text: value => i18n.text(value),
     describe: item => views.record(item, context),
   };
-  return nodes.map(node => {
-    const item = records.get(node.id)!;
+  return nodes.map((node, index) => {
+    const item = toRecord(node, index + 1);
     const view = views.record(item, context);
     // 来源只看记录归属：有归属对象是资源记录，否则是会话级记录；宿主不认识具体契约。
     const owner = item.source.resource?.id ?? null;

@@ -4,6 +4,7 @@ import type { FoldedObject } from "../session/fold.ts";
 import type { AgentCapabilities, ToolPolicy } from "../execution/capabilities.ts";
 import type { ContextFile } from "../resources/contract.ts";
 import type { ContentLease } from "../runtime/content-store.ts";
+import type { NodeView } from "../session/view.ts";
 
 /** 宿主内部的存储与执行接口；插件只接收 SDK 门面。 */
 export interface SessionHostWriter {
@@ -11,8 +12,9 @@ export interface SessionHostWriter {
   nodes(): SessionNode[];
 }
 export interface SessionHost {
+  view(sessionId: string): NodeView;
+  sequences(sessionId: string, nodes: readonly SessionNode[]): number[];
   path(sessionId: string): SessionNode[];
-  nodes(sessionId: string): SessionNode[];
   title(sessionId: string): string;
   setTitle(sessionId: string, text: string): void;
   commit<T>(sessionId: string, work: (writer: SessionHostWriter) => T): T;

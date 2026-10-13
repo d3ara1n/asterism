@@ -43,9 +43,9 @@ export default definePlugin({ namespace: ns, version: "1.0.0", modules: [
 
 两种 `commit` 都可同时 `writer.set(DataContract, value)` 和 `writer.append(RecordContract, data)`：前者覆盖当前会话或对象数据，后者追加本插件声明过的记录。模块及资源的 `records` 声明决定可写记录，宿主使用声明的 schema 校验，填节点身份、父指针与对象关联。提交回调须同步完成；Promise 导致回滚，回调结束后的 writer 失效。嵌套同会话提交加入外层事务，失败的内层写入回滚，通知仅在最外层提交成功后派发。
 
-快照的路径、记录和不可变资源数据固定在读取时刻，`position.nodeId` 给出当前位置；执行体投影上下文时自行截取合理位置。`session.get` 和 `object.get` 读取当前数据；数据按会话、对象作用域和具型契约隔离，随会话保存，不能据此恢复历史。数据契约使用 `ns.data(name, schema)`，记录使用 `defineRecord(id, { schema })`，均不要求手填版本。读取按所属类型的 schema 解码；兼容数据继续读取，不兼容数据明确不可用或保留 unknown。插件用自己的 schema 兼容旧形状并负责迁移，读取不修改原始记录。纯数据提交通知视图，不追加时间轴或触发事件观察者。
+快照是固定位置的观察柄，构造时捕获路径末端、会话追加上界和标题，不物化历史；`records.*` 与 `resources.*` 按需读取，首次查询晚于后续提交也不改变原快照。`position.nodeId` 给出捕获位置；执行体投影上下文时自行截取合理位置。`session.get` 和 `object.get` 读取当前数据；数据按会话、对象作用域和具型契约隔离，随会话保存，不能据此恢复历史。数据契约使用 `ns.data(name, schema)`，记录使用 `defineRecord(id, { schema })`，均不要求手填版本。读取按所属类型的 schema 解码；兼容数据继续读取，不兼容数据明确不可用或保留 unknown。插件用自己的 schema 兼容旧形状并负责迁移，读取不修改原始记录。纯数据提交通知视图，不追加时间轴或触发事件观察者。
 
-`snapshot.records.first(Contract, {scope}) / last(Contract, {scope})` 按固定快照的契约首尾索引定位，只解码目标记录；返回 null／known／unknown，损坏的首尾记录不跳过。`query` 解码所有匹配记录，`all` 提供原始信封。`scope` 为 `path` 或 `session`。`session.title.set(text)` 直接覆盖标题，在 `commit` 内调用时随该次提交生效；宿主不解释或自动追加命名来源事件。
+`snapshot.records.first(Contract, {scope}) / last(Contract, {scope})` 在固定范围内按契约定位，只解码目标记录；返回 null／known／unknown，损坏的首尾记录不跳过。`query` 解码所有匹配记录，`all` 才物化指定范围的全部原始信封。`scope` 为 `path` 或 `session`，记录 `sequence` 始终是会话内从 1 开始的追加顺序，不因路径筛选重新编号。`session.title.set(text)` 直接覆盖标题，在 `commit` 内调用时随该次提交生效；宿主不解释或自动追加命名来源事件。
 
 `SessionObserver` 的 `committed` 与 `cursorChanged` 是独立可选入口。前者接收新增记录与固定快照，只在记录提交时调用；后者接收固定快照与会话门面，只在执行游标变化时调用，正常追加、回溯与分叉选择使用同一形状。一次外层事务只通知最终位置，回滚、选择相同位置、纯数据／标题写入、布局与只读查看不触发游标观察。两个入口同步执行，观察者内的后续提交排队派发；快照不随派生值同步改变，也不应依赖观察者先后顺序。
 
