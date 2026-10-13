@@ -3,6 +3,8 @@ import type { DatabaseSync } from "node:sqlite";
 import { sessionNodeSchema, type NewNode, type SessionNode } from "../shared/session.ts";
 import { SessionError } from "../shared/session-path.ts";
 import type { NodeQuery, NodeView, SequencedNode } from "./view.ts";
+import { foldWorkbench, type FoldedState } from "./fold.ts";
+import { deepFreeze } from "../shared/immutable.ts";
 export { SessionError } from "../shared/session-path.ts";
 
 export type CursorSelection = {
@@ -19,6 +21,19 @@ type NodeIndex = { id: string; seq: number; contract: string };
 /** 会话级扁平事件树：节点只追加，sessions.cursor 保存当前路径的末端。 */
 export class SessionTree {
   constructor(private readonly db: DatabaseSync) {}
+  private readonly workbenches = new Map<string, { cursor: string | null; state: FoldedState }>();
+
+  /** 当前工作台的唯一重建入口；游标变化全量重放，回滚后按实际游标重新取用。 */
+  workbench(sessionId: string): FoldedState {
+    const cursor = this.cursor(sessionId);
+    const previous = this.workbenches.get(sessionId);
+    if (previous?.cursor === cursor) return previous.state;
+    const state = deepFreeze(foldWorkbench(this.view(sessionId).read({
+      scope: "path", contracts: ["resource_created", "object_removed", "resource_attached", "resource_detached"],
+    }).map(({ node }) => node)));
+    this.workbenches.set(sessionId, { cursor, state });
+    return state;
+  }
 
   create(title: string, id: string = randomUUID()): string {
     this.db.prepare("INSERT INTO sessions (id, title, created_at, cursor) VALUES (?, ?, ?, NULL)").run(id, title, new Date().toISOString());

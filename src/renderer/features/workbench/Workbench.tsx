@@ -47,7 +47,7 @@ type Run = (command: WorkbenchOperation) => Promise<boolean>;
 type WorkbenchEdge = Edge<ConnectionEdge["data"]>;
 
 /** 工作台根浮岛：投影平级对象和关系；代理对话只是代理对象的卡片内容。 */
-export function Workbench({ ref, controller, session, ready, busy, historical, run, onHome, canDrop, onDropItems }: Props) {
+export function Workbench({ ref, controller, session, ready, busy, run, onHome, canDrop, onDropItems }: Props) {
   const i18n = useI18n();
   const canvasRef = useRef<WorkbenchCanvas>(null);
   const canvas = useMemo<WorkbenchCanvas>(() => ({
@@ -56,8 +56,8 @@ export function Workbench({ ref, controller, session, ready, busy, historical, r
   }), []);
   // 按字段组装环境，只有字段真的变化时才通知卡片与面板浮岛。
   const context = useMemo<WorkbenchView>(
-    () => ({ controller, session, ready, busy, historical, run, canvas }),
-    [controller, session, ready, busy, historical, run, canvas]);
+    () => ({ controller, session, ready, busy, run, canvas }),
+    [controller, session, ready, busy, run, canvas]);
   const island = useIsland();
   const [store] = useState(() => new WorkbenchStore());
   const open = useCallback((id: string, label: import("@atelier/sdk/contracts").UiText, render: () => ReactNode, origin: HTMLElement | null) => {
@@ -74,12 +74,7 @@ export function Workbench({ ref, controller, session, ready, busy, historical, r
 
   return <RendererNavigationProvider value={{ home: onHome }}><RendererCatalogProvider ready={ready}><WorkbenchContext.Provider value={context}>
     <div className="relative h-full">
-      <ReactFlowProvider><Canvas ref={canvasRef} session={session} run={run} writable={ready && !busy && !historical} canDrop={canDrop} onDropItems={onDropItems} /></ReactFlowProvider>
-      {historical && <div role="status"
-        className="surface-floating absolute bottom-[var(--overlay-inset)] left-1/2 z-10 flex -translate-x-1/2 items-center gap-3 whitespace-nowrap p-1 pl-3 text-sm">
-        <span>{i18n.formatMessage(commonMessages.viewingHistory)}</span>
-        <Button size="sm" onClick={controller.followCursor}>{i18n.formatMessage(commonMessages.backToLive)}</Button>
-      </div>}
+      <ReactFlowProvider><Canvas ref={canvasRef} session={session} run={run} writable={ready && !busy} canDrop={canDrop} onDropItems={onDropItems} /></ReactFlowProvider>
       {session.objects.length === 0 && <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
         <p className="type-caption">{i18n.formatMessage(workbenchMessages.emptyHint)}</p>
       </div>}

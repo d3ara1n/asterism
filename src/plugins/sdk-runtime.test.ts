@@ -446,7 +446,7 @@ describe("工作台 SDK 的宿主实现", () => {
     expect(paths).toEqual([ids]);
     expect(published).toEqual(["Position 3"]);
     const first = ids[0]!;
-    service.sessions.snapshot(sessionId, { kind: "history", nodeId: first });
+    service.sessions.snapshot(sessionId);
     session.commit(writer => { writer.set(Current, 1); });
     session.title.set("Current title");
     expect(paths).toHaveLength(1);

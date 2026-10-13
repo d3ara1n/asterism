@@ -20,8 +20,8 @@ export function useAgentConversation(object: RendererObjectContext, hasSelection
   const state = useSyncExternalStore(draft.subscribe, draft.getSnapshot);
   const [error, setError] = useState<UiText | null>(null);
   const command = (value: AgentCommand) => object.invoke(agentAction(value), value);
-  const { ready, busy, historical, status } = object.view;
-  const writable = ready && !busy && status === "ready" && !object.activity.running && !historical && hasSelection;
+  const { ready, busy, status } = object.view;
+  const writable = ready && !busy && status === "ready" && !object.activity.running && hasSelection;
   return {
     draft, error, setError, writable, configurable: ready && !busy && status === "ready",
     async configure(selection: AgentSelection) {

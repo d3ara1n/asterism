@@ -10,7 +10,6 @@ export interface WorkbenchEnvironment {
   session: WorkbenchSnapshot;
   ready: boolean;
   busy: boolean;
-  historical: boolean;
   run: (command: WorkbenchOperation) => Promise<boolean>;
 
 }

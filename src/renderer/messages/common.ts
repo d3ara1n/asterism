@@ -45,14 +45,6 @@ export const commonMessages = pluginNamespace("atelier.host").messages("en", def
     id: "live",
     defaultMessage: "Live",
   },
-  viewingHistory: {
-    id: "viewingHistory",
-    defaultMessage: "Viewing history",
-  },
-  backToLive: {
-    id: "backToLive",
-    defaultMessage: "Back to live",
-  },
   statusBusy: {
     id: "statusBusy",
     defaultMessage: "Saving…",

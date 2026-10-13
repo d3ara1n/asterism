@@ -26,13 +26,13 @@
 
 `renderer/features/session → preload → main/RuntimeHost → utilityProcess → SessionService → SessionTree / SessionWorkbench / ObjectStore`
 
-会话命令先由 Zod 校验，再交运行时单一写入者处理。业务创建、查询索引与初始视图处于同一事务；正文引用只在内容文件成功落盘后进入事件。命令返回受理结果，读取返回指定位置的会话树与工作台投影，UI 将其映射为画布和代理对话。
+会话命令先由 Zod 校验，再交运行时单一写入者处理。业务创建、查询索引与初始视图处于同一事务；正文引用只在内容文件成功落盘后进入事件。命令返回受理结果，读取返回执行游标对应的会话树与工作台投影，UI 将其映射为画布和代理对话。
 
 路径遍历位于 `shared/session-path.ts`，运行时与 renderer 共用；所有入树记录均推进游标且可查看，宿主不判断续接点。会话节点是通用记录（契约、来源、载荷、模型可见文本、接收者），宿主不解释载荷。`execution/request.ts` 完成一次补全及工具批次，`execution/response.ts` 只持有该响应的临时流状态；正文在终态到达后交付，工具块在取得结局后交付；终态内含于最高序号块，由执行体作为自身记录一次提交。内置 Agent 由 `modules/agent/runtime.ts` 装配，`selection.ts` 解析选择与策略，`admission.ts` 原子受理输入，`loop.ts` 每次从时间轴重新投影并推动下一请求；`projection.ts` 负责响应分组、事件后置与上下文末尾截取。`plugins/sdk-context.ts` 在具型写入入口统一校验与来源打戳，`plugins/records.ts` 直接映射通用记录信封。在途输出经 `session.progress` 的 `live` 字段按 `objectId` 提供给界面；异常收束时仍将已收到的内容保存为块，以完整性字段供审计。数据库结构只在运行时建库，仓储构造不隐式建表。
 
 `SessionTree.select` 将选择审计与游标更新原子提交，`cursorSelections` 可读取日志。提交后分别派发新增记录观察 `committed` 与执行游标观察 `cursorChanged`；正常追加和历史选择共用游标通知，批量／嵌套事务只通知最终位置。命名模块据此按路径同步标题，Agent 上下文仍在请求时即时投影。`seq` 只计节点追加，视图同步使用独立 `revision`。
 
-`workspace.read` 只返回工作区与会话列表摘要，不接受会话身份或历史位置。应用导航打开会话后由 `features/session/` 读取正文，查看位置在该模块中维护。`runtime/workbench.ts` 管理资源事件与独立布局，在会话查询所固定的同一路径上投影对象；不再经应用快照中转。
+`workspace.read` 只返回工作区与会话列表摘要，不接受会话身份或历史位置。应用导航打开会话后由 `features/session/` 读取正文。`runtime/workbench.ts` 管理资源事件与独立布局；`SessionTree.workbench` 统一重建当前存在性与链接，工作台投影和执行校验共用。会话查询只读取执行游标，不接受独立历史位置；历史面板仅选中候选节点，明确继续才跳转。
 
 画布库类型只存在于 renderer。IPC 不提供 SQL、任意路径、通用脚本或动态方法调用。对外工具协议不等于内部应用命令；模型与 MCP 接入时仍需独立资源校验与授权执行层。
 

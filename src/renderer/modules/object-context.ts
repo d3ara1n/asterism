@@ -30,28 +30,28 @@ export function RendererCatalogProvider({ ready, children }: { ready: boolean; c
 export function useObjectContext(object: WorkbenchObject): RendererObjectContext {
   const workbench = useWorkbench();
   const { controller } = workbench;
-  const { state, snapshot, historical } = useSession(controller);
+  const { state, snapshot } = useSession(controller);
   const progress = useSessionProgress(controller);
   const records = useMemo(() => snapshot
-    ? sessionSnapshot(nodeView(snapshot.sessionId, snapshot.title, snapshot.nodes, snapshot.at)) : null, [snapshot]);
+    ? sessionSnapshot(nodeView(snapshot.sessionId, snapshot.title, snapshot.nodes, snapshot.cursor)) : null, [snapshot]);
   const onStream = useCallback<RendererObjectContext["onStream"]>((channel, listener) =>
     window.host.onObjectStream(controller.sessionId, object.id, (name, data) => {
       if (name === `${pluginOf(object.kind)}/${channel}`) listener(data);
     }), [controller.sessionId, object.id, object.kind]);
-  const content = useMemo(() => contentReader(() => ({ sessionId: controller.sessionId, objectId: object.id, nodeId: snapshot?.at ?? null })),
-    [controller.sessionId, object.id, snapshot?.at]);
+  const content = useMemo(() => contentReader(() => ({ sessionId: controller.sessionId, objectId: object.id })),
+    [controller.sessionId, object.id]);
   return {
     ref: { sessionId: controller.sessionId, id: object.id, kind: object.kind },
     content,
     input: contract => contentInput({ sessionId: controller.sessionId, resourceKind: contract.resource.kind, contractId: contract.id,
       ...(contract.kind === "action" ? { objectId: object.id } : {}) }),
-    view: { ready: workbench.ready, busy: state.busy, historical, status: state.status, error: state.error, missing: state.missing },
+    view: { ready: workbench.ready, busy: state.busy, status: state.status, error: state.error, missing: state.missing },
     session: {
       snapshot: () => records, subscribe: controller.subscribe,
       create: (contract, input, position, options) => contentCommand(options?.content,
         { sessionId: controller.sessionId, resourceKind: contract.resource.kind, contractId: contract.id },
         contentScopeId => controller.executeAndRead({ type: "resource.create", sessionId: controller.sessionId, kind: contract.resource.kind, creation: reference(contract), input, position, contentScopeId })),
-      refresh: controller.refresh, followLive: controller.followCursor,
+      refresh: controller.refresh,
     },
     invoke: (contract, input, options) => contentCommand(options?.content,
       { sessionId: controller.sessionId, objectId: object.id, resourceKind: contract.resource.kind, contractId: contract.id },
@@ -66,10 +66,9 @@ export function useObjectContext(object: WorkbenchObject): RendererObjectContext
 /** 专门能力按对象绑定，读取与基础对象接口相同的宿主状态源。 */
 export function ObjectServices({ object, children }: { object: WorkbenchObject; children: ReactNode }) {
   const { controller } = useWorkbench();
-  const { historical } = useSession(controller);
   const progress = useSessionProgress(controller);
   const registry = useModuleViews();
-  const models = useMemo(() => ({ blocks: historical ? [] : progress.live.filter(block => block.objectId === object.id) }), [historical, progress.live, object.id]);
+  const models = useMemo(() => ({ blocks: progress.live.filter(block => block.objectId === object.id) }), [progress.live, object.id]);
   const tools = useMemo(() => ({ resolve: (props: Parameters<typeof resolveToolView>[0]) => resolveToolView(props, registry), preparation: toolPreparation }), [registry]);
   const preferences = useMemo(() => pluginPreferences(pluginOf(object.kind) ?? "unknown"), [object.kind]);
   return createElement(RendererModelsProvider, { value: models }, createElement(RendererToolsProvider, { value: tools },

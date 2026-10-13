@@ -1,6 +1,6 @@
 import type { DataContract, Json } from "@atelier/sdk/contracts";
 import type { NewNode, SessionNode } from "../shared/session.ts";
-import type { FoldedObject } from "../session/fold.ts";
+import type { FoldedObject, FoldedState } from "../session/fold.ts";
 import type { AgentCapabilities, ToolPolicy } from "../execution/capabilities.ts";
 import type { ContextFile } from "../resources/contract.ts";
 import type { ContentLease } from "../runtime/content-store.ts";
@@ -15,13 +15,14 @@ export interface SessionHost {
   view(sessionId: string): NodeView;
   sequences(sessionId: string, nodes: readonly SessionNode[]): number[];
   path(sessionId: string): SessionNode[];
+  workbench(sessionId: string): FoldedState;
   title(sessionId: string): string;
   setTitle(sessionId: string, text: string): void;
   commit<T>(sessionId: string, work: (writer: SessionHostWriter) => T): T;
   /** 会话内除 objectId 外没有在途活动；用于历史选择前的收束检查。 */
   idle(sessionId: string, objectId?: string): boolean;
   progressChanged(sessionId: string): void;
-  linked(path: readonly SessionNode[], objectId: string): FoldedObject[];
+  linked(sessionId: string, objectId: string): FoldedObject[];
   capabilities(linked: readonly FoldedObject[], policy: ToolPolicy): AgentCapabilities;
   context(linked: readonly FoldedObject[]): Promise<ContextFile[]>;
 }

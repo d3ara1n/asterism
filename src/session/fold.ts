@@ -8,7 +8,7 @@ export function foldWorkbench(path: readonly SessionNode[]): FoldedState {
   const objects = new Map<string, FoldedObject>();
   const links = new Map<string, { agentId: string; resourceId: string }>();
   for (const node of path) {
-        const d = (node.data ?? {}) as Record<string, unknown>;
+    const d = (node.data ?? {}) as Record<string, unknown>;
     const id = String(d.id ?? "");
     switch (node.contract) {
       // 代理与其他资源同为 resource_created；类型只由 data.type 区分。

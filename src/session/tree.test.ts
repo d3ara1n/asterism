@@ -2,7 +2,7 @@ import { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it } from "vitest";
 import { SessionTree } from "./tree.ts";
 import { sessionSchemaSql } from "./schema.ts";
-import { event } from "./test-nodes.ts";
+import { attached, created, event, removed } from "./test-nodes.ts";
 
 const databases: DatabaseSync[] = [];
 afterEach(() => { for (const db of databases.splice(0)) db.close(); });
@@ -25,7 +25,7 @@ describe("会话级扁平树", () => {
     expect(new SessionTree(db).nodes(s)).toMatchObject([{ id: saved.id, data: payload }]);
   });
 
-  it("查看不写选择日志；显式选择保存原位置和实际位置，历史保持不变", () => {
+  it("读取不写选择日志；显式选择保存原位置和实际位置，历史保持不变", () => {
     const { tree, s } = setup();
     const first = tree.append(s, record("first"));
     const last = tree.append(s, record("last"));
@@ -86,5 +86,42 @@ describe("会话级扁平树", () => {
     expect(() => tree.append(s, record("hello"))).toThrow("Cursor failed");
     expect(tree.nodes(s)).toEqual([]);
     expect(tree.cursor(s)).toBeNull();
+  });
+
+  // 工作台契约：追加、回溯、旁支选择与重开都从执行路径重建存在性和关系。
+  it("工作台随游标重建，不带入旁支对象或链接", () => {
+    const { db, tree, s } = setup();
+    tree.append(s, created("agent-a", "A"));
+    tree.append(s, created("agent-b", "B"));
+    const linked = tree.append(s, attached("agent-a", "agent-b"));
+    expect(tree.workbench(s).links).toEqual([{ agentId: "agent-a", resourceId: "agent-b" }]);
+    const removedNode = tree.append(s, removed("agent-b"));
+    expect(tree.workbench(s).objects.map(object => object.id)).toEqual(["agent-a"]);
+    expect(tree.workbench(s).links).toEqual([]);
+    tree.select(s, linked.id);
+    expect(tree.workbench(s).objects.map(object => object.id)).toEqual(["agent-a", "agent-b"]);
+    tree.append(s, event("resource_detached", { id: "agent-b", agentId: "agent-a" }));
+    const branch = tree.append(s, created("branch-only", "Branch"));
+    expect(tree.workbench(s).links).toEqual([]);
+    tree.select(s, removedNode.id);
+    expect(tree.workbench(s).objects.map(object => object.id)).toEqual(["agent-a"]);
+    tree.select(s, branch.id);
+    expect(new SessionTree(db).workbench(s).objects.map(object => object.id)).toEqual(["agent-a", "agent-b", "branch-only"]);
+  });
+
+  // 提交内读到的派生状态不能越过回滚边界，否则会错误放行资源或沿用失效授权。
+  it("事务内重建后回滚，下一次读取恢复真实游标的存在性和链接", () => {
+    const { db, tree, s } = setup();
+    tree.append(s, created("a", "A"));
+    tree.append(s, created("b", "B"));
+    tree.append(s, attached("a", "b"));
+    const before = tree.workbench(s);
+    db.exec("BEGIN");
+    tree.append(s, removed("b"));
+    expect(tree.workbench(s).links).toEqual([]);
+    expect(tree.workbench(s).objects.map(object => object.id)).toEqual(["a"]);
+    db.exec("ROLLBACK");
+    expect(tree.workbench(s)).toEqual(before);
+    expect(before.links).toEqual([{ agentId: "a", resourceId: "b" }]);
   });
 });

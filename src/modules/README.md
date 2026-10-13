@@ -80,7 +80,7 @@ args、target、result schema 必须有非空的整体 description，声明 help
 
 投影、检查、环境读取、链接说明与准备只取得 `ObjectReader`；创建、动作和授权工具执行取得 `ObjectExecutor`。读取门面的 session 也是只读。任务、动作与模型调用共用宿主内部运行生命周期，分别保留去重、排队和请求授权规则。具体有效期及提交约束见 SDK 说明。
 
-笔记的不可变资源数据为 `{}`，当前正文由 `NoteContent` 声明，以 `object.get(NoteContent)` 读取，以 `object.commit` 中的 `writer.set` 保存。状态提交由宿主通知视图刷新，不追加正文历史；卡片与历史查看都显示当前值。空正文是有效状态，缺失或损坏的正文回退为不可用，工具拒绝覆盖。正文限制为 100,000 UTF-16 code units，由契约与工具验证共用同一上限。
+笔记的不可变资源数据为 `{}`，当前正文由 `NoteContent` 声明，以 `object.get(NoteContent)` 读取，以 `object.commit` 中的 `writer.set` 保存。状态提交由宿主通知视图刷新，不追加正文历史；卡片始终显示当前值，游标回溯不恢复正文。空正文是有效状态，缺失或损坏的正文回退为不可用，工具拒绝覆盖。正文限制为 100,000 UTF-16 code units，由契约与工具验证共用同一上限。
 
 ### 会话数据与 Agent
 

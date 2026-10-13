@@ -25,7 +25,7 @@ export interface RendererObjectContext {
   readonly content: ContentReader;
   input<I, O extends Json>(contract: ActionContract<I, O> | CreationContract<I, Json, O>): RendererContentInput;
   readonly view: {
-    ready: boolean; busy: boolean; historical: boolean; status: "loading" | "ready" | "error";
+    ready: boolean; busy: boolean; status: "loading" | "ready" | "error";
     error: UiText | null; missing: boolean;
   };
   readonly session: {
@@ -33,7 +33,6 @@ export interface RendererObjectContext {
     subscribe(listener: () => void): () => void;
     create<I, O extends Json>(contract: CreationContract<I, Json, O>, input: NoInfer<I> & Json, position: { x: number; y: number }, options?: RendererInputOptions): Promise<RendererReceipt>;
     refresh(): Promise<void>;
-    followLive(): void;
   };
   invoke<I, O extends Json>(contract: ActionContract<I, O>, input: NoInfer<I> & Json, options?: RendererInputOptions): Promise<RendererReceipt>;
   onStream(channel: string, listener: (data: Uint8Array) => void): () => void;

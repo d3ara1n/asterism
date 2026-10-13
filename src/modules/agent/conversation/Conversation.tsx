@@ -24,13 +24,13 @@ import { useAgentConversation } from "./interaction";
 export function ConversationActions() {
   const i18n = useI18n();
   const object = useRendererObject();
-  const { ready, historical } = object.view;
+  const { ready } = object.view;
   const snapshot = object.session.snapshot();
   const agentRunning = object.activity.running;
   if (!snapshot) return null;
   return <>
     <Badge variant="secondary" role="status">{agentRunning && <LoaderCircle className="animate-spin" />}
-      {!ready ? i18n.formatMessage(commonMessages.statusUnavailable) : historical ? i18n.formatMessage(commonMessages.viewingHistory) : agentRunning ? i18n.formatMessage(conversationMessages.working) : i18n.formatMessage(conversationMessages.ready)}</Badge>
+      {!ready ? i18n.formatMessage(commonMessages.statusUnavailable) : agentRunning ? i18n.formatMessage(conversationMessages.working) : i18n.formatMessage(conversationMessages.ready)}</Badge>
   </>;
 }
 
@@ -42,7 +42,7 @@ export function Conversation({ selection, onHome }: { selection: AgentSelection 
   const interaction = useAgentConversation(object, selection !== null);
   const models = useRendererModels();
   const catalogs = useRendererCatalogs();
-  const { ready, historical } = state;
+  const { ready } = state;
   const agentId = object.ref.id;
   const snapshot = session.snapshot();
   const agentRunning = object.activity.running;
@@ -65,15 +65,11 @@ export function Conversation({ selection, onHome }: { selection: AgentSelection 
   const resume = async () => { await interaction.resume(); latest(); };
 
   return <>
-    {historical && <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b px-4 py-2">
-      <p className="type-caption">{i18n.formatMessage(conversationMessages.historyHint)}</p>
-      <Button variant="ghost" size="sm" onClick={session.followLive}>{i18n.formatMessage(commonMessages.backToLive)}</Button>
-    </div>}
     <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
       <div ref={scroll} className="min-h-0 flex-1 select-text overflow-y-auto overscroll-contain" onScroll={onScroll}>
         <div className="space-y-4 p-4">
           <ConversationTimeline items={timeline} />
-          {agentRunning && !historical && <p role="status" className="type-caption flex items-center gap-2"><LoaderCircle className="size-3 animate-spin" />{i18n.formatMessage(conversationMessages.workingHint)}</p>}
+          {agentRunning && <p role="status" className="type-caption flex items-center gap-2"><LoaderCircle className="size-3 animate-spin" />{i18n.formatMessage(conversationMessages.workingHint)}</p>}
           {!timeline.length && !running && <p className="type-caption">{i18n.formatMessage(conversationMessages.emptyHint)}</p>}
         </div>
       </div>
@@ -84,15 +80,15 @@ export function Conversation({ selection, onHome }: { selection: AgentSelection 
       </div>}
     </div>
     <footer className="shrink-0 space-y-3 border-t p-3">
-      {!historical && selection && <AgentConfigurationPicker selection={selection} disabled={!interaction.configurable}
+      {selection && <AgentConfigurationPicker selection={selection} disabled={!interaction.configurable}
         running={running} onChange={interaction.configure} onError={interaction.setError} />}
       {error && <Alert variant="destructive"><AlertDescription className="flex flex-wrap items-center gap-2">
         <span className="flex-1">{i18n.text(error)}</span>
         <Button variant="ghost" size="sm" onClick={() => { void session.refresh(); }}>{i18n.formatMessage(conversationMessages.reload)}</Button>
       </AlertDescription></Alert>}
-      {!historical && <MessageComposer draft={interaction.draft} inputRef={composer}
+      <MessageComposer draft={interaction.draft} inputRef={composer}
         busy={state.busy} ready={ready} running={running} writable={interaction.writable} onSend={send}
-        onCancel={interaction.cancel} onContinue={resume} />}
+        onCancel={interaction.cancel} onContinue={resume} />
     </footer>
   </>;
 }

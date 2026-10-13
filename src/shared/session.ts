@@ -24,18 +24,13 @@ export type NewNode = Omit<SessionNode, "id" | "sessionId" | "parentId" | "creat
 
 // ---- 会话能力接口 ----
 const uuid = z.string().uuid();
-export const sessionVersion = 17;
-export const viewPositionSchema = z.discriminatedUnion("kind", [
-  z.strictObject({ kind: z.literal("live") }),
-  z.strictObject({ kind: z.literal("history"), nodeId: id.nullable() }),
-]);
-export type ViewPosition = z.infer<typeof viewPositionSchema>;
+export const sessionVersion = 18;
 export const sessionChannel = coreChannel("session");
 export const sessionChangedChannel = coreChannel("session-changed");
 export const sessionCommandSchema = z.discriminatedUnion("type", [
   // 首页组合入口：建立会话、创建第一个代理资源并向它提交首条输入。
   z.strictObject({ type: z.literal("start"), submissionId: uuid, agent: id, model: modelExpressionSchema, thinking: thinkingSchema.nullable(), parts: userInputPartsSchema, contentScopeId: uuid.optional() }),
-  z.strictObject({ type: z.literal("read"), sessionId: id, position: viewPositionSchema }),
+  z.strictObject({ type: z.literal("read"), sessionId: id }),
   z.strictObject({ type: z.literal("select"), sessionId: id, nodeId: id.nullable() }),
   // 应用组合入口：将人工命名交给内置命名模块追加领域记录。
   z.strictObject({ type: z.literal("rename"), sessionId: id, title: z.string().max(160).refine(value => value.trim().length > 0) }),
@@ -73,7 +68,7 @@ export const sessionProgressSchema = z.strictObject({
 export type SessionProgress = z.infer<typeof sessionProgressSchema>;
 /** 同次读取固定路径与对象投影；seq 是节点序号，revision 还涵盖选择、对象数据与布局。 */
 export const sessionSnapshotSchema = z.strictObject({
-  sessionId: id, title: z.string(), cursor: id.nullable(), at: id.nullable(), seq: revision, revision,
+  sessionId: id, title: z.string(), cursor: id.nullable(), seq: revision, revision,
   nodes: z.array(sessionNodeSchema),
   workbench: workbenchSnapshotSchema, progress: sessionProgressSchema,
 });

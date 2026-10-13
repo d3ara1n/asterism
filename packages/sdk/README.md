@@ -47,7 +47,7 @@ export default definePlugin({ namespace: ns, version: "1.0.0", modules: [
 
 `snapshot.records.first(Contract, {scope}) / last(Contract, {scope})` 在固定范围内按契约定位，只解码目标记录；返回 null／known／unknown，损坏的首尾记录不跳过。`query` 解码所有匹配记录，`all` 才物化指定范围的全部原始信封。`scope` 为 `path` 或 `session`，记录 `sequence` 始终是会话内从 1 开始的追加顺序，不因路径筛选重新编号。`session.title.set(text)` 直接覆盖标题，在 `commit` 内调用时随该次提交生效；宿主不解释或自动追加命名来源事件。
 
-`SessionObserver` 的 `committed` 与 `cursorChanged` 是独立可选入口。前者接收新增记录与固定快照，只在记录提交时调用；后者接收固定快照与会话门面，只在执行游标变化时调用，正常追加、回溯与分叉选择使用同一形状。一次外层事务只通知最终位置，回滚、选择相同位置、纯数据／标题写入、布局与只读查看不触发游标观察。两个入口同步执行，观察者内的后续提交排队派发；快照不随派生值同步改变，也不应依赖观察者先后顺序。
+`SessionObserver` 的 `committed` 与 `cursorChanged` 是独立可选入口。前者接收新增记录与固定快照，只在记录提交时调用；后者接收固定快照与会话门面，只在执行游标变化时调用，正常追加、回溯与分叉选择使用同一形状。一次外层事务只通知最终位置，回滚、选择相同位置、纯数据／标题写入、布局与只读查询不触发游标观察。两个入口同步执行，观察者内的后续提交排队派发；快照不随派生值同步改变，也不应依赖观察者先后顺序。
 
 需要保存历史派生当前值的模块可以在 `cursorChanged` 中按当前路径重建。例如命名模块只提交自身命名事件，再按当前路径最后一条事件同步标题；上下文等即时投影无需维护派生当前值。观察失败只记录日志；队列清空后发布界面变化通知。
 
@@ -71,7 +71,7 @@ schema 支持默认值、去空白与转换。调用方提交 schema 的输入�
   "exports": { "./public": "./src/public.ts" },
   "atelier": {
     "id": "example.tools",
-    "api": { "major": 5, "minMinor": 0 },
+    "api": { "major": 6, "minMinor": 0 },
     "runtime": "./src/runtime.ts"
   }
 }
@@ -105,7 +105,7 @@ import { Read, settings, service } from "@example/tools/public";
 
 内容能力以 `contentRefSchema` 嵌入业务 schema，宿主从最终写入值自动登记依赖。准备统一为 `prepare(input, { signal, content, object? })`；执行与创建中的 `object.content` 可读取与 `stage`，外部准备者与会话门面只读。前端拖放文件统一为 `DropItem.kind: "file"`（`file` 必有，`path` 可选，需路径时声明 `requiresPath`）；`toInput(item, content)` 与 `InputView` 取得宿主管理的草稿，卡片动作通过 `object.input(contract)` 与 `{ content: draft }` 携带，成功后宿主关闭草稿。用法总表见 [插件 SDK](../../docs/plugin-sdk.md#不可变内容)，作者示例见 [内容契约声明](examples/content-contract.ts)、[后台实现](examples/content-author.ts)、[前端入口](examples/content-renderer.ts)。
 
-`cardRenderer` 校验卡片载荷并向 Body 与 Actions 注入对象环境，组件通过 `useRendererObject()` 取得基础对象接口。`session.snapshot()` 提供具型记录与资源快照，`session.create(CreationContract, input, position)` 创建资源，`invoke(ActionContract, input)` 调用当前对象动作。`onStream` 订阅对象二进制通道，短名由宿主补全插件命名空间。基础接口提供通用运行状态；临时模型块经专门接口按需取用，历史查看不交付实时块。
+`cardRenderer` 校验卡片载荷并向 Body 与 Actions 注入对象环境，组件通过 `useRendererObject()` 取得基础对象接口。`session.snapshot()` 提供具型记录与资源快照，`session.create(CreationContract, input, position)` 创建资源，`invoke(ActionContract, input)` 调用当前对象动作。`onStream` 订阅对象二进制通道，短名由宿主补全插件命名空间。基础接口提供通用运行状态；临时模型块经专门接口按需取用，实时块始终对应当前执行状态，卡片不接收历史模式或返回实时视图接口。
 
 `toolRenderer` 的 input、execution、result 是三个平行可选入口，每个都使用 `{ headerRenderer?, bodyRenderer? }`。例如三态共用组件时：
 
@@ -153,7 +153,7 @@ ResourceDescription、ToolView、CreationEntry 的 label／description 接收 Ui
 
 ## 版本与当前边界
 
-SDK 包版本为 `0.8.0`，宿主提供 API 5.0；插件声明 `api: { major: 5, minMinor: 0 }`，其他主版本在加载前拒绝。应用 IPC 版本为 5，会话 IPC 为 16，内容 IPC 为 2，应用配置 IPC 为 3，插件配置 IPC 为 2；工作数据库格式为 18，应用配置文件格式为 2。
+SDK 包版本为 `0.9.0`，宿主提供 API 6.0；插件声明 `api: { major: 6, minMinor: 0 }`，其他主版本在加载前拒绝。应用 IPC 版本为 5，会话 IPC 为 18，内容 IPC 为 3，应用配置 IPC 为 3，插件配置 IPC 为 2；工作数据库格式为 18，应用配置文件格式为 2。
 
 资源创建数据必须是 JSON 对象，不能占用宿主的 `id / type / title` 字段。当前会话数据保存于 `session_data`，事件及工具结果保存稳定契约身份与原始数据。core 消费具型用户消息、模型执行、通知与环境记录，存储编码由宿主负责；环境记录保留原事件身份与载荷。
 

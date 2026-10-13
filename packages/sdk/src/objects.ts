@@ -29,7 +29,7 @@ export interface ObjectReader {
   readonly session: SessionReader;
   /** 调用绑定的资源快照；创建事务内尚未建立身份时为 null。 */
   snapshot(): ResourceSnapshot | null;
-  /** 当前数据独立于固定快照，不随历史查看或分叉恢复。 */
+  /** 当前数据独立于固定快照，不随游标回溯或分叉恢复。 */
   get<T extends Json>(contract: DataContract<T>): T | null;
 }
 export interface ObjectExecutor extends ObjectReader {

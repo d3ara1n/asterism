@@ -94,7 +94,7 @@ describe("宿主不可变内容", () => {
     expect(await f.object(id).content.read(ref)).toEqual(new Uint8Array([0, 255, 128]));
     await f.service.close(); services.splice(services.indexOf(f.service), 1);
     const reopened = new ApplicationService(f.root); services.push(reopened);
-    const reader = await reopened.content.execute({ type: "read.open", source: { sessionId: f.sessionId, objectId: id, nodeId: reopened.sessions.tree.cursor(f.sessionId) }, ref });
+    const reader = await reopened.content.execute({ type: "read.open", source: { sessionId: f.sessionId, objectId: id }, ref });
     expect(reader.kind).toBe("reader");
     if (reader.kind !== "reader") throw new Error("Expected reader.");
     expect(await reopened.content.execute({ type: "read.next", readerId: reader.readerId })).toMatchObject({ kind: "bytes", data: new Uint8Array([0, 255, 128]) });
@@ -111,6 +111,27 @@ describe("宿主不可变内容", () => {
     const abandoned = f.input(), orphan = await f.store.writer({ scope: abandoned }).stage(bytes("orphan"));
     await abandoned.close(); f.store.collect();
     expect(() => f.store.reader({ sessionId: f.sessionId, objectId: id }).read(orphan)).toThrow();
+  });
+  // 桌面内容契约：读取只按执行游标授权；旧分支记录仍保留字节，但已知引用不授予访问。
+  it("桌面读取随游标重建资格，拒绝旁支记录和已移除对象", async () => {
+    const f = fixture(), draft = f.input();
+    const ref = await f.store.writer({ scope: draft }).stage(bytes("saved"));
+    const id = await f.create(ref, draft.id);
+    await draft.close();
+    const created = f.service.sessions.tree.cursor(f.sessionId);
+    await f.replace(id, { file: ref, history: true });
+    const saved = f.service.sessions.tree.cursor(f.sessionId);
+    await f.replace(id, { file: null });
+    const read = () => f.service.content.execute({ type: "read.open", source: { sessionId: f.sessionId, objectId: id }, ref });
+    await f.service.sessions.execute({ type: "select", sessionId: f.sessionId, nodeId: created });
+    await expect(read()).rejects.toThrow();
+    await f.service.sessions.execute({ type: "select", sessionId: f.sessionId, nodeId: saved });
+    const reader = await read();
+    expect(reader.kind).toBe("reader");
+    if (reader.kind !== "reader") throw new Error("Expected reader.");
+    await f.service.content.execute({ type: "read.close", readerId: reader.readerId });
+    await f.service.sessions.execute({ type: "object.remove", sessionId: f.sessionId, objectId: id });
+    await expect(read()).rejects.toMatchObject({ code: "foreign_resource" });
   });
   it("替换当前值后历史事件和创建原件的独立根仍保留", async () => {
     const f = fixture(), draft = f.input();

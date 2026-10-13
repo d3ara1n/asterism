@@ -9,10 +9,6 @@ export const objectsMessages = pluginNamespace("atelier.host").messages("en", de
     id: "objects",
     defaultMessage: "Objects",
   },
-  noObjectsHistorical: {
-    id: "noObjectsHistorical",
-    defaultMessage: "No objects existed here yet.",
-  },
   noObjects: {
     id: "noObjects",
     defaultMessage: "There are no objects in this conversation.",

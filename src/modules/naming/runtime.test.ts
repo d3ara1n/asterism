@@ -228,7 +228,7 @@ describe("两级自动命名", () => {
   });
 
   // 预期来自命名回溯规则：标题取执行路径最新命名；没有命名时取当前分支首条输入的 72 单位截断，两者都没有时保持不变。
-  it("仅追加命名事件即可更新标题，查看不更新，回溯与分支切换不追加恢复事件", async () => {
+  it("仅追加命名事件即可更新标题，读取不更新，回溯与分支切换不追加恢复事件", async () => {
     const test = await open(() => title("Generated"));
     const opening = `  ${"首条用户消息".repeat(20)}  `;
     const fallback = "首条用户消息".repeat(20).slice(0, 72);
@@ -241,8 +241,8 @@ describe("两级自动命名", () => {
     expect(test.session.title.get()).toBe("Manual");
     const original = test.service.sessions.tree.nodes(test.sessionId);
     const select = (nodeId: string | null) => test.service.sessions.execute({ type: "select", sessionId: test.sessionId, nodeId });
-    const historical = test.service.sessions.snapshot(test.sessionId, { kind: "history", nodeId: first });
-    expect(historical.title).toBe("Manual");
+    const current = test.service.sessions.snapshot(test.sessionId);
+    expect(current.title).toBe("Manual");
     expect(test.session.snapshot().position.nodeId).toBe(manual);
     await select(generated.id);
     expect(test.session.title.get()).toBe("Generated");

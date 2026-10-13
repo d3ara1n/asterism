@@ -1,20 +1,19 @@
-
 import type { DatabaseSync } from "node:sqlite";
 import type { ResourceRegistry } from "../resources/registry.ts";
 import { createResourceId } from "../resources/id.ts";
-import { foldWorkbench, type FoldedObject } from "../session/fold.ts";
+import type { FoldedObject } from "../session/fold.ts";
 import { SessionError, type SessionTree } from "../session/tree.ts";
 import type { Json } from "@atelier/sdk/contracts";
-import type { SessionNode } from "../shared/session.ts";
 
-/** 宿主工作台写入的会话级来源。 */
-const host = { plugin: "atelier.host", resource: null } as const;
 import { workbenchSnapshotSchema, type WorkbenchCommand, type WorkbenchSnapshot, type Point, type Viewport } from "../shared/workbench.ts";
 import type { ContentStore, ContentLease } from "./content-store.ts";
 
+/** 宿主工作台写入的会话级来源。 */
+const host = { plugin: "atelier.host", resource: null } as const;
+
 type ViewRow = { object_id: string; x: number; y: number; hidden: number; collapsed: number; width: number | null; height: number | null };
 
-/** 会话的资源事件与独立布局；由会话入口统一事务和通知，不拥有查看位置。 */
+/** 会话的资源事件与独立布局；当前存在性与链接统一由会话树重建。 */
 export class SessionWorkbench {
   constructor(private readonly db: DatabaseSync, private readonly tree: SessionTree,
     private readonly resources: ResourceRegistry,
@@ -36,7 +35,7 @@ export class SessionWorkbench {
   }
 
   mutate(command: WorkbenchCommand): void {
-    const folded = foldWorkbench(this.tree.path(command.sessionId));
+    const folded = this.tree.workbench(command.sessionId);
     const tree = this.tree;
     switch (command.type) {
       case "object.remove": {
@@ -92,8 +91,8 @@ export class SessionWorkbench {
     this.db.prepare("INSERT INTO object_views (session_id, object_id, x, y) VALUES (?, ?, ?, ?)").run(sessionId, objectId, position.x, position.y);
   }
 
-  project(sessionId: string, title: string, path: readonly SessionNode[]): WorkbenchSnapshot {
-    const folded = foldWorkbench(path);
+  project(sessionId: string, title: string): WorkbenchSnapshot {
+    const folded = this.tree.workbench(sessionId);
     const objects = folded.objects.map(object => ({ id: object.id, kind: object.kind, title: object.title, presentation: this.resources.project(object) }));
     const ids = new Set(objects.map(object => object.id));
     const rows = this.db.prepare("SELECT * FROM object_views WHERE session_id = ?").all(sessionId) as ViewRow[];

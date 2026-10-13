@@ -3,7 +3,6 @@ import { PluginApiError, type ContentReader, type ContentScope, type ObjectReade
 import type { RunGroup } from "./lifecycle.ts";
 import type { ObjectScope } from "./host.ts";
 import type { PluginHostServices } from "./loader.ts";
-import { foldWorkbench } from "../session/fold.ts";
 import { sessionSnapshot, resourceSnapshot } from "./records.ts";
 import { synchronous } from "./synchronous.ts";
 import type { LiveBlock } from "../shared/session.ts";
@@ -91,7 +90,7 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
     if (ref) {
       own(ref.kind); checkRef(ref, scope?.active && scope.provisional);
       if (scope?.execution && !scope.active) throw new PluginApiError("unavailable", "The tool execution scope is closed.");
-      if (!(scope?.active && (scope.provisional || scope.execution)) && !foldWorkbench(host.sessions.path(id)).objects.some(object => object.id === ref.id))
+      if (!(scope?.active && (scope.provisional || scope.execution)) && !host.sessions.workbench(id).objects.some(object => object.id === ref.id))
         throw new PluginApiError("unavailable", "The resource is not on the current session path.");
     }
     host.sessions.commit(id, writer => {
@@ -143,7 +142,7 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
         checkRef(ref, scope?.active && scope.provisional);
         if (captured) return captured;
         if (scope?.active && scope.provisional && !host.refOf(ref.id)) return null;
-        const current = foldWorkbench(host.sessions.path(ref.sessionId)).objects.find(object => object.id === ref.id);
+        const current = host.sessions.workbench(ref.sessionId).objects.find(object => object.id === ref.id);
         return current ? resourceSnapshot(ref, current) : null;
       },
       get(contract) {
@@ -209,7 +208,7 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
         own(ref.kind); checkRef(ref);
         if (running.has(ref.id)) throw new PluginApiError("unavailable", "A model request is already running on this resource.");
         const path = host.sessions.path(ref.sessionId);
-        if (!foldWorkbench(path).objects.some(object => object.id === ref.id))
+        if (!host.sessions.workbench(ref.sessionId).objects.some(object => object.id === ref.id))
           throw new PluginApiError("unavailable", "The resource is not on the current session path.");
         if ((path.at(-1)?.id ?? null) !== request.requestParentId)
           throw new PluginApiError("invalid_argument", "Rebuild model input from the current session position.");
@@ -218,7 +217,7 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
         });
         const allowed = tools?.allow ? new Set(tools.allow) : null;
         const excluded = new Set(tools?.exclude ?? []);
-        const linked = host.sessions.linked(path, ref.id);
+        const linked = host.sessions.linked(ref.sessionId, ref.id);
         const capabilities = host.sessions.capabilities(linked, name => (allowed === null || allowed.has(name)) && !excluded.has(name));
         let progressTimer: ReturnType<typeof setTimeout> | undefined;
         const receive = request.observer.event.bind(request.observer);

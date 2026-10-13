@@ -72,8 +72,7 @@ export function App({ controller }: { controller: ApplicationController }) {
   const sessionBusy = !!sessionState && (sessionState.busy || sessionState.status !== "ready");
   const sessionLoading = sessionState?.status === "loading";
   const error = state.error ?? sessionState?.error;
-  const historical = sessionState?.position.kind === "history";
-  const writable = ready && !sessionBusy && !!session && !historical;
+  const writable = ready && !sessionBusy && !!session;
   const inSettings = page === "settings";
   const mainTitle = view.kind === "home" ? i18n.formatMessage(commonMessages.home)
     : session?.title ?? snapshot?.sessions.find(item => item.id === view.sessionId)?.title ?? i18n.formatMessage(commonMessages.conversation);
@@ -161,7 +160,7 @@ export function App({ controller }: { controller: ApplicationController }) {
       <PageState kind="error" title={i18n.formatMessage(commonMessages.unavailableTitle)} body={i18n.text(sessionState?.error ?? commonMessages.unavailableBody)}
         action={<Button variant="secondary" onClick={() => { void active?.refresh(); }} disabled={!ready}>{i18n.formatMessage(commonMessages.retry)}</Button>} />
     </div> : undefined}>
-    {session && active ? <Workbench key={session.id} ref={workbench} session={session} controller={active} historical={historical}
+    {session && active ? <Workbench key={session.id} ref={workbench} session={session} controller={active}
       ready={ready} busy={sessionBusy} run={run}
       onHome={goHome} canDrop={creation.canDrop} onDropItems={creation.drop} /> : null}
   </WorkbenchSurface>;

@@ -7,8 +7,8 @@ import { startLanguage, getI18n } from "../../shared/i18n.ts";
 import { pluginNamespace, defineMessages } from "@atelier/sdk/contracts";
 import type { LanguageState } from "../../../shared/language.ts";
 
-function snapshot(revision: number, at: string | null = null): SessionSnapshot {
-  return { sessionId: "s", title: "S", cursor: "current", at, seq: 4, revision, nodes: [],
+function snapshot(revision: number, cursor: string | null = "current"): SessionSnapshot {
+  return { sessionId: "s", title: "S", cursor, seq: 4, revision, nodes: [],
     workbench: { id: "s", title: "S", objects: [], links: [], views: [], viewport: { x: 0, y: 0, zoom: 1 } },
     progress: { revision, version: revision, unsettledObjectIds: [], live: [] } };
 }
@@ -83,18 +83,6 @@ describe("会话视图所有权", () => {
     disconnect();
   });
 
-
-  it("离开并返回 live 不会复用旧导航意图的身份", async () => {
-    const { controller, requests } = fixture(), disconnect = controller.connect();
-    requests[0]!.resolve(view(snapshot(1))); await flush();
-    const intent = controller.getSnapshot().navigationVersion;
-    controller.inspect("old"); controller.followCursor();
-    requests.at(-1)!.resolve(view(snapshot(1))); await flush();
-    expect(controller.getSnapshot().navigationVersion).not.toBe(intent);
-    expect(controller.getSnapshot().position.kind).toBe("live");
-    disconnect();
-  });
-
   it("命令受理后仍等待新投影，不能基于旧选择再次配置", async () => {
     const { controller, requests } = fixture(); const disconnect = controller.connect();
     requests[0]!.resolve(view(snapshot(1))); await flush();
@@ -142,34 +130,29 @@ describe("会话视图所有权", () => {
     disconnect();
   });
 
-  it.each(["history", "disconnect"] as const)("创建排队等待同步时 %s 不会留下挂起命令", async action => {
+  it("创建排队等待同步时断开不会留下挂起命令", async () => {
     const { controller, requests } = fixture(); const disconnect = controller.connect();
     requests[0]!.resolve(view(snapshot(1))); await flush();
     const command = { type: "resource.create" as const, sessionId: "s", kind: "note", creation: { id: "note/create" }, input: {}, position: { x: 0, y: 0 } };
     const first = controller.execute(command);
     const second = controller.execute(command);
     await flush(); requests[1]!.resolve(accepted); await first; await flush();
-    if (action === "history") controller.inspect("history");
-    else disconnect();
+    disconnect();
     expect((await second).ok).toBe(false);
     expect(requests.filter(r => r.command.type === "resource.create")).toHaveLength(1);
     disconnect();
   });
 
-  it.each([false, true])("导航失败回到已显示位置并阻止基于旧数据操作（原为历史=%s）", async historical => {
+  it("读取失败保留画面并阻止基于旧数据操作，刷新后恢复", async () => {
     const { controller, requests } = fixture(); const disconnect = controller.connect();
-    requests[0]!.resolve(view(snapshot(1, "current"))); await flush();
-    if (historical) {
-      controller.inspect("history"); requests.at(-1)!.resolve(view(snapshot(1, "history"))); await flush();
-      controller.followCursor();
-    } else controller.inspect("history");
-    requests.at(-1)!.resolve({ ok: false, error: { code: "unavailable", message: "Read failed.", display: "Read failed." } }); await flush();
-    expect(controller.getSnapshot()).toMatchObject({ status: "error", position: historical ? { kind: "history", nodeId: "history" } : { kind: "live" } });
-    expect((await controller.mutate({ type: "object.remove", sessionId: "s", objectId: "note" }))).toBe(false);
+    requests[0]!.resolve(view(snapshot(1))); await flush();
     void controller.refresh();
-    expect(requests.at(-1)!.command).toEqual({ type: "read", sessionId: "s",
-      position: historical ? { kind: "history", nodeId: "history" } : { kind: "live" } });
-    requests.at(-1)!.resolve(view(snapshot(1, historical ? "history" : "current"))); await flush();
+    requests[1]!.resolve({ ok: false, error: { code: "unavailable", message: "Read failed.", display: "Read failed." } }); await flush();
+    expect(controller.getSnapshot()).toMatchObject({ status: "error", snapshot: { cursor: "current" } });
+    expect(await controller.mutate({ type: "object.remove", sessionId: "s", objectId: "note" })).toBe(false);
+    void controller.refresh();
+    expect(requests.at(-1)!.command).toEqual({ type: "read", sessionId: "s" });
+    requests.at(-1)!.resolve(view(snapshot(1))); await flush();
     expect(controller.getSnapshot()).toMatchObject({ status: "ready", error: null });
     disconnect();
   });
@@ -187,56 +170,18 @@ describe("会话视图所有权", () => {
     disconnect();
   });
 
-  it("快速查看历史时旧查询不能覆盖新位置，对话路径与工作台一起发布", async () => {
-    const { controller, requests } = fixture(); const disconnect = controller.connect();
-    requests[0]!.resolve(view(snapshot(1, "current"))); await flush();
-    controller.inspect("old");
-    controller.inspect("older");
-    expect(controller.getSnapshot()).toMatchObject({ status: "loading", position: { kind: "live" }, snapshot: { at: "current" } });
-    requests[2]!.resolve(view(snapshot(1, "older"))); await flush();
-    requests[1]!.resolve(view(snapshot(1, "old"))); await flush();
-    expect(controller.getSnapshot()).toMatchObject({ status: "ready", position: { kind: "history", nodeId: "older" }, snapshot: { at: "older" } });
-    disconnect();
-  });
-
-  it("历史中保存布局只发送局部命令，之后由模块读取原查看位置", async () => {
-    const { controller, requests } = fixture(); const disconnect = controller.connect();
-    requests[0]!.resolve(view(snapshot(1))); await flush();
-    controller.inspect("history"); requests[1]!.resolve(view(snapshot(1, "history"))); await flush();
-    const positions: Array<string | null | undefined> = [];
-    controller.subscribe(() => positions.push(controller.getSnapshot().snapshot?.at));
-    const saved = controller.mutate({ type: "view.set", sessionId: "s", objectId: "note", collapsed: true });
-    await flush(); requests[2]!.resolve(accepted); await saved;
-    expect(requests[3]!.command).toEqual({ type: "read", sessionId: "s", position: { kind: "history", nodeId: "history" } });
-    requests[3]!.resolve(view(snapshot(2, "history"))); await flush();
-    expect(positions.every(at => at === "history")).toBe(true);
-    disconnect();
-  });
-
-  it("历史中拒绝领域变更，排队命令按执行时位置检查", async () => {
-    const { controller, requests } = fixture(); const disconnect = controller.connect();
-    requests[0]!.resolve(view(snapshot(1))); await flush();
-    const layout = controller.mutate({ type: "view.set", sessionId: "s", objectId: "note", hidden: true });
-    await flush();
-    const removal = controller.mutate({ type: "object.remove", sessionId: "s", objectId: "note" });
-    controller.inspect("history");
-    requests[1]!.resolve(accepted); await layout;
-    expect(await removal).toBe(false);
-    expect(requests.some(request => request.command.type === "object.remove")).toBe(false);
-    disconnect();
-  });
-
-  it("分叉受理后转为跟随游标，旧同序号查询不能把位置拉回去", async () => {
+  // 时间线契约：只有 select 移动执行游标；命令前的读取不得覆盖新位置。
+  it("游标跳转受理后重读当前状态，旧查询不能覆盖新位置", async () => {
     const { controller, requests, notify } = fixture(); const disconnect = controller.connect();
-    requests[0]!.resolve(view(snapshot(1, "current"))); await flush();
-    controller.inspect("branch"); requests[1]!.resolve(view(snapshot(1, "branch"))); await flush();
+    requests[0]!.resolve(view(snapshot(1))); await flush();
     notify(2);
     const selected = controller.branchFrom("branch"); await flush();
-    requests[3]!.resolve(accepted); await selected;
-    expect(requests[4]!.command).toEqual({ type: "read", sessionId: "s", position: { kind: "live" } });
-    requests[4]!.resolve(view({ ...snapshot(3, "branch"), cursor: "branch" })); await flush();
-    requests[2]!.resolve(view(snapshot(2, "branch"))); await flush();
-    expect(controller.getSnapshot()).toMatchObject({ position: { kind: "live" }, snapshot: { cursor: "branch", revision: 3 } });
+    expect(requests[2]!.command).toEqual({ type: "select", sessionId: "s", nodeId: "branch" });
+    requests[2]!.resolve(accepted); await selected;
+    expect(requests[3]!.command).toEqual({ type: "read", sessionId: "s" });
+    requests[3]!.resolve(view(snapshot(3, "branch"))); await flush();
+    requests[1]!.resolve(view(snapshot(2))); await flush();
+    expect(controller.getSnapshot()).toMatchObject({ snapshot: { cursor: "branch", revision: 3 } });
     disconnect();
   });
 
@@ -292,6 +237,5 @@ describe("会话视图所有权", () => {
     expect(requests.every(request => request.command.type === "read")).toBe(true);
     reopened();
   });
-
 
 });

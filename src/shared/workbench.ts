@@ -18,7 +18,7 @@ export type Point = z.infer<typeof pointSchema>;
 export type CardSize = z.infer<typeof cardSizeSchema>;
 export type Viewport = z.infer<typeof viewportSchema>;
 
-/** 资源变更与布局属于指定会话；命令不携带用户的查看位置。 */
+/** 资源变更与布局属于指定会话；操作始终针对执行游标。 */
 export const workbenchCommands = [
   z.strictObject({ type: z.literal("object.remove"), sessionId, objectId: id }),
   z.strictObject({ type: z.literal("link.set"), sessionId, agentId: id, resourceId: id, linked: z.boolean() }),

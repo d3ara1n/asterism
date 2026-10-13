@@ -31,7 +31,7 @@ function mutationFailure(error: unknown, signal: AbortSignal, operation: string)
   throw error;
 }
 
-/** 笔记只保存当前可变正文；任何历史位置的卡片与读取都取用此状态。 */
+/** 笔记只保存当前可变正文；游标回溯不恢复正文。 */
 export default defineModule(() => ({
   resources: [implementResource(Note, NoteView, {
     creation: implementCreation(CreateNote, {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { SessionNode } from "../../../shared/session";
 import { node, message as input, text } from "../../../session/test-nodes";
-import { arrivedBranch, branchContains, historyBranches, viewedBranch } from "./history-branches";
+import { branchContains, historyBranches, branchForNode } from "./history-branches";
 
 const message = (id: string, parentId: string | null): SessionNode => node(id, parentId, input("a", id));
 const interrupted = (id: string, parentId: string): SessionNode => node(id, parentId, text("a", "r", 0, "Partial", { complete: false, requestParentId: parentId }));
@@ -14,10 +14,10 @@ describe("历史分支 Tab 契约", () => {
     expect([...main!.nodeIds]).toEqual(["A", "C", "B"]);
     expect([...child!.nodeIds]).toEqual(["C", "D"]);
     expect(child).toMatchObject({ parentId: main!.id, forkId: "C", tip: "D", number: 1 });
-    expect(viewedBranch(tree, "C", child!.id)).toBe(child);
-    expect(viewedBranch(tree, "C", main!.id)).toBe(main);
-    expect(viewedBranch(tree, "B", child!.id)).toBe(main);
-    expect(viewedBranch(tree, "D")).toBe(child);
+    expect(branchForNode(tree, "C", child!.id)).toBe(child);
+    expect(branchForNode(tree, "C", main!.id)).toBe(main);
+    expect(branchForNode(tree, "B", child!.id)).toBe(main);
+    expect(branchForNode(tree, "D")).toBe(child);
     expect(nodes.map(node => node.id)).toEqual(["A", "C", "B", "D"]);
   });
 
@@ -44,7 +44,7 @@ describe("历史分支 Tab 契约", () => {
     expect([...after.branches[0]!.nodeIds]).toEqual(["A", "B", "C"]);
   });
 
-  it("从会话起点分叉仍可在共享起点往返，空会话也有可查看位置", () => {
+  it("从会话起点分叉仍可在共享起点往返，空会话也有可选择节点", () => {
     const empty = historyBranches([]);
     expect(empty.branches).toHaveLength(1);
     expect(branchContains(empty.branches[0]!, null)).toBe(true);
@@ -52,8 +52,8 @@ describe("历史分支 Tab 契约", () => {
     const [main, child] = tree.branches;
     expect(child).toMatchObject({ parentId: main!.id, forkId: null, tip: "D" });
     expect([...child!.nodeIds]).toEqual(["D"]);
-    expect(viewedBranch(tree, null, child!.id)).toBe(child);
-    expect(viewedBranch(tree, null)).toBe(main);
+    expect(branchForNode(tree, null, child!.id)).toBe(child);
+    expect(branchForNode(tree, null)).toBe(main);
   });
 
   it("不完整块同样可查看，分叉使用它自身作为共享起点", () => {
@@ -69,14 +69,4 @@ describe("历史分支 Tab 契约", () => {
     expect(branchContains(child!, "tail")).toBe(true);
   });
 
-  it("只有同次成功导航可选中新 Tab，失败或离开再返回相同节点不能复活旧意图", () => {
-    const pending = { branchId: "branch:D", nodeId: "C", version: 2 };
-    const state = { status: "ready", navigationVersion: 2, snapshot: { at: "C" } };
-    expect(arrivedBranch(pending, state)).toBe("branch:D");
-    expect(arrivedBranch(pending, { ...state, status: "loading" })).toBeNull();
-    expect(arrivedBranch(pending, { ...state, status: "error" })).toBeNull();
-    expect(arrivedBranch(pending, { ...state, navigationVersion: 4 })).toBeNull();
-    expect(arrivedBranch(pending, { ...state, snapshot: { at: "D" } })).toBeNull();
-    expect(arrivedBranch(null, state)).toBeNull();
-  });
 });

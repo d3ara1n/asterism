@@ -33,10 +33,6 @@ export const conversationMessages = pluginNamespace("atelier.core").messages("en
     id: "agent_conversation_Conversation_2",
     defaultMessage: "Ready",
   },
-  historyHint: {
-    id: "agent_conversation_Conversation_3",
-    defaultMessage: "Viewing saved history. Choose “Continue from here” in history to branch.",
-  },
   workingHint: {
     id: "agent_conversation_Conversation_4",
     defaultMessage: "The agent is working…",

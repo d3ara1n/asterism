@@ -49,7 +49,7 @@ async function setup(model: ModelAdapter = adapter(), onSessionChanged?: (event:
   return { service, root, start };
 }
 async function execute(service: ApplicationService, command: SessionMutation | { type: "read"; sessionId: string }) {
-  const reply = await service.sessions.execute(command.type === "read" ? { ...command, position: { kind: "live" } } : command);
+  const reply = await service.sessions.execute(command);
   return reply.kind === "view" ? reply.snapshot : service.sessions.snapshot(reply.sessionId);
 }
 async function settled(service: ApplicationService) {
@@ -58,7 +58,7 @@ async function settled(service: ApplicationService) {
 
 describe("会话运行时", () => {
   // 预期来自时间线契约：终态属于块，正常工具续轮不得生成用户未选择的分支。
-  it("首页工具调用后自动续接保持单一路径，回看工具块即包含结果与一次计量", async () => {
+  it("首页工具调用后自动续接保持单一路径，回溯到工具块即包含结果与一次计量", async () => {
     let requests = 0;
     const usage = { input: 5, output: 2, total: 7, reasoning: null, cacheRead: null, cacheWrite: null };
     const model: ModelAdapter = { validate() {}, version: "test/1", prepare: () => ({ async *stream() {
@@ -82,8 +82,8 @@ describe("会话运行时", () => {
     expect(blocks.map(block => block.kind)).toEqual(["toolcall", "text"]);
     expect(blocks[1]!.parentId).toBe(blocks[0]!.id);
     expect(blocks.reduce((sum, block) => sum + block.completion.usage.total, 0)).toBe(14);
-    const viewed = service.sessions.snapshot(first.sessionId, { kind: "history", nodeId: blocks[0]!.id });
-    expect(service.sessions.tree.path(first.sessionId, viewed.at).map(flat).at(-1)).toMatchObject({
+    await service.sessions.execute({ type: "select", sessionId: first.sessionId, nodeId: blocks[0]!.id });
+    expect(service.sessions.tree.path(first.sessionId).map(flat).at(-1)).toMatchObject({
       kind: "toolcall", complete: true, outcome: { kind: "succeeded", data: { resources: [] } },
       completion: { usage, finishReason: "tool-calls" },
     });
@@ -152,7 +152,7 @@ describe("会话运行时", () => {
     expect(snapshot.providers).toHaveLength(1);
     expect(snapshot.overrides.agents.worker).toEqual({ systemPrompt: "Persistent instructions" });
   });
-  it("笔记写入只更新当前正文和视图，历史查看与重开均读取当前值", async () => {
+  it("笔记写入只更新当前正文和视图，游标选择与重开均读取当前值", async () => {
     let tools!: ToolRegistry;
     const original = runtimeModules.createModules;
     vi.spyOn(runtimeModules, "createModules").mockImplementation(services => {
@@ -171,14 +171,14 @@ describe("会话运行时", () => {
     expect(service.sessions.snapshot(sessionId).revision).toBeGreaterThan(created.revision);
     expect(service.sessions.tree.nodes(sessionId)).toEqual(before);
     expect(service.sessions.tree.cursor(sessionId)).toBe(cursor);
-    const historical = { kind: "history" as const, nodeId: cursor };
-    expect(service.sessions.snapshot(sessionId, historical).workbench.objects.find(object => object.id === note.id)?.presentation.data).toEqual({ text: "latest" });
+    await service.sessions.execute({ type: "select", sessionId, nodeId: cursor });
+    expect(service.sessions.snapshot(sessionId).workbench.objects.find(object => object.id === note.id)?.presentation.data).toEqual({ text: "latest" });
     await service.close(); services.delete(service);
     const reopened = new ApplicationService(root); services.add(reopened);
-    expect(reopened.sessions.snapshot(sessionId, historical).workbench.objects.find(object => object.id === note.id)?.presentation.data).toEqual({ text: "latest" });
+    expect(reopened.sessions.snapshot(sessionId).workbench.objects.find(object => object.id === note.id)?.presentation.data).toEqual({ text: "latest" });
   });
 
-  it("历史读取的路径与对象一致，布局独立保存、重开且不移动历史", async () => {
+  it("游标重建存在性，布局跨回溯和重开保留且不追加历史", async () => {
     const { service, root, start } = await setup();
     const first = await execute(service, start); await settled(service);
     const sessionId = first.sessionId;
@@ -186,25 +186,29 @@ describe("会话运行时", () => {
       input: { title: "Saved note", content: "original" }, position: { x: 10, y: 20 } });
     const note = created.workbench.objects.find(object => object.kind === "atelier.core/note")!, nodeId = created.cursor!;
     expect(await service.sessions.execute({ type: "object.remove", sessionId, objectId: note.id })).toEqual({ kind: "accepted", sessionId });
-    const cursor = service.sessions.tree.cursor(sessionId), before = service.sessions.tree.nodes(sessionId);
-    const position = { kind: "history" as const, nodeId }, historical = service.sessions.snapshot(sessionId, position);
-    expect(historical.at).toBe(nodeId);
-    expect(historical.workbench.objects.map(object => object.id)).toContain(note.id);
+    const removedCursor = service.sessions.tree.cursor(sessionId), before = service.sessions.tree.nodes(sessionId);
     expect(service.sessions.snapshot(sessionId).workbench.objects.map(object => object.id)).not.toContain(note.id);
+    await service.sessions.execute({ type: "select", sessionId, nodeId });
+    expect(service.sessions.snapshot(sessionId).cursor).toBe(nodeId);
+    expect(service.sessions.snapshot(sessionId).workbench.objects.map(object => object.id)).toContain(note.id);
+    const selections = service.sessions.tree.cursorSelections(sessionId);
     await service.sessions.execute({ type: "view.set", sessionId, objectId: note.id, size: { width: 900, height: 1000 } });
     await service.sessions.execute({ type: "view.set", sessionId, objectId: note.id, collapsed: true, position: { x: 30, y: 40 } });
-    expect(service.sessions.snapshot(sessionId, position).workbench.views.find(view => view.objectId === note.id))
+    expect(service.sessions.snapshot(sessionId).workbench.views.find(view => view.objectId === note.id))
       .toMatchObject({ size: { width: 900, height: 1000 }, collapsed: true, position: { x: 30, y: 40 } });
     expect(service.sessions.tree.nodes(sessionId)).toEqual(before);
-    expect(service.sessions.tree.cursor(sessionId)).toBe(cursor);
-    expect(service.sessions.tree.cursorSelections(sessionId)).toEqual([]);
+    expect(service.sessions.tree.cursor(sessionId)).toBe(nodeId);
+    expect(service.sessions.tree.cursorSelections(sessionId)).toEqual(selections);
+    await service.sessions.execute({ type: "select", sessionId, nodeId: removedCursor });
+    expect(service.sessions.snapshot(sessionId).workbench.objects.map(object => object.id)).not.toContain(note.id);
+    await service.sessions.execute({ type: "select", sessionId, nodeId });
     await service.close(); services.delete(service);
     const reopened = new ApplicationService(root); services.add(reopened);
-    expect(reopened.sessions.snapshot(sessionId, position).workbench.views.find(view => view.objectId === note.id)?.size).toEqual({ width: 900, height: 1000 });
+    expect(reopened.sessions.snapshot(sessionId).workbench.views.find(view => view.objectId === note.id)?.size).toEqual({ width: 900, height: 1000 });
     await reopened.sessions.execute({ type: "view.set", sessionId, objectId: note.id, size: null, collapsed: false });
-    expect(reopened.sessions.snapshot(sessionId, position).workbench.views.find(view => view.objectId === note.id))
+    expect(reopened.sessions.snapshot(sessionId).workbench.views.find(view => view.objectId === note.id))
       .toMatchObject({ size: null, collapsed: false, position: { x: 30, y: 40 } });
-    expect(reopened.sessions.tree.cursor(sessionId)).toBe(cursor);
+    expect(reopened.sessions.tree.cursor(sessionId)).toBe(nodeId);
   });
 
   it("正文增量发布独立进度，持久节点和终态才使会话视图失效", async () => {
@@ -622,7 +626,7 @@ describe("插件包管理命令", () => {
   it("应用命令登记和移除插件包，正确表达重启标记", async () => {
     const { service, root } = await setup();
     const dir = join(root, "pkg"); mkdirSync(dir);
-    writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "p", atelier: { id: "acme.p", api: { major: 5, minMinor: 0 } } }));
+    writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "p", atelier: { id: "acme.p", api: { major: 6, minMinor: 0 } } }));
     const added = service.execute({ type: "plugin.add", path: dir });
     expect(added.plugins.map(p => [p.source, p.status, p.enabled])).toEqual([[dir, "pending", true]]);
     expect(added.restartRequired).toBe(true);

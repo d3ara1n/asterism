@@ -46,18 +46,8 @@ export function branchContains(branch: HistoryBranch, nodeId: string | null): bo
 }
 
 /** 共享起点可同时属于两个 Tab；显式选择优先，外部定位则落到节点所属分支。 */
-export function viewedBranch(tree: HistoryBranches, at: string | null, preferredId?: string | null): HistoryBranch {
+export function branchForNode(tree: HistoryBranches, nodeId: string | null, preferredId?: string | null): HistoryBranch {
   const preferred = tree.branches.find(branch => branch.id === preferredId);
-  if (preferred && branchContains(preferred, at)) return preferred;
-  return (at === null ? undefined : tree.owner.get(at)) ?? tree.branches[0]!;
-}
-
-export type BranchNavigation = { branchId: string; nodeId: string | null; version: number };
-
-/** 只接受成功发布且未被之后导航取代的跳转；失败时保留原 Tab。 */
-export function arrivedBranch(
-  pending: BranchNavigation | null, state: { status: string; navigationVersion: number; snapshot: { at: string | null } | null },
-): string | null {
-  return pending && state.status === "ready" && state.navigationVersion === pending.version && state.snapshot?.at === pending.nodeId
-    ? pending.branchId : null;
+  if (preferred && branchContains(preferred, nodeId)) return preferred;
+  return (nodeId === null ? undefined : tree.owner.get(nodeId)) ?? tree.branches[0]!;
 }

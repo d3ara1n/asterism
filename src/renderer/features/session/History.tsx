@@ -1,4 +1,4 @@
-import { CircleDot, History, Eye, PanelsTopLeft, MoreHorizontal, ArrowUpLeft, GitBranch, ChevronDown, Layers, Check } from "lucide-react";
+import { CircleDot, History, PanelsTopLeft, MoreHorizontal, ArrowUpLeft, GitBranch, ChevronDown, Layers, Check } from "lucide-react";
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { commonMessages } from "../../messages/common";
@@ -15,7 +15,7 @@ import { Spinner } from "../../shared/ui/spinner";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../../shared/ui/tabs";
 import { IslandPanel } from "../../shared/weave/IslandPanel";
 import type { SessionController } from "./controller";
-import { arrivedBranch, branchContains, historyBranches, viewedBranch, type BranchNavigation, type HistoryBranch } from "./history-branches";
+import { branchContains, historyBranches, branchForNode, type HistoryBranch } from "./history-branches";
 import { historyBefore, historyEntries, historyResources, historyResourceViews, matchesHistoryView, type HistoryView, type HistoryEntry } from "./history-navigation";
 import { useSession, useSessionProgress } from "./state";
 
@@ -24,12 +24,11 @@ const branchLabel = (branch: HistoryBranch) => branch.number === 0 ? getI18n().f
 /** 历史逐节点导航；正文阅读与 response 聚合属于代理卡片。 */
 export function SessionHistoryPanel({ controller }: { controller: SessionController }) {
   const i18n = useI18n();
-  const { snapshot, state, historical } = useSession(controller);
+  const { snapshot, state } = useSession(controller);
   const registry = useModuleViews();
   const [query, setQuery] = useState("");
   const [view, setView] = useState<HistoryView>({ kind: "all" });
-  const [preferredBranch, setPreferredBranch] = useState<string | null>(null);
-  const pending = useRef<BranchNavigation | null>(null);
+  const [selection, setSelection] = useState<{ branchId: string; nodeId: string | null } | null>(null);
   const focusOrigin = useRef<Element | null>(null);
   const remembered = useRef(new Map<string, string | null>());
   const list = useRef<HTMLDivElement>(null);
@@ -37,9 +36,9 @@ export function SessionHistoryPanel({ controller }: { controller: SessionControl
   const scrollRequested = useRef(true);
   const entries = useMemo(() => snapshot ? historyEntries(snapshot.nodes, registry) : [], [snapshot?.nodes, registry, i18n]);
   const tree = useMemo(() => historyBranches(snapshot?.nodes ?? []), [snapshot?.nodes]);
-  const arrived = arrivedBranch(pending.current, state);
-  const branch = viewedBranch(tree, snapshot?.at ?? null, historical ? arrived ?? preferredBranch : null);
-  const executionBranch = viewedBranch(tree, snapshot?.cursor ?? null);
+  const selectedId = selection ? selection.nodeId : snapshot?.cursor ?? null;
+  const branch = branchForNode(tree, selectedId, selection?.branchId);
+  const executionBranch = branchForNode(tree, snapshot?.cursor ?? null);
   const branchesByFork = useMemo(() => {
     const result = new Map<string | null, HistoryBranch[]>();
     for (const child of tree.branches) {
@@ -53,27 +52,25 @@ export function SessionHistoryPanel({ controller }: { controller: SessionControl
   const parent = tree.branches.find(item => item.id === branch.parentId);
   const search = query.trim().toLocaleLowerCase(i18n.locale);
   const visible = entries.filter(entry => branch.nodeIds.has(entry.node.id) && matchesHistoryView(entry, view)
-    && (!search || `${"text" in entry.node ? entry.node.text : entry.label} ${entry.resource?.title ?? i18n.formatMessage(commonMessages.workbench)} ${entry.resource ? i18n.text(registry.resource(entry.resource.kind).label) : ""}`.toLocaleLowerCase(i18n.locale).includes(search)));
+    && (!search || `${entry.label} ${entry.resource?.title ?? i18n.formatMessage(commonMessages.workbench)} ${entry.resource ? i18n.text(registry.resource(entry.resource.kind).label) : ""}`.toLocaleLowerCase(i18n.locale).includes(search)));
   const showStart = branch.forkId === null && !search && view.kind === "all";
-  const navigate = (target: HistoryBranch, at?: string | null, reveal = false) => {
+  const navigate = (target: HistoryBranch, requestedId?: string | null, reveal = false) => {
     const last = remembered.current.get(target.id);
-    const nodeId = at !== undefined ? at : last !== undefined && branchContains(target, last) ? last : target.tip;
+    const nodeId = requestedId !== undefined ? requestedId : last !== undefined && branchContains(target, last) ? last : target.tip;
     if (reveal) { setQuery(""); setView({ kind: "all" }); }
-    focusOrigin.current = at !== undefined ? document.activeElement : null;
+    focusOrigin.current = requestedId !== undefined ? document.activeElement : null;
     scrollRequested.current = true;
-    controller.inspect(nodeId);
-    pending.current = { branchId: target.id, nodeId, version: controller.getSnapshot().navigationVersion };
+    setSelection({ branchId: target.id, nodeId });
+    remembered.current.set(target.id, nodeId);
   };
-  const inspect = (at: string | null) => navigate(viewedBranch(tree, at, branch.id), at);
+  const selectEntry = (nodeId: string | null) => navigate(branchForNode(tree, nodeId, branch.id), nodeId);
   useLayoutEffect(() => {
-    // 旧 Tab 移除后承接焦点；等待期间用户已移到搜索等控件时，不夺回焦点。
-    const transferFocus = arrived && focusOrigin.current && (document.activeElement === focusOrigin.current
+    // 切换 Tab 后承接原条目焦点，不夺取搜索等控件的焦点。
+    const transferFocus = focusOrigin.current && (document.activeElement === focusOrigin.current
       || document.activeElement === document.body || list.current?.contains(document.activeElement));
-    if (state.status !== "loading") { pending.current = null; focusOrigin.current = null; }
-    if (!snapshot || state.status !== "ready") return;
-    setPreferredBranch(branch.id);
-    remembered.current.set(branch.id, snapshot.at);
-    const row = list.current?.querySelector<HTMLElement>('[data-inspected="true"]');
+    focusOrigin.current = null;
+    if (!snapshot) return;
+    const row = list.current?.querySelector<HTMLElement>('[data-selected="true"]');
     if (transferFocus) {
       const target = row?.querySelector<HTMLButtonElement>("[data-history-entry]")
         ?? tabs.current?.querySelector<HTMLButtonElement>('[data-state="active"]');
@@ -82,23 +79,22 @@ export function SessionHistoryPanel({ controller }: { controller: SessionControl
     if (!scrollRequested.current) return;
     scrollRequested.current = false;
     row?.scrollIntoView({ block: "nearest" });
-  }, [snapshot, state.status, branch.id, arrived]);
+  }, [snapshot, branch.id, selectedId]);
   useLayoutEffect(() => {
     tabs.current?.querySelector<HTMLElement>('[data-state="active"]')?.scrollIntoView({ block: "nearest", inline: "nearest" });
   }, [branch.id]);
   if (!snapshot) return <IslandPanel title={i18n.formatMessage(historyMessages.history)}><p className="type-caption">{i18n.text(state.error ?? historyMessages.historyLoadingBody)}</p></IslandPanel>;
-  const selected = entries.find(entry => entry.node.id === snapshot.at);
-  const selectedVisible = snapshot.at === null ? showStart : visible.some(entry => entry.node.id === snapshot.at);
-  const junction = (at: string | null) => <BranchNavigationRow
-    parent={branch.forkId === at ? parent : undefined}
-    branches={branchesByFork.get(at) ?? []}
-    onNavigate={target => navigate(target, at, true)}
+  const selected = entries.find(entry => entry.node.id === selectedId);
+  const selectedVisible = selectedId === null ? showStart : visible.some(entry => entry.node.id === selectedId);
+  const junction = (nodeId: string | null) => <BranchNavigationRow
+    parent={branch.forkId === nodeId ? parent : undefined}
+    branches={branchesByFork.get(nodeId) ?? []}
+    onNavigate={target => navigate(target, nodeId, true)}
   />;
   return <Tabs value={branch.id} activationMode="manual" onValueChange={id => { const target = tree.branches.find(item => item.id === id); if (target) navigate(target); }} className="island-panel min-w-0 gap-0">
-    <IslandPanel title={i18n.formatMessage(historyMessages.history)} compact contentRef={list} action={<ContinueAction controller={controller} />} toolbar={<>
+    <IslandPanel title={i18n.formatMessage(historyMessages.history)} compact contentRef={list} action={<ContinueAction controller={controller} nodeId={selectedId} />} toolbar={<>
       <div ref={tabs} className="overflow-x-auto pb-1"><TabsList variant="line" aria-label={i18n.formatMessage(historyMessages.historyBranches)}>
         {tree.branches.map(item => <TabsTrigger key={item.id} value={item.id}
-          onClick={() => { if (item.id === branch.id && pending.current) navigate(item); }}
           title={item.id === executionBranch.id ? `${branchLabel(item)} · ${i18n.formatMessage(historyMessages.historyExecutionBranch)}` : branchLabel(item)}>
           {branchLabel(item)}{item.id === executionBranch.id && <CircleDot className="size-3" aria-label={i18n.formatMessage(historyMessages.historyExecutionBranch)} />}
         </TabsTrigger>)}
@@ -108,18 +104,16 @@ export function SessionHistoryPanel({ controller }: { controller: SessionControl
         <HistoryViewPicker entries={entries} value={view} onChange={next => { setView(next); if (list.current) list.current.scrollTop = 0; }} />
       </div>
       <div className="flex items-center justify-between gap-2"><p className="type-caption min-w-0 truncate" title={selected?.label ?? i18n.formatMessage(historyMessages.historyStart)}>
-        {state.status === "loading" ? i18n.formatMessage(historyMessages.historyLoadingBody) : historical ? snapshot.at === null ? i18n.formatMessage(historyMessages.historyStart) : i18n.formatMessage(commonMessages.viewingHistory) : i18n.formatMessage(commonMessages.live)}</p>
-        {historical && <Button size="xs" variant="secondary" onClick={() => { scrollRequested.current = true; controller.followCursor(); }}>{i18n.formatMessage(commonMessages.backToLive)}</Button>}</div>
+        {selected?.label ?? i18n.formatMessage(historyMessages.historyStart)}</p></div>
       {!selectedVisible && (search || view.kind !== "all") && <p className="type-caption">{i18n.formatMessage(historyMessages.historyFiltered)}</p>}
       {state.error && <p role="alert" className="type-caption">{i18n.text(state.error)}</p>}
     </>}>
       {tree.branches.map(item => <TabsContent key={item.id} value={item.id}>{item.id === branch.id && <>
-        {showStart && <div data-inspected={snapshot.at === null}>
+        {showStart && <div data-selected={selectedId === null}>
           <div className="flex items-center gap-0.5">
-            <Button data-history-entry variant={snapshot.at === null ? "secondary" : "ghost"} aria-pressed={snapshot.at === null} className="min-w-0 flex-1 justify-start font-normal" onClick={() => inspect(null)}>
+            <Button data-history-entry variant={selectedId === null ? "secondary" : "ghost"} aria-pressed={selectedId === null} className="min-w-0 flex-1 justify-start font-normal" onClick={() => selectEntry(null)}>
               <History className="size-4 text-muted-foreground" />{i18n.formatMessage(historyMessages.historyStart)}
               {snapshot.cursor === null && <CircleDot className="size-3" aria-label={i18n.formatMessage(historyMessages.historyExecutionPosition)} />}
-              {snapshot.at === null && <Eye className="size-3" aria-label={i18n.formatMessage(commonMessages.viewingHistory)} />}
             </Button>
           </div>
           {junction(null)}
@@ -128,19 +122,18 @@ export function SessionHistoryPanel({ controller }: { controller: SessionControl
           const { node, resource } = entry;
           const descriptor = registry.resource(resource?.kind ?? "");
           const source = entry.scope === "session" ? i18n.formatMessage(historyMessages.sessionEvents) : `${i18n.text(descriptor.label)} · ${resource?.title ?? i18n.formatMessage(historyMessages.unknownResource)}`;
-          const active = snapshot.at === node.id;
-          return <div key={node.id} data-inspected={active}>
+          const active = selectedId === node.id;
+          return <div key={node.id} data-selected={active}>
             <div className="flex items-center gap-0.5">
               <Button data-history-entry variant={active ? "secondary" : "ghost"} aria-pressed={active} className="h-auto min-w-0 flex-1 justify-start gap-3 px-2 py-1.5 text-left font-normal"
-                title={`${entry.label}\n${source}\n${i18n.formatDate(Date.parse(node.createdAt), { dateStyle: "medium", timeStyle: "short" })}`} onClick={() => inspect(node.id)}>
+                title={`${entry.label}\n${source}\n${i18n.formatDate(Date.parse(node.createdAt), { dateStyle: "medium", timeStyle: "short" })}`} onClick={() => selectEntry(node.id)}>
                 <span className="shrink-0 text-muted-foreground" aria-hidden="true">{entry.icon ?? (entry.scope === "session" ? <PanelsTopLeft className="size-4" /> : descriptor.icon)}</span>
                 <span className="min-w-0 flex-1">{entry.row?.(entry.label) ?? <span className="block truncate leading-5">{entry.label}</span>}<span className="type-caption block truncate leading-4">{source}</span></span>
                 {snapshot.cursor === node.id && <CircleDot className="size-3" aria-label={i18n.formatMessage(historyMessages.historyExecutionPosition)} />}
-                {active && <Eye className="size-3" aria-label={i18n.formatMessage(commonMessages.viewingHistory)} />}
               </Button>
               <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon-xs" aria-label={i18n.formatMessage(historyMessages.historyEntryActions)}><MoreHorizontal /></Button></DropdownMenuTrigger>
-                <DropdownMenuContent align="end"><DropdownMenuItem onSelect={() => inspect(historyBefore(snapshot.nodes, node))}>{i18n.formatMessage(historyMessages.historyBefore)}</DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => inspect(node.id)}>{i18n.formatMessage(historyMessages.historyAfter)}</DropdownMenuItem></DropdownMenuContent></DropdownMenu>
+                <DropdownMenuContent align="end"><DropdownMenuItem onSelect={() => selectEntry(historyBefore(snapshot.nodes, node))}>{i18n.formatMessage(historyMessages.historyBefore)}</DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => selectEntry(node.id)}>{i18n.formatMessage(historyMessages.historyAfter)}</DropdownMenuItem></DropdownMenuContent></DropdownMenu>
             </div>
             {junction(node.id)}
           </div>;
@@ -201,9 +194,9 @@ function HistoryViewPicker({ entries, value, onChange }: { entries: HistoryEntry
 }
 
 /** 进度订阅只刷新继续操作，不使整份历史列表随流增量重渲染。 */
-function ContinueAction({ controller }: { controller: SessionController }) {
+function ContinueAction({ controller, nodeId }: { controller: SessionController; nodeId: string | null }) {
   const i18n = useI18n();
-  const { snapshot, state, historical } = useSession(controller);
+  const { snapshot, state } = useSession(controller);
   const progress = useSessionProgress(controller);
   const registry = useModuleViews();
   const [target, setTarget] = useState<{ id: string | null } | null>(null);
@@ -215,7 +208,7 @@ function ContinueAction({ controller }: { controller: SessionController }) {
   const disabled = saving || unsettled || state.busy || state.status !== "ready";
   const actual = target?.id ?? null;
   const actualEntry = target ? historyEntries(snapshot.nodes, registry).find(entry => entry.node.id === actual) : undefined;
-  return <><span title={unsettled ? wait : i18n.formatMessage(historyMessages.continueFromHere)}><Button size="xs" disabled={!historical || disabled} onClick={() => setTarget({ id: snapshot.at })}><GitBranch />{i18n.formatMessage(historyMessages.continueFromHere)}</Button></span>
+  return <><span title={unsettled ? wait : i18n.formatMessage(historyMessages.continueFromHere)}><Button size="xs" disabled={nodeId === snapshot.cursor || disabled} onClick={() => setTarget({ id: nodeId })}><GitBranch />{i18n.formatMessage(historyMessages.continueFromHere)}</Button></span>
     <AlertDialog open={target !== null} onOpenChange={open => { if (!open && !saving) setTarget(null); }}><AlertDialogContent>
       <AlertDialogHeader><AlertDialogTitle>{i18n.formatMessage(historyMessages.continueTitle)}</AlertDialogTitle><AlertDialogDescription>{i18n.formatMessage(historyMessages.continueDescription)}</AlertDialogDescription></AlertDialogHeader>
       <p className="type-body break-words">{actualEntry?.label ?? i18n.formatMessage(historyMessages.historyStart)}</p>

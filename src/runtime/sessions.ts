@@ -23,12 +23,11 @@ import { createModelServices } from "../plugins/models.ts";
 import { createResourceId } from "../resources/id.ts";
 import type { ResourceRegistry } from "../resources/registry.ts";
 import { SessionDataStore } from "../session/data.ts";
-import { foldWorkbench, type FoldedObject } from "../session/fold.ts";
+import type { FoldedObject } from "../session/fold.ts";
 import { SessionError, SessionTree } from "../session/tree.ts";
 import type { ModelSettings, AgentSelection } from "../shared/model.ts";
 import type { ObjectStreamPayload } from "../shared/object-stream.ts";
-import { sessionPath } from "../shared/session-path.ts";
-import { sessionCommandSchema, sessionSnapshotSchema, type SessionChanged, type SessionCommand, type SessionSnapshot, type SessionProgress, type SessionReply, type ViewPosition, type SessionNode, type LiveBlock } from "../shared/session.ts";
+import { sessionCommandSchema, sessionSnapshotSchema, type SessionChanged, type SessionCommand, type SessionSnapshot, type SessionProgress, type SessionReply, type SessionNode, type LiveBlock } from "../shared/session.ts";
 import type { ToolRegistry } from "../tools/registry.ts";
 import { sessionPluginError } from "./plugin-errors.ts";
 import { SessionWorkbench } from "./workbench.ts";
@@ -68,6 +67,7 @@ export class SessionService {
       view: sessionId => this.tree.view(sessionId),
       sequences: (sessionId, nodes) => this.tree.sequences(sessionId, nodes),
       path: sessionId => this.tree.path(sessionId),
+      workbench: sessionId => this.tree.workbench(sessionId),
       title: sessionId => this.tree.title(sessionId),
       setTitle: (sessionId, text) => {
         const title = text.replace(/\s+/gu, " ").trim().slice(0, 160);
@@ -79,8 +79,8 @@ export class SessionService {
       idle: (sessionId, objectId) => this.modelActivity(sessionId).running.length === 0
         && !this.resources.controllers().some(controller => controller.activity?.(sessionId).running.some(id => id !== objectId)),
       progressChanged: sessionId => this.progressChanged(sessionId),
-      linked: (path, objectId) => {
-        const folded = foldWorkbench(path);
+      linked: (sessionId, objectId) => {
+        const folded = this.tree.workbench(sessionId);
         const ids = new Set(folded.links.filter(link => link.agentId === objectId).map(link => link.resourceId));
         return folded.objects.filter(object => ids.has(object.id));
       },
@@ -155,7 +155,12 @@ export class SessionService {
     };
     const result = this.transaction(() => {
       this.committing = { sessionId, writer };
-      try { return work(writer); }
+      try {
+        const result = work(writer);
+        // 存在性与链接参与执行校验，必须在提交成功和派发观察者之前重建。
+        this.tree.workbench(sessionId);
+        return result;
+      }
       finally { this.committing = null; }
     });
     // 提交后交给插件派发队列；观察者内的提交排队，队列清空后每个会话通知界面一次。
@@ -190,15 +195,13 @@ export class SessionService {
     const recipient = this.object(sessionId, agentId);
     return this.resources.controller(recipient.kind)?.linkTools?.(sessionId, agentId, resource) ?? [];
   }
-  snapshot(sessionId: string, position: ViewPosition = { kind: "live" }): SessionSnapshot {
+  snapshot(sessionId: string): SessionSnapshot {
     const nodes = this.tree.nodes(sessionId);
     const cursor = this.tree.cursor(sessionId);
-    const at = position.kind === "live" ? cursor : position.nodeId;
-    const path = sessionPath(nodes, at);
     const title = this.tree.title(sessionId);
-    return sessionSnapshotSchema.parse({ sessionId, title, cursor, at, seq: this.tree.head(sessionId),
+    return sessionSnapshotSchema.parse({ sessionId, title, cursor, seq: this.tree.head(sessionId),
       revision: this.revisions.get(sessionId) ?? 0, nodes, progress: this.progress(sessionId),
-      workbench: this.workbench.project(sessionId, title, path) });
+      workbench: this.workbench.project(sessionId, title) });
   }
   /** 资源命令入口：事务外准备，执行时 before 在提交事务内重验对象仍在当前路径上。 */
   private async invoke(sessionId: string, objectId: string, raw: ResourceCall, inputScopeId?: string): Promise<void> {
@@ -219,7 +222,7 @@ export class SessionService {
     }
   }
   private object(sessionId: string, objectId: string): FoldedObject {
-    const object = foldWorkbench(this.tree.path(sessionId)).objects.find(o => o.id === objectId);
+    const object = this.tree.workbench(sessionId).objects.find(o => o.id === objectId);
     if (!object) throw new SessionError("not_found", "Object not found on the current session path.");
     return object;
   }
@@ -229,7 +232,7 @@ export class SessionService {
     if (!parsed.success) throw new SessionError("invalid_request", "Invalid session command.");
     const command = parsed.data;
     switch (command.type) {
-      case "read": return { kind: "view", snapshot: this.snapshot(command.sessionId, command.position) };
+      case "read": return { kind: "view", snapshot: this.snapshot(command.sessionId) };
       case "select":
         if (!this.settled(command.sessionId)) throw new SessionError("conflict", "Wait for all captured resources to settle before moving through history.");
         this.commit(command.sessionId, () => this.tree.select(command.sessionId, command.nodeId));

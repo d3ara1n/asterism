@@ -3,7 +3,7 @@ import { contentRefSchema } from "@atelier/sdk/contracts";
 import { coreChannel } from "./core.ts";
 
 export const contentChannel = coreChannel("content");
-export const contentVersion = 2;
+export const contentVersion = 3;
 /** 单块传输上限；分块确认形成背压。 */
 export const contentChunkSize = 1024 * 1024;
 /** 单次 read 上限；更大内容用 open 或范围读取。 */
@@ -13,7 +13,7 @@ const identity = z.string().min(1).max(160);
 export const contentTargetSchema = z.strictObject({ contractId: identity, resourceKind: identity, sessionId: identity.optional(), objectId: identity.optional() });
 const source = z.union([
   z.strictObject({ scopeId: id }),
-  z.strictObject({ sessionId: identity, objectId: identity, nodeId: identity.nullable() }),
+  z.strictObject({ sessionId: identity, objectId: identity }),
 ]);
 export const contentCommandSchema = z.discriminatedUnion("type", [
   z.strictObject({ type: z.literal("input.open"), target: contentTargetSchema }),

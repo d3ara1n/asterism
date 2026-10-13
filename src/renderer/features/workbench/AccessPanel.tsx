@@ -14,7 +14,6 @@ import { errorDisplay } from "../../../shared/error-display.ts";
 import type { UiText } from "@atelier/sdk/contracts";
 import { accessMessages } from "../../messages/access";
 import { commonMessages } from "../../messages/common";
-import { historyMessages } from "../../messages/history";
 import { objectsMessages } from "../../messages/objects";
 import { useI18n } from "../../shared/i18n";
 import { useEffect, useRef, useState } from "react";
@@ -29,7 +28,7 @@ import { useWorkbench } from "./context";
 /** 授权消费真实链接；在途请求的说明不冒充单条链接的生效状态。 */
 export function AccessPanel() {
   const i18n = useI18n();
-  const { controller, session, historical } = useWorkbench();
+  const { controller, session } = useWorkbench();
   const { state } = useSession(controller);
   const registry = useModuleViews();
   const [mode, setMode] = useState<"agent" | "resource">("agent");
@@ -44,11 +43,10 @@ export function AccessPanel() {
   const search = query.trim().toLocaleLowerCase(i18n.locale);
   const targets = (byAgent ? session.objects : agents).filter(object => object.id !== selected?.id
     && `${object.title} ${i18n.text(registry.resource(object.kind).label)}`.toLocaleLowerCase(i18n.locale).includes(search));
-  return <IslandPanel title={i18n.formatMessage(accessMessages.accessLabel)} description={historical ? i18n.formatMessage(commonMessages.viewingHistory) : undefined} toolbar={<>
+  return <IslandPanel title={i18n.formatMessage(accessMessages.accessLabel)} toolbar={<>
     <div className="flex gap-1">{([["agent", i18n.formatMessage(accessMessages.byAgent)], ["resource", i18n.formatMessage(accessMessages.byResource)]] as const).map(([key, label]) => <Button key={key} size="xs" variant={mode === key ? "secondary" : "ghost"} aria-pressed={mode === key} onClick={() => { setMode(key); setQuery(""); }}>{label}</Button>)}</div>
     <ResourcePicker objects={choices} selected={selected} onSelect={byAgent ? setSelectedAgent : setSelectedResource} label={byAgent ? i18n.formatMessage(accessMessages.accessRecipient) : i18n.formatMessage(accessMessages.accessTarget)} />
     <SearchInput value={query} onChange={setQuery} label={byAgent ? i18n.formatMessage(objectsMessages.searchResources) : i18n.formatMessage(objectsMessages.searchObjects)} />
-    {historical && <div className="flex items-center justify-between gap-2"><p className="type-caption">{i18n.formatMessage(historyMessages.historyReadOnly)}</p><Button size="xs" variant="secondary" onClick={controller.followCursor}>{i18n.formatMessage(commonMessages.backToLive)}</Button></div>}
   </>}>
     {state.status === "error" && <div className="mb-4 space-y-2"><p role="alert" className="type-caption">{i18n.text(state.error ?? "")}</p><Button variant="secondary" size="sm" onClick={() => { void controller.refresh(); }}>{i18n.formatMessage(commonMessages.retry)}</Button></div>}
     {selected && <h3 className="type-section mb-2 break-words">{byAgent ? i18n.formatMessage(accessMessages.canAccess, { title: selected.title }) : i18n.formatMessage(accessMessages.accessibleBy, { title: selected.title })}</h3>}
@@ -76,7 +74,7 @@ function ResourcePicker({ objects, selected, onSelect, label }: { objects: Workb
 }
 function AccessRow({ agent, resource, object }: { agent: WorkbenchObject; resource: WorkbenchObject; object: WorkbenchObject }) {
   const i18n = useI18n();
-  const { controller, session, ready, busy, historical } = useWorkbench();
+  const { controller, session, ready, busy } = useWorkbench();
   const { state } = useSession(controller);
   const descriptor = useModuleViews().resource(object.kind);
   const linked = session.links.some(link => link.agentId === agent.id && link.resourceId === resource.id);
@@ -85,12 +83,9 @@ function AccessRow({ agent, resource, object }: { agent: WorkbenchObject; resour
   const [saved, setSaved] = useState<import("@atelier/sdk/contracts").UiText | null>(null);
   const submitting = useRef(false);
   const generation = useRef(0);
-  useEffect(() => {
-    generation.current++; setPending(null); submitting.current = false; setError(null); setSaved(null);
-    return () => { generation.current++; };
-  }, [historical]);
+  useEffect(() => () => { generation.current++; }, []);
   const change = async (desired: boolean) => {
-    if (submitting.current || historical) return;
+    if (submitting.current) return;
     const token = ++generation.current;
     submitting.current = true; setPending({ desired }); setError(null); setSaved(null);
     // 等待受理后的读取，而非等到期望值出现：继续或分叉可能已经覆盖这次变更。
@@ -121,7 +116,7 @@ function AccessRow({ agent, resource, object }: { agent: WorkbenchObject; resour
         {pending ? i18n.formatMessage(commonMessages.statusBusy) : `${linked ? i18n.formatMessage(accessMessages.linked) : i18n.formatMessage(accessMessages.notLinked)}${saved ? ` · ${i18n.text(saved)}` : ""}`}
       </p>
       {error && <p role="alert" className="type-caption mt-1 text-destructive">{i18n.text(error)}</p>}
-    </div><Switch id={id} checked={pending?.desired ?? linked} disabled={!ready || busy || historical || !!pending || state.status !== "ready"}
+    </div><Switch id={id} checked={pending?.desired ?? linked} disabled={!ready || busy || !!pending || state.status !== "ready"}
       aria-label={i18n.formatMessage(accessMessages.changeAccess, { agent: agent.title, resource: resource.title })} aria-busy={!!pending} onCheckedChange={desired => { void change(desired); }} />
   </div>;
 }

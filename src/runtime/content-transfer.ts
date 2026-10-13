@@ -1,8 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { PluginApiError } from "@atelier/sdk/runtime";
 import { contentCommandSchema, type ContentCommand, type ContentReply } from "../shared/content.ts";
-import { sessionPath } from "../shared/session-path.ts";
-import { foldWorkbench } from "../session/fold.ts";
 import type { SessionService } from "./sessions.ts";
 import type { ContentLease, ContentAccess } from "./content-store.ts";
 
@@ -20,9 +18,9 @@ export class ContentTransferService {
   }
   private access(source: Extract<ContentCommand, { type: "read.open" }>["source"]): ContentAccess {
     if ("scopeId" in source) return { scope: this.scope(source.scopeId) };
-    const path = sessionPath(this.sessions.tree.nodes(source.sessionId), source.nodeId);
-    if (!foldWorkbench(path).objects.some(object => object.id === source.objectId))
-      throw new PluginApiError("foreign_resource", "The content object is not visible at this history position.");
+    const path = this.sessions.tree.path(source.sessionId);
+    if (!this.sessions.tree.workbench(source.sessionId).objects.some(object => object.id === source.objectId))
+      throw new PluginApiError("foreign_resource", "The content object is not on the current session path.");
     return { sessionId: source.sessionId, objectId: source.objectId, recordIds: new Set(path.map(node => node.id)) };
   }
   async execute(raw: ContentCommand): Promise<ContentReply> {

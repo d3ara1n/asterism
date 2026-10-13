@@ -18,7 +18,7 @@ export interface WorkbenchCanvas {
   focusObjects: (objectIds: readonly string[], options?: { select?: boolean }) => Promise<void>;
 }
 
-type FocusRequest = { objectIds: string[]; select: boolean; token: number; navigationVersion: number };
+type FocusRequest = { objectIds: string[]; select: boolean; token: number; selectionVersion: number };
 
 /** 下游只消费 WorkbenchCanvas；React Flow 的视口操作与等待集中在此。 */
 export function useWorkbenchCanvas(nodes: ObjectNodeType[], setNodes: Dispatch<SetStateAction<ObjectNodeType[]>>, element: RefObject<HTMLDivElement | null>) {
@@ -27,13 +27,13 @@ export function useWorkbenchCanvas(nodes: ObjectNodeType[], setNodes: Dispatch<S
   const flow = useReactFlow<ObjectNodeType>();
   const width = useStore(state => state.width);
   const height = useStore(state => state.height);
-  const navigationVersion = controller.getSnapshot().navigationVersion;
+  const selectionVersion = controller.getSnapshot().selectionVersion;
   const available = useRef(ready);
   available.current = ready;
   const [focusing, setFocusing] = useState<FocusRequest | null>(null);
   const sequence = useRef(0);
   const mounted = useRef(true);
-  useLayoutEffect(() => { sequence.current++; setFocusing(null); }, [navigationVersion]);
+  useLayoutEffect(() => { sequence.current++; setFocusing(null); }, [selectionVersion]);
   useLayoutEffect(() => {
     if (!ready || busy) { sequence.current++; setFocusing(null); }
   }, [ready, busy]);
@@ -70,7 +70,7 @@ export function useWorkbenchCanvas(nodes: ObjectNodeType[], setNodes: Dispatch<S
     const valid = () => {
       const current = controller.getSnapshot();
       return mounted.current && sequence.current === token && current.status === "ready"
-        && current.navigationVersion === state.navigationVersion;
+        && current.selectionVersion === state.selectionVersion;
     };
     const hidden = new Set(workbench.views.filter(view => view.hidden).map(view => view.objectId));
     for (const objectId of objectIds) {
@@ -78,7 +78,7 @@ export function useWorkbenchCanvas(nodes: ObjectNodeType[], setNodes: Dispatch<S
       if (!valid() || !(await controller.executeAndRead({ type: "view.set", sessionId: controller.sessionId, objectId, hidden: false })).ok) return;
     }
     // 受理与节点投影分离；画布等待全部目标测量，而非猜测某一帧已经渲染完。
-    if (valid()) setFocusing({ objectIds, select: options?.select ?? false, token, navigationVersion: state.navigationVersion });
+    if (valid()) setFocusing({ objectIds, select: options?.select ?? false, token, selectionVersion: state.selectionVersion });
   }, [controller]);
 
   const targetsReady = !!focusing && focusing.objectIds.every(id => {
@@ -96,7 +96,7 @@ export function useWorkbenchCanvas(nodes: ObjectNodeType[], setNodes: Dispatch<S
       animating = true;
       void flow.setViewport(viewport, { duration: matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 420 }).then(() => {
         animating = false;
-        if (!active || sequence.current !== focusing.token || controller.getSnapshot().navigationVersion !== focusing.navigationVersion) return;
+        if (!active || sequence.current !== focusing.token || controller.getSnapshot().selectionVersion !== focusing.selectionVersion) return;
         setFocusing(current => current?.token === focusing.token ? null : current);
         void run({ type: "viewport.set", sessionId: controller.sessionId, viewport: flow.getViewport() });
       });

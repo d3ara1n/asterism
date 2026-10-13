@@ -17,14 +17,6 @@ export const commonMessages = pluginNamespace("atelier.core").messages("en", def
     id: "retry",
     defaultMessage: "Try again",
   },
-  viewingHistory: {
-    id: "viewingHistory",
-    defaultMessage: "Viewing history",
-  },
-  backToLive: {
-    id: "backToLive",
-    defaultMessage: "Back to live",
-  },
   statusUnavailable: {
     id: "statusUnavailable",
     defaultMessage: "Connection unavailable",

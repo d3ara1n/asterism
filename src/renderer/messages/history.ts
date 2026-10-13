@@ -9,10 +9,6 @@ export const historyMessages = pluginNamespace("atelier.host").messages("en", de
     id: "historyLoadingBody",
     defaultMessage: "Reading saved history.",
   },
-  historyReadOnly: {
-    id: "historyReadOnly",
-    defaultMessage: "Return to live before changing session resources.",
-  },
   searchHistory: {
     id: "searchHistory",
     defaultMessage: "Find text, tools or resources",
@@ -71,7 +67,7 @@ export const historyMessages = pluginNamespace("atelier.host").messages("en", de
   },
   historyBranchJump: {
     id: "historyBranchJump",
-    defaultMessage: "View {branch} at this fork point",
+    defaultMessage: "Find {branch} at this fork point",
   },
   historyBranchChildren: {
     id: "historyBranchChildren",
@@ -79,11 +75,11 @@ export const historyMessages = pluginNamespace("atelier.host").messages("en", de
   },
   historyBefore: {
     id: "historyBefore",
-    defaultMessage: "View before this entry",
+    defaultMessage: "Select before this entry",
   },
   historyAfter: {
     id: "historyAfter",
-    defaultMessage: "View through this entry",
+    defaultMessage: "Select this entry",
   },
   historyStart: {
     id: "historyStart",
@@ -91,7 +87,7 @@ export const historyMessages = pluginNamespace("atelier.host").messages("en", de
   },
   historyFiltered: {
     id: "historyFiltered",
-    defaultMessage: "The viewed entry is hidden by filters.",
+    defaultMessage: "The selected entry is hidden by filters.",
   },
   historyEntryActions: {
     id: "historyEntryActions",
