@@ -35,7 +35,7 @@ export type ModelSource = { model: string; adapter: string; scope: string };
 export type ModelCompletion = {
   usage: Usage | null; finishReason: string; rawFinishReason: string | null; providerResponseId: string | null;
 };
-/** 成型响应块；不是会话节点，时间轴身份和保存由消费者提供。 */
+/** 成型响应块；不是会话节点，时间线身份和保存由消费者提供。 */
 export type ModelBlock = {
   responseId: string; requestParentId: string | null; ordinal: number; complete: boolean; continuation: Json; source: ModelSource;
   /** 终态随响应最高序号的实际块一次交付；其他块为 null。 */

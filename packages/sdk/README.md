@@ -1,6 +1,6 @@
 # 插件 SDK
 
-`@atelier/sdk` 定义宿主与插件共用的契约。宿主实现服务，插件贡献模块、资源、工具和具名生命周期成员。SDK 基础围绕工作台、会话与时间轴；读取其他领域的事件时，插件仍须引入该领域的纯契约。
+`@atelier/sdk` 定义宿主与插件共用的契约。宿主实现服务，插件贡献模块、资源、工具和具名生命周期成员。SDK 基础围绕工作台、会话与时间线；读取其他领域的事件时，插件仍须引入该领域的纯契约。
 
 契约和组合规则见 [插件 SDK 与功能组合](../../docs/plugin-sdk.md)。本文是作者入口；代码迁移和验收状态以 [插件计划](../../plans/todo-2026-10-12-plugin-system.md) 的当前任务为准，未完成项不表示已交付。
 
@@ -30,7 +30,7 @@ export default definePlugin({ namespace: ns, version: "1.0.0", modules: [
   defineModule(plugin => ({
     records: [Entry],
     observers: [{ id: "journal", committed(event) {
-      const entry = event.snapshot.records.first(Entry, { scope: "path" });
+      const entry = event.snapshot.records.first(Entry, { scope: "timeline" });
       if (entry?.status === "known") plugin.log.info(entry.data.text);
     } }],
   })),
@@ -39,13 +39,13 @@ export default definePlugin({ namespace: ns, version: "1.0.0", modules: [
 
 ## 会话、资源与提交
 
-`plugin.session(id)` 提供固定快照、当前会话数据读写、同步提交、续接位置与标题覆盖。`plugin.object(ref)` 绑定本插件对象，提供当前对象数据读写、关联对象的事件提交和二进制流。引用只是地址，宿主每次检查真实归属、会话与有效性；普通写入还要求对象在当前路径上。资源创建中的对象门面由宿主提供，数据和事件写入加入创建事务。`object.snapshot()` 读取该调用绑定的资源身份、标题与数据；已授权工具使用捕获快照，执行期间保留对该对象的提交能力，结束后对象提交、嵌套会话修改和流发布都失效。
+`plugin.session(id)` 提供固定快照、当前会话数据读写、同步提交与标题覆盖。记录追加沿提交时的当前时间线末端进行，此前取得的只读快照不决定追加位置。`plugin.object(ref)` 绑定本插件对象，提供当前对象数据读写、关联对象的事件提交和二进制流。引用只是地址，宿主每次检查真实归属、会话与有效性；普通写入还要求对象在当前时间线上。资源创建中的对象门面由宿主提供，数据和事件写入加入创建事务。`object.snapshot()` 读取该调用绑定的资源身份、标题与数据；已授权工具使用捕获快照，执行期间保留对该对象的提交能力，结束后对象提交、嵌套会话修改和流发布都失效。
 
 两种 `commit` 都可同时 `writer.set(DataContract, value)` 和 `writer.append(RecordContract, data)`：前者覆盖当前会话或对象数据，后者追加本插件声明过的记录。模块及资源的 `records` 声明决定可写记录，宿主使用声明的 schema 校验，填节点身份、父指针与对象关联。提交回调须同步完成；Promise 导致回滚，回调结束后的 writer 失效。嵌套同会话提交加入外层事务，失败的内层写入回滚，通知仅在最外层提交成功后派发。
 
-快照是固定位置的观察柄，构造时捕获路径末端、会话追加上界和标题，不物化历史；`records.*` 与 `resources.*` 按需读取，首次查询晚于后续提交也不改变原快照。`position.nodeId` 给出捕获位置；执行体投影上下文时自行截取合理位置。`session.get` 和 `object.get` 读取当前数据；数据按会话、对象作用域和具型契约隔离，随会话保存，不能据此恢复历史。数据契约使用 `ns.data(name, schema)`，记录使用 `defineRecord(id, { schema })`，均不要求手填版本。读取按所属类型的 schema 解码；兼容数据继续读取，不兼容数据明确不可用或保留 unknown。插件用自己的 schema 兼容旧形状并负责迁移，读取不修改原始记录。纯数据提交通知视图，不追加时间轴或触发事件观察者。
+快照是固定位置的观察柄，构造时捕获路径末端、会话追加上界和标题，不物化历史；`records.*` 与 `resources.*` 按需读取，首次查询晚于后续提交也不改变原快照。`position.nodeId` 给出捕获位置；执行体投影上下文时自行截取合理位置。`session.get` 和 `object.get` 读取当前数据；数据按会话、对象作用域和具型契约隔离，随会话保存，不能据此恢复历史。数据契约使用 `ns.data(name, schema)`，记录使用 `defineRecord(id, { schema })`，均不要求手填版本。读取按所属类型的 schema 解码；兼容数据继续读取，不兼容数据明确不可用或保留 unknown。插件用自己的 schema 兼容旧形状并负责迁移，读取不修改原始记录。纯数据提交通知视图，不追加时间线或触发事件观察者。
 
-`snapshot.records.first(Contract, {scope}) / last(Contract, {scope})` 在固定范围内按契约定位，只解码目标记录；返回 null／known／unknown，损坏的首尾记录不跳过。`query` 解码所有匹配记录，`all` 才物化指定范围的全部原始信封。`scope` 为 `path` 或 `session`，记录 `sequence` 始终是会话内从 1 开始的追加顺序，不因路径筛选重新编号。`session.title.set(text)` 直接覆盖标题，在 `commit` 内调用时随该次提交生效；宿主不解释或自动追加命名来源事件。
+`snapshot.records.first(Contract, {scope}) / last(Contract, {scope})` 在固定范围内按契约定位，只解码目标记录；返回 null／known／unknown，损坏的首尾记录不跳过。`query` 解码所有匹配记录，`all` 才物化指定范围的全部原始信封。`scope: "timeline"` 读取从根到快照末端的完整祖先路径，末端不必是树的叶子；`scope: "session"` 按保存顺序读取快照上界内全会话的记录，包含其他分支。`first / last` 取各自范围内的首尾匹配记录，记录 `sequence` 始终是会话内从 1 开始的保存顺序，不因时间线筛选重新编号。`session.title.set(text)` 直接覆盖标题，在 `commit` 内调用时随该次提交生效；宿主不解释或自动追加命名来源事件。
 
 `SessionObserver` 的 `committed` 与 `cursorChanged` 是独立可选入口。前者接收新增记录与固定快照，只在记录提交时调用；后者接收固定快照与会话门面，只在执行游标变化时调用，正常追加、回溯与分叉选择使用同一形状。一次外层事务只通知最终位置，回滚、选择相同位置、纯数据／标题写入、布局与只读查询不触发游标观察。两个入口同步执行，观察者内的后续提交排队派发；快照不随派生值同步改变，也不应依赖观察者先后顺序。
 
@@ -71,7 +71,7 @@ schema 支持默认值、去空白与转换。调用方提交 schema 的输入�
   "exports": { "./public": "./src/public.ts" },
   "atelier": {
     "id": "example.tools",
-    "api": { "major": 6, "minMinor": 0 },
+    "api": { "major": 7, "minMinor": 0 },
     "runtime": "./src/runtime.ts"
   }
 }
@@ -120,7 +120,7 @@ toolRenderer(WriteContract, {
 
 [可编译的作者示例与类型反例](examples/tool-renderer.ts) 验证跨阶段复用、部分参数与结局收窄。内置 [目录视图](../../src/modules/filesystem/renderer.tsx) 和 [正文视图](../../src/modules/text-view.tsx) 共用三态声明，header 保留路径及字数，body 按 phase 展示尾部或结果。宿主管理开合与原始详情，工具外壳不限高，body 提供方自行控制局部高度、滚动、分页、截取与渲染量；视图尽可能保持目标、数量和样式连续，逐步补充内容。内置插件的 120 行正文预算不作为 SDK 对外部插件的强制要求。
 
-二进制流的宿主信封由 main 与 preload 共用 Zod schema 校验，preload 按会话与对象筛选订阅。载荷保留 `Uint8Array`，支持空帧与具有偏移的视图，不转换为 JSON，也不写入时间轴；无效信封不交付插件。
+二进制流的宿主信封由 main 与 preload 共用 Zod schema 校验，preload 按会话与对象筛选订阅。载荷保留 `Uint8Array`，支持空帧与具有偏移的视图，不转换为 JSON，也不写入时间线；无效信封不交付插件。
 
 宿主协调读取、命令门禁和错误状态。模型进度、配置目录与工具展示分别通过 `useRendererModels / useRendererCatalogs / useRendererTools` 取得，共用已有宿主状态源；`useRendererNavigation` 提供导航，聚合视图将具体操作传给内容模块。草稿和提交身份归交互模块，按会话与对象绑定并跨卡片重挂载保留；重试相同输入保留身份，受理后清除。导航显式注入。资源后台的 `links.receive` 与前端静态描述的 `receivesLinks` 声明接收链接，授权仍由执行层检查真实链接。
 
@@ -153,7 +153,7 @@ ResourceDescription、ToolView、CreationEntry 的 label／description 接收 Ui
 
 ## 版本与当前边界
 
-SDK 包版本为 `0.9.0`，宿主提供 API 6.0；插件声明 `api: { major: 6, minMinor: 0 }`，其他主版本在加载前拒绝。应用 IPC 版本为 5，会话 IPC 为 18，内容 IPC 为 3，应用配置 IPC 为 3，插件配置 IPC 为 2；工作数据库格式为 18，应用配置文件格式为 2。
+SDK 包版本为 `0.10.0`，宿主提供 API 7.0；插件声明 `api: { major: 7, minMinor: 0 }`，其他主版本在加载前拒绝。应用 IPC 版本为 5，会话 IPC 为 18，内容 IPC 为 3，应用配置 IPC 为 3，插件配置 IPC 为 2；工作数据库格式为 18，应用配置文件格式为 2。
 
 资源创建数据必须是 JSON 对象，不能占用宿主的 `id / type / title` 字段。当前会话数据保存于 `session_data`，事件及工具结果保存稳定契约身份与原始数据。core 消费具型用户消息、模型执行、通知与环境记录，存储编码由宿主负责；环境记录保留原事件身份与载荷。
 
@@ -171,6 +171,6 @@ validate 检查目标、续接、文件类型、归属与大小，不读取全�
 
 具名 `ModelRunObserver.event` 同步收到 `block / diagnostic / progress`。正文等响应终态齐全后交付，工具块等取得工具结局后交付；终态直接保存在最高 ordinal 块的 `completion` 字段中，不另发 completion 事件。异常收束时也保留已收到的块，不完整内容由 `complete=false` 标记，未报告的终态不补造；无块响应的来源与计量保存在 `empty_response` 诊断内。临时进度不写历史。`modelRunRecordSchema` 提供可保存事件的共识载荷，插件用它声明自己的 RecordContract，并经 `ObjectExecutor.commit` 保存；所有 append 都由宿主沿当前游标原子追加并推进游标，无 audit 选项。run 不隐式保存输出，也不读取、保存或续接内部对话。消费者失败时取消执行并收束工具，返回 `event_delivery`，不再调用该消费者。
 
-返回结果包含终止原因、来源、终态和按模型调用顺序排列的工具结局。取消、失败与未知写入影响要求 Agent 停止自动继续。run 完成工具批次即返回，上层插件的 Agent 决定是否再次调用、维护轮数和预算，每次消息都从时间轴重新投影。Agent 可以持有非 context 状态；context 的唯一真值在时间轴，不能在 Agent 或 run 内保存另一份历史。
+返回结果包含终止原因、来源、终态和按模型调用顺序排列的工具结局。取消、失败与未知写入影响要求 Agent 停止自动继续。run 完成工具批次即返回，上层插件的 Agent 决定是否再次调用、维护轮数和预算，每次消息都从时间线重新投影。Agent 可以持有非 context 状态；context 的唯一真值在时间线，不能在 Agent 或 run 内保存另一份历史。
 
 `cache.expectHit` 是本次请求的诊断预期，结合 provider 报告的用量判断缓存未命中；不证明支持显式缓存，也不提供隐式缓存会话。更多缓存控制留在未来任务中，所需状态仍须显式输入、输出。

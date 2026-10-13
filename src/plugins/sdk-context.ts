@@ -51,7 +51,7 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
     const view = established ? host.sessions.view(sessionId!) : undefined;
     // 动作作用域结束后对象仍按自身记录根与请求交接读取；工具执行作用域关闭后严格拒绝。
     return { owner: internal.id, sessionId, objectId,
-      get recordIds() { return new Set(view?.pathIds()); },
+      get recordIds() { return new Set(view?.timelineIds()); },
       get scope() { return scope?.active ? scope.content : undefined; }, check: () => {
       checkAvailable();
       if (scope?.execution && !scope.active) throw new PluginApiError("unavailable", "The content execution is closed.");
@@ -207,7 +207,7 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
         const ref = Object.freeze({ ...request.object });
         own(ref.kind); checkRef(ref);
         if (running.has(ref.id)) throw new PluginApiError("unavailable", "A model request is already running on this resource.");
-        const path = host.sessions.path(ref.sessionId);
+        const path = host.sessions.timeline(ref.sessionId);
         if (!host.sessions.workbench(ref.sessionId).objects.some(object => object.id === ref.id))
           throw new PluginApiError("unavailable", "The resource is not on the current session path.");
         if ((path.at(-1)?.id ?? null) !== request.requestParentId)

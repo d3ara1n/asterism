@@ -39,7 +39,7 @@ export function openDatabase(root: string): DatabaseSync {
         id TEXT PRIMARY KEY, command_json TEXT NOT NULL,
         session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE
       ) STRICT;
-      -- 当前会话数据；空 object_id 表示会话作用域，具型契约与时间轴独立。
+      -- 当前会话数据；空 object_id 表示会话作用域，具型契约与时间线独立。
       CREATE TABLE session_data (
         session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
         object_id TEXT NOT NULL, contract_id TEXT NOT NULL,

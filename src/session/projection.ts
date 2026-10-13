@@ -1,6 +1,6 @@
 import type { ModelItem, ModelPart as ProjectedPart } from "@atelier/sdk/contracts";
 import type { SessionNode } from "../shared/session.ts";
-import { SessionError } from "../shared/session-path.ts";
+import { SessionError } from "../shared/session-timeline.ts";
 import { projectForAgent as projectRecords } from "../modules/agent/projection.ts";
 import { sessionView } from "../plugins/records.ts";
 import { nodeView } from "./view.ts";

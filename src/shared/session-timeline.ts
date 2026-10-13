@@ -7,8 +7,8 @@ export class SessionError extends Error {
   }
 }
 
-/** 根到 at 的祖先路径；运行时与渲染进程共享校验和遍历规则。 */
-export function sessionPath(nodes: readonly SessionNode[], at: string | null): SessionNode[] {
+/** 从逻辑根到任意末端的只读时间线；末端不必是会话树的叶子，null 表示空时间线。 */
+export function sessionTimeline(nodes: readonly SessionNode[], at: string | null): SessionNode[] {
   const byId = new Map(nodes.map(node => [node.id, node]));
   const path: SessionNode[] = [];
   for (let cursor = at; cursor !== null;) {

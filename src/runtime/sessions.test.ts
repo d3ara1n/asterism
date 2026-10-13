@@ -76,24 +76,24 @@ describe("会话运行时", () => {
     await settled(service);
     expect(requests).toBe(2);
     const snapshot = service.sessions.snapshot(first.sessionId);
-    expect(service.sessions.tree.path(first.sessionId)).toEqual(snapshot.nodes);
+    expect(service.sessions.tree.timeline(first.sessionId)).toEqual(snapshot.nodes);
     expect(service.sessions.tree.cursorSelections(first.sessionId)).toEqual([]);
     const blocks = snapshot.nodes.map(flat).filter(node => node.kind === "toolcall" || node.kind === "text");
     expect(blocks.map(block => block.kind)).toEqual(["toolcall", "text"]);
     expect(blocks[1]!.parentId).toBe(blocks[0]!.id);
     expect(blocks.reduce((sum, block) => sum + block.completion.usage.total, 0)).toBe(14);
     await service.sessions.execute({ type: "select", sessionId: first.sessionId, nodeId: blocks[0]!.id });
-    expect(service.sessions.tree.path(first.sessionId).map(flat).at(-1)).toMatchObject({
+    expect(service.sessions.tree.timeline(first.sessionId).map(flat).at(-1)).toMatchObject({
       kind: "toolcall", complete: true, outcome: { kind: "succeeded", data: { resources: [] } },
       completion: { usage, finishReason: "tool-calls" },
     });
   });
 
-  it("文件输入先提交到时间轴，图文顺序保留且已受理重试不依赖草稿", async () => {
+  it("文件输入先提交到时间线，图文顺序保留且已受理重试不依赖草稿", async () => {
     const inputs: ModelInput[] = [];
     let currentService!: ApplicationService;
     const model: ModelAdapter = { version: "ai-sdk-v7/3", validate() {}, prepare(input) {
-      expect(currentService.sessions.tree.list().some(session => currentService.sessions.tree.path(session.id).map(flat).some(node => node.kind === "message"))).toBe(true);
+      expect(currentService.sessions.tree.list().some(session => currentService.sessions.tree.timeline(session.id).map(flat).some(node => node.kind === "message"))).toBe(true);
       inputs.push(input); return { async *stream() { yield* reply(); } };
     } };
     const { service, start } = await setup(model); currentService = service;
@@ -313,7 +313,7 @@ describe("会话运行时", () => {
     const outcome = reopened.sessions.tree.nodes(first.sessionId).map(flat).find(node => node.kind === "toolcall")!;
     const file = (outcome as unknown as { outcome: { model: { kind: string; file?: { "$atelier.content": string } }[] } }).outcome.model.find(part => part.kind === "file")!.file!;
     expect(await reopened.sessions.content.reader({ sessionId: first.sessionId, objectId: agentId,
-      recordIds: new Set(reopened.sessions.tree.path(first.sessionId).map(flat).map(node => node.id)) }).read(file)).toEqual(new Uint8Array(png));
+      recordIds: new Set(reopened.sessions.tree.timeline(first.sessionId).map(flat).map(node => node.id)) }).read(file)).toEqual(new Uint8Array(png));
   });
 
   it.each(["succeeded", "cancelled"] as const)("工具 %s 结局和当次资源身份落库，移除资源与重开不改变历史", async kind => {
@@ -401,7 +401,7 @@ describe("会话运行时", () => {
     const sent = inputs.map(texts);
     expect(sent.filter(m => m.includes("To A")).at(-1)).toEqual(["First", "To A"]);
     expect(sent.filter(m => m.includes("To B")).at(-1)).toEqual(["To B"]);
-    const path = service.sessions.tree.path(sessionId).map(flat);
+    const path = service.sessions.tree.timeline(sessionId).map(flat);
     expect(path.filter(n => n.kind === "message").map(n => n.source.resource?.id)).toEqual([a, a, b]);
   });
 
@@ -437,7 +437,7 @@ describe("会话运行时", () => {
     } finally { release(); }
     await settled(service);
     const nodes = service.sessions.tree.nodes(sessionId);
-    expect(service.sessions.tree.path(sessionId)).toEqual(nodes);
+    expect(service.sessions.tree.timeline(sessionId)).toEqual(nodes);
     expect(nodes.map(flat).some(node => node.kind === "thinking")).toBe(true);
   });
 
@@ -626,7 +626,7 @@ describe("插件包管理命令", () => {
   it("应用命令登记和移除插件包，正确表达重启标记", async () => {
     const { service, root } = await setup();
     const dir = join(root, "pkg"); mkdirSync(dir);
-    writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "p", atelier: { id: "acme.p", api: { major: 6, minMinor: 0 } } }));
+    writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "p", atelier: { id: "acme.p", api: { major: 7, minMinor: 0 } } }));
     const added = service.execute({ type: "plugin.add", path: dir });
     expect(added.plugins.map(p => [p.source, p.status, p.enabled])).toEqual([[dir, "pending", true]]);
     expect(added.restartRequired).toBe(true);

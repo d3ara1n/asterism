@@ -27,7 +27,7 @@
 | `features/session/registry.ts` | 会话共享控制器 |
 | `features/creation/` | 创建协调器：菜单、拖放与无路径图片粘贴的仲裁、路由记忆、异步输入、内容草稿、放置、提交与取消；`content.ts` 隐藏内容分块与读取协议，供创建及对象动作复用 |
 | `features/workbench/AccessPanel.tsx` | 授权浮岛，按代理／资源查看有向链接，受理后的读取结束即显示实际状态 |
-| `../modules/agent/conversation/Conversation.tsx` | 聚合时间轴、跟随、输入、配置与交互；块从生成到保存保持同一组件 |
+| `../modules/agent/conversation/Conversation.tsx` | 聚合时间线、跟随、输入、配置与交互；块从生成到保存保持同一组件 |
 | `../modules/agent/conversation/ConversationTimeline.tsx` / `output-follow.ts` | 条目展示与滚动跟随，各自消费数据或明确意图 |
 | `../modules/agent/conversation/Composer.tsx` / `ConfigurationPicker.tsx` | 消息输入与 Agent 配置选择 |
 | `../modules/agent/conversation/draft.ts` / `Files.tsx` | 首页与对话共用的文件草稿、上传取消、图片缩略与附件控件 |

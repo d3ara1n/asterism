@@ -53,25 +53,25 @@ export function createNamingModule(connect: (api: NamingApi) => () => void) {
       observers: [{
         id: "session-naming",
         committed({ records, snapshot, session }) {
-          const latest = snapshot.records.last(UserMessage, { scope: "path" });
+          const latest = snapshot.records.last(UserMessage, { scope: "timeline" });
           if (latest?.status !== "known" || !records.some(record => record.id === latest.record.id)) return;
-          const named = snapshot.records.last(SessionNamed, { scope: "path" });
+          const named = snapshot.records.last(SessionNamed, { scope: "timeline" });
           if (named?.status === "unknown" || named?.data.source === "user") return;
           const first = snapshot.records.first(UserMessage, { scope: "session" });
           const initial = first?.status === "known" && records.some(record => record.id === first.record.id);
           const message = initial ? first : latest;
           const level = initial ? "initial" : "refined";
-          if (level === "refined" && !renameCheckpoints.has(snapshot.records.query(UserMessage, { scope: "path" }).length)) return;
+          if (level === "refined" && !renameCheckpoints.has(snapshot.records.query(UserMessage, { scope: "timeline" }).length)) return;
           if (named?.status === "known" && named.data.auto?.messageId === message.record.id) return;
           const model = plugin.models.roles().find(role => role.id === "utility")?.model ?? null;
           if (model === null) return;
           const nameId = named?.record.id ?? null;
           const prompt = namingPrompt(level === "initial" ? [{ user: inputSummary(message.data.parts) }]
-            : collectTurns(snapshot.records.all({ scope: "path" })));
+            : collectTurns(snapshot.records.all({ scope: "timeline" })));
           // 命名依据只来自当前路径，标题同步与观察者顺序不参与过时判断。
           const isCurrent = (view: SessionSnapshot) =>
-            (view.records.last(SessionNamed, { scope: "path" })?.record.id ?? null) === nameId &&
-            view.records.last(UserMessage, { scope: "path" })?.record.id === latest.record.id;
+            (view.records.last(SessionNamed, { scope: "timeline" })?.record.id ?? null) === nameId &&
+            view.records.last(UserMessage, { scope: "timeline" })?.record.id === latest.record.id;
           plugin.tasks.start(`naming:${session.id}:${message.record.id}`, async signal => {
             if (!isCurrent(session.snapshot())) return;
             const title = await generateTitle(plugin.models, prompt, signal);
@@ -83,10 +83,10 @@ export function createNamingModule(connect: (api: NamingApi) => () => void) {
           }, { timeoutMs });
         },
         cursorChanged({ snapshot, session }) {
-          // 标题 = 当前分支最后一次命名，否则为当前分支首条输入的截断；两者都没有时保持不变。
-          const named = snapshot.records.last(SessionNamed, { scope: "path" });
+          // 标题 = 当前时间线最后一次命名，否则为当前时间线首条输入的截断；两者都没有时保持不变。
+          const named = snapshot.records.last(SessionNamed, { scope: "timeline" });
           if (named?.status === "unknown") return;
-          const first = named ? null : snapshot.records.first(UserMessage, { scope: "path" });
+          const first = named ? null : snapshot.records.first(UserMessage, { scope: "timeline" });
           const title = named?.data.title ?? (first?.status === "known" ? inputSummary(first.data.parts).slice(0, 72) : null);
           if (title !== null) session.title.set(title);
         },

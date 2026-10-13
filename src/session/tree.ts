@@ -1,11 +1,11 @@
 import { randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import { sessionNodeSchema, type NewNode, type SessionNode } from "../shared/session.ts";
-import { SessionError } from "../shared/session-path.ts";
+import { SessionError } from "../shared/session-timeline.ts";
 import type { NodeQuery, NodeView, SequencedNode } from "./view.ts";
 import { foldWorkbench, type FoldedState } from "./fold.ts";
 import { deepFreeze } from "../shared/immutable.ts";
-export { SessionError } from "../shared/session-path.ts";
+export { SessionError } from "../shared/session-timeline.ts";
 
 export type CursorSelection = {
   seq: number;
@@ -18,7 +18,7 @@ export type CursorSelection = {
 
 type NodeIndex = { id: string; seq: number; contract: string };
 
-/** 会话级扁平事件树：节点只追加，sessions.cursor 保存当前路径的末端。 */
+/** 会话树存储与当前时间线执行；节点不可改写，sessions.cursor 确定当前时间线末端。 */
 export class SessionTree {
   constructor(private readonly db: DatabaseSync) {}
   private readonly workbenches = new Map<string, { cursor: string | null; state: FoldedState }>();
@@ -29,7 +29,7 @@ export class SessionTree {
     const previous = this.workbenches.get(sessionId);
     if (previous?.cursor === cursor) return previous.state;
     const state = deepFreeze(foldWorkbench(this.view(sessionId).read({
-      scope: "path", contracts: ["resource_created", "object_removed", "resource_attached", "resource_detached"],
+      scope: "timeline", contracts: ["resource_created", "object_removed", "resource_attached", "resource_detached"],
     }).map(({ node }) => node)));
     this.workbenches.set(sessionId, { cursor, state });
     return state;
@@ -61,7 +61,7 @@ export class SessionTree {
     if (!row) throw new SessionError("not_found", "Session not found.");
     const upperSeq = this.head(sessionId);
     return { id: sessionId, title: row.title, nodeId: row.cursor,
-      pathIds: () => Array.from(this.ancestors(sessionId, row.cursor, upperSeq), entry => entry.id).reverse(),
+      timelineIds: () => Array.from(this.ancestors(sessionId, row.cursor, upperSeq), entry => entry.id).reverse(),
       read: query => this.readView(sessionId, row.cursor, upperSeq, query) };
   }
 
@@ -89,8 +89,8 @@ export class SessionTree {
   }
 
   private readView(sessionId: string, nodeId: string | null, upperSeq: number, query: NodeQuery): SequencedNode[] {
-    const backwards = query.scope === "path" || query.edge === "last";
-    const entries = query.scope === "path" ? this.ancestors(sessionId, nodeId, upperSeq)
+    const backwards = query.scope === "timeline" || query.edge === "last";
+    const entries = query.scope === "timeline" ? this.ancestors(sessionId, nodeId, upperSeq)
       : this.db.prepare(`SELECT id, seq, contract FROM session_nodes
           WHERE session_id = ? AND seq <= ? ORDER BY seq ${backwards ? "DESC" : "ASC"}`)
         .iterate(sessionId, upperSeq) as Iterable<NodeIndex>;
@@ -130,8 +130,8 @@ export class SessionTree {
     }));
   }
 
-  /** 在当前游标后追加通用记录并推进游标；宿主不解释载荷。 */
-  append(sessionId: string, node: NewNode): SessionNode {
+  /** 向提交时的当前时间线末端追加并推进游标；不提供向任意树节点写入的能力。 */
+  appendToTimeline(sessionId: string, node: NewNode): SessionNode {
     const parentId = this.cursor(sessionId);
     const full = sessionNodeSchema.parse({ ...node, id: randomUUID(), sessionId, parentId, createdAt: new Date().toISOString() });
     // savepoint 可嵌在应用事务中；节点与游标要么同时保存，要么同时回退。
@@ -194,7 +194,8 @@ export class SessionTree {
     if (!row) throw new SessionError("not_found", "Session not found.");
     return row.title;
   }
-  path(sessionId: string, at?: string | null): SessionNode[] {
+  /** 读取根到末端的时间线；省略 at 时取执行游标，读取不激活该位置或授予追加能力。 */
+  timeline(sessionId: string, at?: string | null): SessionNode[] {
     const cursor = this.cursor(sessionId);
     return this.readNodes(this.ancestors(sessionId, at === undefined ? cursor : at, this.head(sessionId))).reverse();
   }

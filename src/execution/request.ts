@@ -15,7 +15,7 @@ export interface ModelExecutionEnvironment {
   system: SystemPrompt;
   messages: ResolvedModelItem[];
 }
-/** 一次补全及完整工具批次。缓冲只在此次调用内存在，输出交给消费者，不接触时间轴。 */
+/** 一次补全及完整工具批次。缓冲只在此次调用内存在，输出交给消费者，不接触时间线。 */
 export async function runModelRequest(request: ModelRunRequest, environment: Promise<ModelExecutionEnvironment>, handover?: ContentLease): Promise<ModelRunResult> {
   const controller = new AbortController();
   const signal = AbortSignal.any([request.signal, controller.signal]);

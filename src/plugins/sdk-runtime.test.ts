@@ -278,7 +278,7 @@ describe("工作台 SDK 的宿主实现", () => {
     } finally { unchanged.close(); }
     const reopened = new ApplicationService(root, { plugins: [c.plugin] }); services.push(reopened);
     expect(c.context().object(sessionId, Counter, id).get(State)).toBe(42);
-    expect(c.context().session(sessionId).snapshot().records.first(Changed, { scope: "path" })).toMatchObject({ data: { value: 42 } });
+    expect(c.context().session(sessionId).snapshot().records.first(Changed, { scope: "timeline" })).toMatchObject({ data: { value: 42 } });
   });
 
   it("不依赖 Agent 的资源创建与事件、状态同事务，信封关联真实资源种类", async () => {
@@ -290,7 +290,7 @@ describe("工作台 SDK 的宿主实现", () => {
     expect(createdValue).toBe(3);
     const snapshot = c.context().session(sessionId).snapshot();
     expect(snapshot.resources.get(Counter, id)?.status).toBe("known");
-    expect(snapshot.records.first(Changed, { scope: "path" })).toMatchObject({ status: "known", data: { value: 3 }, record: { source: { plugin: "test.counter", resource: { id, kind: Counter.kind } } } });
+    expect(snapshot.records.first(Changed, { scope: "timeline" })).toMatchObject({ status: "known", data: { value: 3 }, record: { source: { plugin: "test.counter", resource: { id, kind: Counter.kind } } } });
     expect(observed.map(record => record.contract.id)).toEqual([Changed.id, "resource_created"]);
     expect(service.sessions.snapshot(sessionId).workbench.objects.find(object => object.id === id)?.presentation.data).toEqual({ value: 3 });
     const session = c.context().session(sessionId);
@@ -323,7 +323,7 @@ describe("工作台 SDK 的宿主实现", () => {
     });
     const { service, sessionId } = open([plugin]);
     await create(service, sessionId, 4);
-    const resource = foldWorkbench(service.sessions.tree.path(sessionId).map(flat)).objects[0]!;
+    const resource = foldWorkbench(service.sessions.tree.timeline(sessionId).map(flat)).objects[0]!;
     const adapted = tools.match(resource)[0]!;
     const invocation = adapted.prepare(resource, null, {});
     if (!("execute" in invocation)) throw new Error("Expected a tool invocation.");
@@ -399,7 +399,7 @@ describe("工作台 SDK 的宿主实现", () => {
         { id: "read", committed(event) {
           seen.push([event.records[0]!.contract.id, event.snapshot.records.all({ scope: "session" }).length]);
         }, cursorChanged(event) {
-          positions.push(event.snapshot.records.all({ scope: "path" }).length);
+          positions.push(event.snapshot.records.all({ scope: "timeline" }).length);
         } },
       ] };
     })] });
@@ -424,7 +424,7 @@ describe("工作台 SDK 的宿主实现", () => {
         committed(event) { commits.push(event.records.map(record => record.id)); },
         cursorChanged(event) {
           expect(event).not.toHaveProperty("records");
-          const path = event.snapshot.records.all({ scope: "path" }).map(record => record.id);
+          const path = event.snapshot.records.all({ scope: "timeline" }).map(record => record.id);
           paths.push(path);
           event.session.title.set(`Position ${path.length}`);
         },
@@ -523,7 +523,7 @@ describe("工作台 SDK 的宿主实现", () => {
       observer: { event(event) { if (event.type !== "progress") object.commit(writer => { writer.append(Execution, modelRunRecordSchema.parse(event)); }); } },
     });
     expect(result).toMatchObject({ reason: "completed", tools: [{ kind: "succeeded" }], source: { adapter: "test-adapter" } });
-    expect(object.session.snapshot().records.query(Execution, { scope: "path" }).map(record => record.status)).toEqual(["known"]);
+    expect(object.session.snapshot().records.query(Execution, { scope: "timeline" }).map(record => record.status)).toEqual(["known"]);
     const count = service.sessions.tree.nodes(sessionId).map(flat).length;
     await c.context().models.run({ object: object.ref, requestParentId: object.session.snapshot().position.nodeId,
       target, system: { blocks: [] }, messages: [{ kind: "input", parts: [{ kind: "text", text: "Second projection" }] }], signal: new AbortController().signal,
@@ -557,7 +557,7 @@ describe("工作台 SDK 的宿主实现", () => {
     expect(service.sessions.running).toBe(false);
   });
 
-  it.each(["cancel", "close"] as const)("运行中的 SDK 请求受收束规则保护，%s 后部分内容可提交到时间轴", async mode => {
+  it.each(["cancel", "close"] as const)("运行中的 SDK 请求受收束规则保护，%s 后部分内容可提交到时间线", async mode => {
     const c = counter();
     const Execution = defineRecord(ns.name("execution"), { schema: modelRunRecordSchema });
     const plugin = definePlugin({ ...c.plugin, modules: [...c.plugin.modules, defineModule(() => ({ records: [Execution] }))] });

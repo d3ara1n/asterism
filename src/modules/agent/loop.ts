@@ -5,7 +5,7 @@ import { composeSystemPrompt } from "./system-prompt.ts";
 import { projectForAgent } from "./projection.ts";
 
 const key = (object: ObjectReader) => `agent:${object.ref.id}`;
-/** 执行循环只持请求次数，消息始终从时间轴重建。 */
+/** 执行循环只持请求次数，消息始终从时间线重建。 */
 export function createAgentLoop(deps: { selection: AgentSelectionService; tasks: PluginTasks; run: ModelServices["run"] }) {
   return {
     running: (object: ObjectReader) => deps.tasks.has(key(object)),

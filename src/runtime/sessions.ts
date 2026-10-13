@@ -66,7 +66,7 @@ export class SessionService {
     const host: SessionHost = {
       view: sessionId => this.tree.view(sessionId),
       sequences: (sessionId, nodes) => this.tree.sequences(sessionId, nodes),
-      path: sessionId => this.tree.path(sessionId),
+      timeline: sessionId => this.tree.timeline(sessionId),
       workbench: sessionId => this.tree.workbench(sessionId),
       title: sessionId => this.tree.title(sessionId),
       setTitle: (sessionId, text) => {
@@ -150,7 +150,7 @@ export class SessionService {
     }
     const head = this.tree.head(sessionId), before = this.tree.position(sessionId);
     const writer: SessionWriter = {
-      append: node => this.tree.append(sessionId, node).id,
+      append: node => this.tree.appendToTimeline(sessionId, node).id,
       nodes: () => this.tree.nodes(sessionId),
     };
     const result = this.transaction(() => {

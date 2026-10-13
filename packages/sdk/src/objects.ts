@@ -6,7 +6,7 @@ import type { ContentReader, ContentScope } from "./content-runtime.ts";
 
 /** 同步事务中的数据与事件写入；宿主限制 writer 的调用有效期。 */
 export interface SessionWriter {
-  /** 所有追加记录均进入历史路径并推进游标。 */
+  /** 向提交时的当前时间线末端追加并推进游标；此前取得的只读快照不决定追加位置。 */
   append<T extends Json>(contract: RecordContract<T>, data: NoInfer<T>): string;
   set<T extends Json>(contract: DataContract<T>, data: NoInfer<T>): void;
 }

@@ -84,7 +84,7 @@ args、target、result schema 必须有非空的整体 description，声明 help
 
 ### 会话数据与 Agent
 
-`session.get / commit` 与 `object.get / commit` 分别作用于当前会话数据与当前对象数据，数据按契约身份保存到 `session_data`，读取由 schema 判断兼容性；不维护手填数据版本。当前值不随历史位置恢复；重建历史须消费不可变时间轴事件。插件目录的数据独立于会话生命周期。
+`session.get / commit` 与 `object.get / commit` 分别作用于当前会话数据与当前对象数据，数据按契约身份保存到 `session_data`，读取由 schema 判断兼容性；不维护手填数据版本。当前值不随历史位置恢复；重建历史须消费不可变时间线事件。插件目录的数据独立于会话生命周期。
 
 Agent 的选择和提交去重保存于对象数据，用户输入与执行输出保存为 `UserMessage / Execution / Notice` 记录；每次请求由 `agent/projection.ts` 重建消息。`agent/configuration.ts` 声明只读配置目录，应用级配置与用户覆盖仍由宿主保存。运行以对象绑定任务承载，取消与关闭由托管设施收束；会话仅在全部对象收束后允许回溯，移除对象也要求该对象收束。命名依赖同插件的 Agent 契约，用户消息触发两级自动命名；人工与自动命名只追加来源事件，游标观察者按当前路径同步标题，规则见 [会话命名](../../docs/session-naming.md)。
 
@@ -110,7 +110,7 @@ edit 的差异视图交给 Pierre Diffs 的 FileDiff，使用 stacked 展示（A
 
 三个宿主固定入口在 `renderer/features/conversation/tool-views.tsx` 内置，不进入模块注册面。resource_call 的适配器将内层参数、选定实现身份和同一结果交给 ViewRegistry，填充时允许参数不完整，其余阶段使用完整调用；采用二级工具的三态视图，不新增外层折叠框。
 
-前端目录在应用根通过 ModuleViewsProvider 注入。基础对象接口提供读取、具型创建／动作、对象流与通用运行状态；模型进度、配置目录、工具展示经具名接口按需取得，共享已有宿主状态源。`agent/conversation/` 组合时间轴、输出跟随、消息输入、配置选择与交互协调；草稿和重试身份按会话／对象保留，导航显式注入。公共控件与文案可从 `renderer/shared/` 复用；模块不导入宿主控制器、物理节点或模块总表。
+前端目录在应用根通过 ModuleViewsProvider 注入。基础对象接口提供读取、具型创建／动作、对象流与通用运行状态；模型进度、配置目录、工具展示经具名接口按需取得，共享已有宿主状态源。`agent/conversation/` 组合时间线、输出跟随、消息输入、配置选择与交互协调；草稿和重试身份按会话／对象保留，导航显式注入。公共控件与文案可从 `renderer/shared/` 复用；模块不导入宿主控制器、物理节点或模块总表。
 
 ## 历史
 

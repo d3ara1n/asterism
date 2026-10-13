@@ -24,7 +24,7 @@ export const journalPlugin = definePlugin({
         }
       },
       cursorChanged({ snapshot, session }) {
-        const annotation = snapshot.records.last(Annotation, { scope: "path" });
+        const annotation = snapshot.records.last(Annotation, { scope: "timeline" });
         if (annotation?.status !== "known") return;
         session.commit(writer => { writer.set(CurrentSummary, { text: annotation.data.text }); });
       },
@@ -39,7 +39,7 @@ export function latestAnnotation(plugin: PluginContext, sessionId: string) {
   return plugin.session(sessionId).snapshot().records.last(Annotation, { scope: "session" });
 }
 const CurrentSummary = journal.data("summary", z.strictObject({ text: z.string() }));
-/** 当前会话数据不进入时间轴；与对象数据及插件私有数据库分别保存。 */
+/** 当前会话数据不进入时间线；与对象数据及插件私有数据库分别保存。 */
 export function saveSummary(plugin: PluginContext, sessionId: string, text: string) {
   const session = plugin.session(sessionId);
   session.commit(writer => { writer.set(CurrentSummary, { text }); });
@@ -111,7 +111,7 @@ export const counterPlugin = definePlugin({
   })],
 });
 
-/** 场景三：插件自己的 Agent 推动循环，context 每次从时间轴投影。 */
+/** 场景三：插件自己的 Agent 推动循环，context 每次从时间线投影。 */
 const research = pluginNamespace("example.research");
 const Execution = defineRecord(research.name("execution"), { schema: modelRunRecordSchema });
 export const modelRecordsModule = defineModule(() => ({ records: [Execution] }));

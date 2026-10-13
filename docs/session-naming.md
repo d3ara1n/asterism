@@ -58,5 +58,5 @@
 
 - [命名模块](../src/modules/naming/runtime.ts)：用户消息筛选、托管任务、命名事件追加与游标变化后的标题同步。
 - [材料与提示规则](../src/modules/naming/policy.ts)：Agent 回合投影、采样、提示与标题清理。
-- [命名契约](../src/modules/naming/records.ts)：不可变时间轴事件。
-- [SDK 时间轴查询](../packages/sdk/src/records.ts)：具型 `first / last / query`，不包含命名或 Agent 语义。
+- [命名契约](../src/modules/naming/records.ts)：不可变时间线事件。
+- [SDK 时间线查询](../packages/sdk/src/records.ts)：具型 `first / last / query`，不包含命名或 Agent 语义。

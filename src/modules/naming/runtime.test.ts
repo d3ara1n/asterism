@@ -171,7 +171,7 @@ describe("两级自动命名", () => {
     } finally { release(); }
     await test.idle();
     expect(test.session.title.get()).toBe("First");
-    const manual = test.session.snapshot().records.last(SessionNamed, { scope: "path" })!.record;
+    const manual = test.session.snapshot().records.last(SessionNamed, { scope: "timeline" })!.record;
     for (let i = 2; i <= 5; i++) test.submit(`Protected ${i}`);
     await test.idle();
     expect(test.requests).toHaveLength(1);
@@ -180,7 +180,7 @@ describe("两级自动命名", () => {
     await test.idle();
     expect(test.requests).toHaveLength(2);
     expect(test.session.title.get()).toBe("Automatic");
-    expect(test.session.snapshot().records.last(SessionNamed, { scope: "path" })).toMatchObject({ data: { source: "auto" } });
+    expect(test.session.snapshot().records.last(SessionNamed, { scope: "timeline" })).toMatchObject({ data: { source: "auto" } });
     await test.service.sessions.execute({ type: "select", sessionId: test.sessionId, nodeId: manual.id });
     expect(test.session.title.get()).toBe("First");
     expect(test.requests).toHaveLength(2);
@@ -227,7 +227,7 @@ describe("两级自动命名", () => {
     expect(log).toHaveBeenCalled();
   });
 
-  // 预期来自命名回溯规则：标题取执行路径最新命名；没有命名时取当前分支首条输入的 72 单位截断，两者都没有时保持不变。
+  // 预期来自命名回溯规则：标题取执行路径最新命名；没有命名时取当前时间线首条输入的 72 单位截断，两者都没有时保持不变。
   it("仅追加命名事件即可更新标题，读取不更新，回溯与分支切换不追加恢复事件", async () => {
     const test = await open(() => title("Generated"));
     const opening = `  ${"首条用户消息".repeat(20)}  `;
@@ -235,9 +235,9 @@ describe("两级自动命名", () => {
     const first = test.submit(opening);
     expect(test.session.title.get()).toBe(fallback);
     await test.idle();
-    const generated = test.session.snapshot().records.last(SessionNamed, { scope: "path" })!.record;
+    const generated = test.session.snapshot().records.last(SessionNamed, { scope: "timeline" })!.record;
     await test.rename("Manual");
-    const manual = test.session.snapshot().records.last(SessionNamed, { scope: "path" })!.record.id;
+    const manual = test.session.snapshot().records.last(SessionNamed, { scope: "timeline" })!.record.id;
     expect(test.session.title.get()).toBe("Manual");
     const original = test.service.sessions.tree.nodes(test.sessionId);
     const select = (nodeId: string | null) => test.service.sessions.execute({ type: "select", sessionId: test.sessionId, nodeId });
@@ -253,7 +253,7 @@ describe("两级自动命名", () => {
     expect(test.service.sessions.tree.nodes(test.sessionId)).toEqual(original);
     await select(first);
     await test.rename("Branch");
-    const branch = test.session.snapshot().records.last(SessionNamed, { scope: "path" })!.record.id;
+    const branch = test.session.snapshot().records.last(SessionNamed, { scope: "timeline" })!.record.id;
     expect(test.session.title.get()).toBe("Branch");
     await select(manual);
     expect(test.session.title.get()).toBe("Manual");

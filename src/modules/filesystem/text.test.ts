@@ -35,7 +35,7 @@ function setup() {
   const service = new ApplicationService(join(root, "host")); services.push(service);
   capture.mockRestore();
   const sessionId = service.sessions.tree.create("Files");
-  for (const object of [resource, { ...resource, id: "other", title: "Other resource" }]) service.sessions.tree.append(sessionId, {
+  for (const object of [resource, { ...resource, id: "other", title: "Other resource" }]) service.sessions.tree.appendToTimeline(sessionId, {
     contract: "resource_created", source: { plugin: "atelier.host", resource: null }, recipient: null, model: null,
     data: { ...object.data, id: object.id, type: object.kind, title: object.title },
   });

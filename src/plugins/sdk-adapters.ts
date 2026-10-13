@@ -99,7 +99,7 @@ export function adaptResource(contribution: ResourceContribution, sdk: SdkContex
           finally { scope.active = false; }
           const value = applyPreparation(action.contract, call.value, result);
           host.content?.validate(value, { scope: call.content, sessionId: ref.sessionId, objectId: ref.id,
-            recordIds: new Set(host.refOf(ref.id) ? host.sessions.path(ref.sessionId).map(node => node.id) : []) });
+            recordIds: new Set(host.refOf(ref.id) ? host.sessions.timeline(ref.sessionId).map(node => node.id) : []) });
           return { ...call, value };
         },
         async execute(context, raw, before) {

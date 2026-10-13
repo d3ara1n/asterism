@@ -13,7 +13,7 @@
 | `runtime/` | 应用组合与列表；会话命令、历史查询、资源与布局、执行进度；SQLite、对象存储与私有凭据客户端 | shared、session、configuration、modules 后台入口、Node API |
 | `runtime/content-store.ts`、`runtime/content-transfer.ts` | 不可变字节、临时占用与持久依赖；桌面分块传输和读取占用 | SDK 内容契约、SQLite、Node 文件系统；不解释领域格式 |
 | `configuration/` | 全局配置 JSON、密文凭据、连接测试与默认角色，见目录 README | shared、Node 文件系统、模型 SDK；不依赖 Electron 或数据库 |
-| `session/` | 会话级扁平树、游标与吸附、模型投影、工作台折叠 | shared、SDK 纯契约、Node SQLite；不依赖 UI 或插件运行时 |
+| `session/` | 会话树存储、当前时间线追加与游标选择、模型投影、工作台折叠 | shared、SDK 纯契约、Node SQLite；不依赖 UI 或插件运行时 |
 | `model/` | 单次请求契约、文件输入检查与解析、三协议 SDK 适配与续接资料 | shared、session、AI SDK |
 | `execution/` | 单次模型请求与工具批次、流块状态机、请求能力视图、外部工具策略与固定宿主操作入口；外层循环归插件 Agent | model、resources、tools、存储格式 adapter |
 | `resources/` | 资源身份生成、后台契约、注册目录、卡片投影与环境聚合 | shared、session 对象类型、Nano ID |
@@ -26,9 +26,9 @@
 
 `renderer/features/session → preload → main/RuntimeHost → utilityProcess → SessionService → SessionTree / SessionWorkbench / ObjectStore`
 
-会话命令先由 Zod 校验，再交运行时单一写入者处理。业务创建、查询索引与初始视图处于同一事务；正文引用只在内容文件成功落盘后进入事件。命令返回受理结果，读取返回执行游标对应的会话树与工作台投影，UI 将其映射为画布和代理对话。
+会话命令先由 Zod 校验，再交运行时单一写入者处理。业务创建、查询索引与初始视图处于同一事务；正文引用只在内容文件成功落盘后进入事件。命令返回受理结果，读取返回完整会话树、执行游标及当前时间线的工作台投影，UI 将其映射为历史导航、画布和代理对话。
 
-路径遍历位于 `shared/session-path.ts`，运行时与 renderer 共用；所有入树记录均推进游标且可查看，宿主不判断续接点。会话节点是通用记录（契约、来源、载荷、模型可见文本、接收者），宿主不解释载荷。`execution/request.ts` 完成一次补全及工具批次，`execution/response.ts` 只持有该响应的临时流状态；正文在终态到达后交付，工具块在取得结局后交付；终态内含于最高序号块，由执行体作为自身记录一次提交。内置 Agent 由 `modules/agent/runtime.ts` 装配，`selection.ts` 解析选择与策略，`admission.ts` 原子受理输入，`loop.ts` 每次从时间轴重新投影并推动下一请求；`projection.ts` 负责响应分组、事件后置与上下文末尾截取。`plugins/sdk-context.ts` 在具型写入入口统一校验与来源打戳，`plugins/records.ts` 直接映射通用记录信封。在途输出经 `session.progress` 的 `live` 字段按 `objectId` 提供给界面；异常收束时仍将已收到的内容保存为块，以完整性字段供审计。数据库结构只在运行时建库，仓储构造不隐式建表。
+路径遍历位于 `shared/session-timeline.ts`，运行时与 renderer 共用；所有入树记录均推进游标且可查看，宿主不判断续接点。会话节点是通用记录（契约、来源、载荷、模型可见文本、接收者），宿主不解释载荷。`execution/request.ts` 完成一次补全及工具批次，`execution/response.ts` 只持有该响应的临时流状态；正文在终态到达后交付，工具块在取得结局后交付；终态内含于最高序号块，由执行体作为自身记录一次提交。内置 Agent 由 `modules/agent/runtime.ts` 装配，`selection.ts` 解析选择与策略，`admission.ts` 原子受理输入，`loop.ts` 每次从时间线重新投影并推动下一请求；`projection.ts` 负责响应分组、事件后置与上下文末尾截取。`plugins/sdk-context.ts` 在具型写入入口统一校验与来源打戳，`plugins/records.ts` 直接映射通用记录信封。在途输出经 `session.progress` 的 `live` 字段按 `objectId` 提供给界面；异常收束时仍将已收到的内容保存为块，以完整性字段供审计。数据库结构只在运行时建库，仓储构造不隐式建表。
 
 `SessionTree.select` 将选择审计与游标更新原子提交，`cursorSelections` 可读取日志。提交后分别派发新增记录观察 `committed` 与执行游标观察 `cursorChanged`；正常追加和历史选择共用游标通知，批量／嵌套事务只通知最终位置。命名模块据此按路径同步标题，Agent 上下文仍在请求时即时投影。`seq` 只计节点追加，视图同步使用独立 `revision`。
 

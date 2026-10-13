@@ -2,9 +2,9 @@ import type { SessionRecord, ModelBlock, ModelItem, ModelPart } from "@atelier/s
 import { PluginApiError, type SessionSnapshot } from "@atelier/sdk/runtime";
 import { Execution, UserMessage } from "./records.ts";
 
-/** 按请求起点组合响应，事件顺序不改变；上下文只从当前时间轴读取。 */
+/** 按请求起点组合响应，事件顺序不改变；上下文只从当前时间线读取。 */
 export function projectForAgent(snapshot: Pick<SessionSnapshot, "records">, agentId: string): ModelItem[] {
-  const path = snapshot.records.all({ scope: "path" });
+  const path = snapshot.records.all({ scope: "timeline" });
   const positions = new Map(path.map((record, index) => [record.id, index]));
   const responses = new Map<string, { record: SessionRecord; block: ModelBlock }[]>();
   for (const record of path) {

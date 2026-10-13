@@ -11,7 +11,7 @@ function CounterBody({ data }: { data: z.infer<typeof Card.schema> }) {
   return createElement("button", {
     disabled: activity.running,
     onClick: () => { void invoke(ChangeCount, { amount: 1 }); },
-  }, `${data.value} · ${bytes} bytes · ${session.snapshot()?.records.all({ scope: "path" }).length ?? 0} records`);
+  }, `${data.value} · ${bytes} bytes · ${session.snapshot()?.records.all({ scope: "timeline" }).length ?? 0} records`);
 }
 export const renderer = {
   resources: [{ kind: Counter.kind, label: "Counter", icon: null }],

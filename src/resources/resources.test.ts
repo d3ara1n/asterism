@@ -40,7 +40,7 @@ function setup() {
   const service = new ApplicationService(join(base, "host")); services.push(service);
   capture.mockRestore();
   const sessionId = service.sessions.tree.create("Resources");
-  for (const object of [resource, note]) service.sessions.tree.append(sessionId, {
+  for (const object of [resource, note]) service.sessions.tree.appendToTimeline(sessionId, {
     contract: "resource_created", source: { plugin: "atelier.host", resource: null }, recipient: null, model: null,
     data: { ...object.data, id: object.id, type: object.kind, title: object.title },
   });
@@ -66,7 +66,7 @@ describe("工具与资源的匹配及授权", () => {
     const { service, sessionId, resource, scope } = setup();
     await service.sessions.execute({ type: "resource.create", sessionId, kind: "atelier.core/note", creation: { id: "atelier.core/note.create" },
       input: { title: "Captured note", content: "before" }, position: { x: 0, y: 0 } });
-    const note = foldWorkbench(service.sessions.tree.path(sessionId)).objects.find(object => object.title === "Captured note")!;
+    const note = foldWorkbench(service.sessions.tree.timeline(sessionId)).objects.find(object => object.title === "Captured note")!;
     const captured = scope([resource, note]);
     for (const object of [resource, note]) await service.sessions.execute({ type: "object.remove", sessionId, objectId: object.id });
     expect(await invoke(captured, "resource_inspect", { resource_id: resource.id })).toMatchObject({

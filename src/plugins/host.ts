@@ -14,7 +14,7 @@ export interface SessionHostWriter {
 export interface SessionHost {
   view(sessionId: string): NodeView;
   sequences(sessionId: string, nodes: readonly SessionNode[]): number[];
-  path(sessionId: string): SessionNode[];
+  timeline(sessionId: string): SessionNode[];
   workbench(sessionId: string): FoldedState;
   title(sessionId: string): string;
   setTitle(sessionId: string, text: string): void;

@@ -18,7 +18,7 @@ export class ContentTransferService {
   }
   private access(source: Extract<ContentCommand, { type: "read.open" }>["source"]): ContentAccess {
     if ("scopeId" in source) return { scope: this.scope(source.scopeId) };
-    const path = this.sessions.tree.path(source.sessionId);
+    const path = this.sessions.tree.timeline(source.sessionId);
     if (!this.sessions.tree.workbench(source.sessionId).objects.some(object => object.id === source.objectId))
       throw new PluginApiError("foreign_resource", "The content object is not on the current session path.");
     return { sessionId: source.sessionId, objectId: source.objectId, recordIds: new Set(path.map(node => node.id)) };

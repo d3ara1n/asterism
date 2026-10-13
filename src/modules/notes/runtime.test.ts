@@ -32,7 +32,7 @@ describe("笔记当前正文", () => {
     });
     const { service, sessionId } = open();
     await service.sessions.execute({ type: "resource.create", sessionId, kind: Note.kind, creation: { id: "atelier.core/note.create" }, input: {}, position: { x: 0, y: 0 } });
-    const note = foldWorkbench(service.sessions.tree.path(sessionId).map(flat)).objects.find(object => object.kind === Note.kind)!;
+    const note = foldWorkbench(service.sessions.tree.timeline(sessionId).map(flat)).objects.find(object => object.kind === Note.kind)!;
     expect(note.title).toBe("Untitled note");
     expect(data.get(sessionId, note.id, NoteContent.id)).toEqual({ text: "" });
     expect(modules.resources.project(note).data).toEqual({ text: "" });

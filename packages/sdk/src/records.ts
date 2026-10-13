@@ -50,7 +50,8 @@ export function defineRecord<D extends Json>(id: string, definition: {
     },
   };
 }
-export interface RecordQuery { readonly scope: "path" | "session" }
+/** timeline 读取快照末端的完整祖先路径；session 按保存顺序读取快照上界内的全会话记录。 */
+export interface RecordQuery { readonly scope: "timeline" | "session" }
 /** 固定在一次读取位置的观察柄；按需读取记录，await 之后不切换到最新状态。 */
 export interface SessionView {
   readonly id: string;
