@@ -17,7 +17,7 @@ export function MessageComposer({ draft, inputRef, busy, ready, running, writabl
   const i18n = useI18n();
   const state = useSyncExternalStore(draft.subscribe, draft.getSnapshot);
   return <form {...fileInputEvents(draft, busy || !ready)} onSubmit={event => { event.preventDefault(); void onSend(); }}>
-  <DraftFiles draft={draft} disabled={busy} />
+  <DraftFiles draft={draft} disabled={busy} className="pt-0 pb-2" />
   <InputGroup>
     <InputGroupTextarea ref={inputRef} rows={3} maxLength={100_000} value={state.text} disabled={busy}
       onChange={event => draft.setText(event.target.value)} aria-label={i18n.formatMessage(conversationMessages.messagePlaceholder)}

@@ -16,6 +16,7 @@ import { startAppearance } from "./features/appearance/state";
 
 import { builtinViews } from "../modules/renderer";
 import { ViewRegistry } from "./modules/registry";
+import { workbenchRecordViews } from "./features/workbench/records";
 import { loadPluginRenderers } from "./modules/plugins";
 import { loadPreferences } from "./features/creation/preferences";
 import { prepareModules, showStartupStage } from "./app/startup";
@@ -30,7 +31,7 @@ await startLanguage(initial?.ok ? initial.snapshot.catalogs ?? [] : []).catch(er
 showStartupStage(getI18n().formatMessage(appMessages.startupPlugins));
 const plugins = initial?.ok ? initial.snapshot.plugins.flatMap(p => p.status === "loaded" && p.renderer && p.id ? [{ id: p.id, renderer: p.renderer }] : []) : [];
 const { modules } = await loadPluginRenderers(plugins);
-const accepted = [...builtinViews];
+const accepted = [...builtinViews, workbenchRecordViews];
 for (const module of modules) {
   try { new ViewRegistry([...accepted, module]); accepted.push(module); }
   catch (error) { console.error("Plugin views conflict with existing views and were skipped.", error); }

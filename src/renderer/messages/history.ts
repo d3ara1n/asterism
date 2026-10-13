@@ -145,12 +145,8 @@ export const historyMessages = pluginNamespace("atelier.host").messages("en", de
     id: "eventDetached",
     defaultMessage: "Disconnected {resource} from {agent}",
   },
-  eventInput: {
-    id: "eventInput",
-    defaultMessage: "Input: {text}",
-  },
-  eventThinking: {
-    id: "eventThinking",
-    defaultMessage: "Thinking: {text}",
+  unknownRecord: {
+    id: "unknownRecord",
+    defaultMessage: "Unknown record · {id}",
   },
 }));

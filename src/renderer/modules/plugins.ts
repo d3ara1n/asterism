@@ -27,6 +27,8 @@ export async function loadPluginRenderers(entries: readonly { id: string; render
       const module = loaded.default;
       if (!module || !Array.isArray(module.resources) || !Array.isArray(module.cards) || !Array.isArray(module.tools)
         || (module.creations !== undefined && !Array.isArray(module.creations))
+        || (module.records !== undefined && !Array.isArray(module.records))
+        || (module.records !== undefined && !Array.isArray(module.records))
         || (module.prepare !== undefined && typeof module.prepare !== "function")) {
         throw new Error("The renderer entry must default-export { resources, cards, tools }.");
       }

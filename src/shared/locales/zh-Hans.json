@@ -123,8 +123,6 @@
   "eventRemoved": "从工作台移除「{title}」",
   "eventLinked": "将「{resource}」链接到「{agent}」",
   "eventDetached": "断开「{resource}」与「{agent}」的链接",
-  "eventInput": "输入：{text}",
-  "eventThinking": "思考：{text}",
   "byAgent": "按代理",
   "byResource": "按资源",
   "accessRecipient": "接收访问能力的代理",
@@ -537,5 +535,6 @@
   "provider.apiKey": "API 密钥",
   "provider.baseUrl": "基础 URL",
   "startup.windowLoadFailed": "无法加载应用窗口。",
-  "startup.workspaceOpenFailed": "无法打开工作区。"
+  "startup.workspaceOpenFailed": "无法打开工作区。",
+  "unknownRecord": "未知记录 · {id}"
 }

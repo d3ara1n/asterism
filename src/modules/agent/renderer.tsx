@@ -5,6 +5,7 @@ import { commonMessages } from "../messages/common";
 import { CreateAgent, AgentView } from "./contract";
 import { Conversation, ConversationActions } from "./conversation/Conversation";
 import { AgentInput } from "./creation";
+import { agentRecordViews } from "./history";
 
 const appearance = { width: 560, height: 640, minWidth: 480, minHeight: 480 };
 
@@ -16,6 +17,7 @@ export default {
     Actions: ConversationActions,
   })],
   tools: [],
+  records: agentRecordViews,
   creations: [creationEntry(CreateAgent, { id: "atelier.core/agent.configured", label: commonMessages.kindAgent, icon: <Bot className="size-4" />, group: "agents", InputView: AgentInput, triggers: { menu: {} } })],
 } satisfies RendererModule;
 

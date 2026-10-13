@@ -65,7 +65,7 @@ export function HomePage({ active, draft, onSettings, ready, busy, submitError, 
       event.preventDefault();
       if (canSend) void onStart({ agent: agent!.id, model: modelReference(model!), thinking, parts: draft.parts() });
     }} aria-label={i18n.formatMessage(commonMessages.newConversation)} className="rounded-xl border bg-muted">
-      <DraftFiles draft={draft} disabled={busy} />
+      <DraftFiles draft={draft} disabled={busy} className="px-3 py-2" />
       <InputGroup className="rounded-xl border-0 border-b bg-card shadow-none">
         <label htmlFor="home-message" className="sr-only">{i18n.formatMessage(homeMessages.firstMessage)}</label>
         <InputGroupTextarea id="home-message" className="min-h-32 px-4 py-4" rows={4} maxLength={100_000}

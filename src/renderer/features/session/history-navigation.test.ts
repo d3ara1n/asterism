@@ -3,13 +3,16 @@ import { describe, expect, it } from "vitest";
 import { emptyCompletion, type NewNode, type SessionNode } from "../../../shared/session";
 import { historyMessages } from "../../messages/history";
 import { getI18n } from "../../shared/i18n";
+import { ViewRegistry } from "../../modules/registry";
+import { builtinViews } from "../../../modules/renderer";
+import { workbenchRecordViews } from "../workbench/records";
 import { historyBefore, historyEntries, historyResources, historyResourceViews, matchesHistoryView } from "./history-navigation";
 
 const block = { ...emptyCompletion, agentId: "a", responseId: "r", ordinal: 0, requestParentId: null,
   complete: true, model: "test", continuation: null, adapter: "test", scope: "test" };
 const node = (id: string, parentId: string | null, value: NewNode): SessionNode => ({ ...value, id, parentId, sessionId: "s", createdAt: "2026-10-10T10:00:00Z" });
 const created = (id: string, title: string, kind = "agent"): NewNode => ({ kind: "event", type: "resource_created", agentId: null, data: { id, title, type: kind }, model: null });
-const label = (kind: string) => kind;
+const label = new ViewRegistry([...builtinViews, workbenchRecordViews]);
 
 describe("历史导航契约", () => {
   it("资源视图按来源身份筛选，不混入同名代理、链接事件或工具目标", () => {

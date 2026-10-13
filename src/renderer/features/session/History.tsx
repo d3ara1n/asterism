@@ -36,7 +36,7 @@ export function SessionHistoryPanel({ controller }: { controller: SessionControl
   const list = useRef<HTMLDivElement>(null);
   const tabs = useRef<HTMLDivElement>(null);
   const scrollRequested = useRef(true);
-  const entries = useMemo(() => snapshot ? historyEntries(snapshot.nodes, kind => i18n.text(registry.resource(kind).label)) : [], [snapshot?.nodes, registry, i18n]);
+  const entries = useMemo(() => snapshot ? historyEntries(snapshot.nodes, registry) : [], [snapshot?.nodes, registry, i18n]);
   const tree = useMemo(() => historyBranches(snapshot?.nodes ?? []), [snapshot?.nodes]);
   const arrived = arrivedBranch(pending.current, state);
   const branch = viewedBranch(tree, snapshot?.at ?? null, historical ? arrived ?? preferredBranch : null);
@@ -54,7 +54,7 @@ export function SessionHistoryPanel({ controller }: { controller: SessionControl
   const parent = tree.branches.find(item => item.id === branch.parentId);
   const search = query.trim().toLocaleLowerCase(i18n.locale);
   const visible = entries.filter(entry => branch.nodeIds.has(entry.node.id) && matchesHistoryView(entry, view)
-    && (!search || `${"text" in entry.node ? entry.node.text : i18n.text(entry.label)} ${entry.resource?.title ?? i18n.formatMessage(commonMessages.workbench)} ${entry.resource ? i18n.text(registry.resource(entry.resource.kind).label) : ""}`.toLocaleLowerCase(i18n.locale).includes(search)));
+    && (!search || `${"text" in entry.node ? entry.node.text : entry.label} ${entry.resource?.title ?? i18n.formatMessage(commonMessages.workbench)} ${entry.resource ? i18n.text(registry.resource(entry.resource.kind).label) : ""}`.toLocaleLowerCase(i18n.locale).includes(search)));
   const showStart = branch.forkId === null && !search && view.kind === "all";
   const navigate = (target: HistoryBranch, at?: string | null, reveal = false) => {
     const last = remembered.current.get(target.id);
@@ -133,9 +133,9 @@ export function SessionHistoryPanel({ controller }: { controller: SessionControl
           return <div key={node.id} data-inspected={active}>
             <div className="flex items-center gap-0.5">
               <Button data-history-entry variant={active ? "secondary" : "ghost"} aria-pressed={active} className="h-auto min-w-0 flex-1 justify-start gap-3 px-2 py-1.5 text-left font-normal"
-                title={`${i18n.text(entry.label)}\n${source}\n${i18n.formatDate(Date.parse(node.createdAt), { dateStyle: "medium", timeStyle: "short" })}`} onClick={() => inspect(node.id)}>
-                <span className="shrink-0 text-muted-foreground" aria-hidden="true">{entry.scope === "session" ? <PanelsTopLeft className="size-4" /> : descriptor.icon}</span>
-                <span className="min-w-0 flex-1"><span className="block truncate leading-5">{i18n.text(entry.label)}</span><span className="type-caption block truncate leading-4">{source}</span></span>
+                title={`${entry.label}\n${source}\n${i18n.formatDate(Date.parse(node.createdAt), { dateStyle: "medium", timeStyle: "short" })}`} onClick={() => inspect(node.id)}>
+                <span className="shrink-0 text-muted-foreground" aria-hidden="true">{entry.icon ?? (entry.scope === "session" ? <PanelsTopLeft className="size-4" /> : descriptor.icon)}</span>
+                <span className="min-w-0 flex-1">{entry.row?.(entry.label) ?? <span className="block truncate leading-5">{entry.label}</span>}<span className="type-caption block truncate leading-4">{source}</span></span>
                 {snapshot.cursor === node.id && <CircleDot className="size-3" aria-label={i18n.formatMessage(historyMessages.historyExecutionPosition)} />}
                 {active && <Eye className="size-3" aria-label={i18n.formatMessage(commonMessages.viewingHistory)} />}
               </Button>
@@ -215,7 +215,7 @@ function ContinueAction({ controller }: { controller: SessionController }) {
   const wait = i18n.formatMessage(historyMessages.waitForResources, { names: progress.unsettledObjectIds.map(id => resources.get(id)?.title ?? i18n.formatMessage(historyMessages.unknownResource)).join(", ") });
   const disabled = saving || unsettled || state.busy || state.status !== "ready";
   const actual = target?.id ? snap(snapshot.nodes, target.id) : null;
-  const actualEntry = target ? historyEntries(snapshot.nodes, kind => i18n.text(registry.resource(kind).label)).find(entry => entry.node.id === actual) : undefined;
+  const actualEntry = target ? historyEntries(snapshot.nodes, registry).find(entry => entry.node.id === actual) : undefined;
   return <><span title={unsettled ? wait : i18n.formatMessage(historyMessages.continueFromHere)}><Button size="xs" disabled={!historical || disabled} onClick={() => setTarget({ id: snapshot.at })}><GitBranch />{i18n.formatMessage(historyMessages.continueFromHere)}</Button></span>
     <AlertDialog open={target !== null} onOpenChange={open => { if (!open && !saving) setTarget(null); }}><AlertDialogContent>
       <AlertDialogHeader><AlertDialogTitle>{i18n.formatMessage(historyMessages.continueTitle)}</AlertDialogTitle><AlertDialogDescription>{i18n.formatMessage(historyMessages.continueDescription)}</AlertDialogDescription></AlertDialogHeader>

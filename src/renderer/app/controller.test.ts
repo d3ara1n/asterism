@@ -7,7 +7,7 @@ describe("应用会话列表", () => {
   it("查询途中再次刷新时补读，晚到创建可刷新列表且不携带任何会话位置", async () => {
     const requests: Array<(result: CommandResult) => void> = [];
     const execute = vi.fn(() => new Promise<CommandResult>(resolve => requests.push(resolve)));
-    const controller = new ApplicationController({ execute, onStatus: () => () => {} });
+    const controller = new ApplicationController({ execute, onStatus: () => () => {}, session: { execute: vi.fn(), onChanged: () => () => {} } });
     const first = controller.refresh();
     void controller.refresh();
     requests[0]!({ ok: true, snapshot });

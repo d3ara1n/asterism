@@ -1,15 +1,19 @@
-import { inputSummary } from "../../../shared/model-input";
+import type { ReactNode } from "react";
+import type { RecordRenderContext } from "@atelier/sdk/renderer";
+import { toRecords } from "../../../plugins/records";
+import type { ViewRegistry } from "../../modules/registry";
 import type { Json } from "@atelier/sdk/contracts";
 
 import type { SessionNode } from "../../../shared/session";
 import { selectable } from "../../../shared/session-path";
+import { workbenchRecords } from "../../../shared/workbench-records";
 import { historyMessages } from "../../messages/history";
 import { getI18n } from "../../shared/i18n";
 
 export type HistoryResource = { id: string; kind: string; title: string };
-export type HistoryEntry = { node: SessionNode; label: string; scope: "session" | "resource"; resource: HistoryResource | null };
+export type HistoryEntry = { node: SessionNode; label: string; icon?: ReactNode; row?: (label: string) => ReactNode; scope: "session" | "resource"; resource: HistoryResource | null };
 export type HistoryView = { kind: "all" | "workbench" | "resources" } | { kind: "resource"; resourceId: string };
-const workbenchEvents = new Set(["resource_created", "object_added", "object_removed", "resource_attached", "resource_detached"]);
+const workbenchEvents = new Set<string>(workbenchRecords.map(contract => contract.id));
 const record = (value: Json): Record<string, Json> => value !== null && typeof value === "object" && !Array.isArray(value) ? value : {};
 const snippet = (value: string) => value.slice(0, 500).replace(/\s+/gu, " ").trim() || "…";
 
@@ -48,40 +52,25 @@ export function historyResources(nodes: readonly SessionNode[]): Map<string, His
   return result;
 }
 
-/** 保持输入的追加次序和节点身份；不按 response、时间戳或来源重新排序。 */
-export function historyEntries(nodes: readonly SessionNode[], typeLabel: (kind: string) => string): HistoryEntry[] {
+/** 保持输入的追加次序和节点身份；摘要与图标由记录契约的提供方注册，宿主只区分来源。 */
+export function historyEntries(nodes: readonly SessionNode[], views: Pick<ViewRegistry, "record" | "resource">): HistoryEntry[] {
   const resources = historyResources(nodes);
-  const name = (id: unknown) => typeof id === "string" ? resources.get(id)?.title ?? getI18n().formatMessage(historyMessages.unknownResource) : getI18n().formatMessage(historyMessages.unknownResource);
+  const i18n = getI18n();
+  const records = new Map(toRecords(nodes, nodes).map(item => [item.id, item]));
+  const context: RecordRenderContext = {
+    resourceTitle: id => resources.get(id)?.title ?? i18n.formatMessage(historyMessages.unknownResource),
+    resourceLabel: kind => views.resource(kind).label,
+    text: value => i18n.text(value),
+    describe: item => views.record(item, context),
+  };
   return nodes.filter(selectable).map(node => {
-    let label: string;
-    let resourceId: unknown = node.agentId;
+    const item = records.get(node.id)!;
+    const view = views.record(item, context);
+    const data = node.kind === "event" ? record(node.data) : {};
+    const resourceId: unknown = node.kind === "event" ? node.agentId ?? data.resourceId ?? data.id : node.agentId;
     const sessionEvent = node.kind === "event" && workbenchEvents.has(node.type) || node.kind === "notice" && node.agentId === null;
-    switch (node.kind) {
-      case "message": label = getI18n().formatMessage(historyMessages.eventInput, { text: inputSummary(node.parts) }); break;
-      case "thinking": label = getI18n().formatMessage(historyMessages.eventThinking, { text: node.text }); break;
-      case "text": label = node.text; break;
-      case "notice": label = node.message; break;
-      case "toolcall": {
-        const args = record(node.arguments);
-        const target = record(args.target ?? null);
-        const tool = node.name === "resource_call" && typeof args.tool === "string" ? args.tool : node.name;
-        label = typeof target.path === "string" ? `${tool} · ${target.path}` : tool;
-        break;
-      }
-      case "event": {
-        const data = record(node.data), title = name(data.id ?? data.resourceId);
-        resourceId = node.agentId ?? data.resourceId ?? data.id;
-        switch (node.type) {
-          case "resource_created": label = getI18n().formatMessage(historyMessages.eventCreated, { kind: typeLabel(String(data.type ?? "")), title: title }); break;
-          case "object_added": label = getI18n().formatMessage(historyMessages.eventAdded, { title: title }); break;
-          case "object_removed": label = getI18n().formatMessage(historyMessages.eventRemoved, { title: title }); break;
-          case "resource_attached": label = getI18n().formatMessage(historyMessages.eventLinked, { resource: title, agent: name(node.agentId) }); break;
-          case "resource_detached": label = getI18n().formatMessage(historyMessages.eventDetached, { resource: title, agent: name(node.agentId) }); break;
-          default: label = node.type;
-        }
-      }
-    }
-    return { node, label: snippet(label), scope: sessionEvent ? "session" : "resource",
+    const label = view ? i18n.text(view.label) : i18n.formatMessage(historyMessages.unknownRecord, { id: item.contract.id });
+    return { node, label: snippet(label), icon: view?.icon, row: view?.row, scope: sessionEvent ? "session" : "resource",
       resource: !sessionEvent && typeof resourceId === "string" ? resources.get(resourceId) ?? null : null };
   });
 }

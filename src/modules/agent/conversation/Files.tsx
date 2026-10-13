@@ -39,15 +39,15 @@ export function FilePreview({ part, content, onRemove, disabled }: {
   </Attachment>;
 }
 
-export function DraftFiles({ draft, disabled }: { draft: MessageDraft; disabled: boolean }) {
+export function DraftFiles({ draft, disabled, className }: { draft: MessageDraft; disabled: boolean; className?: string }) {
   const state = useSyncExternalStore(draft.subscribe, draft.getSnapshot);
   const i18n = useI18n();
   return <>
-    {state.files.length > 0 && <AttachmentGroup className="px-3 py-2">
+    {state.files.length > 0 && <AttachmentGroup className={className}>
       {state.files.map(({ part }, index) => <FilePreview key={`${part.file["$atelier.content"]}:${index}`} part={part} content={draft.content()}
         disabled={disabled || state.uploading} onRemove={() => draft.remove(index)} />)}
     </AttachmentGroup>}
-    {state.error && <p role="alert" className="type-caption px-3 text-destructive">{i18n.text(state.error)}</p>}
+    {state.error && <p role="alert" className="type-caption text-destructive">{i18n.text(state.error)}</p>}
   </>;
 }
 export function AttachFiles({ draft, disabled }: { draft: MessageDraft; disabled: boolean }) {

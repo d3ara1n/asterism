@@ -9,6 +9,8 @@ import type { ResourceRef, SessionSnapshot } from "./workspace.ts";
 export * from "./renderer-services.ts";
 export * from "./renderer-creation.ts";
 export * from "./renderer-tools.ts";
+export * from "./renderer-records.ts";
+import type { RecordRenderer } from "./renderer-records.ts";
 export type * from "./renderer-content.ts";
 import type { RendererContentInput, RendererInputOptions } from "./renderer-content.ts";
 import type { ContentReader } from "./content-runtime.ts";
@@ -72,6 +74,8 @@ export interface RendererModule {
   resources: ResourceDescription[];
   cards: CardRenderer[];
   tools: ToolRenderer[];
+  /** 历史记录视图：按记录契约声明摘要、图标与可选行内容。 */
+  records?: RecordRenderer[];
   /** 创建入口：菜单与拖放由宿主统一仲裁，最终都走所绑定的创建契约。 */
   creations?: CreationEntry[];
   /** 启动准备：宿主在首屏前并行调用，模块自行初始化内部资源；超时或失败只记录，不阻止启动。 */
