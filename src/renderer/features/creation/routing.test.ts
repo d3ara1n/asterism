@@ -25,6 +25,8 @@ describe("拖放声明式匹配", () => {
     expect(acceptsItem({ files: { extensions: [".pdf"] } }, file("Report.PDF"))).toBe(true);
     expect(acceptsItem({ files: { mime: ["image/*"] } }, file("noext", "image/png"))).toBe(true);
     expect(acceptsItem({ files: { mime: ["image/*"] } }, file("a.pdf", "application/pdf"))).toBe(false);
+    const entries = [entry("image", { files: { mime: ["image/*"] } }), entry("pdf", { files: { extensions: [".pdf"] } })];
+    expect(dropCandidates(entries, file("a.png", "image/png")).map(item => item.id)).toEqual(["image"]);
   });
   it("URL 按 scheme 过滤，非法 URL 不受理", () => {
     const accepts = { urls: { schemes: ["https"] } };
@@ -32,18 +34,14 @@ describe("拖放声明式匹配", () => {
     expect(acceptsItem(accepts, { kind: "url", url: "file:///etc/hosts" })).toBe(false);
     expect(acceptsItem(accepts, { kind: "url", url: "not a url" })).toBe(false);
   });
-  it("候选只包含受理该项的入口", () => {
-    const pdf = entry("a.x/pdf", { files: { extensions: [".pdf"] } });
-    const dir = entry("a.x/dir", { files: { directories: true } });
-    expect(dropCandidates([pdf, dir], file("a.pdf")).map(e => e.id)).toEqual(["a.x/pdf"]);
-  });
 });
 
 describe("路由记忆键", () => {
   it("按扩展名 > MIME 的优先级取判别项，不同类型互不污染", () => {
     expect(routeKey(file("a.PDF", "application/pdf"))).toBe(routeKey(file("b.pdf", "")));
     expect(routeKey(file("a.pdf"))).not.toBe(routeKey(file("a.png")));
-    expect(routeKey(file("noext", "image/png"))).toContain("mime:image/png");
+    expect(routeKey(file("noext", "image/png"))).toBe(routeKey(file("other", "image/png")));
+    expect(routeKey(file("noext", "image/png"))).not.toBe(routeKey(file("noext", "image/jpeg")));
     expect(routeKey(file("project", "", true))).not.toBe(routeKey(file("project")));
   });
   it("记忆只在仍属当前候选时命中", () => {

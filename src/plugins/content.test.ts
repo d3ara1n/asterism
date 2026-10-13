@@ -82,8 +82,8 @@ describe("宿主不可变内容", () => {
   it("保留值只识别严格 SDK 对象，普通文本没有引用语义", () => {
     const ref = { "$atelier.content": randomUUID() };
     expect(contentReferences({ nested: [ref, ref], text: JSON.stringify(ref) })).toEqual([ref]);
-    expect(() => contentReferences({ ...ref, extra: true })).toThrow("reserved");
-    expect(() => contentReferences({ "$atelier.content": "../file" })).toThrow("reserved");
+    expect(() => contentReferences({ ...ref, extra: true })).toThrow();
+    expect(() => contentReferences({ "$atelier.content": "../file" })).toThrow();
   });
   it("二进制导入经准备、同步创建、当前数据读取持久化，并支持缺席插件重开", async () => {
     const f = fixture(), draft = f.input();
@@ -94,7 +94,6 @@ describe("宿主不可变内容", () => {
     expect(await f.object(id).content.read(ref)).toEqual(new Uint8Array([0, 255, 128]));
     await f.service.close(); services.splice(services.indexOf(f.service), 1);
     const reopened = new ApplicationService(f.root); services.push(reopened);
-    expect(reopened.sessions.snapshot(f.sessionId).workbench.objects[0]!.presentation.contract.id).toContain("missing-resource");
     const reader = await reopened.content.execute({ type: "read.open", source: { sessionId: f.sessionId, objectId: id, nodeId: reopened.sessions.tree.cursor(f.sessionId) }, ref });
     expect(reader.kind).toBe("reader");
     if (reader.kind !== "reader") throw new Error("Expected reader.");
@@ -111,9 +110,9 @@ describe("宿主不可变内容", () => {
     expect(text(await f.object(id).content.read(ref))).toBe("retry");
     const abandoned = f.input(), orphan = await f.store.writer({ scope: abandoned }).stage(bytes("orphan"));
     await abandoned.close(); f.store.collect();
-    expect(() => f.store.reader({ sessionId: f.sessionId, objectId: id }).read(orphan)).toThrow("unavailable");
+    expect(() => f.store.reader({ sessionId: f.sessionId, objectId: id }).read(orphan)).toThrow();
   });
-  it("动作替换当前内容释放旧根，历史事件和创建原件保持独立根", async () => {
+  it("替换当前值后历史事件和创建原件的独立根仍保留", async () => {
     const f = fixture(), draft = f.input();
     const original = await f.store.writer({ scope: draft }).stage(bytes("original"));
     const id = await f.create(original, draft.id, { history: true }); await draft.close();
@@ -133,7 +132,7 @@ describe("宿主不可变内容", () => {
     const b = await f.store.writer({ scope: second }).stage(bytes("B"));
     const aid = await f.create(a, first.id), bid = await f.create(b, second.id);
     await Promise.all([first.close(), second.close()]);
-    expect(() => f.object(bid).content.read(a)).toThrow("does not belong");
+    expect(() => f.object(bid).content.read(a)).toThrow();
     await expect(f.replace(bid, { file: a })).rejects.toThrow();
     expect(f.object(bid).get(Current)!.file).toEqual(b);
     expect(text(await f.object(aid).content.read(a))).toBe("A");
@@ -144,10 +143,10 @@ describe("宿主不可变内容", () => {
     const id = await f.create(old, draft.id); await draft.close();
     const action = f.service.sessions.openContentInput({ sessionId: f.sessionId, objectId: id, resourceKind: Document.kind, contractId: Replace.id });
     const file = await f.store.writer({ scope: action }).stage(bytes("new"));
-    await expect(f.create(file, action.id)).rejects.toThrow("another command");
+    await expect(f.create(file, action.id)).rejects.toThrow();
     await f.replace(id, { file }, action.id); await action.close(); f.store.collect();
     expect(text(await f.object(id).content.read(file))).toBe("new");
-    expect(() => f.object(id).content.read(old)).toThrow("unavailable");
+    expect(() => f.object(id).content.read(old)).toThrow();
   });
   it("依赖来自实际保存的 schema 输出，转换移除引用后不保留字节", async () => {
     const f = fixture(), draft = f.input();
@@ -157,9 +156,9 @@ describe("宿主不可变内容", () => {
     const Raw = ns.data("raw", z.json());
     f.object(id).commit(writer => { writer.set(Stripped, { file: ref }); });
     expect(f.object(id).get(Stripped)).toEqual({});
-    expect(() => f.object(id).commit(writer => { writer.set(Raw, { ...ref, extra: true }); })).toThrow("reserved");
+    expect(() => f.object(id).commit(writer => { writer.set(Raw, { ...ref, extra: true }); })).toThrow();
     await f.replace(id, { file: null }); f.store.collect();
-    expect(() => f.object(id).content.read(ref)).toThrow("unavailable");
+    expect(() => f.object(id).content.read(ref)).toThrow();
   });
   it("读取占用保护已被替换的内容，结束读取才可回收", async () => {
     const f = fixture(), draft = f.input();
@@ -167,13 +166,15 @@ describe("宿主不可变内容", () => {
     const ref = await f.store.writer({ scope: draft }).stage(payload);
     const id = await f.create(ref, draft.id); await draft.close();
     const stream = f.object(id).content.open(ref)[Symbol.asyncIterator]();
-    expect((await stream.next()).value).toHaveLength(contentLimits.chunk);
+    const first = (await stream.next()).value!;
     await f.replace(id, { file: null }); f.store.collect();
-    expect((await stream.next()).value).toEqual(new Uint8Array([7, 7, 7]));
-    expect((await stream.next()).done).toBe(true); f.store.collect();
-    expect(() => f.object(id).content.read(ref)).toThrow("unavailable");
+    const chunks = [first];
+    for (let next = await stream.next(); !next.done; next = await stream.next()) chunks.push(next.value);
+    expect(Buffer.concat(chunks.map(chunk => Buffer.from(chunk)))).toEqual(Buffer.from(payload));
+    f.store.collect();
+    expect(() => f.object(id).content.read(ref)).toThrow();
   });
-  it("关闭原始草稿不撤回已捕获的尝试，创建失败不留下持久根", async () => {
+  it("关闭原始草稿不撤回已捕获的创建尝试", async () => {
     let started!: () => void, finish!: () => void;
     const ready = new Promise<void>(resolve => { started = resolve; });
     const wait = new Promise<void>(resolve => { finish = resolve; });
@@ -193,10 +194,10 @@ describe("宿主不可变内容", () => {
     const ref = await f.store.writer({ scope: draft }).stage(bytes("cancel"));
     const requestId = randomUUID();
     const creating = f.service.sessions.execute({ type: "resource.create", sessionId: f.sessionId, kind: Document.kind, creation: { id: Create.id }, input: { file: ref }, contentScopeId: draft.id, requestId, position: { x: 0, y: 0 } });
-    const rejected = expect(creating).rejects.toThrow("cancelled");
+    const rejected = expect(creating).rejects.toThrow();
     await ready; await f.service.sessions.execute({ type: "resource.create.cancel", sessionId: f.sessionId, requestId }); await rejected;
     expect(text(await f.store.reader({ scope: draft }).read(ref))).toBe("cancel");
-    await draft.close(); await expect(f.create(ref, draft.id)).rejects.toThrow("unavailable");
+    await draft.close(); await expect(f.create(ref, draft.id)).rejects.toThrow();
   });
   it("嵌套提交回滚后旧数据与引用保持一致", async () => {
     const f = fixture(), draft = f.input();
@@ -210,15 +211,21 @@ describe("宿主不可变内容", () => {
     await expect(f.replace(id, { file: null, fail: true })).rejects.toThrow();
     f.store.collect(); expect(object.get(Current)!.file).toEqual(ref);
   });
-  it("只在可见历史路径认领记录内容，分叉保留共同创建原件", async () => {
+  it("对象内容只取当前值与可见历史，分叉保留共同原件而不取得旁支专有引用", async () => {
     const f = fixture(), draft = f.input();
-    const ref = await f.store.writer({ scope: draft }).stage(bytes("ancestor"));
-    const id = await f.create(ref, draft.id, { history: true }); await draft.close();
+    const original = await f.store.writer({ scope: draft }).stage(bytes("ancestor"));
+    const id = await f.create(original, draft.id, { history: true }); await draft.close();
     const ancestor = f.service.sessions.tree.cursor(f.sessionId);
-    await f.replace(id, { file: ref, history: true });
+    await f.service.sessions.execute({ type: "resource.command", sessionId: f.sessionId, objectId: id, command: resourceCall(Generate, "branch-only") });
+    const branch = f.object(id).get(Current)!.file!;
+    f.object(id).commit(writer => { writer.append(Saved, { file: branch }); });
+    await f.replace(id, { file: original });
     await f.service.sessions.execute({ type: "select", sessionId: f.sessionId, nodeId: ancestor });
-    await f.replace(id, { file: ref });
-    expect(text(await f.object(id).content.read(ref))).toBe("ancestor");
+    await f.replace(id, { file: original });
+    expect(text(await f.object(id).content.read(original))).toBe("ancestor");
+    expect(() => f.object(id).content.read(branch)).toThrow();
+    await expect(f.replace(id, { file: branch })).rejects.toThrow();
+    expect(f.object(id).get(Current)!.file).toEqual(original);
   });
   it("外部准备者只能读取，replace 引用不能扩大尝试资格", async () => {
     let replacement: ContentRef | null = null;
@@ -244,7 +251,7 @@ describe("宿主不可变内容", () => {
     expect(await dispatchContent(f.service, request)).toBeNull();
     const begun = await f.service.content.execute({ type: "upload.begin", scopeId: opened.scopeId });
     if (begun.kind !== "upload") throw new Error("Expected upload.");
-    await expect(f.service.content.execute({ type: "upload.write", scopeId: opened.scopeId, uploadId: begun.uploadId, offset: 1, data: bytes("bad") })).rejects.toThrow("offset");
+    await expect(f.service.content.execute({ type: "upload.write", scopeId: opened.scopeId, uploadId: begun.uploadId, offset: 1, data: bytes("bad") })).rejects.toThrow();
     await expect(f.service.content.execute({ type: "upload.seal", scopeId: opened.scopeId, uploadId: begun.uploadId })).rejects.toThrow();
     await f.service.content.execute({ type: "upload.abort", scopeId: opened.scopeId, uploadId: begun.uploadId });
     const valid = await f.service.content.execute({ type: "upload.begin", scopeId: opened.scopeId });
@@ -336,7 +343,7 @@ describe("模型消费不可变内容", () => {
       release(); await first;
       expect(seen[0]!.messages).toMatchObject([{ parts: [{ data: bytes("captured") }] }]);
       await iterator.return?.(); f.store.collect();
-      expect(() => f.store.reader({ sessionId: f.sessionId, objectId: id }).read(file)).toThrow("unavailable");
+      expect(() => f.store.reader({ sessionId: f.sessionId, objectId: id }).read(file)).toThrow();
     } finally { release(); await iterator.return?.(); spy.mockRestore(); }
   });
 

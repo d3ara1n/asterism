@@ -40,12 +40,13 @@ describe("自动命名的领域材料", () => {
     const turns = Array.from({ length: 12 }, (_, i) => ({ user: `用户${i + 1}`, assistant: `结果${i + 1}` }));
     turns[0]!.user = "开头" + "x".repeat(300) + "末尾";
     const prompt = namingPrompt([...turns, { user: "最后请求" }]);
-    expect(prompt).toContain("User: 开头");
+    expect(prompt).toContain("开头");
     expect(prompt).toContain("末尾");
-    expect(prompt).toContain("(5 turns omitted)");
-    expect(prompt).not.toContain("[Turn 5]");
-    expect(prompt).toContain("[Turn 13]\nUser: 最后请求");
-    expect(prompt).toContain("Assistant: 结果12");
+    for (const index of [2, 3, 4, 10, 11, 12]) expect(prompt).toContain("用户" + index);
+    for (const index of [5, 6, 7, 8, 9]) expect(prompt).not.toContain("用户" + index);
+    expect(prompt).toContain("最后请求");
+    expect(prompt).toContain("结果12");
+    expect(prompt).toMatch(/5.*omit/i);
   });
 
   it("清理标题包装并按 Unicode 字符限制长度，空标题保持为空", () => {

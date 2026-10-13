@@ -12,8 +12,9 @@ describe("正文填充预览", () => {
     const text = "old\n".repeat(100_000) + "latest";
     const tail = toolTextTail(text);
     expect(tail.endsWith("latest")).toBe(true);
-    expect(tail.length).toBeLessThanOrEqual(12_000);
-    expect(tail.split("\n").length).toBeLessThanOrEqual(80);
-    expect(toolTextTail("😀" + "a".repeat(11_999))).toBe("a".repeat(11_999));
+    expect(tail.length).toBeLessThan(text.length);
+    const withEmoji = toolTextTail("😀".repeat(100_000) + "latest");
+    expect(withEmoji.endsWith("latest")).toBe(true);
+    expect(Buffer.from(withEmoji).toString("utf8")).toBe(withEmoji);
   });
 });

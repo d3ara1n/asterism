@@ -23,8 +23,6 @@ describe("layout", () => {
     const result = layout([slot("a", 400, 1), slot("b", 400, 1), slot("c", 400, 1)], 900, 6);
     expect(result.overflow).toBe(true);
     expect(result.spans.map(span => span.width)).toEqual([400, 400, 400]);
-  });
-  it("overflows when a single minimum is wider than the viewport", () => {
     expect(layout([slot("a", 1200, 1)], 900, 6).overflow).toBe(true);
   });
 });
@@ -34,11 +32,9 @@ describe("follow", () => {
   it("keeps the viewport still when the focused island is fully visible", () => {
     expect(follow(spans, 1, 900, 0)).toBe(0);
   });
-  it("aligns the right edge when focus moves deeper past the viewport", () => {
+  it("越界焦点沿移动方向贴边，返回时贴近左缘", () => {
     // c 位于 812..1212，右缘对齐视口：1212 - 900
     expect(follow(spans, 2, 900, 0)).toBe(312);
-  });
-  it("aligns the left edge when focus returns past the viewport", () => {
     expect(follow(spans, 0, 900, 312)).toBe(0);
   });
 });
@@ -50,7 +46,7 @@ describe("open and close", () => {
     expect(next.islands.map(island => island.id)).toEqual(["root", "c"]);
     expect(next.focus).toBe("c");
   });
-  it("closes deeper islands and returns focus to the left neighbour, never the root", () => {
+  it("关闭深层浮岛回到保留的父浮岛，根浮岛不能关闭", () => {
     expect(closeIsland(state, "a")).toMatchObject({ islands: [{ id: "root" }], focus: "root" });
     expect(closeIsland(state, "root")).toBe(state);
   });

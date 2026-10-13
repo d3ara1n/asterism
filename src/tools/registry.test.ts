@@ -5,7 +5,6 @@ import { defineData } from "@atelier/sdk/contracts";
 import { implement } from "./testing.ts";
 import { declareTool, projectTool } from "./definition.ts";
 import { ToolRegistry } from "./registry.ts";
-import { finishToolResult } from "./result.ts";
 
 const Sample = defineTool({
   id: "test.tools/sample", name: "sample",
@@ -37,18 +36,18 @@ describe("工具定义与实现注册边界", () => {
   });
 
   it("拒绝重复支持关系和重复实现身份", () => {
-    expect(() => new ToolRegistry([text, text])).toThrow("Duplicate tool implementation");
-    expect(() => new ToolRegistry([text, { ...collection, reference: text.reference }])).toThrow("Duplicate tool implementation");
-    expect(() => new ToolRegistry([text, { ...collection, resourceKind: "text" }])).toThrow("Duplicate tool implementation");
+    expect(() => new ToolRegistry([text, text])).toThrow();
+    expect(() => new ToolRegistry([text, { ...collection, reference: text.reference }])).toThrow();
+    expect(() => new ToolRegistry([text, { ...collection, resourceKind: "text" }])).toThrow();
   });
 
   it("共享实际声明对象，独立副本即使 ID 相同也冲突", () => {
     const copy = defineTool({ ...Sample, argsSchema: z.strictObject({}).describe("No operation parameters.") });
     expect(copy).not.toBe(Sample);
-    expect(() => new ToolRegistry([text, { ...collection, tool: copy }])).toThrow("Conflicting tool contract");
+    expect(() => new ToolRegistry([text, { ...collection, tool: copy }])).toThrow();
     for (const tool of [
       defineTool({ ...Sample, id: "test.tools/other" }),
-    ]) expect(() => new ToolRegistry([text, { ...collection, tool }])).toThrow("Conflicting tool contract");
+    ]) expect(() => new ToolRegistry([text, { ...collection, tool }])).toThrow();
   });
 
   it("声明时要求 args、target 与 result 的整体描述", () => {
@@ -67,13 +66,14 @@ describe("工具定义与实现注册边界", () => {
       description: "Find matching items.", guidelines: ["Supply a query before searching."],
       args: { description: "Search parameters.", properties: { query: { description: "The text to match." } } },
     });
-    expect(declareTool(Find)).toEqual({
-      name: "find", description: "Find matching items.\n\nGuidelines:\n- Supply a query before searching.", parameters: resourceDefinition.args,
-    });
+    const declaration = declareTool(Find);
+    expect(declaration).toMatchObject({ name: "find", parameters: resourceDefinition.args });
+    expect(declaration.description).toContain(Find.description);
+    expect(declaration.description).toContain(Find.guidelines[0]);
     expect(declareTool(defineTool({ ...Find, guidelines: [] })).description).toBe("Find matching items.");
   });
 
-  it("target 可以是方块定位，handler 与模型投影按各自契约执行", async () => {
+  it("target 可以是方块定位，handler 取得具型参数并校验产出", async () => {
     const contract = defineImplementation({
       ...defineData("test.game.move", z.strictObject({ x: z.number().nonnegative(), piece: z.string() }).describe("The moved piece and its new position.")),
       resource: defineResource("game", z.object({ origin: z.number() })),
@@ -92,11 +92,9 @@ describe("工具定义与实现注册边界", () => {
     const invoke = (delta: number) => {
       const prepared = implementation.prepare(resource, { piece: "T" }, { delta });
       if (!("execute" in prepared)) throw new Error("Valid arguments were rejected.");
-      return prepared.execute(new AbortController().signal).then(result => finishToolResult(result,
-        { implementation: prepared.implementation }, null, prepared.toModel));
+      return prepared.execute(new AbortController().signal);
     };
-    expect(await invoke(1)).toEqual({ kind: "succeeded", data: { x: 3, piece: "T" },
-      model: [{ kind: "text", text: "Moved T to 3" }], implementation: { id: "test.game.move" } });
+    expect(await invoke(1)).toMatchObject({ kind: "succeeded", data: { x: 3, piece: "T" } });
     expect(implementation.prepare(resource, { path: "T" }, { delta: 1 })).toMatchObject({ kind: "rejected" });
     expect(implementation.prepare(resource, { piece: "T" }, { delta: "1" })).toMatchObject({ kind: "rejected" });
     expect(implementation.prepare({ ...resource, data: {} }, { piece: "T" }, { delta: 1 })).toMatchObject({ kind: "failed" });

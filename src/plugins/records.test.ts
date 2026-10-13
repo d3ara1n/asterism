@@ -1,9 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { defineRecord, type SessionRecord } from "@atelier/sdk/contracts";
-import { Execution } from "../modules/agent/records.ts";
 import { sessionView } from "./records.ts";
-import { attached, event, node, text } from "../session/test-nodes.ts";
+import { attached, event, node } from "../session/test-nodes.ts";
 
 const contract = defineRecord("example.plugin/value", { schema: z.object({ value: z.number() }) });
 const record: SessionRecord = { id: "r", sessionId: "s", parentId: null, sequence: 1, createdAt: "2026-10-11T00:00:00Z",
@@ -34,13 +33,15 @@ describe("共享时间轴的契约解码", () => {
     expect(view.records.all({ scope: "session" }).map(record => record.data)).toEqual([{ value: "bad" }, { value: 2 }]);
     expect(() => { (view.records.all({ scope: "session" })[0]!.data as { value: string }).value = "changed"; }).toThrow();
   });
-  it("执行块按插件记录原样保存与读取，宿主不改写载荷，来源取自节点", () => {
-    const block = node("block", null, text("a", "response", 0, "Answer", { continuation: { opaque: "resume" },
-      completion: { usage: null, finishReason: "stop", rawFinishReason: null, providerResponseId: "remote" } }));
-    const decoded = sessionView("s", "Model", [block], [block]).records.first(Execution, { scope: "path" });
-    expect(decoded).toMatchObject({ status: "known", record: { source: { resource: { id: "a" } } }, data: {
-      type: "block", block: { kind: "text", text: "Answer", continuation: { opaque: "resume" }, completion: { providerResponseId: "remote" } },
-    } });
+  it("不透明插件载荷与来源按信封原样交付，宿主不解释字段", () => {
+    const opaque = { value: 7, future: { secret: "plugin-owned", items: [null, "resume"] } };
+    const declared = defineRecord("example.plugin/opaque", { schema: z.json() });
+    const saved = node("opaque", null, event(declared.id, opaque, {
+      source: { plugin: "example.plugin", resource: { id: "resource", kind: "example.plugin/resource" } },
+    }));
+    const decoded = sessionView("s", "", [saved], [saved]).records.first(declared, { scope: "path" });
+    expect(decoded).toMatchObject({ status: "known", data: opaque,
+      record: { source: { plugin: "example.plugin", resource: { id: "resource", kind: "example.plugin/resource" } } } });
   });
   it("具型 last 按范围索引仅解码目标；最新坏记录不回退，固定快照不受后续追加影响", () => {
     const first = value("first", null, { value: 1 });
@@ -55,7 +56,7 @@ describe("共享时间轴的契约解码", () => {
     expect(decode).toHaveBeenCalledTimes(2);
     expect(view.records.first(contract, { scope: "session" })).toMatchObject({ status: "known", record: { id: "first" } });
     expect(decode).toHaveBeenCalledTimes(3);
-    expect(view.records.last(Execution, { scope: "session" })).toBeNull();
+    expect(view.records.last(defineRecord("other.plugin/absent", { schema: z.json() }), { scope: "session" })).toBeNull();
     nodes.push(value("later", "first", { value: 3 }));
     expect(view.records.last(contract, { scope: "session" })?.record.id).toBe("branch");
     decode.mockRestore();

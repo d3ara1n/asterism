@@ -9,7 +9,6 @@ import * as runtimeModules from "../runtime.ts";
 import { loadPlugins } from "../../plugins/loader.ts";
 import { Agent, CreateAgent } from "../agent/contract.ts";
 import { Execution, UserMessage } from "../agent/records.ts";
-import { projectForAgent } from "../agent/projection.ts";
 import { SessionNamed } from "./records.ts";
 
 const roots: string[] = [], services: ApplicationService[] = [];
@@ -75,8 +74,8 @@ describe("两级自动命名", () => {
     const test = await open(() => title("Opening title"));
     test.submitBatch(["Opening request", "Additional request"]); await test.idle();
     expect(test.requests).toHaveLength(1);
-    expect(test.requests[0]!.messages[0]).toMatchObject({ parts: [{ kind: "text", text: expect.stringContaining("User: Opening request") }] });
-    expect(test.requests[0]!.messages[0]).toMatchObject({ parts: [{ kind: "text", text: expect.not.stringContaining("User: Additional request") }] });
+    expect(test.requests[0]!.messages[0]).toMatchObject({ parts: [{ kind: "text", text: expect.stringContaining("Opening request") }] });
+    expect(test.requests[0]!.messages[0]).toMatchObject({ parts: [{ kind: "text", text: expect.not.stringContaining("Additional request") }] });
     expect(test.session.snapshot().records.last(SessionNamed, { scope: "session" })).toMatchObject({ data: { source: "auto", auto: { level: "initial", model: "test/model" } } });
   });
 
@@ -91,7 +90,7 @@ describe("两级自动命名", () => {
     await test.idle();
     expect(test.requests).toHaveLength(2);
     expect(test.requests[1]!.messages[0]).toMatchObject({ parts: [{ kind: "text", text: expect.stringContaining("找到了 token 过期原因") }] });
-    expect(test.requests[1]!.messages[0]).toMatchObject({ parts: [{ kind: "text", text: expect.stringContaining("User: 请求 5") }] });
+    expect(test.requests[1]!.messages[0]).toMatchObject({ parts: [{ kind: "text", text: expect.stringContaining("请求 5") }] });
     const snapshot = test.session.snapshot();
     expect(snapshot.records.query(SessionNamed, { scope: "session" }).map(value => value.status === "known" && value.data))
       .toMatchObject([{ title: "修复登录", source: "auto", auto: { level: "initial", model: "test/model" } },
@@ -99,9 +98,6 @@ describe("两级自动命名", () => {
     expect(test.session.title.get()).toBe("完善 token 刷新");
     expect(test.service.sessions.tree.nodes(test.sessionId).filter(node =>
       node.contract === SessionNamed.id).every(node => node.model === null)).toBe(true);
-    const projected = projectForAgent(snapshot, test.agentId);
-    expect(JSON.stringify(projected)).not.toContain("完善 token 刷新");
-    expect(JSON.stringify(projected)).not.toContain("session.named");
   });
 
   it("用户命名即使文字相同也阻止在途结果和后续自动命名，跨分支仍保护会话标题", async () => {

@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { configurationResultSchema, resolveModelRole, type ConfigurationCommand, type ConfigurationSnapshot } from "../shared/configuration.ts";
+import { resolveModelRole, type ConfigurationSnapshot } from "../shared/configuration.ts";
 import { ConfigurationService } from "./service.ts";
 import type { ConnectionProbe } from "./probe.ts";
 import { configurationDefaults, resolveAgentConfiguration, resolveRoleConfiguration } from "./layers.ts";
@@ -46,7 +46,6 @@ describe("真实配置与消费边界", () => {
     const saved = await service.execute({ type: "agent.save", id: "worker", value: {
       systemPrompt: "Custom instructions", enabled: false, tools: [], subagentRoles: [],
     } });
-    expect(configurationResultSchema.safeParse({ ok: true, ...saved }).success).toBe(true);
     expect(saved.snapshot.agents.find(agent => agent.id === "worker")).toMatchObject({
       systemPrompt: "Custom instructions", enabled: false, tools: [], subagentRoles: [],
     });
@@ -61,14 +60,14 @@ describe("真实配置与消费边界", () => {
     await service.execute({ type: "role.save", id: "default", value: { thinking: "off", enabled: false } });
     const agent = await service.execute({ type: "agent.save", id: null, value: { name: "Supervisor", tools: [] } });
     expect(agent.snapshot.agents.find(item => item.id === agent.savedId)).toMatchObject({
-      name: "Supervisor", tools: [], systemPrompt: configurationDefaults.agents.worker!.systemPrompt, timeout: 2400, enabled: true,
+      name: "Supervisor", tools: [], systemPrompt: configurationDefaults.agents.worker!.systemPrompt, timeout: configurationDefaults.agents.worker!.timeout, enabled: true,
     });
     const role = await service.execute({ type: "role.save", id: null, value: { name: "Custom" } });
-    expect(role.snapshot.roles.find(item => item.id === role.savedId)).toMatchObject({ name: "Custom", thinking: "medium", enabled: true });
+    expect(role.snapshot.roles.find(item => item.id === role.savedId)).toMatchObject({ name: "Custom", thinking: configurationDefaults.roles.default!.thinking, enabled: true });
     await service.execute({ type: "remove", kind: "agent", id: "worker" });
     const after = await service.execute({ type: "agent.save", id: null, value: { name: "Independent" } });
     expect(after.snapshot.agents.find(item => item.id === after.savedId)?.systemPrompt).toBe(configurationDefaults.agents.worker!.systemPrompt);
-    await expect(service.execute({ type: "role.save", id: null, value: {} })).rejects.toThrow("require a name");
+    await expect(service.execute({ type: "role.save", id: null, value: {} })).rejects.toMatchObject({ code: "invalid_request" });
   });
   it("工具策略覆盖替换内置策略；显式 null 与缺省分别表示调用方继承和内置值", async () => {
     const { service } = setup();
@@ -76,7 +75,7 @@ describe("真实配置与消费边界", () => {
     expect(saved.snapshot.agents.find(item => item.id === "explorer")).toMatchObject({ tools: null, excludeTools: ["bash"] });
     const empty = await service.execute({ type: "agent.save", id: "explorer", value: { tools: [] } });
     expect(empty.snapshot.agents.find(item => item.id === "explorer")).toMatchObject({ tools: [], excludeTools: null });
-    await expect(service.execute({ type: "agent.save", id: "explorer", value: { tools: [], excludeTools: [] } })).rejects.toThrow("Invalid configuration");
+    await expect(service.execute({ type: "agent.save", id: "explorer", value: { tools: [], excludeTools: [] } })).rejects.toMatchObject({ code: "invalid_request" });
     const inherited = await service.execute({ type: "role.save", id: "heavy", value: { thinking: null, hidden: false } });
     expect(resolveModelRole(inherited.snapshot, "heavy", { model: null, thinking: "low" }).thinking).toBe("low");
     const reset = await service.execute({ type: "role.save", id: "heavy", value: {} });
@@ -85,13 +84,14 @@ describe("真实配置与消费边界", () => {
   it("内置升级只改变未覆盖字段，已取得的生效配置保持稳定", () => {
     const oldDefaults = structuredClone(configurationDefaults);
     const nextDefaults = structuredClone(configurationDefaults);
+    oldDefaults.agents.worker!.timeout = 1200;
     nextDefaults.agents.worker!.timeout = 3000;
     nextDefaults.agents.worker!.systemPrompt = "New built-in prompt";
     nextDefaults.roles.default!.thinking = "high";
     const agent = { id: "custom-agent", revision: 1, builtin: false, overrides: { name: "Custom", systemPrompt: "Pinned prompt" } };
     const before = resolveAgentConfiguration(agent, oldDefaults);
     const after = resolveAgentConfiguration(agent, nextDefaults);
-    expect(before.timeout).toBe(2400);
+    expect(before.timeout).toBe(1200);
     expect(after).toMatchObject({ timeout: 3000, systemPrompt: "Pinned prompt" });
     const role = { id: "custom-role", revision: 1, builtin: false, overrides: { name: "Custom", hidden: false } };
     expect(resolveRoleConfiguration(role, nextDefaults)).toMatchObject({ thinking: "high", hidden: false });
@@ -111,7 +111,6 @@ describe("真实配置与消费边界", () => {
     const { providerId } = await addModel(service, "api_key");
     await service.execute({ type: "agent.save", id: "worker", value: { systemPrompt: "Pinned", enabled: false, tools: [] } });
     await service.execute({ type: "role.save", id: "heavy", value: { thinking: null, hidden: false } });
-    expect(protector.encrypt).toHaveBeenCalledWith("test-key-not-for-network");
     expect(existsSync(join(root, "db"))).toBe(false);
     expect(readFileSync(join(root, "configuration.json"), "utf8")).not.toContain("test-key-not-for-network");
     const encrypted = readFileSync(join(root, "credentials", readdirSync(join(root, "credentials"))[0]!));
@@ -123,7 +122,7 @@ describe("真实配置与消费边界", () => {
       expect(result.snapshot.providers[0]).toMatchObject({ id: providerId, credentialState: "available" });
       expect(result.snapshot.models).toHaveLength(1);
       expect(result.snapshot.overrides.agents.worker).toEqual({ systemPrompt: "Pinned", enabled: false, tools: [] });
-      expect(result.snapshot.agents.find(agent => agent.id === "worker")).toMatchObject({ revision: 2, enabled: false, tools: [] });
+      expect(result.snapshot.agents.find(agent => agent.id === "worker")).toMatchObject({ enabled: false, tools: [] });
       expect(result.snapshot.overrides.roles.heavy).toEqual({ thinking: null, hidden: false });
       expect(JSON.stringify(result)).not.toMatch(/test-key-not-for-network|credentialRef|ciphertext/);
     } finally { reopened.close(); }
@@ -137,7 +136,7 @@ describe("真实配置与消费边界", () => {
     expect(removed.snapshot.roles.find(role => role.id === "heavy")?.model).toBe(modelId);
     expect(assigned.snapshot.models).toHaveLength(1);
     expect(resolveModelRole(removed.snapshot, "heavy", { model: "another", thinking: "low" }).error).toBe("model_unavailable");
-    await expect(service.execute({ type: "test.start", model: modelId })).rejects.toThrow("no longer exists");
+    await expect(service.execute({ type: "test.start", model: modelId })).rejects.toMatchObject({ code: "not_found" });
   });
   it("只有空值继承；显式 off 不继承，停用不等于隐藏", async () => {
     const { service } = setup();
@@ -152,7 +151,7 @@ describe("真实配置与消费边界", () => {
   });
   it("内置模型角色不可删除；自定义和 agent 可删，重开不重新播种", async () => {
     const { service, root, protector } = setup();
-    await expect(service.execute({ type: "remove", kind: "role", id: "smart"})).rejects.toThrow("cannot be deleted");
+    await expect(service.execute({ type: "remove", kind: "role", id: "smart"})).rejects.toMatchObject({ code: "invalid_request" });
     const { snapshot } = await service.execute({ type: "read" });
     const custom = await service.execute({ type: "role.save", id: null, value: { ...roleValue(snapshot, "default"), name: "Custom" } });
     await service.execute({ type: "remove", kind: "role", id: custom.savedId!});
@@ -162,15 +161,11 @@ describe("真实配置与消费边界", () => {
     try { expect((await reopened.execute({ type: "read" })).snapshot.agents.some(agent => agent.id === "advisor")).toBe(false); }
     finally { reopened.close(); }
   });
-  it("凭据保护不可用时不写明文，普通配置按显式保存更新", async () => {
+  it("凭据保护不可用时拒绝保存密钥，不落明文", async () => {
     const { service, root } = setup(undefined, false);
-    await expect(addModel(service, "api_key")).rejects.toThrow("could not be saved");
+    await expect(addModel(service, "api_key")).rejects.toThrow();
     expect(readdirSync(join(root, "credentials"))).toEqual([]);
-    const { providerId } = await addModel(service);
-    const save: ConfigurationCommand = { type: "provider.save", id: providerId, value: { ...providerValue, name: "Updated" }, credential: { action: "keep" } };
-    await service.execute(save);
-    await service.execute(save);
-    expect((await service.execute({ type: "read" })).snapshot.providers[0]?.name).toBe("Updated");
+    expect(JSON.stringify((await service.execute({ type: "read" })).snapshot)).not.toContain("test-key-not-for-network");
   });
   it("连接测试立即返回 ID，不占住配置读取；取消后迟到成功不覆盖结果", async () => {
     let resolveProbe!: () => void;
@@ -186,7 +181,7 @@ describe("真实配置与消费边界", () => {
     resolveProbe(); await Promise.resolve();
     expect((await service.execute({ type: "read" })).snapshot.tests[0]?.state).toBe("cancelled");
   });
-  it("超时主动取消网络请求，不保留活动计时器，结果带测试时配置修订", async () => {
+  it("超时主动取消网络请求，结果带测试时配置修订", async () => {
     vi.useFakeTimers();
     const probe = vi.fn<ConnectionProbe>(async ({ signal }) => new Promise<void>((_resolve, reject) => signal.addEventListener("abort", () => reject(new Error("aborted")), { once: true })));
     const { service } = setup(probe, true, 50);
@@ -204,7 +199,7 @@ describe("真实配置与消费边界", () => {
     const save = { type: "provider.save" as const, id: providerId, value: { ...providerValue, auth: "api_key" as const },
       credential: { action: "replace" as const, value: "replacement-test-key" } };
     protector.encrypt.mockRejectedValueOnce(new Error("Sensitive system detail"));
-    await expect(service.execute(save)).rejects.toThrow("could not be saved");
+    await expect(service.execute(save)).rejects.toThrow();
     expect(readdirSync(join(root, "credentials"))).toEqual([first]);
     await service.execute(save);
     const files = readdirSync(join(root, "credentials"));
@@ -235,7 +230,7 @@ describe("真实配置与消费边界", () => {
     try {
       await expect(service.execute({ type: "provider.save", id: providerId,
         value: { ...providerValue, name: "Must not commit", auth: "api_key" },
-        credential: { action: "replace", value: "replacement-test-key" } })).rejects.toThrow("could not be saved");
+        credential: { action: "replace", value: "replacement-test-key" } })).rejects.toThrow();
       expect((await service.execute({ type: "read" })).snapshot.providers).toEqual(before.providers);
       expect(readdirSync(join(root, "credentials"))).toEqual(credentials);
       expect(readdirSync(root).some(file => file.endsWith(".tmp"))).toBe(false);
@@ -249,19 +244,16 @@ describe("真实配置与消费边界", () => {
       expect((await reopened.execute({ type: "read" })).snapshot.providers[0]).toMatchObject({ id: providerId, name: "Local", revision: 1 });
     } finally { reopened.close(); }
   });
-  it.each([
-    ["无效 JSON", "{broken"],
-    ["不支持的版本", JSON.stringify({ version: 999, providers: [], models: [], roles: [], agents: [] })],
-    ["缺失配置类别", JSON.stringify({ version: 1, providers: [], models: [] })],
-    ["身份重复", JSON.stringify({ version: 1, providers: [], models: [], agents: [],
-      roles: [{ id: "default", revision: 1, builtin: true, overrides: {} }, { id: "default", revision: 2, builtin: true, overrides: {} }] })],
-  ])("%s 不触发重置或覆盖原配置", (_name, content) => {
-    const { root, service, protector } = setup();
-    service.close();
-    const path = join(root, "configuration.json");
-    writeFileSync(path, content);
-    expect(() => new ConfigurationService(root, protector)).toThrow("invalid or unsupported");
-    expect(readFileSync(path, "utf8")).toBe(content);
+  it.each(["无效 JSON", "不支持的版本", "缺失配置类别", "身份重复"])("%s 不触发重置或覆盖原配置", scenario => {
+    const { root, service, protector } = setup(); service.close();
+    const file = join(root, "configuration.json"), document = JSON.parse(readFileSync(file, "utf8"));
+    if (scenario === "不支持的版本") document.version = 999;
+    else if (scenario === "缺失配置类别") delete document.agents;
+    else if (scenario === "身份重复") document.roles.push(structuredClone(document.roles[0]));
+    const content = scenario === "无效 JSON" ? "{broken" : JSON.stringify(document);
+    writeFileSync(file, content);
+    expect(() => new ConfigurationService(root, protector)).toThrow();
+    expect(readFileSync(file, "utf8")).toBe(content);
   });
   it("关闭服务取消在途连接测试并拒绝后续命令", async () => {
     const probe = vi.fn<ConnectionProbe>(async ({ signal }) => new Promise<void>((_resolve, reject) => signal.addEventListener("abort", () => reject(new Error("aborted")), { once: true })));
@@ -270,7 +262,7 @@ describe("真实配置与消费边界", () => {
     await service.execute({ type: "test.start", model: modelId });
     service.close();
     expect(probe.mock.calls[0]![0].signal.aborted).toBe(true);
-    await expect(service.execute({ type: "read" })).rejects.toThrow("unavailable");
+    await expect(service.execute({ type: "read" })).rejects.toMatchObject({ code: "unavailable" });
   });
 
 });

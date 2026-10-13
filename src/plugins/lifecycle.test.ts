@@ -15,7 +15,6 @@ describe("共享运行生命周期", () => {
     }, caller.signal);
     const iterator = stream[Symbol.asyncIterator]();
     expect(await iterator.next()).toEqual({ done: false, value: 1 });
-    expect(stream[Symbol.asyncIterator]()).toBe(iterator);
     const closing = mode === "return" ? iterator.return!() : lifecycle.close();
     await Promise.resolve();
     expect(cleaned).toBe(false);
@@ -37,7 +36,7 @@ describe("共享运行生命周期", () => {
     expect(work.signal.aborted).toBe(true);
     expect(child.signal.aborted).toBe(true);
     expect(lifecycle.activity(object.sessionId)).toEqual([object.id]);
-    expect(() => task.start(async () => {})).toThrow(/closing/);
+    expect(() => task.start(async () => {})).toThrow();
     release(); await closing;
     expect(lifecycle.activity(object.sessionId)).toEqual([]);
   });

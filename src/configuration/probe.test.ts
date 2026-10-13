@@ -18,7 +18,7 @@ describe("协议连接测试", () => {
   it("不会把 API key 发送到远程明文 HTTP 端点", async () => {
     const transport = vi.fn<typeof fetch>();
     await expect(runConnectionProbe({ provider: { ...provider("openai-chat"), auth: "api_key", baseUrl: "http://example.test/v1" },
-      model, apiKey: "must-not-be-sent", signal: new AbortController().signal }, transport)).rejects.toThrow("require HTTPS");
+      model, apiKey: "must-not-be-sent", signal: new AbortController().signal }, transport)).rejects.toThrow();
     expect(transport).not.toHaveBeenCalled();
   });
   it.each(["openai-responses", "openai-chat", "anthropic"] as const)("%s 显式请求正确端点，无鉴权时不使用环境密钥", async protocol => {

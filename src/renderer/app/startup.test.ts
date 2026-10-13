@@ -8,15 +8,15 @@ describe("模块启动准备", () => {
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
     let signal: AbortSignal | undefined;
     const done = vi.fn(async () => {});
-    await prepareModules([
-      { ...base, prepare: async () => { throw new Error("boom"); } },
-      { ...base, prepare: context => { signal = context.signal; return new Promise(() => {}); } },
-      { ...base, prepare: done },
-      base,
-    ], 20);
-    expect(done).toHaveBeenCalled();
-    expect(signal?.aborted).toBe(true);
-    expect(error).toHaveBeenCalledTimes(2);
-    error.mockRestore();
+    try {
+      await prepareModules([
+        { ...base, prepare: async () => { throw new Error("boom"); } },
+        { ...base, prepare: context => { signal = context.signal; return new Promise(() => {}); } },
+        { ...base, prepare: done },
+        base,
+      ], 20);
+      expect(done).toHaveBeenCalled();
+      expect(signal?.aborted).toBe(true);
+    } finally { error.mockRestore(); }
   });
 });

@@ -31,17 +31,21 @@ describe("任务进程请求生命周期", () => {
     expect(await pending).toEqual(error);
     requests.close();
   });
-  it("配置保存容纳系统凭据处理，不沿用工作台的 15 秒超时", async () => {
+  it("配置通道有独立等待策略，工作台超时不终止在途配置请求", async () => {
     vi.useFakeTimers();
-    const sent: { id: string }[] = [];
-    const timeout = vi.fn();
-    const requests = new ConfigurationRequests(message => sent.push(message as { id: string }), timeout);
-    const pending = requests.execute({ type: "read" });
-    await vi.advanceTimersByTimeAsync(20_000);
-    expect(timeout).not.toHaveBeenCalled();
-    requests.receive({ kind: "configuration.response", version: configurationVersion, id: sent[0]!.id, result: { ok: false, error: { code: "unavailable", message: "System protection is unavailable." } } });
-    expect((await pending).ok).toBe(false);
-    requests.close();
+    const sent: { id: string }[] = [], configTimeout = vi.fn(), runtimeTimeout = vi.fn();
+    const configuration = new ConfigurationRequests(message => sent.push(message as { id: string }), configTimeout);
+    const runtime = new RuntimeRequests(() => {}, runtimeTimeout);
+    const read = configuration.execute({ type: "read" }), workspace = runtime.execute({ type: "workspace.read" });
+    try {
+      await vi.advanceTimersToNextTimerAsync();
+      expect(runtimeTimeout).toHaveBeenCalled();
+      expect((await workspace).ok).toBe(false);
+      expect(configTimeout).not.toHaveBeenCalled();
+      configuration.receive({ kind: "configuration.response", version: configurationVersion, id: sent[0]!.id,
+        result: { ok: false, error: { code: "unavailable", message: "System protection is unavailable." } } });
+      expect((await read).ok).toBe(false);
+    } finally { configuration.close(); runtime.close(); }
   });
   it("按请求身份匹配响应，忽略未知响应", async () => {
     const sent: { id: string }[] = [];

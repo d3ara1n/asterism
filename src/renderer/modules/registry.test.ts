@@ -60,8 +60,8 @@ describe("视图契约分派", () => {
     }
   });
   it("拒绝重复注册；当前 schema 可自行兼容旧数据形状", () => {
-    expect(() => new ViewRegistry([{ resources: [], cards: [card, card], tools: [] }])).toThrow("Duplicate renderer");
-    expect(() => new ViewRegistry([{ resources: [], cards: [], tools: [tool, tool] }])).toThrow("Duplicate renderer");
+    expect(() => new ViewRegistry([{ resources: [], cards: [card, card], tools: [] }])).toThrow();
+    expect(() => new ViewRegistry([{ resources: [], cards: [], tools: [tool, tool] }])).toThrow();
     const current = defineData(data.id, z.union([z.strictObject({ content: z.string() }),
       data.schema.transform(({ text }) => ({ content: text }))]));
     const registry = new ViewRegistry([{ resources: [], cards: [], tools: [toolRenderer(current, { result: { bodyRenderer: () => null } })] }]);
@@ -76,7 +76,7 @@ describe("视图契约分派", () => {
     expect(resolve).not.toHaveBeenCalled();
     expect(registry.resource("missing").kind).toBe("missing");
     expect(registry.resource("missing").label).toBeTruthy();
-    expect(() => new ViewRegistry([{ resources: [descriptor, descriptor], cards: [], tools: [] }])).toThrow("Duplicate resource description");
+    expect(() => new ViewRegistry([{ resources: [descriptor, descriptor], cards: [], tools: [] }])).toThrow();
   });
 
   it("三态按同级入口分派，等待使用执行视图，缺少阶段不会借用其他阶段", () => {

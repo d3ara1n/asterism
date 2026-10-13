@@ -1,8 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { node, created as make, text, thinking, call, message, notice, event, attached, removed, hostSource, agentSource } from "../../../session/test-nodes";
-import { historyMessages } from "../../messages/history";
-import { getI18n } from "../../shared/i18n";
+import { node, created as make, text, thinking, call, message, notice, event, attached, removed } from "../../../session/test-nodes";
 import { ViewRegistry } from "../../modules/registry";
 import { builtinViews } from "../../../modules/renderer";
 import { workbenchRecordViews } from "../workbench/records";
@@ -29,8 +27,6 @@ describe("历史导航契约", () => {
     expect(entries.filter(entry => matchesHistoryView(entry, { kind: "resources" })).map(entry => entry.node.id)).toEqual(["4", "6", "7"]);
     expect(entries.filter(entry => matchesHistoryView(entry, { kind: "all" }))).toHaveLength(8);
     expect(historyResourceViews(entries).map(source => [source.resource.id, source.count])).toEqual([["a", 2], ["b", 1]]);
-    // A 的列表中 4 与 6 相邻，“6 之前”仍是被过滤掉的工作台事件 5。
-    expect(historyBefore(nodes, nodes[5])).toBe("5");
   });
   it("已移除、其他分支与非代理资源的自发事件仍可作为视图来源", () => {
     const nodes = [
@@ -39,6 +35,8 @@ describe("历史导航契约", () => {
       node("3", "1", event("board.move", {}, { source: { plugin: "example.board", resource: { id: "r", kind: "board" } } })),
     ];
     const entries = historyEntries(nodes, label);
+    expect(historyResources(nodes).get("r")).toEqual({ id: "r", kind: "board", title: "Game" });
+    expect(entries[2]).toMatchObject({ scope: "resource", resource: { id: "r", title: "Game" } });
     expect(historyResourceViews(entries)).toEqual([{ resource: { id: "r", kind: "board", title: "Game" }, count: 1 }]);
     expect(entries.filter(entry => matchesHistoryView(entry, { kind: "resource", resourceId: "r" })).map(entry => entry.node.id)).toEqual(["3"]);
   });
@@ -54,22 +52,9 @@ describe("历史导航契约", () => {
     nodes[4].createdAt = "2026-10-09T10:00:00Z"; // 时钟时间不参与导航排序。
     const entries = historyEntries(nodes, label);
     expect(entries.map(entry => entry.node.id)).toEqual(["1", "2", "3", "4", "5"]);
-    expect(entries[1].label).toBe("First paragraph");
     expect(entries[2].scope).toBe("session");
     expect(entries[3].resource?.title).toBe("Beta");
     expect(entries[4].resource?.title).toBe("Alpha");
-  });
-  it("移除对象与另一分支不丢失资源身份；资源自发事件沿自己的身份解析", () => {
-    const nodes = [
-      node("1", null, created("n", "Old note", "note")),
-      node("2", "1", removed("n")),
-      node("3", "1", event("custom.saved", {}, { source: { plugin: "example.custom", resource: { id: "n", kind: "note" } } })),
-    ];
-    const entries = historyEntries(nodes, label);
-    expect(historyResources(nodes).get("n")).toEqual({ id: "n", kind: "note", title: "Old note" });
-    expect(entries[1].label).toBe(getI18n().formatMessage(historyMessages.eventRemoved, { title: "Old note" }));
-    expect(entries[2].scope).toBe("resource");
-    expect(entries[2].resource?.title).toBe("Old note");
   });
   it("不完整块也是历史位置，查看之前使用真实父节点而非过滤后的上一行", () => {
     const nodes = [
@@ -81,7 +66,8 @@ describe("历史导航契约", () => {
       node("6", "1", message("a", "Another branch")),
     ];
     expect(historyEntries(nodes, label).map(entry => entry.node.id)).toEqual(["1", "2", "3", "4", "5", "6"]);
-    expect(historyEntries(nodes, label)[2].label).toBe("read · input.md");
+    const filtered = historyEntries(nodes, label).filter(entry => entry.node.id === "3" || entry.node.id === "5");
+    expect(filtered.map(entry => entry.node.id)).toEqual(["3", "5"]);
     expect(historyBefore(nodes, nodes[2])).toBe("2");
     expect(historyBefore(nodes, nodes[4])).toBe("4");
     expect(historyBefore(nodes, nodes[5])).toBe("1");

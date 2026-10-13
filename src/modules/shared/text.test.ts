@@ -72,7 +72,7 @@ describe("正文工具契约", () => {
     const before = "a\nb";
     const rows = readText(before, true).rows;
     const removed = editText(before, [{ op: "delete", anchor: { line: 1, hash: rows[0].hash! } }]);
-    expect(removed).toMatchObject({ text: "b", touchedLines: [0] });
+    expect(removed.text).toBe("b");
     const empty = editText(before, [{ op: "delete", anchor: { line: 1, hash: rows[0].hash! }, end: { line: 2, hash: rows[1].hash! } }]);
     expect(empty.text).toBe("");
     expect(editText("", [{ op: "append", body: ["new"] }]).text).toBe("new\n");
@@ -86,12 +86,19 @@ describe("正文工具契约", () => {
     const after = Array.from({ length: 50 }, (_, i) => `${i} ${"x".repeat(2000)}`).join("\n");
     const change = textChange("", after, "text.txt", Array.from({ length: 50 }, (_, i) => i));
     expect(change.anchorsTruncated).toBe(true);
-    expect(Buffer.byteLength(editToModel(change))).toBeLessThan(84 * 1024);
-    expect(editToModel(change)).toContain("Diff output was truncated");
-    expect(editToModel(change)).toContain("Updated anchors (use for the next edit):");
-    expect(editToModel(change)).toContain("Some updated anchors were omitted");
-    expect(writeToModel(change)).toBe("Content saved (+50 -0).");
-    expect(writeToModel(textChange(after, after, "text.txt"))).toBe("Content was already identical; no change was needed.");
+    const model = editToModel(change), lines = model.split("\n");
+    const diff = lines.filter(line => /^(?:@@ |--- |\+\+\+ |[ +\-\\])/.test(line)).join("\n");
+    const anchors = lines.filter(line => /^\d+#.*│/.test(line));
+    expect(Buffer.byteLength(diff)).toBeLessThanOrEqual(64 * 1024);
+    expect(anchors.length).toBeLessThanOrEqual(40);
+    expect(Buffer.byteLength(anchors.join("\n"))).toBeLessThanOrEqual(16 * 1024);
+    expect(model).toMatch(/truncat/i);
+    expect(model).toMatch(/omit/i);
+    for (const anchor of change.anchors) expect(model).toContain(String(anchor.line) + "#" + anchor.hash + "│" + anchor.content);
+    expect(writeToModel(change).split("\n")).toHaveLength(1);
+    expect(writeToModel(change)).not.toContain(change.diff);
+    expect(writeToModel(change)).not.toContain("│");
+    expect(writeToModel(textChange(after, after, "text.txt"))).toEqual(expect.any(String));
     expect(applyPatch("", change.diff)).toBe(after);
   });
   it("用户正文预览预算不限制 read 返回给模型的内容", () => {

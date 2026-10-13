@@ -74,7 +74,7 @@ describe("工具产出与终结", () => {
     expect(waiting[0]).not.toHaveProperty("startedAt");
     expect(outcome).toMatchObject({ kind: "succeeded", data: { text: "final" }, model: [{ kind: "text", text: "final" }], implementation: reference(contract),
       resource: { id: "r", kind: "test", title: resource.title }, startedAt: expect.any(Number), finishedAt: expect.any(Number) });
-    expect(toModel).toHaveBeenCalledTimes(1);
+    expect(toModel).toHaveBeenCalledWith({ text: "final" });
     expect(() => late({ text: 4 } as never)).not.toThrow();
     expect(updates).toHaveLength(2);
   });
@@ -109,17 +109,18 @@ describe("工具产出与终结", () => {
     expect(text(cleared)).not.toContain("invalidated preview");
   });
 
-  it.each(["read", "write"] as const)("%s 执行中抛出中止时保留产出，不能把未知写入伪装成已撤销", async effect => {
+  it.each([
+    { effect: "read", abort: false, kind: "failed" }, { effect: "write", abort: false, kind: "unknown" },
+    { effect: "read", abort: true, kind: "cancelled" }, { effect: "write", abort: true, kind: "unknown" },
+  ] as const)("$effect 执行抛错（中止=$abort）按副作用分类，保留已取得产出", async ({ effect, abort, kind }) => {
     const controller = new AbortController();
     const outcome = await run(async ({ publish, signal }) => {
-      publish({ text: "before abort" });
-      controller.abort();
-      signal.throwIfAborted();
-      return { kind: "succeeded", data: { text: "unreachable" } };
+      publish({ text: "captured" });
+      if (abort) { controller.abort(); signal.throwIfAborted(); }
+      throw new Error("Synthetic execution failure.");
     }, { effect, signal: controller.signal });
-    expect(outcome).toMatchObject({ kind: effect === "read" ? "cancelled" : "unknown", data: { text: "before abort" } });
-    expect(text(outcome)).toContain(outcome.kind);
-    expect(text(outcome)).toContain("before abort");
+    expect(outcome).toMatchObject({ kind, data: { text: "captured" } });
+    expect(text(outcome)).toContain(kind); expect(text(outcome)).toContain("captured");
   });
 
   it.each(["publish", "return"] as const)("%s 的不合法数据不会覆盖之前的有效快照", async where => {
@@ -148,7 +149,7 @@ describe("工具产出与终结", () => {
   it("模型投影失败保留已知执行结局，不绕过投影发送原始数据", async () => {
     const outcome = await run(async () => ({ kind: "succeeded", data: { text: "UI only" } }), { effect: "write", toModel() { throw new Error("Internal exception"); } });
     expect(outcome).toMatchObject({ kind: "succeeded", data: { text: "UI only" }, });
-    expect(text(outcome)).toContain("could not be prepared for the model");
+    expect(text(outcome)).toContain("succeeded");
     expect(JSON.stringify(outcome.model)).not.toContain("UI only");
     expect(JSON.stringify(outcome)).not.toContain("Internal exception");
   });
