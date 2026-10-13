@@ -4,6 +4,7 @@ import type { DataContract } from "./presentation.ts";
 import type { ConfigContract } from "./config.ts";
 import type { ModelLiveBlock } from "./models.ts";
 import type { ToolRenderProps, ToolView } from "./renderer-tools.ts";
+import type { EventSubscriber } from "./events.ts";
 
 export interface RendererCatalogs { get<T extends Json>(contract: DataContract<T>): T | null; error: UiText | null }
 export interface RendererTools {
@@ -16,6 +17,10 @@ const Catalogs = createContext<RendererCatalogs | null>(null);
 const Tools = createContext<RendererTools | null>(null);
 const Models = createContext<RendererModels | null>(null);
 const Navigation = createContext<RendererNavigation | null>(null);
+const Events = createContext<EventSubscriber | null>(null);
+export const RendererEventsProvider = Events.Provider;
+/** 全局具型订阅；组件应在 effect 清理时关闭自己建立的订阅。 */
+export function useRendererEvents(): EventSubscriber { return required(useContext(Events), "events"); }
 export const RendererCatalogsProvider = Catalogs.Provider;
 export const RendererToolsProvider = Tools.Provider;
 export const RendererModelsProvider = Models.Provider;

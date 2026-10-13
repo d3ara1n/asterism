@@ -4,6 +4,7 @@ export * from "./presentation.ts";
 export * from "./module-contract.ts";
 export * from "./plugin.ts";
 export * from "./records.ts";
+export * from "./events.ts";
 export * from "./tool-result.ts";
 export * from "./workspace.ts";
 export type * from "./models.ts";

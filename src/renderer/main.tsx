@@ -1,4 +1,6 @@
 import { StrictMode } from "react";
+import { RendererEventsProvider } from "@atelier/sdk/renderer";
+import { EventClient } from "../shared/event-client";
 import { HostI18nProvider, startLanguage } from "./shared/i18n";
 import { ErrorBoundary } from "./app/ErrorBoundary";
 import { MotionConfig } from "motion/react";
@@ -26,6 +28,10 @@ import { appMessages } from "./messages/app";
 
 startAppearance();
 const controller = new ApplicationController(window.host);
+const events = new EventClient(window.host.events);
+const lifetime = new AbortController();
+const stopEventStatus = window.host.onStatus(status => { if (status !== "ready") events.disconnect(); });
+window.addEventListener("pagehide", () => { lifetime.abort(); events.close(); stopEventStatus(); }, { once: true });
 // 插件视图只在启动时加载；内置视图之后合并，重复契约使该插件视图被忽略。
 const initial = await window.host.execute({ type: "workspace.read" }).catch(() => null);
 await startLanguage(initial?.ok ? initial.snapshot.catalogs ?? [] : []).catch(error => console.error("Language settings could not be loaded. English is used.", error));
@@ -39,7 +45,7 @@ for (const module of modules) {
 }
 const moduleViews = new ViewRegistry(accepted);
 showStartupStage(getI18n().formatMessage(appMessages.startupEnvironment));
-await Promise.all([prepareModules(accepted), loadPreferences()]);
+await Promise.all([prepareModules(accepted, events, undefined, lifetime.signal), loadPreferences()]);
 createRoot(document.getElementById("root")!).render(<StrictMode><HostI18nProvider><ErrorBoundary><MotionConfig reducedMotion="user"><TooltipProvider>
-  <HostConfigsProvider><ModuleViewsProvider registry={moduleViews}><App controller={controller} /></ModuleViewsProvider></HostConfigsProvider>
+  <RendererEventsProvider value={events}><HostConfigsProvider><ModuleViewsProvider registry={moduleViews}><App controller={controller} /></ModuleViewsProvider></HostConfigsProvider></RendererEventsProvider>
 </TooltipProvider></MotionConfig></ErrorBoundary></HostI18nProvider></StrictMode>);

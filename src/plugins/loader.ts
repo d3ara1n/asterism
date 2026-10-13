@@ -20,8 +20,11 @@ import type { ParsedCall } from "./commands.ts";
 import type { PluginConfiguration, PluginConfigurationCommand } from "../shared/plugin-configuration.ts";
 import type { ObjectStreamPayload } from "../shared/object-stream.ts";
 import type { ContentStore, ContentLease } from "../runtime/content-store.ts";
+import { EventBus } from "./events.ts";
+import { PluginEventScope } from "./event-scope.ts";
 
 export interface PluginHostServices {
+  events?: EventBus;
   extensionsDirectory: string;
   data: SessionDataStore;
   content?: ContentStore;
@@ -40,6 +43,7 @@ export interface PluginManifest {
   implementations: { id: string; tool: string; resource: string; active: boolean; overriddenBy?: string }[];
 }
 export interface LoadedPlugins {
+  events: EventBus;
   configure(command: PluginConfigurationCommand): PluginConfiguration[];
   activity(sessionId: string): { running: string[]; live: LiveBlock[] };
   resources: ResourceRegistry;
@@ -51,6 +55,7 @@ export interface LoadedPlugins {
   close(): Promise<void>;
 }
 interface Collected {
+  events: PluginEventScope;
   plugin: PluginDefinition; resources: ResourceBackend[]; tools: ToolImplementation[];
   actions: readonly ActionContract<unknown>[];
   observers: readonly SessionObserver[]; preparers: readonly CommandPreparer[];
@@ -117,6 +122,7 @@ function validate(entry: Collected): void {
 
 /** 启动时收集 SDK 贡献，按插件顺序解析覆盖并冻结目录。 */
 export function loadPlugins(plugins: readonly PluginDefinition[], services: PluginHostServices): LoadedPlugins {
+  const events = services.events ?? new EventBus();
   const manifest: PluginManifest[] = [], collected: Collected[] = [];
   const lifecycles: RunLifecycle[] = [];
   const failedCleanup: Promise<void>[] = [];
@@ -138,16 +144,18 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
       storage.onChanged = () => services.configurationChanged?.(id);
       const lifecycle = new RunLifecycle(sessionId => services.sessions.progressChanged(sessionId)); lifecycles.push(lifecycle);
       const taskHost = new TaskHost(log, lifecycle.group("task"));
+      const eventScope = new PluginEventScope(events, id, lifecycle.group("event"));
       const sdk = createSdkContext({ id, dir: storage.dir, log, config: contract => storage.config(contract),
-        secrets: storage.secrets, db: () => storage.db(), tasks: taskHost }, services, lifecycle.group("model"));
+        secrets: storage.secrets, db: () => storage.db(), tasks: taskHost }, services, lifecycle.group("model"), eventScope);
       const resources: ResourceBackend[] = [], tools: ToolImplementation[] = [], observers: SessionObserver[] = [], preparers: CommandPreparer[] = [];
       const actions: ActionContract<unknown>[] = [];
-      entry = { plugin, resources, tools, actions, observers, preparers, sdk, tasks: taskHost, storage, lifecycle, preparations: lifecycle.group("prepare"), closing: [] };
+      entry = { plugin, resources, tools, actions, observers, preparers, sdk, tasks: taskHost, storage, lifecycle, events: eventScope, preparations: lifecycle.group("prepare"), closing: [] };
       const commandIds = new Set<string>();
       for (const module of plugin.modules) {
         let contribution!: ModuleContribution;
         synchronous(() => { contribution = module.setup(sdk.context); return contribution; });
         if (contribution.closing) entry.closing.push(contribution.closing);
+        for (const contract of contribution.events ?? []) events.declare(id, contract);
         for (const record of contribution.records ?? []) sdk.declare(record);
         for (const resource of contribution.resources ?? []) {
           for (const record of resource.records) sdk.declare(record);
@@ -178,9 +186,11 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
       for (const key of ownIds) if (identities.has(key) || ownIds.indexOf(key) !== ownIds.lastIndexOf(key)) throw new Error(`Duplicate implementation: ${key}`);
       ownKinds.forEach(kind => kinds.add(kind)); ownIds.forEach(key => identities.add(key));
       tools.forEach(tool => toolContracts.set(tool.tool.id, tool.tool));
+      eventScope.activate();
       collected.push(entry); manifest.push({ id, version: plugin.version, status: "loaded", resources: ownKinds, implementations: [] });
     } catch (error) {
       if (entry) {
+        entry.events.stop(); events.removeOwner(id);
         entry.lifecycle.stop();
         failedCleanup.push(dispose(entry).catch(error => (services.log ?? defaultLog)(id, "error", "Plugin cleanup failed.", error)));
       }
@@ -189,6 +199,7 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
     }
   }
   async function dispose(entry: Collected) {
+    entry.events.stop();
     await entry.lifecycle.close();
     for (const close of [...entry.closing].reverse()) {
       try { await close(); } catch (error) { (services.log ?? defaultLog)(entry.plugin.namespace.id, "error", "Plugin closing callback failed.", error); }
@@ -211,6 +222,7 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
       const record = manifest.find(record => record.id === entry.plugin.namespace.id)!;
       record.status = "failed"; record.error = error; record.resources = [];
       entry.lifecycle.stop();
+      entry.events.stop(); events.removeOwner(entry.plugin.namespace.id);
       invalidEntries.add(entry);
       collected.splice(i, 1); invalidated = true;
     }
@@ -247,6 +259,7 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
   let closed = false;
   let closing: Promise<void> | undefined;
   return {
+    events,
     configure(command) {
       if (closed) throw new PluginApiError("unavailable", "Plugins are closing.");
       if (command.type !== "read") {
@@ -325,6 +338,8 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
     close() {
       if (closing) return closing;
       closed = true;
+      for (const entry of collected) entry.events.stop();
+      events.close();
       for (const lifecycle of lifecycles) lifecycle.stop();
       closing = (async () => {
         await Promise.allSettled(collected.map(entry => entry.lifecycle.close()));

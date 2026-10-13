@@ -3,6 +3,7 @@ import type { DataContract } from "./presentation.ts";
 import type { RecordContract } from "./records.ts";
 import type { ResourceRef, ResourceSnapshot, SessionSnapshot } from "./workspace.ts";
 import type { ContentReader, ContentScope } from "./content-runtime.ts";
+import type { EventPublisher } from "./events.ts";
 
 /** 同步事务中的数据与事件写入；宿主限制 writer 的调用有效期。 */
 export interface SessionWriter {
@@ -33,6 +34,7 @@ export interface ObjectReader {
   get<T extends Json>(contract: DataContract<T>): T | null;
 }
 export interface ObjectExecutor extends ObjectReader {
+  readonly events: EventPublisher;
   /** 暂存仅在宿主执行作用域有效；读取按对象已有归属或本次输入校验。 */
   readonly content: ContentScope;
   readonly session: SessionExecutor;

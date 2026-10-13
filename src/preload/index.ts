@@ -10,8 +10,20 @@ import { sessionChannel, sessionChangedChannel, sessionCommandSchema, sessionRes
 import { preferencesGetChannel, preferencesSetChannel, preferenceWriteSchema, uiStateSchemas } from "../shared/ui-state.ts";
 import { pluginConfigurationChangedChannel, pluginConfigurationChannel, pluginConfigurationCommandSchema, pluginConfigurationResultSchema } from "../shared/plugin-configuration.ts";
 import { contentChannel, contentCommandSchema, contentResultSchema } from "../shared/content.ts";
+import { pluginEventsChannel, eventControlSchema, eventFrameSchema } from "../shared/plugin-events.ts";
 
 const bridge: DesktopBridge = {
+  events: {
+    send(control) { ipcRenderer.send(pluginEventsChannel, eventControlSchema.parse(control)); },
+    onFrame(listener) {
+      const handler = (_event: Electron.IpcRendererEvent, raw: unknown) => {
+        const parsed = eventFrameSchema.safeParse(raw);
+        if (parsed.success) listener(parsed.data);
+      };
+      ipcRenderer.on(pluginEventsChannel, handler);
+      return () => ipcRenderer.removeListener(pluginEventsChannel, handler);
+    },
+  },
   content: {
     async execute(command) {
       const parsed = contentCommandSchema.safeParse(command);

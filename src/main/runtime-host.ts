@@ -11,6 +11,7 @@ import { handleSecretRequest } from "./secrets.ts";
 import { pluginConfigurationChangedSchema, pluginConfigurationResponseSchema, type PluginConfigurationCommand, type PluginConfigurationResult } from "../shared/plugin-configuration.ts";
 import { objectStreamSchema, type ObjectStream } from "../shared/object-stream.ts";
 import { contentResponseSchema, type ContentCommand, type ContentResult } from "../shared/content.ts";
+import { eventRuntimeFrameSchema, pluginEventsVersion, type EventControl, type EventFrame } from "../shared/plugin-events.ts";
 
 export class RuntimeHost {
   private child: UtilityProcess | null = null;
@@ -23,7 +24,8 @@ export class RuntimeHost {
   constructor(private readonly onStatus: (status: RuntimeStatus) => void, private readonly onConfigurationChanged: () => void = () => {},
     private readonly onSessionChanged: (event: SessionChanged) => void = () => {},
     private readonly onStream: (event: ObjectStream) => void = () => {},
-    private readonly onPluginConfigurationChanged: (pluginId: string) => void = () => {}) {}
+    private readonly onPluginConfigurationChanged: (pluginId: string) => void = () => {},
+    private readonly onEventFrame: (frame: EventFrame) => void = () => {}) {}
   private setStatus(status: RuntimeStatus): void { this.status = status; this.onStatus(status); }
 
   start(entry: string, root: string): Promise<void> {
@@ -85,6 +87,11 @@ export class RuntimeHost {
         reject(new Error("Task runtime encountered a fatal process error."));
       });
       child.on("message", raw => {
+        if (raw?.kind === "plugin-events.frame") {
+          const parsed = eventRuntimeFrameSchema.safeParse(raw);
+          if (parsed.success) this.onEventFrame(parsed.data.frame);
+          return;
+        }
         if (secretRequestSchema.safeParse(raw).success) {
           void handleSecretRequest(raw).then(response => {
             if (response && this.child === child && this.status !== "stopping") {
@@ -143,6 +150,14 @@ export class RuntimeHost {
       ok: false, error: { code: "unavailable", message: `The workspace is unavailable. Restart ${applicationBrand.en} to reopen it.` },
     });
     return this.requests.execute(command);
+  }
+
+  events(control: EventControl): void {
+    if (this.child && this.status === "ready") {
+      try { this.child.postMessage({ kind: "plugin-events.control", version: pluginEventsVersion, control }); return; }
+      catch { this.setStatus("unavailable"); }
+    }
+    if (control.type === "subscribe") this.onEventFrame({ type: "closed", id: control.id, end: { reason: "unavailable" } });
   }
 
   configure(command: ConfigurationCommand): Promise<ConfigurationResult> {

@@ -17,6 +17,7 @@ import type { ContentReader } from "./content-runtime.ts";
 export type { ContentReader } from "./content-runtime.ts";
 import type { CreationEntry } from "./renderer-creation.ts";
 import type { ToolRenderer } from "./renderer-tools.ts";
+import type { EventSubscriber } from "./events.ts";
 
 export type RendererReceipt = { ok: true } | { ok: false; error: { code: string; message: string; display?: UiText } };
 /** 绑定卡片对象的前端能力；宿主负责订阅、命令门禁和当前视图的一致性。 */
@@ -81,6 +82,8 @@ export interface RendererModule {
   prepare?(context: RendererPrepareContext): Promise<void>;
 }
 export interface RendererPrepareContext {
+  /** 与模块生命周期绑定的全局订阅，失败、超时和应用关闭时清理。 */
+  readonly events: EventSubscriber;
   /** 宿主放弃等待（超时或关闭）时触发；模块应尽快停止。 */
   readonly signal: AbortSignal;
 }

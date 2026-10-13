@@ -89,9 +89,19 @@ import { Read, settings, service } from "@example/tools/public";
 
 同一运行环境中，提供方内部引用与所有消费者取得同一个实际对象、函数或类，公共入口的 re-export 保留这种关系。配置与状态的公开形式由提供方决定；有生命周期的服务在提供方 setup 中初始化，消费者 setup 之后执行，关闭按相反顺序。模块顶层只应依赖模块本身已初始化的导出，不依赖尚未执行的插件 setup。缺失、禁用、重复公共包名、声明冲突和循环初始化依赖明确失败。
 
-后台与前端各有自己的模块实例；共享对象不跨进程。公共模块可以只提供导出而没有 runtime／renderer 入口，仍须登记并启用。通用跨进程通信继续独立设计。
+后台与前端各有自己的模块实例；共享对象不跨进程。公共模块可以只提供导出而没有 runtime／renderer 入口，仍须登记并启用。具型事件通过宿主的全局通信机制跨进程投递，通用调用留待有实际需求后设计。
 
 观察者消费提交时的固定快照；它产生的新提交按顺序排队，异常隔离。耗时任务用 `plugin.tasks.start`，以 key 去重并通过 `has / cancel` 查询和取消；可绑定本插件对象，使任务计入该对象的执行进度与收束检查。成功 setup 的 `closing` 清理立即登记，后续装配失败或正常关闭均取消工作并等待、按逆序清理；setup 返回前失败自行清理尚未交付的设施。`plugin.catalogs.get` 按领域数据契约读取只读目录；Agent 配置目录由 core 声明，模型与角色目录由模型服务提供。
+
+## 全局具型事件
+
+纯契约以 `ns.event(name, { schema, source, semantics })` 声明，归属插件在 `ModuleContribution.events` 登记。source 为 `plugin / resource / any`；`occurrence` 按次消费，`snapshot` 声明同键完整替代语义及顶层标量 key 字段。契约、发布输入与订阅载荷的类型由 schema 推导。
+
+后台 `plugin.ipc.events.publish(contract, data)` 发布插件级事件，`object.events.publish(contract, data)` 绑定资源来源；来源由宿主生成，载荷里的关联对象不改变 stamp。`plugin.ipc.events.subscribe(contract, { delivery?, source?, signal? }, handler)` 默认全局逐条消费，快照契约可选 latest 合并。setup 可以先订阅再返回声明，ready 在装配成功后生效。
+
+前端 `prepare({ events })` 可建立不依赖卡片挂载的模块订阅，失败、超时或应用关闭时自动取消；组件以 `useRendererEvents()` 取用接口，自行在 effect 清理时 close。订阅提供 ready、closed 与 close，handler 接收具型信封及取消信号。每个订阅按序投递、期间不丢事件，失败和断连明确结束。事件不参与事务，调用即投递。事件不写历史、不保留供晚订阅读取的状态，领域自行恢复当前值。
+
+[事件作者示例与类型反例](examples/events.ts) 随 typecheck 检查；完整来源与投递约定见 [插件 SDK](../../docs/plugin-sdk.md#瞬态事件与插件调用)。使用这些入口的插件声明 API 7.1；标题和通知的应用消费接入仍在独立计划中。
 
 ## 插件配置
 
@@ -153,7 +163,7 @@ ResourceDescription、ToolView、CreationEntry 的 label／description 接收 Ui
 
 ## 版本与当前边界
 
-SDK 包版本为 `0.10.0`，宿主提供 API 7.0；插件声明 `api: { major: 7, minMinor: 0 }`，其他主版本在加载前拒绝。应用 IPC 版本为 5，会话 IPC 为 18，内容 IPC 为 3，应用配置 IPC 为 3，插件配置 IPC 为 2；工作数据库格式为 18，应用配置文件格式为 2。
+SDK 包版本为 `0.11.0`，宿主提供 API 7.1；使用事件接口的插件声明 `api: { major: 7, minMinor: 1 }`，同主版本旧插件继续可用，其他主版本或更高小版本在加载前拒绝。应用 IPC 版本为 5，会话 IPC 为 18，内容 IPC 为 3，应用配置 IPC 为 3，插件配置 IPC 为 2，插件事件 IPC 为 1；工作数据库格式为 18，应用配置文件格式为 2。
 
 资源创建数据必须是 JSON 对象，不能占用宿主的 `id / type / title` 字段。当前会话数据保存于 `session_data`，事件及工具结果保存稳定契约身份与原始数据。core 消费具型用户消息、模型执行、通知与环境记录，存储编码由宿主负责；环境记录保留原事件身份与载荷。
 

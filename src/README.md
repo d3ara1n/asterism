@@ -38,6 +38,8 @@
 
 插件配置经独立 `plugin-configuration` 通道读写，不加载会话。对象二进制流经 `shared/object-stream.ts` 的同一信封从任务进程送至 main、preload；两端用 Zod 校验后交付，preload 按会话与对象筛选订阅，不写入事件或转换正文。
 
+全局具型事件由 `plugins/events.ts` 登记契约、校验并路由，`plugins/event-scope.ts` 绑定插件来源和运行生命周期。前后台订阅共用 `shared/event-queue.ts` 的按序队列与 latest 合并，以及 `shared/event-subscription.ts` 的建立、结束与取消状态。`runtime/event-peer.ts`、main 与 preload 经 `shared/plugin-events.ts` 逐条转发原始信封，`shared/event-client.ts` 按本地契约解码。事件不参与事务，publish 即投递；前端入口为 SDK prepare.events 与 useRendererEvents，领域消费接入见独立计划。
+
 语言偏好由 `main/language.ts` 管理，保存于 `language.json`；`preload` 只暴露语言读取、选择与订阅。插件静态目录由 `plugins/catalogs.ts` 在启动时读取，带 owner、规范化语言和内容修订，通过应用列表快照交付 renderer，包括没有前端入口的包。源消息按功能分别位于 `renderer/messages/` 与 `modules/messages/`，声明使用语义化引用名，目录按稳定的 owner/id 寻址；宿主译文在 `shared/locales/`，内置插件译文在 `modules/locales/`。会话准备与执行的插件错误统一由 `runtime/plugin-errors.ts` 适配，SDK 声明与作者路径见 [公共 i18n](../docs/i18n.md)。
 
 ## 开发与验证

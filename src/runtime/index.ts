@@ -6,6 +6,8 @@ import { join } from "node:path";
 import { PackageList, loadPackages } from "../plugins/packages.ts";
 import { core } from "../modules/plugin.ts";
 import { DatabaseVersionError } from "./storage.ts";
+import { EventPeer } from "./event-peer.ts";
+import { eventRuntimeControlSchema, pluginEventsVersion } from "../shared/plugin-events.ts";
 
 // 任务进程只接收主进程给出的应用数据根目录，不接受 renderer 文件路径。
 const port = process.parentPort;
@@ -26,13 +28,20 @@ try {
     onSessionChanged: event => port.postMessage(event),
     onPluginConfigurationChanged: id => port.postMessage({ kind: "plugin-configuration.changed", id }),
     onStream: event => port.postMessage({ kind: "object.stream", ...event }) });
+  const events = new EventPeer(service.sessions.events, frame => port.postMessage({ kind: "plugin-events.frame", version: pluginEventsVersion, frame }));
   port.on("message", ({ data }) => {
     if (data?.kind === "shutdown") {
+      events.close();
       secrets.close();
       void service.close().finally(() => process.exit(0));
       return;
     }
     if (secrets.receive(data)) return;
+    if (data?.kind === "plugin-events.control") {
+      const parsed = eventRuntimeControlSchema.safeParse(data);
+      if (parsed.success) events.receive(parsed.data.control);
+      return;
+    }
     if (data?.kind === "content.request") {
       void dispatchContent(service, data).then(response => { if (response) port.postMessage(response); });
       return;

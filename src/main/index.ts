@@ -18,6 +18,7 @@ import { configurationChannel, configurationChangedChannel, configurationCommand
 import { sessionChannel, sessionChangedChannel, sessionCommandSchema, type SessionResult } from "../shared/session.ts";
 import { pluginConfigurationChangedChannel, pluginConfigurationChannel, pluginConfigurationCommandSchema, type PluginConfigurationResult } from "../shared/plugin-configuration.ts";
 import { contentChannel, contentCommandSchema, type ContentResult } from "../shared/content.ts";
+import { pluginEventsChannel, eventControlSchema } from "../shared/plugin-events.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 let window: BrowserWindow | null = null;
@@ -35,6 +36,8 @@ const runtime = new RuntimeHost(status => {
   if (window && !window.isDestroyed()) window.webContents.send(objectStreamChannel, event);
 }, pluginId => {
   if (window && !window.isDestroyed()) window.webContents.send(pluginConfigurationChangedChannel, pluginId);
+}, frame => {
+  if (window && !window.isDestroyed()) window.webContents.send(pluginEventsChannel, frame);
 });
 
 function createWindow(): void {
@@ -71,8 +74,14 @@ function createWindow(): void {
   ipcMain.removeHandler(pickDirectoryChannel);
   ipcMain.removeHandler(pluginConfigurationChannel);
   ipcMain.removeHandler(contentChannel);
-  const trusted = (event: Electron.IpcMainInvokeEvent) => event.sender === current.webContents &&
+  const trusted = (event: Electron.IpcMainInvokeEvent | Electron.IpcMainEvent) => event.sender === current.webContents &&
     event.senderFrame === current.webContents.mainFrame && event.senderFrame?.url === allowedURL;
+  const receiveEvents = (event: Electron.IpcMainEvent, raw: unknown) => {
+    if (!trusted(event)) return;
+    const parsed = eventControlSchema.safeParse(raw);
+    if (parsed.success) runtime.events(parsed.data);
+  };
+  ipcMain.on(pluginEventsChannel, receiveEvents);
   const stopAppearance = serveAppearance(current, trusted, () => refreshAppearance());
   const stopPreferences = servePreferences(trusted);
   const stopLanguage = serveLanguage(current, trusted);
@@ -82,9 +91,10 @@ function createWindow(): void {
     if (!parsed.success) return { ok: false, error: { code: "invalid_request", message: "Invalid content command." } };
     return runtime.content(parsed.data);
   });
-  current.webContents.on("render-process-gone", () => { void runtime.content({ type: "reset" }); });
+  const resetRenderer = () => { runtime.events({ type: "reset" }); void runtime.content({ type: "reset" }); };
+  current.webContents.on("render-process-gone", resetRenderer);
   current.webContents.on("did-start-navigation", (_event, _url, inPlace, mainFrame) => {
-    if (mainFrame && !inPlace) void runtime.content({ type: "reset" });
+    if (mainFrame && !inPlace) resetRenderer();
   });
   ipcMain.handle(sessionChannel, async (event, raw): Promise<SessionResult> => {
     if (!trusted(event)) return { ok: false, error: { code: "invalid_request", message: "Untrusted application frame." } };
@@ -123,8 +133,9 @@ function createWindow(): void {
     return runtime.configure(parsed.data);
   });
   current.on("closed", () => {
+    ipcMain.removeListener(pluginEventsChannel, receiveEvents);
     ipcMain.removeHandler(contentChannel);
-    void runtime.content({ type: "reset" });
+    resetRenderer();
     window = null; ipcMain.removeHandler(commandChannel); ipcMain.removeHandler(configurationChannel); ipcMain.removeHandler(sessionChannel); ipcMain.removeHandler(pickDirectoryChannel); ipcMain.removeHandler(pluginConfigurationChannel); stopAppearance(); stopPreferences(); stopLanguage();
   });
   const loading = developmentURL ? current.loadURL(developmentURL) : current.loadFile(rendererFile);

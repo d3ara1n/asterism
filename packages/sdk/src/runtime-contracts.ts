@@ -8,6 +8,7 @@ import type { PluginNamespace } from "./plugin.ts";
 import type { ResourceContract, ImplementationContract } from "./module-contract.ts";
 import type { DataContract, Presentation } from "./presentation.ts";
 import type { RecordContract, SessionRecord } from "./records.ts";
+import type { EventContract, PluginEvents } from "./events.ts";
 import type { ToolCompletion, ToolInvocationInfo, ToolModelOutput } from "./tool-result.ts";
 import type { PluginConfig, PluginLogger, PluginSecrets, PluginTasks } from "./runtime.ts";
 import type { ModelServices } from "./models.ts";
@@ -22,6 +23,7 @@ export interface PluginContext {
   readonly id: string;
   readonly dir: string;
   readonly log: PluginLogger;
+  readonly ipc: { readonly events: PluginEvents };
   config<T extends Json>(contract: ConfigContract<T>): PluginConfig<T>;
   readonly secrets: PluginSecrets;
   db(): DatabaseSync;
@@ -98,6 +100,7 @@ export interface ToolContribution {
   prepare(resource: ResourceSnapshot, object: ObjectExecutor, target: Json, args: Json): ToolInvocation | PreparedResult;
 }
 export interface ModuleContribution {
+  events?: readonly EventContract[];
   records?: readonly RecordContract[];
   resources?: readonly ResourceContribution[];
   tools?: readonly ToolContribution[];

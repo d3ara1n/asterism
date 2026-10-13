@@ -8,9 +8,10 @@ import { synchronous } from "./synchronous.ts";
 import type { LiveBlock } from "../shared/session.ts";
 import type { ContentLease } from "../runtime/content-store.ts";
 import { inputReferences } from "../model/input.ts";
+import type { PluginEventScope } from "./event-scope.ts";
 
 type PluginServices = Pick<PluginContext, "id" | "dir" | "log" | "config" | "secrets" | "db" | "tasks">;
-export function createSdkContext(internal: PluginServices, host: PluginHostServices, modelRuns: RunGroup) {
+export function createSdkContext(internal: PluginServices, host: PluginHostServices, modelRuns: RunGroup, eventScope: PluginEventScope) {
   const records = new Map<string, RecordContract>();
   const running = new Map<string, { sessionId: string; live: LiveBlock[] }>();
   let available = true;
@@ -135,6 +136,15 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
     checkRef(ref, scope?.active && scope.provisional);
     return {
       ref, content: host.content?.writer(access(ref.sessionId, ref.id, scope)) ?? content(),
+      events: { publish(contract, data) {
+        checkExecution(scope); own(ref.kind);
+        if (!(scope?.active && (scope.provisional || scope.execution))) {
+          // 身份已在绑定时检查；热路径只检查当前工作台，不扫描所有会话历史。
+          const actual = host.sessions.workbench(ref.sessionId).objects.find(object => object.id === ref.id);
+          if (!actual || actual.kind !== ref.kind) throw new PluginApiError("unavailable", "The event resource is no longer available.");
+        }
+        eventScope.publish(contract, data, { plugin: internal.id, resource: ref });
+      } },
       session: session(ref.sessionId, ref.id, () => {
         checkExecution(scope); checkRef(ref, scope?.active && scope.provisional);
       }, scope),
@@ -172,6 +182,7 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
     });
   };
   const context: PluginContext = {
+    ipc: { events: eventScope.api },
     id: internal.id, dir: internal.dir, log: internal.log,
     config: contract => {
       checkAvailable();
