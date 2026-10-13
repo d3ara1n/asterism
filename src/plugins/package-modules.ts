@@ -1,6 +1,8 @@
 import { createHash } from "node:crypto";
-import { mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { dirname, join, relative, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import type { BuildOptions, Plugin } from "esbuild";
 
 /** 包公共入口是标准 exports["./public"]；类型与运行时共用正常包导入。 */
@@ -29,10 +31,33 @@ export interface CompiledModules {
   failures: Map<string, string>;
 }
 
+/** 归档段 `<name>.asar` 改写为 Forge 解包出的实体目录 `<name>.asar.unpacked`；路径不在归档内时返回 null。 */
+export function unpackedArchivePath(entry: string): string | null {
+  const segments = entry.split(/[\\/]/u);
+  let archive = -1;
+  for (let index = 0; index < segments.length; index += 1) if (segments[index]!.endsWith(".asar")) archive = index;
+  if (archive < 0) return null;
+  const separator = entry.match(/[\\/]/u)?.[0] ?? "/";
+  return [...segments.slice(0, archive), `${segments[archive]}.unpacked`, ...segments.slice(archive + 1)].join(separator);
+}
+
+/**
+ * 打包后 esbuild 的 JS 入口位于 asar 归档内；Electron 只为 fs 提供归档补丁，spawn 不改写可执行路径，
+ * esbuild 服务进程会以 ENOTDIR 失败。Forge 已把 esbuild 与平台包整体解包，改从实体路径加载，
+ * 平台二进制由 esbuild 自行解析；开发环境（无归档段）保持正常包导入。
+ */
+async function loadEsbuild(): Promise<typeof import("esbuild")> {
+  const nodeRequire = createRequire(import.meta.url);
+  const unpacked = unpackedArchivePath(nodeRequire.resolve("esbuild"));
+  if (unpacked === null) return import("esbuild");
+  if (!existsSync(unpacked)) throw new Error(`esbuild is not unpacked next to the asar archive: ${unpacked} is missing.`);
+  const loaded: typeof import("esbuild") | { default: typeof import("esbuild") } = await import(pathToFileURL(unpacked).href);
+  return "build" in loaded ? loaded : loaded.default;
+}
 /** 一次构建一个运行环境的完整模块图，ESM 共享 chunk 保留对象身份与 live binding。 */
 export async function compileModules(packages: readonly PackageModule[], enabled: ReadonlySet<string>, cacheRoot: string,
   hostModule: (realm: "runtime" | "renderer") => Plugin): Promise<CompiledModules> {
-  const esbuild = await import("esbuild");
+  const esbuild = await loadEsbuild();
   const result: CompiledModules = { runtime: new Map(), renderer: new Map(), dependencies: new Map(), runtimeDependencies: new Map(), failures: new Map() };
   const providers = new Map<string, PackageModule>();
   for (const pkg of packages.filter(pkg => enabled.has(pkg.id) && pkg.public)) {
@@ -135,5 +160,7 @@ export async function compileModules(packages: readonly PackageModule[], enabled
       }
     }
   }
+  // esbuild 服务进程长驻；本函数是一个构建批次的唯一所有者，收束后停止，同进程下次构建按需重启。
+  await esbuild.stop();
   return result;
 }
