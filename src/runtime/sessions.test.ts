@@ -402,7 +402,7 @@ describe("会话运行时", () => {
     expect(sent.filter(m => m.includes("To A")).at(-1)).toEqual(["First", "To A"]);
     expect(sent.filter(m => m.includes("To B")).at(-1)).toEqual(["To B"]);
     const path = service.sessions.tree.timeline(sessionId).map(flat);
-    expect(path.filter(n => n.kind === "message").map(n => n.source.resource?.id)).toEqual([a, a, b]);
+    expect(path.filter(n => n.kind === "message").map(n => n.source?.resource?.id)).toEqual([a, a, b]);
   });
 
   it("其他代理在 thinking 生成期间发送时沿当前游标追加，终态到达后仍保持单一路径", async () => {

@@ -33,7 +33,7 @@ describe("全局事件路由与投递", () => {
     let release!: () => void;
     const gate = new Promise<void>(r => { release = r; });
     bus.listen(Progress, { delivery: "latest" }, async packet => {
-      seen.push([packet.event.source.resource?.id, (packet.event.data as { value: number }).value]);
+      seen.push([packet.event.source?.resource?.id, (packet.event.data as { value: number }).value]);
       if (seen.length === 1) await gate;
     });
     bus.publish(Progress, source("a"), { job: "job", value: 0 });

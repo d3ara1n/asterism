@@ -8,7 +8,7 @@ export function projectForAgent(snapshot: Pick<SessionSnapshot, "records">, agen
   const positions = new Map(path.map((record, index) => [record.id, index]));
   const responses = new Map<string, { record: SessionRecord; block: ModelBlock }[]>();
   for (const record of path) {
-    if (record.source.resource?.id !== agentId) continue;
+    if (record.source?.resource?.id !== agentId) continue;
     const decoded = Execution.decode(record);
     if (decoded?.status !== "known" || decoded.data.type !== "block" || !decoded.data.block.complete) continue;
     const block = decoded.data.block;
@@ -39,7 +39,7 @@ export function projectForAgent(snapshot: Pick<SessionSnapshot, "records">, agen
   emit(null);
   for (const record of path) {
     const message = UserMessage.decode(record);
-    if (message?.status === "known" && record.source.resource?.id === agentId) out.push({ kind: "input", parts: message.data.parts });
+    if (message?.status === "known" && record.source?.resource?.id === agentId) out.push({ kind: "input", parts: message.data.parts });
     // 平台公开的模型可见文本：任何记录可携带，按接收者投影。
     const context = record.context;
     if (context && (context.recipient === null || context.recipient === agentId))

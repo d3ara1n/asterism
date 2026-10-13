@@ -21,17 +21,17 @@ export function collectTurns(records: readonly SessionRecord[]): NamingTurn[] {
     if (input?.status === "known") {
       const turn: NamingTurn = { user: inputSummary(input.data.parts) };
       turns.push(turn);
-      const agentInputs = inputs.get(record.source.resource?.id ?? "") ?? [];
-      agentInputs.push({ position, turn }); inputs.set(record.source.resource?.id ?? "", agentInputs);
+      const agentInputs = inputs.get(record.source?.resource?.id ?? "") ?? [];
+      agentInputs.push({ position, turn }); inputs.set(record.source?.resource?.id ?? "", agentInputs);
       continue;
     }
     const output = Execution.decode(record);
-    if (output?.status !== "known" || output.data.type !== "block" || !record.source.resource) continue;
+    if (output?.status !== "known" || output.data.type !== "block" || !record.source?.resource) continue;
     const block = output.data.block;
     if (block.kind !== "text" || !block.complete || !block.text.trim()) continue;
     const origin = block.requestParentId === null ? -1 : positions.get(block.requestParentId);
     if (origin === undefined) continue;
-    const turn = inputs.get(record.source.resource.id)?.findLast(input => input.position <= origin)?.turn;
+    const turn = inputs.get(record.source?.resource.id)?.findLast(input => input.position <= origin)?.turn;
     if (!turn) continue;
     const response = responses.get(block.responseId) ?? { turn, texts: new Map<number, string>(), last: position };
     response.texts.set(block.ordinal, block.text); response.last = position;

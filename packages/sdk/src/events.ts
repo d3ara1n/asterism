@@ -1,13 +1,12 @@
-import type { z } from "zod";
+import { z } from "zod";
 import type { Json } from "./json.ts";
-import type { ResourceRef } from "./workspace.ts";
+import type { Source } from "./workspace.ts";
 
-export type EventSourceKind = "plugin" | "resource" | "any";
-export interface EventSource { readonly plugin: string; readonly resource: ResourceRef | null }
+export type EventSourceKind = "plugin" | "resource" | "any" | "host";
 export interface EventEnvelope<D extends Json = Json> {
   readonly contract: { readonly id: string };
   readonly emittedAt: string;
-  readonly source: EventSource;
+  readonly source: Source;
   readonly data: D;
 }
 export type EventSemantics = { readonly kind: "occurrence" } | { readonly kind: "snapshot"; readonly key: readonly string[] };
@@ -53,3 +52,10 @@ export interface EventPublisher {
   publish<I, D extends Json>(contract: EventContract<I, D>, data: NoInfer<I> & Json): void;
 }
 export interface PluginEvents extends EventSubscriber, EventPublisher {}
+
+/** 软件本身发布的公共事件：会话标题实际变化后发出，无插件与资源来源。 */
+export const SessionTitleChanged = defineEvent("atelier/session-title", {
+  schema: z.strictObject({ sessionId: z.string(), title: z.string() }),
+  source: "host",
+  semantics: { kind: "snapshot", key: ["sessionId"] },
+});

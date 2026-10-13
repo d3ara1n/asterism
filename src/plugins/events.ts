@@ -1,4 +1,4 @@
-import { belongsTo, jsonSchema, type EventContract, type EventEnvelope, type EventFilter, type EventSource,
+import { belongsTo, jsonSchema, type EventContract, type EventEnvelope, type EventFilter, type Source,
   type EventSubscribeOptions, type Json, type SubscriptionEnd } from "@atelier/sdk/contracts";
 import { PluginApiError } from "@atelier/sdk/runtime";
 import { deepFreeze } from "../shared/immutable.ts";
@@ -11,7 +11,7 @@ export interface EventPacket {
   readonly wire: EventEnvelope;
 }
 interface Listener { filter?: EventFilter; queue: EventQueue<EventPacket> }
-const matches = (source: EventSource, filter?: EventFilter) => !filter ||
+const matches = (source: Source, filter?: EventFilter) => !filter || source !== null &&
   (filter.plugin === undefined || source.plugin === filter.plugin)
   && (filter.sessionId === undefined || source.resource?.sessionId === filter.sessionId)
   && (filter.resourceId === undefined || source.resource?.id === filter.resourceId)
@@ -33,6 +33,11 @@ export class EventBus {
     if (previous && previous !== contract) throw new PluginApiError("conflict", `Conflicting event declaration: ${contract.id}.`);
     this.contracts.set(contract.id, contract);
   }
+  /** 软件本身的公共契约；不属于任何插件，只能由宿主以 null 来源发布。 */
+  declareHost(contract: EventContract): void {
+    if (contract.source !== "host") throw new PluginApiError("invalid_argument", "Host event contracts must use the host source.");
+    this.contracts.set(contract.id, contract);
+  }
   contract(id: string): EventContract {
     const contract = this.contracts.get(id);
     if (!contract || this.stopped) throw new PluginApiError("unavailable", `Event contract ${id} is unavailable.`);
@@ -51,9 +56,10 @@ export class EventBus {
       for (const listener of [...this.listeners.get(id) ?? []]) listener.queue.end({ reason: "unavailable" });
     }
   }
-  publish(contract: EventContract, source: EventSource, input: unknown): void {
+  publish(contract: EventContract, source: Source, input: unknown): void {
     this.validate(contract);
-    if (contract.source !== "any" && contract.source !== (source.resource ? "resource" : "plugin"))
+    const kind = source === null ? "host" : source.resource ? "resource" : "plugin";
+    if (contract.source === "host" ? kind !== "host" : kind === "host" || (contract.source !== "any" && contract.source !== kind))
       throw new PluginApiError("invalid_argument", "The event source does not match its contract.");
     let raw: Json, data: Json, key: string;
     try {

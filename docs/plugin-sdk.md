@@ -39,7 +39,7 @@
 
 事件在纯契约入口以 `ns.event(name, { schema, source, semantics })` 声明，身份为 `<namespace>/<name>`。声明归属方装配登记，发布者与订阅者引用共享声明；同运行环境要求同一契约实例，跨进程用稳定 ID 关联各端声明。宿主使用已装配契约校验，不接收消息临时提供的 schema。公共领域契约由插件公共入口或普通领域共识包提供，不把具体领域规则放入 SDK。
 
-模块通过 `ModuleContribution.events` 登记本插件声明，source 可取 `plugin / resource / any`。发布参数由 schema 输入类型推导，handler 接收解析后的输出；原始输入与解析值均须为 JSON。跨进程携带原始输入，由消费端契约解码，避免对已转换值重复套用输入 schema。snapshot 的 key 指定顶层标量字段，空数组表示按来源保持一个当前值。
+模块通过 `ModuleContribution.events` 登记本插件声明，source 可取 `plugin / resource / any`；`host` 只用于软件本身发布的公共契约，信封来源为 null，插件不能声明或发布。发布参数由 schema 输入类型推导，handler 接收解析后的输出；原始输入与解析值均须为 JSON。跨进程携带原始输入，由消费端契约解码，避免对已转换值重复套用输入 schema。snapshot 的 key 指定顶层标量字段，空数组表示按来源保持一个当前值。
 
 | 契约语义 | 含义 | 消费方式 |
 | --- | --- | --- |
@@ -94,6 +94,10 @@ handler 抛错或 Promise rejection 只结束该订阅，不影响其他订阅�
 取消订阅停止新投递并清理待处理队列，已运行的 handler 收到取消信号；宿主生命周期管理其真实结束，取消不等于收束。模块装配失败和插件关闭同样清理订阅，待运行工作结束后释放依赖设施。订阅存在或展示进度本身不构成资源写入活动，真正的修改仍经既有执行门面与授权检查。
 
 断连结束旧订阅，恢复连接重新订阅，不补发断连期间的事件。总线不保存可供晚订阅读取的当前状态。需要当前值的消费方先建立订阅，再读取领域快照；之后以事件为准。
+
+### 软件本身的公共事件
+
+SDK 从 `@atelier/sdk/contracts` 导出宿主发布的公共契约，供应用外壳与插件订阅。`SessionTitleChanged`（`atelier/session-title`）载荷为 `{ sessionId, title }`，snapshot 语义、键为 `sessionId`：宿主在最外层提交成功后比较实际标题，变化才发布，覆盖命名、回溯与分支切换；回滚与相同标题不发布。订阅方建立订阅后读取会话列表，之后以事件为准，未打开的会话同样更新。
 
 ### 公共消费与调用扩展
 
@@ -259,7 +263,7 @@ SDK helper 负责具型声明与实现包装，宿主命令模块负责解析、
 
 ### 记录来源
 
-`SessionRecord.source` 为 `{ plugin, resource }`。来源由写入通道决定，`append` 与记录数据不接收来源参数：`session.commit` 写入 `{ plugin: 调用插件, resource: null }`；`plugin.object(ResourceContract, id).commit` 写入 `{ plugin: 调用插件, resource: { id, kind } }`；宿主工作台写入 `{ plugin: "atelier.host", resource: null }`。`plugin` 是宿主按操作柄打的戳，供诊断，界面不显示。对象操作柄以具名资源契约取得，宿主校验契约属于调用插件、资源在会话中存在且类型一致，否则拒绝。关联对象（例如链接事件中的代理）由各契约放入 `data`，不借用来源。
+`SessionRecord.source` 与事件信封的 `source` 共用 SDK `Source` 类型：`{ plugin, resource: ResourceRef | null } | null`。来源由写入通道决定，`append` 与记录数据不接收来源参数：`session.commit` 写入 `{ plugin: 调用插件, resource: null }`；`plugin.object(ResourceContract, id).commit` 写入 `{ plugin: 调用插件, resource: { sessionId, id, kind } }`；宿主工作台、环境等软件本身写入 `null`。插件写入必带插件身份，不能产生 `null`；资源来源一定属于发出插件。资源引用包含会话 ID，为跨会话引用保留同一身份写法。`plugin` 是宿主按操作柄打的戳，供诊断，界面不显示。对象操作柄以具名资源契约取得，宿主校验契约属于调用插件、资源在会话中存在且类型一致，否则拒绝。关联对象（例如链接事件中的代理）由各契约放入 `data`，不借用来源。
 
 ## 创建入口
 

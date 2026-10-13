@@ -1,4 +1,4 @@
-import type { UiText } from "@atelier/sdk/contracts";
+import { SessionTitleChanged, type EventSubscriber, type UiText } from "@atelier/sdk/contracts";
 
 import type { AppSnapshot, DesktopBridge, RuntimeStatus } from "../../shared/contracts";
 import { errorDisplay } from "../../shared/error-display";
@@ -12,23 +12,44 @@ export class ApplicationController {
   private reading = false;
   private dirty = false;
   private pending: ReturnType<typeof setTimeout> | null = null;
-  constructor(private readonly bridge: Pick<DesktopBridge, "execute" | "onStatus" | "session">, private readonly settleMs = 300) {}
+  /** 订阅生效后收到的标题；之后读取的列表快照以它为准，避免旧快照覆盖新标题。 */
+  private titles = new Map<string, string>();
+  constructor(private readonly bridge: Pick<DesktopBridge, "execute" | "onStatus" | "session">,
+    private readonly events?: EventSubscriber, private readonly settleMs = 300) {}
   getSnapshot = (): ApplicationState => this.state;
   subscribe = (listener: () => void): (() => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; };
   private update(next: Partial<ApplicationState>): void {
     this.state = { ...this.state, ...next };
+    const snapshot = this.state.snapshot;
+    if (snapshot && this.titles.size && snapshot.sessions.some(session => this.titles.has(session.id) && this.titles.get(session.id) !== session.title))
+      this.state.snapshot = { ...snapshot, sessions: snapshot.sessions.map(session => ({ ...session, title: this.titles.get(session.id) ?? session.title })) };
     this.listeners.forEach(listener => listener());
   }
+  /** 先订阅标题再读取列表；断连后重新订阅并重读，不依赖补发。 */
+  private watchTitles(): () => void {
+    this.titles.clear();
+    const subscription = this.events?.subscribe(SessionTitleChanged, { delivery: "latest" }, event => {
+      this.titles.set(event.data.sessionId, event.data.title);
+      this.update({});
+    });
+    return () => subscription?.close();
+  }
   connect(): () => void {
-    const unsubscribe = this.bridge.onStatus(status => this.update({ status, ...(status === "unavailable" ? { error: commonMessages.runtimeStopped } : {}) }));
-    // 应用层观察业务层：任一会话提交（含后台会话自动命名）都可能改变列表标题；无专门名称通道，合并一段时间内的通知后静默重读。
+    let stopTitles = this.watchTitles();
+    const unsubscribe = this.bridge.onStatus(status => {
+      if (status === "ready" && this.state.status !== "ready" && this.state.status !== "starting") {
+        stopTitles(); stopTitles = this.watchTitles(); void this.refresh({ quiet: true });
+      }
+      this.update({ status, ...(status === "unavailable" ? { error: commonMessages.runtimeStopped } : {}) });
+    });
+    // 标题经公共标题事件即时更新；会话提交通知只用于列表结构（新增、删除）的合并重读。
     const stopSessions = this.bridge.session.onChanged(event => {
       if (event.kind !== "session.changed" || this.pending) return;
       this.pending = setTimeout(() => { this.pending = null; void this.refresh({ quiet: true }); }, this.settleMs);
     });
     void this.refresh();
     return () => {
-      unsubscribe(); stopSessions();
+      unsubscribe(); stopSessions(); stopTitles();
       if (this.pending) { clearTimeout(this.pending); this.pending = null; }
     };
   }

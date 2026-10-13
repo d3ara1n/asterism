@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { jsonSchema } from "@atelier/sdk/contracts";
 import { coreChannel } from "./core.ts";
+import { sourceSchema } from "./session.ts";
 
 export const pluginEventsChannel = coreChannel("plugin-events");
 export const pluginEventsVersion = 1;
@@ -14,7 +15,7 @@ export const subscriptionEndSchema = z.strictObject({
 export const eventEnvelopeSchema = z.strictObject({
   contract: z.strictObject({ id: name }),
   emittedAt: z.string(),
-  source: z.strictObject({ plugin: name, resource: z.strictObject({ sessionId: name, id: name, kind: name }).nullable() }),
+  source: sourceSchema,
   data: jsonSchema,
 });
 export const eventControlSchema = z.discriminatedUnion("type", [

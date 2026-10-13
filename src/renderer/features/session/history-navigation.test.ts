@@ -32,7 +32,7 @@ describe("历史导航契约", () => {
     const nodes = [
       node("1", null, created("r", "Game", "board")),
       node("2", "1", removed("r")),
-      node("3", "1", event("board.move", {}, { source: { plugin: "example.board", resource: { id: "r", kind: "board" } } })),
+      node("3", "1", event("board.move", {}, { source: { plugin: "example.board", resource: { sessionId: "s", id: "r", kind: "board" } } })),
     ];
     const entries = historyEntries(nodes, label);
     expect(historyResources(nodes).get("r")).toEqual({ id: "r", kind: "board", title: "Game" });

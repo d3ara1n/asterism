@@ -3,8 +3,8 @@ import type { Json, ModelCompletion, ToolOutcome } from "@atelier/sdk/contracts"
 import { Execution, Notice, UserMessage } from "../modules/agent/records.ts";
 import type { NewNode, SessionNode } from "../shared/session.ts";
 
-export const agentSource = (id: string) => ({ plugin: "atelier.core", resource: { id, kind: "atelier.core/agent" } });
-export const hostSource = { plugin: "atelier.host", resource: null };
+export const agentSource = (id: string) => ({ plugin: "atelier.core", resource: { sessionId: "s", id, kind: "atelier.core/agent" } });
+export const hostSource = null;
 const modelSource = { model: "p/m", adapter: "test/1", scope: "s" };
 type BlockOptions = { requestParentId?: string | null; complete?: boolean; continuation?: Json; completion?: ModelCompletion | null };
 

@@ -12,7 +12,7 @@ export const Progress = ns.event("progress", {
 export const backend = defineModule(plugin => {
   plugin.ipc.events.subscribe(Progress, { delivery: "latest" }, event => {
     const completed: number = event.data.completed;
-    plugin.log.info(`Downloaded ${completed} bytes from ${event.source.resource?.id}.`);
+    plugin.log.info(`Downloaded ${completed} bytes from ${event.source?.resource?.id}.`);
     // @ts-expect-error 领域载荷不含其他契约的字段。
     event.data.title;
   });

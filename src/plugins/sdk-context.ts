@@ -114,7 +114,7 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
             const value = jsonSchema.parse(parsed.data);
             // 来源由写入通道打戳：插件身份来自操作柄，资源来自已校验的对象引用。
             const recordId = writer.append({ contract: declared.id, data: value, model: null, recipient: null,
-              source: { plugin: internal.id, resource: ref ? { id: ref.id, kind: ref.kind } : null } });
+              source: { plugin: internal.id, resource: ref ?? null } });
             host.content?.bind(access(id, ref?.id, scope), { kind: "record", id: recordId }, value);
             return recordId;
           },

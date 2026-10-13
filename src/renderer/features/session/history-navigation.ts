@@ -63,7 +63,7 @@ export function historyEntries(nodes: readonly SessionNode[], views: Pick<ViewRe
     const item = toRecord(node, index + 1);
     const view = views.record(item, context);
     // 来源只看记录归属：有归属对象是资源记录，否则是会话级记录；宿主不认识具体契约。
-    const owner = item.source.resource?.id ?? null;
+    const owner = item.source?.resource?.id ?? null;
     const label = view ? i18n.text(view.label) : i18n.formatMessage(historyMessages.unknownRecord, { id: item.contract.id });
     return { node, label: snippet(label), icon: view?.icon, row: view?.row, scope: owner ? "resource" : "session",
       resource: owner ? resources.get(owner) ?? null : null };

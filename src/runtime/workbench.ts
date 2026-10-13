@@ -9,7 +9,7 @@ import { workbenchSnapshotSchema, type WorkbenchCommand, type WorkbenchSnapshot,
 import type { ContentStore, ContentLease } from "./content-store.ts";
 
 /** 宿主工作台写入的会话级来源。 */
-const host = { plugin: "atelier.host", resource: null } as const;
+const host = null;
 
 type ViewRow = { object_id: string; x: number; y: number; hidden: number; collapsed: number; width: number | null; height: number | null };
 

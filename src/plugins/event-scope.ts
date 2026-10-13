@@ -1,4 +1,4 @@
-import type { EventContract, EventSource, PluginEvents } from "@atelier/sdk/contracts";
+import type { EventContract, Source, PluginEvents } from "@atelier/sdk/contracts";
 import { PluginApiError } from "@atelier/sdk/runtime";
 import { EventSubscriptionState } from "../shared/event-subscription.ts";
 import type { EventQueue } from "../shared/event-queue.ts";
@@ -45,7 +45,7 @@ export class PluginEventScope {
       },
     };
   }
-  publish(contract: EventContract, data: unknown, source: EventSource): void {
+  publish(contract: EventContract, data: unknown, source: Source): void {
     if (this.phase !== "active") throw new PluginApiError("unavailable", "Plugin events are not available.");
     this.bus.publish(contract, source, data);
   }

@@ -189,10 +189,14 @@ export class SessionTree {
   position(sessionId: string): string | null | undefined {
     return (this.db.prepare("SELECT cursor FROM sessions WHERE id = ?").get(sessionId) as { cursor: string | null } | undefined)?.cursor;
   }
+  /** 会话尚未创建时为 null，供提交前后比较。 */
+  titleOf(sessionId: string): string | null {
+    return (this.db.prepare("SELECT title FROM sessions WHERE id = ?").get(sessionId) as { title: string } | undefined)?.title ?? null;
+  }
   title(sessionId: string): string {
-    const row = this.db.prepare("SELECT title FROM sessions WHERE id = ?").get(sessionId) as { title: string } | undefined;
-    if (!row) throw new SessionError("not_found", "Session not found.");
-    return row.title;
+    const title = this.titleOf(sessionId);
+    if (title === null) throw new SessionError("not_found", "Session not found.");
+    return title;
   }
   /** 读取根到末端的时间线；省略 at 时取执行游标，读取不激活该位置或授予追加能力。 */
   timeline(sessionId: string, at?: string | null): SessionNode[] {

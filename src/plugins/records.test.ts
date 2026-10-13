@@ -51,11 +51,11 @@ describe("共享时间线的契约解码", () => {
     const opaque = { value: 7, future: { secret: "plugin-owned", items: [null, "resume"] } };
     const declared = defineRecord("example.plugin/opaque", { schema: z.json() });
     const saved = node("opaque", null, event(declared.id, opaque, {
-      source: { plugin: "example.plugin", resource: { id: "resource", kind: "example.plugin/resource" } },
+      source: { plugin: "example.plugin", resource: { sessionId: "s", id: "resource", kind: "example.plugin/resource" } },
     }));
     const decoded = sessionView(nodeView("s", "", [saved], saved.id)).records.first(declared, { scope: "timeline" });
     expect(decoded).toMatchObject({ status: "known", data: opaque,
-      record: { source: { plugin: "example.plugin", resource: { id: "resource", kind: "example.plugin/resource" } } } });
+      record: { source: { plugin: "example.plugin", resource: { sessionId: "s", id: "resource", kind: "example.plugin/resource" } } } });
   });
   it("具型 last 按范围仅解码目标；最新坏记录不回退，固定快照不受后续追加影响", () => {
     const first = value("first", null, { value: 1 });

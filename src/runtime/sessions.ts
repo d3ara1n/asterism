@@ -34,6 +34,7 @@ import { SessionWorkbench } from "./workbench.ts";
 import { ContentStore, type ContentLease, type ContentTarget } from "./content-store.ts";
 import { applicationStorage } from "../shared/application.ts";
 import { EventBus } from "../plugins/events.ts";
+import { SessionTitleChanged } from "@atelier/sdk/contracts";
 
 const agentKind = Agent.kind;
 const startIdentity = ({ contentScopeId: _scope, ...input }: Extract<SessionCommand, { type: "start" }>) => JSON.stringify(input);
@@ -64,6 +65,7 @@ export class SessionService {
     private readonly changed: (event: SessionChanged) => void = () => {}, adapterFactory?: (settings: ModelSettings) => ModelAdapter, external: readonly PluginDefinition[] = [],
     stream?: (event: ObjectStreamPayload) => void, configurationChanged?: (pluginId: string) => void) {
     this.tree = new SessionTree(db);
+    this.events.declareHost(SessionTitleChanged);
     this.content = new ContentStore(db, join(dataRoot, applicationStorage.contentDirectory));
     const host: SessionHost = {
       view: sessionId => this.tree.view(sessionId),
@@ -150,7 +152,7 @@ export class SessionService {
         throw error;
       }
     }
-    const head = this.tree.head(sessionId), before = this.tree.position(sessionId);
+    const head = this.tree.head(sessionId), before = this.tree.position(sessionId), titleBefore = this.tree.titleOf(sessionId);
     const writer: SessionWriter = {
       append: node => this.tree.appendToTimeline(sessionId, node).id,
       nodes: () => this.tree.nodes(sessionId),
@@ -165,6 +167,9 @@ export class SessionService {
       }
       finally { this.committing = null; }
     });
+    // 标题以最外层提交成功后的实际值为准；回滚的提交不会走到这里。
+    const title = this.tree.titleOf(sessionId);
+    if (!this.closed && title !== null && title !== titleBefore) this.events.publish(SessionTitleChanged, null, { sessionId, title });
     // 提交后交给插件派发队列；观察者内的提交排队，队列清空后每个会话通知界面一次。
     const change = { records: this.tree.since(sessionId, head), cursorChanged: before !== this.tree.position(sessionId) };
     if (this.closed) this.notify(sessionId);

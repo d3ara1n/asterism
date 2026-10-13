@@ -8,15 +8,14 @@ import { pointSchema, workbenchCommands, workbenchSnapshotSchema } from "./workb
 import { resourceCallSchema, contractReferenceSchema, toolInvocationSchema, toolRunningResultSchema } from "@atelier/sdk/contracts";
 
 const id = z.string().min(1).max(160);
-/** 记录来源：plugin 由宿主按写入通道打戳；resource 为经校验的发出资源，null 表示会话级记录。 */
-export const recordSourceSchema = z.strictObject({ plugin: id, resource: z.strictObject({ id, kind: id }).nullable() });
-export type RecordSource = z.infer<typeof recordSourceSchema>;
+/** 来源：null 表示软件本身；否则 plugin 由宿主按写入通道打戳，resource 为经校验的发出资源。记录与事件共用。 */
+export const sourceSchema = z.strictObject({ plugin: id, resource: z.strictObject({ sessionId: id, id, kind: id }).nullable() }).nullable();
 /**
  * 会话树节点即通用记录：契约身份、宿主打戳的来源与不透明载荷；宿主不解释 data。
  * model 非空时作为文本投影给 recipient（null 为全部执行体）；每条记录都进入路径并推进游标。
  */
 export const sessionNodeSchema = z.strictObject({
-  id, sessionId: id, parentId: id.nullable(), createdAt: z.string(), source: recordSourceSchema,
+  id, sessionId: id, parentId: id.nullable(), createdAt: z.string(), source: sourceSchema,
   contract: id, data: jsonSchema, model: z.string().nullable(), recipient: id.nullable(),
 });
 export type SessionNode = z.infer<typeof sessionNodeSchema>;

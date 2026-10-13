@@ -1,11 +1,11 @@
-import type { EventContract, EventSource, Json, SubscriptionEnd } from "@atelier/sdk/contracts";
+import type { EventContract, Source, Json, SubscriptionEnd } from "@atelier/sdk/contracts";
 import { EventSubscriptionState } from "./event-subscription.ts";
 
 /** latest 合并键：同来源、同 snapshot 键的值互相替换；occurrence 契约返回空串，不参与合并。 */
-export function eventKey(contract: EventContract, source: EventSource, data: Json): string {
+export function eventKey(contract: EventContract, source: Source, data: Json): string {
   if (contract.semantics.kind !== "snapshot") return "";
   const record = data && typeof data === "object" && !Array.isArray(data) ? data : {};
-  return JSON.stringify([source.plugin, source.resource?.sessionId ?? null, source.resource?.id ?? null,
+  return JSON.stringify([source?.plugin ?? null, source?.resource?.sessionId ?? null, source?.resource?.id ?? null,
     contract.semantics.key.map(key => record[key] ?? null)]);
 }
 

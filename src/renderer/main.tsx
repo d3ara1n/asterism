@@ -27,8 +27,8 @@ import { getI18n } from "./shared/i18n";
 import { appMessages } from "./messages/app";
 
 startAppearance();
-const controller = new ApplicationController(window.host);
 const events = new EventClient(window.host.events);
+const controller = new ApplicationController(window.host, events);
 const lifetime = new AbortController();
 const stopEventStatus = window.host.onStatus(status => { if (status !== "ready") events.disconnect(); });
 window.addEventListener("pagehide", () => { lifetime.abort(); events.close(); stopEventStatus(); }, { once: true });
