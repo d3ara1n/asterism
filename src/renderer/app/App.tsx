@@ -81,6 +81,7 @@ export function App({ controller }: { controller: ApplicationController }) {
   const go = (next: PageId) => {
     if (next === page) return;
     if (next === "settings") returnFocus.current = document.activeElement as HTMLElement | null;
+    controller.setVisibleSession(next === "main" && view.kind === "conversation" ? view.sessionId : null);
     setPage(next);
     requestAnimationFrame(() => {
       if (next === "main" && returnFocus.current?.isConnected) returnFocus.current.focus({ preventScroll: true });
@@ -95,6 +96,7 @@ export function App({ controller }: { controller: ApplicationController }) {
   });
   const navigate = (next: MainView) => {
     navigation.current++;
+    controller.setVisibleSession(next.kind === "conversation" ? next.sessionId : null);
     setView(next); setPage("main");
     controller.clearError();
     focusMain();
@@ -167,6 +169,7 @@ export function App({ controller }: { controller: ApplicationController }) {
   const sidebar: IslandSpec = {
     id: "navigation", label: i18n.formatMessage(appMessages.appNavigation), width: { min: 224, max: 224 },
     render: () => <Sidebar snapshot={snapshot} status={state.status} busy={state.busy}
+      resourceStatuses={state.resourceStatuses}
       selectedSessionId={view.kind === "conversation" ? view.sessionId : null}
       renameDisabledSessionId={active && !writable ? active.sessionId : null}
       onRename={renameSession}

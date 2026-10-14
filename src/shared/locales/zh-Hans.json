@@ -1,4 +1,10 @@
 {
+  "resourceStatus.title": "资源状态",
+  "resourceStatus.summary": "{status} · {count} 个资源",
+  "resourceStatus.running": "运行中",
+  "resourceStatus.failed": "失败",
+  "resourceStatus.awaiting": "需要你操作",
+  "resourceStatus.completed": "已完成",
   "model_modality_image": "图片",
   "appName": "工坊",
   "startupPlugins": "正在加载插件…",

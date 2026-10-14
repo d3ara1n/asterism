@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { defineCreation, pluginNamespace, type EventEnvelope, type EventSubscription } from "@atelier/sdk/contracts";
+import { defineCreation, pluginNamespace, ResourceStatusChanged, type EventEnvelope, type EventSubscription } from "@atelier/sdk/contracts";
 import { defineModule, definePlugin, implementCreation, implementResource, type ObjectExecutor, type PluginContext, type PluginDefinition } from "@atelier/sdk/runtime";
 import { ApplicationService } from "../runtime/service.ts";
 import { loadPlugins, type PluginHostServices } from "./loader.ts";
@@ -33,6 +33,28 @@ function publisher(capture: (plugin: PluginContext) => void, resource: (object: 
 
 // 契约依据：SDK 来源印记由操作柄绑定；插件装配、真实事务和关闭复用宿主机制。
 describe("事件 SDK 与宿主边界", () => {
+  // 公共状态使用资源级完整快照；latest 保留最新载荷，进度只属于 running，来源由宿主校验。
+  it("外部资源发布公共状态按 latest 合并，保留真实来源且不写历史", async () => {
+    let context!: PluginContext, object!: ObjectExecutor;
+    const received: EventEnvelope[] = [];
+    const service = open([publisher(value => { context = value; }, value => { object = value; })]);
+    context.ipc.events.subscribe(ResourceStatusChanged, { delivery: "latest" }, event => { received.push(event); });
+    const sessionId = service.sessions.tree.create("Unopened");
+    await service.sessions.execute({ type: "resource.create", sessionId, kind: Resource.kind, creation: { id: Create.id }, input: { fail: false }, position: { x: 0, y: 0 } });
+    const before = service.sessions.tree.nodes(sessionId);
+    object.events.publish(ResourceStatusChanged, { title: "Download", status: "running" });
+    object.events.publish(ResourceStatusChanged, { title: "Download", status: "running", progress: { value: 0.6 } });
+    expect(() => context.ipc.events.publish(ResourceStatusChanged, { title: "Download", status: "failed" })).toThrow("source");
+    await vi.waitFor(() => expect(received).toHaveLength(1));
+    expect(received[0]).toMatchObject({ source: { plugin: ns.id, resource: object.ref },
+      data: { title: "Download", status: "running", progress: { value: 0.6 } } });
+    object.events.publish(ResourceStatusChanged, { title: "Download", status: "completed" });
+    await vi.waitFor(() => expect(received).toHaveLength(2));
+    expect(received[1]!.data).toEqual({ title: "Download", status: "completed" });
+    expect(ResourceStatusChanged.schema.safeParse({ title: "Download", status: "completed", progress: { value: 1 } }).success).toBe(false);
+    expect(() => object.events.publish(ResourceStatusChanged, { title: "Download", status: "running", progress: { value: 2 } })).toThrow("Invalid event payload");
+    expect(service.sessions.tree.nodes(sessionId)).toEqual(before);
+  });
   it("公共契约发布保留实际插件来源，资源来源独立于载荷关联对象且失效后拒绝发布", async () => {
     let context!: PluginContext, other!: PluginContext, object!: ObjectExecutor;
     const received: EventEnvelope[] = [];

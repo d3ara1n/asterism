@@ -34,7 +34,7 @@ import { SessionWorkbench } from "./workbench.ts";
 import { ContentStore, type ContentLease, type ContentTarget } from "./content-store.ts";
 import { applicationStorage } from "../shared/application.ts";
 import { EventBus } from "../plugins/events.ts";
-import { SessionTitleChanged } from "@atelier/sdk/contracts";
+import { ResourceStatusChanged, SessionTitleChanged } from "@atelier/sdk/contracts";
 
 const agentKind = Agent.kind;
 const startIdentity = ({ contentScopeId: _scope, ...input }: Extract<SessionCommand, { type: "start" }>) => JSON.stringify(input);
@@ -65,7 +65,8 @@ export class SessionService {
     private readonly changed: (event: SessionChanged) => void = () => {}, adapterFactory?: (settings: ModelSettings) => ModelAdapter, external: readonly PluginDefinition[] = [],
     stream?: (event: ObjectStreamPayload) => void, configurationChanged?: (pluginId: string) => void) {
     this.tree = new SessionTree(db);
-    this.events.declareHost(SessionTitleChanged);
+    this.events.declarePublic(SessionTitleChanged);
+    this.events.declarePublic(ResourceStatusChanged);
     this.content = new ContentStore(db, join(dataRoot, applicationStorage.contentDirectory));
     const host: SessionHost = {
       view: sessionId => this.tree.view(sessionId),

@@ -101,7 +101,7 @@ import { Read, settings, service } from "@example/tools/public";
 
 前端 `prepare({ events })` 可建立不依赖卡片挂载的模块订阅，失败、超时或应用关闭时自动取消；组件以 `useRendererEvents()` 取用接口，自行在 effect 清理时 close。订阅提供 ready、closed 与 close，handler 接收具型信封及取消信号。每个订阅按序投递、期间不丢事件，失败和断连明确结束。事件不参与事务，调用即投递。事件不写历史、不保留供晚订阅读取的状态，领域自行恢复当前值。
 
-[事件作者示例与类型反例](examples/events.ts) 随 typecheck 检查；完整来源与投递约定见 [插件 SDK](../../docs/plugin-sdk.md#瞬态事件与插件调用)。使用这些入口的插件声明 API 7.1；标题和通知的应用消费接入仍在独立计划中。
+[事件作者示例与类型反例](examples/events.ts) 随 typecheck 检查；完整来源与投递约定见 [插件 SDK](../../docs/plugin-sdk.md#瞬态事件与插件调用)。通用事件入口要求 API 7.1。API 7.2 增加宿主登记的公共 `ResourceStatusChanged`，资源直接发布 `{ title: UiText, status: "running" | "failed" | "awaiting" | "completed" }`，running 可附带 `progress: { value: number }`（0～1），终态不能携带进度，不在自己的 events 中重复登记。状态采用资源级 snapshot（key 为空），四种状态均以最新完整值替换旧值；外壳以 latest 消费并聚合为会话 badge，进入会话只清除终态，running 及进度保留。不提供 reset、撤回或恢复查询。
 
 ## 插件配置
 
@@ -163,7 +163,7 @@ ResourceDescription、ToolView、CreationEntry 的 label／description 接收 Ui
 
 ## 版本与当前边界
 
-SDK 包版本为 `0.11.0`，宿主提供 API 7.1；使用事件接口的插件声明 `api: { major: 7, minMinor: 1 }`，同主版本旧插件继续可用，其他主版本或更高小版本在加载前拒绝。应用 IPC 版本为 5，会话 IPC 为 18，内容 IPC 为 3，应用配置 IPC 为 3，插件配置 IPC 为 2，插件事件 IPC 为 1；工作数据库格式为 18，应用配置文件格式为 2。
+SDK 包版本为 `0.12.0`，宿主提供 API 7.2；使用公共资源状态的插件声明 `api: { major: 7, minMinor: 2 }`，通用事件接口要求 minMinor 1。同主版本旧插件继续可用，其他主版本或更高小版本在加载前拒绝。应用 IPC 版本为 5，会话 IPC 为 18，内容 IPC 为 3，应用配置 IPC 为 3，插件配置 IPC 为 2，插件事件 IPC 为 1；工作数据库格式为 18，应用配置文件格式为 2。
 
 资源创建数据必须是 JSON 对象，不能占用宿主的 `id / type / title` 字段。当前会话数据保存于 `session_data`，事件及工具结果保存稳定契约身份与原始数据。core 消费具型用户消息、模型执行、通知与环境记录，存储编码由宿主负责；环境记录保留原事件身份与载荷。
 

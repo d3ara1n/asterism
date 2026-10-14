@@ -40,6 +40,8 @@
 
 全局具型事件由 `plugins/events.ts` 登记契约、校验并路由，`plugins/event-scope.ts` 绑定插件来源和运行生命周期。前后台订阅共用 `shared/event-queue.ts` 的按序队列与 latest 合并，以及 `shared/event-subscription.ts` 的建立、结束与取消状态。`runtime/event-peer.ts`、main 与 preload 经 `shared/plugin-events.ts` 逐条转发原始信封，`shared/event-client.ts` 按本地契约解码。事件不参与事务，publish 即投递；前端入口为 SDK prepare.events 与 useRendererEvents，领域消费接入见独立计划。
 
+Agent 经 SDK 公共 `ResourceStatusChanged` 发布 running、failed、awaiting、completed。`renderer/app/controller.ts` 以 latest 消费并完整替换同资源状态，`SessionStatus.tsx` 展示会话行概要与资源 popup。导航进入会话只清除终态，running 及其可选进度保留；当前会话收到终态时替换后立即消费，相同展示数据不刷新。状态只经事件投递，不读取会话正文、查询当前值或持久恢复。
+
 语言偏好由 `main/language.ts` 管理，保存于 `language.json`；`preload` 只暴露语言读取、选择与订阅。插件静态目录由 `plugins/catalogs.ts` 在启动时读取，带 owner、规范化语言和内容修订，通过应用列表快照交付 renderer，包括没有前端入口的包。源消息按功能分别位于 `renderer/messages/` 与 `modules/messages/`，声明使用语义化引用名，目录按稳定的 owner/id 寻址；宿主译文在 `shared/locales/`，内置插件译文在 `modules/locales/`。会话准备与执行的插件错误统一由 `runtime/plugin-errors.ts` 适配，SDK 声明与作者路径见 [公共 i18n](../docs/i18n.md)。
 
 ## 开发与验证

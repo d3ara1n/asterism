@@ -11,7 +11,7 @@ import { flat } from "../session/test-nodes.ts";
 import type { AgentSelection, Json } from "../shared/model.ts";
 import * as runtimeModules from "../modules/runtime.ts";
 import { z } from "zod";
-import { defineData } from "@atelier/sdk/contracts";
+import { defineData, ResourceStatusChanged, type ResourceStatus } from "@atelier/sdk/contracts";
 import { defineImplementation, defineTool } from "@atelier/sdk/contracts";
 import { Directory } from "../modules/filesystem/contract.ts";
 import { Note } from "../modules/notes/contract.ts";
@@ -55,6 +55,11 @@ async function execute(service: ApplicationService, command: SessionMutation | {
 async function settled(service: ApplicationService) {
   await vi.waitFor(() => { expect(service.sessions.running).toBe(false); }, { timeout: 2000, interval: 5 });
 }
+function resourceStatuses(service: ApplicationService) {
+  const states: ResourceStatus["status"][] = [];
+  service.sessions.events.listen(ResourceStatusChanged, {}, packet => { states.push((packet.event.data as ResourceStatus).status); });
+  return states;
+}
 
 describe("会话运行时", () => {
   // 预期来自时间线契约：终态属于块，正常工具续轮不得生成用户未选择的分支。
@@ -72,8 +77,11 @@ describe("会话运行时", () => {
       }
     } }) };
     const { service, start } = await setup(model);
+    // 状态对应整次代理执行，工具续轮期间不能提前标记 completed。
+    const states = resourceStatuses(service);
     const first = await execute(service, start);
     await settled(service);
+    expect(states).toEqual(["running", "completed"]);
     expect(requests).toBe(2);
     const snapshot = service.sessions.snapshot(first.sessionId);
     expect(service.sessions.tree.timeline(first.sessionId)).toEqual(snapshot.nodes);
@@ -498,7 +506,10 @@ describe("会话运行时", () => {
   it("请求在产生块之前失败时记录错误级通知，不伪造回复", async () => {
     let n = 0;
     const { service, start } = await setup(adapter(() => { if (++n === 1) throw new ModelFailure("prepare_failed", "Cannot prepare."); }));
+    // 无输出的请求失败也必须终结运行标记。
+    const states = resourceStatuses(service);
     const s = await execute(service, start); await settled(service);
+    expect(states).toEqual(["running", "failed"]);
     const snap = await execute(service, { type: "read", sessionId: s.sessionId });
     expect(snap.nodes.map(flat).some(x => x.kind === "text")).toBe(false);
     expect(snap.nodes.map(flat).at(-1)).toMatchObject({ kind: "notice", level: "error", code: "prepare_failed" });
@@ -514,6 +525,8 @@ describe("会话运行时", () => {
       await new Promise((_, reject) => signal.addEventListener("abort", () => reject(signal.reason)));
     } }) };
     const { service, start } = await setup(partial);
+    // 主动停止后需要用户显式继续，不能误报正常完成或留下 running。
+    const states = resourceStatuses(service);
     const s = await execute(service, start);
     await streamed.promise;
     const running = await execute(service, { type: "read", sessionId: s.sessionId });
@@ -523,6 +536,7 @@ describe("会话运行时", () => {
     await settled(service);
     const snap = await execute(service, { type: "read", sessionId: s.sessionId });
     const half = snap.nodes.map(flat).find(x => x.kind === "text");
+    expect(states).toEqual(["running", "awaiting"]);
     expect(half).toMatchObject({ text: "Half", complete: false });
     expect(snap.progress.live).toEqual([]);
   });

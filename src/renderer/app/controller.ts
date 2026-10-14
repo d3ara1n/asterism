@@ -1,13 +1,21 @@
-import { SessionTitleChanged, type EventSubscriber, type UiText } from "@atelier/sdk/contracts";
+import { ResourceStatusChanged, SessionTitleChanged, type EventSubscriber, type UiText } from "@atelier/sdk/contracts";
 
 import type { AppSnapshot, DesktopBridge, RuntimeStatus } from "../../shared/contracts";
 import { errorDisplay } from "../../shared/error-display";
 import { commonMessages } from "../messages/common";
+import type { ResourceStatusMark } from "./resource-status";
 
-export type ApplicationState = { snapshot: AppSnapshot | null; busy: boolean; error: UiText | null; status: RuntimeStatus };
-/** 应用只管理列表和连接状态；刷新列表不能改变会话视图或导航。 */
+export type ApplicationState = {
+  snapshot: AppSnapshot | null;
+  busy: boolean;
+  error: UiText | null;
+  status: RuntimeStatus;
+  resourceStatuses: readonly ResourceStatusMark[];
+};
+/** 应用管理列表、资源状态和连接状态；刷新列表不能改变会话视图或导航。 */
 export class ApplicationController {
-  private state: ApplicationState = { snapshot: null, busy: false, error: null, status: "starting" };
+  private state: ApplicationState = { snapshot: null, busy: false, error: null, status: "starting", resourceStatuses: [] };
+  private visibleSessionId: string | null = null;
   private listeners = new Set<() => void>();
   private reading = false;
   private dirty = false;
@@ -34,11 +42,38 @@ export class ApplicationController {
     });
     return () => subscription?.close();
   }
+  private watchResourceStatuses(): () => void {
+    const subscription = this.events?.subscribe(ResourceStatusChanged, { delivery: "latest" }, event => {
+      // 公共契约要求资源来源，身份由宿主发布入口校验。
+      const resource = event.source!.resource!;
+      const mark: ResourceStatusMark = { ...event.data, resource };
+      const marks = [...this.state.resourceStatuses];
+      const index = marks.findIndex(item => item.resource.id === resource.id);
+      if (index < 0) marks.push(mark);
+      else marks[index] = mark;
+      this.setResourceStatuses(marks);
+    });
+    return () => subscription?.close();
+  }
+  /** 四种状态统一替换后，消费已查看的终态；相同展示数据不触发刷新。 */
+  private setResourceStatuses(marks: readonly ResourceStatusMark[]): void {
+    const resourceStatuses = marks.filter(mark => mark.status === "running" || mark.resource.sessionId !== this.visibleSessionId);
+    if (JSON.stringify(resourceStatuses) !== JSON.stringify(this.state.resourceStatuses))
+      this.update({ resourceStatuses });
+  }
+  /** 查看只消费终态；running 及其进度保留，打开 popup 不算进入会话。 */
+  setVisibleSession(sessionId: string | null): void {
+    this.visibleSessionId = sessionId;
+    this.setResourceStatuses(this.state.resourceStatuses);
+  }
   connect(): () => void {
     let stopTitles = this.watchTitles();
+    let stopResourceStatuses = this.watchResourceStatuses();
     const unsubscribe = this.bridge.onStatus(status => {
       if (status === "ready" && this.state.status !== "ready" && this.state.status !== "starting") {
-        stopTitles(); stopTitles = this.watchTitles(); void this.refresh({ quiet: true });
+        stopTitles(); stopTitles = this.watchTitles();
+        stopResourceStatuses(); stopResourceStatuses = this.watchResourceStatuses();
+        void this.refresh({ quiet: true });
       }
       this.update({ status, ...(status === "unavailable" ? { error: commonMessages.runtimeStopped } : {}) });
     });
@@ -49,7 +84,7 @@ export class ApplicationController {
     });
     void this.refresh();
     return () => {
-      unsubscribe(); stopSessions(); stopTitles();
+      unsubscribe(); stopSessions(); stopTitles(); stopResourceStatuses();
       if (this.pending) { clearTimeout(this.pending); this.pending = null; }
     };
   }

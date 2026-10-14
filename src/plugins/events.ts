@@ -27,15 +27,14 @@ export class EventBus {
   private listeners = new Map<string, Set<Listener>>();
   private stopped = false;
   declare(owner: string, contract: EventContract): void {
-    if (this.stopped) throw new PluginApiError("unavailable", "The event bus is closed.");
     if (!belongsTo(owner, contract.id)) throw new PluginApiError("foreign_event", "The event contract belongs to another plugin.");
+    this.declarePublic(contract);
+  }
+  /** 软件登记的公共契约；发布身份仍由各契约的 source 约束。 */
+  declarePublic(contract: EventContract): void {
+    if (this.stopped) throw new PluginApiError("unavailable", "The event bus is closed.");
     const previous = this.contracts.get(contract.id);
     if (previous && previous !== contract) throw new PluginApiError("conflict", `Conflicting event declaration: ${contract.id}.`);
-    this.contracts.set(contract.id, contract);
-  }
-  /** 软件本身的公共契约；不属于任何插件，只能由宿主以 null 来源发布。 */
-  declareHost(contract: EventContract): void {
-    if (contract.source !== "host") throw new PluginApiError("invalid_argument", "Host event contracts must use the host source.");
     this.contracts.set(contract.id, contract);
   }
   contract(id: string): EventContract {

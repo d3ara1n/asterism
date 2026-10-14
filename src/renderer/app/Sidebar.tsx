@@ -10,10 +10,13 @@ import { useI18n } from "../shared/i18n";
 import type { AppSnapshot, RuntimeStatus } from "../../shared/contracts";
 import type { SessionResult } from "../../shared/session";
 import { SessionActions } from "./SessionActions";
+import { SessionStatus } from "./SessionStatus";
+import type { ResourceStatusMark } from "./resource-status";
 
 /** 应用导航只消费会话摘要；选择会话后由应用层显式加载工作台。 */
-export function Sidebar({ snapshot, status, busy, selectedSessionId, renameDisabledSessionId, homeActive, onHome, onSession, onRename, onSettings, onHide, onRetry }: {
+export function Sidebar({ snapshot, status, busy, resourceStatuses, selectedSessionId, renameDisabledSessionId, homeActive, onHome, onSession, onRename, onSettings, onHide, onRetry }: {
   snapshot: AppSnapshot | null; status: RuntimeStatus; busy: boolean; selectedSessionId: string | null;
+  resourceStatuses: readonly ResourceStatusMark[];
   renameDisabledSessionId: string | null; onRename: (sessionId: string, title: string) => Promise<SessionResult>;
   homeActive: boolean; onHome: () => void; onSession: (id: string) => void;
   onSettings: () => void; onHide: () => void; onRetry: () => void;
@@ -31,15 +34,19 @@ export function Sidebar({ snapshot, status, busy, selectedSessionId, renameDisab
     <section className="mt-6 flex min-h-0 flex-1 flex-col" aria-labelledby="conversation-list-title">
       <h2 id="conversation-list-title" className="type-label mb-2 px-2">{i18n.formatMessage(commonMessages.conversations)}</h2>
       <div className="min-h-0 flex-1 overflow-y-auto">
-        {snapshot?.sessions.map(session => <div key={session.id} className="group/session relative">
-          <Button variant={selectedSessionId === session.id ? "secondary" : "ghost"} className="w-full justify-start pr-9"
-            aria-current={selectedSessionId === session.id ? "page" : undefined} disabled={disabled}
-            onClick={() => onSession(session.id)} title={session.title}>
-            <MessageSquare className="text-muted-foreground" /><span className="truncate">{session.title}</span>
-          </Button>
-          <SessionActions title={session.title} disabled={disabled} renameDisabled={renameDisabledSessionId === session.id}
-            onRename={title => onRename(session.id, title)} />
-        </div>)}
+        {snapshot?.sessions.map(session => {
+          const marks = resourceStatuses.filter(mark => mark.resource.sessionId === session.id);
+          return <div key={session.id} className="group/session relative">
+            <Button variant={selectedSessionId === session.id ? "secondary" : "ghost"} className={`w-full justify-start ${marks.length > 1 ? "pr-24" : marks.length ? "pr-20" : "pr-9"}`}
+              aria-current={selectedSessionId === session.id ? "page" : undefined} disabled={disabled}
+              onClick={() => onSession(session.id)} title={session.title}>
+              <MessageSquare className="text-muted-foreground" /><span className="truncate">{session.title}</span>
+            </Button>
+            <SessionStatus marks={marks} />
+            <SessionActions title={session.title} disabled={disabled} renameDisabled={renameDisabledSessionId === session.id}
+              onRename={title => onRename(session.id, title)} />
+          </div>;
+        })}
         {snapshot?.sessions.length === 0 && <p className="type-caption px-2 py-3">{i18n.formatMessage(appMessages.noConversations)}</p>}
         {!snapshot && status !== "unavailable" && <p role="status" className="type-caption px-2 py-3">{i18n.formatMessage(appMessages.loadingConversations)}</p>}
         {status === "unavailable" && <p role="status" className="type-caption px-2 py-3">{i18n.formatMessage(commonMessages.statusUnavailable)}</p>}

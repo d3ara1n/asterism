@@ -1,4 +1,5 @@
 import { PluginApiError, type ObjectExecutor, type ObjectReader, type PluginTasks, type ModelServices } from "@atelier/sdk/runtime";
+import { ResourceStatusChanged, type ResourceStatus } from "@atelier/sdk/contracts";
 import { Execution, Notice } from "./records.ts";
 import { selectionOf, type AgentSelectionService } from "./selection.ts";
 import { composeSystemPrompt } from "./system-prompt.ts";
@@ -12,7 +13,12 @@ export function createAgentLoop(deps: { selection: AgentSelectionService; tasks:
     cancel: (object: ObjectReader) => deps.tasks.cancel(key(object)),
     start(object: ObjectExecutor) {
       const initial = deps.selection.agent(selectionOf(object).selection);
+      const publish = (status: ResourceStatus["status"]) => object.events.publish(ResourceStatusChanged, {
+        title: object.snapshot()!.title, status,
+      });
       const started = deps.tasks.start(key(object), async signal => {
+        let status: ResourceStatus["status"] = "failed";
+        publish("running");
         try {
           for (let request = 0; ; request++) {
             signal.throwIfAborted();
@@ -20,6 +26,7 @@ export function createAgentLoop(deps: { selection: AgentSelectionService; tasks:
             if (request >= (agent.maxTurns ?? 32)) {
               object.commit(writer => { writer.append(Notice, { level: "error", code: "request_limit",
                 message: "The agent reached the model request limit. Continue explicitly to resume." }); });
+              status = "awaiting";
               return;
             }
             const snapshot = object.session.snapshot();
@@ -35,13 +42,19 @@ export function createAgentLoop(deps: { selection: AgentSelectionService; tasks:
                 message: "The model response could not be saved to the timeline. Execution stopped." }); });
               return;
             }
-            if (result.reason !== "completed" || result.tools.length === 0) return;
+            if (result.reason !== "completed" || result.tools.length === 0) {
+              status = result.reason === "cancelled" ? "awaiting" : result.reason;
+              return;
+            }
           }
         } catch (error) {
+          status = signal.aborted ? "awaiting" : "failed";
           object.commit(writer => { writer.append(Notice, signal.aborted
             ? { level: "warning", code: "cancelled", message: "Execution was cancelled." }
             : { level: "error", code: error instanceof PluginApiError ? error.code : "execution_failed",
               message: error instanceof PluginApiError ? error.message : "Execution could not be completed." }); });
+        } finally {
+          publish(status);
         }
       }, { object: object.ref, timeoutMs: (initial.timeout ?? 600) * 1000 });
       if (!started) throw new PluginApiError("conflict", "This agent is running. Cancel or wait for it to finish.");

@@ -10,6 +10,7 @@
 | `app/Sidebar.tsx` | 首页、会话摘要列表、设置入口与隐藏 |
 | `app/Window.tsx` | Window/Titlebar、平台控件留白和拖动区域 |
 | `app/controller.ts` | 会话列表读取与运行时连接状态，不持有当前会话 |
+| `app/SessionStatus.tsx` / `resource-status.ts` | 会话行状态入口、资源详情及进度 popup 与概要聚合；控制器订阅公共资源状态，导航进入会话时只消费终态 |
 | `app/ErrorBoundary.tsx` | 渲染异常后的重新加载入口 |
 | `features/home/HomePage.tsx` | 草稿、agent/模型/思考选择及首次发送 |
 | `features/workbench/Workbench.tsx` | 对象/关系到画布的投影、定位和视图保存 |
@@ -64,6 +65,7 @@
 - 启动固定进入首页，只读取列表摘要；用户明确选择后才加载会话正文。首页草稿保存在应用层，首次发送接受后清空；失败保留。会话输入草稿与提交去重身份在页面切换期间保留。
 - 发送入口使用 `session.start`，由运行时生成 Session/agent/输入身份。初始标题取首条输入文字或文件名摘要的前 72 字符，配置了模型的 utility 角色执行两级自动命名，失败时保留当前标题；规则见 [自动会话命名](../../docs/session-naming.md)。创建期间用户若已导航，晚到结果只刷新列表，不夺回焦点或视图。
 - 会话列表每行通过 `app/SessionActions.tsx` 的 more 菜单打开 `features/session/RenameSession.tsx` 对话框；more 在悬停、键盘聚焦或菜单打开时显示。当前会话由控制器提交 `rename` 并等待重读，其他会话直接提交命令，不加载正文或切换导航。草稿只在打开时初始化，视图未就绪时禁用当前会话的重命名，详细语义见 [人工命名](../../docs/session-naming.md#人工命名入口)。
+- 会话行独立状态入口聚合不同资源的 running／failed／awaiting／completed，所有事件统一完整替换同资源旧状态，按资源 ID 保持组件身份，相同展示数据不刷新。running 外侧显示 spinner，popup 展示资源名称、状态及可选进度；进入会话只清除终态，running 保留，当前会话收到终态时替换后立即清除。状态只存内存，以 latest 接收未来事件，不查当前值或恢复，没有 reset 或撤回。
 - 会话导航立即切换，不等待首份投影。工作台底板与外观纹理先入场，投影返回后填入内容，保持同一页面过渡；读取期间不展示独立加载画面，失败时在工作台内保留错误与重试入口。
 - 代理对象的卡片内部使用连续阅读区与底部输入区，卡片位于 React Flow 工作台。正文、思考和摘要交给 Streamdown；工具结果使用结构化用户数据展示，不向模型回传 GUI 状态。Enter 发送、Shift+Enter 换行；中文输入法确认不会触发发送。
 - 资源卡片由模块的展示契约分派，工作台不判断具体资源种类如何绘制。工具的 input/execution/result 三态同级，各自的 headerRenderer/bodyRenderer 独立可选，共享阶段数据；组件可跨阶段复用，完整参数与过程/终结 data 经契约校验。历史按保存的实现 ID、当次资源身份和 data 渲染，缺失或不兼容时使用默认摘要/原始数据正文；不重新访问文件或当前资源。模块前端入口与后台入口分别编译，跨 IPC 只传身份和数据。

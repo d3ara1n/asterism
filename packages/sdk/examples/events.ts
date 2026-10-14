@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { pluginNamespace } from "@atelier/sdk/contracts";
+import { pluginNamespace, ResourceStatusChanged, type ResourceStatus } from "@atelier/sdk/contracts";
 import { defineModule, type ObjectExecutor } from "@atelier/sdk/runtime";
 import type { RendererModule } from "@atelier/sdk/renderer";
 
@@ -22,6 +22,17 @@ export function report(object: ObjectExecutor): void {
   object.events.publish(Progress, { job: "file", completed: 10, total: 100 });
   // @ts-expect-error 发布参数由契约推导。
   object.events.publish(Progress, { job: "file", completed: "ten", total: 100 });
+}
+/** 公共状态由宿主登记；插件只经自己的资源操作柄发布，要求宿主 API 7.2。 */
+export function reportStatus(object: ObjectExecutor): void {
+  object.events.publish(ResourceStatusChanged, { title: "Download", status: "running" });
+  object.events.publish(ResourceStatusChanged, { title: "Download", status: "running", progress: { value: 0.6 } });
+  object.events.publish(ResourceStatusChanged, { title: "Download", status: "completed" });
+  // @ts-expect-error 状态标记不提供 reset 或撤回。
+  object.events.publish(ResourceStatusChanged, { title: "Download", status: "reset" });
+  // @ts-expect-error 进度只属于 running，终态完整替换运行状态。
+  const invalid: ResourceStatus = { title: "Download", status: "completed", progress: { value: 1 } };
+  void invalid;
 }
 export const renderer: RendererModule = {
   resources: [], cards: [], tools: [],
