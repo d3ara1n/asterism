@@ -7,6 +7,16 @@ export const UserMessage = defineRecord(core.name("agent.user-message"), {
   schema: z.object({ parts: modelInputPartsSchema }),
 });
 export const Execution = defineRecord(core.name("agent.execution"), { schema: modelRunRecordSchema });
+/** 摘要只替换模型输入的前缀；keptFrom 指向原样保留的首个历史节点。 */
+export const ContextSummary = defineRecord(core.name("agent.context-summary"), {
+  schema: z.strictObject({
+    summary: z.string().trim().min(1),
+    keptFrom: z.string().min(1),
+    model: z.string().min(1),
+    tokensBefore: z.number().nonnegative(),
+    completion: modelCompletionSchema,
+  }),
+});
 export const Notice = defineRecord(core.name("agent.notice"), {
   schema: z.strictObject({ code: z.string(), message: z.string(), level: z.enum(["info", "warning", "error"]),
     response: modelCompletionSchema.extend({ responseId: z.string(), requestParentId: z.string().nullable(), model: z.string() }).optional() }),

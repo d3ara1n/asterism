@@ -36,6 +36,8 @@
 
 配置字段、模型协议与存储工作已完成并验收（2026-10-13），记录见 [专项计划](../plans/archived/todo-2026-10-01-model-protocol-storage.md)；后续能力由 [运行时能力计划](../plans/todo-2026-10-01-runtime-capabilities.md)、[上下文压缩](../plans/todo-2026-10-13-context-compression.md) 与 [跨模型续接](../plans/todo-2026-10-13-cross-model-continuation.md) 分别跟踪。
 
+上下文自动压缩已实现并通过自动化验证：请求之间摘要旧前缀，保留近期原文与完整工具批次，失败／取消不替换上下文。策略和参数见 [设计契约](context-compression.md)，真实端点、连续压缩的摘要质量与 GUI 待 [专项验收](../plans/todo-2026-10-13-context-compression.md#当前待验收)。
+
 ## 2. 目录资源与单代理
 
 接入一个 provider，提供带 resource_id 的最小文件操作；只通过明确绑定获得目录能力。

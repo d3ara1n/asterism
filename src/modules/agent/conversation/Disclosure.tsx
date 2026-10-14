@@ -5,7 +5,7 @@ import { Button } from "../../../renderer/shared/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../../../renderer/shared/ui/collapsible";
 import { Item } from "../../../renderer/shared/ui/item";
 
-/** 思考与工具共用外壳；调用方拥有状态，标题点击区不受外层内边距挤压。 */
+/** 思考、工具与摘要共用外壳；调用方拥有状态，标题点击区不受外层内边距挤压。 */
 export function Disclosure({ header, children, open, onOpenChange, expandable = true, pending = false }: {
   header: ReactNode;
   children: ReactNode;

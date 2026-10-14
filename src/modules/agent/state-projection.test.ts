@@ -30,7 +30,7 @@ describe("代理执行状态投影", () => {
 
   it("正常完成从持久历史恢复，非中断提示、其他代理和资源事件不重新打开继续入口", () => {
     expect(project([
-      message("a", "Go"), answer(), diagnostic("cache_miss", "warning"), diagnostic("context_budget", "warning"),
+      message("a", "Go"), answer(), diagnostic("cache_miss", "warning"), diagnostic("context_compression_failed", "warning"),
       notice("a", "info", "Information", "info"), message("b", "For B"),
       notice("b", "execution_failed", "Failed"), notice(null, "execution_failed", "Session notice"), attached("a", "dir"),
     ])).toBe("completed");

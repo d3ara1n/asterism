@@ -163,7 +163,7 @@ ResourceDescription、ToolView、CreationEntry 的 label／description 接收 Ui
 
 ## 版本与当前边界
 
-SDK 包版本为 `0.12.0`，宿主提供 API 7.2；使用公共资源状态的插件声明 `api: { major: 7, minMinor: 2 }`，通用事件接口要求 minMinor 1。同主版本旧插件继续可用，其他主版本或更高小版本在加载前拒绝。应用 IPC 版本为 5，会话 IPC 为 18，内容 IPC 为 3，应用配置 IPC 为 3，插件配置 IPC 为 2，插件事件 IPC 为 1；工作数据库格式为 18，应用配置文件格式为 2。
+SDK 包版本为 `0.13.0`，宿主提供 API 7.3；依赖 `models.stream` 的 `maxOutputTokens` 参数时声明 `api: { major: 7, minMinor: 3 }`，使用公共资源状态要求 minMinor 2，通用事件接口要求 minMinor 1。输出上限须为正安全整数，与模型配置的上限取较小值，省略时沿用模型配置。同主版本旧插件继续可用，其他主版本或更高小版本在加载前拒绝。应用内部 IPC、数据库与配置文件版本独立维护，职责及格式约定见 [架构文档](../../docs/architecture.md)，不以 SDK 包版本替代。
 
 资源创建数据必须是 JSON 对象，不能占用宿主的 `id / type / title` 字段。当前会话数据保存于 `session_data`，事件及工具结果保存稳定契约身份与原始数据。core 消费具型用户消息、模型执行、通知与环境记录，存储编码由宿主负责；环境记录保留原事件身份与载荷。
 

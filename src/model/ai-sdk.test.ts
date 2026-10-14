@@ -16,6 +16,22 @@ const input: ModelInput = {
 };
 
 describe("AI SDK 适配契约", () => {
+  // SDK stream 的调用方上限须抵达 provider，且不得扩大用户配置的输出上限。
+  it.each([{ requested: 400, expected: 400 }, { requested: 2000, expected: 1000 }])(
+    "单次补全输出上限 $requested 与模型配置取较小值", async ({ requested, expected }) => {
+      const model = new MockLanguageModelV4({ doStream: async () => ({ stream: simulateReadableStream({
+        initialDelayInMs: null, chunkDelayInMs: null, chunks: [
+          { type: "finish", finishReason: { unified: "stop", raw: "stop" }, usage: {
+            inputTokens: { total: 1, noCache: 1, cacheRead: undefined, cacheWrite: undefined },
+            outputTokens: { total: 1, text: 1, reasoning: undefined },
+          } },
+        ],
+      }) }) });
+      const adapter = new AiSdkAdapter(async () => "synthetic-key", () => model);
+      for await (const _event of adapter.prepare({ ...input, maxOutputTokens: requested }).stream(new AbortController().signal)) { /* 消费终态。 */ }
+      expect(model.doStreamCalls[0]!.maxOutputTokens).toBe(expected);
+      expect(() => adapter.prepare({ ...input, maxOutputTokens: 0 })).toThrow("positive safe integer");
+    });
   it.each([
     { modelId: "o3", thinking: "low", reasoning: true },
     { modelId: "deepseek-flash", thinking: "off", reasoning: true },

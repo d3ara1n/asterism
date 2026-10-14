@@ -29,7 +29,7 @@ describe("插件包", () => {
     expect(() => list.add({ source: { kind: "path", path: dir } }, data)).toThrow();
     expect(list.read()).toEqual([]);
   });
-  it("API 7.2 接受同主版本旧插件与资源状态插件，拒绝旧主版本与更高小版本", () => {
+  it("API 7.3 接受同主版本旧插件与请求输出上限插件，拒绝旧主版本与更高小版本", () => {
     const dir = temp();
     pkg(dir, { id: "acme.x", api: { major: 7, minMinor: 0 } });
     expect(readManifest(dir).api).toEqual({ major: 7, minMinor: 0 });
@@ -40,6 +40,8 @@ describe("插件包", () => {
     pkg(dir, { id: "acme.x", api: { major: 7, minMinor: 2 } });
     expect(readManifest(dir).api).toEqual({ major: 7, minMinor: 2 });
     pkg(dir, { id: "acme.x", api: { major: 7, minMinor: 3 } });
+    expect(readManifest(dir).api).toEqual({ major: 7, minMinor: 3 });
+    pkg(dir, { id: "acme.x", api: { major: 7, minMinor: 4 } });
     expect(() => readManifest(dir)).toThrow();
   });
   it("源码包经 esbuild 打包导入，SDK 解析到宿主实例；禁用与重复 ID 不加载", async () => {

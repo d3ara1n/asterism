@@ -81,6 +81,8 @@ export interface StreamRequest {
   target: ModelTarget;
   system: SystemPrompt;
   messages: ModelItem[];
+  /** 本次补全的输出上限；与模型配置的上限取较小值。 */
+  maxOutputTokens?: number;
   tools?: { name: string; description: string; parameters: Json }[];
   signal: AbortSignal;
 }

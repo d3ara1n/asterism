@@ -13,7 +13,7 @@ export type ResolvedInputPart = Extract<ModelInputPart, { kind: "text" }> | { ki
 export type ResolvedModelItem = Extract<ModelItem, { kind: "output" }>
   | { kind: "input" | "context"; parts: readonly ResolvedInputPart[] }
   | { kind: "result"; callId: string; name: string; error: boolean; parts: readonly ResolvedInputPart[] };
-export interface ModelInput { settings: ModelSettings; system: SystemPrompt; messages: ResolvedModelItem[]; tools: ToolDeclaration[] }
+export interface ModelInput { settings: ModelSettings; system: SystemPrompt; messages: ResolvedModelItem[]; tools: ToolDeclaration[]; maxOutputTokens?: number }
 export type ModelValidationInput = Omit<ModelInput, "messages"> & { messages: readonly (ModelItem | ResolvedModelItem)[] };
 export interface PreparedModel {
   stream(signal: AbortSignal): AsyncIterable<ModelEvent>;

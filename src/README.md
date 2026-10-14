@@ -22,6 +22,7 @@
 | `tools/` | 两层共用的工具定义投影、实现注册与产出校验、终结模型投影、支持关系；不持有外部授权策略 | shared、session 对象类型 |
 | `plugins/` | 包与公共模块图加载、配置／凭据托管、读取／执行门面、具型命令校验、共享运行生命周期、资源／工具适配、core 存储与目录适配、提交后派发 | SDK、session、resources、tools |
 | `modules/` | core 的资源、代理、命名与视图；`modules/shared/` 承接共享工具契约、正文算法与前端预览投影，见目录 README | 后台/前端分入口；宿主能力通过公开 SDK 消费，公共视觉复用 renderer/shared |
+| `modules/agent/compression.ts`、`compression-prompt.ts`、`projection.ts` | 请求之间的预算与摘要执行、独立摘要提示、近期原文投影；摘要及边界从时间线读取，失败不替换上下文 | SDK 模型与记录契约；策略归代理，不进入通用模型执行器 |
 | `renderer/` | 应用视图、视图注册机制、React Flow、用户意图 | shared、modules 前端入口、React 与 UI 库；不访问 Node/数据库 |
 
 ## 完整路径

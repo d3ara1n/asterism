@@ -1,5 +1,6 @@
 import { useI18n, useRendererObject } from "@atelier/sdk/renderer";
 import { TriangleAlert, Info } from "lucide-react";
+import { useState } from "react";
 
 import { Alert, AlertDescription } from "../../../renderer/shared/ui/alert";
 import { Badge } from "../../../renderer/shared/ui/badge";
@@ -9,6 +10,7 @@ import { ThinkingBlock } from "./ThinkingBlock";
 import { timelineKey, type TimelineItem } from "./timeline";
 import { ToolCall } from "./ToolCall";
 import { FilePreview } from "./Files";
+import { Disclosure } from "./Disclosure";
 
 export function ConversationTimeline({ items }: { items: readonly TimelineItem[] }) {
 
@@ -39,8 +41,17 @@ function NodeContent({ node }: { node: TimelineItem }) {
     case "text": return <article className="space-y-1">{tag}<Markdown streaming={streaming}>{node.text}</Markdown></article>;
     case "thinking": return node.text.trim() ? <ThinkingBlock node={node} /> : null;
     case "toolcall": return <ToolCall node={node} />;
+    case "summary": return <Summary text={node.text} />;
     case "notice": return <Alert variant={node.level === "error" ? "destructive" : "default"}>
       {node.level === "error" ? <TriangleAlert /> : <Info />}<AlertDescription>{node.message}</AlertDescription></Alert>;
     default: return null;
   }
+}
+function Summary({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  const i18n = useI18n();
+  return <Disclosure open={open} onOpenChange={setOpen} header={<><Info className="size-3.5" />
+    <span className="min-w-0 flex-1 text-left">{i18n.formatMessage(conversationMessages.contextSummary)}</span></>}>
+    <Markdown>{text}</Markdown>
+  </Disclosure>;
 }

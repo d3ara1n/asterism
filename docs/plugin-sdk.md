@@ -234,7 +234,7 @@ SDK helper 负责具型声明与实现包装，宿主命令模块负责解析、
 
 `ToolRenderProps<D, T, A>` 是三种 Props 的可辨识联合，供跨阶段组件复用；根据 phase 收窄后，完整参数与终结结局保留准确类型。填充参数的字段可能缺失、类型错误或只收到字符串前缀，视图自行安全读取，不以 `Partial<已校验参数>` 冒充有效数据。等待调度归 execution，不表示已经开始执行。执行产出和结果由同一 result schema 校验。
 
-未声明 input 时使用静态填充提示；声明填充视图后，缺少 header 时使用工具默认摘要，缺少 body 时不提供填充展开。execution/result 缺少阶段或单个入口时分别回退默认摘要和产出正文，不跨阶段借用视图。SDK 为 0.12.0，宿主 API 为 7.2；不兼容的插件在加载前拒绝。
+未声明 input 时使用静态填充提示；声明填充视图后，缺少 header 时使用工具默认摘要，缺少 body 时不提供填充展开。execution/result 缺少阶段或单个入口时分别回退默认摘要和产出正文，不跨阶段借用视图。SDK 为 0.13.0，宿主 API 为 7.3；不兼容的插件在加载前拒绝。
 
 三态的样式与内容归工具，宿主控制开合设置、阶段图标、异常和原始详情入口。工具外壳不限制正文高度；body 提供方自行管理局部高度、滚动、分页、截取与渲染量。视图应尽可能保留已出现的路径、数量和相同元素的样式，逐步补充信息；允许按内容语义切换正文形态，例如生成中的 write 尾部预览与成功写入后的代码正文。内置插件的 120 行正文预算是 `atelier.core` 自身的展示约定，不是 SDK 对外部插件的强制限制。完整约定见 [设计系统](design-system.md#对话过程视图)，可编译的作者示例和类型反例见 [tool-renderer.ts](../packages/sdk/examples/tool-renderer.ts)。
 
@@ -309,6 +309,8 @@ renderer 模块可声明 `prepare({ signal })` 完成自身内部准备，例如
 前端创建入口由宿主提供草稿并管理关闭。卡片动作用 `object.input(contract)` 取得草稿，`invoke(contract, input, { content: draft })` 携带资格；命令成功后宿主关闭草稿，失败保留可重试，放弃时调用 `close`。暂存结果只有写入提交后的数据或事件才持久保留；字符串化或写入私有文件不建立依赖。
 
 ## 模型输入
+
+`models.stream` 的可选 `maxOutputTokens` 为本次补全的输出上限，必须是正安全整数，与模型配置的输出上限取较小值。依赖此参数的插件要求宿主 API 7.3；未设置时沿用模型配置。摘要、命名等消费者可约束自己的补全，通用模型服务不解释其业务策略。
 
 模型输入与 context 使用有序 ModelInputPart：文字为 `{ kind: "text", text }`，文件为 `{ kind: "file", file: ContentRef, mediaType, filename? }`；mediaType 如实标注，不建模输入模态。工具实现的 `toModel(data)` 可返回字符串或同形 parts，文件引用执行期 `object.content.stage` 暂存的内容，宿主随结果记录登记根；声明与 schema 从 contracts 导出，调用示例见 [模型文件输入](../packages/sdk/examples/model-input.ts)。输入不携带字节或读取门面。
 

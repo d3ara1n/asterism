@@ -86,8 +86,6 @@ export async function runModelRequest(request: ModelRunRequest, environment: Pro
         }, handover);
       if (request.cache?.expectHit && finish.usage?.cacheRead === 0 && (finish.usage.input ?? 0) > 2048)
         diagnostic("cache_miss", "The provider reported no cached input for this request.", "warning");
-      if (settings.model.contextWindow && (finish.usage?.input ?? 0) > settings.model.contextWindow * 0.8)
-        diagnostic("context_budget", "Context usage is above 80% of the model's window.", "warning");
       if ([...outcomes.values()].some(outcome => outcome.kind === "unknown"))
         throw new ModelFailure("unknown_outcome", "A tool outcome is unknown. Automatic continuation stopped.");
       signal.throwIfAborted();

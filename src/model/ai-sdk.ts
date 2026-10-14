@@ -60,14 +60,16 @@ export class AiSdkAdapter implements ModelAdapter {
     private readonly languageModelFactory?: (input: ModelInput, key: string) => LanguageModel) {}
   validate(input: ModelValidationInput): void {
     validateProviderTransport(input.settings.provider);
-    requestOptions(input.settings.provider, input.settings.model, { purpose: "execution", thinking: input.settings.thinking });
+    requestOptions(input.settings.provider, input.settings.model, { purpose: "execution", thinking: input.settings.thinking, maxOutputTokens: input.maxOutputTokens });
     validateProjection(input);
   }
   prepare(input: ModelInput): PreparedModel {
     this.validate(input);
     const messages = sdkMessages(input);
     const system = projectSystemPrompt(input.system);
-    const options = requestOptions(input.settings.provider, input.settings.model, { purpose: "execution", thinking: input.settings.thinking, system });
+    const options = requestOptions(input.settings.provider, input.settings.model, {
+      purpose: "execution", thinking: input.settings.thinking, system, maxOutputTokens: input.maxOutputTokens,
+    });
     return { stream: signal => this.stream(input, messages, options, signal) };
   }
   private async *stream(input: ModelInput, messages: ModelMessage[], options: ReturnType<typeof requestOptions>, signal: AbortSignal): AsyncIterable<ModelEvent> {

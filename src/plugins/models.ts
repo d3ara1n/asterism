@@ -118,15 +118,15 @@ export function createModelServices(configuration: ConfigurationService, adapter
     },
     async *stream(request, options) {
       request.signal.throwIfAborted();
-      const { target, system, messages, tools } = structuredClone({
-        target: request.target, system: request.system, messages: request.messages, tools: request.tools,
+      const { target, system, messages, tools, maxOutputTokens } = structuredClone({
+        target: request.target, system: request.system, messages: request.messages, tools: request.tools, maxOutputTokens: request.maxOutputTokens,
       });
       const content = capture(messages, options?.content);
       try {
         const { settings, adapter } = await resolve(target);
         const resolvedMessages = await resolveInput(messages, content, request.signal);
         const source = { model: modelExpression(settings), adapter: adapter.version, scope: modelScope(settings) };
-        for await (const event of adapter.prepare({ settings, system, messages: resolvedMessages,
+        for await (const event of adapter.prepare({ settings, system, messages: resolvedMessages, maxOutputTokens,
           tools: settings.model.capabilities.tools ? tools ?? [] : [] }).stream(request.signal)) {
           request.signal.throwIfAborted();
           yield event.type === "finish" ? { ...event, source } : event;

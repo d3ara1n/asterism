@@ -4,7 +4,7 @@ import { ModelFailure } from "./contract.ts";
 import { compatibilityForTarget } from "./projection.ts";
 
 type Connection = Pick<ProviderInput, "protocol">;
-type RequestPurpose = { purpose: "probe" } | { purpose: "execution"; thinking: ThinkingLevel | null; system?: string };
+type RequestPurpose = { purpose: "probe" } | { purpose: "execution"; thinking: ThinkingLevel | null; system?: string; maxOutputTokens?: number };
 interface RequestOptions {
   maxRetries: 0;
   system?: string;
@@ -27,6 +27,11 @@ export function requestOptions(provider: Connection, model: ProviderModel, reque
   if (request.purpose === "probe") {
     options.maxOutputTokens = Math.min(model.generation.maxOutputTokens ?? 64, 128);
     return options;
+  }
+  if (request.maxOutputTokens !== undefined) {
+    if (!Number.isSafeInteger(request.maxOutputTokens) || request.maxOutputTokens <= 0)
+      throw new ModelFailure("invalid_argument", "The output token limit must be a positive safe integer.");
+    options.maxOutputTokens = Math.min(options.maxOutputTokens ?? Infinity, request.maxOutputTokens);
   }
   const compatibility = compatibilityForTarget({ provider, model });
   if (provider.protocol !== "openai-responses" || compatibility.systemMessage) options.system = request.system;

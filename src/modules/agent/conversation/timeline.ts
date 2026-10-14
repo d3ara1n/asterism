@@ -1,12 +1,13 @@
 import type { z } from "zod";
 import type { ModelLiveBlock, SessionSnapshot, SessionRecord, Usage, ModelInputPart } from "@atelier/sdk/contracts";
-import { Execution, Notice, UserMessage } from "../records";
+import { ContextSummary, Execution, Notice, UserMessage } from "../records";
 
 type SavedBlock = Extract<z.infer<typeof Execution.schema>, { type: "block" }>["block"] & {
   id: string; createdAt: string; usage: Usage | null;
 };
 export type TimelineItem = SavedBlock | ModelLiveBlock
   | { kind: "message"; id: string; parts: readonly ModelInputPart[] }
+  | { kind: "summary"; id: string; text: string; usage: Usage | null }
   | ({ kind: "notice"; id: string } & z.infer<typeof Notice.schema>);
 export function timelineKey(item: TimelineItem): string {
   return "responseId" in item ? JSON.stringify([item.responseId, item.ordinal]) : item.id;
@@ -15,6 +16,8 @@ function item(record: SessionRecord, agentId: string): TimelineItem | null {
   const notice = Notice.decode(record);
   if (notice?.status === "known" && (!record.source?.resource || record.source?.resource.id === agentId)) return { kind: "notice", id: record.id, ...notice.data };
   if (record.source?.resource?.id !== agentId) return null;
+  const summary = ContextSummary.decode(record);
+  if (summary?.status === "known") return { kind: "summary", id: record.id, text: summary.data.summary, usage: summary.data.completion.usage };
   const message = UserMessage.decode(record);
   if (message?.status === "known") return { kind: "message", id: record.id, parts: message.data.parts };
   const execution = Execution.decode(record);

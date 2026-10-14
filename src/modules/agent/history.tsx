@@ -4,13 +4,17 @@ import { Brain, MessageSquareText, User, Wrench, TriangleAlert, Info } from "luc
 import { inputSummary } from "../../shared/model-input";
 import { Badge } from "../../renderer/shared/ui/badge";
 import { conversationMessages } from "../messages/conversation";
-import { Execution, UserMessage, Notice } from "./records";
+import { Execution, UserMessage, Notice, ContextSummary } from "./records";
 
 /** 代理记录的历史行：以样式区分用户、思考与输出，不依赖文字前缀。 */
 const RowText = ({ label, className }: { label: string; className?: string }) => <span className={`block truncate leading-5 ${className ?? ""}`}>{label}</span>;
 const record = (value: unknown): Record<string, unknown> => value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 
 export const agentRecordViews: RecordRenderer[] = [
+  recordRenderer(ContextSummary, {
+    icon: <Info className="size-4" />,
+    label: (data, context) => `${context.text(conversationMessages.contextSummary)} · ${data.summary}`,
+  }),
   recordRenderer(UserMessage, {
     icon: <User className="size-4 text-primary" />,
     label: data => inputSummary(data.parts),

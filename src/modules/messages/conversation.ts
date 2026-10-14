@@ -1,6 +1,10 @@
 import { defineMessages, pluginNamespace } from "@atelier/sdk/contracts";
 
 export const conversationMessages = pluginNamespace("atelier.core").messages("en", defineMessages({
+  contextSummary: {
+    id: "agent_conversation_contextSummary",
+    defaultMessage: "Context compressed",
+  },
   messagePlaceholder: {
     id: "agent_conversation_Composer_1",
     defaultMessage: "Message the agent",

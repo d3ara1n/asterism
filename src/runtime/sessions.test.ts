@@ -19,6 +19,8 @@ import { Note } from "../modules/notes/contract.ts";
 import { implement } from "../tools/testing.ts";
 import { ToolRegistry } from "../tools/registry.ts";
 import { foldWorkbench } from "../session/fold.ts";
+import { ContextSummary } from "../modules/agent/records.ts";
+import { COMPRESSION_MAX_OUTPUT } from "../modules/agent/compression.ts";
 
 const roots: string[] = [];
 type Snap = { workbench: { objects: { id: string; kind: string; presentation: { data: unknown } }[] } };
@@ -63,6 +65,99 @@ function resourceStatuses(service: ApplicationService) {
 }
 
 describe("会话运行时", () => {
+  // 压缩契约横跨插件记录注册、托管任务、模型 stream 和下一次工作请求，使用真实隔离会话贯通。
+  it("工具请求之间压缩旧前缀，近期工具批次原样续接，摘要与用量只追加一次", async () => {
+    const work: ModelInput[] = [], summaries: ModelInput[] = [];
+    const model: ModelAdapter = { validate() {}, version: "test/1", prepare(input) {
+      const summary = input.system.blocks.some(block => block.id === "context-summary");
+      (summary ? summaries : work).push(input);
+      const number = work.length;
+      return { async *stream() {
+        if (summary) {
+          yield* reply("Remember the original task.").slice(0, -1);
+          yield { type: "finish", reason: "stop", usage: { input: 100, output: 20, total: 120, cacheRead: 0, cacheWrite: 0, reasoning: 0 } };
+        } else if (number === 2) {
+          yield { type: "part.start", part: { id: "list", kind: "toolcall", callId: "list", name: "resource_list" } };
+          yield { type: "part.end", partId: "list", arguments: {} };
+          yield { type: "finish", reason: "tool-calls", usage: { input: 190_000, output: 10, total: 190_010, cacheRead: 150_000, cacheWrite: 0, reasoning: 0 } };
+        } else {
+          yield* reply(number === 1 ? "Old answer" : "Task finished").slice(0, -1);
+          yield { type: "finish", reason: "stop", usage: { input: number === 1 ? 100 : 22_000, output: 10, total: 110, cacheRead: 0, cacheWrite: 0, reasoning: 0 } };
+        }
+      } };
+    } };
+    const { service, start } = await setup(model);
+    const { revision: _revision, ...configured } = service.configuration.current().models[0]!;
+    await service.configuration.execute({ type: "model.save", id: start.model, value: { ...configured, contextWindow: 200_000 } });
+    const first = await execute(service, start); await settled(service);
+    const saved = service.sessions.tree.timeline(first.sessionId);
+    const recent = "Recent request " + "R".repeat(80_000);
+    await execute(service, agentCommand(first.sessionId, agentOf(first), {
+      type: "submit", submissionId: randomUUID(), parts: [{ kind: "text", text: recent }],
+    })); await settled(service);
+    expect(work).toHaveLength(3);
+    expect(summaries).toHaveLength(1);
+    expect(summaries[0]).toMatchObject({ maxOutputTokens: COMPRESSION_MAX_OUTPUT, settings: { thinking: "off" }, tools: [] });
+    expect(summaries[0]!.system.blocks).toHaveLength(1);
+    expect(JSON.stringify(summaries[0]!.messages)).toContain("Old answer");
+    expect(JSON.stringify(summaries[0]!.messages)).not.toContain(recent);
+    expect(work[2]!.messages.map(item => item.kind)).toEqual(["context", "input", "output", "result"]);
+    expect(work[2]!.messages[1]).toMatchObject({ parts: [{ text: recent }] });
+    expect(work[2]!.messages.at(-1)).toMatchObject({ callId: "list", error: false });
+    const path = service.sessions.tree.timeline(first.sessionId);
+    expect(path.slice(0, saved.length)).toEqual(saved);
+    expect(path.filter(node => node.contract === ContextSummary.id)).toHaveLength(1);
+    expect(ContextSummary.schema.parse(path.find(node => node.contract === ContextSummary.id)!.data).completion.usage?.total).toBe(120);
+    expect(path.map(flat).filter(node => node.kind === "notice").map(node => node.code)).not.toContain("context_budget");
+  });
+
+  // 空/截断/调工具/取消各有不同失败机制，均不得提交半截摘要或更改原上下文。
+  it.each(["empty", "length", "toolcall", "cancel"] as const)("摘要 %s 时原历史仍可继续，显式重试可成功", async failure => {
+    const work: ModelInput[] = [];
+    let attempts = 0, summarizing = false;
+    const model: ModelAdapter = { validate() {}, version: "test/1", prepare(input) {
+      const summary = input.system.blocks.some(block => block.id === "context-summary");
+      if (!summary) work.push(input);
+      return { async *stream(signal) {
+        if (summary) {
+          attempts++; summarizing = true;
+          if (attempts > 1) { yield* reply("Recovered summary"); return; }
+          if (failure === "cancel") {
+            await new Promise<void>(resolve => {
+              if (signal.aborted) resolve();
+              else signal.addEventListener("abort", () => resolve(), { once: true });
+            });
+            signal.throwIfAborted(); return;
+          }
+          if (failure === "toolcall") {
+            yield { type: "part.start", part: { kind: "toolcall", id: "bad", callId: "bad", name: "resource_list" } }; return;
+          }
+          yield* reply(failure === "empty" ? "" : "Incomplete summary").slice(0, -1);
+          yield { type: "finish", reason: failure === "length" ? "length" : "stop", usage: null };
+        } else yield* reply(work.length === 1 ? "Recent answer " + "R".repeat(80_000) : "Resumed");
+      } };
+    } };
+    const { service, start } = await setup(model);
+    const { revision: _revision, ...configured } = service.configuration.current().models[0]!;
+    await service.configuration.execute({ type: "model.save", id: start.model, value: { ...configured, contextWindow: 40_000 } });
+    const first = await execute(service, { ...start, parts: [{ kind: "text", text: "Original task " + "O".repeat(20_000) }] });
+    if (failure === "cancel") {
+      await vi.waitFor(() => expect(summarizing).toBe(true));
+      await execute(service, agentCommand(first.sessionId, agentOf(first), { type: "cancel" }));
+    }
+    await settled(service);
+    const failed = service.sessions.tree.timeline(first.sessionId);
+    expect(attempts).toBe(1);
+    expect(failed.some(node => node.contract === ContextSummary.id)).toBe(false);
+    expect(failed.map(flat).some(node => node.kind === "notice"
+      && node.code === (failure === "cancel" ? "cancelled" : "context_compression_failed"))).toBe(true);
+    await execute(service, agentCommand(first.sessionId, agentOf(first), { type: "continue" }));
+    await settled(service);
+    expect(attempts).toBe(2);
+    expect(work.at(-1)!.messages[0]).toMatchObject({ kind: "context", parts: [{ text: expect.stringContaining("Recovered summary") }] });
+    expect(service.sessions.tree.timeline(first.sessionId).slice(0, failed.length)).toEqual(failed);
+  });
+
   // 选择是覆盖身份，不保存角色默认值；首页 IPC、对象持久化和后续请求必须贯通 null。
   it("首页空选择持久保留，角色默认每次重取，末端错误透传且不受理失败输入", async () => {
     const inputs: ModelInput[] = [];

@@ -86,7 +86,9 @@ args、target、result schema 必须有非空的整体 description，声明 help
 
 `session.get / commit` 与 `object.get / commit` 分别作用于当前会话数据与当前对象数据，数据按契约身份保存到 `session_data`，读取由 schema 判断兼容性；不维护手填数据版本。当前值不随历史位置恢复；重建历史须消费不可变时间线事件。插件目录的数据独立于会话生命周期。
 
-Agent 的选择和提交去重保存于对象数据，用户输入与执行输出保存为 `UserMessage / Execution / Notice` 记录；每次请求由 `agent/projection.ts` 重建消息。`agent/configuration.ts` 声明只读配置目录，应用级配置与用户覆盖仍由宿主保存。运行以对象绑定任务承载，取消与关闭由托管设施收束；会话仅在全部对象收束后允许回溯，移除对象也要求该对象收束。命名依赖同插件的 Agent 契约，用户消息触发两级自动命名；人工与自动命名只追加来源事件，游标观察者按当前路径同步标题，规则见 [会话命名](../../docs/session-naming.md)。
+Agent 的选择和提交去重保存于对象数据，用户输入、执行输出、通知与摘要保存为 `UserMessage / Execution / Notice / ContextSummary` 记录；每次请求由 `agent/projection.ts` 重建消息。`agent/configuration.ts` 声明只读配置目录，应用级配置与用户覆盖仍由宿主保存。运行以对象绑定任务承载，取消与关闭由托管设施收束；会话仅在全部对象收束后允许回溯，移除对象也要求该对象收束。命名依赖同插件的 Agent 契约，用户消息触发两级自动命名；人工与自动命名只追加来源事件，游标观察者按当前路径同步标题，规则见 [会话命名](../../docs/session-naming.md)。
+
+`agent/compression.ts` 负责预算、切点、摘要调用与提交；`compression-prompt.ts` 独立维护摘要系统提示、增量更新指令和材料序列化。工作请求仍按当前配置组装系统提示，摘要提示不复用普通工作的职责指令。响应分组和保留边界由 `projection.ts` 解释，摘要流失败不提交部分记录。参数、历史语义与失败边界见 [上下文自动压缩](../../docs/context-compression.md)。
 
 ## 资源视图
 
