@@ -3,6 +3,7 @@ import { defineMessages } from "@atelier/sdk/contracts";
 import { core } from "../plugin.ts";
 
 const messages = core.messages("en", defineMessages({
+  title: { id: "settings.title", defaultMessage: "Built-in plugin" },
   thinkingAutoExpand: { id: "settings.thinkingAutoExpand", defaultMessage: "Expand thinking while it streams" },
   thinkingAutoCollapse: { id: "settings.thinkingAutoCollapse", defaultMessage: "Collapse thinking when it finishes" },
   toolInputAutoExpand: { id: "settings.toolInputAutoExpand", defaultMessage: "Expand tool input while it streams" },
@@ -15,6 +16,7 @@ export const CoreSettings = core.config(z.strictObject({
   toolInputAutoExpand: z.boolean(), toolInputAutoCollapse: z.boolean(),
 }), { thinkingAutoExpand: true, thinkingAutoCollapse: true, toolInputAutoExpand: true, toolInputAutoCollapse: true }, {
   presentation: { fields: {
+    "": { title: messages.title },
     "/thinkingAutoExpand": { title: messages.thinkingAutoExpand }, "/thinkingAutoCollapse": { title: messages.thinkingAutoCollapse },
     "/toolInputAutoExpand": { title: messages.toolInputAutoExpand }, "/toolInputAutoCollapse": { title: messages.toolInputAutoCollapse },
   } },

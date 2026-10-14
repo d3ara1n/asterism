@@ -13,7 +13,7 @@ export const plainLabel: UiText = "Counter";
 export const summary = withValues(messages.items, { count: 3 });
 /** 仅后台插件也可以声明可翻译的配置；固定路径遵循 JSON Pointer。 */
 export const CounterConfig = namespace.config(z.object({ limit: z.number().int().positive() }), { limit: 20 }, {
-  presentation: { fields: { "/limit": { title: messages.limit } } },
+  presentation: { fields: { "": { title: messages.title }, "/limit": { title: messages.limit } } },
 });
 export function configure(plugin: PluginContext) {
   return plugin.config(CounterConfig);

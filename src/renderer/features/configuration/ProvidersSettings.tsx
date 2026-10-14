@@ -10,9 +10,10 @@ import { getI18n, useI18n } from "../../shared/i18n";
 import { Badge } from "../../shared/ui/badge";
 import { Button } from "../../shared/ui/button";
 import { Checkbox } from "../../shared/ui/checkbox";
-import { FieldGroup, Field, FieldLabel, FieldDescription, FieldSet, FieldLegend } from "../../shared/ui/field";
+import { FieldGroup, Field, FieldContent, FieldLabel, FieldDescription, FieldSet, FieldLegend } from "../../shared/ui/field";
 import { Input } from "../../shared/ui/input";
 import { ItemGroup, ItemSeparator, Item, ItemMedia, ItemContent, ItemTitle, ItemDescription, ItemActions } from "../../shared/ui/item";
+import { Separator } from "../../shared/ui/separator";
 import { Spinner } from "../../shared/ui/spinner";
 import { Switch } from "../../shared/ui/switch";
 import { cn } from "../../shared/utils";
@@ -342,24 +343,38 @@ function ModelEditor({ initialId, providerId }: { initialId: string | null; prov
       <TextField label={i18n.formatMessage(providersMessages.modelDisplayName)} value={value.name} onChange={setName} required />
       <TextField label={i18n.formatMessage(providersMessages.serverModelId)} value={value.modelId} onChange={next => { setIdEdited(true); set("modelId", next); }} required hint={i18n.formatMessage(providersMessages.serverModelIdHint)} />
       <FieldSet><FieldLegend variant="label">{i18n.formatMessage(providersMessages.capabilities)}</FieldLegend>
-        <FieldGroup data-slot="checkbox-group" className="gap-3">
-          <Field orientation="horizontal">
-            <Checkbox id="capability-reasoning" checked={value.capabilities.reasoning} onCheckedChange={next => set("capabilities", { ...value.capabilities, reasoning: next === true })} />
-            <FieldLabel htmlFor="capability-reasoning" className="font-normal">{i18n.formatMessage(providersMessages.reasoning)}</FieldLabel>
-          </Field>
-          {value.capabilities.reasoning && <div className="ml-6 flex flex-wrap gap-x-4 gap-y-2">
-            {thinkingSchema.options.map(level => <Field key={level} orientation="horizontal" className="w-auto">
-              <Checkbox id={`thinking-${level}`} checked={value.capabilities.thinkingLevels.includes(level)}
-                onCheckedChange={next => set("capabilities", { ...value.capabilities,
-                  thinkingLevels: thinkingSchema.options.filter(item => item === level ? next === true : value.capabilities.thinkingLevels.includes(item)) })} />
-              <FieldLabel htmlFor={`thinking-${level}`} className="font-normal">{i18n.text(thinkingLabels[level])}</FieldLabel>
-            </Field>)}
-          </div>}
-          <Field orientation="horizontal">
-            <Checkbox id="capability-tools" checked={value.capabilities.tools} onCheckedChange={next => set("capabilities", { ...value.capabilities, tools: next === true })} />
-            <FieldLabel htmlFor="capability-tools" className="font-normal">{i18n.formatMessage(providersMessages.toolCalls)}</FieldLabel>
-          </Field>
-        </FieldGroup>
+        <div className="surface">
+          <FieldGroup className="gap-4 p-4">
+            <Field orientation="horizontal">
+              <FieldContent><FieldLabel htmlFor="capability-reasoning">{i18n.formatMessage(providersMessages.reasoning)}</FieldLabel></FieldContent>
+              <Switch id="capability-reasoning" checked={value.capabilities.reasoning}
+                onCheckedChange={reasoning => set("capabilities", { ...value.capabilities, reasoning })} />
+            </Field>
+            {value.capabilities.reasoning && <FieldSet className="gap-3" aria-describedby="thinking-levels-description">
+              <FieldLegend variant="label">{i18n.formatMessage(providersMessages.availableThinkingLevels)}</FieldLegend>
+              <FieldDescription id="thinking-levels-description">{i18n.formatMessage(providersMessages.thinkingLevelsHint)}</FieldDescription>
+              <FieldGroup className="grid grid-cols-3 gap-x-4 gap-y-3">
+                {thinkingSchema.options.map(level => <Field key={level} orientation="horizontal">
+                  <Checkbox id={`thinking-${level}`} checked={value.capabilities.thinkingLevels.includes(level)}
+                    onCheckedChange={checked => set("capabilities", { ...value.capabilities,
+                      thinkingLevels: thinkingSchema.options.filter(item => item === level ? checked === true : value.capabilities.thinkingLevels.includes(item)) })} />
+                  <FieldLabel htmlFor={`thinking-${level}`}>{i18n.text(thinkingLabels[level])}</FieldLabel>
+                </Field>)}
+              </FieldGroup>
+              {value.capabilities.thinkingLevels.length === 0 && <FieldDescription role="status">
+                {i18n.formatMessage(providersMessages.noThinkingLevels)}
+              </FieldDescription>}
+            </FieldSet>}
+          </FieldGroup>
+          <Separator />
+          <FieldGroup className="p-4">
+            <Field orientation="horizontal">
+              <FieldContent><FieldLabel htmlFor="capability-tools">{i18n.formatMessage(providersMessages.toolCalls)}</FieldLabel></FieldContent>
+              <Switch id="capability-tools" checked={value.capabilities.tools}
+                onCheckedChange={tools => set("capabilities", { ...value.capabilities, tools })} />
+            </Field>
+          </FieldGroup>
+        </div>
       </FieldSet>
       {current && <Field><FieldLabel>{i18n.formatMessage(providersMessages.usedBy)}</FieldLabel>
         {users.length ? <ul className="flex flex-wrap gap-1.5" aria-label={i18n.formatMessage(providersMessages.rolesUsingModel)}>

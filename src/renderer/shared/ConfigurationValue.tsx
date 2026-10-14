@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useId, useRef, useState, type ReactElement, type ReactNode } from "react";
 import { jsonSchema, type UiText, type Json, type ConfigurationPresentation } from "@atelier/sdk/contracts";
 import { pointerChild } from "../../shared/configuration-presentation";
 import { configurationField, configurationLabel, configurationProperty, objectValue } from "../../shared/configuration-fields";
@@ -10,6 +10,8 @@ import { Button } from "./ui/button";
 import { Switch } from "./ui/switch";
 import { Input } from "./ui/input";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectGroup, SelectItem } from "./ui/select";
+import { Separator } from "./ui/separator";
+import { cn } from "./utils";
 
 /** 复杂值保留完整文本；无效输入阻止提交，不把部分值或旧值保存为新配置。 */
 function JsonInput({ id, value, onChange, required, title, description, actions }: {
@@ -50,9 +52,10 @@ function JsonInput({ id, value, onChange, required, title, description, actions 
   </Field>;
 }
 
-export function ConfigurationValue({ schema, value, onChange, label, required = true, depth = 0, presentation, path = "", actions }: {
+export function ConfigurationValue({ schema, value, onChange, label, required = true, depth = 0, presentation, path = "", actions, layout = "form" }: {
   schema: Json | null; value: Json | undefined; onChange(value: Json | undefined): void;
   label: string; required?: boolean; depth?: number; presentation?: ConfigurationPresentation; path?: string; actions?: ReactNode;
+  layout?: "form" | "settings";
 }) {
   const id = useId();
   const i18n = useI18n(), display = presentation?.fields[path];
@@ -60,46 +63,75 @@ export function ConfigurationValue({ schema, value, onChange, label, required = 
   const description = display?.description !== undefined ? i18n.text(display.description) : typeof shape?.description === "string" ? shape.description : undefined;
   const field = depth < 6 ? configurationField(schema) : { kind: "json" as const };
   const title = display?.title !== undefined ? i18n.text(display.title) : configurationLabel(schema, label);
-  if (field.kind === "object" && required && objectValue(value)) return <FieldSet>
-    <FieldLegend variant="label" className={actions ? "flex w-full items-center justify-between gap-2" : undefined}>
-      {title}{actions}
-    </FieldLegend>
-    {description && <FieldDescription>{description}</FieldDescription>}
-    <FieldGroup>{Object.entries(field.properties).map(([name, child]) => <ConfigurationValue key={name} schema={child}
-      value={objectValue(value)?.[name]} label={name} required={field.required.includes(name)} depth={depth + 1}
-      presentation={presentation} path={pointerChild(path, name)}
-      onChange={next => onChange(configurationProperty(value, name, next))} />)}</FieldGroup>
-  </FieldSet>;
+  const settings = layout === "settings";
+  const object = objectValue(value);
+  if (field.kind === "object" && required && object) {
+    // 设置按对象层级分组；连续普通字段共用底板，嵌套对象拥有自己的标题与底板。
+    const groups: { key: string; nested: boolean; children: ReactElement[] }[] = [];
+    for (const [name, child] of Object.entries(field.properties)) {
+      const childValue = object[name];
+      const childRequired = field.required.includes(name);
+      const nested = settings && depth + 1 < 6 && childRequired
+        && configurationField(child).kind === "object" && !!objectValue(childValue);
+      const node = <ConfigurationValue key={name} schema={child} value={childValue} label={name}
+        required={childRequired} depth={depth + 1} presentation={presentation} path={pointerChild(path, name)} layout={layout}
+        onChange={next => onChange(configurationProperty(value, name, next))} />;
+      const previous = groups.at(-1);
+      if (!nested && previous && !previous.nested) previous.children.push(node);
+      else groups.push({ key: name, nested, children: [node] });
+    }
+    return <FieldSet className={settings ? "min-w-0 gap-3" : undefined}>
+      <FieldLegend variant="label" className={cn(actions && "flex w-full items-center justify-between gap-2",
+        settings && depth === 0 && !actions && "sr-only")}>
+        {title}{actions}
+      </FieldLegend>
+      {description && <FieldDescription>{description}</FieldDescription>}
+      <FieldGroup className={settings ? "gap-5" : undefined}>{groups.map(group => group.nested || !settings
+        ? <Fragment key={group.key}>{group.children}</Fragment>
+        : <div key={group.key} className="min-w-0"><FieldGroup className="surface gap-0">
+          {group.children.map((node, index) => <Fragment key={node.key}>
+            {index > 0 && <Separator />}
+            <div className="min-w-0 p-4">{node}</div>
+          </Fragment>)}
+        </FieldGroup></div>)}</FieldGroup>
+    </FieldSet>;
+  }
   if (field.kind === "json" || field.kind === "object") return <JsonInput id={id} title={title} description={description}
     value={value} onChange={onChange} required={required} actions={actions} />;
   const boolean = field.kind === "boolean";
-  return <Field orientation={boolean ? "horizontal" : "vertical"}>
-    <FieldContent>
+  const controlProps = { id, "aria-describedby": description ? `${id}-description` : undefined };
+  return <Field orientation={boolean ? "horizontal" : settings ? "responsive" : "vertical"}>
+    <FieldContent className="min-w-0">
       {actions ? <div className="flex items-center justify-between gap-2"><FieldLabel htmlFor={id}>{title}</FieldLabel>{actions}</div>
         : <FieldLabel htmlFor={id}>{title}</FieldLabel>}
-      {description && <FieldDescription>{description}</FieldDescription>}
+      {description && <FieldDescription id={`${id}-description`}>{description}</FieldDescription>}
       {value === undefined && !required && <FieldDescription>{i18n.formatMessage(pluginConfigurationMessages.notSetOption)}</FieldDescription>}
     </FieldContent>
-    {boolean ? <Switch id={id} checked={value === true} onCheckedChange={onChange} />
-      : field.kind === "string" ? <Input id={id} value={typeof value === "string" ? value : ""} required={required && typeof shape?.minLength === "number" && shape.minLength > 0}
-        minLength={typeof shape?.minLength === "number" ? shape.minLength : undefined}
-        maxLength={typeof shape?.maxLength === "number" ? shape.maxLength : undefined}
-        onChange={event => {
-          const next = event.currentTarget.value;
-          onChange(!required && next === "" && typeof shape?.minLength === "number" && shape.minLength > 0 ? undefined : next);
-        }} />
-        : field.kind === "number" || field.kind === "integer" ? <Input id={id} type="number" value={typeof value === "number" ? value : ""} required={required}
-          step={field.kind === "integer" ? 1 : "any"} min={typeof shape?.minimum === "number" ? shape.minimum : undefined}
-          max={typeof shape?.maximum === "number" ? shape.maximum : undefined}
-          onChange={event => onChange(event.currentTarget.value === "" || !Number.isFinite(event.currentTarget.valueAsNumber) ? undefined : event.currentTarget.valueAsNumber)} />
-          : field.kind === "enum" ? <Select value={value === undefined ? "" : JSON.stringify(value)} required={required}
-            onValueChange={next => onChange(JSON.parse(next))}>
-            <SelectTrigger id={id}><SelectValue placeholder={i18n.formatMessage(pluginConfigurationMessages.selectValue)} /></SelectTrigger>
-            <SelectContent><SelectGroup>{field.options.map(option => <SelectItem key={JSON.stringify(option)} value={JSON.stringify(option)}>
-              {(() => { const translated = display?.enumLabels?.find(entry => entry.value === option); return translated ? i18n.text(translated.label) : String(option); })()}
-            </SelectItem>)}</SelectGroup></SelectContent>
-          </Select> : null}
-    {!required && value !== undefined && <Button type="button" variant="ghost" size="xs" onClick={() => onChange(undefined)}>{i18n.formatMessage(pluginConfigurationMessages.leaveUnsetOption)}</Button>}
+    <div className={cn("flex min-w-0 items-center gap-2", settings && !boolean && "@md/field-group:w-56 @md/field-group:shrink-0")}>
+      {boolean ? <Switch {...controlProps} checked={value === true} onCheckedChange={onChange} />
+        : field.kind === "string" ? <Input {...controlProps} value={typeof value === "string" ? value : ""} required={required && typeof shape?.minLength === "number" && shape.minLength > 0}
+          minLength={typeof shape?.minLength === "number" ? shape.minLength : undefined}
+          maxLength={typeof shape?.maxLength === "number" ? shape.maxLength : undefined}
+          onChange={event => {
+            const next = event.currentTarget.value;
+            onChange(!required && next === "" && typeof shape?.minLength === "number" && shape.minLength > 0 ? undefined : next);
+          }} />
+          : field.kind === "number" || field.kind === "integer" ? <Input {...controlProps} type="number" value={typeof value === "number" ? value : ""} required={required}
+            step={field.kind === "integer" ? 1 : "any"} min={typeof shape?.minimum === "number" ? shape.minimum : undefined}
+            max={typeof shape?.maximum === "number" ? shape.maximum : undefined}
+            onChange={event => onChange(event.currentTarget.value === "" || !Number.isFinite(event.currentTarget.valueAsNumber) ? undefined : event.currentTarget.valueAsNumber)} />
+            : field.kind === "enum" ? <Select value={value === undefined ? "" : JSON.stringify(value)} required={required}
+              onValueChange={next => onChange(JSON.parse(next))}>
+              <SelectTrigger {...controlProps} className="w-full"><SelectValue placeholder={i18n.formatMessage(pluginConfigurationMessages.selectValue)} /></SelectTrigger>
+              <SelectContent><SelectGroup>{field.options.map(option => {
+                const translated = display?.enumLabels?.find(entry => entry.value === option);
+                return <SelectItem key={JSON.stringify(option)} value={JSON.stringify(option)}>
+                  {translated ? i18n.text(translated.label) : String(option)}
+                </SelectItem>;
+              })}</SelectGroup></SelectContent>
+            </Select> : null}
+      {!required && value !== undefined && <Button type="button" variant="ghost" size="xs" onClick={() => onChange(undefined)}>{i18n.formatMessage(pluginConfigurationMessages.leaveUnsetOption)}</Button>}
+    </div>
   </Field>;
 }
 

@@ -37,10 +37,6 @@ export const pluginConfigurationMessages = pluginNamespace("atelier.host").messa
     id: "features_plugins_PluginConfigurations_9",
     defaultMessage: "The saved configuration could not be read. Defaults are shown; saving will replace it.",
   },
-  configuration: {
-    id: "features_plugins_PluginConfigurations_10",
-    defaultMessage: "Configuration",
-  },
   save: {
     id: "features_plugins_PluginConfigurations_11",
     defaultMessage: "Save",

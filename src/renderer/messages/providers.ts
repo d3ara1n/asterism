@@ -330,6 +330,18 @@ export const providersMessages = pluginNamespace("atelier.host").messages("en", 
     id: "features_configuration_ProvidersSettings_80",
     defaultMessage: "Reasoning",
   },
+  availableThinkingLevels: {
+    id: "model.availableThinkingLevels",
+    defaultMessage: "Available thinking levels",
+  },
+  thinkingLevelsHint: {
+    id: "model.thinkingLevelsHint",
+    defaultMessage: "Select the levels this model supports. Save to make them available in conversations and model roles.",
+  },
+  noThinkingLevels: {
+    id: "model.noThinkingLevels",
+    defaultMessage: "No levels selected. Select at least one before using this model with reasoning enabled.",
+  },
   toolCalls: {
     id: "features_configuration_ProvidersSettings_81",
     defaultMessage: "Tool calls",

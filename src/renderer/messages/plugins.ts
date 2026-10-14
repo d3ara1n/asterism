@@ -57,10 +57,6 @@ export const pluginsMessages = pluginNamespace("atelier.host").messages("en", de
     id: "features_plugins_PluginsSettings_14",
     defaultMessage: "Plugin settings could not be loaded.",
   },
-  settingsTitle: {
-    id: "features_plugins_PluginsSettings_15",
-    defaultMessage: "Plugin settings",
-  },
   settingsLabel: {
     id: "features_plugins_PluginsSettings_16",
     defaultMessage: "Plugin settings",
