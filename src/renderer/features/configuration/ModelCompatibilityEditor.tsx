@@ -7,6 +7,7 @@ import { ConfigurationValue } from "../../shared/ConfigurationValue";
 import { useI18n } from "../../shared/i18n";
 import { Badge } from "../../shared/ui/badge";
 import { Button } from "../../shared/ui/button";
+import { Card } from "../../shared/ui/card";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "../../shared/ui/dropdown-menu";
 import { modelProtocolLabels } from "./protocols";
 
@@ -43,14 +44,14 @@ export function ModelCompatibilityEditor({ value, inherited, onChange }: {
       const remove = readOnly ? undefined : <Button type="button" variant="ghost" size="icon-xs"
         aria-label={i18n.formatMessage(fromProvider ? providersMessages.restoreProviderCompatibility : providersMessages.removeCompatibility, { name: title })}
         onClick={() => onChange(value.filter(item => item.id !== entry.id))}><X /></Button>;
-      return <div key={entry.id} className="space-y-3">
+      return <Card key={entry.id} className="gap-3 p-4">
         {fromProvider && <div className="flex items-center justify-between gap-2">
           <Badge variant="secondary">{i18n.formatMessage(readOnly ? providersMessages.compatibilityFromProvider : providersMessages.compatibilityOverridden)}</Badge>
           {readOnly && definition.kind === "options" && <Button type="button" variant="ghost" size="xs"
             onClick={() => onChange([...value, structuredClone(entry)])}>{i18n.formatMessage(providersMessages.overrideCompatibility)}</Button>}
         </div>}
-        {definition.kind === "tag" ? <div className="flex items-center justify-between gap-2">
-          <div className="space-y-2"><span className="type-label">{title}</span><Applicability definition={definition} /></div>{remove}
+        {definition.kind === "tag" ? <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0 flex-1 space-y-2"><span className="type-label break-words">{title}</span><Applicability definition={definition} /></div>{remove}
         </div> : <>
           <Applicability definition={definition} />
           <fieldset disabled={readOnly} className="min-w-0">
@@ -60,7 +61,7 @@ export function ModelCompatibilityEditor({ value, inherited, onChange }: {
               }} />
           </fieldset>
         </>}
-      </div>;
+      </Card>;
     })}
     <DropdownMenu>
       <DropdownMenuTrigger asChild><Button type="button" variant="ghost" size="sm" className="-ml-2" disabled={!available.length}>

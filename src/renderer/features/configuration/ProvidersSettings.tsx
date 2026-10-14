@@ -2,7 +2,7 @@ import { Plus, Zap, Search, ExternalLink, ChevronDown } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { modelReference, thinkingSchema, type ConfigurationSnapshot, type ConnectionTest, type Provider, type ProviderInput, type ProviderModel, type TestError } from "../../../shared/configuration";
-import { presetGroups, providerPresets, type ProviderPreset } from "../../../shared/provider-presets";
+import { presetGroups, providerPresets, providerPresetDraft, type ProviderPreset, type ProviderDraft } from "../../../shared/provider-presets";
 import { commonMessages } from "../../messages/common";
 import { providersMessages } from "../../messages/providers";
 import { thinkingLabels } from "../../messages/model-selection";
@@ -28,7 +28,7 @@ const protocols = Object.entries(modelProtocolLabels).map(([value, label]) => ({
 const protocolLabel = (value: string) => protocols.find(item => item.value === value)?.label ?? value;
 const islandWidth = { min: 400, grow: 1, max: 620 };
 type ModelValue = Omit<ProviderModel, "id" | "revision">;
-type ProviderValue = Omit<ProviderInput, "enabled">;
+type ProviderValue = ProviderDraft;
 
 /* ---------- 状态推导：列表与详情共用，均直接读取最新快照 ---------- */
 
@@ -102,7 +102,7 @@ export function ProvidersSettings() {
   const island = useIsland();
   const quick = useQuickActions();
   const open = (id: string | null, origin?: HTMLElement | null) => island.open({ id: `provider-${id ?? "new"}`, label: providersMessages.provider, width: islandWidth, origin,
-    render: () => <ProviderEditor key={id ?? "new"} initialId={id} /> });
+    render: () => id === null ? <ProviderCreation /> : <ProviderEditor key={id} initialId={id} /> });
   const providers = snapshot?.providers ?? [];
   return <Section title={i18n.formatMessage(providersMessages.connections)} hint={i18n.formatMessage(providersMessages.summary)}
     action={<Button size="sm" disabled={!snapshot} onClick={event => open(null, event.currentTarget)}><Plus />{i18n.formatMessage(providersMessages.addProvider)}</Button>}>
@@ -139,15 +139,24 @@ function Monogram({ name }: { name: string }) {
 /* ---------- 预设选择：自适应网格，数量增长后自动出现分组与搜索 ---------- */
 
 const groupLabels = (): Record<ProviderPreset["group"], string> => ({ official: getI18n().formatMessage(providersMessages.official), aggregator: getI18n().formatMessage(providersMessages.aggregators), local: getI18n().formatMessage(providersMessages.local) });
+const billingLabels = {
+  usage: providersMessages.payAsYouGo,
+  subscription: providersMessages.subscription,
+  none: providersMessages.noBilling,
+};
+function presetDescription(preset: ProviderPreset): string {
+  const i18n = getI18n();
+  return [preset.region && i18n.text(preset.region), preset.plan && i18n.text(preset.plan), i18n.text(billingLabels[preset.billing])].filter(Boolean).join(" · ");
+}
 const searchThreshold = 8;
 function PresetPicker({ onPick }: { onPick: (preset: ProviderPreset | null) => void }) {
   const i18n = useI18n();
   const [query, setQuery] = useState("");
   const q = query.trim().toLowerCase();
-  const matches = providerPresets.filter(preset => !q || [preset.name, preset.id, ...(preset.keywords ?? [])].some(word => word.toLowerCase().includes(q)));
+  const matches = providerPresets.filter(preset => !q || [preset.name, preset.id, presetDescription(preset), ...(preset.keywords ?? [])].some(word => word.toLowerCase().includes(q)));
   const groups = presetGroups.map(group => ({ group, items: matches.filter(preset => preset.group === group) })).filter(entry => entry.items.length);
   const titled = new Set(providerPresets.map(preset => preset.group)).size > 1;
-  const tile = "flex h-16 flex-col items-start justify-center gap-0.5 rounded-lg border px-3 text-left outline-none transition-colors hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50";
+  const tile = "flex min-h-16 flex-col items-start justify-center gap-0.5 rounded-lg border px-3 py-2 text-left outline-none transition-colors hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50";
   return <div className="flex flex-col gap-5">
     <p className="type-caption">{i18n.formatMessage(providersMessages.presetHint)}</p>
     {providerPresets.length > searchThreshold && <div className="relative">
@@ -157,10 +166,15 @@ function PresetPicker({ onPick }: { onPick: (preset: ProviderPreset | null) => v
     {groups.map(({ group, items }) => <section key={group} aria-label={groupLabels()[group]}>
       {titled && <h3 className="type-label mb-2">{groupLabels()[group]}</h3>}
       <div className="grid gap-2" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(9rem, 1fr))" }}>
-        {items.map(preset => <button key={preset.id} type="button" className={`${tile} bg-card`} onClick={() => onPick(preset)}>
-          <span className="type-section truncate">{preset.name}</span>
-          <span className="type-caption truncate">{preset.auth === "none" ? i18n.formatMessage(providersMessages.noKeyNeeded) : i18n.text(commonMessages.apiKey)}</span>
-        </button>)}
+        {items.map(preset => <div key={preset.id} className="flex flex-col gap-1">
+          <button type="button" className={`${tile} bg-card`} onClick={() => onPick(preset)}>
+            <span className="type-section truncate">{preset.name}</span>
+            <span className="type-caption">{presetDescription(preset)}</span>
+          </button>
+          {preset.keyUrl && <a href={preset.keyUrl} target="_blank" rel="noreferrer" className="type-caption inline-flex items-center gap-1 self-start px-1 hover:text-foreground">
+            {i18n.formatMessage(providersMessages.getKey)}<ExternalLink className="size-3" aria-hidden="true" />
+          </a>}
+        </div>)}
       </div>
     </section>)}
     {q && !groups.length && <p className="type-caption">{i18n.formatMessage(providersMessages.noMatchingProvider)}</p>}
@@ -179,36 +193,40 @@ export function slugify(name: string, options: { slash?: boolean } = {}): string
   const allowed = options.slash ? /[^\p{L}\p{N}._\/-]/gu : /[^\p{L}\p{N}._-]/gu;
   return name.trim().toLowerCase().replace(/\s+/gu, "-").replace(allowed, "").replace(/-+/gu, "-").replace(/^-|-$/gu, "");
 }
-const blank: ProviderValue = { id: "", name: "", protocol: "openai-responses", baseUrl: "https://api.openai.com/v1", auth: "api_key", compatibility: [] };
+const blank: ProviderValue = { id: "", name: "", protocol: "openai-responses", baseUrl: "", auth: "api_key", compatibility: [] };
 
-function ProviderEditor({ initialId }: { initialId: string | null }) {
+/** 选择入口只生成初始字段；编辑器不接收或保留预设身份。 */
+function ProviderCreation() {
+  const i18n = useI18n();
+  const { snapshot } = useSettingsConfiguration();
+  const [initialValue, setInitialValue] = useState<ProviderValue | null>(null);
+  if (initialValue) return <ProviderEditor initialId={null} initialValue={initialValue} />;
+  return <Editor form="provider-form" title={i18n.formatMessage(providersMessages.confirmAddProvider)} dirty={false}>
+    <PresetPicker onPick={picked => setInitialValue(picked ? {
+      ...providerPresetDraft(picked, snapshot?.providers.map(provider => provider.id)),
+      name: `${picked.name} · ${presetDescription(picked)}`,
+    } : structuredClone(blank))} />
+  </Editor>;
+}
+
+function ProviderEditor({ initialId, initialValue = blank }: { initialId: string | null; initialValue?: ProviderValue }) {
   const i18n = useI18n();
   const { snapshot, run, busy } = useSettingsConfiguration();
   const island = useIsland();
   const [id, setId] = useState(initialId);
-  const [picking, setPicking] = useState(initialId === null);
-  const [preset, setPreset] = useState<ProviderPreset | null>(null);
   const current = snapshot?.providers.find(item => item.id === id);
   // 草稿不含 enabled：启用是即时操作，始终取快照，避免与上级浮岛的开关互相覆盖。
-  const [value, setValue] = useState<ProviderValue>(() => current ? providerValue(current) : blank);
+  const [value, setValue] = useState<ProviderValue>(() => current ? providerValue(current) : structuredClone(initialValue));
   const [keyAction, setKeyAction] = useState<KeyAction>(current ? "keep" : "replace");
   const [key, setKey] = useState("");
   const set = <K extends keyof typeof value>(field: K, next: (typeof value)[K]) => setValue(previous => ({ ...previous, [field]: next }));
-  // 新建时 ID 跟随显示名称生成；用户手动改过 ID 后不再跟随。
-  const [idEdited, setIdEdited] = useState(!!current);
+  // 已填好的 ID 保持独立；空白连接在用户手动编辑 ID 前随名称生成。
+  const [idEdited, setIdEdited] = useState(!!current || !!initialValue.id);
   const setName = (name: string) => setValue(previous => ({ ...previous, name, ...(idEdited ? {} : { id: slugify(name) }) }));
 
   const saved = current ? providerValue(current) : null;
   const credentialChanged = value.auth === "api_key" && (keyAction === "clear" || (keyAction === "replace" && key.trim() !== ""));
   const dirty = !saved || JSON.stringify(saved) !== JSON.stringify(value) || credentialChanged;
-
-  if (picking) return <Editor form="provider-form" title={i18n.formatMessage(providersMessages.confirmAddProvider)} dirty={false}>
-    <PresetPicker onPick={picked => {
-      setPreset(picked);
-      setValue(picked ? { id: picked.id, name: picked.name, protocol: picked.protocol, baseUrl: picked.baseUrl, auth: picked.auth, compatibility: [] } : { ...blank });
-      setPicking(false);
-    }} />
-  </Editor>;
 
   const openModel = (modelId: string | null, origin?: HTMLElement | null) => {
     if (id) island.open({ id: `model-${modelId ?? "new"}`, label: providersMessages.model, width: islandWidth, origin,
@@ -218,11 +236,10 @@ function ProviderEditor({ initialId }: { initialId: string | null }) {
   const storedKey = current?.credentialState === "available";
 
   return <Editor form="provider-form" title={current?.name ?? i18n.formatMessage(providersMessages.newProvider)} dirty={dirty}
-    description={current ? protocolLabel(current.protocol) : preset?.name ?? i18n.formatMessage(providersMessages.customProvider)}
+    description={protocolLabel(value.protocol)}
     remove={current ? { title: i18n.formatMessage(providersMessages.deleteProviderTitle),
       description: i18n.formatMessage(providersMessages.deleteProviderDescription, { current_name: current.name, models_length: models.length }),
       onConfirm: async () => { const result = await run({ type: "remove", kind: "provider", id: current.id }); if (result.ok) void island.close({ force: true }); } } : undefined}>
-    {!current && <Button type="button" variant="ghost" size="sm" className="-ml-2 mb-3" onClick={() => setPicking(true)}>{i18n.formatMessage(providersMessages.changePreset)}</Button>}
     <form id="provider-form" onSubmit={async event => {
       event.preventDefault();
       const result = await run({ type: "provider.save", id, value: { ...value, enabled: current?.enabled ?? true },
@@ -245,11 +262,7 @@ function ProviderEditor({ initialId }: { initialId: string | null }) {
         <ChoiceField label={i18n.formatMessage(providersMessages.authentication)} value={value.auth} options={[{ value: "api_key", label: i18n.text(commonMessages.apiKey) }, { value: "none", label: i18n.formatMessage(providersMessages.noAuthenticationOption) }]}
           onChange={next => next && set("auth", next as ProviderInput["auth"])} />
         {value.auth === "api_key" && <Field>
-          <div className="flex items-center justify-between gap-2">
-            <FieldLabel htmlFor="provider-api-key">{i18n.text(commonMessages.apiKey)}</FieldLabel>
-            {preset?.keyUrl && <a href={preset.keyUrl} target="_blank" rel="noreferrer" className="type-caption inline-flex items-center gap-1 hover:text-foreground">
-              {i18n.formatMessage(providersMessages.getKey)}<ExternalLink className="size-3" aria-hidden="true" /></a>}
-          </div>
+          <FieldLabel htmlFor="provider-api-key">{i18n.text(commonMessages.apiKey)}</FieldLabel>
           <Input id="provider-api-key" type="password" autoComplete="off" autoFocus={!current} value={key} disabled={keyAction === "clear"}
             onChange={event => { setKey(event.target.value); setKeyAction("replace"); }}
             placeholder={storedKey ? i18n.formatMessage(providersMessages.keepSavedKey) : i18n.formatMessage(providersMessages.pasteApiKey)} />

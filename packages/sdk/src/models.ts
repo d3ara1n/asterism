@@ -6,7 +6,7 @@ import type { ToolOutcome, ToolInvocationInfo, ToolResult } from "./tool-result.
 import type { ResourceRef } from "./workspace.ts";
 
 /** 全软件共用的标准等级；协议编码不改变公共取值。 */
-export const thinkingLevels = ["off", "minimal", "low", "medium", "high", "xhigh"] as const;
+export const thinkingLevels = ["off", "minimal", "low", "medium", "high", "xhigh", "max"] as const;
 export type ThinkingLevel = typeof thinkingLevels[number];
 export interface ModelTarget { role: string; model?: string; thinking?: ThinkingLevel }
 export type PromptBlock =

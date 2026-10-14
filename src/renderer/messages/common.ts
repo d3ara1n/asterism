@@ -185,6 +185,10 @@ export const commonMessages = pluginNamespace("atelier.host").messages("en", def
     id: "thinkingXhigh",
     defaultMessage: "Extra high",
   },
+  thinkingMax: {
+    id: "thinkingMax",
+    defaultMessage: "Maximum",
+  },
   apiKey: {
     id: "provider.apiKey",
     defaultMessage: "API key",

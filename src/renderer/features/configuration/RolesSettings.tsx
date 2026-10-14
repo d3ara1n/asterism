@@ -3,7 +3,7 @@ import { useState } from "react";
 
 import { availableThinkingLevels, modelReference, type ProviderModel, type ModelRole, type ModelRoleOverrides, type ThinkingLevel } from "../../../shared/configuration";
 import { rolesMessages } from "../../messages/roles";
-import { modelSelectionMessages } from "../../messages/model-selection";
+import { modelSelectionMessages, thinkingLabels } from "../../messages/model-selection";
 import { getI18n, useI18n } from "../../shared/i18n";
 import { Badge } from "../../shared/ui/badge";
 import { Button } from "../../shared/ui/button";
@@ -18,7 +18,7 @@ import { Editor, TextField, OverrideToggleField } from "./forms";
 import { useSettingsConfiguration } from "./state";
 
 const FOLLOW = "__follow";
-const thinkingLabel = (level: ThinkingLevel) => ({ off: getI18n().formatMessage(rolesMessages.thinkingOff), minimal: getI18n().formatMessage(rolesMessages.thinkingMinimal), low: getI18n().formatMessage(rolesMessages.thinkingLow), medium: getI18n().formatMessage(rolesMessages.thinkingMedium), high: getI18n().formatMessage(rolesMessages.thinkingHigh), xhigh: getI18n().formatMessage(rolesMessages.thinkingExtraHigh) })[level];
+const thinkingLabel = (level: ThinkingLevel) => getI18n().text(thinkingLabels[level]);
 /** 角色值等于内置值时撤下覆盖，界面只显示生效值。 */
 const toOverride = <T,>(next: T, inherited: T): T | undefined => next === inherited ? undefined : next;
 

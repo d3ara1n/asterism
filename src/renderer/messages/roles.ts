@@ -1,30 +1,6 @@
 import { defineMessages, pluginNamespace } from "@atelier/sdk/contracts";
 
 export const rolesMessages = pluginNamespace("atelier.host").messages("en", defineMessages({
-  thinkingOff: {
-    id: "features_configuration_RolesSettings_1",
-    defaultMessage: "Off",
-  },
-  thinkingMinimal: {
-    id: "features_configuration_RolesSettings_2",
-    defaultMessage: "Minimal",
-  },
-  thinkingLow: {
-    id: "features_configuration_RolesSettings_3",
-    defaultMessage: "Low",
-  },
-  thinkingMedium: {
-    id: "features_configuration_RolesSettings_4",
-    defaultMessage: "Medium",
-  },
-  thinkingHigh: {
-    id: "features_configuration_RolesSettings_5",
-    defaultMessage: "High",
-  },
-  thinkingExtraHigh: {
-    id: "features_configuration_RolesSettings_6",
-    defaultMessage: "Extra high",
-  },
   model: {
     id: "features_configuration_RolesSettings_7",
     defaultMessage: "Model",

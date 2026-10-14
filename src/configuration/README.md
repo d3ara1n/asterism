@@ -1,5 +1,21 @@
 # 配置能力
 
+## 声明提供商预设
+
+在 `../shared/provider-presets.ts` 的 `defineProviderPresets([...])` 中追加一项即可；不修改选择器或运行时。每项显式填写：
+
+- `id`：目录唯一身份，也是新连接默认 ID；地区或计费产品不同则分别命名。
+- `name / group / billing`：名称、官方／聚合／本地分组，以及 `usage / subscription / none` 计费类别。
+- `region / plan`：可选地区、套餐说明，支持 SDK 的 `UiText`；界面显示并参与搜索，新增地区或套餐不需要扩充枚举。
+- `connection`：`protocol / baseUrl / auth / compatibility`。兼容条目必须来自已实现的目录，明确无差异时填 `[]`。
+- `keyUrl / sources / verifiedOn / keywords`：该产品的凭据页面、非空官方资料列表、实际核对日期和可选搜索别名。
+
+优先使用 Responses；Anthropic 使用原生 Messages。连接或兼容要求未核实、所需包未实现时不加入目录。不在声明里维护模型或思考等级。
+
+目录校验复用 `providerInputSchema`，并拒绝重复 ID。`providerPresetDraft` 只复制连接字段，为重复连接分配未占用 ID，并深复制兼容参数。选择入口一次性生成初始字段，将地区／套餐／计费说明带入可编辑的默认显示名；凭据页面链接只在选择入口展示。之后交给普通连接编辑器，与空白自定义连接共用全部表单、草稿和保存逻辑；编辑器不接收预设对象，不保留预设状态或更换入口。切换界面语言不会改写已有草稿。保存、密钥托管和后续编辑仍走普通配置接口，不向存储或运行时引入预设身份。
+
+## 配置与存储
+
 应用级配置与连接测试独立于工作台、任务历史和 renderer。公开契约在 `../shared/configuration.ts`，产品语义见 `../../docs/model-configuration.md`。
 
 | 文件 | 职责 |
@@ -11,6 +27,7 @@
 | `credentials.ts` | 密文文件的创建、读取、替换与删除，不直接依赖 Electron |
 | `probe.ts` | 三种显式 SDK 协议实例，简短连通请求和脱敏错误分类 |
 | `defaults.ts` | 五种模型角色、五种 agent 的内置原始定义；不导入本机模型或凭据 |
+| `../shared/provider-presets.ts` | 提供商连接目录、目录声明校验与独立草稿生成；不含模型数据 |
 
 入口为 `window.host.configuration.execute`，经 preload/main 校验转入任务进程。响应只有配置快照、保存 ID 或固定错误，不携带密钥或密文。配置修改不触发会话重载或级联刷新；选择与实际消费通过 `resolveProviderModel` / `resolveModelRole` 检查配置。
 

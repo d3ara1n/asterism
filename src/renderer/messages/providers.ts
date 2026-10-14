@@ -147,8 +147,11 @@ export const providersMessages = pluginNamespace("atelier.host").messages("en", 
   },
   presetHint: {
     id: "features_configuration_ProvidersSettings_33",
-    defaultMessage: "Pick a service to prefill its connection. You can change everything afterwards.",
+    defaultMessage: "Choose a provider connection. Regions and billing plans use separate presets.",
   },
+  payAsYouGo: { id: "providerPreset.payAsYouGo", defaultMessage: "API · Pay as you go" },
+  subscription: { id: "providerPreset.subscription", defaultMessage: "Subscription" },
+  noBilling: { id: "providerPreset.noBilling", defaultMessage: "No billing" },
   searchProviders: {
     id: "features_configuration_ProvidersSettings_34",
     defaultMessage: "Search providers",
@@ -156,10 +159,6 @@ export const providersMessages = pluginNamespace("atelier.host").messages("en", 
   searchProvidersLabel: {
     id: "features_configuration_ProvidersSettings_35",
     defaultMessage: "Search providers",
-  },
-  noKeyNeeded: {
-    id: "features_configuration_ProvidersSettings_36",
-    defaultMessage: "No key needed",
   },
   noMatchingProvider: {
     id: "features_configuration_ProvidersSettings_37",
@@ -185,10 +184,6 @@ export const providersMessages = pluginNamespace("atelier.host").messages("en", 
     id: "features_configuration_ProvidersSettings_42",
     defaultMessage: "New provider",
   },
-  customProvider: {
-    id: "features_configuration_ProvidersSettings_43",
-    defaultMessage: "Custom connection",
-  },
   deleteProviderTitle: {
     id: "features_configuration_ProvidersSettings_44",
     defaultMessage: "Delete this provider?",
@@ -196,10 +191,6 @@ export const providersMessages = pluginNamespace("atelier.host").messages("en", 
   deleteProviderDescription: {
     id: "features_configuration_ProvidersSettings_45",
     defaultMessage: "“{current_name}” and its {models_length} models will be removed, including the saved key.",
-  },
-  changePreset: {
-    id: "features_configuration_ProvidersSettings_46",
-    defaultMessage: "Change preset",
   },
   connection: {
     id: "features_configuration_ProvidersSettings_47",

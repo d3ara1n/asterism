@@ -31,6 +31,11 @@ async function request(value: ModelInput): Promise<Record<string, unknown>> {
     { type: "content_block_stop", index: 0 },
     { type: "message_delta", delta: { stop_reason: "end_turn", stop_sequence: null }, usage: { output_tokens: 1 } },
     { type: "message_stop" },
+  ] : value.settings.provider.protocol === "openai-chat" ? [
+    { id: "response", object: "chat.completion.chunk", model: "test", created: 0,
+      choices: [{ index: 0, delta: { role: "assistant", content: "OK" }, finish_reason: null }] },
+    { id: "response", object: "chat.completion.chunk", model: "test", created: 0,
+      choices: [{ index: 0, delta: {}, finish_reason: "stop" }], usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 } },
   ] : [
     { type: "response.created", response: { id: "response", model: "test", created_at: 0, status: "in_progress" } },
     { type: "response.output_item.added", output_index: 0, item: { id: "message", type: "message", role: "assistant", status: "in_progress", content: [] } },
@@ -48,6 +53,21 @@ async function request(value: ModelInput): Promise<Record<string, unknown>> {
 }
 
 describe("显式兼容与目标投影", () => {
+  // 标准等级契约：max 与 xhigh 独立；在支持两者的协议／型号上，真实 SDK 不得丢失或混同它们。
+  it.each(["openai-responses", "openai-chat", "anthropic"] as const)("%s 编码独立的 max 与 xhigh 等级", async protocol => {
+    const current = input(protocol);
+    if (protocol === "anthropic") current.settings.model.modelId = "claude-opus-4-7";
+    for (const level of ["xhigh", "max"] as const) {
+      current.settings.thinking = level;
+      const body = await request(current);
+      if (protocol === "anthropic") expect(body.output_config).toMatchObject({ effort: level });
+      else if (protocol === "openai-chat") expect(body.reasoning_effort).toBe(level);
+      else expect(body.reasoning).toMatchObject({ effort: level });
+    }
+    current.settings.model.capabilities.thinkingLevels = ["xhigh"];
+    expect(() => new AiSdkAdapter(async () => "unused").validate(current)).toThrow("thinking level is unavailable");
+  });
+
   // 两层合并不能深合并参数、把空列表当禁用，或把生效条目回写到任一来源。
   it("按 id 去重，模型参数整项优先，撤下覆盖恢复提供商条目", () => {
     const provider: ModelCompatibility[] = [{ id: "tag" }, { id: "options", value: { count: 3, enabled: true } }];

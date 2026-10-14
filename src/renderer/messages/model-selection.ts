@@ -9,4 +9,5 @@ export const modelSelectionMessages = pluginNamespace("atelier.host").messages("
 export const thinkingLabels = {
   off: commonMessages.thinkingOff, minimal: commonMessages.thinkingMinimal, low: commonMessages.thinkingLow,
   medium: commonMessages.thinkingMedium, high: commonMessages.thinkingHigh, xhigh: commonMessages.thinkingXhigh,
+  max: commonMessages.thinkingMax,
 };
