@@ -28,6 +28,7 @@ const protocols = Object.entries(modelProtocolLabels).map(([value, label]) => ({
 const protocolLabel = (value: string) => protocols.find(item => item.value === value)?.label ?? value;
 const islandWidth = { min: 400, grow: 1, max: 620 };
 type ModelValue = Omit<ProviderModel, "id" | "revision">;
+type ProviderValue = Omit<ProviderInput, "enabled">;
 
 /* ---------- 状态推导：列表与详情共用，均直接读取最新快照 ---------- */
 
@@ -75,7 +76,7 @@ function useQuickActions() {
   const { snapshot, run } = useSettingsConfiguration();
   return {
     setProviderEnabled: (provider: Provider, enabled: boolean) => run({ type: "provider.save", id: provider.id, credential: { action: "keep" },
-      value: { id: provider.id, name: provider.name, protocol: provider.protocol, baseUrl: provider.baseUrl, auth: provider.auth, enabled } }),
+      value: { ...providerValue(provider), enabled } }),
     setModelEnabled: (model: ProviderModel, enabled: boolean) => run({ type: "model.save", id: modelReference(model), value: { ...modelValue(model), enabled } }),
     test: (model: ProviderModel) => {
       const running = snapshot && latestTest(snapshot, modelReference(model));
@@ -83,6 +84,11 @@ function useQuickActions() {
     },
   };
 }
+/** 详情草稿与快捷操作共用字段投影，启用状态由各自操作显式提供。 */
+const providerValue = (provider: Provider): ProviderValue => ({
+  id: provider.id, name: provider.name, protocol: provider.protocol, baseUrl: provider.baseUrl, auth: provider.auth,
+  compatibility: structuredClone(provider.compatibility),
+});
 const modelValue = (model: ProviderModel): ModelValue => ({
   providerId: model.providerId, name: model.name, modelId: model.modelId, enabled: model.enabled, contextWindow: model.contextWindow,
   capabilities: { ...model.capabilities }, generation: { ...model.generation }, compatibility: structuredClone(model.compatibility),
@@ -173,7 +179,7 @@ export function slugify(name: string, options: { slash?: boolean } = {}): string
   const allowed = options.slash ? /[^\p{L}\p{N}._\/-]/gu : /[^\p{L}\p{N}._-]/gu;
   return name.trim().toLowerCase().replace(/\s+/gu, "-").replace(allowed, "").replace(/-+/gu, "-").replace(/^-|-$/gu, "");
 }
-const blank: Omit<ProviderInput, "enabled"> = { id: "", name: "", protocol: "openai-responses", baseUrl: "https://api.openai.com/v1", auth: "api_key" };
+const blank: ProviderValue = { id: "", name: "", protocol: "openai-responses", baseUrl: "https://api.openai.com/v1", auth: "api_key", compatibility: [] };
 
 function ProviderEditor({ initialId }: { initialId: string | null }) {
   const i18n = useI18n();
@@ -184,8 +190,7 @@ function ProviderEditor({ initialId }: { initialId: string | null }) {
   const [preset, setPreset] = useState<ProviderPreset | null>(null);
   const current = snapshot?.providers.find(item => item.id === id);
   // 草稿不含 enabled：启用是即时操作，始终取快照，避免与上级浮岛的开关互相覆盖。
-  const fromCurrent = (provider: Provider): Omit<ProviderInput, "enabled"> => ({ id: provider.id, name: provider.name, protocol: provider.protocol, baseUrl: provider.baseUrl, auth: provider.auth });
-  const [value, setValue] = useState<Omit<ProviderInput, "enabled">>(() => current ? fromCurrent(current) : blank);
+  const [value, setValue] = useState<ProviderValue>(() => current ? providerValue(current) : blank);
   const [keyAction, setKeyAction] = useState<KeyAction>(current ? "keep" : "replace");
   const [key, setKey] = useState("");
   const set = <K extends keyof typeof value>(field: K, next: (typeof value)[K]) => setValue(previous => ({ ...previous, [field]: next }));
@@ -193,14 +198,14 @@ function ProviderEditor({ initialId }: { initialId: string | null }) {
   const [idEdited, setIdEdited] = useState(!!current);
   const setName = (name: string) => setValue(previous => ({ ...previous, name, ...(idEdited ? {} : { id: slugify(name) }) }));
 
-  const saved = current ? fromCurrent(current) : null;
+  const saved = current ? providerValue(current) : null;
   const credentialChanged = value.auth === "api_key" && (keyAction === "clear" || (keyAction === "replace" && key.trim() !== ""));
   const dirty = !saved || JSON.stringify(saved) !== JSON.stringify(value) || credentialChanged;
 
   if (picking) return <Editor form="provider-form" title={i18n.formatMessage(providersMessages.confirmAddProvider)} dirty={false}>
     <PresetPicker onPick={picked => {
       setPreset(picked);
-      setValue(picked ? { id: picked.id, name: picked.name, protocol: picked.protocol, baseUrl: picked.baseUrl, auth: picked.auth } : { ...blank });
+      setValue(picked ? { id: picked.id, name: picked.name, protocol: picked.protocol, baseUrl: picked.baseUrl, auth: picked.auth, compatibility: [] } : { ...blank });
       setPicking(false);
     }} />
   </Editor>;
@@ -224,7 +229,7 @@ function ProviderEditor({ initialId }: { initialId: string | null }) {
         credential: value.auth === "none" || keyAction === "clear" ? { action: "clear" } : keyAction === "replace" && key.trim() ? { action: "replace", value: key } : { action: "keep" } });
       if (result.ok) {
         const persisted = result.snapshot.providers.find(item => item.id === result.savedId);
-        if (persisted) setValue(fromCurrent(persisted));
+        if (persisted) setValue(providerValue(persisted));
         setId(result.savedId);
         setKey("");
         setKeyAction("keep");
@@ -256,6 +261,7 @@ function ProviderEditor({ initialId }: { initialId: string | null }) {
           {!snapshot?.credentialStorageAvailable && <p className="text-xs text-destructive">{i18n.formatMessage(providersMessages.encryptionUnavailable)}</p>}
         </Field>}
       </FieldGroup>
+      <ModelCompatibilityEditor value={value.compatibility} onChange={next => set("compatibility", next)} />
     </form>
 
     {current && snapshot && <section className="mt-8 border-t pt-5">
@@ -390,7 +396,7 @@ function ModelEditor({ initialId, providerId }: { initialId: string | null; prov
         <NumberField label="Top P" value={value.generation.topP} onChange={next => set("generation", { ...value.generation, topP: next })} max={1} />
         <NumberField label={i18n.formatMessage(providersMessages.maximumOutputTokens)} value={value.generation.maxOutputTokens} onChange={next => set("generation", { ...value.generation, maxOutputTokens: next })} min={1} integer />
       </FieldGroup>}
-      <ModelCompatibilityEditor value={value.compatibility} onChange={next => set("compatibility", next)} />
+      <ModelCompatibilityEditor value={value.compatibility} inherited={provider?.compatibility ?? []} onChange={next => set("compatibility", next)} />
     </form>
     {current && <section className="mt-7 border-t pt-5">
       <div className="flex items-center justify-between gap-2">

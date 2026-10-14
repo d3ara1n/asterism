@@ -1,6 +1,13 @@
 import { defineMessages, pluginNamespace } from "@atelier/sdk/contracts";
 
 export const providersMessages = pluginNamespace("atelier.host").messages("en", defineMessages({
+  compatibility: { id: "compatibility.title", defaultMessage: "Compatibility" },
+  providerCompatibilityHint: { id: "compatibility.providerHint", defaultMessage: "Applies to all models under this provider after saving." },
+  modelCompatibilityHint: { id: "compatibility.modelHint", defaultMessage: "Provider settings apply automatically. Model settings replace the entire matching setting; removing an override restores the provider setting." },
+  compatibilityFromProvider: { id: "compatibility.fromProvider", defaultMessage: "From provider" },
+  compatibilityOverridden: { id: "compatibility.overridden", defaultMessage: "Overrides provider" },
+  overrideCompatibility: { id: "compatibility.override", defaultMessage: "Override for this model" },
+  restoreProviderCompatibility: { id: "compatibility.restoreProvider", defaultMessage: "Restore provider setting for {name}" },
   addCompatibility: {
     id: "model_compatibility_add",
     defaultMessage: "Add compatibility setting",

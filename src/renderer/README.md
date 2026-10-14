@@ -49,7 +49,7 @@
 | `features/plugins/PluginsSettings.tsx` | 插件包管理、当前运行插件的配置读取及命令队列 |
 | `features/plugins/PluginConfigurations.tsx` | 插件配置草稿、保存与恢复默认；字段编辑复用共享 schema 表单 |
 | `shared/ConfigurationValue.tsx` | 插件配置与模型兼容设置共用的 schema 字段编辑器；支持展示元数据与复杂 JSON 值，插件设置按对象层级生成分组底板与响应式字段行 |
-| `features/configuration/ModelCompatibilityEditor.tsx` | 模型兼容条目的添加、移除、协议展示与 schema 参数编辑 |
+| `features/configuration/ModelCompatibilityEditor.tsx` | 提供商与模型共用的兼容条目编辑器；添加、移除、协议展示、schema 参数编辑与提供商来源／模型覆盖展示 |
 | `features/configuration/forms.tsx` | 配置编辑器与字段公共入口；文本 placeholder、内置选择、显式空值与恢复操作在此复用 |
 | `shared/ConfigurationChoice.tsx` | 首页与会话输入托盘共用的紧凑配置菜单 |
 | `shared/ModelChoices.tsx` | 首页、添加代理与对话共用的模型／等级覆盖选择；默认值只投影，不回填 |

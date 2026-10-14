@@ -8,6 +8,7 @@ import { resolveModelRole, type ConfigurationSnapshot } from "../shared/configur
 import { ConfigurationService } from "./service.ts";
 import type { ConnectionProbe } from "./probe.ts";
 import { configurationDefaults, resolveAgentConfiguration, resolveRoleConfiguration } from "./layers.ts";
+import type { ModelCompatibility } from "../shared/model-compatibility.ts";
 
 const cleanups: (() => void)[] = [];
 afterEach(() => { cleanups.splice(0).reverse().forEach(cleanup => cleanup()); vi.useRealTimers(); });
@@ -24,7 +25,7 @@ function setup(probe: ConnectionProbe = async () => {}, available = true, timeou
   cleanups.push(() => { service.close(); rmSync(root, { recursive: true, force: true }); });
   return { root, service, protector, changed };
 }
-const providerValue = { id: "local", name: "Local", protocol: "openai-chat" as const, baseUrl: "http://127.0.0.1:1234/v1", enabled: true, auth: "none" as "none" | "api_key" };
+const providerValue = { id: "local", name: "Local", protocol: "openai-chat" as const, baseUrl: "http://127.0.0.1:1234/v1", enabled: true, auth: "none" as "none" | "api_key", compatibility: [] };
 async function addModel(service: ConfigurationService, auth: "none" | "api_key" = "none") {
   const provider = await service.execute({ type: "provider.save", id: null, value: { ...providerValue, auth },
     credential: auth === "none" ? { action: "keep" } : { action: "replace", value: "test-key-not-for-network" } });
@@ -40,29 +41,32 @@ function roleValue(snapshot: ConfigurationSnapshot, id: string) {
 }
 
 describe("真实配置与消费边界", () => {
-  // 模型兼容列表只保存显式身份与参数；参考协议不拦截保存，非法候选不能污染已保存数据。
-  it("兼容标签跨协议保存并重开，重复或非法条目拒绝且移除后不重现", async () => {
+  // 两层独立保存显式条目；参考协议不拦截保存，非法候选不能污染已保存数据。
+  it.each(["provider", "model"] as const)("%s 兼容条目独立保存并重开，非法条目拒绝且移除后不重现", async kind => {
     const { service, root, protector } = setup();
-    const { modelId, snapshot } = await addModel(service);
+    const { providerId, modelId, snapshot } = await addModel(service);
     const { revision: _revision, ...value } = snapshot.models[0]!;
+    const save = (target: ConfigurationService, compatibility: ModelCompatibility[]) => kind === "provider"
+      ? target.execute({ type: "provider.save", id: providerId, value: { ...providerValue, compatibility }, credential: { action: "keep" } })
+      : target.execute({ type: "model.save", id: modelId, value: { ...value, compatibility } });
     const compatibility = [{ id: "thinkingInDeepSeekFormat" }, { id: "systemMessageInMessages" }];
-    await service.execute({ type: "model.save", id: modelId, value: { ...value, compatibility } });
+    await save(service, compatibility);
     for (const invalid of [
       [compatibility[0]!, compatibility[0]!],
       [{ id: "unknownCompatibility" }],
       [{ id: "thinkingInDeepSeekFormat", value: false }],
     ]) {
-      await expect(service.execute({ type: "model.save", id: modelId, value: { ...value, compatibility: invalid } }))
-        .rejects.toMatchObject({ code: "invalid_request" });
+      await expect(save(service, invalid)).rejects.toMatchObject({ code: "invalid_request" });
     }
     const reopened = new ConfigurationService(root, protector);
     cleanups.push(() => reopened.close());
-    expect(reopened.current().models[0]?.compatibility).toEqual(compatibility);
+    expect(reopened.current()[kind === "provider" ? "providers" : "models"][0]?.compatibility).toEqual(compatibility);
+    expect(reopened.current()[kind === "provider" ? "models" : "providers"][0]?.compatibility).toEqual([]);
     expect(reopened.current().providers[0]?.protocol).toBe("openai-chat");
-    await reopened.execute({ type: "model.save", id: modelId, value: { ...value, compatibility: [] } });
+    await save(reopened, []);
     const again = new ConfigurationService(root, protector);
     cleanups.push(() => again.close());
-    expect(again.current().models[0]?.compatibility).toEqual([]);
+    expect(again.current()[kind === "provider" ? "providers" : "models"][0]?.compatibility).toEqual([]);
   });
 
   it("只保存用户覆盖，空提示词恢复内置，显式 false 与空列表不丢失", async () => {

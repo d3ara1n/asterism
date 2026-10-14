@@ -8,7 +8,7 @@ import { createProviderModel } from "./provider.ts";
 import { composeSystemPrompt, projectSystemPrompt } from "../modules/agent/system-prompt.ts";
 
 const input: ModelInput = {
-  settings: { provider: { id: "p", revision: 1, name: "Provider", enabled: true, baseUrl: "https://example.invalid", protocol: "anthropic", auth: "api_key" },
+  settings: { provider: { id: "p", revision: 1, name: "Provider", enabled: true, baseUrl: "https://example.invalid", protocol: "anthropic", auth: "api_key", compatibility: [] },
     model: { revision: 1, name: "Model", modelId: "test", providerId: "p", enabled: true, contextWindow: null, compatibility: [],
       capabilities: { reasoning: true, tools: true, thinkingLevels: [...thinkingLevels] }, generation: { temperature: 0.2, topP: null, maxOutputTokens: 1000 } }, thinking: "low" },
   system: composeSystemPrompt({ id: "worker", systemPrompt: "System" }), messages: [{ kind: "input", parts: [{ kind: "text", text: "Read" }] }],

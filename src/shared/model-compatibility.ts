@@ -1,7 +1,6 @@
 import { z } from "zod";
 import { jsonSchema, type Json } from "@atelier/sdk/contracts";
 import type { ProviderInput } from "./configuration.ts";
-import { temporaryModelCompatibility } from "./model-compatibility-preview.ts";
 
 /** 应用预定义的声明目录；参数与展示同源，行为由请求投影层按 id 解释。 */
 export type ModelCompatibilityDefinition = {
@@ -44,7 +43,6 @@ export const modelCompatibilityDefinitions: readonly ModelCompatibilityDefinitio
       description: "Send files from tool results in a following user message, with a reference in the tool result.",
     }),
   },
-  ...temporaryModelCompatibility,
 ];
 
 export function modelCompatibilityDefinition(id: string): ModelCompatibilityDefinition | undefined {
@@ -66,7 +64,7 @@ const entrySchema = z.strictObject({ id: z.string().min(1), value: jsonSchema.op
   return parsed.data === undefined ? { id: entry.id } : { id: entry.id, value: parsed.data };
 });
 
-/** 列表只包含用户已添加的项；不按协议阻止保存，不合并或继承。 */
+/** 每层只保存显式条目；不按协议阻止保存，同层不允许重复 id。 */
 export const modelCompatibilitySchema = z.array(entrySchema).superRefine((entries, context) => {
   const ids = new Set<string>();
   entries.forEach((entry, index) => {
@@ -74,3 +72,10 @@ export const modelCompatibilitySchema = z.array(entrySchema).superRefine((entrie
     ids.add(entry.id);
   });
 });
+
+/** 请求与展示共用：按 id 合并，模型条目整项优先，省略的参数不从提供商补齐。 */
+export function mergeModelCompatibility(
+  provider: readonly ModelCompatibility[], model: readonly ModelCompatibility[],
+): ModelCompatibility[] {
+  return [...new Map([...provider, ...model].map(entry => [entry.id, entry])).values()];
+}

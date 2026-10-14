@@ -1,4 +1,11 @@
 {
+  "compatibility.title": "兼容设置",
+  "compatibility.providerHint": "保存后对该提供商下的所有模型生效。",
+  "compatibility.modelHint": "自动使用提供商的兼容设置。模型设置整项覆盖同名设置；移除覆盖后恢复使用提供商设置。",
+  "compatibility.fromProvider": "来自提供商",
+  "compatibility.overridden": "已覆盖提供商设置",
+  "compatibility.override": "为此模型覆盖",
+  "compatibility.restoreProvider": "恢复 {name} 的提供商设置",
   "model_compatibility_add": "添加兼容设置",
   "model_compatibility_remove": "移除 {name}",
   "modelSelection.agentDefault": "代理默认",

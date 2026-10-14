@@ -6,11 +6,12 @@ import { aiSdkAdapterVersion } from "./continuation.ts";
 import { modelScope, type Json } from "../shared/model.ts";
 import { projectSystemPrompt } from "../modules/agent/system-prompt.ts";
 import type { ModelInput } from "./contract.ts";
+import { mergeModelCompatibility, type ModelCompatibility } from "../shared/model-compatibility.ts";
 
 function input(protocol: ModelInput["settings"]["provider"]["protocol"] = "openai-responses"): ModelInput {
   return {
     settings: {
-      provider: { id: "p", revision: 1, name: "Test", protocol, baseUrl: "https://example.invalid/v1", enabled: true, auth: "none" },
+      provider: { id: "p", revision: 1, name: "Test", protocol, baseUrl: "https://example.invalid/v1", enabled: true, auth: "none", compatibility: [] },
       model: { providerId: "p", modelId: "test", name: "Test", revision: 1, enabled: true, contextWindow: null,
         capabilities: { reasoning: true, thinkingLevels: [...thinkingLevels], tools: true },
         generation: { temperature: null, topP: null, maxOutputTokens: 4096 }, compatibility: [] }, thinking: "low",
@@ -47,13 +48,30 @@ async function request(value: ModelInput): Promise<Record<string, unknown>> {
 }
 
 describe("显式兼容与目标投影", () => {
+  // 两层合并不能深合并参数、把空列表当禁用，或把生效条目回写到任一来源。
+  it("按 id 去重，模型参数整项优先，撤下覆盖恢复提供商条目", () => {
+    const provider: ModelCompatibility[] = [{ id: "tag" }, { id: "options", value: { count: 3, enabled: true } }];
+    const model: ModelCompatibility[] = [{ id: "tag" }, { id: "options", value: { enabled: false } }, { id: "modelOnly" }];
+    const original = structuredClone({ provider, model });
+    expect(mergeModelCompatibility(provider, model)).toEqual([
+      { id: "tag" }, { id: "options", value: { enabled: false } }, { id: "modelOnly" },
+    ]);
+    expect(mergeModelCompatibility(provider, model.filter(entry => entry.id !== "options"))).toEqual([
+      ...provider, { id: "modelOnly" },
+    ]);
+    expect(mergeModelCompatibility(provider, [])).toEqual(provider);
+    expect(mergeModelCompatibility([], model)).toEqual(model);
+    expect({ provider, model }).toEqual(original);
+  });
+
   // 系统提示只能发送一份：默认 instructions，显式标签才改为首条 system。
-  it.each([false, true])("Responses 系统提示位置由标签决定：$0", async enabled => {
+  it.each(["none", "provider", "model", "both"])("Responses 系统提示位置由两层标签决定：%s", async source => {
     const current = input();
-    current.settings.model.compatibility = enabled ? [{ id: "systemMessageInMessages" }] : [];
+    current.settings.provider.compatibility = source === "provider" || source === "both" ? [{ id: "systemMessageInMessages" }] : [];
+    current.settings.model.compatibility = source === "model" || source === "both" ? [{ id: "systemMessageInMessages" }] : [];
     const body = await request(current);
     const messages = body.input as Record<string, unknown>[];
-    if (enabled) {
+    if (source !== "none") {
       expect(body).not.toHaveProperty("instructions");
       expect(messages[0]).toMatchObject({ role: "system", content: projectSystemPrompt(current.system) });
       expect(messages.filter(message => message.role === "system")).toHaveLength(1);
@@ -66,7 +84,7 @@ describe("显式兼容与目标投影", () => {
   // 参考协议不限制添加；不认识这些行为的协议继续正常编码。
   it("Responses 标签不改变 Anthropic 请求", async () => {
     const current = input("anthropic");
-    current.settings.model.compatibility = [{ id: "systemMessageInMessages" }, { id: "thinkingInDeepSeekFormat" }];
+    current.settings.provider.compatibility = [{ id: "systemMessageInMessages" }, { id: "thinkingInDeepSeekFormat" }];
     const body = await request(current);
     expect(body).not.toHaveProperty("instructions");
     expect(body.system).toEqual([{ type: "text", text: projectSystemPrompt(current.system) }]);
@@ -76,7 +94,8 @@ describe("显式兼容与目标投影", () => {
   // 明文 reasoning 必须在原位置，不能被 SDK 丢弃，也不能破坏相邻的图片、工具配对或助手文字。
   it("DeepSeek 明文思考按原顺序插入，跨来源只取公共文字", async () => {
     const current = input();
-    current.settings.model.compatibility = [{ id: "thinkingInDeepSeekFormat" }, { id: "systemMessageInMessages" }];
+    current.settings.provider.compatibility = [{ id: "thinkingInDeepSeekFormat" }];
+    current.settings.model.compatibility = [{ id: "systemMessageInMessages" }];
     const foreign = { adapter: "foreign-adapter", scope: "foreign-scope" };
     current.messages = [
       { kind: "input", parts: [{ kind: "text", text: "Look" }, { kind: "file", data: new Uint8Array([1, 2, 3]), mediaType: "image/png" }] },
@@ -191,7 +210,7 @@ describe("显式兼容与目标投影", () => {
     current.messages = [{ kind: "result", callId: "call", name: "lookup", error: false,
       parts: [{ kind: "file", data: new Uint8Array([1]), mediaType: "image/png" }] }];
     expect(() => adapter.prepare(current)).toThrow("Tool files in a user message");
-    current.settings.model.compatibility = [{ id: "toolFilesAsUserMessage" }];
+    current.settings.provider.compatibility = [{ id: "toolFilesAsUserMessage" }];
     expect(() => adapter.validate({ ...saved, settings: current.settings })).not.toThrow();
     expect(() => adapter.prepare(current)).not.toThrow();
   });

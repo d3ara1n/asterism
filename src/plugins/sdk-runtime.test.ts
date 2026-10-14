@@ -40,7 +40,7 @@ function open(plugins: PluginDefinition[], adapterFactory?: () => ModelAdapter, 
 }
 async function configureModel(service: ApplicationService) {
   await service.configuration.execute({ type: "provider.save", id: null, credential: { action: "keep" },
-    value: { id: "test", name: "Test", protocol: "openai-responses", baseUrl: "https://example.invalid", auth: "none", enabled: true } });
+    value: { id: "test", name: "Test", protocol: "openai-responses", baseUrl: "https://example.invalid", auth: "none", enabled: true, compatibility: [] } });
   const result = await service.configuration.execute({ type: "model.save", id: null, value: {
     providerId: "test", name: "Test", modelId: "test", enabled: true, contextWindow: null, compatibility: [],
     capabilities: { tools: true, reasoning: false, thinkingLevels: [...thinkingLevels] }, generation: { temperature: null, topP: null, maxOutputTokens: null },

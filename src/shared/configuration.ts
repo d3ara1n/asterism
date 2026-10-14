@@ -5,7 +5,7 @@ import { modelCompatibilitySchema } from "./model-compatibility.ts";
 
 export const configurationChannel = coreChannel("configuration");
 export const configurationChangedChannel = coreChannel("configuration-changed");
-export const configurationVersion = 5;
+export const configurationVersion = 6;
 const id = z.string().min(1).max(160);
 const name = z.string().trim().min(1).max(160);
 const revision = z.number().int().positive();
@@ -35,6 +35,7 @@ const endpoint = z.string().trim().url().refine(value => {
 }, "Use an HTTP(S) base URL without credentials, query, or fragment.");
 export const providerInputSchema = z.strictObject({
   id: providerIdSchema, name, protocol: protocolSchema, baseUrl: endpoint, enabled: z.boolean(), auth: z.enum(["api_key", "none"]),
+  compatibility: modelCompatibilitySchema,
 });
 export const credentialStateSchema = z.enum(["not_required", "missing", "available", "storage_unavailable", "decryption_failed"]);
 export const providerSchema = providerInputSchema.extend({ revision, credentialState: credentialStateSchema });

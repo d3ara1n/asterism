@@ -107,7 +107,7 @@ Responses 系统提示默认只发送在顶层 `instructions`；显式添加 `sy
 
 DeepSeek 明文输入通过 SDK 公开语言模型中间件与自定义 fetch 补充：在编码前固定思考的有序插入计划，普通消息、文件和工具继续由 SDK 编码；发送前逐项核对序列化结果并插入明文 reasoning item。不匹配时明确失败，不猜测位置、不伪造密文或插入文本哨兵，不提供通用 JSON patch。计划只存在于单次调用，原生资料选择、公共内容转换与兼容包共用同一次目标投影。
 
-模型兼容包由用户显式添加到具体模型；`appliesTo` 中的协议、端点仅供 UI 参考，不用于自动启用或运行时匹配。编码器只解释其协议下认识的已添加行为。实现与真实端点／GUI 验收进度见 [模型兼容计划](../plans/todo-2026-10-10-model-compatibility.md)及 [跨模型续接计划](../plans/todo-2026-10-13-cross-model-continuation.md)。
+模型兼容包由用户显式添加到提供商或具体模型；本次请求的两层配置按 id 合并，模型同名条目整项优先，不深合并参数、不回写配置。`appliesTo` 中的协议、端点仅供 UI 参考，不用于自动启用或运行时匹配。编码器只解释其协议下认识的已添加行为。实现与真实端点／GUI 验收进度见 [模型兼容计划](../plans/todo-2026-10-10-model-compatibility.md)及 [跨模型续接计划](../plans/todo-2026-10-13-cross-model-continuation.md)。
 
 ## 前端能力接口
 

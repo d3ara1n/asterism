@@ -12,7 +12,7 @@ import type { ModelAdapter, ModelEvent } from "../model/contract.ts";
 import type { ModelSettings } from "../shared/model.ts";
 
 const settings: ModelSettings = {
-  provider: { id: "p", revision: 1, name: "Provider", enabled: true, baseUrl: "https://example.invalid", protocol: "openai-responses", auth: "none" },
+  provider: { id: "p", revision: 1, name: "Provider", enabled: true, baseUrl: "https://example.invalid", protocol: "openai-responses", auth: "none", compatibility: [] },
   model: { revision: 1, name: "Model", modelId: "test", providerId: "p", enabled: true, contextWindow: 4000, compatibility: [],
     capabilities: { reasoning: false, tools: true, thinkingLevels: [...thinkingLevels] }, generation: { temperature: null, topP: null, maxOutputTokens: null } }, thinking: "off",
 };

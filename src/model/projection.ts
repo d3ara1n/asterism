@@ -1,13 +1,15 @@
 import { createHash } from "node:crypto";
 import type { ModelPart } from "@atelier/sdk/contracts";
 import type { ProviderInput, ProviderModel } from "../shared/configuration.ts";
+import { mergeModelCompatibility } from "../shared/model-compatibility.ts";
 import { ModelFailure, type ModelInput, type ModelValidationInput, type ResolvedModelItem } from "./contract.ts";
 import { canReuseContinuation, continuationForTarget } from "./continuation.ts";
 
 export function compatibilityForTarget(settings: {
-  provider: Pick<ProviderInput, "protocol">; model: Pick<ProviderModel, "compatibility">;
+  provider: Pick<ProviderInput, "protocol" | "compatibility">; model: Pick<ProviderModel, "compatibility">;
 }) {
-  const has = (id: string) => settings.model.compatibility.some(entry => entry.id === id);
+  const entries = mergeModelCompatibility(settings.provider.compatibility, settings.model.compatibility);
+  const has = (id: string) => entries.some(entry => entry.id === id);
   // 协议编码器解释自己认识的行为；appliesTo 只用于展示，不参与匹配。
   return {
     systemMessage: settings.provider.protocol === "openai-responses" && has("systemMessageInMessages"),

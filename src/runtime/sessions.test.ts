@@ -44,7 +44,7 @@ async function setup(model: ModelAdapter = adapter(), onSessionChanged?: (event:
   const root = mkdtempSync(join(tmpdir(), "core-session-")); roots.push(root);
   const service = new ApplicationService(root, { adapterFactory: () => model, onSessionChanged }); services.add(service);
   const { savedId: providerId } = await service.configuration.execute({ type: "provider.save", id: null,
-    value: { id: "test", name: "Test", protocol: "openai-responses", baseUrl: "https://example.invalid/v1", enabled: true, auth: "none" }, credential: { action: "keep" } });
+    value: { id: "test", name: "Test", protocol: "openai-responses", baseUrl: "https://example.invalid/v1", enabled: true, auth: "none", compatibility: [] }, credential: { action: "keep" } });
   const { savedId: modelId } = await service.configuration.execute({ type: "model.save", id: null,
     value: { providerId: providerId!, name: "Test", modelId: "test", enabled: true, contextWindow: null, compatibility: [],
       capabilities: { tools: true, reasoning: false, thinkingLevels: [...thinkingLevels] }, generation: { temperature: null, topP: null, maxOutputTokens: null } } });

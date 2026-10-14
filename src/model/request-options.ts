@@ -3,7 +3,7 @@ import type { Json } from "../shared/model.ts";
 import { ModelFailure } from "./contract.ts";
 import { compatibilityForTarget } from "./projection.ts";
 
-type Connection = Pick<ProviderInput, "protocol">;
+type Connection = Pick<ProviderInput, "protocol" | "compatibility">;
 type RequestPurpose = { purpose: "probe" } | { purpose: "execution"; thinking: ThinkingLevel | null; system?: string; maxOutputTokens?: number };
 interface RequestOptions {
   maxRetries: 0;

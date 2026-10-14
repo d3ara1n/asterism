@@ -12,7 +12,7 @@ function configuration(): ConfigurationSnapshot {
     agents: defaultAgents.map(agent => ({ ...agent, revision: 1 })),
     roles: defaultRoles.map(role => ({ ...role, revision: 1, model: "p/test", thinking: "high" })),
     providers: [{ id: "p", revision: 1, name: "Test", protocol: "openai-responses", baseUrl: "https://example.invalid",
-      enabled: true, auth: "none", credentialState: "not_required" }],
+      enabled: true, auth: "none", compatibility: [], credentialState: "not_required" }],
     models: [{ revision: 1, providerId: "p", name: "Test", modelId: "test", enabled: true, contextWindow: null, compatibility: [],
       capabilities: { reasoning: true, tools: true, thinkingLevels: [...thinkingLevels] },
       generation: { temperature: null, topP: null, maxOutputTokens: null } }],
