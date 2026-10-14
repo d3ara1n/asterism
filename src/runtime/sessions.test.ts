@@ -246,7 +246,7 @@ describe("会话运行时", () => {
     } finally { release(); vi.useRealTimers(); }
   });
 
-  it("正文等待终态后作为同一块入树并推进游标，重开保留计量", async () => {
+  it("正文等待终态后作为同一块入树并推进游标，代理视图交付回合状态且重开保留计量", async () => {
     let release!: () => void;
     let entered!: () => void;
     const gate = new Promise<void>(resolve => { release = resolve; });
@@ -265,6 +265,9 @@ describe("会话运行时", () => {
     try {
       expect(before.nodes.map(flat).some(node => node.kind === "text")).toBe(false);
       expect(before.progress.live).toContainEqual(expect.objectContaining({ kind: "text", text: "Saved text" }));
+      // 领域状态须经资源投影交付；不能只在前端或执行循环内存中计算。
+      expect(before.workbench.objects.find(object => object.kind === "atelier.core/agent")?.presentation)
+        .toMatchObject({ data: { turnState: "incomplete" } });
     } finally { release(); }
     await settled(service);
     const after = service.sessions.snapshot(first.sessionId);
@@ -272,9 +275,14 @@ describe("会话运行时", () => {
     expect(after.cursor).toBe(after.nodes.at(-1)!.id);
     expect(after.nodes.map(flat).at(-1)).toMatchObject({ kind: "text", parentId: before.cursor,
       completion: { usage, finishReason: "stop", rawFinishReason: "end_turn", providerResponseId: "provider-response" } });
+    expect(after.workbench.objects.find(object => object.kind === "atelier.core/agent")?.presentation)
+      .toMatchObject({ data: { turnState: "completed" } });
     await service.close(); services.delete(service);
     const reopened = new ApplicationService(root); services.add(reopened);
-    expect(reopened.sessions.snapshot(first.sessionId).nodes).toEqual(after.nodes);
+    const restored = reopened.sessions.snapshot(first.sessionId);
+    expect(restored.nodes).toEqual(after.nodes);
+    expect(restored.workbench.objects.find(object => object.kind === "atelier.core/agent")?.presentation)
+      .toMatchObject({ data: { turnState: "completed" } });
   });
 
   it("无块响应保留已报告计量，不伪造正文或工具块", async () => {

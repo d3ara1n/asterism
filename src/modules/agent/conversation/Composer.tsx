@@ -2,6 +2,7 @@ import { useI18n } from "@atelier/sdk/renderer";
 import { Square, ArrowUp } from "lucide-react";
 import { useSyncExternalStore, type Ref } from "react";
 import type { MessageDraft } from "./draft";
+import type { AgentExecutionState } from "../state";
 import { AttachFiles, DraftFiles, fileInputEvents } from "./Files";
 
 import { Button } from "../../../renderer/shared/ui/button";
@@ -9,13 +10,14 @@ import { InputGroup, InputGroupTextarea, InputGroupAddon } from "../../../render
 import { commonMessages } from "../../messages/common";
 import { conversationMessages } from "../../messages/conversation";
 
-export function MessageComposer({ draft, inputRef, busy, ready, running, writable, onSend, onCancel, onContinue }: {
+export function MessageComposer({ draft, inputRef, busy, ready, executionState, writable, onSend, onCancel, onContinue }: {
   draft: MessageDraft; inputRef: Ref<HTMLTextAreaElement>;
-  busy: boolean; ready: boolean; running: boolean; writable: boolean;
+  busy: boolean; ready: boolean; executionState: AgentExecutionState; writable: boolean;
   onSend(): Promise<void>; onCancel(): Promise<unknown>; onContinue(): Promise<void>;
 }) {
   const i18n = useI18n();
   const state = useSyncExternalStore(draft.subscribe, draft.getSnapshot);
+  const running = executionState === "running";
   return <form {...fileInputEvents(draft, busy || !ready)} onSubmit={event => { event.preventDefault(); void onSend(); }}>
   <DraftFiles draft={draft} disabled={busy} className="pt-0 pb-2" />
   <InputGroup>
@@ -31,7 +33,7 @@ export function MessageComposer({ draft, inputRef, busy, ready, running, writabl
       {running ? <Button type="button" size="sm" variant="secondary" disabled={busy || !ready}
         onClick={() => { void onCancel(); }}><Square />{i18n.formatMessage(conversationMessages.stop)}</Button>
         : <div className="flex gap-1">
-          <Button type="button" size="sm" variant="ghost" disabled={!writable} onClick={() => { void onContinue(); }}>{i18n.formatMessage(conversationMessages.continue)}</Button>
+          {executionState === "incomplete" && <Button type="button" size="sm" variant="ghost" disabled={!writable} onClick={() => { void onContinue(); }}>{i18n.formatMessage(conversationMessages.continue)}</Button>}
           <Button type="submit" size="icon-sm" disabled={!writable || state.uploading || (!state.text.trim() && !state.files.length)} aria-label={i18n.formatMessage(commonMessages.sendMessage)} title={i18n.formatMessage(commonMessages.sendMessage)}><ArrowUp /></Button>
         </div>}
     </InputGroupAddon>

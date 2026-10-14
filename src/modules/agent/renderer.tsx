@@ -1,5 +1,6 @@
 import { creationEntry, cardRenderer, useRendererNavigation, type RendererModule } from "@atelier/sdk/renderer";
 import { Bot } from "lucide-react";
+import type { z } from "zod";
 
 import { commonMessages } from "../messages/common";
 import { CreateAgent, AgentView } from "./contract";
@@ -21,8 +22,7 @@ export default {
   creations: [creationEntry(CreateAgent, { id: "atelier.core/agent.configured", label: commonMessages.kindAgent, icon: <Bot className="size-4" />, group: "agents", InputView: AgentInput, triggers: { menu: {} } })],
 } satisfies RendererModule;
 
-function AgentBody({ data }: { data: { selection: import("../../shared/model").AgentSelection | null } }) {
-
+function AgentBody({ data }: { data: z.infer<typeof AgentView.schema> }) {
   const navigation = useRendererNavigation();
-  return <Conversation selection={data.selection} onHome={navigation.home} />;
+  return <Conversation selection={data.selection} turnState={data.turnState} onHome={navigation.home} />;
 }

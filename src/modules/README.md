@@ -90,6 +90,8 @@ Agent 的选择和提交去重保存于对象数据，用户输入与执行输�
 
 ## 资源视图
 
+Agent 状态契约与实时活动组合位于 `agent/state.ts`，历史推导位于 `agent/state-projection.ts`，只依赖 SDK 纯契约与自身记录。后台资源投影通过 `AgentView.turnState` 交付结果；前端组合实时活动后交给输入与交互模块消费，不在控件内解析终态。模型上下文仍由 `agent/projection.ts` 独立负责，状态投影不改变协议过滤策略。语义见 [执行状态投影](../../docs/runtime.md#执行状态投影)。
+
 `RendererModule.resources` 按资源类型声明静态 `kind / label / icon`，label 在模块中使用应用本地化文案。`ViewRegistry.resource(kind)` 不解析正文、不构造 Body，向对象目录、历史、授权、添加入口和卡片外壳提供同一份识别信息；未知类型回退为通用资源。类型身份重复注册会被拒绝。描述不随实例存储，不包含动态能力与授权。
 
 `cardRenderer(DirectoryView, …)` 使用卡片契约推导 data 类型。卡片提供默认 width/height、可选 minWidth/minHeight、Body 和可选 Actions；宽高使用画布单位，未声明下限时使用公共下限。工作台统一处理缩放、尺寸覆盖和保存，ObjectCard 处理框架、标题栏拖动、折叠与关闭，ObjectActions 提供尺寸预设、恢复默认与对象移除入口。模块不重建这套外壳。Body 使用可伸缩的内容区，溢出时在内部滚动；媒体视图可在内容区按比例适配，外框尺寸不强制锁定比例。

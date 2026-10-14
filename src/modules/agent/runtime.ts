@@ -5,6 +5,7 @@ import { UserMessage, Execution, Notice } from "./records.ts";
 import { createSelection, selectionOf } from "./selection.ts";
 import { createAgentLoop } from "./loop.ts";
 import { createAdmission } from "./admission.ts";
+import { projectAgentTurnState } from "./state-projection.ts";
 
 /** 资源入口只装配领域模块与贡献；业务模块不依赖完整插件上下文。 */
 export default defineModule(plugin => {
@@ -24,7 +25,8 @@ export default defineModule(plugin => {
       }),
       project(_data, object) {
         const value = object.get(AgentSelection);
-        return { agentId: object.ref.id, selection: value?.selection ?? null, selectionRevision: value?.revision ?? 0 };
+        return { agentId: object.ref.id, selection: value?.selection ?? null, selectionRevision: value?.revision ?? 0,
+          turnState: projectAgentTurnState(object.session.snapshot(), object.ref.id) };
       },
       async inspect(_data, object) {
         return { type: Agent.kind, title: object.snapshot()?.title ?? "Agent" };

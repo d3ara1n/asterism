@@ -83,6 +83,8 @@ Session 是时间线的单一写入者。含终态的成型记录、对象与链
 
 context 唯一真值在时间线。Agent 可以持有选择、计数、取消与活动状态，但不保存另一份 context；消息投影只服务当次调用。后续上下文裁剪、压缩和选取机制也须以时间线事实为依据，不直接改写既有事件或在 Agent 内维持独立历史。
 
+Agent 的回合状态同样从当前时间线推导，经 `AgentView.turnState` 交付；与实时活动组合后形成供外部消费的执行状态，定义与分层见 [执行状态投影](runtime.md#执行状态投影)。模型输入投影与状态投影分别负责协议可发送性和执行完成判断，不完整块仅在前者被过滤。
+
 ## 模型适配
 
 三协议使用已安装 AI SDK：OpenAI Responses、OpenAI Chat Completions、Anthropic Messages。工具定义不提供 SDK execute；关闭隐式重试与流重试。带凭据的远程端点要求 HTTPS，无鉴权模式去除认证头，禁止自动重定向。每个 SDK 调用只进行一个模型步骤，由工坊执行后续循环。OpenAI Responses 使用 store:false 并请求 encrypted reasoning。

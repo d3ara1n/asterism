@@ -19,6 +19,7 @@ import type { AgentSelection } from "../../../shared/model";
 import { conversationTimeline } from "./timeline";
 
 import { useAgentConversation } from "./interaction";
+import { agentExecutionState, type AgentTurnState } from "../state";
 
 /** 卡片标题栏中的执行状态；历史属于会话，入口在窗口标题栏。 */
 export function ConversationActions() {
@@ -35,18 +36,18 @@ export function ConversationActions() {
 }
 
 /** 代理卡片内容：当前路径的最终视图与输入区；没有分支感，回溯在会话历史中进行。 */
-export function Conversation({ selection, onHome }: { selection: AgentSelection | null; onHome(): void }) {
+export function Conversation({ selection, turnState, onHome }: { selection: AgentSelection | null; turnState: AgentTurnState; onHome(): void }) {
   const i18n = useI18n();
   const object = useRendererObject();
   const { view: state, session } = object;
-  const interaction = useAgentConversation(object, selection !== null);
+  const executionState = agentExecutionState(turnState, object.activity.running);
+  const interaction = useAgentConversation(object, selection !== null, executionState);
   const models = useRendererModels();
   const catalogs = useRendererCatalogs();
   const { ready } = state;
   const agentId = object.ref.id;
   const snapshot = session.snapshot();
-  const agentRunning = object.activity.running;
-  const running = agentRunning;
+  const running = executionState === "running";
   const timeline = useMemo(() => snapshot ? conversationTimeline(snapshot, agentId, models.blocks) : [], [snapshot, agentId, models.blocks]);
   const configurationError = catalogs.error;
   const { scroll, awayFromBottom, latest, onScroll } = useOutputFollow(timeline);
@@ -69,7 +70,7 @@ export function Conversation({ selection, onHome }: { selection: AgentSelection 
       <div ref={scroll} className="min-h-0 flex-1 select-text overflow-y-auto overscroll-contain" onScroll={onScroll}>
         <div className="space-y-4 p-4">
           <ConversationTimeline items={timeline} />
-          {agentRunning && <p role="status" className="type-caption flex items-center gap-2"><LoaderCircle className="size-3 animate-spin" />{i18n.formatMessage(conversationMessages.workingHint)}</p>}
+          {running && <p role="status" className="type-caption flex items-center gap-2"><LoaderCircle className="size-3 animate-spin" />{i18n.formatMessage(conversationMessages.workingHint)}</p>}
           {!timeline.length && !running && <p className="type-caption">{i18n.formatMessage(conversationMessages.emptyHint)}</p>}
         </div>
       </div>
@@ -87,7 +88,7 @@ export function Conversation({ selection, onHome }: { selection: AgentSelection 
         <Button variant="ghost" size="sm" onClick={() => { void session.refresh(); }}>{i18n.formatMessage(conversationMessages.reload)}</Button>
       </AlertDescription></Alert>}
       <MessageComposer draft={interaction.draft} inputRef={composer}
-        busy={state.busy} ready={ready} running={running} writable={interaction.writable} onSend={send}
+        busy={state.busy} ready={ready} executionState={executionState} writable={interaction.writable} onSend={send}
         onCancel={interaction.cancel} onContinue={resume} />
     </footer>
   </>;

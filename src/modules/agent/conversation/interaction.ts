@@ -5,10 +5,11 @@ import { type AgentSelection } from "../../../shared/model";
 import { useState, useSyncExternalStore } from "react";
 import { SubmissionIdentity } from "../../../renderer/shared/submission";
 import { createMessageDraft } from "./draft";
+import type { AgentExecutionState } from "../state";
 
 /** 草稿与提交身份随会话／对象保留，卡片重挂载不丢失文件和重试资格。 */
 const interactions = new Map<string, { draft: ReturnType<typeof createMessageDraft>; submission: SubmissionIdentity; pending: boolean }>();
-export function useAgentConversation(object: RendererObjectContext, hasSelection: boolean) {
+export function useAgentConversation(object: RendererObjectContext, hasSelection: boolean, executionState: AgentExecutionState) {
   const key = JSON.stringify([object.ref.sessionId, object.ref.id]);
   let entry = interactions.get(key);
   if (!entry) {
@@ -21,7 +22,7 @@ export function useAgentConversation(object: RendererObjectContext, hasSelection
   const [error, setError] = useState<UiText | null>(null);
   const command = (value: AgentCommand) => object.invoke(agentAction(value), value);
   const { ready, busy, status } = object.view;
-  const writable = ready && !busy && status === "ready" && !object.activity.running && hasSelection;
+  const writable = ready && !busy && status === "ready" && executionState !== "running" && hasSelection;
   return {
     draft, error, setError, writable, configurable: ready && !busy && status === "ready",
     async configure(selection: AgentSelection) {
@@ -41,7 +42,7 @@ export function useAgentConversation(object: RendererObjectContext, hasSelection
         return true;
       } finally { current.pending = false; }
     },
-    async resume() { if (writable) await command({ type: "continue" }); },
+    async resume() { if (writable && executionState === "incomplete") await command({ type: "continue" }); },
     cancel: () => command({ type: "cancel" }),
   };
 }
