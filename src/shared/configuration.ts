@@ -1,10 +1,11 @@
 import { z } from "zod";
 import { coreChannel } from "./core.ts";
 import { thinkingLevels } from "@atelier/sdk/contracts";
+import { modelCompatibilitySchema } from "./model-compatibility.ts";
 
 export const configurationChannel = coreChannel("configuration");
 export const configurationChangedChannel = coreChannel("configuration-changed");
-export const configurationVersion = 4;
+export const configurationVersion = 5;
 const id = z.string().min(1).max(160);
 const name = z.string().trim().min(1).max(160);
 const revision = z.number().int().positive();
@@ -46,6 +47,7 @@ export const modelInputSchema = z.strictObject({
     temperature: z.number().min(0).max(2).nullable(), topP: z.number().min(0).max(1).nullable(),
     maxOutputTokens: z.number().int().positive().nullable(),
   }),
+  compatibility: modelCompatibilitySchema,
 });
 export const modelSchema = modelInputSchema.extend({ revision });
 export const modelRoleInputSchema = z.strictObject({

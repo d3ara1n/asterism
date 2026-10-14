@@ -1,6 +1,14 @@
 import { defineMessages, pluginNamespace } from "@atelier/sdk/contracts";
 
 export const providersMessages = pluginNamespace("atelier.host").messages("en", defineMessages({
+  addCompatibility: {
+    id: "model_compatibility_add",
+    defaultMessage: "Add compatibility setting",
+  },
+  removeCompatibility: {
+    id: "model_compatibility_remove",
+    defaultMessage: "Remove {name}",
+  },
   image: { id: "model_modality_image", defaultMessage: "Image" },
   disabled: {
     id: "features_configuration_ProvidersSettings_1",

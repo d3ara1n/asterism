@@ -20,11 +20,10 @@ import { useIsland } from "../../shared/weave/Screen";
 import { Section } from "../settings/layout";
 import { Editor, TextField, ChoiceField, NumberField } from "./forms";
 import { useSettingsConfiguration } from "./state";
+import { ModelCompatibilityEditor } from "./ModelCompatibilityEditor";
+import { modelProtocolLabels } from "./protocols";
 
-const protocols = [
-  { value: "openai-responses", label: "OpenAI Responses" }, { value: "openai-chat", label: "OpenAI Chat Completions" },
-  { value: "anthropic", label: "Anthropic Messages" },
-];
+const protocols = Object.entries(modelProtocolLabels).map(([value, label]) => ({ value, label }));
 const protocolLabel = (value: string) => protocols.find(item => item.value === value)?.label ?? value;
 const islandWidth = { min: 400, grow: 1, max: 620 };
 type ModelValue = Omit<ProviderModel, "id" | "revision">;
@@ -85,7 +84,7 @@ function useQuickActions() {
 }
 const modelValue = (model: ProviderModel): ModelValue => ({
   providerId: model.providerId, name: model.name, modelId: model.modelId, enabled: model.enabled, contextWindow: model.contextWindow,
-  capabilities: { ...model.capabilities }, generation: { ...model.generation },
+  capabilities: { ...model.capabilities }, generation: { ...model.generation }, compatibility: structuredClone(model.compatibility),
 });
 
 /* ---------- 根：提供商总览 ---------- */
@@ -312,7 +311,7 @@ function ModelEditor({ initialId, providerId }: { initialId: string | null; prov
   const current = snapshot?.models.find(model => modelReference(model) === id);
   const provider = snapshot?.providers.find(item => item.id === providerId);
   const [value, setValue] = useState<ModelValue>(() => current ? modelValue(current) : {
-    providerId, name: "", modelId: "", enabled: true, contextWindow: null,
+    providerId, name: "", modelId: "", enabled: true, contextWindow: null, compatibility: [],
     capabilities: { reasoning: false, tools: true, thinkingLevels: [...thinkingSchema.options] }, generation: { temperature: null, topP: null, maxOutputTokens: null } });
   const [advanced, setAdvanced] = useState(false);
   const set = <K extends keyof ModelValue>(field: K, next: ModelValue[K]) => setValue(previous => ({ ...previous, [field]: next }));
@@ -376,6 +375,7 @@ function ModelEditor({ initialId, providerId }: { initialId: string | null; prov
         <NumberField label="Top P" value={value.generation.topP} onChange={next => set("generation", { ...value.generation, topP: next })} max={1} />
         <NumberField label={i18n.formatMessage(providersMessages.maximumOutputTokens)} value={value.generation.maxOutputTokens} onChange={next => set("generation", { ...value.generation, maxOutputTokens: next })} min={1} integer />
       </FieldGroup>}
+      <ModelCompatibilityEditor value={value.compatibility} onChange={next => set("compatibility", next)} />
     </form>
     {current && <section className="mt-7 border-t pt-5">
       <div className="flex items-center justify-between gap-2">

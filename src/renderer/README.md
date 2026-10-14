@@ -47,7 +47,9 @@
 | `../modules/*/renderer.tsx` | 资源模块的具体卡片、附加操作和工具视图，与后端共用纯契约 |
 | `features/configuration/` | 提供商/模型角色/agent 配置表单及共享读取入口 |
 | `features/plugins/PluginsSettings.tsx` | 插件包管理、当前运行插件的配置读取及命令队列 |
-| `features/plugins/PluginConfigurations.tsx` / `configuration-fields.ts` | 按插件生成具型配置表单；复杂值编辑、草稿、保存与恢复默认 |
+| `features/plugins/PluginConfigurations.tsx` | 插件配置草稿、保存与恢复默认；字段编辑复用共享 schema 表单 |
+| `shared/ConfigurationValue.tsx` | 插件配置与模型兼容设置共用的 schema 字段编辑器；支持展示元数据与复杂 JSON 值 |
+| `features/configuration/ModelCompatibilityEditor.tsx` | 模型兼容条目的添加、移除、协议展示与 schema 参数编辑 |
 | `features/configuration/forms.tsx` | 配置编辑器与字段公共入口；文本 placeholder、内置选择、显式空值与恢复操作在此复用 |
 | `shared/ConfigurationChoice.tsx` | 首页与会话输入托盘共用的紧凑配置菜单 |
 | `shared/ModelChoices.tsx` | 首页、添加代理与对话共用的模型／等级覆盖选择；默认值只投影，不回填 |
