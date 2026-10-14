@@ -13,6 +13,10 @@
 - A → B → A 不会逐次转换保存内容；A 原先的原生资料一直留在时间线，切回时可重新使用。B 产生的公共回答保留，不携带不适用的 B 原生资料。
 - 实现入口：src/model/projection.ts、src/model/continuation.ts；公共 SDK ModelBlock／ModelPart 存储结构不变。
 
+## 待办
+
+- [ ] 接入非 OpenAI 兼容协议时扩展原生资料命名空间：`continuationForTarget` 目前按协议二分（anthropic 之外全部归 openai），`pickContinuation` 白名单也只有这两个命名空间；新增协议（如 Gemini 原生 thought signature）时需一并扩展命名空间选择与白名单，公共块结构不变。
+
 ## 验收
 
 - [x] 隔离协议测试：跨模型或适配版本变化不阻断公共正文，不泄漏来源签名／密文／item ID。
