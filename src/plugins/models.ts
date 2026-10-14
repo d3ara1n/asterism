@@ -13,6 +13,7 @@ import { coreDeclarations } from "../execution/core.ts";
 import { coreId } from "../shared/core.ts";
 import { inputReferences, validateInput, resolveInput, type ModelContent } from "../model/input.ts";
 import type { ModelItem } from "@atelier/sdk/contracts";
+import { errorMessages } from "../shared/error-display.ts";
 
 /** 模型目标：选择一个角色，可覆盖模型表达式或思考等级；未给出的沿用角色。 */
 export type { ModelTarget, StreamRequest } from "@atelier/sdk/contracts";
@@ -42,7 +43,7 @@ export interface HostModels {
   list: ModelServices["list"];
 }
 
-/** 按角色与覆盖解析；模型不支持 reasoning 时思考归为 off。 */
+/** 按角色与覆盖解析，思考可用性与请求过滤由模型适配层解释。 */
 export function resolveTarget(snapshot: ConfigurationSnapshot, target: ModelTarget):
   { ok: true; model: string; thinking: ThinkingLevel | null } | { ok: false; reason: ModelTargetError } {
   const role = snapshot.roles.find(item => item.id === target.role);
@@ -54,7 +55,7 @@ export function resolveTarget(snapshot: ConfigurationSnapshot, target: ModelTarg
   const { provider } = resolved;
   if (provider.auth === "api_key" && provider.credentialState !== "available") return { ok: false, reason: "credential_unavailable" };
   const thinking = target.thinking !== undefined ? target.thinking : role.thinking;
-  return { ok: true, model, thinking: resolved.model.capabilities.reasoning ? thinking : "off" };
+  return { ok: true, model, thinking };
 }
 
 export function createModelServices(configuration: ConfigurationService, adapterFactory?: (settings: ModelSettings) => ModelAdapter): HostModels {
@@ -110,7 +111,8 @@ export function createModelServices(configuration: ConfigurationService, adapter
         if (error instanceof PluginApiError) throw error;
         if (request.signal.aborted) throw error;
         throw new PluginApiError("invalid_argument", error instanceof ModelFailure ? error.message : "The model request could not be prepared.",
-          error instanceof ModelFailure ? error.code : undefined);
+          error instanceof ModelFailure ? error.code : undefined,
+          error instanceof ModelFailure && error.code === "thinking_unavailable" ? errorMessages.thinking_unavailable : undefined);
       } finally { await content?.close(); }
     },
     async *stream(request, options) {

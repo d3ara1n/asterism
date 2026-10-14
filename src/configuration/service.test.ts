@@ -1,3 +1,4 @@
+import { thinkingLevels } from "@atelier/sdk/contracts";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -29,7 +30,7 @@ async function addModel(service: ConfigurationService, auth: "none" | "api_key" 
     credential: auth === "none" ? { action: "keep" } : { action: "replace", value: "test-key-not-for-network" } });
   const model = await service.execute({ type: "model.save", id: null, value: {
     providerId: provider.savedId!, name: "Test model", modelId: "test-model", enabled: true, contextWindow: 32000,
-    capabilities: { reasoning: false, tools: true }, generation: { temperature: null, topP: null, maxOutputTokens: null },
+    capabilities: { reasoning: false, tools: true, thinkingLevels: [...thinkingLevels] }, generation: { temperature: null, topP: null, maxOutputTokens: null },
   } });
   return { providerId: provider.savedId!, modelId: model.savedId!, snapshot: model.snapshot };
 }
@@ -111,6 +112,11 @@ describe("真实配置与消费边界", () => {
     const { providerId } = await addModel(service, "api_key");
     await service.execute({ type: "agent.save", id: "worker", value: { systemPrompt: "Pinned", enabled: false, tools: [] } });
     await service.execute({ type: "role.save", id: "heavy", value: { thinking: null, hidden: false } });
+    // 等级空集属于合法配置；保存与重开不因当前角色等级不可用而改写配置。
+    const model = service.current().models[0]!;
+    const { revision: _revision, ...modelValue } = model;
+    await service.execute({ type: "model.save", id: `${model.providerId}/${model.modelId}`,
+      value: { ...modelValue, capabilities: { ...model.capabilities, reasoning: true, thinkingLevels: [] } } });
     expect(existsSync(join(root, "db"))).toBe(false);
     expect(readFileSync(join(root, "configuration.json"), "utf8")).not.toContain("test-key-not-for-network");
     const encrypted = readFileSync(join(root, "credentials", readdirSync(join(root, "credentials"))[0]!));
@@ -121,6 +127,7 @@ describe("真实配置与消费边界", () => {
       const result = await reopened.execute({ type: "read" });
       expect(result.snapshot.providers[0]).toMatchObject({ id: providerId, credentialState: "available" });
       expect(result.snapshot.models).toHaveLength(1);
+      expect(result.snapshot.models[0]!.capabilities).toMatchObject({ reasoning: true, thinkingLevels: [] });
       expect(result.snapshot.overrides.agents.worker).toEqual({ systemPrompt: "Pinned", enabled: false, tools: [] });
       expect(result.snapshot.agents.find(agent => agent.id === "worker")).toMatchObject({ enabled: false, tools: [] });
       expect(result.snapshot.overrides.roles.heavy).toEqual({ thinking: null, hidden: false });

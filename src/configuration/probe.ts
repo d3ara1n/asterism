@@ -1,5 +1,6 @@
 import { APICallError, generateText } from "ai";
 import { createProviderModel, ProviderTransportError } from "../model/provider.ts";
+import { requestOptions } from "../model/request-options.ts";
 import type { Provider, ProviderModel, TestError } from "../shared/configuration.ts";
 
 export interface ProbeInput { provider: Provider; model: ProviderModel; apiKey: string; signal: AbortSignal }
@@ -10,11 +11,8 @@ export async function runConnectionProbe(input: ProbeInput, transport: typeof fe
   const { provider, model, apiKey, signal } = input;
   const languageModel = createProviderModel(provider, model, apiKey, transport);
   await generateText({
-    model: languageModel, prompt: "Reply with OK.", maxRetries: 0, abortSignal: signal,
-    maxOutputTokens: Math.min(model.generation.maxOutputTokens ?? 64, 128),
-    ...(model.generation.temperature === null ? {} : { temperature: model.generation.temperature }),
-    ...(model.generation.topP === null ? {} : { topP: model.generation.topP }),
-    ...(provider.protocol === "openai-responses" ? { providerOptions: { openai: { store: false } } } : {}),
+    model: languageModel, prompt: "Reply with OK.", abortSignal: signal,
+    ...requestOptions(provider, model, { purpose: "probe" }),
   });
 }
 

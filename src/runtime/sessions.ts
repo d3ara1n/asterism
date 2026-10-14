@@ -104,7 +104,7 @@ export class SessionService {
       return null;
     };
     const models = createModelServices(configuration, adapterFactory);
-    const selection = createSelection({ agents: () => configuration.current().agents, models: models.list });
+    const selection = createSelection({ agents: () => configuration.current().agents });
     // 首条 submit 准备时对象尚未创建；组合入口用已经准备好的选择执行同一模型预检。
     this.validateInitialInput = async (value, parts, content) => {
       try {

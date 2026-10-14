@@ -3,6 +3,7 @@ import { jsonSchema, modelScope, unauthenticatedApiKey, type Json, type Usage } 
 import { ModelFailure, type ModelAdapter, type ModelEvent, type ModelInput, type ResolvedInputPart, type PreparedModel, type ModelValidationInput } from "./contract.ts";
 import { createProviderModel, validateProviderTransport } from "./provider.ts";
 import { projectSystemPrompt } from "../modules/agent/system-prompt.ts";
+import { requestOptions, usesPlainResponseReasoning } from "./request-options.ts";
 
 const adapterVersion = "ai-sdk-v7/3";
 function validateContinuation(item: { adapter: string; scope: string }, scope: string): void {
@@ -10,31 +11,6 @@ function validateContinuation(item: { adapter: string; scope: string }, scope: s
   if (item.scope !== scope) throw new ModelFailure("model_switch", "Cross-model continuation is not supported yet. Start from a history position before the model output.");
 }
 function json(value: unknown): Json { return jsonSchema.parse(JSON.parse(JSON.stringify(value))); }
-function usesPlainResponseReasoning(input: ModelValidationInput): boolean {
-  const { provider } = input.settings;
-  return provider.protocol === "openai-responses" && new URL(provider.baseUrl).hostname === "api.deepseek.com";
-}
-function reasoningFor(input: ModelValidationInput) {
-  const thinking = input.settings.model.capabilities.reasoning ? input.settings.thinking : null;
-  return thinking === "off" ? "none" as const : thinking ?? undefined;
-}
-function providerOptions(input: ModelValidationInput): Record<string, Record<string, Json>> {
-  const { provider, thinking, model } = input.settings;
-  if (thinking && thinking !== "off" && !model.capabilities.reasoning) throw new ModelFailure("unsupported_thinking", "This model does not support thinking.");
-  if (provider.protocol === "anthropic") {
-    // SDK 按模型能力把统一 reasoning 参数转换成 adaptive 或预算模式。
-    return {};
-  }
-  return { openai: { ...(provider.protocol === "openai-responses" ? {
-    store: false, include: ["reasoning.encrypted_content"],
-    // 能力由工坊配置声明，兼容端点的模型名不必在 SDK 的 OpenAI 名单中。
-    ...(model.capabilities.reasoning ? { forceReasoning: true } : {}),
-    // DeepSeek 把 developer 视为 user，系统指令需保留 system 身份。
-    ...(usesPlainResponseReasoning(input) ? { systemMessageMode: "system" } : {}),
-    ...(model.capabilities.reasoning && thinking !== "off" ? { reasoningSummary: "auto" } : {}),
-  } : {}),
-    ...(reasoningFor(input) ? { reasoningEffort: reasoningFor(input)! } : {}) } };
-}
 /** 只保留白名单续接资料，不持久化原始 HTTP、响应头或未筛选的 provider metadata。 */
 export function pickContinuation(metadata: unknown): Record<string, Record<string, Json>> {
   const options: Record<string, Record<string, Json>> = {};
@@ -51,7 +27,7 @@ export function pickContinuation(metadata: unknown): Record<string, Record<strin
 export function sdkMessages(input: ModelInput): ModelMessage[] {
   const messages: ModelMessage[] = [];
   const scope = modelScope(input.settings);
-  const plainReasoning = usesPlainResponseReasoning(input);
+  const plainReasoning = usesPlainResponseReasoning(input.settings.provider);
   const chat = input.settings.provider.protocol === "openai-chat";
   const attachments: Extract<ResolvedInputPart, { kind: "file" }>[] = [];
   /** Chat Completions 的 tool 消息只能是文字；本批工具文件在其后的一条 user 消息中如实发送。 */
@@ -68,7 +44,8 @@ export function sdkMessages(input: ModelInput): ModelMessage[] {
         : { type: "file" as const, data: part.data, mediaType: part.mediaType, ...(part.filename ? { filename: part.filename } : {}) }) });
     if (item.kind === "output") {
       validateContinuation(item, scope);
-      messages.push({ role: "assistant", content: item.parts.map(p => {
+      const parts = item.parts.filter(part => input.settings.model.capabilities.reasoning || part.kind !== "thinking");
+      if (parts.length) messages.push({ role: "assistant", content: parts.map(p => {
         // DeepSeek 将 reasoning.content 合入相邻 assistant 正文，不支持 summary/encrypted_content 输入。
         const plainThinking = plainReasoning && p.kind === "thinking";
         const providerOptions = (plainThinking ? {} : p.continuation ?? {}) as Record<string, Record<string, never>>;
@@ -104,7 +81,7 @@ export class AiSdkAdapter implements ModelAdapter {
     private readonly languageModelFactory?: (input: ModelInput, key: string) => LanguageModel) {}
   validate(input: ModelValidationInput): void {
     validateProviderTransport(input.settings.provider);
-    providerOptions(input);
+    requestOptions(input.settings.provider, input.settings.model, { purpose: "execution", thinking: input.settings.thinking });
     const scope = modelScope(input.settings);
     for (const item of input.messages) if (item.kind === "output") validateContinuation(item, scope);
   }
@@ -112,20 +89,18 @@ export class AiSdkAdapter implements ModelAdapter {
     this.validate(input);
     const messages = sdkMessages(input);
     const system = projectSystemPrompt(input.system);
-    const options = providerOptions(input);
+    const options = requestOptions(input.settings.provider, input.settings.model, { purpose: "execution", thinking: input.settings.thinking });
     return { stream: signal => this.stream(input, system, messages, options, signal) };
   }
-  private async *stream(input: ModelInput, system: string, messages: ModelMessage[], providerOptions: Record<string, Record<string, Json>>, signal: AbortSignal): AsyncIterable<ModelEvent> {
+  private async *stream(input: ModelInput, system: string, messages: ModelMessage[], options: ReturnType<typeof requestOptions>, signal: AbortSignal): AsyncIterable<ModelEvent> {
     const { provider, model } = input.settings;
     const key = provider.auth === "none" ? unauthenticatedApiKey : await this.readCredential(provider.id);
     if (!key) throw new ModelFailure("missing_credential", "Provider credentials are unavailable.");
     const languageModel = this.languageModelFactory?.(input, key) ?? createProviderModel(provider, model, key);
-    const plainReasoning = usesPlainResponseReasoning(input);
+    const plainReasoning = usesPlainResponseReasoning(provider);
     const tools: ToolSet = Object.fromEntries(input.tools.map(t => [t.name, tool({ description: t.description, inputSchema: sdkJsonSchema(t.parameters as Record<string, unknown>) })]));
     const result = streamText({ model: languageModel, system, messages, tools,
-      providerOptions, maxOutputTokens: model.generation.maxOutputTokens ?? undefined, maxRetries: 0, abortSignal: signal,
-      temperature: model.generation.temperature ?? undefined, topP: model.generation.topP ?? undefined,
-      reasoning: reasoningFor(input),
+      ...options, abortSignal: signal,
       include: { rawChunks: plainReasoning },
       // SDK 不执行工具；单步结果交还工坊循环，工具注册中不提供 execute。
       onError: () => {},

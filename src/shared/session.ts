@@ -23,12 +23,12 @@ export type NewNode = Omit<SessionNode, "id" | "sessionId" | "parentId" | "creat
 
 // ---- 会话能力接口 ----
 const uuid = z.string().uuid();
-export const sessionVersion = 18;
+export const sessionVersion = 19;
 export const sessionChannel = coreChannel("session");
 export const sessionChangedChannel = coreChannel("session-changed");
 export const sessionCommandSchema = z.discriminatedUnion("type", [
   // 首页组合入口：建立会话、创建第一个代理资源并向它提交首条输入。
-  z.strictObject({ type: z.literal("start"), submissionId: uuid, agent: id, model: modelExpressionSchema, thinking: thinkingSchema.nullable(), parts: userInputPartsSchema, contentScopeId: uuid.optional() }),
+  z.strictObject({ type: z.literal("start"), submissionId: uuid, agent: id, model: modelExpressionSchema.nullable(), thinking: thinkingSchema.nullable(), parts: userInputPartsSchema, contentScopeId: uuid.optional() }),
   z.strictObject({ type: z.literal("read"), sessionId: id }),
   z.strictObject({ type: z.literal("select"), sessionId: id, nodeId: id.nullable() }),
   // 应用组合入口：将人工命名交给内置命名模块追加领域记录。

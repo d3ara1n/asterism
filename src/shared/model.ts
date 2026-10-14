@@ -21,6 +21,6 @@ export function modelExpression(settings: Pick<ModelSettings, "thinking"> & { pr
   return `${settings.provider.id}/${settings.model.modelId}${settings.thinking ? `:${settings.thinking}` : ""}`;
 }
 /** 代理当前选择：属于环境，可修改，不进会话树。 */
-/** agent 为代理配置 ID；model 与 thinking 覆盖其角色，值与角色相同时效果一致。 */
-export const agentSelectionSchema = z.strictObject({ agent: id, model: modelExpressionSchema, thinking: thinkingSchema.nullable() });
+/** agent 为代理配置 ID；model 与 thinking 为显式覆盖，null 表示每次请求沿用角色默认值。 */
+export const agentSelectionSchema = z.strictObject({ agent: id, model: modelExpressionSchema.nullable(), thinking: thinkingSchema.nullable() });
 export type AgentSelection = z.infer<typeof agentSelectionSchema>;

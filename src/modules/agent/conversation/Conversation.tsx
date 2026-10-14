@@ -82,7 +82,7 @@ export function Conversation({ selection, turnState, onHome }: { selection: Agen
     </div>
     <footer className="shrink-0 space-y-3 border-t p-3">
       {selection && <AgentConfigurationPicker selection={selection} disabled={!interaction.configurable}
-        running={running} onChange={interaction.configure} onError={interaction.setError} />}
+        running={running} onChange={interaction.configure} />}
       {error && <Alert variant="destructive"><AlertDescription className="flex flex-wrap items-center gap-2">
         <span className="flex-1">{i18n.text(error)}</span>
         <Button variant="ghost" size="sm" onClick={() => { void session.refresh(); }}>{i18n.formatMessage(conversationMessages.reload)}</Button>

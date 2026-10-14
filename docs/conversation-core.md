@@ -87,11 +87,11 @@ Agent 的回合状态同样从当前时间线推导，经 `AgentView.turnState` 
 
 ## 模型适配
 
-三协议使用已安装 AI SDK：OpenAI Responses、OpenAI Chat Completions、Anthropic Messages。工具定义不提供 SDK execute；关闭隐式重试与流重试。带凭据的远程端点要求 HTTPS，无鉴权模式去除认证头，禁止自动重定向。每个 SDK 调用只进行一个模型步骤，由工坊执行后续循环。OpenAI Responses 使用 store:false 并请求 encrypted reasoning。
+三协议使用已安装 AI SDK：OpenAI Responses、OpenAI Chat Completions、Anthropic Messages。工具定义不提供 SDK execute；关闭隐式重试与流重试。带凭据的远程端点要求 HTTPS，无鉴权模式去除认证头，禁止自动重定向。每个 SDK 调用只进行一个模型步骤，由工坊执行后续循环。OpenAI Responses 使用 store:false，声明思考能力时请求 encrypted reasoning。连接测试与执行共用 `src/model/request-options.ts` 解释请求选项；测试仅走最小连通 probe，不选择等级或验证兼容行为。
 
 直接续接要求 provider、协议、端点、模型标识和适配版本兼容；不兼容时在提交前明确失败。用户输入与工具结果的文件按 mediaType 如实编码：Responses 与 Anthropic 走 SDK 工具结果 content 输出，协议不支持的类型由 SDK 处理，客户端不补丁；Chat Completions 的 tool 消息只放文字并注明附件，文件在紧随的一条 user 消息中发送。纯文字结果用 text／error-text 形态，避免二次序列化。服务端工具与模型生成媒体暂不支持。
 
-Responses 模型声明的思考能力显式传给 SDK，不依赖 SDK 的 OpenAI 模型名称识别；声明思考能力时，开启、关闭与等级参数均传到请求中。模型声明思考能力且未关闭思考时，显式请求可见摘要，包括采用默认思考等级的情况；加密推理资料独立用于续接。代理页面只展示含可见正文的思考块，空块仍保留在历史与模型投影中，不显示空折叠项。
+Responses 模型声明的思考能力以 true 或 false 显式传给 SDK，不依赖 SDK 的 OpenAI 模型名称识别。声明思考能力时，末端检查继承后的标准等级属于可用集合，再按现有协议编码并请求可见摘要与加密续接资料；off 也是等级，不改变历史投影。声明不支持思考时，请求省略思考选项及历史思考部件，过滤后为空的 assistant 消息不发送。过滤只作用于当前请求，不改变历史、展示或响应接收；服务端仍返回思考时正常保存。代理页面只展示含可见正文的思考块，不显示空折叠项。
 
 DeepSeek 官方端点 `api.deepseek.com` 的 Responses 返回 `response.reasoning_text.delta`，不生成思考摘要。适配层通过 SDK 的原始事件接口读取已知正文增量，复用原有思考块身份、即时进度与保存流程；原始帧不持久化或写入日志。DeepSeek 不支持 reasoning 输入的 summary/encrypted_content，声明将纯文本 content 合入相邻 assistant 正文，因此模型投影将保存的思考作为 assistant 文本发送，不携带该块的 OpenAI 续接字段；工坊历史仍区分 thinking 与 text。系统指令保留 system 身份，避免 DeepSeek 把 developer 当作 user。协议依据见 [DeepSeek Responses 指南](https://api-docs.deepseek.com/guides/responses_api/) 与 [接口参考](https://api-docs.deepseek.com/api/create-response/)。
 
@@ -99,11 +99,11 @@ DeepSeek 官方端点 `api.deepseek.com` 的 Responses 返回 `response.reasonin
 
 ## 前端能力接口
 
-`window.host.session` 提供 `execute` 与 `onChanged`，IPC 版本为 14。资源与布局命令也属于此会话入口。应用通道只读取工作区身份和会话列表，不持有已打开会话的正文。
+`window.host.session` 提供 `execute` 与 `onChanged`，IPC 版本为 19。资源与布局命令也属于此会话入口。应用通道只读取工作区身份和会话列表，不持有已打开会话的正文。
 
 | 命令 | 行为 |
 | --- | --- |
-| `start` | 显式 agent 配置、模型和 thinking；原子保存 Session、首个代理、首条输入并开始执行 |
+| `start` | 显式 agent 配置，模型与 thinking 可为 null 并在请求时继承；原子保存 Session、首个代理、首条输入并开始执行 |
 | `resource.command` | 路由到对象所属资源控制器；代理命令为 `submit`（追加消息并执行，仅本代理运行中返回 conflict）、`continue`、`configure`（修改资源私有选择，下一请求生效）、`cancel`（只停止该代理） |
 | `resource.create` | 由资源模块校验 input 并创建对象：代理需显式选择，笔记可空正文，目录须为存在的绝对路径 |
 | `read` | 同次读取返回会话树、执行游标、工作台投影和当前进度，不接受独立历史位置 |

@@ -1,3 +1,4 @@
+import { thinkingLevels } from "@atelier/sdk/contracts";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { defineData, defineResource, defineTool, defineImplementation, type ModelRunEvent, type ModelRunRequest } from "@atelier/sdk/contracts";
@@ -13,7 +14,7 @@ import type { ModelSettings } from "../shared/model.ts";
 const settings: ModelSettings = {
   provider: { id: "p", revision: 1, name: "Provider", enabled: true, baseUrl: "https://example.invalid", protocol: "openai-responses", auth: "none" },
   model: { revision: 1, name: "Model", modelId: "test", providerId: "p", enabled: true, contextWindow: 4000,
-    capabilities: { reasoning: false, tools: true }, generation: { temperature: null, topP: null, maxOutputTokens: null } }, thinking: "off",
+    capabilities: { reasoning: false, tools: true, thinkingLevels: [...thinkingLevels] }, generation: { temperature: null, topP: null, maxOutputTokens: null } }, thinking: "off",
 };
 const empty = () => new AgentCapabilities(new ResourceRegistry([]), new ToolRegistry([]), [], () => true);
 const text: ModelEvent[] = [

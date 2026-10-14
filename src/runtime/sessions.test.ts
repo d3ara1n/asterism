@@ -1,3 +1,4 @@
+import { thinkingLevels } from "@atelier/sdk/contracts";
 import { randomUUID } from "node:crypto";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -5,7 +6,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApplicationService } from "./service.ts";
 import { ModelFailure, type ModelAdapter, type ModelEvent, type ModelInput } from "../model/contract.ts";
-import { sdkMessages } from "../model/ai-sdk.ts";
+import { AiSdkAdapter, sdkMessages } from "../model/ai-sdk.ts";
 import { type SessionChanged, type SessionCommand, type SessionMutation } from "../shared/session.ts";
 import { flat } from "../session/test-nodes.ts";
 import type { AgentSelection, Json } from "../shared/model.ts";
@@ -44,7 +45,7 @@ async function setup(model: ModelAdapter = adapter(), onSessionChanged?: (event:
     value: { id: "test", name: "Test", protocol: "openai-responses", baseUrl: "https://example.invalid/v1", enabled: true, auth: "none" }, credential: { action: "keep" } });
   const { savedId: modelId } = await service.configuration.execute({ type: "model.save", id: null,
     value: { providerId: providerId!, name: "Test", modelId: "test", enabled: true, contextWindow: null,
-      capabilities: { tools: true, reasoning: false }, generation: { temperature: null, topP: null, maxOutputTokens: null } } });
+      capabilities: { tools: true, reasoning: false, thinkingLevels: [...thinkingLevels] }, generation: { temperature: null, topP: null, maxOutputTokens: null } } });
   const start: Extract<SessionCommand, { type: "start" }> = { type: "start", submissionId: randomUUID(), agent: "worker", model: modelId!, thinking: null, parts: [{ kind: "text", text: "First" }] };
   return { service, root, start };
 }
@@ -62,6 +63,37 @@ function resourceStatuses(service: ApplicationService) {
 }
 
 describe("会话运行时", () => {
+  // 选择是覆盖身份，不保存角色默认值；首页 IPC、对象持久化和后续请求必须贯通 null。
+  it("首页空选择持久保留，角色默认每次重取，末端错误透传且不受理失败输入", async () => {
+    const inputs: ModelInput[] = [];
+    const validator = new AiSdkAdapter(async () => { throw new Error("Validation must not read credentials"); });
+    const model: ModelAdapter = { version: validator.version, validate: input => validator.validate(input), prepare(input) {
+      inputs.push(input); return { async *stream() { yield* reply(); } };
+    } };
+    const { service, start } = await setup(model);
+    await service.configuration.execute({ type: "role.save", id: "default", value: { model: start.model, thinking: "high" } });
+    const first = await execute(service, { ...start, model: null, thinking: null });
+    await settled(service);
+    expect(selectionOf(service.sessions.snapshot(first.sessionId))).toMatchObject({ model: null, thinking: null });
+    expect(inputs[0]!.settings).toMatchObject({ model: { modelId: "test" }, thinking: "high" });
+    await service.configuration.execute({ type: "role.save", id: "default", value: { model: start.model, thinking: "low" } });
+    await execute(service, agentCommand(first.sessionId, agentOf(first), {
+      type: "submit", submissionId: randomUUID(), parts: [{ kind: "text", text: "Next" }],
+    }));
+    await settled(service);
+    expect(inputs.at(-1)!.settings.thinking).toBe("low");
+    expect(selectionOf(service.sessions.snapshot(first.sessionId))).toMatchObject({ model: null, thinking: null });
+    const { revision: _revision, ...configured } = service.configuration.current().models[0]!;
+    await service.configuration.execute({ type: "model.save", id: start.model,
+      value: { ...configured, capabilities: { ...configured.capabilities, reasoning: true, thinkingLevels: [] } } });
+    const before = service.sessions.snapshot(first.sessionId).nodes;
+    await expect(execute(service, agentCommand(first.sessionId, agentOf(first), {
+      type: "submit", submissionId: randomUUID(), parts: [{ kind: "text", text: "Unavailable thinking" }],
+    }))).rejects.toMatchObject({ code: "thinking_unavailable", display: { id: "error.thinkingUnavailable" } });
+    expect(service.sessions.snapshot(first.sessionId).nodes).toEqual(before);
+    expect(inputs).toHaveLength(2);
+  });
+
   // 预期来自时间线契约：终态属于块，正常工具续轮不得生成用户未选择的分支。
   it("首页工具调用后自动续接保持单一路径，回溯到工具块即包含结果与一次计量", async () => {
     let requests = 0;

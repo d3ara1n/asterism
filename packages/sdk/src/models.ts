@@ -5,7 +5,9 @@ import type { ContentReader } from "./content-runtime.ts";
 import type { ToolOutcome, ToolInvocationInfo, ToolResult } from "./tool-result.ts";
 import type { ResourceRef } from "./workspace.ts";
 
-export type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
+/** 全软件共用的标准等级；协议编码不改变公共取值。 */
+export const thinkingLevels = ["off", "minimal", "low", "medium", "high", "xhigh"] as const;
+export type ThinkingLevel = typeof thinkingLevels[number];
 export interface ModelTarget { role: string; model?: string; thinking?: ThinkingLevel }
 export type PromptBlock =
   | { id: string; kind: "system"; from: string; text: string }
@@ -88,5 +90,5 @@ export interface ModelServices {
   /** 一次请求及其工具批次；不保存历史，不推动下一次请求。 */
   run(request: ModelRunRequest): Promise<ModelRunResult>;
   roles(): readonly { id: string; name: string; description: string; hidden: boolean; model: string | null; thinking: ThinkingLevel | null }[];
-  list(): readonly { model: string; provider: string; name: string; contextWindow: number | null; capabilities: { reasoning: boolean; tools: boolean } }[];
+  list(): readonly { model: string; provider: string; name: string; contextWindow: number | null; capabilities: { reasoning: boolean; tools: boolean; thinkingLevels: readonly ThinkingLevel[] } }[];
 }

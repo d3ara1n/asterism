@@ -1,10 +1,11 @@
 import { Plus, Zap, Search, ExternalLink, ChevronDown } from "lucide-react";
 import { useMemo, useState } from "react";
 
-import { modelReference, type ConfigurationSnapshot, type ConnectionTest, type Provider, type ProviderInput, type ProviderModel, type TestError } from "../../../shared/configuration";
+import { modelReference, thinkingSchema, type ConfigurationSnapshot, type ConnectionTest, type Provider, type ProviderInput, type ProviderModel, type TestError } from "../../../shared/configuration";
 import { presetGroups, providerPresets, type ProviderPreset } from "../../../shared/provider-presets";
 import { commonMessages } from "../../messages/common";
 import { providersMessages } from "../../messages/providers";
+import { thinkingLabels } from "../../messages/model-selection";
 import { getI18n, useI18n } from "../../shared/i18n";
 import { Badge } from "../../shared/ui/badge";
 import { Button } from "../../shared/ui/button";
@@ -312,7 +313,7 @@ function ModelEditor({ initialId, providerId }: { initialId: string | null; prov
   const provider = snapshot?.providers.find(item => item.id === providerId);
   const [value, setValue] = useState<ModelValue>(() => current ? modelValue(current) : {
     providerId, name: "", modelId: "", enabled: true, contextWindow: null,
-    capabilities: { reasoning: false, tools: true }, generation: { temperature: null, topP: null, maxOutputTokens: null } });
+    capabilities: { reasoning: false, tools: true, thinkingLevels: [...thinkingSchema.options] }, generation: { temperature: null, topP: null, maxOutputTokens: null } });
   const [advanced, setAdvanced] = useState(false);
   const set = <K extends keyof ModelValue>(field: K, next: ModelValue[K]) => setValue(previous => ({ ...previous, [field]: next }));
   // 与提供商一致：名称在前并生成 ID；手动改过 ID 或编辑已有模型时不再覆盖。
@@ -343,11 +344,22 @@ function ModelEditor({ initialId, providerId }: { initialId: string | null; prov
       <TextField label={i18n.formatMessage(providersMessages.serverModelId)} value={value.modelId} onChange={next => { setIdEdited(true); set("modelId", next); }} required hint={i18n.formatMessage(providersMessages.serverModelIdHint)} />
       <FieldSet><FieldLegend variant="label">{i18n.formatMessage(providersMessages.capabilities)}</FieldLegend>
         <FieldGroup data-slot="checkbox-group" className="gap-3">
-          {([["reasoning", i18n.formatMessage(providersMessages.reasoning)], ["tools", i18n.formatMessage(providersMessages.toolCalls)]] as const).map(([key, label]) =>
-            <Field key={key} orientation="horizontal">
-              <Checkbox id={`capability-${key}`} checked={value.capabilities[key]} onCheckedChange={next => set("capabilities", { ...value.capabilities, [key]: next === true })} />
-              <FieldLabel htmlFor={`capability-${key}`} className="font-normal">{label}</FieldLabel>
+          <Field orientation="horizontal">
+            <Checkbox id="capability-reasoning" checked={value.capabilities.reasoning} onCheckedChange={next => set("capabilities", { ...value.capabilities, reasoning: next === true })} />
+            <FieldLabel htmlFor="capability-reasoning" className="font-normal">{i18n.formatMessage(providersMessages.reasoning)}</FieldLabel>
+          </Field>
+          {value.capabilities.reasoning && <div className="ml-6 flex flex-wrap gap-x-4 gap-y-2">
+            {thinkingSchema.options.map(level => <Field key={level} orientation="horizontal" className="w-auto">
+              <Checkbox id={`thinking-${level}`} checked={value.capabilities.thinkingLevels.includes(level)}
+                onCheckedChange={next => set("capabilities", { ...value.capabilities,
+                  thinkingLevels: thinkingSchema.options.filter(item => item === level ? next === true : value.capabilities.thinkingLevels.includes(item)) })} />
+              <FieldLabel htmlFor={`thinking-${level}`} className="font-normal">{i18n.text(thinkingLabels[level])}</FieldLabel>
             </Field>)}
+          </div>}
+          <Field orientation="horizontal">
+            <Checkbox id="capability-tools" checked={value.capabilities.tools} onCheckedChange={next => set("capabilities", { ...value.capabilities, tools: next === true })} />
+            <FieldLabel htmlFor="capability-tools" className="font-normal">{i18n.formatMessage(providersMessages.toolCalls)}</FieldLabel>
+          </Field>
         </FieldGroup>
       </FieldSet>
       {current && <Field><FieldLabel>{i18n.formatMessage(providersMessages.usedBy)}</FieldLabel>

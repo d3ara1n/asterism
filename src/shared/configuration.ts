@@ -1,9 +1,10 @@
 import { z } from "zod";
 import { coreChannel } from "./core.ts";
+import { thinkingLevels } from "@atelier/sdk/contracts";
 
 export const configurationChannel = coreChannel("configuration");
 export const configurationChangedChannel = coreChannel("configuration-changed");
-export const configurationVersion = 3;
+export const configurationVersion = 4;
 const id = z.string().min(1).max(160);
 const name = z.string().trim().min(1).max(160);
 const revision = z.number().int().positive();
@@ -25,7 +26,7 @@ export function modelReference(model: { providerId: string; modelId: string }): 
   return formatModelExpression({ provider: model.providerId, model: model.modelId });
 }
 export const protocolSchema = z.enum(["openai-responses", "openai-chat", "anthropic"]);
-export const thinkingSchema = z.enum(["off", "minimal", "low", "medium", "high", "xhigh"]);
+export const thinkingSchema = z.enum(thinkingLevels);
 export type ThinkingLevel = z.infer<typeof thinkingSchema>;
 const endpoint = z.string().trim().url().refine(value => {
   const url = new URL(value);
@@ -40,7 +41,7 @@ export const modelInputSchema = z.strictObject({
   providerId: providerIdSchema, name, modelId: serverModelId, enabled: z.boolean(),
   contextWindow: z.number().int().positive().nullable(),
   // 只保留改变请求内容的能力；文件是否被接受由服务端决定。
-  capabilities: z.strictObject({ reasoning: z.boolean(), tools: z.boolean() }),
+  capabilities: z.strictObject({ reasoning: z.boolean(), tools: z.boolean(), thinkingLevels: z.array(thinkingSchema) }),
   generation: z.strictObject({
     temperature: z.number().min(0).max(2).nullable(), topP: z.number().min(0).max(1).nullable(),
     maxOutputTokens: z.number().int().positive().nullable(),
@@ -132,6 +133,19 @@ export function resolveProviderModel(snapshot: ConfigurationSnapshot, reference:
   if (!model?.enabled) return null;
   const provider = snapshot.providers.find(item => item.id === model.providerId);
   return provider?.enabled ? { model, provider } : null;
+}
+
+/** 只投影菜单能力，不把角色默认值写回代理选择，也不提前拒绝未解析的选择。 */
+export function resolveAgentModel(snapshot: ConfigurationSnapshot, selection: { agent: string | null; model: string | null }): ProviderModel | null {
+  const agent = snapshot.agents.find(item => item.id === selection.agent);
+  const role = snapshot.roles.find(item => item.id === (agent?.modelRole ?? "default"));
+  return resolveProviderModel(snapshot, selection.model ?? role?.model ?? null)?.model ?? null;
+}
+
+/** 未确定模型时保留标准选项，最终可用性由请求适配层检查。 */
+export function availableThinkingLevels(model: Pick<ProviderModel, "capabilities"> | null): readonly ThinkingLevel[] {
+  if (!model) return thinkingLevels;
+  return model.capabilities.reasoning ? thinkingLevels.filter(level => model.capabilities.thinkingLevels.includes(level)) : [];
 }
 
 /**

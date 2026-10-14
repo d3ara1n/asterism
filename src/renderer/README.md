@@ -50,7 +50,7 @@
 | `features/plugins/PluginConfigurations.tsx` / `configuration-fields.ts` | 按插件生成具型配置表单；复杂值编辑、草稿、保存与恢复默认 |
 | `features/configuration/forms.tsx` | 配置编辑器与字段公共入口；文本 placeholder、内置选择、显式空值与恢复操作在此复用 |
 | `shared/ConfigurationChoice.tsx` | 首页与会话输入托盘共用的紧凑配置菜单 |
-| `features/configuration/agent-selection.ts` | 首页与添加代理共用的创建前默认选择解析 |
+| `shared/ModelChoices.tsx` | 首页、添加代理与对话共用的模型／等级覆盖选择；默认值只投影，不回填 |
 | `features/settings/` | 设置屏与分类注册表；LanguageSettings 消费主进程语言设置，layout 提供共享分组与设置行 |
 | `shared/weave/` | Space 屏间平移、Screen 浮岛、布局模型与动效 |
 | `shared/ui/` | 本地维护的 shadcn/ui Radix 控件 |

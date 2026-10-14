@@ -1,3 +1,4 @@
+import { thinkingLevels } from "@atelier/sdk/contracts";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -42,7 +43,7 @@ async function configureModel(service: ApplicationService) {
     value: { id: "test", name: "Test", protocol: "openai-responses", baseUrl: "https://example.invalid", auth: "none", enabled: true } });
   const result = await service.configuration.execute({ type: "model.save", id: null, value: {
     providerId: "test", name: "Test", modelId: "test", enabled: true, contextWindow: null,
-    capabilities: { tools: true, reasoning: false }, generation: { temperature: null, topP: null, maxOutputTokens: null },
+    capabilities: { tools: true, reasoning: false, thinkingLevels: [...thinkingLevels] }, generation: { temperature: null, topP: null, maxOutputTokens: null },
   } });
   return { role: "default", model: result.savedId! };
 }

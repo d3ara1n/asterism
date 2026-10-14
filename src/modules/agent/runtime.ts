@@ -9,7 +9,7 @@ import { projectAgentTurnState } from "./state-projection.ts";
 
 /** 资源入口只装配领域模块与贡献；业务模块不依赖完整插件上下文。 */
 export default defineModule(plugin => {
-  const selection = createSelection({ agents: () => plugin.catalogs.get(AgentConfigurations) ?? [], models: plugin.models.list });
+  const selection = createSelection({ agents: () => plugin.catalogs.get(AgentConfigurations) ?? [] });
   const loop = createAgentLoop({ selection, tasks: plugin.tasks, run: plugin.models.run });
   const admission = createAdmission({ selection, validate: plugin.models.validate, running: loop.running });
   return {
@@ -17,7 +17,7 @@ export default defineModule(plugin => {
       records: [UserMessage, Execution, Notice],
       links: { receive: true, tools: object => selection.tools(selection.agent(selectionOf(object).selection)) },
       creation: implementCreation(CreateAgent, {
-        prepare(input) { return { action: "replace", input: { ...input, selection: selection.normalize(input.selection) } }; },
+        prepare(input) { selection.validate(input.selection); return { action: "accept" }; },
         create(input, object) {
           object.commit(writer => { writer.set(AgentSelection, { selection: input.selection, revision: 1 }); });
           return { title: input.title ?? selection.agent(input.selection).name, data: {} };
@@ -43,7 +43,8 @@ export default defineModule(plugin => {
         implementAction(ConfigureAgent, { async execute(input, object) {
           object.commit(writer => {
             const current = selectionOf(object);
-            writer.set(AgentSelection, { selection: selection.normalize(input.selection, current.selection), revision: current.revision + 1 });
+            selection.validate(input.selection, current.selection);
+            writer.set(AgentSelection, { selection: input.selection, revision: current.revision + 1 });
           });
         } }),
         implementAction(CancelAgent, { async execute(_input, object) { loop.cancel(object); } }),

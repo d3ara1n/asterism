@@ -1,3 +1,4 @@
+import { thinkingLevels } from "@atelier/sdk/contracts";
 import { describe, expect, it } from "vitest";
 import { MockLanguageModelV4, simulateReadableStream } from "ai/test";
 import { AiSdkAdapter, sdkMessages } from "./ai-sdk.ts";
@@ -9,21 +10,25 @@ import { composeSystemPrompt, projectSystemPrompt } from "../modules/agent/syste
 const input: ModelInput = {
   settings: { provider: { id: "p", revision: 1, name: "Provider", enabled: true, baseUrl: "https://example.invalid", protocol: "anthropic", auth: "api_key" },
     model: { revision: 1, name: "Model", modelId: "test", providerId: "p", enabled: true, contextWindow: null,
-      capabilities: { reasoning: true, tools: true }, generation: { temperature: 0.2, topP: null, maxOutputTokens: 1000 } }, thinking: "low" },
+      capabilities: { reasoning: true, tools: true, thinkingLevels: [...thinkingLevels] }, generation: { temperature: 0.2, topP: null, maxOutputTokens: 1000 } }, thinking: "low" },
   system: composeSystemPrompt({ id: "worker", systemPrompt: "System" }), messages: [{ kind: "input", parts: [{ kind: "text", text: "Read" }] }],
   tools: [{ name: "read", description: "Read", parameters: { type: "object", properties: { resource_id: { type: "string" } }, required: ["resource_id"] } }],
 };
 
 describe("AI SDK 适配契约", () => {
   it.each([
-    { modelId: "o3", thinking: null }, { modelId: "o3", thinking: "low" },
-    { modelId: "deepseek-flash", thinking: null }, { modelId: "deepseek-flash", thinking: "off" },
-  ] as const)("Responses $modelId 思考等级 $thinking 的摘要请求与可见正文解码", async ({ modelId, thinking }) => {
+    { modelId: "o3", thinking: "low", reasoning: true },
+    { modelId: "deepseek-flash", thinking: "off", reasoning: true },
+    { modelId: "o3", thinking: "high", reasoning: false },
+    { modelId: "deepseek-flash", thinking: null, reasoning: false },
+  ] as const)("Responses $modelId reasoning=$reasoning 等级=$thinking：开关控制请求，所有返回思考照常接收", async ({ modelId, thinking, reasoning }) => {
     const current = structuredClone(input);
     current.settings.provider.protocol = "openai-responses";
     current.settings.model.modelId = modelId;
     current.settings.model.generation.temperature = null;
     current.settings.thinking = thinking;
+    current.settings.model.capabilities.reasoning = reasoning;
+    if (!reasoning) current.settings.model.capabilities.thinkingLevels = [];
     const response = { id: "response-thinking", model: modelId, created_at: 0 };
     const frames = [
       { type: "response.created", response: { ...response, status: "in_progress" } },
@@ -47,15 +52,46 @@ describe("AI SDK 适配契约", () => {
       (value, key) => createProviderModel(value.settings.provider, value.settings.model, key, transport));
     const events: ModelEvent[] = [];
     for await (const event of adapter.prepare(current).stream(new AbortController().signal)) events.push(event);
-    // 摘要是可见内容；加密推理只供后续请求续接，两者需分别请求和保留。
-    if (thinking === "off") expect(request?.reasoning).not.toHaveProperty("summary");
-    else expect(request?.reasoning).toMatchObject({ summary: "auto" });
-    if (thinking !== null) expect(request?.reasoning).toMatchObject({ effort: thinking === "off" ? "none" : thinking });
-    expect(request).toMatchObject({ store: false, include: ["reasoning.encrypted_content"] });
+    // off 只是等级编码，false 才省略思考选项；两种情况下均接收服务端实际返回的思考。
+    if (reasoning) {
+      expect(request?.reasoning).toMatchObject({ summary: "auto", effort: thinking === "off" ? "none" : thinking });
+      expect(request).toMatchObject({ store: false, include: ["reasoning.encrypted_content"] });
+    } else {
+      expect(request).not.toHaveProperty("reasoning");
+      expect(request).not.toHaveProperty("include");
+    }
     expect(events.find(event => event.type === "part.delta")).toMatchObject({ partId: "thinking:reasoning-1:0", delta: "Visible summary" });
     expect(events.find(event => event.type === "part.end")).toMatchObject({
       continuation: { openai: { itemId: "reasoning-1", reasoningEncryptedContent: "encrypted-continuation" } },
     });
+  });
+
+  // 请求投影契约：开关不改历史；off 不删思考；过滤后不得发送空 assistant 或丢失工具调用。
+  it("历史思考只受当前请求 reasoning 开关控制，重新开启可完整回传", () => {
+    const current = structuredClone(input);
+    const adapter = new AiSdkAdapter(async () => "unused");
+    current.settings.thinking = "off";
+    current.messages = [
+      { kind: "output", adapter: adapter.version, scope: modelScope(current.settings),
+        parts: [{ kind: "thinking", text: "Only thought", continuation: { anthropic: { signature: "only-signature" } } }] },
+      { kind: "output", adapter: adapter.version, scope: modelScope(current.settings), parts: [
+        { kind: "thinking", text: "Saved thought", continuation: { anthropic: { signature: "saved-signature" } } },
+        { kind: "text", text: "Saved answer", continuation: null },
+        { kind: "toolcall", callId: "call", name: "read", arguments: {}, continuation: null },
+      ] },
+      { kind: "result", callId: "call", name: "read", error: false, parts: [{ kind: "text", text: "Tool answer" }] },
+    ];
+    const original = structuredClone(current.messages);
+    const enabled = sdkMessages(current);
+    expect(JSON.stringify(enabled)).toContain("saved-signature");
+    current.settings.model.capabilities.reasoning = false;
+    const disabled = sdkMessages(current);
+    expect(disabled.map(message => message.role)).toEqual(["assistant", "tool"]);
+    expect(disabled[0]).toMatchObject({ content: [{ type: "text", text: "Saved answer" }, { type: "tool-call", toolCallId: "call" }] });
+    expect(JSON.stringify(disabled)).not.toMatch(/thought|signature/);
+    expect(current.messages).toEqual(original);
+    current.settings.model.capabilities.reasoning = true;
+    expect(sdkMessages(current)).toEqual(enabled);
   });
 
   it("DeepSeek Responses 的 reasoning_text 增量进入即时与保存正文，续接使用受支持的纯文本", async () => {

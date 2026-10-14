@@ -1,8 +1,9 @@
 import { Plus } from "lucide-react";
 import { useState } from "react";
 
-import { thinkingSchema, modelReference, type ModelRole, type ModelRoleOverrides, type ThinkingLevel } from "../../../shared/configuration";
+import { availableThinkingLevels, modelReference, type ProviderModel, type ModelRole, type ModelRoleOverrides, type ThinkingLevel } from "../../../shared/configuration";
 import { rolesMessages } from "../../messages/roles";
+import { modelSelectionMessages } from "../../messages/model-selection";
 import { getI18n, useI18n } from "../../shared/i18n";
 import { Badge } from "../../shared/ui/badge";
 import { Button } from "../../shared/ui/button";
@@ -43,14 +44,21 @@ function ModelSelect({ value, onChange, disabled }: { value: string | null; onCh
     </SelectContent>
   </Select>;
 }
-function ThinkingSelect({ value, onChange, disabled }: { value: ThinkingLevel | null; onChange: (value: ThinkingLevel | null) => void; disabled?: boolean }) {
+function ThinkingSelect({ value, model, onChange, disabled }: { value: ThinkingLevel | null; model: ProviderModel | null; onChange: (value: ThinkingLevel | null) => void; disabled?: boolean }) {
   const i18n = useI18n();
-  return <Select value={value ?? FOLLOW} disabled={disabled} onValueChange={next => onChange(next === FOLLOW ? null : next as ThinkingLevel)}>
-    <SelectTrigger size="sm" className="w-32" aria-label={i18n.formatMessage(rolesMessages.thinkingLevel)}><SelectValue /></SelectTrigger>
+  const levels = availableThinkingLevels(model);
+  const unsupported = model?.capabilities.reasoning === false;
+  const unavailable = value !== null && !levels.includes(value);
+  return <Select value={value ?? FOLLOW} disabled={disabled || unsupported} onValueChange={next => onChange(next === FOLLOW ? null : next as ThinkingLevel)}>
+    <SelectTrigger size="sm" className="w-32" aria-label={i18n.formatMessage(rolesMessages.thinkingLevel)}>
+      <SelectValue>{unsupported ? i18n.text(modelSelectionMessages.thinkingUnsupported)
+        : unavailable ? i18n.formatMessage(modelSelectionMessages.unavailable, { value: thinkingLabel(value) })
+          : value === null ? i18n.text(rolesMessages.followConversationThinking) : thinkingLabel(value)}</SelectValue>
+    </SelectTrigger>
     <SelectContent>
       <SelectItem value={FOLLOW}>{i18n.formatMessage(rolesMessages.followConversationThinking)}</SelectItem>
       <SelectSeparator />
-      {thinkingSchema.options.map(level => <SelectItem key={level} value={level}>{thinkingLabel(level)}</SelectItem>)}
+      {levels.map(level => <SelectItem key={level} value={level}>{thinkingLabel(level)}</SelectItem>)}
     </SelectContent>
   </Select>;
 }
@@ -84,7 +92,8 @@ export function RolesSettings() {
         </ItemContent>
         <ItemActions className="relative">
           <ModelSelect value={role.model} disabled={busy} onChange={next => patch(role, "model", next)} />
-          <ThinkingSelect value={role.thinking} disabled={busy} onChange={next => patch(role, "thinking", next)} />
+          <ThinkingSelect value={role.thinking} model={snapshot.models.find(model => modelReference(model) === role.model) ?? null}
+            disabled={busy} onChange={next => patch(role, "thinking", next)} />
           <Switch aria-label={i18n.formatMessage(rolesMessages.enableRole, { role_name: role.name })} checked={role.enabled} disabled={busy} onCheckedChange={next => patch(role, "enabled", next)} />
         </ItemActions>
       </Item></div>;

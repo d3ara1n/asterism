@@ -1,3 +1,4 @@
+import { thinkingLevels } from "@atelier/sdk/contracts";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -305,7 +306,7 @@ describe("模型消费不可变内容", () => {
     await f.service.configuration.execute({ type: "provider.save", id: null,
       value: { id: "media", name: "Media", protocol: "openai-responses", baseUrl: "https://example.invalid", enabled: true, auth: "none" }, credential: { action: "keep" } });
     await f.service.configuration.execute({ type: "model.save", id: null, value: { providerId: "media", name: "Model", modelId: "model", enabled: true, contextWindow: null,
-      capabilities: { reasoning: false, tools: false }, generation: { temperature: null, topP: null, maxOutputTokens: null } } });
+      capabilities: { reasoning: false, tools: false, thinkingLevels: [...thinkingLevels] }, generation: { temperature: null, topP: null, maxOutputTokens: null } } });
   }
   const adapter = (seen: ModelInput[]): ModelAdapter => ({ version: "media-test", validate() {}, prepare(input) {
     seen.push(input); return { async *stream() {

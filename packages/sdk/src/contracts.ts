@@ -8,6 +8,7 @@ export * from "./events.ts";
 export * from "./tool-result.ts";
 export * from "./workspace.ts";
 export type * from "./models.ts";
+export { thinkingLevels } from "./models.ts";
 export * from "./model-records.ts";
 export { validationMessage, jsonArgumentHint } from "./tool-validation.ts";
 export * from "./commands.ts";
