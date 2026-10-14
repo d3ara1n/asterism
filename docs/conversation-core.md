@@ -14,7 +14,7 @@
 
 以下块字段均属 core 代理插件的记录载荷，宿主只按通用记录保存、不建索引或约束。block 通过 response_id 关联，response 由代理投影，不设独立 response_end 或 completion 节点。每个块携带 request_parent_id 和请求计算结果（adapter、模型表达式 `<providerId>/<modelId>[:<thinking>]`、协议作用域），以及可空的 completion（usage、finishReason、rawFinishReason、providerResponseId）。响应状态机将终态与最高序号的实际块一同交付，其他块不带计量；每块只提交一次，按响应汇总块的 usage 不会重复计量。系统提示词、角色正文、工具目录、模型参数和完整请求不持久化。
 
-续接资料保存为带适配版本的块级不透明字段：保留 Anthropic signature/redactedData，以及 OpenAI itemId/reasoningEncryptedContent/phase 白名单。不保存原始 HTTP、凭据、响应头或未筛选的 provider metadata。
+时间线的 thinking、text、toolcall 及其文字、参数与结果是公共领域表达。续接资料是附属于这些内容的块级不透明字段：保留 Anthropic signature/redactedData，以及 OpenAI itemId/reasoningEncryptedContent/phase 白名单，连同 source 记录来源作用域与适配版本。原生资料不能覆盖公共正文，也不决定整段上下文是否可用。不保存原始 HTTP、凭据、响应头或未筛选的 provider metadata。
 
 ## 用户输入与文件
 
@@ -89,13 +89,21 @@ Agent 的回合状态同样从当前时间线推导，经 `AgentView.turnState` 
 
 三协议使用已安装 AI SDK：OpenAI Responses、OpenAI Chat Completions、Anthropic Messages。工具定义不提供 SDK execute；关闭隐式重试与流重试。带凭据的远程端点要求 HTTPS，无鉴权模式去除认证头，禁止自动重定向。每个 SDK 调用只进行一个模型步骤，由工坊执行后续循环。OpenAI Responses 使用 store:false，声明思考能力时请求 encrypted reasoning。连接测试与执行共用 `src/model/request-options.ts` 解释请求选项；测试仅走最小连通 probe，不选择等级或验证兼容行为。
 
-直接续接要求 provider、协议、端点、模型标识和适配版本兼容；不兼容时在提交前明确失败。用户输入与工具结果的文件按 mediaType 如实编码：Responses 与 Anthropic 走 SDK 工具结果 content 输出，协议不支持的类型由 SDK 处理，客户端不补丁；Chat Completions 的 tool 消息只放文字并注明附件，文件在紧随的一条 user 消息中发送。纯文字结果用 text／error-text 形态，避免二次序列化。服务端工具与模型生成媒体暂不支持。
+每次请求从公共历史向目标模型投影，不因 provider、协议、端点或模型变化而拒绝整段上下文。原生附加资料仅在来源作用域（provider 身份、协议、端点、模型）与适配版本均一致时复用，跨来源只省略不适用的原生资料。公共回答、工具调用与结果继续投影，不增加来源水印、桥接消息或第二份历史。外来工具调用 ID 不满足通用字符／长度范围或与已有身份冲突时，在本次请求内确定性转换，调用和结果成对使用；本来源原始 ID 优先保留。投影不改写时间线，A → B → A 时原先 A 的资料仍可复用。
 
-Responses 模型声明的思考能力以 true 或 false 显式传给 SDK，不依赖 SDK 的 OpenAI 模型名称识别。声明思考能力时，末端检查继承后的标准等级属于可用集合，再按现有协议编码并请求可见摘要与加密续接资料；off 也是等级，不改变历史投影。声明不支持思考时，请求省略思考选项及历史思考部件，过滤后为空的 assistant 消息不发送。过滤只作用于当前请求，不改变历史、展示或响应接收；服务端仍返回思考时正常保存。代理页面只展示含可见正文的思考块，不显示空折叠项。
+用户输入与工具结果文件按 mediaType 如实编码；Responses 与 Anthropic 继续使用 SDK 的原生文件表达。Chat Completions 无法承载工具结果文件时，以 `tool_files_unsupported` 在准备阶段明确拒绝；只有显式添加 `toolFilesAsUserMessage` 才将同批文件搬到一条 user 消息，位置固定在该批工具结果之后、下一条历史消息之前，并在 tool 结果中保留关联说明。纯文字结果用 text／error-text 形态，避免二次序列化。服务端工具与模型生成媒体暂不支持。
 
-DeepSeek 官方端点 `api.deepseek.com` 的 Responses 返回 `response.reasoning_text.delta`，不生成思考摘要。适配层通过 SDK 的原始事件接口读取已知正文增量，复用原有思考块身份、即时进度与保存流程；原始帧不持久化或写入日志。DeepSeek 不支持 reasoning 输入的 summary/encrypted_content，声明将纯文本 content 合入相邻 assistant 正文，因此模型投影将保存的思考作为 assistant 文本发送，不携带该块的 OpenAI 续接字段；工坊历史仍区分 thinking 与 text。系统指令保留 system 身份，避免 DeepSeek 把 developer 当作 user。协议依据见 [DeepSeek Responses 指南](https://api-docs.deepseek.com/guides/responses_api/) 与 [接口参考](https://api-docs.deepseek.com/api/create-response/)。
+Responses 模型声明的思考能力以 true 或 false 显式传给 SDK，不依赖 SDK 的 OpenAI 模型名称识别。声明思考能力时，末端检查继承后的标准等级属于可用集合，再按现有协议编码并请求可见摘要与加密续接资料；off 也是等级，不改变工坊的历史过滤规则。声明不支持思考时，请求省略思考选项及历史思考部件，过滤后为空的 assistant 消息不发送。所有过滤只作用于当前请求，不改变历史、展示或响应接收；服务端仍返回思考时正常保存。代理页面只展示含可见正文的思考块，不显示空折叠项。
 
-模型兼容包由用户显式添加到具体模型，不设置提供商继承。定义、校验、存储与 UI 已接入，正式请求投影消费尚未实现；临时 UI 预览条目不改变编码、解码或续接。上述端点专用行为的迁移仍待完成，实施与验收边界见 [模型兼容计划](../plans/todo-2026-10-10-model-compatibility.md)。
+正常原生思考续接属于协议基线：OpenAI Responses 在 `store:false` 下使用可复用的密文；Anthropic 使用可复用的 thinking 签名或 redactedData。没有目标可用的原生资料时，不伪造签名或密文，也不默认把思考变成助手正文；目标无法表达的思考仅从本次输入省略，公共原文仍在历史中。可见思考可能是全文或摘要，不宣称能够从密文恢复缺失的文字。
+
+原始流事件读取始终开启。Responses 的已知 `response.reasoning_text.delta` 进入公共 thinking 块，不按品牌、域名或兼容包开关启用；同一 item 的原始与 SDK 正文通道同时存在时，只消费首个产生文字的通道，原生元数据仍正常累积，避免重复展示。原始帧不持久化或写入日志。
+
+Responses 系统提示默认只发送在顶层 `instructions`；显式添加 `systemMessageInMessages` 时，改为 `input` 第一条 `system` 消息，不同时发送 `instructions`。显式添加 `thinkingInDeepSeekFormat` 时，公共思考文字按原位置编码为独立 `reasoning` item，其 `content` 包含 `reasoning_text`；不夹带来源的签名、密文或 item ID，不转成普通助手正文。协议依据见 [DeepSeek Responses 指南](https://api-docs.deepseek.com/guides/responses_api/)。
+
+DeepSeek 明文输入通过 SDK 公开语言模型中间件与自定义 fetch 补充：在编码前固定思考的有序插入计划，普通消息、文件和工具继续由 SDK 编码；发送前逐项核对序列化结果并插入明文 reasoning item。不匹配时明确失败，不猜测位置、不伪造密文或插入文本哨兵，不提供通用 JSON patch。计划只存在于单次调用，原生资料选择、公共内容转换与兼容包共用同一次目标投影。
+
+模型兼容包由用户显式添加到具体模型；`appliesTo` 中的协议、端点仅供 UI 参考，不用于自动启用或运行时匹配。编码器只解释其协议下认识的已添加行为。实现与真实端点／GUI 验收进度见 [模型兼容计划](../plans/todo-2026-10-10-model-compatibility.md)及 [跨模型续接计划](../plans/todo-2026-10-13-cross-model-continuation.md)。
 
 ## 前端能力接口
 

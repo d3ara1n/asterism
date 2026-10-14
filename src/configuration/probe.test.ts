@@ -29,6 +29,7 @@ describe("协议连接测试", () => {
     // probe 只验证连通性；即使执行没有可用思考等级，也不参与等级选择或能力校验。
     await runConnectionProbe({ provider: provider(protocol), model: { ...model,
       capabilities: { ...model.capabilities, reasoning: true, thinkingLevels: [] },
+      compatibility: [{ id: "systemMessageInMessages" }, { id: "thinkingInDeepSeekFormat" }, { id: "toolFilesAsUserMessage" }],
       generation: { temperature: 0.3, topP: 0.8, maxOutputTokens: 1000 } },
       apiKey: "", signal: new AbortController().signal }, transport);
     expect(transport).toHaveBeenCalledTimes(1);
@@ -48,6 +49,7 @@ describe("协议连接测试", () => {
     if (protocol === "openai-responses") {
       expect(body.store).toBe(false);
       expect(body).not.toHaveProperty("include");
+      expect(body).not.toHaveProperty("instructions");
     }
     expect(init?.redirect).toBe("error");
   });

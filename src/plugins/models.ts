@@ -112,7 +112,8 @@ export function createModelServices(configuration: ConfigurationService, adapter
         if (request.signal.aborted) throw error;
         throw new PluginApiError("invalid_argument", error instanceof ModelFailure ? error.message : "The model request could not be prepared.",
           error instanceof ModelFailure ? error.code : undefined,
-          error instanceof ModelFailure && error.code === "thinking_unavailable" ? errorMessages.thinking_unavailable : undefined);
+          error instanceof ModelFailure && error.code === "thinking_unavailable" ? errorMessages.thinking_unavailable
+            : error instanceof ModelFailure && error.code === "tool_files_unsupported" ? errorMessages.tool_files_unsupported : undefined);
       } finally { await content?.close(); }
     },
     async *stream(request, options) {

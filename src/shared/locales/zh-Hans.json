@@ -5,6 +5,7 @@
   "modelSelection.unavailable": "{value}（不可用）",
   "modelSelection.thinkingUnsupported": "不支持思考",
   "error.thinkingUnavailable": "此模型的思考等级不可用。请选择已启用的思考等级，或修改角色配置。",
+  "error.toolFilesUnsupported": "Chat Completions 无法在工具结果中携带文件。请添加“Tool files in a user message”兼容设置，或选择其他协议。",
   "resourceStatus.title": "资源状态",
   "resourceStatus.summary": "{status} · {count} 个资源",
   "resourceStatus.running": "运行中",

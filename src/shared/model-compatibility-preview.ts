@@ -6,7 +6,7 @@ export const temporaryModelCompatibility: readonly ModelCompatibilityDefinition[
   {
     id: "previewTag",
     kind: "tag",
-    protocols: ["openai-responses"],
+    appliesTo: { protocols: ["openai-responses"] },
     schema: z.undefined().meta({
       title: "Preview tag (temporary)",
       description: "Temporary UI preview. This tag does not change model requests.",
@@ -15,7 +15,7 @@ export const temporaryModelCompatibility: readonly ModelCompatibilityDefinition[
   {
     id: "previewOptions",
     kind: "options",
-    protocols: ["openai-chat", "anthropic"],
+    appliesTo: { protocols: ["openai-chat", "anthropic"] },
     schema: z.strictObject({
       text: z.string().min(1).optional().meta({ title: "Text", description: "Leave unset to omit this value." }),
       mode: z.enum(["first", "second"]).optional().meta({ title: "Mode" }),

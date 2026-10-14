@@ -14,11 +14,13 @@ export type PromptBlock =
   | { id: string; kind: "agent"; role: string; text: string }
   | { id: string; kind: "context"; file: string; text: string };
 export interface SystemPrompt { blocks: readonly PromptBlock[] }
+/** 正文、思考与工具是公共内容；continuation 只附带原生资料，由目标投影判断能否复用。 */
 export type ModelPart =
   | { kind: "thinking" | "text"; text: string; continuation: Json }
   | { kind: "toolcall"; callId: string; name: string; arguments: Json; continuation: Json };
 export type ModelItem =
   | { kind: "input" | "context"; parts: readonly ModelInputPart[] }
+  // scope／adapter 约束原生资料，不是公共内容参与跨模型请求的门禁。
   | { kind: "output"; parts: ModelPart[]; scope: string; adapter: string }
   | { kind: "result"; callId: string; name: string; outcome: ToolOutcome };
 export interface Usage {

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { Json } from "@atelier/sdk/contracts";
-import { configurationField, configurationLabel, configurationProperty } from "./configuration-fields";
+import { configurationField, configurationLabel, configurationProperty } from "./configuration-fields.ts";
 
-describe("插件配置控件选择", () => {
+describe("配置 schema 控件选择", () => {
   it("普通字段按明确类型显示，引用、联合和动态对象保留完整值编辑", () => {
     expect(configurationField({ type: "boolean" })).toEqual({ kind: "boolean" });
     expect(configurationField({ type: "integer", minimum: 0 })).toEqual({ kind: "integer" });

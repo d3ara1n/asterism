@@ -94,10 +94,15 @@ describe("AI SDK 适配契约", () => {
     expect(sdkMessages(current)).toEqual(enabled);
   });
 
-  it("DeepSeek Responses 的 reasoning_text 增量进入即时与保存正文，续接使用受支持的纯文本", async () => {
+  // 相同思考流不依赖域名；只有用户添加的标签改变下一次请求的历史编码。
+  it.each([
+    { enabled: false, baseUrl: "https://api.deepseek.com" },
+    { enabled: true, baseUrl: "https://example.invalid/v1" },
+  ])("Responses 原始思考正常解码，明文回传由显式标签决定：$enabled", async ({ enabled, baseUrl }) => {
     const current = structuredClone(input);
     current.settings.provider.protocol = "openai-responses";
-    current.settings.provider.baseUrl = "https://api.deepseek.com";
+    current.settings.provider.baseUrl = baseUrl;
+    current.settings.model.compatibility = enabled ? [{ id: "thinkingInDeepSeekFormat" }] : [];
     current.settings.model.modelId = "deepseek-flash";
     current.settings.thinking = "medium";
     current.settings.model.generation.temperature = null;
@@ -133,12 +138,45 @@ describe("AI SDK 适配契约", () => {
     }] };
     for await (const _event of adapter.prepare(next).stream(new AbortController().signal)) { /* 检查实际序列化请求。 */ }
     expect(requests[0]?.reasoning).toMatchObject({ effort: "medium" });
-    expect((requests[0]?.input as Array<{ role?: string }>)[0]?.role).toBe("system");
+    expect(requests[0]?.instructions).toBe(projectSystemPrompt(current.system));
+    expect((requests[0]?.input as Array<{ role?: string }>)[0]?.role).toBe("user");
     const replay = requests[1]?.input as Array<{ type?: string; role?: string; content?: unknown }>;
     const assistant = replay.filter(item => item.role === "assistant");
-    expect(JSON.stringify(assistant)).toContain("Assess the plan.");
+    expect(JSON.stringify(assistant)).not.toContain("Assess the plan.");
     expect(JSON.stringify(assistant)).toContain("Answer");
-    expect(replay.some(item => item.type === "reasoning")).toBe(false);
+    const reasoning = replay.find(item => item.type === "reasoning");
+    if (enabled) {
+      expect(reasoning).toEqual({ type: "reasoning", content: [{ type: "reasoning_text", text: "Assess the plan." }] });
+    } else {
+      // OpenAI 的无状态基线不能用明文替代密文；域名不触发助手文字回传。
+      expect(reasoning).toBeUndefined();
+    }
+  });
+
+  // 同一 item 的原始与 SDK 正文通道不能重复交付；无论哪个先产生文字，都只消费该通道。
+  it.each(["raw", "sdk"] as const)("原始思考与 SDK 思考同时出现，首个通道为 %s", async first => {
+    const raw = { type: "raw" as const, rawValue: { type: "response.reasoning_text.delta", item_id: "reasoning", delta: "Thought" } };
+    const sdk = { type: "reasoning-delta" as const, id: "reasoning:0", delta: "Thought" };
+    const model = new MockLanguageModelV4({ doStream: async options => {
+      expect(options.includeRawChunks).toBe(true);
+      return { stream: simulateReadableStream({ initialDelayInMs: null, chunkDelayInMs: null, chunks: [
+        { type: "stream-start", warnings: [] },
+        { type: "reasoning-start", id: "reasoning:0", providerMetadata: { openai: { itemId: "reasoning" } } },
+        ...(first === "raw" ? [raw, sdk] : [sdk, raw]),
+        { type: "reasoning-end", id: "reasoning:0", providerMetadata: { openai: { itemId: "reasoning", reasoningEncryptedContent: "opaque" } } },
+        { type: "finish", finishReason: { unified: "stop", raw: "stop" }, usage: {
+          inputTokens: { total: 1, noCache: 1, cacheRead: undefined, cacheWrite: undefined },
+          outputTokens: { total: 1, text: 0, reasoning: 1 },
+        } },
+      ] }) };
+    } });
+    const current = structuredClone(input);
+    current.settings.provider.protocol = "openai-responses";
+    const adapter = new AiSdkAdapter(async () => "synthetic-key", () => model);
+    const events: ModelEvent[] = [];
+    for await (const event of adapter.prepare(current).stream(new AbortController().signal)) events.push(event);
+    expect(events.filter(event => event.type === "part.delta")).toEqual([{ type: "part.delta", partId: "thinking:reasoning:0", delta: "Thought" }]);
+    expect(events.find(event => event.type === "part.end")).toMatchObject({ continuation: { openai: { reasoningEncryptedContent: "opaque" } } });
   });
 
   it("真实 Anthropic 解码保留 start 的 redactedData 与 delta 的签名", async () => {
@@ -293,9 +331,10 @@ describe("AI SDK 适配契约", () => {
       output: { type: "error-text", value: text } }] }]);
   });
 
-  it.each(["anthropic", "openai-responses", "openai-chat"] as const)("%s 工具结果文件如实交出；Chat 的 tool 消息只含文字与说明，文件随后续 user 消息", protocol => {
+  it.each(["anthropic", "openai-responses", "openai-chat"] as const)("%s 工具结果文件如实交出；Chat 显式兼容包才搬运到 user 消息", protocol => {
     const png = new Uint8Array([1, 2, 3]);
     const current = structuredClone(input); current.settings.provider.protocol = protocol;
+    current.settings.model.compatibility = [{ id: "toolFilesAsUserMessage" }];
     const messages = sdkMessages({ ...current, messages: [{ kind: "result", callId: "see", name: "resource_call", error: false,
       parts: [{ kind: "text", text: "a.png (image/png, 3 bytes)" }, { kind: "file", data: png, mediaType: "image/png", filename: "a.png" }] }] });
     if (protocol !== "openai-chat") {
@@ -319,8 +358,18 @@ describe("AI SDK 适配契约", () => {
     expect(model.doStreamCalls).toHaveLength(1);
   });
 
-  it("跨模型作用域的续接明确拒绝", () => {
+  it("跨模型或适配版本变化不阻断公共正文，原生资料不跨来源发送", () => {
     const adapter = new AiSdkAdapter(async () => "credential");
-    expect(() => sdkMessages({ ...input, messages: [{ kind: "output", parts: [], scope: "different-provider", adapter: adapter.version }] })).toThrow();
+    const current: ModelInput = { ...input, messages: [{
+      kind: "output", adapter: "older-adapter", scope: "different-provider",
+      parts: [
+        { kind: "thinking", text: "Foreign thought", continuation: { anthropic: { signature: "foreign-signature" } } },
+        { kind: "text", text: "Portable answer", continuation: { openai: { itemId: "foreign-message" } } },
+      ],
+    }] };
+    expect(() => adapter.prepare(current)).not.toThrow();
+    expect(sdkMessages(current)).toEqual([{ role: "assistant", content: [
+      { type: "text", text: "Portable answer", providerOptions: {} },
+    ] }]);
   });
 });

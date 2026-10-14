@@ -6,6 +6,7 @@ export const errorMessages = pluginNamespace("atelier.host").messages("en", defi
   conflict: { id: "error.conflict", defaultMessage: "The state has changed. Refresh and try again." },
   unavailable: { id: "error.unavailable", defaultMessage: "The operation is currently unavailable. Reload before retrying." },
   thinking_unavailable: { id: "error.thinkingUnavailable", defaultMessage: "The thinking level is unavailable for this model. Choose an enabled thinking level or update the role configuration." },
+  tool_files_unsupported: { id: "error.toolFilesUnsupported", defaultMessage: "Chat Completions cannot carry files in tool results. Add the 'Tool files in a user message' compatibility setting or choose another protocol." },
   internal: { id: "error.internal", defaultMessage: "The operation could not be completed. Check the application logs." },
 }));
 export function errorDisplay(error: { code: string; message: string; display?: UiText }): UiText {

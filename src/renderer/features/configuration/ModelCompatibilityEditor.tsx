@@ -13,9 +13,12 @@ import { modelProtocolLabels } from "./protocols";
 const forms = new Map(modelCompatibilityDefinitions.filter(definition => definition.kind === "options")
   .map(definition => [definition.id, jsonSchema.parse(z.toJSONSchema(definition.schema, { io: "input" }))]));
 
-function Protocols({ definition }: { definition: ModelCompatibilityDefinition }) {
-  return <span className="flex flex-wrap gap-1">{definition.protocols.map(protocol =>
-    <Badge key={protocol} variant="secondary">{modelProtocolLabels[protocol]}</Badge>)}</span>;
+function Applicability({ definition }: { definition: ModelCompatibilityDefinition }) {
+  return <span className="flex flex-col gap-1">
+    <span className="flex flex-wrap gap-1">{definition.appliesTo.protocols.map(protocol =>
+      <Badge key={protocol} variant="secondary">{modelProtocolLabels[protocol]}</Badge>)}</span>
+    {definition.appliesTo.endpoints?.map(endpoint => <span key={endpoint} className="type-caption break-all">{endpoint}</span>)}
+  </span>;
 }
 
 /** 只编辑模型的显式列表；协议标记用于说明，不过滤添加菜单。 */
@@ -34,9 +37,9 @@ export function ModelCompatibilityEditor({ value, onChange }: {
         onClick={() => onChange(value.filter(item => item.id !== entry.id))}><X /></Button>;
       return <div key={entry.id} className="space-y-3">
         {definition.kind === "tag" ? <div className="flex items-center justify-between gap-2">
-          <div className="space-y-2"><span className="type-label">{title}</span><Protocols definition={definition} /></div>{remove}
+          <div className="space-y-2"><span className="type-label">{title}</span><Applicability definition={definition} /></div>{remove}
         </div> : <>
-          <Protocols definition={definition} />
+          <Applicability definition={definition} />
           <ConfigurationValue schema={forms.get(entry.id)!} value={"value" in entry ? entry.value : undefined} label={title} actions={remove}
             onChange={next => onChange(value.map(item => item.id === entry.id ? { id: entry.id, ...(next === undefined ? {} : { value: next }) } : item))} />
         </>}
@@ -53,7 +56,7 @@ export function ModelCompatibilityEditor({ value, onChange }: {
             onSelect={() => onChange([...value, definition.kind === "tag" ? { id: definition.id }
               : { id: definition.id, value: structuredClone(definition.initialValue) }])}>
             <span>{metadata?.title ?? definition.id}</span>
-            <Protocols definition={definition} />
+            <Applicability definition={definition} />
             {metadata?.description && <span className="type-caption max-w-sm whitespace-normal">{metadata.description}</span>}
           </DropdownMenuItem>;
         })}

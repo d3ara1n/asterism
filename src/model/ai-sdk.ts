@@ -1,63 +1,42 @@
-import { jsonSchema as sdkJsonSchema, streamText, tool, type ModelMessage, type ToolResultPart, type ToolSet, type AssistantModelMessage, type LanguageModel } from "ai";
-import { jsonSchema, modelScope, unauthenticatedApiKey, type Json, type Usage } from "../shared/model.ts";
+import { jsonSchema as sdkJsonSchema, streamText, tool, type ModelMessage, type ToolResultPart, type ToolSet, type LanguageModel } from "ai";
+import { jsonSchema, unauthenticatedApiKey, type Json, type Usage } from "../shared/model.ts";
 import { ModelFailure, type ModelAdapter, type ModelEvent, type ModelInput, type ResolvedInputPart, type PreparedModel, type ModelValidationInput } from "./contract.ts";
 import { createProviderModel, validateProviderTransport } from "./provider.ts";
 import { projectSystemPrompt } from "../modules/agent/system-prompt.ts";
-import { requestOptions, usesPlainResponseReasoning } from "./request-options.ts";
+import { requestOptions } from "./request-options.ts";
+import { aiSdkAdapterVersion, pickContinuation } from "./continuation.ts";
+import { projectHistory, validateProjection } from "./projection.ts";
 
-const adapterVersion = "ai-sdk-v7/3";
-function validateContinuation(item: { adapter: string; scope: string }, scope: string): void {
-  if (item.adapter !== adapterVersion) throw new ModelFailure("replay_version", "The saved response needs a compatible protocol adapter.");
-  if (item.scope !== scope) throw new ModelFailure("model_switch", "Cross-model continuation is not supported yet. Start from a history position before the model output.");
-}
 function json(value: unknown): Json { return jsonSchema.parse(JSON.parse(JSON.stringify(value))); }
-/** 只保留白名单续接资料，不持久化原始 HTTP、响应头或未筛选的 provider metadata。 */
-export function pickContinuation(metadata: unknown): Record<string, Record<string, Json>> {
-  const options: Record<string, Record<string, Json>> = {};
-  if (!metadata || typeof metadata !== "object") return options;
-  for (const [provider, keys] of Object.entries({ anthropic: ["signature", "redactedData"], openai: ["itemId", "reasoningEncryptedContent", "phase"] })) {
-    const source = (metadata as Record<string, unknown>)[provider];
-    if (!source || typeof source !== "object" || Array.isArray(source)) continue;
-    const picked: Record<string, Json> = {};
-    for (const key of keys) { const v = (source as Record<string, unknown>)[key]; if (v !== undefined) picked[key] = json(v); }
-    if (Object.keys(picked).length) options[provider] = picked;
-  }
-  return options;
-}
 export function sdkMessages(input: ModelInput): ModelMessage[] {
   const messages: ModelMessage[] = [];
-  const scope = modelScope(input.settings);
-  const plainReasoning = usesPlainResponseReasoning(input.settings.provider);
   const chat = input.settings.provider.protocol === "openai-chat";
   const attachments: Extract<ResolvedInputPart, { kind: "file" }>[] = [];
-  /** Chat Completions 的 tool 消息只能是文字；本批工具文件在其后的一条 user 消息中如实发送。 */
+  /** 工具文件已由目标投影检查显式标签；获准搬运的同批文件合入后续 user 消息。 */
   const flushAttachments = () => {
     if (!attachments.length) return;
     messages.push({ role: "user", content: [{ type: "text", text: "Files attached from the preceding tool results:" },
       ...attachments.map(file => ({ type: "file" as const, data: file.data, mediaType: file.mediaType, ...(file.filename ? { filename: file.filename } : {}) }))] });
     attachments.length = 0;
   };
-  for (const item of input.messages) {
+  for (const item of projectHistory(input)) {
+    if (item.kind !== "result") flushAttachments();
     if (item.kind === "input" || item.kind === "context") messages.push({ role: "user", content: item.parts.map(part =>
       part.kind === "text" ? { type: "text" as const, text: part.text }
         // 各模态统一按 AI SDK 文件部件发送，mediaType 为编码标签；端点是否接受由服务端反馈。
         : { type: "file" as const, data: part.data, mediaType: part.mediaType, ...(part.filename ? { filename: part.filename } : {}) }) });
     if (item.kind === "output") {
-      validateContinuation(item, scope);
-      const parts = item.parts.filter(part => input.settings.model.capabilities.reasoning || part.kind !== "thinking");
+      const parts = item.parts;
       if (parts.length) messages.push({ role: "assistant", content: parts.map(p => {
-        // DeepSeek 将 reasoning.content 合入相邻 assistant 正文，不支持 summary/encrypted_content 输入。
-        const plainThinking = plainReasoning && p.kind === "thinking";
-        const providerOptions = (plainThinking ? {} : p.continuation ?? {}) as Record<string, Record<string, never>>;
+        const providerOptions = p.continuation as Record<string, Record<string, Json>>;
         return p.kind === "toolcall" ? { type: "tool-call" as const, toolCallId: p.callId, toolName: p.name, input: p.arguments, providerOptions }
-          : { type: p.kind === "text" || plainThinking ? "text" as const : "reasoning" as const, text: p.text, providerOptions };
-      }) } as AssistantModelMessage);
+          : { type: p.kind === "text" ? "text" as const : "reasoning" as const, text: p.text, providerOptions };
+      }) });
     }
-    if (item.kind !== "result") flushAttachments();
     if (item.kind === "result") {
       const files = item.parts.filter(part => part.kind === "file");
       const text = item.parts.flatMap(part => part.kind === "text" ? [part.text] : []).join("\n");
-      // 文字只序列化一次：纯文字用 text/error-text；Chat 的 content 会被整体再序列化，文件改由紧随的 user 消息携带。
+      // 文字只序列化一次；Chat 工具文件已通过显式兼容门禁，才能搬运到后续 user 消息。
       let output: ToolResultPart["output"];
       if (!files.length || chat) {
         const notice = files.length ? `[${files.length} file(s) attached in the following user message: ${files.map(file => file.filename ?? file.mediaType).join(", ")}]` : "";
@@ -76,37 +55,36 @@ export function sdkMessages(input: ModelInput): ModelMessage[] {
   return messages;
 }
 export class AiSdkAdapter implements ModelAdapter {
-  readonly version = adapterVersion;
+  readonly version = aiSdkAdapterVersion;
   constructor(private readonly readCredential: (providerId: string) => Promise<string | null>,
     private readonly languageModelFactory?: (input: ModelInput, key: string) => LanguageModel) {}
   validate(input: ModelValidationInput): void {
     validateProviderTransport(input.settings.provider);
     requestOptions(input.settings.provider, input.settings.model, { purpose: "execution", thinking: input.settings.thinking });
-    const scope = modelScope(input.settings);
-    for (const item of input.messages) if (item.kind === "output") validateContinuation(item, scope);
+    validateProjection(input);
   }
   prepare(input: ModelInput): PreparedModel {
     this.validate(input);
     const messages = sdkMessages(input);
     const system = projectSystemPrompt(input.system);
-    const options = requestOptions(input.settings.provider, input.settings.model, { purpose: "execution", thinking: input.settings.thinking });
-    return { stream: signal => this.stream(input, system, messages, options, signal) };
+    const options = requestOptions(input.settings.provider, input.settings.model, { purpose: "execution", thinking: input.settings.thinking, system });
+    return { stream: signal => this.stream(input, messages, options, signal) };
   }
-  private async *stream(input: ModelInput, system: string, messages: ModelMessage[], options: ReturnType<typeof requestOptions>, signal: AbortSignal): AsyncIterable<ModelEvent> {
+  private async *stream(input: ModelInput, messages: ModelMessage[], options: ReturnType<typeof requestOptions>, signal: AbortSignal): AsyncIterable<ModelEvent> {
     const { provider, model } = input.settings;
     const key = provider.auth === "none" ? unauthenticatedApiKey : await this.readCredential(provider.id);
     if (!key) throw new ModelFailure("missing_credential", "Provider credentials are unavailable.");
     const languageModel = this.languageModelFactory?.(input, key) ?? createProviderModel(provider, model, key);
-    const plainReasoning = usesPlainResponseReasoning(provider);
     const tools: ToolSet = Object.fromEntries(input.tools.map(t => [t.name, tool({ description: t.description, inputSchema: sdkJsonSchema(t.parameters as Record<string, unknown>) })]));
-    const result = streamText({ model: languageModel, system, messages, tools,
+    const result = streamText({ model: languageModel, messages, tools,
       ...options, abortSignal: signal,
-      include: { rawChunks: plainReasoning },
+      include: { rawChunks: true },
       // SDK 不执行工具；单步结果交还工坊循环，工具注册中不提供 execute。
       onError: () => {},
     });
     const calls = new Set<string>();
-    const plainThinkingParts = new Map<string, string>();
+    const thinkingItems = new Map<string, string>();
+    const thinkingChannels = new Map<string, "raw" | "sdk">();
     const continuations = new Map<string, ReturnType<typeof pickContinuation>>();
     const collectContinuation = (id: string, metadata: unknown) => {
       const accumulated = continuations.get(id) ?? {};
@@ -124,35 +102,44 @@ export class AiSdkAdapter implements ModelAdapter {
           const kind = event.type === "text-start" ? "text" : "thinking";
           const id = `${kind}:${event.id}`;
           const metadata = collectContinuation(id, event.providerMetadata);
-          if (plainReasoning && kind === "thinking" && typeof metadata.openai?.itemId === "string") {
-            plainThinkingParts.set(metadata.openai.itemId, id);
+          if (kind === "thinking" && typeof metadata.openai?.itemId === "string") {
+            thinkingItems.set(metadata.openai.itemId, id);
           }
           yield { type: "part.start", part: { id, kind } };
           break;
         }
         case "raw": {
-          if (!plainReasoning || !event.rawValue || typeof event.rawValue !== "object") break;
+          if (provider.protocol !== "openai-responses" || !event.rawValue || typeof event.rawValue !== "object") break;
           const raw = event.rawValue as Record<string, unknown>;
-          // SDK 尚未解码 DeepSeek 的 reasoning_text；只取已知正文增量，不保存原始帧。
+          // 原始思考事件是协议解码能力，不按品牌、域名或兼容包开关启用。
           if (raw.type !== "response.reasoning_text.delta") break;
           if (typeof raw.item_id !== "string" || typeof raw.delta !== "string") {
             throw new ModelFailure("protocol", "The provider returned an invalid reasoning text delta.");
           }
-          const partId = plainThinkingParts.get(raw.item_id);
+          const partId = thinkingItems.get(raw.item_id);
           if (!partId) throw new ModelFailure("protocol", "The provider updated an inactive reasoning item.");
+          if (thinkingChannels.get(raw.item_id) === "sdk") break;
+          if (raw.delta) thinkingChannels.set(raw.item_id, "raw");
           yield { type: "part.delta", partId, delta: raw.delta };
           break;
         }
         case "text-delta": case "reasoning-delta": {
           const partId = `${event.type === "text-delta" ? "text" : "thinking"}:${event.id}`;
-          collectContinuation(partId, event.providerMetadata);
+          const metadata = collectContinuation(partId, event.providerMetadata);
+          if (event.type === "reasoning-delta" && typeof metadata.openai?.itemId === "string") {
+            const itemId = metadata.openai.itemId;
+            if (thinkingChannels.get(itemId) === "raw") break;
+            if (event.text) thinkingChannels.set(itemId, "sdk");
+          }
           yield { type: "part.delta", partId, delta: event.text };
           break;
         }
         case "text-end": case "reasoning-end": {
           const partId = `${event.type === "text-end" ? "text" : "thinking"}:${event.id}`;
           const metadata = collectContinuation(partId, event.providerMetadata);
-          if (typeof metadata.openai?.itemId === "string") plainThinkingParts.delete(metadata.openai.itemId);
+          if (typeof metadata.openai?.itemId === "string" && thinkingItems.get(metadata.openai.itemId) === partId) {
+            thinkingItems.delete(metadata.openai.itemId);
+          }
           yield { type: "part.end", partId, continuation: metadata };
           continuations.delete(partId);
           break;

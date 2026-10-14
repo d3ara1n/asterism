@@ -1,20 +1,18 @@
 import type { ProviderInput, ProviderModel, ThinkingLevel } from "../shared/configuration.ts";
 import type { Json } from "../shared/model.ts";
 import { ModelFailure } from "./contract.ts";
+import { compatibilityForTarget } from "./projection.ts";
 
-type Connection = Pick<ProviderInput, "protocol" | "baseUrl">;
-type RequestPurpose = { purpose: "probe" } | { purpose: "execution"; thinking: ThinkingLevel | null };
+type Connection = Pick<ProviderInput, "protocol">;
+type RequestPurpose = { purpose: "probe" } | { purpose: "execution"; thinking: ThinkingLevel | null; system?: string };
 interface RequestOptions {
   maxRetries: 0;
+  system?: string;
   maxOutputTokens?: number;
   temperature?: number;
   topP?: number;
   reasoning?: Exclude<ThinkingLevel, "off"> | "none";
   providerOptions: Record<string, Record<string, Json>>;
-}
-
-export function usesPlainResponseReasoning(provider: Connection): boolean {
-  return provider.protocol === "openai-responses" && new URL(provider.baseUrl).hostname === "api.deepseek.com";
 }
 
 /** 连接测试与执行的唯一请求选项解释入口；probe 只验证基础协议连通性。 */
@@ -30,6 +28,8 @@ export function requestOptions(provider: Connection, model: ProviderModel, reque
     options.maxOutputTokens = Math.min(model.generation.maxOutputTokens ?? 64, 128);
     return options;
   }
+  const compatibility = compatibilityForTarget({ provider, model });
+  if (provider.protocol !== "openai-responses" || compatibility.systemMessage) options.system = request.system;
 
   const { reasoning, thinkingLevels } = model.capabilities;
   const thinking = request.thinking;
@@ -46,8 +46,8 @@ export function requestOptions(provider: Connection, model: ProviderModel, reque
       // 显式 false 同样重要：否则 SDK 会按模型名自动请求加密思考。
       store: false, forceReasoning: reasoning,
       ...(reasoning ? { include: ["reasoning.encrypted_content"], reasoningSummary: "auto" } : {}),
-      // DeepSeek 把 developer 视为 user，系统指令需保留 system 身份。
-      ...(usesPlainResponseReasoning(provider) ? { systemMessageMode: "system" } : {}),
+      ...(compatibility.systemMessage ? { systemMessageMode: "system" }
+        : request.system !== undefined ? { instructions: request.system } : {}),
     } : {}),
     ...(options.reasoning ? { reasoningEffort: options.reasoning } : {}),
   } };
