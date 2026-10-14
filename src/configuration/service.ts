@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { configurationCommandSchema, modelReference, providerSchema, resolveProviderModel,
-  type ConfigurationCommand, type ConfigurationSnapshot, type ConnectionTest, type Provider, type ProviderModel } from "../shared/configuration.ts";
+import { configurationCommandSchema, createModelInput, modelReference, providerSchema, resolveProviderModel,
+  type ConfigurationCommand, type ConfigurationSnapshot, type ConnectionTest, type Provider, type ProviderModel, type ModelParameterUpdate } from "../shared/configuration.ts";
 import type { SecretProtector } from "../shared/secrets.ts";
 import { unauthenticatedApiKey } from "../shared/model.ts";
 import { ConfigurationError } from "./errors.ts";
@@ -8,6 +8,9 @@ import { ConfigurationStore, type StoredProvider } from "./store.ts";
 import { CredentialVault } from "./credentials.ts";
 import { classifyProbeError, runConnectionProbe, type ConnectionProbe } from "./probe.ts";
 import { configurationDefaults, resolveAgentConfiguration, resolveRoleConfiguration } from "./layers.ts";
+import { discoverModels, ModelDiscoveries, type DiscoverModels } from "./discovery.ts";
+import { loadModelCatalog, modelParameters, type LoadModelCatalog } from "./model-catalog.ts";
+import { modelCatalogMessages } from "../shared/model-catalog-messages.ts";
 
 const saveKinds = { "provider.save": "provider", "model.save": "model", "role.save": "role", "agent.save": "agent" } as const;
 
@@ -18,24 +21,74 @@ export class ConfigurationService {
   private queue: Promise<unknown> = Promise.resolve();
   private closed = false;
   private storageAvailable = false;
+  private readonly discoveries: ModelDiscoveries;
+  private readonly shutdown = new AbortController();
+  private readonly parameterRequests = new Set<{ model: string; providerId: string; controller: AbortController }>();
   private tests = new Map<string, { value: ConnectionTest; controller: AbortController; timer: ReturnType<typeof setTimeout>; started: number }>();
   constructor(root: string, protector: SecretProtector, private readonly onChanged: () => void = () => {},
-    private readonly probe: ConnectionProbe = runConnectionProbe, private readonly testTimeoutMs = 30_000) {
+    private readonly probe: ConnectionProbe = runConnectionProbe, private readonly testTimeoutMs = 30_000,
+    discover: DiscoverModels = discoverModels, private readonly catalog: LoadModelCatalog = loadModelCatalog) {
     this.store = new ConfigurationStore(root);
     this.vault = new CredentialVault(root, protector);
+    this.discoveries = new ModelDiscoveries(onChanged, discover, testTimeoutMs);
   }
-  execute(raw: ConfigurationCommand): Promise<{ snapshot: ConfigurationSnapshot; savedId: string | null }> {
-    const operation = this.queue.then(async () => {
+  execute(raw: ConfigurationCommand): Promise<{ snapshot: ConfigurationSnapshot; savedId: string | null; parameterUpdate?: ModelParameterUpdate }> {
+    const parsed = configurationCommandSchema.safeParse(raw);
+    if (!parsed.success) return Promise.reject(new ConfigurationError("invalid_request", "Invalid configuration. Check the entered values."));
+    if (parsed.data.type === "model.parameters") return this.fetchParameters(parsed.data.model);
+    const command = parsed.data;
+    return this.enqueue(async () => {
       this.assertOpen();
-      const parsed = configurationCommandSchema.safeParse(raw);
-      if (!parsed.success) throw new ConfigurationError("invalid_request", "Invalid configuration. Check the entered values.");
       this.storageAvailable = await this.vault.available();
       this.assertOpen();
-      const savedId = await this.perform(parsed.data);
+      const savedId = await this.perform(command);
       return { snapshot: this.snapshot(), savedId };
     });
+  }
+  private enqueue<T>(work: () => T | Promise<T>): Promise<T> {
+    const operation = this.queue.then(work);
     this.queue = operation.catch(() => {});
     return operation;
+  }
+  private async fetchParameters(reference: string) {
+    const captured = await this.enqueue(() => {
+      this.assertOpen();
+      const model = this.store.get("model", reference);
+      const provider = model && this.store.get("provider", model.providerId);
+      if (!model || !provider) throw new ConfigurationError("not_found", "The model or provider no longer exists.");
+      const request = { model: reference, providerId: provider.id, controller: new AbortController() };
+      this.parameterRequests.add(request);
+      return { model, provider, request };
+    });
+    const timeout = AbortSignal.timeout(10_000);
+    const signal = AbortSignal.any([timeout, this.shutdown.signal, captured.request.controller.signal]);
+    try {
+      let catalog;
+      try { catalog = await this.catalog(signal); signal.throwIfAborted(); }
+      catch {
+        if (captured.request.controller.signal.aborted)
+          throw new ConfigurationError("conflict", "The model or provider changed during parameter retrieval.", modelCatalogMessages.changed);
+        throw new ConfigurationError("unavailable", "Model catalog request failed.",
+          timeout.aborted ? modelCatalogMessages.timeout : modelCatalogMessages.failed);
+      }
+      return await this.enqueue(() => {
+        this.assertOpen();
+        if (captured.request.controller.signal.aborted ||
+            this.store.get("model", reference)?.revision !== captured.model.revision ||
+            this.store.get("provider", captured.provider.id)?.revision !== captured.provider.revision)
+          throw new ConfigurationError("conflict", "The model or provider changed during parameter retrieval.", modelCatalogMessages.changed);
+        const { value, report } = modelParameters(catalog, captured.model);
+        this.store.save({ kind: "model", id: reference, value });
+        this.parameterRequests.delete(captured.request);
+        this.invalidateParameterRequests("model", reference);
+        return { snapshot: this.snapshot(), savedId: reference, parameterUpdate: report };
+      });
+    } finally { this.parameterRequests.delete(captured.request); }
+  }
+  private invalidateParameterRequests(kind: string, id: string): void {
+    for (const request of this.parameterRequests)
+      if ((kind === "model" && request.model === id) || (kind === "provider" && request.providerId === id))
+        request.controller.abort();
   }
   private assertOpen(): void { if (this.closed) throw new ConfigurationError("unavailable", "Configuration service is unavailable."); }
   /** 同步取得当前生效配置；凭据状态沿用最近一次检查结果。 */
@@ -66,15 +119,41 @@ export class ConfigurationService {
         roles: Object.fromEntries(roles.map(role => [role.id, role.overrides])),
         agents: Object.fromEntries(agents.map(agent => [agent.id, agent.overrides])),
       },
-      tests: [...this.tests.values()].map(test => ({ ...test.value })), credentialStorageAvailable: this.storageAvailable,
+      tests: [...this.tests.values()].map(test => ({ ...test.value })), discoveries: this.discoveries.snapshot(), credentialStorageAvailable: this.storageAvailable,
     };
   }
-  private async perform(command: ConfigurationCommand): Promise<string | null> {
+  private async perform(command: Exclude<ConfigurationCommand, { type: "model.parameters" }>): Promise<string | null> {
     if (command.type === "read") return null;
     if (command.type === "test.start") return this.startTest(command.model);
     if (command.type === "test.cancel") { this.cancelTest(command.id); return command.id; }
+    if (command.type === "discovery.start") {
+      const stored = this.store.get("provider", command.providerId);
+      if (!stored) throw new ConfigurationError("not_found", "The provider no longer exists. Reload settings.");
+      return this.discoveries.start(this.provider(stored), async () => {
+        if (stored.auth === "none") return "";
+        if (!stored.credentialRef) throw new Error("Credential is unavailable.");
+        return this.vault.read(stored.credentialRef);
+      });
+    }
+    if (command.type === "discovery.cancel") { this.discoveries.cancel(command.id); return command.id; }
+    if (command.type === "discovery.add") {
+      const discovery = this.discoveries.get(command.id);
+      const provider = this.store.get("provider", discovery.providerId);
+      if (discovery.state !== "succeeded" || !provider || provider.revision !== discovery.providerRevision)
+        throw new ConfigurationError("conflict", "The provider or model list changed. Fetch models again.");
+      const models = new Map(discovery.models.map(model => [model.modelId, model]));
+      const selected = [...new Set(command.modelIds)].map(id => {
+        const model = models.get(id);
+        if (!model) throw new ConfigurationError("invalid_request", "The selected model is not in this model list.");
+        return createModelInput(provider.id, model);
+      });
+      this.store.addModels(selected);
+      return provider.id;
+    }
     if (command.type === "remove") {
       const { credentialRef } = this.store.remove(command.kind, command.id);
+      this.invalidateParameterRequests(command.kind, command.id);
+      if (command.kind === "provider") this.discoveries.clearProvider(command.id);
       if (credentialRef) this.removeCredential(credentialRef);
       return command.id;
     }
@@ -88,6 +167,7 @@ export class ConfigurationService {
       case "model.save":
         if (!this.store.get("provider", command.value.providerId)) throw new ConfigurationError("not_found", "The provider no longer exists. Reload settings.");
         this.store.save({ kind: "model", id: command.id, value: command.value });
+        if (command.id) this.invalidateParameterRequests("model", command.id);
         return modelReference(command.value);
       case "provider.save": break;
     }
@@ -104,6 +184,10 @@ export class ConfigurationService {
       }
       this.assertOpen();
       this.store.save({ kind: "provider", id: command.id, value: command.value, credentialRef: ref });
+      if (command.id) {
+        this.invalidateParameterRequests("provider", command.id);
+        this.discoveries.clearProvider(command.id);
+      }
     } catch (error) {
       if (newRef) this.removeCredential(newRef);
       if (error instanceof ConfigurationError) throw error;
@@ -173,6 +257,8 @@ export class ConfigurationService {
   }
   close(): void {
     this.closed = true;
+    this.shutdown.abort();
+    this.discoveries.close();
     for (const test of this.tests.values()) { clearTimeout(test.timer); test.controller.abort(); }
   }
 }

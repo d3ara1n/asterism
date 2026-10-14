@@ -73,7 +73,7 @@ Session 是时间线的单一写入者。含终态的成型记录、对象与链
 
 模型协议中的 tools 是 Atelier 固定操作入口：`resource_list`、`resource_inspect`、`resource_call(resource_id, tool, target?, args)`。两层工具使用同一 ToolContract 与定义投影；一级入口的 guidelines 合入协议说明，二级工具的 description、guidelines、args 及实现的 target/result schema 在资源链接通知或 inspect 中提供，不进入顶层 tools。核心工具与资源平级定义，通过后端实现声明支持关系。链接资源激活匹配工具，agent 的 tools/excludeTools 等外部策略再决定是否允许使用；资源实例不持有工具列表或白名单。宿主入口不受名单约束，也不开放插件注册。请求能力视图从统一目录选择实现并应用链接状态和外部策略；批次按实际实现的副作用和调度策略执行。当前原生资源工具包括目录 list 与文件、笔记的 read/edit/write；MCP 与代理间通信待接入。
 
-一个回合内可有多次模型请求及执行启停，划分见 [运行时](runtime.md#执行轮次)。每次提交或显式继续启动的执行循环独立计算请求上限 `agent.maxTurns`，空值为 32；该字段限制模型请求数，不计用户回合数。timeout 空值为 600 秒，取消协作式中止，不承诺撤销副作用。费用预算字段 maxCost 已于 2026-10-13 移除，不设执行层预算限制；价格与计量资料随 [模型目录计划](../plans/todo-2026-10-07-model-catalog.md)另行考虑。
+一个回合内可有多次模型请求及执行启停，划分见 [运行时](runtime.md#执行轮次)。每次提交或显式继续启动的执行循环独立计算请求上限 `agent.maxTurns`，空值为 32；该字段限制模型请求数，不计用户回合数。timeout 空值为 600 秒，取消协作式中止，不承诺撤销副作用。费用预算字段 maxCost 已于 2026-10-13 移除，不设执行层预算限制；价格与费用计量随[独立计划](../plans/todo-2026-10-14-model-costs.md)另行考虑。
 
 多次请求的循环由内置 Agent 控制器推动。通用 `models.run` 只执行一次模型请求及该响应的工具批次，显式接收投影输入，交付内含终态的块、诊断与临时进度，不自行保存对话或发起下一请求。Agent 将成型输出经会话提交到时间线，随后重新投影下一次输入。轮数、缓存命中预期和停止规则由 Agent 提供；命名等一次性补全消费者直接使用 `models.stream`。
 

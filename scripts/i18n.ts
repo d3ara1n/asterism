@@ -45,7 +45,7 @@ function groups(packageRoot?: string): Group[] {
   return [{
     owner: "atelier.host",
     root: project,
-    files: [...files(join(project, "src/renderer")), join(project, "src/shared/error-display.ts")],
+    files: [...files(join(project, "src/renderer")), ...files(join(project, "src/shared"))],
     catalogs: {
       "zh-Hans": "src/shared/locales/zh-Hans.json"
     },

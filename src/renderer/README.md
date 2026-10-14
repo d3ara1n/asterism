@@ -46,6 +46,8 @@
 | `modules/object-context.ts` | 宿主实现基础对象接口；通过专门 provider 提供配置目录、模型块与工具展示，共用原有状态源 |
 | `../modules/*/renderer.tsx` | 资源模块的具体卡片、附加操作和工具视图，与后端共用纯契约 |
 | `features/configuration/` | 提供商/模型角色/agent 配置表单及共享读取入口 |
+| `features/configuration/ModelDiscoveryPicker.tsx` | 提供商模型目录的搜索、多选、已添加标记、刷新与取消；列表发现不覆盖已有模型 |
+| `features/configuration/ModelParameters.tsx` | 模型设置页的参数获取与结果展示；按 models.dev 资料覆盖后更新当前表单，列表／卡片不提供该入口 |
 | `features/plugins/PluginsSettings.tsx` | 插件包管理、当前运行插件的配置读取及命令队列 |
 | `features/plugins/PluginConfigurations.tsx` | 插件配置草稿、保存与恢复默认；字段编辑复用共享 schema 表单 |
 | `shared/ConfigurationValue.tsx` | 插件配置与模型兼容设置共用的 schema 字段编辑器；支持展示元数据与复杂 JSON 值，插件设置按对象层级生成分组底板与响应式字段行 |

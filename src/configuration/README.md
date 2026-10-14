@@ -26,10 +26,18 @@
 | `layers.ts` | 配置条目类型、内置原始定义、用户局部覆盖与生效配置的纯解析；不依赖文件存储 |
 | `credentials.ts` | 密文文件的创建、读取、替换与删除，不直接依赖 Electron |
 | `probe.ts` | 三种显式 SDK 协议实例，简短连通请求和脱敏错误分类 |
+| `discovery.ts` | OpenAI／Anthropic 模型列表请求、同端点分页与元数据解析；后台发现、取消、超时与连接失效 |
+| `model-catalog.ts` | 复用官方 models.dev 客户端，精确匹配目录模型并映射可覆盖参数；不持有另一份目录类型或网络客户端 |
 | `defaults.ts` | 五种模型角色、五种 agent 的内置原始定义；不导入本机模型或凭据 |
 | `../shared/provider-presets.ts` | 提供商连接目录、目录声明校验与独立草稿生成；不含模型数据 |
 
-入口为 `window.host.configuration.execute`，经 preload/main 校验转入任务进程。响应只有配置快照、保存 ID 或固定错误，不携带密钥或密文。配置修改不触发会话重载或级联刷新；选择与实际消费通过 `resolveProviderModel` / `resolveModelRole` 检查配置。
+入口为 `window.host.configuration.execute`，经 preload/main 校验转入任务进程。响应携带配置快照、保存 ID、可选参数获取报告或固定错误，不携带密钥或密文。配置修改不触发会话重载或级联刷新；选择与实际消费通过 `resolveProviderModel` / `resolveModelRole` 检查配置。
+
+配置 IPC 版本为 8。`discovery.start / cancel / add` 分别启动后台发现、取消、批量添加；快照 `discoveries` 持有每个连接最近一次请求的状态与候选资料，不进入配置文件。发现读取已保存连接与凭据，网络等待不占用配置队列；更改连接使旧结果失效。批量添加根据本次结果校验选择，在一次原子保存中跳过已有模型，刷新不修改配置。界面位于 `renderer/features/configuration/ModelDiscoveryPicker.tsx`，未知参数采用手动新建初始值并明确提示，完整约定见模型配置文档。
+
+`model.parameters` 在队列外通过官方 `@opencode-ai/models` 获取目录，10 秒超时且不携带提供商凭据；回到队列确认发起时的模型与连接仍有效，再覆盖可映射字段并原子保存。成功结果的 `parameterUpdate` 说明来源和需手动检查的字段；失败通过固定本地化消息说明原配置保留。模型设置页通过 `ModelParameters.tsx` 提供唯一的获取入口与结果展示，列表／卡片不提供此操作。参数不会因获取模型列表或目录更新而自动变化。
+
+手动新建与发现添加共用 `createModelInput` 的初始参数；默认开启思考与工具调用，已知端点资料可以覆盖。参数查询仅在检索时剥离模型 ID 的厂商／路由前缀，保存与调用仍使用完整服务端 ID。用户已于 2026-10-14 确认功能与 GUI 验收通过，见[模型目录归档](../../plans/archived/todo-2026-10-07-model-catalog.md)。
 
 角色/代理保存命令提交完整的用户覆盖集合，省略字段即撤下该字段的覆盖；非空文本覆盖、说明与提示词留空恢复内置，false/null/空列表保留业务含义。工具允许/排除列表作为一组互斥策略替换，列表不拼接。新自定义角色与代理只继承内置原始 default/worker，不受用户修改这两项影响。
 

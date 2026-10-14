@@ -123,6 +123,16 @@ export class ConfigurationStore {
     this.commit(next);
     return { credentialRef: "credentialRef" in old ? old.credentialRef : null };
   }
+  /** 一次保存全部选择；已有模型保留原值，重试不会覆盖用户配置。 */
+  addModels(models: Omit<ProviderModel, "revision">[]): void {
+    const next = structuredClone(this.document);
+    const existing = new Set(next.models.map(modelReference));
+    for (const model of models) if (!existing.has(modelReference(model))) {
+      next.models.push({ ...model, revision: 1 });
+      existing.add(modelReference(model));
+    }
+    if (next.models.length !== this.document.models.length) this.commit(next);
+  }
   private commit(raw: ConfigurationDocument): void {
     let next: ConfigurationDocument;
     // 写入前统一校验结构与生效配置；失败时不改变当前文档。

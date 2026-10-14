@@ -9,10 +9,13 @@ import { ConfigurationService } from "./service.ts";
 import type { ConnectionProbe } from "./probe.ts";
 import { configurationDefaults, resolveAgentConfiguration, resolveRoleConfiguration } from "./layers.ts";
 import type { ModelCompatibility } from "../shared/model-compatibility.ts";
+import type { DiscoverModels } from "./discovery.ts";
+import type { LoadModelCatalog } from "./model-catalog.ts";
+import type { Catalog } from "@opencode-ai/models";
 
 const cleanups: (() => void)[] = [];
 afterEach(() => { cleanups.splice(0).reverse().forEach(cleanup => cleanup()); vi.useRealTimers(); });
-function setup(probe: ConnectionProbe = async () => {}, available = true, timeout = 30_000) {
+function setup(probe: ConnectionProbe = async () => {}, available = true, timeout = 30_000, discover?: DiscoverModels, catalog?: LoadModelCatalog) {
   const root = mkdtempSync(join(tmpdir(), "core-configuration-"));
   const ciphertexts = new Map<string, string>();
   const protector = {
@@ -21,7 +24,7 @@ function setup(probe: ConnectionProbe = async () => {}, available = true, timeou
     decrypt: vi.fn(async (encrypted: string) => { const value = ciphertexts.get(Buffer.from(encrypted, "base64").toString()); if (!value) throw new Error("Cannot decrypt"); return value; }),
   };
   const changed = vi.fn();
-  const service = new ConfigurationService(root, protector, changed, probe, timeout);
+  const service = new ConfigurationService(root, protector, changed, probe, timeout, discover, catalog);
   cleanups.push(() => { service.close(); rmSync(root, { recursive: true, force: true }); });
   return { root, service, protector, changed };
 }
@@ -41,6 +44,132 @@ function roleValue(snapshot: ConfigurationSnapshot, id: string) {
 }
 
 describe("真实配置与消费边界", () => {
+  // 参数获取在队列外等待，成功才原子保存；网络失败和期间改动不得污染已保存配置。
+  it("目录参数覆盖旧值并持久化，获取失败保留原值且返回明确提示", async () => {
+    const data: Catalog = { providers: {}, models: { "lab/test-model": {
+      id: "lab/test-model", name: "Test", description: "", reasoning: true, tool_call: false,
+      limit: { context: 128000, output: 16000 },
+    } } };
+    const catalog = vi.fn<LoadModelCatalog>(async () => data);
+    const { service, root, protector } = setup(undefined, true, 30_000, undefined, catalog);
+    const { modelId } = await addModel(service);
+    const updated = await service.execute({ type: "model.parameters", model: modelId });
+    expect(updated.snapshot.models[0]).toMatchObject({
+      contextWindow: 128000, capabilities: { reasoning: true, tools: false }, generation: { maxOutputTokens: 16000 },
+    });
+    expect(updated.parameterUpdate).toEqual({ source: "lab/test-model", unfilled: ["thinkingLevels"] });
+    const reopened = new ConfigurationService(root, protector);
+    cleanups.push(() => reopened.close());
+    expect(reopened.current().models).toEqual(updated.snapshot.models);
+    catalog.mockRejectedValueOnce(new Error("Sensitive upstream diagnostic"));
+    await expect(service.execute({ type: "model.parameters", model: modelId }))
+      .rejects.toMatchObject({ code: "unavailable", message: "Model catalog request failed.", display: { id: "modelCatalog.failed" } });
+    expect(service.current().models).toEqual(updated.snapshot.models);
+  });
+
+  it("目录网络等待不阻塞配置队列，期间模型修改与退出阻止迟到覆盖", async () => {
+    let finish!: (catalog: Catalog) => void;
+    let signal!: AbortSignal;
+    const catalog: LoadModelCatalog = input => { signal = input; return new Promise(resolve => { finish = resolve; }); };
+    const { service } = setup(undefined, true, 30_000, undefined, catalog);
+    const { modelId } = await addModel(service);
+    const request = service.execute({ type: "model.parameters", model: modelId });
+    const rejected = expect(request).rejects.toMatchObject({ code: "conflict", display: { id: "modelCatalog.changed" } });
+    const snapshot = (await service.execute({ type: "read" })).snapshot;
+    const { revision: _revision, ...value } = snapshot.models[0]!;
+    await service.execute({ type: "model.save", id: modelId, value: { ...value, contextWindow: 777 } });
+    finish({ providers: {}, models: {} });
+    await rejected;
+    expect(service.current().models[0]?.contextWindow).toBe(777);
+    const second = service.execute({ type: "model.parameters", model: modelId });
+    const closed = expect(second).rejects.toMatchObject({ code: "unavailable" });
+    await service.execute({ type: "read" });
+    service.close();
+    expect(signal.aborted).toBe(true);
+    finish({ providers: {}, models: {} });
+    await closed;
+  });
+  // 删除后重建会重新从 revision=1 开始，仅比较修订号会把旧请求写入新记录。
+  it("删除再以相同 ID 与修订号重建模型，旧参数请求仍失效", async () => {
+    let finish!: (catalog: Catalog) => void;
+    const catalog: LoadModelCatalog = () => new Promise(resolve => { finish = resolve; });
+    const { service } = setup(undefined, true, 30_000, undefined, catalog);
+    const { modelId, snapshot } = await addModel(service);
+    const { revision: _revision, ...value } = snapshot.models[0]!;
+    const request = service.execute({ type: "model.parameters", model: modelId });
+    const rejected = expect(request).rejects.toMatchObject({ code: "conflict", display: { id: "modelCatalog.changed" } });
+    await service.execute({ type: "remove", kind: "model", id: modelId });
+    await service.execute({ type: "model.save", id: null, value });
+    finish({ providers: {}, models: {} });
+    await rejected;
+    expect(service.current().models).toEqual(snapshot.models);
+  });
+  // 发现不写配置；批量添加只接受本次目录中的 ID，已有记录与用户覆盖永不被刷新替换。
+  it("发现后批量添加、去重和重开保留配置；连接变化使旧列表失效", async () => {
+    const discover = vi.fn<DiscoverModels>(async () => [
+      { modelId: "test-model", name: "Upstream changed name" },
+      { modelId: "new-model", name: "New", contextWindow: 64000, reasoning: true, thinkingLevels: ["low", "high"] },
+    ]);
+    const { service, root, protector } = setup(undefined, true, 30_000, discover);
+    const { snapshot } = await addModel(service, "api_key");
+    const original = snapshot.models[0];
+    const started = await service.execute({ type: "discovery.start", providerId: "local" });
+    await vi.waitFor(() => expect(service.current().discoveries[0]?.state).toBe("succeeded"));
+    expect(discover.mock.calls[0]?.[0].apiKey).toBe("test-key-not-for-network");
+    expect(service.current().models).toEqual([original]);
+    const id = started.savedId!;
+    await expect(service.execute({ type: "discovery.add", id, modelIds: ["new-model", "absent"] })).rejects.toMatchObject({ code: "invalid_request" });
+    expect(service.current().models).toEqual([original]);
+    const added = await service.execute({ type: "discovery.add", id, modelIds: ["test-model", "new-model", "new-model"] });
+    expect(added.snapshot.models).toHaveLength(2);
+    expect(added.snapshot.models[0]).toEqual(original);
+    expect(added.snapshot.models[1]).toMatchObject({
+      modelId: "new-model", contextWindow: 64000, capabilities: { reasoning: true, thinkingLevels: ["low", "high"] },
+      generation: { maxOutputTokens: null }, compatibility: [],
+    });
+    await service.execute({ type: "discovery.add", id, modelIds: ["new-model"] });
+    expect(service.current().models).toEqual(added.snapshot.models);
+    const reopened = new ConfigurationService(root, protector);
+    cleanups.push(() => reopened.close());
+    expect(reopened.current().models).toEqual(added.snapshot.models);
+    expect(reopened.current().discoveries).toEqual([]);
+    await service.execute({ type: "provider.save", id: "local", value: providerValue, credential: { action: "keep" } });
+    await expect(service.execute({ type: "discovery.add", id, modelIds: ["new-model"] })).rejects.toMatchObject({ code: "not_found" });
+  });
+
+  // 网络等待不能占用配置队列；取消、超时和刷新后的迟到成功不能复活旧结果。
+  it("发现等待不阻塞配置读取；取消、刷新、超时与关闭均终止在途请求", async () => {
+    vi.useFakeTimers();
+    const pending: { resolve: (models: []) => void; signal: AbortSignal }[] = [];
+    const discover: DiscoverModels = ({ signal }) => new Promise(resolve => pending.push({ resolve, signal }));
+    const { service, changed } = setup(undefined, true, 100, discover);
+    await service.execute({ type: "provider.save", id: null, value: providerValue, credential: { action: "keep" } });
+    const first = await service.execute({ type: "discovery.start", providerId: "local" });
+    expect((await service.execute({ type: "read" })).snapshot.discoveries[0]?.state).toBe("running");
+    await service.execute({ type: "discovery.cancel", id: first.savedId! });
+    expect(pending[0]!.signal.aborted).toBe(true);
+    pending[0]!.resolve([]);
+    await Promise.resolve();
+    expect(service.current().discoveries[0]?.state).toBe("cancelled");
+    await service.execute({ type: "discovery.start", providerId: "local" });
+    await service.execute({ type: "discovery.start", providerId: "local" });
+    expect(pending[1]!.signal.aborted).toBe(true);
+    pending[1]!.resolve([]);
+    await vi.advanceTimersByTimeAsync(101);
+    expect(service.current().discoveries).toHaveLength(1);
+    expect(service.current().discoveries[0]).toMatchObject({ state: "failed", error: "timeout", models: [] });
+    expect(pending[2]!.signal.aborted).toBe(true);
+    pending[2]!.resolve([]);
+    await Promise.resolve();
+    expect(service.current().discoveries[0]?.state).toBe("failed");
+    await service.execute({ type: "discovery.start", providerId: "local" });
+    const notifications = changed.mock.calls.length;
+    service.close();
+    expect(pending[3]!.signal.aborted).toBe(true);
+    pending[3]!.resolve([]);
+    await Promise.resolve();
+    expect(changed).toHaveBeenCalledTimes(notifications);
+  });
   // 两层独立保存显式条目；参考协议不拦截保存，非法候选不能污染已保存数据。
   it.each(["provider", "model"] as const)("%s 兼容条目独立保存并重开，非法条目拒绝且移除后不重现", async kind => {
     const { service, root, protector } = setup();

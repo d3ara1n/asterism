@@ -16,7 +16,7 @@ function configuration(): ConfigurationSnapshot {
     models: [{ revision: 1, providerId: "p", name: "Test", modelId: "test", enabled: true, contextWindow: null, compatibility: [],
       capabilities: { reasoning: true, tools: true, thinkingLevels: [...thinkingLevels] },
       generation: { temperature: null, topP: null, maxOutputTokens: null } }],
-    defaults: { agents: {}, roles: {} }, overrides: { agents: {}, roles: {} }, tests: [], credentialStorageAvailable: false,
+    defaults: { agents: {}, roles: {} }, overrides: { agents: {}, roles: {} }, tests: [], discoveries: [], credentialStorageAvailable: false,
   };
 }
 

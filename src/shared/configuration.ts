@@ -5,7 +5,7 @@ import { modelCompatibilitySchema } from "./model-compatibility.ts";
 
 export const configurationChannel = coreChannel("configuration");
 export const configurationChangedChannel = coreChannel("configuration-changed");
-export const configurationVersion = 6;
+export const configurationVersion = 8;
 const id = z.string().min(1).max(160);
 const name = z.string().trim().min(1).max(160);
 const revision = z.number().int().positive();
@@ -75,9 +75,33 @@ export const connectionTestSchema = z.strictObject({
   state: z.enum(["running", "succeeded", "failed", "cancelled"]), startedAt: z.string(),
   durationMs: z.number().nonnegative().nullable(), error: testErrorSchema.nullable(), message: z.string().nullable(),
 });
+/** 发现只保存端点明确声明的资料；缺失字段不代表不支持。 */
+export const discoveredModelSchema = z.strictObject({
+  modelId: serverModelId, name,
+  contextWindow: z.number().int().positive().optional(),
+  reasoning: z.boolean().optional(),
+  thinkingLevels: z.array(thinkingSchema).optional(),
+});
+export const modelDiscoverySchema = z.strictObject({
+  id, providerId: providerIdSchema, providerRevision: revision,
+  state: z.enum(["running", "succeeded", "failed", "cancelled"]),
+  models: z.array(discoveredModelSchema),
+  error: z.enum(["configuration", "credential", "authentication", "unsupported", "rate_limit", "network", "timeout", "protocol", "server", "cancelled"]).nullable(),
+});
+export type DiscoveredModel = z.infer<typeof discoveredModelSchema>;
+export type ModelDiscovery = z.infer<typeof modelDiscoverySchema>;
+/** 手动新建与发现添加共用初始值；只用已知资料覆盖默认值。 */
+export function createModelInput(providerId: string, model: DiscoveredModel): z.infer<typeof modelInputSchema> {
+  return {
+    providerId, modelId: model.modelId, name: model.name, enabled: true,
+    contextWindow: model.contextWindow ?? null, compatibility: [],
+    capabilities: { reasoning: model.reasoning ?? true, tools: true, thinkingLevels: model.thinkingLevels ?? [...thinkingLevels] },
+    generation: { temperature: null, topP: null, maxOutputTokens: null },
+  };
+}
 export const configurationSnapshotSchema = z.strictObject({
   providers: z.array(providerSchema), models: z.array(modelSchema), roles: z.array(modelRoleSchema), agents: z.array(agentSchema),
-  tests: z.array(connectionTestSchema), credentialStorageAvailable: z.boolean(),
+  tests: z.array(connectionTestSchema), discoveries: z.array(modelDiscoverySchema), credentialStorageAvailable: z.boolean(),
   defaults: z.strictObject({
     roles: z.record(id, modelRoleInputSchema), agents: z.record(id, agentInputSchema),
   }),
@@ -100,12 +124,21 @@ export const configurationCommandSchema = z.discriminatedUnion("type", [
   z.strictObject({ type: z.literal("remove"), kind: z.enum(["provider", "model", "role", "agent"]), id: z.string().min(1).max(321) }),
   z.strictObject({ type: z.literal("test.start"), model: modelExpressionSchema }),
   z.strictObject({ type: z.literal("test.cancel"), id }),
+  z.strictObject({ type: z.literal("discovery.start"), providerId: providerIdSchema }),
+  z.strictObject({ type: z.literal("discovery.cancel"), id }),
+  z.strictObject({ type: z.literal("discovery.add"), id, modelIds: z.array(serverModelId).min(1) }),
+  z.strictObject({ type: z.literal("model.parameters"), model: modelExpressionSchema }),
 ]);
+export const modelParameterUpdateSchema = z.strictObject({
+  source: z.string(),
+  unfilled: z.array(z.enum(["contextWindow", "maxOutputTokens", "reasoning", "tools", "thinkingLevels"])),
+});
+export type ModelParameterUpdate = z.infer<typeof modelParameterUpdateSchema>;
 export const configurationErrorSchema = z.strictObject({
   code: z.enum(["invalid_request", "not_found", "conflict", "unavailable", "internal"]), message: z.string(), display: uiTextSchema.optional(),
 });
 export const configurationResultSchema = z.discriminatedUnion("ok", [
-  z.strictObject({ ok: z.literal(true), snapshot: configurationSnapshotSchema, savedId: z.string().max(321).nullable() }),
+  z.strictObject({ ok: z.literal(true), snapshot: configurationSnapshotSchema, savedId: z.string().max(321).nullable(), parameterUpdate: modelParameterUpdateSchema.optional() }),
   z.strictObject({ ok: z.literal(false), error: configurationErrorSchema }),
 ]);
 export const configurationRequestSchema = z.strictObject({ kind: z.literal("configuration.request"), version: z.literal(configurationVersion), id: z.string().uuid(), command: configurationCommandSchema });

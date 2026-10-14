@@ -1,7 +1,7 @@
 import { Plus, Zap, Search, ExternalLink, ChevronDown } from "lucide-react";
 import { useMemo, useState } from "react";
 
-import { modelReference, thinkingSchema, type ConfigurationSnapshot, type ConnectionTest, type Provider, type ProviderInput, type ProviderModel, type TestError } from "../../../shared/configuration";
+import { createModelInput, modelReference, thinkingSchema, type ConfigurationSnapshot, type ConnectionTest, type Provider, type ProviderInput, type ProviderModel, type TestError } from "../../../shared/configuration";
 import { presetGroups, providerPresets, providerPresetDraft, type ProviderPreset, type ProviderDraft } from "../../../shared/provider-presets";
 import { commonMessages } from "../../messages/common";
 import { providersMessages } from "../../messages/providers";
@@ -23,11 +23,14 @@ import { Editor, TextField, ChoiceField, NumberField } from "./forms";
 import { useSettingsConfiguration } from "./state";
 import { ModelCompatibilityEditor } from "./ModelCompatibilityEditor";
 import { modelProtocolLabels } from "./protocols";
+import { ModelDiscoveryPicker } from "./ModelDiscoveryPicker";
+import { useModelParameters } from "./ModelParameters";
+import { modelCatalogMessages } from "../../../shared/model-catalog-messages";
 
 const protocols = Object.entries(modelProtocolLabels).map(([value, label]) => ({ value, label }));
 const protocolLabel = (value: string) => protocols.find(item => item.value === value)?.label ?? value;
 const islandWidth = { min: 400, grow: 1, max: 620 };
-type ModelValue = Omit<ProviderModel, "id" | "revision">;
+type ModelValue = Omit<ProviderModel, "revision">;
 type ProviderValue = ProviderDraft;
 
 /* ---------- 状态推导：列表与详情共用，均直接读取最新快照 ---------- */
@@ -280,9 +283,17 @@ function ProviderEditor({ initialId, initialValue = blank }: { initialId: string
     {current && snapshot && <section className="mt-8 border-t pt-5">
       <div className="mb-3 flex items-center justify-between gap-2">
         <h3 className="type-section">{i18n.formatMessage(providersMessages.models)}</h3>
-        {/* 模型发现尚未接入，入口待 plans/todo-2026-10-07-model-catalog.md 落地后加在此处。 */}
-        <Button size="sm" variant="outline" disabled={busy} onClick={event => openModel(null, event.currentTarget)}><Plus />{i18n.formatMessage(providersMessages.addModel)}</Button>
+        <div className="flex flex-wrap justify-end gap-2">
+          <Button size="sm" variant="outline" disabled={busy || dirty} onClick={async event => {
+            const origin = event.currentTarget;
+            const result = await run({ type: "discovery.start", providerId: current.id });
+            if (result.ok) island.open({ id: `discover-${current.id}`, label: providersMessages.fetchModels, width: islandWidth, origin,
+              render: () => <ModelDiscoveryPicker providerId={current.id} /> });
+          }}><Search />{i18n.text(providersMessages.fetchModels)}</Button>
+          <Button size="sm" variant="outline" disabled={busy} onClick={event => openModel(null, event.currentTarget)}><Plus />{i18n.formatMessage(providersMessages.addModel)}</Button>
+        </div>
       </div>
+      {dirty && <p className="type-caption mb-3">{i18n.text(providersMessages.saveBeforeDiscovery)}</p>}
       {models.length ? <ItemGroup className="surface">{models.map((model, index) => <div key={modelReference(model)}>{index > 0 && <ItemSeparator />}
         <ModelRow model={model} provider={current} selected={island.child === `model-${modelReference(model)}`} onOpen={origin => openModel(modelReference(model), origin)} />
       </div>)}</ItemGroup>
@@ -308,7 +319,7 @@ function ModelRow({ model, provider, selected, onOpen }: { model: ProviderModel;
   const running = test?.state === "running";
   return <Item size="sm" className={cn("relative transition-colors hover:bg-accent/60 has-[button:focus-visible]:bg-accent/60", selected && "bg-accent hover:bg-accent")}>
     <ItemContent className="min-w-0">
-      <button type="button" className="text-left outline-none after:absolute after:inset-0 focus-visible:underline" aria-current={selected || undefined}
+      <button type="button" disabled={busy} className="text-left outline-none after:absolute after:inset-0 focus-visible:underline" aria-current={selected || undefined}
         onClick={event => onOpen(event.currentTarget)}><ItemTitle>{model.name}</ItemTitle></button>
       <ItemDescription className="truncate"><span className="font-mono">{model.modelId}</span>{test && <> · <TestResult test={test} stale={stale} /></>}</ItemDescription>
     </ItemContent>
@@ -330,9 +341,7 @@ function ModelEditor({ initialId, providerId }: { initialId: string | null; prov
   const [id, setId] = useState(initialId);
   const current = snapshot?.models.find(model => modelReference(model) === id);
   const provider = snapshot?.providers.find(item => item.id === providerId);
-  const [value, setValue] = useState<ModelValue>(() => current ? modelValue(current) : {
-    providerId, name: "", modelId: "", enabled: true, contextWindow: null, compatibility: [],
-    capabilities: { reasoning: false, tools: true, thinkingLevels: [...thinkingSchema.options] }, generation: { temperature: null, topP: null, maxOutputTokens: null } });
+  const [value, setValue] = useState<ModelValue>(() => current ? modelValue(current) : createModelInput(providerId, { name: "", modelId: "" }));
   const [advanced, setAdvanced] = useState(false);
   const set = <K extends keyof ModelValue>(field: K, next: ModelValue[K]) => setValue(previous => ({ ...previous, [field]: next }));
   // 与提供商一致：名称在前并生成 ID；手动改过 ID 或编辑已有模型时不再覆盖。
@@ -343,6 +352,7 @@ function ModelEditor({ initialId, providerId }: { initialId: string | null; prov
   const test = current && snapshot ? latestTest(snapshot, modelReference(current)) : undefined;
   const stale = !!test && !!current && (test.modelRevision !== current.revision || test.providerRevision !== provider?.revision);
   const users = current && snapshot ? snapshot.roles.filter(role => role.model === modelReference(current)) : [];
+  const parameters = useModelParameters(current, dirty, updated => setValue(modelValue(updated)));
 
   return <Editor form="model-form" title={current?.name ?? i18n.formatMessage(providersMessages.newModel)} description={provider?.name} dirty={dirty}
     remove={current ? { title: i18n.formatMessage(providersMessages.deleteModelTitle),
@@ -358,7 +368,7 @@ function ModelEditor({ initialId, providerId }: { initialId: string | null; prov
         if (persisted) setValue(modelValue(persisted));
         setId(result.savedId);
       }
-    }}><FieldGroup>
+    }}><fieldset disabled={parameters.pending} className="contents"><FieldGroup>
       <TextField label={i18n.formatMessage(providersMessages.modelDisplayName)} value={value.name} onChange={setName} required />
       <TextField label={i18n.formatMessage(providersMessages.serverModelId)} value={value.modelId} onChange={next => { setIdEdited(true); set("modelId", next); }} required hint={i18n.formatMessage(providersMessages.serverModelIdHint)} />
       <FieldSet><FieldLegend variant="label">{i18n.formatMessage(providersMessages.capabilities)}</FieldLegend>
@@ -410,7 +420,16 @@ function ModelEditor({ initialId, providerId }: { initialId: string | null; prov
         <NumberField label={i18n.formatMessage(providersMessages.maximumOutputTokens)} value={value.generation.maxOutputTokens} onChange={next => set("generation", { ...value.generation, maxOutputTokens: next })} min={1} integer />
       </FieldGroup>}
       <ModelCompatibilityEditor value={value.compatibility} inherited={provider?.compatibility ?? []} onChange={next => set("compatibility", next)} />
+      </fieldset>
     </form>
+    <section className="mt-5 flex flex-col gap-3">
+      <div className="flex items-center justify-between gap-3">
+        <p className="type-caption">{i18n.text(modelCatalogMessages.hint)}</p>
+        {parameters.action}
+      </div>
+      {dirty && <p className="type-caption">{i18n.text(modelCatalogMessages.saveFirst)}</p>}
+      {parameters.feedback}
+    </section>
     {current && <section className="mt-7 border-t pt-5">
       <div className="flex items-center justify-between gap-2">
         <h3 className="type-section">{i18n.formatMessage(providersMessages.connectionTest)}</h3>
