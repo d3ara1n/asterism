@@ -18,7 +18,7 @@
 
 ## 工具编写与错误自愈准则
 
-共享工具契约在 `shared/declarations.ts` 中通过 `defineTool({ id, name, description, guidelines, argsSchema })` 定义（当前含 `List / Read / Edit / Write / See`）；资源模块通过 `defineImplementation` 与 `implementTool` 绑定本资源的 `target` 和 `result` schema。一级宿主入口（`resource_list / inspect / call`）固定在 `src/tools/core.ts` 与 `src/execution/core.ts` 中维护，不进入模块工具目录。正文工具与 `toModel` 的具体契约见 [运行时](../../docs/runtime.md#原生正文工具与目录操作)。
+共享资源工具契约在 `shared/declarations.ts` 中通过 `defineTool({ id, name, description, guidelines, argsSchema })` 定义（当前含 `List / Read / Edit / Write / See`）；资源模块通过 `defineImplementation` 与 `implementTool` 绑定本资源的 `target` 和 `result` schema。现有宿主顶层工具（`resource_list / inspect / call`）实现在 `src/tools/core.ts` 与 `src/execution/core.ts`；插件顶层工具的模块贡献入口尚待实现，设计见 [工具贡献](../../docs/plugin-sdk.md#工具贡献)。正文工具与 `toModel` 的具体契约见 [运行时](../../docs/runtime.md#原生正文工具与目录操作)。
 
 新增或修改工具时，必须确保模型能凭首次说明构造合法调用，并凭错误反馈自愈：
 - **Schema 描述完整**：`args`、`target`、`result` schema 均须有非空整体 `.describe(...)`，各字段明确 JSON 类型、定位基准、空值含义与限制，要求直接传 JSON 值而非序列化字符串。
