@@ -1,8 +1,10 @@
 # 插件 SDK 与功能组合
 
-本文规定插件 SDK 的接口、组合方式与宿主职责。产品与授权原则见 [运行时](runtime.md)，实现进度和迁移验收见 [插件计划](../plans/todo-2026-10-12-plugin-system.md)。SDK 的 `contracts`、`runtime`、`renderer` 三个入口分别承担纯契约、后台接口和前端接口。
+本文规定插件 SDK（`@atelier/sdk`）的接口、模块组合方式与宿主职责。产品与授权原则见 [运行时](runtime.md)，宿主进程与打包机制见 [技术架构](architecture.md#应用组合与宿主机制)，作者快速上手与代码示例见 [SDK 作者指南](../packages/sdk/README.md)。
 
 ## 模块与装配
+
+SDK 的 `contracts`、`runtime`、`renderer` 三个子路径分别承担纯契约（不依赖 Node 或 React）、后台接口和前端接口：
 
 | 层次 | 职责 | 接口的消费方 |
 | --- | --- | --- |
@@ -11,323 +13,85 @@
 | 插件业务模块 | 配置选择、输入受理、执行循环、正文编辑与视图等领域功能 | 插件自己的装配入口和其他业务模块；公开领域接口也可由应用组合层消费 |
 | 应用组合层 | 连接宿主能力与内置插件公开领域接口，组成用户操作入口 | Atelier 应用 |
 
-`PluginModule.setup` 是贡献装配入口，接收完整 `PluginContext`，创建业务模块、连接依赖并返回 `ModuleContribution`。业务模块是普通函数、闭包或对象，只接收需要的具名接口；复用一个业务模块不要求将它注册为 `PluginModule`。聚合模块承担依赖连接与整体语义，不能要求调用方自行维护隐藏的调用顺序。
+`PluginModule.setup` 是贡献装配入口，接收完整 `PluginContext`，创建业务模块、连接依赖并返回 `ModuleContribution`。业务模块是普通函数、闭包或对象，只接收需要的具名接口；复用一个业务模块不要求将它注册为 `PluginModule`。
 
-一项功能的纯契约、后台实现和前端视图共置、分入口编译。组合以显式导入和参数传递完成，不引入通用服务查找、动态依赖注入容器、无具型契约的字符串事件总线或任意生命周期 hook 集合。宿主仍在启动时装配并冻结贡献；业务组合不改变插件安装、启用和身份语义。
-
-应用组合层可显式引入内置插件公开领域契约；通用宿主机制与插件分别依赖 SDK，SDK 不包含具体插件领域规则。公开导入只建立代码依赖，不自动取得插件 context 或写入身份，记录仍经具身份的操作柄校验与提交。完整边界见 [应用组合与宿主机制](architecture.md#应用组合与宿主机制)。
+一项功能的纯契约、后台实现和前端视图共置、分入口编译。组合以显式导入和参数传递完成，不引入通用服务查找、动态依赖注入容器、无具型契约的字符串事件总线或任意生命周期 hook 集合。宿主在启动时装配并冻结贡献，安装、启用、禁用与升级重启后生效。贡献身份由宿主按插件命名空间补全为 `<pluginId>/<name>`（工具契约 `name` 为模型可见全局短名）。插件缺席时历史与对象保留，资源投影为 `atelier.core/missing-resource`，视图回退默认渲染与原始数据。
 
 ## 公共模块与契约身份
 
-插件通过包的 `exports["./public"]` 导出愿意共享的契约、配置访问接口、服务或状态，消费者使用普通 `import { Read } from "@example/tools/public"`。路径由提供方的 package.json `name` 决定，源文件可自由命名，并支持标准条件导出。消费者在 dependencies、peerDependencies 或 optionalDependencies 中声明提供方包；实际使用的公共依赖必须已登记并启用。宿主选择登记的实际提供方，包管理器负责安装与版本解析，宿主不另做 npm 版本求解。
+插件通过 `package.json` 的 `exports["./public"]` 导出愿意共享的契约、配置访问接口、服务或状态，消费者在依赖中声明提供方包并使用 `import { ... } from "<包名>/public"`。
 
-宿主在每个运行环境中统一构建启用插件的模块图，ESM 共享 chunk 保证提供方自身与消费者引用同一次模块执行的真实导出；公共模块不重复内联到各自独立的 bundle。构建产物按实际内容缓存，公共源码变化会生成新的图；插件安装、启用和更新仍在重启后生效。
+宿主在每个运行环境（后台、前端分别独立）中统一构建启用插件的 ESM 模块图，保证提供方自身与所有消费者引用同一次模块执行的**真实导出实例**（含 re-export）。消费者要绑定同一个工具或动作契约，必须取得同一个声明对象；复制声明并保留相同 ID 不构成共享。稳定标识仅用于寻址、持久化及跨进程关联；不同声明占用同一契约身份、公共依赖缺失或存在循环初始化依赖时明确报错。
 
-公共入口可以是 re-export，宿主必须保留其底层对象的实际共享关系；提供方的私有入口也不能再创建同一公共声明的另一份副本。共享对象的内容与操作接口由提供方决定，宿主不要求每个对象登记版本、不要求作者使用 globalThis，也不以工具注册表承担通用数据交换。
-
-声明实例的共享由模块加载保证。消费者要绑定同一个工具契约，须取得同一个声明对象；复制声明并保留相同 ID 或版本不构成共享。稳定标识用于寻址、持久化及跨进程关联，不证明两个运行时对象相同。不同声明占用同一契约身份、公共依赖缺失或无法消解时明确报错，不按字段相似性或版本数字合并。
-
-实例唯一性以运行环境为边界：后台与前端分别加载自己的模块实例，跨进程通过明确接口传递数据。运行期服务的初始化和清理由提供方负责；宿主依据公共导入关系先初始化提供方、再初始化消费者，关闭先等待托管工作收束，再按反向依赖顺序清理。提供方失败则依赖方不可用；循环初始化依赖明确报错。工具名称覆盖仍按用户列表顺序，与初始化顺序分开；同一资源类型与工具名只能有一个当前实现。
+运行期服务的初始化和清理由提供方负责：宿主依据公共导入关系先初始化提供方、再初始化消费者；关闭时先等待托管工作收束，再按反向依赖顺序清理。
 
 ## 瞬态事件与插件调用
 
-事件总线在宿主管理的全局通信机制中提供具名、有归属、具型的瞬态投递。插件、模块与应用外壳共用寻址空间，不按会话或模块建立私有总线，也不依赖页面或卡片是否打开。消费者显式导入认识的领域契约，宿主只向匹配的订阅投递；全局可订阅不等于向所有消费者广播全部载荷。事件本身不写时间线、不构成模型上下文、不移动执行游标。
+事件总线在宿主管理的全局通信机制中提供具名、有归属、具型的瞬态投递。插件、模块与应用外壳共用寻址空间，不按会话或模块分割，不写时间线、不构成模型上下文、不移动执行游标。机制遵循「信任插件，暴露问题」，不设配额、溢出丢弃或公平调度。
 
-机制遵循 KISS 与「信任插件，暴露问题」：只提供契约校验、来源绑定、按序投递、latest 合并与生命周期清理，不设配额、溢出或公平调度。SDK、后台／前端事件管线、会话标题和资源状态 badge 已接通；toast 待实际发布方接入，实施进度见 [事件投递与插件互相调用计划](../plans/todo-2026-10-13-event-bus-plugin-calls.md)。
+### 事件契约、来源与投递语义
 
-### 事件契约与来源
-
-事件在纯契约入口以 `ns.event(name, { schema, source, semantics })` 声明，身份为 `<namespace>/<name>`。声明归属方装配登记，发布者与订阅者引用共享声明；同运行环境要求同一契约实例，跨进程用稳定 ID 关联各端声明。宿主使用已装配契约校验，不接收消息临时提供的 schema。公共领域契约由插件公共入口或普通领域共识包提供，不把具体领域规则放入 SDK。
-
-模块通过 `ModuleContribution.events` 登记本插件声明，source 可取 `plugin / resource / any`；`host` 只用于软件本身发布的公共契约，信封来源为 null，插件不能声明或发布。发布参数由 schema 输入类型推导，handler 接收解析后的输出；原始输入与解析值均须为 JSON。跨进程携带原始输入，由消费端契约解码，避免对已转换值重复套用输入 schema。snapshot 的 key 指定顶层标量字段，空数组表示按来源保持一个当前值。
+事件在纯契约入口以 `ns.event(name, { schema, source, semantics })` 声明，通过 `ModuleContribution.events` 登记。`source` 可取 `plugin / resource / any`（`host` 仅用于软件自身发布的公共契约，信封 `source` 为 null）。公开事件信封包含 `contract: { id }`、`emittedAt`、`source: { plugin, resource }` 与具型 `data`。`plugin.ipc.events.publish` 发布插件级事件（`resource: null`），`object.events.publish` 绑定经校验的资源来源 `ResourceRef`。
 
 | 契约语义 | 含义 | 消费方式 |
 | --- | --- | --- |
-| `occurrence` | 每次发生有独立意义，如资源通知；不允许替代 | `all` |
-| `snapshot` | 同键的新值完整替代旧值，如当前进度；契约声明业务键字段 | `all` 或 `latest` |
+| `occurrence` | 每次发生有独立意义（如资源通知），不允许替代 | `all`（按受理顺序逐条消费） |
+| `snapshot` | 同键的新值完整替代旧值（如当前进度），声明顶层标量 `key` 字段（空数组表示按来源保持一个值） | `all` 或 `latest`（替换接收端队列中尚未消费的同键值） |
 
-快照语义不用于增量。合并键由契约身份、宿主来源与声明的业务键共同组成，不能跨资源覆盖。契约允许替代不意味着所有消费者都必须合并；逐条消费与最新值消费可以同时存在。
-
-```ts
-const DownloadProgress = ns.event("download-progress", {
-  schema: downloadProgressSchema,
-  source: "resource",
-  semantics: { kind: "snapshot", key: ["downloadId"] },
-});
-```
-
-公开事件信封包含 `contract: { id }`、`emittedAt`、`source: { plugin, resource }` 与具型 `data`。资源来源使用含会话 ID、资源 ID 和类型的 `ResourceRef`，插件级事件的 resource 为 null，关联会话或对象可由领域载荷表达。
-
-来源复用记录的身份原则：插件 stamp 由宿主按发布通道确定，资源来源由绑定且经校验的操作柄确定。`plugin.ipc.events.publish(contract, data)` 发布插件级事件；`object.events.publish(contract, data)` 绑定资源来源。发布参数不接受 source；宿主校验契约要求的来源类别、操作柄有效期与资源身份。公共资源通知必须带插件与资源来源。消费公共契约不取得声明者身份，收到事件或知道对象 ID 也不构成资源操作授权。
-
-### 订阅与消费
-
-`plugin.ipc.events.subscribe(contract, options, handler)` 返回宿主管理的订阅；应用外壳使用同形接口。默认覆盖所有会话与来源，可用声明式来源筛选在入队前缩小范围，不把任意 JavaScript predicate 作为 IPC 路由协议。模块可以接收窄接口，订阅清理由宿主关联模块生命周期，无须增加模块通信地址。
-
-后台 setup 可先订阅再返回贡献，插件装配成功后建立订阅，不能在同步 setup 中等待 ready 或发布事件。前端模块通过 `prepare({ events, signal })` 建立与模块准备结果和应用生命周期绑定的全局订阅；组件通过 `useRendererEvents()` 取用同形订阅接口，并在 effect 清理时关闭自己建立的订阅。应用外壳使用同一个 EventClient。作者示例见 [events.ts](../packages/sdk/examples/events.ts)。
-
-```ts
-const subscription = plugin.ipc.events.subscribe(
-  DownloadProgress,
-  { delivery: "latest", signal },
-  async (event, { signal }) => {
-    await consumeProgress(event.source, event.data, signal);
-  },
-);
-await subscription.ready;
-```
-
-订阅暴露 `ready: Promise<void>`、`closed: Promise<SubscriptionEnd>` 与 `close()`。ready 表示路由端已经建立订阅；closed 交付正常关闭、取消、契约不可用、消费失败或断连等结束原因。建立失败必须明确报告。
-
-默认 `delivery: "all"`，按受理顺序逐条消费；`latest` 只对 snapshot 契约有效，同键尚未消费的值被新值替换。保留的事件按其受理位置排序，不能在旧队列位置交付后到的新值。每个订阅串行等待自己的异步 handler，不等待其他订阅；各订阅之间不承诺完成顺序。
-
-### 投递
-
-发布只做校验、来源打戳与路由，立即放入各匹配订阅的队列，不执行订阅者代码、不等待回调；无匹配订阅时不保留事件。订阅期间不丢弃事件，队列不设上限；latest 合并只替换尚未交付的同键值，在接收端（后台订阅或 renderer）进行。跨进程逐条转发原始信封，依赖 IPC 本身的有序可靠。
-
-handler 抛错或 Promise rejection 只结束该订阅，不影响其他订阅。慢消费只占用自己的订阅，不因耗时被结束；需要取消时由订阅方关闭订阅或中止 signal。插件阻塞线程、刷屏或积压内存的后果直接可见，由用户判断并卸载，宿主不替其兜底。
-
-### 发布时机、关闭与恢复
-
-事件不参与事务：`publish` 调用即投递，不随事务回滚撤回。需要确保事件对应已生效变化时，在提交成功后再发布。会话标题事件在提交观察队列收束后按最终实际变化发布。
-
-取消订阅停止新投递并清理待处理队列，已运行的 handler 收到取消信号；宿主生命周期管理其真实结束，取消不等于收束。模块装配失败和插件关闭同样清理订阅，待运行工作结束后释放依赖设施。订阅存在或展示进度本身不构成资源写入活动，真正的修改仍经既有执行门面与授权检查。
-
-断连结束旧订阅，恢复连接重新订阅，不补发断连期间的事件。总线不保存可供晚订阅读取的当前状态。需要当前值的消费方先建立订阅，再读取领域快照；之后以事件为准。
-
-### 软件本身的公共事件
-
-SDK 从 `@atelier/sdk/contracts` 导出宿主发布的公共契约，供应用外壳与插件订阅。`SessionTitleChanged`（`atelier/session-title`）载荷为 `{ sessionId, title }`，snapshot 语义、键为 `sessionId`：宿主在最外层提交成功后比较实际标题，变化才发布，覆盖命名、回溯与分支切换；回滚与相同标题不发布。订阅方建立订阅后读取会话列表，之后以事件为准，未打开的会话同样更新。
-
-SDK 同时导出由宿主登记、资源发布的 `ResourceStatusChanged`（`atelier/resource-status`），属于宿主 API 8.0。载荷为 `{ title: UiText, status: "running" | "failed" | "awaiting" | "completed" }`，其中 running 可附带 `progress: { value: number }`，value 为 0～1，终态不接受 progress。title 为资源展示名称，资源身份来自信封。契约使用 `source: "resource"` 与 `snapshot` 语义，`key: []` 表示每资源一份完整状态，经 `object.events.publish` 发布；插件无需再次声明公共契约，也不能用插件级发布通道代替资源来源。四种状态都完整替换旧状态，不合并字段。awaiting 表示需要用户操作，不提供 reset、撤回、修订号或持久化当前值。
-
-### 公共消费与调用扩展
-
-会话标题、资源通知与资源状态分别由领域契约表达。资源通知复用来源机制显示 toast，不另设通知 API；展示文案沿用 `UiText`。外壳以 latest 订阅资源状态，按来源资源保留最新值，不同资源互不覆盖。用户进入会话只清除终态，running 及进度保留；当前会话收到终态时完整替换后立即消费。latest 只合并待消费值，外壳自行跳过相同展示数据的刷新，并按资源 ID 保持组件身份。外壳只订阅未来事件，不查询当前值或恢复已消费标记。展示状态不替代宿主运行生命周期的活动登记、取消与收束判定。
-
-插件互相调用与事件共用通信机制中的契约身份、来源绑定、端点连接与生命周期。调用表达明确目标及完成或失败，使用独立请求／结果／取消协议，不用事件拼装请求／应答。仅在设计中为 `plugin.ipc.calls` 留位，在有实际需求前不导出空调用 API，也不预定目标模型和返回契约；调用执行仍需真实目标与适用的资源授权。
+- **非事务与按序消费**：`publish` 只做校验、打戳与路由，立即入队并返回，不参与事务回滚（需对应已生效变化时在提交成功后发布）。每个订阅串行等待自己的异步 handler，失败或断连只结束该订阅。
+- **生命周期与恢复**：后台在 `setup` 中订阅，前端在 `prepare({ events })` 或组件 `useRendererEvents()` 中订阅。取消订阅停止新投递并传取消信号，宿主等待运行中的回调真实结束后释放设施。总线不保留供晚订阅读取的状态，断连不补发；需要当前值的消费者先订阅再读取领域快照。
+- **宿主公共事件**：`@atelier/sdk/contracts` 导出 `SessionTitleChanged`（`atelier/session-title`，最外层提交后实际标题变化时发布）与 `ResourceStatusChanged`（`atelier/resource-status`，资源级 snapshot，发布 `running / failed / awaiting / completed` 及可选 `progress`，外壳消费规则见 [工作台](workbench.md#会话列表状态与资源通知)）。
+- **插件互相调用（预留）**：设计上与事件共用契约身份、来源绑定与生命周期，采用独立请求／结果／取消协议（`plugin.ipc.calls`），有实际需求前不导出空 API。
 
 ## 数据兼容
 
-契约不要求手填数据版本。宿主按资源、记录、实现或数据的稳定 ID 找到对应消费方，实际兼容性由其 schema 决定；兼容的旧数据继续读取，不因插件发行版本变化而拒绝。插件可通过 union、transform 等 schema 解码逻辑兼容和转换旧形状；读取转换不改写保存的原始数据。不能解码时返回 unknown、不可用或默认展示，保留原始数据，迁移和语义兼容由插件负责。
+契约不要求手填数据版本。宿主按资源、记录、实现或数据的稳定 ID 找到对应消费方，实际兼容性由其 schema 解码决定；兼容旧数据继续读取（插件可用 union/transform 转换旧形状，读取不改写原始存储），不能解码时返回 `unknown`、不可用或回退默认视图并保留原始数据。宿主 SDK、IPC 与数据库的格式版本独立维护。
 
-形状校验不证明业务含义相同，宿主不猜测单位、字段用途或领域规则。SDK／IPC／宿主数据库的格式版本仍独立维护，用于宿主自身兼容边界；它们不作为插件数据的读取版本。
-
-## 对象读取与执行
+## 对象读取、执行与时间线查询
 
 | 接口 | 能力 |
 | --- | --- |
-| `SessionReader` | 会话身份、固定快照、当前会话数据读取、标题读取 |
-| `SessionExecutor` | 读取能力，以及同步提交（当前数据写入与当前时间线追加）和标题覆盖 |
-| `ObjectReader` | 资源身份、调用绑定的资源快照、当前对象数据读取、只读会话接口 |
-| `ObjectExecutor` | 读取能力，以及对象同步提交、可执行会话接口、对象二进制流发布 |
+| `SessionReader` | 会话身份、固定观察快照 `snapshot()`、当前会话数据读取 `get()`、标题读取 |
+| `SessionExecutor` | 读取能力 + 同步提交 `commit(writer => ...)`（当前数据 `set` 与当前时间线 `append`）+ 标题覆盖 `title.set` |
+| `ObjectReader` | 资源身份、调用绑定的资源快照 `snapshot()`、当前对象数据读取 `get()`、只读 `session` |
+| `ObjectExecutor` | 读取能力 + 对象同步提交 `commit`、可执行 `session`、对象二进制流发布 `publishStream` |
 
-资源 `project / inspect / context / links.tools`、动作准备与外部准备者只接收 `ObjectReader`。创建、动作执行和已授权工具执行接收 `ObjectExecutor`。只读门面的 `session` 也只暴露读取能力；宿主构造实际的窄门面，不只用 TypeScript 隐藏同一个可写对象的方法。
+资源 `project / inspect / context / links.tools`、动作准备与外部准备者只接收只读门面；创建、动作执行和已授权工具执行接收执行门面（工具执行结束后修改与流发布能力失效）。
 
-这些接口表达副作用职责，不构成插件沙箱。插件完全信任；宿主对显式修改仍检查身份、作用域与有效性。普通对象写入要求对象位于当前路径；创建门面加入宿主创建事务；已授权工具保留捕获对象快照和调用期间的修改能力，执行结束后对象提交、嵌套会话修改和流发布全部失效。
+- **同步提交**：`commit` 回调必须同步完成（返回 Promise 导致回滚），嵌套同会话提交加入外层事务，通知仅在最外层提交成功后派发。`writer.append(contract, data)` 始终向提交时的当前时间线末端追加并原子推进游标。
+- **按需观察快照与查询范围**：`snapshot()` 构造时只捕获时间线末端、会话追加上界和标题，不预先物化历史。`records.all / query / first / last` 支持两个 `scope`：
+  - `timeline`：读取从根到快照末端的完整线性祖先路径（按根到末端排序）。
+  - `session`：读取快照上界内包含所有分支的全会话记录（按进入会话的保存顺序 `sequence` 从 1 排序）。
+  `first / last` 只解码目标首尾记录（损坏不跳过，返回 `unknown`）。
+- **记录提交与游标观察（`SessionObserver`）**：在原事务提交后同步排队执行，失败记日志、不回滚原提交：
+  - `committed({ records, snapshot, session })`：仅在新记录提交时调用，交付本批新增记录。
+  - `cursorChanged({ snapshot, session })`：仅在提交前后执行游标改变时调用（正常追加、回溯与分叉选择统一为此入口，一次外层事务只通知最终位置）。依赖历史的派生当前值（如会话标题）在此重建。
 
-`snapshot()` 固定在该次调用或读取位置，`get()` 读取当前数据。固定资源快照不冻结当前对象数据；游标回溯和分叉不恢复非历史性的当前数据。`commit` 的同步性、writer 有效期、嵌套事务回滚与提交后通知规则保持一致。
+## 具型创建、动作与准备管线
 
-`writer.append(contract, data)` 只提交准备齐全的记录，向提交时的当前时间线末端追加；父节点由宿主在同步事务内取执行游标，追加后必定推进游标。此前读取的快照不决定写入位置，也不提供向未激活分支直接写入的能力。所有记录均可导航，不提供独立审计节点、隐藏位置或不推进游标的选项。模型块的终态与工具结局由执行侧准备，随所属块一次保存；运行期进度不成为历史记录。
-
-记录查询支持 `all / query / first / last`，`RecordQuery.scope` 保留两个范围：`timeline` 读取从根到快照末端的完整时间线，`session` 读取包含所有分支的全会话记录。快照是固定边界的观察柄：构造时只捕获时间线末端、会话追加上界和标题；节点原子追加且不可改写，沿固定末端读取祖先即可重现时间线，`session` 范围受捕获的追加上界限制。记录与资源都在实际查询时读取，不预先复制历史、折叠资源或建立首尾索引，也不维护跨快照查询缓存。
-
-`timeline` 按根到末端排序；`session` 按记录进入会话的保存顺序排序，列表结果不代表整棵树是一条时间线。`first / last` 分别取所选范围内最早／最晚的匹配记录。全会话查询用于跨分支事实，例如命名模块判断全会话第一条用户输入；执行体的模型上下文从 `timeline` 投影。宿主内部 `SessionTree` 承担树存储与当前时间线执行，`timeline()` 只读，`appendToTimeline()` 只向当前时间线追加；纯内存遍历由 `shared/session-timeline.ts` 提供。
-
-`first / last` 在固定范围内按契约定位，只映射和解码目标记录；首尾记录不兼容时返回 unknown，不跳过或回退。`query` 只物化匹配记录，`all` 才物化指定范围的全部信封。`sequence` 是会话内从 1 开始的追加顺序，不因分支筛选重新编号；存储层的全局序号不直接交付插件。`session.title.set(text)` 直接覆盖会话标题，在同步 `commit` 内调用时随该次提交生效；宿主不解释标题来源，也不添加命名事件。
-
-### 记录提交与执行游标观察
-
-模块在 `observers` 声明具名 `SessionObserver`，可独立提供两个同步入口：
-
-- `committed({ records, snapshot, session })`：只在成功提交了新记录时调用，records 是本批新增记录。
-- `cursorChanged({ snapshot, session })`：只在成功提交前后执行游标不同时调用。正常追加、回溯与分叉选择使用同一形状，不包含记录提交载荷或变化原因。
-
-同一外层事务内的批量追加与嵌套提交只按最终位置通知一次；回滚、选择相同位置、纯数据／标题写入、布局修改和只读查询不触发游标观察。两个入口均取得该批提交后的固定快照与可执行会话门面，观察者内追加记录按真实提交顺序排队，后续提交不改写此前快照。
-
-依赖历史的派生当前值由领域模块在 `cursorChanged` 中重建；Agent 上下文等即时投影继续在读取时计算。观察者在原事务提交后同步执行，内部提交按顺序排队；失败记录日志，不回滚原提交。队列清空后每个会话发布一次界面变化通知。消费方不应依赖两个观察入口的调用先后或另一观察者已更新派生值。
-
-## 具型创建与动作
-
-创建和动作属于资源行为；工具独立声明支持关系，支持关系和动作契约都不授予模型访问权限。
-
-- `CreationContract<I, S, O>` 与 `ActionContract<I, O>` 具有稳定的 `id`、关联资源类型和输入 schema，位于插件的纯契约入口。`I` 是调用输入，`O` 是解析结果，创建的 `S` 是资源数据；均由声明推导。
-- `defineCreation(resource, { id, schema })` 与 `defineAction(resource, { id, schema })` 定义契约。身份使用声明插件的命名空间。
-- `implementCreation(contract, { prepare?, create })` 与 `implementAction(contract, { prepare?, execute })` 根据契约推导输入类型。创建同步返回资源标题与数据，动作异步执行并返回受理结果所需的完成状态，不在这一接口增加任意 RPC 返回值。
-- `implementResource` 聚合一个可选的创建实现和一组动作实现，以及投影、检查、环境来源和记录声明。动作实现可以独立开发、组合；同一业务操作的参数分支可以继续使用联合类型。
-- `implementPreparer(ActionContract, { id, prepare })` 构造 `CommandPreparer`，由动作契约推导输入，取得只读对象与取消信号，返回接受、替换或拒绝。
-
-前端调用 `object.invoke(ActionContract, input)` 和 `session.create(CreationContract, input, position)`。参数由契约推导；传输包含契约身份、目标和 JSON 输入，可附带宿主管理的内容作用域身份，不发送 schema 或函数。宿主按已装配声明验证契约与真实资源类型，拒绝未知或冲突的路由。宿主校验使用自己的声明，不信任调用者提供的契约对象。
-
-资源类型拥有的动作保持内联装配，不另设全局动作目录。首页的首次提交仍由宿主协调会话、Agent 创建、首条输入与幂等身份的整体原子提交；领域动作负责输入受理，不能通过准备替换动作身份来绕过首次提交语义。准备者只能替换所绑定动作的输入。
-
-以下为作者组合形态，具体领域契约由插件自己的纯契约文件导出：
-
-```ts
-const counter = implementResource(Counter, CounterView, {
-  creation: implementCreation(CreateCounter, createCounter),
-  actions: [
-    implementAction(ChangeCount, changeCount),
-    implementAction(ResetCount, resetCount),
-  ],
-  project: projectCounter,
-  inspect: inspectCounter,
-});
-
-// 前端引用同一份纯契约。
-object.invoke(ChangeCount, { amount: 1 });
-session.create(CreateCounter, { title: "Counter" }, position);
-```
-
-## 校验与准备
-
-公开创建和动作的 schema 将调用输入解析为业务值，支持默认值、去空白、coerce、transform 等常用处理。传输输入和解析结果均须是 JSON 值，调用与实现的类型分别从 schema 的输入、输出推导。纯输入转换放在 schema；需要异步读取配置、文件或对象状态的业务判断放在准备阶段。
-
-宿主命令模块拥有输入处理次序：
-
-1. 按资源所有者已注册的 schema 解析原始输入一次。
-2. 动作按装配顺序执行匹配的外部准备者，向每一位交付当前解析结果。
-3. 执行资源自身准备。创建与动作准备均返回 `accept / replace / reject`：接受沿用解析结果，替换提供新的原始输入并立即由所有者 schema 解析一次，拒绝终止处理。
-4. 将解析结果交给对象队列，执行层直接使用，不再套用输入 schema；执行前再次检查真实对象和当前路径等执行条件。
-5. 创建在准备成功后进入宿主事务，创建资源及其初始数据和事件。
-
-准备阶段不通过所交付门面提交数据。资源自身准备可通过窄内容上下文暂存计算结果，外部准备者仅读取；暂存不建立持久引用。业务执行仍须在最终修改处检查冲突和幂等，不能将异步准备的检查结果视为永久有效。拒绝不会因为准备门面而留下会话数据或事件写入。
-
-SDK helper 负责具型声明与实现包装，宿主命令模块负责解析、路由与准备的调度。宿主内部的解析结果与传输信封分开表示，防止相邻适配层把解析结果误当新输入。例如字符串转数字的动作，调用与 `replace` 提供字符串，准备与执行接收数字；`accept` 不会再触发转换。
+- **契约与实现**：在纯契约入口用 `defineCreation(resource, { id, schema })` 与 `defineAction(resource, { id, schema })` 声明；后台用 `implementCreation`、`implementAction` 与 `implementResource` 内联聚合，外部准备者用 `implementPreparer(ActionContract, ...)` 绑定具体动作；前端用 `session.create(CreationContract, input, position)` 与 `object.invoke(ActionContract, input)` 调用。
+- **五步输入处理次序**：
+  1. 按资源所有者注册的 schema 解析原始输入一次（支持默认值、trim、transform，输入与输出均须为 JSON 值）。
+  2. 动作按装配顺序执行匹配的外部准备者（只读门面）。
+  3. 执行资源自身准备。准备均返回 `accept`（沿用解析结果）、`replace`（提供新原始输入并立即由所有者 schema 重新解析一次；不能替换动作身份）或 `reject`（终止处理，可选携带 `display: UiText`）。
+  4. 将解析结果交给对象队列，执行层直接使用，不再重复解析；执行前再次检查真实对象和当前路径有效性。
+  5. 创建在准备成功后进入宿主事务，同步返回 `{ title, data }` 并写入创建事件。
 
 ## 宿主运行生命周期
 
-任务、资源动作和模型调用组合使用同一个宿主内部运行生命周期模块。它负责关闭门禁、插件／会话／对象关联、取消传播、真实结束等待与活动汇总；不作为插件需要直接调用的新服务。
+托管任务（`plugin.tasks.start`，按 key 去重、带超时）、资源动作（按对象排队）和模型调用（同对象互斥、固定请求环境与工具批次）组合使用同一个宿主内部运行生命周期模块。它统一负责关闭门禁、插件／会话／对象关联、取消传播、真实结束等待与写入活动汇总。
 
-| 使用方 | 自己负责的规则 |
-| --- | --- |
-| 托管任务 | key 去重、超时、任务失败日志 |
-| 资源动作 | 对象队列、具型动作调用、执行条件 |
-| 模型调用 | 同对象请求互斥、请求环境与授权固定、工具批次和模型进度 |
-| 运行生命周期 | 接受运行、活动登记、取消、等待收束和关闭状态 |
+取消信号不等于工作已经结束；会话回溯、资源移除和插件关闭清理均等待真实收束。每个成功返回的模块 `setup` 立即登记清理责任，后续模块装配失败或正常关闭时先取消托管工作并等待收束，再按初始化逆序执行清理。
 
-对象写入活动由尚未结束的工作汇总，同一工作通过组合进入多个层次时要明确关联；取消信号不等于已经结束。创建准备、外部准备者与资源自身准备也登记生命周期，关闭时取消并等待后再释放设施；只读准备不计入阻止历史导航或对象移除的写入活动，执行阶段仍检查最新对象有效性。Agent 任务可以等待其模型调用，模型调用可以等待工具批次，关闭时先关闭入口并向相关工作传播取消，再等待依赖收束。会话回溯和资源移除继续依据真实收束状态。
+## 插件配置与界面本地化
 
-每个成功返回的模块 `setup` 的清理责任立即由宿主登记。后续模块或贡献校验失败时，宿主取消该插件的托管工作，并按初始化逆序执行已取得的清理责任；等待结束后释放托管存储。正常关闭也遵守运行收束与设施释放的次序。某个 `setup` 在返回之前失败，须自行清理尚未交给宿主的设施。
+- **唯一配置契约**：插件在纯契约中以 `ns.config(schema, defaults, { presentation? })` 声明唯一配置契约，保存在 `<data>/extensions/<pluginId>/.atelier/config.json`。后台通过 `plugin.config(contract)` 取得 `get / update / subscribe / section`，前端通过 `useRendererConfig(contract)` 读取；宿主负责存储、Zod 校验、恢复默认及生成设置页表单。界面偏好（`useRendererPreferences`）存于 `ui-state.json` 的 `plugin/<pluginId>/` 下，不属于配置。
+- **可选界面本地化**：公共展示字段接受 `UiText`（普通字符串或 `ns.messages(sourceLocale, defineMessages(...))` 声明的具归属消息描述），前端组件通过 `useI18n()` 格式化。完整规范见 [公共 i18n](i18n.md)。
 
-## 插件配置与领域适配
+## 前端视图与扩展入口
 
-配置是用户与插件协商的设置：插件声明可接受的形状，用户在设置页决定取值。一个插件只有一份配置契约 `ns.config(schema, defaults, { presentation? })`，为纯契约，前后台共同导入，身份即插件 ID，保存在 `.atelier/config.json`。
-
-- 后台：`plugin.config(contract)` 返回 `get / update / subscribe`；`update` 基于最新完整值，`section(key)` 向业务模块提供其负责部分，避免缓存覆盖其他分组。
-- 渲染层：`useRendererConfig(contract)` 返回按契约解码的当前值；存储值无效时使用默认值并标出状态。
-- 宿主：存储、校验、恢复默认，按展示描述生成设置页表单；保存后经配置通道同时通知前后台。插件不能读取其他插件的配置。
-
-偏好（`useRendererPreferences`）不属于配置层，只记录上次选择等无需统一设置入口的状态。凭据和私有数据库职责保持独立。
-
-内置插件的记录与其他插件相同，经通用记录写入，宿主不保留领域存储适配。公共模块提供同进程共享实例；core 领域共识包的发布见插件计划，通用后台跨插件调用与瞬态事件投递由 [独立计划](../plans/todo-2026-10-13-event-bus-plugin-calls.md) 统一推进。
-
-## 工具视图
-
-工具通过 `toolRenderer(contract, { label?, icon?, input?, execution?, result? })` 声明三态视图。三个入口平行且可选，均为 `ToolPhaseView<Props>`，分别包含可选 `headerRenderer / bodyRenderer`。两个组件收到同一份阶段数据；共享组件或视图声明可直接用于多个阶段，不要求为每个阶段复制组件。
-
-| 入口 | Props | 阶段与数据 |
-| --- | --- | --- |
-| input | ToolInputRenderProps | phase 为 input，target/args 是部分 JSON，result 为 null |
-| execution | ToolExecutionRenderProps | phase 为 ready 或 executing，target/args 已校验，result 为 null 或 running 产出 |
-| result | ToolResultRenderProps | phase 为 settled，完整调用参数与终结结局，data 可为 null |
-
-`ToolRenderProps<D, T, A>` 是三种 Props 的可辨识联合，供跨阶段组件复用；根据 phase 收窄后，完整参数与终结结局保留准确类型。填充参数的字段可能缺失、类型错误或只收到字符串前缀，视图自行安全读取，不以 `Partial<已校验参数>` 冒充有效数据。等待调度归 execution，不表示已经开始执行。执行产出和结果由同一 result schema 校验。
-
-未声明 input 时使用静态填充提示；声明填充视图后，缺少 header 时使用工具默认摘要，缺少 body 时不提供填充展开。execution/result 缺少阶段或单个入口时分别回退默认摘要和产出正文，不跨阶段借用视图。SDK 为 0.15.0，宿主 API 为 8.1；不兼容的插件在加载前拒绝。
-
-三态的样式与内容归工具，宿主控制开合设置、阶段图标、异常和原始详情入口。工具外壳不限制正文高度；body 提供方自行管理局部高度、滚动、分页、截取与渲染量。视图应尽可能保留已出现的路径、数量和相同元素的样式，逐步补充信息；允许按内容语义切换正文形态，例如生成中的 write 尾部预览与成功写入后的代码正文。内置插件的 120 行正文预算是 `atelier.core` 自身的展示约定，不是 SDK 对外部插件的强制限制。完整约定见 [设计系统](design-system.md#对话过程视图)，可编译的作者示例和类型反例见 [tool-renderer.ts](../packages/sdk/examples/tool-renderer.ts)。
-
-## 界面文案与语言环境
-
-公共展示字段接受 `UiText`：普通字符串原样显示，具归属消息描述支持可选翻译。`ns.messages(sourceLocale, defineMessages(...))` 在纯契约中绑定来源，跨公共模块引用与 IPC 保持 owner；宿主显示时格式化，不在静态注册时固定语言。`useI18n()` 是应用级展示能力，创建入口和无对象组件也能使用；不向插件暴露可修改全局语言或目录的引擎。
-
-配置契约的 `presentation` 可显式提供固定对象字段的标题、说明及枚举显示名；配置 IPC 传递纯描述，语言切换不重读配置或覆盖草稿。准备拒绝与命令错误保留 code／诊断 message，可选 display 携带用户提示；不改变模型工具结果。翻译目录由宿主独立装载，无 renderer 的插件也可本地化配置。
-
-设置页的插件配置标题取根路径 `presentation.fields[""].title`，由插件提供普通字符串或可本地化消息；缺省时依次取根 schema 的标题、插件 ID。根对象标题只在配置区标题处显示一次，插件身份、保存命令与草稿 key 始终使用 ID，不随译后标题变化。内置插件与其他插件使用相同声明方式。
-
-具体类型、包清单、语言回退、抽取工具与作者用例见 [公共 i18n](i18n.md)，已完成的实施与验收记录见 [归档计划](../plans/archived/todo-2026-10-12-i18n.md)。
-
-## Agent 组合
-
-| 业务模块 | 对外职责 |
-| --- | --- |
-| 选择与策略解析 | 从当前配置得到模型选择、提示所需配置及工具策略；链接说明和实际执行消费同一套策略规则 |
-| 输入受理 | 去重、续接有效性、输入与状态的原子提交；调用方不自行编排事务内步骤 |
-| 执行循环 | 每轮重新从时间线投影消息、执行一次模型调用、处理预算及继续／停止规则 |
-| 资源装配 | 组合创建、动作、投影、检查与上述业务模块，交给 SDK 装配 |
-
-模型执行仍只完成一次补全及完整工具批次；Agent 持有非 context 状态，时间线是 context 唯一真值。循环依赖明确的请求执行、领域投影和记录保存接口。命名模块继续按现有规模保持内聚，真实复用或独立变化出现时再拆分其内部业务模块。
-
-## 历史记录视图
-
-记录的历史展示归提供该记录的模块。renderer 模块在 `records` 中声明 `recordRenderer(RecordContract, { label, icon?, Row? })`：`label(data, context, record)` 必填，返回纯文本摘要，供搜索、提示与无障碍名称使用；`icon` 可按数据选择；`Row` 可选，替换摘要行内容。数据经契约解码后才进入视图。`context` 由宿主提供整份历史中的对象标题、资源类型名、按当前语言格式化文案的 `text`，以及 `describe(record)` 供包装记录借用被包装记录的视图。
-
-宿主历史面板不认识任何领域记录，只负责行外壳：候选选择、执行游标、分支导航、行内菜单，以及按记录来源分类；摘要下方的来源行由宿主只读 `record.source` 追加，插件不能替换：资源记录为「资源类型 · 资源标题」，会话级记录为「会话」。插件未提供图标时使用资源类型或会话图标。未注册、解码失败或视图抛错的记录显示“未知记录”与契约 ID。宿主工作台事件与插件记录走同一注册表。
-
-### 记录来源
-
-`SessionRecord.source` 与事件信封的 `source` 共用 SDK `Source` 类型：`{ plugin, resource: ResourceRef | null } | null`。来源由写入通道决定，`append` 与记录数据不接收来源参数：`session.commit` 写入 `{ plugin: 调用插件, resource: null }`；`plugin.object(ResourceContract, id).commit` 写入 `{ plugin: 调用插件, resource: { sessionId, id, kind } }`；宿主工作台、环境等软件本身写入 `null`。插件写入必带插件身份，不能产生 `null`；资源来源一定属于发出插件。资源引用包含会话 ID，为跨会话引用保留同一身份写法。`plugin` 是宿主按操作柄打的戳，供诊断，界面不显示。对象操作柄以具名资源契约取得，宿主校验契约属于调用插件、资源在会话中存在且类型一致，否则拒绝。关联对象（例如链接事件中的代理）由各契约放入 `data`，不借用来源。
-
-## 创建入口
-
-添加菜单与拖放共用一个原语：renderer 模块在 `creations` 中声明 `creationEntry(CreationContract, { id, label, icon?, description?, group?, triggers, InputView? })`。入口 ID 使用插件命名空间，全局唯一；入口只负责产出创建输入，之后统一进入解析、准备与宿主事务。同一契约可以有多个入口，一个入口可以同时声明菜单与拖放来源。
-
-- `triggers.menu`：无载荷来源，可带 `initialInput`。
-- `triggers.drop`：`accepts` 为声明式条件（文件的扩展名／MIME／目录、URL scheme、文本）。悬停只按类别同步判断；放下后宿主读取 `DropItem` 快照。文件统一为 `kind: "file"`，总带 `file: File`，本机路径由桌面桥解析为可选 `path`；剪贴板图片等无路径文件同属此类。需要路径的入口声明 `files.requiresPath`，目录入口隐含需要路径。
-- `toInput(item, content)` 可异步上传 File／Blob，只在入口开始时调用一次，返回 null 表示拒绝；输入视图取得已计算的初始输入。
-- `InputView` 接收 `{ source, initialInput?, busy, content, resolve, cancel }`，不取得可写会话。`content` 是绑定创建契约的输入草稿；resolve 自动附带作用域，失败保留草稿，成功或取消后关闭。缺省输入视图时由来源直接产出输入，菜单来源须提供 `initialInput`。
-- 工作台粘贴图片复用无路径字节文件的路由；文本编辑控件保留自身粘贴行为。
-
-宿主创建协调器负责：候选仲裁、输入视图外壳与错误边界、放置位置、提交、等待与取消。0 个候选不受理，1 个直接进入，多个由用户选择并可记住。多项拖入逐项路由。联网等异步业务判断放在创建契约的 `prepare`；创建请求带请求身份，用户可在准备阶段取消，已进入事务的创建不受影响。
-
-路由记忆归宿主所有，键由宿主规范化并带版本，按扩展名 > MIME > URL scheme > 类别取最具体判别项（如 `creation-route/v1/drop:file/ext:.pdf`），值为全局入口 ID；只在记忆的入口仍属当前候选时命中，否则清理并重新选择。插件自有偏好经 `useRendererPreferences()` 读写，宿主按插件隔离在 `plugin/<pluginId>/` 下，读取按调用方 schema 校验。
-
-## 前端组合
-
-前端基础对象接口提供对象身份、视图状态、会话读取与刷新、具型创建／动作、对象流订阅和通用运行状态。模型块、工具展示、配置目录分别通过具名的专门接口按需取用，共享宿主已有状态源，不为拆分接口复制状态或订阅真值。
-
-草稿与提交身份由交互模块管理，按会话和对象绑定并跨卡片重挂载保留；相同输入重试保留身份，受理成功后清除。导航通过显式界面依赖提供。普通资源无需取得模型、对话草稿或 Agent 提交知识。
-
-Agent 对话由时间线展示、输出跟随、消息输入、配置选择、Agent 交互协调组成。展示模块消费投影后的条目和明确的操作意图；交互协调负责受理结果、去重身份、发送后清理、继续与停止。只读对话与完整 Agent 对话复用同一套展示模块，差异在组合位置表达，不向单个组件累加控制全部功能的开关。
-
-renderer 模块可声明 `prepare({ signal })` 完成自身内部准备，例如预加载语法与主题资源。宿主在加载插件、合并视图注册表后并行调用全部准备，期间显示启动屏，全部结束后渲染应用。单个模块等待上限为 10 秒，超时触发 `signal` 并放弃等待；失败与超时只记录日志，模块视图保留。联网等需要外部访问的初始化放在后台模块 `setup`，前端准备只处理本地资源。
-
-## 不可变内容
-
-字节内容以 SDK 保留 JSON 值 `ContentRef` 嵌入普通 schema（`contentRefSchema`）。宿主扫描最终写入值，自动与当前数据、记录或创建事件同事务登记依赖，作者不填附件清单。引用本身不授予读取或保留权；资格由宿主按当前作用域裁定。宿主机制见 [不可变内容](content.md)。
-
-凡能取得 `content` 的地方形状一致：`read(ref, range?)` 有界读取，`open(ref, range?)` 流式读取，可写处另有 `stage(bytes | AsyncIterable)`。
-
-| 位置 | content | 范围 |
-| --- | --- | --- |
-| 创建／资源动作 `prepare(input, { signal, content, object? })` | 可暂存 | 本次输入与对象已有内容 |
-| 外部准备者 `prepare(input, { signal, object, content })` | 只读 | 同上 |
-| `create` / `execute` 的 `object.content` | 可暂存 | 本对象当前数据与可见历史 |
-| `object.session.content` | 只读 | 会话级根 |
-| 前端 `object.content` | 只读 | 本对象当前执行路径 |
-| 前端 `toInput(item, content)`、`InputView` 的 `content`、`object.input(contract)` | 草稿，可上传 | 绑定该创建／动作契约 |
-
-前端创建入口由宿主提供草稿并管理关闭。卡片动作用 `object.input(contract)` 取得草稿，`invoke(contract, input, { content: draft })` 携带资格；命令成功后宿主关闭草稿，失败保留可重试，放弃时调用 `close`。暂存结果只有写入提交后的数据或事件才持久保留；字符串化或写入私有文件不建立依赖。
-
-## 模型输入
-
-公共思考部件与成型块使用 `{ kind: "thinking", text, summary, continuation }`：text 是协议交付的明文，summary 是协议交付的摘要，两者必填、可为空且不相互填充；continuation 保留带来源约束的签名与密文。流事件 `part.delta` 的 `channel: "summary"` 写入摘要，缺省写入 text；摘要通道仅适用于思考块。即时块中的 text 是展示投影，优先明文否则摘要，不能拿它替代正式记录重建模型输入。完整续接语义见 [模型适配](conversation-core.md#模型适配)。
-
-`models.stream` 的可选 `maxOutputTokens` 为本次补全的输出上限，必须是正安全整数，与模型配置的输出上限取较小值；未设置时沿用模型配置。摘要、命名等消费者可约束自己的补全，通用模型服务不解释其业务策略。
-
-宿主 API 8.1 提供请求身份：`models.stream / validate` 接受可选 `userAgent / sessionId`，`run` 接受 `userAgent` 并从对象引用取得会话 ID。身份在请求开始固定，只用于传输头，不构成会话读取、资源授权或模型上下文。内置 Agent、命名与压缩显式声明应用 UA 并沿用所属 Session ID；第三方调用方可声明自身身份，省略 UA 时保持 SDK 默认值。参数型兼容包 `customUserAgent` 按模型、提供商的优先级覆盖 UA；标签型 `opencodeSession` 将会话 ID 写入 Go 请求头，无会话的单次调用使用独立临时 ID。具体编码见 [模型适配](conversation-core.md#模型适配)。
-
-模型输入与 context 使用有序 ModelInputPart：文字为 `{ kind: "text", text }`，文件为 `{ kind: "file", file: ContentRef, mediaType, filename? }`；mediaType 如实标注，不建模输入模态。工具实现的 `toModel(data)` 可返回字符串或同形 parts，文件引用执行期 `object.content.stage` 暂存的内容，宿主随结果记录登记根；声明与 schema 从 contracts 导出，调用示例见 [模型文件输入](../packages/sdk/examples/model-input.ts)。输入不携带字节或读取门面。
-
-`models.validate(request, { content })` 与 `models.stream(request, { content })` 复用 prepare、对象或会话已有的 ContentReader；包含文件时须提供合法宿主门面，纯文字可省略。validate 只检查元数据和协议条件，实际请求重新取用并读取字节。`models.run` 根据 object/requestParentId 固定对象当前数据和历史路径资格，不提供外部 reader 覆盖。SDK 不增加模型专用上传器、resolver 或公开内容占用管理。
-
-宿主为请求独立保留所用内容，结束时释放；调用方应消费或关闭 stream。模型失败与取消不关闭借来的 content，输入作用域关闭也不撤销已经捕获的请求。模型服务不自动保存用户消息；内置 Agent 在调用前通过用户消息记录建立时间线事实和内容依赖。完整约定见 [会话核心](conversation-core.md#用户输入与文件)。
-
-## 验证接口
-
-- 作者用例直接导入公开 SDK，覆盖普通资源、具型创建／动作和自有 Agent；类型反例验证错误输入与读取门面上的写操作被拒绝。
-- 命令测试验证默认值与转换、每份新输入只解析一次、准备替换和拒绝、真实类型与身份检查、对象队列和最终冲突检查。源码插件测试验证提供方与多个消费者的实际对象引用、共享状态、类身份、re-export、依赖初始化与关闭，以及独立声明冲突。
-- 生命周期测试验证装配失败逆序清理、取消与真实收束、关闭门禁、被捕获工具的有效期和历史门禁。
-- Agent 测试通过输入受理和执行循环接口验证原子性、幂等与停止语义，不按内部函数数量补测试。
-- 复用源码插件加载测试验证完整作者路径；前端只做必要的类型检查、逻辑验证和构建，视觉与真实交互由用户验收。
+- **工具三态视图（`toolRenderer`）**：声明平行可选的 `input / execution / result`，每阶段含可选 `headerRenderer / bodyRenderer`，可复用 `ToolRenderProps<D, T, A>` 联合类型。`input` 接收部分 JSON 与 `result: null`；`execution` 接收已校验参数与 running 产出；`result` 接收终结结局。视觉与连续性规范见 [界面设计系统](design-system.md#对话过程视图)。
+- **历史记录视图（`recordRenderer`）**：声明 `label(data, context, record)`（必填纯文本摘要）、可选 `icon` 与 `Row`。宿主历史面板据此展示第一行摘要，并由宿主只读 `record.source` 固定追加第二行来源说明。
+- **创建入口（`creationEntry`）**：统一声明添加菜单（`triggers.menu`）与画布拖放／粘贴（`triggers.drop`，支持扩展名、MIME、目录、URL scheme、文本条件）入口，可选提供 `toInput(item, content)` 与 `InputView`。宿主创建协调器负责候选仲裁、跨插件路由记忆（`creation-route/v1/...`）、放置位置与提交。
+- **前端模块准备（`prepare`）**：renderer 模块可声明 `prepare({ events, signal })` 预加载本地语法／主题或建立全局事件订阅（单个模块超时上限 10 秒，失败只记日志）。
+- **不可变内容与模型服务接口**：各阶段 `content` 门面（`read / open / stage`）的作用域矩阵见 [不可变内容](content.md)；`models.validate / stream / run` 的无状态模型调用接口见 [SDK 作者指南](../packages/sdk/README.md#可选模型分支)。

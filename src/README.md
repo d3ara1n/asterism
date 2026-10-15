@@ -1,69 +1,44 @@
 # 源码地图
 
-这是正式桌面应用，不依赖固定场景或浏览器内存演示。
-
-首页、侧栏与三类真实配置已实现并验收。提供商保存/测试、模型角色和 agent 配置能力见 `configuration/README.md`；单代理核心与会话 IPC 已实现，契约见 [会话与单代理能力](../docs/conversation-core.md)，首页发送与代理对话视图已消费会话接口，真实端点与 GUI 验收已确认（2026-10-13），实施记录见 [模型接入计划](../plans/archived/todo-2026-10-01-model-protocol-storage.md)。
+这是正式桌面应用源码，不依赖固定场景或浏览器内存演示。架构契约见 [技术架构](../docs/architecture.md)，运行时与模型执行契约见 [运行时](../docs/runtime.md)。
 
 | 目录 | 职责 | 依赖方向 |
 | --- | --- | --- |
-| `shared/` | 版本化命令、投影与传输校验 | Zod 与 SDK 纯契约，不依赖任何进程或 UI |
-| `shared/i18n.ts`、`shared/language.ts` | FormatJS 消息格式化、语言匹配与展示传输；不读写业务数据 | FormatJS 与 SDK 纯契约 |
-| `main/` | Electron 窗口、单实例锁、数据目录、运行时生命周期、可信 IPC 路由 | shared，不调用数据库 |
-| `preload/` | 沙箱桥，受控命令与状态订阅 | shared，只暴露 `window.host` |
-| `runtime/` | 应用组合与列表；会话命令、历史查询、资源与布局、执行进度；SQLite、对象存储与私有凭据客户端 | shared、session、configuration、modules 后台入口、Node API |
-| `runtime/content-store.ts`、`runtime/content-transfer.ts` | 不可变字节、临时占用与持久依赖；桌面分块传输和读取占用 | SDK 内容契约、SQLite、Node 文件系统；不解释领域格式 |
-| `configuration/` | 全局配置 JSON、密文凭据、连接测试与默认角色，见目录 README | shared、Node 文件系统、模型 SDK；不依赖 Electron 或数据库 |
-| `session/` | 会话树存储、当前时间线追加与游标选择、模型投影、工作台折叠 | shared、SDK 纯契约、Node SQLite；不依赖 UI 或插件运行时 |
-| `model/` | 单次请求契约、文件输入检查、目标投影与三协议 SDK 编解码 | shared、session、AI SDK |
-| `model/projection.ts`、`continuation.ts` | 公共历史向目标模型投影，原生资料按来源复用，显式兼容行为与工具 ID 配对 | shared、SDK 公共模型契约、Node crypto |
-| `model/request-identity.ts` | 调用方 UA、显式 UA 覆盖与 Go 会话头；身份不进入模型消息或历史 | shared 兼容目录、SDK 请求身份、Node crypto |
-| `model/responses-reasoning.ts`、`anthropic-thinking.ts` | 明文、摘要与原生密文／签名的有序编码；兼容配置只控制端点字段差异，复用 SDK 普通消息、文件与工具序列化 | AI SDK 公开中间件与传输入口 |
-| `execution/` | 单次模型请求与工具批次、流块状态机、请求能力视图、外部工具策略与固定宿主操作入口；外层循环归插件 Agent | model、resources、tools、存储格式 adapter |
-| `resources/` | 资源身份生成、后台契约、注册目录、卡片投影与环境聚合 | shared、session 对象类型、Nano ID |
-| `tools/` | 两层共用的工具定义投影、实现注册与产出校验、终结模型投影、支持关系；不持有外部授权策略 | shared、session 对象类型 |
-| `plugins/` | 包与公共模块图加载、配置／凭据托管、读取／执行门面、具型命令校验、共享运行生命周期、资源／工具适配、core 存储与目录适配、提交后派发 | SDK、session、resources、tools |
-| `modules/` | core 的资源、代理、命名与视图；`modules/shared/` 承接共享工具契约、正文算法与前端预览投影，见目录 README | 后台/前端分入口；宿主能力通过公开 SDK 消费，公共视觉复用 renderer/shared |
-| `modules/agent/compression.ts`、`compression-prompt.ts`、`projection.ts` | 请求之间的预算与摘要执行、独立摘要提示、近期原文投影；摘要及边界从时间线读取，失败不替换上下文 | SDK 模型与记录契约；策略归代理，不进入通用模型执行器 |
-| `renderer/` | 应用视图、视图注册机制、React Flow、用户意图 | shared、modules 前端入口、React 与 UI 库；不访问 Node/数据库 |
+| `shared/` | 版本化命令、工作台投影、传输信封与公共 schema（`i18n.ts`、`language.ts`、`provider-presets.ts`、`model-compatibility.ts` 等） | Zod、FormatJS 与 SDK 纯契约，不依赖任何进程或 UI |
+| `main/` | Electron 窗口、平台材质、单实例锁、数据目录、运行时进程生命周期、可信 IPC 路由、`safeStorage` 加解密 | `shared`，不调用数据库 |
+| `preload/` | 沙箱桥，受控命令与状态订阅 | `shared`，只暴露 `window.host` |
+| `runtime/` | 应用组合与会话列表；会话命令、历史查询、资源与布局、执行进度；SQLite、`objects/`、`content/` 存储与私有凭据客户端 | `shared`、`session`、`configuration`、`modules` 后台入口、Node API |
+| `configuration/` | 全局 `configuration.json`、密文凭据、模型发现、models.dev 参数获取、异步连接测试与默认角色（见 `configuration/README.md`） | `shared`、Node 文件系统、模型 SDK；不依赖 Electron 或数据库 |
+| `session/` | 会话树存储（`session_nodes`）、当前时间线追加与游标选择、工作台存在性与链接重放 | `shared`、SDK 纯契约、Node SQLite；不依赖 UI 或插件运行时 |
+| `model/` | 单次请求契约、文件输入检查、请求身份头、跨模型目标投影、思考续接中间件与三协议 AI SDK 编解码 | `shared`、`session`、AI SDK |
+| `execution/` | 单次模型请求与工具批次（`models.run`）、流块状态机、请求能力视图、外部工具策略与固定宿主操作入口（`resource_*`） | `model`、`resources`、`tools`、存储格式 adapter |
+| `resources/` | 资源身份生成（Nano ID）、后台契约、注册目录、卡片投影与环境聚合 | `shared`、`session` 对象类型 |
+| `tools/` | 两层共用的工具定义投影、实现注册与产出校验、终结 `toModel` 投影、支持关系 | `shared`、`session` 对象类型 |
+| `plugins/` | 包与公共模块图加载、配置／凭据托管、读取／执行门面、具型命令准备与校验、共享运行生命周期、全局瞬态事件路由与提交后派发 | `@atelier/sdk`、`session`、`resources`、`tools` |
+| `modules/` | 内置 `atelier.core` 插件的资源（`notes`、`filesystem`）、代理（`agent`）、会话命名（`naming`）与共享正文工具（见 `modules/README.md`） | 后台/前端分入口；通过公开 SDK 消费宿主能力 |
+| `renderer/` | 应用视图、浮岛编织、视图注册表、React Flow 工作台与用户意图（见 `renderer/README.md`） | `shared`、`modules` 前端入口、React 与 UI 库；不访问 Node/数据库 |
 
-## 完整路径
+## 核心调用路径
 
 `renderer/features/session → preload → main/RuntimeHost → utilityProcess → SessionService → SessionTree / SessionWorkbench / ObjectStore`
 
-会话命令先由 Zod 校验，再交运行时单一写入者处理。业务创建、查询索引与初始视图处于同一事务；正文引用只在内容文件成功落盘后进入事件。命令返回受理结果，读取返回完整会话树、执行游标及当前时间线的工作台投影，UI 将其映射为历史导航、画布和代理对话。
+- **会话写入与观察**：会话命令经 Zod 校验后交运行时单一写入者同步事务处理。路径遍历位于 `shared/session-timeline.ts`（前后台共用）。`SessionTree.select` 将游标选择审计与游标更新原子提交；提交后分别派发新增记录观察 `committed` 与最终游标变化观察 `cursorChanged`（命名模块据此同步会话标题）。`SessionTree.workbench` 沿当前游标全量重放资源与链接事件，供工作台展示与执行校验共用。
+- **代理执行循环**：`execution/request.ts` 完成单次补全及工具批次，`execution/response.ts` 维护该响应的临时流状态，终态内含于最高序号块交付。内置 Agent 由 `modules/agent/runtime.ts` 装配：`selection.ts` 解析选择与工具策略，`admission.ts` 原子受理输入，`loop.ts` 驱动多轮请求，`compression.ts` 在请求间检查预算并生成摘要，`projection.ts` 负责响应分组、期间事件后置与上下文截取。在途输出经 `session.progress` 的 `live` 字段按 `objectId` 送达界面。
+- **插件事件与二进制流**：全局具型瞬态事件由 `plugins/events.ts` 登记路由，前后台共用 `shared/event-queue.ts`（支持 `all` 与 `latest` 合并），经 `runtime/event-peer.ts → main → preload → shared/event-client.ts` 跨进程投递。Agent 经此发布 `ResourceStatusChanged` 供侧栏 `SessionStatus.tsx` 消费。高频对象二进制流经 `shared/object-stream.ts` 独立信封转发，不进历史。
+- **多语言目录**：语言偏好由 `main/language.ts` 管理（`language.json`）；插件静态翻译目录由 `plugins/catalogs.ts` 在启动时装载并随应用列表快照交付 renderer。源消息位于 `renderer/messages/` 与 `modules/messages/`，译文位于 `shared/locales/` 与 `modules/locales/`。
 
-路径遍历位于 `shared/session-timeline.ts`，运行时与 renderer 共用；所有入树记录均推进游标且可查看，宿主不判断续接点。会话节点是通用记录（契约、来源、载荷、模型可见文本、接收者），宿主不解释载荷。`execution/request.ts` 完成一次补全及工具批次，`execution/response.ts` 只持有该响应的临时流状态；正文在终态到达后交付，工具块在取得结局后交付；终态内含于最高序号块，由执行体作为自身记录一次提交。内置 Agent 由 `modules/agent/runtime.ts` 装配，`selection.ts` 解析选择与策略，`admission.ts` 原子受理输入，`loop.ts` 每次从时间线重新投影并推动下一请求；`projection.ts` 负责响应分组、事件后置与上下文末尾截取。`plugins/sdk-context.ts` 在具型写入入口统一校验与来源打戳，`plugins/records.ts` 直接映射通用记录信封。在途输出经 `session.progress` 的 `live` 字段按 `objectId` 提供给界面；异常收束时仍将已收到的内容保存为块，以完整性字段供审计。数据库结构只在运行时建库，仓储构造不隐式建表。
-
-`SessionTree.select` 将选择审计与游标更新原子提交，`cursorSelections` 可读取日志。提交后分别派发新增记录观察 `committed` 与执行游标观察 `cursorChanged`；正常追加和显式游标选择共用游标通知，批量／嵌套事务只通知最终位置，历史面板候选选择不触发通知或审计。命名模块据此按当前时间线同步标题，Agent 上下文仍在请求时即时投影。`seq` 只计节点追加，视图同步使用独立 `revision`。
-
-`workspace.read` 只返回工作区与会话列表摘要，不接受会话身份或历史位置。应用导航打开会话后由 `features/session/` 读取正文。`runtime/workbench.ts` 管理资源事件与独立布局；`SessionTree.workbench` 统一重建当前存在性与链接，工作台投影和执行校验共用。会话查询只读取执行游标，不接受独立历史位置；历史面板仅选中候选节点，明确继续才跳转。
-
-画布库类型只存在于 renderer。IPC 不提供 SQL、任意路径、通用脚本或动态方法调用。对外工具协议不等于内部应用命令；模型与 MCP 接入时仍需独立资源校验与授权执行层。
-
-插件配置经独立 `plugin-configuration` 通道读写，不加载会话。对象二进制流经 `shared/object-stream.ts` 的同一信封从任务进程送至 main、preload；两端用 Zod 校验后交付，preload 按会话与对象筛选订阅，不写入事件或转换正文。
-
-全局具型事件由 `plugins/events.ts` 登记契约、校验并路由，`plugins/event-scope.ts` 绑定插件来源和运行生命周期。前后台订阅共用 `shared/event-queue.ts` 的按序队列与 latest 合并，以及 `shared/event-subscription.ts` 的建立、结束与取消状态。`runtime/event-peer.ts`、main 与 preload 经 `shared/plugin-events.ts` 逐条转发原始信封，`shared/event-client.ts` 按本地契约解码。事件不参与事务，publish 即投递；前端入口为 SDK prepare.events 与 useRendererEvents，领域消费接入见独立计划。
-
-Agent 经 SDK 公共 `ResourceStatusChanged` 发布 running、failed、awaiting、completed。`renderer/app/controller.ts` 以 latest 消费并完整替换同资源状态，`SessionStatus.tsx` 展示会话行概要与资源 popup。导航进入会话只清除终态，running 及其可选进度保留；当前会话收到终态时替换后立即消费，相同展示数据不刷新。状态只经事件投递，不读取会话正文、查询当前值或持久恢复。
-
-语言偏好由 `main/language.ts` 管理，保存于 `language.json`；`preload` 只暴露语言读取、选择与订阅。插件静态目录由 `plugins/catalogs.ts` 在启动时读取，带 owner、规范化语言和内容修订，通过应用列表快照交付 renderer，包括没有前端入口的包。源消息按功能分别位于 `renderer/messages/` 与 `modules/messages/`，声明使用语义化引用名，目录按稳定的 owner/id 寻址；宿主译文在 `shared/locales/`，内置插件译文在 `modules/locales/`。会话准备与执行的插件错误统一由 `runtime/plugin-errors.ts` 适配，SDK 声明与作者路径见 [公共 i18n](../docs/i18n.md)。
-
-## 开发与验证
+## 开发与验证命令
 
 - `npm run dev`：构建并运行 Electron，renderer 使用 Vite HMR。
 - `npm run typecheck`：分别检查 Node 进程代码与 renderer。
-- `npm test`：历史契约、应用事务与持久化、进程请求生命周期。
-- `npm run build`：仅构建，不启动应用。
-- `npm run i18n:extract` / `npm run i18n:check`：官方抽取、ICU／参数和翻译覆盖检查；可追加外部插件包根。
-- `npm run package` / `npm run make`：构建后交给 Forge 打包，ZIP maker 支持三平台；当前只验证本机 macOS arm64 包内容。
-
-GUI 由用户验证。测试使用独立临时数据库，结束后清理；不访问 Electron 的真实应用数据目录。
+- `npm test`：运行单元与契约测试（使用独立临时目录并自动清理，不访问真实应用数据目录）。
+- `npm run build`：仅构建产物至 `dist/`。
+- `npm run i18n:extract` / `npm run i18n:check`：FormatJS 消息抽取与 ICU／参数／覆盖率检查（支持在 `--` 后传外部插件包根）。
+- `npm run package` / `npm run make`：通过 Electron Forge 打包至 `out/`。
 
 ## 扩展入口
 
-- 新增应用操作：先定义 shared 命令与响应，再在 runtime 实现事务/查询，最后接 UI。
-- 模型与执行：运行时接入 provider 与工具调度；不在 React 生命周期执行，不把 provider 会话当任务历史。
-- 资源与工具：按 [功能模块约定](modules/README.md) 添加纯契约、后台实现与前端视图，遵守统一工具 args 和实现自有 target/result；支持关系不替代执行授权。
-- 外部插件：只消费 [公开 SDK](../packages/sdk/README.md)，后台使用具名模块入口，不依赖宿主的资源控制器或物理会话节点。
-- 数据变更：发布前直接修改建表结构与 schema，不写迁移或兼容读取；旧开发数据删除重建。
-- UI 布局：独立视图存储；不得把 React Flow 节点 JSON 作为持久领域模型。
+- **新增应用命令**：先在 `shared/` 定义命令与响应 schema，再在 `runtime/` 实现事务或查询，最后接入 `renderer/`。
+- **新增资源与工具**：按 [功能模块指南](modules/README.md) 添加 `contract.ts`、`runtime.ts` 与 `renderer.tsx`。
+- **外部插件开发**：消费 [公开 SDK](../packages/sdk/README.md)，不依赖宿主内部控制器或物理节点表。
+- **数据 schema 变更**：发布前直接修改建表结构、配置版本常量与 Zod schema，不写旧版本兼容迁移；旧开发数据清理重建。

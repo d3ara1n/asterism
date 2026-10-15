@@ -1,55 +1,29 @@
-# 配置能力
+# 配置模块实现说明
 
-## 声明提供商预设
+应用级配置与连接测试独立于工作台、任务历史和 renderer。公开传输契约在 `../shared/configuration.ts`，完整领域语义与覆盖规则见 [模型与代理配置](../../docs/model-configuration.md)。
 
-在 `../shared/provider-presets.ts` 的 `defineProviderPresets([...])` 中追加一项即可；不修改选择器或运行时。每项显式填写：
-
-- `id`：目录唯一身份，也是新连接默认 ID。按量用厂商 slug，订阅追加 `-plan`，地区后缀放最后，例如 `kimi / kimi-plan / kimi-cn / kimi-plan-cn`。名称与搜索别名保留产品品牌；目录 ID 调整不迁移用户已保存的连接与引用。
-- `name / billing`：名称与 `usage / subscription / none` 计费类别；选择器依次按按量、订阅、不计费分组，空组不显示，不再按厂商或服务来源分组。
-- `none` 表示连接没有服务端计费，例如本地模型服务；按量 API 的免费额度不改变其 `usage` 分类。
-- `region / plan`：可选地区、套餐说明，支持 SDK 的 `UiText`；界面显示并参与搜索，新增地区或套餐不需要扩充枚举。
-- `connection`：`protocol / baseUrl / auth / compatibility`。兼容条目必须来自已实现的目录，明确无差异时填 `[]`。
-- `keyUrl / sources / verifiedOn / keywords`：该产品的凭据页面、非空官方资料列表、实际核对日期和可选搜索别名。
-
-优先使用 Responses；Anthropic 使用原生 Messages。聚合服务对同一计费产品与地区默认只提供一个预设，支持 Responses 时优先选择；只有不同端点对应不同模型集合时才拆分提供商，不仅因存在多种协议路径或模型上游协议不同就增加入口。实际请求使用用户配置的协议。连接或兼容要求未核实、所需包未实现时不加入目录。不在声明里维护模型或思考等级。
-
-目录校验复用 `providerInputSchema`，并拒绝重复 ID。`providerPresetDraft` 只复制连接字段，为重复连接分配未占用 ID，并深复制兼容参数。选择入口一次性生成初始字段，将地区／套餐／计费说明带入可编辑的默认显示名；凭据页面链接只在选择入口展示。之后交给普通连接编辑器，与空白自定义连接共用全部表单、草稿和保存逻辑；编辑器不接收预设对象，不保留预设状态或更换入口。切换界面语言不会改写已有草稿。保存、密钥托管和后续编辑仍走普通配置接口，不向存储或运行时引入预设身份。
-
-## 配置与存储
-
-应用级配置与连接测试独立于工作台、任务历史和 renderer。公开契约在 `../shared/configuration.ts`，产品语义见 `../../docs/model-configuration.md`。
+## 文件职责
 
 | 文件 | 职责 |
 | --- | --- |
-| `service.ts` | 配置命令、消费投影、凭据协调、异步连接测试及取消/超时 |
-| `store.ts` | 具类型的配置读写、覆盖归一化、完整校验与 configuration.json 原子保存；不依赖数据库 |
-| `errors.ts` | 配置模块的固定错误分类 |
-| `layers.ts` | 配置条目类型、内置原始定义、用户局部覆盖与生效配置的纯解析；不依赖文件存储 |
-| `credentials.ts` | 密文文件的创建、读取、替换与删除，不直接依赖 Electron |
-| `probe.ts` | 三种显式 SDK 协议实例，简短连通请求和脱敏错误分类 |
-| `discovery.ts` | OpenAI／Anthropic 模型列表请求、同端点分页与元数据解析；后台发现、取消、超时与连接失效 |
-| `model-catalog.ts` | 复用官方 models.dev 客户端，精确匹配目录模型并映射可覆盖参数；不持有另一份目录类型或网络客户端 |
-| `defaults.ts` | 五种模型角色、五种 agent 的内置原始定义；不导入本机模型或凭据 |
-| `../shared/provider-presets.ts` | 提供商连接目录、目录声明校验与独立草稿生成；不含模型数据 |
+| `service.ts` | 配置命令队列、消费解析入口（`resolveProviderModel / resolveModelRole`）、凭据协调、后台模型发现、参数获取及异步连接测试 |
+| `store.ts` | `configuration.json` 的读写、覆盖归一化、完整候选文档 Zod 校验与临时文件重命名原子保存；不依赖数据库 |
+| `layers.ts` | 内置原始定义、用户局部覆盖（`overrides`）与最终生效配置的纯函数解析；不依赖文件存储 |
+| `defaults.ts` | 五种内置模型角色与五种内置 agent 的原始定义 |
+| `credentials.ts` | `credentials/` 下密文文件的创建、读取、替换与清理；经 `runtime/secret-client.ts` 请求主进程 `safeStorage` 加解密 |
+| `probe.ts` | 三种协议的显式 AI SDK 实例、最小连通性测试请求与脱敏错误分类 |
+| `discovery.ts` | OpenAI／Anthropic `GET /models` 列表请求、游标分页、元数据解析、取消与 30 秒超时管理 |
+| `model-catalog.ts` | 调用官方 `@opencode-ai/models` 客户端，按剥离路由前缀后的模型名精确匹配并映射可覆盖参数 |
+| `../shared/provider-presets.ts` | 提供商连接预设目录声明、校验与一次性连接草稿生成（`providerPresetDraft`） |
+| `../shared/model-compatibility.ts` | 五项预定义模型兼容包的 schema 声明与提供商／模型两层按 `id` 整项覆盖合并逻辑 |
+| `errors.ts` | 配置模块的固定错误码分类 |
 
-入口为 `window.host.configuration.execute`，经 preload/main 校验转入任务进程。响应携带配置快照、保存 ID、可选参数获取报告或固定错误，不携带密钥或密文。配置修改不触发会话重载或级联刷新；选择与实际消费通过 `resolveProviderModel` / `resolveModelRole` 检查配置。
+## 新增提供商预设
 
-配置 IPC 版本为 9。`discovery.start / cancel / add` 分别启动后台发现、取消、批量添加；快照 `discoveries` 持有每个连接最近一次请求的状态与候选资料，不进入配置文件。发现读取已保存连接与凭据，网络等待不占用配置队列；更改连接使旧结果失效。批量添加根据本次结果校验选择，在一次原子保存中跳过已有模型，刷新不修改配置。界面位于 `renderer/features/configuration/ModelDiscoveryPicker.tsx`，未知参数采用手动新建初始值并明确提示，完整约定见模型配置文档。
+在 `../shared/provider-presets.ts` 的 `defineProviderPresets([...])` 中追加条目即可，无需修改选择器或运行时：
 
-`model.parameters` 在队列外通过官方 `@opencode-ai/models` 获取目录，10 秒超时且不携带提供商凭据；回到队列确认发起时的模型与连接仍有效，再覆盖可映射字段并原子保存。成功结果的 `parameterUpdate` 说明来源和需手动检查的字段；失败通过固定本地化消息说明原配置保留。模型设置页通过 `ModelParameters.tsx` 提供唯一的获取入口与结果展示，列表／卡片不提供此操作。参数不会因获取模型列表或目录更新而自动变化。
-
-手动新建与发现添加共用 `createModelInput` 的初始参数；默认开启思考与工具调用，已知端点资料可以覆盖。参数查询仅在检索时剥离模型 ID 的厂商／路由前缀，保存与调用仍使用完整服务端 ID。用户已于 2026-10-14 确认功能与 GUI 验收通过，见[模型目录归档](../../plans/archived/todo-2026-10-07-model-catalog.md)。
-
-角色/代理保存命令提交完整的用户覆盖集合，省略字段即撤下该字段的覆盖；非空文本覆盖、说明与提示词留空恢复内置，false/null/空列表保留业务含义。工具允许/排除列表作为一组互斥策略替换，列表不拼接。新自定义角色与代理只继承内置原始 default/worker，不受用户修改这两项影响。
-
-读取快照中的 roles/agents 是完整生效配置，defaults 是原始内置基准，overrides 是编辑器填写值。执行每轮取用最新完整配置，不写入会话历史。
-
-配置模块独占应用数据目录下的 `configuration.json`，格式版本为 6，分别保存 providers、models、roles、agents；角色与代理的用户字段保存于 overrides，不持久化生效视图。提供商与模型的 compatibility 分别保存已添加的兼容条目，定义、参数校验与合并位于 `../shared/model-compatibility.ts`；消费时按 id 合并，模型条目整项优先，合并结果不回写存储。文件只在不存在时初始化内置项身份与空覆盖，已有删除状态不会重新播种。损坏或不支持的格式明确报错并保留原文件，工作数据库重建不影响配置。
-
-保存由 store 统一归一化覆盖并校验完整候选文档，再通过临时文件写入、刷新与重命名原子替换；成功后才更新内存。提供商及其模型的删除共用一次保存，失败保持旧视图与旧凭据引用。配置意图与文件格式留在模块内部，调用方只消费配置接口。编辑器可逐项或整项恢复内置值，自定义项保留名称；配置编辑不改写会话历史。
-
-运行时通过 `runtime/secret-client.ts` 请求主进程的私有系统加解密服务；renderer 没有解密 API。系统保护不可用时拒绝保存密钥。新密文落盘后才写入引用，提交失败清理新文件，替换/删除后清理旧文件；清理失败只记录固定英文错误。
-
-测试 start 立即返回 ID，网络请求在后台运行；查询、取消和结果通知独立于工作台命令。测试快照保留启动时的提供商/模型修订，不随编辑变化；修订号仅用于结果说明，不用于配置写入冲突。每次测试只有一次请求，不自动重试。HTTP 仅允许在回环地址发送 API key，其他带密钥端点要求 HTTPS；无鉴权请求不会携带环境变量中的密钥。
-
-配置保存不访问外部服务。测试使用临时配置与密文目录、注入的系统保护与网络接口，覆盖重开、删除状态、保存失败与损坏配置保留；会话测试验证重建数据库不重置全局配置。真实系统钥匙串及提供商端点由用户在界面中验收。角色与代理的设置页复用配置表单及浮岛机制，GUI 继承提示、恢复与保存交互由用户验收。首次消息与单代理执行已消费生效配置；委派尚未接入。
+- `id`：目录唯一身份及新连接默认 ID（按量用厂商 slug，订阅追加 `-plan`，地区后缀放最后，如 `kimi-plan-cn`）。
+- `name / billing`：显示名称与 `usage | subscription | none` 计费分组。
+- `region / plan`：可选地区与套餐说明（支持 `UiText`）。
+- `connection`：`protocol | baseUrl | auth | compatibility`（兼容条目须来自 `model-compatibility.ts` 已实现目录，无差异填 `[]`；优先使用 Responses，Anthropic 用 Messages）。
+- `keyUrl / sources / verifiedOn / keywords`：凭据获取页、非空官方核验资料链接、核对日期与搜索别名。

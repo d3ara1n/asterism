@@ -1,6 +1,6 @@
 # 工坊 Atelier 项目规范
 
-以对象为中心的个人 agent 工作台：代理、资源与操作以卡片和连线呈现，任务过程可查看、分叉，资源支持时可恢复。定位与边界见 `docs/product.md`。首页、侧栏、持久化工作台与三类真实配置已实现，单代理核心与会话 IPC 已实现，首页发送与代理对话视图已接通，真实端点与 GUI 验收已确认，无 CI。后续能力入口见 `plans/todo-2026-10-01-runtime-capabilities.md`；会话核心契约见 `docs/conversation-core.md`。
+以对象为中心的个人 agent 工作台：代理、资源与操作以卡片和连线呈现，任务过程可查看、分叉，资源支持时可恢复。定位与边界见 `docs/product.md`。
 
 ## 工作台占位边界
 
@@ -20,8 +20,8 @@
 
 ## 环境
 
-- 实现中：正式入口 `npm run dev`；模块地图见 `src/README.md`，界面维护见 `src/renderer/README.md`。
-- 实现期基线：Electron + React + TypeScript，shadcn/ui（Radix）+ Tailwind CSS 与 @xyflow/react，SQLite（`node:sqlite`）与本地对象存储，Zod，独立 Node.js 任务运行时；包管理器 npm，构建 electron-vite，打包 Electron Forge。Vercel AI SDK 已用于三协议连接测试与单代理请求适配，核心契约见 `docs/conversation-core.md`。测试以 macOS 为主，发布目标覆盖 macOS、Windows 与 Linux。选型与职责见 `docs/architecture.md`，已安装版本见 `package-lock.json`。
+- 正式入口 `npm run dev`；源码结构见下方仓库与文档地图。
+- 技术基线：Electron + React + TypeScript，shadcn/ui（Radix）+ Tailwind CSS 与 @xyflow/react，SQLite（`node:sqlite`）与本地对象存储，Zod，独立 Node.js 任务运行时；包管理器 npm，构建 electron-vite，打包 Electron Forge。模型请求适配使用 Vercel AI SDK。测试以 macOS 为主，发布目标覆盖 macOS、Windows 与 Linux。选型与职责见 `docs/architecture.md`，已安装版本见 `package-lock.json`。
 - 开发数据与发布数据隔离，均使用 Electron 数据目录；测试使用独立临时目录并清理。一次性原型仅留于 `feat/ux-prototype`，正式分支不依赖其代码。
 - 品牌、固定应用身份与数据布局统一维护在 `src/shared/application.ts`，内部契约与通道身份见 `src/shared/core.ts`。UI 视觉以 `docs/design-system.md` 为准：原生材质底座、独立内容表面、统一 token 与公共控件；新功能复用现有风格，整体视觉变更须由用户确认。
 - 界面控件先查 shadcn registry：`shared/ui/` 缺少时用 `npx shadcn@latest add <name>` 拉取（官方控件不算新依赖），再组合使用；拉取后核对导入路径为相对路径，并清理 CLI 误加的依赖或目录。
@@ -34,31 +34,53 @@
 - 测试只守护 `docs/` 约定或 SDK 公开接口；每个用例须说明具体失败机制与预期依据，断言可观察的契约结果。说不清的用例删除或合并。
 - 同一契约在一处覆盖，下游信任上游；下游必须重测时先查明并修复契约封装缺口。按独立契约组织用例，保持独立运行，覆盖率与测试数量不作为目标。
 
-## 文档地图
+## 仓库与文档地图
 
-先读 `README.md`，按任务读对应文档；未决设计查 `docs/decisions.md`，产品词汇查 `docs/glossary.md`。
+每一项概念或契约只在唯一真值文档中维护，跨文档引用只保留链接，不复制规则正文。产品词汇查 `docs/glossary.md`。
 
-| 文档 | 内容 | 生命周期 |
+### 1. 源码入口地图
+
+| 路径 | 职责与读取时机 |
+| --- | --- |
+| `README.md` | 产品概览、本地开发命令与数据目录说明 |
+| `src/README.md` | 进程与目录职责、跨层调用路径、开发扩展入口 |
+| `src/renderer/README.md` | 前端目录结构、状态协调与界面组件职责 |
+| `src/configuration/README.md` | 提供商预设声明、全局配置存储与连接测试实现 |
+| `src/modules/README.md` | 内置 `atelier.core` 功能模块的契约、后台与视图编写规范 |
+| `packages/sdk/README.md` | `@atelier/sdk` 作者指南与代码示例 |
+
+### 2. 设计契约真值（`docs/`）
+
+| 文档 | 唯一真值范围（何时读取） | 性质 |
 | --- | --- | --- |
-| `docs/product.md` | 定位、核心体验、边界、成功标准 | 极稳定 |
-| `docs/glossary.md` | 产品词汇的中英对照与含义 | 随命名与含义同步 |
-| `docs/object-model.md` | Workspace、Session、资源、操作、视图语义 | 最终状态真值 |
-| `docs/runtime.md` | 执行轮次、绑定、工具目录、授权 | 最终状态真值 |
-| `docs/model-configuration.md` | 配置提供商、模型角色、agent 或设计对话模型选择时读取 | 最终状态真值 |
-| `docs/timeline.md` | 事件、检查点、历史查看、分叉、恢复 | 最终状态真值 |
-| `docs/workbench.md` | 卡片、连线、执行段、时间导航 | 最终状态真值 |
-| `docs/design-system.md` | 已确认视觉、平台窗口、主题参数与组件约束 | 随设计决策同步 |
-| `docs/architecture.md` | 技术栈、进程职责、存储、安全边界 | 随技术决策同步 |
-| `docs/plugin-sdk.md` | 插件 SDK 接口、具型创建／动作、生命周期与功能组合；维护 SDK 或模块时读取 | 最终状态真值 |
-| `docs/decisions.md` | 已定原则、初版取舍、开放问题 | 最终状态真值，演进看 git log |
-| `docs/roadmap.md` | 实现顺序与验收场景 | 随实施推进更新 |
-| `docs/mcp-caching.md` | MCP 延迟加载与提示缓存调研 | 时点固化，接入时重新核验 |
-| `docs/agent-transcript-research.md` | 开源项目的模型适配、对话记录与执行分工 | 源码事实按提交固化；工坊决策以设计文档为准 |
-| `plans/` | 立案任务 | 见下方 plans 纪律 |
+| `docs/product.md` | 产品定位、核心体验、首批验证资源与边界 | 极稳定真值 |
+| `docs/glossary.md` | 产品与代码词汇的中英对照及定义；新增概念先入表 | 随命名同步 |
+| `docs/object-model.md` | Workspace、Session、Agent、Resource、工具匹配与 View 的领域语义 | 最终状态真值 |
+| `docs/timeline.md` | 会话树节点、时间线、执行游标、投影、回溯与分叉语义 | 最终状态真值 |
+| `docs/runtime.md` | 执行轮次、状态投影、代理循环、系统提示词、工具批次、执行授权、模型协议适配与原生正文工具 | 最终状态真值 |
+| `docs/model-configuration.md` | 提供商与预设、模型发现、models.dev 参数获取、输入能力、模型角色、代理配置与用户覆盖 | 最终状态真值 |
+| `docs/workbench.md` | 首页、会话列表状态、工作台画布、代理卡片、工具三态视图、对象／授权／历史面板交互 | 最终状态真值 |
+| `docs/design-system.md` | 原生窗口材质、窗口层次、浮岛编织、动效、主题 token、按钮与状态反馈规范 | 随设计决策同步 |
+| `docs/architecture.md` | 技术选型、三进程职责、SQLite 与文件存储归属、会话 IPC 契约与安全边界 | 随技术决策同步 |
+| `docs/plugin-sdk.md` | 插件 SDK 架构、公共模块、瞬态事件总线、门面与生命周期、具型创建／动作与工具视图接口 | 最终状态真值 |
+| `docs/content.md` | `ContentRef` 不可变字节导入、草稿与运行占用、持久依赖根与回收；修改二进制或文件流转时读取 | 最终状态真值 |
+| `docs/i18n.md` | `UiText` 消息声明、插件翻译目录、语言匹配回退与 FormatJS 抽取；修改多语言时读取 | 最终状态真值 |
+| `docs/session-naming.md` | 两级自动命名、`SessionNamed` 事件、游标标题同步与人工重命名；修改标题逻辑时读取 | 最终状态真值 |
+| `docs/context-compression.md` | 上下文压缩预算、保留边界、独立摘要提示与历史投影；修改长对话压缩时读取 | 最终状态真值 |
+
+### 3. 决策归档、路线与调研（非当前契约真值）
+
+| 文档 | 内容与定位 | 生命周期 |
+| --- | --- | --- |
+| `docs/decisions.md` | **历史决策归档与未决问题**：按演进脉络记录过去为什么这样选、排除了什么替代方案，避免重复推翻或重走弯路。**不是当前规格说明书**，具体契约以第 2 类真值文档为准 | 按决策时间归档 |
+| `docs/roadmap.md` | 实施阶段划分、里程碑验收场景与必测边界 | 随阶段推进更新 |
+| `docs/mcp-caching.md` | MCP 延迟加载与提示缓存机制调研 | 时点固化，接入时核验 |
+| `docs/agent-transcript-research.md` | 开源项目（pi、OpenCode、Cline、Codex、AI SDK）源码调研 | 时点固化，仅作背景参考 |
+| `plans/` | 跨会话延续的待办任务与已归档实施记录 | 见下方 plans 纪律 |
 
 ## plans 纪律
 
-- `plans/todo-<日期>-<主题>.md`：跨会话延续的任务，当前要做什么的唯一真值；完成即移入 `plans/archived/`，有留存价值的结论转 docs/。文件名与文内的日期用立案当天的真实日期，不推算、不占位，不出现未来日期。
+- `plans/todo-<日期>-<主题>.md`：跨会话延续的任务，当前要做什么的唯一真值；完成即移入 `plans/archived/`，有留存价值的结论转入对应真值文档，不在真值文档中保留验收日期流水账。文件名与文内的日期用立案当天的真实日期，不推算、不占位，不出现未来日期。
 - `plans/archived/`：已结束的计划，只进不出。
 - **延后才立案**：本轮会话内完成的任务直接做，不立案；确定留待以后的事才落到 plans/。聊天即焚，延后却未入档的决策视为未发生。
 - 文件名即性质，从名字直接读出生命周期；新类型前缀按需增设（常驻手册用全大写），但必须能一句话说清其生命周期。
@@ -67,7 +89,7 @@
 
 - **agent 自主**：文档措辞与结构、仓库内文件组织；（实现期）内部拆分、命名、代码组织、实现层参数。
 - **必须拍板**：产品定位与交互范式、对象模型语义、provider 与消息/工具协议、存储格式、依赖引入、授权模型、对外行为。
-- 拍板结果更新 `docs/decisions.md` 与对应设计文档；文档描述最终约定，过程追溯看 git log。
+- 拍板结果将最终规则写入对应设计真值文档，并在 `docs/decisions.md` 归档决策取舍理由；文档描述最终状态，不堆砌变更过程。
 
 ## 操作边界
 

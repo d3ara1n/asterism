@@ -25,16 +25,16 @@ Atelier 是一个本地优先、以对象为中心的个人 agent 工作台。�
 - **历史保留过程。** 资源链接与解绑、用户输入、模型输出和工具结果按真实次序记录。解绑撤销后续访问，既有记录仍可查看。
 - **执行取用明确的环境。** 每次模型请求固定当次配置与资源授权，同一响应的工具批次沿用该环境；期间变化由下一次请求取用。
 
-## 当前可以验证什么
+## 已接通的核心能力
 
-- **代理与模型配置：** 提供商、具体模型、模型角色和代理配置已接通，支持 Responses、Chat Completions 与 Anthropic Messages 的连接测试。保存提供商后可获取模型列表、搜索并多选添加；仅在模型设置中从 models.dev 获取参数并覆盖现值，保留手动配置。模型发现与参数获取已获用户功能及 GUI 验收，见[实施记录](plans/archived/todo-2026-10-07-model-catalog.md)。
-- **真实会话：** 首页发送、流式 Markdown 回复、思考与工具三态视图、停止、继续、持久化重开和历史分支已接通。工具填充可实时显示路径与正文，自动开合可在外观设置调整。模型执行由独立任务进程承载，切换页面不停止执行。
-- **上下文自动压缩：** 长对话在请求之间摘要旧内容，近期原文与工具批次继续保留，摘要可展开查看，旧历史不改写。自动化验证已通过，真实模型的摘要质量与 GUI 待 [专项验收](plans/todo-2026-10-13-context-compression.md)。
-- **会话状态：** 侧栏聚合资源的运行、失败、待操作与完成状态，点击徽标查看具体资源；运行状态持续显示，终态进入会话后清除。进度可作为运行状态的附属数据展示，内置代理不生成百分比。专项 GUI 验收见 [事件与状态计划](plans/todo-2026-10-13-event-bus-plugin-calls.md)。
-- **资源与工作台：** 代理、笔记和授权目录使用统一对象卡片。目录支持列举与 UTF-8 文本读取、编辑、写入，笔记支持正文读取、编辑、写入；对象定位、卡片尺寸、历史导航和有向授权链接已实现。
-- **图片与文件输入：** 首页与代理对话可粘贴图片、拖入或选择图片和 PDF，允许纯文件消息；输入先存入时间线，再按模型声明的输入类型发送。请在模型设置启用需要的文件类型，验收记录见 [模型内容输入计划](plans/archived/todo-2026-10-12-model-media-input.md)。
+- **代理与模型配置：** 支持 OpenAI Responses、OpenAI Chat Completions 与 Anthropic Messages 的连接配置与测试；支持提供商预设、端点模型发现、从 models.dev 获取参考参数，以及模型角色与代理配置的内置继承和局部覆盖。
+- **真实会话与流式执行：** 首页发送、流式 Markdown 回复、思考与工具三态视图、停止、继续、持久化重开、两级自动命名和历史分支已接通。模型执行由独立任务进程承载，切换页面不停止执行。
+- **上下文自动压缩：** 长对话在请求之间摘要旧内容，近期原文与工具批次继续保留，摘要可展开查看，旧历史不改写。
+- **会话状态与通知：** 侧栏通过瞬态事件总线聚合资源的运行、失败、待操作与完成状态，点击徽标查看具体资源与可选进度。
+- **资源与工作台：** 代理、笔记和授权目录使用统一对象卡片。目录支持列举、UTF-8 文本读写编辑与图片查看（`see`），笔记支持正文读写编辑；对象定位、卡片尺寸缩放、逐节点历史导航和有向授权链接已实现。
+- **图片与文件输入：** 首页与代理对话可粘贴图片、拖入或选择图片和 PDF，允许纯文件消息；输入以不可变内容引用存入时间线，并在请求边界编码发送。
 
-真实提供商端点、专项行为和 GUI 已完成验收（2026-10-13），记录见 [模型接入计划](plans/archived/todo-2026-10-01-model-protocol-storage.md)。检查点与资源恢复、MCP、代理间通信等能力继续按 [实施路线](docs/roadmap.md) 推进。当前资源种类用于验证基础能力，不代表最终的资源目录。
+检查点与资源恢复、MCP、代理间通信等后续能力按 [实施路线](docs/roadmap.md) 与 `plans/` 推进。当前资源种类用于验证基础能力，不代表最终的资源目录。
 
 ## 开发与体验
 
@@ -55,43 +55,40 @@ npm run dev
 npm test
 npm run typecheck
 npm run build
+npm run i18n:check
 ```
 
-`npm run package` 生成当前平台的未签名应用目录，`npm run make` 进一步生成 ZIP。编译产物位于 `dist/`，Forge 产物位于 `out/`。macOS arm64 已完成本地打包与内容检查，GUI 和其他平台需人工验收。
+`npm run package` 生成当前平台的未签名应用目录，`npm run make` 进一步生成 ZIP。编译产物位于 `dist/`，Forge 产物位于 `out/`。
 
 ## 数据与运行边界
 
-工作数据与应用配置保存到本设备的 Electron 数据目录，源码目录和安装目录不承担数据存储。开发版使用 `appData/dev.dearain.atelier-development`，发布版使用 `appData/dev.dearain.atelier`；两者由固定应用身份生成，不随显示名称或仓库文件夹变化。正式应用标识为 `dev.dearain.atelier`。
+工作数据与应用配置保存到本设备的 Electron 数据目录，源码目录和安装目录不承担数据存储。开发版使用 `appData/dev.dearain.atelier-development`，发布版使用 `appData/dev.dearain.atelier`；两者由固定应用身份 `dev.dearain.atelier` 生成，不随显示名称或仓库文件夹变化。
 
-全局模型与代理配置保存在 `configuration.json`，外观在 `appearance.json`，界面语言在 `language.json`，窗口状态在 `ui-state.json`，密钥独立加密保存于 `credentials/`。设置中的「通用」支持跟随系统、英文和简体中文，切换只更新界面展示。工作数据库为 `db/workspace.sqlite`，不可变正文位于 `objects/`，插件内容位于 `content/`，运行日志位于 `logs/runtime.log`，Chromium 数据位于 `chromium/`。重建会话数据库不重置全局配置；关闭最后一个窗口会退出应用和任务进程。
+全局模型与代理配置保存在 `configuration.json`，外观在 `appearance.json`，界面语言在 `language.json`，窗口状态在 `ui-state.json`，密钥独立加密保存于 `credentials/`。工作数据库为 `db/workspace.sqlite`，不可变正文位于 `objects/`，插件内容位于 `content/`，运行日志位于 `logs/runtime.log`，Chromium 数据位于 `chromium/`。重建会话数据库不重置全局配置；关闭最后一个窗口会退出应用和任务进程。
 
-当前工作数据库版本为 19，配置文件版本为 6。开发前期只支持当前格式，不提供旧数据兼容或迁移；版本不符时明确报错，关闭应用后备份、清理并重新初始化开发数据。公共思考分别保存明文、摘要与原生续接资料，SDK 0.15.0／宿主 API 8.1。
+开发前期只支持当前存储与协议版本（具体版本号定义于源码常量），不提供旧数据兼容或迁移；版本不符时明确报错，关闭应用后备份、清理并重新初始化开发数据。完整的存储与副作用约定见 [技术架构](docs/architecture.md) 和 [运行时](docs/runtime.md)。
 
-笔记只持有当前正文，游标回溯后仍显示其最新内容。目录工具对外部文件的修改不会随会话历史回溯恢复。完整的存储与副作用约定见 [技术架构](docs/architecture.md) 和 [运行时](docs/runtime.md)。
+## 文档导航
 
-## 设计与源码
+完整仓库地图与文档维护纪律见 [AGENTS.md](AGENTS.md)。
 
 | 文档 | 内容 |
 | --- | --- |
 | [产品定义](docs/product.md) | 工坊的定位、工作方式、边界与成功标准 |
-| [词汇表](docs/glossary.md) | 产品词汇的中英对照与含义 |
-| [对象模型](docs/object-model.md) | Workspace、Session、资源、操作、关系与视图 |
-| [运行时与上下文](docs/runtime.md) | 执行轮次、资源绑定、工具、权限与模型输入 |
-| [模型与代理配置](docs/model-configuration.md) | 提供商、模型角色、代理配置及对话模型覆盖 |
-| [自动会话命名](docs/session-naming.md) | 两级自动命名、标题来源事件与异步更新保护 |
-| [时间线与恢复](docs/timeline.md) | 事件、检查点、历史浏览、分叉与恢复 |
-| [上下文自动压缩](docs/context-compression.md) | 触发预算、摘要提示、近期原文保留与历史边界 |
-| [工作台交互](docs/workbench.md) | 卡片、连线、执行段与时间导航 |
-| [技术架构](docs/architecture.md) | 桌面技术栈、进程职责、存储与扩展契约 |
-| [插件 SDK 与功能组合](docs/plugin-sdk.md) | 读写接口、具型创建／动作、运行生命周期与模块组合 |
-| [不可变内容与导入](docs/content.md) | 字节暂存、SDK 内容引用、事务保留与回收 |
+| [词汇表](docs/glossary.md) | 产品与代码词汇的中英对照与含义 |
+| [对象模型](docs/object-model.md) | Workspace、Session、Agent、Resource、工具匹配与视图语义 |
+| [时间线与回溯](docs/timeline.md) | 会话树节点、时间线、执行游标、投影、回溯与分叉 |
+| [运行时与模型执行](docs/runtime.md) | 执行轮次、状态投影、环境与提示词、工具批次、授权、模型协议适配与原生正文工具 |
+| [模型与代理配置](docs/model-configuration.md) | 提供商预设、模型发现、参数获取、模型角色、代理配置与覆盖规则 |
+| [工作台交互](docs/workbench.md) | 首页、会话列表状态、画布、代理卡片、工具视图与辅助面板交互 |
+| [界面设计系统](docs/design-system.md) | 原生窗口材质、浮岛编织、动效、主题 token 与公共控件约束 |
+| [技术架构](docs/architecture.md) | 桌面技术栈、进程职责、数据存储归属、会话 IPC 与安全边界 |
+| [插件 SDK 与功能组合](docs/plugin-sdk.md) | 插件装配、公共模块、瞬态事件总线、门面生命周期与具型创建／动作 |
+| [不可变内容与导入](docs/content.md) | `ContentRef` 字节暂存、封存、持久依赖根与回收 |
 | [公共 i18n](docs/i18n.md) | 语言环境、插件可选本地化、消息归属与展示契约 |
-| [实施路线](docs/roadmap.md) | 实现顺序与验收场景 |
-| [决策与开放问题](docs/decisions.md) | 已定原则、初版取舍与待验证事项 |
-| [MCP 缓存调研](docs/mcp-caching.md) | 延迟加载与提示缓存的机制 |
-| [模型与 Transcript 源码调研](docs/agent-transcript-research.md) | 协议适配、消息组织、执行与持久化分工 |
-| [立案任务](plans/) | 当前待办与跨会话延续的任务 |
-
-实现采用 Electron、React、TypeScript、shadcn/ui + Tailwind CSS、React Flow、SQLite 与 Zod；构建使用 electron-vite，打包使用 Electron Forge。模型接入使用 Vercel AI SDK，任务历史与授权由 Atelier 的运行时持有。安装版本见 `package-lock.json`，模块入口见 [源码地图](src/README.md) 和 [界面维护](src/renderer/README.md)。
-
-本仓库维护 Atelier 的源码与设计资料，真实会话、目录内容、凭据和运行快照保存于仓库之外。文档生命周期与协作约定见 [AGENTS.md](AGENTS.md)。
+| [自动会话命名](docs/session-naming.md) | 两级自动命名、标题来源事件、游标同步与人工命名 |
+| [上下文自动压缩](docs/context-compression.md) | 触发预算、摘要提示、近期原文保留与历史边界 |
+| [实施路线](docs/roadmap.md) | 阶段划分、里程碑验收场景与必测边界 |
+| [历史决策与开放问题](docs/decisions.md) | 架构演进中的取舍归档与待验证问题 |
+| [源码地图](src/README.md) / [界面维护](src/renderer/README.md) | 代码目录职责、数据流路径与扩展指南 |
+| [SDK 作者指南](packages/sdk/README.md) | `@atelier/sdk` 入口说明与插件编写示例 |
