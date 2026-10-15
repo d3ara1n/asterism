@@ -1,4 +1,6 @@
 {
+  "objects.auxiliaryPanels": "辅助面板",
+  "objects.closeAuxiliaryPanel": "关闭面板",
   "modelCatalog.fetch": "获取参数",
   "modelCatalog.fetching": "正在获取…",
   "modelCatalog.hint": "从 models.dev 获取参数与 API 参考价格并覆盖现值，之后仍可手动修改。",

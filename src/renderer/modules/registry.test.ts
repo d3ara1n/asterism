@@ -1,9 +1,9 @@
-import { createElement, isValidElement } from "react";
+import { createElement, isValidElement, type ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { defineData, present, reference } from "@atelier/sdk/contracts";
 import type { Json } from "@atelier/sdk/contracts";
-import { cardRenderer, toolRenderer, type ToolRenderProps, type ToolInputRenderProps, type ToolResultRenderProps } from "@atelier/sdk/renderer";
+import { cardRenderer, toolRenderer, type RendererObjectContext, type ToolRenderProps, type ToolInputRenderProps, type ToolResultRenderProps } from "@atelier/sdk/renderer";
 import { ViewRegistry } from "./registry";
 
 const data = defineData("test.text", z.strictObject({ text: z.string() }));
@@ -15,6 +15,38 @@ const card = cardRenderer(data, { width: 340, height: 200, Body: Text });
 const props = (value: Json): ToolResultRenderProps => ({ phase: "settled", name: "sample", target: null, args: {}, invocation: {}, result: { kind: "succeeded", data: value } });
 
 describe("视图契约分派", () => {
+  // SDK 面板与主体共享校验后的投影和对象身份；解析只创建元素，不启动面板订阅或读取。
+  it("辅助面板绑定同一对象和投影，未挂载时不执行组件", () => {
+    const Panel = vi.fn((_props: { data: { text: string } }) => null);
+    const context = { ref: { id: "object", sessionId: "session", kind: "test.text" } } as RendererObjectContext;
+    const renderer = cardRenderer(data, { width: 340, height: 200, Body: Text,
+      panels: [{ id: "details", label: "Details", icon: null, Body: Panel }] });
+    const view = renderer.resolve({ text: "saved" }, context)!;
+    expect(view.panels).toHaveLength(1);
+    expect(view.panels![0]).toMatchObject({ id: "details", label: "Details", icon: null });
+    const panel = view.panels![0]!.body;
+    expect(isValidElement<{ value: RendererObjectContext; children: ReactNode }>(panel)).toBe(true);
+    if (!isValidElement<{ value: RendererObjectContext; children: ReactNode }>(panel)) throw new Error("Expected an object provider.");
+    expect(panel.props.value).toBe(context);
+    const child = panel.props.children;
+    expect(isValidElement<{ data: { text: string } }>(child) && child.type).toBe(Panel);
+    expect(isValidElement<{ data: { text: string } }>(child) && child.props.data).toEqual({ text: "saved" });
+    const body = view.body;
+    if (!isValidElement<{ children: ReactNode }>(body) || !isValidElement<{ data: unknown }>(body.props.children)) throw new Error("Expected the card body.");
+    expect(isValidElement<{ data: unknown }>(child) && child.props.data).toBe(body.props.children.props.data);
+    expect(Panel).not.toHaveBeenCalled();
+    expect(renderer.resolve({ text: 7 }, context)).toBeNull();
+  });
+  // 面板按卡片内的稳定 ID 导航；重复或空 ID 会让选择目标不明确，其他卡片可复用同名 ID。
+  it("面板 ID 在卡片内唯一，未声明面板的既有卡片保持兼容", () => {
+    const panel = { id: "details", label: "Details", icon: null, Body: Text };
+    expect(() => cardRenderer(data, { width: 340, height: 200, Body: Text, panels: [panel, panel] })).toThrow("Duplicate card panel ID");
+    expect(() => cardRenderer(data, { width: 340, height: 200, Body: Text, panels: [{ ...panel, id: " " }] })).toThrow();
+    for (let index = 0; index < 2; index++)
+      expect(cardRenderer(data, { width: 340, height: 200, Body: Text, panels: [panel] }).resolve({ text: "saved" })?.panels?.[0]?.id).toBe("details");
+    expect(card.resolve({ text: "saved" })?.panels).toBeUndefined();
+  });
+
   it("填充视图独立可选，不把未完成参数交给完整参数的 renderer", () => {
     const Header = vi.fn(() => null);
     const Preview = (_props: ToolInputRenderProps) => null;

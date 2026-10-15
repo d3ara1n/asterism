@@ -16,7 +16,7 @@
 | `features/home/HomePage.tsx` | 首页草稿、agent/模型/思考选择及首次发送 |
 | `features/workbench/Workbench.tsx` / `WorkbenchSurface.tsx` | 对象与关系到 React Flow 画布的投影、过渡底板与视图保存 |
 | `features/workbench/canvas.ts` / `viewport.ts` / `placement.ts` | `WorkbenchCanvas` 接口（`findPlacement` 最近空位、`focusObjects` 对象聚焦、动态缩放下限与视口保存） |
-| `features/workbench/ObjectNode.tsx` / `ObjectCard.tsx` / `ObjectActions.tsx` | 已注册卡片分派、统一 `ObjectCard` 外壳、右下角缩放柄与尺寸预设／移除菜单 |
+| `features/workbench/ObjectNode.tsx` / `ObjectCard.tsx` / `ObjectActions.tsx` | 已注册卡片与辅助面板分派、统一 `ObjectCard` 外壳及局部面板布局／焦点、右下角缩放柄与尺寸预设／移除菜单 |
 | `features/workbench/layout.ts` / `sizing.ts` / `nodes.ts` / `size-intents.ts` | 卡片默认尺寸与下限、本地缩放拖动与后台布局同步协调 |
 | `features/workbench/connections.ts` | 双向链接合并显示与卡片四边动态端点排序分布 |
 | `features/workbench/ObjectsPanel.tsx` / `AccessPanel.tsx` | 右侧对象快速定位浮岛与有向授权管理浮岛 |
@@ -25,6 +25,7 @@
 | `features/session/History.tsx` / `history-navigation.ts` / `history-branches.ts` | 历史浮岛面板：分支 Tab、分叉点双向导航、两行逐节点列表、来源筛选与「从这里继续」跳转 |
 | `features/conversation/tool-views.tsx` / `shared/tool-content.tsx` | 三个宿主固定入口（`resource_*`）的内置视图、`resource_call` 转交适配与调用／结果原始详情切换 |
 | `../modules/agent/conversation/` | 内置 Agent 对话组件簇：`Conversation.tsx`、`ConversationTimeline.tsx`、`output-follow.ts`、`Composer.tsx`、`ConfigurationPicker.tsx`、`draft.ts`、`Files.tsx`、`interaction.ts`、`Disclosure.tsx`、`ToolCall.tsx`、`ThinkingBlock.tsx`、`Markdown.tsx` |
+| `../modules/agent/diagnostics/` | 代理诊断的历史请求投影、当前价格计量及面板内的列表／详情／汇总 |
 | `../modules/text-view.tsx` / `code-view.tsx` / `shared/tool-body.ts` | 内置正文工具三态视图、Pierre Diffs 代码／差异渲染与 120 行预览预算截取 |
 | `modules/registry.ts` / `views.tsx` / `object-context.ts` | 静态资源展示描述、卡片／工具／历史记录视图注册表与 SDK 前端对象接口注入 |
 | `features/configuration/` | 提供商、模型发现（`ModelDiscoveryPicker.tsx`）、参数获取（`ModelParameters.tsx`）、模型兼容设置（`ModelCompatibilityEditor.tsx`）、模型角色与 agent 覆盖表单（`forms.tsx`） |

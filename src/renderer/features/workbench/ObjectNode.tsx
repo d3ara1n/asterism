@@ -37,6 +37,7 @@ export const ObjectNode = memo(function ObjectNode({ id, data, selected }: NodeP
     ...fallbackCardAppearance,
     body: <div className="min-h-0 flex-1 select-text overflow-auto p-3"><JsonView value={object.presentation.data} /></div>,
     actions: undefined,
+    panels: undefined,
   };
   const onObjectView = useCallback((patch: ViewPatch) => onView(object.id, patch), [onView, object.id]);
   return <>
@@ -47,6 +48,9 @@ export const ObjectNode = memo(function ObjectNode({ id, data, selected }: NodeP
       isConnectableEnd={descriptor.receivesLinks === true} />)}
     <ObjectCard title={object.title} collapsed={collapsed} selected={!!selected} onView={onObjectView}
       icon={descriptor.icon} kind={i18n.text(descriptor.label)}
+      panels={view.panels?.map(panel => ({ ...panel,
+        body: <SlotBoundary><ObjectServices object={object}>{panel.body}</ObjectServices></SlotBoundary>,
+      }))}
       actions={<><SlotBoundary fallback={null}><ObjectServices object={object}>{view.actions}</ObjectServices></SlotBoundary><ObjectActions object={object} defaultSize={cardSize(view)} onView={onObjectView} /></>}>
       <SlotBoundary key={JSON.stringify(object.presentation.contract)}><ObjectServices object={object}>{view.body}</ObjectServices></SlotBoundary>
     </ObjectCard>

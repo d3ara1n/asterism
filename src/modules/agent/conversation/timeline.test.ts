@@ -6,6 +6,13 @@ import { conversationTimeline, timelineKey } from "./timeline";
 
 const base = { sessionId: "s", createdAt: "2026-10-12T00:00:00Z", source: { plugin: "atelier.core", resource: { sessionId: "s", id: "a", kind: "atelier.core/agent" } } };
 describe("代理的具型记录视图", () => {
+  // 模型可能只交付思考摘要；显示转换须保留可读内容，但不能改写历史里的明文／摘要字段。
+  it("只有摘要的思考块仍可阅读", () => {
+    const saved = node("summary-only", null, thinking("a", "r", 0, "", { summary: "Saved reasoning summary" }));
+    const timeline = conversationTimeline(sessionSnapshot(nodeView("s", "", [saved], saved.id)), "a", []);
+    expect(timeline[0]).toMatchObject({ kind: "thinking", text: "Saved reasoning summary", summary: "Saved reasoning summary" });
+    expect(saved.data).toMatchObject({ block: { text: "", summary: "Saved reasoning summary" } });
+  });
   it("同一块从内存转入历史时展示身份不变，过渡快照不重复展示", () => {
     const live = { id: "r:0", responseId: "r", ordinal: 0, kind: "thinking" as const, text: "thinking", startedAt: 1000, endedAt: null };
     const saved = node("saved-id", null, thinking("a", "r", 0, live.text));

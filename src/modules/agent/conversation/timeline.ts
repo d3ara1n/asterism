@@ -12,6 +12,14 @@ export type TimelineItem = SavedBlock | ModelLiveBlock
 export function timelineKey(item: TimelineItem): string {
   return "responseId" in item ? JSON.stringify([item.responseId, item.ordinal]) : item.id;
 }
+/** 对话与诊断共用历史块的展示转换；摘要式思考也能阅读，原始记录不改写。 */
+export function savedTimelineBlock(record: Pick<SessionRecord, "id" | "createdAt">,
+  block: Extract<z.infer<typeof Execution.schema>, { type: "block" }>["block"]): SavedBlock {
+  return {
+    ...block, id: record.id, createdAt: record.createdAt, usage: block.completion?.usage ?? null,
+    ...(block.kind === "thinking" ? { text: block.text || block.summary } : {}),
+  };
+}
 function item(record: SessionRecord, agentId: string): TimelineItem | null {
   const notice = Notice.decode(record);
   if (notice?.status === "known" && (!record.source?.resource || record.source?.resource.id === agentId)) return { kind: "notice", id: record.id, ...notice.data };
@@ -26,10 +34,7 @@ function item(record: SessionRecord, agentId: string): TimelineItem | null {
     return { ...diagnostic, kind: "notice", id: record.id,
       ...(response ? { response: { ...response, model: response.source.model } } : {}) };
   }
-  if (execution?.status === "known" && execution.data.type === "block") return {
-    ...execution.data.block, id: record.id, createdAt: record.createdAt, usage: execution.data.block.completion?.usage ?? null,
-    ...(execution.data.block.kind === "thinking" ? { text: execution.data.block.text || execution.data.block.summary } : {}),
-  };
+  if (execution?.status === "known" && execution.data.type === "block") return savedTimelineBlock(record, execution.data.block);
   return null;
 }
 /** 所有已保存块直接来自当前路径；实时块以响应身份接续。 */

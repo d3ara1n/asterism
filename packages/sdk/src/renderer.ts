@@ -10,6 +10,8 @@ export * from "./renderer-services.ts";
 export * from "./renderer-creation.ts";
 export * from "./renderer-tools.ts";
 export * from "./renderer-records.ts";
+export * from "./renderer-card.ts";
+import type { CardPanelDefinition, CardPanelView } from "./renderer-card.ts";
 import type { RecordRenderer } from "./renderer-records.ts";
 export type * from "./renderer-content.ts";
 import type { RendererContentInput, RendererInputOptions } from "./renderer-content.ts";
@@ -65,6 +67,7 @@ export interface CardAppearance {
 export interface CardView extends CardAppearance {
   body: ReactNode;
   actions?: ReactNode;
+  panels?: readonly CardPanelView[];
 }
 export interface CardRenderer {
   contract: ContractReference;
@@ -91,14 +94,27 @@ export interface RendererPrepareContext {
 /** 类型擦除只发生在注册边界；组件接收到的是已通过契约校验的数据。 */
 export function cardRenderer<T extends Json>(
   contract: DataContract<T>,
-  definition: CardAppearance & { Body: ComponentType<{ data: T }>; Actions?: ComponentType<{ data: T }> },
+  definition: CardAppearance & {
+    Body: ComponentType<{ data: T }>;
+    Actions?: ComponentType<{ data: T }>;
+    panels?: readonly CardPanelDefinition<T>[];
+  },
 ): CardRenderer {
-  const { Body, Actions, ...appearance } = definition;
+  const { Body, Actions, panels, ...appearance } = definition;
+  const ids = new Set<string>();
+  for (const panel of panels ?? []) {
+    if (!panel.id.trim() || panel.id !== panel.id.trim()) throw new Error("Card panel IDs must be non-empty and trimmed.");
+    if (ids.has(panel.id)) throw new Error(`Duplicate card panel ID: ${panel.id}`);
+    ids.add(panel.id);
+  }
   return { contract: reference(contract), resolve(raw, context) {
     const parsed = contract.schema.safeParse(raw);
     if (!parsed.success) return null;
     const bind = (node: ReactNode) => context ? createElement(ObjectContext.Provider, { value: context }, node) : node;
     return { ...appearance, body: bind(createElement(Body, { data: parsed.data })),
-      actions: Actions ? bind(createElement(Actions, { data: parsed.data })) : undefined };
+      actions: Actions ? bind(createElement(Actions, { data: parsed.data })) : undefined,
+      panels: panels?.map(({ Body: PanelBody, ...panel }) => ({
+        ...panel, body: bind(createElement(PanelBody, { data: parsed.data })),
+      })) };
   } };
 }

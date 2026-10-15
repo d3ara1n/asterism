@@ -28,5 +28,5 @@
 ## 模块内部组织要点
 
 - **`notes/` & `filesystem/`**：共用 `shared/text-contract.ts`、后台 `shared/text.ts`（及 `shared/hashline/`）与前端 `text-view.tsx / code-view.tsx / shared/tool-body.ts`（Pierre Diffs 渲染与 120 行逻辑行预算，启动时通过 `prepareCodeView` 预热高亮器）。笔记正文保存在 `session_data` 对象作用域的 `atelier.core/note.content`。
-- **`agent/`**：后台由 `selection.ts`（配置与工具策略）、`admission.ts`（输入原子受理与幂等）、`loop.ts`（多轮 `models.run` 循环）、`compression.ts` / `compression-prompt.ts`（上下文自动压缩，见 [上下文自动压缩](../../docs/context-compression.md)）、`projection.ts`（时间线到模型消息投影）与 `state.ts / state-projection.ts`（执行状态投影）显式组合；前端 `agent/conversation/` 组合时间线展示、输出跟随、输入草稿与配置选择。
+- **`agent/`**：后台由 `selection.ts`（配置与工具策略）、`admission.ts`（输入原子受理与幂等）、`loop.ts`（多轮 `models.run` 循环）、`compression.ts` / `compression-prompt.ts`（上下文自动压缩，见 [上下文自动压缩](../../docs/context-compression.md)）、`projection.ts`（时间线到模型消息投影）与 `state.ts / state-projection.ts`（执行状态投影）显式组合；前端 `agent/conversation/` 组合时间线展示、输出跟随、输入草稿与配置选择，`agent/diagnostics/` 从历史投影请求列表、适配已报告用量并展示费用与关联内容。通用单位计价在 `src/shared/model-cost-estimate.ts`，不依赖 agent。
 - **`naming/`**：后台 `runtime.ts` 监听 `committed` 与 `cursorChanged`，结合 `policy.ts` 的材料采样规则调用 `utility` 模型生成标题，并通过显式公开接口 `NamingApi.nameByUser` 供应用组合层执行人工重命名（见 [自动会话命名](../../docs/session-naming.md)）。

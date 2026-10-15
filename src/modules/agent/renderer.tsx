@@ -7,6 +7,7 @@ import { CreateAgent, AgentView } from "./contract";
 import { Conversation, ConversationActions } from "./conversation/Conversation";
 import { AgentInput } from "./creation";
 import { agentRecordViews } from "./history";
+import { agentPanels } from "./panels";
 
 const appearance = { width: 560, height: 640, minWidth: 480, minHeight: 480 };
 
@@ -16,6 +17,7 @@ export default {
     ...appearance,
     Body: AgentBody,
     Actions: ConversationActions,
+    panels: agentPanels,
   })],
   tools: [],
   records: agentRecordViews,

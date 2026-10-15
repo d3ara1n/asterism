@@ -1,6 +1,8 @@
 import { defineMessages, pluginNamespace } from "@atelier/sdk/contracts";
 
 export const objectsMessages = pluginNamespace("atelier.host").messages("en", defineMessages({
+  auxiliaryPanels: { id: "objects.auxiliaryPanels", defaultMessage: "Auxiliary panels" },
+  closeAuxiliaryPanel: { id: "objects.closeAuxiliaryPanel", defaultMessage: "Close panel" },
   objectActions: {
     id: "objectActions",
     defaultMessage: "Object actions",
