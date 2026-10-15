@@ -3,7 +3,7 @@ import type { ModelCompletion } from "@atelier/sdk/contracts";
 import { sessionView } from "../../../plugins/records.ts";
 import { nodeView } from "../../../session/view.ts";
 import { agentSource, call, event, message, node, notice, text, thinking } from "../../../session/test-nodes.ts";
-import { ContextSummary, Execution, UserMessage } from "../records.ts";
+import { ContextSummary, Execution, RequestDiagnosticsRecord, UserMessage } from "../records.ts";
 import { diagnosticHistory } from "./history.ts";
 
 const completion: ModelCompletion = { finishReason: "stop", rawFinishReason: null, providerResponseId: "upstream-id",
@@ -71,5 +71,21 @@ describe("代理诊断历史", () => {
     expect(result.requests.find(request => request.responseId === "before")?.inputHasFiles).toBe(true);
     expect(result.requests.find(request => request.responseId === "after")?.inputHasFiles).toBe(false);
     expect(result.requests.find(request => request.responseId === "branch")?.inputHasFiles).toBe(true);
+  });
+
+  // docs/workbench.md#代理上下文：请求诊断按 responseId 关联，不按相邻位置猜测；没有记录的请求保持 null。
+  it("请求诊断按响应身份关联到请求，压缩保留压缩前估算", () => {
+    const sent = { system: [{ kind: "agent", role: "worker", characters: 4 }], tools: ["resource_list"] };
+    const nodes = [
+      node("input", null, message("a", "Start")),
+      node("diag-late", "input", event(RequestDiagnosticsRecord.id, { responseId: "second", diagnostics: sent }, { source: agentSource("a") })),
+      node("first", "diag-late", text("a", "first", 0, "One", { requestParentId: "input", completion })),
+      node("summary", "first", event(ContextSummary.id, { summary: "S", keptFrom: "input", model: "p/m", tokensBefore: 777, completion }, { source: agentSource("a") })),
+      node("second", "summary", text("a", "second", 0, "Two", { requestParentId: "summary", completion })),
+    ];
+    const result = diagnosticHistory(sessionView(nodeView("s", "", nodes, "second")), "a", "timeline");
+    expect(result.requests.find(request => request.responseId === "second")?.sent).toEqual(sent);
+    expect(result.requests.find(request => request.responseId === "first")?.sent).toBeNull();
+    expect(result.requests.find(request => request.kind === "compression")).toMatchObject({ tokensBefore: 777, sent: null });
   });
 });

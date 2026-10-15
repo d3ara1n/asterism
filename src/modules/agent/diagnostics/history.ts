@@ -1,5 +1,5 @@
-import type { ModelBlock, ModelCompletion, ModelInputPart, SessionRecord, SessionView } from "@atelier/sdk/contracts";
-import { ContextSummary, Execution, Notice, UserMessage } from "../records.ts";
+import type { ModelBlock, ModelCompletion, ModelInputPart, RequestDiagnostics, SessionRecord, SessionView } from "@atelier/sdk/contracts";
+import { ContextSummary, Execution, Notice, RequestDiagnosticsRecord, UserMessage } from "../records.ts";
 
 export type DiagnosticScope = "timeline" | "session";
 export interface DiagnosticNotice { id: string; createdAt: string; code: string; message: string; level: "info" | "warning" | "error" }
@@ -12,6 +12,10 @@ export interface DiagnosticRequest {
   relatedInput: { id: string; parts: readonly ModelInputPart[] } | null;
   /** 仅判断历史投影是否含文件，不把多模态总 token 冒充文本细分。 */
   inputHasFiles: boolean | null;
+  /** 压缩请求保存的压缩前估算量；工作请求为 null。 */
+  tokensBefore: number | null;
+  /** 按 responseId 关联的请求诊断；未保存时为 null，不以当前配置补齐。 */
+  sent: RequestDiagnostics | null;
 }
 interface HistoryState { lastFile: number | null; input: DiagnosticRequest["relatedInput"] }
 export interface DiagnosticHistory { requests: DiagnosticRequest[]; notices: DiagnosticNotice[]; unreadable: number }
@@ -25,6 +29,7 @@ export function diagnosticHistory(snapshot: Pick<SessionView, "records">, agentI
   const requests = new Map<string, DiagnosticRequest>();
   const notices: DiagnosticNotice[] = [];
   let unreadable = 0;
+  const sent = new Map<string, RequestDiagnostics>();
   const stateAt = (id: string | null): HistoryState => id === null ? { lastFile: -1, input: null } : history.get(id) ?? { lastFile: null, input: null };
   const response = (record: SessionRecord, id: string, model: string, parentId: string | null, modelScope: string | null): DiagnosticRequest => {
     const key = `response:${id}`;
@@ -33,7 +38,7 @@ export function diagnosticHistory(snapshot: Pick<SessionView, "records">, agentI
     const state = stateAt(parentId);
     const request: DiagnosticRequest = {
       id: key, kind: "response", responseId: id, model, modelScope, requestParentId: parentId,
-      createdAt: record.createdAt, sequence: record.sequence, completion: null, blocks: [], summary: null, notices: [],
+      createdAt: record.createdAt, sequence: record.sequence, completion: null, blocks: [], summary: null, notices: [], tokensBefore: null, sent: null,
       onTimeline: timelineIds.has(record.id), relatedInput: state.input, inputHasFiles: state.lastFile === null ? null : state.lastFile >= 0,
     };
     requests.set(key, request);
@@ -46,7 +51,8 @@ export function diagnosticHistory(snapshot: Pick<SessionView, "records">, agentI
     const summary = ContextSummary.decode(record);
     const execution = Execution.decode(record);
     const notice = Notice.decode(record);
-    if ([input, summary, execution, notice].some(value => value?.status === "unknown")) {
+    const sentRecord = RequestDiagnosticsRecord.decode(record);
+    if ([input, summary, execution, notice, sentRecord].some(value => value?.status === "unknown")) {
       unreadable++; state = { input: null, lastFile: null };
     }
     if (input?.status === "known") state = {
@@ -57,6 +63,7 @@ export function diagnosticHistory(snapshot: Pick<SessionView, "records">, agentI
       requests.set(`summary:${record.id}`, {
         id: `summary:${record.id}`, kind: "compression", responseId: null, model: summary.data.model, modelScope: null,
         requestParentId: null, createdAt: record.createdAt, sequence: record.sequence, completion: summary.data.completion,
+        tokensBefore: summary.data.tokensBefore, sent: null,
         blocks: [], summary: summary.data.summary, notices: [], onTimeline: timelineIds.has(record.id),
         relatedInput: state.input, inputHasFiles: false,
       });
@@ -82,8 +89,12 @@ export function diagnosticHistory(snapshot: Pick<SessionView, "records">, agentI
         request.notices.push(item);
       } else notices.push(item);
     }
+    if (sentRecord?.status === "known") sent.set(sentRecord.data.responseId, sentRecord.data.diagnostics);
     history.set(record.id, state);
   }
-  for (const request of requests.values()) request.blocks.sort((a, b) => a.block.ordinal - b.block.ordinal);
+  for (const request of requests.values()) {
+    request.blocks.sort((a, b) => a.block.ordinal - b.block.ordinal);
+    if (request.responseId) request.sent = sent.get(request.responseId) ?? null;
+  }
   return { requests: [...requests.values()].sort((a, b) => b.sequence - a.sequence), notices: notices.reverse(), unreadable };
 }

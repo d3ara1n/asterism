@@ -25,7 +25,8 @@
 | `features/session/History.tsx` / `history-navigation.ts` / `history-branches.ts` | 历史浮岛面板：分支 Tab、分叉点双向导航、两行逐节点列表、来源筛选与「从这里继续」跳转 |
 | `features/conversation/tool-views.tsx` / `shared/tool-content.tsx` | 三个宿主固定入口（`resource_*`）的内置视图、`resource_call` 转交适配与调用／结果原始详情切换 |
 | `../modules/agent/conversation/` | 内置 Agent 对话组件簇：`Conversation.tsx`、`ConversationTimeline.tsx`、`output-follow.ts`、`Composer.tsx`、`ConfigurationPicker.tsx`、`draft.ts`、`Files.tsx`、`interaction.ts`、`Disclosure.tsx`、`ToolCall.tsx`、`ThinkingBlock.tsx`、`Markdown.tsx` |
-| `../modules/agent/diagnostics/` | 代理诊断的历史请求投影、当前价格计量及面板内的列表／详情／汇总 |
+| `../modules/agent/diagnostics/` | 代理诊断的历史请求投影、当前价格计量、缓存与增长概览及面板内的列表／详情／汇总 |
+| `../modules/agent/context/` / `panel-kit.tsx` | 代理上下文面板的窗口占用、对话与系统构成；两个代理面板共用的版式、数值与系统构成部件 |
 | `../modules/text-view.tsx` / `code-view.tsx` / `shared/tool-body.ts` | 内置正文工具三态视图、Pierre Diffs 代码／差异渲染与 120 行预览预算截取 |
 | `modules/registry.ts` / `views.tsx` / `object-context.ts` | 静态资源展示描述、卡片／工具／历史记录视图注册表与 SDK 前端对象接口注入 |
 | `features/configuration/` | 提供商、模型发现（`ModelDiscoveryPicker.tsx`）、参数获取（`ModelParameters.tsx`）、模型兼容设置（`ModelCompatibilityEditor.tsx`）、模型角色与 agent 覆盖表单（`forms.tsx`） |

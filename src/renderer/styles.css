@@ -31,6 +31,9 @@
   /* 工坊扩展：画布纹理与选区。 */
   --canvas-grid: #c4cfca;
   --selection: #cae5d7;
+  /* 图表分类色：Radix 第 9 级，亮暗同值；运行时由 themeTokens 写入。 */
+  --chart-1: #0090ff; --chart-2: #12a594; --chart-3: #ffc53d; --chart-4: #6e56cf;
+  --chart-5: #e93d82; --chart-6: #f76b15; --chart-7: #00a2c7; --chart-8: #ab4aba;
   /* 受管空间内边距：浮岛顶边与页面顶边对齐。 */
   --space-inset: 0px;
   --motion-fast: 200ms;
@@ -76,6 +79,14 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-chart-6: var(--chart-6);
+  --color-chart-7: var(--chart-7);
+  --color-chart-8: var(--chart-8);
   /* 字体由外观设置在 :root 写入 --app-font-sans / --app-font-mono；此处为未加载前的回退。 */
   --font-sans: var(--app-font-sans, system-ui, -apple-system, "Segoe UI Variable Text", "Segoe UI", "PingFang SC", "Microsoft YaHei UI", "Noto Sans CJK SC", sans-serif);
   --font-mono: var(--app-font-mono, ui-monospace, "SF Mono", Menlo, Consolas, "Cascadia Mono", "Noto Sans Mono CJK SC", monospace);

@@ -1,6 +1,6 @@
 import { PluginApiError, type ObjectExecutor, type ObjectReader, type PluginTasks, type ModelServices } from "@atelier/sdk/runtime";
 import { ResourceStatusChanged, type ResourceStatus } from "@atelier/sdk/contracts";
-import { Execution, Notice } from "./records.ts";
+import { Execution, Notice, RequestDiagnosticsRecord } from "./records.ts";
 import { selectionOf, type AgentSelectionService } from "./selection.ts";
 import { composeSystemPrompt } from "./system-prompt.ts";
 import { projectForAgent } from "./projection.ts";
@@ -47,6 +47,9 @@ export function createAgentLoop(deps: { selection: AgentSelectionService; tasks:
                 if (event.type !== "progress") object.commit(writer => { writer.append(Execution, event); });
               } },
             });
+            const { diagnostics, responseId } = result;
+            if (diagnostics && responseId && !(result.reason === "failed" && result.code === "event_delivery"))
+              object.commit(writer => { writer.append(RequestDiagnosticsRecord, { responseId, diagnostics }); });
             // 事件提交失败时请求已中止且无法写入诊断；在循环层补一条可见通知，避免静默停止。
             if (result.reason === "failed" && result.code === "event_delivery") {
               object.commit(writer => { writer.append(Notice, { level: "error", code: "event_delivery",

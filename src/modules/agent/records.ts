@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { defineRecord, modelRunRecordSchema, modelCompletionSchema, modelInputPartsSchema } from "@atelier/sdk/contracts";
+import { defineRecord, modelRunRecordSchema, modelCompletionSchema, modelInputPartsSchema, requestDiagnosticsSchema } from "@atelier/sdk/contracts";
 import { core } from "../plugin.ts";
 
 /** 代理用户消息的公开记录契约；接收代理即记录来源资源。需要识别用户输入的插件导入它。 */
@@ -20,4 +20,8 @@ export const ContextSummary = defineRecord(core.name("agent.context-summary"), {
 export const Notice = defineRecord(core.name("agent.notice"), {
   schema: z.strictObject({ code: z.string(), message: z.string(), level: z.enum(["info", "warning", "error"]),
     response: modelCompletionSchema.extend({ responseId: z.string(), requestParentId: z.string().nullable(), model: z.string() }).optional() }),
+});
+/** 一次工作请求实际发出的结构与计量；不进入模型投影，不作为后续请求的环境来源。 */
+export const RequestDiagnosticsRecord = defineRecord(core.name("agent.request-diagnostics"), {
+  schema: z.strictObject({ responseId: z.string().min(1), diagnostics: requestDiagnosticsSchema }),
 });

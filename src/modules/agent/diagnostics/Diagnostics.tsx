@@ -1,7 +1,7 @@
 import { ArrowLeft, FileText, MessagesSquare } from "lucide-react";
-import { useEffect, useRef, useState, type ReactNode } from "react";
-import { useI18n } from "@atelier/sdk/renderer";
-import type { UiMessage } from "@atelier/sdk/contracts";
+import { useEffect, useRef, useState } from "react";
+import { useI18n, type I18n } from "@atelier/sdk/renderer";
+import type { UiMessage, Usage } from "@atelier/sdk/contracts";
 import { Alert, AlertDescription } from "../../../renderer/shared/ui/alert";
 import { Badge } from "../../../renderer/shared/ui/badge";
 import { Button } from "../../../renderer/shared/ui/button";
@@ -12,8 +12,11 @@ import { diagnosticMessages as messages } from "../../messages/diagnostics";
 import { ConversationTimeline } from "../conversation/ConversationTimeline";
 import { savedTimelineBlock, type TimelineItem } from "../conversation/timeline";
 import { Disclosure } from "../conversation/Disclosure";
+import { compact, PanelBody, percent, Section, Stat, Stats, SystemComposition } from "../panel-kit";
 import { useDiagnostics, type PricedRequest } from "./use-diagnostics";
 import type { DiagnosticNotice, DiagnosticScope } from "./history";
+import type { DiagnosticOverview } from "./overview";
+import { InputTrend } from "./InputTrend";
 import { formatEstimate, formatMoney } from "./format";
 import type { CostIssue } from "../../../shared/model-cost-estimate";
 
@@ -29,19 +32,20 @@ function requestState(request: PricedRequest) {
     && (!request.blocks.length || request.blocks.at(-1)!.block.ordinal + 1 === request.blocks.length);
   return complete ? messages.finished : messages.incomplete;
 }
-function Section({ title, children }: { title: string; children: ReactNode }) {
-  return <section className="space-y-2"><h4 className="type-label">{title}</h4>{children}</section>;
-}
+const cacheRate = (i18n: I18n, usage: Usage | null) =>
+  usage?.input != null && usage.cacheRead != null ? percent(i18n, usage.cacheRead, usage.input) : "—";
+
 function Notices({ notices }: { notices: readonly DiagnosticNotice[] }) {
   return <div className="space-y-2">{notices.map(notice => <Alert key={notice.id} variant={notice.level === "error" ? "destructive" : "default"}>
     <AlertDescription><span className="type-label">{notice.code}</span><p className="break-words">{notice.message}</p></AlertDescription>
   </Alert>)}</div>;
 }
+
 function RequestDetails({ request, onBack }: { request: PricedRequest; onBack(): void }) {
   const i18n = useI18n();
   const back = useRef<HTMLButtonElement>(null);
   useEffect(() => { back.current?.focus({ preventScroll: true }); }, []);
-  const usage = request.completion?.usage;
+  const usage = request.completion?.usage ?? null;
   const estimate = request.estimate;
   let pricingLabel = i18n.text(messages.basePrice);
   if (!request.configuredModel?.cost) pricingLabel = i18n.text(messages.priceMissing);
@@ -55,44 +59,112 @@ function RequestDetails({ request, onBack }: { request: PricedRequest; onBack():
     [messages.model, request.model],
     [messages.recordedAt, i18n.formatDate(Date.parse(request.createdAt), { dateStyle: "short", timeStyle: "medium" })],
   ];
+  if (request.completion) metadata.push([messages.finishReason, [request.completion.finishReason, request.completion.rawFinishReason].filter(Boolean).join(" / ")]);
   if (request.responseId) metadata.push([messages.responseId, request.responseId]);
   if (request.requestParentId) metadata.push([messages.requestParent, request.requestParentId]);
-  if (request.completion) metadata.push([messages.finishReason, [request.completion.finishReason, request.completion.rawFinishReason].filter(Boolean).join(" / ")]);
   if (request.completion?.providerResponseId) metadata.push([messages.providerResponseId, request.completion.providerResponseId]);
-  return <div className="space-y-5">
-    <Button ref={back} variant="ghost" size="sm" className="-ml-2" onClick={onBack}><ArrowLeft />{i18n.text(messages.back)}</Button>
-    <div className="flex flex-wrap gap-2"><Badge variant="outline">{i18n.text(request.kind === "compression" ? messages.compression : messages.conversation)}</Badge>
-      <Badge variant="secondary">{i18n.text(requestState(request))}</Badge>
-      {!request.onTimeline && <Badge variant="outline">{i18n.text(messages.otherBranch)}</Badge>}
+  const count = (value: number | null | undefined) => value == null ? "—" : i18n.formatNumber(value);
+  return <>
+    <div className="space-y-3">
+      <Button ref={back} variant="ghost" size="sm" className="-ml-2" onClick={onBack}><ArrowLeft />{i18n.text(messages.back)}</Button>
+      <div className="space-y-2">
+        <h4 className="type-section break-all">{request.configuredModel?.name ?? request.model}</h4>
+        <div className="flex flex-wrap gap-1.5">
+          <Badge variant="outline">{i18n.text(request.kind === "compression" ? messages.compression : messages.conversation)}</Badge>
+          <Badge variant="secondary">{i18n.text(requestState(request))}</Badge>
+          {!request.onTimeline && <Badge variant="outline">{i18n.text(messages.otherBranch)}</Badge>}
+        </div>
+      </div>
+      <dl className="space-y-2">{metadata.map(([label, value]) => <div key={label.id}>
+        <dt className="type-caption">{i18n.text(label)}</dt><dd className="type-caption text-foreground select-text break-all">{value}</dd>
+      </div>)}</dl>
     </div>
-    <dl className="space-y-2">{metadata.map(([label, value]) => <div key={label.id}>
-      <dt className="type-caption">{i18n.text(label)}</dt><dd className="type-body select-text break-all">{value}</dd>
-    </div>)}</dl>
-    <Section title={i18n.text(messages.usage)}><dl className="grid grid-cols-2 gap-x-4 gap-y-2">
-      {(["input", "output", "total", "cacheRead", "cacheWrite", "reasoning"] as const).map(key => <div key={key}>
-        <dt className="type-caption">{i18n.text(messages[key])}</dt><dd className="type-body tabular-nums">{usage?.[key] == null ? "—" : i18n.formatNumber(usage[key])}</dd>
-      </div>)}
-    </dl></Section>
-    <Section title={i18n.text(messages.pricing)}>
-      <p className="type-body tabular-nums">{formatEstimate(i18n, estimate.amount, estimate.status === "partial")}</p>
-      <p className="type-caption">{pricingLabel}</p>
-      <div className="space-y-3">{estimate.lines.map(line => <div key={`${line.modality}/${line.item}`}>
-        <div className="flex items-baseline justify-between gap-3"><span className="type-label">{i18n.text(messages[line.item])}</span>
+    <Section title={i18n.text(messages.usage)}>
+      <Stats columns={3}>
+        <Stat label={i18n.text(messages.input)} value={count(usage?.input)} />
+        <Stat label={i18n.text(messages.output)} value={count(usage?.output)} />
+        <Stat label={i18n.text(messages.cacheHit)} value={cacheRate(i18n, usage)} />
+        <Stat label={i18n.text(messages.cacheRead)} value={count(usage?.cacheRead)} />
+        <Stat label={i18n.text(messages.cacheWrite)} value={count(usage?.cacheWrite)} />
+        <Stat label={i18n.text(messages.reasoning)} value={count(usage?.reasoning)} />
+      </Stats>
+    </Section>
+    {request.kind === "response" && <Section title={i18n.text(messages.composition)}>
+      {request.sent ? <SystemComposition diagnostics={request.sent} /> : <p className="type-caption">{i18n.text(messages.compositionMissing)}</p>}
+    </Section>}
+    <Section title={i18n.text(messages.pricing)} aside={formatEstimate(i18n, estimate.amount, estimate.status === "partial")}>
+      <ul className="space-y-2.5">{estimate.lines.map(line => <li key={`${line.modality}/${line.item}`} className="space-y-0.5">
+        <div className="flex items-baseline justify-between gap-3"><span className="type-body">{i18n.text(messages[line.item])}</span>
           <span className="type-body tabular-nums">{line.amount === null ? "—" : formatMoney(i18n, line.amount)}</span></div>
-        <p className="type-caption">{line.quantity === null ? "—" : i18n.formatNumber(line.quantity)} {i18n.text(messages[line.unit])}</p>
-        {line.price && <p className="type-caption">{i18n.formatMessage(messages.rate, { amount: formatMoney(i18n, line.price.amount), count: line.price.per, unit: i18n.text(messages[line.price.unit]) })}</p>}
+        <p className="type-caption tabular-nums">{line.quantity === null ? "—" : i18n.formatNumber(line.quantity)} {i18n.text(messages[line.unit])}
+          {line.price && <> · {i18n.formatMessage(messages.rate, { amount: formatMoney(i18n, line.price.amount), count: line.price.per, unit: i18n.text(messages[line.price.unit]) })}</>}</p>
         {line.issue && <p className="type-caption">{i18n.text(issueMessages[line.issue])}</p>}
-      </div>)}</div>
-      {request.inputHasFiles !== false && <p className="type-caption">{i18n.text(messages.inputNotText)}</p>}
-      {!estimate.lines.some(line => line.item === "reasoning") && <p className="type-caption">{i18n.text(messages.reasoningIncluded)}</p>}
+      </li>)}</ul>
+      <div className="space-y-1">
+        <p className="type-caption">{pricingLabel}</p>
+        {request.inputHasFiles !== false && <p className="type-caption">{i18n.text(messages.inputNotText)}</p>}
+        {!estimate.lines.some(line => line.item === "reasoning") && <p className="type-caption">{i18n.text(messages.reasoningIncluded)}</p>}
+      </div>
     </Section>
     {request.notices.length > 0 && <Notices notices={request.notices} />}
     <Section title={i18n.text(messages.contents)}>
       <p className="type-caption">{i18n.text(messages.contentsHint)}</p>
       {content.length > 0 ? <div className="space-y-4"><ConversationTimeline items={content} /></div> : <p className="type-caption">{i18n.text(messages.noContent)}</p>}
     </Section>
-  </div>;
+  </>;
 }
+
+function Headroom({ headroom }: { headroom: DiagnosticOverview["headroom"] }) {
+  const i18n = useI18n();
+  if (headroom === null) return null;
+  const label = i18n.text(messages.headroom);
+  if (headroom === "compressed") return <Stat label={label} value="—" caption={i18n.text(messages.headroomCompressed)} />;
+  if (headroom === "unknown") return <Stat label={label} value="—" caption={i18n.text(messages.headroomUnknown)} />;
+  return <Stat label={label} value={headroom.remaining > 0 ? compact(i18n, headroom.remaining) : i18n.text(messages.headroomOver)}
+    caption={i18n.formatMessage(messages.headroomCaption, { threshold: compact(i18n, headroom.threshold) })} />;
+}
+
+function Overview({ data, scope }: { data: ReturnType<typeof useDiagnostics>; scope: DiagnosticScope }) {
+  const i18n = useI18n();
+  const { cache, trend, compressions, headroom } = data.overview;
+  const path = scope === "timeline";
+  return <>
+    <Section title={i18n.text(messages.overview)}>
+      <Stats>
+        <Stat label={i18n.text(messages.referenceCost)}
+          value={formatEstimate(i18n, data.total.amount, data.total.incomplete > 0 || data.unreadable > 0)} />
+        <Stat label={i18n.text(messages.requests)} value={i18n.formatNumber(data.requests.length)} />
+        <Stat label={i18n.text(messages.cacheHit)} value={cache ? percent(i18n, cache.read, cache.input) : "—"}
+          caption={cache ? i18n.formatMessage(messages.cacheHitCaption, { read: compact(i18n, cache.read), input: compact(i18n, cache.input) }) : undefined} />
+        {path ? <Headroom headroom={headroom} />
+          : <Stat label={i18n.text(messages.compressionCount)} value={i18n.formatNumber(compressions.length)} />}
+      </Stats>
+      <div className="space-y-1">
+        <p className="type-caption">{i18n.text(messages.currentPrices)}</p>
+        {data.total.incomplete > 0 && <p className="type-caption">{i18n.formatMessage(messages.incompleteCount, { count: data.total.incomplete })}</p>}
+        {data.unreadable > 0 && <p className="type-caption">{i18n.formatMessage(messages.unreadable, { count: data.unreadable })}</p>}
+      </div>
+    </Section>
+    {path && trend.length > 0 && <Section title={i18n.text(messages.trend)}>
+      {trend.length > 1 ? <>
+        <InputTrend points={trend} compressions={compressions} threshold={typeof headroom === "object" && headroom ? headroom.threshold : null} />
+        <p className="type-caption">{i18n.text(messages.trendHint)}</p>
+      </> : <p className="type-caption">{i18n.text(messages.trendSingle)}</p>}
+    </Section>}
+    {path && compressions.length > 0 && <Section title={i18n.text(messages.compressions)} aside={i18n.formatNumber(compressions.length)}>
+      <ul className="space-y-1.5">{[...compressions].reverse().map(entry => {
+        const before = entry.tokensBefore === null ? "—" : compact(i18n, entry.tokensBefore);
+        return <li key={entry.id} className="flex items-baseline justify-between gap-3">
+          <span className="type-body tabular-nums">{entry.after === null ? i18n.formatMessage(messages.compressionPending, { before })
+            : i18n.formatMessage(messages.compressionRow, { before, after: compact(i18n, entry.after) })}</span>
+          <span className="type-caption shrink-0 tabular-nums">{i18n.formatDate(Date.parse(entry.createdAt), { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
+        </li>;
+      })}</ul>
+      <p className="type-caption">{i18n.text(messages.compressionHint)}</p>
+    </Section>}
+  </>;
+}
+
 export function Diagnostics() {
   const i18n = useI18n();
   const [scope, setScope] = useState<DiagnosticScope>("timeline");
@@ -109,35 +181,36 @@ export function Diagnostics() {
     }
   }, [selected]);
   const body = selected ? <RequestDetails request={selected} onBack={() => { restoreListFocus.current = true; setSelection(null); }} /> : <>
-    <div ref={listHeading} tabIndex={-1} className="space-y-1 outline-none">
-      <div className="flex items-baseline justify-between gap-3"><span className="type-label">{i18n.text(messages.referenceCost)}</span>
-        <span className="type-body tabular-nums">{formatEstimate(i18n, data.total.amount, data.total.incomplete > 0 || data.unreadable > 0)}</span></div>
-      <p className="type-caption">{i18n.formatMessage(messages.requestCount, { count: data.requests.length })}</p>
-      <p className="type-caption">{i18n.text(messages.currentPrices)}</p>
-      {data.total.incomplete > 0 && <p className="type-caption">{i18n.formatMessage(messages.incompleteCount, { count: data.total.incomplete })}</p>}
-      {data.unreadable > 0 && <p className="type-caption">{i18n.formatMessage(messages.unreadable, { count: data.unreadable })}</p>}
-    </div>
-    {!data.requests.length && <p className="type-caption py-4">{i18n.text(messages.noRequests)}</p>}
-    <ItemGroup>{data.requests.map((request, index) => <div key={request.id}>
-      {index > 0 && <ItemSeparator />}
-      <ListRow className="px-0" title={<span className="break-all">{request.configuredModel?.name ?? request.model}</span>}
-        description={<>{i18n.text(request.kind === "compression" ? messages.compression : messages.conversation)} · {i18n.formatDate(Date.parse(request.createdAt), { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</>}
-        media={request.kind === "compression" ? <FileText className="size-4" /> : <MessagesSquare className="size-4" />}
-        actions={<span className="type-caption max-w-24 break-words text-right tabular-nums">{formatEstimate(i18n, request.estimate.amount, request.estimate.status === "partial")}</span>}
-        onOpen={() => setSelection(request.id)} />
-    </div>)}</ItemGroup>
+    <div ref={listHeading} tabIndex={-1} className="space-y-6 outline-none"><Overview data={data} scope={scope} /></div>
+    <Section title={i18n.text(messages.requests)}>
+      {!data.requests.length ? <p className="type-caption">{i18n.text(messages.noRequests)}</p>
+        : <ItemGroup className="-mx-1">{data.requests.map((request, index) => <div key={request.id}>
+          {index > 0 && <ItemSeparator />}
+          <ListRow className="px-1" title={<span className="break-all">{request.configuredModel?.name ?? request.model}</span>}
+            description={<>{i18n.text(request.kind === "compression" ? messages.compression : messages.conversation)} · {i18n.formatDate(Date.parse(request.createdAt), { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</>}
+            media={request.kind === "compression" ? <FileText className="size-4" /> : <MessagesSquare className="size-4" />}
+            actions={<span className="flex flex-col items-end gap-0.5 text-right">
+              <span className="type-caption max-w-24 break-words tabular-nums">{formatEstimate(i18n, request.estimate.amount, request.estimate.status === "partial")}</span>
+              {request.completion?.usage?.input != null && <span className="type-caption tabular-nums">{compact(i18n, request.completion.usage.input)}</span>}
+            </span>}
+            onOpen={() => setSelection(request.id)} />
+        </div>)}</ItemGroup>}
+    </Section>
     {data.notices.length > 0 && <Disclosure open={noticesOpen} onOpenChange={setNoticesOpen}
       header={<span className="type-label">{i18n.text(messages.notices)} ({data.notices.length})</span>}>
       <div className="space-y-2"><p className="type-caption">{i18n.text(messages.noticesHint)}</p><Notices notices={data.notices} /></div>
     </Disclosure>}
   </>;
-  return <div className="flex min-h-0 min-w-0 flex-1 flex-col p-3">
-    {data.error && <Alert variant="destructive" className="mb-3"><AlertDescription>{i18n.text(data.error)}</AlertDescription></Alert>}
-    <Tabs className="flex min-h-0 flex-1 flex-col" value={scope} onValueChange={value => { if (value === "timeline" || value === "session") { setScope(value); setSelection(null); } }}>
-      <TabsList className="w-full shrink-0" aria-label={i18n.text(messages.scope)}>
+  return <Tabs className="flex min-h-0 min-w-0 flex-1 flex-col gap-0" value={scope}
+    onValueChange={value => { if (value === "timeline" || value === "session") { setScope(value); setSelection(null); } }}>
+    <div className="shrink-0 px-3 pt-3">
+      {data.error && <Alert variant="destructive" className="mb-3"><AlertDescription>{i18n.text(data.error)}</AlertDescription></Alert>}
+      <TabsList className="w-full" aria-label={i18n.text(messages.scope)}>
         <TabsTrigger value="timeline">{i18n.text(messages.currentPath)}</TabsTrigger><TabsTrigger value="session">{i18n.text(messages.allBranches)}</TabsTrigger>
       </TabsList>
-      <TabsContent key={`${scope}:${selection ?? ""}`} value={scope} className="min-h-0 flex-1 space-y-3 overflow-x-hidden overflow-y-auto pt-2">{body}</TabsContent>
-    </Tabs>
-  </div>;
+    </div>
+    <TabsContent key={`${scope}:${selection ?? ""}`} value={scope} className="flex min-h-0 flex-1 flex-col">
+      <PanelBody>{body}</PanelBody>
+    </TabsContent>
+  </Tabs>;
 }

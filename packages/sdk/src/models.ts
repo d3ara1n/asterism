@@ -4,6 +4,7 @@ import type { ModelInputPart } from "./model-input.ts";
 import type { ContentReader } from "./content-runtime.ts";
 import type { ToolOutcome, ToolInvocationInfo, ToolResult } from "./tool-result.ts";
 import type { ResourceRef } from "./workspace.ts";
+import type { RequestDiagnostics } from "./model-records.ts";
 
 /** 全软件共用的标准等级；协议编码不改变公共取值。 */
 export const thinkingLevels = ["off", "minimal", "low", "medium", "high", "xhigh", "max"] as const;
@@ -88,6 +89,8 @@ export interface ModelRunRequest {
 }
 export type ModelRunResult = {
   responseId: string | null; source: ModelSource | null; completion: ModelCompletion | null; tools: readonly ToolOutcome[];
+  /** 宿主组装最终请求时的现场计量；环境组装前失败时为 null。见 docs/runtime.md#请求诊断。 */
+  diagnostics: RequestDiagnostics | null;
 } & ({ reason: "completed" } | { reason: "cancelled" } | { reason: "failed"; code: string });
 export interface StreamRequest extends ModelRequestIdentity {
   target: ModelTarget;

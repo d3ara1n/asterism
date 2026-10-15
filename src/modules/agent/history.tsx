@@ -1,10 +1,12 @@
 import { recordRenderer, useI18n, type RecordRenderer } from "@atelier/sdk/renderer";
-import { Brain, MessageSquareText, User, Wrench, TriangleAlert, Info } from "lucide-react";
+import { Brain, MessageSquareText, User, Wrench, TriangleAlert, Info, Gauge } from "lucide-react";
+import { withValues } from "@atelier/sdk/contracts";
 
 import { inputSummary } from "../../shared/model-input";
 import { Badge } from "../../renderer/shared/ui/badge";
 import { conversationMessages } from "../messages/conversation";
-import { Execution, UserMessage, Notice, ContextSummary } from "./records";
+import { Execution, UserMessage, Notice, ContextSummary, RequestDiagnosticsRecord } from "./records";
+import { contextMessages } from "../messages/context";
 
 /** 代理记录的历史行：以样式区分用户、思考与输出，不依赖文字前缀。 */
 const RowText = ({ label, className }: { label: string; className?: string }) => <span className={`block truncate leading-5 ${className ?? ""}`}>{label}</span>;
@@ -39,6 +41,10 @@ export const agentRecordViews: RecordRenderer[] = [
         {data.type === "block" && !data.block.complete && <Badge variant="outline">{i18n.formatMessage(conversationMessages.incomplete)}</Badge>}
       </span>;
     },
+  }),
+  recordRenderer(RequestDiagnosticsRecord, {
+    icon: <Gauge className="size-4" />,
+    label: data => withValues(contextMessages.requestRecorded, { blocks: data.diagnostics.system?.length ?? 0, tools: data.diagnostics.tools?.length ?? 0 }),
   }),
   recordRenderer(Notice, {
     icon: data => data.level === "info" ? <Info className="size-4" /> : <TriangleAlert className="size-4" />,

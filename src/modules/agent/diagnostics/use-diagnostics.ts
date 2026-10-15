@@ -4,6 +4,7 @@ import { totalEstimatedCost } from "../../../shared/model-cost-estimate.ts";
 import { ModelConfiguration } from "../configuration.ts";
 import { diagnosticHistory, type DiagnosticScope } from "./history.ts";
 import { diagnosticModel, estimateUsageCost } from "./cost.ts";
+import { diagnosticOverview } from "./overview.ts";
 
 /** 快照和配置变化时重新推导，不创建消费记录；关闭面板也不影响运行。 */
 export function useDiagnostics(scope: DiagnosticScope) {
@@ -18,6 +19,7 @@ export function useDiagnostics(scope: DiagnosticScope) {
     return { ...request, configuredModel: model, estimate: estimateUsageCost(request.completion?.usage ?? null, model?.cost ?? null, request.inputHasFiles) };
   }), [history, configuration]);
   const total = useMemo(() => totalEstimatedCost(requests.map(request => request.estimate)), [requests]);
-  return { ...history, requests, total, error: object.view.error ?? catalogs.error };
+  const overview = useMemo(() => diagnosticOverview(requests, request => request.configuredModel?.contextWindow ?? null), [requests]);
+  return { ...history, requests, total, overview, error: object.view.error ?? catalogs.error };
 }
 export type PricedRequest = ReturnType<typeof useDiagnostics>["requests"][number];

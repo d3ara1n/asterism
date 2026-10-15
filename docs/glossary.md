@@ -83,6 +83,7 @@
 | 一级工具 / 二级工具 | protocol tool / resource tool | 一级是协议 tools 中的固定宿主入口 resource_list/inspect/call；二级是经 resource_call 使用的动态资源工具。层级表示调用关系，资源工具是产品主要的工具扩展面 |
 | 运行支撑环境 | harness | 软件为代理提供的执行环境、工作机制及通用指令；执行授权由运行时落实 |
 | 提示块 | prompt block | 带身份、种类、来源与正文的结构化指令单元，按确定顺序统一渲染为系统指令 |
+| 请求诊断 | request diagnostics | `models.run` 结果中宿主组装最终请求时取得的现场资料，按分区（系统提示块计量、声明的工具名称等）组织，不含正文；与 provider 回报的 usage 并列，用于还原请求现场 |
 | 事件 | event | 会话树节点的一类，记录资源与工作台状态变化，种类见 `docs/timeline.md` |
 | 通知 | notice | 对象发出的带级别提示节点（含错误），用于审计与 UI 重建，默认不发给模型 |
 | 瞬态事件 | transient event | 按具名、具型契约投递给订阅者的信息，带声明归属与发起者来源，本身不进入会话树；区别于历史事件 |

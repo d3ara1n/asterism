@@ -99,6 +99,8 @@ export function contrastRatio(a: string, b: string): number {
 function onSolid(background: string, dark: string): string {
   return contrastRatio(background, "#ffffff") >= contrastRatio(background, dark) ? "#ffffff" : dark;
 }
+/** 图表分类色相顺序；docs/design-system.md#数据图表。 */
+export const chartHues = ["blue", "teal", "amber", "violet", "crimson", "orange", "cyan", "plum"] as const;
 /** 语义层：唯一一份映射，把 accent/gray 色阶按亮暗解析为 shadcn token；token 名不随任何选择改变。 */
 export function themeTokens(appearance: Appearance, scheme: Scheme): Record<string, string> {
   const g = scale(appearance.gray, scheme);
@@ -121,6 +123,8 @@ export function themeTokens(appearance: Appearance, scheme: Scheme): Record<stri
     // 状态色统一取 11 级：亮暗两侧均可作文字与图标色。
     destructive: red(11), success: green(11), warning: amber(11), border: g(6), input: g(7), ring: a(8),
     "canvas-grid": g(6), selection: a(5),
+    // 图表分类色：固定色相第 9 级，不随主题色与灰色变化；只用于图形填充。
+    ...Object.fromEntries(chartHues.map((hue, index) => [`chart-${index + 1}`, scale(hue, scheme)(9)])),
     radius: `${radiusPx[appearance.radius]}px`,
   };
 }

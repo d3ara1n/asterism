@@ -1,7 +1,7 @@
 import { defineModule, implementResource, implementCreation, implementAction } from "@atelier/sdk/runtime";
 import { Agent, AgentView, AgentSelection, CreateAgent, SubmitAgentInput, ContinueAgent, ConfigureAgent, CancelAgent } from "./contract.ts";
 import { AgentConfigurations } from "./configuration.ts";
-import { UserMessage, Execution, Notice, ContextSummary } from "./records.ts";
+import { UserMessage, Execution, Notice, ContextSummary, RequestDiagnosticsRecord } from "./records.ts";
 import { createSelection, selectionOf } from "./selection.ts";
 import { createAgentLoop } from "./loop.ts";
 import { createAdmission } from "./admission.ts";
@@ -14,7 +14,7 @@ export default defineModule(plugin => {
   const admission = createAdmission({ selection, validate: plugin.models.validate, running: loop.running });
   return {
     resources: [implementResource(Agent, AgentView, {
-      records: [UserMessage, Execution, Notice, ContextSummary],
+      records: [UserMessage, Execution, Notice, ContextSummary, RequestDiagnosticsRecord],
       links: { receive: true, tools: object => selection.tools(selection.agent(selectionOf(object).selection)) },
       creation: implementCreation(CreateAgent, {
         prepare(input) { selection.validate(input.selection); return { action: "accept" }; },

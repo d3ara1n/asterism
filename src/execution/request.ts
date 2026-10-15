@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { ModelRunRequest, ModelRunResult, ModelRunEvent, ModelSource, ModelCompletion, SystemPrompt, ModelRequestIdentity } from "@atelier/sdk/contracts";
+import type { ModelRunRequest, ModelRunResult, ModelRunEvent, ModelSource, ModelCompletion, SystemPrompt, ModelRequestIdentity, RequestDiagnostics } from "@atelier/sdk/contracts";
 import { modelExpression, modelScope, type ModelSettings, type ToolOutcome } from "../shared/model.ts";
 import { ModelFailure, type ModelAdapter, type ResolvedModelItem } from "../model/contract.ts";
 import { executeCoreBatch, coreDeclarations, previewCoreCall } from "./core.ts";
@@ -15,6 +15,16 @@ export interface ModelExecutionEnvironment extends ModelRequestIdentity {
   system: SystemPrompt;
   messages: ResolvedModelItem[];
 }
+/** 最终发出的系统块与工具声明的计量；字数按码点，不含正文。 */
+export function requestDiagnostics(system: SystemPrompt, tools: readonly { name: string }[]): RequestDiagnostics {
+  const characters = (text: string) => [...text].length;
+  return {
+    system: system.blocks.map(block => block.kind === "system" ? { kind: "system", from: block.from, characters: characters(block.text) }
+      : block.kind === "agent" ? { kind: "agent", role: block.role, characters: characters(block.text) }
+        : { kind: "context", file: block.file, characters: characters(block.text) }),
+    tools: tools.map(tool => tool.name),
+  };
+}
 /** 一次补全及完整工具批次。缓冲只在此次调用内存在，输出交给消费者，不接触时间线。 */
 export async function runModelRequest(request: ModelRunRequest, environment: Promise<ModelExecutionEnvironment>, handover?: ContentLease): Promise<ModelRunResult> {
   const controller = new AbortController();
@@ -29,6 +39,7 @@ export async function runModelRequest(request: ModelRunRequest, environment: Pro
   let source: ModelSource | null = null;
   let responseId: string | null = null;
   let completion: ModelCompletion | null = null;
+  let diagnostics: RequestDiagnostics | null = null;
   const outcomes = new Map<string, ToolOutcome>();
   let callIds: string[] = [];
   let termination: { reason: "completed" } | { reason: "cancelled" } | { reason: "failed"; code: string } = { reason: "completed" };
@@ -38,7 +49,10 @@ export async function runModelRequest(request: ModelRunRequest, environment: Pro
     signal.throwIfAborted();
     source = { model: modelExpression(settings), adapter: adapter.version, scope: modelScope(settings) };
     responseId = randomUUID();
-    const prepared = adapter.prepare({ settings, system, messages, userAgent, sessionId, tools: settings.model.capabilities.tools ? coreDeclarations() : [] });
+    const tools = settings.model.capabilities.tools ? coreDeclarations() : [];
+    const prepared = adapter.prepare({ settings, system, messages, userAgent, sessionId, tools });
+    // 适配层接受请求后才记录现场；准备失败的请求没有诊断。
+    diagnostics = requestDiagnostics(system, tools);
     // 平台只交付准备完整的块，终态随最高序号块保存；分组与投影由执行体负责。
     const response = new ResponseBuffer({ responseId, requestParentId: request.requestParentId, source }, block => {
       emit({ type: "block", block });
@@ -106,5 +120,5 @@ export async function runModelRequest(request: ModelRunRequest, environment: Pro
     }
   } finally { emit({ type: "progress", blocks: [] }); }
   if (deliveryFailed) termination = { reason: "failed", code: "event_delivery" };
-  return { ...termination, responseId, source, completion, tools: callIds.flatMap(id => outcomes.has(id) ? [structuredClone(outcomes.get(id)!)] : []) };
+  return { ...termination, responseId, source, completion, diagnostics, tools: callIds.flatMap(id => outcomes.has(id) ? [structuredClone(outcomes.get(id)!)] : []) };
 }

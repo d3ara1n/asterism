@@ -19,7 +19,9 @@ import { Note } from "../modules/notes/contract.ts";
 import { implement } from "../tools/testing.ts";
 import { ToolRegistry } from "../tools/registry.ts";
 import { foldWorkbench } from "../session/fold.ts";
-import { ContextSummary } from "../modules/agent/records.ts";
+import { ContextSummary, RequestDiagnosticsRecord } from "../modules/agent/records.ts";
+/** 请求诊断记录随每次工作请求追加；路径、游标与节点顺序断言只看工作记录。 */
+const work = <T extends { contract: string }>(nodes: readonly T[]) => nodes.filter(node => node.contract !== RequestDiagnosticsRecord.id);
 import { COMPRESSION_MAX_OUTPUT } from "../modules/agent/compression.ts";
 import { applicationUserAgent } from "../shared/application.ts";
 
@@ -219,7 +221,10 @@ describe("会话运行时", () => {
     expect(service.sessions.tree.cursorSelections(first.sessionId)).toEqual([]);
     const blocks = snapshot.nodes.map(flat).filter(node => node.kind === "toolcall" || node.kind === "text");
     expect(blocks.map(block => block.kind)).toEqual(["toolcall", "text"]);
-    expect(blocks[1]!.parentId).toBe(blocks[0]!.id);
+    // 工具批次与续轮请求之间只隔请求诊断记录；续轮起点仍在同一线性路径上。
+    const between = snapshot.nodes.find(node => node.id === blocks[1]!.parentId)!;
+    expect(between.contract).toBe(RequestDiagnosticsRecord.id);
+    expect(between.parentId).toBe(blocks[0]!.id);
     expect(blocks.reduce((sum, block) => sum + block.completion.usage.total, 0)).toBe(14);
     await service.sessions.execute({ type: "select", sessionId: first.sessionId, nodeId: blocks[0]!.id });
     expect(service.sessions.tree.timeline(first.sessionId).map(flat).at(-1)).toMatchObject({
@@ -402,9 +407,10 @@ describe("会话运行时", () => {
     } finally { release(); }
     await settled(service);
     const after = service.sessions.snapshot(first.sessionId);
-    expect(after.nodes).toHaveLength(before.nodes.length + 1);
+    expect(work(after.nodes)).toHaveLength(work(before.nodes).length + 1);
     expect(after.cursor).toBe(after.nodes.at(-1)!.id);
-    expect(after.nodes.map(flat).at(-1)).toMatchObject({ kind: "text", parentId: before.cursor,
+    expect(after.nodes.at(-1)!.contract).toBe(RequestDiagnosticsRecord.id);
+    expect(work(after.nodes).map(flat).at(-1)).toMatchObject({ kind: "text", parentId: before.cursor,
       completion: { usage, finishReason: "stop", rawFinishReason: "end_turn", providerResponseId: "provider-response" } });
     expect(after.workbench.objects.find(object => object.kind === "atelier.core/agent")?.presentation)
       .toMatchObject({ data: { turnState: "completed" } });
@@ -516,7 +522,7 @@ describe("会话运行时", () => {
     expect(a.sessionId).toBe(b.sessionId);
     await settled(service);
     const snap = await execute(service, { type: "read", sessionId: a.sessionId });
-    expect(snap.nodes.map(flat).map(n => n.kind)).toEqual(["event", "message", "text"]);
+    expect(work(snap.nodes).map(flat).map(n => n.kind)).toEqual(["event", "message", "text"]);
     expect(snap.workbench.objects.filter(o => o.kind === "atelier.core/agent")).toHaveLength(1);
     await expect(execute(service, { ...start, parts: [{ kind: "text", text: "Other" }] })).rejects.toThrow();
     await service.close(); services.delete(service);
@@ -693,7 +699,7 @@ describe("会话运行时", () => {
     await settled(service);
     expect(requests).toBe(1);
     const nodes = service.sessions.tree.nodes(first.sessionId).map(flat);
-    expect(nodes.at(-1)).toMatchObject({ kind: "notice", code: "incomplete" });
+    expect(work(nodes).at(-1)).toMatchObject({ kind: "notice", code: "incomplete" });
   });
 
   it("运行中修改代理配置在下一模型请求生效", async () => {

@@ -5,10 +5,10 @@ import { summaryPrompt, summarySystemPrompt } from "./compression-prompt.ts";
 import { contextMessages, projectAgentContext, type AgentContext } from "./projection.ts";
 import { applicationUserAgent } from "../../shared/application.ts";
 
+import { COMPRESSION_KEEP_RECENT, COMPRESSION_MAX_OUTPUT, COMPRESSION_RESERVE } from "./context-budget.ts";
+
 // 窗口预留与近期保留预算；工具结果截取只用于独立的摘要材料。
-export const COMPRESSION_RESERVE = 16_384;
-export const COMPRESSION_KEEP_RECENT = 20_000;
-export const COMPRESSION_MAX_OUTPUT = Math.floor(COMPRESSION_RESERVE * 0.8);
+export { COMPRESSION_KEEP_RECENT, COMPRESSION_MAX_OUTPUT, COMPRESSION_RESERVE } from "./context-budget.ts";
 
 /** 字符估算只用于选取和触发；不作为 provider 实报计量持久化。 */
 function estimateItems(items: readonly ModelItem[]): number {

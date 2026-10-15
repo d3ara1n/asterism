@@ -27,3 +27,15 @@ export const modelRunRecordSchema = z.discriminatedUnion("type", [
   z.strictObject({ type: z.literal("diagnostic"), code: z.string(), message: z.string(), level: z.enum(["error", "warning"]),
     response: modelCompletionSchema.extend({ responseId: id, requestParentId: id.nullable(), source: modelSourceSchema }).optional() }),
 ]);
+/** 请求诊断：按分区描述实际发出的请求结构与计量，不含正文。分区独立可选，缺失表示未测量；
+ * 未知分区在解码时忽略，新增分区不使旧记录失效。characters 为 Unicode 码点数。 */
+const characters = z.number().int().nonnegative();
+export const requestDiagnosticsSchema = z.object({
+  system: z.array(z.discriminatedUnion("kind", [
+    z.strictObject({ kind: z.literal("system"), from: z.string(), characters }),
+    z.strictObject({ kind: z.literal("agent"), role: z.string(), characters }),
+    z.strictObject({ kind: z.literal("context"), file: z.string(), characters }),
+  ])).optional(),
+  tools: z.array(z.string()).optional(),
+});
+export type RequestDiagnostics = z.infer<typeof requestDiagnosticsSchema>;

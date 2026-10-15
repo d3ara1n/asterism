@@ -122,6 +122,15 @@ Window          平台差异、拖动区域、窗口几何变量
 
 - Badge 只用两种：`secondary` 表示标签与归属（内置、默认、已添加、使用方），`StatusBadge`（outline + 状态图标）表示状态。
 
+## 数据图表
+
+图表表达数量构成与占比，配合文字明细使用，不单独承载含义。图表用 CSS 与内联 SVG 由业务组合，不引入图表库；动效遵循上文 Motion 规范与减少动态。
+
+- **分类色板**：`chart-1` 至 `chart-8` 取 Radix Colors 第 9 级（blue、teal、amber、violet、crimson、orange、cyan、plum），亮暗分别取对应色阶，不随主题色与灰色变化。只用于图形填充（分段、瓷砖、图例色块），不用作文字、边框或状态色；同一视图内类别按固定顺序取色，跨视图的同一类别不要求同色。
+- **非数据区域**：空闲与背景用 `muted`，预留等需与空闲区分的保留区用 `border` 色斜纹，不新增 token。
+- **图例与明细**：每个色块都有可见文字标签与数值；颜色不是唯一区分手段，悬停或聚焦图例与图形双向高亮，键盘可聚焦图例项。数值使用等宽数字。
+
+
 ## 选择控件、列表与编辑器
 
 | 控件 | 用途 |
@@ -141,7 +150,7 @@ Window          平台差异、拖动区域、窗口几何变量
 
 | 内容 | 入口 |
 | --- | --- |
-| 颜色、字体、圆角、阴影、共享表面 | `src/renderer/styles.css`、`src/shared/theme.ts`（Radix Colors 12 级色阶映射） |
+| 颜色、字体、圆角、阴影、共享表面、图表色板 | `src/renderer/styles.css`、`src/shared/theme.ts`（Radix Colors 12 级色阶映射） |
 | 状态表达与临时通知 | `shared/ui/status.tsx`、`shared/ui/sonner.tsx`、`shared/toast.ts` |
 | 控件行为与视觉变体 | `src/renderer/shared/ui/`、`components.json` |
 | 窗口布局、几何与平台材质 | `src/renderer/app/Window.tsx`、`src/shared/desktop.ts`、`src/main/window-appearance.ts` |

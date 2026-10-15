@@ -80,4 +80,4 @@ export default definePlugin({
 - `models.roles()` / `models.list()`：读取模型角色与可用模型目录。
 - `models.validate(request, { content? })`：校验模型目标、续接资料与文件引用资格，不发送网络请求。
 - `models.stream(request, { content? })`：执行单次无工具补全（支持可选 `maxOutputTokens`、`userAgent`、`sessionId`），流式交付协议事件。
-- `models.run(request)`：绑定具体资源对象（`object`）与请求起点（`requestParentId`），执行一次模型请求及该响应的完整资源工具批次，经 `ModelRunObserver.event` 同步交付 `block`（最高序号块内含 `completion` 终态）、`diagnostic` 与 `progress`。外层多轮循环与时间线提交由调用方插件自行驱动。
+- `models.run(request)`：绑定具体资源对象（`object`）与请求起点（`requestParentId`），执行一次模型请求及该响应的完整资源工具批次，经 `ModelRunObserver.event` 同步交付 `block`（最高序号块内含 `completion` 终态）、`diagnostic` 与 `progress`。结果附带 `diagnostics`（API 8.3）：系统提示块的种类、来源与字数及声明的工具名称，不含正文；可用 `requestDiagnosticsSchema` 校验保存（分区语义见 [请求诊断](../../docs/runtime.md#请求诊断)）。外层多轮循环与时间线提交由调用方插件自行驱动。

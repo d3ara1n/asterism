@@ -8,7 +8,7 @@ import { ToolRegistry } from "../tools/registry.ts";
 import { AgentCapabilities } from "./capabilities.ts";
 import { resolveInput } from "../model/input.ts";
 import { runModelRequest } from "./request.ts";
-import type { ModelAdapter, ModelEvent } from "../model/contract.ts";
+import { ModelFailure, type ModelAdapter, type ModelEvent } from "../model/contract.ts";
 import type { ModelSettings } from "../shared/model.ts";
 
 const settings: ModelSettings = {
@@ -155,5 +155,22 @@ describe("无状态的单次模型执行", () => {
     expect(first.filter(event => event.type === "diagnostic")).toEqual([]);
     expect(second.filter(event => event.type === "diagnostic")).toMatchObject([{ code: "cache_miss", level: "warning" }]);
     expect(third.filter(event => event.type === "diagnostic")).toEqual([]);
+  });
+  // docs/runtime.md#请求诊断：计量取自最终发出的系统块与声明工具，不含正文；适配层拒绝的请求没有诊断。
+  it("请求诊断按码点计量最终系统块并列出声明工具，准备失败时为 null", async () => {
+    const system = { blocks: [
+      { id: "s", kind: "system" as const, from: "core", text: "环境😀" },
+      { id: "a", kind: "agent" as const, role: "worker", text: "role" },
+      { id: "c", kind: "context" as const, file: "/w/AGENTS.md", text: "中文" },
+    ] };
+    const result = await execute(input([], { system }), model(text));
+    expect(result.diagnostics).toEqual({
+      system: [{ kind: "system", from: "core", characters: 3 }, { kind: "agent", role: "worker", characters: 4 },
+        { kind: "context", file: "/w/AGENTS.md", characters: 2 }],
+      tools: ["resource_list", "resource_inspect", "resource_call"],
+    });
+    expect(JSON.stringify(result.diagnostics)).not.toContain("环境");
+    const rejected = await execute(input([], { system }), model(text, () => { throw new ModelFailure("thinking_unavailable", "No."); }));
+    expect(rejected).toMatchObject({ reason: "failed", diagnostics: null });
   });
 });
