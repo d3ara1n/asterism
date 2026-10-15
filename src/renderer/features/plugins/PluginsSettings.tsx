@@ -1,5 +1,6 @@
 import type { UiText } from "@atelier/sdk/contracts";
 import { Fragment, useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { Plus, RefreshCw } from "lucide-react";
 
 import type { AppSnapshot, Command } from "../../../shared/contracts";
 import { errorDisplay } from "../../../shared/error-display.ts";
@@ -7,11 +8,12 @@ import type { PluginConfiguration, PluginConfigurationCommand } from "../../../s
 import { pluginsMessages } from "../../messages/plugins";
 import { getI18n, useI18n } from "../../shared/i18n";
 import { Alert, AlertDescription } from "../../shared/ui/alert";
-import { Badge } from "../../shared/ui/badge";
+import { StatusBadge, type StatusTone } from "../../shared/ui/status";
 import { Button } from "../../shared/ui/button";
 import { Empty, EmptyHeader, EmptyTitle, EmptyDescription } from "../../shared/ui/empty";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemSeparator, ItemTitle } from "../../shared/ui/item";
 import { Spinner } from "../../shared/ui/spinner";
+import { Switch } from "../../shared/ui/switch";
 import { Section } from "../settings/layout";
 import { PluginConfigurations } from "./PluginConfigurations";
 
@@ -30,6 +32,9 @@ const statusLabels = (): Record<AppSnapshot["plugins"][number]["status"], string
   loaded: getI18n().formatMessage(pluginsMessages.loaded), disabled: getI18n().formatMessage(pluginsMessages.disabled), invalid: getI18n().formatMessage(pluginsMessages.invalidPackage),
   failed: getI18n().formatMessage(pluginsMessages.failed), pending: getI18n().formatMessage(pluginsMessages.restartRequired),
 });
+const statusTones: Record<AppSnapshot["plugins"][number]["status"], StatusTone> = {
+  loaded: "success", disabled: "neutral", invalid: "error", failed: "error", pending: "warning",
+};
 
 export function PluginsSettings() {
   const i18n = useI18n();
@@ -43,7 +48,7 @@ export function PluginsSettings() {
   };
   return <div className="flex flex-col pb-4">
     <Section title={i18n.formatMessage(pluginsMessages.packages)} hint={i18n.formatMessage(pluginsMessages.addPackageHint)}
-      action={<Button size="sm" variant="outline" onClick={() => { void add(); }}>{i18n.formatMessage(pluginsMessages.addPackage)}</Button>}>
+      action={<Button size="sm" onClick={() => { void add(); }}><Plus />{i18n.formatMessage(pluginsMessages.addPackage)}</Button>}>
       <div className="flex flex-col gap-3">
         {restartRequired && <Alert role="status"><AlertDescription>{i18n.formatMessage(pluginsMessages.restartHint)}</AlertDescription></Alert>}
         {error && <Alert variant="destructive"><AlertDescription>{i18n.text(error)}</AlertDescription></Alert>}
@@ -54,14 +59,14 @@ export function PluginsSettings() {
               <ItemContent className="min-w-0">
                 <ItemTitle className="max-w-full flex-wrap">
                   <span className="break-all">{item.id ?? i18n.formatMessage(pluginsMessages.unknownPlugin)}</span>
-                  <Badge variant={item.status === "invalid" || item.status === "failed" ? "destructive" : "secondary"}>{statusLabels()[item.status]}</Badge>
+                  <StatusBadge tone={statusTones[item.status]}>{statusLabels()[item.status]}</StatusBadge>
                 </ItemTitle>
                 <ItemDescription className="break-all" title={item.source}>{item.source}</ItemDescription>
                 {item.error && <Alert variant="destructive"><AlertDescription className="select-text break-words">{item.error}</AlertDescription></Alert>}
               </ItemContent>
               <ItemActions className="flex-wrap">
-                <Button variant="secondary" size="sm" onClick={() => act({ type: "plugin.enable", index: item.index, enabled: !item.enabled })}>
-                  {item.enabled ? i18n.formatMessage(pluginsMessages.disable) : i18n.formatMessage(pluginsMessages.enable)}</Button>
+                <Switch aria-label={i18n.formatMessage(pluginsMessages.enablePlugin, { plugin_name: item.id ?? item.source })} checked={item.enabled}
+                  onCheckedChange={enabled => act({ type: "plugin.enable", index: item.index, enabled })} />
                 <Button variant="ghost" size="sm" onClick={() => act({ type: "plugin.remove", index: item.index })}>{i18n.formatMessage(pluginsMessages.remove)}</Button>
               </ItemActions>
             </Item>
@@ -102,8 +107,8 @@ function ConfigurationSection() {
     generation.current++; setValues(next); setLoading(false); setError(null);
   };
   return <Section title={i18n.formatMessage(pluginsMessages.settingsLabel)} hint={i18n.formatMessage(pluginsMessages.settingsHint)}
-    action={<Button type="button" size="sm" variant="ghost" disabled={loading} onClick={() => { void load(); }}>
-      {loading && <Spinner data-icon="inline-start" />}{i18n.formatMessage(pluginsMessages.reload)}
+    action={<Button type="button" size="sm" variant="outline" disabled={loading} onClick={() => { void load(); }}>
+      {loading ? <Spinner data-icon="inline-start" /> : <RefreshCw data-icon="inline-start" />}{i18n.formatMessage(pluginsMessages.reload)}
     </Button>}>
     <div className="flex flex-col gap-4">
       {error && <Alert variant="destructive"><AlertDescription>{i18n.text(error)}</AlertDescription></Alert>}

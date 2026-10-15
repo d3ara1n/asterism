@@ -12,7 +12,9 @@ import { homeMessages } from "../../messages/home";
 import { ConfigurationChoice as Choice } from "../../shared/ConfigurationChoice";
 import { useI18n } from "../../shared/i18n";
 import { BrandMark } from "../../shared/ui/brand-mark";
+import { StatusText } from "../../shared/ui/status";
 import { Button } from "../../shared/ui/button";
+import { IconButton } from "../../shared/ui/icon-button";
 import { InputGroup, InputGroupTextarea, InputGroupAddon } from "../../shared/ui/input-group";
 import { ModelChoices } from "../../shared/ModelChoices";
 import { useConfiguration } from "../configuration/state";
@@ -68,7 +70,7 @@ export function HomePage({ active, draft, onSettings, ready, busy, submitError, 
           }} />
         <InputGroupAddon align="block-end" className="justify-between">
           <AttachFiles draft={draft} disabled={busy || !ready} />
-          <Button size="icon-sm" className="rounded-full" aria-label={i18n.formatMessage(commonMessages.sendMessage)} title={i18n.formatMessage(commonMessages.sendMessage)} type="submit" disabled={!canSend} aria-describedby="home-availability"><ArrowUp /></Button>
+          <IconButton variant="default" className="rounded-full" label={i18n.formatMessage(commonMessages.sendMessage)} type="submit" disabled={!canSend} aria-describedby="home-availability"><ArrowUp /></IconButton>
         </InputGroupAddon>
       </InputGroup>
       <div className="flex min-w-0 flex-wrap items-center gap-0.5 px-1.5 py-1">
@@ -79,7 +81,7 @@ export function HomePage({ active, draft, onSettings, ready, busy, submitError, 
           onModelChange={setModelId} onThinkingChange={setThinking} />
       </div>
     </form>
-    {(submitError || error) && <p role="alert" className="mt-3 text-center text-xs text-destructive">{i18n.text(submitError ?? error ?? "")}</p>}
+    {(submitError || error) && <p role="alert" className="mt-3 text-center"><StatusText tone="error">{i18n.text(submitError ?? error ?? "")}</StatusText></p>}
     <div className="mt-4 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-center">
       <p id="home-availability" role="status" className="type-caption">{busy ? i18n.formatMessage(homeMessages.startingConversation) : !ready ? i18n.formatMessage(commonMessages.statusUnavailable) : i18n.formatMessage(homeMessages.keyboardHint)}</p>
       <Button variant="ghost" size="sm" onClick={onSettings}><Settings />{i18n.formatMessage(appMessages.menuSettings)}</Button>

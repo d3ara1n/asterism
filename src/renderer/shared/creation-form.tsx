@@ -37,7 +37,7 @@ export function CreationForm({ busy, disabled, validate, onSubmit, onCancel, chi
       <FieldGroup>{children}</FieldGroup>
     </FieldSet>
     <DialogFooter>
-      <Button type="button" variant="ghost" onClick={onCancel}>{i18n.formatMessage(commonMessages.cancel)}</Button>
+      <Button type="button" variant="outline" onClick={onCancel}>{i18n.formatMessage(commonMessages.cancel)}</Button>
       <Button disabled={blocked || disabled} aria-busy={blocked}>
         {blocked && <Spinner aria-hidden="true" />}{blocked ? i18n.formatMessage(commonMessages.creating) : i18n.formatMessage(commonMessages.create)}
       </Button>

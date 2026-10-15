@@ -1,5 +1,6 @@
 import { IslandPanel } from "../../shared/weave/IslandPanel";
 import { SearchInput } from "../../shared/ui/search-input";
+import { ToggleGroup, ToggleGroupItem } from "../../shared/ui/toggle-group";
 import { Button } from "../../shared/ui/button";
 import { Scan } from "lucide-react";
 import { commonMessages } from "../../messages/common";
@@ -23,8 +24,10 @@ export function ObjectsPanel() {
     && `${object.title} ${i18n.text(registry.resource(object.kind).label)}`.toLocaleLowerCase(i18n.locale).includes(search));
   return <IslandPanel title={i18n.formatMessage(objectsMessages.objects)} compact toolbar={<>
     <SearchInput value={query} onChange={setQuery} label={i18n.formatMessage(objectsMessages.searchObjects)} />
-    <div className="flex gap-1"><Button size="xs" variant={!hiddenOnly ? "secondary" : "ghost"} aria-pressed={!hiddenOnly} onClick={() => setHiddenOnly(false)}>{i18n.formatMessage(commonMessages.all)}</Button>
-      <Button size="xs" variant={hiddenOnly ? "secondary" : "ghost"} aria-pressed={hiddenOnly} onClick={() => setHiddenOnly(true)}>{i18n.formatMessage(objectsMessages.hiddenObjects)}</Button></div>
+    <ToggleGroup type="single" size="sm" aria-label={i18n.formatMessage(objectsMessages.objects)} value={hiddenOnly ? "hidden" : "all"} onValueChange={next => { if (next) setHiddenOnly(next === "hidden"); }}>
+      <ToggleGroupItem value="all">{i18n.formatMessage(commonMessages.all)}</ToggleGroupItem>
+      <ToggleGroupItem value="hidden">{i18n.formatMessage(objectsMessages.hiddenObjects)}</ToggleGroupItem>
+    </ToggleGroup>
   </>}>
     {objects.map(object => { const descriptor = registry.resource(object.kind); return <Button key={object.id} variant="ghost"
       className="h-auto w-full justify-start gap-3 px-2 py-1.5 text-left" title={i18n.formatMessage(objectsMessages.locateObject, { title: object.title })} aria-label={i18n.formatMessage(objectsMessages.locateObject, { title: object.title })}

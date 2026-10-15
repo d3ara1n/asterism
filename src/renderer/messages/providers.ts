@@ -375,9 +375,9 @@ export const providersMessages = pluginNamespace("atelier.host").messages("en", 
     id: "features_configuration_ProvidersSettings_85",
     defaultMessage: "No roles use this model.",
   },
-  advanced: {
-    id: "features_configuration_ProvidersSettings_86",
-    defaultMessage: "Advanced",
+  parameters: {
+    id: "features_configuration_ProvidersSettings_95",
+    defaultMessage: "Parameters",
   },
   contextWindow: {
     id: "features_configuration_ProvidersSettings_87",

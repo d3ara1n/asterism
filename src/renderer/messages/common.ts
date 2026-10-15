@@ -41,6 +41,10 @@ export const commonMessages = pluginNamespace("atelier.host").messages("en", def
     id: "close",
     defaultMessage: "Close",
   },
+  notifications: {
+    id: "notifications",
+    defaultMessage: "Notifications",
+  },
   live: {
     id: "live",
     defaultMessage: "Live",
@@ -56,10 +60,6 @@ export const commonMessages = pluginNamespace("atelier.host").messages("en", def
   statusUnavailable: {
     id: "statusUnavailable",
     defaultMessage: "Connection unavailable",
-  },
-  dismissError: {
-    id: "dismissError",
-    defaultMessage: "Dismiss error",
   },
   unavailableTitle: {
     id: "unavailableTitle",

@@ -1,7 +1,7 @@
 import { motion, AnimatePresence } from "motion/react";
 import { DropdownMenuItem, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuSeparator, DropdownMenuLabel } from "../shared/ui/dropdown-menu";
 import { Button } from "../shared/ui/button";
-import { PanelLeft, ArrowLeft, ChevronDown, House, Settings, Plus, KeyRound, ListTree, History, X } from "lucide-react";
+import { PanelLeft, ArrowLeft, ChevronDown, House, Settings, Plus, KeyRound, ListTree, History } from "lucide-react";
 
 import { BrandMark } from "../shared/ui/brand-mark";
 
@@ -20,7 +20,9 @@ import { Window, Titlebar } from "./Window";
 import { Space } from "../shared/weave/Space";
 import { SettingsPage } from "../features/settings/SettingsPage";
 import { Screen, type IslandSpec } from "../shared/weave/Screen";
-import { Alert, AlertDescription } from "../shared/ui/alert";
+import { Toaster } from "../shared/ui/sonner";
+import { IconButton } from "../shared/ui/icon-button";
+import { useStateToast } from "../shared/toast";
 
 import { errorDisplay } from "../../shared/error-display.ts";
 import type { UiText } from "@atelier/sdk/contracts";
@@ -130,9 +132,9 @@ export function App({ controller }: { controller: ApplicationController }) {
   };
 
   const titleNavigation = <>
-    {!inSettings && <Button ref={sidebarToggle} variant="ghost" size="icon-xs" aria-label={sidebarVisible ? i18n.formatMessage(appMessages.hideSidebar) : i18n.formatMessage(appMessages.showSidebar)} title={sidebarVisible ? i18n.formatMessage(appMessages.hideSidebar) : i18n.formatMessage(appMessages.showSidebar)}
+    {!inSettings && <IconButton ref={sidebarToggle} size="icon-xs" label={sidebarVisible ? i18n.formatMessage(appMessages.hideSidebar) : i18n.formatMessage(appMessages.showSidebar)}
       aria-expanded={sidebarVisible} aria-controls={sidebarVisible ? "app-sidebar" : undefined}
-      onClick={() => setSidebarVisible(visible => !visible)}><PanelLeft /></Button>}
+      onClick={() => setSidebarVisible(visible => !visible)}><PanelLeft /></IconButton>}
     {inSettings ? <Button variant="ghost" size="sm" onClick={() => go("main")}><ArrowLeft />{i18n.formatMessage(commonMessages.back)}</Button> :
       <DropdownMenu modal={false}><DropdownMenuTrigger asChild><Button variant="ghost" size="sm" aria-label={i18n.formatMessage(appMessages.menu)}>
         <BrandMark className="size-4 text-primary" /><span className="text-sm font-semibold text-primary">{i18n.formatMessage(appMessages.appName)}</span><ChevronDown className="text-muted-foreground" />
@@ -160,7 +162,7 @@ export function App({ controller }: { controller: ApplicationController }) {
   const conversation = <WorkbenchSurface overlay={!session && !sessionLoading && view.kind === "conversation"
     ? <div className="absolute inset-0 flex items-center justify-center px-6">
       <PageState kind="error" title={i18n.formatMessage(commonMessages.unavailableTitle)} body={i18n.text(sessionState?.error ?? commonMessages.unavailableBody)}
-        action={<Button variant="secondary" onClick={() => { void active?.refresh(); }} disabled={!ready}>{i18n.formatMessage(commonMessages.retry)}</Button>} />
+        action={<Button variant="outline" onClick={() => { void active?.refresh(); }} disabled={!ready}>{i18n.formatMessage(commonMessages.retry)}</Button>} />
     </div> : undefined}>
     {session && active ? <Workbench key={session.id} ref={workbench} session={session} controller={active}
       ready={ready} busy={sessionBusy} run={run}
@@ -191,6 +193,13 @@ export function App({ controller }: { controller: ApplicationController }) {
           {conversation}</motion.div>}
     </AnimatePresence>,
   };
+  // 全局错误经临时通知呈现：会话读取失败提供重试，其余错误可关闭。
+  const sessionFailed = !state.error && sessionState?.status === "error";
+  useStateToast("app-error", error ? i18n.text(error) : null, {
+    tone: "error",
+    action: sessionFailed ? { label: i18n.formatMessage(commonMessages.retry), onClick: () => { void active?.refresh(); } } : undefined,
+    onDismiss: sessionFailed ? undefined : state.error ? controller.clearError : active?.clearError,
+  });
 
   return <>
     <Window skipTarget={`screen-${page}`} titlebar={<Titlebar navigation={titleNavigation} actions={actions} actionsHidden={inSettings} />}>
@@ -201,12 +210,8 @@ export function App({ controller }: { controller: ApplicationController }) {
           content: <Screen label={i18n.formatMessage(appMessages.appNavigation)} leading={sidebarVisible ? [sidebar] : []} root={main} resetKey={view.kind === "conversation" ? view.sessionId : "home"} className="h-full" /> },
       ]} />
     </Window>
-    {error && <Alert variant="destructive" className="fixed bottom-4 left-1/2 z-[60] w-[min(560px,calc(100%-32px))] -translate-x-1/2 flex items-start gap-3 shadow-md">
-      <AlertDescription className="flex-1">{i18n.text(error)}</AlertDescription>
-      {sessionState?.status === "error" && <Button variant="ghost" size="sm" onClick={() => { void active?.refresh(); }}>{i18n.formatMessage(commonMessages.retry)}</Button>}
-      {(state.error || sessionState?.status !== "error") && <Button variant="ghost" size="icon-xs" aria-label={i18n.formatMessage(commonMessages.dismissError)} title={i18n.formatMessage(commonMessages.dismissError)}
-        onClick={state.error ? controller.clearError : active?.clearError}><X /></Button>}
-    </Alert>}
+    <Toaster position="bottom-center" containerAriaLabel={i18n.formatMessage(commonMessages.notifications)}
+      toastOptions={{ closeButtonAriaLabel: i18n.formatMessage(commonMessages.close) }} />
     {creation.element}
   </>;
 }

@@ -13,7 +13,6 @@ import { RendererCatalogProvider } from "../../modules/object-context";
 import { useModuleViews } from "../../modules/views";
 import { useI18n } from "../../shared/i18n";
 import { Badge } from "../../shared/ui/badge";
-import { Button } from "../../shared/ui/button";
 import { useIsland } from "../../shared/weave/Screen";
 import { useScheme } from "../appearance/state";
 import type { DragKind } from "../creation/routing";
@@ -26,7 +25,8 @@ import { useWorkbenchCanvas, type WorkbenchCanvas } from "./canvas";
 import { layoutConnections, type ConnectionEdge } from "./connections";
 import { WorkbenchScope, WorkbenchContext, WorkbenchStore, useWorkbench, type WorkbenchEnvironment, type WorkbenchView } from "./context";
 import { workbenchNodes } from "./nodes";
-import { IconAction, type ViewPatch } from "./ObjectCard";
+import { type ViewPatch } from "./ObjectCard";
+import { IconButton } from "../../shared/ui/icon-button";
 import { ObjectNode, type ObjectNodeType } from "./ObjectNode";
 import { ObjectsPanel } from "./ObjectsPanel";
 import { confirmCardSizes, saveCardSize, type SizeIntent } from "./size-intents";
@@ -223,6 +223,6 @@ function ViewControls({ session, run, canvas, objects, selected }: { session: Wo
   ] as const;
   return <Panel position="bottom-right" className="surface flex flex-col p-0.5">
     {controls.map(([label, Icon, action], index) =>
-      <IconAction key={index} label={label} size="icon-sm" onClick={() => { void action(); }}><Icon /></IconAction>)}
+      <IconButton key={index} label={label} onClick={() => { void action(); }}><Icon /></IconButton>)}
   </Panel>;
 }

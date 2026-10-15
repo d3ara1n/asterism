@@ -1,4 +1,4 @@
-import { CircleAlert, CircleCheck, Hand } from "lucide-react";
+import { Hand } from "lucide-react";
 import type { ResourceStatus } from "@atelier/sdk/contracts";
 import { useId } from "react";
 import { resourceStatusMessages as messages } from "../messages/resource-status";
@@ -6,14 +6,13 @@ import { useI18n } from "../shared/i18n";
 import { Button } from "../shared/ui/button";
 import { Item, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "../shared/ui/item";
 import { Popover, PopoverContent, PopoverTrigger } from "../shared/ui/popover";
-import { Spinner } from "../shared/ui/spinner";
+import { StatusIcon as SharedStatusIcon, type StatusTone } from "../shared/ui/status";
 import { Progress } from "../shared/ui/progress";
 import { summarizeResourceStatus, type ResourceStatusMark } from "./resource-status";
 
+const tones: Record<ResourceStatus["status"], StatusTone> = { running: "progress", failed: "error", awaiting: "warning", completed: "success" };
 function StatusIcon({ status }: { status: ResourceStatus["status"] }) {
-  if (status === "running") return <Spinner className="size-4 motion-reduce:animate-none" />;
-  const Icon = status === "failed" ? CircleAlert : status === "awaiting" ? Hand : CircleCheck;
-  return <Icon aria-hidden="true" className="size-4" />;
+  return <SharedStatusIcon tone={tones[status]} icon={status === "awaiting" ? Hand : undefined} className="size-4" />;
 }
 
 /** 独立于会话导航的状态入口；展开只查看条目，不消费标记。 */

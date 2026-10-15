@@ -37,13 +37,9 @@ export const pluginsMessages = pluginNamespace("atelier.host").messages("en", de
     id: "features_plugins_PluginsSettings_9",
     defaultMessage: "Unknown plugin",
   },
-  disable: {
-    id: "features_plugins_PluginsSettings_10",
-    defaultMessage: "Disable",
-  },
-  enable: {
-    id: "features_plugins_PluginsSettings_11",
-    defaultMessage: "Enable",
+  enablePlugin: {
+    id: "features_plugins_PluginsSettings_21",
+    defaultMessage: "Enable {plugin_name}",
   },
   remove: {
     id: "features_plugins_PluginsSettings_12",

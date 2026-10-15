@@ -15,7 +15,7 @@ import { Button } from "../../shared/ui/button";
 import { Checkbox } from "../../shared/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "../../shared/ui/dialog";
 import { Label } from "../../shared/ui/label";
-import { Spinner } from "../../shared/ui/spinner";
+import { useStateToast } from "../../shared/toast";
 import type { SessionController } from "../session/controller";
 import type { WorkbenchCanvas } from "../workbench/canvas";
 import { pluginPreferences, readPreference, writePreference } from "./preferences";
@@ -160,6 +160,11 @@ export function useCreationCoordinator({ controller, canvas, writable, ready }: 
     setInput(current => { current?.done(ok); return null; });
     setError(null);
   };
+  // 输入对话框之外的进度与错误经临时通知呈现；对话框打开时错误留在对话框内。
+  useStateToast("creation-running", running && !input ? i18n.formatMessage(creationMessages.adding, { running_label: i18n.text(running.label) }) : null, {
+    tone: "loading", action: { label: i18n.formatMessage(commonMessages.cancel), onClick: cancelRunning },
+  });
+  useStateToast("creation-error", error && !input && !running ? i18n.text(error) : null, { tone: "error", onDismiss: () => setError(null) });
   const View = input?.entry.InputView;
   const element = <>
     {input && View && <Dialog open onOpenChange={next => { if (!next) closeInput(false); }}>
@@ -187,14 +192,6 @@ export function useCreationCoordinator({ controller, canvas, writable, ready }: 
       if (entry && remember) writePreference(choice.key, entry.id);
       setChoice(null); choice.done(entry);
     }} />}
-    {running && !input && <div role="status" className="surface-floating fixed bottom-4 left-1/2 z-[60] flex -translate-x-1/2 items-center gap-3 p-1 pl-3 text-sm">
-      <Spinner aria-hidden="true" /><span>{i18n.formatMessage(creationMessages.adding, { running_label: i18n.text(running.label) })}</span>
-      <Button size="sm" variant="ghost" onClick={cancelRunning}>{i18n.formatMessage(commonMessages.cancel)}</Button>
-    </div>}
-    {error && !input && !running && <Alert variant="destructive" className="surface-floating fixed bottom-4 left-1/2 z-[60] flex w-auto max-w-lg -translate-x-1/2 items-center gap-3">
-      <AlertDescription>{i18n.text(error)}</AlertDescription>
-      <Button size="sm" variant="ghost" onClick={() => setError(null)}>{i18n.formatMessage(commonMessages.dismissError)}</Button>
-    </Alert>}
   </>;
   return { menu, open, canDrop, drop, element };
 }
@@ -220,7 +217,7 @@ function RouteChooser({ choice, onDone }: { choice: ChoiceState; onDone: (entry:
           <Checkbox id="creation-route-remember" checked={remember} onCheckedChange={value => setRemember(value === true)} />
           <Label htmlFor="creation-route-remember">{i18n.formatMessage(creationMessages.rememberType)}</Label>
         </div>
-        <Button variant="ghost" onClick={() => onDone(null, false)}>{i18n.formatMessage(commonMessages.cancel)}</Button>
+        <Button variant="outline" onClick={() => onDone(null, false)}>{i18n.formatMessage(commonMessages.cancel)}</Button>
       </DialogFooter>
     </DialogContent>
   </Dialog>;

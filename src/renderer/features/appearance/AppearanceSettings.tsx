@@ -1,9 +1,8 @@
-import { Monitor, Sun, Moon, FileText, Bot } from "lucide-react";
+import { Monitor, Sun, Moon, FileText, Bot, Palette } from "lucide-react";
 import { useState, type CSSProperties } from "react";
 
 import { accentIds, codeFontSizes, grayIds, palettes, themeTokens, type AccentId, type CodeFontSize, type Appearance, type GrayId } from "../../../shared/theme";
 import { appearanceMessages } from "../../messages/appearance";
-import { commonMessages } from "../../messages/common";
 import { getI18n, useI18n } from "../../shared/i18n";
 import { Button } from "../../shared/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "../../shared/ui/dialog";
@@ -11,7 +10,6 @@ import { FontPicker } from "../../shared/ui/font-picker";
 import { ItemGroup, ItemSeparator, Item, ItemContent, ItemTitle, ItemDescription, ItemActions } from "../../shared/ui/item";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "../../shared/ui/select";
 import { SwatchGroup, ColorSwatch, TileSwatch } from "../../shared/ui/swatch";
-import { Switch } from "../../shared/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "../../shared/ui/toggle-group";
 import { Section } from "../settings/layout";
 import { updateAppearance, useAppearance, useScheme } from "./state";
@@ -65,7 +63,7 @@ export function AppearanceSettings() {
   return <div className="flex flex-col">
     <LivePreview appearance={appearance} />
 
-    <Section title={i18n.formatMessage(appearanceMessages.color)} action={<Button size="sm" variant="outline" onClick={() => setPicking(true)}>{i18n.formatMessage(appearanceMessages.choosePalette)}</Button>}>
+    <Section title={i18n.formatMessage(appearanceMessages.color)} action={<Button size="sm" variant="outline" onClick={() => setPicking(true)}><Palette />{i18n.formatMessage(appearanceMessages.choosePalette)}</Button>}>
       <ItemGroup className="surface">
         <Row label={i18n.formatMessage(appearanceMessages.mode)} hint={i18n.formatMessage(appearanceMessages.modeHint)}>
           <ToggleGroup type="single" variant="outline" size="sm" aria-label={i18n.formatMessage(appearanceMessages.modeLabel)} value={appearance.mode}
@@ -213,9 +211,8 @@ function PaletteDialog({ open, onOpenChange, appearance }: { open: boolean; onOp
         {palettes.map(palette => {
           const t = themeTokens({ ...appearance, accent: palette.accent, gray: palette.gray }, scheme);
           const name = i18n.text(paletteMessages[palette.id]!);
-          return <button key={palette.id} type="button"
-            onClick={() => { void updateAppearance({ accent: palette.accent, gray: palette.gray }); onOpenChange(false); }}
-            className="overflow-hidden rounded-md border bg-card text-left outline-none transition-colors hover:border-ring/60 focus-visible:ring-[3px] focus-visible:ring-ring/50">
+          return <Item key={palette.id} asChild variant="outline" className="flex-col items-stretch gap-0 overflow-hidden bg-card p-0 text-left hover:border-ring/60"><button type="button"
+            onClick={() => { void updateAppearance({ accent: palette.accent, gray: palette.gray }); onOpenChange(false); }}>
             {/* 迷你界面：底色、卡片、主色条与次要文字条。 */}
             <span aria-hidden="true" className="flex h-16 gap-1.5 p-2" style={{ background: t.background }}>
               <span className="flex flex-1 flex-col gap-1 rounded-sm border p-1.5" style={{ background: t.card, borderColor: t.border }}>
@@ -226,7 +223,7 @@ function PaletteDialog({ open, onOpenChange, appearance }: { open: boolean; onOp
               <span className="w-3 rounded-sm" style={{ background: t.secondary }} />
             </span>
             <span className="block px-2 py-1.5 text-sm">{name}</span>
-          </button>;
+          </button></Item>;
         })}
       </div>
     </DialogContent>

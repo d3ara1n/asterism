@@ -1,5 +1,6 @@
 import { BrandMark } from "../shared/ui/brand-mark";
 import { Button } from "../shared/ui/button";
+import { IconButton } from "../shared/ui/icon-button";
 import { PanelLeftClose, House, MessageSquare, Settings } from "lucide-react";
 
 import { appMessages } from "../messages/app";
@@ -26,7 +27,7 @@ export function Sidebar({ snapshot, status, busy, resourceStatuses, selectedSess
   return <aside id="app-sidebar" className="app-sidebar" aria-label={i18n.formatMessage(appMessages.appNavigation)}>
     <header className="flex items-center justify-between gap-2 px-2 pb-5 pt-1">
       <span className="flex items-center gap-2 text-sm font-semibold"><BrandMark className="size-5 text-primary" />{i18n.formatMessage(appMessages.appName)}</span>
-      <Button variant="ghost" size="icon-xs" aria-label={i18n.formatMessage(appMessages.hideSidebar)} title={i18n.formatMessage(appMessages.hideSidebar)} onClick={onHide}><PanelLeftClose /></Button>
+      <IconButton size="icon-xs" label={i18n.formatMessage(appMessages.hideSidebar)} onClick={onHide}><PanelLeftClose /></IconButton>
     </header>
     <nav className="flex flex-col gap-1" aria-label={i18n.formatMessage(appMessages.mainViews)}>
       <Button variant={homeActive ? "secondary" : "ghost"} className="w-full justify-start disabled:opacity-100" aria-current={homeActive ? "page" : undefined} disabled={homeActive} onClick={onHome}><House />{i18n.formatMessage(commonMessages.home)}</Button>

@@ -104,6 +104,8 @@ export function themeTokens(appearance: Appearance, scheme: Scheme): Record<stri
   const g = scale(appearance.gray, scheme);
   const a = scale(appearance.accent, scheme);
   const red = scale("red", scheme);
+  const green = scale("green", scheme);
+  const amber = scale("amber", scheme);
   const dark = scheme === "dark";
   // 亮色用 11 级保证白字 AA；暗色用 9 级实色，文字色按对比度选。
   const primary = dark ? a(9) : a(11);
@@ -116,7 +118,8 @@ export function themeTokens(appearance: Appearance, scheme: Scheme): Record<stri
     secondary: g(4), "secondary-foreground": fg,
     muted: g(3), "muted-foreground": g(11),
     accent: g(4), "accent-foreground": fg,
-    destructive: red(11), border: g(6), input: g(7), ring: a(8),
+    // 状态色统一取 11 级：亮暗两侧均可作文字与图标色。
+    destructive: red(11), success: green(11), warning: amber(11), border: g(6), input: g(7), ring: a(8),
     "canvas-grid": g(6), selection: a(5),
     radius: `${radiusPx[appearance.radius]}px`,
   };

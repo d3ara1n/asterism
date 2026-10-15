@@ -1,4 +1,4 @@
-import { Plus, X, ChevronDown } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import { useId, useState, type ReactNode } from "react";
 
 import type { AgentConfiguration, AgentOverrides, ConfigurationSnapshot } from "../../../shared/configuration";
@@ -10,15 +10,16 @@ import { Checkbox } from "../../shared/ui/checkbox";
 import { FieldLabel, FieldGroup, Field, FieldDescription, FieldSet, FieldLegend } from "../../shared/ui/field";
 import { Input } from "../../shared/ui/input";
 import { InputGroup, InputGroupInput, InputGroupAddon, InputGroupButton } from "../../shared/ui/input-group";
-import { ItemGroup, ItemSeparator, Item, ItemContent, ItemTitle, ItemDescription, ItemActions } from "../../shared/ui/item";
+import { ItemGroup, ItemSeparator } from "../../shared/ui/item";
+import { ListRow } from "../../shared/ui/list-row";
+import { StatusBadge } from "../../shared/ui/status";
 import { RadioGroup, RadioGroupItem } from "../../shared/ui/radio-group";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectGroup, SelectItem, SelectSeparator } from "../../shared/ui/select";
 import { Switch } from "../../shared/ui/switch";
 import { Textarea } from "../../shared/ui/textarea";
-import { cn } from "../../shared/utils";
 import { useIsland } from "../../shared/weave/Screen";
 import { Section } from "../settings/layout";
-import { Editor, OverrideNumberField } from "./forms";
+import { Editor, EditorSection, ModifiedNote, OverrideNumberField } from "./forms";
 import { useSettingsConfiguration } from "./state";
 
 type Base = Omit<AgentConfiguration, "id" | "revision" | "builtin">;
@@ -65,20 +66,17 @@ export function AgentsSettings() {
   return <Section title={i18n.formatMessage(agentsMessages.agents)} hint={i18n.formatMessage(agentsMessages.summary)}
     action={<Button size="sm" disabled={!snapshot} onClick={event => open(null, event.currentTarget)}><Plus />{i18n.formatMessage(agentsMessages.addAgent)}</Button>}>
     {snapshot && <ItemGroup className="surface">{agents.map((agent, index) => {
-      const selected = island.child === `agent-${agent.id}`;
       const role = agent.modelRole === null ? null : snapshot.roles.find(item => item.id === agent.modelRole);
-      return <div key={agent.id}>{index > 0 && <ItemSeparator />}<Item size="sm" className={cn("relative transition-colors hover:bg-accent/60 has-[button:focus-visible]:bg-accent/60", selected && "bg-accent hover:bg-accent", !agent.enabled && "opacity-70")}>
-        <ItemContent className="min-w-0">
-          <button type="button" className="text-left outline-none after:absolute after:inset-0 focus-visible:underline" aria-current={selected || undefined}
-            onClick={event => open(agent.id, event.currentTarget)}><ItemTitle>{agent.name}{agent.id === "worker" && <Badge variant="secondary">{i18n.formatMessage(agentsMessages.default)}</Badge>}</ItemTitle></button>
-          <ItemDescription className="truncate">{agent.description}</ItemDescription>
-        </ItemContent>
-        <ItemActions className="relative">
-          <Badge variant="outline" className={cn("font-normal text-muted-foreground", agent.modelRole !== null && !role && "text-destructive")}>
-            {agent.modelRole === null ? i18n.formatMessage(agentsMessages.noRole) : role ? role.name : i18n.formatMessage(agentsMessages.unavailableRole)}</Badge>
-          <Switch aria-label={i18n.formatMessage(agentsMessages.enableAgent, { agent_name: agent.name })} checked={agent.enabled} disabled={busy} onCheckedChange={next => setEnabled(agent, next)} />
-        </ItemActions>
-      </Item></div>;
+      return <div key={agent.id}>{index > 0 && <ItemSeparator />}
+        <ListRow selected={island.child === `agent-${agent.id}`} inactive={!agent.enabled} onOpen={origin => open(agent.id, origin)}
+          title={<>{agent.name}{agent.id === "worker" && <Badge variant="secondary">{i18n.formatMessage(agentsMessages.default)}</Badge>}</>}
+          description={agent.description}
+          actions={<>
+            {agent.modelRole !== null && !role
+              ? <StatusBadge tone="error">{i18n.formatMessage(agentsMessages.unavailableRole)}</StatusBadge>
+              : <Badge variant="secondary">{role ? role.name : i18n.formatMessage(agentsMessages.noRole)}</Badge>}
+            <Switch aria-label={i18n.formatMessage(agentsMessages.enableAgent, { agent_name: agent.name })} checked={agent.enabled} disabled={busy} onCheckedChange={next => setEnabled(agent, next)} />
+          </>} /></div>;
     })}</ItemGroup>}
   </Section>;
 }
@@ -87,14 +85,11 @@ export function AgentsSettings() {
 
 /** 字段标签行：右侧在偏离内置值时给出“已修改 · 恢复”。 */
 function Label({ htmlFor, children, modified, onRestore }: { htmlFor?: string; children: ReactNode; modified?: boolean; onRestore?: () => void }) {
-  const i18n = useI18n();
   return <div className="flex items-center justify-between gap-2">
     <FieldLabel htmlFor={htmlFor}>{children}</FieldLabel>
-    {modified && onRestore && <span className="type-caption">{i18n.formatMessage(agentsMessages.roleModified)} · <button type="button" className="underline-offset-2 hover:underline" onClick={onRestore}>{i18n.formatMessage(agentsMessages.restoreRole)}</button></span>}
+    {modified && onRestore && <ModifiedNote onRestore={onRestore} />}
   </div>;
 }
-function Heading({ children }: { children: ReactNode }) {
-   return <h3 className="type-section mb-3 mt-8 first:mt-0">{children}</h3>; }
 
 /**
  * 模型角色选择：“无”项仅在界面使用哨兵值，保存时写为 null；default 是真实角色，按普通 ID 保存。
@@ -108,7 +103,7 @@ function RoleSelect({ id, value, onChange }: { id: string; value: string | null;
   const blocked = value !== null ? roles.find(role => role.id === value && (!role.enabled || role.hidden)) : undefined;
   const missing = value !== null && !roles.some(role => role.id === value);
   return <Select value={value ?? NONE} onValueChange={next => onChange(next === NONE ? null : next)}>
-    <SelectTrigger id={id} className={cn("w-full", (missing || blocked) && "text-destructive")}><SelectValue /></SelectTrigger>
+    <SelectTrigger id={id} className="w-full" aria-invalid={missing || !!blocked || undefined}><SelectValue /></SelectTrigger>
     <SelectContent><SelectGroup>
       <SelectItem value={NONE}>{i18n.formatMessage(agentsMessages.none)}</SelectItem>
       {missing && <SelectItem value={value} disabled>{i18n.formatMessage(agentsMessages.unavailableRoleOption)} · {value}</SelectItem>}
@@ -127,7 +122,7 @@ function TagInput({ id, value, onChange, placeholder }: { id: string; value: str
   return <div className="flex flex-col gap-2">
     {value.length > 0 && <ul className="flex flex-wrap gap-1.5">{value.map(tag => <li key={tag}>
       <Badge variant="secondary" className="gap-1 pr-1 font-mono">{tag}
-        <button type="button" className="rounded-full p-0.5 hover:bg-background/60" aria-label={i18n.formatMessage(agentsMessages.removeTag, { tag: tag })} onClick={() => onChange(value.filter(item => item !== tag))}><X /></button>
+        <Button type="button" variant="ghost" size="icon-xs" className="size-4 rounded-full" aria-label={i18n.formatMessage(agentsMessages.removeTag, { tag: tag })} onClick={() => onChange(value.filter(item => item !== tag))}><X /></Button>
       </Badge></li>)}</ul>}
     <InputGroup>
       <InputGroupInput id={id} value={text} placeholder={placeholder} className="font-mono" onChange={event => setText(event.target.value)}
@@ -157,7 +152,6 @@ function AgentEditor({ initialId }: { initialId: string | null }) {
   const [draft, setDraft] = useState<AgentOverrides>(() => strip(id ? snapshot?.overrides.agents[id] ?? {} : {}));
   const [toolLists, setToolLists] = useState<{ allow: string[]; exclude: string[] }>({ allow: [], exclude: [] });
   const [delegateMode, setDelegateMode] = useState<DelegateMode | null>(null);
-  const [advanced, setAdvanced] = useState(false);
   if (!snapshot) return null;
   const base = baseOf(snapshot, current);
   const builtin = !!current?.builtin;
@@ -207,25 +201,22 @@ function AgentEditor({ initialId }: { initialId: string | null }) {
       if (result.ok && result.savedId) { setId(result.savedId); setDraft(strip(result.snapshot.overrides.agents[result.savedId] ?? {})); setDelegateMode(null); }
     }}><fieldset disabled={busy}>
 
-      <Heading>{i18n.formatMessage(agentsMessages.basics)}</Heading>
-      <FieldGroup>
+      <EditorSection title={i18n.formatMessage(agentsMessages.basics)}><FieldGroup>
         <Field><Label htmlFor={ids.name} modified={builtin && modified("name")} onRestore={() => restore("name")}>{i18n.formatMessage(agentsMessages.name)}</Label>
           <Input id={ids.name} value={draft.name ?? ""} placeholder={builtin ? base.name : undefined} required={!builtin} maxLength={160} onChange={event => set("name", event.target.value)} /></Field>
         <Field><Label htmlFor={ids.description} modified={modified("description")} onRestore={() => restore("description")}>{i18n.formatMessage(agentsMessages.description)}</Label>
           <Textarea id={ids.description} rows={3} value={draft.description ?? ""} placeholder={base.description} onChange={event => set("description", event.target.value)} /></Field>
-      </FieldGroup>
+      </FieldGroup></EditorSection>
 
-      <Heading>{i18n.formatMessage(agentsMessages.modelRoles)}</Heading>
-      <FieldGroup>
+      <EditorSection title={i18n.formatMessage(agentsMessages.modelRoles)}><FieldGroup>
         <Field><Label htmlFor={ids.role} modified={modified("modelRole")} onRestore={() => restore("modelRole")}>{i18n.formatMessage(agentsMessages.defaultModelRole)}</Label>
           <RoleSelect id={ids.role} value={effective("modelRole")} onChange={next => set("modelRole", next)} />
           <FieldDescription>{i18n.formatMessage(agentsMessages.defaultModelRoleHint)}</FieldDescription></Field>
         <Field><Label htmlFor={ids.fallback} modified={modified("fallbackRole")} onRestore={() => restore("fallbackRole")}>{i18n.formatMessage(agentsMessages.fallbackModelRole)}</Label>
           <RoleSelect id={ids.fallback} value={effective("fallbackRole")} onChange={next => set("fallbackRole", next)} /></Field>
-      </FieldGroup>
+      </FieldGroup></EditorSection>
 
-      <Heading>{i18n.formatMessage(agentsMessages.prompts)}</Heading>
-      <FieldGroup>
+      <EditorSection title={i18n.formatMessage(agentsMessages.prompts)}><FieldGroup>
         <Field><Label htmlFor={ids.prompt} modified={modified("systemPrompt")} onRestore={() => restore("systemPrompt")}>{i18n.formatMessage(agentsMessages.systemPrompt)}</Label>
           <Textarea id={ids.prompt} rows={10} className="font-mono text-xs" value={draft.systemPrompt ?? ""} placeholder={base.systemPrompt} onChange={event => set("systemPrompt", event.target.value)} />
           {builtin && <FieldDescription>{i18n.formatMessage(agentsMessages.systemPromptHint)}</FieldDescription>}</Field>
@@ -240,13 +231,12 @@ function AgentEditor({ initialId }: { initialId: string | null }) {
                 onClick={() => set("examples", examples.filter((_, at) => at !== index))}><X /></InputGroupButton></InputGroupAddon>
             </InputGroup></li>)}</ol>}
           <Button type="button" variant="outline" size="sm" className="w-fit" onClick={() => set("examples", [...examples, ""])}><Plus />{i18n.formatMessage(agentsMessages.addExample)}</Button></Field>
-      </FieldGroup>
+      </FieldGroup></EditorSection>
 
-      <Heading>{i18n.formatMessage(agentsMessages.toolsAndDelegation)}</Heading>
-      <FieldGroup>
+      <EditorSection title={i18n.formatMessage(agentsMessages.toolsAndDelegation)}><FieldGroup>
         <FieldSet>
           <div className="flex items-center justify-between gap-2"><FieldLegend variant="label">{i18n.formatMessage(agentsMessages.toolPolicy)}</FieldLegend>
-            {(modified("tools") || modified("excludeTools")) && <span className="type-caption">{i18n.formatMessage(agentsMessages.toolsModified)} · <button type="button" className="underline-offset-2 hover:underline" onClick={() => restore("tools", "excludeTools")}>{i18n.formatMessage(agentsMessages.restoreTools)}</button></span>}</div>
+            {(modified("tools") || modified("excludeTools")) && <ModifiedNote onRestore={() => restore("tools", "excludeTools")} />}</div>
           <RadioGroup value={toolMode} onValueChange={next => setToolMode(next as ToolMode)}>
             {([["all", i18n.formatMessage(agentsMessages.allAuthorizedTools)], ["allow", i18n.formatMessage(agentsMessages.onlyListedTools)], ["exclude", i18n.formatMessage(agentsMessages.exceptListedTools)]] as const).map(([mode, label]) =>
               <Field key={mode} orientation="horizontal"><RadioGroupItem value={mode} id={`${ids.tools}-${mode}`} /><FieldLabel htmlFor={`${ids.tools}-${mode}`} className="font-normal">{label}</FieldLabel></Field>)}
@@ -262,7 +252,7 @@ function AgentEditor({ initialId }: { initialId: string | null }) {
 
         <FieldSet>
           <div className="flex items-center justify-between gap-2"><FieldLegend variant="label">{i18n.formatMessage(agentsMessages.delegation)}</FieldLegend>
-            {modified("subagentRoles") && <span className="type-caption">{i18n.formatMessage(agentsMessages.delegationModified)} · <button type="button" className="underline-offset-2 hover:underline" onClick={() => { restore("subagentRoles"); setDelegateMode(null); }}>{i18n.formatMessage(agentsMessages.restoreDelegation)}</button></span>}</div>
+            {modified("subagentRoles") && <ModifiedNote onRestore={() => { restore("subagentRoles"); setDelegateMode(null); }} />}</div>
           <RadioGroup value={shownDelegate} onValueChange={next => {
             const mode = next as DelegateMode; setDelegateMode(mode);
             set("subagentRoles", mode === "all" ? null : mode === "none" ? [] : delegates?.length ? delegates : []);
@@ -279,14 +269,12 @@ function AgentEditor({ initialId }: { initialId: string | null }) {
           </FieldGroup>}
           <FieldDescription>{i18n.formatMessage(agentsMessages.delegationHint)}</FieldDescription>
         </FieldSet>
-      </FieldGroup>
+      </FieldGroup></EditorSection>
 
-      <Button type="button" variant="ghost" size="sm" className="-ml-2 mt-8" aria-expanded={advanced} onClick={() => setAdvanced(open => !open)}>
-        <ChevronDown className={advanced ? "rotate-180 transition-transform" : "transition-transform"} />{i18n.formatMessage(agentsMessages.limits)}</Button>
-      {advanced && <FieldGroup className="mt-3">
+      <EditorSection collapsible defaultOpen={false} title={i18n.formatMessage(agentsMessages.limits)}><FieldGroup>
         <OverrideNumberField label={i18n.formatMessage(agentsMessages.timeout)} value={draft.timeout} inherited={base.timeout} onChange={next => set("timeout", next)} min={1} max={86_400} integer empty={i18n.formatMessage(agentsMessages.timeoutPlaceholder)} />
         <OverrideNumberField label={i18n.formatMessage(agentsMessages.maximumRequests)} value={draft.maxTurns} inherited={base.maxTurns} onChange={next => set("maxTurns", next)} min={1} integer empty={i18n.formatMessage(agentsMessages.maximumRequestsPlaceholder)} />
-      </FieldGroup>}
+      </FieldGroup></EditorSection>
 
     </fieldset></form>
   </Editor>;

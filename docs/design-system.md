@@ -92,16 +92,79 @@ Window          平台差异、拖动区域、窗口几何变量
 - 字号五级：`type-page`、`type-section`、`type-body`、`type-caption`、`type-label`。
 - 字体只有两个 token：`--font-sans`（界面）与 `--font-mono`（代码）。用户在外观设置选择的本机字体置于默认回退栈之前；Markdown 正文沿用界面字体，代码块与行内代码沿用代码字体，不单独设置。界面字号即密度；代码另有字号 `--code-font-size`（11–18px，未设置时跟随所在文字），代码文字统一用 `type-code`。
 - 图标统一使用 lucide-react，不使用 Unicode 符号；界面标识为 `brand-mark.tsx` 的经纬线框。
-- `shared/ui/` 只放 shadcn（new-york-v4）官方 registry 源码，不手改结构与样式类；升级即重新拉取覆盖。官方没有的组合（如 PageState）放在 `shared/ui/` 内但只组合官方组件，不另写皮肤。业务代码需要的控件官方已有时（如确认用 AlertDialog、列表行用 Item、加载用 Spinner），先拉取再使用，不以 div 与 class 手写同类控件。
-- 业务代码只用官方组件与布局类，不使用裸 button/select 等控件，不写控件颜色、阴影或圆角。
+- `shared/ui/` 只放 shadcn（new-york-v4）官方 registry 源码，不手改结构与样式类；升级即重新拉取覆盖。唯一例外是 `sonner.tsx`：主题取自 `useScheme()` 而不引入 `next-themes`，状态图标按状态 token 着色。官方没有的组合（如 PageState、StatusBadge、IconButton、ListRow）放在 `shared/ui/` 内但只组合官方组件，不另写皮肤。业务代码需要的控件官方已有时（如确认用 AlertDialog、列表行用 Item、加载用 Spinner），先拉取再使用，不以 div 与 class 手写同类控件。
+- 业务代码只用官方组件与公共组合，不使用裸 button/select 等控件，不写控件颜色、阴影或圆角。可点击的卡片用 `Item variant="outline" asChild` 包裹 button。
 - 表面只有两种：`surface`（边框 + 卡片底，无阴影，用于浮岛、顶栏部件、卡片、画布）与 `surface-floating`（加阴影，用于悬浮面板、浮条、通知）；对话框、菜单、下拉由官方组件提供浮层外观。
 - 焦点、错误、禁用状态使用官方组件自带样式；进出场动画由 `tw-animate-css` 提供。
+
+## 按钮层级
+
+按钮变体只表达所在区域内的强调层级与角色，不区分操作是否改写数据。操作会改变什么由按钮文案、区块说明与完成反馈表达，不可逆操作另经确认。
+
+| 变体 | 用途 | 示例 |
+| --- | --- | --- |
+| `default` | 区域主操作，每个表单、浮岛或对话框至多一个；列表区块标题处的新建入口 | 保存、创建、添加所选、添加提供商 |
+| `outline` | 区块与编辑器内的辅助操作；错误状态中的恢复操作；对话框与表单页脚中与主操作成组的取消、放弃 | 获取模型、获取参数、测试连接、重试、取消 |
+| `ghost` | 顶栏与导航、列表行内操作、折叠区块标题、浮条内的操作、仅图标按钮 | 行内测试、参数（折叠）、关闭 |
+| `secondary` | 仅表示导航与列表中的当前项，配合 `aria-current` 或 `aria-pressed` | 侧栏当前会话、历史当前条目 |
+| `destructive` | 确认对话框中的不可逆确认按钮 | 删除、放弃修改 |
+| `link` | 文字行内的附属操作 | 移除已保存的密钥 |
+
+- 删除等不可逆操作的入口用 `ghost` 加 `text-destructive`，经 AlertDialog 确认后执行。
+- 区块与编辑器中带文字的辅助操作使用语义前导图标，进行中以 Spinner 替换该图标；错误恢复与对话框、表单页脚中的取消、放弃不带图标。
+- 启用、停用等可切换的布尔状态用 Switch，不用切换文案的按钮表达。
+- 设置页与浮岛内使用 `sm`，对话框页脚沿用默认尺寸，紧凑行内使用 `xs`。仅图标按钮使用 `IconButton`（Button + Tooltip），可访问名称与提示一致；作为菜单或弹层触发器时直接用 Button 并提供 `aria-label`。
+
+## 状态与反馈
+
+状态分五类，每类固定图标与颜色；业务代码经 `shared/ui/status.tsx` 的 `StatusIcon`、`StatusBadge`、`StatusText` 表达，不直接写状态颜色。颜色不单独表达含义，始终与图标和文字同时出现。
+
+| 状态 | token | 图标 | 示例 |
+| --- | --- | --- | --- |
+| 成功 | `success`（green 11） | CircleCheck | 已连接、测试通过、插件已加载、资源已完成 |
+| 警告 | `warning`（amber 11） | TriangleAlert | 缺少密钥、需要重启、配置已改需重测、等待处理 |
+| 错误 | `destructive`（red 11） | CircleAlert | 测试失败、插件无效、引用失效 |
+| 进行中 | `muted-foreground` | Spinner | 测试中、运行中 |
+| 中性 | `muted-foreground` | Circle | 已停用、未测试、无模型 |
+
+三个状态 token 均取色阶 11 级，亮暗两侧都可作文字与图标色。领域可替换图标（如等待处理用 Hand），颜色仍由状态决定。
+
+| 场景 | 通道 |
+| --- | --- |
+| 字段校验与失效引用 | 控件 `aria-invalid`，说明用 `FieldError` |
+| 区块内持续存在的状态（读取失败、需要重启、加密不可用、获取参数的逐项结果） | 区块内 `Alert` |
+| 结果不在当前视野或无固定位置的操作反馈（全局错误、创建失败、模型已添加） | Sonner 临时通知 |
+
+- 临时通知统一位于窗口底部居中。错误通知不自动消失、可关闭，需要时带「重试」；成功通知按默认时长消失；进行中通知不可关闭，经操作（如取消）结束。由状态驱动的通知使用 `shared/toast.ts` 的 `useStateToast`，状态清除即撤下。
+- 区块与浮岛内的加载用 Spinner 加一行说明并带 `role="status"`；按钮内以 Spinner 替换前导图标；行内用小号 Spinner。
+- 尚无数据且需要引导下一步时用 `Empty`，可附一个操作；搜索无结果与侧栏、画布等窄区域用一行说明文字。
+- Badge 只用两种：`secondary` 表示标签与归属（内置、默认、已添加、使用方），`StatusBadge`（outline + 状态图标）表示状态。
+
+## 选择控件
+
+| 控件 | 用途 |
+| --- | --- |
+| Switch | 启用、停用等即时生效的布尔设置 |
+| Checkbox | 从一组中多选，或表单内随保存生效的布尔项 |
+| RadioGroup | 表单内需要逐项说明的单选 |
+| ToggleGroup | 单行紧凑的单选与视图筛选 |
+| Tabs | 切换内容面板 |
+| Select | 选项较多的单选 |
+| Popover + Command | 可搜索的选择 |
+
+## 列表与编辑器
+
+- 可打开详情的列表行统一使用 `ListRow`：标题按钮命中区铺满整行，行内操作位于其上层；当前打开项高亮，停用项降低不透明度。
+- 编辑器正文按 `EditorSection` 分区：标题、说明与右侧操作，区块之间以 Separator 分隔。可折叠区块以标题为展开开关，说明、操作与操作结果在折叠时仍可见；低频区块（限制、兼容设置无条目时）默认折叠。
+- 操作与它改写的字段同属一个区块：模型编辑器的获取参数位于「参数」区块，能力、上下文窗口与生成参数都在其中；连接测试独立成区块。
+- 字段偏离内置或继承值时显示 `ModifiedNote`（已修改 · 恢复）。
 
 ## 唯一维护入口
 
 | 内容 | 入口 |
 | --- | --- |
 | 颜色、字体、圆角、阴影、共享表面 | `src/renderer/styles.css` |
+| 状态表达与临时通知 | `shared/ui/status.tsx`、`shared/ui/sonner.tsx`、`shared/toast.ts` |
 | 控件行为与视觉变体 | `src/renderer/shared/ui/` |
 | 窗口布局与原生控件留白 | `src/renderer/app/Window.tsx` |
 | 受管空间、屏与浮岛编织 | `src/renderer/shared/weave/` |
@@ -111,7 +174,7 @@ Window          平台差异、拖动区域、窗口几何变量
 | 平台材质、实色回退与系统偏好监听 | `src/main/window-appearance.ts` |
 | shadcn/ui 组件配置 | `components.json` |
 
-主题采用 shadcn 语义 token（background、card、popover、primary、secondary、muted、accent、border、input、ring、destructive 等）与单一 `--radius` 圆角刻度，另加 `--canvas-grid` 画布纹理色。主题定义在 `src/shared/theme.ts`：原始层为 Radix Colors 色阶，语义层由 `themeTokens(appearance, scheme)` 按固定级别映射（如 border 取灰色 6 级、primary 取主题色）；组件的 `dark:` 变体绑定 `data-mode=dark`，业务代码不写 `dark:`；`styles.css` 中的值仅作首帧兜底。原生窗口回退色取当前主题背景色。
+主题采用 shadcn 语义 token（background、card、popover、primary、secondary、muted、accent、border、input、ring、destructive 等）、状态 token `success` 与 `warning`，以及单一 `--radius` 圆角刻度，另加 `--canvas-grid` 画布纹理色。主题定义在 `src/shared/theme.ts`：原始层为 Radix Colors 色阶，语义层由 `themeTokens(appearance, scheme)` 按固定级别映射（如 border 取灰色 6 级、primary 取主题色）；组件的 `dark:` 变体绑定 `data-mode=dark`，业务代码不写 `dark:`；`styles.css` 中的值仅作首帧兜底。原生窗口回退色取当前主题背景色。
 
 shadcn/ui 组件源码由项目维护，Radix 管理基础交互，Tailwind 表达布局与 token。业务页面只组合已有控件、布局与语义样式；不新增局部色板、任意阴影或独立控件皮肤。确需新增变体时进入公共组件，整体视觉变更须由用户确认。
 

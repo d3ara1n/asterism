@@ -1,4 +1,4 @@
-import { Button } from "../ui/button";
+import { IconButton } from "../ui/icon-button";
 import { X } from "lucide-react";
 import type { ReactNode, Ref } from "react";
 
@@ -24,7 +24,7 @@ export function IslandPanel({ title, description, action, toolbar, compact, cont
         {description && <p className="type-caption truncate">{description}</p>}
       </div>
       {action}
-      <Button variant="ghost" size="icon-sm" aria-label={i18n.formatMessage(commonMessages.close)} title={i18n.formatMessage(commonMessages.close)} onClick={() => void island.close()}><X /></Button>
+      <IconButton label={i18n.formatMessage(commonMessages.close)} onClick={() => void island.close()}><X /></IconButton>
     </header>
     {toolbar && <div className="shrink-0 space-y-2 border-b px-3 py-3">{toolbar}</div>}
     <div ref={contentRef} className={`island-panel-content${compact ? " px-2 py-2" : ""}`}>{children}</div>

@@ -1,6 +1,4 @@
-import { Tooltip, TooltipTrigger, TooltipContent } from "../../shared/ui/tooltip";
-
-import { Button } from "../../shared/ui/button";
+import { IconButton } from "../../shared/ui/icon-button";
 
 import { Card } from "../../shared/ui/card";
 import { ChevronRight, ChevronDown, X } from "lucide-react";
@@ -17,20 +15,6 @@ import type { CardSize } from "../../../shared/workbench";
 export const cardDragHandle = ".card-drag-handle";
 
 export type ViewPatch = { hidden?: boolean; collapsed?: boolean; size?: CardSize | null };
-
-/** 带主题提示的图标按钮；可访问名称与提示文案一致。 */
-export function IconAction({ label, onClick, expanded, size = "icon-xs", children }: {
-  label: string; onClick: () => void; expanded?: boolean;
-  size?: "icon-xs" | "icon-sm"; children: ReactNode;
-}) {
-
-  return <Tooltip>
-    <TooltipTrigger asChild>
-      <Button variant="ghost" size={size} aria-label={label} aria-expanded={expanded} onClick={onClick}>{children}</Button>
-    </TooltipTrigger>
-    <TooltipContent>{label}</TooltipContent>
-  </Tooltip>;
-}
 
 /**
  * 对象卡片控件：官方 Card 外壳 + 拖动柄标题栏 + 折叠/关闭视图操作 + 不触发画布的内容区。
@@ -52,10 +36,10 @@ export const ObjectCard = memo(function ObjectCard({ icon, kind, title, actions,
       </div>
       <div className="nodrag flex shrink-0 items-center gap-0.5">
         {actions}
-        <IconAction label={toggleLabel} expanded={!collapsed} onClick={() => onView({ collapsed: !collapsed })}>
+        <IconButton size="icon-xs" label={toggleLabel} aria-expanded={!collapsed} onClick={() => onView({ collapsed: !collapsed })}>
           {collapsed ? <ChevronRight /> : <ChevronDown />}
-        </IconAction>
-        <IconAction label={i18n.formatMessage(commonMessages.closeView)} onClick={() => onView({ hidden: true })}><X /></IconAction>
+        </IconButton>
+        <IconButton size="icon-xs" label={i18n.formatMessage(commonMessages.closeView)} onClick={() => onView({ hidden: true })}><X /></IconButton>
       </div>
     </header>
     {!collapsed && <div className="nodrag nopan nowheel flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden border-t">{children}</div>}

@@ -7,7 +7,10 @@ import { ChevronDown, Check, Link2 } from "lucide-react";
 
 import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from "../../shared/ui/command";
 
-import { Spinner } from "../../shared/ui/spinner";
+import { Alert, AlertDescription } from "../../shared/ui/alert";
+import { Separator } from "../../shared/ui/separator";
+import { StatusText } from "../../shared/ui/status";
+import { ToggleGroup, ToggleGroupItem } from "../../shared/ui/toggle-group";
 
 import { Switch } from "../../shared/ui/switch";
 import { errorDisplay } from "../../../shared/error-display.ts";
@@ -44,18 +47,21 @@ export function AccessPanel() {
   const targets = (byAgent ? session.objects : agents).filter(object => object.id !== selected?.id
     && `${object.title} ${i18n.text(registry.resource(object.kind).label)}`.toLocaleLowerCase(i18n.locale).includes(search));
   return <IslandPanel title={i18n.formatMessage(accessMessages.accessLabel)} toolbar={<>
-    <div className="flex gap-1">{([["agent", i18n.formatMessage(accessMessages.byAgent)], ["resource", i18n.formatMessage(accessMessages.byResource)]] as const).map(([key, label]) => <Button key={key} size="xs" variant={mode === key ? "secondary" : "ghost"} aria-pressed={mode === key} onClick={() => { setMode(key); setQuery(""); }}>{label}</Button>)}</div>
+    <ToggleGroup type="single" size="sm" aria-label={i18n.formatMessage(accessMessages.accessLabel)} value={mode} onValueChange={next => { if (next) { setMode(next as typeof mode); setQuery(""); } }}>
+      <ToggleGroupItem value="agent">{i18n.formatMessage(accessMessages.byAgent)}</ToggleGroupItem>
+      <ToggleGroupItem value="resource">{i18n.formatMessage(accessMessages.byResource)}</ToggleGroupItem>
+    </ToggleGroup>
     <ResourcePicker objects={choices} selected={selected} onSelect={byAgent ? setSelectedAgent : setSelectedResource} label={byAgent ? i18n.formatMessage(accessMessages.accessRecipient) : i18n.formatMessage(accessMessages.accessTarget)} />
     <SearchInput value={query} onChange={setQuery} label={byAgent ? i18n.formatMessage(objectsMessages.searchResources) : i18n.formatMessage(objectsMessages.searchObjects)} />
   </>}>
-    {state.status === "error" && <div className="mb-4 space-y-2"><p role="alert" className="type-caption">{i18n.text(state.error ?? "")}</p><Button variant="secondary" size="sm" onClick={() => { void controller.refresh(); }}>{i18n.formatMessage(commonMessages.retry)}</Button></div>}
+    {state.status === "error" && <Alert variant="destructive" className="mb-4"><AlertDescription>{i18n.text(state.error ?? "")}<Button variant="outline" size="sm" className="mt-2" onClick={() => { void controller.refresh(); }}>{i18n.formatMessage(commonMessages.retry)}</Button></AlertDescription></Alert>}
     {selected && <h3 className="type-section mb-2 break-words">{byAgent ? i18n.formatMessage(accessMessages.canAccess, { title: selected.title }) : i18n.formatMessage(accessMessages.accessibleBy, { title: selected.title })}</h3>}
     {selected && targets.map(object => {
       const agent = byAgent ? selected : object, resource = byAgent ? object : selected;
       return <AccessRow key={`${agent.id}:${resource.id}`} agent={agent} resource={resource} object={object} />;
     })}
     {(!selected || !targets.length) && <p className="type-caption py-6 text-center">{query ? i18n.formatMessage(commonMessages.noMatches) : i18n.formatMessage(accessMessages.accessEmpty)}</p>}
-    <div className="mt-5 space-y-2 border-t pt-4"><p className="type-caption">{i18n.formatMessage(accessMessages.accessRequestBoundary)}</p><p className="type-caption">{i18n.formatMessage(accessMessages.accessRules)}</p></div>
+    <Separator className="mt-5 mb-4" /><div className="space-y-2"><p className="type-caption">{i18n.formatMessage(accessMessages.accessRequestBoundary)}</p><p className="type-caption">{i18n.formatMessage(accessMessages.accessRules)}</p></div>
   </IslandPanel>;
 }
 function ResourcePicker({ objects, selected, onSelect, label }: { objects: WorkbenchObject[]; selected?: WorkbenchObject; onSelect: (id: string) => void; label: string }) {
@@ -111,11 +117,12 @@ function AccessRow({ agent, resource, object }: { agent: WorkbenchObject; resour
     <span className="pt-1 text-muted-foreground" aria-hidden="true">{descriptor.icon}</span>
     <div className="min-w-0 flex-1"><label htmlFor={id} className="type-section block cursor-pointer truncate">{object.title}</label>
       <p className="type-caption mt-0.5">{i18n.text(descriptor.label)}</p>
-      <p className="type-caption mt-1 flex items-center gap-1.5" role={pending || saved ? "status" : undefined}>
-        {pending ? <Spinner className="size-3" /> : linked ? <Check className="size-3" /> : <Link2 className="size-3" />}
-        {pending ? i18n.formatMessage(commonMessages.statusBusy) : `${linked ? i18n.formatMessage(accessMessages.linked) : i18n.formatMessage(accessMessages.notLinked)}${saved ? ` · ${i18n.text(saved)}` : ""}`}
+      <p className="mt-1" role={pending || saved ? "status" : undefined}>
+        <StatusText tone={pending ? "progress" : linked ? "success" : "neutral"} icon={pending ? undefined : linked ? Check : Link2}>
+          {pending ? i18n.formatMessage(commonMessages.statusBusy) : `${linked ? i18n.formatMessage(accessMessages.linked) : i18n.formatMessage(accessMessages.notLinked)}${saved ? ` · ${i18n.text(saved)}` : ""}`}
+        </StatusText>
       </p>
-      {error && <p role="alert" className="type-caption mt-1 text-destructive">{i18n.text(error)}</p>}
+      {error && <p role="alert" className="mt-1"><StatusText tone="error">{i18n.text(error)}</StatusText></p>}
     </div><Switch id={id} checked={pending?.desired ?? linked} disabled={!ready || busy || !!pending || state.status !== "ready"}
       aria-label={i18n.formatMessage(accessMessages.changeAccess, { agent: agent.title, resource: resource.title })} aria-busy={!!pending} onCheckedChange={desired => { void change(desired); }} />
   </div>;

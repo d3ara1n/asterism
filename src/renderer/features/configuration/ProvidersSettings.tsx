@@ -1,4 +1,4 @@
-import { Plus, Zap, Search, ExternalLink, ChevronDown } from "lucide-react";
+import { Plus, Zap, Search, ExternalLink, PlugZap } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { createModelInput, modelReference, thinkingSchema, type ConfigurationSnapshot, type ConnectionTest, type Provider, type ProviderInput, type ProviderModel, type TestError } from "../../../shared/configuration";
@@ -8,18 +8,22 @@ import { providersMessages } from "../../messages/providers";
 import { thinkingLabels } from "../../messages/model-selection";
 import { getI18n, useI18n } from "../../shared/i18n";
 import { Badge } from "../../shared/ui/badge";
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia } from "../../shared/ui/empty";
+import { ListRow } from "../../shared/ui/list-row";
+import { StatusBadge, StatusText, type StatusTone } from "../../shared/ui/status";
 import { Button } from "../../shared/ui/button";
 import { Checkbox } from "../../shared/ui/checkbox";
 import { FieldGroup, Field, FieldContent, FieldLabel, FieldDescription, FieldSet, FieldLegend } from "../../shared/ui/field";
 import { Input } from "../../shared/ui/input";
-import { ItemGroup, ItemSeparator, Item, ItemMedia, ItemContent, ItemTitle, ItemDescription, ItemActions } from "../../shared/ui/item";
+import { Alert, AlertDescription } from "../../shared/ui/alert";
+import { ItemGroup, ItemSeparator, Item } from "../../shared/ui/item";
 import { Separator } from "../../shared/ui/separator";
 import { Spinner } from "../../shared/ui/spinner";
 import { Switch } from "../../shared/ui/switch";
 import { cn } from "../../shared/utils";
 import { useIsland } from "../../shared/weave/Screen";
 import { Section } from "../settings/layout";
-import { Editor, TextField, ChoiceField, NumberField } from "./forms";
+import { Editor, EditorSection, TextField, ChoiceField, NumberField } from "./forms";
 import { useSettingsConfiguration } from "./state";
 import { ModelCompatibilityEditor } from "./ModelCompatibilityEditor";
 import { modelProtocolLabels } from "./protocols";
@@ -35,24 +39,18 @@ type ProviderValue = ProviderDraft;
 
 /* ---------- 状态推导：列表与详情共用，均直接读取最新快照 ---------- */
 
-type Tone = "ok" | "warn" | "off" | "idle";
-interface Health { tone: Tone; label: string }
+interface Health { tone: StatusTone; label: string }
 const latestTest = (snapshot: ConfigurationSnapshot, modelId: string): ConnectionTest | undefined =>
   snapshot.tests.filter(test => test.model === modelId).at(-1);
 function providerHealth(snapshot: ConfigurationSnapshot, provider: Provider): Health {
-  if (!provider.enabled) return { tone: "off", label: getI18n().formatMessage(providersMessages.disabled) };
-  if (provider.auth === "api_key" && provider.credentialState !== "available") return { tone: "warn", label: getI18n().formatMessage(providersMessages.needsApiKey) };
+  if (!provider.enabled) return { tone: "neutral", label: getI18n().formatMessage(providersMessages.disabled) };
+  if (provider.auth === "api_key" && provider.credentialState !== "available") return { tone: "warning", label: getI18n().formatMessage(providersMessages.needsApiKey) };
   const models = snapshot.models.filter(model => model.providerId === provider.id);
-  if (!models.length) return { tone: "idle", label: getI18n().formatMessage(providersMessages.noModels) };
+  if (!models.length) return { tone: "neutral", label: getI18n().formatMessage(providersMessages.noModels) };
   const tests = models.map(model => latestTest(snapshot, modelReference(model))).filter(test => test && test.providerRevision === provider.revision);
-  if (tests.some(test => test!.state === "failed")) return { tone: "warn", label: getI18n().formatMessage(providersMessages.lastTestFailed) };
-  if (tests.some(test => test!.state === "succeeded")) return { tone: "ok", label: getI18n().formatMessage(providersMessages.connected) };
-  return { tone: "idle", label: getI18n().formatMessage(providersMessages.notTested) };
-}
-const dot: Record<Tone, string> = { ok: "bg-primary", warn: "bg-destructive", off: "bg-muted-foreground/40", idle: "bg-muted-foreground" };
-function StatusBadge({ health }: { health: Health }) {
-
-  return <Badge variant="outline" className="font-normal text-muted-foreground"><span aria-hidden="true" className={`size-1.5 rounded-full ${dot[health.tone]}`} />{health.label}</Badge>;
+  if (tests.some(test => test!.state === "failed")) return { tone: "error", label: getI18n().formatMessage(providersMessages.lastTestFailed) };
+  if (tests.some(test => test!.state === "succeeded")) return { tone: "success", label: getI18n().formatMessage(providersMessages.connected) };
+  return { tone: "neutral", label: getI18n().formatMessage(providersMessages.notTested) };
 }
 const credentialLabels = (): Record<Provider["credentialState"], string> => ({
   not_required: getI18n().formatMessage(providersMessages.noAuthentication), missing: getI18n().formatMessage(providersMessages.noKeySaved), available: getI18n().formatMessage(providersMessages.keySaved),
@@ -109,34 +107,23 @@ export function ProvidersSettings() {
   const providers = snapshot?.providers ?? [];
   return <Section title={i18n.formatMessage(providersMessages.connections)} hint={i18n.formatMessage(providersMessages.summary)}
     action={<Button size="sm" disabled={!snapshot} onClick={event => open(null, event.currentTarget)}><Plus />{i18n.formatMessage(providersMessages.addProvider)}</Button>}>
-    {snapshot && !providers.length ? <div className="surface flex flex-col items-center gap-3 px-6 py-10 text-center">
-      <Zap className="size-5 text-muted-foreground" aria-hidden="true" />
-      <p className="type-body">{i18n.formatMessage(providersMessages.emptyConnections)}</p>
-      <Button size="sm" variant="outline" onClick={event => open(null, event.currentTarget)}><Plus />{i18n.formatMessage(providersMessages.addFirstProvider)}</Button>
-    </div> : snapshot && <ItemGroup className="surface">{providers.map((provider, index) => {
+    {snapshot && !providers.length ? <Empty className="border">
+      <EmptyHeader><EmptyMedia variant="icon"><Zap /></EmptyMedia><EmptyDescription>{i18n.formatMessage(providersMessages.emptyConnections)}</EmptyDescription></EmptyHeader>
+      <EmptyContent><Button size="sm" variant="outline" onClick={event => open(null, event.currentTarget)}><Plus />{i18n.formatMessage(providersMessages.addFirstProvider)}</Button></EmptyContent>
+    </Empty> : snapshot && <ItemGroup className="surface">{providers.map((provider, index) => {
       const count = snapshot.models.filter(model => model.providerId === provider.id).length;
-      const selected = island.child === `provider-${provider.id}`;
-      return <div key={provider.id}>{index > 0 && <ItemSeparator />}<Item size="sm" className={cn("relative transition-colors hover:bg-accent/60 has-[button:focus-visible]:bg-accent/60", selected && "bg-accent hover:bg-accent")}>
-        <ItemMedia><Monogram name={provider.name} /></ItemMedia>
-        <ItemContent className="min-w-0">
-          <button type="button" className="text-left outline-none after:absolute after:inset-0 focus-visible:underline" aria-current={selected || undefined}
-            onClick={event => open(provider.id, event.currentTarget)}><ItemTitle>{provider.name}</ItemTitle></button>
-          <ItemDescription className="truncate">{protocolLabel(provider.protocol)} · {i18n.formatMessage(providersMessages.modelCount, { count: count })}</ItemDescription>
-        </ItemContent>
-        <ItemActions className="relative">
-          <StatusBadge health={providerHealth(snapshot, provider)} />
-          <Switch aria-label={i18n.formatMessage(providersMessages.enableProvider, { provider_name: provider.name })} checked={provider.enabled} disabled={busy}
-            onCheckedChange={next => void quick.setProviderEnabled(provider, next)} />
-        </ItemActions>
-      </Item></div>;
+      const health = providerHealth(snapshot, provider);
+      return <div key={provider.id}>{index > 0 && <ItemSeparator />}
+        <ListRow mediaVariant="icon" media={<span className="text-sm font-medium text-muted-foreground">{provider.name.trim().charAt(0).toUpperCase() || "?"}</span>}
+          title={provider.name} selected={island.child === `provider-${provider.id}`} onOpen={origin => open(provider.id, origin)}
+          description={<>{protocolLabel(provider.protocol)} · {i18n.formatMessage(providersMessages.modelCount, { count: count })}</>}
+          actions={<>
+            <StatusBadge tone={health.tone}>{health.label}</StatusBadge>
+            <Switch aria-label={i18n.formatMessage(providersMessages.enableProvider, { provider_name: provider.name })} checked={provider.enabled} disabled={busy}
+              onCheckedChange={next => void quick.setProviderEnabled(provider, next)} />
+          </>} /></div>;
     })}</ItemGroup>}
   </Section>;
-}
-
-function Monogram({ name }: { name: string }) {
-
-  return <span aria-hidden="true" className="flex size-8 shrink-0 items-center justify-center rounded-md border bg-muted text-sm font-medium text-muted-foreground">
-    {name.trim().charAt(0).toUpperCase() || "?"}</span>;
 }
 
 /* ---------- 预设选择：自适应网格，数量增长后自动出现分组与搜索 ---------- */
@@ -159,7 +146,7 @@ function PresetPicker({ onPick }: { onPick: (preset: ProviderPreset | null) => v
   const matches = providerPresets.filter(preset => !q || [preset.name, preset.id, presetDescription(preset), ...(preset.keywords ?? [])].some(word => word.toLowerCase().includes(q)));
   const groups = presetGroups.map(group => ({ group, items: matches.filter(preset => preset.group === group) })).filter(entry => entry.items.length);
   const titled = new Set(providerPresets.map(preset => preset.group)).size > 1;
-  const tile = "flex min-h-16 flex-col items-start justify-center gap-0.5 rounded-lg border px-3 py-2 text-left outline-none transition-colors hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50";
+  const tile = "min-h-16 flex-col items-start justify-center gap-0.5 px-3 py-2 text-left hover:bg-accent";
   return <div className="flex flex-col gap-5">
     <p className="type-caption">{i18n.formatMessage(providersMessages.presetHint)}</p>
     {providerPresets.length > searchThreshold && <div className="relative">
@@ -170,10 +157,10 @@ function PresetPicker({ onPick }: { onPick: (preset: ProviderPreset | null) => v
       {titled && <h3 className="type-label mb-2">{groupLabels()[group]}</h3>}
       <div className="grid gap-2" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(9rem, 1fr))" }}>
         {items.map(preset => <div key={preset.id} className="flex flex-col gap-1">
-          <button type="button" className={`${tile} bg-card`} onClick={() => onPick(preset)}>
-            <span className="type-section truncate">{preset.name}</span>
+          <Item asChild variant="outline" className={cn(tile, "bg-card")}><button type="button" onClick={() => onPick(preset)}>
+            <span className="type-section max-w-full truncate">{preset.name}</span>
             <span className="type-caption">{presetDescription(preset)}</span>
-          </button>
+          </button></Item>
           {preset.keyUrl && <a href={preset.keyUrl} target="_blank" rel="noreferrer" className="type-caption inline-flex items-center gap-1 self-start px-1 hover:text-foreground">
             {i18n.formatMessage(providersMessages.getKey)}<ExternalLink className="size-3" aria-hidden="true" />
           </a>}
@@ -181,10 +168,10 @@ function PresetPicker({ onPick }: { onPick: (preset: ProviderPreset | null) => v
       </div>
     </section>)}
     {q && !groups.length && <p className="type-caption">{i18n.formatMessage(providersMessages.noMatchingProvider)}</p>}
-    <button type="button" className={`${tile} border-dashed`} onClick={() => onPick(null)}>
+    <Item asChild variant="outline" className={cn(tile, "border-dashed")}><button type="button" onClick={() => onPick(null)}>
       <span className="type-section">{i18n.formatMessage(providersMessages.customConnection)}</span>
       <span className="type-caption">{i18n.formatMessage(providersMessages.customConnectionHint)}</span>
-    </button>
+    </button></Item>
   </div>;
 }
 
@@ -255,8 +242,7 @@ function ProviderEditor({ initialId, initialValue = blank }: { initialId: string
         setKeyAction("keep");
       }
     }}>
-      <h3 className="type-section mb-3">{i18n.formatMessage(providersMessages.connection)}</h3>
-      <FieldGroup>
+      <EditorSection title={i18n.formatMessage(providersMessages.connection)}><FieldGroup>
         <TextField label={i18n.formatMessage(providersMessages.displayName)} value={value.name} onChange={setName} required />
         <TextField label={i18n.formatMessage(providersMessages.providerId)} value={value.id} onChange={next => { setIdEdited(true); set("id", next); }} required hint={i18n.formatMessage(providersMessages.providerIdHint)} />
         <ChoiceField label={i18n.formatMessage(providersMessages.protocol)} value={value.protocol} options={protocols} onChange={next => next && set("protocol", next as ProviderInput["protocol"])} />
@@ -269,45 +255,44 @@ function ProviderEditor({ initialId, initialValue = blank }: { initialId: string
           <Input id="provider-api-key" type="password" autoComplete="off" autoFocus={!current} value={key} disabled={keyAction === "clear"}
             onChange={event => { setKey(event.target.value); setKeyAction("replace"); }}
             placeholder={storedKey ? i18n.formatMessage(providersMessages.keepSavedKey) : i18n.formatMessage(providersMessages.pasteApiKey)} />
-          <FieldDescription className={keyAction === "clear" || (current && !storedKey && current.credentialState !== "missing") ? "text-destructive" : undefined}>
-            {keyAction === "clear" ? i18n.formatMessage(providersMessages.keyRemovalHint) : current ? credentialLabels()[current.credentialState] : i18n.formatMessage(providersMessages.keyStorageHint)}
+          <FieldDescription>
+            {keyAction === "clear" ? <StatusText tone="warning">{i18n.formatMessage(providersMessages.keyRemovalHint)}</StatusText>
+              : current && !storedKey && current.credentialState !== "missing" ? <StatusText tone="error">{credentialLabels()[current.credentialState]}</StatusText>
+              : current ? credentialLabels()[current.credentialState] : i18n.formatMessage(providersMessages.keyStorageHint)}
             {storedKey && <Button type="button" variant="link" size="sm" className="ml-1 h-auto p-0 text-xs"
               onClick={() => { setKey(""); setKeyAction(keyAction === "clear" ? "keep" : "clear"); }}>{keyAction === "clear" ? i18n.formatMessage(providersMessages.undo) : i18n.formatMessage(providersMessages.removeSavedKey)}</Button>}
           </FieldDescription>
-          {!snapshot?.credentialStorageAvailable && <p className="text-xs text-destructive">{i18n.formatMessage(providersMessages.encryptionUnavailable)}</p>}
+          {!snapshot?.credentialStorageAvailable && <Alert variant="destructive"><AlertDescription>{i18n.formatMessage(providersMessages.encryptionUnavailable)}</AlertDescription></Alert>}
         </Field>}
-      </FieldGroup>
+      </FieldGroup></EditorSection>
       <ModelCompatibilityEditor value={value.compatibility} onChange={next => set("compatibility", next)} />
     </form>
 
-    {current && snapshot && <section className="mt-8 border-t pt-5">
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <h3 className="type-section">{i18n.formatMessage(providersMessages.models)}</h3>
-        <div className="flex flex-wrap justify-end gap-2">
-          <Button size="sm" variant="outline" disabled={busy || dirty} onClick={async event => {
-            const origin = event.currentTarget;
-            const result = await run({ type: "discovery.start", providerId: current.id });
-            if (result.ok) island.open({ id: `discover-${current.id}`, label: providersMessages.fetchModels, width: islandWidth, origin,
-              render: () => <ModelDiscoveryPicker providerId={current.id} /> });
-          }}><Search />{i18n.text(providersMessages.fetchModels)}</Button>
-          <Button size="sm" variant="outline" disabled={busy} onClick={event => openModel(null, event.currentTarget)}><Plus />{i18n.formatMessage(providersMessages.addModel)}</Button>
-        </div>
-      </div>
-      {dirty && <p className="type-caption mb-3">{i18n.text(providersMessages.saveBeforeDiscovery)}</p>}
+    {current && snapshot && <EditorSection title={i18n.formatMessage(providersMessages.models)}
+      hint={dirty ? i18n.text(providersMessages.saveBeforeDiscovery) : undefined}
+      action={<>
+        <Button size="sm" variant="outline" disabled={busy || dirty} onClick={async event => {
+          const origin = event.currentTarget;
+          const result = await run({ type: "discovery.start", providerId: current.id });
+          if (result.ok) island.open({ id: `discover-${current.id}`, label: providersMessages.fetchModels, width: islandWidth, origin,
+            render: () => <ModelDiscoveryPicker providerId={current.id} /> });
+        }}><Search />{i18n.text(providersMessages.fetchModels)}</Button>
+        <Button size="sm" variant="outline" disabled={busy} onClick={event => openModel(null, event.currentTarget)}><Plus />{i18n.formatMessage(providersMessages.addModel)}</Button>
+      </>}>
       {models.length ? <ItemGroup className="surface">{models.map((model, index) => <div key={modelReference(model)}>{index > 0 && <ItemSeparator />}
         <ModelRow model={model} provider={current} selected={island.child === `model-${modelReference(model)}`} onOpen={origin => openModel(modelReference(model), origin)} />
       </div>)}</ItemGroup>
-        : <p className="type-caption rounded-md border border-dashed px-3 py-4 text-center">{i18n.formatMessage(providersMessages.emptyModels)}</p>}
-    </section>}
+        : <Empty className="border md:p-6"><EmptyHeader><EmptyDescription>{i18n.formatMessage(providersMessages.emptyModels)}</EmptyDescription></EmptyHeader></Empty>}
+    </EditorSection>}
   </Editor>;
 }
 
 function TestResult({ test, stale }: { test: ConnectionTest; stale: boolean }) {
   const i18n = useI18n();
-  if (test.state === "running") return <span className="type-caption inline-flex items-center gap-1"><Spinner className="size-3" />{i18n.formatMessage(providersMessages.testing)}</span>;
-  if (stale) return <span className="type-caption">{i18n.formatMessage(providersMessages.settingsChanged)}</span>;
-  if (test.state === "succeeded") return <span className="type-caption">{i18n.formatMessage(providersMessages.testConnected)}{test.durationMs !== null && ` · ${test.durationMs} ms`}</span>;
-  return <span className="type-caption text-destructive">{test.error ? testHints()[test.error] : test.message}</span>;
+  if (test.state === "running") return <StatusText tone="progress">{i18n.formatMessage(providersMessages.testing)}</StatusText>;
+  if (stale) return <StatusText tone="warning">{i18n.formatMessage(providersMessages.settingsChanged)}</StatusText>;
+  if (test.state === "succeeded") return <StatusText tone="success">{i18n.formatMessage(providersMessages.testConnected)}{test.durationMs !== null && ` · ${test.durationMs} ms`}</StatusText>;
+  return <StatusText tone="error">{test.error ? testHints()[test.error] : test.message}</StatusText>;
 }
 
 function ModelRow({ model, provider, selected, onOpen }: { model: ProviderModel; provider: Provider; selected: boolean; onOpen: (origin: HTMLElement) => void }) {
@@ -317,21 +302,16 @@ function ModelRow({ model, provider, selected, onOpen }: { model: ProviderModel;
   const test = snapshot ? latestTest(snapshot, modelReference(model)) : undefined;
   const stale = !!test && (test.modelRevision !== model.revision || test.providerRevision !== provider.revision);
   const running = test?.state === "running";
-  return <Item size="sm" className={cn("relative transition-colors hover:bg-accent/60 has-[button:focus-visible]:bg-accent/60", selected && "bg-accent hover:bg-accent")}>
-    <ItemContent className="min-w-0">
-      <button type="button" disabled={busy} className="text-left outline-none after:absolute after:inset-0 focus-visible:underline" aria-current={selected || undefined}
-        onClick={event => onOpen(event.currentTarget)}><ItemTitle>{model.name}</ItemTitle></button>
-      <ItemDescription className="truncate"><span className="font-mono">{model.modelId}</span>{test && <> · <TestResult test={test} stale={stale} /></>}</ItemDescription>
-    </ItemContent>
-    <ItemActions className="relative">
+  return <ListRow title={model.name} selected={selected} disabled={busy} onOpen={onOpen}
+    description={<><span className="font-mono">{model.modelId}</span>{test && <> · <TestResult test={test} stale={stale} /></>}</>}
+    actions={<>
       <Button size="sm" variant="ghost" disabled={busy || (!running && (!model.enabled || !provider.enabled))} onClick={() => void quick.test(model)}>
         {running ? i18n.formatMessage(providersMessages.cancelTestRequest) : i18n.formatMessage(providersMessages.test)}</Button>
       <Switch aria-label={i18n.formatMessage(providersMessages.enableModel, { model_name: model.name })} checked={model.enabled} disabled={busy} onCheckedChange={next => void quick.setModelEnabled(model, next)} />
-    </ItemActions>
-  </Item>;
+    </>} />;
 }
 
-/* ---------- 模型详情：常用字段在前，参数收进高级 ---------- */
+/* ---------- 模型详情：基本信息、参数、兼容设置与连接测试分区，参数获取位于参数区块 ---------- */
 
 function ModelEditor({ initialId, providerId }: { initialId: string | null; providerId: string }) {
   const i18n = useI18n();
@@ -342,7 +322,6 @@ function ModelEditor({ initialId, providerId }: { initialId: string | null; prov
   const current = snapshot?.models.find(model => modelReference(model) === id);
   const provider = snapshot?.providers.find(item => item.id === providerId);
   const [value, setValue] = useState<ModelValue>(() => current ? modelValue(current) : createModelInput(providerId, { name: "", modelId: "" }));
-  const [advanced, setAdvanced] = useState(false);
   const set = <K extends keyof ModelValue>(field: K, next: ModelValue[K]) => setValue(previous => ({ ...previous, [field]: next }));
   // 与提供商一致：名称在前并生成 ID；手动改过 ID 或编辑已有模型时不再覆盖。
   const [idEdited, setIdEdited] = useState(!!current);
@@ -371,77 +350,67 @@ function ModelEditor({ initialId, providerId }: { initialId: string | null; prov
     }}><fieldset disabled={parameters.pending} className="contents"><FieldGroup>
       <TextField label={i18n.formatMessage(providersMessages.modelDisplayName)} value={value.name} onChange={setName} required />
       <TextField label={i18n.formatMessage(providersMessages.serverModelId)} value={value.modelId} onChange={next => { setIdEdited(true); set("modelId", next); }} required hint={i18n.formatMessage(providersMessages.serverModelIdHint)} />
-      <FieldSet><FieldLegend variant="label">{i18n.formatMessage(providersMessages.capabilities)}</FieldLegend>
-        <div className="surface">
-          <FieldGroup className="gap-4 p-4">
-            <Field orientation="horizontal">
-              <FieldContent><FieldLabel htmlFor="capability-reasoning">{i18n.formatMessage(providersMessages.reasoning)}</FieldLabel></FieldContent>
-              <Switch id="capability-reasoning" checked={value.capabilities.reasoning}
-                onCheckedChange={reasoning => set("capabilities", { ...value.capabilities, reasoning })} />
-            </Field>
-            {value.capabilities.reasoning && <FieldSet className="gap-3" aria-describedby="thinking-levels-description">
-              <FieldLegend variant="label">{i18n.formatMessage(providersMessages.availableThinkingLevels)}</FieldLegend>
-              <FieldDescription id="thinking-levels-description">{i18n.formatMessage(providersMessages.thinkingLevelsHint)}</FieldDescription>
-              <FieldGroup className="grid grid-cols-3 gap-x-4 gap-y-3">
-                {thinkingSchema.options.map(level => <Field key={level} orientation="horizontal">
-                  <Checkbox id={`thinking-${level}`} checked={value.capabilities.thinkingLevels.includes(level)}
-                    onCheckedChange={checked => set("capabilities", { ...value.capabilities,
-                      thinkingLevels: thinkingSchema.options.filter(item => item === level ? checked === true : value.capabilities.thinkingLevels.includes(item)) })} />
-                  <FieldLabel htmlFor={`thinking-${level}`}>{i18n.text(thinkingLabels[level])}</FieldLabel>
-                </Field>)}
-              </FieldGroup>
-              {value.capabilities.thinkingLevels.length === 0 && <FieldDescription role="status">
-                {i18n.formatMessage(providersMessages.noThinkingLevels)}
-              </FieldDescription>}
-            </FieldSet>}
-          </FieldGroup>
-          <Separator />
-          <FieldGroup className="p-4">
-            <Field orientation="horizontal">
-              <FieldContent><FieldLabel htmlFor="capability-tools">{i18n.formatMessage(providersMessages.toolCalls)}</FieldLabel></FieldContent>
-              <Switch id="capability-tools" checked={value.capabilities.tools}
-                onCheckedChange={tools => set("capabilities", { ...value.capabilities, tools })} />
-            </Field>
-          </FieldGroup>
-        </div>
-      </FieldSet>
       {current && <Field><FieldLabel>{i18n.formatMessage(providersMessages.usedBy)}</FieldLabel>
         {users.length ? <ul className="flex flex-wrap gap-1.5" aria-label={i18n.formatMessage(providersMessages.rolesUsingModel)}>
           {users.map(role => <li key={role.id}><Badge variant="secondary">{role.name}</Badge></li>)}
         </ul> : <FieldDescription>{i18n.formatMessage(providersMessages.noRolesUsingModel)}</FieldDescription>}
       </Field>}
     </FieldGroup>
-      <Button type="button" variant="ghost" size="sm" className="-ml-2 mt-5" aria-expanded={advanced} onClick={() => setAdvanced(open => !open)}>
-        <ChevronDown className={advanced ? "rotate-180 transition-transform" : "transition-transform"} />{i18n.formatMessage(providersMessages.advanced)}</Button>
-      {advanced && <FieldGroup className="mt-3">
-        <NumberField label={i18n.formatMessage(providersMessages.contextWindow)} value={value.contextWindow} onChange={next => set("contextWindow", next)} min={1} integer />
-        <NumberField label={i18n.formatMessage(providersMessages.temperature)} value={value.generation.temperature} onChange={next => set("generation", { ...value.generation, temperature: next })} max={2} />
-        <NumberField label="Top P" value={value.generation.topP} onChange={next => set("generation", { ...value.generation, topP: next })} max={1} />
-        <NumberField label={i18n.formatMessage(providersMessages.maximumOutputTokens)} value={value.generation.maxOutputTokens} onChange={next => set("generation", { ...value.generation, maxOutputTokens: next })} min={1} integer />
-      </FieldGroup>}
+      <EditorSection collapsible title={i18n.formatMessage(providersMessages.parameters)} action={parameters.action}
+        hint={<>{i18n.text(modelCatalogMessages.hint)}{dirty && <> {i18n.text(modelCatalogMessages.saveFirst)}</>}</>}
+        status={parameters.feedback}>
+        <FieldSet><FieldLegend variant="label">{i18n.formatMessage(providersMessages.capabilities)}</FieldLegend>
+          <div className="surface">
+            <FieldGroup className="gap-4 p-4">
+              <Field orientation="horizontal">
+                <FieldContent><FieldLabel htmlFor="capability-reasoning">{i18n.formatMessage(providersMessages.reasoning)}</FieldLabel></FieldContent>
+                <Switch id="capability-reasoning" checked={value.capabilities.reasoning}
+                  onCheckedChange={reasoning => set("capabilities", { ...value.capabilities, reasoning })} />
+              </Field>
+              {value.capabilities.reasoning && <FieldSet className="gap-3" aria-describedby="thinking-levels-description">
+                <FieldLegend variant="label">{i18n.formatMessage(providersMessages.availableThinkingLevels)}</FieldLegend>
+                <FieldDescription id="thinking-levels-description">{i18n.formatMessage(providersMessages.thinkingLevelsHint)}</FieldDescription>
+                <FieldGroup className="grid grid-cols-3 gap-x-4 gap-y-3">
+                  {thinkingSchema.options.map(level => <Field key={level} orientation="horizontal">
+                    <Checkbox id={`thinking-${level}`} checked={value.capabilities.thinkingLevels.includes(level)}
+                      onCheckedChange={checked => set("capabilities", { ...value.capabilities,
+                        thinkingLevels: thinkingSchema.options.filter(item => item === level ? checked === true : value.capabilities.thinkingLevels.includes(item)) })} />
+                    <FieldLabel htmlFor={`thinking-${level}`}>{i18n.text(thinkingLabels[level])}</FieldLabel>
+                  </Field>)}
+                </FieldGroup>
+                {value.capabilities.thinkingLevels.length === 0 && <FieldDescription role="status">
+                  {i18n.formatMessage(providersMessages.noThinkingLevels)}
+                </FieldDescription>}
+              </FieldSet>}
+            </FieldGroup>
+            <Separator />
+            <FieldGroup className="p-4">
+              <Field orientation="horizontal">
+                <FieldContent><FieldLabel htmlFor="capability-tools">{i18n.formatMessage(providersMessages.toolCalls)}</FieldLabel></FieldContent>
+                <Switch id="capability-tools" checked={value.capabilities.tools}
+                  onCheckedChange={tools => set("capabilities", { ...value.capabilities, tools })} />
+              </Field>
+            </FieldGroup>
+          </div>
+        </FieldSet>
+        <FieldGroup>
+          <NumberField label={i18n.formatMessage(providersMessages.contextWindow)} value={value.contextWindow} onChange={next => set("contextWindow", next)} min={1} integer />
+          <NumberField label={i18n.formatMessage(providersMessages.temperature)} value={value.generation.temperature} onChange={next => set("generation", { ...value.generation, temperature: next })} max={2} />
+          <NumberField label="Top P" value={value.generation.topP} onChange={next => set("generation", { ...value.generation, topP: next })} max={1} />
+          <NumberField label={i18n.formatMessage(providersMessages.maximumOutputTokens)} value={value.generation.maxOutputTokens} onChange={next => set("generation", { ...value.generation, maxOutputTokens: next })} min={1} integer />
+        </FieldGroup>
+      </EditorSection>
       <ModelCompatibilityEditor value={value.compatibility} inherited={provider?.compatibility ?? []} onChange={next => set("compatibility", next)} />
       </fieldset>
     </form>
-    <section className="mt-5 flex flex-col gap-3">
-      <div className="flex items-center justify-between gap-3">
-        <p className="type-caption">{i18n.text(modelCatalogMessages.hint)}</p>
-        {parameters.action}
-      </div>
-      {dirty && <p className="type-caption">{i18n.text(modelCatalogMessages.saveFirst)}</p>}
-      {parameters.feedback}
-    </section>
-    {current && <section className="mt-7 border-t pt-5">
-      <div className="flex items-center justify-between gap-2">
-        <h3 className="type-section">{i18n.formatMessage(providersMessages.connectionTest)}</h3>
-        <Button size="sm" variant="secondary" disabled={busy || (test?.state !== "running" && (!current.enabled || !provider?.enabled))} onClick={() => void quick.test(current)}>
-          {test?.state === "running" ? i18n.formatMessage(providersMessages.cancelTest) : i18n.formatMessage(providersMessages.testConnection)}</Button>
-      </div>
-      <p className="type-caption mt-1">{i18n.formatMessage(providersMessages.testHint)}</p>
-      {test && <div role="status" className="mt-3 rounded-md border px-3 py-2">
+    {current && <EditorSection title={i18n.formatMessage(providersMessages.connectionTest)}
+      hint={<>{i18n.formatMessage(providersMessages.testHint)}{dirty && <> {i18n.formatMessage(providersMessages.saveBeforeTest)}</>}</>}
+      action={<Button size="sm" variant="outline" disabled={busy || (test?.state !== "running" && (!current.enabled || !provider?.enabled))} onClick={() => void quick.test(current)}>
+        {test?.state === "running" ? <><Spinner data-icon="inline-start" />{i18n.formatMessage(providersMessages.cancelTest)}</> : <><PlugZap data-icon="inline-start" />{i18n.formatMessage(providersMessages.testConnection)}</>}</Button>}>
+      {test && <div role="status" className="flex flex-col gap-1">
         <TestResult test={test} stale={stale} />
-        {test.state === "failed" && test.message && !stale && <p className="type-caption mt-1 break-words">{test.message}</p>}
+        {test.state === "failed" && test.message && !stale && <p className="type-caption break-words">{test.message}</p>}
       </div>}
-      {dirty && <p className="type-caption mt-2">{i18n.formatMessage(providersMessages.saveBeforeTest)}</p>}
-    </section>}
+    </EditorSection>}
   </Editor>;
 }

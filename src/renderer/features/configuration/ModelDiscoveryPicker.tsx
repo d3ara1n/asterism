@@ -9,6 +9,8 @@ import { Checkbox } from "../../shared/ui/checkbox";
 import { Field, FieldLabel } from "../../shared/ui/field";
 import { Input } from "../../shared/ui/input";
 import { Spinner } from "../../shared/ui/spinner";
+import { Alert, AlertDescription } from "../../shared/ui/alert";
+import { toast } from "../../shared/toast";
 import { IslandPanel } from "../../shared/weave/IslandPanel";
 import { ConfigurationStatus } from "./forms";
 import { useSettingsConfiguration } from "./state";
@@ -32,7 +34,6 @@ function DiscoveryContent({ provider, discovery }: { provider: Provider | undefi
   const { snapshot, run, busy } = useSettingsConfiguration();
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
-  const [addedCount, setAddedCount] = useState<number | null>(null);
   const running = discovery?.state === "running";
   const existing = new Set(snapshot?.models.filter(model => model.providerId === provider?.id).map(model => model.modelId));
   const selectedIds = [...selected].filter(id => !existing.has(id));
@@ -41,13 +42,13 @@ function DiscoveryContent({ provider, discovery }: { provider: Provider | undefi
   const add = async () => {
     if (!discovery || discovery.state !== "succeeded") return;
     const result = await run({ type: "discovery.add", id: discovery.id, modelIds: selectedIds });
-    if (result.ok) { setSelected(new Set()); setAddedCount(selectedIds.length); }
+    if (result.ok) { setSelected(new Set()); toast.success(i18n.formatMessage(messages.modelsAdded, { count: selectedIds.length })); }
   };
   return <IslandPanel title={i18n.text(messages.fetchModels)} description={provider?.name}
     action={<>
       <Button size="sm" variant="outline" disabled={busy || !provider}
         onClick={() => { if (provider) void run(running ? { type: "discovery.cancel", id: discovery.id } : { type: "discovery.start", providerId: provider.id }); }}>
-        {running ? i18n.text(messages.cancelTestRequest) : <><RefreshCw />{i18n.text(messages.refreshModels)}</>}
+        {running ? <><Spinner data-icon="inline-start" />{i18n.text(messages.cancelTestRequest)}</> : <><RefreshCw data-icon="inline-start" />{i18n.text(messages.refreshModels)}</>}
       </Button>
       {discovery?.state === "succeeded" && <Button size="sm" disabled={busy || !selectedIds.length} onClick={() => void add()}>
         <Download />{i18n.formatMessage(messages.addSelectedModels, { count: selectedIds.length })}
@@ -55,8 +56,8 @@ function DiscoveryContent({ provider, discovery }: { provider: Provider | undefi
     </>}>
     <ConfigurationStatus />
     <p className="type-caption mb-4">{i18n.text(messages.discoveryHint)}</p>
-    {running && <p role="status" className="type-caption flex items-center gap-2"><Spinner />{i18n.text(messages.fetchingModels)}</p>}
-    {discovery?.error && <p role="alert" className="type-caption text-destructive">{i18n.text(errors[discovery.error])}</p>}
+    {running && <p role="status" className="type-caption flex items-center gap-2"><Spinner aria-hidden="true" />{i18n.text(messages.fetchingModels)}</p>}
+    {discovery?.error && <Alert variant="destructive"><AlertDescription>{i18n.text(errors[discovery.error])}</AlertDescription></Alert>}
     {!discovery && <p role="status" className="type-caption">{i18n.text(messages.discoveryChanged)}</p>}
     {discovery?.state === "succeeded" && <div className="flex flex-col gap-4">
       <p className="type-caption">{i18n.text(messages.discoveryDefaults)}</p>
@@ -88,7 +89,6 @@ function DiscoveryContent({ provider, discovery }: { provider: Provider | undefi
         })}
         {!matches.length && <p className="type-caption">{i18n.text(discovery.models.length ? messages.noMatchingModel : messages.discoveryEmpty)}</p>}
       </div>
-      {addedCount !== null && <p role="status" className="type-caption">{i18n.formatMessage(messages.modelsAdded, { count: addedCount })}</p>}
     </div>}
   </IslandPanel>;
 }

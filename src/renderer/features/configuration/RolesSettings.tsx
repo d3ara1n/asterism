@@ -8,7 +8,8 @@ import { getI18n, useI18n } from "../../shared/i18n";
 import { Badge } from "../../shared/ui/badge";
 import { Button } from "../../shared/ui/button";
 import { FieldGroup, Field, FieldLabel, FieldDescription } from "../../shared/ui/field";
-import { ItemGroup, ItemSeparator, Item, ItemContent, ItemTitle, ItemDescription, ItemActions } from "../../shared/ui/item";
+import { ItemGroup, ItemSeparator } from "../../shared/ui/item";
+import { ListRow } from "../../shared/ui/list-row";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem, SelectGroup, SelectSeparator, SelectLabel } from "../../shared/ui/select";
 import { Switch } from "../../shared/ui/switch";
 import { cn } from "../../shared/utils";
@@ -29,7 +30,7 @@ function ModelSelect({ value, onChange, disabled }: { value: string | null; onCh
   if (!snapshot) return null;
   const missing = value !== null && !snapshot.models.some(model => modelReference(model) === value);
   return <Select value={value ?? FOLLOW} disabled={disabled} onValueChange={next => onChange(next === FOLLOW ? null : next)}>
-    <SelectTrigger size="sm" className={cn("w-48", missing && "text-destructive")} aria-label={i18n.formatMessage(rolesMessages.model)}><SelectValue /></SelectTrigger>
+    <SelectTrigger size="sm" className="w-48" aria-invalid={missing || undefined} aria-label={i18n.formatMessage(rolesMessages.model)}><SelectValue /></SelectTrigger>
     <SelectContent>
       <SelectItem value={FOLLOW}>{i18n.formatMessage(rolesMessages.followConversation)}</SelectItem>
       {missing && <SelectItem value={value} disabled>{i18n.formatMessage(rolesMessages.unavailableModel)}</SelectItem>}
@@ -83,20 +84,16 @@ export function RolesSettings() {
   return <Section title={i18n.formatMessage(rolesMessages.modelRoles)} hint={i18n.formatMessage(rolesMessages.summary)}
     action={<Button size="sm" disabled={!snapshot} onClick={event => open(null, event.currentTarget)}><Plus />{i18n.formatMessage(rolesMessages.addRole)}</Button>}>
     {snapshot && <ItemGroup className="surface">{roles.map((role, index) => {
-      const selected = island.child === `role-${role.id}`;
-      return <div key={role.id}>{index > 0 && <ItemSeparator />}<Item size="sm" className={cn("relative flex-wrap transition-colors hover:bg-accent/60 has-[button:focus-visible]:bg-accent/60", selected && "bg-accent hover:bg-accent", !role.enabled && "opacity-70")}>
-        <ItemContent className="min-w-40">
-          <button type="button" className="text-left outline-none after:absolute after:inset-0 focus-visible:underline" aria-current={selected || undefined}
-            onClick={event => open(role.id, event.currentTarget)}><ItemTitle>{role.name}{role.hidden && <Badge variant="secondary">{i18n.formatMessage(rolesMessages.internal)}</Badge>}</ItemTitle></button>
-          <ItemDescription className="truncate">{role.description}</ItemDescription>
-        </ItemContent>
-        <ItemActions className="relative">
-          <ModelSelect value={role.model} disabled={busy} onChange={next => patch(role, "model", next)} />
-          <ThinkingSelect value={role.thinking} model={snapshot.models.find(model => modelReference(model) === role.model) ?? null}
-            disabled={busy} onChange={next => patch(role, "thinking", next)} />
-          <Switch aria-label={i18n.formatMessage(rolesMessages.enableRole, { role_name: role.name })} checked={role.enabled} disabled={busy} onCheckedChange={next => patch(role, "enabled", next)} />
-        </ItemActions>
-      </Item></div>;
+      return <div key={role.id}>{index > 0 && <ItemSeparator />}
+        <ListRow className="flex-wrap" contentClassName="min-w-40" selected={island.child === `role-${role.id}`} inactive={!role.enabled} onOpen={origin => open(role.id, origin)}
+          title={<>{role.name}{role.hidden && <Badge variant="secondary">{i18n.formatMessage(rolesMessages.internal)}</Badge>}</>}
+          description={role.description}
+          actions={<>
+            <ModelSelect value={role.model} disabled={busy} onChange={next => patch(role, "model", next)} />
+            <ThinkingSelect value={role.thinking} model={snapshot.models.find(model => modelReference(model) === role.model) ?? null}
+              disabled={busy} onChange={next => patch(role, "thinking", next)} />
+            <Switch aria-label={i18n.formatMessage(rolesMessages.enableRole, { role_name: role.name })} checked={role.enabled} disabled={busy} onCheckedChange={next => patch(role, "enabled", next)} />
+          </>} /></div>;
     })}</ItemGroup>}
   </Section>;
 }

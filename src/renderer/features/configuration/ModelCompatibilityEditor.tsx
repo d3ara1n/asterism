@@ -9,6 +9,7 @@ import { Badge } from "../../shared/ui/badge";
 import { Button } from "../../shared/ui/button";
 import { Card } from "../../shared/ui/card";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "../../shared/ui/dropdown-menu";
+import { EditorSection } from "./forms";
 import { modelProtocolLabels } from "./protocols";
 
 const forms = new Map(modelCompatibilityDefinitions.filter(definition => definition.kind === "options")
@@ -22,19 +23,15 @@ function Applicability({ definition }: { definition: ModelCompatibilityDefinitio
   </span>;
 }
 
-/** 只修改当前层的显式列表；提供商条目只读，模型可复制参数条目并整项覆盖。 */
+/** 只修改当前层的显式列表；提供商条目只读，模型可复制参数条目并整项覆盖。区块可折叠，已有条目时默认展开。 */
 export function ModelCompatibilityEditor({ value, inherited, onChange }: {
   value: ModelCompatibility[]; inherited?: ModelCompatibility[]; onChange(value: ModelCompatibility[]): void;
 }) {
   const i18n = useI18n();
   const entries = mergeModelCompatibility(inherited ?? [], value);
   const available = modelCompatibilityDefinitions.filter(definition => !entries.some(entry => entry.id === definition.id));
-  return <div className="mt-5 space-y-5">
-    <div className="space-y-1">
-      <h3 className="type-section">{i18n.formatMessage(providersMessages.compatibility)}</h3>
-      <p className="type-caption">{i18n.formatMessage(inherited === undefined
-        ? providersMessages.providerCompatibilityHint : providersMessages.modelCompatibilityHint)}</p>
-    </div>
+  return <EditorSection collapsible defaultOpen={entries.length > 0} title={i18n.formatMessage(providersMessages.compatibility)}
+    hint={i18n.formatMessage(inherited === undefined ? providersMessages.providerCompatibilityHint : providersMessages.modelCompatibilityHint)}>
     {entries.map(entry => {
       const definition = modelCompatibilityDefinition(entry.id)!;
       const metadata = definition.schema.meta();
@@ -64,7 +61,7 @@ export function ModelCompatibilityEditor({ value, inherited, onChange }: {
       </Card>;
     })}
     <DropdownMenu>
-      <DropdownMenuTrigger asChild><Button type="button" variant="ghost" size="sm" className="-ml-2" disabled={!available.length}>
+      <DropdownMenuTrigger asChild><Button type="button" variant="outline" size="sm" className="w-fit" disabled={!available.length}>
         <Plus />{i18n.formatMessage(providersMessages.addCompatibility)}
       </Button></DropdownMenuTrigger>
       <DropdownMenuContent align="start">
@@ -80,5 +77,5 @@ export function ModelCompatibilityEditor({ value, inherited, onChange }: {
         })}
       </DropdownMenuContent>
     </DropdownMenu>
-  </div>;
+  </EditorSection>;
 }

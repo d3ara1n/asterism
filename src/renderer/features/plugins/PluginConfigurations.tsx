@@ -56,7 +56,7 @@ function ConfigurationForm({ settings, execute, onSaved }: {
           <Button type="button" size="sm" variant="outline" className="mr-auto" onClick={() => {
             setDraft(structuredClone(settings.defaults)); setReset(true); setError(null); setVersion(value => value + 1);
           }}>{i18n.formatMessage(pluginConfigurationMessages.restoreDefaults)}</Button>
-          <Button type="button" size="sm" variant="ghost" disabled={!dirty && !error} onClick={() => {
+          <Button type="button" size="sm" variant="outline" disabled={!dirty && !error} onClick={() => {
             setDraft(structuredClone(settings.value)); setBaseline(settings); setReset(false); setEdited(false); setError(null); setVersion(value => value + 1);
           }}>{i18n.formatMessage(pluginConfigurationMessages.discardChanges)}</Button>
           <Button type="submit" size="sm" disabled={!dirty || draft === undefined}>{busy && <Spinner data-icon="inline-start" />}{i18n.formatMessage(pluginConfigurationMessages.save)}</Button>

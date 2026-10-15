@@ -28,7 +28,7 @@ function ErrorScreen({ details }: { details: string }) {
         {import.meta.env.DEV && <pre className="mt-4 max-h-[50vh] select-text overflow-auto rounded-md border bg-muted p-3 text-xs whitespace-pre-wrap">{details}</pre>}
         <div className="mt-6 flex gap-2">
           <Button onClick={() => window.location.reload()}>{i18n.formatMessage(commonMessages.reload)}</Button>
-          {import.meta.env.DEV && <Button variant="secondary" onClick={() => { void navigator.clipboard.writeText(details); }}>Copy details</Button>}
+          {import.meta.env.DEV && <Button variant="outline" onClick={() => { void navigator.clipboard.writeText(details); }}>Copy details</Button>}
         </div></div>
     </main>;
 }

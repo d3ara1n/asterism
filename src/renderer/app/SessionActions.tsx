@@ -21,7 +21,7 @@ export function SessionActions({ title, disabled, renameDisabled, onRename }: {
       <DropdownMenuTrigger asChild>
         <Button ref={trigger} variant="ghost" size="icon-xs" disabled={disabled}
           className="absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover/session:opacity-100 group-focus-within/session:opacity-100 data-[state=open]:opacity-100"
-          aria-label={i18n.formatMessage(appMessages.conversationActions, { title })} title={i18n.text(appMessages.moreActions)}>
+          aria-label={i18n.formatMessage(appMessages.conversationActions, { title })}>
           <MoreHorizontal />
         </Button>
       </DropdownMenuTrigger>

@@ -1,4 +1,4 @@
-import { RotateCcw, Trash2 } from "lucide-react";
+import { ChevronDown, RotateCcw, Trash2 } from "lucide-react";
 import { useId, useState, type ReactNode } from "react";
 
 import { formsMessages } from "../../messages/forms";
@@ -6,10 +6,14 @@ import { useI18n } from "../../shared/i18n";
 import { Alert, AlertDescription } from "../../shared/ui/alert";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "../../shared/ui/alert-dialog";
 import { Button } from "../../shared/ui/button";
+import { IconButton } from "../../shared/ui/icon-button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../../shared/ui/collapsible";
 import { Field, FieldLabel, FieldDescription } from "../../shared/ui/field";
 import { Input } from "../../shared/ui/input";
 import { InputGroup, InputGroupInput, InputGroupAddon, InputGroupButton } from "../../shared/ui/input-group";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "../../shared/ui/select";
+import { Separator } from "../../shared/ui/separator";
+import { Spinner } from "../../shared/ui/spinner";
 import { Switch } from "../../shared/ui/switch";
 import { Textarea } from "../../shared/ui/textarea";
 import { IslandPanel } from "../../shared/weave/IslandPanel";
@@ -77,7 +81,6 @@ export function OverrideChoiceField({ value, inherited, onChange, ...props }: {
 export function OverrideToggleField({ value, inherited, onChange, label, hint }: {
   label: string; value: boolean | undefined; inherited: boolean; onChange: (value: boolean | undefined) => void; hint?: string;
 }) {
-  const i18n = useI18n();
   const id = useId();
   const effective = value ?? inherited;
   const modified = value !== undefined && value !== inherited;
@@ -85,7 +88,7 @@ export function OverrideToggleField({ value, inherited, onChange, label, hint }:
     <div className="flex min-w-0 flex-1 flex-col gap-1">
       <FieldLabel htmlFor={id}>{label}</FieldLabel>
       {hint && <FieldDescription>{hint}</FieldDescription>}
-      {modified && <span className="type-caption">{i18n.formatMessage(formsMessages.modified)} · <button type="button" className="underline-offset-2 hover:underline" onClick={() => onChange(undefined)}>{i18n.formatMessage(formsMessages.restore)}</button></span>}
+      {modified && <ModifiedNote onRestore={() => onChange(undefined)} />}
     </div>
     <Switch id={id} checked={effective} onCheckedChange={next => onChange(next === inherited ? undefined : next)} />
   </Field>;
@@ -129,8 +132,8 @@ export function Editor({ title, description, form, dirty, remove, restore, child
   const answer = (discard: boolean) => { asking?.(discard); setAsking(null); };
   return <IslandPanel title={title} description={description}
     action={<>
-      {restore && <Button type="button" variant="ghost" size="icon-sm" aria-label={i18n.formatMessage(formsMessages.restoreAll)} title={i18n.formatMessage(formsMessages.restoreAllLabel)} disabled={busy} onClick={restore}><RotateCcw /></Button>}
-      {remove && <Button type="button" variant="ghost" size="icon-sm" className="text-destructive" aria-label={i18n.formatMessage(formsMessages.deleteLabel)} title={i18n.formatMessage(formsMessages.deleteButton)} disabled={busy} onClick={() => setRemoving(true)}><Trash2 /></Button>}
+      {restore && <IconButton type="button" label={i18n.formatMessage(formsMessages.restoreAll)} tooltip={i18n.formatMessage(formsMessages.restoreAllLabel)} disabled={busy} onClick={restore}><RotateCcw /></IconButton>}
+      {remove && <IconButton type="button" className="text-destructive" label={i18n.formatMessage(formsMessages.deleteLabel)} tooltip={i18n.formatMessage(formsMessages.deleteButton)} disabled={busy} onClick={() => setRemoving(true)}><Trash2 /></IconButton>}
       <Button type="submit" form={form} size="sm" disabled={busy || dirty === false}>{busy ? i18n.formatMessage(formsMessages.saving) : i18n.formatMessage(formsMessages.save)}</Button>
     </>}>
     <ConfigurationStatus />{children}
@@ -175,5 +178,34 @@ export function ConfigurationStatus() {
   const i18n = useI18n();
   const { snapshot, error, load } = useSettingsConfiguration();
   if (error) return <Alert variant="destructive" className="mb-4"><AlertDescription>{i18n.text(error)}<Button variant="outline" size="sm" className="mt-2" onClick={() => void load()}>{i18n.formatMessage(formsMessages.reload)}</Button></AlertDescription></Alert>;
-  return !snapshot ? <p role="status" className="type-caption py-4">{i18n.formatMessage(formsMessages.loading)}</p> : null;
+  return !snapshot ? <p role="status" className="type-caption flex items-center gap-2 py-4"><Spinner aria-hidden="true" />{i18n.formatMessage(formsMessages.loading)}</p> : null;
+}
+/** 字段偏离内置或继承值时的“已修改 · 恢复”。 */
+export function ModifiedNote({ onRestore }: { onRestore: () => void }) {
+  const i18n = useI18n();
+  return <span className="type-caption">{i18n.formatMessage(formsMessages.modified)} · <Button type="button" variant="link" size="sm" className="h-auto p-0 text-xs" onClick={onRestore}>{i18n.formatMessage(formsMessages.restore)}</Button></span>;
+}
+/**
+ * 编辑器区块：标题、说明与右侧操作，区块之间以分隔线隔开，首个区块不带分隔线。
+ * collapsible 时标题即展开开关；说明、操作与操作结果（status）在折叠时仍可见，只有正文随折叠收起。
+ */
+export function EditorSection({ title, hint, action, status, collapsible = false, defaultOpen = true, children }: {
+  title: string; hint?: ReactNode; action?: ReactNode; status?: ReactNode; collapsible?: boolean; defaultOpen?: boolean; children: ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  const heading = collapsible
+    ? <h3><CollapsibleTrigger asChild><Button type="button" variant="ghost" size="sm" className="-ml-2">
+      <ChevronDown className={open ? "transition-transform" : "-rotate-90 transition-transform"} /><span className="type-section">{title}</span>
+    </Button></CollapsibleTrigger></h3>
+    : <h3 className="type-section">{title}</h3>;
+  const body = <>
+    <div className="flex min-h-8 items-center justify-between gap-3">{heading}{action && <div className="flex flex-wrap justify-end gap-2">{action}</div>}</div>
+    {hint && <div className="type-caption -mt-2">{hint}</div>}
+    {status}
+    {collapsible ? <CollapsibleContent className="flex flex-col gap-3">{children}</CollapsibleContent> : children}
+  </>;
+  return <section className="group/editor-section mt-6 flex flex-col gap-3 first:mt-0">
+    <Separator className="mb-2 group-first/editor-section:hidden" />
+    {collapsible ? <Collapsible open={open} onOpenChange={setOpen} className="contents">{body}</Collapsible> : body}
+  </section>;
 }

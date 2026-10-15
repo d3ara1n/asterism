@@ -33,14 +33,6 @@ export const agentsMessages = pluginNamespace("atelier.host").messages("en", def
     id: "features_configuration_AgentsSettings_8",
     defaultMessage: "Enable {agent_name}",
   },
-  roleModified: {
-    id: "features_configuration_AgentsSettings_9",
-    defaultMessage: "Modified",
-  },
-  restoreRole: {
-    id: "features_configuration_AgentsSettings_10",
-    defaultMessage: "Restore",
-  },
   none: {
     id: "features_configuration_AgentsSettings_11",
     defaultMessage: "None",
@@ -153,14 +145,6 @@ export const agentsMessages = pluginNamespace("atelier.host").messages("en", def
     id: "features_configuration_AgentsSettings_38",
     defaultMessage: "Tool policy",
   },
-  toolsModified: {
-    id: "features_configuration_AgentsSettings_39",
-    defaultMessage: "Modified",
-  },
-  restoreTools: {
-    id: "features_configuration_AgentsSettings_40",
-    defaultMessage: "Restore",
-  },
   allAuthorizedTools: {
     id: "features_configuration_AgentsSettings_41",
     defaultMessage: "All authorized tools",
@@ -192,14 +176,6 @@ export const agentsMessages = pluginNamespace("atelier.host").messages("en", def
   delegation: {
     id: "features_configuration_AgentsSettings_48",
     defaultMessage: "Delegation",
-  },
-  delegationModified: {
-    id: "features_configuration_AgentsSettings_49",
-    defaultMessage: "Modified",
-  },
-  restoreDelegation: {
-    id: "features_configuration_AgentsSettings_50",
-    defaultMessage: "Restore",
   },
   anyAgent: {
     id: "features_configuration_AgentsSettings_51",
