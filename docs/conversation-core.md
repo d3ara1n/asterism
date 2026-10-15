@@ -91,7 +91,11 @@ Agent 的回合状态同样从当前时间线推导，经 `AgentView.turnState` 
 
 ## 模型适配
 
-三协议使用已安装 AI SDK：OpenAI Responses、OpenAI Chat Completions、Anthropic Messages。新增提供商优先 Responses，Anthropic 使用 Messages，不为已有 Responses 入口新增 Chat 预设。工具定义不提供 SDK execute；关闭隐式重试与流重试。带凭据的远程端点要求 HTTPS，无鉴权模式去除认证头，禁止自动重定向。每个 SDK 调用只进行一个模型步骤，由工坊执行后续循环。Responses 固定 store:false；思考能力开启时基线请求摘要与 encrypted reasoning，端点不支持的请求字段由显式兼容设置省略。连接测试与执行共用 `src/model/request-options.ts` 解释请求选项；测试仅走最小连通 probe，不选择等级或验证续接行为。
+请求身份与模型内容分开：`stream / validate` 可接收调用方声明的 `userAgent / sessionId`，`run` 接收 UA 并从已校验对象取得 Session ID。内置 Agent、标题命名和上下文压缩均传入 `Atelier/<应用版本>` 与所属会话；会话重开、同会话分支和工具续轮保持同一 ID，新会话使用新 ID。身份不写入模型消息、历史或续接作用域，不授权资源，也不依赖 provider 保存会话。
+
+模型与提供商的 `customUserAgent` 按既有兼容合并规则覆盖调用方 UA，优先级为模型 > 提供商 > 调用方；都未提供时保留 SDK 默认值。显式 `opencodeSession` 才发送 `x-opencode-session`，无会话的独立调用或连接测试为本次调用生成临时 UUID。连接测试使用应用 UA；模型列表发现不发送会话头。最终 HTTP 边界设置身份头，避免 SDK 改写或追加自定义 UA；头值必须为非空可打印 ASCII 字符串，非法值在发送前失败。提供商域名不触发隐式兼容行为。
+
+三协议使用已安装 AI SDK：OpenAI Responses、OpenAI Chat Completions、Anthropic Messages。新增提供商优先 Responses，Anthropic 使用 Messages；聚合服务同产品同地区默认一个预设，只有不同端点对应不同模型集合时才拆分，不按模型上游协议拆分入口。工具定义不提供 SDK execute；关闭隐式重试与流重试。带凭据的远程端点要求 HTTPS，无鉴权模式去除认证头，禁止自动重定向。每个 SDK 调用只进行一个模型步骤，由工坊执行后续循环。Responses 固定 store:false；思考能力开启时基线请求摘要与 encrypted reasoning，端点不支持的请求字段由显式兼容设置省略。连接测试与执行共用 `src/model/request-options.ts` 解释请求选项；测试仅走最小连通 probe，不选择等级或验证续接行为。
 
 每次请求从公共历史向目标模型投影，不因 provider、协议、端点或模型变化而拒绝整段上下文。原生附加资料仅在来源作用域（provider 身份、协议、端点、模型）与适配版本均一致时复用，跨来源只省略不适用的原生资料。公共回答、工具调用与结果继续投影，不增加来源水印、桥接消息或第二份历史。外来工具调用 ID 不满足通用字符／长度范围或与已有身份冲突时，在本次请求内确定性转换，调用和结果成对使用；本来源原始 ID 优先保留。投影不改写时间线，A → B → A 时原先 A 的资料仍可复用。
 

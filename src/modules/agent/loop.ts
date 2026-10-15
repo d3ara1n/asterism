@@ -5,6 +5,7 @@ import { selectionOf, type AgentSelectionService } from "./selection.ts";
 import { composeSystemPrompt } from "./system-prompt.ts";
 import { projectForAgent } from "./projection.ts";
 import { compressContext } from "./compression.ts";
+import { applicationUserAgent } from "../../shared/application.ts";
 
 const key = (object: ObjectReader) => `agent:${object.ref.id}`;
 /** 执行循环只持请求次数，消息始终从时间线重建。 */
@@ -40,6 +41,7 @@ export function createAgentLoop(deps: { selection: AgentSelectionService; tasks:
             const selection = selectionOf(object).selection, agent = deps.selection.agent(selection);
             const snapshot = object.session.snapshot();
             const result = await deps.models.run({ object: object.ref, requestParentId: snapshot.position.nodeId,
+              userAgent: applicationUserAgent,
               target: deps.selection.target(selection), system: composeSystemPrompt(agent), messages: projectForAgent(snapshot, object.ref.id), signal,
               tools: deps.selection.tools(agent), cache: { expectHit: request > 0 && !compressed }, observer: { event(event) {
                 if (event.type !== "progress") object.commit(writer => { writer.append(Execution, event); });

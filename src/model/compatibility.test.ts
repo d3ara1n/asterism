@@ -22,7 +22,7 @@ function input(protocol: ModelInput["settings"]["provider"]["protocol"] = "opena
 }
 
 // 沿用真实 SDK 的流接口，只替换传输；捕获最终 HTTP 正文，避免只验证中间选项。
-async function request(value: ModelInput): Promise<Record<string, unknown>> {
+async function request(value: ModelInput, inspectHeaders?: (headers: Headers) => void): Promise<Record<string, unknown>> {
   let body: Record<string, unknown> | undefined;
   const frames = value.settings.provider.protocol === "anthropic" ? [
     { type: "message_start", message: { id: "response", type: "message", role: "assistant", model: "test", content: [], stop_reason: null, stop_sequence: null, usage: { input_tokens: 1, output_tokens: 0 } } },
@@ -45,14 +45,44 @@ async function request(value: ModelInput): Promise<Record<string, unknown>> {
   ];
   const transport: typeof fetch = async (_url, init) => {
     body = JSON.parse(String(init?.body));
+    inspectHeaders?.(new Headers(init?.headers));
     return new Response(frames.map(frame => `data: ${JSON.stringify(frame)}\n\n`).join(""), { headers: { "content-type": "text/event-stream" } });
   };
-  const adapter = new AiSdkAdapter(async () => "unused", (current, key) => createProviderModel(current.settings.provider, current.settings.model, key, transport));
+  const adapter = new AiSdkAdapter(async () => "unused", (current, key) => createProviderModel(current.settings.provider, current.settings.model, key, transport, current));
   for await (const _event of adapter.prepare(value).stream(new AbortController().signal)) { /* 消费完整流，序列化错误不能被忽略。 */ }
   return body!;
 }
 
 describe("显式兼容与目标投影", () => {
+  // 请求身份契约：最终 HTTP 头遵循模型 > 提供商 > 调用方，SDK 不得追加 UA；
+  // 会话头由显式兼容设置启用，同会话跨请求稳定，且身份不进入模型正文。
+  it.each(["openai-responses", "openai-chat", "anthropic"] as const)("%s 请求身份在最终传输边界生效", async protocol => {
+    const current = input(protocol);
+    current.userAgent = "ExampleAgent/1.0";
+    current.sessionId = "session-a";
+    const headers: Headers[] = [];
+    const send = () => request(current, value => headers.push(value));
+    await send();
+    expect(headers[0]!.get("user-agent")).toBe("ExampleAgent/1.0");
+    expect(headers[0]!.has("x-opencode-session")).toBe(false);
+    current.settings.provider.compatibility = [
+      { id: "opencodeSession" }, { id: "customUserAgent", value: { userAgent: "ConnectionAgent/2.0" } },
+    ];
+    await send();
+    expect(headers[1]!.get("user-agent")).toBe("ConnectionAgent/2.0");
+    current.settings.model.compatibility = [{ id: "customUserAgent", value: { userAgent: "ModelAgent/3.0" } }];
+    const body = await send();
+    expect(headers[2]!.get("user-agent")).toBe("ModelAgent/3.0");
+    expect(headers[1]!.get("x-opencode-session")).toBe("session-a");
+    expect(headers[2]!.get("x-opencode-session")).toBe("session-a");
+    expect(JSON.stringify(body)).not.toMatch(/session-a|ExampleAgent|ConnectionAgent|ModelAgent/);
+    current.sessionId = "session-b";
+    current.settings.model.compatibility = [];
+    await send();
+    expect(headers[3]!.get("x-opencode-session")).toBe("session-b");
+    expect(headers[3]!.get("user-agent")).toBe("ConnectionAgent/2.0");
+  });
+
   // 公共契约：摘要不能填充全文；来源密文可复用时优先发送，空文字密文也不得丢失。
   it("Responses 分别编码明文、摘要与原生密文，历史不变", async () => {
     const current = input();

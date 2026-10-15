@@ -17,6 +17,32 @@ export type ModelCompatibilityDefinition = {
 
 export const modelCompatibilityDefinitions: readonly ModelCompatibilityDefinition[] = [
   {
+    id: "customUserAgent",
+    kind: "options",
+    initialValue: { userAgent: "" },
+    appliesTo: { protocols: ["openai-responses", "openai-chat", "anthropic"] },
+    schema: z.strictObject({
+      userAgent: z.string().trim().min(1).regex(/^[\x20-\x7e]+$/u).meta({
+        title: "User-Agent", description: "HTTP client identity. Overrides the identity supplied by the caller.",
+      }),
+    }).meta({
+      title: "Custom User-Agent",
+      description: "Override the User-Agent header for model requests and connection tests.",
+    }),
+  },
+  {
+    id: "opencodeSession",
+    kind: "tag",
+    appliesTo: {
+      protocols: ["openai-responses", "openai-chat", "anthropic"],
+      endpoints: ["https://opencode.ai/inference/go/v1"],
+    },
+    schema: z.undefined().meta({
+      title: "OpenCode session header",
+      description: "Send a stable conversation ID in x-opencode-session. Standalone calls use a temporary ID.",
+    }),
+  },
+  {
     id: "systemMessageInMessages",
     kind: "tag",
     appliesTo: { protocols: ["openai-responses"] },

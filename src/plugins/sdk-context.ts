@@ -223,8 +223,9 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
           throw new PluginApiError("unavailable", "The resource is not on the current session path.");
         if ((path.at(-1)?.id ?? null) !== request.requestParentId)
           throw new PluginApiError("invalid_argument", "Rebuild model input from the current session position.");
-        const { target, system, messages, tools, cache } = structuredClone({
+        const { target, system, messages, tools, cache, userAgent } = structuredClone({
           target: request.target, system: request.system, messages: request.messages, tools: request.tools, cache: request.cache,
+          userAgent: request.userAgent,
         });
         const allowed = tools?.allow ? new Set(tools.allow) : null;
         const excluded = new Set(tools?.exclude ?? []);
@@ -232,7 +233,7 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
         const capabilities = host.sessions.capabilities(linked, name => (allowed === null || allowed.has(name)) && !excluded.has(name));
         let progressTimer: ReturnType<typeof setTimeout> | undefined;
         const receive = request.observer.event.bind(request.observer);
-        const work = modelRuns.start(signal => host.models.run({ plugin: internal.id, object: ref, target, system, messages, tools, cache, requestParentId: request.requestParentId,
+        const work = modelRuns.start(signal => host.models.run({ plugin: internal.id, object: ref, target, system, messages, tools, cache, userAgent, requestParentId: request.requestParentId,
           signal, capabilities, context: host.sessions.context(linked),
           content: messages => host.content?.capture(inputReferences(messages), { owner: internal.id, sessionId: ref.sessionId,
             objectId: ref.id, recordIds: new Set(path.map(node => node.id)), check: checkAvailable }),

@@ -16,6 +16,7 @@
 | `session/` | 会话树存储、当前时间线追加与游标选择、模型投影、工作台折叠 | shared、SDK 纯契约、Node SQLite；不依赖 UI 或插件运行时 |
 | `model/` | 单次请求契约、文件输入检查、目标投影与三协议 SDK 编解码 | shared、session、AI SDK |
 | `model/projection.ts`、`continuation.ts` | 公共历史向目标模型投影，原生资料按来源复用，显式兼容行为与工具 ID 配对 | shared、SDK 公共模型契约、Node crypto |
+| `model/request-identity.ts` | 调用方 UA、显式 UA 覆盖与 Go 会话头；身份不进入模型消息或历史 | shared 兼容目录、SDK 请求身份、Node crypto |
 | `model/responses-reasoning.ts`、`anthropic-thinking.ts` | 明文、摘要与原生密文／签名的有序编码；兼容配置只控制端点字段差异，复用 SDK 普通消息、文件与工具序列化 | AI SDK 公开中间件与传输入口 |
 | `execution/` | 单次模型请求与工具批次、流块状态机、请求能力视图、外部工具策略与固定宿主操作入口；外层循环归插件 Agent | model、resources、tools、存储格式 adapter |
 | `resources/` | 资源身份生成、后台契约、注册目录、卡片投影与环境聚合 | shared、session 对象类型、Nano ID |

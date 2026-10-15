@@ -11,6 +11,7 @@ import * as pluginLoader from "../../plugins/loader.ts";
 import { Agent, CreateAgent } from "../agent/contract.ts";
 import { Execution, UserMessage } from "../agent/records.ts";
 import { SessionNamed } from "./records.ts";
+import { applicationUserAgent } from "../../shared/application.ts";
 
 const roots: string[] = [], services: ApplicationService[] = [];
 const loadPlugins = pluginLoader.loadPlugins;
@@ -150,6 +151,9 @@ describe("两级自动命名", () => {
     for (let i = 2; i <= 5; i++) { test.submit(`请求 ${i}`); if (i < 5) test.reply(`完成 ${i}`); }
     await test.idle();
     expect(test.requests).toHaveLength(2);
+    // 命名不是另一个会话：多次标题请求沿用当前会话和内置应用身份。
+    for (const request of test.requests)
+      expect(request).toMatchObject({ userAgent: applicationUserAgent, sessionId: test.sessionId });
     expect(test.requests[1]!.messages[0]).toMatchObject({ parts: [{ kind: "text", text: expect.stringContaining("找到了 token 过期原因") }] });
     expect(test.requests[1]!.messages[0]).toMatchObject({ parts: [{ kind: "text", text: expect.stringContaining("请求 5") }] });
     const snapshot = test.session.snapshot();

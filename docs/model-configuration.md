@@ -22,9 +22,13 @@
 
 选择器按按量计费、订阅、不计费依次分组，不按厂商分组，空组不显示。搜索跨组匹配名称、地区、套餐与计费说明；卡片只显示名称及地区／套餐细节，不重复组标题。自定义连接独立放在末尾。
 
-预设就是已填好参数的自定义提供商。选择入口一次性生成普通连接草稿，显式带入兼容条目，然后打开与空白自定义连接相同的编辑器，统一展示全部连接字段和兼容设置。编辑器只接收初始字段，不保留预设身份、来源状态或更换预设入口。重复添加同一预设时，默认连接 ID 追加未占用的数字后缀，用户仍可修改。空白自定义连接不预填某一官方地址。保存不持久化预设身份、计费标签或资料来源；目录更新或撤下入口不修改已保存连接。
+预设就是已填好参数的自定义提供商。选择入口一次性生成普通连接草稿，显式带入兼容条目，然后打开与空白自定义连接相同的编辑器，统一展示全部连接字段和兼容设置。编辑器只接收初始字段，不保留预设身份、来源状态或更换预设入口。目录 ID 按量采用厂商 slug，订阅追加 `-plan`，地区后缀放最后，例如 `kimi / kimi-plan / kimi-cn / kimi-plan-cn`；显示名保留实际产品名。重复添加同一预设时，默认连接 ID 追加未占用的数字后缀，用户仍可修改。空白自定义连接不预填某一官方地址。保存不持久化预设身份、计费标签或资料来源；目录更新、改名或撤下入口不修改已保存连接及其引用。
 
-优先使用 Responses；Anthropic 使用原生 Messages，不为已有 Responses 的产品增加 Chat 预设。当前目录包含 OpenAI、Anthropic、DeepSeek、xAI，以及 Kimi 和智谱／Z.ai；DeepSeek 明文续接直接使用协议基线。无确定地区差异的连接不人为拆分。预设记录官方资料与核验日期；官方接口声明不替代账户权限、真实端点及 GUI 验收。
+优先使用 Responses；Anthropic 使用原生 Messages。聚合服务对同一计费产品与地区默认只提供一个预设，支持 Responses 时优先选择；只有不同端点对应不同模型集合时才拆分提供商，不仅因存在多种协议路径就增加入口。当前目录包含 OpenAI、Anthropic、DeepSeek、xAI、OpenRouter、OpenCode Console／Go，以及 Kimi 和智谱／Z.ai；DeepSeek 明文续接直接使用协议基线。无确定地区差异的连接不人为拆分。预设记录官方资料与核验日期；官方接口声明不替代账户权限、真实端点及 GUI 验收。
+
+OpenRouter 使用 `https://openrouter.ai/api/v1` 的 Responses 入口，保持协议基线的 `store:false`、加密思考请求与摘要请求；其接口不接受服务端存储及 previous_response_id。OpenCode Console 按量连接使用 `https://opencode.ai/inference/v1` 的 Responses 入口，Zen 保留为搜索别名。两者均只提供一个预设，不按模型上游厂商或原生协议拆分；OpenCode 聚合入口的统一 Responses 调用已由用户实测确认。实际请求按用户配置的协议发送，两者均不附带模型清单或能力参数。
+
+OpenCode Go 订阅预设 ID 为 `opencode-plan`，使用 `https://opencode.ai/inference/go/v1` 的单一 Responses 入口；Go／Go Plus 共用连接与凭据入口。预设显式带入 `opencodeSession`，内置调用提供 Atelier UA 和稳定 Session ID，连接测试使用独立临时 ID。Go 面向 coding agent 请求，客户端要求见[官方说明](https://opencode.ai/docs/go/)；请求头可由已有兼容编辑器管理，用户可额外添加 `customUserAgent` 覆盖 UA。
 
 Kimi 按量提供国内 `api.moonshot.cn/v1` 与国际 `api.moonshot.ai/v1`；Kimi Code 订阅提供国内 `api.kimi.com/coding/v1` 与国际 `api.kimi.ai/coding/v1`。智谱／Z.ai 按地区与计费产品提供四个预设，共用同一 Responses 适配：国内 `open.bigmodel.cn/api/v1`，国际 `api.z.ai/api/v1`；同地区的按量与 Coding Plan 使用相同 Responses 基址，凭据入口与计费说明分开。国内外 GLM-5.3 文档均在“模型 API”一节列出该入口，并说明曾订阅 Coding Plan（含已过期）的账户目前只能通过 Chat 调用模型 API；这是账户的按量调用限制，不据此切换为订阅计费或自动降级协议。
 
@@ -90,11 +94,11 @@ ID 可编辑、提供商与模型可删除，引用失效不可避免：保存�
 
 提供商与模型设置页均提供「添加兼容设置」，复用同一目录与参数编辑器。模型页只读展示来自提供商的条目；参数条目可复制为模型覆盖，已覆盖项标明来源，移除覆盖恢复提供商设置。已添加项可以编辑、移除，名称、参数与适用参考信息由定义目录驱动。schema 之外的 `appliesTo` 包含协议列表和可选端点列表，添加菜单与已添加项都展示。它只供用户参考，不阻止添加，也不提供自动启用或运行时匹配规则；协议编码器只解释其认识的已添加行为。内置目录可以推荐，是否添加由用户决定，不按品牌、域名或模型名自动启用。
 
-每次请求取用当时提供商与模型的完整配置，统一合并兼容条目后消费，并与该请求及其工具批次保持一致；修改从下一次请求取用。声明本身不执行行为，协议投影按 id 消费适用条目，不能通过兼容设置重新开放模型已关闭的标准思考等级。连接测试保持最小 probe，不验证兼容行为；配置修改不改写历史。
+每次请求取用当时提供商与模型的完整配置，统一合并兼容条目后消费，并与该请求及其工具批次保持一致；修改从下一次请求取用。声明本身不执行行为，协议投影按 id 消费适用条目，不能通过兼容设置重新开放模型已关闭的标准思考等级。连接测试保持最小 probe，消费请求身份头，但不代替消息、思考与工具兼容行为的验收；配置修改不改写历史。
 
-正式目录包含两个标签与一个参数型设置：`systemMessageInMessages` 将 Responses 系统提示从 instructions 改为第一条 system 消息；`toolFilesAsUserMessage` 允许 Chat 工具结果文件搬运到后续 user 消息；`responsesReasoning` 适配明文 content 的数组／对象形状，以及是否请求 encrypted_content 和 reasoning.summary。省略参数使用协议基线，不按域名自动启用。明文、摘要、密文与签名续接都是内置能力，不由兼容包开关；摘要不得改写为明文思考。具体投影规则见 [模型适配](conversation-core.md#模型适配)。
+正式目录包含三个标签与两个参数型设置：`systemMessageInMessages` 将 Responses 系统提示从 instructions 改为第一条 system 消息；`toolFilesAsUserMessage` 允许 Chat 工具结果文件搬运到后续 user 消息；`responsesReasoning` 适配明文 content 的数组／对象形状，以及是否请求 encrypted_content 和 reasoning.summary；`customUserAgent` 以必填 `userAgent` 参数覆盖客户端身份；`opencodeSession` 将本次请求的会话 ID 写入 `x-opencode-session`。UA 与会话头适用于三种协议，连接测试同样消费这两项。省略参数使用协议基线，不按域名自动启用。明文、摘要、密文与签名续接都是内置能力，不由兼容包开关；摘要不得改写为明文思考。具体投影规则见 [模型适配](conversation-core.md#模型适配)。
 
-正式目录仅包含上述三项；`customThinkingLevels` 编码暂缓。完整 GUI 与真实端点验收进度见 [模型兼容计划](../plans/todo-2026-10-10-model-compatibility.md)。
+正式目录仅包含上述五项；`customThinkingLevels` 编码暂缓。完整 GUI 与真实端点验收进度见 [模型兼容计划](../plans/todo-2026-10-10-model-compatibility.md)。
 
 ## 模型角色
 
@@ -193,7 +197,7 @@ ID 可编辑、提供商与模型可删除，引用失效不可避免：保存�
 
 连接测试取用点击测试时的配置快照，后续编辑或删除不会重写它；结果标记测试时修订。取消、超时与应用退出终止在途请求，迟到结果不改变已经结束的状态。配置保存本身不访问外部服务。
 
-连接测试与真实执行共用请求选项解释入口。测试保留最小 probe，只验证端点与基础协议连通性，不选择或验证思考等级，不验证兼容行为；执行路径在同一入口解释生成参数及协议选项。
+连接测试与真实执行共用请求选项及身份头解释入口。测试保留最小 probe，只验证端点与基础协议连通性，不选择或验证思考等级，不验证多轮消息、思考或工具兼容行为；执行路径在同一入口解释生成参数及协议选项。
 
 ## 参考设计
 

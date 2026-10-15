@@ -5,15 +5,17 @@ import { coreId, coreNamespace } from "../../shared/core.ts";
 import { UserMessage } from "../agent/records.ts";
 import { SessionNamed } from "./records.ts";
 import { cleanTitle, collectTurns, namingInstruction, namingPrompt, renameCheckpoints } from "./policy.ts";
+import { applicationUserAgent } from "../../shared/application.ts";
 
 const timeoutMs = 10_000;
 const responseLimit = 4000;
 
-async function generateTitle(models: Pick<ModelServices, "stream">, prompt: string, signal: AbortSignal): Promise<string> {
+async function generateTitle(models: Pick<ModelServices, "stream">, prompt: string, signal: AbortSignal, sessionId: string): Promise<string> {
   let text = "", finished = false;
   const textParts = new Set<string>();
   for await (const event of models.stream({
     target: { role: "utility" }, signal,
+    userAgent: applicationUserAgent, sessionId,
     system: { blocks: [{ id: coreId("session-naming"), kind: "system", from: coreNamespace, text: namingInstruction }] },
     messages: [{ kind: "input", parts: [{ kind: "text", text: prompt }] }],
   })) {
@@ -74,7 +76,7 @@ export function createNamingModule(connect: (api: NamingApi) => () => void) {
             view.records.last(UserMessage, { scope: "timeline" })?.record.id === latest.record.id;
           plugin.tasks.start(`naming:${session.id}:${message.record.id}`, async signal => {
             if (!isCurrent(session.snapshot())) return;
-            const title = await generateTitle(plugin.models, prompt, signal);
+            const title = await generateTitle(plugin.models, prompt, signal, session.id);
             // 检查与追加在同一同步提交中完成；标题由游标观察者独立同步。
             session.commit(writer => {
               if (isCurrent(session.snapshot())) writer.append(SessionNamed, {

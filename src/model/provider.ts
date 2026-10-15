@@ -1,11 +1,13 @@
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAI } from "@ai-sdk/openai";
+import type { ModelRequestIdentity } from "@atelier/sdk/contracts";
 import type { ProviderInput, ProviderModel } from "../shared/configuration.ts";
 import { ModelFailure } from "./contract.ts";
 import { unauthenticatedApiKey } from "../shared/model.ts";
 import { compatibilityForTarget } from "./projection.ts";
 import { withResponsesReasoning } from "./responses-reasoning.ts";
 import { withAnthropicThinking } from "./anthropic-thinking.ts";
+import { modelRequestHeaders } from "./request-identity.ts";
 
 export class ProviderTransportError extends ModelFailure {
   constructor() { super("configuration", "API key connections require HTTPS, except on loopback addresses."); }
@@ -16,10 +18,13 @@ export function validateProviderTransport(provider: ProviderInput): void {
   if (provider.auth === "api_key" && endpoint.protocol !== "https:" && !loopback) throw new ProviderTransportError();
 }
 /** 连接测试与真实执行共用传输边界；不回退环境凭据，不自动跟随重定向。 */
-export function createProviderModel(provider: ProviderInput, model: ProviderModel, key: string, transport: typeof fetch = fetch) {
+export function createProviderModel(provider: ProviderInput, model: ProviderModel, key: string, transport: typeof fetch = fetch, identity: ModelRequestIdentity = {}) {
   validateProviderTransport(provider);
+  const identityHeaders = modelRequestHeaders({ provider, model }, identity);
   const scopedFetch: typeof fetch = (url, init) => {
     const headers = new Headers(init?.headers);
+    // 最终发送边界覆盖 SDK 自动生成或追加的 UA，保持调用方／兼容包声明的原值。
+    identityHeaders.forEach((value, name) => headers.set(name, value));
     if (provider.auth === "none") { headers.delete("authorization"); headers.delete("x-api-key"); }
     return transport(url, { ...init, headers, redirect: "error" });
   };

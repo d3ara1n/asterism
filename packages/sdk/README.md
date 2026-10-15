@@ -163,7 +163,7 @@ ResourceDescription、ToolView、CreationEntry 的 label／description 接收 Ui
 
 ## 版本与当前边界
 
-SDK 包版本为 `0.14.0`，宿主提供 API 8.0，插件声明 `api: { major: 8, minMinor: 0 }`。思考内容必须分别提供 text 与 summary；旧主版本及更高小版本在加载前拒绝。`models.stream` 的 maxOutputTokens 须为正安全整数，与模型配置的上限取较小值，省略时沿用模型配置。应用内部 IPC、数据库与配置文件版本独立维护，职责及格式约定见 [架构文档](../../docs/architecture.md)，不以 SDK 包版本替代。
+SDK 包版本为 `0.15.0`，宿主提供 API 8.1；使用请求身份能力的插件声明 `api: { major: 8, minMinor: 1 }`，已有 API 8.0 插件继续兼容。思考内容必须分别提供 text 与 summary；旧主版本及更高小版本在加载前拒绝。`models.stream` 的 maxOutputTokens 须为正安全整数，与模型配置的上限取较小值，省略时沿用模型配置。应用内部 IPC、数据库与配置文件版本独立维护，职责及格式约定见 [架构文档](../../docs/architecture.md)，不以 SDK 包版本替代。
 
 资源创建数据必须是 JSON 对象，不能占用宿主的 `id / type / title` 字段。当前会话数据保存于 `session_data`，事件及工具结果保存稳定契约身份与原始数据。core 消费具型用户消息、模型执行、通知与环境记录，存储编码由宿主负责；环境记录保留原事件身份与载荷。
 
@@ -178,6 +178,10 @@ SDK 包版本为 `0.14.0`，宿主提供 API 8.0，插件声明 `api: { major: 8
 validate 检查目标、续接、文件类型、归属与大小，不读取全部字节。实际请求独立捕获资格与内容占用、重新检查并读取字节；调用方须消费或关闭流，宿主关闭也会收束流。请求不关闭借来的 content，草稿关闭不撤销已经捕获的请求。
 
 `models.roles / list` 读取模型与角色目录。`models.validate` 检查目标与显式输入能否准备，不发送请求或写入数据。`models.stream` 提供一次补全，只消费显式输入并交付协议事件；终态附带实际模型、适配版本与协议作用域。会话命名使用 stream，无须对象或资源工具执行。
+
+`stream` 与 `validate` 的请求可包含 `userAgent?: string`、`sessionId?: string`；`run` 可包含 `userAgent`，会话 ID 始终取自已校验的 `object.sessionId`。这些字段仅用于 HTTP 请求身份，不授权资源、不读取会话、不进入模型消息或历史。请求开始固定其值；调用方应为同一会话传入稳定 ID。内置 Agent、命名与压缩显式提供 `Atelier/<应用版本>`，第三方调用方可声明自己的 UA，未声明时宿主不代填 Atelier 身份。
+
+`customUserAgent` 兼容包覆盖调用方 UA，模型条目优先于提供商条目；最终发送边界保留覆盖后的原值，不追加 SDK 身份。`opencodeSession` 兼容包才发送 `x-opencode-session`，无所属会话的独立调用生成本次调用专用的临时 ID。有效头值必须为非空可打印 ASCII 字符串；无效值在发送前明确失败。兼容设置不改变已有会话或模型续接资料。
 
 `models.run(request)` 是一次补全及该响应的完整资源工具批次。每次提供 `object / requestParentId / target / system / messages / signal / observer`，可提供工具筛选与缓存命中预期。宿主校验对象归属、当前路径与请求起点，按本对象当前数据和请求路径记录解析 file 部件，不接收外部 content 覆盖；按真实链接固定授权视图，并取用链接资源提供的环境文件追加到本次系统提示；工具筛选只收窄权限。同一对象并发 run 拒绝，运行期间对象和历史须遵守收束规则，关闭时取消并等待批次结束。
 

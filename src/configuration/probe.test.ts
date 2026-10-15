@@ -2,6 +2,7 @@ import { thinkingLevels } from "@atelier/sdk/contracts";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Provider, ProviderModel } from "../shared/configuration.ts";
 import { classifyProbeError, runConnectionProbe } from "./probe.ts";
+import { applicationUserAgent } from "../shared/application.ts";
 
 afterEach(() => vi.unstubAllEnvs());
 const model: ProviderModel = { providerId: "provider", revision: 1, name: "Test", modelId: "test-model", enabled: true, contextWindow: null, compatibility: [],
@@ -16,6 +17,24 @@ const responses = {
   anthropic: { id: "msg_1", type: "message", role: "assistant", model: "test-model", content: [{ type: "text", text: "OK" }], stop_reason: "end_turn", stop_sequence: null, usage: { input_tokens: 1, output_tokens: 1 } },
 };
 describe("协议连接测试", () => {
+  // 无所属会话的 probe 不能共用全局 session ID；它仍携带内置客户端身份并消费 UA 覆盖。
+  it("Go 连接测试使用独立临时会话，UA 可由兼容设置覆盖", async () => {
+    const connection = { ...provider("openai-responses"), compatibility: [{ id: "opencodeSession" }] };
+    const transport = vi.fn<typeof fetch>(async () => Response.json(responses["openai-responses"]));
+    const probe = () => runConnectionProbe({ provider: connection, model, apiKey: "", signal: new AbortController().signal }, transport);
+    await probe();
+    await probe();
+    const first = new Headers(transport.mock.calls[0]![1]?.headers);
+    const second = new Headers(transport.mock.calls[1]![1]?.headers);
+    expect(first.get("user-agent")).toBe(applicationUserAgent);
+    expect(first.get("x-opencode-session")).toBeTruthy();
+    expect(second.get("x-opencode-session")).toBeTruthy();
+    expect(first.get("x-opencode-session")).not.toBe(second.get("x-opencode-session"));
+    await runConnectionProbe({ provider: connection, model: { ...model,
+      compatibility: [{ id: "customUserAgent", value: { userAgent: "CustomProbe/1.0" } }] },
+      apiKey: "", signal: new AbortController().signal }, transport);
+    expect(new Headers(transport.mock.calls[2]![1]?.headers).get("user-agent")).toBe("CustomProbe/1.0");
+  });
   it("不会把 API key 发送到远程明文 HTTP 端点", async () => {
     const transport = vi.fn<typeof fetch>();
     await expect(runConnectionProbe({ provider: { ...provider("openai-chat"), auth: "api_key", baseUrl: "http://example.test/v1" },

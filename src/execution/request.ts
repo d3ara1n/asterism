@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { ModelRunRequest, ModelRunResult, ModelRunEvent, ModelSource, ModelCompletion, SystemPrompt } from "@atelier/sdk/contracts";
+import type { ModelRunRequest, ModelRunResult, ModelRunEvent, ModelSource, ModelCompletion, SystemPrompt, ModelRequestIdentity } from "@atelier/sdk/contracts";
 import { modelExpression, modelScope, type ModelSettings, type ToolOutcome } from "../shared/model.ts";
 import { ModelFailure, type ModelAdapter, type ResolvedModelItem } from "../model/contract.ts";
 import { executeCoreBatch, coreDeclarations, previewCoreCall } from "./core.ts";
@@ -8,7 +8,7 @@ import { ResponseBuffer } from "./response.ts";
 import { synchronous } from "../plugins/synchronous.ts";
 import type { ContentLease } from "../runtime/content-store.ts";
 
-export interface ModelExecutionEnvironment {
+export interface ModelExecutionEnvironment extends ModelRequestIdentity {
   adapter: ModelAdapter;
   settings: ModelSettings;
   capabilities: AgentCapabilities;
@@ -34,11 +34,11 @@ export async function runModelRequest(request: ModelRunRequest, environment: Pro
   let termination: { reason: "completed" } | { reason: "cancelled" } | { reason: "failed"; code: string } = { reason: "completed" };
   try {
     // 即使已取消也消费准备 Promise 的拒绝，避免遗留未处理异常。
-    const { adapter, settings, capabilities, system, messages } = await environment;
+    const { adapter, settings, capabilities, system, messages, userAgent, sessionId } = await environment;
     signal.throwIfAborted();
     source = { model: modelExpression(settings), adapter: adapter.version, scope: modelScope(settings) };
     responseId = randomUUID();
-    const prepared = adapter.prepare({ settings, system, messages, tools: settings.model.capabilities.tools ? coreDeclarations() : [] });
+    const prepared = adapter.prepare({ settings, system, messages, userAgent, sessionId, tools: settings.model.capabilities.tools ? coreDeclarations() : [] });
     // 平台只交付准备完整的块，终态随最高序号块保存；分组与投影由执行体负责。
     const response = new ResponseBuffer({ responseId, requestParentId: request.requestParentId, source }, block => {
       emit({ type: "block", block });

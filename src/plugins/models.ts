@@ -25,7 +25,6 @@ export class ModelTargetFailure extends PluginApiError {
 interface ResolvedTarget { settings: ModelSettings; adapter: ModelAdapter }
 /** 内部 adapter 的一次调用输入；授权视图与资源环境取用不进入公开 SDK。 */
 export interface RunRequest extends ModelRunRequest {
-  /** 宿主打戳的写入插件身份，用于响应块来源。 */
   /** 发起请求的插件身份，由宿主填写；用于响应块来源打戳。 */
   plugin: string;
   capabilities: AgentCapabilities;
@@ -98,14 +97,16 @@ export function createModelServices(configuration: ConfigurationService, adapter
     list: catalog.models,
     async validate(request, options) {
       request.signal.throwIfAborted();
-      const { target, system, messages } = structuredClone({ target: request.target, system: request.system, messages: request.messages });
+      const { target, system, messages, userAgent, sessionId } = structuredClone({
+        target: request.target, system: request.system, messages: request.messages, userAgent: request.userAgent, sessionId: request.sessionId,
+      });
       let content: ModelContent | undefined;
       try {
         content = capture(messages, options?.content);
         const { settings, adapter } = await resolve(target);
         request.signal.throwIfAborted();
         validateInput(messages, content);
-        adapter.validate({ settings, system, messages,
+        adapter.validate({ settings, system, messages, userAgent, sessionId,
           tools: settings.model.capabilities.tools ? coreDeclarations() : [] });
       } catch (error) {
         if (error instanceof PluginApiError) throw error;
@@ -118,15 +119,16 @@ export function createModelServices(configuration: ConfigurationService, adapter
     },
     async *stream(request, options) {
       request.signal.throwIfAborted();
-      const { target, system, messages, tools, maxOutputTokens } = structuredClone({
+      const { target, system, messages, tools, maxOutputTokens, userAgent, sessionId } = structuredClone({
         target: request.target, system: request.system, messages: request.messages, tools: request.tools, maxOutputTokens: request.maxOutputTokens,
+        userAgent: request.userAgent, sessionId: request.sessionId,
       });
       const content = capture(messages, options?.content);
       try {
         const { settings, adapter } = await resolve(target);
         const resolvedMessages = await resolveInput(messages, content, request.signal);
         const source = { model: modelExpression(settings), adapter: adapter.version, scope: modelScope(settings) };
-        for await (const event of adapter.prepare({ settings, system, messages: resolvedMessages, maxOutputTokens,
+        for await (const event of adapter.prepare({ settings, system, messages: resolvedMessages, maxOutputTokens, userAgent, sessionId,
           tools: settings.model.capabilities.tools ? tools ?? [] : [] }).stream(request.signal)) {
           request.signal.throwIfAborted();
           yield event.type === "finish" ? { ...event, source } : event;
@@ -134,13 +136,15 @@ export function createModelServices(configuration: ConfigurationService, adapter
       } finally { await content?.close(); }
     },
     run(request) {
-      const { system, messages, target } = structuredClone({ system: request.system, messages: request.messages, target: request.target });
+      const { system, messages, target, userAgent, sessionId } = structuredClone({
+        system: request.system, messages: request.messages, target: request.target, userAgent: request.userAgent, sessionId: request.object.sessionId,
+      });
       let content: ModelContent | undefined;
       let captured: Promise<void>;
       try { request.signal.throwIfAborted(); content = capture(messages, request.content); captured = Promise.resolve(); }
       catch (error) { captured = Promise.reject(error); }
       const environment = Promise.all([resolve(target), request.context, captured]).then(async ([resolved, context]) => ({
-        ...resolved, capabilities: request.capabilities, messages: await resolveInput(messages, content, request.signal),
+        ...resolved, userAgent, sessionId, capabilities: request.capabilities, messages: await resolveInput(messages, content, request.signal),
         system: { blocks: [...system.blocks, ...context.map((file, index) => ({
           id: coreId(`context.${index}`), kind: "context" as const, ...file,
         }))] },

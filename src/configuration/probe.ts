@@ -2,6 +2,7 @@ import { APICallError, generateText } from "ai";
 import { createProviderModel, ProviderTransportError } from "../model/provider.ts";
 import { requestOptions } from "../model/request-options.ts";
 import type { Provider, ProviderModel, TestError } from "../shared/configuration.ts";
+import { applicationUserAgent } from "../shared/application.ts";
 
 export interface ProbeInput { provider: Provider; model: ProviderModel; apiKey: string; signal: AbortSignal }
 export type ConnectionProbe = (input: ProbeInput) => Promise<void>;
@@ -9,7 +10,7 @@ export type ConnectionProbe = (input: ProbeInput) => Promise<void>;
 /** 显式协议实例，不使用 Gateway 或环境变量中的模型/凭据。无鉴权连接删除鉴权头。 */
 export async function runConnectionProbe(input: ProbeInput, transport: typeof fetch = fetch): Promise<void> {
   const { provider, model, apiKey, signal } = input;
-  const languageModel = createProviderModel(provider, model, apiKey, transport);
+  const languageModel = createProviderModel(provider, model, apiKey, transport, { userAgent: applicationUserAgent });
   await generateText({
     model: languageModel, prompt: "Reply with OK.", abortSignal: signal,
     ...requestOptions(provider, model, { purpose: "probe" }),

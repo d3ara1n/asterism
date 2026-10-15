@@ -520,6 +520,7 @@ describe("工作台 SDK 的宿主实现", () => {
     const object = c.context().object(sessionId, Counter, id);
     const before = object.session.snapshot();
     const result = await c.context().models.run({ object: object.ref, requestParentId: before.position.nodeId,
+      userAgent: "PluginAgent/1.0",
       target, system: { blocks: [] }, messages: [{ kind: "input", parts: [{ kind: "text", text: "First projection" }] }], signal: new AbortController().signal,
       observer: { event(event) { if (event.type !== "progress") object.commit(writer => { writer.append(Execution, modelRunRecordSchema.parse(event)); }); } },
     });
@@ -527,10 +528,15 @@ describe("工作台 SDK 的宿主实现", () => {
     expect(object.session.snapshot().records.query(Execution, { scope: "timeline" }).map(record => record.status)).toEqual(["known"]);
     const count = service.sessions.tree.nodes(sessionId).map(flat).length;
     await c.context().models.run({ object: object.ref, requestParentId: object.session.snapshot().position.nodeId,
+      userAgent: "PluginAgent/1.0",
       target, system: { blocks: [] }, messages: [{ kind: "input", parts: [{ kind: "text", text: "Second projection" }] }], signal: new AbortController().signal,
       observer: { event() {} },
     });
     expect(inputs.map(input => input.messages)).toEqual([[{ kind: "input", parts: [{ kind: "text", text: "First projection" }] }], [{ kind: "input", parts: [{ kind: "text", text: "Second projection" }] }]]);
+    // run 的会话身份来自已校验对象，宿主不能丢失插件 UA 或在续轮时更换会话 ID。
+    expect(inputs.map(({ userAgent, sessionId }) => ({ userAgent, sessionId }))).toEqual([
+      { userAgent: "PluginAgent/1.0", sessionId }, { userAgent: "PluginAgent/1.0", sessionId },
+    ]);
     expect(service.sessions.tree.nodes(sessionId).map(flat)).toHaveLength(count);
   });
 
@@ -542,16 +548,20 @@ describe("工作台 SDK 的宿主实现", () => {
     } }));
     const target = await configureModel(service), count = service.sessions.tree.nodes(sessionId).length;
     const streamRequest = {
+      userAgent: "PluginStream/1.0", sessionId,
       target, system: { blocks: [] }, messages: [{ kind: "input" as const, parts: [{ kind: "text" as const, text: "Generate a title" }] }], signal: new AbortController().signal,
     };
     const stream = [];
     const iterable = c.context().models.stream(streamRequest);
     const first = iterable[Symbol.asyncIterator]().next();
     streamRequest.messages[0]!.parts[0]!.text = "Changed after the request began";
+    streamRequest.userAgent = "Changed/2.0";
+    streamRequest.sessionId = "changed-session";
     const head = await first;
     if (!head.done) stream.push(head.value);
     for await (const event of iterable) stream.push(event);
     expect(inputs[0]!.tools).toEqual([]);
+    expect(inputs[0]).toMatchObject({ userAgent: "PluginStream/1.0", sessionId });
     expect(inputs[0]!.messages).toEqual([{ kind: "input", parts: [{ kind: "text" as const, text: "Generate a title" }] }]);
     expect(stream.at(-1)).toMatchObject({ type: "finish", source: { adapter: "test-adapter" } });
     expect(service.sessions.tree.nodes(sessionId).map(flat)).toHaveLength(count);

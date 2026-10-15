@@ -6,6 +6,7 @@ import { projectSystemPrompt } from "../modules/agent/system-prompt.ts";
 import { requestOptions } from "./request-options.ts";
 import { aiSdkAdapterVersion, pickContinuation } from "./continuation.ts";
 import { projectHistory, validateProjection } from "./projection.ts";
+import { validateRequestIdentity } from "./request-identity.ts";
 
 function json(value: unknown): Json { return jsonSchema.parse(JSON.parse(JSON.stringify(value))); }
 export function sdkMessages(input: ModelInput): ModelMessage[] {
@@ -63,10 +64,13 @@ export class AiSdkAdapter implements ModelAdapter {
     private readonly languageModelFactory?: (input: ModelInput, key: string) => LanguageModel) {}
   validate(input: ModelValidationInput): void {
     validateProviderTransport(input.settings.provider);
+    validateRequestIdentity(input.settings, input);
     requestOptions(input.settings.provider, input.settings.model, { purpose: "execution", thinking: input.settings.thinking, maxOutputTokens: input.maxOutputTokens });
     validateProjection(input);
   }
   prepare(input: ModelInput): PreparedModel {
+    // 固定顶层请求身份，避免等待凭据时读到调用方后续替换的值。
+    input = { ...input };
     this.validate(input);
     const messages = sdkMessages(input);
     const system = projectSystemPrompt(input.system);
@@ -79,7 +83,7 @@ export class AiSdkAdapter implements ModelAdapter {
     const { provider, model } = input.settings;
     const key = provider.auth === "none" ? unauthenticatedApiKey : await this.readCredential(provider.id);
     if (!key) throw new ModelFailure("missing_credential", "Provider credentials are unavailable.");
-    const languageModel = this.languageModelFactory?.(input, key) ?? createProviderModel(provider, model, key);
+    const languageModel = this.languageModelFactory?.(input, key) ?? createProviderModel(provider, model, key, fetch, input);
     const tools: ToolSet = Object.fromEntries(input.tools.map(t => [t.name, tool({ description: t.description, inputSchema: sdkJsonSchema(t.parameters as Record<string, unknown>) })]));
     const result = streamText({ model: languageModel, messages, tools,
       ...options, abortSignal: signal,

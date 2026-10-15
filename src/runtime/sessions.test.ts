@@ -21,6 +21,7 @@ import { ToolRegistry } from "../tools/registry.ts";
 import { foldWorkbench } from "../session/fold.ts";
 import { ContextSummary } from "../modules/agent/records.ts";
 import { COMPRESSION_MAX_OUTPUT } from "../modules/agent/compression.ts";
+import { applicationUserAgent } from "../shared/application.ts";
 
 const roots: string[] = [];
 type Snap = { workbench: { objects: { id: string; kind: string; presentation: { data: unknown } }[] } };
@@ -97,6 +98,9 @@ describe("会话运行时", () => {
     })); await settled(service);
     expect(work).toHaveLength(3);
     expect(summaries).toHaveLength(1);
+    // 内置工作请求与辅助摘要必须声明同一应用身份、同一会话归属。
+    for (const input of [...work, ...summaries])
+      expect(input).toMatchObject({ userAgent: applicationUserAgent, sessionId: first.sessionId });
     expect(summaries[0]).toMatchObject({ maxOutputTokens: COMPRESSION_MAX_OUTPUT, settings: { thinking: "off" }, tools: [] });
     expect(summaries[0]!.system.blocks).toHaveLength(1);
     expect(JSON.stringify(summaries[0]!.messages)).toContain("Old answer");

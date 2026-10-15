@@ -3,6 +3,7 @@ import type { ModelServices, ObjectExecutor } from "@atelier/sdk/runtime";
 import { ContextSummary, Execution, Notice } from "./records.ts";
 import { summaryPrompt, summarySystemPrompt } from "./compression-prompt.ts";
 import { contextMessages, projectAgentContext, type AgentContext } from "./projection.ts";
+import { applicationUserAgent } from "../../shared/application.ts";
 
 // 窗口预留与近期保留预算；工具结果截取只用于独立的摘要材料。
 export const COMPRESSION_RESERVE = 16_384;
@@ -78,6 +79,7 @@ export async function compressContext(
   let finish: Extract<ModelEvent, { type: "finish" }> | undefined;
   try {
     for await (const event of models.stream({ target: { ...target, model, thinking: "off" },
+      userAgent: applicationUserAgent, sessionId: object.ref.sessionId,
       system: { blocks: [{ id: "context-summary", kind: "system", from: "atelier.core", text: summarySystemPrompt }] },
       messages: [{ kind: "input", parts: [{ kind: "text", text: summaryPrompt(plan) }] }],
       maxOutputTokens: COMPRESSION_MAX_OUTPUT, signal,

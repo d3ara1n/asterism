@@ -21,13 +21,16 @@
 | systemMessageInMessages | 标签；Responses | 将 instructions 改为第一条 system 消息，不重复发送 |
 | responsesReasoning | 参数；Responses | content 缺省 array，可设 object；encryptedContent 与 summary 缺省 true，false 分别省略 encrypted_content include 与 reasoning.summary 请求参数；不控制历史思考是否参与输入 |
 | toolFilesAsUserMessage | 标签；Chat | 显式允许同批工具文件紧随工具结果进入 user 消息，tool 保留关联说明 |
+| customUserAgent | 参数；三协议 | 必填 userAgent 覆盖调用方 UA；模型覆盖提供商，最终 HTTP 头不追加 SDK 身份 |
+| opencodeSession | 标签；三协议 | 将请求会话 ID 写入 x-opencode-session；无会话的单次调用生成独立临时 ID |
 
 明文续接不需要 DeepSeek 专用开关。SDK 自动添加的密文 include 和默认摘要也须服从最终请求边界的字段设置。未支持的服务端输入由服务端反馈，不自动改写历史、切换协议或重试降级。
 
 ## 实现边界
 
 - `src/shared/model-compatibility.ts` 承接定义、校验与合并；配置文件版本 6，配置 IPC 版本 9。
-- SDK 0.14.0／宿主 API 8.0 声明 thinking 的独立 text、summary 及 summary delta；工作数据库版本 19。开发期不提供旧数据推断或迁移。
+- SDK 0.15.0／宿主 API 8.1 声明 thinking 的独立 text、summary 及 summary delta，以及调用方 UA／会话归属；工作数据库版本 19。开发期不提供旧数据推断或迁移。
+- `src/model/request-identity.ts` 解释身份兼容包，最终传输边界设置头；内置 Agent、命名与压缩提供应用 UA 和稳定会话 ID。连接测试沿用同一编码并生成临时 ID。
 - `src/model/projection.ts` 从公共历史生成目标内容，`continuation.ts` 只判断原生资料可复用性。
 - `src/model/responses-reasoning.ts`、`anthropic-thinking.ts` 通过 SDK 公开中间件固定思考顺序，再在传输入口核对普通消息／工具并编码思考；不修改依赖源码，不使用文本哨兵或通用 JSON patch。
 - 原生签名对应文字不裁剪、不替换为摘要；跨来源清除不适用的签名、密文与原生 item ID，公共内容保持语义。
@@ -48,6 +51,8 @@
 - [x] 公共思考的明文／摘要／不透明资料分离，贯通流、记录、投影与展示。
 - [x] Responses 与 Messages 原生思考编码；兼容包只控制端点字段差异。
 - [x] Kimi 与智谱／Z.ai 的已公布 Responses 产品预设、地区／套餐说明及凭据入口。
+- [x] OpenRouter、OpenCode Console／Go 的单一 Responses 预设；UA 覆盖、Go 会话头及公开 SDK 请求身份传递。
+- [ ] GUI 与真实 Go 端点：UA 添加／覆盖／移除、同会话正常对话及辅助调用、连接测试；Go 请求头功能待用户验收。
 - [x] GUI：提供商卡片按计费方式分组、地区／套餐显示，用户于 2026-10-15 确认。
 - [ ] GUI：兼容参数添加／编辑／移除、保存重开、模型覆盖及恢复；summary-only 与纯密文块展示。
 - [ ] 真实端点：OpenAI、Anthropic、DeepSeek、Kimi 与智谱的多轮思考、工具配对与跨模型切回；分别确认套餐权限与客户端准入。
@@ -58,3 +63,5 @@
 验证以实际 HTTP 正文、真实 SDK 解码与公共记录往返为边界，覆盖两通道分离、密文／签名原样续接、跨来源隔离、工具顺序及字段设置。真实服务与 GUI 由用户操作，未完成前不归档。
 
 2026-10-15 验证：类型检查、73 个测试文件／489 项用例、i18n 检查与构建通过。回归包含空正文签名、Responses output_index 稳定归属、未闭合块仍交付终态计量，以及 SDK 末段正文裁剪。构建保留既有的 500 kB 产物大小提示；没有调用真实模型端点或操作真实开发数据。
+
+2026-10-15 请求身份收尾验证：类型检查、全量 74 个测试文件／495 项用例、i18n 检查、兼容表单 schema 转换与构建通过；覆盖 UA 优先级、三协议最终 HTTP 头、Go 临时／稳定会话 ID、SDK 输入快照，以及内置 Agent、命名、压缩的身份传递。真实 Go 请求头与 GUI 仍待上述专项验收。
