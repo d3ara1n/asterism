@@ -5,6 +5,7 @@ import { errorDisplay } from "../../../shared/error-display";
 import { modelCatalogMessages as messages } from "../../../shared/model-catalog-messages";
 import type { UiText } from "@atelier/sdk/contracts";
 import { providersMessages } from "../../messages/providers";
+import { modelCostMessages } from "../../messages/model-cost";
 import { useI18n } from "../../shared/i18n";
 import { Alert, AlertDescription } from "../../shared/ui/alert";
 import { Button } from "../../shared/ui/button";
@@ -14,6 +15,7 @@ import { useSettingsConfiguration } from "./state";
 const fields = {
   contextWindow: providersMessages.contextWindow, maxOutputTokens: providersMessages.maximumOutputTokens,
   reasoning: providersMessages.reasoning, tools: providersMessages.toolCalls, thinkingLevels: providersMessages.availableThinkingLevels,
+  cost: modelCostMessages.title,
 };
 
 /** 模型设置中的参数获取与结果展示；失败不被随后配置读取清掉。 */

@@ -13,7 +13,7 @@ function configuration(): ConfigurationSnapshot {
     roles: defaultRoles.map(role => ({ ...role, revision: 1, model: "p/test", thinking: "high" })),
     providers: [{ id: "p", revision: 1, name: "Test", protocol: "openai-responses", baseUrl: "https://example.invalid",
       enabled: true, auth: "none", compatibility: [], credentialState: "not_required" }],
-    models: [{ revision: 1, providerId: "p", name: "Test", modelId: "test", enabled: true, contextWindow: null, compatibility: [],
+    models: [{ revision: 1, providerId: "p", name: "Test", modelId: "test", enabled: true, contextWindow: null, cost: null, compatibility: [],
       capabilities: { reasoning: true, tools: true, thinkingLevels: [...thinkingLevels] },
       generation: { temperature: null, topP: null, maxOutputTokens: null } }],
     defaults: { agents: {}, roles: {} }, overrides: { agents: {}, roles: {} }, tests: [], discoveries: [], credentialStorageAvailable: false,

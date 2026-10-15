@@ -1,0 +1,28 @@
+import { defineMessages, pluginNamespace } from "@atelier/sdk/contracts";
+
+export const modelCostMessages = pluginNamespace("atelier.host").messages("en", defineMessages({
+  title: { id: "modelCost.title", defaultMessage: "Reference prices" },
+  hint: { id: "modelCost.hint", defaultMessage: "All amounts are in USD, for estimates only. Enter an amount, then choose its unit and quantity (for example, 1,000,000 tokens, 1 image or 60 seconds). Blank means unknown; zero means free. Fetch parameters to fill published API prices." },
+  base: { id: "modelCost.base", defaultMessage: "Base prices" },
+  input: { id: "modelCost.input", defaultMessage: "Input" },
+  output: { id: "modelCost.output", defaultMessage: "Output" },
+  cacheRead: { id: "modelCost.cacheRead", defaultMessage: "Cache read" },
+  cacheWrite: { id: "modelCost.cacheWrite", defaultMessage: "Cache write" },
+  reasoning: { id: "modelCost.reasoning", defaultMessage: "Reasoning" },
+  text: { id: "modelCost.text", defaultMessage: "Text" },
+  image: { id: "modelCost.image", defaultMessage: "Image" },
+  audio: { id: "modelCost.audio", defaultMessage: "Audio" },
+  video: { id: "modelCost.video", defaultMessage: "Video" },
+  per: { id: "modelCost.per", defaultMessage: "Per quantity" },
+  unit: { id: "modelCost.unit", defaultMessage: "Unit" },
+  tokenUnit: { id: "modelCost.tokenUnit", defaultMessage: "Tokens" },
+  imageUnit: { id: "modelCost.imageUnit", defaultMessage: "Images" },
+  secondUnit: { id: "modelCost.secondUnit", defaultMessage: "Seconds" },
+  unknown: { id: "modelCost.unknown", defaultMessage: "Unknown" },
+  tiers: { id: "modelCost.tiers", defaultMessage: "Input length tiers" },
+  tiersHint: { id: "modelCost.tiersHint", defaultMessage: "Thresholds must increase. Each tier applies from its input token threshold, including cached input, to the entire request. Blank tier prices stay unknown." },
+  threshold: { id: "modelCost.threshold", defaultMessage: "Input tokens from (inclusive)" },
+  addTier: { id: "modelCost.addTier", defaultMessage: "Add tier" },
+  removeTier: { id: "modelCost.removeTier", defaultMessage: "Remove tier {number}" },
+  clear: { id: "modelCost.clear", defaultMessage: "Clear prices" },
+}));

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Catalog, Model } from "@opencode-ai/models";
 import { createModelInput, modelReference, type ProviderModel } from "../shared/configuration.ts";
 import { loadModelCatalog, modelParameters } from "./model-catalog.ts";
+import { emptyModelRates, emptyModalityRates, type ModelCost } from "../shared/model-cost.ts";
 
 const current: ProviderModel = {
   ...createModelInput("my-connection", { modelId: "test-model", name: "My model" }),
@@ -14,6 +15,7 @@ const entry: Model = {
   attachment: false, modalities: { input: ["text"], output: ["text"] }, open_weights: false,
   release_date: "2026-01-01", last_updated: "2026-01-01",
   limit: { context: 200000, output: 32000 },
+  cost: { input: 2, output: 10, cache_read: 0.2, cache_write: 2.5 },
   reasoning_options: [{ type: "effort", values: ["none", "low", "high"] }],
 };
 function catalog(model: Model = entry): Catalog {
@@ -24,6 +26,7 @@ function catalog(model: Model = entry): Catalog {
   };
 }
 afterEach(() => { vi.unstubAllGlobals(); });
+const perMillion = { unit: "token", per: 1_000_000 } as const;
 
 describe("models.dev 参数覆盖", () => {
   // 新建默认开启思考，但端点的明确 false 仍是有效配置。
@@ -87,7 +90,7 @@ describe("models.dev 参数覆盖", () => {
     const result = modelParameters(data, current);
     expect(result.value.contextWindow).toBe(current.contextWindow);
     expect(result.value.capabilities.thinkingLevels).toEqual(current.capabilities.thinkingLevels);
-    expect(result.report.unfilled).toEqual(["contextWindow", "maxOutputTokens", "thinkingLevels"]);
+    expect(result.report.unfilled).toEqual(["contextWindow", "maxOutputTokens", "thinkingLevels", "cost"]);
     const budget = modelParameters(catalog({ ...entry, reasoning_options: [{ type: "budget_tokens", min: 1024 }, { type: "toggle" }] }), current);
     expect(budget.report.unfilled).toEqual(["thinkingLevels"]);
     const partial = modelParameters(catalog({ ...entry, reasoning_options: [{ type: "effort", values: ["default", "high"] }] }), current);
@@ -95,6 +98,63 @@ describe("models.dev 参数覆盖", () => {
     expect(partial.report.unfilled).toEqual(["thinkingLevels"]);
     expect(() => modelParameters(catalog({ ...entry, limit: { context: -1, output: 32000 } }), current))
       .toThrow(expect.objectContaining({ code: "unavailable" }));
+  });
+
+  // 价格属于原模型 API 参考资料；必须映射成独立契约，保留零价、未知项及全部档位。
+  it("转换参考单价和任意输入阈值，按阈值排序且不继承缺失的档内单价", () => {
+    const result = modelParameters(catalog({ ...entry, cost: {
+      input: 0, output: 10, cache_read: 0, cache_write: 2.5, reasoning: 12, input_audio: 3, output_audio: 15,
+      tiers: [
+        { tier: { type: "context", size: 272000 }, input: 5, output: 22.5, cache_read: 0.5 },
+        { tier: { type: "context", size: 128000 }, input: 3, output: 15 },
+      ],
+      context_over_200k: { input: 99, output: 99 },
+    } }), current);
+    expect(result.value.cost).toEqual({
+      currency: "USD",
+      rates: {
+        text: { input: { amount: 0, ...perMillion }, output: { amount: 10, ...perMillion },
+          cacheRead: { amount: 0, ...perMillion }, cacheWrite: { amount: 2.5, ...perMillion }, reasoning: { amount: 12, ...perMillion } },
+        audio: { ...emptyModalityRates(), input: { amount: 3, ...perMillion }, output: { amount: 15, ...perMillion } },
+        image: emptyModalityRates(), video: emptyModalityRates(),
+      },
+      tiers: [
+        { fromInputTokens: 128000, rates: { ...emptyModelRates(), text: { ...emptyModalityRates(), input: { amount: 3, ...perMillion }, output: { amount: 15, ...perMillion } } } },
+        { fromInputTokens: 272000, rates: { ...emptyModelRates(), text: { ...emptyModalityRates(),
+          input: { amount: 5, ...perMillion }, output: { amount: 22.5, ...perMillion }, cacheRead: { amount: 0.5, ...perMillion } } } },
+      ],
+    });
+    expect(result.report.unfilled).toEqual([]);
+  });
+
+  // 旧字段表达严格超过 200k，新字段则保留目录声明的含边界起点；不能把任意阈值折成 200k。
+  it("只有旧分档字段时转换为 200001 起点，新版空档位列表仍优先", () => {
+    const cost = { input: 1, output: 2, context_over_200k: { input: 3, output: 4 } };
+    expect(modelParameters(catalog({ ...entry, cost }), current).value.cost?.tiers)
+      .toEqual([{ fromInputTokens: 200001, rates: { ...emptyModelRates(), text: { ...emptyModalityRates(),
+        input: { amount: 3, ...perMillion }, output: { amount: 4, ...perMillion } } } }]);
+    expect(modelParameters(catalog({ ...entry, cost: { ...cost, tiers: [] } }), current).value.cost?.tiers).toEqual([]);
+  });
+
+  // 不可表示的价格规则不能被静默简化成基础价；整份旧价格保留，不妨碍其余有效参数更新。
+  it("缺失、非法或未知的价格规则保留原价格并报告，合法零价可以覆盖", () => {
+    const previous: ModelCost = { currency: "USD", rates: { ...emptyModelRates(), text: { ...emptyModalityRates(),
+      input: { amount: 9, ...perMillion }, output: { amount: 20, ...perMillion } } }, tiers: [] };
+    const tier = { tier: { type: "context", size: 100000 }, input: 3, output: 4 };
+    const cases: unknown[] = [
+      undefined, { input: -1, output: 2 }, { input: 1, output: 2, tiers: [tier, tier] },
+      { input: 1, output: 2, tiers: [{ ...tier, tier: { type: "monthly", size: 100000 } }] },
+      { input: 1, output: 2, per_request: 5 },
+    ];
+    for (const cost of cases) {
+      const result = modelParameters(catalog({ ...entry, cost } as Model), { ...current, cost: previous });
+      expect(result.value.cost).toEqual(previous);
+      expect(result.value.contextWindow).toBe(200000);
+      expect(result.report.unfilled).toEqual(["cost"]);
+    }
+    expect(modelParameters(catalog({ ...entry, cost: { input: 0, output: 0 } }), { ...current, cost: previous }).value.cost)
+      .toEqual({ currency: "USD", rates: { ...emptyModelRates(), text: { ...emptyModalityRates(),
+        input: { amount: 0, ...perMillion }, output: { amount: 0, ...perMillion } } }, tiers: [] });
   });
 
   // 官方客户端只访问公开目录；提供商凭据与模型 ID 无需传给 models.dev。

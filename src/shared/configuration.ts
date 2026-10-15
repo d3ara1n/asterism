@@ -2,10 +2,11 @@ import { z } from "zod";
 import { coreChannel } from "./core.ts";
 import { thinkingLevels } from "@atelier/sdk/contracts";
 import { modelCompatibilitySchema } from "./model-compatibility.ts";
+import { modelCostSchema } from "./model-cost.ts";
 
 export const configurationChannel = coreChannel("configuration");
 export const configurationChangedChannel = coreChannel("configuration-changed");
-export const configurationVersion = 9;
+export const configurationVersion = 10;
 const id = z.string().min(1).max(160);
 const name = z.string().trim().min(1).max(160);
 const revision = z.number().int().positive();
@@ -42,6 +43,7 @@ export const providerSchema = providerInputSchema.extend({ revision, credentialS
 export const modelInputSchema = z.strictObject({
   providerId: providerIdSchema, name, modelId: serverModelId, enabled: z.boolean(),
   contextWindow: z.number().int().positive().nullable(),
+  cost: modelCostSchema.nullable().default(null),
   // 只保留改变请求内容的能力；文件是否被接受由服务端决定。
   capabilities: z.strictObject({ reasoning: z.boolean(), tools: z.boolean(), thinkingLevels: z.array(thinkingSchema) }),
   generation: z.strictObject({
@@ -94,7 +96,7 @@ export type ModelDiscovery = z.infer<typeof modelDiscoverySchema>;
 export function createModelInput(providerId: string, model: DiscoveredModel): z.infer<typeof modelInputSchema> {
   return {
     providerId, modelId: model.modelId, name: model.name, enabled: true,
-    contextWindow: model.contextWindow ?? null, compatibility: [],
+    contextWindow: model.contextWindow ?? null, cost: null, compatibility: [],
     capabilities: { reasoning: model.reasoning ?? true, tools: true, thinkingLevels: model.thinkingLevels ?? [...thinkingLevels] },
     generation: { temperature: null, topP: null, maxOutputTokens: null },
   };
@@ -131,7 +133,7 @@ export const configurationCommandSchema = z.discriminatedUnion("type", [
 ]);
 export const modelParameterUpdateSchema = z.strictObject({
   source: z.string(),
-  unfilled: z.array(z.enum(["contextWindow", "maxOutputTokens", "reasoning", "tools", "thinkingLevels"])),
+  unfilled: z.array(z.enum(["contextWindow", "maxOutputTokens", "reasoning", "tools", "thinkingLevels", "cost"])),
 });
 export type ModelParameterUpdate = z.infer<typeof modelParameterUpdateSchema>;
 export const configurationErrorSchema = z.strictObject({

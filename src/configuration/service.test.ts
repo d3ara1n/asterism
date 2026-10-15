@@ -33,7 +33,7 @@ async function addModel(service: ConfigurationService, auth: "none" | "api_key" 
   const provider = await service.execute({ type: "provider.save", id: null, value: { ...providerValue, auth },
     credential: auth === "none" ? { action: "keep" } : { action: "replace", value: "test-key-not-for-network" } });
   const model = await service.execute({ type: "model.save", id: null, value: {
-    providerId: provider.savedId!, name: "Test model", modelId: "test-model", enabled: true, contextWindow: 32000, compatibility: [],
+    providerId: provider.savedId!, name: "Test model", modelId: "test-model", enabled: true, contextWindow: 32000, cost: null, compatibility: [],
     capabilities: { reasoning: false, tools: true, thinkingLevels: [...thinkingLevels] }, generation: { temperature: null, topP: null, maxOutputTokens: null },
   } });
   return { providerId: provider.savedId!, modelId: model.savedId!, snapshot: model.snapshot };
@@ -50,12 +50,23 @@ describe("真实配置与消费边界", () => {
       id: "lab/test-model", name: "Test", description: "", reasoning: true, tool_call: false,
       limit: { context: 128000, output: 16000 },
     } } };
+    data.providers.lab = { id: "lab", name: "Lab", env: [], npm: "@ai-sdk/openai", doc: "https://lab.test", models: {
+      "test-model": { id: "test-model", name: "Test", description: "", reasoning: true, tool_call: false,
+        attachment: false, modalities: { input: ["text"], output: ["text"] }, open_weights: false,
+        release_date: "2026-01-01", last_updated: "2026-01-01", limit: { context: 128000, output: 16000 },
+        cost: { input: 1, output: 2, tiers: [{ tier: { type: "context", size: 64000 }, input: 3, output: 4 }] } },
+    } };
     const catalog = vi.fn<LoadModelCatalog>(async () => data);
     const { service, root, protector } = setup(undefined, true, 30_000, undefined, catalog);
     const { modelId } = await addModel(service);
     const updated = await service.execute({ type: "model.parameters", model: modelId });
     expect(updated.snapshot.models[0]).toMatchObject({
       contextWindow: 128000, capabilities: { reasoning: true, tools: false }, generation: { maxOutputTokens: 16000 },
+      cost: { currency: "USD", rates: { text: {
+        input: { amount: 1, unit: "token", per: 1_000_000 }, output: { amount: 2, unit: "token", per: 1_000_000 },
+      } }, tiers: [{ fromInputTokens: 64000, rates: { text: {
+        input: { amount: 3, unit: "token", per: 1_000_000 }, output: { amount: 4, unit: "token", per: 1_000_000 },
+      } } }] },
     });
     expect(updated.parameterUpdate).toEqual({ source: "lab/test-model", unfilled: ["thinkingLevels"] });
     const reopened = new ConfigurationService(root, protector);
@@ -65,6 +76,58 @@ describe("真实配置与消费边界", () => {
     await expect(service.execute({ type: "model.parameters", model: modelId }))
       .rejects.toMatchObject({ code: "unavailable", message: "Model catalog request failed.", display: { id: "modelCatalog.failed" } });
     expect(service.current().models).toEqual(updated.snapshot.models);
+  });
+
+  // 添加可选价格资料不得让已有配置无法打开，也不能把缺失价格当成零价或改写原文件。
+  it("没有 cost 字段的已有模型读取为未知价格", async () => {
+    const { service, root, protector } = setup();
+    await addModel(service);
+    service.close();
+    const path = join(root, "configuration.json");
+    const document = JSON.parse(readFileSync(path, "utf8"));
+    delete document.models[0].cost;
+    const original = JSON.stringify(document);
+    writeFileSync(path, original);
+    const reopened = new ConfigurationService(root, protector);
+    cleanups.push(() => reopened.close());
+    expect(reopened.current().models[0]?.cost).toBeNull();
+    expect(readFileSync(path, "utf8")).toBe(original);
+  });
+
+  // 存储边界转换旧单价但不重写读取文件；显式保存后须持久化新单位，不能恢复成百万 token。
+  it("旧平铺价格读取为明确单位，编辑后按模态和单位持久化", async () => {
+    const { service, root, protector } = setup();
+    const { modelId } = await addModel(service);
+    service.close();
+    const path = join(root, "configuration.json");
+    const document = JSON.parse(readFileSync(path, "utf8"));
+    const rates = { input: 1, output: 2, cacheRead: 0, cacheWrite: null, reasoning: 3,
+      inputAudio: 4, outputAudio: null, inputImage: null, outputImage: 5, inputVideo: 6, outputVideo: 7 };
+    document.models[0].cost = { currency: "USD", rates, tiers: [{ fromInputTokens: 200000, rates: { ...rates, input: 8 } }] };
+    const original = JSON.stringify(document);
+    writeFileSync(path, original);
+    const reopened = new ConfigurationService(root, protector);
+    cleanups.push(() => reopened.close());
+    const { revision: _revision, ...model } = reopened.current().models[0]!;
+    expect(model.cost).toMatchObject({
+      rates: {
+        text: { input: { amount: 1, unit: "token", per: 1_000_000 }, cacheRead: { amount: 0, unit: "token", per: 1_000_000 }, cacheWrite: null },
+        image: { output: { amount: 5, unit: "token", per: 1_000_000 } },
+        audio: { input: { amount: 4, unit: "token", per: 1_000_000 } },
+        video: { input: { amount: 6, unit: "token", per: 1_000_000 }, output: { amount: 7, unit: "token", per: 1_000_000 } },
+      },
+      tiers: [{ fromInputTokens: 200000, rates: { text: { input: { amount: 8, unit: "token", per: 1_000_000 } } } }],
+    });
+    expect(readFileSync(path, "utf8")).toBe(original);
+    model.cost!.rates.image.output = { amount: 0.04, unit: "image", per: 1 };
+    model.cost!.rates.audio.input = { amount: 0.006, unit: "second", per: 60 };
+    await reopened.execute({ type: "model.save", id: modelId, value: model });
+    const saved = JSON.parse(readFileSync(path, "utf8")).models[0].cost;
+    expect(saved).toEqual(model.cost);
+    reopened.close();
+    const final = new ConfigurationService(root, protector);
+    cleanups.push(() => final.close());
+    expect(final.current().models[0]?.cost).toEqual(model.cost);
   });
 
   it("目录网络等待不阻塞配置队列，期间模型修改与退出阻止迟到覆盖", async () => {

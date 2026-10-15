@@ -2,6 +2,7 @@ import { Models, type Catalog, type Model, type ModelMetadata } from "@opencode-
 import { z } from "zod";
 import { modelInputSchema, thinkingSchema, type ProviderModel, type ModelParameterUpdate } from "../shared/configuration.ts";
 import { modelCatalogMessages as messages } from "../shared/model-catalog-messages.ts";
+import { emptyModelRates, modelCostSchema, type ModelCost, type ModelRates, type UnitPrice } from "../shared/model-cost.ts";
 import { ConfigurationError } from "./errors.ts";
 
 export type LoadModelCatalog = (signal: AbortSignal) => Promise<Catalog>;
@@ -34,6 +35,7 @@ function selectModel(catalog: Catalog, modelId: string): Match {
 
 // 只校验实际消费的字段；不复制 SDK 的完整目录 schema。
 const entrySchema = z.object({
+  cost: z.unknown().optional(),
   reasoning: z.boolean().optional(),
   tool_call: z.boolean().optional(),
   limit: z.object({ context: z.number().int().nonnegative(), output: z.number().int().nonnegative().optional() }).optional(),
@@ -44,7 +46,49 @@ const entrySchema = z.object({
   ])).optional(),
 });
 
-/** 用户明确获取参数时覆盖已知字段；身份、连接、兼容设置与目录未给出的参数不参与覆盖。 */
+// 外部目录的形状只存在于转换边界，配置与消费者使用工坊自己的价格契约。
+const catalogPrice = z.number().nonnegative();
+const catalogRatesSchema = z.strictObject({
+  input: catalogPrice, output: catalogPrice,
+  cache_read: catalogPrice.optional(), cache_write: catalogPrice.optional(),
+  reasoning: catalogPrice.optional(), input_audio: catalogPrice.optional(), output_audio: catalogPrice.optional(),
+});
+const catalogCostSchema = catalogRatesSchema.extend({
+  context_over_200k: z.unknown().optional(),
+  tiers: z.array(catalogRatesSchema.extend({
+    tier: z.strictObject({ type: z.literal("context"), size: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER) }),
+  })).optional(),
+});
+function tokenPrice(amount: number | undefined): UnitPrice | null {
+  return amount === undefined ? null : { amount, unit: "token", per: 1_000_000 };
+}
+function modelRates(value: z.infer<typeof catalogRatesSchema>): ModelRates {
+  const rates = emptyModelRates();
+  rates.text = {
+    input: tokenPrice(value.input), output: tokenPrice(value.output),
+    cacheRead: tokenPrice(value.cache_read), cacheWrite: tokenPrice(value.cache_write), reasoning: tokenPrice(value.reasoning),
+  };
+  rates.audio.input = tokenPrice(value.input_audio);
+  rates.audio.output = tokenPrice(value.output_audio);
+  // 未提供的模态与计费项保持未知，不从文本单价推断图片、音频或视频价格。
+  return rates;
+}
+function modelCost(raw: unknown): ModelCost | null {
+  const parsed = catalogCostSchema.safeParse(raw);
+  if (!parsed.success) return null;
+  const cost = parsed.data;
+  const tiers = cost.tiers?.map(tier => ({ fromInputTokens: tier.tier.size, rates: modelRates(tier) })) ?? [];
+  if (cost.tiers === undefined && cost.context_over_200k !== undefined) {
+    const legacy = catalogRatesSchema.safeParse(cost.context_over_200k);
+    if (!legacy.success) return null;
+    tiers.push({ fromInputTokens: 200_001, rates: modelRates(legacy.data) });
+  }
+  tiers.sort((left, right) => left.fromInputTokens - right.fromInputTokens);
+  const result = modelCostSchema.safeParse({ currency: "USD", rates: modelRates(cost), tiers });
+  return result.success ? result.data : null;
+}
+
+/** 用户明确获取时覆盖可映射参数；价格整项替换，身份、连接与兼容设置保留。 */
 export function modelParameters(catalog: Catalog, current: ProviderModel): {
   value: z.infer<typeof modelInputSchema>; report: ModelParameterUpdate;
 } {
@@ -72,7 +116,10 @@ export function modelParameters(catalog: Catalog, current: ProviderModel): {
       if (!mapped.length || [...levels].some(level => !thinkingSchema.safeParse(level).success)) unfilled.push("thinkingLevels");
       else value.capabilities.thinkingLevels = mapped;
     }
-    if (unfilled.length === 5) throw new ConfigurationError("unavailable", "No usable catalog parameters were found.", messages.invalid);
+    const cost = modelCost(entry.cost);
+    if (cost) value.cost = cost;
+    else unfilled.push("cost");
+    if (unfilled.length === 6) throw new ConfigurationError("unavailable", "No usable catalog parameters were found.", messages.invalid);
     return { value: modelInputSchema.parse(value), report: { source: match.source, unfilled } };
   } catch (error) {
     if (error instanceof ConfigurationError) throw error;

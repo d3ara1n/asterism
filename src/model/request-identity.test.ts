@@ -21,7 +21,7 @@ describe("模型请求身份", () => {
       settings: {
         provider: { id: "test", name: "Test", protocol: "openai-responses", baseUrl: "https://example.invalid/v1",
           auth: "api_key", enabled: true, revision: 1, compatibility: [{ id: "opencodeSession" }] },
-        model: { providerId: "test", modelId: "test", name: "Test", enabled: true, revision: 1, contextWindow: null,
+        model: { providerId: "test", modelId: "test", name: "Test", enabled: true, revision: 1, contextWindow: null, cost: null,
           capabilities: { reasoning: false, thinkingLevels: [], tools: false }, compatibility: [],
           generation: { temperature: null, topP: null, maxOutputTokens: null } },
         thinking: null,

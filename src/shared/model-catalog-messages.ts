@@ -3,7 +3,7 @@ import { defineMessages, pluginNamespace } from "@atelier/sdk/contracts";
 export const modelCatalogMessages = pluginNamespace("atelier.host").messages("en", defineMessages({
   fetch: { id: "modelCatalog.fetch", defaultMessage: "Fetch parameters" },
   fetching: { id: "modelCatalog.fetching", defaultMessage: "Fetching…" },
-  hint: { id: "modelCatalog.hint", defaultMessage: "Fetch parameters from models.dev and overwrite current values. You can edit them afterwards." },
+  hint: { id: "modelCatalog.hint", defaultMessage: "Fetch parameters and API reference prices from models.dev and overwrite current values. You can edit them afterwards." },
   saved: { id: "modelCatalog.saved", defaultMessage: "Parameters saved from models.dev ({source})." },
   unfilled: { id: "modelCatalog.unfilled", defaultMessage: "Unavailable or not directly supported: {fields}. These settings were kept; review them manually." },
   failed: { id: "modelCatalog.failed", defaultMessage: "Could not fetch parameters from models.dev. Your settings were kept. Try again or enter them manually." },

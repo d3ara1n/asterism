@@ -26,6 +26,7 @@ import { Section } from "../settings/layout";
 import { Editor, EditorSection, TextField, ChoiceField, NumberField } from "./forms";
 import { useSettingsConfiguration } from "./state";
 import { ModelCompatibilityEditor } from "./ModelCompatibilityEditor";
+import { ModelCostEditor } from "./ModelCostEditor";
 import { modelProtocolLabels } from "./protocols";
 import { ModelDiscoveryPicker } from "./ModelDiscoveryPicker";
 import { useModelParameters } from "./ModelParameters";
@@ -93,6 +94,7 @@ const providerValue = (provider: Provider): ProviderValue => ({
 const modelValue = (model: ProviderModel): ModelValue => ({
   providerId: model.providerId, name: model.name, modelId: model.modelId, enabled: model.enabled, contextWindow: model.contextWindow,
   capabilities: { ...model.capabilities }, generation: { ...model.generation }, compatibility: structuredClone(model.compatibility),
+  cost: structuredClone(model.cost),
 });
 
 /* ---------- 根：提供商总览 ---------- */
@@ -399,6 +401,7 @@ function ModelEditor({ initialId, providerId }: { initialId: string | null; prov
           <NumberField label={i18n.formatMessage(providersMessages.maximumOutputTokens)} value={value.generation.maxOutputTokens} onChange={next => set("generation", { ...value.generation, maxOutputTokens: next })} min={1} integer />
         </FieldGroup>
       </EditorSection>
+      <ModelCostEditor value={value.cost} onChange={next => set("cost", next)} />
       <ModelCompatibilityEditor value={value.compatibility} inherited={provider?.compatibility ?? []} onChange={next => set("compatibility", next)} />
       </fieldset>
     </form>

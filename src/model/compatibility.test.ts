@@ -12,7 +12,7 @@ function input(protocol: ModelInput["settings"]["provider"]["protocol"] = "opena
   return {
     settings: {
       provider: { id: "p", revision: 1, name: "Test", protocol, baseUrl: "https://example.invalid/v1", enabled: true, auth: "none", compatibility: [] },
-      model: { providerId: "p", modelId: "test", name: "Test", revision: 1, enabled: true, contextWindow: null,
+      model: { providerId: "p", modelId: "test", name: "Test", revision: 1, enabled: true, contextWindow: null, cost: null,
         capabilities: { reasoning: true, thinkingLevels: [...thinkingLevels], tools: true },
         generation: { temperature: null, topP: null, maxOutputTokens: 4096 }, compatibility: [] }, thinking: "low",
     },

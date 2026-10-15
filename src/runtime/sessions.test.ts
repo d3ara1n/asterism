@@ -47,7 +47,7 @@ async function setup(model: ModelAdapter = adapter(), onSessionChanged?: (event:
   const { savedId: providerId } = await service.configuration.execute({ type: "provider.save", id: null,
     value: { id: "test", name: "Test", protocol: "openai-responses", baseUrl: "https://example.invalid/v1", enabled: true, auth: "none", compatibility: [] }, credential: { action: "keep" } });
   const { savedId: modelId } = await service.configuration.execute({ type: "model.save", id: null,
-    value: { providerId: providerId!, name: "Test", modelId: "test", enabled: true, contextWindow: null, compatibility: [],
+    value: { providerId: providerId!, name: "Test", modelId: "test", enabled: true, contextWindow: null, cost: null, compatibility: [],
       capabilities: { tools: true, reasoning: false, thinkingLevels: [...thinkingLevels] }, generation: { temperature: null, topP: null, maxOutputTokens: null } } });
   const start: Extract<SessionCommand, { type: "start" }> = { type: "start", submissionId: randomUUID(), agent: "worker", model: modelId!, thinking: null, parts: [{ kind: "text", text: "First" }] };
   return { service, root, start };

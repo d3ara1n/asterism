@@ -5,19 +5,22 @@ import { z } from "zod";
 import { applicationStorage } from "../shared/application.ts";
 import { agentOverridesSchema, modelReference, modelRoleOverridesSchema, modelSchema, providerInputSchema,
   type AgentOverrides, type ModelRoleOverrides, type ProviderInput, type ProviderModel } from "../shared/configuration.ts";
+import { modelCostSchema } from "../shared/model-cost.ts";
 import { defaultAgents, defaultRoles } from "./defaults.ts";
 import { ConfigurationError } from "./errors.ts";
 import { normalizeOverrides, resolveAgentConfiguration, resolveRoleConfiguration } from "./layers.ts";
+import { migrateModelCost } from "./model-cost-migration.ts";
 
 const identity = { id: z.string().min(1).max(160), revision: z.number().int().positive() };
 const storedProviderSchema = providerInputSchema.extend({ revision: identity.revision, credentialRef: z.string().uuid().nullable() });
 const storedRoleSchema = z.strictObject({ ...identity, builtin: z.boolean(), overrides: modelRoleOverridesSchema });
 const storedAgentSchema = z.strictObject({ ...identity, builtin: z.boolean(), overrides: agentOverridesSchema });
+const storedModelSchema = modelSchema.extend({ cost: z.preprocess(migrateModelCost, modelCostSchema.nullable().default(null)) });
 /** 模型以 `<providerId>/<modelId>` 识别，其余以 id 识别。 */
 const keyOf = (item: { id: string } | { providerId: string; modelId: string }): string => "id" in item ? item.id : modelReference(item);
 const documentSchema = z.strictObject({
   version: z.literal(6),
-  providers: z.array(storedProviderSchema), models: z.array(modelSchema),
+  providers: z.array(storedProviderSchema), models: z.array(storedModelSchema),
   roles: z.array(storedRoleSchema), agents: z.array(storedAgentSchema),
 }).superRefine((document, context) => {
   for (const key of ["providers", "models", "roles", "agents"] as const) {
