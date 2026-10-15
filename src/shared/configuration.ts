@@ -5,7 +5,7 @@ import { modelCompatibilitySchema } from "./model-compatibility.ts";
 
 export const configurationChannel = coreChannel("configuration");
 export const configurationChangedChannel = coreChannel("configuration-changed");
-export const configurationVersion = 8;
+export const configurationVersion = 9;
 const id = z.string().min(1).max(160);
 const name = z.string().trim().min(1).max(160);
 const revision = z.number().int().positive();

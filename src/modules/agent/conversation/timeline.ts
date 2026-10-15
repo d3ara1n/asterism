@@ -28,6 +28,7 @@ function item(record: SessionRecord, agentId: string): TimelineItem | null {
   }
   if (execution?.status === "known" && execution.data.type === "block") return {
     ...execution.data.block, id: record.id, createdAt: record.createdAt, usage: execution.data.block.completion?.usage ?? null,
+    ...(execution.data.block.kind === "thinking" ? { text: execution.data.block.text || execution.data.block.summary } : {}),
   };
   return null;
 }

@@ -50,7 +50,8 @@ export function requestOptions(provider: Connection, model: ProviderModel, reque
     ...(provider.protocol === "openai-responses" ? {
       // 显式 false 同样重要：否则 SDK 会按模型名自动请求加密思考。
       store: false, forceReasoning: reasoning,
-      ...(reasoning ? { include: ["reasoning.encrypted_content"], reasoningSummary: "auto" } : {}),
+      ...(reasoning && compatibility.encryptedContent ? { include: ["reasoning.encrypted_content"] } : {}),
+      ...(reasoning && compatibility.reasoningSummary ? { reasoningSummary: "auto" } : {}),
       ...(compatibility.systemMessage ? { systemMessageMode: "system" }
         : request.system !== undefined ? { instructions: request.system } : {}),
     } : {}),

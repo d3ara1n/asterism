@@ -3,19 +3,19 @@ import { defineProviderPresets, providerPresetDraft, providerPresets } from "./p
 
 describe("提供商连接预设", () => {
   // 配置契约：预设只提供连接；编辑或移除草稿兼容项不能污染以后创建的连接。
-  it("DeepSeek 带入所需兼容包，每份草稿独立且不携带目录元数据", () => {
-    const preset = providerPresets.find(item => item.id === "deepseek")!;
+  it("Kimi 带入端点字段设置，每份草稿独立且不携带目录元数据", () => {
+    const preset = providerPresets.find(item => item.id === "kimi")!;
     const draft = providerPresetDraft(preset);
     expect(draft).toEqual({
-      id: "deepseek", name: "DeepSeek", protocol: "openai-responses",
-      baseUrl: "https://api.deepseek.com", auth: "api_key",
-      compatibility: [{ id: "thinkingInDeepSeekFormat" }],
+      id: "kimi", name: "Kimi", protocol: "openai-responses",
+      baseUrl: "https://api.moonshot.ai/v1", auth: "api_key",
+      compatibility: [{ id: "responsesReasoning", value: { encryptedContent: false, summary: false } }],
     });
     draft.compatibility[0]!.id = "systemMessageInMessages";
     draft.compatibility.push({ id: "toolFilesAsUserMessage" });
     draft.baseUrl = "https://example.test/v1";
-    expect(providerPresetDraft(preset).compatibility).toEqual([{ id: "thinkingInDeepSeekFormat" }]);
-    expect(preset.connection.baseUrl).toBe("https://api.deepseek.com");
+    expect(providerPresetDraft(preset).compatibility).toEqual([{ id: "responsesReasoning", value: { encryptedContent: false, summary: false } }]);
+    expect(preset.connection.baseUrl).toBe("https://api.moonshot.ai/v1");
   });
 
   // 重复添加同一产品必须生成新连接身份，不能覆盖已有密钥或连接配置。

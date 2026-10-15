@@ -10,10 +10,14 @@ export function compatibilityForTarget(settings: {
 }) {
   const entries = mergeModelCompatibility(settings.provider.compatibility, settings.model.compatibility);
   const has = (id: string) => entries.some(entry => entry.id === id);
+  const reasoning = entries.find(entry => entry.id === "responsesReasoning");
+  const fields = reasoning && "value" in reasoning ? reasoning.value as { content?: "array" | "object"; encryptedContent?: boolean; summary?: boolean } : {};
   // 协议编码器解释自己认识的行为；appliesTo 只用于展示，不参与匹配。
   return {
     systemMessage: settings.provider.protocol === "openai-responses" && has("systemMessageInMessages"),
-    plainThinking: settings.provider.protocol === "openai-responses" && has("thinkingInDeepSeekFormat"),
+    reasoningContent: fields.content ?? "array",
+    encryptedContent: fields.encryptedContent ?? true,
+    reasoningSummary: fields.summary ?? true,
     toolFiles: settings.provider.protocol === "openai-chat" && has("toolFilesAsUserMessage"),
   };
 }
@@ -38,7 +42,6 @@ const portableId = /^[A-Za-z0-9_-]{1,64}$/u;
 export function projectHistory(input: ModelInput): ResolvedModelItem[] {
   validateProjection(input);
   const { settings } = input;
-  const compatibility = compatibilityForTarget(settings);
   const nativeIds = new Set(input.messages.flatMap(item => item.kind === "output" && canReuseContinuation(item, settings)
     ? item.parts.flatMap(part => part.kind === "toolcall" ? [part.callId] : []) : []));
   const usedIds = new Set<string>();
@@ -64,20 +67,11 @@ export function projectHistory(input: ModelInput): ResolvedModelItem[] {
       } else if (part.kind === "text") {
         parts.push({ ...part, continuation });
       } else if (settings.model.capabilities.reasoning) {
-        if (compatibility.plainThinking) {
-          // 明文兼容只消费公共文字，不借用来源的 item ID、签名或密文。
-          if (part.text) parts.push({ ...part, continuation: {} });
-        } else if (settings.provider.protocol === "anthropic") {
-          if (typeof continuation.anthropic?.signature === "string" || typeof continuation.anthropic?.redactedData === "string") {
-            parts.push({ ...part, continuation });
-          }
-        } else if (settings.provider.protocol === "openai-responses") {
-          // 基线固定 store:false，item ID 不能代替无状态续接所需的密文。
-          if (typeof continuation.openai?.reasoningEncryptedContent === "string") {
-            parts.push({ ...part, continuation });
-          }
-        }
-        // 目标不能表达的无签名／无密文思考不伪装成正文；原文始终保留在时间线。
+        if (settings.provider.protocol === "openai-responses" && (part.text || part.summary || typeof continuation.openai?.reasoningEncryptedContent === "string"))
+          parts.push({ ...part, continuation });
+        else if (settings.provider.protocol === "anthropic" && (part.text || typeof continuation.anthropic?.signature === "string" || typeof continuation.anthropic?.redactedData === "string"))
+          parts.push({ ...part, continuation });
+        // Chat 没有公共思考输入；Anthropic 不将独立摘要伪装成 thinking 或助手正文。
       }
     }
     if (parts.length) projected.push({ ...item, parts });

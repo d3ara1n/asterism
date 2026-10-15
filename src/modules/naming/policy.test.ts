@@ -23,7 +23,7 @@ describe("自动命名的领域材料", () => {
       output("a-progress", "a", "b1", "正在检查"), output("b-final", "b", "a-progress", "已核对账单"),
       output("a-final-2", "a", "b-final", "通过测试", { responseId: "a-final", ordinal: 2 }),
       output("a-final-1", "a", "b-final", "修复 token 刷新", { responseId: "a-final", ordinal: 1 }),
-      output("thinking", "a", "a-final-1", "秘密思考", { kind: "thinking" }),
+      output("thinking", "a", "a-final-1", "秘密思考", { kind: "thinking", summary: "" }),
       output("partial", "a", "thinking", "不完整产出", { complete: false }),
       input("a2", "a", "补充说明"),
       output("late", "a", "a1", "原请求迟到的回复"),

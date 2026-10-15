@@ -18,8 +18,8 @@ function block(agentId: string, responseId: string, ordinal: number, body: Recor
 }
 export const text = (agentId: string, responseId: string, ordinal: number, value: string, options?: BlockOptions) =>
   block(agentId, responseId, ordinal, { kind: "text", text: value }, options);
-export const thinking = (agentId: string, responseId: string, ordinal: number, value = "…", options?: BlockOptions) =>
-  block(agentId, responseId, ordinal, { kind: "thinking", text: value }, options);
+export const thinking = (agentId: string, responseId: string, ordinal: number, value = "…", options?: BlockOptions & { summary?: string }) =>
+  block(agentId, responseId, ordinal, { kind: "thinking", text: value, summary: options?.summary ?? "" }, options);
 export const call = (agentId: string, responseId: string, ordinal: number, callId: string, extra: { name?: string; arguments?: Json; outcome?: ToolOutcome | null } & BlockOptions = {}) =>
   block(agentId, responseId, ordinal, { kind: "toolcall", callId, name: extra.name ?? "read", argumentsText: "{}", arguments: extra.arguments ?? {},
     outcome: (extra.outcome === undefined ? { kind: "succeeded", model: [{ kind: "text", text: callId }], data: null } : extra.outcome) as Json },

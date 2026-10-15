@@ -85,5 +85,6 @@ export function projectAgentContext(snapshot: Pick<SessionSnapshot, "records">, 
 function part(block: ModelBlock): ModelPart {
   return block.kind === "toolcall"
     ? { kind: "toolcall", callId: block.callId, name: block.name, arguments: block.arguments, continuation: block.continuation }
-    : { kind: block.kind, text: block.text, continuation: block.continuation };
+    : block.kind === "thinking" ? { kind: "thinking", text: block.text, summary: block.summary, continuation: block.continuation }
+      : { kind: "text", text: block.text, continuation: block.continuation };
 }

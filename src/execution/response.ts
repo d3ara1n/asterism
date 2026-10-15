@@ -7,6 +7,7 @@ type BufferedBlock = {
   part: StreamPart;
   ordinal: number;
   text: string;
+  summary: string;
   startedAt: number;
   endedAt: number | null;
   arguments: Json;
@@ -48,7 +49,7 @@ export class ResponseBuffer {
         throw new ModelFailure("protocol", "The provider started a duplicate response block.");
       }
       if (event.part.kind === "toolcall") this.callIds.add(event.part.callId);
-      this.blocks.set(event.part.id, { part: event.part, ordinal: this.blocks.size, text: "", startedAt: Date.now(), arguments: null, previewArguments: null, previewText: "", continuation: null,
+      this.blocks.set(event.part.id, { part: event.part, ordinal: this.blocks.size, text: "", summary: "", startedAt: Date.now(), arguments: null, previewArguments: null, previewText: "", continuation: null,
         endedAt: null, emitted: false, executing: false, invocation: null, result: null });
       return;
     }
@@ -64,7 +65,10 @@ export class ResponseBuffer {
     const block = this.blocks.get(event.partId);
     if (!block || block.endedAt !== null) throw new ModelFailure("protocol", "The provider updated an inactive response block.");
     if (event.type === "part.delta") {
-      block.text += event.delta;
+      if (event.channel === "summary") {
+        if (block.part.kind !== "thinking") throw new ModelFailure("protocol", "Only thinking blocks can carry a summary.");
+        block.summary += event.delta;
+      } else block.text += event.delta;
       return;
     }
     block.arguments = event.arguments ?? null;
@@ -104,7 +108,7 @@ export class ResponseBuffer {
       return block.part.kind === "toolcall"
         ? { ...base, kind: "toolcall", name: block.part.name, argumentsText: block.text, arguments: block.endedAt !== null ? block.arguments : block.previewArguments,
           state: block.executing ? "executing" : block.endedAt !== null ? "ready" : "input", invocation: block.invocation, result: block.result }
-        : block.part.kind === "thinking" ? { ...base, kind: "thinking", text: block.text, startedAt: block.startedAt, endedAt: block.endedAt }
+        : block.part.kind === "thinking" ? { ...base, kind: "thinking", text: block.text || block.summary, startedAt: block.startedAt, endedAt: block.endedAt }
           : { ...base, kind: "text", text: block.text, endedAt: block.endedAt };
     });
   }
@@ -143,7 +147,8 @@ export class ResponseBuffer {
       completion: block.ordinal === this.blocks.size - 1 ? this.completion : null };
     this.onBlock(block.part.kind === "toolcall"
       ? { ...common, kind: "toolcall" as const, callId: block.part.callId, name: block.part.name, argumentsText: block.text, arguments: block.arguments, outcome }
-      : { ...common, kind: block.part.kind, text: block.text });
+      : block.part.kind === "thinking" ? { ...common, kind: "thinking", text: block.text, summary: block.summary }
+        : { ...common, kind: "text", text: block.text });
     block.emitted = true;
   }
 }

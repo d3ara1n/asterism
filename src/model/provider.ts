@@ -4,7 +4,8 @@ import type { ProviderInput, ProviderModel } from "../shared/configuration.ts";
 import { ModelFailure } from "./contract.ts";
 import { unauthenticatedApiKey } from "../shared/model.ts";
 import { compatibilityForTarget } from "./projection.ts";
-import { withDeepSeekReasoning } from "./deepseek-reasoning.ts";
+import { withResponsesReasoning } from "./responses-reasoning.ts";
+import { withAnthropicThinking } from "./anthropic-thinking.ts";
 
 export class ProviderTransportError extends ModelFailure {
   constructor() { super("configuration", "API key connections require HTTPS, except on loopback addresses."); }
@@ -23,9 +24,9 @@ export function createProviderModel(provider: ProviderInput, model: ProviderMode
     return transport(url, { ...init, headers, redirect: "error" });
   };
   const options = { baseURL: provider.baseUrl, apiKey: provider.auth === "none" ? unauthenticatedApiKey : key, fetch: scopedFetch };
-  if (provider.protocol === "anthropic") return createAnthropic(options).messages(model.modelId);
+  if (provider.protocol === "anthropic") return withAnthropicThinking(
+    fetch => createAnthropic({ ...options, fetch }).messages(model.modelId), scopedFetch);
   if (provider.protocol === "openai-chat") return createOpenAI(options).chat(model.modelId);
   const responses = (fetch: typeof scopedFetch) => createOpenAI({ ...options, fetch }).responses(model.modelId);
-  return compatibilityForTarget({ provider, model }).plainThinking
-    ? withDeepSeekReasoning(responses, scopedFetch) : responses(scopedFetch);
+  return withResponsesReasoning(responses, scopedFetch, compatibilityForTarget({ provider, model }));
 }

@@ -101,7 +101,7 @@ import { Read, settings, service } from "@example/tools/public";
 
 前端 `prepare({ events })` 可建立不依赖卡片挂载的模块订阅，失败、超时或应用关闭时自动取消；组件以 `useRendererEvents()` 取用接口，自行在 effect 清理时 close。订阅提供 ready、closed 与 close，handler 接收具型信封及取消信号。每个订阅按序投递、期间不丢事件，失败和断连明确结束。事件不参与事务，调用即投递。事件不写历史、不保留供晚订阅读取的状态，领域自行恢复当前值。
 
-[事件作者示例与类型反例](examples/events.ts) 随 typecheck 检查；完整来源与投递约定见 [插件 SDK](../../docs/plugin-sdk.md#瞬态事件与插件调用)。通用事件入口要求 API 7.1。API 7.2 增加宿主登记的公共 `ResourceStatusChanged`，资源直接发布 `{ title: UiText, status: "running" | "failed" | "awaiting" | "completed" }`，running 可附带 `progress: { value: number }`（0～1），终态不能携带进度，不在自己的 events 中重复登记。状态采用资源级 snapshot（key 为空），四种状态均以最新完整值替换旧值；外壳以 latest 消费并聚合为会话 badge，进入会话只清除终态，running 及进度保留。不提供 reset、撤回或恢复查询。
+[事件作者示例与类型反例](examples/events.ts) 随 typecheck 检查；完整来源与投递约定见 [插件 SDK](../../docs/plugin-sdk.md#瞬态事件与插件调用)。公共 `ResourceStatusChanged` 由宿主登记，资源直接发布 `{ title: UiText, status: "running" | "failed" | "awaiting" | "completed" }`，running 可附带 `progress: { value: number }`（0～1），终态不能携带进度，不在自己的 events 中重复登记。状态采用资源级 snapshot（key 为空），四种状态均以最新完整值替换旧值；外壳以 latest 消费并聚合为会话 badge，进入会话只清除终态，running 及进度保留。不提供 reset、撤回或恢复查询。
 
 ## 插件配置
 
@@ -163,13 +163,15 @@ ResourceDescription、ToolView、CreationEntry 的 label／description 接收 Ui
 
 ## 版本与当前边界
 
-SDK 包版本为 `0.13.0`，宿主提供 API 7.3；依赖 `models.stream` 的 `maxOutputTokens` 参数时声明 `api: { major: 7, minMinor: 3 }`，使用公共资源状态要求 minMinor 2，通用事件接口要求 minMinor 1。输出上限须为正安全整数，与模型配置的上限取较小值，省略时沿用模型配置。同主版本旧插件继续可用，其他主版本或更高小版本在加载前拒绝。应用内部 IPC、数据库与配置文件版本独立维护，职责及格式约定见 [架构文档](../../docs/architecture.md)，不以 SDK 包版本替代。
+SDK 包版本为 `0.14.0`，宿主提供 API 8.0，插件声明 `api: { major: 8, minMinor: 0 }`。思考内容必须分别提供 text 与 summary；旧主版本及更高小版本在加载前拒绝。`models.stream` 的 maxOutputTokens 须为正安全整数，与模型配置的上限取较小值，省略时沿用模型配置。应用内部 IPC、数据库与配置文件版本独立维护，职责及格式约定见 [架构文档](../../docs/architecture.md)，不以 SDK 包版本替代。
 
 资源创建数据必须是 JSON 对象，不能占用宿主的 `id / type / title` 字段。当前会话数据保存于 `session_data`，事件及工具结果保存稳定契约身份与原始数据。core 消费具型用户消息、模型执行、通知与环境记录，存储编码由宿主负责；环境记录保留原事件身份与载荷。
 
 内置插件与打包验收、core 领域共识包、通用跨插件调用、跨进程通信与包管理的后续能力见 [插件计划](../../plans/todo-2026-10-12-plugin-system.md)。core 领域共识包是确定延后的任务，不包含 core 运行时实例。
 
 ## 可选模型分支
+
+思考是公共模型的原生内容。`ModelPart` 与 `ModelBlock` 的 thinking 分支必填 `text`、`summary` 和 `continuation`：明文、摘要与原生续接资料分别保存，两个文字字段可并存或为空。`part.delta` 缺省累积到 text，`channel: "summary"` 累积到摘要，不能用于正文或工具参数。`ModelLiveBlock.text` 只用于展示，优先明文否则摘要；重建请求必须消费成型块，不能使用这个展示值。来源作用域与适配版本只限制签名／密文等资料，兼容包只处理端点字段差异。
 
 模型输入及 context 均使用 `parts: ModelInputPart[]`，文字为 `{ kind: "text", text }`，文件为 `{ kind: "file", file: ContentRef, mediaType, filename? }`；mediaType 如实标注，不建模输入模态。输入不携带字节或路径。`models.validate(request, { content })` 和 `models.stream(request, { content })` 接收准备阶段、对象或会话已有的宿主 ContentReader；含文件时必须提供，纯文字可省略。模型消息与运行时门面分别传递，内容资格不进入持久消息。可编译示例见 [模型输入](examples/model-input.ts)。
 

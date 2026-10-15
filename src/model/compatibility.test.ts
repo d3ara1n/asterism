@@ -53,6 +53,85 @@ async function request(value: ModelInput): Promise<Record<string, unknown>> {
 }
 
 describe("显式兼容与目标投影", () => {
+  // 公共契约：摘要不能填充全文；来源密文可复用时优先发送，空文字密文也不得丢失。
+  it("Responses 分别编码明文、摘要与原生密文，历史不变", async () => {
+    const current = input();
+    current.messages = [{ kind: "output", adapter: aiSdkAdapterVersion, scope: modelScope(current.settings), parts: [
+      { kind: "thinking", text: "Plain", summary: "Summary", continuation: null },
+      { kind: "thinking", text: "", summary: "Summary only", continuation: null },
+      { kind: "thinking", text: "Visible full text", summary: "Opaque summary",
+        continuation: { openai: { itemId: "rs_native", reasoningEncryptedContent: "cipher" } } },
+      { kind: "thinking", text: "", summary: "", continuation: { openai: { reasoningEncryptedContent: "cipher-only" } } },
+      { kind: "text", text: "Answer", continuation: null },
+    ] }];
+    const original = structuredClone(current);
+    expect((await request(current)).input).toEqual([
+      { type: "reasoning", content: [{ type: "reasoning_text", text: "Plain" }], summary: [{ type: "summary_text", text: "Summary" }] },
+      { type: "reasoning", summary: [{ type: "summary_text", text: "Summary only" }] },
+      { type: "reasoning", id: "rs_native", encrypted_content: "cipher", summary: [{ type: "summary_text", text: "Opaque summary" }] },
+      { type: "reasoning", encrypted_content: "cipher-only", summary: [] },
+      { role: "assistant", content: "Answer" },
+    ]);
+    expect(current).toEqual(original);
+    current.settings.model.capabilities.reasoning = false;
+    expect((await request(current)).input).toEqual([{ role: "assistant", content: "Answer" }]);
+  });
+
+  // Kimi 的 include 枚举没有 encrypted_content；GLM schema 的 content 为单对象，不能继续发数组。
+  it("端点兼容只调整字段形状和不支持的请求参数，首次请求也生效", async () => {
+    const current = input();
+    current.settings.provider.compatibility = [{ id: "responsesReasoning", value: { content: "object", encryptedContent: false, summary: false } }];
+    const first = await request(current);
+    expect(first).not.toHaveProperty("include");
+    expect(first.reasoning).toEqual({ effort: "low" });
+    current.messages.push({ kind: "output", adapter: "foreign", scope: "foreign", parts: [
+      { kind: "thinking", text: "Plain", summary: "", continuation: null },
+      { kind: "text", text: "Answer", continuation: null },
+    ] });
+    expect((await request(current)).input).toContainEqual({ type: "reasoning", content: { type: "reasoning_text", text: "Plain" } });
+  });
+
+  // Messages 的签名必须对应原文字；无签名文字原样编码，摘要不伪装成 thinking，纯遮蔽块正常续接。
+  it("Messages 原生支持无签名明文、签名及遮蔽思考，并保持工具相对顺序", async () => {
+    const current = input("anthropic");
+    current.messages = [{ kind: "output", adapter: aiSdkAdapterVersion, scope: modelScope(current.settings), parts: [
+      { kind: "thinking", text: "  Signed\n", summary: "Display only", continuation: { anthropic: { signature: "signed" } } },
+      { kind: "thinking", text: "", summary: "", continuation: { anthropic: { signature: "empty-signed" } } },
+      { kind: "toolcall", callId: "call", name: "read", arguments: {}, continuation: null },
+      { kind: "thinking", text: "Unsigned", summary: "", continuation: null },
+      { kind: "thinking", text: "", summary: "Not a full thought", continuation: null },
+      { kind: "thinking", text: "", summary: "", continuation: { anthropic: { redactedData: "opaque" } } },
+    ] }];
+    current.messages.push({ kind: "result", callId: "call", name: "read", error: false, parts: [{ kind: "text", text: "Result" }] });
+    expect(((await request(current)).messages as unknown[])[0]).toEqual({ role: "assistant", content: [
+      { type: "thinking", thinking: "  Signed\n", signature: "signed" },
+      { type: "thinking", thinking: "", signature: "empty-signed" },
+      { type: "tool_use", id: "call", name: "read", input: {} },
+      { type: "thinking", thinking: "Unsigned" },
+      { type: "redacted_thinking", data: "opaque" },
+    ] });
+    current.messages = [{ kind: "output", adapter: "foreign", scope: "foreign", parts: [
+      { kind: "thinking", text: "Only thinking", summary: "", continuation: null },
+    ] }, { kind: "input", parts: [{ kind: "text", text: "Continue" }] }];
+    expect((await request(current)).messages).toEqual([
+      { role: "assistant", content: [{ type: "thinking", thinking: "Only thinking" }] },
+      { role: "user", content: [{ type: "text", text: "Continue" }] },
+    ]);
+  });
+
+  // SDK 裁剪末条 assistant 的末段正文；合法前导空白不能使思考插入计划失配，签名原文不受影响。
+  it("Messages 核对 SDK 的末段正文裁剪，签名思考保留原始空白", async () => {
+    const current = input("anthropic");
+    current.messages = [{ kind: "output", adapter: aiSdkAdapterVersion, scope: modelScope(current.settings), parts: [
+      { kind: "thinking", text: "  Thought\n", summary: "", continuation: { anthropic: { signature: "signed" } } },
+      { kind: "text", text: "  Indented answer\n", continuation: null },
+    ] }];
+    expect((await request(current)).messages).toEqual([{ role: "assistant", content: [
+      { type: "thinking", thinking: "  Thought\n", signature: "signed" },
+      { type: "text", text: "Indented answer" },
+    ] }]);
+  });
+
   // 标准等级契约：max 与 xhigh 独立；在支持两者的协议／型号上，真实 SDK 不得丢失或混同它们。
   it.each(["openai-responses", "openai-chat", "anthropic"] as const)("%s 编码独立的 max 与 xhigh 等级", async protocol => {
     const current = input(protocol);
@@ -104,7 +183,7 @@ describe("显式兼容与目标投影", () => {
   // 参考协议不限制添加；不认识这些行为的协议继续正常编码。
   it("Responses 标签不改变 Anthropic 请求", async () => {
     const current = input("anthropic");
-    current.settings.provider.compatibility = [{ id: "systemMessageInMessages" }, { id: "thinkingInDeepSeekFormat" }];
+    current.settings.provider.compatibility = [{ id: "systemMessageInMessages" }, { id: "responsesReasoning", value: {} }];
     const body = await request(current);
     expect(body).not.toHaveProperty("instructions");
     expect(body.system).toEqual([{ type: "text", text: projectSystemPrompt(current.system) }]);
@@ -112,21 +191,20 @@ describe("显式兼容与目标投影", () => {
   });
 
   // 明文 reasoning 必须在原位置，不能被 SDK 丢弃，也不能破坏相邻的图片、工具配对或助手文字。
-  it("DeepSeek 明文思考按原顺序插入，跨来源只取公共文字", async () => {
+  it("明文思考无需兼容包，按原顺序插入，跨来源只取公共文字", async () => {
     const current = input();
-    current.settings.provider.compatibility = [{ id: "thinkingInDeepSeekFormat" }];
     current.settings.model.compatibility = [{ id: "systemMessageInMessages" }];
     const foreign = { adapter: "foreign-adapter", scope: "foreign-scope" };
     current.messages = [
       { kind: "input", parts: [{ kind: "text", text: "Look" }, { kind: "file", data: new Uint8Array([1, 2, 3]), mediaType: "image/png" }] },
       { kind: "output", ...foreign, parts: [
-        { kind: "thinking", text: "Before tool", continuation: { anthropic: { signature: "foreign-signature" } } },
+        { kind: "thinking", summary: "", text: "Before tool", continuation: { anthropic: { signature: "foreign-signature" } } },
         { kind: "text", text: "Checking", continuation: { openai: { itemId: "foreign-item" } } },
         { kind: "toolcall", callId: "vendor/call.with.dots", name: "lookup", arguments: { query: "value" }, continuation: null },
       ] },
       { kind: "result", callId: "vendor/call.with.dots", name: "lookup", error: false, parts: [{ kind: "text", text: "Found" }] },
       { kind: "output", ...foreign, parts: [
-        { kind: "thinking", text: "After tool", continuation: { openai: { reasoningEncryptedContent: "foreign-ciphertext" } } },
+        { kind: "thinking", summary: "", text: "After tool", continuation: { openai: { reasoningEncryptedContent: "foreign-ciphertext" } } },
         { kind: "text", text: "Answer", continuation: null },
       ] },
     ];
@@ -149,7 +227,7 @@ describe("显式兼容与目标投影", () => {
     const native: Json = protocol === "anthropic" ? { anthropic: { signature: "native-token" } }
       : { openai: { itemId: "rs_native", reasoningEncryptedContent: "native-token" } };
     current.messages.push({ kind: "output", adapter: aiSdkAdapterVersion, scope: modelScope(current.settings), parts: [
-      { kind: "thinking", text: "Visible thought", continuation: native },
+      { kind: "thinking", summary: "", text: "Visible thought", continuation: native },
       { kind: "text", text: "Portable answer", continuation: null },
     ] });
     current.messages.push({ kind: "input", parts: [{ kind: "text", text: "Continue" }] });
@@ -163,7 +241,7 @@ describe("显式兼容与目标投影", () => {
     const foreign: Json = other.settings.provider.protocol === "anthropic" ? { anthropic: { signature: "foreign-token" } }
       : { openai: { itemId: "rs_foreign", reasoningEncryptedContent: "foreign-token" } };
     resumed.messages.push({ kind: "output", adapter: aiSdkAdapterVersion, scope: modelScope(other.settings), parts: [
-      { kind: "thinking", text: "B thought", continuation: foreign },
+      { kind: "thinking", summary: "", text: "B thought", continuation: foreign },
       { kind: "text", text: "B answer", continuation: null },
     ] });
     resumed.messages.push({ kind: "input", parts: [{ kind: "text", text: "Return to A" }] });
@@ -171,11 +249,13 @@ describe("显式兼容与目标投影", () => {
     const field = protocol === "anthropic" ? "messages" : "input";
     const otherField = other.settings.provider.protocol === "anthropic" ? "messages" : "input";
     expect(JSON.stringify(a[field])).toContain("native-token");
-    expect(JSON.stringify(b[otherField])).not.toMatch(/native-token|Visible thought|rs_native/);
+    expect(JSON.stringify(b[otherField])).not.toMatch(/native-token|rs_native/);
+    expect(JSON.stringify(b[otherField])).toContain("Visible thought");
     expect(JSON.stringify(b[otherField])).toContain("Portable answer");
     expect((again[field] as unknown[]).slice(0, (a[field] as unknown[]).length)).toEqual(a[field]);
     expect(JSON.stringify(again[field])).toContain("B answer");
-    expect(JSON.stringify(again[field])).not.toMatch(/foreign-token|B thought/);
+    expect(JSON.stringify(again[field])).not.toContain("foreign-token");
+    expect(JSON.stringify(again[field])).toContain("B thought");
     expect(current).toEqual(original);
   });
 

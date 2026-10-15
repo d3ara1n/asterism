@@ -5,7 +5,7 @@ import { ModelFailure } from "./contract.ts";
 type ResponsesModel = ReturnType<ReturnType<typeof createOpenAI>["responses"]>;
 type CallOptions = Parameters<NonNullable<LanguageModelMiddleware["wrapStream"]>>[0]["params"];
 type InputStep =
-  | { kind: "thinking"; text: string }
+  | { kind: "thinking"; item: Record<string, unknown> }
   | { kind: "message"; role: "system" | "user" | "assistant"; text?: string }
   | { kind: "call" | "result"; callId: string };
 
@@ -14,7 +14,7 @@ function encodingFailure(): never {
 }
 
 /** 在 SDK 编码前固定顺序；原生文件、工具和普通消息仍交给 SDK 编码。 */
-function prepare(options: CallOptions): { prompt: CallOptions["prompt"]; steps: InputStep[] } | null {
+function prepare(options: CallOptions, contentShape: "array" | "object"): { prompt: CallOptions["prompt"]; steps: InputStep[] } | null {
   if (!options.prompt.some(message => message.role === "assistant" && message.content.some(part => part.type === "reasoning"))) return null;
   const openai = options.providerOptions?.openai;
   if (openai?.store !== false || openai.conversation != null || openai.previousResponseId != null) encodingFailure();
@@ -27,7 +27,22 @@ function prepare(options: CallOptions): { prompt: CallOptions["prompt"]; steps: 
     } else if (message.role === "assistant") {
       const content = message.content.filter(part => {
         if (part.type === "reasoning") {
-          if (part.text) steps.push({ kind: "thinking", text: part.text });
+          const native = part.providerOptions?.openai;
+          const summary = part.providerOptions?.atelier?.summary;
+          const encrypted = native?.reasoningEncryptedContent;
+          const item: Record<string, unknown> = { type: "reasoning" };
+          if (typeof encrypted === "string") {
+            item.encrypted_content = encrypted;
+            if (typeof native?.itemId === "string") item.id = native.itemId;
+            item.summary = typeof summary === "string" && summary ? [{ type: "summary_text", text: summary }] : [];
+          } else {
+            if (part.text) {
+              const content = { type: "reasoning_text", text: part.text };
+              item.content = contentShape === "object" ? content : [content];
+            }
+            if (typeof summary === "string" && summary) item.summary = [{ type: "summary_text", text: summary }];
+          }
+          if (Object.keys(item).length > 1) steps.push({ kind: "thinking", item });
           return false;
         }
         if (part.type === "text") steps.push({ kind: "message", role: "assistant", text: part.text });
@@ -56,7 +71,7 @@ function insertThinking(body: unknown, steps: readonly InputStep[]): unknown {
   let index = 0;
   for (const step of steps) {
     if (step.kind === "thinking") {
-      input.push({ type: "reasoning", content: [{ type: "reasoning_text", text: step.text }] });
+      input.push(step.item);
       continue;
     }
     const item: unknown = request.input[index++];
@@ -74,16 +89,31 @@ function insertThinking(body: unknown, steps: readonly InputStep[]): unknown {
   return { ...request, input };
 }
 
-/** 只补充 DeepSeek 明文 reasoning 输入；每次调用独立捕获计划，不修改 SDK 或历史。 */
-export function withDeepSeekReasoning(createModel: (transport: typeof fetch) => ResponsesModel, transport: typeof fetch) {
-  const model = createModel(transport);
+/** 公共思考的原生编码；兼容配置仅改变字段形状与参数，不决定明文是否参与请求。 */
+export function withResponsesReasoning(createModel: (transport: typeof fetch) => ResponsesModel, transport: typeof fetch,
+  fields: { reasoningContent: "array" | "object"; encryptedContent: boolean; reasoningSummary: boolean }) {
+  // SDK 会自行加入密文 include 和默认摘要，须在最终请求边界应用端点字段约定。
+  const wireFetch: typeof fetch = (url, init) => {
+    if (fields.encryptedContent && fields.reasoningSummary) return transport(url, init);
+    if (typeof init?.body !== "string") encodingFailure();
+    const body = JSON.parse(init.body) as Record<string, unknown>;
+    if (!fields.encryptedContent && Array.isArray(body.include)) {
+      const include = body.include.filter(field => field !== "reasoning.encrypted_content");
+      if (include.length) body.include = include;
+      else delete body.include;
+    }
+    if (!fields.reasoningSummary && body.reasoning && typeof body.reasoning === "object")
+      delete (body.reasoning as Record<string, unknown>).summary;
+    return transport(url, { ...init, body: JSON.stringify(body) });
+  };
+  const model = createModel(wireFetch);
   const project = (options: CallOptions) => {
-    const plan = prepare(options);
+    const plan = prepare(options, fields.reasoningContent);
     if (!plan) return null;
     const projectedFetch: typeof fetch = (url, init) => {
       if (typeof init?.body !== "string") encodingFailure();
       const body = JSON.stringify(insertThinking(JSON.parse(init.body), plan.steps));
-      return transport(url, { ...init, body });
+      return wireFetch(url, { ...init, body });
     };
     return { model: createModel(projectedFetch), options: { ...options, prompt: plan.prompt } };
   };

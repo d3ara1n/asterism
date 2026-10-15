@@ -6,7 +6,7 @@ import { sessionSchemaSql } from "../session/schema.ts";
 import { applicationBrand, applicationStorage } from "../shared/application.ts";
 import { contentSchemaSql } from "./content-store.ts";
 
-const workspaceDatabaseVersion = 18;
+const workspaceDatabaseVersion = 19;
 
 /** 开发期库格式不符：发布前不迁移，提示开发者删除 db 目录重建。 */
 export class DatabaseVersionError extends Error {

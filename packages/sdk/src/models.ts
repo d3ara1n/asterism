@@ -14,9 +14,12 @@ export type PromptBlock =
   | { id: string; kind: "agent"; role: string; text: string }
   | { id: string; kind: "context"; file: string; text: string };
 export interface SystemPrompt { blocks: readonly PromptBlock[] }
-/** 正文、思考与工具是公共内容；continuation 只附带原生资料，由目标投影判断能否复用。 */
+/** 思考的 text 为协议交付的明文，summary 为独立摘要；两者可并存或为空，不相互填充。
+ * continuation 只附带签名／密文等原生资料，由目标投影判断能否复用。
+ */
 export type ModelPart =
-  | { kind: "thinking" | "text"; text: string; continuation: Json }
+  | { kind: "thinking"; text: string; summary: string; continuation: Json }
+  | { kind: "text"; text: string; continuation: Json }
   | { kind: "toolcall"; callId: string; name: string; arguments: Json; continuation: Json };
 export type ModelItem =
   | { kind: "input" | "context"; parts: readonly ModelInputPart[] }
@@ -32,7 +35,7 @@ export type StreamPart =
   | { id: string; kind: "toolcall"; callId: string; name: string };
 export type ModelEvent =
   | { type: "part.start"; part: StreamPart }
-  | { type: "part.delta"; partId: string; delta: string }
+  | { type: "part.delta"; partId: string; delta: string; channel?: "summary" }
   | { type: "part.end"; partId: string; arguments?: Json; continuation?: Json }
   | { type: "finish"; reason: string; usage: Usage | null; responseId?: string; rawFinishReason?: string; source?: ModelSource };
 export type ModelSource = { model: string; adapter: string; scope: string };
@@ -45,7 +48,8 @@ export type ModelBlock = {
   /** 终态随响应最高序号的实际块一次交付；其他块为 null。 */
   completion?: ModelCompletion | null;
 } & (
-  | { kind: "thinking" | "text"; text: string }
+  | { kind: "thinking"; text: string; summary: string }
+  | { kind: "text"; text: string }
   | { kind: "toolcall"; callId: string; name: string; argumentsText: string; arguments: Json; outcome: ToolOutcome | null }
 );
 export type ModelLiveBlock = { id: string; responseId: string; ordinal: number } & (

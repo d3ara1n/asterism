@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { ModelBlock } from "@atelier/sdk/contracts";
+import { modelBlockSchema, type ModelBlock } from "@atelier/sdk/contracts";
 import type { ModelEvent } from "../model/contract.ts";
 import { ResponseBuffer } from "./response.ts";
 
@@ -15,6 +15,24 @@ const call: ModelEvent = { type: "part.start", part: { id: "c", kind: "toolcall"
 const finish: ModelEvent = { type: "finish", reason: "stop", usage: null };
 
 describe("响应块状态机", () => {
+  // 公共记录契约：展示可以选择摘要，但持久化不能将摘要写成全文或丢掉另一通道。
+  it("思考的全文和摘要独立累积并通过记录 schema，摘要事件不能污染工具参数", () => {
+    const { response, nodes } = setup();
+    response.accept({ type: "part.start", part: { id: "thought", kind: "thinking" } });
+    response.accept({ type: "part.delta", partId: "thought", delta: "Summary", channel: "summary" });
+    expect(response.live()[0]).toMatchObject({ text: "Summary" });
+    response.accept({ type: "part.delta", partId: "thought", delta: "Full thought" });
+    expect(response.live()[0]).toMatchObject({ text: "Full thought" });
+    response.accept({ type: "part.end", partId: "thought", continuation: { openai: { reasoningEncryptedContent: "cipher" } } });
+    response.accept(finish);
+    expect(modelBlockSchema.parse(nodes[0])).toMatchObject({
+      kind: "thinking", text: "Full thought", summary: "Summary", continuation: { openai: { reasoningEncryptedContent: "cipher" } },
+    });
+    const tool = setup().response;
+    tool.accept(call);
+    expect(() => tool.accept({ type: "part.delta", partId: "c", delta: "Summary", channel: "summary" })).toThrow("Only thinking blocks");
+    expect(tool.calls()[0]!.text).toBe("");
+  });
   it("部分 JSON 仅成为预览，未完成转义暂缓显示，取消不保存修复后的参数", async () => {
     const { response, nodes } = setup();
     response.accept(call);

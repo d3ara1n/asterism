@@ -26,12 +26,17 @@ export const modelCompatibilityDefinitions: readonly ModelCompatibilityDefinitio
     }),
   },
   {
-    id: "thinkingInDeepSeekFormat",
-    kind: "tag",
-    appliesTo: { protocols: ["openai-responses"], endpoints: ["https://api.deepseek.com"] },
-    schema: z.undefined().meta({
-      title: "DeepSeek thinking format",
-      description: "Send visible thinking as plain-text reasoning items instead of encrypted reasoning or summaries.",
+    id: "responsesReasoning",
+    kind: "options",
+    initialValue: {},
+    appliesTo: { protocols: ["openai-responses"] },
+    schema: z.strictObject({
+      content: z.enum(["array", "object"]).optional().meta({ title: "Reasoning content shape", description: "Defaults to an array of reasoning_text parts." }),
+      encryptedContent: z.boolean().optional().meta({ title: "Request encrypted content", description: "Defaults to true. Disable when the endpoint does not accept reasoning.encrypted_content in include." }),
+      summary: z.boolean().optional().meta({ title: "Request a reasoning summary", description: "Defaults to true. Disable when the endpoint does not accept reasoning.summary." }),
+    }).meta({
+      title: "Responses reasoning fields",
+      description: "Adapt endpoint field shapes and accepted request parameters. Plain text, summaries and opaque continuation remain native capabilities.",
     }),
   },
   {

@@ -1,7 +1,7 @@
 import { jsonSchema, modelScope, type Json, type ModelSettings } from "../shared/model.ts";
 
-// 原生续接资料的编码未变；公共内容不受此版本限制。
-export const aiSdkAdapterVersion = "ai-sdk-v7/3";
+// 全文、摘要与原生资料分别编码；来源限制只适用于不透明续接资料。
+export const aiSdkAdapterVersion = "ai-sdk-v7/4";
 
 /** 只保留白名单原生资料，不保存完整 SDK metadata 或 HTTP 数据。 */
 export function pickContinuation(metadata: unknown): Record<string, Record<string, Json>> {

@@ -23,7 +23,7 @@ export function report(object: ObjectExecutor): void {
   // @ts-expect-error 发布参数由契约推导。
   object.events.publish(Progress, { job: "file", completed: "ten", total: 100 });
 }
-/** 公共状态由宿主登记；插件只经自己的资源操作柄发布，要求宿主 API 7.2。 */
+/** 公共状态由宿主登记；插件只经自己的资源操作柄发布，属于宿主 API 8.0。 */
 export function reportStatus(object: ObjectExecutor): void {
   object.events.publish(ResourceStatusChanged, { title: "Download", status: "running" });
   object.events.publish(ResourceStatusChanged, { title: "Download", status: "running", progress: { value: 0.6 } });

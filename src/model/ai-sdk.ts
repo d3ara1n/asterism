@@ -28,7 +28,10 @@ export function sdkMessages(input: ModelInput): ModelMessage[] {
     if (item.kind === "output") {
       const parts = item.parts;
       if (parts.length) messages.push({ role: "assistant", content: parts.map(p => {
-        const providerOptions = p.continuation as Record<string, Record<string, Json>>;
+        const providerOptions = {
+          ...p.continuation as Record<string, Record<string, Json>>,
+          ...(p.kind === "thinking" ? { atelier: { summary: p.summary } } : {}),
+        };
         return p.kind === "toolcall" ? { type: "tool-call" as const, toolCallId: p.callId, toolName: p.name, input: p.arguments, providerOptions }
           : { type: p.kind === "text" ? "text" as const : "reasoning" as const, text: p.text, providerOptions };
       }) });
@@ -85,8 +88,7 @@ export class AiSdkAdapter implements ModelAdapter {
       onError: () => {},
     });
     const calls = new Set<string>();
-    const thinkingItems = new Map<string, string>();
-    const thinkingChannels = new Map<string, "raw" | "sdk">();
+    const thinkingItems = new Map<number, { partId: string; itemId: string; summaryIndex: number | null; hasSummary: boolean }>();
     const continuations = new Map<string, ReturnType<typeof pickContinuation>>();
     const collectContinuation = (id: string, metadata: unknown) => {
       const accumulated = continuations.get(id) ?? {};
@@ -101,47 +103,67 @@ export class AiSdkAdapter implements ModelAdapter {
     for await (const event of result.stream) {
       switch (event.type) {
         case "text-start": case "reasoning-start": {
+          if (event.type === "reasoning-start" && provider.protocol === "openai-responses") break;
           const kind = event.type === "text-start" ? "text" : "thinking";
           const id = `${kind}:${event.id}`;
-          const metadata = collectContinuation(id, event.providerMetadata);
-          if (kind === "thinking" && typeof metadata.openai?.itemId === "string") {
-            thinkingItems.set(metadata.openai.itemId, id);
-          }
+          collectContinuation(id, event.providerMetadata);
           yield { type: "part.start", part: { id, kind } };
           break;
         }
         case "raw": {
           if (provider.protocol !== "openai-responses" || !event.rawValue || typeof event.rawValue !== "object") break;
           const raw = event.rawValue as Record<string, unknown>;
-          // 原始思考事件是协议解码能力，不按品牌、域名或兼容包开关启用。
-          if (raw.type !== "response.reasoning_text.delta") break;
-          if (typeof raw.item_id !== "string" || typeof raw.delta !== "string") {
-            throw new ModelFailure("protocol", "The provider returned an invalid reasoning text delta.");
+          // 按 Responses item 收束，全文与摘要分别接收；SDK 的摘要分段不另建思考块。
+          if (raw.type === "response.output_item.added" || raw.type === "response.output_item.done") {
+            const item = raw.item as Record<string, unknown> | undefined;
+            if (item?.type !== "reasoning") break;
+            if (typeof item.id !== "string" || !Number.isInteger(raw.output_index) || (raw.output_index as number) < 0)
+              throw new ModelFailure("protocol", "The provider returned an invalid reasoning item.");
+            const index = raw.output_index as number;
+            if (raw.type === "response.output_item.added") {
+              if (thinkingItems.has(index)) throw new ModelFailure("protocol", "The provider started a duplicate reasoning item.");
+              const partId = `thinking:${item.id}`;
+              thinkingItems.set(index, { partId, itemId: item.id, summaryIndex: null, hasSummary: false });
+              yield { type: "part.start", part: { id: partId, kind: "thinking" } };
+            } else {
+              const thinking = thinkingItems.get(index);
+              if (!thinking) throw new ModelFailure("protocol", "The provider ended an inactive reasoning item.");
+              const continuation = pickContinuation({ openai: {
+                itemId: thinking.itemId,
+                ...(typeof item.encrypted_content === "string" ? { reasoningEncryptedContent: item.encrypted_content } : {}),
+              } });
+              yield { type: "part.end", partId: thinking.partId, continuation };
+              thinkingItems.delete(index);
+            }
+            break;
           }
-          const partId = thinkingItems.get(raw.item_id);
-          if (!partId) throw new ModelFailure("protocol", "The provider updated an inactive reasoning item.");
-          if (thinkingChannels.get(raw.item_id) === "sdk") break;
-          if (raw.delta) thinkingChannels.set(raw.item_id, "raw");
-          yield { type: "part.delta", partId, delta: raw.delta };
+          const summary = raw.type === "response.reasoning_summary_text.delta";
+          if (!summary && raw.type !== "response.reasoning_text.delta") break;
+          if (typeof raw.item_id !== "string" || typeof raw.delta !== "string" || !Number.isInteger(raw.output_index))
+            throw new ModelFailure("protocol", "The provider returned an invalid reasoning delta.");
+          const thinking = thinkingItems.get(raw.output_index as number);
+          if (!thinking) throw new ModelFailure("protocol", "The provider updated an inactive reasoning item.");
+          if (summary) {
+            const index = typeof raw.summary_index === "number" ? raw.summary_index : 0;
+            if (thinking.hasSummary && thinking.summaryIndex !== index)
+              yield { type: "part.delta", partId: thinking.partId, delta: "\n\n", channel: "summary" };
+            thinking.summaryIndex = index;
+            thinking.hasSummary ||= raw.delta.length > 0;
+          }
+          yield { type: "part.delta", partId: thinking.partId, delta: raw.delta, ...(summary ? { channel: "summary" as const } : {}) };
           break;
         }
         case "text-delta": case "reasoning-delta": {
+          if (event.type === "reasoning-delta" && provider.protocol === "openai-responses") break;
           const partId = `${event.type === "text-delta" ? "text" : "thinking"}:${event.id}`;
-          const metadata = collectContinuation(partId, event.providerMetadata);
-          if (event.type === "reasoning-delta" && typeof metadata.openai?.itemId === "string") {
-            const itemId = metadata.openai.itemId;
-            if (thinkingChannels.get(itemId) === "raw") break;
-            if (event.text) thinkingChannels.set(itemId, "sdk");
-          }
+          collectContinuation(partId, event.providerMetadata);
           yield { type: "part.delta", partId, delta: event.text };
           break;
         }
         case "text-end": case "reasoning-end": {
+          if (event.type === "reasoning-end" && provider.protocol === "openai-responses") break;
           const partId = `${event.type === "text-end" ? "text" : "thinking"}:${event.id}`;
           const metadata = collectContinuation(partId, event.providerMetadata);
-          if (typeof metadata.openai?.itemId === "string" && thinkingItems.get(metadata.openai.itemId) === partId) {
-            thinkingItems.delete(metadata.openai.itemId);
-          }
           yield { type: "part.end", partId, continuation: metadata };
           continuations.delete(partId);
           break;
@@ -178,6 +200,7 @@ export class AiSdkAdapter implements ModelAdapter {
         }
       }
     }
+    // 已收到的终态必须交付；ResponseBuffer 先保留计量，再拒绝仍未闭合的块。
     if (!finish) throw new ModelFailure("interrupted", "The provider stream ended without a finish event.");
     const response = await result.response;
     yield { type: "finish", ...finish, responseId: response.id };

@@ -2,7 +2,7 @@ import { Plus, Zap, Search, ExternalLink, PlugZap } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { createModelInput, modelReference, thinkingSchema, type ConfigurationSnapshot, type ConnectionTest, type Provider, type ProviderInput, type ProviderModel, type TestError } from "../../../shared/configuration";
-import { presetGroups, providerPresets, providerPresetDraft, type ProviderPreset, type ProviderDraft } from "../../../shared/provider-presets";
+import { providerPresets, providerPresetDraft, type ProviderPreset, type ProviderDraft } from "../../../shared/provider-presets";
 import { commonMessages } from "../../messages/common";
 import { providersMessages } from "../../messages/providers";
 import { thinkingLabels } from "../../messages/model-selection";
@@ -126,17 +126,17 @@ export function ProvidersSettings() {
   </Section>;
 }
 
-/* ---------- 预设选择：自适应网格，数量增长后自动出现分组与搜索 ---------- */
+/* ---------- 预设选择：按计费方式分组，自适应网格与跨组搜索 ---------- */
 
-const groupLabels = (): Record<ProviderPreset["group"], string> => ({ official: getI18n().formatMessage(providersMessages.official), aggregator: getI18n().formatMessage(providersMessages.aggregators), local: getI18n().formatMessage(providersMessages.local) });
+const billingOrder = ["usage", "subscription", "none"] as const satisfies readonly ProviderPreset["billing"][];
 const billingLabels = {
   usage: providersMessages.payAsYouGo,
   subscription: providersMessages.subscription,
   none: providersMessages.noBilling,
 };
-function presetDescription(preset: ProviderPreset): string {
+function presetDescription(preset: ProviderPreset, includeBilling = true): string {
   const i18n = getI18n();
-  return [preset.region && i18n.text(preset.region), preset.plan && i18n.text(preset.plan), i18n.text(billingLabels[preset.billing])].filter(Boolean).join(" · ");
+  return [preset.region && i18n.text(preset.region), preset.plan && i18n.text(preset.plan), includeBilling && i18n.text(billingLabels[preset.billing])].filter(Boolean).join(" · ");
 }
 const searchThreshold = 8;
 function PresetPicker({ onPick }: { onPick: (preset: ProviderPreset | null) => void }) {
@@ -144,8 +144,7 @@ function PresetPicker({ onPick }: { onPick: (preset: ProviderPreset | null) => v
   const [query, setQuery] = useState("");
   const q = query.trim().toLowerCase();
   const matches = providerPresets.filter(preset => !q || [preset.name, preset.id, presetDescription(preset), ...(preset.keywords ?? [])].some(word => word.toLowerCase().includes(q)));
-  const groups = presetGroups.map(group => ({ group, items: matches.filter(preset => preset.group === group) })).filter(entry => entry.items.length);
-  const titled = new Set(providerPresets.map(preset => preset.group)).size > 1;
+  const groups = billingOrder.map(billing => ({ billing, items: matches.filter(preset => preset.billing === billing) })).filter(entry => entry.items.length);
   const tile = "min-h-16 flex-col items-start justify-center gap-0.5 px-3 py-2 text-left hover:bg-accent";
   return <div className="flex flex-col gap-5">
     <p className="type-caption">{i18n.formatMessage(providersMessages.presetHint)}</p>
@@ -153,13 +152,13 @@ function PresetPicker({ onPick }: { onPick: (preset: ProviderPreset | null) => v
       <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
       <Input autoFocus className="pl-8" placeholder={i18n.formatMessage(providersMessages.searchProviders)} aria-label={i18n.formatMessage(providersMessages.searchProvidersLabel)} value={query} onChange={event => setQuery(event.target.value)} />
     </div>}
-    {groups.map(({ group, items }) => <section key={group} aria-label={groupLabels()[group]}>
-      {titled && <h3 className="type-label mb-2">{groupLabels()[group]}</h3>}
+    {groups.map(({ billing, items }) => <section key={billing} aria-label={i18n.text(billingLabels[billing])}>
+      <h3 className="type-label mb-2">{i18n.text(billingLabels[billing])}</h3>
       <div className="grid gap-2" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(9rem, 1fr))" }}>
         {items.map(preset => <div key={preset.id} className="flex flex-col gap-1">
           <Item asChild variant="outline" className={cn(tile, "bg-card")}><button type="button" onClick={() => onPick(preset)}>
             <span className="type-section max-w-full truncate">{preset.name}</span>
-            <span className="type-caption">{presetDescription(preset)}</span>
+            {(preset.region || preset.plan) && <span className="type-caption">{presetDescription(preset, false)}</span>}
           </button></Item>
           {preset.keyUrl && <a href={preset.keyUrl} target="_blank" rel="noreferrer" className="type-caption inline-flex items-center gap-1 self-start px-1 hover:text-foreground">
             {i18n.formatMessage(providersMessages.getKey)}<ExternalLink className="size-3" aria-hidden="true" />

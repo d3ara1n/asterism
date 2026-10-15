@@ -178,12 +178,12 @@ describe("真实配置与消费边界", () => {
     const save = (target: ConfigurationService, compatibility: ModelCompatibility[]) => kind === "provider"
       ? target.execute({ type: "provider.save", id: providerId, value: { ...providerValue, compatibility }, credential: { action: "keep" } })
       : target.execute({ type: "model.save", id: modelId, value: { ...value, compatibility } });
-    const compatibility = [{ id: "thinkingInDeepSeekFormat" }, { id: "systemMessageInMessages" }];
+    const compatibility = [{ id: "responsesReasoning", value: {} }, { id: "systemMessageInMessages" }];
     await save(service, compatibility);
     for (const invalid of [
       [compatibility[0]!, compatibility[0]!],
       [{ id: "unknownCompatibility" }],
-      [{ id: "thinkingInDeepSeekFormat", value: false }],
+      [{ id: "responsesReasoning", value: false }],
     ]) {
       await expect(save(service, invalid)).rejects.toMatchObject({ code: "invalid_request" });
     }

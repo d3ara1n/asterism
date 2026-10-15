@@ -12,6 +12,19 @@ const project = (path: SessionNode[], agent = "a") => projectForAgent(sessionVie
 
 // 预期来自时间线投影契约；存储、路径选择和通用信封转换由各自边界守护。
 describe("代理模型投影", () => {
+  // 公共载荷经过 Execution 解码和重建后，摘要与全文仍须独立，不能由展示选择覆写。
+  it("历史思考保留独立的全文、摘要和续接资料", () => {
+    const continuation = { openai: { reasoningEncryptedContent: "cipher" } };
+    const path = records(
+      message("a", "go"),
+      thinking("a", "r", 0, "Full thought", { summary: "Summary", continuation, requestParentId: "0" }),
+      text("a", "r", 1, "Answer", { requestParentId: "0" }),
+    );
+    expect(project(path)[1]).toMatchObject({ kind: "output", parts: [
+      { kind: "thinking", text: "Full thought", summary: "Summary", continuation },
+      { kind: "text", text: "Answer" },
+    ] });
+  });
   it("请求起点后的事件置于响应之后，下一请求保留已发送前缀", () => {
     const path = records(message("a", "go"), attached("a", "before"));
     const sent = project(path);

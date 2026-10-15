@@ -99,7 +99,7 @@ handler 抛错或 Promise rejection 只结束该订阅，不影响其他订阅�
 
 SDK 从 `@atelier/sdk/contracts` 导出宿主发布的公共契约，供应用外壳与插件订阅。`SessionTitleChanged`（`atelier/session-title`）载荷为 `{ sessionId, title }`，snapshot 语义、键为 `sessionId`：宿主在最外层提交成功后比较实际标题，变化才发布，覆盖命名、回溯与分支切换；回滚与相同标题不发布。订阅方建立订阅后读取会话列表，之后以事件为准，未打开的会话同样更新。
 
-SDK 同时导出由宿主登记、资源发布的 `ResourceStatusChanged`（`atelier/resource-status`），要求宿主 API 7.2。载荷为 `{ title: UiText, status: "running" | "failed" | "awaiting" | "completed" }`，其中 running 可附带 `progress: { value: number }`，value 为 0～1，终态不接受 progress。title 为资源展示名称，资源身份来自信封。契约使用 `source: "resource"` 与 `snapshot` 语义，`key: []` 表示每资源一份完整状态，经 `object.events.publish` 发布；插件无需再次声明公共契约，也不能用插件级发布通道代替资源来源。四种状态都完整替换旧状态，不合并字段。awaiting 表示需要用户操作，不提供 reset、撤回、修订号或持久化当前值。
+SDK 同时导出由宿主登记、资源发布的 `ResourceStatusChanged`（`atelier/resource-status`），属于宿主 API 8.0。载荷为 `{ title: UiText, status: "running" | "failed" | "awaiting" | "completed" }`，其中 running 可附带 `progress: { value: number }`，value 为 0～1，终态不接受 progress。title 为资源展示名称，资源身份来自信封。契约使用 `source: "resource"` 与 `snapshot` 语义，`key: []` 表示每资源一份完整状态，经 `object.events.publish` 发布；插件无需再次声明公共契约，也不能用插件级发布通道代替资源来源。四种状态都完整替换旧状态，不合并字段。awaiting 表示需要用户操作，不提供 reset、撤回、修订号或持久化当前值。
 
 ### 公共消费与调用扩展
 
@@ -234,7 +234,7 @@ SDK helper 负责具型声明与实现包装，宿主命令模块负责解析、
 
 `ToolRenderProps<D, T, A>` 是三种 Props 的可辨识联合，供跨阶段组件复用；根据 phase 收窄后，完整参数与终结结局保留准确类型。填充参数的字段可能缺失、类型错误或只收到字符串前缀，视图自行安全读取，不以 `Partial<已校验参数>` 冒充有效数据。等待调度归 execution，不表示已经开始执行。执行产出和结果由同一 result schema 校验。
 
-未声明 input 时使用静态填充提示；声明填充视图后，缺少 header 时使用工具默认摘要，缺少 body 时不提供填充展开。execution/result 缺少阶段或单个入口时分别回退默认摘要和产出正文，不跨阶段借用视图。SDK 为 0.13.0，宿主 API 为 7.3；不兼容的插件在加载前拒绝。
+未声明 input 时使用静态填充提示；声明填充视图后，缺少 header 时使用工具默认摘要，缺少 body 时不提供填充展开。execution/result 缺少阶段或单个入口时分别回退默认摘要和产出正文，不跨阶段借用视图。SDK 为 0.14.0，宿主 API 为 8.0；不兼容的插件在加载前拒绝。
 
 三态的样式与内容归工具，宿主控制开合设置、阶段图标、异常和原始详情入口。工具外壳不限制正文高度；body 提供方自行管理局部高度、滚动、分页、截取与渲染量。视图应尽可能保留已出现的路径、数量和相同元素的样式，逐步补充信息；允许按内容语义切换正文形态，例如生成中的 write 尾部预览与成功写入后的代码正文。内置插件的 120 行正文预算是 `atelier.core` 自身的展示约定，不是 SDK 对外部插件的强制限制。完整约定见 [设计系统](design-system.md#对话过程视图)，可编译的作者示例和类型反例见 [tool-renderer.ts](../packages/sdk/examples/tool-renderer.ts)。
 
@@ -312,7 +312,9 @@ renderer 模块可声明 `prepare({ signal })` 完成自身内部准备，例如
 
 ## 模型输入
 
-`models.stream` 的可选 `maxOutputTokens` 为本次补全的输出上限，必须是正安全整数，与模型配置的输出上限取较小值。依赖此参数的插件要求宿主 API 7.3；未设置时沿用模型配置。摘要、命名等消费者可约束自己的补全，通用模型服务不解释其业务策略。
+公共思考部件与成型块使用 `{ kind: "thinking", text, summary, continuation }`：text 是协议交付的明文，summary 是协议交付的摘要，两者必填、可为空且不相互填充；continuation 保留带来源约束的签名与密文。流事件 `part.delta` 的 `channel: "summary"` 写入摘要，缺省写入 text；摘要通道仅适用于思考块。即时块中的 text 是展示投影，优先明文否则摘要，不能拿它替代正式记录重建模型输入。完整续接语义见 [模型适配](conversation-core.md#模型适配)。
+
+`models.stream` 的可选 `maxOutputTokens` 为本次补全的输出上限，必须是正安全整数，与模型配置的输出上限取较小值。当前插件声明宿主 API 8.0；未设置时沿用模型配置。摘要、命名等消费者可约束自己的补全，通用模型服务不解释其业务策略。
 
 模型输入与 context 使用有序 ModelInputPart：文字为 `{ kind: "text", text }`，文件为 `{ kind: "file", file: ContentRef, mediaType, filename? }`；mediaType 如实标注，不建模输入模态。工具实现的 `toModel(data)` 可返回字符串或同形 parts，文件引用执行期 `object.content.stage` 暂存的内容，宿主随结果记录登记根；声明与 schema 从 contracts 导出，调用示例见 [模型文件输入](../packages/sdk/examples/model-input.ts)。输入不携带字节或读取门面。
 

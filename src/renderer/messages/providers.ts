@@ -152,23 +152,11 @@ export const providersMessages = pluginNamespace("atelier.host").messages("en", 
     id: "features_configuration_ProvidersSettings_29",
     defaultMessage: "Enable {provider_name}",
   },
-  official: {
-    id: "features_configuration_ProvidersSettings_30",
-    defaultMessage: "Official",
-  },
-  aggregators: {
-    id: "features_configuration_ProvidersSettings_31",
-    defaultMessage: "Aggregators",
-  },
-  local: {
-    id: "features_configuration_ProvidersSettings_32",
-    defaultMessage: "Local",
-  },
   presetHint: {
     id: "features_configuration_ProvidersSettings_33",
     defaultMessage: "Choose a provider connection. Regions and billing plans use separate presets.",
   },
-  payAsYouGo: { id: "providerPreset.payAsYouGo", defaultMessage: "API · Pay as you go" },
+  payAsYouGo: { id: "providerPreset.payAsYouGo", defaultMessage: "Pay as you go" },
   subscription: { id: "providerPreset.subscription", defaultMessage: "Subscription" },
   noBilling: { id: "providerPreset.noBilling", defaultMessage: "No billing" },
   searchProviders: {

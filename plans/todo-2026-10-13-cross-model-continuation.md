@@ -7,11 +7,11 @@
 - 时间线保存公共 thinking／text／toolcall 内容及原生附加资料，不保存第二份模型上下文。每次请求从当前时间线向目标模型投影，转换不回写历史、不追加桥接消息、不生成摘要或来源水印。
 - 取消整段历史必须与目标 scope／adapter 一致的拒绝。来源作用域（provider 身份、协议、端点、模型）和适配版本只决定原生附加资料能否复用；其他来源的公共回答、工具调用与结果继续参与请求。
 - OpenAI Responses 无状态基线回传可复用密文，Anthropic 回传可复用的签名或 redactedData；这些是正常协议行为，不需要兼容包。只有 item ID 而没有密文，不能替代 store:false 的原生思考续接。
-- 目标无法表达的无签名／无密文思考仅从本次请求省略，不默认伪装成助手正文、不伪造原生资料。启用 thinkingInDeepSeekFormat 时，可见思考按原位置投影为明文 reasoning item；可见内容可能是全文或摘要，不宣称能从密文恢复缺失文字。
+- thinking 的 text、summary 分别保存明文与摘要，不需要兼容包即可参与目标投影。Responses 无可复用密文时分别编码 content 与 summary；Messages 无可复用签名时编码无签名明文，独立摘要省略；Chat 暂不编码历史思考。不将摘要当作明文、不伪造助手正文或原生资料，不宣称能从密文恢复文字。
 - reasoning:false 仍过滤当前请求的全部历史思考；公共模型／等级 null 继承和 off 语义不变。
 - 外来工具调用 ID 若不满足通用字符／长度范围，或与原生／先前调用身份冲突，则确定性转换，并将结果同步映射到相同 ID。本来源原始身份优先保留。
 - A → B → A 不会逐次转换保存内容；A 原先的原生资料一直留在时间线，切回时可重新使用。B 产生的公共回答保留，不携带不适用的 B 原生资料。
-- 实现入口：src/model/projection.ts、src/model/continuation.ts；公共 SDK ModelBlock／ModelPart 存储结构不变。
+- 实现入口：src/model/projection.ts、src/model/continuation.ts、src/model/responses-reasoning.ts、src/model/anthropic-thinking.ts；公共 SDK ModelBlock／ModelPart 必填 summary。SDK 0.14.0、宿主 API 8.0、数据库 19，不推断或迁移旧思考记录。
 
 ## 待办
 
@@ -22,6 +22,7 @@
 - [x] 隔离协议测试：跨模型或适配版本变化不阻断公共正文，不泄漏来源签名／密文／item ID。
 - [x] 隔离协议测试：OpenAI 与 Anthropic 原生续接无需兼容包；A → B → A 中 A 的原有输入前缀一致，B 的公共回答继续参与，历史不改写。
 - [x] 隔离协议测试：外来工具 ID 规范化与冲突处理后，调用和结果仍配对；本来源 ID 保留。
+- [x] 公共思考：明文／摘要／密文分别编码，无签名文字不丢失，摘要不填充明文；跨来源不泄漏签名与密文。
 - [ ] GUI：已有对话切换模型后继续，切回后历史展示不变。
 - [ ] 真实端点：跨 OpenAI／Anthropic／DeepSeek 的正常续接及工具循环。
 

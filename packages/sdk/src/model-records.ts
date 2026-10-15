@@ -15,7 +15,7 @@ export const modelCompletionSchema = z.strictObject({ usage: modelUsageSchema.nu
 const block = { responseId: id, requestParentId: id.nullable(), ordinal: z.number().int().nonnegative(),
   complete: z.boolean(), continuation: jsonSchema, source: modelSourceSchema, completion: modelCompletionSchema.nullable().optional() };
 export const modelBlockSchema = z.discriminatedUnion("kind", [
-  z.strictObject({ ...block, kind: z.literal("thinking"), text: z.string() }),
+  z.strictObject({ ...block, kind: z.literal("thinking"), text: z.string(), summary: z.string() }),
   z.strictObject({ ...block, kind: z.literal("text"), text: z.string() }),
   z.strictObject({ ...block, kind: z.literal("toolcall"), callId: id, name: id,
     argumentsText: z.string(), arguments: jsonSchema, outcome: toolOutcomeSchema.nullable() })

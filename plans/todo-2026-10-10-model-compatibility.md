@@ -1,82 +1,60 @@
 # 模型兼容包与标准思考等级
 
-> 立案 2026-10-10。L0 请求选项收口、L1 标准思考等级、L2a 定义／存储／UI 与 L2b 首批兼容消费已实施；GUI 与真实端点待验收。`customThinkingLevels` 单独暂缓。跨模型续接共用本轮目标投影，其验收记录见 [续接计划](todo-2026-10-13-cross-model-continuation.md)。
+> 立案 2026-10-10。配置、标准等级、公共思考双通道与端点字段适配已实施；GUI 与真实端点待验收。`customThinkingLevels` 单独暂缓。跨模型续接共用请求投影，见 [续接计划](todo-2026-10-13-cross-model-continuation.md)。
 
 ## 已确认设计
 
-- 兼容包是应用预定义、数量有限的行为声明，不是 processor，也不加载用户手写 patch。每个定义有稳定 id、参数 schema（标签型无参数）、名称与说明（直接取 schema 原文，不另做本地化），以及独立的 `appliesTo`。
-- `appliesTo` 包含协议列表与可选端点列表，只供用户参考，不用于自动启用、添加限制或运行时匹配。编码器只解释当前协议下认识的已添加行为。名称不必重复适用协议，例如 `thinkingInDeepSeekFormat`。
-- 提供商与具体模型分别保存已添加项的稀疏列表，同层 id 不重复。提供商条目对其所有模型生效，消费时按 id 合并，模型同名条目整项优先，不深合并参数。移除模型覆盖恢复提供商条目；模型空列表不禁用提供商条目，无 false/null 墓碑。合并结果不回写配置。
-- 提供商与模型设置 UI 共用「添加兼容设置」；标签型展示名称、适用参考与移除，有参数的由 schema 生成编辑器。模型页只读展示提供商条目，参数条目可复制为模型覆盖，覆盖项标明来源。添加菜单同样展示协议与端点参考。
-- 参数是否必填由 schema 决定，可选字段支持未设置，省略行为由包定义。模型整项覆盖后，省略字段不会从提供商条目补齐。
-- 不按品牌、域名或模型名自动启用兼容行为。预设或目录可以推荐，是否添加由用户决定。
-- 思考能力属于标准模型能力：`reasoning` 总开关之下，标准等级为 `off/minimal/low/medium/high/xhigh/max`，`xhigh` 与 `max` 独立，由 `thinkingLevels` 声明可用集合；初始全开，空集合合法。兼容包不能开放被关闭的等级。
-- 模型与等级的 null 逐层继承。配置保存与选择传递不拦截等级可用性；请求末端 reasoning 为 true 时，最终等级为空或不在集合中均以 `thinking_unavailable` 失败，不自动降档。
-- reasoning 为 false 时不发送等级及历史思考，但正常接收、保存、展示新返回的思考；off 只是普通等级，不触发工坊历史过滤。配置与投影均不改写历史。
-- 正常 OpenAI 密文／Anthropic 签名续接，以及原始流读取与已知思考事件解码属于基线，不需要兼容标签。原生资料只在来源作用域与适配版本可用时回传；公共回答与工具记录不因来源不同而整段拒绝。
-- 连接测试保持最小 probe，只验证基础协议连通性，不选择等级或验证兼容行为；与执行路径共享请求选项解释入口。
+- 明文、摘要、密文／签名续接属于内置能力。公共 thinking 必填 text、summary，原生资料保存在带来源的 continuation；摘要不填充明文，不从密文恢复文字。
+- Responses 按原始 reasoning item 生命周期收束，全文与摘要分别累积；SDK 派生摘要事件不重复消费。Messages 思考文字进入 text。展示优先明文否则摘要，选择不写回历史。
+- Responses 基线编码 content 数组、独立 summary 与可复用密文；Messages 基线编码无签名明文、签名原文与遮蔽块，独立摘要不转成 thinking。来源作用域／适配版本只限制原生资料复用，不能阻断公共内容。
+- 兼容包是预定义、有限的端点差异声明，不是 processor，也不加载用户 patch。定义包含稳定 id、参数 schema、schema 原文名称／说明，以及独立的 appliesTo 协议／端点参考。
+- appliesTo 只供展示，不用于自动启用、添加限制或运行时匹配。不按品牌、域名或模型名自动启用兼容行为；预设可以显式填入已核实的配置。
+- 提供商与模型分别保存稀疏列表；按 id 合并，模型同名条目整项覆盖，不深合并参数。移除覆盖恢复提供商条目；模型空列表不禁用提供商项，无 false/null 墓碑。可选参数省略取包定义的协议基线，不继承被覆盖项的字段。
+- UI 共用添加、编辑、移除与适用参考展示，参数编辑由 schema 驱动。连接编辑器不持有预设身份。
+- 标准思考等级为 off/minimal/low/medium/high/xhigh/max；xhigh 与 max 独立。reasoning 为 true 时请求末端校验最终等级，false 过滤当次全部历史思考但不影响接收与保存；off 不触发历史过滤。
+- 连接测试保持最小 probe，与执行共用传输和选项解释入口，不代替思考续接验收。
 
-## 已接入的 L2b 标签
+## 正式兼容目录
 
-| id | 适用协议参考 | 行为 |
+| id | 类型与协议 | 行为 |
 | --- | --- | --- |
-| `systemMessageInMessages` | OpenAI Responses | 基线把系统提示放在 instructions；添加后改为 input 的第一条 system 消息，不同时发送 instructions |
-| `thinkingInDeepSeekFormat` | OpenAI Responses；端点参考 `https://api.deepseek.com` | 将公共可见思考按原位置编码成独立 reasoning item，content 使用 reasoning_text；不带来源签名、密文或 item ID，不转为助手正文 |
-| `toolFilesAsUserMessage` | OpenAI Chat | 基线无法表达工具结果文件时明确报错；添加后才将同批文件放入工具结果批次之后、下一条历史消息之前的 user 消息，并保留 tool 关联说明 |
+| systemMessageInMessages | 标签；Responses | 将 instructions 改为第一条 system 消息，不重复发送 |
+| responsesReasoning | 参数；Responses | content 缺省 array，可设 object；encryptedContent 与 summary 缺省 true，false 分别省略 encrypted_content include 与 reasoning.summary 请求参数；不控制历史思考是否参与输入 |
+| toolFilesAsUserMessage | 标签；Chat | 显式允许同批工具文件紧随工具结果进入 user 消息，tool 保留关联说明 |
 
-Responses 原始 `reasoning_text` 解码始终可用，不受域名或兼容包控制。同一 item 同时提供原始与 SDK 正文事件时，只消费首个产生文字的通道，继续收集原生元数据。
-
-`customThinkingLevels` 不属于本次 L2b：标准等级 → 服务端字符串的稀疏映射、未填写回落、budget 忽略的语义保留，待 SDK 编码方案确认后另行实现。Qwen 标签格式也不在本次接入范围，不能与 DeepSeek Responses 明文 item 混为一类。
+明文续接不需要 DeepSeek 专用开关。SDK 自动添加的密文 include 和默认摘要也须服从最终请求边界的字段设置。未支持的服务端输入由服务端反馈，不自动改写历史、切换协议或重试降级。
 
 ## 实现边界
 
-- `src/shared/model-compatibility.ts` 承接定义目录、条目校验与两层合并。提供商与模型以必填 compatibility 列表分别保存显式条目，初始 `[]`；配置文件版本 5，配置 IPC 版本 6，不提供旧格式迁移。
-- 标签保存 `{ id }`，参数设置保存 `{ id, value }`；未知 id、重复 id 与非法参数在配置边界拒绝，参考协议不阻止保存。设置页与快捷启停都保留完整列表。
-- `src/renderer/shared/ConfigurationValue.tsx` 为提供商／模型兼容设置与插件配置共用的 schema 编辑器。
-- `src/model/projection.ts` 每次从公共历史生成目标内容，解释已添加的兼容行为；`continuation.ts` 只判断原生资料的可复用性。公共正文、思考与工具记录的存储格式不变。
-- `src/model/deepseek-reasoning.ts` 通过公开 SDK 中间件在编码前固定明文思考的顺序，公开 fetch 入口逐项核对 SDK 序列化结果并补充 reasoning item。消息、文件与工具编码继续复用 SDK；对应关系不符明确失败，不猜测位置、不伪造密文／签名、不使用文本哨兵。不建立通用请求体 patch。
-- SDK 内部模型名推断仍属于依赖行为，本轮不修改依赖源码或引入新依赖；相关控制能力须另行核验，不宣称工坊清除域名分支等于消除 SDK 所有内部推断。
-- 正式目录只包含三个有请求行为的标签；保留参数型定义、schema 编辑器与整项覆盖能力。
+- `src/shared/model-compatibility.ts` 承接定义、校验与合并；配置文件版本 6，配置 IPC 版本 9。
+- SDK 0.14.0／宿主 API 8.0 声明 thinking 的独立 text、summary 及 summary delta；工作数据库版本 19。开发期不提供旧数据推断或迁移。
+- `src/model/projection.ts` 从公共历史生成目标内容，`continuation.ts` 只判断原生资料可复用性。
+- `src/model/responses-reasoning.ts`、`anthropic-thinking.ts` 通过 SDK 公开中间件固定思考顺序，再在传输入口核对普通消息／工具并编码思考；不修改依赖源码，不使用文本哨兵或通用 JSON patch。
+- 原生签名对应文字不裁剪、不替换为摘要；跨来源清除不适用的签名、密文与原生 item ID，公共内容保持语义。
+- SDK 内部的模型名推断仍属于依赖行为，不宣称本轮移除了全部 SDK 隐含规则。
 
-## 思考格式核验
+## 提供商预设与核验
 
-- [DeepSeek Responses 官方指南](https://api-docs.deepseek.com/guides/responses_api)：输入接受独立 reasoning item 的明文 content，由服务端合入相邻 assistant；不支持 summary／encrypted_content 输入。这不要求客户端将思考改成普通正文或加 think 标签。输出使用 response.reasoning_text.delta，instructions 插入为第一条系统消息。
-- [DeepSeek Thinking Mode](https://api-docs.deepseek.com/guides/thinking_mode)：Chat 用与 content 同级的 reasoning_content。当前文档规定携带 tools 时后续请求必须完整回传历史思考，否则 400；不携带 tools 时不需要回传，传入也忽略。不可用旧 R1 规则概括当前接口；Chat 思考字段接入不属于本次明文 Responses 标签。
-- [Qwen3-32B 官方模板](https://huggingface.co/Qwen/Qwen3-32B/blob/main/tokenizer_config.json)：可以读取 reasoning_content，也能从正文中的 think 标签解析思考；最后一个真实 user 查询之前的历史不渲染思考，之后的工具循环按条件渲染。模型原始模板不等于所有托管 HTTP 接口要求客户端发标签。
-- [百炼深度思考](https://help.aliyun.com/zh/model-studio/deep-thinking)：输出分别使用 reasoning_content 与 content；部分型号支持 preserve_thinking 控制历史思考取用，默认值和支持范围按型号区分。
-- 以上为官方文档／源码核验，不是本轮真实端点验收。
+核验日期 2026-10-15；目录、资料与端点见 `src/shared/provider-presets.ts`。
 
-## 待办
+- DeepSeek 的 Responses content 明文、Kimi 的 content／summary 与智谱的单对象 content 已按官方文档区分。Kimi 的低／高／最大等级由模型配置另行声明，预设不附带模型。
+- Kimi 按量与 Kimi Code 分别声明国内／国际入口；智谱／Z.ai 也按地区与计费产品声明四项，共用 Responses 字段适配，即使地址相同也不混用凭据说明。
+- 国内外 GLM-5.3 模型 API 文档都列出 Responses `/api/v1`，并说明曾订阅 Coding Plan（含已过期）的账户当前通过模型 API 调用时仅支持 Chat；不自动切换协议或计费产品。
+- 订阅服务存在受支持客户端限制；预设不代表 Atelier 获得厂商准入，不伪装其他客户端。智谱／Z.ai 共用适配的字段依据国内详细 schema，国际页面提供协议与端点声明，真实地区端点仍须分别验收。
+- 官方文档与合成协议测试不替代账户权限、真实模型多轮工具调用与 GUI 验收。
 
-- [x] L0：连接测试与执行共用请求选项入口，probe 保持最小连通测试。
-- [x] L1：标准等级集合、选择器、null 继承与末端校验。
-- [x] L2a：定义目录、模型列表 schema、配置存储及设置 UI。
-- [x] L2b：Responses 系统提示基线 instructions 与首条 system 标签。
-- [x] L2b：原始思考事件解码基线，移除域名限制并避免正文重复交付。
-- [x] L2b：Chat 工具文件默认拒绝，显式标签才搬运。
-- [x] L2b：DeepSeek 明文 reasoning item，移除旧域名触发的无标签文字转换。
-- [x] 兼容与跨模型共用目标投影，来源只限制原生资料复用。
-- [x] 同步正式模型配置与投影契约。
-- [x] 提供商兼容配置、两层统一合并消费、模型页来源与整项覆盖展示。
-- [ ] GUI 验收：两层添加、编辑、移除、保存重开、协议／端点参考展示；模型页提供商来源、参数整项覆盖及移除覆盖后恢复。
-- [x] 临时兼容包测试完成；清理临时定义、目录引用与专用测试。
-- [ ] 真实端点验收三个正式标签及原生续接，不以隔离测试替代。
-- [ ] 暂缓：确认 SDK 编码方案后实现 customThinkingLevels。
-- [ ] 延后：确定模型专属兼容资料的来源与推荐入口；仅推荐已核实且已实现的兼容行为，由用户显式添加。模型参数获取不消费目录中的请求 patch、不自动启用兼容包；来源见[模型目录归档](archived/todo-2026-10-07-model-catalog.md)。
+## 待办与验收
 
-## 验证与验收
+- [x] 公共思考的明文／摘要／不透明资料分离，贯通流、记录、投影与展示。
+- [x] Responses 与 Messages 原生思考编码；兼容包只控制端点字段差异。
+- [x] Kimi 与智谱／Z.ai 的已公布 Responses 产品预设、地区／套餐说明及凭据入口。
+- [x] GUI：提供商卡片按计费方式分组、地区／套餐显示，用户于 2026-10-15 确认。
+- [ ] GUI：兼容参数添加／编辑／移除、保存重开、模型覆盖及恢复；summary-only 与纯密文块展示。
+- [ ] 真实端点：OpenAI、Anthropic、DeepSeek、Kimi 与智谱的多轮思考、工具配对与跨模型切回；分别确认套餐权限与客户端准入。
+- [ ] 真实端点：分别确认智谱／Z.ai 四种地区与计费组合，核对共用 Responses 适配与账户历史订阅限制。
+- [ ] 暂缓：确认 SDK 编码方案后实现 customThinkingLevels。标准等级映射为服务端字符串，不统一改写公共等级；Anthropic effort 与 adaptive/budget 不能混为一项。
+- [ ] 延后：确定模型专属兼容资料的来源与推荐入口；参数获取不消费目录 patch、不自动添加兼容包，见 [模型目录归档](archived/todo-2026-10-07-model-catalog.md)。
 
-- `npm run typecheck`、`npm test`（69 个测试文件、444 项）、`npm run build` 与 `npm run i18n:check` 通过。构建仍有部分产物超过 500 kB 的提示；测试中的 SDK 提示为思考模式下忽略 temperature。
-- 自动化使用合成协议响应和注入传输，不访问真实服务或凭据；在实际 HTTP 正文边界检查系统提示唯一性、明文思考顺序、图片保留、工具配对和原生资料隔离。
-- 提供商兼容改动的类型检查、9 个相关测试文件（151 项）、构建与 i18n 检查通过；包含配置保存、合并与实际 HTTP 正文消费，以及执行／插件／会话路径。构建仍有既有的大产物提示。
-- 配置契约验证两层分别保存并重开，非法候选不污染已保存值，移除后不重现；合并验证同 id 去重、模型参数整项覆盖、省略字段不补齐、移除覆盖恢复及来源配置不变。
-- 原生资料基线与 A → B → A 的隔离验证见续接计划；签名、密文和空／不可见思考不能凭空转成公共全文。
-- GUI 与真实端点仍待用户验收，计划不归档。
+验证以实际 HTTP 正文、真实 SDK 解码与公共记录往返为边界，覆盖两通道分离、密文／签名原样续接、跨来源隔离、工具顺序及字段设置。真实服务与 GUI 由用户操作，未完成前不归档。
 
-交接验收重点：核对 appliesTo 仅供展示、无域名自动启用；检查三个标签的最终请求编码、原生思考事件去重、Chat 附件相对历史消息的顺序，以及 OpenAI ↔ Anthropic 的 A → B → A 原生资料隔离。代码与契约检查可离线执行；GUI 与真实端点由用户操作。
-
-## SDK 编码限制参考
-
-- 已核验 ai@7.0.137、@ai-sdk/openai@4.0.91、@ai-sdk/anthropic@4.0.78：Chat reasoningEffort 与 Anthropic effort 有运行时固定枚举校验；Responses 虽接受字符串，部分模型名仍触发支持列表过滤。
-- Anthropic 显式传入 effort 会跳过顶层 reasoning 的 thinking 模式推导；仅改变 effort 不能保证 adaptive／budget 行为。自定义模型别名当前可能落入 budget，字符串映射不能自行强制 adaptive。
-- 通用中间件位于 provider 校验之前，不能直接绕过上述 effort 限制。DeepSeek 明文输入的限定投影不等于已解决自定义 effort 编码；后者继续暂缓。
+2026-10-15 验证：类型检查、73 个测试文件／489 项用例、i18n 检查与构建通过。回归包含空正文签名、Responses output_index 稳定归属、未闭合块仍交付终态计量，以及 SDK 末段正文裁剪。构建保留既有的 500 kB 产物大小提示；没有调用真实模型端点或操作真实开发数据。

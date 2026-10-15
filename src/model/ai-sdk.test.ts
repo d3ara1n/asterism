@@ -76,7 +76,7 @@ describe("AI SDK 适配契约", () => {
       expect(request).not.toHaveProperty("reasoning");
       expect(request).not.toHaveProperty("include");
     }
-    expect(events.find(event => event.type === "part.delta")).toMatchObject({ partId: "thinking:reasoning-1:0", delta: "Visible summary" });
+    expect(events.find(event => event.type === "part.delta")).toMatchObject({ partId: "thinking:reasoning-1", delta: "Visible summary", channel: "summary" });
     expect(events.find(event => event.type === "part.end")).toMatchObject({
       continuation: { openai: { itemId: "reasoning-1", reasoningEncryptedContent: "encrypted-continuation" } },
     });
@@ -89,9 +89,9 @@ describe("AI SDK 适配契约", () => {
     current.settings.thinking = "off";
     current.messages = [
       { kind: "output", adapter: adapter.version, scope: modelScope(current.settings),
-        parts: [{ kind: "thinking", text: "Only thought", continuation: { anthropic: { signature: "only-signature" } } }] },
+        parts: [{ kind: "thinking", summary: "", text: "Only thought", continuation: { anthropic: { signature: "only-signature" } } }] },
       { kind: "output", adapter: adapter.version, scope: modelScope(current.settings), parts: [
-        { kind: "thinking", text: "Saved thought", continuation: { anthropic: { signature: "saved-signature" } } },
+        { kind: "thinking", summary: "", text: "Saved thought", continuation: { anthropic: { signature: "saved-signature" } } },
         { kind: "text", text: "Saved answer", continuation: null },
         { kind: "toolcall", callId: "call", name: "read", arguments: {}, continuation: null },
       ] },
@@ -110,15 +110,11 @@ describe("AI SDK 适配契约", () => {
     expect(sdkMessages(current)).toEqual(enabled);
   });
 
-  // 相同思考流不依赖域名；只有用户添加的标签改变下一次请求的历史编码。
-  it.each([
-    { enabled: false, baseUrl: "https://api.deepseek.com" },
-    { enabled: true, baseUrl: "https://example.invalid/v1" },
-  ])("Responses 原始思考正常解码，明文回传由显式标签决定：$enabled", async ({ enabled, baseUrl }) => {
+  // 明文思考是协议基线；未知域名、空兼容列表也必须保存并原样回传。
+  it("Responses 原始思考正常解码，无兼容包也能明文续接", async () => {
     const current = structuredClone(input);
     current.settings.provider.protocol = "openai-responses";
-    current.settings.provider.baseUrl = baseUrl;
-    current.settings.model.compatibility = enabled ? [{ id: "thinkingInDeepSeekFormat" }] : [];
+    current.settings.provider.baseUrl = "https://example.invalid/v1";
     current.settings.model.modelId = "deepseek-flash";
     current.settings.thinking = "medium";
     current.settings.model.generation.temperature = null;
@@ -150,7 +146,7 @@ describe("AI SDK 适配契约", () => {
     if (thought?.type !== "part.end") throw new Error("Missing thinking completion.");
     const next: ModelInput = { ...current, messages: [...current.messages, {
       kind: "output", adapter: adapter.version, scope: modelScope(current.settings),
-      parts: [{ kind: "thinking", text: "Assess the plan.", continuation: thought.continuation ?? null }, { kind: "text", text: "Answer", continuation: null }],
+      parts: [{ kind: "thinking", summary: "", text: "Assess the plan.", continuation: thought.continuation ?? null }, { kind: "text", text: "Answer", continuation: null }],
     }] };
     for await (const _event of adapter.prepare(next).stream(new AbortController().signal)) { /* 检查实际序列化请求。 */ }
     expect(requests[0]?.reasoning).toMatchObject({ effort: "medium" });
@@ -161,38 +157,65 @@ describe("AI SDK 适配契约", () => {
     expect(JSON.stringify(assistant)).not.toContain("Assess the plan.");
     expect(JSON.stringify(assistant)).toContain("Answer");
     const reasoning = replay.find(item => item.type === "reasoning");
-    if (enabled) {
-      expect(reasoning).toEqual({ type: "reasoning", content: [{ type: "reasoning_text", text: "Assess the plan." }] });
-    } else {
-      // OpenAI 的无状态基线不能用明文替代密文；域名不触发助手文字回传。
-      expect(reasoning).toBeUndefined();
-    }
+    expect(reasoning).toEqual({ type: "reasoning", content: [{ type: "reasoning_text", text: "Assess the plan." }] });
   });
 
-  // 同一 item 的原始与 SDK 正文通道不能重复交付；无论哪个先产生文字，都只消费该通道。
-  it.each(["raw", "sdk"] as const)("原始思考与 SDK 思考同时出现，首个通道为 %s", async first => {
-    const raw = { type: "raw" as const, rawValue: { type: "response.reasoning_text.delta", item_id: "reasoning", delta: "Thought" } };
-    const sdk = { type: "reasoning-delta" as const, id: "reasoning:0", delta: "Thought" };
-    const model = new MockLanguageModelV4({ doStream: async options => {
-      expect(options.includeRawChunks).toBe(true);
-      return { stream: simulateReadableStream({ initialDelayInMs: null, chunkDelayInMs: null, chunks: [
-        { type: "stream-start", warnings: [] },
-        { type: "reasoning-start", id: "reasoning:0", providerMetadata: { openai: { itemId: "reasoning" } } },
-        ...(first === "raw" ? [raw, sdk] : [sdk, raw]),
-        { type: "reasoning-end", id: "reasoning:0", providerMetadata: { openai: { itemId: "reasoning", reasoningEncryptedContent: "opaque" } } },
-        { type: "finish", finishReason: { unified: "stop", raw: "stop" }, usage: {
-          inputTokens: { total: 1, noCache: 1, cacheRead: undefined, cacheWrite: undefined },
-          outputTokens: { total: 1, text: 0, reasoning: 1 },
-        } },
-      ] }) };
-    } });
+  // Responses summary 分段与全文可同时存在，SDK 摘要事件不能重复交付或提前结束整个 item。
+  it("真实 Responses 解码保留全文、多个摘要段落及密文，只交付一个思考块", async () => {
+    const response = { id: "response", model: "test", created_at: 0 };
+    const frames = [
+      { type: "response.created", response: { ...response, status: "in_progress" } },
+      { type: "response.output_item.added", output_index: 0, item: { type: "reasoning", id: "rs", summary: [] } },
+      { type: "response.reasoning_text.delta", item_id: "rs", output_index: 0, content_index: 0, delta: "Full thought" },
+      ...[0, 1].flatMap(summary_index => [
+        { type: "response.reasoning_summary_part.added", item_id: "rs", output_index: 0, summary_index, part: { type: "summary_text", text: "" } },
+        { type: "response.reasoning_summary_text.delta", item_id: `rs-alias-${summary_index}`, output_index: 0, summary_index, delta: `Summary ${summary_index}` },
+        { type: "response.reasoning_summary_text.done", item_id: "rs", output_index: 0, summary_index, text: `Summary ${summary_index}` },
+        { type: "response.reasoning_summary_part.done", item_id: "rs", output_index: 0, summary_index, part: { type: "summary_text", text: `Summary ${summary_index}` } },
+      ]),
+      { type: "response.output_item.done", output_index: 0, item: { type: "reasoning", id: "rs-final-alias",
+        summary: [{ type: "summary_text", text: "Summary 0" }, { type: "summary_text", text: "Summary 1" }], encrypted_content: "opaque" } },
+      { type: "response.completed", response: { ...response, status: "completed", usage: { input_tokens: 1, output_tokens: 3, total_tokens: 4 } } },
+    ];
+    const transport: typeof fetch = async () => new Response(frames.map(frame => `data: ${JSON.stringify(frame)}\n\n`).join(""),
+      { headers: { "content-type": "text/event-stream" } });
     const current = structuredClone(input);
     current.settings.provider.protocol = "openai-responses";
-    const adapter = new AiSdkAdapter(async () => "synthetic-key", () => model);
+    const adapter = new AiSdkAdapter(async () => "synthetic-key",
+      (value, key) => createProviderModel(value.settings.provider, value.settings.model, key, transport));
     const events: ModelEvent[] = [];
     for await (const event of adapter.prepare(current).stream(new AbortController().signal)) events.push(event);
-    expect(events.filter(event => event.type === "part.delta")).toEqual([{ type: "part.delta", partId: "thinking:reasoning:0", delta: "Thought" }]);
-    expect(events.find(event => event.type === "part.end")).toMatchObject({ continuation: { openai: { reasoningEncryptedContent: "opaque" } } });
+    expect(events.filter(event => event.type === "part.start")).toHaveLength(1);
+    expect(events.filter(event => event.type === "part.end")).toHaveLength(1);
+    expect(events.filter(event => event.type === "part.delta")).toEqual([
+      { type: "part.delta", partId: "thinking:rs", delta: "Full thought" },
+      { type: "part.delta", partId: "thinking:rs", delta: "Summary 0", channel: "summary" },
+      { type: "part.delta", partId: "thinking:rs", delta: "\n\n", channel: "summary" },
+      { type: "part.delta", partId: "thinking:rs", delta: "Summary 1", channel: "summary" },
+    ]);
+    expect(events.find(event => event.type === "part.end")).toMatchObject({ continuation: { openai: { itemId: "rs", reasoningEncryptedContent: "opaque" } } });
+  });
+
+  // 块不完整不等于终态不可用：执行状态机需要先保留服务端计量，再拒绝未闭合块。
+  it("Responses 思考缺少 done 时仍交付已收到的 incomplete 终态与用量", async () => {
+    const response = { id: "response", model: "test", created_at: 0 };
+    const frames = [
+      { type: "response.created", response: { ...response, status: "in_progress" } },
+      { type: "response.output_item.added", output_index: 0, item: { type: "reasoning", id: "rs", summary: [] } },
+      { type: "response.reasoning_text.delta", item_id: "rs", output_index: 0, content_index: 0, delta: "Partial" },
+      { type: "response.incomplete", response: { ...response, status: "incomplete", incomplete_details: { reason: "max_output_tokens" },
+        usage: { input_tokens: 2, output_tokens: 3, total_tokens: 5 } } },
+    ];
+    const transport: typeof fetch = async () => new Response(frames.map(frame => `data: ${JSON.stringify(frame)}\n\n`).join(""),
+      { headers: { "content-type": "text/event-stream" } });
+    const current = structuredClone(input);
+    current.settings.provider.protocol = "openai-responses";
+    const adapter = new AiSdkAdapter(async () => "synthetic-key",
+      (value, key) => createProviderModel(value.settings.provider, value.settings.model, key, transport));
+    const events: ModelEvent[] = [];
+    for await (const event of adapter.prepare(current).stream(new AbortController().signal)) events.push(event);
+    expect(events.filter(event => event.type === "part.end")).toEqual([]);
+    expect(events.at(-1)).toMatchObject({ type: "finish", reason: "length", usage: { input: 2, output: 3, total: 5 } });
   });
 
   it("真实 Anthropic 解码保留 start 的 redactedData 与 delta 的签名", async () => {
@@ -334,7 +357,7 @@ describe("AI SDK 适配契约", () => {
     expect(serialized).toContain("signature-value"); expect(serialized).not.toContain("credential-not-for-history"); expect(serialized).not.toContain("secret-metadata");
     const thinking = events.find(e => e.type === "part.end" && e.partId === "thinking:r");
     if (thinking?.type !== "part.end") throw new Error("Missing thinking completion.");
-    const next = sdkMessages({ ...input, messages: [...input.messages, { kind: "output", parts: [{ kind: "thinking", text: "Think", continuation: thinking.continuation ?? null }, { kind: "toolcall", callId: "call-1", name: "read", arguments: { resource_id: "note" }, continuation: null }], scope: modelScope(input.settings), adapter: adapter.version },
+    const next = sdkMessages({ ...input, messages: [...input.messages, { kind: "output", parts: [{ kind: "thinking", summary: "", text: "Think", continuation: thinking.continuation ?? null }, { kind: "toolcall", callId: "call-1", name: "read", arguments: { resource_id: "note" }, continuation: null }], scope: modelScope(input.settings), adapter: adapter.version },
       { kind: "result", callId: "call-1", name: "read", error: false, parts: [{ kind: "text", text: "Note text" }] }] });
     expect(next.map(m => m.role)).toEqual(["user", "assistant", "tool"]);
     expect(JSON.stringify(next)).toContain("signature-value");
@@ -379,12 +402,13 @@ describe("AI SDK 适配契约", () => {
     const current: ModelInput = { ...input, messages: [{
       kind: "output", adapter: "older-adapter", scope: "different-provider",
       parts: [
-        { kind: "thinking", text: "Foreign thought", continuation: { anthropic: { signature: "foreign-signature" } } },
+        { kind: "thinking", summary: "", text: "Foreign thought", continuation: { anthropic: { signature: "foreign-signature" } } },
         { kind: "text", text: "Portable answer", continuation: { openai: { itemId: "foreign-message" } } },
       ],
     }] };
     expect(() => adapter.prepare(current)).not.toThrow();
     expect(sdkMessages(current)).toEqual([{ role: "assistant", content: [
+      { type: "reasoning", text: "Foreign thought", providerOptions: { atelier: { summary: "" } } },
       { type: "text", text: "Portable answer", providerOptions: {} },
     ] }]);
   });

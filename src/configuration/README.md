@@ -5,7 +5,8 @@
 在 `../shared/provider-presets.ts` 的 `defineProviderPresets([...])` 中追加一项即可；不修改选择器或运行时。每项显式填写：
 
 - `id`：目录唯一身份，也是新连接默认 ID；地区或计费产品不同则分别命名。
-- `name / group / billing`：名称、官方／聚合／本地分组，以及 `usage / subscription / none` 计费类别。
+- `name / billing`：名称与 `usage / subscription / none` 计费类别；选择器依次按按量、订阅、不计费分组，空组不显示，不再按厂商或服务来源分组。
+- `none` 表示连接没有服务端计费，例如本地模型服务；按量 API 的免费额度不改变其 `usage` 分类。
 - `region / plan`：可选地区、套餐说明，支持 SDK 的 `UiText`；界面显示并参与搜索，新增地区或套餐不需要扩充枚举。
 - `connection`：`protocol / baseUrl / auth / compatibility`。兼容条目必须来自已实现的目录，明确无差异时填 `[]`。
 - `keyUrl / sources / verifiedOn / keywords`：该产品的凭据页面、非空官方资料列表、实际核对日期和可选搜索别名。
@@ -33,7 +34,7 @@
 
 入口为 `window.host.configuration.execute`，经 preload/main 校验转入任务进程。响应携带配置快照、保存 ID、可选参数获取报告或固定错误，不携带密钥或密文。配置修改不触发会话重载或级联刷新；选择与实际消费通过 `resolveProviderModel` / `resolveModelRole` 检查配置。
 
-配置 IPC 版本为 8。`discovery.start / cancel / add` 分别启动后台发现、取消、批量添加；快照 `discoveries` 持有每个连接最近一次请求的状态与候选资料，不进入配置文件。发现读取已保存连接与凭据，网络等待不占用配置队列；更改连接使旧结果失效。批量添加根据本次结果校验选择，在一次原子保存中跳过已有模型，刷新不修改配置。界面位于 `renderer/features/configuration/ModelDiscoveryPicker.tsx`，未知参数采用手动新建初始值并明确提示，完整约定见模型配置文档。
+配置 IPC 版本为 9。`discovery.start / cancel / add` 分别启动后台发现、取消、批量添加；快照 `discoveries` 持有每个连接最近一次请求的状态与候选资料，不进入配置文件。发现读取已保存连接与凭据，网络等待不占用配置队列；更改连接使旧结果失效。批量添加根据本次结果校验选择，在一次原子保存中跳过已有模型，刷新不修改配置。界面位于 `renderer/features/configuration/ModelDiscoveryPicker.tsx`，未知参数采用手动新建初始值并明确提示，完整约定见模型配置文档。
 
 `model.parameters` 在队列外通过官方 `@opencode-ai/models` 获取目录，10 秒超时且不携带提供商凭据；回到队列确认发起时的模型与连接仍有效，再覆盖可映射字段并原子保存。成功结果的 `parameterUpdate` 说明来源和需手动检查的字段；失败通过固定本地化消息说明原配置保留。模型设置页通过 `ModelParameters.tsx` 提供唯一的获取入口与结果展示，列表／卡片不提供此操作。参数不会因获取模型列表或目录更新而自动变化。
 
@@ -43,7 +44,7 @@
 
 读取快照中的 roles/agents 是完整生效配置，defaults 是原始内置基准，overrides 是编辑器填写值。执行每轮取用最新完整配置，不写入会话历史。
 
-配置模块独占应用数据目录下的 `configuration.json`，格式版本为 5，分别保存 providers、models、roles、agents；角色与代理的用户字段保存于 overrides，不持久化生效视图。提供商与模型的 compatibility 分别保存已添加的兼容条目，定义、参数校验与合并位于 `../shared/model-compatibility.ts`；消费时按 id 合并，模型条目整项优先，合并结果不回写存储。文件只在不存在时初始化内置项身份与空覆盖，已有删除状态不会重新播种。损坏或不支持的格式明确报错并保留原文件，工作数据库重建不影响配置。
+配置模块独占应用数据目录下的 `configuration.json`，格式版本为 6，分别保存 providers、models、roles、agents；角色与代理的用户字段保存于 overrides，不持久化生效视图。提供商与模型的 compatibility 分别保存已添加的兼容条目，定义、参数校验与合并位于 `../shared/model-compatibility.ts`；消费时按 id 合并，模型条目整项优先，合并结果不回写存储。文件只在不存在时初始化内置项身份与空覆盖，已有删除状态不会重新播种。损坏或不支持的格式明确报错并保留原文件，工作数据库重建不影响配置。
 
 保存由 store 统一归一化覆盖并校验完整候选文档，再通过临时文件写入、刷新与重命名原子替换；成功后才更新内存。提供商及其模型的删除共用一次保存，失败保持旧视图与旧凭据引用。配置意图与文件格式留在模块内部，调用方只消费配置接口。编辑器可逐项或整项恢复内置值，自定义项保留名称；配置编辑不改写会话历史。
 
