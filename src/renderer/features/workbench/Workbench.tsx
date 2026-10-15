@@ -178,7 +178,7 @@ function Canvas({ ref, session, run, writable, canDrop, onDropItems }: DropHandl
       }
     }
   }, [run, toNodes, onView]);
-  return <div ref={viewportElement} className="relative h-full" onDragOver={event => { if (writable && canDrop(dragKinds(event.dataTransfer))) { event.preventDefault(); setDropping(true); } }}
+  return <div ref={viewportElement} className="relative h-full outline-none" onDragOver={event => { if (writable && canDrop(dragKinds(event.dataTransfer))) { event.preventDefault(); setDropping(true); } }}
     tabIndex={-1}
     onPaste={event => {
       if (!writable || event.defaultPrevented || (event.target instanceof Element && event.target.closest("input, textarea, [contenteditable=true]"))) return;

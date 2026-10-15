@@ -161,7 +161,7 @@
     transform: translateX(calc(var(--screen-index) * -1 * (100% + var(--window-gap))));
     transition: transform var(--motion-page) var(--ease-out);
   }
-  .space-screen { @apply relative isolate h-full min-h-0 w-full shrink-0 overflow-hidden rounded-lg; }
+  .space-screen { @apply relative isolate h-full min-h-0 w-full shrink-0 overflow-hidden rounded-lg outline-none; }
   /* 屏铺满 Space、贴住窗口边缘；滚动容器在屏内部留出 --space-inset。带底板的屏自身让出边距。 */
   .space-screen[data-surface] {
     @apply surface bg-background;
