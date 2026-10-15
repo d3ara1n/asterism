@@ -28,6 +28,7 @@ export const ObjectCard = memo(function ObjectCard({ icon, kind, title, actions,
   const active = panels.find(panel => panel.id === panelId);
   const activeId = active?.id ?? null;
   const root = useRef<HTMLDivElement>(null);
+  const content = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const panelElement = useRef<HTMLElement>(null);
   const returnFocus = useRef<HTMLElement | null>(null);
@@ -44,6 +45,18 @@ export const ObjectCard = memo(function ObjectCard({ icon, kind, title, actions,
     if (collapsed) onView({ collapsed: false });
   }, [panels, activeId, collapsed, onView]);
   const closePanel = useCallback(() => setPanelId(null), []);
+  useEffect(() => {
+    const element = content.current;
+    if (!element) return;
+    // React Flow 在原生冒泡阶段处理 wheel；React onWheel 执行时已晚于画布。
+    const onWheel = (event: WheelEvent) => {
+      const zoom = event.ctrlKey || (window.host.platform === "darwin" && event.metaKey);
+      // 普通滚动保留浏览器默认行为；已被内部组件消费的事件不再交给画布。
+      if (!zoom || event.defaultPrevented) event.stopPropagation();
+    };
+    element.addEventListener("wheel", onWheel, { passive: true });
+    return () => element.removeEventListener("wheel", onWheel);
+  }, [collapsed]);
   const card = useMemo<RendererCard>(() => ({ activePanel: activeId, openPanel, closePanel }), [activeId, openPanel, closePanel]);
   useEffect(() => {
     if (panelId !== null && activeId === null) setPanelId(null);
@@ -96,7 +109,7 @@ export const ObjectCard = memo(function ObjectCard({ icon, kind, title, actions,
           <IconButton size="icon-xs" label={i18n.text(commonMessages.closeView)} onClick={() => onView({ hidden: true })}><X /></IconButton>
         </div>
       </header>
-      {!collapsed && <div className="nodrag nopan nowheel relative flex min-h-0 min-w-0 flex-1 overflow-hidden border-t">
+      {!collapsed && <div ref={content} className="nodrag nopan relative flex min-h-0 min-w-0 flex-1 overflow-hidden border-t">
         <div className={cn("flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden", active && "invisible @min-[52rem]/card:visible")}>{children}</div>
         {active && <aside ref={panelElement} tabIndex={-1} aria-labelledby={headingId}
           className="absolute inset-0 z-10 flex min-h-0 min-w-0 flex-col bg-card outline-none @min-[52rem]/card:static @min-[52rem]/card:w-80 @min-[52rem]/card:shrink-0 @min-[52rem]/card:border-l">
