@@ -6,6 +6,6 @@ export const builtinViews: readonly RendererModule[] = Object.keys(entries).sort
 export { BuiltinRendererProvider, type BuiltinRendererServices } from "./renderer-context";
 
 export { createMessageDraft, type MessageDraft } from "./agent/conversation/draft";
-export { AttachFiles, DraftFiles, fileInputEvents } from "./agent/conversation/Files";
+export { AttachFiles, DraftFiles, DraftFileError, fileInputEvents } from "./agent/conversation/Files";
 export { ModelChoices } from "./agent/conversation/ModelChoices";
 export { SubmissionIdentity } from "./agent/conversation/submission";

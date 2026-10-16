@@ -3,7 +3,7 @@ import { Square, ArrowUp } from "lucide-react";
 import { useSyncExternalStore, type Ref } from "react";
 import type { MessageDraft } from "./draft";
 import type { AgentExecutionState } from "../state";
-import { AttachFiles, DraftFiles, fileInputEvents } from "./Files";
+import { AttachFiles, DraftFiles, DraftFileError, fileInputEvents } from "./Files";
 
 import { Button } from "@atelier/ui/ui/button";
 import { InputGroup, InputGroupTextarea, InputGroupAddon } from "@atelier/ui/ui/input-group";
@@ -19,7 +19,6 @@ export function MessageComposer({ draft, inputRef, busy, ready, executionState, 
   const state = useSyncExternalStore(draft.subscribe, draft.getSnapshot);
   const running = executionState === "running";
   return <form {...fileInputEvents(draft, busy || !ready)} onSubmit={event => { event.preventDefault(); void onSend(); }}>
-  <DraftFiles draft={draft} disabled={busy} className="pt-0 pb-2" />
   <InputGroup>
     <InputGroupTextarea ref={inputRef} rows={3} maxLength={100_000} value={state.text} disabled={busy}
       onChange={event => draft.setText(event.target.value)} aria-label={i18n.formatMessage(conversationMessages.messagePlaceholder)}
@@ -28,15 +27,17 @@ export function MessageComposer({ draft, inputRef, busy, ready, executionState, 
         if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
         event.preventDefault(); event.currentTarget.form?.requestSubmit();
       }} />
-    <InputGroupAddon align="block-end" className="justify-between">
+    <InputGroupAddon align="block-end" className="min-w-0 gap-1">
       <AttachFiles draft={draft} disabled={busy || !ready} />
+      <DraftFiles draft={draft} disabled={busy} />
       {running ? <Button type="button" size="sm" variant="secondary" disabled={busy || !ready}
         onClick={() => { void onCancel(); }}><Square />{i18n.formatMessage(conversationMessages.stop)}</Button>
-        : <div className="flex gap-1">
+        : <div className="flex shrink-0 gap-1">
           {executionState === "incomplete" && <Button type="button" size="sm" variant="ghost" disabled={!writable} onClick={() => { void onContinue(); }}>{i18n.formatMessage(conversationMessages.continue)}</Button>}
           <Button type="submit" size="icon-sm" disabled={!writable || state.uploading || (!state.text.trim() && !state.files.length)} aria-label={i18n.formatMessage(commonMessages.sendMessage)} title={i18n.formatMessage(commonMessages.sendMessage)}><ArrowUp /></Button>
         </div>}
     </InputGroupAddon>
   </InputGroup>
+  <DraftFileError draft={draft} className="mt-1" />
 </form>;
 }

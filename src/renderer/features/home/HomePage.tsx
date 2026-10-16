@@ -1,6 +1,6 @@
 import { ArrowUp, Bot, Settings } from "lucide-react";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { type MessageDraft, AttachFiles, DraftFiles, fileInputEvents, ModelChoices } from "@atelier/builtin/renderer";
+import { type MessageDraft, AttachFiles, DraftFiles, DraftFileError, fileInputEvents, ModelChoices } from "@atelier/builtin/renderer";
 import { defaultAgentPreset } from "@atelier/builtin-api/contracts";
 
 import type { ThinkingLevel } from "../../../shared/configuration";
@@ -54,7 +54,6 @@ export function HomePage({ active, draft, onSettings, ready, busy, submitError, 
       event.preventDefault();
       if (canSend) void onStart({ agent: agent!.id, model: modelId, thinking, parts: draft.parts() });
     }} aria-label={i18n.formatMessage(commonMessages.newConversation)} className="rounded-xl border bg-muted">
-      <DraftFiles draft={draft} disabled={busy} className="px-3 py-2" />
       <InputGroup className="rounded-xl border-0 border-b bg-card shadow-none">
         <label htmlFor="home-message" className="sr-only">{i18n.formatMessage(homeMessages.firstMessage)}</label>
         <InputGroupTextarea id="home-message" className="min-h-32 px-4 py-4" rows={4} maxLength={100_000}
@@ -66,8 +65,9 @@ export function HomePage({ active, draft, onSettings, ready, busy, submitError, 
             if (inputState.text.trim() === showcaseSpell) { draft.setText(""); setShowcase(true); }
             else event.currentTarget.form?.requestSubmit();
           }} />
-        <InputGroupAddon align="block-end" className="justify-between">
+        <InputGroupAddon align="block-end" className="min-w-0 gap-1">
           <AttachFiles draft={draft} disabled={busy || !ready} />
+          <DraftFiles draft={draft} disabled={busy} />
           <IconButton variant="default" className="rounded-full" label={i18n.formatMessage(commonMessages.sendMessage)} type="submit" disabled={!canSend} aria-describedby="home-availability"><ArrowUp /></IconButton>
         </InputGroupAddon>
       </InputGroup>
@@ -79,6 +79,7 @@ export function HomePage({ active, draft, onSettings, ready, busy, submitError, 
           onModelChange={setModelId} onThinkingChange={setThinking} />
       </div>
     </form>
+    <DraftFileError draft={draft} className="mt-2" />
     {(submitError || error) && <p role="alert" className="mt-3 text-center"><StatusText tone="error">{i18n.text(submitError ?? error ?? "")}</StatusText></p>}
     <div className="mt-4 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-center">
       <p id="home-availability" role="status" className="type-caption">{busy ? i18n.formatMessage(homeMessages.startingConversation) : !ready ? i18n.formatMessage(commonMessages.statusUnavailable) : i18n.formatMessage(homeMessages.keyboardHint)}</p>
