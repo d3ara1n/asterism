@@ -7,14 +7,14 @@ import { type AgentSelection, ModelConfiguration } from "@atelier/builtin-api/co
 import { commonMessages } from "../../messages/common";
 import { configurationMessages } from "../../messages/configuration";
 
-export function AgentConfigurationPicker({ selection, disabled, running, onChange }: {
-  selection: AgentSelection; disabled: boolean; running: boolean;
+export function AgentConfigurationPicker({ selection, disabled, onChange }: {
+  selection: AgentSelection; disabled: boolean;
   onChange(selection: AgentSelection): Promise<void>;
 }) {
   const i18n = useI18n();
   const configuration = useRendererCatalogs().get(ModelConfiguration);
   const selectedAgent = configuration?.agents.find(a => a.id === selection?.agent && a.enabled);
-  return <div className="flex min-w-0 flex-wrap items-center gap-0.5">
+  return <>
   <ConfigurationChoice icon={<Bot />} label={i18n.formatMessage(commonMessages.agent)} value={selectedAgent?.name ?? i18n.formatMessage(configurationMessages.unavailableAgent)}
     selected={selection.agent} disabled={disabled || !configuration}
     options={configuration?.agents.filter(a => a.enabled).map(a => ({ value: a.id, label: a.name })) ?? []}
@@ -22,6 +22,5 @@ export function AgentConfigurationPicker({ selection, disabled, running, onChang
   <ModelChoices configuration={configuration} {...selection} disabled={disabled}
     onModelChange={model => { void onChange({ ...selection, model }); }}
     onThinkingChange={thinking => { void onChange({ ...selection, thinking }); }} />
-  {running && <span className="type-caption">{i18n.formatMessage(configurationMessages.nextRequestHint)}</span>}
-</div>;
+</>;
 }
