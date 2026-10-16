@@ -241,6 +241,10 @@
 @keyframes startup-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .startup-indicator { animation-duration: 2.4s; } }
 .react-flow__attribution { background: transparent !important; font-size: 9px !important; }
+/* 节点外壳铺满整张卡片，但只有卡片拖动柄能起拖；外壳不承担手势光标，
+   否则内容区会显示并无拖动行为的抓取手型。拖动中指针常移出拖动柄，仍给出 grabbing。 */
+.react-flow__node.draggable { cursor: default; }
+.react-flow__node.draggable.dragging { cursor: grabbing; }
 /* Pierre 自行绘制差异与语法颜色；宿主只接入公共字体、字号与紧凑间距。 */
 .pierre-code {
   display: block;
