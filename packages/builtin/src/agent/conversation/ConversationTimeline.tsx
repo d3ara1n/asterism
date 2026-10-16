@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { Alert, AlertDescription } from "@atelier/ui/ui/alert";
 import { Badge } from "@atelier/ui/ui/badge";
+import { formatCount } from "@atelier/ui/format-count";
 import { conversationMessages } from "../../messages/conversation";
 import { Markdown } from "./Markdown";
 import { ThinkingBlock } from "./ThinkingBlock";
@@ -20,10 +21,11 @@ export function ConversationTimeline({ items }: { items: readonly TimelineItem[]
 function NodeView({ node }: { node: TimelineItem }) {
   const i18n = useI18n();
   const usage = "usage" in node ? node.usage : node.kind === "notice" ? node.response?.usage : null;
+  const count = (value: number | null | undefined) => value == null ? "—" : formatCount(value);
   return <div className="flex flex-col gap-1">
     <NodeContent node={node} />
     {usage && <p className="type-caption">
-      {i18n.formatMessage(conversationMessages.inputTokens)} {usage.input ?? "—"} · {i18n.formatMessage(conversationMessages.outputTokens)} {usage.output ?? "—"} · {i18n.formatMessage(conversationMessages.cachedTokens)} {usage.cacheRead ?? "—"}
+      {i18n.formatMessage(conversationMessages.inputTokens)} {count(usage.input)} · {i18n.formatMessage(conversationMessages.outputTokens)} {count(usage.output)} · {i18n.formatMessage(conversationMessages.cachedTokens)} {count(usage.cacheRead)}
     </p>}
   </div>;
 }

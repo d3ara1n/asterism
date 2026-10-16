@@ -4,13 +4,13 @@ import { useI18n, useRendererCatalogs, type I18n } from "@atelier/sdk/renderer";
 import type { RequestDiagnostics } from "@atelier/sdk/contracts";
 import { Badge } from "@atelier/ui/ui/badge";
 import { cn } from "@atelier/ui/utils";
+import { formatCount } from "@atelier/ui/format-count";
 import { contextMessages as messages } from "../messages/context";
 import { ModelConfiguration } from "@atelier/builtin-api/contracts";
 
 /** 代理辅助面板共用的版式与图表部件；视觉规范见 docs/design-system.md#数据图表。 */
 export const ease = [0.2, 0.8, 0.2, 1] as const;
 export const stripes: CSSProperties = { backgroundImage: "repeating-linear-gradient(-45deg, var(--border) 0 2px, transparent 2px 5px)" };
-export const compact = (i18n: I18n, value: number) => i18n.formatNumber(value, { notation: "compact", maximumFractionDigits: 1 });
 export const percent = (i18n: I18n, part: number, total: number) =>
   total > 0 ? i18n.formatNumber(part / total, { style: "percent", maximumFractionDigits: part / total < 0.01 && part > 0 ? 1 : 0 }) : "—";
 
@@ -44,7 +44,7 @@ function SystemRow({ label, detail, value, total, color, nested = false }: { lab
   return <li className={cn("space-y-1", nested && "pl-4")}>
     <div className="flex items-baseline gap-2">
       <span className={cn("min-w-0 flex-1 truncate", nested ? "type-caption text-foreground" : "type-body")} title={detail ?? label}>{label}</span>
-      <span className="type-caption tabular-nums">{i18n.formatMessage(messages.characters, { count: value })}</span>
+      <span className="type-caption tabular-nums">{i18n.formatMessage(messages.characters, { count: formatCount(value) })}</span>
       <span className="type-label w-10 text-right tabular-nums">{percent(i18n, value, total)}</span>
     </div>
     {!nested && <div className="h-1 overflow-hidden rounded-full bg-muted">

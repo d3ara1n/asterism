@@ -50,7 +50,7 @@
   "discovery.noMatch": "没有匹配的模型。",
   "discovery.added": "已添加",
   "discovery.count": "找到 {count} 个模型",
-  "discovery.context": "上下文窗口：{count, number} token",
+  "discovery.context": "上下文窗口：{count} toks",
   "discovery.reasoning": "提供商声明支持思考",
   "discovery.noReasoning": "提供商声明不支持思考",
   "discovery.addSelected": "添加所选（{count}）",

@@ -27,6 +27,7 @@ export function useAgentConversation(object: RendererObjectContext, hasSelection
     async configure(selection: AgentSelection) {
       const result = await command({ type: "configure", selection });
       if (result.ok) setError(null);
+      return result.ok;
     },
     async send(): Promise<boolean> {
       if (!writable || current.pending || state.uploading) return false;

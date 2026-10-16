@@ -1,8 +1,9 @@
 import { useState, type KeyboardEvent, type PointerEvent } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import { useI18n } from "@atelier/sdk/renderer";
+import { formatCount } from "@atelier/ui/format-count";
 import { diagnosticMessages as messages } from "../../messages/diagnostics";
-import { compact, ease, percent, Swatch } from "../panel-kit";
+import { ease, percent, Swatch } from "../panel-kit";
 import type { CompressionEntry, TrendPoint } from "./overview";
 
 /** 当前路径逐请求的实报 input 与缓存读取；虚线标出压缩，水平虚线是自动压缩阈值。只画已保存的真实计量。 */
@@ -37,10 +38,10 @@ export function InputTrend({ points, compressions, threshold }: { points: readon
   };
   return <div className="space-y-2">
     <p className="type-caption tabular-nums" aria-live="polite">
-      <span className="text-foreground">{i18n.formatMessage(messages.trendPoint, { index: current + 1, input: i18n.formatNumber(point.input) })}</span>
-      {point.cacheRead !== null && <> · {i18n.formatMessage(messages.trendCache, { cache: compact(i18n, point.cacheRead), rate: percent(i18n, point.cacheRead, point.input) })}</>}
+      <span className="text-foreground">{i18n.formatMessage(messages.trendPoint, { index: current + 1, input: formatCount(point.input) })}</span>
+      {point.cacheRead !== null && <> · {i18n.formatMessage(messages.trendCache, { cache: formatCount(point.cacheRead), rate: percent(i18n, point.cacheRead, point.input) })}</>}
       {" · "}{point.delta === null ? i18n.text(messages.trendIncomparable)
-        : i18n.formatMessage(messages.trendDelta, { delta: i18n.formatNumber(point.delta, { signDisplay: "exceptZero" }) })}
+        : i18n.formatMessage(messages.trendDelta, { delta: formatCount(point.delta, "exceptZero") })}
     </p>
     <div tabIndex={0} role="group" aria-label={i18n.text(messages.trend)} onPointerMove={move} onPointerLeave={() => setActive(null)} onKeyDown={key}
       className="relative h-20 cursor-crosshair rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring">

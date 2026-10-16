@@ -4,6 +4,7 @@ import type { ModelDiscovery, Provider } from "../../../shared/configuration";
 import { providersMessages as messages } from "../../messages/providers";
 import { useI18n } from "../../shared/i18n";
 import { Button } from "@atelier/ui/ui/button";
+import { formatCount } from "@atelier/ui/format-count";
 import { Badge } from "@atelier/ui/ui/badge";
 import { Checkbox } from "@atelier/ui/ui/checkbox";
 import { Field, FieldLabel } from "@atelier/ui/ui/field";
@@ -79,7 +80,7 @@ function DiscoveryContent({ provider, discovery }: { provider: Provider | undefi
               <span className="flex min-w-0 flex-col gap-1">
                 <span className="break-words">{model.name}</span>
                 {model.name !== model.modelId && <span className="type-caption break-all">{model.modelId}</span>}
-                {model.contextWindow !== undefined && <span className="type-caption">{i18n.formatMessage(messages.discoveredContext, { count: model.contextWindow })}</span>}
+                {model.contextWindow !== undefined && <span className="type-caption">{i18n.formatMessage(messages.discoveredContext, { count: formatCount(model.contextWindow) })}</span>}
                 {model.reasoning !== undefined && <span className="type-caption">{i18n.text(model.reasoning ? messages.discoveryReasoning : messages.discoveryNoReasoning)}</span>}
                 {model.thinkingLevels !== undefined && <span className="type-caption">{i18n.text(messages.availableThinkingLevels)}: {model.thinkingLevels.join(", ") || "—"}</span>}
               </span>

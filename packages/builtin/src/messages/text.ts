@@ -3,7 +3,7 @@ import { defineMessages, pluginNamespace } from "@atelier/sdk/contracts";
 export const textMessages = pluginNamespace("atelier.builtin").messages("en", defineMessages({
   toolTextCharacters: {
     id: "toolTextCharacters",
-    defaultMessage: "{count, number} characters",
+    defaultMessage: "{count} chars",
   },
   toolTextEdits: {
     id: "toolTextEdits",

@@ -1,4 +1,5 @@
 import { textMessages } from "./messages/text";
+import { formatCount } from "@atelier/ui/format-count";
 import { toolsMessages } from "./messages/tools";
 import { useI18n, type ToolRenderProps, type ToolRendererDefinition } from "@atelier/sdk/renderer";
 import type { Json, ToolResult } from "@atelier/sdk/contracts";
@@ -29,7 +30,7 @@ function TextWriteHeader({ target, args, invocation, result }: ToolRenderProps<T
   return <ToolHeader label={i18n.formatMessage(textMessages.toolTextWrite)} monospace={path !== undefined}
     subject={[invocation.resource?.title, path].filter(Boolean).join(" / ")}
     meta={<>{data && <>+{data.added} −{data.removed}{count !== undefined && " · "}</>}
-      {count !== undefined && i18n.formatMessage(textMessages.toolTextCharacters, { count })}</>} />;
+      {count !== undefined && i18n.formatMessage(textMessages.toolTextCharacters, { count: formatCount(count) })}</>} />;
 }
 function TextEditHeader({ target, args, invocation, result }: ToolRenderProps<TextChange>) {
   const i18n = useI18n();

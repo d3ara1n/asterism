@@ -11,7 +11,6 @@ import { Alert, AlertDescription } from "@atelier/ui/ui/alert";
 import { MessageComposer } from "./Composer";
 import { commonMessages } from "../../messages/common";
 import { conversationMessages } from "../../messages/conversation";
-import { configurationMessages } from "../../messages/configuration";
 import { useI18n, useRendererObject, useRendererModels, useRendererCatalogs } from "@atelier/sdk/renderer";
 
 import { useOutputFollow } from "./output-follow";
@@ -95,7 +94,6 @@ export function Conversation({ selection, turnState, onHome }: { selection: Agen
         <AgentConfigurationPicker selection={selection} disabled={!interaction.configurable}
           onChange={interaction.configure} />
         <ContextUsage selection={selection} />
-        {running && <span className="type-caption">{i18n.formatMessage(configurationMessages.nextRequestHint)}</span>}
       </div>}
       {error && <Alert variant="destructive"><AlertDescription className="flex flex-wrap items-center gap-2">
         <span className="flex-1">{i18n.text(error)}</span>

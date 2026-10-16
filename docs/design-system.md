@@ -83,6 +83,7 @@ Agent overlay 的外壳由内置 Agent 统一提供，插件只组织内部内�
 - 面向普通用户的界面按用户选择或系统语言单语显示，不并排双语；宿主与内置插件提供英文、简体中文，规则见 [公共 i18n](i18n.md)。窄窗口时顶栏按钮只留图标。
 - 对话框描述只提供当前操作的填写引导或特有行为说明，不重复资源创建与授权等通用性质；同类表单使用一致的语气与结构。
 - 字号五级：`type-page`、`type-section`、`type-body`、`type-caption`、`type-label`。
+- 只读 token 与字数统一采用十进制工程缩写：不足千保留普通数字，较大值使用 `k / M / G / T`，最多一位小数；单位固定为 `toks / chars`，不随界面语言切换成「万／亿」。选择器、悬停提示、诊断、上下文面板、图表与工具摘要共用 `@atelier/ui/format-count`，量级与舍入由 `Intl.NumberFormat` 处理。可编辑数值字段及原始数据展示保留完整值，存储与计算不使用缩写。
 - 字体只有两个 token：`--font-sans`（界面）与 `--font-mono`（代码）。用户在外观设置选择的本机字体（通过 Chromium `queryLocalFonts` 获取，代码字体默认筛选等宽）置于默认回退栈之前；界面字号即密度；代码另有字号 `--code-font-size`（11–18px，未设置时跟随所在文字），代码文字统一用 `type-code`。
 - 图标统一使用 `lucide-react`，不使用 Unicode 符号；界面标识为 `brand-mark.tsx` 的经纬线框。
 - `packages/ui/src/ui/` 只放 shadcn（new-york-v4）官方 registry 源码，不手改结构与样式类；升级即重新拉取覆盖。主题绑定的 `src/renderer/shared/ui/sonner.tsx` 留在应用组合侧：主题取自 `useScheme()` 而不引入 `next-themes`，状态图标按状态 token 着色。官方没有的组合（如 `PageState`、`StatusBadge`、`IconButton`、`ListRow`）放在 `packages/ui/src/ui/` 内但只组合官方组件，不另写皮肤。
@@ -105,6 +106,12 @@ Agent overlay 的外壳由内置 Agent 统一提供，插件只组织内部内�
 - 删除等不可逆操作的入口用 `ghost` 加 `text-destructive`，经 `AlertDialog` 确认后执行。
 - 区块与编辑器中带文字的辅助操作使用语义前导图标，进行中以 `Spinner` 替换该图标；错误恢复与页脚取消、放弃不带图标。
 - 设置页与浮岛内使用 `sm`，对话框页脚沿用默认尺寸，紧凑行内使用 `xs`。仅图标按钮使用 `IconButton`（Button + Tooltip）。
+
+### 对话配置摘要与浮层
+
+对话配置摘要使用一个紧凑 `ghost / xs` 按钮：`Bot` 图标、模型名、短竖分隔线、弱化的思考等级、唯一展开箭头。模型名允许省略，等级保持可见；思考等级前不再放图标。机器人图标与浮层「代理配置」行呼应，提示入口管理当前代理的配置；悬停／聚焦提示使用「代理配置名 · 模型名 · 思考等级 · 上下文容量」的紧凑单行摘要，不显示字段标签或单位，例如 `worker · deepseek-flash · 中 · 1M`；窗口缺失时显示未知。
+
+配置浮层复用官方 Popover 表面，贴近按钮展开并避让窗口边缘。第一层是三行配置，图标固定为 `Bot / Cpu / Brain`；右侧当前值弱化。普通选择页和提供商列表保持紧凑宽度；进入提供商的模型列表时加宽为列表与参数预览两栏，以单条分隔线划分同一表面，不嵌套卡片。可用宽度不足时预览排到列表下方，两区分别滚动。返回与标题固定；模型搜索使用局部 Command 列表，不打开全局命令面板或模态框。完整行为见 [对话配置选择](workbench.md#对话配置选择)。
 
 ## 状态与反馈
 

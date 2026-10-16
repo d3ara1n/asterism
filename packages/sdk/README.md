@@ -82,6 +82,7 @@ export default definePlugin({
 ### 5. 可选模型分支（`plugin.models`）
 不依赖内置 Agent 的无状态模型服务（详细协议与续接规则见 [运行时](../../docs/runtime.md#用户输入文件与模型协议适配)）：
 - `models.roles()` / `models.list()`：读取模型角色与可用模型目录。
+- `resolveModelSelection(defaults, overrides)`（`contracts`）：展示与请求共用的模型／思考等级覆盖计算，空值沿用默认值；可用性与凭据由消费边界校验。
 - `models.validate(request, { content? })`：校验模型目标、续接资料与文件引用资格，不发送网络请求。
 - `models.stream(request, { content? })`：执行单次无工具补全（支持可选 `maxOutputTokens`、`userAgent`、`sessionId`），流式交付协议事件。
 - `models.run(request)`：绑定具体资源对象（`object`）与请求起点（`requestParentId`），执行一次模型请求及该响应的完整资源工具批次，经 `ModelRunObserver.event` 同步交付 `block`（最高序号块内含 `completion` 终态）、`diagnostic` 与 `progress`。结果附带 `diagnostics`（API 8.3）：系统提示块的种类、来源与字数及声明的工具名称，不含正文；可用 `requestDiagnosticsSchema` 校验保存（分区语义见 [请求诊断](../../docs/runtime.md#请求诊断)）。外层多轮循环与时间线提交由调用方插件自行驱动。

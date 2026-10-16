@@ -8,16 +8,17 @@ import { Button } from "@atelier/ui/ui/button";
 import { ItemGroup, ItemSeparator } from "@atelier/ui/ui/item";
 import { ListRow } from "@atelier/ui/ui/list-row";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@atelier/ui/ui/tabs";
+import { formatCount } from "@atelier/ui/format-count";
 import { diagnosticMessages as messages } from "../../messages/diagnostics";
 import { ConversationTimeline } from "../conversation/ConversationTimeline";
 import { savedTimelineBlock, type TimelineItem } from "../conversation/timeline";
 import { Disclosure } from "../conversation/Disclosure";
-import { compact, PanelBody, percent, Section, Stat, Stats, SystemComposition } from "../panel-kit";
+import { PanelBody, percent, Section, Stat, Stats, SystemComposition } from "../panel-kit";
 import { useDiagnostics, type PricedRequest } from "./use-diagnostics";
 import type { DiagnosticNotice, DiagnosticScope } from "./history";
 import type { DiagnosticOverview } from "./overview";
 import { InputTrend } from "./InputTrend";
-import { formatEstimate, formatMoney } from "./format";
+import { formatEstimate, formatMoney, formatPrice, formatQuantity } from "./format";
 
 const issueMessages: Record<CostIssue, UiMessage> = {
   quantity: messages.quantityMissing, price: messages.priceMissing, unit: messages.unitMismatch,
@@ -49,7 +50,7 @@ function RequestDetails({ request, onBack }: { request: PricedRequest; onBack():
   let pricingLabel = i18n.text(messages.basePrice);
   if (!request.configuredModel?.cost) pricingLabel = i18n.text(messages.priceMissing);
   else if (estimate.lines.some(line => line.issue === "tier")) pricingLabel = i18n.text(messages.tierUnknown);
-  else if (estimate.fromInputTokens !== null) pricingLabel = i18n.formatMessage(messages.tier, { count: estimate.fromInputTokens });
+  else if (estimate.fromInputTokens !== null) pricingLabel = i18n.formatMessage(messages.tier, { count: formatCount(estimate.fromInputTokens) });
   const content: TimelineItem[] = [];
   if (request.relatedInput) content.push({ kind: "message", ...request.relatedInput });
   content.push(...request.blocks.map(({ record, block }) => ({ ...savedTimelineBlock(record, block), usage: null })));
@@ -62,7 +63,7 @@ function RequestDetails({ request, onBack }: { request: PricedRequest; onBack():
   if (request.responseId) metadata.push([messages.responseId, request.responseId]);
   if (request.requestParentId) metadata.push([messages.requestParent, request.requestParentId]);
   if (request.completion?.providerResponseId) metadata.push([messages.providerResponseId, request.completion.providerResponseId]);
-  const count = (value: number | null | undefined) => value == null ? "—" : i18n.formatNumber(value);
+  const count = (value: number | null | undefined) => value == null ? "—" : formatCount(value);
   return <>
     <div className="space-y-3">
       <Button ref={back} variant="ghost" size="sm" className="-ml-2" onClick={onBack}><ArrowLeft />{i18n.text(messages.back)}</Button>
@@ -95,8 +96,8 @@ function RequestDetails({ request, onBack }: { request: PricedRequest; onBack():
       <ul className="space-y-2.5">{estimate.lines.map(line => <li key={`${line.modality}/${line.item}`} className="space-y-0.5">
         <div className="flex items-baseline justify-between gap-3"><span className="type-body">{i18n.text(messages[line.item])}</span>
           <span className="type-body tabular-nums">{line.amount === null ? "—" : formatMoney(i18n, line.amount)}</span></div>
-        <p className="type-caption tabular-nums">{line.quantity === null ? "—" : i18n.formatNumber(line.quantity)} {i18n.text(messages[line.unit])}
-          {line.price && <> · {i18n.formatMessage(messages.rate, { amount: formatMoney(i18n, line.price.amount), count: line.price.per, unit: i18n.text(messages[line.price.unit]) })}</>}</p>
+        <p className="type-caption tabular-nums">{line.quantity === null ? "—" : formatQuantity(i18n, line.quantity, line.unit)} {i18n.text(messages[line.unit])}
+          {line.price && <> · {formatPrice(i18n, line.price)}</>}</p>
         {line.issue && <p className="type-caption">{i18n.text(issueMessages[line.issue])}</p>}
       </li>)}</ul>
       <div className="space-y-1">
@@ -119,8 +120,8 @@ function Headroom({ headroom }: { headroom: DiagnosticOverview["headroom"] }) {
   const label = i18n.text(messages.headroom);
   if (headroom === "compressed") return <Stat label={label} value="—" caption={i18n.text(messages.headroomCompressed)} />;
   if (headroom === "unknown") return <Stat label={label} value="—" caption={i18n.text(messages.headroomUnknown)} />;
-  return <Stat label={label} value={headroom.remaining > 0 ? compact(i18n, headroom.remaining) : i18n.text(messages.headroomOver)}
-    caption={i18n.formatMessage(messages.headroomCaption, { threshold: compact(i18n, headroom.threshold) })} />;
+  return <Stat label={label} value={headroom.remaining > 0 ? formatCount(headroom.remaining) : i18n.text(messages.headroomOver)}
+    caption={i18n.formatMessage(messages.headroomCaption, { threshold: formatCount(headroom.threshold) })} />;
 }
 
 function Overview({ data, scope }: { data: ReturnType<typeof useDiagnostics>; scope: DiagnosticScope }) {
@@ -134,7 +135,7 @@ function Overview({ data, scope }: { data: ReturnType<typeof useDiagnostics>; sc
           value={formatEstimate(i18n, data.total.amount, data.total.incomplete > 0 || data.unreadable > 0)} />
         <Stat label={i18n.text(messages.requests)} value={i18n.formatNumber(data.requests.length)} />
         <Stat label={i18n.text(messages.cacheHit)} value={cache ? percent(i18n, cache.read, cache.input) : "—"}
-          caption={cache ? i18n.formatMessage(messages.cacheHitCaption, { read: compact(i18n, cache.read), input: compact(i18n, cache.input) }) : undefined} />
+          caption={cache ? i18n.formatMessage(messages.cacheHitCaption, { read: formatCount(cache.read), input: formatCount(cache.input) }) : undefined} />
         {path ? <Headroom headroom={headroom} />
           : <Stat label={i18n.text(messages.compressionCount)} value={i18n.formatNumber(compressions.length)} />}
       </Stats>
@@ -152,10 +153,10 @@ function Overview({ data, scope }: { data: ReturnType<typeof useDiagnostics>; sc
     </Section>}
     {path && compressions.length > 0 && <Section title={i18n.text(messages.compressions)} aside={i18n.formatNumber(compressions.length)}>
       <ul className="space-y-1.5">{[...compressions].reverse().map(entry => {
-        const before = entry.tokensBefore === null ? "—" : compact(i18n, entry.tokensBefore);
+        const before = entry.tokensBefore === null ? "—" : formatCount(entry.tokensBefore);
         return <li key={entry.id} className="flex items-baseline justify-between gap-3">
           <span className="type-body tabular-nums">{entry.after === null ? i18n.formatMessage(messages.compressionPending, { before })
-            : i18n.formatMessage(messages.compressionRow, { before, after: compact(i18n, entry.after) })}</span>
+            : i18n.formatMessage(messages.compressionRow, { before, after: formatCount(entry.after) })}</span>
           <span className="type-caption shrink-0 tabular-nums">{i18n.formatDate(Date.parse(entry.createdAt), { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
         </li>;
       })}</ul>
@@ -190,7 +191,7 @@ export function Diagnostics() {
             media={request.kind === "compression" ? <FileText className="size-4" /> : <MessagesSquare className="size-4" />}
             actions={<span className="flex flex-col items-end gap-0.5 text-right">
               <span className="type-caption max-w-24 break-words tabular-nums">{formatEstimate(i18n, request.estimate.amount, request.estimate.status === "partial")}</span>
-              {request.completion?.usage?.input != null && <span className="type-caption tabular-nums">{compact(i18n, request.completion.usage.input)}</span>}
+              {request.completion?.usage?.input != null && <span className="type-caption tabular-nums">{formatCount(request.completion.usage.input)}</span>}
             </span>}
             onOpen={() => setSelection(request.id)} />
         </div>)}</ItemGroup>}

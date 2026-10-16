@@ -3,6 +3,7 @@ import { modelReference } from "@atelier/sdk/contracts";
 import { useI18n, useRendererCatalogs, useRendererObject } from "@atelier/sdk/renderer";
 import { ModelConfiguration, resolveAgentModel, type AgentSelection } from "@atelier/builtin-api/contracts";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@atelier/ui/ui/tooltip";
+import { formatCount } from "@atelier/ui/format-count";
 import { contextMessages as messages } from "../../messages/context";
 import { contextInsight } from "../context/insight";
 import { ContextProjectionError } from "../context-projection";
@@ -46,8 +47,8 @@ export function ContextUsage({ selection }: { selection: AgentSelection }) {
     </TooltipTrigger>
     <TooltipContent side="top" sideOffset={6} className="max-w-72 space-y-1">
       <p className="font-medium tabular-nums">{title}</p>
-      {input !== null && <p className="tabular-nums">{i18n.formatNumber(input)} {window
-        ? i18n.formatMessage(messages.windowOf, { window: i18n.formatNumber(window) }) : i18n.text(messages.tokens)}</p>}
+      {input !== null && <p className="tabular-nums">{formatCount(input)} {window
+        ? i18n.formatMessage(messages.windowOf, { window: formatCount(window) }) : i18n.text(messages.tokens)}</p>}
       <p>{description}</p>
       {input !== null && <>
         {status && <p>{i18n.text(messages.reported)}</p>}

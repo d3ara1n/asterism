@@ -7,6 +7,7 @@
     "./tool-header": "./src/tool-header.tsx",
     "./json-view": "./src/json-view.tsx",
     "./utils": "./src/utils.ts",
+    "./format-count": "./src/format-count.ts",
     "./ConfigurationChoice": "./src/ConfigurationChoice.tsx",
     "./links": "./src/links.ts",
     "./tool-content": "./src/tool-content.tsx",

@@ -4,6 +4,7 @@ import { useI18n, useRendererCatalogs, useRendererObject } from "@atelier/sdk/re
 import type { z } from "zod";
 import { Alert, AlertDescription } from "@atelier/ui/ui/alert";
 import { cn } from "@atelier/ui/utils";
+import { formatCount } from "@atelier/ui/format-count";
 import { modelReference } from "@atelier/sdk/contracts";
 import { resolveAgentModel, ModelConfiguration } from "@atelier/builtin-api/contracts";
 import { contextMessages as messages } from "../../messages/context";
@@ -11,7 +12,7 @@ import { COMPRESSION_RESERVE } from "../context-budget";
 import { ContextProjectionError } from "../context-projection";
 import type { AgentView } from "../data";
 import { diagnosticModel } from "../diagnostics/cost";
-import { compact, ease, PanelBody, percent, Section, stripes, Swatch, SystemComposition } from "../panel-kit";
+import { ease, PanelBody, percent, Section, stripes, Swatch, SystemComposition } from "../panel-kit";
 import { allocateTiles, contextInsight, conversationCategories, type ContextInsight, type ConversationCategory } from "./insight";
 
 const COLUMNS = 20, ROWS = 5;
@@ -44,8 +45,8 @@ function WindowUsage({ insight, selection }: { insight: ContextInsight; selectio
   ];
   return <Section title={i18n.text(messages.window)} aside={window ? percent(i18n, usage.input, window) : undefined}>
     <div className="flex items-baseline gap-1.5">
-      <span className="type-page tabular-nums">{compact(i18n, usage.input)}</span>
-      <span className="type-caption tabular-nums">{window ? i18n.formatMessage(messages.windowOf, { window: compact(i18n, window) }) : i18n.text(messages.tokens)}</span>
+      <span className="type-page tabular-nums">{formatCount(usage.input)}</span>
+      <span className="type-caption tabular-nums">{window ? i18n.formatMessage(messages.windowOf, { window: formatCount(window) }) : i18n.text(messages.tokens)}</span>
     </div>
     {window && <div role="img" aria-label={`${i18n.text(messages.used)} ${percent(i18n, usage.input, window)}`}
       className="flex h-2.5 w-full overflow-hidden rounded-full bg-muted ring-1 ring-border ring-inset">
@@ -56,7 +57,7 @@ function WindowUsage({ insight, selection }: { insight: ContextInsight; selectio
     </div>}
     <ul className="space-y-1">{legend.map(item => <li key={item.key} className="flex items-center gap-2 type-caption">
       {item.swatch}<span className="flex-1">{i18n.text(item.label)}</span>
-      <span className="tabular-nums">{i18n.formatNumber(item.value)}</span>
+      <span className="tabular-nums">{formatCount(item.value)}</span>
     </li>)}</ul>
     <div className="space-y-1">
       {!window && <p className="type-caption">{i18n.text(messages.windowUnknown)}</p>}
@@ -76,7 +77,7 @@ function ConversationMix({ conversation }: { conversation: ContextInsight["conve
     return present.flatMap((category, index) => Array.from({ length: counts[index]! }, () => category));
   }, [conversation, present.join()]);
   const total = conversation.total;
-  return <Section title={i18n.text(messages.conversation)} aside={total > 0 ? i18n.formatMessage(messages.conversationTotal, { count: total }) : undefined}>
+  return <Section title={i18n.text(messages.conversation)} aside={total > 0 ? i18n.formatMessage(messages.conversationTotal, { count: formatCount(total) }) : undefined}>
     {total === 0 ? <p className="type-caption">{i18n.text(messages.conversationEmpty)}</p> : <>
       <div aria-hidden="true" className="grid gap-[3px]" style={{ gridTemplateColumns: `repeat(${COLUMNS}, minmax(0, 1fr))` }}
         onMouseLeave={() => setActive(null)}>
@@ -94,7 +95,7 @@ function ConversationMix({ conversation }: { conversation: ContextInsight["conve
               active === category && "bg-accent")}>
             <Swatch className={fill[category]} />
             <span className="type-body min-w-0 flex-1 truncate">{i18n.text(messages[category])}</span>
-            <span className="type-caption tabular-nums">{i18n.formatMessage(messages.characters, { count: value })}</span>
+            <span className="type-caption tabular-nums">{i18n.formatMessage(messages.characters, { count: formatCount(value) })}</span>
             <span className="type-label w-10 text-right tabular-nums">{percent(i18n, value, total)}</span>
           </li>;
         })}
@@ -109,7 +110,7 @@ function SystemParts({ system }: { system: ContextInsight["system"] }) {
   const i18n = useI18n();
   if (!system) return <Section title={i18n.text(messages.system)}><p className="type-caption">{i18n.text(messages.systemPending)}</p></Section>;
   const total = (system.diagnostics.system ?? []).reduce((sum, block) => sum + block.characters, 0);
-  return <Section title={i18n.text(messages.system)} aside={i18n.formatMessage(messages.systemTotal, { count: total })}>
+  return <Section title={i18n.text(messages.system)} aside={i18n.formatMessage(messages.systemTotal, { count: formatCount(total) })}>
     <SystemComposition diagnostics={system.diagnostics} />
   </Section>;
 }

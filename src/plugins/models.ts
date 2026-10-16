@@ -3,7 +3,7 @@ import type { ContentLease } from "../runtime/content-store.ts";
 import { AiSdkAdapter } from "../model/ai-sdk.ts";
 import { ModelFailure, type ModelAdapter, type ModelEvent } from "../model/contract.ts";
 import { runModelRequest } from "../execution/request.ts";
-import type { ModelRunRequest, ModelRunResult, ModelTarget, StreamRequest } from "@atelier/sdk/contracts";
+import { resolveModelSelection, type ModelRunRequest, type ModelRunResult, type ModelTarget, type StreamRequest } from "@atelier/sdk/contracts";
 import type { AgentCapabilities } from "../execution/capabilities.ts";
 import { modelReference, parseModelExpression, resolveProviderModel, type ConfigurationSnapshot, type ThinkingLevel } from "../shared/configuration.ts";
 import { modelExpression, modelScope, type ModelSettings } from "../shared/model.ts";
@@ -49,13 +49,12 @@ export function resolveTarget(snapshot: ConfigurationSnapshot, target: ModelTarg
   { ok: true; model: string; thinking: ThinkingLevel | null } | { ok: false; reason: ModelTargetError } {
   const role = snapshot.roles.find(item => item.id === target.role);
   if (!role?.enabled) return { ok: false, reason: "role_unavailable" };
-  const model = target.model ?? role.model;
+  const { model, thinking } = resolveModelSelection(role, target);
   if (!model || !parseModelExpression(model)) return { ok: false, reason: "model_unavailable" };
   const resolved = resolveProviderModel(snapshot, model);
   if (!resolved) return { ok: false, reason: "model_unavailable" };
   const { provider } = resolved;
   if (provider.auth === "api_key" && provider.credentialState !== "available") return { ok: false, reason: "credential_unavailable" };
-  const thinking = target.thinking !== undefined ? target.thinking : role.thinking;
   return { ok: true, model, thinking };
 }
 
