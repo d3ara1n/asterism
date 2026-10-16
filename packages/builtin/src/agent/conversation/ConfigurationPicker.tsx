@@ -51,9 +51,9 @@ export function AgentConfigurationPicker({ selection, disabled, onChange }: {
   };
   const modelName = modelLabel(resolved);
   const thinkingName = thinkingLabel(resolved?.thinking ?? null);
-  const title = i18n.text(configurationMessages.title);
+  const selectionTitle = i18n.text(configurationMessages.selectionTitle);
   const follow = i18n.text(modelSelectionMessages.agentDefault);
-  const labels = { agent: title, model: i18n.text(commonMessages.model), thinking: i18n.text(commonMessages.thinkingTitle) };
+  const labels = { agent: i18n.text(commonMessages.agent), model: i18n.text(commonMessages.model), thinking: i18n.text(commonMessages.thinkingTitle) };
   const icons = { agent: Bot, model: Cpu, thinking: Brain };
   const values = {
     agent: selectedAgent?.name ?? i18n.text(configurationMessages.unavailableAgent),
@@ -110,7 +110,7 @@ export function AgentConfigurationPicker({ selection, disabled, onChange }: {
         <PopoverTrigger asChild>
           <Button variant="ghost" size="xs" disabled={disabled || !configuration}
             className="min-w-0 max-w-full shrink gap-1.5"
-            aria-label={`${title}: ${values.agent}, ${modelName}, ${thinkingName}, ${i18n.text(configurationMessages.contextWindow)}: ${contextWindow}`}>
+            aria-label={`${labels.agent}: ${values.agent}, ${labels.model}: ${modelName}, ${labels.thinking}: ${thinkingName}, ${i18n.text(configurationMessages.contextWindow)}: ${contextWindow}`}>
             <Bot data-icon="inline-start" />
             <span className="max-w-44 truncate">{modelName}</span>
             <Separator orientation="vertical" className="mx-0.5 self-center data-[orientation=vertical]:h-3" />
@@ -123,7 +123,7 @@ export function AgentConfigurationPicker({ selection, disabled, onChange }: {
         {values.agent} · {modelName} · {thinkingName} · {contextWindow}
       </TooltipContent>
     </Tooltip>
-    <PopoverContent side="top" align="start" collisionPadding={8} aria-label={title}
+    <PopoverContent side="top" align="start" collisionPadding={8} aria-label={selectionTitle}
       className={cn("nodrag nopan flex max-h-(--radix-popover-content-available-height) max-w-[calc(100vw-1rem)] flex-col overflow-hidden p-0",
         browsingModels ? "w-[42rem]" : "w-80")}
       onKeyDown={event => event.stopPropagation()}

@@ -1,7 +1,7 @@
 import { defineMessages, pluginNamespace } from "@atelier/sdk/contracts";
 
 export const configurationMessages = pluginNamespace("atelier.builtin").messages("en", defineMessages({
-  title: { id: "agent.configuration.title", defaultMessage: "Agent configuration" },
+  selectionTitle: { id: "agent.configuration.selectionTitle", defaultMessage: "Agent, model and thinking" },
   searchModels: { id: "agent.configuration.searchModels", defaultMessage: "Search models…" },
   providers: { id: "agent.configuration.providers", defaultMessage: "Model providers" },
   searchProviders: { id: "agent.configuration.searchProviders", defaultMessage: "Search providers…" },

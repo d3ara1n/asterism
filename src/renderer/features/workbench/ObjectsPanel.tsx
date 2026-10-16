@@ -1,8 +1,9 @@
 import { IslandPanel } from "../../shared/weave/IslandPanel";
 import { SearchInput } from "@atelier/ui/ui/search-input";
 import { ToggleGroup, ToggleGroupItem } from "@atelier/ui/ui/toggle-group";
-import { Button } from "@atelier/ui/ui/button";
-import { Scan } from "lucide-react";
+import { IconButton } from "@atelier/ui/ui/icon-button";
+import { ListRow } from "@atelier/ui/ui/list-row";
+import { Eye, EyeClosed } from "lucide-react";
 import { commonMessages } from "@atelier/ui/messages/common";
 import { objectsMessages } from "../../messages/objects";
 import { useI18n } from "../../shared/i18n";
@@ -11,10 +12,10 @@ import { useState } from "react";
 import { useWorkbench } from "./context";
 import { useModuleViews } from "../../modules/views";
 
-/** 对象只出现一次；面板负责快速识别与定位，不展开内容或关系。 */
+/** 对象只出现一次；整行定位，行内操作管理卡片可见性。 */
 export function ObjectsPanel() {
   const i18n = useI18n();
-  const { session, ready, busy, canvas } = useWorkbench();
+  const { session, ready, busy, canvas, run } = useWorkbench();
   const registry = useModuleViews();
   const [query, setQuery] = useState("");
   const [hiddenOnly, setHiddenOnly] = useState(false);
@@ -29,14 +30,23 @@ export function ObjectsPanel() {
       <ToggleGroupItem value="hidden">{i18n.formatMessage(objectsMessages.hiddenObjects)}</ToggleGroupItem>
     </ToggleGroup>
   </>}>
-    {objects.map(object => { const descriptor = registry.resource(object.kind); return <Button key={object.id} variant="ghost"
-      className="h-auto w-full justify-start gap-3 px-2 py-1.5 text-left" title={i18n.formatMessage(objectsMessages.locateObject, { title: object.title })} aria-label={i18n.formatMessage(objectsMessages.locateObject, { title: object.title })}
-      disabled={!ready || busy} onClick={() => { void canvas.focusObjects([object.id], { select: true }); }}>
-      <span className="shrink-0 text-muted-foreground" aria-hidden="true">{descriptor.icon}</span>
-      <span className="min-w-0 flex-1"><span className="block truncate leading-5">{object.title}</span>
-        <span className="type-caption block truncate leading-4 font-normal">{i18n.text(descriptor.label)}{hidden.has(object.id) ? ` · ${i18n.formatMessage(objectsMessages.cardHidden)}` : ""}</span></span>
-      <Scan className="size-3.5 text-muted-foreground" aria-hidden="true" />
-    </Button>; })}
+    {objects.map(object => {
+      const descriptor = registry.resource(object.kind);
+      const isHidden = hidden.has(object.id);
+      return <ListRow key={object.id} variant="navigation" className="h-auto px-2 py-1.5"
+        title={<>
+          <span className="block truncate leading-5">{object.title}</span>
+          <span className="type-caption block truncate leading-4 font-normal">{i18n.text(descriptor.label)}{isHidden ? ` · ${i18n.formatMessage(objectsMessages.cardHidden)}` : ""}</span>
+        </>}
+        media={<span className="text-muted-foreground" aria-hidden="true">{descriptor.icon}</span>}
+        buttonProps={{ "aria-label": i18n.formatMessage(objectsMessages.locateObject, { title: object.title }) }}
+        disabled={!ready || busy} onOpen={() => { void canvas.focusObjects([object.id], { select: true }); }}
+        actions={<IconButton size="icon-xs" disabled={!ready || busy}
+          label={i18n.formatMessage(isHidden ? objectsMessages.showCard : objectsMessages.hideCard, { title: object.title })}
+          onClick={() => { void run({ type: "view.set", sessionId: session.id, objectId: object.id, hidden: !isHidden }); }}>
+          {isHidden ? <EyeClosed /> : <Eye />}
+        </IconButton>} />;
+    })}
     {!objects.length && <p className="type-caption px-2 py-6 text-center">{session.objects.length ? i18n.formatMessage(commonMessages.noMatches) : i18n.formatMessage(objectsMessages.noObjects)}</p>}
   </IslandPanel>;
 }

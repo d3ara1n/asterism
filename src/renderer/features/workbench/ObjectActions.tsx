@@ -17,7 +17,7 @@ import { useSession, useSessionProgress } from "../session/state";
 import { useWorkbench } from "./context";
 import type { ViewPatch } from "./ObjectCard";
 
-/** 卡片菜单集中管理视图尺寸与对象移除；快速对象目录只负责定位。 */
+/** 卡片菜单集中管理视图尺寸与对象移除。 */
 export function ObjectActions({ object, defaultSize, onView }: {
   object: WorkbenchObject; defaultSize: CardSize; onView: (patch: ViewPatch) => void;
 }) {

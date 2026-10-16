@@ -39,7 +39,7 @@ SDK 导出 `contentRefSchema` 供业务 schema 组合。仅保留精确键 `$ate
 
 凡能取得 `content` 的地方形状一致：`read(ref, range?)` 有界读取，`open(ref, range?)` 流式读取，可写处另有 `stage(bytes | AsyncIterable)`。
 
-当前数据不按历史分支复制，查看与分叉不恢复当前值。替换当前文件后，旧内容只有在其他当前数据或历史记录仍引用时才继续保留。create 返回的 data 仅属于 `resource_created` 历史事件；创建中的 `writer.set` 属于对应当前数据槽，不自动双写。对象移除、解绑、关闭卡片、切换分支或插件卸载不删除历史依赖。
+当前数据不按历史分支复制，查看与分叉不恢复当前值。替换当前文件后，旧内容只有在其他当前数据或历史记录仍引用时才继续保留。create 返回的 data 仅属于 `resource_created` 历史事件；创建中的 `writer.set` 属于对应当前数据槽，不自动双写。对象移除、解绑、隐藏卡片、切换分支或插件卸载不删除历史依赖。
 
 ## 读取授权、传输与回收
 

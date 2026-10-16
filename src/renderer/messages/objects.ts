@@ -75,6 +75,14 @@ export const objectsMessages = pluginNamespace("atelier.host").messages("en", de
     id: "cardHidden",
     defaultMessage: "Card hidden",
   },
+  hideCard: {
+    id: "objects.hideCard",
+    defaultMessage: "Hide card for {title}",
+  },
+  showCard: {
+    id: "objects.showCard",
+    defaultMessage: "Show card for {title}",
+  },
   locateObject: {
     id: "locateObject",
     defaultMessage: "Locate {title}",

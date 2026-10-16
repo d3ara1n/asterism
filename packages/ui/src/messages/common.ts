@@ -77,10 +77,6 @@ export const commonMessages = pluginNamespace("atelier.host").messages("en", def
     id: "collapse",
     defaultMessage: "Collapse",
   },
-  closeView: {
-    id: "closeView",
-    defaultMessage: "Hide card",
-  },
   zoomIn: {
     id: "zoomIn",
     defaultMessage: "Zoom in",

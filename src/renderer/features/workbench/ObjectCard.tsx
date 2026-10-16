@@ -14,7 +14,7 @@ import type { CardSize } from "../../../shared/workbench";
 
 /** 卡片拖动柄选择器；画布只认它，卡片内容不感知拖动。 */
 export const cardDragHandle = ".card-drag-handle";
-export type ViewPatch = { hidden?: boolean; collapsed?: boolean; size?: CardSize | null };
+export type ViewPatch = { collapsed?: boolean; size?: CardSize | null };
 const noPanels: readonly CardPanelView[] = [];
 
 /** 卡片拥有辅助面板的容器与局部状态；主体位置固定，面板开关不重挂载主体。 */
@@ -79,11 +79,11 @@ export const ObjectCard = memo(function ObjectCard({ icon, kind, title, actions,
         if (event.key !== "Escape" || event.defaultPrevented || !active || !event.currentTarget.contains(event.target as Node)) return;
         event.preventDefault(); event.stopPropagation(); closePanel();
       }}>
-      <header className="card-drag-handle flex shrink-0 cursor-grab items-center gap-2 p-3 active:cursor-grabbing">
-        <span className="text-muted-foreground" aria-hidden="true">{icon}</span>
-        <div className="min-w-0 flex-1">
-          <p className="type-label truncate">{kind}</p>
-          <h2 className="type-section mt-0.5 truncate">{title}</h2>
+      <header className="card-drag-handle flex shrink-0 cursor-grab items-center gap-2 px-3 py-2 active:cursor-grabbing">
+        <span className="flex size-4 shrink-0 items-center justify-center text-muted-foreground [&_svg]:size-4" aria-hidden="true">{icon}</span>
+        <div className="flex min-w-0 flex-1 items-baseline gap-2">
+          <p className="type-label max-w-1/3 shrink-0 truncate" title={kind}>{kind}</p>
+          <h2 className="type-section min-w-0 flex-1 truncate" title={title}>{title}</h2>
         </div>
         <div className="nodrag flex shrink-0 items-center gap-0.5">
           {actions}
@@ -106,7 +106,6 @@ export const ObjectCard = memo(function ObjectCard({ icon, kind, title, actions,
           <IconButton size="icon-xs" label={toggleLabel} aria-expanded={!collapsed} onClick={() => onView({ collapsed: !collapsed })}>
             {collapsed ? <ChevronRight /> : <ChevronDown />}
           </IconButton>
-          <IconButton size="icon-xs" label={i18n.text(commonMessages.closeView)} onClick={() => onView({ hidden: true })}><X /></IconButton>
         </div>
       </header>
       {!collapsed && <div ref={content} className="nodrag nopan relative flex min-h-0 min-w-0 flex-1 overflow-hidden border-t">

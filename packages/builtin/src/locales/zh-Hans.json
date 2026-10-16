@@ -115,7 +115,7 @@
   "agent_conversation_Composer_5": "停止",
   "agent_conversation_Composer_6": "继续执行",
   "agent_conversation_ConfigurationPicker_1": "代理不可用",
-  "agent.configuration.title": "代理配置",
+  "agent.configuration.selectionTitle": "代理、模型与思考",
   "agent.configuration.searchModels": "搜索模型…",
   "agent.configuration.providers": "模型提供商",
   "agent.configuration.searchProviders": "搜索提供商…",
