@@ -1,6 +1,7 @@
 import { StrictMode } from "react";
-import { RendererEventsProvider } from "@atelier/sdk/renderer";
+import { RendererEventsProvider, RendererCallsProvider } from "@atelier/sdk/renderer";
 import { EventClient } from "../shared/event-client";
+import { CallClient } from "../shared/call-client";
 import { HostI18nProvider, startLanguage } from "./shared/i18n";
 import { ErrorBoundary } from "./app/ErrorBoundary";
 import { MotionConfig } from "motion/react";
@@ -32,10 +33,11 @@ import { builtinPublicProvider, builtinPublicModules } from "../builtin-public";
 
 startAppearance();
 const events = new EventClient(window.host.events);
+const calls = new CallClient(window.host.calls);
 const controller = new ApplicationController(window.host, events);
 const lifetime = new AbortController();
-const stopEventStatus = window.host.onStatus(status => { if (status !== "ready") events.disconnect(); });
-window.addEventListener("pagehide", () => { lifetime.abort(); events.close(); stopEventStatus(); }, { once: true });
+const stopEventStatus = window.host.onStatus(status => { if (status !== "ready") { events.disconnect(); calls.disconnect(); } });
+window.addEventListener("pagehide", () => { lifetime.abort(); events.close(); calls.close(); stopEventStatus(); }, { once: true });
 // 插件视图只在启动时加载；内置视图之后合并，重复契约使该插件视图被忽略。
 const initial = await window.host.execute({ type: "workspace.read" }).catch(() => null);
 await startLanguage(initial?.ok ? initial.snapshot.catalogs ?? [] : []).catch(error => console.error("Language settings could not be loaded. English is used.", error));
@@ -62,13 +64,15 @@ createRoot(document.getElementById("root")!).render(
         <MotionConfig reducedMotion="user">
           <TooltipProvider>
             <RendererEventsProvider value={events}>
-              <HostConfigsProvider>
-                <ModuleViewsProvider registry={moduleViews}>
-                  <BuiltinRendererProvider services={builtinRendererServices}>
-                    <App controller={controller} />
-                  </BuiltinRendererProvider>
-                </ModuleViewsProvider>
-              </HostConfigsProvider>
+              <RendererCallsProvider value={calls}>
+                <HostConfigsProvider>
+                  <ModuleViewsProvider registry={moduleViews}>
+                    <BuiltinRendererProvider services={builtinRendererServices}>
+                      <App controller={controller} />
+                    </BuiltinRendererProvider>
+                  </ModuleViewsProvider>
+                </HostConfigsProvider>
+              </RendererCallsProvider>
             </RendererEventsProvider>
           </TooltipProvider>
         </MotionConfig>

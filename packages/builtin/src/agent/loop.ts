@@ -13,7 +13,6 @@ export function createAgentLoop(deps: { selection: AgentSelectionService; tasks:
     running: (object: ObjectReader) => deps.tasks.has(key(object)),
     cancel: (object: ObjectReader) => deps.tasks.cancel(key(object)),
     start(object: ObjectExecutor) {
-      const initial = deps.selection.agent(selectionOf(object).selection);
       const compress = (signal: AbortSignal) => {
         const selection = selectionOf(object).selection;
         const system = deps.systemPrompt(deps.selection.agent(selection));
@@ -70,7 +69,7 @@ export function createAgentLoop(deps: { selection: AgentSelectionService; tasks:
         } finally {
           publish(status);
         }
-      }, { object: object.ref, timeoutMs: (initial.timeout ?? 600) * 1000 });
+      }, { object: object.ref });
       if (!started) throw new PluginApiError("conflict", "This agent is running. Cancel or wait for it to finish.");
     },
   };

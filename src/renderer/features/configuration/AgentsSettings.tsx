@@ -272,7 +272,6 @@ function AgentEditor({ initialId }: { initialId: string | null }) {
       </FieldGroup></EditorSection>
 
       <EditorSection collapsible defaultOpen={false} title={i18n.formatMessage(agentsMessages.limits)}><FieldGroup>
-        <OverrideNumberField label={i18n.formatMessage(agentsMessages.timeout)} value={draft.timeout} inherited={base.timeout} onChange={next => set("timeout", next)} min={1} max={86_400} integer empty={i18n.formatMessage(agentsMessages.timeoutPlaceholder)} />
         <OverrideNumberField label={i18n.formatMessage(agentsMessages.maximumRequests)} value={draft.maxTurns} inherited={base.maxTurns} onChange={next => set("maxTurns", next)} min={1} integer empty={i18n.formatMessage(agentsMessages.maximumRequestsPlaceholder)} />
       </FieldGroup></EditorSection>
 

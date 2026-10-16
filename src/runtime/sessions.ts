@@ -41,6 +41,7 @@ const startIdentity = ({ contentScopeId: _scope, ...input }: Extract<SessionComm
  * 资源行为（含代理的提交、运行、配置）由各资源控制器负责，会话按对象类型路由命令。
  */
 export class SessionService {
+  readonly calls: LoadedPlugins["calls"];
   readonly events = new EventBus();
   private revisions = new Map<string, number>();
   private progressVersions = new Map<string, number>();
@@ -116,6 +117,7 @@ export class SessionService {
     const modules = createModules({ events: this.events, extensionsDirectory: join(dataRoot, "extensions"), data: new SessionDataStore(db), content: this.content, refOf, vault: configuration.vault, stream, configurationChanged,
       sessions: host, models, catalogs: createBuiltinCatalogs(configuration) }, external);
     this.resources = modules.resources;
+    this.calls = modules.calls;
     this.tools = modules.tools;
     this.plugins = modules.manifest;
     this.configurePlugins = modules.configure;

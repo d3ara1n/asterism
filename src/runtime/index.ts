@@ -7,6 +7,8 @@ import { PackageList, loadPackages } from "../plugins/packages.ts";
 import { builtin } from "@atelier/builtin-api/contracts";
 import { DatabaseVersionError } from "./storage.ts";
 import { EventPeer } from "./event-peer.ts";
+import { CallPeer } from "./call-peer.ts";
+import { callRuntimeControlSchema, pluginCallsVersion } from "../shared/plugin-calls.ts";
 import { eventRuntimeControlSchema, pluginEventsVersion } from "../shared/plugin-events.ts";
 import { bindPublicProvider } from "../shared/public-modules.ts";
 import { builtinPublicProvider, builtinPublicModules } from "../builtin-public.ts";
@@ -33,14 +35,21 @@ try {
     onPluginConfigurationChanged: id => port.postMessage({ kind: "plugin-configuration.changed", id }),
     onStream: event => port.postMessage({ kind: "object.stream", ...event }) });
   const events = new EventPeer(service.sessions.events, frame => port.postMessage({ kind: "plugin-events.frame", version: pluginEventsVersion, frame }));
+  const calls = new CallPeer(service.sessions.calls, frame => port.postMessage({ kind: "plugin-calls.frame", version: pluginCallsVersion, frame }));
   port.on("message", ({ data }) => {
     if (data?.kind === "shutdown") {
       events.close();
+      calls.close();
       secrets.close();
       void service.close().finally(() => { releasePublic(); process.exit(0); });
       return;
     }
     if (secrets.receive(data)) return;
+    if (data?.kind === "plugin-calls.control") {
+      const parsed = callRuntimeControlSchema.safeParse(data);
+      if (parsed.success) calls.receive(parsed.data.control);
+      return;
+    }
     if (data?.kind === "plugin-events.control") {
       const parsed = eventRuntimeControlSchema.safeParse(data);
       if (parsed.success) events.receive(parsed.data.control);

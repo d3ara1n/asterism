@@ -201,5 +201,12 @@
   "diagnostics.compressionPending": "≈ {before} tokens，等待下次请求",
   "diagnostics.compressionHint": "压缩前为触发压缩时的估算，压缩后为下一次请求的实报输入。",
   "diagnostics.composition": "发出的系统提示",
-  "diagnostics.compositionMissing": "这次请求没有保存请求诊断。"
+  "diagnostics.compositionMissing": "这次请求没有保存请求诊断。",
+  "questions.title": "请你回答",
+  "questions.answer": "提交回答",
+  "questions.cancel": "取消提问",
+  "questions.failed": "无法读取问题，请刷新重试。",
+  "questions.submitFailed": "未能提交回答，输入内容已保留，请重试。",
+  "questions.refresh": "刷新",
+  "questions.waiting": "等待你的回答"
 }

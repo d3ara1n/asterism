@@ -118,5 +118,6 @@ export function toolPreparation(name: string): string {
   return getI18n().text(builtinViews.get(name)?.preparation ?? toolsMessages.toolPreparing);
 }
 export function resolveToolView(props: ToolRenderProps, registry: ViewRegistry): ResolvedToolView {
-  return builtinViews.get(props.name)?.render(props, registry) ?? { props, icon: <Wrench className="size-3.5" /> };
+  return builtinViews.get(props.name)?.render(props, registry)
+    ?? { props, icon: <Wrench className="size-3.5" />, ...registry.tool(props.invocation.implementation, props) };
 }

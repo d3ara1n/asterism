@@ -19,7 +19,7 @@ const storedModelSchema = modelSchema.extend({ cost: z.preprocess(migrateModelCo
 /** 模型以 `<providerId>/<modelId>` 识别，其余以 id 识别。 */
 const keyOf = (item: { id: string } | { providerId: string; modelId: string }): string => "id" in item ? item.id : modelReference(item);
 const documentSchema = z.strictObject({
-  version: z.literal(6),
+  version: z.literal(7),
   providers: z.array(storedProviderSchema), models: z.array(storedModelSchema),
   roles: z.array(storedRoleSchema), agents: z.array(storedAgentSchema),
 }).superRefine((document, context) => {
@@ -78,7 +78,7 @@ export class ConfigurationStore {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw new ConfigurationError("unavailable", "The application configuration could not be read.");
       // 只有文件不存在才初始化；已有文件中的删除状态不会重新播种。
       this.document = {
-        version: 6, providers: [], models: [],
+        version: 7, providers: [], models: [],
         roles: defaultRoles.map(({ id, builtin }) => ({ id, builtin, revision: 1, overrides: {} })),
         agents: defaultAgents.map(({ id, builtin }) => ({ id, builtin, revision: 1, overrides: {} })),
       };

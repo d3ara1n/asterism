@@ -12,6 +12,7 @@ import { pluginConfigurationChangedSchema, pluginConfigurationResponseSchema, ty
 import { objectStreamSchema, type ObjectStream } from "../shared/object-stream.ts";
 import { contentResponseSchema, type ContentCommand, type ContentResult } from "../shared/content.ts";
 import { eventRuntimeFrameSchema, pluginEventsVersion, type EventControl, type EventFrame } from "../shared/plugin-events.ts";
+import { callRuntimeFrameSchema, pluginCallsVersion, type CallControl, type CallFrame } from "../shared/plugin-calls.ts";
 
 export class RuntimeHost {
   private child: UtilityProcess | null = null;
@@ -25,7 +26,8 @@ export class RuntimeHost {
     private readonly onSessionChanged: (event: SessionChanged) => void = () => {},
     private readonly onStream: (event: ObjectStream) => void = () => {},
     private readonly onPluginConfigurationChanged: (pluginId: string) => void = () => {},
-    private readonly onEventFrame: (frame: EventFrame) => void = () => {}) {}
+    private readonly onEventFrame: (frame: EventFrame) => void = () => {},
+    private readonly onCallFrame: (frame: CallFrame) => void = () => {}) {}
   private setStatus(status: RuntimeStatus): void { this.status = status; this.onStatus(status); }
 
   start(entry: string, root: string): Promise<void> {
@@ -87,6 +89,11 @@ export class RuntimeHost {
         reject(new Error("Task runtime encountered a fatal process error."));
       });
       child.on("message", raw => {
+        if (raw?.kind === "plugin-calls.frame") {
+          const parsed = callRuntimeFrameSchema.safeParse(raw);
+          if (parsed.success) this.onCallFrame(parsed.data.frame);
+          return;
+        }
         if (raw?.kind === "plugin-events.frame") {
           const parsed = eventRuntimeFrameSchema.safeParse(raw);
           if (parsed.success) this.onEventFrame(parsed.data.frame);
@@ -158,6 +165,14 @@ export class RuntimeHost {
       catch { this.setStatus("unavailable"); }
     }
     if (control.type === "subscribe") this.onEventFrame({ type: "closed", id: control.id, end: { reason: "unavailable" } });
+  }
+
+  calls(control: CallControl): void {
+    if (this.child && this.status === "ready") {
+      try { this.child.postMessage({ kind: "plugin-calls.control", version: pluginCallsVersion, control }); return; }
+      catch { this.setStatus("unavailable"); }
+    }
+    if (control.type === "invoke") this.onCallFrame({ type: "error", id: control.id, code: "unavailable", message: "The plugin runtime is unavailable." });
   }
 
   configure(command: ConfigurationCommand): Promise<ConfigurationResult> {

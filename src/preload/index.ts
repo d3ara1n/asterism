@@ -11,8 +11,20 @@ import { preferencesGetChannel, preferencesSetChannel, preferenceWriteSchema, ui
 import { pluginConfigurationChangedChannel, pluginConfigurationChannel, pluginConfigurationCommandSchema, pluginConfigurationResultSchema } from "../shared/plugin-configuration.ts";
 import { contentChannel, contentCommandSchema, contentResultSchema } from "../shared/content.ts";
 import { pluginEventsChannel, eventControlSchema, eventFrameSchema } from "../shared/plugin-events.ts";
+import { pluginCallsChannel, callControlSchema, callFrameSchema } from "../shared/plugin-calls.ts";
 
 const bridge: DesktopBridge = {
+  calls: {
+    send(control) { ipcRenderer.send(pluginCallsChannel, callControlSchema.parse(control)); },
+    onFrame(listener) {
+      const handler = (_event: Electron.IpcRendererEvent, raw: unknown) => {
+        const parsed = callFrameSchema.safeParse(raw);
+        if (parsed.success) listener(parsed.data);
+      };
+      ipcRenderer.on(pluginCallsChannel, handler);
+      return () => ipcRenderer.removeListener(pluginCallsChannel, handler);
+    },
+  },
   events: {
     send(control) { ipcRenderer.send(pluginEventsChannel, eventControlSchema.parse(control)); },
     onFrame(listener) {

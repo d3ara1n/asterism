@@ -9,6 +9,7 @@ import type { SessionBridge } from "./session.ts";
 import type { PluginConfigurationBridge } from "./plugin-configuration.ts";
 import type { ContentBridge } from "./content.ts";
 import type { EventBridge } from "./plugin-events.ts";
+import type { CallBridge } from "./plugin-calls.ts";
 
 export const protocolVersion = 6;
 export const commandChannel = coreChannel("command");
@@ -55,6 +56,7 @@ export const runtimeMessageSchema = z.discriminatedUnion("kind", [
 ]);
 export type RuntimeMessage = z.infer<typeof runtimeMessageSchema>;
 export interface DesktopBridge {
+  calls: CallBridge;
   events: EventBridge;
   content: ContentBridge;
   language: LanguageBridge;

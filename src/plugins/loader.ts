@@ -22,6 +22,9 @@ import type { ObjectStreamPayload } from "../shared/object-stream.ts";
 import type { ContentStore, ContentLease } from "../runtime/content-store.ts";
 import { EventBus } from "./events.ts";
 import { PluginEventScope } from "./event-scope.ts";
+import { CallRegistry } from "./calls.ts";
+import { bindTopLevelTools, type RegisteredTopLevelTool } from "./top-level-tools.ts";
+import { coreDeclarations } from "../execution/core.ts";
 
 export interface PluginHostServices {
   events?: EventBus;
@@ -43,6 +46,7 @@ export interface PluginManifest {
   implementations: { id: string; tool: string; resource: string; active: boolean; overriddenBy?: string }[];
 }
 export interface LoadedPlugins {
+  calls: CallRegistry;
   events: EventBus;
   configure(command: PluginConfigurationCommand): PluginConfiguration[];
   activity(sessionId: string): { running: string[]; live: LiveBlock[] };
@@ -73,13 +77,12 @@ class TaskHost implements PluginTasks {
       try { signal.throwIfAborted(); await run(signal); }
       catch (error) { if (!signal.aborted) this.log.error(`Task ${key} failed.`, error); }
       finally { this.running.delete(key); }
-    }, { ...options, timeoutMs: options.timeoutMs ?? 60_000 });
+    }, options);
     this.running.set(key, work);
     return true;
   }
   cancel(key: string): void { this.running.get(key)?.cancel(); }
   has(key: string): boolean { return this.running.has(key); }
-  activity(sessionId: string): string[] { return this.group.activity(sessionId); }
 }
 const defaultLog: NonNullable<PluginHostServices["log"]> = (id, level, message, error) =>
   console[level](`[plugin ${id}] ${message}`, ...(error === undefined ? [] : [error]));
@@ -123,6 +126,8 @@ function validate(entry: Collected): void {
 /** 启动时收集 SDK 贡献，按插件顺序解析覆盖并冻结目录。 */
 export function loadPlugins(plugins: readonly PluginDefinition[], services: PluginHostServices): LoadedPlugins {
   const events = services.events ?? new EventBus();
+  const calls = new CallRegistry(services);
+  const topLevelTools: RegisteredTopLevelTool[] = [];
   const manifest: PluginManifest[] = [], collected: Collected[] = [];
   const lifecycles: RunLifecycle[] = [];
   const initialized: Collected[] = [], invalidEntries = new Set<Collected>();
@@ -146,7 +151,8 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
       const taskHost = new TaskHost(log, lifecycle.group("task"));
       const eventScope = new PluginEventScope(events, id, lifecycle.group("event"));
       const sdk = createSdkContext({ id, dir: storage.dir, log, config: contract => storage.config(contract),
-        secrets: storage.secrets, db: () => storage.db(), tasks: taskHost }, services, lifecycle.group("model"), eventScope);
+        secrets: storage.secrets, db: () => storage.db(), tasks: taskHost }, services, lifecycle.group("model"), eventScope,
+        calls.client(id, lifecycle.group("call")), (ref, policy) => bindTopLevelTools(topLevelTools, ref, policy));
       const resources: ResourceBackend[] = [], tools: ToolImplementation[] = [], observers: SessionObserver[] = [], preparers: CommandPreparer[] = [];
       const actions: ActionContract<unknown>[] = [];
       entry = { plugin, resources, tools, actions, observers, preparers, sdk, tasks: taskHost, storage, lifecycle, events: eventScope, preparations: lifecycle.group("prepare"), closing: [] };
@@ -156,6 +162,14 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
         let contribution!: ModuleContribution;
         synchronous(() => { contribution = module.setup(sdk.context); return contribution; });
         if (contribution.closing) entry.closing.push(contribution.closing);
+        for (const call of contribution.calls ?? []) calls.declare(id, call, sdk, lifecycle.group("call"));
+        for (const tool of contribution.topLevelTools ?? []) {
+          if (!belongsTo(id, tool.id)) throw new Error(`Top-level tool ${tool.id} belongs to another plugin.`);
+          if (coreDeclarations().some(item => item.name === tool.name) ||
+            topLevelTools.some(item => item.tool.name === tool.name || item.tool.id === tool.id))
+            throw new Error(`Duplicate top-level tool: ${tool.name}`);
+          topLevelTools.push({ tool, sdk, runs: lifecycle.group("tool") });
+        }
         for (const contract of contribution.events ?? []) events.declare(id, contract);
         for (const record of contribution.records ?? []) sdk.declare(record);
         for (const resource of contribution.resources ?? []) {
@@ -191,6 +205,8 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
       collected.push(entry); manifest.push({ id, version: plugin.version, status: "loaded", resources: ownKinds, implementations: [] });
     } catch (error) {
       if (entry) {
+        calls.removeOwner(id);
+        for (let i = topLevelTools.length - 1; i >= 0; i--) if (belongsTo(id, topLevelTools[i]!.tool.id)) topLevelTools.splice(i, 1);
         entry.events.stop(); events.removeOwner(id);
         entry.lifecycle.stop();
         invalidEntries.add(entry);
@@ -222,6 +238,8 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
       const record = manifest.find(record => record.id === entry.plugin.namespace.id)!;
       record.status = "failed"; record.error = error; record.resources = [];
       entry.lifecycle.stop();
+      calls.removeOwner(entry.plugin.namespace.id);
+      for (let j = topLevelTools.length - 1; j >= 0; j--) if (belongsTo(entry.plugin.namespace.id, topLevelTools[j]!.tool.id)) topLevelTools.splice(j, 1);
       entry.events.stop(); events.removeOwner(entry.plugin.namespace.id);
       invalidEntries.add(entry);
       collected.splice(i, 1); invalidated = true;
@@ -260,6 +278,7 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
   let closed = false;
   let closing: Promise<void> | undefined;
   return {
+    calls,
     events,
     configure(command) {
       if (closed) throw new PluginApiError("unavailable", "Plugins are closing.");
@@ -276,7 +295,7 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
     },
     activity(sessionId) {
       const model = collected.map(entry => entry.sdk.activity(sessionId));
-      return { running: [...new Set([...model.flatMap(run => run.running), ...collected.flatMap(entry => [...entry.tasks.activity(sessionId), ...entry.preparations.activity(sessionId)])])],
+      return { running: [...new Set([...model.flatMap(run => run.running), ...collected.flatMap(entry => entry.lifecycle.activity(sessionId))])],
         live: model.flatMap(run => run.live) };
     },
     resources, tools: new ToolRegistry(active), manifest: Object.freeze(manifest.map(entry => Object.freeze(entry))),

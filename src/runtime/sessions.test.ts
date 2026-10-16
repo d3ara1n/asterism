@@ -24,6 +24,11 @@ import { ContextSummary, RequestDiagnosticsRecord } from "@atelier/builtin-api/c
 const work = <T extends { contract: string }>(nodes: readonly T[]) => nodes.filter(node => node.contract !== RequestDiagnosticsRecord.id);
 import { COMPRESSION_MAX_OUTPUT } from "../../packages/builtin/src/agent/compression.ts";
 import { applicationUserAgent } from "../shared/application.ts";
+import { AnswerQuestion, CancelQuestion, ReadQuestions } from "../../packages/builtin/src/questions/contract.ts";
+import { CallClient } from "../shared/call-client.ts";
+import { CallPeer } from "./call-peer.ts";
+import type { CallFrame } from "../shared/plugin-calls.ts";
+import { Agent } from "@atelier/builtin-api/contracts";
 
 const roots: string[] = [];
 type Snap = { workbench: { objects: { id: string; kind: string; presentation: { data: unknown } }[] } };
@@ -68,6 +73,89 @@ function resourceStatuses(service: ApplicationService) {
 }
 
 describe("会话运行时", () => {
+  // 无限期等待契约：模型请求已结束，默认任务计时不得清除问答；重建前端连接只重读状态。
+  it("内置 ask_user 经通用调用回答，等待一年与前端重挂载不丢失，答案进入下一模型请求和历史", async () => {
+    const requests: ModelInput[] = [];
+    const { service, start } = await setup({ validate() {}, version: "test/ask", prepare(input) {
+      requests.push(input);
+      const first = requests.length === 1;
+      return { async *stream() {
+        if (!first) { yield* reply("Understood."); return; }
+        yield { type: "part.start", part: { id: "ask", kind: "toolcall", callId: "question", name: "ask_user" } };
+        yield { type: "part.end", partId: "ask", arguments: { question: "Which destination?" } };
+        yield { type: "finish", reason: "tool-calls", usage: null };
+      } };
+    } });
+    vi.useFakeTimers();
+    const snap = await execute(service, start);
+    const object = { sessionId: snap.sessionId, id: agentOf(snap), kind: Agent.kind };
+    const connect = () => {
+      let listener: ((frame: CallFrame) => void) | undefined;
+      const peer = new CallPeer(service.sessions.calls, frame => listener?.(structuredClone(frame)));
+      const client = new CallClient({
+        send: control => peer.receive(structuredClone(control)),
+        onFrame: receive => { listener = receive; return () => { listener = undefined; }; },
+      });
+      return { client, peer };
+    };
+    let connection = connect();
+    await vi.waitFor(async () => expect((await connection.client.invoke(ReadQuestions, null, { object })).pending).toHaveLength(1));
+    expect(requests[0]!.tools.map(tool => tool.name)).toContain("ask_user");
+    expect(service.sessions.running).toBe(true);
+    const original = await connection.client.invoke(ReadQuestions, null, { object });
+    connection.client.close(); connection.peer.close();
+    await vi.advanceTimersByTimeAsync(366 * 24 * 60 * 60 * 1000);
+    expect(requests).toHaveLength(1);
+    expect(service.sessions.running).toBe(true);
+    vi.useRealTimers();
+    connection = connect();
+    try {
+      const restored = await connection.client.invoke(ReadQuestions, null, { object });
+      expect(restored.pending).toEqual(original.pending);
+      await expect(connection.client.invoke(AnswerQuestion, { id: restored.pending[0]!.id, answer: "  " }, { object })).rejects.toMatchObject({ code: "invalid_argument" });
+      await connection.client.invoke(AnswerQuestion, { id: restored.pending[0]!.id, answer: "Maldives" }, { object });
+      await settled(service);
+      expect((await connection.client.invoke(ReadQuestions, null, { object })).pending).toEqual([]);
+      await expect(connection.client.invoke(AnswerQuestion, { id: restored.pending[0]!.id, answer: "Again" }, { object })).rejects.toMatchObject({ code: "conflict" });
+      expect(requests).toHaveLength(2);
+      expect(requests[1]!.messages).toContainEqual(expect.objectContaining({
+        kind: "result", callId: "question", name: "ask_user", error: false,
+        parts: [{ kind: "text", text: JSON.stringify({ answer: "Maldives" }) }],
+      }));
+      const saved = service.sessions.tree.timeline(snap.sessionId).flatMap(node => {
+        const data = node.data as { type?: string; block?: { kind?: string; outcome?: unknown } };
+        return data.type === "block" && data.block?.kind === "toolcall" ? [data.block.outcome] : [];
+      });
+      expect(saved).toContainEqual(expect.objectContaining({ kind: "succeeded", implementation: { id: "atelier.builtin/ask-user" }, data: { answer: "Maldives" } }));
+      expect(saved[0]).not.toHaveProperty("resource");
+    } finally { connection.client.close(); connection.peer.close(); }
+  });
+
+  // 取消必须结束等待，关闭不得等到不存在的答案；不同 Agent 的交互不能串答。
+  it("问答校验关联 Agent，用户取消及运行时关闭都收束等待", async () => {
+    const { service, start } = await setup({ validate() {}, version: "test/ask", prepare(input) {
+      const hasResult = input.messages.some(message => message.kind === "result");
+      return { async *stream() {
+        if (hasResult) { yield* reply(); return; }
+        yield { type: "part.start", part: { id: "ask", kind: "toolcall", callId: "question", name: "ask_user" } };
+        yield { type: "part.end", partId: "ask", arguments: { question: "Continue?" } };
+        yield { type: "finish", reason: "tool-calls", usage: null };
+      } };
+    } });
+    const first = await execute(service, start);
+    const second = await execute(service, { ...start, submissionId: randomUUID() });
+    const ref = (snap: typeof first) => ({ sessionId: snap.sessionId, id: agentOf(snap), kind: Agent.kind });
+    const read = async (snap: typeof first) => ReadQuestions.output.parse(await service.sessions.calls.invoke(ReadQuestions.id, null, { object: ref(snap) }, null));
+    await vi.waitFor(async () => { expect((await read(first)).pending).toHaveLength(1); expect((await read(second)).pending).toHaveLength(1); });
+    const pending = (await read(first)).pending[0]!;
+    await expect(service.sessions.calls.invoke(AnswerQuestion.id, { id: pending.id, answer: "Wrong agent" }, { object: ref(second) }, null)).rejects.toMatchObject({ code: "conflict" });
+    await service.sessions.calls.invoke(CancelQuestion.id, { id: pending.id }, { object: ref(first) }, null);
+    await vi.waitFor(async () => expect((await read(first)).pending).toEqual([]));
+    expect((await read(second)).pending).toHaveLength(1);
+    await service.close();
+    services.delete(service);
+  });
+
   // 压缩契约横跨插件记录注册、托管任务、模型 stream 和下一次工作请求，使用真实隔离会话贯通。
   it("工具请求之间压缩旧前缀，近期工具批次原样续接，摘要与用量只追加一次", async () => {
     const work: ModelInput[] = [], summaries: ModelInput[] = [];

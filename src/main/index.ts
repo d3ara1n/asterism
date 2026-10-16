@@ -19,6 +19,7 @@ import { sessionChannel, sessionChangedChannel, sessionCommandSchema, type Sessi
 import { pluginConfigurationChangedChannel, pluginConfigurationChannel, pluginConfigurationCommandSchema, type PluginConfigurationResult } from "../shared/plugin-configuration.ts";
 import { contentChannel, contentCommandSchema, type ContentResult } from "../shared/content.ts";
 import { pluginEventsChannel, eventControlSchema } from "../shared/plugin-events.ts";
+import { pluginCallsChannel, callControlSchema } from "../shared/plugin-calls.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 let window: BrowserWindow | null = null;
@@ -38,6 +39,8 @@ const runtime = new RuntimeHost(status => {
   if (window && !window.isDestroyed()) window.webContents.send(pluginConfigurationChangedChannel, pluginId);
 }, frame => {
   if (window && !window.isDestroyed()) window.webContents.send(pluginEventsChannel, frame);
+}, frame => {
+  if (window && !window.isDestroyed()) window.webContents.send(pluginCallsChannel, frame);
 });
 
 function createWindow(): void {
@@ -82,6 +85,12 @@ function createWindow(): void {
     if (parsed.success) runtime.events(parsed.data);
   };
   ipcMain.on(pluginEventsChannel, receiveEvents);
+  const receiveCalls = (event: Electron.IpcMainEvent, raw: unknown) => {
+    if (!trusted(event)) return;
+    const parsed = callControlSchema.safeParse(raw);
+    if (parsed.success) runtime.calls(parsed.data);
+  };
+  ipcMain.on(pluginCallsChannel, receiveCalls);
   const stopAppearance = serveAppearance(current, trusted, () => refreshAppearance());
   const stopPreferences = servePreferences(trusted);
   const stopLanguage = serveLanguage(current, trusted);
@@ -91,7 +100,7 @@ function createWindow(): void {
     if (!parsed.success) return { ok: false, error: { code: "invalid_request", message: "Invalid content command." } };
     return runtime.content(parsed.data);
   });
-  const resetRenderer = () => { runtime.events({ type: "reset" }); void runtime.content({ type: "reset" }); };
+  const resetRenderer = () => { runtime.events({ type: "reset" }); runtime.calls({ type: "reset" }); void runtime.content({ type: "reset" }); };
   current.webContents.on("render-process-gone", resetRenderer);
   current.webContents.on("did-start-navigation", (_event, _url, inPlace, mainFrame) => {
     if (mainFrame && !inPlace) resetRenderer();
@@ -134,6 +143,7 @@ function createWindow(): void {
   });
   current.on("closed", () => {
     ipcMain.removeListener(pluginEventsChannel, receiveEvents);
+    ipcMain.removeListener(pluginCallsChannel, receiveCalls);
     ipcMain.removeHandler(contentChannel);
     resetRenderer();
     window = null; ipcMain.removeHandler(commandChannel); ipcMain.removeHandler(configurationChannel); ipcMain.removeHandler(sessionChannel); ipcMain.removeHandler(pickDirectoryChannel); ipcMain.removeHandler(pluginConfigurationChannel); stopAppearance(); stopPreferences(); stopLanguage();

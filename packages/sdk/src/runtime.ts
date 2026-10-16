@@ -4,6 +4,8 @@ import type { UiText } from "./i18n.ts";
 import type { ResourceRef } from "./workspace.ts";
 export * from "./runtime-contracts.ts";
 export * from "./runtime-resources.ts";
+export * from "./runtime-calls.ts";
+export * from "./runtime-tools.ts";
 export type * from "./content-runtime.ts";
 export type * from "./models.ts";
 export { validationMessage, jsonArgumentHint } from "./tool-validation.ts";
@@ -35,7 +37,7 @@ export interface PluginSecrets {
 export interface PluginStreams {
   publish(sessionId: string, objectId: string, channel: string, data: Uint8Array): void;
 }
-/** 宿主托管的进程内异步任务：同 key 运行中不重复启动，宿主关闭时取消；重启不补做。 */
+/** 宿主托管的进程内异步任务：同 key 运行中不重复启动，宿主关闭时取消；缺省无超时，重启不补做。 */
 export interface PluginTasks {
   start(key: string, run: (signal: AbortSignal) => Promise<void>, options?: { timeoutMs?: number; object?: ResourceRef }): boolean;
   cancel(key: string): void;

@@ -163,7 +163,7 @@ export const agentsMessages = pluginNamespace("atelier.host").messages("en", def
   },
   allowlistHint: {
     id: "features_configuration_AgentsSettings_45",
-    defaultMessage: "An empty allowlist disables resource tools; the application''s resource controls remain available.",
+    defaultMessage: "An empty allowlist disables plugin tools; the application''s resource controls remain available.",
   },
   denylistHint: {
     id: "features_configuration_AgentsSettings_46",
@@ -200,14 +200,6 @@ export const agentsMessages = pluginNamespace("atelier.host").messages("en", def
   limits: {
     id: "features_configuration_AgentsSettings_56",
     defaultMessage: "Limits",
-  },
-  timeout: {
-    id: "features_configuration_AgentsSettings_57",
-    defaultMessage: "Timeout (seconds)",
-  },
-  timeoutPlaceholder: {
-    id: "features_configuration_AgentsSettings_58",
-    defaultMessage: "Runtime default (600 s)",
   },
   maximumRequests: {
     id: "features_configuration_AgentsSettings_59",

@@ -23,7 +23,6 @@ export const defaultAgents: Omit<AgentConfiguration, "revision">[] = [
       "explorer",
       "researcher"
     ],
-    "timeout": 2400,
     "maxTurns": null
   },
   {
@@ -52,7 +51,6 @@ export const defaultAgents: Omit<AgentConfiguration, "revision">[] = [
     ],
     "excludeTools": null,
     "subagentRoles": null,
-    "timeout": 900,
     "maxTurns": null
   },
   {
@@ -82,7 +80,6 @@ export const defaultAgents: Omit<AgentConfiguration, "revision">[] = [
       "explorer",
       "researcher"
     ],
-    "timeout": 3600,
     "maxTurns": null
   },
   {
@@ -116,7 +113,6 @@ export const defaultAgents: Omit<AgentConfiguration, "revision">[] = [
     "subagentRoles": [
       "explorer"
     ],
-    "timeout": 2400,
     "maxTurns": null
   },
   {
@@ -149,7 +145,6 @@ export const defaultAgents: Omit<AgentConfiguration, "revision">[] = [
       "explorer",
       "researcher"
     ],
-    "timeout": 1800,
     "maxTurns": null
   }
 ];

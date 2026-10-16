@@ -8,7 +8,7 @@ const agentFieldsSchema = z.strictObject({
   name, enabled: z.boolean(), description: z.string().max(20_000), systemPrompt: z.string().max(100_000),
   modelRole: id.nullable(), fallbackRole: id.nullable(), examples: z.array(z.string().max(4_000)).max(50), decisionTrigger: z.string().max(4_000),
   tools: names.nullable(), excludeTools: names.nullable(), subagentRoles: names.nullable(),
-  timeout: z.number().int().positive().max(86_400).nullable(), maxTurns: z.number().int().positive().nullable(),
+  maxTurns: z.number().int().positive().nullable(),
 });
 export const agentInputSchema = agentFieldsSchema.refine(value => value.tools === null || value.excludeTools === null, "Tool allowlist and denylist are mutually exclusive.");
 export const agentSchema = agentInputSchema.safeExtend({ id, revision, builtin: z.boolean() });

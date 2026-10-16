@@ -7,6 +7,7 @@ import type { Json } from "./json.ts";
 import { reference, type ContractReference, type DataContract } from "./presentation.ts";
 import type { ResourceRef, SessionSnapshot } from "./workspace.ts";
 export * from "./renderer-services.ts";
+export * from "./renderer-calls.ts";
 export * from "./renderer-creation.ts";
 export * from "./renderer-tools.ts";
 export * from "./renderer-records.ts";

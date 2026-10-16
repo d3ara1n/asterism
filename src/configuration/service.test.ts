@@ -278,11 +278,11 @@ describe("真实配置与消费边界", () => {
   });
   it("自定义配置始终继承原始基准；worker 被修改或删除不改变新代理", async () => {
     const { service } = setup();
-    await service.execute({ type: "agent.save", id: "worker", value: { systemPrompt: "Changed worker", timeout: 1, enabled: false } });
+    await service.execute({ type: "agent.save", id: "worker", value: { systemPrompt: "Changed worker", maxTurns: 1, enabled: false } });
     await service.execute({ type: "role.save", id: "default", value: { thinking: "off", enabled: false } });
     const agent = await service.execute({ type: "agent.save", id: null, value: { name: "Supervisor", tools: [] } });
     expect(agent.snapshot.agents.find(item => item.id === agent.savedId)).toMatchObject({
-      name: "Supervisor", tools: [], systemPrompt: configurationDefaults.agents.worker!.systemPrompt, timeout: configurationDefaults.agents.worker!.timeout, enabled: true,
+      name: "Supervisor", tools: [], systemPrompt: configurationDefaults.agents.worker!.systemPrompt, maxTurns: configurationDefaults.agents.worker!.maxTurns, enabled: true,
     });
     const role = await service.execute({ type: "role.save", id: null, value: { name: "Custom" } });
     expect(role.snapshot.roles.find(item => item.id === role.savedId)).toMatchObject({ name: "Custom", thinking: configurationDefaults.roles.default!.thinking, enabled: true });
@@ -306,15 +306,15 @@ describe("真实配置与消费边界", () => {
   it("内置升级只改变未覆盖字段，已取得的生效配置保持稳定", () => {
     const oldDefaults = structuredClone(configurationDefaults);
     const nextDefaults = structuredClone(configurationDefaults);
-    oldDefaults.agents.worker!.timeout = 1200;
-    nextDefaults.agents.worker!.timeout = 3000;
+    oldDefaults.agents.worker!.maxTurns = 1200;
+    nextDefaults.agents.worker!.maxTurns = 3000;
     nextDefaults.agents.worker!.systemPrompt = "New built-in prompt";
     nextDefaults.roles.default!.thinking = "high";
     const agent = { id: "custom-agent", revision: 1, builtin: false, overrides: { name: "Custom", systemPrompt: "Pinned prompt" } };
     const before = resolveAgentConfiguration(agent, oldDefaults);
     const after = resolveAgentConfiguration(agent, nextDefaults);
-    expect(before.timeout).toBe(1200);
-    expect(after).toMatchObject({ timeout: 3000, systemPrompt: "Pinned prompt" });
+    expect(before.maxTurns).toBe(1200);
+    expect(after).toMatchObject({ maxTurns: 3000, systemPrompt: "Pinned prompt" });
     const role = { id: "custom-role", revision: 1, builtin: false, overrides: { name: "Custom", hidden: false } };
     expect(resolveRoleConfiguration(role, nextDefaults)).toMatchObject({ thinking: "high", hidden: false });
   });

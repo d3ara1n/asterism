@@ -4,8 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { contentRefSchema, defineAction, defineCreation, defineRecord, pluginNamespace, resourceCall, type ContentRef } from "@atelier/sdk/contracts";
-import { defineModule, definePlugin, implementAction, implementCreation, implementPreparer, implementResource, type ContentScope, type PluginContext } from "@atelier/sdk/runtime";
+import { contentRefSchema, defineCall, defineAction, defineCreation, defineRecord, pluginNamespace, resourceCall, type ContentRef } from "@atelier/sdk/contracts";
+import { implementCall, defineModule, definePlugin, implementAction, implementCreation, implementPreparer, implementResource, type ObjectExecutor, type ContentScope, type PluginContext } from "@atelier/sdk/runtime";
 import { ApplicationService } from "../runtime/service.ts";
 import { contentReferences, contentLimits } from "../runtime/content-store.ts";
 import { dispatchContent } from "../runtime/dispatch.ts";
@@ -29,7 +29,7 @@ afterEach(async () => {
   for (const service of services.splice(0)) await service.close();
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
-function fixture(options: { prepare?: (content: ContentScope, signal: AbortSignal) => Promise<void>; extra?: ReturnType<typeof definePlugin>[]; adapter?: ModelAdapter } = {}) {
+function fixture(options: { prepare?: (content: ContentScope, signal: AbortSignal) => Promise<void>; onCreate?: (object: ObjectExecutor) => void; extra?: ReturnType<typeof definePlugin>[]; adapter?: ModelAdapter } = {}) {
   const root = mkdtempSync(join(tmpdir(), "atelier-content-")); roots.push(root);
   let context!: PluginContext;
   const plugin = definePlugin({ namespace: ns, version: "1", modules: [defineModule(value => {
@@ -40,6 +40,7 @@ function fixture(options: { prepare?: (content: ContentScope, signal: AbortSigna
         async prepare(input, { signal, content }) { await content.read(input.file); await options.prepare?.(content, signal); return { action: "accept" }; },
         create(input, object) {
           object.commit(writer => { writer.set(Current, { file: input.file }); });
+          options.onCreate?.(object);
           if (input.fail) throw new Error("Creation rejected after content write.");
           return { title: "Document", data: input.history ? { original: input.file } : {} };
         },
@@ -80,6 +81,36 @@ const text = (data: Uint8Array) => new TextDecoder().decode(data);
 
 // 预期来自内容归属、同步提交和历史契约；验证公开 SDK 完整调用路径。
 describe("宿主不可变内容", () => {
+  // 关联只读对象不能以已知 ContentRef 绕过私有 get；对象、会话和在途交接根需分别守住。
+  it("外部调用只能读取关联对象的公开历史内容，不能读取私有当前数据或交接占用", async () => {
+    const foreign = pluginNamespace("test.foreign");
+    const Read = defineCall(foreign.name("read"), {
+      input: z.strictObject({ ref: contentRefSchema, session: z.boolean() }), output: z.string(),
+    });
+    const plugin = definePlugin({ namespace: foreign, version: "1", modules: [defineModule(() => ({
+      calls: [implementCall(Read, async (input, { object }) =>
+        text(await (input.session ? object.session.content : object.content).read(input.ref)))],
+    }))] });
+    const SessionFile = ns.data("session-file", contentRefSchema);
+    const f = fixture({ extra: [plugin], onCreate: object => object.session.commit(writer => { writer.set(SessionFile, object.get(Current)!.file!); }) }), draft = f.input();
+    const file = await f.store.writer({ scope: draft }).stage(bytes("private"));
+    const id = await f.create(file, draft.id);
+    const lease = f.store.scope();
+    const handover = f.store.handover(f.sessionId, id);
+    try {
+      const object = { id, sessionId: f.sessionId, kind: Document.kind };
+      const read = (ref: ContentRef, session = false) => f.service.sessions.calls.invoke(Read.id, { ref, session }, { object }, null);
+      await expect(read(file)).rejects.toMatchObject({ code: "foreign_resource" });
+      await expect(read(file, true)).rejects.toMatchObject({ code: "foreign_resource" });
+      const temporary = await f.store.writer({ scope: lease }).stage(bytes("handover"));
+      handover.add(temporary["$atelier.content"]);
+      await expect(read(temporary)).rejects.toMatchObject({ code: "foreign_resource" });
+      await f.replace(id, { file, history: true });
+      expect(await read(file)).toBe("private");
+      expect(text(await f.object(id).content.read(file))).toBe("private");
+    } finally { await Promise.all([draft.close(), handover.close(), lease.close()]); }
+  });
+
   it("保留值只识别严格 SDK 对象，普通文本没有引用语义", () => {
     const ref = { "$atelier.content": randomUUID() };
     expect(contentReferences({ nested: [ref, ref], text: JSON.stringify(ref) })).toEqual([ref]);

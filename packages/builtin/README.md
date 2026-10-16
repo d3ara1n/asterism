@@ -1,6 +1,6 @@
 # 内置插件实现（`@atelier/builtin`）
 
-内置 Agent、笔记、目录、命名与设置组成插件 `atelier.builtin`。实现通过 `@atelier/sdk` 使用宿主能力，通过 `@atelier/builtin-api/contracts` 消费公共领域契约，基础控件来自内部 `@atelier/ui`。本包不反向导入应用 `src/` 的生产代码；测试可复用宿主集成设施。
+内置 Agent、问答、笔记、目录、命名与设置组成插件 `atelier.builtin`。实现通过 `@atelier/sdk` 使用宿主能力，通过 `@atelier/builtin-api/contracts` 消费公共领域契约，基础控件来自内部 `@atelier/ui`。本包不反向导入应用 `src/` 的生产代码；测试可复用宿主集成设施。
 
 ## 应用组合入口
 
@@ -16,6 +16,7 @@
 | --- | --- |
 | `src/agent/` | 选择、输入受理、执行循环、上下文压缩、历史投影与对话视图；`data.ts` 保存私有状态声明，公共动作与记录在公共 API 包 |
 | `src/agent/ui/` | Agent 自有 overlay／modal 布局、贡献组件挂载、输入区隐藏请求；公共作者接口在 `@atelier/builtin-api/renderer` |
+| `src/questions/` | `ask_user` 顶层工具、内存问答服务、具型查询／提交调用与 Agent overlay；用单题文本回答验收公共扩展链路 |
 | `src/notes/`、`src/filesystem/` | 资源与正文工具实现、创建入口与三态工具视图 |
 | `src/naming/` | 自动命名、人工命名接口和标题投影；记录契约由公共包提供 |
 | `src/settings/` | 内置插件配置 |

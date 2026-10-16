@@ -25,6 +25,8 @@ SDK 的 `contracts`、`runtime`、`renderer` 三个子路径分别承担纯契�
 - **运行上下文**：顶层工具 handler 在每次调用时取得宿主绑定的当前执行对象、会话及取消等调用环境；静态声明与运行时数据分开。当前对象和会话的操作仍遵守宿主门面、提交及生命周期契约，模型参数不负责声明发起者身份。
 - **资源工具**：共享工具契约与针对资源类型的实现分开声明，由工具目录按资源支持关系匹配。
 
+后台通过 `defineTopLevelTool({ id, name, description, guidelines, argsSchema, resultSchema, effect, execution, execute, toModel? })` 声明，交给 `ModuleContribution.topLevelTools`。`execute(args, { object, callId, signal, publish })` 的 `object` 为绑定执行者的只读门面；不能据此写入其他插件资源或读取其私有数据。插件自有业务状态通过模块内共享服务管理。结果校验、过程发布、终结投影及批次调度沿用工具执行链路；展示契约可以独立共享同一稳定 ID，经 `toolRenderer` 渲染。
+
 ## 公共模块与契约身份
 
 插件通过 `package.json` 的 `exports["./public"]` 导出愿意共享的契约、配置访问接口、服务或状态，消费者在依赖中声明提供方包并使用 `import { ... } from "<包名>/public"`。
@@ -54,7 +56,14 @@ SDK 的 `contracts`、`runtime`、`renderer` 三个子路径分别承担纯契�
 - **非事务与按序消费**：`publish` 只做校验、打戳与路由，立即入队并返回，不参与事务回滚（需对应已生效变化时在提交成功后发布）。每个订阅串行等待自己的异步 handler，失败或断连只结束该订阅。
 - **生命周期与恢复**：后台在 `setup` 中订阅，前端在 `prepare({ events })` 或组件 `useRendererEvents()` 中订阅。取消订阅停止新投递并传取消信号，宿主等待运行中的回调真实结束后释放设施。总线不保留供晚订阅读取的状态，断连不补发；需要当前值的消费者先订阅再读取领域快照。
 - **宿主公共事件**：`@atelier/sdk/contracts` 导出 `SessionTitleChanged`（`atelier/session-title`，最外层提交后实际标题变化时发布）与 `ResourceStatusChanged`（`atelier/resource-status`，资源级 snapshot，发布 `running / failed / awaiting / completed` 及可选 `progress`，外壳消费规则见 [工作台](workbench.md#会话列表状态与资源通知)）。
-- **插件互相调用（预留）**：设计上与事件共用契约身份、来源绑定与生命周期，采用独立请求／结果／取消协议（`plugin.ipc.calls`），有实际需求前不导出空 API。
+
+### 具型插件调用
+
+`defineCall(id, { input, output })` 声明具型请求与结果，后台用 `implementCall(contract, handler)` 通过 `ModuleContribution.calls` 注册。契约归贡献插件所有，重复注册明确失败；后台消费者必须引用同一声明实例，跨进程按稳定 ID 路由。输入在后台按声明校验，输出在后台验证后通过 JSON 交付，消费者解码，不跨进程传递函数或服务实例。
+
+后台 `plugin.ipc.calls.invoke(contract, input, { object, signal? })` 与前端 `useRendererCalls().invoke(...)` 使用同一调用形状。`object` 是关联对象的完整 `ResourceRef`，宿主校验真实会话、类型及当前路径存在性。处理器取得只读 `object`、`signal` 和宿主绑定的 `source`：后台调用来源为调用插件，桌面调用来源为 null。关联对象不改变数据归属，不开放其他插件的对象私有状态或写权限；插件可用自己的内存服务管理关联交互。
+
+调用独立于对象动作队列，等待中的工具不阻塞答案提交。宿主登记调用活动、传播取消并等待处理器实际结束，不设置默认超时，也不自动重放请求。前端卸载可取消其读取或订阅；连接断开、页面导航和插件关闭清理对应调用。取消通信调用不会自动取消业务服务中独立存在的工具等待。当前值由领域查询提供，变化通过事件通知；前端先订阅成功再读当前值，并处理读取期间收到通知的竞态。
 
 ## 数据兼容
 
@@ -92,7 +101,7 @@ SDK 的 `contracts`、`runtime`、`renderer` 三个子路径分别承担纯契�
 
 ## 宿主运行生命周期
 
-托管任务（`plugin.tasks.start`，按 key 去重、带超时）、资源动作（按对象排队）和模型调用（同对象互斥、固定请求环境与工具批次）组合使用同一个宿主内部运行生命周期模块。它统一负责关闭门禁、插件／会话／对象关联、取消传播、真实结束等待与写入活动汇总。
+托管任务（`plugin.tasks.start`，按 key 去重、仅显式传入 `timeoutMs` 时设置期限）、资源动作（按对象排队）、插件调用、顶层工具和模型调用（同对象互斥、固定请求环境与工具批次）组合使用同一个宿主内部运行生命周期模块。它统一负责关闭门禁、插件／会话／对象关联、取消传播、真实结束等待与写入活动汇总。
 
 取消信号不等于工作已经结束；会话回溯、资源移除和插件关闭清理均等待真实收束。每个成功返回的模块 `setup` 立即登记清理责任，后续模块装配失败或正常关闭时先取消托管工作并等待收束，再按初始化逆序执行清理。
 

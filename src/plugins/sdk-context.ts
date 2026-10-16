@@ -9,9 +9,12 @@ import type { LiveBlock } from "../shared/session.ts";
 import type { ContentLease } from "../runtime/content-store.ts";
 import { inputReferences } from "../model/input.ts";
 import type { PluginEventScope } from "./event-scope.ts";
+import type { PluginCalls } from "@atelier/sdk/contracts";
+import type { BoundTopLevelTool } from "./top-level-tools.ts";
 
 type PluginServices = Pick<PluginContext, "id" | "dir" | "log" | "config" | "secrets" | "db" | "tasks">;
-export function createSdkContext(internal: PluginServices, host: PluginHostServices, modelRuns: RunGroup, eventScope: PluginEventScope) {
+export function createSdkContext(internal: PluginServices, host: PluginHostServices, modelRuns: RunGroup, eventScope: PluginEventScope,
+  calls: PluginCalls, topLevelTools: (ref: ResourceRef, policy: (name: string) => boolean) => BoundTopLevelTool[]) {
   const records = new Map<string, RecordContract>();
   const running = new Map<string, { sessionId: string; live: LiveBlock[] }>();
   let available = true;
@@ -52,6 +55,8 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
     const view = established ? host.sessions.view(sessionId!) : undefined;
     // 动作作用域结束后对象仍按自身记录根与请求交接读取；工具执行作用域关闭后严格拒绝。
     return { owner: internal.id, sessionId, objectId,
+      // 关联其他插件的对象不授予其在途暂存内容；历史与当前数据根另按归属校验。
+      allowHandover: !objectId || belongsTo(internal.id, host.refOf(objectId)?.kind ?? ""),
       get recordIds() { return new Set(view?.timelineIds()); },
       get scope() { return scope?.active ? scope.content : undefined; }, check: () => {
       checkAvailable();
@@ -182,7 +187,7 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
     });
   };
   const context: PluginContext = {
-    ipc: { events: eventScope.api },
+    ipc: { events: eventScope.api, calls },
     id: internal.id, dir: internal.dir, log: internal.log,
     config: contract => {
       checkAvailable();
@@ -230,11 +235,13 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
         const allowed = tools?.allow ? new Set(tools.allow) : null;
         const excluded = new Set(tools?.exclude ?? []);
         const linked = host.sessions.linked(ref.sessionId, ref.id);
-        const capabilities = host.sessions.capabilities(linked, name => (allowed === null || allowed.has(name)) && !excluded.has(name));
+        const policy = (name: string) => (allowed === null || allowed.has(name)) && !excluded.has(name);
+        const capabilities = host.sessions.capabilities(linked, policy);
+        const boundTools = topLevelTools(ref, policy);
         let progressTimer: ReturnType<typeof setTimeout> | undefined;
         const receive = request.observer.event.bind(request.observer);
         const work = modelRuns.start(signal => host.models.run({ plugin: internal.id, object: ref, target, system, messages, tools, cache, userAgent, requestParentId: request.requestParentId,
-          signal, capabilities, context: host.sessions.context(linked),
+          signal, capabilities, topLevelTools: boundTools, context: host.sessions.context(linked),
           content: messages => host.content?.capture(inputReferences(messages), { owner: internal.id, sessionId: ref.sessionId,
             objectId: ref.id, recordIds: new Set(path.map(node => node.id)), check: checkAvailable }),
           handover: () => host.content?.handover(ref.sessionId, ref.id),

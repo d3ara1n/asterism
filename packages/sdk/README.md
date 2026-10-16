@@ -2,7 +2,7 @@
 
 `@atelier/sdk` 是宿主与插件共用的独立类型与契约包。宿主实现服务接口，插件贡献模块、资源、工具、视图与生命周期处理器。完整架构与宿主机制见 [插件 SDK 与功能组合](../../docs/plugin-sdk.md)。
 
-当前 SDK 包版本为 **0.18.0**，宿主 API 为 **8.4**。内置插件领域契约独立在 [`@atelier/builtin-api`](../builtin-api/README.md)，不进入通用 SDK。
+当前 SDK 包版本为 **0.19.0**，宿主 API 为 **8.5**。内置插件领域契约独立在 [`@atelier/builtin-api`](../builtin-api/README.md)，不进入通用 SDK。
 
 ## 子路径入口
 
@@ -68,6 +68,7 @@ export default definePlugin({
 
 ### 3. 全局具型事件、配置与国际化
 - **瞬态事件**：`ns.event(name, { schema, source, semantics })` 声明 `occurrence` 或 `snapshot` 事件；后台用 `plugin.ipc.events.publish / subscribe` 或 `object.events.publish`，前端用 `prepare({ events })` 或 `useRendererEvents()`。资源可直接发布宿主公共 `ResourceStatusChanged`。
+- **具型调用（API 8.5）**：`defineCall(id, { input, output })` 声明，`implementCall(contract, handler)` 经 `ModuleContribution.calls` 登记。后台 `plugin.ipc.calls.invoke`、前端 `useRendererCalls().invoke` 均传入契约、输入和 `{ object: ResourceRef, signal? }`；处理器收到只读关联对象、来源和取消信号。规则见 [插件调用](../../docs/plugin-sdk.md#具型插件调用)，可编译示例见 `examples/plugin-calls.ts`。
 - **插件配置**：`ns.config(schema, defaults, { presentation? })` 声明唯一配置；后台 `plugin.config(contract)`，前端 `useRendererConfig(contract)`。
 - **界面本地化（`UiText`）**：普通字符串直接可用；需多语言时用 `ns.messages("en", defineMessages({ ... }))` 声明，在 `atelier.i18n.catalogs` 登记译文 JSON，前端通过 `useI18n()` 格式化（详见 [公共 i18n](../../docs/i18n.md)）。
 
@@ -76,6 +77,7 @@ export default definePlugin({
 - **滚动与缩放**：卡片内交互遵循 [画布与对象卡片](../../docs/workbench.md#画布与对象卡片) 的手势归属规则。
 - **辅助面板（API 8.2）**：`panels: [{ id: "details", label: "Details", icon, Body: Details }]`；主体与面板通过 `useRendererCard().openPanel("details") / closePanel()` 控制卡片局部视图。面板注册、数据绑定与生命周期见 [前端视图与扩展入口](../../docs/plugin-sdk.md#前端视图与扩展入口)，可编译示例见 `examples/renderer.ts`。
 - **工具视图**：`toolRenderer(ToolContract, { label?, icon?, input?, execution?, result? })`，三阶段平行可选，每阶段提供 `{ headerRenderer?, bodyRenderer? }`，可用 `ToolRenderProps<D, T, A>` 跨阶段复用组件。
+- **顶层工具（API 8.5）**：`defineTopLevelTool` 一次提供定义、参数／结果 schema 和 `execute`，经 `ModuleContribution.topLevelTools` 注册；每次调用取得只读 `object`、`callId`、`signal`、`publish`。展示可共享具有相同稳定 ID 的数据契约。详见 [工具贡献](../../docs/plugin-sdk.md#工具贡献)。
 
 ### 5. 可选模型分支（`plugin.models`）
 不依赖内置 Agent 的无状态模型服务（详细协议与续接规则见 [运行时](../../docs/runtime.md#用户输入文件与模型协议适配)）：

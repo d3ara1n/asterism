@@ -1,7 +1,7 @@
 import type { ResourceRef } from "@atelier/sdk/contracts";
 import { PluginApiError } from "@atelier/sdk/runtime";
 
-type Kind = "task" | "action" | "model" | "prepare" | "event";
+type Kind = "task" | "action" | "model" | "prepare" | "event" | "call" | "tool";
 export interface RunningWork<T> { readonly signal: AbortSignal; readonly done: Promise<T>; cancel(): void }
 interface Entry { group: RunGroup; object?: ResourceRef; affectsHistory: boolean; cancel(): void; done: Promise<unknown> }
 /** 一个插件的运行真值：所有执行方式共享登记、取消、等待与关闭门禁。 */

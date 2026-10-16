@@ -81,7 +81,7 @@ export interface ModelRunRequest {
   target: ModelTarget;
   system: SystemPrompt;
   messages: ModelItem[];
-  /** 只收窄宿主按真实链接选出的资源工具。 */
+  /** 按名称收窄插件顶层工具及按真实链接选出的资源工具；不影响宿主固定入口。 */
   tools?: { allow?: readonly string[]; exclude?: readonly string[] };
   cache?: { expectHit: boolean };
   signal: AbortSignal;

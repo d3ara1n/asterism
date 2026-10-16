@@ -5,8 +5,8 @@ import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { defineCreation, defineAction, resourceCall, defineRecord, defineImplementation, defineTool, pluginNamespace, modelRunRecordSchema, type SessionRecord, type ModelRunEvent } from "@atelier/sdk/contracts";
-import { defineModule, definePlugin, implementCreation, implementAction, implementPreparer, implementResource, implementTool, type ObjectReader, type ObjectExecutor, type ObjectWriter, type PluginContext, type PluginDefinition } from "@atelier/sdk/runtime";
+import { defineCall, defineCreation, defineAction, resourceCall, defineRecord, defineImplementation, defineTool, pluginNamespace, modelRunRecordSchema, type SessionRecord, type ModelRunEvent } from "@atelier/sdk/contracts";
+import { defineTopLevelTool, implementCall, defineModule, definePlugin, implementCreation, implementAction, implementPreparer, implementResource, implementTool, type ObjectReader, type ObjectExecutor, type ObjectWriter, type PluginContext, type PluginDefinition } from "@atelier/sdk/runtime";
 import { ApplicationService } from "../runtime/service.ts";
 import { DatabaseVersionError } from "../runtime/storage.ts";
 import * as runtimeModules from "../runtime/builtin.ts";
@@ -87,6 +87,108 @@ async function create(service: ApplicationService, sessionId: string, input = 1)
 }
 
 describe("工作台 SDK 的宿主实现", () => {
+  // 非内置提供者必须通过同一模型工具目录和只读关联门面执行，工具策略在请求开始时捕获。
+  it("外部顶层工具从首个请求声明，绑定调用对象并遵循工具筛选", async () => {
+    const c = counter(), other = pluginNamespace("test.questions");
+    let invoked = 0;
+    const declaration = defineTopLevelTool({
+      id: other.name("prompt"), name: "prompt", description: "Return an answer.", guidelines: [],
+      argsSchema: z.strictObject({ text: z.string() }).describe("Question text."),
+      resultSchema: z.string().describe("Answer text."), effect: "read", execution: "parallel",
+      async execute(args, context) {
+        invoked++;
+        expect(context.object.ref.kind).toBe(Counter.kind);
+        expect(context.callId).toBe("question");
+        expect(context.object).not.toHaveProperty("commit");
+        expect(() => context.object.get(State)).toThrow("another plugin");
+        context.publish("Waiting");
+        return { kind: "succeeded", data: `Answer: ${args.text}` };
+      },
+    });
+    const plugin = definePlugin({ namespace: other, version: "1.0.0", modules: [defineModule(() => ({ topLevelTools: [declaration] }))] });
+    const requests: ModelInput[] = [];
+    const { service, sessionId } = open([c.plugin, plugin], () => ({ version: "test/1", validate() {}, prepare(input) {
+      requests.push(input);
+      return { async *stream() {
+        yield { type: "part.start", part: { id: "q", kind: "toolcall", name: "prompt", callId: "question" } };
+        yield { type: "part.end", partId: "q", arguments: { text: "Hello" } };
+        yield { type: "finish", reason: "tool-calls", usage: null };
+      } };
+    } }));
+    const target = await configureModel(service);
+    const object = { id: await create(service, sessionId), sessionId, kind: Counter.kind };
+    const run = (allow?: string[]) => c.context().models.run({
+      object, target, requestParentId: c.context().session(sessionId).snapshot().position.nodeId,
+      system: { blocks: [] }, messages: [], tools: { allow }, signal: new AbortController().signal, observer: { event() {} },
+    });
+    const allowed = await run(["prompt"]);
+    expect(requests[0]!.tools.map(tool => tool.name)).toEqual(["resource_list", "resource_inspect", "resource_call", "prompt"]);
+    expect(allowed.tools[0]).toMatchObject({ kind: "succeeded", implementation: { id: declaration.id }, data: "Answer: Hello" });
+    expect(allowed.tools[0]).not.toHaveProperty("resource");
+    const denied = await run([]);
+    expect(requests[1]!.tools.map(tool => tool.name)).toEqual(["resource_list", "resource_inspect", "resource_call"]);
+    expect(denied.tools[0]?.kind).toBe("rejected");
+    expect(invoked).toBe(1);
+  });
+
+  // 外部贡献可以关联其他插件的对象，但声明实例、来源与私有数据边界仍由宿主守护。
+  it("具型调用绑定真实关联对象和后台来源，拒绝伪造契约、跨会话引用及非法产出", async () => {
+    const c = counter(), other = pluginNamespace("test.questions");
+    const query = defineCall(other.name("query"), { input: z.string().trim(), output: z.string() });
+    const invalid = defineCall(other.name("invalid"), { input: z.null(), output: z.number() });
+    const plugin = definePlugin({ namespace: other, version: "1.0.0", modules: [defineModule(() => ({
+      calls: [
+        implementCall(query, async (input, context) => {
+          expect(context.source).toEqual({ plugin: ns.id, resource: null });
+          expect(context.object.ref.kind).toBe(Counter.kind);
+          expect(context.object.snapshot()?.title).toBe("Counter");
+          expect(() => context.object.get(State)).toThrow("another plugin");
+          expect(context.object).not.toHaveProperty("commit");
+          return input;
+        }),
+        implementCall(invalid, async () => "not a number" as never),
+      ],
+    }))] });
+    const { service, sessionId } = open([c.plugin, plugin]);
+    const id = await create(service, sessionId);
+    const object = { id, sessionId, kind: Counter.kind };
+    expect(await c.context().ipc.calls.invoke(query, " value ", { object })).toBe("value");
+    await expect(c.context().ipc.calls.invoke({ ...query }, "value", { object })).rejects.toMatchObject({ code: "invalid_argument" });
+    const otherSession = service.sessions.tree.create("Other");
+    await expect(service.sessions.calls.invoke(query.id, "value", { object: { ...object, sessionId: otherSession } }, null)).rejects.toMatchObject({ code: "unavailable" });
+    await expect(service.sessions.calls.invoke(invalid.id, null, { object }, null)).rejects.toThrow();
+  });
+
+  // 取消只发信号，活动必须保持到 handler 清理完成；通用调用不能绕开宿主收束。
+  it("调用取消后等待实际清理，顶层工具不能占用宿主入口", async () => {
+    const c = counter(), other = pluginNamespace("test.questions");
+    const wait = defineCall(other.name("wait"), { input: z.null(), output: z.null() });
+    let signal!: AbortSignal, release!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    const plugin = definePlugin({ namespace: other, version: "1.0.0", modules: [defineModule(() => ({
+      calls: [implementCall(wait, async (_input, context) => { signal = context.signal; await gate; return null; })],
+    }))] });
+    const bad = definePlugin({ namespace: pluginNamespace("test.bad"), version: "1.0.0", modules: [defineModule(() => ({
+      topLevelTools: [defineTopLevelTool({ id: "test.bad/top", name: "resource_call", description: "Conflict.", guidelines: [],
+        argsSchema: z.null().describe("No arguments."), resultSchema: z.null().describe("No result."),
+        effect: "read", execution: "parallel", async execute() { return { kind: "succeeded", data: null }; } })],
+    }))] });
+    const { service, sessionId } = open([c.plugin, plugin, bad]);
+    expect(service.sessions.plugins.find(item => item.id === "test.bad")).toMatchObject({ status: "failed" });
+    const object = { id: await create(service, sessionId), sessionId, kind: Counter.kind };
+    const controller = new AbortController();
+    const waiting = service.sessions.calls.invoke(wait.id, null, { object, signal: controller.signal }, null);
+    const rejected = expect(waiting).rejects.toThrow();
+    try {
+      expect(service.sessions.running).toBe(true);
+      controller.abort();
+      expect(signal.aborted).toBe(true);
+      expect(service.sessions.running).toBe(true);
+    } finally { release(); }
+    await rejected;
+    expect(service.sessions.running).toBe(false);
+  });
+
   it("读取门面不暴露对象或嵌套会话的修改能力", async () => {
     let reader!: ObjectReader;
     const c = counter({ onRead: value => { reader = value; } });

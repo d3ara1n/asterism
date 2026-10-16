@@ -16,6 +16,9 @@ import type { ResourceRef, ResourceSnapshot, SessionSnapshot } from "./workspace
 import type { ActionContract, CreationContract } from "./commands.ts";
 import type { ObjectReader, ObjectExecutor, SessionExecutor } from "./objects.ts";
 import type { ContentReader, ContentScope } from "./content-runtime.ts";
+import type { PluginCalls } from "./calls.ts";
+import type { CallContribution } from "./runtime-calls.ts";
+import type { TopLevelTool } from "./runtime-tools.ts";
 export type * from "./objects.ts";
 export type { ResourceRef, ResourceSnapshot, SessionSnapshot } from "./workspace.ts";
 
@@ -23,7 +26,7 @@ export interface PluginContext {
   readonly id: string;
   readonly dir: string;
   readonly log: PluginLogger;
-  readonly ipc: { readonly events: PluginEvents };
+  readonly ipc: { readonly events: PluginEvents; readonly calls: PluginCalls };
   config<T extends Json>(contract: ConfigContract<T>): PluginConfig<T>;
   readonly secrets: PluginSecrets;
   db(): DatabaseSync;
@@ -100,6 +103,8 @@ export interface ToolContribution {
   prepare(resource: ResourceSnapshot, object: ObjectExecutor, target: Json, args: Json): ToolInvocation | PreparedResult;
 }
 export interface ModuleContribution {
+  calls?: readonly CallContribution[];
+  topLevelTools?: readonly TopLevelTool[];
   events?: readonly EventContract[];
   records?: readonly RecordContract[];
   resources?: readonly ResourceContribution[];

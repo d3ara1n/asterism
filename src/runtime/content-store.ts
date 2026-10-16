@@ -3,7 +3,7 @@ import { mkdirSync, readdirSync, renameSync, rmSync } from "node:fs";
 import { open, type FileHandle } from "node:fs/promises";
 import { join } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
-import { contentRefSchema, type ContentRef, type ContentRange, type Json } from "@atelier/sdk/contracts";
+import { belongsTo, contentRefSchema, type ContentRef, type ContentRange, type Json } from "@atelier/sdk/contracts";
 import { PluginApiError, type ContentReader, type ContentScope } from "@atelier/sdk/runtime";
 import { contentChunkSize, contentReadLimit } from "../shared/content.ts";
 
@@ -19,7 +19,7 @@ export const contentSchemaSql = `
   ) STRICT;
   CREATE INDEX content_roots_content ON content_roots(content_id);
 `;
-export interface ContentAccess { owner?: string; sessionId?: string; objectId?: string; scope?: ContentLease; recordIds?: ReadonlySet<string>; check?(): void }
+export interface ContentAccess { owner?: string; sessionId?: string; objectId?: string; scope?: ContentLease; recordIds?: ReadonlySet<string>; allowHandover?: boolean; check?(): void }
 export interface ContentTarget { contractId: string; resourceKind: string; sessionId?: string; objectId?: string }
 export interface CapturedContent {
   reader: ContentReader;
@@ -164,11 +164,13 @@ export class ContentStore {
     access.check?.(); access.scope?.check();
     const row = this.stored(ref);
     if (access.scope?.refs.has(row.id)) return row;
-    if (access.sessionId && this.handovers.get(`${access.sessionId}\0${access.objectId ?? ""}`)?.refs.has(row.id)) return row;
+    if (access.allowHandover !== false && access.sessionId && this.handovers.get(`${access.sessionId}\0${access.objectId ?? ""}`)?.refs.has(row.id)) return row;
     if (access.sessionId) {
       const roots = this.db.prepare("SELECT kind, root_id FROM content_roots WHERE session_id = ? AND object_id = ? AND content_id = ?")
         .all(access.sessionId, access.objectId ?? "", row.id) as { kind: string; root_id: string }[];
-      if (roots.some(root => root.kind === "data" || access.recordIds?.has(root.root_id))) return row;
+      if (roots.some(root => root.kind === "data"
+        ? !access.owner || belongsTo(access.owner, root.root_id)
+        : access.recordIds?.has(root.root_id))) return row;
     }
     throw new PluginApiError("foreign_resource", "The content does not belong to this input or object.");
   }

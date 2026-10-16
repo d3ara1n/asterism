@@ -7,11 +7,13 @@ import type { AgentCapabilities } from "./capabilities.ts";
 import { ResponseBuffer } from "./response.ts";
 import { synchronous } from "../plugins/synchronous.ts";
 import type { ContentLease } from "../runtime/content-store.ts";
+import type { BoundTopLevelTool } from "../plugins/top-level-tools.ts";
 
 export interface ModelExecutionEnvironment extends ModelRequestIdentity {
   adapter: ModelAdapter;
   settings: ModelSettings;
   capabilities: AgentCapabilities;
+  topLevelTools?: readonly BoundTopLevelTool[];
   system: SystemPrompt;
   messages: ResolvedModelItem[];
 }
@@ -45,11 +47,11 @@ export async function runModelRequest(request: ModelRunRequest, environment: Pro
   let termination: { reason: "completed" } | { reason: "cancelled" } | { reason: "failed"; code: string } = { reason: "completed" };
   try {
     // 即使已取消也消费准备 Promise 的拒绝，避免遗留未处理异常。
-    const { adapter, settings, capabilities, system, messages, userAgent, sessionId } = await environment;
+    const { adapter, settings, capabilities, system, messages, userAgent, sessionId, topLevelTools = [] } = await environment;
     signal.throwIfAborted();
     source = { model: modelExpression(settings), adapter: adapter.version, scope: modelScope(settings) };
     responseId = randomUUID();
-    const tools = settings.model.capabilities.tools ? coreDeclarations() : [];
+    const tools = settings.model.capabilities.tools ? coreDeclarations(topLevelTools) : [];
     const prepared = adapter.prepare({ settings, system, messages, userAgent, sessionId, tools });
     // 适配层接受请求后才记录现场；准备失败的请求没有诊断。
     diagnostics = requestDiagnostics(system, tools);
@@ -65,7 +67,7 @@ export async function runModelRequest(request: ModelRunRequest, environment: Pro
       clearTimeout(progressTimer);
       progressTimer = undefined;
       pendingProgress = pendingProgress.then(async () => {
-        await response.preview((name, args) => previewCoreCall(name, args, capabilities));
+        await response.preview((name, args) => previewCoreCall(name, args, capabilities, topLevelTools));
         progress();
       });
       return pendingProgress;
@@ -97,7 +99,7 @@ export async function runModelRequest(request: ModelRunRequest, environment: Pro
           prepared(call, info) { response.prepare(byCall.get(call.callId)!, info); progress(); },
           started(call, info) { response.start(byCall.get(call.callId)!, info); progress(); },
           published(call, data) { response.publish(byCall.get(call.callId)!, data); progress(); },
-        }, handover);
+        }, handover, topLevelTools);
       if (request.cache?.expectHit && finish.usage?.cacheRead === 0 && (finish.usage.input ?? 0) > 2048)
         diagnostic("cache_miss", "The provider reported no cached input for this request.", "warning");
       if ([...outcomes.values()].some(outcome => outcome.kind === "unknown"))

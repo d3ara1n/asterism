@@ -36,7 +36,7 @@ export function AgentUI({ children }: { children: ReactNode }) {
     <div className="relative flex min-h-0 flex-1 flex-col">
       {children}
       <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
-        <div ref={setCenter} className="flex max-h-full min-h-0 w-full flex-col gap-2 overflow-y-auto empty:hidden" />
+        <div ref={setCenter} className="flex max-h-full min-h-0 w-full flex-col gap-3 overflow-y-auto p-3 empty:hidden" />
       </div>
     </div>
     <Contributions />
@@ -45,7 +45,7 @@ export function AgentUI({ children }: { children: ReactNode }) {
 
 export function AgentUIRegion({ position }: { position: "top" | "bottom" }) {
   const { refs } = useCardUI();
-  return <div ref={refs[position]} className="flex min-h-0 shrink-0 flex-col gap-2 empty:hidden" />;
+  return <div ref={refs[position]} className="relative z-10 flex min-h-0 shrink-0 flex-col gap-3 p-3 empty:hidden" />;
 }
 
 function Contributions() {

@@ -10,6 +10,7 @@ import { jsonArgumentHint, validationMessage } from "../tools/validation.ts";
 import { ResourceCall, ResourceInspect, ResourceList, ResourceInspectResult, ResourceListResult } from "../tools/core.ts";
 import type { AgentCapabilities } from "./capabilities.ts";
 import type { ContentLease } from "../runtime/content-store.ts";
+import type { BoundTopLevelTool } from "../plugins/top-level-tools.ts";
 
 /** 宿主固定操作入口；只在 provider 协议中表示为 tools，不属于资源工具目录。 */
 interface CoreAction {
@@ -23,7 +24,7 @@ export interface ToolObserver {
   published?(call: PendingCall, data: Json): void;
 }
 
-// 此目录由宿主维护；可扩展的工具位于独立 ToolRegistry，不注册或替换这些入口。
+// 宿主入口不允许覆盖；插件顶层工具由请求起点捕获的静态贡献补充。
 const actions: readonly CoreAction[] = [
   { tool: ResourceList,
     resolve: (_args, capabilities) => ({ effect: "read", execution: "parallel", implementation: reference(ResourceListResult), async execute() {
@@ -45,12 +46,14 @@ const actions: readonly CoreAction[] = [
     } },
 ];
 
-export function coreDeclarations(): ToolDeclaration[] {
-  return actions.map(({ tool }) => declareTool(tool));
+export function coreDeclarations(tools: readonly BoundTopLevelTool[] = []): ToolDeclaration[] {
+  return [...actions, ...tools].map(({ tool }) => declareTool(tool));
 }
 
 /** 填充期的身份提示取自捕获目录，完整调用仍由批次独立校验。 */
-export function previewCoreCall(name: string, args: Json, capabilities: AgentCapabilities): ToolInvocationInfo {
+export function previewCoreCall(name: string, args: Json, capabilities: AgentCapabilities, tools: readonly BoundTopLevelTool[] = []): ToolInvocationInfo {
+  const tool = tools.find(entry => entry.tool.name === name);
+  if (tool) return { implementation: reference(tool.tool) };
   if (!args || typeof args !== "object" || Array.isArray(args)) return {};
   if (typeof args.resource_id !== "string") return {};
   if (name === "resource_inspect") return capabilities.identity(args.resource_id);
@@ -61,16 +64,18 @@ export function previewCoreCall(name: string, args: Json, capabilities: AgentCap
 /** 批次先解析实际资源工具，再按其执行策略调度；发布快照不改变批次的模型交付边界。 */
 export async function executeCoreBatch(calls: readonly PendingCall[], capabilities: AgentCapabilities | null,
   signal: AbortSignal, settle: (call: PendingCall, outcome: ToolOutcome) => void,
-  observer: ToolObserver = {}, handover?: ContentLease): Promise<void> {
+  observer: ToolObserver = {}, handover?: ContentLease, tools: readonly BoundTopLevelTool[] = []): Promise<void> {
   const resolved = calls.map(call => {
     let result: Invocation | PreparedResult;
     const action = actions.find(action => action.tool.name === call.name);
-    if (!action || !capabilities) result = { kind: "rejected", error: { code: "operation_unavailable", message: "This core operation is unavailable." } };
+    const extension = tools.find(entry => entry.tool.name === call.name);
+    const definition = action?.tool ?? extension?.tool;
+    if (!definition || !capabilities) result = { kind: "rejected", error: { code: "operation_unavailable", message: "This operation is unavailable." } };
     else {
-      const parsed = action.tool.argsSchema.safeParse(call.arguments);
+      const parsed = definition.argsSchema.safeParse(call.arguments);
       if (!parsed.success) result = { kind: "rejected", error: { code: "invalid_arguments",
         message: `${validationMessage(parsed.error, call.name)}. Correct the reported fields and retry.${call.name === "resource_call" ? ` ${jsonArgumentHint}` : ""}` } };
-      else result = action.resolve(parsed.data, capabilities);
+      else result = action ? action.resolve(parsed.data, capabilities) : extension!.resolve(parsed.data, call.callId);
     }
     const info: ToolInvocationInfo = {
       ...(result.implementation ? { implementation: result.implementation } : {}),

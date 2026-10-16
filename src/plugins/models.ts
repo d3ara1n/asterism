@@ -14,6 +14,7 @@ import { coreId } from "../shared/core.ts";
 import { inputReferences, validateInput, resolveInput, type ModelContent } from "../model/input.ts";
 import type { ModelItem } from "@atelier/sdk/contracts";
 import { errorMessages } from "../shared/error-display.ts";
+import type { BoundTopLevelTool } from "./top-level-tools.ts";
 
 /** 模型目标：选择一个角色，可覆盖模型表达式或思考等级；未给出的沿用角色。 */
 export type { ModelTarget, StreamRequest } from "@atelier/sdk/contracts";
@@ -28,6 +29,7 @@ export interface RunRequest extends ModelRunRequest {
   /** 发起请求的插件身份，由宿主填写；用于响应块来源打戳。 */
   plugin: string;
   capabilities: AgentCapabilities;
+  topLevelTools?: readonly BoundTopLevelTool[];
   context: Promise<{ file: string; text: string }[]>;
   content?: HostInputOptions["content"];
   /** 工具暂存内容的交接占用；结果记录登记内容根前保持可读，请求结束后释放。 */
@@ -144,7 +146,8 @@ export function createModelServices(configuration: ConfigurationService, adapter
       try { request.signal.throwIfAborted(); content = capture(messages, request.content); captured = Promise.resolve(); }
       catch (error) { captured = Promise.reject(error); }
       const environment = Promise.all([resolve(target), request.context, captured]).then(async ([resolved, context]) => ({
-        ...resolved, userAgent, sessionId, capabilities: request.capabilities, messages: await resolveInput(messages, content, request.signal),
+        ...resolved, userAgent, sessionId, capabilities: request.capabilities, topLevelTools: request.topLevelTools,
+        messages: await resolveInput(messages, content, request.signal),
         system: { blocks: [...system.blocks, ...context.map((file, index) => ({
           id: coreId(`context.${index}`), kind: "context" as const, ...file,
         }))] },

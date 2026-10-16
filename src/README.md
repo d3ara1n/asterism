@@ -12,10 +12,10 @@
 | `configuration/` | 全局 `configuration.json`、密文凭据、模型发现、models.dev 参数获取、异步连接测试与默认角色（见 `configuration/README.md`） | `shared`、Node 文件系统、模型 SDK；不依赖 Electron 或数据库 |
 | `session/` | 会话树存储（`session_nodes`）、当前时间线追加与游标选择、工作台存在性与链接重放 | `shared`、SDK 纯契约、Node SQLite；不依赖 UI 或插件运行时 |
 | `model/` | 单次请求契约、文件输入检查、请求身份头、跨模型目标投影、思考续接中间件与三协议 AI SDK 编解码 | `shared`、`session`、AI SDK |
-| `execution/` | 单次模型请求与工具批次（`models.run`）、流块状态机、请求能力视图、外部工具策略与固定宿主操作入口（`resource_*`） | `model`、`resources`、`tools`、存储格式 adapter |
+| `execution/` | 单次模型请求与工具批次（`models.run`）、流块状态机、请求能力视图、工具策略、固定宿主入口与插件顶层工具调度 | `model`、`resources`、`tools`、存储格式 adapter |
 | `resources/` | 资源身份生成（Nano ID）、后台契约、注册目录、卡片投影与环境聚合 | `shared`、`session` 对象类型 |
 | `tools/` | 两层共用的工具定义投影、实现注册与产出校验、终结 `toModel` 投影、支持关系 | `shared`、`session` 对象类型 |
-| `plugins/` | 包与公共模块图加载、配置／凭据托管、读取／执行门面、具型命令准备与校验、共享运行生命周期、全局瞬态事件路由与提交后派发 | `@atelier/sdk`、`session`、`resources`、`tools` |
+| `plugins/` | 包与公共模块图加载、配置／凭据托管、读取／执行门面、具型命令准备、插件调用与顶层工具、共享运行生命周期、瞬态事件路由与提交后派发 | `@atelier/sdk`、`session`、`resources`、`tools` |
 | `../packages/builtin/` | 内置 `atelier.builtin` 插件的资源（`notes`、`filesystem`）、代理（`agent`）、会话命名（`naming`）与共享正文工具（见 `../packages/builtin/README.md`） | 后台/前端分入口；通过公开 SDK 消费宿主能力 |
 | `../packages/builtin-api/` | 内置领域的公共资源、动作、记录、配置目录及作者示例 | SDK、Zod；不依赖内置实现或宿主 |
 | `../packages/ui/` | 应用与内置插件共用的内部 UI 控件与展示 helper | React、SDK 展示接口与既有 UI 库；不访问宿主状态 |
