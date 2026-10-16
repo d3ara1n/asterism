@@ -50,7 +50,7 @@ export function Conversation({ selection, turnState, onHome }: { selection: Agen
   const agentId = object.ref.id;
   const snapshot = session.snapshot();
   const running = executionState === "running";
-  const timeline = useMemo(() => snapshot ? conversationTimeline(snapshot, agentId, models.blocks) : [], [snapshot, agentId, models.blocks]);
+  const timeline = useMemo(() => snapshot ? conversationTimeline(snapshot, agentId, models.blocks, running) : [], [snapshot, agentId, models.blocks, running]);
   const configurationError = catalogs.error;
   const { scroll, awayFromBottom, latest, onScroll } = useOutputFollow(timeline);
   const composer = useRef<HTMLTextAreaElement>(null);

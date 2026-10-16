@@ -4,7 +4,7 @@ import type { ModelInputPart } from "./model-input.ts";
 import type { ContentReader } from "./content-runtime.ts";
 import type { ToolOutcome, ToolInvocationInfo, ToolResult } from "./tool-result.ts";
 import type { ResourceRef } from "./workspace.ts";
-import type { RequestDiagnostics } from "./model-records.ts";
+import type { RequestDiagnostics, RequestTiming } from "./model-records.ts";
 
 /** 全软件共用的标准等级；协议编码不改变公共取值。 */
 export const thinkingLevels = ["off", "minimal", "low", "medium", "high", "xhigh", "max"] as const;
@@ -38,10 +38,11 @@ export type ModelEvent =
   | { type: "part.start"; part: StreamPart }
   | { type: "part.delta"; partId: string; delta: string; channel?: "summary" }
   | { type: "part.end"; partId: string; arguments?: Json; continuation?: Json }
-  | { type: "finish"; reason: string; usage: Usage | null; responseId?: string; rawFinishReason?: string; source?: ModelSource };
+  | { type: "finish"; reason: string; usage: Usage | null; responseId?: string; rawFinishReason?: string; source?: ModelSource; timing?: RequestTiming };
 export type ModelSource = { model: string; adapter: string; scope: string };
 export type ModelCompletion = {
   usage: Usage | null; finishReason: string; rawFinishReason: string | null; providerResponseId: string | null;
+  timing?: RequestTiming;
 };
 /** 成型响应块；不是会话节点，时间线身份和保存由消费者提供。 */
 export type ModelBlock = {

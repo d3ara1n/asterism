@@ -1,4 +1,4 @@
-import type { ModelBlock, SessionSnapshot } from "@atelier/sdk/contracts";
+import type { ModelBlock, SessionRecord, SessionSnapshot } from "@atelier/sdk/contracts";
 import { Execution, Notice, UserMessage } from "@atelier/builtin-api/contracts";
 import type { AgentTurnState } from "./state.ts";
 
@@ -7,11 +7,16 @@ export function projectAgentTurnState(
   snapshot: Pick<SessionSnapshot, "records">,
   agentId: string,
 ): AgentTurnState {
+  return projectTurnState(snapshot.records.all({ scope: "timeline" }), agentId);
+}
+
+/** 同一状态规则也用于历史轮次；传入该轮的记录区间，不创建历史快照副本。 */
+export function projectTurnState(records: readonly SessionRecord[], agentId: string): AgentTurnState {
   let hasInput = false;
   let responseId: string | null = null;
   let interrupted = false;
   const blocks = new Map<number, ModelBlock>();
-  for (const record of snapshot.records.all({ scope: "timeline" })) {
+  for (const record of records) {
     if (record.source?.resource?.id !== agentId) continue;
     if (UserMessage.decode(record)?.status === "known") {
       hasInput = true;

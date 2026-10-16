@@ -47,7 +47,8 @@ export function createAgentLoop(deps: { selection: AgentSelectionService; tasks:
             });
             const { diagnostics, responseId } = result;
             if (diagnostics && responseId && !(result.reason === "failed" && result.code === "event_delivery"))
-              object.commit(writer => { writer.append(RequestDiagnosticsRecord, { responseId, diagnostics }); });
+              object.commit(writer => { writer.append(RequestDiagnosticsRecord, { responseId, diagnostics,
+                ...(diagnostics.timing && result.source ? { origin: { source: result.source, requestParentId: snapshot.position.nodeId } } : {}) }); });
             // 事件提交失败时请求已中止且无法写入诊断；在循环层补一条可见通知，避免静默停止。
             if (result.reason === "failed" && result.code === "event_delivery") {
               object.commit(writer => { writer.append(Notice, { level: "error", code: "event_delivery",

@@ -1,5 +1,5 @@
 import { jsonSchema as sdkJsonSchema, streamText, tool, type ModelMessage, type ToolResultPart, type ToolSet, type LanguageModel } from "ai";
-import { jsonSchema, unauthenticatedApiKey, type Json, type Usage } from "../shared/model.ts";
+import { jsonSchema, unauthenticatedApiKey, type Json } from "../shared/model.ts";
 import { ModelFailure, type ModelAdapter, type ModelEvent, type ModelInput, type ResolvedInputPart, type PreparedModel, type ModelValidationInput } from "./contract.ts";
 import { createProviderModel, validateProviderTransport } from "./provider.ts";
 import { projectSystemPrompt } from "./system-prompt.ts";
@@ -7,6 +7,7 @@ import { requestOptions } from "./request-options.ts";
 import { aiSdkAdapterVersion, pickContinuation } from "./continuation.ts";
 import { projectHistory, validateProjection } from "./projection.ts";
 import { validateRequestIdentity } from "./request-identity.ts";
+import { measureModel, RequestTimer } from "./request-timing.ts";
 
 function json(value: unknown): Json { return jsonSchema.parse(JSON.parse(JSON.stringify(value))); }
 export function sdkMessages(input: ModelInput): ModelMessage[] {
@@ -61,7 +62,7 @@ export function sdkMessages(input: ModelInput): ModelMessage[] {
 export class AiSdkAdapter implements ModelAdapter {
   readonly version = aiSdkAdapterVersion;
   constructor(private readonly readCredential: (providerId: string) => Promise<string | null>,
-    private readonly languageModelFactory?: (input: ModelInput, key: string) => LanguageModel) {}
+    private readonly languageModelFactory?: (input: ModelInput, key: string) => Exclude<LanguageModel, string>) {}
   validate(input: ModelValidationInput): void {
     validateProviderTransport(input.settings.provider);
     validateRequestIdentity(input.settings, input);
@@ -85,12 +86,37 @@ export class AiSdkAdapter implements ModelAdapter {
     if (!key) throw new ModelFailure("missing_credential", "Provider credentials are unavailable.");
     const languageModel = this.languageModelFactory?.(input, key) ?? createProviderModel(provider, model, key, fetch, input);
     const tools: ToolSet = Object.fromEntries(input.tools.map(t => [t.name, tool({ description: t.description, inputSchema: sdkJsonSchema(t.parameters as Record<string, unknown>) })]));
-    const result = streamText({ model: languageModel, messages, tools,
+    signal.throwIfAborted();
+    const timing = new RequestTimer();
+    const measured = measureModel(languageModel, provider.protocol, timing);
+    const controller = new AbortController();
+    const streamSignal = AbortSignal.any([signal, controller.signal]);
+    const cancelled = () => { timing.end("cancelled"); };
+    signal.addEventListener("abort", cancelled, { once: true });
+    try {
+      yield* this.decode(measured, messages, tools, options, provider.protocol, streamSignal);
+    } catch (error) {
+      // 模型终态可能早于连接关闭或用户取消；已取得的计量仍须交付。
+      if (measured.completion) yield measured.completion;
+      const failure = error instanceof ModelFailure ? error : new ModelFailure("execution_failed", "The model request failed.");
+      if (!measured.completion) failure.diagnostics = { timing: timing.end(signal.aborted ? "cancelled" : "failed") };
+      throw failure;
+    } finally {
+      signal.removeEventListener("abort", cancelled);
+      controller.abort();
+    }
+  }
+  private async *decode(measured: ReturnType<typeof measureModel>, messages: ModelMessage[], tools: ToolSet,
+    options: ReturnType<typeof requestOptions>, protocol: ModelInput["settings"]["provider"]["protocol"],
+    signal: AbortSignal): AsyncIterable<ModelEvent> {
+    const result = streamText({ model: measured.model, messages, tools,
       ...options, abortSignal: signal,
       include: { rawChunks: true },
       // SDK 不执行工具；单步结果交还工坊循环，工具注册中不提供 execute。
       onError: () => {},
     });
+    // 使用 SDK 自带消费分支持续接收，避免调用方等待进度处理时拖慢采样。
+    void result.consumeStream();
     const calls = new Set<string>();
     const thinkingItems = new Map<number, { partId: string; itemId: string; summaryIndex: number | null; hasSummary: boolean }>();
     const continuations = new Map<string, ReturnType<typeof pickContinuation>>();
@@ -103,11 +129,11 @@ export class AiSdkAdapter implements ModelAdapter {
       return accumulated;
     };
     const rejectedBySdk = new Set<string>();
-    let finish: { reason: string; rawFinishReason?: string; usage: Usage } | null = null;
     for await (const event of result.stream) {
+      signal.throwIfAborted();
       switch (event.type) {
         case "text-start": case "reasoning-start": {
-          if (event.type === "reasoning-start" && provider.protocol === "openai-responses") break;
+          if (event.type === "reasoning-start" && protocol === "openai-responses") break;
           const kind = event.type === "text-start" ? "text" : "thinking";
           const id = `${kind}:${event.id}`;
           collectContinuation(id, event.providerMetadata);
@@ -115,7 +141,7 @@ export class AiSdkAdapter implements ModelAdapter {
           break;
         }
         case "raw": {
-          if (provider.protocol !== "openai-responses" || !event.rawValue || typeof event.rawValue !== "object") break;
+          if (protocol !== "openai-responses" || !event.rawValue || typeof event.rawValue !== "object") break;
           const raw = event.rawValue as Record<string, unknown>;
           // 按 Responses item 收束，全文与摘要分别接收；SDK 的摘要分段不另建思考块。
           if (raw.type === "response.output_item.added" || raw.type === "response.output_item.done") {
@@ -158,14 +184,14 @@ export class AiSdkAdapter implements ModelAdapter {
           break;
         }
         case "text-delta": case "reasoning-delta": {
-          if (event.type === "reasoning-delta" && provider.protocol === "openai-responses") break;
+          if (event.type === "reasoning-delta" && protocol === "openai-responses") break;
           const partId = `${event.type === "text-delta" ? "text" : "thinking"}:${event.id}`;
           collectContinuation(partId, event.providerMetadata);
           yield { type: "part.delta", partId, delta: event.text };
           break;
         }
         case "text-end": case "reasoning-end": {
-          if (event.type === "reasoning-end" && provider.protocol === "openai-responses") break;
+          if (event.type === "reasoning-end" && protocol === "openai-responses") break;
           const partId = `${event.type === "text-end" ? "text" : "thinking"}:${event.id}`;
           const metadata = collectContinuation(partId, event.providerMetadata);
           yield { type: "part.end", partId, continuation: metadata };
@@ -176,7 +202,8 @@ export class AiSdkAdapter implements ModelAdapter {
           if (event.providerExecuted) throw new ModelFailure("server_tool", "Provider-executed tools are not supported.");
           calls.add(event.id);
           yield { type: "part.start", part: { id: `tool:${event.id}`, kind: "toolcall", callId: event.id, name: event.toolName } }; break;
-        case "tool-input-delta": yield { type: "part.delta", partId: `tool:${event.id}`, delta: event.delta }; break;
+        case "tool-input-delta":
+          yield { type: "part.delta", partId: `tool:${event.id}`, delta: event.delta }; break;
         case "tool-call":
           if (event.providerExecuted) throw new ModelFailure("invalid_tool_call", "Provider-executed tools are not supported.");
           if (event.invalid) rejectedBySdk.add(event.toolCallId);
@@ -192,21 +219,15 @@ export class AiSdkAdapter implements ModelAdapter {
           if (!event.providerExecuted && rejectedBySdk.has(event.toolCallId)) break;
           throw new ModelFailure("unsupported_content", "The provider returned an unexpected tool result.");
         // custom 是 provider 扩展元数据（如 Anthropic message_start 的早期用量），非正文内容；
-        // 用量与续接已在 finish 与 pickContinuation 白名单收束，无需处理。
+        // 用量由接收端计量采集，续接由 pickContinuation 白名单收束，无需处理。
         case "custom": break;
         case "file": case "reasoning-file": case "tool-result":
           throw new ModelFailure("unsupported_content", "The provider returned unsupported response content.");
-        case "finish": {
-          const u = event.totalUsage;
-          finish = { reason: event.finishReason, rawFinishReason: event.rawFinishReason, usage: { input: u.inputTokens ?? null, output: u.outputTokens ?? null, total: u.totalTokens ?? null,
-            reasoning: u.outputTokenDetails.reasoningTokens ?? null, cacheRead: u.inputTokenDetails.cacheReadTokens ?? null, cacheWrite: u.inputTokenDetails.cacheWriteTokens ?? null } };
-          break;
-        }
+        case "finish": break;
       }
     }
     // 已收到的终态必须交付；ResponseBuffer 先保留计量，再拒绝仍未闭合的块。
-    if (!finish) throw new ModelFailure("interrupted", "The provider stream ended without a finish event.");
-    const response = await result.response;
-    yield { type: "finish", ...finish, responseId: response.id };
+    if (!measured.completion) throw new ModelFailure("interrupted", "The provider stream ended without a finish event.");
+    yield measured.completion;
   }
 }

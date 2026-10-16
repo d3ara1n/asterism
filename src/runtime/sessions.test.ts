@@ -165,6 +165,8 @@ describe("会话运行时", () => {
   // 压缩契约横跨插件记录注册、托管任务、模型 stream 和下一次工作请求，使用真实隔离会话贯通。
   it("工具请求之间压缩旧前缀，近期工具批次原样续接，摘要与用量只追加一次", async () => {
     const work: ModelInput[] = [], summaries: ModelInput[] = [];
+    const timing = { startedAt: "2026-01-01T00:00:00.000Z", endedAt: "2026-01-01T00:00:01.000Z",
+      durationMs: 1000, firstOutputMs: 200, firstTextMs: 200, firstReasoningMs: null, lastOutputMs: 800, outputChunks: 2, outcome: "completed" as const };
     const model: ModelAdapter = { validate() {}, version: "test/1", prepare(input) {
       const summary = input.system.blocks.some(block => block.id === "context-summary");
       (summary ? summaries : work).push(input);
@@ -172,7 +174,7 @@ describe("会话运行时", () => {
       return { async *stream() {
         if (summary) {
           yield* reply("Remember the original task.").slice(0, -1);
-          yield { type: "finish", reason: "stop", usage: { input: 100, output: 20, total: 120, cacheRead: 0, cacheWrite: 0, reasoning: 0 } };
+          yield { type: "finish", reason: "stop", timing, usage: { input: 100, output: 20, total: 120, cacheRead: 0, cacheWrite: 0, reasoning: 0 } };
         } else if (number === 2) {
           yield { type: "part.start", part: { id: "list", kind: "toolcall", callId: "list", name: "resource_list" } };
           yield { type: "part.end", partId: "list", arguments: {} };
@@ -208,6 +210,7 @@ describe("会话运行时", () => {
     expect(path.slice(0, saved.length)).toEqual(saved);
     expect(path.filter(node => node.contract === ContextSummary.id)).toHaveLength(1);
     expect(ContextSummary.schema.parse(path.find(node => node.contract === ContextSummary.id)!.data).completion.usage?.total).toBe(120);
+    expect(ContextSummary.schema.parse(path.find(node => node.contract === ContextSummary.id)!.data).completion.timing).toEqual(timing);
     expect(path.map(flat).filter(node => node.kind === "notice").map(node => node.code)).not.toContain("context_budget");
   });
 
@@ -482,11 +485,13 @@ describe("会话运行时", () => {
     const gate = new Promise<void>(resolve => { release = resolve; });
     const saved = new Promise<void>(resolve => { entered = resolve; });
     const usage = { input: 12, output: 3, total: 15, reasoning: 1, cacheRead: 4, cacheWrite: 0 };
+    const timing = { startedAt: "2026-01-01T00:00:00.000Z", endedAt: "2026-01-01T00:00:01.000Z",
+      durationMs: 1000, firstOutputMs: 100, firstTextMs: 500, firstReasoningMs: 100, lastOutputMs: 900, outputChunks: 3, outcome: "completed" as const };
     const model: ModelAdapter = { validate() {}, version: "ai-sdk-v7/3", prepare: () => ({ async *stream() {
       yield* reply("Saved text").slice(0, -1);
       entered();
       await gate;
-      yield { type: "finish", reason: "stop", rawFinishReason: "end_turn", responseId: "provider-response", usage };
+      yield { type: "finish", reason: "stop", rawFinishReason: "end_turn", responseId: "provider-response", usage, timing };
     } }) };
     const { service, root, start } = await setup(model);
     const first = await execute(service, start);
@@ -505,7 +510,7 @@ describe("会话运行时", () => {
     expect(after.cursor).toBe(after.nodes.at(-1)!.id);
     expect(after.nodes.at(-1)!.contract).toBe(RequestDiagnosticsRecord.id);
     expect(work(after.nodes).map(flat).at(-1)).toMatchObject({ kind: "text", parentId: before.cursor,
-      completion: { usage, finishReason: "stop", rawFinishReason: "end_turn", providerResponseId: "provider-response" } });
+      completion: { usage, timing, finishReason: "stop", rawFinishReason: "end_turn", providerResponseId: "provider-response" } });
     expect(after.workbench.objects.find(object => object.kind === "atelier.builtin/agent")?.presentation)
       .toMatchObject({ data: { turnState: "completed" } });
     await service.close(); services.delete(service);

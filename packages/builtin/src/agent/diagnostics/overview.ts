@@ -1,5 +1,6 @@
 import { COMPRESSION_RESERVE } from "../context-budget.ts";
 import type { DiagnosticRequest } from "./history.ts";
+import { cacheUsage } from "./usage";
 
 export interface TrendPoint {
   id: string; sequence: number; input: number; cacheRead: number | null;
@@ -24,11 +25,8 @@ export function diagnosticOverview<R extends DiagnosticRequest>(requests: readon
   const ordered = [...requests].sort((a, b) => a.sequence - b.sequence);
   const work = ordered.filter(request => request.kind === "response" && request.completion?.usage?.input != null);
   const compressions = ordered.filter(request => request.kind === "compression");
-  const cached = work.filter(request => request.completion!.usage!.cacheRead != null);
-  const cache = cached.length ? {
-    read: cached.reduce((sum, request) => sum + request.completion!.usage!.cacheRead!, 0),
-    input: cached.reduce((sum, request) => sum + request.completion!.usage!.input!, 0),
-  } : null;
+  const cached = cacheUsage(ordered);
+  const cache = cached ? { read: cached.read, input: cached.input } : null;
   const trend = work.map((request, index): TrendPoint => {
     const previous = work[index - 1];
     const comparable = previous && sameSnapshot(previous, request)

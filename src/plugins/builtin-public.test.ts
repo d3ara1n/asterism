@@ -14,10 +14,12 @@ import { builtinPublicModules, builtinPublicProvider } from "../builtin-public.t
 import { loadPluginRenderers } from "../renderer/modules/plugins.ts";
 
 const roots: string[] = [], release: (() => void)[] = [];
+const compatibleRange = `^${builtinPublicProvider.version}`;
+const incompatibleRange = `<${builtinPublicProvider.version}`;
 afterEach(() => { for (const close of release.splice(0).reverse()) close(); for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
 function temp() { const root = mkdtempSync(join(tmpdir(), "builtin-public-")); roots.push(root); return root; }
 function file(root: string, path: string, content: string) { const destination = join(root, path); mkdirSync(join(destination, ".."), { recursive: true }); writeFileSync(destination, content); }
-function fixture(ranges: (string | null)[] = ["^0.2.0", "~0.2.0"]) {
+function fixture(ranges: (string | null)[] = [compatibleRange, `~${builtinPublicProvider.version}`]) {
   const data = temp(), list = new PackageList(join(data, "plugins.json"));
   const consumers = ranges.map((range, index) => {
     const root = temp(), id = `fixture.consumer${index}`;
@@ -40,7 +42,7 @@ function fixture(ranges: (string | null)[] = ["^0.2.0", "~0.2.0"]) {
     `);
     file(root, "renderer.ts", 'export { SubmitAgentInput } from "./public.ts"; export default { resources: [], cards: [], tools: [] };');
     // 消费者的本地安装副本不能抢占应用已经加载的声明。
-    file(root, "node_modules/@atelier/builtin-api/package.json", JSON.stringify({ name: "@atelier/builtin-api", version: "0.2.0", exports: { "./contracts": "./copy.js" } }));
+    file(root, "node_modules/@atelier/builtin-api/package.json", JSON.stringify({ name: "@atelier/builtin-api", version: builtinPublicProvider.version, exports: { "./contracts": "./copy.js" } }));
     file(root, "node_modules/@atelier/builtin-api/copy.js", 'throw new Error("A private copy must not execute.");');
     list.add({ source: { kind: "path", path: root } }, data);
     return root;
@@ -89,7 +91,7 @@ describe("内置公共包", () => {
   });
   // 依赖包名、版本范围和环境出口均是加载门禁；本地副本不能成为失败后的兜底。
   it("拒绝缺少依赖、不兼容版本和未公开入口，保留无关消费者", async () => {
-    const f = fixture([null, "^0.3.0", "^0.2.0", "^0.2.0"]);
+    const f = fixture([null, incompatibleRange, compatibleRange, compatibleRange]);
     file(f.consumers[2]!, "public.ts", 'export { SubmitAgentInput } from "@atelier/builtin-api/private";');
     const packages = await f.load();
     expect(packages.map(item => item.status)).toEqual(["failed", "failed", "failed", "loaded"]);
@@ -99,7 +101,7 @@ describe("内置公共包", () => {
   });
   // Agent UI 只经前端公共出口加载；两个源码插件登记到内置实现所读的同一服务。
   it("前端消费者共享 Agent UI 服务，贡献跟随登记生命周期释放", async () => {
-    const f = fixture(["^0.2.0", "^0.2.0"]);
+    const f = fixture([compatibleRange, compatibleRange]);
     for (const [index, root] of f.consumers.entries()) {
       file(root, "renderer.ts", `
         import { agentUI, AgentOverlay, AgentScrollArea } from "@atelier/builtin-api/renderer";
@@ -132,7 +134,7 @@ describe("内置公共包", () => {
 
   // 公共前端服务不能进入后台模块图，避免 React/界面状态跨环境混用。
   it("后台消费者不能导入 Agent UI 前端出口", async () => {
-    const f = fixture(["^0.2.0"]);
+    const f = fixture([compatibleRange]);
     file(f.consumers[0]!, "runtime.ts", 'import { agentUI } from "@atelier/builtin-api/renderer"; export default agentUI;');
     const [item] = await f.load();
     expect(item!.status).toBe("failed");
@@ -140,14 +142,14 @@ describe("内置公共包", () => {
   });
   // 中间库没有 atelier 清单；校验它自己的 npm 依赖，运行依赖仍归实际消费者插件。
   it.each(["nested", "symlink"] as const)("独立中间 npm 包的 %s 导入按包归属校验版本", async mode => {
-    const f = fixture([null, "^0.2.0"]);
+    const f = fixture([null, compatibleRange]);
     for (const [index, root] of f.consumers.entries()) {
       const metadata = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
       metadata.dependencies = { "@fixture/helper": "1.0.0" };
       file(root, "package.json", JSON.stringify(metadata));
       const helper = mode === "nested" ? join(root, "node_modules/@fixture/helper") : temp();
       file(helper, "package.json", JSON.stringify({ name: "@fixture/helper", version: "1.0.0", type: "module",
-        exports: "./index.js", peerDependencies: { "@atelier/builtin-api": index === 0 ? "^0.2.0" : "^0.3.0" } }));
+        exports: "./index.js", peerDependencies: { "@atelier/builtin-api": index === 0 ? compatibleRange : incompatibleRange } }));
       file(helper, "index.js", 'export { SubmitAgentInput } from "@atelier/builtin-api/contracts";');
       if (mode === "symlink") {
         mkdirSync(join(root, "node_modules/@fixture"), { recursive: true });
@@ -160,11 +162,11 @@ describe("内置公共包", () => {
     expect(compatible!.definition!.dependencies).toEqual([builtin.id]);
     expect((compatible!.definition as PluginDefinition & { probe: Probe }).probe.SubmitAgentInput).toBe(SubmitAgentInput);
     expect(incompatible!.status).toBe("failed");
-    expect(incompatible!.error).toContain("Package @fixture/helper requires @atelier/builtin-api ^0.3.0");
+    expect(incompatible!.error).toContain(`Package @fixture/helper requires @atelier/builtin-api ${incompatibleRange}`);
   });
   // 声明导入成功不等于实现可用；缺失或 setup 失败都必须沿实际实现依赖传播。
   it("实现提供方 setup 失败时消费者不初始化", async () => {
-    const f = fixture(["^0.2.0"]), [consumer] = await f.load();
+    const f = fixture([compatibleRange]), [consumer] = await f.load();
     const { loadPlugins } = await import("./loader.ts");
     const { SessionDataStore } = await import("../session/data.ts");
     const { openDatabase } = await import("../runtime/storage.ts");

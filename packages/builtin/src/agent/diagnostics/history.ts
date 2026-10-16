@@ -89,7 +89,12 @@ export function diagnosticHistory(snapshot: Pick<SessionView, "records">, agentI
         request.notices.push(item);
       } else notices.push(item);
     }
-    if (sentRecord?.status === "known") sent.set(sentRecord.data.responseId, sentRecord.data.diagnostics);
+    if (sentRecord?.status === "known") {
+      const { responseId, diagnostics, origin } = sentRecord.data;
+      sent.set(responseId, diagnostics);
+      if (origin && diagnostics.timing)
+        response(record, responseId, origin.source.model, origin.requestParentId, origin.source.scope);
+    }
     history.set(record.id, state);
   }
   for (const request of requests.values()) {

@@ -4,7 +4,6 @@ import { nodeView } from "../../../../../src/session/view";
 import { node, text, thinking, message as input, notice as noticeNode } from "../../../../../src/session/test-nodes";
 import { conversationTimeline, timelineKey } from "./timeline";
 
-const base = { sessionId: "s", createdAt: "2026-10-12T00:00:00Z", source: { plugin: "atelier.builtin", resource: { sessionId: "s", id: "a", kind: "atelier.builtin/agent" } } };
 describe("代理的具型记录视图", () => {
   // 模型可能只交付思考摘要；显示转换须保留可读内容，但不能改写历史里的明文／摘要字段。
   it("只有摘要的思考块仍可阅读", () => {
@@ -30,7 +29,27 @@ describe("代理的具型记录视图", () => {
       usage: { input: 4, output: 0, total: 4, reasoning: null, cacheRead: null, cacheWrite: null } } }));
     const nodes = [message, block, { ...block, id: "other-agent", source: { plugin: "atelier.builtin", resource: { sessionId: "s", id: "b", kind: "atelier.builtin/agent" } } }, { ...block, id: "other-branch", parentId: "elsewhere" }, notice];
     const timeline = conversationTimeline(sessionSnapshot(nodeView("s", "", nodes, notice.id)), "a", []);
-    expect(timeline.map(item => item.id)).toEqual([message.id, block.id, notice.id]);
-    expect(timeline.at(-1)).toMatchObject({ kind: "notice", response: { usage: { input: 4, output: 0 } } });
+    expect(timeline.map(item => item.id)).toEqual([message.id, block.id, notice.id, "turn-metrics:input"]);
+    expect(timeline.find(item => item.kind === "notice")).toMatchObject({ kind: "notice", response: { usage: { input: 4, output: 0 } } });
+  });
+
+  // docs/workbench.md#对话计量：同轮多个请求只有一份尾部概要，历史概要不因下一轮执行而消失。
+  it("各轮计量插入对应轮尾，运行中只隐藏当前轮的概要", () => {
+    const completion = { finishReason: "stop", rawFinishReason: null, providerResponseId: null,
+      usage: { input: 100, output: 10, total: 110, cacheRead: 50, cacheWrite: null, reasoning: null } };
+    const nodes = [
+      node("u1", null, input("a", "First")),
+      node("a1", "u1", text("a", "r1", 0, "First part", { completion })),
+      node("a2", "a1", text("a", "r2", 0, "Second part", { completion })),
+      node("u2", "a2", input("a", "Next")),
+      node("a3", "u2", text("a", "r3", 0, "Latest", { completion })),
+    ];
+    const snapshot = sessionSnapshot(nodeView("s", "", nodes, "a3"));
+    const running = conversationTimeline(snapshot, "a", [], true);
+    expect(running.map(item => item.id)).toEqual(["u1", "a1", "a2", "turn-metrics:u1", "u2", "a3"]);
+    expect(running.find(item => item.kind === "turn-metrics")).toMatchObject({ metrics: { count: 2, usage: { output: { value: 20 } } } });
+    const settled = conversationTimeline(snapshot, "a", [], false);
+    expect(settled.map(item => item.id)).toEqual(["u1", "a1", "a2", "turn-metrics:u1", "u2", "a3", "turn-metrics:u2"]);
+    expect(settled.at(-1)).toMatchObject({ kind: "turn-metrics", metrics: { count: 1 } });
   });
 });

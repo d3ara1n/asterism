@@ -110,7 +110,8 @@ export async function compressContext(
   // 提交失败交给代理循环报告；不能把持久化故障伪装成可继续的摘要失败。
   object.commit(writer => { writer.append(ContextSummary, {
     summary: text.trim(), keptFrom: plan.keptFrom, model: finish.source?.model ?? model, tokensBefore,
-    completion: { usage: finish.usage, finishReason: finish.reason, rawFinishReason: finish.rawFinishReason ?? null, providerResponseId: finish.responseId ?? null },
+    completion: { usage: finish.usage, finishReason: finish.reason, rawFinishReason: finish.rawFinishReason ?? null, providerResponseId: finish.responseId ?? null,
+      ...(finish.timing ? { timing: finish.timing } : {}) },
   }); });
   return true;
 }

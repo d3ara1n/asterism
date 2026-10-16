@@ -38,6 +38,7 @@ export class ResponseBuffer {
     return this.finish ? {
       usage: this.finish.usage, finishReason: this.finish.reason,
       rawFinishReason: this.finish.rawFinishReason ?? null, providerResponseId: this.finish.responseId ?? null,
+      ...(this.finish.timing ? { timing: this.finish.timing } : {}),
     } : null;
   }
 

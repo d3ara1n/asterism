@@ -1,0 +1,76 @@
+import { describe, expect, it } from "vitest";
+import type { ModelCompletion } from "@atelier/sdk/contracts";
+import { ContextSummary } from "@atelier/builtin-api/contracts";
+import { sessionSnapshot } from "../../../../../src/plugins/records";
+import { nodeView } from "../../../../../src/session/view";
+import { agentSource, event, message, node, text } from "../../../../../src/session/test-nodes";
+import { tokensPerSecond } from "../diagnostics/performance";
+import { turnMetrics } from "./turn-metrics";
+
+const completion = (input: number, output: number, cacheRead: number, durationMs: number) => ({
+  finishReason: "stop", rawFinishReason: null, providerResponseId: null,
+  usage: { input, output, cacheRead, cacheWrite: 0, reasoning: 0, total: input + output },
+  timing: { startedAt: "2026-01-01T00:00:00.000Z", endedAt: "2026-01-01T00:00:02.000Z",
+    durationMs, firstOutputMs: 100, firstTextMs: 100, firstReasoningMs: null, lastOutputMs: durationMs - 100, outputChunks: 2, outcome: "completed" },
+} satisfies ModelCompletion);
+const snapshot = (path: ReturnType<typeof node>[]) => sessionSnapshot(nodeView("s", "", path, path.at(-1)?.id ?? null));
+
+describe("对话中的逐轮计量", () => {
+  // docs/workbench.md：只隐藏当前运行轮，历史轮次的计量保留在对话中。
+  it("当前轮运行期间隐藏计量，开启下一轮时保留上一轮概要", () => {
+    const path = [
+      node("u1", null, message("a", "First")),
+      node("r1", "u1", text("a", "r1", 0, "Done", { completion: completion(100, 20, 50, 2000) })),
+    ];
+    expect(turnMetrics(snapshot(path), "a", true)).toEqual([]);
+    expect(turnMetrics(snapshot(path), "a", false)[0]?.metrics.count).toBe(1);
+    path.push(node("u2", "r1", message("a", "Next")));
+    expect(turnMetrics(snapshot(path), "a", true)).toMatchObject([{ userId: "u1", nextUserId: "u2", incomplete: false, metrics: { count: 1 } }]);
+    expect(turnMetrics(snapshot(path), "a", false)).toHaveLength(1);
+  });
+
+  // 本轮从本代理最新用户输入开始；旧轮、其他代理消息和辅助压缩不能改变范围或混入权重。
+  it("同一轮的多个请求按总量计算命中率与吞吐，继续后的请求仍合并", () => {
+    const path = [
+      node("old-user", null, message("a", "Old")),
+      node("old-response", "old-user", text("a", "old", 0, "Old answer", { completion: completion(9000, 9000, 9000, 1000) })),
+      node("u", "old-response", message("a", "Current")),
+      node("r1", "u", text("a", "r1", 0, "First response", { completion: completion(100, 20, 50, 2000) })),
+      node("other-input", "r1", message("b", "Another agent")),
+      node("compression", "other-input", event(ContextSummary.id, { summary: "S", keptFrom: "u", model: "p/m", tokensBefore: 1000,
+        completion: completion(999, 999, 0, 1000) }, { source: agentSource("a") })),
+      node("r2", "compression", text("a", "r2", 0, "Continued", { completion: completion(300, 80, 270, 1000) })),
+    ];
+    const turns = turnMetrics(snapshot(path), "a", false);
+    expect(turns.map(turn => turn.userId)).toEqual(["old-user", "u"]);
+    const metrics = turns[1]!.metrics;
+    expect(metrics.count).toBe(2);
+    expect(metrics.cache).toEqual({ read: 320, input: 400, count: 2 });
+    expect(metrics.usage.input).toEqual({ value: 400, count: 2 });
+    expect(metrics.usage.output).toEqual({ value: 100, count: 2 });
+    expect(tokensPerSecond(metrics.performance.rates.output)).toBeCloseTo(100 / 3);
+  });
+
+  // 不完整请求可能没有 usage；已知部分必须标出覆盖数，不能把缺失值当作零。
+  it("未取得用量的中断请求不产生零速率，继续后仅累计实际报告的数据", () => {
+    const path = [
+      node("u", null, message("a", "Work")),
+      node("partial", "u", text("a", "interrupted", 0, "Partial", { complete: false })),
+    ];
+    const interruptedTurn = turnMetrics(snapshot(path), "a", false)[0]!;
+    expect(interruptedTurn.incomplete).toBe(true);
+    const interrupted = interruptedTurn.metrics;
+    expect(interrupted.cache).toBeNull();
+    expect(interrupted.usage.output).toEqual({ value: null, count: 0 });
+    expect(tokensPerSecond(interrupted.performance.rates.output)).toBeNull();
+    path.push(node("resumed", "partial", text("a", "resumed", 0, "Done", { completion: completion(100, 20, 50, 2000) })));
+    expect(turnMetrics(snapshot(path), "a", true)).toEqual([]);
+    const resumedTurn = turnMetrics(snapshot(path), "a", false)[0]!;
+    expect(resumedTurn.incomplete).toBe(false);
+    const resumed = resumedTurn.metrics;
+    expect(resumed.count).toBe(2);
+    expect(resumed.usage.output).toEqual({ value: 20, count: 1 });
+    expect(resumed.cache?.count).toBe(1);
+    expect(tokensPerSecond(resumed.performance.rates.output)).toBe(10);
+  });
+});

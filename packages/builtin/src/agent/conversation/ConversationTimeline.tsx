@@ -4,7 +4,6 @@ import { useState } from "react";
 
 import { Alert, AlertDescription } from "@atelier/ui/ui/alert";
 import { Badge } from "@atelier/ui/ui/badge";
-import { formatCount } from "@atelier/ui/format-count";
 import { conversationMessages } from "../../messages/conversation";
 import { Markdown } from "./Markdown";
 import { ThinkingBlock } from "./ThinkingBlock";
@@ -12,24 +11,13 @@ import { timelineKey, type TimelineItem } from "./timeline";
 import { ToolCall } from "./ToolCall";
 import { FilePreview } from "./Files";
 import { Disclosure } from "./Disclosure";
+import { TurnMetrics } from "./TurnMetrics";
 
 export function ConversationTimeline({ items }: { items: readonly TimelineItem[] }) {
-
   return <>{items.map(node => <NodeView key={timelineKey(node)} node={node} />)}</>;
 }
 
 function NodeView({ node }: { node: TimelineItem }) {
-  const i18n = useI18n();
-  const usage = "usage" in node ? node.usage : node.kind === "notice" ? node.response?.usage : null;
-  const count = (value: number | null | undefined) => value == null ? "—" : formatCount(value);
-  return <div className="flex flex-col gap-1">
-    <NodeContent node={node} />
-    {usage && <p className="type-caption">
-      {i18n.formatMessage(conversationMessages.inputTokens)} {count(usage.input)} · {i18n.formatMessage(conversationMessages.outputTokens)} {count(usage.output)} · {i18n.formatMessage(conversationMessages.cachedTokens)} {count(usage.cacheRead)}
-    </p>}
-  </div>;
-}
-function NodeContent({ node }: { node: TimelineItem }) {
   const i18n = useI18n();
   const object = useRendererObject();
   const incomplete = "complete" in node && !node.complete;
@@ -44,6 +32,7 @@ function NodeContent({ node }: { node: TimelineItem }) {
     case "thinking": return node.text.trim() ? <ThinkingBlock node={node} /> : null;
     case "toolcall": return <ToolCall node={node} />;
     case "summary": return <Summary text={node.text} />;
+    case "turn-metrics": return <TurnMetrics metrics={node.metrics} incomplete={node.incomplete} />;
     case "notice": return <Alert variant={node.level === "error" ? "destructive" : "default"}>
       {node.level === "error" ? <TriangleAlert /> : <Info />}<AlertDescription>{node.message}</AlertDescription></Alert>;
     default: return null;

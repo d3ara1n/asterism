@@ -2,6 +2,10 @@ import type { I18n } from "@atelier/sdk/renderer";
 import type { UnitPrice } from "@atelier/sdk/contracts";
 import { formatCount } from "@atelier/ui/format-count";
 import { diagnosticMessages as messages } from "../../messages/diagnostics";
+import { performanceMessages } from "../../messages/performance";
+
+export const formatDuration = (i18n: I18n, ms: number | null | undefined) => ms == null ? "—"
+  : i18n.formatMessage(performanceMessages.seconds, { value: i18n.formatNumber(ms / 1000, { maximumFractionDigits: 3 }) });
 
 export function formatMoney(i18n: I18n, amount: number): string {
   const options = { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 8 } as const;

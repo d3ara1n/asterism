@@ -18,13 +18,17 @@ import { useDiagnostics, type PricedRequest } from "./use-diagnostics";
 import type { DiagnosticNotice, DiagnosticScope } from "./history";
 import type { DiagnosticOverview } from "./overview";
 import { InputTrend } from "./InputTrend";
-import { formatEstimate, formatMoney, formatPrice, formatQuantity } from "./format";
+import { formatEstimate, formatMoney, formatPrice, formatQuantity, formatDuration } from "./format";
+import { RequestPerformance, PerformanceOverview } from "./PerformanceMetrics";
+import { requestTiming } from "./performance";
 
 const issueMessages: Record<CostIssue, UiMessage> = {
   quantity: messages.quantityMissing, price: messages.priceMissing, unit: messages.unitMismatch,
   tier: messages.tierUnknown, invalid: messages.invalidQuantity,
 };
 function requestState(request: PricedRequest) {
+  if (requestTiming(request)?.outcome === "cancelled") return messages.cancelled;
+  if (requestTiming(request)?.outcome === "failed") return messages.failed;
   if (!request.completion) return messages.noCompletion;
   const complete = ["stop", "tool-calls"].includes(request.completion.finishReason)
     && !request.notices.some(notice => notice.level === "error" || notice.code === "cancelled")
@@ -53,8 +57,8 @@ function RequestDetails({ request, onBack }: { request: PricedRequest; onBack():
   else if (estimate.fromInputTokens !== null) pricingLabel = i18n.formatMessage(messages.tier, { count: formatCount(estimate.fromInputTokens) });
   const content: TimelineItem[] = [];
   if (request.relatedInput) content.push({ kind: "message", ...request.relatedInput });
-  content.push(...request.blocks.map(({ record, block }) => ({ ...savedTimelineBlock(record, block), usage: null })));
-  if (request.summary) content.push({ kind: "summary", id: request.id, text: request.summary, usage: null });
+  content.push(...request.blocks.map(({ record, block }) => savedTimelineBlock(record, block)));
+  if (request.summary) content.push({ kind: "summary", id: request.id, text: request.summary });
   const metadata: [UiMessage, string][] = [
     [messages.model, request.model],
     [messages.recordedAt, i18n.formatDate(Date.parse(request.createdAt), { dateStyle: "short", timeStyle: "medium" })],
@@ -89,6 +93,7 @@ function RequestDetails({ request, onBack }: { request: PricedRequest; onBack():
         <Stat label={i18n.text(messages.reasoning)} value={count(usage?.reasoning)} />
       </Stats>
     </Section>
+    <RequestPerformance request={request} />
     {request.kind === "response" && <Section title={i18n.text(messages.composition)}>
       {request.sent ? <SystemComposition diagnostics={request.sent} /> : <p className="type-caption">{i18n.text(messages.compositionMissing)}</p>}
     </Section>}
@@ -108,7 +113,6 @@ function RequestDetails({ request, onBack }: { request: PricedRequest; onBack():
     </Section>
     {request.notices.length > 0 && <Notices notices={request.notices} />}
     <Section title={i18n.text(messages.contents)}>
-      <p className="type-caption">{i18n.text(messages.contentsHint)}</p>
       {content.length > 0 ? <div className="space-y-4"><ConversationTimeline items={content} /></div> : <p className="type-caption">{i18n.text(messages.noContent)}</p>}
     </Section>
   </>;
@@ -145,6 +149,7 @@ function Overview({ data, scope }: { data: ReturnType<typeof useDiagnostics>; sc
         {data.unreadable > 0 && <p className="type-caption">{i18n.formatMessage(messages.unreadable, { count: data.unreadable })}</p>}
       </div>
     </Section>
+    <PerformanceOverview requests={data.requests} />
     {path && trend.length > 0 && <Section title={i18n.text(messages.trend)}>
       {trend.length > 1 ? <>
         <InputTrend points={trend} compressions={compressions} threshold={typeof headroom === "object" && headroom ? headroom.threshold : null} />
@@ -192,6 +197,7 @@ export function Diagnostics() {
             actions={<span className="flex flex-col items-end gap-0.5 text-right">
               <span className="type-caption max-w-24 break-words tabular-nums">{formatEstimate(i18n, request.estimate.amount, request.estimate.status === "partial")}</span>
               {request.completion?.usage?.input != null && <span className="type-caption tabular-nums">{formatCount(request.completion.usage.input)}</span>}
+              {requestTiming(request) && <span className="type-caption tabular-nums">{formatDuration(i18n, requestTiming(request)!.durationMs)}</span>}
             </span>}
             onOpen={() => setSelection(request.id)} />
         </div>)}</ItemGroup>}

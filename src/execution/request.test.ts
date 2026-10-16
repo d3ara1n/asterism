@@ -1,4 +1,4 @@
-import { thinkingLevels } from "@atelier/sdk/contracts";
+import { thinkingLevels, type RequestTiming } from "@atelier/sdk/contracts";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { defineData, defineResource, defineTool, defineImplementation, type ModelRunEvent, type ModelRunRequest } from "@atelier/sdk/contracts";
@@ -45,6 +45,32 @@ const write = defineImplementation({ ...defineData("example.resource/write", z.n
   targetSchema: z.null().describe("The whole item."), effect: "write", execution: "sequential" });
 
 describe("无状态的单次模型执行", () => {
+  // docs/runtime.md#响应计量与请求计时：终态计时与 usage 一起交付，执行工具不重置时间；失败也保留计时。
+  it("保留模型终态和失败携带的计时，不用工具批次结束时间覆盖", async () => {
+    const timing: RequestTiming = { startedAt: "2026-01-01T00:00:00.000Z", endedAt: "2026-01-01T00:00:01.000Z",
+      durationMs: 1000, firstOutputMs: 100, firstTextMs: null, firstReasoningMs: null, lastOutputMs: 900, outputChunks: 2, outcome: "completed" };
+    const events = calls(["list"]);
+    const result = await execute(input([]), model([...events.slice(0, -1),
+      { type: "finish", reason: "tool-calls", usage: null, timing }]));
+    expect(result).toMatchObject({ reason: "completed", completion: { timing }, diagnostics: { tools: ["resource_list", "resource_inspect", "resource_call"] },
+      tools: [{ kind: "succeeded" }] });
+    expect(result.diagnostics).not.toHaveProperty("timing");
+    const controller = new AbortController();
+    const cancelled = await execute(input([], { signal: controller.signal }), { validate() {}, version: "test", prepare() { return {
+      async *stream() {
+        yield* events.slice(0, -1);
+        controller.abort();
+        yield { type: "finish", reason: "tool-calls", usage: null, timing };
+      },
+    }; } });
+    expect(cancelled).toMatchObject({ reason: "cancelled", completion: { timing }, tools: [] });
+    const failure = new ModelFailure("provider_error", "Failed.");
+    failure.diagnostics = { timing: { ...timing, outcome: "failed" } };
+    const failed = await execute(input([]), { validate() {}, version: "test", prepare() { return {
+      async *stream() { throw failure; },
+    }; } });
+    expect(failed).toMatchObject({ reason: "failed", completion: null, diagnostics: { timing: { outcome: "failed", durationMs: 1000 } } });
+  });
   it("流暂停时也交付部分输入，填充不执行工具，结束后清理合并计时器", async () => {
     vi.useFakeTimers();
     try {

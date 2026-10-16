@@ -1,9 +1,10 @@
 import { thinkingLevels } from "@atelier/sdk/contracts";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { setImmediate } from "node:timers/promises";
 import { MockLanguageModelV4, simulateReadableStream } from "ai/test";
 import { AiSdkAdapter, sdkMessages } from "./ai-sdk.ts";
 import { modelScope } from "../shared/model.ts";
-import type { ModelInput, ModelEvent } from "./contract.ts";
+import { ModelFailure, type ModelInput, type ModelEvent } from "./contract.ts";
 import { createProviderModel } from "./provider.ts";
 import { projectSystemPrompt } from "./system-prompt.ts";
 import { composeSystemPrompt } from "@atelier/builtin/runtime";
@@ -17,6 +18,70 @@ const input: ModelInput = {
 };
 
 describe("AI SDK 适配契约", () => {
+  // 模型终态是请求边界：客户端暂停消费与连接延后关闭不延长耗时；终态之后取消也不能丢失已实报用量。
+  it.each(["close", "cancel"] as const)("消费者等待和终态之后的 %s 不改变已接收的计量", async action => {
+    let now = 0;
+    const clock = vi.spyOn(performance, "now").mockImplementation(() => now);
+    const controller = new AbortController();
+    let close!: () => void;
+    let drained!: () => void;
+    const received = new Promise<void>(resolve => { drained = resolve; });
+    const model = new MockLanguageModelV4({ doStream: async () => {
+      now = 10;
+      return { stream: new ReadableStream({
+        start(stream) {
+          close = () => stream.close();
+          stream.enqueue({ type: "stream-start", warnings: [] });
+          stream.enqueue({ type: "text-start", id: "t" });
+          for (let i = 0; i < 32; i++) stream.enqueue({ type: "text-delta", id: "t", delta: "word " });
+          stream.enqueue({ type: "text-end", id: "t" });
+          stream.enqueue({ type: "finish", finishReason: { unified: "stop", raw: "stop" },
+            usage: { inputTokens: { total: 10, noCache: 10, cacheRead: undefined, cacheWrite: undefined },
+              outputTokens: { total: 32, text: 32, reasoning: 0 } } });
+        },
+        pull() { drained(); },
+      }) };
+    } });
+    const events: ModelEvent[] = [];
+    let failure: unknown, paused = false;
+    try {
+      const adapter = new AiSdkAdapter(async () => "synthetic-key", () => model);
+      try {
+        for await (const event of adapter.prepare(input).stream(controller.signal)) {
+          events.push(event);
+          if (event.type === "part.delta" && !paused) {
+            paused = true;
+            await received;
+            await setImmediate();
+            now = 1000;
+            if (action === "cancel") controller.abort();
+            close();
+          }
+        }
+      } catch (error) { failure = error; }
+      expect(events.at(-1)).toMatchObject({ type: "finish", usage: { input: 10, output: 32, total: 42 },
+        timing: { durationMs: 10, firstOutputMs: 10, firstTextMs: 10, lastOutputMs: 10, outputChunks: 32, outcome: "completed" } });
+      if (action === "cancel") expect(failure).toBeInstanceOf(ModelFailure);
+      else expect(failure).toBeUndefined();
+    } finally { controller.abort(); clock.mockRestore(); }
+  });
+  // docs/runtime.md#请求诊断：实际适配流在失败/取消时仍交付计时，不把空流或错误当成零 token 成功。
+  it.each(["failed", "cancelled"] as const)("保留%s流的计时", async outcome => {
+    const controller = new AbortController();
+    const model = new MockLanguageModelV4({ doStream: async () => {
+      if (outcome === "cancelled") controller.abort();
+      throw new Error("Synthetic transport failure");
+    } });
+    const adapter = new AiSdkAdapter(async () => "synthetic-key", () => model);
+    let failure: unknown;
+    try {
+      for await (const _event of adapter.prepare(input).stream(controller.signal)) { /* 消费流。 */ }
+    } catch (error) { failure = error; }
+    expect(failure).toBeInstanceOf(ModelFailure);
+    expect((failure as ModelFailure).diagnostics?.timing).toMatchObject({
+      outcome, durationMs: expect.any(Number), firstOutputMs: null, firstTextMs: null, outputChunks: 0,
+    });
+  });
   // SDK stream 的调用方上限须抵达 provider，且不得扩大用户配置的输出上限。
   it.each([{ requested: 400, expected: 400 }, { requested: 2000, expected: 1000 }])(
     "单次补全输出上限 $requested 与模型配置取较小值", async ({ requested, expected }) => {
@@ -353,6 +418,10 @@ describe("AI SDK 适配契约", () => {
     expect(events.find(e => e.type === "part.end" && e.partId === "tool:call-1")).toMatchObject({ arguments: { resource_id: "note" } });
     const end = events.at(-1)!;
     expect(end).toMatchObject({ type: "finish", reason: "tool-calls", responseId: "response-1", rawFinishReason: "tool_use", usage: { input: 10, output: 5, total: 15, reasoning: 2, cacheRead: 2 } });
+    expect(end).toMatchObject({ timing: {
+      outcome: "completed", startedAt: expect.any(String), endedAt: expect.any(String),
+      firstOutputMs: expect.any(Number), firstReasoningMs: expect.any(Number), lastOutputMs: expect.any(Number),
+    } });
     if (end.type !== "finish") throw new Error();
     const serialized = JSON.stringify(events);
     expect(serialized).toContain("signature-value"); expect(serialized).not.toContain("credential-not-for-history"); expect(serialized).not.toContain("secret-metadata");

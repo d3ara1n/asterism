@@ -11,6 +11,24 @@ const completion: ModelCompletion = { finishReason: "stop", rawFinishReason: nul
 const source = { model: "p/m", adapter: "test", scope: "scope" };
 // docs/workbench.md 诊断契约：按响应身份计数，保留压缩与无块响应，用真实父链区分分支。
 describe("代理诊断历史", () => {
+  // 有显式请求身份的计时使无内容失败可见；旧记录仍可读，压缩计时不丢失或重复计数。
+  it("从诊断身份恢复无块失败，并读取压缩请求的计时", () => {
+    const timing = { startedAt: "2026-01-01T00:00:00.000Z", endedAt: "2026-01-01T00:00:01.000Z", durationMs: 1000,
+      firstOutputMs: null, firstTextMs: null, firstReasoningMs: null, lastOutputMs: null, outputChunks: 0, outcome: "failed" };
+    const nodes = [
+      node("input", null, message("a", "Start")),
+      node("failed", "input", event(RequestDiagnosticsRecord.id, { responseId: "failed", diagnostics: { timing },
+        origin: { source, requestParentId: "input" } }, { source: agentSource("a") })),
+      node("summary", "failed", event(ContextSummary.id, { summary: "S", keptFrom: "input", model: "p/m", tokensBefore: 777,
+        completion: { ...completion, timing: { ...timing, outcome: "completed" } } }, { source: agentSource("a") })),
+    ];
+    const result = diagnosticHistory(sessionView(nodeView("s", "", nodes, "summary")), "a", "timeline");
+    expect(result.requests).toHaveLength(2);
+    expect(result.requests[0]).toMatchObject({ kind: "compression", completion: { timing: { outcome: "completed" } }, sent: null });
+    expect(result.requests[1]).toMatchObject({ responseId: "failed", completion: null, blocks: [], sent: { timing },
+      relatedInput: { id: "input" } });
+    expect(result.unreadable).toBe(0);
+  });
   it("乱序保存的响应块只计一个请求，当前路径与全分支不重复公共祖先", () => {
     const nodes = [
       node("input", null, message("a", "Start")),

@@ -74,7 +74,7 @@ export async function runModelRequest(request: ModelRunRequest, environment: Pro
     };
     try {
       for await (const event of prepared.stream(signal)) {
-        signal.throwIfAborted();
+        // 适配层处理中止并交付此前取得的终态；工具批次开始前再检查取消。
         response.accept(event);
         if (event.type === "part.delta") {
           if (response.isToolInput(event.partId)) progressTimer ??= setTimeout(() => {
@@ -110,6 +110,7 @@ export async function runModelRequest(request: ModelRunRequest, environment: Pro
       finally { response.close(); completion = response.completion; }
     }
   } catch (error) {
+    if (error instanceof ModelFailure && error.diagnostics) diagnostics = { ...diagnostics, ...error.diagnostics };
     if (deliveryFailed) termination = { reason: "failed", code: "event_delivery" };
     else if (request.signal.aborted) {
       diagnostic("cancelled", "Execution was cancelled.", "warning"); termination = { reason: "cancelled" };

@@ -52,7 +52,7 @@ describe("工具调用的展示投影", () => {
 
   it("取消后的历史仍交给内部工具两个 renderer，资源身份取自保存结果", () => {
     const node: Extract<TimelineItem, { kind: "toolcall" }> = {
-      id: "saved", createdAt: "2026-10-01", usage: null, kind: "toolcall",
+      id: "saved", createdAt: "2026-10-01", kind: "toolcall",
       responseId: "r", requestParentId: null, ordinal: 0, complete: true, source: { model: "p/m", adapter: "test", scope: "test" }, continuation: null,
       callId: "c", name: "resource_call", argumentsText: "", arguments: args,
       outcome: { ...invocation, finishedAt: 300, kind: "cancelled", data, model: [{ kind: "text", text: "Stopped" }], message: "Stopped." },

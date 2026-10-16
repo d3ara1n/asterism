@@ -9,9 +9,23 @@ export const modelUsageSchema = z.strictObject({
   total: z.number().nonnegative().nullable(), reasoning: z.number().nonnegative().nullable(),
   cacheRead: z.number().nonnegative().nullable(), cacheWrite: z.number().nonnegative().nullable(),
 });
+/** 日期时间用于定位；毫秒偏移来自同一单调时钟，不由日期时间相减。 */
+export const requestTimingSchema = z.strictObject({
+  startedAt: z.iso.datetime(),
+  endedAt: z.iso.datetime(),
+  durationMs: z.number().nonnegative(),
+  firstOutputMs: z.number().nonnegative().nullable(),
+  firstTextMs: z.number().nonnegative().nullable(),
+  firstReasoningMs: z.number().nonnegative().nullable(),
+  lastOutputMs: z.number().nonnegative().nullable(),
+  outputChunks: z.number().int().nonnegative(),
+  outcome: z.enum(["completed", "failed", "cancelled"]),
+});
+export type RequestTiming = z.infer<typeof requestTimingSchema>;
+
 export const modelSourceSchema = z.strictObject({ model: z.string(), adapter: z.string(), scope: z.string() });
 export const modelCompletionSchema = z.strictObject({ usage: modelUsageSchema.nullable(), finishReason: z.string(),
-  rawFinishReason: z.string().nullable(), providerResponseId: z.string().nullable() });
+  rawFinishReason: z.string().nullable(), providerResponseId: z.string().nullable(), timing: requestTimingSchema.optional() });
 const block = { responseId: id, requestParentId: id.nullable(), ordinal: z.number().int().nonnegative(),
   complete: z.boolean(), continuation: jsonSchema, source: modelSourceSchema, completion: modelCompletionSchema.nullable().optional() };
 export const modelBlockSchema = z.discriminatedUnion("kind", [
@@ -31,6 +45,8 @@ export const modelRunRecordSchema = z.discriminatedUnion("type", [
  * 未知分区在解码时忽略，新增分区不使旧记录失效。characters 为 Unicode 码点数。 */
 const characters = z.number().int().nonnegative();
 export const requestDiagnosticsSchema = z.object({
+  /** 无可交付响应终态时的原始计时；正常响应使用 ModelCompletion.timing。 */
+  timing: requestTimingSchema.optional(),
   system: z.array(z.discriminatedUnion("kind", [
     z.strictObject({ kind: z.literal("system"), from: z.string(), characters }),
     z.strictObject({ kind: z.literal("agent"), role: z.string(), characters }),
