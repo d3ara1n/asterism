@@ -24,6 +24,7 @@
     "packages/sdk/src/renderer.ts",
     "src/shared",
     "packages/builtin-api/src",
+    "packages/builtin-api/examples/*.tsx",
     "packages/ui/src",
     "packages/builtin/src/*/renderer.tsx",
     "packages/builtin/src/agent/conversation"

@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import { Agent, CreateAgent, SubmitAgentInput, builtin } from "@atelier/builtin-api/contracts";
+import * as builtinRendererAPI from "@atelier/builtin-api/renderer";
 import { resourceCall } from "@atelier/sdk/contracts";
 import type { PluginDefinition } from "@atelier/sdk/runtime";
 import { PackageList, loadPackages } from "./packages.ts";
@@ -78,6 +79,7 @@ describe("内置公共包", () => {
     const frontendAction = { ...SubmitAgentInput };
     release.push(bindPublicProvider("renderer", builtinPublicProvider, {
       "@atelier/builtin-api/contracts": { ...builtinPublicModules["@atelier/builtin-api/contracts"], SubmitAgentInput: frontendAction },
+      "@atelier/builtin-api/renderer": builtinRendererAPI,
     }));
     for (const item of packages) {
       const frontend = await import(pathToFileURL(join(f.cache, item.renderer!)).href);
@@ -92,8 +94,46 @@ describe("内置公共包", () => {
     const packages = await f.load();
     expect(packages.map(item => item.status)).toEqual(["failed", "failed", "failed", "loaded"]);
     expect(packages[0]!.error).toContain("must declare a dependency");
-    expect(packages[1]!.error).toContain("application provides 0.1.0");
+    expect(packages[1]!.error).toContain(`application provides ${builtinPublicProvider.version}`);
     expect(packages[2]!.error).toContain("not exported");
+  });
+  // Agent UI 只经前端公共出口加载；两个源码插件登记到内置实现所读的同一服务。
+  it("前端消费者共享 Agent UI 服务，贡献跟随登记生命周期释放", async () => {
+    const f = fixture(["^0.1.1", "^0.1.1"]);
+    for (const [index, root] of f.consumers.entries()) {
+      file(root, "renderer.ts", `
+        import { agentUI, AgentOverlay } from "@atelier/builtin-api/renderer";
+        import { createElement } from "react";
+        export { agentUI, AgentOverlay };
+        export default { resources: [], cards: [], tools: [], async prepare({ signal }) {
+          agentUI.register({ id: "fixture.consumer${index}/panel",
+            Component: () => createElement(AgentOverlay, { position: "bottom", hideComposer: true, children: "Question" })
+          }, { signal });
+        } };
+      `);
+    }
+    const packages = await f.load();
+    expect(packages.map(item => item.error)).toEqual([undefined, undefined]);
+    release.push(bindPublicProvider("renderer", builtinPublicProvider, {
+      ...builtinPublicModules, "@atelier/builtin-api/renderer": builtinRendererAPI,
+    }));
+    const loaded = await Promise.all(packages.map(item => import(pathToFileURL(join(f.cache, item.renderer!)).href)));
+    expect(loaded.every(module => module.agentUI === builtinRendererAPI.agentUI && module.AgentOverlay === builtinRendererAPI.AgentOverlay)).toBe(true);
+    const lifetime = new AbortController();
+    try {
+      for (const module of loaded) await module.default.prepare({ signal: lifetime.signal });
+      expect(builtinRendererAPI.agentUI.getSnapshot().map(entry => entry.id)).toEqual(["fixture.consumer0/panel", "fixture.consumer1/panel"]);
+    } finally { lifetime.abort(); }
+    expect(builtinRendererAPI.agentUI.getSnapshot()).toEqual([]);
+  });
+
+  // 公共前端服务不能进入后台模块图，避免 React/界面状态跨环境混用。
+  it("后台消费者不能导入 Agent UI 前端出口", async () => {
+    const f = fixture(["^0.1.1"]);
+    file(f.consumers[0]!, "runtime.ts", 'import { agentUI } from "@atelier/builtin-api/renderer"; export default agentUI;');
+    const [item] = await f.load();
+    expect(item!.status).toBe("failed");
+    expect(item!.error).toContain("not exported");
   });
   // 中间库没有 atelier 清单；校验它自己的 npm 依赖，运行依赖仍归实际消费者插件。
   it.each(["nested", "symlink"] as const)("独立中间 npm 包的 %s 导入按包归属校验版本", async mode => {

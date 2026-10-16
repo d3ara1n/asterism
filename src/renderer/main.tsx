@@ -17,11 +17,12 @@ import "./styles.css";
 
 import { startAppearance } from "./features/appearance/state";
 
-import { builtinViews } from "@atelier/builtin/renderer";
+import { builtinViews, BuiltinRendererProvider } from "@atelier/builtin/renderer";
+import * as builtinRendererAPI from "@atelier/builtin-api/renderer";
 import { ViewRegistry } from "./modules/registry";
 import { workbenchRecordViews } from "./features/workbench/records";
 import { loadPluginRenderers } from "./modules/plugins";
-import { loadPreferences } from "./features/creation/preferences";
+import { loadPreferences, pluginPreferences } from "./features/creation/preferences";
 import { prepareModules, showStartupStage } from "./app/startup";
 import { getI18n } from "./shared/i18n";
 import { appMessages } from "./messages/app";
@@ -42,14 +43,36 @@ showStartupStage(getI18n().formatMessage(appMessages.startupPlugins));
 const plugins = initial?.ok ? initial.snapshot.plugins.flatMap(p => p.status === "loaded" && p.id ? [{ id: p.id, renderer: p.renderer, dependencies: p.dependencies }] : []) : [];
 const accepted = [...builtinViews, workbenchRecordViews];
 new ViewRegistry(accepted);
-const releasePublic = bindPublicProvider("renderer", builtinPublicProvider, builtinPublicModules);
+const releasePublic = bindPublicProvider("renderer", builtinPublicProvider, {
+  ...builtinPublicModules,
+  "@atelier/builtin-api/renderer": builtinRendererAPI,
+});
 window.addEventListener("pagehide", releasePublic, { once: true });
 await loadPluginRenderers(plugins, { available: [builtin.id], accept(module) {
   new ViewRegistry([...accepted, module]); accepted.push(module);
 } });
 const moduleViews = new ViewRegistry(accepted);
+const builtinRendererServices = { preferences: pluginPreferences };
 showStartupStage(getI18n().formatMessage(appMessages.startupEnvironment));
 await Promise.all([prepareModules(accepted, events, undefined, lifetime.signal), loadPreferences()]);
-createRoot(document.getElementById("root")!).render(<StrictMode><HostI18nProvider><ErrorBoundary><MotionConfig reducedMotion="user"><TooltipProvider>
-  <RendererEventsProvider value={events}><HostConfigsProvider><ModuleViewsProvider registry={moduleViews}><App controller={controller} /></ModuleViewsProvider></HostConfigsProvider></RendererEventsProvider>
-</TooltipProvider></MotionConfig></ErrorBoundary></HostI18nProvider></StrictMode>);
+createRoot(document.getElementById("root")!).render(
+  <StrictMode>
+    <HostI18nProvider>
+      <ErrorBoundary>
+        <MotionConfig reducedMotion="user">
+          <TooltipProvider>
+            <RendererEventsProvider value={events}>
+              <HostConfigsProvider>
+                <ModuleViewsProvider registry={moduleViews}>
+                  <BuiltinRendererProvider services={builtinRendererServices}>
+                    <App controller={controller} />
+                  </BuiltinRendererProvider>
+                </ModuleViewsProvider>
+              </HostConfigsProvider>
+            </RendererEventsProvider>
+          </TooltipProvider>
+        </MotionConfig>
+      </ErrorBoundary>
+    </HostI18nProvider>
+  </StrictMode>,
+);

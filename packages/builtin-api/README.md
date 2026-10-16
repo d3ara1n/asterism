@@ -1,6 +1,6 @@
 # 内置插件公共 API（`@atelier/builtin-api`）
 
-内置实现与外部插件共同消费的纯领域契约。插件身份为 `atelier.builtin`；本包不注册第二个插件，也不依赖 `@atelier/builtin` 实现。公共加载与生命周期规则见 [插件 SDK](../../docs/plugin-sdk.md#公共模块与契约身份)。
+内置实现与外部插件共同消费的领域契约和前端扩展 API，当前版本 **0.1.1**。插件身份为 `atelier.builtin`；本包不注册第二个插件，也不依赖 `@atelier/builtin` 实现。公共加载与生命周期规则见 [插件 SDK](../../docs/plugin-sdk.md#公共模块与契约身份)。
 
 ## 入口与边界
 
@@ -10,7 +10,7 @@
 - Agent 输入、配置、选择和历史记录契约，以及会话命名记录与 `NamingApi` 接口类型。
 - `AgentConfigurations` 与 `ModelConfiguration` 目录契约；只包含内置领域需要的配置视图，不暴露配置文件、凭据、测试与覆盖编辑状态。
 
-执行循环、压缩策略、提交去重、卡片投影及 UI 组件属于实现包。取得契约不授予对象写权限；外部准备者仍只能读取宿主绑定的对象门面。Agent 槽位、顶层工具与插件调用接口尚待 [专项计划](../../plans/todo-2026-10-15-plugin-tools-ui.md) 实现。
+`@atelier/builtin-api/renderer` 依赖宿主共享的 React，提供 Agent 界面登记和呈现 API，只允许前端导入。执行循环、压缩策略、提交去重、卡片投影及实际布局属于实现包。取得契约不授予对象写权限；外部准备者仍只能读取宿主绑定的对象门面。顶层工具与插件调用接口由 [专项计划](../../plans/todo-2026-10-15-plugin-tools-ui.md)跟进。
 
 ## 作者接入
 
@@ -23,7 +23,7 @@
   "type": "module",
   "peerDependencies": {
     "@atelier/sdk": "^0.18.0",
-    "@atelier/builtin-api": "^0.1.0"
+    "@atelier/builtin-api": "^0.1.1"
   },
   "atelier": {
     "id": "example.input-review",
@@ -38,3 +38,39 @@
 开发时可在本仓库使用 npm workspace；独立作者可用 `npm pack --workspace @atelier/sdk` 与 `npm pack --workspace @atelier/builtin-api` 生成本地包并安装。当前为孵化期私有包，不依赖 npm registry 发布。作者如预先打包插件，须将 `@atelier/sdk/*`、`@atelier/builtin-api/*` 保留为外部导入，不内联声明源码；包清单仍保留 peerDependencies。
 
 宿主采用已登记公共包版本检查 npm semver 范围，依赖缺失、不兼容或未公开子入口明确失败。消费者自己的安装副本仅用于作者开发，执行时由宿主转接到本环境已经加载的同一份声明。后台、前端分别共享，不跨进程共享对象。公共包版本与 `atelier.api` 的宿主 SDK API 版本分别校验。
+
+## Agent 界面扩展
+
+在插件清单的 `atelier.renderer` 指定前端入口，并在 `prepare` 中登记组件：
+
+```tsx
+import { agentUI, AgentOverlay } from "@atelier/builtin-api/renderer";
+import { useRendererObject, type RendererModule } from "@atelier/sdk/renderer";
+
+function Questions() {
+  const agent = useRendererObject();
+  // 在此按 agent.ref 读取／订阅插件自己的待回答状态。
+  return <AgentOverlay position="bottom" hideComposer>
+    <p>Question for {agent.ref.id}</p>
+  </AgentOverlay>;
+}
+
+export default {
+  resources: [], cards: [], tools: [],
+  async prepare({ signal }) {
+    agentUI.register({ id: "example.questions/panel", Component: Questions }, { signal });
+  },
+} satisfies RendererModule;
+```
+
+| 接口 | 用法 |
+| --- | --- |
+| `agentUI.register({ id, Component }, { signal })` | `id` 使用贡献插件的 `namespace.name(...)`；返回幂等的释放函数，也随 signal 释放。登记不应放在模块顶层副作用中 |
+| `AgentOverlay` | `position: "top" \| "center" \| "bottom"`、可选 `hideComposer`、任意 `children`；不显示时不挂载此组件 |
+| `AgentModal` | 受控 `open`、`title: UiText`、可选 `description / onOpenChange / hideComposer` 与任意 `children` |
+| `agentUI.subscribe / getSnapshot` | 内置实现订阅已登记贡献，保持同一公共服务实例 |
+| `AgentUIRendererProvider` | 内置实现注入两类呈现组件；第三方作者直接使用 `AgentOverlay / AgentModal` |
+
+每个贡献组件可同时呈现多个界面，通常用自己的 hooks 订阅业务状态。`useRendererObject()` 绑定当前 Agent；`useRendererPreferences()` 绑定贡献插件，其他 SDK hooks 沿用当前卡片的服务。UI 只改变呈现，不修改工具的取消、超时或结果协议。完整交互规则见 [Agent 扩展界面](../../docs/workbench.md#agent-扩展界面)。
+
+[可编译的界面示例](examples/agent-ui.tsx) 接收插件提供的状态 hook，展示待办位置选择、`bottom + hideComposer` 提问和受控模态窗。示例不实现顶层工具或前后端通信；真实问答服务须在提交答案成功后清除待回答项，组件卸载不替代服务清理。恢复待回答状态、关联调用身份和工具取消由业务服务负责。

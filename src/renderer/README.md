@@ -25,6 +25,7 @@
 | `features/session/History.tsx` / `history-navigation.ts` / `history-branches.ts` | 历史浮岛面板：分支 Tab、分叉点双向导航、两行逐节点列表、来源筛选与「从这里继续」跳转 |
 | `features/conversation/tool-views.tsx` / `../../packages/ui/src/tool-content.tsx` | 三个宿主固定入口（`resource_*`）的内置视图、`resource_call` 转交适配与调用／结果原始详情切换 |
 | `../../packages/builtin/src/agent/conversation/` | 内置 Agent 对话组件簇：`Conversation.tsx`、`ConversationTimeline.tsx`、`output-follow.ts`、`Composer.tsx`、`ConfigurationPicker.tsx`、`draft.ts`、`Files.tsx`、`interaction.ts`、`Disclosure.tsx`、`ToolCall.tsx`、`ThinkingBlock.tsx`、`Markdown.tsx` |
+| `../../packages/builtin/src/agent/ui/` | Agent 扩展组件挂载、overlay／modal 呈现及输入区控制；作者通过 `@atelier/builtin-api/renderer` 接入，应用注入贡献者偏好门面 |
 | `../../packages/builtin/src/agent/diagnostics/` | 代理诊断的历史请求投影、当前价格计量、缓存与增长概览及面板内的列表／详情／汇总 |
 | `../../packages/builtin/src/agent/context/` / `panel-kit.tsx` | 代理上下文面板的窗口占用、对话与系统构成；两个代理面板共用的版式、数值与系统构成部件 |
 | `../../packages/builtin/src/text-view.tsx` / `code-view.tsx` / `shared/tool-body.ts` | 内置正文工具三态视图、Pierre Diffs 代码／差异渲染与 120 行预览预算截取 |

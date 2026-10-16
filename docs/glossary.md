@@ -59,6 +59,8 @@
 | 视图 | view | 对象的呈现；同一对象可有多个视图 |
 | 卡片 | card | 对象在工作台中的视图实例，不是对象本身 |
 | 辅助面板 | auxiliary panel | 卡片内部呈现对象旁信息的局部视图，由资源提供内容、宿主管理容器；区别于会话级辅助浮岛，见 `docs/workbench.md` |
+| Agent 覆盖界面 | Agent overlay | 内置 Agent 提供给自身与第三方的非模态扩展呈现，按 top／center／bottom 放置；输入区控制与生命周期见 `docs/workbench.md` |
+| Agent 模态窗 | Agent modal | 关联 Agent 的扩展对话框，接管窗口焦点，由插件控制显示与关闭；见 `docs/workbench.md` |
 | 连线 | edge | 关系的视觉表达，不是关系本身，也不是授权机制 |
 | 关系 | relation | 委派、绑定、输入、使用/产出、分叉等对象间联系 |
 

@@ -35,6 +35,6 @@
     "*.config.ts",
     "packages/builtin-api/src",
     "packages/builtin/src/*/*.ts",
-    "packages/builtin-api/examples"
+    "packages/builtin-api/examples/*.ts"
   ]
 }

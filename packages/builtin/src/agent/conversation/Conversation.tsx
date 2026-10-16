@@ -20,6 +20,7 @@ import { conversationTimeline } from "./timeline";
 
 import { useAgentConversation } from "./interaction";
 import { agentExecutionState, type AgentTurnState } from "../state";
+import { AgentUIRegion, useComposerHidden } from "../ui/AgentUI";
 
 /** 卡片标题栏中的执行状态；历史属于会话，入口在窗口标题栏。 */
 export function ConversationActions() {
@@ -52,6 +53,7 @@ export function Conversation({ selection, turnState, onHome }: { selection: Agen
   const configurationError = catalogs.error;
   const { scroll, awayFromBottom, latest, onScroll } = useOutputFollow(timeline);
   const composer = useRef<HTMLTextAreaElement>(null);
+  const composerHidden = useComposerHidden();
 
   if (!snapshot) return state.status === "loading" ? null : <div className="flex flex-1 items-center justify-center p-6">
     <PageState kind="error" title={i18n.formatMessage(commonMessages.unavailableTitle)} body={i18n.text(state.error ?? commonMessages.unavailableBody)}
@@ -60,12 +62,17 @@ export function Conversation({ selection, turnState, onHome }: { selection: Agen
 
   const error = state.error ?? configurationError ?? interaction.error;
   const send = async () => {
+    if (composerHidden) return;
     if (!await interaction.send()) return;
     latest(); composer.current?.focus({ preventScroll: true });
   };
-  const resume = async () => { await interaction.resume(); latest(); };
+  const resume = async () => {
+    if (composerHidden) return;
+    await interaction.resume(); latest();
+  };
 
   return <>
+    <AgentUIRegion position="top" />
     <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
       <div ref={scroll} className="min-h-0 flex-1 select-text overflow-y-auto overscroll-contain" onScroll={onScroll}>
         <div className="space-y-4 p-4">
@@ -80,7 +87,8 @@ export function Conversation({ selection, turnState, onHome }: { selection: Agen
         </div>
       </div>}
     </div>
-    <footer className="shrink-0 space-y-3 border-t p-3">
+    <AgentUIRegion position="bottom" />
+    {!composerHidden && <footer className="shrink-0 space-y-3 border-t p-3">
       {selection && <AgentConfigurationPicker selection={selection} disabled={!interaction.configurable}
         running={running} onChange={interaction.configure} />}
       {error && <Alert variant="destructive"><AlertDescription className="flex flex-wrap items-center gap-2">
@@ -90,6 +98,6 @@ export function Conversation({ selection, turnState, onHome }: { selection: Agen
       <MessageComposer draft={interaction.draft} inputRef={composer}
         busy={state.busy} ready={ready} executionState={executionState} writable={interaction.writable} onSend={send}
         onCancel={interaction.cancel} onContinue={resume} />
-    </footer>
+    </footer>}
   </>;
 }

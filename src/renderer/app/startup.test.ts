@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { prepareModules } from "./startup";
 import { pluginNamespace, type EventSubscriber } from "@atelier/sdk/contracts";
 import { z } from "zod";
+import { agentUI } from "@atelier/builtin-api/renderer";
 
 const base = { resources: [], cards: [], tools: [] };
 
@@ -23,7 +24,7 @@ describe("模块启动准备", () => {
   });
 });
 
-it("模块订阅在准备失败时取消，成功模块的订阅保留到应用关闭", async () => {
+it("模块订阅和 Agent UI 登记在准备失败时释放，成功模块保留到应用关闭", async () => {
   const signals: AbortSignal[] = [];
   const events: EventSubscriber = { subscribe: (_contract, options) => {
     signals.push(options.signal!);
@@ -34,11 +35,20 @@ it("模块订阅在准备失败时取消，成功模块的订阅保留到应用�
   const error = vi.spyOn(console, "error").mockImplementation(() => {});
   try {
     await prepareModules([
-      { ...base, async prepare({ events }) { events.subscribe(Event, {}, () => {}); throw new Error("Setup failed."); } },
-      { ...base, async prepare({ events }) { await events.subscribe(Event, {}, () => {}).ready; } },
+      { ...base, async prepare({ events, signal }) {
+        events.subscribe(Event, {}, () => {});
+        agentUI.register({ id: "test.startup/failed", Component: () => null }, { signal });
+        throw new Error("Setup failed.");
+      } },
+      { ...base, async prepare({ events, signal }) {
+        agentUI.register({ id: "test.startup/ready", Component: () => null }, { signal });
+        await events.subscribe(Event, {}, () => {}).ready;
+      } },
     ], events, 100, lifetime.signal);
     expect(signals.map(signal => signal.aborted)).toEqual([true, false]);
+    expect(agentUI.getSnapshot().map(entry => entry.id)).toEqual(["test.startup/ready"]);
     lifetime.abort();
     expect(signals.every(signal => signal.aborted)).toBe(true);
+    expect(agentUI.getSnapshot()).toEqual([]);
   } finally { error.mockRestore(); lifetime.abort(); }
 });

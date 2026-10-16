@@ -9,6 +9,7 @@ import { Conversation, ConversationActions } from "./conversation/Conversation";
 import { AgentInput } from "./creation";
 import { agentRecordViews } from "./history";
 import { agentPanels } from "./panels";
+import { AgentUI } from "./ui/AgentUI";
 
 const appearance = { width: 560, height: 640, minWidth: 480, minHeight: 480 };
 
@@ -27,5 +28,5 @@ export default {
 
 function AgentBody({ data }: { data: z.infer<typeof AgentView.schema> }) {
   const navigation = useRendererNavigation();
-  return <Conversation selection={data.selection} turnState={data.turnState} onHome={navigation.home} />;
+  return <AgentUI><Conversation selection={data.selection} turnState={data.turnState} onHome={navigation.home} /></AgentUI>;
 }
