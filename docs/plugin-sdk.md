@@ -112,7 +112,7 @@ SDK 的 `contracts`、`runtime`、`renderer` 三个子路径分别承担纯契�
 
 ## 前端视图与扩展入口
 
-- **内置 Agent 界面扩展**：内置插件和第三方通过公共 API 的 `agentUI.register` 在 renderer `prepare` 中登记组件，绑定准备作用域的 `signal`；失败、超时和退出释放登记。每张挂载的 Agent 卡片分别挂载贡献组件，按登记顺序呈现；重复贡献 ID 明确失败。组件通过 SDK 对象 hook 取得当前关联 Agent，偏好按贡献 ID 的插件命名空间绑定，配置仍按自有契约读取；不授予额外资源权限或私有状态访问。`AgentOverlay / AgentModal` 是内置领域的呈现接口，业务显示状态、数据来源及工具等待由贡献者拥有。作者接口见 [内置公共 API](../packages/builtin-api/README.md#agent-界面扩展)，交互见 [Agent 扩展界面](workbench.md#agent-扩展界面)。
+- **内置 Agent 界面扩展**：内置插件和第三方通过公共 API 的 `agentUI.register` 在 renderer `prepare` 中登记组件，绑定准备作用域的 `signal`；失败、超时和退出释放登记。每张挂载的 Agent 卡片分别挂载贡献组件，按登记顺序呈现；重复贡献 ID 明确失败。组件通过 SDK 对象 hook 取得当前关联 Agent，偏好按贡献 ID 的插件命名空间绑定，配置仍按自有契约读取；不授予额外资源权限或私有状态访问。`AgentOverlay / AgentModal` 是内置领域的呈现接口，`AgentScrollArea` 提供两者共用的标准滚动区；业务显示状态、数据来源及工具等待由贡献者拥有。作者接口见 [内置公共 API](../packages/builtin-api/README.md#agent-界面扩展)，交互见 [Agent 扩展界面](workbench.md#agent-扩展界面)。
 - **卡片辅助面板（API 8.2）**：`cardRenderer` 可选声明 `panels: [{ id, label, icon, Body }]`。ID 在该卡片 renderer 内唯一、非空且无首尾空白，不要求全局命名空间。面板 `Body` 与主体收到同一份通过契约校验的投影，并共享绑定对象与宿主服务；解析阶段只交付元素，不执行面板组件。`useRendererCard()` 提供当前 `activePanel`、`openPanel(id)` 与 `closePanel()`，供主体、操作区与面板内容使用；打开未知 ID 明确报错。宿主通过 `RendererCardProvider` 注入每张卡片独立的视图控制，不扩展资源授权或运行时对象接口。未声明面板的既有 renderer 保持兼容。交互与生命周期见 [卡片辅助面板](workbench.md#卡片辅助面板)。
 - **工具三态视图（`toolRenderer`）**：声明平行可选的 `input / execution / result`，每阶段含可选 `headerRenderer / bodyRenderer`，可复用 `ToolRenderProps<D, T, A>` 联合类型。`input` 接收部分 JSON 与 `result: null`；`execution` 接收已校验参数与 running 产出；`result` 接收终结结局。视觉与连续性规范见 [界面设计系统](design-system.md#对话过程视图)。
 - **历史记录视图（`recordRenderer`）**：声明 `label(data, context, record)`（必填纯文本摘要）、可选 `icon` 与 `Row`。宿主历史面板据此展示第一行摘要，并由宿主只读 `record.source` 固定追加第二行来源说明。

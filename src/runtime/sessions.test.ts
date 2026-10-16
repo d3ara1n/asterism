@@ -82,7 +82,9 @@ describe("会话运行时", () => {
       return { async *stream() {
         if (!first) { yield* reply("Understood."); return; }
         yield { type: "part.start", part: { id: "ask", kind: "toolcall", callId: "question", name: "ask_user" } };
-        yield { type: "part.end", partId: "ask", arguments: { question: "Which destination?" } };
+        yield { type: "part.end", partId: "ask", arguments: { questions: [
+          { id: "destination", type: "text", question: "Which destination?" },
+        ] } };
         yield { type: "finish", reason: "tool-calls", usage: null };
       } };
     } });
@@ -112,21 +114,23 @@ describe("会话运行时", () => {
     try {
       const restored = await connection.client.invoke(ReadQuestions, null, { object });
       expect(restored.pending).toEqual(original.pending);
-      await expect(connection.client.invoke(AnswerQuestion, { id: restored.pending[0]!.id, answer: "  " }, { object })).rejects.toMatchObject({ code: "invalid_argument" });
-      await connection.client.invoke(AnswerQuestion, { id: restored.pending[0]!.id, answer: "Maldives" }, { object });
+      const submission = (text: string) => ({ answers: [{ id: "destination", status: "answered" as const, selected: [], text }] });
+      await expect(connection.client.invoke(AnswerQuestion, { id: restored.pending[0]!.id, submission: submission("  ") }, { object })).rejects.toMatchObject({ code: "invalid_argument" });
+      await connection.client.invoke(AnswerQuestion, { id: restored.pending[0]!.id, submission: submission("Maldives") }, { object });
       await settled(service);
       expect((await connection.client.invoke(ReadQuestions, null, { object })).pending).toEqual([]);
-      await expect(connection.client.invoke(AnswerQuestion, { id: restored.pending[0]!.id, answer: "Again" }, { object })).rejects.toMatchObject({ code: "conflict" });
+      await expect(connection.client.invoke(AnswerQuestion, { id: restored.pending[0]!.id, submission: submission("Again") }, { object })).rejects.toMatchObject({ code: "conflict" });
       expect(requests).toHaveLength(2);
+      const answer = { answers: [{ id: "destination", question: "Which destination?", type: "text", status: "answered", selected: [], text: "Maldives" }] };
       expect(requests[1]!.messages).toContainEqual(expect.objectContaining({
         kind: "result", callId: "question", name: "ask_user", error: false,
-        parts: [{ kind: "text", text: JSON.stringify({ answer: "Maldives" }) }],
+        parts: [{ kind: "text", text: JSON.stringify(answer) }],
       }));
       const saved = service.sessions.tree.timeline(snap.sessionId).flatMap(node => {
         const data = node.data as { type?: string; block?: { kind?: string; outcome?: unknown } };
         return data.type === "block" && data.block?.kind === "toolcall" ? [data.block.outcome] : [];
       });
-      expect(saved).toContainEqual(expect.objectContaining({ kind: "succeeded", implementation: { id: "atelier.builtin/ask-user" }, data: { answer: "Maldives" } }));
+      expect(saved).toContainEqual(expect.objectContaining({ kind: "succeeded", implementation: { id: "atelier.builtin/ask-user" }, data: answer }));
       expect(saved[0]).not.toHaveProperty("resource");
     } finally { connection.client.close(); connection.peer.close(); }
   });
@@ -138,7 +142,7 @@ describe("会话运行时", () => {
       return { async *stream() {
         if (hasResult) { yield* reply(); return; }
         yield { type: "part.start", part: { id: "ask", kind: "toolcall", callId: "question", name: "ask_user" } };
-        yield { type: "part.end", partId: "ask", arguments: { question: "Continue?" } };
+        yield { type: "part.end", partId: "ask", arguments: { questions: [{ id: "continue", type: "text", question: "Continue?" }] } };
         yield { type: "finish", reason: "tool-calls", usage: null };
       } };
     } });
@@ -148,7 +152,9 @@ describe("会话运行时", () => {
     const read = async (snap: typeof first) => ReadQuestions.output.parse(await service.sessions.calls.invoke(ReadQuestions.id, null, { object: ref(snap) }, null));
     await vi.waitFor(async () => { expect((await read(first)).pending).toHaveLength(1); expect((await read(second)).pending).toHaveLength(1); });
     const pending = (await read(first)).pending[0]!;
-    await expect(service.sessions.calls.invoke(AnswerQuestion.id, { id: pending.id, answer: "Wrong agent" }, { object: ref(second) }, null)).rejects.toMatchObject({ code: "conflict" });
+    await expect(service.sessions.calls.invoke(AnswerQuestion.id, { id: pending.id, submission: {
+      answers: [{ id: "continue", status: "answered", selected: [], text: "Wrong agent" }],
+    } }, { object: ref(second) }, null)).rejects.toMatchObject({ code: "conflict" });
     await service.sessions.calls.invoke(CancelQuestion.id, { id: pending.id }, { object: ref(first) }, null);
     await vi.waitFor(async () => expect((await read(first)).pending).toEqual([]));
     expect((await read(second)).pending).toHaveLength(1);

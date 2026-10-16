@@ -1,69 +1,101 @@
-import { useState } from "react";
-import { MessageCircleQuestion } from "lucide-react";
-import { agentUI, AgentOverlay } from "@atelier/builtin-api/renderer";
+import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
+import { ChevronDown, ChevronUp, Maximize2, MessageCircleQuestion, RefreshCw } from "lucide-react";
+import { agentUI, AgentModal, AgentOverlay } from "@atelier/builtin-api/renderer";
 import { builtin } from "@atelier/builtin-api/contracts";
-import { toolRenderer, useI18n, useRendererObject, type RendererModule, type ToolRenderProps } from "@atelier/sdk/renderer";
+import { useI18n, useRendererObject, type RendererModule } from "@atelier/sdk/renderer";
 import { Button } from "@atelier/ui/ui/button";
-import { Textarea } from "@atelier/ui/ui/textarea";
-import { ToolHeader } from "@atelier/ui/tool-header";
-import { AskUserResult, type Answer, type PendingQuestion } from "./contract";
+import { IconButton } from "@atelier/ui/ui/icon-button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@atelier/ui/ui/select";
+import { Alert, AlertDescription } from "@atelier/ui/ui/alert";
+import { QuestionsChanged, type PendingQuestion, type Submission } from "./contract";
 import { questionMessages as messages } from "../messages/questions";
 import { useQuestions } from "./use-questions";
+import { draftSubmission, questionDrafts } from "./drafts";
+import { answerIssue } from "./answers";
+import { QuestionForm } from "./form";
+import { questionFocus } from "./focus";
+import { questionToolRenderer } from "./tool-view";
 
 function Questions() {
   const { ref } = useRendererObject();
   const state = useQuestions(ref);
   const i18n = useI18n();
-  if (!state.pending.length && !state.failed) return null;
-  return <AgentOverlay position="bottom" hideComposer={state.pending.length > 0}>
-    <div className="max-h-80 space-y-4 overflow-y-auto">
-      {state.failed && <div role="alert" className="space-y-2 type-caption">
-        <p>{i18n.text(messages.failed)}</p>
-        <Button variant="outline" size="sm" onClick={state.refresh}>{i18n.text(messages.refresh)}</Button>
-      </div>}
-      {state.pending.map(pending => <QuestionForm key={pending.id} pending={pending}
-        answer={answer => state.answer(pending.id, answer)} cancel={() => state.cancel(pending.id)} />)}
-    </div>
-  </AgentOverlay>;
+  const [active, setActive] = useState<string | null>(null);
+  const [focusVersion, setFocusVersion] = useState(0);
+  const [collapsed, setCollapsed] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const pending = state.pending.find(item => item.id === active) ?? state.pending[0];
+  useEffect(() => questionFocus.subscribe((object, id) => {
+    if (object.id !== ref.id || object.sessionId !== ref.sessionId || object.kind !== ref.kind) return;
+    setActive(id); setCollapsed(false); setFocusVersion(value => value + 1);
+  }), [ref.id, ref.sessionId, ref.kind]);
+  const failure = state.failed && <Alert><AlertDescription>
+    {i18n.text(messages.failed)}
+    <Button variant="outline" size="sm" onClick={state.refresh}><RefreshCw />{i18n.text(messages.refresh)}</Button>
+  </AlertDescription></Alert>;
+  if (!pending) return failure ? <AgentOverlay position="bottom">{failure}</AgentOverlay> : null;
+  return <Interaction key={pending.id} pending={pending} answer={submission => state.answer(pending.id, submission)} cancel={() => state.cancel(pending.id)}
+    collapsed={collapsed} setCollapsed={setCollapsed} expanded={expanded} setExpanded={setExpanded} focusVersion={focusVersion}>
+    {failure}
+    {state.pending.length > 1 && <div className="space-y-1">
+      <p className="type-caption text-muted-foreground">{i18n.formatMessage(messages.groups, { count: state.pending.length })}</p>
+      <Select value={pending.id} onValueChange={setActive}>
+        <SelectTrigger className="w-full" aria-label={i18n.formatMessage(messages.groups, { count: state.pending.length })}><SelectValue /></SelectTrigger>
+        <SelectContent>{state.pending.map((item, index) => <SelectItem key={item.id} value={item.id}>
+          {index + 1}. {item.questions[0]?.label ?? item.questions[0]?.question}
+        </SelectItem>)}</SelectContent>
+      </Select>
+    </div>}
+  </Interaction>;
 }
 
-function QuestionForm({ pending, answer, cancel }: {
-  pending: PendingQuestion; answer(value: string): Promise<void>; cancel(): Promise<void>;
+function Interaction({ pending, answer, cancel, children, collapsed, setCollapsed, expanded, setExpanded, focusVersion }: {
+  pending: PendingQuestion; answer(value: Submission): Promise<void>; cancel(): Promise<void>;
+  children: ReactNode; collapsed: boolean; setCollapsed(value: boolean): void; focusVersion: number;
+  expanded: boolean; setExpanded(value: boolean): void;
 }) {
+  const { ref } = useRendererObject();
   const i18n = useI18n();
-  const [value, setValue] = useState("");
-  const [busy, setBusy] = useState(false), [failed, setFailed] = useState(false);
-  const submit = async (action: () => Promise<void>) => {
-    if (busy) return;
-    setBusy(true); setFailed(false);
-    try { await action(); }
-    catch { setFailed(true); }
-    finally { setBusy(false); }
-  };
-  return <form className="space-y-3" onSubmit={event => { event.preventDefault(); void submit(() => answer(value)); }}>
-    <label htmlFor={pending.id} className="block whitespace-pre-wrap type-label">{pending.question}</label>
-    <Textarea id={pending.id} value={value} disabled={busy} onChange={event => setValue(event.target.value)} />
-    {failed && <p role="alert" className="type-caption">{i18n.text(messages.submitFailed)}</p>}
-    <div className="flex flex-wrap gap-2">
-      <Button type="submit" size="sm" disabled={busy || !value.trim()}>{i18n.text(messages.answer)}</Button>
-      <Button type="button" size="sm" variant="ghost" disabled={busy} onClick={() => { void submit(cancel); }}>{i18n.text(messages.cancel)}</Button>
-    </div>
-  </form>;
-}
-
-function Header({ phase }: ToolRenderProps<Answer>) {
-  const i18n = useI18n();
-  return <ToolHeader label={i18n.text(messages.title)}
-    meta={phase !== "settled" ? i18n.text(messages.waiting) : undefined} />;
-}
-function Result({ result }: ToolRenderProps<Answer>) {
-  return result?.data ? <p className="whitespace-pre-wrap type-caption">{result.data.answer}</p> : null;
+  const entry = useMemo(() => questionDrafts.get(ref.sessionId, ref.id, pending), [ref.sessionId, ref.id, pending.id]);
+  const draft = useSyncExternalStore(entry.subscribe, entry.getSnapshot);
+  const { busy, failed } = useSyncExternalStore(entry.subscribe, entry.getOperationSnapshot);
+  const [invalidId, setInvalidId] = useState<string | null>(null);
+  const submission = draftSubmission(pending.questions, draft);
+  const done = pending.questions.filter((question, index) => !answerIssue(question, submission.answers[index])).length;
+  const progress = i18n.formatMessage(messages.progress, { done, total: pending.questions.length });
+  const form = <QuestionForm pending={pending} draft={draft} update={entry.update} answer={submission => { void entry.perform(() => answer(submission)); }}
+    cancel={() => { void entry.perform(cancel); }} busy={busy} failed={failed} expanded={expanded}
+    invalidId={invalidId} setInvalidId={setInvalidId} focusVersion={focusVersion} />;
+  return <>
+    <AgentOverlay position="bottom" hideComposer>
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <MessageCircleQuestion className="size-4 shrink-0 text-muted-foreground" />
+          <div className="min-w-0 flex-1">
+            <p className="type-label truncate">{i18n.text(messages.title)}</p>
+            <p className="type-caption text-muted-foreground" aria-live="polite">{progress}</p>
+          </div>
+          <IconButton type="button" label={i18n.text(messages.enlarge)} onClick={() => setExpanded(true)}><Maximize2 /></IconButton>
+          <IconButton type="button" label={i18n.text(collapsed ? messages.expand : messages.collapse)} aria-expanded={!collapsed}
+            onClick={() => setCollapsed(!collapsed)}>{collapsed ? <ChevronUp /> : <ChevronDown />}</IconButton>
+        </div>
+        {!collapsed && !expanded && <>{children}{form}</>}
+        {expanded && <Button type="button" variant="ghost" size="sm" onClick={() => setExpanded(false)}>{i18n.text(messages.return)}</Button>}
+      </div>
+    </AgentOverlay>
+    <AgentModal open={expanded} onOpenChange={setExpanded} size="wide" title={messages.title} description={progress}>
+      {children}{expanded && form}
+    </AgentModal>
+  </>;
 }
 export default {
-  resources: [], cards: [],
-  tools: [toolRenderer(AskUserResult, {
-    label: messages.title, icon: <MessageCircleQuestion className="size-3.5" />,
-    input: { headerRenderer: Header }, execution: { headerRenderer: Header }, result: { headerRenderer: Header, bodyRenderer: Result },
-  })],
-  async prepare({ signal }) { agentUI.register({ id: builtin.name("questions"), Component: Questions }, { signal }); },
+  resources: [], cards: [], tools: [questionToolRenderer],
+  async prepare({ signal, events }) {
+    const subscription = events.subscribe(QuestionsChanged, { delivery: "latest", signal }, ({ data }) => {
+      questionDrafts.reconcile(data.sessionId, data.agentId, data.version, data.pendingIds);
+    });
+    signal.addEventListener("abort", () => questionDrafts.clear(), { once: true });
+    await subscription.ready;
+    agentUI.register({ id: builtin.name("questions"), Component: Questions }, { signal });
+  },
 } satisfies RendererModule;

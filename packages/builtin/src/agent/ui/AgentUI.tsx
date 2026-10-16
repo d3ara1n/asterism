@@ -6,6 +6,7 @@ import { agentUI, AgentUIRendererProvider, type AgentUIContribution, type AgentO
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@atelier/ui/ui/dialog";
 import { useBuiltinRendererServices } from "../../renderer-context";
 import { createComposerVisibility } from "./composer-visibility";
+import { ScrollArea } from "./ScrollArea";
 
 interface CardUI {
   targets: Record<AgentOverlayPosition, HTMLDivElement | null>;
@@ -14,7 +15,7 @@ interface CardUI {
 }
 const Context = createContext<CardUI | null>(null);
 const ContributionOrder = createContext(0);
-const renderer = { Overlay, Modal };
+const renderer = { Overlay, Modal, ScrollArea };
 function useCardUI() {
   const context = useContext(Context);
   if (!context) throw new Error("Agent UI requires its card layout.");
@@ -33,7 +34,7 @@ export function AgentUI({ children }: { children: ReactNode }) {
     composer,
   }), [top, center, bottom, composer]);
   return <Context.Provider value={value}><AgentUIRendererProvider value={renderer}>
-    <div className="relative flex min-h-0 flex-1 flex-col">
+    <div className="relative flex min-h-0 flex-1 flex-col [container-type:size]">
       {children}
       <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
         <div ref={setCenter} className="flex max-h-full min-h-0 w-full flex-col gap-3 overflow-y-auto p-3 empty:hidden" />
@@ -83,15 +84,16 @@ function Overlay({ position, hideComposer = false, children }: AgentOverlayProps
   }, [container, target]);
   useLayoutEffect(() => { container.style.order = String(order); }, [container, order]);
   useLayoutEffect(() => () => { container.remove(); }, [container]);
-  return target ? createPortal(<div className="surface-floating nokey pointer-events-auto min-h-0 overflow-auto p-3">{children}</div>, container) : null;
+  // 外壳不裁切；局部滚动通过 AgentScrollArea 统一提供视口和焦点光圈留白。
+  return target ? createPortal(<div className="surface-floating nokey pointer-events-auto min-h-0 p-3">{children}</div>, container) : null;
 }
-function Modal({ open, onOpenChange, title, description, hideComposer = false, children }: AgentModalProps) {
+function Modal({ open, onOpenChange, title, description, size = "default", hideComposer = false, children }: AgentModalProps) {
   const i18n = useI18n();
   const descriptionId = useId();
   const previousFocus = useRef<HTMLElement | null>(null);
   useHideComposer(open && hideComposer);
   return <Dialog open={open} onOpenChange={onOpenChange}>
-    <DialogContent className="nodrag nopan nokey max-h-[calc(100dvh-2rem)] overflow-y-auto"
+    <DialogContent className={`nodrag nopan nokey max-h-[calc(100dvh-2rem)] overflow-y-auto ${size === "wide" ? "sm:max-w-4xl" : ""}`}
       showCloseButton={!!onOpenChange} aria-describedby={description ? descriptionId : undefined}
       onOpenAutoFocus={() => { previousFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null; }}
       onCloseAutoFocus={event => {

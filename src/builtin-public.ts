@@ -9,6 +9,6 @@ export const builtinPublicProvider: PublicProvider = {
   name: metadata.name, version: metadata.version, pluginId: contracts.builtin.id,
   modules: { runtime: exports, renderer: {
     ...exports,
-    "@atelier/builtin-api/renderer": ["agentUI", "AgentOverlay", "AgentModal", "AgentUIRendererProvider"],
+    "@atelier/builtin-api/renderer": ["agentUI", "AgentOverlay", "AgentModal", "AgentScrollArea", "AgentUIRendererProvider"],
   } },
 };

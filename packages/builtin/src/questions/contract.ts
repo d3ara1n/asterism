@@ -2,14 +2,74 @@ import { z } from "zod";
 import { defineCall } from "@atelier/sdk/contracts";
 import { builtin } from "@atelier/builtin-api/contracts";
 
+const text = z.string().trim().min(1);
+const optionSchema = z.strictObject({
+  id: text.describe("Stable option ID, unique within this question."),
+  label: text.describe("Short option label in the user's language."),
+  description: text.optional().describe("Brief explanation of the meaningful differences or tradeoffs."),
+  detail: text.optional().describe("Optional Markdown detail, only when needed to make an informed choice. Supports tables and code."),
+});
+const common = {
+  id: text.describe("Stable question ID, unique within this call; returned with the answer."),
+  question: text.describe("The complete, concise question in the user's language."),
+  label: text.optional().describe("Optional short navigation label for a group of questions."),
+  context: text.optional().describe("Optional Markdown background needed to answer. Avoid repeating the conversation."),
+  required: z.boolean().default(true).describe("Whether an answer is required for submission. Optional questions may be left blank and return skipped. Default true."),
+};
+const choice = {
+  options: z.array(optionSchema).min(2).describe("Distinct choices, usually 2–5. Do not add an Other option: custom input is always available."),
+  recommendation: z.strictObject({
+    optionId: text.describe("ID of the recommended option. Does not preselect an answer."),
+    reason: text.describe("Brief reason for the recommendation, shown to the user."),
+  }).optional().describe("Optional recommendation, with an explicit reason."),
+};
+export const questionSchema = z.discriminatedUnion("type", [
+  z.strictObject({ ...common, type: z.literal("single").describe("Choose one option or supply a custom answer."), ...choice }),
+  z.strictObject({ ...common, type: z.literal("multiple").describe("Choose several options and/or add a custom answer."), ...choice }),
+  z.strictObject({ ...common, type: z.literal("text").describe("Write a free-form answer; no options.") }),
+]).superRefine((question, ctx) => {
+  if (question.type === "text") return;
+  if (new Set(question.options.map(option => option.id)).size !== question.options.length)
+    ctx.addIssue({ code: "custom", path: ["options"], message: "Option IDs must be unique within a question." });
+  if (question.recommendation && !question.options.some(option => option.id === question.recommendation!.optionId))
+    ctx.addIssue({ code: "custom", path: ["recommendation", "optionId"], message: "Recommendation must reference an offered option." });
+});
 export const askUserArgs = z.strictObject({
-  question: z.string().trim().min(1).describe("The question to show the user."),
-}).describe("Ask the user a question and wait for a text answer.");
-export const AskUserResult = builtin.data("ask-user", z.strictObject({
-  answer: z.string().describe("The user's answer."),
-}).describe("The user's answer to the question."));
+  questions: z.array(questionSchema).min(1).describe("Independent questions to answer together. Ask dependent follow-up questions in a later call."),
+}).superRefine((args, ctx) => {
+  if (new Set(args.questions.map(question => question.id)).size !== args.questions.length)
+    ctx.addIssue({ code: "custom", path: ["questions"], message: "Question IDs must be unique within a call." });
+}).describe("Ask for decisions or missing information, with single choice, multiple choice or free text.");
+
+export const submittedAnswerSchema = z.discriminatedUnion("status", [
+  z.strictObject({ id: text, status: z.literal("skipped") }),
+  z.strictObject({
+    id: text, status: z.literal("answered"), selected: z.array(text),
+    text: text.optional(),
+  }),
+]);
+export const submissionSchema = z.strictObject({ answers: z.array(submittedAnswerSchema), message: text.optional() });
+const answerSchema = z.strictObject({
+  id: text.describe("Original question ID."),
+  question: text.describe("Original question text."),
+  type: z.enum(["single", "multiple", "text"]).describe("Original question type."),
+  status: z.enum(["answered", "skipped"]).describe("Explicit user response state. Skipped does not mean consent."),
+  selected: z.array(z.strictObject({ id: text, label: text })).describe("User-selected options, with original IDs and labels."),
+  text: text.optional().describe("The user's custom answer, verbatim except outer whitespace."),
+  comment: text.optional().describe("Legacy per-question comment, retained when reading existing results."),
+});
+export const structuredAnswerSchema = z.strictObject({
+  answers: z.array(answerSchema).describe("Answers in original question order."),
+  message: text.optional().describe("User-authored overall correction or additional instructions. Interpret together with the answers."),
+});
+// 历史结果只读兼容；新调用始终使用结构化问答。
+export const AskUserResult = builtin.data("ask-user", z.union([
+  structuredAnswerSchema,
+  z.strictObject({ requestId: text.describe("Identity of the currently waiting question group; only published during execution.") }),
+  z.strictObject({ answer: z.string().describe("Legacy text answer.") }),
+]).describe("The user's submitted answers and qualifications. Cancellation is a separate tool outcome."));
 export const pendingQuestionSchema = z.strictObject({
-  id: z.string().uuid(), callId: z.string(), question: z.string(),
+  id: z.string().uuid(), callId: z.string(), questions: z.array(questionSchema),
 });
 export const questionSnapshotSchema = z.strictObject({
   version: z.number().int().nonnegative(), pending: z.array(pendingQuestionSchema),
@@ -18,15 +78,21 @@ export const ReadQuestions = defineCall(builtin.name("questions.read"), {
   input: z.null(), output: questionSnapshotSchema,
 });
 export const AnswerQuestion = defineCall(builtin.name("questions.answer"), {
-  input: z.strictObject({ id: z.string().uuid(), answer: z.string().trim().min(1) }), output: z.null(),
+  input: z.strictObject({ id: z.string().uuid(), submission: submissionSchema }), output: z.null(),
 });
 export const CancelQuestion = defineCall(builtin.name("questions.cancel"), {
   input: z.strictObject({ id: z.string().uuid() }), output: z.null(),
 });
 export const QuestionsChanged = builtin.event("questions.changed", {
-  schema: z.strictObject({ sessionId: z.string(), agentId: z.string(), version: z.number().int().nonnegative() }),
+  schema: z.strictObject({
+    sessionId: z.string(), agentId: z.string(), version: z.number().int().nonnegative(), pendingIds: z.array(z.string().uuid()),
+  }),
   source: "plugin", semantics: { kind: "snapshot", key: ["sessionId", "agentId"] },
 });
+export type Question = z.infer<typeof questionSchema>;
+export type Submission = z.infer<typeof submissionSchema>;
+export type SubmittedAnswer = z.infer<typeof submittedAnswerSchema>;
+export type StructuredAnswer = z.infer<typeof structuredAnswerSchema>;
 export type PendingQuestion = z.infer<typeof pendingQuestionSchema>;
 export type QuestionSnapshot = z.infer<typeof questionSnapshotSchema>;
 export type Answer = z.infer<typeof AskUserResult.schema>;

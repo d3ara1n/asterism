@@ -102,12 +102,13 @@ describe("内置公共包", () => {
     const f = fixture(["^0.2.0", "^0.2.0"]);
     for (const [index, root] of f.consumers.entries()) {
       file(root, "renderer.ts", `
-        import { agentUI, AgentOverlay } from "@atelier/builtin-api/renderer";
+        import { agentUI, AgentOverlay, AgentScrollArea } from "@atelier/builtin-api/renderer";
         import { createElement } from "react";
-        export { agentUI, AgentOverlay };
+        export { agentUI, AgentOverlay, AgentScrollArea };
         export default { resources: [], cards: [], tools: [], async prepare({ signal }) {
           agentUI.register({ id: "fixture.consumer${index}/panel",
-            Component: () => createElement(AgentOverlay, { position: "bottom", hideComposer: true, children: "Question" })
+            Component: () => createElement(AgentOverlay, { position: "bottom", hideComposer: true,
+              children: createElement(AgentScrollArea, { style: { maxHeight: "16rem" }, children: "Question" }) })
           }, { signal });
         } };
       `);
@@ -118,7 +119,9 @@ describe("内置公共包", () => {
       ...builtinPublicModules, "@atelier/builtin-api/renderer": builtinRendererAPI,
     }));
     const loaded = await Promise.all(packages.map(item => import(pathToFileURL(join(f.cache, item.renderer!)).href)));
-    expect(loaded.every(module => module.agentUI === builtinRendererAPI.agentUI && module.AgentOverlay === builtinRendererAPI.AgentOverlay)).toBe(true);
+    expect(loaded.every(module => module.agentUI === builtinRendererAPI.agentUI
+      && module.AgentOverlay === builtinRendererAPI.AgentOverlay
+      && module.AgentScrollArea === builtinRendererAPI.AgentScrollArea)).toBe(true);
     const lifetime = new AbortController();
     try {
       for (const module of loaded) await module.default.prepare({ signal: lifetime.signal });

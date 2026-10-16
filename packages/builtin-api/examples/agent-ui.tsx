@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { ResourceRef } from "@atelier/sdk/contracts";
-import { AgentModal, AgentOverlay, agentUI, type AgentOverlayPosition } from "@atelier/builtin-api/renderer";
+import { AgentModal, AgentOverlay, AgentScrollArea, agentUI, type AgentOverlayPosition } from "@atelier/builtin-api/renderer";
 import { useRendererObject, type RendererModule } from "@atelier/sdk/renderer";
 
 /** 插件按关联 Agent 提供业务状态与提交回调，界面只消费该接口。 */
@@ -53,7 +53,9 @@ function Question({ question }: { question: NonNullable<AgentUIState["question"]
       setError(error instanceof Error ? error.message : String(error));
     }).finally(() => { setBusy(false); });
   }}>
-    <label>{question.text}<input value={answer} disabled={busy} onChange={event => setAnswer(event.target.value)} /></label>
+    <AgentScrollArea style={{ maxHeight: "16rem" }}>
+      <label>{question.text}<input value={answer} disabled={busy} onChange={event => setAnswer(event.target.value)} /></label>
+    </AgentScrollArea>
     <button type="submit" disabled={busy}>Answer</button>
     {error && <p role="alert">{error}</p>}
   </form>;

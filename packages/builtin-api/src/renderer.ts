@@ -1,4 +1,4 @@
-import { createContext, createElement, useContext, type ComponentType, type ReactNode } from "react";
+import { createContext, createElement, useContext, type ComponentProps, type ComponentType, type ReactNode } from "react";
 import { pluginOf, pluginNamespace, type UiText } from "@atelier/sdk/contracts";
 
 /** 每个已展开的 Agent 卡片挂载一份；通过 SDK useRendererObject 取得关联对象。 */
@@ -51,16 +51,23 @@ export interface AgentModalProps {
   open: boolean;
   title: UiText;
   description?: UiText;
+  /** 宽内容（例如方案比较）可主动使用更宽的标准模态窗。 */
+  size?: "default" | "wide";
   /** 关闭只是界面意图；是否结束业务等待由插件处理。未提供时没有关闭入口。 */
   onOpenChange?(open: boolean): void;
   hideComposer?: boolean;
   children: ReactNode;
+}
+/** overlay／modal 内的标准滚动视口；内置实现统一预留控件焦点光圈空间。 */
+export interface AgentScrollAreaProps extends ComponentProps<"div"> {
+  axis?: "vertical" | "horizontal" | "both";
 }
 
 /** 内置 Agent 注入布局实现；公共包不依赖实现包或控件库。 */
 export interface AgentUIRenderer {
   Overlay: ComponentType<AgentOverlayProps>;
   Modal: ComponentType<AgentModalProps>;
+  ScrollArea: ComponentType<AgentScrollAreaProps>;
 }
 const Renderer = createContext<AgentUIRenderer | null>(null);
 export const AgentUIRendererProvider = Renderer.Provider;
@@ -74,4 +81,7 @@ export function AgentOverlay(props: AgentOverlayProps): ReactNode {
 }
 export function AgentModal(props: AgentModalProps): ReactNode {
   return createElement(useAgentUIRenderer().Modal, props);
+}
+export function AgentScrollArea(props: AgentScrollAreaProps): ReactNode {
+  return createElement(useAgentUIRenderer().ScrollArea, props);
 }

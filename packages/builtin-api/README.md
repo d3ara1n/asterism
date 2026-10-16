@@ -67,10 +67,13 @@ export default {
 | --- | --- |
 | `agentUI.register({ id, Component }, { signal })` | `id` 使用贡献插件的 `namespace.name(...)`；返回幂等的释放函数，也随 signal 释放。登记不应放在模块顶层副作用中 |
 | `AgentOverlay` | `position: "top" \| "center" \| "bottom"`、可选 `hideComposer`、任意 `children`；不显示时不挂载此组件 |
-| `AgentModal` | 受控 `open`、`title: UiText`、可选 `description / onOpenChange / hideComposer` 与任意 `children` |
+| `AgentModal` | 受控 `open`、`title: UiText`、可选 `description / onOpenChange / hideComposer`、`size: "default" \| "wide"`（默认 default）与任意 `children` |
+| `AgentScrollArea` | overlay／modal 内的标准滚动区，`axis: "vertical" \| "horizontal" \| "both"`（默认 vertical）；支持 div 属性、`ref`、`className` 和 `style`，由内置实现统一处理焦点光圈留白与内容对齐 |
 | `agentUI.subscribe / getSnapshot` | 内置实现订阅已登记贡献，保持同一公共服务实例 |
-| `AgentUIRendererProvider` | 内置实现注入两类呈现组件；第三方作者直接使用 `AgentOverlay / AgentModal` |
+| `AgentUIRendererProvider` | 内置实现注入两类呈现组件及标准滚动区；第三方作者直接使用 `AgentOverlay / AgentModal / AgentScrollArea` |
 
 每个贡献组件可同时呈现多个界面，通常用自己的 hooks 订阅业务状态。`useRendererObject()` 绑定当前 Agent；`useRendererPreferences()` 绑定贡献插件，其他 SDK hooks 沿用当前卡片的服务。UI 只改变呈现，不修改工具的取消、超时或结果协议。完整交互规则见 [Agent 扩展界面](../../docs/workbench.md#agent-扩展界面)。
+
+需要局部滚动时，用 `<AgentScrollArea style={{ maxHeight: "16rem" }}>…</AgentScrollArea>` 包裹正文，固定标题和按钮放在外面；插件无需自行配置焦点光圈的 padding 或负边距。视觉规则见 [对象卡片尺寸](../../docs/design-system.md#对象卡片尺寸)。
 
 [可编译的界面示例](examples/agent-ui.tsx) 接收插件提供的状态 hook，展示待办位置选择、`bottom + hideComposer` 提问和受控模态窗。示例不实现顶层工具或前后端通信；真实问答服务须在提交答案成功后清除待回答项，组件卸载不替代服务清理。恢复待回答状态、关联调用身份和工具取消由业务服务负责。
