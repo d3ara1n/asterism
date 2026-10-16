@@ -2,7 +2,7 @@ import { Models, type Catalog, type Model, type ModelMetadata } from "@opencode-
 import { z } from "zod";
 import { modelInputSchema, thinkingSchema, type ProviderModel, type ModelParameterUpdate } from "../shared/configuration.ts";
 import { modelCatalogMessages as messages } from "../shared/model-catalog-messages.ts";
-import { emptyModelRates, modelCostSchema, type ModelCost, type ModelRates, type UnitPrice } from "../shared/model-cost.ts";
+import { emptyModelRates, modelCostSchema, type ModelCost, type ModelRates, type UnitPrice } from "@atelier/sdk/contracts";
 import { ConfigurationError } from "./errors.ts";
 
 export type LoadModelCatalog = (signal: AbortSignal) => Promise<Catalog>;

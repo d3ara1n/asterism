@@ -1,0 +1,31 @@
+{
+  "name": "@atelier/ui",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    "./tool-header": "./src/tool-header.tsx",
+    "./json-view": "./src/json-view.tsx",
+    "./utils": "./src/utils.ts",
+    "./ConfigurationChoice": "./src/ConfigurationChoice.tsx",
+    "./links": "./src/links.ts",
+    "./tool-content": "./src/tool-content.tsx",
+    "./messages/common": "./src/messages/common.ts",
+    "./messages/tools": "./src/messages/tools.ts",
+    "./messages/model-selection": "./src/messages/model-selection.ts",
+    "./ui/*": "./src/ui/*.tsx"
+  },
+  "dependencies": {
+    "class-variance-authority": "0.7.1",
+    "clsx": "2.1.1",
+    "cmdk": "1.1.1",
+    "lucide-react": "1.55.0",
+    "radix-ui": "1.8.0",
+    "tailwind-merge": "3.7.0",
+    "@atelier/sdk": "^0.18.0"
+  },
+  "peerDependencies": {
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  }
+}

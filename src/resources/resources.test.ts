@@ -3,9 +3,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import * as runtimeModules from "../modules/runtime.ts";
+import * as runtimeModules from "../runtime/builtin.ts";
 import { ApplicationService } from "../runtime/service.ts";
-import { Directory } from "../modules/filesystem/contract.ts";
+import { Directory } from "../../packages/builtin/src/filesystem/contract.ts";
 import { defineData, defineImplementation, defineTool } from "@atelier/sdk/contracts";
 import { implement } from "../tools/testing.ts";
 import { ToolRegistry } from "../tools/registry.ts";
@@ -30,8 +30,8 @@ function setup() {
   mkdirSync(root); mkdirSync(outside);
   mkdirSync(join(root, "subdir"));
   writeFileSync(join(root, "a.txt"), "hello"); writeFileSync(join(outside, "secret.txt"), "secret");
-  const resource: FoldedObject = { id: "d1", kind: "atelier.core/directory", title: "root", data: { path: root } };
-  const note: FoldedObject = { id: "n1", kind: "atelier.core/note", title: "Note", data: {} };
+  const resource: FoldedObject = { id: "d1", kind: "atelier.builtin/directory", title: "root", data: { path: root } };
+  const note: FoldedObject = { id: "n1", kind: "atelier.builtin/note", title: "Note", data: {} };
   let modules!: ReturnType<typeof runtimeModules.createModules>;
   const createModules = runtimeModules.createModules;
   const capture = vi.spyOn(runtimeModules, "createModules").mockImplementation((...args) => {
@@ -64,7 +64,7 @@ async function invoke(capabilities: AgentCapabilities, name: string, args: Json)
 describe("工具与资源的匹配及授权", () => {
   it("请求捕获的目录和笔记在期间移除后仍能检查和写入，后续请求撤销访问", async () => {
     const { service, sessionId, resource, scope } = setup();
-    await service.sessions.execute({ type: "resource.create", sessionId, kind: "atelier.core/note", creation: { id: "atelier.core/note.create" },
+    await service.sessions.execute({ type: "resource.create", sessionId, kind: "atelier.builtin/note", creation: { id: "atelier.builtin/note.create" },
       input: { title: "Captured note", content: "before" }, position: { x: 0, y: 0 } });
     const note = foldWorkbench(service.sessions.tree.timeline(sessionId)).objects.find(object => object.title === "Captured note")!;
     const captured = scope([resource, note]);
@@ -186,7 +186,7 @@ describe("工具与资源的匹配及授权", () => {
       arguments: { resource_id: resource.id, tool: "list", args: {} } }],
     scope(), controller.signal, (_call, result) => results.push(result));
     expect(results).toMatchObject([{
-      kind: "cancelled", implementation: { id: "atelier.core/directory.list" }, data: null,
+      kind: "cancelled", implementation: { id: "atelier.builtin/directory.list" }, data: null,
     }]);
     expect(results[0]).not.toHaveProperty("startedAt");
   });

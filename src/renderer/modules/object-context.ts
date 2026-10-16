@@ -2,7 +2,7 @@ import { createElement, useCallback, useMemo, type ReactNode } from "react";
 import { RendererCatalogsProvider, RendererModelsProvider, RendererPreferencesProvider, RendererToolsProvider, type RendererCatalogs, type RendererObjectContext } from "@atelier/sdk/renderer";
 import { pluginOf, resourceCall, reference } from "@atelier/sdk/contracts";
 import type { WorkbenchObject } from "../../shared/workbench";
-import { ModelConfiguration } from "../../modules/agent/configuration";
+import { ModelConfiguration } from "@atelier/builtin-api/contracts";
 import { sessionSnapshot } from "../../plugins/records";
 import { nodeView } from "../../session/view";
 import { useWorkbench } from "../features/workbench/context";

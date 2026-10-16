@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useLayoutEffect, use
 import type { UiText } from "@atelier/sdk/contracts";
 import { useI18n } from "@atelier/sdk/renderer";
 import { windowGeometry } from "../../../shared/desktop";
-import { cn } from "../utils";
+import { cn } from "@atelier/ui/utils";
 
 import { fadeTransition, islandTransition } from "./motion";
 import { closeIsland, focusIsland, follow, layout, openIsland, type IslandWidth } from "./model";

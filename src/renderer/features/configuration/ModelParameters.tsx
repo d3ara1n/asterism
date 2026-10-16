@@ -7,9 +7,9 @@ import type { UiText } from "@atelier/sdk/contracts";
 import { providersMessages } from "../../messages/providers";
 import { modelCostMessages } from "../../messages/model-cost";
 import { useI18n } from "../../shared/i18n";
-import { Alert, AlertDescription } from "../../shared/ui/alert";
-import { Button } from "../../shared/ui/button";
-import { Spinner } from "../../shared/ui/spinner";
+import { Alert, AlertDescription } from "@atelier/ui/ui/alert";
+import { Button } from "@atelier/ui/ui/button";
+import { Spinner } from "@atelier/ui/ui/spinner";
 import { useSettingsConfiguration } from "./state";
 
 const fields = {

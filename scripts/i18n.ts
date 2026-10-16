@@ -45,17 +45,17 @@ function groups(packageRoot?: string): Group[] {
   return [{
     owner: "atelier.host",
     root: project,
-    files: [...files(join(project, "src/renderer")), ...files(join(project, "src/shared"))],
+    files: [...files(join(project, "src/renderer")), ...files(join(project, "src/shared")), ...files(join(project, "packages/ui/src"))],
     catalogs: {
       "zh-Hans": "src/shared/locales/zh-Hans.json"
     },
     complete: true
   }, {
-    owner: "atelier.core",
+    owner: "atelier.builtin",
     root: project,
-    files: files(join(project, "src/modules")),
+    files: files(join(project, "packages/builtin/src")),
     catalogs: {
-      "zh-Hans": "src/modules/locales/zh-Hans.json"
+      "zh-Hans": "packages/builtin/src/locales/zh-Hans.json"
     },
     complete: true
   }];

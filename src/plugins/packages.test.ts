@@ -29,7 +29,7 @@ describe("插件包", () => {
     expect(() => list.add({ source: { kind: "path", path: dir } }, data)).toThrow();
     expect(list.read()).toEqual([]);
   });
-  it("API 8.3 接受兼容小版本，拒绝旧主版本与更高小版本", () => {
+  it("API 8.4 接受兼容小版本，拒绝旧主版本与更高小版本", () => {
     const dir = temp();
     pkg(dir, { id: "acme.x", api: { major: 8, minMinor: 0 } });
     expect(readManifest(dir).api).toEqual({ major: 8, minMinor: 0 });
@@ -42,6 +42,8 @@ describe("插件包", () => {
     pkg(dir, { id: "acme.x", api: { major: 8, minMinor: 3 } });
     expect(readManifest(dir).api).toEqual({ major: 8, minMinor: 3 });
     pkg(dir, { id: "acme.x", api: { major: 8, minMinor: 4 } });
+    expect(readManifest(dir).api).toEqual({ major: 8, minMinor: 4 });
+    pkg(dir, { id: "acme.x", api: { major: 8, minMinor: 5 } });
     expect(() => readManifest(dir)).toThrow();
   });
   it("源码包经 esbuild 打包导入，SDK 解析到宿主实例；禁用与重复 ID 不加载", async () => {
@@ -54,7 +56,7 @@ describe("插件包", () => {
     list.add({ source: { kind: "path", path: b } }, data);
     expect(() => list.add({ source: { kind: "path", path: c } }, data)).toThrow();
     list.setEnabled(1, false);
-    const loaded = await loadPackages(list, data, join(data, "cache"), ["atelier.core"]);
+    const loaded = await loadPackages(list, data, join(data, "cache"), ["atelier.builtin"]);
     expect(loaded.map(item => [item.manifest?.id, item.status])).toEqual([["acme.a", "loaded"], ["acme.b", "disabled"]]);
     expect(loaded[0]!.definition?.namespace.id).toBe("acme.a");
   });

@@ -1,22 +1,20 @@
 import { ArrowUp, Bot, Settings } from "lucide-react";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import type { MessageDraft } from "../../../modules/agent/conversation/draft";
-import { defaultAgentPreset } from "../../../modules/agent/contract";
-import { AttachFiles, DraftFiles, fileInputEvents } from "../../../modules/agent/conversation/Files";
+import { type MessageDraft, AttachFiles, DraftFiles, fileInputEvents, ModelChoices } from "@atelier/builtin/renderer";
+import { defaultAgentPreset } from "@atelier/builtin-api/contracts";
 
 import type { ThinkingLevel } from "../../../shared/configuration";
 import type { SessionCommand } from "../../../shared/session";
 import { appMessages } from "../../messages/app";
-import { commonMessages } from "../../messages/common";
+import { commonMessages } from "@atelier/ui/messages/common";
 import { homeMessages } from "../../messages/home";
-import { ConfigurationChoice as Choice } from "../../shared/ConfigurationChoice";
+import { ConfigurationChoice as Choice } from "@atelier/ui/ConfigurationChoice";
 import { useI18n } from "../../shared/i18n";
-import { BrandMark } from "../../shared/ui/brand-mark";
-import { StatusText } from "../../shared/ui/status";
-import { Button } from "../../shared/ui/button";
-import { IconButton } from "../../shared/ui/icon-button";
-import { InputGroup, InputGroupTextarea, InputGroupAddon } from "../../shared/ui/input-group";
-import { ModelChoices } from "../../shared/ModelChoices";
+import { BrandMark } from "@atelier/ui/ui/brand-mark";
+import { StatusText } from "@atelier/ui/ui/status";
+import { Button } from "@atelier/ui/ui/button";
+import { IconButton } from "@atelier/ui/ui/icon-button";
+import { InputGroup, InputGroupTextarea, InputGroupAddon } from "@atelier/ui/ui/input-group";
 import { useConfiguration } from "../configuration/state";
 import { Showcase, showcaseSpell } from "../showcase/Showcase";
 

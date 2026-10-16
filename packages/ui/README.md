@@ -1,0 +1,7 @@
+# 内部共享 UI（`@atelier/ui`）
+
+应用与内置插件共用的基础控件、布局 helper、JSON／工具展示与界面消息。沿用 [设计系统](../../docs/design-system.md) 的 token 和样式，不持有应用状态、不访问 `window.host`，不导入宿主实现或内置 Agent。
+
+通过 package.json 中的显式子入口消费，例如 `@atelier/ui/ui/button`、`@atelier/ui/ConfigurationChoice`。依赖 React、通用 SDK 的展示／本地化接口与既有 UI 库。本包不是插件，也不是对外插件作者的稳定 UI SDK。
+
+应用负责加载主题样式与 `atelier.host` 翻译目录；Tailwind 源扫描包含本包与内置实现。需要访问应用状态的组合（如主题绑定的 toast）留在应用侧。

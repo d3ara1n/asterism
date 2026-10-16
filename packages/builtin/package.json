@@ -1,0 +1,25 @@
+{
+  "name": "@atelier/builtin",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    "./runtime": "./src/runtime.ts",
+    "./renderer": "./src/renderer.ts",
+    "./locales/zh-Hans.json": "./src/locales/zh-Hans.json"
+  },
+  "dependencies": {
+    "@pierre/diffs": "1.5.2",
+    "diff": "9.0.0",
+    "lucide-react": "1.55.0",
+    "motion": "14.1.0",
+    "streamdown": "2.7.0",
+    "@atelier/sdk": "^0.18.0",
+    "@atelier/builtin-api": "^0.1.0",
+    "@atelier/ui": "^0.1.0"
+  },
+  "peerDependencies": {
+    "react": "19.3.0",
+    "zod": "^4.6.5"
+  }
+}

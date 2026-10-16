@@ -1,8 +1,13 @@
+import { agentInputSchema, agentSchema, agentOverridesSchema } from "@atelier/builtin-api/contracts";
+export { agentInputSchema, agentSchema, agentOverridesSchema, type AgentConfiguration, type AgentOverrides } from "@atelier/builtin-api/contracts";
+import {
+  modelExpressionSchema, parseModelExpression, modelReference, thinkingSchema, type ThinkingLevel,
+  thinkingLevels, modelCostSchema, uiTextSchema,
+} from "@atelier/sdk/contracts";
+export { modelExpressionSchema, parseModelExpression, formatModelExpression, modelReference, thinkingSchema, type ModelExpression, type ThinkingLevel } from "@atelier/sdk/contracts";
 import { z } from "zod";
 import { coreChannel } from "./core.ts";
-import { thinkingLevels } from "@atelier/sdk/contracts";
 import { modelCompatibilitySchema } from "./model-compatibility.ts";
-import { modelCostSchema } from "./model-cost.ts";
 
 export const configurationChannel = coreChannel("configuration");
 export const configurationChangedChannel = coreChannel("configuration-changed");
@@ -14,22 +19,7 @@ const revision = z.number().int().positive();
 export const providerIdSchema = z.string().trim().min(1).max(160).regex(/^[^/\s]+$/u, "Provider IDs cannot contain '/' or whitespace.");
 /** 服务端模型 ID：全局共识的模型名，可含 `/`，不含空白。 */
 const serverModelId = z.string().trim().min(1).max(160).regex(/^\S+$/u, "Model IDs cannot contain whitespace.");
-/** 模型表达式 `<providerId>/<modelId>`：提供商与模型必定成对，按第一个 `/` 切分。 */
-export interface ModelExpression { provider: string; model: string }
-export function parseModelExpression(value: string): ModelExpression | null {
-  const index = value.indexOf("/");
-  if (index <= 0 || index === value.length - 1) return null;
-  return { provider: value.slice(0, index), model: value.slice(index + 1) };
-}
-export function formatModelExpression(expression: ModelExpression): string { return `${expression.provider}/${expression.model}`; }
-export const modelExpressionSchema = z.string().max(321).refine(value => parseModelExpression(value) !== null, "Use a model expression such as provider/model.");
-/** 具体模型的引用串；与模型记录一一对应，不使用随机记录 ID。 */
-export function modelReference(model: { providerId: string; modelId: string }): string {
-  return formatModelExpression({ provider: model.providerId, model: model.modelId });
-}
 export const protocolSchema = z.enum(["openai-responses", "openai-chat", "anthropic"]);
-export const thinkingSchema = z.enum(thinkingLevels);
-export type ThinkingLevel = z.infer<typeof thinkingSchema>;
 const endpoint = z.string().trim().url().refine(value => {
   const url = new URL(value);
   return ["http:", "https:"].includes(url.protocol) && !url.username && !url.password && !url.search && !url.hash;
@@ -57,20 +47,8 @@ export const modelRoleInputSchema = z.strictObject({
   name, model: modelExpressionSchema.nullable(), thinking: thinkingSchema.nullable(), enabled: z.boolean(), description: z.string().max(20_000), hidden: z.boolean(),
 });
 export const modelRoleSchema = modelRoleInputSchema.extend({ id, revision, builtin: z.boolean() });
-const names = z.array(id).max(200);
-const agentFieldsSchema = z.strictObject({
-  name, enabled: z.boolean(), description: z.string().max(20_000), systemPrompt: z.string().max(100_000),
-  modelRole: id.nullable(), fallbackRole: id.nullable(), examples: z.array(z.string().max(4_000)).max(50), decisionTrigger: z.string().max(4_000),
-  tools: names.nullable(), excludeTools: names.nullable(), subagentRoles: names.nullable(),
-  timeout: z.number().int().positive().max(86_400).nullable(), maxTurns: z.number().int().positive().nullable(),
-});
-export const agentInputSchema = agentFieldsSchema.refine(value => value.tools === null || value.excludeTools === null, "Tool allowlist and denylist are mutually exclusive.");
-export const agentSchema = agentInputSchema.safeExtend({ id, revision, builtin: z.boolean() });
-// 留空文本在保存时移除覆盖；false、null 和空列表保留各自的业务含义。
 const overrideName = z.string().trim().max(160).optional();
 export const modelRoleOverridesSchema = modelRoleInputSchema.partial().extend({ name: overrideName });
-export const agentOverridesSchema = agentFieldsSchema.partial().extend({ name: overrideName })
-  .refine(value => value.tools == null || value.excludeTools == null, "Tool allowlist and denylist are mutually exclusive.");
 export const testErrorSchema = z.enum(["configuration", "credential", "authentication", "model_unavailable", "rate_limit", "network", "timeout", "protocol", "server", "cancelled"]);
 export const connectionTestSchema = z.strictObject({
   id, providerId: providerIdSchema, providerRevision: revision, model: modelExpressionSchema, modelRevision: revision,
@@ -150,9 +128,7 @@ export type Provider = z.infer<typeof providerSchema>;
 export type ProviderInput = z.infer<typeof providerInputSchema>;
 export type ProviderModel = z.infer<typeof modelSchema>;
 export type ModelRole = z.infer<typeof modelRoleSchema>;
-export type AgentConfiguration = z.infer<typeof agentSchema>;
 export type ModelRoleOverrides = z.infer<typeof modelRoleOverridesSchema>;
-export type AgentOverrides = z.infer<typeof agentOverridesSchema>;
 export type ConfigurationSnapshot = z.infer<typeof configurationSnapshotSchema>;
 export type ConfigurationCommand = z.infer<typeof configurationCommandSchema>;
 export type ConfigurationResult = z.infer<typeof configurationResultSchema>;
@@ -173,18 +149,8 @@ export function resolveProviderModel(snapshot: ConfigurationSnapshot, reference:
   return provider?.enabled ? { model, provider } : null;
 }
 
-/** 只投影菜单能力，不把角色默认值写回代理选择，也不提前拒绝未解析的选择。 */
-export function resolveAgentModel(snapshot: ConfigurationSnapshot, selection: { agent: string | null; model: string | null }): ProviderModel | null {
-  const agent = snapshot.agents.find(item => item.id === selection.agent);
-  const role = snapshot.roles.find(item => item.id === (agent?.modelRole ?? "default"));
-  return resolveProviderModel(snapshot, selection.model ?? role?.model ?? null)?.model ?? null;
-}
-
-/** 未确定模型时保留标准选项，最终可用性由请求适配层检查。 */
-export function availableThinkingLevels(model: Pick<ProviderModel, "capabilities"> | null): readonly ThinkingLevel[] {
-  if (!model) return thinkingLevels;
-  return model.capabilities.reasoning ? thinkingLevels.filter(level => model.capabilities.thinkingLevels.includes(level)) : [];
-}
+export { resolveAgentModel } from "@atelier/builtin-api/contracts";
+export { availableThinkingLevels } from "@atelier/sdk/contracts";
 
 /**
  * 空值才继承；丢失、停用的配置必须由消费方显式处理，不能偷偷换成其他模型。
@@ -200,4 +166,3 @@ export function resolveModelRole(snapshot: ConfigurationSnapshot, roleId: string
   if (model === null) return { model, thinking, error: null };
   return { model, thinking, error: resolveProviderModel(snapshot, model) ? null : "model_unavailable" };
 }
-import { uiTextSchema } from "@atelier/sdk/contracts";

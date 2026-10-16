@@ -5,10 +5,10 @@ import { mergeModelCompatibility, modelCompatibilityDefinition, modelCompatibili
 import { providersMessages } from "../../messages/providers";
 import { ConfigurationValue } from "../../shared/ConfigurationValue";
 import { useI18n } from "../../shared/i18n";
-import { Badge } from "../../shared/ui/badge";
-import { Button } from "../../shared/ui/button";
-import { Card } from "../../shared/ui/card";
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "../../shared/ui/dropdown-menu";
+import { Badge } from "@atelier/ui/ui/badge";
+import { Button } from "@atelier/ui/ui/button";
+import { Card } from "@atelier/ui/ui/card";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@atelier/ui/ui/dropdown-menu";
 import { EditorSection } from "./forms";
 import { modelProtocolLabels } from "./protocols";
 

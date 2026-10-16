@@ -7,9 +7,9 @@ import { PluginsSettings } from "../plugins/PluginsSettings";
 import { Row } from "./layout";
 import { LayoutGroup, AnimatePresence, motion } from "motion/react";
 
-import { CardHeader, CardTitle, CardDescription, Card } from "../../shared/ui/card";
+import { CardHeader, CardTitle, CardDescription, Card } from "@atelier/ui/ui/card";
 
-import { Button } from "../../shared/ui/button";
+import { Button } from "@atelier/ui/ui/button";
 import { ArrowLeft, Info, Palette, Cpu, PlugZap, Bot, Puzzle, type LucideProps } from "lucide-react";
 import { ConfigurationStatus } from "../configuration/forms";
 import { ConfigurationContext, useConfiguration } from "../configuration/state";

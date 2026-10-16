@@ -1,7 +1,7 @@
 {
   "name": "@atelier/sdk",
   "private": true,
-  "version": "0.17.0",
+  "version": "0.18.0",
   "type": "module",
   "exports": {
     "./contracts": "./src/contracts.ts",
@@ -17,5 +17,10 @@
     "react-intl": {
       "optional": true
     }
-  }
+  },
+  "files": [
+    "src",
+    "!src/**/*.test.ts",
+    "README.md"
+  ]
 }

@@ -1,8 +1,8 @@
-import { IconButton } from "../ui/icon-button";
+import { IconButton } from "@atelier/ui/ui/icon-button";
 import { X } from "lucide-react";
 import type { ReactNode, Ref } from "react";
 
-import { commonMessages } from "../../messages/common";
+import { commonMessages } from "@atelier/ui/messages/common";
 import { useI18n } from "../i18n";
 import { useIsland } from "./Screen";
 

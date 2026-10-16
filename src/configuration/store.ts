@@ -5,7 +5,7 @@ import { z } from "zod";
 import { applicationStorage } from "../shared/application.ts";
 import { agentOverridesSchema, modelReference, modelRoleOverridesSchema, modelSchema, providerInputSchema,
   type AgentOverrides, type ModelRoleOverrides, type ProviderInput, type ProviderModel } from "../shared/configuration.ts";
-import { modelCostSchema } from "../shared/model-cost.ts";
+import { modelCostSchema } from "@atelier/sdk/contracts";
 import { defaultAgents, defaultRoles } from "./defaults.ts";
 import { ConfigurationError } from "./errors.ts";
 import { normalizeOverrides, resolveAgentConfiguration, resolveRoleConfiguration } from "./layers.ts";

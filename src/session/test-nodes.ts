@@ -1,9 +1,9 @@
 /** 测试夹具：按通用记录节点构造 agent 与工作台记录，形状只在此维护。 */
 import type { Json, ModelCompletion, ToolOutcome } from "@atelier/sdk/contracts";
-import { Execution, Notice, UserMessage } from "../modules/agent/records.ts";
+import { Execution, Notice, UserMessage } from "@atelier/builtin-api/contracts";
 import type { NewNode, SessionNode } from "../shared/session.ts";
 
-export const agentSource = (id: string) => ({ plugin: "atelier.core", resource: { sessionId: "s", id, kind: "atelier.core/agent" } });
+export const agentSource = (id: string) => ({ plugin: "atelier.builtin", resource: { sessionId: "s", id, kind: "atelier.builtin/agent" } });
 export const hostSource = null;
 const modelSource = { model: "p/m", adapter: "test/1", scope: "s" };
 type BlockOptions = { requestParentId?: string | null; complete?: boolean; continuation?: Json; completion?: ModelCompletion | null };
@@ -30,7 +30,7 @@ export const notice = (agentId: string | null, code: string, value: string, leve
   record(Notice.id, { code, message: value, level, ...data }, agentId ? agentSource(agentId) : hostSource);
 export const event = (type: string, data: Json, options: { source?: NewNode["source"]; model?: string | null; recipient?: string | null } = {}): NewNode =>
   ({ contract: type, data, source: options.source ?? hostSource, model: options.model ?? null, recipient: options.recipient ?? null });
-export const created = (id: string, title: string, kind = "atelier.core/agent") => event("resource_created", { id, title, type: kind });
+export const created = (id: string, title: string, kind = "atelier.builtin/agent") => event("resource_created", { id, title, type: kind });
 export const attached = (agentId: string, resourceId: string, model: string | null = `${resourceId} attached`) =>
   event("resource_attached", { id: resourceId, agentId }, { model, recipient: agentId });
 export const removed = (id: string) => event("object_removed", { id });

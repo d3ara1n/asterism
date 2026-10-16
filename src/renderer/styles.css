@@ -1,9 +1,10 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @source "../../node_modules/streamdown/dist/*.js";
-@source "../modules";
+@source "../../packages/builtin/src";
+@source "../../packages/ui/src";
 
-/* 主题 token、两种表面、窗口与编织布局机制。控件外观只来自 shared/ui 的 shadcn 官方源码。 */
+/* 主题 token、两种表面、窗口与编织布局机制。控件外观只来自 packages/ui 的 shadcn 官方源码。 */
 :root {
   color-scheme: light;
   /* shadcn 标准语义 token；组件与业务只消费这一层。主题替换整组值即可。 */

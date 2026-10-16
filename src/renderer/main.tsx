@@ -4,7 +4,7 @@ import { EventClient } from "../shared/event-client";
 import { HostI18nProvider, startLanguage } from "./shared/i18n";
 import { ErrorBoundary } from "./app/ErrorBoundary";
 import { MotionConfig } from "motion/react";
-import { TooltipProvider } from "./shared/ui/tooltip";
+import { TooltipProvider } from "@atelier/ui/ui/tooltip";
 import { ModuleViewsProvider } from "./modules/views";
 import { HostConfigsProvider } from "./modules/configs";
 import { App } from "./app/App";
@@ -17,7 +17,7 @@ import "./styles.css";
 
 import { startAppearance } from "./features/appearance/state";
 
-import { builtinViews } from "../modules/renderer";
+import { builtinViews } from "@atelier/builtin/renderer";
 import { ViewRegistry } from "./modules/registry";
 import { workbenchRecordViews } from "./features/workbench/records";
 import { loadPluginRenderers } from "./modules/plugins";
@@ -25,6 +25,9 @@ import { loadPreferences } from "./features/creation/preferences";
 import { prepareModules, showStartupStage } from "./app/startup";
 import { getI18n } from "./shared/i18n";
 import { appMessages } from "./messages/app";
+import { builtin } from "@atelier/builtin-api/contracts";
+import { bindPublicProvider } from "../shared/public-modules";
+import { builtinPublicProvider, builtinPublicModules } from "../builtin-public";
 
 startAppearance();
 const events = new EventClient(window.host.events);
@@ -36,13 +39,14 @@ window.addEventListener("pagehide", () => { lifetime.abort(); events.close(); st
 const initial = await window.host.execute({ type: "workspace.read" }).catch(() => null);
 await startLanguage(initial?.ok ? initial.snapshot.catalogs ?? [] : []).catch(error => console.error("Language settings could not be loaded. English is used.", error));
 showStartupStage(getI18n().formatMessage(appMessages.startupPlugins));
-const plugins = initial?.ok ? initial.snapshot.plugins.flatMap(p => p.status === "loaded" && p.renderer && p.id ? [{ id: p.id, renderer: p.renderer }] : []) : [];
-const { modules } = await loadPluginRenderers(plugins);
+const plugins = initial?.ok ? initial.snapshot.plugins.flatMap(p => p.status === "loaded" && p.id ? [{ id: p.id, renderer: p.renderer, dependencies: p.dependencies }] : []) : [];
 const accepted = [...builtinViews, workbenchRecordViews];
-for (const module of modules) {
-  try { new ViewRegistry([...accepted, module]); accepted.push(module); }
-  catch (error) { console.error("Plugin views conflict with existing views and were skipped.", error); }
-}
+new ViewRegistry(accepted);
+const releasePublic = bindPublicProvider("renderer", builtinPublicProvider, builtinPublicModules);
+window.addEventListener("pagehide", releasePublic, { once: true });
+await loadPluginRenderers(plugins, { available: [builtin.id], accept(module) {
+  new ViewRegistry([...accepted, module]); accepted.push(module);
+} });
 const moduleViews = new ViewRegistry(accepted);
 showStartupStage(getI18n().formatMessage(appMessages.startupEnvironment));
 await Promise.all([prepareModules(accepted, events, undefined, lifetime.signal), loadPreferences()]);

@@ -24,7 +24,7 @@
 - 技术基线：Electron + React + TypeScript，shadcn/ui（Radix）+ Tailwind CSS 与 @xyflow/react，SQLite（`node:sqlite`）与本地对象存储，Zod，独立 Node.js 任务运行时；包管理器 npm，构建 electron-vite，打包 Electron Forge。模型请求适配使用 Vercel AI SDK。测试以 macOS 为主，发布目标覆盖 macOS、Windows 与 Linux。选型与职责见 `docs/architecture.md`，已安装版本见 `package-lock.json`。
 - 开发数据与发布数据隔离，均使用 Electron 数据目录；测试使用独立临时目录并清理。一次性原型仅留于 `feat/ux-prototype`，正式分支不依赖其代码。
 - 品牌、固定应用身份与数据布局统一维护在 `src/shared/application.ts`，内部契约与通道身份见 `src/shared/core.ts`。UI 视觉以 `docs/design-system.md` 为准：原生材质底座、独立内容表面、统一 token 与公共控件；新功能复用现有风格，整体视觉变更须由用户确认。
-- 界面控件先查 shadcn registry：`shared/ui/` 缺少时用 `npx shadcn@latest add <name>` 拉取（官方控件不算新依赖），再组合使用；拉取后核对导入路径为相对路径，并清理 CLI 误加的依赖或目录。
+- 界面控件先查 shadcn registry：`packages/ui/src/ui/` 缺少时用 `npx shadcn@latest add <name>` 拉取（官方控件不算新依赖），再组合使用；拉取后核对导入路径为相对路径，并清理 CLI 误加的依赖或目录。
 
 ## 验证职责
 
@@ -46,7 +46,7 @@
 | `src/README.md` | 进程与目录职责、跨层调用路径、开发扩展入口 |
 | `src/renderer/README.md` | 前端目录结构、状态协调与界面组件职责 |
 | `src/configuration/README.md` | 提供商预设声明、全局配置存储与连接测试实现 |
-| `src/modules/README.md` | 内置 `atelier.core` 功能模块的契约、后台与视图编写规范 |
+| `packages/builtin/README.md` | 内置 `atelier.builtin` 功能模块的契约、后台与视图编写规范 |
 | `packages/sdk/README.md` | `@atelier/sdk` 作者指南与代码示例 |
 
 ### 2. 设计契约真值（`docs/`）

@@ -4,7 +4,8 @@ import { AiSdkAdapter, sdkMessages } from "./ai-sdk.ts";
 import { createProviderModel } from "./provider.ts";
 import { aiSdkAdapterVersion } from "./continuation.ts";
 import { modelScope, type Json } from "../shared/model.ts";
-import { projectSystemPrompt } from "../modules/agent/system-prompt.ts";
+import { projectSystemPrompt } from "./system-prompt.ts";
+
 import type { ModelInput } from "./contract.ts";
 import { mergeModelCompatibility, type ModelCompatibility } from "../shared/model-compatibility.ts";
 

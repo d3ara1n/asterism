@@ -48,4 +48,4 @@ export function pluginOf(qualified: string): string | null {
   return index > 0 ? qualified.slice(0, index) : null;
 }
 /** 实现缺失的资源投影：保留原始数据与来源插件，供界面回退展示。 */
-export const missingResourceContract = { id: "atelier.core/missing-resource" } as const;
+export const missingResourceContract = { id: "atelier.builtin/missing-resource" } as const;

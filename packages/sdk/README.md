@@ -2,11 +2,13 @@
 
 `@atelier/sdk` 是宿主与插件共用的独立类型与契约包。宿主实现服务接口，插件贡献模块、资源、工具、视图与生命周期处理器。完整架构与宿主机制见 [插件 SDK 与功能组合](../../docs/plugin-sdk.md)。
 
+当前 SDK 包版本为 **0.18.0**，宿主 API 为 **8.4**。内置插件领域契约独立在 [`@atelier/builtin-api`](../builtin-api/README.md)，不进入通用 SDK。
+
 ## 子路径入口
 
 | 入口 | 内容 |
 | --- | --- |
-| `@atelier/sdk/contracts` | JSON、数据（`ns.data`）、配置（`ns.config`）、消息（`ns.messages`）、瞬态事件（`ns.event`）、资源／创建／动作／工具／记录契约、工作台快照与公共模型协议类型；不依赖 Node 或 React |
+| `@atelier/sdk/contracts` | JSON、数据（`ns.data`）、配置（`ns.config`）、消息（`ns.messages`）、瞬态事件（`ns.event`）、资源／创建／动作／工具／记录契约、工作台快照与公共模型协议、模型表达式／输入媒体 helper、参考价格与计价；不依赖 Node 或 React |
 | `@atelier/sdk/runtime` | `definePlugin`、`defineModule`、资源／创建／动作／工具实现 helper、`SessionReader / SessionExecutor`、`ObjectReader / ObjectExecutor` 与宿主服务接口；后台可使用 Node |
 | `@atelier/sdk/renderer` | `cardRenderer`、`toolRenderer`、`recordRenderer`、`creationEntry`、对象与全局 hooks（`useRendererObject`、`useRendererConfig`、`useRendererPreferences`、`useRendererEvents`、`useI18n`）；React 由宿主共享 |
 

@@ -4,26 +4,30 @@ import { protocolVersion } from "../shared/contracts.ts";
 import { SecretClient } from "./secret-client.ts";
 import { join } from "node:path";
 import { PackageList, loadPackages } from "../plugins/packages.ts";
-import { core } from "../modules/plugin.ts";
+import { builtin } from "@atelier/builtin-api/contracts";
 import { DatabaseVersionError } from "./storage.ts";
 import { EventPeer } from "./event-peer.ts";
 import { eventRuntimeControlSchema, pluginEventsVersion } from "../shared/plugin-events.ts";
+import { bindPublicProvider } from "../shared/public-modules.ts";
+import { builtinPublicProvider, builtinPublicModules } from "../builtin-public.ts";
 
 // 任务进程只接收主进程给出的应用数据根目录，不接受 renderer 文件路径。
 const port = process.parentPort;
 if (!port) throw new Error("The task runtime must be started as an Electron utility process.");
 let service: ApplicationService;
 const secrets = new SecretClient(message => port.postMessage(message));
+const releasePublic = bindPublicProvider("runtime", builtinPublicProvider, builtinPublicModules);
 try {
   const root = process.argv[2];
   if (!root) throw new Error("Application data directory is required.");
   // 插件包只在启动时解析、打包与导入；列表变化重启后生效。
-  const packages = await loadPackages(new PackageList(join(root, "plugins.json")), join(root, "plugins"), join(root, "plugins", ".cache"), [core.id])
+  const packages = await loadPackages(new PackageList(join(root, "plugins.json")), join(root, "plugins"), join(root, "plugins", ".cache"), [builtin.id], [builtinPublicProvider])
     .catch(error => { console.error("Plugin packages could not be loaded.", error); return []; });
   for (const item of packages) if (item.error) console.error(`Plugin package ${item.root} is ${item.status}: ${item.error}`);
   const listed = packages.map(item => ({ enabled: item.entry.enabled, id: item.manifest?.id ?? null,
     source: item.entry.source.kind === "path" ? item.entry.source.path : `${item.entry.source.name}@${item.entry.source.version}`,
-    status: item.status, error: item.error ?? null, renderer: item.status === "loaded" ? item.renderer ?? null : null }));
+    status: item.status, error: item.error ?? null, renderer: item.status === "loaded" ? item.renderer ?? null : null,
+    dependencies: item.dependencies ?? [], rendererDependencies: item.rendererDependencies ?? [] }));
   service = new ApplicationService(root, { catalogs: packages.flatMap(item => item.catalogs ?? []), packages: listed, plugins: packages.flatMap(item => item.definition ? [item.definition] : []), protector: secrets, onConfigurationChanged: () => port.postMessage({ kind: "configuration.changed" }),
     onSessionChanged: event => port.postMessage(event),
     onPluginConfigurationChanged: id => port.postMessage({ kind: "plugin-configuration.changed", id }),
@@ -33,7 +37,7 @@ try {
     if (data?.kind === "shutdown") {
       events.close();
       secrets.close();
-      void service.close().finally(() => process.exit(0));
+      void service.close().finally(() => { releasePublic(); process.exit(0); });
       return;
     }
     if (secrets.receive(data)) return;
@@ -64,6 +68,7 @@ try {
   });
   port.postMessage({ kind: "ready", version: protocolVersion });
 } catch (error) {
+  releasePublic();
   console.error("Task runtime initialization failed.", error);
   port.postMessage(error instanceof DatabaseVersionError
     ? { kind: "fatal", reason: "database_version", message: error.message, directory: error.directory }

@@ -125,7 +125,7 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
   const events = services.events ?? new EventBus();
   const manifest: PluginManifest[] = [], collected: Collected[] = [];
   const lifecycles: RunLifecycle[] = [];
-  const failedCleanup: Promise<void>[] = [];
+  const initialized: Collected[] = [], invalidEntries = new Set<Collected>();
   const kinds = new Set<string>(), identities = new Set<string>();
   const toolContracts = new Map<string, ToolContract>();
   const initialization = initializationOrder(plugins);
@@ -150,6 +150,7 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
       const resources: ResourceBackend[] = [], tools: ToolImplementation[] = [], observers: SessionObserver[] = [], preparers: CommandPreparer[] = [];
       const actions: ActionContract<unknown>[] = [];
       entry = { plugin, resources, tools, actions, observers, preparers, sdk, tasks: taskHost, storage, lifecycle, events: eventScope, preparations: lifecycle.group("prepare"), closing: [] };
+      initialized.push(entry);
       const commandIds = new Set<string>();
       for (const module of plugin.modules) {
         let contribution!: ModuleContribution;
@@ -192,7 +193,7 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
       if (entry) {
         entry.events.stop(); events.removeOwner(id);
         entry.lifecycle.stop();
-        failedCleanup.push(dispose(entry).catch(error => (services.log ?? defaultLog)(id, "error", "Plugin cleanup failed.", error)));
+        invalidEntries.add(entry);
       }
       (services.log ?? defaultLog)(id, "error", "Plugin failed to load and was disabled.", error);
       manifest.push({ id, version: plugin.version, status: "failed", error: error instanceof Error ? error.message : String(error), resources: [], implementations: [] });
@@ -207,7 +208,6 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
     entry.sdk.disable();
     entry.storage.close();
   }
-  const initialized = [...collected], invalidEntries = new Set<Collected>();
   let invalidated = true;
   while (invalidated) {
     invalidated = false;
@@ -227,13 +227,14 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
       collected.splice(i, 1); invalidated = true;
     }
   }
-  if (invalidEntries.size) failedCleanup.push((async () => {
+  // setup 与后置校验失败共用一次逆序清理，避免提供方越过仍在清理的失败消费者。
+  const failedCleanup = (async () => {
     await Promise.allSettled([...invalidEntries].map(entry => entry.lifecycle.close()));
-    for (const entry of initialized.reverse()) if (invalidEntries.has(entry)) {
+    for (const entry of [...initialized].reverse()) if (invalidEntries.has(entry)) {
       try { await dispose(entry); }
       catch (error) { (services.log ?? defaultLog)(entry.plugin.namespace.id, "error", "Plugin cleanup failed.", error); }
     }
-  })());
+  })();
   const disposalOrder = [...collected].reverse();
   const index = (id: string) => plugins.findIndex(plugin => plugin.namespace.id === id);
   collected.sort((a, b) => index(a.plugin.namespace.id) - index(b.plugin.namespace.id));
@@ -343,7 +344,7 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
       for (const lifecycle of lifecycles) lifecycle.stop();
       closing = (async () => {
         await Promise.allSettled(collected.map(entry => entry.lifecycle.close()));
-        await Promise.allSettled(failedCleanup);
+        await failedCleanup;
         for (const entry of disposalOrder) await dispose(entry);
       })();
       return closing;

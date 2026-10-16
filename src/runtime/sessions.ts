@@ -1,6 +1,5 @@
-import { resourceCall, type ResourceCall, type Json, type ModelInputPart } from "@atelier/sdk/contracts";
-import type { ResourceRef, PluginDefinition } from "@atelier/sdk/runtime";
-import { PluginApiError } from "@atelier/sdk/runtime";
+import { resourceCall, type ResourceCall, type Json, type ModelInputPart, ResourceStatusChanged, SessionTitleChanged } from "@atelier/sdk/contracts";
+import { type ResourceRef, type PluginDefinition, PluginApiError } from "@atelier/sdk/runtime";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
@@ -8,15 +7,14 @@ import type { DatabaseSync } from "node:sqlite";
 import type { ConfigurationService } from "../configuration/service.ts";
 import { AgentCapabilities } from "../execution/capabilities.ts";
 import type { ModelAdapter } from "../model/contract.ts";
-import { Agent, CreateAgent, SubmitAgentInput, startAgentContentTarget, type AgentCommand } from "../modules/agent/contract.ts";
-import { createSelection } from "../modules/agent/selection.ts";
-import { composeSystemPrompt } from "../modules/agent/system-prompt.ts";
-import type { NamingApi } from "../modules/naming/runtime.ts";
+import {
+  Agent, CreateAgent, SubmitAgentInput, startAgentContentTarget, type AgentCommand, type NamingApi, inputSummary,
+} from "@atelier/builtin-api/contracts";
+import { createSelection, composeSystemPrompt } from "@atelier/builtin/runtime";
 import { inputReferences } from "../model/input.ts";
-import { inputSummary } from "../shared/model-input.ts";
-import { createModules } from "../modules/runtime.ts";
+import { createModules } from "./builtin.ts";
 import type { ParsedCall } from "../plugins/commands.ts";
-import { createCoreCatalogs } from "../plugins/core-catalogs.ts";
+import { createBuiltinCatalogs } from "./builtin-catalogs.ts";
 import type { SessionHost, SessionHostWriter as SessionWriter } from "../plugins/host.ts";
 import type { PluginManifest, LoadedPlugins } from "../plugins/loader.ts";
 import { createModelServices } from "../plugins/models.ts";
@@ -32,9 +30,8 @@ import type { ToolRegistry } from "../tools/registry.ts";
 import { sessionPluginError } from "./plugin-errors.ts";
 import { SessionWorkbench } from "./workbench.ts";
 import { ContentStore, type ContentLease, type ContentTarget } from "./content-store.ts";
-import { applicationStorage } from "../shared/application.ts";
+import { applicationStorage, applicationBrand } from "../shared/application.ts";
 import { EventBus } from "../plugins/events.ts";
-import { ResourceStatusChanged, SessionTitleChanged } from "@atelier/sdk/contracts";
 
 const agentKind = Agent.kind;
 const startIdentity = ({ contentScopeId: _scope, ...input }: Extract<SessionCommand, { type: "start" }>) => JSON.stringify(input);
@@ -108,7 +105,7 @@ export class SessionService {
     // 首条 submit 准备时对象尚未创建；组合入口用已经准备好的选择执行同一模型预检。
     this.validateInitialInput = async (value, parts, content) => {
       try {
-        await models.validate({ target: selection.target(value), system: composeSystemPrompt(selection.agent(value)),
+        await models.validate({ target: selection.target(value), system: composeSystemPrompt(selection.agent(value), applicationBrand.en),
           messages: [{ kind: "input", parts }], signal: AbortSignal.timeout(10_000) },
         { content: messages => this.content.capture(inputReferences(messages), { scope: content }) });
       } catch (error) {
@@ -117,7 +114,7 @@ export class SessionService {
       }
     };
     const modules = createModules({ events: this.events, extensionsDirectory: join(dataRoot, "extensions"), data: new SessionDataStore(db), content: this.content, refOf, vault: configuration.vault, stream, configurationChanged,
-      sessions: host, models, catalogs: createCoreCatalogs(configuration) }, external);
+      sessions: host, models, catalogs: createBuiltinCatalogs(configuration) }, external);
     this.resources = modules.resources;
     this.tools = modules.tools;
     this.plugins = modules.manifest;

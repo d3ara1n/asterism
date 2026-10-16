@@ -61,8 +61,4 @@ export const toolsMessages = pluginNamespace("atelier.host").messages("en", defi
     id: "toolResultSchema",
     defaultMessage: "Result schema",
   },
-  toolNoOutput: {
-    id: "toolNoOutput",
-    defaultMessage: "No output was produced.",
-  },
 }));

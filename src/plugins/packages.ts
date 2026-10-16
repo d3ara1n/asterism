@@ -11,9 +11,10 @@ import { compileModules, packageModule, type PackageModule } from "./package-mod
 import { loadCatalogs } from "./catalogs.ts";
 import { localeSchema } from "@atelier/sdk/contracts";
 import type { TranslationCatalog } from "../shared/i18n.ts";
+import type { PublicProvider } from "../shared/public-modules.ts";
 
 /** SDK API 版本；插件清单的 api.major 必须相同，minMinor 不得高于宿主。 */
-export const sdkApi = { major: 8, minor: 3 } as const;
+export const sdkApi = { major: 8, minor: 4 } as const;
 
 /** 插件包清单：package.json 的 atelier 字段；源码与发布产物读同一份。 */
 export const manifestSchema = z.strictObject({
@@ -142,6 +143,8 @@ function hostModules(realm: "runtime" | "renderer"): Plugin {
 }
 
 export interface ResolvedPackage {
+  dependencies?: string[];
+  rendererDependencies?: string[];
   catalogs?: TranslationCatalog[];
   entry: PackageEntry;
   root: string;
@@ -154,7 +157,7 @@ export interface ResolvedPackage {
 }
 
 /** 读取列表、校验清单与冲突、打包并导入启用的插件；失败传播给依赖方。 */
-export async function loadPackages(list: PackageList, npmRoot: string, cacheRoot: string, reserved: readonly string[]): Promise<ResolvedPackage[]> {
+export async function loadPackages(list: PackageList, npmRoot: string, cacheRoot: string, reserved: readonly string[], publicProviders: readonly PublicProvider[] = []): Promise<ResolvedPackage[]> {
   const result: ResolvedPackage[] = [];
   const ids = new Map<string, number>();
   for (const entry of list.read()) {
@@ -179,10 +182,12 @@ export async function loadPackages(list: PackageList, npmRoot: string, cacheRoot
       item.status = "failed"; item.error = error instanceof Error ? error.message : String(error);
     }
   }
-  const compiled = await compileModules(modules, new Set(result.filter(item => item.status === "loaded").map(item => item.manifest!.id)), cacheRoot, hostModules);
+  const compiled = await compileModules(modules, new Set(result.filter(item => item.status === "loaded").map(item => item.manifest!.id)), cacheRoot, hostModules, publicProviders);
   for (const item of result) {
     if (item.status !== "loaded") continue;
     const id = item.manifest!.id;
+    item.dependencies = [...compiled.dependencies.get(id) ?? []];
+    item.rendererDependencies = [...compiled.rendererDependencies.get(id) ?? []];
     try {
       if (compiled.failures.has(id)) throw new PluginPackageError("build_failed", compiled.failures.get(id)!);
       const renderer = compiled.renderer.get(id);
@@ -217,7 +222,8 @@ export async function loadPackages(list: PackageList, npmRoot: string, cacheRoot
     if (visited.has(id)) return [];
     visited.add(id);
     return [...compiled.runtimeDependencies.get(id) ?? []].flatMap(dependency =>
-      result.some(item => item.manifest?.id === dependency && item.definition) ? [dependency] : dependenciesOf(dependency, visited));
+      publicProviders.some(provider => provider.pluginId === dependency) || result.some(item => item.manifest?.id === dependency && item.definition)
+        ? [dependency] : dependenciesOf(dependency, visited));
   };
   for (const item of result) if (item.definition) item.definition = { ...item.definition, dependencies: dependenciesOf(item.manifest!.id) };
   for (const item of result) if (item.status === "loaded" && item.manifest?.i18n)

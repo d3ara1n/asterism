@@ -2,14 +2,14 @@ import { RendererCardProvider, type CardPanelView, type RendererCard } from "@at
 import { ChevronRight, ChevronDown, PanelsTopLeft, X } from "lucide-react";
 import { memo, useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 
-import { commonMessages } from "../../messages/common";
+import { commonMessages } from "@atelier/ui/messages/common";
 import { objectsMessages } from "../../messages/objects";
 import { useI18n } from "../../shared/i18n";
-import { Button } from "../../shared/ui/button";
-import { Card } from "../../shared/ui/card";
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem } from "../../shared/ui/dropdown-menu";
-import { IconButton } from "../../shared/ui/icon-button";
-import { cn } from "../../shared/utils";
+import { Button } from "@atelier/ui/ui/button";
+import { Card } from "@atelier/ui/ui/card";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem } from "@atelier/ui/ui/dropdown-menu";
+import { IconButton } from "@atelier/ui/ui/icon-button";
+import { cn } from "@atelier/ui/utils";
 import type { CardSize } from "../../../shared/workbench";
 
 /** 卡片拖动柄选择器；画布只认它，卡片内容不感知拖动。 */

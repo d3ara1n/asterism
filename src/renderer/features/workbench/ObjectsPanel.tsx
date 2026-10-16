@@ -1,9 +1,9 @@
 import { IslandPanel } from "../../shared/weave/IslandPanel";
-import { SearchInput } from "../../shared/ui/search-input";
-import { ToggleGroup, ToggleGroupItem } from "../../shared/ui/toggle-group";
-import { Button } from "../../shared/ui/button";
+import { SearchInput } from "@atelier/ui/ui/search-input";
+import { ToggleGroup, ToggleGroupItem } from "@atelier/ui/ui/toggle-group";
+import { Button } from "@atelier/ui/ui/button";
 import { Scan } from "lucide-react";
-import { commonMessages } from "../../messages/common";
+import { commonMessages } from "@atelier/ui/messages/common";
 import { objectsMessages } from "../../messages/objects";
 import { useI18n } from "../../shared/i18n";
 import { useState } from "react";

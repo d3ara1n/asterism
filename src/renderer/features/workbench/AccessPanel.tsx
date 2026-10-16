@@ -1,22 +1,22 @@
 import { IslandPanel } from "../../shared/weave/IslandPanel";
-import { Button } from "../../shared/ui/button";
-import { SearchInput } from "../../shared/ui/search-input";
-import { Popover, PopoverTrigger, PopoverContent } from "../../shared/ui/popover";
+import { Button } from "@atelier/ui/ui/button";
+import { SearchInput } from "@atelier/ui/ui/search-input";
+import { Popover, PopoverTrigger, PopoverContent } from "@atelier/ui/ui/popover";
 
 import { ChevronDown, Check, Link2 } from "lucide-react";
 
-import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from "../../shared/ui/command";
+import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from "@atelier/ui/ui/command";
 
-import { Alert, AlertDescription } from "../../shared/ui/alert";
-import { Separator } from "../../shared/ui/separator";
-import { StatusText } from "../../shared/ui/status";
-import { ToggleGroup, ToggleGroupItem } from "../../shared/ui/toggle-group";
+import { Alert, AlertDescription } from "@atelier/ui/ui/alert";
+import { Separator } from "@atelier/ui/ui/separator";
+import { StatusText } from "@atelier/ui/ui/status";
+import { ToggleGroup, ToggleGroupItem } from "@atelier/ui/ui/toggle-group";
 
-import { Switch } from "../../shared/ui/switch";
+import { Switch } from "@atelier/ui/ui/switch";
 import { errorDisplay } from "../../../shared/error-display.ts";
 import type { UiText } from "@atelier/sdk/contracts";
 import { accessMessages } from "../../messages/access";
-import { commonMessages } from "../../messages/common";
+import { commonMessages } from "@atelier/ui/messages/common";
 import { objectsMessages } from "../../messages/objects";
 import { useI18n } from "../../shared/i18n";
 import { useEffect, useRef, useState } from "react";

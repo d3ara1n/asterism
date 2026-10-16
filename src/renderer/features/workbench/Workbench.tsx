@@ -5,14 +5,14 @@ import { useCallback, useEffect, useLayoutEffect, useImperativeHandle, useMemo, 
 
 import { maximumViewportZoom, type Point, type WorkbenchSnapshot } from "../../../shared/workbench";
 import { accessMessages } from "../../messages/access";
-import { commonMessages } from "../../messages/common";
+import { commonMessages } from "@atelier/ui/messages/common";
 import { historyMessages } from "../../messages/history";
 import { objectsMessages } from "../../messages/objects";
 import { workbenchMessages } from "../../messages/workbench";
 import { RendererCatalogProvider } from "../../modules/object-context";
 import { useModuleViews } from "../../modules/views";
 import { useI18n } from "../../shared/i18n";
-import { Badge } from "../../shared/ui/badge";
+import { Badge } from "@atelier/ui/ui/badge";
 import { useIsland } from "../../shared/weave/Screen";
 import { useScheme } from "../appearance/state";
 import type { DragKind } from "../creation/routing";
@@ -26,7 +26,7 @@ import { layoutConnections, type ConnectionEdge } from "./connections";
 import { WorkbenchScope, WorkbenchContext, WorkbenchStore, useWorkbench, type WorkbenchEnvironment, type WorkbenchView } from "./context";
 import { workbenchNodes } from "./nodes";
 import { type ViewPatch } from "./ObjectCard";
-import { IconButton } from "../../shared/ui/icon-button";
+import { IconButton } from "@atelier/ui/ui/icon-button";
 import { ObjectNode, type ObjectNodeType } from "./ObjectNode";
 import { ObjectsPanel } from "./ObjectsPanel";
 import { confirmCardSizes, saveCardSize, type SizeIntent } from "./size-intents";

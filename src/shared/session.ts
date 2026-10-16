@@ -1,11 +1,13 @@
 import { z } from "zod";
 import { coreChannel } from "./core.ts";
-import { userInputPartsSchema } from "./model-input.ts";
-import { modelInputPartsSchema } from "@atelier/sdk/contracts";
+import { userInputPartsSchema } from "@atelier/builtin-api/contracts";
+import {
+  modelInputPartsSchema, resourceCallSchema, contractReferenceSchema, toolInvocationSchema,
+  toolRunningResultSchema, uiTextSchema,
+} from "@atelier/sdk/contracts";
 import { jsonSchema } from "./model.ts";
 import { modelExpressionSchema, thinkingSchema } from "./configuration.ts";
 import { pointSchema, workbenchCommands, workbenchSnapshotSchema } from "./workbench.ts";
-import { resourceCallSchema, contractReferenceSchema, toolInvocationSchema, toolRunningResultSchema } from "@atelier/sdk/contracts";
 
 const id = z.string().min(1).max(160);
 /** 来源：null 表示软件本身；否则 plugin 由宿主按写入通道打戳，resource 为经校验的发出资源。记录与事件共用。 */
@@ -94,4 +96,3 @@ export interface SessionBridge {
   execute(command: SessionCommand): Promise<SessionResult>;
   onChanged(listener: (event: SessionChanged) => void): () => void;
 }
-import { uiTextSchema } from "@atelier/sdk/contracts";

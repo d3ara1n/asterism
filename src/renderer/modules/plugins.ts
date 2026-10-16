@@ -16,27 +16,49 @@ import type { RendererModule } from "@atelier/sdk/renderer";
 };
 
 export interface PluginRendererFailure { id: string; error: string }
-/** 加载启动时已打包的插件视图入口；单个失败只跳过该插件。 */
-export async function loadPluginRenderers(entries: readonly { id: string; renderer: string }[]):
+export interface RendererEntry { id: string; renderer: string | null; dependencies: readonly string[] }
+/** 按公共依赖装配；导入、视图冲突或提供方失败均阻止其消费者。 */
+export async function loadPluginRenderers(entries: readonly RendererEntry[], options: {
+  available?: readonly string[];
+  accept?(module: RendererModule): void;
+  load?(path: string): Promise<{ default?: RendererModule }>;
+} = {}):
   Promise<{ modules: RendererModule[]; failures: PluginRendererFailure[] }> {
   const modules: RendererModule[] = [];
   const failures: PluginRendererFailure[] = [];
-  for (const entry of entries) {
+  const available = new Set(options.available);
+  const visiting = new Set<string>();
+  const failed = new Set<string>();
+  const load = options.load ?? (path => import(/* @vite-ignore */ `atelier-plugin://${path}`));
+  const visit = async (id: string): Promise<void> => {
+    if (available.has(id)) return;
+    if (failed.has(id)) throw new Error(`Public renderer dependency ${id} is unavailable.`);
+    if (visiting.has(id)) throw new Error(`Circular renderer dependency: ${id}.`);
+    const entry = entries.find(entry => entry.id === id);
+    if (!entry) throw new Error(`Public renderer dependency ${id} is unavailable.`);
+    visiting.add(id);
     try {
-      const loaded = await import(/* @vite-ignore */ `atelier-plugin://${entry.renderer}`) as { default?: RendererModule };
+      for (const dependency of entry.dependencies) await visit(dependency);
+      if (!entry.renderer) { available.add(id); return; }
+      const loaded = await load(entry.renderer);
       const module = loaded.default;
       if (!module || !Array.isArray(module.resources) || !Array.isArray(module.cards) || !Array.isArray(module.tools)
         || (module.creations !== undefined && !Array.isArray(module.creations))
         || (module.records !== undefined && !Array.isArray(module.records))
-        || (module.records !== undefined && !Array.isArray(module.records))
         || (module.prepare !== undefined && typeof module.prepare !== "function")) {
         throw new Error("The renderer entry must default-export { resources, cards, tools }.");
       }
-      modules.push(module);
+      options.accept?.(module);
+      modules.push(module); available.add(id);
     } catch (error) {
       console.error(`Plugin ${entry.id} renderer could not be loaded.`, error);
+      failed.add(id);
       failures.push({ id: entry.id, error: error instanceof Error ? error.message : String(error) });
-    }
+      throw error;
+    } finally { visiting.delete(id); }
+  };
+  for (const entry of entries) {
+    try { await visit(entry.id); } catch { /* 本插件及依赖失败均已记录；继续装配无关插件。 */ }
   }
   return { modules, failures };
 }

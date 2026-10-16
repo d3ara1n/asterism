@@ -13,7 +13,7 @@ import { contentResponseSchema, contentVersion } from "../shared/content.ts";
 import { randomUUID } from "node:crypto";
 import type { ModelAdapter, ModelInput } from "../model/contract.ts";
 import type { StreamRequest } from "@atelier/sdk/contracts";
-import { modelInputLimits } from "../shared/model-media.ts";
+import { modelInputLimits } from "@atelier/sdk/contracts";
 import { applicationStorage } from "../shared/application.ts";
 
 const ns = pluginNamespace("test.content");

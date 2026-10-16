@@ -1,6 +1,5 @@
 import type { UiText } from "@atelier/sdk/contracts";
-import type { PluginDefinition } from "@atelier/sdk/runtime";
-import { PluginApiError } from "@atelier/sdk/runtime";
+import { type PluginDefinition, PluginApiError } from "@atelier/sdk/runtime";
 import { join } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 
@@ -24,7 +23,7 @@ export class ApplicationError extends Error {
 }
 
 /** 应用组合根与会话索引；会话内容、操作和查询由 SessionService 拥有。 */
-export interface StartupPackage { source: string; enabled: boolean; id: string | null; status: "loaded" | "disabled" | "invalid" | "failed"; error: string | null; renderer: string | null }
+export interface StartupPackage { source: string; enabled: boolean; id: string | null; status: "loaded" | "disabled" | "invalid" | "failed"; error: string | null; renderer: string | null; dependencies?: string[]; rendererDependencies?: string[] }
 
 export class ApplicationService {
   readonly configuration: ConfigurationService;
@@ -44,6 +43,20 @@ export class ApplicationService {
       const unavailable = async (): Promise<string> => { throw new Error("System credential protection is unavailable."); };
       this.configuration = new ConfigurationService(root, options.protector ?? { available: async () => false, encrypt: unavailable, decrypt: unavailable }, options.onConfigurationChanged);
       this.sessions = new SessionService(this.db, root, this.configuration, options.onSessionChanged, options.adapterFactory, options.plugins, options.onStream, options.onPluginConfigurationChanged);
+      // setup 与贡献登记也可能失败；纯前端消费者同样不能使用失败提供方。
+      let changed = true;
+      while (changed) {
+        changed = false;
+        for (const item of this.packages) if (item.status === "loaded") {
+          const own = this.sessions.plugins.find(plugin => plugin.id === item.id && plugin.status === "failed");
+          const failed = item.dependencies?.find(id =>
+            this.sessions.plugins.some(plugin => plugin.id === id && plugin.status === "failed")
+            || this.packages.some(provider => provider.id === id && provider.status !== "loaded"));
+          if (!own && !failed) continue;
+          item.status = "failed"; item.error = own?.error ?? `Public dependency ${failed} is unavailable.`;
+          item.renderer = null; changed = true;
+        }
+      }
       this.content = new ContentTransferService(this.sessions);
     } catch (error) { this.db.close(); throw error; }
   }
@@ -84,7 +97,8 @@ export class ApplicationService {
       const startup = this.packages.find(item => item.source === source);
       const pending = !startup || startup.enabled !== entry.enabled;
       return { index, source, enabled: entry.enabled, id: startup?.id ?? null, status: pending ? "pending" as const : startup.status,
-        error: pending ? null : startup.error, renderer: pending ? null : startup.renderer };
+        error: pending ? null : startup.error, renderer: pending ? null : startup.renderer,
+        dependencies: startup?.rendererDependencies ?? [] };
     });
     return snapshotSchema.parse({ workspace, sessions, plugins, catalogs: this.options.catalogs ?? [], restartRequired: JSON.stringify(current) !== this.started });
   }

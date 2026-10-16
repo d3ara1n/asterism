@@ -1,6 +1,6 @@
 # 自动会话命名
 
-会话命名由内置插件 `atelier.core` 的 `naming` 模块提供。模块理解同一插件的 Agent 记录契约，通过记录提交观察生成名称，通过执行游标变化观察重建当前标题；回合含义见 [运行时](runtime.md#执行轮次)，公共会话 API 不解释 Agent 的 block／request／turn 或命名事件。
+会话命名由内置插件 `atelier.builtin` 的 `naming` 模块提供。模块理解同一插件的 Agent 记录契约，通过记录提交观察生成名称，通过执行游标变化观察重建当前标题；回合含义见 [运行时](runtime.md#执行轮次)，公共会话 API 不解释 Agent 的 block／request／turn 或命名事件。
 
 ## 触发与材料
 
@@ -19,7 +19,7 @@
 
 ## 标题来源与不可变事件
 
-`SessionNamed`（`atelier.core/session.named`）是会话级记录（经 `session.commit` 写入，来源 `resource` 为 null），记录每次命名的 `{ title, source, auto? }`：
+`SessionNamed`（`atelier.builtin/session.named`）是会话级记录（经 `session.commit` 写入，来源 `resource` 为 null），记录每次命名的 `{ title, source, auto? }`：
 
 | source | 含义 | 自动更新 |
 | --- | --- | --- |
@@ -56,7 +56,7 @@
 
 ## 实现位置
 
-- [命名模块](../src/modules/naming/runtime.ts)：用户消息筛选、托管任务、命名事件追加与游标变化后的标题同步。
-- [材料与提示规则](../src/modules/naming/policy.ts)：Agent 回合投影、采样、提示与标题清理。
-- [命名契约](../src/modules/naming/records.ts)：不可变时间线事件。
+- [命名模块](../packages/builtin/src/naming/runtime.ts)：用户消息筛选、托管任务、命名事件追加与游标变化后的标题同步。
+- [材料与提示规则](../packages/builtin/src/naming/policy.ts)：Agent 回合投影、采样、提示与标题清理。
+- [命名契约](../packages/builtin-api/src/naming.ts)：不可变时间线事件。
 - [SDK 时间线查询](../packages/sdk/src/records.ts)：具型 `first / last / query`，不包含命名或 Agent 语义。

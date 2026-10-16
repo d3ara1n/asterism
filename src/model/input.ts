@@ -1,6 +1,5 @@
-import { modelInputPartsSchema, type ContentRef, type ModelInputPart, type ModelItem } from "@atelier/sdk/contracts";
+import { modelInputPartsSchema, type ContentRef, type ModelInputPart, type ModelItem, modelInputLimits } from "@atelier/sdk/contracts";
 import type { ContentReader } from "@atelier/sdk/runtime";
-import { modelInputLimits } from "../shared/model-media.ts";
 import { ModelFailure, type ResolvedInputPart, type ResolvedModelItem } from "./contract.ts";
 
 export interface ModelContent {

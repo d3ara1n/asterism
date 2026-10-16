@@ -4,8 +4,8 @@ import type { SessionResult } from "../../shared/session";
 import { RenameSession } from "../features/session/RenameSession";
 import { appMessages } from "../messages/app";
 import { useI18n } from "../shared/i18n";
-import { Button } from "../shared/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../shared/ui/dropdown-menu";
+import { Button } from "@atelier/ui/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@atelier/ui/ui/dropdown-menu";
 
 /** 会话列表的操作入口；按钮与导航按钮平级，操作不会触发会话导航。 */
 export function SessionActions({ title, disabled, renameDisabled, onRename }: {

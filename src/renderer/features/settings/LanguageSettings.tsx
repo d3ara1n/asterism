@@ -3,8 +3,8 @@ import { useEffect, useState } from "react";
 
 import type { LanguageState } from "../../../shared/language";
 import { settingsMessages } from "../../messages/settings";
-import { Alert, AlertDescription } from "../../shared/ui/alert";
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "../../shared/ui/select";
+import { Alert, AlertDescription } from "@atelier/ui/ui/alert";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@atelier/ui/ui/select";
 import { Section, Row } from "./layout";
 
 export function LanguageSettings() {

@@ -1,5 +1,5 @@
 import { app, BrowserWindow, dialog, ipcMain, net, protocol, session, shell } from "electron";
-import { externalWebUrl } from "../shared/links.ts";
+import { externalWebUrl } from "@atelier/ui/links";
 import { mkdirSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";

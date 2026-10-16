@@ -1,12 +1,12 @@
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent, DropdownMenuItem, DropdownMenuSeparator } from "../../shared/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent, DropdownMenuItem, DropdownMenuSeparator } from "@atelier/ui/ui/dropdown-menu";
 
-import { Button } from "../../shared/ui/button";
+import { Button } from "@atelier/ui/ui/button";
 import { MoreHorizontal, Scaling, RotateCcw, Trash2 } from "lucide-react";
 
-import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "../../shared/ui/alert-dialog";
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@atelier/ui/ui/alert-dialog";
 
-import { Spinner } from "../../shared/ui/spinner";
-import { commonMessages } from "../../messages/common";
+import { Spinner } from "@atelier/ui/ui/spinner";
+import { commonMessages } from "@atelier/ui/messages/common";
 import { objectsMessages } from "../../messages/objects";
 import { useI18n } from "../../shared/i18n";
 import { useState } from "react";

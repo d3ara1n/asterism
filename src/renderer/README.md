@@ -23,19 +23,19 @@
 | `features/creation/` | 创建协调器：添加菜单、拖放与图片粘贴的候选仲裁、路由记忆、内容草稿（`content.ts`）与提交 |
 | `features/session/controller.ts` / `registry.ts` / `state.ts` | 当前会话执行游标视图的协调查询、操作门禁队列与独立进度订阅 |
 | `features/session/History.tsx` / `history-navigation.ts` / `history-branches.ts` | 历史浮岛面板：分支 Tab、分叉点双向导航、两行逐节点列表、来源筛选与「从这里继续」跳转 |
-| `features/conversation/tool-views.tsx` / `shared/tool-content.tsx` | 三个宿主固定入口（`resource_*`）的内置视图、`resource_call` 转交适配与调用／结果原始详情切换 |
-| `../modules/agent/conversation/` | 内置 Agent 对话组件簇：`Conversation.tsx`、`ConversationTimeline.tsx`、`output-follow.ts`、`Composer.tsx`、`ConfigurationPicker.tsx`、`draft.ts`、`Files.tsx`、`interaction.ts`、`Disclosure.tsx`、`ToolCall.tsx`、`ThinkingBlock.tsx`、`Markdown.tsx` |
-| `../modules/agent/diagnostics/` | 代理诊断的历史请求投影、当前价格计量、缓存与增长概览及面板内的列表／详情／汇总 |
-| `../modules/agent/context/` / `panel-kit.tsx` | 代理上下文面板的窗口占用、对话与系统构成；两个代理面板共用的版式、数值与系统构成部件 |
-| `../modules/text-view.tsx` / `code-view.tsx` / `shared/tool-body.ts` | 内置正文工具三态视图、Pierre Diffs 代码／差异渲染与 120 行预览预算截取 |
+| `features/conversation/tool-views.tsx` / `../../packages/ui/src/tool-content.tsx` | 三个宿主固定入口（`resource_*`）的内置视图、`resource_call` 转交适配与调用／结果原始详情切换 |
+| `../../packages/builtin/src/agent/conversation/` | 内置 Agent 对话组件簇：`Conversation.tsx`、`ConversationTimeline.tsx`、`output-follow.ts`、`Composer.tsx`、`ConfigurationPicker.tsx`、`draft.ts`、`Files.tsx`、`interaction.ts`、`Disclosure.tsx`、`ToolCall.tsx`、`ThinkingBlock.tsx`、`Markdown.tsx` |
+| `../../packages/builtin/src/agent/diagnostics/` | 代理诊断的历史请求投影、当前价格计量、缓存与增长概览及面板内的列表／详情／汇总 |
+| `../../packages/builtin/src/agent/context/` / `panel-kit.tsx` | 代理上下文面板的窗口占用、对话与系统构成；两个代理面板共用的版式、数值与系统构成部件 |
+| `../../packages/builtin/src/text-view.tsx` / `code-view.tsx` / `shared/tool-body.ts` | 内置正文工具三态视图、Pierre Diffs 代码／差异渲染与 120 行预览预算截取 |
 | `modules/registry.ts` / `views.tsx` / `object-context.ts` | 静态资源展示描述、卡片／工具／历史记录视图注册表与 SDK 前端对象接口注入 |
 | `features/configuration/` | 提供商、模型发现（`ModelDiscoveryPicker.tsx`）、参数获取（`ModelParameters.tsx`）、模型兼容设置（`ModelCompatibilityEditor.tsx`）、模型角色与 agent 覆盖表单（`forms.tsx`） |
 | `features/plugins/` / `shared/ConfigurationValue.tsx` | 插件包管理、插件配置表单与 schema 驱动字段编辑器 |
 | `features/settings/` | 设置屏、分类注册表与语言设置（`LanguageSettings.tsx`） |
 | `shared/weave/` | `Space` 屏间平移、`Screen` 浮岛编织纯布局模型（`model.ts`）与动效参数 |
-| `shared/ui/` | 本地维护的 shadcn/ui 官方源码与公共状态组合（`status.tsx`、`sonner.tsx`） |
+| `../../packages/ui/src/ui/` | 本地维护的 shadcn/ui 官方源码与公共状态组合；主题绑定的 `sonner.tsx` 留在应用 `shared/ui/` |
 | `shared/i18n.ts` / `messages/` | 应用级语言环境订阅、共享 `react-intl` context 与按功能组织的宿主消息声明 |
-| `shared/ConfigurationChoice.tsx` / `ModelChoices.tsx` / `tool-header.tsx` | 首页与对话共用的配置选择器、模型／等级覆盖选择器与工具单行标题组件 |
+| `@atelier/ui/ConfigurationChoice` / `@atelier/builtin/renderer` / `@atelier/ui/tool-header` | 首页与对话共用的配置选择器、模型／等级覆盖选择器与工具单行标题组件 |
 | `styles.css` | Tailwind、主题 token、窗口拖动重置与编织布局样式 |
 
 ## 前端状态协调要点

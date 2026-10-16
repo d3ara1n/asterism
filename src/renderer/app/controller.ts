@@ -2,7 +2,7 @@ import { ResourceStatusChanged, SessionTitleChanged, type EventSubscriber, type 
 
 import type { AppSnapshot, DesktopBridge, RuntimeStatus } from "../../shared/contracts";
 import { errorDisplay } from "../../shared/error-display";
-import { commonMessages } from "../messages/common";
+import { commonMessages } from "@atelier/ui/messages/common";
 import type { ResourceStatusMark } from "./resource-status";
 
 export type ApplicationState = {

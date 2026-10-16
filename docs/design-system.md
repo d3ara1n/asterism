@@ -72,7 +72,7 @@ Window          平台差异、拖动区域、窗口几何变量
 - **单行 Header 规范**：所有 block 的 header 按单行摘要设计，使不同内容块的标题视觉高度一致。由各 renderer 决定内容、排列、收缩与省略，外壳不设置高度上限或裁切规则。工具 header 推荐按“操作名—资源名称或路径—右侧摘要”安排（复用 `shared/tool-header.tsx`）：名称与路径占可收缩的中间区域，末尾省略；行数、目录项数、资源数、资源类型和增删统计保留在右侧，不换行，数值使用等宽数字。
 - **三态连续性原则**：填充、执行与结果的 header/body 应尽可能逐步增加信息，保留已出现的路径、输入数量与相同元素的排版，避免阶段切换清空摘要；同时允许按内容语义切换正文形态（如 write 从生成中的 8rem 尾部预览切换为成功写入后的代码正文）。
 - **局部高度与原始详情**：工具外壳不限制正文高度，也不为整个展开区建立滚动容器；body 提供方自行决定局部高度、滚动与截取。调用详情与结果详情使用可取消选中的单选切换，共用下方详情区域（结果含 file 或无非 null data 时隐藏结果详情），原始详情不受正文行预算影响。
-- **内置 120 行预算与 Pierre Diffs 着色**：内置插件 `atelier.core` 的工具正文遵循每次调用最多 120 个逻辑行的展示预算（不是 SDK 对外部插件的强制限制）。`read` 的返回行、`write` 的正文、目录列表与 `edit` 的所有 diff 片段（上下文、删除行、新增行合计）各自在一次调用内共用该预算，超出时提示省略行数。差异与代码展示统一复用 Pierre Diffs（`@pierre/diffs`）：`edit` 使用竖向堆叠的 stacked（`unified`）差异视图，显示修改前后绝对行号、原生增删颜色与片段分隔，不显示补丁头；`read / write` 使用原生 `File` 代码视图，按库自身的文件名与扩展名机制识别语法，未知语言按普通文本展示。两类视图使用 Pierre 亮暗主题与公共代码字体 token。
+- **内置 120 行预算与 Pierre Diffs 着色**：内置插件 `atelier.builtin` 的工具正文遵循每次调用最多 120 个逻辑行的展示预算（不是 SDK 对外部插件的强制限制）。`read` 的返回行、`write` 的正文、目录列表与 `edit` 的所有 diff 片段（上下文、删除行、新增行合计）各自在一次调用内共用该预算，超出时提示省略行数。差异与代码展示统一复用 Pierre Diffs（`@pierre/diffs`）：`edit` 使用竖向堆叠的 stacked（`unified`）差异视图，显示修改前后绝对行号、原生增删颜色与片段分隔，不显示补丁头；`read / write` 使用原生 `File` 代码视图，按库自身的文件名与扩展名机制识别语法，未知语言按普通文本展示。两类视图使用 Pierre 亮暗主题与公共代码字体 token。
 
 ## 文字、图标与控件
 
@@ -81,7 +81,7 @@ Window          平台差异、拖动区域、窗口几何变量
 - 字号五级：`type-page`、`type-section`、`type-body`、`type-caption`、`type-label`。
 - 字体只有两个 token：`--font-sans`（界面）与 `--font-mono`（代码）。用户在外观设置选择的本机字体（通过 Chromium `queryLocalFonts` 获取，代码字体默认筛选等宽）置于默认回退栈之前；界面字号即密度；代码另有字号 `--code-font-size`（11–18px，未设置时跟随所在文字），代码文字统一用 `type-code`。
 - 图标统一使用 `lucide-react`，不使用 Unicode 符号；界面标识为 `brand-mark.tsx` 的经纬线框。
-- `shared/ui/` 只放 shadcn（new-york-v4）官方 registry 源码，不手改结构与样式类；升级即重新拉取覆盖。唯一例外是 `sonner.tsx`：主题取自 `useScheme()` 而不引入 `next-themes`，状态图标按状态 token 着色。官方没有的组合（如 `PageState`、`StatusBadge`、`IconButton`、`ListRow`）放在 `shared/ui/` 内但只组合官方组件，不另写皮肤。
+- `packages/ui/src/ui/` 只放 shadcn（new-york-v4）官方 registry 源码，不手改结构与样式类；升级即重新拉取覆盖。主题绑定的 `src/renderer/shared/ui/sonner.tsx` 留在应用组合侧：主题取自 `useScheme()` 而不引入 `next-themes`，状态图标按状态 token 着色。官方没有的组合（如 `PageState`、`StatusBadge`、`IconButton`、`ListRow`）放在 `packages/ui/src/ui/` 内但只组合官方组件，不另写皮肤。
 - 业务代码只用官方组件与公共组合，不使用裸 button/select 等控件，不写控件颜色、阴影或圆角。可点击的卡片用 `Item variant="outline" asChild` 包裹 button。
 - 表面只有两种：`surface`（边框 + 卡片底，无阴影，用于浮岛、顶栏部件、卡片、画布）与 `surface-floating`（加阴影，用于悬浮面板、浮条、通知）；对话框、菜单、下拉由官方组件提供浮层外观。
 
@@ -104,7 +104,7 @@ Window          平台差异、拖动区域、窗口几何变量
 
 ## 状态与反馈
 
-状态分五类，每类固定图标与颜色；业务代码经 `shared/ui/status.tsx` 的 `StatusIcon`、`StatusBadge`、`StatusText` 表达，不直接写状态颜色。颜色不单独表达含义，始终与图标和文字同时出现。
+状态分五类，每类固定图标与颜色；业务代码经 `packages/ui/src/ui/status.tsx` 的 `StatusIcon`、`StatusBadge`、`StatusText` 表达，不直接写状态颜色。颜色不单独表达含义，始终与图标和文字同时出现。
 
 | 状态 | token | 图标 | 示例 |
 | --- | --- | --- | --- |
@@ -151,8 +151,8 @@ Window          平台差异、拖动区域、窗口几何变量
 | 内容 | 入口 |
 | --- | --- |
 | 颜色、字体、圆角、阴影、共享表面、图表色板 | `src/renderer/styles.css`、`src/shared/theme.ts`（Radix Colors 12 级色阶映射） |
-| 状态表达与临时通知 | `shared/ui/status.tsx`、`shared/ui/sonner.tsx`、`shared/toast.ts` |
-| 控件行为与视觉变体 | `src/renderer/shared/ui/`、`components.json` |
+| 状态表达与临时通知 | `packages/ui/src/ui/status.tsx`、`src/renderer/shared/ui/sonner.tsx`、`shared/toast.ts` |
+| 控件行为与视觉变体 | `packages/ui/src/ui/`、`components.json` |
 | 窗口布局、几何与平台材质 | `src/renderer/app/Window.tsx`、`src/shared/desktop.ts`、`src/main/window-appearance.ts` |
 | 受管空间、屏与浮岛编织 | `src/renderer/shared/weave/` |
 | 动效时长与曲线 | `styles.css` 的 `--motion-*`，Motion 侧镜像于 `shared/weave/motion.ts` |

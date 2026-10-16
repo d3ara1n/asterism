@@ -4,14 +4,14 @@ import { pointerChild } from "../../shared/configuration-presentation";
 import { configurationField, configurationLabel, configurationProperty, objectValue } from "../../shared/configuration-fields";
 import { pluginConfigurationMessages } from "../messages/plugin-configuration";
 import { useI18n } from "./i18n";
-import { Field, FieldLabel, FieldDescription, FieldError, FieldSet, FieldLegend, FieldGroup, FieldContent } from "./ui/field";
-import { Textarea } from "./ui/textarea";
-import { Button } from "./ui/button";
-import { Switch } from "./ui/switch";
-import { Input } from "./ui/input";
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectGroup, SelectItem } from "./ui/select";
-import { Separator } from "./ui/separator";
-import { cn } from "./utils";
+import { Field, FieldLabel, FieldDescription, FieldError, FieldSet, FieldLegend, FieldGroup, FieldContent } from "@atelier/ui/ui/field";
+import { Textarea } from "@atelier/ui/ui/textarea";
+import { Button } from "@atelier/ui/ui/button";
+import { Switch } from "@atelier/ui/ui/switch";
+import { Input } from "@atelier/ui/ui/input";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectGroup, SelectItem } from "@atelier/ui/ui/select";
+import { Separator } from "@atelier/ui/ui/separator";
+import { cn } from "@atelier/ui/utils";
 
 /** 复杂值保留完整文本；无效输入阻止提交，不把部分值或旧值保存为新配置。 */
 function JsonInput({ id, value, onChange, required, title, description, actions }: {

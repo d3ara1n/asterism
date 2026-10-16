@@ -9,11 +9,11 @@ import { defineCreation, defineAction, resourceCall, defineRecord, defineImpleme
 import { defineModule, definePlugin, implementCreation, implementAction, implementPreparer, implementResource, implementTool, type ObjectReader, type ObjectExecutor, type ObjectWriter, type PluginContext, type PluginDefinition } from "@atelier/sdk/runtime";
 import { ApplicationService } from "../runtime/service.ts";
 import { DatabaseVersionError } from "../runtime/storage.ts";
-import * as runtimeModules from "../modules/runtime.ts";
+import * as runtimeModules from "../runtime/builtin.ts";
 import type { ToolRegistry } from "../tools/registry.ts";
 import { foldWorkbench } from "../session/fold.ts";
 import type { ModelAdapter, ModelInput } from "../model/contract.ts";
-import { Agent, SubmitAgentInput } from "../modules/agent/contract.ts";
+import { Agent, SubmitAgentInput } from "@atelier/builtin-api/contracts";
 import { applicationStorage } from "../shared/application.ts";
 import { flat } from "../session/test-nodes.ts";
 

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { thinkingLevels } from "@atelier/sdk/contracts";
 import { defaultAgents, defaultRoles } from "../configuration/defaults.ts";
 import { AiSdkAdapter } from "../model/ai-sdk.ts";
-import { createSelection } from "../modules/agent/selection.ts";
+import { createSelection } from "../../packages/builtin/src/agent/selection.ts";
 import { agentSelectionSchema } from "../shared/model.ts";
 import { availableThinkingLevels, resolveAgentModel, type ConfigurationSnapshot, type ThinkingLevel } from "../shared/configuration.ts";
 import { resolveTarget } from "./models.ts";

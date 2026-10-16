@@ -86,6 +86,29 @@ describe("插件装配", () => {
     await loaded.close();
     expect(calls).toEqual(["consumer", "provider"]);
   });
+  // 同一次装配中 setup 与后置校验分别失败，不能由两条清理任务越过依赖顺序。
+  it("提供方后置校验失败仍等待消费者 setup 失败后的异步清理", async () => {
+    const calls: string[] = [], ns = pluginNamespace("acme.provider");
+    let release!: () => void, started!: () => void;
+    const held = new Promise<void>(resolve => { release = resolve; });
+    const cleaning = new Promise<void>(resolve => { started = resolve; });
+    const action = defineAction(ns.resource("thing", z.object({})), { id: ns.name("missing"), schema: z.null() });
+    const provider = definePlugin({ namespace: ns, version: "1", modules: [defineModule(() => ({
+      preparers: [{ id: "missing", contract: action, prepare: () => ({ action: "accept" }) }],
+      closing: async () => { calls.push("provider"); },
+    }))] });
+    const consumer = definePlugin({ namespace: pluginNamespace("acme.consumer"), version: "1", dependencies: [ns.id], modules: [
+      defineModule(() => ({ closing: async () => { started(); await held; calls.push("consumer"); } })),
+      defineModule(() => { throw new Error("Consumer setup failed."); }),
+    ] });
+    const loaded = loadPlugins([consumer, provider], services);
+    try {
+      await cleaning;
+      expect(loaded.manifest.map(plugin => plugin.status)).toEqual(["failed", "failed"]);
+      expect(calls).toEqual([]);
+    } finally { release(); await loaded.close(); }
+    expect(calls).toEqual(["consumer", "provider"]);
+  });
   it("后装配的同名契约生效，绑定旧契约的实现下线，共享契约身份的实现保留", () => {
     const shared = tool("Shared read.");
     const loaded = loadPlugins([plugin("acme.a", shared), plugin("acme.b", shared), plugin("acme.c", tool("Other read.", "test.tools/other-read"))], services);
@@ -113,7 +136,7 @@ describe("插件缺席", () => {
     const { AgentCapabilities } = await import("../execution/capabilities.ts");
     const resources = new ResourceRegistry([]);
     const object = { id: "x", kind: "acme.gone/thing", title: "Gone", data: { value: 1 } };
-    expect(resources.project(object)).toEqual({ contract: { id: "atelier.core/missing-resource" },
+    expect(resources.project(object)).toEqual({ contract: { id: "atelier.builtin/missing-resource" },
       data: { plugin: "acme.gone", kind: "acme.gone/thing", data: { value: 1 } } });
     expect(await resources.inspect(object)).toMatchObject({ available: false, error: { code: "implementation_missing" } });
     const capabilities = new AgentCapabilities(resources, new ToolRegistry([]), [object], () => true);

@@ -8,6 +8,8 @@ import { coreId } from "./src/shared/core.ts";
 export default defineConfig({
   main: {
     build: {
+      // 工作区源码包随应用静态编译，发布产物不在运行时读取仓库中的 .ts。
+      externalizeDeps: { exclude: ["@atelier/sdk", "@atelier/builtin-api", "@atelier/builtin", "@atelier/ui"] },
       outDir: resolve("dist/main"),
       rolldownOptions: {
         input: { index: resolve("src/main/index.ts"), runtime: resolve("src/runtime/index.ts") },

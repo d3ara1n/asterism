@@ -2,7 +2,7 @@ import { jsonSchema as sdkJsonSchema, streamText, tool, type ModelMessage, type 
 import { jsonSchema, unauthenticatedApiKey, type Json, type Usage } from "../shared/model.ts";
 import { ModelFailure, type ModelAdapter, type ModelEvent, type ModelInput, type ResolvedInputPart, type PreparedModel, type ModelValidationInput } from "./contract.ts";
 import { createProviderModel, validateProviderTransport } from "./provider.ts";
-import { projectSystemPrompt } from "../modules/agent/system-prompt.ts";
+import { projectSystemPrompt } from "./system-prompt.ts";
 import { requestOptions } from "./request-options.ts";
 import { aiSdkAdapterVersion, pickContinuation } from "./continuation.ts";
 import { projectHistory, validateProjection } from "./projection.ts";

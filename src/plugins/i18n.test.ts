@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { afterEach, describe, expect, it } from "vitest";
 import { defineMessages, defineAction, pluginNamespace, withValues } from "@atelier/sdk/contracts";
-import { z } from "zod";
+import { z } from 'zod';
 import { applyPreparation } from "./commands.ts";
 import { PackageList, loadPackages, readManifest } from "./packages.ts";
 import { loadCatalogs } from "./catalogs.ts";
@@ -51,7 +51,7 @@ describe("插件目录与展示 IPC", () => {
     writeFileSync(join(root, "package.json"), JSON.stringify({ name: "@example/backend", atelier: { id: "example.backend", api: { major: 8, minMinor: 0 },
       runtime: "runtime.ts", i18n: { catalogs: { "zh-Hans": "locales/zh.json" } } } }));
     writeFileSync(join(root, "runtime.ts"), `import { z } from 'zod';
-      import { pluginNamespace, defineMessages } from '@atelier/sdk/contracts';
+      import {pluginNamespace,defineMessages} from '@atelier/sdk/contracts';
       import { definePlugin, defineModule, PluginApiError } from '@atelier/sdk/runtime';
       const ns = pluginNamespace('example.backend');
       const messages = ns.messages('en', defineMessages({ limit: { id: 'limit', defaultMessage: 'Limit' } }));

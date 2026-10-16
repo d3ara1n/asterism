@@ -1,6 +1,6 @@
 # 第三方源码声明
 
-`src/renderer/shared/ui/button.tsx` 与 `dialog.tsx` 基于 [shadcn/ui](https://github.com/shadcn-ui/ui) 的控件模式和源码适配。npm 依赖的许可文件随依赖分发。
+`packages/ui/src/ui/button.tsx` 与 `dialog.tsx` 基于 [shadcn/ui](https://github.com/shadcn-ui/ui) 的控件模式和源码适配。npm 依赖的许可文件随依赖分发。
 
 ## shadcn/ui
 

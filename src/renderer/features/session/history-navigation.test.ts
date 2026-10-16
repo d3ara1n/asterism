@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { node, created as make, text, thinking, call, message, notice, event, attached, removed } from "../../../session/test-nodes";
 import { ViewRegistry } from "../../modules/registry";
-import { builtinViews } from "../../../modules/renderer";
+import { builtinViews } from "../../../../packages/builtin/src/renderer";
 import { workbenchRecordViews } from "../workbench/records";
 import { historyBefore, historyEntries, historyResources, historyResourceViews, matchesHistoryView } from "./history-navigation";
 

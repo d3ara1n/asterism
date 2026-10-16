@@ -76,7 +76,7 @@ Agent 从当前时间线中属于自身的记录投影回合状态（`empty / co
 资源工具与资源独立定义：
 - **工具契约（`ToolContract`）**：统一规定 `id`（稳定标识）、`name`（模型调用名）、`description`（能力与场景）、`guidelines`（选定后的使用规则）与 `args` schema。
 - **工具实现**：声明支持的资源类型、`target` schema、`result` schema、读写副作用、并行/顺序策略与 handler，不重复或覆写工具的 description/guidelines。`target` 由实现直接解释（如目录 list 用 `null | {path}`，文件 read 用 `{path, offset?, limit?}`，笔记 read 用 `null`），不引入通用目标解析层。args、target、result 三个 schema 均须有非空整体 description。
-- **契约共享与覆盖**：工具实现必须引用同一个实际声明对象（由公共模块加载保证）；同名异契约按插件装配顺序（`atelier.core` 最先，外部插件按用户列表）取最后定义者生效，被覆盖契约的实现下线。不同声明占用同一 ID 或同一资源类型与工具名存在多个当前实现时明确报错。
+- **契约共享与覆盖**：工具实现必须引用同一个实际声明对象（由公共模块加载保证）；同名异契约按插件装配顺序（`atelier.builtin` 最先，外部插件按用户列表）取最后定义者生效，被覆盖契约的实现下线。不同声明占用同一 ID 或同一资源类型与工具名存在多个当前实现时明确报错。
 - **能力视图匹配**：每次请求先取得已链接资源，再由工具目录匹配支持关系，最后应用 `agent.tools / excludeTools` 等外部策略。链接通知、`resource_inspect` 和实际调用共用这份能力视图与 schema。入口指导要求直接传递符合 schema 的 JSON 值（对象与 null 保持原类型，不先编码成字符串）。
 
 ## 工具调用批次、结局与执行授权
@@ -142,4 +142,4 @@ type ModelInputPart =
 - **`edit`**：以 `{line, hash}` 引用当前正文；`replace / delete` 的 `anchor..end` 范围含端点（仅校验被引用的端点行），`insert_before / insert_after` 保留锚点行，`append / prepend` 无需锚点。整批基于同一份当前正文校验，任一锚点或重叠范围失败则整批拒绝不写入；位移扫描仅给出重试候选，不自动移动目标。成功结果的 `data` 保存实际 unified diff 与受影响行的新锚点；`toModel` 返回摘要、按预算截取的完整行 diff（最多 64 KiB）与新锚点（最多 40 行 / 16 KiB），省略时明确提示。
 - **`write`**：直接创建或覆盖完整正文，不要求也不返回锚点；相同正文返回无变化。目录 `write` 可创建根内缺失的父目录。`toModel` 成功只返回简短确认与少量统计，不回传 diff、正文或锚点。
 - **限额与原子替换**：文件文本操作限于 8 MiB UTF-8，笔记限于 100,000 UTF-16 code units；差异由 `diff`（jsdiff）按计算预算生成。文件修改按真实路径串行，读取用固定句柄，写入先暂存再复核根、父目录、目标身份及完整当前正文，最后原子替换（新建采用排他提交，防止覆盖并发创建的目标；无法确认最终提交时返回 `unknown`）。真实路径复核处理符号链接越界，但并非操作系统级沙箱。
-- **笔记状态边界**：笔记保存只更新会话数据（`session_data`）中该对象的 `atelier.core/note.content` 并通知视图，不追加时间线事件或维护历史版本；回溯后的卡片与实时 inspect/read 均读取最新当前内容。GUI 的 120 行预览预算与 Pierre Diffs 代码着色见 [界面设计系统](design-system.md#对话过程视图)。
+- **笔记状态边界**：笔记保存只更新会话数据（`session_data`）中该对象的 `atelier.builtin/note.content` 并通知视图，不追加时间线事件或维护历史版本；回溯后的卡片与实时 inspect/read 均读取最新当前内容。GUI 的 120 行预览预算与 Pierre Diffs 代码着色见 [界面设计系统](design-system.md#对话过程视图)。

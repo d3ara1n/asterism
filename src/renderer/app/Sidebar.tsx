@@ -1,10 +1,10 @@
-import { BrandMark } from "../shared/ui/brand-mark";
-import { Button } from "../shared/ui/button";
-import { IconButton } from "../shared/ui/icon-button";
+import { BrandMark } from "@atelier/ui/ui/brand-mark";
+import { Button } from "@atelier/ui/ui/button";
+import { IconButton } from "@atelier/ui/ui/icon-button";
 import { PanelLeftClose, House, MessageSquare, Settings } from "lucide-react";
 
 import { appMessages } from "../messages/app";
-import { commonMessages } from "../messages/common";
+import { commonMessages } from "@atelier/ui/messages/common";
 import { settingsMessages } from "../messages/settings";
 import { useI18n } from "../shared/i18n";
 

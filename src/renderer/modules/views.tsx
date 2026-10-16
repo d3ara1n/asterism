@@ -10,4 +10,4 @@ export function useModuleViews(): ViewRegistry {
   if (!registry) throw new Error("Module views must be provided by the application root.");
   return registry;
 }
-export { JsonView } from "../shared/json-view";
+export { JsonView } from "@atelier/ui/json-view";

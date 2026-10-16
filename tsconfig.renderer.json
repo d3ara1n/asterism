@@ -1,12 +1,31 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "lib": [
+      "ES2023",
+      "DOM",
+      "DOM.Iterable"
+    ],
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "jsx": "react-jsx",
-    "types": ["vite/client"],
-    "paths": { "@/*": ["./src/renderer/*"] }
+    "types": [
+      "vite/client"
+    ],
+    "paths": {
+      "@/*": [
+        "./src/renderer/*"
+      ]
+    }
   },
-  "include": ["src/renderer", "packages/sdk/src/contracts.ts", "packages/sdk/src/renderer.ts", "src/shared", "src/modules/*/renderer.tsx", "src/modules/agent/conversation"]
+  "include": [
+    "src/renderer",
+    "packages/sdk/src/contracts.ts",
+    "packages/sdk/src/renderer.ts",
+    "src/shared",
+    "packages/builtin-api/src",
+    "packages/ui/src",
+    "packages/builtin/src/*/renderer.tsx",
+    "packages/builtin/src/agent/conversation"
+  ]
 }

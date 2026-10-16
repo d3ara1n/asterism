@@ -9,9 +9,9 @@ import { toolsMessages } from "../../messages/tools";
 import { JsonView, useModuleViews } from "../../modules/views";
 import type { ViewRegistry } from "../../modules/registry";
 import { getI18n, useI18n } from "../../shared/i18n";
-import { ToolDetails } from "../../shared/tool-content";
-import { ToolHeader } from "../../shared/tool-header";
-import { ItemGroup, Item, ItemMedia, ItemContent, ItemTitle, ItemDescription } from "../../shared/ui/item";
+import { ToolDetails } from "@atelier/ui/tool-content";
+import { ToolHeader } from "@atelier/ui/tool-header";
+import { ItemGroup, Item, ItemMedia, ItemContent, ItemTitle, ItemDescription } from "@atelier/ui/ui/item";
 
 /** 状态字段可能来自任何资源；常规标量直接阅读，复合值保留完整数据。 */
 function ResourceFields({ value }: { value: Json }) {

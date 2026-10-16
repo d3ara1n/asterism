@@ -1,0 +1,26 @@
+# 内置插件实现（`@atelier/builtin`）
+
+内置 Agent、笔记、目录、命名与设置组成插件 `atelier.builtin`。实现通过 `@atelier/sdk` 使用宿主能力，通过 `@atelier/builtin-api/contracts` 消费公共领域契约，基础控件来自内部 `@atelier/ui`。本包不反向导入应用 `src/` 的生产代码；测试可复用宿主集成设施。
+
+## 应用组合入口
+
+- `@atelier/builtin/runtime`：`createBuiltin({ application, connectNaming })` 返回插件定义；应用显式传入展示名称、请求 User-Agent，并连接命名接口。`createSelection`、`composeSystemPrompt` 为首页首次提交提供与 Agent 相同的领域准备规则。
+- `@atelier/builtin/renderer`：`builtinViews` 及首页复用的输入草稿、文件输入、模型选择和提交身份工具。
+- `@atelier/builtin/locales/zh-Hans.json`：由应用装配的内置翻译目录。
+
+宿主加载、外部插件依赖、公共提供方登记与关闭协调留在应用组合层。外部插件使用 [公共 API 包](../builtin-api/README.md)，不依赖实现包。
+
+## 功能目录
+
+| 目录 | 职责 |
+| --- | --- |
+| `src/agent/` | 选择、输入受理、执行循环、上下文压缩、历史投影与对话视图；`data.ts` 保存私有状态声明，公共动作与记录在公共 API 包 |
+| `src/notes/`、`src/filesystem/` | 资源与正文工具实现、创建入口与三态工具视图 |
+| `src/naming/` | 自动命名、人工命名接口和标题投影；记录契约由公共包提供 |
+| `src/settings/` | 内置插件配置 |
+| `src/shared/` | 正文算法、共享工具声明、预览规则与创建表单 |
+| `src/messages/`、`src/locales/` | 内置插件自有文案与翻译 |
+
+功能按契约、后台、前端分入口，不建立同时加载 Node 与 React 实现的 barrel。工具作者的参数说明、错误自愈与 `toModel` 规则见 [运行时](../../docs/runtime.md#原生正文工具与目录操作)；代码编写时 args、target、result schema 必须有完整描述，错误须区分失败、取消与无法确认写入影响。
+
+模型提示块的通用序列化属于宿主模型适配层；Agent 只组合领域提示内容。命名、压缩与执行请求的应用身份通过工厂参数传入，不读取应用 package.json。

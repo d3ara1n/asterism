@@ -1,18 +1,18 @@
 import { motion, AnimatePresence } from "motion/react";
-import { DropdownMenuItem, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuSeparator, DropdownMenuLabel } from "../shared/ui/dropdown-menu";
-import { Button } from "../shared/ui/button";
+import { DropdownMenuItem, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuSeparator, DropdownMenuLabel } from "@atelier/ui/ui/dropdown-menu";
+import { Button } from "@atelier/ui/ui/button";
 import { PanelLeft, ArrowLeft, ChevronDown, House, Settings, Plus, KeyRound, ListTree, History } from "lucide-react";
 
-import { BrandMark } from "../shared/ui/brand-mark";
+import { BrandMark } from "@atelier/ui/ui/brand-mark";
 
 import { WorkbenchSurface } from "../features/workbench/WorkbenchSurface";
-import { PageState } from "../shared/ui/page-state";
+import { PageState } from "@atelier/ui/ui/page-state";
 import { Workbench, type WorkbenchHandle } from "../features/workbench/Workbench";
 import { Sidebar } from "./Sidebar";
 
 import { HomePage, type StartInput } from "../features/home/HomePage";
-import { createMessageDraft } from "../../modules/agent/conversation/draft";
-import { startAgentContentTarget } from "../../modules/agent/contract";
+import { createMessageDraft, SubmissionIdentity } from "@atelier/builtin/renderer";
+import { startAgentContentTarget } from "@atelier/builtin-api/contracts";
 import { contentInput, contentScopeId } from "../features/creation/content";
 import type { RendererContentInput } from "@atelier/sdk/renderer";
 import { Window, Titlebar } from "./Window";
@@ -21,14 +21,14 @@ import { Space } from "../shared/weave/Space";
 import { SettingsPage } from "../features/settings/SettingsPage";
 import { Screen, type IslandSpec } from "../shared/weave/Screen";
 import { Toaster } from "../shared/ui/sonner";
-import { IconButton } from "../shared/ui/icon-button";
+import { IconButton } from "@atelier/ui/ui/icon-button";
 import { useStateToast } from "../shared/toast";
 
 import { errorDisplay } from "../../shared/error-display.ts";
 import type { UiText } from "@atelier/sdk/contracts";
 import { accessMessages } from "../messages/access";
 import { appMessages } from "../messages/app";
-import { commonMessages } from "../messages/common";
+import { commonMessages } from "@atelier/ui/messages/common";
 import { historyMessages } from "../messages/history";
 import { objectsMessages } from "../messages/objects";
 import { settingsMessages } from "../messages/settings";
@@ -39,7 +39,6 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "
 import type { ApplicationController } from "./controller";
 
 import { useCreationCoordinator } from "../features/creation/coordinator";
-import { SubmissionIdentity } from "../shared/submission";
 import { sessionController } from "../features/session/registry";
 
 import { islandTransition } from "../shared/weave/motion";

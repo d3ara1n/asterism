@@ -1,5 +1,5 @@
-import { Button } from "../shared/ui/button";
-import { commonMessages } from "../messages/common";
+import { Button } from "@atelier/ui/ui/button";
+import { commonMessages } from "@atelier/ui/messages/common";
 import { useI18n } from "../shared/i18n";
 
 import { Component, type ReactNode } from "react";

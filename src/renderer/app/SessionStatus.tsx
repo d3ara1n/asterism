@@ -3,11 +3,11 @@ import type { ResourceStatus } from "@atelier/sdk/contracts";
 import { useId } from "react";
 import { resourceStatusMessages as messages } from "../messages/resource-status";
 import { useI18n } from "../shared/i18n";
-import { Button } from "../shared/ui/button";
-import { Item, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "../shared/ui/item";
-import { Popover, PopoverContent, PopoverTrigger } from "../shared/ui/popover";
-import { StatusIcon as SharedStatusIcon, type StatusTone } from "../shared/ui/status";
-import { Progress } from "../shared/ui/progress";
+import { Button } from "@atelier/ui/ui/button";
+import { Item, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@atelier/ui/ui/item";
+import { Popover, PopoverContent, PopoverTrigger } from "@atelier/ui/ui/popover";
+import { StatusIcon as SharedStatusIcon, type StatusTone } from "@atelier/ui/ui/status";
+import { Progress } from "@atelier/ui/ui/progress";
 import { summarizeResourceStatus, type ResourceStatusMark } from "./resource-status";
 
 const tones: Record<ResourceStatus["status"], StatusTone> = { running: "progress", failed: "error", awaiting: "warning", completed: "success" };

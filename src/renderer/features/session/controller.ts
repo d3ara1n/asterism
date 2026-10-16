@@ -1,4 +1,4 @@
-import { CancelAgent } from "../../../modules/agent/contract.ts";
+import { CancelAgent } from "@atelier/builtin-api/contracts";
 import type { UiText } from "@atelier/sdk/contracts";
 import { errorDisplay } from "../../../shared/error-display.ts";
 import type { SessionBridge, SessionMutation, SessionResult, SessionSnapshot, SessionProgress } from "../../../shared/session.ts";

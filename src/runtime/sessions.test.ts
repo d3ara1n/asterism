@@ -10,27 +10,27 @@ import { AiSdkAdapter, sdkMessages } from "../model/ai-sdk.ts";
 import { type SessionChanged, type SessionCommand, type SessionMutation } from "../shared/session.ts";
 import { flat } from "../session/test-nodes.ts";
 import type { AgentSelection, Json } from "../shared/model.ts";
-import * as runtimeModules from "../modules/runtime.ts";
+import * as runtimeModules from "./builtin.ts";
 import { z } from "zod";
 import { defineData, ResourceStatusChanged, type ResourceStatus } from "@atelier/sdk/contracts";
 import { defineImplementation, defineTool } from "@atelier/sdk/contracts";
-import { Directory } from "../modules/filesystem/contract.ts";
-import { Note } from "../modules/notes/contract.ts";
+import { Directory } from "../../packages/builtin/src/filesystem/contract.ts";
+import { Note } from "../../packages/builtin/src/notes/contract.ts";
 import { implement } from "../tools/testing.ts";
 import { ToolRegistry } from "../tools/registry.ts";
 import { foldWorkbench } from "../session/fold.ts";
-import { ContextSummary, RequestDiagnosticsRecord } from "../modules/agent/records.ts";
+import { ContextSummary, RequestDiagnosticsRecord } from "@atelier/builtin-api/contracts";
 /** 请求诊断记录随每次工作请求追加；路径、游标与节点顺序断言只看工作记录。 */
 const work = <T extends { contract: string }>(nodes: readonly T[]) => nodes.filter(node => node.contract !== RequestDiagnosticsRecord.id);
-import { COMPRESSION_MAX_OUTPUT } from "../modules/agent/compression.ts";
+import { COMPRESSION_MAX_OUTPUT } from "../../packages/builtin/src/agent/compression.ts";
 import { applicationUserAgent } from "../shared/application.ts";
 
 const roots: string[] = [];
 type Snap = { workbench: { objects: { id: string; kind: string; presentation: { data: unknown } }[] } };
-const agentOf = (snap: Snap) => snap.workbench.objects.find(o => o.kind === "atelier.core/agent")!.id;
-const selectionOf = (snap: Snap) => (snap.workbench.objects.find(o => o.kind === "atelier.core/agent")!.presentation.data as { selection: AgentSelection }).selection;
+const agentOf = (snap: Snap) => snap.workbench.objects.find(o => o.kind === "atelier.builtin/agent")!.id;
+const selectionOf = (snap: Snap) => (snap.workbench.objects.find(o => o.kind === "atelier.builtin/agent")!.presentation.data as { selection: AgentSelection }).selection;
 import { resourceCall, modelInputText, type ModelInputPart } from "@atelier/sdk/contracts";
-import { agentAction, agentCommandSchema, startAgentContentTarget, SubmitAgentInput } from "../modules/agent/contract.ts";
+import { agentAction, agentCommandSchema, startAgentContentTarget, SubmitAgentInput } from "@atelier/builtin-api/contracts";
 const agentCommand = (sessionId: string, objectId: string, command: Json): SessionMutation => ({ type: "resource.command", sessionId, objectId, command: resourceCall(agentAction(agentCommandSchema.parse(command)), agentCommandSchema.parse(command)) });
 const services = new Set<ApplicationService>();
 afterEach(async () => { vi.useRealTimers(); for (const s of services) await s.close(); services.clear(); vi.restoreAllMocks(); for (const r of roots.splice(0)) rmSync(r, { recursive: true, force: true }); });
@@ -305,9 +305,9 @@ describe("会话运行时", () => {
     const { service, root, start } = await setup();
     const first = await execute(service, start); await settled(service);
     const sessionId = first.sessionId;
-    const created = await execute(service, { type: "resource.create", sessionId, kind: "atelier.core/note", creation: { id: "atelier.core/note.create" },
+    const created = await execute(service, { type: "resource.create", sessionId, kind: "atelier.builtin/note", creation: { id: "atelier.builtin/note.create" },
       input: { title: "Notebook", content: "original" }, position: { x: 0, y: 0 } });
-    const note = foldWorkbench(created.nodes.map(flat)).objects.find(object => object.kind === "atelier.core/note")!;
+    const note = foldWorkbench(created.nodes.map(flat)).objects.find(object => object.kind === "atelier.builtin/note")!;
     const before = service.sessions.tree.nodes(sessionId), cursor = service.sessions.tree.cursor(sessionId);
     const prepared = tools.match(note).find(tool => tool.tool.name === "write")!.prepare(note, null, { content: "latest" });
     if (!("execute" in prepared)) throw new Error("Expected a write invocation.");
@@ -326,9 +326,9 @@ describe("会话运行时", () => {
     const { service, root, start } = await setup();
     const first = await execute(service, start); await settled(service);
     const sessionId = first.sessionId;
-    const created = await execute(service, { type: "resource.create", sessionId, kind: "atelier.core/note", creation: { id: "atelier.core/note.create" },
+    const created = await execute(service, { type: "resource.create", sessionId, kind: "atelier.builtin/note", creation: { id: "atelier.builtin/note.create" },
       input: { title: "Saved note", content: "original" }, position: { x: 10, y: 20 } });
-    const note = created.workbench.objects.find(object => object.kind === "atelier.core/note")!, nodeId = created.cursor!;
+    const note = created.workbench.objects.find(object => object.kind === "atelier.builtin/note")!, nodeId = created.cursor!;
     expect(await service.sessions.execute({ type: "object.remove", sessionId, objectId: note.id })).toEqual({ kind: "accepted", sessionId });
     const removedCursor = service.sessions.tree.cursor(sessionId), before = service.sessions.tree.nodes(sessionId);
     expect(service.sessions.snapshot(sessionId).workbench.objects.map(object => object.id)).not.toContain(note.id);
@@ -402,7 +402,7 @@ describe("会话运行时", () => {
       expect(before.nodes.map(flat).some(node => node.kind === "text")).toBe(false);
       expect(before.progress.live).toContainEqual(expect.objectContaining({ kind: "text", text: "Saved text" }));
       // 领域状态须经资源投影交付；不能只在前端或执行循环内存中计算。
-      expect(before.workbench.objects.find(object => object.kind === "atelier.core/agent")?.presentation)
+      expect(before.workbench.objects.find(object => object.kind === "atelier.builtin/agent")?.presentation)
         .toMatchObject({ data: { turnState: "incomplete" } });
     } finally { release(); }
     await settled(service);
@@ -412,13 +412,13 @@ describe("会话运行时", () => {
     expect(after.nodes.at(-1)!.contract).toBe(RequestDiagnosticsRecord.id);
     expect(work(after.nodes).map(flat).at(-1)).toMatchObject({ kind: "text", parentId: before.cursor,
       completion: { usage, finishReason: "stop", rawFinishReason: "end_turn", providerResponseId: "provider-response" } });
-    expect(after.workbench.objects.find(object => object.kind === "atelier.core/agent")?.presentation)
+    expect(after.workbench.objects.find(object => object.kind === "atelier.builtin/agent")?.presentation)
       .toMatchObject({ data: { turnState: "completed" } });
     await service.close(); services.delete(service);
     const reopened = new ApplicationService(root); services.add(reopened);
     const restored = reopened.sessions.snapshot(first.sessionId);
     expect(restored.nodes).toEqual(after.nodes);
-    expect(restored.workbench.objects.find(object => object.kind === "atelier.core/agent")?.presentation)
+    expect(restored.workbench.objects.find(object => object.kind === "atelier.builtin/agent")?.presentation)
       .toMatchObject({ data: { turnState: "completed" } });
   });
 
@@ -449,8 +449,8 @@ describe("会话运行时", () => {
     const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jX1kAAAAASUVORK5CYII=", "base64");
     writeFileSync(join(root, "shot.png"), png);
     const first = await execute(service, start); await settled(service);
-    const created = await execute(service, { type: "resource.create", sessionId: first.sessionId, kind: "atelier.core/directory", creation: { id: "atelier.core/directory.create" }, input: { path: root }, position: { x: 0, y: 0 } });
-    resourceId = created.workbench.objects.find(object => object.kind === "atelier.core/directory")!.id;
+    const created = await execute(service, { type: "resource.create", sessionId: first.sessionId, kind: "atelier.builtin/directory", creation: { id: "atelier.builtin/directory.create" }, input: { path: root }, position: { x: 0, y: 0 } });
+    resourceId = created.workbench.objects.find(object => object.kind === "atelier.builtin/directory")!.id;
     const agentId = agentOf(first);
     await execute(service, { type: "link.set", sessionId: first.sessionId, agentId, resourceId, linked: true });
     await execute(service, agentCommand(first.sessionId, agentId, { type: "continue" })); await settled(service);
@@ -499,7 +499,7 @@ describe("会话运行时", () => {
     const { service, root, start } = await setup(model);
     const first = await execute(service, start); await settled(service);
     const sessionId = first.sessionId, agentId = agentOf(first);
-    const created = await execute(service, { type: "resource.create", sessionId, kind: Directory.kind, creation: { id: "atelier.core/directory.create" },
+    const created = await execute(service, { type: "resource.create", sessionId, kind: Directory.kind, creation: { id: "atelier.builtin/directory.create" },
       input: { path: root, title: "Captured directory" }, position: { x: 0, y: 0 } });
     resourceId = created.workbench.objects.find(object => object.kind === Directory.kind)!.id;
     await execute(service, { type: "link.set", sessionId, agentId, resourceId, linked: true });
@@ -523,7 +523,7 @@ describe("会话运行时", () => {
     await settled(service);
     const snap = await execute(service, { type: "read", sessionId: a.sessionId });
     expect(work(snap.nodes).map(flat).map(n => n.kind)).toEqual(["event", "message", "text"]);
-    expect(snap.workbench.objects.filter(o => o.kind === "atelier.core/agent")).toHaveLength(1);
+    expect(snap.workbench.objects.filter(o => o.kind === "atelier.builtin/agent")).toHaveLength(1);
     await expect(execute(service, { ...start, parts: [{ kind: "text", text: "Other" }] })).rejects.toThrow();
     await service.close(); services.delete(service);
     const reopened = new ApplicationService(root, { adapterFactory: () => adapter() }); services.add(reopened);
@@ -543,8 +543,8 @@ describe("会话运行时", () => {
     const first = await execute(service, start); await settled(service);
     const sessionId = first.sessionId;
     const a = agentOf(first);
-    await execute(service, { type: "resource.create", sessionId, kind: "atelier.core/agent", creation: { id: "atelier.core/agent.create" }, input: { selection: selectionOf(first) }, position: { x: 600, y: 0 } });
-    const b = service.sessions.snapshot(sessionId).workbench.objects.find(o => o.kind === "atelier.core/agent" && o.id !== a)!.id;
+    await execute(service, { type: "resource.create", sessionId, kind: "atelier.builtin/agent", creation: { id: "atelier.builtin/agent.create" }, input: { selection: selectionOf(first) }, position: { x: 600, y: 0 } });
+    const b = service.sessions.snapshot(sessionId).workbench.objects.find(o => o.kind === "atelier.builtin/agent" && o.id !== a)!.id;
     await execute(service, agentCommand(sessionId, a, { type: "submit", submissionId: randomUUID(), parts: [{ kind: "text", text: "To A" }] }));
     await execute(service, agentCommand(sessionId, b, { type: "submit", submissionId: randomUUID(), parts: [{ kind: "text", text: "To B" }] }));
     await expect(execute(service, agentCommand(sessionId, a, { type: "continue" }))).rejects.toThrow();
@@ -577,7 +577,7 @@ describe("会话运行时", () => {
     const first = await execute(service, start); await settled(service);
     const sessionId = first.sessionId;
     const a = agentOf(first);
-    await execute(service, { type: "resource.create", sessionId, kind: "atelier.core/agent", creation: { id: "atelier.core/agent.create" }, input: { selection: selectionOf(first) }, position: { x: 600, y: 0 } });
+    await execute(service, { type: "resource.create", sessionId, kind: "atelier.builtin/agent", creation: { id: "atelier.builtin/agent.create" }, input: { selection: selectionOf(first) }, position: { x: 600, y: 0 } });
     const b = service.sessions.snapshot(sessionId).workbench.objects.find(o => o.id !== a)!.id;
     try {
       await execute(service, agentCommand(sessionId, a, { type: "submit", submissionId: randomUUID(), parts: [{ kind: "text", text: "To A" }] }));
@@ -632,7 +632,7 @@ describe("会话运行时", () => {
     if (mode === "agent") { await started; capturedId = agentOf(first); }
     else {
       await settled(service);
-      const note = await execute(service, { type: "resource.create", sessionId, kind: Note.kind, creation: { id: "atelier.core/note.create" }, input: {}, position: { x: 0, y: 0 } });
+      const note = await execute(service, { type: "resource.create", sessionId, kind: Note.kind, creation: { id: "atelier.builtin/note.create" }, input: {}, position: { x: 0, y: 0 } });
       capturedId = note.workbench.objects.find(object => object.kind === Note.kind)!.id;
     }
     const id = capturedId;
@@ -640,7 +640,7 @@ describe("会话运行时", () => {
       expect(service.sessions.snapshot(sessionId).progress.unsettledObjectIds).toContain(id);
       await expect(execute(service, { type: "select", sessionId, nodeId: first.cursor })).rejects.toMatchObject({ code: "conflict" });
       await expect(execute(service, { type: "object.remove", sessionId, objectId: id })).rejects.toMatchObject({ code: "conflict" });
-      const directory = await execute(service, { type: "resource.create", sessionId, kind: Directory.kind, creation: { id: "atelier.core/directory.create" }, input: { path: root }, position: { x: 0, y: 0 } });
+      const directory = await execute(service, { type: "resource.create", sessionId, kind: Directory.kind, creation: { id: "atelier.builtin/directory.create" }, input: { path: root }, position: { x: 0, y: 0 } });
       await execute(service, { type: "object.remove", sessionId, objectId: directory.workbench.objects.find(object => object.kind === Directory.kind)!.id });
     } finally { release(); capturedId = ""; }
     await settled(service);
@@ -766,8 +766,8 @@ describe("会话运行时", () => {
     await settled(service);
     const sessionId = first.sessionId;
     const agentId = agentOf(first);
-    const created = await execute(service, { type: "resource.create", sessionId, kind: "atelier.core/directory", creation: { id: "atelier.core/directory.create" }, input: { path: root }, position: { x: 0, y: 0 } });
-    resourceId = created.workbench.objects.find(object => object.kind === "atelier.core/directory")!.id;
+    const created = await execute(service, { type: "resource.create", sessionId, kind: "atelier.builtin/directory", creation: { id: "atelier.builtin/directory.create" }, input: { path: root }, position: { x: 0, y: 0 } });
+    resourceId = created.workbench.objects.find(object => object.kind === "atelier.builtin/directory")!.id;
     await execute(service, { type: "link.set", sessionId: sessionId, agentId: agentId, resourceId: resourceId, linked: true });
     await execute(service, agentCommand(sessionId, agentId, { type: "continue" }));
     await started;

@@ -9,7 +9,7 @@
 - 自动化覆盖交错事件、长回合切分、连续压缩、其他代理隔离、旧历史不变、实报用量口径、输出预算，以及失败／取消后重试。
 - 类型检查、单元／契约测试、i18n 检查与构建已通过；测试使用隔离数据库和合成模型流，不访问真实提供商。
 
-实现入口：`src/modules/agent/compression.ts`（策略与执行）、`compression-prompt.ts`（摘要提示与材料）、`projection.ts`（响应分组与保留边界）。记录、任务与视图沿该模块的 `records.ts`、`loop.ts` 和 `conversation/` 接入；源码分工见 [模块指南](../src/modules/README.md#会话数据与-agent)。
+实现入口：`packages/builtin/src/agent/compression.ts`（策略与执行）、`compression-prompt.ts`（摘要提示与材料）、`projection.ts`（响应分组与保留边界）。记录、任务与视图沿该模块的 `records.ts`、`loop.ts` 和 `conversation/` 接入；源码分工见 [模块指南](../packages/builtin/README.md#会话数据与-agent)。
 
 ## 当前待验收
 

@@ -39,13 +39,13 @@
 
 Atelier 分为**应用组合层**、**通用宿主机制**与**插件**三层：
 
-- **应用组合层**：将宿主能力与随软件分发的内置插件（`atelier.core`）组成产品功能（例如首页创建 Agent 并提交首条输入、人工命名入口调用 `NamingApi.nameByUser`）。
+- **应用组合层**：将宿主能力与随软件分发的内置插件（`atelier.builtin`）组成产品功能（例如首页创建 Agent 并提交首条输入、人工命名入口调用 `NamingApi.nameByUser`）。
 - **通用宿主机制**：负责事务、记录存储、执行游标、路由、校验与运行生命周期，不解释 Agent 消息、回合或命名来源等插件领域语义。
-- **插件业务层**：内置 `atelier.core` 与外部插件使用同一个 `@atelier/sdk`（见 [插件 SDK](plugin-sdk.md)），不因随软件分发获得绕过身份、校验或生命周期的特权。
+- **插件业务层**：内置 `atelier.builtin` 与外部插件使用同一个 `@atelier/sdk`（见 [插件 SDK](plugin-sdk.md)），不因随软件分发获得绕过身份、校验或生命周期的特权。
 
-源码依赖方向为：**应用组合层 → 宿主接口 + 内置插件公开领域接口 + SDK**；**通用宿主机制 → SDK**；**插件 → SDK**；**SDK 不依赖任何实现**。公开导入只建立代码依赖，记录写入仍经具身份的操作柄打戳与校验。
+源码依赖方向为：**应用组合层 → 宿主接口 + 内置插件公开领域接口 + SDK**；**通用宿主机制 → SDK**；**内置实现 → SDK + 内置公共 API + 内部 UI**；**外部插件 → SDK + 已声明的公共包**；**公共 API → SDK**；**SDK 不依赖任何实现**。公开导入只建立代码依赖，记录写入仍经具身份的操作柄打戳与校验。
 
-内置功能模块位于 `src/modules/<name>/`，采用三个分进程编译的静态入口：`contract.ts`（纯 Zod 契约）、`runtime.ts`（后台实现）、`renderer.tsx`（前端卡片与工具视图）。外部插件包在启动时由宿主打包并缓存于 `<data>/plugins/.cache`，前端静态资源经 `atelier-plugin://` 只读提供，高频二进制经 `shared/object-stream.ts` 的按对象流通道传输。
+内置实现位于 `packages/builtin/`，公开领域声明位于 `packages/builtin-api/`，应用与内置界面共享控件位于内部 `packages/ui/`。内置后台与前端保持静态构建，应用组合层通过包入口安装内置插件并登记公共提供方；通用加载器只消费提供方描述，不导入 Agent。公共实例、依赖及版本规则见 [公共模块与契约身份](plugin-sdk.md#公共模块与契约身份)。外部插件包在启动时由宿主打包并缓存于 `<data>/plugins/.cache`，前端静态资源经 `atelier-plugin://` 只读提供，高频二进制经 `shared/object-stream.ts` 的按对象流通道传输。
 
 ## 存储归属与数据事务
 
@@ -71,7 +71,7 @@ Atelier 分为**应用组合层**、**通用宿主机制**与**插件**三层：
 - `workspace` / `sessions`：本地工作区身份与会话查询索引（含当前 `cursor` 与 `title`）。
 - `session_nodes`：保存全部不可变历史节点（`seq`、`id`、`session_id`、`parent_id`、JSON `payload` 及虚拟生成列 `contract`）。载荷含宿主写入的 `source: { plugin, resource } | null`、契约身份与数据；宿主不为特定执行体的输出建列或约束。
 - `cursor_selections`：显式执行游标选择的追加审计日志，与 `sessions.cursor` 更新处于同一事务；不进入会话树或模型上下文。
-- `session_data`：保存当前会话或对象数据，以 `(session_id, object_id, contract_id)` 定位（空 `object_id` 表示会话级，如笔记正文存对象级 `atelier.core/note.content`）。纯数据保存可与事件同事务提交，只通知视图、不追加历史，回溯或分叉不恢复当前值。
+- `session_data`：保存当前会话或对象数据，以 `(session_id, object_id, contract_id)` 定位（空 `object_id` 表示会话级，如笔记正文存对象级 `atelier.builtin/note.content`）。纯数据保存可与事件同事务提交，只通知视图、不追加历史，回溯或分叉不恢复当前值。
 - `contents` / `content_roots`：不可变内容元数据及记录／当前数据的引用依赖根（见 [不可变内容](content.md)）。
 - `object_views` / `viewports`：当前卡片位置、隐藏、折叠、宽高覆盖与会话画布视口；独立于任务历史。
 

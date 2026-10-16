@@ -1,7 +1,6 @@
 import { z } from "zod";
-import { uiTextSchema } from "@atelier/sdk/contracts";
+import { uiTextSchema, type Json } from "@atelier/sdk/contracts";
 import { translationCatalogSchema, type LanguageBridge } from "./language.ts";
-import type { Json } from "@atelier/sdk/contracts";
 import { coreChannel } from "./core.ts";
 import type { ConfigurationBridge } from "./configuration.ts";
 import type { DesktopPlatform } from "./desktop.ts";
@@ -11,7 +10,7 @@ import type { PluginConfigurationBridge } from "./plugin-configuration.ts";
 import type { ContentBridge } from "./content.ts";
 import type { EventBridge } from "./plugin-events.ts";
 
-export const protocolVersion = 5;
+export const protocolVersion = 6;
 export const commandChannel = coreChannel("command");
 export const statusChannel = coreChannel("runtime-status");
 export const pickDirectoryChannel = coreChannel("pick-directory");
@@ -32,7 +31,8 @@ export const snapshotSchema = z.strictObject({
   sessions: z.array(z.strictObject({ id, title: z.string(), created_at: z.string() })),
   /** 插件包：启动时状态；renderer 为 atelier-plugin:// 下的入口路径。 */
   plugins: z.array(z.strictObject({ index: z.number().int().nonnegative(), id: z.string().nullable(), source: z.string(),
-    status: z.enum(["loaded", "disabled", "invalid", "failed", "pending"]), enabled: z.boolean(), error: z.string().nullable(), renderer: z.string().nullable() })),
+    status: z.enum(["loaded", "disabled", "invalid", "failed", "pending"]), enabled: z.boolean(), error: z.string().nullable(), renderer: z.string().nullable(),
+    dependencies: z.array(z.string()).default([]) })),
   /** 包列表与本次启动不同：需要重启生效。 */
   restartRequired: z.boolean(),
   catalogs: z.array(translationCatalogSchema).optional(),

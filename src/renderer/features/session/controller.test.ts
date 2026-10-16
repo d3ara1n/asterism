@@ -1,5 +1,5 @@
 import { resourceCall } from "@atelier/sdk/contracts";
-import { ContinueAgent } from "../../../modules/agent/contract.ts";
+import { ContinueAgent } from "@atelier/builtin-api/contracts";
 import { describe, expect, it, vi } from "vitest";
 import { type SessionBridge, type SessionChanged, type SessionCommand, type SessionResult, type SessionSnapshot, type SessionProgress } from "../../../shared/session.ts";
 import { SessionController } from "./controller.ts";
@@ -87,7 +87,7 @@ describe("会话视图所有权", () => {
     const { controller, requests } = fixture(); const disconnect = controller.connect();
     requests[0]!.resolve(view(snapshot(1))); await flush();
     const command = { type: "resource.command" as const, sessionId: "s", objectId: "a",
-      command: { id: "atelier.core/agent.configure", input: { type: "configure", selection: { agent: "worker", model: "new", thinking: null } } } };
+      command: { id: "atelier.builtin/agent.configure", input: { type: "configure", selection: { agent: "worker", model: "new", thinking: null } } } };
     const changed = controller.execute(command); await flush();
     requests[1]!.resolve(accepted); await changed;
     expect(controller.getSnapshot()).toMatchObject({ busy: false, status: "loading" });

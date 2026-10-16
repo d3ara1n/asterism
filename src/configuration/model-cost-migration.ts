@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { emptyModelRates, modelCostSchema, type ModelRates, type UnitPrice } from "../shared/model-cost.ts";
+import { emptyModelRates, modelCostSchema, type ModelRates, type UnitPrice } from "@atelier/sdk/contracts";
 
 /** 旧配置的平铺单价均为 USD / 百万 token；只在存储边界转换，不进入公共配置契约。 */
 const price = z.number().nonnegative().nullable();

@@ -6,10 +6,10 @@ import type { PluginConfiguration, PluginConfigurationBridge } from "../../../sh
 import { pluginConfigurationMessages } from "../../messages/plugin-configuration";
 import { useI18n } from "../../shared/i18n";
 import { ConfigurationValue } from "../../shared/ConfigurationValue";
-import { FieldSet, FieldGroup } from "../../shared/ui/field";
-import { Button } from "../../shared/ui/button";
-import { Alert, AlertDescription } from "../../shared/ui/alert";
-import { Spinner } from "../../shared/ui/spinner";
+import { FieldSet, FieldGroup } from "@atelier/ui/ui/field";
+import { Button } from "@atelier/ui/ui/button";
+import { Alert, AlertDescription } from "@atelier/ui/ui/alert";
+import { Spinner } from "@atelier/ui/ui/spinner";
 import { Section } from "../settings/layout";
 
 function ConfigurationForm({ settings, execute, onSaved }: {

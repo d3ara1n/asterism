@@ -1,7 +1,9 @@
 {
   "compilerOptions": {
     "target": "ES2023",
-    "lib": ["ES2023"],
+    "lib": [
+      "ES2023"
+    ],
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "strict": true,
@@ -10,8 +12,29 @@
     "resolveJsonModule": true,
     "skipLibCheck": true,
     "noEmit": true,
-    "types": ["node"],
+    "types": [
+      "node"
+    ],
     "rootDir": "."
   },
-  "include": ["scripts", "packages/sdk/src", "packages/sdk/examples", "src/shared", "src/runtime", "src/main", "src/preload", "src/session", "src/execution", "src/resources", "src/tools", "src/model", "src/configuration", "src/plugins", "src/modules/*/*.ts", "*.config.ts"]
+  "include": [
+    "scripts",
+    "packages/sdk/src",
+    "packages/sdk/examples",
+    "src/shared",
+    "src/runtime",
+    "src/main",
+    "src/preload",
+    "src/session",
+    "src/execution",
+    "src/resources",
+    "src/tools",
+    "src/model",
+    "src/configuration",
+    "src/plugins",
+    "*.config.ts",
+    "packages/builtin-api/src",
+    "packages/builtin/src/*/*.ts",
+    "packages/builtin-api/examples"
+  ]
 }

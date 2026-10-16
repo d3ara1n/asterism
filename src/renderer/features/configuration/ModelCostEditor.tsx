@@ -1,11 +1,11 @@
 import { ChevronDown, Plus, Trash2 } from "lucide-react";
-import { emptyModelRates, priceUnits, type ModelCost, type ModelRates, type ModalityRates, type UnitPrice } from "../../../shared/model-cost";
+import { emptyModelRates, priceUnits, type ModelCost, type ModelRates, type ModalityRates, type UnitPrice } from "@atelier/sdk/contracts";
 import { modelCostMessages as messages } from "../../messages/model-cost";
 import { useI18n } from "../../shared/i18n";
-import { Button } from "../../shared/ui/button";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../../shared/ui/collapsible";
-import { FieldDescription, FieldGroup, FieldLegend, FieldSet } from "../../shared/ui/field";
-import { IconButton } from "../../shared/ui/icon-button";
+import { Button } from "@atelier/ui/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@atelier/ui/ui/collapsible";
+import { FieldDescription, FieldGroup, FieldLegend, FieldSet } from "@atelier/ui/ui/field";
+import { IconButton } from "@atelier/ui/ui/icon-button";
 import { ChoiceField, EditorSection, NumberField } from "./forms";
 
 const unitLabels = { token: messages.tokenUnit, image: messages.imageUnit, second: messages.secondUnit };

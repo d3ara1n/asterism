@@ -1,18 +1,18 @@
 import { CircleDot, History, PanelsTopLeft, MoreHorizontal, ArrowUpLeft, GitBranch, ChevronDown, Layers, Check } from "lucide-react";
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 
-import { commonMessages } from "../../messages/common";
+import { commonMessages } from "@atelier/ui/messages/common";
 import { historyMessages } from "../../messages/history";
 import { useModuleViews } from "../../modules/views";
 import { getI18n, useI18n } from "../../shared/i18n";
-import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "../../shared/ui/alert-dialog";
-import { Button } from "../../shared/ui/button";
-import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem, CommandSeparator } from "../../shared/ui/command";
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "../../shared/ui/dropdown-menu";
-import { Popover, PopoverTrigger, PopoverContent } from "../../shared/ui/popover";
-import { SearchInput } from "../../shared/ui/search-input";
-import { Spinner } from "../../shared/ui/spinner";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "../../shared/ui/tabs";
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@atelier/ui/ui/alert-dialog";
+import { Button } from "@atelier/ui/ui/button";
+import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem, CommandSeparator } from "@atelier/ui/ui/command";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@atelier/ui/ui/dropdown-menu";
+import { Popover, PopoverTrigger, PopoverContent } from "@atelier/ui/ui/popover";
+import { SearchInput } from "@atelier/ui/ui/search-input";
+import { Spinner } from "@atelier/ui/ui/spinner";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@atelier/ui/ui/tabs";
 import { IslandPanel } from "../../shared/weave/IslandPanel";
 import type { SessionController } from "./controller";
 import { branchContains, historyBranches, branchForNode, type HistoryBranch } from "./history-branches";

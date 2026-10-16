@@ -5,13 +5,14 @@ import { AiSdkAdapter, sdkMessages } from "./ai-sdk.ts";
 import { modelScope } from "../shared/model.ts";
 import type { ModelInput, ModelEvent } from "./contract.ts";
 import { createProviderModel } from "./provider.ts";
-import { composeSystemPrompt, projectSystemPrompt } from "../modules/agent/system-prompt.ts";
+import { projectSystemPrompt } from "./system-prompt.ts";
+import { composeSystemPrompt } from "@atelier/builtin/runtime";
 
 const input: ModelInput = {
   settings: { provider: { id: "p", revision: 1, name: "Provider", enabled: true, baseUrl: "https://example.invalid", protocol: "anthropic", auth: "api_key", compatibility: [] },
     model: { revision: 1, name: "Model", modelId: "test", providerId: "p", enabled: true, contextWindow: null, cost: null, compatibility: [],
       capabilities: { reasoning: true, tools: true, thinkingLevels: [...thinkingLevels] }, generation: { temperature: 0.2, topP: null, maxOutputTokens: 1000 } }, thinking: "low" },
-  system: composeSystemPrompt({ id: "worker", systemPrompt: "System" }), messages: [{ kind: "input", parts: [{ kind: "text", text: "Read" }] }],
+  system: composeSystemPrompt({ id: "worker", systemPrompt: "System" }, "Atelier"), messages: [{ kind: "input", parts: [{ kind: "text", text: "Read" }] }],
   tools: [{ name: "read", description: "Read", parameters: { type: "object", properties: { resource_id: { type: "string" } }, required: ["resource_id"] } }],
 };
 
