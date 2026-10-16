@@ -7,6 +7,7 @@ import { useModuleViews } from "../../modules/views";
 import { getI18n, useI18n } from "../../shared/i18n";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@atelier/ui/ui/alert-dialog";
 import { Button } from "@atelier/ui/ui/button";
+import { ListRow, ListRowAction } from "@atelier/ui/ui/list-row";
 import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem, CommandSeparator } from "@atelier/ui/ui/command";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@atelier/ui/ui/dropdown-menu";
 import { Popover, PopoverTrigger, PopoverContent } from "@atelier/ui/ui/popover";
@@ -72,7 +73,7 @@ export function SessionHistoryPanel({ controller }: { controller: SessionControl
     if (!snapshot) return;
     const row = list.current?.querySelector<HTMLElement>('[data-selected="true"]');
     if (transferFocus) {
-      const target = row?.querySelector<HTMLButtonElement>("[data-history-entry]")
+      const target = row?.querySelector<HTMLButtonElement>('[data-slot="list-row-open"]')
         ?? tabs.current?.querySelector<HTMLButtonElement>('[data-state="active"]');
       target?.focus({ preventScroll: true });
     }
@@ -110,12 +111,12 @@ export function SessionHistoryPanel({ controller }: { controller: SessionControl
     </>}>
       {tree.branches.map(item => <TabsContent key={item.id} value={item.id}>{item.id === branch.id && <>
         {showStart && <div data-selected={selectedId === null}>
-          <div className="flex items-center gap-0.5">
-            <Button data-history-entry variant={selectedId === null ? "secondary" : "ghost"} aria-pressed={selectedId === null} className="min-w-0 flex-1 justify-start font-normal" onClick={() => selectEntry(null)}>
-              <History className="size-4 text-muted-foreground" />{i18n.formatMessage(historyMessages.historyStart)}
-              {snapshot.cursor === null && <CircleDot className="size-3" aria-label={i18n.formatMessage(historyMessages.historyExecutionPosition)} />}
-            </Button>
-          </div>
+          <ListRow variant="navigation" selected={selectedId === null} className="font-normal"
+            buttonProps={{ "aria-pressed": selectedId === null, "aria-current": undefined }} onOpen={() => selectEntry(null)}
+            media={<History className="size-4 text-muted-foreground" />}
+            title={<span className="flex min-w-0 items-center gap-2"><span className="truncate">{i18n.formatMessage(historyMessages.historyStart)}</span>
+              {snapshot.cursor === null && <CircleDot className="size-3 shrink-0" aria-label={i18n.formatMessage(historyMessages.historyExecutionPosition)} />}
+            </span>} />
           {junction(null)}
         </div>}
         {visible.map(entry => {
@@ -124,17 +125,18 @@ export function SessionHistoryPanel({ controller }: { controller: SessionControl
           const source = entry.scope === "session" ? i18n.formatMessage(historyMessages.sessionEvents) : `${i18n.text(descriptor.label)} · ${resource?.title ?? i18n.formatMessage(historyMessages.unknownResource)}`;
           const active = selectedId === node.id;
           return <div key={node.id} data-selected={active}>
-            <div className="flex items-center gap-0.5">
-              <Button data-history-entry variant={active ? "secondary" : "ghost"} aria-pressed={active} className="h-auto min-w-0 flex-1 justify-start gap-3 px-2 py-1.5 text-left font-normal"
-                title={`${entry.label}\n${source}\n${i18n.formatDate(Date.parse(node.createdAt), { dateStyle: "medium", timeStyle: "short" })}`} onClick={() => selectEntry(node.id)}>
-                <span className="shrink-0 text-muted-foreground" aria-hidden="true">{entry.icon ?? (entry.scope === "session" ? <PanelsTopLeft className="size-4" /> : descriptor.icon)}</span>
+            <ListRow variant="navigation" selected={active} className="h-auto px-2 py-1.5 font-normal" onOpen={() => selectEntry(node.id)}
+              buttonProps={{ "aria-pressed": active, "aria-current": undefined,
+                title: `${entry.label}\n${source}\n${i18n.formatDate(Date.parse(node.createdAt), { dateStyle: "medium", timeStyle: "short" })}` }}
+              media={<span className="text-muted-foreground" aria-hidden="true">{entry.icon ?? (entry.scope === "session" ? <PanelsTopLeft className="size-4" /> : descriptor.icon)}</span>}
+              title={<span className="flex min-w-0 items-center gap-3">
                 <span className="min-w-0 flex-1">{entry.row?.(entry.label) ?? <span className="block truncate leading-5">{entry.label}</span>}<span className="type-caption block truncate leading-4">{source}</span></span>
-                {snapshot.cursor === node.id && <CircleDot className="size-3" aria-label={i18n.formatMessage(historyMessages.historyExecutionPosition)} />}
-              </Button>
-              <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon-xs" aria-label={i18n.formatMessage(historyMessages.historyEntryActions)}><MoreHorizontal /></Button></DropdownMenuTrigger>
+                {snapshot.cursor === node.id && <CircleDot className="size-3 shrink-0" aria-label={i18n.formatMessage(historyMessages.historyExecutionPosition)} />}
+              </span>}
+              actions={<DropdownMenu><DropdownMenuTrigger asChild><ListRowAction
+                aria-label={i18n.formatMessage(historyMessages.historyEntryActions)}><MoreHorizontal /></ListRowAction></DropdownMenuTrigger>
                 <DropdownMenuContent align="end"><DropdownMenuItem onSelect={() => selectEntry(historyBefore(snapshot.nodes, node))}>{i18n.formatMessage(historyMessages.historyBefore)}</DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => selectEntry(node.id)}>{i18n.formatMessage(historyMessages.historyAfter)}</DropdownMenuItem></DropdownMenuContent></DropdownMenu>
-            </div>
+                  <DropdownMenuItem onSelect={() => selectEntry(node.id)}>{i18n.formatMessage(historyMessages.historyAfter)}</DropdownMenuItem></DropdownMenuContent></DropdownMenu>} />
             {junction(node.id)}
           </div>;
         })}

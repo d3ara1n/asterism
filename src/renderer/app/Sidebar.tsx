@@ -1,6 +1,7 @@
 import { BrandMark } from "@atelier/ui/ui/brand-mark";
 import { Button } from "@atelier/ui/ui/button";
 import { IconButton } from "@atelier/ui/ui/icon-button";
+import { ListRow } from "@atelier/ui/ui/list-row";
 import { PanelLeftClose, House, MessageSquare, Settings } from "lucide-react";
 
 import { appMessages } from "../messages/app";
@@ -37,16 +38,15 @@ export function Sidebar({ snapshot, status, busy, resourceStatuses, selectedSess
       <div className="min-h-0 flex-1 overflow-y-auto">
         {snapshot?.sessions.map(session => {
           const marks = resourceStatuses.filter(mark => mark.resource.sessionId === session.id);
-          return <div key={session.id} className="group/session relative">
-            <Button variant={selectedSessionId === session.id ? "secondary" : "ghost"} className={`w-full justify-start ${marks.length > 1 ? "pr-24" : marks.length ? "pr-20" : "pr-9"}`}
-              aria-current={selectedSessionId === session.id ? "page" : undefined} disabled={disabled}
-              onClick={() => onSession(session.id)} title={session.title}>
-              <MessageSquare className="text-muted-foreground" /><span className="truncate">{session.title}</span>
-            </Button>
-            <SessionStatus marks={marks} />
-            <SessionActions title={session.title} disabled={disabled} renameDisabled={renameDisabledSessionId === session.id}
-              onRename={title => onRename(session.id, title)} />
-          </div>;
+          return <ListRow key={session.id} variant="navigation"
+            selected={selectedSessionId === session.id} disabled={disabled} onOpen={() => onSession(session.id)}
+            buttonProps={{ title: session.title, "aria-current": selectedSessionId === session.id ? "page" : undefined }}
+            media={<MessageSquare className="text-muted-foreground" />} title={<span className="block truncate">{session.title}</span>}
+            actions={<>
+              <SessionStatus marks={marks} />
+              <SessionActions title={session.title} disabled={disabled} renameDisabled={renameDisabledSessionId === session.id}
+                onRename={title => onRename(session.id, title)} />
+            </>} />;
         })}
         {snapshot?.sessions.length === 0 && <p className="type-caption px-2 py-3">{i18n.formatMessage(appMessages.noConversations)}</p>}
         {!snapshot && status !== "unavailable" && <p role="status" className="type-caption px-2 py-3">{i18n.formatMessage(appMessages.loadingConversations)}</p>}

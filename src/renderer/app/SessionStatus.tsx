@@ -24,7 +24,7 @@ export function SessionStatus({ marks }: { marks: readonly ResourceStatusMark[] 
   return <Popover>
     <PopoverTrigger asChild>
       <Button variant="ghost" size="xs" aria-label={label} title={label}
-        className="absolute right-8 top-1/2 -translate-y-1/2 gap-1">
+        className="shrink-0 gap-1">
         <StatusIcon status={status} />
         {marks.length > 1 && <span className="tabular-nums">{marks.length}</span>}
       </Button>
