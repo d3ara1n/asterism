@@ -40,6 +40,7 @@ export interface RendererObjectContext {
   };
   invoke<I, O extends Json>(contract: ActionContract<I, O>, input: NoInfer<I> & Json, options?: RendererInputOptions): Promise<RendererReceipt>;
   onStream(channel: string, listener: (data: Uint8Array) => void): () => void;
+  /** 对象任务、动作及模型／工具执行；插件通信调用的收束状态不属于执行状态。 */
   readonly activity: { running: boolean };
 }
 const ObjectContext = createContext<RendererObjectContext | null>(null);

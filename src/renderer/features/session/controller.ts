@@ -15,7 +15,7 @@ export type SessionViewState = {
   /** 显式游标跳转使旧画布定位失效；普通记录追加不打断定位。 */
   selectionVersion: number;
 };
-const emptyProgress: SessionProgress = { revision: 0, version: 0, unsettledObjectIds: [], live: [] };
+const emptyProgress: SessionProgress = { revision: 0, version: 0, unsettledObjectIds: [], runningObjectIds: [], live: [] };
 
 /** 一个会话的当前投影与操作入口；进度单独订阅。 */
 export class SessionController {

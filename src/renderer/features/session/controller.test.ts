@@ -10,7 +10,7 @@ import type { LanguageState } from "../../../shared/language.ts";
 function snapshot(revision: number, cursor: string | null = "current"): SessionSnapshot {
   return { sessionId: "s", title: "S", cursor, seq: 4, revision, nodes: [],
     workbench: { id: "s", title: "S", objects: [], links: [], views: [], viewport: { x: 0, y: 0, zoom: 1 } },
-    progress: { revision, version: revision, unsettledObjectIds: [], live: [] } };
+    progress: { revision, version: revision, runningObjectIds: [], unsettledObjectIds: [], live: [] } };
 }
 const accepted: SessionResult = { ok: true, reply: { kind: "accepted", sessionId: "s" } };
 const view = (snapshot: SessionSnapshot): SessionResult => ({ ok: true, reply: { kind: "view", snapshot } });
@@ -201,8 +201,8 @@ describe("会话视图所有权", () => {
     requests[0]!.resolve(view(snapshot(1))); await flush();
     const changed = vi.fn(); const streamed = vi.fn();
     controller.subscribe(changed); controller.subscribeProgress(streamed);
-    progress({ revision: 1, version: 2, unsettledObjectIds: ["a"], live: [] });
-    progress({ revision: 1, version: 3, unsettledObjectIds: ["a"], live: [] });
+    progress({ revision: 1, version: 2, runningObjectIds: [], unsettledObjectIds: ["a"], live: [] });
+    progress({ revision: 1, version: 3, runningObjectIds: [], unsettledObjectIds: ["a"], live: [] });
     expect(changed).not.toHaveBeenCalled();
     expect(streamed).toHaveBeenCalled();
     expect(controller.getProgress().version).toBe(3);
@@ -213,13 +213,13 @@ describe("会话视图所有权", () => {
   it("块落库后的进度等待对应持久版本，不在查询途中丢掉正在阅读的块", async () => {
     const { controller, requests, progress } = fixture(); const disconnect = controller.connect();
     const block = { id: "r:0", objectId: "a", responseId: "r", ordinal: 0, kind: "thinking" as const, text: "thinking", startedAt: 1000, endedAt: null };
-    requests[0]!.resolve(view({ ...snapshot(1), progress: { revision: 1, version: 1, unsettledObjectIds: ["a"], live: [block] } })); await flush();
-    progress({ revision: 2, version: 3, unsettledObjectIds: ["a"], live: [] });
+    requests[0]!.resolve(view({ ...snapshot(1), progress: { revision: 1, version: 1, runningObjectIds: ["a"], unsettledObjectIds: ["a"], live: [block] } })); await flush();
+    progress({ revision: 2, version: 3, runningObjectIds: ["a"], unsettledObjectIds: ["a"], live: [] });
     expect(controller.getProgress().live).toEqual([block]);
     expect(requests).toHaveLength(2);
     requests[1]!.resolve(view(snapshot(2))); await flush();
     expect(controller.getProgress()).toMatchObject({ version: 3, live: [] });
-    progress({ revision: 1, version: 1, unsettledObjectIds: ["a"], live: [block] });
+    progress({ revision: 1, version: 1, runningObjectIds: ["a"], unsettledObjectIds: ["a"], live: [block] });
     expect(controller.getProgress().live).toEqual([]);
     disconnect();
   });

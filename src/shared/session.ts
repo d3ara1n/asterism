@@ -65,6 +65,8 @@ export const sessionProgressSchema = z.strictObject({
   live: z.array(liveBlockSchema),
   /** 所有尚未收束的被捕获资源；外部状态的持续运行不计入。 */
   unsettledObjectIds: z.array(id),
+  /** 正在执行任务、动作或模型／工具的对象；独立插件通信调用不代表对象执行。 */
+  runningObjectIds: z.array(id),
 });
 export type SessionProgress = z.infer<typeof sessionProgressSchema>;
 /** 同次交付完整会话树、执行游标与当前时间线的工作台投影；区别于 SDK 观察柄。seq 只计节点，revision 还涵盖游标选择、对象数据与布局。 */

@@ -33,8 +33,10 @@ export function createQuestionService(changed: (object: ResourceRef, version: nu
         const finish = (result: CallResult<Answer>) => {
           if (!waiting.delete(id)) return;
           signal.removeEventListener("abort", abort);
-          try { notify(object); resolve(result); }
-          catch (error) { reject(error); }
+          // 答案或取消已被受理；通知失败不改变工具结局，界面可通过快照重读同步。
+          resolve(result);
+          try { notify(object); }
+          catch (error) { console.error("Question state notification failed after settlement.", error); }
         };
         const abort = () => finish({ kind: "cancelled", data: null, message: "The question was cancelled." });
         waiting.set(id, { object: Object.freeze({ ...object }), pending: { id, callId, questions: structuredClone(questions) }, finish });

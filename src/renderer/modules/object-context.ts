@@ -58,7 +58,7 @@ export function useObjectContext(object: WorkbenchObject): RendererObjectContext
       contentScopeId => controller.execute({ type: "resource.command", sessionId: controller.sessionId, objectId: object.id, command: resourceCall(contract, input), contentScopeId })),
     onStream,
     activity: {
-      running: progress.unsettledObjectIds.includes(object.id),
+      running: progress.runningObjectIds.includes(object.id),
     },
   };
 }

@@ -34,8 +34,15 @@ export class RunLifecycle {
     if (object && entry.affectsHistory) this.changed(object.sessionId);
     return { signal, done, cancel };
   }
-  activity(sessionId: string, group?: RunGroup): string[] {
-    return [...new Set([...this.entries].flatMap(entry => entry.affectsHistory && entry.object?.sessionId === sessionId && (!group || entry.group === group) ? [entry.object.id] : []))];
+  /** 通信调用仍参与收束，但执行投影只统计任务、动作及模型／工具。 */
+  activity(sessionId: string, group?: RunGroup): { unsettled: string[]; executing: string[] } {
+    const unsettled = new Set<string>(), executing = new Set<string>();
+    for (const entry of this.entries) {
+      if (!entry.affectsHistory || entry.object?.sessionId !== sessionId || (group && entry.group !== group)) continue;
+      unsettled.add(entry.object.id);
+      if (entry.group.kind !== "call") executing.add(entry.object.id);
+    }
+    return { unsettled: [...unsettled], executing: [...executing] };
   }
   stop(group?: RunGroup): void {
     if (!group) this.stopped = true;
@@ -101,7 +108,7 @@ export class RunGroup {
       };
     } };
   }
-  activity(sessionId: string): string[] { return this.lifecycle.activity(sessionId, this); }
+  activity(sessionId: string): string[] { return this.lifecycle.activity(sessionId, this).unsettled; }
   stop(): void { this.stopped = true; this.lifecycle.stop(this); }
   async close(): Promise<void> { this.stop(); await this.lifecycle.settle(this); }
 }

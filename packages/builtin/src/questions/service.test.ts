@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { Agent } from "@atelier/builtin-api/contracts";
 import { askUserArgs, AskUserResult, type Question, type Submission } from "./contract.ts";
 import { createQuestionService } from "./service.ts";
@@ -87,6 +87,26 @@ describe("结构化问答契约", () => {
     await expect(first).resolves.toEqual({ kind: "cancelled", data: null, message: expect.any(String) });
     service.cancel(object, b!.id);
     await second;
+  });
+
+  // runtime.md：通知不回滚已受理答案，否则 UI 提交成功而模型收到工具失败。
+  it("结束通知失败仍交付已受理答案，记录错误且快照可恢复界面", async () => {
+    const error = new Error("Event delivery failed.");
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    const service = createQuestionService((_object, _version, ids) => { if (!ids.length) throw error; });
+    const controller = new AbortController();
+    const waiting = service.ask(object, "answer", [questions[2]!], controller.signal);
+    try {
+      const id = service.read(object).pending[0]!.id;
+      service.answer(object, id, { answers: [{ id: "text", status: "answered", selected: [], text: "Accepted" }] });
+      await expect(waiting).resolves.toMatchObject({ kind: "succeeded", data: { answers: [{ text: "Accepted" }] } });
+      expect(service.read(object).pending).toEqual([]);
+      expect(log).toHaveBeenCalledWith("Question state notification failed after settlement.", error);
+    } finally {
+      controller.abort();
+      try { await waiting; }
+      finally { log.mockRestore(); }
+    }
   });
 
   // plugin-sdk.md 数据兼容：新版展示继续解码原有工具记录，不改写已保存结果。

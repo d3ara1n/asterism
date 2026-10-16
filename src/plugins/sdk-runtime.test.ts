@@ -160,7 +160,7 @@ describe("工作台 SDK 的宿主实现", () => {
   });
 
   // 取消只发信号，活动必须保持到 handler 清理完成；通用调用不能绕开宿主收束。
-  it("调用取消后等待实际清理，顶层工具不能占用宿主入口", async () => {
+  it.each(["renderer", "plugin"] as const)("%s 调用不显示对象执行，取消后仍等待实际清理；顶层工具不能占用宿主入口", async source => {
     const c = counter(), other = pluginNamespace("test.questions");
     const wait = defineCall(other.name("wait"), { input: z.null(), output: z.null() });
     let signal!: AbortSignal, release!: () => void;
@@ -177,13 +177,18 @@ describe("工作台 SDK 的宿主实现", () => {
     expect(service.sessions.plugins.find(item => item.id === "test.bad")).toMatchObject({ status: "failed" });
     const object = { id: await create(service, sessionId), sessionId, kind: Counter.kind };
     const controller = new AbortController();
-    const waiting = service.sessions.calls.invoke(wait.id, null, { object, signal: controller.signal }, null);
+    const waiting = source === "renderer"
+      ? service.sessions.calls.invoke(wait.id, null, { object, signal: controller.signal }, null)
+      : c.context().ipc.calls.invoke(wait, null, { object, signal: controller.signal });
     const rejected = expect(waiting).rejects.toThrow();
     try {
       expect(service.sessions.running).toBe(true);
+      // 插件 SDK 的调用收束与运行时执行状态是两个契约；查询不能触发代理停止按钮。
+      expect(service.sessions.snapshot(sessionId).progress).toMatchObject({ unsettledObjectIds: [object.id], runningObjectIds: [] });
       controller.abort();
       expect(signal.aborted).toBe(true);
       expect(service.sessions.running).toBe(true);
+      expect(service.sessions.snapshot(sessionId).progress.runningObjectIds).toEqual([]);
     } finally { release(); }
     await rejected;
     expect(service.sessions.running).toBe(false);
@@ -704,6 +709,7 @@ describe("工作台 SDK 的宿主实现", () => {
       expect(service.sessions.running).toBe(true);
       expect(() => c.context().models.run(request)).toThrow();
       expect(service.sessions.snapshot(sessionId).progress.unsettledObjectIds).toContain(id);
+      expect(service.sessions.snapshot(sessionId).progress.runningObjectIds).toContain(id);
     } finally {
       if (mode === "cancel") controller.abort();
       else {

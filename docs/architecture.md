@@ -100,7 +100,7 @@ Atelier 分为**应用组合层**、**通用宿主机制**与**插件**三层：
 ### 状态协调与流式进度衔接
 
 - **受理与读取分离**：命令只返回 `accepted` 与会话身份，不附带展示数据；`start / submit` 以 `submissionId`（UUID）保证同内容幂等重试、异内容返回 `conflict`。命令已受理但新投影尚未通过 `read` 取得时，会话视图处于未就绪门禁状态，连续入队的操作意图依次等待前项投影同步后再执行。
-- **持久修订与内存进度**：`session.changed` 携带持久视图修订 `revision` 通知重读（`seq` 仅计节点追加序号）。`session.progress` 独立发布完整内存进度，携带单调 `version`、所依赖的持久 `revision`、运行代理与 live 块，以及尚未收束的被捕获资源 `unsettledObjectIds`。进度先于对应持久视图到达时，前端保留已有块并等待该视图；块的展示身份使用 `responseId + ordinal`，在流式生成与落库后保持同一组件实例，不重置展开状态。画布只订阅持久视图，不因流式文本增量重算布局。
+- **持久修订与内存进度**：`session.changed` 携带持久视图修订 `revision` 通知重读（`seq` 仅计节点追加序号）。`session.progress` 独立发布完整内存进度，携带单调 `version`、所依赖的持久 `revision`、执行中对象 `runningObjectIds` 与 live 块，以及尚未收束的被捕获资源 `unsettledObjectIds`；两种活动的区别见 [宿主运行生命周期](plugin-sdk.md#宿主运行生命周期)。进度先于对应持久视图到达时，前端保留已有块并等待该视图；块的展示身份使用 `responseId + ordinal`，在流式生成与落库后保持同一组件实例，不重置展开状态。画布只订阅持久视图，不因流式文本增量重算布局。
 
 ## 安全边界与非目标
 

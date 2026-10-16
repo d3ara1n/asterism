@@ -57,7 +57,7 @@ export class SessionService {
   private readonly naming: NamingApi;
   private readonly prepare: LoadedPlugins["prepare"];
   private readonly afterCommit: LoadedPlugins["afterCommit"];
-  private readonly modelActivity: (sessionId: string) => { running: string[]; live: LiveBlock[] };
+  private readonly pluginActivity: LoadedPlugins["activity"];
   private readonly validateInitialInput: (selection: AgentSelection, parts: ModelInputPart[], content: ContentLease) => Promise<void>;
   constructor(private readonly db: DatabaseSync, dataRoot: string, configuration: ConfigurationService,
     private readonly changed: (event: SessionChanged) => void = () => {}, adapterFactory?: (settings: ModelSettings) => ModelAdapter, external: readonly PluginDefinition[] = [],
@@ -79,7 +79,7 @@ export class SessionService {
         this.commit(sessionId, () => this.tree.setTitle(sessionId, title));
       },
       commit: (sessionId, work) => this.commit(sessionId, work),
-      idle: (sessionId, objectId) => this.modelActivity(sessionId).running.length === 0
+      idle: (sessionId, objectId) => this.pluginActivity(sessionId).unsettled.length === 0
         && !this.resources.controllers().some(controller => controller.activity?.(sessionId).running.some(id => id !== objectId)),
       progressChanged: sessionId => this.progressChanged(sessionId),
       linked: (sessionId, objectId) => {
@@ -125,7 +125,7 @@ export class SessionService {
     this.naming = modules.naming;
     this.afterCommit = modules.afterCommit;
     this.prepare = modules.prepare;
-    this.modelActivity = modules.activity;
+    this.pluginActivity = modules.activity;
     this.workbench = new SessionWorkbench(db, this.tree, this.resources,
       (sessionId, agentId, resource) => this.linkTools(sessionId, agentId, resource), this.content);
   }
@@ -178,7 +178,7 @@ export class SessionService {
   }
   /** 会话 settled：没有任何资源在活动；回溯只在此时允许。 */
   private settled(sessionId: string): boolean {
-    return this.modelActivity(sessionId).running.length === 0
+    return this.pluginActivity(sessionId).unsettled.length === 0
       && this.resources.controllers().every(controller => (controller.activity?.(sessionId).running.length ?? 0) === 0);
   }
   private notify(sessionId: string): void {
@@ -188,10 +188,12 @@ export class SessionService {
     catch { /* 查询可恢复遗漏的通知 */ }
   }
   private progress(sessionId: string): SessionProgress {
-    const activity = [...this.resources.controllers().map(controller => controller.activity?.(sessionId) ?? { running: [], live: [] }), this.modelActivity(sessionId)];
+    const resources = this.resources.controllers().map(controller => controller.activity?.(sessionId) ?? { running: [], live: [] });
+    const plugin = this.pluginActivity(sessionId);
     return { revision: this.revisions.get(sessionId) ?? 0, version: this.progressVersions.get(sessionId) ?? 0,
-      unsettledObjectIds: [...new Set(activity.flatMap(a => a.running))],
-      live: activity.flatMap(a => a.live) };
+      unsettledObjectIds: [...new Set([...resources.flatMap(a => a.running), ...plugin.unsettled])],
+      runningObjectIds: [...new Set([...resources.flatMap(a => a.running), ...plugin.executing])],
+      live: [...resources.flatMap(a => a.live), ...plugin.live] };
   }
   private progressChanged(sessionId: string): void {
     this.progressVersions.set(sessionId, (this.progressVersions.get(sessionId) ?? 0) + 1);
@@ -289,7 +291,7 @@ export class SessionService {
       default: {
         if (command.type === "object.remove") {
           const target = this.object(command.sessionId, command.objectId);
-          if (this.modelActivity(command.sessionId).running.includes(target.id)
+          if (this.pluginActivity(command.sessionId).unsettled.includes(target.id)
             || this.resources.controllers().some(controller => controller.activity?.(command.sessionId).running.includes(target.id))) {
             throw new SessionError("conflict", "Wait for this resource to settle before removing it.");
           }
