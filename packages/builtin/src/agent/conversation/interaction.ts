@@ -6,16 +6,12 @@ import { SubmissionIdentity } from "./submission";
 import { createMessageDraft } from "./draft";
 import type { AgentExecutionState } from "../state";
 
-/** 草稿与提交身份随会话／对象保留，卡片重挂载不丢失文件和重试资格。 */
-const interactions = new Map<string, { draft: ReturnType<typeof createMessageDraft>; submission: SubmissionIdentity; pending: boolean }>();
+/** 草稿与提交身份由宿主按对象保留：卡片重挂载、聚焦与会话切换不丢失文件和重试资格，对象离开投影时关闭草稿。 */
+const interactionKey = "atelier.builtin/agent.interaction";
 export function useAgentConversation(object: RendererObjectContext, hasSelection: boolean, executionState: AgentExecutionState) {
-  const key = JSON.stringify([object.ref.sessionId, object.ref.id]);
-  let entry = interactions.get(key);
-  if (!entry) {
-    entry = { draft: createMessageDraft(() => object.input(SubmitAgentInput)), submission: new SubmissionIdentity(), pending: false };
-    interactions.set(key, entry);
-  }
-  const current = entry;
+  const current = object.retained.get(interactionKey,
+    () => ({ draft: createMessageDraft(() => object.input(SubmitAgentInput)), submission: new SubmissionIdentity(), pending: false }),
+    entry => entry.draft.close());
   const { draft, submission } = current;
   const state = useSyncExternalStore(draft.subscribe, draft.getSnapshot);
   const [error, setError] = useState<UiText | null>(null);

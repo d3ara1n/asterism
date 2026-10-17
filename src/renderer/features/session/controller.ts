@@ -33,7 +33,9 @@ export class SessionController {
   private requiredRevision = 0;
   private queue: Promise<unknown> = Promise.resolve();
   private unsubscribe: (() => void) | null = null;
-  constructor(private readonly bridge: SessionBridge, readonly sessionId: string) {}
+  private pending = 0;
+  /** onRelease：没有连接与在途命令时调用，所有者据此释放这份前端视图。 */
+  constructor(private readonly bridge: SessionBridge, readonly sessionId: string, private readonly onRelease?: () => void) {}
   getSnapshot = (): SessionViewState => this.state;
   getProgress = (): SessionProgress => this.progress;
   subscribe = (listener: () => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; };
@@ -73,7 +75,13 @@ export class SessionController {
       this.unsubscribe?.(); this.unsubscribe = null;
       this.generation++; this.reading = false;
       this.viewWaiters.forEach(waiter => waiter());
+      this.releaseWhenIdle();
     };
+  }
+  /** 推迟到微任务再确认空闲：同步重连（如 StrictMode 重放 effect）不释放视图。 */
+  private releaseWhenIdle(): void {
+    if (this.connections || this.pending) return;
+    queueMicrotask(() => { if (!this.connections && !this.pending) this.onRelease?.(); });
   }
   /** 完整读取用于打开与持久变化；密集通知合并读取。 */
   clearError = (): void => this.update({ error: null });
@@ -130,6 +138,9 @@ export class SessionController {
       } : undefined);
     });
     this.queue = operation;
+    // 在途命令收束前保留视图，命令与其后的读取仍按本会话串行。
+    this.pending++;
+    void operation.finally(() => { this.pending--; this.releaseWhenIdle(); });
     // 等待读取不占用命令队列；后续命令可以覆盖状态，最终投影仍结束本次观察。
     return observe ? operation.then(async result => { await observed; return result; }) : operation;
   }

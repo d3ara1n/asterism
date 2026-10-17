@@ -62,6 +62,7 @@
 | 辅助面板 | auxiliary panel | 卡片内部呈现对象旁信息的局部视图，由资源提供内容、宿主管理容器；区别于会话级辅助浮岛，见 `docs/workbench.md` |
 | 聚焦 | focus | 把对象内容从卡片移到工作台左侧聚焦浮岛的视图意图，内容同一份、按会话保存在内存中，见 `docs/workbench.md#对象聚焦` |
 | 聚焦浮岛 | focus island | 承载聚焦对象内容的受控前置浮岛，位于侧栏与工作台之间 |
+| 对象保留状态 | retained object state | 由用户产生、无法从投影重建的前端状态（草稿、聚焦身份等），由宿主按对象持有，对象离开当前投影时释放，见 `docs/workbench.md#会话视图生命周期` |
 | Agent 覆盖界面 | Agent overlay | 内置 Agent 提供给自身与第三方的非模态扩展呈现，按 top／center／bottom 放置；输入区控制与生命周期见 `docs/workbench.md` |
 | Agent 模态窗 | Agent modal | 关联 Agent 的扩展对话框，接管窗口焦点，由插件控制显示与关闭；见 `docs/workbench.md` |
 | 连线 | edge | 关系的视觉表达，不是关系本身，也不是授权机制 |

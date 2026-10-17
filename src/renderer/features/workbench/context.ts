@@ -26,6 +26,11 @@ export class WorkbenchStore {
   private listeners = new Set<() => void>();
   get = (): WorkbenchView | null => this.value;
   set(value: WorkbenchView): void { this.value = value; this.listeners.forEach(listener => listener()); }
+  /** 撤回仍为当前值的环境；已被其他工作台覆盖时无效。 */
+  clear(value: WorkbenchView): void {
+    if (this.value !== value) return;
+    this.value = null; this.listeners.forEach(listener => listener());
+  }
   subscribe = (listener: () => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; };
 }
 

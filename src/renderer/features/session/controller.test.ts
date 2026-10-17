@@ -15,17 +15,17 @@ function snapshot(revision: number, cursor: string | null = "current"): SessionS
 const accepted: SessionResult = { ok: true, reply: { kind: "accepted", sessionId: "s" } };
 const view = (snapshot: SessionSnapshot): SessionResult => ({ ok: true, reply: { kind: "view", snapshot } });
 async function flush() { for (let i = 0; i < 6; i++) await Promise.resolve(); }
-function fixture() {
+function fixture(onRelease?: () => void) {
   let listener: ((event: SessionChanged) => void) | null = null;
   const requests: Array<{ command: SessionCommand; resolve: (result: SessionResult) => void }> = [];
   const bridge: SessionBridge = {
     execute: command => new Promise(resolve => requests.push({ command, resolve })),
     onChanged: callback => { listener = callback; return () => { if (listener === callback) listener = null; }; },
   };
-  const controller = new SessionController(bridge, "s");
+  const controller = new SessionController(bridge, "s", onRelease);
   const notify = (revision: number) => listener?.({ kind: "session.changed", sessionId: "s", revision });
   const progress = (progress: SessionProgress) => listener?.({ kind: "session.progress", sessionId: "s", progress });
-  return { controller, requests, notify, progress };
+  return { controller, requests, notify, progress, subscribed: () => !!listener };
 }
 
 it("语言切换刷新静态文案，保留会话投影、活动与草稿提交身份且不重读会话", async () => {
@@ -238,4 +238,44 @@ describe("会话视图所有权", () => {
     reopened();
   });
 
+});
+
+describe("离开会话释放前端视图", () => {
+  function released() {
+    const release = vi.fn();
+    return { ...fixture(release), release };
+  }
+
+  it("最后一个连接断开且没有在途命令时释放", async () => {
+    const { controller, requests, release, subscribed } = released();
+    const first = controller.connect(), second = controller.connect();
+    requests[0]!.resolve(view(snapshot(1))); await flush();
+    first(); await flush();
+    expect(release).not.toHaveBeenCalled(); // 仍有其他使用者
+    second(); await flush();
+    expect(subscribed()).toBe(false);
+    expect(release).toHaveBeenCalledOnce();
+  });
+
+  it("同步重连（StrictMode 重放 effect）不释放", async () => {
+    const { controller, release } = released();
+    controller.connect()();
+    const disconnect = controller.connect();
+    await flush();
+    expect(release).not.toHaveBeenCalled();
+    disconnect();
+  });
+
+  it("在途命令收束后才释放，命令仍由同一控制器串行", async () => {
+    const { controller, requests, release } = released();
+    const disconnect = controller.connect();
+    requests[0]!.resolve(view(snapshot(1))); await flush();
+    const result = controller.execute({ type: "rename", sessionId: "s", title: "T" });
+    await flush();
+    disconnect(); await flush();
+    expect(release).not.toHaveBeenCalled();
+    requests[1]!.resolve(accepted);
+    await expect(result).resolves.toEqual(accepted); await flush();
+    expect(release).toHaveBeenCalledOnce();
+  });
 });

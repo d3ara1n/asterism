@@ -34,7 +34,7 @@ SDK 导出 `contentRefSchema` 供业务 schema 组合。仅保留精确键 `$ate
 | `create` / `execute` 的 `object.content` | 可读取与 `stage` | 本对象当前数据、所取用历史路径上的记录依赖及本次暂存内容 |
 | `object.session.content` | 只读 | 会话级根，不能借此读取任意对象 |
 | 前端 `object.content` | 只读 | 本对象当前执行路径（不接受任意历史位置） |
-| 前端 `toInput`、`InputView`、`object.input` | 草稿，可上传 | 绑定该创建／动作契约；成功后宿主关闭草稿，失败保留可重试 |
+| 前端 `toInput`、`InputView`、`object.input` | 草稿，可上传 | 绑定该创建／动作契约；成功后宿主关闭草稿，失败保留可重试；以对象保留状态登记的草稿在对象离开当前投影时关闭（见 [会话视图生命周期](workbench.md#会话视图生命周期)） |
 | 模型请求 | 宿主内部读取 | 请求边界按合法作用域独立保留涉及的内容，真实请求收束后释放 |
 
 凡能取得 `content` 的地方形状一致：`read(ref, range?)` 有界读取，`open(ref, range?)` 流式读取，可写处另有 `stage(bytes | AsyncIterable)`。

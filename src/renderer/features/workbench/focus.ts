@@ -1,19 +1,27 @@
 import { useSyncExternalStore } from "react";
+import { objectRetention } from "../session/retention";
 
 /**
  * 聚焦：每个会话至多一个对象的内容从卡片移到工作台左侧的聚焦浮岛。
- * 只在应用内存中保存对象身份，切换会话后保持、重启后清空；内容随会话前端按需重新挂载。
+ * 聚焦身份是对象保留状态：随对象离开当前投影释放，切换会话后保持、重启后清空；内容随会话前端按需重新挂载。
  */
 const focused = new Map<string, string>();
 const listeners = new Set<() => void>();
+const retentionKey = "atelier.host/focus";
 
 export function focusedObject(sessionId: string): string | null {
   return focused.get(sessionId) ?? null;
 }
 
 export function setFocusedObject(sessionId: string, objectId: string | null): void {
-  if (focusedObject(sessionId) === objectId) return;
+  const previous = focusedObject(sessionId);
+  if (previous === objectId) return;
   if (objectId) focused.set(sessionId, objectId); else focused.delete(sessionId);
+  // 先改表再丢弃旧条目，旧条目的 release 因身份已不匹配而无效。
+  if (previous) objectRetention.discard(sessionId, previous, retentionKey);
+  if (objectId) objectRetention.get(sessionId, objectId, retentionKey, () => objectId, () => {
+    if (focusedObject(sessionId) === objectId) setFocusedObject(sessionId, null);
+  });
   listeners.forEach(listener => listener());
 }
 

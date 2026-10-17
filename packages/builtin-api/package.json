@@ -9,7 +9,7 @@
   },
   "dependencies": {},
   "peerDependencies": {
-    "@atelier/sdk": "^0.20.0",
+    "@atelier/sdk": "^0.21.0",
     "react": "^19.3.0",
     "zod": "^4.6.5"
   },

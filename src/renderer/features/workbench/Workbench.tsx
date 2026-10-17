@@ -24,7 +24,6 @@ import { AccessPanel } from "./AccessPanel";
 import { useWorkbenchCanvas, type WorkbenchCanvas } from "./canvas";
 import { layoutConnections, type ConnectionEdge } from "./connections";
 import { WorkbenchScope, WorkbenchContext, useWorkbench, type WorkbenchEnvironment, type WorkbenchStore, type WorkbenchView } from "./context";
-import { focusedObject, setFocusedObject } from "./focus";
 import { workbenchNodes } from "./nodes";
 import { type ViewPatch } from "./ObjectCard";
 import { IconButton } from "@atelier/ui/ui/icon-button";
@@ -62,6 +61,8 @@ export function Workbench({ ref, controller, session, ready, busy, run, onHome, 
   const context = useMemo<WorkbenchView>(
     () => ({ controller, session, ready, busy, run, canvas }),
     [controller, session, ready, busy, run, canvas]);
+  const latestContext = useRef(context);
+  latestContext.current = context;
   const island = useIsland();
   const open = useCallback((id: string, label: import("@atelier/sdk/contracts").UiText, render: () => ReactNode, origin: HTMLElement | null) => {
     if (island.child === id) island.closeChild();
@@ -74,11 +75,8 @@ export function Workbench({ ref, controller, session, ready, busy, run, onHome, 
     canvas,
   }), [open, canvas, controller]);
   useLayoutEffect(() => store.set(context), [store, context]);
-  // 聚焦对象已不在当前投影中（移除或游标跳转）时结束聚焦；隐藏卡片不影响聚焦。
-  useEffect(() => {
-    const id = focusedObject(session.id);
-    if (id && !session.objects.some(object => object.id === id)) setFocusedObject(session.id, null);
-  }, [session]);
+  // 卸载时撤回本工作台写入的环境，离开会话后不再引用其控制器与投影；退场中的浮岛已由 WorkbenchScope 固定各自的环境。
+  useLayoutEffect(() => () => store.clear(latestContext.current), [store]);
 
   return <RendererNavigationProvider value={{ home: onHome }}><RendererCatalogProvider ready={ready}><WorkbenchContext.Provider value={context}>
     <div className="relative h-full">

@@ -74,6 +74,7 @@ export default definePlugin({
 
 ### 4. 前端卡片与工具三态视图
 - **卡片视图**：`cardRenderer(ViewContract, { width, height, minWidth?, minHeight?, Body, Actions?, panels? })`，内部通过 `useRendererObject()` 访问对象数据、动作调用与二进制流 `onStream`。
+- **对象保留状态（API 8.7）**：`object.retained.get("<plugin>/<key>", create, release?)` 保存草稿等需要跨重挂载与会话切换保持的前端状态，对象离开投影时宿主调用 `release`；`discard(key)` 提前结束。规则见 [前端视图与扩展入口](../../docs/plugin-sdk.md#前端视图与扩展入口)，可编译示例见 `examples/renderer.ts`。
 - **滚动与缩放**：卡片内交互遵循 [画布与对象卡片](../../docs/workbench.md#画布与对象卡片) 的手势归属规则。
 - **辅助面板（API 8.2）**：`panels: [{ id: "details", label: "Details", icon, Body: Details }]`；主体与面板通过 `useRendererCard().openPanel("details") / closePanel()` 控制卡片局部视图。面板注册、数据绑定与生命周期见 [前端视图与扩展入口](../../docs/plugin-sdk.md#前端视图与扩展入口)，可编译示例见 `examples/renderer.ts`。
 - **工具视图**：`toolRenderer(ToolContract, { label?, icon?, input?, execution?, result? })`，三阶段平行可选，每阶段提供 `{ headerRenderer?, bodyRenderer? }`，可用 `ToolRenderProps<D, T, A>` 跨阶段复用组件。

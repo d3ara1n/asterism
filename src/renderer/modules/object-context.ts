@@ -12,6 +12,7 @@ import { resolveToolView, toolPreparation } from "../features/conversation/tool-
 import { useModuleViews } from "./views";
 import { pluginPreferences } from "../features/creation/preferences";
 import { contentInput, contentReader, contentCommand } from "../features/creation/content";
+import { objectRetention } from "../features/session/retention";
 
 export function RendererCatalogProvider({ ready, children }: { ready: boolean; children: ReactNode }) {
   const configuration = useConfiguration(ready);
@@ -40,6 +41,7 @@ export function useObjectContext(object: WorkbenchObject): RendererObjectContext
     }), [controller.sessionId, object.id, object.kind]);
   const content = useMemo(() => contentReader(() => ({ sessionId: controller.sessionId, objectId: object.id })),
     [controller.sessionId, object.id]);
+  const retained = useMemo(() => objectRetention.object(controller.sessionId, object.id), [controller.sessionId, object.id]);
   return {
     ref: { sessionId: controller.sessionId, id: object.id, kind: object.kind },
     content,
@@ -60,6 +62,7 @@ export function useObjectContext(object: WorkbenchObject): RendererObjectContext
     activity: {
       running: progress.runningObjectIds.includes(object.id),
     },
+    retained,
   };
 }
 

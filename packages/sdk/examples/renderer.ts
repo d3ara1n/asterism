@@ -31,6 +31,11 @@ export function createCounter(object: RendererObjectContext) {
   return object.session.create(CreateCounter, {}, { x: 0, y: 0 });
 }
 
+/** 按对象保留的前端状态：跨重挂载与会话切换保持，对象离开投影时由宿主调用 release。 */
+export function counterNote(object: RendererObjectContext) {
+  return object.retained.get("example.counter/note", () => ({ text: "" }), note => { note.text = ""; });
+}
+
 export function rejectInvalidCalls(object: RendererObjectContext) {
   // @ts-expect-error 动作参数由共享契约推导，拼错字段不能编译。
   void object.invoke(ChangeCount, { amout: 1 });

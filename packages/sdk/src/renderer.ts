@@ -23,6 +23,16 @@ import type { ToolRenderer } from "./renderer-tools.ts";
 import type { EventSubscriber } from "./events.ts";
 
 export type RendererReceipt = { ok: true } | { ok: false; error: { code: string; message: string; display?: UiText } };
+/**
+ * 按对象保留的前端状态（如输入草稿）：跨卡片重挂载、聚焦容器切换与会话视图释放保持；
+ * 对象离开当前会话投影（移除或游标跳转）或显式丢弃时调用 release，应用重启后不恢复。
+ */
+export interface RendererRetained {
+  /** 取得 key 对应的值，首次调用时用 create 创建；同一对象同一 key 返回同一实例。key 以插件 ID 为前缀避免与其他贡献者冲突。 */
+  get<T>(key: string, create: () => T, release?: (value: T) => void | Promise<void>): T;
+  /** 立即结束保留并调用 release；不存在时无效。 */
+  discard(key: string): void;
+}
 /** 绑定卡片对象的前端能力；宿主负责订阅、命令门禁和当前视图的一致性。 */
 export interface RendererObjectContext {
   readonly ref: ResourceRef;
@@ -42,6 +52,8 @@ export interface RendererObjectContext {
   onStream(channel: string, listener: (data: Uint8Array) => void): () => void;
   /** 对象任务、动作及模型／工具执行；插件通信调用的收束状态不属于执行状态。 */
   readonly activity: { running: boolean };
+  /** 对象级保留状态，生命周期由宿主统一管理。 */
+  readonly retained: RendererRetained;
 }
 const ObjectContext = createContext<RendererObjectContext | null>(null);
 export function useRendererObject(): RendererObjectContext {
