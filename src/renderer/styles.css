@@ -215,6 +215,8 @@
   }
   .island[data-focused] > .island-backdrop { border-color: var(--ring); }
   .island-body { @apply relative h-full overflow-y-auto; }
+  /* 带底板的浮岛：内容区内缩一个边框宽度并按内圆角裁切，任何内容都盖不住边框与焦点高光，也不会从圆角露出。 */
+  .island[data-surface] > .island-body { position: absolute; inset: 1px; height: auto; border-radius: calc(var(--radius) - 1px); }
   /* 面板浮岛：标题栏固定，内容区单独滚动；body 不再滚动，由内容区承担。 */
   .island-body:has(> .island-panel) { overflow: hidden; }
   .island-panel { @apply flex h-full min-h-0 flex-col; }

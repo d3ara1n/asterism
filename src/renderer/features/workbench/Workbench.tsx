@@ -86,7 +86,7 @@ export function Workbench({ ref, controller, session, ready, busy, run, onHome, 
       </div>}
       {/* 忙碌/就绪频繁切换不播报；仅不可用时作为提示。 */}
       <Badge variant="outline" role={!busy && !ready ? "alert" : undefined}
-        className="absolute left-[var(--overlay-inset)] top-[var(--overlay-inset)] z-10 bg-card text-muted-foreground">
+        className="absolute left-2 top-2 z-10 bg-card text-muted-foreground">
         {busy ? i18n.formatMessage(commonMessages.statusBusy) : ready ? i18n.formatMessage(commonMessages.statusReady) : i18n.formatMessage(commonMessages.statusUnavailable)}
       </Badge>
     </div>
