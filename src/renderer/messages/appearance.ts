@@ -235,7 +235,23 @@ export const appearanceMessages = pluginNamespace("atelier.host").messages("en",
   },
   canvasHint: {
     id: "features_appearance_AppearanceSettings_53",
-    defaultMessage: "Background texture of the workbench.",
+    defaultMessage: "Background texture and connection style of the workbench.",
+  },
+  edgeStyle: {
+    id: "appearance.edgeStyle",
+    defaultMessage: "Connection style",
+  },
+  edgeCurved: {
+    id: "appearance.edgeCurved",
+    defaultMessage: "Curved",
+  },
+  edgeStep: {
+    id: "appearance.edgeStep",
+    defaultMessage: "Right angle",
+  },
+  edgeSmoothStep: {
+    id: "appearance.edgeSmoothStep",
+    defaultMessage: "Rounded",
   },
   canvasTexture: {
     id: "features_appearance_AppearanceSettings_54",

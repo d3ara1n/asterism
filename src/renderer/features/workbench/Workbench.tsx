@@ -1,5 +1,5 @@
 import { RendererNavigationProvider, type DropItem } from "@atelier/sdk/renderer";
-import { ReactFlowProvider, ReactFlow, Panel, useReactFlow, applyNodeChanges, applyEdgeChanges, MarkerType, ConnectionMode, type NodeChange, type EdgeChange, type Edge, type Connection, type IsValidConnection } from "@xyflow/react";
+import { ReactFlowProvider, ReactFlow, Panel, useReactFlow, applyNodeChanges, applyEdgeChanges, MarkerType, ConnectionMode, ConnectionLineType, type NodeChange, type EdgeChange, type Edge, type Connection, type IsValidConnection } from "@xyflow/react";
 import { Crosshair, Maximize, Minus, Plus, RotateCcw } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useImperativeHandle, useMemo, useRef, useState, type ReactNode, type Ref } from "react";
 
@@ -14,7 +14,7 @@ import { useModuleViews } from "../../modules/views";
 import { useI18n } from "../../shared/i18n";
 import { Badge } from "@atelier/ui/ui/badge";
 import { useIsland } from "../../shared/weave/Screen";
-import { useScheme } from "../appearance/state";
+import { useAppearance, useScheme } from "../appearance/state";
 import type { DragKind } from "../creation/routing";
 import { dropCandidates } from "../creation/routing";
 import { dragKinds, snapshotDrop } from "../creation/snapshot";
@@ -33,6 +33,7 @@ import { confirmCardSizes, saveCardSize, type SizeIntent } from "./size-intents"
 import { WorkbenchBackground } from "./WorkbenchSurface";
 
 const nodeTypes = { object: ObjectNode };
+const connectionLineTypes = { default: ConnectionLineType.Bezier, step: ConnectionLineType.Step, smoothstep: ConnectionLineType.SmoothStep };
 export type PanelKind = "objects" | "history" | "access";
 
 /** 标题栏操作经此句柄进入工作台浮岛；面板作为更深浮岛打开，不另建浮层。 */
@@ -103,6 +104,7 @@ function Canvas({ ref, session, run, writable, canDrop, onDropItems }: DropHandl
   const viewportElement = useRef<HTMLDivElement>(null);
   const [dropping, setDropping] = useState(false);
   const scheme = useScheme();
+  const { edgeStyle } = useAppearance();
   // 回调经 ref 读取最新会话，保持稳定身份，避免每次快照更新重建所有节点。
   const latest = useRef(session);
   latest.current = session;
@@ -137,12 +139,12 @@ function Canvas({ ref, session, run, writable, canDrop, onDropItems }: DropHandl
   // 连线由快照决定，选中状态留在本地；否则受控连线永远选不中，Delete 无从生效。
   const [selectedEdges, setSelectedEdges] = useState<ReadonlySet<string>>(new Set());
   const edges: WorkbenchEdge[] = useMemo(() => connections.edges.map(edge => ({
-    ...edge, selected: selectedEdges.has(edge.id),
+    ...edge, type: edgeStyle, selected: selectedEdges.has(edge.id),
     style: { stroke: "var(--primary)", strokeWidth: selectedEdges.has(edge.id) ? 2.5 : 1.5 },
     markerEnd: { type: MarkerType.ArrowClosed, color: "var(--primary)" },
     markerStart: edge.data.links.length === 2 ? { type: MarkerType.ArrowClosed, color: "var(--primary)", orient: "auto-start-reverse" } : undefined,
     selectable: writable, deletable: writable, interactionWidth: 16,
-  })), [connections, writable, selectedEdges]);
+  })), [connections, writable, selectedEdges, edgeStyle]);
   const onEdgesChange = useCallback((changes: EdgeChange<WorkbenchEdge>[]) => {
     setSelectedEdges(previous => {
       const next = new Set(applyEdgeChanges(changes, edges).filter(e => e.selected).map(e => e.id));
@@ -201,6 +203,7 @@ function Canvas({ ref, session, run, writable, canDrop, onDropItems }: DropHandl
     colorMode={scheme} nodes={canvasNodes} edges={edges} nodeTypes={nodeTypes} onNodesChange={onNodesChange}
     defaultViewport={session.viewport} minZoom={minZoom} maxZoom={maximumViewportZoom}
     nodesDraggable nodesConnectable={writable} connectionMode={ConnectionMode.Loose} edgesReconnectable={false} isValidConnection={isValidConnection}
+    connectionLineType={connectionLineTypes[edgeStyle]}
     onConnect={onConnect} onEdgesChange={onEdgesChange} onEdgesDelete={onEdgesDelete}
     onBeforeDelete={async ({ edges }) => ({ nodes: [], edges: edges.filter(edge => edge.selected) })}
     deleteKeyCode={writable ? ["Backspace", "Delete"] : null} panOnScroll selectionOnDrag panOnDrag={[1, 2]} zoomOnDoubleClick={false}

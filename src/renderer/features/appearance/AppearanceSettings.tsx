@@ -1,5 +1,6 @@
 import { Monitor, Sun, Moon, FileText, Bot, Palette } from "lucide-react";
 import { useState, type CSSProperties } from "react";
+import { getBezierPath, getSmoothStepPath, Position } from "@xyflow/react";
 
 import { accentIds, codeFontSizes, grayIds, palettes, themeTokens, type AccentId, type CodeFontSize, type Appearance, type GrayId } from "../../../shared/theme";
 import { appearanceMessages } from "../../messages/appearance";
@@ -65,6 +66,17 @@ function crossTile(gap: number): CSSProperties {
 function Texture({ kind, gap }: { kind: Appearance["canvas"]; gap?: number }) {
 
   return <span aria-hidden="true" className="absolute inset-0" style={texture(kind, gap)} />;
+}
+
+/** 示意图复用工作台的原生路径算法，错开的端点让三种风格均可辨认。 */
+function ConnectionPreview({ kind }: { kind: Appearance["edgeStyle"] }) {
+  const endpoints = { sourceX: 4, sourceY: 12, sourcePosition: Position.Right, targetX: 96, targetY: 44, targetPosition: Position.Left };
+  const [path] = kind === "default" ? getBezierPath(endpoints) : getSmoothStepPath({ ...endpoints, borderRadius: kind === "step" ? 0 : 5 });
+  return <svg aria-hidden="true" viewBox="0 0 100 56" preserveAspectRatio="none" className="h-14 w-full text-primary">
+    <path d={path} fill="none" stroke="currentColor" strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
+    <circle cx={4} cy={12} r={2} fill="currentColor" />
+    <circle cx={96} cy={44} r={2} fill="currentColor" />
+  </svg>;
 }
 
 /** 外观设置：修改即保存并立即应用；顶部预览随全部选项实时变化。 */
@@ -157,9 +169,18 @@ export function AppearanceSettings() {
     </Section>
 
     <Section title={i18n.formatMessage(appearanceMessages.canvas)} hint={i18n.formatMessage(appearanceMessages.canvasHint)}>
+      <p className="type-label mb-2">{i18n.formatMessage(appearanceMessages.canvasTexture)}</p>
       <SwatchGroup aria-label={i18n.formatMessage(appearanceMessages.canvasTexture)} value={appearance.canvas} onValueChange={canvas => void updateAppearance({ canvas: canvas as Appearance["canvas"] })}>
         {([["dots", i18n.formatMessage(appearanceMessages.dots)], ["lines", i18n.formatMessage(appearanceMessages.grid)], ["cross", i18n.formatMessage(appearanceMessages.crosses)], ["none", i18n.formatMessage(appearanceMessages.none)]] as const).map(([v, text]) =>
           <TileSwatch key={v} value={v} label={text}><Texture kind={v} /></TileSwatch>)}
+      </SwatchGroup>
+      <p className="type-label mb-2 mt-4">{i18n.formatMessage(appearanceMessages.edgeStyle)}</p>
+      <SwatchGroup aria-label={i18n.formatMessage(appearanceMessages.edgeStyle)} value={appearance.edgeStyle}
+        onValueChange={edgeStyle => void updateAppearance({ edgeStyle: edgeStyle as Appearance["edgeStyle"] })}>
+        {([["default", appearanceMessages.edgeCurved], ["step", appearanceMessages.edgeStep], ["smoothstep", appearanceMessages.edgeSmoothStep]] as const).map(([value, label]) =>
+          <TileSwatch key={value} value={value} label={i18n.formatMessage(label)}>
+            <ConnectionPreview kind={value} />
+          </TileSwatch>)}
       </SwatchGroup>
     </Section>
 
@@ -177,7 +198,7 @@ function LivePreview({ appearance }: { appearance: Appearance }) {
   return <div aria-hidden="true" className="surface relative mt-2 overflow-hidden bg-canvas">
     <Texture kind={appearance.canvas} gap={20} />
     <div className="relative flex items-center px-8 py-7">
-      <div className="w-48 shrink-0 rounded-lg border bg-card p-3 shadow-sm">
+      <div className="w-48 shrink-0 -translate-y-4 rounded-lg border bg-card p-3 shadow-sm">
         <p className="type-label flex items-center gap-1.5 text-muted-foreground"><FileText className="size-3.5" />{i18n.formatMessage(appearanceMessages.previewNote)}</p>
         <p className="type-section mt-1 truncate">{i18n.formatMessage(appearanceMessages.previewChecklist)}</p>
         <div className="mt-2 space-y-1.5">
@@ -188,12 +209,10 @@ function LivePreview({ appearance }: { appearance: Appearance }) {
       </div>
       {/* 连线：资源端到代理端，带两端连接点与授权标签。 */}
       <div className="relative flex min-w-16 flex-1 items-center">
-        <span className="size-2 shrink-0 rounded-full border-2 border-card bg-primary" />
-        <span className="h-px flex-1 border-t-[1.5px] border-dashed border-primary" />
-        <span className="size-2 shrink-0 rounded-full border-2 border-card bg-primary" />
-        <span className="absolute left-1/2 -translate-x-1/2 -translate-y-4 rounded-sm bg-canvas px-1 text-[10px] text-muted-foreground">{i18n.formatMessage(appearanceMessages.previewRead)}</span>
+        <ConnectionPreview kind={appearance.edgeStyle} />
+        <span className="absolute left-1/2 -translate-x-1/2 -translate-y-8 rounded-sm bg-canvas px-1 text-[10px] text-muted-foreground">{i18n.formatMessage(appearanceMessages.previewRead)}</span>
       </div>
-      <div className="w-52 shrink-0 rounded-lg border bg-card shadow-sm">
+      <div className="w-52 shrink-0 translate-y-4 rounded-lg border bg-card shadow-sm">
         <div className="flex items-center gap-1.5 p-3 pb-2">
           <Bot className="size-3.5 text-muted-foreground" />
           <p className="type-section min-w-0 flex-1 truncate">{i18n.formatMessage(appearanceMessages.previewReviewer)}</p>

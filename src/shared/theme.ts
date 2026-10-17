@@ -13,6 +13,7 @@ export const grayIds = ["gray", "slate", "sage", "olive", "sand", "mauve"] as co
 export const densities = ["compact", "standard", "comfortable"] as const;
 export const radii = ["none", "sm", "md", "lg"] as const;
 export const canvasPatterns = ["dots", "lines", "cross", "none"] as const;
+export const edgeStyles = ["default", "step", "smoothstep"] as const;
 export type Scheme = "light" | "dark";
 export type AccentId = (typeof accentIds)[number];
 export type GrayId = (typeof grayIds)[number];
@@ -37,6 +38,7 @@ export const appearanceSchema = z.object({
   density: z.enum(densities).catch("standard"),
   radius: z.enum(radii).catch("md"),
   canvas: z.enum(canvasPatterns).catch("dots"),
+  edgeStyle: z.enum(edgeStyles).catch("default"),
   /** 本机字体家族名；null 为系统默认栈。 */
   uiFont: fontFamilySchema.catch(null),
   codeFont: fontFamilySchema.catch(null),
@@ -44,7 +46,7 @@ export const appearanceSchema = z.object({
   codeFontSize: z.number().int().min(codeFontSizes[0]).max(codeFontSizes[codeFontSizes.length - 1]).nullable().default(null).catch(null),
 });
 export type Appearance = z.infer<typeof appearanceSchema>;
-export const defaultAppearance: Appearance = { mode: "system", accent: "jade", gray: "gray", density: "standard", radius: "md", canvas: "dots", uiFont: null, codeFont: null, codeFontSize: null };
+export const defaultAppearance: Appearance = { mode: "system", accent: "jade", gray: "gray", density: "standard", radius: "md", canvas: "dots", edgeStyle: "default", uiFont: null, codeFont: null, codeFontSize: null };
 
 /** 读取的原始数据不可信：逐项回退到默认值，不因单项损坏丢弃整份设置。 */
 export function parseAppearance(raw: unknown): Appearance {
