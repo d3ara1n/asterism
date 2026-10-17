@@ -23,7 +23,7 @@
 底色分两层：`background` 遵循 shadcn 约定作页面与控件底色（亮色白、暗色灰阶 1 级），对话框、outline 按钮、激活 tab 等官方组件直接使用；`canvas` 是工坊扩展，只用于工作台底板、带底板的屏、React Flow 画布与外观预览等画布区域（亮色灰阶 3 级、暗色灰阶 1 级）。
 
 - 左上是应用导航与当前视图标题，macOS 原生红黄绿置于该区域。
-- 右上是紧凑快捷操作，Windows 原生窗口控件在右侧保留安全区。
+- 右上是紧凑快捷操作，Windows/Linux 覆盖式窗口控件通过统一标题栏安全区避让。
 - 下方是左侧可隐藏的应用侧栏与右侧主内容两个浮岛。启动主内容为无背景首页，不加载会话；选择已有会话或首次发送创建后才显示工作台。工作台是主屏根浮岛；对象、历史、授权与以后的对象预览/编辑器在其右侧以更深浮岛打开，由编织机制压缩与转移焦点。
 - 侧栏以「首页」作为返回首页与准备新会话的唯一入口，不另设「新会话」按钮；处于首页时，入口保持完整高亮并禁用点击，不使用普通禁用按钮的淡化效果。
 - 窗口外沿与部件之间均留 6px 间隙，让系统材质可见。顶部表面高 32px。控件尺寸使用 shadcn 官方尺寸档；界面密度作为主题项统一缩放，不在调用处写死像素。
@@ -33,16 +33,23 @@
 
 | 平台 | 原生窗口 | 内容留白 |
 | --- | --- | --- |
-| macOS | hidden 标题栏 + 原生红黄绿 + under-window vibrancy | 原生按钮使用集中配置的坐标，导航部件按按钮组宽度对称留白 |
-| Windows 11 22H2+ | hidden 标题栏 + titleBarOverlay + Acrylic | 使用 Window Controls Overlay 的环境变量避开右上控件 |
+| macOS | hidden 标题栏 + 原生红黄绿 + under-window vibrancy | 普通窗口中按按钮组宽度对称留白，全屏时恢复导航的普通内边距 |
+| Windows 11 22H2+ | hidden 标题栏 + titleBarOverlay + Acrylic | 使用 Window Controls Overlay 的环境变量避开窗口控件 |
 | 较旧 Windows | 原生控件覆盖 + 实色背景 | 与现代 Windows 使用相同内容布局 |
-| Linux | 保留桌面环境窗口装饰 + 实色背景 | 不模拟 macOS/Windows 的系统按钮 |
+| Linux（默认） | hidden 标题栏 + titleBarOverlay + 实色背景 | 与 Windows 共用覆盖区域避让，按钮由 Electron 绘制 |
+| Linux（系统标题栏） | 桌面环境窗口装饰 + 实色背景 | 系统按钮在 Web 内容之外，应用标题栏不额外留白 |
 
 主进程通过 nativeTheme 响应减少透明度/高对比度设置，必要时禁用材质。亮暗模式经 `nativeTheme.themeSource` 下发，系统材质、renderer 的 `prefers-color-scheme` 与实色回退同源。
 
 系统材质使用 Electron 原生 API，不使用全窗口 CSS backdrop-filter 模拟桌面模糊，不开启 transparent 窗口模式。HTML、body、root 与 Window 无不透明全屏底色。卡片与内容表面保留实色，确保文字可读。
 
-macOS 覆盖区域高为顶部表面高度加两倍窗口边距。原生按钮位置在 `windowGeometry.macControlsPosition` 集中配置（当前为 `{ x: 20, y: 15 }` DIP）；renderer 按 `macControlsPosition` 与 `macControlsWidth` 计算左侧留白，使按钮组两侧到部件边缘等距；不使用 `titlebar-area-x`。
+macOS 覆盖区域高为顶部表面高度加两倍窗口边距。原生按钮位置在 `windowGeometry.macControlsPosition` 集中配置（当前为 `{ x: 20, y: 15 }` DIP）；普通窗口中 renderer 按 `macControlsPosition` 与 `macControlsWidth` 计算左侧留白，使按钮组两侧到部件边缘等距；不使用 `titlebar-area-x`。
+
+窗口层统一消费主进程确定的标题栏模式与原生全屏状态。主进程通过 Electron 的 `enter-full-screen` / `leave-full-screen` 事件发布状态，renderer 首帧前先订阅再读取当前快照；全屏内刷新同样取得真实状态，迟到的初始读取不能覆盖已收到的状态通知。全屏时收回窗口控件专用留白，退出后恢复；最大化仍保留按钮避让。
+
+Windows/Linux 覆盖模式使用 `titlebar-area-x` / `titlebar-area-width` 提供的可用区域计算标题栏左右安全区，控件与菜单之间保留标准部件间隙。右侧工作台菜单随标题栏整体布局避让；Linux 桌面将按钮放在左侧时也遵循实际区域。覆盖区域随系统缩放与窗口尺寸更新，不以固定按钮宽度限制安全区；环境变量尚未就绪时暂按右侧 138px 预留。窗口按钮的绘制、点击与系统行为由 Electron 负责。
+
+Linux 默认使用覆盖式标题栏；桌面环境兼容性不佳或用户偏好系统装饰时，可用 `--native-titlebar` 启动，开发命令为 `npm run dev -- -- --native-titlebar`。标题栏模式在创建窗口时确定，修改启动参数需退出并重启；此选项不改变 macOS/Windows 的标题栏策略。
 
 窗口底座可拖动，包括外沿与部件之间露出的空白；标题区、操作区和工作台均完整排除拖动，保留给交互。根节点声明 `drag`，部件边界声明 `no-drag`；所有后代直接使用 `window-drag: initial` 重置，避免 Electron 的继承语义使画布变换后的后代生成超出可见边界的排除区域（不可用显式 `none` 代替 `initial`）。弹窗和遮罩另行排除底座拖动。
 

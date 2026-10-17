@@ -1,6 +1,21 @@
-/** 桌面平台与窗口几何，不属于任务历史或运行时协议。 */
+/** 桌面窗口状态与几何，不属于任务历史或运行时协议。 */
+import { z } from "zod";
+import { coreChannel } from "./core.ts";
 
 export type DesktopPlatform = "darwin" | "win32" | "linux";
+
+export const desktopWindowGetChannel = coreChannel("window.get");
+export const desktopWindowChangedChannel = coreChannel("window.changed");
+export const desktopWindowStateSchema = z.strictObject({
+  titleBar: z.enum(["macos", "overlay", "native"]),
+  fullScreen: z.boolean(),
+});
+export type DesktopWindowState = z.infer<typeof desktopWindowStateSchema>;
+export type TitleBarMode = DesktopWindowState["titleBar"];
+export interface DesktopWindowBridge {
+  get(): Promise<DesktopWindowState>;
+  onChanged(listener: (state: DesktopWindowState) => void): () => void;
+}
 
 // 原生窗口按钮与 renderer 的留白使用同一套几何参数（单位：DIP）。
 export const windowGeometry = {

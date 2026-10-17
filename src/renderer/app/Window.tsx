@@ -4,6 +4,7 @@ import { windowGeometry } from "../../shared/desktop";
 import { appMessages } from "../messages/app";
 import { objectsMessages } from "../messages/objects";
 import { useI18n } from "../shared/i18n";
+import { useDesktopWindow } from "./window-state";
 
 const geometry = {
   "--window-gutter": `${windowGeometry.gutter}px`,
@@ -21,7 +22,8 @@ const geometry = {
  */
 export function Window({ titlebar, children, skipTarget }: { titlebar: ReactNode; children: ReactNode; skipTarget: string }) {
   const i18n = useI18n();
-  return <main className="window" data-platform={window.host.platform} style={geometry}>
+  const state = useDesktopWindow();
+  return <main className="window" data-titlebar={state.titleBar} data-fullscreen={state.fullScreen} style={geometry}>
     <a href={`#${skipTarget}`} className="skip-link">{i18n.formatMessage(appMessages.skipToContent)}</a>
     {titlebar}
     {children}

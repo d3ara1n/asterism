@@ -3,7 +3,7 @@ import { uiTextSchema, pluginMetadataSchema, type Json } from "@atelier/sdk/cont
 import { translationCatalogSchema, type LanguageBridge } from "./language.ts";
 import { coreChannel } from "./core.ts";
 import type { ConfigurationBridge } from "./configuration.ts";
-import type { DesktopPlatform } from "./desktop.ts";
+import type { DesktopPlatform, DesktopWindowBridge } from "./desktop.ts";
 import type { AppearanceBridge } from "./theme.ts";
 import type { SessionBridge } from "./session.ts";
 import type { PluginConfigurationBridge } from "./plugin-configuration.ts";
@@ -67,6 +67,7 @@ export interface DesktopBridge {
   pluginConfiguration: PluginConfigurationBridge;
   /** 受控偏好容器：只能读写 preferences 内宿主规定前缀的键。 */
   preferences: { read(): Promise<Record<string, Json>>; write(key: string, value: Json | null): Promise<boolean> };
+  window: DesktopWindowBridge;
   readonly platform: DesktopPlatform;
   /** 系统目录选择窗口；取消返回 null。 */
   pickDirectory(): Promise<string | null>;

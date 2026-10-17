@@ -173,13 +173,15 @@
   .window-session-title { @apply min-w-0 max-w-52 truncate px-1.5 text-sm; }
   .window-actions { @apply shrink-0 gap-0.5; }
   .window-actions[data-hidden="true"] { visibility: hidden; }
-  .window[data-platform="darwin"] .window-navigation {
+  .window[data-titlebar="macos"][data-fullscreen="false"] .window-navigation {
     /* 按集中配置的原生按钮坐标对称避让；不使用 titlebar-area-x，其值包含系统额外留白。 */
     padding-inline-start: var(--mac-controls-inset);
   }
-  .window[data-platform="win32"] .titlebar {
-    /* 覆盖区域由系统提供，回退宽度仅用于环境变量尚未就绪的首帧。 */
-    padding-inline-end: clamp(0px, calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, calc(100vw - 138px)) - var(--window-gutter)), 180px);
+  .window[data-titlebar="overlay"][data-fullscreen="false"] .titlebar {
+    /* Windows/Linux 共用官方可用区域；同时兼容桌面将按钮放在左侧的布局。
+       控件与菜单之间保留 window-gap，不限制系统按钮的实际占用宽度。 */
+    padding-left: max(0px, calc(env(titlebar-area-x, 0px) + var(--window-gap) - var(--window-gutter)));
+    padding-right: max(0px, calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, calc(100vw - 138px)) + var(--window-gap) - var(--window-gutter)));
   }
 
   /* 受管空间：唯一负责与窗口的关系；屏自左向右平铺，整屏平移切换（左浅右深）。 */

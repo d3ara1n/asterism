@@ -1,6 +1,6 @@
 import { nativeTheme, type BrowserWindow, type BrowserWindowConstructorOptions } from "electron";
 import { release } from "node:os";
-import { windowGeometry } from "../shared/desktop.ts";
+import type { TitleBarMode } from "../shared/desktop.ts";
 import { themeTokens } from "../shared/theme.ts";
 import { readAppearance } from "./appearance.ts";
 
@@ -15,11 +15,6 @@ export function initialWindowAppearance(): BrowserWindowConstructorOptions {
   const allowMaterial = !nativeTheme.prefersReducedTransparency && !nativeTheme.shouldUseHighContrastColors;
   if (process.platform === "darwin") {
     return {
-      titleBarStyle: "hidden",
-      trafficLightPosition: { ...windowGeometry.macControlsPosition },
-      titleBarOverlay: {
-        height: 2 * windowGeometry.gutter + windowGeometry.headerHeight,
-      },
       backgroundColor: allowMaterial ? "#00000000" : fallbackColor,
       ...(allowMaterial ? { vibrancy: "under-window" as const, visualEffectState: "followWindow" as const } : {}),
     };
@@ -29,12 +24,6 @@ export function initialWindowAppearance(): BrowserWindowConstructorOptions {
     const supported = major > 10 || (major === 10 && build >= 22621);
     const material = allowMaterial && supported;
     return {
-      titleBarStyle: "hidden",
-      titleBarOverlay: {
-        color: "#00000000",
-        symbolColor: material && nativeTheme.shouldUseDarkColors ? "#ffffff" : tokens().foreground!,
-        height: windowGeometry.gutter + windowGeometry.headerHeight,
-      },
       backgroundColor: material ? "#00000000" : fallbackColor,
       ...(supported ? { backgroundMaterial: material ? "acrylic" as const : "none" as const } : {}),
     };
@@ -43,7 +32,7 @@ export function initialWindowAppearance(): BrowserWindowConstructorOptions {
 }
 
 /** 监听系统偏好；减少透明度与高对比度时切回实色，关闭窗口后释放监听。 */
-export function followWindowAppearance(window: BrowserWindow): () => void {
+export function followWindowAppearance(window: BrowserWindow, titleBar: TitleBarMode): () => void {
   const update = () => {
     if (window.isDestroyed()) return;
     const options = initialWindowAppearance();
@@ -53,10 +42,14 @@ export function followWindowAppearance(window: BrowserWindow): () => void {
     }
     if (process.platform === "win32") {
       if (options.backgroundMaterial) window.setBackgroundMaterial(options.backgroundMaterial);
-      if (typeof options.titleBarOverlay === "object") window.setTitleBarOverlay(options.titleBarOverlay);
     }
+    if (titleBar === "overlay") window.setTitleBarOverlay({
+      color: "#00000000",
+      symbolColor: options.backgroundMaterial === "acrylic" && nativeTheme.shouldUseDarkColors ? "#ffffff" : tokens().foreground!,
+    });
   };
   nativeTheme.on("updated", update);
   window.once("closed", () => nativeTheme.removeListener("updated", update));
+  update();
   return update;
 }

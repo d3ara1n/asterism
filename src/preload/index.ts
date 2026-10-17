@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer, webUtils } from "electron";
 import { languageGetChannel, languageSetChannel, languageChangedChannel, languagePreferenceSchema, languageStateSchema } from "../shared/language.ts";
 import { applicationBrand } from "../shared/application.ts";
 import { desktopBridgeKey } from "../shared/core.ts";
+import { desktopWindowChangedChannel, desktopWindowGetChannel, desktopWindowStateSchema } from "../shared/desktop.ts";
 import { commandChannel, pickDirectoryChannel, statusChannel, commandSchema, resultSchema, runtimeStatusSchema, type DesktopBridge } from "../shared/contracts.ts";
 import { objectStreamChannel, objectStreamSchema } from "../shared/object-stream.ts";
 import { configurationChannel, configurationChangedChannel, configurationCommandSchema, configurationResultSchema } from "../shared/configuration.ts";
@@ -124,6 +125,17 @@ const bridge: DesktopBridge = {
   },
   pathForFile: file => webUtils.getPathForFile(file),
   platform: process.platform === "darwin" ? "darwin" : process.platform === "win32" ? "win32" : "linux",
+  window: {
+    async get() { return desktopWindowStateSchema.parse(await ipcRenderer.invoke(desktopWindowGetChannel)); },
+    onChanged(listener) {
+      const handler = (_event: Electron.IpcRendererEvent, raw: unknown) => {
+        const parsed = desktopWindowStateSchema.safeParse(raw);
+        if (parsed.success) listener(parsed.data);
+      };
+      ipcRenderer.on(desktopWindowChangedChannel, handler);
+      return () => ipcRenderer.removeListener(desktopWindowChangedChannel, handler);
+    },
+  },
   async execute(command) {
     const parsed = commandSchema.safeParse(command);
     if (!parsed.success) return { ok: false, error: { code: "invalid_request", message: "Invalid application command." } };

@@ -30,6 +30,7 @@
 - `npm run package`、`npm run make` 已成功生成本机未签名应用与 ZIP；打包产物已由用户打开并加载插件确认（2026-10-13，见插件系统计划的打包验证）。
 - 类型检查与单元／契约测试随各实施计划执行并保持通过；Tailwind 与 React Flow 样式已进入 renderer 产物。
 - macOS 开发启动与热更新经日常开发确认；打包应用打开工作区、关闭/重启与真实 utilityProcess 中的 SQLite 已随 2026-10-13 打包产物验收覆盖。待用户确认：Windows/Linux 的构建与交互。
+- 跨平台标题栏本阶段已由用户验收通过（2026-10-18）；Windows/Linux 实机测试延至后续阶段，由用户验证窗口按钮与菜单避让、系统缩放、最大化／全屏切换，以及 Linux 系统标题栏选项，发现问题后再修正。当前规则见 [原生窗口与 Web 内容](../docs/design-system.md#原生窗口与-web-内容)。
 - 模型 SDK 三协议连接测试与真实端点已验收（2026-10-13）；Monaco 与 MCP SDK 尚未接入。跟踪 `todo-2026-10-01-runtime-capabilities.md`。
 
 ## 参考

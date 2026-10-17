@@ -82,6 +82,7 @@ Atelier 分为**应用组合层**、**通用宿主机制**与**插件**三层：
 
 桌面桥 `window.host` 按职责分为独立版本化通道（协议版本号定义于 `src/shared/` 对应契约文件）：
 - **应用列表通道（`src/shared/contracts.ts`）**：提供工作区身份、会话列表摘要与启动时装载的插件静态翻译目录，不持有已打开会话的正文。
+- **桌面窗口通道（`window.host.window`，`src/shared/desktop.ts`）**：由主进程提供只读窗口状态及变更订阅，不进入任务运行时；布局规则见 [原生窗口与 Web 内容](design-system.md#原生窗口与-web-内容)。
 - **全局配置通道（`src/shared/configuration.ts`）** 与 **插件配置通道**：分别管理提供商／角色／代理配置（含模型发现、参数获取与异步连接测试）及插件 `.atelier/config.json`；读写不触发工作台重载。
 - **插件调用通道（`window.host.calls`，`src/shared/plugin-calls.ts`）**：独立传递具型请求、结果与取消，经主进程受信窗口门禁送达任务运行时；不占用会话命令队列。业务契约与生命周期见 [具型插件调用](plugin-sdk.md#具型插件调用)。
 - **会话通道（`window.host.session`，`src/shared/session.ts` / `workbench.ts`）**：统一处理会话生命周期、资源创建与动作、工作台关系与视图布局：

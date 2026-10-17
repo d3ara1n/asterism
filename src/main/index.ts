@@ -10,6 +10,7 @@ import { applicationBrand, applicationDataDirectory, applicationId, applicationS
 import { followWindowAppearance, initialWindowAppearance } from "./window-appearance.ts";
 import { applyThemeSource, serveAppearance } from "./appearance.ts";
 import { initialWindowState, trackWindowState } from "./window-state.ts";
+import { initialTitleBar, serveDesktopWindow, titleBarMode } from "./window-titlebar.ts";
 import { servePreferences } from "./ui-state.ts";
 import { serveLanguage, readLanguage } from "./language.ts";
 import { startupText } from "./startup-text.ts";
@@ -51,9 +52,11 @@ function createWindow(): void {
   const allowedURL = new URL(developmentURL ?? pathToFileURL(rendererFile).href).href;
   trustedURL = allowedURL.split("#")[0]!;
   const state = initialWindowState();
+  const titleBar = titleBarMode();
   window = new BrowserWindow({
     ...state.bounds, minWidth: state.minWidth, minHeight: state.minHeight, title: applicationBrand.en,
     ...initialWindowAppearance(),
+    ...initialTitleBar(titleBar),
     autoHideMenuBar: true,
     webPreferences: {
       preload: join(here, "../preload/index.cjs"),
@@ -64,7 +67,7 @@ function createWindow(): void {
   const current = window;
   if (state.maximized) current.maximize();
   trackWindowState(current);
-  const refreshAppearance = followWindowAppearance(current);
+  const refreshAppearance = followWindowAppearance(current, titleBar);
   current.webContents.setWindowOpenHandler(({ url }) => {
     const external = externalWebUrl(url);
     if (external) void shell.openExternal(external).catch(() => console.error("External link could not be opened."));
@@ -93,6 +96,7 @@ function createWindow(): void {
   };
   ipcMain.on(pluginCallsChannel, receiveCalls);
   const stopAppearance = serveAppearance(current, trusted, () => refreshAppearance());
+  const stopDesktopWindow = serveDesktopWindow(current, titleBar, trusted);
   const stopPreferences = servePreferences(trusted);
   const stopLanguage = serveLanguage(current, trusted);
   ipcMain.handle(contentChannel, async (event, raw): Promise<ContentResult> => {
@@ -143,6 +147,7 @@ function createWindow(): void {
     return runtime.configure(parsed.data);
   });
   current.on("closed", () => {
+    stopDesktopWindow();
     ipcMain.removeListener(pluginEventsChannel, receiveEvents);
     ipcMain.removeListener(pluginCallsChannel, receiveCalls);
     ipcMain.removeHandler(contentChannel);
