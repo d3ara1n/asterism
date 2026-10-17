@@ -222,9 +222,17 @@
   .island-panel-content { @apply min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-5; }
   .island[data-peek] { cursor: pointer; }
   .island[data-peek] > .island-body { opacity: 0.6; transition: opacity var(--motion-fast); }
-  .weave-indicator { @apply pointer-events-none absolute bottom-px h-1 rounded-full bg-foreground/5; }
-  .weave-indicator { inset-inline: var(--space-inset); }
-  .weave-indicator > span { @apply absolute inset-y-0 rounded-full bg-foreground/20; transition: left var(--motion-page) var(--ease-out); }
+  /* 溢出时的分段导航：命中区占满底部留白，可见条居中；可见浮岛加深，焦点浮岛最深。 */
+  .weave-indicator { @apply absolute bottom-0; height: var(--space-inset); inset-inline: var(--space-inset); }
+  .weave-segment { @apply absolute inset-y-0 cursor-pointer rounded-full outline-none; }
+  .weave-segment::before {
+    @apply absolute inset-x-px top-1/2 h-[3px] -translate-y-1/2 rounded-full bg-foreground/10 content-[''];
+    transition: background-color var(--motion-fast) var(--ease-out), height var(--motion-fast) var(--ease-out);
+  }
+  .weave-segment[data-visible]::before { @apply bg-foreground/25; }
+  .weave-segment[aria-current]::before { @apply bg-foreground/50; }
+  .weave-segment:hover::before { @apply h-1 bg-foreground/40; }
+  .weave-segment:focus-visible::before { @apply h-1 bg-ring; }
   .settings-stage { @apply relative h-full; }
   .settings-grid {
     @apply grid gap-3;

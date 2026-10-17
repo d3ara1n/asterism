@@ -5,6 +5,7 @@ import type { UiText } from "@atelier/sdk/contracts";
 import { useI18n } from "@atelier/sdk/renderer";
 import { windowGeometry } from "../../../shared/desktop";
 import { cn } from "@atelier/ui/utils";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@atelier/ui/ui/tooltip";
 
 import { fadeTransition, islandTransition } from "./motion";
 import { closeIsland, focusIsland, follow, layout, openIsland, type IslandWidth } from "./model";
@@ -63,6 +64,7 @@ export function Screen({ label, root, leading, className, resetKey }: {
   label: string; root: IslandSpec; leading?: IslandSpec[]; className?: string;
   /** 变化时关闭全部更深浮岛。 */ resetKey?: string;
 }) {
+  const i18n = useI18n();
   const viewport = useRef<HTMLDivElement>(null);
   const strip = useRef<HTMLDivElement>(null);
   const [deeper, setDeeper] = useState<IslandSpec[]>([]);
@@ -152,6 +154,11 @@ export function Screen({ label, root, leading, className, resetKey }: {
     event.preventDefault(); event.stopPropagation();
     void close(focus);
   };
+  /** 分段导航：焦点移到目标浮岛，视口随之跟随；等目标解除 inert 后再移入 DOM 焦点。 */
+  const moveTo = (id: string) => {
+    setFocus(current => focusIsland({ islands, focus: current }, id).focus);
+    requestAnimationFrame(() => viewport.current?.querySelector<HTMLElement>(`[data-island="${CSS.escape(id)}"]`)?.focus({ preventScroll: true }));
+  };
 
   return <div className={cn("weave-viewport", className)} aria-label={label} role="group" ref={viewport} onWheel={onWheel} onKeyDown={onKeyDown}>
     {/* 视口宽度测得之前不排布浮岛，避免以 0 宽度按溢出布局渲染一帧。 */}
@@ -174,8 +181,20 @@ export function Screen({ label, root, leading, className, resetKey }: {
           onFocus={() => setFocus(current => focusIsland({ islands, focus: current }, island.id).focus)} />;
       })}</AnimatePresence>
     </div>
-    {overflow && <div className="weave-indicator" aria-hidden="true">
-      <span style={{ left: `${(offset / total) * 100}%`, width: `${(width / total) * 100}%` }} />
+    {/* 溢出时的分段导航：每段对应一个浮岛，点击把焦点移到该浮岛，视口随之跟随；被完全挤出的浮岛也能回到视口。 */}
+    {overflow && <div className="weave-indicator">
+      {islands.map((island, index) => {
+        const span = spans[index] ?? { left: 0, width: 0 };
+        const visibleLeft = span.left - offset, visibleRight = visibleLeft + span.width;
+        const visible = visibleRight > 0 && visibleLeft < width;
+        const name = i18n.text(island.label);
+        return <Tooltip key={island.id}><TooltipTrigger asChild>
+          <button type="button" className="weave-segment" aria-label={name} aria-current={island.id === focus || undefined}
+            data-visible={visible || undefined}
+            style={{ left: `${(span.left / total) * 100}%`, width: `${(span.width / total) * 100}%` }}
+            onClick={() => moveTo(island.id)} />
+        </TooltipTrigger><TooltipContent>{name}</TooltipContent></Tooltip>;
+      })}
     </div>}
   </div>;
 }
