@@ -33,6 +33,26 @@ export const appearanceMessages = pluginNamespace("atelier.host").messages("en",
     id: "features_appearance_AppearanceSettings_8",
     defaultMessage: "Amber",
   },
+  cyan: {
+    id: "accentCyan",
+    defaultMessage: "Cyan",
+  },
+  grass: {
+    id: "accentGrass",
+    defaultMessage: "Grass",
+  },
+  tomato: {
+    id: "accentTomato",
+    defaultMessage: "Tomato",
+  },
+  plum: {
+    id: "accentPlum",
+    defaultMessage: "Plum",
+  },
+  graphite: {
+    id: "accentGraphite",
+    defaultMessage: "Graphite",
+  },
   neutral: {
     id: "features_appearance_AppearanceSettings_9",
     defaultMessage: "Neutral",
@@ -52,6 +72,10 @@ export const appearanceMessages = pluginNamespace("atelier.host").messages("en",
   mauve: {
     id: "features_appearance_AppearanceSettings_13",
     defaultMessage: "Mauve",
+  },
+  olive: {
+    id: "grayOlive",
+    defaultMessage: "Olive",
   },
   systemDefault: {
     id: "features_appearance_AppearanceSettings_14",
@@ -291,6 +315,34 @@ export const appearanceMessages = pluginNamespace("atelier.host").messages("en",
   },
   paletteInk: {
     id: "paletteInk",
-    defaultMessage: "Ink",
+    defaultMessage: "Indigo ink",
+  },
+  paletteGraphite: {
+    id: "paletteGraphite",
+    defaultMessage: "Graphite",
+  },
+  paletteLagoon: {
+    id: "paletteLagoon",
+    defaultMessage: "Lagoon",
+  },
+  paletteCeladon: {
+    id: "paletteCeladon",
+    defaultMessage: "Celadon",
+  },
+  paletteMeadow: {
+    id: "paletteMeadow",
+    defaultMessage: "Meadow",
+  },
+  paletteHoney: {
+    id: "paletteHoney",
+    defaultMessage: "Honey",
+  },
+  paletteCoral: {
+    id: "paletteCoral",
+    defaultMessage: "Coral",
+  },
+  paletteRose: {
+    id: "paletteRose",
+    defaultMessage: "Rose",
   },
 }));

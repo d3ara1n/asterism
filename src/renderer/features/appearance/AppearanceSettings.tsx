@@ -14,14 +14,27 @@ import { ToggleGroup, ToggleGroupItem } from "@atelier/ui/ui/toggle-group";
 import { Section } from "../settings/layout";
 import { updateAppearance, useAppearance, useScheme } from "./state";
 
-const paletteMessages: Record<string, import("@atelier/sdk/contracts").UiMessage> = { tundra: appearanceMessages.paletteTundra, sky: appearanceMessages.paletteSky, terracotta: appearanceMessages.paletteTerracotta, dusk: appearanceMessages.paletteDusk, ink: appearanceMessages.paletteInk };
-const getAccentLabels = (): Record<AccentId, string> => ({
-  jade: getI18n().formatMessage(appearanceMessages.jade), teal: getI18n().formatMessage(appearanceMessages.teal), blue: getI18n().formatMessage(appearanceMessages.blue), indigo: getI18n().formatMessage(appearanceMessages.indigo),
-  violet: getI18n().formatMessage(appearanceMessages.violet), crimson: getI18n().formatMessage(appearanceMessages.crimson), orange: getI18n().formatMessage(appearanceMessages.orange), amber: getI18n().formatMessage(appearanceMessages.amber),
-});
-const getGrayLabels = (): Record<GrayId, string> => ({
-  gray: getI18n().formatMessage(appearanceMessages.neutral), sage: getI18n().formatMessage(appearanceMessages.sage), slate: getI18n().formatMessage(appearanceMessages.slate), sand: getI18n().formatMessage(appearanceMessages.sand), mauve: getI18n().formatMessage(appearanceMessages.mauve),
-});
+const paletteMessages: Record<string, import("@atelier/sdk/contracts").UiMessage> = {
+  tundra: appearanceMessages.paletteTundra, graphite: appearanceMessages.paletteGraphite, sky: appearanceMessages.paletteSky, ink: appearanceMessages.paletteInk,
+  lagoon: appearanceMessages.paletteLagoon, celadon: appearanceMessages.paletteCeladon, meadow: appearanceMessages.paletteMeadow, honey: appearanceMessages.paletteHoney,
+  terracotta: appearanceMessages.paletteTerracotta, coral: appearanceMessages.paletteCoral, rose: appearanceMessages.paletteRose, dusk: appearanceMessages.paletteDusk,
+};
+const getAccentLabels = (): Record<AccentId, string> => {
+  const f = getI18n().formatMessage;
+  return {
+    blue: f(appearanceMessages.blue), cyan: f(appearanceMessages.cyan), teal: f(appearanceMessages.teal), jade: f(appearanceMessages.jade),
+    grass: f(appearanceMessages.grass), amber: f(appearanceMessages.amber), orange: f(appearanceMessages.orange), tomato: f(appearanceMessages.tomato),
+    crimson: f(appearanceMessages.crimson), plum: f(appearanceMessages.plum), violet: f(appearanceMessages.violet), indigo: f(appearanceMessages.indigo),
+    graphite: f(appearanceMessages.graphite),
+  };
+};
+const getGrayLabels = (): Record<GrayId, string> => {
+  const f = getI18n().formatMessage;
+  return {
+    gray: f(appearanceMessages.neutral), slate: f(appearanceMessages.slate), sage: f(appearanceMessages.sage),
+    olive: f(appearanceMessages.olive), sand: f(appearanceMessages.sand), mauve: f(appearanceMessages.mauve),
+  };
+};
 const getFontText = () => ({
   defaultLabel: getI18n().formatMessage(appearanceMessages.systemDefault),
   searchPlaceholder: getI18n().formatMessage(appearanceMessages.searchFonts),
@@ -88,7 +101,7 @@ export function AppearanceSettings() {
               const t = themeTokens({ ...appearance, gray: id }, scheme);
               return <ColorSwatch key={id} value={id} label={getGrayLabels()[id]}>
                 <span className="absolute inset-0 flex">
-                  <span className="flex-1" style={{ background: t.background }} />
+                  <span className="flex-1" style={{ background: t.canvas }} />
                   <span className="flex-1" style={{ background: t.border }} />
                   <span className="flex-1" style={{ background: t["muted-foreground"] }} />
                 </span>
@@ -214,7 +227,7 @@ function PaletteDialog({ open, onOpenChange, appearance }: { open: boolean; onOp
           return <Item key={palette.id} asChild variant="outline" className="flex-col items-stretch gap-0 overflow-hidden bg-card p-0 text-left hover:border-ring/60"><button type="button"
             onClick={() => { void updateAppearance({ accent: palette.accent, gray: palette.gray }); onOpenChange(false); }}>
             {/* 迷你界面：底色、卡片、主色条与次要文字条。 */}
-            <span aria-hidden="true" className="flex h-16 gap-1.5 p-2" style={{ background: t.background }}>
+            <span aria-hidden="true" className="flex h-16 gap-1.5 p-2" style={{ background: t.canvas }}>
               <span className="flex flex-1 flex-col gap-1 rounded-sm border p-1.5" style={{ background: t.card, borderColor: t.border }}>
                 <span className="h-1.5 w-3/4 rounded-full" style={{ background: t.foreground }} />
                 <span className="h-1 w-1/2 rounded-full" style={{ background: t["muted-foreground"] }} />
