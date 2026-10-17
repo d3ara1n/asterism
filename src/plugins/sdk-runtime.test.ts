@@ -131,6 +131,59 @@ describe("工作台 SDK 的宿主实现", () => {
     expect(invoked).toBe(1);
   });
 
+  // runtime.md：顶层工具按用户列表覆盖完整声明，失败贡献不占用名称；模型声明与执行身份必须来自同一胜者。
+  it.each(["loaded", "setup-failed", "validation-failed"] as const)("同名顶层工具替换内置 ask_user，后者状态为 %s", async state => {
+    const c = counter(), first = pluginNamespace("test.first"), last = pluginNamespace("test.last");
+    const invoked: string[] = [];
+    const previous = defineTopLevelTool({
+      id: first.name("ask"), name: "ask_user", description: "First question UI.", guidelines: [],
+      argsSchema: z.number().describe("Question number."), resultSchema: z.number().describe("Answer number."),
+      effect: "read", execution: "parallel",
+      async execute(value) { invoked.push(first.id); return { kind: "succeeded", data: value }; },
+    });
+    const replacement = defineTopLevelTool({
+      id: last.name("ask"), name: "ask_user", description: "Replacement question UI.", guidelines: [],
+      argsSchema: z.strictObject({ prompt: z.string() }).describe("Question prompt."),
+      resultSchema: z.string().describe("Answer text."), effect: "read", execution: "parallel",
+      async execute(value) { invoked.push(last.id); return { kind: "succeeded", data: value.prompt }; },
+    });
+    const missingAction = defineAction(last.resource("missing", z.object({})), { id: last.name("missing"), schema: z.null() });
+    const later = definePlugin({ namespace: last, version: "1", modules: [
+      defineModule(() => ({ topLevelTools: [replacement],
+        ...(state === "validation-failed" ? { preparers: [{ id: "invalid", contract: missingAction, prepare: () => ({ action: "accept" as const }) }] } : {}) })),
+      defineModule(() => { if (state === "setup-failed") throw new Error("Setup failed."); return {}; }),
+    ] });
+    // 正常情形刻意让后者先初始化，验证覆盖依据用户列表；失败情形保持前者独立可用。
+    const earlier = definePlugin({ namespace: first, version: "1", dependencies: state === "loaded" ? [last.id] : [],
+      modules: [defineModule(() => ({ topLevelTools: [previous] }))] });
+    const requests: ModelInput[] = [];
+    const { service, sessionId } = open([c.plugin, earlier, later], () => ({
+      version: "test/1", validate() {}, prepare(input) {
+        requests.push(input);
+        return { async *stream() {
+          yield { type: "part.start", part: { id: "q", kind: "toolcall", name: "ask_user", callId: "question" } };
+          yield { type: "part.end", partId: "q", arguments: state === "loaded" ? { prompt: "Hello" } : 42 };
+          yield { type: "finish", reason: "tool-calls", usage: null };
+        } };
+      },
+    }));
+    const target = await configureModel(service);
+    const object = { id: await create(service, sessionId), sessionId, kind: Counter.kind };
+    const result = await c.context().models.run({
+      object, target, requestParentId: c.context().session(sessionId).snapshot().position.nodeId,
+      system: { blocks: [] }, messages: [], tools: { allow: ["ask_user"] }, signal: new AbortController().signal, observer: { event() {} },
+    });
+    const selected = state === "loaded" ? replacement : previous;
+    expect(service.sessions.plugins.find(plugin => plugin.id === last.id)?.status).toBe(state === "loaded" ? "loaded" : "failed");
+    expect(requests[0]!.tools.filter(tool => tool.name === "ask_user")).toMatchObject([{
+      description: selected.description, parameters: { type: state === "loaded" ? "object" : "number" },
+    }]);
+    expect(result.tools[0]).toMatchObject({
+      kind: "succeeded", implementation: { id: selected.id }, data: state === "loaded" ? "Hello" : 42,
+    });
+    expect(invoked).toEqual([state === "loaded" ? last.id : first.id]);
+  });
+
   // 外部贡献可以关联其他插件的对象，但声明实例、来源与私有数据边界仍由宿主守护。
   it("具型调用绑定真实关联对象和后台来源，拒绝伪造契约、跨会话引用及非法产出", async () => {
     const c = counter(), other = pluginNamespace("test.questions");
@@ -160,7 +213,7 @@ describe("工作台 SDK 的宿主实现", () => {
   });
 
   // 取消只发信号，活动必须保持到 handler 清理完成；通用调用不能绕开宿主收束。
-  it.each(["renderer", "plugin"] as const)("%s 调用不显示对象执行，取消后仍等待实际清理；顶层工具不能占用宿主入口", async source => {
+  it.each(["renderer", "plugin"] as const)("%s 调用不显示对象执行，取消后仍等待实际清理", async source => {
     const c = counter(), other = pluginNamespace("test.questions");
     const wait = defineCall(other.name("wait"), { input: z.null(), output: z.null() });
     let signal!: AbortSignal, release!: () => void;
@@ -168,13 +221,7 @@ describe("工作台 SDK 的宿主实现", () => {
     const plugin = definePlugin({ namespace: other, version: "1.0.0", modules: [defineModule(() => ({
       calls: [implementCall(wait, async (_input, context) => { signal = context.signal; await gate; return null; })],
     }))] });
-    const bad = definePlugin({ namespace: pluginNamespace("test.bad"), version: "1.0.0", modules: [defineModule(() => ({
-      topLevelTools: [defineTopLevelTool({ id: "test.bad/top", name: "resource_call", description: "Conflict.", guidelines: [],
-        argsSchema: z.null().describe("No arguments."), resultSchema: z.null().describe("No result."),
-        effect: "read", execution: "parallel", async execute() { return { kind: "succeeded", data: null }; } })],
-    }))] });
-    const { service, sessionId } = open([c.plugin, plugin, bad]);
-    expect(service.sessions.plugins.find(item => item.id === "test.bad")).toMatchObject({ status: "failed" });
+    const { service, sessionId } = open([c.plugin, plugin]);
     const object = { id: await create(service, sessionId), sessionId, kind: Counter.kind };
     const controller = new AbortController();
     const waiting = source === "renderer"

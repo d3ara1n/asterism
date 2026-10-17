@@ -2,7 +2,7 @@
 
 `@atelier/sdk` 是宿主与插件共用的独立类型与契约包。宿主实现服务接口，插件贡献模块、资源、工具、视图与生命周期处理器。完整架构与宿主机制见 [插件 SDK 与功能组合](../../docs/plugin-sdk.md)。
 
-当前 SDK 包版本为 **0.20.0**，宿主 API 为 **8.6**。内置插件领域契约独立在 [`@atelier/builtin-api`](../builtin-api/README.md)，不进入通用 SDK。
+SDK 包版本见 [package.json](package.json)，宿主 API 版本见 [`sdkApi`](../../src/plugins/packages.ts)。内置插件领域契约独立在 [`@atelier/builtin-api`](../builtin-api/README.md)，不进入通用 SDK。
 
 ## 子路径入口
 
@@ -79,6 +79,7 @@ export default definePlugin({
 - **辅助面板（API 8.2）**：`panels: [{ id: "details", label: "Details", icon, Body: Details }]`；主体与面板通过 `useRendererCard().openPanel("details") / closePanel()` 控制卡片局部视图。面板注册、数据绑定与生命周期见 [前端视图与扩展入口](../../docs/plugin-sdk.md#前端视图与扩展入口)，可编译示例见 `examples/renderer.ts`。
 - **工具视图**：`toolRenderer(ToolContract, { label?, icon?, input?, execution?, result? })`，三阶段平行可选，每阶段提供 `{ headerRenderer?, bodyRenderer? }`，可用 `ToolRenderProps<D, T, A>` 跨阶段复用组件。
 - **顶层工具（API 8.5）**：`defineTopLevelTool` 一次提供定义、参数／结果 schema 和 `execute`，经 `ModuleContribution.topLevelTools` 注册；每次调用取得只读 `object`、`callId`、`signal`、`publish`。展示可共享具有相同稳定 ID 的数据契约。详见 [工具贡献](../../docs/plugin-sdk.md#工具贡献)。
+- **替换已有工具**：顶层工具替换、资源实现替换与全局 schema 替换的注册规则，以及稳定 ID、装配顺序和历史展示的边界，见 [工具覆盖](../../docs/runtime.md#工具覆盖)。
 
 ### 5. 可选模型分支（`plugin.models`）
 不依赖内置 Agent 的无状态模型服务（详细协议与续接规则见 [运行时](../../docs/runtime.md#用户输入文件与模型协议适配)）：

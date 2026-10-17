@@ -24,7 +24,7 @@ import { EventBus } from "./events.ts";
 import { PluginEventScope } from "./event-scope.ts";
 import { CallRegistry } from "./calls.ts";
 import { bindTopLevelTools, type RegisteredTopLevelTool } from "./top-level-tools.ts";
-import { coreDeclarations } from "../execution/core.ts";
+import { resolveToolContributions, validateToolContributions, type ToolImplementationStatus } from "./tool-contributions.ts";
 
 export interface PluginHostServices {
   events?: EventBus;
@@ -43,7 +43,7 @@ export interface PluginHostServices {
 }
 export interface PluginManifest {
   id: string; version: string; status: "loaded" | "failed"; error?: string; resources: string[];
-  implementations: { id: string; tool: string; resource: string; active: boolean; overriddenBy?: string }[];
+  implementations: ToolImplementationStatus[];
 }
 export interface LoadedPlugins {
   calls: CallRegistry;
@@ -61,6 +61,7 @@ export interface LoadedPlugins {
 interface Collected {
   events: PluginEventScope;
   plugin: PluginDefinition; resources: ResourceBackend[]; tools: ToolImplementation[];
+  topLevelTools: RegisteredTopLevelTool[];
   actions: readonly ActionContract<unknown>[];
   observers: readonly SessionObserver[]; preparers: readonly CommandPreparer[];
   sdk: SdkContext; tasks: TaskHost; storage: PluginStorage; lifecycle: RunLifecycle; preparations: RunGroup; closing: (() => Promise<void>)[];
@@ -110,24 +111,11 @@ function initializationOrder(plugins: readonly PluginDefinition[]) {
   return { ordered, failures };
 }
 
-function validate(entry: Collected): void {
-  const id = entry.plugin.namespace.id;
-  for (const resource of entry.resources) if (!belongsTo(id, resource.kind))
-    throw new Error(`Resource type ${resource.kind} is outside plugin namespace ${id}.`);
-  const contracts = new Map<string, ToolContract>();
-  for (const tool of entry.tools) {
-    if (!belongsTo(id, tool.reference.id)) throw new Error(`Implementation ${tool.reference.id} is outside plugin namespace ${id}.`);
-    const previous = contracts.get(tool.tool.name);
-    if (previous && previous !== tool.tool) throw new Error(`Plugin ${id} defines conflicting contracts for tool ${tool.tool.name}.`);
-    contracts.set(tool.tool.name, tool.tool);
-  }
-}
-
 /** 启动时收集 SDK 贡献，按插件顺序解析覆盖并冻结目录。 */
 export function loadPlugins(plugins: readonly PluginDefinition[], services: PluginHostServices): LoadedPlugins {
   const events = services.events ?? new EventBus();
   const calls = new CallRegistry(services);
-  const topLevelTools: RegisteredTopLevelTool[] = [];
+  let topLevelTools: readonly RegisteredTopLevelTool[] = [];
   const manifest: PluginManifest[] = [], collected: Collected[] = [];
   const lifecycles: RunLifecycle[] = [];
   const initialized: Collected[] = [], invalidEntries = new Set<Collected>();
@@ -155,7 +143,7 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
         calls.client(id, lifecycle.group("call")), (ref, policy) => bindTopLevelTools(topLevelTools, ref, policy));
       const resources: ResourceBackend[] = [], tools: ToolImplementation[] = [], observers: SessionObserver[] = [], preparers: CommandPreparer[] = [];
       const actions: ActionContract<unknown>[] = [];
-      entry = { plugin, resources, tools, actions, observers, preparers, sdk, tasks: taskHost, storage, lifecycle, events: eventScope, preparations: lifecycle.group("prepare"), closing: [] };
+      entry = { plugin, resources, tools, topLevelTools: [], actions, observers, preparers, sdk, tasks: taskHost, storage, lifecycle, events: eventScope, preparations: lifecycle.group("prepare"), closing: [] };
       initialized.push(entry);
       const commandIds = new Set<string>();
       for (const module of plugin.modules) {
@@ -164,11 +152,7 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
         if (contribution.closing) entry.closing.push(contribution.closing);
         for (const call of contribution.calls ?? []) calls.declare(id, call, sdk, lifecycle.group("call"));
         for (const tool of contribution.topLevelTools ?? []) {
-          if (!belongsTo(id, tool.id)) throw new Error(`Top-level tool ${tool.id} belongs to another plugin.`);
-          if (coreDeclarations().some(item => item.name === tool.name) ||
-            topLevelTools.some(item => item.tool.name === tool.name || item.tool.id === tool.id))
-            throw new Error(`Duplicate top-level tool: ${tool.name}`);
-          topLevelTools.push({ tool, sdk, runs: lifecycle.group("tool") });
+          entry.topLevelTools.push({ tool, sdk, runs: lifecycle.group("tool") });
         }
         for (const contract of contribution.events ?? []) events.declare(id, contract);
         for (const record of contribution.records ?? []) sdk.declare(record);
@@ -189,7 +173,9 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
         observers.push(...contribution.observers ?? []); preparers.push(...contribution.preparers ?? []);
       }
       if (new Set(observers.map(observer => observer.id)).size !== observers.length) throw new Error(`Plugin ${id} declares duplicate observers.`);
-      validate(entry);
+      for (const resource of resources) if (!belongsTo(id, resource.kind))
+        throw new Error(`Resource type ${resource.kind} is outside plugin namespace ${id}.`);
+      validateToolContributions({ id, tools, topLevelTools: entry.topLevelTools });
       const ownContracts = new Map(toolContracts);
       for (const tool of tools) {
         const previous = ownContracts.get(tool.tool.id);
@@ -206,7 +192,6 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
     } catch (error) {
       if (entry) {
         calls.removeOwner(id);
-        for (let i = topLevelTools.length - 1; i >= 0; i--) if (belongsTo(id, topLevelTools[i]!.tool.id)) topLevelTools.splice(i, 1);
         entry.events.stop(); events.removeOwner(id);
         entry.lifecycle.stop();
         invalidEntries.add(entry);
@@ -239,7 +224,6 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
       record.status = "failed"; record.error = error; record.resources = [];
       entry.lifecycle.stop();
       calls.removeOwner(entry.plugin.namespace.id);
-      for (let j = topLevelTools.length - 1; j >= 0; j--) if (belongsTo(entry.plugin.namespace.id, topLevelTools[j]!.tool.id)) topLevelTools.splice(j, 1);
       entry.events.stop(); events.removeOwner(entry.plugin.namespace.id);
       invalidEntries.add(entry);
       collected.splice(i, 1); invalidated = true;
@@ -257,18 +241,11 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
   const index = (id: string) => plugins.findIndex(plugin => plugin.namespace.id === id);
   collected.sort((a, b) => index(a.plugin.namespace.id) - index(b.plugin.namespace.id));
   manifest.sort((a, b) => index(a.id) - index(b.id));
-  const effective = new Map<string, { contract: ToolContract; plugin: string }>();
-  for (const entry of collected) for (const tool of entry.tools) effective.set(tool.tool.name, { contract: tool.tool, plugin: entry.plugin.namespace.id });
-  const active: ToolImplementation[] = [];
-  for (const entry of collected) {
-    const record = manifest.find(item => item.id === entry.plugin.namespace.id)!;
-    for (const tool of entry.tools) {
-      const winner = effective.get(tool.tool.name)!, enabled = winner.contract === tool.tool;
-      if (enabled) active.push(tool);
-      record.implementations.push({ ...tool.reference, tool: tool.tool.name, resource: tool.resourceKind, active: enabled,
-        ...(enabled ? {} : { overriddenBy: winner.plugin }) });
-    }
-  }
+  const resolvedTools = resolveToolContributions(collected.map(entry => ({
+    id: entry.plugin.namespace.id, tools: entry.tools, topLevelTools: entry.topLevelTools,
+  })));
+  topLevelTools = resolvedTools.topLevelTools;
+  for (const record of manifest) record.implementations = resolvedTools.implementations.get(record.id) ?? [];
   const resources = new ResourceRegistry(collected.flatMap(entry => entry.resources));
   type Notification = { sessionId: string; snapshot: SessionSnapshot; records: SessionRecord[]; cursorChanged: boolean };
   const notifications: Notification[] = [];
@@ -300,7 +277,7 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
         executing: [...new Set([...model.flatMap(run => run.running), ...activity.flatMap(run => run.executing)])],
         live: model.flatMap(run => run.live) };
     },
-    resources, tools: new ToolRegistry(active), manifest: Object.freeze(manifest.map(entry => Object.freeze(entry))),
+    resources, tools: new ToolRegistry(resolvedTools.tools), manifest: Object.freeze(manifest.map(entry => Object.freeze(entry))),
     afterCommit(sessionId, { records: nodes, cursorChanged }, publish) {
       touched.add(sessionId);
       const observed = (nodes.length > 0 && observers.some(observer => observer.committed))
