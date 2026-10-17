@@ -23,7 +23,8 @@ import { SessionHistoryPanel } from "../session/History";
 import { AccessPanel } from "./AccessPanel";
 import { useWorkbenchCanvas, type WorkbenchCanvas } from "./canvas";
 import { layoutConnections, type ConnectionEdge } from "./connections";
-import { WorkbenchScope, WorkbenchContext, WorkbenchStore, useWorkbench, type WorkbenchEnvironment, type WorkbenchView } from "./context";
+import { WorkbenchScope, WorkbenchContext, useWorkbench, type WorkbenchEnvironment, type WorkbenchStore, type WorkbenchView } from "./context";
+import { focusedObject, setFocusedObject } from "./focus";
 import { workbenchNodes } from "./nodes";
 import { type ViewPatch } from "./ObjectCard";
 import { IconButton } from "@atelier/ui/ui/icon-button";
@@ -42,35 +43,42 @@ export interface WorkbenchHandle {
 }
 
 type DropHandlers = { canDrop(kinds: readonly DragKind[]): boolean; onDropItems(items: readonly DropItem[], origin: Point): void };
-type Props = WorkbenchEnvironment & DropHandlers & { ref?: Ref<WorkbenchHandle>; onHome(): void };
+type Props = WorkbenchEnvironment & DropHandlers & {
+  ref?: Ref<WorkbenchHandle>; onHome(): void;
+  /** 应用持有的环境出口：更深浮岛与聚焦浮岛在工作台子树之外经它取得同一份环境。 */ store: WorkbenchStore;
+};
 type Run = (command: WorkbenchOperation) => Promise<boolean>;
 type WorkbenchEdge = Edge<ConnectionEdge["data"]>;
 
 /** 工作台根浮岛：投影平级对象和关系；代理对话只是代理对象的卡片内容。 */
-export function Workbench({ ref, controller, session, ready, busy, run, onHome, canDrop, onDropItems }: Props) {
+export function Workbench({ ref, controller, session, ready, busy, run, onHome, store, canDrop, onDropItems }: Props) {
   const i18n = useI18n();
   const canvasRef = useRef<WorkbenchCanvas>(null);
   const canvas = useMemo<WorkbenchCanvas>(() => ({
     findPlacement: options => canvasRef.current?.findPlacement(options) ?? null,
-    focusObjects: async (ids, options) => { await canvasRef.current?.focusObjects(ids, options); },
+    locateObjects: async (ids, options) => { await canvasRef.current?.locateObjects(ids, options); },
   }), []);
   // 按字段组装环境，只有字段真的变化时才通知卡片与面板浮岛。
   const context = useMemo<WorkbenchView>(
     () => ({ controller, session, ready, busy, run, canvas }),
     [controller, session, ready, busy, run, canvas]);
   const island = useIsland();
-  const [store] = useState(() => new WorkbenchStore());
   const open = useCallback((id: string, label: import("@atelier/sdk/contracts").UiText, render: () => ReactNode, origin: HTMLElement | null) => {
     if (island.child === id) island.closeChild();
-    // 面板浮岛在工作台子树之外渲染，经 WorkbenchScope 取得同一份环境。
-    else island.open({ id, label, width: { min: 320, max: 400 }, origin, render: () => <WorkbenchScope store={store}>{render()}</WorkbenchScope> });
-  }, [island, store]);
+    // 面板浮岛在工作台子树之外渲染，经 WorkbenchScope 取得本会话的同一份环境。
+    else island.open({ id, label, width: { min: 320, max: 400 }, origin, render: () => <WorkbenchScope store={store} sessionId={session.id}>{render()}</WorkbenchScope> });
+  }, [island, store, session.id]);
   useImperativeHandle(ref, () => ({
     togglePanel: (kind, origin) => open(`workbench-${kind}`, ({ objects: i18n.formatMessage(objectsMessages.objects), history: i18n.formatMessage(historyMessages.history), access: i18n.formatMessage(accessMessages.accessLabel) })[kind],
       () => kind === "objects" ? <ObjectsPanel /> : kind === "access" ? <AccessPanel /> : <SessionHistoryPanel controller={controller} />, origin),
     canvas,
   }), [open, canvas, controller]);
   useLayoutEffect(() => store.set(context), [store, context]);
+  // 聚焦对象已不在当前投影中（移除或游标跳转）时结束聚焦；隐藏卡片不影响聚焦。
+  useEffect(() => {
+    const id = focusedObject(session.id);
+    if (id && !session.objects.some(object => object.id === id)) setFocusedObject(session.id, null);
+  }, [session]);
 
   return <RendererNavigationProvider value={{ home: onHome }}><RendererCatalogProvider ready={ready}><WorkbenchContext.Provider value={context}>
     <div className="relative h-full">
@@ -218,8 +226,8 @@ function ViewControls({ session, run, canvas, objects, selected }: { session: Wo
     [i18n.formatMessage(commonMessages.zoomIn), Plus, () => move(() => flow.zoomIn())],
     [i18n.formatMessage(commonMessages.resetZoom), RotateCcw, () => move(() => flow.zoomTo(1))],
     [i18n.formatMessage(commonMessages.zoomOut), Minus, () => move(() => flow.zoomOut())],
-    [i18n.formatMessage(commonMessages.fitObjects), Maximize, () => canvas.focusObjects(objects)],
-    ...(selected.length ? [[i18n.formatMessage(objectsMessages.focusSelection), Crosshair, () => canvas.focusObjects(selected)] as const] : []),
+    [i18n.formatMessage(commonMessages.fitObjects), Maximize, () => canvas.locateObjects(objects)],
+    ...(selected.length ? [[i18n.formatMessage(objectsMessages.focusSelection), Crosshair, () => canvas.locateObjects(selected)] as const] : []),
   ] as const;
   return <Panel position="bottom-right" className="surface flex flex-col p-0.5">
     {controls.map(([label, Icon, action], index) =>

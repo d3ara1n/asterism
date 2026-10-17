@@ -2,6 +2,10 @@ import { defineMessages, pluginNamespace } from "@atelier/sdk/contracts";
 
 export const objectsMessages = pluginNamespace("atelier.host").messages("en", defineMessages({
   auxiliaryPanels: { id: "objects.auxiliaryPanels", defaultMessage: "Auxiliary panels" },
+  openInIsland: { id: "objects.openInIsland", defaultMessage: "Open in island" },
+  returnToCard: { id: "objects.returnToCard", defaultMessage: "Return to card" },
+  focusedInIsland: { id: "objects.focusedInIsland", defaultMessage: "This content is open in the focus island." },
+  focusIsland: { id: "objects.focusIsland", defaultMessage: "Focus" },
   closeAuxiliaryPanel: { id: "objects.closeAuxiliaryPanel", defaultMessage: "Close panel" },
   objectActions: {
     id: "objectActions",

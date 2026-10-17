@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { viewportSchema } from "../../../shared/workbench";
-import { focusViewport, overviewMinZoom } from "./viewport";
+import { locateViewport, overviewMinZoom } from "./viewport";
 
 describe("画布概览与缩放契约", () => {
   it("普通画布与空画布使用 5% 下限", () => {
@@ -12,7 +12,7 @@ describe("画布概览与缩放契约", () => {
     const bounds = { x: -100_000, y: -50_000, width: 200_560, height: 100_640 };
     const width = 1000, height = 700;
     const minZoom = overviewMinZoom(bounds, width, height);
-    const viewport = focusViewport(bounds, width, height);
+    const viewport = locateViewport(bounds, width, height);
     expect(minZoom).toBeLessThan(0.05);
     expect(minZoom).toBeLessThan(viewport.zoom);
     expect(bounds.x * viewport.zoom + viewport.x).toBeGreaterThanOrEqual(0);
@@ -20,7 +20,7 @@ describe("画布概览与缩放契约", () => {
     expect((bounds.x + bounds.width) * viewport.zoom + viewport.x).toBeLessThanOrEqual(width);
     expect((bounds.y + bounds.height) * viewport.zoom + viewport.y).toBeLessThanOrEqual(height);
     expect(overviewMinZoom(bounds, 440, height)).toBeLessThan(minZoom);
-    const narrow = focusViewport(bounds, 440, height);
+    const narrow = locateViewport(bounds, 440, height);
     expect((bounds.x + bounds.width) * narrow.zoom + narrow.x).toBeLessThanOrEqual(440);
   });
 

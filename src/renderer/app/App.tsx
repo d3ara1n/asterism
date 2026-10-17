@@ -8,6 +8,9 @@ import { BrandMark } from "@atelier/ui/ui/brand-mark";
 import { WorkbenchSurface } from "../features/workbench/WorkbenchSurface";
 import { PageState } from "@atelier/ui/ui/page-state";
 import { Workbench, type WorkbenchHandle } from "../features/workbench/Workbench";
+import { WorkbenchStore } from "../features/workbench/context";
+import { FocusIsland } from "../features/workbench/FocusIsland";
+import { focusIslandId, useFocusedObject } from "../features/workbench/focus";
 import { Sidebar } from "./Sidebar";
 
 import { HomePage, type StartInput } from "../features/home/HomePage";
@@ -59,6 +62,8 @@ export function App({ controller }: { controller: ApplicationController }) {
   const [view, setView] = useState<MainView>({ kind: "home" });
   const [sidebarVisible, setSidebarVisible] = useState(true);
   const [draft] = useState(() => createMessageDraft(() => contentInput(startAgentContentTarget)));
+  // 当前工作台的环境出口：右侧更深浮岛与左侧聚焦浮岛经它取得会话环境。
+  const [workbenchStore] = useState(() => new WorkbenchStore());
   const start = useStart();
   // 每次导航递增；异步创建完成时据此判断用户是否已离开，不夺走当前视图。
   const navigation = useRef(0);
@@ -74,6 +79,7 @@ export function App({ controller }: { controller: ApplicationController }) {
   const sessionLoading = sessionState?.status === "loading";
   const error = state.error ?? sessionState?.error;
   const writable = ready && !sessionBusy && !!session;
+  const focusedObjectId = useFocusedObject(view.kind === "conversation" ? view.sessionId : null);
   const inSettings = page === "settings";
   const mainTitle = view.kind === "home" ? i18n.formatMessage(commonMessages.home)
     : session?.title ?? snapshot?.sessions.find(item => item.id === view.sessionId)?.title ?? i18n.formatMessage(commonMessages.conversation);
@@ -164,7 +170,7 @@ export function App({ controller }: { controller: ApplicationController }) {
         action={<Button variant="outline" onClick={() => { void active?.refresh(); }} disabled={!ready}>{i18n.formatMessage(commonMessages.retry)}</Button>} />
     </div> : undefined}>
     {session && active ? <Workbench key={session.id} ref={workbench} session={session} controller={active}
-      ready={ready} busy={sessionBusy} run={run}
+      ready={ready} busy={sessionBusy} run={run} store={workbenchStore}
       onHome={goHome} canDrop={creation.canDrop} onDropItems={creation.drop} /> : null}
   </WorkbenchSurface>;
   const sidebar: IslandSpec = {
@@ -178,6 +184,12 @@ export function App({ controller }: { controller: ApplicationController }) {
       onHome={goHome} onSession={openSession} onSettings={() => go("settings")} onHide={hideSidebar}
       onRetry={() => { void controller.refresh(); }} />,
   };
+  // 聚焦浮岛：受控前置浮岛，位于侧栏与工作台之间；内容随会话切换交替，回到首页时退场。
+  const focusTitle = focusedObjectId ? session?.objects.find(object => object.id === focusedObjectId)?.title : undefined;
+  const focus: IslandSpec | null = view.kind === "conversation" && focusedObjectId ? {
+    id: focusIslandId, label: focusTitle ?? i18n.formatMessage(objectsMessages.focusIsland), width: { min: 480, grow: 1.5 },
+    render: () => <FocusIsland store={workbenchStore} sessionId={view.sessionId} objectId={focusedObjectId} onHome={goHome} />,
+  } : null;
   const main: IslandSpec = {
     id: "main-view", label: mainTitle, width: { min: 440, grow: 1 }, surface: view.kind === "conversation",
     // 首页与工作台双向同时进退场；退场者脱离布局流，不与入场内容叠加占位。
@@ -206,7 +218,7 @@ export function App({ controller }: { controller: ApplicationController }) {
         { id: "settings", label: i18n.formatMessage(settingsMessages.settings), surface: false, content: <SettingsPage active={inSettings} /> },
         { id: "main", label: mainTitle, surface: false,
           // 切换会话时关闭工作台右侧的更深浮岛。
-          content: <Screen label={i18n.formatMessage(appMessages.appNavigation)} leading={sidebarVisible ? [sidebar] : []} root={main} resetKey={view.kind === "conversation" ? view.sessionId : "home"} className="h-full" /> },
+          content: <Screen label={i18n.formatMessage(appMessages.appNavigation)} leading={[...(sidebarVisible ? [sidebar] : []), ...(focus ? [focus] : [])]} root={main} resetKey={view.kind === "conversation" ? view.sessionId : "home"} className="h-full" /> },
       ]} />
     </Window>
     <Toaster position="bottom-center" containerAriaLabel={i18n.formatMessage(commonMessages.notifications)}

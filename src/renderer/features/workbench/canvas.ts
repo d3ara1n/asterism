@@ -6,7 +6,7 @@ import { useWorkbench } from "./context";
 import type { ObjectNodeType } from "./ObjectNode";
 import { placeObject } from "./placement";
 import { cardSize, fallbackCardAppearance } from "./sizing";
-import { defaultOverviewMinZoom, focusViewport, overviewMinZoom } from "./viewport";
+import { defaultOverviewMinZoom, locateViewport, overviewMinZoom } from "./viewport";
 
 export type ObjectPlacement = { sessionId: string; position: Point; selectedObjectIds: string[] };
 
@@ -15,10 +15,10 @@ export interface WorkbenchCanvas {
   /** 没有指定落点时找最近空位；未就绪时返回 null。选择在取用位置时固定。 */
   findPlacement: (options?: { kind?: string; size?: CardSize }) => ObjectPlacement | null;
   /** 打开隐藏对象，等待投影和测量后共同入镜；空列表或失效对象不移动视图。 */
-  focusObjects: (objectIds: readonly string[], options?: { select?: boolean }) => Promise<void>;
+  locateObjects: (objectIds: readonly string[], options?: { select?: boolean }) => Promise<void>;
 }
 
-type FocusRequest = { objectIds: string[]; select: boolean; token: number; selectionVersion: number };
+type LocateRequest = { objectIds: string[]; select: boolean; token: number; selectionVersion: number };
 
 /** 下游只消费 WorkbenchCanvas；React Flow 的视口操作与等待集中在此。 */
 export function useWorkbenchCanvas(nodes: ObjectNodeType[], setNodes: Dispatch<SetStateAction<ObjectNodeType[]>>, element: RefObject<HTMLDivElement | null>) {
@@ -30,12 +30,12 @@ export function useWorkbenchCanvas(nodes: ObjectNodeType[], setNodes: Dispatch<S
   const selectionVersion = controller.getSnapshot().selectionVersion;
   const available = useRef(ready);
   available.current = ready;
-  const [focusing, setFocusing] = useState<FocusRequest | null>(null);
+  const [locating, setLocating] = useState<LocateRequest | null>(null);
   const sequence = useRef(0);
   const mounted = useRef(true);
-  useLayoutEffect(() => { sequence.current++; setFocusing(null); }, [selectionVersion]);
+  useLayoutEffect(() => { sequence.current++; setLocating(null); }, [selectionVersion]);
   useLayoutEffect(() => {
-    if (!ready || busy) { sequence.current++; setFocusing(null); }
+    if (!ready || busy) { sequence.current++; setLocating(null); }
   }, [ready, busy]);
   useEffect(() => {
     mounted.current = true;
@@ -58,7 +58,7 @@ export function useWorkbenchCanvas(nodes: ObjectNodeType[], setNodes: Dispatch<S
     };
   }, [controller, element, flow, registry]);
 
-  const focusObjects = useCallback<WorkbenchCanvas["focusObjects"]>(async (ids, options) => {
+  const locateObjects = useCallback<WorkbenchCanvas["locateObjects"]>(async (ids, options) => {
     const state = controller.getSnapshot();
     const workbench = state.snapshot?.workbench;
     const objectIds = [...new Set(ids)];
@@ -66,7 +66,7 @@ export function useWorkbenchCanvas(nodes: ObjectNodeType[], setNodes: Dispatch<S
     const objects = new Set(workbench.objects.map(object => object.id));
     if (!objectIds.every(id => objects.has(id))) return;
     const token = ++sequence.current;
-    setFocusing(null);
+    setLocating(null);
     const valid = () => {
       const current = controller.getSnapshot();
       return mounted.current && sequence.current === token && current.status === "ready"
@@ -78,26 +78,26 @@ export function useWorkbenchCanvas(nodes: ObjectNodeType[], setNodes: Dispatch<S
       if (!valid() || !(await controller.executeAndRead({ type: "view.set", sessionId: controller.sessionId, objectId, hidden: false })).ok) return;
     }
     // 受理与节点投影分离；画布等待全部目标测量，而非猜测某一帧已经渲染完。
-    if (valid()) setFocusing({ objectIds, select: options?.select ?? false, token, selectionVersion: state.selectionVersion });
+    if (valid()) setLocating({ objectIds, select: options?.select ?? false, token, selectionVersion: state.selectionVersion });
   }, [controller]);
 
-  const targetsReady = !!focusing && focusing.objectIds.every(id => {
+  const targetsReady = !!locating && locating.objectIds.every(id => {
     const node = nodes.find(node => node.id === id);
     return !!node?.measured?.width && !!node.measured.height;
   });
   useEffect(() => {
-    if (!focusing || !targetsReady || !width || !height || !flow.viewportInitialized) return;
+    if (!locating || !targetsReady || !width || !height || !flow.viewportInitialized) return;
     let active = true, animating = false;
     const frame = requestAnimationFrame(() => {
-      if (sequence.current !== focusing.token || !element.current) return;
-      if (focusing.select) setNodes(current => current.map(node => ({ ...node, selected: focusing.objectIds.includes(node.id) })));
-      const bounds = flow.getNodesBounds(focusing.objectIds);
-      const viewport = focusViewport(bounds, width, height);
+      if (sequence.current !== locating.token || !element.current) return;
+      if (locating.select) setNodes(current => current.map(node => ({ ...node, selected: locating.objectIds.includes(node.id) })));
+      const bounds = flow.getNodesBounds(locating.objectIds);
+      const viewport = locateViewport(bounds, width, height);
       animating = true;
       void flow.setViewport(viewport, { duration: matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 420 }).then(() => {
         animating = false;
-        if (!active || sequence.current !== focusing.token || controller.getSnapshot().selectionVersion !== focusing.selectionVersion) return;
-        setFocusing(current => current?.token === focusing.token ? null : current);
+        if (!active || sequence.current !== locating.token || controller.getSnapshot().selectionVersion !== locating.selectionVersion) return;
+        setLocating(current => current?.token === locating.token ? null : current);
         void run({ type: "viewport.set", sessionId: controller.sessionId, viewport: flow.getViewport() });
       });
     });
@@ -105,11 +105,11 @@ export function useWorkbenchCanvas(nodes: ObjectNodeType[], setNodes: Dispatch<S
       active = false; cancelAnimationFrame(frame);
       if (animating) void flow.setViewport(flow.getViewport(), { duration: 0 });
     };
-  }, [focusing, targetsReady, width, height, flow, element, setNodes, controller, run]);
+  }, [locating, targetsReady, width, height, flow, element, setNodes, controller, run]);
 
   const minZoom = width && height
     ? overviewMinZoom(flow.getNodesBounds(nodes), width, height)
     : Math.min(defaultOverviewMinZoom, session.viewport.zoom);
-  const api = useMemo<WorkbenchCanvas>(() => ({ findPlacement, focusObjects }), [findPlacement, focusObjects]);
+  const api = useMemo<WorkbenchCanvas>(() => ({ findPlacement, locateObjects }), [findPlacement, locateObjects]);
   return { api, minZoom };
 }

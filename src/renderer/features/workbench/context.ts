@@ -1,5 +1,5 @@
 import type { WorkbenchOperation } from "../session/controller";
-import { createContext, createElement, useContext, useSyncExternalStore, type ReactNode } from "react";
+import { createContext, createElement, useContext, useRef, useSyncExternalStore, type ReactNode } from "react";
 import type { WorkbenchSnapshot } from "../../../shared/workbench";
 import type { SessionController } from "../session/controller";
 import type { WorkbenchCanvas } from "./canvas";
@@ -18,8 +18,8 @@ export type WorkbenchView = WorkbenchEnvironment & {
 };
 
 /**
- * 更深浮岛由 Screen 渲染，不在工作台的 React 子树内；
- * 工作台把最新环境写入 store，浮岛经 WorkbenchScope 订阅同一份环境。
+ * 更深浮岛与聚焦浮岛由 Screen 渲染，不在工作台的 React 子树内；
+ * 应用持有一份 store，当前工作台把最新环境写入其中，浮岛经 WorkbenchScope 订阅。
  */
 export class WorkbenchStore {
   private value: WorkbenchView | null = null;
@@ -31,8 +31,15 @@ export class WorkbenchStore {
 
 export const WorkbenchContext = createContext<WorkbenchView | null>(null);
 
-export function WorkbenchScope({ store, children }: { store: WorkbenchStore; children: ReactNode }) {
-  const value = useSyncExternalStore(store.subscribe, store.get);
+/**
+ * 浮岛绑定所属会话：只接受该会话的环境，切换会话后保留最后一份，
+ * 让退场中的浮岛继续呈现原内容；所属会话的环境就绪前不渲染内容。
+ */
+export function WorkbenchScope({ store, sessionId, children }: { store: WorkbenchStore; sessionId: string; children: ReactNode }) {
+  const current = useSyncExternalStore(store.subscribe, store.get);
+  const pinned = useRef<WorkbenchView | null>(null);
+  if (current?.session.id === sessionId) pinned.current = current;
+  const value = pinned.current;
   return value ? createElement(WorkbenchContext.Provider, { value }, children) : null;
 }
 

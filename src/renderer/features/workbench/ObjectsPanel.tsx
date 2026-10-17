@@ -40,7 +40,7 @@ export function ObjectsPanel() {
         </>}
         media={<span className="text-muted-foreground" aria-hidden="true">{descriptor.icon}</span>}
         buttonProps={{ "aria-label": i18n.formatMessage(objectsMessages.locateObject, { title: object.title }) }}
-        disabled={!ready || busy} onOpen={() => { void canvas.focusObjects([object.id], { select: true }); }}
+        disabled={!ready || busy} onOpen={() => { void canvas.locateObjects([object.id], { select: true }); }}
         actions={<IconButton size="icon-xs" disabled={!ready || busy}
           label={i18n.formatMessage(isHidden ? objectsMessages.showCard : objectsMessages.hideCard, { title: object.title })}
           onClick={() => { void run({ type: "view.set", sessionId: session.id, objectId: object.id, hidden: !isHidden }); }}>
