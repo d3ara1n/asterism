@@ -142,7 +142,7 @@ export function App({ controller }: { controller: ApplicationController }) {
       onClick={() => setSidebarVisible(visible => !visible)}><PanelLeft /></IconButton>}
     {inSettings ? <Button variant="ghost" size="sm" onClick={() => go("main")}><ArrowLeft />{i18n.formatMessage(commonMessages.back)}</Button> :
       <DropdownMenu modal={false}><DropdownMenuTrigger asChild><Button variant="ghost" size="sm" aria-label={i18n.formatMessage(appMessages.menu)}>
-        <BrandMark className="size-4 text-primary" /><span className="text-sm font-semibold text-primary">{i18n.formatMessage(appMessages.appName)}</span><ChevronDown className="text-muted-foreground" />
+        <BrandMark className="size-4 text-primary" /><span className="text-sm font-semibold text-primary-text">{i18n.formatMessage(appMessages.appName)}</span><ChevronDown className="text-muted-foreground" />
       </Button></DropdownMenuTrigger><DropdownMenuContent align="start">
         <DropdownMenuItem onSelect={goHome}><House />{i18n.formatMessage(commonMessages.home)}</DropdownMenuItem>
         <DropdownMenuSeparator />

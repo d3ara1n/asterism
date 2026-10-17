@@ -252,7 +252,7 @@ function PaletteDialog({ open, onOpenChange, appearance }: { open: boolean; onOp
                 <span className="h-1 w-1/2 rounded-full" style={{ background: t["muted-foreground"] }} />
                 <span className="mt-auto h-2 w-8 rounded-sm" style={{ background: t.primary }} />
               </span>
-              <span className="w-3 rounded-sm" style={{ background: t.secondary }} />
+              <span className="w-3 rounded-sm" style={{ background: t.selected }} />
             </span>
             <span className="block px-2 py-1.5 text-sm">{name}</span>
           </button></Item>;

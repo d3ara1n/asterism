@@ -54,7 +54,7 @@ export function QuestionForm({ pending, draft, update, answer, cancel, busy, fai
         {questions.length > 1 && <AgentScrollArea axis="horizontal"><nav className="flex gap-1" aria-label={i18n.text(messages.navigation)}>
           {questions.map((item, index) => {
             const status = submission.answers[index]?.status === "skipped" ? "skipped" : answerIssue(item, submission.answers[index]) ? "pending" : "answered";
-            return <Button key={item.id} type="button" size="xs" variant={index === draft.page ? "secondary" : "ghost"}
+            return <Button key={item.id} type="button" size="xs" variant={index === draft.page ? "selected" : "ghost"}
               className="max-w-40 shrink-0" aria-current={index === draft.page ? "step" : undefined} onClick={() => navigate(index)}
               title={`${item.question} · ${i18n.text(messages[status])}`}>
               <StatusText tone={status === "answered" ? "success" : "neutral"}><span className="sr-only">{i18n.text(messages[status])} · </span>
@@ -62,7 +62,7 @@ export function QuestionForm({ pending, draft, update, answer, cancel, busy, fai
               </StatusText>
             </Button>;
           })}
-          <Button type="button" size="xs" variant={review ? "secondary" : "ghost"} aria-current={review ? "step" : undefined}
+          <Button type="button" size="xs" variant={review ? "selected" : "ghost"} aria-current={review ? "step" : undefined}
             onClick={() => navigate(questions.length)}>{i18n.text(messages.review)}</Button>
         </nav></AgentScrollArea>}
         <AgentScrollArea ref={scroller} className={`@container/questions ${expanded ? "max-h-[60dvh]" : "max-h-[min(16rem,30cqh)]"}`}>

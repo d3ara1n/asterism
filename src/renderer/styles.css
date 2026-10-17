@@ -4,7 +4,7 @@
 @source "../../packages/builtin/src";
 @source "../../packages/ui/src";
 
-/* 主题 token、两种表面、窗口与编织布局机制。控件外观只来自 packages/ui 的 shadcn 官方源码。 */
+/* 主题 token、两种表面、窗口与编织布局机制；公共控件经 packages/ui 消费语义 token。 */
 :root {
   color-scheme: light;
   /* shadcn 标准语义 token；组件与业务只消费这一层。主题替换整组值即可。 */
@@ -17,15 +17,21 @@
   --popover-foreground: #202020;
   --primary: #208368;
   --primary-foreground: #ffffff;
-  --secondary: #e6f7ed;
-  --secondary-foreground: #1d3b31;
+  --primary-text: #1d3b31;
+  --secondary: #f0f0f0;
+  --secondary-foreground: #202020;
+  --selected: #e6f7ed;
+  --selected-foreground: #1d3b31;
   --muted: #f0f0f0;
   --muted-foreground: #646464;
   --accent: #e8e8e8;
   --accent-foreground: #202020;
   --destructive: #ce2c31;
+  --destructive-foreground: #ffffff;
   --success: #218358;
+  --success-foreground: #ffffff;
   --warning: #ab6400;
+  --warning-foreground: #ffffff;
   --border: #e0e0e0;
   --input: #d9d9d9;
   --ring: #56ba9f;
@@ -50,11 +56,14 @@
     --card: #191919; --card-foreground: #eeeeee;
     --popover: #222222; --popover-foreground: #eeeeee;
     --primary: #29a383; --primary-foreground: #111111;
-    --secondary: #0f2e22; --secondary-foreground: #1fd8a4;
+    --primary-text: #1fd8a4;
+    --secondary: #222222; --secondary-foreground: #eeeeee;
+    --selected: #0f2e22; --selected-foreground: #1fd8a4;
     --muted: #222222; --muted-foreground: #b4b4b4;
     --accent: #2a2a2a; --accent-foreground: #eeeeee;
     --destructive: #ff9592; --border: #3a3a3a; --input: #484848; --ring: #2a7e68;
     --success: #3dd68c; --warning: #ffca16;
+    --destructive-foreground: #111111; --success-foreground: #111111; --warning-foreground: #111111;
     --canvas: #111111; --canvas-grid: #3a3a3a; --selection: #114837;
   }
 }
@@ -70,15 +79,21 @@
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-primary-text: var(--primary-text);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
+  --color-selected: var(--selected);
+  --color-selected-foreground: var(--selected-foreground);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
   --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);

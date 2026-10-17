@@ -16,8 +16,8 @@ export function ListRow({ title, description, media, mediaVariant, actions, sele
 }) {
   const navigation = variant === "navigation";
   return <Item size="sm" className={cn("group/list-row relative transition-colors hover:bg-accent/60 has-[[data-slot=list-row-open]:focus-visible]:bg-accent/60",
-    selected && "bg-secondary text-secondary-foreground hover:bg-secondary", inactive && "opacity-70",
-    navigation && cn(buttonVariants({ variant: selected ? "secondary" : "ghost" }), "flex w-full min-w-0 flex-nowrap gap-0 border-0 px-3"),
+    selected && "bg-selected text-selected-foreground hover:bg-selected has-[[data-slot=list-row-open]:focus-visible]:bg-selected", inactive && "opacity-70",
+    navigation && cn(buttonVariants({ variant: selected ? "selected" : "ghost" }), "flex w-full min-w-0 flex-nowrap gap-0 border-0 px-3"),
     className)}>
     {media && <ItemMedia variant={mediaVariant} className={cn(navigation && "mr-2 [&_svg]:size-4")}>{media}</ItemMedia>}
     <ItemContent className={cn("min-w-0", contentClassName)}>

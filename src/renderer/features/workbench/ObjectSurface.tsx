@@ -75,8 +75,8 @@ export function ObjectSurface({ icon, kind, title, actions, controls, panels = n
         <div className="nodrag flex shrink-0 items-center gap-0.5">
           {actions}
           {panels.length > 0 && <DropdownMenu>
-            <DropdownMenuTrigger asChild><Button ref={trigger} variant={active ? "secondary" : "ghost"} size="icon-xs"
-              aria-label={i18n.text(objectsMessages.auxiliaryPanels)}><PanelsTopLeft /></Button></DropdownMenuTrigger>
+            <DropdownMenuTrigger asChild><Button ref={trigger} variant={active ? "selected" : "ghost"} size="icon-xs"
+              aria-pressed={Boolean(active)} aria-label={i18n.text(objectsMessages.auxiliaryPanels)}><PanelsTopLeft /></Button></DropdownMenuTrigger>
             <DropdownMenuContent align="end" onCloseAutoFocus={event => {
               if (!menuSelected.current) return;
               menuSelected.current = false;

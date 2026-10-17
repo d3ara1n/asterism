@@ -4,6 +4,7 @@ import { useI18n, type I18n } from "@atelier/sdk/renderer";
 import type { UiMessage, Usage, CostIssue } from "@atelier/sdk/contracts";
 import { Alert, AlertDescription } from "@atelier/ui/ui/alert";
 import { Badge } from "@atelier/ui/ui/badge";
+import { StatusBadge, type StatusTone } from "@atelier/ui/ui/status";
 import { Button } from "@atelier/ui/ui/button";
 import { ItemGroup, ItemSeparator } from "@atelier/ui/ui/item";
 import { ListRow } from "@atelier/ui/ui/list-row";
@@ -26,15 +27,16 @@ const issueMessages: Record<CostIssue, UiMessage> = {
   quantity: messages.quantityMissing, price: messages.priceMissing, unit: messages.unitMismatch,
   tier: messages.tierUnknown, invalid: messages.invalidQuantity,
 };
-function requestState(request: PricedRequest) {
-  if (requestTiming(request)?.outcome === "cancelled") return messages.cancelled;
-  if (requestTiming(request)?.outcome === "failed") return messages.failed;
-  if (!request.completion) return messages.noCompletion;
+function requestState(request: PricedRequest): { label: UiMessage; tone: StatusTone } {
+  const outcome = requestTiming(request)?.outcome;
+  if (outcome === "cancelled") return { label: messages.cancelled, tone: "neutral" };
+  if (outcome === "failed") return { label: messages.failed, tone: "error" };
+  if (!request.completion) return { label: messages.noCompletion, tone: "neutral" };
   const complete = ["stop", "tool-calls"].includes(request.completion.finishReason)
     && !request.notices.some(notice => notice.level === "error" || notice.code === "cancelled")
     && request.blocks.every(({ block }) => block.complete)
     && (!request.blocks.length || request.blocks.at(-1)!.block.ordinal + 1 === request.blocks.length);
-  return complete ? messages.finished : messages.incomplete;
+  return complete ? { label: messages.finished, tone: "success" } : { label: messages.incomplete, tone: "warning" };
 }
 const cacheRate = (i18n: I18n, usage: Usage | null) =>
   usage?.input != null && usage.cacheRead != null ? percent(i18n, usage.cacheRead, usage.input) : "—";
@@ -51,6 +53,7 @@ function RequestDetails({ request, onBack }: { request: PricedRequest; onBack():
   useEffect(() => { back.current?.focus({ preventScroll: true }); }, []);
   const usage = request.completion?.usage ?? null;
   const estimate = request.estimate;
+  const status = requestState(request);
   let pricingLabel = i18n.text(messages.basePrice);
   if (!request.configuredModel?.cost) pricingLabel = i18n.text(messages.priceMissing);
   else if (estimate.lines.some(line => line.issue === "tier")) pricingLabel = i18n.text(messages.tierUnknown);
@@ -75,7 +78,7 @@ function RequestDetails({ request, onBack }: { request: PricedRequest; onBack():
         <h4 className="type-section break-all">{request.configuredModel?.name ?? request.model}</h4>
         <div className="flex flex-wrap gap-1.5">
           <Badge variant="outline">{i18n.text(request.kind === "compression" ? messages.compression : messages.conversation)}</Badge>
-          <Badge variant="secondary">{i18n.text(requestState(request))}</Badge>
+          <StatusBadge tone={status.tone}>{i18n.text(status.label)}</StatusBadge>
           {!request.onTimeline && <Badge variant="outline">{i18n.text(messages.otherBranch)}</Badge>}
         </div>
       </div>

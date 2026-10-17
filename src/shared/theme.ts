@@ -105,7 +105,7 @@ export function contrastRatio(a: string, b: string): number {
   const [light, dark] = [luminance(a), luminance(b)].sort((x, y) => y - x);
   return (light + 0.05) / (dark + 0.05);
 }
-/** 实色主色上的文字：在白与深灰之间取对比度更高者，9 级的明亮色相（jade、blue、orange 等）上自动用深色字。 */
+/** 实色表面上的文字：在白与深灰之间取对比度更高者。 */
 function onSolid(background: string, dark: string): string {
   return contrastRatio(background, "#ffffff") >= contrastRatio(background, dark) ? "#ffffff" : dark;
 }
@@ -120,23 +120,29 @@ export function themeTokens(appearance: Appearance, scheme: Scheme): Record<stri
   const green = scale("green", scheme);
   const amber = scale("amber", scheme);
   const dark = scheme === "dark";
-  // 亮色用 11 级保证白字与作文字色时 AA；暗色用 9 级实色，文字色按对比度选。石墨以 12 级（近黑／近白）作主色。
+  // 亮色用 11 级保证实色表面的白字达到 AA；暗色用 9 级。石墨以 12 级（近黑／近白）作主色。
   const primary = mono ? g(12) : dark ? a(9) : a(11);
   const fg = g(12);
+  const primaryText = mono ? fg : dark ? a(11) : a(12);
+  const darkForeground = scale(appearance.gray, "dark")(1);
+  const solidForeground = (background: string) => onSolid(background, darkForeground);
   return {
     // background 遵循 shadcn 约定作页面底色（亮色白）；canvas 为工坊扩展，只给工作台底板等画布区域。
     background: dark ? g(1) : "#ffffff", foreground: fg, canvas: dark ? g(1) : g(3),
     card: dark ? g(2) : "#ffffff", "card-foreground": fg,
     popover: dark ? g(3) : "#ffffff", "popover-foreground": fg,
-    primary, "primary-foreground": onSolid(primary, scale(appearance.gray, "dark")(1)),
-    // 当前项与标签：主题色浅底；亮色用 12 级、暗色用 11 级文字保证 AA。石墨用比 hover（4 级）深一级的灰底，与悬停可分辨。
-    ...(mono
-      ? { secondary: g(5), "secondary-foreground": fg }
-      : { secondary: a(3), "secondary-foreground": dark ? a(11) : a(12) }),
+    primary, "primary-foreground": solidForeground(primary),
+    // 实色填充与表面上的强调文字分别取色，避免暗色 9 级作为小字时对比度不足。
+    "primary-text": primaryText,
+    secondary: g(3), "secondary-foreground": fg,
+    // 持续选中态独立于中性次级表面与 hover；石墨取比 hover（4 级）深一级的灰底。
+    selected: mono ? g(5) : a(3), "selected-foreground": primaryText,
     muted: g(3), "muted-foreground": g(11),
     accent: g(4), "accent-foreground": fg,
-    // 状态色统一取 11 级：亮暗两侧均可作文字与图标色。亮色边框退一级，弱化表面描边。
-    destructive: red(11), success: green(11), warning: amber(11),
+    // 状态色统一取 11 级，实色表面配对独立前景色。
+    destructive: red(11), "destructive-foreground": solidForeground(red(11)),
+    success: green(11), "success-foreground": solidForeground(green(11)),
+    warning: amber(11), "warning-foreground": solidForeground(amber(11)),
     border: dark ? g(6) : g(5), input: dark ? g(7) : g(6), ring: a(8),
     "canvas-grid": g(6), selection: mono ? g(6) : a(5),
     // 图表分类色：固定色相第 9 级，不随主题色与灰色变化；只用于图形填充。

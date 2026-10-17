@@ -1,5 +1,5 @@
-import { Badge } from "@atelier/ui/ui/badge";
-import { LoaderCircle, ArrowDown } from "lucide-react";
+import { StatusBadge, StatusIcon } from "@atelier/ui/ui/status";
+import { ArrowDown } from "lucide-react";
 import { PageState } from "@atelier/ui/ui/page-state";
 import { Button } from "@atelier/ui/ui/button";
 import { ConversationTimeline } from "./ConversationTimeline";
@@ -27,10 +27,9 @@ export function ConversationActions() {
   const snapshot = object.session.snapshot();
   const agentRunning = object.activity.running;
   if (!snapshot) return null;
-  return <>
-    <Badge variant="secondary" role="status">{agentRunning && <LoaderCircle className="animate-spin" />}
-      {!ready ? i18n.formatMessage(commonMessages.statusUnavailable) : agentRunning ? i18n.formatMessage(conversationMessages.working) : i18n.formatMessage(conversationMessages.ready)}</Badge>
-  </>;
+  return <StatusBadge tone={!ready ? "warning" : agentRunning ? "progress" : "neutral"} role="status">
+    {!ready ? i18n.formatMessage(commonMessages.statusUnavailable) : agentRunning ? i18n.formatMessage(conversationMessages.working) : i18n.formatMessage(conversationMessages.ready)}
+  </StatusBadge>;
 }
 
 /** 代理卡片内容：当前路径的最终视图与输入区；没有分支感，回溯在会话历史中进行。 */
@@ -74,7 +73,7 @@ export function Conversation({ onHome }: { onHome(): void }) {
       <div ref={scroll} className="min-h-0 flex-1 select-text overflow-y-auto overscroll-contain" onScroll={onScroll}>
         <div className="space-y-4 p-4">
           <ConversationTimeline items={timeline} />
-          {running && <p role="status" className="type-caption flex items-center gap-2"><LoaderCircle className="size-3 animate-spin" />{i18n.formatMessage(conversationMessages.workingHint)}</p>}
+          {running && <p role="status" className="type-caption flex items-center gap-2"><StatusIcon tone="progress" className="size-3" />{i18n.formatMessage(conversationMessages.workingHint)}</p>}
           {!timeline.length && !running && <p className="type-caption">{i18n.formatMessage(conversationMessages.emptyHint)}</p>}
         </div>
       </div>

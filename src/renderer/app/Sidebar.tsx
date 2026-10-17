@@ -31,7 +31,7 @@ export function Sidebar({ snapshot, status, busy, resourceStatuses, selectedSess
       <IconButton size="icon-xs" label={i18n.formatMessage(appMessages.hideSidebar)} onClick={onHide}><PanelLeftClose /></IconButton>
     </header>
     <nav className="flex flex-col gap-1" aria-label={i18n.formatMessage(appMessages.mainViews)}>
-      <Button variant={homeActive ? "secondary" : "ghost"} className="w-full justify-start disabled:opacity-100" aria-current={homeActive ? "page" : undefined} disabled={homeActive} onClick={onHome}><House />{i18n.formatMessage(commonMessages.home)}</Button>
+      <Button variant={homeActive ? "selected" : "ghost"} className="w-full justify-start disabled:opacity-100" aria-current={homeActive ? "page" : undefined} disabled={homeActive} onClick={onHome}><House />{i18n.formatMessage(commonMessages.home)}</Button>
     </nav>
     <section className="mt-6 flex min-h-0 flex-1 flex-col" aria-labelledby="conversation-list-title">
       <h2 id="conversation-list-title" className="type-label mb-2 px-2">{i18n.formatMessage(commonMessages.conversations)}</h2>

@@ -4,9 +4,21 @@
 
 窗口作为系统材质底座，独立内容表面铺在其上。默认跟随系统亮暗，主题色 jade、灰色 gray；亮暗、主题色、灰色、圆角、密度与画布纹理由用户在设置的「外观」中选择。画布区域同时提供带示意图的连线风格选择，交互规则见 [连线与授权交互](workbench.md#连线与授权交互)。
 
-主题色承担界面的活力，灰色只做中性底：正文与边框取所选灰阶；主色亮色取主题色 11 级配白字，暗色取 9 级、文字在白与深灰之间取对比度更高者，按钮文字均达到 AA；`text-primary` 作文字色时亮色均达到 AA，暗色下 violet、indigo、plum 仅约 3.3–3.7，只宜用于图标与品牌标识。导航与列表当前项、`secondary` 徽章使用主题色 3 级浅底配 AA 文字，焦点环与选区取对应浅级。hover 保持中性灰。亮色边框取灰阶 5 级，暗色取 6 级。
+主题色用于主操作、明确强调、进行中与持续选中态；普通标签、次级操作与静止常态使用所选灰阶。颜色 token 按用途命名，组件消费语义 token，不根据主题色相自行决定用途。
 
-主题色按色相环排列，另有无彩的石墨（`graphite`）：以所选灰阶 12 级（近黑／近白）作主色，当前项取比 hover 深一级的灰阶 5 级底配正文色，焦点环与选区同样取灰阶。调色板只是主题色与灰色的快捷组合：多数配中性灰，暖色与紫色系配 Radix 推荐的同调灰（slate、olive、sand、mauve）。
+| token | 语义与取色 |
+| --- | --- |
+| `primary / primary-foreground` | 主操作与强调徽章的实色表面；亮色取主题色 11 级、暗色取 9 级，前景在白与深灰之间取对比度更高者 |
+| `primary-text` | 普通表面上的主题色文字与状态图标；亮色取主题色 12 级、暗色取 11 级，在内容表面与中性次级表面上均达到 AA |
+| `secondary / secondary-foreground` | 中性次级表面与普通标签；所选灰阶 3 级底、12 级字，不随主题色变化 |
+| `selected / selected-foreground` | 导航、列表与已打开面板入口的持续选中态；主题色 3 级底，亮色 12 级字、暗色 11 级字 |
+| `muted / muted-foreground` | 弱化区域与辅助文字；所选灰阶 3 级底、11 级字 |
+| `accent / accent-foreground` | 悬停与菜单键盘高亮等临时交互反馈；所选灰阶 4 级底、12 级字。这里的 `accent` 是控件 token，与外观设置中选择主题色相的 `appearance.accent` 含义不同 |
+| `success / success-foreground`、`warning / warning-foreground`、`destructive / destructive-foreground` | 成功、警告与错误／破坏性操作；分别取固定 green、amber、red 的 11 级，不随主题色变化，实色表面搭配各自前景色 |
+
+带底色的控件成对使用表面与对应 `*-foreground`，不写死白字；无底色的主题强调文字使用 `primary-text`，状态文字与图标使用对应状态色。主操作、选中态与徽章的文字配对达到 AA。正文与边框取所选灰阶；亮色边框取 5 级，暗色取 6 级。焦点环与文字选区取主题色对应浅级；`selection` 仅用于文字选区，与持续选中态 `selected` 分开。
+
+主题色按色相环排列，另有无彩的石墨（`graphite`）：`primary` 与 `primary-text` 以所选灰阶 12 级（近黑／近白）取色，`selected` 取比 hover 深一级的灰阶 5 级底配正文色，焦点环与选区同样取灰阶。调色板只是主题色与灰色的快捷组合：多数配中性灰，暖色与紫色系配 Radix 推荐的同调灰（slate、olive、sand、mauve）。
 
 底色分两层：`background` 遵循 shadcn 约定作页面与控件底色（亮色白、暗色灰阶 1 级），对话框、outline 按钮、激活 tab 等官方组件直接使用；`canvas` 是工坊扩展，只用于工作台底板、带底板的屏、React Flow 画布与外观预览等画布区域（亮色灰阶 3 级、暗色灰阶 1 级）。
 
@@ -97,7 +109,7 @@ Agent overlay 的外壳由内置 Agent 统一提供，插件只组织内部内�
 - 只读 token 与字数统一采用十进制工程缩写：不足千保留普通数字，较大值使用 `k / M / G / T`，最多一位小数；单位固定为 `toks / chars`，不随界面语言切换成「万／亿」。选择器、悬停提示、诊断、上下文面板、图表与工具摘要共用 `@atelier/ui/format-count`，量级与舍入由 `Intl.NumberFormat` 处理。可编辑数值字段及原始数据展示保留完整值，存储与计算不使用缩写。
 - 字体只有两个 token：`--font-sans`（界面）与 `--font-mono`（代码）。用户在外观设置选择的本机字体（通过 Chromium `queryLocalFonts` 获取，代码字体默认筛选等宽）置于默认回退栈之前；界面字号即密度；代码另有字号 `--code-font-size`（11–18px，未设置时跟随所在文字），代码文字统一用 `type-code`。
 - 图标统一使用 `lucide-react`，不使用 Unicode 符号；界面标识为 `brand-mark.tsx` 的经纬线框。
-- `packages/ui/src/ui/` 只放 shadcn（new-york-v4）官方 registry 源码，不手改结构与样式类；升级即重新拉取覆盖。主题绑定的 `src/renderer/shared/ui/sonner.tsx` 留在应用组合侧：主题取自 `useScheme()` 而不引入 `next-themes`，状态图标按状态 token 着色。官方没有的组合（如 `PageState`、`StatusBadge`、`IconButton`、`ListRow`）放在 `packages/ui/src/ui/` 内但只组合官方组件，不另写皮肤。
+- `packages/ui/src/ui/` 以 shadcn（new-york-v4）官方 registry 源码为基础，保持官方结构、尺寸与交互；公共语义扩展集中在此维护：Button 的 `selected`、Badge 的 `success / warning`、实色表面前景配对与链接文字 token。升级时保留这些语义映射，不在业务调用处覆盖配色。主题绑定的 `src/renderer/shared/ui/sonner.tsx` 留在应用组合侧：主题取自 `useScheme()` 而不引入 `next-themes`，状态图标按状态 token 着色。官方没有的组合（如 `PageState`、`StatusBadge`、`IconButton`、`ListRow`）放在 `packages/ui/src/ui/` 内，复用公共组件与 token。
 - 业务代码只用官方组件与公共组合，不使用裸 button/select 等控件，不写控件颜色、阴影或圆角。可点击的卡片用 `Item variant="outline" asChild` 包裹 button。
 - 表面只有两种：`surface`（边框 + 卡片底，无阴影，用于浮岛、顶栏部件、卡片、画布）与 `surface-floating`（加阴影，用于悬浮面板、浮条、通知）；对话框、菜单、下拉由官方组件提供浮层外观。
 
@@ -110,7 +122,8 @@ Agent overlay 的外壳由内置 Agent 统一提供，插件只组织内部内�
 | `default` | 区域主操作，每个表单、浮岛或对话框至多一个；列表区块标题处的新建入口 | 保存、创建、添加所选、添加提供商 |
 | `outline` | 区块与编辑器内的辅助操作；错误状态中的恢复操作；对话框与表单页脚中与主操作成组的取消、放弃 | 获取模型、获取参数、测试连接、重试、取消 |
 | `ghost` | 顶栏与导航、列表行内操作、折叠区块标题、浮条内的操作、仅图标按钮 | 行内测试、参数（折叠）、关闭 |
-| `secondary` | 仅表示导航与列表中的当前项，配合 `aria-current` 或 `aria-pressed` | 侧栏当前会话、历史当前条目 |
+| `secondary` | 中性底色的次级操作，不表示当前选中 | 浏览目录、停止执行 |
+| `selected` | 导航与列表中的当前项、已打开面板入口，按交互配合 `aria-current` 或 `aria-pressed` | 侧栏当前会话、历史当前条目 |
 | `destructive` | 确认对话框中的不可逆确认按钮 | 删除、放弃修改 |
 | `link` | 文字行内的附属操作 | 移除已保存的密钥 |
 
@@ -139,8 +152,8 @@ Agent overlay 的外壳由内置 Agent 统一提供，插件只组织内部内�
 | 成功 | `success`（green 11） | CircleCheck | 已连接、测试通过、插件已加载、资源已完成 |
 | 警告 | `warning`（amber 11） | TriangleAlert | 缺少密钥、需要重启、配置已改需重测、等待处理 |
 | 错误 | `destructive`（red 11） | CircleAlert | 测试失败、插件无效、引用失效 |
-| 进行中 | `muted-foreground` | Spinner | 测试中、运行中 |
-| 中性 | `muted-foreground` | Circle | 已停用、未测试、无模型 |
+| 进行中 | `primary-text`（图标）／`primary`（徽章表面） | Spinner | 测试中、运行中 |
+| 中性 | `muted-foreground`（图标）／`secondary`（徽章表面） | Circle | 就绪、已停用、未测试、无模型 |
 
 | 场景 | 通道 |
 | --- | --- |
@@ -148,7 +161,8 @@ Agent overlay 的外壳由内置 Agent 统一提供，插件只组织内部内�
 | 区块内持续存在的状态（读取失败、需要重启、加密不可用、获取参数的逐项结果） | 区块内 `Alert` |
 | 瞬时操作反馈（复制成功／失败、创建失败、模型已添加）与全局错误 | Sonner 临时通知（窗口底部居中，状态驱动通知用 `useStateToast`） |
 
-- Badge 只用两种：`secondary` 表示标签与归属（内置、默认、已添加、使用方），`StatusBadge`（outline + 状态图标）表示状态。
+- Badge 变体按含义选择：`default` 对应 `primary`，仅用于明确强调；`secondary` 表示普通标签与归属（内置、默认、已添加、使用方）；`success / warning / destructive` 分别表示成功、警告、错误；`outline` 是中性描边标签。不得仅为增加主题色使用范围而把普通标签设为 `default`。
+- 状态统一使用 `StatusBadge`：进行中映射 `default`，中性映射 `secondary`，其余映射对应语义变体；图标与文字使用该表面的前景色，避免把状态文字色叠在同色底上。
 
 ## 数据图表
 

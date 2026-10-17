@@ -9,6 +9,7 @@ import { Item, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@ateli
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@atelier/ui/ui/select";
 import { Separator } from "@atelier/ui/ui/separator";
 import { Switch } from "@atelier/ui/ui/switch";
+import { StatusBadge } from "@atelier/ui/ui/status";
 import { Textarea } from "@atelier/ui/ui/textarea";
 
 /** 隐藏口令，在首页输入框完整输入后回车触发；纯前端彩蛋，不进入命令系统。 */
@@ -20,10 +21,11 @@ export function Showcase({ open, onOpenChange }: { open: boolean; onOpenChange: 
     <DialogContent closeLabel="Close" className="max-h-[85vh] overflow-y-auto sm:max-w-3xl">
       <DialogHeader><DialogTitle>Creative mode</DialogTitle><DialogDescription>Components under the current theme.</DialogDescription></DialogHeader>
       <Section title="Button">
-        {(["default", "secondary", "outline", "ghost", "destructive", "link"] as const).map(variant => <Button key={variant} size="sm" variant={variant}>{variant}</Button>)}
+        {(["default", "secondary", "selected", "outline", "ghost", "destructive", "link"] as const).map(variant => <Button key={variant} size="sm" variant={variant}>{variant}</Button>)}
         <Button size="sm" disabled>disabled</Button><Button size="icon-sm" aria-label="icon"><Bot /></Button>
       </Section>
-      <Section title="Badge">{(["default", "secondary", "outline", "destructive"] as const).map(variant => <Badge key={variant} variant={variant}>{variant}</Badge>)}</Section>
+      <Section title="Badge">{(["default", "secondary", "outline", "success", "warning", "destructive"] as const).map(variant => <Badge key={variant} variant={variant}>{variant}</Badge>)}</Section>
+      <Section title="Status">{(["neutral", "progress", "success", "warning", "error"] as const).map(tone => <StatusBadge key={tone} tone={tone}>{tone}</StatusBadge>)}</Section>
       <Section title="Field">
         <Input className="w-48" placeholder="Placeholder" /><Input className="w-48" aria-invalid defaultValue="Invalid" />
         <Input className="w-48" disabled defaultValue="Disabled" />

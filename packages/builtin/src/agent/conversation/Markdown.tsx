@@ -10,7 +10,7 @@ const components: Components = {
   img: ({ src, alt }) => {
     const i18n = useI18n();
     const url = typeof src === "string" ? externalWebUrl(src) : null;
-    return url ? <a href={url} target="_blank" rel="noopener noreferrer" className="text-primary underline underline-offset-4">{alt || i18n.text(markdownMessages.markdownImage)}</a>
+    return url ? <a href={url} target="_blank" rel="noopener noreferrer" className="text-primary-text underline underline-offset-4">{alt || i18n.text(markdownMessages.markdownImage)}</a>
       : <span>{alt}</span>;
   },
 };
