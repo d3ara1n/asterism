@@ -11,7 +11,8 @@ const messages = builtin.messages("en", defineMessages({
 }));
 
 /** builtin 插件配置：用户在插件设置页协商；前后台共享同一契约。 */
-export const BuiltinSettings = builtin.config(z.strictObject({
+// 忽略已移除的选项，保留持久配置中仍有效的偏好。
+export const BuiltinSettings = builtin.config(z.object({
   thinkingAutoExpand: z.boolean(), thinkingAutoCollapse: z.boolean(),
   toolInputAutoExpand: z.boolean(), toolInputAutoCollapse: z.boolean(),
 }), { thinkingAutoExpand: true, thinkingAutoCollapse: true, toolInputAutoExpand: true, toolInputAutoCollapse: true }, {

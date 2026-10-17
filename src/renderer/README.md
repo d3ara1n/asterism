@@ -30,7 +30,7 @@
 | `../../packages/builtin/src/agent/ui/` | Agent 扩展组件挂载、toolbar／overlay／modal 呈现、当前模型选择注入及输入区控制；作者通过 `@atelier/builtin-api/renderer` 接入，内置工具栏贡献在 `conversation/Toolbar.tsx`，应用注入贡献者偏好门面 |
 | `../../packages/builtin/src/agent/diagnostics/` | 代理诊断的历史请求投影、当前价格计量、缓存与增长概览及面板内的列表／详情／汇总；`usage.ts / performance.ts` 供诊断和对话轮次共用实报用量及速率计算 |
 | `../../packages/builtin/src/agent/context/` / `panel-kit.tsx` | 代理上下文面板的窗口占用、对话与系统构成；两个代理面板共用的版式、数值与系统构成部件 |
-| `../../packages/builtin/src/text-view.tsx` / `code-view.tsx` / `shared/tool-body.ts` | 内置正文工具三态视图、Pierre Diffs 代码／差异渲染与 120 行预览预算截取 |
+| `../../packages/builtin/src/text-view.tsx` / `code-view.tsx` / `shared/tool-body.ts` | 内置正文工具三态视图与 120 行预览预算；工具和 Markdown 共用 Pierre 代码视图，支持文件名推断或显式语言着色 |
 | `modules/registry.ts` / `views.tsx` / `object-context.ts` | 静态资源展示描述、卡片／工具／历史记录视图注册表与 SDK 前端对象接口注入 |
 | `features/configuration/` | 提供商、模型发现（`ModelDiscoveryPicker.tsx`）、参数获取（`ModelParameters.tsx`）、模型兼容设置（`ModelCompatibilityEditor.tsx`）、模型角色与 agent 覆盖表单（`forms.tsx`） |
 | `features/plugins/` / `shared/ConfigurationValue.tsx` | 插件包管理、插件配置表单与 schema 驱动字段编辑器 |

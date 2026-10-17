@@ -6,10 +6,11 @@
 | --- | --- | --- |
 | 桌面外壳 | Electron | 本地集成与统一 Chromium；测试以 macOS 为主，发布覆盖 macOS、Windows、Linux |
 | 界面 | React + TypeScript + Vite | 交互面板与常规 Web 组件 |
-| 对话渲染 | Streamdown | Markdown、GFM 与流式未闭合语法，应用不自建解析器 |
+| 对话渲染 | LobeHub Streamdown（`@lobehub/streamdown`） | Markdown、GFM、流式未闭合语法与平滑渐入，应用不自建解析器或动画队列 |
 | 设计系统 | shadcn/ui（Radix）+ Tailwind CSS | 组件源码纳入仓库；统一使用 Tailwind 与设计 token，不并行维护另一套组件样式体系 |
 | 节点工作台 | @xyflow/react | DOM 卡片、端点与连线的视图投影，不拥有业务对象、授权或历史 |
 | 代码与差异展示 | Pierre Diffs（`@pierre/diffs`） | 代码语法着色与 stacked unified diff 视图，按需渲染 |
+| Markdown 富内容 | remark-math、rehype-katex、KaTeX、Mermaid | 标准数学语法与 Mermaid 图形；通过渲染器公开插件和组件入口接入 |
 | 文本差异生成 | diff（jsdiff） | 后端按行生成标准 unified diff，保留换行差异并限制计算预算 |
 | 结构化持久化 | SQLite（`node:sqlite`） | 工作区身份、会话节点树、当前数据、内容依赖索引与视图布局 |
 | 校验 | Zod | 事件、工具参数、IPC 与配置的运行时校验 |
@@ -106,7 +107,8 @@ Atelier 分为**应用组合层**、**通用宿主机制**与**插件**三层：
 
 - 应用只接受同一窗口主 frame 的命令；禁止 renderer 任意 Node 调用、窗口跳转、webview 与新窗口。网页链接经 HTTP(S) 检查后交系统浏览器打开。
 - 浏览器权限检查与请求共用受信窗口、主 frame 和页面 URL 校验，只允许本机字体枚举与剪贴板写入；不授予剪贴板读取或其他浏览器权限。
-- 开发版仅为 Fast Refresh 放宽内联脚本 CSP，发布版脚本只允许自身资源；图片仅额外放行受控 `blob:` URL。preload、main、runtime 分别用 Zod 校验边界数据。
+- 开发版仅为 Fast Refresh 放宽内联脚本 CSP，发布版脚本只允许自身资源与已登记插件资源；图片允许受控内容 URL 和 HTTP(S) 来源，Markdown 图片不发送 referrer，文件路径不构成内容读取授权。其余网络连接与脚本来源不随图片放宽。preload、main、runtime 分别用 Zod 校验边界数据。
+- 数学排版使用 KaTeX 的非信任模式；Mermaid 通过官方 `render` 与 `securityLevel: strict` 生成清理后的 SVG，不执行模型正文中的 HTML 或脚本。
 - 网络内容与用户文件按不可信数据处理，不直接执行其中的脚本或指令。
 - 资源引用与 UI 可见性不构成授权；授权在运行时工具执行层落实。独立任务进程与目录真实路径复核不构成操作系统级 shell 沙箱。
 - 凭据与任务日志、事件记录分离，不把 API key 序列化进事件或模型请求记录。

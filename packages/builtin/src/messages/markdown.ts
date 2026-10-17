@@ -13,20 +13,28 @@ export const markdownMessages = pluginNamespace("atelier.builtin").messages("en"
     id: "markdownCopyCode",
     defaultMessage: "Copy code",
   },
-  markdownCopyTable: {
-    id: "markdownCopyTable",
-    defaultMessage: "Copy table",
+  markdownCopyFailed: {
+    id: "markdownCopyFailed",
+    defaultMessage: "Could not copy code",
   },
-  markdownCopyCsv: {
-    id: "markdownCopyCsv",
-    defaultMessage: "Copy as CSV",
+  markdownPlainText: {
+    id: "markdownPlainText",
+    defaultMessage: "Plain text",
   },
-  markdownCopyTsv: {
-    id: "markdownCopyTsv",
-    defaultMessage: "Copy as TSV",
+  markdownImageFailed: {
+    id: "markdownImageFailed",
+    defaultMessage: "Image could not be loaded. Open source",
   },
-  markdownCopyMarkdown: {
-    id: "markdownCopyMarkdown",
-    defaultMessage: "Copy as Markdown",
+  markdownDiagram: {
+    id: "markdownDiagram",
+    defaultMessage: "Mermaid diagram",
+  },
+  markdownDiagramRendering: {
+    id: "markdownDiagramRendering",
+    defaultMessage: "Rendering diagram…",
+  },
+  markdownDiagramFailed: {
+    id: "markdownDiagramFailed",
+    defaultMessage: "Could not render this diagram. The source is shown below.",
   },
 }));

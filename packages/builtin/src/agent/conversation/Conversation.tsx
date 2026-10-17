@@ -48,7 +48,7 @@ export function Conversation({ onHome }: { onHome(): void }) {
   const running = executionState === "running";
   const timeline = useMemo(() => snapshot ? conversationTimeline(snapshot, agentId, models.blocks, running) : [], [snapshot, agentId, models.blocks, running]);
   const configurationError = catalogs.error;
-  const { scroll, awayFromBottom, latest, jumpTo, onScroll } = useOutputFollow(timeline);
+  const { scroll, contentRef, awayFromBottom, latest, jumpTo, onScroll } = useOutputFollow(timeline);
   const composer = useRef<HTMLTextAreaElement>(null);
   const composerHidden = useComposerHidden();
 
@@ -72,7 +72,7 @@ export function Conversation({ onHome }: { onHome(): void }) {
     <AgentUIRegion position="top" />
     <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
       <div ref={scroll} className="min-h-0 flex-1 scroll-pt-4 select-text overflow-y-auto overscroll-contain" onScroll={onScroll}>
-        <div className="space-y-4 p-4">
+        <div ref={contentRef} className="space-y-4 p-4">
           <ConversationTimeline items={timeline} />
           {running && <p role="status" className="type-caption flex items-center gap-2"><StatusIcon tone="progress" className="size-3" />{i18n.formatMessage(conversationMessages.workingHint)}</p>}
           {!timeline.length && !running && <p className="type-caption">{i18n.formatMessage(conversationMessages.emptyHint)}</p>}
