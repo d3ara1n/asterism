@@ -11,7 +11,7 @@ import { timelineKey, type TimelineItem } from "./timeline";
 import { ToolCall } from "./ToolCall";
 import { FilePreview } from "./Files";
 import { Disclosure } from "./Disclosure";
-import { TurnMetrics } from "./TurnMetrics";
+import { TurnFooter } from "./TurnFooter";
 
 export function ConversationTimeline({ items }: { items: readonly TimelineItem[] }) {
   return <>{items.map(node => <NodeView key={timelineKey(node)} node={node} />)}</>;
@@ -32,7 +32,7 @@ function NodeView({ node }: { node: TimelineItem }) {
     case "thinking": return node.text.trim() ? <ThinkingBlock node={node} /> : null;
     case "toolcall": return <ToolCall node={node} />;
     case "summary": return <Summary text={node.text} />;
-    case "turn-metrics": return <TurnMetrics metrics={node.metrics} incomplete={node.incomplete} />;
+    case "turn-metrics": return <TurnFooter metrics={node.metrics} incomplete={node.incomplete} replyMarkdown={node.replyMarkdown} />;
     case "notice": return <Alert variant={node.level === "error" ? "destructive" : "default"}>
       {node.level === "error" ? <TriangleAlert /> : <Info />}<AlertDescription>{node.message}</AlertDescription></Alert>;
     default: return null;

@@ -9,7 +9,7 @@ type SavedBlock = Extract<z.infer<typeof Execution.schema>, { type: "block" }>["
 export type TimelineItem = SavedBlock | ModelLiveBlock
   | { kind: "message"; id: string; parts: readonly ModelInputPart[] }
   | { kind: "summary"; id: string; text: string }
-  | { kind: "turn-metrics"; id: string; metrics: TurnMetricsData; incomplete: boolean }
+  | { kind: "turn-metrics"; id: string; metrics: TurnMetricsData; incomplete: boolean; replyMarkdown: string | null }
   | ({ kind: "notice"; id: string } & z.infer<typeof Notice.schema>);
 export function timelineKey(item: TimelineItem): string {
   return "responseId" in item ? JSON.stringify([item.responseId, item.ordinal]) : item.id;
@@ -48,6 +48,7 @@ export function conversationTimeline(snapshot: SessionSnapshot, agentId: string,
   const before = new Map(summaries.map(turn => [turn.nextUserId, turn]));
   const measured = (turn: typeof summaries[number]): TimelineItem => ({
     kind: "turn-metrics", id: `turn-metrics:${turn.userId}`, metrics: turn.metrics, incomplete: turn.incomplete,
+    replyMarkdown: turn.replyMarkdown,
   });
   const items = saved.flatMap(value => {
     const turn = value.kind === "message" ? before.get(value.id) : undefined;

@@ -4,7 +4,7 @@
 
 **机制层、会话标题与资源状态 badge 已接入，GUI 待验收。** SDK、宿主总线、来源 stamp、按序投递、latest 合并、跨进程逐条转发与订阅生命周期已经可用；会话标题由宿主发布 SDK 公共契约 `SessionTitleChanged`，外壳订阅更新列表；`session.changed` 合并重读只保留列表结构更新。Agent 经公共 `ResourceStatusChanged` 发布状态，外壳按资源聚合，running 及可选进度持续展示，其他终态查看即清除。
 
-对象关联的插件调用已完成，并由内置 ask_user 验收，见 [实施记录](archived/todo-2026-10-15-plugin-tools-ui.md)。资源通知 toast 等待真实消费者；进度作为 running 的可选数据与 popup 展示已提供，待下载器等真实发布方使用，Agent 不虚构百分比。本计划继续跟踪标题、badge 的独立 GUI 验收和资源通知，全部结束后再归档。
+对象关联的插件调用已完成，并由内置 ask_user 验收，见 [实施记录](archived/todo-2026-10-15-plugin-tools-ui.md)。资源通知 toast 尚未接入，轮尾复制反馈已有真实使用场景，当前由内置前端直接调用 Sonner，待迁移到通知事件；进度作为 running 的可选数据与 popup 展示已提供，待下载器等真实发布方使用，Agent 不虚构百分比。本计划继续跟踪标题、badge 的独立 GUI 验收和资源通知，全部结束后再归档。
 
 已确认的接口与行为以 [插件 SDK](../docs/plugin-sdk.md#瞬态事件与插件调用) 为准，执行边界见 [运行时](../docs/runtime.md#瞬态通信与执行生命周期)，交互见 [工作台](../docs/workbench.md#会话列表状态与资源通知)。遵循 KISS 与「信任插件，暴露问题」。
 
@@ -19,7 +19,9 @@
 
 ## 延后：资源通知 toast
 
-- [ ] 出现真实发布方后确定契约归属与载荷（候选：SDK 公共契约，`source: "resource"`，occurrence，`{ text: UiText, level }`），经已校验资源操作柄发布，外壳以 toast 消费，不另设通知 API。
+- [ ] 以轮尾复制反馈等真实使用场景确定契约归属、来源范围与载荷（候选：SDK 公共契约，occurrence，`{ text: UiText, level }`），复用现有事件总线，不另设通知 API。
+- [ ] 插件发布通知语义，外壳选择对应控件表达并显示来源；来源取宿主校验并打戳的事件信封，不由插件提供展示身份。通知不写入任务历史。
+- [ ] 将 `packages/builtin/src/agent/conversation/TurnFooter.tsx` 的直接 Sonner 调用迁移到通知事件，清理其对展示库的直接依赖。内置前端的静态打包共享实例不能作为外部插件通知接口。
 - [ ] 由该发布方验证来源与展示，GUI 由用户验收。
 
 ## 已完成：事件机制

@@ -47,9 +47,9 @@ describe("代理的具型记录视图", () => {
     const snapshot = sessionSnapshot(nodeView("s", "", nodes, "a3"));
     const running = conversationTimeline(snapshot, "a", [], true);
     expect(running.map(item => item.id)).toEqual(["u1", "a1", "a2", "turn-metrics:u1", "u2", "a3"]);
-    expect(running.find(item => item.kind === "turn-metrics")).toMatchObject({ metrics: { count: 2, usage: { output: { value: 20 } } } });
+    expect(running.find(item => item.kind === "turn-metrics")).toMatchObject({ metrics: { count: 2, usage: { output: { value: 20 } } }, replyMarkdown: "Second part" });
     const settled = conversationTimeline(snapshot, "a", [], false);
     expect(settled.map(item => item.id)).toEqual(["u1", "a1", "a2", "turn-metrics:u1", "u2", "a3", "turn-metrics:u2"]);
-    expect(settled.at(-1)).toMatchObject({ kind: "turn-metrics", metrics: { count: 1 } });
+    expect(settled.at(-1)).toMatchObject({ kind: "turn-metrics", metrics: { count: 1 }, replyMarkdown: "Latest" });
   });
 });

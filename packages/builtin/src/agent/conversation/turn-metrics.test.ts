@@ -3,7 +3,7 @@ import type { ModelCompletion } from "@atelier/sdk/contracts";
 import { ContextSummary } from "@atelier/builtin-api/contracts";
 import { sessionSnapshot } from "../../../../../src/plugins/records";
 import { nodeView } from "../../../../../src/session/view";
-import { agentSource, event, message, node, text } from "../../../../../src/session/test-nodes";
+import { agentSource, call, event, message, node, notice, text, thinking } from "../../../../../src/session/test-nodes";
 import { tokensPerSecond } from "../diagnostics/performance";
 import { turnMetrics } from "./turn-metrics";
 
@@ -59,6 +59,7 @@ describe("对话中的逐轮计量", () => {
     ];
     const interruptedTurn = turnMetrics(snapshot(path), "a", false)[0]!;
     expect(interruptedTurn.incomplete).toBe(true);
+    expect(interruptedTurn.replyMarkdown).toBeNull();
     const interrupted = interruptedTurn.metrics;
     expect(interrupted.cache).toBeNull();
     expect(interrupted.usage.output).toEqual({ value: null, count: 0 });
@@ -67,10 +68,45 @@ describe("对话中的逐轮计量", () => {
     expect(turnMetrics(snapshot(path), "a", true)).toEqual([]);
     const resumedTurn = turnMetrics(snapshot(path), "a", false)[0]!;
     expect(resumedTurn.incomplete).toBe(false);
+    expect(resumedTurn.replyMarkdown).toBe("Done");
     const resumed = resumedTurn.metrics;
     expect(resumed.count).toBe(2);
     expect(resumed.usage.output).toEqual({ value: 20, count: 1 });
     expect(resumed.cache?.count).toBe(1);
     expect(tokensPerSecond(resumed.performance.rates.output)).toBe(10);
+  });
+
+  // docs/workbench.md#对话计量：复制最终响应的所有正文，避免漏块或混入思考、过程、工具与其他轮次。
+  it("最终回复按块序号保留 Markdown，历史轮次分别保留自己的回复", () => {
+    const first = "# 结果\n\n- **已修复**";
+    const second = "```ts\nconst ready = true;\n```\n";
+    const path = [
+      node("u1", null, message("a", "User question")),
+      node("progress", "u1", text("a", "work", 0, "Let me inspect the file.")),
+      node("tool", "progress", call("a", "work", 1, "Tool output")),
+      node("reasoning", "tool", thinking("a", "final", 0, "Private reasoning")),
+      node("second", "reasoning", text("a", "final", 2, second, { completion: completion(100, 20, 50, 2000) })),
+      node("first", "second", text("a", "final", 1, first)),
+      node("other", "first", text("b", "other", 0, "Other agent")),
+      node("u2", "other", message("a", "Next question")),
+      node("next", "u2", text("a", "next", 0, "Next answer", { completion: completion(100, 20, 50, 2000) })),
+    ];
+    expect(turnMetrics(snapshot(path), "a", false).map(turn => turn.replyMarkdown))
+      .toEqual([`${first}\n\n${second}`, "Next answer"]);
+  });
+
+  // 没有最终正文时不能回退复制较早的过程文字，工具结果与思考也不能充作回复。
+  it.each([
+    ["工具响应", call("a", "last", 0, "Tool output", { completion: { ...completion(100, 20, 50, 2000), finishReason: "tool-calls" } })],
+    ["纯思考响应", thinking("a", "last", 0, "Reasoning", { completion: completion(100, 20, 50, 2000) })],
+    ["空白正文", text("a", "last", 0, " \n", { completion: completion(100, 20, 50, 2000) })],
+    ["无正文失败", notice("a", "request_failed", "Request failed")],
+  ])("%s 不提供复制内容", (_label, last) => {
+    const path = [
+      node("u", null, message("a", "Question")),
+      node("earlier", "u", text("a", "earlier", 0, "Earlier response", { completion: completion(100, 20, 50, 2000) })),
+      node("last", "earlier", last),
+    ];
+    expect(turnMetrics(snapshot(path), "a", false)[0]?.replyMarkdown).toBeNull();
   });
 });

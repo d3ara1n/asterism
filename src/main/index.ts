@@ -20,6 +20,7 @@ import { pluginConfigurationChangedChannel, pluginConfigurationChannel, pluginCo
 import { contentChannel, contentCommandSchema, type ContentResult } from "../shared/content.ts";
 import { pluginEventsChannel, eventControlSchema } from "../shared/plugin-events.ts";
 import { pluginCallsChannel, callControlSchema } from "../shared/plugin-calls.ts";
+import { allowRendererPermission } from "./permissions.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 let window: BrowserWindow | null = null;
@@ -183,14 +184,14 @@ if (!app.requestSingleInstanceLock()) {
   });
   app.whenReady().then(async () => {
     if (quitting) return;
-    // 仅放行受信主框架的本机字体枚举（只暴露字体名），其余权限一律拒绝。
+    // 权限检查和请求共用同一策略；只放行受信主框架的字体枚举与剪贴板写入。
     // 以窗口当前 URL 判定受信：file:// 的 origin 可能为 "null"，不可依赖 origin 字符串。
-    const trustedFonts = (contents: Electron.WebContents | null, permission: string, isMainFrame: boolean) =>
-      permission === "local-fonts" && isMainFrame && !!contents && contents === window?.webContents && !!trustedURL && contents.getURL().split("#")[0] === trustedURL;
+    const permitted = (contents: Electron.WebContents | null, permission: string, isMainFrame: boolean) =>
+      allowRendererPermission({ permission, isMainFrame, contents, mainContents: window?.webContents, trustedURL });
     session.defaultSession.setPermissionRequestHandler((contents, permission, callback, details) =>
-      callback(trustedFonts(contents, permission, details.isMainFrame)));
+      callback(permitted(contents, permission, details.isMainFrame)));
     session.defaultSession.setPermissionCheckHandler((contents, permission, _origin, details) =>
-      trustedFonts(contents, permission, details.isMainFrame));
+      permitted(contents, permission, details.isMainFrame));
     servePluginArtifacts(dataRoot);
     try { await runtime.start(join(here, "runtime.js"), dataRoot); }
     catch (error) {

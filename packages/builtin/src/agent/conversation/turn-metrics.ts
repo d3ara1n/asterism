@@ -24,6 +24,7 @@ export interface TurnMeasurement {
   nextUserId: string | null;
   incomplete: boolean;
   metrics: TurnMetricsData;
+  replyMarkdown: string | null;
 }
 
 /** 历史轮次保留；只有当前运行轮隐藏。继续执行的请求仍归入同一用户输入。 */
@@ -37,10 +38,15 @@ export function turnMetrics(snapshot: SessionSnapshot, agentId: string, running:
     if (!next && running) return [];
     const current = requests.filter(request => request.sequence > start.record.sequence && (!next || request.sequence < next.record.sequence));
     if (!current.length) return [];
+    const incomplete = projectTurnState(path.slice(start.index, next?.index), agentId) !== "completed";
+    // 请求按时间倒序、块按序号排列；只取最终响应，不回退到工具执行前的过程正文。
+    const reply = incomplete ? "" : current[0]!.blocks.flatMap(({ block }) =>
+      block.kind === "text" ? [block.text] : []).join("\n\n");
     return [{
       userId: start.record.id, nextUserId: next?.record.id ?? null,
-      incomplete: projectTurnState(path.slice(start.index, next?.index), agentId) !== "completed",
+      incomplete,
       metrics: summarizeRequests(current),
+      replyMarkdown: reply.trim() ? reply : null,
     }];
   });
 }
