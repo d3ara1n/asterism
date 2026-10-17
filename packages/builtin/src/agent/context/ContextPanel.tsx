@@ -126,7 +126,7 @@ export function ContextPanel({ data }: { data: z.infer<typeof AgentView.schema> 
     catch (error) { if (error instanceof ContextProjectionError) return { ok: false }; throw error; }
   }, [snapshot, object.ref.id]);
   return <PanelBody>
-    {object.view.error && <Alert variant="destructive"><AlertDescription>{i18n.text(object.view.error)}</AlertDescription></Alert>}
+    {object.view.status !== "error" && object.view.error && <Alert variant="destructive"><AlertDescription>{i18n.text(object.view.error)}</AlertDescription></Alert>}
     {result && !result.ok && <Alert variant="destructive"><AlertDescription>{i18n.text(messages.unavailable)}</AlertDescription></Alert>}
     {result?.ok && <>
       <WindowUsage insight={result.insight} selection={data.selection} />

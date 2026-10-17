@@ -7,7 +7,6 @@ import { ChevronDown, Check, Link2 } from "lucide-react";
 
 import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from "@atelier/ui/ui/command";
 
-import { Alert, AlertDescription } from "@atelier/ui/ui/alert";
 import { Separator } from "@atelier/ui/ui/separator";
 import { StatusText } from "@atelier/ui/ui/status";
 import { ToggleGroup, ToggleGroupItem } from "@atelier/ui/ui/toggle-group";
@@ -31,8 +30,7 @@ import { useWorkbench } from "./context";
 /** 授权消费真实链接；在途请求的说明不冒充单条链接的生效状态。 */
 export function AccessPanel() {
   const i18n = useI18n();
-  const { controller, session } = useWorkbench();
-  const { state } = useSession(controller);
+  const { session } = useWorkbench();
   const registry = useModuleViews();
   const [mode, setMode] = useState<"agent" | "resource">("agent");
   const [selectedAgent, setSelectedAgent] = useState("");
@@ -54,7 +52,6 @@ export function AccessPanel() {
     <ResourcePicker objects={choices} selected={selected} onSelect={byAgent ? setSelectedAgent : setSelectedResource} label={byAgent ? i18n.formatMessage(accessMessages.accessRecipient) : i18n.formatMessage(accessMessages.accessTarget)} />
     <SearchInput value={query} onChange={setQuery} label={byAgent ? i18n.formatMessage(objectsMessages.searchResources) : i18n.formatMessage(objectsMessages.searchObjects)} />
   </>}>
-    {state.status === "error" && <Alert variant="destructive" className="mb-4"><AlertDescription>{i18n.text(state.error ?? "")}<Button variant="outline" size="sm" className="mt-2" onClick={() => { void controller.refresh(); }}>{i18n.formatMessage(commonMessages.retry)}</Button></AlertDescription></Alert>}
     {selected && <h3 className="type-section mb-2 break-words">{byAgent ? i18n.formatMessage(accessMessages.canAccess, { title: selected.title }) : i18n.formatMessage(accessMessages.accessibleBy, { title: selected.title })}</h3>}
     {selected && targets.map(object => {
       const agent = byAgent ? selected : object, resource = byAgent ? object : selected;
@@ -98,18 +95,17 @@ function AccessRow({ agent, resource, object }: { agent: WorkbenchObject; resour
     const result = await controller.executeAndRead({ type: "link.set", sessionId: session.id, agentId: agent.id, resourceId: resource.id, linked: desired });
     if (token !== generation.current) return;
     setPending(null); submitting.current = false;
+    const current = controller.getSnapshot();
     if (result.ok) {
-      const current = controller.getSnapshot();
-      if (current.status === "error") setError(current.error);
-      else {
+      if (current.status === "ready") {
         const actual = current.snapshot?.workbench.links.some(link => link.agentId === agent.id && link.resourceId === resource.id) ?? false;
         setSaved(actual === desired ? accessMessages.accessSaved : i18n.formatMessage(accessMessages.accessSuperseded));
       }
-    }
-    else {
-      setError(errorDisplay(result.error));
+    } else if (current.status !== "error") {
+      const message = errorDisplay(result.error);
+      setError(message);
       // 此命令的错误在对应行呈现；不清除其他操作产生的错误。
-      if (controller.getSnapshot().error === errorDisplay(result.error)) controller.clearError();
+      if (current.error === message) controller.clearError();
     }
   };
   const id = `access-${agent.id}-${resource.id}`;

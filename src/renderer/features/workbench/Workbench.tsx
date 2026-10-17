@@ -12,7 +12,6 @@ import { workbenchMessages } from "../../messages/workbench";
 import { RendererCatalogProvider } from "../../modules/object-context";
 import { useModuleViews } from "../../modules/views";
 import { useI18n } from "../../shared/i18n";
-import { StatusBadge } from "@atelier/ui/ui/status";
 import { useIsland } from "../../shared/weave/Screen";
 import { useAppearance, useScheme } from "../appearance/state";
 import type { DragKind } from "../creation/routing";
@@ -85,11 +84,6 @@ export function Workbench({ ref, controller, session, ready, busy, run, onHome, 
       {session.objects.length === 0 && <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
         <p className="type-caption">{i18n.formatMessage(workbenchMessages.emptyHint)}</p>
       </div>}
-      {/* 忙碌/就绪频繁切换不播报；仅不可用时作为提示。 */}
-      <StatusBadge tone={busy ? "progress" : ready ? "neutral" : "warning"} role={!busy && !ready ? "alert" : undefined}
-        className="absolute left-2 top-2 z-10">
-        {busy ? i18n.formatMessage(commonMessages.statusBusy) : ready ? i18n.formatMessage(commonMessages.statusReady) : i18n.formatMessage(commonMessages.statusUnavailable)}
-      </StatusBadge>
     </div>
   </WorkbenchContext.Provider></RendererCatalogProvider></RendererNavigationProvider>;
 }

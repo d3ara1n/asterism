@@ -143,16 +143,18 @@ describe("会话视图所有权", () => {
     disconnect();
   });
 
-  it("读取失败保留画面并阻止基于旧数据操作，刷新后恢复", async () => {
-    const { controller, requests } = fixture(); const disconnect = controller.connect();
+  // 工作台状态反馈：手动重试和后续通知恢复读取时都撤下旧读取错误，不影响操作错误的保留。
+  it.each(["refresh", "notification"] as const)("读取失败保留画面并阻止基于旧数据操作，经 %s 恢复后清除读取错误", async recovery => {
+    const { controller, requests, notify } = fixture(); const disconnect = controller.connect();
     requests[0]!.resolve(view(snapshot(1))); await flush();
     void controller.refresh();
     requests[1]!.resolve({ ok: false, error: { code: "unavailable", message: "Read failed.", display: "Read failed." } }); await flush();
     expect(controller.getSnapshot()).toMatchObject({ status: "error", snapshot: { cursor: "current" } });
     expect(await controller.mutate({ type: "object.remove", sessionId: "s", objectId: "note" })).toBe(false);
-    void controller.refresh();
+    if (recovery === "refresh") void controller.refresh();
+    else notify(2);
     expect(requests.at(-1)!.command).toEqual({ type: "read", sessionId: "s" });
-    requests.at(-1)!.resolve(view(snapshot(1))); await flush();
+    requests.at(-1)!.resolve(view(snapshot(2))); await flush();
     expect(controller.getSnapshot()).toMatchObject({ status: "ready", error: null });
     disconnect();
   });

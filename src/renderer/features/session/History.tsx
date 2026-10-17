@@ -107,7 +107,7 @@ export function SessionHistoryPanel({ controller }: { controller: SessionControl
       <div className="flex items-center justify-between gap-2"><p className="type-caption min-w-0 truncate" title={selected?.label ?? i18n.formatMessage(historyMessages.historyStart)}>
         {selected?.label ?? i18n.formatMessage(historyMessages.historyStart)}</p></div>
       {!selectedVisible && (search || view.kind !== "all") && <p className="type-caption">{i18n.formatMessage(historyMessages.historyFiltered)}</p>}
-      {state.error && <p role="alert" className="type-caption">{i18n.text(state.error)}</p>}
+      {state.status !== "error" && state.error && <p role="alert" className="type-caption">{i18n.text(state.error)}</p>}
     </>}>
       {tree.branches.map(item => <TabsContent key={item.id} value={item.id}>{item.id === branch.id && <>
         {showStart && <div data-selected={selectedId === null}>
@@ -215,7 +215,7 @@ function ContinueAction({ controller, nodeId }: { controller: SessionController;
       <AlertDialogHeader><AlertDialogTitle>{i18n.formatMessage(historyMessages.continueTitle)}</AlertDialogTitle><AlertDialogDescription>{i18n.formatMessage(historyMessages.continueDescription)}</AlertDialogDescription></AlertDialogHeader>
       <p className="type-body break-words">{actualEntry?.label ?? i18n.formatMessage(historyMessages.historyStart)}</p>
       {unsettled && <p className="type-caption">{wait}</p>}
-      {state.error && <p className="type-caption" role="alert">{i18n.text(state.error)}</p>}
+      {state.status !== "error" && state.error && <p className="type-caption" role="alert">{i18n.text(state.error)}</p>}
       <AlertDialogFooter><AlertDialogCancel disabled={saving}>{i18n.formatMessage(commonMessages.cancel)}</AlertDialogCancel><AlertDialogAction disabled={disabled} aria-busy={saving} onClick={event => {
         event.preventDefault(); if (!target) return; setSaving(true);
         void controller.branchFrom(target.id).then(result => { if (result.ok) setTarget(null); }).finally(() => setSaving(false));

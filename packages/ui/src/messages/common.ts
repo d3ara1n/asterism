@@ -53,10 +53,6 @@ export const commonMessages = pluginNamespace("atelier.host").messages("en", def
     id: "statusBusy",
     defaultMessage: "Saving…",
   },
-  statusReady: {
-    id: "statusReady",
-    defaultMessage: "Local workspace",
-  },
   statusUnavailable: {
     id: "statusUnavailable",
     defaultMessage: "Connection unavailable",

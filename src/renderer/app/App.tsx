@@ -6,7 +6,8 @@ import { PanelLeft, ArrowLeft, ChevronDown, House, Settings, Plus, KeyRound, Lis
 import { BrandMark } from "@atelier/ui/ui/brand-mark";
 
 import { WorkbenchSurface } from "../features/workbench/WorkbenchSurface";
-import { PageState } from "@atelier/ui/ui/page-state";
+import { WorkbenchFeedback } from "../features/workbench/WorkbenchFeedback";
+import { workbenchPhase } from "../features/workbench/feedback";
 import { Workbench, type WorkbenchHandle } from "../features/workbench/Workbench";
 import { WorkbenchStore } from "../features/workbench/context";
 import { FocusIsland } from "../features/workbench/FocusIsland";
@@ -75,10 +76,9 @@ export function App({ controller }: { controller: ApplicationController }) {
   const snapshot = state.snapshot;
   const session = sessionState?.snapshot?.workbench ?? null;
   const ready = state.status === "ready";
-  const sessionBusy = !!sessionState && (sessionState.busy || sessionState.status !== "ready");
-  const sessionLoading = sessionState?.status === "loading";
-  const error = state.error ?? sessionState?.error;
-  const writable = ready && !sessionBusy && !!session;
+  const sessionBlocked = !!sessionState && (sessionState.busy || sessionState.status !== "ready");
+  const phase = workbenchPhase(state.status, sessionState);
+  const writable = ready && !sessionBlocked && !!session;
   const focusedObjectId = useFocusedObject(view.kind === "conversation" ? view.sessionId : null);
   const inSettings = page === "settings";
   const mainTitle = view.kind === "home" ? i18n.formatMessage(commonMessages.home)
@@ -164,13 +164,10 @@ export function App({ controller }: { controller: ApplicationController }) {
     <Button variant="ghost" size="sm" onClick={event => workbench.current?.togglePanel("history", event.currentTarget)} aria-label={i18n.formatMessage(historyMessages.history)}><History /><span className="toolbar-label">{i18n.formatMessage(historyMessages.history)}</span></Button>
   </> : undefined;
 
-  const conversation = <WorkbenchSurface overlay={!session && !sessionLoading && view.kind === "conversation"
-    ? <div className="absolute inset-0 flex items-center justify-center px-6">
-      <PageState kind="error" title={i18n.formatMessage(commonMessages.unavailableTitle)} body={i18n.text(sessionState?.error ?? commonMessages.unavailableBody)}
-        action={<Button variant="outline" onClick={() => { void active?.refresh(); }} disabled={!ready}>{i18n.formatMessage(commonMessages.retry)}</Button>} />
-    </div> : undefined}>
+  const conversation = <WorkbenchSurface overlay={<WorkbenchFeedback key={active?.sessionId} phase={phase} hasContent={!!session}
+    error={phase === "unavailable" ? state.error : sessionState?.error ?? null} onRetry={() => { void active?.refresh(); }} />}>
     {session && active ? <Workbench key={session.id} ref={workbench} session={session} controller={active}
-      ready={ready} busy={sessionBusy} run={run} store={workbenchStore}
+      ready={ready} busy={sessionBlocked} run={run} store={workbenchStore}
       onHome={goHome} canDrop={creation.canDrop} onDropItems={creation.drop} /> : null}
   </WorkbenchSurface>;
   const sidebar: IslandSpec = {
@@ -204,12 +201,14 @@ export function App({ controller }: { controller: ApplicationController }) {
           {conversation}</motion.div>}
     </AnimatePresence>,
   };
-  // 全局错误经临时通知呈现：会话读取失败提供重试，其余错误可关闭。
-  const sessionFailed = !state.error && sessionState?.status === "error";
+  // 会话读取失败由工作台持续提示；后台不可用在工作台可见时也由同一入口承接。
+  const unavailableInWorkbench = view.kind === "conversation" && !inSettings && phase === "unavailable";
+  const appError = unavailableInWorkbench ? null : state.error;
+  const operationError = unavailableInWorkbench || sessionState?.status === "error" ? null : sessionState?.error;
+  const error = appError ?? operationError;
   useStateToast("app-error", error ? i18n.text(error) : null, {
     tone: "error",
-    action: sessionFailed ? { label: i18n.formatMessage(commonMessages.retry), onClick: () => { void active?.refresh(); } } : undefined,
-    onDismiss: sessionFailed ? undefined : state.error ? controller.clearError : active?.clearError,
+    onDismiss: appError ? controller.clearError : active?.clearError,
   });
 
   return <>

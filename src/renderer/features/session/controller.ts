@@ -109,7 +109,7 @@ export class SessionController {
         if (snapshot.revision < this.requiredRevision) { this.dirty = true; continue; }
         this.requiredRevision = snapshot.revision;
         this.publishedGeneration = generation;
-        this.update({ snapshot, status: "ready", missing: false });
+        this.update({ snapshot, status: "ready", missing: false, error: this.state.status === "error" ? null : this.state.error });
         this.acceptProgress(progress);
         const pending = this.pendingProgress;
         this.pendingProgress = null;

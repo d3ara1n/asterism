@@ -98,7 +98,7 @@ export class ApplicationController {
       do {
         this.dirty = false;
         const result = await this.bridge.execute({ type: "workspace.read" });
-        if (result.ok) this.update({ snapshot: result.snapshot, status: "ready" });
+        if (result.ok) this.update({ snapshot: result.snapshot, status: "ready", error: null });
         else this.update({ error: errorDisplay(result.error), ...(result.error.code === "unavailable" ? { status: "unavailable" as const } : {}) });
       } while (this.dirty);
     } catch { this.update({ status: "unavailable", error: commonMessages.connectionLost }); }

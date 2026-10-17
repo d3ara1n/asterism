@@ -57,7 +57,7 @@ export function Conversation({ onHome }: { onHome(): void }) {
       action={<Button variant="secondary" size="sm" onClick={state.missing ? onHome : () => { void session.refresh(); }}>{state.missing ? i18n.formatMessage(commonMessages.newConversation) : i18n.formatMessage(commonMessages.retry)}</Button>} />
   </div>;
 
-  const error = state.error ?? configurationError ?? interaction.error;
+  const error = (state.status === "error" ? null : state.error) ?? configurationError ?? interaction.error;
   const send = async () => {
     if (composerHidden) return;
     if (!await interaction.send()) return;

@@ -6,6 +6,19 @@ import { summarizeResourceStatus } from "./resource-status.ts";
 
 const snapshot: AppSnapshot = { workspace: { id: "w", title: "Workspace" }, sessions: [], plugins: [], restartRequired: false };
 describe("应用会话列表", () => {
+  // 工作台状态反馈：成功读取恢复可用后，旧连接错误必须撤下，不能转为过期的全局通知。
+  it("后台恢复后的静默读取清除连接错误", async () => {
+    const execute = vi.fn<() => Promise<CommandResult>>()
+      .mockResolvedValueOnce({ ok: false, error: { code: "unavailable", message: "Connection lost.", display: "Connection lost." } })
+      .mockResolvedValueOnce({ ok: true, snapshot });
+    const controller = new ApplicationController({ execute, onStatus: () => () => {},
+      session: { execute: vi.fn(), onChanged: () => () => {} } });
+    await controller.refresh();
+    expect(controller.getSnapshot()).toMatchObject({ status: "unavailable", error: "Connection lost." });
+    await controller.refresh({ quiet: true });
+    expect(controller.getSnapshot()).toMatchObject({ status: "ready", error: null, snapshot });
+  });
+
   // 工作台契约：同资源完整替换，查看只消费终态；相同数据不刷新，进度不单独持有。
   it("按资源保留最新状态，running 跨查看保留，终态查看即清除", () => {
     let receive!: EventHandler<ResourceStatus>;
