@@ -1,6 +1,6 @@
 # 内置插件公共 API（`@atelier/builtin-api`）
 
-内置实现与外部插件共同消费的领域契约和前端扩展 API，当前版本 **0.3.0**。插件身份为 `atelier.builtin`；本包不注册第二个插件，也不依赖 `@atelier/builtin` 实现。公共加载与生命周期规则见 [插件 SDK](../../docs/plugin-sdk.md#公共模块与契约身份)。
+内置实现与外部插件共同消费的领域契约和前端扩展 API，当前版本 **0.4.0**。插件身份为 `atelier.builtin`；本包不注册第二个插件，也不依赖 `@atelier/builtin` 实现。公共加载与生命周期规则见 [插件 SDK](../../docs/plugin-sdk.md#公共模块与契约身份)。
 
 ## 入口与边界
 
@@ -23,8 +23,8 @@
   "version": "1.0.0",
   "type": "module",
   "peerDependencies": {
-    "@atelier/sdk": "^0.20.0",
-    "@atelier/builtin-api": "^0.3.0"
+    "@atelier/sdk": "^0.21.0",
+    "@atelier/builtin-api": "^0.4.0"
   },
   "atelier": {
     "id": "example.input-review",
@@ -67,13 +67,17 @@ export default {
 | 接口 | 用法 |
 | --- | --- |
 | `agentUI.register({ id, Component }, { signal })` | `id` 使用贡献插件的 `namespace.name(...)`；返回幂等的释放函数，也随 signal 释放。登记不应放在模块顶层副作用中 |
+| `AgentToolbarItem` | 任意 `children` 呈现在输入工具栏；沿用相同登记入口，布局与显隐见 [Agent 扩展界面](../../docs/workbench.md#agent-扩展界面) |
+| `useAgentModelSelection()` | 返回只读 `AgentModelSelection`：`selection / reference / model / thinking`；解析与失效语义见 [前端视图与扩展入口](../../docs/plugin-sdk.md#前端视图与扩展入口) |
 | `AgentOverlay` | `position: "top" \| "center" \| "bottom"`、可选 `hideComposer`、任意 `children`；不显示时不挂载此组件 |
 | `AgentModal` | 受控 `open`、`title: UiText`、可选 `description / onOpenChange / hideComposer`、`size: "default" \| "wide"`（默认 default）与任意 `children` |
 | `AgentScrollArea` | overlay／modal 内的标准滚动区，`axis: "vertical" \| "horizontal" \| "both"`（默认 vertical）；支持 div 属性、`ref`、`className` 和 `style`，由内置实现统一处理焦点光圈留白与内容对齐 |
 | `agentUI.subscribe / getSnapshot` | 内置实现订阅已登记贡献，保持同一公共服务实例 |
-| `AgentUIRendererProvider` | 内置实现注入两类呈现组件及标准滚动区；第三方作者直接使用 `AgentOverlay / AgentModal / AgentScrollArea` |
+| `AgentUIRendererProvider / AgentModelSelectionProvider` | 内置实现注入三类呈现组件、标准滚动区及当前模型选择；第三方作者使用对应呈现组件与只读 hook |
 
 每个贡献组件可同时呈现多个界面，通常用自己的 hooks 订阅业务状态。`useRendererObject()` 绑定当前 Agent；`useRendererPreferences()` 绑定贡献插件，其他 SDK hooks 沿用当前卡片的服务。UI 只改变呈现，不修改工具的取消、超时或结果协议。完整交互规则见 [Agent 扩展界面](../../docs/workbench.md#agent-扩展界面)。
+
+内置配置选择器与上下文占用是实际使用的工具栏示例，见 [`Toolbar.tsx`](../builtin/src/agent/conversation/Toolbar.tsx)；两者在 Agent 的 renderer `prepare` 中独立登记，均通过 `AgentToolbarItem` 呈现，并消费 `useAgentModelSelection()`。配置提交使用内置交互协调器，读选择的公共 hook 不提供写权限。
 
 需要局部滚动时，用 `<AgentScrollArea style={{ maxHeight: "16rem" }}>…</AgentScrollArea>` 包裹正文，固定标题和按钮放在外面；插件无需自行配置焦点光圈的 padding 或负边距。视觉规则见 [对象卡片尺寸](../../docs/design-system.md#对象卡片尺寸)。
 

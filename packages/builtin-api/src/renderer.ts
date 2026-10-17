@@ -1,5 +1,7 @@
 import { createContext, createElement, useContext, type ComponentProps, type ComponentType, type ReactNode } from "react";
-import { pluginOf, pluginNamespace, type UiText } from "@atelier/sdk/contracts";
+import { pluginOf, pluginNamespace, type ThinkingLevel, type UiText } from "@atelier/sdk/contracts";
+import type { AgentSelection } from "./configuration.ts";
+import type { CatalogModel } from "./catalogs.ts";
 
 /** 每个已展开的 Agent 卡片挂载一份；通过 SDK useRendererObject 取得关联对象。 */
 export interface AgentUIContribution {
@@ -40,6 +42,25 @@ function createAgentUIRegistry() {
 
 export const agentUI = createAgentUIRegistry();
 
+/** 当前选择与目录解析结果；不代表正在执行的请求所用模型，也不包含凭据。 */
+export interface AgentModelSelection {
+  readonly selection: Readonly<AgentSelection> | null;
+  readonly reference: string | null;
+  readonly model: Readonly<CatalogModel> | null;
+  readonly thinking: ThinkingLevel | null;
+}
+const ModelSelection = createContext<AgentModelSelection | null>(null);
+/** 由内置 Agent 为同一卡片及其全部贡献注入只读选择。 */
+export const AgentModelSelectionProvider = ModelSelection.Provider;
+export function useAgentModelSelection(): AgentModelSelection {
+  const selection = useContext(ModelSelection);
+  if (!selection) throw new Error("Agent model selection must be read inside an Agent card.");
+  return selection;
+}
+
+export interface AgentToolbarItemProps {
+  children: ReactNode;
+}
 export type AgentOverlayPosition = "top" | "center" | "bottom";
 export interface AgentOverlayProps {
   position: AgentOverlayPosition;
@@ -65,6 +86,7 @@ export interface AgentScrollAreaProps extends ComponentProps<"div"> {
 
 /** 内置 Agent 注入布局实现；公共包不依赖实现包或控件库。 */
 export interface AgentUIRenderer {
+  ToolbarItem: ComponentType<AgentToolbarItemProps>;
   Overlay: ComponentType<AgentOverlayProps>;
   Modal: ComponentType<AgentModalProps>;
   ScrollArea: ComponentType<AgentScrollAreaProps>;
@@ -78,6 +100,9 @@ function useAgentUIRenderer(): AgentUIRenderer {
 }
 export function AgentOverlay(props: AgentOverlayProps): ReactNode {
   return createElement(useAgentUIRenderer().Overlay, props);
+}
+export function AgentToolbarItem(props: AgentToolbarItemProps): ReactNode {
+  return createElement(useAgentUIRenderer().ToolbarItem, props);
 }
 export function AgentModal(props: AgentModalProps): ReactNode {
   return createElement(useAgentUIRenderer().Modal, props);

@@ -1,21 +1,23 @@
 import { createContext, useContext, useId, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { pluginOf } from "@atelier/sdk/contracts";
-import { RendererPreferencesProvider, useI18n } from "@atelier/sdk/renderer";
-import { agentUI, AgentUIRendererProvider, type AgentUIContribution, type AgentOverlayPosition, type AgentOverlayProps, type AgentModalProps } from "@atelier/builtin-api/renderer";
+import { RendererPreferencesProvider, useI18n, useRendererCatalogs } from "@atelier/sdk/renderer";
+import { ModelConfiguration, resolveAgentModelSelection, type AgentSelection } from "@atelier/builtin-api/contracts";
+import { agentUI, AgentUIRendererProvider, AgentModelSelectionProvider, type AgentModelSelection, type AgentToolbarItemProps, type AgentUIContribution, type AgentOverlayPosition, type AgentOverlayProps, type AgentModalProps } from "@atelier/builtin-api/renderer";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@atelier/ui/ui/dialog";
 import { useBuiltinRendererServices } from "../../renderer-context";
 import { createComposerVisibility } from "./composer-visibility";
 import { ScrollArea } from "./ScrollArea";
 
+type RegionPosition = AgentOverlayPosition | "toolbar";
 interface CardUI {
-  targets: Record<AgentOverlayPosition, HTMLDivElement | null>;
-  refs: Record<"top" | "bottom", (element: HTMLDivElement | null) => void>;
+  targets: Record<RegionPosition, HTMLDivElement | null>;
+  refs: Record<"top" | "bottom" | "toolbar", (element: HTMLDivElement | null) => void>;
   composer: ReturnType<typeof createComposerVisibility>;
 }
 const Context = createContext<CardUI | null>(null);
 const ContributionOrder = createContext(0);
-const renderer = { Overlay, Modal, ScrollArea };
+const renderer = { ToolbarItem, Overlay, Modal, ScrollArea };
 function useCardUI() {
   const context = useContext(Context);
   if (!context) throw new Error("Agent UI requires its card layout.");
@@ -23,17 +25,24 @@ function useCardUI() {
 }
 
 /** 为每张卡片保留独立目标和输入区约束；portal 保留贡献者的 React context。 */
-export function AgentUI({ children }: { children: ReactNode }) {
+export function AgentUI({ selection, children }: { selection: AgentSelection | null; children: ReactNode }) {
   const [top, setTop] = useState<HTMLDivElement | null>(null);
   const [center, setCenter] = useState<HTMLDivElement | null>(null);
   const [bottom, setBottom] = useState<HTMLDivElement | null>(null);
+  const [toolbar, setToolbar] = useState<HTMLDivElement | null>(null);
   const [composer] = useState(createComposerVisibility);
+  const configuration = useRendererCatalogs().get(ModelConfiguration);
+  const modelSelection = useMemo<AgentModelSelection>(() => ({
+    selection,
+    ...(selection && configuration ? resolveAgentModelSelection(configuration, selection)
+      : { reference: null, model: null, thinking: null }),
+  }), [selection, configuration]);
   const value = useMemo<CardUI>(() => ({
-    targets: { top, center, bottom },
-    refs: { top: setTop, bottom: setBottom },
+    targets: { top, center, bottom, toolbar },
+    refs: { top: setTop, bottom: setBottom, toolbar: setToolbar },
     composer,
-  }), [top, center, bottom, composer]);
-  return <Context.Provider value={value}><AgentUIRendererProvider value={renderer}>
+  }), [top, center, bottom, toolbar, composer]);
+  return <Context.Provider value={value}><AgentUIRendererProvider value={renderer}><AgentModelSelectionProvider value={modelSelection}>
     <div className="relative flex min-h-0 flex-1 flex-col [container-type:size]">
       {children}
       <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
@@ -41,7 +50,12 @@ export function AgentUI({ children }: { children: ReactNode }) {
       </div>
     </div>
     <Contributions />
-  </AgentUIRendererProvider></Context.Provider>;
+  </AgentModelSelectionProvider></AgentUIRendererProvider></Context.Provider>;
+}
+
+export function AgentToolbar() {
+  const { refs } = useCardUI();
+  return <div ref={refs.toolbar} className="flex min-w-0 flex-wrap items-center gap-0.5 empty:hidden" />;
 }
 
 export function AgentUIRegion({ position }: { position: "top" | "bottom" }) {
@@ -70,22 +84,37 @@ function useHideComposer(hidden: boolean) {
   useLayoutEffect(() => hidden ? composer.hide() : undefined, [composer, hidden]);
 }
 function Overlay({ position, hideComposer = false, children }: AgentOverlayProps) {
+  useHideComposer(hideComposer);
+  // 外壳不裁切；局部滚动通过 AgentScrollArea 统一提供视口和焦点光圈留白。
+  return <ContributionPortal position={position}>
+    <div className="surface-floating nokey pointer-events-auto min-h-0 p-3">{children}</div>
+  </ContributionPortal>;
+}
+function ToolbarItem({ children }: AgentToolbarItemProps) {
+  return <ContributionPortal position="toolbar" className="nodrag nopan nokey flex min-w-0 max-w-full items-center">
+    {children}
+  </ContributionPortal>;
+}
+function ContributionPortal({ position, className = "", children }: {
+  position: RegionPosition; className?: string; children: ReactNode;
+}) {
   const { targets } = useCardUI();
   const order = useContext(ContributionOrder);
   const [container] = useState(() => document.createElement("div"));
-  useHideComposer(hideComposer);
   const target = targets[position];
   // portal 的目标保持稳定，位置变化只移动容器，保留表单状态和订阅。
   useLayoutEffect(() => {
     if (!target) { container.remove(); return; }
     const focus = document.activeElement;
-    target.appendChild(container);
+    container.style.order = String(order);
+    // DOM 顺序与视觉顺序一致，迟到显示的贡献仍按登记顺序参与键盘导航。
+    const next = Array.from(target.children).find(child => child instanceof HTMLElement && Number(child.style.order) > order);
+    target.insertBefore(container, next ?? null);
     if (focus instanceof HTMLElement && container.contains(focus)) focus.focus({ preventScroll: true });
-  }, [container, target]);
-  useLayoutEffect(() => { container.style.order = String(order); }, [container, order]);
+  }, [container, target, order]);
+  useLayoutEffect(() => { container.className = className; }, [container, className]);
   useLayoutEffect(() => () => { container.remove(); }, [container]);
-  // 外壳不裁切；局部滚动通过 AgentScrollArea 统一提供视口和焦点光圈留白。
-  return target ? createPortal(<div className="surface-floating nokey pointer-events-auto min-h-0 p-3">{children}</div>, container) : null;
+  return target ? createPortal(children, container) : null;
 }
 function Modal({ open, onOpenChange, title, description, size = "default", hideComposer = false, children }: AgentModalProps) {
   const i18n = useI18n();

@@ -1,10 +1,18 @@
 import { type UiText } from "@atelier/sdk/contracts";
 import type { RendererObjectContext } from "@atelier/sdk/renderer";
 import { agentAction, SubmitAgentInput, type AgentCommand, type AgentSelection } from "@atelier/builtin-api/contracts";
-import { useState, useSyncExternalStore } from "react";
+import { createContext, useContext, useState, useSyncExternalStore } from "react";
 import { SubmissionIdentity } from "./submission";
 import { createMessageDraft } from "./draft";
 import type { AgentExecutionState } from "../state";
+
+const Interaction = createContext<ReturnType<typeof useAgentConversation> | null>(null);
+export const AgentConversationProvider = Interaction.Provider;
+export function useConversationInteraction() {
+  const interaction = useContext(Interaction);
+  if (!interaction) throw new Error("Agent conversation interaction requires its card.");
+  return interaction;
+}
 
 /** 草稿与提交身份由宿主按对象保留：卡片重挂载、聚焦与会话切换不丢失文件和重试资格，对象离开投影时关闭草稿。 */
 const interactionKey = "atelier.builtin/agent.interaction";
@@ -19,7 +27,7 @@ export function useAgentConversation(object: RendererObjectContext, hasSelection
   const { ready, busy, status } = object.view;
   const writable = ready && !busy && status === "ready" && executionState !== "running" && hasSelection;
   return {
-    draft, error, setError, writable, configurable: ready && !busy && status === "ready",
+    draft, error, setError, writable, executionState, configurable: ready && !busy && status === "ready",
     async configure(selection: AgentSelection) {
       const result = await command({ type: "configure", selection });
       if (result.ok) setError(null);

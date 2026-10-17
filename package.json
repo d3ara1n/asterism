@@ -26,7 +26,7 @@
     "@ai-sdk/anthropic": "4.0.78",
     "@ai-sdk/openai": "4.0.91",
     "@atelier/builtin": "^0.1.0",
-    "@atelier/builtin-api": "^0.3.0",
+    "@atelier/builtin-api": "^0.4.0",
     "@atelier/sdk": "^0.21.0",
     "@atelier/ui": "^0.1.0",
     "@formatjs/icu-messageformat-parser": "3.5.21",

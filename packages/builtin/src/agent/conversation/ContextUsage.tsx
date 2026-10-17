@@ -1,7 +1,8 @@
 import { useMemo } from "react";
 import { modelReference } from "@atelier/sdk/contracts";
 import { useI18n, useRendererCatalogs, useRendererObject } from "@atelier/sdk/renderer";
-import { ModelConfiguration, resolveAgentModel, type AgentSelection } from "@atelier/builtin-api/contracts";
+import { ModelConfiguration } from "@atelier/builtin-api/contracts";
+import { useAgentModelSelection } from "@atelier/builtin-api/renderer";
 import { formatCount } from "@atelier/ui/format-count";
 import { contextMessages as messages } from "../../messages/context";
 import { contextInsight } from "../context/insight";
@@ -11,11 +12,12 @@ import { percent } from "../panel-kit";
 import { MetricTooltip } from "./MetricTooltip";
 
 /** 对话计量与上下文面板同源；仅显示已保存请求的实报占用。 */
-export function ContextUsage({ selection }: { selection: AgentSelection }) {
+export function ContextUsage() {
   const i18n = useI18n();
   const object = useRendererObject();
   const snapshot = object.session.snapshot();
   const configuration = useRendererCatalogs().get(ModelConfiguration);
+  const { model: current } = useAgentModelSelection();
   const result = useMemo(() => {
     if (!snapshot) return null;
     try { return { usage: contextInsight(snapshot, object.ref.id).usage }; }
@@ -23,7 +25,6 @@ export function ContextUsage({ selection }: { selection: AgentSelection }) {
   }, [snapshot, object.ref.id]);
   const usage = result?.usage;
   const measured = usage ? diagnosticModel({ model: usage.model, modelScope: usage.scope }, configuration?.models ?? []) : null;
-  const current = configuration ? resolveAgentModel(configuration, selection) : null;
   const changed = measured && current && modelReference(measured) !== modelReference(current);
   const window = measured?.contextWindow ?? null;
   const input = usage && !usage.compressedAfter ? usage.input : null;

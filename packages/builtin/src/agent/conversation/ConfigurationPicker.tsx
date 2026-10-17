@@ -3,6 +3,7 @@ import { ArrowLeft, Bot, Brain, ChevronDown, ChevronRight, Cpu, type LucideIcon 
 import { availableThinkingLevels, type ThinkingLevel } from "@atelier/sdk/contracts";
 import { useI18n, useRendererCatalogs } from "@atelier/sdk/renderer";
 import { type AgentSelection, ModelConfiguration, resolveAgentModelSelection } from "@atelier/builtin-api/contracts";
+import { useAgentModelSelection } from "@atelier/builtin-api/renderer";
 import { commonMessages } from "@atelier/ui/messages/common";
 import { modelSelectionMessages, thinkingLabels } from "@atelier/ui/messages/model-selection";
 import { Button } from "@atelier/ui/ui/button";
@@ -25,6 +26,7 @@ export function AgentConfigurationPicker({ selection, disabled, onChange }: {
 }) {
   const i18n = useI18n();
   const configuration = useRendererCatalogs().get(ModelConfiguration);
+  const resolved = useAgentModelSelection();
   const [open, setOpen] = useState(false);
   const [page, setPage] = useState<Page | null>(null);
   const [providerId, setProviderId] = useState<string | null>(null);
@@ -35,12 +37,11 @@ export function AgentConfigurationPicker({ selection, disabled, onChange }: {
   const rows = useRef<Partial<Record<Page, HTMLButtonElement | null>>>({});
   const blocked = disabled || saving || !configuration;
   const selectedAgent = configuration?.agents.find(agent => agent.id === selection.agent && agent.enabled);
-  const resolved = configuration ? resolveAgentModelSelection(configuration, selection) : null;
   const model = resolved?.model ?? null;
   const levels = availableThinkingLevels(model);
   const unsupported = model?.capabilities.reasoning === false;
   const unavailable = i18n.text(configurationMessages.unavailable);
-  const modelLabel = (value: typeof resolved) => value?.model?.name
+  const modelLabel = (value: Pick<typeof resolved, "model" | "reference"> | null) => value?.model?.name
     ?? (value?.reference ? i18n.formatMessage(modelSelectionMessages.unavailable, { value: value.reference }) : i18n.text(configurationMessages.noModel));
   const thinkingLabel = (thinking: ThinkingLevel | null) => {
     if (!model) return unavailable;

@@ -16,7 +16,7 @@
     "sonner": "2.0.8",
     "streamdown": "2.7.0",
     "@atelier/sdk": "^0.21.0",
-    "@atelier/builtin-api": "^0.3.0",
+    "@atelier/builtin-api": "^0.4.0",
     "@atelier/ui": "^0.1.0"
   },
   "peerDependencies": {

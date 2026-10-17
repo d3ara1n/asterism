@@ -104,9 +104,9 @@ describe("内置公共包", () => {
     const f = fixture([compatibleRange, compatibleRange]);
     for (const [index, root] of f.consumers.entries()) {
       file(root, "renderer.ts", `
-        import { agentUI, AgentOverlay, AgentScrollArea } from "@atelier/builtin-api/renderer";
+        import { agentUI, AgentOverlay, AgentScrollArea, AgentToolbarItem, useAgentModelSelection } from "@atelier/builtin-api/renderer";
         import { createElement } from "react";
-        export { agentUI, AgentOverlay, AgentScrollArea };
+        export { agentUI, AgentOverlay, AgentScrollArea, AgentToolbarItem, useAgentModelSelection };
         export default { resources: [], cards: [], tools: [], async prepare({ signal }) {
           agentUI.register({ id: "fixture.consumer${index}/panel",
             Component: () => createElement(AgentOverlay, { position: "bottom", hideComposer: true,
@@ -123,7 +123,9 @@ describe("内置公共包", () => {
     const loaded = await Promise.all(packages.map(item => import(pathToFileURL(join(f.cache, item.renderer!)).href)));
     expect(loaded.every(module => module.agentUI === builtinRendererAPI.agentUI
       && module.AgentOverlay === builtinRendererAPI.AgentOverlay
-      && module.AgentScrollArea === builtinRendererAPI.AgentScrollArea)).toBe(true);
+      && module.AgentScrollArea === builtinRendererAPI.AgentScrollArea
+      && module.AgentToolbarItem === builtinRendererAPI.AgentToolbarItem
+      && module.useAgentModelSelection === builtinRendererAPI.useAgentModelSelection)).toBe(true);
     const lifetime = new AbortController();
     try {
       for (const module of loaded) await module.default.prepare({ signal: lifetime.signal });

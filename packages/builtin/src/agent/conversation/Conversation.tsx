@@ -4,8 +4,6 @@ import { PageState } from "@atelier/ui/ui/page-state";
 import { Button } from "@atelier/ui/ui/button";
 import { ConversationTimeline } from "./ConversationTimeline";
 
-import { AgentConfigurationPicker } from "./ConfigurationPicker";
-import { ContextUsage } from "./ContextUsage";
 import { Alert, AlertDescription } from "@atelier/ui/ui/alert";
 
 import { MessageComposer } from "./Composer";
@@ -16,12 +14,10 @@ import { useI18n, useRendererObject, useRendererModels, useRendererCatalogs } fr
 import { useOutputFollow } from "./output-follow";
 import { useMemo, useRef } from "react";
 
-import type { AgentSelection } from "@atelier/builtin-api/contracts";
 import { conversationTimeline } from "./timeline";
 
-import { useAgentConversation } from "./interaction";
-import { agentExecutionState, type AgentTurnState } from "../state";
-import { AgentUIRegion, useComposerHidden } from "../ui/AgentUI";
+import { useConversationInteraction } from "./interaction";
+import { AgentToolbar, AgentUIRegion, useComposerHidden } from "../ui/AgentUI";
 
 /** 卡片标题栏中的执行状态；历史属于会话，入口在窗口标题栏。 */
 export function ConversationActions() {
@@ -38,12 +34,12 @@ export function ConversationActions() {
 }
 
 /** 代理卡片内容：当前路径的最终视图与输入区；没有分支感，回溯在会话历史中进行。 */
-export function Conversation({ selection, turnState, onHome }: { selection: AgentSelection | null; turnState: AgentTurnState; onHome(): void }) {
+export function Conversation({ onHome }: { onHome(): void }) {
   const i18n = useI18n();
   const object = useRendererObject();
   const { view: state, session } = object;
-  const executionState = agentExecutionState(turnState, object.activity.running);
-  const interaction = useAgentConversation(object, selection !== null, executionState);
+  const interaction = useConversationInteraction();
+  const { executionState } = interaction;
   const models = useRendererModels();
   const catalogs = useRendererCatalogs();
   const { ready } = state;
@@ -90,11 +86,7 @@ export function Conversation({ selection, turnState, onHome }: { selection: Agen
     </div>
     <AgentUIRegion position="bottom" />
     {!composerHidden && <footer className="shrink-0 space-y-1 border-t px-3 pt-1 pb-2">
-      {selection && <div className="flex min-w-0 flex-wrap items-center gap-0.5">
-        <AgentConfigurationPicker selection={selection} disabled={!interaction.configurable}
-          onChange={interaction.configure} />
-        <ContextUsage selection={selection} />
-      </div>}
+      <AgentToolbar />
       {error && <Alert variant="destructive"><AlertDescription className="flex flex-wrap items-center gap-2">
         <span className="flex-1">{i18n.text(error)}</span>
         <Button variant="ghost" size="sm" onClick={() => { void session.refresh(); }}>{i18n.formatMessage(conversationMessages.reload)}</Button>
