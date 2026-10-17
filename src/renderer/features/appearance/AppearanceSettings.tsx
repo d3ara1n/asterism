@@ -161,7 +161,7 @@ export function AppearanceSettings() {
  */
 function LivePreview({ appearance }: { appearance: Appearance }) {
   const i18n = useI18n();
-  return <div aria-hidden="true" className="surface relative mt-2 overflow-hidden bg-background">
+  return <div aria-hidden="true" className="surface relative mt-2 overflow-hidden bg-canvas">
     <Texture kind={appearance.canvas} gap={20} />
     <div className="relative flex items-center px-8 py-7">
       <div className="w-48 shrink-0 rounded-lg border bg-card p-3 shadow-sm">
@@ -178,7 +178,7 @@ function LivePreview({ appearance }: { appearance: Appearance }) {
         <span className="size-2 shrink-0 rounded-full border-2 border-card bg-primary" />
         <span className="h-px flex-1 border-t-[1.5px] border-dashed border-primary" />
         <span className="size-2 shrink-0 rounded-full border-2 border-card bg-primary" />
-        <span className="absolute left-1/2 -translate-x-1/2 -translate-y-4 rounded-sm bg-background px-1 text-[10px] text-muted-foreground">{i18n.formatMessage(appearanceMessages.previewRead)}</span>
+        <span className="absolute left-1/2 -translate-x-1/2 -translate-y-4 rounded-sm bg-canvas px-1 text-[10px] text-muted-foreground">{i18n.formatMessage(appearanceMessages.previewRead)}</span>
       </div>
       <div className="w-52 shrink-0 rounded-lg border bg-card shadow-sm">
         <div className="flex items-center gap-1.5 p-3 pb-2">

@@ -6,7 +6,7 @@ import { useAppearance, useScheme } from "../appearance/state";
 /** 工作台底板随导航入场，内容读取不影响页面过渡。 */
 export function WorkbenchSurface({ children, overlay }: { children?: ReactNode; overlay?: ReactNode }) {
   const scheme = useScheme();
-  return <div className="relative h-full overflow-hidden bg-background">
+  return <div className="relative h-full overflow-hidden bg-canvas">
     {children ?? <ReactFlowProvider>
       <ReactFlow colorMode={scheme} nodesDraggable={false} nodesConnectable={false}
         elementsSelectable={false} panOnDrag={false} zoomOnScroll={false} zoomOnPinch={false} zoomOnDoubleClick={false}>

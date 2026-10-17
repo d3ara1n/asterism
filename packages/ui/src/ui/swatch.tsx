@@ -34,7 +34,7 @@ function TileSwatch({ value, label, children, className }: { value: string; labe
   return <RadioGroupPrimitive.Item value={value} data-slot="tile-swatch"
     className={cn("flex w-24 flex-col overflow-hidden rounded-md border bg-card text-left outline-none transition-colors hover:border-ring/60",
       "focus-visible:ring-[3px] focus-visible:ring-ring/50 data-[state=checked]:border-ring data-[state=checked]:ring-1 data-[state=checked]:ring-ring", className)}>
-    <span className="relative block h-14 border-b bg-background">{children}</span>
+    <span className="relative block h-14 border-b bg-canvas">{children}</span>
     <span className="px-2 py-1 text-xs">{label}</span>
   </RadioGroupPrimitive.Item>
 }

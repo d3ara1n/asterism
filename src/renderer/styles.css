@@ -9,29 +9,30 @@
   color-scheme: light;
   /* shadcn 标准语义 token；组件与业务只消费这一层。主题替换整组值即可。 */
   --radius: 8px;
-  --background: #edf1f0;
-  --foreground: #263c36;
+  --background: #ffffff;
+  --foreground: #202020;
   --card: #ffffff;
-  --card-foreground: #263c36;
+  --card-foreground: #202020;
   --popover: #ffffff;
-  --popover-foreground: #263c36;
-  --primary: #256651;
+  --popover-foreground: #202020;
+  --primary: #208368;
   --primary-foreground: #ffffff;
-  --secondary: #e7efeb;
-  --secondary-foreground: #263c36;
-  --muted: #e7efeb;
-  --muted-foreground: #53695f;
-  --accent: #e7efeb;
-  --accent-foreground: #263c36;
-  --destructive: #8f403d;
+  --secondary: #e6f7ed;
+  --secondary-foreground: #1d3b31;
+  --muted: #f0f0f0;
+  --muted-foreground: #646464;
+  --accent: #e8e8e8;
+  --accent-foreground: #202020;
+  --destructive: #ce2c31;
   --success: #218358;
   --warning: #ab6400;
-  --border: #d3dfd9;
-  --input: #d3dfd9;
-  --ring: #438c72;
-  /* 工坊扩展：画布纹理与选区。 */
-  --canvas-grid: #c4cfca;
-  --selection: #cae5d7;
+  --border: #e0e0e0;
+  --input: #d9d9d9;
+  --ring: #56ba9f;
+  /* 工坊扩展：画布底色、纹理与选区。 */
+  --canvas: #f0f0f0;
+  --canvas-grid: #d9d9d9;
+  --selection: #c3e9d7;
   /* 图表分类色：Radix 第 9 级，亮暗同值；运行时由 themeTokens 写入。 */
   --chart-1: #0090ff; --chart-2: #12a594; --chart-3: #ffc53d; --chart-4: #6e56cf;
   --chart-5: #e93d82; --chart-6: #f76b15; --chart-7: #00a2c7; --chart-8: #ab4aba;
@@ -41,26 +42,27 @@
   --motion-page: 380ms;
   --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
-/* 暗色首帧兜底（苔原 jade + sage）；运行时由 themeTokens 覆盖。 */
+/* 暗色首帧兜底（jade + gray）；运行时由 themeTokens 覆盖。 */
 @media (prefers-color-scheme: dark) {
   :root {
     color-scheme: dark;
-    --background: #101211; --foreground: #eceeed;
-    --card: #171918; --card-foreground: #eceeed;
-    --popover: #202221; --popover-foreground: #eceeed;
-    --primary: #29a383; --primary-foreground: #101211;
-    --secondary: #272a29; --secondary-foreground: #eceeed;
-    --muted: #202221; --muted-foreground: #adb5b2;
-    --accent: #272a29; --accent-foreground: #eceeed;
-    --destructive: #ff9592; --border: #373b39; --input: #444947; --ring: #2a7e68;
+    --background: #111111; --foreground: #eeeeee;
+    --card: #191919; --card-foreground: #eeeeee;
+    --popover: #222222; --popover-foreground: #eeeeee;
+    --primary: #29a383; --primary-foreground: #111111;
+    --secondary: #0f2e22; --secondary-foreground: #1fd8a4;
+    --muted: #222222; --muted-foreground: #b4b4b4;
+    --accent: #2a2a2a; --accent-foreground: #eeeeee;
+    --destructive: #ff9592; --border: #3a3a3a; --input: #484848; --ring: #2a7e68;
     --success: #3dd68c; --warning: #ffca16;
-    --canvas-grid: #373b39; --selection: #114837;
+    --canvas: #111111; --canvas-grid: #3a3a3a; --selection: #114837;
   }
 }
 /* shadcn 组件自带的 dark: 类绑定到解析后的亮暗；业务代码不写 dark:。 */
 @custom-variant dark (&:where([data-mode=dark], [data-mode=dark] *));
 @theme inline {
   --color-background: var(--background);
+  --color-canvas: var(--canvas);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
@@ -181,7 +183,7 @@
   .space-screen { @apply relative isolate h-full min-h-0 w-full shrink-0 overflow-hidden rounded-lg outline-none; }
   /* 屏铺满 Space、贴住窗口边缘；滚动容器在屏内部留出 --space-inset。带底板的屏自身让出边距。 */
   .space-screen[data-surface] {
-    @apply surface bg-background;
+    @apply surface bg-canvas;
     margin: 0 var(--space-inset) var(--space-inset);
     width: calc(100% - 2 * var(--space-inset));
     height: calc(100% - var(--space-inset));
@@ -274,7 +276,9 @@
   --diffs-min-number-column-width: 3ch;
 }
 .react-flow__edge-text { fill: var(--muted-foreground); font-family: var(--font-sans); font-size: 10px; }
-.react-flow__edge-textbg { fill: var(--background); }
+.react-flow__edge-textbg { fill: var(--canvas); }
+/* 画布底色只来自 canvas token；xyflow 暗色模式自带的 #141414 不另起一层。 */
+.react-flow { --xy-background-color: var(--canvas); }
 .react-flow__handle { width: 7px; height: 7px; background: var(--primary); border: 2px solid var(--card); }
 /* 复用画布缩放控件；右下角独立命中区与四边的连线端点分开。 */
 .react-flow__resize-control.object-resize-handle {

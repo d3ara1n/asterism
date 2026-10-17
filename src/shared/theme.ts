@@ -32,7 +32,7 @@ export function fontStack(family: string | null, fallback: string): string {
 export const appearanceSchema = z.object({
   mode: z.enum(modes).catch("system"),
   accent: z.enum(accentIds).catch("jade"),
-  gray: z.enum(grayIds).catch("sage"),
+  gray: z.enum(grayIds).catch("gray"),
   density: z.enum(densities).catch("standard"),
   radius: z.enum(radii).catch("md"),
   canvas: z.enum(canvasPatterns).catch("dots"),
@@ -43,7 +43,7 @@ export const appearanceSchema = z.object({
   codeFontSize: z.number().int().min(codeFontSizes[0]).max(codeFontSizes[codeFontSizes.length - 1]).nullable().default(null).catch(null),
 });
 export type Appearance = z.infer<typeof appearanceSchema>;
-export const defaultAppearance: Appearance = { mode: "system", accent: "jade", gray: "sage", density: "standard", radius: "md", canvas: "dots", uiFont: null, codeFont: null, codeFontSize: null };
+export const defaultAppearance: Appearance = { mode: "system", accent: "jade", gray: "gray", density: "standard", radius: "md", canvas: "dots", uiFont: null, codeFont: null, codeFontSize: null };
 
 /** 读取的原始数据不可信：逐项回退到默认值，不因单项损坏丢弃整份设置。 */
 export function parseAppearance(raw: unknown): Appearance {
@@ -95,7 +95,7 @@ export function contrastRatio(a: string, b: string): number {
   const [light, dark] = [luminance(a), luminance(b)].sort((x, y) => y - x);
   return (light + 0.05) / (dark + 0.05);
 }
-/** 实色主色上的文字：在白与深灰之间取对比度更高者（琥珀等亮色上自动用深色字）。 */
+/** 实色主色上的文字：在白与深灰之间取对比度更高者，9 级的明亮色相（jade、blue、orange 等）上自动用深色字。 */
 function onSolid(background: string, dark: string): string {
   return contrastRatio(background, "#ffffff") >= contrastRatio(background, dark) ? "#ffffff" : dark;
 }
@@ -109,19 +109,22 @@ export function themeTokens(appearance: Appearance, scheme: Scheme): Record<stri
   const green = scale("green", scheme);
   const amber = scale("amber", scheme);
   const dark = scheme === "dark";
-  // 亮色用 11 级保证白字 AA；暗色用 9 级实色，文字色按对比度选。
+  // 亮色用 11 级保证白字与作文字色时 AA；暗色用 9 级实色，文字色按对比度选。
   const primary = dark ? a(9) : a(11);
   const fg = g(12);
   return {
-    background: dark ? g(1) : g(3), foreground: fg,
+    // background 遵循 shadcn 约定作页面底色（亮色白）；canvas 为工坊扩展，只给工作台底板等画布区域。
+    background: dark ? g(1) : "#ffffff", foreground: fg, canvas: dark ? g(1) : g(3),
     card: dark ? g(2) : "#ffffff", "card-foreground": fg,
     popover: dark ? g(3) : "#ffffff", "popover-foreground": fg,
     primary, "primary-foreground": onSolid(primary, scale(appearance.gray, "dark")(1)),
-    secondary: g(4), "secondary-foreground": fg,
+    // 当前项与标签：主题色浅底；亮色用 12 级、暗色用 11 级文字保证 AA。
+    secondary: a(3), "secondary-foreground": dark ? a(11) : a(12),
     muted: g(3), "muted-foreground": g(11),
     accent: g(4), "accent-foreground": fg,
-    // 状态色统一取 11 级：亮暗两侧均可作文字与图标色。
-    destructive: red(11), success: green(11), warning: amber(11), border: g(6), input: g(7), ring: a(8),
+    // 状态色统一取 11 级：亮暗两侧均可作文字与图标色。亮色边框退一级，弱化表面描边。
+    destructive: red(11), success: green(11), warning: amber(11),
+    border: dark ? g(6) : g(5), input: dark ? g(7) : g(6), ring: a(8),
     "canvas-grid": g(6), selection: a(5),
     // 图表分类色：固定色相第 9 级，不随主题色与灰色变化；只用于图形填充。
     ...Object.fromEntries(chartHues.map((hue, index) => [`chart-${index + 1}`, scale(hue, scheme)(9)])),
