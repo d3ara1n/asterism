@@ -1,6 +1,22 @@
 import { defineMessages, pluginNamespace } from "@atelier/sdk/contracts";
 
 export const pluginsMessages = pluginNamespace("atelier.host").messages("en", defineMessages({
+  application: { id: "settings.application", defaultMessage: "Application" },
+  plugins: { id: "settings.plugins", defaultMessage: "Plugins" },
+  search: { id: "plugins.search", defaultMessage: "Search plugins…" },
+  filter: { id: "plugins.filter", defaultMessage: "Filter plugins" },
+  all: { id: "plugins.all", defaultMessage: "All plugins" },
+  builtIn: { id: "plugins.builtIn", defaultMessage: "Built-in" },
+  noResults: { id: "plugins.noResults", defaultMessage: "No matching plugins" },
+  noPage: { id: "plugins.noPage", defaultMessage: "This plugin does not provide a settings page." },
+  pageUnavailable: { id: "plugins.pageUnavailable", defaultMessage: "The settings page is unavailable. Check the plugin status above." },
+  pageFailed: { id: "plugins.pageFailed", defaultMessage: "The plugin settings page could not be displayed." },
+  retry: { id: "plugins.retry", defaultMessage: "Try again" },
+  removeTitle: { id: "plugins.removeTitle", defaultMessage: "Remove this plugin?" },
+  removeHint: { id: "plugins.removeHint", defaultMessage: "Removal takes effect after restarting. Plugin data and session history are kept." },
+  cancel: { id: "plugins.cancel", defaultMessage: "Cancel" },
+  operationFailed: { id: "plugins.operationFailed", defaultMessage: "The plugin operation failed. Try again." },
+  configurationUnavailable: { id: "plugins.configurationUnavailable", defaultMessage: "This plugin has not registered the requested configuration." },
   loaded: {
     id: "features_plugins_PluginsSettings_1",
     defaultMessage: "Loaded",
@@ -21,17 +37,9 @@ export const pluginsMessages = pluginNamespace("atelier.host").messages("en", de
     id: "features_plugins_PluginsSettings_5",
     defaultMessage: "Takes effect after restart",
   },
-  addPackageHint: {
-    id: "features_plugins_PluginsSettings_6",
-    defaultMessage: "Add a package folder that contains an Atelier manifest. Changes take effect after restarting.",
-  },
   restartHint: {
     id: "features_plugins_PluginsSettings_7",
     defaultMessage: "Restart Atelier to apply plugin changes.",
-  },
-  packages: {
-    id: "features_plugins_PluginsSettings_8",
-    defaultMessage: "Plugin packages",
   },
   unknownPlugin: {
     id: "features_plugins_PluginsSettings_9",
@@ -52,25 +60,5 @@ export const pluginsMessages = pluginNamespace("atelier.host").messages("en", de
   settingsLoadFailed: {
     id: "features_plugins_PluginsSettings_14",
     defaultMessage: "Plugin settings could not be loaded.",
-  },
-  settingsLabel: {
-    id: "features_plugins_PluginsSettings_16",
-    defaultMessage: "Plugin settings",
-  },
-  reload: {
-    id: "features_plugins_PluginsSettings_17",
-    defaultMessage: "Reload",
-  },
-  settingsHint: {
-    id: "features_plugins_PluginsSettings_18",
-    defaultMessage: "Settings are provided by active plugins. Changes, including restored defaults, apply when saved.",
-  },
-  noSettings: {
-    id: "features_plugins_PluginsSettings_19",
-    defaultMessage: "No plugin settings",
-  },
-  noSettingsHint: {
-    id: "features_plugins_PluginsSettings_20",
-    defaultMessage: "Active plugins have not declared any settings.",
   },
 }));

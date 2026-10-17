@@ -36,9 +36,31 @@ export function useRendererNavigation(): RendererNavigation { return required(us
 import type { UiText } from "./i18n.ts";
 
 /** 渲染层读取插件配置：宿主按契约解码，设置页保存后随变更通知更新；只能读取本插件的配置。 */
-export interface RendererConfigs { get<T extends Json>(contract: ConfigContract<T>): { value: T; status: "saved" | "defaults" | "invalid" } }
+export interface RendererConfiguration<T extends Json> {
+  value: T;
+  status: "saved" | "defaults" | "invalid";
+  ready: boolean;
+  error: UiText | null;
+}
+export interface RendererConfigs {
+  get<T extends Json>(contract: ConfigContract<T>): RendererConfiguration<T>;
+  save<T extends Json>(contract: ConfigContract<T>, value: NoInfer<T>): Promise<void>;
+  reset(contract: ConfigContract): Promise<void>;
+  refresh(): Promise<void>;
+}
 const Configs = createContext<RendererConfigs | null>(null);
 export const RendererConfigsProvider = Configs.Provider;
 export function useRendererConfig<T extends Json>(contract: ConfigContract<T>): T {
   return required(useContext(Configs), "configs").get(contract).value;
 }
+/** 自定义设置页使用托管配置；写入在后台校验，成功后同步发布新快照。 */
+export function useRendererConfiguration<T extends Json>(contract: ConfigContract<T>) {
+  const configs = required(useContext(Configs), "configs");
+  return { ...configs.get(contract), save: (value: T) => configs.save(contract, value), reset: () => configs.reset(contract), refresh: configs.refresh };
+}
+
+export interface RendererSettingsNavigation { open(pluginId: string, location?: string): void }
+const SettingsNavigation = createContext<RendererSettingsNavigation | null>(null);
+export const RendererSettingsNavigationProvider = SettingsNavigation.Provider;
+/** 打开插件设置，无需绑定当前资源或会话。 */
+export function useRendererSettings(): RendererSettingsNavigation { return required(useContext(SettingsNavigation), "settings navigation"); }

@@ -187,8 +187,8 @@ describe("工作台 SDK 的宿主实现", () => {
   // 外部贡献可以关联其他插件的对象，但声明实例、来源与私有数据边界仍由宿主守护。
   it("具型调用绑定真实关联对象和后台来源，拒绝伪造契约、跨会话引用及非法产出", async () => {
     const c = counter(), other = pluginNamespace("test.questions");
-    const query = defineCall(other.name("query"), { input: z.string().trim(), output: z.string() });
-    const invalid = defineCall(other.name("invalid"), { input: z.null(), output: z.number() });
+    const query = defineCall(other.name("query"), { scope: "object", input: z.string().trim(), output: z.string() });
+    const invalid = defineCall(other.name("invalid"), { scope: "object", input: z.null(), output: z.number() });
     const plugin = definePlugin({ namespace: other, version: "1.0.0", modules: [defineModule(() => ({
       calls: [
         implementCall(query, async (input, context) => {
@@ -215,7 +215,7 @@ describe("工作台 SDK 的宿主实现", () => {
   // 取消只发信号，活动必须保持到 handler 清理完成；通用调用不能绕开宿主收束。
   it.each(["renderer", "plugin"] as const)("%s 调用不显示对象执行，取消后仍等待实际清理", async source => {
     const c = counter(), other = pluginNamespace("test.questions");
-    const wait = defineCall(other.name("wait"), { input: z.null(), output: z.null() });
+    const wait = defineCall(other.name("wait"), { scope: "object", input: z.null(), output: z.null() });
     let signal!: AbortSignal, release!: () => void;
     const gate = new Promise<void>(resolve => { release = resolve; });
     const plugin = definePlugin({ namespace: other, version: "1.0.0", modules: [defineModule(() => ({

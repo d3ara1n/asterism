@@ -257,8 +257,8 @@
     @apply grid gap-3;
     grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   }
-  /* 卡片外观来自官方 Card；这里只有共享元素动画所需的定位与按钮重置。 */
-  .settings-card { @apply rounded-xl text-left outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50; }
+  /* 卡片外观来自官方 Item，详情底板来自 Card。 */
+  .settings-card { @apply text-left; }
   .settings-detail { @apply absolute inset-x-0 top-0 max-h-full overflow-y-auto overscroll-contain; }
 }
 /* 启动屏：静态 HTML，React 挂载时替换；只使用主题 token。 */

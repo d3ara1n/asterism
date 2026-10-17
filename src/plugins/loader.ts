@@ -146,13 +146,14 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
       entry = { plugin, resources, tools, topLevelTools: [], actions, observers, preparers, sdk, tasks: taskHost, storage, lifecycle, events: eventScope, preparations: lifecycle.group("prepare"), closing: [] };
       initialized.push(entry);
       const commandIds = new Set<string>();
-      for (const module of plugin.modules) {
-        let contribution!: ModuleContribution;
-        synchronous(() => { contribution = module.setup(sdk.context); return contribution; });
-        if (contribution.closing) entry.closing.push(contribution.closing);
+      const closing = entry.closing;
+      const pluginTools = entry.topLevelTools;
+      // 根入口与功能模块共用登记管线，清理责任先于其贡献校验登记。
+      const register = (contribution: ModuleContribution) => {
+        if (contribution.closing) closing.push(contribution.closing);
         for (const call of contribution.calls ?? []) calls.declare(id, call, sdk, lifecycle.group("call"));
         for (const tool of contribution.topLevelTools ?? []) {
-          entry.topLevelTools.push({ tool, sdk, runs: lifecycle.group("tool") });
+          pluginTools.push({ tool, sdk, runs: lifecycle.group("tool") });
         }
         for (const contract of contribution.events ?? []) events.declare(id, contract);
         for (const record of contribution.records ?? []) sdk.declare(record);
@@ -171,6 +172,12 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
         }
         tools.push(...(contribution.tools ?? []).map(tool => adaptTool(tool, sdk, services)));
         observers.push(...contribution.observers ?? []); preparers.push(...contribution.preparers ?? []);
+      };
+      const setup = plugin.setup;
+      const root = setup ? synchronous(() => setup.call(plugin, sdk.context)) : undefined;
+      if (root) register(root);
+      for (const module of [...root?.modules ?? [], ...plugin.modules ?? []]) {
+        register(synchronous(() => module.setup(sdk.context)));
       }
       if (new Set(observers.map(observer => observer.id)).size !== observers.length) throw new Error(`Plugin ${id} declares duplicate observers.`);
       for (const resource of resources) if (!belongsTo(id, resource.kind))

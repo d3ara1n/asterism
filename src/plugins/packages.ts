@@ -1,5 +1,5 @@
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
-import { join, relative, resolve } from "node:path";
+import { existsSync, mkdirSync, readFileSync, realpathSync, renameSync, writeFileSync } from "node:fs";
+import { extname, join, relative, resolve, isAbsolute } from "node:path";
 import { pathToFileURL } from "node:url";
 import { z } from "zod";
 import * as zod from "zod";
@@ -9,12 +9,12 @@ import type { PluginDefinition } from "@atelier/sdk/runtime";
 import type { Plugin } from "esbuild";
 import { compileModules, packageModule, type PackageModule } from "./package-modules.ts";
 import { loadCatalogs } from "./catalogs.ts";
-import { localeSchema } from "@atelier/sdk/contracts";
+import { localeSchema, uiTextSchema, pluginMetadataSchema, type PluginMetadata } from "@atelier/sdk/contracts";
 import type { TranslationCatalog } from "../shared/i18n.ts";
 import type { PublicProvider } from "../shared/public-modules.ts";
 
 /** SDK API 版本；插件清单的 api.major 必须相同，minMinor 不得高于宿主。 */
-export const sdkApi = { major: 8, minor: 6 } as const;
+export const sdkApi = { major: 9, minor: 0 } as const;
 
 /** 插件包清单：package.json 的 atelier 字段；源码与发布产物读同一份。 */
 export const manifestSchema = z.strictObject({
@@ -22,6 +22,9 @@ export const manifestSchema = z.strictObject({
   api: z.strictObject({ major: z.number().int().nonnegative(), minMinor: z.number().int().nonnegative() }),
   runtime: z.string().min(1).optional(),
   renderer: z.string().min(1).optional(),
+  displayName: uiTextSchema.optional(),
+  description: uiTextSchema.optional(),
+  icon: z.string().min(1).optional(),
   i18n: z.strictObject({ catalogs: z.record(z.string().refine(value => localeSchema.safeParse(value).success, "Invalid language tag."), z.string().min(1)) }).superRefine((value, context) => {
     const locales = Object.keys(value.catalogs).flatMap(tag => {
       const parsed = localeSchema.safeParse(tag); return parsed.success ? [parsed.data] : [];
@@ -30,6 +33,26 @@ export const manifestSchema = z.strictObject({
   }).optional(),
 });
 export type PluginPackageManifest = z.infer<typeof manifestSchema>;
+
+/** 包信息独立于 API 兼容和代码装载，失败或禁用的插件也能显示。 */
+export function readPackageMetadata(root: string): PluginMetadata {
+  const pkg = z.object({
+    name: z.string().optional(), version: z.string().optional(), description: z.string().optional(),
+    author: z.union([z.string(), z.object({ name: z.string() })]).optional(),
+    atelier: z.object({ displayName: uiTextSchema.optional(), description: uiTextSchema.optional(), icon: z.string().optional() }).optional(),
+  }).parse(JSON.parse(readFileSync(join(root, "package.json"), "utf8")));
+  let icon: string | undefined;
+  if (pkg.atelier?.icon) {
+    const file = realpathSync(resolve(root, pkg.atelier.icon));
+    const inside = relative(realpathSync(root), file);
+    if (!inside || inside.startsWith("..") || isAbsolute(inside)) throw new Error("Plugin icon must be inside the package.");
+    const mime = ({ ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".svg": "image/svg+xml" } as Record<string, string>)[extname(file).toLowerCase()];
+    if (!mime) throw new Error("Plugin icon must be a PNG, JPEG, WebP or SVG image.");
+    icon = `data:${mime};base64,${readFileSync(file).toString("base64")}`;
+  }
+  return pluginMetadataSchema.parse({ name: pkg.atelier?.displayName ?? pkg.name, description: pkg.atelier?.description ?? pkg.description,
+    version: pkg.version, author: typeof pkg.author === "string" ? pkg.author : pkg.author?.name, icon });
+}
 
 /** 管理列表的一项：来源只决定包根在哪里，启用标记与来源无关。 */
 export const packageEntrySchema = z.strictObject({
@@ -196,9 +219,10 @@ export async function loadPackages(list: PackageList, npmRoot: string, cacheRoot
       if (!file) continue;
       const module = await import(pathToFileURL(file).href) as { default?: unknown };
       const definition = module.default as PluginDefinition | undefined;
-      if (!definition || typeof definition !== "object" || !Array.isArray(definition.modules) || definition.namespace?.id !== id
+      if (!definition || typeof definition !== "object" || definition.namespace?.id !== id
         || typeof definition.version !== "string" || !definition.version.trim()
-        || definition.modules.some(module => !module || typeof module.setup !== "function"))
+        || (definition.setup !== undefined && typeof definition.setup !== "function")
+        || (definition.modules !== undefined && (!Array.isArray(definition.modules) || definition.modules.some(module => !module || typeof module.setup !== "function"))))
         throw new PluginPackageError("invalid_entry", `Runtime entry of ${id} must default-export definePlugin(...) with namespace ${id}.`);
       item.definition = definition;
     } catch (error) {

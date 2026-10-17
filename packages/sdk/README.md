@@ -4,13 +4,15 @@
 
 SDK 包版本见 [package.json](package.json)，宿主 API 版本见 [`sdkApi`](../../src/plugins/packages.ts)。内置插件领域契约独立在 [`@atelier/builtin-api`](../builtin-api/README.md)，不进入通用 SDK。
 
+当前宿主 API 为 **9.0**。插件包的 `atelier.api` 声明 `{ "major": 9, "minMinor": 0 }`；前端入口默认导出 `defineRendererPlugin(...)`，功能视图放入其 `modules`，调用契约显式声明 `scope`。旧主版本在装载前拒绝。
+
 ## 子路径入口
 
 | 入口 | 内容 |
 | --- | --- |
 | `@atelier/sdk/contracts` | JSON、数据（`ns.data`）、配置（`ns.config`）、消息（`ns.messages`）、瞬态事件（`ns.event`）、资源／创建／动作／工具／记录契约、工作台快照与公共模型协议、模型表达式／输入媒体 helper、参考价格与计价；不依赖 Node 或 React |
 | `@atelier/sdk/runtime` | `definePlugin`、`defineModule`、资源／创建／动作／工具实现 helper、`SessionReader / SessionExecutor`、`ObjectReader / ObjectExecutor` 与宿主服务接口；后台可使用 Node |
-| `@atelier/sdk/renderer` | `cardRenderer`、`toolRenderer`、`recordRenderer`、`creationEntry`、对象与全局 hooks（`useRendererObject`、`useRendererConfig`、`useRendererPreferences`、`useRendererEvents`、`useI18n`）；React 由宿主共享 |
+| `@atelier/sdk/renderer` | `defineRendererPlugin`、设置页面、功能视图（`cardRenderer`、`toolRenderer`、`recordRenderer`、`creationEntry`）、对象与全局 hooks；React 由宿主共享 |
 
 `packages/sdk/examples/` 下的可编译作者用例（`author.ts`、`renderer.ts`、`events.ts`、`tool-renderer.ts`、`content-*.ts`、`model-input.ts`、`i18n.ts`）随 `npm run typecheck` 直接验证。
 
@@ -60,7 +62,7 @@ export default definePlugin({
   "exports": { "./public": "./src/public.ts" },
   "atelier": {
     "id": "example.tools",
-      "api": { "major": 8, "minMinor": 2 },
+    "api": { "major": 9, "minMinor": 0 },
     "runtime": "./src/runtime.ts"
   }
 }
@@ -68,11 +70,21 @@ export default definePlugin({
 
 ### 3. 全局具型事件、配置与国际化
 - **瞬态事件**：`ns.event(name, { schema, source, semantics })` 声明 `occurrence` 或 `snapshot` 事件；后台用 `plugin.ipc.events.publish / subscribe` 或 `object.events.publish`，前端用 `prepare({ events })` 或 `useRendererEvents()`。资源可直接发布宿主公共 `ResourceStatusChanged`。
-- **具型调用（API 8.5）**：`defineCall(id, { input, output })` 声明，`implementCall(contract, handler)` 经 `ModuleContribution.calls` 登记。后台 `plugin.ipc.calls.invoke`、前端 `useRendererCalls().invoke` 均传入契约、输入和 `{ object: ResourceRef, signal? }`；处理器收到只读关联对象、来源和取消信号。规则见 [插件调用](../../docs/plugin-sdk.md#具型插件调用)，可编译示例见 `examples/plugin-calls.ts`。
-- **插件配置**：`ns.config(schema, defaults, { presentation? })` 声明唯一配置；后台 `plugin.config(contract)`，前端 `useRendererConfig(contract)`。
+- **具型调用**：`defineCall(id, { scope: "plugin" | "object", input, output })` 声明，`implementCall(contract, handler)` 经插件 `setup` 或模块返回的 `calls` 登记。后台 `plugin.ipc.calls.invoke`、前端 `useRendererCalls().invoke` 均传入契约、输入和选项：插件级使用 `{ signal? }`，对象级使用 `{ object: ResourceRef, signal? }`。只有对象级处理器具有只读关联对象。规则见 [插件调用](../../docs/plugin-sdk.md#具型插件调用)，可编译示例见 `examples/plugin-calls.ts` 与 `examples/settings-runtime.ts`。
+- **插件配置**：`ns.config(schema, defaults)` 声明可选托管配置，后台 `plugin.config(contract)` 提供 `get / update / subscribe`。`useRendererConfig(contract)` 读取值；设置页面使用 `useRendererConfiguration(contract)` 取得 `value / status / ready / error / save / reset / refresh`。保存与恢复默认返回 Promise，写入在后台校验，并更新前后台订阅；界面读取未就绪时不应以默认值提交。配置契约不包含布局或标签，插件自行组织页面。
 - **界面本地化（`UiText`）**：普通字符串直接可用；需多语言时用 `ns.messages("en", defineMessages({ ... }))` 声明，在 `atelier.i18n.catalogs` 登记译文 JSON，前端通过 `useI18n()` 格式化（详见 [公共 i18n](../../docs/i18n.md)）。
 
-### 4. 前端卡片与工具三态视图
+### 4. 插件装配与设置页面
+
+后台 `definePlugin({ namespace, version, setup?, modules? })` 的同步 `setup(plugin)` 创建插件级共享服务，返回 `PluginContribution`：与模块共用具型贡献字段，并可返回 `modules` 与 `closing`。根入口返回的模块先装配，再装配静态 `modules`；关闭先收束工作，再逆序清理模块、最后释放根服务。服务通过普通函数参数或闭包传给模块，不需要服务注册表。
+
+前端 `defineRendererPlugin({ modules?, settings?, prepare?, closing? })` 是插件入口。`settings: { Body, locations? }` 与模块平级；页面组件接收可选 `location`，无会话或对象上下文，能使用全局调用、事件、i18n、本插件偏好和托管配置。插件 `prepare({ events, signal })` 先于自己的模块准备；失败阻止该插件及依赖方装配，关闭在取消后等待实际准备结束再调用 `closing`。页面卸载取消页面发起的通信调用，不销毁后台服务。
+
+`useRendererSettings().open(pluginId, location?)` 打开已登记设置页；非根位置须列入 `settings.locations`，未知插件或位置明确报错。完整可编译示例按进程拆分为 `examples/settings-contract.ts`、`examples/settings-runtime.ts`、`examples/settings-renderer.ts`。
+
+信息卡片从包读取元信息：标准 `name / description / version / author`，可用 `atelier.displayName / description`（接受 `UiText`）覆盖显示文案；`atelier.icon` 是包内 PNG、JPEG、WebP 或 SVG 图片的相对路径。宿主读取静态信息不执行插件代码，配置页面由 renderer 单独提供。
+
+### 5. 前端卡片与工具三态视图
 - **卡片视图**：`cardRenderer(ViewContract, { width, height, minWidth?, minHeight?, Body, Actions?, panels? })`，内部通过 `useRendererObject()` 访问对象数据、动作调用与二进制流 `onStream`。
 - **对象保留状态（API 8.7）**：`object.retained.get("<plugin>/<key>", create, release?)` 保存草稿等需要跨重挂载与会话切换保持的前端状态，对象离开投影时宿主调用 `release`；`discard(key)` 提前结束。规则见 [前端视图与扩展入口](../../docs/plugin-sdk.md#前端视图与扩展入口)，可编译示例见 `examples/renderer.ts`。
 - **滚动与缩放**：卡片内交互遵循 [画布与对象卡片](../../docs/workbench.md#画布与对象卡片) 的手势归属规则。
@@ -81,7 +93,7 @@ export default definePlugin({
 - **顶层工具（API 8.5）**：`defineTopLevelTool` 一次提供定义、参数／结果 schema 和 `execute`，经 `ModuleContribution.topLevelTools` 注册；每次调用取得只读 `object`、`callId`、`signal`、`publish`。展示可共享具有相同稳定 ID 的数据契约。详见 [工具贡献](../../docs/plugin-sdk.md#工具贡献)。
 - **替换已有工具**：顶层工具替换、资源实现替换与全局 schema 替换的注册规则，以及稳定 ID、装配顺序和历史展示的边界，见 [工具覆盖](../../docs/runtime.md#工具覆盖)。
 
-### 5. 可选模型分支（`plugin.models`）
+### 6. 可选模型分支（`plugin.models`）
 不依赖内置 Agent 的无状态模型服务（详细协议与续接规则见 [运行时](../../docs/runtime.md#用户输入文件与模型协议适配)）：
 - `models.roles()` / `models.list()`：读取模型角色与可用模型目录。
 - `resolveModelSelection(defaults, overrides)`（`contracts`）：展示与请求共用的模型／思考等级覆盖计算，空值沿用默认值；可用性与凭据由消费边界校验。

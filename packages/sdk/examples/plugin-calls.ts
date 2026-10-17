@@ -3,7 +3,7 @@ import { defineCall, pluginNamespace } from "@atelier/sdk/contracts";
 import { defineModule, defineTopLevelTool, implementCall } from "@atelier/sdk/runtime";
 
 const ns = pluginNamespace("example.interaction");
-export const ReadState = defineCall(ns.name("read"), { input: z.null(), output: z.string() });
+export const ReadState = defineCall(ns.name("read"), { scope: "object", input: z.null(), output: z.string() });
 export const module = defineModule(() => {
   // 进程内共享业务状态；前端通过具型调用读取，不导入后台实例。
   const values = new Map<string, string>();

@@ -98,6 +98,19 @@ export interface RendererModule {
   /** 启动准备：宿主在首屏前并行调用，模块自行初始化内部资源；超时或失败只记录，不阻止启动。 */
   prepare?(context: RendererPrepareContext): Promise<void>;
 }
+export interface PluginSettingsPage {
+  /** 可直接定位的页面内部位置；空位置表示根页面。 */
+  locations?: readonly string[];
+  Body: ComponentType<{ location?: string }>;
+}
+/** 前端插件拥有设置页和共享服务生命周期，功能视图由模块组合。 */
+export interface RendererPlugin {
+  modules?: readonly RendererModule[];
+  settings?: PluginSettingsPage;
+  prepare?(context: RendererPrepareContext): Promise<void>;
+  closing?(): void | Promise<void>;
+}
+export function defineRendererPlugin(plugin: RendererPlugin): RendererPlugin { return plugin; }
 export interface RendererPrepareContext {
   /** 与模块生命周期绑定的全局订阅，失败、超时和应用关闭时清理。 */
   readonly events: EventSubscriber;

@@ -82,7 +82,6 @@
   "diagnostics.noticesHint": "这些记录没有请求身份，不作为额外请求计数或分配费用。",
   "agentPanels.diagnostics": "诊断",
   "agentPanels.context": "上下文",
-  "settings.title": "内置插件",
   "agent_conversation_contextSummary": "上下文已压缩",
   "agent_conversation_minimap": "对话导航",
   "agent_conversation_minimapMessage": "定位第 {number} 条消息",
@@ -311,5 +310,14 @@
   "questions.detail": "查看详情",
   "questions.closeDetail": "收起详情",
   "questions.invalid": "请回答此题；如果是可选题，也可以明确跳过。",
-  "questions.locate": "前往作答面板"
+  "questions.locate": "前往作答面板",
+  "settings.thinking": "思考",
+  "settings.tools": "工具调用",
+  "settings.reset": "恢复默认设置",
+  "settings.loading": "正在加载设置…",
+  "settings.invalid": "无法读取已保存的设置，当前显示默认值。",
+  "settings.saveFailed": "无法保存设置，请重试。",
+  "settings.retry": "重试",
+  "plugin.name": "工坊基础功能",
+  "plugin.description": "代理、对话、笔记、文件与交互工具。"
 }

@@ -1,16 +1,15 @@
 import { z } from "zod";
-import { jsonSchema, configurationPresentationSchema, uiTextSchema } from "@atelier/sdk/contracts";
+import { jsonSchema, uiTextSchema } from "@atelier/sdk/contracts";
 import { coreChannel } from "./core.ts";
 
-export const pluginConfigurationVersion = 2;
+export const pluginConfigurationVersion = 3;
 export const pluginConfigurationChannel = coreChannel("plugin-configuration");
 export const pluginConfigurationChangedChannel = coreChannel("plugin-configuration-changed");
 /** 某插件配置的当前值已变化；接收方重读配置，不携带值。 */
 export const pluginConfigurationChangedSchema = z.strictObject({ kind: z.literal("plugin-configuration.changed"), id: z.string().min(1).max(160) });
 const id = z.string().min(1).max(160);
 export const pluginConfigurationSchema = z.strictObject({
-  id, schema: jsonSchema.nullable(), defaults: jsonSchema, value: jsonSchema,
-  presentation: configurationPresentationSchema.optional(),
+  id, defaults: jsonSchema, value: jsonSchema,
   status: z.enum(["saved", "defaults", "invalid"]),
 });
 export type PluginConfiguration = z.infer<typeof pluginConfigurationSchema>;

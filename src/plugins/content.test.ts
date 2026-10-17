@@ -84,7 +84,7 @@ describe("宿主不可变内容", () => {
   // 关联只读对象不能以已知 ContentRef 绕过私有 get；对象、会话和在途交接根需分别守住。
   it("外部调用只能读取关联对象的公开历史内容，不能读取私有当前数据或交接占用", async () => {
     const foreign = pluginNamespace("test.foreign");
-    const Read = defineCall(foreign.name("read"), {
+    const Read = defineCall(foreign.name("read"), { scope: "object",
       input: z.strictObject({ ref: contentRefSchema, session: z.boolean() }), output: z.string(),
     });
     const plugin = definePlugin({ namespace: foreign, version: "1", modules: [defineModule(() => ({

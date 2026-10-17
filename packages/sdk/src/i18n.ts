@@ -59,24 +59,3 @@ export function bindMessages<T extends Record<string, SourceMessage>>(
 export function withValues(message: UiMessage, values: MessageValues): UiMessage {
   return uiMessageSchema.parse({ ...message, values: { ...message.values, ...values } });
 }
-
-export interface ConfigurationFieldPresentation {
-  title?: UiText;
-  description?: UiText;
-  enumLabels?: readonly { value: string | number | boolean | null; label: UiText }[];
-}
-
-export interface ConfigurationPresentation {
-  fields: Readonly<Record<string, ConfigurationFieldPresentation>>;
-}
-
-export const configurationPresentationSchema = z.strictObject({
-  fields: z.record(z.string(), z.strictObject({
-    title: uiTextSchema.optional(),
-    description: uiTextSchema.optional(),
-    enumLabels: z.array(z.strictObject({
-      value: z.union([z.string(), z.number().finite(), z.boolean(), z.null()]),
-      label: uiTextSchema,
-    })).optional(),
-  })),
-});

@@ -3,18 +3,22 @@ import type { Json } from "./json.ts";
 import { contractReferenceSchema } from "./presentation.ts";
 import type { ResourceRef } from "./workspace.ts";
 
-/** 调用携带关联对象；输入和输出是独立于传输的纯数据契约。 */
-export interface CallContract<I extends Json = Json, O extends Json = Json> {
+export type CallScope = "plugin" | "object";
+/** 作用域由契约声明，调用方不能省略对象来降级对象级操作。 */
+export interface CallContract<I extends Json = Json, O extends Json = Json, S extends CallScope = CallScope> {
   readonly id: string;
+  readonly scope: S;
   readonly input: z.ZodType<I>;
   readonly output: z.ZodType<O>;
 }
-export function defineCall<I extends Json, O extends Json>(id: string, definition: {
-  input: z.ZodType<I>; output: z.ZodType<O>;
-}): CallContract<I, O> {
+export function defineCall<I extends Json, O extends Json, S extends CallScope>(id: string, definition: {
+  scope: S; input: z.ZodType<I>; output: z.ZodType<O>;
+}): CallContract<I, O, S> {
+  if (definition.scope !== "plugin" && definition.scope !== "object") throw new Error("A call must declare plugin or object scope.");
   return Object.freeze({ ...contractReferenceSchema.parse({ id }), ...definition });
 }
-export interface CallOptions { object: ResourceRef; signal?: AbortSignal }
+export type CallOptions<S extends CallScope = CallScope> = { signal?: AbortSignal } &
+  (S extends "object" ? { object: ResourceRef } : { object?: never });
 export interface PluginCalls {
-  invoke<I extends Json, O extends Json>(contract: CallContract<I, O>, input: NoInfer<I>, options: CallOptions): Promise<O>;
+  invoke<I extends Json, O extends Json, S extends CallScope>(contract: CallContract<I, O, S>, input: NoInfer<I>, options: CallOptions<NoInfer<S>>): Promise<O>;
 }

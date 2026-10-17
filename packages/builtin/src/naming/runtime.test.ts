@@ -34,7 +34,7 @@ async function open(stream: (request: StreamRequest) => AsyncIterable<ModelEvent
   const requests: StreamRequest[] = [];
   const assembly = vi.spyOn(runtimeModules, "createModules");
   vi.spyOn(pluginLoader, "loadPlugins").mockImplementation(([builtin, ...external], host) => loadPlugins([
-    { ...builtin!, modules: [...builtin!.modules, defineModule(plugin => {
+    { ...builtin!, modules: [...builtin!.modules ?? [], defineModule(plugin => {
       context = plugin; return {};
     })] }, ...external,
   ], { ...host, models: { ...host.models,
@@ -119,7 +119,7 @@ describe("人工命名入口", () => {
   it("builtin 后续模块装配失败时拒绝人工命名，不覆盖标题或追加记录", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     vi.spyOn(pluginLoader, "loadPlugins").mockImplementation(([builtin, ...external], host) => loadPlugins([
-      { ...builtin!, modules: [...builtin!.modules, defineModule(() => { throw new Error("Setup failed."); })] },
+      { ...builtin!, modules: [...builtin!.modules ?? [], defineModule(() => { throw new Error("Setup failed."); })] },
       ...external,
     ], host));
     const root = mkdtempSync(join(tmpdir(), "atelier-naming-failed-")); roots.push(root);

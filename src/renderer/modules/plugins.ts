@@ -6,7 +6,7 @@ import * as ReactIntl from "react-intl";
 import * as zod from "zod";
 import * as sdkContracts from "@atelier/sdk/contracts";
 import * as sdkRenderer from "@atelier/sdk/renderer";
-import type { RendererModule } from "@atelier/sdk/renderer";
+import type { RendererModule, RendererPlugin } from "@atelier/sdk/renderer";
 
 /** 共享模块白名单：插件 bundle 的这些导入解析到宿主同一实例，保证只有一个 React。 */
 (globalThis as Record<string, unknown>).__atelierRendererModules = {
@@ -17,11 +17,35 @@ import type { RendererModule } from "@atelier/sdk/renderer";
 
 export interface PluginRendererFailure { id: string; error: string }
 export interface RendererEntry { id: string; renderer: string | null; dependencies: readonly string[] }
+export function validateRendererPlugin(plugin: RendererPlugin | undefined): asserts plugin is RendererPlugin {
+  if (!plugin || typeof plugin !== "object" || "resources" in plugin || "cards" in plugin || "tools" in plugin
+    || (plugin.modules !== undefined && !Array.isArray(plugin.modules))
+    || (plugin.prepare !== undefined && typeof plugin.prepare !== "function")
+    || (plugin.closing !== undefined && typeof plugin.closing !== "function"))
+    throw new Error("The renderer entry must default-export defineRendererPlugin(...).");
+  const settings = plugin.settings;
+  if (settings !== undefined) {
+    if (!settings || typeof settings !== "object" || settings.Body === undefined)
+      throw new Error("Plugin settings must declare a Body component.");
+    const locations = settings.locations;
+    if (locations !== undefined && (!Array.isArray(locations)
+      || locations.some(location => typeof location !== "string" || !location.trim())
+      || new Set(locations).size !== locations.length))
+      throw new Error("Plugin settings locations must be unique non-empty strings.");
+  }
+  for (const module of plugin.modules ?? []) {
+    if (!module || !Array.isArray(module.resources) || !Array.isArray(module.cards) || !Array.isArray(module.tools)
+      || (module.creations !== undefined && !Array.isArray(module.creations))
+      || (module.records !== undefined && !Array.isArray(module.records))
+      || (module.prepare !== undefined && typeof module.prepare !== "function"))
+      throw new Error("Renderer modules must declare { resources, cards, tools }.");
+  }
+}
 /** 按公共依赖装配；导入、视图冲突或提供方失败均阻止其消费者。 */
 export async function loadPluginRenderers(entries: readonly RendererEntry[], options: {
   available?: readonly string[];
-  accept?(module: RendererModule): void;
-  load?(path: string): Promise<{ default?: RendererModule }>;
+  accept?(plugin: RendererPlugin, id: string): void | Promise<void>;
+  load?(path: string): Promise<{ default?: RendererPlugin }>;
 } = {}):
   Promise<{ modules: RendererModule[]; failures: PluginRendererFailure[] }> {
   const modules: RendererModule[] = [];
@@ -41,15 +65,10 @@ export async function loadPluginRenderers(entries: readonly RendererEntry[], opt
       for (const dependency of entry.dependencies) await visit(dependency);
       if (!entry.renderer) { available.add(id); return; }
       const loaded = await load(entry.renderer);
-      const module = loaded.default;
-      if (!module || !Array.isArray(module.resources) || !Array.isArray(module.cards) || !Array.isArray(module.tools)
-        || (module.creations !== undefined && !Array.isArray(module.creations))
-        || (module.records !== undefined && !Array.isArray(module.records))
-        || (module.prepare !== undefined && typeof module.prepare !== "function")) {
-        throw new Error("The renderer entry must default-export { resources, cards, tools }.");
-      }
-      options.accept?.(module);
-      modules.push(module); available.add(id);
+      const plugin = loaded.default;
+      validateRendererPlugin(plugin);
+      await options.accept?.(plugin, id);
+      modules.push(...plugin.modules ?? []); available.add(id);
     } catch (error) {
       console.error(`Plugin ${entry.id} renderer could not be loaded.`, error);
       failed.add(id);

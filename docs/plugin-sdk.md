@@ -13,7 +13,15 @@ SDK 的 `contracts`、`runtime`、`renderer` 三个子路径分别承担纯契�
 | 插件业务模块 | 配置选择、输入受理、执行循环、正文编辑与视图等领域功能 | 插件自己的装配入口和其他业务模块；公开领域接口也可由应用组合层消费 |
 | 应用组合层 | 连接宿主能力与内置插件公开领域接口，组成用户操作入口 | Atelier 应用 |
 
-`PluginModule.setup` 是贡献装配入口，接收完整 `PluginContext`，创建业务模块、连接依赖并返回 `ModuleContribution`。业务模块是普通函数、闭包或对象，只接收需要的具名接口；复用一个业务模块不要求将它注册为 `PluginModule`。
+插件是身份、设置与生命周期的归属单位，功能模块是插件内部的组合单位。插件级能力不要求通过占位模块登记：
+
+- **静态元信息**：名称、简介、图标、版本、作者等来自可独立读取的包元信息；展示插件信息不依赖执行插件代码，禁用或加载失败时仍可管理。
+- **后台装配**：插件具有自身的装配入口，可初始化共享业务服务、登记可选托管配置、插件级调用与清理责任，再通过显式参数将共享服务交给功能模块。插件可以没有功能模块。
+- **前端装配**：插件前端入口拥有可选设置页面及插件级准备与清理责任，并组合功能视图模块；设置页面不要求关联资源，也不要求伪装为卡片 renderer。
+
+后台以 `definePlugin({ namespace, version, setup?, modules? })` 声明，插件 `setup` 同步返回贡献、可选功能模块及 `closing`；根入口返回的模块先于静态 `modules` 装配。前端以 `defineRendererPlugin({ modules?, settings?, prepare?, closing? })` 声明，`settings` 包含 `Body` 与可选内部定位 `locations`，组件接收 `location`。具体作者用例与包清单见 [SDK 作者指南](../packages/sdk/README.md#4-插件装配与设置页面)。
+
+`PluginModule.setup` 是功能贡献装配入口，接收完整 `PluginContext`，创建业务模块、连接依赖并返回 `ModuleContribution`。业务模块是普通函数、闭包或对象，只接收需要的具名接口；复用一个业务模块不要求将它注册为 `PluginModule`。调用或事件由插件入口还是功能模块登记，不改变契约归属与作用域；宿主共用身份检查、冲突校验和生命周期机制。
 
 一项功能的纯契约、后台实现和前端视图共置、分入口编译。组合以显式导入和参数传递完成，不引入通用服务查找、动态依赖注入容器、无具型契约的字符串事件总线或任意生命周期 hook 集合。宿主在启动时装配并冻结贡献，安装、启用、禁用与升级重启后生效。贡献身份由宿主按插件命名空间补全为 `<pluginId>/<name>`（工具契约 `name` 为模型可见全局短名）。插件缺席时历史与对象保留，资源投影为 `atelier.builtin/missing-resource`，视图回退默认渲染与原始数据。
 
@@ -59,9 +67,14 @@ SDK 的 `contracts`、`runtime`、`renderer` 三个子路径分别承担纯契�
 
 ### 具型插件调用
 
-`defineCall(id, { input, output })` 声明具型请求与结果，后台用 `implementCall(contract, handler)` 通过 `ModuleContribution.calls` 注册。契约归贡献插件所有，重复注册明确失败；后台消费者必须引用同一声明实例，跨进程按稳定 ID 路由。输入在后台按声明校验，输出在后台验证后通过 JSON 交付，消费者解码，不跨进程传递函数或服务实例。
+`defineCall` 声明具型请求、结果与调用作用域，后台用 `implementCall(contract, handler)` 经插件级装配或 `ModuleContribution.calls` 注册。契约归贡献插件所有，重复注册明确失败；后台消费者必须引用同一声明实例，跨进程按稳定 ID 路由。输入在后台按声明校验，输出在后台验证后通过 JSON 交付，消费者解码，不跨进程传递函数或服务实例。
 
-后台 `plugin.ipc.calls.invoke(contract, input, { object, signal? })` 与前端 `useRendererCalls().invoke(...)` 使用同一调用形状。`object` 是关联对象的完整 `ResourceRef`，宿主校验真实会话、类型及当前路径存在性。处理器取得只读 `object`、`signal` 和宿主绑定的 `source`：后台调用来源为调用插件，桌面调用来源为 null。关联对象不改变数据归属，不开放其他插件的对象私有状态或写权限；插件可用自己的内存服务管理关联交互。
+后台 `plugin.ipc.calls.invoke(...)` 与前端 `useRendererCalls().invoke(...)` 使用同一具型调用机制。调用契约明确声明作用域：
+
+- **插件级调用**：供设置保存、账号登录、连接测试等全局业务使用，不要求会话或资源引用，处理器不取得隐含对象门面。
+- **对象级调用**：调用时提供完整 `ResourceRef`，宿主校验真实会话、类型及当前路径存在性，处理器取得只读 `object`。对象级契约不能通过省略对象降级为插件级调用。
+
+两类处理器均取得 `signal` 和宿主绑定的 `source`：后台调用来源为调用插件，桌面调用来源为 null。调用作用域不改变数据归属，不开放其他插件的对象私有状态或写权限；插件可用自己的业务服务管理交互。插件级调用参与插件关闭与连接断开的取消和真实收束，不计入任何对象的执行状态。
 
 调用独立于对象动作队列，等待中的工具不阻塞答案提交。宿主登记调用活动、传播取消并等待处理器实际结束，不设置默认超时，也不自动重放请求。前端卸载可取消其读取或订阅；连接断开、页面导航和插件关闭清理对应调用。取消通信调用不会自动取消业务服务中独立存在的工具等待。当前值由领域查询提供，变化通过事件通知；前端先订阅成功再读当前值，并处理读取期间收到通知的竞态。
 
@@ -105,11 +118,15 @@ SDK 的 `contracts`、`runtime`、`renderer` 三个子路径分别承担纯契�
 
 对象执行与未收束活动分别投影：任务、动作、模型与工具执行计入对象执行；独立插件通信调用只参与收束，不因查询或提交通信而将关联对象标记为执行中。调用处理器启动的任务、动作或模型工作由各自生命周期登记，仍正常计入执行。界面加载与操作门禁也不作为执行依据。
 
-取消信号不等于工作已经结束；会话回溯、资源移除和插件关闭清理均等待真实收束。每个成功返回的模块 `setup` 立即登记清理责任，后续模块装配失败或正常关闭时先取消托管工作并等待收束，再按初始化逆序执行清理。
+取消信号不等于工作已经结束；会话回溯、资源移除和插件关闭清理均等待真实收束。插件级装配与每个成功返回的模块 `setup` 均立即登记清理责任，后续装配失败或正常关闭时先取消托管工作并等待收束，再按初始化逆序执行清理。依赖共享服务的模块先清理，共享服务后释放；插件级准备与服务生命周期不随设置页面挂载或卸载而开始、结束。
 
 ## 插件配置与界面本地化
 
-- **唯一配置契约**：插件在纯契约中以 `ns.config(schema, defaults, { presentation? })` 声明唯一配置契约，保存在 `<data>/extensions/<pluginId>/.atelier/config.json`。后台通过 `plugin.config(contract)` 取得 `get / update / subscribe / section`，前端通过 `useRendererConfig(contract)` 读取；宿主负责存储、Zod 校验、恢复默认及生成设置页表单。界面偏好（`useRendererPreferences`）存于 `ui-state.json` 的 `plugin/<pluginId>/` 下，不属于配置。
+- **插件自有设置页面**：插件可在前端插件入口提供设置页面，自行组织分组、子页、草稿、保存及业务操作；宿主负责承载、导航与页面异常展示，不根据配置 schema 自动生成表单。页面关闭释放组件与页面订阅，不替代插件级服务关闭。设置页登记与托管配置登记相互独立。
+- **打开设置**：宿主提供按插件身份打开设置页面的导航能力，卡片入口和插件界面内的“打开设置”操作进入同一个页面，可定位插件声明的内部位置。该能力不要求当前会话或资源，不构成资源授权。界面入口与管理行为见 [设置总览与插件管理](workbench.md#设置总览与插件管理)。
+- **可选托管配置**：采用托管配置的插件在纯契约中以 `ns.config(schema, defaults)` 声明一份配置契约，保存在 `<data>/extensions/<pluginId>/.atelier/config.json`。后台通过 `plugin.config(contract)` 取得 `get / update / subscribe`；前端 `useRendererConfig` 读取值，`useRendererConfiguration` 提供值、状态、就绪与错误信息及 `save / reset / refresh`，写入仍由后台按原始 schema 校验。宿主负责原子存储、校验及前后台变更通知；插件决定何时保存及如何响应变化。配置契约不携带自动表单布局职责。
+- **私有业务数据**：插件也可自行维护配置与数据，在自有目录选择文件、数据库等持久化方式，负责格式兼容、迁移与业务同步。托管 SQLite 按需打开，不使用时不创建数据库；托管配置、私有存储与凭据服务可独立选用。自管数据不替代宿主拥有的资源身份、授权、会话历史与内容引用契约。
+- **界面偏好**：`useRendererPreferences` 存于 `ui-state.json` 的 `plugin/<pluginId>/` 下，不属于配置。
 - **可选界面本地化**：公共展示字段接受 `UiText`（普通字符串或 `ns.messages(sourceLocale, defineMessages(...))` 声明的具归属消息描述），前端组件通过 `useI18n()` 格式化。完整规范见 [公共 i18n](i18n.md)。
 
 ## 前端视图与扩展入口
@@ -121,5 +138,5 @@ SDK 的 `contracts`、`runtime`、`renderer` 三个子路径分别承担纯契�
 - **工具三态视图（`toolRenderer`）**：声明平行可选的 `input / execution / result`，每阶段含可选 `headerRenderer / bodyRenderer`，可复用 `ToolRenderProps<D, T, A>` 联合类型。`input` 接收部分 JSON 与 `result: null`；`execution` 接收已校验参数与 running 产出；`result` 接收终结结局。视觉与连续性规范见 [界面设计系统](design-system.md#对话过程视图)。
 - **历史记录视图（`recordRenderer`）**：声明 `label(data, context, record)`（必填纯文本摘要）、可选 `icon` 与 `Row`。宿主历史面板据此展示第一行摘要，并由宿主只读 `record.source` 固定追加第二行来源说明。
 - **创建入口（`creationEntry`）**：统一声明添加菜单（`triggers.menu`）与画布拖放／粘贴（`triggers.drop`，支持扩展名、MIME、目录、URL scheme、文本条件）入口，可选提供 `toInput(item, content)` 与 `InputView`。宿主创建协调器负责候选仲裁、跨插件路由记忆（`creation-route/v1/...`）、放置位置与提交。
-- **前端模块准备（`prepare`）**：renderer 模块可声明 `prepare({ events, signal })` 预加载本地语法／主题或建立全局事件订阅（单个模块超时上限 10 秒，失败只记日志）。
+- **前端准备（`prepare`）**：插件与功能模块可声明 `prepare({ events, signal })` 预加载本地语法／主题或建立全局事件订阅。插件根准备先于自己的模块；根准备失败阻止本插件和依赖方装配，模块准备失败只记日志。单次准备等待上限 10 秒，超时取消但保留真实收束责任；关闭先取消订阅与准备，等待在途事件处理器及原始准备 Promise 结束，再释放根服务。失败插件的清理同样参与应用关闭时的反向依赖顺序。
 - **不可变内容与模型服务接口**：各阶段 `content` 门面（`read / open / stage`）的作用域矩阵见 [不可变内容](content.md)；`models.validate / stream / run` 的无状态模型调用接口见 [SDK 作者指南](../packages/sdk/README.md#可选模型分支)；`models.run` 结果附带的请求诊断（API 8.3）见 [运行时](runtime.md#请求诊断)。

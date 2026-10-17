@@ -74,13 +74,13 @@ export const pendingQuestionSchema = z.strictObject({
 export const questionSnapshotSchema = z.strictObject({
   version: z.number().int().nonnegative(), pending: z.array(pendingQuestionSchema),
 });
-export const ReadQuestions = defineCall(builtin.name("questions.read"), {
+export const ReadQuestions = defineCall(builtin.name("questions.read"), { scope: "object",
   input: z.null(), output: questionSnapshotSchema,
 });
-export const AnswerQuestion = defineCall(builtin.name("questions.answer"), {
+export const AnswerQuestion = defineCall(builtin.name("questions.answer"), { scope: "object",
   input: z.strictObject({ id: z.string().uuid(), submission: submissionSchema }), output: z.null(),
 });
-export const CancelQuestion = defineCall(builtin.name("questions.cancel"), {
+export const CancelQuestion = defineCall(builtin.name("questions.cancel"), { scope: "object",
   input: z.strictObject({ id: z.string().uuid() }), output: z.null(),
 });
 export const QuestionsChanged = builtin.event("questions.changed", {

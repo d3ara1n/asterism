@@ -25,7 +25,7 @@ function fixture(ranges: (string | null)[] = [compatibleRange, `~${builtinPublic
     const root = temp(), id = `fixture.consumer${index}`;
     file(root, "package.json", JSON.stringify({ name: `@fixture/consumer${index}`, version: "1.0.0",
       ...(range === null ? {} : { peerDependencies: { "@atelier/builtin-api": range } }),
-      atelier: { id, api: { major: 8, minMinor: 3 }, runtime: "runtime.ts", renderer: "renderer.ts" } }));
+      atelier: { id, api: { major: 9, minMinor: 0 }, runtime: "runtime.ts", renderer: "renderer.ts" } }));
     file(root, "public.ts", 'export { SubmitAgentInput } from "@atelier/builtin-api/contracts";');
     file(root, "runtime.ts", `
       import { pluginNamespace } from "@atelier/sdk/contracts";
@@ -40,7 +40,7 @@ function fixture(ranges: (string | null)[] = [compatibleRange, `~${builtinPublic
           }
         })] }))] }), probe: { SubmitAgentInput, calls } };
     `);
-    file(root, "renderer.ts", 'export { SubmitAgentInput } from "./public.ts"; export default { resources: [], cards: [], tools: [] };');
+    file(root, "renderer.ts", 'export { SubmitAgentInput } from "./public.ts"; export default { modules: [{ resources: [], cards: [], tools: [] }] };');
     // 消费者的本地安装副本不能抢占应用已经加载的声明。
     file(root, "node_modules/@atelier/builtin-api/package.json", JSON.stringify({ name: "@atelier/builtin-api", version: builtinPublicProvider.version, exports: { "./contracts": "./copy.js" } }));
     file(root, "node_modules/@atelier/builtin-api/copy.js", 'throw new Error("A private copy must not execute.");');
@@ -107,7 +107,7 @@ describe("内置公共包", () => {
         import { agentUI, AgentOverlay, AgentScrollArea, AgentToolbarItem, useAgentModelSelection } from "@atelier/builtin-api/renderer";
         import { createElement } from "react";
         export { agentUI, AgentOverlay, AgentScrollArea, AgentToolbarItem, useAgentModelSelection };
-        export default { resources: [], cards: [], tools: [], async prepare({ signal }) {
+        export default { modules: [{ resources: [], cards: [], tools: [] }], async prepare({ signal }) {
           agentUI.register({ id: "fixture.consumer${index}/panel",
             Component: () => createElement(AgentOverlay, { position: "bottom", hideComposer: true,
               children: createElement(AgentScrollArea, { style: { maxHeight: "16rem" }, children: "Question" }) })
@@ -189,7 +189,7 @@ describe("内置公共包", () => {
       { id: "provider", renderer: "provider", dependencies: [builtin.id] },
       { id: "other", renderer: "other", dependencies: [] },
     ], { available: [builtin.id], load: async path => {
-      seen.push(path); return { default: { resources: [], cards: [], tools: [], marker: path } };
+      seen.push(path); return { default: { modules: [{ resources: [], cards: [], tools: [] }], marker: path } };
     }, accept: module => { if ((module as unknown as { marker: string }).marker === "provider") throw new Error("Conflicting view."); } });
     expect(seen).toEqual(["provider", "other"]);
     expect(result.failures.map(item => item.id)).toEqual(["provider", "consumer"]);

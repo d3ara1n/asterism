@@ -20,11 +20,15 @@ export class CallRegistry {
     const entry = this.entries.get(id);
     if (!entry) throw new PluginApiError("unavailable", "The plugin call is unavailable.");
     if (contract && contract !== entry.contribution.contract) throw new PluginApiError("invalid_argument", "Use the declared call contract instance.");
-    const ref: ResourceRef = Object.freeze({ ...options.object });
-    const actual = this.host.refOf(ref.id);
-    if (!actual || actual.kind !== ref.kind || actual.sessionId !== ref.sessionId ||
-      !this.host.sessions.workbench(ref.sessionId).objects.some(object => object.id === ref.id))
-      throw new PluginApiError("unavailable", "The associated object is not on the current session path.");
+    let ref: ResourceRef | undefined;
+    if (entry.contribution.contract.scope === "object") {
+      if (!options.object) throw new PluginApiError("invalid_argument", "The call requires an associated object.");
+      ref = Object.freeze({ ...options.object });
+      const actual = this.host.refOf(ref.id);
+      if (!actual || actual.kind !== ref.kind || actual.sessionId !== ref.sessionId ||
+        !this.host.sessions.workbench(ref.sessionId).objects.some(object => object.id === ref!.id))
+        throw new PluginApiError("unavailable", "The associated object is not on the current session path.");
+    } else if (options.object) throw new PluginApiError("invalid_argument", "A plugin call cannot bind an object.");
     const parsed = entry.contribution.contract.input.safeParse(jsonSchema.parse(structuredClone(input)));
     if (!parsed.success) throw new PluginApiError("invalid_argument", parsed.error.message);
     return entry.runs.start(async signal => {
@@ -32,7 +36,7 @@ export class CallRegistry {
       const scope = { active: true, execution: true };
       try {
         const result = await entry.contribution.execute(jsonSchema.parse(parsed.data), {
-          object: entry.sdk.reader(ref, scope), source: structuredClone(source), signal,
+          ...(ref ? { object: entry.sdk.reader(ref, scope) } : {}), source: structuredClone(source), signal,
         });
         signal.throwIfAborted();
         // 返回原始 JSON；接收方按自己的同一契约解码，转换型 schema 不重复应用。

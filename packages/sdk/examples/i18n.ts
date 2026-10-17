@@ -11,10 +11,8 @@ export const messages = namespace.messages("en", defineMessages({
 }));
 export const plainLabel: UiText = "Counter";
 export const summary = withValues(messages.items, { count: 3 });
-/** 仅后台插件也可以声明可翻译的配置；固定路径遵循 JSON Pointer。 */
-export const CounterConfig = namespace.config(z.object({ limit: z.number().int().positive() }), { limit: 20 }, {
-  presentation: { fields: { "": { title: messages.title }, "/limit": { title: messages.limit } } },
-});
+/** 配置独立于页面布局，页面通过 useI18n 格式化上述消息。 */
+export const CounterConfig = namespace.config(z.object({ limit: z.number().int().positive() }), { limit: 20 });
 export function configure(plugin: PluginContext) {
   return plugin.config(CounterConfig);
 }

@@ -69,14 +69,6 @@ export const settingsMessages = pluginNamespace("atelier.host").messages("en", d
     id: "features_settings_SettingsPage_7",
     defaultMessage: "Prompts, tools, and delegation",
   },
-  plugins: {
-    id: "features_settings_SettingsPage_8",
-    defaultMessage: "Plugins",
-  },
-  pluginsSummary: {
-    id: "features_settings_SettingsPage_9",
-    defaultMessage: "Packages, status, and settings",
-  },
   languageSystem: {
     id: "languageSystem",
     defaultMessage: "System",

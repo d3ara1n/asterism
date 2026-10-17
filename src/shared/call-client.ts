@@ -1,4 +1,4 @@
-import { jsonSchema, type CallContract, type CallOptions, type Json, type PluginCalls } from "@atelier/sdk/contracts";
+import { jsonSchema, type CallContract, type CallOptions, type CallScope, type Json, type PluginCalls } from "@atelier/sdk/contracts";
 import type { CallBridge } from "./plugin-calls.ts";
 
 /** 请求与取消独立传输；不为进程内业务等待设置期限，不自动重放提交。 */
@@ -13,7 +13,7 @@ export class CallClient implements PluginCalls {
       else pending?.reject(Object.assign(new Error(frame.message), { code: frame.code }));
     });
   }
-  async invoke<I extends Json, O extends Json>(contract: CallContract<I, O>, input: I, options: CallOptions): Promise<O> {
+  async invoke<I extends Json, O extends Json, S extends CallScope>(contract: CallContract<I, O, S>, input: I, options: CallOptions<S>): Promise<O> {
     if (this.closed) throw new Error("The plugin connection is closed.");
     options.signal?.throwIfAborted();
     const id = crypto.randomUUID();

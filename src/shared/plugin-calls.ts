@@ -3,11 +3,11 @@ import { jsonSchema } from "@atelier/sdk/contracts";
 import { coreChannel } from "./core.ts";
 
 export const pluginCallsChannel = coreChannel("plugin-calls");
-export const pluginCallsVersion = 1;
+export const pluginCallsVersion = 2;
 const id = z.string().uuid();
 const ref = z.strictObject({ sessionId: z.string().min(1), id: z.string().min(1), kind: z.string().min(1) });
 export const callControlSchema = z.discriminatedUnion("type", [
-  z.strictObject({ type: z.literal("invoke"), id, contract: z.string().min(1), object: ref, input: jsonSchema }),
+  z.strictObject({ type: z.literal("invoke"), id, contract: z.string().min(1), object: ref.optional(), input: jsonSchema }),
   z.strictObject({ type: z.literal("cancel"), id }),
   z.strictObject({ type: z.literal("reset") }),
 ]);

@@ -1,20 +1,53 @@
-import { readConfig, type Json } from "@atelier/sdk/contracts";
+import { readConfig, type UiText } from "@atelier/sdk/contracts";
 import { RendererConfigsProvider, type RendererConfigs } from "@atelier/sdk/renderer";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import type { PluginConfiguration, PluginConfigurationCommand } from "../../shared/plugin-configuration";
+import { errorDisplay } from "../../shared/error-display";
+import { pluginsMessages } from "../messages/plugins";
 
-/** 宿主读取全部插件配置，变更通道到达时重读；插件按自己的契约解码，不读取原始存储。 */
+/** 配置读取与写入串行，订阅先于首次读取；旧读取不会覆盖新保存结果。 */
 export function HostConfigsProvider({ children }: { children: ReactNode }) {
-  const [values, setValues] = useState<ReadonlyMap<string, Json>>(new Map());
+  const [state, setState] = useState<{ values: Map<string, PluginConfiguration>; ready: boolean; error: UiText | null }>({ values: new Map(), ready: false, error: null });
+  const queue = useRef<Promise<unknown>>(Promise.resolve());
+  const execute = useMemo(() => (command: PluginConfigurationCommand) => {
+    const operation = queue.current.then(() => window.host.pluginConfiguration.execute(command));
+    queue.current = operation.catch(() => {});
+    return operation;
+  }, []);
   useEffect(() => {
     let active = true;
     const load = async () => {
-      const result = await window.host.pluginConfiguration.execute({ type: "read" });
-      if (active && result.ok) setValues(new Map(result.configurations.map(item => [item.id, item.value])));
+      try {
+        const result = await execute({ type: "read" });
+        if (!active) return;
+        if (result.ok) setState({ values: new Map(result.configurations.map(item => [item.id, item])), ready: true, error: null });
+        else setState(previous => ({ ...previous, ready: false, error: errorDisplay(result.error) }));
+      } catch {
+        if (active) setState(previous => ({ ...previous, ready: false, error: pluginsMessages.settingsLoadFailed }));
+      }
     };
-    void load();
     const stop = window.host.pluginConfiguration.onChanged(() => { void load(); });
+    void load();
     return () => { active = false; stop(); };
-  }, []);
-  const value = useMemo<RendererConfigs>(() => ({ get: contract => readConfig(contract, values.get(contract.plugin)) }), [values]);
+  }, [execute]);
+  const value = useMemo<RendererConfigs>(() => {
+    const refreshAfter = async (command: PluginConfigurationCommand) => {
+      const result = await execute(command);
+      if (!result.ok) throw Object.assign(new Error(result.error.message), { display: errorDisplay(result.error) });
+      setState({ values: new Map(result.configurations.map(item => [item.id, item])), ready: true, error: null });
+    };
+    return {
+      get: contract => {
+        const saved = state.values.get(contract.plugin);
+        const decoded = readConfig(contract, saved?.value);
+        const status = saved?.status === "invalid" || decoded.status === "invalid" ? "invalid" : saved?.status ?? "defaults";
+        return { ...decoded, status,
+          ready: state.ready && !!saved, error: state.error ?? (state.ready && !saved ? pluginsMessages.configurationUnavailable : null) };
+      },
+      save: (contract, next) => refreshAfter({ type: "save", id: contract.plugin, value: next }),
+      reset: contract => refreshAfter({ type: "reset", id: contract.plugin }),
+      refresh: () => refreshAfter({ type: "read" }),
+    };
+  }, [state, execute]);
   return <RendererConfigsProvider value={value}>{children}</RendererConfigsProvider>;
 }

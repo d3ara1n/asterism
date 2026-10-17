@@ -18,11 +18,12 @@ import { HomePage, type StartInput } from "../features/home/HomePage";
 import { createMessageDraft, SubmissionIdentity } from "@atelier/builtin/renderer";
 import { startAgentContentTarget } from "@atelier/builtin-api/contracts";
 import { contentInput, contentScopeId } from "../features/creation/content";
-import type { RendererContentInput } from "@atelier/sdk/renderer";
+import { RendererSettingsNavigationProvider, type RendererContentInput } from "@atelier/sdk/renderer";
 import { Window, Titlebar } from "./Window";
 
 import { Space } from "../shared/weave/Space";
-import { SettingsPage } from "../features/settings/SettingsPage";
+import { SettingsPage, type SettingsTarget } from "../features/settings/SettingsPage";
+import { usePluginSettingsRegistry } from "../modules/settings";
 import { Screen, type IslandSpec } from "../shared/weave/Screen";
 import { Toaster } from "../shared/ui/sonner";
 import { IconButton } from "@atelier/ui/ui/icon-button";
@@ -60,6 +61,8 @@ export function App({ controller }: { controller: ApplicationController }) {
   const returnFocus = useRef<HTMLElement | null>(null);
   const sidebarToggle = useRef<HTMLButtonElement>(null);
   const [page, setPage] = useState<PageId>("main");
+  const [settingsTarget, setSettingsTarget] = useState<SettingsTarget | null>(null);
+  const pluginSettings = usePluginSettingsRegistry();
   const [view, setView] = useState<MainView>({ kind: "home" });
   const [sidebarVisible, setSidebarVisible] = useState(true);
   const [draft] = useState(() => createMessageDraft(() => contentInput(startAgentContentTarget)));
@@ -86,6 +89,7 @@ export function App({ controller }: { controller: ApplicationController }) {
 
   const focusMain = () => requestAnimationFrame(() => document.getElementById("screen-main")?.focus({ preventScroll: true }));
   const go = (next: PageId) => {
+    if (next === "settings") setSettingsTarget(null);
     if (next === page) return;
     if (next === "settings") returnFocus.current = document.activeElement as HTMLElement | null;
     controller.setVisibleSession(next === "main" && view.kind === "conversation" ? view.sessionId : null);
@@ -211,10 +215,16 @@ export function App({ controller }: { controller: ApplicationController }) {
     onDismiss: appError ? controller.clearError : active?.clearError,
   });
 
-  return <>
+  return <RendererSettingsNavigationProvider value={{ open(pluginId, location) {
+    const settings = pluginSettings.pages.get(pluginId);
+    if (!settings) throw new Error(`Plugin ${pluginId} has no available settings page.`);
+    if (location !== undefined && !settings.locations?.includes(location)) throw new Error(`Unknown settings location: ${location}`);
+    go("settings");
+    setSettingsTarget({ pluginId, location, sequence: ++navigation.current });
+  } }}>
     <Window skipTarget={`screen-${page}`} titlebar={<Titlebar navigation={titleNavigation} actions={actions} actionsHidden={inSettings} />}>
       <Space active={page} screens={[
-        { id: "settings", label: i18n.formatMessage(settingsMessages.settings), surface: false, content: <SettingsPage active={inSettings} /> },
+        { id: "settings", label: i18n.formatMessage(settingsMessages.settings), surface: false, content: <SettingsPage active={inSettings} target={settingsTarget} /> },
         { id: "main", label: mainTitle, surface: false,
           // 切换会话时关闭工作台右侧的更深浮岛。
           content: <Screen label={i18n.formatMessage(appMessages.appNavigation)} leading={[...(sidebarVisible ? [sidebar] : []), ...(focus ? [focus] : [])]} root={main} resetKey={view.kind === "conversation" ? view.sessionId : "home"} className="h-full" /> },
@@ -223,7 +233,7 @@ export function App({ controller }: { controller: ApplicationController }) {
     <Toaster position="bottom-center" containerAriaLabel={i18n.formatMessage(commonMessages.notifications)}
       toastOptions={{ closeButtonAriaLabel: i18n.formatMessage(commonMessages.close) }} />
     {creation.element}
-  </>;
+  </RendererSettingsNavigationProvider>;
 }
 
 /** 首次发送：同一时刻只提交一次；连接中断后相同输入复用提交身份以找回已创建的会话。 */

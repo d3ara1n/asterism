@@ -5,7 +5,9 @@ import type { DatabaseSync } from "node:sqlite";
 
 import { ConfigurationService } from "../configuration/service.ts";
 import type { ModelAdapter } from "../model/contract.ts";
-import { PackageList, PluginPackageError } from "../plugins/packages.ts";
+import { PackageList, PluginPackageError, readManifest, readPackageMetadata, packageRoot } from "../plugins/packages.ts";
+import { builtinMetadata } from "@atelier/builtin/runtime";
+import { builtin } from "@atelier/builtin-api/contracts";
 import { commandSchema, snapshotSchema, type AppSnapshot, type AppError } from "../shared/contracts.ts";
 import type { TranslationCatalog } from "../shared/i18n.ts";
 import type { ModelSettings } from "../shared/model.ts";
@@ -92,14 +94,22 @@ export class ApplicationService {
     const sessions = this.sessions.tree.list().map(session => ({ id: session.id, title: session.title, created_at: session.createdAt }));
     const current = this.list.read();
     // 列表项按来源匹配本次启动结果；新加入或改动的项显示为待重启。
-    const plugins = current.map((entry, index) => {
+    const plugins: AppSnapshot["plugins"] = current.map((entry, index) => {
       const source = entry.source.kind === "path" ? entry.source.path : `${entry.source.name}@${entry.source.version}`;
       const startup = this.packages.find(item => item.source === source);
       const pending = !startup || startup.enabled !== entry.enabled;
-      return { index, source, enabled: entry.enabled, id: startup?.id ?? null, status: pending ? "pending" as const : startup.status,
-        error: pending ? null : startup.error, renderer: pending ? null : startup.renderer,
+      let metadata = {}, id = startup?.id ?? null, metadataError: string | null = null;
+      const root = packageRoot(entry, this.npmRoot);
+      try { metadata = readPackageMetadata(root); }
+      catch (error) { metadataError = error instanceof Error ? error.message : String(error); }
+      if (!id) { try { id = readManifest(root).id; } catch { /* 加载状态保留包校验失败原因。 */ } }
+      return { index, source, metadata, enabled: entry.enabled, id, status: pending ? "pending" as const : startup.status,
+        error: (pending ? null : startup.error) ?? metadataError, renderer: pending ? null : startup.renderer,
         dependencies: startup?.rendererDependencies ?? [] };
     });
+    const builtIn = this.sessions.plugins.find(plugin => plugin.id === builtin.id);
+    plugins.push({ index: null, source: "@atelier/builtin", id: builtin.id, metadata: builtinMetadata,
+      status: builtIn?.status ?? "failed", enabled: true, error: builtIn?.error ?? null, renderer: null, dependencies: [] });
     return snapshotSchema.parse({ workspace, sessions, plugins, catalogs: this.options.catalogs ?? [], restartRequired: JSON.stringify(current) !== this.started });
   }
 }

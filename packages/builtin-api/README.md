@@ -23,12 +23,12 @@
   "version": "1.0.0",
   "type": "module",
   "peerDependencies": {
-    "@atelier/sdk": "^0.21.0",
+    "@atelier/sdk": "^0.22.0",
     "@atelier/builtin-api": "^0.4.0"
   },
   "atelier": {
     "id": "example.input-review",
-    "api": { "major": 8, "minMinor": 5 },
+    "api": { "major": 9, "minMinor": 0 },
     "runtime": "./src/runtime.ts"
   }
 }
@@ -46,7 +46,7 @@
 
 ```tsx
 import { agentUI, AgentOverlay } from "@atelier/builtin-api/renderer";
-import { useRendererObject, type RendererModule } from "@atelier/sdk/renderer";
+import { defineRendererPlugin, useRendererObject } from "@atelier/sdk/renderer";
 
 function Questions() {
   const agent = useRendererObject();
@@ -56,12 +56,11 @@ function Questions() {
   </AgentOverlay>;
 }
 
-export default {
-  resources: [], cards: [], tools: [],
+export default defineRendererPlugin({
   async prepare({ signal }) {
     agentUI.register({ id: "example.questions/panel", Component: Questions }, { signal });
   },
-} satisfies RendererModule;
+});
 ```
 
 | 接口 | 用法 |

@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { z } from "zod";
 import { defineConfig, pluginNamespace } from "@atelier/sdk/contracts";
-import { defineModule, definePlugin, type PluginConfig } from "@atelier/sdk/runtime";
+import { definePlugin, type PluginConfig } from "@atelier/sdk/runtime";
 import { ApplicationService } from "../runtime/service.ts";
 import { dispatchPluginConfiguration } from "../runtime/dispatch.ts";
 import { pluginConfigurationResponseSchema, pluginConfigurationVersion } from "../shared/plugin-configuration.ts";
@@ -22,7 +22,7 @@ describe("插件配置的 SDK 与 IPC 接入", () => {
     let handle!: PluginConfig<z.infer<typeof schema>>;
     const ns = pluginNamespace("acme.settings"), empty = pluginNamespace("acme.none");
     const plugins = [
-      definePlugin({ namespace: ns, version: "1", modules: [defineModule(plugin => { handle = plugin.config(defineConfig(ns.id, schema, defaults)); return {}; })] }),
+      definePlugin({ namespace: ns, version: "1", setup(plugin) { handle = plugin.config(defineConfig(ns.id, schema, defaults)); return {}; } }),
       definePlugin({ namespace: empty, version: "1", modules: [] }),
     ];
     const root = mkdtempSync(join(tmpdir(), "plugin-config-")); roots.push(root);

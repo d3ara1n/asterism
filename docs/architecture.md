@@ -60,7 +60,7 @@ Atelier 分为**应用组合层**、**通用宿主机制**与**插件**三层：
 | `db/workspace.sqlite` | 工作区身份、会话树节点、当前会话/对象数据、内容依赖索引与工作台视图布局 | 任务运行时 |
 | `objects/<sha256>` | 宿主不可变 UTF-8 正文（先落盘重命名，再提交事件引用；读取校验 hash） | 任务运行时 |
 | `content/` | 插件不可变字节内容（`temporary/` 暂存，`sealed/<id>` 封存，见 [不可变内容](content.md)） | 任务运行时 |
-| `extensions/<pluginId>/` | 插件私有数据，其中 `.atelier/` 由宿主托管插件配置（`config.json`）与数据库 | 插件与运行时托管设施 |
+| `extensions/<pluginId>/` | 插件自管文件与数据；其中 `.atelier/` 保留给按需选用的托管配置、数据库与凭据引用，使用规则见 [插件 SDK](plugin-sdk.md#插件配置与界面本地化) | 插件与运行时托管设施 |
 | `logs/runtime.log` | 运行时正式英文日志 | 任务运行时 |
 | `chromium/` | cookie、缓存等独立 `sessionData` | Electron |
 

@@ -4,10 +4,27 @@ import { defineCall } from "@atelier/sdk/contracts";
 import { CallClient } from "./call-client.ts";
 import { callControlSchema, callFrameSchema, type CallControl, type CallFrame } from "./plugin-calls.ts";
 
-const contract = defineCall("test.calls/query", { input: z.null(), output: z.string() });
+const contract = defineCall("test.calls/query", { scope: "object", input: z.null(), output: z.string() });
 const object = { id: "agent", sessionId: "session", kind: "test.calls/agent" };
 
 describe("插件调用客户端", () => {
+  // 设置页没有 ResourceRef，插件级调用必须完整通过正式信封而不伪造对象。
+  it("插件级调用通过无对象信封交付并按契约解码结果", async () => {
+    const query = defineCall("test.calls/global", { scope: "plugin", input: z.null(), output: z.string() });
+    let receive!: (frame: CallFrame) => void;
+    const client = new CallClient({
+      onFrame: listener => { receive = listener; return () => {}; },
+      send: raw => {
+        const control = callControlSchema.parse(raw);
+        if (control.type === "invoke") {
+          expect(control.object).toBeUndefined();
+          receive({ type: "result", id: control.id, data: "ready" });
+        }
+      },
+    });
+    try { expect(await client.invoke(query, null, {})).toBe("ready"); }
+    finally { client.close(); }
+  });
   // 取消/断连必须释放等待；迟到消息不得完成另一调用，已发送的修改不能自动重放。
   it("取消和断连拒绝对应等待，迟到结果不复用，关闭释放监听", async () => {
     const sent: CallControl[] = [];

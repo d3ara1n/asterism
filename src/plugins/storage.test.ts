@@ -41,7 +41,8 @@ describe("插件托管存储", () => {
     expect(storage.config(contract).get()).toEqual({ limit: 5 });
     expect(() => storage.config(defineConfig("acme.settings", z.strictObject({ limit: z.number() }), { limit: 5 }))).toThrow();
     const snapshot = storage.configuration("acme.settings")!;
-    expect(snapshot).toMatchObject({ id: "acme.settings", schema: { title: "Limits" }, defaults: { limit: 5 }, value: { limit: 5 }, status: "defaults" });
+    expect(snapshot).toMatchObject({ id: "acme.settings", defaults: { limit: 5 }, value: { limit: 5 }, status: "defaults" });
+    expect(existsSync(join(storage.dir, managedDirectory, "db.sqlite"))).toBe(false);
     (snapshot.defaults as { limit: number }).limit = 123;
     expect(storage.configuration("acme.settings")?.defaults).toEqual({ limit: 5 });
   });

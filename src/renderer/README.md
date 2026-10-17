@@ -33,8 +33,10 @@
 | `../../packages/builtin/src/text-view.tsx` / `code-view.tsx` / `shared/tool-body.ts` | 内置正文工具三态视图与 120 行预览预算；工具和 Markdown 共用 Pierre 代码视图，支持文件名推断或显式语言着色 |
 | `modules/registry.ts` / `views.tsx` / `object-context.ts` | 静态资源展示描述、卡片／工具／历史记录视图注册表与 SDK 前端对象接口注入 |
 | `features/configuration/` | 提供商、模型发现（`ModelDiscoveryPicker.tsx`）、参数获取（`ModelParameters.tsx`）、模型兼容设置（`ModelCompatibilityEditor.tsx`）、模型角色与 agent 覆盖表单（`forms.tsx`） |
-| `features/plugins/` / `shared/ConfigurationValue.tsx` | 插件包管理、插件配置表单与 schema 驱动字段编辑器 |
-| `features/settings/` | 设置屏、分类注册表与语言设置（`LanguageSettings.tsx`） |
+| `features/plugins/` | 插件信息卡片、搜索筛选、包管理与自定义设置页承载 |
+| `modules/plugins.ts` / `modules/settings.tsx` / `modules/configs.tsx` | 插件前端入口装载、设置页面目录与托管配置读写通知 |
+| `shared/ConfigurationValue.tsx` | 模型兼容配置使用的 schema 驱动字段编辑器 |
+| `features/settings/` | 应用／插件分区的设置总览、分类与插件页导航、语言设置（`LanguageSettings.tsx`） |
 | `shared/weave/` | `Space` 屏间平移、`Screen` 浮岛编织纯布局模型（`model.ts`）与动效参数 |
 | `../../packages/ui/src/ui/` | 本地维护的 shadcn/ui 官方源码与公共状态组合；主题绑定的 `sonner.tsx` 留在应用 `shared/ui/` |
 | `shared/i18n.ts` / `messages/` | 应用级语言环境订阅、共享 `react-intl` context 与按功能组织的宿主消息声明 |

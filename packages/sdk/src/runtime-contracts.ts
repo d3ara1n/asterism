@@ -115,8 +115,13 @@ export interface ModuleContribution {
 }
 /** 具名模块入口：插件提供贡献，宿主负责装配与调用。 */
 export interface PluginModule { setup(plugin: PluginContext): ModuleContribution }
+/** 插件共享服务与功能模块的组合；共享服务先建立、在模块之后释放。 */
+export interface PluginContribution extends ModuleContribution {
+  modules?: readonly PluginModule[];
+}
 export interface PluginDefinition {
-  namespace: PluginNamespace; version: string; modules: readonly PluginModule[];
+  namespace: PluginNamespace; version: string; modules?: readonly PluginModule[];
+  setup?(plugin: PluginContext): PluginContribution;
   /** 包加载器从公共模块导入关系填充；提供方先 setup，消费者先清理。 */
   dependencies?: readonly string[];
 }
@@ -124,7 +129,7 @@ export function defineModule(setup: PluginModule["setup"]): PluginModule {
   if (typeof setup !== "function") throw new Error("A plugin module must declare a setup function.");
   return { setup };
 }
-export function definePlugin(definition: PluginDefinition): PluginDefinition {
+export function definePlugin(definition: PluginDefinition): PluginDefinition & { modules: readonly PluginModule[] } {
   if (!definition.version.trim()) throw new Error(`Plugin ${definition.namespace.id} must declare a version.`);
-  return { ...definition, modules: [...definition.modules] };
+  return { ...definition, modules: [...definition.modules ?? []] };
 }

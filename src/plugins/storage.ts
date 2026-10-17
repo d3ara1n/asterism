@@ -3,8 +3,7 @@ import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { z } from "zod";
 import type { CredentialVault } from "../configuration/credentials.ts";
-import { jsonSchema, configurationPresentationSchema, type Json, type ConfigContract, type ConfigurationPresentation } from "@atelier/sdk/contracts";
-import { projectConfigurationPresentation } from "../shared/configuration-presentation.ts";
+import { jsonSchema, type Json, type ConfigContract } from "@atelier/sdk/contracts";
 import { PluginApiError, validationMessage, type PluginConfig, type PluginSecrets } from "@atelier/sdk/runtime";
 import type { PluginConfiguration } from "../shared/plugin-configuration.ts";
 
@@ -32,7 +31,7 @@ export class PluginStorage {
   private readonly managed: string;
   private database: DatabaseSync | null = null;
   private settings: {
-    source: object; schema: Json | null; defaults: Json; presentation?: ConfigurationPresentation;
+    source: object; defaults: Json;
     read(): { value: Json; status: PluginConfiguration["status"] };
     write(value: unknown): void;
   } | null = null;
@@ -72,11 +71,7 @@ export class PluginStorage {
         writeJson(file(), jsonSchema.parse(parsed.data));
         this.changed();
       };
-      let formSchema: Json | null = null;
-      try { formSchema = jsonSchema.parse(z.toJSONSchema(contract.schema, { io: "input", unrepresentable: "any" })); }
-      catch { this.warn("Plugin configuration schema cannot be projected; the value editor is used."); }
-      const presentation = projectConfigurationPresentation(formSchema, contract.presentation, this.warn);
-      this.settings = { source: contract, schema: formSchema, defaults: fallback(), presentation, read, write };
+      this.settings = { source: contract, defaults: fallback(), read, write };
     }
     const settings = this.settings!;
     return {
@@ -98,8 +93,7 @@ export class PluginStorage {
   }
 
   configuration(id: string): PluginConfiguration | null {
-    return this.settings ? { id, schema: structuredClone(this.settings.schema),
-      defaults: structuredClone(this.settings.defaults), ...(this.settings.presentation ? { presentation: configurationPresentationSchema.parse(this.settings.presentation) } : {}), ...this.settings.read() } : null;
+    return this.settings ? { id, defaults: structuredClone(this.settings.defaults), ...this.settings.read() } : null;
   }
   saveConfiguration(value: Json): void {
     if (!this.settings) throw new PluginApiError("not_found", "The plugin has no configuration.");

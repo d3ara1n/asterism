@@ -2,7 +2,7 @@ import { Counter, CounterView as Card, CreateCounter, ChangeCount } from "./coun
 /** 前端作者用例：仅依赖 React、Zod 和公开 SDK，不取用 window.host。 */
 import { createElement, useEffect, useState } from "react";
 import { z } from "zod";
-import { cardRenderer, useRendererCard, useRendererObject, type RendererModule, type RendererObjectContext } from "@atelier/sdk/renderer";
+import { defineRendererPlugin, cardRenderer, useRendererCard, useRendererObject, type RendererModule, type RendererObjectContext } from "@atelier/sdk/renderer";
 
 function CounterBody({ data }: { data: z.infer<typeof Card.schema> }) {
   const { onStream, invoke, activity, session } = useRendererObject();
@@ -26,6 +26,7 @@ export const renderer = {
     panels: [{ id: "details", label: "Details", icon: null, Body: CounterDetails }] })],
   tools: [],
 } satisfies RendererModule;
+export default defineRendererPlugin({ modules: [renderer] });
 
 export function createCounter(object: RendererObjectContext) {
   return object.session.create(CreateCounter, {}, { x: 0, y: 0 });

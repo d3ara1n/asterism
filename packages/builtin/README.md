@@ -5,7 +5,7 @@
 ## 应用组合入口
 
 - `@atelier/builtin/runtime`：`createBuiltin({ application, connectNaming })` 返回插件定义；应用显式传入展示名称、请求 User-Agent，并连接命名接口。`createSelection`、`composeSystemPrompt` 为首页首次提交提供与 Agent 相同的领域准备规则。
-- `@atelier/builtin/renderer`：`builtinViews`、`BuiltinRendererProvider` 及首页复用的输入草稿、文件输入、模型选择和提交身份工具。应用通过 provider 注入按插件绑定的偏好门面，供 Agent 扩展组件使用。
+- `@atelier/builtin/renderer`：`builtinRenderer` 聚合功能视图 `builtinViews` 与设置页；另提供 `BuiltinRendererProvider` 及首页复用的输入草稿、文件输入、模型选择和提交身份工具。应用通过 provider 注入按插件绑定的偏好门面，供 Agent 扩展组件使用。
 - `@atelier/builtin/locales/zh-Hans.json`：由应用装配的内置翻译目录。
 
 宿主加载、外部插件依赖、公共提供方登记与关闭协调留在应用组合层。外部插件使用 [公共 API 包](../builtin-api/README.md)，不依赖实现包。
@@ -20,7 +20,7 @@
 | `src/questions/` | `ask_user` 三题型与结构化答案、内存问答服务及具型调用、可保留草稿的底部／模态作答界面和工具三态视图；契约见[等待用户回答](../../docs/runtime.md#等待用户回答)，交互见[结构化问答](../../docs/workbench.md#结构化问答) |
 | `src/notes/`、`src/filesystem/` | 资源与正文工具实现、创建入口与三态工具视图 |
 | `src/naming/` | 自动命名、人工命名接口和标题投影；记录契约由公共包提供 |
-| `src/settings/` | 内置插件配置 |
+| `src/settings/` | 内置插件托管配置与按思考／工具调用分组的自定义设置页；配置在插件根入口登记 |
 | `src/shared/` | 正文算法、共享工具声明、预览规则与创建表单 |
 | `src/messages/`、`src/locales/` | 内置插件自有文案与翻译 |
 

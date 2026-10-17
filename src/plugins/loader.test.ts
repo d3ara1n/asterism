@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { z } from "zod";
-import { belongsTo, pluginNamespace, defineAction, defineRecord, defineImplementation, defineTool, type ResourceContract, type ToolContract } from "@atelier/sdk/contracts";
-import { defineTopLevelTool, definePlugin, defineModule, implementTool, implementResource, type PluginDefinition } from "@atelier/sdk/runtime";
+import { belongsTo, pluginNamespace, defineCall, defineAction, defineRecord, defineImplementation, defineTool, type ResourceContract, type ToolContract } from "@atelier/sdk/contracts";
+import { defineTopLevelTool, definePlugin, defineModule, implementCall, implementTool, implementResource, type PluginDefinition, type PluginContext } from "@atelier/sdk/runtime";
 import { loadPlugins, type PluginHostServices } from "./loader.ts";
 
 const services = { extensionsDirectory: "/unused", data: null as never, refOf: () => null, sessions: { progressChanged() {} } as never,
@@ -32,6 +32,71 @@ function plugin(id: string, contract: ToolContract, options: { extra?: ToolContr
 }
 
 describe("插件装配", () => {
+  // plugin-sdk.md：插件级调用无需对象，契约作用域不能被调用参数降级。
+  it("无模块的插件声明全局服务，后台和桌面调用共用作用域校验", async () => {
+    const ns = pluginNamespace("test.global");
+    const query = defineCall(ns.name("query"), { scope: "plugin", input: z.string().trim(), output: z.string() });
+    const objectQuery = defineCall(ns.name("object"), { scope: "object", input: z.null(), output: z.null() });
+    let context!: PluginContext;
+    const loaded = load([definePlugin({ namespace: ns, version: "1", setup(plugin) {
+      context = plugin;
+      return { calls: [
+        implementCall(query, async (input, call) => {
+          expect(call).not.toHaveProperty("object");
+          return `${call.source?.plugin ?? "desktop"}:${input}`;
+        }),
+        implementCall(objectQuery, async () => null),
+      ] };
+    } })]);
+    expect(loaded.manifest[0]?.status).toBe("loaded");
+    expect(await loaded.calls.invoke(query.id, " text ", {}, null)).toBe("desktop:text");
+    expect(await context.ipc.calls.invoke(query, " text ", {})).toBe("test.global:text");
+    await expect(loaded.calls.invoke(objectQuery.id, null, {}, null)).rejects.toMatchObject({ code: "invalid_argument" });
+    const object = { id: "missing", sessionId: "missing", kind: "test.global/object" };
+    await expect(loaded.calls.invoke(query.id, "text", { object }, null)).rejects.toMatchObject({ code: "invalid_argument" });
+    await expect(loaded.calls.invoke(objectQuery.id, null, { object }, null)).rejects.toMatchObject({ code: "unavailable" });
+    await expect(loaded.calls.invoke(query.id, 42, {}, null)).rejects.toMatchObject({ code: "invalid_argument" });
+  });
+  // 共享服务必须等模块释放；根与模块的贡献仍经过同一冲突校验。
+  it.each([false, true])("插件根共享服务在模块之后清理，重复登记失败=%s", async conflict => {
+    const ns = pluginNamespace("test.composition"), order: string[] = [];
+    const query = defineCall(ns.name("query"), { scope: "plugin", input: z.null(), output: z.number() });
+    const loaded = load([definePlugin({ namespace: ns, version: "1", setup() {
+      const service = { value: 1 };
+      return {
+        calls: [implementCall(query, async () => service.value)],
+        modules: [defineModule(() => ({ calls: conflict ? [implementCall(query, async () => 2)] : [],
+          closing: async () => { expect(service.value).toBe(1); order.push("module"); } }))],
+        closing: async () => { service.value = 0; order.push("plugin"); },
+      };
+    } })]);
+    expect(loaded.manifest[0]?.status).toBe(conflict ? "failed" : "loaded");
+    await loaded.close(); await loaded.close();
+    expect(order).toEqual(["module", "plugin"]);
+  });
+  // 插件级调用不关联任何会话，但关闭依然必须等处理器真实退出再销毁共享服务。
+  it("关闭取消全局调用，处理器清理完成前保留插件服务", async () => {
+    const ns = pluginNamespace("test.wait");
+    const wait = defineCall(ns.name("wait"), { scope: "plugin", input: z.null(), output: z.null() });
+    let started!: () => void, release!: () => void, cancelled!: () => void;
+    const start = new Promise<void>(resolve => { started = resolve; });
+    const held = new Promise<void>(resolve => { release = resolve; });
+    const abort = new Promise<void>(resolve => { cancelled = resolve; });
+    const order: string[] = [];
+    const loaded = load([definePlugin({ namespace: ns, version: "1", setup: () => ({
+      calls: [implementCall(wait, async (_, { signal }) => {
+        signal.addEventListener("abort", cancelled, { once: true }); started();
+        await held; order.push("handler"); return null;
+      })],
+      closing: async () => { order.push("plugin"); },
+    }) })]);
+    const result = expect(loaded.calls.invoke(wait.id, null, {}, null)).rejects.toThrow();
+    await start;
+    const closing = loaded.close();
+    try { await abort; expect(order).toEqual([]); }
+    finally { release(); await result; await closing; }
+    expect(order).toEqual(["handler", "plugin"]);
+  });
   it("记录可复用同一声明，独立副本即使 ID 相同也使装配失败", () => {
     const ns = pluginNamespace("test.records"), record = defineRecord(ns.name("record"), { schema: z.number() });
     const plugin = (other: typeof record) => definePlugin({ namespace: ns, version: "1", modules: [
