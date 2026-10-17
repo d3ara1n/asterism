@@ -3,6 +3,7 @@ import { ArrowDown } from "lucide-react";
 import { PageState } from "@atelier/ui/ui/page-state";
 import { Button } from "@atelier/ui/ui/button";
 import { ConversationTimeline } from "./ConversationTimeline";
+import { ConversationMinimap } from "./ConversationMinimap";
 
 import { Alert, AlertDescription } from "@atelier/ui/ui/alert";
 
@@ -47,7 +48,7 @@ export function Conversation({ onHome }: { onHome(): void }) {
   const running = executionState === "running";
   const timeline = useMemo(() => snapshot ? conversationTimeline(snapshot, agentId, models.blocks, running) : [], [snapshot, agentId, models.blocks, running]);
   const configurationError = catalogs.error;
-  const { scroll, awayFromBottom, latest, onScroll } = useOutputFollow(timeline);
+  const { scroll, awayFromBottom, latest, jumpTo, onScroll } = useOutputFollow(timeline);
   const composer = useRef<HTMLTextAreaElement>(null);
   const composerHidden = useComposerHidden();
 
@@ -70,13 +71,17 @@ export function Conversation({ onHome }: { onHome(): void }) {
   return <>
     <AgentUIRegion position="top" />
     <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
-      <div ref={scroll} className="min-h-0 flex-1 select-text overflow-y-auto overscroll-contain" onScroll={onScroll}>
+      <div ref={scroll} className="min-h-0 flex-1 scroll-pt-4 select-text overflow-y-auto overscroll-contain" onScroll={onScroll}>
         <div className="space-y-4 p-4">
           <ConversationTimeline items={timeline} />
           {running && <p role="status" className="type-caption flex items-center gap-2"><StatusIcon tone="progress" className="size-3" />{i18n.formatMessage(conversationMessages.workingHint)}</p>}
           {!timeline.length && !running && <p className="type-caption">{i18n.formatMessage(conversationMessages.emptyHint)}</p>}
         </div>
       </div>
+      <ConversationMinimap timeline={timeline} onSelect={id => {
+        const target = scroll.current?.querySelector<HTMLElement>(`[data-conversation-message="${CSS.escape(id)}"]`);
+        if (target) jumpTo(target);
+      }} />
       {awayFromBottom && <div className="pointer-events-none absolute inset-x-0 bottom-3 z-10 flex justify-center">
         <div className="surface-floating pointer-events-auto">
           <Button variant="ghost" size="sm" onClick={latest}><ArrowDown />{i18n.formatMessage(conversationMessages.latestOutput)}</Button>

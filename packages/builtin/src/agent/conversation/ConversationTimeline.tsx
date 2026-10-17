@@ -24,7 +24,7 @@ function NodeView({ node }: { node: TimelineItem }) {
   const streaming = (node.kind === "text" || node.kind === "thinking") && "endedAt" in node && node.endedAt === null;
   const tag = incomplete ? <Badge variant="outline">{i18n.formatMessage(conversationMessages.incomplete)}</Badge> : null;
   switch (node.kind) {
-    case "message": return <article className="space-y-2"><p className="type-label">{i18n.formatMessage(conversationMessages.you)}</p>
+    case "message": return <article data-conversation-message={node.id} className="space-y-2"><p className="type-label">{i18n.formatMessage(conversationMessages.you)}</p>
       <div className="space-y-2 rounded-md bg-muted px-3 py-2">{node.parts.map((part, index) =>
         part.kind === "text" ? <Markdown key={index}>{part.text}</Markdown>
           : <FilePreview key={index} part={part} content={object.content} />)}</div></article>;

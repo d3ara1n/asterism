@@ -1,6 +1,14 @@
 import { defineMessages, pluginNamespace } from "@atelier/sdk/contracts";
 
 export const conversationMessages = pluginNamespace("atelier.builtin").messages("en", defineMessages({
+  minimap: {
+    id: "agent_conversation_minimap",
+    defaultMessage: "Conversation navigation",
+  },
+  minimapMessage: {
+    id: "agent_conversation_minimapMessage",
+    defaultMessage: "Go to message {number}",
+  },
   contextSummary: {
     id: "agent_conversation_contextSummary",
     defaultMessage: "Context compressed",

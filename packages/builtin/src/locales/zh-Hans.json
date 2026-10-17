@@ -84,6 +84,8 @@
   "agentPanels.context": "上下文",
   "settings.title": "内置插件",
   "agent_conversation_contextSummary": "上下文已压缩",
+  "agent_conversation_minimap": "对话导航",
+  "agent_conversation_minimapMessage": "定位第 {number} 条消息",
   "agent_media_attach": "添加文件",
   "agent_media_remove": "移除文件",
   "agent_media_uploading": "正在添加文件…",

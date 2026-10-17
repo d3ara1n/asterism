@@ -1,0 +1,26 @@
+.chat-minimap {
+  --minimap-base: 0.3125rem;
+  width: 0.875rem;
+  scrollbar-width: none;
+  transition: width var(--motion-fast) var(--ease-out);
+}
+
+.chat-minimap:hover,
+.chat-minimap:focus-within,
+.chat-minimap[data-active] {
+  --minimap-base: 0.5rem;
+  width: 1.625rem;
+}
+
+.chat-minimap-marker {
+  width: calc(var(--minimap-base) + var(--minimap-lens) * 0.875rem);
+  opacity: calc(0.25 + var(--minimap-lens) * 0.7);
+  transition: width var(--motion-fast) var(--ease-out), opacity var(--motion-fast) var(--ease-out);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-minimap,
+  .chat-minimap-marker {
+    transition: none;
+  }
+}
