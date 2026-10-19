@@ -12,7 +12,8 @@
 | `defaults.ts` | 五种内置模型角色与五种内置 agent 的原始定义 |
 | `credentials.ts` | `credentials/` 下密文文件的创建、读取、替换与清理；经 `runtime/secret-client.ts` 请求主进程 `safeStorage` 加解密 |
 | `probe.ts` | 三种协议的显式 AI SDK 实例、最小连通性测试请求与脱敏错误分类 |
-| `discovery.ts` | OpenAI／Anthropic `GET /models` 列表请求、游标分页、元数据解析、取消与 30 秒超时管理 |
+| `discovery.ts` | `GET /models` 列表请求、连接鉴权、游标分页、取消与 30 秒超时管理 |
+| `discovery-format.ts` | 独立于消息协议，按响应结构识别模型目录并归一化已适配元数据；支持范围见 [模型发现与添加](../../docs/model-configuration.md#模型发现与添加) |
 | `model-catalog.ts` | 调用官方 `@opencode-ai/models` 客户端，按剥离路由前缀后的模型名精确匹配并映射可覆盖参数 |
 | `model-cost-migration.ts` | 在配置存储边界把旧平铺 token 单价转换为按模态、计费项和单位组织的参考价格 |
 | `../shared/provider-presets.ts` | 提供商连接预设目录声明、校验与一次性连接草稿生成（`providerPresetDraft`） |

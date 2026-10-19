@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { z } from "zod";
-import { discoveredModelSchema, thinkingSchema, type DiscoveredModel, type ModelDiscovery, type Provider } from "../shared/configuration.ts";
+import type { DiscoveredModel, ModelDiscovery, Provider } from "../shared/configuration.ts";
 import { validateProviderTransport, ProviderTransportError } from "../model/provider.ts";
 import { ConfigurationError } from "./errors.ts";
+import { parseModelListPage, type ModelListPage } from "./discovery-format.ts";
 
 type DiscoveryError = NonNullable<ModelDiscovery["error"]>;
 export class ModelDiscoveryError extends Error {
@@ -11,21 +11,7 @@ export class ModelDiscoveryError extends Error {
 export interface DiscoveryInput { provider: Provider; apiKey: string; signal: AbortSignal }
 export type DiscoverModels = (input: DiscoveryInput) => Promise<DiscoveredModel[]>;
 
-const support = z.object({ supported: z.boolean() });
-const identity = z.object({ id: discoveredModelSchema.shape.modelId });
-const anthropicModelEntry = identity.extend({
-  display_name: discoveredModelSchema.shape.name.optional(),
-  max_input_tokens: z.number().int().positive().nullish(),
-  capabilities: z.object({
-    thinking: z.object({ supported: z.boolean(), types: z.object({ disabled: support.optional() }).optional() }).optional(),
-    effort: z.record(z.string(), z.unknown()).optional(),
-  }).nullish(),
-});
-const pageSchema = z.object({
-  data: z.array(z.unknown()), has_more: z.boolean().optional(), last_id: z.string().nullable().optional(),
-});
-
-/** 两种 OpenAI 推理协议共用列表接口；保留连接路径，不猜测其他地址。 */
+/** 保留连接路径与鉴权约定，目录响应格式由独立解析器识别。 */
 export async function discoverModels({ provider, apiKey, signal }: DiscoveryInput, transport: typeof fetch = fetch): Promise<DiscoveredModel[]> {
   validateProviderTransport(provider);
   const endpoint = new URL(`${provider.baseUrl.replace(/\/+$/, "")}/models`);
@@ -48,32 +34,16 @@ export async function discoverModels({ provider, apiKey, signal }: DiscoveryInpu
         : status === 404 || status === 405 || status === 501 ? "unsupported"
         : status === 429 ? "rate_limit" : status >= 500 ? "server" : "protocol");
     }
-    let page: z.infer<typeof pageSchema>;
-    try { page = pageSchema.parse(await response.json()); }
+    let page: ModelListPage;
+    try { page = parseModelListPage(await response.json()); }
     catch { throw new ModelDiscoveryError("protocol"); }
-    for (const raw of page.data) {
-      const parsed = identity.safeParse(raw);
-      if (!parsed.success) throw new ModelDiscoveryError("protocol");
-      const model: DiscoveredModel = { modelId: parsed.data.id, name: parsed.data.id };
-      if (provider.protocol === "anthropic") {
-        const metadata = anthropicModelEntry.safeParse(raw);
-        if (!metadata.success) throw new ModelDiscoveryError("protocol");
-        const entry = metadata.data;
-        model.name = entry.display_name ?? entry.id;
-        if (entry.max_input_tokens != null) model.contextWindow = entry.max_input_tokens;
-        const thinking = entry.capabilities?.thinking;
-        if (thinking) model.reasoning = thinking.supported;
-        const effort = entry.capabilities?.effort;
-        if (effort) model.thinkingLevels = thinkingSchema.options.filter(level => level === "off"
-          ? thinking?.types?.disabled?.supported === true
-          : support.safeParse(effort[level]).data?.supported === true);
-      }
+    for (const model of page.models) {
       if (!models.has(model.modelId)) models.set(model.modelId, model);
     }
-    if (!page.has_more) break;
+    if (!page.hasMore) break;
     // 分页只沿当前端点的游标推进，不消费服务端返回的任意 URL。
-    const cursor = page.last_id;
-    if (!cursor || cursors.has(cursor) || !page.data.length) throw new ModelDiscoveryError("protocol");
+    const cursor = page.lastId;
+    if (!cursor || cursors.has(cursor) || !page.models.length) throw new ModelDiscoveryError("protocol");
     cursors.add(cursor);
     endpoint.searchParams.set("after_id", cursor);
   }
