@@ -1,12 +1,13 @@
 import { defineTool, type ToolContract } from "./module-contract.ts";
 import type { Json } from "./json.ts";
-import type { ObjectReader } from "./objects.ts";
+import type { ObjectReader, ToolSession } from "./objects.ts";
 import type { CallResult } from "./runtime-contracts.ts";
 import type { ToolModelOutput } from "./tool-result.ts";
 import type { z } from "zod";
 
 export interface TopLevelToolContext<D extends Json = Json> {
   readonly object: ObjectReader;
+  readonly session: ToolSession;
   readonly callId: string;
   readonly signal: AbortSignal;
   publish(data: D): void;

@@ -1,5 +1,5 @@
-import { belongsTo, jsonSchema, type DataContract, type Json, type RecordContract } from "@atelier/sdk/contracts";
-import { PluginApiError, type ContentReader, type ContentScope, type ObjectReader, type ObjectExecutor, type PluginContext, type ResourceRef, type ResourceSnapshot, type SessionExecutor, type ObjectWriter } from "@atelier/sdk/runtime";
+import { belongsTo, jsonSchema, type DataContract, type Json, type RecordContract, type SessionDirectory } from "@atelier/sdk/contracts";
+import { PluginApiError, type ContentReader, type ContentScope, type ObjectReader, type ObjectExecutor, type PluginContext, type ResourceRef, type ResourceSnapshot, type SessionExecutor, type ObjectWriter, type ToolSession } from "@atelier/sdk/runtime";
 import type { RunGroup } from "./lifecycle.ts";
 import type { ObjectScope } from "./host.ts";
 import type { PluginHostServices } from "./loader.ts";
@@ -11,15 +11,22 @@ import { inputReferences } from "../model/input.ts";
 import type { PluginEventScope } from "./event-scope.ts";
 import type { PluginCalls } from "@atelier/sdk/contracts";
 import type { BoundTopLevelTool } from "./top-level-tools.ts";
+import { SessionError } from "../session/tree.ts";
 
-type PluginServices = Pick<PluginContext, "id" | "dir" | "log" | "config" | "secrets" | "db" | "tasks">;
-export function createSdkContext(internal: PluginServices, host: PluginHostServices, modelRuns: RunGroup, eventScope: PluginEventScope,
-  calls: PluginCalls, topLevelTools: (ref: ResourceRef, policy: (name: string) => boolean) => BoundTopLevelTool[]) {
+type PluginServices = Pick<PluginContext, "id" | "dir" | "log" | "config" | "secrets" | "db" | "tasks" | "signal">;
+export function createSdkContext(internal: PluginServices, host: PluginHostServices, modelRuns: RunGroup, sessionRuns: RunGroup, directory: SessionDirectory, eventScope: PluginEventScope,
+  calls: PluginCalls, topLevelTools: (ref: ResourceRef, policy: (name: string) => boolean, linked: readonly ResourceRef[]) => BoundTopLevelTool[]) {
   const records = new Map<string, RecordContract>();
   const running = new Map<string, { sessionId: string; live: LiveBlock[] }>();
   let available = true;
   const checkAvailable = () => {
     if (!available) throw new PluginApiError("unavailable", "The plugin is not available.");
+  };
+  const sessionError = (error: unknown): never => {
+    if (error instanceof SessionError) throw new PluginApiError(
+      error.code === "conflict" || error.code === "not_found" ? error.code
+        : error.code === "invalid_request" ? "invalid_argument" : "unavailable", error.message);
+    throw error;
   };
   const own = (kind: string) => {
     if (!belongsTo(internal.id, kind)) throw new PluginApiError("foreign_resource", "The resource belongs to another plugin.");
@@ -80,6 +87,31 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
   const session = (id: string, objectId?: string, checkMutation = checkAvailable, scope?: ObjectScope): SessionExecutor => ({
     id,
     content: readOnly(host.content?.reader(access(id, undefined, scope)) ?? missing),
+    create(contract, input, options = {}) {
+      checkMutation();
+      const value = jsonSchema.parse(input);
+      const linkTo = options.linkTo && Object.freeze({ ...options.linkTo });
+      const contentReader = options.content ?? host.content?.reader(access(id, objectId, scope));
+      return sessionRuns.start(async signal => {
+        try {
+          return await host.sessions.create(id, contract, value, {
+            signal, linkTo, content: contentReader, owner: internal.id, check: checkMutation,
+          });
+        } catch (error) { return sessionError(error); }
+      }, { signal: options.signal, ...(objectId ? { object: host.refOf(objectId) ?? undefined } : {}) }).done;
+    },
+    link(receiver, resource) {
+      checkMutation();
+      try { host.sessions.link(id, receiver, resource, true); } catch (error) { sessionError(error); }
+    },
+    unlink(receiver, resource) {
+      checkMutation();
+      try { host.sessions.link(id, receiver, resource, false); } catch (error) { sessionError(error); }
+    },
+    remove(resource) {
+      checkMutation();
+      try { host.sessions.remove(id, resource); } catch (error) { sessionError(error); }
+    },
     get: contract => readData(id, null, contract),
     snapshot() {
       checkAvailable();
@@ -188,7 +220,7 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
   };
   const context: PluginContext = {
     ipc: { events: eventScope.api, calls },
-    id: internal.id, dir: internal.dir, log: internal.log,
+    id: internal.id, signal: internal.signal, sessions: directory, dir: internal.dir, log: internal.log,
     config: contract => {
       checkAvailable();
       if (contract.plugin !== internal.id) throw new PluginApiError("foreign_resource", "The configuration belongs to another plugin.");
@@ -237,7 +269,7 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
         const linked = host.sessions.linked(ref.sessionId, ref.id);
         const policy = (name: string) => (allowed === null || allowed.has(name)) && !excluded.has(name);
         const capabilities = host.sessions.capabilities(linked, policy);
-        const boundTools = topLevelTools(ref, policy);
+        const boundTools = topLevelTools(ref, policy, linked.map(resource => ({ sessionId: ref.sessionId, id: resource.id, kind: resource.kind })));
         let progressTimer: ReturnType<typeof setTimeout> | undefined;
         const receive = request.observer.event.bind(request.observer);
         const work = modelRuns.start(signal => host.models.run({ plugin: internal.id, object: ref, target, system, messages, tools, cache, userAgent, requestParentId: request.requestParentId,
@@ -267,6 +299,24 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
   };
   return {
     context, object, reader, content, linkAbort,
+    toolSession(ref: ResourceRef, linked: readonly ResourceRef[], scope: ObjectScope, signal: AbortSignal): ToolSession {
+      const check = () => {
+        checkExecution(scope); signal.throwIfAborted(); checkRef(ref);
+        if (!host.sessions.workbench(ref.sessionId).objects.some(resource => resource.id === ref.id))
+          throw new PluginApiError("unavailable", "The invoking resource is no longer on the current session path.");
+      };
+      const source = session(ref.sessionId, ref.id, check, scope);
+      return Object.freeze({
+        ...reader(ref, scope).session,
+        create: ((contract, input) => source.create(contract, input, { signal, linkTo: ref })) as ToolSession["create"],
+        remove(resourceId: string) {
+          check();
+          const target = linked.find(resource => resource.id === resourceId);
+          if (!target) throw new PluginApiError("rejected", "The resource was not linked at the start of this request.", "access_denied");
+          source.remove(target);
+        },
+      });
+    },
     declare(contract: RecordContract) {
       if (!belongsTo(internal.id, contract.id)) throw new PluginApiError("foreign_event", "The record contract belongs to another plugin.");
       const existing = records.get(contract.id);

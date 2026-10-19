@@ -11,14 +11,15 @@ import { CallPeer } from "./call-peer.ts";
 import { callRuntimeControlSchema, pluginCallsVersion } from "../shared/plugin-calls.ts";
 import { eventRuntimeControlSchema, pluginEventsVersion } from "../shared/plugin-events.ts";
 import { bindPublicProvider } from "../shared/public-modules.ts";
-import { builtinPublicProvider, builtinPublicModules } from "../builtin-public.ts";
+import { builtinPublicProvider } from "../builtin-public.ts";
+import { builtinRuntimePublicModules } from "../builtin-runtime-public.ts";
 
 // 任务进程只接收主进程给出的应用数据根目录，不接受 renderer 文件路径。
 const port = process.parentPort;
 if (!port) throw new Error("The task runtime must be started as an Electron utility process.");
 let service: ApplicationService;
 const secrets = new SecretClient(message => port.postMessage(message));
-const releasePublic = bindPublicProvider("runtime", builtinPublicProvider, builtinPublicModules);
+const releasePublic = bindPublicProvider("runtime", builtinPublicProvider, builtinRuntimePublicModules);
 try {
   const root = process.argv[2];
   if (!root) throw new Error("Application data directory is required.");

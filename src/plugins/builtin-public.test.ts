@@ -5,12 +5,14 @@ import { pathToFileURL } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import { Agent, CreateAgent, SubmitAgentInput, builtin } from "@atelier/builtin-api/contracts";
 import * as builtinRendererAPI from "@atelier/builtin-api/renderer";
+import { agentCreations, defineAgentCreation } from "@atelier/builtin-api/runtime";
 import { resourceCall } from "@atelier/sdk/contracts";
 import type { PluginDefinition } from "@atelier/sdk/runtime";
 import { PackageList, loadPackages } from "./packages.ts";
 import { ApplicationService } from "../runtime/service.ts";
 import { bindPublicProvider } from "../shared/public-modules.ts";
 import { builtinPublicModules, builtinPublicProvider } from "../builtin-public.ts";
+import { builtinRuntimePublicModules } from "../builtin-runtime-public.ts";
 import { loadPluginRenderers } from "../renderer/modules/plugins.ts";
 
 const roots: string[] = [], release: (() => void)[] = [];
@@ -47,13 +49,32 @@ function fixture(ranges: (string | null)[] = [compatibleRange, `~${builtinPublic
     list.add({ source: { kind: "path", path: root } }, data);
     return root;
   });
-  release.push(bindPublicProvider("runtime", builtinPublicProvider, builtinPublicModules));
+  release.push(bindPublicProvider("runtime", builtinPublicProvider, builtinRuntimePublicModules));
   const cache = join(data, "cache");
   return { data, list, cache, consumers, load: () => loadPackages(list, data, cache, [builtin.id], [builtinPublicProvider]) };
 }
 type Probe = { SubmitAgentInput: typeof SubmitAgentInput; calls: unknown[] };
 
 describe("内置公共包", () => {
+  // 后台创建入口服务须与内置实现共享同一导出实例，不能从消费者私有安装另取一份。
+  it("独立插件从后台公共入口取得相同的创建声明与目录服务", async () => {
+    const f = fixture([compatibleRange]);
+    file(f.consumers[0]!, "runtime.ts", `
+      import { agentCreations, defineAgentCreation } from "@atelier/builtin-api/runtime";
+      import { pluginNamespace } from "@atelier/sdk/contracts";
+      import { definePlugin } from "@atelier/sdk/runtime";
+      export default { ...definePlugin({ namespace: pluginNamespace("fixture.consumer0"), version: "1" }),
+        probe: { agentCreations, defineAgentCreation } };
+    `);
+    const [loaded] = await f.load();
+    expect(loaded?.error).toBeUndefined();
+    const probe = (loaded!.definition as PluginDefinition & { probe: { agentCreations: unknown; defineAgentCreation: unknown } }).probe;
+    expect(probe.agentCreations).toBe(agentCreations);
+    expect(probe.defineAgentCreation).toBe(defineAgentCreation);
+    file(f.consumers[0]!, "renderer.ts", 'import { agentCreations } from "@atelier/builtin-api/runtime"; export default agentCreations;');
+    expect((await f.load())[0]?.error).toContain("not exported");
+  });
+
   // 依据公共契约真实实例与动作准备规则：同名副本不能绑定内置 Agent；re-export 和私有安装不得产生副本。
   it("内置声明与两个独立源码插件共享引用，并在真实 Agent 动作上执行外部准备", async () => {
     const f = fixture();

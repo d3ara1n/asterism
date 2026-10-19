@@ -7,7 +7,7 @@ export const builtinPublicModules = { "@atelier/builtin-api/contracts": contract
 const exports = { "@atelier/builtin-api/contracts": Object.keys(contracts) };
 export const builtinPublicProvider: PublicProvider = {
   name: metadata.name, version: metadata.version, pluginId: contracts.builtin.id,
-  modules: { runtime: exports, renderer: {
+  modules: { runtime: { ...exports, "@atelier/builtin-api/runtime": ["agentCreations", "defineAgentCreation"] }, renderer: {
     ...exports,
     "@atelier/builtin-api/renderer": ["agentUI", "AgentToolbarItem", "AgentOverlay", "AgentModal", "AgentScrollArea",
       "useAgentModelSelection", "AgentModelSelectionProvider", "AgentUIRendererProvider"],

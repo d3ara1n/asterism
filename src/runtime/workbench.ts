@@ -7,6 +7,8 @@ import type { Json } from "@atelier/sdk/contracts";
 
 import { workbenchSnapshotSchema, type WorkbenchCommand, type WorkbenchSnapshot, type Point, type Viewport } from "../shared/workbench.ts";
 import type { ContentStore, ContentLease } from "./content-store.ts";
+import { defaultCardPosition, fallbackCardWidth, fallbackCardHeight } from "../shared/workbench-layout.ts";
+import { placeObject } from "../shared/workbench-placement.ts";
 
 /** 宿主工作台写入的会话级来源。 */
 const host = null;
@@ -32,6 +34,17 @@ export class SessionWorkbench {
     this.content?.bind({ sessionId, objectId: id, scope: content }, { kind: "record", id: node.id }, data ?? {});
     this.addView(sessionId, id, position);
     return id;
+  }
+
+  /** 后台没有鼠标与实时测量，复用空位算法并按已保存尺寸或公共回退尺寸放置。 */
+  placement(sessionId: string): Point {
+    const ids = new Set(this.tree.workbench(sessionId).objects.map(object => object.id));
+    const views = this.db.prepare("SELECT * FROM object_views WHERE session_id = ?").all(sessionId) as ViewRow[];
+    const size = { width: fallbackCardWidth, height: fallbackCardHeight };
+    return placeObject({ x: defaultCardPosition.x + size.width / 2, y: defaultCardPosition.y + size.height / 2 }, size,
+      views.filter(view => ids.has(view.object_id) && !view.hidden).map(view => ({
+        id: view.object_id, position: { x: view.x, y: view.y }, width: view.width ?? fallbackCardWidth, height: view.height ?? fallbackCardHeight,
+      })));
   }
 
   mutate(command: WorkbenchCommand): void {

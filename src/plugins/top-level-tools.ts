@@ -10,7 +10,7 @@ export interface BoundTopLevelTool {
   resolve(args: Json, callId: string): Invocation;
 }
 export interface RegisteredTopLevelTool { tool: TopLevelTool; sdk: SdkContext; runs: RunGroup }
-export function bindTopLevelTools(entries: readonly RegisteredTopLevelTool[], ref: ResourceRef, policy: (name: string) => boolean): BoundTopLevelTool[] {
+export function bindTopLevelTools(entries: readonly RegisteredTopLevelTool[], ref: ResourceRef, policy: (name: string) => boolean, linked: readonly ResourceRef[]): BoundTopLevelTool[] {
   return entries.filter(entry => policy(entry.tool.name)).map(({ tool, sdk, runs }) => ({
     tool,
     resolve: (args, callId) => ({
@@ -24,7 +24,7 @@ export function bindTopLevelTools(entries: readonly RegisteredTopLevelTool[], re
         const validate = (data: Json) => jsonSchema.parse(tool.resultSchema.parse(data));
         try {
           const result = await tool.execute(args, {
-            object: sdk.reader(ref, scope), callId, signal: current,
+            object: sdk.reader(ref, scope), session: sdk.toolSession(ref, linked, scope, current), callId, signal: current,
             publish(data) {
               if (!active) return;
               latest = validate(data); publish?.(latest);

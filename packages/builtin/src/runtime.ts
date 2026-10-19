@@ -1,5 +1,6 @@
 import { definePlugin } from "@atelier/sdk/runtime";
-import { builtin, type NamingApi } from "@atelier/builtin-api/contracts";
+import { builtin, CreateAgent, type NamingApi } from "@atelier/builtin-api/contracts";
+import { defineAgentCreation } from "@atelier/builtin-api/runtime";
 import metadata from "../package.json" with { type: "json" };
 import type { BuiltinApplication } from "./application.ts";
 import { createAgentModule } from "./agent/runtime.ts";
@@ -8,13 +9,24 @@ import notes from "./notes/runtime.ts";
 import { BuiltinSettings } from "./settings/contract.ts";
 import { createNamingModule } from "./naming/runtime.ts";
 import questions from "./questions/runtime.ts";
+import resourceOperations from "./resources/runtime.ts";
+import { CreateNote } from "./notes/contract.ts";
 
 /** 仅组合插件业务；加载、宿主服务及外部插件依赖由应用负责。 */
 export function createBuiltin(options: { application: BuiltinApplication; connectNaming(api: NamingApi): () => void }) {
   return definePlugin({ namespace: builtin, version: metadata.version,
     setup(plugin) {
       plugin.config(BuiltinSettings);
-      return { modules: [createAgentModule(options.application), filesystem, createNamingModule(options.connectNaming, options.application.userAgent), notes, questions] };
+      return { modules: [createAgentModule(options.application), filesystem, createNamingModule(options.connectNaming, options.application.userAgent), notes, questions,
+        resourceOperations,
+        defineAgentCreation({ id: builtin.name("agent.create"), creation: CreateAgent,
+          description: "Create an Agent with a selected agent configuration and optional model/thinking overrides.",
+          guidelines: ["Use an existing agent configuration ID. Null model and thinking selections use that configuration's defaults.",
+            "The Agent starts without input or linked resources. Creating it does not send a task or copy your access."] }),
+        defineAgentCreation({ id: builtin.name("note.create"), creation: CreateNote,
+          description: "Create a note with a title and optional initial text.",
+          guidelines: ["Notes store their current text. Removing a note retains its history but does not provide content rollback."] }),
+      ] };
     } });
 }
 export { createSelection } from "./agent/selection.ts";

@@ -1,6 +1,6 @@
 # 内置插件公共 API（`@atelier/builtin-api`）
 
-内置实现与外部插件共同消费的领域契约和前端扩展 API，当前版本 **0.4.0**。插件身份为 `atelier.builtin`；本包不注册第二个插件，也不依赖 `@atelier/builtin` 实现。公共加载与生命周期规则见 [插件 SDK](../../docs/plugin-sdk.md#公共模块与契约身份)。
+内置实现与外部插件共同消费的领域契约、后台创建入口与前端扩展 API，当前版本 **0.5.0**。插件身份为 `atelier.builtin`；本包不注册第二个插件，也不依赖 `@atelier/builtin` 实现。公共加载与生命周期规则见 [插件 SDK](../../docs/plugin-sdk.md#公共模块与契约身份)。
 
 ## 入口与边界
 
@@ -13,6 +13,8 @@
 
 `@atelier/builtin-api/renderer` 依赖宿主共享的 React，提供 Agent 界面登记和呈现 API，只允许前端导入。执行循环、压缩策略、提交去重、卡片投影及实际布局属于实现包。取得契约不授予对象写权限；外部准备者仍只能读取宿主绑定的对象门面。顶层工具与插件调用接口属于 [SDK](../sdk/README.md)，内置 ask_user 通过这些公共接口消费 Agent UI。
 
+`@atelier/builtin-api/runtime` 只允许后台导入，导出 `defineAgentCreation` 与 `agentCreations`，供插件声明 Agent 创建入口及内置工具消费目录。通用会话创建、链接和移除仍属于 SDK。
+
 ## 作者接入
 
 消费者在 `package.json` 中声明公共包版本范围，并保留公共包导入：
@@ -23,12 +25,12 @@
   "version": "1.0.0",
   "type": "module",
   "peerDependencies": {
-    "@atelier/sdk": "^0.22.0",
-    "@atelier/builtin-api": "^0.4.0"
+    "@atelier/sdk": "^0.23.0",
+    "@atelier/builtin-api": "^0.5.0"
   },
   "atelier": {
     "id": "example.input-review",
-    "api": { "major": 9, "minMinor": 0 },
+    "api": { "major": 9, "minMinor": 1 },
     "runtime": "./src/runtime.ts"
   }
 }
@@ -39,6 +41,24 @@
 开发时可在本仓库使用 npm workspace；独立作者可用 `npm pack --workspace @atelier/sdk` 与 `npm pack --workspace @atelier/builtin-api` 生成本地包并安装。当前为孵化期私有包，不依赖 npm registry 发布。作者如预先打包插件，须将 `@atelier/sdk/*`、`@atelier/builtin-api/*` 保留为外部导入，不内联声明源码；包清单仍保留 peerDependencies。
 
 宿主采用已登记公共包版本检查 npm semver 范围，依赖缺失、不兼容或未公开子入口明确失败。消费者自己的安装副本仅用于作者开发，执行时由宿主转接到本环境已经加载的同一份声明。后台、前端分别共享，不跨进程共享对象。公共包版本与 `atelier.api` 的宿主 SDK API 版本分别校验。
+
+## Agent 创建入口
+
+资源实现继续使用 SDK 的 `CreationContract`。需要向 Agent 提供创建方式时，在插件 `modules` 中加入 `defineAgentCreation(...)` 返回的模块：
+
+```ts
+import { defineAgentCreation } from "@atelier/builtin-api/runtime";
+
+const agentCreation = defineAgentCreation({
+  id: ns.name("document.create"),
+  description: "Create a document with initial text.",
+  creation: CreateDocument,
+});
+```
+
+需要不同的模型参数时，同时提供 `inputSchema` 与同步 `toInput(input, { object })`；`object` 为调用绑定的只读执行者。模型输入按该 schema 解析后交给转换函数，转换结果再由原创建契约解析；直接复用时不重复执行创建 schema 的 transform。完整可编译例子见 [`examples/resource-creation.ts`](examples/resource-creation.ts)。
+
+入口 ID 属于声明插件；同宿主重复 ID 明确失败。目录按宿主实例隔离，并随插件装配失败或关闭撤销登记。`agentCreations.list(plugin)` 返回摘要，`inspect(plugin, id)` 返回输入 schema 与指导，`create(plugin, id, input, toolContext)` 消费本次工具的受约束会话能力。模型工具、自动链接与移除规则见 [Agent 创建与移除](../../docs/runtime.md#agent-创建与移除)。
 
 ## Agent 界面扩展
 

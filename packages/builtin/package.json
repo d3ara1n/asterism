@@ -9,8 +9,8 @@
     "./locales/zh-Hans.json": "./src/locales/zh-Hans.json"
   },
   "dependencies": {
-    "@atelier/builtin-api": "^0.4.0",
-    "@atelier/sdk": "^0.22.0",
+    "@atelier/builtin-api": "^0.5.0",
+    "@atelier/sdk": "^0.23.0",
     "@atelier/ui": "^0.1.0",
     "@lobehub/streamdown": "1.4.1",
     "@pierre/diffs": "1.5.2",

@@ -48,6 +48,7 @@ export function adaptResource(contribution: ResourceContribution, sdk: SdkContex
     },
     controller: {
       creationId: creation?.contract.id,
+      creationContract: creation?.contract,
       actionIds: [...actions.keys()],
       ...(creation ? {
         async prepareCreate(input: unknown, request?: AbortSignal, content?: ContentLease) {

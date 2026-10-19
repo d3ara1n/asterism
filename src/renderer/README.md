@@ -17,7 +17,7 @@
 | `features/home/HomePage.tsx` | 首页草稿、agent/模型/思考选择及首次发送 |
 | `features/workbench/Workbench.tsx` / `WorkbenchSurface.tsx` / `context.ts` | 对象与关系到 React Flow 画布的投影、过渡底板与视图保存；应用持有的工作台环境出口（`WorkbenchStore`）与按会话绑定的 `WorkbenchScope` |
 | `features/workbench/feedback.ts` / `WorkbenchFeedback.tsx` | 独立于操作门禁的状态分类、延迟同步提示、读取异常与恢复入口；应用层协调通知去重 |
-| `features/workbench/canvas.ts` / `viewport.ts` / `placement.ts` | `WorkbenchCanvas` 接口（`findPlacement` 最近空位、`locateObjects` 对象定位、动态缩放下限与视口保存） |
+| `features/workbench/canvas.ts` / `viewport.ts` / `placement.ts` | `WorkbenchCanvas` 接口（`findPlacement` 最近空位、`locateObjects` 对象定位、动态缩放下限与视口保存）；空位算法与布局常量从 `shared/workbench-placement.ts`、`shared/workbench-layout.ts` 复用 |
 | `features/workbench/ObjectNode.tsx` / `ObjectCard.tsx` / `ObjectSurface.tsx` / `object-view.tsx` / `ObjectActions.tsx` | 已注册卡片分派、对象视图解析（`useObjectView`）、卡片外壳（拖动柄、折叠、画布滚轮归属）、卡片与聚焦浮岛共用的对象外壳（标题栏、辅助面板布局／焦点）、右下角缩放柄与尺寸预设／移除菜单 |
 | `features/workbench/focus.ts` / `FocusIsland.tsx` | 以对象保留状态登记的聚焦身份与工作台左侧聚焦浮岛 |
 | `features/workbench/layout.ts` / `sizing.ts` / `nodes.ts` / `size-intents.ts` | 卡片默认尺寸与下限、本地缩放拖动与后台布局同步协调 |

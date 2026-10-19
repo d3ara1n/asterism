@@ -4,7 +4,7 @@
 
 | 目录 | 职责 | 依赖方向 |
 | --- | --- | --- |
-| `builtin-public.ts` | 前后台应用组合共用的内置公共提供方声明；描述包版本、出口与实际声明实例 | 内置公共 API、通用公共模块描述 |
+| `builtin-public.ts` / `builtin-runtime-public.ts` | 公共提供方版本与环境出口；后台领域实例单独绑定，前端不导入后台服务 | 内置公共 API、通用公共模块描述 |
 | `shared/` | 版本化命令、工作台投影、传输信封与公共 schema（`i18n.ts`、`language.ts`、`provider-presets.ts`、`model-compatibility.ts` 等） | Zod、FormatJS 与 SDK 纯契约，不依赖任何进程或 UI |
 | `main/` | Electron 窗口、平台材质、单实例锁、数据目录、运行时进程生命周期、可信 IPC 路由、`safeStorage` 加解密 | `shared`，不调用数据库 |
 | `preload/` | 沙箱桥，受控命令与状态订阅 | `shared`，只暴露 `window.host` |

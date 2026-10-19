@@ -81,6 +81,18 @@ const text = (data: Uint8Array) => new TextDecoder().decode(data);
 
 // 预期来自内容归属、同步提交和历史契约；验证公开 SDK 完整调用路径。
 describe("宿主不可变内容", () => {
+  // SDK 创建必须显式交接合法内容资格，不能因知道引用就读取另一个对象的私有内容。
+  it("后台创建可交接本插件对象内容，缺少读取资格时拒绝", async () => {
+    const f = fixture(), draft = f.input();
+    const file = await f.store.writer({ scope: draft }).stage(bytes("shared creation input"));
+    const id = await f.create(file, draft.id);
+    await draft.close();
+    await expect(f.context.session(f.sessionId).create(Create, { file })).rejects.toThrow("does not belong");
+    const copy = await f.context.session(f.sessionId).create(Create, { file }, { content: f.object(id).content });
+    expect(f.object(copy.id).get(Current)).toEqual({ file });
+    expect(text(await f.object(copy.id).content.read(file))).toBe("shared creation input");
+  });
+
   // 关联只读对象不能以已知 ContentRef 绕过私有 get；对象、会话和在途交接根需分别守住。
   it("外部调用只能读取关联对象的公开历史内容，不能读取私有当前数据或交接占用", async () => {
     const foreign = pluginNamespace("test.foreign");

@@ -1,0 +1,34 @@
+import { z } from "zod";
+import { defineCreation, pluginNamespace } from "@atelier/sdk/contracts";
+import { definePlugin, implementCreation, implementResource } from "@atelier/sdk/runtime";
+import { defineAgentCreation } from "@atelier/builtin-api/runtime";
+
+const ns = pluginNamespace("example.documents");
+const Document = ns.resource("document", z.object({ text: z.string() }));
+const View = ns.data("view", z.object({ text: z.string() }));
+export const CreateDocument = defineCreation(Document, { id: ns.name("create"),
+  schema: z.object({ title: z.string().min(1), text: z.string().default("") }),
+});
+
+export default definePlugin({
+  namespace: ns, version: "1.0.0",
+  setup() {
+    return {
+      resources: [implementResource(Document, View, {
+        creation: implementCreation(CreateDocument, { create: input => ({ title: input.title, data: { text: input.text } }) }),
+        project: data => data,
+        inspect: async data => data,
+      })],
+      modules: [
+        // 直接复用创建契约，无需复制 schema。
+        defineAgentCreation({ id: ns.name("document"), description: "Create a document.", creation: CreateDocument }),
+        // 同一种资源可以提供另一个模型入口，隐藏或转换内部参数。
+        defineAgentCreation({
+          id: ns.name("quick-note"), description: "Create a document from a short note.", creation: CreateDocument,
+          inputSchema: z.object({ note: z.string().min(1).describe("The note text.") }),
+          toInput: ({ note }) => ({ title: note.slice(0, 60), text: note }),
+        }),
+      ],
+    };
+  },
+});

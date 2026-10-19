@@ -12,7 +12,7 @@ import type { EventContract, PluginEvents } from "./events.ts";
 import type { ToolCompletion, ToolInvocationInfo, ToolModelOutput } from "./tool-result.ts";
 import type { PluginConfig, PluginLogger, PluginSecrets, PluginTasks } from "./runtime.ts";
 import type { ModelServices } from "./models.ts";
-import type { ResourceRef, ResourceSnapshot, SessionSnapshot } from "./workspace.ts";
+import type { ResourceRef, ResourceSnapshot, SessionSnapshot, SessionDirectory } from "./workspace.ts";
 import type { ActionContract, CreationContract } from "./commands.ts";
 import type { ObjectReader, ObjectExecutor, SessionExecutor } from "./objects.ts";
 import type { ContentReader, ContentScope } from "./content-runtime.ts";
@@ -24,6 +24,9 @@ export type { ResourceRef, ResourceSnapshot, SessionSnapshot } from "./workspace
 
 export interface PluginContext {
   readonly id: string;
+  /** 装配失败或关闭时取消；用于释放插件自己的公共服务登记。 */
+  readonly signal: AbortSignal;
+  readonly sessions: SessionDirectory;
   readonly dir: string;
   readonly log: PluginLogger;
   readonly ipc: { readonly events: PluginEvents; readonly calls: PluginCalls };

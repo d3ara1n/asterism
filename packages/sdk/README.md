@@ -4,7 +4,7 @@
 
 SDK 包版本见 [package.json](package.json)，宿主 API 版本见 [`sdkApi`](../../src/plugins/packages.ts)。内置插件领域契约独立在 [`@atelier/builtin-api`](../builtin-api/README.md)，不进入通用 SDK。
 
-当前宿主 API 为 **9.0**。插件包的 `atelier.api` 声明 `{ "major": 9, "minMinor": 0 }`；前端入口默认导出 `defineRendererPlugin(...)`，功能视图放入其 `modules`，调用契约显式声明 `scope`。旧主版本在装载前拒绝。
+当前宿主 API 为 **9.1**。使用会话资源操作的插件包在 `atelier.api` 声明 `{ "major": 9, "minMinor": 1 }`；前端入口默认导出 `defineRendererPlugin(...)`，功能视图放入其 `modules`，调用契约显式声明 `scope`。旧主版本在装载前拒绝。
 
 ## 子路径入口
 
@@ -49,7 +49,8 @@ export default definePlugin({
 ## 核心作者接口速查
 
 ### 1. 会话、对象、创建与动作
-- **读取与提交**：`plugin.session(id)` 与 `plugin.object(ref)` 提供 `snapshot()`、`get(DataContract)` 与同步 `commit(writer => { writer.set(...); writer.append(...); })`。快照按需读取 `records.all / query / first / last`（支持 `scope: "timeline" | "session"`）。
+- **读取与提交**：`plugin.session(id)` 与 `plugin.object(sessionId, ResourceContract, id)` 提供 `snapshot()`、`get(DataContract)` 与同步 `commit(writer => { writer.set(...); writer.append(...); })`。快照按需读取 `records.all / query / first / last`（支持 `scope: "timeline" | "session"`）。
+- **会话目录与资源管理（API 9.1）**：`plugin.sessions.list()` 读取全部会话摘要；`session.create(CreationContract, input, { signal?, content?, linkTo? })` 返回已提交的 `ResourceRef`。`session.link(receiver, resource)`、`unlink(receiver, resource)`、`remove(resource)` 使用完整引用，作用域、原子性与收束规则见 [会话资源接口](../../docs/plugin-sdk.md#会话目录与资源操作api-91)，可编译示例见 `examples/session-resources.ts`。
 - **具型创建与动作**：在 `contracts` 中用 `defineCreation(resource, { id, schema })` 与 `defineAction(resource, { id, schema })` 声明；在 `runtime` 中用 `implementResource` 聚合 `creation`、`actions`、`project`、`inspect`、`context`；在 `renderer` 中用 `session.create(CreationContract, input, position)` 与 `object.invoke(ActionContract, input)` 调用。
 - **不可变内容（`ContentRef`）**：在 schema 中组合 `contentRefSchema`；在 `prepare / create / execute` 或前端 `InputView / object.input` 中通过 `content` 门面调用 `read / open / stage`（作用域规则见 [不可变内容](../../docs/content.md)）。
 
@@ -62,7 +63,7 @@ export default definePlugin({
   "exports": { "./public": "./src/public.ts" },
   "atelier": {
     "id": "example.tools",
-    "api": { "major": 9, "minMinor": 0 },
+    "api": { "major": 9, "minMinor": 1 },
     "runtime": "./src/runtime.ts"
   }
 }
@@ -90,7 +91,7 @@ export default definePlugin({
 - **滚动与缩放**：卡片内交互遵循 [画布与对象卡片](../../docs/workbench.md#画布与对象卡片) 的手势归属规则。
 - **辅助面板（API 8.2）**：`panels: [{ id: "details", label: "Details", icon, Body: Details }]`；主体与面板通过 `useRendererCard().openPanel("details") / closePanel()` 控制卡片局部视图。面板注册、数据绑定与生命周期见 [前端视图与扩展入口](../../docs/plugin-sdk.md#前端视图与扩展入口)，可编译示例见 `examples/renderer.ts`。
 - **工具视图**：`toolRenderer(ToolContract, { label?, icon?, input?, execution?, result? })`，三阶段平行可选，每阶段提供 `{ headerRenderer?, bodyRenderer? }`，可用 `ToolRenderProps<D, T, A>` 跨阶段复用组件。
-- **顶层工具（API 8.5）**：`defineTopLevelTool` 一次提供定义、参数／结果 schema 和 `execute`，经 `ModuleContribution.topLevelTools` 注册；每次调用取得只读 `object`、`callId`、`signal`、`publish`。展示可共享具有相同稳定 ID 的数据契约。详见 [工具贡献](../../docs/plugin-sdk.md#工具贡献)。
+- **顶层工具**：`defineTopLevelTool` 一次提供定义、参数／结果 schema 和 `execute`，经 `ModuleContribution.topLevelTools` 注册；每次调用取得只读 `object`、受本次执行约束的 `session`（API 9.1）、`callId`、`signal`、`publish`。展示可共享具有相同稳定 ID 的数据契约。详见 [工具贡献](../../docs/plugin-sdk.md#工具贡献)。
 - **替换已有工具**：顶层工具替换、资源实现替换与全局 schema 替换的注册规则，以及稳定 ID、装配顺序和历史展示的边界，见 [工具覆盖](../../docs/runtime.md#工具覆盖)。
 
 ### 6. 可选模型分支（`plugin.models`）

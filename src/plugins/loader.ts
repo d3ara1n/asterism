@@ -113,6 +113,7 @@ function initializationOrder(plugins: readonly PluginDefinition[]) {
 
 /** 启动时收集 SDK 贡献，按插件顺序解析覆盖并冻结目录。 */
 export function loadPlugins(plugins: readonly PluginDefinition[], services: PluginHostServices): LoadedPlugins {
+  const directory = Object.freeze({ list: () => services.sessions.list() });
   const events = services.events ?? new EventBus();
   const calls = new CallRegistry(services);
   let topLevelTools: readonly RegisteredTopLevelTool[] = [];
@@ -138,9 +139,9 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
       const lifecycle = new RunLifecycle(sessionId => services.sessions.progressChanged(sessionId)); lifecycles.push(lifecycle);
       const taskHost = new TaskHost(log, lifecycle.group("task"));
       const eventScope = new PluginEventScope(events, id, lifecycle.group("event"));
-      const sdk = createSdkContext({ id, dir: storage.dir, log, config: contract => storage.config(contract),
-        secrets: storage.secrets, db: () => storage.db(), tasks: taskHost }, services, lifecycle.group("model"), eventScope,
-        calls.client(id, lifecycle.group("call")), (ref, policy) => bindTopLevelTools(topLevelTools, ref, policy));
+      const sdk = createSdkContext({ id, signal: lifecycle.signal, dir: storage.dir, log, config: contract => storage.config(contract),
+        secrets: storage.secrets, db: () => storage.db(), tasks: taskHost }, services, lifecycle.group("model"), lifecycle.group("action"), directory, eventScope,
+        calls.client(id, lifecycle.group("call")), (ref, policy, linked) => bindTopLevelTools(topLevelTools, ref, policy, linked));
       const resources: ResourceBackend[] = [], tools: ToolImplementation[] = [], observers: SessionObserver[] = [], preparers: CommandPreparer[] = [];
       const actions: ActionContract<unknown>[] = [];
       entry = { plugin, resources, tools, topLevelTools: [], actions, observers, preparers, sdk, tasks: taskHost, storage, lifecycle, events: eventScope, preparations: lifecycle.group("prepare"), closing: [] };

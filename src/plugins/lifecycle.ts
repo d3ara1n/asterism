@@ -7,6 +7,8 @@ interface Entry { group: RunGroup; object?: ResourceRef; affectsHistory: boolean
 /** 一个插件的运行真值：所有执行方式共享登记、取消、等待与关闭门禁。 */
 export class RunLifecycle {
   private entries = new Set<Entry>();
+  private readonly controller = new AbortController();
+  get signal(): AbortSignal { return this.controller.signal; }
   private stopped = false;
   constructor(private readonly changed: (sessionId: string) => void) {}
   group(kind: Kind): RunGroup { return new RunGroup(this, kind); }
@@ -45,7 +47,7 @@ export class RunLifecycle {
     return { unsettled: [...unsettled], executing: [...executing] };
   }
   stop(group?: RunGroup): void {
-    if (!group) this.stopped = true;
+    if (!group) { this.stopped = true; this.controller.abort(); }
     for (const entry of this.entries) if (!group || entry.group === group) entry.cancel();
   }
   async settle(group?: RunGroup): Promise<void> {

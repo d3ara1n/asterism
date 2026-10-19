@@ -33,13 +33,13 @@ SDK 的 `contracts`、`runtime`、`renderer` 三个子路径分别承担纯契�
 - **运行上下文**：顶层工具 handler 在每次调用时取得宿主绑定的当前执行对象、会话及取消等调用环境；静态声明与运行时数据分开。当前对象和会话的操作仍遵守宿主门面、提交及生命周期契约，模型参数不负责声明发起者身份。
 - **资源工具**：共享工具契约与针对资源类型的实现分开声明，由工具目录按资源支持关系匹配。
 
-后台通过 `defineTopLevelTool({ id, name, description, guidelines, argsSchema, resultSchema, effect, execution, execute, toModel? })` 声明，交给 `ModuleContribution.topLevelTools`。`execute(args, { object, callId, signal, publish })` 的 `object` 为绑定执行者的只读门面；不能据此写入其他插件资源或读取其私有数据。插件自有业务状态通过模块内共享服务管理。结果校验、过程发布、终结投影及批次调度沿用工具执行链路；展示契约可以独立共享同一稳定 ID，经 `toolRenderer` 渲染。
+后台通过 `defineTopLevelTool({ id, name, description, guidelines, argsSchema, resultSchema, effect, execution, execute, toModel? })` 声明，交给 `ModuleContribution.topLevelTools`。`execute(args, { object, session, callId, signal, publish })` 的 `object` 为绑定执行者的只读门面；不能据此写入其他插件资源或读取其私有数据。`session` 是本次工具执行绑定的 `ToolSession`，操作范围见下方会话资源接口。插件自有业务状态通过模块内共享服务管理。结果校验、过程发布、终结投影及批次调度沿用工具执行链路；展示契约可以独立共享同一稳定 ID，经 `toolRenderer` 渲染。
 
 ## 公共模块与契约身份
 
 插件通过 `package.json` 的 `exports["./public"]` 导出愿意共享的契约、配置访问接口、服务或状态，消费者在依赖中声明提供方包并使用 `import { ... } from "<包名>/public"`。
 
-内置插件由 `@atelier/builtin` 实现，稳定身份为 `atelier.builtin`；独立 `@atelier/builtin-api` 提供公共契约／领域接口，内置实现和外部插件共同消费。公共包不依赖实现，也不注册第二个插件。纯声明从 `/contracts` 导出，Agent 界面扩展从仅前端可用的 `/renderer` 导出。Agent UI 的登记、呈现位置和输入区控制均归内置插件，SDK 不设跨资源的通用槽位。作者入口与当前导出见 [内置公共 API](../packages/builtin-api/README.md)。
+内置插件由 `@atelier/builtin` 实现，稳定身份为 `atelier.builtin`；独立 `@atelier/builtin-api` 提供公共契约／领域接口，内置实现和外部插件共同消费。公共包不依赖实现，也不注册第二个插件。纯声明从 `/contracts` 导出，Agent 创建入口从仅后台可用的 `/runtime` 导出，Agent 界面扩展从仅前端可用的 `/renderer` 导出。Agent UI 的登记、呈现位置和输入区控制均归内置插件，SDK 不设跨资源的通用槽位。作者入口与当前导出见 [内置公共 API](../packages/builtin-api/README.md)。
 
 内置实现保持静态构建，由应用组合层向通用公共模块机制登记包名、semver 版本、实现提供方插件 ID、按运行环境划分的明确子入口与导出名。应用在各环境绑定实际导出；外部构建按导入文件所属 npm 包检查依赖声明、npm semver 范围与环境出口，再生成指向已绑定导出的转接模块，不从消费者私有安装取另一份源码。没有插件清单的中间 npm 库按自身依赖声明校验，运行依赖仍归承载它的插件。未声明依赖、不兼容版本、重复提供方和未公开入口明确失败；不将内置 API 加入免校验的宿主库白名单。公共包版本与宿主 SDK API 版本独立校验。
 
@@ -87,9 +87,10 @@ SDK 的 `contracts`、`runtime`、`renderer` 三个子路径分别承担纯契�
 | 接口 | 能力 |
 | --- | --- |
 | `SessionReader` | 会话身份、固定观察快照 `snapshot()`、当前会话数据读取 `get()`、标题读取 |
-| `SessionExecutor` | 读取能力 + 同步提交 `commit(writer => ...)`（当前数据 `set` 与当前时间线 `append`）+ 标题覆盖 `title.set` |
+| `SessionExecutor` | 读取能力 + 同步提交 `commit(writer => ...)`（当前数据 `set` 与当前时间线 `append`）+ 标题覆盖 `title.set` + 会话内 `create / link / unlink / remove` |
 | `ObjectReader` | 资源身份、调用绑定的资源快照 `snapshot()`、当前对象数据读取 `get()`、只读 `session` |
-| `ObjectExecutor` | 读取能力 + 对象同步提交 `commit`、可执行 `session`、对象二进制流发布 `publishStream` |
+| `ObjectExecutor` | 读取能力 + 对象同步提交 `commit`、可执行 `session`、对象二进制流发布 `streams.publish` |
+| `ToolSession` | 只读会话能力 + 自动链接给执行者的 `create` + 本请求有效链接范围内的 `remove`；随工具调用结束失效 |
 
 资源 `project / inspect / context / links.tools`、动作准备与外部准备者只接收只读门面；创建、动作执行和已授权工具执行接收执行门面（工具执行结束后修改与流发布能力失效）。
 
@@ -111,6 +112,15 @@ SDK 的 `contracts`、`runtime`、`renderer` 三个子路径分别承担纯契�
   3. 执行资源自身准备。准备均返回 `accept`（沿用解析结果）、`replace`（提供新原始输入并立即由所有者 schema 重新解析一次；不能替换动作身份）或 `reject`（终止处理，可选携带 `display: UiText`）。
   4. 将解析结果交给对象队列，执行层直接使用，不再重复解析；执行前再次检查真实对象和当前路径有效性。
   5. 创建在准备成功后进入宿主事务，同步返回 `{ title, data }` 并写入创建事件。
+
+### 会话目录与资源操作（API 9.1）
+
+- `plugin.sessions.list()` 返回当前全部会话的 `{ id, title, createdAt }` 摘要，按创建时间从新到旧排列；不加载历史、不改变前端视图。`SessionDirectory` 在同一宿主运行实例内共享，生命周期与该实例一致；公共领域服务可据此隔离自己的登记。
+- `plugin.session(id)` 取得指定会话的执行门面。`session.create(CreationContract, input, { signal?, content?, linkTo? })` 引用已装配的真实声明实例，允许调用其他插件公开的契约；输入由资源提供方校验和初始化，成功返回已提交的 `ResourceRef`，不返回资源私有执行门面。
+- `create` 的异步准备参与调用插件及资源提供方的关闭收束。准备期间阻止会话游标回溯，提交时重验会话、执行作用域与初始链接接收者；失败或取消不提交创建。`linkTo` 与身份、初始数据和创建事件同事务写入。后台位置复用工作台空位算法，按已保存尺寸或公共回退尺寸安排，不要求调用者提供画布坐标。内容资格交接见 [不可变内容](content.md#临时占用与提交)。
+- `session.link(receiver, resource)`、`session.unlink(receiver, resource)` 使用完整资源引用，校验双方属于当前会话和当前路径、类型一致且接收者支持链接。`session.remove(resource)` 与前端共用宿主移除操作；对象生命周期语义见 [资源](object-model.md#resource可被操作的对象)。
+- 顶层工具的 `context.session` 固定执行会话和发起对象，`create(contract, input)` 自动将新资源链接给发起者；`remove(resourceId)` 仅接受请求开始时有效的已链接资源，并在提交时验证当前存在性与收束。该门面不开放任意会话寻址或链接修改，不能通过重新取得全局会话句柄替代本次执行身份。普通 `ObjectReader.session` 仍为只读。
+- `plugin.signal` 在装配失败或开始关闭时取消，用于撤销插件自有公共登记；取消不代表活动已结束。宿主保留在途执行所需的提交设施，等待其真实收束后才释放，不因该信号提前阻断最终记录保存。
 
 ## 宿主运行生命周期
 

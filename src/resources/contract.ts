@@ -1,4 +1,4 @@
-import type { Json } from "@atelier/sdk/contracts";
+import type { Json, CreationContract } from "@atelier/sdk/contracts";
 import type { ParsedCall } from "../plugins/commands.ts";
 import type { Presentation } from "@atelier/sdk/contracts";
 import type { LiveBlock } from "../shared/session.ts";
@@ -15,6 +15,7 @@ export interface ResourceCommandContext { sessionId: string; resource: FoldedObj
  */
 export interface ResourceController {
   creationId?: string;
+  creationContract?: CreationContract<unknown>;
   actionIds?: readonly string[];
   /** 外部准备者按装配顺序执行后，进入资源自己的准备；每次替换按目标 schema 校验。 */
   prepareCommand?(input: ParsedCall, ref: ResourceRef, signal: AbortSignal): Promise<ParsedCall>;

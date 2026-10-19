@@ -1,5 +1,5 @@
-import { resourceCall, type ResourceCall, type Json, type ModelInputPart, ResourceStatusChanged, SessionTitleChanged } from "@atelier/sdk/contracts";
-import { type ResourceRef, type PluginDefinition, PluginApiError } from "@atelier/sdk/runtime";
+import { resourceCall, jsonSchema, type CreationContract, type ResourceCall, type Json, type ModelInputPart, ResourceStatusChanged, SessionTitleChanged } from "@atelier/sdk/contracts";
+import { type ResourceRef, type PluginDefinition, type ResourceCreationOptions, PluginApiError } from "@atelier/sdk/runtime";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
@@ -29,7 +29,7 @@ import { sessionCommandSchema, sessionSnapshotSchema, type SessionChanged, type 
 import type { ToolRegistry } from "../tools/registry.ts";
 import { sessionPluginError } from "./plugin-errors.ts";
 import { SessionWorkbench } from "./workbench.ts";
-import { ContentStore, type ContentLease, type ContentTarget } from "./content-store.ts";
+import { ContentStore, contentReferences, type ContentLease, type ContentTarget } from "./content-store.ts";
 import { applicationStorage, applicationBrand } from "../shared/application.ts";
 import { EventBus } from "../plugins/events.ts";
 
@@ -67,6 +67,13 @@ export class SessionService {
     this.events.declarePublic(ResourceStatusChanged);
     this.content = new ContentStore(db, join(dataRoot, applicationStorage.contentDirectory));
     const host: SessionHost = {
+      list: () => {
+        if (this.writesClosed) throw new PluginApiError("unavailable", "The session service is closed.");
+        return this.tree.list();
+      },
+      create: (sessionId, contract, input, options) => this.createFromPlugin(sessionId, contract, input, options),
+      link: (sessionId, receiver, resource, linked) => this.setLink(sessionId, receiver, resource, linked),
+      remove: (sessionId, resource) => this.removeResource(sessionId, resource),
       view: sessionId => this.tree.view(sessionId),
       sequences: (sessionId, nodes) => this.tree.sequences(sessionId, nodes),
       timeline: sessionId => this.tree.timeline(sessionId),
@@ -178,7 +185,8 @@ export class SessionService {
   }
   /** 会话 settled：没有任何资源在活动；回溯只在此时允许。 */
   private settled(sessionId: string): boolean {
-    return this.pluginActivity(sessionId).unsettled.length === 0
+    return ![...this.pendingCreations.values()].some(value => value.sessionId === sessionId)
+      && this.pluginActivity(sessionId).unsettled.length === 0
       && this.resources.controllers().every(controller => (controller.activity?.(sessionId).running.length ?? 0) === 0);
   }
   private notify(sessionId: string): void {
@@ -235,6 +243,84 @@ export class SessionService {
     if (!object) throw new SessionError("not_found", "Object not found on the current session path.");
     return object;
   }
+  private requireRef(sessionId: string, ref: ResourceRef): FoldedObject {
+    if (this.closed) throw new SessionError("unavailable", "The session service is closed.");
+    if (ref.sessionId !== sessionId) throw new SessionError("invalid_request", "The resource belongs to another session.");
+    const object = this.object(sessionId, ref.id);
+    if (object.kind !== ref.kind) throw new SessionError("invalid_request", "The resource type does not match its reference.");
+    return object;
+  }
+  /** 前端与插件共用身份、收束和事务检查。 */
+  private setLink(sessionId: string, receiver: ResourceRef, resource: ResourceRef, linked: boolean): void {
+    this.commit(sessionId, () => {
+      this.requireRef(sessionId, receiver); this.requireRef(sessionId, resource);
+      this.workbench.mutate({ type: "link.set", sessionId, agentId: receiver.id, resourceId: resource.id, linked });
+    });
+  }
+  private removeResource(sessionId: string, ref: ResourceRef): void {
+    this.commit(sessionId, () => {
+      const target = this.requireRef(sessionId, ref);
+      if (this.pluginActivity(sessionId).unsettled.includes(target.id)
+        || this.resources.controllers().some(controller => controller.activity?.(sessionId).running.includes(target.id)))
+        throw new SessionError("conflict", "Wait for this resource to settle before removing it.");
+      this.workbench.mutate({ type: "object.remove", sessionId, objectId: ref.id });
+    });
+  }
+  private readonly pendingCreations = new Map<symbol, { sessionId: string; controller: AbortController; done: Promise<ResourceRef> }>();
+  private createResource(sessionId: string, kind: string, call: ResourceCall, content: ContentLease,
+    options: { signal?: AbortSignal; position?: { x: number; y: number }; linkTo?: ResourceRef; check?(): void } = {}): Promise<ResourceRef> {
+    const controller = new AbortController();
+    const signal = options.signal ? AbortSignal.any([controller.signal, options.signal]) : controller.signal;
+    const key = Symbol();
+    const abortContent = () => content.controller.abort();
+    signal.addEventListener("abort", abortContent, { once: true });
+    // 先登记，防止异步准备期间移动游标；成功提交始终追加到当前时间线。
+    let resolve!: (ref: ResourceRef) => void, reject!: (error: unknown) => void;
+    const done = new Promise<ResourceRef>((accept, fail) => { resolve = accept; reject = fail; });
+    const pending = { sessionId, controller, done };
+    this.pendingCreations.set(key, pending);
+    void (async () => {
+      try {
+        if (this.closed) throw new SessionError("unavailable", "The session service is closed.");
+        this.tree.cursor(sessionId);
+        signal.throwIfAborted(); options.check?.();
+        const backend = this.resources.controller(kind);
+        if (!backend?.prepareCreate || !backend.create) throw new SessionError("invalid_request", "This resource type cannot be created.");
+        const input = await backend.prepareCreate(call, signal, content);
+        return this.commit(sessionId, () => {
+          signal.throwIfAborted(); options.check?.();
+          if (this.closed) throw new SessionError("unavailable", "The session service is closed.");
+          if (options.linkTo) this.requireRef(sessionId, options.linkTo);
+          const id = this.workbench.create(sessionId, kind, input, options.position ?? this.workbench.placement(sessionId), content);
+          const ref = { sessionId, id, kind };
+          if (options.linkTo) this.setLink(sessionId, options.linkTo, ref, true);
+          return ref;
+        });
+      } finally {
+        signal.removeEventListener("abort", abortContent);
+        await content.close();
+        this.pendingCreations.delete(key);
+      }
+    })().then(resolve, reject);
+    return done;
+  }
+  private async createFromPlugin(sessionId: string, contract: CreationContract<unknown>, input: Json,
+    options: ResourceCreationOptions & { owner: string; check(): void }): Promise<ResourceRef> {
+    options.check();
+    if (this.resources.controller(contract.resource.kind)?.creationContract !== contract)
+      throw new PluginApiError("invalid_argument", "Use the registered creation contract instance.");
+    const value = jsonSchema.parse(input);
+    const lease = this.content.scope({ sessionId, resourceKind: contract.resource.kind, contractId: contract.id });
+    let captured: ReturnType<ContentStore["captureReader"]> | undefined;
+    try {
+      const refs = contentReferences(value);
+      if (refs.length) {
+        captured = this.content.captureReader(refs, options.content, options.owner);
+        for (const id of captured.sizes.keys()) lease.add(id);
+      }
+      return await this.createResource(sessionId, contract.resource.kind, { id: contract.id, input: value }, lease, options);
+    } finally { await lease.close(); await captured?.close(); }
+  }
   async execute(raw: SessionCommand): Promise<SessionReply> {
     if (this.closed) throw new SessionError("unavailable", "The session service is closed.");
     const parsed = sessionCommandSchema.safeParse(raw);
@@ -263,24 +349,19 @@ export class SessionService {
       }
       case "resource.create": {
         this.tree.cursor(command.sessionId);
-        const controller = this.resources.controller(command.kind);
         const abort = new AbortController();
         const requestKey = command.requestId ? `${command.sessionId}/${command.requestId}` : undefined;
         if (requestKey && this.creating.has(requestKey)) throw new SessionError("conflict", "This creation request is already running.");
         const content = this.content.fork(command.contentScopeId, { sessionId: command.sessionId, resourceKind: command.kind, contractId: command.creation.id });
         if (requestKey) this.creating.set(requestKey, abort);
-        const cancelContent = () => content.controller.abort();
-        abort.signal.addEventListener("abort", cancelContent, { once: true });
         try {
-          const input = controller?.prepareCreate ? await controller.prepareCreate({ ...command.creation, input: command.input }, abort.signal, content) : command.input;
-          if (abort.signal.aborted) throw new SessionError("conflict", "The creation was cancelled.");
-          this.commit(command.sessionId, () => this.workbench.create(command.sessionId, command.kind, input, command.position, content));
+          await this.createResource(command.sessionId, command.kind, { ...command.creation, input: command.input }, content,
+            { signal: abort.signal, position: command.position });
           return { kind: "accepted", sessionId: command.sessionId };
         } catch (error) {
           if (abort.signal.aborted) throw new SessionError("conflict", "The creation was cancelled.");
           throw error;
         } finally {
-          abort.signal.removeEventListener("abort", cancelContent);
           if (requestKey) this.creating.delete(requestKey);
           await content.close();
         }
@@ -291,12 +372,12 @@ export class SessionService {
       default: {
         if (command.type === "object.remove") {
           const target = this.object(command.sessionId, command.objectId);
-          if (this.pluginActivity(command.sessionId).unsettled.includes(target.id)
-            || this.resources.controllers().some(controller => controller.activity?.(command.sessionId).running.includes(target.id))) {
-            throw new SessionError("conflict", "Wait for this resource to settle before removing it.");
-          }
-        }
-        this.commit(command.sessionId, () => this.workbench.mutate(command));
+          this.removeResource(command.sessionId, { sessionId: command.sessionId, id: target.id, kind: target.kind });
+        } else if (command.type === "link.set") {
+          const receiver = this.object(command.sessionId, command.agentId), resource = this.object(command.sessionId, command.resourceId);
+          this.setLink(command.sessionId, { sessionId: command.sessionId, id: receiver.id, kind: receiver.kind },
+            { sessionId: command.sessionId, id: resource.id, kind: resource.kind }, command.linked);
+        } else this.commit(command.sessionId, () => this.workbench.mutate(command));
         return { kind: "accepted", sessionId: command.sessionId };
       }
     }
@@ -370,7 +451,9 @@ export class SessionService {
   }
   async close(): Promise<void> {
     this.closed = true;
+    for (const pending of this.pendingCreations.values()) pending.controller.abort();
     await this.closePlugins();
+    await Promise.allSettled([...this.pendingCreations.values()].map(pending => pending.done));
     await Promise.allSettled([...this.starting.values()]);
     await this.content.close();
     this.writesClosed = true;
