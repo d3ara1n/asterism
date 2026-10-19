@@ -16,7 +16,7 @@
 - 首页到主代理的表面展开动效、Markdown 代码高亮与长对话阅读优化。
 - 备用角色映射到执行契约；Agent timeout 与费用预算字段 maxCost 已移除，执行边界见 [运行时](../docs/runtime.md#执行轮次与循环)。
 - 暂缓：清理内置代理提示词中的 pi 专用假设（bash/find/grep 等工具名、subagent_delegate、$PI_SUBAGENT_TMPDIR、git 与测试指令），待委派与工具目录成型后再做。
-- 上下文自动压缩已实现并通过自动化验证，真实端点与 GUI 见 [压缩验收计划](todo-2026-10-13-context-compression.md)；跨模型续接见 [续接计划](todo-2026-10-13-cross-model-continuation.md)；模型兼容包与标准思考等级见 [模型兼容计划](todo-2026-10-10-model-compatibility.md)。
+- 上下文自动压缩已实现并通过自动化验证，真实端点与 GUI 见 [压缩验收计划](todo-2026-10-13-context-compression.md)；跨模型续接见 [续接计划](todo-2026-10-13-cross-model-continuation.md)；模型兼容包与标准思考等级已完成并采用延迟验收，见[归档记录](archived/todo-2026-10-10-model-compatibility.md)。
 ## 执行与模型
 
 - 提供商配置、保存与连接测试，以及模型角色与 agent 配置已实现；模型接入计划已完成并归档（2026-10-13），实施记录见 [archived/todo-2026-10-01-model-protocol-storage.md](archived/todo-2026-10-01-model-protocol-storage.md)。配置语义见 [模型与代理配置](../docs/model-configuration.md)。
