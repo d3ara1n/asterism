@@ -92,9 +92,26 @@
 
 具体模型的能力声明 `reasoning`、`thinkingLevels` 与 `tools`。输入模态属于服务端能力，不在客户端配置：文件（首批适配 JPEG、PNG、GIF、WebP、PDF）按 `mediaType` 如实发送，由服务端反馈是否接受（见 [模型输入与协议适配](runtime.md#用户输入文件与模型协议适配)）。
 
-标准思考等级全局统一为 `off / minimal / low / medium / high / xhigh / max`（`xhigh` 与 `max` 独立，不互相映射）。模型的 `thinkingLevels` 保存可用等级集合，新建时全开，空集合合法；关闭思考总开关保留集合与已有选择。选择器只提供可用等级，配置保存与选择传递不拦截等级可用性。
+标准思考等级全局统一为 `off / minimal / low / medium / high / xhigh / max`（`xhigh` 与 `max` 的公共身份独立，不隐式互换）。模型的 `thinkingLevels` 保存可用等级集合，新建时全开，空集合合法；关闭思考总开关保留集合与已有选择。选择器只提供可用等级，配置保存与选择传递不拦截等级可用性。
 
 请求末端解析模型和等级继承后校验：`reasoning: true` 时，最终等级为空或不在可用集合中均以 `thinking_unavailable` 失败，不自动降档；`reasoning: false` 时省略等级及历史思考部件；`off` 是普通等级，不触发历史过滤。所有情况下均正常接收、保存和展示服务端返回的思考。
+
+### 思考等级与预算映射
+
+标准等级是角色、对话选择与历史的公共值；effort 字符串和思考预算只在请求编码时生成，不回写公共等级。协议适配自带默认映射，兼容包仅覆盖映射值，不选择或切换思考模式。
+
+- **等级映射**：Responses 编码 `reasoning.effort`，Chat 编码 `reasoning_effort`；默认 `off` 为 `none`，其他等级同名。Anthropic 自适应思考编码 `output_config.effort`，默认 `minimal` 为 `low`，其他非 off 等级同名；手动预算模式默认不附带 effort。Anthropic 的 `off` 编码 `thinking.type: disabled`，默认省略 effort。
+- **`customThinkingLevels`**：以标准等级为可选键，值为去除首尾空白后的非空上游字符串，`null` 明确省略 effort，缺项使用协议默认。手动预算模式也可通过显式条目附带 effort；省略 effort 不等于关闭思考。模型不接受某等级时，应从可用集合中移除；不自动降级，不将服务端拒绝解释成切换协议或重试的信号。
+- **默认预算**：Anthropic 的手动预算模式无需兼容包即可使用。按本次有效总输出上限 `L` 乘下表比例、向下取整并至少取 1024 tokens；`L` 使用调用方与模型配置取较小值后的上限，两者均未设置时固定为 4096 tokens，不从 SDK 已叠加预算的请求字段反推。工坊的输出上限包含思考，不再额外叠加预算。
+
+| 标准等级 | minimal | low | medium | high | xhigh | max |
+| --- | --- | --- | --- | --- | --- | --- |
+| 默认预算占总输出上限的比例 | 2% | 10% | 30% | 60% | 90% | 95% |
+
+- **`customThinkingBudgets`**：以非 off 标准等级为可选键，值为至少 1024 的安全整数，直接指定绝对 token 数；缺项使用内置比例。预算必须小于 `L`，不满足时在 HTTP 发送前以 `thinking_budget_unavailable` 拒绝，不静默缩小预算。`off` 不属于预算映射，不能表示为零预算。
+- **模式识别**：Anthropic 自适应／手动预算模式仍由 SDK 的模型适配识别；预算包仅在手动预算模式消费，不将 adaptive 模型强制切为 enabled。宿主在最终 HTTP 正文应用等级和预算映射，避免 SDK 删除自定义字符串、改写等级或扩大输出上限；不开放任意请求补丁。
+- **配置覆盖**：先按下节规则确定生效兼容包，再将其显式条目覆盖到协议默认映射；模型包的缺项不继承提供商同名包的值。空对象表示使用协议默认映射，`null` 只作为等级包内部的 effort 省略值，不是兼容包禁用标记。
+- **消费范围**：对话、命名和摘要共用请求编码；连接测试保持最小连通性请求，不消费等级或预算映射。`reasoning: false` 时两张映射均不参与请求。
 
 ## 模型引用与模型目标
 
@@ -111,12 +128,14 @@
 
 提供商与具体模型分别以 `compatibility` 保存稀疏列表（标签型 `{ id }`，参数型 `{ id, value }`）。提供商条目对连接下所有模型生效；请求时按 `id` 合并，模型同名条目**整项覆盖**提供商条目（不逐字段深合并，省略的可选字段不从提供商补齐；不支持模型单独禁用提供商条目或使用墓碑）。合并结果不回写配置。
 
-正式目录包含五项：
+正式目录包含七项：
 - `systemMessageInMessages`（标签）：将 Responses 系统提示从 `instructions` 改为首条 `system` 消息。
 - `toolFilesAsUserMessage`（标签）：允许 Chat Completions 将工具结果文件搬运到后续 `user` 消息。
 - `responsesReasoning`（参数）：适配 Responses 明文 `content` 的 array/object 形状，以及是否请求 `encrypted_content` 和 `reasoning.summary`。
 - `customUserAgent`（参数）：以必填 `userAgent` 覆盖 HTTP 客户端身份头。
 - `opencodeSession`（标签）：将本次请求的会话 ID 写入 `x-opencode-session`。
+- `customThinkingLevels`（参数）：自定义标准等级对应的上游 effort，见[思考等级与预算映射](#思考等级与预算映射)。
+- `customThinkingBudgets`（参数）：覆盖手动思考的 token 预算，见[思考等级与预算映射](#思考等级与预算映射)。
 
 具体协议投影规则见 [三协议编码与跨模型续接](runtime.md#三协议编码与跨模型续接)。
 

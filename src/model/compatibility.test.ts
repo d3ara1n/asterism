@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { generateText } from "ai";
+import { z } from "zod";
 import { thinkingLevels } from "@atelier/sdk/contracts";
 import { AiSdkAdapter, sdkMessages } from "./ai-sdk.ts";
 import { createProviderModel } from "./provider.ts";
@@ -7,7 +9,9 @@ import { modelScope, type Json } from "../shared/model.ts";
 import { projectSystemPrompt } from "./system-prompt.ts";
 
 import type { ModelInput } from "./contract.ts";
-import { mergeModelCompatibility, type ModelCompatibility } from "../shared/model-compatibility.ts";
+import { mergeModelCompatibility, modelCompatibilityDefinition, modelCompatibilitySchema, type ModelCompatibility } from "../shared/model-compatibility.ts";
+import { requestOptions } from "./request-options.ts";
+import { configurationField } from "../shared/configuration-fields.ts";
 
 function input(protocol: ModelInput["settings"]["provider"]["protocol"] = "openai-responses"): ModelInput {
   return {
@@ -53,6 +57,137 @@ async function request(value: ModelInput, inspectHeaders?: (headers: Headers) =>
   for await (const _event of adapter.prepare(value).stream(new AbortController().signal)) { /* 消费完整流，序列化错误不能被忽略。 */ }
   return body!;
 }
+
+describe("思考等级与预算映射", () => {
+  // 映射包只接受标准等级；预算为绝对 token 数，off 不能误编码成零预算。
+  it("等级与预算映射校验稀疏值，表单可区分默认、null 与自定义值", () => {
+    const levels = modelCompatibilityDefinition("customThinkingLevels")!;
+    const budgets = modelCompatibilityDefinition("customThinkingBudgets")!;
+    expect(modelCompatibilitySchema.parse([
+      { id: levels.id, value: { low: " upstream-low ", high: null } },
+      { id: budgets.id, value: { high: 16384 } },
+    ])).toEqual([
+      { id: levels.id, value: { low: "upstream-low", high: null } },
+      { id: budgets.id, value: { high: 16384 } },
+    ]);
+    for (const value of [{ high: "" }, { high: 1024 }, { ultra: "ultra" }])
+      expect(levels.schema.safeParse(value).success).toBe(false);
+    for (const value of [{ off: 0 }, { high: 1023 }, { high: 1024.5 }, { high: null }, { high: Number.MAX_SAFE_INTEGER + 1 }])
+      expect(budgets.schema.safeParse(value).success).toBe(false);
+    const levelsForm = z.toJSONSchema(levels.schema, { io: "input" });
+    const budgetsForm = z.toJSONSchema(budgets.schema, { io: "input" });
+    expect(configurationField(levelsForm.properties!.high as Json).kind).toBe("nullable-string");
+    expect(configurationField(budgetsForm.properties!.high as Json).kind).toBe("integer");
+  });
+
+  // 真正发送的值必须服从显式映射，而非 SDK 的枚举或按模型名选择的默认值；历史保留标准等级。
+  it.each(["openai-responses", "openai-chat", "anthropic"] as const)("%s 原样发送自定义 effort，并支持显式省略与协议默认", async protocol => {
+    const current = input(protocol);
+    current.settings.model.modelId = protocol === "anthropic" ? "claude-opus-4-7" : "gpt-5.1";
+    current.settings.provider.compatibility = [{ id: "customThinkingLevels", value: { low: "upstream-low" } }];
+    const original = structuredClone(current);
+    const effort = (body: Record<string, unknown>) => protocol === "openai-chat" ? body.reasoning_effort
+      : (body[protocol === "anthropic" ? "output_config" : "reasoning"] as Record<string, unknown> | undefined)?.effort;
+    expect(effort(await request(current))).toBe("upstream-low");
+    expect(current).toEqual(original);
+    current.settings.model.compatibility = [{ id: "customThinkingLevels", value: { low: null } }];
+    const omitted = await request(current);
+    expect(effort(omitted)).toBeUndefined();
+    if (protocol === "openai-responses") expect(omitted.reasoning).toMatchObject({ summary: "auto" });
+    if (protocol === "anthropic") expect(omitted.thinking).toMatchObject({ type: "adaptive" });
+    current.settings.model.compatibility = [{ id: "customThinkingLevels", value: { high: "upstream-high" } }];
+    expect(effort(await request(current))).toBe("low");
+    current.settings.model.compatibility = [];
+    expect(effort(await request(current))).toBe("upstream-low");
+    current.settings.model.capabilities.reasoning = false;
+    expect(effort(await request(current))).toBeUndefined();
+  });
+
+  // 无兼容包也能使用 Anthropic 手动预算；本次输出上限含思考，不得被 SDK 额外扩张。
+  it("Anthropic 默认预算按最终输出上限分配，预算包仅覆盖指定等级", async () => {
+    const current = input("anthropic");
+    current.settings.model.modelId = "claude-sonnet-4-5";
+    current.settings.model.generation.maxOutputTokens = 20000;
+    current.maxOutputTokens = 10000;
+    current.settings.thinking = "medium";
+    expect(await request(current)).toMatchObject({ thinking: { type: "enabled", budget_tokens: 3000 }, max_tokens: 10000 });
+    current.settings.provider.compatibility = [{ id: "customThinkingBudgets", value: { medium: 5000, low: 2048 } }];
+    expect(await request(current)).toMatchObject({ thinking: { type: "enabled", budget_tokens: 5000 }, max_tokens: 10000 });
+    current.settings.model.compatibility = [{ id: "customThinkingBudgets", value: { high: 6000 } }];
+    expect(await request(current)).toMatchObject({ thinking: { type: "enabled", budget_tokens: 3000 }, max_tokens: 10000 });
+    current.settings.thinking = "low";
+    expect(await request(current)).toMatchObject({ thinking: { type: "enabled", budget_tokens: 1024 }, max_tokens: 10000 });
+    current.settings.model.compatibility = [];
+    expect(await request(current)).toMatchObject({ thinking: { type: "enabled", budget_tokens: 2048 }, max_tokens: 10000 });
+  });
+
+  // 同时存在两张映射时，effort 名称不参与 token 计算；预算包不能强制 adaptive 模型改用手动预算。
+  it("Anthropic 模式与两张映射独立，off 不被 SDK 降级为低思考", async () => {
+    const current = input("anthropic");
+    current.settings.model.generation.maxOutputTokens = 20000;
+    current.settings.provider.compatibility = [
+      { id: "customThinkingLevels", value: { low: "custom-low" } },
+      { id: "customThinkingBudgets", value: { low: 4096 } },
+    ];
+    const manual = await request(current);
+    expect(manual).toMatchObject({ thinking: { type: "enabled", budget_tokens: 4096 }, output_config: { effort: "custom-low" } });
+    current.settings.model.modelId = "claude-opus-4-7";
+    const adaptive = await request(current);
+    expect(adaptive.thinking).toMatchObject({ type: "adaptive" });
+    expect(adaptive.thinking).not.toHaveProperty("budget_tokens");
+    expect(adaptive.output_config).toMatchObject({ effort: "custom-low" });
+    current.settings.thinking = "off";
+    const disabled = await request(current);
+    expect(disabled.thinking).toEqual({ type: "disabled" });
+    expect(disabled.output_config).toBeUndefined();
+    current.settings.model.capabilities.thinkingLevels = ["low"];
+    expect(() => new AiSdkAdapter(async () => "unused").validate(current)).toThrow("thinking level is unavailable");
+  });
+
+  // SDK 对未知模型把默认输出上限与预算相加、对已知模型另作截断；两者都不能成为宿主默认预算的基数。
+  it("未设置输出上限的手动预算使用固定的 4096 总上限，不随 SDK 或等级扩张", async () => {
+    const current = input("anthropic");
+    current.settings.model.generation.maxOutputTokens = null;
+    for (const modelId of ["test", "claude-sonnet-4-5"]) {
+      current.settings.model.modelId = modelId;
+      current.settings.thinking = "low";
+      expect(await request(current)).toMatchObject({ max_tokens: 4096, thinking: { type: "enabled", budget_tokens: 1024 } });
+      current.settings.thinking = "max";
+      expect(await request(current)).toMatchObject({ max_tokens: 4096, thinking: { type: "enabled", budget_tokens: 3891 } });
+    }
+  });
+
+  // 超预算必须在 HTTP 发送前拒绝，且保留明确的宿主错误，不转换成误导性的网络错误。
+  it.each([{ limit: 8192, budget: 8192 }, { limit: 1000, budget: undefined }])(
+    "Anthropic 预算无法容纳于输出上限 $limit 时拒绝发送", async ({ limit, budget }) => {
+      const current = input("anthropic");
+      current.settings.model.generation.maxOutputTokens = limit;
+      if (budget !== undefined) current.settings.model.compatibility = [{ id: "customThinkingBudgets", value: { low: budget } }];
+      let sent = false;
+      await expect(request(current, () => { sent = true; })).rejects.toMatchObject({ code: "thinking_budget_unavailable" });
+      expect(sent).toBe(false);
+    });
+
+  // 流式与非流式 SDK 调用共享预算契约；最小连接 probe 不启用思考。
+  it("非流式执行使用同一预算映射，连接测试不消费映射", async () => {
+    const current = input("anthropic");
+    current.settings.model.generation.maxOutputTokens = 10000;
+    current.settings.model.compatibility = [{ id: "customThinkingBudgets", value: { low: 2048 } }];
+    const bodies: Record<string, unknown>[] = [];
+    const transport: typeof fetch = async (_url, init) => {
+      bodies.push(JSON.parse(String(init?.body)));
+      return Response.json({ id: "response", type: "message", role: "assistant", model: "test",
+        content: [{ type: "text", text: "OK" }], stop_reason: "end_turn", stop_sequence: null, usage: { input_tokens: 1, output_tokens: 1 } });
+    };
+    const { provider, model } = current.settings;
+    const languageModel = createProviderModel(provider, model, "unused", transport);
+    await generateText({ model: languageModel, prompt: "Question", ...requestOptions(provider, model, { purpose: "execution", thinking: "low" }) });
+    await generateText({ model: languageModel, prompt: "Question", ...requestOptions(provider, model, { purpose: "probe" }) });
+    expect(bodies[0]).toMatchObject({ thinking: { type: "enabled", budget_tokens: 2048 }, max_tokens: 10000 });
+    expect(bodies[1]).not.toHaveProperty("thinking");
+    expect(bodies[1]).toMatchObject({ max_tokens: 128 });
+  });
+});
 
 describe("显式兼容与目标投影", () => {
   // 请求身份契约：最终 HTTP 头遵循模型 > 提供商 > 调用方，SDK 不得追加 UA；

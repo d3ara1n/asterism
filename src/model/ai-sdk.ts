@@ -212,7 +212,10 @@ export class AiSdkAdapter implements ModelAdapter {
             yield { type: "part.start", part: { id: `tool:${event.toolCallId}`, kind: "toolcall", callId: event.toolCallId, name: event.toolName } };
           }
           yield { type: "part.end", partId: `tool:${event.toolCallId}`, arguments: json(event.input), continuation: pickContinuation(event.providerMetadata) }; break;
-        case "error": throw new ModelFailure("provider_error", "The provider request failed. Check provider configuration and connectivity.");
+        case "error":
+          // 宿主编码错误已含可公开诊断；第三方错误仍不能泄漏请求正文或凭据。
+          if (event.error instanceof ModelFailure) throw event.error;
+          throw new ModelFailure("provider_error", "The provider request failed. Check provider configuration and connectivity.");
         case "abort": throw new ModelFailure("cancelled", "The provider stream was cancelled.");
         case "tool-error":
           // SDK 会为解析/目录错误合成结果；正式拒绝由工坊记录，避免保存 SDK 错误对象。

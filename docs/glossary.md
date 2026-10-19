@@ -134,6 +134,8 @@
 | 提供商（提供方） | provider | 模型服务的接入方；不等同于协议类型，一家服务可以支持多种协议 |
 | 提供商连接 | provider connection | 应用级接入配置，关联具体协议、服务端点、模型列表与凭据引用；不构成任务资源授权 |
 | 提供商模型 | provider model | 某连接下可调用的具体模型，具有服务端模型 ID、能力与生成参数 |
+| 标准思考等级 | thinking level | 工坊在角色、对话选择与历史中使用的公共等级；请求时映射为上游 effort 或思考预算 |
+| 思考预算 | thinking budget | 手动思考模式的 token 上限；与 effort 字符串及思考模式独立，映射规则见 `docs/model-configuration.md` |
 | 明文思考 | reasoning text | 协议交付的可见思考文字，保存于 thinking.text；不宣称包含模型全部内部推理 |
 | 思考摘要 | reasoning summary | 协议交付的独立摘要，保存于 thinking.summary；不作为明文思考的替代值 |
 | 续接资料 | continuation data | 附属于公共内容、受来源作用域与适配版本约束的原生签名、密文与身份；不覆盖公共文字 |

@@ -75,6 +75,29 @@ export function ConfigurationValue({ schema, value, onChange, label, required = 
   }
   if (field.kind === "json" || field.kind === "object") return <JsonInput id={id} title={title} description={description}
     value={value} onChange={onChange} required={required} actions={actions} />;
+  if (field.kind === "nullable-string") {
+    const textShape = objectValue(field.schema);
+    return <Field>
+      <FieldLabel htmlFor={id}>{title}</FieldLabel>
+      {description && <FieldDescription>{description}</FieldDescription>}
+      <div className="flex min-w-0 items-center gap-2">
+        <Select value={value === undefined ? "unset" : value === null ? "null" : "value"}
+          onValueChange={mode => onChange(mode === "unset" ? undefined : mode === "null" ? null : "")}>
+          <SelectTrigger id={id} className="w-fit"><SelectValue /></SelectTrigger>
+          <SelectContent><SelectGroup>
+            {!required && <SelectItem value="unset">{i18n.formatMessage(configurationFieldMessages.notSet)}</SelectItem>}
+            <SelectItem value="null">{i18n.formatMessage(configurationFieldMessages.nullValue)}</SelectItem>
+            <SelectItem value="value">{i18n.formatMessage(configurationFieldMessages.customValue)}</SelectItem>
+          </SelectGroup></SelectContent>
+        </Select>
+        {typeof value === "string" && <Input value={value} aria-label={title} required
+          minLength={typeof textShape?.minLength === "number" ? textShape.minLength : undefined}
+          maxLength={typeof textShape?.maxLength === "number" ? textShape.maxLength : undefined}
+          onChange={event => onChange(event.currentTarget.value)} />}
+        {actions}
+      </div>
+    </Field>;
+  }
   const boolean = field.kind === "boolean";
   const controlProps = { id, "aria-describedby": description ? `${id}-description` : undefined };
   return <Field orientation={boolean ? "horizontal" : "vertical"}>

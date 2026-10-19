@@ -302,7 +302,9 @@ describe("AI SDK 适配契约", () => {
     const adapter = new AiSdkAdapter(async () => "synthetic-key",
       (value, key) => createProviderModel(value.settings.provider, value.settings.model, key, transport));
     const events: ModelEvent[] = [];
-    for await (const event of adapter.prepare(input).stream(new AbortController().signal)) events.push(event);
+    const current = structuredClone(input);
+    current.settings.model.generation.maxOutputTokens = 4096;
+    for await (const event of adapter.prepare(current).stream(new AbortController().signal)) events.push(event);
     expect(events.find(event => event.type === "part.delta")).toMatchObject({ partId: "thinking:0", delta: "Reasoning" });
     expect(events.filter(event => event.type === "part.end")).toEqual([
       expect.objectContaining({ continuation: { anthropic: { signature: "signed-thinking" } } }),

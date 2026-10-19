@@ -6,12 +6,21 @@ export function objectValue(value: Json | undefined): Record<string, Json> | nul
 export type ConfigurationField =
   | { kind: "object"; properties: Record<string, Json>; required: readonly string[] }
   | { kind: "enum"; options: readonly Json[] }
+  | { kind: "nullable-string"; schema: Json }
   | { kind: "string" | "number" | "integer" | "boolean" }
   | { kind: "json" };
 /** JSON Schema 只决定控件；约束与 refinement 仍由后台的原始 Zod schema 验证。 */
 export function configurationField(schema: Json | null): ConfigurationField {
   const shape = objectValue(schema);
-  if (!shape || shape.$ref || shape.anyOf || shape.oneOf || shape.allOf || shape.if) return { kind: "json" };
+  if (!shape || shape.$ref || shape.oneOf || shape.allOf || shape.if) return { kind: "json" };
+  if (shape.anyOf) {
+    if (Array.isArray(shape.anyOf) && shape.anyOf.length === 2) {
+      const text = shape.anyOf.find(value => objectValue(value)?.type === "string");
+      if (text && shape.anyOf.some(value => objectValue(value)?.type === "null")
+        && configurationField(text).kind === "string") return { kind: "nullable-string", schema: text };
+    }
+    return { kind: "json" };
+  }
   if (Object.hasOwn(shape, "const") && (shape.const === null || typeof shape.const !== "object"))
     return { kind: "enum", options: [shape.const!] };
   if (Array.isArray(shape.enum) && shape.enum.length && shape.enum.every(value => value === null || typeof value !== "object"))

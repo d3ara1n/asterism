@@ -6,13 +6,16 @@ describe("配置 schema 控件选择", () => {
   it("普通字段按明确类型显示，引用、联合和动态对象保留完整值编辑", () => {
     expect(configurationField({ type: "boolean" })).toEqual({ kind: "boolean" });
     expect(configurationField({ type: "integer", minimum: 0 })).toEqual({ kind: "integer" });
-    const complex: Json[] = [{ $ref: "#/$defs/value" }, { anyOf: [{ type: "string" }, { type: "null" }] },
+    const complex: Json[] = [{ $ref: "#/$defs/value" }, { anyOf: [{ type: "string" }, { type: "number" }] },
       { type: "object", properties: { a: { type: "string" } }, additionalProperties: { type: "number" } }];
     for (const schema of complex)
       expect(configurationField(schema)).toEqual({ kind: "json" });
     expect(configurationField({ type: "object", properties: { limit: { type: "number" } }, required: ["limit"], additionalProperties: false }))
       .toMatchObject({ kind: "object", required: ["limit"] });
     expect(configurationLabel({ title: "Limits" }, "limit")).toBe("Limits");
+    // 等级映射需区分缺省、null 与字符串；识别 nullable 不能丢失输入约束。
+    expect(configurationField({ anyOf: [{ type: "string", minLength: 1 }, { type: "null" }] }))
+      .toEqual({ kind: "nullable-string", schema: { type: "string", minLength: 1 } });
   });
   it("false、0、空字符串与 null 保持原类型，未设置只删除指定字段", () => {
     const original = { limit: 5, enabled: true, label: "Name", timeout: 1 };

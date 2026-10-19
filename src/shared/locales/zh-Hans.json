@@ -1,4 +1,6 @@
 {
+  "configurationFields.nullValue": "显式空值",
+  "configurationFields.customValue": "自定义值",
   "objects.auxiliaryPanels": "辅助面板",
   "objects.closeAuxiliaryPanel": "关闭面板",
   "objects.openInIsland": "在浮岛中打开",

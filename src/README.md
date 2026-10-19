@@ -11,7 +11,7 @@
 | `runtime/` | 应用组合与会话列表；会话命令、历史查询、资源与布局、执行进度；SQLite、`objects/`、`content/` 存储与私有凭据客户端 | `shared`、`session`、`configuration`、内置实现后台入口、Node API |
 | `configuration/` | 全局 `configuration.json`、密文凭据、模型发现、models.dev 参数获取、异步连接测试与默认角色（见 `configuration/README.md`） | `shared`、Node 文件系统、模型 SDK；不依赖 Electron 或数据库 |
 | `session/` | 会话树存储（`session_nodes`）、当前时间线追加与游标选择、工作台存在性与链接重放 | `shared`、SDK 纯契约、Node SQLite；不依赖 UI 或插件运行时 |
-| `model/` | 单次请求契约、文件输入检查、请求身份头、跨模型目标投影、思考续接中间件、请求接收计时与三协议 AI SDK 编解码 | `shared`、`session`、AI SDK |
+| `model/` | 单次请求契约、文件输入检查、请求身份头、跨模型目标投影、思考等级／预算编码（`thinking-options.ts`）、思考续接中间件、请求接收计时与三协议 AI SDK 编解码 | `shared`、`session`、AI SDK |
 | `execution/` | 单次模型请求与工具批次（`models.run`）、流块状态机、请求能力视图、工具策略、固定宿主入口与插件顶层工具调度 | `model`、`resources`、`tools`、存储格式 adapter |
 | `resources/` | 资源身份生成（Nano ID）、后台契约、注册目录、卡片投影与环境聚合 | `shared`、`session` 对象类型 |
 | `tools/` | 两层共用的工具定义投影、实现注册与产出校验、终结 `toModel` 投影、支持关系 | `shared`、`session` 对象类型 |

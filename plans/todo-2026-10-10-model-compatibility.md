@@ -1,6 +1,6 @@
 # 模型兼容包与标准思考等级
 
-> 立案 2026-10-10。配置、标准等级、公共思考双通道与端点字段适配已实施；GUI 与真实端点待验收。`customThinkingLevels` 单独暂缓。跨模型续接共用请求投影，见 [续接计划](todo-2026-10-13-cross-model-continuation.md)。
+> 立案 2026-10-10。配置、标准等级、公共思考双通道、端点字段适配与等级／预算映射已实施；GUI 与真实端点待验收。跨模型续接共用请求投影，见 [续接计划](todo-2026-10-13-cross-model-continuation.md)。
 
 ## 已确认设计
 
@@ -16,21 +16,16 @@
 
 ## 正式兼容目录
 
-| id | 类型与协议 | 行为 |
-| --- | --- | --- |
-| systemMessageInMessages | 标签；Responses | 将 instructions 改为第一条 system 消息，不重复发送 |
-| responsesReasoning | 参数；Responses | content 缺省 array，可设 object；encryptedContent 与 summary 缺省 true，false 分别省略 encrypted_content include 与 reasoning.summary 请求参数；不控制历史思考是否参与输入 |
-| toolFilesAsUserMessage | 标签；Chat | 显式允许同批工具文件紧随工具结果进入 user 消息，tool 保留关联说明 |
-| customUserAgent | 参数；三协议 | 必填 userAgent 覆盖调用方 UA；模型覆盖提供商，最终 HTTP 头不追加 SDK 身份 |
-| opencodeSession | 标签；三协议 | 将请求会话 ID 写入 x-opencode-session；无会话的单次调用生成独立临时 ID |
+目录与各包规则统一维护在[模型兼容包](../docs/model-configuration.md#模型兼容包)，等级与预算的默认行为见[思考等级与预算映射](../docs/model-configuration.md#思考等级与预算映射)。
 
 明文续接不需要 DeepSeek 专用开关。SDK 自动添加的密文 include 和默认摘要也须服从最终请求边界的字段设置。未支持的服务端输入由服务端反馈，不自动改写历史、切换协议或重试降级。
 
 ## 实现边界
 
-- `src/shared/model-compatibility.ts` 承接定义、校验与合并；配置文件版本 6，配置 IPC 版本 9。
+- `src/shared/model-compatibility.ts` 承接定义、校验与合并；配置文件与 IPC 的当前版本分别以 `src/configuration/store.ts`、`src/shared/configuration.ts` 为准。
 - SDK 0.15.0／宿主 API 8.1 声明 thinking 的独立 text、summary 及 summary delta，以及调用方 UA／会话归属；工作数据库版本 19。开发期不提供旧数据推断或迁移。
 - `src/model/request-identity.ts` 解释身份兼容包，最终传输边界设置头；内置 Agent、命名与压缩提供应用 UA 和稳定会话 ID。连接测试沿用同一编码并生成临时 ID。
+- `src/model/thinking-options.ts` 在请求级中间件中统一处理 effort 与手动预算，覆盖流式和非流式调用；通用 schema 表单支持稀疏映射及显式 null。
 - `src/model/projection.ts` 从公共历史生成目标内容，`continuation.ts` 只判断原生资料可复用性。
 - `src/model/responses-reasoning.ts`、`anthropic-thinking.ts` 通过 SDK 公开中间件固定思考顺序，再在传输入口核对普通消息／工具并编码思考；不修改依赖源码，不使用文本哨兵或通用 JSON patch。
 - 原生签名对应文字不裁剪、不替换为摘要；跨来源清除不适用的签名、密文与原生 item ID，公共内容保持语义。
@@ -57,7 +52,8 @@
 - [ ] GUI：兼容参数添加／编辑／移除、保存重开、模型覆盖及恢复；summary-only 与纯密文块展示。
 - [ ] 真实端点：OpenAI、Anthropic、DeepSeek、Kimi 与智谱的多轮思考、工具配对与跨模型切回；分别确认套餐权限与客户端准入。
 - [ ] 真实端点：分别确认智谱／Z.ai 四种地区与计费组合，核对共用 Responses 适配与账户历史订阅限制。
-- [ ] 暂缓：确认 SDK 编码方案后实现 customThinkingLevels。标准等级映射为服务端字符串，不统一改写公共等级；Anthropic effort 与 adaptive/budget 不能混为一项。
+- [x] `customThinkingLevels`、`customThinkingBudgets` 与 Anthropic 内置预算映射；标准等级不回写，模式不由兼容包切换。
+- [ ] GUI 与真实端点：等级映射的缺省／字符串／null、预算覆盖、保存重开和恢复提供商设置；Anthropic 手动预算与 adaptive 各验证一次真实请求，确认预算冲突提示及辅助调用的输出上限。
 - [ ] 延后：确定模型专属兼容资料的来源与推荐入口；参数获取不消费目录 patch、不自动添加兼容包，见 [模型目录归档](archived/todo-2026-10-07-model-catalog.md)。
 
 验证以实际 HTTP 正文、真实 SDK 解码与公共记录往返为边界，覆盖两通道分离、密文／签名原样续接、跨来源隔离、工具顺序及字段设置。真实服务与 GUI 由用户操作，未完成前不归档。
@@ -65,3 +61,5 @@
 2026-10-15 验证：类型检查、73 个测试文件／489 项用例、i18n 检查与构建通过。回归包含空正文签名、Responses output_index 稳定归属、未闭合块仍交付终态计量，以及 SDK 末段正文裁剪。构建保留既有的 500 kB 产物大小提示；没有调用真实模型端点或操作真实开发数据。
 
 2026-10-15 请求身份收尾验证：类型检查、全量 74 个测试文件／495 项用例、i18n 检查、兼容表单 schema 转换与构建通过；覆盖 UA 优先级、三协议最终 HTTP 头、Go 临时／稳定会话 ID、SDK 输入快照，以及内置 Agent、命名、压缩的身份传递。真实 Go 请求头与 GUI 仍待上述专项验收。
+
+2026-10-19 等级与预算映射验证：类型检查、模型／配置／表单契约的 12 个测试文件／133 项用例、本地化抽取与检查、生产构建通过。真实 SDK 传输捕获覆盖三协议自定义 effort、显式省略、整项覆盖、默认与自定义预算、无输出配置时的固定上限、预算冲突拒绝、模式独立，以及流式／非流式和连接 probe；复核发现的 SDK 默认预算叠加问题已修正。构建保留既有产物体积提示。未访问真实提供商、操作 GUI 或修改真实开发数据。

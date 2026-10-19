@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { jsonSchema, type Json } from "@atelier/sdk/contracts";
+import { jsonSchema, thinkingLevels, type Json, type ThinkingLevel } from "@atelier/sdk/contracts";
 import type { ProviderInput } from "./configuration.ts";
 
 /** 应用预定义的声明目录；参数与展示同源，行为由请求投影层按 id 解释。 */
@@ -15,7 +15,44 @@ export type ModelCompatibilityDefinition = {
   | { kind: "options"; schema: z.ZodType<Json>; initialValue: Json }
 );
 
+const activeThinkingLevels = thinkingLevels.filter(level => level !== "off");
+const customThinkingLevelsSchema = z.strictObject(Object.fromEntries(thinkingLevels.map(level => [
+  level, z.string().trim().min(1).nullable().optional().meta({
+    title: level,
+    description: "An upstream effort string, or null to omit effort. Unset uses the protocol default.",
+  }),
+]))) as z.ZodObject<{ [Level in ThinkingLevel]: z.ZodOptional<z.ZodNullable<z.ZodString>> }>;
+const customThinkingBudgetsSchema = z.strictObject(Object.fromEntries(activeThinkingLevels.map(level => [
+  level, z.number().int().min(1024).max(Number.MAX_SAFE_INTEGER).optional().meta({
+    title: level,
+    description: "Thinking tokens for manual-budget models. Unset uses the built-in budget; does not enable manual thinking.",
+  }),
+]))) as z.ZodObject<{ [Level in Exclude<ThinkingLevel, "off">]: z.ZodOptional<z.ZodNumber> }>;
+
+export type CustomThinkingLevels = z.infer<typeof customThinkingLevelsSchema>;
+export type CustomThinkingBudgets = z.infer<typeof customThinkingBudgetsSchema>;
+
 export const modelCompatibilityDefinitions: readonly ModelCompatibilityDefinition[] = [
+  {
+    id: "customThinkingLevels",
+    kind: "options",
+    initialValue: {},
+    appliesTo: { protocols: ["openai-responses", "openai-chat", "anthropic"] },
+    schema: customThinkingLevelsSchema.meta({
+      title: "Custom thinking levels",
+      description: "Map standard levels to upstream effort values. Does not change available levels, history or token budgets.",
+    }),
+  },
+  {
+    id: "customThinkingBudgets",
+    kind: "options",
+    initialValue: {},
+    appliesTo: { protocols: ["anthropic"] },
+    schema: customThinkingBudgetsSchema.meta({
+      title: "Custom thinking budgets",
+      description: "Override manual thinking budgets in tokens. Adaptive thinking keeps its effort mapping.",
+    }),
+  },
   {
     id: "customUserAgent",
     kind: "options",

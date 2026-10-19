@@ -172,6 +172,8 @@ type ModelInputPart =
 
 三协议使用 Vercel AI SDK：OpenAI Responses、OpenAI Chat Completions、Anthropic Messages。工具定义不提供 SDK `execute`；关闭隐式重试与流重试。带凭据的远程端点要求 HTTPS，无鉴权模式去除认证头，禁止自动重定向。每个 SDK 调用只进行一个模型步骤。Responses 固定 `store: false`。连接测试与真实执行共用 `src/model/request-options.ts` 解释请求选项。
 
+思考控制在 SDK 序列化后的请求边界由 `src/model/thinking-options.ts` 编码；流式与非流式调用共用同一映射，规则见[思考等级与预算映射](model-configuration.md#思考等级与预算映射)。这与下方历史思考部件的续接编码独立。
+
 每次请求从公共历史向目标模型做单次目标投影，不因 provider、协议、端点或模型变化而拒绝整段上下文：
 - **原生资料作用域**：签名、密文等 `continuation` 仅在来源作用域（provider 身份、协议、端点、模型）与适配版本均一致时复用；跨来源只省略不适用的原生资料，切回原模型时原先的资料仍可复用。
 - **工具调用 ID 配对**：外来工具调用 ID 不满足通用字符／长度范围或与已有身份冲突时，在本次请求内确定性转换，调用和结果成对使用；本来源原始 ID 优先保留。

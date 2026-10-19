@@ -1,6 +1,14 @@
 import { defineMessages, pluginNamespace } from "@atelier/sdk/contracts";
 
 export const configurationFieldMessages = pluginNamespace("atelier.host").messages("en", defineMessages({
+  nullValue: {
+    id: "configurationFields.nullValue",
+    defaultMessage: "Explicit null",
+  },
+  customValue: {
+    id: "configurationFields.customValue",
+    defaultMessage: "Custom value",
+  },
   notSet: {
     id: "features_plugins_PluginConfigurations_1",
     defaultMessage: "Not set",

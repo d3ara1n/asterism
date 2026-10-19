@@ -17,7 +17,7 @@
 | `model-catalog.ts` | 调用官方 `@opencode-ai/models` 客户端，按剥离路由前缀后的模型名精确匹配并映射可覆盖参数 |
 | `model-cost-migration.ts` | 在配置存储边界把旧平铺 token 单价转换为按模态、计费项和单位组织的参考价格 |
 | `../shared/provider-presets.ts` | 提供商连接预设目录声明、校验与一次性连接草稿生成（`providerPresetDraft`） |
-| `../shared/model-compatibility.ts` | 五项预定义模型兼容包的 schema 声明与提供商／模型两层按 `id` 整项覆盖合并逻辑 |
+| `../shared/model-compatibility.ts` | 预定义模型兼容包的 schema 声明与提供商／模型两层按 `id` 整项覆盖合并逻辑 |
 | `errors.ts` | 配置模块的固定错误码分类 |
 
 ## 新增提供商预设
