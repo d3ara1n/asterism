@@ -19,6 +19,8 @@
 
 插件扩展的分包、公共提供方、顶层工具、对象关联调用与 Agent 界面扩展已完成；内置 `ask_user` 作为首个消费者贯通工具等待、面板输入与结果续轮。实施与验收边界见 [归档记录](../plans/archived/todo-2026-10-15-plugin-tools-ui.md)。插件分发和后续能力分别由 [插件系统计划](../plans/todo-2026-10-12-plugin-system.md) 与 [运行时能力计划](../plans/todo-2026-10-01-runtime-capabilities.md) 跟踪。
 
+已完成实现与自动验证的[模型兼容](../plans/archived/todo-2026-10-10-model-compatibility.md)、[跨模型续接](../plans/archived/todo-2026-10-13-cross-model-continuation.md)、[上下文压缩](../plans/archived/todo-2026-10-13-context-compression.md)与[内容导入](../plans/archived/todo-2026-10-12-plugin-binary-ingestion.md)采用延迟验收：长期质量、端点组合与稀有界面状态由真实使用覆盖，发现具体问题后处理；归档不表示这些场景已全部验收。明确的一次性 GUI 检查、平台构建验证及尚未实现的能力仍由各活动计划跟踪。
+
 ### 核心验收流程
 1. Workspace 存在目录，但未绑定目录资源时，文件调用被拒绝。
 2. 绑定目标目录后，代理读取并成功编辑文件，对话流显示 `edit` 状态，展开可查看实际 diff。
