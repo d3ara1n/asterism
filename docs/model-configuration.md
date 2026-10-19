@@ -24,6 +24,8 @@
 
 预设是已填好参数的自定义提供商。选择入口一次性生成普通连接草稿，显式带入兼容条目，然后打开与空白自定义连接相同的编辑器，统一展示全部连接字段和兼容设置。编辑器不保留预设身份、来源状态或更换预设入口。目录 ID 按量采用厂商 slug，订阅追加 `-plan`，地区后缀放最后（如 `kimi / kimi-plan / kimi-cn / kimi-plan-cn`）；重复添加同一预设时默认连接 ID 追加未占用数字后缀。保存不持久化预设身份、计费标签或资料来源；目录更新不修改已保存连接及其引用。
 
+工坊通过提供商预设提供已核实的连接与兼容配置。自定义提供商的协议、端点与兼容包由用户依据其上游要求自行选择和配置；不提供独立的模型级兼容推荐或自动匹配入口。模型发现与参数获取沿用各自的字段范围，不推断或自动添加兼容包。
+
 优先使用 Responses；Anthropic 使用原生 Messages。聚合服务对同一计费产品与地区默认只提供一个预设，支持 Responses 时优先选择；只有不同端点对应不同模型集合时才拆分提供商。当前目录包含 OpenAI、Anthropic、DeepSeek、xAI、OpenRouter、OpenCode Console／Go，以及 Kimi 和智谱／Z.ai：
 - **OpenRouter / OpenCode Console**：分别使用 `https://openrouter.ai/api/v1` 与 `https://opencode.ai/inference/v1` 的单一 Responses 入口（Zen 保留为搜索别名）。
 - **OpenCode Go**：预设 ID 为 `opencode-plan`，使用 `https://opencode.ai/inference/go/v1` 的 Responses 入口，显式带入 `opencodeSession` 兼容包。
