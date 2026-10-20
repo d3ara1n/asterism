@@ -1,4 +1,4 @@
-import { definePlugin } from "@atelier/sdk/runtime";
+import { definePlugin, implementCall, PluginApiError } from "@atelier/sdk/runtime";
 import { builtin, CreateAgent, type NamingApi } from "@atelier/builtin-api/contracts";
 import { defineAgentCreation } from "@atelier/builtin-api/runtime";
 import metadata from "../package.json" with { type: "json" };
@@ -12,13 +12,23 @@ import questions from "./questions/runtime.ts";
 import resourceOperations from "./resources/runtime.ts";
 import { CreateNote } from "./notes/contract.ts";
 import providers from "./providers/runtime.ts";
+import { UsageConsumer } from "./usage/service.ts";
+import { ReadUsage, UsageChanged } from "./usage/contract.ts";
 
 /** 仅组合插件业务；加载、宿主服务及外部插件依赖由应用负责。 */
 export function createBuiltin(options: { application: BuiltinApplication; connectNaming(api: NamingApi): () => void }) {
   return definePlugin({ namespace: builtin, version: metadata.version,
     setup(plugin) {
       plugin.config(BuiltinSettings);
-      return { modules: [providers, createAgentModule(options.application), filesystem, createNamingModule(options.connectNaming, options.application.userAgent), notes, questions,
+      const usage = new UsageConsumer(plugin.providers, plugin.usages, providerId => {
+        try { plugin.ipc.events.publish(UsageChanged, { providerId }); }
+        catch (error) { if (!(error instanceof PluginApiError && error.code === "unavailable")) throw error; }
+      });
+      plugin.signal.addEventListener("abort", () => usage.close(), { once: true });
+      return { events: [UsageChanged],
+        calls: [implementCall(ReadUsage, (input, { signal }) => usage.query(input.providerId, { refresh: input.refresh, signal }))],
+        async closing() { usage.close(); },
+        modules: [providers, createAgentModule(options.application, usage), filesystem, createNamingModule(options.connectNaming, options.application.userAgent), notes, questions,
         resourceOperations,
         defineAgentCreation({ id: builtin.name("agent.create"), creation: CreateAgent,
           description: "Create an Agent with a selected agent configuration and optional model/thinking overrides.",

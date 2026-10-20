@@ -1,17 +1,21 @@
-import type { ProviderUsageState } from "@atelier/sdk/contracts";
-import type { RendererProviderUsage } from "@atelier/sdk/renderer";
-import type { ConfigurationBridge } from "../../../shared/configuration";
+import type { ProviderUsageState } from "./contract.ts";
+
+export interface UsageBridge {
+  query(providerId: string, refresh: boolean): Promise<ProviderUsageState>;
+  onChanged(listener: (providerId?: string) => void): () => void;
+}
 
 interface Entry { value: ProviderUsageState | null; listeners: Set<() => void>; generation: number; pending?: Promise<void>; timer?: ReturnType<typeof setTimeout> }
 /** 全窗口共享的按连接订阅；多个卡片不各自建立轮询，后台窗口暂停刷新。 */
-export class ProviderUsageClient implements RendererProviderUsage {
+export class ProviderUsageClient {
   private entries = new Map<string, Entry>();
   private active = true;
   private closed = false;
   private readonly unsubscribe: () => void;
-  constructor(private readonly bridge: ConfigurationBridge, private readonly interval = 60_000) {
-    this.unsubscribe = bridge.onChanged(() => {
+  constructor(private readonly bridge: UsageBridge, private readonly interval = 60_000) {
+    this.unsubscribe = bridge.onChanged(providerId => {
       for (const [id, entry] of this.entries) {
+        if (providerId && providerId !== id) continue;
         entry.generation++; entry.pending = undefined; entry.value = null;
         this.emit(entry);
         if (entry.listeners.size && this.active) void this.request(id, false);
@@ -44,17 +48,16 @@ export class ProviderUsageClient implements RendererProviderUsage {
     if (entry.value?.usage) { entry.value = { ...entry.value, state: "loading" }; this.emit(entry); }
     const work = Promise.resolve().then(async () => {
       try {
-        const result = await this.bridge.execute({ type: "usage.query", providerId: id, refresh });
+        const result = await this.bridge.query(id, refresh);
         if (this.closed || entry.generation !== generation) return;
-        if (!result.ok || !result.usage) throw new Error("Provider usage is unavailable.");
-        entry.value = result.usage;
+        entry.value = result;
       } catch {
         if (this.closed || entry.generation !== generation) return;
         entry.value = { ...(entry.value ?? { providerId: id, revision: 0, usage: null, items: [], updatedAt: null }), state: "error", error: "unavailable" };
       } finally {
         if (!this.closed && entry.generation === generation) {
           entry.pending = undefined; this.emit(entry);
-          if (entry.listeners.size && this.active && entry.value?.state !== "disabled")
+          if (entry.listeners.size && this.active && entry.value?.state !== "disabled" && entry.value?.source !== "headers")
             entry.timer = setTimeout(() => { void this.request(id, false); }, this.interval);
         }
       }
@@ -68,6 +71,15 @@ export class ProviderUsageClient implements RendererProviderUsage {
     for (const [id, entry] of this.entries) {
       clearTimeout(entry.timer);
       if (active && entry.listeners.size) void this.request(id, false);
+    }
+  }
+  unavailable(): void {
+    if (this.closed) return;
+    for (const [id, entry] of this.entries) {
+      clearTimeout(entry.timer); entry.generation++; entry.pending = undefined;
+      entry.value = { ...(entry.value ?? { providerId: id, revision: 0, usage: null, items: [], updatedAt: null }),
+        state: "error", error: "unavailable" };
+      this.emit(entry);
     }
   }
   close(): void {

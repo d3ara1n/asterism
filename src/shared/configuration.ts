@@ -3,7 +3,7 @@ export { agentInputSchema, agentSchema, agentOverridesSchema, type AgentConfigur
 import {
   modelExpressionSchema, parseModelExpression, modelReference, thinkingSchema, type ThinkingLevel,
   thinkingLevels, modelCostSchema, uiTextSchema,
-  providerFixedFields, providerUsageIdSchema, providerUsageStateSchema, usageProviderInfoSchema, providerPresetSchema,
+  providerFixedFields, providerUsageIdSchema, usageProviderInfoSchema, providerPresetSchema,
 } from "@atelier/sdk/contracts";
 export { modelExpressionSchema, parseModelExpression, formatModelExpression, modelReference, thinkingSchema, type ModelExpression, type ThinkingLevel } from "@atelier/sdk/contracts";
 import { z } from "zod";
@@ -12,7 +12,7 @@ import { modelCompatibilitySchema } from "./model-compatibility.ts";
 
 export const configurationChannel = coreChannel("configuration");
 export const configurationChangedChannel = coreChannel("configuration-changed");
-export const configurationVersion = 13;
+export const configurationVersion = 14;
 const id = z.string().min(1).max(160);
 const name = z.string().trim().min(1).max(160);
 const revision = z.number().int().positive();
@@ -105,7 +105,6 @@ const credentialUpdateSchema = z.discriminatedUnion("action", [
 ]);
 export const configurationCommandSchema = z.discriminatedUnion("type", [
   z.strictObject({ type: z.literal("read") }),
-  z.strictObject({ type: z.literal("usage.query"), providerId: providerIdSchema, refresh: z.boolean().optional() }),
   // 保存目标是当前 ID；value 中的 ID 可以不同，即改名。
   z.strictObject({ type: z.literal("provider.save"), id: providerIdSchema.nullable(), value: providerInputSchema, credential: credentialUpdateSchema }),
   z.strictObject({ type: z.literal("model.save"), id: modelExpressionSchema.nullable(), value: modelInputSchema }),
@@ -128,7 +127,7 @@ export const configurationErrorSchema = z.strictObject({
   code: z.enum(["invalid_request", "not_found", "conflict", "unavailable", "internal"]), message: z.string(), display: uiTextSchema.optional(),
 });
 export const configurationResultSchema = z.discriminatedUnion("ok", [
-  z.strictObject({ ok: z.literal(true), snapshot: configurationSnapshotSchema, savedId: z.string().max(321).nullable(), parameterUpdate: modelParameterUpdateSchema.optional(), usage: providerUsageStateSchema.optional() }),
+  z.strictObject({ ok: z.literal(true), snapshot: configurationSnapshotSchema, savedId: z.string().max(321).nullable(), parameterUpdate: modelParameterUpdateSchema.optional() }),
   z.strictObject({ ok: z.literal(false), error: configurationErrorSchema }),
 ]);
 export const configurationRequestSchema = z.strictObject({ kind: z.literal("configuration.request"), version: z.literal(configurationVersion), id: z.string().uuid(), command: configurationCommandSchema });

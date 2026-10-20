@@ -5,10 +5,11 @@ import { selectionOf, type AgentSelectionService } from "./selection.ts";
 import type { composeSystemPrompt } from "./system-prompt.ts";
 import { projectForAgent } from "./projection.ts";
 import { compressContext } from "./compression.ts";
+import type { UsageConsumer } from "../usage/service.ts";
 
 const key = (object: ObjectReader) => `agent:${object.ref.id}`;
 /** 执行循环只持请求次数，消息始终从时间线重建。 */
-export function createAgentLoop(deps: { selection: AgentSelectionService; tasks: PluginTasks; models: ModelServices; systemPrompt: (agent: Parameters<typeof composeSystemPrompt>[0]) => ReturnType<typeof composeSystemPrompt>; userAgent: string }) {
+export function createAgentLoop(deps: { selection: AgentSelectionService; tasks: PluginTasks; models: ModelServices; systemPrompt: (agent: Parameters<typeof composeSystemPrompt>[0]) => ReturnType<typeof composeSystemPrompt>; userAgent: string; usage?: Pick<UsageConsumer, "consume"> }) {
   return {
     running: (object: ObjectReader) => deps.tasks.has(key(object)),
     cancel: (object: ObjectReader) => deps.tasks.cancel(key(object)),
@@ -45,6 +46,7 @@ export function createAgentLoop(deps: { selection: AgentSelectionService; tasks:
                 if (event.type !== "progress") object.commit(writer => { writer.append(Execution, event); });
               } },
             });
+            if (result.response) deps.usage?.consume(result.response);
             const { diagnostics, responseId } = result;
             if (diagnostics && responseId && !(result.reason === "failed" && result.code === "event_delivery"))
               object.commit(writer => { writer.append(RequestDiagnosticsRecord, { responseId, diagnostics,

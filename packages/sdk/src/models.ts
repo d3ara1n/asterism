@@ -38,7 +38,7 @@ export type ModelEvent =
   | { type: "part.start"; part: StreamPart }
   | { type: "part.delta"; partId: string; delta: string; channel?: "summary" }
   | { type: "part.end"; partId: string; arguments?: Json; continuation?: Json }
-  | { type: "finish"; reason: string; usage: Usage | null; responseId?: string; rawFinishReason?: string; source?: ModelSource; timing?: RequestTiming };
+  | { type: "finish"; reason: string; usage: Usage | null; responseId?: string; rawFinishReason?: string; source?: ModelSource; timing?: RequestTiming; response?: ModelResponse | null };
 export type ModelSource = { model: string; adapter: string; scope: string };
 export type ModelCompletion = {
   usage: Usage | null; finishReason: string; rawFinishReason: string | null; providerResponseId: string | null;
@@ -74,6 +74,15 @@ export interface ModelRequestIdentity {
   /** 同一会话稳定；无会话的单次调用可省略。 */
   sessionId?: string;
 }
+/** 本次真实 HTTP 响应的瞬态元信息；不包含请求凭据或正文，不自动写入历史。 */
+export interface ModelResponse {
+  connection: { id: string; revision: number };
+  endpoint: string;
+  model: string;
+  status: number;
+  receivedAt: number;
+  headers: Readonly<Record<string, string>>;
+}
 export interface ModelRunRequest {
   object: ResourceRef;
   /** 会话身份取自 object；调用方可声明自己的客户端身份。 */
@@ -90,6 +99,8 @@ export interface ModelRunRequest {
 }
 export type ModelRunResult = {
   responseId: string | null; source: ModelSource | null; completion: ModelCompletion | null; tools: readonly ToolOutcome[];
+  /** 本次调用最后收到的 HTTP 响应元信息；未收到时为 null，不进入响应块或历史。 */
+  response: ModelResponse | null;
   /** 宿主组装最终请求时的现场计量；环境组装前失败时为 null。见 docs/runtime.md#请求诊断。 */
   diagnostics: RequestDiagnostics | null;
 } & ({ reason: "completed" } | { reason: "cancelled" } | { reason: "failed"; code: string });

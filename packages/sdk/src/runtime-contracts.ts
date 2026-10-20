@@ -19,7 +19,7 @@ import type { ContentReader, ContentScope } from "./content-runtime.ts";
 import type { PluginCalls } from "./calls.ts";
 import type { CallContribution } from "./runtime-calls.ts";
 import type { TopLevelTool } from "./runtime-tools.ts";
-import type { ProviderServices, UsageProvider } from "./runtime-providers.ts";
+import type { ProviderServices, UsageServices, UsageProvider } from "./runtime-providers.ts";
 import type { ProviderPresetContribution } from "./provider-usage.ts";
 export type * from "./objects.ts";
 export type { ResourceRef, ResourceSnapshot, SessionSnapshot } from "./workspace.ts";
@@ -38,6 +38,7 @@ export interface PluginContext {
   readonly tasks: PluginTasks;
   readonly models: ModelServices;
   readonly providers: ProviderServices;
+  readonly usages: UsageServices;
   readonly catalogs: { get<T extends Json>(contract: DataContract<T>): T | null };
   session(id: string): SessionExecutor;
   /** 以具名资源契约取得对象操作柄；宿主校验契约属于本插件、对象存在且类型一致，写入记录以此打戳。 */

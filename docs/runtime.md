@@ -63,6 +63,12 @@ Agent 从当前时间线中属于自身的记录投影回合状态（`empty / co
 
 字数按 Unicode 码点计，是对发送文本的精确测量，不换算为 token。provider 的 `usage.input` 只回报输入总量，不能拆分到系统、工具或消息，诊断不推测这种拆分。请求在环境组装前失败（目标不可用、内容不可读等）时没有诊断。消费者自行决定是否保存；内置代理的保存方式见 [代理上下文](workbench.md#代理上下文)。
 
+### 响应元信息
+
+响应元信息是模型调用结果的一部分：`models.stream` 的 `finish.response` 与 `models.run` 的 `result.response` 交付本次调用最后收到的 HTTP 响应，包含请求固定的连接 ID／修订、端点、服务端模型 ID、HTTP 状态、接收时间和小写字段名的响应头。未收到响应时为 null；没有 HTTP 元信息的适配流也可省略 `finish.response`。`run` 失败结果同样保留已经收到的响应；`stream` 未取得终态时仍沿用原有异常路径，不伪造 finish。
+
+元信息只随本次调用的结果交给发起者，不进入 `ModelRunObserver` 的块、诊断或进度事件，也不自动持久化或广播。消费者取得结果后自行解释，模型机制不关联用量提供方。采集不读取或替换响应正文。
+
 ### 响应计量与请求计时
 
 `ModelCompletion` 将 provider 回报的 `usage`、结束原因、provider 响应身份及可选 `timing` 一起交付；计时来自 `models.stream` 的 `finish.timing`，`models.run` 将其随响应最高序号块的终态保存。压缩摘要也使用同一终态计量。未测量的旧记录省略计时，读取时不由节点追加时间补造。

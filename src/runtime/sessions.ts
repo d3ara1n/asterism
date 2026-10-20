@@ -125,8 +125,25 @@ export class SessionService {
       sessions: host, models, catalogs: createBuiltinCatalogs(configuration),
       providerExtensions: configuration.extensions, providers: {
         presets: () => configuration.extensions.presets(),
-        usageProviders: () => configuration.extensions.usageProviders(),
-        queryUsage: (id, options) => configuration.usage.query(id, options),
+        list: () => configuration.current().providers.map(({ credentialState: _state, ...connection }) => connection),
+        get: id => {
+          const provider = configuration.current().providers.find(item => item.id === id);
+          if (!provider) return null;
+          const { credentialState: _state, ...connection } = provider;
+          return connection;
+        },
+        credential: async (connection, options) => {
+          options?.signal?.throwIfAborted();
+          const provider = configuration.current().providers.find(item => item.id === connection.id);
+          const value = await configuration.executionCredential(connection.id, connection.revision);
+          options?.signal?.throwIfAborted();
+          return provider?.auth === "none" ? null : value;
+        },
+        subscribe: listener => configuration.subscribeProviders(listener),
+      }, usages: {
+        list: () => configuration.extensions.usageProviders(),
+        get: id => configuration.extensions.get(id),
+        subscribe: listener => configuration.extensions.subscribe(listener),
       } }, external);
     this.resources = modules.resources;
     this.calls = modules.calls;

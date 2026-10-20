@@ -101,7 +101,7 @@ describe("内置余额与套餐查询", () => {
   // 预设的 usage 必须能找到同名提供方；不把限流响应头或未适配产品隐式接入账户查询。
   it("支持的预设与查询目录同名绑定，未支持的预设保持关闭", () => {
     const ids = createBuiltinUsageProviders().map(provider => provider.id).sort();
-    expect(ids).toEqual(["deepseek", "kimi", "kimi-cn", "kimi-plan", "kimi-plan-cn", "opencode-plan", "openrouter", "zai-plan", "zai-plan-cn"].sort());
+    expect(ids).toEqual(["openai", "anthropic", "xai", "deepseek", "kimi", "kimi-cn", "kimi-plan", "kimi-plan-cn", "opencode-plan", "openrouter", "zai-plan", "zai-plan-cn"].sort());
     for (const preset of providerPresets) {
       expect(preset.connection.usage ?? null).toBe(ids.includes(preset.id) ? preset.id : null);
     }

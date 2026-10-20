@@ -46,7 +46,7 @@ export type ProviderPresetContribution =
 
 const identity = {
   id: z.string().trim().min(1), label: uiTextSchema,
-  scope: z.enum(["account", "plan", "key"]),
+  scope: z.enum(["account", "plan", "key", "connection"]),
 };
 export const quotaValueSchema = z.discriminatedUnion("type", [
   z.strictObject({ type: z.literal("ratio"), remaining: z.number().min(0).max(1) }),
@@ -56,6 +56,7 @@ export const quotaValueSchema = z.discriminatedUnion("type", [
 export const usageItemSchema = z.discriminatedUnion("type", [
   z.strictObject({ ...identity, type: z.literal("balance"), remaining: z.number(), currency: z.string().regex(/^[A-Z]{3}$/u) }),
   z.strictObject({ ...identity, type: z.literal("quota"), value: quotaValueSchema,
+    category: z.enum(["allowance", "rate_limit"]).optional(),
     window: z.strictObject({
       mode: z.enum(["rolling", "fixed", "unknown"]),
       /** 仅在已知时填写实际固定时长；未知周期不能伪造为周或月。 */
@@ -70,13 +71,8 @@ export type UsageItem = z.infer<typeof usageItemSchema>;
 export type QuotaItem = Extract<UsageItem, { type: "quota" }>;
 export const providerUsageErrorSchema = z.enum(["unavailable", "credential", "authentication", "unsupported", "rate_limit", "network", "timeout", "protocol", "server"]);
 export type ProviderUsageError = z.infer<typeof providerUsageErrorSchema>;
-export const providerUsageStateSchema = z.strictObject({
-  providerId: z.string(), revision: z.number().int().nonnegative(), usage: providerUsageIdSchema.nullable(),
-  state: z.enum(["disabled", "loading", "ready", "error"]),
-  items: usageItemsSchema, updatedAt: z.number().nonnegative().nullable(), error: providerUsageErrorSchema.nullable(),
-});
-export type ProviderUsageState = z.infer<typeof providerUsageStateSchema>;
-export const usageProviderInfoSchema = z.strictObject({ id: providerUsageIdSchema, label: uiTextSchema, owner: z.string() });
+export const usageProviderInfoSchema = z.strictObject({ id: providerUsageIdSchema, label: uiTextSchema, owner: z.string(),
+  source: z.enum(["query", "headers"]).default("query") });
 export type UsageProviderInfo = z.infer<typeof usageProviderInfoSchema>;
 
 export function quotaRemaining(item: QuotaItem): number {

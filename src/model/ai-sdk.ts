@@ -8,6 +8,7 @@ import { aiSdkAdapterVersion, pickContinuation } from "./continuation.ts";
 import { projectHistory, validateProjection } from "./projection.ts";
 import { validateRequestIdentity } from "./request-identity.ts";
 import { measureModel, RequestTimer } from "./request-timing.ts";
+import type { ModelResponse } from "@atelier/sdk/contracts";
 
 function json(value: unknown): Json { return jsonSchema.parse(JSON.parse(JSON.stringify(value))); }
 export function sdkMessages(input: ModelInput): ModelMessage[] {
@@ -62,7 +63,8 @@ export function sdkMessages(input: ModelInput): ModelMessage[] {
 export class AiSdkAdapter implements ModelAdapter {
   readonly version = aiSdkAdapterVersion;
   constructor(private readonly readCredential: (providerId: string) => Promise<string | null>,
-    private readonly languageModelFactory?: (input: ModelInput, key: string) => Exclude<LanguageModel, string>) {}
+    private readonly languageModelFactory?: (input: ModelInput, key: string) => Exclude<LanguageModel, string>,
+    private readonly transport: typeof fetch = fetch) {}
   validate(input: ModelValidationInput): void {
     validateProviderTransport(input.settings.provider);
     validateRequestIdentity(input.settings, input);
@@ -84,21 +86,32 @@ export class AiSdkAdapter implements ModelAdapter {
     const { provider, model } = input.settings;
     const key = provider.auth === "none" ? unauthenticatedApiKey : await this.readCredential(provider.id);
     if (!key) throw new ModelFailure("missing_credential", "Provider credentials are unavailable.");
-    const languageModel = this.languageModelFactory?.(input, key) ?? createProviderModel(provider, model, key, fetch, input);
+    const controller = new AbortController();
+    const streamSignal = AbortSignal.any([signal, controller.signal]);
+    let responseMetadata: ModelResponse | null = null;
+    const transport: typeof fetch = async (url, init) => {
+      const response = await this.transport(url, init);
+      responseMetadata = {
+        connection: { id: provider.id, revision: provider.revision }, endpoint: provider.baseUrl, model: model.modelId,
+        status: response.status, receivedAt: Date.now(), headers: Object.fromEntries(response.headers),
+      };
+      return response;
+    };
+    const languageModel = this.languageModelFactory?.(input, key) ?? createProviderModel(provider, model, key, transport, input);
     const tools: ToolSet = Object.fromEntries(input.tools.map(t => [t.name, tool({ description: t.description, inputSchema: sdkJsonSchema(t.parameters as Record<string, unknown>) })]));
     signal.throwIfAborted();
     const timing = new RequestTimer();
     const measured = measureModel(languageModel, provider.protocol, timing);
-    const controller = new AbortController();
-    const streamSignal = AbortSignal.any([signal, controller.signal]);
     const cancelled = () => { timing.end("cancelled"); };
     signal.addEventListener("abort", cancelled, { once: true });
     try {
-      yield* this.decode(measured, messages, tools, options, provider.protocol, streamSignal);
+      for await (const event of this.decode(measured, messages, tools, options, provider.protocol, streamSignal))
+        yield event.type === "finish" ? { ...event, response: responseMetadata } : event;
     } catch (error) {
       // 模型终态可能早于连接关闭或用户取消；已取得的计量仍须交付。
-      if (measured.completion) yield measured.completion;
+      if (measured.completion) yield { ...measured.completion, response: responseMetadata };
       const failure = error instanceof ModelFailure ? error : new ModelFailure("execution_failed", "The model request failed.");
+      failure.response = responseMetadata;
       if (!measured.completion) failure.diagnostics = { timing: timing.end(signal.aborted ? "cancelled" : "failed") };
       throw failure;
     } finally {

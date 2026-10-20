@@ -3,6 +3,17 @@ import { builtin } from "@atelier/builtin-api/contracts";
 
 export const usageMessages = builtin.messages("en", defineMessages({
   title: { id: "usage.title", defaultMessage: "Account usage" },
+  rateLimits: { id: "usage.rateLimits", defaultMessage: "Rate limit allowance" },
+  tokenRate: { id: "usage.tokenRate", defaultMessage: "Token rate limit" },
+  projectTokenRate: { id: "usage.projectTokenRate", defaultMessage: "Project token rate limit" },
+  requestRate: { id: "usage.requestRate", defaultMessage: "Request rate limit" },
+  inputTokenRate: { id: "usage.inputTokenRate", defaultMessage: "Input token rate limit" },
+  outputTokenRate: { id: "usage.outputTokenRate", defaultMessage: "Output token rate limit" },
+  requests: { id: "usage.requests", defaultMessage: "requests" },
+  waiting: { id: "usage.waiting", defaultMessage: "Waiting for model response headers" },
+  headerSource: { id: "usage.headerSource", defaultMessage: "Updated from model response headers." },
+  rateHint: { id: "usage.rateHint", defaultMessage: "Rate limits are separate from account balance and plan allowance." },
+  reportedModel: { id: "usage.reportedModel", defaultMessage: "Reported for {model}" },
   zhipu: { id: "usage.zhipu", defaultMessage: "Zhipu Coding Plan" },
   balance: { id: "usage.balance", defaultMessage: "Account balance" },
   keyBalance: { id: "usage.keyBalance", defaultMessage: "API key budget" },

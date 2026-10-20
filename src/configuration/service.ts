@@ -11,16 +11,19 @@ import { configurationDefaults, resolveAgentConfiguration, resolveRoleConfigurat
 import { discoverModels, ModelDiscoveries, type DiscoverModels } from "./discovery.ts";
 import { loadModelCatalog, modelParameters, type LoadModelCatalog } from "./model-catalog.ts";
 import { modelCatalogMessages } from "../shared/model-catalog-messages.ts";
-import type { ProviderUsageState } from "@atelier/sdk/contracts";
-import { UsageQueryError } from "@atelier/sdk/runtime";
 import { ProviderExtensions } from "./provider-extensions.ts";
-import { ProviderUsageQueries } from "./provider-usage.ts";
 
 const saveKinds = { "provider.save": "provider", "model.save": "model", "role.save": "role", "agent.save": "agent" } as const;
 
 export class ConfigurationService {
   readonly extensions = new ProviderExtensions();
-  readonly usage: ProviderUsageQueries;
+  private readonly providerListeners = new Set<() => void>();
+  subscribeProviders(listener: () => void): () => void {
+    this.providerListeners.add(listener);
+    const release = this.extensions.subscribe(listener);
+    return () => { this.providerListeners.delete(listener); release(); };
+  }
+  private providersChanged() { for (const listener of this.providerListeners) listener(); }
   private readonly store: ConfigurationStore;
   /** 宿主凭据库；插件凭据以独立引用存于同一 vault。 */
   readonly vault: CredentialVault;
@@ -37,26 +40,18 @@ export class ConfigurationService {
     this.store = new ConfigurationStore(root);
     this.vault = new CredentialVault(root, protector);
     this.discoveries = new ModelDiscoveries(onChanged, discover, testTimeoutMs);
-    this.usage = new ProviderUsageQueries(this.extensions, id => this.store.get("provider", id), async provider => {
-      try { return provider.auth === "none" ? null : await this.executionCredential(provider.id, provider.revision); }
-      catch { throw new UsageQueryError("credential"); }
-    });
   }
-  execute(raw: ConfigurationCommand): Promise<{ snapshot: ConfigurationSnapshot; savedId: string | null; parameterUpdate?: ModelParameterUpdate; usage?: ProviderUsageState }> {
+  execute(raw: ConfigurationCommand): Promise<{ snapshot: ConfigurationSnapshot; savedId: string | null; parameterUpdate?: ModelParameterUpdate }> {
     const parsed = configurationCommandSchema.safeParse(raw);
     if (!parsed.success) return Promise.reject(new ConfigurationError("invalid_request", "Invalid configuration. Check the entered values."));
     if (parsed.data.type === "model.parameters") return this.fetchParameters(parsed.data.model);
-    if (parsed.data.type === "usage.query") {
-      this.assertOpen();
-      return this.usage.query(parsed.data.providerId, { refresh: parsed.data.refresh, signal: this.shutdown.signal })
-        .then(usage => ({ snapshot: this.snapshot(), savedId: null, usage }));
-    }
     const command = parsed.data;
     return this.enqueue(async () => {
       this.assertOpen();
       this.storageAvailable = await this.vault.available();
       this.assertOpen();
       const savedId = await this.perform(command);
+      if (command.type === "provider.save" || command.type === "remove" && command.kind === "provider") this.providersChanged();
       if (command.type !== "read") this.onChanged();
       return { snapshot: this.snapshot(), savedId };
     });
@@ -139,7 +134,7 @@ export class ConfigurationService {
       tests: [...this.tests.values()].map(test => ({ ...test.value })), discoveries: this.discoveries.snapshot(), credentialStorageAvailable: this.storageAvailable,
     };
   }
-  private async perform(command: Exclude<ConfigurationCommand, { type: "model.parameters" | "usage.query" }>): Promise<string | null> {
+  private async perform(command: Exclude<ConfigurationCommand, { type: "model.parameters" }>): Promise<string | null> {
     if (command.type === "read") return null;
     if (command.type === "test.start") return this.startTest(command.model);
     if (command.type === "test.cancel") { this.cancelTest(command.id); return command.id; }
@@ -171,7 +166,6 @@ export class ConfigurationService {
       const { credentialRef } = this.store.remove(command.kind, command.id);
       this.invalidateParameterRequests(command.kind, command.id);
       if (command.kind === "provider") this.discoveries.clearProvider(command.id);
-      if (command.kind === "provider") this.usage.invalidate(command.id);
       if (credentialRef) this.removeCredential(credentialRef);
       return command.id;
     }
@@ -205,7 +199,6 @@ export class ConfigurationService {
       if (command.id) {
         this.invalidateParameterRequests("provider", command.id);
         this.discoveries.clearProvider(command.id);
-        this.usage.invalidate(command.id);
       }
     } catch (error) {
       if (newRef) this.removeCredential(newRef);
@@ -278,7 +271,7 @@ export class ConfigurationService {
     this.closed = true;
     this.shutdown.abort();
     this.discoveries.close();
-    this.usage.close();
+    this.providerListeners.clear();
     for (const test of this.tests.values()) { clearTimeout(test.timer); test.controller.abort(); }
   }
 }

@@ -1,7 +1,8 @@
-import { providerPresetSchema, usageProviderInfoSchema, type ProviderPreset, type ProviderPresetContribution } from "@atelier/sdk/contracts";
-import type { UsageProvider, UsageQueryContext } from "@atelier/sdk/runtime";
+import { providerPresetSchema, usageProviderInfoSchema, usageItemsSchema, type ProviderPreset, type ProviderPresetContribution } from "@atelier/sdk/contracts";
+import { UsageQueryError, type UsageProvider } from "@atelier/sdk/runtime";
 import type { RunGroup } from "../plugins/lifecycle.ts";
 import { defineProviderPresets } from "../shared/provider-presets.ts";
+import { synchronous } from "../plugins/synchronous.ts";
 
 interface Layer { owner: string; changes: readonly ProviderPresetContribution[] }
 /** 插件贡献的目录：按装配次序覆盖预设；查询身份唯一，不以覆盖预设隐式替换实现。 */
@@ -27,15 +28,20 @@ export class ProviderExtensions {
     return defineProviderPresets([...presets.values()]);
   }
   presets() { return this.resolve(); }
-  usageProviders() { return [...this.queries.values()].map(({ owner, provider }) => usageProviderInfoSchema.parse({ id: provider.id, label: provider.label, owner })); }
+  usageProviders() { return [...this.queries.values()].map(({ owner, provider }) =>
+    usageProviderInfoSchema.parse({ id: provider.id, label: provider.label, owner, source: provider.source })); }
   declare(owner: string, providers: readonly UsageProvider[], changes: readonly ProviderPresetContribution[], runs: RunGroup, dependencies: readonly string[] = []): void {
     const ids = new Set(this.queries.keys());
-    const normalizedProviders = providers.map(provider => {
-      const info = usageProviderInfoSchema.parse({ id: provider.id, label: provider.label, owner });
+    const normalizedProviders = providers.map((provider): UsageProvider => {
+      const info = usageProviderInfoSchema.parse({ id: provider.id, label: provider.label, owner, source: provider.source });
       if (ids.has(info.id)) throw new Error(`Duplicate usage provider: ${info.id}`);
-      if (typeof provider.query !== "function") throw new Error(`Usage provider ${provider.id} has no query function.`);
       ids.add(info.id);
-      return { id: info.id, label: info.label, query: provider.query.bind(provider) };
+      if (provider.source === "headers") {
+        if (typeof provider.parseHeaders !== "function") throw new Error(`Usage provider ${provider.id} has no header parser.`);
+        return { id: info.id, label: info.label, source: "headers", parseHeaders: provider.parseHeaders.bind(provider) };
+      }
+      if (typeof provider.query !== "function") throw new Error(`Usage provider ${provider.id} has no query function.`);
+      return { id: info.id, label: info.label, source: "query", query: provider.query.bind(provider) };
     });
     const normalizedChanges: ProviderPresetContribution[] = changes.map(change => {
       if (change.type === "add") return { type: "add", preset: providerPresetSchema.parse(change.preset) };
@@ -60,10 +66,35 @@ export class ProviderExtensions {
     for (const [id, query] of this.queries) if (removed.has(query.owner)) this.queries.delete(id);
     this.changed();
   }
-  has(id: string): boolean { return this.queries.has(id); }
-  query(id: string, context: UsageQueryContext) {
+  /** 句柄绑定登记实例；同 ID 重新登记不会复用旧句柄。 */
+  get(id: string): UsageProvider | null {
     const entry = this.queries.get(id);
-    if (!entry) throw new Error(`Usage provider ${id} is unavailable.`);
-    return entry.runs.start(signal => entry.provider.query({ ...context, signal }), { signal: context.signal, affectsHistory: false }).done;
+    if (!entry) return null;
+    const check = () => {
+      if (this.queries.get(id) !== entry || entry.runs.closed) throw new UsageQueryError("unavailable");
+    };
+    const validate = (raw: unknown) => {
+      const result = usageItemsSchema.safeParse(raw);
+      if (!result.success) throw new UsageQueryError("protocol");
+      return result.data;
+    };
+    const provider = entry.provider;
+    if (provider.source === "headers") return {
+      id, label: structuredClone(provider.label), source: "headers",
+      parseHeaders(context) {
+        check();
+        const result = synchronous(() => provider.parseHeaders(structuredClone(context)));
+        return result === null ? null : validate(result);
+      },
+    };
+    return { id, label: structuredClone(provider.label), source: "query", query: context => {
+      check();
+      const captured = { connection: structuredClone(context.connection), credential: context.credential };
+      return entry.runs.start(async signal => {
+        const result = await provider.query({ ...captured, signal });
+        signal.throwIfAborted(); check();
+        return validate(result);
+      }, { signal: context.signal, affectsHistory: false }).done;
+    } };
   }
 }

@@ -10,13 +10,15 @@ import { createSelection, selectionOf } from "./selection.ts";
 import { createAgentLoop } from "./loop.ts";
 import { createAdmission } from "./admission.ts";
 import { projectAgentTurnState } from "./state-projection.ts";
+import type { UsageConsumer } from "../usage/service.ts";
 
 /** 资源入口只装配领域模块与贡献；业务模块不依赖完整插件上下文。 */
-export function createAgentModule(application: BuiltinApplication) {
+export function createAgentModule(application: BuiltinApplication, usage: UsageConsumer) {
   return defineModule(plugin => {
     const systemPrompt = (agent: Parameters<typeof composeSystemPrompt>[0]) => composeSystemPrompt(agent, application.name);
     const selection = createSelection({ agents: () => plugin.catalogs.get(AgentConfigurations) ?? [] });
-    const loop = createAgentLoop({ selection, tasks: plugin.tasks, models: plugin.models, systemPrompt, userAgent: application.userAgent });
+    const loop = createAgentLoop({ selection, tasks: plugin.tasks, models: plugin.models, systemPrompt, userAgent: application.userAgent,
+      usage });
     const admission = createAdmission({ selection, validate: plugin.models.validate, running: loop.running, systemPrompt });
     return {
       resources: [implementResource(Agent, AgentView, {

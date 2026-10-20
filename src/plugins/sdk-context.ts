@@ -218,6 +218,13 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
         title: Object.freeze({ get: session.title.get }) }),
     });
   };
+  const subscribeRegistry = (registry: { subscribe(listener: () => void): () => void } | undefined, listener: () => void) => {
+    checkAvailable();
+    const unsubscribe = registry?.subscribe(() => { checkAvailable(); synchronous(listener); }) ?? (() => {});
+    const release = () => { unsubscribe(); internal.signal.removeEventListener("abort", release); };
+    internal.signal.addEventListener("abort", release, { once: true });
+    return release;
+  };
   const context: PluginContext = {
     ipc: { events: eventScope.api, calls },
     id: internal.id, signal: internal.signal, sessions: directory, dir: internal.dir, log: internal.log,
@@ -239,13 +246,34 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
     catalogs: { get: contract => { checkAvailable(); return host.catalogs?.get(contract) ?? null; } },
     providers: {
       presets: () => { checkAvailable(); return host.providers?.presets() ?? []; },
-      usageProviders: () => { checkAvailable(); return host.providers?.usageProviders() ?? []; },
-      queryUsage: (id, options = {}) => {
+      list: () => { checkAvailable(); return structuredClone(host.providers?.list() ?? []); },
+      get: id => { checkAvailable(); return structuredClone(host.providers?.get(id) ?? null); },
+      credential: (connection, options = {}) => {
         checkAvailable();
-        if (!host.providers) throw new PluginApiError("unavailable", "Provider queries are unavailable.");
-        return sessionRuns.start(signal => host.providers!.queryUsage(id, { ...options, signal }),
+        if (!host.providers) throw new PluginApiError("unavailable", "Provider connections are unavailable.");
+        const captured = { id: connection.id, revision: connection.revision };
+        return sessionRuns.start(signal => host.providers!.credential(captured, { signal }),
           { signal: options.signal, affectsHistory: false }).done;
       },
+      subscribe: listener => subscribeRegistry(host.providers, listener),
+    },
+    usages: {
+      list: () => { checkAvailable(); return host.usages?.list() ?? []; },
+      get: id => {
+        checkAvailable();
+        const provider = host.usages?.get(id);
+        if (!provider) return null;
+        if (provider.source === "headers") return { ...provider, parseHeaders(value) {
+          checkAvailable(); return provider.parseHeaders(value);
+        } };
+        return { ...provider, query(value) {
+          checkAvailable();
+          const captured = { connection: structuredClone(value.connection), credential: value.credential };
+          return sessionRuns.start(signal => provider.query({ ...captured, signal }),
+            { signal: value.signal, affectsHistory: false }).done;
+        } };
+      },
+      subscribe: listener => subscribeRegistry(host.usages, listener),
     },
     models: {
       validate: (request, options) => {

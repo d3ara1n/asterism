@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { withValues, type UsageItem } from "@atelier/sdk/contracts";
-import type { UsageProvider } from "@atelier/sdk/runtime";
+import type { QueryUsageProvider } from "@atelier/sdk/runtime";
 import { jsonUsage, parseUsageResponse } from "./usage-http.ts";
 import { usageMessages as messages } from "../messages/usage.ts";
 
@@ -26,7 +26,7 @@ export function parseZhipuQuota(raw: unknown): UsageItem[] {
         resetAt: row.nextResetTime ?? null } };
   });
 }
-export function createZhipuUsage(transport: typeof fetch = fetch, id: "zai-plan-cn" | "zai-plan" = "zai-plan-cn"): UsageProvider {
+export function createZhipuUsage(transport: typeof fetch = fetch, id: "zai-plan-cn" | "zai-plan" = "zai-plan-cn"): QueryUsageProvider {
   return jsonUsage({ id, label: id === "zai-plan-cn" ? messages.zhipu : "Z.ai Coding Plan",
     path: "/api/monitor/usage/quota/limit", auth: "raw", parse: parseZhipuQuota }, transport);
 }

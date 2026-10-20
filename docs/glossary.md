@@ -137,8 +137,8 @@
 | 提供商连接 | provider connection | 应用级接入配置，关联具体协议、服务端点、模型列表与凭据引用；不构成任务资源授权 |
 | 提供商预设 | provider preset | 一次性生成普通连接值与编辑规则的组合模板；连接不持久化预设或提供商类型身份，见 `docs/model-configuration.md` |
 | 固定字段 | fixed fields | 连接自身保存的有限编辑规则 `fixedFields`；通用编辑器隐藏对应配置项，保存边界保留已固定值，不改变执行消费语义 |
-| 账户用量 | account usage | 提供商账户、套餐或密钥的余额与额度快照；连接以 `usage` 选择查询提供方，区别于模型响应 token 用量及费用估算 |
-| 用量查询提供方 | usage provider | 插件按全局目录 ID 提供的账户用量查询实现；返回统一 `balance / quota` 结果，消费方不依赖具体厂商 |
+| 账户用量 | account usage | 提供商余额、套餐／密钥额度及响应头报告的限流余量快照；连接以 `usage` 选择提供方，区别于模型响应 token 用量及费用估算 |
+| 用量查询提供方 | usage provider | 插件按全局目录 ID 提供的主动查询或被动响应头解析；返回统一 `balance / quota` 结果，消费方不依赖具体厂商 |
 | 提供商模型 | provider model | 某连接下可调用的具体模型，具有服务端模型 ID、能力与生成参数 |
 | 标准思考等级 | thinking level | 工坊在角色、对话选择与历史中使用的公共等级；请求时映射为上游 effort 或思考预算 |
 | 思考预算 | thinking budget | 手动思考模式的 token 上限；与 effort 字符串及思考模式独立，映射规则见 `docs/model-configuration.md` |

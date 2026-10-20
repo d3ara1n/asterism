@@ -26,7 +26,7 @@ import { CallRegistry } from "./calls.ts";
 import { bindTopLevelTools, type RegisteredTopLevelTool } from "./top-level-tools.ts";
 import { resolveToolContributions, validateToolContributions, type ToolImplementationStatus } from "./tool-contributions.ts";
 import type { ProviderExtensions } from "../configuration/provider-extensions.ts";
-import type { ProviderServices } from "@atelier/sdk/runtime";
+import type { ProviderServices, UsageServices } from "@atelier/sdk/runtime";
 
 export interface PluginHostServices {
   events?: EventBus;
@@ -38,6 +38,7 @@ export interface PluginHostServices {
   catalogs?: CatalogHost;
   models: HostModels;
   providers?: ProviderServices;
+  usages?: UsageServices;
   providerExtensions?: ProviderExtensions;
   vault?: CredentialVault | null;
   stream?: (event: ObjectStreamPayload) => void;

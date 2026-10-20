@@ -19,14 +19,14 @@ const zaiResponses = (baseUrl: string): ProviderPreset["connection"] => ({
 export const providerPresets: readonly ProviderPreset[] = [
   {
     id: "openai", name: "OpenAI", billing: "usage",
-    connection: { fixedFields, protocol: "openai-responses", baseUrl: "https://api.openai.com/v1", auth: "api_key", compatibility: [] },
+    connection: { fixedFields, protocol: "openai-responses", baseUrl: "https://api.openai.com/v1", auth: "api_key", compatibility: [], usage: "openai" },
     keyUrl: "https://platform.openai.com/api-keys",
     sources: ["https://developers.openai.com/api/docs/guides/reasoning"],
     verifiedOn: "2026-10-14", keywords: ["gpt", "chatgpt"],
   },
   {
     id: "anthropic", name: "Anthropic", billing: "usage",
-    connection: { fixedFields, protocol: "anthropic", baseUrl: "https://api.anthropic.com/v1", auth: "api_key", compatibility: [] },
+    connection: { fixedFields, protocol: "anthropic", baseUrl: "https://api.anthropic.com/v1", auth: "api_key", compatibility: [], usage: "anthropic" },
     keyUrl: "https://platform.claude.com/settings/keys",
     sources: ["https://platform.claude.com/docs/en/api/overview", "https://platform.claude.com/docs/en/build-with-claude/thinking-tool-workflows"],
     verifiedOn: "2026-10-14", keywords: ["claude"],
@@ -40,7 +40,7 @@ export const providerPresets: readonly ProviderPreset[] = [
   },
   {
     id: "xai", name: "xAI", billing: "usage",
-    connection: { fixedFields, protocol: "openai-responses", baseUrl: "https://api.x.ai/v1", auth: "api_key", compatibility: [] },
+    connection: { fixedFields, protocol: "openai-responses", baseUrl: "https://api.x.ai/v1", auth: "api_key", compatibility: [], usage: "xai" },
     keyUrl: "https://console.x.ai/team/default/api-keys",
     sources: ["https://docs.x.ai/developers/rest-api-reference/inference/responses", "https://docs.x.ai/developers/model-capabilities/text/reasoning"],
     verifiedOn: "2026-10-14", keywords: ["grok"],

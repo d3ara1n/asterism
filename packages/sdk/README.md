@@ -4,7 +4,7 @@
 
 SDK 包版本见 [package.json](package.json)，宿主 API 版本见 [`sdkApi`](../../src/plugins/packages.ts)。内置插件领域契约独立在 [`@atelier/builtin-api`](../builtin-api/README.md)，不进入通用 SDK。
 
-当前宿主 API 为 **9.2**。使用提供商贡献或账户用量的插件包在 `atelier.api` 声明 `{ "major": 9, "minMinor": 2 }`，依赖 `@atelier/sdk: ^0.24.0`；已有 9.0/9.1 能力继续可用。前端入口默认导出 `defineRendererPlugin(...)`，功能视图放入其 `modules`，调用契约显式声明 `scope`。旧主版本在装载前拒绝。
+当前宿主 API 为 **10.0**，清单声明 `{ "major": 10, "minMinor": 0 }`，依赖 `@atelier/sdk: ^0.25.0`。提供商与用量以独立目录供插件消费；原宿主用量查询、状态和前端 hook 已移入内置消费者，旧主版本在装载前拒绝。前端入口默认导出 `defineRendererPlugin(...)`，功能视图放入其 `modules`，调用契约显式声明 `scope`。
 
 ## 子路径入口
 
@@ -63,7 +63,7 @@ export default definePlugin({
   "exports": { "./public": "./src/public.ts" },
   "atelier": {
     "id": "example.tools",
-    "api": { "major": 9, "minMinor": 1 },
+    "api": { "major": 10, "minMinor": 0 },
     "runtime": "./src/runtime.ts"
   }
 }
@@ -102,9 +102,9 @@ export default definePlugin({
 - `models.stream(request, { content? })`：执行单次无工具补全（支持可选 `maxOutputTokens`、`userAgent`、`sessionId`），流式交付协议事件。`finish.timing`（API 8.6）可携带请求计时，与 usage 一起按 `ModelCompletion` 保存。
 - `models.run(request)`：绑定具体资源对象（`object`）与请求起点（`requestParentId`），执行一次模型请求及该响应的完整资源工具批次，经 `ModelRunObserver.event` 同步交付 `block`（最高序号块内含 `completion` 终态）、`diagnostic` 与 `progress`。终态包含 `usage` 及可选 `timing`（API 8.6）。结果附带 `diagnostics`（API 8.3）：系统提示块的种类、来源与字数及声明的工具名称，不含正文；失败或取消未取得可交付终态时，`diagnostics.timing` 保留已测量计时。可用 `requestDiagnosticsSchema` 校验保存（分区语义见 [请求诊断](../../docs/runtime.md#请求诊断)）。外层多轮循环与时间线提交由调用方插件自行驱动。
 
-### 7. 提供商预设与账户用量（API 9.2）
+### 7. 提供商与用量目录（API 10.0）
 
-`contracts` 导出 `ProviderPreset`、`ProviderPresetContribution`、`UsageItem`、`ProviderUsageState` 及对应 schema；`runtime` 导出 `UsageProvider`、`UsageQueryContext`、`UsageQueryError`、`ProviderServices`。通过 `ModuleContribution.usageProviders / providerPresets` 贡献查询实现和预设，编译示例见 [`examples/provider-usage.ts`](examples/provider-usage.ts)。
+`contracts` 导出 `ProviderPreset`、`ProviderPresetContribution`、`UsageItem` 及对应 schema；`runtime` 导出 `UsageProvider`（`QueryUsageProvider | HeadersUsageProvider`）、对应上下文、`UsageQueryError`、`ProviderServices`、`UsageServices`。通过 `ModuleContribution.usageProviders / providerPresets` 贡献实现和预设，编译示例见 [`examples/provider-usage.ts`](examples/provider-usage.ts)。
 
 修改其他插件预设时，通过公共包导入建立对提供方插件的依赖。例如依赖 `@atelier/builtin-api` 的插件可导入 `builtin`，在 `definePlugin` 中声明 `dependencies: [builtin.id]`，贡献：
 
@@ -116,18 +116,29 @@ providerPresets: [{
 }]
 ```
 
-`my-glm-query` 是该插件同时注册的查询 ID。patch 不修改已有连接；身份、合并与生命周期规则见 [提供商贡献](../../docs/plugin-sdk.md#提供商贡献与账户用量api-92)。
+`my-glm-query` 是该插件同时注册的查询 ID。patch 不修改已有连接；身份、合并与生命周期规则见 [提供商贡献](../../docs/plugin-sdk.md#提供商与用量目录api-100)。
 
-后台消费：`await plugin.providers.queryUsage(connectionId, { signal })`。前端消费：
+后台消费者从目录显式组合调用：
 
-```tsx
-import { useProviderUsage } from "@atelier/sdk/renderer";
-
-function Allowance({ connectionId }: { connectionId: string }) {
-  const { state } = useProviderUsage(connectionId);
-  if (!state || state.state === "disabled") return null;
-  return <pre>{JSON.stringify(state.items, null, 2)}</pre>;
+```ts
+const connection = plugin.providers.get(connectionId);
+const usage = connection?.usage ? plugin.usages.get(connection.usage) : null;
+if (connection?.enabled && usage && usage.source !== "headers") {
+  const credential = await plugin.providers.credential(connection, { signal });
+  const items = await usage.query({
+    connection: { id: connection.id, endpoint: connection.baseUrl },
+    credential, signal,
+  });
+  // 消费者保存、展示或进一步处理 items。
 }
 ```
 
-查询共享、刷新和凭据由宿主管理；消费者只根据 `balance / quota` 呈现数据，不导入厂商实现。内置实例见 `packages/builtin/src/providers/`（提供）和 `packages/builtin/src/usage/`（消费）。
+`providers.list / presets`、`usages.list` 提供目录；两者的 `subscribe` 通知变更，关闭时自动清理。凭据仅经后台 `providers.credential` 显式读取；registry 不代选连接、缓存结果或轮询。消费者用自己的具型调用和事件向前端交付状态。内置实例见 `packages/builtin/src/providers/`（提供）和 `packages/builtin/src/usage/`（消费）。
+
+响应头来源使用 `source: "headers"` 和同步 `parseHeaders`，参见 [`examples/provider-usage-headers.ts`](examples/provider-usage-headers.ts)。返回 null 表示本次没有新数据，返回空列表明确清空。来源不限制结果类型；示例通过响应头提供 balance，内置 OpenAI／Anthropic／xAI 提供 `category: "rate_limit"` 的 quota。query 提供方可省略 source。
+
+`models.stream` 的 `finish.response` 和 `models.run` 返回值的 `response` 携带通用响应元信息。发起者取得结果后自行调用 `parseHeaders`，模型服务不访问用量目录，也不另设响应回调或广播。消费示例见 [`examples/consume-usage.ts`](examples/consume-usage.ts)，响应元信息契约见 [运行时](../../docs/runtime.md#响应元信息)。
+
+仅列出连接的 dashboard 可以主动调用 query 来源；headers 来源需要模型调用结果，通常由 Agent 消费。目录提供解析实现，不提供其他插件的响应或缓存。
+
+使用类实现提供方时，分别声明 `implements QueryUsageProvider` 或 `implements HeadersUsageProvider`；`UsageProvider` 是两者的联合类型，不能直接用于类的 implements。

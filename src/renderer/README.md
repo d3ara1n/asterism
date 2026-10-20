@@ -33,7 +33,7 @@
 | `../../packages/builtin/src/agent/context/` / `panel-kit.tsx` | 代理上下文面板的窗口占用、对话与系统构成；两个代理面板共用的版式、数值与系统构成部件 |
 | `../../packages/builtin/src/text-view.tsx` / `code-view.tsx` / `shared/tool-body.ts` | 内置正文工具三态视图与 120 行预览预算；工具和 Markdown 共用 Pierre 代码视图，支持文件名推断或显式语言着色 |
 | `modules/registry.ts` / `views.tsx` / `object-context.ts` | 静态资源展示描述、卡片／工具／历史记录视图注册表与 SDK 前端对象接口注入 |
-| `features/configuration/` | 提供商编辑器消费插件预设／查询目录及连接编辑规则，认证方式与凭据由 `ProviderAuthentication.tsx` 组合；`provider-usage-client.ts` 向 SDK 消费者提供共享查询订阅；模型发现、参数获取、模型兼容设置及模型角色／agent 表单 |
+| `features/configuration/` | 提供商编辑器消费插件预设／用量目录及连接编辑规则，认证方式与凭据由 `ProviderAuthentication.tsx` 组合；模型发现、参数获取、模型兼容设置及模型角色／agent 表单；用量订阅与展示由消费插件自己管理 |
 | `features/plugins/` | 插件信息卡片、搜索筛选、包管理与自定义设置页承载 |
 | `modules/plugins.ts` / `modules/settings.tsx` / `modules/configs.tsx` | 插件前端入口装载、设置页面目录与托管配置读写通知 |
 | `shared/ConfigurationValue.tsx` | 模型兼容配置使用的 schema 驱动字段编辑器 |

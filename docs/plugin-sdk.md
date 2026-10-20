@@ -35,20 +35,33 @@ SDK 的 `contracts`、`runtime`、`renderer` 三个子路径分别承担纯契�
 
 后台通过 `defineTopLevelTool({ id, name, description, guidelines, argsSchema, resultSchema, effect, execution, execute, toModel? })` 声明，交给 `ModuleContribution.topLevelTools`。`execute(args, { object, session, callId, signal, publish })` 的 `object` 为绑定执行者的只读门面；不能据此写入其他插件资源或读取其私有数据。`session` 是本次工具执行绑定的 `ToolSession`，操作范围见下方会话资源接口。插件自有业务状态通过模块内共享服务管理。结果校验、过程发布、终结投影及批次调度沿用工具执行链路；展示契约可以独立共享同一稳定 ID，经 `toolRenderer` 渲染。
 
-## 提供商贡献与账户用量（API 9.2）
+## 提供商与用量目录（API 10.0）
 
 插件通过根入口或模块的 `ModuleContribution` 提供两类声明；内置插件采用同一管线，宿主不内置厂商预设或查询函数：
 
-- **`usageProviders`**：`{ id, label, query }`；`query({ connection: { id, endpoint }, credential, signal })` 返回 `UsageItem[]`。查询身份是全局目录 ID，可与预设 ID 同名，归属另由宿主记录；重复身份拒绝加载，不能凭同名覆盖其他查询实现。凭据仅交付给连接明确选择的实现，结果经公共 schema 校验。提供方用 `UsageQueryError(code)` 报告公开错误类别，原始错误或响应不交付消费者。
+- **`usageProviders`**：查询身份是全局目录 ID，可与预设 ID 同名，归属另由宿主记录；重复身份拒绝加载，不能凭同名覆盖其他查询实现。来源与数据种类独立，结果经公共 schema 校验。提供方用 `UsageQueryError(code)` 报告公开错误类别。
 - **`providerPresets`**：`{ type: "add", preset }` 新增完整预设；`{ type: "patch", id, patch }` 修改已有预设。patch 按顶层字段覆盖，`connection` 按字段合并，其中数组整项替换；预设 ID 不可由 patch 改写。新增同名身份或修改不存在的身份均报错，修改 `usage` 只修改引用，不替换对应查询实现。
 
 贡献按插件依赖装配顺序、模块声明顺序应用；修改另一插件新增的预设时须声明对该插件的依赖。声明整体校验通过才加入目录，插件装配失败撤销该插件的全部查询与预设贡献，后置依赖失败共同撤销。插件关闭先停止查询并等待真实收束，再释放服务。安装、禁用与升级仍按插件既有规则重启生效。
 
-后台消费者通过 `plugin.providers.presets()`、`usageProviders()` 读取目录，通过 `queryUsage(connectionId, { signal?, refresh? })` 查询已保存连接。宿主根据该连接的 `usage` 寻址实现并读取凭据；消费者不能通过此接口取得密钥。等待者取消只结束自己的等待，不取消其他消费者共享的请求；连接失效和提供方关闭取消实际查询。
+`UsageProvider` 按来源分为两种声明：
 
-前端消费者用 `useProviderUsage(connectionId | null)` 获取 `{ state, refresh }`。宿主注入 `RendererProviderUsageProvider`，按连接共用订阅与轮询；消费者组件释放自己的订阅即可，不自行建立网络轮询或读取配置文件。该能力不要求对象或会话，任何插件界面可消费；内置 `usage` 模块通过 Agent toolbar API 显示结果，与内置 `providers` 提供模块分开。
+- **主动来源**：`QueryUsageProvider = { id, label, source?: "query", query }`。`query({ connection: { id, endpoint }, credential, signal })` 异步返回 `UsageItem[]`；参数由消费者显式提供。
+- **响应头来源**：`HeadersUsageProvider = { id, label, source: "headers", parseHeaders }`。同步 `parseHeaders({ connection, model, status, receivedAt, headers })` 返回 `UsageItem[] | null`；消费者提供小写字段名的响应头、毫秒接收时间和服务端模型 ID。null 表示没有新数据，空列表明确报告空结果。实现不能返回 Promise；解析失败由消费者处理。
+
+后台目录与 `plugin.models` 采用同一边界：宿主负责登记、查找、契约校验和生命周期，消费方式由插件决定。
+
+- `plugin.providers.presets()` 返回组合后的预设；`list()`／`get(id)` 返回不含凭据的连接快照（含修订与 `usage` 引用）；`credential({ id, revision }, { signal? })` 显式读取该修订的连接凭据，无鉴权连接返回 null。这是受信后台插件的能力，不向前端暴露凭据库引用或原始密钥。
+- `plugin.usages.list()` 返回提供方描述；`get(id)` 返回可调用的 query／headers 实现或 null。句柄绑定登记实例，撤销后不能接管同 ID 的新实现。query 参与提供方和调用方的取消与真实收束，headers 同步执行；宿主不代选连接、不代取凭据、不保存结果。
+- 两个目录均提供 `subscribe(listener)`，返回取消函数，插件关闭时自动释放。连接或预设变更通知 providers，提供方增删通知 usages；消费者按需清理自己的状态。
+
+前端消费通过插件自行声明的具型调用和事件连接其后台服务。内置 `usage` 模块拥有查询、缓存、刷新、展示状态及 toolbar，与 `providers` 提供模块分开；第三方 dashboard 可以独立遍历连接和用量目录，采用自己的策略，不依赖内置 toolbar 或会话。
 
 连接配置与结果语义见 [账户用量](model-configuration.md#账户用量)，作者示例见 [`provider-usage.ts`](../packages/sdk/examples/provider-usage.ts)。
+
+模型调用的通用响应元信息见 [响应元信息](runtime.md#响应元信息)。调用插件自行决定是否交给用量实现；模型机制不引用用量目录。作者示例见 [`provider-usage-headers.ts`](../packages/sdk/examples/provider-usage-headers.ts) 与 [`consume-usage.ts`](../packages/sdk/examples/consume-usage.ts)。
+
+headers 来源需要消费者持有自己的模型调用结果，因此自然用于 Agent 等发起模型请求的插件；不按插件类别额外设门禁。仅遍历连接的 dashboard 可主动消费 query 来源，目录不会向它提供其他插件的响应头或已有用量状态。
 
 ## 公共模块与契约身份
 

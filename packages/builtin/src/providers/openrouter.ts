@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { withValues, type UsageItem } from "@atelier/sdk/contracts";
-import type { UsageProvider } from "@atelier/sdk/runtime";
+import type { QueryUsageProvider } from "@atelier/sdk/runtime";
 import { fetchUsageJson, parseUsageResponse, timestamp } from "./usage-http.ts";
 import { usageMessages as messages } from "../messages/usage.ts";
 
@@ -37,7 +37,7 @@ export function parseOpenRouterCredits(raw: unknown): UsageItem[] {
   return [{ id: "account-balance", type: "balance", scope: "account", label: messages.balance,
     remaining: data.total_credits - data.total_usage, currency: "USD" }];
 }
-export function createOpenRouterUsage(transport: typeof fetch = fetch): UsageProvider {
+export function createOpenRouterUsage(transport: typeof fetch = fetch): QueryUsageProvider {
   return { id: "openrouter", label: "OpenRouter", async query(context) {
     const current = parseOpenRouterKey(await fetchUsageJson(context, "/api/v1/key", transport));
     if (!current.management) return current.items;

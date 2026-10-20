@@ -45,6 +45,20 @@ const write = defineImplementation({ ...defineData("example.resource/write", z.n
   targetSchema: z.null().describe("The whole item."), effect: "write", execution: "sequential" });
 
 describe("无状态的单次模型执行", () => {
+  // 响应元信息只随返回结果交付发起者，不进入可保存的块、诊断或进度事件。
+  it.each(["completed", "failed"] as const)("%s 结果保留 HTTP 元信息，观察事件不包含 headers", async outcome => {
+    const response = { connection: { id: "p", revision: 1 }, endpoint: settings.provider.baseUrl, model: "test",
+      status: outcome === "completed" ? 200 : 429, receivedAt: 1, headers: { "x-test-metadata": "private-response" } };
+    const failure = new ModelFailure("provider_error", "Failed.");
+    failure.response = response;
+    const adapter = outcome === "completed"
+      ? model([...text.slice(0, -1), { type: "finish", reason: "stop", usage: null, response }])
+      : { validate() {}, version: "test", prepare() { return { async *stream(): AsyncIterable<ModelEvent> { throw failure; } }; } };
+    const events: ModelRunEvent[] = [];
+    const result = await execute(input(events), adapter);
+    expect(result).toMatchObject({ reason: outcome, response });
+    expect(JSON.stringify(events)).not.toContain("private-response");
+  });
   // docs/runtime.md#响应计量与请求计时：终态计时与 usage 一起交付，执行工具不重置时间；失败也保留计时。
   it("保留模型终态和失败携带的计时，不用工具批次结束时间覆盖", async () => {
     const timing: RequestTiming = { startedAt: "2026-01-01T00:00:00.000Z", endedAt: "2026-01-01T00:00:01.000Z",

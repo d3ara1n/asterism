@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { UiText, UsageItem } from "@atelier/sdk/contracts";
-import { UsageQueryError, type UsageProvider, type UsageQueryContext } from "@atelier/sdk/runtime";
+import { UsageQueryError, type QueryUsageProvider, type UsageQueryContext } from "@atelier/sdk/runtime";
 
 /** 金额接口可用十进制字符串，空串、布尔值和非有限数不能被当成零余额。 */
 export const decimal = z.union([z.number(), z.string().trim().regex(/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/u).transform(Number)])
@@ -32,7 +32,7 @@ export async function fetchUsageJson(context: UsageQueryContext, path: string, t
 }
 export function jsonUsage(definition: {
   id: string; label: UiText; path: string; auth?: "bearer" | "raw"; parse(raw: unknown): UsageItem[];
-}, transport: typeof fetch = fetch): UsageProvider {
+}, transport: typeof fetch = fetch): QueryUsageProvider {
   return { id: definition.id, label: definition.label, async query(context) {
     return definition.parse(await fetchUsageJson(context, definition.path, transport, definition.auth));
   } };

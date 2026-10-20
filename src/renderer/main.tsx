@@ -1,6 +1,5 @@
 import { StrictMode } from "react";
-import { RendererEventsProvider, RendererCallsProvider, RendererProviderUsageProvider } from "@atelier/sdk/renderer";
-import { ProviderUsageClient } from "./features/configuration/provider-usage-client";
+import { RendererEventsProvider, RendererCallsProvider } from "@atelier/sdk/renderer";
 import { EventClient } from "../shared/event-client";
 import { CallClient } from "../shared/call-client";
 import { HostI18nProvider, startLanguage } from "./shared/i18n";
@@ -40,11 +39,6 @@ const events = new EventClient(window.host.events);
 const calls = new CallClient(window.host.calls);
 const controller = new ApplicationController(window.host, events);
 const lifetime = new AbortController();
-const providerUsage = new ProviderUsageClient(window.host.configuration);
-const updateUsageVisibility = () => providerUsage.setActive(document.visibilityState === "visible");
-document.addEventListener("visibilitychange", updateUsageVisibility);
-updateUsageVisibility();
-window.addEventListener("pagehide", () => { providerUsage.close(); document.removeEventListener("visibilitychange", updateUsageVisibility); }, { once: true });
 const stopEventStatus = window.host.onStatus(status => { if (status !== "ready") { events.disconnect(); calls.disconnect(); } });
 window.addEventListener("pagehide", () => { lifetime.abort(); events.close(); calls.close(); stopEventStatus(); }, { once: true });
 // 插件视图只在启动时加载；内置视图之后合并，重复契约使该插件视图被忽略。
@@ -88,17 +82,15 @@ createRoot(document.getElementById("root")!).render(
           <TooltipProvider>
             <RendererEventsProvider value={events}>
               <RendererCallsProvider value={calls}>
-                <RendererProviderUsageProvider value={providerUsage}>
-                  <HostConfigsProvider>
-                    <ModuleViewsProvider registry={moduleViews}>
-                      <BuiltinRendererProvider services={builtinRendererServices}>
-                        <PluginSettingsProvider value={{ pages, failures: new Map(rendererPlugins.failures.map(failure => [failure.id, failure.error])) }}>
-                          <App controller={controller} />
-                        </PluginSettingsProvider>
-                      </BuiltinRendererProvider>
-                    </ModuleViewsProvider>
-                  </HostConfigsProvider>
-                </RendererProviderUsageProvider>
+                <HostConfigsProvider>
+                  <ModuleViewsProvider registry={moduleViews}>
+                    <BuiltinRendererProvider services={builtinRendererServices}>
+                      <PluginSettingsProvider value={{ pages, failures: new Map(rendererPlugins.failures.map(failure => [failure.id, failure.error])) }}>
+                        <App controller={controller} />
+                      </PluginSettingsProvider>
+                    </BuiltinRendererProvider>
+                  </ModuleViewsProvider>
+                </HostConfigsProvider>
               </RendererCallsProvider>
             </RendererEventsProvider>
           </TooltipProvider>

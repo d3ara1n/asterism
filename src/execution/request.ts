@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { ModelRunRequest, ModelRunResult, ModelRunEvent, ModelSource, ModelCompletion, SystemPrompt, ModelRequestIdentity, RequestDiagnostics } from "@atelier/sdk/contracts";
+import type { ModelRunRequest, ModelRunResult, ModelRunEvent, ModelSource, ModelCompletion, ModelResponse, SystemPrompt, ModelRequestIdentity, RequestDiagnostics } from "@atelier/sdk/contracts";
 import { modelExpression, modelScope, type ModelSettings, type ToolOutcome } from "../shared/model.ts";
 import { ModelFailure, type ModelAdapter, type ResolvedModelItem } from "../model/contract.ts";
 import { executeCoreBatch, coreDeclarations, previewCoreCall } from "./core.ts";
@@ -42,6 +42,7 @@ export async function runModelRequest(request: ModelRunRequest, environment: Pro
   let responseId: string | null = null;
   let completion: ModelCompletion | null = null;
   let diagnostics: RequestDiagnostics | null = null;
+  let responseMetadata: ModelResponse | null = null;
   const outcomes = new Map<string, ToolOutcome>();
   let callIds: string[] = [];
   let termination: { reason: "completed" } | { reason: "cancelled" } | { reason: "failed"; code: string } = { reason: "completed" };
@@ -74,6 +75,7 @@ export async function runModelRequest(request: ModelRunRequest, environment: Pro
     };
     try {
       for await (const event of prepared.stream(signal)) {
+        if (event.type === "finish") responseMetadata = event.response ?? null;
         // 适配层处理中止并交付此前取得的终态；工具批次开始前再检查取消。
         response.accept(event);
         if (event.type === "part.delta") {
@@ -110,6 +112,7 @@ export async function runModelRequest(request: ModelRunRequest, environment: Pro
       finally { response.close(); completion = response.completion; }
     }
   } catch (error) {
+    if (error instanceof ModelFailure && error.response) responseMetadata = error.response;
     if (error instanceof ModelFailure && error.diagnostics) diagnostics = { ...diagnostics, ...error.diagnostics };
     if (deliveryFailed) termination = { reason: "failed", code: "event_delivery" };
     else if (request.signal.aborted) {
@@ -123,5 +126,6 @@ export async function runModelRequest(request: ModelRunRequest, environment: Pro
     }
   } finally { emit({ type: "progress", blocks: [] }); }
   if (deliveryFailed) termination = { reason: "failed", code: "event_delivery" };
-  return { ...termination, responseId, source, completion, diagnostics, tools: callIds.flatMap(id => outcomes.has(id) ? [structuredClone(outcomes.get(id)!)] : []) };
+  return { ...termination, responseId, source, completion, diagnostics, response: responseMetadata,
+    tools: callIds.flatMap(id => outcomes.has(id) ? [structuredClone(outcomes.get(id)!)] : []) };
 }

@@ -16,8 +16,24 @@ const input: ModelInput = {
   system: composeSystemPrompt({ id: "worker", systemPrompt: "System" }, "Atelier"), messages: [{ kind: "input", parts: [{ kind: "text", text: "Read" }] }],
   tools: [{ name: "read", description: "Read", parameters: { type: "object", properties: { resource_id: { type: "string" } }, required: ["resource_id"] } }],
 };
+async function consume(events: AsyncIterable<ModelEvent>) { for await (const _event of events) { /* 消费到终态或错误。 */ } }
+const transportInput: ModelInput = { ...input, settings: { ...input.settings, thinking: "off" } };
 
 describe("AI SDK 适配契约", () => {
+  // HTTP 失败仍把已收到的元信息保留给 run 的失败结果，不需要旁路回调。
+  it("请求失败携带响应元信息，不包含请求凭据", async () => {
+    const response = new Response('{"error":{"type":"authentication_error","message":"denied"}}', {
+      status: 401, headers: { "content-type": "application/json", "X-Test-Metadata": "value" },
+    });
+    const transport = vi.fn<typeof fetch>(async () => response);
+    const adapter = new AiSdkAdapter(async () => "synthetic-key", undefined, transport);
+    const failure = await consume(adapter.prepare(transportInput).stream(new AbortController().signal)).catch(error => error);
+    expect(failure).toBeInstanceOf(ModelFailure);
+    expect(failure.response).toMatchObject({ connection: { id: "p", revision: 1 }, endpoint: input.settings.provider.baseUrl,
+      model: "test", status: 401, headers: { "x-test-metadata": "value" } });
+    expect(failure.response.headers).not.toHaveProperty("x-api-key");
+    expect(transport).toHaveBeenCalledTimes(1);
+  });
   // 模型终态是请求边界：客户端暂停消费与连接延后关闭不延长耗时；终态之后取消也不能丢失已实报用量。
   it.each(["close", "cancel"] as const)("消费者等待和终态之后的 %s 不改变已接收的计量", async action => {
     let now = 0;
