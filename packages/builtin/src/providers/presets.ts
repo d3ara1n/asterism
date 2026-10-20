@@ -33,7 +33,7 @@ export const providerPresets: readonly ProviderPreset[] = [
   },
   {
     id: "deepseek", name: "DeepSeek", billing: "usage",
-    connection: { fixedFields, protocol: "openai-responses", baseUrl: "https://api.deepseek.com", auth: "api_key", compatibility: [] },
+    connection: { fixedFields, protocol: "openai-responses", baseUrl: "https://api.deepseek.com", auth: "api_key", compatibility: [], usage: "deepseek" },
     keyUrl: "https://platform.deepseek.com/api_keys",
     sources: ["https://api-docs.deepseek.com/guides/responses_api"],
     verifiedOn: "2026-10-14", keywords: ["深度求索"],
@@ -47,7 +47,7 @@ export const providerPresets: readonly ProviderPreset[] = [
   },
   {
     id: "openrouter", name: "OpenRouter", billing: "usage",
-    connection: { fixedFields, protocol: "openai-responses", baseUrl: "https://openrouter.ai/api/v1", auth: "api_key", compatibility: [] },
+    connection: { fixedFields, protocol: "openai-responses", baseUrl: "https://openrouter.ai/api/v1", auth: "api_key", compatibility: [], usage: "openrouter" },
     keyUrl: "https://openrouter.ai/settings/keys",
     sources: ["https://openrouter.ai/docs/api/reference/responses/overview", "https://openrouter.ai/docs/api/api-reference/responses/create-a-response"],
     verifiedOn: "2026-10-15", keywords: ["router", "aggregator"],
@@ -61,7 +61,7 @@ export const providerPresets: readonly ProviderPreset[] = [
   },
   {
     id: "opencode-plan", name: "OpenCode Go", billing: "subscription",
-    connection: { fixedFields, protocol: "openai-responses", baseUrl: "https://opencode.ai/inference/go/v1", auth: "api_key",
+    connection: { fixedFields, protocol: "openai-responses", baseUrl: "https://opencode.ai/inference/go/v1", auth: "api_key", usage: "opencode-plan",
       compatibility: [{ id: "opencodeSession" }] },
     keyUrl: "https://opencode.ai/console",
     sources: ["https://opencode.ai/docs/go/"],
@@ -69,7 +69,7 @@ export const providerPresets: readonly ProviderPreset[] = [
   },
   {
     id: "kimi-cn", name: "Kimi", billing: "usage", region: presetMessages.mainlandChina,
-    connection: { fixedFields, protocol: "openai-responses", baseUrl: "https://api.moonshot.cn/v1", auth: "api_key",
+    connection: { fixedFields, protocol: "openai-responses", baseUrl: "https://api.moonshot.cn/v1", auth: "api_key", usage: "kimi-cn",
       compatibility: [{ id: "responsesReasoning", value: { encryptedContent: false, summary: false } }] },
     keyUrl: "https://platform.kimi.com/console/api-keys",
     sources: ["https://platform.kimi.com/docs/api/overview", "https://platform.kimi.com/docs/api/responses"],
@@ -77,7 +77,7 @@ export const providerPresets: readonly ProviderPreset[] = [
   },
   {
     id: "kimi", name: "Kimi", billing: "usage", region: presetMessages.international,
-    connection: { fixedFields, protocol: "openai-responses", baseUrl: "https://api.moonshot.ai/v1", auth: "api_key",
+    connection: { fixedFields, protocol: "openai-responses", baseUrl: "https://api.moonshot.ai/v1", auth: "api_key", usage: "kimi",
       compatibility: [{ id: "responsesReasoning", value: { encryptedContent: false, summary: false } }] },
     keyUrl: "https://platform.kimi.ai/console/api-keys",
     sources: ["https://platform.kimi.ai/docs/api/overview", "https://platform.kimi.ai/docs/api/responses"],
@@ -85,7 +85,7 @@ export const providerPresets: readonly ProviderPreset[] = [
   },
   {
     id: "kimi-plan-cn", name: "Kimi Code", billing: "subscription", region: presetMessages.mainlandChina, plan: presetMessages.coding,
-    connection: { fixedFields, protocol: "openai-responses", baseUrl: "https://api.kimi.com/coding/v1", auth: "api_key",
+    connection: { fixedFields, protocol: "openai-responses", baseUrl: "https://api.kimi.com/coding/v1", auth: "api_key", usage: "kimi-plan-cn",
       compatibility: [{ id: "responsesReasoning", value: { encryptedContent: false, summary: false } }] },
     keyUrl: "https://www.kimi.com/code/console",
     sources: ["https://www.kimi.com/code/docs/third-party-tools/codex.html", "https://www.kimi.com/code/docs/kimi-code/community-guidelines.html"],
@@ -93,7 +93,7 @@ export const providerPresets: readonly ProviderPreset[] = [
   },
   {
     id: "kimi-plan", name: "Kimi Code", billing: "subscription", region: presetMessages.international, plan: presetMessages.coding,
-    connection: { fixedFields, protocol: "openai-responses", baseUrl: "https://api.kimi.ai/coding/v1", auth: "api_key",
+    connection: { fixedFields, protocol: "openai-responses", baseUrl: "https://api.kimi.ai/coding/v1", auth: "api_key", usage: "kimi-plan",
       compatibility: [{ id: "responsesReasoning", value: { encryptedContent: false, summary: false } }] },
     keyUrl: "https://www.kimi.com/code/console",
     sources: ["https://www.kimi.com/code/docs/en/third-party-tools/codex.html", "https://www.kimi.com/code/docs/en/kimi-code/community-guidelines.html"],
@@ -122,7 +122,7 @@ export const providerPresets: readonly ProviderPreset[] = [
   },
   {
     id: "zai-plan", name: "Z.ai", billing: "subscription", region: presetMessages.international, plan: presetMessages.coding,
-    connection: zaiResponses("https://api.z.ai/api/v1"),
+    connection: { ...zaiResponses("https://api.z.ai/api/v1"), usage: "zai-plan" },
     keyUrl: "https://z.ai/manage-apikey/apikey-list",
     sources: ["https://docs.z.ai/devpack/tool/codex", "https://docs.z.ai/devpack/usage-policy", "https://docs.bigmodel.cn/api-reference/response/创建-response"],
     verifiedOn: "2026-10-15", keywords: ["zai", "glm", "zhipu", "智谱"],

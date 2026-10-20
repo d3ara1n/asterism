@@ -10,7 +10,7 @@ describe("提供商连接预设", () => {
     const draft = providerPresetDraft(preset);
     expect(draft).toEqual({
       id: "kimi", name: "Kimi", protocol: "openai-responses",
-      baseUrl: "https://api.moonshot.ai/v1", auth: "api_key",
+      baseUrl: "https://api.moonshot.ai/v1", auth: "api_key", usage: "kimi",
       compatibility: [{ id: "responsesReasoning", value: { encryptedContent: false, summary: false } }],
       fixedFields: ["protocol", "baseUrl", "auth", "compatibility", "usage"],
     });

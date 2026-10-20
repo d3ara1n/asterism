@@ -2,7 +2,7 @@
 
 立案日期：2026-10-20。
 
-预设组合、插件提供的预设／用量查询目录、智谱 Coding Plan 查询和独立 toolbar 消费已有实现；最终规则见 [提供商预设与账户用量](../docs/model-configuration.md#提供商预设)、[SDK 提供商贡献](../docs/plugin-sdk.md#提供商贡献与账户用量api-92)与[账户用量工具栏](../docs/workbench.md#账户用量工具栏)。本计划只维护尚未实施的事项。
+预设组合、插件提供的预设／用量查询目录、内置余额／套餐查询和独立 toolbar 消费已有实现；最终规则见 [提供商预设与账户用量](../docs/model-configuration.md#提供商预设)、[SDK 提供商贡献](../docs/plugin-sdk.md#提供商贡献与账户用量api-92)与[账户用量工具栏](../docs/workbench.md#账户用量工具栏)。本计划只维护尚未实施的事项。
 
 ## 认证与配置演进
 
@@ -13,7 +13,7 @@
 
 ## 后续查询资料
 
-首批只接智谱国内 Coding Plan。其他余额／套餐提供方尚未指定实施顺序，接入时重新核验接口、鉴权与产品准入，不直接照搬旧地址。
+当前支持范围以[内置查询目录](../docs/model-configuration.md#内置查询目录)为准。其他提供方尚未指定实施顺序，接入时重新核验接口、鉴权与产品准入，不直接照搬旧地址。Kimi Code 的额外充值钱包待取得可靠的字段与金额单位依据后再适配。
 
 - 本地参考：`../pi-extensions/packages/pi-usage-block`。
 - AstrLink：[配额查询](https://github.com/Calcium-Ion/AstrLink/blob/main/core/internal/codingplan/usage.go)。

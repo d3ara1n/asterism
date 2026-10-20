@@ -49,7 +49,7 @@ describe("插件提供预设与账户用量", () => {
     const snapshot = service.configuration.current();
     expect(snapshot.providerPresets?.find(preset => preset.id === "zai-plan-cn")?.connection.usage).toBe("test-usage");
     expect(snapshot.providerPresets?.some(preset => preset.id === "custom-plan")).toBe(true);
-    expect(consumer.providers.usageProviders().map(provider => provider.id)).toEqual(["zai-plan-cn", "test-usage"]);
+    expect(consumer.providers.usageProviders().map(provider => provider.id)).toEqual(expect.arrayContaining(["zai-plan-cn", "test-usage"]));
     const preset = consumer.providers.presets().find(preset => preset.id === "zai-plan-cn")!;
     const draft = providerPresetDraft(preset);
     expect(draft.usage).toBe("test-usage");
@@ -76,7 +76,8 @@ describe("插件提供预设与账户用量", () => {
     }) })]);
     expect(service.sessions.plugins.filter(plugin => plugin.id.startsWith("test.")).map(plugin => plugin.status)).toEqual(["failed", "failed"]);
     expect(service.configuration.current().providerPresets?.find(preset => preset.id === "zai-plan-cn")?.connection.usage).toBe("zai-plan-cn");
-    expect(service.configuration.current().usageProviders?.map(provider => provider.id)).toEqual(["zai-plan-cn"]);
+    expect(service.configuration.current().usageProviders?.map(provider => provider.id)).not.toContain("temporary");
+    expect(service.configuration.current().usageProviders?.filter(provider => provider.id === "zai-plan-cn")).toHaveLength(1);
   });
 
   // 同一连接更新凭据/修订后，旧查询即使返回成功也不能覆盖新账户；失败保留上次实报。

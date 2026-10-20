@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { withValues, type UsageItem } from "@atelier/sdk/contracts";
-import { UsageQueryError, type UsageProvider } from "@atelier/sdk/runtime";
+import type { UsageProvider } from "@atelier/sdk/runtime";
+import { jsonUsage, parseUsageResponse } from "./usage-http.ts";
 import { usageMessages as messages } from "../messages/usage.ts";
 
 const rowSchema = z.object({
@@ -12,12 +13,9 @@ const responseSchema = z.object({ data: z.object({ limits: z.array(z.object({ ty
 
 /** 百分比只表示比例，不伪造 token 数；未知周期仍保留真实额度与重置时间。 */
 export function parseZhipuQuota(raw: unknown): UsageItem[] {
-  const data = responseSchema.safeParse(raw);
-  if (!data.success) throw new UsageQueryError("protocol");
-  return data.data.data.limits.filter(row => row.type === "TOKENS_LIMIT" || row.type === "CREDIT_LIMIT").map(raw => {
-    const result = rowSchema.safeParse(raw);
-    if (!result.success) throw new UsageQueryError("protocol");
-    const row = result.data;
+  const data = parseUsageResponse(responseSchema, raw);
+  return data.data.limits.filter(row => row.type === "TOKENS_LIMIT" || row.type === "CREDIT_LIMIT").map(raw => {
+    const row = parseUsageResponse(rowSchema, raw);
     const hours = row.unit === 3 && row.number !== undefined;
     // unit 6 为每周窗口；已知响应的 number 有 1/7 两种形态，不能解释成周数。
     const weekly = row.unit === 6;
@@ -28,21 +26,7 @@ export function parseZhipuQuota(raw: unknown): UsageItem[] {
         resetAt: row.nextResetTime ?? null } };
   });
 }
-export function createZhipuUsage(transport: typeof fetch = fetch): UsageProvider {
-  return { id: "zai-plan-cn", label: messages.zhipu, async query({ connection, credential, signal }) {
-    if (!credential) throw new UsageQueryError("credential");
-    const endpoint = new URL("/api/monitor/usage/quota/limit", connection.endpoint);
-    const response = await transport(endpoint, {
-      headers: { Authorization: credential, Accept: "application/json" }, signal, redirect: "error",
-    });
-    if (!response.ok) {
-      await response.body?.cancel();
-      throw new UsageQueryError(response.status === 401 || response.status === 403 ? "authentication"
-        : response.status === 404 || response.status === 405 ? "unsupported"
-        : response.status === 429 ? "rate_limit" : response.status >= 500 ? "server" : "protocol");
-    }
-    let raw: unknown;
-    try { raw = await response.json(); } catch { throw new UsageQueryError("protocol"); }
-    return parseZhipuQuota(raw);
-  } };
+export function createZhipuUsage(transport: typeof fetch = fetch, id: "zai-plan-cn" | "zai-plan" = "zai-plan-cn"): UsageProvider {
+  return jsonUsage({ id, label: id === "zai-plan-cn" ? messages.zhipu : "Z.ai Coding Plan",
+    path: "/api/monitor/usage/quota/limit", auth: "raw", parse: parseZhipuQuota }, transport);
 }

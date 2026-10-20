@@ -71,11 +71,26 @@
 
 结果仅在内存缓存，60 秒内普通读取复用最近查询状态，显式刷新可以重新查询；刷新失败保留同一修订的上次成功数据并记录错误。连接、凭据或查询方式修改、连接删除和提供方撤销均使旧结果失效，迟到结果不能重新交付旧账户数据。重置时间到达后仍以远端下一次实报为准，不在本地把额度恢复为满额。
 
-### 内置智谱 Coding Plan
+### 内置查询目录
 
-内置插件提供 `zai-plan-cn` 查询，与国内智谱 Coding Plan 预设同名绑定。实现使用当前连接 origin 下的 `GET /api/monitor/usage/quota/limit`，沿用连接 API key，以裸 `Authorization` 发送，禁止重定向。自定义代理需实现这个路径；查询失败不改发官方站点。
+内置查询与支持的预设同名绑定，使用当前连接 origin 下的明确路径。智谱／Z.ai 使用裸 `Authorization`，其余使用 Bearer；均复用连接凭据、禁止重定向，不在失败后改发官方站点。自定义代理需实现所选查询方式要求的路径。
 
-读取 `data.limits` 中的 `TOKENS_LIMIT / CREDIT_LIMIT`，把已用 `percentage` 转为剩余比例，`nextResetTime` 按毫秒读取。已核实的 `unit: 3` 为小时，`unit: 6` 为每周；每周的 `number` 在已知响应中有 1/7 两种形态，不解释成周数。未知周期保留额度及真实重置时间；`TIME_LIMIT` 工具调用预算不混入模型套餐额度。此能力不代表智谱按量账户余额或国际站套餐已经适配。
+| 查询 ID | 返回内容 | GET 路径与依据 |
+| --- | --- | --- |
+| `deepseek` | 各币种的账户总余额 | `/user/balance`；[官方接口](https://api-docs.deepseek.com/api/get-user-balance) |
+| `kimi-cn / kimi` | Moonshot 账户可用余额，分别为 CNY / USD | `/v1/users/me/balance`；[国内](https://platform.kimi.com/docs/api/balance)、[国际](https://platform.kimi.ai/docs/api/balance) |
+| `openrouter` | 当前 key 的有效预算；管理 key 另取得账户余额 | `/api/v1/key`，管理 key 再读 `/api/v1/credits`；[key 与预算](https://openrouter.ai/docs/api_reference/limits)、[credits](https://openrouter.ai/docs/api/api-reference/credits/get-remaining-credits) |
+| `opencode-plan` | Go 的 5 小时、每周与每月窗口 | `/zen/go/v1/usage`；[官方套餐说明](https://opencode.ai/docs/go/)、[查询路由](https://github.com/anomalyco/opencode/commit/2b8a5969e932c15083e599c82d34ce0268f81b9e) |
+| `kimi-plan-cn / kimi-plan` | Kimi Code 周汇总及返回的额度窗口 | `/coding/v1/usages`；[官方讨论中的响应](https://forum.moonshot.ai/t/error-code-429-were-receiving-too-many-requests-at-the-moment/191/7)、[地区入口](https://www.kimi.ai/help/kimi-code/membership-guide) |
+| `zai-plan-cn / zai-plan` | 智谱／Z.ai Coding Plan 额度窗口 | `/api/monitor/usage/quota/limit`；复用已核实的接口结构 |
+
+- **余额**：DeepSeek 的 `total_balance` 已包含充值和赠送部分，按各币种独立显示；Moonshot 使用 `available_balance`，币种由所选地区查询方式确定，不重复累加子余额。
+- **OpenRouter**：`effective_budget` 存在时优先消费，否则使用当前 key 的 `limit_remaining`；有周期及限额时表达为 quota，无周期金额预算表达为 `scope: key` 的 balance。普通 key 不请求需要管理权限的 credits 接口；不限额且没有有效预算时返回空列表，不伪造账户余额。只有 `/key` 明确报告 `is_management_key: true` 时才查询 `total_credits − total_usage`，作为独立账户余额返回。
+- **OpenCode Go**：把各窗口的已用 `percent` 转为剩余比例；滚动窗口为 5 小时，周窗口按服务端的 UTC 周重置，月窗口以订阅日期为基准。自然月的 `durationMs` 留空，重置时间沿用远端。按量 OpenCode Console 不借用 Go 查询。
+- **Kimi Code**：接受数字或数字字符串的额度数量，优先采用明确的 `remaining`，否则由 `limit − used` 求得；单位标为额度单位，不推断成 token 或请求数。周汇总优先于重复的周窗口，等价周期只显示一次，月周期不折算成固定天数。未知周期保留名称、额度和已报告重置时间。额外充值钱包 `boosterWallet` 暂未适配；国际端点依据官方地区入口与已知客户端实现，接口本身仍属未正式文档化的查询。
+- **智谱／Z.ai**：读取 `data.limits` 中的 `TOKENS_LIMIT / CREDIT_LIMIT`，把已用 `percentage` 转为剩余比例，`nextResetTime` 按毫秒读取。`unit: 3` 为小时，`unit: 6` 为每周；每周的 `number` 有 1/7 两种已知形态，不解释成周数。未知周期保留额度及真实重置时间，`TIME_LIMIT` 工具预算不混入模型套餐额度。
+
+OpenAI、Anthropic、xAI、OpenCode Console 和智谱／Z.ai 按量预设未绑定账户查询。推理响应的 TPM/RPM 限流余量不作为套餐额度接入。新增预设默认值只影响后续创建，既有连接不自动改写。
 
 ## 模型发现与添加
 
