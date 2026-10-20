@@ -11,13 +11,14 @@ import { createNamingModule } from "./naming/runtime.ts";
 import questions from "./questions/runtime.ts";
 import resourceOperations from "./resources/runtime.ts";
 import { CreateNote } from "./notes/contract.ts";
+import providers from "./providers/runtime.ts";
 
 /** 仅组合插件业务；加载、宿主服务及外部插件依赖由应用负责。 */
 export function createBuiltin(options: { application: BuiltinApplication; connectNaming(api: NamingApi): () => void }) {
   return definePlugin({ namespace: builtin, version: metadata.version,
     setup(plugin) {
       plugin.config(BuiltinSettings);
-      return { modules: [createAgentModule(options.application), filesystem, createNamingModule(options.connectNaming, options.application.userAgent), notes, questions,
+      return { modules: [providers, createAgentModule(options.application), filesystem, createNamingModule(options.connectNaming, options.application.userAgent), notes, questions,
         resourceOperations,
         defineAgentCreation({ id: builtin.name("agent.create"), creation: CreateAgent,
           description: "Create an Agent with a selected agent configuration and optional model/thinking overrides.",

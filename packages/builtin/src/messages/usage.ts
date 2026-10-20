@@ -1,0 +1,28 @@
+import { defineMessages } from "@atelier/sdk/contracts";
+import { builtin } from "@atelier/builtin-api/contracts";
+
+export const usageMessages = builtin.messages("en", defineMessages({
+  title: { id: "usage.title", defaultMessage: "Account usage" },
+  zhipu: { id: "usage.zhipu", defaultMessage: "Zhipu Coding Plan" },
+  window: { id: "usage.window", defaultMessage: "Quota window" },
+  hours: { id: "usage.hours", defaultMessage: "{count, plural, one {# hour} other {# hours}}" },
+  weeks: { id: "usage.weeks", defaultMessage: "{count, plural, one {# week} other {# weeks}}" },
+  remaining: { id: "usage.remaining", defaultMessage: "{value} remaining" },
+  resets: { id: "usage.resets", defaultMessage: "Resets in {duration}" },
+  resetPending: { id: "usage.resetPending", defaultMessage: "Reset time reached · Awaiting an update" },
+  resetUnknown: { id: "usage.resetUnknown", defaultMessage: "Reset time unavailable" },
+  loading: { id: "usage.loading", defaultMessage: "Checking allowance…" },
+  empty: { id: "usage.empty", defaultMessage: "No allowance reported" },
+  updated: { id: "usage.updated", defaultMessage: "Updated {time}" },
+  stale: { id: "usage.stale", defaultMessage: "Last known allowance · Update unavailable" },
+  exhausted: { id: "usage.exhausted", defaultMessage: "An allowance window is exhausted" },
+  unavailable: { id: "usage.unavailable", defaultMessage: "The usage provider is unavailable." },
+  credential: { id: "usage.credential", defaultMessage: "Save a valid API key in provider settings." },
+  authentication: { id: "usage.authentication", defaultMessage: "The usage service rejected the credentials." },
+  unsupported: { id: "usage.unsupported", defaultMessage: "This connection does not support the selected usage query." },
+  rate_limit: { id: "usage.rateLimit", defaultMessage: "Usage queries are rate limited. Try again later." },
+  network: { id: "usage.network", defaultMessage: "The usage service could not be reached." },
+  timeout: { id: "usage.timeout", defaultMessage: "The usage query timed out." },
+  protocol: { id: "usage.protocol", defaultMessage: "The usage service returned an invalid response." },
+  server: { id: "usage.server", defaultMessage: "The usage service is temporarily unavailable." },
+}));

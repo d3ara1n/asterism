@@ -6,6 +6,7 @@ export * from "./runtime-contracts.ts";
 export * from "./runtime-resources.ts";
 export * from "./runtime-calls.ts";
 export * from "./runtime-tools.ts";
+export * from "./runtime-providers.ts";
 export type * from "./content-runtime.ts";
 export type * from "./models.ts";
 export { validationMessage, jsonArgumentHint } from "./tool-validation.ts";

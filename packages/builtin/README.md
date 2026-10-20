@@ -22,6 +22,8 @@
 | `src/resources/` | Agent 创建目录查询、创建和统一移除顶层工具；通过 SDK 绑定会话门面消费宿主生命周期 |
 | `src/naming/` | 自动命名、人工命名接口和标题投影；记录契约由公共包提供 |
 | `src/settings/` | 内置插件托管配置与按思考／工具调用分组的自定义设置页；配置在插件根入口登记 |
+| `src/providers/` | 提供商预设目录及智谱 Coding Plan 查询；通过 SDK 贡献登记，不拥有查询缓存或跨进程消费 |
+| `src/usage/` | 独立的账户用量 toolbar 消费模块；使用 SDK 查询状态及 Agent toolbar 公共入口，不导入提供方实现 |
 | `src/shared/` | 正文算法、共享工具声明、预览规则与创建表单 |
 | `src/messages/`、`src/locales/` | 内置插件自有文案与翻译 |
 

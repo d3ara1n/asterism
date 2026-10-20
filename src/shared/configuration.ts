@@ -3,6 +3,7 @@ export { agentInputSchema, agentSchema, agentOverridesSchema, type AgentConfigur
 import {
   modelExpressionSchema, parseModelExpression, modelReference, thinkingSchema, type ThinkingLevel,
   thinkingLevels, modelCostSchema, uiTextSchema,
+  providerFixedFields, providerUsageIdSchema, providerUsageStateSchema, usageProviderInfoSchema, providerPresetSchema,
 } from "@atelier/sdk/contracts";
 export { modelExpressionSchema, parseModelExpression, formatModelExpression, modelReference, thinkingSchema, type ModelExpression, type ThinkingLevel } from "@atelier/sdk/contracts";
 import { z } from "zod";
@@ -11,7 +12,7 @@ import { modelCompatibilitySchema } from "./model-compatibility.ts";
 
 export const configurationChannel = coreChannel("configuration");
 export const configurationChangedChannel = coreChannel("configuration-changed");
-export const configurationVersion = 11;
+export const configurationVersion = 13;
 const id = z.string().min(1).max(160);
 const name = z.string().trim().min(1).max(160);
 const revision = z.number().int().positive();
@@ -20,6 +21,9 @@ export const providerIdSchema = z.string().trim().min(1).max(160).regex(/^[^/\s]
 /** 服务端模型 ID：全局共识的模型名，可含 `/`，不含空白。 */
 const serverModelId = z.string().trim().min(1).max(160).regex(/^\S+$/u, "Model IDs cannot contain whitespace.");
 export const protocolSchema = z.enum(["openai-responses", "openai-chat", "anthropic"]);
+/** 连接可固定的配置项；认证方式不包含凭据，兼容设置同时约束模型编辑。 */
+export const providerFixedFieldSchema = z.enum(providerFixedFields);
+export type ProviderFixedField = z.infer<typeof providerFixedFieldSchema>;
 const endpoint = z.string().trim().url().refine(value => {
   const url = new URL(value);
   return ["http:", "https:"].includes(url.protocol) && !url.username && !url.password && !url.search && !url.hash;
@@ -27,6 +31,9 @@ const endpoint = z.string().trim().url().refine(value => {
 export const providerInputSchema = z.strictObject({
   id: providerIdSchema, name, protocol: protocolSchema, baseUrl: endpoint, enabled: z.boolean(), auth: z.enum(["api_key", "none"]),
   compatibility: modelCompatibilitySchema,
+  usage: providerUsageIdSchema.nullable().optional(),
+  fixedFields: z.array(providerFixedFieldSchema).refine(fields => new Set(fields).size === fields.length,
+    "Fixed fields must be unique.").optional(),
 });
 export const credentialStateSchema = z.enum(["not_required", "missing", "available", "storage_unavailable", "decryption_failed"]);
 export const providerSchema = providerInputSchema.extend({ revision, credentialState: credentialStateSchema });
@@ -82,6 +89,8 @@ export function createModelInput(providerId: string, model: DiscoveredModel): z.
 export const configurationSnapshotSchema = z.strictObject({
   providers: z.array(providerSchema), models: z.array(modelSchema), roles: z.array(modelRoleSchema), agents: z.array(agentSchema),
   tests: z.array(connectionTestSchema), discoveries: z.array(modelDiscoverySchema), credentialStorageAvailable: z.boolean(),
+  providerPresets: z.array(providerPresetSchema).optional(),
+  usageProviders: z.array(usageProviderInfoSchema).optional(),
   defaults: z.strictObject({
     roles: z.record(id, modelRoleInputSchema), agents: z.record(id, agentInputSchema),
   }),
@@ -96,6 +105,7 @@ const credentialUpdateSchema = z.discriminatedUnion("action", [
 ]);
 export const configurationCommandSchema = z.discriminatedUnion("type", [
   z.strictObject({ type: z.literal("read") }),
+  z.strictObject({ type: z.literal("usage.query"), providerId: providerIdSchema, refresh: z.boolean().optional() }),
   // 保存目标是当前 ID；value 中的 ID 可以不同，即改名。
   z.strictObject({ type: z.literal("provider.save"), id: providerIdSchema.nullable(), value: providerInputSchema, credential: credentialUpdateSchema }),
   z.strictObject({ type: z.literal("model.save"), id: modelExpressionSchema.nullable(), value: modelInputSchema }),
@@ -118,7 +128,7 @@ export const configurationErrorSchema = z.strictObject({
   code: z.enum(["invalid_request", "not_found", "conflict", "unavailable", "internal"]), message: z.string(), display: uiTextSchema.optional(),
 });
 export const configurationResultSchema = z.discriminatedUnion("ok", [
-  z.strictObject({ ok: z.literal(true), snapshot: configurationSnapshotSchema, savedId: z.string().max(321).nullable(), parameterUpdate: modelParameterUpdateSchema.optional() }),
+  z.strictObject({ ok: z.literal(true), snapshot: configurationSnapshotSchema, savedId: z.string().max(321).nullable(), parameterUpdate: modelParameterUpdateSchema.optional(), usage: providerUsageStateSchema.optional() }),
   z.strictObject({ ok: z.literal(false), error: configurationErrorSchema }),
 ]);
 export const configurationRequestSchema = z.strictObject({ kind: z.literal("configuration.request"), version: z.literal(configurationVersion), id: z.string().uuid(), command: configurationCommandSchema });
@@ -126,6 +136,10 @@ export const configurationResponseSchema = z.strictObject({ kind: z.literal("con
 export const configurationChangedSchema = z.strictObject({ kind: z.literal("configuration.changed") });
 export type Provider = z.infer<typeof providerSchema>;
 export type ProviderInput = z.infer<typeof providerInputSchema>;
+/** 缺少编辑规则的连接保持自由配置，不按名称、端点或目录反推来源。 */
+export function canEditProviderField(provider: Pick<ProviderInput, "fixedFields">, field: ProviderFixedField): boolean {
+  return !provider.fixedFields?.includes(field);
+}
 export type ProviderModel = z.infer<typeof modelSchema>;
 export type ModelRole = z.infer<typeof modelRoleSchema>;
 export type ModelRoleOverrides = z.infer<typeof modelRoleOverridesSchema>;

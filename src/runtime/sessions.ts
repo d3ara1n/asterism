@@ -122,7 +122,12 @@ export class SessionService {
       }
     };
     const modules = createModules({ events: this.events, extensionsDirectory: join(dataRoot, "extensions"), data: new SessionDataStore(db), content: this.content, refOf, vault: configuration.vault, stream, configurationChanged,
-      sessions: host, models, catalogs: createBuiltinCatalogs(configuration) }, external);
+      sessions: host, models, catalogs: createBuiltinCatalogs(configuration),
+      providerExtensions: configuration.extensions, providers: {
+        presets: () => configuration.extensions.presets(),
+        usageProviders: () => configuration.extensions.usageProviders(),
+        queryUsage: (id, options) => configuration.usage.query(id, options),
+      } }, external);
     this.resources = modules.resources;
     this.calls = modules.calls;
     this.tools = modules.tools;

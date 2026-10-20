@@ -25,6 +25,8 @@ import { PluginEventScope } from "./event-scope.ts";
 import { CallRegistry } from "./calls.ts";
 import { bindTopLevelTools, type RegisteredTopLevelTool } from "./top-level-tools.ts";
 import { resolveToolContributions, validateToolContributions, type ToolImplementationStatus } from "./tool-contributions.ts";
+import type { ProviderExtensions } from "../configuration/provider-extensions.ts";
+import type { ProviderServices } from "@atelier/sdk/runtime";
 
 export interface PluginHostServices {
   events?: EventBus;
@@ -35,6 +37,8 @@ export interface PluginHostServices {
   sessions: SessionHost;
   catalogs?: CatalogHost;
   models: HostModels;
+  providers?: ProviderServices;
+  providerExtensions?: ProviderExtensions;
   vault?: CredentialVault | null;
   stream?: (event: ObjectStreamPayload) => void;
   /** 插件配置变更：设置页保存、恢复默认与后台 update 都经此通知。 */
@@ -152,6 +156,11 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
       // 根入口与功能模块共用登记管线，清理责任先于其贡献校验登记。
       const register = (contribution: ModuleContribution) => {
         if (contribution.closing) closing.push(contribution.closing);
+        if (contribution.usageProviders?.length || contribution.providerPresets?.length) {
+          if (!services.providerExtensions) throw new Error("Provider contributions are unavailable.");
+          services.providerExtensions.declare(id, contribution.usageProviders ?? [], contribution.providerPresets ?? [],
+            lifecycle.group("call"), plugin.dependencies);
+        }
         for (const call of contribution.calls ?? []) calls.declare(id, call, sdk, lifecycle.group("call"));
         for (const tool of contribution.topLevelTools ?? []) {
           pluginTools.push({ tool, sdk, runs: lifecycle.group("tool") });
@@ -199,6 +208,7 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
       collected.push(entry); manifest.push({ id, version: plugin.version, status: "loaded", resources: ownKinds, implementations: [] });
     } catch (error) {
       if (entry) {
+        services.providerExtensions?.removeOwners([id]);
         calls.removeOwner(id);
         entry.events.stop(); events.removeOwner(id);
         entry.lifecycle.stop();
@@ -237,6 +247,7 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
       collected.splice(i, 1); invalidated = true;
     }
   }
+  services.providerExtensions?.removeOwners([...invalidEntries].map(entry => entry.plugin.namespace.id));
   // setup 与后置校验失败共用一次逆序清理，避免提供方越过仍在清理的失败消费者。
   const failedCleanup = (async () => {
     await Promise.allSettled([...invalidEntries].map(entry => entry.lifecycle.close()));
@@ -345,6 +356,7 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
     close() {
       if (closing) return closing;
       closed = true;
+      services.providerExtensions?.removeOwners(collected.map(entry => entry.plugin.namespace.id));
       for (const entry of collected) entry.events.stop();
       events.close();
       for (const lifecycle of lifecycles) lifecycle.stop();

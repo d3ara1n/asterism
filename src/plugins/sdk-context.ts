@@ -237,6 +237,16 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
       has: key => internal.tasks.has(key),
     },
     catalogs: { get: contract => { checkAvailable(); return host.catalogs?.get(contract) ?? null; } },
+    providers: {
+      presets: () => { checkAvailable(); return host.providers?.presets() ?? []; },
+      usageProviders: () => { checkAvailable(); return host.providers?.usageProviders() ?? []; },
+      queryUsage: (id, options = {}) => {
+        checkAvailable();
+        if (!host.providers) throw new PluginApiError("unavailable", "Provider queries are unavailable.");
+        return sessionRuns.start(signal => host.providers!.queryUsage(id, { ...options, signal }),
+          { signal: options.signal, affectsHistory: false }).done;
+      },
+    },
     models: {
       validate: (request, options) => {
         checkAvailable();

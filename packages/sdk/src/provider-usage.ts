@@ -1,0 +1,91 @@
+import { z } from "zod";
+import { uiTextSchema, type UiText } from "./i18n.ts";
+import { jsonSchema, type Json } from "./json.ts";
+
+/** 用量查询与预设使用全局目录 ID；连接身份独立，重复目录身份必须显式报错。 */
+export const providerUsageIdSchema = z.string().trim().min(1).max(160).regex(/^\S+$/u);
+export const providerFixedFields = ["protocol", "baseUrl", "auth", "compatibility", "usage"] as const;
+export interface ProviderConnection {
+  protocol: "openai-responses" | "openai-chat" | "anthropic";
+  baseUrl: string;
+  auth: "api_key" | "none";
+  compatibility: { id: string; value?: Json }[];
+  usage?: string | null;
+  fixedFields?: (typeof providerFixedFields)[number][];
+}
+export interface ProviderPreset {
+  id: string;
+  name: string;
+  billing: "usage" | "subscription" | "none";
+  region?: UiText;
+  plan?: UiText;
+  connection: ProviderConnection;
+  keyUrl?: string;
+  sources: readonly [string, ...string[]];
+  verifiedOn: string;
+  keywords?: readonly string[];
+}
+const webUrl = z.string().url().refine(value => ["http:", "https:"].includes(new URL(value).protocol));
+export const providerConnectionSchema = z.strictObject({
+  protocol: z.enum(["openai-responses", "openai-chat", "anthropic"]),
+  baseUrl: webUrl, auth: z.enum(["api_key", "none"]),
+  compatibility: z.array(z.strictObject({ id: z.string().min(1), value: jsonSchema.optional() })),
+  usage: providerUsageIdSchema.nullable().optional(),
+  fixedFields: z.array(z.enum(providerFixedFields)).optional(),
+});
+export const providerPresetSchema = z.strictObject({
+  id: z.string().trim().min(1).max(160).regex(/^[^/\s]+$/u), name: z.string().trim().min(1).max(160),
+  billing: z.enum(["usage", "subscription", "none"]), region: uiTextSchema.optional(), plan: uiTextSchema.optional(),
+  connection: providerConnectionSchema, keyUrl: webUrl.optional(),
+  sources: z.tuple([webUrl]).rest(webUrl), verifiedOn: z.iso.date(), keywords: z.array(z.string()).optional(),
+});
+/** patch 只覆盖显式字段；connection 按字段合并，数组整项替换，不改写已保存连接。 */
+export type ProviderPresetContribution =
+  | { type: "add"; preset: ProviderPreset }
+  | { type: "patch"; id: string; patch: Partial<Omit<ProviderPreset, "id" | "connection">> & { connection?: Partial<ProviderConnection> } };
+
+const identity = {
+  id: z.string().trim().min(1), label: uiTextSchema,
+  scope: z.enum(["account", "plan", "key"]),
+};
+export const quotaValueSchema = z.discriminatedUnion("type", [
+  z.strictObject({ type: z.literal("ratio"), remaining: z.number().min(0).max(1) }),
+  z.strictObject({ type: z.literal("quantity"), remaining: z.number().nonnegative(), limit: z.number().positive(), unit: uiTextSchema })
+    .refine(value => value.remaining <= value.limit, "Remaining quota cannot exceed its limit."),
+]);
+export const usageItemSchema = z.discriminatedUnion("type", [
+  z.strictObject({ ...identity, type: z.literal("balance"), remaining: z.number(), currency: z.string().regex(/^[A-Z]{3}$/u) }),
+  z.strictObject({ ...identity, type: z.literal("quota"), value: quotaValueSchema,
+    window: z.strictObject({
+      mode: z.enum(["rolling", "fixed", "unknown"]),
+      /** 仅在已知时填写实际固定时长；未知周期不能伪造为周或月。 */
+      durationMs: z.number().positive().nullable(),
+      resetAt: z.number().nonnegative().nullable(),
+    }),
+  }),
+]);
+export const usageItemsSchema = z.array(usageItemSchema).refine(items => new Set(items.map(item => item.id)).size === items.length,
+  "Usage item IDs must be unique.");
+export type UsageItem = z.infer<typeof usageItemSchema>;
+export type QuotaItem = Extract<UsageItem, { type: "quota" }>;
+export const providerUsageErrorSchema = z.enum(["unavailable", "credential", "authentication", "unsupported", "rate_limit", "network", "timeout", "protocol", "server"]);
+export type ProviderUsageError = z.infer<typeof providerUsageErrorSchema>;
+export const providerUsageStateSchema = z.strictObject({
+  providerId: z.string(), revision: z.number().int().nonnegative(), usage: providerUsageIdSchema.nullable(),
+  state: z.enum(["disabled", "loading", "ready", "error"]),
+  items: usageItemsSchema, updatedAt: z.number().nonnegative().nullable(), error: providerUsageErrorSchema.nullable(),
+});
+export type ProviderUsageState = z.infer<typeof providerUsageStateSchema>;
+export const usageProviderInfoSchema = z.strictObject({ id: providerUsageIdSchema, label: uiTextSchema, owner: z.string() });
+export type UsageProviderInfo = z.infer<typeof usageProviderInfoSchema>;
+
+export function quotaRemaining(item: QuotaItem): number {
+  return item.value.type === "ratio" ? item.value.remaining : item.value.remaining / item.value.limit;
+}
+/** 选周期最短的窗口，不以重置倒计时决定；未知周期排在已知周期之后，同长保留来源顺序。 */
+export function primaryQuota(items: readonly UsageItem[]): QuotaItem | null {
+  let selected: QuotaItem | null = null;
+  for (const item of items) if (item.type === "quota" && (!selected ||
+    (item.window.durationMs ?? Infinity) < (selected.window.durationMs ?? Infinity))) selected = item;
+  return selected;
+}

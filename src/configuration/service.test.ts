@@ -4,7 +4,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { resolveModelRole, type ConfigurationSnapshot } from "../shared/configuration.ts";
+import { createModelInput, resolveModelRole, type ConfigurationSnapshot, type ProviderInput } from "../shared/configuration.ts";
+import { providerPresetDraft } from "../shared/provider-presets.ts";
+import { providerPresets } from "../../packages/builtin/src/providers/presets.ts";
 import { ConfigurationService } from "./service.ts";
 import type { ConnectionProbe } from "./probe.ts";
 import { configurationDefaults, resolveAgentConfiguration, resolveRoleConfiguration } from "./layers.ts";
@@ -44,6 +46,71 @@ function roleValue(snapshot: ConfigurationSnapshot, id: string) {
 }
 
 describe("真实配置与消费边界", () => {
+  // 编辑规则须随连接独立持久化；固定认证方式不能阻止改名、启停和凭据管理。
+  it("预设固定项跨重开保留，连接身份和密钥仍可修改", async () => {
+    const { service, root, protector } = setup();
+    const value = { ...providerPresetDraft(providerPresets.find(preset => preset.id === "kimi")!), enabled: true };
+    await service.execute({ type: "provider.save", id: null, value, credential: { action: "replace", value: "first-key" } });
+    const renamed = { ...value, id: "personal-kimi", name: "Personal", enabled: false };
+    await service.execute({ type: "provider.save", id: value.id, value: renamed, credential: { action: "replace", value: "replacement-key" } });
+    const saved = service.current().providers[0]!;
+    expect(saved).toMatchObject({ ...renamed, credentialState: "available" });
+    expect(await service.executionCredential(saved.id, saved.revision)).toBe("replacement-key");
+    expect(JSON.parse(readFileSync(join(root, "configuration.json"), "utf8")).providers[0]).not.toHaveProperty("kind");
+    service.close();
+    const reopened = new ConfigurationService(root, protector);
+    cleanups.push(() => reopened.close());
+    expect(reopened.current().providers[0]).toMatchObject(renamed);
+    await reopened.execute({ type: "provider.save", id: renamed.id, value: { ...renamed, enabled: true }, credential: { action: "clear" } });
+    expect(reopened.current().providers[0]).toMatchObject({ enabled: true, credentialState: "missing", fixedFields: value.fixedFields });
+  });
+
+  // 隐藏不等于不可改：命令边界须拒绝更改固定值或撤下规则，失败不污染配置和凭据。
+  it("固定字段与规则不可通过保存命令改写，模型也不能覆盖固定兼容设置", async () => {
+    const { service, root } = setup();
+    const value = { ...providerPresetDraft(providerPresets.find(preset => preset.id === "kimi")!), enabled: true };
+    await service.execute({ type: "provider.save", id: null, value, credential: { action: "replace", value: "original-key" } });
+    const original = readFileSync(join(root, "configuration.json"), "utf8");
+    const changes: Partial<ProviderInput>[] = [
+      { protocol: "openai-chat" }, { baseUrl: "https://relay.test/v1" }, { auth: "none" },
+      { compatibility: [] }, { fixedFields: [] }, { fixedFields: undefined },
+    ];
+    for (const change of changes) {
+      await expect(service.execute({ type: "provider.save", id: value.id, value: { ...value, ...change },
+        credential: { action: "replace", value: "must-not-replace" } })).rejects.toMatchObject({
+        code: "invalid_request", display: { id: "providerEditing.fixed" },
+      });
+    }
+    expect(readFileSync(join(root, "configuration.json"), "utf8")).toBe(original);
+    const saved = service.current().providers[0]!;
+    expect(await service.executionCredential(saved.id, saved.revision)).toBe("original-key");
+    expect(readdirSync(join(root, "credentials"))).toHaveLength(1);
+    const model = createModelInput(value.id, { modelId: "test", name: "Test" });
+    await expect(service.execute({ type: "model.save", id: null, value: { ...model,
+      compatibility: [{ id: "responsesReasoning", value: { summary: true } }] } })).rejects.toMatchObject({ code: "invalid_request" });
+    await service.execute({ type: "model.save", id: null, value: model });
+    await service.execute({ type: "model.save", id: `${value.id}/test`, value: { ...model, name: "Renamed model" } });
+    expect(service.current().models[0]).toMatchObject({ name: "Renamed model", compatibility: [] });
+  });
+
+  // 没有规则的旧连接保持自定义行为，即使命名或地址与预设相同；不自动接管现有配置。
+  it("未声明规则的连接可修改全部接入字段", async () => {
+    const { service, root, protector } = setup();
+    const value = { ...providerValue, id: "kimi", baseUrl: "https://api.moonshot.ai/v1" };
+    await service.execute({ type: "provider.save", id: null, value, credential: { action: "keep" } });
+    service.close();
+    const reopened = new ConfigurationService(root, protector);
+    cleanups.push(() => reopened.close());
+    expect(reopened.current().providers[0]?.fixedFields).toBeUndefined();
+    const changed: ProviderInput = { ...value, protocol: "anthropic", baseUrl: "https://relay.test/v1", auth: "api_key",
+      compatibility: [{ id: "customUserAgent", value: { userAgent: "Atelier" } }] };
+    await reopened.execute({ type: "provider.save", id: value.id, value: changed, credential: { action: "replace", value: "custom-key" } });
+    expect(reopened.current().providers[0]).toMatchObject(changed);
+    const model = createModelInput(value.id, { modelId: "test", name: "Test" });
+    await reopened.execute({ type: "model.save", id: null, value: { ...model, compatibility: [{ id: "systemMessageInMessages" }] } });
+    expect(reopened.current().models[0]?.compatibility).toEqual([{ id: "systemMessageInMessages" }]);
+  });
+
   // 参数获取在队列外等待，成功才原子保存；网络失败和期间改动不得污染已保存配置。
   it("目录参数覆盖旧值并持久化，获取失败保留原值且返回明确提示", async () => {
     const data: Catalog = { providers: {}, models: { "lab/test-model": {

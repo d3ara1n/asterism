@@ -1,6 +1,9 @@
 import { defineMessages, pluginNamespace } from "@atelier/sdk/contracts";
 
 export const providersMessages = pluginNamespace("atelier.host").messages("en", defineMessages({
+  usage: { id: "providerUsage.selection", defaultMessage: "Usage query" },
+  usageOff: { id: "providerUsage.off", defaultMessage: "Off" },
+  usageMissing: { id: "providerUsage.missing", defaultMessage: "{id} (unavailable)" },
   fetchModels: { id: "discovery.fetch", defaultMessage: "Fetch models" },
   refreshModels: { id: "discovery.refresh", defaultMessage: "Refresh" },
   fetchingModels: { id: "discovery.fetching", defaultMessage: "Fetching models…" },
@@ -154,7 +157,7 @@ export const providersMessages = pluginNamespace("atelier.host").messages("en", 
   },
   presetHint: {
     id: "features_configuration_ProvidersSettings_33",
-    defaultMessage: "Choose a provider connection. Regions and billing plans use separate presets.",
+    defaultMessage: "Choose a provider and add your credentials. Use a custom connection for a different endpoint or connection settings.",
   },
   payAsYouGo: { id: "providerPreset.payAsYouGo", defaultMessage: "Pay as you go" },
   subscription: { id: "providerPreset.subscription", defaultMessage: "Subscription" },

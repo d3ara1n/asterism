@@ -4,7 +4,7 @@
 
 SDK 包版本见 [package.json](package.json)，宿主 API 版本见 [`sdkApi`](../../src/plugins/packages.ts)。内置插件领域契约独立在 [`@atelier/builtin-api`](../builtin-api/README.md)，不进入通用 SDK。
 
-当前宿主 API 为 **9.1**。使用会话资源操作的插件包在 `atelier.api` 声明 `{ "major": 9, "minMinor": 1 }`；前端入口默认导出 `defineRendererPlugin(...)`，功能视图放入其 `modules`，调用契约显式声明 `scope`。旧主版本在装载前拒绝。
+当前宿主 API 为 **9.2**。使用提供商贡献或账户用量的插件包在 `atelier.api` 声明 `{ "major": 9, "minMinor": 2 }`，依赖 `@atelier/sdk: ^0.24.0`；已有 9.0/9.1 能力继续可用。前端入口默认导出 `defineRendererPlugin(...)`，功能视图放入其 `modules`，调用契约显式声明 `scope`。旧主版本在装载前拒绝。
 
 ## 子路径入口
 
@@ -101,3 +101,33 @@ export default definePlugin({
 - `models.validate(request, { content? })`：校验模型目标、续接资料与文件引用资格，不发送网络请求。
 - `models.stream(request, { content? })`：执行单次无工具补全（支持可选 `maxOutputTokens`、`userAgent`、`sessionId`），流式交付协议事件。`finish.timing`（API 8.6）可携带请求计时，与 usage 一起按 `ModelCompletion` 保存。
 - `models.run(request)`：绑定具体资源对象（`object`）与请求起点（`requestParentId`），执行一次模型请求及该响应的完整资源工具批次，经 `ModelRunObserver.event` 同步交付 `block`（最高序号块内含 `completion` 终态）、`diagnostic` 与 `progress`。终态包含 `usage` 及可选 `timing`（API 8.6）。结果附带 `diagnostics`（API 8.3）：系统提示块的种类、来源与字数及声明的工具名称，不含正文；失败或取消未取得可交付终态时，`diagnostics.timing` 保留已测量计时。可用 `requestDiagnosticsSchema` 校验保存（分区语义见 [请求诊断](../../docs/runtime.md#请求诊断)）。外层多轮循环与时间线提交由调用方插件自行驱动。
+
+### 7. 提供商预设与账户用量（API 9.2）
+
+`contracts` 导出 `ProviderPreset`、`ProviderPresetContribution`、`UsageItem`、`ProviderUsageState` 及对应 schema；`runtime` 导出 `UsageProvider`、`UsageQueryContext`、`UsageQueryError`、`ProviderServices`。通过 `ModuleContribution.usageProviders / providerPresets` 贡献查询实现和预设，编译示例见 [`examples/provider-usage.ts`](examples/provider-usage.ts)。
+
+修改其他插件预设时，通过公共包导入建立对提供方插件的依赖。例如依赖 `@atelier/builtin-api` 的插件可导入 `builtin`，在 `definePlugin` 中声明 `dependencies: [builtin.id]`，贡献：
+
+```ts
+providerPresets: [{
+  type: "patch",
+  id: "zai-plan-cn",
+  patch: { connection: { usage: "my-glm-query" } },
+}]
+```
+
+`my-glm-query` 是该插件同时注册的查询 ID。patch 不修改已有连接；身份、合并与生命周期规则见 [提供商贡献](../../docs/plugin-sdk.md#提供商贡献与账户用量api-92)。
+
+后台消费：`await plugin.providers.queryUsage(connectionId, { signal })`。前端消费：
+
+```tsx
+import { useProviderUsage } from "@atelier/sdk/renderer";
+
+function Allowance({ connectionId }: { connectionId: string }) {
+  const { state } = useProviderUsage(connectionId);
+  if (!state || state.state === "disabled") return null;
+  return <pre>{JSON.stringify(state.items, null, 2)}</pre>;
+}
+```
+
+查询共享、刷新和凭据由宿主管理；消费者只根据 `balance / quota` 呈现数据，不导入厂商实现。内置实例见 `packages/builtin/src/providers/`（提供）和 `packages/builtin/src/usage/`（消费）。

@@ -1,15 +1,17 @@
 import { randomUUID } from "node:crypto";
 import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { isDeepStrictEqual } from "node:util";
 import { z } from "zod";
 import { applicationStorage } from "../shared/application.ts";
-import { agentOverridesSchema, modelReference, modelRoleOverridesSchema, modelSchema, providerInputSchema,
+import { agentOverridesSchema, canEditProviderField, modelReference, modelRoleOverridesSchema, modelSchema, providerInputSchema,
   type AgentOverrides, type ModelRoleOverrides, type ProviderInput, type ProviderModel } from "../shared/configuration.ts";
 import { modelCostSchema } from "@atelier/sdk/contracts";
 import { defaultAgents, defaultRoles } from "./defaults.ts";
 import { ConfigurationError } from "./errors.ts";
 import { normalizeOverrides, resolveAgentConfiguration, resolveRoleConfiguration } from "./layers.ts";
 import { migrateModelCost } from "./model-cost-migration.ts";
+import { providerEditingMessages } from "../shared/provider-editing-messages.ts";
 
 const identity = { id: z.string().min(1).max(160), revision: z.number().int().positive() };
 const storedProviderSchema = providerInputSchema.extend({ revision: identity.revision, credentialRef: z.string().uuid().nullable() });
@@ -96,6 +98,7 @@ export class ConfigurationStore {
     return item ? structuredClone(item) as Entry[K] : null;
   }
   save(input: ConfigurationSave): void {
+    this.validateEdit(input);
     const next = structuredClone(this.document);
     const { id } = input;
     const revision = (id === null ? 0 : this.get(input.kind, id)?.revision ?? 0) + 1;
@@ -110,6 +113,26 @@ export class ConfigurationStore {
       case "agent": upsert(next.agents, id, { id: id!, revision, builtin: this.get("agent", id!)?.builtin ?? false, overrides: normalizeOverrides(input.value) }); break;
     }
     this.commit(next);
+  }
+  /** 编辑限制随连接保存；比较已保存值，不依赖当前预设目录。 */
+  private validateEdit(input: ConfigurationSave): void {
+    const reject = () => { throw new ConfigurationError("invalid_request",
+      "Fixed connection settings cannot be changed.", providerEditingMessages.fixed); };
+    if (input.kind === "provider" && input.id !== null) {
+      const previous = this.get("provider", input.id);
+      if (!previous) return;
+      const fixed = previous.fixedFields ?? [];
+      const nextFixed = input.value.fixedFields ?? [];
+      if (fixed.length !== nextFixed.length || fixed.some(field => !nextFixed.includes(field))) reject();
+      for (const field of fixed) if (!isDeepStrictEqual(previous[field], input.value[field])) reject();
+    }
+    if (input.kind === "model") {
+      const provider = this.get("provider", input.value.providerId);
+      if (!provider || canEditProviderField(provider, "compatibility")) return;
+      const previous = input.id === null ? null : this.get("model", input.id);
+      const compatibility = previous?.providerId === provider.id ? previous.compatibility : [];
+      if (!isDeepStrictEqual(compatibility, input.value.compatibility)) reject();
+    }
   }
   remove(kind: ConfigurationKind, id: string): { credentialRef: string | null } {
     const old = this.get(kind, id);
