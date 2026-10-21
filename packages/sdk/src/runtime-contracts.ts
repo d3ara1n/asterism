@@ -22,7 +22,7 @@ import type { TopLevelTool } from "./runtime-tools.ts";
 import type { ProviderServices, UsageServices, UsageProvider } from "./runtime-providers.ts";
 import type { ProviderPresetContribution } from "./provider-usage.ts";
 export type * from "./objects.ts";
-export type { ResourceRef, ResourceSnapshot, SessionSnapshot } from "./workspace.ts";
+export type { ResourceRef, ResourceCreationResult, ResourceSnapshot, SessionSnapshot } from "./workspace.ts";
 
 export interface PluginContext {
   readonly id: string;

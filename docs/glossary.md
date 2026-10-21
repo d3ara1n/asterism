@@ -33,7 +33,8 @@
 | 功能模块 | feature module | 插件内部提供具体功能的模块；业务模块以显式依赖组合，setup 负责贡献装配，纯契约、后台实现与前端视图按功能共置、分进程装配 |
 | 装配入口 | composition root | 取得宿主能力、创建业务模块、连接依赖并返回贡献的位置；负责聚合功能和整体语义 |
 | 创建契约 | creation contract | 带稳定身份、关联资源和输入 schema 的具型资源创建协议，前后端共享 |
-| Agent 创建入口 | Agent creation entry | 插件显式贡献的模型创建通路，引用创建契约，声明模型输入及可选转换；属于内置公共领域 API，区别于资源类型标记和通用创建契约 |
+| 创建结果 | ResourceCreationResult | 已提交资源的身份与创建时标题；兼容 ResourceRef，标题作为通用资源摘要附带，不参与身份校验 |
+| Agent 创建入口 | Agent creation entry | 供 Agent 调用的资源创建通路，适用于笔记、Agent 及第三方资源；引用创建契约，声明模型输入及可选转换，属于内置公共领域 API |
 | 会话目录 | session directory | 插件读取当前全部会话身份、标题与创建时间的摘要接口；不加载历史或切换当前视图 |
 | 动作契约 | action contract | 带稳定身份、关联资源和输入 schema 的具型对象动作协议，由资源内联装配；不属于模型工具目录 |
 | 调用契约 | call contract | 插件声明的具型请求／结果接口，按稳定 ID 路由，声明插件级或对象级作用域；对象级调用绑定关联对象，与资源动作队列独立，见 `docs/plugin-sdk.md` |

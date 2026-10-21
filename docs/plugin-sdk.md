@@ -144,10 +144,10 @@ headers 来源需要消费者持有自己的模型调用结果，因此自然用
 ### 会话目录与资源操作（API 9.1）
 
 - `plugin.sessions.list()` 返回当前全部会话的 `{ id, title, createdAt }` 摘要，按创建时间从新到旧排列；不加载历史、不改变前端视图。`SessionDirectory` 在同一宿主运行实例内共享，生命周期与该实例一致；公共领域服务可据此隔离自己的登记。
-- `plugin.session(id)` 取得指定会话的执行门面。`session.create(CreationContract, input, { signal?, content?, linkTo?, resources? })` 引用已装配的真实声明实例，允许调用其他插件公开的契约；输入由资源提供方校验和初始化，成功返回已提交的 `ResourceRef`，不返回资源私有执行门面。`resources`（API 10.1）为新资源接收的初始 `ResourceRef` 列表。
+- `plugin.session(id)` 取得指定会话的执行门面。`session.create(CreationContract, input, { signal?, content?, linkTo?, resources? })` 引用已装配的真实声明实例，允许调用其他插件公开的契约；输入由资源提供方校验和初始化，成功返回 `ResourceCreationResult`（API 10.2）：包含 `ResourceRef` 的全部字段及创建事务内捕获的通用 `title`，不返回资源私有数据或执行门面。标题由资源创建实现决定，创建输入是否含标题字段由各契约定义。`resources`（API 10.1）为新资源接收的初始 `ResourceRef` 列表。
 - `create` 的异步准备参与调用插件及资源提供方的关闭收束。准备期间阻止会话游标回溯，提交时重验会话、执行作用域与初始链接的全部端点；失败或取消不提交创建。`linkTo / resources` 与身份、初始数据和创建事件同事务写入。后台位置复用工作台空位算法，按已保存尺寸或公共回退尺寸安排，不要求调用者提供画布坐标。内容资格交接见 [不可变内容](content.md#临时占用与提交)。
 - `session.link(receiver, resource)`、`session.unlink(receiver, resource)` 使用完整资源引用，校验双方属于当前会话和当前路径、类型一致且接收者支持链接。`session.remove(resource)` 与前端共用宿主移除操作；对象生命周期语义见 [资源](object-model.md#resource可被操作的对象)。
-- 顶层工具的 `context.session` 固定执行会话和发起对象，`create(contract, input, { resources? })` 自动将新资源链接给发起者；可选 `resources`（API 10.1）接收本请求有效链接范围内的资源 ID。`remove(resourceId)` 采用同一请求范围，并在提交时验证当前存在性与收束。模型创建的完整规则见 [Agent 创建与移除](runtime.md#agent-创建与移除)。普通 `ObjectReader.session` 仍为只读。
+- 顶层工具的 `context.session` 固定执行会话和发起对象，`create(contract, input, { resources? })` 自动将新资源链接给发起者，返回同一 `ResourceCreationResult`；可选 `resources`（API 10.1）接收本请求有效链接范围内的资源 ID。`remove(resourceId)` 采用同一请求范围，并在提交时验证当前存在性与收束。模型创建的完整规则见 [Agent 创建与移除](runtime.md#agent-创建与移除)。普通 `ObjectReader.session` 仍为只读。
 - `plugin.signal` 在装配失败或开始关闭时取消，用于撤销插件自有公共登记；取消不代表活动已结束。宿主保留在途执行所需的提交设施，等待其真实收束后才释放，不因该信号提前阻断最终记录保存。
 
 ## 宿主运行生命周期
@@ -169,6 +169,7 @@ headers 来源需要消费者持有自己的模型调用结果，因此自然用
 
 ## 前端视图与扩展入口
 
+- **资源展示目录（API 10.2）**：`useRendererResources()` 提供静态只读目录，`list()` 返回已装配的 `ResourceDescription[]`，`get(kind)` 返回对应描述；未知类型复用宿主的缺失资源名称和图标。目录与宿主卡片外壳共用登记，不解析实例正文，不授予资源授权。`label` 保留原插件的 `UiText` 消息归属，由消费组件在 render 中按当前语言格式化，图标保持前端节点。模型创建入口与资源类型的关联由内置公共领域 API 提供，见 [Agent 创建入口](../packages/builtin-api/README.md#agent-创建入口)。
 - **内置 Agent 界面扩展**：内置插件和第三方通过公共 API 的 `agentUI.register` 在 renderer `prepare` 中登记组件，绑定准备作用域的 `signal`；失败、超时和退出释放登记。每张挂载的 Agent 卡片分别挂载贡献组件，按登记顺序呈现；重复贡献 ID 明确失败。组件通过 SDK 对象 hook 取得当前关联 Agent，偏好按贡献 ID 的插件命名空间绑定，配置仍按自有契约读取；不授予额外资源权限或私有状态访问。`AgentToolbarItem / AgentOverlay / AgentModal` 是内置领域的呈现接口，`AgentScrollArea` 提供 overlay／modal 共用的标准滚动区；业务显示状态、数据来源及工具等待由贡献者拥有。作者接口见 [内置公共 API](../packages/builtin-api/README.md#agent-界面扩展)，交互见 [Agent 扩展界面](workbench.md#agent-扩展界面)。
 - **Agent 当前模型选择**：`useAgentModelSelection()` 在关联 Agent 的前端范围内提供只读快照：`selection` 为原始选择，`reference / model / thinking` 为当前目录解析结果。Agent 选择或目录改变时同步更新，内置配置摘要与上下文占用消费同一结果；原始选择中的继承空值不回填。缺少选择或目录时解析字段为 null；引用失效时 `model` 为 null，保留可解析的 `reference` 与思考选择，不自动换用其他模型。它表达下一次请求取用的当前选择，不表示运行中的响应已经切换；思考选择仍须在请求边界按模型能力校验。接口不提供修改回调、凭据或 Agent 的其他私有状态；在 Agent 范围之外调用明确报错。
 - **卡片辅助面板（API 8.2）**：`cardRenderer` 可选声明 `panels: [{ id, label, icon, Body }]`。ID 在该卡片 renderer 内唯一、非空且无首尾空白，不要求全局命名空间。面板 `Body` 与主体收到同一份通过契约校验的投影，并共享绑定对象与宿主服务；解析阶段只交付元素，不执行面板组件。`useRendererCard()` 提供当前 `activePanel`、`openPanel(id)` 与 `closePanel()`，供主体、操作区与面板内容使用；打开未知 ID 明确报错。宿主通过 `RendererCardProvider` 注入每张卡片独立的视图控制，不扩展资源授权或运行时对象接口。未声明面板的既有 renderer 保持兼容。交互与生命周期见 [卡片辅助面板](workbench.md#卡片辅助面板)。

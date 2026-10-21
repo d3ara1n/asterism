@@ -1,7 +1,7 @@
 import { createElement, isValidElement, type ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { defineData, present, reference } from "@atelier/sdk/contracts";
+import { defineData, present, reference, pluginNamespace } from "@atelier/sdk/contracts";
 import type { Json } from "@atelier/sdk/contracts";
 import { cardRenderer, toolRenderer, type RendererObjectContext, type ToolRenderProps, type ToolInputRenderProps, type ToolResultRenderProps } from "@atelier/sdk/renderer";
 import { ViewRegistry } from "./registry";
@@ -102,9 +102,14 @@ describe("视图契约分派", () => {
   });
   it("资源识别不调用正文解析，缺少卡片或资源实例时仍可取得描述", () => {
     const resolve = vi.fn(() => null);
-    const descriptor = { kind: "text", label: "Text", icon: null };
+    const ns = pluginNamespace("example.text");
+    const label = ns.messages("en", { name: { id: "type.name", defaultMessage: "Text" } }).name;
+    const descriptor = { kind: "text", label, icon: null };
     const registry = new ViewRegistry([{ resources: [descriptor], cards: [{ contract: reference(data), resolve }], tools: [] }]);
     expect(registry.resource("text")).toBe(descriptor);
+    // 依据资源展示目录与 i18n 契约：枚举保留提供方消息归属，消费时再按语言格式化。
+    expect(registry.resourceDescriptions()).toEqual([descriptor]);
+    expect(registry.resourceDescriptions()[0]!.label).toMatchObject({ owner: ns.id, id: "type.name", defaultMessage: "Text" });
     expect(resolve).not.toHaveBeenCalled();
     expect(registry.resource("missing").kind).toBe("missing");
     expect(registry.resource("missing").label).toBeTruthy();

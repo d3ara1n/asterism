@@ -4,7 +4,7 @@
 
 SDK 包版本见 [package.json](package.json)，宿主 API 版本见 [`sdkApi`](../../src/plugins/packages.ts)。内置插件领域契约独立在 [`@atelier/builtin-api`](../builtin-api/README.md)，不进入通用 SDK。
 
-当前宿主 API 为 **10.1**，使用初始资源链接时清单声明 `{ "major": 10, "minMinor": 1 }`，依赖 `@atelier/sdk: ^0.26.0`。提供商与用量以独立目录供插件消费；前端入口默认导出 `defineRendererPlugin(...)`，功能视图放入其 `modules`，调用契约显式声明 `scope`。
+当前宿主 API 为 **10.2**，使用资源展示目录或创建结果标题时清单声明 `{ "major": 10, "minMinor": 2 }`，依赖 `@atelier/sdk: ^0.27.0`。提供商与用量以独立目录供插件消费；前端入口默认导出 `defineRendererPlugin(...)`，功能视图放入其 `modules`，调用契约显式声明 `scope`。
 
 ## 子路径入口
 
@@ -50,7 +50,7 @@ export default definePlugin({
 
 ### 1. 会话、对象、创建与动作
 - **读取与提交**：`plugin.session(id)` 与 `plugin.object(sessionId, ResourceContract, id)` 提供 `snapshot()`、`get(DataContract)` 与同步 `commit(writer => { writer.set(...); writer.append(...); })`。快照按需读取 `records.all / query / first / last`（支持 `scope: "timeline" | "session"`）。
-- **会话目录与资源管理（API 9.1，初始资源链接为 10.1）**：`plugin.sessions.list()` 读取全部会话摘要；`session.create(CreationContract, input, { signal?, content?, linkTo?, resources? })` 返回已提交的 `ResourceRef`，`resources` 是新资源接收的引用列表。工具的 `context.session.create(contract, input, { resources? })` 接收本请求有效范围内的资源 ID 列表。`session.link(receiver, resource)`、`unlink(receiver, resource)`、`remove(resource)` 使用完整引用，作用域、原子性与收束规则见 [会话资源接口](../../docs/plugin-sdk.md#会话目录与资源操作api-91)，可编译示例见 `examples/session-resources.ts`。
+- **会话目录与资源管理（API 9.1，初始资源链接为 10.1，创建标题为 10.2）**：`plugin.sessions.list()` 读取全部会话摘要；`session.create(CreationContract, input, { signal?, content?, linkTo?, resources? })` 返回 `ResourceCreationResult`（兼容 `ResourceRef`，附带提交时的 `title`），`resources` 是新资源接收的引用列表。工具的 `context.session.create(contract, input, { resources? })` 返回同一结果，接收本请求有效范围内的资源 ID 列表。`session.link(receiver, resource)`、`unlink(receiver, resource)`、`remove(resource)` 使用完整引用，作用域、原子性与收束规则见 [会话资源接口](../../docs/plugin-sdk.md#会话目录与资源操作api-91)，可编译示例见 `examples/session-resources.ts`。
 - **具型创建与动作**：在 `contracts` 中用 `defineCreation(resource, { id, schema })` 与 `defineAction(resource, { id, schema })` 声明；在 `runtime` 中用 `implementResource` 聚合 `creation`、`actions`、`project`、`inspect`、`context`；在 `renderer` 中用 `session.create(CreationContract, input, position)` 与 `object.invoke(ActionContract, input)` 调用。
 - **不可变内容（`ContentRef`）**：在 schema 中组合 `contentRefSchema`；在 `prepare / create / execute` 或前端 `InputView / object.input` 中通过 `content` 门面调用 `read / open / stage`（作用域规则见 [不可变内容](../../docs/content.md)）。
 
@@ -86,6 +86,7 @@ export default definePlugin({
 信息卡片从包读取元信息：标准 `name / description / version / author`，可用 `atelier.displayName / description`（接受 `UiText`）覆盖显示文案；`atelier.icon` 是包内 PNG、JPEG、WebP 或 SVG 图片的相对路径。宿主读取静态信息不执行插件代码，配置页面由 renderer 单独提供。
 
 ### 5. 前端卡片与工具三态视图
+- **资源展示目录（API 10.2）**：`useRendererResources().list()` 枚举已登记的 `ResourceDescription`，`get(kind)` 查询单一类型（缺失时返回宿主通用描述）。组件用 `useI18n().text(description.label)` 取得当前语言名称，`description.icon` 可直接渲染；不需要资源实例或卡片投影。
 - **卡片视图**：`cardRenderer(ViewContract, { width, height, minWidth?, minHeight?, Body, Actions?, panels? })`，内部通过 `useRendererObject()` 访问对象数据、动作调用与二进制流 `onStream`。
 - **对象保留状态（API 8.7）**：`object.retained.get("<plugin>/<key>", create, release?)` 保存草稿等需要跨重挂载与会话切换保持的前端状态，对象离开投影时宿主调用 `release`；`discard(key)` 提前结束。规则见 [前端视图与扩展入口](../../docs/plugin-sdk.md#前端视图与扩展入口)，可编译示例见 `examples/renderer.ts`。
 - **滚动与缩放**：卡片内交互遵循 [画布与对象卡片](../../docs/workbench.md#画布与对象卡片) 的手势归属规则。

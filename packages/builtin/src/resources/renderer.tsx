@@ -1,21 +1,42 @@
 import type { ReactNode } from "react";
 import type { z } from "zod";
 import { ListPlus, ScanSearch, CirclePlus, CircleMinus, Users, Bot, MessageSquareText } from "lucide-react";
-import { toolRenderer, useI18n, type RendererModule, type ToolRenderProps } from "@atelier/sdk/renderer";
+import { toolRenderer, useI18n, useRendererResources, type RendererModule, type ToolRenderProps } from "@atelier/sdk/renderer";
 import { JsonView } from "@atelier/ui/json-view";
 import { ToolDetails } from "@atelier/ui/tool-content";
 import { ToolHeader } from "@atelier/ui/tool-header";
 import { ItemGroup, Item, ItemContent, ItemTitle, ItemDescription, ItemMedia } from "@atelier/ui/ui/item";
 import { Separator } from "@atelier/ui/ui/separator";
+import { Badge } from "@atelier/ui/ui/badge";
 import { resourceMessages as messages } from "../messages/resources";
 import { inputText } from "../shared/tool-preview";
 import { TOOL_BODY_LINE_LIMIT } from "../shared/tool-body";
 import { AgentListResult, CreationListResult, CreationInspectResult, ResourceCreateResult, ResourceRemoveResult } from "./contract";
+import { useCreationDirectory } from "./directory";
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
+function ResourceType({ kind }: { kind: string }) {
+  const resource = useRendererResources().get(kind);
+  const label = useI18n().text(resource.label);
+  return <Badge variant="secondary" className="max-w-full py-0 type-caption font-normal" title={label}>
+    {resource.icon}<span className="truncate">{label}</span>
+  </Badge>;
+}
+
+/** 结果保留当次类型；当前入口目录只补充尚未终结的调用。 */
+function CreationHeader({ label, creationId, kind, title }: {
+  label: string; creationId?: string; kind?: string; title?: string;
+}) {
+  const directory = useCreationDirectory();
+  const i18n = useI18n();
+  const resourceKind = kind ?? (creationId ? directory.kinds.get(creationId) : undefined);
+  return <ToolHeader label={label} badge={resourceKind && <ResourceType kind={resourceKind} />}
+    subject={title} meta={creationId && !resourceKind && directory.failed ? i18n.text(messages.directoryUnavailable) : undefined} />;
+}
+
+function Field({ label, children, monospace = true }: { label: string; children: ReactNode; monospace?: boolean }) {
   return <div className="space-y-1">
     <dt className="type-caption text-muted-foreground">{label}</dt>
-    <dd className="type-caption break-all font-mono">{children}</dd>
+    <dd className={monospace ? "type-caption break-all font-mono" : "type-caption"}>{children}</dd>
   </div>;
 }
 
@@ -77,9 +98,8 @@ function ListBody({ result }: ListProps) {
   return <div className="space-y-2">
     <ItemGroup>{entries.slice(0, TOOL_BODY_LINE_LIMIT).map(entry => <Item key={entry.id} size="sm" className="px-0">
       <ItemContent>
-        <ItemTitle className="break-all font-mono">{entry.id}</ItemTitle>
+        <ItemTitle><ResourceType kind={entry.resourceKind} /></ItemTitle>
         <ItemDescription className="line-clamp-none whitespace-pre-wrap">{entry.description}</ItemDescription>
-        <dl><Field label={i18n.text(messages.kind)}>{entry.resourceKind}</Field></dl>
       </ItemContent>
     </Item>)}</ItemGroup>
     {entries.length > TOOL_BODY_LINE_LIMIT && <p className="type-caption text-muted-foreground">
@@ -89,10 +109,10 @@ function ListBody({ result }: ListProps) {
 }
 
 type InspectProps = ToolRenderProps<z.infer<typeof CreationInspectResult.schema>>;
-function InspectHeader({ args, result }: InspectProps) {
+function InspectHeader({ args, phase, result }: InspectProps) {
   const i18n = useI18n();
-  return <ToolHeader label={i18n.text(messages.inspect)} monospace
-    subject={result?.data?.id ?? inputText(args, "creation_id")} />;
+  return <CreationHeader label={i18n.text(messages.inspect)}
+    creationId={phase === "settled" ? undefined : inputText(args, "creation_id")} kind={result?.data?.resourceKind} />;
 }
 function InspectBody({ result }: InspectProps) {
   const i18n = useI18n();
@@ -100,10 +120,6 @@ function InspectBody({ result }: InspectProps) {
   if (!entry) return null;
   return <div className="space-y-3">
     <p className="type-caption whitespace-pre-wrap break-words">{entry.description}</p>
-    <dl className="space-y-2">
-      <Field label={i18n.text(messages.entry)}>{entry.id}</Field>
-      <Field label={i18n.text(messages.kind)}>{entry.resourceKind}</Field>
-    </dl>
     {!!entry.guidelines.length && <section className="space-y-2">
       <p className="type-label">{i18n.text(messages.guidelines)}</p>
       <ul className="list-disc space-y-1 pl-4 type-caption whitespace-pre-wrap break-words">
@@ -115,20 +131,21 @@ function InspectBody({ result }: InspectProps) {
 }
 
 type CreateProps = ToolRenderProps<z.infer<typeof ResourceCreateResult.schema>>;
-function CreateHeader({ args }: CreateProps) {
+function CreateHeader({ args, phase, result }: CreateProps) {
   const i18n = useI18n();
-  return <ToolHeader label={i18n.text(messages.create)} subject={inputText(args, "creation_id")} monospace />;
+  const created = phase === "settled" && result.kind === "succeeded" && result.data && "title" in result.data
+    ? result.data : null;
+  return <CreationHeader label={i18n.text(messages.create)} creationId={phase === "settled" ? undefined : inputText(args, "creation_id")}
+    kind={result?.data?.type} title={created?.title} />;
 }
 function CreateBody({ result }: CreateProps) {
   const i18n = useI18n();
   const resource = result?.data;
   if (!resource) return null;
-  return <div className="space-y-3">
-    <dl className="space-y-2">
-      <Field label={i18n.text(messages.resourceId)}>{resource.resource_id}</Field>
-      <Field label={i18n.text(messages.kind)}>{resource.type}</Field>
-    </dl>
-  </div>;
+  return <dl className="space-y-2">
+    {"resource_id" in resource && <Field label={i18n.text(messages.resourceId)}>{resource.resource_id}</Field>}
+    <Field label={i18n.text(messages.kind)} monospace={false}><ResourceType kind={resource.type} /></Field>
+  </dl>;
 }
 
 type RemoveProps = ToolRenderProps<z.infer<typeof ResourceRemoveResult.schema>>;

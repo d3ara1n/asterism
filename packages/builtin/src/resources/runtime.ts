@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { jsonSchema, type Json } from "@atelier/sdk/contracts";
-import { defineModule, defineTopLevelTool, PluginApiError, type CallResult } from "@atelier/sdk/runtime";
+import { defineModule, defineTopLevelTool, implementCall, PluginApiError, type CallResult } from "@atelier/sdk/runtime";
 import { agentCreations } from "@atelier/builtin-api/runtime";
-import { AgentConfigurations } from "@atelier/builtin-api/contracts";
+import { AgentConfigurations, ReadAgentCreations } from "@atelier/builtin-api/contracts";
 import { AgentListResult, CreationListResult, CreationInspectResult, ResourceCreateResult, ResourceRemoveResult } from "./contract.ts";
 
 /** 已知拒绝不伪装为未知写入；资源初始化异常仍沿用工具执行器的未知结局。 */
@@ -17,6 +17,8 @@ async function attempt<T extends Json>(signal: AbortSignal, work: () => T | Prom
 const id = z.string().min(1).describe("Stable resource creation entry ID. creation_list returns available entries.");
 
 export default defineModule(plugin => ({
+  calls: [implementCall(ReadAgentCreations, async () =>
+    agentCreations.list(plugin).map(({ id, resourceKind }) => ({ id, resourceKind })))],
   topLevelTools: [
     defineTopLevelTool({
       id: AgentListResult.id, name: "agent_list",
@@ -62,8 +64,10 @@ export default defineModule(plugin => ({
       resultSchema: ResourceCreateResult.schema,
       effect: "write", execution: "sequential",
       execute(args, context) { return attempt(context.signal, async () => {
-        const ref = await agentCreations.create(plugin, args.creation_id, args.input, context);
-        return { resource_id: ref.id, type: ref.kind };
+        // 工具执行层在失败或取消时保留过程产出，成功结果显式提供实际标题。
+        context.publish({ type: agentCreations.inspect(plugin, args.creation_id).resourceKind });
+        const resource = await agentCreations.create(plugin, args.creation_id, args.input, context);
+        return { resource_id: resource.id, type: resource.kind, title: resource.title };
       }); },
     }),
     defineTopLevelTool({

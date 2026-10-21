@@ -17,7 +17,9 @@ export const CreationInspectResult = builtin.data("creation.inspect",
   creationEntrySchema.extend({ guidelines: z.array(z.string()), input: jsonSchema })
     .describe("Creation entry identity, resource type, description, guidelines, and input JSON schema."));
 export const ResourceCreateResult = builtin.data("resource.create",
-  z.strictObject({ resource_id: z.string(), type: z.string() })
-    .describe("Identity and type of the created resource, now linked to you."));
+  z.union([
+    z.strictObject({ type: z.string() }),
+    z.strictObject({ resource_id: z.string(), type: z.string(), title: z.string().optional() }),
+  ]).describe("Resource type during creation; committed resource identity, type, and title on success."));
 export const ResourceRemoveResult = builtin.data("resource.remove",
   z.strictObject({ resource_id: z.string() }).describe("Identity of the removed resource."));

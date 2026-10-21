@@ -42,6 +42,7 @@ export class ViewRegistry {
     const plugin = pluginOf(kind);
     return this.resources.get(kind) ?? { kind, label: plugin ? withValues(objectsMessages.kindMissing, { plugin }) : objectsMessages.kindResource, icon: createElement(Box, { className: "size-4" }) };
   }
+  resourceDescriptions(): readonly ResourceDescription[] { return [...this.resources.values()]; }
   creation(id: string): CreationEntry | undefined {
     return this.creations.find(entry => entry.id === id);
   }

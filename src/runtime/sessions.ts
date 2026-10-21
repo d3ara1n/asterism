@@ -1,4 +1,4 @@
-import { resourceCall, jsonSchema, type CreationContract, type ResourceCall, type Json, type ModelInputPart, ResourceStatusChanged, SessionTitleChanged } from "@atelier/sdk/contracts";
+import { resourceCall, jsonSchema, type CreationContract, type ResourceCall, type ResourceCreationResult, type Json, type ModelInputPart, ResourceStatusChanged, SessionTitleChanged } from "@atelier/sdk/contracts";
 import { type ResourceRef, type PluginDefinition, type ResourceCreationOptions, PluginApiError } from "@atelier/sdk/runtime";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
@@ -288,17 +288,17 @@ export class SessionService {
       this.workbench.mutate({ type: "object.remove", sessionId, objectId: ref.id });
     });
   }
-  private readonly pendingCreations = new Map<symbol, { sessionId: string; controller: AbortController; done: Promise<ResourceRef> }>();
+  private readonly pendingCreations = new Map<symbol, { sessionId: string; controller: AbortController; done: Promise<ResourceCreationResult> }>();
   private createResource(sessionId: string, kind: string, call: ResourceCall, content: ContentLease,
-    options: { signal?: AbortSignal; position?: { x: number; y: number }; linkTo?: ResourceRef; resources?: readonly ResourceRef[]; check?(): void } = {}): Promise<ResourceRef> {
+    options: { signal?: AbortSignal; position?: { x: number; y: number }; linkTo?: ResourceRef; resources?: readonly ResourceRef[]; check?(): void } = {}): Promise<ResourceCreationResult> {
     const controller = new AbortController();
     const signal = options.signal ? AbortSignal.any([controller.signal, options.signal]) : controller.signal;
     const key = Symbol();
     const abortContent = () => content.controller.abort();
     signal.addEventListener("abort", abortContent, { once: true });
     // 先登记，防止异步准备期间移动游标；成功提交始终追加到当前时间线。
-    let resolve!: (ref: ResourceRef) => void, reject!: (error: unknown) => void;
-    const done = new Promise<ResourceRef>((accept, fail) => { resolve = accept; reject = fail; });
+    let resolve!: (ref: ResourceCreationResult) => void, reject!: (error: unknown) => void;
+    const done = new Promise<ResourceCreationResult>((accept, fail) => { resolve = accept; reject = fail; });
     const pending = { sessionId, controller, done };
     this.pendingCreations.set(key, pending);
     void (async () => {
@@ -318,7 +318,7 @@ export class SessionService {
           const ref = { sessionId, id, kind };
           if (options.linkTo) this.setLink(sessionId, options.linkTo, ref, true);
           for (const resource of options.resources ?? []) this.setLink(sessionId, ref, resource, true);
-          return ref;
+          return { ...ref, title: this.requireRef(sessionId, ref).title };
         });
       } finally {
         signal.removeEventListener("abort", abortContent);
@@ -329,7 +329,7 @@ export class SessionService {
     return done;
   }
   private async createFromPlugin(sessionId: string, contract: CreationContract<unknown>, input: Json,
-    options: ResourceCreationOptions & { owner: string; check(): void }): Promise<ResourceRef> {
+    options: ResourceCreationOptions & { owner: string; check(): void }): Promise<ResourceCreationResult> {
     options.check();
     if (this.resources.controller(contract.resource.kind)?.creationContract !== contract)
       throw new PluginApiError("invalid_argument", "Use the registered creation contract instance.");

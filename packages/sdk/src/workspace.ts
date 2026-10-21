@@ -4,6 +4,8 @@ import type { ResourceContract } from "./module-contract.ts";
 import type { SessionView } from "./records.ts";
 
 export interface ResourceRef { readonly sessionId: string; readonly id: string; readonly kind: string }
+/** 已提交创建的身份与当时标题；标题是结果摘要，不参与资源身份校验。 */
+export interface ResourceCreationResult extends ResourceRef { readonly title: string }
 export interface SessionSummary { readonly id: string; readonly title: string; readonly createdAt: string }
 /** 同一宿主运行实例共享的只读会话目录；每次 list 读取当前摘要。 */
 export interface SessionDirectory { list(): readonly SessionSummary[] }

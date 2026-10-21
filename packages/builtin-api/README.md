@@ -1,6 +1,6 @@
 # 内置插件公共 API（`@atelier/builtin-api`）
 
-内置实现与外部插件共同消费的领域契约、后台创建入口与前端扩展 API，当前版本 **0.7.0**。插件身份为 `atelier.builtin`；本包不注册第二个插件，也不依赖 `@atelier/builtin` 实现。公共加载与生命周期规则见 [插件 SDK](../../docs/plugin-sdk.md#公共模块与契约身份)。
+内置实现与外部插件共同消费的领域契约、后台创建入口与前端扩展 API，当前版本 **0.8.0**。插件身份为 `atelier.builtin`；本包不注册第二个插件，也不依赖 `@atelier/builtin` 实现。公共加载与生命周期规则见 [插件 SDK](../../docs/plugin-sdk.md#公共模块与契约身份)。
 
 ## 入口与边界
 
@@ -9,6 +9,7 @@
 - `builtin` 命名空间、Agent 资源与创建／提交／继续／配置／取消动作。
 - Agent 输入、配置、选择和历史记录契约，以及会话命名记录与 `NamingApi` 接口类型。
 - `AgentConfigurations` 与 `ModelConfiguration` 目录契约；只包含内置领域需要的配置视图，不暴露配置文件、凭据、测试与覆盖编辑状态。
+- `ReadAgentCreations`：通过 SDK 具型调用查询模型创建入口与资源类型的关联，供前后端公共消费者使用。
 - `resolveAgentModelSelection`：按目录解析代理选择的模型引用、可用模型与思考等级，供摘要展示；`resolveAgentModel` 只取其中的模型。展示结果不改写原始选择，也不替代请求边界校验。
 
 `@atelier/builtin-api/renderer` 依赖宿主共享的 React，提供 Agent 界面登记和呈现 API，只允许前端导入。执行循环、压缩策略、提交去重、卡片投影及实际布局属于实现包。取得契约不授予对象写权限；外部准备者仍只能读取宿主绑定的对象门面。顶层工具与插件调用接口属于 [SDK](../sdk/README.md)，内置 ask_user 通过这些公共接口消费 Agent UI。
@@ -25,12 +26,12 @@
   "version": "1.0.0",
   "type": "module",
   "peerDependencies": {
-    "@atelier/sdk": "^0.26.0",
-    "@atelier/builtin-api": "^0.7.0"
+    "@atelier/sdk": "^0.27.0",
+    "@atelier/builtin-api": "^0.8.0"
   },
   "atelier": {
     "id": "example.input-review",
-    "api": { "major": 10, "minMinor": 1 },
+    "api": { "major": 10, "minMinor": 2 },
     "runtime": "./src/runtime.ts"
   }
 }
@@ -59,6 +60,8 @@ const agentCreation = defineAgentCreation({
 需要不同的模型参数时，同时提供 `inputSchema` 与同步 `toInput(input, { object })`；`object` 为调用绑定的只读执行者。模型输入按该 schema 解析后交给转换函数，转换结果再由原创建契约解析；直接复用时不重复执行创建 schema 的 transform。可选的同步 `toOptions(input, { object })` 接收同一份已解析输入，返回 `ToolSession.create` 的创建选项，沿用宿主授权与事务校验。完整可编译例子见 [`examples/resource-creation.ts`](examples/resource-creation.ts)。
 
 入口 ID 属于声明插件；同宿主重复 ID 明确失败。目录按宿主实例隔离，并随插件装配失败或关闭撤销登记。`agentCreations.list(plugin)` 返回摘要，`inspect(plugin, id)` 返回输入 schema 与规则，`create(plugin, id, input, toolContext)` 消费本次工具的受约束会话能力。模型工具、各入口输入、初始链接与移除规则见 [Agent 创建与移除](../../docs/runtime.md#agent-创建与移除)。
+
+这里的 Agent 创建入口指供 Agent 调用的资源创建通路，适用于笔记、Agent 及第三方资源。前端通过 `useRendererCalls().invoke(ReadAgentCreations, {}, { signal })` 读取 `{ id, resourceKind }[]`，再用 SDK 的 `useRendererResources()` 查询资源类型的本地化名称和图标；入口 ID、创建契约 ID 与资源类型分别寻址，无需同名。查询不创建资源，也不开放执行权限。
 
 ## Agent 界面扩展
 

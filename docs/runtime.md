@@ -133,12 +133,14 @@ Agent 从当前时间线中属于自身的记录投影回合状态（`empty / co
 | `agent_list` | 返回启用代理配置的选择信息，字段边界见 [代理配置](model-configuration.md#代理配置) |
 | `creation_list` | 返回可用 Agent 创建入口的 ID、资源类型与说明 |
 | `creation_inspect` | 按 `creation_id` 返回入口输入 schema 与指导 |
-| `resource_create` | 接收 `creation_id` 与该入口 schema 定义的结构化 `input`，在当前执行会话创建资源并链接给发起者，返回资源 ID 与类型 |
+| `resource_create` | 接收 `creation_id` 与该入口 schema 定义的结构化 `input`，在当前执行会话创建资源并链接给发起者，成功返回资源 ID、类型与提交时的通用标题 |
 | `resource_remove` | 接收当前请求有效链接范围内的 `resource_id`，通过宿主公共操作移除资源 |
 
 schema 可从 skill、文档、历史知识或 `creation_inspect` 获知；创建不要求预先枚举或 inspect，也不记录“是否已经获知”。实际执行验证入口可用性、参数、资源提供方的领域条件及当前执行作用域。新链接沿用请求边界规则，下一次模型请求取用。
 
 领域参数由各创建入口声明。内置 Agent 入口的 `input` 包含 `selection`、可选 `title` 与可选 `resources`；笔记入口的 `input` 包含 `title / content`。通用 `resource_create` 的外层参数固定为 `creation_id / input`，按入口 schema 传递输入。
+
+`resource_create` 解析到入口后发布 `{ type }` 作为过程产出，失败或取消保留该类型；创建成功后结果为 `{ resource_id, type, title }`，其中 `title` 直接取通用创建结果。界面阶段与标题展示见 [创建工具视图](workbench.md#工具调用三态视图)。
 
 Agent 入口的 `input.resources` 逐项引用发起者本次请求开始时已链接的资源；省略或空列表表示初始接收链接为空，重复 ID 合并。该入口通过 `toInput` 提交代理配置与标题，通过 `toOptions` 交付初始资源链接。宿主在工具会话门面检查请求授权范围，在创建提交时检查资源当前仍存在、属于同一会话且新资源支持接收链接。创建身份、初始数据、发起者到新资源的链接和新资源接收的全部链接同事务提交，任一失败整体回滚。源资源与发起者的链接保留，新代理按自己的配置解析工具策略。
 

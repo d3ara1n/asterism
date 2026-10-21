@@ -22,7 +22,7 @@ export class SessionWorkbench {
     private readonly tools: (sessionId: string, agentId: string, resource: FoldedObject) => Json,
     private readonly content?: ContentStore) {}
 
-  /** 通用资源创建：资源贡献给出标题并保存对象数据；创建事件只记录身份与类型。 */
+  /** 通用资源创建：资源贡献给出标题并保存对象数据；创建事件保存身份、类型与标题。 */
   create(sessionId: string, kind: string, input: Json, position: Point, content?: ContentLease): string {
     return this.createWith(sessionId, kind, createResourceId(), input, position, content);
   }

@@ -1,7 +1,7 @@
 import type { Json } from "./json.ts";
 import type { DataContract } from "./presentation.ts";
 import type { RecordContract } from "./records.ts";
-import type { ResourceRef, ResourceSnapshot, SessionSnapshot } from "./workspace.ts";
+import type { ResourceRef, ResourceCreationResult, ResourceSnapshot, SessionSnapshot } from "./workspace.ts";
 import type { ContentReader, ContentScope } from "./content-runtime.ts";
 import type { EventPublisher } from "./events.ts";
 import type { CreationContract } from "./commands.ts";
@@ -31,7 +31,7 @@ export interface SessionReader {
   readonly title: { get(): string };
 }
 export interface SessionExecutor extends SessionReader {
-  create<I, S extends Json, O extends Json>(contract: CreationContract<I, S, O>, input: NoInfer<I> & Json, options?: ResourceCreationOptions): Promise<ResourceRef>;
+  create<I, S extends Json, O extends Json>(contract: CreationContract<I, S, O>, input: NoInfer<I> & Json, options?: ResourceCreationOptions): Promise<ResourceCreationResult>;
   link(receiver: ResourceRef, resource: ResourceRef): void;
   unlink(receiver: ResourceRef, resource: ResourceRef): void;
   /** 移除已收束对象并解除所有链接；保留历史与外部实体。 */
@@ -42,7 +42,7 @@ export interface SessionExecutor extends SessionReader {
 }
 /** 工具调用绑定的会话操作：创建后链接给发起者，移除限定于请求开始时的链接集合。 */
 export interface ToolSession extends SessionReader {
-  create<I, S extends Json, O extends Json>(contract: CreationContract<I, S, O>, input: NoInfer<I> & Json, options?: { resources?: readonly string[] }): Promise<ResourceRef>;
+  create<I, S extends Json, O extends Json>(contract: CreationContract<I, S, O>, input: NoInfer<I> & Json, options?: { resources?: readonly string[] }): Promise<ResourceCreationResult>;
   remove(resourceId: string): void;
 }
 export interface ObjectReader {

@@ -6,7 +6,7 @@ import { z } from "zod";
 import { defineCreation, defineAction, defineRecord, pluginNamespace, thinkingLevels, type Json, type ResourceRef } from "@atelier/sdk/contracts";
 import { definePlugin, defineModule, implementCreation, implementResource, implementPreparer, type PluginContext, type PluginDefinition, type ObjectExecutor, type ToolSession, defineTopLevelTool } from "@atelier/sdk/runtime";
 import { agentCreations, defineAgentCreation } from "@atelier/builtin-api/runtime";
-import { CreateAgent } from "@atelier/builtin-api/contracts";
+import { CreateAgent, ReadAgentCreations } from "@atelier/builtin-api/contracts";
 import { CreateNote } from "../../packages/builtin/src/notes/contract.ts";
 import { ApplicationService } from "../runtime/service.ts";
 import type { ModelAdapter } from "../model/contract.ts";
@@ -100,14 +100,14 @@ describe("SDK 会话资源生命周期", () => {
     expect(() => context.sessions.list()).toThrow("closed");
   });
 
-  // 依据具型创建与归属契约：调用者持公开声明，初始化属于提供者；同 ID 副本不能绕过声明身份校验。
-  it("跨插件创建只解析一次，返回引用而不泄露私有写句柄，并枚举会话摘要", async () => {
+  // 依据具型创建与归属契约：标题来自提供者，即使输入没有标题；同 ID 副本不能绕过声明身份校验。
+  it("跨插件创建只解析一次，返回身份与实际标题而不泄露私有数据，并枚举会话摘要", async () => {
     let consumer!: PluginContext;
     const caller = pluginNamespace("test.caller");
     const f = open({ plugins: [definePlugin({ namespace: caller, version: "1", setup(plugin) { consumer = plugin; return {}; } })] });
     const other = f.app.sessions.tree.create("Other");
     const ref = await consumer.session(f.sessionId).create(Create, 4);
-    expect(ref).toMatchObject({ sessionId: f.sessionId, kind: Item.kind });
+    expect(ref).toEqual({ sessionId: f.sessionId, kind: Item.kind, id: expect.any(String), title: "Item" });
     expect(f.plugin.object(f.sessionId, Item, ref.id).get(State)).toBe(5);
     expect(() => consumer.object(f.sessionId, Item, ref.id)).toThrow("another plugin");
     await expect(consumer.session(f.sessionId).create({ ...Create }, 4)).rejects.toThrow("registered creation contract");
@@ -202,11 +202,11 @@ describe("Agent 创建与移除入口", () => {
     calls = [{ name: "resource_create", args: { creation_id, input, resources: [] } }];
     expect((await run()).tools[0]?.kind).toBe("rejected");
     calls = [{ name: "resource_create", args: { creation_id, input: { ...input, resources: [] } } }];
-    expect((await run()).tools[0]?.kind).toBe("rejected");
+    expect((await run()).tools[0]).toMatchObject({ kind: "rejected", data: { type: CreateNote.resource.kind } });
     expect(f.session.snapshot().position.nodeId).toBe(before);
     calls = [{ name: "resource_create", args: { creation_id, input } }];
     const result = await run();
-    expect(result.tools[0]).toMatchObject({ kind: "succeeded", data: { type: CreateNote.resource.kind } });
+    expect(result.tools[0]).toMatchObject({ kind: "succeeded", data: { type: CreateNote.resource.kind, title: "A note" } });
     const noteId = (result.tools[0]!.data as { resource_id: string }).resource_id;
     expect(f.app.sessions.snapshot(f.sessionId).workbench.links).toEqual([{ agentId: actor.id, resourceId: noteId }]);
   });
@@ -300,7 +300,7 @@ describe("Agent 创建与移除入口", () => {
     const denied = await run([]);
     expect(denied.tools[0]?.kind).toBe("rejected");
     const created = await run();
-    expect(created.tools[0]).toMatchObject({ kind: "succeeded", data: { type: Item.kind } });
+    expect(created.tools[0]).toMatchObject({ kind: "succeeded", data: { type: Item.kind, title: "Item" } });
     const result = created.tools[0]!.data as { resource_id: string };
     expect(f.plugin.object(f.sessionId, Item, result.resource_id).get(State)).toBe(9);
     expect(f.app.sessions.snapshot(f.sessionId).workbench.links).toEqual([{ agentId: actor.id, resourceId: result.resource_id }]);
@@ -340,7 +340,7 @@ describe("Agent 创建与移除入口", () => {
   });
 
   // 依据插件生命周期与公共服务作用域：失败贡献即时移除，不串入另一个宿主实例。
-  it("创建目录按宿主隔离，后置装配失败撤销登记", () => {
+  it("创建目录按宿主隔离，公开查询包含第三方类型且排除失败登记", async () => {
     const extra = pluginNamespace("test.extra"), missing = defineAction(extra.resource("missing", z.object({})), { id: extra.name("missing"), schema: z.null() });
     const failed = definePlugin({ namespace: extra, version: "1", modules: [
       defineAgentCreation({ id: extra.name("new"), description: "Invalid contribution.", creation: Create }),
@@ -352,5 +352,10 @@ describe("Agent 创建与移除入口", () => {
     expect(agentCreations.list(first.plugin)).toEqual(agentCreations.list(second.plugin));
     expect(() => agentCreations.inspect(first.plugin, ns.name("new"))).not.toThrow();
     expect(agentCreations.inspect(first.plugin, ns.name("new")).input).toMatchObject({ type: "object", properties: { initial: { type: "number" } } });
+    // 公开展示查询使用真实目录；入口 ID 与创建契约 ID 不同，仍可取得资源类型。
+    const directory = await first.app.sessions.calls.invoke(ReadAgentCreations.id, {}, {}, null);
+    expect(directory).toEqual(agentCreations.list(first.plugin).map(({ id, resourceKind }) => ({ id, resourceKind })));
+    expect(directory).toContainEqual({ id: ns.name("new"), resourceKind: Item.kind });
+    expect(await first.plugin.ipc.calls.invoke(ReadAgentCreations, {}, {})).toEqual(directory);
   });
 });
