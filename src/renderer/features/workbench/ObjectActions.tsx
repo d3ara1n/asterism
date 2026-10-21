@@ -13,7 +13,7 @@ import { useState } from "react";
 
 import { maximumCardDimension, type CardSize, type WorkbenchObject } from "../../../shared/workbench";
 
-import { useSession, useSessionProgress } from "../session/state";
+import { useSessionProgress } from "../session/state";
 import { useWorkbench } from "./context";
 import type { ViewPatch } from "./ObjectCard";
 
@@ -46,14 +46,12 @@ function RemoveObject({ object, onClose }: { object: WorkbenchObject; onClose: (
   const i18n = useI18n();
   const { controller, session, ready, busy, run } = useWorkbench();
   const progress = useSessionProgress(controller);
-  const { state } = useSession(controller);
   const [saving, setSaving] = useState(false);
   const unsettled = progress.unsettledObjectIds.includes(object.id);
   const disabled = !ready || busy || saving || unsettled;
   return <AlertDialog open onOpenChange={open => { if (!open && !saving) onClose(); }}><AlertDialogContent>
     <AlertDialogHeader><AlertDialogTitle>{i18n.formatMessage(objectsMessages.removeObjectTitle)}</AlertDialogTitle><AlertDialogDescription>{i18n.formatMessage(objectsMessages.removeObjectDescription, { title: object.title })}</AlertDialogDescription></AlertDialogHeader>
     {unsettled && <p className="type-caption">{i18n.formatMessage(objectsMessages.objectStillActive)}</p>}
-    {state.status !== "error" && state.error && <p className="type-caption" role="alert">{i18n.text(state.error)}</p>}
     <AlertDialogFooter><AlertDialogCancel disabled={saving}>{i18n.formatMessage(commonMessages.cancel)}</AlertDialogCancel><AlertDialogAction variant="destructive" disabled={disabled} aria-busy={saving}
       onClick={event => { event.preventDefault(); setSaving(true); void run({ type: "object.remove", sessionId: session.id, objectId: object.id })
         .then(saved => { if (saved) onClose(); }).finally(() => setSaving(false)); }}>{saving && <Spinner />}{i18n.formatMessage(commonMessages.remove)}</AlertDialogAction></AlertDialogFooter>

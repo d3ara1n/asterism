@@ -249,7 +249,6 @@
   "agent_conversation_Conversation_4": "代理正在执行…",
   "agent_conversation_Conversation_5": "发送消息开始对话。",
   "agent_conversation_Conversation_6": "最新内容",
-  "agent_conversation_Conversation_7": "重新读取",
   "turnMetrics.cache": "缓存命中率",
   "turnMetrics.throughput": "输出吞吐 · E2E",
   "turnMetrics.turn": "本轮",

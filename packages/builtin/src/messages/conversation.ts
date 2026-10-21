@@ -57,10 +57,6 @@ export const conversationMessages = pluginNamespace("atelier.builtin").messages(
     id: "agent_conversation_Conversation_6",
     defaultMessage: "Latest output",
   },
-  reload: {
-    id: "agent_conversation_Conversation_7",
-    defaultMessage: "Reload",
-  },
   incomplete: {
     id: "agent_conversation_ConversationTimeline_4",
     defaultMessage: "Incomplete",

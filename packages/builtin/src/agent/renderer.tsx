@@ -1,5 +1,5 @@
 import { AgentView } from "./data.ts";
-import { creationEntry, cardRenderer, useRendererNavigation, useRendererObject, type RendererModule } from "@atelier/sdk/renderer";
+import { creationEntry, cardRenderer, useRendererObject, type RendererModule } from "@atelier/sdk/renderer";
 import { Bot } from "lucide-react";
 import type { z } from "zod";
 
@@ -36,11 +36,10 @@ export default {
 } satisfies RendererModule;
 
 function AgentBody({ data }: { data: z.infer<typeof AgentView.schema> }) {
-  const navigation = useRendererNavigation();
   const object = useRendererObject();
   const executionState = agentExecutionState(data.turnState, object.activity.running);
   const interaction = useAgentConversation(object, data.selection !== null, executionState);
   return <AgentConversationProvider value={interaction}>
-    <AgentUI selection={data.selection}><Conversation onHome={navigation.home} /></AgentUI>
+    <AgentUI selection={data.selection}><Conversation /></AgentUI>
   </AgentConversationProvider>;
 }

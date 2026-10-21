@@ -5,6 +5,7 @@ import { commonMessages } from "@atelier/ui/messages/common";
 import { historyMessages } from "../../messages/history";
 import { useModuleViews } from "../../modules/views";
 import { getI18n, useI18n } from "../../shared/i18n";
+import { operationSucceeded } from "../../shared/toast";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@atelier/ui/ui/alert-dialog";
 import { Button } from "@atelier/ui/ui/button";
 import { ListRow, ListRowAction } from "@atelier/ui/ui/list-row";
@@ -84,7 +85,7 @@ export function SessionHistoryPanel({ controller }: { controller: SessionControl
   useLayoutEffect(() => {
     tabs.current?.querySelector<HTMLElement>('[data-state="active"]')?.scrollIntoView({ block: "nearest", inline: "nearest" });
   }, [branch.id]);
-  if (!snapshot) return <IslandPanel title={i18n.formatMessage(historyMessages.history)}><p className="type-caption">{i18n.text(state.error ?? historyMessages.historyLoadingBody)}</p></IslandPanel>;
+  if (!snapshot) return <IslandPanel title={i18n.formatMessage(historyMessages.history)}><p className="type-caption">{i18n.text(state.readError ?? historyMessages.historyLoadingBody)}</p></IslandPanel>;
   const selected = entries.find(entry => entry.node.id === selectedId);
   const selectedVisible = selectedId === null ? showStart : visible.some(entry => entry.node.id === selectedId);
   const junction = (nodeId: string | null) => <BranchNavigationRow
@@ -107,7 +108,6 @@ export function SessionHistoryPanel({ controller }: { controller: SessionControl
       <div className="flex items-center justify-between gap-2"><p className="type-caption min-w-0 truncate" title={selected?.label ?? i18n.formatMessage(historyMessages.historyStart)}>
         {selected?.label ?? i18n.formatMessage(historyMessages.historyStart)}</p></div>
       {!selectedVisible && (search || view.kind !== "all") && <p className="type-caption">{i18n.formatMessage(historyMessages.historyFiltered)}</p>}
-      {state.status !== "error" && state.error && <p role="alert" className="type-caption">{i18n.text(state.error)}</p>}
     </>}>
       {tree.branches.map(item => <TabsContent key={item.id} value={item.id}>{item.id === branch.id && <>
         {showStart && <div data-selected={selectedId === null}>
@@ -215,10 +215,9 @@ function ContinueAction({ controller, nodeId }: { controller: SessionController;
       <AlertDialogHeader><AlertDialogTitle>{i18n.formatMessage(historyMessages.continueTitle)}</AlertDialogTitle><AlertDialogDescription>{i18n.formatMessage(historyMessages.continueDescription)}</AlertDialogDescription></AlertDialogHeader>
       <p className="type-body break-words">{actualEntry?.label ?? i18n.formatMessage(historyMessages.historyStart)}</p>
       {unsettled && <p className="type-caption">{wait}</p>}
-      {state.status !== "error" && state.error && <p className="type-caption" role="alert">{i18n.text(state.error)}</p>}
       <AlertDialogFooter><AlertDialogCancel disabled={saving}>{i18n.formatMessage(commonMessages.cancel)}</AlertDialogCancel><AlertDialogAction disabled={disabled} aria-busy={saving} onClick={event => {
         event.preventDefault(); if (!target) return; setSaving(true);
-        void controller.branchFrom(target.id).then(result => { if (result.ok) setTarget(null); }).finally(() => setSaving(false));
+        void controller.branchFrom(target.id).then(result => { if (operationSucceeded(result)) setTarget(null); }).finally(() => setSaving(false));
       }}>{saving && <Spinner />}{i18n.formatMessage(historyMessages.continueConfirm)}</AlertDialogAction></AlertDialogFooter>
     </AlertDialogContent></AlertDialog></>;
 }

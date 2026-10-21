@@ -79,7 +79,7 @@ describe("会话视图所有权", () => {
     if (action === "error") requests[2]!.resolve({ ok: false, error: { code: "unavailable", message: "Read failed.", display: "Read failed." } });
     else disconnect();
     expect((await saved).ok).toBe(true); // 受理结果与查询失败分别表达。
-    if (action === "error") expect(controller.getSnapshot()).toMatchObject({ status: "error", error: "Read failed." });
+    if (action === "error") expect(controller.getSnapshot()).toMatchObject({ status: "error", readError: "Read failed." });
     disconnect();
   });
 
@@ -126,7 +126,7 @@ describe("会话视图所有权", () => {
     expect((await second).ok).toBe(false);
     expect(requests.filter(r => r.command.type === "resource.create")).toHaveLength(1);
     expect(controller.getSnapshot().status).toBe("error");
-    expect(controller.getSnapshot().error).toBe("Read failed.");
+    expect(controller.getSnapshot().readError).toBe("Read failed.");
     disconnect();
   });
 
@@ -143,32 +143,41 @@ describe("会话视图所有权", () => {
     disconnect();
   });
 
-  // 工作台状态反馈：手动重试和后续通知恢复读取时都撤下旧读取错误，不影响操作错误的保留。
+  // 工作台状态反馈：读取错误独立于命令回执，手动重试和后续通知恢复后撤下读取错误。
   it.each(["refresh", "notification"] as const)("读取失败保留画面并阻止基于旧数据操作，经 %s 恢复后清除读取错误", async recovery => {
     const { controller, requests, notify } = fixture(); const disconnect = controller.connect();
     requests[0]!.resolve(view(snapshot(1))); await flush();
     void controller.refresh();
     requests[1]!.resolve({ ok: false, error: { code: "unavailable", message: "Read failed.", display: "Read failed." } }); await flush();
     expect(controller.getSnapshot()).toMatchObject({ status: "error", snapshot: { cursor: "current" } });
-    expect(await controller.mutate({ type: "object.remove", sessionId: "s", objectId: "note" })).toBe(false);
+    expect((await controller.execute({ type: "object.remove", sessionId: "s", objectId: "note" })).ok).toBe(false);
     if (recovery === "refresh") void controller.refresh();
     else notify(2);
     expect(requests.at(-1)!.command).toEqual({ type: "read", sessionId: "s" });
     requests.at(-1)!.resolve(view(snapshot(2))); await flush();
-    expect(controller.getSnapshot()).toMatchObject({ status: "ready", error: null });
+    expect(controller.getSnapshot()).toMatchObject({ status: "ready", readError: null });
     disconnect();
   });
 
-  it("操作错误由会话持有，后台重读不清除它，调用方可明确关闭", async () => {
-    const { controller, requests } = fixture(); const disconnect = controller.connect();
+  // 工作台反馈归属：操作失败只随本次回执交给发起者，共享视图只拥有自己的读取异常。
+  it.each(["resource.create", "resource.command"] as const)("%s 失败只通过回执交付，重读前后均不保存为会话状态", async type => {
+    const { controller, requests, notify } = fixture(); const disconnect = controller.connect();
     requests[0]!.resolve(view(snapshot(1))); await flush();
-    const failed = controller.execute({ type: "resource.create", sessionId: "s", kind: "directory", creation: { id: "directory/create" }, input: { path: "relative" }, position: { x: 0, y: 0 } }); await flush();
-    requests[1]!.resolve({ ok: false, error: { code: "invalid_request", message: "Directory path must be absolute.", display: "Directory path must be absolute." } });
-    expect((await failed).ok).toBe(false);
+    const command = type === "resource.command"
+      ? { type, sessionId: "s", objectId: "new-agent", command: resourceCall(ContinueAgent, { type: "continue" }) }
+      : { type, sessionId: "s", kind: "atelier.builtin/agent", creation: { id: "atelier.builtin/agent.create" },
+        input: {}, position: { x: 0, y: 0 } };
+    const failed = controller.execute(command); await flush();
+    const failure = { ok: false as const, error: { code: "model_unavailable", message: "The selected model is unavailable.", display: "Model unavailable." } };
+    requests[1]!.resolve(failure);
+    expect(await failed).toEqual(failure);
+    expect(controller.getSnapshot()).not.toHaveProperty("error");
+    expect(controller.getSnapshot().readError).toBeNull();
     requests[2]!.resolve(view(snapshot(1))); await flush();
-    expect(controller.getSnapshot()).toMatchObject({ status: "ready", error: "Directory path must be absolute." });
-    controller.clearError();
-    expect(controller.getSnapshot().error).toBeNull();
+    expect(controller.getSnapshot()).toMatchObject({ status: "ready", readError: null });
+    notify(2);
+    requests[3]!.resolve({ ok: false, error: { code: "unavailable", message: "Read failed.", display: "Read failed." } }); await flush();
+    expect(controller.getSnapshot()).toMatchObject({ status: "error", readError: "Read failed." });
     disconnect();
   });
 

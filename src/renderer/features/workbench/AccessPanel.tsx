@@ -104,8 +104,6 @@ function AccessRow({ agent, resource, object }: { agent: WorkbenchObject; resour
     } else if (current.status !== "error") {
       const message = errorDisplay(result.error);
       setError(message);
-      // 此命令的错误在对应行呈现；不清除其他操作产生的错误。
-      if (current.error === message) controller.clearError();
     }
   };
   const id = `access-${agent.id}-${resource.id}`;

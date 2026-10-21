@@ -1,7 +1,16 @@
 import { useEffect, useRef, type MouseEvent } from "react";
 import { toast } from "sonner";
+import type { RendererReceipt } from "@atelier/sdk/renderer";
+import { errorDisplay } from "../../shared/error-display";
+import { getI18n } from "./i18n";
 
 export { toast };
+
+/** 操作入口消费本次回执；失败即时提示，不存入会话或其他对象的状态。 */
+export function operationSucceeded(result: RendererReceipt): boolean {
+  if (!result.ok) toast.error(getI18n().text(errorDisplay(result.error)));
+  return result.ok;
+}
 
 export interface ToastAction { label: string; onClick: () => void }
 

@@ -47,7 +47,7 @@ export function useObjectContext(object: WorkbenchObject): RendererObjectContext
     content,
     input: contract => contentInput({ sessionId: controller.sessionId, resourceKind: contract.resource.kind, contractId: contract.id,
       ...(contract.kind === "action" ? { objectId: object.id } : {}) }),
-    view: { ready: workbench.ready, busy: state.busy, status: state.status, error: state.error, missing: state.missing },
+    view: { ready: workbench.ready, busy: state.busy, status: state.status, error: state.readError, missing: state.missing },
     session: {
       snapshot: () => records, subscribe: controller.subscribe,
       create: (contract, input, position, options) => contentCommand(options?.content,

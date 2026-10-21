@@ -7,6 +7,7 @@ import type { ObjectNodeType } from "./ObjectNode";
 import { placeObject } from "./placement";
 import { cardSize, fallbackCardAppearance } from "./sizing";
 import { defaultOverviewMinZoom, locateViewport, overviewMinZoom } from "./viewport";
+import { operationSucceeded } from "../../shared/toast";
 
 export type ObjectPlacement = { sessionId: string; position: Point; selectedObjectIds: string[] };
 
@@ -75,7 +76,7 @@ export function useWorkbenchCanvas(nodes: ObjectNodeType[], setNodes: Dispatch<S
     const hidden = new Set(workbench.views.filter(view => view.hidden).map(view => view.objectId));
     for (const objectId of objectIds) {
       if (!hidden.has(objectId)) continue;
-      if (!valid() || !(await controller.executeAndRead({ type: "view.set", sessionId: controller.sessionId, objectId, hidden: false })).ok) return;
+      if (!valid() || !operationSucceeded(await controller.executeAndRead({ type: "view.set", sessionId: controller.sessionId, objectId, hidden: false }))) return;
     }
     // 受理与节点投影分离；画布等待全部目标测量，而非猜测某一帧已经渲染完。
     if (valid()) setLocating({ objectIds, select: options?.select ?? false, token, selectionVersion: state.selectionVersion });

@@ -13,6 +13,7 @@ import { Separator } from "@atelier/ui/ui/separator";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@atelier/ui/ui/tooltip";
 import { cn } from "@atelier/ui/utils";
 import { formatCount } from "@atelier/ui/format-count";
+import { StatusText } from "@atelier/ui/ui/status";
 import { configurationMessages } from "../../messages/configuration";
 import { ConfigurationOptions, type ConfigurationChoice } from "./ConfigurationOptions";
 import { ProviderOptions, ProviderModels } from "./ModelPicker";
@@ -25,7 +26,8 @@ export function AgentConfigurationPicker({ selection, disabled, onChange }: {
   onChange(selection: AgentSelection): Promise<boolean>;
 }) {
   const i18n = useI18n();
-  const configuration = useRendererCatalogs().get(ModelConfiguration);
+  const catalogs = useRendererCatalogs();
+  const configuration = catalogs.get(ModelConfiguration);
   const resolved = useAgentModelSelection();
   const [open, setOpen] = useState(false);
   const [page, setPage] = useState<Page | null>(null);
@@ -102,6 +104,7 @@ export function AgentConfigurationPicker({ selection, disabled, onChange }: {
     }
   }
 
+  if (catalogs.error) return <StatusText tone="error">{i18n.text(catalogs.error)}</StatusText>;
   return <Popover open={open} onOpenChange={value => {
     setOpen(value);
     if (value) { setPage(null); returnTo.current = "agent"; }

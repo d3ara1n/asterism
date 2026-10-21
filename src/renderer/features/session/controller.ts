@@ -11,7 +11,7 @@ type SessionOperation = Exclude<SessionMutation, { type: "start" }>;
 /** 会话界面可发出的变更：命名、布局、链接、移除与资源创建/命令。 */
 export type WorkbenchOperation = Exclude<SessionOperation, { type: "select" }>;
 export type SessionViewState = {
-  snapshot: SessionView | null; status: "loading" | "ready" | "error"; busy: boolean; error: UiText | null; missing: boolean;
+  snapshot: SessionView | null; status: "loading" | "ready" | "error"; busy: boolean; readError: UiText | null; missing: boolean;
   /** 显式游标跳转使旧画布定位失效；普通记录追加不打断定位。 */
   selectionVersion: number;
 };
@@ -19,7 +19,7 @@ const emptyProgress: SessionProgress = { revision: 0, version: 0, unsettledObjec
 
 /** 一个会话的当前投影与操作入口；进度单独订阅。 */
 export class SessionController {
-  private state: SessionViewState = { snapshot: null, status: "loading", busy: false, error: null, missing: false, selectionVersion: 0 };
+  private state: SessionViewState = { snapshot: null, status: "loading", busy: false, readError: null, missing: false, selectionVersion: 0 };
   private progress: SessionProgress = emptyProgress;
   private pendingProgress: SessionProgress | null = null;
   private listeners = new Set<() => void>();
@@ -59,7 +59,7 @@ export class SessionController {
   connect(): () => void {
     if (this.connections++ === 0) {
       this.generation++;
-      this.update({ status: "loading", error: null });
+      this.update({ status: "loading", readError: null });
       this.unsubscribe = this.bridge.onChanged(event => {
         if (event.sessionId !== this.sessionId) return;
         if (event.kind === "session.progress") this.acceptProgress(event.progress);
@@ -84,11 +84,10 @@ export class SessionController {
     queueMicrotask(() => { if (!this.connections && !this.pending) this.onRelease?.(); });
   }
   /** 完整读取用于打开与持久变化；密集通知合并读取。 */
-  clearError = (): void => this.update({ error: null });
-  refresh = (): Promise<void> => { this.update({ status: "loading", error: null }); return this.read(); };
+  refresh = (): Promise<void> => { this.update({ status: "loading", readError: null }); return this.read(); };
   private readFailed(message: UiText, missing = false): void {
     // 读取失败保留旧画面，重新同步前不接受基于旧数据的领域变更。
-    this.update({ status: "error", error: message, missing });
+    this.update({ status: "error", readError: message, missing });
   }
   private async read(): Promise<void> {
     if (!this.connections) return;
@@ -109,7 +108,7 @@ export class SessionController {
         if (snapshot.revision < this.requiredRevision) { this.dirty = true; continue; }
         this.requiredRevision = snapshot.revision;
         this.publishedGeneration = generation;
-        this.update({ snapshot, status: "ready", missing: false, error: this.state.status === "error" ? null : this.state.error });
+        this.update({ snapshot, status: "ready", missing: false, readError: null });
         this.acceptProgress(progress);
         const pending = this.pendingProgress;
         this.pendingProgress = null;
@@ -167,29 +166,28 @@ export class SessionController {
   private async perform(command: SessionOperation, onAccepted?: () => void): Promise<SessionResult> {
     const reject = (code: "conflict" | "invalid_request", message: string, display?: UiText): SessionResult => {
       const error = { code, message, ...(display !== undefined ? { display } : {}) };
-      this.update({ error: errorDisplay(error) }); return { ok: false, error };
+      return { ok: false, error };
     };
     if (command.sessionId !== this.sessionId) return reject("invalid_request", "The command belongs to another session.");
     if (this.state.status !== "ready" && !isLayoutCommand(command) && command.type !== "select" && !(command.type === "resource.command" && isCancel(command.command))) {
-      return reject("conflict", "Wait for the session view to synchronize before making changes.", this.state.error ?? undefined);
+      return reject("conflict", "Wait for the session view to synchronize before making changes.", this.state.readError ?? undefined);
     }
     // 在途读取可能早于本次变更；命令完成后统一重新读取执行游标。
     this.generation++; this.reading = false;
     // 连线与布局在服务端幂等，不依赖旧投影；不进入加载态，避免卡片随之闪烁。
     const quiet = isLayoutCommand(command) || command.type === "link.set";
-    this.update(quiet ? { error: null } : { busy: true, status: "loading", error: null,
+    if (!quiet) this.update({ busy: true, status: "loading", readError: null,
       selectionVersion: this.state.selectionVersion + Number(command.type === "select") });
     try {
       const result = await this.bridge.execute(command);
-      if (!result.ok) this.update({ error: errorDisplay(result.error) });
-      else {
+      if (result.ok) {
         if (result.reply.kind !== "accepted" || result.reply.sessionId !== this.sessionId) throw new Error("Invalid session receipt.");
         onAccepted?.();
       }
       return result;
     } catch {
       const result: SessionResult = { ok: false, error: { code: "unavailable", message: "The session connection was lost. Reload before retrying." } };
-      this.update({ error: errorDisplay(result.error) }); return result;
+      return result;
     } finally {
       if (!quiet) this.update({ busy: false });
       void this.read();
@@ -200,5 +198,4 @@ export class SessionController {
     await this.bridge.execute({ type: "resource.create.cancel", sessionId: this.sessionId, requestId }).catch(() => undefined);
   };
   branchFrom = (nodeId: string | null): Promise<SessionResult> => this.execute({ type: "select", sessionId: this.sessionId, nodeId });
-  mutate = async (command: WorkbenchOperation): Promise<boolean> => (await this.execute(command)).ok;
 }

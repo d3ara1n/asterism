@@ -12,6 +12,7 @@ import { workbenchMessages } from "../../messages/workbench";
 import { RendererCatalogProvider } from "../../modules/object-context";
 import { useModuleViews } from "../../modules/views";
 import { useI18n } from "../../shared/i18n";
+import { operationSucceeded } from "../../shared/toast";
 import { useIsland } from "../../shared/weave/Screen";
 import { useAppearance, useScheme } from "../appearance/state";
 import type { DragKind } from "../creation/routing";
@@ -108,7 +109,7 @@ function Canvas({ ref, session, run, writable, canDrop, onDropItems }: DropHandl
     if (patch.size === undefined) { void run(command); return; }
     void saveCardSize({
       pending: pendingSizes.current, objectId, size: patch.size,
-      saveAndRead: async () => (await controller.executeAndRead(command)).ok,
+      saveAndRead: async () => operationSucceeded(await controller.executeAndRead(command)),
       read: () => {
         const state = controller.getSnapshot();
         return state.status === "ready" ? state.snapshot?.workbench ?? null : null;

@@ -40,6 +40,7 @@ export interface RendererObjectContext {
   input<I, O extends Json>(contract: ActionContract<I, O> | CreationContract<I, Json, O>): RendererContentInput;
   readonly view: {
     ready: boolean; busy: boolean; status: "loading" | "ready" | "error";
+    /** 视图读取异常；对象动作和创建失败通过各自调用回执返回。 */
     error: UiText | null; missing: boolean;
   };
   readonly session: {

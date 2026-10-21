@@ -20,6 +20,6 @@ export function useDiagnostics(scope: DiagnosticScope) {
   }), [history, configuration]);
   const total = useMemo(() => totalEstimatedCost(requests.map(request => request.estimate)), [requests]);
   const overview = useMemo(() => diagnosticOverview(requests, request => request.configuredModel?.contextWindow ?? null), [requests]);
-  return { ...history, requests, total, overview, error: (object.view.status === "error" ? null : object.view.error) ?? catalogs.error };
+  return { ...history, requests, total, overview, error: catalogs.error };
 }
 export type PricedRequest = ReturnType<typeof useDiagnostics>["requests"][number];

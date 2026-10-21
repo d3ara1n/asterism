@@ -1,16 +1,13 @@
 import { StatusBadge, StatusIcon } from "@atelier/ui/ui/status";
 import { ArrowDown } from "lucide-react";
-import { PageState } from "@atelier/ui/ui/page-state";
 import { Button } from "@atelier/ui/ui/button";
 import { ConversationTimeline } from "./ConversationTimeline";
 import { ConversationMinimap } from "./ConversationMinimap";
 
-import { Alert, AlertDescription } from "@atelier/ui/ui/alert";
-
 import { MessageComposer } from "./Composer";
 import { commonMessages } from "../../messages/common";
 import { conversationMessages } from "../../messages/conversation";
-import { useI18n, useRendererObject, useRendererModels, useRendererCatalogs } from "@atelier/sdk/renderer";
+import { useI18n, useRendererObject, useRendererModels } from "@atelier/sdk/renderer";
 
 import { useOutputFollow } from "./output-follow";
 import { useMemo, useRef } from "react";
@@ -34,30 +31,23 @@ export function ConversationActions() {
 }
 
 /** 代理卡片内容：当前路径的最终视图与输入区；没有分支感，回溯在会话历史中进行。 */
-export function Conversation({ onHome }: { onHome(): void }) {
+export function Conversation() {
   const i18n = useI18n();
   const object = useRendererObject();
   const { view: state, session } = object;
   const interaction = useConversationInteraction();
   const { executionState } = interaction;
   const models = useRendererModels();
-  const catalogs = useRendererCatalogs();
   const { ready } = state;
   const agentId = object.ref.id;
   const snapshot = session.snapshot();
   const running = executionState === "running";
   const timeline = useMemo(() => snapshot ? conversationTimeline(snapshot, agentId, models.blocks, running) : [], [snapshot, agentId, models.blocks, running]);
-  const configurationError = catalogs.error;
   const { scroll, contentRef, awayFromBottom, latest, jumpTo, onScroll } = useOutputFollow(timeline);
   const composer = useRef<HTMLTextAreaElement>(null);
   const composerHidden = useComposerHidden();
 
-  if (!snapshot) return state.status === "loading" ? null : <div className="flex flex-1 items-center justify-center p-6">
-    <PageState kind="error" title={i18n.formatMessage(commonMessages.unavailableTitle)} body={i18n.text(state.error ?? commonMessages.unavailableBody)}
-      action={<Button variant="secondary" size="sm" onClick={state.missing ? onHome : () => { void session.refresh(); }}>{state.missing ? i18n.formatMessage(commonMessages.newConversation) : i18n.formatMessage(commonMessages.retry)}</Button>} />
-  </div>;
-
-  const error = (state.status === "error" ? null : state.error) ?? configurationError ?? interaction.error;
+  if (!snapshot) return null;
   const send = async () => {
     if (composerHidden) return;
     if (!await interaction.send()) return;
@@ -91,10 +81,6 @@ export function Conversation({ onHome }: { onHome(): void }) {
     <AgentUIRegion position="bottom" />
     {!composerHidden && <footer className="shrink-0 space-y-1 border-t px-3 pt-1 pb-2">
       <AgentToolbar />
-      {error && <Alert variant="destructive"><AlertDescription className="flex flex-wrap items-center gap-2">
-        <span className="flex-1">{i18n.text(error)}</span>
-        <Button variant="ghost" size="sm" onClick={() => { void session.refresh(); }}>{i18n.formatMessage(conversationMessages.reload)}</Button>
-      </AlertDescription></Alert>}
       <MessageComposer draft={interaction.draft} inputRef={composer}
         busy={state.busy} ready={ready} executionState={executionState} writable={interaction.writable} onSend={send}
         onCancel={interaction.cancel} onContinue={resume} />

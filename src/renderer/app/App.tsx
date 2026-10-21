@@ -27,7 +27,7 @@ import { usePluginSettingsRegistry } from "../modules/settings";
 import { Screen, type IslandSpec } from "../shared/weave/Screen";
 import { Toaster } from "../shared/ui/sonner";
 import { IconButton } from "@atelier/ui/ui/icon-button";
-import { useStateToast } from "../shared/toast";
+import { operationSucceeded, useStateToast } from "../shared/toast";
 
 import { errorDisplay } from "../../shared/error-display.ts";
 import type { UiText } from "@atelier/sdk/contracts";
@@ -71,7 +71,7 @@ export function App({ controller }: { controller: ApplicationController }) {
   const start = useStart();
   // 每次导航递增；异步创建完成时据此判断用户是否已离开，不夺走当前视图。
   const navigation = useRef(0);
-  const run = useCallback((command: WorkbenchOperation) => sessionController(command.sessionId).mutate(command), []);
+  const run = useCallback(async (command: WorkbenchOperation) => operationSucceeded(await sessionController(command.sessionId).execute(command)), []);
   useEffect(() => controller.connect(), [controller]);
   const active = view.kind === "conversation" ? sessionController(view.sessionId) : null;
   const sessionState = useSyncExternalStore(active?.subscribe ?? idleSubscribe, active?.getSnapshot ?? noSession);
@@ -169,7 +169,7 @@ export function App({ controller }: { controller: ApplicationController }) {
   </> : undefined;
 
   const conversation = <WorkbenchSurface overlay={<WorkbenchFeedback key={active?.sessionId} phase={phase} hasContent={!!session}
-    error={phase === "unavailable" ? state.error : sessionState?.error ?? null} onRetry={() => { void active?.refresh(); }} />}>
+    error={phase === "unavailable" ? state.error : sessionState?.readError ?? null} onRetry={() => { void active?.refresh(); }} />}>
     {session && active ? <Workbench key={session.id} ref={workbench} session={session} controller={active}
       ready={ready} busy={sessionBlocked} run={run} store={workbenchStore}
       onHome={goHome} canDrop={creation.canDrop} onDropItems={creation.drop} /> : null}
@@ -208,11 +208,9 @@ export function App({ controller }: { controller: ApplicationController }) {
   // 会话读取失败由工作台持续提示；后台不可用在工作台可见时也由同一入口承接。
   const unavailableInWorkbench = view.kind === "conversation" && !inSettings && phase === "unavailable";
   const appError = unavailableInWorkbench ? null : state.error;
-  const operationError = unavailableInWorkbench || sessionState?.status === "error" ? null : sessionState?.error;
-  const error = appError ?? operationError;
-  useStateToast("app-error", error ? i18n.text(error) : null, {
+  useStateToast("app-error", appError ? i18n.text(appError) : null, {
     tone: "error",
-    onDismiss: appError ? controller.clearError : active?.clearError,
+    onDismiss: controller.clearError,
   });
 
   return <RendererSettingsNavigationProvider value={{ open(pluginId, location) {
