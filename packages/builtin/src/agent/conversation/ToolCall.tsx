@@ -15,7 +15,7 @@ import { BuiltinSettings } from "../../settings/contract";
 import { advancePeekDisclosure, type PeekDisclosure } from "../peek/disclosure";
 
 const labels = {
-  running: toolsMessages.toolRunning, partial: toolsMessages.toolPartial, failed: toolsMessages.toolFailed,
+  partial: toolsMessages.toolPartial, failed: toolsMessages.toolFailed,
   rejected: toolsMessages.toolRejected, cancelled: toolsMessages.toolCancelled, unknown: toolsMessages.toolUnknown,
 };
 
@@ -38,12 +38,12 @@ export function ToolCall({ node }: { node: ToolCallNode }) {
   const diagnostic = result && ("error" in result ? result.error.message : "message" in result ? result.message : null);
   const error = result?.kind === "failed" || result?.kind === "rejected" || result?.kind === "unknown";
   const status = state.phase === "ready" ? i18n.formatMessage(toolsMessages.toolWaiting) : state.phase === "incomplete" ? i18n.formatMessage(toolsMessages.toolIncomplete)
-    : result && result.kind !== "succeeded" ? i18n.text(labels[result.kind]) : null;
+    : result && result.kind !== "running" && result.kind !== "succeeded" ? i18n.text(labels[result.kind]) : null;
   const tone: StatusTone = error ? "error" : state.phase === "ready" || result?.kind === "partial" ? "warning"
     : state.phase === "executing" ? "progress" : "neutral";
   const icon = state.phase === "input"
     ? <motion.span className="inline-flex" animate={reducedMotion ? undefined : { opacity: [0.45, 1, 0.45] }} transition={{ duration: 1.4, repeat: Infinity }}><TextCursorInput className="size-3.5" /></motion.span>
-    : state.phase === "executing" && !status ? <StatusIcon tone="progress" className="size-3.5" />
+    : state.phase === "executing" ? <StatusIcon tone="progress" className="size-3.5" />
       : view?.icon ?? <Wrench className="size-3.5" />;
   const header = <>
     <span className="inline-flex shrink-0" aria-hidden="true">{icon}</span>

@@ -5,10 +5,6 @@ export const toolsMessages = pluginNamespace("atelier.builtin").messages("en", d
     id: "toolWaiting",
     defaultMessage: "Waiting",
   },
-  toolRunning: {
-    id: "toolRunning",
-    defaultMessage: "Running",
-  },
   toolIncomplete: {
     id: "toolIncomplete",
     defaultMessage: "Not executed",

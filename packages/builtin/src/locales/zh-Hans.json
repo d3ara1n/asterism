@@ -170,7 +170,6 @@
   "agent": "代理",
   "absolutePath": "绝对路径",
   "toolWaiting": "等待执行",
-  "toolRunning": "执行中",
   "toolIncomplete": "未执行",
   "toolIncompleteRequest": "资源操作请求未完成",
   "toolSucceeded": "已完成",
