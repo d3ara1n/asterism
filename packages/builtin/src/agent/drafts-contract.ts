@@ -4,9 +4,8 @@ import { Agent, builtin, userInputPartsSchema, agentMessageSenderSchema } from "
 
 /** 草稿箱属于资源当前数据；界面动作只在内置包内共享。 */
 export const draftModeSchema = z.enum(["none", "steer", "follow"]);
-export const agentDraftSchema = z.strictObject({
+export const agentDraftSchema = z.object({
   id: z.string().uuid(),
-  revision: z.number().int().nonnegative(),
   mode: draftModeSchema,
   parts: userInputPartsSchema,
   sender: agentMessageSenderSchema,
@@ -19,12 +18,12 @@ export const SaveAgentDraft = defineAction(Agent, {
 });
 export const SetAgentDraftMode = defineAction(Agent, {
   id: builtin.name("agent.draft.mode"),
-  schema: z.strictObject({ id: z.string().uuid(), revision: z.number().int().nonnegative(), mode: draftModeSchema }),
+  schema: z.strictObject({ id: z.string().uuid(), mode: draftModeSchema }),
 });
 export const ExchangeAgentDraft = defineAction(Agent, {
   id: builtin.name("agent.draft.exchange"),
   schema: z.strictObject({
-    submissionId: z.string().uuid(), id: z.string().uuid(), revision: z.number().int().nonnegative(),
+    submissionId: z.string().uuid(), id: z.string().uuid(),
     replacement: userInputPartsSchema.nullable(),
   }),
 });

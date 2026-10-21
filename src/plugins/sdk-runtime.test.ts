@@ -100,34 +100,57 @@ function counter(options: { onRead?: (object: ObjectReader) => void; failCreate?
 }
 async function create(service: ApplicationService, sessionId: string, input = 1) {
   await service.sessions.execute({ type: "resource.create", sessionId, kind: Counter.kind, creation: { id: "test.counter/create" }, input, position: { x: 0, y: 0 } });
-  return service.sessions.snapshot(sessionId).workbench.objects.find(object => object.kind === Counter.kind)!.id;
+  return service.sessions.current(sessionId).workbench.objects.find(object => object.kind === Counter.kind)!.id;
 }
 
 describe("工作台 SDK 的宿主实现", () => {
+  // docs/plugin-sdk.md：提交内通知随事务一起生效，回滚的数据不能交付到界面。
+  it("事务中的资源投影通知在提交后交付，失败回滚不推送", async () => {
+    const c = counter(), changed = vi.fn();
+    const { service, sessionId } = open([c.plugin], undefined, changed);
+    const id = await create(service, sessionId);
+    await service.sessions.execute({ type: "watch", sessionId });
+    const object = c.context().object(sessionId, Counter, id);
+    changed.mockClear();
+    expect(() => object.commit(writer => {
+      writer.set(State, 99); object.invalidate();
+      throw new Error("Rollback");
+    })).toThrow("Rollback");
+    expect(object.get(State)).toBe(1);
+    expect(changed).not.toHaveBeenCalled();
+    object.commit(writer => { writer.set(State, 2); object.invalidate(); });
+    expect(changed).toHaveBeenCalledOnce();
+    expect(changed).toHaveBeenCalledWith(expect.objectContaining({ kind: "session.changed",
+      objects: [expect.objectContaining({ presentation: expect.objectContaining({ data: { value: 2 } }) })] }));
+  });
+
   // docs/plugin-sdk.md：busy 只保护当前路径；重叠占用独立释放，取消等到清理完成。
   it("withBusy 重叠占用保护回溯，内存投影通知不写历史", async () => {
     const c = counter();
-    const { service, sessionId } = open([c.plugin]);
+    const changed = vi.fn();
+    const { service, sessionId } = open([c.plugin], undefined, changed);
     const id = await create(service, sessionId);
     const object = c.context().object(sessionId, Counter, id);
-    const before = service.sessions.snapshot(sessionId);
+    await service.sessions.execute({ type: "watch", sessionId });
+    const before = service.sessions.current(sessionId);
     object.invalidate();
-    const refreshed = service.sessions.snapshot(sessionId);
+    const refreshed = service.sessions.current(sessionId);
     expect(refreshed.nodes).toEqual(before.nodes);
-    expect(refreshed.revision).toBeGreaterThan(before.revision);
+    expect(changed).toHaveBeenCalledWith(expect.objectContaining({ kind: "session.changed", nodes: [],
+      objects: [expect.objectContaining({ id })] }));
     const first = actionGate(), second = actionGate(), cancel = new AbortController();
     const a = object.withBusy(async () => { await first.promise; });
     const b = object.withBusy(async signal => { await second.promise; signal.throwIfAborted(); }, { signal: cancel.signal });
     const rejected = expect(b).rejects.toThrow();
     try {
-      expect(service.sessions.snapshot(sessionId).progress.busyObjectIds).toEqual([id]);
+      expect(service.sessions.current(sessionId).progress.busyObjectIds).toEqual([id]);
       first.resolve(); await a;
       cancel.abort();
       await expect(service.sessions.execute({ type: "select", sessionId, nodeId: before.cursor })).rejects.toMatchObject({ code: "conflict" });
-      expect(service.sessions.snapshot(sessionId).progress.busyObjectIds).toEqual([id]);
+      expect(service.sessions.current(sessionId).progress.busyObjectIds).toEqual([id]);
     } finally { first.resolve(); second.resolve(); }
     await rejected;
-    expect(service.sessions.snapshot(sessionId).progress.busyObjectIds).toEqual([]);
+    expect(service.sessions.current(sessionId).progress.busyObjectIds).toEqual([]);
     await service.sessions.execute({ type: "select", sessionId, nodeId: before.cursor });
   });
 
@@ -427,11 +450,11 @@ describe("工作台 SDK 的宿主实现", () => {
     const rejected = expect(waiting).rejects.toThrow();
     try {
       expect(service.sessions.running).toBe(false);
-      expect(service.sessions.snapshot(sessionId).progress).toMatchObject({ busyObjectIds: [] });
+      expect(service.sessions.current(sessionId).progress).toMatchObject({ busyObjectIds: [] });
       controller.abort();
       expect(signal.aborted).toBe(true);
       expect(service.sessions.running).toBe(false);
-      expect(service.sessions.snapshot(sessionId).progress.busyObjectIds).toEqual([]);
+      expect(service.sessions.current(sessionId).progress.busyObjectIds).toEqual([]);
     } finally { release(); }
     await rejected;
     expect(service.sessions.running).toBe(false);
@@ -442,7 +465,7 @@ describe("工作台 SDK 的宿主实现", () => {
     const c = counter({ onRead: value => { reader = value; } });
     const { service, sessionId } = open([c.plugin]);
     await create(service, sessionId);
-    service.sessions.snapshot(sessionId);
+    service.sessions.current(sessionId);
     expect(reader.get(State)).toBe(1);
     expect(reader).not.toHaveProperty("commit");
     expect(reader).not.toHaveProperty("streams");
@@ -575,6 +598,7 @@ describe("工作台 SDK 的宿主实现", () => {
     const c = counter({ observe: record => observed.push(record) });
     const { service, sessionId } = open([c.plugin], undefined, event => notifications.push(event.kind));
     await create(service, sessionId);
+    await service.sessions.execute({ type: "watch", sessionId });
     const session = c.context().session(sessionId), before = session.snapshot().records.all({ scope: "session" });
     observed.length = notifications.length = 0;
     session.commit(writer => { writer.set(State, 8); });
@@ -643,7 +667,7 @@ describe("工作台 SDK 的宿主实现", () => {
     expect(snapshot.resources.get(Counter, id)?.status).toBe("known");
     expect(snapshot.records.first(Changed, { scope: "timeline" })).toMatchObject({ status: "known", data: { value: 3 }, record: { source: { plugin: "test.counter", resource: { id, kind: Counter.kind } } } });
     expect(observed.map(record => record.contract.id)).toEqual([Changed.id, "resource_created"]);
-    expect(service.sessions.snapshot(sessionId).workbench.objects.find(object => object.id === id)?.presentation.data).toEqual({ value: 3 });
+    expect(service.sessions.current(sessionId).workbench.objects.find(object => object.id === id)?.presentation.data).toEqual({ value: 3 });
     const session = c.context().session(sessionId);
     session.commit(writer => { writer.append(Changed, { value: 4 }); });
     expect(session.snapshot().records.last(Changed, { scope: "session" })).toMatchObject({
@@ -789,6 +813,7 @@ describe("工作台 SDK 的宿主实现", () => {
       if (event.kind === "session.changed") published.push(current.sessions.tree.title(event.sessionId));
     });
     current = service;
+    await service.sessions.execute({ type: "watch", sessionId });
     const session = context.session(sessionId);
     const ids: string[] = [];
     session.commit(writer => {
@@ -800,7 +825,7 @@ describe("工作台 SDK 的宿主实现", () => {
     expect(paths).toEqual([ids]);
     expect(published).toEqual(["Position 3"]);
     const first = ids[0]!;
-    service.sessions.snapshot(sessionId);
+    service.sessions.current(sessionId);
     session.commit(writer => { writer.set(Current, 1); });
     session.title.set("Current title");
     expect(paths).toHaveLength(1);
@@ -954,7 +979,7 @@ describe("工作台 SDK 的宿主实现", () => {
       await started;
       expect(service.sessions.running).toBe(true);
       expect(() => c.context().models.run(request)).toThrow();
-      expect(service.sessions.snapshot(sessionId).progress.busyObjectIds).toContain(id);
+      expect(service.sessions.current(sessionId).progress.busyObjectIds).toContain(id);
     } finally {
       if (mode === "cancel") controller.abort();
       else {

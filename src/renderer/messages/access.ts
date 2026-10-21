@@ -53,10 +53,6 @@ export const accessMessages = pluginNamespace("atelier.host").messages("en", def
     id: "accessSaved",
     defaultMessage: "Access updated.",
   },
-  accessSuperseded: {
-    id: "accessSuperseded",
-    defaultMessage: "The current path has changed.",
-  },
   accessRequestBoundary: {
     id: "accessRequestBoundary",
     defaultMessage: "Requests already in progress keep their original access. Subsequent requests use the updated links.",

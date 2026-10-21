@@ -70,7 +70,7 @@ export function useCreationCoordinator({ controller, canvas, writable, ready }: 
     submitting.current.add(content);
     try {
       const scopeId = await contentScopeId(content, { sessionId: active.sessionId, resourceKind: kind, contractId: entry.contract.id });
-      const result = await active.executeAndRead({ type: "resource.create", sessionId: active.sessionId, kind,
+      const result = await active.execute({ type: "resource.create", sessionId: active.sessionId, kind,
         creation: reference(entry.contract), input: value, position: placement, requestId, contentScopeId: scopeId });
       if (!result.ok) setError(errorDisplay(result.error));
       return result.ok;

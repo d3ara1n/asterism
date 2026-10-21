@@ -72,7 +72,7 @@ export const pendingQuestionSchema = z.strictObject({
   id: z.string().uuid(), callId: z.string(), questions: z.array(questionSchema),
 });
 export const questionSnapshotSchema = z.strictObject({
-  version: z.number().int().nonnegative(), pending: z.array(pendingQuestionSchema),
+  pending: z.array(pendingQuestionSchema),
 });
 export const ReadQuestions = defineCall(builtin.name("questions.read"), { scope: "object",
   input: z.null(), output: questionSnapshotSchema,
@@ -85,7 +85,7 @@ export const CancelQuestion = defineCall(builtin.name("questions.cancel"), { sco
 });
 export const QuestionsChanged = builtin.event("questions.changed", {
   schema: z.strictObject({
-    sessionId: z.string(), agentId: z.string(), version: z.number().int().nonnegative(), pendingIds: z.array(z.string().uuid()),
+    sessionId: z.string(), agentId: z.string(), pending: z.array(pendingQuestionSchema),
   }),
   source: "plugin", semantics: { kind: "snapshot", key: ["sessionId", "agentId"] },
 });

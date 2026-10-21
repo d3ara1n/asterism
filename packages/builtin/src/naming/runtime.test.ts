@@ -48,7 +48,7 @@ async function open(stream: (request: StreamRequest) => AsyncIterable<ModelEvent
   const sessionId = service.sessions.tree.create("Temporary");
   await service.sessions.execute({ type: "resource.create", sessionId, kind: Agent.kind,
     creation: { id: CreateAgent.id }, input: { selection: { agent: "worker", model: "test/model", thinking: null } }, position: { x: 0, y: 0 } });
-  const agentId = service.sessions.snapshot(sessionId).workbench.objects[0]!.id;
+  const agentId = service.sessions.current(sessionId).workbench.objects[0]!.id;
   const object = context.object(sessionId, Agent, agentId);
   const session = context.session(sessionId);
   const submit = (text: string) => {
@@ -261,7 +261,7 @@ describe("两级自动命名", () => {
     expect(test.session.title.get()).toBe("Manual");
     const original = test.service.sessions.tree.nodes(test.sessionId);
     const select = (nodeId: string | null) => test.service.sessions.execute({ type: "select", sessionId: test.sessionId, nodeId });
-    const current = test.service.sessions.snapshot(test.sessionId);
+    const current = test.service.sessions.current(test.sessionId);
     expect(current.title).toBe("Manual");
     expect(test.session.snapshot().position.nodeId).toBe(manual);
     await select(generated.id);

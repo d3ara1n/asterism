@@ -184,7 +184,7 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
           },
         }));
       } finally { active = false; }
-    });
+    }, ref?.id);
   }
   const object = (address: ResourceRef, scope?: ObjectScope, captured?: ResourceSnapshot): ObjectExecutor => {
     const ref = Object.freeze({ ...address });
@@ -226,7 +226,7 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
       },
       invalidate() {
         checkExecution(scope); own(ref.kind); checkRef(ref);
-        host.sessions.viewChanged(ref.sessionId);
+        host.sessions.viewChanged(ref.sessionId, ref.id);
       },
       streams: { publish(channel, data) {
         checkExecution(scope);

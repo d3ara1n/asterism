@@ -16,10 +16,10 @@ export function sessionController(sessionId: string): SessionController {
     });
     let swept: SessionView | null = null;
     created.subscribe(() => {
-      const { status, snapshot } = created.getSnapshot();
-      if (status !== "ready" || !snapshot || snapshot === swept) return;
-      swept = snapshot;
-      objectRetention.retainOnly(sessionId, new Set(snapshot.workbench.objects.map(object => object.id)));
+      const { status, data } = created.getSnapshot();
+      if (status !== "ready" || !data || data === swept) return;
+      swept = data;
+      objectRetention.retainOnly(sessionId, new Set(data.workbench.objects.map(object => object.id)));
     });
     controllers.set(sessionId, controller = created);
   }

@@ -33,7 +33,8 @@ export function useObjectContext(object: WorkbenchObject): RendererObjectContext
   const { controller } = workbench;
   const { state, snapshot } = useSession(controller);
   const records = useMemo(() => snapshot
-    ? sessionSnapshot(nodeView(snapshot.sessionId, snapshot.title, snapshot.nodes, snapshot.cursor)) : null, [snapshot]);
+    ? sessionSnapshot(nodeView(snapshot.sessionId, snapshot.title, snapshot.nodes, snapshot.cursor)) : null,
+  [snapshot?.sessionId, snapshot?.title, snapshot?.nodes, snapshot?.cursor]);
   const onStream = useCallback<RendererObjectContext["onStream"]>((channel, listener) =>
     window.host.onObjectStream(controller.sessionId, object.id, (name, data) => {
       if (name === `${pluginOf(object.kind)}/${channel}`) listener(data);
@@ -51,12 +52,12 @@ export function useObjectContext(object: WorkbenchObject): RendererObjectContext
       snapshot: () => records, subscribe: controller.subscribe,
       create: (contract, input, position, options) => contentCommand(options?.content,
         { sessionId: controller.sessionId, resourceKind: contract.resource.kind, contractId: contract.id },
-        contentScopeId => controller.executeAndRead({ type: "resource.create", sessionId: controller.sessionId, kind: contract.resource.kind, creation: reference(contract), input, position, contentScopeId })),
+        contentScopeId => controller.execute({ type: "resource.create", sessionId: controller.sessionId, kind: contract.resource.kind, creation: reference(contract), input, position, contentScopeId })),
       refresh: controller.refresh,
     },
     invoke: (contract, input, options) => contentCommand(options?.content,
       { sessionId: controller.sessionId, objectId: object.id, resourceKind: contract.resource.kind, contractId: contract.id },
-      contentScopeId => controller.executeAndRead({ type: "resource.command", sessionId: controller.sessionId, objectId: object.id, command: resourceCall(contract, input), contentScopeId })),
+      contentScopeId => controller.execute({ type: "resource.command", sessionId: controller.sessionId, objectId: object.id, command: resourceCall(contract, input), contentScopeId })),
     onStream,
     retained,
   };

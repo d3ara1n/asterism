@@ -37,7 +37,7 @@ export function createAdmission(deps: { selection: AgentSelectionService; valida
       object.commit(writer => {
         ready(object);
         if (queued) writer.set(AgentDrafts, [...object.get(AgentDrafts) ?? [], {
-          id: input.submissionId, revision: 0, mode: input.mode, parts: input.parts, sender: input.sender,
+          id: input.submissionId, mode: input.mode, parts: input.parts, sender: input.sender,
         }]);
         else writer.append(AgentInputMessage, { parts: input.parts, startsTurn: true, sender: input.sender });
         rememberSubmission(object, writer, SubmitAgentInput, input);

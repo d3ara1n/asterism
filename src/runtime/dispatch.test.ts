@@ -37,6 +37,6 @@ describe("运行时 IPC 校验", () => {
     expect(await dispatchSession(service, { ...request, command: { ...request.command, extra: true } })).toBeNull();
     expect(await dispatchSession(service, { ...request, command: { ...request.command, position: { kind: "history", nodeId: null } } })).toBeNull();
     expect(execute).not.toHaveBeenCalled();
-    expect(await dispatchSession(service, request)).toMatchObject({ result: { ok: true, reply: { kind: "view", snapshot: { cursor: null } } } });
+    expect(await dispatchSession(service, request)).toMatchObject({ result: { ok: true, reply: { kind: "view", data: { cursor: null } } } });
   });
 });

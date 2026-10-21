@@ -154,10 +154,10 @@ describe("SDK 会话资源生命周期", () => {
   it("初始化与创建后的链接原子提交，失败不遗留对象或私有数据", async () => {
     let fail = false;
     const f = open({ create() { if (fail) throw new Error("Creation failed."); } });
-    const before = f.app.sessions.snapshot(f.sessionId);
+    const before = f.app.sessions.current(f.sessionId);
     fail = true;
     await expect(f.session.create(Create, 2)).rejects.toThrow("Creation failed");
-    expect(f.app.sessions.snapshot(f.sessionId).nodes).toEqual(before.nodes);
+    expect(f.app.sessions.current(f.sessionId).nodes).toEqual(before.nodes);
     fail = false;
     const note = await f.session.create(CreateAgent, { selection: { agent: "worker", model: null, thinking: null } });
     const foreign = { ...note, sessionId: f.app.sessions.tree.create("Foreign") };
@@ -167,18 +167,18 @@ describe("SDK 会话资源生命周期", () => {
     await expect(f.session.create(Create, 2, { resources: [foreign] })).rejects.toThrow("another session");
     expect(f.session.snapshot().position.nodeId).toBe(head);
     const child = await f.session.create(Create, 3, { linkTo: note });
-    expect(f.app.sessions.snapshot(f.sessionId).workbench.links).toEqual([{ receiverId: note.id, resourceId: child.id }]);
+    expect(f.app.sessions.current(f.sessionId).workbench.links).toEqual([{ receiverId: note.id, resourceId: child.id }]);
     const otherAgent = await f.session.create(CreateAgent, { selection: { agent: "worker", model: null, thinking: null } }, { linkTo: note });
-    expect(f.app.sessions.snapshot(f.sessionId).workbench.links.filter(link => link.receiverId === otherAgent.id)).toEqual([]);
+    expect(f.app.sessions.current(f.sessionId).workbench.links.filter(link => link.receiverId === otherAgent.id)).toEqual([]);
   });
 
   // 依据宿主原子创建契约：接收者类型不支持链接时，已创建的身份、内容及调用者链接一起回滚。
   it("初始资源链接失败时整体回滚创建", async () => {
     const f = open(), actor = await f.session.create(Create, 0), resource = await f.session.create(Create, 1);
-    const before = f.app.sessions.snapshot(f.sessionId);
+    const before = f.app.sessions.current(f.sessionId);
     await expect(f.session.create(CreateNote, { title: "Rejected note", content: "temporary" },
       { linkTo: actor, resources: [resource] })).rejects.toThrow();
-    const after = f.app.sessions.snapshot(f.sessionId);
+    const after = f.app.sessions.current(f.sessionId);
     expect(after.nodes).toEqual(before.nodes);
     expect(after.workbench).toEqual(before.workbench);
   });
@@ -196,9 +196,9 @@ describe("SDK 会话资源生命周期", () => {
     await expect(f.app.sessions.execute({ type: "object.remove", sessionId: f.sessionId, objectId: resource.id })).rejects.toThrow("settle");
     ended.release();
     await vi.waitFor(() => expect(f.plugin.tasks.has("busy")).toBe(false));
-    const prior = f.app.sessions.snapshot(f.sessionId).nodes;
+    const prior = f.app.sessions.current(f.sessionId).nodes;
     f.session.remove(resource);
-    const after = f.app.sessions.snapshot(f.sessionId);
+    const after = f.app.sessions.current(f.sessionId);
     expect(after.workbench.objects.map(object => object.id)).toEqual([receiver.id, target.id]);
     expect(after.workbench.links).toEqual([]);
     expect(after.nodes.slice(0, prior.length)).toEqual(prior);
@@ -241,7 +241,7 @@ describe("Agent 创建与移除入口", () => {
     const result = await run();
     expect(result.tools[0]).toMatchObject({ kind: "succeeded", data: { type: CreateNote.resource.kind, title: "A note" } });
     const noteId = (result.tools[0]!.data as { resource_id: string }).resource_id;
-    expect(f.app.sessions.snapshot(f.sessionId).workbench.links).toEqual([{ receiverId: actor.id, resourceId: noteId }]);
+    expect(f.app.sessions.current(f.sessionId).workbench.links).toEqual([{ receiverId: actor.id, resourceId: noteId }]);
   });
 
   // 依据代理发现契约：列表仅返回启用配置的选择信息，新增配置字段和私有提示均不进入模型结果。
@@ -278,7 +278,7 @@ describe("Agent 创建与移除入口", () => {
     const run = runner(f, actor, target), result = await run();
     expect(result.tools[0]?.kind).toBe("succeeded");
     const child = (result.tools[0]!.data as { resource_id: string }).resource_id;
-    expect(f.app.sessions.snapshot(f.sessionId).workbench.links).toEqual([
+    expect(f.app.sessions.current(f.sessionId).workbench.links).toEqual([
       { receiverId: actor.id, resourceId: shared.id }, { receiverId: actor.id, resourceId: other.id },
       { receiverId: actor.id, resourceId: child }, { receiverId: child, resourceId: shared.id },
       ...(exposeSelf ? [{ receiverId: child, resourceId: actor.id }] : []),
@@ -295,13 +295,13 @@ describe("Agent 创建与移除入口", () => {
       input: { selection: { agent: "worker", model: null, thinking: null }, expose_self: true, resources: [resourceId] },
     } }]) });
     const target = await model(f.app), actor = await f.session.create(Create, 0), other = await f.session.create(Create, 1);
-    const before = f.app.sessions.snapshot(f.sessionId);
+    const before = f.app.sessions.current(f.sessionId);
     const run = runner(f, actor, target);
     for (const id of [actor.id, other.id]) {
       resourceId = id;
       expect((await run()).tools[0]).toMatchObject({ kind: "rejected", error: { code: "access_denied" } });
     }
-    const after = f.app.sessions.snapshot(f.sessionId);
+    const after = f.app.sessions.current(f.sessionId);
     expect(after.nodes).toEqual(before.nodes);
     expect(after.workbench).toEqual(before.workbench);
   });
@@ -320,9 +320,9 @@ describe("Agent 创建与移除入口", () => {
       } }]),
     });
     const target = await model(f.app), actor = await f.session.create(Create, 0);
-    const before = f.app.sessions.snapshot(f.sessionId);
+    const before = f.app.sessions.current(f.sessionId);
     expect((await runner(f, actor, target)()).tools[0]?.kind).toBe("rejected");
-    const after = f.app.sessions.snapshot(f.sessionId);
+    const after = f.app.sessions.current(f.sessionId);
     expect(after.nodes).toEqual(before.nodes);
     expect(after.workbench).toEqual(before.workbench);
   });
@@ -378,7 +378,7 @@ describe("Agent 创建与移除入口", () => {
     expect(created.tools[0]).toMatchObject({ kind: "succeeded", data: { type: Item.kind, title: "Item" } });
     const result = created.tools[0]!.data as { resource_id: string };
     expect(f.plugin.object(f.sessionId, Item, result.resource_id).get(State)).toBe(9);
-    expect(f.app.sessions.snapshot(f.sessionId).workbench.links).toEqual([{ receiverId: actor.id, resourceId: result.resource_id }]);
+    expect(f.app.sessions.current(f.sessionId).workbench.links).toEqual([{ receiverId: actor.id, resourceId: result.resource_id }]);
     calls = [{ name: "resource_remove", args: { resource_id: result.resource_id } }];
     expect((await run()).tools[0]?.kind).toBe("succeeded");
     expect(f.session.snapshot().resources.all().map(item => item.ref.id)).toEqual([actor.id]);

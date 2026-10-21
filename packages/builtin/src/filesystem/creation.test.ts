@@ -26,7 +26,7 @@ describe("目录创建", () => {
       await service.sessions.execute({ type: "resource.create", sessionId, kind: Directory.kind, creation: { id: "atelier.builtin/directory.create" },
         input: { path: directory, ...(title ? { title } : {}) }, position: { x: 0, y: 0 } });
     }
-    const snapshot = service.sessions.snapshot(sessionId);
+    const snapshot = service.sessions.current(sessionId);
     const directories = snapshot.workbench.objects.filter(object => object.kind === Directory.kind);
     expect(directories.map(object => object.title)).toEqual(["directory", "Materials"]);
     expect(directories.map(object => object.presentation)).toEqual([
@@ -43,7 +43,7 @@ describe("目录创建", () => {
         input, position: { x: 0, y: 0 } })).rejects.toMatchObject({ code: "invalid_request" });
     }
     expect(service.sessions.tree.nodes(sessionId)).toEqual([]);
-    expect(service.sessions.snapshot(sessionId).workbench.objects).toEqual([]);
+    expect(service.sessions.current(sessionId).workbench.objects).toEqual([]);
   });
 
 });

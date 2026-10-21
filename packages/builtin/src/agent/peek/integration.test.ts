@@ -85,6 +85,7 @@ it("真实 Agent 资源调用沿用授权、空 target、工具进度与调用�
     expect((await run()).tools[0]).toMatchObject({ kind: "rejected", error: { code: "access_denied" } });
     expect(requests).toHaveLength(0);
     session.link(caller, target);
+    await app.sessions.execute({ type: "watch", sessionId });
     const running = run();
     // 状态必须经过宿主 32ms 合并到达 GUI 通道，不能只检查工具内部 publish 的调用。
     await vi.waitFor(() => expect(delivered.some(data => data.phase === "searching")).toBe(true));

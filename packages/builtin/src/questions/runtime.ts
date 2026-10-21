@@ -4,8 +4,8 @@ import { AnswerQuestion, AskUserResult, CancelQuestion, QuestionsChanged, ReadQu
 import { createQuestionService } from "./service.ts";
 
 export default defineModule(plugin => {
-  const questions = createQuestionService((object, version, pendingIds) => {
-    try { plugin.ipc.events.publish(QuestionsChanged, { sessionId: object.sessionId, agentId: object.id, version, pendingIds }); }
+  const questions = createQuestionService((object, pending) => {
+    try { plugin.ipc.events.publish(QuestionsChanged, { sessionId: object.sessionId, agentId: object.id, pending }); }
     catch (error) {
       // 宿主关闭先结束事件路由，再取消运行；此时只收束后台等待。
       if (!(error instanceof PluginApiError && error.code === "unavailable")) throw error;
@@ -32,7 +32,10 @@ export default defineModule(plugin => {
       },
     })],
     calls: [
-      implementCall(ReadQuestions, async (_input, { object }) => questions.read(object.ref)),
+      implementCall(ReadQuestions, async (_input, { object }) => {
+        questions.publish(object.ref);
+        return questions.read(object.ref);
+      }),
       implementCall(AnswerQuestion, async (input, { object }) => { questions.answer(object.ref, input.id, input.submission); return null; }),
       implementCall(CancelQuestion, async (input, { object }) => { questions.cancel(object.ref, input.id); return null; }),
     ],

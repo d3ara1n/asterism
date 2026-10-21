@@ -12,11 +12,10 @@ interface Waiting {
 const same = (a: ResourceRef, b: ResourceRef) => a.id === b.id && a.sessionId === b.sessionId && a.kind === b.kind;
 
 /** 服务只持有本次运行的交互；模型消息与已完成答案由既有工具历史保存。 */
-export function createQuestionService(changed: (object: ResourceRef, version: number, pendingIds: string[]) => void) {
+export function createQuestionService(changed: (object: ResourceRef, pending: PendingQuestion[]) => void) {
   const waiting = new Map<string, Waiting>();
-  let version = 0;
-  const notify = (ref: ResourceRef) => changed(ref, ++version,
-    [...waiting.values()].filter(entry => same(entry.object, ref)).map(entry => entry.pending.id));
+  const current = (ref: ResourceRef) => [...waiting.values()].filter(entry => same(entry.object, ref)).map(entry => structuredClone(entry.pending));
+  const notify = (ref: ResourceRef) => changed(ref, current(ref));
   const lookup = (object: ResourceRef, id: string) => {
     const entry = waiting.get(id);
     if (!entry || !same(entry.object, object)) throw new PluginApiError("conflict", "This question is no longer awaiting an answer.");
@@ -24,8 +23,9 @@ export function createQuestionService(changed: (object: ResourceRef, version: nu
   };
   return {
     read(object: ResourceRef): QuestionSnapshot {
-      return { version, pending: [...waiting.values()].filter(entry => same(entry.object, object)).map(entry => structuredClone(entry.pending)) };
+      return { pending: current(object) };
     },
+    publish: notify,
     ask(object: ResourceRef, callId: string, questions: Question[], signal: AbortSignal, publish?: (id: string) => void): Promise<CallResult<Answer>> {
       signal.throwIfAborted();
       const id = randomUUID();

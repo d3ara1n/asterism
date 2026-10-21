@@ -19,7 +19,7 @@ export interface WorkbenchCanvas {
   locateObjects: (objectIds: readonly string[], options?: { select?: boolean }) => Promise<void>;
 }
 
-type LocateRequest = { objectIds: string[]; select: boolean; token: number; selectionVersion: number };
+type LocateRequest = { objectIds: string[]; select: boolean; token: number };
 
 /** 下游只消费 WorkbenchCanvas；React Flow 的视口操作与等待集中在此。 */
 export function useWorkbenchCanvas(nodes: ObjectNodeType[], setNodes: Dispatch<SetStateAction<ObjectNodeType[]>>, element: RefObject<HTMLDivElement | null>) {
@@ -28,13 +28,11 @@ export function useWorkbenchCanvas(nodes: ObjectNodeType[], setNodes: Dispatch<S
   const flow = useReactFlow<ObjectNodeType>();
   const width = useStore(state => state.width);
   const height = useStore(state => state.height);
-  const selectionVersion = controller.getSnapshot().selectionVersion;
   const available = useRef(ready);
   available.current = ready;
   const [locating, setLocating] = useState<LocateRequest | null>(null);
   const sequence = useRef(0);
   const mounted = useRef(true);
-  useLayoutEffect(() => { sequence.current++; setLocating(null); }, [selectionVersion]);
   useLayoutEffect(() => {
     if (!ready) { sequence.current++; setLocating(null); }
   }, [ready]);
@@ -61,7 +59,7 @@ export function useWorkbenchCanvas(nodes: ObjectNodeType[], setNodes: Dispatch<S
 
   const locateObjects = useCallback<WorkbenchCanvas["locateObjects"]>(async (ids, options) => {
     const state = controller.getSnapshot();
-    const workbench = state.snapshot?.workbench;
+    const workbench = state.data?.workbench;
     const objectIds = [...new Set(ids)];
     if (!mounted.current || !available.current || state.navigating || state.status !== "ready" || !workbench || !objectIds.length) return;
     const objects = new Set(workbench.objects.map(object => object.id));
@@ -71,15 +69,15 @@ export function useWorkbenchCanvas(nodes: ObjectNodeType[], setNodes: Dispatch<S
     const valid = () => {
       const current = controller.getSnapshot();
       return mounted.current && sequence.current === token && current.status === "ready"
-        && current.selectionVersion === state.selectionVersion;
+        && !current.navigating;
     };
     const hidden = new Set(workbench.views.filter(view => view.hidden).map(view => view.objectId));
     for (const objectId of objectIds) {
       if (!hidden.has(objectId)) continue;
-      if (!valid() || !operationSucceeded(await controller.executeAndRead({ type: "view.set", sessionId: controller.sessionId, objectId, hidden: false }))) return;
+      if (!valid() || !operationSucceeded(await controller.execute({ type: "view.set", sessionId: controller.sessionId, objectId, hidden: false }))) return;
     }
     // 受理与节点投影分离；画布等待全部目标测量，而非猜测某一帧已经渲染完。
-    if (valid()) setLocating({ objectIds, select: options?.select ?? false, token, selectionVersion: state.selectionVersion });
+    if (valid()) setLocating({ objectIds, select: options?.select ?? false, token });
   }, [controller]);
 
   const targetsReady = !!locating && locating.objectIds.every(id => {
@@ -97,7 +95,7 @@ export function useWorkbenchCanvas(nodes: ObjectNodeType[], setNodes: Dispatch<S
       animating = true;
       void flow.setViewport(viewport, { duration: matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 420 }).then(() => {
         animating = false;
-        if (!active || sequence.current !== locating.token || controller.getSnapshot().selectionVersion !== locating.selectionVersion) return;
+        if (!active || sequence.current !== locating.token || controller.getSnapshot().navigating) return;
         setLocating(current => current?.token === locating.token ? null : current);
         void run({ type: "viewport.set", sessionId: controller.sessionId, viewport: flow.getViewport() });
       });

@@ -11,6 +11,7 @@ import { createAgentLoop } from "./loop.ts";
 import { createAdmission } from "./admission.ts";
 import { projectAgentTurnState } from "./state-projection.ts";
 import { agentExecutionState } from "./state.ts";
+import type { AgentTurnState } from "./state.ts";
 import type { UsageConsumer } from "../usage/service.ts";
 import { createPeekTool } from "./peek/runtime.ts";
 import { AgentExecutionFeedback } from "./feedback.ts";
@@ -26,6 +27,8 @@ export function createAgentModule(application: BuiltinApplication, usage: UsageC
     const loop = createAgentLoop({ selection, tasks: plugin.tasks, models: plugin.models, systemPrompt, userAgent: application.userAgent,
       usage });
     const admission = createAdmission({ selection, validate: plugin.models.validate, running: loop.running, systemPrompt });
+    // 草稿与配置更新复用当前路径的回合状态；历史位置改变时才重新推导。
+    const turns = new Map<string, { nodeId: string | null; state: AgentTurnState }>();
     return {
       events: [AgentExecutionFeedback],
       tools: [createPeekTool(plugin.models, application.userAgent, usage), createSendTool()],
@@ -35,15 +38,23 @@ export function createAgentModule(application: BuiltinApplication, usage: UsageC
         creation: implementCreation(CreateAgent, {
           prepare(input) { selection.validate(input.selection); return { action: "accept" }; },
           create(input, object) {
-            object.commit(writer => { writer.set(AgentSelection, { selection: input.selection, revision: 1 }); });
+            object.commit(writer => { writer.set(AgentSelection, { selection: input.selection }); });
             return { title: input.title ?? selection.agent(input.selection).name, data: {} };
           },
         }),
         project(_data, object) {
           const value = object.get(AgentSelection);
-          return { agentId: object.ref.id, selection: value?.selection ?? null, selectionRevision: value?.revision ?? 0,
-            executionState: agentExecutionState(projectAgentTurnState(object.session.snapshot(), object.ref.id), loop.running(object)),
-            drafts: object.get(AgentDrafts) ?? [] };
+          const drafts = object.get(AgentDrafts) ?? [];
+          if (loop.running(object))
+            return { agentId: object.ref.id, selection: value?.selection ?? null, executionState: "running" as const, drafts };
+          const history = object.session.snapshot();
+          let turn = turns.get(object.ref.id);
+          if (!turn || turn.nodeId !== history.position.nodeId) {
+            turn = { nodeId: history.position.nodeId, state: projectAgentTurnState(history, object.ref.id) };
+            turns.set(object.ref.id, turn);
+          }
+          return { agentId: object.ref.id, selection: value?.selection ?? null,
+            executionState: agentExecutionState(turn.state, false), drafts };
         },
         async inspect(_data, object) {
           return { type: Agent.kind, title: object.snapshot()?.title ?? "Agent" };
@@ -64,7 +75,7 @@ export function createAgentModule(application: BuiltinApplication, usage: UsageC
             object.commit(writer => {
               const current = selectionOf(object);
               selection.validate(input.selection, current.selection);
-              writer.set(AgentSelection, { selection: input.selection, revision: current.revision + 1 });
+              writer.set(AgentSelection, { selection: input.selection });
             });
           } }),
           implementAction(CancelAgent, { async execute(_input, object) { loop.cancel(object); } }),

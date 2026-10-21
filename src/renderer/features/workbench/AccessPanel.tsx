@@ -85,26 +85,17 @@ function AccessRow({ receiver, resource, object }: { receiver: WorkbenchObject; 
   const [error, setError] = useState<UiText | null>(null);
   const [saved, setSaved] = useState<import("@atelier/sdk/contracts").UiText | null>(null);
   const submitting = useRef(false);
-  const generation = useRef(0);
-  useEffect(() => () => { generation.current++; }, []);
+  const operation = useRef<AbortController | null>(null);
+  useEffect(() => () => operation.current?.abort(), []);
   const change = async (desired: boolean) => {
     if (submitting.current) return;
-    const token = ++generation.current;
+    const scope = operation.current = new AbortController();
     submitting.current = true; setPending({ desired }); setError(null); setSaved(null);
-    // 等待受理后的读取，而非等到期望值出现：继续或分叉可能已经覆盖这次变更。
-    const result = await controller.executeAndRead({ type: "link.set", sessionId: session.id, receiverId: receiver.id, resourceId: resource.id, linked: desired });
-    if (token !== generation.current) return;
+    const result = await controller.execute({ type: "link.set", sessionId: session.id, receiverId: receiver.id, resourceId: resource.id, linked: desired });
+    if (scope.signal.aborted) return;
     setPending(null); submitting.current = false;
-    const current = controller.getSnapshot();
-    if (result.ok) {
-      if (current.status === "ready") {
-        const actual = current.snapshot?.workbench.links.some(link => link.receiverId === receiver.id && link.resourceId === resource.id) ?? false;
-        setSaved(actual === desired ? accessMessages.accessSaved : i18n.formatMessage(accessMessages.accessSuperseded));
-      }
-    } else if (current.status !== "error") {
-      const message = errorDisplay(result.error);
-      setError(message);
-    }
+    if (result.ok) setSaved(accessMessages.accessSaved);
+    else setError(errorDisplay(result.error));
   };
   const id = `access-${receiver.id}-${resource.id}`;
   return <div className="flex items-start gap-3 border-b py-3 last:border-0">

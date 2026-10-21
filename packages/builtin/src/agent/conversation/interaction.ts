@@ -112,7 +112,7 @@ export function useAgentConversation(object: RendererObjectContext, hasSelection
     },
     async setMode(item: AgentDraft, mode: DraftMode) {
       if (!editable || mode === item.mode) return false;
-      try { return accepted(await object.invoke(SetAgentDraftMode, { id: item.id, revision: item.revision, mode })); }
+      try { return accepted(await object.invoke(SetAgentDraftMode, { id: item.id, mode })); }
       catch { toast.error(i18n.text(conversationMessages.draftTransferFailed)); return false; }
     },
     async take(item: AgentDraft): Promise<boolean> {
@@ -122,7 +122,7 @@ export function useAgentConversation(object: RendererObjectContext, hasSelection
         const parts = draft.parts(false);
         const replacement = state.text.trim() || state.files.length
           ? await transfer("exchange", parts, draft.content(), () => object.input(ExchangeAgentDraft)) : null;
-        const input = { id: item.id, revision: item.revision, replacement: replacement?.parts ?? null };
+        const input = { id: item.id, replacement: replacement?.parts ?? null };
         current.exchange.begin({ input: {
           ...input, submissionId: submission.forInput({ contract: ExchangeAgentDraft.id, input }),
         }, incoming, replacement });

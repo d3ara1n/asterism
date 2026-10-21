@@ -220,7 +220,6 @@
   "notLinked": "未链接",
   "changeAccess": "「{receiver}」访问「{resource}」",
   "accessSaved": "授权已更新。",
-  "accessSuperseded": "当前路径的状态已改变。",
   "accessRequestBoundary": "在途请求保持开始时的授权，后续请求取用更新后的链接。",
   "accessRules": "链接有方向；工具还需受资源支持并符合接收者的工具策略。隐藏卡片不会撤销访问。",
   "objectStillActive": "请等待这个对象的活动结束后再移除。",

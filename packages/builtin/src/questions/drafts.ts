@@ -61,7 +61,6 @@ function createEntry(pending: PendingQuestion) {
 /** 草稿跟随提问身份而非挂载组件；已结束条目从索引移除，退场组件仍可读自己的旧句柄。 */
 export function createQuestionDrafts() {
   const drafts = new Map<string, { owner: string; id: string; entry: ReturnType<typeof createEntry> }>();
-  const versions = new Map<string, number>();
   const owner = (sessionId: string, agentId: string) => JSON.stringify([sessionId, agentId]);
   return {
     get(sessionId: string, agentId: string, pending: PendingQuestion) {
@@ -73,13 +72,11 @@ export function createQuestionDrafts() {
       }
       return draft.entry;
     },
-    reconcile(sessionId: string, agentId: string, version: number, pendingIds: string[]) {
+    reconcile(sessionId: string, agentId: string, pendingIds: string[]) {
       const scope = owner(sessionId, agentId);
-      if (version < (versions.get(scope) ?? -1)) return;
-      versions.set(scope, version);
       for (const [key, draft] of drafts) if (draft.owner === scope && !pendingIds.includes(draft.id)) drafts.delete(key);
     },
-    clear() { drafts.clear(); versions.clear(); },
+    clear() { drafts.clear(); },
   };
 }
 export const questionDrafts = createQuestionDrafts();

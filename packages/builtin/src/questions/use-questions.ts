@@ -1,13 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRendererCalls, useRendererEvents } from "@atelier/sdk/renderer";
 import type { ResourceRef } from "@atelier/sdk/contracts";
-import { AnswerQuestion, CancelQuestion, QuestionsChanged, ReadQuestions, type QuestionSnapshot, type Submission } from "./contract.ts";
-import { questionDrafts } from "./drafts.ts";
+import { AnswerQuestion, CancelQuestion, QuestionsChanged, ReadQuestions, type PendingQuestion, type Submission } from "./contract.ts";
 
-/** 先订阅再读取；同一挂载串行重读，通知与查询交错时再读取一次。 */
+/** 订阅直接交付当前问题；首次读取也经同一事件通道发送，普通变化不触发查询。 */
 export function useQuestions(object: ResourceRef) {
   const calls = useRendererCalls(), events = useRendererEvents();
-  const [snapshot, setSnapshot] = useState<QuestionSnapshot>({ version: 0, pending: [] });
+  const [pending, setPending] = useState<PendingQuestion[]>([]);
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const retry = useRef<() => void>(() => {});
@@ -15,56 +14,35 @@ export function useQuestions(object: ResourceRef) {
   const { id, sessionId, kind } = object;
   useEffect(() => {
     const controller = new AbortController();
-    const ref = { id, sessionId, kind };
-    let reading = false, dirty = false, ready = false;
-    let latestVersion = -1;
+    let reading = false;
     const read = async () => {
-      dirty = true;
-      if (!ready || reading || controller.signal.aborted) return;
+      if (reading || controller.signal.aborted) return;
       reading = true;
-      try {
-        while (dirty && !controller.signal.aborted) {
-          dirty = false;
-          const next = await calls.invoke(ReadQuestions, null, { object: ref, signal: controller.signal });
-          if (!controller.signal.aborted && next.version >= latestVersion) {
-            latestVersion = next.version;
-            questionDrafts.reconcile(sessionId, id, next.version, next.pending.map(item => item.id));
-            setSnapshot(next); setFailed(false);
-          }
-        }
-      } catch { if (!controller.signal.aborted) setFailed(true); }
+      try { await calls.invoke(ReadQuestions, null, { object: { id, sessionId, kind }, signal: controller.signal }); }
+      catch { if (!controller.signal.aborted) setFailed(true); }
       finally { reading = false; }
     };
-    // 查询失败只重读；订阅断开才重建连接，已结束的连接不再提交查询结果。
-    retry.current = () => { void read(); };
     const disconnected = () => {
       if (controller.signal.aborted) return;
-      controller.abort();
-      setFailed(true);
+      controller.abort(); setFailed(true);
       retry.current = () => setAttempt(value => value + 1);
     };
     const subscription = events.subscribe(QuestionsChanged, { delivery: "latest", signal: controller.signal }, event => {
-      if (event.data.agentId === id && event.data.sessionId === sessionId) {
-        latestVersion = Math.max(latestVersion, event.data.version);
-        void read();
+      if (!controller.signal.aborted && event.data.agentId === id && event.data.sessionId === sessionId) {
+        setPending(event.data.pending); setFailed(false);
       }
     });
-    void subscription.ready.then(() => {
-      if (controller.signal.aborted) return;
-      ready = true; return read();
-    }).catch(disconnected);
+    void subscription.ready.then(() => { retry.current = () => { void read(); }; return read(); }).catch(disconnected);
     void subscription.closed.then(disconnected);
     return () => { controller.abort(); retry.current = () => {}; };
   }, [calls, events, id, sessionId, kind, attempt]);
   return {
-    pending: snapshot.pending, failed, refresh,
+    pending, failed, refresh,
     async answer(interactionId: string, submission: Submission) {
       await calls.invoke(AnswerQuestion, { id: interactionId, submission }, { object: { id, sessionId, kind } });
-      refresh();
     },
     async cancel(interactionId: string) {
       await calls.invoke(CancelQuestion, { id: interactionId }, { object: { id, sessionId, kind } });
-      refresh();
     },
   };
 }

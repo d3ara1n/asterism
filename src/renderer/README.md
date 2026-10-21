@@ -24,7 +24,7 @@
 | `features/workbench/connections.ts` | 双向链接合并显示与卡片四边动态端点排序分布 |
 | `features/workbench/ObjectsPanel.tsx` / `AccessPanel.tsx` | 右侧对象快速定位浮岛与有向授权管理浮岛 |
 | `features/creation/` | 创建协调器：添加菜单、拖放与图片粘贴的候选仲裁、路由记忆、内容草稿（`content.ts`）与提交 |
-| `features/session/controller.ts` / `registry.ts` / `retention.ts` / `state.ts` | 当前会话执行游标视图的协调查询、操作门禁队列与独立进度订阅；离开会话且命令收束后释放控制器；对象保留表及按就绪投影释放 |
+| `features/session/controller.ts` / `registry.ts` / `retention.ts` / `state.ts` | 当前会话数据与进度的按序订阅、局部动作调用；离开会话且命令收束后释放控制器；对象保留表及按当前对象集合释放 |
 | `features/session/History.tsx` / `history-navigation.ts` / `history-branches.ts` | 历史浮岛面板：分支 Tab、分叉点双向导航、两行逐节点列表、来源筛选与「从这里继续」跳转 |
 | `features/conversation/tool-views.tsx` / `../../packages/ui/src/tool-content.tsx` | 三个宿主固定入口（`resource_*`）的内置视图、`resource_call` 转交适配与调用／结果原始详情切换 |
 | `../../packages/builtin/src/agent/conversation/` | 内置 Agent 对话、输入与配置组件；`timeline.ts / turn-metrics.ts` 投影历史轮次与计量，`TurnMetrics.tsx / MetricTooltip.tsx` 展示轮尾只读概要与悬停详情，`ContextUsage.tsx` 展示输入区上下文占用 |
@@ -46,8 +46,8 @@
 
 ## 前端状态协调要点
 
-- **局部提交与重读**：`executeAndRead` 在命令受理后等待新投影，等待属于调用入口；普通操作不改变会话可用性，独立对象不在前端排队。只有游标切换持有会话级导航屏障并取消旧定位意图，直到目标投影就绪；首次无内容时才呈现加载画面。
+- **当前数据与局部提交**：会话控制器打开时取得当前数据，随后直接应用同一通道交付的记录、资源、布局与进度变化。`execute` 只等待动作完成，按钮自行防止重入，独立对象不在前端排队。游标切换期间取消旧定位意图；首次无内容时才呈现加载画面。
 - **失败反馈**：控制器只保存读取异常 `readError`；操作失败随回执返回，由发起入口处理，分工见[工作台状态反馈](../../docs/workbench.md#工作台状态反馈)。
-- **持久视图与流式进度衔接**：会话模块先订阅再查询，以持久 `revision` 拒绝过时读取；`session.progress` 携带所依赖的 `revision`，先于持久视图到达时保留原块等待重读。输出块以 `responseId + ordinal` 为稳定 key，从流式生成到落库保持同一组件实例与展开状态。
+- **记录与流式进度衔接**：初始数据与后续变化使用同一通道按序交付；保存的记录先追加，随后移除对应流式块，无动态版本比较或追赶重读。输出块以 `responseId + ordinal` 为稳定 key，从流式生成到落库保持同一组件实例与展开状态。
 - **草稿与附件生命周期**：首页草稿由应用持有；代理卡片的输入草稿、文件上传占用和 `submissionId`（重试幂等身份）经 `object.retained` 按对象保留，跨页面切换、卡片重挂载、聚焦与会话视图释放不丢失，对象离开当前投影时关闭草稿；用户消息中的图片通过受控 `object.content` 读取生成短期 Blob URL，卸载时回收。
 - **覆盖表单与本地化**：角色与代理编辑器只提交用户显式覆盖（placeholder 显示内置基准，不回填保存）。组件在 render 中通过 `useI18n()` 格式化 `UiText`，不以 locale 或译后文本作为业务组件 key。

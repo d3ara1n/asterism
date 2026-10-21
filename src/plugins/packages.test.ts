@@ -44,20 +44,20 @@ describe("插件包", () => {
     expect(() => list.add({ source: { kind: "path", path: dir } }, data)).toThrow();
     expect(list.read()).toEqual([]);
   });
-  it("API 12.0 接受同主版本接口并拒绝旧主版本与更高小版本", () => {
+  it("API 13.0 接受同主版本接口并拒绝旧主版本与更高小版本", () => {
     const dir = temp();
-    pkg(dir, { id: "acme.x", api: { major: 12, minMinor: 0 } });
-    expect(readManifest(dir).api).toEqual({ major: 12, minMinor: 0 });
+    pkg(dir, { id: "acme.x", api: { major: 13, minMinor: 0 } });
+    expect(readManifest(dir).api).toEqual({ major: 13, minMinor: 0 });
     pkg(dir, { id: "acme.x", api: { major: 10, minMinor: 2 } });
     expect(() => readManifest(dir)).toThrow();
-    pkg(dir, { id: "acme.x", api: { major: 12, minMinor: 1 } });
+    pkg(dir, { id: "acme.x", api: { major: 13, minMinor: 1 } });
     expect(() => readManifest(dir)).toThrow();
   });
   it("源码包经 esbuild 打包导入，SDK 解析到宿主实例；禁用与重复 ID 不加载", async () => {
     const data = temp(); const a = temp(); const b = temp(); const c = temp();
-    pkg(a, { id: "acme.a", api: { major: 12, minMinor: 0 }, runtime: "src/runtime.ts" }, runtime("acme.a"));
-    pkg(b, { id: "acme.b", api: { major: 12, minMinor: 0 }, runtime: "src/runtime.ts" }, runtime("acme.b"));
-    pkg(c, { id: "acme.b", api: { major: 12, minMinor: 0 }, runtime: "src/runtime.ts" }, runtime("acme.b"));
+    pkg(a, { id: "acme.a", api: { major: 13, minMinor: 0 }, runtime: "src/runtime.ts" }, runtime("acme.a"));
+    pkg(b, { id: "acme.b", api: { major: 13, minMinor: 0 }, runtime: "src/runtime.ts" }, runtime("acme.b"));
+    pkg(c, { id: "acme.b", api: { major: 13, minMinor: 0 }, runtime: "src/runtime.ts" }, runtime("acme.b"));
     const list = new PackageList(join(data, "plugins.json"));
     list.add({ source: { kind: "path", path: a } }, data);
     list.add({ source: { kind: "path", path: b } }, data);
@@ -69,7 +69,7 @@ describe("插件包", () => {
   });
   it("构建失败只标记该包", async () => {
     const data = temp(); const a = temp();
-    pkg(a, { id: "acme.a", api: { major: 12, minMinor: 0 }, runtime: "src/runtime.ts" }, "export default {{;");
+    pkg(a, { id: "acme.a", api: { major: 13, minMinor: 0 }, runtime: "src/runtime.ts" }, "export default {{;");
     const list = new PackageList(join(data, "plugins.json"));
     list.add({ source: { kind: "path", path: a } }, data);
     const [item] = await loadPackages(list, data, join(data, "cache"), []);
@@ -78,7 +78,7 @@ describe("插件包", () => {
   });
   it("源码包仅引入公开 SDK 即可提供真实资源，不需要宿主内部工厂", async () => {
     const data = temp(); const root = temp();
-    pkg(root, { id: "acme.sdk", api: { major: 12, minMinor: 0 }, runtime: "src/runtime.ts" }, `
+    pkg(root, { id: "acme.sdk", api: { major: 13, minMinor: 0 }, runtime: "src/runtime.ts" }, `
       import { z } from "zod";
       import { pluginNamespace, defineCreation, defineAction } from "@atelier/sdk/contracts";
       import { definePlugin, defineModule, implementResource, implementCreation, implementAction } from "@atelier/sdk/runtime";
@@ -102,20 +102,20 @@ describe("插件包", () => {
     try {
       const sessionId = service.sessions.tree.create("SDK");
       await service.sessions.execute({ type: "resource.create", sessionId, kind: "acme.sdk/label", creation: { id: "acme.sdk/create" }, input: "Hello", position: { x: 0, y: 0 } });
-      expect(service.sessions.snapshot(sessionId).workbench.objects[0]!.presentation).toEqual({
+      expect(service.sessions.current(sessionId).workbench.objects[0]!.presentation).toEqual({
         contract: { id: "acme.sdk/view" }, data: "Hello",
       });
-      const objectId = service.sessions.snapshot(sessionId).workbench.objects[0]!.id;
+      const objectId = service.sessions.current(sessionId).workbench.objects[0]!.id;
       await service.sessions.execute({ type: "resource.command", sessionId, objectId,
         command: { id: "acme.sdk/rename", input: "Renamed" } });
-      expect(service.sessions.snapshot(sessionId).workbench.objects[0]!.presentation.data).toBe("Renamed");
+      expect(service.sessions.current(sessionId).workbench.objects[0]!.presentation.data).toBe("Renamed");
     } finally { await service.close(); }
   });
 });
 
 function publicFixture() {
   const data = temp(), provider = temp(), consumer = temp();
-  pkg(provider, { id: "acme.provider", api: { major: 12, minMinor: 0 }, runtime: "src/runtime.ts", renderer: "src/renderer.ts" }, `
+  pkg(provider, { id: "acme.provider", api: { major: 13, minMinor: 0 }, runtime: "src/runtime.ts", renderer: "src/renderer.ts" }, `
     import { pluginNamespace } from "@atelier/sdk/contracts";
     import { Read, settings, Marker, events } from "./state.ts";
     export default { namespace: pluginNamespace("acme.provider"), version: "1",
@@ -137,7 +137,7 @@ function publicFixture() {
   `);
   writeFileSync(join(provider, "src/public.ts"), 'export { Read, settings, Marker, events } from "./state.ts";');
   writeFileSync(join(provider, "src/renderer.ts"), 'export { Read, settings, Marker } from "./state.ts"; export default { modules: [{ resources: [], cards: [], tools: [] }] };');
-  pkg(consumer, { id: "acme.consumer", api: { major: 12, minMinor: 0 }, runtime: "src/runtime.ts", renderer: "src/renderer.ts" }, `
+  pkg(consumer, { id: "acme.consumer", api: { major: 13, minMinor: 0 }, runtime: "src/runtime.ts", renderer: "src/renderer.ts" }, `
     import { pluginNamespace, defineImplementation } from "@atelier/sdk/contracts";
     import { implementTool } from "@atelier/sdk/runtime";
     import { z } from "zod";
@@ -207,7 +207,7 @@ describe("公共模块", () => {
   });
   it("提供方禁用明确阻断消费者；损坏的无关插件不阻断公共模块图", async () => {
     const fixture = publicFixture(), broken = temp();
-    pkg(broken, { id: "acme.broken", api: { major: 12, minMinor: 0 }, runtime: "src/runtime.ts" }, "invalid }");
+    pkg(broken, { id: "acme.broken", api: { major: 13, minMinor: 0 }, runtime: "src/runtime.ts" }, "invalid }");
     fixture.list.add({ source: { kind: "path", path: broken } }, fixture.data);
     let packages = await loadPackages(fixture.list, fixture.data, fixture.cache, []);
     expect(packages.map(pkg => pkg.status)).toEqual(["loaded", "loaded", "failed"]);
@@ -225,7 +225,7 @@ describe("公共模块", () => {
     const metadata = JSON.parse(readFileSync(join(fixture.consumer, "package.json"), "utf8"));
     delete metadata.atelier.renderer;
     writeFileSync(join(fixture.consumer, "package.json"), JSON.stringify(metadata));
-    pkg(healthy, { id: "acme.healthy", api: { major: 12, minMinor: 0 }, runtime: "src/runtime.ts" }, runtime("acme.healthy"));
+    pkg(healthy, { id: "acme.healthy", api: { major: 13, minMinor: 0 }, runtime: "src/runtime.ts" }, runtime("acme.healthy"));
     fixture.list.add({ source: { kind: "path", path: healthy } }, fixture.data);
     let packages = await loadPackages(fixture.list, fixture.data, fixture.cache, []);
     expect(packages[0]!.definition?.dependencies).toEqual(["acme.provider"]);
@@ -258,7 +258,7 @@ describe("公共模块", () => {
     writeFileSync(join(fixture.provider, "package.json"), JSON.stringify(provider));
     const source = join(fixture.provider, "src/runtime.ts");
     writeFileSync(source, readFileSync(source, "utf8").replace('"./state.ts"', '"@fixture/provider/internal"'));
-    writeFileSync(join(disabled, "package.json"), JSON.stringify({ ...provider, atelier: { id: "acme.disabled", api: { major: 12, minMinor: 0 } } }));
+    writeFileSync(join(disabled, "package.json"), JSON.stringify({ ...provider, atelier: { id: "acme.disabled", api: { major: 13, minMinor: 0 } } }));
     const list = new PackageList(join(fixture.data, "other-plugins.json"));
     list.add({ source: { kind: "path", path: disabled } }, fixture.data); list.setEnabled(0, false);
     list.add({ source: { kind: "path", path: fixture.consumer } }, fixture.data);

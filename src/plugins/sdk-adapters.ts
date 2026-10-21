@@ -12,6 +12,7 @@ import { parseCall, applyPreparation, type ParsedCall } from "./commands.ts";
 import { synchronous } from "./synchronous.ts";
 import type { ObjectScope } from "./host.ts";
 import type { ContentLease } from "../runtime/content-store.ts";
+import { contentReferences } from "../runtime/content-store.ts";
 import { AsyncLocalStorage } from "node:async_hooks";
 
 function address(host: PluginHostServices, resource: FoldedObject): ResourceRef {
@@ -107,8 +108,8 @@ export function adaptResource(contribution: ResourceContribution, sdk: SdkContex
           }, { object: ref, signal, affectsHistory: false }).done; }
           finally { scope.active = false; }
           const value = applyPreparation(action.contract, call.value, result);
-          host.content?.validate(value, { scope: call.content, sessionId: ref.sessionId, objectId: ref.id,
-            recordIds: new Set(host.refOf(ref.id) ? host.sessions.timeline(ref.sessionId).map(node => node.id) : []) });
+          if (contentReferences(value).length) host.content?.validate(value, { scope: call.content, sessionId: ref.sessionId, objectId: ref.id,
+            recordIds: new Set(host.refOf(ref.id) ? host.sessions.view(ref.sessionId).timelineIds() : []) });
           return { ...call, value };
         },
         async execute(context, raw, before) {

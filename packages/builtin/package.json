@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@atelier/builtin-api": "^0.12.0",
-    "@atelier/sdk": "^0.32.0",
+    "@atelier/sdk": "^0.33.0",
     "@atelier/ui": "^0.1.0",
     "@lobehub/streamdown": "1.4.1",
     "@pierre/diffs": "1.5.2",

@@ -77,7 +77,7 @@ export function App({ controller }: { controller: ApplicationController }) {
   const sessionState = useSyncExternalStore(active?.subscribe ?? idleSubscribe, active?.getSnapshot ?? noSession);
   useEffect(() => active?.connect(), [active]);
   const snapshot = state.snapshot;
-  const session = sessionState?.snapshot?.workbench ?? null;
+  const session = sessionState?.data?.workbench ?? null;
   const ready = state.status === "ready";
   const sessionBlocked = !!sessionState && (sessionState.navigating || sessionState.status !== "ready");
   const phase = workbenchPhase(state.status, sessionState);
@@ -120,7 +120,7 @@ export function App({ controller }: { controller: ApplicationController }) {
   };
   const renameSession = (sessionId: string, title: string) => {
     const command = { type: "rename" as const, sessionId, title };
-    return active?.sessionId === sessionId ? active.executeAndRead(command) : window.host.session.execute(command);
+    return active?.sessionId === sessionId ? active.execute(command) : window.host.session.execute(command);
   };
   const startConversation = async (input: StartInput) => {
     if (!ready) return;

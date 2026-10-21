@@ -70,7 +70,7 @@ function fixture(options: { prepare?: (content: ContentScope, signal: AbortSigna
   const input = () => service.sessions.openContentInput({ contractId: Create.id, resourceKind: Document.kind, sessionId });
   const create = async (file: ContentRef, scopeId?: string, rest: { history?: boolean; fail?: boolean } = {}) => {
     await service.sessions.execute({ type: "resource.create", sessionId, kind: Document.kind, creation: { id: Create.id }, input: { file, ...rest }, contentScopeId: scopeId, position: { x: 0, y: 0 } });
-    return service.sessions.snapshot(sessionId).workbench.objects.at(-1)!.id;
+    return service.sessions.current(sessionId).workbench.objects.at(-1)!.id;
   };
   const object = (id: string) => context.object(sessionId, Document, id);
   const replace = (id: string, value: z.input<typeof Replace.schema>, scopeId?: string) => service.sessions.execute({ type: "resource.command", sessionId, objectId: id,
@@ -113,7 +113,7 @@ describe("宿主不可变内容", () => {
     await f.service.sessions.execute({ type: "resource.create", sessionId: f.sessionId, kind: Source.kind,
       creation: { id: CreateSource.id }, input: file, contentScopeId: input.id, position: { x: 0, y: 0 } });
     await input.close();
-    const sourceId = f.service.sessions.snapshot(f.sessionId).workbench.objects.find(item => item.kind === Source.kind)!.id;
+    const sourceId = f.service.sessions.current(f.sessionId).workbench.objects.find(item => item.kind === Source.kind)!.id;
     const source = caller.object(f.sessionId, Source, sourceId), session = caller.session(f.sessionId);
     const target = f.object(targetId).ref;
     await expect(session.invoke(Replace, target, { file })).rejects.toMatchObject({ code: "foreign_resource" });
@@ -198,7 +198,7 @@ describe("宿主不可变内容", () => {
     const f = fixture(), draft = f.input();
     const ref = await f.store.writer({ scope: draft }).stage(bytes("retry"));
     await expect(f.create(ref, draft.id, { fail: true })).rejects.toThrow();
-    expect(f.service.sessions.snapshot(f.sessionId).workbench.objects).toHaveLength(0);
+    expect(f.service.sessions.current(f.sessionId).workbench.objects).toHaveLength(0);
     expect(text(await f.store.reader({ scope: draft }).read(ref))).toBe("retry");
     const id = await f.create(ref, draft.id); await draft.close();
     expect(text(await f.object(id).content.read(ref))).toBe("retry");

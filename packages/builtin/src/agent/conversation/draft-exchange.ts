@@ -27,7 +27,7 @@ export class DraftExchange {
         this.pending = null;
         this.release(exchange.incoming.content);
         this.editor.restore(exchange.incoming);
-      } else if (["draft_changed", "invalid_request", "not_found"].includes(result.error.code)) {
+      } else if (["invalid_request", "not_found"].includes(result.error.code)) {
         // 业务拒绝发生在资源动作队列中；旧提交若已生效会先命中幂等受理。
         this.pending = null;
         this.release();

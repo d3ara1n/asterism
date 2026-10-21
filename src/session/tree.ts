@@ -5,6 +5,7 @@ import { SessionError } from "../shared/session-timeline.ts";
 import type { NodeQuery, NodeView, SequencedNode } from "./view.ts";
 import { foldWorkbench, type FoldedState } from "./fold.ts";
 import { deepFreeze } from "../shared/immutable.ts";
+import type { ResourceRef } from "@atelier/sdk/contracts";
 export { SessionError } from "../shared/session-timeline.ts";
 
 export type CursorSelection = {
@@ -22,6 +23,20 @@ type NodeIndex = { id: string; seq: number; contract: string };
 export class SessionTree {
   constructor(private readonly db: DatabaseSync) {}
   private readonly workbenches = new Map<string, { cursor: string | null; state: FoldedState }>();
+  private readonly identities = new Map<string, ResourceRef>();
+
+  /** 创建记录的身份不可变；首次按 ID 查找后直接复用，不重复读取历史正文。 */
+  resourceRef(id: string): ResourceRef | null {
+    const known = this.identities.get(id);
+    if (known) return known;
+    const row = this.db.prepare(`SELECT session_id AS sessionId, json_extract(payload, '$.data.type') AS kind
+      FROM session_nodes WHERE json_extract(payload, '$.contract') = 'resource_created'
+      AND json_extract(payload, '$.data.id') = ? LIMIT 1`).get(id) as { sessionId: string; kind: string } | undefined;
+    if (!row) return null;
+    const ref = { ...row, id };
+    if (!this.db.isTransaction) this.identities.set(id, ref);
+    return ref;
+  }
 
   /** 当前工作台的唯一重建入口；游标变化全量重放，回滚后按实际游标重新取用。 */
   workbench(sessionId: string): FoldedState {

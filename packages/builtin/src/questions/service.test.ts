@@ -77,7 +77,7 @@ describe("结构化问答契约", () => {
   it("取消只结束指定实例，变化事件和工具过程态关联同一等待身份", async () => {
     const events: string[][] = [];
     const published: string[] = [];
-    const service = createQuestionService((_object, _version, ids) => events.push(ids));
+    const service = createQuestionService((_object, pending) => { events.push(pending.map(item => item.id)); });
     const first = service.ask(object, "first", questions, new AbortController().signal, id => published.push(id));
     const second = service.ask(object, "second", questions, new AbortController().signal, id => published.push(id));
     const [a, b] = service.read(object).pending;
@@ -93,7 +93,7 @@ describe("结构化问答契约", () => {
   it("结束通知失败仍交付已受理答案，记录错误且快照可恢复界面", async () => {
     const error = new Error("Event delivery failed.");
     const log = vi.spyOn(console, "error").mockImplementation(() => {});
-    const service = createQuestionService((_object, _version, ids) => { if (!ids.length) throw error; });
+    const service = createQuestionService((_object, pending) => { if (!pending.length) throw error; });
     const controller = new AbortController();
     const waiting = service.ask(object, "answer", [questions[2]!], controller.signal);
     try {

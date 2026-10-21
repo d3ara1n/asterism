@@ -5,7 +5,6 @@ import { ConversationTimeline } from "./ConversationTimeline";
 import { ConversationMinimap } from "./ConversationMinimap";
 
 import { MessageComposer } from "./Composer";
-import { commonMessages } from "../../messages/common";
 import { conversationMessages } from "../../messages/conversation";
 import { useI18n, useRendererObject, useRendererModels } from "@atelier/sdk/renderer";
 
@@ -23,12 +22,11 @@ import type { AgentExecutionState } from "../state";
 export function ConversationActions({ data }: { data: { executionState: AgentExecutionState } }) {
   const i18n = useI18n();
   const object = useRendererObject();
-  const { ready } = object.view;
   const snapshot = object.session.snapshot();
   const agentRunning = data.executionState === "running";
   if (!snapshot) return null;
-  return <StatusBadge tone={!ready ? "warning" : agentRunning ? "progress" : "neutral"} role="status">
-    {!ready ? i18n.formatMessage(commonMessages.statusUnavailable) : agentRunning ? i18n.formatMessage(conversationMessages.working) : i18n.formatMessage(conversationMessages.ready)}
+  return <StatusBadge tone={agentRunning ? "progress" : "neutral"} role="status">
+    {agentRunning ? i18n.formatMessage(conversationMessages.working) : i18n.formatMessage(conversationMessages.ready)}
   </StatusBadge>;
 }
 

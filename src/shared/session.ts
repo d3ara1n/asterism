@@ -25,13 +25,15 @@ export type NewNode = Omit<SessionNode, "id" | "sessionId" | "parentId" | "creat
 
 // ---- 会话能力接口 ----
 const uuid = z.string().uuid();
-export const sessionVersion = 21;
+export const sessionVersion = 22;
 export const sessionChannel = coreChannel("session");
 export const sessionChangedChannel = coreChannel("session-changed");
 export const sessionCommandSchema = z.discriminatedUnion("type", [
   // 首页组合入口：建立会话、创建第一个代理资源并向它提交首条输入。
   z.strictObject({ type: z.literal("start"), submissionId: uuid, agent: id, model: modelExpressionSchema.nullable(), thinking: thinkingSchema.nullable(), parts: userInputPartsSchema, contentScopeId: uuid.optional() }),
   z.strictObject({ type: z.literal("read"), sessionId: id }),
+  z.strictObject({ type: z.literal("watch"), sessionId: id }),
+  z.strictObject({ type: z.literal("unwatch"), sessionId: id }),
   z.strictObject({ type: z.literal("select"), sessionId: id, nodeId: id.nullable() }),
   // 应用组合入口：将人工命名交给内置命名模块追加领域记录。
   z.strictObject({ type: z.literal("rename"), sessionId: id, title: z.string().max(160).refine(value => value.trim().length > 0) }),
@@ -46,7 +48,7 @@ export const sessionCommandSchema = z.discriminatedUnion("type", [
   ...workbenchCommands,
 ]);
 export type SessionCommand = z.infer<typeof sessionCommandSchema>;
-export type SessionMutation = Exclude<SessionCommand, { type: "read" }>;
+export type SessionMutation = Exclude<SessionCommand, { type: "read" | "watch" | "unwatch" }>;
 /** 仅在运行时存在的输出投影；没有父指针，不属于可选择的历史节点。 */
 const liveBase = { id, objectId: id, responseId: id, ordinal: z.number().int().nonnegative() };
 export const liveBlockSchema = z.discriminatedUnion("kind", [
@@ -57,10 +59,8 @@ export const liveBlockSchema = z.discriminatedUnion("kind", [
     invocation: toolInvocationSchema.nullable(), result: toolRunningResultSchema.nullable() }),
 ]);
 export type LiveBlock = z.infer<typeof liveBlockSchema>;
-const revision = z.number().int().nonnegative();
-/** 进度可独立替换；revision 指出它依赖的视图版本，version 表示内存进度先后。 */
+/** 与数据更新使用同一个按序投递通道。 */
 export const sessionProgressSchema = z.strictObject({
-  revision, version: revision,
   /** 运行中执行体的临时输出，按发出对象归属。 */
   live: z.array(liveBlockSchema),
   /** 依赖当前时间线路径的资源占用；不表示资源的业务执行状态。 */
@@ -69,15 +69,15 @@ export const sessionProgressSchema = z.strictObject({
   timelineBusy: z.boolean(),
 });
 export type SessionProgress = z.infer<typeof sessionProgressSchema>;
-/** 同次交付会话树、游标与工作台投影。seq 只计节点；revision 也涵盖游标、对象数据、布局及内存投影通知。 */
-export const sessionSnapshotSchema = z.strictObject({
-  sessionId: id, title: z.string(), cursor: id.nullable(), seq: revision, revision,
+/** 打开会话时交付当前数据，之后直接应用变化。 */
+export const sessionDataSchema = z.strictObject({
+  sessionId: id, title: z.string(), cursor: id.nullable(),
   nodes: z.array(sessionNodeSchema),
   workbench: workbenchSnapshotSchema, progress: sessionProgressSchema,
 });
-export type SessionSnapshot = z.infer<typeof sessionSnapshotSchema>;
+export type SessionData = z.infer<typeof sessionDataSchema>;
 export const sessionReplySchema = z.discriminatedUnion("kind", [
-  z.strictObject({ kind: z.literal("view"), snapshot: sessionSnapshotSchema }),
+  z.strictObject({ kind: z.literal("view"), data: sessionDataSchema }),
   z.strictObject({ kind: z.literal("accepted"), sessionId: id }),
 ]);
 export type SessionReply = z.infer<typeof sessionReplySchema>;
@@ -90,7 +90,13 @@ export type SessionResult = z.infer<typeof sessionResultSchema>;
 export const sessionRequestSchema = z.strictObject({ kind: z.literal("session.request"), version: z.literal(sessionVersion), id: uuid, command: sessionCommandSchema });
 export const sessionResponseSchema = z.strictObject({ kind: z.literal("session.response"), version: z.literal(sessionVersion), id: uuid, result: sessionResultSchema });
 export const sessionChangedSchema = z.discriminatedUnion("kind", [
-  z.strictObject({ kind: z.literal("session.changed"), sessionId: id, revision }),
+  z.strictObject({ kind: z.literal("session.opened"), sessionId: id, data: sessionDataSchema }),
+  z.strictObject({ kind: z.literal("session.changed"), sessionId: id,
+    nodes: z.array(sessionNodeSchema), cursor: id.nullable(), title: z.string(),
+    objects: workbenchSnapshotSchema.shape.objects,
+    workbench: workbenchSnapshotSchema.optional(),
+    layout: workbenchSnapshotSchema.pick({ views: true, viewport: true }).optional(),
+  }),
   z.strictObject({ kind: z.literal("session.progress"), sessionId: id, progress: sessionProgressSchema }),
 ]);
 export type SessionChanged = z.infer<typeof sessionChangedSchema>;

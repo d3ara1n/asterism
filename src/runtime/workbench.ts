@@ -5,7 +5,7 @@ import type { FoldedObject } from "../session/fold.ts";
 import { SessionError, type SessionTree } from "../session/tree.ts";
 import type { Json } from "@atelier/sdk/contracts";
 
-import { workbenchSnapshotSchema, type WorkbenchCommand, type WorkbenchSnapshot, type Point, type Viewport } from "../shared/workbench.ts";
+import { type WorkbenchCommand, type WorkbenchSnapshot, type Point, type Viewport } from "../shared/workbench.ts";
 import type { ContentStore, ContentLease } from "./content-store.ts";
 import { defaultCardPosition, fallbackCardWidth, fallbackCardHeight } from "../shared/workbench-layout.ts";
 import { placeObject } from "../shared/workbench-placement.ts";
@@ -78,8 +78,7 @@ export class SessionWorkbench {
       }
       case "view.set": {
         // 布局不属于历史路径；旁支和已移除对象的卡片也可以调整。
-        const exists = tree.nodes(command.sessionId).some(node => node.contract === "resource_created"
-          && node.data !== null && typeof node.data === "object" && !Array.isArray(node.data) && node.data.id === command.objectId);
+        const exists = tree.resourceRef(command.objectId)?.sessionId === command.sessionId;
         if (!exists) throw new SessionError("not_found", "Object does not belong to this session.");
         const previous = this.db.prepare("SELECT * FROM object_views WHERE session_id = ? AND object_id = ?").get(command.sessionId, command.objectId) as ViewRow | undefined;
         const size = command.size === undefined
@@ -107,13 +106,20 @@ export class SessionWorkbench {
   project(sessionId: string, title: string): WorkbenchSnapshot {
     const folded = this.tree.workbench(sessionId);
     const objects = folded.objects.map(object => ({ id: object.id, kind: object.kind, title: object.title, presentation: this.resources.project(object) }));
-    const ids = new Set(objects.map(object => object.id));
+    return { id: sessionId, title, objects, links: folded.links, ...this.layout(sessionId) };
+  }
+  object(sessionId: string, id: string) {
+    const object = this.tree.workbench(sessionId).objects.find(item => item.id === id);
+    return object ? { id: object.id, kind: object.kind, title: object.title, presentation: this.resources.project(object) } : null;
+  }
+  layout(sessionId: string): Pick<WorkbenchSnapshot, "views" | "viewport"> {
+    const ids = new Set(this.tree.workbench(sessionId).objects.map(object => object.id));
     const rows = this.db.prepare("SELECT * FROM object_views WHERE session_id = ?").all(sessionId) as ViewRow[];
     const viewport = this.db.prepare("SELECT x, y, zoom FROM viewports WHERE session_id = ?").get(sessionId) as Viewport | undefined;
-    return workbenchSnapshotSchema.parse({ id: sessionId, title, objects, links: folded.links,
+    return {
       views: rows.filter(row => ids.has(row.object_id)).map(row => ({
         objectId: row.object_id, position: { x: row.x, y: row.y }, hidden: !!row.hidden, collapsed: !!row.collapsed,
         size: row.width === null || row.height === null ? null : { width: row.width, height: row.height },
-      })), viewport: viewport ?? { x: 0, y: 0, zoom: 1 } });
+      })), viewport: viewport ?? { x: 0, y: 0, zoom: 1 } };
   }
 }

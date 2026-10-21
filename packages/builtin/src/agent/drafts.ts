@@ -7,31 +7,31 @@ import { duplicateSubmission, rememberSubmission } from "./submissions.ts";
 export function saveDraft(object: ObjectExecutor, input: { submissionId: string; parts: AgentDraft["parts"] }): void {
   if (duplicateSubmission(object, SaveAgentDraft, input)) return;
   object.commit(writer => {
-    writer.set(AgentDrafts, [...object.get(AgentDrafts) ?? [], { id: input.submissionId, revision: 0, mode: "none", parts: input.parts, sender: { kind: "user" } }]);
+    writer.set(AgentDrafts, [...object.get(AgentDrafts) ?? [], { id: input.submissionId, mode: "none", parts: input.parts, sender: { kind: "user" } }]);
     rememberSubmission(object, writer, SaveAgentDraft, input);
   });
 }
-function currentDraft(object: ObjectReader, id: string, revision: number) {
+function currentDraft(object: ObjectReader, id: string) {
   const drafts = object.get(AgentDrafts) ?? [];
   const draft = drafts.find(item => item.id === id);
-  if (!draft || draft.revision !== revision)
-    throw new PluginApiError("conflict", "The draft has changed or has already been sent.", "draft_changed");
+  if (!draft)
+    throw new PluginApiError("not_found", "The draft has already been sent or taken out.");
   return { drafts, draft };
 }
-export function setDraftMode(object: ObjectExecutor, input: { id: string; revision: number; mode: DraftMode }): void {
+export function setDraftMode(object: ObjectExecutor, input: { id: string; mode: DraftMode }): void {
   object.commit(writer => {
-    const { drafts } = currentDraft(object, input.id, input.revision);
-    writer.set(AgentDrafts, drafts.map(item => item.id === input.id ? { ...item, revision: item.revision + 1, mode: input.mode } : item));
+    const { drafts } = currentDraft(object, input.id);
+    writer.set(AgentDrafts, drafts.map(item => item.id === input.id ? { ...item, mode: input.mode } : item));
   });
 }
 export function exchangeDraft(object: ObjectExecutor, input: {
-  submissionId: string; id: string; revision: number; replacement: AgentDraft["parts"] | null;
+  submissionId: string; id: string; replacement: AgentDraft["parts"] | null;
 }): void {
   if (duplicateSubmission(object, ExchangeAgentDraft, input)) return;
   object.commit(writer => {
-    const { drafts } = currentDraft(object, input.id, input.revision);
+    const { drafts } = currentDraft(object, input.id);
     writer.set(AgentDrafts, drafts.flatMap(item => item.id !== input.id ? [item]
-      : input.replacement ? [{ ...item, revision: item.revision + 1, mode: "none" as const, parts: input.replacement, sender: { kind: "user" as const } }] : []));
+      : input.replacement ? [{ ...item, mode: "none" as const, parts: input.replacement, sender: { kind: "user" as const } }] : []));
     rememberSubmission(object, writer, ExchangeAgentDraft, input);
   });
 }

@@ -109,10 +109,10 @@ function Canvas({ ref, session, run, writable, canDrop, onDropItems }: DropHandl
     if (patch.size === undefined) { void run(command); return; }
     void saveCardSize({
       pending: pendingSizes.current, objectId, size: patch.size,
-      saveAndRead: async () => operationSucceeded(await controller.executeAndRead(command)),
+      saveAndRead: async () => operationSucceeded(await controller.execute(command)),
       read: () => {
         const state = controller.getSnapshot();
-        return state.status === "ready" ? state.snapshot?.workbench ?? null : null;
+        return state.status === "ready" ? state.data?.workbench ?? null : null;
       },
       project: snapshot => setNodes(previous =>
         workbenchNodes(snapshot ?? latest.current, previous, registry, onView, pendingSizes.current)),

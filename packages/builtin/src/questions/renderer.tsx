@@ -92,7 +92,7 @@ export default {
   resources: [], cards: [], tools: [questionToolRenderer],
   async prepare({ signal, events }) {
     const subscription = events.subscribe(QuestionsChanged, { delivery: "latest", signal }, ({ data }) => {
-      questionDrafts.reconcile(data.sessionId, data.agentId, data.version, data.pendingIds);
+      questionDrafts.reconcile(data.sessionId, data.agentId, data.pending.map(item => item.id));
     });
     signal.addEventListener("abort", () => questionDrafts.clear(), { once: true });
     await subscription.ready;

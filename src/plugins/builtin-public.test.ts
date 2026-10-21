@@ -27,7 +27,7 @@ function fixture(ranges: (string | null)[] = [compatibleRange, `~${builtinPublic
     const root = temp(), id = `fixture.consumer${index}`;
     file(root, "package.json", JSON.stringify({ name: `@fixture/consumer${index}`, version: "1.0.0",
       ...(range === null ? {} : { peerDependencies: { "@atelier/builtin-api": range } }),
-      atelier: { id, api: { major: 12, minMinor: 0 }, runtime: "runtime.ts", renderer: "renderer.ts" } }));
+      atelier: { id, api: { major: 13, minMinor: 0 }, runtime: "runtime.ts", renderer: "renderer.ts" } }));
     file(root, "public.ts", 'export { SubmitAgentInput } from "@atelier/builtin-api/contracts";');
     file(root, "runtime.ts", `
       import { pluginNamespace } from "@atelier/sdk/contracts";
@@ -91,12 +91,12 @@ describe("内置公共包", () => {
       const sessionId = service.sessions.tree.create("Public API");
       await service.sessions.execute({ type: "resource.create", sessionId, kind: Agent.kind, creation: { id: CreateAgent.id },
         input: { selection: { agent: "worker", model: null, thinking: null } }, position: { x: 0, y: 0 } });
-      const before = service.sessions.snapshot(sessionId), objectId = before.workbench.objects[0]!.id;
+      const before = service.sessions.current(sessionId), objectId = before.workbench.objects[0]!.id;
       await expect(service.sessions.execute({ type: "resource.command", sessionId, objectId,
         command: resourceCall(SubmitAgentInput, { mode: "follow", submissionId: crypto.randomUUID(), parts: [{ kind: "text", text: "Hello" }] }) }))
         .rejects.toThrow("Blocked by external preparer.");
       expect(probes.map(probe => probe.calls.length)).toEqual([1, 1]);
-      expect(service.sessions.snapshot(sessionId).nodes).toEqual(before.nodes);
+      expect(service.sessions.current(sessionId).nodes).toEqual(before.nodes);
     } finally { await service.close(); }
     // 前端产物从其环境绑定取实例；刻意使用不同对象，防止误取后台绑定。
     const frontendAction = { ...SubmitAgentInput };

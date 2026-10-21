@@ -25,7 +25,7 @@ import type { FoldedObject } from "../session/fold.ts";
 import { SessionError, SessionTree } from "../session/tree.ts";
 import type { ModelSettings, AgentSelection } from "../shared/model.ts";
 import type { ObjectStreamPayload } from "../shared/object-stream.ts";
-import { sessionCommandSchema, sessionSnapshotSchema, type SessionChanged, type SessionCommand, type SessionSnapshot, type SessionProgress, type SessionReply, type SessionNode, type LiveBlock } from "../shared/session.ts";
+import { sessionCommandSchema, type SessionChanged, type SessionCommand, type SessionData, type SessionProgress, type SessionReply, type SessionNode, type LiveBlock } from "../shared/session.ts";
 import type { ToolRegistry } from "../tools/registry.ts";
 import { sessionPluginError } from "./plugin-errors.ts";
 import { SessionWorkbench } from "./workbench.ts";
@@ -43,8 +43,8 @@ const startIdentity = ({ contentScopeId: _scope, ...input }: Extract<SessionComm
 export class SessionService {
   readonly calls: LoadedPlugins["calls"];
   readonly events = new EventBus();
-  private revisions = new Map<string, number>();
-  private progressVersions = new Map<string, number>();
+  private readonly watching = new Map<string, SessionProgress>();
+  private readonly updates = new Map<string, { nodes: SessionNode[]; objects: Set<string>; workbench: boolean; layout: boolean }>();
   private closed = false;
   readonly tree: SessionTree;
   readonly content: ContentStore;
@@ -86,11 +86,16 @@ export class SessionService {
         if (!title || this.closed || title === this.tree.title(sessionId)) return;
         this.commit(sessionId, () => this.tree.setTitle(sessionId, title));
       },
-      commit: (sessionId, work) => this.commit(sessionId, work),
+      commit: (sessionId, work, objectId) => this.commit(sessionId, work, { objectId }),
       idle: (sessionId, objectId) => !this.pluginActivity(sessionId).busy.some(id => id !== objectId)
         && !this.resources.controllers().some(controller => controller.activity?.(sessionId).busy.some(id => id !== objectId)),
       progressChanged: sessionId => this.progressChanged(sessionId),
-      viewChanged: sessionId => this.notify(sessionId),
+      viewChanged: (sessionId, objectId) => {
+        if (this.committing?.sessionId === sessionId) { this.committing.objects.add(objectId); return; }
+        if (!this.watching.has(sessionId)) return;
+        this.pendingUpdate(sessionId).objects.add(objectId);
+        this.notify(sessionId);
+      },
       linked: (sessionId, objectId) => {
         const folded = this.tree.workbench(sessionId);
         const ids = new Set(folded.links.filter(link => link.receiverId === objectId).map(link => link.resourceId));
@@ -99,17 +104,7 @@ export class SessionService {
       capabilities: (linked, policy, caller) => new AgentCapabilities(this.resources, this.tools, linked, policy, caller),
       context: linked => this.resources.context(linked),
     };
-    const refOf = (objectId: string): ResourceRef | null => {
-      const sessionIds = this.tree.list().map(session => session.id);
-      for (const sessionId of sessionIds) {
-        for (const node of this.tree.nodes(sessionId)) {
-          if (node.contract !== "resource_created") continue;
-          const data = node.data as { id?: unknown; type?: unknown };
-          if (data.id === objectId) return { sessionId, id: objectId, kind: String(data.type) };
-        }
-      }
-      return null;
-    };
+    const refOf = (objectId: string): ResourceRef | null => this.tree.resourceRef(objectId);
     const models = createModelServices(configuration, adapterFactory);
     const selection = createSelection({ agents: () => configuration.current().agents });
     // 首条 submit 准备时对象尚未创建；组合入口用已经准备好的选择执行同一模型预检。
@@ -167,9 +162,10 @@ export class SessionService {
     catch (error) { this.db.exec("ROLLBACK"); throw error; }
   }
   /** 单一写入者的同步提交区间：取父节点、记录事件与更新游标不可交错。 */
-  private committing: { sessionId: string; writer: SessionWriter } | null = null;
+  private committing: { sessionId: string; writer: SessionWriter; objects: Set<string> } | null = null;
   private writesClosed = false;
-  private commit<T>(sessionId: string, work: (writer: SessionWriter) => T): T {
+  private commit<T>(sessionId: string, work: (writer: SessionWriter) => T,
+    scope: { objectId?: string; workbench?: boolean; layout?: boolean } = {}): T {
     if (this.writesClosed) throw new SessionError("unavailable", "The session service is closed.");
     if (this.committing) {
       if (this.committing.sessionId !== sessionId) throw new SessionError("conflict", "A commit cannot write another session.");
@@ -177,6 +173,7 @@ export class SessionService {
       try {
         const result = work(this.committing.writer);
         this.db.exec("RELEASE nested_session_commit");
+        if (scope.objectId) this.committing.objects.add(scope.objectId);
         return result;
       } catch (error) {
         this.db.exec("ROLLBACK TO nested_session_commit; RELEASE nested_session_commit");
@@ -188,8 +185,10 @@ export class SessionService {
       append: node => this.tree.appendToTimeline(sessionId, node).id,
       nodes: () => this.tree.nodes(sessionId),
     };
+    const objects = new Set<string>();
+    if (scope.objectId) objects.add(scope.objectId);
     const result = this.transaction(() => {
-      this.committing = { sessionId, writer };
+      this.committing = { sessionId, writer, objects };
       try {
         const result = work(writer);
         // 存在性与链接参与执行校验，必须在提交成功和派发观察者之前重建。
@@ -203,6 +202,17 @@ export class SessionService {
     if (!this.closed && title !== null && title !== titleBefore) this.events.publish(SessionTitleChanged, null, { sessionId, title });
     // 提交后交给插件派发队列；观察者内的提交排队，队列清空后每个会话通知界面一次。
     const change = { records: this.tree.since(sessionId, head), cursorChanged: before !== this.tree.position(sessionId) };
+    if (this.watching.has(sessionId)) {
+      const update = this.pendingUpdate(sessionId);
+      update.nodes.push(...change.records);
+      for (const objectId of objects) update.objects.add(objectId);
+      for (const node of change.records) {
+        if (node.source?.resource) update.objects.add(node.source.resource.id);
+      }
+      update.workbench ||= !!scope.workbench || change.records.some(node =>
+        ["resource_created", "object_removed", "resource_attached", "resource_detached"].includes(node.contract));
+      update.layout ||= !!scope.layout;
+    }
     if (this.closed) this.notify(sessionId);
     else this.afterCommit(sessionId, change, id => this.notify(id));
     return result;
@@ -215,36 +225,56 @@ export class SessionService {
       && this.resources.controllers().every(controller => (controller.activity?.(sessionId).busy.length ?? 0) === 0);
   }
   private notify(sessionId: string): void {
-    const revision = (this.revisions.get(sessionId) ?? 0) + 1;
-    this.revisions.set(sessionId, revision);
-    try { this.changed({ kind: "session.changed", sessionId, revision }); }
-    catch { /* 查询可恢复遗漏的通知 */ }
+    const update = this.updates.get(sessionId);
+    this.updates.delete(sessionId);
+    if (!update || !this.watching.has(sessionId) || this.closed) return;
+    const title = this.tree.title(sessionId);
+    this.changed({ kind: "session.changed", sessionId, nodes: update.nodes, title, cursor: this.tree.cursor(sessionId),
+      objects: update.workbench ? [] : [...update.objects].flatMap(id => {
+        const object = this.workbench.object(sessionId, id);
+        return object ? [object] : [];
+      }),
+      ...(update.workbench ? { workbench: this.workbench.project(sessionId, title) } : {}),
+      ...(update.layout && !update.workbench ? { layout: this.workbench.layout(sessionId) } : {}),
+    });
+  }
+  private pendingUpdate(sessionId: string) {
+    let update = this.updates.get(sessionId);
+    if (!update) { update = { nodes: [], objects: new Set<string>(), workbench: false, layout: false }; this.updates.set(sessionId, update); }
+    return update;
   }
   private progress(sessionId: string): SessionProgress {
     const resources = this.resources.controllers().map(controller => controller.activity?.(sessionId) ?? { busy: [], live: [] });
     const plugin = this.pluginActivity(sessionId);
-    return { revision: this.revisions.get(sessionId) ?? 0, version: this.progressVersions.get(sessionId) ?? 0,
+    return {
       busyObjectIds: [...new Set([...resources.flatMap(a => a.busy), ...plugin.busy,
         ...[...this.pendingActions.values()].filter(ref => ref.sessionId === sessionId).map(ref => ref.id)])],
       timelineBusy: [...this.pendingCreations.values()].some(item => item.sessionId === sessionId),
       live: [...resources.flatMap(a => a.live), ...plugin.live] };
   }
   private progressChanged(sessionId: string): void {
-    this.progressVersions.set(sessionId, (this.progressVersions.get(sessionId) ?? 0) + 1);
-    try { this.changed({ kind: "session.progress", sessionId, progress: this.progress(sessionId) }); }
-    catch { /* 重新读取会话恢复当前进度 */ }
+    const previous = this.watching.get(sessionId);
+    if (!previous || this.closed) return;
+    const progress = this.progress(sessionId);
+    // 生命周期内的多层占用常对应同一个 busy；没有实际变化时不重发流式正文。
+    if (previous.timelineBusy === progress.timelineBusy
+      && previous.busyObjectIds.length === progress.busyObjectIds.length
+      && previous.busyObjectIds.every(id => progress.busyObjectIds.includes(id))
+      && previous.live.length === progress.live.length
+      && previous.live.every((block, index) => block === progress.live[index])) return;
+    this.watching.set(sessionId, progress);
+    this.changed({ kind: "session.progress", sessionId, progress });
   }
   private linkTools(sessionId: string, receiverId: string, resource: FoldedObject) {
     const recipient = this.object(sessionId, receiverId);
     return this.resources.controller(recipient.kind)?.linkTools?.(sessionId, receiverId, resource) ?? [];
   }
-  snapshot(sessionId: string): SessionSnapshot {
+  current(sessionId: string): SessionData {
     const nodes = this.tree.nodes(sessionId);
     const cursor = this.tree.cursor(sessionId);
     const title = this.tree.title(sessionId);
-    return sessionSnapshotSchema.parse({ sessionId, title, cursor, seq: this.tree.head(sessionId),
-      revision: this.revisions.get(sessionId) ?? 0, nodes, progress: this.progress(sessionId),
-      workbench: this.workbench.project(sessionId, title) });
+    return { sessionId, title, cursor, nodes, progress: this.progress(sessionId),
+      workbench: this.workbench.project(sessionId, title) };
   }
   /** 资源命令入口：事务外准备，执行时 before 在提交事务内重验对象仍在当前路径上。 */
   private async invoke(sessionId: string, objectId: string, raw: ResourceCall, inputScopeId?: string): Promise<void> {
@@ -406,10 +436,19 @@ export class SessionService {
     if (!parsed.success) throw new SessionError("invalid_request", "Invalid session command.");
     const command = parsed.data;
     switch (command.type) {
-      case "read": return { kind: "view", snapshot: this.snapshot(command.sessionId) };
+      case "read": return { kind: "view", data: this.current(command.sessionId) };
+      case "watch": {
+        const data = this.current(command.sessionId);
+        this.watching.set(command.sessionId, data.progress);
+        this.changed({ kind: "session.opened", sessionId: command.sessionId, data });
+        return { kind: "accepted", sessionId: command.sessionId };
+      }
+      case "unwatch":
+        this.watching.delete(command.sessionId);
+        return { kind: "accepted", sessionId: command.sessionId };
       case "select":
         if (!this.settled(command.sessionId)) throw new SessionError("conflict", "Wait for all captured resources to settle before moving through history.");
-        this.commit(command.sessionId, () => this.tree.select(command.sessionId, command.nodeId));
+        this.commit(command.sessionId, () => this.tree.select(command.sessionId, command.nodeId), { workbench: true });
         return { kind: "accepted", sessionId: command.sessionId };
       case "start": return this.start(command);
       case "rename":
@@ -456,7 +495,7 @@ export class SessionService {
           const receiver = this.object(command.sessionId, command.receiverId), resource = this.object(command.sessionId, command.resourceId);
           this.setLink(command.sessionId, { sessionId: command.sessionId, id: receiver.id, kind: receiver.kind },
             { sessionId: command.sessionId, id: resource.id, kind: resource.kind }, command.linked);
-        } else this.commit(command.sessionId, () => this.workbench.mutate(command));
+        } else this.commit(command.sessionId, () => this.workbench.mutate(command), { layout: true });
         return { kind: "accepted", sessionId: command.sessionId };
       }
     }

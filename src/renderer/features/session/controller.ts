@@ -1,34 +1,25 @@
 import type { UiText } from "@atelier/sdk/contracts";
 import { errorDisplay } from "../../../shared/error-display.ts";
-import type { SessionBridge, SessionMutation, SessionResult, SessionSnapshot, SessionProgress } from "../../../shared/session.ts";
+import type { SessionBridge, SessionMutation, SessionResult, SessionData, SessionProgress, SessionChanged } from "../../../shared/session.ts";
 
-export type SessionView = Omit<SessionSnapshot, "progress">;
+export type SessionView = Omit<SessionData, "progress">;
 type SessionOperation = Exclude<SessionMutation, { type: "start" }>;
 export type WorkbenchOperation = Exclude<SessionOperation, { type: "select" }>;
 export type SessionViewState = {
-  snapshot: SessionView | null; status: "loading" | "ready" | "error"; readError: UiText | null; missing: boolean;
-  /** 只有执行游标切换暂时关闭旧路径上的操作；普通命令由发起视图管理等待。 */
+  data: SessionView | null; status: "loading" | "ready" | "error"; readError: UiText | null; missing: boolean;
   navigating: boolean;
-  selectionVersion: number;
 };
-const emptyProgress: SessionProgress = { revision: 0, version: 0, busyObjectIds: [], timelineBusy: false, live: [] };
+const emptyProgress: SessionProgress = { busyObjectIds: [], timelineBusy: false, live: [] };
 
-/** 会话只拥有可查询投影、进度及游标切换；局部操作状态由调用者拥有。 */
+/** 打开时取得当前数据，之后按序应用后台变化；动作完成直接返回。 */
 export class SessionController {
-  private state: SessionViewState = { snapshot: null, status: "loading", navigating: false, readError: null, missing: false, selectionVersion: 0 };
+  private state: SessionViewState = { data: null, status: "loading", navigating: false, readError: null, missing: false };
   private progress: SessionProgress = emptyProgress;
-  private pendingProgress: SessionProgress | null = null;
   private listeners = new Set<() => void>();
   private progressListeners = new Set<() => void>();
-  private viewWaiters = new Set<() => void>();
-  private generation = 0;
-  private completedReadGeneration = -1;
   private connections = 0;
-  private reading = false;
-  private dirty = false;
-  private requiredRevision = 0;
-  private unsubscribe: (() => void) | null = null;
   private pending = 0;
+  private scope: AbortController | null = null;
   constructor(private readonly bridge: SessionBridge, readonly sessionId: string, private readonly onRelease?: () => void) {}
   getSnapshot = (): SessionViewState => this.state;
   getProgress = (): SessionProgress => this.progress;
@@ -37,38 +28,42 @@ export class SessionController {
   private update(patch: Partial<SessionViewState>): void {
     this.state = { ...this.state, ...patch };
     this.listeners.forEach(listener => listener());
-    this.viewWaiters.forEach(waiter => waiter());
   }
-  private acceptProgress(progress: SessionProgress): void {
-    if (progress.version < this.progress.version) return;
-    if (!this.state.snapshot || progress.revision > this.state.snapshot.revision) {
-      if (!this.pendingProgress || progress.version >= this.pendingProgress.version) this.pendingProgress = progress;
-      this.requiredRevision = Math.max(this.requiredRevision, progress.revision);
-      void this.read();
-      return;
+  private receive(event: SessionChanged): void {
+    if (event.sessionId !== this.sessionId) return;
+    if (event.kind === "session.opened") {
+      const { progress, ...data } = event.data;
+      this.progress = progress;
+      this.update({ data, status: "ready", readError: null, missing: false });
+      this.progressListeners.forEach(listener => listener());
+    } else if (event.kind === "session.progress") {
+      this.progress = event.progress;
+      this.progressListeners.forEach(listener => listener());
+    } else {
+      const current = this.state.data;
+      if (!current) return;
+      const objects = new Map(event.objects.map(object => [object.id, object]));
+      const workbench = event.workbench ?? { ...current.workbench, title: event.title,
+        objects: event.objects.length ? current.workbench.objects.map(object => objects.get(object.id) ?? object) : current.workbench.objects,
+        ...event.layout };
+      this.update({ data: { ...current, title: event.title, cursor: event.cursor, workbench,
+        nodes: event.nodes.length ? [...current.nodes, ...event.nodes] : current.nodes } });
     }
-    this.progress = progress;
-    this.progressListeners.forEach(listener => listener());
   }
   connect(): () => void {
     if (this.connections++ === 0) {
-      this.generation++;
-      if (!this.state.snapshot) this.update({ status: "loading", readError: null });
-      this.unsubscribe = this.bridge.onChanged(event => {
-        if (event.sessionId !== this.sessionId) return;
-        if (event.kind === "session.progress") this.acceptProgress(event.progress);
-        else { this.requiredRevision = Math.max(this.requiredRevision, event.revision); void this.read(); }
-      });
-      void this.read();
+      const scope = this.scope = new AbortController();
+      const unsubscribe = this.bridge.onChanged(event => { if (!scope.signal.aborted) this.receive(event); });
+      scope.signal.addEventListener("abort", unsubscribe, { once: true });
+      void this.refresh();
     }
     let open = true;
     return () => {
       if (!open) return;
       open = false;
       if (--this.connections > 0) return;
-      this.unsubscribe?.(); this.unsubscribe = null;
-      this.generation++; this.reading = false;
-      this.viewWaiters.forEach(waiter => waiter());
+      this.scope?.abort(); this.scope = null;
+      void this.bridge.execute({ type: "unwatch", sessionId: this.sessionId });
       this.releaseWhenIdle();
     };
   }
@@ -76,90 +71,35 @@ export class SessionController {
     if (this.connections || this.pending) return;
     queueMicrotask(() => { if (!this.connections && !this.pending) this.onRelease?.(); });
   }
-  /** 有内容时后台更新保留就绪画面；查询失败单独反馈。 */
-  refresh = (): Promise<void> => this.read();
-  private async read(): Promise<void> {
-    if (!this.connections) return;
-    if (this.reading) { this.dirty = true; return; }
-    const generation = this.generation;
-    this.reading = true;
+  /** 首次连接和用户主动重试共用打开入口；初始数据与后续更新在同一通道顺序交付。 */
+  refresh = async (): Promise<void> => {
+    const scope = this.scope;
+    if (!scope) return;
     try {
-      do {
-        this.dirty = false;
-        const result = await this.bridge.execute({ type: "read", sessionId: this.sessionId });
-        if (generation !== this.generation) return;
-        if (!result.ok) {
-          this.completedReadGeneration = generation;
-          this.update({ status: "error", readError: errorDisplay(result.error), missing: result.error.code === "not_found" });
-          break;
-        }
-        if (result.reply.kind !== "view" || result.reply.snapshot.sessionId !== this.sessionId) throw new Error("Invalid session view response.");
-        const { progress, ...snapshot } = result.reply.snapshot;
-        if (snapshot.revision < this.requiredRevision) { this.dirty = true; continue; }
-        this.requiredRevision = snapshot.revision;
-        this.completedReadGeneration = generation;
-        this.update({ snapshot, status: "ready", missing: false, readError: null });
-        this.acceptProgress(progress);
-        const pending = this.pendingProgress;
-        this.pendingProgress = null;
-        if (pending) this.acceptProgress(pending);
-      } while (this.dirty);
+      const result = await this.bridge.execute({ type: "watch", sessionId: this.sessionId });
+      if (!scope.signal.aborted && !result.ok)
+        this.update({ status: "error", readError: errorDisplay(result.error), missing: result.error.code === "not_found" });
     } catch {
-      if (generation === this.generation) {
-        this.completedReadGeneration = generation;
-        this.update({ status: "error", readError: "The session connection was lost. Reload to read saved progress." });
-      }
-    } finally { if (generation === this.generation) this.reading = false; }
-  }
-  execute = (command: SessionOperation): Promise<SessionResult> => this.enqueue(command, false);
-  /** 局部调用可等待回执后的投影；等待期间不改变工作台可用性。 */
-  executeAndRead = (command: SessionOperation): Promise<SessionResult> => this.enqueue(command, true);
-  private enqueue(command: SessionOperation, observe: boolean): Promise<SessionResult> {
-    if (this.state.navigating) return Promise.resolve(this.rejected("The session position is changing. Read the current view before retrying."));
-    let observed: Promise<void> | undefined;
-    this.pending++;
-    // 后台按对象串行写入；前端的独立对象调用不互相排队。
-    const operation = this.perform(command, observe ? pending => { observed = pending; } : undefined);
-    const result = observe ? operation.then(async result => { await observed; return result; }) : operation;
-    return result.finally(() => { this.pending--; this.releaseWhenIdle(); });
-  }
-  private rejected(message: string): SessionResult {
-    return { ok: false, error: { code: "conflict", message } };
-  }
-  private waitForRead(generation: number): Promise<void> {
-    return new Promise(resolve => {
-      const complete = () => {
-        if (this.connections > 0 && this.completedReadGeneration < generation) return;
-        this.viewWaiters.delete(complete); resolve();
-      };
-      this.viewWaiters.add(complete); complete();
-    });
-  }
-  private async perform(command: SessionOperation, observe?: (pending: Promise<void>) => void): Promise<SessionResult> {
-    if (command.sessionId !== this.sessionId) return this.rejected("The command belongs to another session.");
-    if (!this.connections || this.state.status !== "ready") return this.rejected("Read the current session view before making changes.");
+      if (!scope.signal.aborted) this.update({ status: "error", readError: "The session connection was lost. Reopen the session to retry." });
+    }
+  };
+  execute = async (command: SessionOperation): Promise<SessionResult> => {
+    if (command.sessionId !== this.sessionId || !this.connections || this.state.status !== "ready")
+      return { ok: false, error: { code: "unavailable", message: "Open the current session before making changes." } };
+    if (this.state.navigating)
+      return { ok: false, error: { code: "conflict", message: "The session position is changing." } };
     const navigating = command.type === "select";
-    if (navigating) this.update({ navigating: true, selectionVersion: this.state.selectionVersion + 1 });
-    let result: SessionResult;
-    try {
-      result = await this.bridge.execute(command);
-      if (result.ok && (result.reply.kind !== "accepted" || result.reply.sessionId !== this.sessionId))
-        throw new Error("Invalid session receipt.");
+    if (navigating) this.update({ navigating: true });
+    this.pending++;
+    try { return await this.bridge.execute(command); }
+    catch { return { ok: false, error: { code: "unavailable", message: "The session connection was lost." } }; }
+    finally {
+      if (navigating) this.update({ navigating: false });
+      this.pending--; this.releaseWhenIdle();
     }
-    catch { result = { ok: false, error: { code: "unavailable", message: "The session connection was lost. Reload before retrying." } }; }
-    // 回执后的读取与后台占用无关；旧查询不能覆盖这次更新，游标切换等待目标投影。
-    this.generation++; this.reading = false;
-    const read = this.waitForRead(this.generation);
-    observe?.(read);
-    void this.read();
-    if (navigating) {
-      await read;
-      this.update({ navigating: false });
-    }
-    return result;
-  }
+  };
   cancelCreation = async (requestId: string): Promise<void> => {
-    await this.bridge.execute({ type: "resource.create.cancel", sessionId: this.sessionId, requestId }).catch(() => undefined);
+    await this.bridge.execute({ type: "resource.create.cancel", sessionId: this.sessionId, requestId });
   };
   branchFrom = (nodeId: string | null): Promise<SessionResult> => this.execute({ type: "select", sessionId: this.sessionId, nodeId });
 }

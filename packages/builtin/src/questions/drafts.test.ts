@@ -31,7 +31,7 @@ describe("问答草稿连续性", () => {
   });
 
   // workbench.md：卡片卸载与视图切换不丢草稿；完成通知清理当前实例，不能跨 Agent 串答。
-  it("重挂载取得同一草稿，乱序快照不清理新草稿，完成后释放且不影响其他 Agent", () => {
+  it("重挂载取得同一草稿，完成后释放且不影响其他 Agent", () => {
     const drafts = createQuestionDrafts();
     const entry = drafts.get("session", "agent", pending);
     const original = entry.getSnapshot();
@@ -39,10 +39,9 @@ describe("问答草稿连续性", () => {
     expect(drafts.get("session", "agent", pending).getSnapshot().message).toBe("Keep this constraint");
     const other = drafts.get("session", "other", pending);
     expect(other.getSnapshot().message).toBe("");
-    drafts.reconcile("session", "agent", 3, [pending.id]);
-    drafts.reconcile("session", "agent", 2, []);
+    drafts.reconcile("session", "agent", [pending.id]);
     expect(drafts.get("session", "agent", pending)).toBe(entry);
-    drafts.reconcile("session", "agent", 4, []);
+    drafts.reconcile("session", "agent", []);
     expect(drafts.get("session", "agent", pending)).not.toBe(entry);
     expect(drafts.get("session", "other", pending)).toBe(other);
     // 退场组件的句柄仍可读取，不会把已释放的实例重新放回索引。
