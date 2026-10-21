@@ -11,6 +11,7 @@ import { createAgentLoop } from "./loop.ts";
 import { createAdmission } from "./admission.ts";
 import { projectAgentTurnState } from "./state-projection.ts";
 import type { UsageConsumer } from "../usage/service.ts";
+import { createPeekTool } from "./peek/runtime.ts";
 
 /** 资源入口只装配领域模块与贡献；业务模块不依赖完整插件上下文。 */
 export function createAgentModule(application: BuiltinApplication, usage: UsageConsumer) {
@@ -21,6 +22,7 @@ export function createAgentModule(application: BuiltinApplication, usage: UsageC
       usage });
     const admission = createAdmission({ selection, validate: plugin.models.validate, running: loop.running, systemPrompt });
     return {
+      tools: [createPeekTool(plugin.models, application.userAgent, usage)],
       resources: [implementResource(Agent, AgentView, {
         records: [UserMessage, Execution, Notice, ContextSummary, RequestDiagnosticsRecord],
         links: { receive: true, tools: object => selection.tools(selection.agent(selectionOf(object).selection)) },

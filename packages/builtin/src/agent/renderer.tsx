@@ -14,6 +14,7 @@ import { AgentUI } from "./ui/AgentUI";
 import { AgentConversationProvider, useAgentConversation } from "./conversation/interaction";
 import { ConfigurationToolbarItem, ContextToolbarItem } from "./conversation/Toolbar";
 import { agentExecutionState } from "./state";
+import { peekToolRenderer } from "./peek/view";
 
 const appearance = { width: 560, height: 640, minWidth: 480, minHeight: 480 };
 
@@ -25,7 +26,7 @@ export default {
     Actions: ConversationActions,
     panels: agentPanels,
   })],
-  tools: [],
+  tools: [peekToolRenderer],
   records: agentRecordViews,
   creations: [creationEntry(CreateAgent, { id: "atelier.builtin/agent.configured", label: commonMessages.kindAgent, icon: <Bot className="size-4" />, group: "agents", InputView: AgentInput, triggers: { menu: {} } })],
   async prepare({ signal }) {

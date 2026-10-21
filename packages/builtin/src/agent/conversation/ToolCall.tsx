@@ -12,6 +12,7 @@ import { toolsMessages } from "../../messages/tools";
 import { Disclosure } from "./Disclosure";
 import { advanceToolDisclosure, initialToolDisclosure, toolCallState, type ToolCallNode } from "./tool-state";
 import { BuiltinSettings } from "../../settings/contract";
+import { advancePeekDisclosure, type PeekDisclosure } from "../peek/disclosure";
 
 const labels = {
   running: toolsMessages.toolRunning, partial: toolsMessages.toolPartial, failed: toolsMessages.toolFailed,
@@ -28,8 +29,8 @@ export function ToolCall({ node }: { node: ToolCallNode }) {
   const filling = state.phase === "input";
   const view = state.props ? tools.resolve(state.props) : null;
   const hasInputBody = filling && view?.body !== undefined && view.body !== null;
-  const [disclosure, setDisclosure] = useState(() => initialToolDisclosure(filling, preferences, hasInputBody));
-  const next = advanceToolDisclosure(disclosure, filling, preferences, hasInputBody);
+  const [disclosure, setDisclosure] = useState<PeekDisclosure>(() => initialToolDisclosure(filling, preferences, hasInputBody));
+  const next = advancePeekDisclosure(advanceToolDisclosure(disclosure, filling, preferences, hasInputBody), view?.props, preferences);
   if (next !== disclosure) setDisclosure(next);
   const result = state.props?.result;
   const outcome = "outcome" in node ? node.outcome : null;
@@ -58,7 +59,7 @@ export function ToolCall({ node }: { node: ToolCallNode }) {
     <div className="space-y-3">
       {view && (view.body ?? (!filling && <DefaultToolBody {...view.props} />))}
       {diagnostic && <Alert variant={error ? "destructive" : "default"}><AlertDescription className="whitespace-pre-wrap">{diagnostic}</AlertDescription></Alert>}
-      {!filling && <ToolDetailsSwitcher items={[
+      {state.phase === "settled" && <ToolDetailsSwitcher items={[
         { value: "call", label: i18n.formatMessage(toolsMessages.toolCallDetails),
           render: () => <JsonView value={{ tool: node.name, arguments: node.arguments ?? node.argumentsText }} /> },
         ...(hasResultDetails ? [{ value: "result", label: i18n.formatMessage(toolsMessages.toolResultDetails),

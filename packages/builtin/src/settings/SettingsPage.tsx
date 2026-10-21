@@ -14,9 +14,9 @@ export function BuiltinSettingsPage({ location }: { location?: string }) {
   const config = useRendererConfiguration(BuiltinSettings);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<UiText | null>(null);
-  const thinking = useRef<HTMLElement>(null), tools = useRef<HTMLElement>(null);
+  const thinking = useRef<HTMLElement>(null), tools = useRef<HTMLElement>(null), peek = useRef<HTMLElement>(null);
   useEffect(() => {
-    const target = location === "thinking" ? thinking.current : location === "tools" ? tools.current : null;
+    const target = location === "thinking" ? thinking.current : location === "tools" ? tools.current : location === "peek" ? peek.current : null;
     target?.scrollIntoView({ block: "nearest" }); target?.focus({ preventScroll: true });
   }, [location]);
   const save = async (work: () => Promise<void>) => {
@@ -43,6 +43,10 @@ export function BuiltinSettingsPage({ location }: { location?: string }) {
     <section ref={tools} tabIndex={-1} className="outline-none">
       <h3 className="type-section mb-2">{i18n.text(messages.tools)}</h3>
       <ItemGroup className="surface">{row("toolInputAutoExpand", messages.toolInputAutoExpand)}<ItemSeparator />{row("toolInputAutoCollapse", messages.toolInputAutoCollapse)}</ItemGroup>
+    </section>
+    <section ref={peek} tabIndex={-1} className="outline-none">
+      <h3 className="type-section mb-2">{i18n.text(messages.peek)}</h3>
+      <ItemGroup className="surface">{row("peekAutoExpand", messages.peekAutoExpand)}<ItemSeparator />{row("peekAutoCollapse", messages.peekAutoCollapse)}</ItemGroup>
     </section>
     <div><Button variant="outline" size="sm" disabled={busy || !config.ready} onClick={() => { void save(config.reset); }}>{busy && <Spinner />}{i18n.text(messages.reset)}</Button></div>
   </div>;
