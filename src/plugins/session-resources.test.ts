@@ -7,6 +7,7 @@ import { defineCreation, defineAction, defineRecord, pluginNamespace, thinkingLe
 import { definePlugin, defineModule, implementCreation, implementResource, implementPreparer, type PluginContext, type PluginDefinition, type ObjectExecutor, type ToolSession, defineTopLevelTool } from "@atelier/sdk/runtime";
 import { agentCreations, defineAgentCreation } from "@atelier/builtin-api/runtime";
 import { CreateAgent } from "@atelier/builtin-api/contracts";
+import { CreateNote } from "../../packages/builtin/src/notes/contract.ts";
 import { ApplicationService } from "../runtime/service.ts";
 import type { ModelAdapter } from "../model/contract.ts";
 
@@ -33,7 +34,8 @@ function open(options: { prepare?: (signal: AbortSignal) => Promise<void>; creat
       project: (_data, object) => ({ value: object.get(State)! }),
       inspect: async (_data, object) => ({ value: object.get(State)! }),
     })], modules: [defineAgentCreation({ id: ns.name("new"), creation: Create, description: "Create an item.",
-      inputSchema: z.object({ initial: z.number() }), toInput: ({ initial }) => initial })] };
+      inputSchema: z.strictObject({ initial: z.number(), sources: z.array(z.string()).optional() }),
+      toInput: ({ initial }) => initial, toOptions: ({ sources }) => ({ resources: sources }) })] };
   } });
   const root = mkdtempSync(join(tmpdir(), "atelier-session-resources-")); roots.push(root);
   const app = new ApplicationService(root, { plugins: [definition, ...options.plugins ?? []], adapterFactory: options.adapter ? () => options.adapter! : undefined }); apps.push(app);
@@ -138,6 +140,17 @@ describe("SDK 会话资源生命周期", () => {
     expect(f.app.sessions.snapshot(f.sessionId).workbench.links.filter(link => link.agentId === otherAgent.id)).toEqual([]);
   });
 
+  // 依据宿主原子创建契约：接收者类型不支持链接时，已创建的身份、内容及调用者链接一起回滚。
+  it("初始资源链接失败时整体回滚创建", async () => {
+    const f = open(), actor = await f.session.create(Create, 0), resource = await f.session.create(Create, 1);
+    const before = f.app.sessions.snapshot(f.sessionId);
+    await expect(f.session.create(CreateNote, { title: "Rejected note", content: "temporary" },
+      { linkTo: actor, resources: [resource] })).rejects.toThrow();
+    const after = f.app.sessions.snapshot(f.sessionId);
+    expect(after.nodes).toEqual(before.nodes);
+    expect(after.workbench).toEqual(before.workbench);
+  });
+
   // 依据移除与收束契约：发出取消不等于结束；用户和 SDK 必须使用同一忙碌检查。
   it("用户和插件都不能移除取消后尚未收束的对象，收束后解除全部方向链接并保留历史", async () => {
     const f = open();
@@ -175,6 +188,29 @@ describe("SDK 会话资源生命周期", () => {
 });
 
 describe("Agent 创建与移除入口", () => {
+  // 依据入口拥有领域输入：资源列表只在选择的入口显式声明，通用创建参数和笔记输入保持各自的结构。
+  it("代理入口声明资源列表，笔记入口按自身 schema 创建", async () => {
+    let calls: { name: string; args: Json }[] = [];
+    const f = open({ adapter: adapter(() => calls) }), target = await model(f.app), actor = await f.session.create(Create, 0);
+    expect(agentCreations.inspect(f.plugin, "atelier.builtin/agent.create").input).toHaveProperty("properties.resources");
+    expect(agentCreations.inspect(f.plugin, "atelier.builtin/note.create").input).toMatchObject({
+      type: "object", additionalProperties: false, properties: { title: { type: "string" }, content: { type: "string" } },
+    });
+    expect(agentCreations.inspect(f.plugin, "atelier.builtin/note.create").input).not.toHaveProperty("properties.resources");
+    const input = { title: "A note", content: "Note text" }, creation_id = "atelier.builtin/note.create";
+    const run = runner(f, actor, target), before = f.session.snapshot().position.nodeId;
+    calls = [{ name: "resource_create", args: { creation_id, input, resources: [] } }];
+    expect((await run()).tools[0]?.kind).toBe("rejected");
+    calls = [{ name: "resource_create", args: { creation_id, input: { ...input, resources: [] } } }];
+    expect((await run()).tools[0]?.kind).toBe("rejected");
+    expect(f.session.snapshot().position.nodeId).toBe(before);
+    calls = [{ name: "resource_create", args: { creation_id, input } }];
+    const result = await run();
+    expect(result.tools[0]).toMatchObject({ kind: "succeeded", data: { type: CreateNote.resource.kind } });
+    const noteId = (result.tools[0]!.data as { resource_id: string }).resource_id;
+    expect(f.app.sessions.snapshot(f.sessionId).workbench.links).toEqual([{ agentId: actor.id, resourceId: noteId }]);
+  });
+
   // 依据代理发现契约：列表仅返回启用配置的选择信息，新增配置字段和私有提示均不进入模型结果。
   it("agent_list 公开选择字段并隔离系统提示词和执行配置", async () => {
     const f = open({ adapter: adapter(() => [{ name: "agent_list", args: {} }]) });
@@ -203,8 +239,7 @@ describe("Agent 创建与移除入口", () => {
     f.session.link(actor, shared); f.session.link(actor, other);
     calls = [{ name: "resource_create", args: {
       creation_id: "atelier.builtin/agent.create",
-      input: { selection: { agent: "worker", model: null, thinking: null } },
-      resources: [shared.id, shared.id],
+      input: { selection: { agent: "worker", model: null, thinking: null }, resources: [shared.id, shared.id] },
     } }];
     const run = runner(f, actor, target), result = await run();
     expect(result.tools[0]?.kind).toBe("succeeded");
@@ -223,7 +258,7 @@ describe("Agent 创建与移除入口", () => {
     const f = open({ adapter: adapter(() => {
       mutate?.();
       return [{ name: "resource_create", args: { creation_id: "atelier.builtin/agent.create",
-        input: { selection: { agent: "worker", model: null, thinking: null } }, resources: [resourceId] } }];
+        input: { selection: { agent: "worker", model: null, thinking: null }, resources: [resourceId] } } }];
     }) });
     const target = await model(f.app), actor = await f.session.create(Create, 0), resource = await f.session.create(Create, 1);
     resourceId = resource.id;
@@ -237,28 +272,13 @@ describe("Agent 创建与移除入口", () => {
     expect((await run()).tools[0]?.kind).toBe("succeeded");
   });
 
-  // 依据宿主原子创建契约：接收者类型不支持链接时，已创建的身份、内容及调用者链接一起回滚。
-  it("初始资源链接失败时整体回滚创建", async () => {
-    let resources: string[] = [];
-    const f = open({ adapter: adapter(() => [{ name: "resource_create", args: {
-      creation_id: "atelier.builtin/note.create", input: { title: "Rejected note", content: "temporary" }, resources,
-    } }]) });
-    const target = await model(f.app), actor = await f.session.create(Create, 0), resource = await f.session.create(Create, 1);
-    f.session.link(actor, resource); resources = [resource.id];
-    const before = f.app.sessions.snapshot(f.sessionId);
-    expect((await runner(f, actor, target)()).tools[0]?.kind).toBe("rejected");
-    const after = f.app.sessions.snapshot(f.sessionId);
-    expect(after.nodes).toEqual(before.nodes);
-    expect(after.workbench).toEqual(before.workbench);
-  });
-
   // 依据创建提交时重验端点：异步准备期间资源可能已移除，固定请求授权仍需真实资源身份才能落地链接。
   it("准备期间移除初始资源后拒绝迟到创建", async () => {
     let resources: string[] = [], pending = false;
     const started = latch(), end = latch();
     const f = open({
       async prepare() { if (pending) { started.release(); await end.promise; } },
-      adapter: adapter(() => [{ name: "resource_create", args: { creation_id: ns.name("new"), input: { initial: 1 }, resources } }]),
+      adapter: adapter(() => [{ name: "resource_create", args: { creation_id: ns.name("new"), input: { initial: 1, sources: resources } } }]),
     });
     const target = await model(f.app), actor = await f.session.create(Create, 0), resource = await f.session.create(Create, 1);
     f.session.link(actor, resource); resources = [resource.id]; pending = true;

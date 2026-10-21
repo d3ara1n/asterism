@@ -1,11 +1,12 @@
 import type { ReactNode } from "react";
 import type { z } from "zod";
-import { ListPlus, ScanSearch, CirclePlus, CircleMinus, Users } from "lucide-react";
+import { ListPlus, ScanSearch, CirclePlus, CircleMinus, Users, Bot, MessageSquareText } from "lucide-react";
 import { toolRenderer, useI18n, type RendererModule, type ToolRenderProps } from "@atelier/sdk/renderer";
 import { JsonView } from "@atelier/ui/json-view";
 import { ToolDetails } from "@atelier/ui/tool-content";
 import { ToolHeader } from "@atelier/ui/tool-header";
-import { ItemGroup, Item, ItemContent, ItemTitle, ItemDescription } from "@atelier/ui/ui/item";
+import { ItemGroup, Item, ItemContent, ItemTitle, ItemDescription, ItemMedia } from "@atelier/ui/ui/item";
+import { Separator } from "@atelier/ui/ui/separator";
 import { resourceMessages as messages } from "../messages/resources";
 import { inputText } from "../shared/tool-preview";
 import { TOOL_BODY_LINE_LIMIT } from "../shared/tool-body";
@@ -30,17 +31,34 @@ function AgentListBody({ result }: AgentListProps) {
   const entries = result?.data;
   if (!entries) return null;
   if (!entries.length) return <p className="type-caption">{i18n.text(messages.noAgents)}</p>;
-  return <div className="space-y-2">
-    <ItemGroup>{entries.slice(0, TOOL_BODY_LINE_LIMIT).map(entry => <Item key={entry.id} size="sm" className="px-0">
-      <ItemContent>
-        <ItemTitle>{entry.name}</ItemTitle>
-        <ItemDescription className="line-clamp-none whitespace-pre-wrap">{entry.description}</ItemDescription>
-        <dl className="space-y-2">
-          <Field label={i18n.text(messages.agentId)}>{entry.id}</Field>
-          {!!entry.examples.length && <Field label={i18n.text(messages.examples)}>{entry.examples.join("\n")}</Field>}
-        </dl>
-      </ItemContent>
-    </Item>)}</ItemGroup>
+  return <div className="@container/agents space-y-3">
+    <ItemGroup className="grid grid-cols-1 items-stretch gap-3 @min-[36rem]/agents:grid-cols-2">
+      {entries.slice(0, TOOL_BODY_LINE_LIMIT).map(entry => <Item key={entry.id} role="listitem"
+        variant="outline" size="sm" className="min-w-0 flex-col items-stretch gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <ItemMedia variant="icon" className="text-muted-foreground"><Bot aria-hidden="true" /></ItemMedia>
+          <ItemContent className="min-w-0">
+            <ItemTitle className="w-full break-words">{entry.name}</ItemTitle>
+            {entry.id !== entry.name && <code className="type-caption break-all text-muted-foreground"
+              title={i18n.text(messages.agentId)}>{entry.id}</code>}
+          </ItemContent>
+        </div>
+        {entry.description && <p className="type-caption whitespace-pre-wrap break-words text-pretty text-muted-foreground">
+          {entry.description}
+        </p>}
+        {!!entry.examples.length && <div className="mt-auto space-y-2">
+          <Separator />
+          <p className="flex items-center gap-1.5 type-label text-muted-foreground">
+            <MessageSquareText className="size-3.5 shrink-0" aria-hidden="true" />
+            {i18n.text(messages.examples)}
+          </p>
+          <ul className="space-y-2 pl-4 type-caption list-disc marker:text-muted-foreground">
+            {entry.examples.map((example, index) => <li key={index}
+              className="whitespace-pre-wrap break-words text-pretty">{example}</li>)}
+          </ul>
+        </div>}
+      </Item>)}
+    </ItemGroup>
     {entries.length > TOOL_BODY_LINE_LIMIT && <p className="type-caption text-muted-foreground">
       {i18n.formatMessage(messages.omitted, { count: entries.length - TOOL_BODY_LINE_LIMIT })}
     </p>}
@@ -106,7 +124,6 @@ function CreateBody({ result }: CreateProps) {
   const resource = result?.data;
   if (!resource) return null;
   return <div className="space-y-3">
-    {result.kind === "succeeded" && <p className="type-caption">{i18n.text(messages.created)}</p>}
     <dl className="space-y-2">
       <Field label={i18n.text(messages.resourceId)}>{resource.resource_id}</Field>
       <Field label={i18n.text(messages.kind)}>{resource.type}</Field>

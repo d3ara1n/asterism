@@ -1,5 +1,6 @@
+import { z } from "zod";
 import { definePlugin, implementCall, PluginApiError } from "@atelier/sdk/runtime";
-import { builtin, CreateAgent, type NamingApi } from "@atelier/builtin-api/contracts";
+import { builtin, CreateAgent, agentCreateSchema, type NamingApi } from "@atelier/builtin-api/contracts";
 import { defineAgentCreation } from "@atelier/builtin-api/runtime";
 import metadata from "../package.json" with { type: "json" };
 import type { BuiltinApplication } from "./application.ts";
@@ -31,10 +32,17 @@ export function createBuiltin(options: { application: BuiltinApplication; connec
         modules: [providers, createAgentModule(options.application, usage), filesystem, createNamingModule(options.connectNaming, options.application.userAgent), notes, questions,
         resourceOperations,
         defineAgentCreation({ id: builtin.name("agent.create"), creation: CreateAgent,
-          description: "Create an Agent with a selected agent configuration and optional model/thinking overrides.",
+          description: "Create an Agent with a selected agent configuration, optional model/thinking overrides, and initial resource links.",
+          inputSchema: agentCreateSchema.extend({
+            resources: z.array(z.string().min(1)).optional()
+              .describe("IDs of resources to authorize for the new Agent, drawn from your current request's linked resources. Defaults to an empty list."),
+          }).describe("Agent configuration selection, optional title, and initial resource links."),
+          toInput: ({ resources: _resources, ...input }) => input,
+          toOptions: ({ resources }) => ({ resources }),
           guidelines: [
             "selection.agent identifies an agent configuration. agent_list returns available configuration IDs, names, descriptions, and task examples.",
             "Null model and thinking selections use that configuration's defaults.",
+            "resources contains the initial resources authorized for the new Agent. resource_list returns your linked resource IDs. Creation and initial links are committed together.",
           ] }),
         defineAgentCreation({ id: builtin.name("note.create"), creation: CreateNote,
           description: "Create a note with a title and optional initial text.",

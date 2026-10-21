@@ -14,7 +14,7 @@ async function attempt<T extends Json>(signal: AbortSignal, work: () => T | Prom
     throw error;
   }
 }
-const id = z.string().min(1).describe("Stable Agent creation entry ID, learned from a skill, documentation, or creation_list.");
+const id = z.string().min(1).describe("Stable resource creation entry ID. creation_list returns available entries.");
 
 export default defineModule(plugin => ({
   topLevelTools: [
@@ -33,7 +33,7 @@ export default defineModule(plugin => ({
     }),
     defineTopLevelTool({
       id: CreationListResult.id, name: "creation_list",
-      description: "List available Agent resource creation entries and their purposes.", guidelines: [],
+      description: "List available resource creation entries and their purposes.", guidelines: [],
       argsSchema: z.strictObject({}).describe("No parameters."),
       resultSchema: CreationListResult.schema,
       effect: "read", execution: "parallel",
@@ -41,7 +41,7 @@ export default defineModule(plugin => ({
     }),
     defineTopLevelTool({
       id: CreationInspectResult.id, name: "creation_inspect",
-      description: "Read an Agent resource creation entry's input schema and guidelines.",
+      description: "Read a resource creation entry's input schema and guidelines.",
       guidelines: [],
       argsSchema: z.strictObject({ creation_id: id }).describe("The creation entry to inspect."),
       resultSchema: CreationInspectResult.schema,
@@ -50,21 +50,19 @@ export default defineModule(plugin => ({
     }),
     defineTopLevelTool({
       id: ResourceCreateResult.id, name: "resource_create",
-      description: "Create a resource in this session using a declared Agent creation entry and link it to you.",
+      description: "Create a resource in this session using a declared creation entry and link it to you.",
       guidelines: [
         "input is a JSON value matching the creation entry's input schema.",
-        "resources contains IDs from your current request's linked resources. These become initial links received by the new resource.",
-        "Creation and all initial links are committed together. Your new resource link becomes available on your next model request.",
+        "Creation and the link to you are committed together. Your new resource link becomes available on your next model request.",
       ],
       argsSchema: z.strictObject({
         creation_id: id,
-        input: jsonSchema.describe("JSON input matching the selected Agent creation entry."),
-        resources: z.array(z.string().min(1)).optional().describe("Resource IDs to link to the new resource. Each ID belongs to your current request's linked resources; the new resource type supports receiving links. Defaults to an empty list."),
-      }).describe("Creation entry, structured input, and initial resource links."),
+        input: jsonSchema.describe("JSON input matching the selected creation entry."),
+      }).describe("Creation entry and its structured input."),
       resultSchema: ResourceCreateResult.schema,
       effect: "write", execution: "sequential",
       execute(args, context) { return attempt(context.signal, async () => {
-        const ref = await agentCreations.create(plugin, args.creation_id, args.input, context, { resources: args.resources });
+        const ref = await agentCreations.create(plugin, args.creation_id, args.input, context);
         return { resource_id: ref.id, type: ref.kind };
       }); },
     }),

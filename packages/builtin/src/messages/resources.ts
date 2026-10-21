@@ -18,6 +18,5 @@ export const resourceMessages = pluginNamespace("atelier.builtin").messages("en"
   resourceId: { id: "resources.resourceId", defaultMessage: "Resource ID" },
   guidelines: { id: "resources.guidelines", defaultMessage: "Usage guidelines" },
   inputSchema: { id: "resources.inputSchema", defaultMessage: "Input schema" },
-  created: { id: "resources.created", defaultMessage: "Created and linked to this agent." },
   removed: { id: "resources.removed", defaultMessage: "Removed from the session and all its links detached. History is preserved." },
 }));

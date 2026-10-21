@@ -182,7 +182,6 @@
   "resources.resourceId": "资源 ID",
   "resources.guidelines": "使用指导",
   "resources.inputSchema": "输入 schema",
-  "resources.created": "已创建并链接给当前代理。",
   "resources.removed": "已从会话移除并解除全部链接，历史记录保留。",
   "toolDirectoryList": "列出目录",
   "toolDirectorySee": "查看图片",
