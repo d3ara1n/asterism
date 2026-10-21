@@ -1,32 +1,29 @@
 import { describe, expect, it } from "vitest";
-import type { ModelCompletion } from "@atelier/sdk/contracts";
+import { present, type ModelCompletion } from "@atelier/sdk/contracts";
 import { sessionView } from "../../../../../src/plugins/records.ts";
 import { nodeView } from "../../../../../src/session/view.ts";
 import { agentSource, call, event, message, node, notice, text, thinking } from "../../../../../src/session/test-nodes.ts";
-import { ContextSummary, Execution, RequestDiagnosticsRecord, UserMessage } from "@atelier/builtin-api/contracts";
+import { ContextSummary, Execution, AgentRequestContext, UserMessage } from "@atelier/builtin-api/contracts";
 import { diagnosticHistory } from "./history.ts";
 
 const completion: ModelCompletion = { finishReason: "stop", rawFinishReason: null, providerResponseId: "upstream-id",
   usage: { input: 100, output: 10, total: 110, cacheRead: 0, cacheWrite: 0, reasoning: 0 } };
 const source = { model: "p/m", adapter: "test", scope: "scope" };
-// docs/workbench.md 诊断契约：按响应身份计数，保留压缩与无块响应，用真实父链区分分支。
+// docs/workbench.md 诊断契约：按响应身份计数，用真实父链区分分支；既有记录保持可读。
 describe("代理诊断历史", () => {
-  // 有显式请求身份的计时使无内容失败可见；旧记录仍可读，压缩计时不丢失或重复计数。
-  it("从诊断身份恢复无块失败，并读取压缩请求的计时", () => {
+  // 只有用户输入不构成已保存响应；成功摘要的真实计时仍可消费。
+  it("无回复时没有诊断请求，成功压缩保留计时", () => {
     const timing = { startedAt: "2026-01-01T00:00:00.000Z", endedAt: "2026-01-01T00:00:01.000Z", durationMs: 1000,
       firstOutputMs: null, firstTextMs: null, firstReasoningMs: null, lastOutputMs: null, outputChunks: 0, outcome: "failed" };
     const nodes = [
       node("input", null, message("a", "Start")),
-      node("failed", "input", event(RequestDiagnosticsRecord.id, { responseId: "failed", diagnostics: { timing },
-        origin: { source, requestParentId: "input" } }, { source: agentSource("a") })),
-      node("summary", "failed", event(ContextSummary.id, { summary: "S", keptFrom: "input", model: "p/m", tokensBefore: 777,
+      node("summary", "input", event(ContextSummary.id, { summary: "S", keptFrom: "input", model: "p/m", tokensBefore: 777,
         completion: { ...completion, timing: { ...timing, outcome: "completed" } } }, { source: agentSource("a") })),
     ];
     const result = diagnosticHistory(sessionView(nodeView("s", "", nodes, "summary")), "a", "timeline");
-    expect(result.requests).toHaveLength(2);
+    expect(diagnosticHistory(sessionView(nodeView("s", "", nodes, "input")), "a", "timeline").requests).toEqual([]);
+    expect(result.requests).toHaveLength(1);
     expect(result.requests[0]).toMatchObject({ kind: "compression", completion: { timing: { outcome: "completed" } }, sent: null });
-    expect(result.requests[1]).toMatchObject({ responseId: "failed", completion: null, blocks: [], sent: { timing },
-      relatedInput: { id: "input" } });
     expect(result.unreadable).toBe(0);
   });
   it("乱序保存的响应块只计一个请求，当前路径与全分支不重复公共祖先", () => {
@@ -52,7 +49,7 @@ describe("代理诊断历史", () => {
     expect(all.requests.map(request => [request.responseId, request.onTimeline])).toEqual([["branch-b", false], ["branch-a", true], ["shared", true]]);
   });
 
-  it("压缩和无块响应保留计量，重复终态不重复计数，无身份通知单列", () => {
+  it("既有通知载荷仍可读，重复终态不重复计数，无身份通知单列", () => {
     const nodes = [
       node("input", null, message("a", "Start")),
       node("answer", "input", text("a", "r", 0, "Done", { requestParentId: "input", completion })),
@@ -91,19 +88,23 @@ describe("代理诊断历史", () => {
     expect(result.requests.find(request => request.responseId === "branch")?.inputHasFiles).toBe(true);
   });
 
-  // docs/workbench.md#代理上下文：请求诊断按 responseId 关联，不按相邻位置猜测；没有记录的请求保持 null。
-  it("请求诊断按响应身份关联到请求，压缩保留压缩前估算", () => {
+  // docs/workbench.md#代理上下文：诊断来自同一终态；回溯到块就有完整资料。
+  it("请求诊断随终态保存，回溯和分支只消费自身扩展", () => {
     const sent = { system: [{ kind: "agent", role: "worker", characters: 4 }], tools: ["resource_list"] };
     const nodes = [
       node("input", null, message("a", "Start")),
-      node("diag-late", "input", event(RequestDiagnosticsRecord.id, { responseId: "second", diagnostics: sent }, { source: agentSource("a") })),
-      node("first", "diag-late", text("a", "first", 0, "One", { requestParentId: "input", completion })),
+      node("first", "input", text("a", "first", 0, "One", { requestParentId: "input", completion })),
       node("summary", "first", event(ContextSummary.id, { summary: "S", keptFrom: "input", model: "p/m", tokensBefore: 777, completion }, { source: agentSource("a") })),
-      node("second", "summary", text("a", "second", 0, "Two", { requestParentId: "summary", completion })),
+      node("second", "summary", text("a", "second", 0, "Two", { requestParentId: "summary",
+        completion: { ...completion, extensions: [present(AgentRequestContext, sent)] } })),
+      node("branch", "summary", text("a", "branch", 0, "Branch", { requestParentId: "summary", completion })),
     ];
     const result = diagnosticHistory(sessionView(nodeView("s", "", nodes, "second")), "a", "timeline");
     expect(result.requests.find(request => request.responseId === "second")?.sent).toEqual(sent);
     expect(result.requests.find(request => request.responseId === "first")?.sent).toBeNull();
     expect(result.requests.find(request => request.kind === "compression")).toMatchObject({ tokensBefore: 777, sent: null });
+    const branch = diagnosticHistory(sessionView(nodeView("s", "", nodes, "branch")), "a", "timeline");
+    expect(branch.requests.some(request => request.responseId === "second")).toBe(false);
+    expect(branch.requests.find(request => request.responseId === "branch")?.sent).toBeNull();
   });
 });

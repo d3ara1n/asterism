@@ -97,8 +97,9 @@
 | 顶层工具（一级工具） / 二级工具 | protocol tool / resource tool | 一级直接出现在协议 tools 中，由宿主或插件模块静态声明并注册；二级经 resource_call 操作已链接资源。层级表示调用关系，见 `docs/runtime.md` |
 | 运行支撑环境 | harness | 软件为代理提供的执行环境、工作机制及通用指令；执行授权由运行时落实 |
 | 提示块 | prompt block | 带身份、种类、来源与正文的结构化指令单元，按确定顺序统一渲染为系统指令 |
-| 请求诊断 | request diagnostics | `models.run` 结果中宿主组装最终请求时取得的现场资料，按分区（系统提示块计量、声明的工具名称等）组织，不含正文；与 provider 回报的 usage 并列，用于还原请求现场 |
-| 请求计时 | request timing | 模型调用的客户端起止日期时间及单调时钟耗时、输出偏移；与 usage 同属响应终态计量，无终态失败时由请求诊断保存，边界见 [运行时](runtime.md#响应计量与请求计时) |
+| 终态领域扩展 | completion extension | 公共 `ModelCompletion.extensions` 携带的具型领域数据；生产方声明契约，认识该契约的消费者解码，未知数据保留并跳过解释 |
+| 请求诊断 | request diagnostics | Agent 从最终请求现场提取的系统提示分区计量与工具名称等资料，由领域契约 `AgentRequestContext` 声明，随终态块的扩展保存，不含正文 |
+| 请求计时 | request timing | 模型调用的客户端起止日期时间及单调时钟耗时、输出偏移；与 usage 同属响应终态计量，无终态时仅交付当次调用，边界见 [运行时](runtime.md#响应计量与请求计时) |
 | 端到端输出速率 | E2E output TPS | 实报输出 token 数除以整次模型请求耗时，包含网络、等待与思考；不是独立解码阶段速率 |
 | 流式输出速率 | streaming TPS | 可观测输出 token 数相对于首末内容增量接收区间的估算速率，数据要求与汇总口径见 [代理诊断](workbench.md#代理诊断) |
 | 事件 | event | 会话树节点的一类，记录资源与工作台状态变化，种类见 `docs/timeline.md` |
@@ -109,7 +110,7 @@
 | 快照语义 | snapshot semantics | 瞬态事件载荷是同键完整值，允许订阅以 latest 合并待消费值；区别于资源快照、检查点及持久状态 |
 | 消费额度 | delivery credit | 接收端可消费的有界容量，发送端据此限制在途数据；消费释放容量后归还，发送成功不等于消费完成 |
 | 事件来源 | event source | 宿主按发布通道确定的插件身份戳与经校验的资源来源；区别于事件契约的声明归属及载荷中的关联对象 |
-| 资源通知 | resource notification | 通过公共瞬态事件发出的用户提示，必须带插件与资源来源，应用外壳可显示为 toast；区别于时间线通知节点 |
+| 资源通知 | resource notification | 通过具型瞬态事件发出的用户提示，带插件与资源来源，声明方的前端或应用外壳可显示为 toast；区别于时间线通知节点 |
 | 资源状态推送 | resource status update | 资源通过公共 snapshot 事件发布 running／failed／awaiting／completed，每次完整替换旧状态；running 可携带进度并持续展示，其他终态查看会话即消费，awaiting 表示需要用户操作；不持久化或恢复，不替代宿主活动登记与收束判定 |
 | 会话状态徽标 | session status badge | 会话列表行上的资源状态概要入口，点击 popup 显示具体资源、状态及可选进度，不消费标记；进入会话只清除终态，running 保留，不同资源独立聚合 |
 | 历史位置 | history position | 会话树上的一个节点或逻辑起点；浏览、重建与继续的定位点，节点位置含该节点本身，逻辑起点以 null 表达 |

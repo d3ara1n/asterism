@@ -1,8 +1,8 @@
 import type { Json, ModelSettings } from "../shared/model.ts";
-import type { ModelItem, SystemPrompt, ModelInputPart, ModelRequestIdentity, ModelResponse, ModelEvent, RequestDiagnostics } from "@atelier/sdk/contracts";
+import type { ModelItem, SystemPrompt, ModelInputPart, ModelRequestIdentity, ModelResponse, ModelEvent, RequestTiming } from "@atelier/sdk/contracts";
 
 export class ModelFailure extends Error {
-  diagnostics?: RequestDiagnostics;
+  timing?: RequestTiming;
   response?: ModelResponse | null;
   constructor(readonly code: string, message: string) { super(message); }
 }

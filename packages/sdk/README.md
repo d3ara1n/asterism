@@ -4,7 +4,7 @@
 
 SDK 包版本见 [package.json](package.json)，宿主 API 版本见 [`sdkApi`](../../src/plugins/packages.ts)。内置插件领域契约独立在 [`@atelier/builtin-api`](../builtin-api/README.md)，不进入通用 SDK。
 
-当前宿主 API 为 **10.2**，使用资源展示目录或创建结果标题时清单声明 `{ "major": 10, "minMinor": 2 }`，依赖 `@atelier/sdk: ^0.27.0`。提供商与用量以独立目录供插件消费；前端入口默认导出 `defineRendererPlugin(...)`，功能视图放入其 `modules`，调用契约显式声明 `scope`。
+当前宿主 API 为 **11.0**，清单声明 `{ "major": 11, "minMinor": 0 }`，依赖 `@atelier/sdk: ^0.28.0`。公共模型终态通过具型扩展携带领域数据；提供商与用量以独立目录供插件消费；前端入口默认导出 `defineRendererPlugin(...)`，功能视图放入其 `modules`，调用契约显式声明 `scope`。
 
 ## 子路径入口
 
@@ -63,7 +63,7 @@ export default definePlugin({
   "exports": { "./public": "./src/public.ts" },
   "atelier": {
     "id": "example.tools",
-    "api": { "major": 10, "minMinor": 0 },
+    "api": { "major": 11, "minMinor": 0 },
     "runtime": "./src/runtime.ts"
   }
 }
@@ -101,7 +101,8 @@ export default definePlugin({
 - `resolveModelSelection(defaults, overrides)`（`contracts`）：展示与请求共用的模型／思考等级覆盖计算，空值沿用默认值；可用性与凭据由消费边界校验。
 - `models.validate(request, { content? })`：校验模型目标、续接资料与文件引用资格，不发送网络请求。
 - `models.stream(request, { content? })`：执行单次模型请求（支持可选 `tools` 声明、`maxOutputTokens`、`userAgent`、`sessionId`），流式交付正文、思考、工具调用与终态协议事件；工具执行、结果配对及续轮由消费者负责。`finish.timing`（API 8.6）可携带请求计时，与 usage 一起按 `ModelCompletion` 保存。
-- `models.run(request)`：绑定具体资源对象（`object`）与请求起点（`requestParentId`），执行一次模型请求及该响应的完整资源工具批次，经 `ModelRunObserver.event` 同步交付 `block`（最高序号块内含 `completion` 终态）、`diagnostic` 与 `progress`。终态包含 `usage` 及可选 `timing`（API 8.6）。结果附带 `diagnostics`（API 8.3）：系统提示块的种类、来源与字数及声明的工具名称，不含正文；失败或取消未取得可交付终态时，`diagnostics.timing` 保留已测量计时。可用 `requestDiagnosticsSchema` 校验保存（分区语义见 [请求诊断](../../docs/runtime.md#请求诊断)）。外层多轮循环与时间线提交由调用方插件自行驱动。
+- `models.run(request)`：绑定具体资源对象（`object`）与请求起点（`requestParentId`），执行一次模型请求及该响应的完整资源工具批次，经 `ModelRunObserver.event` 同步交付 `block`（最高序号块内含 `completion` 终态）、`diagnostic` 与 `progress`。终态包含 `usage`、可选 `timing` 和具型 `extensions`；结果的 `timing` 提供当次实测计时，无终态时也可瞬态消费。外层多轮循环与时间线提交由调用方插件自行驱动。
+- **终态领域扩展（API 11.0）**：调用方通过 `completionExtensions(context)` 同步读取最终系统提示与工具声明的独立副本，返回 `present(DataContract, data)` 数组。宿主将它随终态块交付，领域消费者用 `completionData(completion, DataContract)` 读取，未知或无法解码的扩展返回 null，公共计量仍可读取。完整边界见 [请求诊断](../../docs/runtime.md#请求诊断)，可编译示例见 [`examples/model-completion.ts`](examples/model-completion.ts)。
 
 ### 7. 提供商与用量目录（API 10.0）
 

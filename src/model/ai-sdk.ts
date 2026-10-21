@@ -112,7 +112,7 @@ export class AiSdkAdapter implements ModelAdapter {
       if (measured.completion) yield { ...measured.completion, response: responseMetadata };
       const failure = error instanceof ModelFailure ? error : new ModelFailure("execution_failed", "The model request failed.");
       failure.response = responseMetadata;
-      if (!measured.completion) failure.diagnostics = { timing: timing.end(signal.aborted ? "cancelled" : "failed") };
+      if (!measured.completion) failure.timing = timing.end(signal.aborted ? "cancelled" : "failed");
       throw failure;
     } finally {
       signal.removeEventListener("abort", cancelled);

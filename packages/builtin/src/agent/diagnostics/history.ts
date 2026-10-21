@@ -1,5 +1,5 @@
-import type { ModelBlock, ModelCompletion, ModelInputPart, RequestDiagnostics, SessionRecord, SessionView } from "@atelier/sdk/contracts";
-import { ContextSummary, Execution, Notice, RequestDiagnosticsRecord, UserMessage } from "@atelier/builtin-api/contracts";
+import { completionData, type ModelBlock, type ModelCompletion, type ModelInputPart, type SessionRecord, type SessionView } from "@atelier/sdk/contracts";
+import { ContextSummary, Execution, Notice, AgentRequestContext, UserMessage, type AgentRequestContextData } from "@atelier/builtin-api/contracts";
 
 export type DiagnosticScope = "timeline" | "session";
 export interface DiagnosticNotice { id: string; createdAt: string; code: string; message: string; level: "info" | "warning" | "error" }
@@ -14,8 +14,8 @@ export interface DiagnosticRequest {
   inputHasFiles: boolean | null;
   /** 压缩请求保存的压缩前估算量；工作请求为 null。 */
   tokensBefore: number | null;
-  /** 按 responseId 关联的请求诊断；未保存时为 null，不以当前配置补齐。 */
-  sent: RequestDiagnostics | null;
+  /** 本请求 completion 中的领域扩展；缺失时为 null。 */
+  sent: AgentRequestContextData | null;
 }
 interface HistoryState { lastFile: number | null; input: DiagnosticRequest["relatedInput"] }
 export interface DiagnosticHistory { requests: DiagnosticRequest[]; notices: DiagnosticNotice[]; unreadable: number }
@@ -29,7 +29,6 @@ export function diagnosticHistory(snapshot: Pick<SessionView, "records">, agentI
   const requests = new Map<string, DiagnosticRequest>();
   const notices: DiagnosticNotice[] = [];
   let unreadable = 0;
-  const sent = new Map<string, RequestDiagnostics>();
   const stateAt = (id: string | null): HistoryState => id === null ? { lastFile: -1, input: null } : history.get(id) ?? { lastFile: null, input: null };
   const response = (record: SessionRecord, id: string, model: string, parentId: string | null, modelScope: string | null): DiagnosticRequest => {
     const key = `response:${id}`;
@@ -51,8 +50,7 @@ export function diagnosticHistory(snapshot: Pick<SessionView, "records">, agentI
     const summary = ContextSummary.decode(record);
     const execution = Execution.decode(record);
     const notice = Notice.decode(record);
-    const sentRecord = RequestDiagnosticsRecord.decode(record);
-    if ([input, summary, execution, notice, sentRecord].some(value => value?.status === "unknown")) {
+    if ([input, summary, execution, notice].some(value => value?.status === "unknown")) {
       unreadable++; state = { input: null, lastFile: null };
     }
     if (input?.status === "known") state = {
@@ -74,7 +72,10 @@ export function diagnosticHistory(snapshot: Pick<SessionView, "records">, agentI
       const block = execution.data.block;
       const request = response(record, block.responseId, block.source.model, block.requestParentId, block.source.scope);
       if (!request.blocks.some(item => item.block.ordinal === block.ordinal)) request.blocks.push({ record, block });
-      if (block.completion) request.completion = block.completion;
+      if (block.completion) {
+        request.completion = block.completion;
+        request.sent = completionData(block.completion, AgentRequestContext);
+      }
       if (block.complete && block.kind === "toolcall" && block.outcome?.model.some(part => part.kind === "file"))
         state = { ...state, lastFile: record.sequence };
     }
@@ -89,17 +90,10 @@ export function diagnosticHistory(snapshot: Pick<SessionView, "records">, agentI
         request.notices.push(item);
       } else notices.push(item);
     }
-    if (sentRecord?.status === "known") {
-      const { responseId, diagnostics, origin } = sentRecord.data;
-      sent.set(responseId, diagnostics);
-      if (origin && diagnostics.timing)
-        response(record, responseId, origin.source.model, origin.requestParentId, origin.source.scope);
-    }
     history.set(record.id, state);
   }
   for (const request of requests.values()) {
     request.blocks.sort((a, b) => a.block.ordinal - b.block.ordinal);
-    if (request.responseId) request.sent = sent.get(request.responseId) ?? null;
   }
   return { requests: [...requests.values()].sort((a, b) => b.sequence - a.sequence), notices: notices.reverse(), unreadable };
 }

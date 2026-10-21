@@ -1,6 +1,6 @@
-import type { ModelInputPart, ModelItem, RequestDiagnostics, SessionSnapshot } from "@atelier/sdk/contracts";
+import { completionData, type ModelInputPart, type ModelItem, type SessionSnapshot } from "@atelier/sdk/contracts";
 import { contextMessages, projectAgentContext } from "../context-projection.ts";
-import { ContextSummary, Execution, RequestDiagnosticsRecord } from "@atelier/builtin-api/contracts";
+import { ContextSummary, Execution, AgentRequestContext, type AgentRequestContextData } from "@atelier/builtin-api/contracts";
 
 /** 对话构成的固定类别与展示顺序；docs/workbench.md#代理上下文。 */
 export const conversationCategories = ["user", "assistant", "thinking", "toolcall", "result", "context", "summary"] as const;
@@ -10,8 +10,8 @@ export interface ContextInsight {
   /** 最近一次本代理工作请求的实报 input；没有可用计量时为 null。 */
   usage: { input: number; model: string; scope: string; compressedAfter: boolean } | null;
   conversation: { characters: Record<ConversationCategory, number>; total: number; files: number };
-  /** 当前路径上本代理最近一条请求诊断。 */
-  system: { responseId: string; diagnostics: RequestDiagnostics } | null;
+  /** 与窗口占用取自同一个工作请求的终态扩展。 */
+  system: { responseId: string; diagnostics: AgentRequestContextData } | null;
 }
 
 /** 字数按 Unicode 码点计，与请求诊断一致。 */
@@ -46,20 +46,19 @@ export function contextInsight(snapshot: Pick<SessionSnapshot, "records">, agent
   conversation.total = conversationCategories.reduce((sum, category) => sum + conversation.characters[category], 0);
 
   let usage: ContextInsight["usage"] = null, system: ContextInsight["system"] = null, compressedAfter = false;
-  for (let index = context.path.length - 1; index >= 0 && (!usage || !system); index--) {
+  for (let index = context.path.length - 1; index >= 0; index--) {
     const record = context.path[index]!;
     if (record.source?.resource?.id !== agentId) continue;
-    if (!usage && ContextSummary.decode(record)?.status === "known") compressedAfter = true;
-    if (!system) {
-      const diagnostics = RequestDiagnosticsRecord.decode(record);
-      if (diagnostics?.status === "known") system = diagnostics.data;
-    }
-    if (usage) continue;
+    if (ContextSummary.decode(record)?.status === "known") compressedAfter = true;
     const execution = Execution.decode(record);
     if (execution?.status !== "known" || execution.data.type !== "block") continue;
     const block = execution.data.block;
-    const input = block.completion?.usage?.input;
+    if (!block.completion) continue;
+    const diagnostics = completionData(block.completion, AgentRequestContext);
+    if (diagnostics) system = { responseId: block.responseId, diagnostics };
+    const input = block.completion.usage?.input;
     if (input != null) usage = { input, model: block.source.model, scope: block.source.scope, compressedAfter };
+    break;
   }
   return { usage, conversation, system };
 }

@@ -19,9 +19,8 @@ import { Note } from "../../packages/builtin/src/notes/contract.ts";
 import { implement } from "../tools/testing.ts";
 import { ToolRegistry } from "../tools/registry.ts";
 import { foldWorkbench } from "../session/fold.ts";
-import { ContextSummary, RequestDiagnosticsRecord } from "@atelier/builtin-api/contracts";
-/** 请求诊断记录随每次工作请求追加；路径、游标与节点顺序断言只看工作记录。 */
-const work = <T extends { contract: string }>(nodes: readonly T[]) => nodes.filter(node => node.contract !== RequestDiagnosticsRecord.id);
+import { ContextSummary, AgentRequestContext } from "@atelier/builtin-api/contracts";
+import { AgentExecutionFeedback } from "../../packages/builtin/src/agent/feedback.ts";
 import { COMPRESSION_MAX_OUTPUT } from "../../packages/builtin/src/agent/compression.ts";
 import { applicationUserAgent } from "../shared/application.ts";
 import { AnswerQuestion, CancelQuestion, ReadQuestions } from "../../packages/builtin/src/questions/contract.ts";
@@ -252,8 +251,7 @@ describe("会话运行时", () => {
     const failed = service.sessions.tree.timeline(first.sessionId);
     expect(attempts).toBe(1);
     expect(failed.some(node => node.contract === ContextSummary.id)).toBe(false);
-    expect(failed.map(flat).some(node => node.kind === "notice"
-      && node.code === (failure === "cancel" ? "cancelled" : "context_compression_failed"))).toBe(true);
+    expect(failed.map(flat).some(node => node.kind === "notice")).toBe(false);
     await execute(service, agentCommand(first.sessionId, agentOf(first), { type: "continue" }));
     await settled(service);
     expect(attempts).toBe(2);
@@ -318,15 +316,14 @@ describe("会话运行时", () => {
     expect(service.sessions.tree.cursorSelections(first.sessionId)).toEqual([]);
     const blocks = snapshot.nodes.map(flat).filter(node => node.kind === "toolcall" || node.kind === "text");
     expect(blocks.map(block => block.kind)).toEqual(["toolcall", "text"]);
-    // 工具批次与续轮请求之间只隔请求诊断记录；续轮起点仍在同一线性路径上。
-    const between = snapshot.nodes.find(node => node.id === blocks[1]!.parentId)!;
-    expect(between.contract).toBe(RequestDiagnosticsRecord.id);
-    expect(between.parentId).toBe(blocks[0]!.id);
+    expect(blocks[1]!.parentId).toBe(blocks[0]!.id);
     expect(blocks.reduce((sum, block) => sum + block.completion.usage.total, 0)).toBe(14);
     await service.sessions.execute({ type: "select", sessionId: first.sessionId, nodeId: blocks[0]!.id });
     expect(service.sessions.tree.timeline(first.sessionId).map(flat).at(-1)).toMatchObject({
       kind: "toolcall", complete: true, outcome: { kind: "succeeded", data: { resources: [] } },
-      completion: { usage, finishReason: "tool-calls" },
+      completion: { usage, finishReason: "tool-calls", extensions: [
+        { contract: { id: AgentRequestContext.id }, data: { tools: expect.arrayContaining(["resource_list"]) } },
+      ] },
     });
   });
 
@@ -506,10 +503,9 @@ describe("会话运行时", () => {
     } finally { release(); }
     await settled(service);
     const after = service.sessions.snapshot(first.sessionId);
-    expect(work(after.nodes)).toHaveLength(work(before.nodes).length + 1);
+    expect(after.nodes).toHaveLength(before.nodes.length + 1);
     expect(after.cursor).toBe(after.nodes.at(-1)!.id);
-    expect(after.nodes.at(-1)!.contract).toBe(RequestDiagnosticsRecord.id);
-    expect(work(after.nodes).map(flat).at(-1)).toMatchObject({ kind: "text", parentId: before.cursor,
+    expect(after.nodes.map(flat).at(-1)).toMatchObject({ kind: "text", parentId: before.cursor,
       completion: { usage, timing, finishReason: "stop", rawFinishReason: "end_turn", providerResponseId: "provider-response" } });
     expect(after.workbench.objects.find(object => object.kind === "atelier.builtin/agent")?.presentation)
       .toMatchObject({ data: { turnState: "completed" } });
@@ -521,17 +517,40 @@ describe("会话运行时", () => {
       .toMatchObject({ data: { turnState: "completed" } });
   });
 
-  it("无块响应保留已报告计量，不伪造正文或工具块", async () => {
-    const model: ModelAdapter = { validate() {}, version: "ai-sdk-v7/3", prepare: () => ({ async *stream() {
+  // docs/timeline.md：无实际输出只交付瞬态反馈，重启后保持只有用户输入的客观历史。
+  it.each(["empty_response", "provider_error", "cancelled"] as const)("无块 %s 只发瞬态反馈，重开不补响应", async failure => {
+    let started!: () => void;
+    const entered = new Promise<void>(resolve => { started = resolve; });
+    const model: ModelAdapter = { validate() {}, version: "ai-sdk-v7/3", prepare: () => ({ async *stream(signal) {
+      started();
+      if (failure === "provider_error") throw new ModelFailure("provider_error", "Provider unavailable.");
+      if (failure === "cancelled") {
+        await new Promise<void>(resolve => {
+          if (signal.aborted) resolve();
+          else signal.addEventListener("abort", () => resolve(), { once: true });
+        });
+        signal.throwIfAborted();
+        return;
+      }
       yield { type: "finish", reason: "stop", responseId: "empty-response",
         usage: { input: 2, output: 0, total: 2, reasoning: null, cacheRead: null, cacheWrite: null } };
     } }) };
-    const { service, start } = await setup(model);
+    const { service, root, start } = await setup(model);
+    const feedback: unknown[] = [];
+    service.sessions.events.listen(AgentExecutionFeedback, {}, packet => { feedback.push(packet.event.data); });
     const first = await execute(service, start);
+    await entered;
+    if (failure === "cancelled") await execute(service, agentCommand(first.sessionId, agentOf(first), { type: "cancel" }));
     await settled(service);
     const nodes = service.sessions.snapshot(first.sessionId).nodes;
-    expect(nodes.map(flat).some(node => ["text", "thinking", "toolcall"].includes(node.kind))).toBe(false);
-    expect(nodes.map(flat).find(node => node.kind === "notice")).toMatchObject({ code: "empty_response", response: { providerResponseId: "empty-response", usage: { total: 2 } } });
+    expect(nodes.map(flat).map(node => node.kind)).toEqual(["event", "message"]);
+    await vi.waitFor(() => expect(feedback).toMatchObject([{ code: failure }]));
+    await service.close(); services.delete(service);
+    const reopened = new ApplicationService(root); services.add(reopened);
+    const restored = reopened.sessions.snapshot(first.sessionId);
+    expect(restored.nodes).toEqual(nodes);
+    expect(restored.workbench.objects.find(object => object.kind === Agent.kind)?.presentation)
+      .toMatchObject({ data: { turnState: "incomplete" } });
   });
 
   it("目录 see 的图片随代理工具结果落库，下一次请求作为文件部件发送，重开仍可读取", async () => {
@@ -621,7 +640,7 @@ describe("会话运行时", () => {
     expect(a.sessionId).toBe(b.sessionId);
     await settled(service);
     const snap = await execute(service, { type: "read", sessionId: a.sessionId });
-    expect(work(snap.nodes).map(flat).map(n => n.kind)).toEqual(["event", "message", "text"]);
+    expect(snap.nodes.map(flat).map(n => n.kind)).toEqual(["event", "message", "text"]);
     expect(snap.workbench.objects.filter(o => o.kind === "atelier.builtin/agent")).toHaveLength(1);
     await expect(execute(service, { ...start, parts: [{ kind: "text", text: "Other" }] })).rejects.toThrow();
     await service.close(); services.delete(service);
@@ -747,16 +766,19 @@ describe("会话运行时", () => {
     await execute(service, { type: "select", sessionId, nodeId: first.cursor });
   });
 
-  it("请求在产生块之前失败时记录错误级通知，不伪造回复", async () => {
+  it("请求准备失败时终结运行标记并即时提示，时间线只保留输入", async () => {
     let n = 0;
     const { service, start } = await setup(adapter(() => { if (++n === 1) throw new ModelFailure("prepare_failed", "Cannot prepare."); }));
     // 无输出的请求失败也必须终结运行标记。
     const states = resourceStatuses(service);
+    const feedback: unknown[] = [];
+    service.sessions.events.listen(AgentExecutionFeedback, {}, packet => { feedback.push(packet.event.data); });
     const s = await execute(service, start); await settled(service);
     expect(states).toEqual(["running", "failed"]);
     const snap = await execute(service, { type: "read", sessionId: s.sessionId });
     expect(snap.nodes.map(flat).some(x => x.kind === "text")).toBe(false);
-    expect(snap.nodes.map(flat).at(-1)).toMatchObject({ kind: "notice", level: "error", code: "prepare_failed" });
+    expect(snap.nodes.map(flat).at(-1)).toMatchObject({ kind: "message" });
+    await vi.waitFor(() => expect(feedback).toMatchObject([{ level: "error", code: "prepare_failed" }]));
   });
 
   it("取消时已收到的部分正文以不完整块留档，不进入可续接路径", async () => {
@@ -798,7 +820,7 @@ describe("会话运行时", () => {
     await settled(service);
     expect(requests).toBe(1);
     const nodes = service.sessions.tree.nodes(first.sessionId).map(flat);
-    expect(work(nodes).at(-1)).toMatchObject({ kind: "notice", code: "incomplete" });
+    expect(nodes.at(-1)).toMatchObject({ kind: "notice", code: "incomplete" });
   });
 
   it("运行中修改代理配置在下一模型请求生效", async () => {
@@ -884,7 +906,7 @@ describe("插件包管理命令", () => {
   it("应用命令登记和移除插件包，正确表达重启标记", async () => {
     const { service, root } = await setup();
     const dir = join(root, "pkg"); mkdirSync(dir);
-    writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "p", atelier: { id: "acme.p", api: { major: 10, minMinor: 0 } } }));
+    writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "p", atelier: { id: "acme.p", api: { major: 11, minMinor: 0 } } }));
     const added = service.execute({ type: "plugin.add", path: dir });
     expect(added.plugins.filter(p => p.index !== null).map(p => [p.source, p.status, p.enabled])).toEqual([[dir, "pending", true]]);
     expect(added.plugins.find(p => p.index === null)).toMatchObject({ id: "atelier.builtin", status: "loaded" });

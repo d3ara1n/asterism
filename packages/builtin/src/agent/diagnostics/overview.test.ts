@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import type { RequestDiagnostics } from "@atelier/sdk/contracts";
+import type { AgentRequestContextData } from "@atelier/builtin-api/contracts";
 import { COMPRESSION_RESERVE } from "../context-budget.ts";
 import type { DiagnosticRequest } from "./history.ts";
 import { diagnosticOverview } from "./overview.ts";
 
-const sent: RequestDiagnostics = { system: [{ kind: "system", from: "builtin", characters: 10 }], tools: ["resource_list"] };
+const sent: AgentRequestContextData = { system: [{ kind: "system", from: "builtin", characters: 10 }], tools: ["resource_list"] };
 function request(sequence: number, input: number | null, extra: Partial<DiagnosticRequest> = {}): DiagnosticRequest {
   return {
     id: `r${sequence}`, kind: "response", responseId: `r${sequence}`, model: "p/m", modelScope: "scope", createdAt: "2026-10-15T10:00:00Z",

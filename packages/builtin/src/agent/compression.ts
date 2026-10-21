@@ -1,6 +1,7 @@
 import { thinkingLevels, type ModelItem, type ModelTarget, type ModelEvent } from "@atelier/sdk/contracts";
 import type { ModelServices, ObjectExecutor } from "@atelier/sdk/runtime";
-import { ContextSummary, Execution, Notice } from "@atelier/builtin-api/contracts";
+import { ContextSummary, Execution } from "@atelier/builtin-api/contracts";
+import { AgentExecutionFeedback } from "./feedback.ts";
 import { summaryPrompt, summarySystemPrompt } from "./compression-prompt.ts";
 import { contextMessages, projectAgentContext, type AgentContext } from "./projection.ts";
 
@@ -103,8 +104,8 @@ export async function compressContext(
       throw new Error("Context summarization did not produce a complete non-empty summary.");
   } catch (error) {
     signal.throwIfAborted();
-    object.commit(writer => { writer.append(Notice, { code: "context_compression_failed", level: "warning",
-      message: `Context compression failed; the existing context is unchanged. ${error instanceof Error ? error.message : "The summary request failed."}` }); });
+    object.events.publish(AgentExecutionFeedback, { code: "context_compression_failed", level: "warning",
+      message: `Context compression failed; the existing context is unchanged. ${error instanceof Error ? error.message : "The summary request failed."}` });
     return false;
   }
   // 提交失败交给代理循环报告；不能把持久化故障伪装成可继续的摘要失败。

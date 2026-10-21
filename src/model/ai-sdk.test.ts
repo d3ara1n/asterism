@@ -94,7 +94,7 @@ describe("AI SDK 适配契约", () => {
       for await (const _event of adapter.prepare(input).stream(controller.signal)) { /* 消费流。 */ }
     } catch (error) { failure = error; }
     expect(failure).toBeInstanceOf(ModelFailure);
-    expect((failure as ModelFailure).diagnostics?.timing).toMatchObject({
+    expect((failure as ModelFailure).timing).toMatchObject({
       outcome, durationMs: expect.any(Number), firstOutputMs: null, firstTextMs: null, outputChunks: 0,
     });
   });

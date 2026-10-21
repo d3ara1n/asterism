@@ -25,7 +25,7 @@ export const performanceMessages = pluginNamespace("atelier.builtin").messages("
   streaming: { id: "diagnostics.streamingTps", defaultMessage: "Streaming TPS · estimated" },
   streamingHint: { id: "diagnostics.streamingTpsHint", defaultMessage: "Output tokens ÷ output duration. Available for multiple chunks with explicitly zero reasoning tokens and no observed reasoning. Chunk buffering makes this an estimate." },
   totalDuration: { id: "diagnostics.totalDuration", defaultMessage: "Total request time" },
-  totalDurationHint: { id: "diagnostics.totalDurationHint", defaultMessage: "Sum of measured request durations, including failed and cancelled requests. Excludes tools and gaps between requests." },
+  totalDurationHint: { id: "diagnostics.totalDurationHint", defaultMessage: "Sum of recorded request durations. Excludes tools, gaps between requests, and calls without saved timing." },
   samples: { id: "diagnostics.timingSamples", defaultMessage: "{count, plural, one {# request} other {# requests}}" },
   aggregateHint: { id: "diagnostics.aggregateRatesHint", defaultMessage: "Each rate uses total tokens ÷ total duration for the requests counted beneath it." },
   missing: { id: "diagnostics.timingMissing", defaultMessage: "Timing unavailable for this request." },

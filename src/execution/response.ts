@@ -1,4 +1,4 @@
-import type { ModelBlock, ModelSource, ModelCompletion, ModelLiveBlock, ToolInvocationInfo, ToolResult } from "@atelier/sdk/contracts";
+import type { ModelBlock, ModelSource, ModelCompletion, ModelLiveBlock, ToolInvocationInfo, ToolResult, Presentation } from "@atelier/sdk/contracts";
 import { ModelFailure, type ModelEvent, type StreamPart } from "../model/contract.ts";
 import { parsePartialJson } from "ai";
 import { jsonSchema, type Json, type ToolOutcome } from "../shared/model.ts";
@@ -31,6 +31,7 @@ export class ResponseBuffer {
   constructor(
     private readonly identity: { responseId: string; requestParentId: string | null; source: ModelSource },
     private readonly onBlock: (block: ModelBlock) => void,
+    private readonly extensions: Presentation[] = [],
   ) {}
 
   get empty(): boolean { return this.blocks.size === 0; }
@@ -39,6 +40,7 @@ export class ResponseBuffer {
       usage: this.finish.usage, finishReason: this.finish.reason,
       rawFinishReason: this.finish.rawFinishReason ?? null, providerResponseId: this.finish.responseId ?? null,
       ...(this.finish.timing ? { timing: this.finish.timing } : {}),
+      ...(this.extensions.length ? { extensions: this.extensions } : {}),
     } : null;
   }
 

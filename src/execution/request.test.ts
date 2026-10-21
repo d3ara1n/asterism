@@ -1,4 +1,4 @@
-import { thinkingLevels, type RequestTiming } from "@atelier/sdk/contracts";
+import { thinkingLevels, present, completionData, modelCompletionSchema, type RequestTiming } from "@atelier/sdk/contracts";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { defineData, defineResource, defineTool, defineImplementation, type ModelRunEvent, type ModelRunRequest } from "@atelier/sdk/contracts";
@@ -66,9 +66,8 @@ describe("无状态的单次模型执行", () => {
     const events = calls(["list"]);
     const result = await execute(input([]), model([...events.slice(0, -1),
       { type: "finish", reason: "tool-calls", usage: null, timing }]));
-    expect(result).toMatchObject({ reason: "completed", completion: { timing }, diagnostics: { tools: ["resource_list", "resource_inspect", "resource_call"] },
+    expect(result).toMatchObject({ reason: "completed", completion: { timing }, timing,
       tools: [{ kind: "succeeded" }] });
-    expect(result.diagnostics).not.toHaveProperty("timing");
     const controller = new AbortController();
     const cancelled = await execute(input([], { signal: controller.signal }), { validate() {}, version: "test", prepare() { return {
       async *stream() {
@@ -79,11 +78,11 @@ describe("无状态的单次模型执行", () => {
     }; } });
     expect(cancelled).toMatchObject({ reason: "cancelled", completion: { timing }, tools: [] });
     const failure = new ModelFailure("provider_error", "Failed.");
-    failure.diagnostics = { timing: { ...timing, outcome: "failed" } };
+    failure.timing = { ...timing, outcome: "failed" };
     const failed = await execute(input([]), { validate() {}, version: "test", prepare() { return {
       async *stream() { throw failure; },
     }; } });
-    expect(failed).toMatchObject({ reason: "failed", completion: null, diagnostics: { timing: { outcome: "failed", durationMs: 1000 } } });
+    expect(failed).toMatchObject({ reason: "failed", completion: null, timing: { outcome: "failed", durationMs: 1000 } });
   });
   it("流暂停时也交付部分输入，填充不执行工具，结束后清理合并计时器", async () => {
     vi.useFakeTimers();
@@ -196,21 +195,35 @@ describe("无状态的单次模型执行", () => {
     expect(second.filter(event => event.type === "diagnostic")).toMatchObject([{ code: "cache_miss", level: "warning" }]);
     expect(third.filter(event => event.type === "diagnostic")).toEqual([]);
   });
-  // docs/runtime.md#请求诊断：计量取自最终发出的系统块与声明工具，不含正文；适配层拒绝的请求没有诊断。
-  it("请求诊断按码点计量最终系统块并列出声明工具，准备失败时为 null", async () => {
-    const system = { blocks: [
-      { id: "s", kind: "system" as const, from: "core", text: "环境😀" },
-      { id: "a", kind: "agent" as const, role: "worker", text: "role" },
-      { id: "c", kind: "context" as const, file: "/w/AGENTS.md", text: "中文" },
-    ] };
-    const result = await execute(input([], { system }), model(text));
-    expect(result.diagnostics).toEqual({
-      system: [{ kind: "system", from: "core", characters: 3 }, { kind: "agent", role: "worker", characters: 4 },
-        { kind: "context", file: "/w/AGENTS.md", characters: 2 }],
-      tools: ["resource_list", "resource_inspect", "resource_call"],
+  // docs/runtime.md：领域扩展消费最终现场的独立副本，与 usage 同时交付最高序号块，公共层只保留封装。
+  it("领域扩展在准备后生成，随终态块一次交付，未知或不兼容扩展不破坏公共计量", async () => {
+    const contract = defineData("example.agent/request", z.object({ tools: z.array(z.string()) }));
+    const unknown = { contract: { id: "other.plugin/opaque" }, data: { version: 42 } };
+    const system = { blocks: [{ id: "s", kind: "system" as const, from: "core", text: "Environment" }] };
+    let prepared = false;
+    const extensions = vi.fn(context => {
+      expect(prepared).toBe(true);
+      context.system.blocks[0].text = "Changed copy";
+      return [present(contract, { tools: context.tools.map((tool: { name: string }) => tool.name) }), unknown];
     });
-    expect(JSON.stringify(result.diagnostics)).not.toContain("环境");
-    const rejected = await execute(input([], { system }), model(text, () => { throw new ModelFailure("thinking_unavailable", "No."); }));
-    expect(rejected).toMatchObject({ reason: "failed", diagnostics: null });
+    const events: ModelRunEvent[] = [];
+    const result = await execute(input(events, { system, completionExtensions: extensions }), model([
+      { type: "part.start", part: { id: "thought", kind: "thinking" } },
+      { type: "part.end", partId: "thought" }, ...text,
+    ], () => { prepared = true; }));
+    const blocks = events.filter(event => event.type === "block").map(event => event.block);
+    expect(blocks[0]?.completion).toBeNull();
+    expect(blocks[1]?.completion).toEqual(result.completion);
+    expect(extensions).toHaveBeenCalledTimes(1);
+    expect(system.blocks[0]?.text).toBe("Environment");
+    const saved = modelCompletionSchema.parse(result.completion);
+    expect(saved.extensions).toContainEqual(unknown);
+    expect(completionData(saved, contract)).toEqual({ tools: ["resource_list", "resource_inspect", "resource_call"] });
+    expect(completionData(saved, defineData("missing/plugin", z.string()))).toBeNull();
+    expect(completionData(saved, defineData(contract.id, z.number()))).toBeNull();
+    extensions.mockClear();
+    const rejected = await execute(input([], { completionExtensions: extensions }), model(text, () => { throw new ModelFailure("thinking_unavailable", "No."); }));
+    expect(rejected).toMatchObject({ reason: "failed", completion: null });
+    expect(extensions).not.toHaveBeenCalled();
   });
 });

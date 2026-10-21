@@ -4,7 +4,8 @@ import type { ModelInputPart } from "./model-input.ts";
 import type { ContentReader } from "./content-runtime.ts";
 import type { ToolOutcome, ToolInvocationInfo, ToolResult } from "./tool-result.ts";
 import type { ResourceRef } from "./workspace.ts";
-import type { RequestDiagnostics, RequestTiming } from "./model-records.ts";
+import type { RequestTiming } from "./model-records.ts";
+import type { Presentation } from "./presentation.ts";
 
 /** 全软件共用的标准等级；协议编码不改变公共取值。 */
 export const thinkingLevels = ["off", "minimal", "low", "medium", "high", "xhigh", "max"] as const;
@@ -43,6 +44,8 @@ export type ModelSource = { model: string; adapter: string; scope: string };
 export type ModelCompletion = {
   usage: Usage | null; finishReason: string; rawFinishReason: string | null; providerResponseId: string | null;
   timing?: RequestTiming;
+  /** 由领域声明和消费的具型数据；公共层保留未知契约。 */
+  extensions?: Presentation[];
 };
 /** 成型响应块；不是会话节点，时间线身份和保存由消费者提供。 */
 export type ModelBlock = {
@@ -94,6 +97,8 @@ export interface ModelRunRequest {
   /** 按名称收窄插件顶层工具及按真实链接选出的资源工具；不影响宿主固定入口。 */
   tools?: { allow?: readonly string[]; exclude?: readonly string[] };
   cache?: { expectHit: boolean };
+  /** 最终请求准备完成后同步封装领域资料；随实际响应的 completion 交付。 */
+  completionExtensions?: (context: ModelRequestContext) => readonly Presentation[];
   signal: AbortSignal;
   observer: ModelRunObserver;
 }
@@ -101,9 +106,14 @@ export type ModelRunResult = {
   responseId: string | null; source: ModelSource | null; completion: ModelCompletion | null; tools: readonly ToolOutcome[];
   /** 本次调用最后收到的 HTTP 响应元信息；未收到时为 null，不进入响应块或历史。 */
   response: ModelResponse | null;
-  /** 宿主组装最终请求时的现场计量；环境组装前失败时为 null。见 docs/runtime.md#请求诊断。 */
-  diagnostics: RequestDiagnostics | null;
+  /** 当次调用的实测计时；未取得终态时仍可用于瞬态反馈。 */
+  timing: RequestTiming | null;
 } & ({ reason: "completed" } | { reason: "cancelled" } | { reason: "failed"; code: string });
+/** 最终请求的输入现场；独立副本供领域扩展生产者读取。 */
+export interface ModelRequestContext {
+  system: SystemPrompt;
+  tools: readonly { name: string; description: string; parameters: Json }[];
+}
 export interface StreamRequest extends ModelRequestIdentity {
   target: ModelTarget;
   system: SystemPrompt;

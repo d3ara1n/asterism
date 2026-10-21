@@ -1,7 +1,7 @@
 import type { CSSProperties, ReactNode } from "react";
 import { motion } from "motion/react";
 import { useI18n, useRendererCatalogs, type I18n } from "@atelier/sdk/renderer";
-import type { RequestDiagnostics } from "@atelier/sdk/contracts";
+import type { AgentRequestContextData } from "@atelier/builtin-api/contracts";
 import { Badge } from "@atelier/ui/ui/badge";
 import { cn } from "@atelier/ui/utils";
 import { formatCount } from "@atelier/ui/format-count";
@@ -54,7 +54,7 @@ function SystemRow({ label, detail, value, total, color, nested = false }: { lab
   </li>;
 }
 /** 一次请求实际发出的系统提示块与工具名称；只显示字数与占比，不换算 token。 */
-export function SystemComposition({ diagnostics }: { diagnostics: RequestDiagnostics }) {
+export function SystemComposition({ diagnostics }: { diagnostics: AgentRequestContextData }) {
   const i18n = useI18n();
   const configuration = useRendererCatalogs().get(ModelConfiguration);
   const blocks = diagnostics.system ?? [];

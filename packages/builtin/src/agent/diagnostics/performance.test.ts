@@ -16,7 +16,7 @@ const request = (clock: RequestTiming | undefined, counts: Usage | null): Diagno
   sequence: 1, requestParentId: null, completion: counts ? { usage: counts, finishReason: "stop", rawFinishReason: null, providerResponseId: null,
     ...(clock ? { timing: clock } : {}) } : null,
   blocks: [], summary: null, notices: [], onTimeline: true, relatedInput: null, inputHasFiles: false,
-  tokensBefore: null, sent: clock && !counts ? { timing: clock } : null,
+  tokensBefore: null, sent: null,
 });
 
 describe("诊断速率", () => {
@@ -40,14 +40,14 @@ describe("诊断速率", () => {
   });
 
   // 直接平均 10 TPS 和 100 TPS 会得到错误的 55；分子和分母必须来自同一批可计量请求。
-  it("按总 token 与对应总耗时汇总，并单独计入失败耗时", () => {
+  it("按总 token 与对应总耗时汇总，没有终态计时的记录不补耗时", () => {
     const overview = performanceOverview([
       request(timing, usage),
       request({ ...timing, durationMs: 1000, firstOutputMs: 100, firstTextMs: 100, lastOutputMs: 900 }, { ...usage, input: null }),
       request({ ...timing, durationMs: 5000, outcome: "failed" }, null),
       request(undefined, usage),
     ]);
-    expect(overview).toMatchObject({ durationMs: 16000, timed: 3, rates: {
+    expect(overview).toMatchObject({ durationMs: 11000, timed: 2, rates: {
       output: { count: 2, tokens: 200, durationMs: 11000 },
       total: { count: 1, tokens: 1100, durationMs: 10000 },
     } });

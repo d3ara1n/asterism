@@ -1,6 +1,6 @@
 # 内置插件公共 API（`@atelier/builtin-api`）
 
-内置实现与外部插件共同消费的领域契约、后台创建入口与前端扩展 API，当前版本 **0.8.0**。插件身份为 `atelier.builtin`；本包不注册第二个插件，也不依赖 `@atelier/builtin` 实现。公共加载与生命周期规则见 [插件 SDK](../../docs/plugin-sdk.md#公共模块与契约身份)。
+内置实现与外部插件共同消费的领域契约、后台创建入口与前端扩展 API，当前版本 **0.9.0**。插件身份为 `atelier.builtin`；本包不注册第二个插件，也不依赖 `@atelier/builtin` 实现。公共加载与生命周期规则见 [插件 SDK](../../docs/plugin-sdk.md#公共模块与契约身份)。
 
 ## 入口与边界
 
@@ -8,6 +8,7 @@
 
 - `builtin` 命名空间、Agent 资源与创建／提交／继续／配置／取消动作。
 - Agent 输入、配置、选择和历史记录契约，以及会话命名记录与 `NamingApi` 接口类型。
+- `AgentRequestContext`：工作请求终态中的具型领域资料，生产与读取遵循 [请求诊断](../../docs/runtime.md#请求诊断)，不构成独立历史记录。
 - `AgentConfigurations` 与 `ModelConfiguration` 目录契约；只包含内置领域需要的配置视图，不暴露配置文件、凭据、测试与覆盖编辑状态。
 - `ReadAgentCreations`：通过 SDK 具型调用查询模型创建入口与资源类型的关联，供前后端公共消费者使用。
 - `resolveAgentModelSelection`：按目录解析代理选择的模型引用、可用模型与思考等级，供摘要展示；`resolveAgentModel` 只取其中的模型。展示结果不改写原始选择，也不替代请求边界校验。
@@ -26,12 +27,12 @@
   "version": "1.0.0",
   "type": "module",
   "peerDependencies": {
-    "@atelier/sdk": "^0.27.0",
-    "@atelier/builtin-api": "^0.8.0"
+    "@atelier/sdk": "^0.28.0",
+    "@atelier/builtin-api": "^0.9.0"
   },
   "atelier": {
     "id": "example.input-review",
-    "api": { "major": 10, "minMinor": 2 },
+    "api": { "major": 11, "minMinor": 0 },
     "runtime": "./src/runtime.ts"
   }
 }

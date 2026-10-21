@@ -3,6 +3,7 @@ export * from "./agent.ts";
 export * from "./configuration.ts";
 export * from "./input.ts";
 export * from "./records.ts";
+export * from "./request-context.ts";
 export * from "./naming.ts";
 export * from "./catalogs.ts";
 export * from "./creations.ts";

@@ -7,7 +7,7 @@ type RateSample = { tokens: number; durationMs: number };
 const quantity = (value: number | null | undefined): value is number =>
   value != null && Number.isFinite(value) && value >= 0;
 
-export const requestTiming = (request: DiagnosticRequest) => request.completion?.timing ?? request.sent?.timing;
+export const requestTiming = (request: DiagnosticRequest) => request.completion?.timing;
 
 export function outputDuration(timing: RequestTiming | undefined): number | null {
   if (!timing || timing.firstOutputMs === null || timing.lastOutputMs === null) return null;

@@ -313,6 +313,7 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
         const receive = request.observer.event.bind(request.observer);
         const work = modelRuns.start(signal => host.models.run({ plugin: internal.id, object: ref, target, system, messages, tools, cache, userAgent, requestParentId: request.requestParentId,
           signal, capabilities, topLevelTools: boundTools, context: host.sessions.context(linked),
+          completionExtensions: request.completionExtensions,
           content: messages => host.content?.capture(inputReferences(messages), { owner: internal.id, sessionId: ref.sessionId,
             objectId: ref.id, recordIds: new Set(path.map(node => node.id)), check: checkAvailable }),
           handover: () => host.content?.handover(ref.sessionId, ref.id),
