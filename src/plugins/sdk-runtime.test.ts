@@ -637,6 +637,9 @@ describe("工作台 SDK 的宿主实现", () => {
     const plugin = definePlugin({ ...c.plugin, modules: [...c.plugin.modules, defineModule(() => ({
       tools: [implementTool(implementation, { async call(_data, _target, _args, context) {
         toolObject = context.object;
+        // SDK caller 是宿主提供的只读身份快照，与可写的目标对象门面分开。
+        expect(context.caller).toEqual({ ref: { sessionId: context.object.ref.sessionId, id: "caller", kind: "test/agent" }, title: "Caller" });
+        expect(Object.isFrozen(context.caller.ref)).toBe(true);
         context.publish(context.object.get(State)!);
         return { kind: "succeeded", data: context.object.get(State)! };
       } })],
@@ -650,7 +653,7 @@ describe("工作台 SDK 的宿主实现", () => {
     await create(service, sessionId, 4);
     const resource = foldWorkbench(service.sessions.tree.timeline(sessionId).map(flat)).objects[0]!;
     const adapted = tools.match(resource)[0]!;
-    const invocation = adapted.prepare(resource, null, {});
+    const invocation = adapted.prepare(resource, null, {}, { ref: { sessionId, id: "caller", kind: "test/agent" }, title: "Caller" });
     if (!("execute" in invocation)) throw new Error("Expected a tool invocation.");
     const progress: unknown[] = [];
     expect(await invocation.execute(new AbortController().signal, data => progress.push(data))).toEqual({ kind: "succeeded", data: 4 });

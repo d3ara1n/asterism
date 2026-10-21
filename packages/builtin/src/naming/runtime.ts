@@ -1,7 +1,7 @@
 import { defineModule, type ModelServices } from "@atelier/sdk/runtime";
-import { inputSummary, builtin, UserMessage, SessionNamed, type NamingApi } from "@atelier/builtin-api/contracts";
+import { inputSummary, builtin, SessionNamed, type NamingApi } from "@atelier/builtin-api/contracts";
 import type { SessionSnapshot } from "@atelier/sdk/contracts";
-import { cleanTitle, collectTurns, namingInstruction, namingPrompt, renameCheckpoints } from "./policy.ts";
+import { cleanTitle, collectTurns, namingInstruction, namingPrompt, renameCheckpoints, userMessages } from "./policy.ts";
 
 const timeoutMs = 10_000;
 const responseLimit = 4000;
@@ -48,15 +48,16 @@ export function createNamingModule(connect: (api: NamingApi) => () => void, user
       observers: [{
         id: "session-naming",
         committed({ records, snapshot, session }) {
-          const latest = snapshot.records.last(UserMessage, { scope: "timeline" });
+          const inputs = userMessages(snapshot, "timeline");
+          const latest = inputs.at(-1);
           if (latest?.status !== "known" || !records.some(record => record.id === latest.record.id)) return;
           const named = snapshot.records.last(SessionNamed, { scope: "timeline" });
           if (named?.status === "unknown" || named?.data.source === "user") return;
-          const first = snapshot.records.first(UserMessage, { scope: "session" });
+          const first = userMessages(snapshot, "session")[0];
           const initial = first?.status === "known" && records.some(record => record.id === first.record.id);
           const message = initial ? first : latest;
           const level = initial ? "initial" : "refined";
-          if (level === "refined" && !renameCheckpoints.has(snapshot.records.query(UserMessage, { scope: "timeline" }).length)) return;
+          if (level === "refined" && !renameCheckpoints.has(inputs.length)) return;
           if (named?.status === "known" && named.data.auto?.messageId === message.record.id) return;
           const model = plugin.models.roles().find(role => role.id === "utility")?.model ?? null;
           if (model === null) return;
@@ -66,7 +67,7 @@ export function createNamingModule(connect: (api: NamingApi) => () => void, user
           // 命名依据只来自当前路径，标题同步与观察者顺序不参与过时判断。
           const isCurrent = (view: SessionSnapshot) =>
             (view.records.last(SessionNamed, { scope: "timeline" })?.record.id ?? null) === nameId &&
-            view.records.last(UserMessage, { scope: "timeline" })?.record.id === latest.record.id;
+            userMessages(view, "timeline").at(-1)?.record.id === latest.record.id;
           plugin.tasks.start(`naming:${session.id}:${message.record.id}`, async signal => {
             if (!isCurrent(session.snapshot())) return;
             const title = await generateTitle(plugin.models, prompt, signal, session.id, userAgent);
@@ -81,7 +82,7 @@ export function createNamingModule(connect: (api: NamingApi) => () => void, user
           // 标题 = 当前时间线最后一次命名，否则为当前时间线首条输入的截断；两者都没有时保持不变。
           const named = snapshot.records.last(SessionNamed, { scope: "timeline" });
           if (named?.status === "unknown") return;
-          const first = named ? null : snapshot.records.first(UserMessage, { scope: "timeline" });
+          const first = named ? null : userMessages(snapshot, "timeline")[0];
           const title = named?.data.title ?? (first?.status === "known" ? inputSummary(first.data.parts).slice(0, 72) : null);
           if (title !== null) session.title.set(title);
         },

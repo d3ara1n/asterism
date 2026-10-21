@@ -1,4 +1,4 @@
-import { SubmitAgentInput, CancelAgent } from "@atelier/builtin-api/contracts";
+import { SubmitAgentInput, CancelAgent, type AgentMessageSender } from "@atelier/builtin-api/contracts";
 import type { ModelInputPart } from "@atelier/sdk/contracts";
 import type { PluginContext, ResourceRef, ResourceActionOptions } from "@atelier/sdk/runtime";
 
@@ -6,6 +6,14 @@ import type { PluginContext, ResourceRef, ResourceActionOptions } from "@atelier
 export async function steerAgent(plugin: PluginContext, agent: ResourceRef, parts: ModelInputPart[], options?: ResourceActionOptions) {
   await plugin.session(agent.sessionId).invoke(SubmitAgentInput, agent, {
     submissionId: crypto.randomUUID(), mode: "steer", parts,
+  }, options);
+}
+
+/** 中继适配者提供自己的资源地址与该资源上的代理名，正文保持原样。 */
+export async function deliverAgentMessage(plugin: PluginContext, agent: ResourceRef,
+  sender: Extract<AgentMessageSender, { kind: "agent" }>, parts: ModelInputPart[], options?: ResourceActionOptions) {
+  await plugin.session(agent.sessionId).invoke(SubmitAgentInput, agent, {
+    submissionId: crypto.randomUUID(), mode: "steer", sender, parts,
   }, options);
 }
 

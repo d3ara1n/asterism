@@ -9,7 +9,7 @@ import { ApplicationService } from "../../../../src/runtime/service.ts";
 import * as runtimeModules from "../../../../src/runtime/builtin.ts";
 import * as pluginLoader from "../../../../src/plugins/loader.ts";
 import { Agent, CreateAgent } from "@atelier/builtin-api/contracts";
-import { Execution, UserMessage } from "@atelier/builtin-api/contracts";
+import { Execution, AgentInputMessage } from "@atelier/builtin-api/contracts";
 import { SessionNamed } from "@atelier/builtin-api/contracts";
 import { applicationUserAgent } from "../../../../src/shared/application.ts";
 
@@ -53,11 +53,11 @@ async function open(stream: (request: StreamRequest) => AsyncIterable<ModelEvent
   const session = context.session(sessionId);
   const submit = (text: string) => {
     let id!: string;
-    object.commit(writer => { id = writer.append(UserMessage, { startsTurn: true, parts: [{ kind: "text", text }] }); });
+    object.commit(writer => { id = writer.append(AgentInputMessage, { sender: { kind: "user" }, startsTurn: true, parts: [{ kind: "text", text }] }); });
     messages.push(id); return id;
   };
   const submitBatch = (texts: string[]) => {
-    object.commit(writer => { for (const text of texts) messages.push(writer.append(UserMessage, { startsTurn: true, parts: [{ kind: "text", text }] })); });
+    object.commit(writer => { for (const text of texts) messages.push(writer.append(AgentInputMessage, { sender: { kind: "user" }, startsTurn: true, parts: [{ kind: "text", text }] })); });
   };
   const reply = (text: string) => {
     const origin = session.snapshot().position.nodeId;
@@ -76,6 +76,21 @@ async function open(stream: (request: StreamRequest) => AsyncIterable<ModelEvent
 }
 
 describe("人工命名入口", () => {
+  // docs/session-naming.md：代理通信既不触发命名，也不占首条用户输入的位置或计入用户检查点。
+  it("代理输入先于用户输入时不命名，首条人类输入仍触发一级命名", async () => {
+    const test = await open(() => title("User task"));
+    const object = test.context.object(test.sessionId, Agent, test.agentId);
+    object.commit(writer => { writer.append(AgentInputMessage, {
+      startsTurn: true, parts: [{ kind: "text", text: "Agent coordination" }],
+      sender: { kind: "agent", resource: { sessionId: test.sessionId, id: "relay", kind: "example/relay" }, name: "Reviewer" },
+    }); });
+    expect(test.requests).toEqual([]);
+    expect(test.session.title.get()).toBe("Temporary");
+    test.submit("User task"); await test.idle();
+    expect(test.requests).toHaveLength(1);
+    expect(test.session.title.get()).toBe("User task");
+  });
+
   // 命名契约：用户保存只追加一条具 builtin 身份的会话记录，标题由观察者同步；无效输入不留下事实。
   it("应用入口保存正规来源和规范化标题，无效输入不修改历史，重开保留标题与事件", async () => {
     const test = await open(() => title("Unused"));

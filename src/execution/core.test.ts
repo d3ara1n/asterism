@@ -6,7 +6,7 @@ import type { Json, ToolOutcome } from "../shared/model.ts";
 import type { ToolModelOutput } from "@atelier/sdk/contracts";
 const text = (outcome: ToolOutcome) => outcome.model.flatMap(part => part.kind === "text" ? [part.text] : []).join("\n");
 import type { ToolInvocationInfo } from "@atelier/sdk/contracts";
-import { implement } from "../tools/testing.ts";
+import { implement, toolCaller } from "../tools/testing.ts";
 import type { CallResult } from "@atelier/sdk/runtime";
 import { ToolRegistry } from "../tools/registry.ts";
 import { ResourceRegistry } from "../resources/registry.ts";
@@ -27,7 +27,7 @@ async function run(handler: Handler, options: { effect?: "read" | "write"; signa
   const tool = implement({ ...contract, effect: options.effect ?? "read" }, {
     call: async (_state, _target, _args, context) => handler(context), toModel: options.toModel,
   });
-  const capabilities = new AgentCapabilities(new ResourceRegistry([]), new ToolRegistry([tool]), [resource], () => true);
+  const capabilities = new AgentCapabilities(new ResourceRegistry([]), new ToolRegistry([tool]), [resource], () => true, toolCaller);
   const results: ToolOutcome[] = [];
   await executeCoreBatch([call], capabilities, options.signal ?? new AbortController().signal, (_call, result) => results.push(result), options.observer);
   expect(results).toHaveLength(1);

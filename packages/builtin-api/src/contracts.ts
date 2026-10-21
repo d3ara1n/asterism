@@ -1,5 +1,6 @@
 export * from "./identity.ts";
 export * from "./agent.ts";
+export * from "./messaging.ts";
 export * from "./configuration.ts";
 export * from "./input.ts";
 export * from "./records.ts";

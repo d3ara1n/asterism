@@ -37,7 +37,7 @@ describe("笔记当前正文", () => {
     expect(data.get(sessionId, note.id, NoteContent.id)).toEqual({ text: "" });
     expect(modules.resources.project(note).data).toEqual({ text: "" });
     const call = async (name: string, args: Record<string, never> | { content: string }) => {
-      const invocation = modules.tools.match(note).find(tool => tool.tool.name === name)!.prepare(note, null, args);
+      const invocation = modules.tools.match(note).find(tool => tool.tool.name === name)!.prepare(note, null, args, { ref: { sessionId, id: "caller", kind: "test/agent" }, title: "Caller" });
       if (!("execute" in invocation)) throw new Error("Expected a tool invocation.");
       return invocation.execute(new AbortController().signal);
     };

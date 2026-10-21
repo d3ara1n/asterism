@@ -1,5 +1,5 @@
 import type { ModelBlock, SessionRecord, SessionSnapshot } from "@atelier/sdk/contracts";
-import { Execution, Notice, UserMessage } from "@atelier/builtin-api/contracts";
+import { Execution, Notice, AgentInputMessage } from "@atelier/builtin-api/contracts";
 import type { AgentTurnState } from "./state.ts";
 
 /** 从当前路径推导回合状态；不完整块参与判断，模型输入仍由上下文投影独立生成。 */
@@ -18,7 +18,7 @@ export function projectTurnState(records: readonly SessionRecord[], agentId: str
   const blocks = new Map<number, ModelBlock>();
   for (const record of records) {
     if (record.source?.resource?.id !== agentId) continue;
-    if (UserMessage.decode(record)?.status === "known") {
+    if (AgentInputMessage.decode(record)?.status === "known") {
       hasInput = true;
       responseId = null;
       blocks.clear();

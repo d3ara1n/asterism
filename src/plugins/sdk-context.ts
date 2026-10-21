@@ -312,7 +312,8 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
         own(ref.kind); checkRef(ref);
         if (running.has(ref.id)) throw new PluginApiError("unavailable", "A model request is already running on this resource.");
         const path = host.sessions.timeline(ref.sessionId);
-        if (!host.sessions.workbench(ref.sessionId).objects.some(object => object.id === ref.id))
+        const executing = host.sessions.workbench(ref.sessionId).objects.find(object => object.id === ref.id);
+        if (!executing)
           throw new PluginApiError("unavailable", "The resource is not on the current session path.");
         if ((path.at(-1)?.id ?? null) !== request.requestParentId)
           throw new PluginApiError("invalid_argument", "Rebuild model input from the current session position.");
@@ -324,7 +325,7 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
         const excluded = new Set(tools?.exclude ?? []);
         const linked = host.sessions.linked(ref.sessionId, ref.id);
         const policy = (name: string) => (allowed === null || allowed.has(name)) && !excluded.has(name);
-        const capabilities = host.sessions.capabilities(linked, policy);
+        const capabilities = host.sessions.capabilities(linked, policy, { ref, title: executing.title });
         const boundTools = topLevelTools(ref, policy, linked.map(resource => ({ sessionId: ref.sessionId, id: resource.id, kind: resource.kind })));
         let progressTimer: ReturnType<typeof setTimeout> | undefined;
         const receive = request.observer.event.bind(request.observer);

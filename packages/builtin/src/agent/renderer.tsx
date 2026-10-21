@@ -15,6 +15,7 @@ import { AgentConversationProvider, useAgentConversation } from "./conversation/
 import { ConfigurationToolbarItem, ContextToolbarItem } from "./conversation/Toolbar";
 import { agentExecutionState } from "./state";
 import { peekToolRenderer } from "./peek/view";
+import { sendToolRenderer } from "./send/view";
 import { AgentExecutionFeedback } from "./feedback";
 import { toast } from "sonner";
 
@@ -28,7 +29,7 @@ export default {
     Actions: ConversationActions,
     panels: agentPanels,
   })],
-  tools: [peekToolRenderer],
+  tools: [peekToolRenderer, sendToolRenderer],
   records: agentRecordViews,
   creations: [creationEntry(CreateAgent, { id: "atelier.builtin/agent.configured", label: commonMessages.kindAgent, icon: <Bot className="size-4" />, group: "agents", InputView: AgentInput, triggers: { menu: {} } })],
   async prepare({ signal, events }) {

@@ -33,6 +33,8 @@ SDK 的 `contracts`、`runtime`、`renderer` 三个子路径分别承担纯契�
 - **运行上下文**：顶层工具 handler 在每次调用时取得宿主绑定的当前执行对象、会话及取消等调用环境；静态声明与运行时数据分开。当前对象和会话的操作仍遵守宿主门面、提交及生命周期契约，模型参数不负责声明发起者身份。
 - **资源工具**：共享工具契约与针对资源类型的实现分开声明，由工具目录按资源支持关系匹配。
 
+资源工具的 `implementTool` handler 接收 `{ object, caller, signal, publish }`（API 11.3）。`object` 为已授权目标的执行门面，`caller: ToolCaller` 只包含发起资源的 `{ ref, title }`，由宿主在模型请求边界捕获并冻结；调用者身份与目标对象分别绑定，模型参数不声明来源。caller 不携带私有数据或额外授权。
+
 后台通过 `defineTopLevelTool({ id, name, description, guidelines, argsSchema, resultSchema, effect, execution, execute, toModel? })` 声明，交给 `ModuleContribution.topLevelTools`。`execute(args, { object, session, callId, signal, publish })` 的 `object` 为绑定执行者的只读门面；不能据此写入其他插件资源或读取其私有数据。`session` 是本次工具执行绑定的 `ToolSession`，操作范围见下方会话资源接口。插件自有业务状态通过模块内共享服务管理。结果校验、过程发布、终结投影及批次调度沿用工具执行链路；展示契约可以独立共享同一稳定 ID，经 `toolRenderer` 渲染。
 
 ## 提供商与用量目录（API 10.0）

@@ -1,5 +1,5 @@
 import { completionData, type ModelBlock, type ModelCompletion, type ModelInputPart, type SessionRecord, type SessionView } from "@atelier/sdk/contracts";
-import { ContextSummary, Execution, Notice, AgentRequestContext, UserMessage, type AgentRequestContextData } from "@atelier/builtin-api/contracts";
+import { ContextSummary, Execution, Notice, AgentRequestContext, AgentInputMessage, type AgentRequestContextData, type AgentMessageSender } from "@atelier/builtin-api/contracts";
 
 export type DiagnosticScope = "timeline" | "session";
 export interface DiagnosticNotice { id: string; createdAt: string; code: string; message: string; level: "info" | "warning" | "error" }
@@ -9,7 +9,7 @@ export interface DiagnosticRequest {
   requestParentId: string | null; completion: ModelCompletion | null;
   blocks: { record: SessionRecord; block: ModelBlock }[];
   summary: string | null; onTimeline: boolean;
-  relatedInput: { id: string; parts: readonly ModelInputPart[] } | null;
+  relatedInput: { id: string; parts: readonly ModelInputPart[]; sender: AgentMessageSender } | null;
   /** 仅判断历史投影是否含文件，不把多模态总 token 冒充文本细分。 */
   inputHasFiles: boolean | null;
   /** 压缩请求保存的压缩前估算量；工作请求为 null。 */
@@ -46,7 +46,7 @@ export function diagnosticHistory(snapshot: Pick<SessionView, "records">, agentI
   for (const record of records) {
     let state = stateAt(record.parentId);
     if (record.source?.resource?.id !== agentId) { history.set(record.id, state); continue; }
-    const input = UserMessage.decode(record);
+    const input = AgentInputMessage.decode(record);
     const summary = ContextSummary.decode(record);
     const execution = Execution.decode(record);
     const notice = Notice.decode(record);
@@ -54,7 +54,7 @@ export function diagnosticHistory(snapshot: Pick<SessionView, "records">, agentI
       unreadable++; state = { input: null, lastFile: null };
     }
     if (input?.status === "known") state = {
-      input: { id: record.id, parts: input.data.parts },
+      input: { id: record.id, parts: input.data.parts, sender: input.data.sender },
       lastFile: input.data.parts.some(part => part.kind === "file") ? record.sequence : state.lastFile,
     };
     if (summary?.status === "known") {

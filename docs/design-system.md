@@ -13,6 +13,7 @@
 | `secondary / secondary-foreground` | 中性次级表面与普通标签；所选灰阶 3 级底、12 级字，不随主题色变化 |
 | `selected / selected-foreground` | 导航、列表与已打开面板入口的持续选中态；主题色 3 级底，亮色 12 级字、暗色 11 级字 |
 | `muted / muted-foreground` | 弱化区域与辅助文字；所选灰阶 3 级底、11 级字 |
+| `external-message / external-message-foreground` | 外部代理输入与待发送条目；固定 violet 3 级底、12 级字，随亮暗切换，不随主题色变化 |
 | `accent / accent-foreground` | 悬停与菜单键盘高亮等临时交互反馈；所选灰阶 4 级底、12 级字。这里的 `accent` 是控件 token，与外观设置中选择主题色相的 `appearance.accent` 含义不同 |
 | `success / success-foreground`、`warning / warning-foreground`、`destructive / destructive-foreground` | 成功、警告与错误／破坏性操作；分别取固定 green、amber、red 的 11 级，不随主题色变化，实色表面搭配各自前景色 |
 
@@ -101,6 +102,8 @@ Agent overlay 的外壳由内置 Agent 统一提供，插件只组织内部内�
 结构化问答复用该外壳，内部以问题、选项和说明的字号层级组织，不叠加浮动卡片。普通选项与自定义项共用官方 FieldLabel／Field／FieldContent 的外框、内边距、选择控件列和文字列；自定义项通过 FieldLabel 的 `asChild` 组合 InputGroup 与无独立边框的编辑器，保留统一选中外观及编辑焦点反馈，不使用 addon 的按钮偏移。题目区和横向导航使用 `AgentScrollArea`，操作区保持可见；底部呈现保留上方历史阅读空间，主动放大使用宽版 Agent modal（`size: wide`），详情分栏按作答容器宽度决定。交互见 [结构化问答](workbench.md#结构化问答)。
 
 ## 对话过程视图
+
+输入消息气泡限制在阅读区宽度内并留出侧边空间，用户消息靠右、使用中性底色，外部代理消息靠左、使用 `external-message / external-message-foreground`。发送者标签与对应气泡对齐，正文保持左对齐；外部代理标签同时包含 Bot 图标和名字，不单独依赖颜色区分。草稿箱沿用相同的发送者标识与底色。交互规则见 [代理卡片](workbench.md#代理卡片与工具调用视图)。
 
 思考块和工具调用共用折叠外壳，外层无内边距，标题按钮铺满点击区域。标题与正文分别拥有留白，展开正文四周使用相同内边距。
 

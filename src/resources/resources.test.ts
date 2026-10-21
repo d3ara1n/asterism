@@ -7,7 +7,7 @@ import * as runtimeModules from "../runtime/builtin.ts";
 import { ApplicationService } from "../runtime/service.ts";
 import { Directory } from "../../packages/builtin/src/filesystem/contract.ts";
 import { defineData, defineImplementation, defineTool } from "@atelier/sdk/contracts";
-import { implement } from "../tools/testing.ts";
+import { implement, toolCaller } from "../tools/testing.ts";
 import { ToolRegistry } from "../tools/registry.ts";
 import { AgentCapabilities, agentToolPolicy } from "../execution/capabilities.ts";
 import { executeCoreBatch, coreDeclarations } from "../execution/core.ts";
@@ -46,7 +46,7 @@ function setup() {
   });
   const { resources, tools } = modules;
   const scope = (linked: readonly FoldedObject[] = [resource], policy: Parameters<typeof agentToolPolicy>[0] = unrestricted) =>
-    new AgentCapabilities(resources, tools, linked, agentToolPolicy(policy));
+    new AgentCapabilities(resources, tools, linked, agentToolPolicy(policy), toolCaller);
   return { root, outside, resource, note, resources, tools, scope, service, sessionId };
 }
 /** 成功结果的模型投影是一次序列化的 JSON 文本；断言时解析回结构，非成功结局保留文字。 */
@@ -149,7 +149,7 @@ describe("工具与资源的匹配及授权", () => {
     expect(await invoke(capabilities, "resource_call", { resource_id: resource.id, tool: "read", args: {} }))
       .toMatchObject({ kind: "rejected", error: { code: "tool_unavailable" } });
     const allowed = agentToolPolicy({ tools: ["list"], excludeTools: null }), excluded = new Set(["list"]);
-    const combined = new AgentCapabilities(resources, tools, [resource], name => allowed(name) && !excluded.has(name));
+    const combined = new AgentCapabilities(resources, tools, [resource], name => allowed(name) && !excluded.has(name), toolCaller);
     expect(combined.describe(resource.id)).toEqual([]);
     expect(await invoke(combined, "resource_call", { resource_id: resource.id, tool: "list", args: {} })).toMatchObject({ kind: "rejected", error: { code: "tool_unavailable" } });
   });
@@ -207,7 +207,7 @@ describe("工具与资源的匹配及授权", () => {
         return { kind: "succeeded", data: id };
       },
     })]);
-    const capabilities = new AgentCapabilities(resources, tools, [resource], () => true);
+    const capabilities = new AgentCapabilities(resources, tools, [resource], () => true, toolCaller);
     const results: ToolOutcome[] = [];
     await executeCoreBatch(["a", "b"].map(id => ({ callId: id, name: "resource_call",
       arguments: { resource_id: resource.id, tool: "work", args: { id } } })), capabilities, signal, (_call, outcome) => results.push(outcome));

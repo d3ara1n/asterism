@@ -1,9 +1,9 @@
 import { completionData, type ModelInputPart, type ModelItem, type SessionSnapshot } from "@atelier/sdk/contracts";
 import { contextMessages, projectAgentContext } from "../context-projection.ts";
-import { ContextSummary, Execution, AgentRequestContext, type AgentRequestContextData } from "@atelier/builtin-api/contracts";
+import { ContextSummary, Execution, AgentRequestContext, AgentInputMessage, type AgentRequestContextData } from "@atelier/builtin-api/contracts";
 
 /** 对话构成的固定类别与展示顺序；docs/workbench.md#代理上下文。 */
-export const conversationCategories = ["user", "assistant", "thinking", "toolcall", "result", "context", "summary"] as const;
+export const conversationCategories = ["user", "agentMessage", "assistant", "thinking", "toolcall", "result", "context", "summary"] as const;
 export type ConversationCategory = typeof conversationCategories[number];
 
 export interface ContextInsight {
@@ -23,9 +23,9 @@ function addParts(parts: readonly ModelInputPart[], category: ConversationCatego
     else target.files++;
   }
 }
-function addItem(item: ModelItem, summary: boolean, target: ContextInsight["conversation"]) {
+function addItem(item: ModelItem, inputCategory: "user" | "agentMessage", target: ContextInsight["conversation"]) {
   if (item.kind === "input" || item.kind === "context")
-    return addParts(item.parts, item.kind === "input" ? "user" : summary ? "summary" : "context", target);
+    return addParts(item.parts, item.kind === "input" ? inputCategory : "context", target);
   if (item.kind === "result") return addParts(item.outcome.model, "result", target);
   if (item.kind !== "output") return;
   for (const part of item.parts) {
@@ -42,7 +42,16 @@ export function contextInsight(snapshot: Pick<SessionSnapshot, "records">, agent
     characters: Object.fromEntries(conversationCategories.map(category => [category, 0])) as Record<ConversationCategory, number>,
     total: 0, files: 0,
   };
-  contextMessages(context).forEach((item, index) => addItem(item, context.summary !== null && index === 0, conversation));
+  if (context.summary) {
+    // 摘要计量包含实际投影的提示信封。
+    const summary = contextMessages(context)[0]!;
+    if (summary.kind === "context") addParts(summary.parts, "summary", conversation);
+  }
+  for (const group of context.groups) {
+    const input = AgentInputMessage.decode(context.path[group.first]!);
+    const category = input?.status === "known" && input.data.sender.kind === "agent" ? "agentMessage" : "user";
+    group.items.forEach(item => addItem(item, category, conversation));
+  }
   conversation.total = conversationCategories.reduce((sum, category) => sum + conversation.characters[category], 0);
 
   let usage: ContextInsight["usage"] = null, system: ContextInsight["system"] = null, compressedAfter = false;

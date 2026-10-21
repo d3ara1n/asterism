@@ -12,6 +12,7 @@ import { ToolCall } from "./ToolCall";
 import { FilePreview } from "./Files";
 import { Disclosure } from "./Disclosure";
 import { TurnFooter } from "./TurnFooter";
+import { MessageSender } from "./MessageSender";
 
 export function ConversationTimeline({ items }: { items: readonly TimelineItem[] }) {
   return <>{items.map(node => <NodeView key={timelineKey(node)} node={node} />)}</>;
@@ -24,8 +25,11 @@ function NodeView({ node }: { node: TimelineItem }) {
   const streaming = (node.kind === "text" || node.kind === "thinking") && "endedAt" in node && node.endedAt === null;
   const tag = incomplete ? <Badge variant="outline">{i18n.formatMessage(conversationMessages.incomplete)}</Badge> : null;
   switch (node.kind) {
-    case "message": return <article data-conversation-message={node.id} className="space-y-2"><p className="type-label">{i18n.formatMessage(conversationMessages.you)}</p>
-      <div className="space-y-2 rounded-md bg-muted px-3 py-2">{node.parts.map((part, index) =>
+    case "message": return <article data-conversation-message={node.id}
+      className={`min-w-0 max-w-[92%] space-y-2 ${node.sender.kind === "agent" ? "mr-auto" : "ml-auto"}`}>
+      <MessageSender sender={node.sender} />
+      <div className={`space-y-2 rounded-md px-3 py-2 ${node.sender.kind === "agent"
+        ? "bg-external-message text-external-message-foreground" : "bg-muted text-foreground"}`}>{node.parts.map((part, index) =>
         part.kind === "text" ? <Markdown key={index}>{part.text}</Markdown>
           : <FilePreview key={index} part={part} content={object.content} />)}</div></article>;
     case "text": return <article className="space-y-1">{tag}<Markdown streaming={streaming}>{node.text}</Markdown></article>;

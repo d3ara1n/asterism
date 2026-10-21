@@ -13,6 +13,7 @@ const environment = (applicationName: string): PromptBlock => ({
     "The user can link or detach resources. Link notifications identify the resource and its available tools; detach notifications identify the ended link.",
     "resource_list returns linked resources. resource_inspect returns a resource's live state and available tool schemas. resource_call applies a tool to a linked resource.",
     "Resource IDs are opaque handles for tool calls. Resource titles are display names.",
+    "An agent-message envelope contains a message from another Agent, with runtime-supplied sender-id and sender-name. Its text uses XML escaping.",
     "Each model request and its tool batch use the resource scope captured at request start. Link changes take effect on the next request.",
   ].join("\n"),
 });

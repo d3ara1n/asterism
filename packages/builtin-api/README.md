@@ -1,6 +1,6 @@
 # 内置插件公共 API（`@atelier/builtin-api`）
 
-内置实现与外部插件共同消费的领域契约、后台创建入口与前端扩展 API，当前版本 **0.11.0**。插件身份为 `atelier.builtin`；本包不注册第二个插件，也不依赖 `@atelier/builtin` 实现。公共加载与生命周期规则见 [插件 SDK](../../docs/plugin-sdk.md#公共模块与契约身份)。
+内置实现与外部插件共同消费的领域契约、后台创建入口与前端扩展 API，当前版本 **0.12.0**。插件身份为 `atelier.builtin`；本包不注册第二个插件，也不依赖 `@atelier/builtin` 实现。公共加载与生命周期规则见 [插件 SDK](../../docs/plugin-sdk.md#公共模块与契约身份)。
 
 ## 入口与边界
 
@@ -8,7 +8,8 @@
 
 - `builtin` 命名空间、Agent 资源与创建／提交／继续／配置／取消动作。
 - Agent 输入、配置、选择和历史记录契约，以及会话命名记录与 `NamingApi` 接口类型。
-- `SubmitAgentInput` 的 `mode: "steer" | "follow"` 与 `UserMessage.startsTurn` 的语义见 [输入调度与执行轮次](../../docs/runtime.md#输入调度与草稿箱)。草稿箱界面动作属于内置实现，不从公共包导出。
+- `SubmitAgentInput` 的 `mode: "steer" | "follow"` 与 `AgentInputMessage.startsTurn` 的语义见 [输入调度与执行轮次](../../docs/runtime.md#输入调度与草稿箱)。草稿箱界面动作属于内置实现，不从公共包导出。
+- `AgentInputMessage` 记录用户与代理输入，`AgentMessageSender / agentMessageSenderSchema` 表达发送者，`Send` 为通信资源共享的发送契约，各实现独立声明 target schema；语义见 [代理通信](../../docs/runtime.md#代理通信)。`SubmitAgentInput.sender` 省略时为用户，后台适配者显式提供发送者。
 - `AgentRequestContext`：工作请求终态中的具型领域资料，生产与读取遵循 [请求诊断](../../docs/runtime.md#请求诊断)，不构成独立历史记录。
 - `AgentConfigurations` 与 `ModelConfiguration` 目录契约；只包含内置领域需要的配置视图，不暴露配置文件、凭据、测试与覆盖编辑状态。
 - `ReadAgentCreations`：通过 SDK 具型调用查询模型创建入口与资源类型的关联，供前后端公共消费者使用。
@@ -28,8 +29,8 @@
   "version": "1.0.0",
   "type": "module",
   "peerDependencies": {
-    "@atelier/sdk": "^0.30.0",
-    "@atelier/builtin-api": "^0.11.0"
+    "@atelier/sdk": "^0.31.0",
+    "@atelier/builtin-api": "^0.12.0"
   },
   "atelier": {
     "id": "example.input-review",

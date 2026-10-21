@@ -5,6 +5,7 @@ import type { ToolContract } from "@atelier/sdk/contracts";
 import type { ContractReference } from "@atelier/sdk/contracts";
 import type { FoldedObject } from "../session/fold.ts";
 import type { ContentLease } from "../runtime/content-store.ts";
+import type { ToolCaller } from "@atelier/sdk/runtime";
 
 export type { CallResult } from "@atelier/sdk/runtime";
 import type { CallResult } from "@atelier/sdk/runtime";
@@ -23,5 +24,5 @@ export interface ToolImplementation {
   effect: "read" | "write";
   targetSchema: z.ZodType<Json>;
   resultSchema: z.ZodType<Json>;
-  prepare(resource: FoldedObject, target: Json, args: Json): Invocation | PreparedResult;
+  prepare(resource: FoldedObject, target: Json, args: Json, caller: ToolCaller): Invocation | PreparedResult;
 }

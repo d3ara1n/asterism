@@ -24,6 +24,8 @@
   --selected-foreground: #1d3b31;
   --muted: #f0f0f0;
   --muted-foreground: #646464;
+  --external-message: #f4f0fe;
+  --external-message-foreground: #2f265f;
   --accent: #e8e8e8;
   --accent-foreground: #202020;
   --destructive: #ce2c31;
@@ -60,6 +62,7 @@
     --secondary: #222222; --secondary-foreground: #eeeeee;
     --selected: #0f2e22; --selected-foreground: #1fd8a4;
     --muted: #222222; --muted-foreground: #b4b4b4;
+    --external-message: #291f43; --external-message-foreground: #e2ddfe;
     --accent: #2a2a2a; --accent-foreground: #eeeeee;
     --destructive: #ff9592; --border: #3a3a3a; --input: #484848; --ring: #2a7e68;
     --success: #3dd68c; --warning: #ffca16;
@@ -86,6 +89,8 @@
   --color-selected-foreground: var(--selected-foreground);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
+  --color-external-message: var(--external-message);
+  --color-external-message-foreground: var(--external-message-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);

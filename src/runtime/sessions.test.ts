@@ -16,10 +16,10 @@ import { defineData, ResourceStatusChanged, type ResourceStatus } from "@atelier
 import { defineImplementation, defineTool } from "@atelier/sdk/contracts";
 import { Directory } from "../../packages/builtin/src/filesystem/contract.ts";
 import { Note } from "../../packages/builtin/src/notes/contract.ts";
-import { implement } from "../tools/testing.ts";
+import { implement, toolCaller } from "../tools/testing.ts";
 import { ToolRegistry } from "../tools/registry.ts";
 import { foldWorkbench } from "../session/fold.ts";
-import { ContextSummary, AgentRequestContext } from "@atelier/builtin-api/contracts";
+import { ContextSummary, AgentRequestContext, AgentInputMessage, CreateAgent } from "@atelier/builtin-api/contracts";
 import { AgentExecutionFeedback } from "../../packages/builtin/src/agent/feedback.ts";
 import { COMPRESSION_MAX_OUTPUT } from "../../packages/builtin/src/agent/compression.ts";
 import { applicationUserAgent } from "../shared/application.ts";
@@ -76,6 +76,122 @@ function resourceStatuses(service: ApplicationService) {
 }
 
 describe("会话运行时", () => {
+  // docs/runtime.md#代理通信：Agent 由资源身份直接寻址，省略 target；来源由执行层绑定，受理不等待接收方完成。
+  it("send 仅凭资源身份发送，自动绑定发送者，空闲启动与运行中 steer 共用输入链路", async () => {
+    let receiverId = "", senderId = "", sessionId = "", release!: () => void, sendRound = 0;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    const received: ModelInput[] = [];
+    const body = "Review <node> & </agent-message>";
+    const { service, start } = await setup({ validate() {}, version: "test/send", prepare(input) {
+      const last = input.messages.at(-1);
+      const message = last?.kind === "input" ? last.parts.flatMap(part => part.kind === "text" ? [part.text] : []).join("\n") : "";
+      const external = message.startsWith("<agent-message ");
+      if (external) received.push(input);
+      const firstReceipt = external && received.length === 1;
+      const round = message === "Send" ? ++sendRound : 0;
+      return { async *stream(signal) {
+        if (round) {
+          const calls = round === 1 ? [
+            { id: "unlinked", resource_id: senderId },
+            { id: "accepted-1", resource_id: receiverId },
+          ] : [{ id: "accepted-2", resource_id: receiverId }];
+          for (const call of calls) {
+            yield { type: "part.start", part: { id: call.id, kind: "toolcall", callId: call.id, name: "resource_call" } };
+            yield { type: "part.end", partId: call.id, arguments: {
+              resource_id: call.resource_id, tool: "send", args: { message: body },
+            } };
+          }
+          yield { type: "finish", reason: "tool-calls", usage: null };
+        } else {
+          if (firstReceipt) await Promise.race([gate, new Promise<void>(resolve => {
+            if (signal.aborted) resolve(); else signal.addEventListener("abort", () => resolve(), { once: true });
+          })]);
+          signal.throwIfAborted();
+          yield* reply();
+        }
+      } };
+    } });
+    try {
+      const snap = await execute(service, start); await settled(service);
+      sessionId = snap.sessionId; senderId = agentOf(snap);
+      const created = await execute(service, { type: "resource.create", sessionId, kind: Agent.kind, creation: { id: CreateAgent.id },
+        input: { title: "Reviewer", selection: selectionOf(snap) }, position: { x: 600, y: 0 } });
+      receiverId = created.workbench.objects.find(object => object.id !== senderId)!.id;
+      await execute(service, { type: "link.set", sessionId, receiverId: senderId, resourceId: receiverId, linked: true });
+      const send = () => execute(service, actionCommand(sessionId, senderId, SubmitAgentInput, {
+        submissionId: randomUUID(), mode: "follow", parts: [{ kind: "text", text: "Send" }],
+      }));
+      const outcomes = () => service.sessions.tree.timeline(sessionId).map(flat).filter(record => record.kind === "toolcall");
+      await send();
+      await vi.waitFor(() => expect(outcomes()).toHaveLength(2));
+      expect(outcomes().map(record => record.outcome.kind)).toEqual(["rejected", "succeeded"]);
+      expect(outcomes()[0]!.outcome.error.code).toBe("access_denied");
+      await vi.waitFor(() => expect(service.sessions.snapshot(sessionId).progress.runningObjectIds).not.toContain(senderId));
+      expect(received).toHaveLength(1);
+      expect(received[0]!.messages.at(-1)).toMatchObject({ kind: "input", parts: [
+        { text: `<agent-message sender-id="${senderId}" sender-name="worker">` },
+        { text: "Review &lt;node&gt; &amp; &lt;/agent-message&gt;" }, { text: "</agent-message>" },
+      ] });
+      await send();
+      await vi.waitFor(() => expect(outcomes()).toHaveLength(3));
+      const receiver = () => AgentView.schema.parse(service.sessions.snapshot(sessionId).workbench.objects.find(object => object.id === receiverId)!.presentation.data);
+      expect(receiver().drafts).toMatchObject([{ mode: "steer", parts: [{ text: body }],
+        sender: { kind: "agent", resource: { sessionId, id: senderId, kind: Agent.kind }, name: "worker" } }]);
+      expect(received).toHaveLength(1);
+      release(); await settled(service);
+      expect(received).toHaveLength(2);
+      const inputs = service.sessions.tree.timeline(sessionId).filter(record => record.contract === AgentInputMessage.id && record.source?.resource?.id === receiverId);
+      expect(inputs.map(record => record.data)).toMatchObject([
+        { startsTurn: true, parts: [{ text: body }], sender: { kind: "agent", name: "worker" } },
+        { startsTurn: false, parts: [{ text: body }], sender: { kind: "agent", name: "worker" } },
+      ]);
+      expect(receiver().drafts).toEqual([]);
+    } finally { release(); }
+  });
+
+  // docs/workbench.md#代理草稿箱：取回只交接原文，交换回箱与重新发送均为用户消息；取消／重启保留原来源。
+  it("中继来源随队列跨重启保存，取回编辑与交换移除发送者信封", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    const { service, root, start } = await setup({ validate() {}, version: "test/queued-sender", prepare() {
+      return { async *stream(signal) {
+        await Promise.race([gate, new Promise<void>(resolve => {
+          if (signal.aborted) resolve(); else signal.addEventListener("abort", () => resolve(), { once: true });
+        })]);
+        signal.throwIfAborted(); yield* reply();
+      } };
+    } });
+    const snap = await execute(service, start), sessionId = snap.sessionId, objectId = agentOf(snap);
+    const sender = { kind: "agent" as const, resource: { sessionId, id: "relay", kind: "example/relay" }, name: "Remote reviewer" };
+    const parts = [{ kind: "text" as const, text: "  Keep <original> & whitespace\n" }];
+    try {
+      await execute(service, actionCommand(sessionId, objectId, SubmitAgentInput, {
+        submissionId: randomUUID(), mode: "steer", parts, sender,
+      }));
+      await service.close(); services.delete(service);
+    } finally { release(); }
+    const requests: ModelInput[] = [];
+    const reopened = new ApplicationService(root, { adapterFactory: () => ({ validate() {}, version: "test/reopen",
+      prepare(input) { requests.push(input); return { async *stream() { yield* reply(); } }; },
+    }) }); services.add(reopened);
+    const view = () => AgentView.schema.parse(reopened.sessions.snapshot(sessionId).workbench.objects.find(object => object.id === objectId)!.presentation.data);
+    const queued = view().drafts[0]!;
+    expect(queued).toMatchObject({ sender, parts, mode: "steer" });
+    expect(requests).toEqual([]);
+    await execute(reopened, actionCommand(sessionId, objectId, ExchangeAgentDraft, {
+      submissionId: randomUUID(), id: queued.id, revision: queued.revision,
+      replacement: [{ kind: "text", text: "Editor contents" }],
+    }));
+    expect(view().drafts[0]).toMatchObject({ sender: { kind: "user" }, mode: "none", parts: [{ text: "Editor contents" }] });
+    await execute(reopened, actionCommand(sessionId, objectId, SubmitAgentInput, {
+      submissionId: randomUUID(), mode: "follow", parts: queued.parts,
+    }));
+    await settled(reopened);
+    expect(requests[0]!.messages.at(-1)).toEqual({ kind: "input", parts });
+    expect(reopened.sessions.tree.timeline(sessionId).map(flat).filter(record => record.kind === "message").at(-1))
+      .toMatchObject({ sender: { kind: "user" }, parts });
+  });
+
   // 输入受理依据循环是否仍会消费；宿主任务的清理尾部不能使新提交滞留在无人处理的草稿箱。
   it("旧循环结束而宿主仍在清理任务时，新提交启动新的执行", async () => {
     let release!: () => void, requests = 0, ended = false, first = true;
@@ -99,7 +215,7 @@ describe("会话运行时", () => {
     const snap = await execute(service, start);
     await vi.waitFor(() => expect(ended).toBe(true));
     expect(service.sessions.running).toBe(true);
-    await execute(service, actionCommand(snap.sessionId, agentOf(snap), SubmitAgentInput, { mode: "follow", submissionId: randomUUID(), parts: [{ kind: "text", text: "At the boundary" }],
+    await execute(service, actionCommand(snap.sessionId, agentOf(snap), SubmitAgentInput, { sender: { kind: "user" }, mode: "follow", submissionId: randomUUID(), parts: [{ kind: "text", text: "At the boundary" }],
     }));
     await vi.waitFor(() => expect(requests).toBe(2));
     release(); await settled(service);
@@ -125,7 +241,7 @@ describe("会话运行时", () => {
     } });
     await service.configuration.execute({ type: "agent.save", id: "worker", value: { maxTurns: 1 } });
     const snap = await execute(service, start), sessionId = snap.sessionId, objectId = agentOf(snap);
-    await execute(service, actionCommand(sessionId, objectId, SubmitAgentInput, { mode: "follow", submissionId: randomUUID(), parts: [{ kind: "text", text: "Keep queued" }],
+    await execute(service, actionCommand(sessionId, objectId, SubmitAgentInput, { sender: { kind: "user" }, mode: "follow", submissionId: randomUUID(), parts: [{ kind: "text", text: "Keep queued" }],
     }));
     const append = service.sessions.tree.appendToTimeline.bind(service.sessions.tree);
     let failures = 0;
@@ -169,12 +285,12 @@ describe("会话运行时", () => {
     const view = () => AgentView.schema.parse(service.sessions.snapshot(snap.sessionId).workbench.objects.find(item => item.id === objectId)!.presentation.data);
     const questions = () => service.sessions.calls.invoke(ReadQuestions.id, null, { object }, null).then(value => ReadQuestions.output.parse(value));
     await vi.waitFor(async () => expect((await questions()).pending).toHaveLength(1));
-    const firstSteer = { mode: "steer", submissionId: randomUUID(), parts: [{ kind: "text", text: "Steer A" }] } satisfies SubmitAgentInputData;
+    const firstSteer = { sender: { kind: "user" }, mode: "steer", submissionId: randomUUID(), parts: [{ kind: "text", text: "Steer A" }] } satisfies SubmitAgentInputData;
     for (const command of [
-      { mode: "follow", submissionId: randomUUID(), parts: [{ kind: "text", text: "Follow A" }] },
+      { sender: { kind: "user" }, mode: "follow", submissionId: randomUUID(), parts: [{ kind: "text", text: "Follow A" }] },
       firstSteer,
-      { mode: "follow", submissionId: randomUUID(), parts: [{ kind: "text", text: "Follow B" }] },
-      { mode: "steer", submissionId: randomUUID(), parts: [{ kind: "text", text: "Steer B" }] },
+      { sender: { kind: "user" }, mode: "follow", submissionId: randomUUID(), parts: [{ kind: "text", text: "Follow B" }] },
+      { sender: { kind: "user" }, mode: "steer", submissionId: randomUUID(), parts: [{ kind: "text", text: "Steer B" }] },
       firstSteer,
     ] satisfies SubmitAgentInputData[]) await execute(service, actionCommand(snap.sessionId, objectId, SubmitAgentInput, command));
     expect(requests).toHaveLength(1);
@@ -191,7 +307,7 @@ describe("会话运行时", () => {
     release(); await settled(service);
     expect(requests).toHaveLength(3);
     expect(requests[2]!.messages.slice(-2)).toMatchObject([{ parts: [{ text: "Follow A" }] }, { parts: [{ text: "Follow B" }] }]);
-    const messages = service.sessions.tree.timeline(snap.sessionId).filter(item => item.contract === "atelier.builtin/agent.user-message");
+    const messages = service.sessions.tree.timeline(snap.sessionId).filter(item => item.contract === "atelier.builtin/agent.input-message");
     expect(messages.map(item => item.data)).toMatchObject([
       { startsTurn: true }, { startsTurn: false }, { startsTurn: false }, { startsTurn: true }, { startsTurn: false },
     ]);
@@ -251,7 +367,7 @@ describe("会话运行时", () => {
     const append = service.sessions.tree.appendToTimeline.bind(service.sessions.tree);
     let attempts = 0;
     vi.spyOn(service.sessions.tree, "appendToTimeline").mockImplementation((session, node) => {
-      if (node.contract === "atelier.builtin/agent.user-message" && ++attempts === 2) throw new Error("Storage failed");
+      if (node.contract === "atelier.builtin/agent.input-message" && ++attempts === 2) throw new Error("Storage failed");
       return append(session, node);
     });
     release(); await settled(service);
@@ -280,7 +396,7 @@ describe("会话运行时", () => {
     let requests = 0;
     const reopened = new ApplicationService(root, { adapterFactory: () => adapter(() => { requests++; }) }); services.add(reopened);
     const view = () => AgentView.schema.parse(reopened.sessions.snapshot(sessionId).workbench.objects.find(item => item.id === objectId)!.presentation.data);
-    expect(view().drafts).toEqual([{ id, revision: 0, mode: "none", parts }]);
+    expect(view().drafts).toEqual([{ id, revision: 0, mode: "none", parts, sender: { kind: "user" } }]);
     expect(reopened.sessions.running).toBe(false);
     expect(requests).toBe(0);
     const reader = reopened.sessions.content.reader({ sessionId, objectId });
@@ -294,7 +410,7 @@ describe("会话运行时", () => {
       submissionId: randomUUID(), id, revision: 1, replacement: [{ kind: "text", text: "Editor contents" }],
     }) };
     await reopened.sessions.execute(exchange); await reopened.sessions.execute(exchange);
-    expect(view().drafts).toEqual([{ id, revision: 2, mode: "none", parts: [{ kind: "text", text: "Editor contents" }] }]);
+    expect(view().drafts).toEqual([{ id, revision: 2, mode: "none", parts: [{ kind: "text", text: "Editor contents" }], sender: { kind: "user" } }]);
     expect(await reopened.sessions.content.reader({ scope: editor }).read(editorFile)).toEqual(bytes);
     await expect(reopened.sessions.execute({ type: "resource.command", sessionId, objectId,
       command: resourceCall(SetAgentDraftMode, { id, revision: 1, mode: "follow" }) })).rejects.toMatchObject({ code: "draft_changed" });
@@ -427,7 +543,7 @@ describe("会话运行时", () => {
     const first = await execute(service, start); await settled(service);
     const saved = service.sessions.tree.timeline(first.sessionId);
     const recent = "Recent request " + "R".repeat(80_000);
-    await execute(service, actionCommand(first.sessionId, agentOf(first), SubmitAgentInput, { mode: "follow", submissionId: randomUUID(), parts: [{ kind: "text", text: recent }],
+    await execute(service, actionCommand(first.sessionId, agentOf(first), SubmitAgentInput, { sender: { kind: "user" }, mode: "follow", submissionId: randomUUID(), parts: [{ kind: "text", text: recent }],
     })); await settled(service);
     expect(work).toHaveLength(3);
     expect(summaries).toHaveLength(1);
@@ -509,7 +625,7 @@ describe("会话运行时", () => {
     expect(selectionOf(service.sessions.snapshot(first.sessionId))).toMatchObject({ model: null, thinking: null });
     expect(inputs[0]!.settings).toMatchObject({ model: { modelId: "test" }, thinking: "high" });
     await service.configuration.execute({ type: "role.save", id: "default", value: { model: start.model, thinking: "low" } });
-    await execute(service, actionCommand(first.sessionId, agentOf(first), SubmitAgentInput, { mode: "follow", submissionId: randomUUID(), parts: [{ kind: "text", text: "Next" }],
+    await execute(service, actionCommand(first.sessionId, agentOf(first), SubmitAgentInput, { sender: { kind: "user" }, mode: "follow", submissionId: randomUUID(), parts: [{ kind: "text", text: "Next" }],
     }));
     await settled(service);
     expect(inputs.at(-1)!.settings.thinking).toBe("low");
@@ -518,7 +634,7 @@ describe("会话运行时", () => {
     await service.configuration.execute({ type: "model.save", id: start.model,
       value: { ...configured, capabilities: { ...configured.capabilities, reasoning: true, thinkingLevels: [] } } });
     const before = service.sessions.snapshot(first.sessionId).nodes;
-    await expect(execute(service, actionCommand(first.sessionId, agentOf(first), SubmitAgentInput, { mode: "follow", submissionId: randomUUID(), parts: [{ kind: "text", text: "Unavailable thinking" }],
+    await expect(execute(service, actionCommand(first.sessionId, agentOf(first), SubmitAgentInput, { sender: { kind: "user" }, mode: "follow", submissionId: randomUUID(), parts: [{ kind: "text", text: "Unavailable thinking" }],
     }))).rejects.toMatchObject({ code: "thinking_unavailable", display: { id: "error.thinkingUnavailable" } });
     expect(service.sessions.snapshot(first.sessionId).nodes).toEqual(before);
     expect(inputs).toHaveLength(2);
@@ -580,7 +696,7 @@ describe("会话运行时", () => {
     const other = await service.sessions.content.writer({ scope: next }).stage(new Uint8Array([4, 5, 6]));
     const parts: ModelInputPart[] = [{ kind: "text", text: "Compare" }, { kind: "file", file: other, mediaType: "image/webp" }, { kind: "text", text: "with the screenshot" }];
     await service.sessions.execute({ type: "resource.command", sessionId: first.sessionId, objectId,
-      command: resourceCall(SubmitAgentInput, { mode: "follow", submissionId: randomUUID(), parts }), contentScopeId: next.id });
+      command: resourceCall(SubmitAgentInput, { sender: { kind: "user" }, mode: "follow", submissionId: randomUUID(), parts }), contentScopeId: next.id });
     await settled(service); await next.close();
     expect(service.sessions.tree.nodes(first.sessionId).map(flat).filter(node => node.kind === "message").at(-1)).toMatchObject({ parts });
     expect(inputs.at(-1)!.messages.at(-1)).toMatchObject({ kind: "input", parts: [
@@ -605,7 +721,7 @@ describe("会话运行时", () => {
   it("同一代理相同 submission 的并发重试均受理且只保存一条输入", async () => {
     const { service, start } = await setup();
     const first = await execute(service, start); await settled(service);
-    const command = actionCommand(first.sessionId, agentOf(first), SubmitAgentInput, { mode: "follow", submissionId: randomUUID(), parts: [{ kind: "text", text: "Concurrent retry" }] });
+    const command = actionCommand(first.sessionId, agentOf(first), SubmitAgentInput, { sender: { kind: "user" }, mode: "follow", submissionId: randomUUID(), parts: [{ kind: "text", text: "Concurrent retry" }] });
     const receipts = await Promise.all([service.sessions.execute(command), service.sessions.execute(command)]);
     expect(receipts).toEqual([{ kind: "accepted", sessionId: first.sessionId }, { kind: "accepted", sessionId: first.sessionId }]);
     await settled(service);
@@ -637,7 +753,7 @@ describe("会话运行时", () => {
       input: { title: "Notebook", content: "original" }, position: { x: 0, y: 0 } });
     const note = foldWorkbench(created.nodes.map(flat)).objects.find(object => object.kind === "atelier.builtin/note")!;
     const before = service.sessions.tree.nodes(sessionId), cursor = service.sessions.tree.cursor(sessionId);
-    const prepared = tools.match(note).find(tool => tool.tool.name === "write")!.prepare(note, null, { content: "latest" });
+    const prepared = tools.match(note).find(tool => tool.tool.name === "write")!.prepare(note, null, { content: "latest" }, toolCaller);
     if (!("execute" in prepared)) throw new Error("Expected a write invocation.");
     expect(await prepared.execute(new AbortController().signal)).toMatchObject({ kind: "succeeded" });
     expect(service.sessions.snapshot(sessionId).revision).toBeGreaterThan(created.revision);
@@ -897,8 +1013,8 @@ describe("会话运行时", () => {
     const a = agentOf(first);
     await execute(service, { type: "resource.create", sessionId, kind: "atelier.builtin/agent", creation: { id: "atelier.builtin/agent.create" }, input: { selection: selectionOf(first) }, position: { x: 600, y: 0 } });
     const b = service.sessions.snapshot(sessionId).workbench.objects.find(o => o.kind === "atelier.builtin/agent" && o.id !== a)!.id;
-    await execute(service, actionCommand(sessionId, a, SubmitAgentInput, { mode: "follow", submissionId: randomUUID(), parts: [{ kind: "text", text: "To A" }] }));
-    await execute(service, actionCommand(sessionId, b, SubmitAgentInput, { mode: "follow", submissionId: randomUUID(), parts: [{ kind: "text", text: "To B" }] }));
+    await execute(service, actionCommand(sessionId, a, SubmitAgentInput, { sender: { kind: "user" }, mode: "follow", submissionId: randomUUID(), parts: [{ kind: "text", text: "To A" }] }));
+    await execute(service, actionCommand(sessionId, b, SubmitAgentInput, { sender: { kind: "user" }, mode: "follow", submissionId: randomUUID(), parts: [{ kind: "text", text: "To B" }] }));
     await expect(execute(service, actionCommand(sessionId, a, ContinueAgent, { }))).rejects.toThrow();
     release(); await settled(service);
     const texts = (input: ModelInput) => input.messages.flatMap(m => m.kind === "input" ? [modelInputText(m.parts)] : []);
@@ -932,11 +1048,11 @@ describe("会话运行时", () => {
     await execute(service, { type: "resource.create", sessionId, kind: "atelier.builtin/agent", creation: { id: "atelier.builtin/agent.create" }, input: { selection: selectionOf(first) }, position: { x: 600, y: 0 } });
     const b = service.sessions.snapshot(sessionId).workbench.objects.find(o => o.id !== a)!.id;
     try {
-      await execute(service, actionCommand(sessionId, a, SubmitAgentInput, { mode: "follow", submissionId: randomUUID(), parts: [{ kind: "text", text: "To A" }] }));
+      await execute(service, actionCommand(sessionId, a, SubmitAgentInput, { sender: { kind: "user" }, mode: "follow", submissionId: randomUUID(), parts: [{ kind: "text", text: "To A" }] }));
       await thinkingSaved;
       const cursor = service.sessions.tree.cursor(sessionId);
       expect(service.sessions.snapshot(sessionId).progress.live).toContainEqual(expect.objectContaining({ kind: "thinking", text: "Reasoning" }));
-      await execute(service, actionCommand(sessionId, b, SubmitAgentInput, { mode: "follow", submissionId: randomUUID(), parts: [{ kind: "text", text: "To B" }] }));
+      await execute(service, actionCommand(sessionId, b, SubmitAgentInput, { sender: { kind: "user" }, mode: "follow", submissionId: randomUUID(), parts: [{ kind: "text", text: "To B" }] }));
       expect(service.sessions.tree.nodes(sessionId).map(flat).find(n => n.kind === "message" && modelInputText(n.parts) === "To B")?.parentId).toBe(cursor);
       expect(service.sessions.tree.cursorSelections(sessionId)).toEqual([]);
     } finally { release(); }
@@ -955,7 +1071,7 @@ describe("会话运行时", () => {
     let release!: () => void;
     const gate = new Promise<void>(resolve => { release = resolve; });
     vi.spyOn(service.configuration, "execute").mockImplementationOnce(async command => { await gate; return read(command); });
-    const input: SubmitAgentInputData = { mode: "follow", submissionId: randomUUID(), parts: [{ kind: "text", text: "Too late" }] };
+    const input: SubmitAgentInputData = { sender: { kind: "user" }, mode: "follow", submissionId: randomUUID(), parts: [{ kind: "text", text: "Too late" }] };
     const pending = execute(service, actionCommand(sessionId, agentId, SubmitAgentInput, input));
     const rejected = expect(pending).rejects.toMatchObject({ code: "not_found" });
     try {

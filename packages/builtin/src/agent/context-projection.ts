@@ -1,6 +1,7 @@
 import type { SessionRecord, SessionSnapshot, ModelBlock, ModelItem, ModelPart } from "@atelier/sdk/contracts";
 import type { z } from "zod";
-import { ContextSummary, Execution, UserMessage } from "@atelier/builtin-api/contracts";
+import { ContextSummary, Execution, AgentInputMessage } from "@atelier/builtin-api/contracts";
+import { projectInputMessage } from "./input-message.ts";
 
 /** 投影只依赖纯契约，后台请求与前端上下文面板共用同一规则；后台入口把失败转换为插件错误。 */
 export class ContextProjectionError extends Error {}
@@ -63,9 +64,9 @@ export function projectAgentContext(snapshot: Pick<SessionSnapshot, "records">, 
   };
   emit(null);
   for (const [index, record] of path.entries()) {
-    const message = UserMessage.decode(record);
+    const message = AgentInputMessage.decode(record);
     if (message?.status === "known" && record.source?.resource?.id === agentId)
-      groups.push({ first: index, last: index, items: [{ kind: "input", parts: message.data.parts }] });
+      groups.push({ first: index, last: index, items: [projectInputMessage(message.data)] });
     const context = record.context;
     if (context && (context.recipient === null || context.recipient === agentId))
       groups.push({ first: index, last: index, items: [{ kind: "context", parts: [{ kind: "text", text: context.text }] }] });

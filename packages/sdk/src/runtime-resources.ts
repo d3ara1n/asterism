@@ -8,6 +8,7 @@ import { reference, present, type DataContract } from "./presentation.ts";
 import { PluginApiError } from "./runtime.ts";
 import type { ContextFile, ObjectReader, ObjectExecutor, CreationContribution, ActionContribution, CommandPreparer, CreationPreparation, ActionPreparation, ExternalPreparation, ResourceContribution, ToolContribution, Preparation, CallResult } from "./runtime-contracts.ts";
 import { validationMessage, jsonArgumentHint } from "./tool-validation.ts";
+import type { ToolCaller } from "./runtime-contracts.ts";
 
 function parse<T>(schema: z.ZodType<T>, input: unknown, subject: string): T {
   const result = schema.safeParse(input);
@@ -55,7 +56,7 @@ export function implementResource<S extends Json, V extends Json>(
 export function implementTool<S extends Json, T extends Json, A extends Json, D extends Json>(
   contract: ImplementationContract<S, T, A, D>, definition: {
     call(data: S, target: T, args: A, context: {
-      object: ObjectExecutor; signal: AbortSignal; publish(data: NoInfer<D>): void;
+      object: ObjectExecutor; caller: ToolCaller; signal: AbortSignal; publish(data: NoInfer<D>): void;
     }): Promise<CallResult<NoInfer<D>>>;
     toModel?(data: D): ToolModelOutput;
   },
@@ -63,7 +64,7 @@ export function implementTool<S extends Json, T extends Json, A extends Json, D 
   const identity = reference(contract);
   return {
     contract: contract as unknown as ToolContribution["contract"],
-    prepare(resource, object, target, args) {
+    prepare(resource, object, target, args, caller) {
       const state = contract.resource.stateSchema.safeParse(resource.data);
       if (!state.success) return { kind: "failed", implementation: identity,
         error: { code: "invalid_resource", message: "The resource state does not match its backend contract." } };
@@ -84,7 +85,7 @@ export function implementTool<S extends Json, T extends Json, A extends Json, D 
           let active = true;
           const snapshot = (data: unknown) => jsonSchema.parse(contract.schema.parse(data));
           try {
-            const result = await definition.call(state.data, parsedTarget.data, parsedArgs.data, { object, signal,
+            const result = await definition.call(state.data, parsedTarget.data, parsedArgs.data, { object, caller, signal,
               publish(data) { if (active) publish?.(snapshot(data)); } });
             if (result.kind === "succeeded" || result.kind === "partial") {
               if (result.data === undefined) throw new PluginApiError("invalid_argument", "The tool did not provide final data.");

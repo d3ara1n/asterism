@@ -138,6 +138,7 @@ export function themeTokens(appearance: Appearance, scheme: Scheme): Record<stri
     // 持续选中态独立于中性次级表面与 hover；石墨取比 hover（4 级）深一级的灰底。
     selected: mono ? g(5) : a(3), "selected-foreground": primaryText,
     muted: g(3), "muted-foreground": g(11),
+    "external-message": scale("violet", scheme)(3), "external-message-foreground": scale("violet", scheme)(12),
     accent: g(4), "accent-foreground": fg,
     // 状态色统一取 11 级，实色表面配对独立前景色。
     destructive: red(11), "destructive-foreground": solidForeground(red(11)),

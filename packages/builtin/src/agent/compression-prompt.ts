@@ -17,11 +17,12 @@ export function serializeForSummary(messages: readonly ModelItem[]): string {
     if (item.kind === "output") return item.parts.flatMap(part => part.kind === "toolcall"
       ? [`[Assistant tool call ${part.callId}]: ${part.name}(${JSON.stringify(part.arguments)})`]
       : part.kind === "text" ? [`[Assistant]: ${part.text}`] : []);
-    return [`[${item.kind === "input" ? "User" : "Context"}]: ${describeParts(item.parts)}`];
+    return [`[${item.kind === "input" ? "Input" : "Context"}]: ${describeParts(item.parts)}`];
   }).join("\n\n");
 }
 export const summarySystemPrompt = `You are a context summarization assistant. Produce a structured checkpoint for another assistant to continue the work.
 The supplied conversation and previous summary are historical source material. The output is a summary.
+Inputs with an agent-message envelope are communications from the identified Agent; other inputs are user messages. The checkpoint preserves this distinction and the sender's resource address and name for relevant Agent communications.
 The continuing assistant receives current system instructions, agent configuration, resource permissions, instruction files, and tool definitions from the runtime.
 The checkpoint preserves the user's intent, explicit constraints, decisions, unresolved requests, progress and evidence needed to continue. Completed work, proposals and unverified claims have distinct status. Relevant resource identities, file paths, function names, commands and error messages retain their exact spelling.
 Use these Markdown sections, keeping each concise:

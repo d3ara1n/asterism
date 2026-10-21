@@ -5,6 +5,18 @@ import { node, text, thinking, message as input, notice as noticeNode } from "..
 import { conversationTimeline, timelineKey } from "./timeline";
 
 describe("代理的具型记录视图", () => {
+  // docs/workbench.md：显示来源读取结构化 sender，正文内的信封字样不决定归属。
+  it("输入视图保留代理来源及原始正文，用户写入的标签仍是用户消息", () => {
+    const sender = { kind: "agent" as const, resource: { sessionId: "s", id: "relay", kind: "example/relay" }, name: "Reviewer" };
+    const body = "<agent-message>Literal text</agent-message>";
+    const nodes = [node("external", null, input("a", body, true, sender)), node("user", "external", input("a", body))];
+    const timeline = conversationTimeline(sessionSnapshot(nodeView("s", "", nodes, "user")), "a", []);
+    expect(timeline).toMatchObject([
+      { kind: "message", sender, parts: [{ text: body }] },
+      { kind: "message", sender: { kind: "user" }, parts: [{ text: body }] },
+    ]);
+  });
+
   // 模型可能只交付思考摘要；显示转换须保留可读内容，但不能改写历史里的明文／摘要字段。
   it("只有摘要的思考块仍可阅读", () => {
     const saved = node("summary-only", null, thinking("a", "r", 0, "", { summary: "Saved reasoning summary" }));

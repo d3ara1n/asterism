@@ -29,8 +29,8 @@ describe("对话中的逐轮计量", () => {
       node("r3", "follow2", text("a", "r3", 0, "Next answer", { completion: completion(300, 40, 200, 1000) })),
     ];
     expect(turnMetrics(snapshot(path), "a", false)).toMatchObject([
-      { userId: "u1", nextUserId: "follow1", incomplete: false, metrics: { count: 2, usage: { input: { value: 300 } } } },
-      { userId: "follow1", nextUserId: null, incomplete: false, metrics: { count: 1 } },
+      { inputId: "u1", nextInputId: "follow1", incomplete: false, metrics: { count: 2, usage: { input: { value: 300 } } } },
+      { inputId: "follow1", nextInputId: null, incomplete: false, metrics: { count: 1 } },
     ]);
     expect(turnMetrics(snapshot(path), "a", true)).toHaveLength(1);
   });
@@ -44,7 +44,7 @@ describe("对话中的逐轮计量", () => {
     expect(turnMetrics(snapshot(path), "a", true)).toEqual([]);
     expect(turnMetrics(snapshot(path), "a", false)[0]?.metrics.count).toBe(1);
     path.push(node("u2", "r1", message("a", "Next")));
-    expect(turnMetrics(snapshot(path), "a", true)).toMatchObject([{ userId: "u1", nextUserId: "u2", incomplete: false, metrics: { count: 1 } }]);
+    expect(turnMetrics(snapshot(path), "a", true)).toMatchObject([{ inputId: "u1", nextInputId: "u2", incomplete: false, metrics: { count: 1 } }]);
     expect(turnMetrics(snapshot(path), "a", false)).toHaveLength(1);
   });
 
@@ -61,7 +61,7 @@ describe("对话中的逐轮计量", () => {
       node("r2", "compression", text("a", "r2", 0, "Continued", { completion: completion(300, 80, 270, 1000) })),
     ];
     const turns = turnMetrics(snapshot(path), "a", false);
-    expect(turns.map(turn => turn.userId)).toEqual(["old-user", "u"]);
+    expect(turns.map(turn => turn.inputId)).toEqual(["old-user", "u"]);
     const metrics = turns[1]!.metrics;
     expect(metrics.count).toBe(2);
     expect(metrics.cache).toEqual({ read: 320, input: 400, count: 2 });

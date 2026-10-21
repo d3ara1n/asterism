@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
 import type { ModelBlock, SessionRecord } from "@atelier/sdk/contracts";
 import { jsonSchema } from "@atelier/sdk/contracts";
-import { Execution, UserMessage } from "@atelier/builtin-api/contracts";
+import { Execution, AgentInputMessage } from "@atelier/builtin-api/contracts";
 import { cleanTitle, collectTurns, namingPrompt } from "./policy.ts";
 
 function record(id: string, contract: string, data: SessionRecord["data"], agentId: string): SessionRecord {
   return { id, sessionId: "s", parentId: null, sequence: 0, createdAt: "2026-10-12T00:00:00Z",
     contract: { id: contract }, source: { plugin: "atelier.builtin", resource: { sessionId: "s", id: agentId, kind: "atelier.builtin/agent" } }, data, context: null };
 }
-const input = (id: string, agentId: string, text: string) => record(id, UserMessage.id, { startsTurn: true, parts: [{ kind: "text", text }] }, agentId);
+const input = (id: string, agentId: string, text: string) => record(id, AgentInputMessage.id, { sender: { kind: "user" }, startsTurn: true, parts: [{ kind: "text", text }] }, agentId);
 function output(id: string, agentId: string, origin: string, text: string, extra: Partial<ModelBlock> = {}) {
   return record(id, Execution.id, jsonSchema.parse({ type: "block", block: {
     kind: "text", text, responseId: id, requestParentId: origin, ordinal: 0, complete: true,

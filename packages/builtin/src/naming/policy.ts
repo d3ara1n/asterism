@@ -1,5 +1,5 @@
-import { inputSummary, Execution, UserMessage } from "@atelier/builtin-api/contracts";
-import type { SessionRecord } from "@atelier/sdk/contracts";
+import { inputSummary, Execution, AgentInputMessage } from "@atelier/builtin-api/contracts";
+import type { SessionRecord, SessionSnapshot } from "@atelier/sdk/contracts";
 
 export const renameCheckpoints = new Set([5, 10, 20, 50, 100]);
 const windowEdge = 4;
@@ -9,16 +9,29 @@ const assistantBudget = 400;
 
 export interface NamingTurn { user: string; assistant?: string }
 
+/** 命名触发与回退只消费真实用户输入；损坏记录保留 unknown 供调用方停止判断。 */
+export function userMessages(snapshot: Pick<SessionSnapshot, "records">, scope: "timeline" | "session") {
+  return snapshot.records.query(AgentInputMessage, { scope })
+    .filter(message => message.status === "unknown" || message.data.sender.kind === "user");
+}
+
 /** 回合是 Agent 领域投影；按代理与请求起点关联，不把 loop 启停或工具批次计作新回合。 */
 export function collectTurns(records: readonly SessionRecord[]): NamingTurn[] {
   const positions = new Map(records.map((record, i) => [record.id, i]));
   const turns: NamingTurn[] = [];
-  const inputs = new Map<string, { position: number; turn: NamingTurn }[]>();
+  const inputs = new Map<string, { position: number; turn: NamingTurn | null }[]>();
   const responses = new Map<string, { turn: NamingTurn; texts: Map<number, string>; last: number }>();
   for (const [position, record] of records.entries()) {
-    const input = UserMessage.decode(record);
+    const input = AgentInputMessage.decode(record);
     if (input?.status === "known") {
       const agentInputs = inputs.get(record.source?.resource?.id ?? "") ?? [];
+      if (input.data.sender.kind === "agent") {
+        if (input.data.startsTurn) {
+          agentInputs.push({ position, turn: null });
+          inputs.set(record.source?.resource?.id ?? "", agentInputs);
+        }
+        continue;
+      }
       const prior = agentInputs.at(-1)?.turn;
       const turn: NamingTurn = !input.data.startsTurn && prior ? prior : { user: "" };
       if (turn !== prior) turns.push(turn);

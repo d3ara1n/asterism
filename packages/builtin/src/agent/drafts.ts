@@ -1,5 +1,5 @@
 import { PluginApiError, type ObjectExecutor, type ObjectReader } from "@atelier/sdk/runtime";
-import { UserMessage } from "@atelier/builtin-api/contracts";
+import { AgentInputMessage } from "@atelier/builtin-api/contracts";
 import { AgentDrafts } from "./data.ts";
 import { SaveAgentDraft, ExchangeAgentDraft, type AgentDraft, type DraftMode } from "./drafts-contract.ts";
 import { duplicateSubmission, rememberSubmission } from "./submissions.ts";
@@ -7,7 +7,7 @@ import { duplicateSubmission, rememberSubmission } from "./submissions.ts";
 export function saveDraft(object: ObjectExecutor, input: { submissionId: string; parts: AgentDraft["parts"] }): void {
   if (duplicateSubmission(object, SaveAgentDraft, input)) return;
   object.commit(writer => {
-    writer.set(AgentDrafts, [...object.get(AgentDrafts) ?? [], { id: input.submissionId, revision: 0, mode: "none", parts: input.parts }]);
+    writer.set(AgentDrafts, [...object.get(AgentDrafts) ?? [], { id: input.submissionId, revision: 0, mode: "none", parts: input.parts, sender: { kind: "user" } }]);
     rememberSubmission(object, writer, SaveAgentDraft, input);
   });
 }
@@ -31,7 +31,7 @@ export function exchangeDraft(object: ObjectExecutor, input: {
   object.commit(writer => {
     const { drafts } = currentDraft(object, input.id, input.revision);
     writer.set(AgentDrafts, drafts.flatMap(item => item.id !== input.id ? [item]
-      : input.replacement ? [{ ...item, revision: item.revision + 1, mode: "none" as const, parts: input.replacement }] : []));
+      : input.replacement ? [{ ...item, revision: item.revision + 1, mode: "none" as const, parts: input.replacement, sender: { kind: "user" as const } }] : []));
     rememberSubmission(object, writer, ExchangeAgentDraft, input);
   });
 }
@@ -43,7 +43,7 @@ export function deliverDrafts(object: ObjectExecutor, boundary: "request" | "tur
   const ids = new Set(batch.map(item => item.id));
   object.commit(writer => {
     for (const [index, draft] of batch.entries())
-      writer.append(UserMessage, { parts: draft.parts, startsTurn: boundary === "turn" && index === 0 });
+      writer.append(AgentInputMessage, { parts: draft.parts, startsTurn: boundary === "turn" && index === 0, sender: draft.sender });
     writer.set(AgentDrafts, drafts.filter(item => !ids.has(item.id)));
   });
   return true;

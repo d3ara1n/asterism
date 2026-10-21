@@ -19,7 +19,7 @@ const COLUMNS = 20, ROWS = 5;
 /** 类别按固定顺序取图表色；docs/design-system.md#数据图表。 */
 const fill: Record<ConversationCategory, string> = {
   user: "bg-chart-1", assistant: "bg-chart-2", thinking: "bg-chart-4", toolcall: "bg-chart-6",
-  result: "bg-chart-3", context: "bg-chart-7", summary: "bg-chart-8",
+  result: "bg-chart-3", context: "bg-chart-7", summary: "bg-chart-8", agentMessage: "bg-chart-5",
 };
 /** 窗口占用：已用取实报 input，窗口与预留来自所测请求的模型配置；不画未计量内容。 */
 function WindowUsage({ insight, selection }: { insight: ContextInsight; selection: z.infer<typeof AgentView.schema>["selection"] }) {

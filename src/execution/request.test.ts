@@ -2,7 +2,7 @@ import { thinkingLevels, present, completionData, modelCompletionSchema, type Re
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { defineData, defineResource, defineTool, defineImplementation, type ModelRunEvent, type ModelRunRequest } from "@atelier/sdk/contracts";
-import { implement } from "../tools/testing.ts";
+import { implement, toolCaller } from "../tools/testing.ts";
 import { ResourceRegistry } from "../resources/registry.ts";
 import { ToolRegistry } from "../tools/registry.ts";
 import { AgentCapabilities } from "./capabilities.ts";
@@ -89,7 +89,7 @@ describe("无状态的单次模型执行", () => {
     try {
       let executions = 0;
       const tool = implement(write, { async call() { executions++; return { kind: "succeeded", data: 1 }; } });
-      const capabilities = new AgentCapabilities(new ResourceRegistry([]), new ToolRegistry([tool]), [resource], () => true);
+      const capabilities = new AgentCapabilities(new ResourceRegistry([]), new ToolRegistry([tool]), [resource], () => true, toolCaller);
       const events: ModelRunEvent[] = [];
       const adapter: ModelAdapter = { validate() {}, version: "test", prepare() { return { async *stream() {
         yield { type: "part.start", part: { id: "c", kind: "toolcall", callId: "c", name: "resource_call" } } as const;
@@ -160,7 +160,7 @@ describe("无状态的单次模型执行", () => {
     const tool = implement(write, { async call(_state, _target, _args, { publish, signal }) {
       started++; publish(1); signal.throwIfAborted(); return { kind: "succeeded", data: 2 };
     } });
-    const capabilities = new AgentCapabilities(new ResourceRegistry([]), new ToolRegistry([tool]), [resource], () => true);
+    const capabilities = new AgentCapabilities(new ResourceRegistry([]), new ToolRegistry([tool]), [resource], () => true, toolCaller);
     let failed = false;
     let later = 0;
     const request = input([], { observer: { event(event) {
@@ -177,7 +177,7 @@ describe("无状态的单次模型执行", () => {
 
   it("未知工具结局显式阻止自动继续，宿主仍交付全部调用和终态", async () => {
     const tool = implement(write, { async call() { return { kind: "unknown", message: "Effects require inspection." }; } });
-    const capabilities = new AgentCapabilities(new ResourceRegistry([]), new ToolRegistry([tool]), [resource], () => true);
+    const capabilities = new AgentCapabilities(new ResourceRegistry([]), new ToolRegistry([tool]), [resource], () => true, toolCaller);
     const events: ModelRunEvent[] = [];
     const result = await execute(input(events), model(calls(["first", "second"], "resource_call", { resource_id: "r", tool: "write", args: {} })), capabilities);
     expect(result).toMatchObject({ reason: "failed", code: "unknown_outcome", tools: [{ kind: "unknown" }, { kind: "unknown" }] });

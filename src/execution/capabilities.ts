@@ -6,6 +6,7 @@ import type { ResourceRegistry } from "../resources/registry.ts";
 import type { ToolRegistry } from "../tools/registry.ts";
 import type { Invocation, PreparedResult, ToolImplementation } from "../tools/contract.ts";
 import { projectTool, schemaOf } from "../tools/definition.ts";
+import type { ToolCaller } from "@atelier/sdk/runtime";
 
 /** 外部工具策略；支持关系、资源链接与这层策略分别判断。 */
 export type ToolPolicy = (name: string) => boolean;
@@ -19,8 +20,10 @@ const denied = (): PreparedResult => ({ kind: "rejected", error: { code: "access
 /** 每次请求的能力视图：链接资源 × 工具支持关系，再由外部策略筛选。资源和工具目录彼此独立。 */
 export class AgentCapabilities {
   private readonly linked = new Map<string, { resource: FoldedObject; tools: readonly ToolImplementation[] }>();
+  private readonly caller?: ToolCaller;
   constructor(private readonly resources: ResourceRegistry, tools: ToolRegistry,
-    linked: readonly FoldedObject[], policy: ToolPolicy) {
+    linked: readonly FoldedObject[], policy: ToolPolicy, caller?: ToolCaller) {
+    this.caller = caller && Object.freeze({ ref: Object.freeze({ ...caller.ref }), title: caller.title });
     for (const source of linked) {
       const resource = structuredClone(source);
       this.linked.set(resource.id, { resource, tools: tools.match(resource).filter(implementation => policy(implementation.tool.name)) });
@@ -63,6 +66,7 @@ export class AgentCapabilities {
     if (!tool && !this.resources.has(target.resource.kind)) return { ...this.identity(id), kind: "rejected", error: { code: "implementation_missing",
       message: `The plugin providing ${target.resource.kind} is unavailable.` } };
     if (!tool) return { ...this.identity(id), kind: "rejected", error: { code: "tool_unavailable", message: "This tool is unavailable for the resource." } };
-    return { ...tool.prepare(target.resource, selector, args), ...this.identity(id) };
+    if (!this.caller) throw new Error("Tool execution requires a bound caller.");
+    return { ...tool.prepare(target.resource, selector, args, this.caller), ...this.identity(id) };
   }
 }

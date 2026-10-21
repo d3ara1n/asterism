@@ -1,6 +1,6 @@
 /** 测试夹具：按通用记录节点构造 agent 与工作台记录，形状只在此维护。 */
 import type { Json, ModelCompletion, ToolOutcome } from "@atelier/sdk/contracts";
-import { Execution, Notice, UserMessage } from "@atelier/builtin-api/contracts";
+import { Execution, Notice, AgentInputMessage, type AgentMessageSender } from "@atelier/builtin-api/contracts";
 import type { NewNode, SessionNode } from "../shared/session.ts";
 
 export const agentSource = (id: string) => ({ plugin: "atelier.builtin", resource: { sessionId: "s", id, kind: "atelier.builtin/agent" } });
@@ -24,8 +24,8 @@ export const call = (agentId: string, responseId: string, ordinal: number, callI
   block(agentId, responseId, ordinal, { kind: "toolcall", callId, name: extra.name ?? "read", argumentsText: "{}", arguments: extra.arguments ?? {},
     outcome: (extra.outcome === undefined ? { kind: "succeeded", model: [{ kind: "text", text: callId }], data: null } : extra.outcome) as Json },
     { ...extra, complete: extra.complete ?? (extra.outcome !== null) });
-export const message = (agentId: string, value: string, startsTurn = true): NewNode =>
-  record(UserMessage.id, { startsTurn, parts: [{ kind: "text", text: value }] }, agentSource(agentId));
+export const message = (agentId: string, value: string, startsTurn = true, sender: AgentMessageSender = { kind: "user" }): NewNode =>
+  record(AgentInputMessage.id, { startsTurn, parts: [{ kind: "text", text: value }], sender }, agentSource(agentId));
 export const notice = (agentId: string | null, code: string, value: string, level: "info" | "warning" | "error" = "error"): NewNode =>
   record(Notice.id, { code, message: value, level }, agentId ? agentSource(agentId) : hostSource);
 export const event = (type: string, data: Json, options: { source?: NewNode["source"]; model?: string | null; recipient?: string | null } = {}): NewNode =>
@@ -41,7 +41,7 @@ export const node = (id: string, parentId: string | null, value: NewNode, create
 export type FlatNode = SessionNode & { kind: "message" | "thinking" | "text" | "toolcall" | "notice" | "event" } & Record<string, any>;
 export function flat(node: SessionNode): FlatNode {
   const data = (node.data ?? {}) as Record<string, any>;
-  if (node.contract === UserMessage.id) return { ...node, kind: "message", parts: data.parts } as FlatNode;
+  if (node.contract === AgentInputMessage.id) return { ...node, kind: "message", parts: data.parts, sender: data.sender } as FlatNode;
   if (node.contract === Notice.id) return { ...node, ...data, kind: "notice" } as FlatNode;
   if (node.contract === Execution.id) {
     if (data.type === "block") return { ...node, ...data.block, source: node.source, kind: data.block.kind } as FlatNode;

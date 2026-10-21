@@ -1,5 +1,5 @@
 import type { SessionSnapshot, Usage } from "@atelier/sdk/contracts";
-import { UserMessage } from "@atelier/builtin-api/contracts";
+import { AgentInputMessage } from "@atelier/builtin-api/contracts";
 import { diagnosticHistory, type DiagnosticRequest } from "../diagnostics/history";
 import { performanceOverview } from "../diagnostics/performance";
 import { cacheUsage } from "../diagnostics/usage";
@@ -20,8 +20,8 @@ function summarizeRequests(requests: readonly DiagnosticRequest[]) {
 }
 export type TurnMetricsData = ReturnType<typeof summarizeRequests>;
 export interface TurnMeasurement {
-  userId: string;
-  nextUserId: string | null;
+  inputId: string;
+  nextInputId: string | null;
   incomplete: boolean;
   metrics: TurnMetricsData;
   replyMarkdown: string | null;
@@ -32,7 +32,7 @@ export function turnMetrics(snapshot: SessionSnapshot, agentId: string, running:
   const path = snapshot.records.all({ scope: "timeline" });
   const starts = path.flatMap((record, index) => {
     if (record.source?.resource?.id !== agentId) return [];
-    const message = UserMessage.decode(record);
+    const message = AgentInputMessage.decode(record);
     return message?.status === "known" && message.data.startsTurn ? [{ record, index }] : [];
   });
   const requests = diagnosticHistory(snapshot, agentId, "timeline").requests.filter(request => request.kind === "response");
@@ -46,7 +46,7 @@ export function turnMetrics(snapshot: SessionSnapshot, agentId: string, running:
     const reply = incomplete ? "" : current[0]!.blocks.flatMap(({ block }) =>
       block.kind === "text" ? [block.text] : []).join("\n\n");
     return [{
-      userId: start.record.id, nextUserId: next?.record.id ?? null,
+      inputId: start.record.id, nextInputId: next?.record.id ?? null,
       incomplete,
       metrics: summarizeRequests(current),
       replyMarkdown: reply.trim() ? reply : null,

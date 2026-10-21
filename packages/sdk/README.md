@@ -4,7 +4,7 @@
 
 SDK 包版本见 [package.json](package.json)，宿主 API 版本见 [`sdkApi`](../../src/plugins/packages.ts)。内置插件领域契约独立在 [`@atelier/builtin-api`](../builtin-api/README.md)，不进入通用 SDK。
 
-当前宿主 API 为 **11.2**，使用工具创建自身授权选项的插件声明 `{ "major": 11, "minMinor": 2 }`，依赖 `@atelier/sdk: ^0.30.0`。后台通过 `session.invoke` 调用资源动作；公共模型终态通过具型扩展携带领域数据；前端入口默认导出 `defineRendererPlugin(...)`，功能视图放入其 `modules`，调用契约显式声明 `scope`。
+当前宿主 API 为 **11.3**，使用资源工具调用者身份的插件声明 `{ "major": 11, "minMinor": 3 }`，依赖 `@atelier/sdk: ^0.31.0`。后台通过 `session.invoke` 调用资源动作；公共模型终态通过具型扩展携带领域数据；前端入口默认导出 `defineRendererPlugin(...)`，功能视图放入其 `modules`，调用契约显式声明 `scope`。
 
 ## 子路径入口
 
@@ -94,6 +94,7 @@ export default definePlugin({
 - **辅助面板（API 8.2）**：`panels: [{ id: "details", label: "Details", icon, Body: Details }]`；主体与面板通过 `useRendererCard().openPanel("details") / closePanel()` 控制卡片局部视图。面板注册、数据绑定与生命周期见 [前端视图与扩展入口](../../docs/plugin-sdk.md#前端视图与扩展入口)，可编译示例见 `examples/renderer.ts`。
 - **工具视图**：`toolRenderer(ToolContract, { label?, icon?, input?, execution?, result? })`，三阶段平行可选，每阶段提供 `{ headerRenderer?, bodyRenderer? }`，可用 `ToolRenderProps<D, T, A>` 跨阶段复用组件。
 - **顶层工具**：`defineTopLevelTool` 一次提供定义、参数／结果 schema 和 `execute`，经 `ModuleContribution.topLevelTools` 注册；每次调用取得只读 `object`、受本次执行约束的 `session`（API 9.1）、`callId`、`signal`、`publish`。展示可共享具有相同稳定 ID 的数据契约。详见 [工具贡献](../../docs/plugin-sdk.md#工具贡献)。
+- **资源工具调用者（API 11.3）**：`implementTool` 的 `call` 上下文包含 `caller: ToolCaller`，其 `ref / title` 由宿主在请求边界捕获；`object` 仍为工具目标。身份与权限边界见 [工具贡献](../../docs/plugin-sdk.md#工具贡献)。
 - **替换已有工具**：顶层工具替换、资源实现替换与全局 schema 替换的注册规则，以及稳定 ID、装配顺序和历史展示的边界，见 [工具覆盖](../../docs/runtime.md#工具覆盖)。
 
 ### 6. 可选模型分支（`plugin.models`）

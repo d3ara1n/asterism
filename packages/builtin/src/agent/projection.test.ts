@@ -4,6 +4,10 @@ import { sessionView } from "../../../../src/plugins/records.ts";
 import { nodeView } from "../../../../src/session/view.ts";
 import { attached, call, event, message, node, text, thinking } from "../../../../src/session/test-nodes.ts";
 import type { NewNode, SessionNode } from "../../../../src/shared/session.ts";
+import { projectPeekRecords } from "./peek/snapshot.ts";
+import { contextInsight } from "./context/insight.ts";
+import { serializeForSummary } from "./compression-prompt.ts";
+import { sessionSnapshot } from "../../../../src/plugins/records.ts";
 
 function records(...values: NewNode[]): SessionNode[] {
   return values.map((value, index) => node(String(index), index ? String(index - 1) : null, value));
@@ -12,6 +16,25 @@ const project = (path: SessionNode[], agent = "a") => projectForAgent(sessionVie
 
 // 预期来自时间线投影契约；存储、路径选择和通用信封转换由各自边界守护。
 describe("代理模型投影", () => {
+  // docs/runtime.md#代理通信：地址允许中继类型，身份与正文分别转义，UI 与历史调查消费同一保存来源。
+  it("中继资源与具名代理的信封只在模型投影生成，展示保留原文与来源", () => {
+    const sender = { kind: "agent" as const, resource: { sessionId: "s", id: "relay", kind: "example/relay" }, name: '审查 "A" & B' };
+    const body = "  <agent-message>raw & text</agent-message>\n";
+    const path = records(message("a", "User"), message("a", body, false, sender));
+    const snapshot = sessionSnapshot(nodeView("s", "", path, "1"));
+    const projected = project(path);
+    expect(projected[1]).toEqual({ kind: "input", parts: [
+      { kind: "text", text: '<agent-message sender-id="relay" sender-name="审查 &quot;A&quot; &amp; B">' },
+      { kind: "text", text: "  &lt;agent-message&gt;raw &amp; text&lt;/agent-message&gt;\n" },
+      { kind: "text", text: "</agent-message>" },
+    ] });
+    expect(projectPeekRecords(snapshot, "a", false).at(-1)).toMatchObject({ kind: "agent", text: expect.stringContaining('sender-id="relay"') });
+    expect(contextInsight(snapshot, "a").conversation.characters).toMatchObject({ user: 4, agentMessage: expect.any(Number) });
+    expect(contextInsight(snapshot, "a").conversation.characters.agentMessage).toBeGreaterThan(body.length);
+    expect(serializeForSummary(projected)).toContain('[Input]: <agent-message sender-id="relay"');
+    expect(path[1]!.data).toMatchObject({ sender, parts: [{ text: body }] });
+  });
+
   // 公共载荷经过 Execution 解码和重建后，摘要与全文仍须独立，不能由展示选择覆写。
   it("历史思考保留独立的全文、摘要和续接资料", () => {
     const continuation = { openai: { reasoningEncryptedContent: "cipher" } };

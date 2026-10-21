@@ -1,7 +1,7 @@
 import { recordRenderer, useI18n, type RecordRenderer } from "@atelier/sdk/renderer";
-import { Brain, MessageSquareText, User, Wrench, TriangleAlert, Info } from "lucide-react";
+import { Brain, MessageSquareText, User, Bot, Wrench, TriangleAlert, Info } from "lucide-react";
 
-import { inputSummary, Execution, UserMessage, Notice, ContextSummary } from "@atelier/builtin-api/contracts";
+import { inputSummary, Execution, AgentInputMessage, Notice, ContextSummary } from "@atelier/builtin-api/contracts";
 import { Badge } from "@atelier/ui/ui/badge";
 import { conversationMessages } from "../messages/conversation";
 
@@ -14,9 +14,9 @@ export const agentRecordViews: RecordRenderer[] = [
     icon: <Info className="size-4" />,
     label: (data, context) => `${context.text(conversationMessages.contextSummary)} · ${data.summary}`,
   }),
-  recordRenderer(UserMessage, {
-    icon: <User className="size-4 text-primary" />,
-    label: data => inputSummary(data.parts),
+  recordRenderer(AgentInputMessage, {
+    icon: data => data.sender.kind === "agent" ? <Bot className="size-4" /> : <User className="size-4 text-primary-text" />,
+    label: data => data.sender.kind === "agent" ? `${data.sender.name} · ${inputSummary(data.parts)}` : inputSummary(data.parts),
     Row: ({ label }) => <RowText label={label} className="font-medium" />,
   }),
   recordRenderer(Execution, {

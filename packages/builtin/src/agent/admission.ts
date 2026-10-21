@@ -1,10 +1,11 @@
 import { AgentSelection, AgentDrafts } from "./data.ts";
 import { PluginApiError, type ModelServices, type ObjectReader, type ObjectExecutor, type ContentReader } from "@atelier/sdk/runtime";
-import { SubmitAgentInput, type SubmitAgentInputData, UserMessage } from "@atelier/builtin-api/contracts";
+import { SubmitAgentInput, type SubmitAgentInputData, AgentInputMessage } from "@atelier/builtin-api/contracts";
 import { selectionOf, type AgentSelectionService } from "./selection.ts";
 import type { composeSystemPrompt } from "./system-prompt.ts";
 import { projectForAgent } from "./projection.ts";
 import { duplicateSubmission, rememberSubmission } from "./submissions.ts";
+import { projectInputMessage } from "./input-message.ts";
 
 /** 资源动作各自受理，共用模型预检；提交身份和落库构成一次原子受理。 */
 export function createAdmission(deps: { selection: AgentSelectionService; validate: ModelServices["validate"]; running(object: ObjectReader): boolean; systemPrompt: (agent: Parameters<typeof composeSystemPrompt>[0]) => ReturnType<typeof composeSystemPrompt> }) {
@@ -20,7 +21,7 @@ export function createAdmission(deps: { selection: AgentSelectionService; valida
     if (!current) return;
     const agent = deps.selection.agent(current.selection), snapshot = object.session.snapshot();
     const messages = projectForAgent(snapshot, object.ref.id);
-    if (input) messages.push({ kind: "input", parts: input.parts });
+    if (input) messages.push(projectInputMessage(input));
     await deps.validate({ target: deps.selection.target(current.selection), system: deps.systemPrompt(agent), messages, signal }, { content });
   };
   return {
@@ -36,9 +37,9 @@ export function createAdmission(deps: { selection: AgentSelectionService; valida
       object.commit(writer => {
         ready(object);
         if (queued) writer.set(AgentDrafts, [...object.get(AgentDrafts) ?? [], {
-          id: input.submissionId, revision: 0, mode: input.mode, parts: input.parts,
+          id: input.submissionId, revision: 0, mode: input.mode, parts: input.parts, sender: input.sender,
         }]);
-        else writer.append(UserMessage, { parts: input.parts, startsTurn: true });
+        else writer.append(AgentInputMessage, { parts: input.parts, startsTurn: true, sender: input.sender });
         rememberSubmission(object, writer, SubmitAgentInput, input);
       });
       return !queued;

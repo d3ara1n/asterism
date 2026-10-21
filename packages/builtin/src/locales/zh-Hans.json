@@ -1,4 +1,7 @@
 {
+  "agent_send_title": "发送消息",
+  "agent_send_accepted": "已受理",
+  "context.agentMessage": "代理消息",
   "agent_drafts_title": "草稿箱",
   "agent_drafts_save": "存入草稿",
   "agent_drafts_mode": "自动发送",

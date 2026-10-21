@@ -7,6 +7,7 @@ import { Button } from "@atelier/ui/ui/button";
 import { conversationMessages as messages } from "../../messages/conversation";
 import { useConversationInteraction } from "./interaction";
 import type { DraftMode } from "../drafts-contract";
+import { MessageSender } from "./MessageSender";
 
 /** 非常驻的资源草稿箱；编辑器与条目交换时保留各自的完整附件。 */
 export function AgentDraftsPanel({ onTake }: { onTake(): void }) {
@@ -24,7 +25,10 @@ export function AgentDraftsPanel({ onTake }: { onTake(): void }) {
         onClick={async () => { if (await interaction.retryTake()) onTake(); }}>{i18n.text(messages.retryTake)}</Button>
     </div>}
     <div className="max-h-48 space-y-3 overflow-y-auto">
-      {interaction.drafts.map(item => <div key={item.id} className="space-y-1">
+      {interaction.drafts.map(item => <div key={item.id}
+        className={`space-y-1 rounded-md px-2 py-2 ${item.sender.kind === "agent"
+          ? "bg-external-message text-external-message-foreground" : "bg-muted text-foreground"}`}>
+        <MessageSender sender={item.sender} />
         {modelInputText(item.parts) && <p className="type-caption line-clamp-3 whitespace-pre-wrap break-words">{modelInputText(item.parts)}</p>}
         {item.parts.filter(part => part.kind === "file").map((part, index) =>
           <p key={index} className="type-caption flex min-w-0 items-center gap-1 text-muted-foreground">

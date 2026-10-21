@@ -100,6 +100,8 @@ export type CallResult<D extends Json = Json> =
   | { kind: "partial"; data: D; message: string }
   | OptionalData<Exclude<ToolCompletion, { kind: "succeeded" | "partial" }>, D>;
 export type PreparedResult = CallResult & ToolInvocationInfo;
+/** 请求边界捕获的工具调用者身份；不携带资源私有状态或操作权限。 */
+export type ToolCaller = Readonly<Pick<ResourceSnapshot, "ref" | "title">>;
 export interface ToolInvocation extends ToolInvocationInfo {
   effect: "read" | "write";
   execution: "parallel" | "sequential";
@@ -108,7 +110,7 @@ export interface ToolInvocation extends ToolInvocationInfo {
 }
 export interface ToolContribution {
   readonly contract: ImplementationContract<Json, Json, Json, Json>;
-  prepare(resource: ResourceSnapshot, object: ObjectExecutor, target: Json, args: Json): ToolInvocation | PreparedResult;
+  prepare(resource: ResourceSnapshot, object: ObjectExecutor, target: Json, args: Json, caller: ToolCaller): ToolInvocation | PreparedResult;
 }
 export interface ModuleContribution {
   usageProviders?: readonly UsageProvider[];

@@ -162,10 +162,11 @@ export function adaptTool(contribution: ToolContribution, sdk: SdkContext, host:
   return {
     reference: reference(contract), resourceKind: contract.resource.kind, tool: contract.tool,
     effect: contract.effect, targetSchema: contract.targetSchema, resultSchema: contract.schema,
-    prepare(resource, target, args) {
+    prepare(resource, target, args, caller) {
       const captured = snapshot(host, resource);
       const scope: ObjectScope = { active: false, execution: true };
-      const prepared = contribution.prepare(captured, sdk.object(captured.ref, scope, captured), target, args);
+      const prepared = contribution.prepare(captured, sdk.object(captured.ref, scope, captured), target, args,
+        Object.freeze({ ref: Object.freeze({ ...caller.ref }), title: caller.title }));
       if (!("execute" in prepared)) return prepared;
       return { ...prepared, async execute(signal, publish, handover?: ContentLease) {
         scope.active = true;

@@ -4,7 +4,7 @@ import { AgentView, AgentSelection, AgentDrafts } from "./data.ts";
 import { defineModule, implementResource, implementCreation, implementAction } from "@atelier/sdk/runtime";
 import {
   Agent, CreateAgent, SubmitAgentInput, ContinueAgent, ConfigureAgent, CancelAgent, AgentConfigurations,
-  UserMessage, Execution, Notice, ContextSummary,
+  AgentInputMessage, Execution, Notice, ContextSummary,
 } from "@atelier/builtin-api/contracts";
 import { createSelection, selectionOf } from "./selection.ts";
 import { createAgentLoop } from "./loop.ts";
@@ -15,6 +15,7 @@ import { createPeekTool } from "./peek/runtime.ts";
 import { AgentExecutionFeedback } from "./feedback.ts";
 import { SaveAgentDraft, SetAgentDraftMode, ExchangeAgentDraft } from "./drafts-contract.ts";
 import { saveDraft, setDraftMode, exchangeDraft } from "./drafts.ts";
+import { createSendTool } from "./send/runtime.ts";
 
 /** 资源入口只装配领域模块与贡献；业务模块不依赖完整插件上下文。 */
 export function createAgentModule(application: BuiltinApplication, usage: UsageConsumer) {
@@ -26,9 +27,9 @@ export function createAgentModule(application: BuiltinApplication, usage: UsageC
     const admission = createAdmission({ selection, validate: plugin.models.validate, running: loop.running, systemPrompt });
     return {
       events: [AgentExecutionFeedback],
-      tools: [createPeekTool(plugin.models, application.userAgent, usage)],
+      tools: [createPeekTool(plugin.models, application.userAgent, usage), createSendTool()],
       resources: [implementResource(Agent, AgentView, {
-        records: [UserMessage, Execution, Notice, ContextSummary],
+        records: [AgentInputMessage, Execution, Notice, ContextSummary],
         links: { receive: true, tools: object => selection.tools(selection.agent(selectionOf(object).selection)) },
         creation: implementCreation(CreateAgent, {
           prepare(input) { selection.validate(input.selection); return { action: "accept" }; },

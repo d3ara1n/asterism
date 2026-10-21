@@ -1,5 +1,5 @@
 import type { ActionContract, CreationContract, DataContract, Json, ResourceRef, ResourceCreationResult, SessionDirectory } from "@atelier/sdk/contracts";
-import type { ResourceActionOptions, ResourceCreationOptions } from "@atelier/sdk/runtime";
+import type { ResourceActionOptions, ResourceCreationOptions, ToolCaller } from "@atelier/sdk/runtime";
 import type { NewNode, SessionNode } from "../shared/session.ts";
 import type { FoldedObject, FoldedState } from "../session/fold.ts";
 import type { AgentCapabilities, ToolPolicy } from "../execution/capabilities.ts";
@@ -29,7 +29,7 @@ export interface SessionHost {
   idle(sessionId: string, objectId?: string): boolean;
   progressChanged(sessionId: string): void;
   linked(sessionId: string, objectId: string): FoldedObject[];
-  capabilities(linked: readonly FoldedObject[], policy: ToolPolicy): AgentCapabilities;
+  capabilities(linked: readonly FoldedObject[], policy: ToolPolicy, caller?: ToolCaller): AgentCapabilities;
   context(linked: readonly FoldedObject[]): Promise<ContextFile[]>;
 }
 export interface CatalogHost {

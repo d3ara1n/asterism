@@ -32,7 +32,7 @@ describe("代理上下文洞察", () => {
       { source: agentSource("a") })));
     const result = insight(path);
     expect(result.conversation.characters).toEqual({
-      user: 3, assistant: 0, thinking: 5, toolcall: '{"p":1}'.length, result: 2, context: "linked".length,
+      user: 3, agentMessage: 0, assistant: 0, thinking: 5, toolcall: '{"p":1}'.length, result: 2, context: "linked".length,
       summary: expect.any(Number),
     });
     expect(result.conversation.characters.summary).toBeGreaterThan(2);

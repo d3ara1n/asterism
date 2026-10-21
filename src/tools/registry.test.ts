@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { defineImplementation, defineResource, defineTool } from "@atelier/sdk/contracts";
 import { defineData } from "@atelier/sdk/contracts";
-import { implement } from "./testing.ts";
+import { implement, toolCaller } from "./testing.ts";
 import { declareTool, projectTool } from "./definition.ts";
 import { ToolRegistry } from "./registry.ts";
 
@@ -90,14 +90,14 @@ describe("工具定义与实现注册边界", () => {
     });
     const resource = { id: "game", kind: "game", title: "Game", data: { origin: 2 } };
     const invoke = (delta: number) => {
-      const prepared = implementation.prepare(resource, { piece: "T" }, { delta });
+      const prepared = implementation.prepare(resource, { piece: "T" }, { delta }, toolCaller);
       if (!("execute" in prepared)) throw new Error("Valid arguments were rejected.");
       return prepared.execute(new AbortController().signal);
     };
     expect(await invoke(1)).toMatchObject({ kind: "succeeded", data: { x: 3, piece: "T" } });
-    expect(implementation.prepare(resource, { path: "T" }, { delta: 1 })).toMatchObject({ kind: "rejected" });
-    expect(implementation.prepare(resource, { piece: "T" }, { delta: "1" })).toMatchObject({ kind: "rejected" });
-    expect(implementation.prepare({ ...resource, data: {} }, { piece: "T" }, { delta: 1 })).toMatchObject({ kind: "failed" });
+    expect(implementation.prepare(resource, { path: "T" }, { delta: 1 }, toolCaller)).toMatchObject({ kind: "rejected" });
+    expect(implementation.prepare(resource, { piece: "T" }, { delta: "1" }, toolCaller)).toMatchObject({ kind: "rejected" });
+    expect(implementation.prepare({ ...resource, data: {} }, { piece: "T" }, { delta: 1 }, toolCaller)).toMatchObject({ kind: "failed" });
     // TS 的 number 无法表达非负范围，返回值仍必须通过运行时契约。
     await expect(invoke(-3)).rejects.toThrow();
   });

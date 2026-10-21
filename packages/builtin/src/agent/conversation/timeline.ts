@@ -1,13 +1,13 @@
 import type { z } from "zod";
 import type { ModelLiveBlock, SessionSnapshot, SessionRecord, ModelInputPart } from "@atelier/sdk/contracts";
-import { ContextSummary, Execution, Notice, UserMessage } from "@atelier/builtin-api/contracts";
+import { ContextSummary, Execution, Notice, AgentInputMessage, type AgentMessageSender } from "@atelier/builtin-api/contracts";
 import { turnMetrics, type TurnMetricsData } from "./turn-metrics";
 
 type SavedBlock = Extract<z.infer<typeof Execution.schema>, { type: "block" }>["block"] & {
   id: string; createdAt: string;
 };
 export type TimelineItem = SavedBlock | ModelLiveBlock
-  | { kind: "message"; id: string; parts: readonly ModelInputPart[] }
+  | { kind: "message"; id: string; parts: readonly ModelInputPart[]; sender: AgentMessageSender }
   | { kind: "summary"; id: string; text: string }
   | { kind: "turn-metrics"; id: string; metrics: TurnMetricsData; incomplete: boolean; replyMarkdown: string | null }
   | ({ kind: "notice"; id: string } & z.infer<typeof Notice.schema>);
@@ -28,8 +28,8 @@ function item(record: SessionRecord, agentId: string): TimelineItem | null {
   if (record.source?.resource?.id !== agentId) return null;
   const summary = ContextSummary.decode(record);
   if (summary?.status === "known") return { kind: "summary", id: record.id, text: summary.data.summary };
-  const message = UserMessage.decode(record);
-  if (message?.status === "known") return { kind: "message", id: record.id, parts: message.data.parts };
+  const message = AgentInputMessage.decode(record);
+  if (message?.status === "known") return { kind: "message", id: record.id, parts: message.data.parts, sender: message.data.sender };
   const execution = Execution.decode(record);
   if (execution?.status === "known" && execution.data.type === "diagnostic")
     return { ...execution.data, kind: "notice", id: record.id };
@@ -42,9 +42,9 @@ export function conversationTimeline(snapshot: SessionSnapshot, agentId: string,
   const saved = path.flatMap(record => { const value = item(record, agentId); return value ? [value] : []; });
   const keys = new Set(saved.map(timelineKey));
   const summaries = turnMetrics(snapshot, agentId, running);
-  const before = new Map(summaries.map(turn => [turn.nextUserId, turn]));
+  const before = new Map(summaries.map(turn => [turn.nextInputId, turn]));
   const measured = (turn: typeof summaries[number]): TimelineItem => ({
-    kind: "turn-metrics", id: `turn-metrics:${turn.userId}`, metrics: turn.metrics, incomplete: turn.incomplete,
+    kind: "turn-metrics", id: `turn-metrics:${turn.inputId}`, metrics: turn.metrics, incomplete: turn.incomplete,
     replyMarkdown: turn.replyMarkdown,
   });
   const items = saved.flatMap(value => {

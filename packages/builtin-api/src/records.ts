@@ -1,10 +1,11 @@
 import { z } from "zod";
 import { defineRecord, modelRunRecordSchema, modelCompletionSchema, modelInputPartsSchema } from "@atelier/sdk/contracts";
 import { builtin } from "./identity.ts";
+import { agentMessageSenderSchema } from "./messaging.ts";
 
-/** 代理用户消息的公开记录契约；接收代理即记录来源资源。需要识别用户输入的插件导入它。 */
-export const UserMessage = defineRecord(builtin.name("agent.user-message"), {
-  schema: z.object({ parts: modelInputPartsSchema, startsTurn: z.boolean() }),
+/** 输入消息的记录来源为接收代理；通信发送者由 sender 独立表达。 */
+export const AgentInputMessage = defineRecord(builtin.name("agent.input-message"), {
+  schema: z.object({ parts: modelInputPartsSchema, startsTurn: z.boolean(), sender: agentMessageSenderSchema }),
 });
 export const Execution = defineRecord(builtin.name("agent.execution"), { schema: modelRunRecordSchema });
 /** 摘要只替换模型输入的前缀；keptFrom 指向原样保留的首个历史节点。 */
