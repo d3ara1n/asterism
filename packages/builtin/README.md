@@ -8,6 +8,8 @@
 - `@atelier/builtin/renderer`：`builtinRenderer` 聚合功能视图 `builtinViews` 与设置页；另提供 `BuiltinRendererProvider` 及首页复用的输入草稿、文件输入、模型选择和提交身份工具。应用通过 provider 注入按插件绑定的偏好门面，供 Agent 扩展组件使用。
 - `@atelier/builtin/locales/zh-Hans.json`：由应用装配的内置翻译目录。
 
+`agent/renderer.tsx` 同步登记配置与上下文工具栏项；`agent/feedback-renderer.tsx` 作为独立模块订阅执行反馈，由插件入口显式组合，订阅的准备与清理作用域独立于视图登记。
+
 宿主加载、外部插件依赖、公共提供方登记与关闭协调留在应用组合层。外部插件使用 [公共 API 包](../builtin-api/README.md)，不依赖实现包。
 
 ## 功能目录

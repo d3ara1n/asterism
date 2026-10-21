@@ -16,8 +16,6 @@ import { ConfigurationToolbarItem, ContextToolbarItem } from "./conversation/Too
 import { agentExecutionState } from "./state";
 import { peekToolRenderer } from "./peek/view";
 import { sendToolRenderer } from "./send/view";
-import { AgentExecutionFeedback } from "./feedback";
-import { toast } from "sonner";
 
 const appearance = { width: 560, height: 640, minWidth: 480, minHeight: 480 };
 
@@ -32,11 +30,7 @@ export default {
   tools: [peekToolRenderer, sendToolRenderer],
   records: agentRecordViews,
   creations: [creationEntry(CreateAgent, { id: "atelier.builtin/agent.configured", label: commonMessages.kindAgent, icon: <Bot className="size-4" />, group: "agents", InputView: AgentInput, triggers: { menu: {} } })],
-  async prepare({ signal, events }) {
-    await events.subscribe(AgentExecutionFeedback, { signal }, ({ data }) => {
-      if (data.level === "error") toast.error(data.message);
-      else toast.warning(data.message);
-    }).ready;
+  async prepare({ signal }) {
     agentUI.register({ id: builtin.name("agent.configuration"), Component: ConfigurationToolbarItem }, { signal });
     agentUI.register({ id: builtin.name("agent.context"), Component: ContextToolbarItem }, { signal });
   },
