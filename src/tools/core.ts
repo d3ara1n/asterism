@@ -58,7 +58,7 @@ export const ResourceCall = defineTool({
   argsSchema: z.strictObject({
     resource_id: z.string().min(1).describe("The opaque ID of a resource currently linked to this agent."),
     tool: z.string().min(1).describe("An available resource tool name supplied by the link notification or resource_inspect."),
-    target: jsonSchema.default(null).describe("A JSON value matching this resource tool's target schema from resource_inspect. Pass objects directly, e.g. {\"path\":\"subdir\"}; use null only when supported. Do not JSON-encode the value into a string."),
-    args: jsonSchema.default({}).describe("A JSON value matching the tool's args schema from resource_inspect. Pass an object directly when the schema requires one, e.g. {}. Do not JSON-encode the value into a string."),
+    target: jsonSchema.default(null).describe("A JSON value matching this resource tool's target schema from resource_inspect. Pass objects directly; use null only when supported. Do not JSON-encode the value into a string."),
+    args: jsonSchema.default({}).describe("A JSON value matching the tool's args schema from resource_inspect. Pass an object directly when the schema requires one. Do not JSON-encode the value into a string."),
   }).describe("Select a linked resource and a tool, then supply its implementation-specific target and shared operation args."),
 });

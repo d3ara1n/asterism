@@ -15,8 +15,18 @@
 - 重新确定正式可添加资源、添加方式及授权交互；直接文件资源与目录内 path 定位的身份关系、edit 的前置版本条件。
 - 首页到主代理的表面展开动效、Markdown 代码高亮与长对话阅读优化。
 - 备用角色映射到执行契约；Agent timeout 与费用预算字段 maxCost 已移除，执行边界见 [运行时](../docs/runtime.md#执行轮次与循环)。
-- 暂缓：清理内置代理提示词中的 pi 专用假设（bash/find/grep 等工具名、subagent_delegate、$PI_SUBAGENT_TMPDIR、git 与测试指令），待委派与工具目录成型后再做。
+- 暂缓：内置代理提示词与模型可见指导的清理，待委派与工具目录成型后按[模型说明与指导收敛](#模型说明与指导收敛)推进。
 - 上下文自动压缩、跨模型续接、模型兼容包与标准思考等级已实现并通过自动验证，长期真实使用覆盖采用延迟验收，分别见[压缩归档](archived/todo-2026-10-13-context-compression.md)、[续接归档](archived/todo-2026-10-13-cross-model-continuation.md)、[模型兼容归档](archived/todo-2026-10-10-model-compatibility.md)。尚未实现的后续能力由本计划继续跟踪。
+
+## 模型说明与指导收敛
+
+当前处于能力建设中间期，本阶段不全面重写提示词。说明职责以[运行时契约](../docs/runtime.md#工具匹配与宿主操作入口)为准；后续按实际操作能力逐项核验，不把所有指导或列表与详情共有的用途描述视为冗余。
+
+- [ ] 委派与工具目录成型后核验 `src/configuration/defaults.ts` 中的 pi 专用假设：bash/find/grep、subagent_delegate、$PI_SUBAGENT_TMPDIR、git 与测试流程。
+- [ ] 整理 `packages/builtin/src/agent/system-prompt.ts`、`src/tools/core.ts`、`packages/builtin/src/resources/runtime.ts` 的环境、授权、请求边界与生命周期说明，区分实际调用所需指导与可由操作面表达的宿主机制。
+- [ ] 核验 `packages/builtin/src/runtime.ts` 的创建入口描述是否足以支持资源用途与创建时机的判断，创建后的操作指导由对应资源工具承接。
+- [ ] 核验 `packages/builtin/src/shared/declarations.ts` 及 filesystem/notes 的 schema 描述：共享工具中的具体资源假设、固定示例和参数说明应与实际实现对应。
+- [ ] 检查链接通知、ask_user、错误与结果投影、压缩摘要中的附加指导；区分操作事实、按需纠正信息与常驻规则，保留必要参数语义，不调整已保存历史。
 
 ## 执行与模型
 

@@ -96,6 +96,8 @@ Agent 从当前时间线中属于自身的记录投影回合状态（`empty / co
 - **工具实现**：声明支持的资源类型、`target` schema、`result` schema、读写副作用、并行/顺序策略与 handler，不重复或覆写工具的 description/guidelines。`target` 由实现直接解释（如目录 list 用 `null | {path}`，文件 read 用 `{path, offset?, limit?}`，笔记 read 用 `null`），不引入通用目标解析层。args、target、result 三个 schema 均须有非空整体 description。
 - **契约共享**：工具实现通过公共模块引用实际声明对象；不同声明占用同一稳定 ID 明确报错，不能原地修改或复制原声明冒充共享。
 
+模型可见说明按用途组织：`description` 说明能力、资源或代理的用途与适用场景，供模型选择；`guidelines` 提供选定后的使用指导。列表发现阶段提供身份与用途描述，不展开候选项的 guidelines；详情提供所选项的指导与输入 schema。创建入口的描述说明资源用途与创建时机，创建后的操作指导由资源工具提供。
+
 ### 工具覆盖
 
 插件工具按用户列表顺序实行后来者优先，`atelier.builtin` 最先，外部插件随后；公共依赖只影响初始化顺序，不改变覆盖优先级。只有成功装配的插件参与覆盖，装配失败的贡献不占用名称。顶层工具与二级资源工具分别解析名称，不互相覆盖。
