@@ -67,8 +67,7 @@ export type ModelLiveBlock = { id: string; responseId: string; ordinal: number }
 export type ModelRunEvent =
   | { type: "block"; block: ModelBlock }
   | { type: "progress"; blocks: readonly ModelLiveBlock[] }
-  | { type: "diagnostic"; code: string; message: string; level: "error" | "warning";
-      response?: ModelCompletion & { responseId: string; requestParentId: string | null; source: ModelSource } };
+  | { type: "diagnostic"; code: string; message: string; level: "error" | "warning" };
 /** 同步交付执行事件；消费者保存成型记录，异常将停止执行，返回后不再交付。 */
 export interface ModelRunObserver { event(event: ModelRunEvent): undefined }
 /** 仅用于 HTTP 请求身份，不进入模型消息、历史或资源授权。 */

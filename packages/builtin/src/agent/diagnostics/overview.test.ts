@@ -8,7 +8,7 @@ const sent: AgentRequestContextData = { system: [{ kind: "system", from: "builti
 function request(sequence: number, input: number | null, extra: Partial<DiagnosticRequest> = {}): DiagnosticRequest {
   return {
     id: `r${sequence}`, kind: "response", responseId: `r${sequence}`, model: "p/m", modelScope: "scope", createdAt: "2026-10-15T10:00:00Z",
-    sequence, requestParentId: null, blocks: [], summary: null, notices: [], onTimeline: true, relatedInput: null, inputHasFiles: false,
+    sequence, requestParentId: null, blocks: [], summary: null, onTimeline: true, relatedInput: null, inputHasFiles: false,
     tokensBefore: null, sent,
     completion: input === null ? null : { finishReason: "stop", rawFinishReason: null, providerResponseId: null,
       usage: { input, output: 1, total: input + 1, reasoning: null, cacheRead: Math.floor(input / 2), cacheWrite: null } },

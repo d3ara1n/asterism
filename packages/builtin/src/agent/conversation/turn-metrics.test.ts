@@ -3,7 +3,7 @@ import type { ModelCompletion } from "@atelier/sdk/contracts";
 import { ContextSummary } from "@atelier/builtin-api/contracts";
 import { sessionSnapshot } from "../../../../../src/plugins/records";
 import { nodeView } from "../../../../../src/session/view";
-import { agentSource, call, event, message, node, notice, text, thinking } from "../../../../../src/session/test-nodes";
+import { agentSource, call, event, message, node, text, thinking } from "../../../../../src/session/test-nodes";
 import { tokensPerSecond } from "../diagnostics/performance";
 import { turnMetrics } from "./turn-metrics";
 
@@ -100,7 +100,6 @@ describe("对话中的逐轮计量", () => {
     ["工具响应", call("a", "last", 0, "Tool output", { completion: { ...completion(100, 20, 50, 2000), finishReason: "tool-calls" } })],
     ["纯思考响应", thinking("a", "last", 0, "Reasoning", { completion: completion(100, 20, 50, 2000) })],
     ["空白正文", text("a", "last", 0, " \n", { completion: completion(100, 20, 50, 2000) })],
-    ["无正文失败", notice("a", "request_failed", "Request failed")],
   ])("%s 不提供复制内容", (_label, last) => {
     const path = [
       node("u", null, message("a", "Question")),

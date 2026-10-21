@@ -18,6 +18,5 @@ export const ContextSummary = defineRecord(builtin.name("agent.context-summary")
   }),
 });
 export const Notice = defineRecord(builtin.name("agent.notice"), {
-  schema: z.strictObject({ code: z.string(), message: z.string(), level: z.enum(["info", "warning", "error"]),
-    response: modelCompletionSchema.extend({ responseId: z.string(), requestParentId: z.string().nullable(), model: z.string() }).optional() }),
+  schema: z.strictObject({ code: z.string(), message: z.string(), level: z.enum(["info", "warning", "error"]) }),
 });

@@ -8,7 +8,7 @@ export interface DiagnosticRequest {
   model: string; modelScope: string | null; createdAt: string; sequence: number;
   requestParentId: string | null; completion: ModelCompletion | null;
   blocks: { record: SessionRecord; block: ModelBlock }[];
-  summary: string | null; notices: DiagnosticNotice[]; onTimeline: boolean;
+  summary: string | null; onTimeline: boolean;
   relatedInput: { id: string; parts: readonly ModelInputPart[] } | null;
   /** 仅判断历史投影是否含文件，不把多模态总 token 冒充文本细分。 */
   inputHasFiles: boolean | null;
@@ -20,7 +20,7 @@ export interface DiagnosticRequest {
 interface HistoryState { lastFile: number | null; input: DiagnosticRequest["relatedInput"] }
 export interface DiagnosticHistory { requests: DiagnosticRequest[]; notices: DiagnosticNotice[]; unreadable: number }
 
-/** 从已有记录按响应归组；失败通知没有响应身份时单列，不推断成某次请求。 */
+/** 从实际输出块按响应归组；执行通知单列，不计为请求。 */
 export function diagnosticHistory(snapshot: Pick<SessionView, "records">, agentId: string, scope: DiagnosticScope): DiagnosticHistory {
   const records = snapshot.records.all({ scope });
   const timelineIds = new Set(snapshot.records.all({ scope: "timeline" }).map(record => record.id));
@@ -37,7 +37,7 @@ export function diagnosticHistory(snapshot: Pick<SessionView, "records">, agentI
     const state = stateAt(parentId);
     const request: DiagnosticRequest = {
       id: key, kind: "response", responseId: id, model, modelScope, requestParentId: parentId,
-      createdAt: record.createdAt, sequence: record.sequence, completion: null, blocks: [], summary: null, notices: [], tokensBefore: null, sent: null,
+      createdAt: record.createdAt, sequence: record.sequence, completion: null, blocks: [], summary: null, tokensBefore: null, sent: null,
       onTimeline: timelineIds.has(record.id), relatedInput: state.input, inputHasFiles: state.lastFile === null ? null : state.lastFile >= 0,
     };
     requests.set(key, request);
@@ -62,7 +62,7 @@ export function diagnosticHistory(snapshot: Pick<SessionView, "records">, agentI
         id: `summary:${record.id}`, kind: "compression", responseId: null, model: summary.data.model, modelScope: null,
         requestParentId: null, createdAt: record.createdAt, sequence: record.sequence, completion: summary.data.completion,
         tokensBefore: summary.data.tokensBefore, sent: null,
-        blocks: [], summary: summary.data.summary, notices: [], onTimeline: timelineIds.has(record.id),
+        blocks: [], summary: summary.data.summary, onTimeline: timelineIds.has(record.id),
         relatedInput: state.input, inputHasFiles: false,
       });
       const kept = byId.get(summary.data.keptFrom);
@@ -80,16 +80,9 @@ export function diagnosticHistory(snapshot: Pick<SessionView, "records">, agentI
         state = { ...state, lastFile: record.sequence };
     }
     const diagnostic = execution?.status === "known" && execution.data.type === "diagnostic" ? execution.data : notice?.status === "known" ? notice.data : null;
-    if (diagnostic) {
-      const item: DiagnosticNotice = { id: record.id, createdAt: record.createdAt, code: diagnostic.code, message: diagnostic.message, level: diagnostic.level };
-      const detail = diagnostic.response;
-      if (detail) {
-        const source = "source" in detail ? detail.source : { model: detail.model, scope: null };
-        const request = response(record, detail.responseId, source.model, detail.requestParentId, source.scope);
-        request.completion ??= detail;
-        request.notices.push(item);
-      } else notices.push(item);
-    }
+    if (diagnostic) notices.push({
+      id: record.id, createdAt: record.createdAt, code: diagnostic.code, message: diagnostic.message, level: diagnostic.level,
+    });
     history.set(record.id, state);
   }
   for (const request of requests.values()) {

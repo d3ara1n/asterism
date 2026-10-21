@@ -22,15 +22,14 @@ describe("代理的具型记录视图", () => {
     expect(after[0]).toMatchObject({ id: saved.id, kind: "thinking", text: "thinking", complete: true });
   });
 
-  it("当前路径包含未完成块，其他分支与代理隐藏；空响应通知保留用量", () => {
+  it("当前路径包含未完成块和执行通知，其他分支与代理隐藏", () => {
     const message = node("input", null, input("a", "Question"));
     const block = node("partial", message.id, text("a", "r", 0, "Partial", { complete: false, requestParentId: message.id }));
-    const notice = node("notice", block.id, noticeNode("a", "empty_response", "Empty", "error", { response: { responseId: "empty", requestParentId: message.id, model: "p/m", finishReason: "stop", rawFinishReason: null, providerResponseId: null,
-      usage: { input: 4, output: 0, total: 4, reasoning: null, cacheRead: null, cacheWrite: null } } }));
+    const notice = node("notice", block.id, noticeNode("a", "interrupted", "The response was interrupted.", "error"));
     const nodes = [message, block, { ...block, id: "other-agent", source: { plugin: "atelier.builtin", resource: { sessionId: "s", id: "b", kind: "atelier.builtin/agent" } } }, { ...block, id: "other-branch", parentId: "elsewhere" }, notice];
     const timeline = conversationTimeline(sessionSnapshot(nodeView("s", "", nodes, notice.id)), "a", []);
     expect(timeline.map(item => item.id)).toEqual([message.id, block.id, notice.id, "turn-metrics:input"]);
-    expect(timeline.find(item => item.kind === "notice")).toMatchObject({ kind: "notice", response: { usage: { input: 4, output: 0 } } });
+    expect(timeline.find(item => item.kind === "notice")).toMatchObject({ kind: "notice", code: "interrupted" });
   });
 
   // docs/workbench.md#对话计量：同轮多个请求只有一份尾部概要，历史概要不因下一轮执行而消失。

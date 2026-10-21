@@ -33,7 +33,6 @@ function requestState(request: PricedRequest): { label: UiMessage; tone: StatusT
   if (outcome === "failed") return { label: messages.failed, tone: "error" };
   if (!request.completion) return { label: messages.noCompletion, tone: "neutral" };
   const complete = ["stop", "tool-calls"].includes(request.completion.finishReason)
-    && !request.notices.some(notice => notice.level === "error" || notice.code === "cancelled")
     && request.blocks.every(({ block }) => block.complete)
     && (!request.blocks.length || request.blocks.at(-1)!.block.ordinal + 1 === request.blocks.length);
   return complete ? { label: messages.finished, tone: "success" } : { label: messages.incomplete, tone: "warning" };
@@ -114,7 +113,6 @@ function RequestDetails({ request, onBack }: { request: PricedRequest; onBack():
         {!estimate.lines.some(line => line.item === "reasoning") && <p className="type-caption">{i18n.text(messages.reasoningIncluded)}</p>}
       </div>
     </Section>
-    {request.notices.length > 0 && <Notices notices={request.notices} />}
     <Section title={i18n.text(messages.contents)}>
       {content.length > 0 ? <div className="space-y-4"><ConversationTimeline items={content} /></div> : <p className="type-caption">{i18n.text(messages.noContent)}</p>}
     </Section>

@@ -31,11 +31,8 @@ function item(record: SessionRecord, agentId: string): TimelineItem | null {
   const message = UserMessage.decode(record);
   if (message?.status === "known") return { kind: "message", id: record.id, parts: message.data.parts };
   const execution = Execution.decode(record);
-  if (execution?.status === "known" && execution.data.type === "diagnostic") {
-    const { response, ...diagnostic } = execution.data;
-    return { ...diagnostic, kind: "notice", id: record.id,
-      ...(response ? { response: { ...response, model: response.source.model } } : {}) };
-  }
+  if (execution?.status === "known" && execution.data.type === "diagnostic")
+    return { ...execution.data, kind: "notice", id: record.id };
   if (execution?.status === "known" && execution.data.type === "block") return savedTimelineBlock(record, execution.data.block);
   return null;
 }

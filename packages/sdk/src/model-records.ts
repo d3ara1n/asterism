@@ -45,9 +45,8 @@ export const modelBlockSchema = z.discriminatedUnion("kind", [
     argumentsText: z.string(), arguments: jsonSchema, outcome: toolOutcomeSchema.nullable() })
     .refine(data => data.complete === (data.outcome !== null), "Complete tool calls must have an outcome."),
 ]);
-/** 终态内含于成型块；诊断的可选响应资料兼容既有记录，新请求的无块反馈仅瞬态交付。 */
+/** 终态内含于成型块；执行通知只携带反馈，不承载响应身份或计量。 */
 export const modelRunRecordSchema = z.discriminatedUnion("type", [
   z.strictObject({ type: z.literal("block"), block: modelBlockSchema }),
-  z.strictObject({ type: z.literal("diagnostic"), code: z.string(), message: z.string(), level: z.enum(["error", "warning"]),
-    response: modelCompletionSchema.extend({ responseId: id, requestParentId: id.nullable(), source: modelSourceSchema }).optional() }),
+  z.strictObject({ type: z.literal("diagnostic"), code: z.string(), message: z.string(), level: z.enum(["error", "warning"]) }),
 ]);

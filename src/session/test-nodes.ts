@@ -26,8 +26,8 @@ export const call = (agentId: string, responseId: string, ordinal: number, callI
     { ...extra, complete: extra.complete ?? (extra.outcome !== null) });
 export const message = (agentId: string, value: string): NewNode =>
   record(UserMessage.id, { parts: [{ kind: "text", text: value }] }, agentSource(agentId));
-export const notice = (agentId: string | null, code: string, value: string, level: "info" | "warning" | "error" = "error", data: Record<string, Json> = {}): NewNode =>
-  record(Notice.id, { code, message: value, level, ...data }, agentId ? agentSource(agentId) : hostSource);
+export const notice = (agentId: string | null, code: string, value: string, level: "info" | "warning" | "error" = "error"): NewNode =>
+  record(Notice.id, { code, message: value, level }, agentId ? agentSource(agentId) : hostSource);
 export const event = (type: string, data: Json, options: { source?: NewNode["source"]; model?: string | null; recipient?: string | null } = {}): NewNode =>
   ({ contract: type, data, source: options.source ?? hostSource, model: options.model ?? null, recipient: options.recipient ?? null });
 export const created = (id: string, title: string, kind = "atelier.builtin/agent") => event("resource_created", { id, title, type: kind });

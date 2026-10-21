@@ -15,7 +15,7 @@ const request = (clock: RequestTiming | undefined, counts: Usage | null): Diagno
   id: "r", kind: "response", responseId: "r", model: "p/m", modelScope: null, createdAt: timing.endedAt,
   sequence: 1, requestParentId: null, completion: counts ? { usage: counts, finishReason: "stop", rawFinishReason: null, providerResponseId: null,
     ...(clock ? { timing: clock } : {}) } : null,
-  blocks: [], summary: null, notices: [], onTimeline: true, relatedInput: null, inputHasFiles: false,
+  blocks: [], summary: null, onTimeline: true, relatedInput: null, inputHasFiles: false,
   tokensBefore: null, sent: null,
 });
 

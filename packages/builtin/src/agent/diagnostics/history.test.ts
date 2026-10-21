@@ -8,8 +8,7 @@ import { diagnosticHistory } from "./history.ts";
 
 const completion: ModelCompletion = { finishReason: "stop", rawFinishReason: null, providerResponseId: "upstream-id",
   usage: { input: 100, output: 10, total: 110, cacheRead: 0, cacheWrite: 0, reasoning: 0 } };
-const source = { model: "p/m", adapter: "test", scope: "scope" };
-// docs/workbench.md 诊断契约：按响应身份计数，用真实父链区分分支；既有记录保持可读。
+// docs/workbench.md 诊断契约：按实际响应身份计数，用真实父链区分分支。
 describe("代理诊断历史", () => {
   // 只有用户输入不构成已保存响应；成功摘要的真实计时仍可消费。
   it("无回复时没有诊断请求，成功压缩保留计时", () => {
@@ -49,26 +48,22 @@ describe("代理诊断历史", () => {
     expect(all.requests.map(request => [request.responseId, request.onTimeline])).toEqual([["branch-b", false], ["branch-a", true], ["shared", true]]);
   });
 
-  it("既有通知载荷仍可读，重复终态不重复计数，无身份通知单列", () => {
+  // 执行通知不能被统计为请求；无法解码的记录独立报告，不能污染实际响应计量。
+  it("执行通知单列且不参与请求计量，无法解码的记录保持可见", () => {
     const nodes = [
       node("input", null, message("a", "Start")),
       node("answer", "input", text("a", "r", 0, "Done", { requestParentId: "input", completion })),
-      node("legacy", "answer", notice("a", "reported", "Reported", "info", {
-        response: { ...completion, responseId: "r", requestParentId: "input", model: "p/m" },
-      })),
-      node("empty", "legacy", event(Execution.id, { type: "diagnostic", code: "empty_response", message: "Empty", level: "error",
-        response: { ...completion, responseId: "empty", requestParentId: "legacy", source } }, { source: agentSource("a") })),
-      node("summary", "empty", event(ContextSummary.id, { summary: "Summary", keptFrom: "input", model: "p/m:off", tokensBefore: 1000, completion }, { source: agentSource("a") })),
-      node("failure", "summary", notice("a", "context_compression_failed", "Failed", "warning")),
+      node("cache", "answer", event(Execution.id, { type: "diagnostic", code: "cache_miss", message: "Cache missed", level: "warning" }, { source: agentSource("a") })),
+      node("summary", "cache", event(ContextSummary.id, { summary: "Summary", keptFrom: "input", model: "p/m:off", tokensBefore: 1000, completion }, { source: agentSource("a") })),
+      node("failure", "summary", notice("a", "request_limit", "Request limit reached", "error")),
       node("invalid", "failure", event(Execution.id, {}, { source: agentSource("a") })),
     ];
     const result = diagnosticHistory(sessionView(nodeView("s", "", nodes, "invalid")), "a", "timeline");
-    expect(result.requests).toHaveLength(3);
-    expect(result.requests.map(request => request.completion?.usage)).toEqual([completion.usage, completion.usage, completion.usage]);
+    expect(result.requests).toHaveLength(2);
+    expect(result.requests.map(request => request.completion?.usage)).toEqual([completion.usage, completion.usage]);
     expect(result.requests[0]).toMatchObject({ kind: "compression", model: "p/m:off", summary: "Summary", inputHasFiles: false });
-    expect(result.requests[1]).toMatchObject({ responseId: "empty", blocks: [], notices: [{ code: "empty_response" }] });
-    expect(result.requests[2]?.notices).toMatchObject([{ code: "reported" }]);
-    expect(result.notices).toMatchObject([{ code: "context_compression_failed" }]);
+    expect(result.requests[1]).toMatchObject({ responseId: "r", blocks: [{ record: { id: "answer" } }] });
+    expect(result.notices).toMatchObject([{ code: "request_limit" }, { code: "cache_miss" }]);
     expect(result.unreadable).toBe(1);
   });
 
