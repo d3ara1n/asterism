@@ -70,7 +70,7 @@ describe("代理诊断历史", () => {
   it("输入模态沿请求真实父链判断，压缩移除旧附件后不再影响新请求", () => {
     const file = { kind: "file", file: { "$atelier.content": "00000000-0000-4000-8000-000000000001" }, mediaType: "image/png" };
     const nodes = [
-      node("file", null, event(UserMessage.id, { parts: [file] }, { source: agentSource("a") })),
+      node("file", null, event(UserMessage.id, { startsTurn: true, parts: [file] }, { source: agentSource("a") })),
       node("before", "file", text("a", "before", 0, "Read file", { requestParentId: "file", completion })),
       node("recent", "before", message("a", "Continue in text")),
       node("summary", "recent", event(ContextSummary.id, { summary: "File summarized", keptFrom: "recent", model: "p/m", tokensBefore: 1000, completion }, { source: agentSource("a") })),

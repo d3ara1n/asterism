@@ -115,7 +115,7 @@ headers 来源需要消费者持有自己的模型调用结果，因此自然用
 | 接口 | 能力 |
 | --- | --- |
 | `SessionReader` | 会话身份、固定观察快照 `snapshot()`、当前会话数据读取 `get()`、标题读取 |
-| `SessionExecutor` | 读取能力 + 同步提交 `commit(writer => ...)`（当前数据 `set` 与当前时间线 `append`）+ 标题覆盖 `title.set` + 会话内 `create / link / unlink / remove` |
+| `SessionExecutor` | 读取能力 + 同步提交 `commit(writer => ...)`（当前数据 `set` 与当前时间线 `append`）+ 标题覆盖 `title.set` + 会话内 `create / invoke / link / unlink / remove` |
 | `ObjectReader` | 资源身份、调用绑定的资源快照 `snapshot()`、当前对象数据读取 `get()`、只读 `session` |
 | `ObjectExecutor` | 读取能力 + 对象同步提交 `commit`、可执行 `session`、对象二进制流发布 `streams.publish` |
 | `ToolSession` | 只读会话能力 + 自动链接给执行者且可附带初始资源链接的 `create` + 本请求有效链接范围内的 `remove`；随工具调用结束失效 |
@@ -134,6 +134,7 @@ headers 来源需要消费者持有自己的模型调用结果，因此自然用
 ## 具型创建、动作与准备管线
 
 - **契约与实现**：在纯契约入口用 `defineCreation(resource, { id, schema })` 与 `defineAction(resource, { id, schema })` 声明；后台用 `implementCreation`、`implementAction` 与 `implementResource` 内联聚合，外部准备者用 `implementPreparer(ActionContract, ...)` 绑定具体动作；前端用 `session.create(CreationContract, input, position)` 与 `object.invoke(ActionContract, input)` 调用。
+- **调用输入**：按契约调用的操作身份由契约单独确定，输入只承载业务参数；每个契约独立声明 schema。业务联合中的判别字段表达数据自身的分型，跨进程信封中的路由身份属于传输层，两者与重复声明操作名的输入字段分别处理。
 - **五步输入处理次序**：
   1. 按资源所有者注册的 schema 解析原始输入一次（支持默认值、trim、transform，输入与输出均须为 JSON 值）。
   2. 动作按装配顺序执行匹配的外部准备者（只读门面）。
@@ -149,6 +150,16 @@ headers 来源需要消费者持有自己的模型调用结果，因此自然用
 - `session.link(receiver, resource)`、`session.unlink(receiver, resource)` 使用完整资源引用，校验双方属于当前会话和当前路径、类型一致且接收者支持链接。`session.remove(resource)` 与前端共用宿主移除操作；对象生命周期语义见 [资源](object-model.md#resource可被操作的对象)。
 - 顶层工具的 `context.session` 固定执行会话和发起对象，`create(contract, input, { resources? })` 自动将新资源链接给发起者，返回同一 `ResourceCreationResult`；可选 `resources`（API 10.1）接收本请求有效链接范围内的资源 ID。`remove(resourceId)` 采用同一请求范围，并在提交时验证当前存在性与收束。模型创建的完整规则见 [Agent 创建与移除](runtime.md#agent-创建与移除)。普通 `ObjectReader.session` 仍为只读。
 - `plugin.signal` 在装配失败或开始关闭时取消，用于撤销插件自有公共登记；取消不代表活动已结束。宿主保留在途执行所需的提交设施，等待其真实收束后才释放，不因该信号提前阻断最终记录保存。
+
+### 后台资源动作（API 11.1）
+
+`SessionExecutor.invoke(ActionContract, target: ResourceRef, input, { signal?, content? })` 由调用插件发起后台资源动作，返回 `Promise<void>`。契约须为目标资源已注册的真实声明实例；目标须属于绑定会话且仍在当前路径上，声明副本、类型不匹配及已移除资源明确失败。公开契约提供调用入口，目标的私有数据与提交门面继续由资源提供方持有；`plugin.object(...)` 的归属校验保持不变。
+
+- **处理与结果**：复用前端动作的 schema、外部准备者、资源准备与对象串行队列；执行前和首次提交时重验目标。返回表示动作处理完成，错误通过 `PluginApiError` 交付，领域原因和展示文案保留。由动作启动的独立托管任务遵循资源自己的契约，例如 Agent 提交返回只表示输入已受理。
+- **取消与收束**：`signal` 贯穿准备、排队与动作处理器。取消排队项使其轮到执行时直接结束；已执行动作协作式处理取消，宿主等待真实结束后释放内容。调用方的整次操作以及提供方的准备／执行均参与运行生命周期，期间阻止相关资源移除和会话游标回溯。准备期限只约束准备阶段，完成准备后清除计时；动作没有默认执行超时。
+- **附件交接**：`content` 为调用插件取得的合法读取门面，省略时使用调用位置绑定的会话／对象内容。首次异步等待前独立保留输入引用，规则见 [临时占用与提交](content.md#临时占用与提交)。指定目标不授予读取其私有附件的资格。
+- **动作重入**：当前动作调用链仍在执行同一目标时，新的调用在准备前返回 `conflict`，避免等待排在自己之后的动作。动作结束后，其异步后续可再次调用该对象。资源内部的同步复用通过普通函数完成。
+- **能力门面**：此入口属于后台执行门面；`ObjectReader.session` 与工具受约束的 `ToolSession` 保持各自声明的能力。动作调用不自动作为模型工具暴露，前端继续使用绑定对象的 `object.invoke`。
 
 ## 宿主运行生命周期
 

@@ -1,5 +1,5 @@
-import type { CreationContract, DataContract, Json, ResourceRef, ResourceCreationResult, SessionDirectory } from "@atelier/sdk/contracts";
-import type { ResourceCreationOptions } from "@atelier/sdk/runtime";
+import type { ActionContract, CreationContract, DataContract, Json, ResourceRef, ResourceCreationResult, SessionDirectory } from "@atelier/sdk/contracts";
+import type { ResourceActionOptions, ResourceCreationOptions } from "@atelier/sdk/runtime";
 import type { NewNode, SessionNode } from "../shared/session.ts";
 import type { FoldedObject, FoldedState } from "../session/fold.ts";
 import type { AgentCapabilities, ToolPolicy } from "../execution/capabilities.ts";
@@ -15,6 +15,7 @@ export interface SessionHostWriter {
 export interface SessionHost {
   list: SessionDirectory["list"];
   create(sessionId: string, contract: CreationContract<unknown>, input: Json, options: ResourceCreationOptions & { owner: string; check(): void }): Promise<ResourceCreationResult>;
+  invoke(sessionId: string, contract: ActionContract<unknown>, target: ResourceRef, input: Json, options: ResourceActionOptions & { owner: string; check(): void }): Promise<void>;
   link(sessionId: string, receiver: ResourceRef, resource: ResourceRef, linked: boolean): void;
   remove(sessionId: string, resource: ResourceRef): void;
   view(sessionId: string): NodeView;

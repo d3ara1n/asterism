@@ -347,7 +347,7 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
           return result;
         }, { object: ref, signal: context.signal, affectsHistory: false }).done; }
         finally { scope.active = false; }
-        if (result.action === "reject") throw new PluginApiError("rejected", result.message, result.code);
+        if (result.action === "reject") throw new PluginApiError("rejected", result.message, result.code, result.display);
         if (result.action === "replace") {
           current = { ...controller.parseCommand({ id: current.id, input: result.input }), content: context.content };
         }

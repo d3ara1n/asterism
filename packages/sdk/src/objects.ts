@@ -4,7 +4,7 @@ import type { RecordContract } from "./records.ts";
 import type { ResourceRef, ResourceCreationResult, ResourceSnapshot, SessionSnapshot } from "./workspace.ts";
 import type { ContentReader, ContentScope } from "./content-runtime.ts";
 import type { EventPublisher } from "./events.ts";
-import type { CreationContract } from "./commands.ts";
+import type { ActionContract, CreationContract } from "./commands.ts";
 
 export interface ResourceCreationOptions {
   signal?: AbortSignal;
@@ -14,6 +14,11 @@ export interface ResourceCreationOptions {
   linkTo?: ResourceRef;
   /** 新资源接收的初始资源链接，与创建原子提交。 */
   resources?: readonly ResourceRef[];
+}
+export interface ResourceActionOptions {
+  signal?: AbortSignal;
+  /** 本次动作输入的合法内容来源；省略时使用调用者绑定的会话／对象内容门面。 */
+  content?: ContentReader;
 }
 
 /** 同步事务中的数据与事件写入；宿主限制 writer 的调用有效期。 */
@@ -32,6 +37,8 @@ export interface SessionReader {
 }
 export interface SessionExecutor extends SessionReader {
   create<I, S extends Json, O extends Json>(contract: CreationContract<I, S, O>, input: NoInfer<I> & Json, options?: ResourceCreationOptions): Promise<ResourceCreationResult>;
+  /** 调用资源公开动作；返回表示动作处理完成，独立托管工作由资源自身管理。 */
+  invoke<I, O extends Json>(contract: ActionContract<I, O>, target: ResourceRef, input: NoInfer<I> & Json, options?: ResourceActionOptions): Promise<void>;
   link(receiver: ResourceRef, resource: ResourceRef): void;
   unlink(receiver: ResourceRef, resource: ResourceRef): void;
   /** 移除已收束对象并解除所有链接；保留历史与外部实体。 */

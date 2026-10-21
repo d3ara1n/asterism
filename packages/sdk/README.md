@@ -4,7 +4,7 @@
 
 SDK 包版本见 [package.json](package.json)，宿主 API 版本见 [`sdkApi`](../../src/plugins/packages.ts)。内置插件领域契约独立在 [`@atelier/builtin-api`](../builtin-api/README.md)，不进入通用 SDK。
 
-当前宿主 API 为 **11.0**，清单声明 `{ "major": 11, "minMinor": 0 }`，依赖 `@atelier/sdk: ^0.28.0`。公共模型终态通过具型扩展携带领域数据；提供商与用量以独立目录供插件消费；前端入口默认导出 `defineRendererPlugin(...)`，功能视图放入其 `modules`，调用契约显式声明 `scope`。
+当前宿主 API 为 **11.1**，使用后台资源动作调用的插件声明 `{ "major": 11, "minMinor": 1 }`，依赖 `@atelier/sdk: ^0.29.0`。后台通过 `session.invoke` 调用资源动作；公共模型终态通过具型扩展携带领域数据；前端入口默认导出 `defineRendererPlugin(...)`，功能视图放入其 `modules`，调用契约显式声明 `scope`。
 
 ## 子路径入口
 
@@ -52,6 +52,7 @@ export default definePlugin({
 - **读取与提交**：`plugin.session(id)` 与 `plugin.object(sessionId, ResourceContract, id)` 提供 `snapshot()`、`get(DataContract)` 与同步 `commit(writer => { writer.set(...); writer.append(...); })`。快照按需读取 `records.all / query / first / last`（支持 `scope: "timeline" | "session"`）。
 - **会话目录与资源管理（API 9.1，初始资源链接为 10.1，创建标题为 10.2）**：`plugin.sessions.list()` 读取全部会话摘要；`session.create(CreationContract, input, { signal?, content?, linkTo?, resources? })` 返回 `ResourceCreationResult`（兼容 `ResourceRef`，附带提交时的 `title`），`resources` 是新资源接收的引用列表。工具的 `context.session.create(contract, input, { resources? })` 返回同一结果，接收本请求有效范围内的资源 ID 列表。`session.link(receiver, resource)`、`unlink(receiver, resource)`、`remove(resource)` 使用完整引用，作用域、原子性与收束规则见 [会话资源接口](../../docs/plugin-sdk.md#会话目录与资源操作api-91)，可编译示例见 `examples/session-resources.ts`。
 - **具型创建与动作**：在 `contracts` 中用 `defineCreation(resource, { id, schema })` 与 `defineAction(resource, { id, schema })` 声明；在 `runtime` 中用 `implementResource` 聚合 `creation`、`actions`、`project`、`inspect`、`context`；在 `renderer` 中用 `session.create(CreationContract, input, position)` 与 `object.invoke(ActionContract, input)` 调用。
+- **后台资源动作（API 11.1）**：`plugin.session(sessionId).invoke(ActionContract, target, input, { signal?, content? })` 返回 `Promise<void>`，复用完整准备和对象队列。调用其他插件资源不取得其私有对象门面；返回表示动作处理完成，独立托管工作由资源继续管理。取消、附件交接和重入规则见 [后台资源动作](../../docs/plugin-sdk.md#后台资源动作api-111)，可编译示例见 [`examples/session-resources.ts`](examples/session-resources.ts)。
 - **不可变内容（`ContentRef`）**：在 schema 中组合 `contentRefSchema`；在 `prepare / create / execute` 或前端 `InputView / object.input` 中通过 `content` 门面调用 `read / open / stage`（作用域规则见 [不可变内容](../../docs/content.md)）。
 
 ### 2. 公共模块导出（`./public`）
@@ -63,7 +64,7 @@ export default definePlugin({
   "exports": { "./public": "./src/public.ts" },
   "atelier": {
     "id": "example.tools",
-    "api": { "major": 11, "minMinor": 0 },
+    "api": { "major": 11, "minMinor": 1 },
     "runtime": "./src/runtime.ts"
   }
 }

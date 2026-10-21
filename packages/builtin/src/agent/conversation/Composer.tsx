@@ -1,5 +1,5 @@
 import { useI18n } from "@atelier/sdk/renderer";
-import { Square, ArrowUp } from "lucide-react";
+import { Square, ArrowUp, Archive } from "lucide-react";
 import { useSyncExternalStore, type Ref } from "react";
 import type { MessageDraft } from "./draft";
 import type { AgentExecutionState } from "../state";
@@ -10,14 +10,16 @@ import { InputGroup, InputGroupTextarea, InputGroupAddon } from "@atelier/ui/ui/
 import { commonMessages } from "../../messages/common";
 import { conversationMessages } from "../../messages/conversation";
 
-export function MessageComposer({ draft, inputRef, busy, ready, executionState, writable, onSend, onCancel, onContinue }: {
+export function MessageComposer({ draft, inputRef, busy, ready, executionState, writable, onSend, onSave, onCancel, onContinue }: {
   draft: MessageDraft; inputRef: Ref<HTMLTextAreaElement>;
   busy: boolean; ready: boolean; executionState: AgentExecutionState; writable: boolean;
-  onSend(): Promise<void>; onCancel(): Promise<unknown>; onContinue(): Promise<void>;
+  onSend(): Promise<void>; onSave(): Promise<unknown>; onCancel(): Promise<unknown>; onContinue(): Promise<void>;
 }) {
   const i18n = useI18n();
   const state = useSyncExternalStore(draft.subscribe, draft.getSnapshot);
   const running = executionState === "running";
+  const cancelDisabled = busy || !ready;
+  busy = busy || state.locked;
   return <form {...fileInputEvents(draft, busy || !ready)} onSubmit={event => { event.preventDefault(); void onSend(); }}>
   <InputGroup>
     <InputGroupTextarea ref={inputRef} rows={3} maxLength={100_000} value={state.text} disabled={busy}
@@ -30,7 +32,9 @@ export function MessageComposer({ draft, inputRef, busy, ready, executionState, 
     <InputGroupAddon align="block-end" className="min-w-0 gap-1">
       <AttachFiles draft={draft} disabled={busy || !ready} />
       <DraftFiles draft={draft} disabled={busy} />
-      {running ? <Button type="button" size="sm" variant="secondary" disabled={busy || !ready}
+      <Button type="button" size="sm" variant="ghost" disabled={busy || !ready || state.uploading || (!state.text.trim() && !state.files.length)}
+        onClick={() => { void onSave(); }}><Archive />{i18n.text(conversationMessages.saveDraft)}</Button>
+      {running ? <Button type="button" size="sm" variant="secondary" disabled={cancelDisabled}
         onClick={() => { void onCancel(); }}><Square />{i18n.formatMessage(conversationMessages.stop)}</Button>
         : <div className="flex shrink-0 gap-1">
           {executionState === "incomplete" && <Button type="button" size="sm" variant="ghost" disabled={!writable} onClick={() => { void onContinue(); }}>{i18n.formatMessage(conversationMessages.continue)}</Button>}

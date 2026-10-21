@@ -1,13 +1,30 @@
 import { type ModelFilePart, type ModelInputPart, type UiText, fileMediaType, modelInputLimits } from "@atelier/sdk/contracts";
-import type { RendererContentInput } from "@atelier/sdk/renderer";
+import type { RendererContentInput, ContentReader } from "@atelier/sdk/renderer";
 import { mediaMessages } from "../../messages/media.ts";
 
 interface DraftFile { part: ModelFilePart; size: number }
-interface DraftState { text: string; files: readonly DraftFile[]; uploading: boolean; error: UiText | null }
+interface DraftState { text: string; files: readonly DraftFile[]; uploading: boolean; locked: boolean; error: UiText | null }
+
+/** 在移除持久根之前，把附件交给编辑器自己的上传占用；失败关闭新占用，原内容保留。 */
+export async function copyDraft(parts: readonly ModelInputPart[], source: ContentReader, content: RendererContentInput) {
+  const copied: ModelInputPart[] = [], files: DraftFile[] = [];
+  try {
+    for (const part of parts) {
+      if (part.kind === "text") { copied.push({ ...part }); continue; }
+      const chunks: Uint8Array<ArrayBuffer>[] = [];
+      for await (const chunk of source.open(part.file)) chunks.push(Uint8Array.from(chunk));
+      const blob = new Blob(chunks, { type: part.mediaType });
+      const file = { ...part, file: await content.stage(blob) };
+      copied.push(file); files.push({ part: file, size: blob.size });
+    }
+    return { parts: copied, text: parts.flatMap(part => part.kind === "text" ? [part.text] : []).join("\n"), files, content };
+  } catch (error) { await content.close(); throw error; }
+}
+export type CopiedDraft = Awaited<ReturnType<typeof copyDraft>>;
 
 /** 草稿属于交互模块，独立于 Composer 挂载；内容资格只随提交信封传递。 */
 export function createMessageDraft(createContent: () => RendererContentInput) {
-  let state: DraftState = { text: "", files: [], uploading: false, error: null };
+  let state: DraftState = { text: "", files: [], uploading: false, locked: false, error: null };
   let content: RendererContentInput | undefined;
   let upload: AbortController | undefined;
   const listeners = new Set<() => void>();
@@ -16,11 +33,19 @@ export function createMessageDraft(createContent: () => RendererContentInput) {
   return {
     getSnapshot: () => state,
     subscribe(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener); }; },
-    setText: (text: string) => change({ text }),
+    setText: (text: string) => { if (!state.locked) change({ text }); },
+    lock: (locked: boolean) => change({ locked }),
     content: input,
-    parts(): ModelInputPart[] { return [...(state.text.trim() ? [{ kind: "text" as const, text: state.text.trim() }] : []), ...state.files.map(file => file.part)]; },
+    parts(trim = true): ModelInputPart[] {
+      const text = trim ? state.text.trim() : state.text;
+      return [...(text ? [{ kind: "text" as const, text }] : []), ...state.files.map(file => file.part)];
+    },
+    restore(value: CopiedDraft) {
+      void content?.close(); content = value.content;
+      change({ text: value.text, files: value.files, error: null });
+    },
     async add(files: readonly File[]) {
-      if (state.uploading || !files.length) return;
+      if (state.locked || state.uploading || !files.length) return;
       const controller = new AbortController(); upload = controller;
       change({ uploading: true, error: null });
       try {
@@ -41,7 +66,7 @@ export function createMessageDraft(createContent: () => RendererContentInput) {
     },
     cancelUpload: () => upload?.abort(),
     remove(index: number) {
-      if (state.uploading) return;
+      if (state.locked || state.uploading) return;
       change({ files: state.files.filter((_, i) => i !== index), error: null });
       if (!state.files.length) { void content?.close(); content = undefined; }
     },

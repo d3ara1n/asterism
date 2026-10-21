@@ -53,11 +53,11 @@ async function open(stream: (request: StreamRequest) => AsyncIterable<ModelEvent
   const session = context.session(sessionId);
   const submit = (text: string) => {
     let id!: string;
-    object.commit(writer => { id = writer.append(UserMessage, { parts: [{ kind: "text", text }] }); });
+    object.commit(writer => { id = writer.append(UserMessage, { startsTurn: true, parts: [{ kind: "text", text }] }); });
     messages.push(id); return id;
   };
   const submitBatch = (texts: string[]) => {
-    object.commit(writer => { for (const text of texts) messages.push(writer.append(UserMessage, { parts: [{ kind: "text", text }] })); });
+    object.commit(writer => { for (const text of texts) messages.push(writer.append(UserMessage, { startsTurn: true, parts: [{ kind: "text", text }] })); });
   };
   const reply = (text: string) => {
     const origin = session.snapshot().position.nodeId;

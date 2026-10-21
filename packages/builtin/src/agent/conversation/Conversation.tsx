@@ -16,6 +16,7 @@ import { conversationTimeline } from "./timeline";
 
 import { useConversationInteraction } from "./interaction";
 import { AgentToolbar, AgentUIRegion, useComposerHidden } from "../ui/AgentUI";
+import { AgentDraftsPanel } from "./Drafts";
 
 /** 卡片标题栏中的执行状态；历史属于会话，入口在窗口标题栏。 */
 export function ConversationActions() {
@@ -79,11 +80,12 @@ export function Conversation() {
       </div>}
     </div>
     <AgentUIRegion position="bottom" />
+    {!composerHidden && <AgentDraftsPanel onTake={() => composer.current?.focus({ preventScroll: true })} />}
     {!composerHidden && <footer className="shrink-0 space-y-1 border-t px-3 pt-1 pb-2">
       <AgentToolbar />
       <MessageComposer draft={interaction.draft} inputRef={composer}
         busy={state.busy} ready={ready} executionState={executionState} writable={interaction.writable} onSend={send}
-        onCancel={interaction.cancel} onContinue={resume} />
+        onSave={() => interaction.save()} onCancel={interaction.cancel} onContinue={resume} />
     </footer>}
   </>;
 }

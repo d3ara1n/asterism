@@ -14,7 +14,7 @@
 
 | 目录 | 职责 |
 | --- | --- |
-| `src/agent/` | 选择、输入受理、执行循环、上下文压缩、历史投影与对话视图；`data.ts` 保存私有状态声明，公共动作与记录在公共 API 包 |
+| `src/agent/` | 选择、输入受理、执行循环、上下文压缩、历史投影与对话视图；`data.ts` 保存私有状态，`submissions.ts` 按动作契约与输入去重，`drafts.ts / drafts-contract.ts` 管理持久输入调度与内部草稿动作，公共动作与记录在公共 API 包 |
 | `src/agent/peek/` | Agent 资源的只读调查工具、时间线记录快照、内部检索与 utility 流式报告；报告视图复用对话折叠外壳与思考预览 |
 | `src/agent/ui/` | Agent 自有 toolbar／overlay／modal 布局、贡献组件挂载、当前模型选择注入与输入区隐藏请求；公共作者接口在 `@atelier/builtin-api/renderer`，内置工具栏贡献在 `conversation/Toolbar.tsx` |
 | `src/agent/conversation/Markdown.tsx`、`MarkdownCode.tsx`、`MermaidDiagram.tsx` | Markdown 图片与代码组件、Mermaid 按需渲染；`markdown-options.ts` 声明历史与实时内容共用的插件，交互见[对话视图](../../docs/workbench.md#代理卡片与工具调用视图) |

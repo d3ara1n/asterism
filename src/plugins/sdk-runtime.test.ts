@@ -13,7 +13,7 @@ import * as runtimeModules from "../runtime/builtin.ts";
 import type { ToolRegistry } from "../tools/registry.ts";
 import { foldWorkbench } from "../session/fold.ts";
 import type { ModelAdapter, ModelInput } from "../model/contract.ts";
-import { Agent, SubmitAgentInput } from "@atelier/builtin-api/contracts";
+import { Agent, CreateAgent, SubmitAgentInput, CancelAgent } from "@atelier/builtin-api/contracts";
 import { applicationStorage } from "../shared/application.ts";
 import { flat } from "../session/test-nodes.ts";
 
@@ -27,7 +27,21 @@ const CreateCounter = defineCreation(Counter, { id: ns.name("create"), schema: z
 const ChangeCount = defineAction(Counter, { id: ns.name("change"), schema: Command });
 const roots: string[] = [];
 const services: ApplicationService[] = [];
+const actionGates = new Set<() => void>();
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  const promise = new Promise<T>(accept => { resolve = accept; });
+  return { promise, resolve };
+}
+function actionGate() {
+  const gate = deferred<void>();
+  actionGates.add(gate.resolve);
+  return gate;
+}
 afterEach(async () => {
+  vi.useRealTimers();
+  for (const release of actionGates) release();
+  actionGates.clear();
   for (const service of services.splice(0)) await service.close();
   vi.restoreAllMocks();
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
@@ -47,7 +61,9 @@ async function configureModel(service: ApplicationService) {
   } });
   return { role: "default", model: result.savedId! };
 }
-function counter(options: { onRead?: (object: ObjectReader) => void; failCreate?: boolean; onCreate?: (object: ObjectExecutor) => void; afterCreate?: (object: ObjectExecutor) => void; afterAction?: (object: ObjectExecutor) => void; observe?: (record: SessionRecord, context: PluginContext) => void } = {}) {
+function counter(options: { onRead?: (object: ObjectReader) => void; failCreate?: boolean; onCreate?: (object: ObjectExecutor) => void; afterCreate?: (object: ObjectExecutor) => void; afterAction?: (object: ObjectExecutor) => void; observe?: (record: SessionRecord, context: PluginContext) => void;
+  prepare?: (signal: AbortSignal) => Promise<void>; execute?: (object: ObjectExecutor, signal: AbortSignal, amount: number) => Promise<void>;
+} = {}) {
   let context!: PluginContext;
   const plugin = definePlugin({ namespace: ns, version: "1.0.0", modules: [defineModule(plugin => {
     context = plugin;
@@ -64,8 +80,9 @@ function counter(options: { onRead?: (object: ObjectReader) => void; failCreate?
           },
         }),
         actions: [implementAction(ChangeCount, {
-          prepare: input => ({ action: "replace", input: { amount: input.amount + 1 } }),
-          async execute(input, object) {
+          async prepare(input, { signal }) { await options.prepare?.(signal); return { action: "replace", input: { amount: input.amount + 1 } }; },
+          async execute(input, object, signal) {
+            await options.execute?.(object, signal, input.amount);
             object.commit(writer => {
               const value = object.get(State)! + input.amount;
               writer.set(State, value); writer.append(Changed, { value });
@@ -87,6 +104,159 @@ async function create(service: ApplicationService, sessionId: string, input = 1)
 }
 
 describe("工作台 SDK 的宿主实现", () => {
+  // docs/plugin-sdk.md：后台动作消费真实契约并复用全部准备流水线，调用不取得目标私有门面。
+  it("session.invoke 跨插件复用准备与记录来源，拒绝声明副本和错误目标", async () => {
+    const c = counter(), caller = pluginNamespace("test.action-caller");
+    let consumer!: PluginContext, prepared = 0, reject = false;
+    const { service, sessionId } = open([c.plugin, definePlugin({ namespace: caller, version: "1", setup(plugin) {
+      consumer = plugin;
+      return { preparers: [implementPreparer(ChangeCount, { id: "adjust", prepare(input) {
+        prepared++;
+        if (reject) return { action: "reject", code: "counter_blocked", message: "Counter changes are blocked.", display: "Changes are paused." };
+        return { action: "replace", input: { amount: input.amount + 10 } };
+      } })] };
+    } })]);
+    const objectId = await create(service, sessionId), target = { sessionId, id: objectId, kind: Counter.kind };
+    await expect(consumer.session(sessionId).invoke(ChangeCount, target, { amount: 3 })).resolves.toBeUndefined();
+    expect(c.context().object(sessionId, Counter, objectId).get(State)).toBe(15);
+    expect(prepared).toBe(1);
+    const last = consumer.session(sessionId).snapshot().records.last(Changed, { scope: "timeline" });
+    expect(last?.record.source).toEqual({ plugin: ns.id, resource: target });
+    expect(() => consumer.object(sessionId, Counter, objectId)).toThrow("another plugin");
+    reject = true;
+    await expect(consumer.session(sessionId).invoke(ChangeCount, target, { amount: 1 }))
+      .rejects.toMatchObject({ reason: "counter_blocked", display: "Changes are paused." });
+    await expect(consumer.session(sessionId).invoke({ ...ChangeCount }, target, { amount: 1 })).rejects.toMatchObject({ code: "invalid_argument" });
+    await expect(consumer.session(sessionId).invoke(SubmitAgentInput, target, {
+      submissionId: crypto.randomUUID(), mode: "follow", parts: [{ kind: "text", text: "Wrong type" }],
+    })).rejects.toMatchObject({ code: "invalid_argument" });
+    const other = service.sessions.tree.create("Other");
+    await expect(consumer.session(other).invoke(ChangeCount, target, { amount: 1 })).rejects.toMatchObject({ code: "invalid_argument" });
+    consumer.session(sessionId).remove(target);
+    await expect(consumer.session(sessionId).invoke(ChangeCount, target, { amount: 1 })).rejects.toMatchObject({ code: "not_found" });
+    expect(prepared).toBe(2);
+  });
+
+  // 资源动作按对象串行，取消尚在排队的调用不会执行；后续动作仍等待前项真实完成。
+  it("后台动作与桌面动作共享队列，排队取消不改变顺序", async () => {
+    const entered = deferred<void>(), end = actionGate(), order: number[] = [];
+    const c = counter({ async execute(_object, signal, amount) {
+      order.push(amount);
+      if (amount === 2) { entered.resolve(); await end.promise; }
+      signal.throwIfAborted();
+    } });
+    const { service, sessionId } = open([c.plugin]), id = await create(service, sessionId);
+    const target = { sessionId, id, kind: Counter.kind }, session = c.context().session(sessionId);
+    const first = session.invoke(ChangeCount, target, { amount: 1 });
+    await entered.promise;
+    const controller = new AbortController();
+    const cancelled = session.invoke(ChangeCount, target, { amount: 2 }, { signal: controller.signal });
+    const rejected = expect(cancelled).rejects.toThrow();
+    const last = service.sessions.execute({ type: "resource.command", sessionId, objectId: id, command: resourceCall(ChangeCount, { amount: 3 }) });
+    controller.abort();
+    expect(order).toEqual([2]);
+    end.resolve(); await Promise.all([first, rejected, last]);
+    expect(order).toEqual([2, 4]);
+    expect(c.context().object(sessionId, Counter, id).get(State)).toBe(7);
+  });
+
+  // 准备和执行都属于在途调用；取消信号不会提前释放生命周期，迟到准备不进入动作。
+  it.each(["prepare", "execute"] as const)("取消 %s 中的后台动作等待真实结束并阻止回溯", async phase => {
+    const entered = deferred<AbortSignal>(), end = actionGate();
+    const wait = async (signal: AbortSignal) => { entered.resolve(signal); await end.promise; signal.throwIfAborted(); };
+    const c = counter(phase === "prepare" ? { prepare: wait } : { execute: (_object, signal) => wait(signal) });
+    const { service, sessionId } = open([c.plugin]), id = await create(service, sessionId);
+    const controller = new AbortController();
+    const call = c.context().session(sessionId).invoke(ChangeCount, { sessionId, id, kind: Counter.kind }, { amount: 1 }, { signal: controller.signal });
+    const rejected = expect(call).rejects.toThrow();
+    const signal = await entered.promise;
+    controller.abort();
+    expect(signal.aborted).toBe(true);
+    await expect(service.sessions.execute({ type: "select", sessionId, nodeId: null })).rejects.toThrow("settle");
+    expect(() => c.context().session(sessionId).remove({ sessionId, id, kind: Counter.kind })).toThrow("settle");
+    end.resolve(); await rejected;
+    expect(c.context().object(sessionId, Counter, id).get(State)).toBe(1);
+  });
+
+  // 准备期限只约束准备；动作进入执行后，已经完成的准备计时不能取消内容或执行信号。
+  it("准备期限不会变成动作执行超时，关闭仍取消并等待后台调用", async () => {
+    const entered = deferred<AbortSignal>(), end = actionGate();
+    const c = counter({ async execute(_object, signal) { entered.resolve(signal); await end.promise; signal.throwIfAborted(); } });
+    const { service, sessionId } = open([c.plugin]), id = await create(service, sessionId);
+    vi.useFakeTimers();
+    const call = c.context().session(sessionId).invoke(ChangeCount, { sessionId, id, kind: Counter.kind }, { amount: 1 });
+    const rejected = expect(call).rejects.toThrow();
+    const signal = await entered.promise;
+    await vi.advanceTimersByTimeAsync(20_000);
+    expect(signal.aborted).toBe(false);
+    let closed = false;
+    const closing = service.close().then(() => { closed = true; });
+    expect(signal.aborted).toBe(true);
+    expect(closed).toBe(false);
+    end.resolve(); await rejected; await closing;
+    services.splice(services.indexOf(service), 1);
+    vi.useRealTimers();
+  });
+
+  // docs/plugin-sdk.md 的关闭契约：已进入动作可以提交收尾事实，新调用门禁不阻断第一次收尾提交。
+  it("关闭时已进入的后台动作可以保存最终记录", async () => {
+    const entered = deferred<AbortSignal>(), end = actionGate();
+    let saved: number | null = null;
+    const c = counter({ async execute(_object, signal) { entered.resolve(signal); await end.promise; expect(signal.aborted).toBe(true); },
+      afterAction(object) { saved = object.get(State); } });
+    const { service, sessionId } = open([c.plugin]), id = await create(service, sessionId);
+    const call = c.context().session(sessionId).invoke(ChangeCount, { sessionId, id, kind: Counter.kind }, { amount: 1 });
+    await entered.promise;
+    const closing = service.close();
+    end.resolve();
+    await call; await closing;
+    services.splice(services.indexOf(service), 1);
+    expect(saved).toBe(3);
+  });
+
+  // 同对象动作重入明确冲突；动作结束后的异步工作可再次提交，避免把历史调用链当成永久锁。
+  it("拒绝同对象重入且释放已结束动作的调用链", async () => {
+    let deferred: Promise<void> | undefined;
+    const resume = actionGate();
+    const c = counter({ async execute(object, _signal, amount) {
+      if (amount !== 2) return;
+      await expect(object.session.invoke(ChangeCount, object.ref, { amount: 2 })).rejects.toMatchObject({ code: "conflict" });
+      await expect(c.context().session(object.ref.sessionId).invoke(ChangeCount, object.ref, { amount: 2 })).rejects.toMatchObject({ code: "conflict" });
+      deferred = resume.promise.then(() => object.session.invoke(ChangeCount, object.ref, { amount: 2 }));
+    } });
+    const { service, sessionId } = open([c.plugin]), id = await create(service, sessionId);
+    await c.context().session(sessionId).invoke(ChangeCount, { sessionId, id, kind: Counter.kind }, { amount: 1 });
+    resume.resolve(); await deferred;
+    expect(c.context().object(sessionId, Counter, id).get(State)).toBe(6);
+  });
+
+  // Agent 动作完成只表示受理，独立执行通过 CancelAgent 控制，不随提交调用信号继续绑定。
+  it("外部后台插件提交 Agent 输入后立即返回，并通过资源动作停止执行", async () => {
+    let consumer!: PluginContext;
+    const entered = deferred<AbortSignal>();
+    const { service, sessionId } = open([definePlugin({ namespace: pluginNamespace("test.agent-caller"), version: "1",
+      setup(plugin) { consumer = plugin; return {}; } })], () => ({
+      version: "test/1", validate() {}, prepare() { return { async *stream(signal) {
+        entered.resolve(signal);
+        await new Promise<void>(resolve => {
+          if (signal.aborted) resolve(); else signal.addEventListener("abort", () => resolve(), { once: true });
+        });
+        signal.throwIfAborted();
+      } }; },
+    }));
+    const model = await configureModel(service), session = consumer.session(sessionId);
+    const agent = await session.create(CreateAgent, { selection: { agent: "worker", model: model.model, thinking: null } });
+    const submission = new AbortController();
+    await session.invoke(SubmitAgentInput, agent, { submissionId: crypto.randomUUID(), mode: "follow",
+      parts: [{ kind: "text", text: "Start" }] }, { signal: submission.signal });
+    const signal = await entered.promise;
+    submission.abort();
+    expect(signal.aborted).toBe(false);
+    await session.invoke(CancelAgent, agent, {});
+    await vi.waitFor(() => expect(service.sessions.running).toBe(false));
+    expect(signal.aborted).toBe(true);
+  });
+
   // 非内置提供者必须通过同一模型工具目录和只读关联门面执行，工具策略在请求开始时捕获。
   it("外部顶层工具从首个请求声明，绑定调用对象并遵循工具筛选", async () => {
     const c = counter(), other = pluginNamespace("test.questions");
@@ -348,11 +518,11 @@ describe("工作台 SDK 的宿主实现", () => {
     await Promise.all([closing, rejected]);
     expect(closed).toBe(true);
   });
-  it("首页 prepare 不能将首条输入替换成不提交输入的动作", async () => {
+  it("首页输入准备的替换结果必须满足提交契约，失败不创建会话", async () => {
     const namespace = pluginNamespace("test.first-input");
     const plugin = definePlugin({ namespace, version: "1", modules: [defineModule(() => ({
-      preparers: [{ id: "cancel", contract: SubmitAgentInput,
-        prepare: () => ({ action: "replace", input: { type: "cancel" } }) }],
+      preparers: [{ id: "empty-input", contract: SubmitAgentInput,
+        prepare: () => ({ action: "replace", input: {} }) }],
     }))] });
     const { service } = open([plugin]);
     const target = await configureModel(service);

@@ -1,6 +1,6 @@
 import { composeSystemPrompt } from "./system-prompt.ts";
 import type { BuiltinApplication } from "../application.ts";
-import { AgentView, AgentSelection } from "./data.ts";
+import { AgentView, AgentSelection, AgentDrafts } from "./data.ts";
 import { defineModule, implementResource, implementCreation, implementAction } from "@atelier/sdk/runtime";
 import {
   Agent, CreateAgent, SubmitAgentInput, ContinueAgent, ConfigureAgent, CancelAgent, AgentConfigurations,
@@ -13,6 +13,8 @@ import { projectAgentTurnState } from "./state-projection.ts";
 import type { UsageConsumer } from "../usage/service.ts";
 import { createPeekTool } from "./peek/runtime.ts";
 import { AgentExecutionFeedback } from "./feedback.ts";
+import { SaveAgentDraft, SetAgentDraftMode, ExchangeAgentDraft } from "./drafts-contract.ts";
+import { saveDraft, setDraftMode, exchangeDraft } from "./drafts.ts";
 
 /** 资源入口只装配领域模块与贡献；业务模块不依赖完整插件上下文。 */
 export function createAgentModule(application: BuiltinApplication, usage: UsageConsumer) {
@@ -38,19 +40,22 @@ export function createAgentModule(application: BuiltinApplication, usage: UsageC
         project(_data, object) {
           const value = object.get(AgentSelection);
           return { agentId: object.ref.id, selection: value?.selection ?? null, selectionRevision: value?.revision ?? 0,
-            turnState: projectAgentTurnState(object.session.snapshot(), object.ref.id) };
+            turnState: projectAgentTurnState(object.session.snapshot(), object.ref.id), drafts: object.get(AgentDrafts) ?? [] };
         },
         async inspect(_data, object) {
           return { type: Agent.kind, title: object.snapshot()?.title ?? "Agent" };
         },
         actions: [
+          implementAction(SaveAgentDraft, { async execute(input, object) { saveDraft(object, input); } }),
+          implementAction(SetAgentDraftMode, { async execute(input, object) { setDraftMode(object, input); } }),
+          implementAction(ExchangeAgentDraft, { async execute(input, object) { exchangeDraft(object, input); } }),
           implementAction(SubmitAgentInput, {
-            async prepare(input, { object, signal, content }) { await admission.prepare(input, object, signal, content); return { action: "accept" }; },
-            async execute(input, object) { if (admission.accept(input, object)) loop.start(object); },
+            async prepare(input, { object, signal, content }) { await admission.prepareSubmit(input, object, signal, content); return { action: "accept" }; },
+            async execute(input, object) { if (admission.submit(input, object)) loop.start(object); },
           }),
           implementAction(ContinueAgent, {
-            async prepare(input, { object, signal, content }) { await admission.prepare(input, object, signal, content); return { action: "accept" }; },
-            async execute(input, object) { if (admission.accept(input, object)) loop.start(object); },
+            async prepare(_input, { object, signal, content }) { await admission.prepareResume(object, signal, content); return { action: "accept" }; },
+            async execute(_input, object) { admission.resume(object); loop.start(object); },
           }),
           implementAction(ConfigureAgent, { async execute(input, object) {
             object.commit(writer => {

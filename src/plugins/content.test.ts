@@ -29,7 +29,7 @@ afterEach(async () => {
   for (const service of services.splice(0)) await service.close();
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
-function fixture(options: { prepare?: (content: ContentScope, signal: AbortSignal) => Promise<void>; onCreate?: (object: ObjectExecutor) => void; extra?: ReturnType<typeof definePlugin>[]; adapter?: ModelAdapter } = {}) {
+function fixture(options: { prepare?: (content: ContentScope, signal: AbortSignal) => Promise<void>; prepareAction?: (content: ContentScope, signal: AbortSignal) => Promise<void>; onCreate?: (object: ObjectExecutor) => void; extra?: ReturnType<typeof definePlugin>[]; adapter?: ModelAdapter } = {}) {
   const root = mkdtempSync(join(tmpdir(), "atelier-content-")); roots.push(root);
   let context!: PluginContext;
   const plugin = definePlugin({ namespace: ns, version: "1", modules: [defineModule(value => {
@@ -46,6 +46,7 @@ function fixture(options: { prepare?: (content: ContentScope, signal: AbortSigna
         },
       }),
       actions: [implementAction(Replace, {
+        async prepare(_input, { content, signal }) { await options.prepareAction?.(content, signal); return { action: "accept" }; },
         async execute(input, object) {
           object.commit(writer => {
             writer.set(Current, { file: input.file });
@@ -81,6 +82,55 @@ const text = (data: Uint8Array) => new TextDecoder().decode(data);
 
 // 预期来自内容归属、同步提交和历史契约；验证公开 SDK 完整调用路径。
 describe("宿主不可变内容", () => {
+  // docs/content.md：跨插件动作在首次等待前捕获调用者合法内容，后续失去原根仍可完成交接。
+  it("后台跨插件动作要求合法内容来源，并独立保留输入直到提交", async () => {
+    const ns = pluginNamespace("test.action-source");
+    const Source = ns.resource("source", z.object({}));
+    const SourceFile = ns.data("file", z.object({ file: contentRefSchema.nullable() }));
+    const CreateSource = defineCreation(Source, { id: ns.name("create"), schema: contentRefSchema });
+    let caller!: PluginContext, release!: () => void, started!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    const entered = new Promise<void>(resolve => { started = resolve; });
+    const f = fixture({
+      async prepareAction() { started(); await gate; },
+      extra: [definePlugin({ namespace: ns, version: "1", setup(plugin) {
+        caller = plugin;
+        return { resources: [implementResource(Source, SourceFile, {
+          creation: implementCreation(CreateSource, { create(file, object) {
+            object.commit(writer => { writer.set(SourceFile, { file }); }); return { title: "Source", data: {} };
+          } }),
+          project: (_data, object) => object.get(SourceFile)!,
+          inspect: async () => ({}),
+        })] };
+      } })],
+    });
+    const initial = f.input();
+    const initialFile = await f.store.writer({ scope: initial }).stage(bytes("target"));
+    const targetId = await f.create(initialFile, initial.id);
+    await initial.close();
+    const input = f.service.sessions.openContentInput({ sessionId: f.sessionId, resourceKind: Source.kind, contractId: CreateSource.id });
+    const file = await f.store.writer({ scope: input }).stage(bytes("shared input"));
+    await f.service.sessions.execute({ type: "resource.create", sessionId: f.sessionId, kind: Source.kind,
+      creation: { id: CreateSource.id }, input: file, contentScopeId: input.id, position: { x: 0, y: 0 } });
+    await input.close();
+    const sourceId = f.service.sessions.snapshot(f.sessionId).workbench.objects.find(item => item.kind === Source.kind)!.id;
+    const source = caller.object(f.sessionId, Source, sourceId), session = caller.session(f.sessionId);
+    const target = f.object(targetId).ref;
+    await expect(session.invoke(Replace, target, { file })).rejects.toMatchObject({ code: "foreign_resource" });
+    await expect(session.invoke(Replace, target, { file }, { content: f.object(targetId).content })).rejects.toMatchObject({ code: "foreign_resource" });
+    await expect(session.invoke(Replace, target, { file }, { content: { read: async () => bytes("fake"), async *open() {} } }))
+      .rejects.toMatchObject({ code: "foreign_resource" });
+    const invoked = session.invoke(Replace, target, { file }, { content: source.content });
+    try {
+      await entered;
+      source.commit(writer => { writer.set(SourceFile, { file: null }); });
+      f.store.collect();
+      release(); await invoked;
+      expect(f.object(targetId).get(Current)).toEqual({ file });
+      expect(text(await f.object(targetId).content.read(file))).toBe("shared input");
+    } finally { release(); await invoked; }
+  });
+
   // SDK 创建必须显式交接合法内容资格，不能因知道引用就读取另一个对象的私有内容。
   it("后台创建可交接本插件对象内容，缺少读取资格时拒绝", async () => {
     const f = fixture(), draft = f.input();

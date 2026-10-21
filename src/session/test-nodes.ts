@@ -24,8 +24,8 @@ export const call = (agentId: string, responseId: string, ordinal: number, callI
   block(agentId, responseId, ordinal, { kind: "toolcall", callId, name: extra.name ?? "read", argumentsText: "{}", arguments: extra.arguments ?? {},
     outcome: (extra.outcome === undefined ? { kind: "succeeded", model: [{ kind: "text", text: callId }], data: null } : extra.outcome) as Json },
     { ...extra, complete: extra.complete ?? (extra.outcome !== null) });
-export const message = (agentId: string, value: string): NewNode =>
-  record(UserMessage.id, { parts: [{ kind: "text", text: value }] }, agentSource(agentId));
+export const message = (agentId: string, value: string, startsTurn = true): NewNode =>
+  record(UserMessage.id, { startsTurn, parts: [{ kind: "text", text: value }] }, agentSource(agentId));
 export const notice = (agentId: string | null, code: string, value: string, level: "info" | "warning" | "error" = "error"): NewNode =>
   record(Notice.id, { code, message: value, level }, agentId ? agentSource(agentId) : hostSource);
 export const event = (type: string, data: Json, options: { source?: NewNode["source"]; model?: string | null; recipient?: string | null } = {}): NewNode =>

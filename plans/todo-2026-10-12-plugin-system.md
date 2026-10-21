@@ -65,6 +65,7 @@
 - [x] 宿主存储到公开记录信封的 adapter（`src/plugins/records.ts`），公开接口不依赖物理节点。
 - [x] 提交后观察、托管任务（进程内，关闭取消）、标题比较更新、core `naming` 模块；会话命名使用配置了模型的 `utility` 角色，用户确认实现无故障。
 - [x] 资源动作 prepare（接受／替换／拒绝）与前端对象 `invoke`。
+- [x] 后台 `session.invoke` 接通公开资源动作；契约与作者入口见 [后台资源动作](../docs/plugin-sdk.md#后台资源动作api-111)。
 - [x] 插件包：清单校验（只认包根）、`plugins.json` 列表、添加与启用分离、重启生效、esbuild 打包与缓存。
 - [x] renderer 插件：`atelier-plugin://` 协议、共享模块表、卡片错误边界。
 - [x] 按对象的二进制流通道；插件页（添加、启用、禁用、移除、失败原因）。

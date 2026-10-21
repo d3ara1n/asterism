@@ -1,6 +1,6 @@
 # 内置插件公共 API（`@atelier/builtin-api`）
 
-内置实现与外部插件共同消费的领域契约、后台创建入口与前端扩展 API，当前版本 **0.9.0**。插件身份为 `atelier.builtin`；本包不注册第二个插件，也不依赖 `@atelier/builtin` 实现。公共加载与生命周期规则见 [插件 SDK](../../docs/plugin-sdk.md#公共模块与契约身份)。
+内置实现与外部插件共同消费的领域契约、后台创建入口与前端扩展 API，当前版本 **0.11.0**。插件身份为 `atelier.builtin`；本包不注册第二个插件，也不依赖 `@atelier/builtin` 实现。公共加载与生命周期规则见 [插件 SDK](../../docs/plugin-sdk.md#公共模块与契约身份)。
 
 ## 入口与边界
 
@@ -8,6 +8,7 @@
 
 - `builtin` 命名空间、Agent 资源与创建／提交／继续／配置／取消动作。
 - Agent 输入、配置、选择和历史记录契约，以及会话命名记录与 `NamingApi` 接口类型。
+- `SubmitAgentInput` 的 `mode: "steer" | "follow"` 与 `UserMessage.startsTurn` 的语义见 [输入调度与执行轮次](../../docs/runtime.md#输入调度与草稿箱)。草稿箱界面动作属于内置实现，不从公共包导出。
 - `AgentRequestContext`：工作请求终态中的具型领域资料，生产与读取遵循 [请求诊断](../../docs/runtime.md#请求诊断)，不构成独立历史记录。
 - `AgentConfigurations` 与 `ModelConfiguration` 目录契约；只包含内置领域需要的配置视图，不暴露配置文件、凭据、测试与覆盖编辑状态。
 - `ReadAgentCreations`：通过 SDK 具型调用查询模型创建入口与资源类型的关联，供前后端公共消费者使用。
@@ -27,18 +28,20 @@
   "version": "1.0.0",
   "type": "module",
   "peerDependencies": {
-    "@atelier/sdk": "^0.28.0",
-    "@atelier/builtin-api": "^0.9.0"
+    "@atelier/sdk": "^0.29.0",
+    "@atelier/builtin-api": "^0.11.0"
   },
   "atelier": {
     "id": "example.input-review",
-    "api": { "major": 11, "minMinor": 0 },
+    "api": { "major": 11, "minMinor": 1 },
     "runtime": "./src/runtime.ts"
   }
 }
 ```
 
 [可编译示例](examples/input-review.ts) 使用 `implementPreparer(SubmitAgentInput, ...)` 扩展现有 Agent 的输入准备，直接纳入项目类型检查。不需要重写 Agent 或导入应用内部目录。
+
+后台插件通过 SDK API 11.1 的 `session.invoke(SubmitAgentInput, agentRef, input, options)` 提交输入，通过同一入口调用 `CancelAgent` 等资源动作。调用不取得 Agent 私有门面；提交受理与独立执行的边界见 [输入调度](../../docs/runtime.md#输入调度与草稿箱)，可编译示例见 [`examples/agent-input.ts`](examples/agent-input.ts)。
 
 开发时可在本仓库使用 npm workspace；独立作者可用 `npm pack --workspace @atelier/sdk` 与 `npm pack --workspace @atelier/builtin-api` 生成本地包并安装。当前为孵化期私有包，不依赖 npm registry 发布。作者如预先打包插件，须将 `@atelier/sdk/*`、`@atelier/builtin-api/*` 保留为外部导入，不内联声明源码；包清单仍保留 peerDependencies。
 

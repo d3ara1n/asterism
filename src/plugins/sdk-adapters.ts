@@ -12,6 +12,7 @@ import { parseCall, applyPreparation, type ParsedCall } from "./commands.ts";
 import { synchronous } from "./synchronous.ts";
 import type { ObjectScope } from "./host.ts";
 import type { ContentLease } from "../runtime/content-store.ts";
+import { AsyncLocalStorage } from "node:async_hooks";
 
 function address(host: PluginHostServices, resource: FoldedObject): ResourceRef {
   const ref = host.refOf(resource.id);
@@ -31,6 +32,12 @@ export function adaptResource(contribution: ResourceContribution, sdk: SdkContex
     return action;
   };
   const queued = new Map<string, { sessionId: string; done: Promise<void> }>();
+  // 活跃动作链按宿主资源实现隔离；已完成动作的异步后代可以再次调用该对象。
+  const executing = new AsyncLocalStorage<readonly { id: string; active: boolean }[]>();
+  const assertActionEntry = (id: string) => {
+    if (executing.getStore()?.some(entry => entry.active && entry.id === id))
+      throw new PluginApiError("conflict", "An action cannot invoke another action on the same object before it finishes.");
+  };
   return {
     kind: resource.kind,
     receivesLinks: contribution.links?.receive === true,
@@ -49,7 +56,8 @@ export function adaptResource(contribution: ResourceContribution, sdk: SdkContex
     controller: {
       creationId: creation?.contract.id,
       creationContract: creation?.contract,
-      actionIds: [...actions.keys()],
+      actionContracts: [...actions.values()].map(action => action.contract),
+      assertActionEntry,
       ...(creation ? {
         async prepareCreate(input: unknown, request?: AbortSignal, content?: ContentLease) {
           try {
@@ -106,6 +114,7 @@ export function adaptResource(contribution: ResourceContribution, sdk: SdkContex
         async execute(context, raw, before) {
           if (runs.closed) throw new PluginApiError("unavailable", "The resource controller is closed.");
           const ref = { sessionId: context.sessionId, id: context.resource.id, kind: resource.kind };
+          assertActionEntry(ref.id);
           const previous = queued.get(ref.id)?.done ?? Promise.resolve();
           const work = runs.start(async signal => {
             await previous.catch(() => {});
@@ -114,13 +123,17 @@ export function adaptResource(contribution: ResourceContribution, sdk: SdkContex
             const scope = { active: true, provisional: !host.refOf(ref.id), before, content: raw.content };
             sdk.linkAbort(raw.content, signal);
             if (host.refOf(ref.id)) before?.();
-            try { await actionFor(raw).execute(raw.value, sdk.object(ref, scope), signal); }
-            finally { scope.active = false; }
-          }, { object: ref });
+            const entry = { id: ref.id, active: true };
+            try {
+              await executing.run([...(executing.getStore() ?? []), entry],
+                () => actionFor(raw).execute(raw.value, sdk.object(ref, scope), signal));
+            } finally { entry.active = false; scope.active = false; }
+          }, { object: ref, signal: context.signal });
           const done = work.done.catch(error => {
               if (error instanceof PluginApiError) throw new SessionError(
-                error.code === "invalid_argument" || error.code === "rejected" ? "invalid_request"
-                  : error.code === "conflict" || error.code === "not_found" ? error.code : "unavailable", error.message);
+                error.reason ?? (error.code === "invalid_argument" || error.code === "rejected" ? "invalid_request"
+                  : error.code === "conflict" || error.code === "not_found" ? error.code : "unavailable"),
+                error.message, error.display ?? (error.reason ? error.message : undefined));
               throw error;
             })
             .finally(() => {

@@ -25,7 +25,8 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
   const sessionError = (error: unknown): never => {
     if (error instanceof SessionError) throw new PluginApiError(
       error.code === "conflict" || error.code === "not_found" ? error.code
-        : error.code === "invalid_request" ? "invalid_argument" : "unavailable", error.message);
+        : error.code === "invalid_request" ? "invalid_argument" : "unavailable", error.message,
+      ["conflict", "not_found", "invalid_request", "unavailable"].includes(error.code) ? undefined : error.code, error.display);
     throw error;
   };
   const own = (kind: string) => {
@@ -87,6 +88,22 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
   const session = (id: string, objectId?: string, checkMutation = checkAvailable, scope?: ObjectScope): SessionExecutor => ({
     id,
     content: readOnly(host.content?.reader(access(id, undefined, scope)) ?? missing),
+    async invoke(contract, target, input, options = {}) {
+      checkMutation();
+      const ref = Object.freeze({ ...target });
+      if (ref.sessionId !== id) throw new PluginApiError("invalid_argument", "The resource belongs to another session.");
+      checkRef(ref);
+      const value = jsonSchema.parse(input);
+      const contentReader = options.content ?? host.content?.reader(access(id, objectId, scope));
+      return sessionRuns.start(async signal => {
+        signal.throwIfAborted();
+        try {
+          await host.sessions.invoke(id, contract, ref, value, {
+            signal, content: contentReader, owner: internal.id, check: checkMutation,
+          });
+        } catch (error) { sessionError(error); }
+      }, { object: ref, signal: options.signal }).done;
+    },
     create(contract, input, options = {}) {
       checkMutation();
       const value = jsonSchema.parse(input);

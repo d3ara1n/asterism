@@ -44,7 +44,7 @@ export default {
 function AgentBody({ data }: { data: z.infer<typeof AgentView.schema> }) {
   const object = useRendererObject();
   const executionState = agentExecutionState(data.turnState, object.activity.running);
-  const interaction = useAgentConversation(object, data.selection !== null, executionState);
+  const interaction = useAgentConversation(object, data.selection !== null, executionState, data.drafts);
   return <AgentConversationProvider value={interaction}>
     <AgentUI selection={data.selection}><Conversation /></AgentUI>
   </AgentConversationProvider>;

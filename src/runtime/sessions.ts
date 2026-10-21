@@ -1,5 +1,5 @@
-import { resourceCall, jsonSchema, type CreationContract, type ResourceCall, type ResourceCreationResult, type Json, type ModelInputPart, ResourceStatusChanged, SessionTitleChanged } from "@atelier/sdk/contracts";
-import { type ResourceRef, type PluginDefinition, type ResourceCreationOptions, PluginApiError } from "@atelier/sdk/runtime";
+import { resourceCall, jsonSchema, type ActionContract, type CreationContract, type ResourceCall, type ResourceCreationResult, type Json, type ModelInputPart, ResourceStatusChanged, SessionTitleChanged } from "@atelier/sdk/contracts";
+import { type ResourceRef, type PluginDefinition, type ResourceCreationOptions, type ResourceActionOptions, PluginApiError } from "@atelier/sdk/runtime";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
@@ -8,7 +8,7 @@ import type { ConfigurationService } from "../configuration/service.ts";
 import { AgentCapabilities } from "../execution/capabilities.ts";
 import type { ModelAdapter } from "../model/contract.ts";
 import {
-  Agent, CreateAgent, SubmitAgentInput, startAgentContentTarget, type AgentCommand, type NamingApi, inputSummary,
+  Agent, CreateAgent, SubmitAgentInput, startAgentContentTarget, type SubmitAgentInputData, type NamingApi, inputSummary,
 } from "@atelier/builtin-api/contracts";
 import { createSelection, composeSystemPrompt } from "@atelier/builtin/runtime";
 import { inputReferences } from "../model/input.ts";
@@ -72,6 +72,7 @@ export class SessionService {
         return this.tree.list();
       },
       create: (sessionId, contract, input, options) => this.createFromPlugin(sessionId, contract, input, options),
+      invoke: (sessionId, contract, target, input, options) => this.invokeFromPlugin(sessionId, contract, target, input, options),
       link: (sessionId, receiver, resource, linked) => this.setLink(sessionId, receiver, resource, linked),
       remove: (sessionId, resource) => this.removeResource(sessionId, resource),
       view: sessionId => this.tree.view(sessionId),
@@ -248,25 +249,65 @@ export class SessionService {
     const controller = this.resources.controller(resource.kind);
     if (!controller?.execute) throw new SessionError("invalid_request", "This resource has no actions.");
     const content = this.content.fork(inputScopeId, { sessionId, objectId, resourceKind: resource.kind, contractId: raw.id });
-    try {
-      const command = await this.prepareCommand(resource.kind, raw, { sessionId, objectId, content });
-      await controller.execute({ sessionId, resource }, command, () => { this.object(sessionId, objectId); });
-    } finally { await content.close(); }
+    await this.invokeResource({ sessionId, id: objectId, kind: resource.kind }, raw, content);
   }
-  private async prepareCommand(kind: string, raw: ResourceCall, context: { sessionId: string; objectId: string; content?: ContentLease }): Promise<ParsedCall> {
-    try { return await this.prepare(kind, raw, { ...context, signal: AbortSignal.timeout(10_000) }); }
+  /** 前后台动作共用准备与对象队列；本次内容占用覆盖准备、排队和真实执行。 */
+  private async invokeResource(ref: ResourceRef, raw: ResourceCall, content: ContentLease,
+    options: { signal?: AbortSignal; check?(): void } = {}): Promise<void> {
+    const abortContent = () => content.controller.abort();
+    options.signal?.addEventListener("abort", abortContent, { once: true });
+    try {
+      options.signal?.throwIfAborted(); options.check?.();
+      const resource = this.requireRef(ref.sessionId, ref);
+      const controller = this.resources.controller(ref.kind);
+      if (!controller?.execute) throw new SessionError("invalid_request", "This resource has no actions.");
+      controller.assertActionEntry?.(ref.id);
+      const command = await this.prepareCommand(ref.kind, raw, { sessionId: ref.sessionId, objectId: ref.id, content }, options.signal);
+      options.signal?.throwIfAborted(); options.check?.();
+      await controller.execute({ sessionId: ref.sessionId, resource, signal: options.signal }, command, () => {
+        options.check?.(); this.requireRef(ref.sessionId, ref, true);
+      });
+    } finally {
+      options.signal?.removeEventListener("abort", abortContent);
+      await content.close();
+    }
+  }
+  private async invokeFromPlugin(sessionId: string, contract: ActionContract<unknown>, target: ResourceRef, input: Json,
+    options: ResourceActionOptions & { owner: string; check(): void }): Promise<void> {
+    options.check(); options.signal?.throwIfAborted();
+    this.requireRef(sessionId, target);
+    if (!this.resources.controller(target.kind)?.actionContracts?.includes(contract))
+      throw new PluginApiError("invalid_argument", "Use the registered action contract instance for this resource.");
+    const value = jsonSchema.parse(input);
+    const lease = this.content.scope({ sessionId, objectId: target.id, resourceKind: target.kind, contractId: contract.id });
+    let captured: ReturnType<ContentStore["captureReader"]> | undefined;
+    try {
+      const refs = contentReferences(value);
+      if (refs.length) {
+        captured = this.content.captureReader(refs, options.content, options.owner);
+        for (const id of captured.sizes.keys()) lease.add(id);
+      }
+      await this.invokeResource(target, { id: contract.id, input: value }, lease, options);
+    } finally { await lease.close(); await captured?.close(); }
+  }
+  private async prepareCommand(kind: string, raw: ResourceCall, context: { sessionId: string; objectId: string; content?: ContentLease }, request?: AbortSignal): Promise<ParsedCall> {
+    const deadline = new AbortController();
+    const timeout = setTimeout(() => deadline.abort(new Error("Action preparation timed out.")), 10_000);
+    const signal = request ? AbortSignal.any([request, deadline.signal]) : deadline.signal;
+    try { return await this.prepare(kind, raw, { ...context, signal }); }
     catch (error) {
       if (error instanceof PluginApiError) throw sessionPluginError(error);
       throw new SessionError("unavailable", "A plugin could not prepare this command.");
     }
+    finally { clearTimeout(timeout); }
   }
   private object(sessionId: string, objectId: string): FoldedObject {
     const object = this.tree.workbench(sessionId).objects.find(o => o.id === objectId);
     if (!object) throw new SessionError("not_found", "Object not found on the current session path.");
     return object;
   }
-  private requireRef(sessionId: string, ref: ResourceRef): FoldedObject {
-    if (this.closed) throw new SessionError("unavailable", "The session service is closed.");
+  private requireRef(sessionId: string, ref: ResourceRef, finishingAction = false): FoldedObject {
+    if (this.closed && !finishingAction) throw new SessionError("unavailable", "The session service is closed.");
     if (ref.sessionId !== sessionId) throw new SessionError("invalid_request", "The resource belongs to another session.");
     const object = this.object(sessionId, ref.id);
     if (object.kind !== ref.kind) throw new SessionError("invalid_request", "The resource type does not match its reference.");
@@ -421,7 +462,7 @@ export class SessionService {
     const controller = this.resources.controller(target.resourceKind);
     if (target.objectId) {
       if (!target.sessionId || this.object(target.sessionId, target.objectId).kind !== target.resourceKind
-        || !controller?.actionIds?.includes(target.contractId))
+        || !controller?.actionContracts?.some(action => action.id === target.contractId))
         throw new SessionError("invalid_request", "The content input does not match this object action.");
     } else {
       if (controller?.creationId !== target.contractId) throw new SessionError("invalid_request", "Unknown content creation contract.");
@@ -466,9 +507,9 @@ export class SessionService {
       };
       const resource: FoldedObject = { id: agentId, kind: agentKind, title: "", data: {} };
       // 首页首条输入同样经准备流水线；此时代理尚未创建，objectId 为将要创建的身份。
-      const submit = await this.prepareCommand(agentKind, resourceCall(SubmitAgentInput, { type: "submit", submissionId: command.submissionId, parts: command.parts }), { sessionId, objectId: agentId, content });
+      const submit = await this.prepareCommand(agentKind, resourceCall(SubmitAgentInput, { mode: "follow", submissionId: command.submissionId, parts: command.parts }), { sessionId, objectId: agentId, content });
       await this.validateInitialInput((input as { selection: AgentSelection }).selection,
-        (submit.value as Extract<AgentCommand, { type: "submit" }>).parts, content);
+        (submit.value as SubmitAgentInputData).parts, content);
       await agents.execute!({ sessionId, resource }, submit, before);
       return { kind: "accepted", sessionId };
     } finally { await content.close(); }

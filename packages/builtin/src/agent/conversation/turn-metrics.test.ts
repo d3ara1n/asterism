@@ -16,6 +16,25 @@ const completion = (input: number, output: number, cacheRead: number, durationMs
 const snapshot = (path: ReturnType<typeof node>[]) => sessionSnapshot(nodeView("s", "", path, path.at(-1)?.id ?? null));
 
 describe("对话中的逐轮计量", () => {
+  // docs/runtime.md：同批独立消息和请求之间的 steer 都归入一个回合，follow 才开始下一回合。
+  it("连续输入与插话不产生空回合或拆分请求计量", () => {
+    const path = [
+      node("u1", null, message("a", "First")),
+      node("u2", "u1", message("a", "Second", false)),
+      node("r1", "u2", call("a", "r1", 0, "c", { completion: { ...completion(100, 20, 50, 2000), finishReason: "tool-calls" } })),
+      node("steer", "r1", message("a", "Correction", false)),
+      node("r2", "steer", text("a", "r2", 0, "Done", { completion: completion(200, 30, 100, 1000) })),
+      node("follow1", "r2", message("a", "Next")),
+      node("follow2", "follow1", message("a", "More", false)),
+      node("r3", "follow2", text("a", "r3", 0, "Next answer", { completion: completion(300, 40, 200, 1000) })),
+    ];
+    expect(turnMetrics(snapshot(path), "a", false)).toMatchObject([
+      { userId: "u1", nextUserId: "follow1", incomplete: false, metrics: { count: 2, usage: { input: { value: 300 } } } },
+      { userId: "follow1", nextUserId: null, incomplete: false, metrics: { count: 1 } },
+    ]);
+    expect(turnMetrics(snapshot(path), "a", true)).toHaveLength(1);
+  });
+
   // docs/workbench.md：只隐藏当前运行轮，历史轮次的计量保留在对话中。
   it("当前轮运行期间隐藏计量，开启下一轮时保留上一轮概要", () => {
     const path = [

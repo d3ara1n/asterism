@@ -61,7 +61,7 @@ describe("会话视图所有权", () => {
     const linked = snapshot(2); linked.workbench.links = [{ agentId: "a", resourceId: "n" }];
     requests[2]!.resolve(view(linked)); await flush();
     expect(settled).not.toHaveBeenCalled();
-    const continued = controller.execute({ type: "resource.command", sessionId: "s", objectId: "a", command: resourceCall(ContinueAgent, { type: "continue" }) });
+    const continued = controller.execute({ type: "resource.command", sessionId: "s", objectId: "a", command: resourceCall(ContinueAgent, {}) });
     await flush(); requests[4]!.resolve(accepted); await continued;
     requests[3]!.resolve(view(linked)); await flush(); // 已被继续操作使之过时。
     expect(settled).not.toHaveBeenCalled();
@@ -87,7 +87,7 @@ describe("会话视图所有权", () => {
     const { controller, requests } = fixture(); const disconnect = controller.connect();
     requests[0]!.resolve(view(snapshot(1))); await flush();
     const command = { type: "resource.command" as const, sessionId: "s", objectId: "a",
-      command: { id: "atelier.builtin/agent.configure", input: { type: "configure", selection: { agent: "worker", model: "new", thinking: null } } } };
+      command: { id: "atelier.builtin/agent.configure", input: { selection: { agent: "worker", model: "new", thinking: null } } } };
     const changed = controller.execute(command); await flush();
     requests[1]!.resolve(accepted); await changed;
     expect(controller.getSnapshot()).toMatchObject({ busy: false, status: "loading" });
@@ -164,7 +164,7 @@ describe("会话视图所有权", () => {
     const { controller, requests, notify } = fixture(); const disconnect = controller.connect();
     requests[0]!.resolve(view(snapshot(1))); await flush();
     const command = type === "resource.command"
-      ? { type, sessionId: "s", objectId: "new-agent", command: resourceCall(ContinueAgent, { type: "continue" }) }
+      ? { type, sessionId: "s", objectId: "new-agent", command: resourceCall(ContinueAgent, {}) }
       : { type, sessionId: "s", kind: "atelier.builtin/agent", creation: { id: "atelier.builtin/agent.create" },
         input: {}, position: { x: 0, y: 0 } };
     const failed = controller.execute(command); await flush();

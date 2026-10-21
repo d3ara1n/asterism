@@ -1,6 +1,17 @@
 import { defineMessages, pluginNamespace } from "@atelier/sdk/contracts";
 
 export const conversationMessages = pluginNamespace("atelier.builtin").messages("en", defineMessages({
+  drafts: { id: "agent_drafts_title", defaultMessage: "Drafts" },
+  saveDraft: { id: "agent_drafts_save", defaultMessage: "Save draft" },
+  draftMode: { id: "agent_drafts_mode", defaultMessage: "Send automatically" },
+  draftNone: { id: "agent_drafts_none", defaultMessage: "None" },
+  draftSteer: { id: "agent_drafts_steer", defaultMessage: "Soon" },
+  draftFollow: { id: "agent_drafts_follow", defaultMessage: "Next turn" },
+  takeDraft: { id: "agent_drafts_take", defaultMessage: "Take out" },
+  exchangeDraft: { id: "agent_drafts_exchange", defaultMessage: "Exchange with editor" },
+  draftTransferFailed: { id: "agent_drafts_transferFailed", defaultMessage: "The draft could not be transferred. Its contents have been kept." },
+  draftExchangePending: { id: "agent_drafts_exchangePending", defaultMessage: "The draft exchange is awaiting confirmation. Retry to finish restoring the editor." },
+  retryTake: { id: "agent_drafts_retryTake", defaultMessage: "Retry take out" },
   minimap: {
     id: "agent_conversation_minimap",
     defaultMessage: "Conversation navigation",

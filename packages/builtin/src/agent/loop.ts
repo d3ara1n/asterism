@@ -7,9 +7,9 @@ import { selectionOf, type AgentSelectionService } from "./selection.ts";
 import type { composeSystemPrompt } from "./system-prompt.ts";
 import { projectForAgent } from "./projection.ts";
 import { compressContext } from "./compression.ts";
+import { deliverDrafts } from "./drafts.ts";
 import type { UsageConsumer } from "../usage/service.ts";
 
-const key = (object: ObjectReader) => `agent:${object.ref.id}`;
 type AgentDefinition = Parameters<typeof composeSystemPrompt>[0];
 interface AgentLoopDependencies {
   selection: AgentSelectionService;
@@ -20,12 +20,23 @@ interface AgentLoopDependencies {
   usage?: Pick<UsageConsumer, "consume">;
 }
 
-/** 执行循环只持请求次数，消息始终从时间线重建。 */
+/** 循环持有执行计数；消息和回合边界从时间线读取，待发送输入由资源持有。 */
 export function createAgentLoop(deps: AgentLoopDependencies) {
+  // 资源输入受理依赖仍会消费消息的循环；宿主任务稍后的清理仍由其生命周期跟踪。
+  const active = new Map<string, { key: string; entered: boolean }>();
+  let execution = 0;
   return {
-    running: (object: ObjectReader) => deps.tasks.has(key(object)),
-    cancel: (object: ObjectReader) => deps.tasks.cancel(key(object)),
+    running: (object: ObjectReader) => active.has(object.ref.id),
+    cancel(object: ObjectReader) {
+      const run = active.get(object.ref.id);
+      if (!run) return;
+      deps.tasks.cancel(run.key);
+      // 宿主在调用任务体之前就收到取消时，不会进入任务体的 finally。
+      if (!run.entered) active.delete(object.ref.id);
+    },
     start(object: ObjectExecutor) {
+      if (active.has(object.ref.id)) throw new PluginApiError("conflict", "This agent is running. Cancel or wait for it to finish.");
+      const run = { key: `agent:${object.ref.id}:${++execution}`, entered: false };
       const compress = (signal: AbortSignal) => {
         const selection = selectionOf(object).selection;
         const system = deps.systemPrompt(deps.selection.agent(selection));
@@ -35,64 +46,99 @@ export function createAgentLoop(deps: AgentLoopDependencies) {
       const publish = (status: ResourceStatus["status"]) => object.events.publish(ResourceStatusChanged, {
         title: object.snapshot()!.title, status,
       });
-      const started = deps.tasks.start(key(object), async signal => {
+      const feedback = (error: unknown, signal: AbortSignal) => object.events.publish(AgentExecutionFeedback, signal.aborted
+        ? { level: "warning", code: "cancelled", message: "Execution was cancelled." }
+        : { level: "error", code: error instanceof PluginApiError ? error.code : "execution_failed",
+          message: error instanceof PluginApiError ? error.message : "Execution could not be completed." });
+      active.set(object.ref.id, run);
+      const started = deps.tasks.start(run.key, async signal => {
+        run.entered = true;
         let status: ResourceStatus["status"] = "failed";
-        publish("running");
         try {
-          for (let request = 0; ; request++) {
+          // Agent start 的扩展位置；生命周期观察与拦截由实际消费者接入时定义。
+          publish("running");
+          // Turn start 的扩展位置；显式继续执行仍属于原回合。
+          let request = 0;
+          for (;;) {
             signal.throwIfAborted();
-            if (request >= (deps.selection.agent(selectionOf(object).selection).maxTurns ?? 32)) {
+            let cancelled = false, completed = false, hasTools = false;
+            const requestLimit = deps.selection.agent(selectionOf(object).selection).maxTurns ?? 32;
+            if (request >= requestLimit) {
               object.commit(writer => { writer.append(Notice, { level: "error", code: "request_limit",
                 message: "The agent reached the model request limit. Continue explicitly to resume." }); });
               status = "awaiting";
-              return;
-            }
-            const compressed = await compress(signal);
-            // 摘要期间环境可变；真正的工作请求重新取用选择、配置和时间线。
-            const selection = selectionOf(object).selection, agent = deps.selection.agent(selection);
-            const snapshot = object.session.snapshot();
-            let hasBlocks = false;
-            const observer: ModelRunObserver = {
-              event(event) {
-                if (event.type === "progress") return;
-                if (event.type === "diagnostic" && !hasBlocks) {
-                  object.events.publish(AgentExecutionFeedback, { code: event.code, message: event.message, level: event.level });
+            } else {
+              // 摘要和通知的持久写入失败直接结束执行，不进入模型错误的消费分支。
+              const compressed = await compress(signal);
+              // Request start 的扩展位置：摘要完成后固定本次上下文、配置与授权。
+              const selection = selectionOf(object).selection, agent = deps.selection.agent(selection);
+              const snapshot = object.session.snapshot();
+              let hasBlocks = false;
+              const observer: ModelRunObserver = {
+                event(event) {
+                  if (event.type === "progress") return;
+                  if (event.type === "diagnostic" && !hasBlocks) {
+                    object.events.publish(AgentExecutionFeedback, { code: event.code, message: event.message, level: event.level });
+                    return;
+                  }
+                  object.commit(writer => { writer.append(Execution, event); });
+                  if (event.type === "block") hasBlocks = true;
+                },
+              };
+              let result: Awaited<ReturnType<ModelServices["run"]>> | undefined;
+              try {
+                result = await deps.models.run({ object: object.ref, requestParentId: snapshot.position.nodeId,
+                  userAgent: deps.userAgent, completionExtensions: agentRequestExtensions,
+                  target: deps.selection.target(selection), system: deps.systemPrompt(agent), messages: projectForAgent(snapshot, object.ref.id), signal,
+                  tools: deps.selection.tools(agent), cache: { expectHit: request > 0 && !compressed }, observer,
+                });
+              } catch (error) {
+                cancelled = signal.aborted;
+                status = cancelled ? "awaiting" : "failed";
+                feedback(error, signal);
+              }
+              request++;
+              if (result) {
+                if (result.response) deps.usage?.consume(result.response);
+                if (result.reason === "failed" && result.code === "event_delivery") {
+                  status = "failed";
+                  object.events.publish(AgentExecutionFeedback, { level: "error", code: "event_delivery",
+                    message: "The model response could not be saved to the timeline. Execution stopped." });
                   return;
                 }
-                object.commit(writer => { writer.append(Execution, event); });
-                if (event.type === "block") hasBlocks = true;
-              },
-            };
-            const result = await deps.models.run({ object: object.ref, requestParentId: snapshot.position.nodeId,
-              userAgent: deps.userAgent,
-              completionExtensions: agentRequestExtensions,
-              target: deps.selection.target(selection), system: deps.systemPrompt(agent), messages: projectForAgent(snapshot, object.ref.id), signal,
-              tools: deps.selection.tools(agent), cache: { expectHit: request > 0 && !compressed }, observer,
-            });
-            if (result.response) deps.usage?.consume(result.response);
-            // 提交失败由瞬态通道反馈；已提交的实际内容保持原样。
-            if (result.reason === "failed" && result.code === "event_delivery") {
-              object.events.publish(AgentExecutionFeedback, { level: "error", code: "event_delivery",
-                message: "The model response could not be saved to the timeline. Execution stopped." });
-              return;
+                // Request end：包含该响应的完整工具批次；取消后保留所有待发送输入。
+                cancelled = signal.aborted || result.reason === "cancelled";
+                completed = result.reason === "completed";
+                hasTools = result.tools.length > 0;
+                status = result.reason === "cancelled" ? "awaiting" : result.reason;
+              }
             }
-            if (result.reason !== "completed" || result.tools.length === 0) {
-              if (result.reason === "completed") await compress(signal);
-              status = result.reason === "cancelled" ? "awaiting" : result.reason;
-              return;
+            if (cancelled || signal.aborted) { status = "awaiting"; return; }
+            if (completed) {
+              if (request < requestLimit && deliverDrafts(object, "request")) continue;
+              if (hasTools) continue;
+              await compress(signal);
             }
+            // Turn end 与 Agent settled 独立；正常结束、错误和请求上限均可交付下一批。
+            signal.throwIfAborted();
+            if (!deliverDrafts(object, "turn")) return;
+            // 下一批输入已原子交付；此处进入新的 turn。
+            request = 0;
           }
         } catch (error) {
           status = signal.aborted ? "awaiting" : "failed";
-          object.events.publish(AgentExecutionFeedback, signal.aborted
-            ? { level: "warning", code: "cancelled", message: "Execution was cancelled." }
-            : { level: "error", code: error instanceof PluginApiError ? error.code : "execution_failed",
-              message: error instanceof PluginApiError ? error.message : "Execution could not be completed." });
+          feedback(error, signal);
         } finally {
+          // 从此处开始的新输入启动新循环，不会落入已经停止消费的旧循环。
+          active.delete(object.ref.id);
           publish(status);
+          // Agent settled 由宿主等待任务和相关活动真实结束后判定。
         }
       }, { object: object.ref });
-      if (!started) throw new PluginApiError("conflict", "This agent is running. Cancel or wait for it to finish.");
+      if (!started) {
+        active.delete(object.ref.id);
+        throw new PluginApiError("unavailable", "The agent execution could not be started.");
+      }
     },
   };
 }

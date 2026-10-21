@@ -28,14 +28,18 @@ import { CallClient } from "../shared/call-client.ts";
 import { CallPeer } from "./call-peer.ts";
 import type { CallFrame } from "../shared/plugin-calls.ts";
 import { Agent } from "@atelier/builtin-api/contracts";
+import { AgentView } from "../../packages/builtin/src/agent/data.ts";
+import { SaveAgentDraft, SetAgentDraftMode, ExchangeAgentDraft } from "../../packages/builtin/src/agent/drafts-contract.ts";
+import * as agentLoops from "../../packages/builtin/src/agent/loop.ts";
 
 const roots: string[] = [];
 type Snap = { workbench: { objects: { id: string; kind: string; presentation: { data: unknown } }[] } };
 const agentOf = (snap: Snap) => snap.workbench.objects.find(o => o.kind === "atelier.builtin/agent")!.id;
 const selectionOf = (snap: Snap) => (snap.workbench.objects.find(o => o.kind === "atelier.builtin/agent")!.presentation.data as { selection: AgentSelection }).selection;
-import { resourceCall, modelInputText, type ModelInputPart } from "@atelier/sdk/contracts";
-import { agentAction, agentCommandSchema, startAgentContentTarget, SubmitAgentInput } from "@atelier/builtin-api/contracts";
-const agentCommand = (sessionId: string, objectId: string, command: Json): SessionMutation => ({ type: "resource.command", sessionId, objectId, command: resourceCall(agentAction(agentCommandSchema.parse(command)), agentCommandSchema.parse(command)) });
+import { resourceCall, modelInputText, type ModelInputPart, type ActionContract } from "@atelier/sdk/contracts";
+import { startAgentContentTarget, SubmitAgentInput, ContinueAgent, CancelAgent, type SubmitAgentInputData } from "@atelier/builtin-api/contracts";
+const actionCommand = <I, O extends Json>(sessionId: string, objectId: string, contract: ActionContract<I, O>, input: NoInfer<I> & Json): SessionMutation =>
+  ({ type: "resource.command", sessionId, objectId, command: resourceCall(contract, input) });
 const services = new Set<ApplicationService>();
 afterEach(async () => { vi.useRealTimers(); for (const s of services) await s.close(); services.clear(); vi.restoreAllMocks(); for (const r of roots.splice(0)) rmSync(r, { recursive: true, force: true }); });
 
@@ -72,6 +76,239 @@ function resourceStatuses(service: ApplicationService) {
 }
 
 describe("会话运行时", () => {
+  // 输入受理依据循环是否仍会消费；宿主任务的清理尾部不能使新提交滞留在无人处理的草稿箱。
+  it("旧循环结束而宿主仍在清理任务时，新提交启动新的执行", async () => {
+    let release!: () => void, requests = 0, ended = false, first = true;
+    const cleanup = new Promise<void>(resolve => { release = resolve; });
+    const create = agentLoops.createAgentLoop;
+    vi.spyOn(agentLoops, "createAgentLoop").mockImplementation(deps => create({
+      ...deps,
+      tasks: {
+        has: key => deps.tasks.has(key), cancel: key => deps.tasks.cancel(key),
+        start: (key, work, options) => deps.tasks.start(key, async signal => {
+          await work(signal);
+          if (!first) return;
+          first = false; ended = true;
+          await Promise.race([cleanup, new Promise<void>(resolve => {
+            if (signal.aborted) resolve(); else signal.addEventListener("abort", () => resolve(), { once: true });
+          })]);
+        }, options),
+      },
+    }));
+    const { service, start } = await setup(adapter(() => { requests++; }));
+    const snap = await execute(service, start);
+    await vi.waitFor(() => expect(ended).toBe(true));
+    expect(service.sessions.running).toBe(true);
+    await execute(service, actionCommand(snap.sessionId, agentOf(snap), SubmitAgentInput, { mode: "follow", submissionId: randomUUID(), parts: [{ kind: "text", text: "At the boundary" }],
+    }));
+    await vi.waitFor(() => expect(requests).toBe(2));
+    release(); await settled(service);
+    const view = AgentView.schema.parse(service.sessions.snapshot(snap.sessionId).workbench.objects.find(item => item.id === agentOf(snap))!.presentation.data);
+    expect(view.drafts).toEqual([]);
+  });
+
+  // 历史通知落库错误和网络错误不同：失败的请求上限通知必须结束执行，不能消费 follow 重启。
+  it("请求上限通知保存失败保留待发送草稿", async () => {
+    let release!: () => void, requests = 0;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    const { service, start } = await setup({ validate() {}, version: "test/limit", prepare() {
+      requests++;
+      return { async *stream(signal) {
+        await Promise.race([gate, new Promise<void>(resolve => {
+          if (signal.aborted) resolve(); else signal.addEventListener("abort", () => resolve(), { once: true });
+        })]);
+        signal.throwIfAborted();
+        yield { type: "part.start", part: { id: "list", kind: "toolcall", callId: "list", name: "resource_list" } };
+        yield { type: "part.end", partId: "list", arguments: {} };
+        yield { type: "finish", reason: "tool-calls", usage: null };
+      } };
+    } });
+    await service.configuration.execute({ type: "agent.save", id: "worker", value: { maxTurns: 1 } });
+    const snap = await execute(service, start), sessionId = snap.sessionId, objectId = agentOf(snap);
+    await execute(service, actionCommand(sessionId, objectId, SubmitAgentInput, { mode: "follow", submissionId: randomUUID(), parts: [{ kind: "text", text: "Keep queued" }],
+    }));
+    const append = service.sessions.tree.appendToTimeline.bind(service.sessions.tree);
+    let failures = 0;
+    vi.spyOn(service.sessions.tree, "appendToTimeline").mockImplementation((session, node) => {
+      if (node.contract === "atelier.builtin/agent.notice") { failures++; throw new Error("Storage failed"); }
+      return append(session, node);
+    });
+    release(); await settled(service);
+    expect(failures).toBe(1);
+    expect(requests).toBe(1);
+    const view = AgentView.schema.parse(service.sessions.snapshot(sessionId).workbench.objects.find(item => item.id === objectId)!.presentation.data);
+    expect(view.drafts.map(item => modelInputText(item.parts))).toEqual(["Keep queued"]);
+  });
+
+  // docs/runtime.md#输入调度与草稿箱：完整工具批次后交付所有 steer，turn 结束后交付全部 follow。
+  it("运行中输入幂等入箱，工具结果后批量插话，下一轮批量发送且保留独立消息", async () => {
+    const requests: ModelInput[] = [];
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    const { service, start } = await setup({ validate() {}, version: "test/drafts", prepare(input) {
+      requests.push(input);
+      const index = requests.length;
+      return { async *stream(signal) {
+        if (index === 1) {
+          yield { type: "part.start", part: { id: "ask", kind: "toolcall", callId: "question", name: "ask_user" } };
+          yield { type: "part.end", partId: "ask", arguments: { questions: [{ id: "answer", type: "text", question: "Continue?" }] } };
+          yield { type: "finish", reason: "tool-calls", usage: null };
+        } else {
+          if (index === 2) {
+            await Promise.race([gate, new Promise<void>(resolve => {
+              if (signal.aborted) resolve(); else signal.addEventListener("abort", () => resolve(), { once: true });
+            })]);
+            signal.throwIfAborted();
+          }
+          yield* reply();
+        }
+      } };
+    } });
+    const snap = await execute(service, start), objectId = agentOf(snap);
+    const object = { sessionId: snap.sessionId, id: objectId, kind: Agent.kind };
+    const view = () => AgentView.schema.parse(service.sessions.snapshot(snap.sessionId).workbench.objects.find(item => item.id === objectId)!.presentation.data);
+    const questions = () => service.sessions.calls.invoke(ReadQuestions.id, null, { object }, null).then(value => ReadQuestions.output.parse(value));
+    await vi.waitFor(async () => expect((await questions()).pending).toHaveLength(1));
+    const firstSteer = { mode: "steer", submissionId: randomUUID(), parts: [{ kind: "text", text: "Steer A" }] } satisfies SubmitAgentInputData;
+    for (const command of [
+      { mode: "follow", submissionId: randomUUID(), parts: [{ kind: "text", text: "Follow A" }] },
+      firstSteer,
+      { mode: "follow", submissionId: randomUUID(), parts: [{ kind: "text", text: "Follow B" }] },
+      { mode: "steer", submissionId: randomUUID(), parts: [{ kind: "text", text: "Steer B" }] },
+      firstSteer,
+    ] satisfies SubmitAgentInputData[]) await execute(service, actionCommand(snap.sessionId, objectId, SubmitAgentInput, command));
+    expect(requests).toHaveLength(1);
+    expect(view().drafts.map(item => modelInputText(item.parts))).toEqual(["Follow A", "Steer A", "Follow B", "Steer B"]);
+    expect(service.sessions.tree.timeline(snap.sessionId).map(flat).filter(item => item.kind === "message")).toHaveLength(1);
+    const pending = (await questions()).pending[0]!;
+    await service.sessions.calls.invoke(AnswerQuestion.id, { id: pending.id, submission: {
+      answers: [{ id: "answer", status: "answered", selected: [], text: "Yes" }],
+    } }, { object }, null);
+    await vi.waitFor(() => expect(requests).toHaveLength(2));
+    expect(requests[1]!.messages.slice(-3).map(item => item.kind)).toEqual(["result", "input", "input"]);
+    expect(requests[1]!.messages.slice(-2)).toMatchObject([{ parts: [{ text: "Steer A" }] }, { parts: [{ text: "Steer B" }] }]);
+    expect(view().drafts.map(item => modelInputText(item.parts))).toEqual(["Follow A", "Follow B"]);
+    release(); await settled(service);
+    expect(requests).toHaveLength(3);
+    expect(requests[2]!.messages.slice(-2)).toMatchObject([{ parts: [{ text: "Follow A" }] }, { parts: [{ text: "Follow B" }] }]);
+    const messages = service.sessions.tree.timeline(snap.sessionId).filter(item => item.contract === "atelier.builtin/agent.user-message");
+    expect(messages.map(item => item.data)).toMatchObject([
+      { startsTurn: true }, { startsTurn: false }, { startsTurn: false }, { startsTurn: true }, { startsTurn: false },
+    ]);
+    expect(view().drafts).toEqual([]);
+  });
+
+  // 取消和网络失败是不同消费边界：取消保留全部模式；错误交付同批符合条件输入。
+  it.each(["cancel", "error"] as const)("%s 对待发送草稿采用明确的消费规则", async outcome => {
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    let requests = 0;
+    const { service, start } = await setup({ validate() {}, version: "test/drafts", prepare() {
+      const first = ++requests === 1;
+      return { async *stream(signal) {
+        if (first) {
+          await Promise.race([gate, new Promise<void>(resolve => {
+            if (signal.aborted) resolve(); else signal.addEventListener("abort", () => resolve(), { once: true });
+          })]);
+          signal.throwIfAborted();
+          throw new ModelFailure("network_error", "The connection failed.");
+        }
+        yield* reply();
+      } };
+    } });
+    const snap = await execute(service, start), objectId = agentOf(snap), sessionId = snap.sessionId;
+    await vi.waitFor(() => expect(requests).toBe(1));
+    for (const mode of ["follow", "steer"] as const) await execute(service, actionCommand(sessionId, objectId, SubmitAgentInput, { mode, submissionId: randomUUID(), parts: [{ kind: "text", text: mode }],
+    }));
+    await service.sessions.execute({ type: "resource.command", sessionId, objectId,
+      command: resourceCall(SaveAgentDraft, { submissionId: randomUUID(), parts: [{ kind: "text", text: "  Keep as draft\n" }] }) });
+    if (outcome === "cancel") await execute(service, actionCommand(sessionId, objectId, CancelAgent, { }));
+    else release();
+    await settled(service);
+    const view = AgentView.schema.parse(service.sessions.snapshot(sessionId).workbench.objects.find(item => item.id === objectId)!.presentation.data);
+    expect(view.drafts.map(item => item.mode)).toEqual(outcome === "cancel" ? ["follow", "steer", "none"] : ["none"]);
+    expect(requests).toBe(outcome === "cancel" ? 1 : 2);
+    const messages = service.sessions.tree.timeline(sessionId).map(flat).filter(item => item.kind === "message");
+    expect(messages.map(item => modelInputText(item.parts))).toEqual(outcome === "cancel" ? ["First"] : ["First", "follow", "steer"]);
+  });
+
+  // docs/runtime.md：批次消息和草稿移除必须共同提交；存储失败不能触发第二次隐式交付。
+  it.each(["steer", "follow"] as const)("%s 批次落库失败回滚全部消息并保留草稿", async mode => {
+    let release!: () => void, requests = 0;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    const { service, start } = await setup({ validate() {}, version: "test/drafts", prepare() {
+      requests++;
+      return { async *stream(signal) {
+        await Promise.race([gate, new Promise<void>(resolve => {
+          if (signal.aborted) resolve(); else signal.addEventListener("abort", () => resolve(), { once: true });
+        })]);
+        signal.throwIfAborted(); yield* reply();
+      } };
+    } });
+    const snap = await execute(service, start), sessionId = snap.sessionId, objectId = agentOf(snap);
+    for (const text of ["A", "B"]) await execute(service, actionCommand(sessionId, objectId, SubmitAgentInput, { mode, submissionId: randomUUID(), parts: [{ kind: "text", text }],
+    }));
+    const append = service.sessions.tree.appendToTimeline.bind(service.sessions.tree);
+    let attempts = 0;
+    vi.spyOn(service.sessions.tree, "appendToTimeline").mockImplementation((session, node) => {
+      if (node.contract === "atelier.builtin/agent.user-message" && ++attempts === 2) throw new Error("Storage failed");
+      return append(session, node);
+    });
+    release(); await settled(service);
+    expect(attempts).toBe(2);
+    expect(requests).toBe(1);
+    expect(service.sessions.tree.timeline(sessionId).map(flat).filter(item => item.kind === "message")).toHaveLength(1);
+    const view = AgentView.schema.parse(service.sessions.snapshot(sessionId).workbench.objects.find(item => item.id === objectId)!.presentation.data);
+    expect(view.drafts.map(item => modelInputText(item.parts))).toEqual(["A", "B"]);
+  });
+
+  // docs/content.md：资源当前数据保留附件根；重启不自动发信，交换与移除不能丢失另一侧内容。
+  it("完整草稿与附件跨重启保存，切换模式和交换保持顺序且冲突不覆盖已发送条目", async () => {
+    const { service, root, start } = await setup();
+    const snap = await execute(service, start); await settled(service);
+    const sessionId = snap.sessionId, objectId = agentOf(snap);
+    const scope = service.sessions.openContentInput({ sessionId, objectId, contractId: SaveAgentDraft.id, resourceKind: Agent.kind });
+    const bytes = new Uint8Array([1, 2, 3]);
+    const file = await service.sessions.content.writer({ scope }).stage(bytes);
+    const parts: ModelInputPart[] = [{ kind: "text", text: "  Original\n" }, { kind: "file", file, mediaType: "image/png", filename: "picture.png" }];
+    const id = randomUUID();
+    const save = { type: "resource.command" as const, sessionId, objectId,
+      command: resourceCall(SaveAgentDraft, { submissionId: id, parts }), contentScopeId: scope.id };
+    await service.sessions.execute(save); await scope.close();
+    await service.sessions.execute({ ...save, contentScopeId: undefined });
+    await service.close(); services.delete(service);
+    let requests = 0;
+    const reopened = new ApplicationService(root, { adapterFactory: () => adapter(() => { requests++; }) }); services.add(reopened);
+    const view = () => AgentView.schema.parse(reopened.sessions.snapshot(sessionId).workbench.objects.find(item => item.id === objectId)!.presentation.data);
+    expect(view().drafts).toEqual([{ id, revision: 0, mode: "none", parts }]);
+    expect(reopened.sessions.running).toBe(false);
+    expect(requests).toBe(0);
+    const reader = reopened.sessions.content.reader({ sessionId, objectId });
+    expect(await reader.read(file)).toEqual(bytes);
+    await reopened.sessions.execute({ type: "resource.command", sessionId, objectId,
+      command: resourceCall(SetAgentDraftMode, { id, revision: 0, mode: "steer" }) });
+    // UI 先捕获取回附件，持久交换才允许删除原根。
+    const editor = reopened.sessions.openContentInput({ sessionId, objectId, contractId: SubmitAgentInput.id, resourceKind: Agent.kind });
+    const editorFile = await reopened.sessions.content.writer({ scope: editor }).stage(reader.open(file));
+    const exchange = { type: "resource.command" as const, sessionId, objectId, command: resourceCall(ExchangeAgentDraft, {
+      submissionId: randomUUID(), id, revision: 1, replacement: [{ kind: "text", text: "Editor contents" }],
+    }) };
+    await reopened.sessions.execute(exchange); await reopened.sessions.execute(exchange);
+    expect(view().drafts).toEqual([{ id, revision: 2, mode: "none", parts: [{ kind: "text", text: "Editor contents" }] }]);
+    expect(await reopened.sessions.content.reader({ scope: editor }).read(editorFile)).toEqual(bytes);
+    await expect(reopened.sessions.execute({ type: "resource.command", sessionId, objectId,
+      command: resourceCall(SetAgentDraftMode, { id, revision: 1, mode: "follow" }) })).rejects.toMatchObject({ code: "draft_changed" });
+    await reopened.sessions.execute({ type: "resource.command", sessionId, objectId, command: resourceCall(SubmitAgentInput, {
+      mode: "follow", submissionId: randomUUID(), parts: [{ kind: "file", file: editorFile, mediaType: "image/png", filename: "picture.png" }],
+    }), contentScopeId: editor.id });
+    await editor.close(); await settled(reopened);
+    expect(requests).toBe(1);
+    await reopened.sessions.execute({ type: "resource.command", sessionId, objectId, command: resourceCall(ExchangeAgentDraft, {
+      submissionId: randomUUID(), id, revision: 2, replacement: null,
+    }) });
+    expect(view().drafts).toEqual([]);
+  });
+
   // 无限期等待契约：模型请求已结束，默认任务计时不得清除问答；重建前端连接只重读状态。
   it("内置 ask_user 经通用调用回答，等待一年与前端重挂载不丢失，答案进入下一模型请求和历史", async () => {
     const requests: ModelInput[] = [];
@@ -190,8 +427,7 @@ describe("会话运行时", () => {
     const first = await execute(service, start); await settled(service);
     const saved = service.sessions.tree.timeline(first.sessionId);
     const recent = "Recent request " + "R".repeat(80_000);
-    await execute(service, agentCommand(first.sessionId, agentOf(first), {
-      type: "submit", submissionId: randomUUID(), parts: [{ kind: "text", text: recent }],
+    await execute(service, actionCommand(first.sessionId, agentOf(first), SubmitAgentInput, { mode: "follow", submissionId: randomUUID(), parts: [{ kind: "text", text: recent }],
     })); await settled(service);
     expect(work).toHaveLength(3);
     expect(summaries).toHaveLength(1);
@@ -245,14 +481,14 @@ describe("会话运行时", () => {
     const first = await execute(service, { ...start, parts: [{ kind: "text", text: "Original task " + "O".repeat(20_000) }] });
     if (failure === "cancel") {
       await vi.waitFor(() => expect(summarizing).toBe(true));
-      await execute(service, agentCommand(first.sessionId, agentOf(first), { type: "cancel" }));
+      await execute(service, actionCommand(first.sessionId, agentOf(first), CancelAgent, { }));
     }
     await settled(service);
     const failed = service.sessions.tree.timeline(first.sessionId);
     expect(attempts).toBe(1);
     expect(failed.some(node => node.contract === ContextSummary.id)).toBe(false);
     expect(failed.map(flat).some(node => node.kind === "notice")).toBe(false);
-    await execute(service, agentCommand(first.sessionId, agentOf(first), { type: "continue" }));
+    await execute(service, actionCommand(first.sessionId, agentOf(first), ContinueAgent, { }));
     await settled(service);
     expect(attempts).toBe(2);
     expect(work.at(-1)!.messages[0]).toMatchObject({ kind: "context", parts: [{ text: expect.stringContaining("Recovered summary") }] });
@@ -273,8 +509,7 @@ describe("会话运行时", () => {
     expect(selectionOf(service.sessions.snapshot(first.sessionId))).toMatchObject({ model: null, thinking: null });
     expect(inputs[0]!.settings).toMatchObject({ model: { modelId: "test" }, thinking: "high" });
     await service.configuration.execute({ type: "role.save", id: "default", value: { model: start.model, thinking: "low" } });
-    await execute(service, agentCommand(first.sessionId, agentOf(first), {
-      type: "submit", submissionId: randomUUID(), parts: [{ kind: "text", text: "Next" }],
+    await execute(service, actionCommand(first.sessionId, agentOf(first), SubmitAgentInput, { mode: "follow", submissionId: randomUUID(), parts: [{ kind: "text", text: "Next" }],
     }));
     await settled(service);
     expect(inputs.at(-1)!.settings.thinking).toBe("low");
@@ -283,8 +518,7 @@ describe("会话运行时", () => {
     await service.configuration.execute({ type: "model.save", id: start.model,
       value: { ...configured, capabilities: { ...configured.capabilities, reasoning: true, thinkingLevels: [] } } });
     const before = service.sessions.snapshot(first.sessionId).nodes;
-    await expect(execute(service, agentCommand(first.sessionId, agentOf(first), {
-      type: "submit", submissionId: randomUUID(), parts: [{ kind: "text", text: "Unavailable thinking" }],
+    await expect(execute(service, actionCommand(first.sessionId, agentOf(first), SubmitAgentInput, { mode: "follow", submissionId: randomUUID(), parts: [{ kind: "text", text: "Unavailable thinking" }],
     }))).rejects.toMatchObject({ code: "thinking_unavailable", display: { id: "error.thinkingUnavailable" } });
     expect(service.sessions.snapshot(first.sessionId).nodes).toEqual(before);
     expect(inputs).toHaveLength(2);
@@ -346,7 +580,7 @@ describe("会话运行时", () => {
     const other = await service.sessions.content.writer({ scope: next }).stage(new Uint8Array([4, 5, 6]));
     const parts: ModelInputPart[] = [{ kind: "text", text: "Compare" }, { kind: "file", file: other, mediaType: "image/webp" }, { kind: "text", text: "with the screenshot" }];
     await service.sessions.execute({ type: "resource.command", sessionId: first.sessionId, objectId,
-      command: resourceCall(SubmitAgentInput, { type: "submit", submissionId: randomUUID(), parts }), contentScopeId: next.id });
+      command: resourceCall(SubmitAgentInput, { mode: "follow", submissionId: randomUUID(), parts }), contentScopeId: next.id });
     await settled(service); await next.close();
     expect(service.sessions.tree.nodes(first.sessionId).map(flat).filter(node => node.kind === "message").at(-1)).toMatchObject({ parts });
     expect(inputs.at(-1)!.messages.at(-1)).toMatchObject({ kind: "input", parts: [
@@ -371,7 +605,7 @@ describe("会话运行时", () => {
   it("同一代理相同 submission 的并发重试均受理且只保存一条输入", async () => {
     const { service, start } = await setup();
     const first = await execute(service, start); await settled(service);
-    const command = agentCommand(first.sessionId, agentOf(first), { type: "submit", submissionId: randomUUID(), parts: [{ kind: "text", text: "Concurrent retry" }] });
+    const command = actionCommand(first.sessionId, agentOf(first), SubmitAgentInput, { mode: "follow", submissionId: randomUUID(), parts: [{ kind: "text", text: "Concurrent retry" }] });
     const receipts = await Promise.all([service.sessions.execute(command), service.sessions.execute(command)]);
     expect(receipts).toEqual([{ kind: "accepted", sessionId: first.sessionId }, { kind: "accepted", sessionId: first.sessionId }]);
     await settled(service);
@@ -540,7 +774,7 @@ describe("会话运行时", () => {
     service.sessions.events.listen(AgentExecutionFeedback, {}, packet => { feedback.push(packet.event.data); });
     const first = await execute(service, start);
     await entered;
-    if (failure === "cancelled") await execute(service, agentCommand(first.sessionId, agentOf(first), { type: "cancel" }));
+    if (failure === "cancelled") await execute(service, actionCommand(first.sessionId, agentOf(first), CancelAgent, { }));
     await settled(service);
     const nodes = service.sessions.snapshot(first.sessionId).nodes;
     expect(nodes.map(flat).map(node => node.kind)).toEqual(["event", "message"]);
@@ -571,7 +805,7 @@ describe("会话运行时", () => {
     resourceId = created.workbench.objects.find(object => object.kind === "atelier.builtin/directory")!.id;
     const agentId = agentOf(first);
     await execute(service, { type: "link.set", sessionId: first.sessionId, agentId, resourceId, linked: true });
-    await execute(service, agentCommand(first.sessionId, agentId, { type: "continue" })); await settled(service);
+    await execute(service, actionCommand(first.sessionId, agentId, ContinueAgent, { })); await settled(service);
     const nodes = service.sessions.tree.nodes(first.sessionId).map(flat);
     expect(nodes.filter(node => node.kind === "notice")).toEqual([]);
     const saved = nodes.find(node => node.kind === "toolcall");
@@ -621,8 +855,8 @@ describe("会话运行时", () => {
       input: { path: root, title: "Captured directory" }, position: { x: 0, y: 0 } });
     resourceId = created.workbench.objects.find(object => object.kind === Directory.kind)!.id;
     await execute(service, { type: "link.set", sessionId, agentId, resourceId, linked: true });
-    await execute(service, agentCommand(sessionId, agentId, { type: "continue" })); await executing;
-    if (kind === "cancelled") await execute(service, agentCommand(sessionId, agentId, { type: "cancel" }));
+    await execute(service, actionCommand(sessionId, agentId, ContinueAgent, { })); await executing;
+    if (kind === "cancelled") await execute(service, actionCommand(sessionId, agentId, CancelAgent, { }));
     await settled(service);
     const saved = service.sessions.tree.nodes(sessionId).map(flat).find(node => node.kind === "toolcall")!;
     expect(saved).toMatchObject({ outcome: { kind, data: { text: "captured" }, implementation: { id: contract.id },
@@ -663,9 +897,9 @@ describe("会话运行时", () => {
     const a = agentOf(first);
     await execute(service, { type: "resource.create", sessionId, kind: "atelier.builtin/agent", creation: { id: "atelier.builtin/agent.create" }, input: { selection: selectionOf(first) }, position: { x: 600, y: 0 } });
     const b = service.sessions.snapshot(sessionId).workbench.objects.find(o => o.kind === "atelier.builtin/agent" && o.id !== a)!.id;
-    await execute(service, agentCommand(sessionId, a, { type: "submit", submissionId: randomUUID(), parts: [{ kind: "text", text: "To A" }] }));
-    await execute(service, agentCommand(sessionId, b, { type: "submit", submissionId: randomUUID(), parts: [{ kind: "text", text: "To B" }] }));
-    await expect(execute(service, agentCommand(sessionId, a, { type: "continue" }))).rejects.toThrow();
+    await execute(service, actionCommand(sessionId, a, SubmitAgentInput, { mode: "follow", submissionId: randomUUID(), parts: [{ kind: "text", text: "To A" }] }));
+    await execute(service, actionCommand(sessionId, b, SubmitAgentInput, { mode: "follow", submissionId: randomUUID(), parts: [{ kind: "text", text: "To B" }] }));
+    await expect(execute(service, actionCommand(sessionId, a, ContinueAgent, { }))).rejects.toThrow();
     release(); await settled(service);
     const texts = (input: ModelInput) => input.messages.flatMap(m => m.kind === "input" ? [modelInputText(m.parts)] : []);
     // 提交时先预检（prepare）再真正请求；按最后一次含该输入的请求核对各代理投影。
@@ -698,11 +932,11 @@ describe("会话运行时", () => {
     await execute(service, { type: "resource.create", sessionId, kind: "atelier.builtin/agent", creation: { id: "atelier.builtin/agent.create" }, input: { selection: selectionOf(first) }, position: { x: 600, y: 0 } });
     const b = service.sessions.snapshot(sessionId).workbench.objects.find(o => o.id !== a)!.id;
     try {
-      await execute(service, agentCommand(sessionId, a, { type: "submit", submissionId: randomUUID(), parts: [{ kind: "text", text: "To A" }] }));
+      await execute(service, actionCommand(sessionId, a, SubmitAgentInput, { mode: "follow", submissionId: randomUUID(), parts: [{ kind: "text", text: "To A" }] }));
       await thinkingSaved;
       const cursor = service.sessions.tree.cursor(sessionId);
       expect(service.sessions.snapshot(sessionId).progress.live).toContainEqual(expect.objectContaining({ kind: "thinking", text: "Reasoning" }));
-      await execute(service, agentCommand(sessionId, b, { type: "submit", submissionId: randomUUID(), parts: [{ kind: "text", text: "To B" }] }));
+      await execute(service, actionCommand(sessionId, b, SubmitAgentInput, { mode: "follow", submissionId: randomUUID(), parts: [{ kind: "text", text: "To B" }] }));
       expect(service.sessions.tree.nodes(sessionId).map(flat).find(n => n.kind === "message" && modelInputText(n.parts) === "To B")?.parentId).toBe(cursor);
       expect(service.sessions.tree.cursorSelections(sessionId)).toEqual([]);
     } finally { release(); }
@@ -721,8 +955,8 @@ describe("会话运行时", () => {
     let release!: () => void;
     const gate = new Promise<void>(resolve => { release = resolve; });
     vi.spyOn(service.configuration, "execute").mockImplementationOnce(async command => { await gate; return read(command); });
-    const command: Json = { type: "submit", submissionId: randomUUID(), parts: [{ kind: "text", text: "Too late" }] };
-    const pending = execute(service, agentCommand(sessionId, agentId, command));
+    const input: SubmitAgentInputData = { mode: "follow", submissionId: randomUUID(), parts: [{ kind: "text", text: "Too late" }] };
+    const pending = execute(service, actionCommand(sessionId, agentId, SubmitAgentInput, input));
     const rejected = expect(pending).rejects.toMatchObject({ code: "not_found" });
     try {
       await execute(service, { type: "object.remove", sessionId, objectId: agentId });
@@ -798,7 +1032,7 @@ describe("会话运行时", () => {
     const running = await execute(service, { type: "read", sessionId: s.sessionId });
     expect(running.progress.live).toEqual([expect.objectContaining({ kind: "text", text: "Half" })]);
     expect(running.nodes.map(flat).some(node => node.kind === "text")).toBe(false);
-    await execute(service, agentCommand(s.sessionId, agentOf(s), { type: "cancel" }));
+    await execute(service, actionCommand(s.sessionId, agentOf(s), CancelAgent, { }));
     await settled(service);
     const snap = await execute(service, { type: "read", sessionId: s.sessionId });
     const half = snap.nodes.map(flat).find(x => x.kind === "text");
@@ -890,7 +1124,7 @@ describe("会话运行时", () => {
     const created = await execute(service, { type: "resource.create", sessionId, kind: "atelier.builtin/directory", creation: { id: "atelier.builtin/directory.create" }, input: { path: root }, position: { x: 0, y: 0 } });
     resourceId = created.workbench.objects.find(object => object.kind === "atelier.builtin/directory")!.id;
     await execute(service, { type: "link.set", sessionId: sessionId, agentId: agentId, resourceId: resourceId, linked: true });
-    await execute(service, agentCommand(sessionId, agentId, { type: "continue" }));
+    await execute(service, actionCommand(sessionId, agentId, ContinueAgent, { }));
     await started;
     try {
       await execute(service, { type: "link.set", sessionId: sessionId, agentId: agentId, resourceId: resourceId, linked: false });

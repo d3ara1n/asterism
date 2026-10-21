@@ -27,11 +27,14 @@ export interface TurnMeasurement {
   replyMarkdown: string | null;
 }
 
-/** 历史轮次保留；只有当前运行轮隐藏。继续执行的请求仍归入同一用户输入。 */
+/** 历史轮次保留；批次中的连续输入和 steer 属于同轮，只有当前运行轮隐藏。 */
 export function turnMetrics(snapshot: SessionSnapshot, agentId: string, running: boolean): TurnMeasurement[] {
   const path = snapshot.records.all({ scope: "timeline" });
-  const starts = path.flatMap((record, index) => record.source?.resource?.id === agentId && UserMessage.decode(record)?.status === "known"
-    ? [{ record, index }] : []);
+  const starts = path.flatMap((record, index) => {
+    if (record.source?.resource?.id !== agentId) return [];
+    const message = UserMessage.decode(record);
+    return message?.status === "known" && message.data.startsTurn ? [{ record, index }] : [];
+  });
   const requests = diagnosticHistory(snapshot, agentId, "timeline").requests.filter(request => request.kind === "response");
   return starts.flatMap((start, index) => {
     const next = starts[index + 1];

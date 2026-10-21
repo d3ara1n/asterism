@@ -18,9 +18,11 @@ export function collectTurns(records: readonly SessionRecord[]): NamingTurn[] {
   for (const [position, record] of records.entries()) {
     const input = UserMessage.decode(record);
     if (input?.status === "known") {
-      const turn: NamingTurn = { user: inputSummary(input.data.parts) };
-      turns.push(turn);
       const agentInputs = inputs.get(record.source?.resource?.id ?? "") ?? [];
+      const prior = agentInputs.at(-1)?.turn;
+      const turn: NamingTurn = !input.data.startsTurn && prior ? prior : { user: "" };
+      if (turn !== prior) turns.push(turn);
+      turn.user = [turn.user, inputSummary(input.data.parts)].filter(Boolean).join("\n");
       agentInputs.push({ position, turn }); inputs.set(record.source?.resource?.id ?? "", agentInputs);
       continue;
     }

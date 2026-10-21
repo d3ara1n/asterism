@@ -93,7 +93,7 @@ describe("内置公共包", () => {
         input: { selection: { agent: "worker", model: null, thinking: null } }, position: { x: 0, y: 0 } });
       const before = service.sessions.snapshot(sessionId), objectId = before.workbench.objects[0]!.id;
       await expect(service.sessions.execute({ type: "resource.command", sessionId, objectId,
-        command: resourceCall(SubmitAgentInput, { type: "submit", submissionId: crypto.randomUUID(), parts: [{ kind: "text", text: "Hello" }] }) }))
+        command: resourceCall(SubmitAgentInput, { mode: "follow", submissionId: crypto.randomUUID(), parts: [{ kind: "text", text: "Hello" }] }) }))
         .rejects.toThrow("Blocked by external preparer.");
       expect(probes.map(probe => probe.calls.length)).toEqual([1, 1]);
       expect(service.sessions.snapshot(sessionId).nodes).toEqual(before.nodes);
