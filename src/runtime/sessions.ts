@@ -290,7 +290,7 @@ export class SessionService {
   }
   private readonly pendingCreations = new Map<symbol, { sessionId: string; controller: AbortController; done: Promise<ResourceRef> }>();
   private createResource(sessionId: string, kind: string, call: ResourceCall, content: ContentLease,
-    options: { signal?: AbortSignal; position?: { x: number; y: number }; linkTo?: ResourceRef; check?(): void } = {}): Promise<ResourceRef> {
+    options: { signal?: AbortSignal; position?: { x: number; y: number }; linkTo?: ResourceRef; resources?: readonly ResourceRef[]; check?(): void } = {}): Promise<ResourceRef> {
     const controller = new AbortController();
     const signal = options.signal ? AbortSignal.any([controller.signal, options.signal]) : controller.signal;
     const key = Symbol();
@@ -313,9 +313,11 @@ export class SessionService {
           signal.throwIfAborted(); options.check?.();
           if (this.closed) throw new SessionError("unavailable", "The session service is closed.");
           if (options.linkTo) this.requireRef(sessionId, options.linkTo);
+          for (const resource of options.resources ?? []) this.requireRef(sessionId, resource);
           const id = this.workbench.create(sessionId, kind, input, options.position ?? this.workbench.placement(sessionId), content);
           const ref = { sessionId, id, kind };
           if (options.linkTo) this.setLink(sessionId, options.linkTo, ref, true);
+          for (const resource of options.resources ?? []) this.setLink(sessionId, ref, resource, true);
           return ref;
         });
       } finally {

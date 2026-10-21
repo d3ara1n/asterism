@@ -11,7 +11,7 @@ export interface AgentCreationDescription {
 }
 interface Entry {
   readonly description: AgentCreationDescription;
-  create(input: Json, context: TopLevelToolContext): ReturnType<TopLevelToolContext["session"]["create"]>;
+  create(input: Json, context: TopLevelToolContext, options?: { resources?: readonly string[] }): ReturnType<TopLevelToolContext["session"]["create"]>;
 }
 /** 目录按宿主运行实例隔离；共享公共导出不使不同宿主的插件登记串线。 */
 const directories = new WeakMap<SessionDirectory, Map<string, Entry>>();
@@ -33,7 +33,9 @@ export const agentCreations = {
     return [...directory(plugin).values()].map(({ description: { id, resourceKind, description } }) => ({ id, resourceKind, description }));
   },
   inspect(plugin: PluginContext, id: string): AgentCreationDescription { return structuredClone(entry(plugin, id).description); },
-  create(plugin: PluginContext, id: string, input: Json, context: TopLevelToolContext) { return entry(plugin, id).create(input, context); },
+  create(plugin: PluginContext, id: string, input: Json, context: TopLevelToolContext, options?: { resources?: readonly string[] }) {
+    return entry(plugin, id).create(input, context, options);
+  },
 };
 
 /** Agent 创建入口是独立领域贡献；直接复用创建输入，或显式适配模型输入。 */
@@ -55,7 +57,7 @@ export function defineAgentCreation<I, S extends Json, O extends Json, A extends
     const value: Entry = {
       description: { id: definition.id, resourceKind: definition.creation.resource.kind,
         description: definition.description, guidelines: [...definition.guidelines ?? []], input },
-      create(raw, context) {
+      create(raw, context, options) {
         plugin.signal.throwIfAborted(); context.signal.throwIfAborted();
         let converted: I & Json;
         if (definition.inputSchema) {
@@ -63,7 +65,7 @@ export function defineAgentCreation<I, S extends Json, O extends Json, A extends
           if (!parsed.success) throw new PluginApiError("invalid_argument", parsed.error.message);
           converted = jsonSchema.parse(definition.toInput(parsed.data, { object: context.object })) as I & Json;
         } else converted = raw as I & Json;
-        return context.session.create(definition.creation, converted);
+        return context.session.create(definition.creation, converted, options);
       },
     };
     entries.set(definition.id, value);

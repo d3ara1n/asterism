@@ -39,7 +39,7 @@ describe("正文工具契约", () => {
     expect(() => editText("a\nchanged\nc", [
       { op: "replace", anchor: anchor(0), body: ["A"] },
       { op: "replace", anchor: anchor(1), body: ["B"] },
-    ])).toThrow("no changes were written");
+    ])).toThrow("original content preserved");
     expect(() => editText("prefix\na\nb\nc", [{ op: "replace", anchor: anchor(1), body: ["B"] }])).toThrow('"line":3');
     expect(() => editText("prefix\na\nb\nb", [{ op: "replace", anchor: anchor(1), body: ["B"] }])).toThrow("several nearby lines");
   });

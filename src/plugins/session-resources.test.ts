@@ -130,6 +130,8 @@ describe("SDK 会话资源生命周期", () => {
     const head = f.session.snapshot().position.nodeId;
     await expect(f.session.create(Create, 2, { linkTo: foreign })).rejects.toThrow("another session");
     expect(f.session.snapshot().position.nodeId).toBe(head);
+    await expect(f.session.create(Create, 2, { resources: [foreign] })).rejects.toThrow("another session");
+    expect(f.session.snapshot().position.nodeId).toBe(head);
     const child = await f.session.create(Create, 3, { linkTo: note });
     expect(f.app.sessions.snapshot(f.sessionId).workbench.links).toEqual([{ agentId: note.id, resourceId: child.id }]);
     const otherAgent = await f.session.create(CreateAgent, { selection: { agent: "worker", model: null, thinking: null } }, { linkTo: note });
@@ -173,6 +175,103 @@ describe("SDK 会话资源生命周期", () => {
 });
 
 describe("Agent 创建与移除入口", () => {
+  // 依据代理发现契约：列表仅返回启用配置的选择信息，新增配置字段和私有提示均不进入模型结果。
+  it("agent_list 公开选择字段并隔离系统提示词和执行配置", async () => {
+    const f = open({ adapter: adapter(() => [{ name: "agent_list", args: {} }]) });
+    const target = await model(f.app), actor = await f.session.create(Create, 0);
+    await f.app.configuration.execute({ type: "agent.save", id: "worker", value: {
+      description: "Public purpose", examples: ["Public example"],
+      systemPrompt: "PRIVATE_AGENT_INSTRUCTIONS", maxTurns: 123,
+    } });
+    await f.app.configuration.execute({ type: "agent.save", id: "reviewer", value: { enabled: false } });
+    const result = await runner(f, actor, target)();
+    expect(result.tools[0]?.kind).toBe("succeeded");
+    const entries = result.tools[0]!.data as { id: string }[];
+    expect(entries.find(entry => entry.id === "worker")).toEqual({
+      id: "worker", name: "worker", description: "Public purpose",
+      examples: ["Public example"],
+    });
+    expect(entries.some(entry => entry.id === "reviewer")).toBe(false);
+    expect(JSON.stringify(result.tools[0]!.model)).not.toContain("PRIVATE_AGENT_INSTRUCTIONS");
+  });
+
+  // 依据显式初始链接契约：只链接指定资源；创建、调用者链接与新代理接收的链接一次提交，源链接保留。
+  it("创建代理时附带选定资源，下一请求可发现新代理", async () => {
+    let calls: { name: string; args: Json }[] = [];
+    const f = open({ adapter: adapter(() => calls) }), target = await model(f.app);
+    const actor = await f.session.create(Create, 0), shared = await f.session.create(Create, 1), other = await f.session.create(Create, 2);
+    f.session.link(actor, shared); f.session.link(actor, other);
+    calls = [{ name: "resource_create", args: {
+      creation_id: "atelier.builtin/agent.create",
+      input: { selection: { agent: "worker", model: null, thinking: null } },
+      resources: [shared.id, shared.id],
+    } }];
+    const run = runner(f, actor, target), result = await run();
+    expect(result.tools[0]?.kind).toBe("succeeded");
+    const child = (result.tools[0]!.data as { resource_id: string }).resource_id;
+    expect(f.app.sessions.snapshot(f.sessionId).workbench.links).toEqual([
+      { agentId: actor.id, resourceId: shared.id }, { agentId: actor.id, resourceId: other.id },
+      { agentId: actor.id, resourceId: child }, { agentId: child, resourceId: shared.id },
+    ]);
+    calls = [{ name: "resource_list", args: {} }];
+    expect((await run()).tools[0]?.data).toMatchObject({ resources: expect.arrayContaining([expect.objectContaining({ resource_id: child })]) });
+  });
+
+  // 依据请求固定授权：已知未授权 ID 和模型请求过程中新增的链接都不能成为本批次初始授权。
+  it("初始资源受请求开始时的链接范围约束", async () => {
+    let resourceId = "", mutate: (() => void) | undefined;
+    const f = open({ adapter: adapter(() => {
+      mutate?.();
+      return [{ name: "resource_create", args: { creation_id: "atelier.builtin/agent.create",
+        input: { selection: { agent: "worker", model: null, thinking: null } }, resources: [resourceId] } }];
+    }) });
+    const target = await model(f.app), actor = await f.session.create(Create, 0), resource = await f.session.create(Create, 1);
+    resourceId = resource.id;
+    const run = runner(f, actor, target), before = f.session.snapshot().position.nodeId;
+    expect((await run()).tools[0]).toMatchObject({ kind: "rejected", error: { code: "access_denied" } });
+    expect(f.session.snapshot().position.nodeId).toBe(before);
+    mutate = () => f.session.link(actor, resource);
+    expect((await run()).tools[0]).toMatchObject({ kind: "rejected", error: { code: "access_denied" } });
+    expect(f.session.snapshot().resources.all()).toHaveLength(2);
+    mutate = undefined;
+    expect((await run()).tools[0]?.kind).toBe("succeeded");
+  });
+
+  // 依据宿主原子创建契约：接收者类型不支持链接时，已创建的身份、内容及调用者链接一起回滚。
+  it("初始资源链接失败时整体回滚创建", async () => {
+    let resources: string[] = [];
+    const f = open({ adapter: adapter(() => [{ name: "resource_create", args: {
+      creation_id: "atelier.builtin/note.create", input: { title: "Rejected note", content: "temporary" }, resources,
+    } }]) });
+    const target = await model(f.app), actor = await f.session.create(Create, 0), resource = await f.session.create(Create, 1);
+    f.session.link(actor, resource); resources = [resource.id];
+    const before = f.app.sessions.snapshot(f.sessionId);
+    expect((await runner(f, actor, target)()).tools[0]?.kind).toBe("rejected");
+    const after = f.app.sessions.snapshot(f.sessionId);
+    expect(after.nodes).toEqual(before.nodes);
+    expect(after.workbench).toEqual(before.workbench);
+  });
+
+  // 依据创建提交时重验端点：异步准备期间资源可能已移除，固定请求授权仍需真实资源身份才能落地链接。
+  it("准备期间移除初始资源后拒绝迟到创建", async () => {
+    let resources: string[] = [], pending = false;
+    const started = latch(), end = latch();
+    const f = open({
+      async prepare() { if (pending) { started.release(); await end.promise; } },
+      adapter: adapter(() => [{ name: "resource_create", args: { creation_id: ns.name("new"), input: { initial: 1 }, resources } }]),
+    });
+    const target = await model(f.app), actor = await f.session.create(Create, 0), resource = await f.session.create(Create, 1);
+    f.session.link(actor, resource); resources = [resource.id]; pending = true;
+    const work = runner(f, actor, target)();
+    await started.promise;
+    let head: string | null;
+    try { f.session.remove(resource); head = f.session.snapshot().position.nodeId; }
+    finally { end.release(); }
+    expect((await work).tools[0]?.kind).toBe("rejected");
+    expect(f.session.snapshot().position.nodeId).toBe(head);
+    expect(f.session.snapshot().resources.all().map(item => item.ref.id)).toEqual([actor.id]);
+  });
+
   // 依据显式领域入口：无需 inspect，模型输入适配后走同一创建管线，结果自动链接且不继承链接。
   it("直接创建已知入口，参数转换与工具策略生效，并可统一移除", async () => {
     let calls = [{ name: "resource_create", args: { creation_id: ns.name("new"), input: { initial: 8 } } as Json }];

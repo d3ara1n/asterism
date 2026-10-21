@@ -1,4 +1,9 @@
 {
+  "resources.agentList": "列出代理配置",
+  "resources.agentCount": "{count} 个代理",
+  "resources.noAgents": "暂无可用代理配置。",
+  "resources.agentId": "代理配置 ID",
+  "resources.agentExamples": "任务示例",
   "providerPreset.mainlandChina": "中国大陆",
   "providerPreset.international": "国际",
   "providerPreset.coding": "编程套餐 · 仅限受支持客户端",

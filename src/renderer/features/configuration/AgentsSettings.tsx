@@ -144,7 +144,7 @@ function AgentEditor({ initialId }: { initialId: string | null }) {
   const i18n = useI18n();
   const { snapshot, run, busy } = useSettingsConfiguration();
   const island = useIsland();
-  const ids = { name: useId(), description: useId(), prompt: useId(), trigger: useId(), role: useId(), fallback: useId(), tools: useId() };
+  const ids = { name: useId(), description: useId(), prompt: useId(), role: useId(), fallback: useId(), tools: useId() };
   const [id, setId] = useState(initialId);
   const current = snapshot?.agents.find(agent => agent.id === id);
   // 启用是列表行内的即时操作，草稿不持有，避免互相覆盖。
@@ -220,8 +220,6 @@ function AgentEditor({ initialId }: { initialId: string | null }) {
         <Field><Label htmlFor={ids.prompt} modified={modified("systemPrompt")} onRestore={() => restore("systemPrompt")}>{i18n.formatMessage(agentsMessages.systemPrompt)}</Label>
           <Textarea id={ids.prompt} rows={10} className="font-mono text-xs" value={draft.systemPrompt ?? ""} placeholder={base.systemPrompt} onChange={event => set("systemPrompt", event.target.value)} />
           {builtin && <FieldDescription>{i18n.formatMessage(agentsMessages.systemPromptHint)}</FieldDescription>}</Field>
-        <Field><Label htmlFor={ids.trigger} modified={modified("decisionTrigger")} onRestore={() => restore("decisionTrigger")}>{i18n.formatMessage(agentsMessages.whenToSelect)}</Label>
-          <Textarea id={ids.trigger} rows={3} value={draft.decisionTrigger ?? ""} placeholder={base.decisionTrigger} onChange={event => set("decisionTrigger", event.target.value)} /></Field>
         <Field><Label modified={modified("examples")} onRestore={() => restore("examples")}>{i18n.formatMessage(agentsMessages.taskExamples)}</Label>
           {examples.length > 0 && <ol className="flex flex-col gap-2">{examples.map((example, index) => <li key={index}>
             <InputGroup>

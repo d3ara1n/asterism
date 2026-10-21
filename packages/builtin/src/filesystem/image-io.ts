@@ -20,7 +20,7 @@ export async function readImageFile(root: string, rel: string, signal: AbortSign
   const handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
   try {
     const info = await handle.stat();
-    if (!info.isFile()) throw new FilesystemError(failed("not_file", "The target is not a regular file. Use list to check entry types and select an image file."));
+    if (!info.isFile()) throw new FilesystemError(failed("not_file", "The target requires a regular image file."));
     if (info.size > modelInputLimits.file) throw new TextError("file_too_large", "The image exceeds the 5 MiB limit. Choose a smaller image.");
     const bytes = new Uint8Array(info.size);
     let read = 0;
@@ -31,7 +31,7 @@ export async function readImageFile(root: string, rel: string, signal: AbortSign
       read += bytesRead;
     }
     const mediaType = imageMediaType(bytes);
-    if (!mediaType) throw new TextError("unsupported_image", "The target is not a PNG, JPEG, GIF or WebP image. Use read for UTF-8 text; other formats are unsupported.");
+    if (!mediaType) throw new TextError("unsupported_image", "Supported image formats are PNG, JPEG, GIF, and WebP.");
     return { bytes: bytes.subarray(0, read), mediaType };
   } finally { await handle.close(); }
 }

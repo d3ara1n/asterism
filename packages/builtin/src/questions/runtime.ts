@@ -17,13 +17,11 @@ export default defineModule(plugin => {
       id: AskUserResult.id, name: "ask_user",
       description: "Ask the user to make a decision or supply missing information. Waits until the user answers or cancels.",
       guidelines: [
-        "Use only for decisions or missing information that materially affect the work and require the user.",
-        "Combine independent questions in one call. Ask questions that depend on earlier answers in a later call.",
-        "Use the user's language. Usually offer 2–5 distinct options with concise tradeoffs; use text questions for open-ended input.",
-        "An editable custom option is always available for choice questions; an overall note is available for corrections and constraints. Do not add Other options or prefill user answers.",
-        "Recommendations must explain why and never count as user selections.",
-        "Read all qualifications and overall corrections together with selections. A skipped or cancelled question is not consent.",
-        "Questions have no response deadline. Cancelling a question does not by itself stop the Agent.",
+        "One call presents a group of single-choice, multiple-choice, or text questions.",
+        "Choice questions include an editable custom option. The user can add an overall note with corrections and constraints.",
+        "Recommendations contain an option ID and a reason. User selections are recorded in the returned answers.",
+        "The result includes each question's answered or skipped state and the user's overall note.",
+        "The tool waits until the user answers, cancels, or execution ends.",
       ],
       argsSchema: askUserArgs, resultSchema: AskUserResult.schema, effect: "read", execution: "parallel",
       execute(args, { object, callId, signal, publish }) {

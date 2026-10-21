@@ -6,7 +6,7 @@ const revision = z.number().int().positive();
 const names = z.array(id).max(200);
 const agentFieldsSchema = z.strictObject({
   name, enabled: z.boolean(), description: z.string().max(20_000), systemPrompt: z.string().max(100_000),
-  modelRole: id.nullable(), fallbackRole: id.nullable(), examples: z.array(z.string().max(4_000)).max(50), decisionTrigger: z.string().max(4_000),
+  modelRole: id.nullable(), fallbackRole: id.nullable(), examples: z.array(z.string().max(4_000)).max(50),
   tools: names.nullable(), excludeTools: names.nullable(), subagentRoles: names.nullable(),
   maxTurns: z.number().int().positive().nullable(),
 });

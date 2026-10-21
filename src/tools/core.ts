@@ -23,11 +23,9 @@ export const ResourceList = defineTool({
   name: "resource_list",
   description: "List resources currently linked to you.",
   guidelines: [
-    "Use this control when you need to discover authorized resource IDs, types and titles.",
-    "Inspect a selected resource to obtain its live state and available tool definitions.",
-    "Use this list to refresh resource availability when earlier resource references may be out of date.",
+    "The result contains resource IDs, types, and titles in the current request's resource scope.",
   ],
-  argsSchema: z.strictObject({}).describe("No parameters; pass an empty object."),
+  argsSchema: z.strictObject({}).describe("Empty parameter object."),
 });
 
 export const ResourceInspect = defineTool({
@@ -35,9 +33,7 @@ export const ResourceInspect = defineTool({
   name: "resource_inspect",
   description: "Inspect a linked resource's live state and available tools.",
   guidelines: [
-    "Use the tool descriptions to choose an operation, then follow its guidelines and args schema.",
-    "Use the selected implementation's target schema to locate the object and its result schema to interpret the returned data.",
-    "Inspect again when live resource state matters or the available definitions need refreshing.",
+    "The result contains live resource state and available tool descriptions, guidelines, and schemas.",
   ],
   argsSchema: z.strictObject({
     resource_id: z.string().min(1).describe("The opaque ID of a resource currently linked to this agent."),
@@ -49,16 +45,14 @@ export const ResourceCall = defineTool({
   name: "resource_call",
   description: "Use an available tool on a linked resource.",
   guidelines: [
-    "Choose the resource and tool using the link notification or resource_inspect; obtain missing definitions before calling.",
-    "Follow the selected tool's guidelines and shared args schema; target follows that resource implementation's schema.",
+    "args follows the tool's shared schema. target follows the selected resource implementation's schema.",
     "Omitting target is equivalent to null; this is valid only when the implementation accepts null.",
     jsonArgumentHint,
-    "Use the outcome to decide whether to continue or correct the call. If access is denied, refresh the resource list; if the needed resource is no longer linked, ask the user to link it again.",
   ],
   argsSchema: z.strictObject({
     resource_id: z.string().min(1).describe("The opaque ID of a resource currently linked to this agent."),
     tool: z.string().min(1).describe("An available resource tool name supplied by the link notification or resource_inspect."),
-    target: jsonSchema.default(null).describe("A JSON value matching this resource tool's target schema from resource_inspect. Pass objects directly; use null only when supported. Do not JSON-encode the value into a string."),
-    args: jsonSchema.default({}).describe("A JSON value matching the tool's args schema from resource_inspect. Pass an object directly when the schema requires one. Do not JSON-encode the value into a string."),
+    target: jsonSchema.default(null).describe("A JSON value matching the resource tool's target schema. Objects and null retain their JSON types."),
+    args: jsonSchema.default({}).describe("A JSON value matching the tool's args schema. Objects retain their JSON type."),
   }).describe("Select a linked resource and a tool, then supply its implementation-specific target and shared operation args."),
 });

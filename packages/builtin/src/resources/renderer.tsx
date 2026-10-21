@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import type { z } from "zod";
-import { ListPlus, ScanSearch, CirclePlus, CircleMinus } from "lucide-react";
+import { ListPlus, ScanSearch, CirclePlus, CircleMinus, Users } from "lucide-react";
 import { toolRenderer, useI18n, type RendererModule, type ToolRenderProps } from "@atelier/sdk/renderer";
 import { JsonView } from "@atelier/ui/json-view";
 import { ToolDetails } from "@atelier/ui/tool-content";
@@ -9,7 +9,7 @@ import { ItemGroup, Item, ItemContent, ItemTitle, ItemDescription } from "@ateli
 import { resourceMessages as messages } from "../messages/resources";
 import { inputText } from "../shared/tool-preview";
 import { TOOL_BODY_LINE_LIMIT } from "../shared/tool-body";
-import { CreationListResult, CreationInspectResult, ResourceCreateResult, ResourceRemoveResult } from "./contract";
+import { AgentListResult, CreationListResult, CreationInspectResult, ResourceCreateResult, ResourceRemoveResult } from "./contract";
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return <div className="space-y-1">
@@ -19,6 +19,33 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 }
 
 type ListProps = ToolRenderProps<z.infer<typeof CreationListResult.schema>>;
+type AgentListProps = ToolRenderProps<z.infer<typeof AgentListResult.schema>>;
+function AgentListHeader({ result }: AgentListProps) {
+  const i18n = useI18n();
+  return <ToolHeader label={i18n.text(messages.agents)}
+    meta={result?.data && i18n.formatMessage(messages.agentCount, { count: result.data.length })} />;
+}
+function AgentListBody({ result }: AgentListProps) {
+  const i18n = useI18n();
+  const entries = result?.data;
+  if (!entries) return null;
+  if (!entries.length) return <p className="type-caption">{i18n.text(messages.noAgents)}</p>;
+  return <div className="space-y-2">
+    <ItemGroup>{entries.slice(0, TOOL_BODY_LINE_LIMIT).map(entry => <Item key={entry.id} size="sm" className="px-0">
+      <ItemContent>
+        <ItemTitle>{entry.name}</ItemTitle>
+        <ItemDescription className="line-clamp-none whitespace-pre-wrap">{entry.description}</ItemDescription>
+        <dl className="space-y-2">
+          <Field label={i18n.text(messages.agentId)}>{entry.id}</Field>
+          {!!entry.examples.length && <Field label={i18n.text(messages.examples)}>{entry.examples.join("\n")}</Field>}
+        </dl>
+      </ItemContent>
+    </Item>)}</ItemGroup>
+    {entries.length > TOOL_BODY_LINE_LIMIT && <p className="type-caption text-muted-foreground">
+      {i18n.formatMessage(messages.omitted, { count: entries.length - TOOL_BODY_LINE_LIMIT })}
+    </p>}
+  </div>;
+}
 function ListHeader({ result }: ListProps) {
   const i18n = useI18n();
   return <ToolHeader label={i18n.text(messages.list)}
@@ -104,6 +131,7 @@ function RemoveBody({ result }: RemoveProps) {
 }
 
 const listView = { headerRenderer: ListHeader, bodyRenderer: ListBody };
+const agentListView = { headerRenderer: AgentListHeader, bodyRenderer: AgentListBody };
 const inspectView = { headerRenderer: InspectHeader, bodyRenderer: InspectBody };
 const createView = { headerRenderer: CreateHeader, bodyRenderer: CreateBody };
 const removeView = { headerRenderer: RemoveHeader, bodyRenderer: RemoveBody };
@@ -111,6 +139,10 @@ const removeView = { headerRenderer: RemoveHeader, bodyRenderer: RemoveBody };
 export default {
   resources: [], cards: [],
   tools: [
+    toolRenderer(AgentListResult, {
+      label: messages.agents, icon: <Users className="size-3.5" />,
+      input: { headerRenderer: AgentListHeader }, execution: agentListView, result: agentListView,
+    }),
     toolRenderer(CreationListResult, {
       label: messages.list, icon: <ListPlus className="size-3.5" />,
       input: { headerRenderer: ListHeader }, execution: listView, result: listView,

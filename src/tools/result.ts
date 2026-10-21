@@ -35,7 +35,7 @@ export function finishToolResult(result: CallResult, info: ToolInvocationInfo = 
     // 已知执行结局不能因展示投影失败变成“执行失败”，也不绕过投影泄漏原始数据。
     projected = null; projectionFailed = true;
   }
-  const failure = projectionFailed ? "The operation ended, but its output could not be prepared for the model. Do not repeat a write solely to recover this output." : null;
+  const failure = projectionFailed ? "The operation ended. Model output preparation failed; the operation's recorded outcome remains authoritative." : null;
   if (completion.kind === "succeeded" && projected) return toolOutcomeSchema.parse({ ...completion, ...info, model: projected });
   // 非成功结局以文字说明状态；文件只随成功或部分成功交付。
   const status = "error" in completion ? `${completion.kind} (${completion.error.code}): ${completion.error.message}`

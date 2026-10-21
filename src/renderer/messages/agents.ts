@@ -117,10 +117,6 @@ export const agentsMessages = pluginNamespace("atelier.host").messages("en", def
     id: "features_configuration_AgentsSettings_31",
     defaultMessage: "Leave blank to use the built-in prompt shown above.",
   },
-  whenToSelect: {
-    id: "features_configuration_AgentsSettings_32",
-    defaultMessage: "When to select",
-  },
   taskExamples: {
     id: "features_configuration_AgentsSettings_33",
     defaultMessage: "Task examples",

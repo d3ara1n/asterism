@@ -118,7 +118,7 @@ headers 来源需要消费者持有自己的模型调用结果，因此自然用
 | `SessionExecutor` | 读取能力 + 同步提交 `commit(writer => ...)`（当前数据 `set` 与当前时间线 `append`）+ 标题覆盖 `title.set` + 会话内 `create / link / unlink / remove` |
 | `ObjectReader` | 资源身份、调用绑定的资源快照 `snapshot()`、当前对象数据读取 `get()`、只读 `session` |
 | `ObjectExecutor` | 读取能力 + 对象同步提交 `commit`、可执行 `session`、对象二进制流发布 `streams.publish` |
-| `ToolSession` | 只读会话能力 + 自动链接给执行者的 `create` + 本请求有效链接范围内的 `remove`；随工具调用结束失效 |
+| `ToolSession` | 只读会话能力 + 自动链接给执行者且可附带初始资源链接的 `create` + 本请求有效链接范围内的 `remove`；随工具调用结束失效 |
 
 资源 `project / inspect / context / links.tools`、动作准备与外部准备者只接收只读门面；创建、动作执行和已授权工具执行接收执行门面（工具执行结束后修改与流发布能力失效）。
 
@@ -144,10 +144,10 @@ headers 来源需要消费者持有自己的模型调用结果，因此自然用
 ### 会话目录与资源操作（API 9.1）
 
 - `plugin.sessions.list()` 返回当前全部会话的 `{ id, title, createdAt }` 摘要，按创建时间从新到旧排列；不加载历史、不改变前端视图。`SessionDirectory` 在同一宿主运行实例内共享，生命周期与该实例一致；公共领域服务可据此隔离自己的登记。
-- `plugin.session(id)` 取得指定会话的执行门面。`session.create(CreationContract, input, { signal?, content?, linkTo? })` 引用已装配的真实声明实例，允许调用其他插件公开的契约；输入由资源提供方校验和初始化，成功返回已提交的 `ResourceRef`，不返回资源私有执行门面。
-- `create` 的异步准备参与调用插件及资源提供方的关闭收束。准备期间阻止会话游标回溯，提交时重验会话、执行作用域与初始链接接收者；失败或取消不提交创建。`linkTo` 与身份、初始数据和创建事件同事务写入。后台位置复用工作台空位算法，按已保存尺寸或公共回退尺寸安排，不要求调用者提供画布坐标。内容资格交接见 [不可变内容](content.md#临时占用与提交)。
+- `plugin.session(id)` 取得指定会话的执行门面。`session.create(CreationContract, input, { signal?, content?, linkTo?, resources? })` 引用已装配的真实声明实例，允许调用其他插件公开的契约；输入由资源提供方校验和初始化，成功返回已提交的 `ResourceRef`，不返回资源私有执行门面。`resources`（API 10.1）为新资源接收的初始 `ResourceRef` 列表。
+- `create` 的异步准备参与调用插件及资源提供方的关闭收束。准备期间阻止会话游标回溯，提交时重验会话、执行作用域与初始链接的全部端点；失败或取消不提交创建。`linkTo / resources` 与身份、初始数据和创建事件同事务写入。后台位置复用工作台空位算法，按已保存尺寸或公共回退尺寸安排，不要求调用者提供画布坐标。内容资格交接见 [不可变内容](content.md#临时占用与提交)。
 - `session.link(receiver, resource)`、`session.unlink(receiver, resource)` 使用完整资源引用，校验双方属于当前会话和当前路径、类型一致且接收者支持链接。`session.remove(resource)` 与前端共用宿主移除操作；对象生命周期语义见 [资源](object-model.md#resource可被操作的对象)。
-- 顶层工具的 `context.session` 固定执行会话和发起对象，`create(contract, input)` 自动将新资源链接给发起者；`remove(resourceId)` 仅接受请求开始时有效的已链接资源，并在提交时验证当前存在性与收束。该门面不开放任意会话寻址或链接修改，不能通过重新取得全局会话句柄替代本次执行身份。普通 `ObjectReader.session` 仍为只读。
+- 顶层工具的 `context.session` 固定执行会话和发起对象，`create(contract, input, { resources? })` 自动将新资源链接给发起者；可选 `resources`（API 10.1）接收本请求有效链接范围内的资源 ID。`remove(resourceId)` 采用同一请求范围，并在提交时验证当前存在性与收束。模型创建的完整规则见 [Agent 创建与移除](runtime.md#agent-创建与移除)。普通 `ObjectReader.session` 仍为只读。
 - `plugin.signal` 在装配失败或开始关闭时取消，用于撤销插件自有公共登记；取消不代表活动已结束。宿主保留在途执行所需的提交设施，等待其真实收束后才释放，不因该信号提前阻断最终记录保存。
 
 ## 宿主运行生命周期

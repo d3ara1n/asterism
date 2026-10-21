@@ -32,11 +32,13 @@ export function createBuiltin(options: { application: BuiltinApplication; connec
         resourceOperations,
         defineAgentCreation({ id: builtin.name("agent.create"), creation: CreateAgent,
           description: "Create an Agent with a selected agent configuration and optional model/thinking overrides.",
-          guidelines: ["Use an existing agent configuration ID. Null model and thinking selections use that configuration's defaults.",
-            "The Agent starts without input or linked resources. Creating it does not send a task or copy your access."] }),
+          guidelines: [
+            "selection.agent identifies an agent configuration. agent_list returns available configuration IDs, names, descriptions, and task examples.",
+            "Null model and thinking selections use that configuration's defaults.",
+          ] }),
         defineAgentCreation({ id: builtin.name("note.create"), creation: CreateNote,
           description: "Create a note with a title and optional initial text.",
-          guidelines: ["Notes store their current text. Removing a note retains its history but does not provide content rollback."] }),
+          guidelines: ["Notes store their current text."] }),
       ] };
     } });
 }

@@ -75,7 +75,6 @@ export function implementTool<S extends Json, T extends Json, A extends Json, D 
           ...(!parsedTarget.success ? [validationMessage(parsedTarget.error, "target")] : []),
           ...(!parsedArgs.success ? [validationMessage(parsedArgs.error, "args")] : []),
           jsonArgumentHint,
-          "Correct the reported fields using this resource's tool schemas from resource_inspect and retry.",
         ].join("\n") } };
       return {
         effect: contract.effect, execution: contract.execution, implementation: identity,

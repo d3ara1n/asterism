@@ -10,8 +10,10 @@ export interface ResourceCreationOptions {
   signal?: AbortSignal;
   /** 输入引用的内容读取资格；省略时使用当前会话内容门面。 */
   content?: ContentReader;
-  /** 与创建原子提交；不复制接收者的其他链接或授权。 */
+  /** 新资源链接给此接收者，与创建原子提交。 */
   linkTo?: ResourceRef;
+  /** 新资源接收的初始资源链接，与创建原子提交。 */
+  resources?: readonly ResourceRef[];
 }
 
 /** 同步事务中的数据与事件写入；宿主限制 writer 的调用有效期。 */
@@ -40,7 +42,7 @@ export interface SessionExecutor extends SessionReader {
 }
 /** 工具调用绑定的会话操作：创建后链接给发起者，移除限定于请求开始时的链接集合。 */
 export interface ToolSession extends SessionReader {
-  create<I, S extends Json, O extends Json>(contract: CreationContract<I, S, O>, input: NoInfer<I> & Json): Promise<ResourceRef>;
+  create<I, S extends Json, O extends Json>(contract: CreationContract<I, S, O>, input: NoInfer<I> & Json, options?: { resources?: readonly string[] }): Promise<ResourceRef>;
   remove(resourceId: string): void;
 }
 export interface ObjectReader {

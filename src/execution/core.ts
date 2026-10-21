@@ -74,7 +74,7 @@ export async function executeCoreBatch(calls: readonly PendingCall[], capabiliti
     else {
       const parsed = definition.argsSchema.safeParse(call.arguments);
       if (!parsed.success) result = { kind: "rejected", error: { code: "invalid_arguments",
-        message: `${validationMessage(parsed.error, call.name)}. Correct the reported fields and retry.${call.name === "resource_call" ? ` ${jsonArgumentHint}` : ""}` } };
+        message: `${validationMessage(parsed.error, call.name)}.${call.name === "resource_call" ? ` ${jsonArgumentHint}` : ""}` } };
       else result = action ? action.resolve(parsed.data, capabilities) : extension!.resolve(parsed.data, call.callId);
     }
     const info: ToolInvocationInfo = {
@@ -104,7 +104,7 @@ export async function executeCoreBatch(calls: readonly PendingCall[], capabiliti
       completion = resolveToolCompletion(completion, latest);
     } catch {
       completion = result.effect === "write"
-        ? { kind: "unknown", message: "The tool stopped without a reliable outcome. Inspect the resource before retrying." }
+        ? { kind: "unknown", message: "The tool stopped with an unknown outcome." }
         : signal.aborted ? { kind: "cancelled", message: "Operation execution was cancelled." }
           : { kind: "failed", error: { code: "tool_failed", message: "The operation could not complete." } };
     } finally { active = false; }

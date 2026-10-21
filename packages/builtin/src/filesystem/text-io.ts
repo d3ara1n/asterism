@@ -12,17 +12,17 @@ const temporaryFilePrefix = ".builtin-";
 interface FileStamp { dev: number; ino: number; size: number; mtimeMs: number; ctimeMs: number; mode: number }
 export interface TextFile { path: string; text: string; stamp: FileStamp }
 const sameStamp = (a: FileStamp, b: FileStamp) => a.dev === b.dev && a.ino === b.ino && a.size === b.size && a.mtimeMs === b.mtimeMs && a.ctimeMs === b.ctimeMs;
-const conflict = () => new FilesystemError(rejected("file_changed", "The file or its path changed while this operation was being prepared; no replacement was committed. Read the target again and reconsider the change before retrying."));
+const conflict = () => new FilesystemError(rejected("file_changed", "The file or its path changed during preparation. The operation ended before replacement."));
 export class UnconfirmedWriteError extends Error {}
 export function validateTextSize(text: string): void {
-  if (Buffer.byteLength(text) > MAX_TEXT_BYTES) throw new TextError("file_too_large", "Text operations are limited to 8 MiB. Reduce the replacement content or choose a smaller file.");
+  if (Buffer.byteLength(text) > MAX_TEXT_BYTES) throw new TextError("file_too_large", "Text operations are limited to 8 MiB.");
   const bytes = Buffer.from(text);
-  if (bytes.toString("utf8") !== text) throw new TextError("invalid_text", "The replacement contains unpaired Unicode surrogates. Supply valid Unicode text before retrying.");
+  if (bytes.toString("utf8") !== text) throw new TextError("invalid_text", "The replacement contains unpaired Unicode surrogates.");
   decodeText(bytes);
 }
 function decodeText(bytes: Buffer): string {
   if (!isUtf8(bytes) || bytes.subarray(0, 5).toString("ascii") === "%PDF-" || bytes.some(byte => byte < 9 || (byte > 13 && byte < 32))) {
-    throw new TextError("unsupported_text", "The target is binary or is not UTF-8 text. Select a UTF-8 text file; use see for images; PDFs and other binary formats are unsupported.");
+    throw new TextError("unsupported_text", "The content format differs from the supported UTF-8 text format.");
   }
   return bytes.toString("utf8");
 }
@@ -33,8 +33,8 @@ export async function readTextFile(root: string, rel: string, signal: AbortSigna
   const handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
   try {
     const before = await handle.stat();
-    if (!before.isFile()) throw new FilesystemError(failed("not_file", "The target is not a regular file. Use list to check entry types and select a text file."));
-    if (before.size > MAX_TEXT_BYTES) throw new TextError("file_too_large", "The target exceeds the 8 MiB text file limit. Choose a smaller file.");
+    if (!before.isFile()) throw new FilesystemError(failed("not_file", "The target requires a regular UTF-8 text file."));
+    if (before.size > MAX_TEXT_BYTES) throw new TextError("file_too_large", "The target exceeds the 8 MiB text file limit.");
     if (await withinDirectory(root, rel) !== path || !sameStamp(before, await stat(path))) throw conflict();
     const chunks: Buffer[] = [];
     let length = 0;
@@ -45,7 +45,7 @@ export async function readTextFile(root: string, rel: string, signal: AbortSigna
       if (!bytesRead) break;
       chunks.push(buffer.subarray(0, bytesRead)); length += bytesRead;
     }
-    if (length > MAX_TEXT_BYTES) throw new TextError("file_too_large", "The target grew beyond the 8 MiB text file limit. Choose a smaller file.");
+    if (length > MAX_TEXT_BYTES) throw new TextError("file_too_large", "The target grew beyond the 8 MiB text file limit.");
     if (!sameStamp(before, await handle.stat()) || await withinDirectory(root, rel) !== path) throw conflict();
     signal.throwIfAborted();
     return { path, text: decodeText(Buffer.concat(chunks, length)), stamp: before };
@@ -122,7 +122,7 @@ export async function commitTextFile(root: string, rel: string, before: TextFile
     }
     committed = true;
   } catch (error) {
-    if (committing) throw new UnconfirmedWriteError("The filesystem could not confirm the final file replacement. Read the target before retrying; do not assume the content is unchanged.");
+    if (committing) throw new UnconfirmedWriteError("The final file replacement has an unknown outcome.");
     throw error;
   } finally {
     // 提交已经确认时，清理失败不能把已知成功改为失败。

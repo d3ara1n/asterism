@@ -13,13 +13,13 @@ const common = {
   id: text.describe("Stable question ID, unique within this call; returned with the answer."),
   question: text.describe("The complete, concise question in the user's language."),
   label: text.optional().describe("Optional short navigation label for a group of questions."),
-  context: text.optional().describe("Optional Markdown background needed to answer. Avoid repeating the conversation."),
+  context: text.optional().describe("Optional Markdown background for the question."),
   required: z.boolean().default(true).describe("Whether an answer is required for submission. Optional questions may be left blank and return skipped. Default true."),
 };
 const choice = {
-  options: z.array(optionSchema).min(2).describe("Distinct choices, usually 2–5. Do not add an Other option: custom input is always available."),
+  options: z.array(optionSchema).min(2).describe("Distinct choices. The interface also provides a custom input option."),
   recommendation: z.strictObject({
-    optionId: text.describe("ID of the recommended option. Does not preselect an answer."),
+    optionId: text.describe("ID of the option presented as a recommendation."),
     reason: text.describe("Brief reason for the recommendation, shown to the user."),
   }).optional().describe("Optional recommendation, with an explicit reason."),
 };
@@ -35,7 +35,7 @@ export const questionSchema = z.discriminatedUnion("type", [
     ctx.addIssue({ code: "custom", path: ["recommendation", "optionId"], message: "Recommendation must reference an offered option." });
 });
 export const askUserArgs = z.strictObject({
-  questions: z.array(questionSchema).min(1).describe("Independent questions to answer together. Ask dependent follow-up questions in a later call."),
+  questions: z.array(questionSchema).min(1).describe("Questions presented together in one group."),
 }).superRefine((args, ctx) => {
   if (new Set(args.questions.map(question => question.id)).size !== args.questions.length)
     ctx.addIssue({ code: "custom", path: ["questions"], message: "Question IDs must be unique within a call." });
@@ -53,7 +53,7 @@ const answerSchema = z.strictObject({
   id: text.describe("Original question ID."),
   question: text.describe("Original question text."),
   type: z.enum(["single", "multiple", "text"]).describe("Original question type."),
-  status: z.enum(["answered", "skipped"]).describe("Explicit user response state. Skipped does not mean consent."),
+  status: z.enum(["answered", "skipped"]).describe("Explicit user response state."),
   selected: z.array(z.strictObject({ id: text, label: text })).describe("User-selected options, with original IDs and labels."),
   text: text.optional().describe("The user's custom answer, verbatim except outer whitespace."),
   comment: text.optional().describe("Legacy per-question comment, retained when reading existing results."),

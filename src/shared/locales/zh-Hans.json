@@ -353,7 +353,6 @@
   "features_configuration_AgentsSettings_29": "提示词",
   "features_configuration_AgentsSettings_30": "系统提示词",
   "features_configuration_AgentsSettings_31": "留空使用上方显示的内置提示词。",
-  "features_configuration_AgentsSettings_32": "选择条件",
   "features_configuration_AgentsSettings_33": "任务示例",
   "features_configuration_AgentsSettings_34": "示例 {index___1}",
   "features_configuration_AgentsSettings_35": "移除示例",

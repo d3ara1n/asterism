@@ -12,7 +12,7 @@ export interface AgentContext {
   summary: { record: SessionRecord; data: z.infer<typeof ContextSummary.schema> } | null;
 }
 function summaryItem(summary: string): ModelItem {
-  return { kind: "context", parts: [{ kind: "text", text: `Earlier conversation has been summarized below. Use it as historical context alongside the recent messages that follow. Current system instructions and resource permissions still apply.\n<summary>\n${summary}\n</summary>` }] };
+  return { kind: "context", parts: [{ kind: "text", text: `The following summary describes earlier conversation. Recent messages follow it.\n<summary>\n${summary}\n</summary>` }] };
 }
 export function contextMessages(context: AgentContext): ModelItem[] {
   return [...(context.summary ? [summaryItem(context.summary.data.summary)] : []), ...context.groups.flatMap(group => group.items)];

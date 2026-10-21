@@ -11,7 +11,7 @@ function currentContent(object: ObjectReader) {
 }
 function requireText(object: ObjectReader): string {
   const content = currentContent(object);
-  if (content === null) throw new TextError("note_unavailable", "This note's current content is unavailable. Ask the user to restore or recreate the note; do not overwrite it by assuming empty content.");
+  if (content === null) throw new TextError("note_unavailable", "This note's current content is unavailable.");
   return content.text;
 }
 function titleOf(object: ObjectReader): string {
@@ -23,7 +23,7 @@ function save(object: ObjectExecutor, text: string): void {
   object.commit(writer => { writer.set(NoteContent, { text }); });
 }
 function validateNoteText(text: string): void {
-  if (text.length > MAX_NOTE_LENGTH) throw new TextError("note_too_large", `Note content exceeds ${MAX_NOTE_LENGTH} UTF-16 code units. Shorten the content before retrying.`);
+  if (text.length > MAX_NOTE_LENGTH) throw new TextError("note_too_large", `Note content exceeds ${MAX_NOTE_LENGTH} UTF-16 code units.`);
 }
 function mutationFailure(error: unknown, signal: AbortSignal, operation: string): CallResult<never> {
   if (error instanceof TextError) return error.outcome();

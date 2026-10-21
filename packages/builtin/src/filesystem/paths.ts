@@ -6,11 +6,11 @@ export function insideDirectory(root: string, path: string): boolean {
   const rel = relative(root, path);
   return rel === "" || (!isAbsolute(rel) && !rel.split(sep).includes(".."));
 }
-export const outsideDirectory = () => new FilesystemError(rejected("outside_resource", "target.path resolves outside this directory resource. Choose a path within the resource; for another directory, ask the user to link it and use its resource_id."));
+export const outsideDirectory = () => new FilesystemError(rejected("outside_resource", "target.path resolves outside this directory resource. Paths are relative to the linked resource root and resolve within it."));
 export async function directoryRoot(root: string): Promise<string> {
   try {
     const base = await realpath(root);
-    if (!(await stat(base)).isDirectory()) throw new FilesystemError(failed("resource_not_directory", "The resource root is no longer a directory. Ask the user to relink an existing directory."));
+    if (!(await stat(base)).isDirectory()) throw new FilesystemError(failed("resource_not_directory", "The resource root requires an existing directory."));
     return base;
   } catch (error) { throw new FilesystemError(filesystemFailure(error, "Resolve resource root", true)); }
 }
@@ -44,7 +44,7 @@ export async function writableTarget(root: string, rel: string): Promise<{ root:
       path = await realpath(path);
       if (!insideDirectory(base, path)) throw outsideDirectory();
       if (i < parts.length - 1 && !(entry.isDirectory() || (entry.isSymbolicLink() && (await stat(path)).isDirectory()))) {
-        throw new FilesystemError(failed("not_directory", "A target.path parent is not a directory. Use list to check the parent and correct the path."));
+        throw new FilesystemError(failed("not_directory", "target.path requires directory entries for its parent components."));
       }
     } catch (error) {
       // 只有 lstat 确认不存在时才采用剩余路径；realpath 的 ENOENT 可能是断开的链接。

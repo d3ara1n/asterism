@@ -58,7 +58,7 @@ export class SessionWorkbench {
         for (const link of folded.links.filter(l => l.resourceId === target.id || l.agentId === target.id)) {
           const resource = folded.objects.find(o => o.id === link.resourceId)!;
           tree.appendToTimeline(command.sessionId, { source: host, recipient: link.agentId, contract: "resource_detached", data: { id: resource.id, agentId: link.agentId },
-            model: link.agentId === target.id ? null : `Resource "${resource.title}" (resource_id: ${resource.id}) is no longer linked to you.` });
+            model: link.agentId === target.id ? null : `Resource "${resource.title}" (resource_id: ${resource.id}) has been detached.` });
         }
         tree.appendToTimeline(command.sessionId, { source: host, recipient: null, contract: "object_removed", data: { id: target.id }, model: null });
         break;
@@ -72,8 +72,8 @@ export class SessionWorkbench {
         if (folded.links.some(l => l.agentId === agent.id && l.resourceId === resource.id) === command.linked) break;
         tree.appendToTimeline(command.sessionId, { source: host, recipient: agent.id, contract: command.linked ? "resource_attached" : "resource_detached",
           data: { id: resource.id, agentId: agent.id }, model: command.linked
-            ? `Resource "${resource.title}" (type: ${resource.kind}, resource_id: ${resource.id}) is now linked to you. Tools: ${JSON.stringify(this.tools(command.sessionId, agent.id, resource))}. Call them with resource_call.`
-            : `Resource "${resource.title}" (resource_id: ${resource.id}) is no longer linked to you.` });
+            ? `Resource "${resource.title}" (type: ${resource.kind}, resource_id: ${resource.id}) is now linked to you. Tools: ${JSON.stringify(this.tools(command.sessionId, agent.id, resource))}.`
+            : `Resource "${resource.title}" (resource_id: ${resource.id}) has been detached.` });
         break;
       }
       case "view.set": {

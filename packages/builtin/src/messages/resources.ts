@@ -1,6 +1,11 @@
 import { defineMessages, pluginNamespace } from "@atelier/sdk/contracts";
 
 export const resourceMessages = pluginNamespace("atelier.builtin").messages("en", defineMessages({
+  agents: { id: "resources.agentList", defaultMessage: "List agent configurations" },
+  agentCount: { id: "resources.agentCount", defaultMessage: "{count, plural, one {# agent} other {# agents}}" },
+  noAgents: { id: "resources.noAgents", defaultMessage: "No agent configurations are available." },
+  agentId: { id: "resources.agentId", defaultMessage: "Agent configuration ID" },
+  examples: { id: "resources.agentExamples", defaultMessage: "Task examples" },
   list: { id: "resources.creationList", defaultMessage: "List creation entries" },
   inspect: { id: "resources.creationInspect", defaultMessage: "Inspect creation entry" },
   create: { id: "resources.create", defaultMessage: "Create resource" },

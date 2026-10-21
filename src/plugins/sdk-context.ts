@@ -91,11 +91,12 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
       checkMutation();
       const value = jsonSchema.parse(input);
       const linkTo = options.linkTo && Object.freeze({ ...options.linkTo });
+      const resources = options.resources?.map(resource => Object.freeze({ ...resource }));
       const contentReader = options.content ?? host.content?.reader(access(id, objectId, scope));
       return sessionRuns.start(async signal => {
         try {
           return await host.sessions.create(id, contract, value, {
-            signal, linkTo, content: contentReader, owner: internal.id, check: checkMutation,
+            signal, linkTo, resources, content: contentReader, owner: internal.id, check: checkMutation,
           });
         } catch (error) { return sessionError(error); }
       }, { signal: options.signal, ...(objectId ? { object: host.refOf(objectId) ?? undefined } : {}) }).done;
@@ -344,14 +345,21 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
           throw new PluginApiError("unavailable", "The invoking resource is no longer on the current session path.");
       };
       const source = session(ref.sessionId, ref.id, check, scope);
+      const authorized = (resourceId: string) => {
+        const target = linked.find(resource => resource.id === resourceId);
+        if (!target) throw new PluginApiError("rejected", "Resource access requires a link in this request's resource scope.", "access_denied");
+        return target;
+      };
       return Object.freeze({
         ...reader(ref, scope).session,
-        create: ((contract, input) => source.create(contract, input, { signal, linkTo: ref })) as ToolSession["create"],
+        create: ((contract, input, options = {}) => {
+          check();
+          const resources = [...new Set(options.resources ?? [])].map(authorized);
+          return source.create(contract, input, { signal, linkTo: ref, resources });
+        }) as ToolSession["create"],
         remove(resourceId: string) {
           check();
-          const target = linked.find(resource => resource.id === resourceId);
-          if (!target) throw new PluginApiError("rejected", "The resource was not linked at the start of this request.", "access_denied");
-          source.remove(target);
+          source.remove(authorized(resourceId));
         },
       });
     },

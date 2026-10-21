@@ -15,7 +15,7 @@ export const DirectoryList = defineImplementation({
     entries: z.array(z.strictObject({
       name: z.string().describe("Entry name within the listed directory."),
       type: z.enum(["directory", "file", "other"]).describe("The entry type; symbolic links and other special entries are reported as other."),
-    })).describe("Up to 500 direct entries; contents are not read and subdirectories are not traversed."),
+    })).describe("Up to 500 direct entries."),
     truncated: z.boolean().describe("True when the directory contains more than 500 entries and the listing is incomplete."),
   }).describe("A directory listing with its relative path, entry types and truncation status.")),
   resource: Directory, tool: List,
@@ -39,7 +39,7 @@ export const DirectoryRead = defineImplementation({
     path: filePath,
     offset: z.number().int().positive().optional().describe("First line to read, 1-based in the complete file; defaults to 1."),
     limit: z.number().int().positive().max(2000).optional().describe("Maximum complete lines to read; defaults to 1000, maximum 2000. The output is also limited to 64 KiB of line text."),
-  }).describe("Select file content and its line range, e.g. {\"path\":\"src/main.ts\",\"offset\":100,\"limit\":80}. Use nextOffset to continue. Non-UTF-8 or binary content is unsupported."),
+  }).describe("Select file content and its line range, e.g. {\"path\":\"src/main.ts\",\"offset\":100,\"limit\":80}. Content is UTF-8 text; nextOffset marks the start of remaining lines."),
   effect: "read", execution: "parallel",
 });
 export const DirectoryEdit = defineImplementation({
@@ -51,7 +51,7 @@ export const DirectoryWrite = defineImplementation({
   ...builtin.data("directory.write", textChangeSchema.extend({
     path: filePath,
     created: z.boolean().describe("True when this call created the target file; false when it already existed."),
-  }).describe("The written file's actual diff and creation status; write never returns edit anchors. Full content is limited to 8 MiB.")),
+  }).describe("The written file's actual diff and creation status, with an empty anchors array. Full content is limited to 8 MiB.")),
   resource: Directory, tool: Write, targetSchema: fileTarget, effect: "write", execution: "sequential",
 });
 export const DirectorySee = defineImplementation({

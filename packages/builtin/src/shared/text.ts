@@ -19,7 +19,7 @@ export class TextError extends Error {
 export function readText(text: string, anchored: boolean, range: { offset?: number; limit?: number; maxBytes?: number } = {}): TextRead {
   const lines = splitLines(text);
   const fromLine = range.offset ?? 1;
-  if (fromLine > Math.max(1, lines.length)) throw new TextError("line_out_of_range", `target.offset ${fromLine} exceeds the text's ${lines.length} lines. Use an offset within the text or read from line 1.`);
+  if (fromLine > Math.max(1, lines.length)) throw new TextError("line_out_of_range", `target.offset ${fromLine} exceeds the text's ${lines.length} lines.`);
   const rows: TextRead["rows"] = [];
   const end = Math.min(lines.length, fromLine - 1 + (range.limit ?? lines.length));
   let bytes = 0;
@@ -27,7 +27,7 @@ export function readText(text: string, anchored: boolean, range: { offset?: numb
     const row = { line: i + 1, content: lines[i], hash: anchored ? computeLineHash(i + 1, lines[i]) : null };
     const cost = Buffer.byteLength(`${row.line}${row.hash ? `#${row.hash}` : ""}│${row.content}\n`);
     if (range.maxBytes !== undefined && bytes + cost > range.maxBytes) {
-      if (rows.length === 0) throw new TextError("line_too_large", "The selected line exceeds the text read output limit. This tool returns complete lines only; ask the user to split the line or select other content.");
+      if (rows.length === 0) throw new TextError("line_too_large", "The selected line exceeds the text read output limit. This tool returns complete lines.");
       break;
     }
     rows.push(row); bytes += cost;
@@ -40,17 +40,17 @@ export function readToModel(data: TextRead): string {
   return [
     `${data.totalLines} lines · from line ${data.fromLine}${data.noFinalNewline ? " · no trailing newline" : ""}`,
     ...rows,
-    ...(data.nextOffset === null ? [] : [`More content remains; continue with target.offset:${data.nextOffset}.`]),
+    ...(data.nextOffset === null ? [] : [`Remaining content starts at target.offset:${data.nextOffset}.`]),
   ].join("\n");
 }
 
 function failureMessage(failure: ApplyFailure): string {
   if (failure.kind !== "anchor") return failure.message;
-  return ["Anchor mismatch; no changes were written.", ...failure.failures.map(f => {
+  return ["Anchor mismatch; original content preserved.", ...failure.failures.map(f => {
     const prefix = `edits[${f.opIndex}].${f.which} (${f.cited.line}#${f.cited.hash})`;
-    if (f.recovery.kind === "found") return `${prefix}: content may have shifted; review and retry with {\"line\":${f.recovery.newLine},\"hash\":\"${f.recovery.newHash}\"}.`;
-    if (f.recovery.kind === "ambiguous") return `${prefix}: several nearby lines match. Read the target to choose the intended line: ${JSON.stringify(f.recovery.candidates)}.`;
-    return `${prefix}: ${f.current ? `current line is ${f.cited.line}#${f.current.hash}│${f.current.content}` : "line is out of range"}. Read the target again before retrying.`;
+    if (f.recovery.kind === "found") return `${prefix}: matching nearby line: {\"line\":${f.recovery.newLine},\"hash\":\"${f.recovery.newHash}\"}.`;
+    if (f.recovery.kind === "ambiguous") return `${prefix}: several nearby lines match: ${JSON.stringify(f.recovery.candidates)}.`;
+    return `${prefix}: ${f.current ? `current line is ${f.cited.line}#${f.current.hash}│${f.current.content}` : "line is out of range"}.`;
   })].join("\n");
 }
 export function editText(text: string, edits: Edit[]): { text: string; touchedLines: readonly number[] } {
@@ -62,7 +62,7 @@ export function editText(text: string, edits: Edit[]): { text: string; touchedLi
 export function textChange(before: string, after: string, label: string, touched: readonly number[] = []): TextChange {
   label = label.replace(/[\r\n\t]/g, " ");
   const patch = structuredPatch(label, label, before, after, "", "", { context: 3, timeout: 1000, maxEditLength: 10000 });
-  if (!patch) throw new TextError("diff_limit", "The content change exceeded the diff computation budget; no content was written. Split the change into smaller edit batches.");
+  if (!patch) throw new TextError("diff_limit", "The content change exceeded the diff computation budget; original content preserved.");
   let added = 0, removed = 0;
   for (const hunk of patch.hunks) for (const line of hunk.lines) {
     if (line.startsWith("+")) added++;
@@ -102,8 +102,8 @@ export function editToModel(data: TextChange): string {
   return [
     changeSummary(data),
     diff,
-    ...(diff !== data.diff ? ["Diff output was truncated; the full diff is saved in the tool result. Read the target to inspect its current content."] : []),
-    ...(data.anchors.length ? ["Updated anchors (use for the next edit):", ...data.anchors.map(row => `${row.line}#${row.hash}│${row.content}`)] : []),
-    ...(data.anchorsTruncated ? ["Some updated anchors were omitted; read the target for the remaining anchors."] : []),
+    ...(diff !== data.diff ? ["Diff output was truncated; the full diff is saved in the tool result."] : []),
+    ...(data.anchors.length ? ["Updated anchors:", ...data.anchors.map(row => `${row.line}#${row.hash}│${row.content}`)] : []),
+    ...(data.anchorsTruncated ? ["Some updated anchors were omitted."] : []),
   ].filter(Boolean).join("\n");
 }

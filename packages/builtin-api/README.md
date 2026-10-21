@@ -1,6 +1,6 @@
 # 内置插件公共 API（`@atelier/builtin-api`）
 
-内置实现与外部插件共同消费的领域契约、后台创建入口与前端扩展 API，当前版本 **0.5.0**。插件身份为 `atelier.builtin`；本包不注册第二个插件，也不依赖 `@atelier/builtin` 实现。公共加载与生命周期规则见 [插件 SDK](../../docs/plugin-sdk.md#公共模块与契约身份)。
+内置实现与外部插件共同消费的领域契约、后台创建入口与前端扩展 API，当前版本 **0.6.0**。插件身份为 `atelier.builtin`；本包不注册第二个插件，也不依赖 `@atelier/builtin` 实现。公共加载与生命周期规则见 [插件 SDK](../../docs/plugin-sdk.md#公共模块与契约身份)。
 
 ## 入口与边界
 
@@ -25,12 +25,12 @@
   "version": "1.0.0",
   "type": "module",
   "peerDependencies": {
-    "@atelier/sdk": "^0.23.0",
-    "@atelier/builtin-api": "^0.5.0"
+    "@atelier/sdk": "^0.26.0",
+    "@atelier/builtin-api": "^0.6.0"
   },
   "atelier": {
     "id": "example.input-review",
-    "api": { "major": 10, "minMinor": 0 },
+    "api": { "major": 10, "minMinor": 1 },
     "runtime": "./src/runtime.ts"
   }
 }
@@ -58,7 +58,7 @@ const agentCreation = defineAgentCreation({
 
 需要不同的模型参数时，同时提供 `inputSchema` 与同步 `toInput(input, { object })`；`object` 为调用绑定的只读执行者。模型输入按该 schema 解析后交给转换函数，转换结果再由原创建契约解析；直接复用时不重复执行创建 schema 的 transform。完整可编译例子见 [`examples/resource-creation.ts`](examples/resource-creation.ts)。
 
-入口 ID 属于声明插件；同宿主重复 ID 明确失败。目录按宿主实例隔离，并随插件装配失败或关闭撤销登记。`agentCreations.list(plugin)` 返回摘要，`inspect(plugin, id)` 返回输入 schema 与指导，`create(plugin, id, input, toolContext)` 消费本次工具的受约束会话能力。模型工具、自动链接与移除规则见 [Agent 创建与移除](../../docs/runtime.md#agent-创建与移除)。
+入口 ID 属于声明插件；同宿主重复 ID 明确失败。目录按宿主实例隔离，并随插件装配失败或关闭撤销登记。`agentCreations.list(plugin)` 返回摘要，`inspect(plugin, id)` 返回输入 schema 与规则，`create(plugin, id, input, toolContext, { resources? })` 消费本次工具的受约束会话能力，`resources` 传入新资源接收的资源 ID 列表。模型工具、初始链接与移除规则见 [Agent 创建与移除](../../docs/runtime.md#agent-创建与移除)。
 
 ## Agent 界面扩展
 

@@ -56,7 +56,7 @@ export function createQuestionService(changed: (object: ResourceRef, version: nu
       entry.finish({ kind: "succeeded", data });
     },
     cancel(object: ResourceRef, id: string) {
-      lookup(object, id).finish({ kind: "cancelled", data: null, message: "The user cancelled these questions. No draft answers were submitted. This is not consent. Do not repeat them without a new reason." });
+      lookup(object, id).finish({ kind: "cancelled", data: null, message: "The user cancelled this question group." });
     },
   };
 }
