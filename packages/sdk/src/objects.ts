@@ -35,6 +35,7 @@ export interface SessionReader {
   get<T extends Json>(contract: DataContract<T>): T | null;
   readonly title: { get(): string };
 }
+/** 会话层面的通用执行门面；资源操作使用显式引用，调用者视角由具体调用入口绑定。 */
 export interface SessionExecutor extends SessionReader {
   create<I, S extends Json, O extends Json>(contract: CreationContract<I, S, O>, input: NoInfer<I> & Json, options?: ResourceCreationOptions): Promise<ResourceCreationResult>;
   /** 调用资源公开动作；返回表示动作处理完成，独立托管工作由资源自身管理。 */
@@ -49,7 +50,13 @@ export interface SessionExecutor extends SessionReader {
   /** set 直接覆盖会话标题；可在同步 commit 内调用并随其提交或回滚。 */
   readonly title: SessionReader["title"] & { set(text: string): void };
 }
-/** 工具调用绑定的会话操作：创建后链接给发起者，移除限定于请求开始时的链接集合。 */
+/**
+ * 同一会话在工具调用发起者与本次请求视角下的操作门面。
+ * 宿主绑定发起资源、请求开始时的有效链接范围和工具执行作用域，统一处理身份与执行校验。
+ * 操作从发起资源出发：创建后链接给发起者，移除目标从本请求有效链接范围内解析。
+ * 新增操作沿用此视角，明确隐式绑定的端点、可操作资源范围及执行作用域。
+ * 完整契约见 docs/plugin-sdk.md「会话目录与资源操作」。
+ */
 export interface ToolSession extends SessionReader {
   create<I, S extends Json, O extends Json>(contract: CreationContract<I, S, O>, input: NoInfer<I> & Json, options?: {
     resources?: readonly string[];
