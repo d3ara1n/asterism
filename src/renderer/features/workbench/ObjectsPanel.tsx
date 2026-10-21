@@ -15,7 +15,7 @@ import { useModuleViews } from "../../modules/views";
 /** 对象只出现一次；整行定位，行内操作管理卡片可见性。 */
 export function ObjectsPanel() {
   const i18n = useI18n();
-  const { session, ready, busy, canvas, run } = useWorkbench();
+  const { session, ready, canvas, run } = useWorkbench();
   const registry = useModuleViews();
   const [query, setQuery] = useState("");
   const [hiddenOnly, setHiddenOnly] = useState(false);
@@ -40,8 +40,8 @@ export function ObjectsPanel() {
         </>}
         media={<span className="text-muted-foreground" aria-hidden="true">{descriptor.icon}</span>}
         buttonProps={{ "aria-label": i18n.formatMessage(objectsMessages.locateObject, { title: object.title }) }}
-        disabled={!ready || busy} onOpen={() => { void canvas.locateObjects([object.id], { select: true }); }}
-        actions={<IconButton size="icon-xs" disabled={!ready || busy}
+        disabled={!ready} onOpen={() => { void canvas.locateObjects([object.id], { select: true }); }}
+        actions={<IconButton size="icon-xs" disabled={!ready}
           label={i18n.formatMessage(isHidden ? objectsMessages.showCard : objectsMessages.hideCard, { title: object.title })}
           onClick={() => { void run({ type: "view.set", sessionId: session.id, objectId: object.id, hidden: !isHidden }); }}>
           {isHidden ? <EyeClosed /> : <Eye />}

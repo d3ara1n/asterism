@@ -28,6 +28,7 @@ export interface SessionHost {
   /** 会话内除 objectId 外没有在途活动；用于显式游标选择前的收束检查。 */
   idle(sessionId: string, objectId?: string): boolean;
   progressChanged(sessionId: string): void;
+  viewChanged(sessionId: string): void;
   linked(sessionId: string, objectId: string): FoldedObject[];
   capabilities(linked: readonly FoldedObject[], policy: ToolPolicy, caller?: ToolCaller): AgentCapabilities;
   context(linked: readonly FoldedObject[]): Promise<ContextFile[]>;

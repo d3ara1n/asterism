@@ -10,6 +10,7 @@ import { createSelection, selectionOf } from "./selection.ts";
 import { createAgentLoop } from "./loop.ts";
 import { createAdmission } from "./admission.ts";
 import { projectAgentTurnState } from "./state-projection.ts";
+import { agentExecutionState } from "./state.ts";
 import type { UsageConsumer } from "../usage/service.ts";
 import { createPeekTool } from "./peek/runtime.ts";
 import { AgentExecutionFeedback } from "./feedback.ts";
@@ -41,7 +42,8 @@ export function createAgentModule(application: BuiltinApplication, usage: UsageC
         project(_data, object) {
           const value = object.get(AgentSelection);
           return { agentId: object.ref.id, selection: value?.selection ?? null, selectionRevision: value?.revision ?? 0,
-            turnState: projectAgentTurnState(object.session.snapshot(), object.ref.id), drafts: object.get(AgentDrafts) ?? [] };
+            executionState: agentExecutionState(projectAgentTurnState(object.session.snapshot(), object.ref.id), loop.running(object)),
+            drafts: object.get(AgentDrafts) ?? [] };
         },
         async inspect(_data, object) {
           return { type: Agent.kind, title: object.snapshot()?.title ?? "Agent" };

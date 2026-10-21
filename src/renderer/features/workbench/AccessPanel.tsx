@@ -77,7 +77,7 @@ function ResourcePicker({ objects, selected, onSelect, label }: { objects: Workb
 }
 function AccessRow({ receiver, resource, object }: { receiver: WorkbenchObject; resource: WorkbenchObject; object: WorkbenchObject }) {
   const i18n = useI18n();
-  const { controller, session, ready, busy } = useWorkbench();
+  const { controller, session, ready } = useWorkbench();
   const { state } = useSession(controller);
   const descriptor = useModuleViews().resource(object.kind);
   const linked = session.links.some(link => link.receiverId === receiver.id && link.resourceId === resource.id);
@@ -117,7 +117,7 @@ function AccessRow({ receiver, resource, object }: { receiver: WorkbenchObject; 
         </StatusText>
       </p>
       {error && <p role="alert" className="mt-1"><StatusText tone="error">{i18n.text(error)}</StatusText></p>}
-    </div><Switch id={id} checked={pending?.desired ?? linked} disabled={!ready || busy || !!pending || state.status !== "ready"}
+    </div><Switch id={id} checked={pending?.desired ?? linked} disabled={!ready || !!pending || state.status !== "ready"}
       aria-label={i18n.formatMessage(accessMessages.changeAccess, { receiver: receiver.title, resource: resource.title })} aria-busy={!!pending} onCheckedChange={desired => { void change(desired); }} />
   </div>;
 }

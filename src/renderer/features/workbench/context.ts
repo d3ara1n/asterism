@@ -9,7 +9,6 @@ export interface WorkbenchEnvironment {
   controller: SessionController;
   session: WorkbenchSnapshot;
   ready: boolean;
-  busy: boolean;
   run: (command: WorkbenchOperation) => Promise<boolean>;
 
 }

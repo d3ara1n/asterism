@@ -39,7 +39,8 @@ export interface RendererObjectContext {
   readonly content: ContentReader;
   input<I, O extends Json>(contract: ActionContract<I, O> | CreationContract<I, Json, O>): RendererContentInput;
   readonly view: {
-    ready: boolean; busy: boolean; status: "loading" | "ready" | "error";
+    /** 当前对象视图可操作；普通后台刷新与其他对象的局部提交不改变此值。 */
+    ready: boolean;
     /** 视图读取异常；对象动作和创建失败通过各自调用回执返回。 */
     error: UiText | null; missing: boolean;
   };
@@ -51,8 +52,6 @@ export interface RendererObjectContext {
   };
   invoke<I, O extends Json>(contract: ActionContract<I, O>, input: NoInfer<I> & Json, options?: RendererInputOptions): Promise<RendererReceipt>;
   onStream(channel: string, listener: (data: Uint8Array) => void): () => void;
-  /** 对象任务、动作及模型／工具执行；插件通信调用的收束状态不属于执行状态。 */
-  readonly activity: { running: boolean };
   /** 对象级保留状态，生命周期由宿主统一管理。 */
   readonly retained: RendererRetained;
 }

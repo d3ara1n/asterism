@@ -32,7 +32,6 @@ export function useObjectContext(object: WorkbenchObject): RendererObjectContext
   const workbench = useWorkbench();
   const { controller } = workbench;
   const { state, snapshot } = useSession(controller);
-  const progress = useSessionProgress(controller);
   const records = useMemo(() => snapshot
     ? sessionSnapshot(nodeView(snapshot.sessionId, snapshot.title, snapshot.nodes, snapshot.cursor)) : null, [snapshot]);
   const onStream = useCallback<RendererObjectContext["onStream"]>((channel, listener) =>
@@ -47,7 +46,7 @@ export function useObjectContext(object: WorkbenchObject): RendererObjectContext
     content,
     input: contract => contentInput({ sessionId: controller.sessionId, resourceKind: contract.resource.kind, contractId: contract.id,
       ...(contract.kind === "action" ? { objectId: object.id } : {}) }),
-    view: { ready: workbench.ready, busy: state.busy, status: state.status, error: state.readError, missing: state.missing },
+    view: { ready: workbench.ready, error: state.readError, missing: state.missing },
     session: {
       snapshot: () => records, subscribe: controller.subscribe,
       create: (contract, input, position, options) => contentCommand(options?.content,
@@ -57,11 +56,8 @@ export function useObjectContext(object: WorkbenchObject): RendererObjectContext
     },
     invoke: (contract, input, options) => contentCommand(options?.content,
       { sessionId: controller.sessionId, objectId: object.id, resourceKind: contract.resource.kind, contractId: contract.id },
-      contentScopeId => controller.execute({ type: "resource.command", sessionId: controller.sessionId, objectId: object.id, command: resourceCall(contract, input), contentScopeId })),
+      contentScopeId => controller.executeAndRead({ type: "resource.command", sessionId: controller.sessionId, objectId: object.id, command: resourceCall(contract, input), contentScopeId })),
     onStream,
-    activity: {
-      running: progress.runningObjectIds.includes(object.id),
-    },
     retained,
   };
 }

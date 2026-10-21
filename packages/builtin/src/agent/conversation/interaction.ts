@@ -44,8 +44,8 @@ export function useAgentConversation(object: RendererObjectContext, hasSelection
     if (!result.ok) toast.error(i18n.text(result.error.display ?? result.error.message));
     return result.ok;
   };
-  const { ready, busy, status } = object.view;
-  const editable = ready && !busy && status === "ready" && !state.locked;
+  const { ready } = object.view;
+  const editable = ready && !state.locked;
   const writable = editable && hasSelection;
   const transfer = async (key: string, parts: readonly ModelInputPart[], source: ContentReader, input: () => RendererContentInput) => {
     const signature = JSON.stringify(parts), existing = current.transfers.get(key);
@@ -86,11 +86,11 @@ export function useAgentConversation(object: RendererObjectContext, hasSelection
     });
   };
   return {
-    draft, drafts, writable, editable, executionState, configurable: ready && !busy && status === "ready",
+    draft, drafts, writable, editable, executionState, configurable: ready,
     pendingTake: current.exchange.pending !== null,
-    canRetryTake: ready && !busy && status === "ready" && !current.exchange.working,
+    canRetryTake: ready && !current.exchange.working,
     async retryTake(): Promise<boolean> {
-      if (!ready || busy || status !== "ready" || current.exchange.working || current.closed) return false;
+      if (!ready || current.exchange.working || current.closed) return false;
       try { return await completeExchange(); }
       catch { toast.error(i18n.text(conversationMessages.draftExchangePending)); return false; }
     },
@@ -111,7 +111,9 @@ export function useAgentConversation(object: RendererObjectContext, hasSelection
       });
     },
     async setMode(item: AgentDraft, mode: DraftMode) {
-      return mutate(async () => accepted(await object.invoke(SetAgentDraftMode, { id: item.id, revision: item.revision, mode })));
+      if (!editable || mode === item.mode) return false;
+      try { return accepted(await object.invoke(SetAgentDraftMode, { id: item.id, revision: item.revision, mode })); }
+      catch { toast.error(i18n.text(conversationMessages.draftTransferFailed)); return false; }
     },
     async take(item: AgentDraft): Promise<boolean> {
       return mutate(async () => {

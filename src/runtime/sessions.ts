@@ -87,9 +87,10 @@ export class SessionService {
         this.commit(sessionId, () => this.tree.setTitle(sessionId, title));
       },
       commit: (sessionId, work) => this.commit(sessionId, work),
-      idle: (sessionId, objectId) => this.pluginActivity(sessionId).unsettled.length === 0
-        && !this.resources.controllers().some(controller => controller.activity?.(sessionId).running.some(id => id !== objectId)),
+      idle: (sessionId, objectId) => !this.pluginActivity(sessionId).busy.some(id => id !== objectId)
+        && !this.resources.controllers().some(controller => controller.activity?.(sessionId).busy.some(id => id !== objectId)),
       progressChanged: sessionId => this.progressChanged(sessionId),
+      viewChanged: sessionId => this.notify(sessionId),
       linked: (sessionId, objectId) => {
         const folded = this.tree.workbench(sessionId);
         const ids = new Set(folded.links.filter(link => link.receiverId === objectId).map(link => link.resourceId));
@@ -209,8 +210,9 @@ export class SessionService {
   /** 会话 settled：没有任何资源在活动；回溯只在此时允许。 */
   private settled(sessionId: string): boolean {
     return ![...this.pendingCreations.values()].some(value => value.sessionId === sessionId)
-      && this.pluginActivity(sessionId).unsettled.length === 0
-      && this.resources.controllers().every(controller => (controller.activity?.(sessionId).running.length ?? 0) === 0);
+      && ![...this.pendingActions.values()].some(ref => ref.sessionId === sessionId)
+      && this.pluginActivity(sessionId).busy.length === 0
+      && this.resources.controllers().every(controller => (controller.activity?.(sessionId).busy.length ?? 0) === 0);
   }
   private notify(sessionId: string): void {
     const revision = (this.revisions.get(sessionId) ?? 0) + 1;
@@ -219,11 +221,12 @@ export class SessionService {
     catch { /* 查询可恢复遗漏的通知 */ }
   }
   private progress(sessionId: string): SessionProgress {
-    const resources = this.resources.controllers().map(controller => controller.activity?.(sessionId) ?? { running: [], live: [] });
+    const resources = this.resources.controllers().map(controller => controller.activity?.(sessionId) ?? { busy: [], live: [] });
     const plugin = this.pluginActivity(sessionId);
     return { revision: this.revisions.get(sessionId) ?? 0, version: this.progressVersions.get(sessionId) ?? 0,
-      unsettledObjectIds: [...new Set([...resources.flatMap(a => a.running), ...plugin.unsettled])],
-      runningObjectIds: [...new Set([...resources.flatMap(a => a.running), ...plugin.executing])],
+      busyObjectIds: [...new Set([...resources.flatMap(a => a.busy), ...plugin.busy,
+        ...[...this.pendingActions.values()].filter(ref => ref.sessionId === sessionId).map(ref => ref.id)])],
+      timelineBusy: [...this.pendingCreations.values()].some(item => item.sessionId === sessionId),
       live: [...resources.flatMap(a => a.live), ...plugin.live] };
   }
   private progressChanged(sessionId: string): void {
@@ -254,6 +257,7 @@ export class SessionService {
   /** 前后台动作共用准备与对象队列；本次内容占用覆盖准备、排队和真实执行。 */
   private async invokeResource(ref: ResourceRef, raw: ResourceCall, content: ContentLease,
     options: { signal?: AbortSignal; check?(): void } = {}): Promise<void> {
+    const pending = Symbol();
     const abortContent = () => content.controller.abort();
     options.signal?.addEventListener("abort", abortContent, { once: true });
     try {
@@ -262,6 +266,8 @@ export class SessionService {
       const controller = this.resources.controller(ref.kind);
       if (!controller?.execute) throw new SessionError("invalid_request", "This resource has no actions.");
       controller.assertActionEntry?.(ref.id);
+      this.pendingActions.set(pending, ref);
+      this.progressChanged(ref.sessionId);
       const command = await this.prepareCommand(ref.kind, raw, { sessionId: ref.sessionId, objectId: ref.id, content }, options.signal);
       options.signal?.throwIfAborted(); options.check?.();
       await controller.execute({ sessionId: ref.sessionId, resource, signal: options.signal }, command, () => {
@@ -269,7 +275,11 @@ export class SessionService {
       });
     } finally {
       options.signal?.removeEventListener("abort", abortContent);
-      await content.close();
+      try { await content.close(); }
+      finally {
+        this.pendingActions.delete(pending);
+        this.progressChanged(ref.sessionId);
+      }
     }
   }
   private async invokeFromPlugin(sessionId: string, contract: ActionContract<unknown>, target: ResourceRef, input: Json,
@@ -323,12 +333,14 @@ export class SessionService {
   private removeResource(sessionId: string, ref: ResourceRef): void {
     this.commit(sessionId, () => {
       const target = this.requireRef(sessionId, ref);
-      if (this.pluginActivity(sessionId).unsettled.includes(target.id)
-        || this.resources.controllers().some(controller => controller.activity?.(sessionId).running.includes(target.id)))
+      if ([...this.pendingActions.values()].some(item => item.sessionId === sessionId && item.id === target.id)
+        || this.pluginActivity(sessionId).busy.includes(target.id)
+        || this.resources.controllers().some(controller => controller.activity?.(sessionId).busy.includes(target.id)))
         throw new SessionError("conflict", "Wait for this resource to settle before removing it.");
       this.workbench.mutate({ type: "object.remove", sessionId, objectId: ref.id });
     });
   }
+  private readonly pendingActions = new Map<symbol, ResourceRef>();
   private readonly pendingCreations = new Map<symbol, { sessionId: string; controller: AbortController; done: Promise<ResourceCreationResult> }>();
   private createResource(sessionId: string, kind: string, call: ResourceCall, content: ContentLease,
     options: { signal?: AbortSignal; position?: { x: number; y: number }; linkTo?: ResourceRef; resources?: readonly ResourceRef[]; check?(): void } = {}): Promise<ResourceCreationResult> {
@@ -342,6 +354,7 @@ export class SessionService {
     const done = new Promise<ResourceCreationResult>((accept, fail) => { resolve = accept; reject = fail; });
     const pending = { sessionId, controller, done };
     this.pendingCreations.set(key, pending);
+    this.progressChanged(sessionId);
     void (async () => {
       try {
         if (this.closed) throw new SessionError("unavailable", "The session service is closed.");
@@ -365,6 +378,7 @@ export class SessionService {
         signal.removeEventListener("abort", abortContent);
         await content.close();
         this.pendingCreations.delete(key);
+        this.progressChanged(sessionId);
       }
     })().then(resolve, reject);
     return done;

@@ -76,6 +76,33 @@ function resourceStatuses(service: ApplicationService) {
 }
 
 describe("会话运行时", () => {
+  // docs/runtime.md#执行状态投影：草稿动作只修改输入策略，Agent 状态由真实循环决定。
+  it.each([false, true])("草稿策略修改不改变对话执行状态（循环运行：%s）", async running => {
+    let release!: () => void, requests = 0, capture = () => {};
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    const { service, start } = await setup({ validate() {}, version: "test/draft-state", prepare() {
+      requests++;
+      return { async *stream() { if (running) await gate; yield* reply(); } };
+    } }, () => capture());
+    try {
+      const snap = await execute(service, start), sessionId = snap.sessionId, objectId = agentOf(snap);
+      if (!running) await settled(service);
+      const id = randomUUID();
+      await service.sessions.execute(actionCommand(sessionId, objectId, SaveAgentDraft, { submissionId: id, parts: [{ kind: "text", text: "你好" }] }));
+      const view = () => AgentView.schema.parse(service.sessions.snapshot(sessionId).workbench.objects.find(item => item.id === objectId)!.presentation.data);
+      const states: string[] = [];
+      capture = () => { states.push(view().executionState); };
+      await service.sessions.execute(actionCommand(sessionId, objectId, SetAgentDraftMode, { id, revision: 0, mode: "follow" }));
+      capture = () => {};
+      expect(states.length).toBeGreaterThan(0);
+      expect(new Set(states)).toEqual(new Set([running ? "running" : "completed"]));
+      expect(view().drafts[0]?.mode).toBe("follow");
+      expect(requests).toBe(1);
+      if (running) await service.sessions.execute(actionCommand(sessionId, objectId, CancelAgent, {}));
+    } finally { capture = () => {}; release(); }
+    await settled(service);
+  });
+
   // docs/runtime.md#代理通信：Agent 由资源身份直接寻址，省略 target；来源由执行层绑定，受理不等待接收方完成。
   it("send 仅凭资源身份发送，自动绑定发送者，空闲启动与运行中 steer 共用输入链路", async () => {
     let receiverId = "", senderId = "", sessionId = "", release!: () => void, sendRound = 0;
@@ -126,7 +153,7 @@ describe("会话运行时", () => {
       await vi.waitFor(() => expect(outcomes()).toHaveLength(2));
       expect(outcomes().map(record => record.outcome.kind)).toEqual(["rejected", "succeeded"]);
       expect(outcomes()[0]!.outcome.error.code).toBe("access_denied");
-      await vi.waitFor(() => expect(service.sessions.snapshot(sessionId).progress.runningObjectIds).not.toContain(senderId));
+      await vi.waitFor(() => expect(service.sessions.snapshot(sessionId).progress.busyObjectIds).not.toContain(senderId));
       expect(received).toHaveLength(1);
       expect(received[0]!.messages.at(-1)).toMatchObject({ kind: "input", parts: [
         { text: `<agent-message sender-id="${senderId}" sender-name="worker">` },
@@ -849,7 +876,7 @@ describe("会话运行时", () => {
       expect(before.progress.live).toContainEqual(expect.objectContaining({ kind: "text", text: "Saved text" }));
       // 领域状态须经资源投影交付；不能只在前端或执行循环内存中计算。
       expect(before.workbench.objects.find(object => object.kind === "atelier.builtin/agent")?.presentation)
-        .toMatchObject({ data: { turnState: "incomplete" } });
+        .toMatchObject({ data: { executionState: "running" } });
     } finally { release(); }
     await settled(service);
     const after = service.sessions.snapshot(first.sessionId);
@@ -858,13 +885,13 @@ describe("会话运行时", () => {
     expect(after.nodes.map(flat).at(-1)).toMatchObject({ kind: "text", parentId: before.cursor,
       completion: { usage, timing, finishReason: "stop", rawFinishReason: "end_turn", providerResponseId: "provider-response" } });
     expect(after.workbench.objects.find(object => object.kind === "atelier.builtin/agent")?.presentation)
-      .toMatchObject({ data: { turnState: "completed" } });
+      .toMatchObject({ data: { executionState: "completed" } });
     await service.close(); services.delete(service);
     const reopened = new ApplicationService(root); services.add(reopened);
     const restored = reopened.sessions.snapshot(first.sessionId);
     expect(restored.nodes).toEqual(after.nodes);
     expect(restored.workbench.objects.find(object => object.kind === "atelier.builtin/agent")?.presentation)
-      .toMatchObject({ data: { turnState: "completed" } });
+      .toMatchObject({ data: { executionState: "completed" } });
   });
 
   // docs/timeline.md：无实际输出只交付瞬态反馈，重启后保持只有用户输入的客观历史。
@@ -900,7 +927,7 @@ describe("会话运行时", () => {
     const restored = reopened.sessions.snapshot(first.sessionId);
     expect(restored.nodes).toEqual(nodes);
     expect(restored.workbench.objects.find(object => object.kind === Agent.kind)?.presentation)
-      .toMatchObject({ data: { turnState: "incomplete" } });
+      .toMatchObject({ data: { executionState: "incomplete" } });
   });
 
   it("目录 see 的图片随代理工具结果落库，下一次请求作为文件部件发送，重开仍可读取", async () => {
@@ -1062,25 +1089,21 @@ describe("会话运行时", () => {
     expect(nodes.map(flat).some(node => node.kind === "thinking")).toBe(true);
   });
 
-  it("异步 submit 准备期间对象被移除，落地前拒绝命令", async () => {
+  // docs/plugin-sdk.md：资源动作从准备到提交期间保护对象身份与当前路径。
+  it("submit 准备尚未完成时已经 busy，禁止移除与回溯", async () => {
     const { service, start } = await setup();
     const first = await execute(service, start); await settled(service);
     const sessionId = first.sessionId;
     const agentId = agentOf(first);
-    const read = service.configuration.execute.bind(service.configuration);
-    let release!: () => void;
-    const gate = new Promise<void>(resolve => { release = resolve; });
-    vi.spyOn(service.configuration, "execute").mockImplementationOnce(async command => { await gate; return read(command); });
     const input: SubmitAgentInputData = { sender: { kind: "user" }, mode: "follow", submissionId: randomUUID(), parts: [{ kind: "text", text: "Too late" }] };
     const pending = execute(service, actionCommand(sessionId, agentId, SubmitAgentInput, input));
-    const rejected = expect(pending).rejects.toMatchObject({ code: "not_found" });
-    try {
-      await execute(service, { type: "object.remove", sessionId, objectId: agentId });
-      const nodes = service.sessions.tree.nodes(sessionId).map(flat);
-      release(); await rejected;
-      expect(service.sessions.tree.nodes(sessionId).map(flat)).toEqual(nodes);
-      expect(service.sessions.running).toBe(false);
-    } finally { release(); }
+    expect(service.sessions.snapshot(sessionId).progress.busyObjectIds).toContain(agentId);
+    const removed = execute(service, { type: "object.remove", sessionId, objectId: agentId });
+    const selected = execute(service, { type: "select", sessionId, nodeId: first.cursor });
+    await expect(removed).rejects.toMatchObject({ code: "conflict" });
+    await expect(selected).rejects.toMatchObject({ code: "conflict" });
+    await pending;
+    await settled(service);
   });
 
   it.each(["agent", "resource"] as const)("%s 写入活动未收束时禁止选择和自身移除，其他对象可移除", async mode => {
@@ -1089,7 +1112,7 @@ describe("会话运行时", () => {
     const original = runtimeModules.createModules;
     vi.spyOn(runtimeModules, "createModules").mockImplementation(services => {
       const modules = original(services);
-      modules.resources.controller(Note.kind)!.activity = () => ({ running: mode === "resource" && capturedId ? [capturedId] : [], live: [] });
+      modules.resources.controller(Note.kind)!.activity = () => ({ busy: mode === "resource" && capturedId ? [capturedId] : [], live: [] });
       return modules;
     });
     const model: ModelAdapter = { validate() {}, version: "ai-sdk-v7/3", prepare: () => ({ async *stream() {
@@ -1105,7 +1128,7 @@ describe("会话运行时", () => {
     }
     const id = capturedId;
     try {
-      expect(service.sessions.snapshot(sessionId).progress.unsettledObjectIds).toContain(id);
+      expect(service.sessions.snapshot(sessionId).progress.busyObjectIds).toContain(id);
       await expect(execute(service, { type: "select", sessionId, nodeId: first.cursor })).rejects.toMatchObject({ code: "conflict" });
       await expect(execute(service, { type: "object.remove", sessionId, objectId: id })).rejects.toMatchObject({ code: "conflict" });
       const directory = await execute(service, { type: "resource.create", sessionId, kind: Directory.kind, creation: { id: "atelier.builtin/directory.create" }, input: { path: root }, position: { x: 0, y: 0 } });
@@ -1256,7 +1279,7 @@ describe("插件包管理命令", () => {
   it("应用命令登记和移除插件包，正确表达重启标记", async () => {
     const { service, root } = await setup();
     const dir = join(root, "pkg"); mkdirSync(dir);
-    writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "p", atelier: { id: "acme.p", api: { major: 11, minMinor: 0 } } }));
+    writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "p", atelier: { id: "acme.p", api: { major: 12, minMinor: 0 } } }));
     const added = service.execute({ type: "plugin.add", path: dir });
     expect(added.plugins.filter(p => p.index !== null).map(p => [p.source, p.status, p.enabled])).toEqual([[dir, "pending", true]]);
     expect(added.plugins.find(p => p.index === null)).toMatchObject({ id: "atelier.builtin", status: "loaded" });

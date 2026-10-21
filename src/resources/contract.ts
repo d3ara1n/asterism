@@ -28,11 +28,11 @@ export interface ResourceController {
   create?(sessionId: string, objectId: string, input: Json, content?: ContentLease): { title: string; data?: { [key: string]: Json } };
   execute?(context: ResourceCommandContext, command: ParsedCall, before?: () => void): Promise<void>;
   /**
-   * running 是仍可能向会话树追加事件的对象 ID，涵盖代理与其他被捕获的资源。
+   * busy 是仍依赖当前时间线路径的对象 ID，涵盖代理与其他被捕获的资源。
    * 外部状态的持续运行不计入；会话回溯与对象移除据此判断 settled。
    * live 只包含模型的临时输出；活动开始与结束由宿主发布进度通知。
    */
-  activity?(sessionId: string): { running: string[]; live: LiveBlock[] };
+  activity?(sessionId: string): { busy: string[]; live: LiveBlock[] };
   /** 本对象作为链接终点时，向它描述被链接资源的可用工具。 */
   linkTools?(sessionId: string, objectId: string, resource: FoldedObject): Json;
   close?(): Promise<void>;

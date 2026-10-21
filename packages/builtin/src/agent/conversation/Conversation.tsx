@@ -17,14 +17,15 @@ import { conversationTimeline } from "./timeline";
 import { useConversationInteraction } from "./interaction";
 import { AgentToolbar, AgentUIRegion, useComposerHidden } from "../ui/AgentUI";
 import { AgentDraftsPanel } from "./Drafts";
+import type { AgentExecutionState } from "../state";
 
 /** 卡片标题栏中的执行状态；历史属于会话，入口在窗口标题栏。 */
-export function ConversationActions() {
+export function ConversationActions({ data }: { data: { executionState: AgentExecutionState } }) {
   const i18n = useI18n();
   const object = useRendererObject();
   const { ready } = object.view;
   const snapshot = object.session.snapshot();
-  const agentRunning = object.activity.running;
+  const agentRunning = data.executionState === "running";
   if (!snapshot) return null;
   return <StatusBadge tone={!ready ? "warning" : agentRunning ? "progress" : "neutral"} role="status">
     {!ready ? i18n.formatMessage(commonMessages.statusUnavailable) : agentRunning ? i18n.formatMessage(conversationMessages.working) : i18n.formatMessage(conversationMessages.ready)}
@@ -84,7 +85,7 @@ export function Conversation() {
     {!composerHidden && <footer className="shrink-0 space-y-1 border-t px-3 pt-1 pb-2">
       <AgentToolbar />
       <MessageComposer draft={interaction.draft} inputRef={composer}
-        busy={state.busy} ready={ready} executionState={executionState} writable={interaction.writable} onSend={send}
+        ready={ready} executionState={executionState} writable={interaction.writable} onSend={send}
         onSave={() => interaction.save()} onCancel={interaction.cancel} onContinue={resume} />
     </footer>}
   </>;

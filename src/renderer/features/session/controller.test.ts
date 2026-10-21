@@ -10,7 +10,7 @@ import type { LanguageState } from "../../../shared/language.ts";
 function snapshot(revision: number, cursor: string | null = "current"): SessionSnapshot {
   return { sessionId: "s", title: "S", cursor, seq: 4, revision, nodes: [],
     workbench: { id: "s", title: "S", objects: [], links: [], views: [], viewport: { x: 0, y: 0, zoom: 1 } },
-    progress: { revision, version: revision, runningObjectIds: [], unsettledObjectIds: [], live: [] } };
+    progress: { revision, version: revision, busyObjectIds: [], timelineBusy: false, live: [] } };
 }
 const accepted: SessionResult = { ok: true, reply: { kind: "accepted", sessionId: "s" } };
 const view = (snapshot: SessionSnapshot): SessionResult => ({ ok: true, reply: { kind: "view", snapshot } });
@@ -30,7 +30,7 @@ function fixture(onRelease?: () => void) {
 
 it("语言切换刷新静态文案，保留会话投影、活动与草稿提交身份且不重读会话", async () => {
   const { controller, requests } = fixture(), disconnect = controller.connect();
-  const initial = snapshot(1); initial.progress.unsettledObjectIds = ["agent"];
+  const initial = snapshot(1); initial.progress.busyObjectIds = ["agent"];
   requests[0]!.resolve(view(initial)); await flush();
   const state = controller.getSnapshot(), progress = controller.getProgress();
   const label = pluginNamespace("example.counter").messages("en", defineMessages({ title: { id: "title", defaultMessage: "Counter" } })).title;
@@ -44,12 +44,31 @@ it("语言切换刷新静态文案，保留会话投影、活动与草稿提交�
     changed({ preference: "zh-Hans", locale: "zh-Hans", interfaceLocale: "zh-Hans" });
     expect(getI18n().text(label)).toBe("计数器");
     expect(controller.getSnapshot()).toBe(state); expect(controller.getProgress()).toBe(progress);
-    expect(progress.unsettledObjectIds).toEqual(["agent"]);
+    expect(progress.busyObjectIds).toEqual(["agent"]);
     expect(requests.map(request => request.command.type)).toEqual(["read"]);
   } finally { changed(english); stop(); disconnect(); }
 });
 
 describe("会话视图所有权", () => {
+  // docs/workbench.md：调用与游标切换等待本次回执后的读取，旧查询失败不能提前解除等待。
+  it.each(["resource.command", "select"] as const)("%s 回执前的查询失败不结束回执后的投影等待", async type => {
+    const { controller, requests, notify } = fixture(), disconnect = controller.connect();
+    requests[0]!.resolve(view(snapshot(1))); await flush();
+    const finished = vi.fn();
+    const pending = (type === "select" ? controller.branchFrom("branch")
+      : controller.executeAndRead({ type, sessionId: "s", objectId: "a", command: resourceCall(ContinueAgent, {}) }))
+      .then(result => { finished(); return result; });
+    notify(2);
+    requests[2]!.resolve({ ok: false, error: { code: "unavailable", message: "Old read failed." } }); await flush();
+    requests[1]!.resolve(accepted); await flush();
+    expect(finished).not.toHaveBeenCalled();
+    expect(controller.getSnapshot().navigating).toBe(type === "select");
+    requests[3]!.resolve(view(snapshot(2, type === "select" ? "branch" : "current")));
+    await pending;
+    expect(controller.getSnapshot()).toMatchObject({ status: "ready", navigating: false, readError: null });
+    disconnect();
+  });
+
   it("观察命令等待受理后的读取，后续命令覆盖链接结果也能结束等待", async () => {
     const { controller, requests, notify } = fixture(); const disconnect = controller.connect();
     requests[0]!.resolve(view(snapshot(1))); await flush();
@@ -83,63 +102,37 @@ describe("会话视图所有权", () => {
     disconnect();
   });
 
-  it("命令受理后仍等待新投影，不能基于旧选择再次配置", async () => {
+  // docs/workbench.md：局部等待不改变已有工作台，其他对象可以独立提交。
+  it("局部调用等待新投影期间工作台保持就绪，另一对象不等待该调用", async () => {
     const { controller, requests } = fixture(); const disconnect = controller.connect();
     requests[0]!.resolve(view(snapshot(1))); await flush();
     const command = { type: "resource.command" as const, sessionId: "s", objectId: "a",
       command: { id: "atelier.builtin/agent.configure", input: { selection: { agent: "worker", model: "new", thinking: null } } } };
-    const changed = controller.execute(command); await flush();
-    requests[1]!.resolve(accepted); await changed;
-    expect(controller.getSnapshot()).toMatchObject({ busy: false, status: "loading" });
-    expect((await controller.execute(command)).ok).toBe(false);
-    expect(requests.filter(request => request.command.type === "resource.command")).toHaveLength(1);
-    requests[2]!.resolve(view(snapshot(2))); await flush();
-    expect(controller.getSnapshot().status).toBe("ready");
+    const done = vi.fn();
+    const changed = controller.executeAndRead(command).then(result => { done(); return result; });
+    const other = controller.execute({ ...command, objectId: "b" });
+    expect(requests.map(item => item.command.type)).toEqual(["read", "resource.command", "resource.command"]);
+    expect(controller.getSnapshot()).toMatchObject({ status: "ready", navigating: false });
+    requests[1]!.resolve(accepted); await flush();
+    expect(done).not.toHaveBeenCalled();
+    expect(controller.getSnapshot()).toMatchObject({ status: "ready", navigating: false });
+    requests[2]!.resolve(accepted); await other;
+    requests.at(-1)!.resolve(view(snapshot(2))); await changed;
+    expect(done).toHaveBeenCalledOnce();
     disconnect();
   });
 
-  it("就绪视图上同时入队的创建依次受理，后项等待前项的新投影", async () => {
-    const { controller, requests } = fixture(); const disconnect = controller.connect();
+  it("创建等待后台准备时仍接收投影与进度更新", async () => {
+    const { controller, requests, notify, progress } = fixture(); const disconnect = controller.connect();
     requests[0]!.resolve(view(snapshot(1))); await flush();
     const create = (path: string) => ({ type: "resource.create" as const, sessionId: "s", kind: "directory", creation: { id: "directory/create" }, input: { path }, position: { x: 0, y: 0 } });
     const first = controller.execute(create("/first"));
-    const second = controller.execute(create("/second"));
-    await flush();
-    requests[1]!.resolve(accepted); expect((await first).ok).toBe(true);
-    await flush();
-    expect(requests.map(r => r.command.type)).toEqual(["read", "resource.create", "read"]);
+    notify(2);
     requests[2]!.resolve(view(snapshot(2))); await flush();
-    expect(requests[3]!.command).toEqual(create("/second"));
-    requests[3]!.resolve(accepted); expect((await second).ok).toBe(true);
-    requests[4]!.resolve(view(snapshot(3))); await flush();
-    disconnect();
-  });
-
-  it("排队创建等待的重读失败时保留错误并拒绝后项", async () => {
-    const { controller, requests } = fixture(); const disconnect = controller.connect();
-    requests[0]!.resolve(view(snapshot(1))); await flush();
-    const command = { type: "resource.create" as const, sessionId: "s", kind: "note", creation: { id: "note/create" }, input: {}, position: { x: 0, y: 0 } };
-    const first = controller.execute(command);
-    const second = controller.execute(command);
-    await flush(); requests[1]!.resolve(accepted); await first;
-    requests[2]!.resolve({ ok: false, error: { code: "unavailable", message: "Read failed.", display: "Read failed." } });
-    expect((await second).ok).toBe(false);
-    expect(requests.filter(r => r.command.type === "resource.create")).toHaveLength(1);
-    expect(controller.getSnapshot().status).toBe("error");
-    expect(controller.getSnapshot().readError).toBe("Read failed.");
-    disconnect();
-  });
-
-  it("创建排队等待同步时断开不会留下挂起命令", async () => {
-    const { controller, requests } = fixture(); const disconnect = controller.connect();
-    requests[0]!.resolve(view(snapshot(1))); await flush();
-    const command = { type: "resource.create" as const, sessionId: "s", kind: "note", creation: { id: "note/create" }, input: {}, position: { x: 0, y: 0 } };
-    const first = controller.execute(command);
-    const second = controller.execute(command);
-    await flush(); requests[1]!.resolve(accepted); await first; await flush();
-    disconnect();
-    expect((await second).ok).toBe(false);
-    expect(requests.filter(r => r.command.type === "resource.create")).toHaveLength(1);
+    progress({ revision: 2, version: 3, busyObjectIds: ["b"], timelineBusy: true, live: [] });
+    expect(controller.getSnapshot()).toMatchObject({ status: "ready", navigating: false, snapshot: { revision: 2 } });
+    expect(controller.getProgress()).toMatchObject({ busyObjectIds: ["b"], timelineBusy: true });
+    requests[1]!.resolve(accepted); await first;
     disconnect();
   });
 
@@ -188,11 +181,13 @@ describe("会话视图所有权", () => {
     notify(2);
     const selected = controller.branchFrom("branch"); await flush();
     expect(requests[2]!.command).toEqual({ type: "select", sessionId: "s", nodeId: "branch" });
-    requests[2]!.resolve(accepted); await selected;
+    expect(controller.getSnapshot().navigating).toBe(true);
+    expect((await controller.execute({ type: "rename", sessionId: "s", title: "Old path" })).ok).toBe(false);
+    requests[2]!.resolve(accepted); await flush();
     expect(requests[3]!.command).toEqual({ type: "read", sessionId: "s" });
-    requests[3]!.resolve(view(snapshot(3, "branch"))); await flush();
+    requests[3]!.resolve(view(snapshot(3, "branch"))); await selected;
     requests[1]!.resolve(view(snapshot(2))); await flush();
-    expect(controller.getSnapshot()).toMatchObject({ snapshot: { cursor: "branch", revision: 3 } });
+    expect(controller.getSnapshot()).toMatchObject({ navigating: false, snapshot: { cursor: "branch", revision: 3 } });
     disconnect();
   });
 
@@ -212,8 +207,8 @@ describe("会话视图所有权", () => {
     requests[0]!.resolve(view(snapshot(1))); await flush();
     const changed = vi.fn(); const streamed = vi.fn();
     controller.subscribe(changed); controller.subscribeProgress(streamed);
-    progress({ revision: 1, version: 2, runningObjectIds: [], unsettledObjectIds: ["a"], live: [] });
-    progress({ revision: 1, version: 3, runningObjectIds: [], unsettledObjectIds: ["a"], live: [] });
+    progress({ timelineBusy: false, revision: 1, version: 2, busyObjectIds: ["a"], live: [] });
+    progress({ timelineBusy: false, revision: 1, version: 3, busyObjectIds: ["a"], live: [] });
     expect(changed).not.toHaveBeenCalled();
     expect(streamed).toHaveBeenCalled();
     expect(controller.getProgress().version).toBe(3);
@@ -224,13 +219,13 @@ describe("会话视图所有权", () => {
   it("块落库后的进度等待对应持久版本，不在查询途中丢掉正在阅读的块", async () => {
     const { controller, requests, progress } = fixture(); const disconnect = controller.connect();
     const block = { id: "r:0", objectId: "a", responseId: "r", ordinal: 0, kind: "thinking" as const, text: "thinking", startedAt: 1000, endedAt: null };
-    requests[0]!.resolve(view({ ...snapshot(1), progress: { revision: 1, version: 1, runningObjectIds: ["a"], unsettledObjectIds: ["a"], live: [block] } })); await flush();
-    progress({ revision: 2, version: 3, runningObjectIds: ["a"], unsettledObjectIds: ["a"], live: [] });
+    requests[0]!.resolve(view({ ...snapshot(1), progress: { timelineBusy: false, revision: 1, version: 1, busyObjectIds: ["a"], live: [block] } })); await flush();
+    progress({ timelineBusy: false, revision: 2, version: 3, busyObjectIds: ["a"], live: [] });
     expect(controller.getProgress().live).toEqual([block]);
     expect(requests).toHaveLength(2);
     requests[1]!.resolve(view(snapshot(2))); await flush();
     expect(controller.getProgress()).toMatchObject({ version: 3, live: [] });
-    progress({ revision: 1, version: 1, runningObjectIds: ["a"], unsettledObjectIds: ["a"], live: [block] });
+    progress({ timelineBusy: false, revision: 1, version: 1, busyObjectIds: ["a"], live: [block] });
     expect(controller.getProgress().live).toEqual([]);
     disconnect();
   });

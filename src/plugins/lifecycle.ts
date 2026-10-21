@@ -36,15 +36,14 @@ export class RunLifecycle {
     if (object && entry.affectsHistory) this.changed(object.sessionId);
     return { signal, done, cancel };
   }
-  /** 通信调用仍参与收束，但执行投影只统计任务、动作及模型／工具。 */
-  activity(sessionId: string, group?: RunGroup): { unsettled: string[]; executing: string[] } {
-    const unsettled = new Set<string>(), executing = new Set<string>();
+  /** 只汇总依赖当前时间线路径的占用；资源自己的业务运行状态由资源投影。 */
+  activity(sessionId: string, group?: RunGroup): { busy: string[] } {
+    const busy = new Set<string>();
     for (const entry of this.entries) {
       if (!entry.affectsHistory || entry.object?.sessionId !== sessionId || (group && entry.group !== group)) continue;
-      unsettled.add(entry.object.id);
-      if (entry.group.kind !== "call") executing.add(entry.object.id);
+      busy.add(entry.object.id);
     }
-    return { unsettled: [...unsettled], executing: [...executing] };
+    return { busy: [...busy] };
   }
   stop(group?: RunGroup): void {
     if (!group) { this.stopped = true; this.controller.abort(); }
@@ -110,7 +109,7 @@ export class RunGroup {
       };
     } };
   }
-  activity(sessionId: string): string[] { return this.lifecycle.activity(sessionId, this).unsettled; }
+  activity(sessionId: string): string[] { return this.lifecycle.activity(sessionId, this).busy; }
   stop(): void { this.stopped = true; this.lifecycle.stop(this); }
   async close(): Promise<void> { this.stop(); await this.lifecycle.settle(this); }
 }

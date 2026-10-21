@@ -205,9 +205,9 @@ function ContinueAction({ controller, nodeId }: { controller: SessionController;
   const [saving, setSaving] = useState(false);
   const resources = useMemo(() => historyResources(snapshot?.nodes ?? []), [snapshot?.nodes, i18n]);
   if (!snapshot) return null;
-  const unsettled = progress.unsettledObjectIds.length > 0;
-  const wait = i18n.formatMessage(historyMessages.waitForResources, { names: progress.unsettledObjectIds.map(id => resources.get(id)?.title ?? i18n.formatMessage(historyMessages.unknownResource)).join(", ") });
-  const disabled = saving || unsettled || state.busy || state.status !== "ready";
+  const unsettled = progress.timelineBusy || progress.busyObjectIds.length > 0;
+  const wait = i18n.formatMessage(historyMessages.waitForResources, { names: progress.busyObjectIds.map(id => resources.get(id)?.title ?? i18n.formatMessage(historyMessages.unknownResource)).join(", ") });
+  const disabled = saving || unsettled || state.navigating || state.status !== "ready";
   const actual = target?.id ?? null;
   const actualEntry = target ? historyEntries(snapshot.nodes, registry).find(entry => entry.node.id === actual) : undefined;
   return <><span title={unsettled ? wait : i18n.formatMessage(historyMessages.continueFromHere)}><Button size="xs" disabled={nodeId === snapshot.cursor || disabled} onClick={() => setTarget({ id: nodeId })}><GitBranch />{i18n.formatMessage(historyMessages.continueFromHere)}</Button></span>

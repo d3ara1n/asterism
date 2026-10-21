@@ -13,7 +13,6 @@ import { agentPanels } from "./panels";
 import { AgentUI } from "./ui/AgentUI";
 import { AgentConversationProvider, useAgentConversation } from "./conversation/interaction";
 import { ConfigurationToolbarItem, ContextToolbarItem } from "./conversation/Toolbar";
-import { agentExecutionState } from "./state";
 import { peekToolRenderer } from "./peek/view";
 import { sendToolRenderer } from "./send/view";
 
@@ -38,8 +37,7 @@ export default {
 
 function AgentBody({ data }: { data: z.infer<typeof AgentView.schema> }) {
   const object = useRendererObject();
-  const executionState = agentExecutionState(data.turnState, object.activity.running);
-  const interaction = useAgentConversation(object, data.selection !== null, executionState, data.drafts);
+  const interaction = useAgentConversation(object, data.selection !== null, data.executionState, data.drafts);
   return <AgentConversationProvider value={interaction}>
     <AgentUI selection={data.selection}><Conversation /></AgentUI>
   </AgentConversationProvider>;

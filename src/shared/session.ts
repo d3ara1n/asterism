@@ -25,7 +25,7 @@ export type NewNode = Omit<SessionNode, "id" | "sessionId" | "parentId" | "creat
 
 // ---- 会话能力接口 ----
 const uuid = z.string().uuid();
-export const sessionVersion = 20;
+export const sessionVersion = 21;
 export const sessionChannel = coreChannel("session");
 export const sessionChangedChannel = coreChannel("session-changed");
 export const sessionCommandSchema = z.discriminatedUnion("type", [
@@ -58,18 +58,18 @@ export const liveBlockSchema = z.discriminatedUnion("kind", [
 ]);
 export type LiveBlock = z.infer<typeof liveBlockSchema>;
 const revision = z.number().int().nonnegative();
-/** 进度可独立替换；revision 指出它依赖的持久视图版本，version 表示内存进度先后。 */
+/** 进度可独立替换；revision 指出它依赖的视图版本，version 表示内存进度先后。 */
 export const sessionProgressSchema = z.strictObject({
   revision, version: revision,
   /** 运行中执行体的临时输出，按发出对象归属。 */
   live: z.array(liveBlockSchema),
-  /** 所有尚未收束的被捕获资源；外部状态的持续运行不计入。 */
-  unsettledObjectIds: z.array(id),
-  /** 正在执行任务、动作或模型／工具的对象；独立插件通信调用不代表对象执行。 */
-  runningObjectIds: z.array(id),
+  /** 依赖当前时间线路径的资源占用；不表示资源的业务执行状态。 */
+  busyObjectIds: z.array(id),
+  /** 资源身份尚未建立的创建准备占用。 */
+  timelineBusy: z.boolean(),
 });
 export type SessionProgress = z.infer<typeof sessionProgressSchema>;
-/** 同次交付完整会话树、执行游标与当前时间线的工作台投影；区别于 SDK 观察柄。seq 只计节点，revision 还涵盖游标选择、对象数据与布局。 */
+/** 同次交付会话树、游标与工作台投影。seq 只计节点；revision 也涵盖游标、对象数据、布局及内存投影通知。 */
 export const sessionSnapshotSchema = z.strictObject({
   sessionId: id, title: z.string(), cursor: id.nullable(), seq: revision, revision,
   nodes: z.array(sessionNodeSchema),

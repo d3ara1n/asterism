@@ -79,7 +79,7 @@ export function App({ controller }: { controller: ApplicationController }) {
   const snapshot = state.snapshot;
   const session = sessionState?.snapshot?.workbench ?? null;
   const ready = state.status === "ready";
-  const sessionBlocked = !!sessionState && (sessionState.busy || sessionState.status !== "ready");
+  const sessionBlocked = !!sessionState && (sessionState.navigating || sessionState.status !== "ready");
   const phase = workbenchPhase(state.status, sessionState);
   const writable = ready && !sessionBlocked && !!session;
   const focusedObjectId = useFocusedObject(view.kind === "conversation" ? view.sessionId : null);
@@ -170,9 +170,10 @@ export function App({ controller }: { controller: ApplicationController }) {
 
   const conversation = <WorkbenchSurface overlay={<WorkbenchFeedback key={active?.sessionId} phase={phase} hasContent={!!session}
     error={phase === "unavailable" ? state.error : sessionState?.readError ?? null} onRetry={() => { void active?.refresh(); }} />}>
-    {session && active ? <Workbench key={session.id} ref={workbench} session={session} controller={active}
-      ready={ready} busy={sessionBlocked} run={run} store={workbenchStore}
-      onHome={goHome} canDrop={creation.canDrop} onDropItems={creation.drop} /> : null}
+    {session && active ? <motion.div key={session.id} className="h-full" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+      <Workbench ref={workbench} session={session} controller={active}
+      ready={writable} run={run} store={workbenchStore}
+      onHome={goHome} canDrop={creation.canDrop} onDropItems={creation.drop} /></motion.div> : null}
   </WorkbenchSurface>;
   const sidebar: IslandSpec = {
     id: "navigation", label: i18n.formatMessage(appMessages.appNavigation), width: { min: 224, max: 224 },

@@ -51,7 +51,7 @@ type Run = (command: WorkbenchOperation) => Promise<boolean>;
 type WorkbenchEdge = Edge<ConnectionEdge["data"]>;
 
 /** 工作台根浮岛：投影平级对象和关系；代理对话只是代理对象的卡片内容。 */
-export function Workbench({ ref, controller, session, ready, busy, run, onHome, store, canDrop, onDropItems }: Props) {
+export function Workbench({ ref, controller, session, ready, run, onHome, store, canDrop, onDropItems }: Props) {
   const i18n = useI18n();
   const canvasRef = useRef<WorkbenchCanvas>(null);
   const canvas = useMemo<WorkbenchCanvas>(() => ({
@@ -60,8 +60,8 @@ export function Workbench({ ref, controller, session, ready, busy, run, onHome, 
   }), []);
   // 按字段组装环境，只有字段真的变化时才通知卡片与面板浮岛。
   const context = useMemo<WorkbenchView>(
-    () => ({ controller, session, ready, busy, run, canvas }),
-    [controller, session, ready, busy, run, canvas]);
+    () => ({ controller, session, ready, run, canvas }),
+    [controller, session, ready, run, canvas]);
   const latestContext = useRef(context);
   latestContext.current = context;
   const island = useIsland();
@@ -81,7 +81,7 @@ export function Workbench({ ref, controller, session, ready, busy, run, onHome, 
 
   return <RendererNavigationProvider value={{ home: onHome }}><RendererCatalogProvider ready={ready}><WorkbenchContext.Provider value={context}>
     <div className="relative h-full">
-      <ReactFlowProvider><Canvas ref={canvasRef} session={session} run={run} writable={ready && !busy} canDrop={canDrop} onDropItems={onDropItems} /></ReactFlowProvider>
+      <ReactFlowProvider><Canvas ref={canvasRef} session={session} run={run} writable={ready} canDrop={canDrop} onDropItems={onDropItems} /></ReactFlowProvider>
       {session.objects.length === 0 && <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
         <p className="type-caption">{i18n.formatMessage(workbenchMessages.emptyHint)}</p>
       </div>}

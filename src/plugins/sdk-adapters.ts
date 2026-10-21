@@ -150,7 +150,7 @@ export function adaptResource(contribution: ResourceContribution, sdk: SdkContex
         const allowed = policy?.allow ? new Set(policy.allow) : null, excluded = new Set(policy?.exclude ?? []);
         return host.sessions.capabilities([linked], name => (allowed === null || allowed.has(name)) && !excluded.has(name)).describe(linked.id);
       } } : {}),
-      activity: sessionId => ({ running: runs.activity(sessionId), live: [] }),
+      activity: sessionId => ({ busy: runs.activity(sessionId), live: [] }),
       async close() {
         await runs.close();
       },

@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import type { UiText } from "@atelier/sdk/contracts";
 import { Alert, AlertDescription, AlertTitle } from "@atelier/ui/ui/alert";
 import { Button } from "@atelier/ui/ui/button";
@@ -14,8 +13,10 @@ export function WorkbenchFeedback({ phase, hasContent, error, onRetry }: {
   phase: WorkbenchPhase; hasContent: boolean; error: UiText | null; onRetry(): void;
 }) {
   const i18n = useI18n();
-  if (phase === "ready" || phase === "processing") return null;
-  if (phase === "syncing" || phase === "starting") return <DelayedProgress key={phase} phase={phase} />;
+  if (phase === "ready") return null;
+  if (phase === "loading" || phase === "starting") return <div className="absolute inset-0 flex items-center justify-center" role="status">
+    <StatusText tone="progress">{i18n.text(phase === "starting" ? messages.connecting : messages.syncing)}</StatusText>
+  </div>;
 
   const unavailable = phase === "unavailable";
   const title = i18n.text(unavailable ? messages.serviceUnavailable : hasContent ? messages.updateFailed : messages.loadFailed);
@@ -40,21 +41,5 @@ export function WorkbenchFeedback({ phase, hasContent, error, onRetry }: {
         {action}
       </AlertDescription>
     </Alert>
-  </div>;
-}
-
-/** 每段等待独立计时；恢复、失败或离开会话即卸载，短暂同步不闪现提示。 */
-function DelayedProgress({ phase }: { phase: "syncing" | "starting" }) {
-  const i18n = useI18n();
-  const [visible, setVisible] = useState(false);
-  useEffect(() => {
-    const timer = setTimeout(() => setVisible(true), 500);
-    return () => clearTimeout(timer);
-  }, []);
-  if (!visible) return null;
-  return <div className="pointer-events-none absolute inset-x-3 top-3 z-20 flex justify-center" role="status">
-    <div className="surface px-3 py-2">
-      <StatusText tone="progress">{i18n.text(phase === "starting" ? messages.connecting : messages.syncing)}</StatusText>
-    </div>
   </div>;
 }

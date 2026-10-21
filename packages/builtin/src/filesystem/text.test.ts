@@ -39,13 +39,14 @@ function setup() {
     contract: "resource_created", source: null, recipient: null, model: null,
     data: { ...object.data, id: object.id, type: object.kind, title: object.title },
   });
-  const capabilities = new AgentCapabilities(modules.resources, modules.tools, [resource], () => true);
+  const caller = { ref: { sessionId, id: resource.id, kind: resource.kind }, title: resource.title };
+  const capabilities = new AgentCapabilities(modules.resources, modules.tools, [resource], () => true, caller);
   const call = async (tool: string, target: Json, args: Json = {}, cap = capabilities, signal = new AbortController().signal, resourceId = resource.id) => {
     const results: ToolOutcome[] = [];
     await executeCoreBatch([{ callId: "call", name: "resource_call", arguments: { resource_id: resourceId, tool, target, args } }], cap, signal, (_call, outcome) => results.push(outcome));
     return results[0];
   };
-  return { root, directory, outside, resource, modules, call };
+  return { root, directory, outside, resource, modules, call, caller };
 }
 
 // 在真实临时目录和执行边界验证授权、批次失败、并发与冲突，避免影响用户文件。
@@ -108,9 +109,9 @@ describe("目录正文工具", () => {
 
 
   it("不同资源指向同一文件的修改串行，两个 append 不丢失", async () => {
-    const { directory, modules, resource, call } = setup();
+    const { directory, modules, resource, call, caller } = setup();
     writeFileSync(join(directory, "text.txt"), "base\n");
-    const second = new AgentCapabilities(modules.resources, modules.tools, [{ ...resource, id: "other", title: "Other resource" }], () => true);
+    const second = new AgentCapabilities(modules.resources, modules.tools, [{ ...resource, id: "other", title: "Other resource" }], () => true, caller);
     const results = await Promise.all([
       call("edit", { path: "text.txt" }, { edits: [{ op: "append", body: ["first"] }] }),
       call("edit", { path: "text.txt" }, { edits: [{ op: "append", body: ["second"] }] }, second, undefined, "other"),

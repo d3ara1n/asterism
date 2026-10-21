@@ -3,22 +3,22 @@ import { RunLifecycle } from "./lifecycle.ts";
 
 const object = { sessionId: "session", id: "object", kind: "test.resource/object" };
 describe("共享运行生命周期", () => {
-  // 关联同一对象的查询不能遮掉真实执行；执行结束后的查询仍须受收束保护。
-  it("通信与任务重叠时分别投影执行和未收束活动", async () => {
+  // docs/plugin-sdk.md：只读查询不占用时间线，宿主关闭仍等待它真实结束。
+  it("只读通信等待不占用时间线，资源工作单独登记 busy", async () => {
     const lifecycle = new RunLifecycle(() => {});
     let finishCall!: () => void, finishTask!: () => void;
-    const call = lifecycle.group("call").start(() => new Promise<void>(resolve => { finishCall = resolve; }), { object });
+    const call = lifecycle.group("call").start(() => new Promise<void>(resolve => { finishCall = resolve; }), { object, affectsHistory: false });
     const task = lifecycle.group("task").start(() => new Promise<void>(resolve => { finishTask = resolve; }), { object });
     try {
-      expect(lifecycle.activity(object.sessionId)).toEqual({ unsettled: [object.id], executing: [object.id] });
+      expect(lifecycle.activity(object.sessionId)).toEqual({ busy: [object.id] });
       finishTask(); await task.done;
-      expect(lifecycle.activity(object.sessionId)).toEqual({ unsettled: [object.id], executing: [] });
+      expect(lifecycle.activity(object.sessionId)).toEqual({ busy: [] });
     } finally {
       finishTask(); finishCall();
       await lifecycle.close();
     }
     await call.done;
-    expect(lifecycle.activity(object.sessionId)).toEqual({ unsettled: [], executing: [] });
+    expect(lifecycle.activity(object.sessionId)).toEqual({ busy: [] });
   });
   it.each(["return", "close"] as const)("流暂停消费时 %s 关闭真实迭代器，等待清理但不取消调用方信号", async mode => {
     const lifecycle = new RunLifecycle(() => {}), models = lifecycle.group("model");
@@ -52,10 +52,10 @@ describe("共享运行生命周期", () => {
     const closing = lifecycle.close();
     expect(work.signal.aborted).toBe(true);
     expect(child.signal.aborted).toBe(true);
-    expect(lifecycle.activity(object.sessionId)).toEqual({ unsettled: [object.id], executing: [object.id] });
+    expect(lifecycle.activity(object.sessionId)).toEqual({ busy: [object.id] });
     expect(() => task.start(async () => {})).toThrow();
     release(); await closing;
-    expect(lifecycle.activity(object.sessionId)).toEqual({ unsettled: [], executing: [] });
+    expect(lifecycle.activity(object.sessionId)).toEqual({ busy: [] });
   });
   it("执行失败仍收束；关闭一个执行组不停止其他组", async () => {
     const lifecycle = new RunLifecycle(() => {});

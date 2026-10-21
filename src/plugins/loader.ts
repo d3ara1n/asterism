@@ -54,7 +54,7 @@ export interface LoadedPlugins {
   calls: CallRegistry;
   events: EventBus;
   configure(command: PluginConfigurationCommand): PluginConfiguration[];
-  activity(sessionId: string): { unsettled: string[]; executing: string[]; live: LiveBlock[] };
+  activity(sessionId: string): { busy: string[]; live: LiveBlock[] };
   resources: ResourceRegistry;
   tools: ToolRegistry;
   manifest: readonly PluginManifest[];
@@ -293,8 +293,7 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
     activity(sessionId) {
       const model = collected.map(entry => entry.sdk.activity(sessionId));
       const activity = collected.map(entry => entry.lifecycle.activity(sessionId));
-      return { unsettled: [...new Set([...model.flatMap(run => run.running), ...activity.flatMap(run => run.unsettled)])],
-        executing: [...new Set([...model.flatMap(run => run.running), ...activity.flatMap(run => run.executing)])],
+      return { busy: [...new Set([...model.flatMap(run => run.running), ...activity.flatMap(run => run.busy)])],
         live: model.flatMap(run => run.live) };
     },
     resources, tools: new ToolRegistry(resolvedTools.tools), manifest: Object.freeze(manifest.map(entry => Object.freeze(entry))),

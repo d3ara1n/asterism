@@ -44,12 +44,12 @@ export class CallRegistry {
         entry.contribution.contract.output.parse(wire);
         return wire;
       } finally { scope.active = false; }
-    }, { object: ref, signal: options.signal }).done;
+    }, { object: ref, signal: options.signal, affectsHistory: false }).done;
   }
   client(owner: string, runs: RunGroup): PluginCalls {
     return { invoke: (contract, input, options) => runs.start(async signal => {
       const result = await this.invoke(contract.id, input, { ...options, signal }, { plugin: owner, resource: null }, contract);
       return contract.output.parse(result);
-    }, { object: options.object, signal: options.signal }).done };
+    }, { object: options.object, signal: options.signal, affectsHistory: false }).done };
   }
 }

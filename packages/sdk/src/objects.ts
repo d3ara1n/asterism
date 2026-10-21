@@ -80,5 +80,9 @@ export interface ObjectExecutor extends ObjectReader {
   readonly content: ContentScope;
   readonly session: SessionExecutor;
   commit(work: (writer: ObjectWriter) => undefined): void;
+  /** 标记依赖当前时间线路径的异步工作；嵌套占用分别释放，取消后等待工作真实结束。 */
+  withBusy<T>(work: (signal: AbortSignal) => Promise<T>, options?: { signal?: AbortSignal }): Promise<T>;
+  /** 内存中的展示数据变化后通知宿主重新查询投影；不追加历史或保存资源数据。 */
+  invalidate(): void;
   readonly streams: { publish(channel: string, data: Uint8Array): void };
 }

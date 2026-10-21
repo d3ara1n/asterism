@@ -22,7 +22,7 @@ export function ObjectActions({ object, defaultSize, onView }: {
   object: WorkbenchObject; defaultSize: CardSize; onView: (patch: ViewPatch) => void;
 }) {
   const i18n = useI18n();
-  const { ready, busy } = useWorkbench();
+  const { ready } = useWorkbench();
   const [open, setOpen] = useState(false);
   return <><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon-xs" aria-label={i18n.formatMessage(objectsMessages.objectActions)}><MoreHorizontal /></Button></DropdownMenuTrigger>
     <DropdownMenuContent align="end">
@@ -38,17 +38,17 @@ export function ObjectActions({ object, defaultSize, onView }: {
         </DropdownMenuSubContent>
       </DropdownMenuSub>
       <DropdownMenuSeparator />
-      <DropdownMenuItem disabled={!ready || busy} onSelect={() => setOpen(true)}><Trash2 />{i18n.formatMessage(objectsMessages.removeObject, { title: object.title })}…</DropdownMenuItem>
+      <DropdownMenuItem disabled={!ready} onSelect={() => setOpen(true)}><Trash2 />{i18n.formatMessage(objectsMessages.removeObject, { title: object.title })}…</DropdownMenuItem>
     </DropdownMenuContent>
   </DropdownMenu>{open && <RemoveObject object={object} onClose={() => setOpen(false)} />}</>;
 }
 function RemoveObject({ object, onClose }: { object: WorkbenchObject; onClose: () => void }) {
   const i18n = useI18n();
-  const { controller, session, ready, busy, run } = useWorkbench();
+  const { controller, session, ready, run } = useWorkbench();
   const progress = useSessionProgress(controller);
   const [saving, setSaving] = useState(false);
-  const unsettled = progress.unsettledObjectIds.includes(object.id);
-  const disabled = !ready || busy || saving || unsettled;
+  const unsettled = progress.busyObjectIds.includes(object.id);
+  const disabled = !ready || saving || unsettled;
   return <AlertDialog open onOpenChange={open => { if (!open && !saving) onClose(); }}><AlertDialogContent>
     <AlertDialogHeader><AlertDialogTitle>{i18n.formatMessage(objectsMessages.removeObjectTitle)}</AlertDialogTitle><AlertDialogDescription>{i18n.formatMessage(objectsMessages.removeObjectDescription, { title: object.title })}</AlertDialogDescription></AlertDialogHeader>
     {unsettled && <p className="type-caption">{i18n.formatMessage(objectsMessages.objectStillActive)}</p>}

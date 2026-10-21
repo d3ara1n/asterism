@@ -5,13 +5,17 @@ import { z } from "zod";
 import { defineRendererPlugin, cardRenderer, useRendererCard, useRendererObject, type RendererModule, type RendererObjectContext } from "@atelier/sdk/renderer";
 
 function CounterBody({ data }: { data: z.infer<typeof Card.schema> }) {
-  const { onStream, invoke, activity, session } = useRendererObject();
+  const { onStream, invoke, view, session } = useRendererObject();
+  const [pending, setPending] = useState(false);
   const card = useRendererCard();
   const [bytes, setBytes] = useState(0);
   useEffect(() => onStream("updates", chunk => setBytes(chunk.byteLength)), [onStream]);
   return createElement("div", null, createElement("button", {
-    disabled: activity.running,
-    onClick: () => { void invoke(ChangeCount, { amount: 1 }); },
+    disabled: !view.ready || pending,
+    onClick: () => {
+      setPending(true);
+      void invoke(ChangeCount, { amount: 1 }).finally(() => setPending(false));
+    },
   }, `${data.value} · ${bytes} bytes · ${session.snapshot()?.records.all({ scope: "timeline" }).length ?? 0} records`),
   createElement("button", { onClick: () => card.openPanel("details") }, "Details"));
 }

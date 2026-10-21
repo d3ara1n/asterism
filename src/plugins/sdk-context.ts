@@ -218,6 +218,16 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
         return readData(ref.sessionId, ref.id, contract);
       },
       commit: work => commit(ref.sessionId, work, ref, scope),
+      withBusy(work, options = {}) {
+        checkExecution(scope); own(ref.kind); checkRef(ref);
+        if (!host.sessions.workbench(ref.sessionId).objects.some(item => item.id === ref.id))
+          throw new PluginApiError("unavailable", "The resource is not on the current session path.");
+        return sessionRuns.start(work, { object: ref, signal: options.signal }).done;
+      },
+      invalidate() {
+        checkExecution(scope); own(ref.kind); checkRef(ref);
+        host.sessions.viewChanged(ref.sessionId);
+      },
       streams: { publish(channel, data) {
         checkExecution(scope);
         own(ref.kind); checkRef(ref, scope?.active && scope.provisional);

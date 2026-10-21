@@ -4,7 +4,7 @@
 
 SDK 包版本见 [package.json](package.json)，宿主 API 版本见 [`sdkApi`](../../src/plugins/packages.ts)。内置插件领域契约独立在 [`@atelier/builtin-api`](../builtin-api/README.md)，不进入通用 SDK。
 
-当前宿主 API 为 **11.3**，使用资源工具调用者身份的插件声明 `{ "major": 11, "minMinor": 3 }`，依赖 `@atelier/sdk: ^0.31.0`。后台通过 `session.invoke` 调用资源动作；公共模型终态通过具型扩展携带领域数据；前端入口默认导出 `defineRendererPlugin(...)`，功能视图放入其 `modules`，调用契约显式声明 `scope`。
+当前宿主 API 为 **12.0**，插件声明 `{ "major": 12, "minMinor": 0 }`，依赖 `@atelier/sdk: ^0.32.0`。后台通过 `session.invoke` 调用资源动作；公共模型终态通过具型扩展携带领域数据；前端入口默认导出 `defineRendererPlugin(...)`，功能视图放入其 `modules`，调用契约显式声明 `scope`。
 
 ## 子路径入口
 
@@ -50,6 +50,7 @@ export default definePlugin({
 
 ### 1. 会话、对象、创建与动作
 - **读取与提交**：`plugin.session(id)` 与 `plugin.object(sessionId, ResourceContract, id)` 提供 `snapshot()`、`get(DataContract)` 与同步 `commit(writer => { writer.set(...); writer.append(...); })`。快照按需读取 `records.all / query / first / last`（支持 `scope: "timeline" | "session"`）。
+- **时间线占用与内存投影（API 12.0）**：`object.withBusy(async signal => { ... }, { signal? })` 保护依赖当前路径的异步工作；`object.invalidate()` 通知重读内存中的资源投影。两者分别用于宿主时间线保护和资源自己的领域视图，完整语义见 [宿主运行生命周期](../../docs/plugin-sdk.md#宿主运行生命周期)。
 - **会话目录与资源管理（API 9.1，初始资源链接为 10.1，创建标题为 10.2）**：`plugin.sessions.list()` 读取全部会话摘要；`session.create(CreationContract, input, { signal?, content?, linkTo?, resources? })` 返回 `ResourceCreationResult`（兼容 `ResourceRef`，附带提交时的 `title`），`resources` 是新资源接收的引用列表。工具的 `context.session.create(contract, input, { resources?, exposeSelf? })` 返回同一结果，接收本请求有效范围内的资源 ID 列表；API 11.2 的 `exposeSelf` 选项由宿主绑定发起者身份，语义见会话资源接口。`session.link(receiver, resource)`、`unlink(receiver, resource)`、`remove(resource)` 使用完整引用，作用域、原子性与收束规则见 [会话资源接口](../../docs/plugin-sdk.md#会话目录与资源操作api-91)，可编译示例见 `examples/session-resources.ts`。
 - **具型创建与动作**：在 `contracts` 中用 `defineCreation(resource, { id, schema })` 与 `defineAction(resource, { id, schema })` 声明；在 `runtime` 中用 `implementResource` 聚合 `creation`、`actions`、`project`、`inspect`、`context`；在 `renderer` 中用 `session.create(CreationContract, input, position)` 与 `object.invoke(ActionContract, input)` 调用。
 - **后台资源动作（API 11.1）**：`plugin.session(sessionId).invoke(ActionContract, target, input, { signal?, content? })` 返回 `Promise<void>`，复用完整准备和对象队列。调用其他插件资源不取得其私有对象门面；返回表示动作处理完成，独立托管工作由资源继续管理。取消、附件交接和重入规则见 [后台资源动作](../../docs/plugin-sdk.md#后台资源动作api-111)，可编译示例见 [`examples/session-resources.ts`](examples/session-resources.ts)。
@@ -64,7 +65,7 @@ export default definePlugin({
   "exports": { "./public": "./src/public.ts" },
   "atelier": {
     "id": "example.tools",
-    "api": { "major": 11, "minMinor": 1 },
+    "api": { "major": 12, "minMinor": 0 },
     "runtime": "./src/runtime.ts"
   }
 }
@@ -89,6 +90,7 @@ export default definePlugin({
 ### 5. 前端卡片与工具三态视图
 - **资源展示目录（API 10.2）**：`useRendererResources().list()` 枚举已登记的 `ResourceDescription`，`get(kind)` 查询单一类型（缺失时返回宿主通用描述）。组件用 `useI18n().text(description.label)` 取得当前语言名称，`description.icon` 可直接渲染；不需要资源实例或卡片投影。
 - **卡片视图**：`cardRenderer(ViewContract, { width, height, minWidth?, minHeight?, Body, Actions?, panels? })`，内部通过 `useRendererObject()` 访问对象数据、动作调用与二进制流 `onStream`。
+- **局部操作（API 12.0）**：`object.view.ready` 表示视图可操作；按钮自行管理 `await object.invoke(...)` 期间的 pending，动作回执后的读取由该调用等待，错误仍按回执与视图读取分别反馈。资源业务状态通过自己的展示契约交付，宿主 busy 不作为卡片的运行或加载状态。
 - **对象保留状态（API 8.7）**：`object.retained.get("<plugin>/<key>", create, release?)` 保存草稿等需要跨重挂载与会话切换保持的前端状态，对象离开投影时宿主调用 `release`；`discard(key)` 提前结束。规则见 [前端视图与扩展入口](../../docs/plugin-sdk.md#前端视图与扩展入口)，可编译示例见 `examples/renderer.ts`。
 - **滚动与缩放**：卡片内交互遵循 [画布与对象卡片](../../docs/workbench.md#画布与对象卡片) 的手势归属规则。
 - **辅助面板（API 8.2）**：`panels: [{ id: "details", label: "Details", icon, Body: Details }]`；主体与面板通过 `useRendererCard().openPanel("details") / closePanel()` 控制卡片局部视图。面板注册、数据绑定与生命周期见 [前端视图与扩展入口](../../docs/plugin-sdk.md#前端视图与扩展入口)，可编译示例见 `examples/renderer.ts`。

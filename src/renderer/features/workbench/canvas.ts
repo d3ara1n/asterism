@@ -23,7 +23,7 @@ type LocateRequest = { objectIds: string[]; select: boolean; token: number; sele
 
 /** 下游只消费 WorkbenchCanvas；React Flow 的视口操作与等待集中在此。 */
 export function useWorkbenchCanvas(nodes: ObjectNodeType[], setNodes: Dispatch<SetStateAction<ObjectNodeType[]>>, element: RefObject<HTMLDivElement | null>) {
-  const { session, controller, run, ready, busy } = useWorkbench();
+  const { session, controller, run, ready } = useWorkbench();
   const registry = useModuleViews();
   const flow = useReactFlow<ObjectNodeType>();
   const width = useStore(state => state.width);
@@ -36,8 +36,8 @@ export function useWorkbenchCanvas(nodes: ObjectNodeType[], setNodes: Dispatch<S
   const mounted = useRef(true);
   useLayoutEffect(() => { sequence.current++; setLocating(null); }, [selectionVersion]);
   useLayoutEffect(() => {
-    if (!ready || busy) { sequence.current++; setLocating(null); }
-  }, [ready, busy]);
+    if (!ready) { sequence.current++; setLocating(null); }
+  }, [ready]);
   useEffect(() => {
     mounted.current = true;
     return () => { mounted.current = false; sequence.current++; };
@@ -46,7 +46,7 @@ export function useWorkbenchCanvas(nodes: ObjectNodeType[], setNodes: Dispatch<S
   const findPlacement = useCallback<WorkbenchCanvas["findPlacement"]>((options = {}) => {
     const state = controller.getSnapshot();
     const host = element.current;
-    if (!mounted.current || !available.current || state.busy || state.status !== "ready"
+    if (!mounted.current || !available.current || state.navigating || state.status !== "ready"
       || !host?.clientWidth || !host.clientHeight || !flow.viewportInitialized) return null;
     const viewport = flow.getViewport();
     const center = { x: (host.clientWidth / 2 - viewport.x) / viewport.zoom, y: (host.clientHeight / 2 - viewport.y) / viewport.zoom };
@@ -63,7 +63,7 @@ export function useWorkbenchCanvas(nodes: ObjectNodeType[], setNodes: Dispatch<S
     const state = controller.getSnapshot();
     const workbench = state.snapshot?.workbench;
     const objectIds = [...new Set(ids)];
-    if (!mounted.current || !available.current || state.busy || state.status !== "ready" || !workbench || !objectIds.length) return;
+    if (!mounted.current || !available.current || state.navigating || state.status !== "ready" || !workbench || !objectIds.length) return;
     const objects = new Set(workbench.objects.map(object => object.id));
     if (!objectIds.every(id => objects.has(id))) return;
     const token = ++sequence.current;

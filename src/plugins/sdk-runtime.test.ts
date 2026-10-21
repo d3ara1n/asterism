@@ -104,6 +104,33 @@ async function create(service: ApplicationService, sessionId: string, input = 1)
 }
 
 describe("工作台 SDK 的宿主实现", () => {
+  // docs/plugin-sdk.md：busy 只保护当前路径；重叠占用独立释放，取消等到清理完成。
+  it("withBusy 重叠占用保护回溯，内存投影通知不写历史", async () => {
+    const c = counter();
+    const { service, sessionId } = open([c.plugin]);
+    const id = await create(service, sessionId);
+    const object = c.context().object(sessionId, Counter, id);
+    const before = service.sessions.snapshot(sessionId);
+    object.invalidate();
+    const refreshed = service.sessions.snapshot(sessionId);
+    expect(refreshed.nodes).toEqual(before.nodes);
+    expect(refreshed.revision).toBeGreaterThan(before.revision);
+    const first = actionGate(), second = actionGate(), cancel = new AbortController();
+    const a = object.withBusy(async () => { await first.promise; });
+    const b = object.withBusy(async signal => { await second.promise; signal.throwIfAborted(); }, { signal: cancel.signal });
+    const rejected = expect(b).rejects.toThrow();
+    try {
+      expect(service.sessions.snapshot(sessionId).progress.busyObjectIds).toEqual([id]);
+      first.resolve(); await a;
+      cancel.abort();
+      await expect(service.sessions.execute({ type: "select", sessionId, nodeId: before.cursor })).rejects.toMatchObject({ code: "conflict" });
+      expect(service.sessions.snapshot(sessionId).progress.busyObjectIds).toEqual([id]);
+    } finally { first.resolve(); second.resolve(); }
+    await rejected;
+    expect(service.sessions.snapshot(sessionId).progress.busyObjectIds).toEqual([]);
+    await service.sessions.execute({ type: "select", sessionId, nodeId: before.cursor });
+  });
+
   // docs/plugin-sdk.md：后台动作消费真实契约并复用全部准备流水线，调用不取得目标私有门面。
   it("session.invoke 跨插件复用准备与记录来源，拒绝声明副本和错误目标", async () => {
     const c = counter(), caller = pluginNamespace("test.action-caller");
@@ -382,8 +409,8 @@ describe("工作台 SDK 的宿主实现", () => {
     await expect(service.sessions.calls.invoke(invalid.id, null, { object }, null)).rejects.toThrow();
   });
 
-  // 取消只发信号，活动必须保持到 handler 清理完成；通用调用不能绕开宿主收束。
-  it.each(["renderer", "plugin"] as const)("%s 调用不显示对象执行，取消后仍等待实际清理", async source => {
+  // docs/plugin-sdk.md：只读调用不占用时间线；取消与宿主关闭仍等待 handler 真正结束。
+  it.each(["renderer", "plugin"] as const)("%s 只读调用不标记资源 busy，取消后仍等待实际清理", async source => {
     const c = counter(), other = pluginNamespace("test.questions");
     const wait = defineCall(other.name("wait"), { scope: "object", input: z.null(), output: z.null() });
     let signal!: AbortSignal, release!: () => void;
@@ -399,13 +426,12 @@ describe("工作台 SDK 的宿主实现", () => {
       : c.context().ipc.calls.invoke(wait, null, { object, signal: controller.signal });
     const rejected = expect(waiting).rejects.toThrow();
     try {
-      expect(service.sessions.running).toBe(true);
-      // 插件 SDK 的调用收束与运行时执行状态是两个契约；查询不能触发代理停止按钮。
-      expect(service.sessions.snapshot(sessionId).progress).toMatchObject({ unsettledObjectIds: [object.id], runningObjectIds: [] });
+      expect(service.sessions.running).toBe(false);
+      expect(service.sessions.snapshot(sessionId).progress).toMatchObject({ busyObjectIds: [] });
       controller.abort();
       expect(signal.aborted).toBe(true);
-      expect(service.sessions.running).toBe(true);
-      expect(service.sessions.snapshot(sessionId).progress.runningObjectIds).toEqual([]);
+      expect(service.sessions.running).toBe(false);
+      expect(service.sessions.snapshot(sessionId).progress.busyObjectIds).toEqual([]);
     } finally { release(); }
     await rejected;
     expect(service.sessions.running).toBe(false);
@@ -928,8 +954,7 @@ describe("工作台 SDK 的宿主实现", () => {
       await started;
       expect(service.sessions.running).toBe(true);
       expect(() => c.context().models.run(request)).toThrow();
-      expect(service.sessions.snapshot(sessionId).progress.unsettledObjectIds).toContain(id);
-      expect(service.sessions.snapshot(sessionId).progress.runningObjectIds).toContain(id);
+      expect(service.sessions.snapshot(sessionId).progress.busyObjectIds).toContain(id);
     } finally {
       if (mode === "cancel") controller.abort();
       else {
