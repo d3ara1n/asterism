@@ -46,7 +46,7 @@
 
 macOS 覆盖区域高为顶部表面高度加两倍窗口边距。原生按钮位置在 `windowGeometry.macControlsPosition` 集中配置（当前为 `{ x: 20, y: 15 }` DIP）；普通窗口中 renderer 按 `macControlsPosition` 与 `macControlsWidth` 计算左侧留白，使按钮组两侧到部件边缘等距；不使用 `titlebar-area-x`。
 
-窗口层统一消费主进程确定的标题栏模式与原生全屏状态。主进程通过 Electron 的 `enter-full-screen` / `leave-full-screen` 事件发布状态，renderer 首帧前先订阅再读取当前快照；全屏内刷新同样取得真实状态，迟到的初始读取不能覆盖已收到的状态通知。全屏时收回窗口控件专用留白，退出后恢复；最大化仍保留按钮避让。
+窗口层统一消费主进程确定的标题栏模式与原生全屏状态。主进程通过 Electron 的 `enter-full-screen` / `leave-full-screen` 事件发布状态，renderer 首帧前先订阅再读取当前状态，此后直接采用每次收到的状态；全屏内刷新同样取得真实状态。全屏时收回窗口控件专用留白，退出后恢复；最大化仍保留按钮避让。
 
 Windows/Linux 覆盖模式使用 `titlebar-area-x` / `titlebar-area-width` 提供的可用区域计算标题栏左右安全区，控件与菜单之间保留标准部件间隙。右侧工作台菜单随标题栏整体布局避让；Linux 桌面将按钮放在左侧时也遵循实际区域。覆盖区域随系统缩放与窗口尺寸更新，不以固定按钮宽度限制安全区；环境变量尚未就绪时暂按右侧 138px 预留。窗口按钮的绘制、点击与系统行为由 Electron 负责。
 
