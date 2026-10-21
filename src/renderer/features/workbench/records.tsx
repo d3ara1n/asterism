@@ -14,8 +14,8 @@ export const workbenchRecordViews: RendererModule = {
     recordRenderer(ObjectAdded, { icon: <Plus className="size-4" />, label: (data, ctx) => withValues(historyMessages.eventAdded, { title: ctx.resourceTitle(data.id) }) }),
     recordRenderer(ObjectRemoved, { icon: <Minus className="size-4" />, label: (data, ctx) => withValues(historyMessages.eventRemoved, { title: ctx.resourceTitle(data.id) }) }),
     recordRenderer(ResourceAttached, { icon: <Link className="size-4" />, label: (data, ctx) =>
-      withValues(historyMessages.eventLinked, { resource: ctx.resourceTitle(data.id), agent: ctx.resourceTitle(data.agentId) }) }),
+      withValues(historyMessages.eventLinked, { resource: ctx.resourceTitle(data.id), receiver: ctx.resourceTitle(data.receiverId) }) }),
     recordRenderer(ResourceDetached, { icon: <Unlink className="size-4" />, label: (data, ctx) =>
-      withValues(historyMessages.eventDetached, { resource: ctx.resourceTitle(data.id), agent: ctx.resourceTitle(data.agentId) }) }),
+      withValues(historyMessages.eventDetached, { resource: ctx.resourceTitle(data.id), receiver: ctx.resourceTitle(data.receiverId) }) }),
   ],
 };

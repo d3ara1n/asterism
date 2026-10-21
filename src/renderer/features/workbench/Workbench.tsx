@@ -149,9 +149,9 @@ function Canvas({ ref, session, run, writable, canDrop, onDropItems }: DropHandl
   const objects = useMemo(() => new Map(session.objects.map(o => [o.id, o])), [session.objects]);
   // 终点由资源的静态接收声明决定；起点是任意其他对象。
   const isValidConnection: IsValidConnection = useCallback(c => !!c.source && !!c.target && c.source !== c.target
-    && !!objects.get(c.target) && registry.resource(objects.get(c.target)!.kind).receivesLinks === true && !session.links.some(l => l.agentId === c.target && l.resourceId === c.source), [objects, session.links, registry]);
+    && !!objects.get(c.target) && registry.resource(objects.get(c.target)!.kind).receivesLinks === true && !session.links.some(l => l.receiverId === c.target && l.resourceId === c.source), [objects, session.links, registry]);
   const onConnect = useCallback((c: Connection) => {
-    void run({ type: "link.set", sessionId: latest.current.id, agentId: c.target, resourceId: c.source, linked: true });
+    void run({ type: "link.set", sessionId: latest.current.id, receiverId: c.target, resourceId: c.source, linked: true });
   }, [run]);
   const onEdgesDelete = useCallback((removed: WorkbenchEdge[]) => {
     // 合并线携带其代表的有向关系；整条删除时逐一解除，后端仍分别记录事件。

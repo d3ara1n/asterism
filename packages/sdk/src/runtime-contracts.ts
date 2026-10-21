@@ -86,6 +86,7 @@ export interface ActionContribution {
 export interface ResourceContribution {
   readonly resource: ResourceContract;
   readonly records: readonly RecordContract[];
+  /** 声明本资源可作为链接接收者，并提供接收端工具策略；与 Agent 领域类型无关。 */
   readonly links?: { receive: boolean; tools?(object: ObjectReader): { allow?: readonly string[]; exclude?: readonly string[] } };
   readonly creation?: CreationContribution;
   readonly actions?: readonly ActionContribution[];

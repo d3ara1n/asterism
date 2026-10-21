@@ -78,7 +78,7 @@ describe("共享时间线的契约解码", () => {
   it("模型可见文本与接收者进入信封 context，原事件身份与载荷保留", () => {
     const linked = node("event", null, attached("a", "directory", "A resource was linked."));
     expect(sessionView(nodeView("s", "", [linked], linked.id)).records.all({ scope: "timeline" })[0]).toMatchObject({
-      contract: { id: "resource_attached" }, data: { id: "directory", agentId: "a" },
+      contract: { id: "resource_attached" }, data: { id: "directory", receiverId: "a" },
       context: { text: "A resource was linked.", recipient: "a" },
     });
   });

@@ -21,7 +21,7 @@ export type Viewport = z.infer<typeof viewportSchema>;
 /** 资源变更与布局属于指定会话；操作始终针对执行游标。 */
 export const workbenchCommands = [
   z.strictObject({ type: z.literal("object.remove"), sessionId, objectId: id }),
-  z.strictObject({ type: z.literal("link.set"), sessionId, agentId: id, resourceId: id, linked: z.boolean() }),
+  z.strictObject({ type: z.literal("link.set"), sessionId, receiverId: id, resourceId: id, linked: z.boolean() }),
   z.strictObject({ type: z.literal("view.set"), sessionId, objectId: id, position: pointSchema.optional(),
     hidden: z.boolean().optional(), collapsed: z.boolean().optional(), size: cardSizeSchema.nullable().optional() }),
   z.strictObject({ type: z.literal("viewport.set"), sessionId, viewport: viewportSchema }),
@@ -38,6 +38,7 @@ const viewSchema = z.strictObject({ objectId: id, position: pointSchema, hidden:
 export type ObjectView = z.infer<typeof viewSchema>;
 export const workbenchSnapshotSchema = z.strictObject({
   id: sessionId, title: z.string(), objects: z.array(objectSchema), views: z.array(viewSchema), viewport: viewportSchema,
-  links: z.array(z.strictObject({ agentId: id, resourceId: id })),
+  /** 有向链接的两端均为资源：resourceId 指向接收访问资格的 receiverId。 */
+  links: z.array(z.strictObject({ receiverId: id, resourceId: id })),
 });
 export type WorkbenchSnapshot = z.infer<typeof workbenchSnapshotSchema>;

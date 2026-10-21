@@ -39,7 +39,9 @@ export interface SessionExecutor extends SessionReader {
   create<I, S extends Json, O extends Json>(contract: CreationContract<I, S, O>, input: NoInfer<I> & Json, options?: ResourceCreationOptions): Promise<ResourceCreationResult>;
   /** 调用资源公开动作；返回表示动作处理完成，独立托管工作由资源自身管理。 */
   invoke<I, O extends Json>(contract: ActionContract<I, O>, target: ResourceRef, input: NoInfer<I> & Json, options?: ResourceActionOptions): Promise<void>;
+  /** 将资源链接给接收者；两端均为资源，接收者由资源类型声明支持链接。 */
   link(receiver: ResourceRef, resource: ResourceRef): void;
+  /** 解除指定方向的链接；反向链接独立保留。 */
   unlink(receiver: ResourceRef, resource: ResourceRef): void;
   /** 移除已收束对象并解除所有链接；保留历史与外部实体。 */
   remove(resource: ResourceRef): void;

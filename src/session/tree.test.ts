@@ -94,13 +94,13 @@ describe("会话级扁平树", () => {
     tree.appendToTimeline(s, created("agent-a", "A"));
     tree.appendToTimeline(s, created("agent-b", "B"));
     const linked = tree.appendToTimeline(s, attached("agent-a", "agent-b"));
-    expect(tree.workbench(s).links).toEqual([{ agentId: "agent-a", resourceId: "agent-b" }]);
+    expect(tree.workbench(s).links).toEqual([{ receiverId: "agent-a", resourceId: "agent-b" }]);
     const removedNode = tree.appendToTimeline(s, removed("agent-b"));
     expect(tree.workbench(s).objects.map(object => object.id)).toEqual(["agent-a"]);
     expect(tree.workbench(s).links).toEqual([]);
     tree.select(s, linked.id);
     expect(tree.workbench(s).objects.map(object => object.id)).toEqual(["agent-a", "agent-b"]);
-    tree.appendToTimeline(s, event("resource_detached", { id: "agent-b", agentId: "agent-a" }));
+    tree.appendToTimeline(s, event("resource_detached", { id: "agent-b", receiverId: "agent-a" }));
     const branch = tree.appendToTimeline(s, created("branch-only", "Branch"));
     expect(tree.workbench(s).links).toEqual([]);
     tree.select(s, removedNode.id);
@@ -122,6 +122,6 @@ describe("会话级扁平树", () => {
     expect(tree.workbench(s).objects.map(object => object.id)).toEqual(["a"]);
     db.exec("ROLLBACK");
     expect(tree.workbench(s)).toEqual(before);
-    expect(before.links).toEqual([{ agentId: "a", resourceId: "b" }]);
+    expect(before.links).toEqual([{ receiverId: "a", resourceId: "b" }]);
   });
 });

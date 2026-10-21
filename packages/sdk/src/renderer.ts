@@ -70,6 +70,7 @@ export interface ResourceDescription {
   icon: ReactNode;
   /** 创建前可取用的默认卡片尺寸，与卡片 renderer 共用声明。 */
   card?: CardAppearance;
+  /** 本资源可作为有向链接终点，与后台 links.receive 一致。 */
   receivesLinks?: boolean;
 }
 export interface CardAppearance {

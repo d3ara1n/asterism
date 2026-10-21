@@ -25,12 +25,12 @@ export function layoutConnections(nodes: readonly LayoutNode[], links: Workbench
   }]));
   const pairs = new Map<string, ConnectionEdge>();
   for (const link of links) {
-    if (!geometry.has(link.resourceId) || !geometry.has(link.agentId)) continue;
+    if (!geometry.has(link.resourceId) || !geometry.has(link.receiverId)) continue;
     // 显示身份只取决于对象对；增加或解除反向关系时保留连线选中状态和端点身份。
-    const id = [link.agentId, link.resourceId].sort().map(encodeURIComponent).join(":");
+    const id = [link.receiverId, link.resourceId].sort().map(encodeURIComponent).join(":");
     const existing = pairs.get(id);
     if (existing) existing.data.links.push(link);
-    else pairs.set(id, { id, source: link.resourceId, target: link.agentId, sourceHandle: id, targetHandle: id, data: { links: [link] } });
+    else pairs.set(id, { id, source: link.resourceId, target: link.receiverId, sourceHandle: id, targetHandle: id, data: { links: [link] } });
   }
   const edges = [...pairs.values()];
   for (const edge of edges) {

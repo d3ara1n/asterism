@@ -31,8 +31,8 @@ export const notice = (agentId: string | null, code: string, value: string, leve
 export const event = (type: string, data: Json, options: { source?: NewNode["source"]; model?: string | null; recipient?: string | null } = {}): NewNode =>
   ({ contract: type, data, source: options.source ?? hostSource, model: options.model ?? null, recipient: options.recipient ?? null });
 export const created = (id: string, title: string, kind = "atelier.builtin/agent") => event("resource_created", { id, title, type: kind });
-export const attached = (agentId: string, resourceId: string, model: string | null = `${resourceId} attached`) =>
-  event("resource_attached", { id: resourceId, agentId }, { model, recipient: agentId });
+export const attached = (receiverId: string, resourceId: string, model: string | null = `${resourceId} attached`) =>
+  event("resource_attached", { id: resourceId, receiverId }, { model, recipient: receiverId });
 export const removed = (id: string) => event("object_removed", { id });
 /** 构造带身份的完整节点，供不经存储的纯函数测试使用。 */
 export const node = (id: string, parentId: string | null, value: NewNode, createdAt = "2026-10-10T10:00:00Z"): SessionNode =>

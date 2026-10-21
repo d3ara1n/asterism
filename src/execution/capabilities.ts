@@ -14,7 +14,7 @@ export function agentToolPolicy(agent: Pick<AgentConfiguration, "tools" | "exclu
   const excluded = new Set(agent.excludeTools ?? []);
   return name => (allowed === null || allowed.has(name)) && !excluded.has(name);
 }
-const denied = (): PreparedResult => ({ kind: "rejected", error: { code: "access_denied", message: "The resource is not linked to this agent." } });
+const denied = (): PreparedResult => ({ kind: "rejected", error: { code: "access_denied", message: "Resource access requires a link to the executing object." } });
 
 /** 每次请求的能力视图：链接资源 × 工具支持关系，再由外部策略筛选。资源和工具目录彼此独立。 */
 export class AgentCapabilities {

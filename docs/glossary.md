@@ -72,6 +72,8 @@
 | 工具栏项 | toolbar item | 通过 `AgentToolbarItem` 呈现在输入工具栏中的贡献内容，随输入区一同显隐；见 `docs/workbench.md#agent-扩展界面` |
 | Agent 模态窗 | Agent modal | 关联 Agent 的扩展对话框，接管窗口焦点，由插件控制显示与关闭；见 `docs/workbench.md` |
 | 连线 | edge | 关系的视觉表达，不是关系本身，也不是授权机制 |
+| 资源链接 | resource link | 宿主持有的资源间有向关系，被链接资源指向接收者；两端均为资源身份，语义见 [对象模型](object-model.md#资源链接宿主公共关系) |
+| 链接接收者 | link receiver | 有向资源链接的接收端，由资源类型声明支持接收；Agent 是其中一种实现 |
 | 关系 | relation | 委派、绑定、输入、使用/产出、分叉等对象间联系 |
 
 ## 运行与历史

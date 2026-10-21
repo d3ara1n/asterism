@@ -11,11 +11,11 @@ export const accessMessages = pluginNamespace("atelier.host").messages("en", def
   },
   accessEmpty: {
     id: "accessEmpty",
-    defaultMessage: "Add an agent and another resource to manage access.",
+    defaultMessage: "Add a resource that receives links and another resource to manage access.",
   },
-  byAgent: {
-    id: "byAgent",
-    defaultMessage: "By agent",
+  byReceiver: {
+    id: "byReceiver",
+    defaultMessage: "By receiver",
   },
   byResource: {
     id: "byResource",
@@ -23,7 +23,7 @@ export const accessMessages = pluginNamespace("atelier.host").messages("en", def
   },
   accessRecipient: {
     id: "accessRecipient",
-    defaultMessage: "Agent receiving access",
+    defaultMessage: "Resource receiving access",
   },
   accessTarget: {
     id: "accessTarget",
@@ -35,7 +35,7 @@ export const accessMessages = pluginNamespace("atelier.host").messages("en", def
   },
   accessibleBy: {
     id: "accessibleBy",
-    defaultMessage: "Agents with access to {title}",
+    defaultMessage: "Resources with access to {title}",
   },
   linked: {
     id: "linked",
@@ -47,7 +47,7 @@ export const accessMessages = pluginNamespace("atelier.host").messages("en", def
   },
   changeAccess: {
     id: "changeAccess",
-    defaultMessage: "{agent}: access to {resource}",
+    defaultMessage: "{receiver}: access to {resource}",
   },
   accessSaved: {
     id: "accessSaved",
@@ -63,6 +63,6 @@ export const accessMessages = pluginNamespace("atelier.host").messages("en", def
   },
   accessRules: {
     id: "accessRules",
-    defaultMessage: "Links are directional. Resource tools must also be supported and allowed by the agent’s policy. Hiding a card does not revoke access.",
+    defaultMessage: "Links are directional. Resource tools must also be supported and allowed by the receiver’s tool policy. Hiding a card does not revoke access.",
   },
 }));

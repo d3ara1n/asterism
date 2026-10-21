@@ -19,7 +19,7 @@ type ViewRow = { object_id: string; x: number; y: number; hidden: number; collap
 export class SessionWorkbench {
   constructor(private readonly db: DatabaseSync, private readonly tree: SessionTree,
     private readonly resources: ResourceRegistry,
-    private readonly tools: (sessionId: string, agentId: string, resource: FoldedObject) => Json,
+    private readonly tools: (sessionId: string, receiverId: string, resource: FoldedObject) => Json,
     private readonly content?: ContentStore) {}
 
   /** 通用资源创建：资源贡献给出标题并保存对象数据；创建事件保存身份、类型与标题。 */
@@ -54,25 +54,25 @@ export class SessionWorkbench {
       case "object.remove": {
         const target = folded.objects.find(o => o.id === command.objectId);
         if (!target) throw new SessionError("not_found", "Object does not belong to this session.");
-        // 代理同样是资源：入向与出向链接都解除。
-        for (const link of folded.links.filter(l => l.resourceId === target.id || l.agentId === target.id)) {
+        // 对象移除时解除全部入向与出向链接。
+        for (const link of folded.links.filter(l => l.resourceId === target.id || l.receiverId === target.id)) {
           const resource = folded.objects.find(o => o.id === link.resourceId)!;
-          tree.appendToTimeline(command.sessionId, { source: host, recipient: link.agentId, contract: "resource_detached", data: { id: resource.id, agentId: link.agentId },
-            model: link.agentId === target.id ? null : `Resource "${resource.title}" (resource_id: ${resource.id}) has been detached.` });
+          tree.appendToTimeline(command.sessionId, { source: host, recipient: link.receiverId, contract: "resource_detached", data: { id: resource.id, receiverId: link.receiverId },
+            model: link.receiverId === target.id ? null : `Resource "${resource.title}" (resource_id: ${resource.id}) has been detached.` });
         }
         tree.appendToTimeline(command.sessionId, { source: host, recipient: null, contract: "object_removed", data: { id: target.id }, model: null });
         break;
       }
       case "link.set": {
         // 终点必须声明接收链接；起点是任意其他资源。
-        const agent = folded.objects.find(o => o.id === command.agentId && this.resources.receivesLinks(o.kind));
+        const receiver = folded.objects.find(o => o.id === command.receiverId && this.resources.receivesLinks(o.kind));
         const resource = folded.objects.find(o => o.id === command.resourceId);
-        if (!agent || !resource) throw new SessionError("not_found", "Agent or resource does not belong to this session.");
-        if (agent.id === resource.id) throw new SessionError("invalid_request", "An agent cannot be linked to itself.");
-        if (folded.links.some(l => l.agentId === agent.id && l.resourceId === resource.id) === command.linked) break;
-        tree.appendToTimeline(command.sessionId, { source: host, recipient: agent.id, contract: command.linked ? "resource_attached" : "resource_detached",
-          data: { id: resource.id, agentId: agent.id }, model: command.linked
-            ? `Resource "${resource.title}" (type: ${resource.kind}, resource_id: ${resource.id}) is now linked to you. Tools: ${JSON.stringify(this.tools(command.sessionId, agent.id, resource))}.`
+        if (!receiver || !resource) throw new SessionError("not_found", "The link requires a resource and a receiver that supports links in this session.");
+        if (receiver.id === resource.id) throw new SessionError("invalid_request", "A link requires two distinct resources.");
+        if (folded.links.some(l => l.receiverId === receiver.id && l.resourceId === resource.id) === command.linked) break;
+        tree.appendToTimeline(command.sessionId, { source: host, recipient: receiver.id, contract: command.linked ? "resource_attached" : "resource_detached",
+          data: { id: resource.id, receiverId: receiver.id }, model: command.linked
+            ? `Resource "${resource.title}" (type: ${resource.kind}, resource_id: ${resource.id}) is now linked to you. Tools: ${JSON.stringify(this.tools(command.sessionId, receiver.id, resource))}.`
             : `Resource "${resource.title}" (resource_id: ${resource.id}) has been detached.` });
         break;
       }

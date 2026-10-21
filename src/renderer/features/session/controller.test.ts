@@ -54,11 +54,11 @@ describe("会话视图所有权", () => {
     const { controller, requests, notify } = fixture(); const disconnect = controller.connect();
     requests[0]!.resolve(view(snapshot(1))); await flush();
     const settled = vi.fn();
-    const saved = controller.executeAndRead({ type: "link.set", sessionId: "s", agentId: "a", resourceId: "n", linked: true }).then(result => { settled(); return result; });
+    const saved = controller.executeAndRead({ type: "link.set", sessionId: "s", receiverId: "a", resourceId: "n", linked: true }).then(result => { settled(); return result; });
     await flush();
     notify(2); // 受理前已经开始的读取，不能结束观察。
     requests[1]!.resolve(accepted); await flush();
-    const linked = snapshot(2); linked.workbench.links = [{ agentId: "a", resourceId: "n" }];
+    const linked = snapshot(2); linked.workbench.links = [{ receiverId: "a", resourceId: "n" }];
     requests[2]!.resolve(view(linked)); await flush();
     expect(settled).not.toHaveBeenCalled();
     const continued = controller.execute({ type: "resource.command", sessionId: "s", objectId: "a", command: resourceCall(ContinueAgent, {}) });
@@ -74,7 +74,7 @@ describe("会话视图所有权", () => {
   it.each(["error", "disconnect"] as const)("命令受理后 %s 会结束读取观察，不永久挂起保存", async action => {
     const { controller, requests } = fixture(); const disconnect = controller.connect();
     requests[0]!.resolve(view(snapshot(1))); await flush();
-    const saved = controller.executeAndRead({ type: "link.set", sessionId: "s", agentId: "a", resourceId: "n", linked: true });
+    const saved = controller.executeAndRead({ type: "link.set", sessionId: "s", receiverId: "a", resourceId: "n", linked: true });
     await flush(); requests[1]!.resolve(accepted); await flush();
     if (action === "error") requests[2]!.resolve({ ok: false, error: { code: "unavailable", message: "Read failed.", display: "Read failed." } });
     else disconnect();

@@ -92,7 +92,7 @@ export class SessionService {
       progressChanged: sessionId => this.progressChanged(sessionId),
       linked: (sessionId, objectId) => {
         const folded = this.tree.workbench(sessionId);
-        const ids = new Set(folded.links.filter(link => link.agentId === objectId).map(link => link.resourceId));
+        const ids = new Set(folded.links.filter(link => link.receiverId === objectId).map(link => link.resourceId));
         return folded.objects.filter(object => ids.has(object.id));
       },
       capabilities: (linked, policy) => new AgentCapabilities(this.resources, this.tools, linked, policy),
@@ -157,7 +157,7 @@ export class SessionService {
     this.prepare = modules.prepare;
     this.pluginActivity = modules.activity;
     this.workbench = new SessionWorkbench(db, this.tree, this.resources,
-      (sessionId, agentId, resource) => this.linkTools(sessionId, agentId, resource), this.content);
+      (sessionId, receiverId, resource) => this.linkTools(sessionId, receiverId, resource), this.content);
   }
   get running(): boolean { return this.tree.list().some(session => !this.settled(session.id)); }
   private transaction<T>(work: () => T): T {
@@ -231,9 +231,9 @@ export class SessionService {
     try { this.changed({ kind: "session.progress", sessionId, progress: this.progress(sessionId) }); }
     catch { /* 重新读取会话恢复当前进度 */ }
   }
-  private linkTools(sessionId: string, agentId: string, resource: FoldedObject) {
-    const recipient = this.object(sessionId, agentId);
-    return this.resources.controller(recipient.kind)?.linkTools?.(sessionId, agentId, resource) ?? [];
+  private linkTools(sessionId: string, receiverId: string, resource: FoldedObject) {
+    const recipient = this.object(sessionId, receiverId);
+    return this.resources.controller(recipient.kind)?.linkTools?.(sessionId, receiverId, resource) ?? [];
   }
   snapshot(sessionId: string): SessionSnapshot {
     const nodes = this.tree.nodes(sessionId);
@@ -317,7 +317,7 @@ export class SessionService {
   private setLink(sessionId: string, receiver: ResourceRef, resource: ResourceRef, linked: boolean): void {
     this.commit(sessionId, () => {
       this.requireRef(sessionId, receiver); this.requireRef(sessionId, resource);
-      this.workbench.mutate({ type: "link.set", sessionId, agentId: receiver.id, resourceId: resource.id, linked });
+      this.workbench.mutate({ type: "link.set", sessionId, receiverId: receiver.id, resourceId: resource.id, linked });
     });
   }
   private removeResource(sessionId: string, ref: ResourceRef): void {
@@ -439,7 +439,7 @@ export class SessionService {
           const target = this.object(command.sessionId, command.objectId);
           this.removeResource(command.sessionId, { sessionId: command.sessionId, id: target.id, kind: target.kind });
         } else if (command.type === "link.set") {
-          const receiver = this.object(command.sessionId, command.agentId), resource = this.object(command.sessionId, command.resourceId);
+          const receiver = this.object(command.sessionId, command.receiverId), resource = this.object(command.sessionId, command.resourceId);
           this.setLink(command.sessionId, { sessionId: command.sessionId, id: receiver.id, kind: receiver.kind },
             { sessionId: command.sessionId, id: resource.id, kind: resource.kind }, command.linked);
         } else this.commit(command.sessionId, () => this.workbench.mutate(command));

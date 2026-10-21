@@ -15,7 +15,7 @@ describe("工作台折叠", () => {
     expect(current.objects.map(object => object.id)).toEqual(["agent-b"]);
     expect(current.links).toEqual([]);
     expect(foldWorkbench(path).links).toEqual([
-      { agentId: "agent-b", resourceId: "agent-a" }, { agentId: "agent-a", resourceId: "agent-b" },
+      { receiverId: "agent-b", resourceId: "agent-a" }, { receiverId: "agent-a", resourceId: "agent-b" },
     ]);
   });
 });

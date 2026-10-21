@@ -804,7 +804,7 @@ describe("会话运行时", () => {
     const created = await execute(service, { type: "resource.create", sessionId: first.sessionId, kind: "atelier.builtin/directory", creation: { id: "atelier.builtin/directory.create" }, input: { path: root }, position: { x: 0, y: 0 } });
     resourceId = created.workbench.objects.find(object => object.kind === "atelier.builtin/directory")!.id;
     const agentId = agentOf(first);
-    await execute(service, { type: "link.set", sessionId: first.sessionId, agentId, resourceId, linked: true });
+    await execute(service, { type: "link.set", sessionId: first.sessionId, receiverId: agentId, resourceId, linked: true });
     await execute(service, actionCommand(first.sessionId, agentId, ContinueAgent, { })); await settled(service);
     const nodes = service.sessions.tree.nodes(first.sessionId).map(flat);
     expect(nodes.filter(node => node.kind === "notice")).toEqual([]);
@@ -854,7 +854,7 @@ describe("会话运行时", () => {
     const created = await execute(service, { type: "resource.create", sessionId, kind: Directory.kind, creation: { id: "atelier.builtin/directory.create" },
       input: { path: root, title: "Captured directory" }, position: { x: 0, y: 0 } });
     resourceId = created.workbench.objects.find(object => object.kind === Directory.kind)!.id;
-    await execute(service, { type: "link.set", sessionId, agentId, resourceId, linked: true });
+    await execute(service, { type: "link.set", sessionId, receiverId: agentId, resourceId, linked: true });
     await execute(service, actionCommand(sessionId, agentId, ContinueAgent, { })); await executing;
     if (kind === "cancelled") await execute(service, actionCommand(sessionId, agentId, CancelAgent, { }));
     await settled(service);
@@ -1123,11 +1123,11 @@ describe("会话运行时", () => {
     const agentId = agentOf(first);
     const created = await execute(service, { type: "resource.create", sessionId, kind: "atelier.builtin/directory", creation: { id: "atelier.builtin/directory.create" }, input: { path: root }, position: { x: 0, y: 0 } });
     resourceId = created.workbench.objects.find(object => object.kind === "atelier.builtin/directory")!.id;
-    await execute(service, { type: "link.set", sessionId: sessionId, agentId: agentId, resourceId: resourceId, linked: true });
+    await execute(service, { type: "link.set", sessionId, receiverId: agentId, resourceId, linked: true });
     await execute(service, actionCommand(sessionId, agentId, ContinueAgent, { }));
     await started;
     try {
-      await execute(service, { type: "link.set", sessionId: sessionId, agentId: agentId, resourceId: resourceId, linked: false });
+      await execute(service, { type: "link.set", sessionId, receiverId: agentId, resourceId, linked: false });
     } finally { release(); }
     await settled(service);
     expect(requests).toBe(4);

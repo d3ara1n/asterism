@@ -32,30 +32,30 @@ export function AccessPanel() {
   const i18n = useI18n();
   const { session } = useWorkbench();
   const registry = useModuleViews();
-  const [mode, setMode] = useState<"agent" | "resource">("agent");
-  const [selectedAgent, setSelectedAgent] = useState("");
+  const [mode, setMode] = useState<"receiver" | "resource">("receiver");
+  const [selectedReceiver, setSelectedReceiver] = useState("");
   const [selectedResource, setSelectedResource] = useState("");
   const [query, setQuery] = useState("");
-  const agents = session.objects.filter(object => registry.resource(object.kind).receivesLinks === true);
-  const byAgent = mode === "agent";
-  const choices = byAgent ? agents : session.objects;
-  const selectedId = byAgent ? selectedAgent : selectedResource;
+  const receivers = session.objects.filter(object => registry.resource(object.kind).receivesLinks === true);
+  const byReceiver = mode === "receiver";
+  const choices = byReceiver ? receivers : session.objects;
+  const selectedId = byReceiver ? selectedReceiver : selectedResource;
   const selected = choices.find(object => object.id === selectedId) ?? choices[0];
   const search = query.trim().toLocaleLowerCase(i18n.locale);
-  const targets = (byAgent ? session.objects : agents).filter(object => object.id !== selected?.id
+  const targets = (byReceiver ? session.objects : receivers).filter(object => object.id !== selected?.id
     && `${object.title} ${i18n.text(registry.resource(object.kind).label)}`.toLocaleLowerCase(i18n.locale).includes(search));
   return <IslandPanel title={i18n.formatMessage(accessMessages.accessLabel)} toolbar={<>
     <ToggleGroup type="single" size="sm" aria-label={i18n.formatMessage(accessMessages.accessLabel)} value={mode} onValueChange={next => { if (next) { setMode(next as typeof mode); setQuery(""); } }}>
-      <ToggleGroupItem value="agent">{i18n.formatMessage(accessMessages.byAgent)}</ToggleGroupItem>
+      <ToggleGroupItem value="receiver">{i18n.formatMessage(accessMessages.byReceiver)}</ToggleGroupItem>
       <ToggleGroupItem value="resource">{i18n.formatMessage(accessMessages.byResource)}</ToggleGroupItem>
     </ToggleGroup>
-    <ResourcePicker objects={choices} selected={selected} onSelect={byAgent ? setSelectedAgent : setSelectedResource} label={byAgent ? i18n.formatMessage(accessMessages.accessRecipient) : i18n.formatMessage(accessMessages.accessTarget)} />
-    <SearchInput value={query} onChange={setQuery} label={byAgent ? i18n.formatMessage(objectsMessages.searchResources) : i18n.formatMessage(objectsMessages.searchObjects)} />
+    <ResourcePicker objects={choices} selected={selected} onSelect={byReceiver ? setSelectedReceiver : setSelectedResource} label={byReceiver ? i18n.formatMessage(accessMessages.accessRecipient) : i18n.formatMessage(accessMessages.accessTarget)} />
+    <SearchInput value={query} onChange={setQuery} label={byReceiver ? i18n.formatMessage(objectsMessages.searchResources) : i18n.formatMessage(objectsMessages.searchObjects)} />
   </>}>
-    {selected && <h3 className="type-section mb-2 break-words">{byAgent ? i18n.formatMessage(accessMessages.canAccess, { title: selected.title }) : i18n.formatMessage(accessMessages.accessibleBy, { title: selected.title })}</h3>}
+    {selected && <h3 className="type-section mb-2 break-words">{byReceiver ? i18n.formatMessage(accessMessages.canAccess, { title: selected.title }) : i18n.formatMessage(accessMessages.accessibleBy, { title: selected.title })}</h3>}
     {selected && targets.map(object => {
-      const agent = byAgent ? selected : object, resource = byAgent ? object : selected;
-      return <AccessRow key={`${agent.id}:${resource.id}`} agent={agent} resource={resource} object={object} />;
+      const receiver = byReceiver ? selected : object, resource = byReceiver ? object : selected;
+      return <AccessRow key={`${receiver.id}:${resource.id}`} receiver={receiver} resource={resource} object={object} />;
     })}
     {(!selected || !targets.length) && <p className="type-caption py-6 text-center">{query ? i18n.formatMessage(commonMessages.noMatches) : i18n.formatMessage(accessMessages.accessEmpty)}</p>}
     <Separator className="mt-5 mb-4" /><div className="space-y-2"><p className="type-caption">{i18n.formatMessage(accessMessages.accessRequestBoundary)}</p><p className="type-caption">{i18n.formatMessage(accessMessages.accessRules)}</p></div>
@@ -75,12 +75,12 @@ function ResourcePicker({ objects, selected, onSelect, label }: { objects: Workb
         </CommandItem>; })}
       </CommandGroup></CommandList></Command></PopoverContent></Popover></div>;
 }
-function AccessRow({ agent, resource, object }: { agent: WorkbenchObject; resource: WorkbenchObject; object: WorkbenchObject }) {
+function AccessRow({ receiver, resource, object }: { receiver: WorkbenchObject; resource: WorkbenchObject; object: WorkbenchObject }) {
   const i18n = useI18n();
   const { controller, session, ready, busy } = useWorkbench();
   const { state } = useSession(controller);
   const descriptor = useModuleViews().resource(object.kind);
-  const linked = session.links.some(link => link.agentId === agent.id && link.resourceId === resource.id);
+  const linked = session.links.some(link => link.receiverId === receiver.id && link.resourceId === resource.id);
   const [pending, setPending] = useState<{ desired: boolean } | null>(null);
   const [error, setError] = useState<UiText | null>(null);
   const [saved, setSaved] = useState<import("@atelier/sdk/contracts").UiText | null>(null);
@@ -92,13 +92,13 @@ function AccessRow({ agent, resource, object }: { agent: WorkbenchObject; resour
     const token = ++generation.current;
     submitting.current = true; setPending({ desired }); setError(null); setSaved(null);
     // 等待受理后的读取，而非等到期望值出现：继续或分叉可能已经覆盖这次变更。
-    const result = await controller.executeAndRead({ type: "link.set", sessionId: session.id, agentId: agent.id, resourceId: resource.id, linked: desired });
+    const result = await controller.executeAndRead({ type: "link.set", sessionId: session.id, receiverId: receiver.id, resourceId: resource.id, linked: desired });
     if (token !== generation.current) return;
     setPending(null); submitting.current = false;
     const current = controller.getSnapshot();
     if (result.ok) {
       if (current.status === "ready") {
-        const actual = current.snapshot?.workbench.links.some(link => link.agentId === agent.id && link.resourceId === resource.id) ?? false;
+        const actual = current.snapshot?.workbench.links.some(link => link.receiverId === receiver.id && link.resourceId === resource.id) ?? false;
         setSaved(actual === desired ? accessMessages.accessSaved : i18n.formatMessage(accessMessages.accessSuperseded));
       }
     } else if (current.status !== "error") {
@@ -106,7 +106,7 @@ function AccessRow({ agent, resource, object }: { agent: WorkbenchObject; resour
       setError(message);
     }
   };
-  const id = `access-${agent.id}-${resource.id}`;
+  const id = `access-${receiver.id}-${resource.id}`;
   return <div className="flex items-start gap-3 border-b py-3 last:border-0">
     <span className="pt-1 text-muted-foreground" aria-hidden="true">{descriptor.icon}</span>
     <div className="min-w-0 flex-1"><label htmlFor={id} className="type-section block cursor-pointer truncate">{object.title}</label>
@@ -118,6 +118,6 @@ function AccessRow({ agent, resource, object }: { agent: WorkbenchObject; resour
       </p>
       {error && <p role="alert" className="mt-1"><StatusText tone="error">{i18n.text(error)}</StatusText></p>}
     </div><Switch id={id} checked={pending?.desired ?? linked} disabled={!ready || busy || !!pending || state.status !== "ready"}
-      aria-label={i18n.formatMessage(accessMessages.changeAccess, { agent: agent.title, resource: resource.title })} aria-busy={!!pending} onCheckedChange={desired => { void change(desired); }} />
+      aria-label={i18n.formatMessage(accessMessages.changeAccess, { receiver: receiver.title, resource: resource.title })} aria-busy={!!pending} onCheckedChange={desired => { void change(desired); }} />
   </div>;
 }

@@ -131,11 +131,11 @@ export const historyMessages = pluginNamespace("atelier.host").messages("en", de
   },
   eventLinked: {
     id: "eventLinked",
-    defaultMessage: "Linked {resource} to {agent}",
+    defaultMessage: "Linked {resource} to {receiver}",
   },
   eventDetached: {
     id: "eventDetached",
-    defaultMessage: "Disconnected {resource} from {agent}",
+    defaultMessage: "Disconnected {resource} from {receiver}",
   },
   unknownRecord: {
     id: "unknownRecord",
