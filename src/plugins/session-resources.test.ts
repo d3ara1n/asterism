@@ -225,6 +225,7 @@ describe("Agent 创建与移除入口", () => {
     let calls: { name: string; args: Json }[] = [];
     const f = open({ adapter: adapter(() => calls) }), target = await model(f.app), actor = await f.session.create(Create, 0);
     expect(agentCreations.inspect(f.plugin, "atelier.builtin/agent.create").input).toHaveProperty("properties.resources");
+    expect(agentCreations.inspect(f.plugin, "atelier.builtin/agent.create").input).toHaveProperty("properties.expose_self.type", "boolean");
     expect(agentCreations.inspect(f.plugin, "atelier.builtin/note.create").input).toMatchObject({
       type: "object", additionalProperties: false, properties: { title: { type: "string" }, content: { type: "string" } },
     });
@@ -263,15 +264,16 @@ describe("Agent 创建与移除入口", () => {
     expect(JSON.stringify(result.tools[0]!.model)).not.toContain("PRIVATE_AGENT_INSTRUCTIONS");
   });
 
-  // 依据显式初始链接契约：只链接指定资源；创建、调用者链接与新代理接收的链接一次提交，源链接保留。
-  it("创建代理时附带选定资源，下一请求可发现新代理", async () => {
+  // 依据显式初始链接与自身授权契约：省略或 false 不暴露自身，true 仅额外链接绑定的发起者，源链接保留。
+  it.each([undefined, false, true])("创建代理时附带选定资源与自身授权 %s，下一请求可发现新代理", async exposeSelf => {
     let calls: { name: string; args: Json }[] = [];
     const f = open({ adapter: adapter(() => calls) }), target = await model(f.app);
     const actor = await f.session.create(Create, 0), shared = await f.session.create(Create, 1), other = await f.session.create(Create, 2);
     f.session.link(actor, shared); f.session.link(actor, other);
     calls = [{ name: "resource_create", args: {
       creation_id: "atelier.builtin/agent.create",
-      input: { selection: { agent: "worker", model: null, thinking: null }, resources: [shared.id, shared.id] },
+      input: { selection: { agent: "worker", model: null, thinking: null }, resources: [shared.id, shared.id],
+        ...(exposeSelf === undefined ? {} : { expose_self: exposeSelf }) },
     } }];
     const run = runner(f, actor, target), result = await run();
     expect(result.tools[0]?.kind).toBe("succeeded");
@@ -279,9 +281,50 @@ describe("Agent 创建与移除入口", () => {
     expect(f.app.sessions.snapshot(f.sessionId).workbench.links).toEqual([
       { receiverId: actor.id, resourceId: shared.id }, { receiverId: actor.id, resourceId: other.id },
       { receiverId: actor.id, resourceId: child }, { receiverId: child, resourceId: shared.id },
+      ...(exposeSelf ? [{ receiverId: child, resourceId: actor.id }] : []),
     ]);
     calls = [{ name: "resource_list", args: {} }];
     expect((await run()).tools[0]?.data).toMatchObject({ resources: expect.arrayContaining([expect.objectContaining({ resource_id: child })]) });
+  });
+
+  // 依据自身授权与初始资源的独立范围：expose_self 只提供绑定身份，不能把任意未授权 ID 加入 resources。
+  it("暴露自身不扩大初始资源列表的授权范围", async () => {
+    let resourceId = "";
+    const f = open({ adapter: adapter(() => [{ name: "resource_create", args: {
+      creation_id: "atelier.builtin/agent.create",
+      input: { selection: { agent: "worker", model: null, thinking: null }, expose_self: true, resources: [resourceId] },
+    } }]) });
+    const target = await model(f.app), actor = await f.session.create(Create, 0), other = await f.session.create(Create, 1);
+    const before = f.app.sessions.snapshot(f.sessionId);
+    const run = runner(f, actor, target);
+    for (const id of [actor.id, other.id]) {
+      resourceId = id;
+      expect((await run()).tools[0]).toMatchObject({ kind: "rejected", error: { code: "access_denied" } });
+    }
+    const after = f.app.sessions.snapshot(f.sessionId);
+    expect(after.nodes).toEqual(before.nodes);
+    expect(after.workbench).toEqual(before.workbench);
+  });
+
+  // 依据 SDK 自身授权与原子创建契约：第三方入口可选择 exposeSelf，目标不接收链接时创建及反向链接一起回滚。
+  it("自身授权的目标不支持接收链接时整体回滚", async () => {
+    const extra = pluginNamespace("test.expose");
+    const f = open({
+      plugins: [definePlugin({ namespace: extra, version: "1", modules: [
+        defineAgentCreation({ id: extra.name("note"), creation: CreateNote, description: "Create an exposed note.",
+          inputSchema: CreateNote.schema, toInput: input => input,
+          toOptions: () => ({ exposeSelf: true }) }),
+      ] })],
+      adapter: adapter(() => [{ name: "resource_create", args: {
+        creation_id: extra.name("note"), input: { title: "Rejected note", content: "temporary" },
+      } }]),
+    });
+    const target = await model(f.app), actor = await f.session.create(Create, 0);
+    const before = f.app.sessions.snapshot(f.sessionId);
+    expect((await runner(f, actor, target)()).tools[0]?.kind).toBe("rejected");
+    const after = f.app.sessions.snapshot(f.sessionId);
+    expect(after.nodes).toEqual(before.nodes);
+    expect(after.workbench).toEqual(before.workbench);
   });
 
   // 依据请求固定授权：已知未授权 ID 和模型请求过程中新增的链接都不能成为本批次初始授权。

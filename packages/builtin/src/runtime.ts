@@ -36,13 +36,15 @@ export function createBuiltin(options: { application: BuiltinApplication; connec
           inputSchema: agentCreateSchema.extend({
             resources: z.array(z.string().min(1)).optional()
               .describe("IDs of resources to authorize for the new Agent, drawn from your current request's linked resources. Defaults to an empty list."),
+            expose_self: z.boolean().optional()
+              .describe("Authorize the new Agent to access you as a resource. Your identity is supplied by the host. Defaults to false."),
           }).describe("Agent configuration selection, optional title, and initial resource links."),
-          toInput: ({ resources: _resources, ...input }) => input,
-          toOptions: ({ resources }) => ({ resources }),
+          toInput: ({ resources: _resources, expose_self: _exposeSelf, ...input }) => input,
+          toOptions: ({ resources, expose_self }) => ({ resources, exposeSelf: expose_self }),
           guidelines: [
-            "selection.agent identifies an agent configuration. agent_list returns available configuration IDs, names, descriptions, and task examples.",
-            "Null model and thinking selections use that configuration's defaults.",
-            "resources contains the initial resources authorized for the new Agent. resource_list returns your linked resource IDs. Creation and initial links are committed together.",
+            "agent_list returns available agent configurations and their purposes.",
+            "resource_list returns your linked resource IDs.",
+            "Creation and all initial links are committed together. The new Agent uses its own configuration's tool policy.",
           ] }),
         defineAgentCreation({ id: builtin.name("note.create"), creation: CreateNote,
           description: "Create a note with a title and optional initial text.",

@@ -148,7 +148,7 @@ headers 来源需要消费者持有自己的模型调用结果，因此自然用
 - `plugin.session(id)` 取得指定会话的执行门面。`session.create(CreationContract, input, { signal?, content?, linkTo?, resources? })` 引用已装配的真实声明实例，允许调用其他插件公开的契约；输入由资源提供方校验和初始化，成功返回 `ResourceCreationResult`（API 10.2）：包含 `ResourceRef` 的全部字段及创建事务内捕获的通用 `title`，不返回资源私有数据或执行门面。标题由资源创建实现决定，创建输入是否含标题字段由各契约定义。`resources`（API 10.1）为新资源接收的初始 `ResourceRef` 列表。
 - `create` 的异步准备参与调用插件及资源提供方的关闭收束。准备期间阻止会话游标回溯，提交时重验会话、执行作用域与初始链接的全部端点；失败或取消不提交创建。`linkTo / resources` 与身份、初始数据和创建事件同事务写入。后台位置复用工作台空位算法，按已保存尺寸或公共回退尺寸安排，不要求调用者提供画布坐标。内容资格交接见 [不可变内容](content.md#临时占用与提交)。
 - `session.link(receiver, resource)`、`session.unlink(receiver, resource)` 使用完整资源引用，校验双方属于当前会话和当前路径、类型一致且接收者支持链接。接收者的后台声明为 `ResourceContribution.links.receive`，前端静态描述通过 `ResourceDescription.receivesLinks` 表达同一资格；关系语义见 [资源链接](object-model.md#资源链接宿主公共关系)。`session.remove(resource)` 与前端共用宿主移除操作；对象生命周期语义见 [资源](object-model.md#resource可被操作的对象)。
-- 顶层工具的 `context.session` 固定执行会话和发起对象，`create(contract, input, { resources? })` 自动将新资源链接给发起者，返回同一 `ResourceCreationResult`；可选 `resources`（API 10.1）接收本请求有效链接范围内的资源 ID。`remove(resourceId)` 采用同一请求范围，并在提交时验证当前存在性与收束。模型创建的完整规则见 [Agent 创建与移除](runtime.md#agent-创建与移除)。普通 `ObjectReader.session` 仍为只读。
+- 顶层工具的 `context.session` 固定执行会话和发起对象，`create(contract, input, { resources?, exposeSelf? })` 自动将新资源链接给发起者，返回同一 `ResourceCreationResult`；可选 `resources`（API 10.1）接收本请求有效链接范围内的资源 ID。`exposeSelf`（API 11.2）省略为 `false`，为 `true` 时由宿主将绑定的发起者作为新资源接收的初始资源，与创建及全部链接原子提交；接收资格与端点校验沿用同一创建管线。`remove(resourceId)` 采用本请求有效链接范围，并在提交时验证当前存在性与收束。模型创建的完整规则见 [Agent 创建与移除](runtime.md#agent-创建与移除)。普通 `ObjectReader.session` 仍为只读。
 - `plugin.signal` 在装配失败或开始关闭时取消，用于撤销插件自有公共登记；取消不代表活动已结束。宿主保留在途执行所需的提交设施，等待其真实收束后才释放，不因该信号提前阻断最终记录保存。
 
 ### 后台资源动作（API 11.1）

@@ -19,5 +19,9 @@ export const agentOverridesSchema = agentFieldsSchema.partial().extend({ name: o
 
 export type AgentConfiguration = z.infer<typeof agentSchema>;
 export type AgentOverrides = z.infer<typeof agentOverridesSchema>;
-export const agentSelectionSchema = z.strictObject({ agent: id, model: modelExpressionSchema.nullable(), thinking: thinkingSchema.nullable() });
+export const agentSelectionSchema = z.strictObject({
+  agent: id.describe("ID of the configuration supplying this Agent's instructions and tool policy."),
+  model: modelExpressionSchema.nullable().describe("Model for this Agent as provider/model. Null uses the model resolved from its configuration."),
+  thinking: thinkingSchema.nullable().describe("Thinking level for this Agent. Null uses the default resolved from its configuration."),
+}).describe("The Agent's base configuration and per-instance model settings.");
 export type AgentSelection = z.infer<typeof agentSelectionSchema>;

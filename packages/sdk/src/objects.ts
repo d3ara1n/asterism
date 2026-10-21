@@ -51,7 +51,11 @@ export interface SessionExecutor extends SessionReader {
 }
 /** 工具调用绑定的会话操作：创建后链接给发起者，移除限定于请求开始时的链接集合。 */
 export interface ToolSession extends SessionReader {
-  create<I, S extends Json, O extends Json>(contract: CreationContract<I, S, O>, input: NoInfer<I> & Json, options?: { resources?: readonly string[] }): Promise<ResourceCreationResult>;
+  create<I, S extends Json, O extends Json>(contract: CreationContract<I, S, O>, input: NoInfer<I> & Json, options?: {
+    resources?: readonly string[];
+    /** 将绑定的发起者链接给新资源，与创建原子提交；省略为 false。 */
+    exposeSelf?: boolean;
+  }): Promise<ResourceCreationResult>;
   remove(resourceId: string): void;
 }
 export interface ObjectReader {

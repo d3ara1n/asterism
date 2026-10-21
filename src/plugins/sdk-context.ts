@@ -373,6 +373,7 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
         create: ((contract, input, options = {}) => {
           check();
           const resources = [...new Set(options.resources ?? [])].map(authorized);
+          if (options.exposeSelf === true) resources.push(ref);
           return source.create(contract, input, { signal, linkTo: ref, resources });
         }) as ToolSession["create"],
         remove(resourceId: string) {

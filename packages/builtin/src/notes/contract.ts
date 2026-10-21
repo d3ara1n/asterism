@@ -7,7 +7,10 @@ import { textReadSchema, textChangeSchema } from "../shared/text-contract.ts";
 export const MAX_NOTE_LENGTH = 100_000;
 export const Note = builtin.resource("note", z.object({}));
 export const CreateNote = defineCreation(Note, { id: builtin.name("note.create"),
-  schema: z.strictObject({ title: z.string().trim().min(1).max(160).default("Untitled note"), content: z.string().max(MAX_NOTE_LENGTH).default("") }),
+  schema: z.strictObject({
+    title: z.string().trim().min(1).max(160).default("Untitled note").describe("Display title for the new note."),
+    content: z.string().max(MAX_NOTE_LENGTH).default("").describe("Initial editable text stored in the note. Defaults to empty."),
+  }).describe("Note title and initial text."),
 });
 export const NoteContent = builtin.data("note.content", z.strictObject({ text: z.string().max(MAX_NOTE_LENGTH) }));
 export const NoteView = builtin.data("note.card", z.strictObject({ text: z.string().nullable() }));
