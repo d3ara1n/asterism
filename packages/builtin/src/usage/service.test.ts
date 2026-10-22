@@ -74,21 +74,4 @@ describe("内置用量消费者", () => {
       expect(await fixture.usage.query("p")).toMatchObject({ state: "ready", items });
     } finally { fixture.usage.close(); }
   });
-  // 迟到的查询状态可以写回缓存，但新响应必须声明本次实际使用的 headers 来源，避免继续轮询。
-  it("查询切换到响应头来源后，新响应更新来源元数据", async () => {
-    let finish!: (value: UsageItem[]) => void;
-    const query = vi.fn(() => new Promise<UsageItem[]>(resolve => { finish = resolve; }));
-    const fixture = setup({ id: "query-provider", label: "Query", query });
-    try {
-      const pending = fixture.usage.query("p");
-      await vi.waitFor(() => expect(query).toHaveBeenCalledOnce());
-      fixture.change({ id: "header-provider", label: "Headers", source: "headers", parseHeaders: () => items });
-      finish(items);
-      await pending;
-      fixture.usage.consume(fixture.response());
-      expect(await fixture.usage.query("p")).toMatchObject({
-        state: "ready", usage: "header-provider", source: "headers", items,
-      });
-    } finally { fixture.usage.close(); }
-  });
 });

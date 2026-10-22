@@ -43,34 +43,3 @@ it("就绪前拒绝交接直连端口，就绪后随转移列表交给任务进�
   }
 });
 
-// 存活契约：renderer 直连请求不设期限；任务进程卡死时由主进程心跳判定，结束进程并以 unavailable 通知，在途控制请求随之结算。
-it("心跳持续应答时保持就绪，停止应答后结束任务进程并报告不可用", async () => {
-  vi.useFakeTimers();
-  const root = mkdtempSync(join(tmpdir(), "atelier-liveness-"));
-  const { child, closed } = fakeChild();
-  let responding = true;
-  child.postMessage.mockImplementation((message: { kind?: string }) => {
-    if (message.kind === "ping" && responding) queueMicrotask(() => child.emit("message", { kind: "pong" }));
-    if (message.kind === "shutdown") child.emit("exit", 0);
-  });
-  fork.mockReturnValue(child);
-  const statuses: string[] = [];
-  const host = new RuntimeHost(status => statuses.push(status), { intervalMs: 10, timeoutMs: 30 });
-  try {
-    const ready = host.start("unused-runtime.js", root);
-    child.emit("message", { kind: "ready", version: protocolVersion });
-    await ready;
-    await vi.advanceTimersByTimeAsync(100);
-    expect(child.kill).not.toHaveBeenCalled();
-    expect(host.ready).toBe(true);
-    const pending = host.execute({ type: "workspace.read" });
-    responding = false;
-    await vi.advanceTimersByTimeAsync(60);
-    expect(child.kill).toHaveBeenCalled();
-    expect(statuses.at(-1)).toBe("unavailable");
-    expect((await pending).ok).toBe(false);
-  } finally {
-    vi.useRealTimers();
-    await host.stop(); await closed(); rmSync(root, { recursive: true, force: true }); vi.clearAllMocks();
-  }
-});

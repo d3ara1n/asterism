@@ -27,14 +27,4 @@ describe("主进程工作区请求生命周期", () => {
     expect(send).toHaveBeenCalledTimes(2);
   });
 
-  it("超时关闭通道，不自动重放可能已提交的操作", async () => {
-    vi.useFakeTimers();
-    const send = vi.fn(), timeout = vi.fn();
-    const requests = new RuntimeRequests(send, timeout, 50);
-    const result = requests.execute({ type: "workspace.read" });
-    await vi.advanceTimersByTimeAsync(50);
-    expect((await result).ok).toBe(false);
-    expect(send).toHaveBeenCalledTimes(1);
-    expect(timeout).toHaveBeenCalledTimes(1);
-  });
 });

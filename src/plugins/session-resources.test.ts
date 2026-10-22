@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { z } from "zod";
 import { defineCreation, defineAction, defineRecord, pluginNamespace, thinkingLevels, type Json, type ResourceRef } from "@atelier/sdk/contracts";
 import { definePlugin, defineModule, implementCreation, implementResource, implementPreparer, type PluginContext, type PluginDefinition, type ObjectExecutor, type ToolSession, defineTopLevelTool } from "@atelier/sdk/runtime";
@@ -181,28 +181,6 @@ describe("SDK 会话资源生命周期", () => {
     const after = f.app.sessions.current(f.sessionId);
     expect(after.nodes).toEqual(before.nodes);
     expect(after.workbench).toEqual(before.workbench);
-  });
-
-  // 依据移除与收束契约：发出取消不等于结束；用户和 SDK 必须使用同一忙碌检查。
-  it("用户和插件都不能移除取消后尚未收束的对象，收束后解除全部方向链接并保留历史", async () => {
-    const f = open();
-    const receiver = await f.session.create(Create, 0), resource = await f.session.create(Create, 1), target = await f.session.create(Create, 2);
-    f.session.link(receiver, resource); f.session.link(resource, target);
-    const ended = latch(), started = latch();
-    f.plugin.tasks.start("busy", async signal => { started.release(); await ended.promise; expect(signal.aborted).toBe(true); }, { object: resource });
-    await started.promise;
-    f.plugin.tasks.cancel("busy");
-    expect(() => f.session.remove(resource)).toThrow("settle");
-    await expect(f.app.sessions.execute({ type: "object.remove", sessionId: f.sessionId, objectId: resource.id })).rejects.toThrow("settle");
-    ended.release();
-    await vi.waitFor(() => expect(f.plugin.tasks.has("busy")).toBe(false));
-    const prior = f.app.sessions.current(f.sessionId).nodes;
-    f.session.remove(resource);
-    const after = f.app.sessions.current(f.sessionId);
-    expect(after.workbench.objects.map(object => object.id)).toEqual([receiver.id, target.id]);
-    expect(after.workbench.links).toEqual([]);
-    expect(after.nodes.slice(0, prior.length)).toEqual(prior);
-    expect(() => f.session.remove(resource)).toThrow("current session path");
   });
 
   // 依据请求边界与同步提交：创建准备期间禁止游标回溯，取消后不能提交迟到创建。

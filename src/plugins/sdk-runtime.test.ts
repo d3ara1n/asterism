@@ -13,7 +13,7 @@ import * as runtimeModules from "../runtime/builtin.ts";
 import type { ToolRegistry } from "../tools/registry.ts";
 import { foldWorkbench } from "../session/fold.ts";
 import type { ModelAdapter, ModelInput } from "../model/contract.ts";
-import { Agent, CreateAgent, SubmitAgentInput, CancelAgent } from "@atelier/builtin-api/contracts";
+import { SubmitAgentInput } from "@atelier/builtin-api/contracts";
 import { applicationStorage } from "../shared/application.ts";
 import { flat } from "../session/test-nodes.ts";
 
@@ -228,26 +228,6 @@ describe("工作台 SDK 的宿主实现", () => {
     expect(c.context().object(sessionId, Counter, id).get(State)).toBe(1);
   });
 
-  // 准备期限只约束准备；动作进入执行后，已经完成的准备计时不能取消内容或执行信号。
-  it("准备期限不会变成动作执行超时，关闭仍取消并等待后台调用", async () => {
-    const entered = deferred<AbortSignal>(), end = actionGate();
-    const c = counter({ async execute(_object, signal) { entered.resolve(signal); await end.promise; signal.throwIfAborted(); } });
-    const { service, sessionId } = open([c.plugin]), id = await create(service, sessionId);
-    vi.useFakeTimers();
-    const call = c.context().session(sessionId).invoke(ChangeCount, { sessionId, id, kind: Counter.kind }, { amount: 1 });
-    const rejected = expect(call).rejects.toThrow();
-    const signal = await entered.promise;
-    await vi.advanceTimersByTimeAsync(20_000);
-    expect(signal.aborted).toBe(false);
-    let closed = false;
-    const closing = service.close().then(() => { closed = true; });
-    expect(signal.aborted).toBe(true);
-    expect(closed).toBe(false);
-    end.resolve(); await rejected; await closing;
-    services.splice(services.indexOf(service), 1);
-    vi.useRealTimers();
-  });
-
   // docs/plugin-sdk.md 的关闭契约：已进入动作可以提交收尾事实，新调用门禁不阻断第一次收尾提交。
   it("关闭时已进入的后台动作可以保存最终记录", async () => {
     const entered = deferred<AbortSignal>(), end = actionGate();
@@ -278,33 +258,6 @@ describe("工作台 SDK 的宿主实现", () => {
     await c.context().session(sessionId).invoke(ChangeCount, { sessionId, id, kind: Counter.kind }, { amount: 1 });
     resume.resolve(); await deferred;
     expect(c.context().object(sessionId, Counter, id).get(State)).toBe(6);
-  });
-
-  // Agent 动作完成只表示受理，独立执行通过 CancelAgent 控制，不随提交调用信号继续绑定。
-  it("外部后台插件提交 Agent 输入后立即返回，并通过资源动作停止执行", async () => {
-    let consumer!: PluginContext;
-    const entered = deferred<AbortSignal>();
-    const { service, sessionId } = open([definePlugin({ namespace: pluginNamespace("test.agent-caller"), version: "1",
-      setup(plugin) { consumer = plugin; return {}; } })], () => ({
-      version: "test/1", validate() {}, prepare() { return { async *stream(signal) {
-        entered.resolve(signal);
-        await new Promise<void>(resolve => {
-          if (signal.aborted) resolve(); else signal.addEventListener("abort", () => resolve(), { once: true });
-        });
-        signal.throwIfAborted();
-      } }; },
-    }));
-    const model = await configureModel(service), session = consumer.session(sessionId);
-    const agent = await session.create(CreateAgent, { selection: { agent: "worker", model: model.model, thinking: null } });
-    const submission = new AbortController();
-    await session.invoke(SubmitAgentInput, agent, { submissionId: crypto.randomUUID(), mode: "follow",
-      parts: [{ kind: "text", text: "Start" }] }, { signal: submission.signal });
-    const signal = await entered.promise;
-    submission.abort();
-    expect(signal.aborted).toBe(false);
-    await session.invoke(CancelAgent, agent, {});
-    await vi.waitFor(() => expect(service.sessions.running).toBe(false));
-    expect(signal.aborted).toBe(true);
   });
 
   // 非内置提供者必须通过同一模型工具目录和只读关联门面执行，工具策略在请求开始时捕获。

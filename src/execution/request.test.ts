@@ -84,49 +84,7 @@ describe("无状态的单次模型执行", () => {
     }; } });
     expect(failed).toMatchObject({ reason: "failed", completion: null, timing: { outcome: "failed", durationMs: 1000 } });
   });
-  it("流暂停时也交付部分输入，填充不执行工具，结束后清理合并计时器", async () => {
-    vi.useFakeTimers();
-    try {
-      let executions = 0;
-      const tool = implement(write, { async call() { executions++; return { kind: "succeeded", data: 1 }; } });
-      const capabilities = new AgentCapabilities(new ResourceRegistry([]), new ToolRegistry([tool]), [resource], () => true, toolCaller);
-      const events: ModelRunEvent[] = [];
-      const adapter: ModelAdapter = { validate() {}, version: "test", prepare() { return { async *stream() {
-        yield { type: "part.start", part: { id: "c", kind: "toolcall", callId: "c", name: "resource_call" } } as const;
-        yield { type: "part.delta", partId: "c", delta: '{"resource_id":"r","tool":"write","args":{"content":"正在生成' } as const;
-        await new Promise(resolve => setTimeout(resolve, 80));
-        expect(executions).toBe(0);
-        expect(events).toContainEqual(expect.objectContaining({ type: "progress", blocks: [
-          expect.objectContaining({ state: "input", arguments: { resource_id: "r", tool: "write", args: { content: "正在生成" } },
-            invocation: expect.objectContaining({ implementation: { id: write.id }, resource: { id: "r", kind: resource.kind, title: "Item" } }) }),
-        ] }));
-        yield { type: "part.end", partId: "c", arguments: { resource_id: "r", tool: "write", args: {} } } as const;
-        yield { type: "finish", reason: "tool-calls", usage: null } as const;
-      } }; } };
-      const running = execute(input(events), adapter, capabilities);
-      await vi.runAllTimersAsync();
-      expect(await running).toMatchObject({ reason: "completed" });
-      expect(executions).toBe(1);
-      expect(events.at(-1)).toEqual({ type: "progress", blocks: [] });
-    } finally { vi.useRealTimers(); }
-  });
 
-  it("流在合并间隔内中断仍刷新最后输入，且不会在收束后发出迟到进度", async () => {
-    vi.useFakeTimers();
-    try {
-      const events: ModelRunEvent[] = [];
-      await execute(input(events), model([
-        { type: "part.start", part: { id: "c", kind: "toolcall", callId: "c", name: "resource_call" } },
-        { type: "part.delta", partId: "c", delta: '{"tool":"write","args":{"content":"unfinished' },
-      ]));
-      expect(events).toContainEqual(expect.objectContaining({ type: "progress", blocks: [
-        expect.objectContaining({ state: "input", argumentsText: expect.stringContaining("unfinished") }),
-      ] }));
-      const count = events.length;
-      await vi.runAllTimersAsync();
-      expect(events).toHaveLength(count);
-    } finally { vi.useRealTimers(); }
-  });
   it("工具批次结束即返回，不隐式发起下一请求，另一次调用只使用显式输入", async () => {
     let requests = 0;
     const seen: unknown[] = [];

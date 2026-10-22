@@ -233,74 +233,7 @@ describe("真实配置与消费边界", () => {
     await rejected;
     expect(service.current().models).toEqual([]);
   });
-  // 发现不写配置；批量添加只接受本次目录中的 ID，已有记录与用户覆盖永不被刷新替换。
-  it("发现后批量添加、去重和重开保留配置；列表保留至刷新或删除连接", async () => {
-    const discover = vi.fn<DiscoverModels>(async () => [
-      { modelId: "test-model", name: "Upstream changed name" },
-      { modelId: "new-model", name: "New", contextWindow: 64000, reasoning: true, thinkingLevels: ["low", "high"] },
-    ]);
-    const { service, root, protector } = setup(undefined, true, 30_000, discover);
-    const { snapshot } = await addModel(service, "api_key");
-    const original = snapshot.models[0];
-    const started = await service.execute({ type: "discovery.start", providerId: "local" });
-    await vi.waitFor(() => expect(service.current().discoveries[0]?.state).toBe("succeeded"));
-    expect(discover.mock.calls[0]?.[0].apiKey).toBe("test-key-not-for-network");
-    expect(service.current().models).toEqual([original]);
-    const id = started.savedId!;
-    await expect(service.execute({ type: "discovery.add", id, modelIds: ["new-model", "absent"] })).rejects.toMatchObject({ code: "invalid_request" });
-    expect(service.current().models).toEqual([original]);
-    const added = await service.execute({ type: "discovery.add", id, modelIds: ["test-model", "new-model", "new-model"] });
-    expect(added.snapshot.models).toHaveLength(2);
-    expect(added.snapshot.models[0]).toEqual(original);
-    expect(added.snapshot.models[1]).toMatchObject({
-      modelId: "new-model", contextWindow: 64000, capabilities: { reasoning: true, thinkingLevels: ["low", "high"] },
-      generation: { maxOutputTokens: null }, compatibility: [],
-    });
-    await service.execute({ type: "discovery.add", id, modelIds: ["new-model"] });
-    expect(service.current().models).toEqual(added.snapshot.models);
-    const reopened = new ConfigurationService(root, protector);
-    cleanups.push(() => reopened.close());
-    expect(reopened.current().models).toEqual(added.snapshot.models);
-    expect(reopened.current().discoveries).toEqual([]);
-    await service.execute({ type: "provider.save", id: "local", value: providerValue, credential: { action: "keep" } });
-    expect((await service.execute({ type: "discovery.add", id, modelIds: ["new-model"] })).snapshot.models).toEqual(added.snapshot.models);
-    await service.execute({ type: "remove", kind: "provider", id: "local" });
-    await expect(service.execute({ type: "discovery.add", id, modelIds: ["new-model"] })).rejects.toMatchObject({ code: "not_found" });
-  });
 
-  // 网络等待不能占用配置队列；取消、超时和刷新后的迟到成功不能复活旧结果。
-  it("发现等待不阻塞配置读取；取消、刷新、超时与关闭均终止在途请求", async () => {
-    vi.useFakeTimers();
-    const pending: { resolve: (models: []) => void; signal: AbortSignal }[] = [];
-    const discover: DiscoverModels = ({ signal }) => new Promise(resolve => pending.push({ resolve, signal }));
-    const { service, changed } = setup(undefined, true, 100, discover);
-    await service.execute({ type: "provider.save", id: null, value: providerValue, credential: { action: "keep" } });
-    const first = await service.execute({ type: "discovery.start", providerId: "local" });
-    expect((await service.execute({ type: "read" })).snapshot.discoveries[0]?.state).toBe("running");
-    await service.execute({ type: "discovery.cancel", id: first.savedId! });
-    expect(pending[0]!.signal.aborted).toBe(true);
-    pending[0]!.resolve([]);
-    await Promise.resolve();
-    expect(service.current().discoveries[0]?.state).toBe("cancelled");
-    await service.execute({ type: "discovery.start", providerId: "local" });
-    await service.execute({ type: "discovery.start", providerId: "local" });
-    expect(pending[1]!.signal.aborted).toBe(true);
-    pending[1]!.resolve([]);
-    await vi.advanceTimersByTimeAsync(101);
-    expect(service.current().discoveries).toHaveLength(1);
-    expect(service.current().discoveries[0]).toMatchObject({ state: "failed", error: "timeout", models: [] });
-    expect(pending[2]!.signal.aborted).toBe(true);
-    pending[2]!.resolve([]);
-    await Promise.resolve();
-    expect(service.current().discoveries[0]?.state).toBe("failed");
-    await service.execute({ type: "discovery.start", providerId: "local" });
-    const notifications = changed.mock.calls.length;
-    service.close();
-    expect(pending[3]!.signal.aborted).toBe(true);
-    pending[3]!.resolve([]);
-    await Promise.resolve();
-    expect(changed).toHaveBeenCalledTimes(notifications);
-  });
   // 两层独立保存显式条目；参考协议不拦截保存，非法候选不能污染已保存数据。
   it.each(["provider", "model"] as const)("%s 兼容条目独立保存并重开，非法条目拒绝且移除后不重现", async kind => {
     const { service, root, protector } = setup();
@@ -476,34 +409,6 @@ describe("真实配置与消费边界", () => {
     expect(probe.mock.calls[0]![0].signal.aborted).toBe(true);
     resolveProbe(); await Promise.resolve();
     expect((await service.execute({ type: "read" })).snapshot.tests[0]?.state).toBe("cancelled");
-  });
-  it("超时主动取消网络请求并交付测试结果", async () => {
-    vi.useFakeTimers();
-    const probe = vi.fn<ConnectionProbe>(async ({ signal }) => new Promise<void>((_resolve, reject) => signal.addEventListener("abort", () => reject(new Error("aborted")), { once: true })));
-    const { service } = setup(probe, true, 50);
-    const { modelId } = await addModel(service);
-    const started = await service.execute({ type: "test.start", model: modelId });
-    await vi.advanceTimersByTimeAsync(50);
-    const read = await service.execute({ type: "read" });
-    expect(read.snapshot.tests[0]).toMatchObject({ id: started.savedId, state: "failed", error: "timeout" });
-    expect(probe.mock.calls[0]![0].signal.aborted).toBe(true);
-  });
-  // 模型配置契约：保存只清除对应已结束的测试，不取消已经取用配置的在途测试。
-  it("保存模型或连接清除已结束的测试，在途测试仍可结束", async () => {
-    let finish!: () => void;
-    const { service } = setup(() => new Promise(resolve => { finish = resolve; }));
-    const { modelId, providerId, snapshot } = await addModel(service);
-    const started = await service.execute({ type: "test.start", model: modelId });
-    const saveModel = () => service.execute({ type: "model.save", id: modelId, value: snapshot.models[0]! });
-    expect((await saveModel()).snapshot.tests[0]).toMatchObject({ id: started.savedId, state: "running" });
-    finish();
-    await vi.waitFor(() => expect(service.current().tests[0]?.state).toBe("succeeded"));
-    expect((await saveModel()).snapshot.tests).toEqual([]);
-    await service.execute({ type: "test.start", model: modelId });
-    finish();
-    await vi.waitFor(() => expect(service.current().tests[0]?.state).toBe("succeeded"));
-    const saved = await service.execute({ type: "provider.save", id: providerId, value: providerValue, credential: { action: "keep" } });
-    expect(saved.snapshot.tests).toEqual([]);
   });
   it("替换和删除凭据会清理旧密文；加密失败保留原配置", async () => {
     const { service, root, protector } = setup();

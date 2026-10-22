@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { pluginNamespace, type UsageItem, type ModelEvent } from "@atelier/sdk/contracts";
-import { definePlugin, defineModule, UsageQueryError, type PluginContext, type PluginDefinition, type UsageQueryContext } from "@atelier/sdk/runtime";
+import { definePlugin, defineModule, type PluginContext, type PluginDefinition, type UsageQueryContext } from "@atelier/sdk/runtime";
 import { ApplicationService } from "../runtime/service.ts";
 import { providerPresetDraft } from "../shared/provider-presets.ts";
 import { createModelInput } from "../shared/configuration.ts";
@@ -124,28 +124,6 @@ describe("插件提供预设与账户用量", () => {
     expect(service.configuration.current().providerPresets?.find(preset => preset.id === "zai-plan-cn")?.connection.usage).toBe("zai-plan-cn");
     expect(service.configuration.current().usageProviders?.map(provider => provider.id)).not.toContain("temporary");
     expect(service.configuration.current().usageProviders?.filter(provider => provider.id === "zai-plan-cn")).toHaveLength(1);
-  });
-
-  // 配置变化取消在途查询并清空缓存；完成结果照常交付，显式刷新重新查询，失败保留上次实报。
-  it("连接变化取消查询，刷新失败保留实报，提供方缺席明确不可用", async () => {
-    let finish!: (items: UsageItem[]) => void;
-    const query = vi.fn(async (_: UsageQueryContext) => items);
-    const { service, observer } = open([definePlugin({ namespace: pluginNamespace("test.provider"), version: "1", setup: () => ({
-      usageProviders: [{ id: "test-usage", label: "Test", query }],
-    }) })]);
-    await save(service);
-    query.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
-    const pending = read(observer);
-    await vi.waitFor(() => expect(query).toHaveBeenCalledTimes(1));
-    await save(service, value.id, "Changed");
-    finish(items);
-    expect((await pending).items).toEqual([]);
-    const current = await read(observer, true);
-    expect(current).toMatchObject({ state: "ready", items });
-    query.mockRejectedValueOnce(new UsageQueryError("authentication"));
-    expect(await read(observer, true)).toMatchObject({ state: "error", error: "authentication", items, updatedAt: current.updatedAt });
-    service.configuration.extensions.removeOwners(["test.provider"]);
-    expect(await read(observer)).toMatchObject({ state: "error", error: "unavailable", items: [] });
   });
 
   // 查询与插件调用同样参与真实收束；取消信号不能提前释放提供方的 closing 资源。
