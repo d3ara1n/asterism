@@ -30,7 +30,7 @@ export function DirectoryInput({ initialInput, busy, resolve, cancel }: Creation
       setBrowseError(filesystemMessages.directoryBrowseFailed);
     } finally { setBrowsing(false); }
   };
-  return <CreationForm busy={busy || browsing} onCancel={cancel}
+  return <CreationForm busy={busy} disabled={browsing} onCancel={cancel}
     onSubmit={() => resolve({ path: path.trim(), ...(title.trim() ? { title: title.trim() } : {}) })}>
     <Field>
       <FieldLabel htmlFor="directory-title">{i18n.formatMessage(commonMessages.name)}</FieldLabel>
@@ -42,7 +42,7 @@ export function DirectoryInput({ initialInput, busy, resolve, cancel }: Creation
         <Input id="directory-path" maxLength={4096} spellCheck={false} autoComplete="off"
           aria-invalid={!!browseError} aria-describedby={browseError ? "directory-path-error" : undefined}
           value={path} onChange={e => setPath(e.target.value)} placeholder={pathPlaceholder()} />
-        <Button type="button" variant="secondary" onClick={() => { void browse(); }}>{i18n.formatMessage(filesystemMessages.browse)}</Button>
+        <Button type="button" variant="secondary" disabled={browsing} onClick={() => { void browse(); }}>{i18n.formatMessage(filesystemMessages.browse)}</Button>
       </div>
       {browseError && <FieldError id="directory-path-error">{i18n.text(browseError)}</FieldError>}
     </Field>
