@@ -7,6 +7,8 @@ import { Button } from "@atelier/ui/ui/button";
 import { Alert, AlertDescription } from "@atelier/ui/ui/alert";
 import { Spinner } from "@atelier/ui/ui/spinner";
 import type { UiText } from "@atelier/sdk/contracts";
+import { ShellSettings } from "../shell/Settings";
+import { shellMessages } from "../messages/shell";
 
 /** 页面自行分组，普通偏好即时提交；配置存储和通知由宿主托管。 */
 export function BuiltinSettingsPage({ location }: { location?: string }) {
@@ -14,9 +16,9 @@ export function BuiltinSettingsPage({ location }: { location?: string }) {
   const config = useRendererConfiguration(BuiltinSettings);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<UiText | null>(null);
-  const thinking = useRef<HTMLElement>(null), tools = useRef<HTMLElement>(null), peek = useRef<HTMLElement>(null);
+  const thinking = useRef<HTMLElement>(null), tools = useRef<HTMLElement>(null), peek = useRef<HTMLElement>(null), shell = useRef<HTMLElement>(null);
   useEffect(() => {
-    const target = location === "thinking" ? thinking.current : location === "tools" ? tools.current : location === "peek" ? peek.current : null;
+    const target = location === "thinking" ? thinking.current : location === "tools" ? tools.current : location === "peek" ? peek.current : location === "shell" ? shell.current : null;
     target?.scrollIntoView({ block: "nearest" }); target?.focus({ preventScroll: true });
   }, [location]);
   const save = async (work: () => Promise<void>) => {
@@ -25,7 +27,7 @@ export function BuiltinSettingsPage({ location }: { location?: string }) {
     catch (failure) { setError((failure as { display?: UiText }).display ?? messages.saveFailed); }
     finally { setBusy(false); }
   };
-  const row = (key: keyof typeof config.value, label: UiText) => <Item key={key}>
+  const row = (key: Exclude<keyof typeof config.value, "shell">, label: UiText) => <Item key={key}>
     <ItemContent><ItemTitle>{i18n.text(label)}</ItemTitle></ItemContent>
     <ItemActions><Switch checked={config.value[key]} disabled={busy || !config.ready} aria-label={i18n.text(label)}
       onCheckedChange={checked => { void save(() => config.save({ ...config.value, [key]: checked })); }} /></ItemActions>
@@ -47,6 +49,11 @@ export function BuiltinSettingsPage({ location }: { location?: string }) {
     <section ref={peek} tabIndex={-1} className="outline-none">
       <h3 className="type-section mb-2">{i18n.text(messages.peek)}</h3>
       <ItemGroup className="surface">{row("peekAutoExpand", messages.peekAutoExpand)}<ItemSeparator />{row("peekAutoCollapse", messages.peekAutoCollapse)}</ItemGroup>
+    </section>
+    <section ref={shell} tabIndex={-1} className="outline-none">
+      <h3 className="type-section mb-2">{i18n.text(shellMessages.profiles)}</h3>
+      <ShellSettings value={config.value.shell} disabled={busy || !config.ready}
+        save={value => save(() => config.save({ ...config.value, shell: value }))} />
     </section>
     <div><Button variant="outline" size="sm" disabled={busy || !config.ready} onClick={() => { void save(config.reset); }}>{busy && <Spinner />}{i18n.text(messages.reset)}</Button></div>
   </div>;

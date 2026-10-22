@@ -15,6 +15,8 @@ export const protocolVersion = 7;
 export const commandChannel = coreChannel("command");
 export const statusChannel = coreChannel("runtime-status");
 export const pickDirectoryChannel = coreChannel("pick-directory");
+export const openLocalFileChannel = coreChannel("open-local-file");
+export const localFilePathSchema = z.string().min(1).refine(value => !value.includes("\0"), "A local file path is required.");
 const id = z.string().uuid();
 /** 应用入口只读取工作区身份和会话摘要，不持有已打开会话的正文。 */
 export const commandSchema = z.discriminatedUnion("type", [
@@ -71,6 +73,8 @@ export interface DesktopBridge {
   readonly platform: DesktopPlatform;
   /** 系统目录选择窗口；取消返回 null。 */
   pickDirectory(): Promise<string | null>;
+  /** 用户点击的本机文件交给系统关联应用打开；失败返回错误文字。 */
+  openLocalFile(path: string): Promise<string>;
   /** 拖入文件的本机路径；由 Electron webUtils 解析，renderer 不能伪造 File.path。 */
   pathForFile(file: File): string;
   execute(command: Command): Promise<CommandResult>;

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { defineMessages } from "@atelier/sdk/contracts";
 import { builtin } from "@atelier/builtin-api/contracts";
+import { defaultShellSettings, shellSettingsSchema } from "../shell/contract.ts";
 
 export const settingsMessages = builtin.messages("en", defineMessages({
   thinking: { id: "settings.thinking", defaultMessage: "Thinking" },
@@ -25,5 +26,6 @@ export const BuiltinSettings = builtin.config(z.object({
   thinkingAutoExpand: z.boolean(), thinkingAutoCollapse: z.boolean(),
   toolInputAutoExpand: z.boolean(), toolInputAutoCollapse: z.boolean(),
   peekAutoExpand: z.boolean().default(true), peekAutoCollapse: z.boolean().default(true),
+  shell: shellSettingsSchema.default(defaultShellSettings),
 }), { thinkingAutoExpand: true, thinkingAutoCollapse: true, toolInputAutoExpand: true, toolInputAutoCollapse: true,
-  peekAutoExpand: true, peekAutoCollapse: true });
+  peekAutoExpand: true, peekAutoCollapse: true, shell: defaultShellSettings });

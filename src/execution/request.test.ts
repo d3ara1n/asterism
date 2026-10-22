@@ -175,13 +175,21 @@ describe("无状态的单次模型执行", () => {
     expect(later).toBe(0);
   });
 
-  it("未知工具结局显式阻止自动继续，宿主仍交付全部调用和终态", async () => {
-    const tool = implement(write, { async call() { return { kind: "unknown", message: "Effects require inspection." }; } });
+  // docs/runtime.md：工具结局是模型反馈；显式未知与写工具抛错均不改变模型请求结局。
+  it("未知工具结局和写工具异常正常交付，整批完成供代理继续处理", async () => {
+    let executions = 0;
+    const tool = implement(write, { async call() {
+      if (++executions === 2) throw new Error("The command stopped before reporting its result.");
+      return { kind: "unknown", message: "Effects require inspection." };
+    } });
     const capabilities = new AgentCapabilities(new ResourceRegistry([]), new ToolRegistry([tool]), [resource], () => true, toolCaller);
     const events: ModelRunEvent[] = [];
     const result = await execute(input(events), model(calls(["first", "second"], "resource_call", { resource_id: "r", tool: "write", args: {} })), capabilities);
-    expect(result).toMatchObject({ reason: "failed", code: "unknown_outcome", tools: [{ kind: "unknown" }, { kind: "unknown" }] });
+    expect(result).toMatchObject({ reason: "completed", tools: [{ kind: "unknown" }, { kind: "unknown" }] });
+    expect(result.tools[0]!.model).toEqual([{ kind: "text", text: "unknown: Effects require inspection." }]);
+    expect(result.tools[1]!.model).toEqual([{ kind: "text", text: "unknown: The tool stopped with an unknown outcome." }]);
     expect(events.filter(event => event.type === "block")).toHaveLength(2);
+    expect(events.filter(event => event.type === "diagnostic")).toEqual([]);
   });
 
   it("缓存命中预期每次显式输入，不根据上次调用推断", async () => {

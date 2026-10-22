@@ -7,19 +7,22 @@ import { readImageFile } from "./image-io.ts";
 import { withinDirectory, writableTarget } from "./paths.ts";
 import { failed, filesystemFailure } from "./errors.ts";
 import { readTextFile, commitTextFile, validateTextSize } from "./text-io.ts";
+import { DirectoryExec } from "./exec-contract.ts";
+import { execToModel } from "../shell/contract.ts";
+import type { ShellService } from "../shell/service.ts";
 
 function textFailure(error: unknown, signal: AbortSignal, operation: string): CallResult<never> {
   if (signal.aborted) return { kind: "cancelled", message: `${operation} was cancelled before committing file content.` };
   return error instanceof TextError ? error.outcome() : filesystemFailure(error, operation);
 }
 
-export default defineModule(() => ({
+export function createFilesystemModule(shell: ShellService) { return defineModule(() => ({
   resources: [implementResource(Directory, DirectoryView, {
     project: directory => ({ path: directory.path }),
     async inspect(directory, object) {
       const resource = object.snapshot();
       if (!resource) throw new PluginApiError("unavailable", "The directory is not available on this session path.");
-      const base = { type: Directory.kind, title: resource.title, path: directory.path };
+      const base = { type: Directory.kind, title: resource.title, path: directory.path, shell: await shell.inspect() };
       try {
         const info = await stat(directory.path);
         return info.isDirectory() ? { ...base, exists: true }
@@ -50,6 +53,10 @@ export default defineModule(() => ({
     },
   })],
   tools: [
+    implementTool(DirectoryExec, {
+      call: (directory, _target, args, context) => shell.execute(directory.path, args, context),
+      toModel: execToModel,
+    }),
     implementTool(DirectoryList, {
       async call(directory, target, _args, { signal }) {
         const path = target?.path ?? ".";
@@ -125,4 +132,4 @@ export default defineModule(() => ({
         { kind: "file", file: data.image, mediaType: data.mediaType, filename: basename(data.path) }],
     }),
   ],
-}));
+})); }

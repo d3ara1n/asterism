@@ -5,7 +5,7 @@ import { defineAgentCreation } from "@atelier/builtin-api/runtime";
 import metadata from "../package.json" with { type: "json" };
 import type { BuiltinApplication } from "./application.ts";
 import { createAgentModule } from "./agent/runtime.ts";
-import filesystem from "./filesystem/runtime.ts";
+import { createFilesystemModule } from "./filesystem/runtime.ts";
 import notes from "./notes/runtime.ts";
 import { BuiltinSettings } from "./settings/contract.ts";
 import { createNamingModule } from "./naming/runtime.ts";
@@ -15,12 +15,14 @@ import { CreateNote } from "./notes/contract.ts";
 import providers from "./providers/runtime.ts";
 import { UsageConsumer } from "./usage/service.ts";
 import { ReadUsage, UsageChanged } from "./usage/contract.ts";
+import { ShellService } from "./shell/service.ts";
 
 /** 仅组合插件业务；加载、宿主服务及外部插件依赖由应用负责。 */
 export function createBuiltin(options: { application: BuiltinApplication; connectNaming(api: NamingApi): () => void }) {
   return definePlugin({ namespace: builtin, version: metadata.version,
     setup(plugin) {
-      plugin.config(BuiltinSettings);
+      const settings = plugin.config(BuiltinSettings);
+      const shell = new ShellService(() => settings.get().shell, plugin.signal);
       const usage = new UsageConsumer(plugin.providers, plugin.usages, providerId => {
         try { plugin.ipc.events.publish(UsageChanged, { providerId }); }
         catch (error) { if (!(error instanceof PluginApiError && error.code === "unavailable")) throw error; }
@@ -29,7 +31,7 @@ export function createBuiltin(options: { application: BuiltinApplication; connec
       return { events: [UsageChanged],
         calls: [implementCall(ReadUsage, (input, { signal }) => usage.query(input.providerId, { refresh: input.refresh, signal }))],
         async closing() { usage.close(); },
-        modules: [providers, createAgentModule(options.application, usage), filesystem, createNamingModule(options.connectNaming, options.application.userAgent), notes, questions,
+        modules: [providers, createAgentModule(options.application, usage), createFilesystemModule(shell), createNamingModule(options.connectNaming, options.application.userAgent), notes, questions,
         resourceOperations,
         defineAgentCreation({ id: builtin.name("agent.create"), creation: CreateAgent,
           description: "Create an Agent with a selected agent configuration, optional model/thinking overrides, and initial resource links.",

@@ -198,6 +198,8 @@ Agent 入口的 `input.resources` 逐项引用发起者本次请求开始时已�
 
 模型响应正常结束 → 校验本次可用工具与参数 → 绑定调用上下文；资源操作另校验显式 `resource_id` 与本轮有效链接 → 执行 → 结局节点保存 → 整批收束 → 下一请求。输出截断、无终态流与不完整参数不启动工具。含顺序工具的批次按原顺序执行；并行完成顺序不影响模型输入顺序，投影按序号排列。
 
+工具结局是模型反馈，不控制 Agent 生命周期。六种结局均随完整工具批次进入下一次模型请求，由模型依据实际反馈决定检查、修正、重试或结束任务；`unknown`、工具超时、工具自身取消和被执行边界转换的工具异常均不使模型请求失败、不停止 Agent 循环。用户取消整个 Agent 时，由外层取消信号结束执行并向在途工具传播；模型请求、历史交付与执行预算的处理由各自执行层负责，独立于工具结局。
+
 资源工具调度器在调用时验证：
 1. agent 配置等外部工具策略是否允许二级工具。
 2. 资源身份能否解析，资源当前是否链接到本代理。
@@ -269,10 +271,42 @@ type ModelInputPart =
 
 ## 原生正文工具与目录操作
 
-内置目录与笔记共享正文的 `read / edit / write` 工具契约，目录另提供 `list` 与图片查看 `see`（按文件头识别 PNG、JPEG、GIF、WebP 并输出文件部件）。
+内置目录与笔记共享正文的 `read / edit / write` 工具契约，目录另提供 `list`、图片查看 `see`（按文件头识别 PNG、JPEG、GIF、WebP 并输出文件部件）与 [命令执行 `exec`](#目录命令执行exec)。
 
 - **`read`**：`args` 只有 `anchored?`（默认 true，输出 `LINE#HASH│正文`，四位 Crockford Base32 短哈希；false 输出行号与正文）。文件的 `{path, offset?, limit?}` 属于 `target`，使用完整文件的绝对行号；笔记以 `null` 选择完整正文。文件单次读取返回最多指定行数与 64 KiB 完整行文本，`nextOffset` 指向首个未返回行；无法容纳的单行明确报错，不将截断内容标成可编辑行。
 - **`edit`**：以 `{line, hash}` 引用当前正文；`replace / delete` 的 `anchor..end` 范围含端点（仅校验被引用的端点行），`insert_before / insert_after` 保留锚点行，`append / prepend` 无需锚点。整批基于同一份当前正文校验，任一锚点或重叠范围失败则整批拒绝不写入；位移扫描仅给出重试候选，不自动移动目标。成功结果的 `data` 保存实际 unified diff 与受影响行的新锚点；`toModel` 返回摘要、按预算截取的完整行 diff（最多 64 KiB）与新锚点（最多 40 行 / 16 KiB），省略时明确提示。
 - **`write`**：直接创建或覆盖完整正文，不要求也不返回锚点；相同正文返回无变化。目录 `write` 可创建根内缺失的父目录。`toModel` 成功只返回简短确认与少量统计，不回传 diff、正文或锚点。
 - **限额与写入**：文件文本操作限于 8 MiB UTF-8，笔记限于 100,000 UTF-16 code units；差异由 `diff`（jsdiff）按计算预算生成。路径在操作开始时解析一次真实路径，限制在目录根内并处理符号链接越界，但并非操作系统级沙箱。写入先在同目录暂存并落盘，再以 rename 原子替换目标，进程中断不留下半截文件；替换失败时目标保持原样，返回 `failed`。外部程序或其他代理同时修改时后写为准。
 - **笔记状态边界**：笔记保存只更新会话数据（`session_data`）中该对象的 `atelier.builtin/note.content` 并通知视图，不追加时间线事件或维护历史版本；回溯后的卡片与实时 inspect/read 均读取最新当前内容。GUI 的 120 行预览预算与 Pierre Diffs 代码着色见 [界面设计系统](design-system.md#对话过程视图)。
+
+## 目录命令执行（exec）
+
+`exec` 是支持目录资源的写操作、顺序资源工具。`resource_call` 的 `target` 省略或为 null，参数只有 `command` 与可选 `timeout`。目录只提供初始 cwd；命令自行解释 cd、绝对路径、管道与重定向，shell 的文件和网络访问按当前系统用户权限执行。资源工具入口仍消费既有链接与工具策略，目录路径不构成命令沙箱；命令权限机制独立于此工具。
+
+### Shell 配置与进程
+
+内置插件托管 `shell.selected / shell.profiles`。每份 profile 包含稳定 ID、名称、可执行文件、启动参数 `args`、命令参数 `commandArgs` 与环境覆盖 `env`。实际 argv 为 `args + commandArgs + [command]`，命令作为一个完整参数传递。可执行文件支持绝对路径、`~/` 与 PATH 名称；继承应用环境，profile 的环境变量覆盖同名值。
+
+`selected` 为 profile ID 或 `auto`。自动模式在已配置的 profile 中按平台顺序查找实际存在的可执行文件，最后再尝试其余自定义 profile：
+
+| 平台 | 推荐顺序 |
+| --- | --- |
+| Windows | PowerShell 7、Nushell、Fish、Bash、Zsh、sh |
+| macOS | Zsh、Bash、PowerShell 7、Fish、Nushell、sh |
+| Linux | Bash、Zsh、PowerShell 7、Fish、Nushell、sh |
+
+预设均以非交互方式运行：PowerShell 7 使用 `-NonInteractive -Command` 并保留 profile；Nushell 使用 `-l -c` 读取用户配置，登录模式与交互模式分别表达；其他预设使用 `-c`，配置文件加载遵循 shell 自身的非交互规则。用户可通过启动参数与环境变量配置所需环境。显式 profile 不可用时明确失败，自动模式才继续查找。目录 inspect 报告当时解析的 profile、可执行文件与平台；每次执行取用当前 profile 并使用到底。
+
+每次 `exec` 启动独立进程，stdin 关闭、stdout/stderr 使用管道；工作目录和 shell 状态随该次进程结束。shell 模块提供配置解析、进程句柄、输出消费和进程清理；单次调用持有进程，宿主负责调用取消与真实收束，不另设活动进程登记。进程退出观察、IO 收束观察与 `stop()` 相互独立，等待本身不终止进程。
+
+`timeout` 为大于零且不超过 2,147,483.647 的秒数，省略表示无执行期限。期限在启动调用时开始，到主进程退出截止；输出不续期。主进程运行期间，期限、工具取消与插件关闭触发强制终止：Unix 杀独立进程组，Windows 使用系统 `taskkill /F /T`；不追踪主动脱离执行范围的进程。主命令退出后只收尾输出，后台程序按命令自身生命周期继续，不再终止其进程组。调用等待主进程和输出 IO 真正收束后才交付结果、释放宿主占用。主进程退出后，继承管道按 100ms 输出空闲收尾，背压中尚未消费的数据先排空。
+
+### 输出与结局
+
+stdout/stderr 按接收次序合并，各自流式解码 UTF-8、移除终端控制序列；CRLF 归一为 LF，独立 CR 作为换行。`output` 始终表示处理后的文本，最多保留最后 **16,384 个 Unicode 码点**。超过预算时把处理后的完整输出流写系统临时目录中的日志文件，内存和历史只保留有界尾部；磁盘写入实施背压。模型自己重定向生成的文件由命令管理，工具不另行复制。
+
+结果包含 `output / truncation / shell / termination / exitCode / signal / durationMs`。`truncation` 为 null 或 `{ totalChars, retainedChars, file }`，`file` 为临时日志绝对路径。过程通过 `publish` 节流交付相同结构，终结后只有最终结构进入历史；完整日志不进入 SQLite、`ContentRef` 或资源目录。
+
+模型投影先显示实际 shell、退出信息与耗时，再显示 `output`；超限时追加 `[Output truncated: showing the last … of … Unicode characters. Full output: …]`。guidelines 解释处理、预算、标记与路径；后续通过普通 `exec` 命令读取临时日志。临时文件按系统临时目录生命周期存在，不保证跨重启或长期可读，历史不修复、不重新生成已丢失的日志。UI 独立消费结构化截断信息，见 [命令执行视图](workbench.md#工具调用三态视图)。
+
+进程正常退出 0 为 `succeeded`，非零或信号退出为 `failed`；启动失败为 `failed`。启动前取消为 `cancelled`；已启动后超时、取消或 IO/清理失败、无法确认命令副作用时为 `unknown`，保留已收到的输出及具体 `termination` 原因。停止不撤销命令已经产生的副作用。

@@ -1,9 +1,9 @@
 import { app, BrowserWindow, dialog, ipcMain, net, protocol, session, shell } from "electron";
 import { externalWebUrl } from "@atelier/ui/links";
 import { mkdirSync } from "node:fs";
-import { dirname, join, relative, resolve } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { commandChannel, commandSchema, pickDirectoryChannel, statusChannel, type CommandResult } from "../shared/contracts.ts";
+import { commandChannel, commandSchema, pickDirectoryChannel, openLocalFileChannel, localFilePathSchema, statusChannel, type CommandResult } from "../shared/contracts.ts";
 import { objectStreamChannel } from "../shared/object-stream.ts";
 import { RuntimeHost } from "./runtime-host.ts";
 import { applicationBrand, applicationDataDirectory, applicationId, applicationStorage } from "../shared/application.ts";
@@ -79,6 +79,7 @@ function createWindow(): void {
   ipcMain.removeHandler(configurationChannel);
   ipcMain.removeHandler(sessionChannel);
   ipcMain.removeHandler(pickDirectoryChannel);
+  ipcMain.removeHandler(openLocalFileChannel);
   ipcMain.removeHandler(pluginConfigurationChannel);
   ipcMain.removeHandler(contentChannel);
   const trusted = (event: Electron.IpcMainInvokeEvent | Electron.IpcMainEvent) => event.sender === current.webContents &&
@@ -128,6 +129,12 @@ function createWindow(): void {
     const result = await dialog.showOpenDialog(current, { properties: ["openDirectory"] });
     return result.canceled ? null : result.filePaths[0] ?? null;
   });
+  ipcMain.handle(openLocalFileChannel, async (event, raw: unknown) => {
+    if (!trusted(event)) return "Untrusted application frame.";
+    const parsed = localFilePathSchema.safeParse(raw);
+    if (!parsed.success || !isAbsolute(parsed.data)) return "An absolute local file path is required.";
+    return shell.openPath(parsed.data);
+  });
   ipcMain.handle(commandChannel, async (event, raw): Promise<CommandResult> => {
     if (event.sender !== current.webContents || event.senderFrame !== current.webContents.mainFrame ||
       event.senderFrame.url !== allowedURL) {
@@ -148,6 +155,7 @@ function createWindow(): void {
   });
   current.on("closed", () => {
     stopDesktopWindow();
+    ipcMain.removeHandler(openLocalFileChannel);
     ipcMain.removeListener(pluginEventsChannel, receiveEvents);
     ipcMain.removeListener(pluginCallsChannel, receiveCalls);
     ipcMain.removeHandler(contentChannel);

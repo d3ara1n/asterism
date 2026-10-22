@@ -23,9 +23,10 @@
 | `src/agent/conversation/Markdown.tsx`、`MarkdownCode.tsx`、`MermaidDiagram.tsx` | Markdown 图片与代码组件、Mermaid 按需渲染；`markdown-options.ts` 声明历史与实时内容共用的插件，交互见[对话视图](../../docs/workbench.md#代理卡片与工具调用视图) |
 | `src/questions/` | `ask_user` 三题型与结构化答案、内存问答服务及具型调用、可保留草稿的底部／模态作答界面和工具三态视图；契约见[等待用户回答](../../docs/runtime.md#等待用户回答)，交互见[结构化问答](../../docs/workbench.md#结构化问答) |
 | `src/notes/`、`src/filesystem/` | 资源与正文工具实现、创建入口与三态工具视图 |
+| `src/shell/` | Shell profile、非交互管道进程、显式终止与 IO 收束、有界输出及临时日志；目录 `exec` 经同一服务执行，契约见 [目录命令执行](../../docs/runtime.md#目录命令执行exec) |
 | `src/resources/` | Agent 创建目录查询、创建和统一移除顶层工具及三态视图；通过 SDK 绑定会话门面消费宿主生命周期 |
 | `src/naming/` | 自动命名、人工命名接口和标题投影；记录契约由公共包提供 |
-| `src/settings/` | 内置插件托管配置与按思考／工具调用／代理调查分组的自定义设置页；配置在插件根入口登记 |
+| `src/settings/` | 内置插件托管配置与按思考／工具调用／代理调查／Shell 分组的自定义设置页；配置在插件根入口登记 |
 | `src/providers/` | 提供商预设、主动余额／套餐查询及 `headers.ts` 的被动限流解析；各服务独立解析，主动 HTTP 共用 `usage-http.ts`，通过 SDK 贡献登记，不拥有缓存或跨进程消费 |
 | `src/usage/` | 独立的账户用量消费者：从 SDK 目录取实现，管理缓存、解析 Agent 显式交付的响应结果，通过自有调用／事件向共享订阅和 toolbar 交付状态；不导入提供方实现 |
 | `src/shared/` | 正文算法、共享工具声明、预览规则与创建表单 |

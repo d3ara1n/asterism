@@ -12,6 +12,7 @@ import { TOOL_BODY_LINE_LIMIT } from "../shared/tool-body";
 import { CreateDirectory, DirectoryView, DirectoryList, DirectoryRead, DirectoryEdit, DirectoryWrite, DirectorySee } from "./contract";
 import { FilePreview } from "../agent/conversation/Files";
 import { DirectoryInput } from "./creation";
+import { execToolRenderer } from "./exec-view";
 
 const appearance = { width: 340, height: 200, minWidth: 280, minHeight: 160 };
 
@@ -60,6 +61,7 @@ export default {
     </div>; },
   })],
   tools: [
+    execToolRenderer,
     toolRenderer(DirectoryRead, {
       label: textMessages.toolTextRead, icon: <BookOpen className="size-3.5" />,
       ...textReadViews,

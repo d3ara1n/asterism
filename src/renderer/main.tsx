@@ -69,7 +69,10 @@ const rendererPlugins = await loadPluginRenderers(plugins, { available: [builtin
   if (plugin.settings) pages.set(id, plugin.settings);
 } });
 const moduleViews = new ViewRegistry(accepted);
-const builtinRendererServices = { preferences: pluginPreferences };
+const builtinRendererServices = { preferences: pluginPreferences, async openLocalFile(path: string) {
+  const error = await window.host.openLocalFile(path);
+  if (error) throw new Error(error);
+} };
 showStartupStage(getI18n().formatMessage(appMessages.startupEnvironment));
 await loadPreferences();
 const stopDesktopWindow = await startDesktopWindow(window.host.window);

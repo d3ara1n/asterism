@@ -13,6 +13,7 @@ import { Disclosure } from "./Disclosure";
 import { advanceToolDisclosure, initialToolDisclosure, toolCallState, type ToolCallNode } from "./tool-state";
 import { BuiltinSettings } from "../../settings/contract";
 import { advancePeekDisclosure, type PeekDisclosure } from "../peek/disclosure";
+import { advanceExecDisclosure, type ExecDisclosure } from "../../filesystem/exec-disclosure";
 
 const labels = {
   partial: toolsMessages.toolPartial, failed: toolsMessages.toolFailed,
@@ -29,8 +30,8 @@ export function ToolCall({ node }: { node: ToolCallNode }) {
   const filling = state.phase === "input";
   const view = state.props ? tools.resolve(state.props) : null;
   const hasInputBody = filling && view?.body !== undefined && view.body !== null;
-  const [disclosure, setDisclosure] = useState<PeekDisclosure>(() => initialToolDisclosure(filling, preferences, hasInputBody));
-  const next = advancePeekDisclosure(advanceToolDisclosure(disclosure, filling, preferences, hasInputBody), view?.props, preferences);
+  const [disclosure, setDisclosure] = useState<PeekDisclosure & ExecDisclosure>(() => initialToolDisclosure(filling, preferences, hasInputBody));
+  const next = advanceExecDisclosure(advancePeekDisclosure(advanceToolDisclosure(disclosure, filling, preferences, hasInputBody), view?.props, preferences), view?.props);
   if (next !== disclosure) setDisclosure(next);
   const result = state.props?.result;
   const outcome = "outcome" in node ? node.outcome : null;

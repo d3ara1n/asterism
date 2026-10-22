@@ -5,6 +5,7 @@ import { CreationDirectoryProvider } from "./resources/directory";
 /** 应用组合注入宿主服务；内置插件不读取宿主存储实现。 */
 export interface BuiltinRendererServices {
   preferences(pluginId: string): RendererPreferences;
+  openLocalFile(path: string): Promise<void>;
 }
 const Services = createContext<BuiltinRendererServices | null>(null);
 export function BuiltinRendererProvider({ services, children }: { services: BuiltinRendererServices; children: ReactNode }) {

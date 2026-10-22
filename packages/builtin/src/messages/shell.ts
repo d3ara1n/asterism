@@ -1,0 +1,31 @@
+import { defineMessages } from "@atelier/sdk/contracts";
+import { builtin } from "@atelier/builtin-api/contracts";
+
+export const shellMessages = builtin.messages("en", defineMessages({
+  title: { id: "shell.title", defaultMessage: "Shell" },
+  exec: { id: "shell.exec", defaultMessage: "Execute" },
+  auto: { id: "shell.auto", defaultMessage: "Automatic" },
+  selected: { id: "shell.selected", defaultMessage: "Execution profile" },
+  profiles: { id: "shell.profiles", defaultMessage: "Shell profiles" },
+  description: { id: "shell.description", defaultMessage: "Commands run in a fresh non-interactive shell. Automatic chooses the first installed profile in the platform's recommended order." },
+  profile: { id: "shell.profile", defaultMessage: "Edit profile" },
+  name: { id: "shell.name", defaultMessage: "Name" },
+  executable: { id: "shell.executable", defaultMessage: "Executable" },
+  args: { id: "shell.args", defaultMessage: "Startup arguments · one per line" },
+  commandArgs: { id: "shell.commandArgs", defaultMessage: "Command arguments · one per line, followed by the command text" },
+  env: { id: "shell.env", defaultMessage: "Environment overrides · NAME=value, one per line" },
+  add: { id: "shell.add", defaultMessage: "Duplicate profile" },
+  remove: { id: "shell.remove", defaultMessage: "Remove profile" },
+  preset: { id: "shell.preset", defaultMessage: "Use preset" },
+  save: { id: "shell.save", defaultMessage: "Save shell profiles" },
+  invalid: { id: "shell.invalid", defaultMessage: "Check profile names, executables and environment entries before saving." },
+  empty: { id: "shell.empty", defaultMessage: "No output" },
+  exit: { id: "shell.exit", defaultMessage: "Exit {code} · {seconds}s" },
+  elapsed: { id: "shell.elapsed", defaultMessage: "{seconds}s" },
+  timeout: { id: "shell.timeout", defaultMessage: "Timed out · {seconds}s" },
+  cancelled: { id: "shell.cancelled", defaultMessage: "Cancelled · {seconds}s" },
+  truncated: { id: "shell.truncated", defaultMessage: "Showing the last {retained, number} of {total, number} characters." },
+  openLog: { id: "shell.openLog", defaultMessage: "Open temporary log" },
+  temporary: { id: "shell.temporary", defaultMessage: "Temporary files may be cleaned up by the system." },
+  openFailed: { id: "shell.openFailed", defaultMessage: "The temporary log could not be opened. It may have been removed." },
+}));

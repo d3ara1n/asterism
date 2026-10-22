@@ -98,8 +98,7 @@ export async function runModelRequest(request: ModelRunRequest, environment: Pro
         }, handover, topLevelTools);
       if (request.cache?.expectHit && finish.usage?.cacheRead === 0 && (finish.usage.input ?? 0) > 2048)
         diagnostic("cache_miss", "The provider reported no cached input for this request.", "warning");
-      if ([...outcomes.values()].some(outcome => outcome.kind === "unknown"))
-        throw new ModelFailure("unknown_outcome", "A tool outcome is unknown. Automatic continuation stopped.");
+      // 工具结局作为下一请求的反馈交付；代理生命周期由外层取消信号与控制器管理。
       signal.throwIfAborted();
     } finally {
       try { await flushProgress(); }

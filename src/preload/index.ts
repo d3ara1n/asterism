@@ -3,7 +3,7 @@ import { languageGetChannel, languageSetChannel, languageChangedChannel, languag
 import { applicationBrand } from "../shared/application.ts";
 import { desktopBridgeKey } from "../shared/core.ts";
 import { desktopWindowChangedChannel, desktopWindowGetChannel, desktopWindowStateSchema } from "../shared/desktop.ts";
-import { commandChannel, pickDirectoryChannel, statusChannel, resultSchema, runtimeStatusSchema, type DesktopBridge } from "../shared/contracts.ts";
+import { commandChannel, pickDirectoryChannel, openLocalFileChannel, localFilePathSchema, statusChannel, resultSchema, runtimeStatusSchema, type DesktopBridge } from "../shared/contracts.ts";
 import { objectStreamChannel, objectStreamSchema } from "../shared/object-stream.ts";
 import { configurationChannel, configurationChangedChannel, configurationResultSchema } from "../shared/configuration.ts";
 import { appearanceChangedChannel, appearanceGetChannel, appearancePatchSchema, appearanceSetChannel, parseAppearance } from "../shared/theme.ts";
@@ -114,6 +114,10 @@ const bridge: DesktopBridge = {
   async pickDirectory() {
     const path = await ipcRenderer.invoke(pickDirectoryChannel);
     return typeof path === "string" ? path : null;
+  },
+  async openLocalFile(path) {
+    const result: unknown = await ipcRenderer.invoke(openLocalFileChannel, localFilePathSchema.parse(path));
+    return typeof result === "string" ? result : "The local file could not be opened.";
   },
   pathForFile: file => webUtils.getPathForFile(file),
   platform: process.platform === "darwin" ? "darwin" : process.platform === "win32" ? "win32" : "linux",
