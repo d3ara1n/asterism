@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ProviderUsageState } from "./contract.ts";
 import { ProviderUsageClient, type UsageBridge } from "./client.ts";
 
-const state: ProviderUsageState = { providerId: "p", revision: 1, usage: "quota", state: "ready", error: null,
+const state: ProviderUsageState = { providerId: "p", usage: "quota", state: "ready", error: null,
   updatedAt: 1, items: [{ type: "balance", id: "balance", label: "Balance", scope: "account", remaining: 10, currency: "USD" }] };
 const result = (usage = state) => usage;
 afterEach(() => vi.useRealTimers());
@@ -51,12 +51,12 @@ describe("用量消费订阅", () => {
       expect(execute).toHaveBeenCalledTimes(3);
     } finally { client.close(); }
   });
-  // 换凭据后旧 IPC 可以迟到；订阅端必须清掉旧账户数据，拒绝旧读取覆盖。
-  it("配置变化后切换到新修订，旧读取不能重新显示旧余额", async () => {
+  // 通知发生在读取期间时合并重读意图；每个连接保持一个在途请求，结果按返回顺序应用。
+  it("读取期间收到通知，先应用返回结果，再查询一次当前值", async () => {
     let changed!: () => void, finish!: (value: ProviderUsageState) => void;
     const execute = vi.fn<UsageBridge["query"]>()
       .mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }))
-      .mockResolvedValue(result({ ...state, revision: 2, items: [] }));
+      .mockResolvedValue(result({ ...state, items: [] }));
     const client = new ProviderUsageClient({ query: execute, onChanged: listener => { changed = listener; return () => {}; } });
     try {
       client.subscribe("p", () => {});
@@ -64,9 +64,11 @@ describe("用量消费订阅", () => {
       await Promise.resolve();
       changed();
       expect(client.get("p")).toBeNull();
-      await client.refresh("p");
+      expect(execute).toHaveBeenCalledTimes(1);
       finish(result()); await old;
-      expect(client.get("p")).toMatchObject({ revision: 2, items: [] });
+      await vi.waitFor(() => expect(client.get("p")).toMatchObject({ items: [] }));
+      expect(execute).toHaveBeenCalledTimes(2);
+      expect(client.get("p")).toMatchObject({ items: [] });
     } finally { client.close(); }
   });
 });

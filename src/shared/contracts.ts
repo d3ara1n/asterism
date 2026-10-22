@@ -47,7 +47,7 @@ export const resultSchema = z.discriminatedUnion("ok", [
   z.strictObject({ ok: z.literal(false), error: errorSchema }),
 ]);
 export type CommandResult = z.infer<typeof resultSchema>;
-export const requestSchema = z.strictObject({ version: z.literal(protocolVersion), id, command: commandSchema });
+export const requestSchema = z.strictObject({ version: z.literal(protocolVersion), id, command: z.unknown() });
 export const responseSchema = z.strictObject({ version: z.literal(protocolVersion), id, result: resultSchema });
 export const runtimeMessageSchema = z.discriminatedUnion("kind", [
   z.strictObject({ kind: z.literal("ready"), version: z.literal(protocolVersion) }),

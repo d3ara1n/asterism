@@ -206,17 +206,19 @@ describe("两级自动命名", () => {
     expect(test.requests).toHaveLength(2);
   });
 
-  it("任务等待启动时已被用户同名命名，短路且不发送模型请求", async () => {
+  // 人工命名优先在结果追加时判断，不在请求启动前使任务失效。
+  it("任务启动前人工命名，返回后保留人工标题", async () => {
     const test = await open(() => title("Automatic"));
     test.submit("First");
     await test.rename("First");
     await test.idle();
-    expect(test.requests).toHaveLength(0);
+    expect(test.requests).toHaveLength(1);
     expect(test.session.title.get()).toBe("First");
     expect(test.session.snapshot().records.query(SessionNamed, { scope: "session" })).toHaveLength(1);
   });
 
-  it("后发二级请求胜过迟到的一级结果，旧结果不留下生效事件", async () => {
+  // 触发输入仍在当前路径且未人工命名时，两次结果按完成顺序追加。
+  it("自动命名按完成顺序追加，迟到一级结果后写生效", async () => {
     let release!: () => void, calls = 0;
     const held = new Promise<void>(resolve => { release = resolve; });
     const test = await open(async function* () {
@@ -230,8 +232,8 @@ describe("两级自动命名", () => {
       await vi.waitFor(() => expect(test.session.title.get()).toBe("New refined"));
     } finally { release(); }
     await test.idle();
-    expect(test.session.snapshot().records.query(SessionNamed, { scope: "session" })).toHaveLength(1);
-    expect(test.session.title.get()).toBe("New refined");
+    expect(test.session.snapshot().records.query(SessionNamed, { scope: "session" })).toHaveLength(2);
+    expect(test.session.title.get()).toBe("Old initial");
   });
 
   it.each(["error", "length"])("带正文但终态为 %s 的命名不应用，后续节点仍可重命名", async reason => {

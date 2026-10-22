@@ -43,6 +43,6 @@ export const contentResultSchema = z.discriminatedUnion("ok", [
   z.strictObject({ ok: z.literal(false), error: z.strictObject({ code: z.string(), message: z.string() }) }),
 ]);
 export type ContentResult = z.infer<typeof contentResultSchema>;
-export const contentRequestSchema = z.strictObject({ kind: z.literal("content.request"), version: z.literal(contentVersion), id, command: contentCommandSchema });
+export const contentRequestSchema = z.strictObject({ kind: z.literal("content.request"), version: z.literal(contentVersion), id, command: z.unknown() });
 export const contentResponseSchema = z.strictObject({ kind: z.literal("content.response"), version: z.literal(contentVersion), id, result: contentResultSchema });
 export interface ContentBridge { execute(command: ContentCommand): Promise<ContentResult> }

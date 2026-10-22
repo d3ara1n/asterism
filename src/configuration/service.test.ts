@@ -41,7 +41,7 @@ async function addModel(service: ConfigurationService, auth: "none" | "api_key" 
   return { providerId: provider.savedId!, modelId: model.savedId!, snapshot: model.snapshot };
 }
 function roleValue(snapshot: ConfigurationSnapshot, id: string) {
-  const { id: _id, revision: _revision, builtin: _builtin, ...value } = snapshot.roles.find(role => role.id === id)!;
+  const { id: _id, builtin: _builtin, ...value } = snapshot.roles.find(role => role.id === id)!;
   return value;
 }
 
@@ -55,7 +55,7 @@ describe("真实配置与消费边界", () => {
     await service.execute({ type: "provider.save", id: value.id, value: renamed, credential: { action: "replace", value: "replacement-key" } });
     const saved = service.current().providers[0]!;
     expect(saved).toMatchObject({ ...renamed, credentialState: "available" });
-    expect(await service.executionCredential(saved.id, saved.revision)).toBe("replacement-key");
+    expect(await service.executionCredential(saved.id)).toBe("replacement-key");
     expect(JSON.parse(readFileSync(join(root, "configuration.json"), "utf8")).providers[0]).not.toHaveProperty("kind");
     service.close();
     const reopened = new ConfigurationService(root, protector);
@@ -83,7 +83,7 @@ describe("真实配置与消费边界", () => {
     }
     expect(readFileSync(join(root, "configuration.json"), "utf8")).toBe(original);
     const saved = service.current().providers[0]!;
-    expect(await service.executionCredential(saved.id, saved.revision)).toBe("original-key");
+    expect(await service.executionCredential(saved.id)).toBe("original-key");
     expect(readdirSync(join(root, "credentials"))).toHaveLength(1);
     const model = createModelInput(value.id, { modelId: "test", name: "Test" });
     await expect(service.execute({ type: "model.save", id: null, value: { ...model,
@@ -111,7 +111,7 @@ describe("真实配置与消费边界", () => {
     expect(reopened.current().models[0]?.compatibility).toEqual([{ id: "systemMessageInMessages" }]);
   });
 
-  // 参数获取在队列外等待，成功才原子保存；网络失败和期间改动不得污染已保存配置。
+  // 参数获取在队列外等待，成功才原子保存；网络失败保留已保存配置。
   it("目录参数覆盖旧值并持久化，获取失败保留原值且返回明确提示", async () => {
     const data: Catalog = { providers: {}, models: { "lab/test-model": {
       id: "lab/test-model", name: "Test", description: "", reasoning: true, tool_call: false,
@@ -175,7 +175,7 @@ describe("真实配置与消费边界", () => {
     writeFileSync(path, original);
     const reopened = new ConfigurationService(root, protector);
     cleanups.push(() => reopened.close());
-    const { revision: _revision, ...model } = reopened.current().models[0]!;
+    const model = reopened.current().models[0]!;
     expect(model.cost).toMatchObject({
       rates: {
         text: { input: { amount: 1, unit: "token", per: 1_000_000 }, cacheRead: { amount: 0, unit: "token", per: 1_000_000 }, cacheWrite: null },
@@ -197,20 +197,21 @@ describe("真实配置与消费边界", () => {
     expect(final.current().models[0]?.cost).toEqual(model.cost);
   });
 
-  it("目录网络等待不阻塞配置队列，期间模型修改与退出阻止迟到覆盖", async () => {
+  // 参数契约要求合并当前模型：期间改名保留，目录提供的参数后写生效；关闭仍取消请求。
+  it("目录等待不阻塞配置，返回后合并当前模型，退出取消请求", async () => {
     let finish!: (catalog: Catalog) => void;
     let signal!: AbortSignal;
     const catalog: LoadModelCatalog = input => { signal = input; return new Promise(resolve => { finish = resolve; }); };
     const { service } = setup(undefined, true, 30_000, undefined, catalog);
     const { modelId } = await addModel(service);
     const request = service.execute({ type: "model.parameters", model: modelId });
-    const rejected = expect(request).rejects.toMatchObject({ code: "conflict", display: { id: "modelCatalog.changed" } });
     const snapshot = (await service.execute({ type: "read" })).snapshot;
-    const { revision: _revision, ...value } = snapshot.models[0]!;
-    await service.execute({ type: "model.save", id: modelId, value: { ...value, contextWindow: 777 } });
-    finish({ providers: {}, models: {} });
-    await rejected;
-    expect(service.current().models[0]?.contextWindow).toBe(777);
+    const value = snapshot.models[0]!;
+    await service.execute({ type: "model.save", id: modelId, value: { ...value, name: "Renamed", contextWindow: 777 } });
+    finish({ providers: {}, models: { "lab/test-model": {
+      id: "lab/test-model", name: "Test", description: "", limit: { context: 64000 },
+    } } });
+    expect((await request).snapshot.models[0]).toMatchObject({ name: "Renamed", contextWindow: 64000 });
     const second = service.execute({ type: "model.parameters", model: modelId });
     const closed = expect(second).rejects.toMatchObject({ code: "unavailable" });
     await service.execute({ type: "read" });
@@ -219,23 +220,21 @@ describe("真实配置与消费边界", () => {
     finish({ providers: {}, models: {} });
     await closed;
   });
-  // 删除后重建会重新从 revision=1 开始，仅比较修订号会把旧请求写入新记录。
-  it("删除再以相同 ID 与修订号重建模型，旧参数请求仍失效", async () => {
+  // 参数返回时模型不存在属于真实 not_found，不创建记录或用 conflict 代替。
+  it("参数返回时模型已删除，返回 not_found", async () => {
     let finish!: (catalog: Catalog) => void;
     const catalog: LoadModelCatalog = () => new Promise(resolve => { finish = resolve; });
     const { service } = setup(undefined, true, 30_000, undefined, catalog);
-    const { modelId, snapshot } = await addModel(service);
-    const { revision: _revision, ...value } = snapshot.models[0]!;
+    const { modelId } = await addModel(service);
     const request = service.execute({ type: "model.parameters", model: modelId });
-    const rejected = expect(request).rejects.toMatchObject({ code: "conflict", display: { id: "modelCatalog.changed" } });
+    const rejected = expect(request).rejects.toMatchObject({ code: "not_found" });
     await service.execute({ type: "remove", kind: "model", id: modelId });
-    await service.execute({ type: "model.save", id: null, value });
     finish({ providers: {}, models: {} });
     await rejected;
-    expect(service.current().models).toEqual(snapshot.models);
+    expect(service.current().models).toEqual([]);
   });
   // 发现不写配置；批量添加只接受本次目录中的 ID，已有记录与用户覆盖永不被刷新替换。
-  it("发现后批量添加、去重和重开保留配置；连接变化使旧列表失效", async () => {
+  it("发现后批量添加、去重和重开保留配置；列表保留至刷新或删除连接", async () => {
     const discover = vi.fn<DiscoverModels>(async () => [
       { modelId: "test-model", name: "Upstream changed name" },
       { modelId: "new-model", name: "New", contextWindow: 64000, reasoning: true, thinkingLevels: ["low", "high"] },
@@ -264,6 +263,8 @@ describe("真实配置与消费边界", () => {
     expect(reopened.current().models).toEqual(added.snapshot.models);
     expect(reopened.current().discoveries).toEqual([]);
     await service.execute({ type: "provider.save", id: "local", value: providerValue, credential: { action: "keep" } });
+    expect((await service.execute({ type: "discovery.add", id, modelIds: ["new-model"] })).snapshot.models).toEqual(added.snapshot.models);
+    await service.execute({ type: "remove", kind: "provider", id: "local" });
     await expect(service.execute({ type: "discovery.add", id, modelIds: ["new-model"] })).rejects.toMatchObject({ code: "not_found" });
   });
 
@@ -304,7 +305,7 @@ describe("真实配置与消费边界", () => {
   it.each(["provider", "model"] as const)("%s 兼容条目独立保存并重开，非法条目拒绝且移除后不重现", async kind => {
     const { service, root, protector } = setup();
     const { providerId, modelId, snapshot } = await addModel(service);
-    const { revision: _revision, ...value } = snapshot.models[0]!;
+    const value = snapshot.models[0]!;
     const save = (target: ConfigurationService, compatibility: ModelCompatibility[]) => kind === "provider"
       ? target.execute({ type: "provider.save", id: providerId, value: { ...providerValue, compatibility }, credential: { action: "keep" } })
       : target.execute({ type: "model.save", id: modelId, value: { ...value, compatibility } });
@@ -377,12 +378,12 @@ describe("真实配置与消费边界", () => {
     nextDefaults.agents.worker!.maxTurns = 3000;
     nextDefaults.agents.worker!.systemPrompt = "New built-in prompt";
     nextDefaults.roles.default!.thinking = "high";
-    const agent = { id: "custom-agent", revision: 1, builtin: false, overrides: { name: "Custom", systemPrompt: "Pinned prompt" } };
+    const agent = { id: "custom-agent", builtin: false, overrides: { name: "Custom", systemPrompt: "Pinned prompt" } };
     const before = resolveAgentConfiguration(agent, oldDefaults);
     const after = resolveAgentConfiguration(agent, nextDefaults);
     expect(before.maxTurns).toBe(1200);
     expect(after).toMatchObject({ maxTurns: 3000, systemPrompt: "Pinned prompt" });
-    const role = { id: "custom-role", revision: 1, builtin: false, overrides: { name: "Custom", hidden: false } };
+    const role = { id: "custom-role", builtin: false, overrides: { name: "Custom", hidden: false } };
     expect(resolveRoleConfiguration(role, nextDefaults)).toMatchObject({ thinking: "high", hidden: false });
   });
   it("初始化五种模型角色和五种 agent；worker 默认可用，utility 可管理且隐藏", async () => {
@@ -402,7 +403,7 @@ describe("真实配置与消费边界", () => {
     await service.execute({ type: "role.save", id: "heavy", value: { thinking: null, hidden: false } });
     // 等级空集属于合法配置；保存与重开不因当前角色等级不可用而改写配置。
     const model = service.current().models[0]!;
-    const { revision: _revision, ...modelValue } = model;
+    const modelValue = model;
     await service.execute({ type: "model.save", id: `${model.providerId}/${model.modelId}`,
       value: { ...modelValue, capabilities: { ...model.capabilities, reasoning: true, thinkingLevels: [] } } });
     expect(existsSync(join(root, "db"))).toBe(false);
@@ -476,7 +477,7 @@ describe("真实配置与消费边界", () => {
     resolveProbe(); await Promise.resolve();
     expect((await service.execute({ type: "read" })).snapshot.tests[0]?.state).toBe("cancelled");
   });
-  it("超时主动取消网络请求，结果带测试时配置修订", async () => {
+  it("超时主动取消网络请求并交付测试结果", async () => {
     vi.useFakeTimers();
     const probe = vi.fn<ConnectionProbe>(async ({ signal }) => new Promise<void>((_resolve, reject) => signal.addEventListener("abort", () => reject(new Error("aborted")), { once: true })));
     const { service } = setup(probe, true, 50);
@@ -484,8 +485,25 @@ describe("真实配置与消费边界", () => {
     const started = await service.execute({ type: "test.start", model: modelId });
     await vi.advanceTimersByTimeAsync(50);
     const read = await service.execute({ type: "read" });
-    expect(read.snapshot.tests[0]).toMatchObject({ id: started.savedId, state: "failed", error: "timeout", modelRevision: 1, providerRevision: 1 });
+    expect(read.snapshot.tests[0]).toMatchObject({ id: started.savedId, state: "failed", error: "timeout" });
     expect(probe.mock.calls[0]![0].signal.aborted).toBe(true);
+  });
+  // 模型配置契约：保存只清除对应已结束的测试，不取消已经取用配置的在途测试。
+  it("保存模型或连接清除已结束的测试，在途测试仍可结束", async () => {
+    let finish!: () => void;
+    const { service } = setup(() => new Promise(resolve => { finish = resolve; }));
+    const { modelId, providerId, snapshot } = await addModel(service);
+    const started = await service.execute({ type: "test.start", model: modelId });
+    const saveModel = () => service.execute({ type: "model.save", id: modelId, value: snapshot.models[0]! });
+    expect((await saveModel()).snapshot.tests[0]).toMatchObject({ id: started.savedId, state: "running" });
+    finish();
+    await vi.waitFor(() => expect(service.current().tests[0]?.state).toBe("succeeded"));
+    expect((await saveModel()).snapshot.tests).toEqual([]);
+    await service.execute({ type: "test.start", model: modelId });
+    finish();
+    await vi.waitFor(() => expect(service.current().tests[0]?.state).toBe("succeeded"));
+    const saved = await service.execute({ type: "provider.save", id: providerId, value: providerValue, credential: { action: "keep" } });
+    expect(saved.snapshot.tests).toEqual([]);
   });
   it("替换和删除凭据会清理旧密文；加密失败保留原配置", async () => {
     const { service, root, protector } = setup();
@@ -536,7 +554,7 @@ describe("真实配置与消费边界", () => {
     service.close();
     const reopened = new ConfigurationService(root, { available: async () => false, encrypt: async () => "", decrypt: async () => "" });
     try {
-      expect((await reopened.execute({ type: "read" })).snapshot.providers[0]).toMatchObject({ id: providerId, name: "Local", revision: 1 });
+      expect((await reopened.execute({ type: "read" })).snapshot.providers[0]).toMatchObject({ id: providerId, name: "Local" });
     } finally { reopened.close(); }
   });
   it.each(["无效 JSON", "不支持的版本", "缺失配置类别", "身份重复"])("%s 不触发重置或覆盖原配置", scenario => {

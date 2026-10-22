@@ -4,13 +4,12 @@ import { createWriteStream, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { runtimeMessageSchema, type Command, type CommandResult, type RuntimeStatus } from "../shared/contracts.ts";
 import { ConfigurationRequests, SessionRequests, RuntimeRequests, PluginConfigurationRequests, ContentRequests } from "./requests.ts";
-import { sessionChangedSchema, sessionResponseSchema, type SessionChanged, type SessionCommand, type SessionResult } from "../shared/session.ts";
-import { configurationChangedSchema, configurationResponseSchema, type ConfigurationCommand, type ConfigurationResult } from "../shared/configuration.ts";
-import { secretRequestSchema } from "../shared/secrets.ts";
+import { sessionChangedSchema, type SessionChanged, type SessionCommand, type SessionResult } from "../shared/session.ts";
+import { configurationChangedSchema, type ConfigurationCommand, type ConfigurationResult } from "../shared/configuration.ts";
 import { handleSecretRequest } from "./secrets.ts";
-import { pluginConfigurationChangedSchema, pluginConfigurationResponseSchema, type PluginConfigurationCommand, type PluginConfigurationResult } from "../shared/plugin-configuration.ts";
+import { pluginConfigurationChangedSchema, type PluginConfigurationCommand, type PluginConfigurationResult } from "../shared/plugin-configuration.ts";
 import { objectStreamSchema, type ObjectStream } from "../shared/object-stream.ts";
-import { contentResponseSchema, type ContentCommand, type ContentResult } from "../shared/content.ts";
+import type { ContentCommand, ContentResult } from "../shared/content.ts";
 import { eventRuntimeFrameSchema, pluginEventsVersion, type EventControl, type EventFrame } from "../shared/plugin-events.ts";
 import { callRuntimeFrameSchema, pluginCallsVersion, type CallControl, type CallFrame } from "../shared/plugin-calls.ts";
 
@@ -99,7 +98,7 @@ export class RuntimeHost {
           if (parsed.success) this.onEventFrame(parsed.data.frame);
           return;
         }
-        if (secretRequestSchema.safeParse(raw).success) {
+        if (raw?.kind === "secret.request") {
           void handleSecretRequest(raw).then(response => {
             if (response && this.child === child && this.status !== "stopping") {
               try { child.postMessage(response); } catch { /* 子进程可能已退出；不记录凭据消息。 */ }
@@ -110,14 +109,15 @@ export class RuntimeHost {
         if (configurationChangedSchema.safeParse(raw).success) { this.onConfigurationChanged(); return; }
         const pluginChanged = pluginConfigurationChangedSchema.safeParse(raw);
         if (pluginChanged.success) { this.onPluginConfigurationChanged(pluginChanged.data.id); return; }
-        if (contentResponseSchema.safeParse(raw).success) { this.contentRequests?.receive(raw); return; }
-        if (configurationResponseSchema.safeParse(raw).success) { this.configurationRequests?.receive(raw); return; }
-        if (pluginConfigurationResponseSchema.safeParse(raw).success) { this.pluginConfigurationRequests?.receive(raw); return; }
+        if (raw?.kind === "content.response") { this.contentRequests?.receive(raw); return; }
+        if (raw?.kind === "configuration.response") { this.configurationRequests?.receive(raw); return; }
+        if (raw?.kind === "plugin-configuration.response") { this.pluginConfigurationRequests?.receive(raw); return; }
         const stream = objectStreamSchema.safeParse(raw);
         if (stream.success) { this.onStream(stream.data); return; }
         const session = sessionChangedSchema.safeParse(raw);
         if (session.success) { this.onSessionChanged(session.data); return; }
-        if (sessionResponseSchema.safeParse(raw).success) { this.sessionRequests?.receive(raw); return; }
+        if (raw?.kind === "session.response") { this.sessionRequests?.receive(raw); return; }
+        if (raw?.kind === "response") { this.requests?.receive(raw); return; }
         const parsed = runtimeMessageSchema.safeParse(raw);
         if (!parsed.success) return;
         if (parsed.data.kind === "ready") {
@@ -135,7 +135,7 @@ export class RuntimeHost {
           this.sessionRequests?.close();
           child.kill();
           reject(Object.assign(new Error(parsed.data.message), { reason: parsed.data.reason, directory: parsed.data.directory }));
-        } else this.requests?.receive(raw);
+        }
       });
       child.once("exit", code => {
         clearTimeout(timeout);

@@ -50,7 +50,7 @@ export async function discoverModels({ provider, apiKey, signal }: DiscoveryInpu
   return [...models.values()];
 }
 
-/** 每个连接保留一次发现结果；刷新、连接变更及关闭终止旧请求，迟到结果不能覆盖新状态。 */
+/** 每个连接保留一次发现结果；刷新、删除连接及关闭时取消请求。 */
 export class ModelDiscoveries {
   private entries = new Map<string, { value: ModelDiscovery; controller: AbortController; timer: ReturnType<typeof setTimeout> }>();
   constructor(private readonly changed: () => void, private readonly discover: DiscoverModels, private readonly timeout: number) {}
@@ -69,7 +69,7 @@ export class ModelDiscoveries {
       controller.abort();
     }, this.timeout);
     this.entries.set(id, { controller, timer, value: {
-      id, providerId: provider.id, providerRevision: provider.revision, state: "running", models: [], error: null,
+      id, providerId: provider.id, state: "running", models: [], error: null,
     } });
     void this.run(id, provider, credential, controller.signal);
     return id;

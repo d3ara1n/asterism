@@ -13,16 +13,16 @@ async function execute<K extends ContentReply["kind"]>(command: ContentCommand, 
 }
 
 /** 消费者提前退出 for-await 时关闭读取；分块协议不暴露给插件组件。 */
-export function contentReader(source: () => Source | Promise<Source>): ContentReader {
+export function contentReader(source: () => Source | Promise<Source>, request = execute): ContentReader {
   const open = async function* (ref: ContentRef, range?: ContentRange): AsyncIterable<Uint8Array> {
-    const { readerId } = await execute({ type: "read.open", source: await source(), ref, range }, "reader");
+    const { readerId } = await request({ type: "read.open", source: await source(), ref, range }, "reader");
     try {
       while (true) {
-        const part = await execute({ type: "read.next", readerId }, "bytes");
+        const part = await request({ type: "read.next", readerId }, "bytes");
         if (part.done) return;
         yield part.data;
       }
-    } finally { await execute({ type: "read.close", readerId }, "done").catch(() => {}); }
+    } finally { await request({ type: "read.close", readerId }, "done").catch(() => {}); }
   };
   return { open, async read(ref, range) {
     const parts: Uint8Array[] = []; let size = 0;
@@ -41,29 +41,33 @@ export function contentReader(source: () => Source | Promise<Source>): ContentRe
 export function contentInput(target: Target): RendererContentInput {
   const bound = { ...target };
   let scope: Promise<string> | undefined, closed = false;
+  const checkOpen = () => { if (closed) throw new DOMException("The content input is closed.", "AbortError"); };
+  const request: typeof execute = (command, kind) => execute(command, kind).catch(error => {
+    checkOpen(); throw error;
+  });
   const get = () => {
-    if (closed) throw new Error("The content input is closed.");
-    return scope ??= execute({ type: "input.open", target: bound }, "input").then(reply => reply.scopeId);
+    checkOpen();
+    return scope ??= request({ type: "input.open", target: bound }, "input").then(reply => reply.scopeId);
   };
   const content: RendererContentInput = {
-    ...contentReader(async () => ({ scopeId: await get() })),
+    ...contentReader(async () => ({ scopeId: await get() }), request),
     async stage(source, options = {}) {
       options.signal?.throwIfAborted();
       const scopeId = await get();
-      if (closed) throw new Error("The content input is closed.");
-      const { uploadId } = await execute({ type: "upload.begin", scopeId }, "upload");
+      checkOpen();
+      const { uploadId } = await request({ type: "upload.begin", scopeId }, "upload");
       const total = source instanceof Uint8Array ? source.byteLength : source.size;
       try {
         for (let offset = 0; offset < total; offset += contentChunkSize) {
           options.signal?.throwIfAborted();
-          if (closed) throw new Error("The content input is closed.");
+          checkOpen();
           const data = source instanceof Uint8Array ? source.slice(offset, offset + contentChunkSize)
             : new Uint8Array(await source.slice(offset, offset + contentChunkSize).arrayBuffer());
-          await execute({ type: "upload.write", scopeId, uploadId, offset, data }, "done");
+          await request({ type: "upload.write", scopeId, uploadId, offset, data }, "done");
           options.progress?.(Math.min(offset + data.length, total), total);
         }
         options.signal?.throwIfAborted();
-        return (await execute({ type: "upload.seal", scopeId, uploadId }, "content")).ref;
+        return (await request({ type: "upload.seal", scopeId, uploadId }, "content")).ref;
       } catch (error) {
         await execute({ type: "upload.abort", scopeId, uploadId }, "done").catch(() => {}); throw error;
       }
@@ -73,7 +77,7 @@ export function contentInput(target: Target): RendererContentInput {
       if (scope) { const scopeId = await scope.catch(() => undefined); if (scopeId) await execute({ type: "input.close", scopeId }, "done").catch(() => {}); }
     },
   };
-  inputs.set(content, { target: bound, scope: async () => { if (closed) throw new Error("The content input is closed."); return scope; } });
+  inputs.set(content, { target: bound, scope: async () => { checkOpen(); return scope; } });
   return content;
 }
 export async function contentScopeId(content: RendererContentInput | undefined, target: Target): Promise<string | undefined> {

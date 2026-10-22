@@ -100,7 +100,7 @@ describe("插件提供预设与账户用量", () => {
     expect(consumer.providers.list()).toContainEqual(connection);
     const provider = consumer.usages.get(connection.usage!)!;
     if (provider.source === "headers") throw new Error("Expected query provider");
-    const credential = await consumer.providers.credential(connection);
+    const credential = await consumer.providers.credential(connection.id);
     expect(await provider.query({ connection: { id: connection.id, endpoint: connection.baseUrl }, credential, signal: new AbortController().signal })).toEqual(items);
     const [runtime, desktop] = await Promise.all([read(consumer), read(consumer)]);
     expect(runtime.items).toEqual(items);
@@ -126,8 +126,8 @@ describe("插件提供预设与账户用量", () => {
     expect(service.configuration.current().usageProviders?.filter(provider => provider.id === "zai-plan-cn")).toHaveLength(1);
   });
 
-  // 同一连接更新凭据/修订后，旧查询即使返回成功也不能覆盖新账户；失败保留上次实报。
-  it("旧修订结果失效，失败保留已知结果，提供方缺席明确不可用", async () => {
+  // 配置变化取消在途查询并清空缓存；完成结果照常交付，显式刷新重新查询，失败保留上次实报。
+  it("连接变化取消查询，刷新失败保留实报，提供方缺席明确不可用", async () => {
     let finish!: (items: UsageItem[]) => void;
     const query = vi.fn(async (_: UsageQueryContext) => items);
     const { service, observer } = open([definePlugin({ namespace: pluginNamespace("test.provider"), version: "1", setup: () => ({
@@ -140,7 +140,7 @@ describe("插件提供预设与账户用量", () => {
     await save(service, value.id, "Changed");
     finish(items);
     expect((await pending).items).toEqual([]);
-    const current = await read(observer);
+    const current = await read(observer, true);
     expect(current).toMatchObject({ state: "ready", items });
     query.mockRejectedValueOnce(new UsageQueryError("authentication"));
     expect(await read(observer, true)).toMatchObject({ state: "error", error: "authentication", items, updatedAt: current.updatedAt });

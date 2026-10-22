@@ -15,7 +15,6 @@ export const configurationChangedChannel = coreChannel("configuration-changed");
 export const configurationVersion = 15;
 const id = z.string().min(1).max(160);
 const name = z.string().trim().min(1).max(160);
-const revision = z.number().int().positive();
 /** 提供商 ID：程序与用户共用的可读 slug，可编辑，不含 `/` 与空白。 */
 export const providerIdSchema = z.string().trim().min(1).max(160).regex(/^[^/\s]+$/u, "Provider IDs cannot contain '/' or whitespace.");
 /** 服务端模型 ID：全局共识的模型名，可含 `/`，不含空白。 */
@@ -36,7 +35,7 @@ export const providerInputSchema = z.strictObject({
     "Fixed fields must be unique.").optional(),
 });
 export const credentialStateSchema = z.enum(["not_required", "missing", "available", "storage_unavailable", "decryption_failed"]);
-export const providerSchema = providerInputSchema.extend({ revision, credentialState: credentialStateSchema });
+export const providerSchema = providerInputSchema.extend({ credentialState: credentialStateSchema });
 export const modelInputSchema = z.strictObject({
   providerId: providerIdSchema, name, modelId: serverModelId, enabled: z.boolean(),
   contextWindow: z.number().int().positive().nullable(),
@@ -49,16 +48,16 @@ export const modelInputSchema = z.strictObject({
   }),
   compatibility: modelCompatibilitySchema,
 });
-export const modelSchema = modelInputSchema.extend({ revision });
+export const modelSchema = modelInputSchema;
 export const modelRoleInputSchema = z.strictObject({
   name, model: modelExpressionSchema.nullable(), thinking: thinkingSchema.nullable(), enabled: z.boolean(), description: z.string().max(20_000), hidden: z.boolean(),
 });
-export const modelRoleSchema = modelRoleInputSchema.extend({ id, revision, builtin: z.boolean() });
+export const modelRoleSchema = modelRoleInputSchema.extend({ id, builtin: z.boolean() });
 const overrideName = z.string().trim().max(160).optional();
 export const modelRoleOverridesSchema = modelRoleInputSchema.partial().extend({ name: overrideName });
 export const testErrorSchema = z.enum(["configuration", "credential", "authentication", "model_unavailable", "rate_limit", "network", "timeout", "protocol", "server", "cancelled"]);
 export const connectionTestSchema = z.strictObject({
-  id, providerId: providerIdSchema, providerRevision: revision, model: modelExpressionSchema, modelRevision: revision,
+  id, providerId: providerIdSchema, model: modelExpressionSchema,
   state: z.enum(["running", "succeeded", "failed", "cancelled"]), startedAt: z.string(),
   durationMs: z.number().nonnegative().nullable(), error: testErrorSchema.nullable(), message: z.string().nullable(),
 });
@@ -70,7 +69,7 @@ export const discoveredModelSchema = z.strictObject({
   thinkingLevels: z.array(thinkingSchema).optional(),
 });
 export const modelDiscoverySchema = z.strictObject({
-  id, providerId: providerIdSchema, providerRevision: revision,
+  id, providerId: providerIdSchema,
   state: z.enum(["running", "succeeded", "failed", "cancelled"]),
   models: z.array(discoveredModelSchema),
   error: z.enum(["configuration", "credential", "authentication", "unsupported", "rate_limit", "network", "timeout", "protocol", "server", "cancelled"]).nullable(),
@@ -130,7 +129,7 @@ export const configurationResultSchema = z.discriminatedUnion("ok", [
   z.strictObject({ ok: z.literal(true), snapshot: configurationSnapshotSchema, savedId: z.string().max(321).nullable(), parameterUpdate: modelParameterUpdateSchema.optional() }),
   z.strictObject({ ok: z.literal(false), error: configurationErrorSchema }),
 ]);
-export const configurationRequestSchema = z.strictObject({ kind: z.literal("configuration.request"), version: z.literal(configurationVersion), id: z.string().uuid(), command: configurationCommandSchema });
+export const configurationRequestSchema = z.strictObject({ kind: z.literal("configuration.request"), version: z.literal(configurationVersion), id: z.string().uuid(), command: z.unknown() });
 export const configurationResponseSchema = z.strictObject({ kind: z.literal("configuration.response"), version: z.literal(configurationVersion), id: z.string().uuid(), result: configurationResultSchema });
 export const configurationChangedSchema = z.strictObject({ kind: z.literal("configuration.changed") });
 export type Provider = z.infer<typeof providerSchema>;

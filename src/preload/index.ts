@@ -3,20 +3,20 @@ import { languageGetChannel, languageSetChannel, languageChangedChannel, languag
 import { applicationBrand } from "../shared/application.ts";
 import { desktopBridgeKey } from "../shared/core.ts";
 import { desktopWindowChangedChannel, desktopWindowGetChannel, desktopWindowStateSchema } from "../shared/desktop.ts";
-import { commandChannel, pickDirectoryChannel, statusChannel, commandSchema, resultSchema, runtimeStatusSchema, type DesktopBridge } from "../shared/contracts.ts";
+import { commandChannel, pickDirectoryChannel, statusChannel, resultSchema, runtimeStatusSchema, type DesktopBridge } from "../shared/contracts.ts";
 import { objectStreamChannel, objectStreamSchema } from "../shared/object-stream.ts";
-import { configurationChannel, configurationChangedChannel, configurationCommandSchema, configurationResultSchema } from "../shared/configuration.ts";
+import { configurationChannel, configurationChangedChannel, configurationResultSchema } from "../shared/configuration.ts";
 import { appearanceChangedChannel, appearanceGetChannel, appearancePatchSchema, appearanceSetChannel, parseAppearance } from "../shared/theme.ts";
-import { sessionChannel, sessionChangedChannel, sessionCommandSchema, sessionResultSchema, sessionChangedSchema } from "../shared/session.ts";
+import { sessionChannel, sessionChangedChannel, sessionResultSchema, sessionChangedSchema } from "../shared/session.ts";
 import { preferencesGetChannel, preferencesSetChannel, preferenceWriteSchema, uiStateSchemas } from "../shared/ui-state.ts";
-import { pluginConfigurationChangedChannel, pluginConfigurationChannel, pluginConfigurationCommandSchema, pluginConfigurationResultSchema } from "../shared/plugin-configuration.ts";
-import { contentChannel, contentCommandSchema, contentResultSchema } from "../shared/content.ts";
-import { pluginEventsChannel, eventControlSchema, eventFrameSchema } from "../shared/plugin-events.ts";
-import { pluginCallsChannel, callControlSchema, callFrameSchema } from "../shared/plugin-calls.ts";
+import { pluginConfigurationChangedChannel, pluginConfigurationChannel, pluginConfigurationResultSchema } from "../shared/plugin-configuration.ts";
+import { contentChannel, contentResultSchema } from "../shared/content.ts";
+import { pluginEventsChannel, eventFrameSchema } from "../shared/plugin-events.ts";
+import { pluginCallsChannel, callFrameSchema } from "../shared/plugin-calls.ts";
 
 const bridge: DesktopBridge = {
   calls: {
-    send(control) { ipcRenderer.send(pluginCallsChannel, callControlSchema.parse(control)); },
+    send(control) { ipcRenderer.send(pluginCallsChannel, control); },
     onFrame(listener) {
       const handler = (_event: Electron.IpcRendererEvent, raw: unknown) => {
         const parsed = callFrameSchema.safeParse(raw);
@@ -27,7 +27,7 @@ const bridge: DesktopBridge = {
     },
   },
   events: {
-    send(control) { ipcRenderer.send(pluginEventsChannel, eventControlSchema.parse(control)); },
+    send(control) { ipcRenderer.send(pluginEventsChannel, control); },
     onFrame(listener) {
       const handler = (_event: Electron.IpcRendererEvent, raw: unknown) => {
         const parsed = eventFrameSchema.safeParse(raw);
@@ -39,9 +39,7 @@ const bridge: DesktopBridge = {
   },
   content: {
     async execute(command) {
-      const parsed = contentCommandSchema.safeParse(command);
-      if (!parsed.success) return { ok: false, error: { code: "invalid_request", message: "Invalid content command." } };
-      try { return contentResultSchema.parse(await ipcRenderer.invoke(contentChannel, parsed.data)); }
+      try { return contentResultSchema.parse(await ipcRenderer.invoke(contentChannel, command)); }
       catch { return { ok: false, error: { code: "unavailable", message: "The content connection was lost." } }; }
     },
   },
@@ -58,9 +56,7 @@ const bridge: DesktopBridge = {
   },
   pluginConfiguration: {
     async execute(command) {
-      const parsed = pluginConfigurationCommandSchema.safeParse(command);
-      if (!parsed.success) return { ok: false, error: { code: "invalid_request", message: "Invalid plugin configuration command." } };
-      try { return pluginConfigurationResultSchema.parse(await ipcRenderer.invoke(pluginConfigurationChannel, parsed.data)); }
+      try { return pluginConfigurationResultSchema.parse(await ipcRenderer.invoke(pluginConfigurationChannel, command)); }
       catch { return { ok: false, error: { code: "unavailable", message: "The plugin configuration connection was lost. Reload before retrying." } }; }
     },
     onChanged(listener) {
@@ -71,9 +67,7 @@ const bridge: DesktopBridge = {
   },
   session: {
     async execute(command) {
-      const parsed = sessionCommandSchema.safeParse(command);
-      if (!parsed.success) return { ok: false, error: { code: "invalid_request", message: "Invalid session command." } };
-      try { return sessionResultSchema.parse(await ipcRenderer.invoke(sessionChannel, parsed.data)); }
+      try { return sessionResultSchema.parse(await ipcRenderer.invoke(sessionChannel, command)); }
       catch { return { ok: false, error: { code: "unavailable", message: "The session connection was lost. Reopen history before retrying." } }; }
     },
     onChanged(listener) {
@@ -96,9 +90,7 @@ const bridge: DesktopBridge = {
   },
   configuration: {
     async execute(command) {
-      const parsed = configurationCommandSchema.safeParse(command);
-      if (!parsed.success) return { ok: false, error: { code: "invalid_request", message: "Invalid configuration command." } };
-      try { return configurationResultSchema.parse(await ipcRenderer.invoke(configurationChannel, parsed.data)); }
+      try { return configurationResultSchema.parse(await ipcRenderer.invoke(configurationChannel, command)); }
       catch { return { ok: false, error: { code: "unavailable", message: "The configuration connection was lost. Reload settings before retrying." } }; }
     },
     onChanged(listener) {
@@ -137,9 +129,7 @@ const bridge: DesktopBridge = {
     },
   },
   async execute(command) {
-    const parsed = commandSchema.safeParse(command);
-    if (!parsed.success) return { ok: false, error: { code: "invalid_request", message: "Invalid application command." } };
-    try { return resultSchema.parse(await ipcRenderer.invoke(commandChannel, parsed.data)); }
+    try { return resultSchema.parse(await ipcRenderer.invoke(commandChannel, command)); }
     catch { return { ok: false, error: { code: "unavailable", message: `The application connection was lost. Restart ${applicationBrand.en} and inspect the workspace before retrying.` } }; }
   },
   onObjectStream(sessionId, objectId, listener) {

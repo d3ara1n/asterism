@@ -27,7 +27,7 @@ export const pluginConfigurationResultSchema = z.discriminatedUnion("ok", [
 ]);
 export type PluginConfigurationResult = z.infer<typeof pluginConfigurationResultSchema>;
 export const pluginConfigurationRequestSchema = z.strictObject({ kind: z.literal("plugin-configuration.request"),
-  version: z.literal(pluginConfigurationVersion), id: z.string().uuid(), command: pluginConfigurationCommandSchema });
+  version: z.literal(pluginConfigurationVersion), id: z.string().uuid(), command: z.unknown() });
 export const pluginConfigurationResponseSchema = z.strictObject({ kind: z.literal("plugin-configuration.response"),
   version: z.literal(pluginConfigurationVersion), id: z.string().uuid(), result: pluginConfigurationResultSchema });
 export interface PluginConfigurationBridge {

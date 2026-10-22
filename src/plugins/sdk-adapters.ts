@@ -1,4 +1,4 @@
-import { jsonSchema, reference, resourceCallSchema, type Json, type ContractReference } from "@atelier/sdk/contracts";
+import { jsonSchema, reference, type ResourceCall, type Json, type ContractReference } from "@atelier/sdk/contracts";
 import { PluginApiError, type ResourceContribution, type ResourceRef, type ToolContribution, type ResourceSnapshot } from "@atelier/sdk/runtime";
 import { SessionError } from "../session/tree.ts";
 import type { FoldedObject } from "../session/fold.ts";
@@ -60,9 +60,9 @@ export function adaptResource(contribution: ResourceContribution, sdk: SdkContex
       actionContracts: [...actions.values()].map(action => action.contract),
       assertActionEntry,
       ...(creation ? {
-        async prepareCreate(input: unknown, request?: AbortSignal, content?: ContentLease) {
+        async prepareCreate(input: ResourceCall, request?: AbortSignal, content?: ContentLease) {
           try {
-            const parsed = parseCall(creation.contract, resourceCallSchema.parse(input)).value;
+            const parsed = parseCall(creation.contract, input).value;
             return await runs.start(async signal => {
               signal.throwIfAborted();
               const prepared = applyPreparation(creation.contract, parsed, await creation.prepare?.(parsed, { signal, content: sdk.content(content, undefined, signal) }));
@@ -92,8 +92,7 @@ export function adaptResource(contribution: ResourceContribution, sdk: SdkContex
         },
       } : {}),
       ...(actions.size ? {
-        parseCommand(raw: unknown) {
-          const call = resourceCallSchema.parse(raw);
+        parseCommand(call: ResourceCall) {
           return parseCall(actionFor(call).contract, call);
         },
         async prepareCommand(call: ParsedCall, ref: ResourceRef, signal: AbortSignal) {

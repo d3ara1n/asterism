@@ -6,7 +6,7 @@ import { waitForUsage, UsageConsumer } from "./service.ts";
 const items: UsageItem[] = [{ id: "quota", label: "Quota", scope: "connection", type: "quota", category: "rate_limit",
   value: { type: "ratio", remaining: 0.4 }, window: { mode: "unknown", durationMs: null, resetAt: null } }];
 function setup(provider: UsageProvider) {
-  let connection: ProviderInfo = { id: "p", name: "P", revision: 1, protocol: "openai-chat", baseUrl: "https://example.test/v1",
+  let connection: ProviderInfo = { id: "p", name: "P", protocol: "openai-chat", baseUrl: "https://example.test/v1",
     auth: "api_key", enabled: true, compatibility: [], usage: provider.id };
   const listeners = new Set<() => void>();
   const subscribe = (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener); }; };
@@ -15,10 +15,11 @@ function setup(provider: UsageProvider) {
   const usages: UsageServices = { list: () => [], get: () => provider, subscribe };
   const changed = vi.fn();
   const usage = new UsageConsumer(providers, usages, changed);
-  return { usage, credential, changed, response: (): ModelResponse => ({ connection: { id: connection.id, revision: connection.revision },
+  return { usage, credential, changed, response: (): ModelResponse => ({ connection: { id: connection.id },
     endpoint: connection.baseUrl, model: "model", receivedAt: Date.now(), status: 429, headers: { quota: "yes" } }),
-    change(replacement: boolean) {
-      connection = { ...connection, revision: replacement ? 1 : 2, baseUrl: "https://new.test/v1" };
+    change(next = provider) {
+      provider = next;
+      connection = { ...connection, baseUrl: "https://new.test/v1", usage: provider.id };
       for (const listener of listeners) listener();
     } };
 }
@@ -60,16 +61,34 @@ describe("内置用量消费者", () => {
       expect(await fixture.usage.query("p")).toMatchObject({ state: "ready", items: [] });
     } finally { fixture.usage.close(); }
   });
-  // 已修改的配置不再消费旧连接结果；只校验现有修订与端点，不引入额外实例身份。
-  it.each([false, true])("连接修订或端点变化后不消费旧响应（重建：%s）", async replacement => {
+  // 响应按连接当前 usage 消费；请求取用的端点变化不使返回结果失效。
+  it("连接变化清空缓存，迟到响应仍按当前目录消费", async () => {
     const parseHeaders = vi.fn(() => items);
     const fixture = setup({ id: "headers", label: "Headers", source: "headers", parseHeaders });
     try {
       const response = fixture.response();
-      fixture.change(replacement);
-      fixture.usage.consume(response);
-      expect(parseHeaders).not.toHaveBeenCalled();
+      fixture.change();
       expect(await fixture.usage.query("p")).toMatchObject({ state: "waiting", items: [] });
+      fixture.usage.consume(response);
+      expect(parseHeaders).toHaveBeenCalledOnce();
+      expect(await fixture.usage.query("p")).toMatchObject({ state: "ready", items });
+    } finally { fixture.usage.close(); }
+  });
+  // 迟到的查询状态可以写回缓存，但新响应必须声明本次实际使用的 headers 来源，避免继续轮询。
+  it("查询切换到响应头来源后，新响应更新来源元数据", async () => {
+    let finish!: (value: UsageItem[]) => void;
+    const query = vi.fn(() => new Promise<UsageItem[]>(resolve => { finish = resolve; }));
+    const fixture = setup({ id: "query-provider", label: "Query", query });
+    try {
+      const pending = fixture.usage.query("p");
+      await vi.waitFor(() => expect(query).toHaveBeenCalledOnce());
+      fixture.change({ id: "header-provider", label: "Headers", source: "headers", parseHeaders: () => items });
+      finish(items);
+      await pending;
+      fixture.usage.consume(fixture.response());
+      expect(await fixture.usage.query("p")).toMatchObject({
+        state: "ready", usage: "header-provider", source: "headers", items,
+      });
     } finally { fixture.usage.close(); }
   });
 });

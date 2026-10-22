@@ -48,10 +48,8 @@ export async function startLanguage(
   bridge: LanguageBridge = window.host.language,
 ): Promise<() => void> {
   catalogs = [...entries];
-  // 先订阅再读取，避免语言设置在初始化间隙改变。
-  let changed = false;
+  // 先订阅再读取，直接采用收到的当前值。
   const stop = bridge.onChanged(value => {
-    changed = true;
     if (value.preference === language.preference
       && value.locale === language.locale
       && value.interfaceLocale === language.interfaceLocale) return;
@@ -59,8 +57,7 @@ export async function startLanguage(
     publish();
   });
   try {
-    const initial = await bridge.get();
-    if (!changed) language = initial;
+    language = await bridge.get();
     publish();
     return stop;
   } catch (error) {

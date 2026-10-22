@@ -22,7 +22,7 @@ import { Section } from "../settings/layout";
 import { Editor, EditorSection, ModifiedNote, OverrideNumberField } from "./forms";
 import { useSettingsConfiguration } from "./state";
 
-type Base = Omit<AgentConfiguration, "id" | "revision" | "builtin">;
+type Base = Omit<AgentConfiguration, "id" | "builtin">;
 const NONE = "__none";
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 const baseOf = (snapshot: ConfigurationSnapshot, agent?: AgentConfiguration): Base => snapshot.defaults.agents[agent?.builtin ? agent.id : "worker"]!;

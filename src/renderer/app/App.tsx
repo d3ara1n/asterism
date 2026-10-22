@@ -133,7 +133,7 @@ export function App({ controller }: { controller: ApplicationController }) {
   };
   const creation = useCreationCoordinator({ controller: active, canvas: () => workbench.current?.canvas ?? null, writable, ready });
   const menuGroup = (group: "agents" | "resources") => creation.menu.filter(entry => (entry.group ?? "resources") === group)
-    .map(entry => <DropdownMenuItem key={entry.id} onSelect={() => creation.open(entry)}>{entry.icon}{i18n.text(entry.label)}{entry.InputView ? "…" : ""}</DropdownMenuItem>);
+    .map(entry => <DropdownMenuItem key={entry.id} disabled={creation.pending} onSelect={() => creation.open(entry)}>{entry.icon}{i18n.text(entry.label)}{entry.InputView ? "…" : ""}</DropdownMenuItem>);
   const agentItems = menuGroup("agents"), resourceItems = menuGroup("resources");
   const hideSidebar = () => {
     setSidebarVisible(false);

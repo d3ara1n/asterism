@@ -5,9 +5,9 @@ import { classifyProbeError, runConnectionProbe } from "./probe.ts";
 import { applicationUserAgent } from "../shared/application.ts";
 
 afterEach(() => vi.unstubAllEnvs());
-const model: ProviderModel = { providerId: "provider", revision: 1, name: "Test", modelId: "test-model", enabled: true, contextWindow: null, cost: null, compatibility: [],
+const model: ProviderModel = { providerId: "provider", name: "Test", modelId: "test-model", enabled: true, contextWindow: null, cost: null, compatibility: [],
   capabilities: { reasoning: false, tools: true, thinkingLevels: [...thinkingLevels] }, generation: { temperature: null, topP: null, maxOutputTokens: null } };
-const provider = (protocol: Provider["protocol"]): Provider => ({ id: "provider", revision: 1, name: "Test", protocol, baseUrl: "http://localhost:9999/v1", enabled: true, auth: "none", compatibility: [], credentialState: "not_required" });
+const provider = (protocol: Provider["protocol"]): Provider => ({ id: "provider", name: "Test", protocol, baseUrl: "http://localhost:9999/v1", enabled: true, auth: "none", compatibility: [], credentialState: "not_required" });
 // 独立协议响应样本：分别遵循 Responses、Chat Completions、Messages 的成功响应契约。
 const responses = {
   "openai-responses": { id: "resp_1", object: "response", created_at: 1700000000, status: "completed", model: "test-model", error: null, incomplete_details: null,

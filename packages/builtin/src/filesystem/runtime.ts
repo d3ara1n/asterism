@@ -6,7 +6,7 @@ import { Directory, CreateDirectory, DirectoryView, DirectoryList, DirectoryRead
 import { readImageFile } from "./image-io.ts";
 import { withinDirectory, writableTarget } from "./paths.ts";
 import { failed, filesystemFailure } from "./errors.ts";
-import { readTextFile, withFileMutation, commitTextFile, validateTextSize, UnconfirmedWriteError } from "./text-io.ts";
+import { readTextFile, commitTextFile, validateTextSize, UnconfirmedWriteError } from "./text-io.ts";
 
 function textFailure(error: unknown, signal: AbortSignal, operation: string): CallResult<never> {
   if (error instanceof UnconfirmedWriteError) return { kind: "unknown", message: error.message };
@@ -71,7 +71,7 @@ export default defineModule(() => ({
     implementTool(DirectoryRead, {
       async call(directory, target, args, { signal }) {
         try {
-          const file = await readTextFile(directory.path, target.path, signal);
+          const file = await readTextFile(await withinDirectory(directory.path, target.path), signal);
           const data = readText(file.text, args.anchored !== false, {
             offset: target.offset, limit: target.limit ?? 1000, maxBytes: 64 * 1024,
           });
@@ -83,16 +83,13 @@ export default defineModule(() => ({
     implementTool(DirectoryEdit, {
       async call(directory, target, args, { signal }) {
         try {
-          const resolved = await withinDirectory(directory.path, target.path);
-          return await withFileMutation(resolved, async () => {
-            const before = await readTextFile(directory.path, target.path, signal);
-            if (before.path !== resolved) throw new TextError("file_changed", "The target path changed while waiting for an earlier operation.");
-            const edited = editText(before.text, args.edits);
-            validateTextSize(edited.text);
-            const data = { path: target.path, ...textChange(before.text, edited.text, target.path, edited.touchedLines) };
-            await commitTextFile(directory.path, target.path, before, edited.text, signal);
-            return { kind: "succeeded" as const, data };
-          });
+          const selected = await writableTarget(directory.path, target.path);
+          const before = await readTextFile(selected.path, signal);
+          const edited = editText(before.text, args.edits);
+          validateTextSize(edited.text);
+          const data = { path: target.path, ...textChange(before.text, edited.text, target.path, edited.touchedLines) };
+          await commitTextFile(selected, before, edited.text, signal);
+          return { kind: "succeeded" as const, data };
         } catch (error) { return textFailure(error, signal, "Edit target file"); }
       },
       toModel: data => `${data.path}\n${editToModel(data)}`,
@@ -103,22 +100,16 @@ export default defineModule(() => ({
           signal.throwIfAborted();
           validateTextSize(args.content);
           const selected = await writableTarget(directory.path, target.path);
-          return await withFileMutation(selected.path, async () => {
-            signal.throwIfAborted();
-            let before: Awaited<ReturnType<typeof readTextFile>> | null = null;
-            try { before = await readTextFile(directory.path, target.path, signal); }
-            catch (error) {
-              const outcome = filesystemFailure(error, "Read existing target");
-              if (outcome.error.code !== "path_not_found") throw error;
-              // 断开的符号链接不会被当成不存在的目标覆盖。
-              await writableTarget(directory.path, target.path);
-            }
-            if ((await writableTarget(directory.path, target.path)).path !== selected.path) throw new TextError("file_changed", "The target path changed while waiting for an earlier operation.");
-            const change = textChange(before?.text ?? "", args.content, target.path);
-            const data = { path: target.path, created: before === null, ...change, changed: before === null || change.changed };
-            if (before === null || data.changed) await commitTextFile(directory.path, target.path, before, args.content, signal);
-            return { kind: "succeeded" as const, data };
-          });
+          let before: Awaited<ReturnType<typeof readTextFile>> | null = null;
+          try { before = await readTextFile(selected.path, signal); }
+          catch (error) {
+            const outcome = filesystemFailure(error, "Read existing target");
+            if (outcome.error.code !== "path_not_found") throw error;
+          }
+          const change = textChange(before?.text ?? "", args.content, target.path);
+          const data = { path: target.path, created: before === null, ...change, changed: before === null || change.changed };
+          if (before === null || data.changed) await commitTextFile(selected, before, args.content, signal);
+          return { kind: "succeeded" as const, data };
         } catch (error) { return textFailure(error, signal, "Write target file"); }
       },
       toModel: data => `${data.path}${data.created ? " (created)" : ""}: ${writeToModel(data)}`,

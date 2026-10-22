@@ -11,6 +11,5 @@ export const modelCatalogMessages = pluginNamespace("atelier.host").messages("en
   invalid: { id: "modelCatalog.invalid", defaultMessage: "models.dev returned invalid parameter data. Your settings were kept." },
   notFound: { id: "modelCatalog.notFound", defaultMessage: "No exact model match was found on models.dev. Enter the parameters manually." },
   ambiguous: { id: "modelCatalog.ambiguous", defaultMessage: "Multiple models match this ID on models.dev. Enter the parameters manually." },
-  changed: { id: "modelCatalog.changed", defaultMessage: "The model or connection changed while fetching parameters. Nothing was overwritten; fetch again." },
   saveFirst: { id: "modelCatalog.saveFirst", defaultMessage: "Save your changes before fetching parameters." },
 }));

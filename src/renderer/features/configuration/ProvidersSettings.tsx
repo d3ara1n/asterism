@@ -35,7 +35,6 @@ import { ProviderAuthentication, type ProviderCredentialDraft } from "./Provider
 const protocols = Object.entries(modelProtocolLabels).map(([value, label]) => ({ value, label }));
 const protocolLabel = (value: string) => protocols.find(item => item.value === value)?.label ?? value;
 const islandWidth = { min: 400, grow: 1, max: 620 };
-type ModelValue = Omit<ProviderModel, "revision">;
 type ProviderValue = ProviderDraft;
 
 /* ---------- 状态推导：列表与详情共用，均直接读取最新快照 ---------- */
@@ -48,9 +47,9 @@ function providerHealth(snapshot: ConfigurationSnapshot, provider: Provider): He
   if (provider.auth === "api_key" && provider.credentialState !== "available") return { tone: "warning", label: getI18n().formatMessage(providersMessages.needsApiKey) };
   const models = snapshot.models.filter(model => model.providerId === provider.id);
   if (!models.length) return { tone: "neutral", label: getI18n().formatMessage(providersMessages.noModels) };
-  const tests = models.map(model => latestTest(snapshot, modelReference(model))).filter(test => test && test.providerRevision === provider.revision);
-  if (tests.some(test => test!.state === "failed")) return { tone: "error", label: getI18n().formatMessage(providersMessages.lastTestFailed) };
-  if (tests.some(test => test!.state === "succeeded")) return { tone: "success", label: getI18n().formatMessage(providersMessages.connected) };
+  const tests = models.map(model => latestTest(snapshot, modelReference(model)));
+  if (tests.some(test => test?.state === "failed")) return { tone: "error", label: getI18n().formatMessage(providersMessages.lastTestFailed) };
+  if (tests.some(test => test?.state === "succeeded")) return { tone: "success", label: getI18n().formatMessage(providersMessages.connected) };
   return { tone: "neutral", label: getI18n().formatMessage(providersMessages.notTested) };
 }
 /** 按错误类别给出下一步；原始信息仍随结果展示。 */
@@ -70,7 +69,6 @@ const testHints = (): Record<TestError, string> => ({
 /* ---------- 即时操作：与编辑草稿分离，任何浮岛中触发都写回同一快照 ---------- */
 
 function useQuickActions() {
-
   const { snapshot, run } = useSettingsConfiguration();
   return {
     setProviderEnabled: (provider: Provider, enabled: boolean) => run({ type: "provider.save", id: provider.id, credential: { action: "keep" },
@@ -89,11 +87,7 @@ const providerValue = (provider: Provider): ProviderValue => ({
   ...(provider.usage !== undefined && { usage: provider.usage }),
   ...(provider.fixedFields && { fixedFields: [...provider.fixedFields] }),
 });
-const modelValue = (model: ProviderModel): ModelValue => ({
-  providerId: model.providerId, name: model.name, modelId: model.modelId, enabled: model.enabled, contextWindow: model.contextWindow,
-  capabilities: { ...model.capabilities }, generation: { ...model.generation }, compatibility: structuredClone(model.compatibility),
-  cost: structuredClone(model.cost),
-});
+const modelValue = (model: ProviderModel): ProviderModel => structuredClone(model);
 
 /* ---------- 根：提供商总览 ---------- */
 
@@ -278,10 +272,9 @@ function ProviderEditor({ initialId, initialValue = blank }: { initialId: string
   </Editor>;
 }
 
-function TestResult({ test, stale }: { test: ConnectionTest; stale: boolean }) {
+function TestResult({ test }: { test: ConnectionTest }) {
   const i18n = useI18n();
   if (test.state === "running") return <StatusText tone="progress">{i18n.formatMessage(providersMessages.testing)}</StatusText>;
-  if (stale) return <StatusText tone="warning">{i18n.formatMessage(providersMessages.settingsChanged)}</StatusText>;
   if (test.state === "succeeded") return <StatusText tone="success">{i18n.formatMessage(providersMessages.testConnected)}{test.durationMs !== null && ` · ${test.durationMs} ms`}</StatusText>;
   return <StatusText tone="error">{test.error ? testHints()[test.error] : test.message}</StatusText>;
 }
@@ -291,10 +284,9 @@ function ModelRow({ model, provider, selected, onOpen }: { model: ProviderModel;
   const { snapshot, busy } = useSettingsConfiguration();
   const quick = useQuickActions();
   const test = snapshot ? latestTest(snapshot, modelReference(model)) : undefined;
-  const stale = !!test && (test.modelRevision !== model.revision || test.providerRevision !== provider.revision);
   const running = test?.state === "running";
   return <ListRow title={model.name} selected={selected} disabled={busy} onOpen={onOpen}
-    description={<><span className="font-mono">{model.modelId}</span>{test && <> · <TestResult test={test} stale={stale} /></>}</>}
+    description={<><span className="font-mono">{model.modelId}</span>{test && <> · <TestResult test={test} /></>}</>}
     actions={<>
       <Button size="sm" variant="ghost" disabled={busy || (!running && (!model.enabled || !provider.enabled))} onClick={() => void quick.test(model)}>
         {running ? i18n.formatMessage(providersMessages.cancelTestRequest) : i18n.formatMessage(providersMessages.test)}</Button>
@@ -312,15 +304,14 @@ function ModelEditor({ initialId, providerId }: { initialId: string | null; prov
   const [id, setId] = useState(initialId);
   const current = snapshot?.models.find(model => modelReference(model) === id);
   const provider = snapshot?.providers.find(item => item.id === providerId);
-  const [value, setValue] = useState<ModelValue>(() => current ? modelValue(current) : createModelInput(providerId, { name: "", modelId: "" }));
-  const set = <K extends keyof ModelValue>(field: K, next: ModelValue[K]) => setValue(previous => ({ ...previous, [field]: next }));
+  const [value, setValue] = useState<ProviderModel>(() => current ? modelValue(current) : createModelInput(providerId, { name: "", modelId: "" }));
+  const set = <K extends keyof ProviderModel>(field: K, next: ProviderModel[K]) => setValue(previous => ({ ...previous, [field]: next }));
   // 与提供商一致：名称在前并生成 ID；手动改过 ID 或编辑已有模型时不再覆盖。
   const [idEdited, setIdEdited] = useState(!!current);
   const setName = (name: string) => setValue(previous => ({ ...previous, name, ...(idEdited ? {} : { modelId: slugify(name, { slash: true }) }) }));
   // enabled 为即时操作，比较与保存都取快照值。
   const dirty = useMemo(() => !current || JSON.stringify({ ...modelValue(current), enabled: 0 }) !== JSON.stringify({ ...value, enabled: 0 }), [current, value]);
   const test = current && snapshot ? latestTest(snapshot, modelReference(current)) : undefined;
-  const stale = !!test && !!current && (test.modelRevision !== current.revision || test.providerRevision !== provider?.revision);
   const users = current && snapshot ? snapshot.roles.filter(role => role.model === modelReference(current)) : [];
   const parameters = useModelParameters(current, dirty, updated => setValue(modelValue(updated)));
 
@@ -400,8 +391,8 @@ function ModelEditor({ initialId, providerId }: { initialId: string | null; prov
       action={<Button size="sm" variant="outline" disabled={busy || (test?.state !== "running" && (!current.enabled || !provider?.enabled))} onClick={() => void quick.test(current)}>
         {test?.state === "running" ? <><Spinner data-icon="inline-start" />{i18n.formatMessage(providersMessages.cancelTest)}</> : <><PlugZap data-icon="inline-start" />{i18n.formatMessage(providersMessages.testConnection)}</>}</Button>}>
       {test && <div role="status" className="flex flex-col gap-1">
-        <TestResult test={test} stale={stale} />
-        {test.state === "failed" && test.message && !stale && <p className="type-caption break-words">{test.message}</p>}
+        <TestResult test={test} />
+        {test.state === "failed" && test.message && <p className="type-caption break-words">{test.message}</p>}
       </div>}
     </EditorSection>}
   </Editor>;

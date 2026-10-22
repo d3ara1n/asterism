@@ -12,8 +12,8 @@ import { ModelFailure, type ModelAdapter, type ModelEvent } from "../model/contr
 import type { ModelSettings } from "../shared/model.ts";
 
 const settings: ModelSettings = {
-  provider: { id: "p", revision: 1, name: "Provider", enabled: true, baseUrl: "https://example.invalid", protocol: "openai-responses", auth: "none", compatibility: [] },
-  model: { revision: 1, name: "Model", modelId: "test", providerId: "p", enabled: true, contextWindow: 4000, cost: null, compatibility: [],
+  provider: { id: "p", name: "Provider", enabled: true, baseUrl: "https://example.invalid", protocol: "openai-responses", auth: "none", compatibility: [] },
+  model: { name: "Model", modelId: "test", providerId: "p", enabled: true, contextWindow: 4000, cost: null, compatibility: [],
     capabilities: { reasoning: false, tools: true, thinkingLevels: [...thinkingLevels] }, generation: { temperature: null, topP: null, maxOutputTokens: null } }, thinking: "off",
 };
 const empty = () => new AgentCapabilities(new ResourceRegistry([]), new ToolRegistry([]), [], () => true);
@@ -47,7 +47,7 @@ const write = defineImplementation({ ...defineData("example.resource/write", z.n
 describe("无状态的单次模型执行", () => {
   // 响应元信息只随返回结果交付发起者，不进入可保存的块、诊断或进度事件。
   it.each(["completed", "failed"] as const)("%s 结果保留 HTTP 元信息，观察事件不包含 headers", async outcome => {
-    const response = { connection: { id: "p", revision: 1 }, endpoint: settings.provider.baseUrl, model: "test",
+    const response = { connection: { id: "p" }, endpoint: settings.provider.baseUrl, model: "test",
       status: outcome === "completed" ? 200 : 429, receivedAt: 1, headers: { "x-test-metadata": "private-response" } };
     const failure = new ModelFailure("provider_error", "Failed.");
     failure.response = response;

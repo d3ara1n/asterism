@@ -37,8 +37,8 @@ export interface ProviderServices {
   presets(): readonly ProviderPreset[];
   list(): readonly ProviderInfo[];
   get(id: string): ProviderInfo | null;
-  /** 仅后台可用；校验连接修订，返回该连接的凭据，无鉴权连接返回 null。 */
-  credential(connection: Pick<ProviderInfo, "id" | "revision">, options?: { signal?: AbortSignal }): Promise<string | null>;
+  /** 仅后台可用；读取该连接的当前凭据，无鉴权连接返回 null。 */
+  credential(id: string, options?: { signal?: AbortSignal }): Promise<string | null>;
   /** 连接或预设目录变化；返回取消订阅函数，插件关闭时自动取消。 */
   subscribe(listener: () => void): () => void;
 }
@@ -46,7 +46,6 @@ export interface ProviderInfo extends ProviderConnection {
   id: string;
   name: string;
   enabled: boolean;
-  revision: number;
 }
 export interface UsageServices {
   list(): readonly UsageProviderInfo[];

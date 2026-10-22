@@ -606,7 +606,7 @@ describe("会话运行时", () => {
       } };
     } };
     const { service, start } = await setup(model);
-    const { revision: _revision, ...configured } = service.configuration.current().models[0]!;
+    const configured = service.configuration.current().models[0]!;
     await service.configuration.execute({ type: "model.save", id: start.model, value: { ...configured, contextWindow: 200_000 } });
     const first = await execute(service, start); await settled(service);
     const saved = service.sessions.tree.timeline(first.sessionId);
@@ -660,7 +660,7 @@ describe("会话运行时", () => {
       } };
     } };
     const { service, start } = await setup(model);
-    const { revision: _revision, ...configured } = service.configuration.current().models[0]!;
+    const configured = service.configuration.current().models[0]!;
     await service.configuration.execute({ type: "model.save", id: start.model, value: { ...configured, contextWindow: 40_000 } });
     const first = await execute(service, { ...start, parts: [{ kind: "text", text: "Original task " + "O".repeat(20_000) }] });
     if (failure === "cancel") {
@@ -698,7 +698,7 @@ describe("会话运行时", () => {
     await settled(service);
     expect(inputs.at(-1)!.settings.thinking).toBe("low");
     expect(selectionOf(service.sessions.current(first.sessionId))).toMatchObject({ model: null, thinking: null });
-    const { revision: _revision, ...configured } = service.configuration.current().models[0]!;
+    const configured = service.configuration.current().models[0]!;
     await service.configuration.execute({ type: "model.save", id: start.model,
       value: { ...configured, capabilities: { ...configured.capabilities, reasoning: true, thinkingLevels: [] } } });
     const before = service.sessions.current(first.sessionId).nodes;
@@ -780,7 +780,7 @@ describe("会话运行时", () => {
     await expect(service.sessions.execute({ ...input, agent: "missing" })).rejects.toThrow();
     expect(service.sessions.tree.list()).toEqual([]);
     expect(await service.sessions.content.reader({ scope: draft }).read(file)).toEqual(new Uint8Array([1]));
-    const { revision: _revision, ...configured } = service.configuration.current().models[0]!;
+    const configured = service.configuration.current().models[0]!;
     await service.configuration.execute({ type: "model.save", id: start.model,
       value: { ...configured, capabilities: { ...configured.capabilities } } });
     await service.sessions.execute(input); await settled(service);
@@ -1062,7 +1062,7 @@ describe("会话运行时", () => {
     const snap = await execute(service, { type: "read", sessionId: a.sessionId });
     expect(snap.nodes.map(flat).map(n => n.kind)).toEqual(["event", "message", "text"]);
     expect(snap.workbench.objects.filter(o => o.kind === "atelier.builtin/agent")).toHaveLength(1);
-    await expect(execute(service, { ...start, parts: [{ kind: "text", text: "Other" }] })).rejects.toThrow();
+    expect((await execute(service, { ...start, parts: [{ kind: "text", text: "Other" }] })).nodes).toEqual(snap.nodes);
     await service.close(); services.delete(service);
     const reopened = new ApplicationService(root, { adapterFactory: () => adapter() }); services.add(reopened);
     expect((await execute(reopened, { type: "read", sessionId: a.sessionId })).nodes).toEqual(snap.nodes);
@@ -1322,7 +1322,7 @@ describe("插件包管理命令", () => {
   it("应用命令登记和移除插件包，正确表达重启标记", async () => {
     const { service, root } = await setup();
     const dir = join(root, "pkg"); mkdirSync(dir);
-    writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "p", atelier: { id: "acme.p", api: { major: 13, minMinor: 0 } } }));
+    writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "p", atelier: { id: "acme.p", api: { major: 14, minMinor: 0 } } }));
     const added = service.execute({ type: "plugin.add", path: dir });
     expect(added.plugins.filter(p => p.index !== null).map(p => [p.source, p.status, p.enabled])).toEqual([[dir, "pending", true]]);
     expect(added.plugins.find(p => p.index === null)).toMatchObject({ id: "atelier.builtin", status: "loaded" });

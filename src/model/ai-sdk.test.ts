@@ -10,8 +10,8 @@ import { projectSystemPrompt } from "./system-prompt.ts";
 import { composeSystemPrompt } from "@atelier/builtin/runtime";
 
 const input: ModelInput = {
-  settings: { provider: { id: "p", revision: 1, name: "Provider", enabled: true, baseUrl: "https://example.invalid", protocol: "anthropic", auth: "api_key", compatibility: [] },
-    model: { revision: 1, name: "Model", modelId: "test", providerId: "p", enabled: true, contextWindow: null, cost: null, compatibility: [],
+  settings: { provider: { id: "p", name: "Provider", enabled: true, baseUrl: "https://example.invalid", protocol: "anthropic", auth: "api_key", compatibility: [] },
+    model: { name: "Model", modelId: "test", providerId: "p", enabled: true, contextWindow: null, cost: null, compatibility: [],
       capabilities: { reasoning: true, tools: true, thinkingLevels: [...thinkingLevels] }, generation: { temperature: 0.2, topP: null, maxOutputTokens: 1000 } }, thinking: "low" },
   system: composeSystemPrompt({ id: "worker", systemPrompt: "System" }, "Atelier"), messages: [{ kind: "input", parts: [{ kind: "text", text: "Read" }] }],
   tools: [{ name: "read", description: "Read", parameters: { type: "object", properties: { resource_id: { type: "string" } }, required: ["resource_id"] } }],
@@ -29,7 +29,7 @@ describe("AI SDK 适配契约", () => {
     const adapter = new AiSdkAdapter(async () => "synthetic-key", undefined, transport);
     const failure = await consume(adapter.prepare(transportInput).stream(new AbortController().signal)).catch(error => error);
     expect(failure).toBeInstanceOf(ModelFailure);
-    expect(failure.response).toMatchObject({ connection: { id: "p", revision: 1 }, endpoint: input.settings.provider.baseUrl,
+    expect(failure.response).toMatchObject({ connection: { id: "p" }, endpoint: input.settings.provider.baseUrl,
       model: "test", status: 401, headers: { "x-test-metadata": "value" } });
     expect(failure.response.headers).not.toHaveProperty("x-api-key");
     expect(transport).toHaveBeenCalledTimes(1);

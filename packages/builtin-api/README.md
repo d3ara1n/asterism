@@ -1,6 +1,6 @@
 # 内置插件公共 API（`@atelier/builtin-api`）
 
-内置实现与外部插件共同消费的领域契约、后台创建入口与前端扩展 API，当前版本 **0.12.0**。插件身份为 `atelier.builtin`；本包不注册第二个插件，也不依赖 `@atelier/builtin` 实现。公共加载与生命周期规则见 [插件 SDK](../../docs/plugin-sdk.md#公共模块与契约身份)。
+内置实现与外部插件共同消费的领域契约、后台创建入口与前端扩展 API，当前版本 **0.13.0**。插件身份为 `atelier.builtin`；本包不注册第二个插件，也不依赖 `@atelier/builtin` 实现。公共加载与生命周期规则见 [插件 SDK](../../docs/plugin-sdk.md#公共模块与契约身份)。
 
 ## 入口与边界
 
@@ -29,12 +29,12 @@
   "version": "1.0.0",
   "type": "module",
   "peerDependencies": {
-    "@atelier/sdk": "^0.33.0",
-    "@atelier/builtin-api": "^0.12.0"
+    "@atelier/sdk": "^0.34.0",
+    "@atelier/builtin-api": "^0.13.0"
   },
   "atelier": {
     "id": "example.input-review",
-    "api": { "major": 13, "minMinor": 0 },
+    "api": { "major": 14, "minMinor": 0 },
     "runtime": "./src/runtime.ts"
   }
 }

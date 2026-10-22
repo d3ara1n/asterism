@@ -358,12 +358,12 @@ describe("宿主不可变内容", () => {
     await expect(f.replace(id, { file: ref })).rejects.toThrow();
     expect(f.object(id).get(Current)!.file).toEqual(ref);
   });
-  it("传输信封拒绝超大块，顺序错误不能封存，空文件可正常导入", async () => {
+  it("内容服务拒绝超大块，顺序错误不能封存，空文件可正常导入", async () => {
     const f = fixture();
     const opened = await f.service.content.execute({ type: "input.open", target: { sessionId: f.sessionId, resourceKind: Document.kind, contractId: Create.id } });
     if (opened.kind !== "input") throw new Error("Expected input.");
     const request = { kind: "content.request", version: contentVersion, id: randomUUID(), command: { type: "upload.write", scopeId: opened.scopeId, uploadId: randomUUID(), offset: 0, data: new Uint8Array(contentLimits.chunk + 1) } };
-    expect(await dispatchContent(f.service, request)).toBeNull();
+    expect(await dispatchContent(f.service, request)).toMatchObject({ result: { ok: false, error: { code: "invalid_argument" } } });
     const begun = await f.service.content.execute({ type: "upload.begin", scopeId: opened.scopeId });
     if (begun.kind !== "upload") throw new Error("Expected upload.");
     await expect(f.service.content.execute({ type: "upload.write", scopeId: opened.scopeId, uploadId: begun.uploadId, offset: 1, data: bytes("bad") })).rejects.toThrow();

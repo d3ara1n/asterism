@@ -29,6 +29,7 @@ type RunningState = { label: import("@atelier/sdk/contracts").UiText; requestId:
 export interface CreationCoordinator {
   /** 菜单入口，按装配顺序。 */
   readonly menu: readonly CreationEntry[];
+  readonly pending: boolean;
   open(entry: CreationEntry): void;
   canDrop(kinds: readonly DragKind[]): boolean;
   drop(items: readonly DropItem[], origin: Point): void;
@@ -51,10 +52,16 @@ export function useCreationCoordinator({ controller, canvas, writable, ready }: 
   const [busy, setBusy] = useState(false);
   const drafts = useRef(new Set<RendererContentInput>());
   const submitting = useRef(new Set<RendererContentInput>());
-  const inputGeneration = useRef(0);
-  useEffect(() => () => { inputGeneration.current++; for (const draft of drafts.current) void draft.close(); drafts.current.clear(); }, []);
-  const latest = useRef({ controller, writable });
-  latest.current = { controller, writable };
+  const pending = busy || input !== null || choice !== null;
+  const latest = useRef({ controller, writable, pending, input, choice });
+  latest.current = { controller, writable, pending, input, choice };
+  useEffect(() => () => {
+    for (const draft of drafts.current) void draft.close();
+    drafts.current.clear();
+    latest.current.input?.done(false);
+    latest.current.choice?.done(null);
+    setInput(null); setChoice(null);
+  }, [controller]);
 
   /** 提交一次创建；带请求身份，准备阶段可由用户取消。 */
   const create = useCallback(async (entry: CreationEntry, value: Json, position: Point | null, content: RendererContentInput): Promise<boolean> => {
@@ -80,26 +87,23 @@ export function useCreationCoordinator({ controller, canvas, writable, ready }: 
     } finally {
       submitting.current.delete(content);
       setBusy(false);
-      setRunning(current => current?.requestId === requestId ? null : current);
+      setRunning(null);
     }
   }, [canvas]);
-  // 取消绕过会话命令队列：队列正被这次创建占用。
   const cancelRunning = useCallback(() => {
-    if (running?.content) { inputGeneration.current++; void running.content.close(); }
+    if (running?.content) void running.content.close();
     else if (running) void window.host.session.execute({ type: "resource.create.cancel", sessionId: running.sessionId, requestId: running.requestId });
   }, [running]);
 
   const collect = useCallback((entry: CreationEntry, source: CreationSource, position: Point | null, content: RendererContentInput, initialInput?: Json) =>
-    new Promise<boolean>(done => { setError(null); setInput(previous => {
-      previous?.done(false);
-      return { entry, source, position, content, initialInput, done };
-    }); }), []);
+    new Promise<boolean>(done => {
+      setError(null); setInput({ entry, source, position, content, initialInput, done });
+    }), []);
 
   /** 有输入视图时打开外壳，否则由来源直接产出输入。 */
   const start = useCallback(async (entry: CreationEntry, source: CreationSource, position: Point | null) => {
     const active = latest.current.controller;
     if (!active) return false;
-    const generation = ++inputGeneration.current;
     const requestId = crypto.randomUUID();
     const content = contentInput({ sessionId: active.sessionId, resourceKind: entry.contract.resource.kind, contractId: entry.contract.id });
     drafts.current.add(content);
@@ -107,19 +111,19 @@ export function useCreationCoordinator({ controller, canvas, writable, ready }: 
       setError(null); setBusy(true);
       setRunning({ label: entry.label, sessionId: active.sessionId, requestId, content });
       const value = source.kind === "menu" ? entry.triggers.menu?.initialInput : await entry.triggers.drop?.toInput(source.item, content);
-      setRunning(current => current?.requestId === requestId ? null : current);
-      if (generation === inputGeneration.current) setBusy(false);
-      if (generation !== inputGeneration.current || latest.current.controller?.sessionId !== active.sessionId || !latest.current.writable) return false;
+      await contentScopeId(content, { sessionId: active.sessionId, resourceKind: entry.contract.resource.kind, contractId: entry.contract.id });
+      setRunning(null);
+      setBusy(false);
       if (entry.InputView) return await collect(entry, source, position, content, value ?? undefined);
       if (value === undefined || value === null) return false;
       return await create(entry, value as Json, position, content);
     } catch (error) {
-      if (generation === inputGeneration.current)
+      if (!(error instanceof DOMException && error.name === "AbortError"))
         setError(errorDisplay({ code: "unavailable", message: error instanceof Error ? error.message : "Content input is unavailable." }));
       return false;
     } finally {
-      setRunning(current => current?.requestId === requestId ? null : current);
-      if (generation === inputGeneration.current || drafts.current.size === 1) setBusy(false);
+      setRunning(null);
+      setBusy(false);
       drafts.current.delete(content); await content.close();
     }
   }, [collect, create]);
@@ -135,7 +139,7 @@ export function useCreationCoordinator({ controller, canvas, writable, ready }: 
   }, []);
 
   const drop = useCallback((items: readonly DropItem[], origin: Point) => {
-    if (!latest.current.writable) return;
+    if (!latest.current.writable || latest.current.pending) return;
     void (async () => {
       // 多项拖入逐项路由，依次错开落点；后项等前项完成再开始。
       let index = 0;
@@ -152,8 +156,8 @@ export function useCreationCoordinator({ controller, canvas, writable, ready }: 
   }, [registry, choose, start]);
 
   const menu = useMemo(() => registry.creations.filter(entry => entry.triggers.menu), [registry]);
-  const open = useCallback((entry: CreationEntry) => { if (latest.current.writable) void start(entry, { kind: "menu" }, null); }, [start]);
-  const canDrop = useCallback((kinds: readonly DragKind[]) => kinds.some(kind => canDropKind(registry.creations, kind)), [registry]);
+  const open = useCallback((entry: CreationEntry) => { if (latest.current.writable && !latest.current.pending) void start(entry, { kind: "menu" }, null); }, [start]);
+  const canDrop = useCallback((kinds: readonly DragKind[]) => !latest.current.pending && kinds.some(kind => canDropKind(registry.creations, kind)), [registry]);
 
   const closeInput = (ok: boolean) => {
     if (busy) cancelRunning();
@@ -180,7 +184,7 @@ export function useCreationCoordinator({ controller, canvas, writable, ready }: 
               initialInput={input.initialInput}
               resolve={async value => {
                 const ok = await create(input.entry, value, input.position, input.content);
-                if (ok) { setInput(current => current?.content === input.content ? null : current); input.done(true); }
+                if (ok) { setInput(null); input.done(true); }
                 return ok;
               }}
               cancel={() => closeInput(false)} />
@@ -193,7 +197,7 @@ export function useCreationCoordinator({ controller, canvas, writable, ready }: 
       setChoice(null); choice.done(entry);
     }} />}
   </>;
-  return { menu, open, canDrop, drop, element };
+  return { menu, pending, open, canDrop, drop, element };
 }
 
 /** 多个入口受理同一拖入项时由用户选择，可记住此类内容的选择。 */

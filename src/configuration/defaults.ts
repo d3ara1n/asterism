@@ -1,7 +1,7 @@
 import type { AgentConfiguration, ModelRole } from "../shared/configuration.ts";
 
 // 内置代理按用途提供默认配置，作为原始基准参与解析。
-export const defaultAgents: Omit<AgentConfiguration, "revision">[] = [
+export const defaultAgents: AgentConfiguration[] = [
   {
     "id": "worker",
     "builtin": true,
@@ -143,7 +143,7 @@ export const defaultAgents: Omit<AgentConfiguration, "revision">[] = [
   }
 ];
 
-export const defaultRoles: Omit<ModelRole, "revision">[] = [
+export const defaultRoles: ModelRole[] = [
   {
     "id": "default",
     "builtin": true,

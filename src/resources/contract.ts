@@ -1,4 +1,4 @@
-import type { Json, CreationContract, ActionContract } from "@atelier/sdk/contracts";
+import type { Json, CreationContract, ActionContract, ResourceCall } from "@atelier/sdk/contracts";
 import type { ParsedCall } from "../plugins/commands.ts";
 import type { Presentation } from "@atelier/sdk/contracts";
 import type { LiveBlock } from "../shared/session.ts";
@@ -21,9 +21,9 @@ export interface ResourceController {
   assertActionEntry?(objectId: string): void;
   /** 外部准备者按装配顺序执行后，进入资源自己的准备；每次替换按目标 schema 校验。 */
   prepareCommand?(input: ParsedCall, ref: ResourceRef, signal: AbortSignal): Promise<ParsedCall>;
-  parseCommand?(input: unknown): ParsedCall;
+  parseCommand?(input: ResourceCall): ParsedCall;
   /** 校验创建输入（可异步读取配置或文件系统），结果再交给 create。 */
-  prepareCreate?(input: unknown, signal?: AbortSignal, content?: ContentLease): Promise<Json>;
+  prepareCreate?(input: ResourceCall, signal?: AbortSignal, content?: ContentLease): Promise<Json>;
   /** 在创建事务内执行：返回标题与写入创建事件的不可变资源数据，可同时保存私有状态。 */
   create?(sessionId: string, objectId: string, input: Json, content?: ContentLease): { title: string; data?: { [key: string]: Json } };
   execute?(context: ResourceCommandContext, command: ParsedCall, before?: () => void): Promise<void>;

@@ -1,14 +1,14 @@
 import { PluginApiError, type ObjectExecutor, type ObjectReader } from "@atelier/sdk/runtime";
 import { AgentInputMessage } from "@atelier/builtin-api/contracts";
 import { AgentDrafts } from "./data.ts";
-import { SaveAgentDraft, ExchangeAgentDraft, type AgentDraft, type DraftMode } from "./drafts-contract.ts";
+import type { AgentDraft, DraftMode } from "./drafts-contract.ts";
 import { duplicateSubmission, rememberSubmission } from "./submissions.ts";
 
 export function saveDraft(object: ObjectExecutor, input: { submissionId: string; parts: AgentDraft["parts"] }): void {
-  if (duplicateSubmission(object, SaveAgentDraft, input)) return;
+  if (duplicateSubmission(object, input)) return;
   object.commit(writer => {
     writer.set(AgentDrafts, [...object.get(AgentDrafts) ?? [], { id: input.submissionId, mode: "none", parts: input.parts, sender: { kind: "user" } }]);
-    rememberSubmission(object, writer, SaveAgentDraft, input);
+    rememberSubmission(object, writer, input);
   });
 }
 function currentDraft(object: ObjectReader, id: string) {
@@ -27,12 +27,12 @@ export function setDraftMode(object: ObjectExecutor, input: { id: string; mode: 
 export function exchangeDraft(object: ObjectExecutor, input: {
   submissionId: string; id: string; replacement: AgentDraft["parts"] | null;
 }): void {
-  if (duplicateSubmission(object, ExchangeAgentDraft, input)) return;
+  if (duplicateSubmission(object, input)) return;
   object.commit(writer => {
     const { drafts } = currentDraft(object, input.id);
     writer.set(AgentDrafts, drafts.flatMap(item => item.id !== input.id ? [item]
       : input.replacement ? [{ ...item, mode: "none" as const, parts: input.replacement, sender: { kind: "user" as const } }] : []));
-    rememberSubmission(object, writer, ExchangeAgentDraft, input);
+    rememberSubmission(object, writer, input);
   });
 }
 /** 先形成完整批次，再允许循环取上下文；消息与持久附件的归属在同一事务交接。 */

@@ -1,6 +1,6 @@
 import { AgentSelection, AgentDrafts } from "./data.ts";
 import { PluginApiError, type ModelServices, type ObjectReader, type ObjectExecutor, type ContentReader } from "@atelier/sdk/runtime";
-import { SubmitAgentInput, type SubmitAgentInputData, AgentInputMessage } from "@atelier/builtin-api/contracts";
+import { type SubmitAgentInputData, AgentInputMessage } from "@atelier/builtin-api/contracts";
 import { selectionOf, type AgentSelectionService } from "./selection.ts";
 import type { composeSystemPrompt } from "./system-prompt.ts";
 import { projectForAgent } from "./projection.ts";
@@ -26,13 +26,13 @@ export function createAdmission(deps: { selection: AgentSelectionService; valida
   };
   return {
     async prepareSubmit(input: SubmitAgentInputData, object: ObjectReader, signal: AbortSignal, content: ContentReader): Promise<void> {
-      if (duplicateSubmission(object, SubmitAgentInput, input)) return;
+      if (duplicateSubmission(object, input)) return;
       // 在途输入只受理到草稿箱；模型目标和完整上下文在实际请求边界重新校验。
       if (deps.running(object)) return;
       await validate(object, signal, content, input);
     },
     submit(input: SubmitAgentInputData, object: ObjectExecutor): boolean {
-      if (duplicateSubmission(object, SubmitAgentInput, input)) return false;
+      if (duplicateSubmission(object, input)) return false;
       const queued = deps.running(object);
       object.commit(writer => {
         ready(object);
@@ -40,7 +40,7 @@ export function createAdmission(deps: { selection: AgentSelectionService; valida
           id: input.submissionId, mode: input.mode, parts: input.parts, sender: input.sender,
         }]);
         else writer.append(AgentInputMessage, { parts: input.parts, startsTurn: true, sender: input.sender });
-        rememberSubmission(object, writer, SubmitAgentInput, input);
+        rememberSubmission(object, writer, input);
       });
       return !queued;
     },

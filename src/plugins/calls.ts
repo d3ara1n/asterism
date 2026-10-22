@@ -29,7 +29,7 @@ export class CallRegistry {
         !this.host.sessions.workbench(ref.sessionId).objects.some(object => object.id === ref!.id))
         throw new PluginApiError("unavailable", "The associated object is not on the current session path.");
     } else if (options.object) throw new PluginApiError("invalid_argument", "A plugin call cannot bind an object.");
-    const parsed = entry.contribution.contract.input.safeParse(jsonSchema.parse(structuredClone(input)));
+    const parsed = entry.contribution.contract.input.safeParse(jsonSchema.parse(input));
     if (!parsed.success) throw new PluginApiError("invalid_argument", parsed.error.message);
     return entry.runs.start(async signal => {
       signal.throwIfAborted();
@@ -40,7 +40,7 @@ export class CallRegistry {
         });
         signal.throwIfAborted();
         // 返回原始 JSON；接收方按自己的同一契约解码，转换型 schema 不重复应用。
-        const wire = jsonSchema.parse(structuredClone(result));
+        const wire = jsonSchema.parse(result);
         entry.contribution.contract.output.parse(wire);
         return wire;
       } finally { scope.active = false; }

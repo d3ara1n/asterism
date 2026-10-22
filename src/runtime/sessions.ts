@@ -34,7 +34,6 @@ import { applicationStorage, applicationBrand } from "../shared/application.ts";
 import { EventBus } from "../plugins/events.ts";
 
 const agentKind = Agent.kind;
-const startIdentity = ({ contentScopeId: _scope, ...input }: Extract<SessionCommand, { type: "start" }>) => JSON.stringify(input);
 
 /**
  * 会话应用入口：组合内置领域接口，并提供会话树、工作台事件、布局和通知机制。
@@ -129,10 +128,10 @@ export class SessionService {
           const { credentialState: _state, ...connection } = provider;
           return connection;
         },
-        credential: async (connection, options) => {
+        credential: async (id, options) => {
           options?.signal?.throwIfAborted();
-          const provider = configuration.current().providers.find(item => item.id === connection.id);
-          const value = await configuration.executionCredential(connection.id, connection.revision);
+          const provider = configuration.current().providers.find(item => item.id === id);
+          const value = await configuration.executionCredential(id);
           options?.signal?.throwIfAborted();
           return provider?.auth === "none" ? null : value;
         },
@@ -430,7 +429,7 @@ export class SessionService {
       return await this.createResource(sessionId, contract.resource.kind, { id: contract.id, input: value }, lease, options);
     } finally { await lease.close(); await captured?.close(); }
   }
-  async execute(raw: SessionCommand): Promise<SessionReply> {
+  async execute(raw: unknown): Promise<SessionReply> {
     if (this.closed) throw new SessionError("unavailable", "The session service is closed.");
     const parsed = sessionCommandSchema.safeParse(raw);
     if (!parsed.success) throw new SessionError("invalid_request", "Invalid session command.");
@@ -526,37 +525,26 @@ export class SessionService {
   /** 同一提交身份的并发首页发送共享一次执行。 */
   private start(command: Extract<SessionCommand, { type: "start" }>): Promise<SessionReply> {
     const pending = this.starting.get(command.submissionId);
-    if (pending) return pending.then(reply => {
-      if (this.db.prepare("SELECT command_json FROM session_submissions WHERE id = ?").get(command.submissionId) &&
-        (this.db.prepare("SELECT command_json FROM session_submissions WHERE id = ?").get(command.submissionId) as { command_json: string }).command_json !== startIdentity(command))
-        throw new SessionError("conflict", "This submission ID was already used for different input.");
-      return reply;
-    });
+    if (pending) return pending;
     const run = this.startOnce(command).finally(() => this.starting.delete(command.submissionId));
     this.starting.set(command.submissionId, run);
     return run;
   }
   /** 唯一领域例外：首页发起指名内置 agent，经正规创建与动作接口建立代理并提交首条输入。 */
   private async startOnce(command: Extract<SessionCommand, { type: "start" }>): Promise<SessionReply> {
-    const existing = () => {
-      const row = this.db.prepare("SELECT session_id, command_json FROM session_submissions WHERE id = ?").get(command.submissionId) as { session_id: string; command_json: string } | undefined;
-      if (!row) return null;
-      if (row.command_json !== startIdentity(command)) throw new SessionError("conflict", "This submission ID was already used for different input.");
-      return { kind: "accepted" as const, sessionId: row.session_id };
-    };
-    const prior = existing(); if (prior) return prior;
+    const prior = this.db.prepare("SELECT session_id FROM session_submissions WHERE id = ?").get(command.submissionId) as { session_id: string } | undefined;
+    if (prior) return { kind: "accepted", sessionId: prior.session_id };
     const content = this.content.fork(command.contentScopeId, startAgentContentTarget);
     try {
       const agents = this.resources.controller(agentKind)!;
       const selection = { agent: command.agent, model: command.model, thinking: command.thinking };
       const input = await agents.prepareCreate!(resourceCall(CreateAgent, { selection }));
-      const again = existing(); if (again) return again;
       const sessionId = randomUUID();
       const agentId = createResourceId();
       const before = () => {
         this.tree.create(inputSummary(command.parts).slice(0, 72), sessionId);
         this.workbench.createWith(sessionId, agentKind, agentId, input, { x: 48, y: 48 });
-        this.db.prepare("INSERT INTO session_submissions (id, command_json, session_id) VALUES (?, ?, ?)").run(command.submissionId, startIdentity(command), sessionId);
+        this.db.prepare("INSERT INTO session_submissions (id, session_id) VALUES (?, ?)").run(command.submissionId, sessionId);
       };
       const resource: FoldedObject = { id: agentId, kind: agentKind, title: "", data: {} };
       // 首页首条输入同样经准备流水线；此时代理尚未创建，objectId 为将要创建的身份。

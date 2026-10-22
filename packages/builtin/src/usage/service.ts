@@ -25,7 +25,7 @@ export class UsageConsumer {
     this.unsubscribe = [providers.subscribe(() => this.clear()), usages.subscribe(() => this.clear())];
   }
   private empty(id: string, connection: ProviderInfo | null, source?: "query" | "headers"): ProviderUsageState {
-    return { providerId: id, revision: connection?.revision ?? 0, usage: connection?.usage ?? null,
+    return { providerId: id, usage: connection?.usage ?? null,
       ...(source && { source }), state: "disabled", items: [], updatedAt: null, error: null };
   }
   async query(id: string, options: { signal?: AbortSignal; refresh?: boolean } = {}): Promise<ProviderUsageState> {
@@ -37,9 +37,6 @@ export class UsageConsumer {
     if (!connection?.enabled || !connection.usage) return empty;
     if (!provider) return { ...empty, state: "error", error: "unavailable" };
     let entry = this.entries.get(id);
-    if (entry && (entry.value.revision !== connection.revision || entry.value.usage !== connection.usage)) {
-      entry.controller.abort(); this.entries.delete(id); entry = undefined;
-    }
     if (provider.source === "headers") {
       if (!entry) {
         entry = { controller: new AbortController(), attemptedAt: 0, value: { ...empty, state: "waiting" } };
@@ -50,7 +47,8 @@ export class UsageConsumer {
     if (entry?.pending) return structuredClone(await waitForUsage(entry.pending, options.signal));
     if (entry && !options.refresh && Date.now() - entry.attemptedAt < this.freshness) return structuredClone(entry.value);
     const controller = new AbortController();
-    const current: Entry = { controller, attemptedAt: Date.now(), value: entry?.value ?? empty };
+    const current: Entry = { controller, attemptedAt: Date.now(),
+      value: { ...(entry?.value ?? empty), usage: provider.id, source: "query" } };
     this.entries.set(id, current);
     current.pending = Promise.resolve().then(async () => {
       const timeout = AbortSignal.timeout(this.timeout);
@@ -58,7 +56,7 @@ export class UsageConsumer {
       try {
         signal.throwIfAborted();
         let credential: string | null;
-        try { credential = await waitForUsage(this.providers.credential(connection, { signal }), signal); }
+        try { credential = await waitForUsage(this.providers.credential(connection.id, { signal }), signal); }
         catch { throw new UsageQueryError("credential"); }
         if (connection.auth === "api_key" && !credential) throw new UsageQueryError("credential");
         signal.throwIfAborted();
@@ -68,8 +66,6 @@ export class UsageConsumer {
         current.value = { ...current.value, state: "error", error: timeout.aborted ? "timeout"
           : controller.signal.aborted ? "unavailable" : error instanceof UsageQueryError ? error.code : "network" };
       } finally { current.pending = undefined; }
-      if (this.entries.get(id) !== current || this.providers.get(id)?.revision !== connection.revision)
-        return { ...empty, state: "error", error: "unavailable" } as ProviderUsageState;
       return current.value;
     });
     return structuredClone(await waitForUsage(current.pending, options.signal));
@@ -78,11 +74,12 @@ export class UsageConsumer {
   consume(response: ModelResponse): void {
     if (this.closed) return;
     const connection = this.providers.get(response.connection.id);
-    if (!connection?.enabled || connection.revision !== response.connection.revision || connection.baseUrl !== response.endpoint) return;
+    if (!connection?.enabled) return;
     const provider = connection.usage ? this.usages.get(connection.usage) : null;
     if (provider?.source !== "headers") return;
     const previous = this.entries.get(connection.id);
-    const value = previous?.value ?? this.empty(connection.id, connection, "headers");
+    const value = { ...(previous?.value ?? this.empty(connection.id, connection, "headers")),
+      usage: provider.id, source: "headers" as const };
     let next: ProviderUsageState;
     try {
       const items = provider.parseHeaders({ connection: { id: connection.id, endpoint: response.endpoint },

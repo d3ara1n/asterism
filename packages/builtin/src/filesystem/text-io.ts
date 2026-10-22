@@ -1,18 +1,14 @@
 import { isUtf8 } from "node:buffer";
 import { constants } from "node:fs";
-import { open, stat, mkdir, realpath, rename, link, unlink, rmdir } from "node:fs/promises";
+import { open, mkdir, rename, unlink, rmdir } from "node:fs/promises";
 import { dirname, join, relative, sep } from "node:path";
 import { randomUUID } from "node:crypto";
 import { TextError } from "../shared/text.ts";
-import { FilesystemError, failed, rejected } from "./errors.ts";
-import { directoryRoot, insideDirectory, outsideDirectory, withinDirectory, writableTarget } from "./paths.ts";
+import { FilesystemError, failed } from "./errors.ts";
 
 export const MAX_TEXT_BYTES = 8 * 1024 * 1024;
 const temporaryFilePrefix = ".builtin-";
-interface FileStamp { dev: number; ino: number; size: number; mtimeMs: number; ctimeMs: number; mode: number }
-export interface TextFile { path: string; text: string; stamp: FileStamp }
-const sameStamp = (a: FileStamp, b: FileStamp) => a.dev === b.dev && a.ino === b.ino && a.size === b.size && a.mtimeMs === b.mtimeMs && a.ctimeMs === b.ctimeMs;
-const conflict = () => new FilesystemError(rejected("file_changed", "The file or its path changed during preparation. The operation ended before replacement."));
+export interface TextFile { text: string; mode: number }
 export class UnconfirmedWriteError extends Error {}
 export function validateTextSize(text: string): void {
   if (Buffer.byteLength(text) > MAX_TEXT_BYTES) throw new TextError("file_too_large", "Text operations are limited to 8 MiB.");
@@ -26,16 +22,14 @@ function decodeText(bytes: Buffer): string {
   }
   return bytes.toString("utf8");
 }
-/** 固定句柄读取，限制实际字节量，并复核打开后的路径与文件身份。 */
-export async function readTextFile(root: string, rel: string, signal: AbortSignal): Promise<TextFile> {
+/** 读取操作开始时已解析的真实路径，以固定句柄限制实际字节量。 */
+export async function readTextFile(path: string, signal: AbortSignal): Promise<TextFile> {
   signal.throwIfAborted();
-  const path = await withinDirectory(root, rel);
   const handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
   try {
-    const before = await handle.stat();
-    if (!before.isFile()) throw new FilesystemError(failed("not_file", "The target requires a regular UTF-8 text file."));
-    if (before.size > MAX_TEXT_BYTES) throw new TextError("file_too_large", "The target exceeds the 8 MiB text file limit.");
-    if (await withinDirectory(root, rel) !== path || !sameStamp(before, await stat(path))) throw conflict();
+    const info = await handle.stat();
+    if (!info.isFile()) throw new FilesystemError(failed("not_file", "The target requires a regular UTF-8 text file."));
+    if (info.size > MAX_TEXT_BYTES) throw new TextError("file_too_large", "The target exceeds the 8 MiB text file limit.");
     const chunks: Buffer[] = [];
     let length = 0;
     while (length <= MAX_TEXT_BYTES) {
@@ -45,30 +39,15 @@ export async function readTextFile(root: string, rel: string, signal: AbortSigna
       if (!bytesRead) break;
       chunks.push(buffer.subarray(0, bytesRead)); length += bytesRead;
     }
-    if (length > MAX_TEXT_BYTES) throw new TextError("file_too_large", "The target grew beyond the 8 MiB text file limit.");
-    if (!sameStamp(before, await handle.stat()) || await withinDirectory(root, rel) !== path) throw conflict();
+    if (length > MAX_TEXT_BYTES) throw new TextError("file_too_large", "The target exceeds the 8 MiB text file limit.");
     signal.throwIfAborted();
-    return { path, text: decodeText(Buffer.concat(chunks, length)), stamp: before };
+    return { text: decodeText(Buffer.concat(chunks, length)), mode: info.mode };
   } finally { await handle.close(); }
 }
 
-/** 同一真实路径的修改串行，包含不同目录资源指向同一个文件的情况。 */
-const mutations = new Map<string, Promise<void>>();
-export async function withFileMutation<T>(path: string, work: () => Promise<T>): Promise<T> {
-  const previous = mutations.get(path) ?? Promise.resolve();
-  let release!: () => void;
-  const next = new Promise<void>(resolve => { release = resolve; });
-  mutations.set(path, next);
-  await previous;
-  try { return await work(); }
-  finally { release(); if (mutations.get(path) === next) mutations.delete(path); }
-}
-
-/** 同目录暂存后提交；提交前复核路径、文件身份和完整正文，失败清理暂存及空的新目录。 */
-export async function commitTextFile(root: string, rel: string, before: TextFile | null, text: string, signal: AbortSignal): Promise<void> {
+/** 向已解析的目标写入；同目录暂存后原子替换，失败清理暂存及空的新目录。 */
+export async function commitTextFile(selected: { root: string; path: string }, before: TextFile | null, text: string, signal: AbortSignal): Promise<void> {
   validateTextSize(text);
-  const selected = await writableTarget(root, rel);
-  if (before && before.path !== selected.path) throw conflict();
   const parent = dirname(selected.path);
   const createdParents: string[] = [];
   let temp: string | null = null;
@@ -81,45 +60,20 @@ export async function commitTextFile(root: string, rel: string, before: TextFile
       current = join(current, component);
       try { await mkdir(current); createdParents.push(current); }
       catch (error) { if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error; }
-      const canonical = await realpath(current);
-      if (!insideDirectory(selected.root, canonical)) throw outsideDirectory();
-      if (canonical !== current || !(await stat(current)).isDirectory()) throw conflict();
       signal.throwIfAborted();
     }
-    const parentStamp = await stat(parent);
-    if (await directoryRoot(root) !== selected.root || (await writableTarget(root, rel)).path !== selected.path) throw conflict();
     temp = join(parent, `${temporaryFilePrefix}${randomUUID()}.tmp`);
-    const handle = await open(temp, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, before ? before.stamp.mode & 0o777 : 0o666);
+    const handle = await open(temp, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, before ? before.mode & 0o777 : 0o666);
     try {
-      // 创建后复核父目录与暂存目标，避免向已换位的目录继续写正文。
-      const currentParent = await stat(parent);
-      if (await realpath(parent) !== parent || currentParent.dev !== parentStamp.dev || currentParent.ino !== parentStamp.ino) throw conflict();
       signal.throwIfAborted();
       await handle.writeFile(text, "utf8");
-      if (before) await handle.chmod(before.stamp.mode & 0o777);
+      if (before) await handle.chmod(before.mode & 0o777);
       await handle.sync();
     } finally { await handle.close(); }
     signal.throwIfAborted();
-    if (await directoryRoot(root) !== selected.root || await realpath(parent) !== parent || (await writableTarget(root, rel)).path !== selected.path) throw conflict();
-    const nowParent = await stat(parent);
-    if (nowParent.ino !== parentStamp.ino || nowParent.dev !== parentStamp.dev) throw conflict();
-    if (before) {
-      const currentFile = await readTextFile(root, rel, signal);
-      if (!sameStamp(before.stamp, currentFile.stamp) || currentFile.text !== before.text) throw conflict();
-    } else {
-      try { await stat(selected.path); throw conflict(); }
-      catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
-    }
-    signal.throwIfAborted();
     committing = true;
-    if (before) { await rename(temp, selected.path); temp = null; }
-    else {
-      try { await link(temp, selected.path); }
-      catch (error) {
-        if ((error as NodeJS.ErrnoException).code === "EEXIST") { committing = false; throw conflict(); }
-        throw error;
-      }
-    }
+    await rename(temp, selected.path);
+    temp = null;
     committed = true;
   } catch (error) {
     if (committing) throw new UnconfirmedWriteError("The final file replacement has an unknown outcome.");

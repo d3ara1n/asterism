@@ -4,7 +4,7 @@ import {
 } from "../shared/configuration.ts";
 import { defaultAgents, defaultRoles } from "./defaults.ts";
 
-type ConfigurationIdentity = { id: string; revision: number; builtin: boolean };
+type ConfigurationIdentity = { id: string; builtin: boolean };
 export type RoleConfigurationEntry = ConfigurationIdentity & { overrides: ModelRoleOverrides };
 export type AgentConfigurationEntry = ConfigurationIdentity & { overrides: AgentOverrides };
 
@@ -29,7 +29,7 @@ export function resolveRoleConfiguration(role: RoleConfigurationEntry, defaults 
   if (!inherited) throw new Error("Built-in role definition is unavailable.");
   return modelRoleSchema.parse({
     ...inherited, ...overrides, name: overrides.name ?? (role.builtin ? inherited.name : role.id),
-    id: role.id, revision: role.revision, builtin: role.builtin,
+    id: role.id, builtin: role.builtin,
   });
 }
 export function resolveAgentConfiguration(agent: AgentConfigurationEntry, defaults = configurationDefaults) {
@@ -42,6 +42,6 @@ export function resolveAgentConfiguration(agent: AgentConfigurationEntry, defaul
     ? { tools: overrides.tools ?? null, excludeTools: overrides.excludeTools ?? null } : {};
   return agentSchema.parse({
     ...inherited, ...overrides, ...policy, name: overrides.name ?? (agent.builtin ? inherited.name : agent.id),
-    id: agent.id, revision: agent.revision, builtin: agent.builtin,
+    id: agent.id, builtin: agent.builtin,
   });
 }

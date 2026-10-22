@@ -4,7 +4,7 @@ import { discoverModels } from "./discovery.ts";
 
 const provider: Provider = {
   id: "relay", name: "Relay", baseUrl: "https://example.test/proxy/v1/", protocol: "openai-responses",
-  enabled: true, auth: "api_key", credentialState: "available", revision: 1, compatibility: [],
+  enabled: true, auth: "api_key", credentialState: "available", compatibility: [],
 };
 
 describe("模型发现协议与传输边界", () => {

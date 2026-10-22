@@ -6,7 +6,7 @@ import { sessionSchemaSql } from "../session/schema.ts";
 import { applicationBrand, applicationStorage } from "../shared/application.ts";
 import { contentSchemaSql } from "./content-store.ts";
 
-const workspaceDatabaseVersion = 21;
+const workspaceDatabaseVersion = 22;
 
 /** 开发期库格式不符：发布前不迁移，提示开发者删除 db 目录重建。 */
 export class DatabaseVersionError extends Error {
@@ -36,7 +36,7 @@ export function openDatabase(root: string): DatabaseSync {
       CREATE TABLE viewports (session_id TEXT PRIMARY KEY REFERENCES sessions(id) ON DELETE CASCADE, x REAL NOT NULL, y REAL NOT NULL, zoom REAL NOT NULL);
       -- 首页发送的会话级提交去重；代理内部的提交去重属于代理资源状态。
       CREATE TABLE session_submissions (
-        id TEXT PRIMARY KEY, command_json TEXT NOT NULL,
+        id TEXT PRIMARY KEY,
         session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE
       ) STRICT;
       -- 当前会话数据；空 object_id 表示会话作用域，具型契约与时间线独立。

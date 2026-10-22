@@ -4,7 +4,7 @@ import { configurationCommandSchema, createModelInput, modelReference, providerS
 import type { SecretProtector } from "../shared/secrets.ts";
 import { unauthenticatedApiKey } from "../shared/model.ts";
 import { ConfigurationError } from "./errors.ts";
-import { ConfigurationStore, type StoredProvider } from "./store.ts";
+import { ConfigurationStore, type ConfigurationKind, type StoredProvider } from "./store.ts";
 import { CredentialVault } from "./credentials.ts";
 import { classifyProbeError, runConnectionProbe, type ConnectionProbe } from "./probe.ts";
 import { configurationDefaults, resolveAgentConfiguration, resolveRoleConfiguration } from "./layers.ts";
@@ -32,7 +32,6 @@ export class ConfigurationService {
   private storageAvailable = false;
   private readonly discoveries: ModelDiscoveries;
   private readonly shutdown = new AbortController();
-  private readonly parameterRequests = new Set<{ model: string; providerId: string; controller: AbortController }>();
   private tests = new Map<string, { value: ConnectionTest; controller: AbortController; timer: ReturnType<typeof setTimeout>; started: number }>();
   constructor(root: string, protector: SecretProtector, private readonly onChanged: () => void = () => {},
     private readonly probe: ConnectionProbe = runConnectionProbe, private readonly testTimeoutMs = 30_000,
@@ -41,7 +40,7 @@ export class ConfigurationService {
     this.vault = new CredentialVault(root, protector);
     this.discoveries = new ModelDiscoveries(onChanged, discover, testTimeoutMs);
   }
-  execute(raw: ConfigurationCommand): Promise<{ snapshot: ConfigurationSnapshot; savedId: string | null; parameterUpdate?: ModelParameterUpdate }> {
+  execute(raw: unknown): Promise<{ snapshot: ConfigurationSnapshot; savedId: string | null; parameterUpdate?: ModelParameterUpdate }> {
     const parsed = configurationCommandSchema.safeParse(raw);
     if (!parsed.success) return Promise.reject(new ConfigurationError("invalid_request", "Invalid configuration. Check the entered values."));
     if (parsed.data.type === "model.parameters") return this.fetchParameters(parsed.data.model);
@@ -62,52 +61,38 @@ export class ConfigurationService {
     return operation;
   }
   private async fetchParameters(reference: string) {
-    const captured = await this.enqueue(() => {
+    await this.enqueue(() => {
       this.assertOpen();
       const model = this.store.get("model", reference);
       const provider = model && this.store.get("provider", model.providerId);
       if (!model || !provider) throw new ConfigurationError("not_found", "The model or provider no longer exists.");
-      const request = { model: reference, providerId: provider.id, controller: new AbortController() };
-      this.parameterRequests.add(request);
-      return { model, provider, request };
     });
     const timeout = AbortSignal.timeout(10_000);
-    const signal = AbortSignal.any([timeout, this.shutdown.signal, captured.request.controller.signal]);
-    try {
-      let catalog;
-      try { catalog = await this.catalog(signal); signal.throwIfAborted(); }
-      catch {
-        if (captured.request.controller.signal.aborted)
-          throw new ConfigurationError("conflict", "The model or provider changed during parameter retrieval.", modelCatalogMessages.changed);
-        throw new ConfigurationError("unavailable", "Model catalog request failed.",
-          timeout.aborted ? modelCatalogMessages.timeout : modelCatalogMessages.failed);
-      }
-      return await this.enqueue(() => {
-        this.assertOpen();
-        if (captured.request.controller.signal.aborted ||
-            this.store.get("model", reference)?.revision !== captured.model.revision ||
-            this.store.get("provider", captured.provider.id)?.revision !== captured.provider.revision)
-          throw new ConfigurationError("conflict", "The model or provider changed during parameter retrieval.", modelCatalogMessages.changed);
-        const { value, report } = modelParameters(catalog, captured.model);
-        this.store.save({ kind: "model", id: reference, value });
-        this.parameterRequests.delete(captured.request);
-        this.invalidateParameterRequests("model", reference);
-        return { snapshot: this.snapshot(), savedId: reference, parameterUpdate: report };
-      });
-    } finally { this.parameterRequests.delete(captured.request); }
-  }
-  private invalidateParameterRequests(kind: string, id: string): void {
-    for (const request of this.parameterRequests)
-      if ((kind === "model" && request.model === id) || (kind === "provider" && request.providerId === id))
-        request.controller.abort();
+    const signal = AbortSignal.any([timeout, this.shutdown.signal]);
+    let catalog;
+    try { catalog = await this.catalog(signal); signal.throwIfAborted(); }
+    catch {
+      throw new ConfigurationError("unavailable", "Model catalog request failed.",
+        timeout.aborted ? modelCatalogMessages.timeout : modelCatalogMessages.failed);
+    }
+    return this.enqueue(() => {
+      this.assertOpen();
+      const model = this.store.get("model", reference);
+      if (!model) throw new ConfigurationError("not_found", "The model no longer exists.");
+      const { value, report } = modelParameters(catalog, model);
+      this.store.save({ kind: "model", id: reference, value });
+      this.clearFinishedTests("model", reference);
+      this.onChanged();
+      return { snapshot: this.snapshot(), savedId: reference, parameterUpdate: report };
+    });
   }
   private assertOpen(): void { if (this.closed) throw new ConfigurationError("unavailable", "Configuration service is unavailable."); }
   /** 同步取得当前生效配置；凭据状态沿用最近一次检查结果。 */
   current(): ConfigurationSnapshot { this.assertOpen(); return this.snapshot(); }
-  async executionCredential(providerId: string, revision: number): Promise<string | null> {
+  async executionCredential(providerId: string): Promise<string | null> {
     this.assertOpen();
     const provider = this.store.get("provider", providerId);
-    if (!provider || provider.revision !== revision) throw new ConfigurationError("conflict", "The provider changed before execution started.");
+    if (!provider) throw new ConfigurationError("not_found", "The provider no longer exists.");
     if (provider.auth === "none") return unauthenticatedApiKey;
     return provider.credentialRef ? this.vault.read(provider.credentialRef) : null;
   }
@@ -151,8 +136,9 @@ export class ConfigurationService {
     if (command.type === "discovery.add") {
       const discovery = this.discoveries.get(command.id);
       const provider = this.store.get("provider", discovery.providerId);
-      if (discovery.state !== "succeeded" || !provider || provider.revision !== discovery.providerRevision)
-        throw new ConfigurationError("conflict", "The provider or model list changed. Fetch models again.");
+      if (!provider) throw new ConfigurationError("not_found", "The provider no longer exists.");
+      if (discovery.state !== "succeeded")
+        throw new ConfigurationError("invalid_request", "Model discovery has not succeeded.");
       const models = new Map(discovery.models.map(model => [model.modelId, model]));
       const selected = [...new Set(command.modelIds)].map(id => {
         const model = models.get(id);
@@ -164,7 +150,7 @@ export class ConfigurationService {
     }
     if (command.type === "remove") {
       const { credentialRef } = this.store.remove(command.kind, command.id);
-      this.invalidateParameterRequests(command.kind, command.id);
+      this.clearFinishedTests(command.kind, command.id);
       if (command.kind === "provider") this.discoveries.clearProvider(command.id);
       if (credentialRef) this.removeCredential(credentialRef);
       return command.id;
@@ -179,7 +165,7 @@ export class ConfigurationService {
       case "model.save":
         if (!this.store.get("provider", command.value.providerId)) throw new ConfigurationError("not_found", "The provider no longer exists. Reload settings.");
         this.store.save({ kind: "model", id: command.id, value: command.value });
-        if (command.id) this.invalidateParameterRequests("model", command.id);
+        this.clearFinishedTests("model", command.id ?? modelReference(command.value));
         return modelReference(command.value);
       case "provider.save": break;
     }
@@ -196,10 +182,7 @@ export class ConfigurationService {
       }
       this.assertOpen();
       this.store.save({ kind: "provider", id: command.id, value: command.value, credentialRef: ref });
-      if (command.id) {
-        this.invalidateParameterRequests("provider", command.id);
-        this.discoveries.clearProvider(command.id);
-      }
+      this.clearFinishedTests("provider", command.id ?? id);
     } catch (error) {
       if (newRef) this.removeCredential(newRef);
       if (error instanceof ConfigurationError) throw error;
@@ -212,26 +195,32 @@ export class ConfigurationService {
     try { this.vault.remove(ref); }
     catch { console.error("Unreferenced encrypted credential cleanup failed."); }
   }
+  private clearFinishedTests(kind: ConfigurationKind, id: string): void {
+    for (const [key, test] of this.tests) {
+      if (test.value.state !== "running" &&
+          (kind === "provider" && test.value.providerId === id || kind === "model" && test.value.model === id))
+        this.tests.delete(key);
+    }
+  }
   private startTest(modelId: string): string {
     const resolved = resolveProviderModel(this.snapshot(), modelId);
     if (!resolved) throw new ConfigurationError("not_found", "The model or provider no longer exists or is disabled. Reload settings.");
     const { model, provider } = resolved;
     const storedProvider = this.store.get("provider", provider.id)!;
-    if ([...this.tests.values()].filter(test => test.value.state === "running").length >= 8) throw new ConfigurationError("conflict", "Too many connection tests are running.");
     for (const [key, test] of this.tests) {
       if (this.tests.size < 50) break;
       if (test.value.state !== "running") this.tests.delete(key);
     }
     const id = randomUUID();
     const controller = new AbortController();
-    const value: ConnectionTest = { id, providerId: provider.id, providerRevision: provider.revision, model: modelReference(model), modelRevision: model.revision,
+    const value: ConnectionTest = { id, providerId: provider.id, model: modelReference(model),
       state: "running", startedAt: new Date().toISOString(), durationMs: null, error: null, message: null };
     const timer = setTimeout(() => {
       this.finishTest(id, { state: "failed", error: "timeout", message: "The connection test timed out." });
       controller.abort();
     }, this.testTimeoutMs);
     this.tests.set(id, { value, controller, timer, started: performance.now() });
-    // 配置与修订在点击测试时取得；后续编辑不改变这次请求。
+    // 配置与凭据在点击测试时取用；后续编辑不改变这次请求。
     void this.runTest(id, provider, model, storedProvider.credentialRef, controller.signal);
     return id;
   }

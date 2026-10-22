@@ -16,7 +16,7 @@
 
 | 目录 | 职责 |
 | --- | --- |
-| `src/agent/` | 选择、输入受理、执行循环、上下文压缩、历史投影与对话视图；`data.ts` 保存私有状态，`submissions.ts` 按动作契约与输入去重，`drafts.ts / drafts-contract.ts` 管理持久输入调度与内部草稿动作，公共动作与记录在公共 API 包 |
+| `src/agent/` | 选择、输入受理、执行循环、上下文压缩、历史投影与对话视图；`data.ts` 保存私有状态，`submissions.ts` 按提交身份去重，`drafts.ts / drafts-contract.ts` 管理持久输入调度与内部草稿动作，公共动作与记录在公共 API 包 |
 | `src/agent/peek/` | Agent 资源的只读调查工具、时间线记录快照、内部检索与 utility 流式报告；报告视图复用对话折叠外壳与思考预览 |
 | `src/agent/send/` | 共享 `Send` 工具的 Agent 实现与三态视图；通过资源身份直接发送、从调用者上下文填写来源并复用 `SubmitAgentInput` |
 | `src/agent/ui/` | Agent 自有 toolbar／overlay／modal 布局、贡献组件挂载、当前模型选择注入与输入区隐藏请求；公共作者接口在 `@atelier/builtin-api/renderer`，内置工具栏贡献在 `conversation/Toolbar.tsx` |

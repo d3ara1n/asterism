@@ -9,7 +9,7 @@ export const unauthenticatedApiKey = "no-auth";
 const id = z.string().min(1).max(160);
 export { modelUsageSchema as usageSchema, type Usage } from "@atelier/sdk/contracts";
 export const modelSettingsSchema = z.strictObject({
-  provider: providerInputSchema.extend({ revision: z.number().int().positive() }),
+  provider: providerInputSchema,
   model: modelSchema, thinking: thinkingSchema.nullable(),
 });
 export type ModelSettings = z.infer<typeof modelSettingsSchema>;

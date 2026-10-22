@@ -86,8 +86,6 @@ export class SessionController {
   execute = async (command: SessionOperation): Promise<SessionResult> => {
     if (command.sessionId !== this.sessionId || !this.connections || this.state.status !== "ready")
       return { ok: false, error: { code: "unavailable", message: "Open the current session before making changes." } };
-    if (this.state.navigating)
-      return { ok: false, error: { code: "conflict", message: "The session position is changing." } };
     const navigating = command.type === "select";
     if (navigating) this.update({ navigating: true });
     this.pending++;

@@ -40,7 +40,7 @@ describe("代理用量到费用的消费适配", () => {
   });
 
   it("按历史身份寻找当前价格，停用仍可查价，歧义或已删除模型不借用其他模型", () => {
-    const model = { ...createModelInput("p", { modelId: "m", name: "Model" }), revision: 1, enabled: false, cost };
+    const model = { ...createModelInput("p", { modelId: "m", name: "Model" }), enabled: false, cost };
     const namedLikeThinking = { ...model, modelId: "m:high" };
     const request = { model: "p/m:high", modelScope: null };
     expect(diagnosticModel(request, [model])).toBe(model);

@@ -6,13 +6,12 @@ const listeners = new Set<() => void>();
 const subscribe = (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener); }; };
 const publish = (state: DesktopWindowState) => { current = state; listeners.forEach(listener => listener()); };
 
-/** 首帧前读取；先订阅再读取，避免全屏切换被迟到的初始快照覆盖。 */
+/** 首帧前先订阅再读取，直接采用收到的当前状态。 */
 export async function startDesktopWindow(bridge: DesktopWindowBridge): Promise<() => void> {
-  let changed = false;
-  const stop = bridge.onChanged(state => { changed = true; publish(state); });
+  const stop = bridge.onChanged(publish);
   try {
     const initial = await bridge.get();
-    if (!changed) publish(initial);
+    publish(initial);
     return stop;
   } catch (error) {
     stop();

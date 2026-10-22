@@ -2,8 +2,8 @@ import { expect, it, vi } from "vitest";
 import type { DesktopWindowState } from "../../shared/desktop";
 import { getDesktopWindowState, startDesktopWindow } from "./window-state";
 
-// design-system.md：首帧前读到原生状态；读取在途的切换通知不能被旧快照覆盖。
-it("先订阅再读取，保留读取期间到达的全屏切换并持续响应退出", async () => {
+// design-system.md：首帧前先订阅再读取，初始读取与事件按收到的顺序采用。
+it("先订阅再读取，直接采用每次收到的窗口状态", async () => {
   let receive!: (state: DesktopWindowState) => void;
   let resolve!: (state: DesktopWindowState) => void;
   const unsubscribe = vi.fn();
@@ -15,12 +15,13 @@ it("先订阅再读取，保留读取期间到达的全屏切换并持续响应�
     onChanged: listener => { receive = listener; return unsubscribe; },
   });
   receive({ titleBar: "macos", fullScreen: true });
+  expect(getDesktopWindowState().fullScreen).toBe(true);
   resolve({ titleBar: "macos", fullScreen: false });
   const stop = await pending;
   try {
-    expect(getDesktopWindowState()).toEqual({ titleBar: "macos", fullScreen: true });
-    receive({ titleBar: "macos", fullScreen: false });
-    expect(getDesktopWindowState().fullScreen).toBe(false);
+    expect(getDesktopWindowState()).toEqual({ titleBar: "macos", fullScreen: false });
+    receive({ titleBar: "macos", fullScreen: true });
+    expect(getDesktopWindowState().fullScreen).toBe(true);
   } finally { stop(); }
   expect(unsubscribe).toHaveBeenCalledOnce();
 });

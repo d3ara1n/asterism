@@ -282,10 +282,6 @@ export const providersMessages = pluginNamespace("atelier.host").messages("en", 
     id: "features_configuration_ProvidersSettings_66",
     defaultMessage: "Testing…",
   },
-  settingsChanged: {
-    id: "features_configuration_ProvidersSettings_67",
-    defaultMessage: "Settings changed, test again",
-  },
   testConnected: {
     id: "features_configuration_ProvidersSettings_68",
     defaultMessage: "Connected",

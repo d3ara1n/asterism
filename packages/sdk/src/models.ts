@@ -78,7 +78,7 @@ export interface ModelRequestIdentity {
 }
 /** 本次真实 HTTP 响应的瞬态元信息；不包含请求凭据或正文，不自动写入历史。 */
 export interface ModelResponse {
-  connection: { id: string; revision: number };
+  connection: { id: string };
   endpoint: string;
   model: string;
   status: number;

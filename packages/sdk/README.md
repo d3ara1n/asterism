@@ -4,7 +4,7 @@
 
 SDK 包版本见 [package.json](package.json)，宿主 API 版本见 [`sdkApi`](../../src/plugins/packages.ts)。内置插件领域契约独立在 [`@atelier/builtin-api`](../builtin-api/README.md)，不进入通用 SDK。
 
-当前宿主 API 为 **13.0**，插件声明 `{ "major": 13, "minMinor": 0 }`，依赖 `@atelier/sdk: ^0.33.0`。后台通过 `session.invoke` 调用资源动作；公共模型终态通过具型扩展携带领域数据；前端入口默认导出 `defineRendererPlugin(...)`，功能视图放入其 `modules`，调用契约显式声明 `scope`。
+当前宿主 API 为 **14.0**，插件声明 `{ "major": 14, "minMinor": 0 }`，依赖 `@atelier/sdk: ^0.34.0`。后台通过 `session.invoke` 调用资源动作；公共模型终态通过具型扩展携带领域数据；前端入口默认导出 `defineRendererPlugin(...)`，功能视图放入其 `modules`，调用契约显式声明 `scope`。
 
 ## 子路径入口
 
@@ -65,7 +65,7 @@ export default definePlugin({
   "exports": { "./public": "./src/public.ts" },
   "atelier": {
     "id": "example.tools",
-    "api": { "major": 13, "minMinor": 0 },
+    "api": { "major": 14, "minMinor": 0 },
     "runtime": "./src/runtime.ts"
   }
 }
@@ -130,7 +130,7 @@ providerPresets: [{
 const connection = plugin.providers.get(connectionId);
 const usage = connection?.usage ? plugin.usages.get(connection.usage) : null;
 if (connection?.enabled && usage && usage.source !== "headers") {
-  const credential = await plugin.providers.credential(connection, { signal });
+  const credential = await plugin.providers.credential(connection.id, { signal });
   const items = await usage.query({
     connection: { id: connection.id, endpoint: connection.baseUrl },
     credential, signal,
@@ -140,6 +140,8 @@ if (connection?.enabled && usage && usage.source !== "headers") {
 ```
 
 `providers.list / presets`、`usages.list` 提供目录；两者的 `subscribe` 通知变更，关闭时自动清理。凭据仅经后台 `providers.credential` 显式读取；registry 不代选连接、缓存结果或轮询。消费者用自己的具型调用和事件向前端交付状态。内置实例见 `packages/builtin/src/providers/`（提供）和 `packages/builtin/src/usage/`（消费）。
+
+API 14.0 的 `providers.credential(id, { signal? })` 读取当前连接凭据；连接信息和模型响应的 `connection` 以 ID 标识，模型请求在开始时取用连接配置与凭据。消费规则见 [提供商与用量目录](../../docs/plugin-sdk.md#提供商与用量目录api-100)。
 
 响应头来源使用 `source: "headers"` 和同步 `parseHeaders`，参见 [`examples/provider-usage-headers.ts`](examples/provider-usage-headers.ts)。返回 null 表示本次没有新数据，返回空列表明确清空。来源不限制结果类型；示例通过响应头提供 balance，内置 OpenAI／Anthropic／xAI 提供 `category: "rate_limit"` 的 quota。query 提供方可省略 source。
 

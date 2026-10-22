@@ -6,7 +6,7 @@ import { emptyModelRates, emptyModalityRates, type ModelCost } from "@atelier/sd
 
 const current: ProviderModel = {
   ...createModelInput("my-connection", { modelId: "test-model", name: "My model" }),
-  revision: 3, contextWindow: 1000,
+  contextWindow: 1000,
   generation: { maxOutputTokens: 100, temperature: 0.5, topP: 0.9 },
   compatibility: [{ id: "systemMessageInMessages" }],
 };

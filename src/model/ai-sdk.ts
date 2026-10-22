@@ -92,7 +92,7 @@ export class AiSdkAdapter implements ModelAdapter {
     const transport: typeof fetch = async (url, init) => {
       const response = await this.transport(url, init);
       responseMetadata = {
-        connection: { id: provider.id, revision: provider.revision }, endpoint: provider.baseUrl, model: model.modelId,
+        connection: { id: provider.id }, endpoint: provider.baseUrl, model: model.modelId,
         status: response.status, receivedAt: Date.now(), headers: Object.fromEntries(response.headers),
       };
       return response;

@@ -23,9 +23,11 @@ export class ContentTransferService {
       throw new PluginApiError("foreign_resource", "The content object is not on the current session path.");
     return { sessionId: source.sessionId, objectId: source.objectId, recordIds: new Set(path.map(node => node.id)) };
   }
-  async execute(raw: ContentCommand): Promise<ContentReply> {
+  async execute(raw: unknown): Promise<ContentReply> {
     if (this.closed) throw new PluginApiError("unavailable", "Content transfer is closed.");
-    const command = contentCommandSchema.parse(raw), store = this.sessions.content;
+    const parsed = contentCommandSchema.safeParse(raw);
+    if (!parsed.success) throw new PluginApiError("invalid_argument", "Invalid content command.");
+    const command = parsed.data, store = this.sessions.content;
     switch (command.type) {
       case "input.open": {
         const scope = this.sessions.openContentInput(command.target); this.inputs.set(scope.id, scope);

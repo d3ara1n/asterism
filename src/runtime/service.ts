@@ -12,7 +12,7 @@ import { commandSchema, snapshotSchema, type AppSnapshot, type AppError } from "
 import type { TranslationCatalog } from "../shared/i18n.ts";
 import type { ModelSettings } from "../shared/model.ts";
 import type { ObjectStreamPayload } from "../shared/object-stream.ts";
-import { pluginConfigurationCommandSchema, type PluginConfigurationCommand, type PluginConfiguration } from "../shared/plugin-configuration.ts";
+import { pluginConfigurationCommandSchema, type PluginConfiguration } from "../shared/plugin-configuration.ts";
 import type { SecretProtector } from "../shared/secrets.ts";
 import type { SessionChanged } from "../shared/session.ts";
 import { pluginErrorDisplay } from "./plugin-errors.ts";
@@ -68,7 +68,7 @@ export class ApplicationService {
     this.db.close();
   }
   private readonly npmRoot: string;
-  configurePlugin(raw: PluginConfigurationCommand): PluginConfiguration[] {
+  configurePlugin(raw: unknown): PluginConfiguration[] {
     const parsed = pluginConfigurationCommandSchema.safeParse(raw);
     if (!parsed.success) throw new ApplicationError("invalid_request", "Invalid plugin configuration command.");
     try { return this.sessions.configurePlugins(parsed.data); }

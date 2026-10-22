@@ -60,18 +60,18 @@ export function resolveTarget(snapshot: ConfigurationSnapshot, target: ModelTarg
 
 export function createModelServices(configuration: ConfigurationService, adapterFactory?: (settings: ModelSettings) => ModelAdapter): HostModels {
   // 请求前刷新凭据可用性；目录读取同步取当前配置。
-  const snapshot = async () => (await configuration.execute({ type: "read" })).snapshot;
   const current = () => configuration.current();
-  const resolve = async (target: ModelTarget): Promise<ResolvedTarget> => {
-    const config = await snapshot();
+  const resolve = async (target: ModelTarget, execute = true): Promise<ResolvedTarget> => {
+    await configuration.execute({ type: "read" });
+    const config = current();
     const result = resolveTarget(config, target);
     if (!result.ok) throw new ModelTargetFailure(result.reason, `The model target for role ${target.role} is unavailable (${result.reason}).`);
     const { model, provider } = resolveProviderModel(config, result.model)!;
     const { credentialState: _state, ...connection } = provider;
     const settings: ModelSettings = { provider: connection, model, thinking: result.thinking };
-    let credential: Promise<string | null> | undefined;
+    const credential = adapterFactory || !execute ? null : await configuration.executionCredential(connection.id);
     const adapter = adapterFactory?.(settings)
-      ?? new AiSdkAdapter(() => credential ??= configuration.executionCredential(connection.id, connection.revision));
+      ?? new AiSdkAdapter(async () => credential);
     return { settings, adapter };
   };
   const catalog = {
@@ -104,7 +104,7 @@ export function createModelServices(configuration: ConfigurationService, adapter
       let content: ModelContent | undefined;
       try {
         content = capture(messages, options?.content);
-        const { settings, adapter } = await resolve(target);
+        const { settings, adapter } = await resolve(target, false);
         request.signal.throwIfAborted();
         validateInput(messages, content);
         adapter.validate({ settings, system, messages, userAgent, sessionId,

@@ -276,11 +276,10 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
       presets: () => { checkAvailable(); return host.providers?.presets() ?? []; },
       list: () => { checkAvailable(); return structuredClone(host.providers?.list() ?? []); },
       get: id => { checkAvailable(); return structuredClone(host.providers?.get(id) ?? null); },
-      credential: (connection, options = {}) => {
+      credential: (id, options = {}) => {
         checkAvailable();
         if (!host.providers) throw new PluginApiError("unavailable", "Provider connections are unavailable.");
-        const captured = { id: connection.id, revision: connection.revision };
-        return sessionRuns.start(signal => host.providers!.credential(captured, { signal }),
+        return sessionRuns.start(signal => host.providers!.credential(id, { signal }),
           { signal: options.signal, affectsHistory: false }).done;
       },
       subscribe: listener => subscribeRegistry(host.providers, listener),

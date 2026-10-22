@@ -87,7 +87,7 @@ export const sessionResultSchema = z.discriminatedUnion("ok", [
   z.strictObject({ ok: z.literal(false), error: z.strictObject({ code: errorCode, message: z.string(), display: uiTextSchema.optional() }) }),
 ]);
 export type SessionResult = z.infer<typeof sessionResultSchema>;
-export const sessionRequestSchema = z.strictObject({ kind: z.literal("session.request"), version: z.literal(sessionVersion), id: uuid, command: sessionCommandSchema });
+export const sessionRequestSchema = z.strictObject({ kind: z.literal("session.request"), version: z.literal(sessionVersion), id: uuid, command: z.unknown() });
 export const sessionResponseSchema = z.strictObject({ kind: z.literal("session.response"), version: z.literal(sessionVersion), id: uuid, result: sessionResultSchema });
 export const sessionChangedSchema = z.discriminatedUnion("kind", [
   z.strictObject({ kind: z.literal("session.opened"), sessionId: id, data: sessionDataSchema }),

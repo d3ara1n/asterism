@@ -95,7 +95,7 @@ export function modelParameters(catalog: Catalog, current: ProviderModel): {
   try {
     const match = selectModel(catalog, current.modelId);
     const entry = entrySchema.parse(match.model);
-    const { revision: _revision, ...value } = structuredClone(current);
+    const value = structuredClone(current);
     const unfilled: ModelParameterUpdate["unfilled"] = [];
     if (entry.limit?.context) value.contextWindow = entry.limit.context;
     else unfilled.push("contextWindow");

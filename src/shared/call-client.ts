@@ -17,7 +17,7 @@ export class CallClient implements PluginCalls {
     if (this.closed) throw new Error("The plugin connection is closed.");
     options.signal?.throwIfAborted();
     const id = crypto.randomUUID();
-    const wire = jsonSchema.parse(structuredClone(input));
+    const wire = jsonSchema.parse(input);
     return new Promise<Json>((resolve, reject) => {
       const finish = (work: () => void) => {
         if (!this.pending.delete(id)) return;

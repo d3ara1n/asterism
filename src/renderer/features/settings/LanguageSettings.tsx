@@ -12,9 +12,9 @@ export function LanguageSettings() {
   const [state, setState] = useState<LanguageState | null>(null);
   const [busy, setBusy] = useState(false), [failed, setFailed] = useState(false);
   useEffect(() => {
-    let active = true, changed = false;
-    const stop = window.host.language.onChanged(value => { changed = true; if (active) setState(value); });
-    void window.host.language.get().then(value => { if (active && !changed) setState(value); }).catch(() => { if (active) setFailed(true); });
+    let active = true;
+    const stop = window.host.language.onChanged(value => { if (active) setState(value); });
+    void window.host.language.get().then(value => { if (active) setState(value); }).catch(() => { if (active) setFailed(true); });
     return () => { active = false; stop(); };
   }, []);
   return <Section title={i18n.text(settingsMessages.generalTitle)}>

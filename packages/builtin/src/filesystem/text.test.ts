@@ -10,10 +10,11 @@ import { executeCoreBatch } from "../../../../src/execution/core.ts";
 import type { Json, ToolOutcome } from "../../../../src/shared/model.ts";
 import { textReadSchema } from "../shared/text-contract.ts";
 import { readTextFile, commitTextFile } from "./text-io.ts";
+import { writableTarget } from "./paths.ts";
 
 vi.mock("node:fs/promises", async importOriginal => {
   const actual = await importOriginal<typeof fs>();
-  return { ...actual, rename: vi.fn(actual.rename), link: vi.fn(actual.link) };
+  return { ...actual, rename: vi.fn(actual.rename) };
 });
 const roots: string[] = [];
 const services: ApplicationService[] = [];
@@ -49,7 +50,7 @@ function setup() {
   return { root, directory, outside, resource, modules, call, caller };
 }
 
-// 在真实临时目录和执行边界验证授权、批次失败、并发与冲突，避免影响用户文件。
+// 在真实临时目录和执行边界验证授权、批次失败与原子写入，避免影响用户文件。
 describe("目录正文工具", () => {
   it("文件 read 将 target 范围交给正文读取，模型与数据来自同一次读取", async () => {
     const { directory, call } = setup();
@@ -108,38 +109,27 @@ describe("目录正文工具", () => {
   });
 
 
-  it("不同资源指向同一文件的修改串行，两个 append 不丢失", async () => {
-    const { directory, modules, resource, call, caller } = setup();
-    writeFileSync(join(directory, "text.txt"), "base\n");
-    const second = new AgentCapabilities(modules.resources, modules.tools, [{ ...resource, id: "other", title: "Other resource" }], () => true, caller);
-    const results = await Promise.all([
-      call("edit", { path: "text.txt" }, { edits: [{ op: "append", body: ["first"] }] }),
-      call("edit", { path: "text.txt" }, { edits: [{ op: "append", body: ["second"] }] }, second, undefined, "other"),
-    ]);
-    expect(results.map(result => result.kind)).toEqual(["succeeded", "succeeded"]);
-    expect(["base\nfirst\nsecond\n", "base\nsecond\nfirst\n"]).toContain(readFileSync(join(directory, "text.txt"), "utf8"));
-  });
-
-  it("准备后的外部变化阻止提交；新文件提交不能覆盖外部刚创建的文件", async () => {
+  // 原生正文工具采用后写为准；已有目标和新建目标都通过 rename 提交。
+  it("准备后的外部写入可被覆盖，新建同样原子替换目标", async () => {
     const { directory, call } = setup();
     const signal = new AbortController().signal;
     const file = join(directory, "text.txt");
     writeFileSync(file, "initial");
-    const before = await readTextFile(directory, "text.txt", signal);
+    const selected = await writableTarget(directory, "text.txt");
+    const before = await readTextFile(selected.path, signal);
     writeFileSync(file, "external");
-    await expect(commitTextFile(directory, "text.txt", before, "ours", signal)).rejects.toThrow("changed");
-    expect(readFileSync(file, "utf8")).toBe("external");
-    await expect(commitTextFile(directory, "text.txt", null, "ours", signal)).rejects.toThrow("changed");
+    await commitTextFile(selected, before, "ours", signal);
+    expect(readFileSync(file, "utf8")).toBe("ours");
     expect(readdirSync(directory)).toEqual(["text.txt"]);
     const actual = await vi.importActual<typeof fs>("node:fs/promises");
-    vi.mocked(fs.link).mockImplementationOnce(async (source, target) => {
+    vi.mocked(fs.rename).mockImplementationOnce(async (source, target) => {
       writeFileSync(target, "external");
-      await actual.link(source, target);
+      await actual.rename(source, target);
     });
     expect(await call("write", { path: "new.txt" }, { content: "ours" })).toMatchObject({
-      kind: "rejected", error: { code: "file_changed" },
+      kind: "succeeded",
     });
-    expect(readFileSync(join(directory, "new.txt"), "utf8")).toBe("external");
+    expect(readFileSync(join(directory, "new.txt"), "utf8")).toBe("ours");
     expect(readdirSync(directory).sort()).toEqual(["new.txt", "text.txt"]);
   });
 

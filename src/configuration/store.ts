@@ -13,11 +13,11 @@ import { normalizeOverrides, resolveAgentConfiguration, resolveRoleConfiguration
 import { migrateModelCost } from "./model-cost-migration.ts";
 import { providerEditingMessages } from "../shared/provider-editing-messages.ts";
 
-const identity = { id: z.string().min(1).max(160), revision: z.number().int().positive() };
-const storedProviderSchema = providerInputSchema.extend({ revision: identity.revision, credentialRef: z.string().uuid().nullable() });
-const storedRoleSchema = z.strictObject({ ...identity, builtin: z.boolean(), overrides: modelRoleOverridesSchema });
-const storedAgentSchema = z.strictObject({ ...identity, builtin: z.boolean(), overrides: agentOverridesSchema });
-const storedModelSchema = modelSchema.extend({ cost: z.preprocess(migrateModelCost, modelCostSchema.nullable().default(null)) });
+const identity = { id: z.string().min(1).max(160) };
+const storedProviderSchema = providerInputSchema.extend({ credentialRef: z.string().uuid().nullable() }).strip();
+const storedRoleSchema = z.object({ ...identity, builtin: z.boolean(), overrides: modelRoleOverridesSchema });
+const storedAgentSchema = z.object({ ...identity, builtin: z.boolean(), overrides: agentOverridesSchema });
+const storedModelSchema = modelSchema.extend({ cost: z.preprocess(migrateModelCost, modelCostSchema.nullable().default(null)) }).strip();
 /** 模型以 `<providerId>/<modelId>` 识别，其余以 id 识别。 */
 const keyOf = (item: { id: string } | { providerId: string; modelId: string }): string => "id" in item ? item.id : modelReference(item);
 const documentSchema = z.strictObject({
@@ -42,7 +42,7 @@ export type ConfigurationKind = keyof typeof collections;
 type Entry = { [K in ConfigurationKind]: ConfigurationDocument[(typeof collections)[K]][number] };
 type ConfigurationSave =
   | { kind: "provider"; id: string | null; value: ProviderInput; credentialRef: string | null }
-  | { kind: "model"; id: string | null; value: Omit<ProviderModel, "revision"> }
+  | { kind: "model"; id: string | null; value: ProviderModel }
   | { kind: "role"; id: string; value: ModelRoleOverrides }
   | { kind: "agent"; id: string; value: AgentOverrides };
 
@@ -81,8 +81,8 @@ export class ConfigurationStore {
       // 只有文件不存在才初始化；已有文件中的删除状态不会重新播种。
       this.document = {
         version: 7, providers: [], models: [],
-        roles: defaultRoles.map(({ id, builtin }) => ({ id, builtin, revision: 1, overrides: {} })),
-        agents: defaultAgents.map(({ id, builtin }) => ({ id, builtin, revision: 1, overrides: {} })),
+        roles: defaultRoles.map(({ id, builtin }) => ({ id, builtin, overrides: {} })),
+        agents: defaultAgents.map(({ id, builtin }) => ({ id, builtin, overrides: {} })),
       };
       this.commit(this.document);
       return;
@@ -101,16 +101,15 @@ export class ConfigurationStore {
     this.validateEdit(input);
     const next = structuredClone(this.document);
     const { id } = input;
-    const revision = (id === null ? 0 : this.get(input.kind, id)?.revision ?? 0) + 1;
     switch (input.kind) {
       case "provider":
-        upsert(next.providers, id, { ...input.value, revision, credentialRef: input.credentialRef });
+        upsert(next.providers, id, { ...input.value, credentialRef: input.credentialRef });
         // 提供商拥有其模型：改名时模型随之迁移；角色等引用不改写。
         if (id !== null && id !== input.value.id) for (const model of next.models) if (model.providerId === id) model.providerId = input.value.id;
         break;
-      case "model": upsert(next.models, id, { ...input.value, revision }); break;
-      case "role": upsert(next.roles, id, { id: id!, revision, builtin: this.get("role", id!)?.builtin ?? false, overrides: normalizeOverrides(input.value) }); break;
-      case "agent": upsert(next.agents, id, { id: id!, revision, builtin: this.get("agent", id!)?.builtin ?? false, overrides: normalizeOverrides(input.value) }); break;
+      case "model": upsert(next.models, id, input.value); break;
+      case "role": upsert(next.roles, id, { id: id!, builtin: this.get("role", id!)?.builtin ?? false, overrides: normalizeOverrides(input.value) }); break;
+      case "agent": upsert(next.agents, id, { id: id!, builtin: this.get("agent", id!)?.builtin ?? false, overrides: normalizeOverrides(input.value) }); break;
     }
     this.commit(next);
   }
@@ -150,11 +149,11 @@ export class ConfigurationStore {
     return { credentialRef: "credentialRef" in old ? old.credentialRef : null };
   }
   /** 一次保存全部选择；已有模型保留原值，重试不会覆盖用户配置。 */
-  addModels(models: Omit<ProviderModel, "revision">[]): void {
+  addModels(models: ProviderModel[]): void {
     const next = structuredClone(this.document);
     const existing = new Set(next.models.map(modelReference));
     for (const model of models) if (!existing.has(modelReference(model))) {
-      next.models.push({ ...model, revision: 1 });
+      next.models.push(model);
       existing.add(modelReference(model));
     }
     if (next.models.length !== this.document.models.length) this.commit(next);

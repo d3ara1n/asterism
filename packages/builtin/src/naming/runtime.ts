@@ -61,19 +61,18 @@ export function createNamingModule(connect: (api: NamingApi) => () => void, user
           if (named?.status === "known" && named.data.auto?.messageId === message.record.id) return;
           const model = plugin.models.roles().find(role => role.id === "utility")?.model ?? null;
           if (model === null) return;
-          const nameId = named?.record.id ?? null;
           const prompt = namingPrompt(level === "initial" ? [{ user: inputSummary(message.data.parts) }]
             : collectTurns(snapshot.records.all({ scope: "timeline" })));
-          // 命名依据只来自当前路径，标题同步与观察者顺序不参与过时判断。
-          const isCurrent = (view: SessionSnapshot) =>
-            (view.records.last(SessionNamed, { scope: "timeline" })?.record.id ?? null) === nameId &&
-            userMessages(view, "timeline").at(-1)?.record.id === latest.record.id;
+          const applicable = (view: SessionSnapshot) => {
+            const named = view.records.last(SessionNamed, { scope: "timeline" });
+            return named?.status !== "unknown" && named?.data.source !== "user" &&
+              userMessages(view, "timeline").some(input => input.record.id === message.record.id);
+          };
           plugin.tasks.start(`naming:${session.id}:${message.record.id}`, async signal => {
-            if (!isCurrent(session.snapshot())) return;
             const title = await generateTitle(plugin.models, prompt, signal, session.id, userAgent);
             // 检查与追加在同一同步提交中完成；标题由游标观察者独立同步。
             session.commit(writer => {
-              if (isCurrent(session.snapshot())) writer.append(SessionNamed, {
+              if (applicable(session.snapshot())) writer.append(SessionNamed, {
                 title, source: "auto", auto: { level, messageId: message.record.id, model } });
             });
           }, { timeoutMs });
