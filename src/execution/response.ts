@@ -1,7 +1,7 @@
 import type { ModelBlock, ModelSource, ModelCompletion, ModelLiveBlock, ToolInvocationInfo, ToolResult, Presentation } from "@atelier/sdk/contracts";
 import { ModelFailure, type ModelEvent, type StreamPart } from "../model/contract.ts";
-import { parsePartialJson } from "ai";
-import { jsonSchema, type Json, type ToolOutcome } from "../shared/model.ts";
+import { previewArguments } from "../shared/partial-arguments.ts";
+import type { Json, ToolOutcome } from "../shared/model.ts";
 
 type BufferedBlock = {
   part: StreamPart;
@@ -93,12 +93,8 @@ export class ResponseBuffer {
     for (const block of this.calls()) {
       if (block.emitted || block.executing) continue;
       if (block.endedAt === null && block.previewText !== block.text) {
-        const text = block.text;
-        const parsed = await parsePartialJson(text);
-        if (block.endedAt !== null || block.emitted || text !== block.text) continue;
-        block.previewText = text;
-        const preview = jsonSchema.safeParse(parsed.value);
-        block.previewArguments = preview.success ? preview.data : null;
+        block.previewText = block.text;
+        block.previewArguments = previewArguments(block.text);
       }
       block.invocation = identity(block.part.name, block.endedAt !== null ? block.arguments : block.previewArguments);
     }
@@ -149,7 +145,7 @@ export class ResponseBuffer {
     const common = { ...this.identity, ordinal: block.ordinal, complete, continuation: block.continuation,
       completion: block.ordinal === this.blocks.size - 1 ? this.completion : null };
     this.onBlock(block.part.kind === "toolcall"
-      ? { ...common, kind: "toolcall" as const, callId: block.part.callId, name: block.part.name, argumentsText: block.text, arguments: block.arguments, outcome }
+      ? { ...common, kind: "toolcall" as const, callId: block.part.callId, name: block.part.name, argumentsText: block.arguments === null ? block.text : null, arguments: block.arguments, outcome }
       : block.part.kind === "thinking" ? { ...common, kind: "thinking", text: block.text, summary: block.summary }
         : { ...common, kind: "text", text: block.text });
     block.emitted = true;

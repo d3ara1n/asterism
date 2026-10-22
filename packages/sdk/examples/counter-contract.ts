@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { pluginNamespace, defineCreation, defineAction, defineRecord } from "@atelier/sdk/contracts";
+import { pluginNamespace, defineCreation, defineAction, defineRecord, defineChannel } from "@atelier/sdk/contracts";
 
 export const sample = pluginNamespace("example.counter");
 export const Counter = sample.resource("counter", z.strictObject({}));
@@ -12,3 +12,5 @@ const createInput = z.strictObject({ title: z.string().trim().min(1).default("Co
 const actionInput = z.strictObject({ amount: z.number().int() });
 export const CreateCounter = defineCreation(Counter, { id: sample.name("create"), schema: createInput });
 export const ChangeCount = defineAction(Counter, { id: sample.name("change"), schema: actionInput });
+/** 对象级双工通道：前端请求实时推送，后台按对象发送当前值；不进入时间线。 */
+export const CounterUpdates = defineChannel<{ type: "subscribe" }, { value: number }>(sample.name("updates"));

@@ -5,6 +5,7 @@ import type { ResourceRef } from "./workspace.ts";
 export * from "./runtime-contracts.ts";
 export * from "./runtime-resources.ts";
 export * from "./runtime-calls.ts";
+export * from "./runtime-channels.ts";
 export * from "./runtime-tools.ts";
 export * from "./runtime-providers.ts";
 export type * from "./content-runtime.ts";
@@ -33,10 +34,6 @@ export interface PluginSecrets {
   get(key: string): Promise<string | null>;
   set(key: string, value: string): Promise<void>;
   delete(key: string): Promise<void>;
-}
-/** 按对象的二进制流：高频数据（画面、音频）推送到该对象的视图；不进入会话记录，无订阅者时丢弃。 */
-export interface PluginStreams {
-  publish(sessionId: string, objectId: string, channel: string, data: Uint8Array): void;
 }
 /** 宿主托管的进程内异步任务：同 key 运行中不重复启动，宿主关闭时取消；缺省无超时，重启不补做。 */
 export interface PluginTasks {

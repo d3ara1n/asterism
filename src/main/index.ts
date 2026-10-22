@@ -1,10 +1,11 @@
-import { app, BrowserWindow, dialog, ipcMain, net, protocol, session, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, MessageChannelMain, net, protocol, session, shell } from "electron";
+import { randomUUID } from "node:crypto";
 import { externalWebUrl } from "@atelier/ui/links";
 import { mkdirSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { commandChannel, commandSchema, pickDirectoryChannel, openLocalFileChannel, localFilePathSchema, statusChannel, type CommandResult } from "../shared/contracts.ts";
-import { objectStreamChannel } from "../shared/object-stream.ts";
+import { pickDirectoryChannel, openLocalFileChannel, localFilePathSchema, statusChannel } from "../shared/contracts.ts";
+import { connectionRequestChannel } from "../shared/connection.ts";
 import { RuntimeHost } from "./runtime-host.ts";
 import { applicationBrand, applicationDataDirectory, applicationId, applicationStorage } from "../shared/application.ts";
 import { followWindowAppearance, initialWindowAppearance } from "./window-appearance.ts";
@@ -15,12 +16,6 @@ import { servePreferences } from "./ui-state.ts";
 import { serveLanguage, readLanguage } from "./language.ts";
 import { startupText } from "./startup-text.ts";
 import { startupMessages } from "../shared/error-display.ts";
-import { configurationChannel, configurationChangedChannel, configurationCommandSchema, type ConfigurationResult } from "../shared/configuration.ts";
-import { sessionChannel, sessionChangedChannel, sessionCommandSchema, type SessionResult } from "../shared/session.ts";
-import { pluginConfigurationChangedChannel, pluginConfigurationChannel, pluginConfigurationCommandSchema, type PluginConfigurationResult } from "../shared/plugin-configuration.ts";
-import { contentChannel, contentCommandSchema, type ContentResult } from "../shared/content.ts";
-import { pluginEventsChannel, eventControlSchema } from "../shared/plugin-events.ts";
-import { pluginCallsChannel, callControlSchema } from "../shared/plugin-calls.ts";
 import { allowRendererPermission } from "./permissions.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -31,19 +26,6 @@ let quitRequest: Promise<void> | null = null;
 let trustedURL: string | null = null;
 const runtime = new RuntimeHost(status => {
   if (window && !window.isDestroyed()) window.webContents.send(statusChannel, status);
-}, () => {
-  if (window && !window.isDestroyed()) window.webContents.send(configurationChangedChannel);
-}, event => {
-  if (window && !window.isDestroyed()) window.webContents.send(sessionChangedChannel, event);
-}, event => {
-  // 高频二进制只转发给窗口，不经会话 IPC 或持久化。
-  if (window && !window.isDestroyed()) window.webContents.send(objectStreamChannel, event);
-}, pluginId => {
-  if (window && !window.isDestroyed()) window.webContents.send(pluginConfigurationChangedChannel, pluginId);
-}, frame => {
-  if (window && !window.isDestroyed()) window.webContents.send(pluginEventsChannel, frame);
-}, frame => {
-  if (window && !window.isDestroyed()) window.webContents.send(pluginCallsChannel, frame);
 });
 
 /** 用户退出先读取资源的当前提示；确认后按原关闭流程等待后台清理。 */
@@ -101,53 +83,34 @@ function createWindow(): void {
   });
   current.webContents.on("will-navigate", event => event.preventDefault());
   current.webContents.on("will-attach-webview", event => event.preventDefault());
-  ipcMain.removeHandler(commandChannel);
-  ipcMain.removeHandler(configurationChannel);
-  ipcMain.removeHandler(sessionChannel);
   ipcMain.removeHandler(pickDirectoryChannel);
   ipcMain.removeHandler(openLocalFileChannel);
-  ipcMain.removeHandler(pluginConfigurationChannel);
-  ipcMain.removeHandler(contentChannel);
   const trusted = (event: Electron.IpcMainInvokeEvent | Electron.IpcMainEvent) => event.sender === current.webContents &&
     event.senderFrame === current.webContents.mainFrame && event.senderFrame?.url === allowedURL;
-  const receiveEvents = (event: Electron.IpcMainEvent, raw: unknown) => {
+  // renderer 与任务进程直连：只在交接端口时校验来源；页面重载、跳转或崩溃时关闭旧连接。
+  let connection: string | null = null;
+  const closeConnection = () => { if (connection) { runtime.disconnect(connection); connection = null; } };
+  const requestConnection = (event: Electron.IpcMainEvent) => {
     if (!trusted(event)) return;
-    const parsed = eventControlSchema.safeParse(raw);
-    if (parsed.success) runtime.events(parsed.data);
+    closeConnection();
+    const { port1, port2 } = new MessageChannelMain();
+    const id = randomUUID();
+    if (runtime.connect(id, port1)) {
+      connection = id;
+      event.sender.postMessage(connectionRequestChannel, null, [port2]);
+    } else {
+      port1.close(); port2.close();
+      event.sender.postMessage(connectionRequestChannel, null);
+    }
   };
-  ipcMain.on(pluginEventsChannel, receiveEvents);
-  const receiveCalls = (event: Electron.IpcMainEvent, raw: unknown) => {
-    if (!trusted(event)) return;
-    const parsed = callControlSchema.safeParse(raw);
-    if (parsed.success) runtime.calls(parsed.data);
-  };
-  ipcMain.on(pluginCallsChannel, receiveCalls);
+  ipcMain.on(connectionRequestChannel, requestConnection);
   const stopAppearance = serveAppearance(current, trusted, () => refreshAppearance());
   const stopDesktopWindow = serveDesktopWindow(current, titleBar, trusted);
   const stopPreferences = servePreferences(trusted);
   const stopLanguage = serveLanguage(current, trusted);
-  ipcMain.handle(contentChannel, async (event, raw): Promise<ContentResult> => {
-    if (!trusted(event)) return { ok: false, error: { code: "invalid_request", message: "Untrusted application frame." } };
-    const parsed = contentCommandSchema.safeParse(raw);
-    if (!parsed.success) return { ok: false, error: { code: "invalid_request", message: "Invalid content command." } };
-    return runtime.content(parsed.data);
-  });
-  const resetRenderer = () => { runtime.events({ type: "reset" }); runtime.calls({ type: "reset" }); void runtime.content({ type: "reset" }); };
-  current.webContents.on("render-process-gone", resetRenderer);
+  current.webContents.on("render-process-gone", closeConnection);
   current.webContents.on("did-start-navigation", (_event, _url, inPlace, mainFrame) => {
-    if (mainFrame && !inPlace) resetRenderer();
-  });
-  ipcMain.handle(sessionChannel, async (event, raw): Promise<SessionResult> => {
-    if (!trusted(event)) return { ok: false, error: { code: "invalid_request", message: "Untrusted application frame." } };
-    const parsed = sessionCommandSchema.safeParse(raw);
-    if (!parsed.success) return { ok: false, error: { code: "invalid_request", message: "Invalid session command." } };
-    return runtime.session(parsed.data);
-  });
-  ipcMain.handle(pluginConfigurationChannel, async (event, raw): Promise<PluginConfigurationResult> => {
-    if (!trusted(event)) return { ok: false, error: { code: "invalid_request", message: "Untrusted application frame." } };
-    const parsed = pluginConfigurationCommandSchema.safeParse(raw);
-    if (!parsed.success) return { ok: false, error: { code: "invalid_request", message: "Invalid plugin configuration command." } };
-    return runtime.configurePlugin(parsed.data);
+    if (mainFrame && !inPlace) closeConnection();
   });
   // 只返回用户在系统窗口中选择的路径；渲染端不能借此读取文件。
   ipcMain.handle(pickDirectoryChannel, async event => {
@@ -161,32 +124,12 @@ function createWindow(): void {
     if (!parsed.success || !isAbsolute(parsed.data)) return "An absolute local file path is required.";
     return shell.openPath(parsed.data);
   });
-  ipcMain.handle(commandChannel, async (event, raw): Promise<CommandResult> => {
-    if (event.sender !== current.webContents || event.senderFrame !== current.webContents.mainFrame ||
-      event.senderFrame.url !== allowedURL) {
-      return { ok: false, error: { code: "invalid_request", message: "Untrusted application frame." } };
-    }
-    const parsed = commandSchema.safeParse(raw);
-    if (!parsed.success) return { ok: false, error: { code: "invalid_request", message: "Invalid application command." } };
-    return runtime.execute(parsed.data);
-  });
-  ipcMain.handle(configurationChannel, async (event, raw): Promise<ConfigurationResult> => {
-    if (event.sender !== current.webContents || event.senderFrame !== current.webContents.mainFrame ||
-      event.senderFrame.url !== allowedURL) {
-      return { ok: false, error: { code: "invalid_request", message: "Untrusted application frame." } };
-    }
-    const parsed = configurationCommandSchema.safeParse(raw);
-    if (!parsed.success) return { ok: false, error: { code: "invalid_request", message: "Invalid configuration command." } };
-    return runtime.configure(parsed.data);
-  });
   current.on("closed", () => {
     stopDesktopWindow();
-    ipcMain.removeHandler(openLocalFileChannel);
-    ipcMain.removeListener(pluginEventsChannel, receiveEvents);
-    ipcMain.removeListener(pluginCallsChannel, receiveCalls);
-    ipcMain.removeHandler(contentChannel);
-    resetRenderer();
-    window = null; ipcMain.removeHandler(commandChannel); ipcMain.removeHandler(configurationChannel); ipcMain.removeHandler(sessionChannel); ipcMain.removeHandler(pickDirectoryChannel); ipcMain.removeHandler(pluginConfigurationChannel); stopAppearance(); stopPreferences(); stopLanguage();
+    ipcMain.removeListener(connectionRequestChannel, requestConnection);
+    closeConnection();
+    window = null; ipcMain.removeHandler(pickDirectoryChannel); ipcMain.removeHandler(openLocalFileChannel);
+    stopAppearance(); stopPreferences(); stopLanguage();
   });
   const loading = developmentURL ? current.loadURL(developmentURL) : current.loadFile(rendererFile);
   loading.catch(error => { console.error("Renderer initialization failed.", error); dialog.showErrorBox(applicationBrand.en, startupText(startupMessages.windowLoadFailed, () => readLanguage().locale)); });

@@ -228,12 +228,6 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
         checkExecution(scope); own(ref.kind); checkRef(ref);
         host.sessions.viewChanged(ref.sessionId, ref.id);
       },
-      streams: { publish(channel, data) {
-        checkExecution(scope);
-        own(ref.kind); checkRef(ref, scope?.active && scope.provisional);
-        if (!(data instanceof Uint8Array)) throw new PluginApiError("invalid_argument", "Stream data must be a Uint8Array.");
-        host.stream?.({ sessionId: ref.sessionId, objectId: ref.id, channel: `${internal.id}/${channel}`, data });
-      } },
     };
   };
   const reader = (address: ResourceRef, scope?: ObjectScope, captured?: ResourceSnapshot): ObjectReader => {

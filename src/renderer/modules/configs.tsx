@@ -1,3 +1,4 @@
+import { runtime } from "../runtime";
 import { readConfig, type UiText } from "@atelier/sdk/contracts";
 import { RendererConfigsProvider, type RendererConfigs } from "@atelier/sdk/renderer";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -10,7 +11,7 @@ export function HostConfigsProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<{ values: Map<string, PluginConfiguration>; ready: boolean; error: UiText | null }>({ values: new Map(), ready: false, error: null });
   const queue = useRef<Promise<unknown>>(Promise.resolve());
   const execute = useMemo(() => (command: PluginConfigurationCommand) => {
-    const operation = queue.current.then(() => window.host.pluginConfiguration.execute(command));
+    const operation = queue.current.then(() => runtime.pluginConfiguration.execute(command));
     queue.current = operation.catch(() => {});
     return operation;
   }, []);
@@ -26,7 +27,7 @@ export function HostConfigsProvider({ children }: { children: ReactNode }) {
         if (active) setState(previous => ({ ...previous, ready: false, error: pluginsMessages.settingsLoadFailed }));
       }
     };
-    const stop = window.host.pluginConfiguration.onChanged(() => { void load(); });
+    const stop = runtime.pluginConfiguration.onChanged(() => { void load(); });
     void load();
     return () => { active = false; stop(); };
   }, [execute]);

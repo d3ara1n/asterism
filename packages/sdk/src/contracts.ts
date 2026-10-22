@@ -6,6 +6,7 @@ export * from "./plugin.ts";
 export * from "./records.ts";
 export * from "./events.ts";
 export * from "./calls.ts";
+export * from "./channels.ts";
 export * from "./tool-result.ts";
 export * from "./workspace.ts";
 export type * from "./models.ts";

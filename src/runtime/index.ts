@@ -1,15 +1,13 @@
 import { ApplicationService } from "./service.ts";
-import { dispatch, dispatchConfiguration, dispatchSession, dispatchPluginConfiguration, dispatchContent } from "./dispatch.ts";
+import { dispatch } from "./dispatch.ts";
 import { protocolVersion } from "../shared/contracts.ts";
 import { SecretClient } from "./secret-client.ts";
 import { join } from "node:path";
 import { PackageList, loadPackages } from "../plugins/packages.ts";
 import { builtin } from "@atelier/builtin-api/contracts";
 import { DatabaseVersionError } from "./storage.ts";
-import { EventPeer } from "./event-peer.ts";
-import { CallPeer } from "./call-peer.ts";
-import { callRuntimeControlSchema, pluginCallsVersion } from "../shared/plugin-calls.ts";
-import { eventRuntimeControlSchema, pluginEventsVersion } from "../shared/plugin-events.ts";
+import { RendererConnection } from "./connection.ts";
+import type { RendererFrame, RuntimeFrame } from "../shared/connection.ts";
 import { bindPublicProvider } from "../shared/public-modules.ts";
 import { builtinPublicProvider } from "../builtin-public.ts";
 import { builtinRuntimePublicModules } from "../builtin-runtime-public.ts";
@@ -20,6 +18,9 @@ if (!port) throw new Error("The task runtime must be started as an Electron util
 let service: ApplicationService;
 const secrets = new SecretClient(message => port.postMessage(message));
 const releasePublic = bindPublicProvider("runtime", builtinPublicProvider, builtinRuntimePublicModules);
+/** 主进程交接的 renderer 直连；编号由主进程分配，用于显式断开。 */
+const connections = new Map<string, RendererConnection>();
+const broadcast = (frame: RuntimeFrame) => { for (const connection of connections.values()) connection.send(frame); };
 try {
   const root = process.argv[2];
   if (!root) throw new Error("Application data directory is required.");
@@ -31,48 +32,36 @@ try {
     source: item.entry.source.kind === "path" ? item.entry.source.path : `${item.entry.source.name}@${item.entry.source.version}`,
     status: item.status, error: item.error ?? null, renderer: item.status === "loaded" ? item.renderer ?? null : null,
     dependencies: item.dependencies ?? [], rendererDependencies: item.rendererDependencies ?? [] }));
-  service = new ApplicationService(root, { catalogs: packages.flatMap(item => item.catalogs ?? []), packages: listed, plugins: packages.flatMap(item => item.definition ? [item.definition] : []), protector: secrets, onConfigurationChanged: () => port.postMessage({ kind: "configuration.changed" }),
-    onSessionChanged: event => port.postMessage(event),
-    onPluginConfigurationChanged: id => port.postMessage({ kind: "plugin-configuration.changed", id }),
-    onStream: event => port.postMessage({ kind: "object.stream", ...event }) });
-  const events = new EventPeer(service.sessions.events, frame => port.postMessage({ kind: "plugin-events.frame", version: pluginEventsVersion, frame }));
-  const calls = new CallPeer(service.sessions.calls, frame => port.postMessage({ kind: "plugin-calls.frame", version: pluginCallsVersion, frame }));
-  port.on("message", ({ data }) => {
+  service = new ApplicationService(root, { catalogs: packages.flatMap(item => item.catalogs ?? []), packages: listed,
+    plugins: packages.flatMap(item => item.definition ? [item.definition] : []), protector: secrets,
+    onConfigurationChanged: () => broadcast({ kind: "configuration.changed" }),
+    onSessionChanged: event => broadcast({ kind: "session", event }),
+    onPluginConfigurationChanged: id => broadcast({ kind: "plugin-configuration.changed", id }) });
+  const disconnect = (id: string) => { const connection = connections.get(id); connections.delete(id); connection?.close(); };
+  port.on("message", ({ data, ports }) => {
     if (data?.kind === "shutdown") {
-      events.close();
-      calls.close();
+      for (const id of [...connections.keys()]) disconnect(id);
       secrets.close();
       void service.close().finally(() => { releasePublic(); process.exit(0); });
       return;
     }
+    if (data?.kind === "ping") { port.postMessage({ kind: "pong" }); return; }
     if (secrets.receive(data)) return;
-    if (data?.kind === "plugin-calls.control") {
-      const parsed = callRuntimeControlSchema.safeParse(data);
-      if (parsed.success) calls.receive(parsed.data.control);
+    if (data?.kind === "connection.open" && typeof data.id === "string" && ports[0]) {
+      disconnect(data.id);
+      const endpoint = ports[0];
+      const connection = new RendererConnection(service, {
+        post: message => endpoint.postMessage(message),
+        onMessage: listener => endpoint.on("message", event => listener(event.data as RendererFrame)),
+        close: () => endpoint.close(),
+      }, () => { if (connections.get(data.id) === connection) connections.delete(data.id); });
+      // renderer 页面销毁时端口关闭，连接随之结束。
+      endpoint.on("close", () => connection.close());
+      connections.set(data.id, connection);
+      endpoint.start();
       return;
     }
-    if (data?.kind === "plugin-events.control") {
-      const parsed = eventRuntimeControlSchema.safeParse(data);
-      if (parsed.success) events.receive(parsed.data.control);
-      return;
-    }
-    if (data?.kind === "content.request") {
-      void dispatchContent(service, data).then(response => { if (response) port.postMessage(response); });
-      return;
-    }
-    if (data?.kind === "plugin-configuration.request") {
-      const response = dispatchPluginConfiguration(service, data);
-      if (response) port.postMessage(response);
-      return;
-    }
-    if (data?.kind === "session.request") {
-      void dispatchSession(service, data).then(response => { if (response) port.postMessage(response); });
-      return;
-    }
-    if (data?.kind === "configuration.request") {
-      void dispatchConfiguration(service, data).then(response => { if (response) port.postMessage(response); });
-      return;
-    }
+    if (data?.kind === "connection.close" && typeof data.id === "string") { disconnect(data.id); return; }
     const response = dispatch(service, data);
     if (response) port.postMessage(response);
   });

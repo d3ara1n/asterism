@@ -8,8 +8,8 @@ import { contentRefSchema, defineCall, defineAction, defineCreation, defineRecor
 import { implementCall, defineModule, definePlugin, implementAction, implementCreation, implementPreparer, implementResource, type ObjectExecutor, type ContentScope, type PluginContext } from "@atelier/sdk/runtime";
 import { ApplicationService } from "../runtime/service.ts";
 import { contentReferences, contentLimits } from "../runtime/content-store.ts";
-import { dispatchContent } from "../runtime/dispatch.ts";
-import { contentResponseSchema, contentVersion } from "../shared/content.ts";
+import { serveContent } from "../runtime/dispatch.ts";
+import { contentResultSchema } from "../shared/content.ts";
 import { randomUUID } from "node:crypto";
 import type { ModelAdapter, ModelInput } from "../model/contract.ts";
 import type { StreamRequest } from "@atelier/sdk/contracts";
@@ -362,8 +362,8 @@ describe("宿主不可变内容", () => {
     const f = fixture();
     const opened = await f.service.content.execute({ type: "input.open", target: { sessionId: f.sessionId, resourceKind: Document.kind, contractId: Create.id } });
     if (opened.kind !== "input") throw new Error("Expected input.");
-    const request = { kind: "content.request", version: contentVersion, id: randomUUID(), command: { type: "upload.write", scopeId: opened.scopeId, uploadId: randomUUID(), offset: 0, data: new Uint8Array(contentLimits.chunk + 1) } };
-    expect(await dispatchContent(f.service, request)).toMatchObject({ result: { ok: false, error: { code: "invalid_argument" } } });
+    const oversized = { type: "upload.write", scopeId: opened.scopeId, uploadId: randomUUID(), offset: 0, data: new Uint8Array(contentLimits.chunk + 1) };
+    expect(await serveContent(f.service, oversized)).toMatchObject({ ok: false, error: { code: "invalid_argument" } });
     const begun = await f.service.content.execute({ type: "upload.begin", scopeId: opened.scopeId });
     if (begun.kind !== "upload") throw new Error("Expected upload.");
     await expect(f.service.content.execute({ type: "upload.write", scopeId: opened.scopeId, uploadId: begun.uploadId, offset: 1, data: bytes("bad") })).rejects.toThrow();
@@ -384,7 +384,7 @@ describe("宿主不可变内容", () => {
     const id = await f.create(sealed.ref, opened.scopeId);
     await f.service.content.execute({ type: "input.close", scopeId: opened.scopeId });
     expect(await f.object(id).content.read(sealed.ref)).toEqual(new Uint8Array());
-    expect(contentResponseSchema.safeParse({ kind: "content.response", version: contentVersion, id: randomUUID(), result: { ok: true, reply: sealed } }).success).toBe(true);
+    expect(contentResultSchema.safeParse({ ok: true, reply: sealed }).success).toBe(true);
   });
 });
 

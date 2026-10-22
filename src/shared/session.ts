@@ -1,13 +1,13 @@
 import { z } from "zod";
-import { coreChannel } from "./core.ts";
+import type { LivePatch } from "./live-patch.ts";
 import { userInputPartsSchema } from "@atelier/builtin-api/contracts";
 import {
-  modelInputPartsSchema, resourceCallSchema, contractReferenceSchema, toolInvocationSchema,
+  resourceCallSchema, contractReferenceSchema, toolInvocationSchema,
   toolRunningResultSchema, uiTextSchema,
 } from "@atelier/sdk/contracts";
 import { jsonSchema } from "./model.ts";
 import { modelExpressionSchema, thinkingSchema } from "./configuration.ts";
-import { pointSchema, workbenchCommands, workbenchSnapshotSchema } from "./workbench.ts";
+import { pointSchema, workbenchCommands, workbenchSnapshotSchema, type WorkbenchSnapshot } from "./workbench.ts";
 
 const id = z.string().min(1).max(160);
 /** 来源：null 表示软件本身；否则 plugin 由宿主按写入通道打戳，resource 为经校验的发出资源。记录与事件共用。 */
@@ -25,15 +25,14 @@ export type NewNode = Omit<SessionNode, "id" | "sessionId" | "parentId" | "creat
 
 // ---- 会话能力接口 ----
 const uuid = z.string().uuid();
-export const sessionVersion = 23;
-export const sessionChannel = coreChannel("session");
-export const sessionChangedChannel = coreChannel("session-changed");
 export const sessionCommandSchema = z.discriminatedUnion("type", [
   // 首页组合入口：建立会话、创建第一个代理资源并向它提交首条输入。
   z.strictObject({ type: z.literal("start"), submissionId: uuid, agent: id, model: modelExpressionSchema.nullable(), thinking: thinkingSchema.nullable(), parts: userInputPartsSchema, contentScopeId: uuid.optional() }),
   z.strictObject({ type: z.literal("read"), sessionId: id }),
   z.strictObject({ type: z.literal("watch"), sessionId: id }),
   z.strictObject({ type: z.literal("unwatch"), sessionId: id }),
+  // 结束提示在确认时读取实例当前状态；不进入投影，状态变化不触发重投影。
+  z.strictObject({ type: z.literal("disposal.warnings"), sessionId: id, objectIds: z.array(id).max(1000) }),
   z.strictObject({ type: z.literal("select"), sessionId: id, nodeId: id.nullable() }),
   // 应用组合入口：将人工命名交给内置命名模块追加领域记录。
   z.strictObject({ type: z.literal("rename"), sessionId: id, title: z.string().max(160).refine(value => value.trim().length > 0) }),
@@ -48,7 +47,7 @@ export const sessionCommandSchema = z.discriminatedUnion("type", [
   ...workbenchCommands,
 ]);
 export type SessionCommand = z.infer<typeof sessionCommandSchema>;
-export type SessionMutation = Exclude<SessionCommand, { type: "read" | "watch" | "unwatch" }>;
+export type SessionMutation = Exclude<SessionCommand, { type: "read" | "watch" | "unwatch" | "disposal.warnings" }>;
 /** 仅在运行时存在的输出投影；没有父指针，不属于可选择的历史节点。 */
 const liveBase = { id, objectId: id, responseId: id, ordinal: z.number().int().nonnegative() };
 export const liveBlockSchema = z.discriminatedUnion("kind", [
@@ -79,6 +78,7 @@ export type SessionData = z.infer<typeof sessionDataSchema>;
 export const sessionReplySchema = z.discriminatedUnion("kind", [
   z.strictObject({ kind: z.literal("view"), data: sessionDataSchema }),
   z.strictObject({ kind: z.literal("accepted"), sessionId: id }),
+  z.strictObject({ kind: z.literal("warnings"), warnings: z.array(z.strictObject({ objectId: id, title: z.string(), warning: uiTextSchema })) }),
 ]);
 export type SessionReply = z.infer<typeof sessionReplySchema>;
 const errorCode = z.string().min(1);
@@ -87,19 +87,13 @@ export const sessionResultSchema = z.discriminatedUnion("ok", [
   z.strictObject({ ok: z.literal(false), error: z.strictObject({ code: errorCode, message: z.string(), display: uiTextSchema.optional() }) }),
 ]);
 export type SessionResult = z.infer<typeof sessionResultSchema>;
-export const sessionRequestSchema = z.strictObject({ kind: z.literal("session.request"), version: z.literal(sessionVersion), id: uuid, command: z.unknown() });
-export const sessionResponseSchema = z.strictObject({ kind: z.literal("session.response"), version: z.literal(sessionVersion), id: uuid, result: sessionResultSchema });
-export const sessionChangedSchema = z.discriminatedUnion("kind", [
-  z.strictObject({ kind: z.literal("session.opened"), sessionId: id, data: sessionDataSchema }),
-  z.strictObject({ kind: z.literal("session.changed"), sessionId: id,
-    nodes: z.array(sessionNodeSchema), cursor: id.nullable(), title: z.string(),
-    objects: workbenchSnapshotSchema.shape.objects,
-    workbench: workbenchSnapshotSchema.optional(),
-    layout: workbenchSnapshotSchema.pick({ views: true, viewport: true }).optional(),
-  }),
-  z.strictObject({ kind: z.literal("session.progress"), sessionId: id, progress: sessionProgressSchema }),
-]);
-export type SessionChanged = z.infer<typeof sessionChangedSchema>;
+/** 后台按序推送的会话变化；runtime 是受信发送方，接收端不重复校验。 */
+export type SessionChanged =
+  | { kind: "session.opened"; sessionId: string; data: SessionData }
+  | { kind: "session.changed"; sessionId: string; nodes: SessionNode[]; cursor: string | null; title: string;
+      objects: WorkbenchSnapshot["objects"]; workbench?: WorkbenchSnapshot; layout?: Pick<WorkbenchSnapshot, "views" | "viewport"> }
+  /** live 为相对上一次交付的增量；null 表示流式正文未变化。 */
+  | { kind: "session.progress"; sessionId: string; busyObjectIds: string[]; timelineBusy: boolean; live: LivePatch | null };
 export interface SessionBridge {
   execute(command: SessionCommand): Promise<SessionResult>;
   onChanged(listener: (event: SessionChanged) => void): () => void;

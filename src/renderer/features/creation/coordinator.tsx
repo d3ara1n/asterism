@@ -1,3 +1,4 @@
+import { runtime } from "../../runtime";
 import { pluginOf, reference, type Json, type UiText } from "@atelier/sdk/contracts";
 import { RendererPreferencesProvider, type CreationEntry, type CreationSource, type DropItem, type RendererContentInput } from "@atelier/sdk/renderer";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -92,7 +93,7 @@ export function useCreationCoordinator({ controller, canvas, writable, ready }: 
   }, [canvas]);
   const cancelRunning = useCallback(() => {
     if (running?.content) void running.content.close();
-    else if (running) void window.host.session.execute({ type: "resource.create.cancel", sessionId: running.sessionId, requestId: running.requestId });
+    else if (running) void runtime.session.execute({ type: "resource.create.cancel", sessionId: running.sessionId, requestId: running.requestId });
   }, [running]);
 
   const collect = useCallback((entry: CreationEntry, source: CreationSource, position: Point | null, content: RendererContentInput, initialInput?: Json) =>

@@ -4,9 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApplicationService } from "./service.ts";
-import { dispatch, dispatchSession } from "./dispatch.ts";
+import { dispatch, serveSession } from "./dispatch.ts";
 import { protocolVersion } from "../shared/contracts.ts";
-import { sessionVersion } from "../shared/session.ts";
 
 const roots: string[] = [], services: ApplicationService[] = [];
 afterEach(async () => {
@@ -31,13 +30,10 @@ describe("运行时 IPC 校验", () => {
 
   it("会话通道先拒绝非法命令，再执行合法读取并交付当前执行位置", async () => {
     const service = setup(), sessionId = service.sessions.tree.create("IPC");
-    const request = { kind: "session.request", version: sessionVersion, id: randomUUID(),
-      command: { type: "read", sessionId } };
-    expect(await dispatchSession(service, { ...request, version: -1 })).toBeNull();
-    expect(await dispatchSession(service, { ...request, command: { ...request.command, extra: true } }))
-      .toMatchObject({ result: { ok: false, error: { code: "invalid_request" } } });
-    expect(await dispatchSession(service, { ...request, command: { ...request.command, position: { kind: "history", nodeId: null } } }))
-      .toMatchObject({ result: { ok: false, error: { code: "invalid_request" } } });
-    expect(await dispatchSession(service, request)).toMatchObject({ result: { ok: true, reply: { kind: "view", data: { cursor: null } } } });
+    const command = { type: "read", sessionId };
+    expect(await serveSession(service, { ...command, extra: true })).toMatchObject({ ok: false, error: { code: "invalid_request" } });
+    expect(await serveSession(service, { ...command, position: { kind: "history", nodeId: null } }))
+      .toMatchObject({ ok: false, error: { code: "invalid_request" } });
+    expect(await serveSession(service, command)).toMatchObject({ ok: true, reply: { kind: "view", data: { cursor: null } } });
   });
 });

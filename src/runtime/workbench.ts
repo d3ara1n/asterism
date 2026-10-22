@@ -105,14 +105,12 @@ export class SessionWorkbench {
 
   project(sessionId: string, title: string): WorkbenchSnapshot {
     const folded = this.tree.workbench(sessionId);
-    const objects = folded.objects.map(object => ({ id: object.id, kind: object.kind, title: object.title, presentation: this.resources.project(object),
-      disposalWarning: this.resources.disposalWarning(object) }));
+    const objects = folded.objects.map(object => ({ id: object.id, kind: object.kind, title: object.title, presentation: this.resources.project(object) }));
     return { id: sessionId, title, objects, links: folded.links, ...this.layout(sessionId) };
   }
   object(sessionId: string, id: string) {
     const object = this.tree.workbench(sessionId).objects.find(item => item.id === id);
-    return object ? { id: object.id, kind: object.kind, title: object.title, presentation: this.resources.project(object),
-      disposalWarning: this.resources.disposalWarning(object) } : null;
+    return object ? { id: object.id, kind: object.kind, title: object.title, presentation: this.resources.project(object) } : null;
   }
   layout(sessionId: string): Pick<WorkbenchSnapshot, "views" | "viewport"> {
     const ids = new Set(this.tree.workbench(sessionId).objects.map(object => object.id));

@@ -27,13 +27,13 @@
 
 | 源码 | 构建产物 | 职责 |
 | --- | --- | --- |
-| `src/main/index.ts` | `dist/main/index.js` | 窗口、平台材质、单实例锁、数据目录、IPC 信任检查、Electron `safeStorage` 凭据加解密 |
-| `src/preload/index.ts` | `dist/preload/index.cjs` | 沙箱桥（独立 CJS bundle，校验代码内联）；仅暴露 `window.host` 受控命令和状态订阅 |
+| `src/main/index.ts` | `dist/main/index.js` | 窗口、平台材质、单实例锁、数据目录、任务进程监护、直连端口交接、退出确认、Electron `safeStorage` 凭据加解密 |
+| `src/preload/index.ts` | `dist/preload/index.cjs` | 沙箱桥（独立 CJS bundle，校验代码内联）；`window.host` 只暴露主进程能力，并把任务进程直连端口转交页面 |
 | `src/runtime/index.ts` | `dist/main/runtime.js` | Electron `utilityProcess` 入口，拥有应用服务、SQLite 数据库、模型循环、工具调度与插件宿主 |
 | `src/renderer/main.tsx` | `dist/renderer/` | React 组合、工作台视图与用户意图，不直接访问任意文件或凭据 |
 
 - **应用标识與数据根**：正式标识固定为 `dev.dearain.atelier`（集中于 `src/shared/application.ts`，内部契约与通道通过 `src/shared/core.ts` 生成 `core.* / core:*`）。应用数据统一位于 Electron `app.getPath('userData')` 下：发布版为 `appData/dev.dearain.atelier`，开发版为 `appData/dev.dearain.atelier-development`，在获取单实例锁前创建并显式设置，不写入源码仓库或安装目录。
-- **进程生命周期**：任务进程启动就绪后才创建窗口。请求带协议版本与关联 ID，只发送一次；超时或退出使在途请求失败，不自动重放。关闭最后一个窗口时先要求任务进程关闭数据库再退出应用；任务进程崩溃后要求重启应用。
+- **进程生命周期**：任务进程启动就绪后才创建窗口。主进程与任务进程之间保留控制链路（就绪、退出确认读取、关闭与凭据请求），请求带协议版本与关联 ID，只发送一次，超时或退出使在途请求失败，不自动重放。renderer 业务流量走直连端口，见 [直连传输](#直连传输)。关闭最后一个窗口时先要求任务进程关闭数据库再退出应用；任务进程崩溃后要求重启应用。
 - **凭据隔离**：凭据加解密由主进程调用 `safeStorage` 提供私有接口供任务运行时使用，不向 renderer 开放解密命令。加密不可用或 Linux 仅提供 `basic_text` 时拒绝保存明文 key。
 
 ## 应用组合与宿主机制
@@ -48,9 +48,9 @@ Atelier 分为**应用组合层**、**通用宿主机制**与**插件**三层：
 
 内置 `shell/` 模块实现 shell profile、管道进程句柄、输出处理与清理，目录工具是消费入口。等待退出与显式终止分开，单次 `exec` 自行绑定期限与取消，其收束由宿主管理。具体规则见 [目录命令执行](runtime.md#目录命令执行exec)。
 
-内置 `terminal/` 模块复用 shell 配置解析，以 `node-pty` 持有交互式外部进程，`@xterm/headless` 持有屏幕状态，前端 `@xterm/xterm` 展示并接收用户输入。模块通过资源存在性观察和关闭回调管理实例，不由通用宿主解释终端状态。模型图片通过模块级前端服务绘制已捕获网格，后台以内容引用交付。原生依赖和辅助程序随应用打包到 asar 外；macOS 预编译辅助程序的执行权限由项目安装步骤设置。完整行为见 [终端资源](runtime.md#终端资源)。
+内置 `terminal/` 模块复用 shell 配置解析，以 `node-pty` 持有交互式外部进程，`@xterm/headless` 持有屏幕状态，前端 `@xterm/xterm`（WebGL 渲染，上下文不可用时回退 DOM）展示并接收用户输入。屏幕、输入与实例状态经对象级双工通道传输；模块通过资源存在性观察和关闭回调管理实例，不由通用宿主解释终端状态。模型图片通过模块级前端服务绘制已捕获网格，后台以内容引用交付。原生依赖和辅助程序随应用打包到 asar 外；macOS 预编译辅助程序的执行权限由项目安装步骤设置。完整行为见 [终端资源](runtime.md#终端资源)。
 
-内置实现位于 `packages/builtin/`，公开领域声明位于 `packages/builtin-api/`，应用与内置界面共享控件位于内部 `packages/ui/`。内置后台与前端保持静态构建，应用组合层通过包入口安装内置插件并登记公共提供方；通用加载器只消费提供方描述，不导入 Agent。公共实例、依赖及版本规则见 [公共模块与契约身份](plugin-sdk.md#公共模块与契约身份)。外部插件包在启动时由宿主打包并缓存于 `<data>/plugins/.cache`，前端静态资源经 `atelier-plugin://` 只读提供，高频二进制经 `shared/object-stream.ts` 的按对象流通道传输。
+内置实现位于 `packages/builtin/`，公开领域声明位于 `packages/builtin-api/`，应用与内置界面共享控件位于内部 `packages/ui/`。内置后台与前端保持静态构建，应用组合层通过包入口安装内置插件并登记公共提供方；通用加载器只消费提供方描述，不导入 Agent。公共实例、依赖及版本规则见 [公共模块与契约身份](plugin-sdk.md#公共模块与契约身份)。外部插件包在启动时由宿主打包并缓存于 `<data>/plugins/.cache`，前端静态资源经 `atelier-plugin://` 只读提供，高频数据经 [对象级双工通道](plugin-sdk.md#对象级双工通道api-150) 传输。
 
 ## 存储归属与数据事务
 
@@ -84,15 +84,25 @@ Atelier 分为**应用组合层**、**通用宿主机制**与**插件**三层：
 
 ## 会话与前端能力接口
 
-命令在主进程 IPC 入口检查来源和结构，preload 负责传递。任务进程分发层解析通道信封，命令正文交由对应领域服务解析；内部动作沿已解析的调用身份进入目标契约。回执在主进程接收时解码一次，路由按信封种类分派，发送端使用类型约束构造数据。
+### 直连传输
 
-桌面桥 `window.host` 按职责分为独立版本化通道（协议版本号定义于 `src/shared/` 对应契约文件）：
-- **应用列表通道（`src/shared/contracts.ts`）**：提供工作区身份、会话列表摘要与启动时装载的插件静态翻译目录，不持有已打开会话的正文。
-- **桌面窗口通道（`window.host.window`，`src/shared/desktop.ts`）**：由主进程提供只读窗口状态及变更订阅，不进入任务运行时；布局规则见 [原生窗口与 Web 内容](design-system.md#原生窗口与-web-内容)。
+renderer 与任务进程经一对 `MessagePort` 直连（`src/shared/connection.ts`）。页面注册接收监听后调用 `window.host.connectRuntime()`，主进程只受理受信主框架的首次请求，以 `MessageChannelMain` 建立端口对，一端交给任务进程，另一端经 preload 原样转交页面；任务进程不可用时转交不带端口的消息。之后主进程不转发任何业务消息。
+
+- **信任边界**：来源校验只在交接端口时进行一次；端口只交给受信窗口的主框架，每个页面只受理一次请求。
+- **校验与编码**：两端由同一构建产出，帧形状以类型约束。任务进程入口按领域命令解析一次（会话、配置、内容等领域服务各自的 schema），推送帧由受信的任务进程构造，接收端不逐帧校验；载荷以结构化克隆传递，不经 JSON 编码。
+- **多路复用**：一条连接承载请求／回执（`workspace / session / configuration / plugin-configuration / content`）、会话与配置变化推送、插件事件、具型调用与对象通道。
+- **连接寿命**：页面刷新、跳转或渲染进程退出时主进程通知任务进程结束该连接；连接结束取消其事件订阅、调用处理与对象通道，并释放内容传输状态。运行状态变为不可用或停止时 renderer 端结算在途请求。直连请求不设单次等待期限（会话命令可合法地长时间运行）；任务进程卡死由主进程心跳判定：就绪后每 5 秒 ping，15 秒内没有 pong 即结束任务进程并通知 unavailable。
+
+### 能力通道
+
+主进程能力经 `window.host`（窗口、外观、语言、偏好、系统对话框、本机文件打开与运行状态）；任务进程能力经直连客户端（`src/renderer/runtime.ts`）：
+- **应用列表（`src/shared/contracts.ts`）**：提供工作区身份、会话列表摘要与启动时装载的插件静态翻译目录，不持有已打开会话的正文。
+- **桌面窗口（`window.host.window`，`src/shared/desktop.ts`）**：由主进程提供只读窗口状态及变更订阅，不进入任务运行时；布局规则见 [原生窗口与 Web 内容](design-system.md#原生窗口与-web-内容)。
 - **本机文件打开（`core:open-local-file`）**：受信主 frame 通过 preload 提交绝对路径，主进程调用系统关联应用打开并返回错误文字；不读取文件内容、不进入任务运行时。内置插件前端通过应用组合注入的方法消费，网页链接继续只接受 HTTP(S)。
-- **全局配置通道（`src/shared/configuration.ts`）** 与 **插件配置通道**：分别管理提供商／角色／代理配置（含插件提供的预设与用量目录、模型发现、参数获取与异步连接测试）及插件 `.atelier/config.json`；读写不触发工作台重载。用量结果由消费插件通过具型调用和事件交付自己的界面；后台目录及凭据边界见 [插件 SDK](plugin-sdk.md#提供商与用量目录api-100)。
-- **插件调用通道（`window.host.calls`，`src/shared/plugin-calls.ts`）**：独立传递具型请求、结果与取消，经主进程受信窗口门禁送达任务运行时；不占用会话命令队列。业务契约与生命周期见 [具型插件调用](plugin-sdk.md#具型插件调用)。
-- **会话通道（`window.host.session`，`src/shared/session.ts` / `workbench.ts`）**：统一处理会话生命周期、资源创建与动作、工作台关系与视图布局：
+- **全局配置（`src/shared/configuration.ts`）** 与 **插件配置**：分别管理提供商／角色／代理配置（含插件提供的预设与用量目录、模型发现、参数获取与异步连接测试）及插件 `.atelier/config.json`；读写不触发工作台重载。用量结果由消费插件通过具型调用和事件交付自己的界面；后台目录及凭据边界见 [插件 SDK](plugin-sdk.md#提供商与用量目录api-100)。
+- **插件调用（`src/shared/plugin-calls.ts`）**：独立传递具型请求、结果与取消；不占用会话命令队列。业务契约与生命周期见 [具型插件调用](plugin-sdk.md#具型插件调用)。
+- **对象通道**：按对象打开的双工消息流，宿主校验对象位于当前路径并路由到所属插件；接口见 [对象级双工通道](plugin-sdk.md#对象级双工通道api-150)。
+- **会话（`src/shared/session.ts` / `workbench.ts`）**：统一处理会话生命周期、资源创建与动作、工作台关系与视图布局：
 
 | 命令 | 行为 |
 | --- | --- |
@@ -102,6 +112,7 @@ Atelier 分为**应用组合层**、**通用宿主机制**与**插件**三层：
 | `read` | 同次读取返回会话树、执行游标、工作台投影和当前进度，不接受独立历史位置参数 |
 | `watch` / `unwatch` | 打开／关闭当前会话数据订阅；初始数据与后续变化经同一通道按序交付 |
 | `select` | 会话所有被捕获资源均 settled 时移动执行游标，同事务记录 `cursor_selections` |
+| `disposal.warnings` | 按对象 ID 读取资源当前的结束提示；移除、回溯确认框在打开时查询，不进入工作台投影 |
 | `object.remove` | 对象 settled 后移除，并解除全部入向、出向链接；未收束时返回 `conflict` |
 | `link.set` | 变更指定会话的资源有向链接，事务提交后通知 |
 | `view.set` / `viewport.set` | 保存卡片布局（位置、折叠、隐藏、尺寸覆盖）或画布视口，不修改历史 |
@@ -113,13 +124,13 @@ Atelier 分为**应用组合层**、**通用宿主机制**与**插件**三层：
 
 - **动作与显示分离**：命令完成后返回 `accepted` 与会话身份，普通动作不触发读取或等待同步；`start / submit` 以 `submissionId`（UUID）保证幂等重试，同 ID 沿用已受理结果。入口用 pending 禁止重入，异步订阅与读取沿挂载生命周期取消。真实写入仍由后台按资源处理，当前数据更新独立交付。
 - **当前数据与按序更新**：前端先订阅会话通道，再以 `watch` 打开；后台同步交付一次 `session.opened` 当前数据，之后 `session.changed` 直接携带新增记录、当前游标／标题和发生变化的资源投影。结构变化与回溯交付当前工作台，布局修改只交付布局。普通资源数据写入不读取或传输历史；资源身份按稳定创建记录定位并复用。最后一个查看者离开后 `unwatch` 停止推送，重开重新取得当前数据。
-- **流式进度**：`session.progress` 与初始数据、记录追加使用同一后台出口按发生顺序投递，携带 `live` 块、资源占用 `busyObjectIds` 和创建占用 `timelineBusy`。记录提交先交付，随后移除对应流式块；展示身份使用 `responseId + ordinal`，流式生成与落库保持同一组件。占用语义见 [宿主运行生命周期](plugin-sdk.md#宿主运行生命周期)。
+- **流式进度**：`session.progress` 与初始数据、记录追加使用同一后台出口按发生顺序投递，携带资源占用 `busyObjectIds`、创建占用 `timelineBusy` 与 `live` 增量。增量相对上一次交付按块 ID 对齐（`src/shared/live-patch.ts`）：新块整块发送；块内按 JSON 路径比较，字符串只追加时发送尾部，数组增长时只发送新元素，对象按键比较，其余变化在最深的变化位置整值替换（含工具执行中的 `result`），未变化的块与字段不出现；`null` 表示流式正文未变化。输入阶段的工具调用只传 `argumentsText`，`arguments` 为 null；宿主前端按块宽容解析（`src/shared/partial-arguments.ts`，`partial-json`，不接受 NaN／Infinity）补回预览参数后交给插件，进入 ready 后采用后台的完整参数。后台同一解析只用于调用身份。接收端从 `session.opened` 的完整列表开始依次应用，未变化的块保持对象身份。记录提交先交付，随后移除对应流式块；展示身份使用 `responseId + ordinal`，流式生成与落库保持同一组件。占用语义见 [宿主运行生命周期](plugin-sdk.md#宿主运行生命周期)。
 
 ## 安全边界与非目标
 
 - 应用只接受同一窗口主 frame 的命令；禁止 renderer 任意 Node 调用、窗口跳转、webview 与新窗口。网页链接经 HTTP(S) 检查后交系统浏览器打开。
 - 浏览器权限检查与请求共用受信窗口、主 frame 和页面 URL 校验，只允许本机字体枚举与剪贴板写入；不授予剪贴板读取或其他浏览器权限。
-- 开发版仅为 Fast Refresh 放宽内联脚本 CSP，发布版脚本只允许自身资源与已登记插件资源；图片允许受控内容 URL 和 HTTP(S) 来源，Markdown 图片不发送 referrer，文件路径不构成内容读取授权。其余网络连接与脚本来源不随图片放宽。preload、main、runtime 分别用 Zod 校验边界数据。
+- 开发版仅为 Fast Refresh 放宽内联脚本 CSP，发布版脚本只允许自身资源与已登记插件资源；图片允许受控内容 URL 和 HTTP(S) 来源，Markdown 图片不发送 referrer，文件路径不构成内容读取授权。其余网络连接与脚本来源不随图片放宽。preload 与 main 校验主进程能力的边界数据，任务进程入口校验直连命令。
 - 数学排版使用 KaTeX 的非信任模式；Mermaid 通过官方 `render` 与 `securityLevel: strict` 生成清理后的 SVG，不执行模型正文中的 HTML 或脚本。
 - 网络内容与用户文件按不可信数据处理，不直接执行其中的脚本或指令。
 - 资源引用与 UI 可见性不构成授权；授权在运行时工具执行层落实。独立任务进程与目录真实路径校验不构成操作系统级 shell 沙箱。

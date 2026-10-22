@@ -468,7 +468,6 @@ describe("工作台 SDK 的宿主实现", () => {
     service.sessions.current(sessionId);
     expect(reader.get(State)).toBe(1);
     expect(reader).not.toHaveProperty("commit");
-    expect(reader).not.toHaveProperty("streams");
     expect(reader.session).not.toHaveProperty("commit");
     expect(reader.session).not.toHaveProperty("resume");
     expect(reader.session.title).not.toHaveProperty("set");
@@ -711,7 +710,6 @@ describe("工作台 SDK 的宿主实现", () => {
     expect(() => toolObject.commit(writer => { writer.set(State, 5); })).toThrow();
     expect(() => toolObject.session.commit(writer => { writer.set(State, 5); })).toThrow();
     expect(() => toolObject.session.title.set("Late")).toThrow();
-    expect(() => toolObject.streams.publish("late", new Uint8Array())).toThrow();
   });
 
   it("创建失败回滚对象状态和记录；临时对象门面不能越过失败创建", async () => {

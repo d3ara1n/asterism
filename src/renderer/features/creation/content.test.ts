@@ -2,7 +2,10 @@ import { afterEach, expect, it, vi } from "vitest";
 import type { ContentCommand, ContentResult } from "../../../shared/content.ts";
 import { contentInput } from "./content.ts";
 
-afterEach(() => vi.unstubAllGlobals());
+const backend = vi.hoisted(() => ({ execute: async (_command: unknown): Promise<unknown> => { throw new Error("Unset."); } }));
+vi.mock("../../runtime", () => ({ runtime: { content: { execute: (command: unknown) => backend.execute(command) } } }));
+
+afterEach(() => { backend.execute = async () => { throw new Error("Unset."); }; });
 
 // docs/content.md：关闭内容作用域取消其在途操作，上传和读取均以取消收束。
 // 后台拒绝可能晚于 close 返回；不能把它呈现为普通创建失败。
@@ -18,7 +21,7 @@ it.each(["upload.begin", "read.open"] as const)("内容关闭后 %s 的后台拒
     }
     return { ok: true, reply: { kind: "done" } };
   });
-  vi.stubGlobal("window", { host: { content: { execute } } });
+  backend.execute = execute as typeof backend.execute;
   const content = contentInput({ resourceKind: "example/document", contractId: "example/create" });
   try {
     const pending = operation === "upload.begin"
@@ -34,9 +37,9 @@ it.each(["upload.begin", "read.open"] as const)("内容关闭后 %s 的后台拒
 
 // 正常作用域中的基础设施错误仍需暴露，不能被取消处理吞掉。
 it("内容未关闭时保留后台错误", async () => {
-  vi.stubGlobal("window", { host: { content: { execute: async (): Promise<ContentResult> => ({
+  backend.execute = async (): Promise<ContentResult> => ({
     ok: false, error: { code: "unavailable", message: "Storage is unavailable." },
-  }) } } });
+  });
   const content = contentInput({ resourceKind: "example/document", contractId: "example/create" });
   try {
     await expect(content.stage(new Uint8Array([1]))).rejects.toMatchObject({ name: "Error", message: "Storage is unavailable." });

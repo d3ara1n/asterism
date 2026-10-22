@@ -21,7 +21,7 @@ export const text = (agentId: string, responseId: string, ordinal: number, value
 export const thinking = (agentId: string, responseId: string, ordinal: number, value = "…", options?: BlockOptions & { summary?: string }) =>
   block(agentId, responseId, ordinal, { kind: "thinking", text: value, summary: options?.summary ?? "" }, options);
 export const call = (agentId: string, responseId: string, ordinal: number, callId: string, extra: { name?: string; arguments?: Json; outcome?: ToolOutcome | null } & BlockOptions = {}) =>
-  block(agentId, responseId, ordinal, { kind: "toolcall", callId, name: extra.name ?? "read", argumentsText: "{}", arguments: extra.arguments ?? {},
+  block(agentId, responseId, ordinal, { kind: "toolcall", callId, name: extra.name ?? "read", argumentsText: null, arguments: extra.arguments ?? {},
     outcome: (extra.outcome === undefined ? { kind: "succeeded", model: [{ kind: "text", text: callId }], data: null } : extra.outcome) as Json },
     { ...extra, complete: extra.complete ?? (extra.outcome !== null) });
 export const message = (agentId: string, value: string, startsTurn = true, sender: AgentMessageSender = { kind: "user" }): NewNode =>

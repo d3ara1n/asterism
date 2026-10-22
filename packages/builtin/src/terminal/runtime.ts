@@ -2,57 +2,67 @@ import { stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { isAbsolute, join } from "node:path";
 import { randomUUID } from "node:crypto";
-import { defineModule, implementResource, implementCreation, implementTool, implementCall, PluginApiError, type CallResult, type ObjectReader } from "@atelier/sdk/runtime";
+import { defineModule, implementResource, implementCreation, implementTool, implementCall, implementChannel, PluginApiError,
+  type CallResult, type ObjectReader } from "@atelier/sdk/runtime";
 import { ResourceStatusChanged, type Json } from "@atelier/sdk/contracts";
 import type { ShellSettings } from "../shell/contract.ts";
 import { terminalMessages } from "../messages/terminal.ts";
-import { TerminalSession, TerminalError, keySequence } from "./service.ts";
-import { TerminalResource, CreateTerminal, TerminalView, TerminalInput, TerminalRead, TerminalWait, TerminalSee,
-  ReadTerminal, StartTerminal, WriteTerminal, ResizeTerminal, TerminalImageRequested, CompleteTerminalImage, type TerminalConfig, type TerminalImage } from "./contract.ts";
+import { SharedTerminal, TerminalError, keySequence, type TerminalViewer } from "./service.ts";
+import { TerminalResource, CreateTerminal, TerminalView, TerminalInput, TerminalRead, TerminalWait, TerminalSee, TerminalChannel,
+  StartTerminal, CloseTerminal, TerminalImageRequested, CompleteTerminalImage, inactiveStatus, type TerminalConfig, type TerminalDown, type TerminalImage } from "./contract.ts";
 
+/**
+ * 终端资源是静态入口，外部 shell 实例单独登记：只有新建资源时自动开启；
+ * 软件重启与回溯恢复后保持未开启。资源离开当前集合时结束实例。
+ */
 export function createTerminalModule(settings: () => ShellSettings) { return defineModule(plugin => {
-  const entries = new Map<string, { terminal: TerminalSession; alive: boolean }>();
+  const terminals = new Map<string, SharedTerminal>();
+  /** 本次运行中新建、尚待出现通知的资源；出现时自动开启。 */
+  const pendingStart = new Set<string>();
   const cleanups = new Set<Promise<void>>();
   const images = new Map<string, { resolve(png: Uint8Array): void; reject(error: Error): void }>();
-  const encoder = new TextEncoder();
-  const release = (id: string) => {
-    const entry = entries.get(id);
-    if (!entry) return;
-    entries.delete(id); entry.alive = false;
-    const cleanup = entry.terminal.dispose().catch(error => plugin.log.error("Terminal cleanup failed.", error));
+  const root = join(plugin.dir, "shell-integration");
+  const track = (work: Promise<void>) => {
+    const cleanup = work.catch(error => plugin.log.error("Terminal cleanup failed.", error));
     cleanups.add(cleanup); void cleanup.finally(() => cleanups.delete(cleanup));
   };
+  const release = (id: string) => {
+    pendingStart.delete(id);
+    const terminal = terminals.get(id);
+    if (!terminal) return;
+    terminals.delete(id);
+    track(terminal.dispose());
+  };
+  function terminal(config: TerminalConfig, ref: ObjectReader["ref"]): SharedTerminal {
+    const existing = terminals.get(ref.id);
+    if (existing) return existing;
+    const created = new SharedTerminal(config, settings, root, {
+      changed() {},
+      // 会话列表只标记启动失败；交互 shell 的每条命令不构成完成或常驻运行标记。
+      failed(error) {
+        if (plugin.signal.aborted || terminals.get(ref.id) !== created) return;
+        plugin.log.warn(`Terminal startup failed: ${error instanceof Error ? error.message : String(error)}`);
+        try { plugin.object(ref.sessionId, TerminalResource, ref.id).events.publish(ResourceStatusChanged, ResourceStatusChanged.schema.parse({ status: "failed", title: terminalMessages.terminal })); }
+        catch { /* 资源已离开当前集合。 */ }
+      },
+      log: (message, error) => plugin.log.error(message, error),
+    });
+    terminals.set(ref.id, created);
+    return created;
+  }
+  function get(object: ObjectReader): SharedTerminal {
+    const data = object.snapshot()?.data;
+    if (!data) throw new TerminalError("terminal_removed", "The terminal is no longer available.");
+    return terminal(TerminalResource.stateSchema.parse(data), object.ref);
+  }
+  const statusOf = (object: ObjectReader) => terminals.get(object.ref.id)?.status ?? { ...inactiveStatus };
   const close = async () => {
-    for (const id of entries.keys()) release(id);
+    for (const id of [...terminals.keys()]) release(id);
     for (const image of images.values()) image.reject(new TerminalError("renderer_unavailable", "The terminal image service is closing."));
     await Promise.all([...cleanups]);
   };
   plugin.signal.addEventListener("abort", () => { void close(); }, { once: true });
-  function add(config: TerminalConfig, object: ObjectReader) {
-    const ref = object.ref;
-    const existing = entries.get(ref.id);
-    if (existing) return existing.terminal;
-    const executor = plugin.object(ref.sessionId, TerminalResource, ref.id);
-    const entry = { terminal: undefined as unknown as TerminalSession, alive: true };
-    entry.terminal = new TerminalSession(config, settings, join(plugin.dir, "terminal"), () => {
-      if (!entry.alive || plugin.signal.aborted) return;
-      executor.invalidate();
-      const state = entry.terminal.status.state;
-      if (["idle", "running", "failed", "exited"].includes(state)) executor.events.publish(ResourceStatusChanged, ResourceStatusChanged.schema.parse({
-        status: state === "running" ? "running" : state === "failed" ? "failed" : "completed", title: terminalMessages.terminal }));
-    }, frame => {
-      if (entry.alive && !plugin.signal.aborted) executor.streams.publish("terminal", encoder.encode(JSON.stringify(frame)));
-    });
-    entries.set(ref.id, entry);
-    return entry.terminal;
-  }
-  function get(object: ObjectReader) {
-    const data = object.snapshot()?.data;
-    if (!data) throw new TerminalError("terminal_removed", "The terminal is no longer available.");
-    return entries.get(object.ref.id)?.terminal ?? add(TerminalResource.stateSchema.parse(data), object);
-  }
-  const statusOf = (object: ObjectReader) => entries.get(object.ref.id)?.terminal.status
-    ?? { state: "inactive" as const, shell: null, integration: false, exitCode: null, error: null };
+
   async function outcome<T extends Json>(signal: AbortSignal, work: () => Promise<T>): Promise<CallResult<T>> {
     try { signal.throwIfAborted(); return { kind: "succeeded", data: await work() }; }
     catch (error) {
@@ -75,14 +85,15 @@ export function createTerminalModule(settings: () => ShellSettings) { return def
       });
     } finally { images.delete(id); lifetime.removeEventListener("abort", abort); }
   }
+
   return {
     events: [TerminalImageRequested],
-    observers: [{ id: "terminal.presence", resourcesChanged({ appeared, disappeared, initial }) {
+    observers: [{ id: "terminal.presence", resourcesChanged({ appeared, disappeared }) {
       for (const resource of disappeared) if (resource.ref.kind === TerminalResource.kind) release(resource.ref.id);
-      for (const resource of appeared) if (resource.ref.kind === TerminalResource.kind) {
-        const object = plugin.object(resource.ref.sessionId, TerminalResource, resource.ref.id);
-        const terminal = add(TerminalResource.stateSchema.parse(resource.data), object);
-        if (!initial) void terminal.start().catch(error => { if (!plugin.signal.aborted) plugin.log.error("Terminal startup failed.", error); });
+      for (const resource of appeared) {
+        if (resource.ref.kind !== TerminalResource.kind || !pendingStart.delete(resource.ref.id)) continue;
+        const created = terminal(TerminalResource.stateSchema.parse(resource.data), resource.ref);
+        void created.start().catch(error => { if (!plugin.signal.aborted) plugin.log.warn(`Terminal startup failed: ${String(error)}`); });
       }
     } }],
     resources: [implementResource(TerminalResource, TerminalView, {
@@ -94,20 +105,35 @@ export function createTerminalModule(settings: () => ShellSettings) { return def
             throw new PluginApiError("invalid_argument", "The shell profile is not configured.");
           return { action: "accept" };
         },
-        create(input) { return { title: input.title ?? "Terminal", data: { cwd: input.cwd ?? homedir(), profile: input.profile ?? settings().selected } }; },
+        create(input, object) {
+          pendingStart.add(object.ref.id);
+          return { title: input.title ?? "Terminal", data: { cwd: input.cwd ?? homedir(), profile: input.profile ?? settings().selected } };
+        },
       }),
-      project: (config, object) => ({ ...config, ...statusOf(object) }),
+      project: config => config,
       inspect: async (config, object) => ({ ...config, ...statusOf(object) }),
       disposalWarning(_config, object) {
         const state = statusOf(object).state;
         return state === "running" ? terminalMessages.runningWarning : state === "unknown" || state === "starting" ? terminalMessages.unknownWarning : null;
       },
     })],
+    channels: [implementChannel(TerminalChannel, channel => {
+      const shared = get(channel.object);
+      const viewer: TerminalViewer = { send: (frame: TerminalDown) => channel.send(frame) };
+      const receive = shared.attach(viewer);
+      channel.onMessage(receive);
+      channel.signal.addEventListener("abort", () => shared.detach(viewer), { once: true });
+    })],
     calls: [
-      implementCall(ReadTerminal, (_input, { object }) => get(object).snapshot()),
-      implementCall(StartTerminal, async (_input, { object }) => { await get(object).start(); return null; }),
-      implementCall(WriteTerminal, async ({ data }, { object, signal }) => { await get(object).input(data, signal); return null; }),
-      implementCall(ResizeTerminal, async ({ cols, rows }, { object }) => { await get(object).resize(cols, rows); return null; }),
+      implementCall(StartTerminal, async (_input, { object }) => {
+        try { await get(object).start(); }
+        catch (error) {
+          // 失败已反映在终端状态中；调用方取得可读原因。
+          throw new PluginApiError("unavailable", error instanceof Error ? error.message : "The shell could not be started.");
+        }
+        return null;
+      }),
+      implementCall(CloseTerminal, async (_input, { object }) => { await terminals.get(object.ref.id)?.close(); return null; }),
       implementCall(CompleteTerminalImage, async ({ id, png, error }) => {
         const pending = images.get(id);
         if (pending) {
@@ -120,10 +146,9 @@ export function createTerminalModule(settings: () => ShellSettings) { return def
     tools: [
       implementTool(TerminalInput, {
         call: (_data, _target, args, { object, signal }) => outcome(signal, async () => {
-          const terminal = get(object);
-          const data = (args.text ?? "") + (args.key ? keySequence(args.key, terminal.applicationCursor) : "") + (args.enter ? "\r" : "");
-          await terminal.input(data, signal);
-          return terminal.status;
+          const shared = get(object);
+          const data = (args.text ?? "") + (args.key ? keySequence(args.key, shared.applicationCursor) : "") + (args.enter ? "\r" : "");
+          return shared.input(data, signal);
         }),
       }),
       implementTool(TerminalRead, { call: (_data, _target, args, { object, signal }) => outcome(signal, () => get(object).read(args.mode, args.offset, args.limit)) }),
@@ -136,9 +161,9 @@ export function createTerminalModule(settings: () => ShellSettings) { return def
       } }),
       implementTool(TerminalSee, {
         call: (_data, _target, _args, { object, signal }) => outcome(signal, async () => {
-          const terminal = get(object), screen = await terminal.image();
+          const shared = get(object), screen = await shared.image();
           const png = await renderImage(screen, signal);
-          return { image: await object.content.stage(png), cols: screen.cols, rows: screen.rows, state: terminal.status.state };
+          return { image: await object.content.stage(png), cols: screen.cols, rows: screen.rows, state: shared.status.state };
         }),
         toModel: data => [{ kind: "text", text: `Terminal screen: ${data.cols}×${data.rows}, ${data.state}.` },
           { kind: "file", file: data.image, mediaType: "image/png", filename: "terminal.png" }],

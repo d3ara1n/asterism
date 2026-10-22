@@ -1,22 +1,27 @@
-import { Counter, CounterView as Card, CreateCounter, ChangeCount } from "./counter-contract.ts";
+import { Counter, CounterView as Card, CreateCounter, ChangeCount, CounterUpdates } from "./counter-contract.ts";
 /** 前端作者用例：仅依赖 React、Zod 和公开 SDK，不取用 window.host。 */
 import { createElement, useEffect, useState } from "react";
 import { z } from "zod";
 import { defineRendererPlugin, cardRenderer, useRendererCard, useRendererObject, type RendererModule, type RendererObjectContext } from "@atelier/sdk/renderer";
 
 function CounterBody({ data }: { data: z.infer<typeof Card.schema> }) {
-  const { onStream, invoke, view, session } = useRendererObject();
+  const { openChannel, invoke, view, session } = useRendererObject();
   const [pending, setPending] = useState(false);
   const card = useRendererCard();
-  const [bytes, setBytes] = useState(0);
-  useEffect(() => onStream("updates", chunk => setBytes(chunk.byteLength)), [onStream]);
+  const [live, setLive] = useState<number | null>(null);
+  useEffect(() => {
+    const channel = openChannel(CounterUpdates);
+    channel.onMessage(update => setLive(update.value));
+    channel.send({ type: "subscribe" });
+    return () => channel.close();
+  }, [openChannel]);
   return createElement("div", null, createElement("button", {
     disabled: !view.ready || pending,
     onClick: () => {
       setPending(true);
       void invoke(ChangeCount, { amount: 1 }).finally(() => setPending(false));
     },
-  }, `${data.value} · ${bytes} bytes · ${session.snapshot()?.records.all({ scope: "timeline" }).length ?? 0} records`),
+  }, `${data.value} · live ${live ?? "-"} · ${session.snapshot()?.records.all({ scope: "timeline" }).length ?? 0} records`),
   createElement("button", { onClick: () => card.openPanel("details") }, "Details"));
 }
 function CounterDetails({ data }: { data: z.infer<typeof Card.schema> }) {

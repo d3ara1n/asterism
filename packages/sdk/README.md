@@ -4,7 +4,7 @@
 
 SDK 包版本见 [package.json](package.json)，宿主 API 版本见 [`sdkApi`](../../src/plugins/packages.ts)。内置插件领域契约独立在 [`@atelier/builtin-api`](../builtin-api/README.md)，不进入通用 SDK。
 
-当前宿主 API 为 **14.1**，插件声明 `{ "major": 14, "minMinor": 1 }`，依赖 `@atelier/sdk: ^0.35.0`。后台通过 `session.invoke` 调用资源动作；资源存在性通过 `resourcesChanged` 观察；前端入口默认导出 `defineRendererPlugin(...)`，`prepare` 上下文提供 `events / calls / signal`，调用契约显式声明 `scope`。
+当前宿主 API 为 **15.0**，插件声明 `{ "major": 15, "minMinor": 0 }`，依赖 `@atelier/sdk: ^0.36.0`。后台通过 `session.invoke` 调用资源动作；资源存在性通过 `resourcesChanged` 观察；前端入口默认导出 `defineRendererPlugin(...)`，`prepare` 上下文提供 `events / calls / signal`，调用契约显式声明 `scope`。
 
 ## 子路径入口
 
@@ -66,7 +66,7 @@ export default definePlugin({
   "exports": { "./public": "./src/public.ts" },
   "atelier": {
     "id": "example.tools",
-    "api": { "major": 14, "minMinor": 0 },
+    "api": { "major": 15, "minMinor": 0 },
     "runtime": "./src/runtime.ts"
   }
 }
@@ -90,7 +90,7 @@ export default definePlugin({
 
 ### 5. 前端卡片与工具三态视图
 - **资源展示目录（API 10.2）**：`useRendererResources().list()` 枚举已登记的 `ResourceDescription`，`get(kind)` 查询单一类型（缺失时返回宿主通用描述）。组件用 `useI18n().text(description.label)` 取得当前语言名称，`description.icon` 可直接渲染；不需要资源实例或卡片投影。
-- **卡片视图**：`cardRenderer(ViewContract, { width, height, minWidth?, minHeight?, Body, Actions?, panels? })`，内部通过 `useRendererObject()` 访问对象数据、动作调用与二进制流 `onStream`。
+- **卡片视图**：`cardRenderer(ViewContract, { width, height, minWidth?, minHeight?, Body, Actions?, panels? })`，内部通过 `useRendererObject()` 访问对象数据、动作调用与对象级双工通道 `openChannel(contract)`（API 15.0，后台以 `implementChannel` 登记，见 [对象级双工通道](../../docs/plugin-sdk.md#对象级双工通道api-150)）。
 - **局部操作（API 13.0）**：`object.view.ready` 表示视图可操作；按钮自行管理 `await object.invoke(...)` 期间的 pending。动作完成直接返回，数据变化通过宿主通道交付，调用不隐含会话读取。资源业务状态通过自己的展示契约交付，宿主 busy 不作为卡片的运行或加载状态。
 - **对象保留状态（API 8.7）**：`object.retained.get("<plugin>/<key>", create, release?)` 保存草稿等需要跨重挂载与会话切换保持的前端状态，对象离开投影时宿主调用 `release`；`discard(key)` 提前结束。规则见 [前端视图与扩展入口](../../docs/plugin-sdk.md#前端视图与扩展入口)，可编译示例见 `examples/renderer.ts`。
 - **滚动与缩放**：卡片内交互遵循 [画布与对象卡片](../../docs/workbench.md#画布与对象卡片) 的手势归属规则。

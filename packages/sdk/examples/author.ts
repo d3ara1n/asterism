@@ -1,9 +1,9 @@
-import { sample, Counter, Count, CounterView, CountChanged, CreateCounter, ChangeCount } from "./counter-contract.ts";
+import { sample, Counter, Count, CounterView, CountChanged, CreateCounter, ChangeCount, CounterUpdates } from "./counter-contract.ts";
 /** SDK 作者用例与类型反例：只编译，不执行插件、数据库或真实模型请求。 */
 import { z } from "zod";
 import { pluginNamespace, defineAction, resourceCall, defineRecord, defineTool, defineImplementation, modelRunRecordSchema, type ModelItem } from "@atelier/sdk/contracts";
 import {
-  defineModule, definePlugin, implementCreation, implementAction, implementPreparer, implementResource, implementTool,
+  defineModule, definePlugin, implementCreation, implementAction, implementPreparer, implementResource, implementTool, implementChannel,
   type PluginContext, type ObjectReader, type ObjectExecutor, type SessionObserver, type SessionSnapshot, type ResourceRef,
 } from "@atelier/sdk/runtime";
 
@@ -106,6 +106,12 @@ export const counterPlugin = definePlugin({
           context.signal.throwIfAborted();
           return { kind: "succeeded", data: currentCount(context.object) };
         },
+      })],
+      // 通道随对象存在：对象被移除或回溯消失时宿主中止 signal。
+      channels: [implementChannel(CounterUpdates, channel => {
+        channel.onMessage(() => channel.send(currentCount(channel.object)));
+        const timer = setInterval(() => channel.send(currentCount(channel.object)), 1000);
+        channel.signal.addEventListener("abort", () => clearInterval(timer), { once: true });
       })],
     };
   })],

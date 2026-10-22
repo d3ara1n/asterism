@@ -66,7 +66,7 @@ describe("会话当前数据", () => {
   it("初始数据之后的变化直接生效，不比较版本或丢弃后重读", () => {
     const f = fixture(), disconnect = f.open();
     f.notify({ kind: "session.changed", sessionId: "s", nodes: [], cursor: null, title: "Renamed", objects: [] });
-    f.notify({ kind: "session.progress", sessionId: "s", progress: { busyObjectIds: ["a"], timelineBusy: false, live: [] } });
+    f.notify({ kind: "session.progress", sessionId: "s", busyObjectIds: ["a"], timelineBusy: false, live: null });
     expect(f.controller.getSnapshot().data?.title).toBe("Renamed");
     expect(f.controller.getProgress().busyObjectIds).toEqual(["a"]);
     expect(f.requests).toHaveLength(1);
@@ -77,13 +77,27 @@ describe("会话当前数据", () => {
   it("历史追加与流式块结束按消息顺序交付", () => {
     const f = fixture(), disconnect = f.open();
     const block = { id: "r:0", objectId: "a", responseId: "r", ordinal: 0, kind: "text" as const, text: "Hello", endedAt: null };
-    f.notify({ kind: "session.progress", sessionId: "s", progress: { busyObjectIds: ["a"], timelineBusy: false, live: [block] } });
+    f.notify({ kind: "session.progress", sessionId: "s", busyObjectIds: ["a"], timelineBusy: false, live: { order: [block.id], changes: [{ id: block.id, kind: "put", block }] } });
     const node = { id: "n", sessionId: "s", parentId: null, createdAt: "now", source: null, contract: "test/text", data: { text: "Hello" }, model: null, recipient: null };
     f.notify({ kind: "session.changed", sessionId: "s", nodes: [node], cursor: "n", title: "Session", objects: [] });
     expect(f.controller.getSnapshot().data?.nodes).toEqual([node]);
-    f.notify({ kind: "session.progress", sessionId: "s", progress: { busyObjectIds: [], timelineBusy: false, live: [] } });
+    f.notify({ kind: "session.progress", sessionId: "s", busyObjectIds: [], timelineBusy: false, live: { order: [], changes: [] } });
     expect(f.controller.getProgress().live).toEqual([]);
     expect(f.controller.getSnapshot().data?.nodes).toEqual([node]);
+    disconnect();
+  });
+
+  // docs/architecture.md 流式进度：输入阶段的工具参数只以 argumentsText 增量传输，前端推导预览；参数文本只发送追加部分。
+  it("输入阶段工具参数由前端从追加的参数文本推导，进入 ready 后采用后台完整参数", () => {
+    const f = fixture(), disconnect = f.open();
+    const block = { id: "r:0", objectId: "a", responseId: "r", ordinal: 0, kind: "toolcall" as const, name: "write", argumentsText: '{"path":"a.txt","content":"hel',
+      arguments: null, state: "input" as const, invocation: null, result: null };
+    f.notify({ kind: "session.progress", sessionId: "s", busyObjectIds: ["a"], timelineBusy: false, live: { order: [block.id], changes: [{ id: block.id, kind: "put", block }] } });
+    expect(f.controller.getProgress().live[0]).toMatchObject({ arguments: { path: "a.txt", content: "hel" } });
+    f.notify({ kind: "session.progress", sessionId: "s", busyObjectIds: ["a"], timelineBusy: false, live: { order: [block.id], changes: [{ id: block.id, kind: "update", ops: [{ path: ["argumentsText"], append: 'lo"}' }] }] } });
+    expect(f.controller.getProgress().live[0]).toMatchObject({ argumentsText: '{"path":"a.txt","content":"hello"}', arguments: { path: "a.txt", content: "hello" } });
+    f.notify({ kind: "session.progress", sessionId: "s", busyObjectIds: ["a"], timelineBusy: false, live: { order: [block.id], changes: [{ id: block.id, kind: "update", ops: [{ path: ["state"], set: "ready" }, { path: ["arguments"], set: { path: "b.txt" } }] }] } });
+    expect(f.controller.getProgress().live[0]).toMatchObject({ state: "ready", arguments: { path: "b.txt" } });
     disconnect();
   });
 

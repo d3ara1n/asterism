@@ -1,18 +1,14 @@
 import { agentInputSchema, agentSchema, agentOverridesSchema } from "@atelier/builtin-api/contracts";
 export { agentInputSchema, agentSchema, agentOverridesSchema, type AgentConfiguration, type AgentOverrides } from "@atelier/builtin-api/contracts";
 import {
-  modelExpressionSchema, parseModelExpression, modelReference, thinkingSchema, type ThinkingLevel,
+  modelExpressionSchema, parseModelExpression, thinkingSchema, type ThinkingLevel,
   thinkingLevels, modelCostSchema, uiTextSchema,
   providerFixedFields, providerUsageIdSchema, usageProviderInfoSchema, providerPresetSchema,
 } from "@atelier/sdk/contracts";
 export { modelExpressionSchema, parseModelExpression, formatModelExpression, modelReference, thinkingSchema, type ModelExpression, type ThinkingLevel } from "@atelier/sdk/contracts";
 import { z } from "zod";
-import { coreChannel } from "./core.ts";
 import { modelCompatibilitySchema } from "./model-compatibility.ts";
 
-export const configurationChannel = coreChannel("configuration");
-export const configurationChangedChannel = coreChannel("configuration-changed");
-export const configurationVersion = 15;
 const id = z.string().min(1).max(160);
 const name = z.string().trim().min(1).max(160);
 /** 提供商 ID：程序与用户共用的可读 slug，可编辑，不含 `/` 与空白。 */
@@ -129,9 +125,6 @@ export const configurationResultSchema = z.discriminatedUnion("ok", [
   z.strictObject({ ok: z.literal(true), snapshot: configurationSnapshotSchema, savedId: z.string().max(321).nullable(), parameterUpdate: modelParameterUpdateSchema.optional() }),
   z.strictObject({ ok: z.literal(false), error: configurationErrorSchema }),
 ]);
-export const configurationRequestSchema = z.strictObject({ kind: z.literal("configuration.request"), version: z.literal(configurationVersion), id: z.string().uuid(), command: z.unknown() });
-export const configurationResponseSchema = z.strictObject({ kind: z.literal("configuration.response"), version: z.literal(configurationVersion), id: z.string().uuid(), result: configurationResultSchema });
-export const configurationChangedSchema = z.strictObject({ kind: z.literal("configuration.changed") });
 export type Provider = z.infer<typeof providerSchema>;
 export type ProviderInput = z.infer<typeof providerInputSchema>;
 /** 缺少编辑规则的连接保持自由配置，不按名称、端点或目录反推来源。 */

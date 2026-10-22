@@ -1,3 +1,4 @@
+import { runtime } from "../../runtime";
 import { SessionController, type SessionView } from "./controller";
 import { objectRetention } from "./retention";
 
@@ -11,7 +12,7 @@ const controllers = new Map<string, SessionController>();
 export function sessionController(sessionId: string): SessionController {
   let controller = controllers.get(sessionId);
   if (!controller) {
-    const created: SessionController = new SessionController(window.host.session, sessionId, () => {
+    const created: SessionController = new SessionController(runtime.session, sessionId, () => {
       if (controllers.get(sessionId) === created) controllers.delete(sessionId);
     });
     let swept: SessionView | null = null;

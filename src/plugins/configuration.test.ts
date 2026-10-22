@@ -7,8 +7,7 @@ import { z } from "zod";
 import { defineConfig, pluginNamespace } from "@atelier/sdk/contracts";
 import { definePlugin, type PluginConfig } from "@atelier/sdk/runtime";
 import { ApplicationService } from "../runtime/service.ts";
-import { dispatchPluginConfiguration } from "../runtime/dispatch.ts";
-import { pluginConfigurationResponseSchema, pluginConfigurationVersion } from "../shared/plugin-configuration.ts";
+import { servePluginConfiguration } from "../runtime/dispatch.ts";
 
 const roots: string[] = [], services: ApplicationService[] = [];
 afterEach(async () => {
@@ -27,9 +26,7 @@ describe("插件配置的 SDK 与 IPC 接入", () => {
     ];
     const root = mkdtempSync(join(tmpdir(), "plugin-config-")); roots.push(root);
     const service = new ApplicationService(root, { plugins }); services.push(service);
-    const request = (command: unknown) => pluginConfigurationResponseSchema.parse(dispatchPluginConfiguration(service, {
-      kind: "plugin-configuration.request", version: pluginConfigurationVersion, id: randomUUID(), command,
-    })).result;
+    const request = (command: unknown) => servePluginConfiguration(service, command);
     const read = request({ type: "read" });
     if (!read.ok) throw new Error("Expected configuration read.");
     expect(read.configurations.filter(item => item.id.startsWith("acme.")).map(item => item.id)).toEqual([ns.id]);

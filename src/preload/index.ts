@@ -1,48 +1,18 @@
 import { contextBridge, ipcRenderer, webUtils } from "electron";
 import { languageGetChannel, languageSetChannel, languageChangedChannel, languagePreferenceSchema, languageStateSchema } from "../shared/language.ts";
-import { applicationBrand } from "../shared/application.ts";
 import { desktopBridgeKey } from "../shared/core.ts";
 import { desktopWindowChangedChannel, desktopWindowGetChannel, desktopWindowStateSchema } from "../shared/desktop.ts";
-import { commandChannel, pickDirectoryChannel, openLocalFileChannel, localFilePathSchema, statusChannel, resultSchema, runtimeStatusSchema, type DesktopBridge } from "../shared/contracts.ts";
-import { objectStreamChannel, objectStreamSchema } from "../shared/object-stream.ts";
-import { configurationChannel, configurationChangedChannel, configurationResultSchema } from "../shared/configuration.ts";
+import { pickDirectoryChannel, openLocalFileChannel, localFilePathSchema, statusChannel, runtimeStatusSchema, type DesktopBridge } from "../shared/contracts.ts";
+import { connectionPortMessage, connectionRequestChannel } from "../shared/connection.ts";
 import { appearanceChangedChannel, appearanceGetChannel, appearancePatchSchema, appearanceSetChannel, parseAppearance } from "../shared/theme.ts";
-import { sessionChannel, sessionChangedChannel, sessionResultSchema, sessionChangedSchema } from "../shared/session.ts";
 import { preferencesGetChannel, preferencesSetChannel, preferenceWriteSchema, uiStateSchemas } from "../shared/ui-state.ts";
-import { pluginConfigurationChangedChannel, pluginConfigurationChannel, pluginConfigurationResultSchema } from "../shared/plugin-configuration.ts";
-import { contentChannel, contentResultSchema } from "../shared/content.ts";
-import { pluginEventsChannel, eventFrameSchema } from "../shared/plugin-events.ts";
-import { pluginCallsChannel, callFrameSchema } from "../shared/plugin-calls.ts";
 
+let connectionRequested = false;
+// 端口直接交给页面：业务消息不经 contextBridge 二次克隆。主进程只接受受信主框架的请求。
+ipcRenderer.on(connectionRequestChannel, event => {
+  window.postMessage({ type: connectionPortMessage }, "*", event.ports.length ? [event.ports[0]!] : []);
+});
 const bridge: DesktopBridge = {
-  calls: {
-    send(control) { ipcRenderer.send(pluginCallsChannel, control); },
-    onFrame(listener) {
-      const handler = (_event: Electron.IpcRendererEvent, raw: unknown) => {
-        const parsed = callFrameSchema.safeParse(raw);
-        if (parsed.success) listener(parsed.data);
-      };
-      ipcRenderer.on(pluginCallsChannel, handler);
-      return () => ipcRenderer.removeListener(pluginCallsChannel, handler);
-    },
-  },
-  events: {
-    send(control) { ipcRenderer.send(pluginEventsChannel, control); },
-    onFrame(listener) {
-      const handler = (_event: Electron.IpcRendererEvent, raw: unknown) => {
-        const parsed = eventFrameSchema.safeParse(raw);
-        if (parsed.success) listener(parsed.data);
-      };
-      ipcRenderer.on(pluginEventsChannel, handler);
-      return () => ipcRenderer.removeListener(pluginEventsChannel, handler);
-    },
-  },
-  content: {
-    async execute(command) {
-      try { return contentResultSchema.parse(await ipcRenderer.invoke(contentChannel, command)); }
-      catch { return { ok: false, error: { code: "unavailable", message: "The content connection was lost." } }; }
-    },
-  },
   language: {
     async get() { return languageStateSchema.parse(await ipcRenderer.invoke(languageGetChannel)); },
     async set(preference) { return languageStateSchema.parse(await ipcRenderer.invoke(languageSetChannel, languagePreferenceSchema.parse(preference))); },
@@ -54,31 +24,6 @@ const bridge: DesktopBridge = {
       return () => ipcRenderer.removeListener(languageChangedChannel, handler);
     },
   },
-  pluginConfiguration: {
-    async execute(command) {
-      try { return pluginConfigurationResultSchema.parse(await ipcRenderer.invoke(pluginConfigurationChannel, command)); }
-      catch { return { ok: false, error: { code: "unavailable", message: "The plugin configuration connection was lost. Reload before retrying." } }; }
-    },
-    onChanged(listener) {
-      const handler = (_event: Electron.IpcRendererEvent, id: unknown) => { if (typeof id === "string") listener(id); };
-      ipcRenderer.on(pluginConfigurationChangedChannel, handler);
-      return () => ipcRenderer.removeListener(pluginConfigurationChangedChannel, handler);
-    },
-  },
-  session: {
-    async execute(command) {
-      try { return sessionResultSchema.parse(await ipcRenderer.invoke(sessionChannel, command)); }
-      catch { return { ok: false, error: { code: "unavailable", message: "The session connection was lost. Reopen history before retrying." } }; }
-    },
-    onChanged(listener) {
-      const handler = (_event: Electron.IpcRendererEvent, raw: unknown) => {
-        const parsed = sessionChangedSchema.safeParse(raw);
-        if (parsed.success) listener(parsed.data);
-      };
-      ipcRenderer.on(sessionChangedChannel, handler);
-      return () => ipcRenderer.removeListener(sessionChangedChannel, handler);
-    },
-  },
   appearance: {
     async get() { return parseAppearance(await ipcRenderer.invoke(appearanceGetChannel)); },
     async set(patch) { return parseAppearance(await ipcRenderer.invoke(appearanceSetChannel, appearancePatchSchema.parse(patch))); },
@@ -86,17 +31,6 @@ const bridge: DesktopBridge = {
       const handler = (_event: Electron.IpcRendererEvent, raw: unknown) => listener(parseAppearance(raw));
       ipcRenderer.on(appearanceChangedChannel, handler);
       return () => ipcRenderer.removeListener(appearanceChangedChannel, handler);
-    },
-  },
-  configuration: {
-    async execute(command) {
-      try { return configurationResultSchema.parse(await ipcRenderer.invoke(configurationChannel, command)); }
-      catch { return { ok: false, error: { code: "unavailable", message: "The configuration connection was lost. Reload settings before retrying." } }; }
-    },
-    onChanged(listener) {
-      const handler = () => listener();
-      ipcRenderer.on(configurationChangedChannel, handler);
-      return () => ipcRenderer.removeListener(configurationChangedChannel, handler);
     },
   },
   preferences: {
@@ -132,18 +66,10 @@ const bridge: DesktopBridge = {
       return () => ipcRenderer.removeListener(desktopWindowChangedChannel, handler);
     },
   },
-  async execute(command) {
-    try { return resultSchema.parse(await ipcRenderer.invoke(commandChannel, command)); }
-    catch { return { ok: false, error: { code: "unavailable", message: `The application connection was lost. Restart ${applicationBrand.en} and inspect the workspace before retrying.` } }; }
-  },
-  onObjectStream(sessionId, objectId, listener) {
-    const handler = (_event: Electron.IpcRendererEvent, raw: unknown) => {
-      const parsed = objectStreamSchema.safeParse(raw);
-      if (parsed.success && parsed.data.sessionId === sessionId && parsed.data.objectId === objectId)
-        listener(parsed.data.channel, parsed.data.data);
-    };
-    ipcRenderer.on(objectStreamChannel, handler);
-    return () => ipcRenderer.removeListener(objectStreamChannel, handler);
+  connectRuntime() {
+    if (connectionRequested) return;
+    connectionRequested = true;
+    ipcRenderer.send(connectionRequestChannel);
   },
   onStatus(listener) {
     const handler = (_event: Electron.IpcRendererEvent, raw: unknown) => {

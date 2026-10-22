@@ -1,6 +1,8 @@
 import type { UiText } from "@atelier/sdk/contracts";
 import { errorDisplay } from "../../../shared/error-display.ts";
-import type { SessionBridge, SessionMutation, SessionResult, SessionData, SessionProgress, SessionChanged } from "../../../shared/session.ts";
+import { applyLive } from "../../../shared/live-patch.ts";
+import { viewLive } from "../../../shared/partial-arguments.ts";
+import type { SessionBridge, SessionMutation, SessionResult, SessionData, SessionProgress, SessionChanged, LiveBlock } from "../../../shared/session.ts";
 
 export type SessionView = Omit<SessionData, "progress">;
 type SessionOperation = Exclude<SessionMutation, { type: "start" }>;
@@ -15,6 +17,8 @@ const emptyProgress: SessionProgress = { busyObjectIds: [], timelineBusy: false,
 export class SessionController {
   private state: SessionViewState = { data: null, status: "loading", navigating: false, readError: null, missing: false };
   private progress: SessionProgress = emptyProgress;
+  /** 线上形态的流式块：增量的应用基线；对外的 progress.live 由此推导预览参数。 */
+  private wire: LiveBlock[] = [];
   private listeners = new Set<() => void>();
   private progressListeners = new Set<() => void>();
   private connections = 0;
@@ -33,11 +37,14 @@ export class SessionController {
     if (event.sessionId !== this.sessionId) return;
     if (event.kind === "session.opened") {
       const { progress, ...data } = event.data;
-      this.progress = progress;
+      this.wire = progress.live;
+      this.progress = { ...progress, live: progress.live.map(viewLive) };
       this.update({ data, status: "ready", readError: null, missing: false });
       this.progressListeners.forEach(listener => listener());
     } else if (event.kind === "session.progress") {
-      this.progress = event.progress;
+      const { busyObjectIds, timelineBusy, live } = event;
+      if (live) this.wire = applyLive(this.wire, live);
+      this.progress = { busyObjectIds, timelineBusy, live: live ? this.wire.map(viewLive) : this.progress.live };
       this.progressListeners.forEach(listener => listener());
     } else {
       const current = this.state.data;

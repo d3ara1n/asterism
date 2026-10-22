@@ -11,7 +11,7 @@ import { commonMessages } from "../messages/common";
 import { filesystemMessages } from "../messages/filesystem";
 import { terminalMessages } from "../messages/terminal";
 import { BuiltinSettings } from "../settings/contract";
-import { TerminalCard } from "./TerminalCard";
+import { TerminalActions, TerminalCard } from "./TerminalCard";
 import { prepareTerminalImages } from "./image-renderer";
 import { CreateTerminal, TerminalResource, TerminalView, TerminalInput, TerminalRead, TerminalWait, TerminalSee } from "./contract";
 import type { z } from "zod";
@@ -60,7 +60,7 @@ const imageView = { headerRenderer: header(terminalMessages.see), bodyRenderer: 
 export default {
   prepare: prepareTerminalImages,
   resources: [{ kind: TerminalResource.kind, label: terminalMessages.terminal, icon: <TerminalSquare className="size-4" />, card: appearance }],
-  cards: [cardRenderer(TerminalView, { ...appearance, Body: TerminalCard })],
+  cards: [cardRenderer(TerminalView, { ...appearance, Body: TerminalCard, Actions: TerminalActions })],
   creations: [creationEntry(CreateTerminal, { id: "atelier.builtin/terminal.local", label: terminalMessages.terminal, icon: <TerminalSquare className="size-4" />, group: "resources", InputView: TerminalCreation, triggers: { menu: {} } })],
   tools: [
     toolRenderer(TerminalInput, { label: terminalMessages.input, icon: <Keyboard className="size-3.5" />, input: inputView, execution: inputView, result: inputView }),

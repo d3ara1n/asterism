@@ -1,9 +1,6 @@
 import { z } from "zod";
 import { contentRefSchema } from "@atelier/sdk/contracts";
-import { coreChannel } from "./core.ts";
 
-export const contentChannel = coreChannel("content");
-export const contentVersion = 3;
 /** 单块传输上限；分块确认形成背压。 */
 export const contentChunkSize = 1024 * 1024;
 /** 单次 read 上限；更大内容用 open 或范围读取。 */
@@ -43,6 +40,4 @@ export const contentResultSchema = z.discriminatedUnion("ok", [
   z.strictObject({ ok: z.literal(false), error: z.strictObject({ code: z.string(), message: z.string() }) }),
 ]);
 export type ContentResult = z.infer<typeof contentResultSchema>;
-export const contentRequestSchema = z.strictObject({ kind: z.literal("content.request"), version: z.literal(contentVersion), id, command: z.unknown() });
-export const contentResponseSchema = z.strictObject({ kind: z.literal("content.response"), version: z.literal(contentVersion), id, result: contentResultSchema });
 export interface ContentBridge { execute(command: ContentCommand): Promise<ContentResult> }

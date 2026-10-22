@@ -1,10 +1,9 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import type { DesktopBridge } from "../shared/contracts.ts";
-import { objectStreamChannel } from "../shared/object-stream.ts";
-import { pluginEventsChannel } from "../shared/plugin-events.ts";
+import { connectionPortMessage, connectionRequestChannel } from "../shared/connection.ts";
 
 const electron = vi.hoisted(() => ({
-  exposeInMainWorld: vi.fn(), on: vi.fn(), removeListener: vi.fn(), send: vi.fn(),
+  exposeInMainWorld: vi.fn(), on: vi.fn(), removeListener: vi.fn(), send: vi.fn(), postMessage: vi.fn(),
 }));
 vi.mock("electron", () => ({
   contextBridge: { exposeInMainWorld: electron.exposeInMainWorld },
@@ -12,45 +11,25 @@ vi.mock("electron", () => ({
   webUtils: {},
 }));
 let bridge: DesktopBridge;
+let relay: (event: { ports: unknown[] }) => void;
 beforeAll(async () => {
+  vi.stubGlobal("window", { postMessage: electron.postMessage });
   await import("./index.ts");
   bridge = electron.exposeInMainWorld.mock.calls[0]![1] as DesktopBridge;
+  // 模块加载时注册的监听在用例开始前被清理记录，先行取出。
+  relay = electron.on.mock.calls.find(([name]) => name === connectionRequestChannel)![1];
 });
 
-describe("前端对象流订阅", () => {
-  it("按同一信封校验并筛选会话和对象，取消订阅移除原监听器", async () => {
-    const listener = vi.fn();
-    const stop = bridge.onObjectStream("session", "resource", listener);
-    const [channel, receive] = electron.on.mock.calls[0]!;
-    expect(channel).toBe(objectStreamChannel);
-    const data = new Uint8Array([1, 2]);
-    const frame = { kind: "object.stream", sessionId: "session", objectId: "resource", channel: "example.counter/updates", data };
-    try {
-      for (const invalid of [
-        null, { ...frame, kind: "session.progress" }, { ...frame, data: [1, 2] },
-        { ...frame, objectId: "" }, { ...frame, channel: 5 }, { ...frame, extra: true },
-        { ...frame, sessionId: "other" }, { ...frame, objectId: "other" },
-      ]) receive({}, invalid);
-      expect(listener).not.toHaveBeenCalled();
-      receive({}, frame);
-      expect(listener).toHaveBeenCalledExactlyOnceWith(frame.channel, data);
-      expect(listener.mock.calls[0]![1]).toBe(data);
-    } finally { stop(); }
-    expect(electron.removeListener).toHaveBeenCalledExactlyOnceWith(objectStreamChannel, receive);
+// 直连交接契约：页面重复请求不能让主进程重建连接（会结束在途调用与订阅）；端口原样转交页面。
+describe("任务进程直连交接", () => {
+  it("每个页面只发送一次连接请求，端口与不可用通知都转交给页面", () => {
+    bridge.connectRuntime();
+    bridge.connectRuntime();
+    expect(electron.send).toHaveBeenCalledExactlyOnceWith(connectionRequestChannel);
+    const port = { kind: "port" };
+    relay({ ports: [port] });
+    expect(electron.postMessage).toHaveBeenLastCalledWith({ type: connectionPortMessage }, "*", [port]);
+    relay({ ports: [] });
+    expect(electron.postMessage).toHaveBeenLastCalledWith({ type: connectionPortMessage }, "*", []);
   });
-});
-
-it("事件控制与批次走独立通道，消费方关闭时移除桥监听", async () => {
-  const id = crypto.randomUUID(), listener = vi.fn();
-  const stop = bridge.events.onFrame(listener);
-  const [channel, receive] = electron.on.mock.calls.at(-1)!;
-  const subscribe = { type: "subscribe" as const, id, contract: "test.events/notice" };
-  try {
-    bridge.events.send(subscribe);
-    expect(electron.send).toHaveBeenLastCalledWith(pluginEventsChannel, subscribe);
-    expect(channel).toBe(pluginEventsChannel);
-    receive({}, { type: "ready", id });
-    expect(listener).toHaveBeenCalledExactlyOnceWith({ type: "ready", id });
-  } finally { stop(); }
-  expect(electron.removeListener).toHaveBeenLastCalledWith(pluginEventsChannel, receive);
 });

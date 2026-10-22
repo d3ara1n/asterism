@@ -9,6 +9,7 @@ import { ModelFailure, type ModelAdapter, type ModelEvent, type ModelInput } fro
 import { AiSdkAdapter, sdkMessages } from "../model/ai-sdk.ts";
 import { type SessionChanged, type SessionCommand, type SessionMutation } from "../shared/session.ts";
 import { flat } from "../session/test-nodes.ts";
+import { applyLive } from "../shared/live-patch.ts";
 import type { AgentSelection, Json } from "../shared/model.ts";
 import * as runtimeModules from "./builtin.ts";
 import { z } from "zod";
@@ -64,6 +65,7 @@ async function setup(model: ModelAdapter = adapter(), onSessionChanged?: (event:
 }
 async function execute(service: ApplicationService, command: SessionMutation | { type: "read"; sessionId: string }) {
   const reply = await service.sessions.execute(command);
+  if (reply.kind === "warnings") throw new Error("Unexpected warnings reply.");
   return reply.kind === "view" ? reply.data : service.sessions.current(reply.sessionId);
 }
 async function settled(service: ApplicationService) {
@@ -884,14 +886,17 @@ describe("会话运行时", () => {
     try {
       const first = await execute(service, start); await started;
       await service.sessions.execute({ type: "watch", sessionId: first.sessionId });
-      expect(events.some(event => event.kind === "session.opened"
-        && event.data.progress.live.some(block => block.kind === "text" && block.text === "Live"))).toBe(true);
+      const opened = events.find(event => event.kind === "session.opened");
+      if (opened?.kind !== "session.opened") throw new Error("Expected opened session.");
+      expect(opened.data.progress.live.some(block => block.kind === "text" && block.text === "Live")).toBe(true);
       events.length = 0;
       await vi.advanceTimersToNextTimerAsync();
       expect(events).toEqual([]);
       release(); await settled(service);
       expect(events.some(event => event.kind === "session.changed")).toBe(true);
-      expect(events.at(-1)).toMatchObject({ kind: "session.progress", progress: { live: [] } });
+      // 增量从打开时的基线依次应用，终态与后台一致：流式块随成型记录移除。
+      const live = events.reduce((blocks, event) => event.kind === "session.progress" && event.live ? applyLive(blocks, event.live) : blocks, opened.data.progress.live);
+      expect(live).toEqual([]);
       expect(service.sessions.current(first.sessionId).nodes.map(flat).some(node => node.kind === "text" && node.complete)).toBe(true);
     } finally { release(); vi.useRealTimers(); }
   });
@@ -1322,7 +1327,7 @@ describe("插件包管理命令", () => {
   it("应用命令登记和移除插件包，正确表达重启标记", async () => {
     const { service, root } = await setup();
     const dir = join(root, "pkg"); mkdirSync(dir);
-    writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "p", atelier: { id: "acme.p", api: { major: 14, minMinor: 0 } } }));
+    writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "p", atelier: { id: "acme.p", api: { major: 15, minMinor: 0 } } }));
     const added = service.execute({ type: "plugin.add", path: dir });
     expect(added.plugins.filter(p => p.index !== null).map(p => [p.source, p.status, p.enabled])).toEqual([[dir, "pending", true]]);
     expect(added.plugins.find(p => p.index === null)).toMatchObject({ id: "atelier.builtin", status: "loaded" });

@@ -42,7 +42,8 @@ export const modelBlockSchema = z.discriminatedUnion("kind", [
   z.strictObject({ ...block, kind: z.literal("thinking"), text: z.string(), summary: z.string() }),
   z.strictObject({ ...block, kind: z.literal("text"), text: z.string() }),
   z.strictObject({ ...block, kind: z.literal("toolcall"), callId: id, name: id,
-    argumentsText: z.string(), arguments: jsonSchema, outcome: toolOutcomeSchema.nullable() })
+    /** 模型原文；只在没有解析参数（调用未完成）时保留，已解析时以 arguments 为准。 */
+    argumentsText: z.string().nullable(), arguments: jsonSchema, outcome: toolOutcomeSchema.nullable() })
     .refine(data => data.complete === (data.outcome !== null), "Complete tool calls must have an outcome."),
 ]);
 /** 终态内含于成型块；执行通知只携带反馈，不承载响应身份或计量。 */

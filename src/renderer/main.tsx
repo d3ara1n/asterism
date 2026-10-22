@@ -34,15 +34,17 @@ import { builtin } from "@atelier/builtin-api/contracts";
 import { bindPublicProvider } from "../shared/public-modules";
 import { builtinPublicProvider, builtinPublicModules } from "../builtin-public";
 
+import { runtime } from "./runtime";
+
 startAppearance();
-const events = new EventClient(window.host.events);
-const calls = new CallClient(window.host.calls);
-const controller = new ApplicationController(window.host, events);
+const events = new EventClient(runtime.events);
+const calls = new CallClient(runtime.calls);
+const controller = new ApplicationController({ execute: runtime.execute, session: runtime.session, onStatus: window.host.onStatus }, events);
 const lifetime = new AbortController();
 const stopEventStatus = window.host.onStatus(status => { if (status !== "ready") { events.disconnect(); calls.disconnect(); } });
 window.addEventListener("pagehide", () => { lifetime.abort(); events.close(); calls.close(); stopEventStatus(); }, { once: true });
 // 插件视图只在启动时加载；内置视图之后合并，重复契约使该插件视图被忽略。
-const initial = await window.host.execute({ type: "workspace.read" }).catch(() => null);
+const initial = await runtime.execute({ type: "workspace.read" }).catch(() => null);
 await startLanguage(initial?.ok ? initial.snapshot.catalogs ?? [] : []).catch(error => console.error("Language settings could not be loaded. English is used.", error));
 showStartupStage(getI18n().formatMessage(appMessages.startupPlugins));
 const plugins = initial?.ok ? initial.snapshot.plugins.flatMap(p => p.status === "loaded" && p.id ? [{ id: p.id, renderer: p.renderer, dependencies: p.dependencies }] : []) : [];

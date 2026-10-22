@@ -1,56 +1,15 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ConfigurationRequests, RuntimeRequests, PluginConfigurationRequests } from "./requests.ts";
-import { configurationVersion } from "../shared/configuration.ts";
+import { RuntimeRequests } from "./requests.ts";
 import { protocolVersion } from "../shared/contracts.ts";
-import { pluginConfigurationVersion } from "../shared/plugin-configuration.ts";
 
 afterEach(() => vi.useRealTimers());
-describe("任务进程请求生命周期", () => {
-  it("插件配置只消费自己的响应，关闭时结算未完成保存且不重放", async () => {
-    const sent: { id: string }[] = [];
-    const requests = new PluginConfigurationRequests(message => sent.push(message as { id: string }), () => {});
-    const read = requests.execute({ type: "read" });
-    requests.receive({ kind: "configuration.response", version: configurationVersion, id: sent[0]!.id,
-      result: { ok: false, error: { code: "unavailable", message: "Wrong channel." } } });
-    requests.receive({ kind: "plugin-configuration.response", version: pluginConfigurationVersion, id: sent[0]!.id,
-      result: { ok: true, configurations: [] } });
-    expect(await read).toEqual({ ok: true, configurations: [] });
-    const save = requests.execute({ type: "save", id: "acme.plugin", value: false });
-    requests.close();
-    expect((await save).ok).toBe(false);
-    expect((await requests.execute({ type: "read" })).ok).toBe(false);
-    expect(sent).toHaveLength(2);
-  });
-  it("配置请求使用独立响应类型，不接受工作台响应冒充", async () => {
-    const sent: { id: string }[] = [];
-    const requests = new ConfigurationRequests(message => sent.push(message as { id: string }), () => {});
-    const pending = requests.execute({ type: "read" });
-    const error = { ok: false as const, error: { code: "not_found", message: "Configuration unavailable." } };
-    requests.receive({ kind: "response", version: protocolVersion, id: sent[0]!.id, result: error });
-    requests.receive({ kind: "configuration.response", version: configurationVersion, id: sent[0]!.id, result: error });
-    expect(await pending).toEqual(error);
-    requests.close();
-  });
-  it("配置通道有独立等待策略，工作台超时不终止在途配置请求", async () => {
-    vi.useFakeTimers();
-    const sent: { id: string }[] = [], configTimeout = vi.fn(), runtimeTimeout = vi.fn();
-    const configuration = new ConfigurationRequests(message => sent.push(message as { id: string }), configTimeout);
-    const runtime = new RuntimeRequests(() => {}, runtimeTimeout);
-    const read = configuration.execute({ type: "read" }), workspace = runtime.execute({ type: "workspace.read" });
-    try {
-      await vi.advanceTimersToNextTimerAsync();
-      expect(runtimeTimeout).toHaveBeenCalled();
-      expect((await workspace).ok).toBe(false);
-      expect(configTimeout).not.toHaveBeenCalled();
-      configuration.receive({ kind: "configuration.response", version: configurationVersion, id: sent[0]!.id,
-        result: { ok: false, error: { code: "unavailable", message: "System protection is unavailable." } } });
-      expect((await read).ok).toBe(false);
-    } finally { configuration.close(); runtime.close(); }
-  });
+// 主进程控制链路契约：退出确认等工作区请求按身份配对、断开时结算且不重放。
+describe("主进程工作区请求生命周期", () => {
   it("按请求身份匹配响应，忽略未知响应", async () => {
     const sent: { id: string }[] = [];
     const requests = new RuntimeRequests(message => sent.push(message as { id: string }), () => {});
     const pending = requests.execute({ type: "workspace.read" });
+    requests.receive({ kind: "response", version: protocolVersion, id: crypto.randomUUID(), result: { ok: false, error: { code: "other", message: "Other." } } });
     requests.receive({ kind: "response", version: protocolVersion, id: sent[0]!.id, result: { ok: false, error: { code: "not_found", message: "Missing task." } } });
     expect(await pending).toEqual({ ok: false, error: { code: "not_found", message: "Missing task." } });
     requests.close();
@@ -70,8 +29,7 @@ describe("任务进程请求生命周期", () => {
 
   it("超时关闭通道，不自动重放可能已提交的操作", async () => {
     vi.useFakeTimers();
-    const send = vi.fn();
-    const timeout = vi.fn();
+    const send = vi.fn(), timeout = vi.fn();
     const requests = new RuntimeRequests(send, timeout, 50);
     const result = requests.execute({ type: "workspace.read" });
     await vi.advanceTimersByTimeAsync(50);

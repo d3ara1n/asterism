@@ -13,6 +13,7 @@ import { useModuleViews } from "./views";
 import { pluginPreferences } from "../features/creation/preferences";
 import { contentInput, contentReader, contentCommand } from "../features/creation/content";
 import { objectRetention } from "../features/session/retention";
+import { channels } from "../runtime";
 
 export function RendererCatalogProvider({ ready, children }: { ready: boolean; children: ReactNode }) {
   const configuration = useConfiguration(ready);
@@ -35,10 +36,8 @@ export function useObjectContext(object: WorkbenchObject): RendererObjectContext
   const records = useMemo(() => snapshot
     ? sessionSnapshot(nodeView(snapshot.sessionId, snapshot.title, snapshot.nodes, snapshot.cursor)) : null,
   [snapshot?.sessionId, snapshot?.title, snapshot?.nodes, snapshot?.cursor]);
-  const onStream = useCallback<RendererObjectContext["onStream"]>((channel, listener) =>
-    window.host.onObjectStream(controller.sessionId, object.id, (name, data) => {
-      if (name === `${pluginOf(object.kind)}/${channel}`) listener(data);
-    }), [controller.sessionId, object.id, object.kind]);
+  const openChannel = useCallback<RendererObjectContext["openChannel"]>(contract =>
+    channels.open(contract, { sessionId: controller.sessionId, id: object.id, kind: object.kind }), [controller.sessionId, object.id, object.kind]);
   const content = useMemo(() => contentReader(() => ({ sessionId: controller.sessionId, objectId: object.id })),
     [controller.sessionId, object.id]);
   const retained = useMemo(() => objectRetention.object(controller.sessionId, object.id), [controller.sessionId, object.id]);
@@ -58,7 +57,7 @@ export function useObjectContext(object: WorkbenchObject): RendererObjectContext
     invoke: (contract, input, options) => contentCommand(options?.content,
       { sessionId: controller.sessionId, objectId: object.id, resourceKind: contract.resource.kind, contractId: contract.id },
       contentScopeId => controller.execute({ type: "resource.command", sessionId: controller.sessionId, objectId: object.id, command: resourceCall(contract, input), contentScopeId })),
-    onStream,
+    openChannel,
     retained,
   };
 }

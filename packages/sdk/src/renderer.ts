@@ -22,6 +22,15 @@ import type { CreationEntry } from "./renderer-creation.ts";
 import type { ToolRenderer } from "./renderer-tools.ts";
 import type { EventSubscriber } from "./events.ts";
 import type { PluginCalls } from "./calls.ts";
+import type { ChannelContract, ChannelEnd, ChannelValue } from "./channels.ts";
+
+/** 前端持有的通道一端：消息按序交付，监听注册前到达的消息先缓存；closed 在任一端结束时兑现。 */
+export interface RendererChannel<Up extends ChannelValue = ChannelValue, Down extends ChannelValue = ChannelValue> {
+  send(data: Up): void;
+  onMessage(listener: (data: Down) => void): () => void;
+  close(): void;
+  readonly closed: Promise<ChannelEnd>;
+}
 
 export type RendererReceipt = { ok: true } | { ok: false; error: { code: string; message: string; display?: UiText } };
 /**
@@ -52,8 +61,8 @@ export interface RendererObjectContext {
     refresh(): Promise<void>;
   };
   invoke<I, O extends Json>(contract: ActionContract<I, O>, input: NoInfer<I> & Json, options?: RendererInputOptions): Promise<RendererReceipt>;
-  /** channel 使用插件内短名，与 object.streams.publish 相同；宿主自动补全插件命名空间。 */
-  onStream(channel: string, listener: (data: Uint8Array) => void): () => void;
+  /** 打开本对象的双工通道；宿主校验对象位于当前路径并路由到所属插件，对象离开当前集合或连接断开时结束。 */
+  openChannel<Up extends ChannelValue, Down extends ChannelValue>(contract: ChannelContract<Up, Down>): RendererChannel<Up, Down>;
   /** 对象级保留状态，生命周期由宿主统一管理。 */
   readonly retained: RendererRetained;
 }

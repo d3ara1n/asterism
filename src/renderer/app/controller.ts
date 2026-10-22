@@ -1,6 +1,7 @@
 import { ResourceStatusChanged, ResourcePresenceChanged, SessionTitleChanged, type EventSubscriber, type UiText } from "@atelier/sdk/contracts";
 
 import type { AppSnapshot, DesktopBridge, RuntimeStatus } from "../../shared/contracts";
+import type { RuntimeBridge } from "../../shared/connection";
 import { errorDisplay } from "../../shared/error-display";
 import { commonMessages } from "@atelier/ui/messages/common";
 import type { ResourceStatusMark } from "./resource-status";
@@ -22,7 +23,7 @@ export class ApplicationController {
   private pending: ReturnType<typeof setTimeout> | null = null;
   /** 订阅生效后收到的标题；之后读取的列表快照以它为准，避免旧快照覆盖新标题。 */
   private titles = new Map<string, string>();
-  constructor(private readonly bridge: Pick<DesktopBridge, "execute" | "onStatus" | "session">,
+  constructor(private readonly bridge: Pick<RuntimeBridge, "execute" | "session"> & Pick<DesktopBridge, "onStatus">,
     private readonly events?: EventSubscriber, private readonly settleMs = 300) {}
   getSnapshot = (): ApplicationState => this.state;
   subscribe = (listener: () => void): (() => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; };

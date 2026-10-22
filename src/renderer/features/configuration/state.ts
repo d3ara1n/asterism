@@ -1,3 +1,4 @@
+import { runtime } from "../../runtime";
 import { errorDisplay } from "../../../shared/error-display.ts";
 import type { UiText } from "@atelier/sdk/contracts";
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
@@ -8,20 +9,20 @@ export function useConfiguration(active: boolean) {
   const [error, setError] = useState<UiText | null>(null);
   const [busy, setBusy] = useState(false);
   const load = useCallback(async () => {
-    const result = await window.host.configuration.execute({ type: "read" });
+    const result = await runtime.configuration.execute({ type: "read" });
     if (result.ok) { setSnapshot(result.snapshot); setError(null); }
     else setError(errorDisplay(result.error));
   }, []);
   useEffect(() => {
     if (!active) return;
-    const unsubscribe = window.host.configuration.onChanged(() => { void load(); });
+    const unsubscribe = runtime.configuration.onChanged(() => { void load(); });
     void load();
     return unsubscribe;
   }, [active, load]);
   const run = useCallback(async (command: ConfigurationCommand): Promise<ConfigurationResult> => {
     setBusy(true); setError(null);
     try {
-      const result = await window.host.configuration.execute(command);
+      const result = await runtime.configuration.execute(command);
       if (result.ok) setSnapshot(result.snapshot); else setError(errorDisplay(result.error));
       return result;
     } finally { setBusy(false); }

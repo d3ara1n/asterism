@@ -1,33 +1,28 @@
-import { utilityProcess, type UtilityProcess } from "electron";
+import { utilityProcess, type MessagePortMain, type UtilityProcess } from "electron";
 import { applicationBrand, applicationStorage } from "../shared/application.ts";
 import { createWriteStream, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { runtimeMessageSchema, type Command, type CommandResult, type RuntimeStatus } from "../shared/contracts.ts";
-import { ConfigurationRequests, SessionRequests, RuntimeRequests, PluginConfigurationRequests, ContentRequests } from "./requests.ts";
-import { sessionChangedSchema, type SessionChanged, type SessionCommand, type SessionResult } from "../shared/session.ts";
-import { configurationChangedSchema, type ConfigurationCommand, type ConfigurationResult } from "../shared/configuration.ts";
+import { RuntimeRequests } from "./requests.ts";
 import { handleSecretRequest } from "./secrets.ts";
-import { pluginConfigurationChangedSchema, type PluginConfigurationCommand, type PluginConfigurationResult } from "../shared/plugin-configuration.ts";
-import { objectStreamSchema, type ObjectStream } from "../shared/object-stream.ts";
-import type { ContentCommand, ContentResult } from "../shared/content.ts";
-import { eventRuntimeFrameSchema, pluginEventsVersion, type EventControl, type EventFrame } from "../shared/plugin-events.ts";
-import { callRuntimeFrameSchema, pluginCallsVersion, type CallControl, type CallFrame } from "../shared/plugin-calls.ts";
 
+/**
+ * 任务进程监护与控制链路：启动、存活、退出流程与凭据解密留在主进程。
+ * renderer 的业务流量经直连端口进入任务进程，不经此处转发。
+ */
 export class RuntimeHost {
   private child: UtilityProcess | null = null;
   private requests: RuntimeRequests | null = null;
-  private configurationRequests: ConfigurationRequests | null = null;
-  private sessionRequests: SessionRequests | null = null;
-  private pluginConfigurationRequests: PluginConfigurationRequests | null = null;
-  private contentRequests: ContentRequests | null = null;
   private status: RuntimeStatus = "starting";
-  constructor(private readonly onStatus: (status: RuntimeStatus) => void, private readonly onConfigurationChanged: () => void = () => {},
-    private readonly onSessionChanged: (event: SessionChanged) => void = () => {},
-    private readonly onStream: (event: ObjectStream) => void = () => {},
-    private readonly onPluginConfigurationChanged: (pluginId: string) => void = () => {},
-    private readonly onEventFrame: (frame: EventFrame) => void = () => {},
-    private readonly onCallFrame: (frame: CallFrame) => void = () => {}) {}
+  private heartbeat: ReturnType<typeof setInterval> | null = null;
+  /**
+   * 存活检测：就绪后定期 ping，超过期限没有 pong 视为卡死并结束进程。
+   * renderer 直连请求不设等待期限，任务进程失联由此转为 unavailable 状态通知。
+   */
+  constructor(private readonly onStatus: (status: RuntimeStatus) => void,
+    private readonly liveness = { intervalMs: 5_000, timeoutMs: 15_000 }) {}
   private setStatus(status: RuntimeStatus): void { this.status = status; this.onStatus(status); }
+  get ready(): boolean { return this.status === "ready" && this.child !== null; }
 
   start(entry: string, root: string): Promise<void> {
     mkdirSync(join(root, applicationStorage.logsDirectory), { recursive: true });
@@ -43,61 +38,42 @@ export class RuntimeHost {
       return Promise.reject(error);
     }
     this.child = child;
-    this.contentRequests = new ContentRequests(message => child.postMessage(message), () => {
-      this.setStatus("unavailable"); child.kill();
-    });
     child.stdout?.pipe(log, { end: false });
     child.stderr?.pipe(log, { end: false });
-    this.requests = new RuntimeRequests(message => child.postMessage(message), () => {
-      this.setStatus("unavailable");
-      child.kill();
-    });
-    this.configurationRequests = new ConfigurationRequests(message => child.postMessage(message), () => {
-      this.setStatus("unavailable");
-      child.kill();
-    });
-    this.sessionRequests = new SessionRequests(message => child.postMessage(message), () => {
-      this.setStatus("unavailable");
-      child.kill();
-    });
-    this.pluginConfigurationRequests = new PluginConfigurationRequests(message => child.postMessage(message), () => {
+    const requests = this.requests = new RuntimeRequests(message => child.postMessage(message), () => {
       this.setStatus("unavailable");
       child.kill();
     });
     return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        this.setStatus("unavailable");
-        this.requests?.close();
-        this.configurationRequests?.close();
-        this.pluginConfigurationRequests?.close();
-        this.contentRequests?.close();
-        this.sessionRequests?.close();
-        child.kill();
-        reject(new Error("Task runtime initialization timed out."));
-      }, 15_000);
-      child.on("error", () => {
+      const fail = (error: Error) => {
         clearTimeout(timeout);
-        console.error("Task runtime encountered a fatal process error.");
-        this.requests?.close();
-        this.configurationRequests?.close();
-        this.pluginConfigurationRequests?.close();
-        this.contentRequests?.close();
-        this.sessionRequests?.close();
+        requests.close();
         this.setStatus("unavailable");
         child.kill();
-        reject(new Error("Task runtime encountered a fatal process error."));
+        reject(error);
+      };
+      const timeout = setTimeout(() => fail(new Error("Task runtime initialization timed out.")), 15_000);
+      let lastPong = 0;
+      const watch = () => {
+        lastPong = Date.now();
+        this.heartbeat = setInterval(() => {
+          if (this.child !== child || this.status !== "ready") return;
+          if (Date.now() - lastPong > this.liveness.timeoutMs) {
+            console.error("Task runtime stopped responding and was terminated.");
+            this.stopHeartbeat();
+            requests.close(`The task runtime stopped responding. Restart ${applicationBrand.en} and inspect the workspace before retrying.`);
+            this.setStatus("unavailable");
+            child.kill();
+            return;
+          }
+          try { child.postMessage({ kind: "ping" }); } catch { /* 退出由 exit 事件处理。 */ }
+        }, this.liveness.intervalMs);
+      };
+      child.on("error", () => {
+        console.error("Task runtime encountered a fatal process error.");
+        fail(new Error("Task runtime encountered a fatal process error."));
       });
       child.on("message", raw => {
-        if (raw?.kind === "plugin-calls.frame") {
-          const parsed = callRuntimeFrameSchema.safeParse(raw);
-          if (parsed.success) this.onCallFrame(parsed.data.frame);
-          return;
-        }
-        if (raw?.kind === "plugin-events.frame") {
-          const parsed = eventRuntimeFrameSchema.safeParse(raw);
-          if (parsed.success) this.onEventFrame(parsed.data.frame);
-          return;
-        }
         if (raw?.kind === "secret.request") {
           void handleSecretRequest(raw).then(response => {
             if (response && this.child === child && this.status !== "stopping") {
@@ -106,46 +82,26 @@ export class RuntimeHost {
           });
           return;
         }
-        if (configurationChangedSchema.safeParse(raw).success) { this.onConfigurationChanged(); return; }
-        const pluginChanged = pluginConfigurationChangedSchema.safeParse(raw);
-        if (pluginChanged.success) { this.onPluginConfigurationChanged(pluginChanged.data.id); return; }
-        if (raw?.kind === "content.response") { this.contentRequests?.receive(raw); return; }
-        if (raw?.kind === "configuration.response") { this.configurationRequests?.receive(raw); return; }
-        if (raw?.kind === "plugin-configuration.response") { this.pluginConfigurationRequests?.receive(raw); return; }
-        const stream = objectStreamSchema.safeParse(raw);
-        if (stream.success) { this.onStream(stream.data); return; }
-        const session = sessionChangedSchema.safeParse(raw);
-        if (session.success) { this.onSessionChanged(session.data); return; }
-        if (raw?.kind === "session.response") { this.sessionRequests?.receive(raw); return; }
-        if (raw?.kind === "response") { this.requests?.receive(raw); return; }
+        if (raw?.kind === "pong") { lastPong = Date.now(); return; }
+        if (raw?.kind === "response") { requests.receive(raw); return; }
         const parsed = runtimeMessageSchema.safeParse(raw);
         if (!parsed.success) return;
         if (parsed.data.kind === "ready") {
           clearTimeout(timeout);
           if (this.status !== "starting") return;
           this.setStatus("ready");
+          watch();
           resolve();
         } else if (parsed.data.kind === "fatal") {
-          clearTimeout(timeout);
-          this.setStatus("unavailable");
-          this.requests?.close();
-          this.configurationRequests?.close();
-          this.pluginConfigurationRequests?.close();
-          this.contentRequests?.close();
-          this.sessionRequests?.close();
-          child.kill();
-          reject(Object.assign(new Error(parsed.data.message), { reason: parsed.data.reason, directory: parsed.data.directory }));
+          fail(Object.assign(new Error(parsed.data.message), { reason: parsed.data.reason, directory: parsed.data.directory }));
         }
       });
       child.once("exit", code => {
         clearTimeout(timeout);
+        this.stopHeartbeat();
         log.end();
         this.child = null;
-        this.requests?.close();
-        this.configurationRequests?.close();
-        this.pluginConfigurationRequests?.close();
-        this.contentRequests?.close();
-        this.sessionRequests?.close();
+        requests.close();
         if (this.status !== "stopping") this.setStatus("unavailable");
         reject(new Error("Task runtime exited with code " + code));
       });
@@ -153,61 +109,32 @@ export class RuntimeHost {
   }
 
   execute(command: Command): Promise<CommandResult> {
-    if (this.status !== "ready" || !this.requests) return Promise.resolve({
+    if (!this.ready || !this.requests) return Promise.resolve({
       ok: false, error: { code: "unavailable", message: `The workspace is unavailable. Restart ${applicationBrand.en} to reopen it.` },
     });
     return this.requests.execute(command);
   }
 
-  events(control: EventControl): void {
-    if (this.child && this.status === "ready") {
-      try { this.child.postMessage({ kind: "plugin-events.control", version: pluginEventsVersion, control }); return; }
-      catch { this.setStatus("unavailable"); }
-    }
-    if (control.type === "subscribe") this.onEventFrame({ type: "closed", id: control.id, end: { reason: "unavailable" } });
+  /** 把 renderer 直连的一端交给任务进程；不可用时返回 false，调用方关闭另一端。 */
+  connect(id: string, port: MessagePortMain): boolean {
+    if (!this.ready) return false;
+    try { this.child!.postMessage({ kind: "connection.open", id }, [port]); return true; }
+    catch { this.setStatus("unavailable"); return false; }
+  }
+  disconnect(id: string): void {
+    if (!this.ready) return;
+    try { this.child!.postMessage({ kind: "connection.close", id }); } catch { /* 子进程已退出。 */ }
   }
 
-  calls(control: CallControl): void {
-    if (this.child && this.status === "ready") {
-      try { this.child.postMessage({ kind: "plugin-calls.control", version: pluginCallsVersion, control }); return; }
-      catch { this.setStatus("unavailable"); }
-    }
-    if (control.type === "invoke") this.onCallFrame({ type: "error", id: control.id, code: "unavailable", message: "The plugin runtime is unavailable." });
-  }
-
-  configure(command: ConfigurationCommand): Promise<ConfigurationResult> {
-    if (this.status !== "ready" || !this.configurationRequests) return Promise.resolve({
-      ok: false, error: { code: "unavailable", message: `Configuration service is unavailable. Restart ${applicationBrand.en}.` },
-    });
-    return this.configurationRequests.execute(command);
-  }
-
-  session(command: SessionCommand): Promise<SessionResult> {
-    if (this.status !== "ready" || !this.sessionRequests) return Promise.resolve({
-      ok: false, error: { code: "unavailable", message: `Session service is unavailable. Restart ${applicationBrand.en}.` },
-    });
-    return this.sessionRequests.execute(command);
-  }
-  configurePlugin(command: PluginConfigurationCommand): Promise<PluginConfigurationResult> {
-    if (this.status !== "ready" || !this.pluginConfigurationRequests) return Promise.resolve({
-      ok: false, error: { code: "unavailable", message: "Plugin configuration service is unavailable." },
-    });
-    return this.pluginConfigurationRequests.execute(command);
-  }
-  content(command: ContentCommand): Promise<ContentResult> {
-    if (this.status !== "ready" || !this.contentRequests) return Promise.resolve({
-      ok: false, error: { code: "unavailable", message: "Content transfer is unavailable." },
-    });
-    return this.contentRequests.execute(command);
+  private stopHeartbeat(): void {
+    if (this.heartbeat) clearInterval(this.heartbeat);
+    this.heartbeat = null;
   }
 
   stop(): Promise<void> {
+    this.stopHeartbeat();
     this.setStatus("stopping");
     this.requests?.close(`${applicationBrand.en} is shutting down.`);
-    this.configurationRequests?.close(`${applicationBrand.en} is shutting down.`);
-    this.pluginConfigurationRequests?.close(`${applicationBrand.en} is shutting down.`);
-    this.contentRequests?.close(`${applicationBrand.en} is shutting down.`);
-    this.sessionRequests?.close(`${applicationBrand.en} is shutting down.`);
     const child = this.child;
     if (!child) return Promise.resolve();
     return new Promise(resolve => {

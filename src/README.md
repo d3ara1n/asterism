@@ -28,7 +28,7 @@
 - **插件工具装配**：`plugins/loader.ts` 收集贡献、处理依赖与生命周期；`plugins/tool-contributions.ts` 校验插件内工具声明，并按用户列表解析覆盖与实现状态；`plugins/top-level-tools.ts` 绑定顶层工具调用上下文，`tools/registry.ts` 提供有效资源实现目录。覆盖契约见 [工具覆盖](../docs/runtime.md#工具覆盖)。
 - **会话写入与观察**：会话命令经 Zod 校验后交运行时单一写入者同步事务处理。路径遍历位于 `shared/session-timeline.ts`（前后台共用）。`SessionTree.select` 将游标选择审计与游标更新原子提交；提交后分别派发新增记录观察 `committed` 与最终游标变化观察 `cursorChanged`（命名模块据此同步会话标题）。`SessionTree.workbench` 沿当前游标全量重放资源与链接事件，供工作台展示与执行校验共用。
 - **代理执行循环**：`execution/request.ts` 完成单次补全及工具批次，`execution/response.ts` 维护该响应的临时流状态，终态内含于最高序号块交付。内置 Agent 由 `../packages/builtin/src/agent/runtime.ts` 装配：`selection.ts` 解析选择与工具策略，`admission.ts` 原子受理输入，`loop.ts` 驱动多轮请求，`compression.ts` 在请求间检查预算并生成摘要，`projection.ts` 负责响应分组、期间事件后置与上下文截取。在途输出经 `session.progress` 的 `live` 字段按 `objectId` 送达界面。
-- **插件事件与二进制流**：全局具型瞬态事件由 `plugins/events.ts` 登记路由，前后台共用 `shared/event-queue.ts`（支持 `all` 与 `latest` 合并），经 `runtime/event-peer.ts → main → preload → shared/event-client.ts` 跨进程投递。Agent 经此发布 `ResourceStatusChanged` 供侧栏 `SessionStatus.tsx` 消费。高频对象二进制流经 `shared/object-stream.ts` 独立信封转发，不进历史。
+- **直连传输与插件事件**：renderer 经 `renderer/runtime.ts` 与任务进程 `runtime/connection.ts` 以 MessagePort 直连（协议见 `shared/connection.ts`），主进程只交接端口。全局具型瞬态事件由 `plugins/events.ts` 登记路由，前后台共用 `shared/event-queue.ts`（支持 `all` 与 `latest` 合并），经 `runtime/event-peer.ts → 直连 → shared/event-client.ts` 投递。Agent 经此发布 `ResourceStatusChanged` 供侧栏 `SessionStatus.tsx` 消费。高频对象数据经 `plugins/channels.ts` 的对象级双工通道传输，不进历史。
 - **多语言目录**：语言偏好由 `main/language.ts` 管理（`language.json`）；插件静态翻译目录由 `plugins/catalogs.ts` 在启动时装载并随应用列表快照交付 renderer。源消息位于 `renderer/messages/` 与 `../packages/builtin/src/messages/` 与 `../packages/ui/src/messages/`，译文位于 `shared/locales/` 与 `../packages/builtin/src/locales/`。
 
 ## 开发与验证命令

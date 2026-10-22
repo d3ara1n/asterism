@@ -1,7 +1,8 @@
 import { type EventContract, type EventEnvelope, type EventHandler, type EventSubscriber,
   type EventSubscribeOptions, type EventSubscription, type Json, type SubscriptionEnd } from "@atelier/sdk/contracts";
 import { deepFreeze } from "./immutable.ts";
-import type { EventBridge, EventFrame } from "./plugin-events.ts";
+import type { EventFrame } from "./plugin-events.ts";
+import type { EventBridge } from "./connection.ts";
 import { EventQueue, eventKey } from "./event-queue.ts";
 
 interface Consumer { queue: EventQueue<EventEnvelope>; receive(event: EventEnvelope): void; end(end: SubscriptionEnd, notify: boolean): void }

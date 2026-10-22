@@ -111,6 +111,14 @@ headers 来源需要消费者持有自己的模型调用结果，因此自然用
 
 调用独立于对象动作队列，等待中的工具不阻塞答案提交。宿主登记调用活动、传播取消并等待处理器实际结束，不设置默认超时，也不自动重放请求。前端卸载可取消其读取或订阅；连接断开、页面导航和插件关闭清理对应调用。取消通信调用不会自动取消业务服务中独立存在的工具等待。当前值由领域查询提供，变化通过事件通知；前端先订阅再读取当前值，收到通知后再次读取，直接采用每次返回的结果。
 
+### 对象级双工通道（API 15.0）
+
+高频、持续的对象数据（屏幕、音频、交互输入）使用对象级双工通道，不经会话投影或具型调用。`defineChannel<Up, Down>(id)` 声明契约，`Up` 为前端发往后台的消息、`Down` 为后台发往前端的消息；载荷为结构化克隆可传递的 JSON 值与 `Uint8Array`，可互相嵌套，宿主不逐帧校验，需要时由插件自行校验。
+
+- **打开与路由**：前端以 `useRendererObject().openChannel(contract)` 打开；宿主校验对象位于当前路径且类型属于契约所属插件，再调用后台经 `ModuleContribution.channels` 登记的 `implementChannel(contract, channel => ...)`。处理器抛出 `PluginApiError` 时通道以 `unavailable` 结束。
+- **两端接口**：后台 `ObjectChannel` 提供只读 `object`、`signal`、`send`、`onMessage`、`close`；前端 `RendererChannel` 提供 `send`、`onMessage`、`close` 与 `closed`。两端消息按发送顺序交付，不逐帧确认；监听注册前到达的消息先缓存，首个监听注册时按序补交。流量控制按需在插件协议中实现。
+- **结束**：任一端关闭（`closed`）、对象离开当前集合（`removed`，含移除与回溯）、契约或插件不可用（`unavailable`）以及直连断开（`disconnected`）都会结束通道；后台 `signal` 以 `ChannelEnd` 为原因中止，前端 `closed` 兑现同一原因。通道不写历史，不占用时间线，也不计入对象执行状态。
+
 ## 数据兼容
 
 契约不要求手填数据版本。宿主按资源、记录、实现或数据的稳定 ID 找到对应消费方，实际兼容性由其 schema 解码决定；兼容旧数据继续读取（插件可用 union/transform 转换旧形状，读取不改写原始存储），不能解码时返回 `unknown`、不可用或回退默认视图并保留原始数据。宿主 SDK、IPC 与数据库的格式版本独立维护。
@@ -122,7 +130,7 @@ headers 来源需要消费者持有自己的模型调用结果，因此自然用
 | `SessionReader` | 会话身份、固定观察快照 `snapshot()`、当前会话数据读取 `get()`、标题读取 |
 | `SessionExecutor` | 读取能力 + 同步提交 `commit(writer => ...)`（当前数据 `set` 与当前时间线 `append`）+ 标题覆盖 `title.set` + 会话内 `create / invoke / link / unlink / remove` |
 | `ObjectReader` | 资源身份、调用绑定的资源快照 `snapshot()`、当前对象数据读取 `get()`、只读 `session` |
-| `ObjectExecutor` | 读取能力 + 对象同步提交 `commit`、可执行 `session`、时间线占用 `withBusy`、投影通知 `invalidate`、对象二进制流发布 `streams.publish` |
+| `ObjectExecutor` | 读取能力 + 对象同步提交 `commit`、可执行 `session`、时间线占用 `withBusy`、投影通知 `invalidate` |
 | `ToolSession` | 只读会话能力 + 自动链接给执行者且可附带初始资源链接的 `create` + 本请求有效链接范围内的 `remove`；随工具调用结束失效 |
 
 资源 `project / inspect / context / links.tools`、动作准备与外部准备者只接收只读门面；创建、动作执行和已授权工具执行接收执行门面（工具执行结束后修改与流发布能力失效）。
@@ -137,7 +145,7 @@ headers 来源需要消费者持有自己的模型调用结果，因此自然用
   - `cursorChanged({ snapshot, session })`：仅在提交前后执行游标改变时调用（正常追加、回溯与分叉选择统一为此入口，一次外层事务只通知最终位置）。依赖历史的派生当前值（如会话标题）在此重建。
   - `resourcesChanged({ session, appeared, disappeared, initial })`（API 14.1）：当前资源身份集合变化时，先于该批记录／游标观察调用；`appeared / disappeared` 为资源快照数组。宿主设施就绪后枚举已有会话并交付 `initial: true` 的初始出现，其后为 `false`。回调同步接收通知，资源提供方自行启动和跟踪异步初始化／清理。通知不占用时间线，不写历史，隐藏卡片和切换会话不触发。
 
-资源贡献可声明同步 `disposalWarning(data, object): UiText | null`（API 14.1），提供结束当前外部实例前的用户提示。宿主将其用于移除、回溯导致消失和软件退出的确认；它不作为后台移除授权或收束门禁。类型和模型工具声明保持静态，资源提供方自行定义外部实例的初始化策略。
+资源贡献可声明同步 `disposalWarning(data, object): UiText | null`（API 14.1），提供结束当前外部实例前的用户提示。宿主不把它写入工作台投影：移除与回溯确认框打开时经会话命令 `disposal.warnings` 按对象查询，软件退出时由主进程读取当前提示。它不作为后台移除授权或收束门禁。类型和模型工具声明保持静态，资源提供方自行定义外部实例的初始化策略。
 
 ## 具型创建、动作与准备管线
 

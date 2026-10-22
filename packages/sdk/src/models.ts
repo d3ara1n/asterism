@@ -55,7 +55,7 @@ export type ModelBlock = {
 } & (
   | { kind: "thinking"; text: string; summary: string }
   | { kind: "text"; text: string }
-  | { kind: "toolcall"; callId: string; name: string; argumentsText: string; arguments: Json; outcome: ToolOutcome | null }
+  | { kind: "toolcall"; callId: string; name: string; argumentsText: string | null; arguments: Json; outcome: ToolOutcome | null }
 );
 export type ModelLiveBlock = { id: string; responseId: string; ordinal: number } & (
   | { kind: "text"; text: string; endedAt: number | null }

@@ -1,5 +1,4 @@
 /** 插件与宿主共用的后台接口；存储、事务和授权由宿主实现。 */
-import type { z } from "zod";
 import type { UiText } from "./i18n.ts";
 import type { ConfigContract } from "./config.ts";
 import type { DatabaseSync } from "node:sqlite";
@@ -12,12 +11,13 @@ import type { EventContract, PluginEvents } from "./events.ts";
 import type { ToolCompletion, ToolInvocationInfo, ToolModelOutput } from "./tool-result.ts";
 import type { PluginConfig, PluginLogger, PluginSecrets, PluginTasks } from "./runtime.ts";
 import type { ModelServices } from "./models.ts";
-import type { ResourceRef, ResourceSnapshot, SessionSnapshot, SessionDirectory } from "./workspace.ts";
+import type { ResourceSnapshot, SessionSnapshot, SessionDirectory } from "./workspace.ts";
 import type { ActionContract, CreationContract } from "./commands.ts";
 import type { ObjectReader, ObjectExecutor, SessionExecutor } from "./objects.ts";
 import type { ContentReader, ContentScope } from "./content-runtime.ts";
 import type { PluginCalls } from "./calls.ts";
 import type { CallContribution } from "./runtime-calls.ts";
+import type { ChannelContribution } from "./runtime-channels.ts";
 import type { TopLevelTool } from "./runtime-tools.ts";
 import type { ProviderServices, UsageServices, UsageProvider } from "./runtime-providers.ts";
 import type { ProviderPresetContribution } from "./provider-usage.ts";
@@ -126,6 +126,8 @@ export interface ModuleContribution {
   usageProviders?: readonly UsageProvider[];
   providerPresets?: readonly ProviderPresetContribution[];
   calls?: readonly CallContribution[];
+  /** 对象级双工通道；契约归本插件，按对象类型所属插件路由。 */
+  channels?: readonly ChannelContribution[];
   topLevelTools?: readonly TopLevelTool[];
   events?: readonly EventContract[];
   records?: readonly RecordContract[];

@@ -24,8 +24,9 @@ import { SessionDataStore } from "../session/data.ts";
 import type { FoldedObject } from "../session/fold.ts";
 import { SessionError, SessionTree } from "../session/tree.ts";
 import type { ModelSettings, AgentSelection } from "../shared/model.ts";
-import type { ObjectStreamPayload } from "../shared/object-stream.ts";
-import { sessionCommandSchema, type SessionChanged, type SessionCommand, type SessionData, type SessionProgress, type SessionReply, type SessionNode, type LiveBlock } from "../shared/session.ts";
+import { sessionCommandSchema, type SessionChanged, type SessionCommand, type SessionData, type SessionProgress, type SessionReply, type SessionNode } from "../shared/session.ts";
+import { diffLive } from "../shared/live-patch.ts";
+import { wireLive } from "../shared/partial-arguments.ts";
 import type { ToolRegistry } from "../tools/registry.ts";
 import { sessionPluginError } from "./plugin-errors.ts";
 import { SessionWorkbench } from "./workbench.ts";
@@ -41,6 +42,7 @@ const agentKind = Agent.kind;
  */
 export class SessionService {
   readonly calls: LoadedPlugins["calls"];
+  readonly channels: LoadedPlugins["channels"];
   readonly events = new EventBus();
   private readonly watching = new Map<string, SessionProgress>();
   private readonly updates = new Map<string, { nodes: SessionNode[]; objects: Set<string>; workbench: boolean; layout: boolean }>();
@@ -60,7 +62,7 @@ export class SessionService {
   private readonly validateInitialInput: (selection: AgentSelection, parts: ModelInputPart[], content: ContentLease) => Promise<void>;
   constructor(private readonly db: DatabaseSync, dataRoot: string, configuration: ConfigurationService,
     private readonly changed: (event: SessionChanged) => void = () => {}, adapterFactory?: (settings: ModelSettings) => ModelAdapter, external: readonly PluginDefinition[] = [],
-    stream?: (event: ObjectStreamPayload) => void, configurationChanged?: (pluginId: string) => void) {
+    configurationChanged?: (pluginId: string) => void) {
     this.tree = new SessionTree(db);
     this.events.declarePublic(SessionTitleChanged);
     this.events.declarePublic(ResourceStatusChanged);
@@ -117,7 +119,7 @@ export class SessionService {
         throw error;
       }
     };
-    const modules = createModules({ events: this.events, extensionsDirectory: join(dataRoot, "extensions"), data: new SessionDataStore(db), content: this.content, refOf, vault: configuration.vault, stream, configurationChanged,
+    const modules = createModules({ events: this.events, extensionsDirectory: join(dataRoot, "extensions"), data: new SessionDataStore(db), content: this.content, refOf, vault: configuration.vault, configurationChanged,
       sessions: host, models, catalogs: createBuiltinCatalogs(configuration),
       providerExtensions: configuration.extensions, providers: {
         presets: () => configuration.extensions.presets(),
@@ -143,6 +145,7 @@ export class SessionService {
       } }, external);
     this.resources = modules.resources;
     this.calls = modules.calls;
+    this.channels = modules.channels;
     this.tools = modules.tools;
     this.plugins = modules.manifest;
     this.configurePlugins = modules.configure;
@@ -256,20 +259,20 @@ export class SessionService {
       busyObjectIds: [...new Set([...resources.flatMap(a => a.busy), ...plugin.busy,
         ...[...this.pendingActions.values()].filter(ref => ref.sessionId === sessionId).map(ref => ref.id)])],
       timelineBusy: [...this.pendingCreations.values()].some(item => item.sessionId === sessionId),
-      live: [...resources.flatMap(a => a.live), ...plugin.live] };
+      // 输入阶段的工具参数只以 argumentsText 传输，预览由前端推导。
+      live: [...resources.flatMap(a => a.live), ...plugin.live].map(wireLive) };
   }
   private progressChanged(sessionId: string): void {
     const previous = this.watching.get(sessionId);
     if (!previous || this.closed) return;
     const progress = this.progress(sessionId);
-    // 生命周期内的多层占用常对应同一个 busy；没有实际变化时不重发流式正文。
-    if (previous.timelineBusy === progress.timelineBusy
+    // 流式正文按块增量交付：追加只发尾部，未变化的块不重发。
+    const live = diffLive(previous.live, progress.live);
+    if (!live && previous.timelineBusy === progress.timelineBusy
       && previous.busyObjectIds.length === progress.busyObjectIds.length
-      && previous.busyObjectIds.every(id => progress.busyObjectIds.includes(id))
-      && previous.live.length === progress.live.length
-      && previous.live.every((block, index) => block === progress.live[index])) return;
+      && previous.busyObjectIds.every(id => progress.busyObjectIds.includes(id))) return;
     this.watching.set(sessionId, progress);
-    this.changed({ kind: "session.progress", sessionId, progress });
+    this.changed({ kind: "session.progress", sessionId, busyObjectIds: progress.busyObjectIds, timelineBusy: progress.timelineBusy, live });
   }
   private linkTools(sessionId: string, receiverId: string, resource: FoldedObject) {
     const recipient = this.object(sessionId, receiverId);
@@ -457,6 +460,13 @@ export class SessionService {
         this.commit(command.sessionId, () => this.tree.select(command.sessionId, command.nodeId), { workbench: true });
         return { kind: "accepted", sessionId: command.sessionId };
       case "start": return this.start(command);
+      case "disposal.warnings": {
+        const ids = new Set(command.objectIds);
+        return { kind: "warnings", warnings: this.tree.workbench(command.sessionId).objects.flatMap(object => {
+          const warning = ids.has(object.id) ? this.resources.disposalWarning(object) : null;
+          return warning ? [{ objectId: object.id, title: object.title, warning }] : [];
+        }) };
+      }
       case "rename":
         try { this.naming.nameByUser(command.sessionId, command.title); }
         catch (error) {

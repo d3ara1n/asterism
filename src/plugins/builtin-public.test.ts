@@ -27,7 +27,7 @@ function fixture(ranges: (string | null)[] = [compatibleRange, `~${builtinPublic
     const root = temp(), id = `fixture.consumer${index}`;
     file(root, "package.json", JSON.stringify({ name: `@fixture/consumer${index}`, version: "1.0.0",
       ...(range === null ? {} : { peerDependencies: { "@atelier/builtin-api": range } }),
-      atelier: { id, api: { major: 14, minMinor: 0 }, runtime: "runtime.ts", renderer: "renderer.ts" } }));
+      atelier: { id, api: { major: 15, minMinor: 0 }, runtime: "runtime.ts", renderer: "renderer.ts" } }));
     file(root, "public.ts", 'export { SubmitAgentInput } from "@atelier/builtin-api/contracts";');
     file(root, "runtime.ts", `
       import { pluginNamespace } from "@atelier/sdk/contracts";

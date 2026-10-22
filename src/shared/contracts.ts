@@ -2,17 +2,10 @@ import { z } from "zod";
 import { uiTextSchema, pluginMetadataSchema, type Json } from "@atelier/sdk/contracts";
 import { translationCatalogSchema, type LanguageBridge } from "./language.ts";
 import { coreChannel } from "./core.ts";
-import type { ConfigurationBridge } from "./configuration.ts";
 import type { DesktopPlatform, DesktopWindowBridge } from "./desktop.ts";
 import type { AppearanceBridge } from "./theme.ts";
-import type { SessionBridge } from "./session.ts";
-import type { PluginConfigurationBridge } from "./plugin-configuration.ts";
-import type { ContentBridge } from "./content.ts";
-import type { EventBridge } from "./plugin-events.ts";
-import type { CallBridge } from "./plugin-calls.ts";
 
 export const protocolVersion = 8;
-export const commandChannel = coreChannel("command");
 export const statusChannel = coreChannel("runtime-status");
 export const pickDirectoryChannel = coreChannel("pick-directory");
 export const openLocalFileChannel = coreChannel("open-local-file");
@@ -60,15 +53,10 @@ export const runtimeMessageSchema = z.discriminatedUnion("kind", [
   z.strictObject({ kind: z.literal("fatal"), message: z.string(), reason: z.enum(["database_version", "unknown"]), directory: z.string().optional() }),
 ]);
 export type RuntimeMessage = z.infer<typeof runtimeMessageSchema>;
+/** 主进程能力：窗口、外观、语言、偏好与系统对话框。任务进程能力经 connectRuntime 交接的直连端口使用。 */
 export interface DesktopBridge {
-  calls: CallBridge;
-  events: EventBridge;
-  content: ContentBridge;
   language: LanguageBridge;
-  session: SessionBridge;
-  configuration: ConfigurationBridge;
   appearance: AppearanceBridge;
-  pluginConfiguration: PluginConfigurationBridge;
   /** 受控偏好容器：只能读写 preferences 内宿主规定前缀的键。 */
   preferences: { read(): Promise<Record<string, Json>>; write(key: string, value: Json | null): Promise<boolean> };
   window: DesktopWindowBridge;
@@ -79,8 +67,10 @@ export interface DesktopBridge {
   openLocalFile(path: string): Promise<string>;
   /** 拖入文件的本机路径；由 Electron webUtils 解析，renderer 不能伪造 File.path。 */
   pathForFile(file: File): string;
-  execute(command: Command): Promise<CommandResult>;
   onStatus(listener: (status: RuntimeStatus) => void): () => void;
-  /** 对象二进制流：按会话与对象订阅，channel 带插件命名空间。 */
-  onObjectStream(sessionId: string, objectId: string, listener: (channel: string, data: Uint8Array) => void): () => void;
+  /**
+   * 请求任务进程直连；每个页面只受理一次。端口经 window 消息（connectionPortMessage）交给页面，
+   * 任务进程不可用时消息不带端口。
+   */
+  connectRuntime(): void;
 }

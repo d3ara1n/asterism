@@ -20,6 +20,7 @@ import type { SessionController } from "./controller";
 import { branchContains, historyBranches, branchForNode, type HistoryBranch } from "./history-branches";
 import { historyBefore, historyEntries, historyResources, historyResourceViews, matchesHistoryView, type HistoryView, type HistoryEntry } from "./history-navigation";
 import { useSession, useSessionProgress } from "./state";
+import { useDisposalWarnings } from "./disposal";
 import { sessionTimeline } from "../../../shared/session-timeline";
 import { foldWorkbench } from "../../../session/fold";
 
@@ -206,19 +207,24 @@ function ContinueAction({ controller, nodeId }: { controller: SessionController;
   const [target, setTarget] = useState<{ id: string | null } | null>(null);
   const [saving, setSaving] = useState(false);
   const resources = useMemo(() => historyResources(snapshot?.nodes ?? []), [snapshot?.nodes, i18n]);
+  // 回溯将移出当前集合的对象；确认框打开时才计算并查询其结束提示。
+  const leaving = useMemo(() => {
+    if (!target || !snapshot) return null;
+    const retained = new Set(foldWorkbench(sessionTimeline(snapshot.nodes, target.id)).objects.map(object => object.id));
+    return snapshot.workbench.objects.filter(object => !retained.has(object.id)).map(object => object.id);
+  }, [target, snapshot?.nodes, snapshot?.workbench.objects]);
+  const warnings = useDisposalWarnings(controller.sessionId, leaving);
   if (!snapshot) return null;
   const unsettled = progress.timelineBusy || progress.busyObjectIds.length > 0;
   const wait = i18n.formatMessage(historyMessages.waitForResources, { names: progress.busyObjectIds.map(id => resources.get(id)?.title ?? i18n.formatMessage(historyMessages.unknownResource)).join(", ") });
   const disabled = saving || unsettled || state.navigating || state.status !== "ready";
   const actual = target?.id ?? null;
   const actualEntry = target ? historyEntries(snapshot.nodes, registry).find(entry => entry.node.id === actual) : undefined;
-  const retained = target ? new Set(foldWorkbench(sessionTimeline(snapshot.nodes, actual)).objects.map(object => object.id)) : null;
-  const warnings = retained ? snapshot.workbench.objects.filter(object => !retained.has(object.id) && object.disposalWarning) : [];
   return <><span title={unsettled ? wait : i18n.formatMessage(historyMessages.continueFromHere)}><Button size="xs" disabled={nodeId === snapshot.cursor || disabled} onClick={() => setTarget({ id: nodeId })}><GitBranch />{i18n.formatMessage(historyMessages.continueFromHere)}</Button></span>
     <AlertDialog open={target !== null} onOpenChange={open => { if (!open && !saving) setTarget(null); }}><AlertDialogContent>
       <AlertDialogHeader><AlertDialogTitle>{i18n.formatMessage(historyMessages.continueTitle)}</AlertDialogTitle><AlertDialogDescription>{i18n.formatMessage(historyMessages.continueDescription)}</AlertDialogDescription></AlertDialogHeader>
       <p className="type-body break-words">{actualEntry?.label ?? i18n.formatMessage(historyMessages.historyStart)}</p>
-      {warnings.map(object => <p key={object.id} className="type-body break-words text-destructive">{object.title}: {i18n.text(object.disposalWarning!)}</p>)}
+      {warnings.map(item => <p key={item.objectId} className="type-body break-words text-destructive">{item.title}: {i18n.text(item.warning)}</p>)}
       {unsettled && <p className="type-caption">{wait}</p>}
       <AlertDialogFooter><AlertDialogCancel disabled={saving}>{i18n.formatMessage(commonMessages.cancel)}</AlertDialogCancel><AlertDialogAction disabled={disabled} aria-busy={saving} onClick={event => {
         event.preventDefault(); if (!target) return; setSaving(true);

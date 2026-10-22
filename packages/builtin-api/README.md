@@ -29,12 +29,12 @@
   "version": "1.0.0",
   "type": "module",
   "peerDependencies": {
-    "@atelier/sdk": "^0.35.0",
+    "@atelier/sdk": "^0.36.0",
     "@atelier/builtin-api": "^0.13.0"
   },
   "atelier": {
     "id": "example.input-review",
-    "api": { "major": 14, "minMinor": 0 },
+    "api": { "major": 15, "minMinor": 0 },
     "runtime": "./src/runtime.ts"
   }
 }

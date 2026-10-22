@@ -9,6 +9,8 @@ import { ApplicationService } from "../../../../../src/runtime/service.ts";
 import * as pluginLoader from "../../../../../src/plugins/loader.ts";
 import type { ModelAdapter } from "../../../../../src/model/contract.ts";
 import { AgentPeek, peekResultSchema, type PeekResult } from "./contract.ts";
+import { applyLive } from "../../../../../src/shared/live-patch.ts";
+import type { LiveBlock } from "../../../../../src/shared/session.ts";
 
 // docs/runtime.md：真实内置装配必须通过 resource_call 的授权，工具流及结局由调用方拥有。
 it("真实 Agent 资源调用沿用授权、空 target、工具进度与调用方历史", async () => {
@@ -48,10 +50,12 @@ it("真实 Agent 资源调用沿用授权、空 target、工具进度与调用�
     },
   }; } };
   let app: ApplicationService | undefined;
+  let live: LiveBlock[] = [];
   try {
     app = new ApplicationService(root, { adapterFactory: () => adapter, onSessionChanged(event) {
-      if (event.kind !== "session.progress") return;
-      for (const block of event.progress.live) {
+      if (event.kind !== "session.progress" || !event.live) return;
+      live = applyLive(live, event.live);
+      for (const block of live) {
         if (block.kind !== "toolcall") continue;
         const parsed = peekResultSchema.safeParse(block.result?.data);
         if (parsed.success) delivered.push(parsed.data);

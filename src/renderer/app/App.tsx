@@ -1,3 +1,4 @@
+import { runtime } from "../runtime";
 import { motion, AnimatePresence } from "motion/react";
 import { DropdownMenuItem, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuSeparator, DropdownMenuLabel } from "@atelier/ui/ui/dropdown-menu";
 import { Button } from "@atelier/ui/ui/button";
@@ -120,7 +121,7 @@ export function App({ controller }: { controller: ApplicationController }) {
   };
   const renameSession = (sessionId: string, title: string) => {
     const command = { type: "rename" as const, sessionId, title };
-    return active?.sessionId === sessionId ? active.execute(command) : window.host.session.execute(command);
+    return active?.sessionId === sessionId ? active.execute(command) : runtime.session.execute(command);
   };
   const startConversation = async (input: StartInput) => {
     if (!ready) return;
@@ -246,7 +247,7 @@ function useStart() {
     if (pending.current) return null;
     pending.current = true; setBusy(true); setError(null);
     try {
-      const result = await window.host.session.execute({ type: "start", ...input, submissionId: identity.current.forInput(input),
+      const result = await runtime.session.execute({ type: "start", ...input, submissionId: identity.current.forInput(input),
         contentScopeId: await contentScopeId(content, startAgentContentTarget) });
       if (!result.ok) { setError(errorDisplay(result.error)); return null; }
       if (result.reply.kind !== "accepted") throw new Error("Invalid session receipt.");

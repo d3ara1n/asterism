@@ -1,3 +1,4 @@
+import { runtime } from "../../runtime";
 import type { ContentRange, ContentRef } from "@atelier/sdk/contracts";
 import type { ContentReader, RendererContentInput, RendererReceipt } from "@atelier/sdk/renderer";
 import { contentChunkSize, contentReadLimit, type ContentCommand, type ContentReply } from "../../../shared/content";
@@ -6,7 +7,7 @@ type Target = Extract<ContentCommand, { type: "input.open" }>["target"];
 type Source = Extract<ContentCommand, { type: "read.open" }>["source"];
 const inputs = new WeakMap<RendererContentInput, { target: Target; scope(): Promise<string | undefined> }>();
 async function execute<K extends ContentReply["kind"]>(command: ContentCommand, kind: K): Promise<Extract<ContentReply, { kind: K }>> {
-  const result = await window.host.content.execute(command);
+  const result = await runtime.content.execute(command);
   if (!result.ok) throw Object.assign(new Error(result.error.message), { code: result.error.code });
   if (result.reply.kind !== kind) throw new Error("Unexpected content response.");
   return result.reply as Extract<ContentReply, { kind: K }>;

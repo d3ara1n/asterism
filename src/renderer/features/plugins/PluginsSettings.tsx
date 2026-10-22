@@ -1,3 +1,4 @@
+import { runtime } from "../../runtime";
 import { Component, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { motion } from "motion/react";
 import { Plus, Puzzle, RefreshCw } from "lucide-react";
@@ -39,7 +40,7 @@ export function usePlugins(active: boolean) {
     if (pending.current) return;
     pending.current = true; setBusy(true); setError(null);
     try {
-      const result = await window.host.execute(command);
+      const result = await runtime.execute(command);
       if (result.ok) setSnapshot(result.snapshot);
       else setError(errorDisplay(result.error));
     } catch { setError(messages.operationFailed); }

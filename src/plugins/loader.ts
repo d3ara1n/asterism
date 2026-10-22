@@ -1,5 +1,5 @@
-import { belongsTo, ResourcePresenceChanged, type ActionContract, type Json, type ResourceCall, type SessionRecord, type SessionSnapshot, type ToolContract } from "@atelier/sdk/contracts";
-import { PluginApiError, type PluginDefinition, type PluginContext, type PluginLogger, type PluginTasks,
+import { belongsTo, ResourcePresenceChanged, type ActionContract, type ResourceCall, type SessionRecord, type SessionSnapshot, type ToolContract } from "@atelier/sdk/contracts";
+import { PluginApiError, type PluginDefinition, type PluginLogger, type PluginTasks,
   type ResourceRef, type SessionObserver, type CommandPreparer, type ModuleContribution } from "@atelier/sdk/runtime";
 import type { CredentialVault } from "../configuration/credentials.ts";
 import type { ResourceBackend } from "../resources/contract.ts";
@@ -19,7 +19,7 @@ import { ResourcePresence } from "./presence.ts";
 import { adaptResource, adaptTool } from "./sdk-adapters.ts";
 import type { ParsedCall } from "./commands.ts";
 import type { PluginConfiguration, PluginConfigurationCommand } from "../shared/plugin-configuration.ts";
-import type { ObjectStreamPayload } from "../shared/object-stream.ts";
+import { ChannelRegistry } from "./channels.ts";
 import type { ContentStore, ContentLease } from "../runtime/content-store.ts";
 import { EventBus } from "./events.ts";
 import { PluginEventScope } from "./event-scope.ts";
@@ -42,7 +42,6 @@ export interface PluginHostServices {
   usages?: UsageServices;
   providerExtensions?: ProviderExtensions;
   vault?: CredentialVault | null;
-  stream?: (event: ObjectStreamPayload) => void;
   /** 插件配置变更：设置页保存、恢复默认与后台 update 都经此通知。 */
   configurationChanged?: (pluginId: string) => void;
   log?: (pluginId: string, level: "info" | "warn" | "error", message: string, error?: unknown) => void;
@@ -53,6 +52,7 @@ export interface PluginManifest {
 }
 export interface LoadedPlugins {
   calls: CallRegistry;
+  channels: ChannelRegistry;
   events: EventBus;
   configure(command: PluginConfigurationCommand): PluginConfiguration[];
   activity(sessionId: string): { busy: string[]; live: LiveBlock[] };
@@ -124,6 +124,7 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
   const events = services.events ?? new EventBus();
   events.declarePublic(ResourcePresenceChanged);
   const calls = new CallRegistry(services);
+  const channels = new ChannelRegistry(services);
   let topLevelTools: readonly RegisteredTopLevelTool[] = [];
   const manifest: PluginManifest[] = [], collected: Collected[] = [];
   const lifecycles: RunLifecycle[] = [];
@@ -166,6 +167,7 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
             lifecycle.group("call"), plugin.dependencies);
         }
         for (const call of contribution.calls ?? []) calls.declare(id, call, sdk, lifecycle.group("call"));
+        for (const channel of contribution.channels ?? []) channels.declare(id, channel, sdk);
         for (const tool of contribution.topLevelTools ?? []) {
           pluginTools.push({ tool, sdk, runs: lifecycle.group("tool") });
         }
@@ -213,7 +215,7 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
     } catch (error) {
       if (entry) {
         services.providerExtensions?.removeOwners([id]);
-        calls.removeOwner(id);
+        calls.removeOwner(id); channels.removeOwner(id);
         entry.events.stop(); events.removeOwner(id);
         entry.lifecycle.stop();
         invalidEntries.add(entry);
@@ -245,7 +247,7 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
       const record = manifest.find(record => record.id === entry.plugin.namespace.id)!;
       record.status = "failed"; record.error = error; record.resources = [];
       entry.lifecycle.stop();
-      calls.removeOwner(entry.plugin.namespace.id);
+      calls.removeOwner(entry.plugin.namespace.id); channels.removeOwner(entry.plugin.namespace.id);
       entry.events.stop(); events.removeOwner(entry.plugin.namespace.id);
       invalidEntries.add(entry);
       collected.splice(i, 1); invalidated = true;
@@ -278,6 +280,8 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
   const notifyPresence = (sessionId: string, snapshot: SessionSnapshot, initial: boolean) => {
     const change = presence.update(sessionId, snapshot.resources.all());
     if (!change.appeared.length && !change.disappeared.length) return;
+    // 对象离开当前集合即结束其前端通道，先于插件观察者释放外部实例。
+    if (change.disappeared.length) channels.release(sessionId, change.disappeared.map(resource => resource.ref.id));
     events.publish(ResourcePresenceChanged, null, { sessionId,
       appeared: change.appeared.map(resource => resource.ref.id), disappeared: change.disappeared.map(resource => resource.ref.id) });
     for (const entry of collected) for (const observer of entry.observers) {
@@ -290,7 +294,7 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
   let closed = false;
   let closing: Promise<void> | undefined;
   return {
-    calls,
+    calls, channels,
     events,
     configure(command) {
       if (closed) throw new PluginApiError("unavailable", "Plugins are closing.");
@@ -318,7 +322,8 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
     afterCommit(sessionId, { records: nodes, cursorChanged }, publish) {
       touched.add(sessionId);
       const observed = (nodes.length > 0 && observers.some(observer => observer.committed))
-        || (cursorChanged && observers.some(observer => observer.cursorChanged || observer.resourcesChanged));
+        // 游标变化总要比较资源存在性：观察者与前端通道都依赖消失通知。
+        || cursorChanged;
       if (observed) {
         // 快照固定在本次提交时刻，后续排队的提交不改写它。
         const sequences = services.sessions.sequences(sessionId, nodes);
@@ -379,6 +384,7 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
       for (const entry of collected) entry.events.stop();
       events.close();
       for (const lifecycle of lifecycles) lifecycle.stop();
+      channels.close();
       closing = (async () => {
         await Promise.allSettled(collected.map(entry => entry.lifecycle.close()));
         await failedCleanup;

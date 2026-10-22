@@ -1,12 +1,18 @@
 import { useEffect, useRef, useState } from "react";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
+import { WebglAddon } from "@xterm/addon-webgl";
 import "@xterm/xterm/css/xterm.css";
 import { useI18n, useRendererCalls, useRendererObject } from "@atelier/sdk/renderer";
 import { Button } from "@atelier/ui/ui/button";
-import { Play, Square } from "lucide-react";
+import { IconButton } from "@atelier/ui/ui/icon-button";
+import { StatusBadge, type StatusTone } from "@atelier/ui/ui/status";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@atelier/ui/ui/alert-dialog";
+import { Play, Power, RotateCcw } from "lucide-react";
+import { commonMessages } from "@atelier/ui/messages/common";
 import { terminalMessages } from "../messages/terminal";
-import { ReadTerminal, WriteTerminal, ResizeTerminal, StartTerminal, type TerminalFrame, type TerminalStatus, type TerminalConfig } from "./contract";
+import { CloseTerminal, StartTerminal, type TerminalConfig, type TerminalState } from "./contract";
+import { useTerminalLink, type TerminalScreen } from "./link";
 
 /** 浏览器副本保留输入能力；终端协议查询由后台的唯一解析器应答。 */
 function passiveProtocol(terminal: Terminal) {
@@ -16,95 +22,114 @@ function passiveProtocol(terminal: Terminal) {
   terminal.parser.registerDcsHandler({ final: "q", intermediates: "$" }, () => true);
   for (const code of [4, 10, 11, 12]) terminal.parser.registerOscHandler(code, data => data.includes("?"));
 }
+const tones: Record<TerminalState, StatusTone> = { inactive: "neutral", starting: "progress", idle: "success", running: "progress", unknown: "neutral", exited: "neutral", failed: "error" };
 
-export function TerminalCard({ data }: { data: TerminalStatus & TerminalConfig }) {
+
+/** 卡片头部：实例状态与关闭。关闭结束 shell，资源对象保留，可再次开启。 */
+export function TerminalActions({ data }: { data: TerminalConfig }) {
   const object = useRendererObject(), calls = useRendererCalls(), i18n = useI18n();
+  const { status } = useTerminalLink(object);
+  const [confirming, setConfirming] = useState(false), [closing, setClosing] = useState(false);
+  const close = () => {
+    setClosing(true);
+    void calls.invoke(CloseTerminal, {}, { object: object.ref }).catch(error => console.error("Terminal close failed.", error))
+      .finally(() => { setClosing(false); setConfirming(false); });
+  };
+  const warn = status.state === "running" || status.state === "unknown" || status.state === "starting";
+  return <>
+    <StatusBadge tone={tones[status.state]} role="status" title={status.cwd ?? data.cwd}>{i18n.formatMessage(terminalMessages.state, { state: status.state })}</StatusBadge>
+    {status.state !== "inactive" && <IconButton size="icon-xs" label={i18n.formatMessage(terminalMessages.close)} disabled={closing}
+      onClick={() => { if (warn) setConfirming(true); else close(); }}><Power /></IconButton>}
+    <AlertDialog open={confirming} onOpenChange={open => { if (!open && !closing) setConfirming(false); }}><AlertDialogContent>
+      <AlertDialogHeader><AlertDialogTitle>{i18n.formatMessage(terminalMessages.closeTitle)}</AlertDialogTitle>
+        <AlertDialogDescription>{i18n.formatMessage(status.state === "running" ? terminalMessages.runningWarning : terminalMessages.unknownWarning)}</AlertDialogDescription></AlertDialogHeader>
+      <AlertDialogFooter><AlertDialogCancel disabled={closing}>{i18n.formatMessage(commonMessages.cancel)}</AlertDialogCancel>
+        <AlertDialogAction variant="destructive" disabled={closing} onClick={event => { event.preventDefault(); close(); }}>{i18n.formatMessage(terminalMessages.close)}</AlertDialogAction></AlertDialogFooter>
+    </AlertDialogContent></AlertDialog>
+  </>;
+}
+
+/** 卡片正文：终端屏幕与开启／重新开启入口；配置与状态显示在头部。 */
+export function TerminalCard() {
+  const object = useRendererObject(), calls = useRendererCalls(), i18n = useI18n();
+  const { link, status, end } = useTerminalLink(object);
   const container = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<Terminal | null>(null);
   const [error, setError] = useState<string | null>(null), [starting, setStarting] = useState(false);
-  const { sessionId, id, kind } = object.ref;
   useEffect(() => {
     const host = container.current;
     if (!host) return;
-    const controller = new AbortController(), signal = controller.signal;
     const terminal = new Terminal({ cols: 100, rows: 28, scrollback: 5000, allowProposedApi: true,
       fontFamily: 'Menlo, Consolas, "Liberation Mono", monospace', fontSize: 14, cursorBlink: true,
       theme: { background: "#1e1e1e", foreground: "#d4d4d4", cursor: "#d4d4d4" } });
-    const fit = new FitAddon(); terminal.loadAddon(fit); passiveProtocol(terminal);
+    const fit = new FitAddon();
+    terminal.loadAddon(fit); passiveProtocol(terminal);
+    terminal.open(host);
+    // WebGL 上下文数量受浏览器限制；创建失败或丢失时回退 DOM 渲染。
+    try {
+      const webgl = new WebglAddon();
+      webgl.onContextLoss(() => webgl.dispose());
+      terminal.loadAddon(webgl);
+    } catch (failure) { console.warn("Terminal WebGL rendering is unavailable; using DOM rendering.", failure); }
     terminalRef.current = terminal;
-    const ref = { sessionId, id, kind };
-    let initialized = false, sequence = 0, scheduled = 0;
-    let input = Promise.resolve(), rendering = Promise.resolve();
-    const queued: TerminalFrame[] = [];
-    const report = (failure: unknown) => { if (!signal.aborted) setError(String(failure)); };
-    const apply = (frame: TerminalFrame) => {
-      if (frame.sequence <= sequence) return;
-      sequence = frame.sequence;
-      // 输出解析是异步的；尺寸帧也按相同流次序处理。
-      rendering = rendering.then(() => new Promise<void>(resolve => {
-        if (signal.aborted) { resolve(); return; }
-        if (frame.kind === "output") terminal.write(frame.data, resolve);
-        else { terminal.resize(frame.cols, frame.rows); resolve(); }
-      }));
-    };
-    const unsubscribe = object.onStream("terminal", bytes => {
-      const frame = JSON.parse(new TextDecoder().decode(bytes)) as TerminalFrame;
-      if (!initialized) queued.push(frame); else apply(frame);
-    });
-    terminal.onData(text => {
-      input = input.then(async () => { signal.throwIfAborted(); await calls.invoke(WriteTerminal, { data: text }, { object: ref, signal }); }).catch(report);
-    });
+    // 后台以通道顺序交付帧；xterm 写入异步，重置与尺寸排在已写入内容之后。
+    const screen: TerminalScreen = { receive(frame, done) {
+      if (frame.type === "output") { terminal.write(frame.data, done); return; }
+      terminal.write("", () => {
+        if (frame.type === "reset") { terminal.reset(); terminal.resize(frame.cols, frame.rows); terminal.write(frame.data, done); }
+        else { terminal.resize(frame.cols, frame.rows); done(); }
+      });
+    } };
+    const detach = link.attach(screen);
+    const input = terminal.onData(text => link.send({ type: "input", data: text }));
+    const binary = terminal.onBinary(text => link.send({ type: "binary", data: text }));
     terminal.attachCustomKeyEventHandler(event => {
       if (event.type === "keydown" && (event.metaKey || (event.ctrlKey && event.shiftKey)) && event.key.toLowerCase() === "c" && terminal.hasSelection()) {
-        void navigator.clipboard.writeText(terminal.getSelection()).catch(report); return false;
+        void navigator.clipboard.writeText(terminal.getSelection()).catch(failure => setError(String(failure))); return false;
       }
       return true;
     });
-    const resize = () => {
+    let scheduled = 0;
+    // 尺寸以后台回传为准；本地只提出建议。
+    const observer = new ResizeObserver(() => {
       cancelAnimationFrame(scheduled);
       scheduled = requestAnimationFrame(() => {
-        if (!initialized || !host.clientWidth || !host.clientHeight) return;
+        if (!host.clientWidth || !host.clientHeight) return;
         const size = fit.proposeDimensions();
-        if (size) void calls.invoke(ResizeTerminal, { cols: Math.max(2, Math.min(500, size.cols)), rows: Math.max(1, Math.min(200, size.rows)) }, { object: ref, signal }).catch(report);
+        if (size && (size.cols !== terminal.cols || size.rows !== terminal.rows)) link.send({ type: "resize", cols: size.cols, rows: size.rows });
       });
+    });
+    observer.observe(host);
+    return () => {
+      observer.disconnect(); cancelAnimationFrame(scheduled);
+      input.dispose(); binary.dispose(); detach();
+      terminal.dispose(); terminalRef.current = null;
     };
-    const observer = new ResizeObserver(resize); observer.observe(host);
-    void calls.invoke(ReadTerminal, {}, { object: ref, signal }).then(snapshot => {
-      if (signal.aborted) return;
-      terminal.resize(snapshot.cols, snapshot.rows);
-      terminal.write(snapshot.serialized, () => {
-        if (signal.aborted) return;
-        sequence = snapshot.sequence;
-        terminal.open(host); initialized = true;
-        for (const frame of queued) apply(frame);
-        queued.length = 0; resize();
-      });
-    }).catch(report);
-    return () => { controller.abort(); unsubscribe(); observer.disconnect(); cancelAnimationFrame(scheduled); terminal.dispose(); terminalRef.current = null; };
-  }, [sessionId, id, kind, calls]);
+  }, [link]);
   const start = async () => {
     setStarting(true); setError(null);
     try { await calls.invoke(StartTerminal, {}, { object: object.ref }); terminalRef.current?.focus(); }
-    catch (failure) { setError(String(failure)); }
+    catch (failure) { setError(failure instanceof Error ? failure.message : String(failure)); }
     finally { setStarting(false); }
   };
+  const stopped = status.state === "exited" || status.state === "failed";
+  const message = end ? end.message ?? end.reason : error ?? status.error;
   return <div className="flex min-h-0 flex-1 flex-col">
-    <div className="flex min-h-8 shrink-0 items-center gap-2 border-b px-3 py-1">
-      <span className={`size-1.5 shrink-0 rounded-full ${data.state === "running" ? "animate-pulse bg-primary" : data.state === "idle" ? "bg-success" : "bg-muted-foreground"}`} />
-      <span className="type-caption shrink-0">{i18n.formatMessage(terminalMessages.state, { state: data.state })}</span>
-      <span className="type-caption min-w-0 flex-1 truncate font-mono" title={data.cwd}>{data.cwd}</span>
-      <Button size="icon-xs" variant="ghost" title={i18n.formatMessage(terminalMessages.interrupt)} disabled={["inactive", "exited", "failed"].includes(data.state)}
-        onClick={() => { void calls.invoke(WriteTerminal, { data: "\x03" }, { object: object.ref }).catch(failure => setError(String(failure))); }}><Square className="size-3" /></Button>
-    </div>
     <div className="nodrag nopan nowheel relative min-h-0 flex-1 bg-[#1e1e1e] p-2" onKeyDown={event => event.stopPropagation()}>
-      <div ref={container} className="h-full w-full" />
-      {data.state === "inactive" && <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-[#1e1e1e] p-6 text-[#d4d4d4]">
+      {/* xterm 内部层带 z-index；隔离为独立层叠上下文，覆盖层按文档顺序位于其上。 */}
+      <div ref={container} className="isolate h-full w-full" />
+      {status.state === "inactive" && <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-[#1e1e1e] p-6 text-[#d4d4d4]">
         <p className="text-center text-xs">{i18n.formatMessage(terminalMessages.inactive)}</p>
-        <Button variant="secondary" size="sm" disabled={starting || !object.view.ready} onClick={() => { void start(); }}><Play />{i18n.formatMessage(terminalMessages.start)}</Button>
+        <Button variant="secondary" size="sm" disabled={starting || !object.view.ready || !!end} onClick={() => { void start(); }}><Play />{i18n.formatMessage(terminalMessages.start)}</Button>
       </div>}
     </div>
-    {data.state === "exited" && <p className="type-caption shrink-0 px-3 py-2">{i18n.formatMessage(terminalMessages.exited, { code: data.exitCode ?? "?" })}</p>}
-    {data.state === "unknown" && !data.integration && <p className="type-caption shrink-0 px-3 py-2">{i18n.formatMessage(terminalMessages.noIntegration)}</p>}
-    {(error || data.error) && <p className="type-caption shrink-0 break-words px-3 py-2 text-destructive">{i18n.formatMessage(terminalMessages.failed, { error: error ?? data.error! })}</p>}
+    {stopped && <div className="flex shrink-0 items-center gap-2 border-t px-3 py-1.5">
+      <p className="type-caption min-w-0 flex-1">{status.state === "exited"
+        ? i18n.formatMessage(terminalMessages.exited, { code: status.exitCode ?? "?" })
+        : i18n.formatMessage(terminalMessages.failed, { error: status.error ?? "" })}</p>
+      <Button size="xs" variant="secondary" disabled={starting || !object.view.ready || !!end} onClick={() => { void start(); }}><RotateCcw />{i18n.formatMessage(terminalMessages.restart)}</Button>
+    </div>}
+    {status.state === "unknown" && !status.integration && <p className="type-caption shrink-0 px-3 py-2">{i18n.formatMessage(terminalMessages.noIntegration)}</p>}
+    {message && !stopped && <p className="type-caption shrink-0 break-words px-3 py-2 text-destructive">{i18n.formatMessage(terminalMessages.failed, { error: message })}</p>}
   </div>;
 }
