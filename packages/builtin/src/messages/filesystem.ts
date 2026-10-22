@@ -9,6 +9,10 @@ export const filesystemMessages = pluginNamespace("atelier.builtin").messages("e
     id: "absolutePath",
     defaultMessage: "Absolute path",
   },
+  directoryTitlePlaceholder: {
+    id: "filesystem_creation_2",
+    defaultMessage: "Leave empty to use the folder name",
+  },
   toolDirectoryList: {
     id: "toolDirectoryList",
     defaultMessage: "List directory",

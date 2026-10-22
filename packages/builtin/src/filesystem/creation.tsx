@@ -34,7 +34,7 @@ export function DirectoryInput({ initialInput, busy, resolve, cancel }: Creation
     onSubmit={() => resolve({ path: path.trim(), ...(title.trim() ? { title: title.trim() } : {}) })}>
     <Field>
       <FieldLabel htmlFor="directory-title">{i18n.formatMessage(commonMessages.name)}</FieldLabel>
-      <Input id="directory-title" autoFocus maxLength={160} value={title} onChange={e => setTitle(e.target.value)} />
+      <Input id="directory-title" autoFocus maxLength={160} value={title} placeholder={i18n.formatMessage(filesystemMessages.directoryTitlePlaceholder)} onChange={e => setTitle(e.target.value)} />
     </Field>
     <Field>
       <FieldLabel htmlFor="directory-path">{i18n.formatMessage(filesystemMessages.absolutePath)}</FieldLabel>

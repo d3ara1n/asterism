@@ -280,6 +280,7 @@
   "agent_conversation_ConversationTimeline_5": "你",
   "agent_creation_2": "选择代理",
   "filesystem_creation_1": "浏览…",
+  "filesystem_creation_2": "留空使用目录名",
   "filesystem_renderer_1": "目录",
   "filesystem_renderer_2": "目录",
   "markdownImage": "查看图片",
