@@ -55,12 +55,10 @@ export const execResultSchema = shellOutputSchema.extend({
 }).describe("Processed shell output, optional temporary log location and execution status.");
 export type ExecResult = z.infer<typeof execResultSchema>;
 
-/** 结构化结果用于 UI；模型只消费这一处生成的说明与尾部正文。 */
+/** 模型消费输出正文与截断提示；执行信息由 UI 展示，非成功说明由公共工具层生成。 */
 export function execToModel(data: ExecResult): string {
-  const status = data.termination === "exited" ? `Exit code: ${data.exitCode ?? data.signal ?? "unknown"}`
-    : `Execution: ${data.termination}`;
   const notice = data.truncation
     ? `\n\n[Output truncated: showing the last ${data.truncation.retainedChars} of ${data.truncation.totalChars} Unicode characters. Full output: ${data.truncation.file}]`
     : "";
-  return `Shell: ${data.shell}\n${status}; duration: ${(data.durationMs / 1000).toFixed(1)}s\n\n${data.output || "(no output)"}${notice}`;
+  return data.output + notice;
 }

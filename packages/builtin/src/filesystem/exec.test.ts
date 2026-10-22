@@ -41,11 +41,22 @@ it("目录 exec 经真实工具入口执行，省略 target，cwd 不限制命�
     const result = await invoke({ command: `console.log(process.cwd());process.chdir(${JSON.stringify(outside)});console.log(process.cwd())` });
     expect(result).toMatchObject({ kind: "succeeded", implementation: { id: "atelier.builtin/directory.exec" },
       data: { output: `${realpathSync(directory)}\n${realpathSync(outside)}\n`, exitCode: 0, truncation: null } });
-    expect(result.model).toEqual([expect.objectContaining({ kind: "text", text: expect.stringContaining("Exit code: 0") })]);
+    expect(result.model).toEqual([{ kind: "text", text: `${realpathSync(directory)}\n${realpathSync(outside)}\n` }]);
     expect(await invoke({ command: "console.log(process.cwd())" })).toMatchObject({
       kind: "succeeded", data: { output: `${realpathSync(directory)}\n` },
     });
     expect(await invoke({ command: "console.log('never')", timeout: 0 })).toMatchObject({ kind: "rejected" });
+    // docs/runtime.md：非成功说明由公共工具层保留，输出投影不重复包装退出信息。
+    expect(await invoke({ command: "console.log('failure output'); process.exitCode=7" })).toMatchObject({
+      kind: "failed", model: [
+        { kind: "text", text: "failed (command_failed): Command exited with code 7." },
+        { kind: "text", text: "failure output\n" },
+      ],
+    });
+    // docs/runtime.md：成功空输出保持为空，通过真实结果 schema，不添加占位正文。
+    expect(await invoke({ command: "void 0" })).toMatchObject({
+      kind: "succeeded", model: [{ kind: "text", text: "" }],
+    });
   } finally {
     capture.mockRestore();
     await app?.close();

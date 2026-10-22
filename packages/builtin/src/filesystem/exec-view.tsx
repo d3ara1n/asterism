@@ -10,7 +10,7 @@ import { shellMessages as messages } from "../messages/shell";
 import { inputText } from "../shared/tool-preview";
 import { useBuiltinRendererServices } from "../renderer-context";
 
-function Header({ args, phase, invocation, result }: ToolRenderProps<ExecResult>) {
+function Header({ phase, invocation, result }: ToolRenderProps<ExecResult>) {
   const i18n = useI18n(), data = result?.data;
   const [now, setNow] = useState(Date.now);
   useEffect(() => {
@@ -22,24 +22,34 @@ function Header({ args, phase, invocation, result }: ToolRenderProps<ExecResult>
   const durationMs = phase === "executing" && invocation.startedAt !== undefined
     ? Math.max(0, now - invocation.startedAt) : data?.durationMs;
   const seconds = durationMs === undefined ? "" : (durationMs / 1000).toFixed(1);
-  const label = data?.termination === "timeout" ? messages.timeout : data?.termination === "cancelled" ? messages.cancelled
-    : data?.termination === "exited" ? messages.exit : messages.elapsed;
-  return <ToolHeader label={i18n.text(messages.exec)} subject={inputText(args, "command")} monospace
-    meta={data && i18n.formatMessage(label, { seconds, code: data.exitCode ?? data.signal ?? "—" })} />;
+  return <ToolHeader label={i18n.text(messages.exec)} subject={invocation.resource?.title}
+    meta={durationMs !== undefined && i18n.formatMessage(messages.elapsed, { seconds })} />;
 }
 
-function Body({ phase, result }: ToolRenderProps<ExecResult>) {
+function Body({ args, phase, result }: ToolRenderProps<ExecResult>) {
   const i18n = useI18n(), services = useBuiltinRendererServices();
   const [opening, setOpening] = useState(false), [error, setError] = useState(false);
   const data = result?.data;
-  if (!data) return null;
-  return <div className="flex flex-col gap-2">
-    <div className="min-w-0 text-xs leading-relaxed">
+  const settled = phase === "settled", command = inputText(args, "command");
+  if (!data && !settled) return null;
+  return <div className="flex flex-col gap-3">
+    {settled && command !== undefined && <section className="min-w-0 space-y-1 text-xs leading-relaxed">
+      <h4 className="type-caption">{i18n.text(messages.input)}</h4>
+      <pre className="type-code m-0 max-h-96 overflow-auto whitespace-pre-wrap break-all">{command}</pre>
+    </section>}
+    {settled && data && <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 type-caption">
+      <span className="min-w-0 break-all">{i18n.text(messages.title)}: <span className="type-code">{data.shell}</span></span>
+      {data.exitCode !== null && <span>{i18n.formatMessage(messages.exit, { code: data.exitCode })}</span>}
+      {data.signal !== null && <span>{i18n.formatMessage(messages.signal, { signal: data.signal })}</span>}
+      {data.termination !== "exited" && <span>{i18n.formatMessage(messages.termination, { reason: data.termination })}</span>}
+    </div>}
+    {data && <section className="min-w-0 space-y-1 text-xs leading-relaxed">
+      {settled && <h4 className="type-caption">{i18n.text(messages.output)}</h4>}
       {phase === "executing"
         ? <StreamingPreview><pre className="type-code m-0 whitespace-pre-wrap break-all">{data.output}</pre></StreamingPreview>
         : <pre className="type-code m-0 max-h-96 overflow-auto whitespace-pre-wrap break-all">{data.output || i18n.text(messages.empty)}</pre>}
-    </div>
-    {data.truncation && <div className="flex flex-wrap items-center gap-x-3 gap-y-1 type-caption">
+    </section>}
+    {data?.truncation && <div className="flex flex-wrap items-center gap-x-3 gap-y-1 type-caption">
       <span>{i18n.formatMessage(messages.truncated, { retained: data.truncation.retainedChars, total: data.truncation.totalChars })}</span>
       <Button variant="link" size="sm" className="h-auto p-0" disabled={opening} title={`${data.truncation.file}\n${i18n.text(messages.temporary)}`}
         onClick={async () => {

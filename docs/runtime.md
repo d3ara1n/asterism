@@ -307,6 +307,6 @@ stdout/stderr 按接收次序合并，各自流式解码 UTF-8、移除终端控
 
 结果包含 `output / truncation / shell / termination / exitCode / signal / durationMs`。`truncation` 为 null 或 `{ totalChars, retainedChars, file }`，`file` 为临时日志绝对路径。过程通过 `publish` 节流交付相同结构，终结后只有最终结构进入历史；完整日志不进入 SQLite、`ContentRef` 或资源目录。
 
-模型投影先显示实际 shell、退出信息与耗时，再显示 `output`；超限时追加 `[Output truncated: showing the last … of … Unicode characters. Full output: …]`。guidelines 用一条条件说明交代字符上限、超限保留尾部及提示提供全文日志路径；后续通过普通 `exec` 命令读取临时日志。其余指导描述独立进程、shell 信息来源和终止行为。临时文件按系统临时目录生命周期存在，不保证跨重启或长期可读，历史不修复、不重新生成已丢失的日志。UI 独立消费结构化截断信息，见 [命令执行视图](workbench.md#工具调用三态视图)。
+模型投影直接返回 `output`，空输出保持空字符串；超限时追加 `[Output truncated: showing the last … of … Unicode characters. Full output: …]`。非成功结局由公共工具层在输出前附加错误或终止说明。shell、退出码、信号与耗时保存在结构化结果中供 UI 展示。guidelines 用一条条件说明交代字符上限、超限保留尾部及提示提供全文日志路径；后续通过普通 `exec` 命令读取临时日志。其余指导描述独立进程、shell 信息来源和终止行为。临时文件按系统临时目录生命周期存在，不保证跨重启或长期可读，历史不修复、不重新生成已丢失的日志。UI 独立消费结构化截断信息，见 [命令执行视图](workbench.md#工具调用三态视图)。
 
 进程正常退出 0 为 `succeeded`，非零或信号退出为 `failed`；启动失败为 `failed`。启动前取消为 `cancelled`；已启动后超时、取消或 IO/清理失败、无法确认命令副作用时为 `unknown`，保留已收到的输出及具体 `termination` 原因。停止不撤销命令已经产生的副作用。

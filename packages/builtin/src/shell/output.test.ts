@@ -30,6 +30,6 @@ it("流式解码、尾部预算与临时日志保留处理后的完整文本，�
     expect(await readFile(result.truncation!.file, "utf8")).toBe(`首😀错误\n${suffix}`);
     expect(result.output).not.toContain("Output truncated");
     expect(execToModel({ ...result, shell: "/test/shell", termination: "exited", exitCode: 0, signal: null, durationMs: 100 }))
-      .toContain(`[Output truncated: showing the last ${OUTPUT_CHAR_LIMIT} of ${5 + OUTPUT_CHAR_LIMIT * 2} Unicode characters. Full output: ${result.truncation!.file}]`);
+      .toBe(`${result.output}\n\n[Output truncated: showing the last ${OUTPUT_CHAR_LIMIT} of ${5 + OUTPUT_CHAR_LIMIT * 2} Unicode characters. Full output: ${result.truncation!.file}]`);
   } finally { await output.close(); await rm(root, { recursive: true, force: true }); }
 });
