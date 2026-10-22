@@ -151,7 +151,7 @@ export function createTerminalModule(settings: () => ShellSettings) { return def
           return shared.input(data, signal);
         }),
       }),
-      implementTool(TerminalRead, { call: (_data, _target, args, { object, signal }) => outcome(signal, () => get(object).read(args.mode, args.offset, args.limit)) }),
+      implementTool(TerminalRead, { call: (_data, target, _args, { object, signal }) => outcome(signal, () => get(object).read(target?.source ?? "screen", target?.offset, target?.limit)) }),
       implementTool(TerminalWait, { async call(_data, _target, args, { object, signal }) {
         const result = await outcome(signal, () => get(object).waitIdle(args.timeout, signal));
         if (result.kind !== "succeeded") return result;

@@ -44,7 +44,7 @@ function TerminalCreation({ initialInput, busy, resolve, cancel }: CreationInput
 }
 function ReadBody({ result }: ToolRenderProps<z.infer<typeof TerminalRead.schema>>) {
   const data = result?.data;
-  return data ? <pre className="type-code max-h-96 overflow-auto whitespace-pre">{data.mode === "raw" ? JSON.stringify(data.text) : data.text}</pre> : null;
+  return data ? <pre className="type-code max-h-96 overflow-auto whitespace-pre">{data.source === "raw" ? JSON.stringify(data.text) : data.text}</pre> : null;
 }
 function ImageBody({ result }: ToolRenderProps<z.infer<typeof TerminalSee.schema>>) {
   const object = useRendererObject();

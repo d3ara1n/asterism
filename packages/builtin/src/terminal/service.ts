@@ -254,22 +254,22 @@ export class ShellInstance {
     return { cols: this.terminal.cols, rows: this.terminal.rows, data: this.serializer.serialize() };
   }
 
-  read(mode: "screen" | "history" | "raw", offset?: number, limit?: number) {
+  read(source: "screen" | "history" | "raw", offset?: number, limit?: number) {
     return this.enqueue(() => {
       const buffer = this.terminal.buffer.active;
       let text: string, start: number, end: number, truncated: boolean;
-      if (mode === "raw") {
+      if (source === "raw") {
         const first = this.raw.first, last = this.raw.end;
         const requested = offset ?? Math.max(first, last - (limit ?? 16384));
         start = Math.max(first, Math.min(requested, last)); end = Math.min(last, start + (limit ?? 16384));
         text = this.raw.slice(start, end); truncated = requested < first || end < last;
       } else {
-        start = mode === "screen" ? buffer.baseY : Math.max(0, Math.min(offset ?? Math.max(0, buffer.length - (limit ?? 100)), buffer.length));
-        end = Math.min(buffer.length, start + (mode === "screen" ? this.terminal.rows : Math.min(limit ?? 100, 2000)));
-        text = Array.from({ length: end - start }, (_, row) => buffer.getLine(start + row)?.translateToString(mode !== "screen") ?? "").join("\n");
-        truncated = mode === "history" && (start > 0 || end < buffer.length);
+        start = source === "screen" ? buffer.baseY : Math.max(0, Math.min(offset ?? Math.max(0, buffer.length - (limit ?? 100)), buffer.length));
+        end = Math.min(buffer.length, start + (source === "screen" ? this.terminal.rows : Math.min(limit ?? 100, 2000)));
+        text = Array.from({ length: end - start }, (_, row) => buffer.getLine(start + row)?.translateToString(source !== "screen") ?? "").join("\n");
+        truncated = source === "history" && (start > 0 || end < buffer.length);
       }
-      return { ...this.status, mode, text, cols: this.terminal.cols, rows: this.terminal.rows,
+      return { ...this.status, source, text, cols: this.terminal.cols, rows: this.terminal.rows,
         cursor: { x: buffer.cursorX, y: buffer.cursorY }, offset: start, nextOffset: end, truncated };
     });
   }
@@ -526,7 +526,7 @@ export class SharedTerminal {
     if (!this.instance) throw new TerminalError("terminal_inactive", "The terminal has not been started.");
     return this.instance;
   }
-  read(mode: "screen" | "history" | "raw", offset?: number, limit?: number) { return this.require().read(mode, offset, limit); }
+  read(source: "screen" | "history" | "raw", offset?: number, limit?: number) { return this.require().read(source, offset, limit); }
   image() { return this.require().image(); }
   async waitIdle(timeout: number, signal: AbortSignal) {
     const started = performance.now();

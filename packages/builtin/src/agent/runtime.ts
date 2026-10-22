@@ -18,6 +18,7 @@ import { AgentExecutionFeedback } from "./feedback.ts";
 import { SaveAgentDraft, SetAgentDraftMode, ExchangeAgentDraft } from "./drafts-contract.ts";
 import { saveDraft, setDraftMode, exchangeDraft } from "./drafts.ts";
 import { createSendTool } from "./send/runtime.ts";
+import { createWaitTool } from "./wait/runtime.ts";
 
 /** 资源入口只装配领域模块与贡献；业务模块不依赖完整插件上下文。 */
 export function createAgentModule(application: BuiltinApplication, usage: UsageConsumer) {
@@ -31,7 +32,7 @@ export function createAgentModule(application: BuiltinApplication, usage: UsageC
     const turns = new Map<string, { nodeId: string | null; state: AgentTurnState }>();
     return {
       events: [AgentExecutionFeedback],
-      tools: [createPeekTool(plugin.models, application.userAgent, usage), createSendTool()],
+      tools: [createPeekTool(plugin.models, application.userAgent, usage), createSendTool(), createWaitTool(loop)],
       resources: [implementResource(Agent, AgentView, {
         records: [AgentInputMessage, Execution, Notice, ContextSummary],
         links: { receive: true, tools: object => selection.tools(selection.agent(selectionOf(object).selection)) },

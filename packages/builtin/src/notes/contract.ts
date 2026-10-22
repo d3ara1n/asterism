@@ -1,8 +1,6 @@
 import { z } from "zod";
 import { defineImplementation, defineCreation } from "@atelier/sdk/contracts";
-import { builtin } from "@atelier/builtin-api/contracts";
-import { Read, Edit, Write } from "../shared/declarations.ts";
-import { textReadSchema, textChangeSchema } from "../shared/text-contract.ts";
+import { builtin, Read, Edit, Write, textReadSchema, textChangeSchema } from "@atelier/builtin-api/contracts";
 
 export const MAX_NOTE_LENGTH = 100_000;
 export const Note = builtin.resource("note", z.object({}));

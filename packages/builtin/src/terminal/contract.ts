@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { defineCall, defineChannel, defineCreation, defineImplementation, defineTool, contentRefSchema } from "@atelier/sdk/contracts";
-import { builtin } from "@atelier/builtin-api/contracts";
+import { builtin, Read, See, Wait } from "@atelier/builtin-api/contracts";
 
 export const terminalStateSchema = z.enum(["inactive", "starting", "idle", "running", "unknown", "exited", "failed"]);
 export type TerminalState = z.infer<typeof terminalStateSchema>;
@@ -62,28 +62,27 @@ const Input = defineTool({ id: builtin.name("tool.terminal_input"), name: "termi
   argsSchema: terminalInputSchema });
 export const TerminalInput = defineImplementation({ ...builtin.data("terminal.input-result", terminalStatusSchema.describe("Terminal status after input was accepted.")),
   resource: TerminalResource, tool: Input, targetSchema: z.null().describe("Select the terminal itself."), effect: "write", execution: "sequential" });
-const Read = defineTool({ id: builtin.name("tool.terminal_read"), name: "terminal_read", description: "Read the terminal screen, retained scrollback, or raw output stream.",
-  guidelines: ["screen returns the parsed character grid with spaces and cursor coordinates. history returns retained terminal rows.", "raw returns original output with control characters escaped in JSON. Its offsets count UTF-16 code units.", "Reads observe the current shell instance, including the final screen of an exited shell. Buffers are retained only during this application run."],
-  argsSchema: z.strictObject({
-    mode: z.enum(["screen", "history", "raw"]).default("screen").describe("screen: visible grid; history: retained rows; raw: original control sequences."),
-    offset: z.number().int().nonnegative().optional().describe("Zero-based row for history, or stream character offset for raw. Omitted selects the most recent content."),
-    limit: z.number().int().positive().max(65536).optional().describe("Maximum rows (history, default 100) or characters (raw, default 16384)."),
-  }).describe("Choose a terminal observation and optional range.") });
+/** 终端读取的内容选择：null 为当前屏幕；history 为保留的缓冲行；raw 为原始输出流。 */
+export const terminalReadTargetSchema = z.union([
+  z.null().describe("Select the visible screen: the parsed character grid with spaces and cursor coordinates."),
+  z.strictObject({
+    source: z.enum(["history", "raw"]).describe("history: retained terminal rows; raw: original output with control sequences, escaped in the JSON result."),
+    offset: z.number().int().nonnegative().optional().describe("Zero-based row for history, or stream character offset (UTF-16 code units) for raw. Omitted selects the most recent content."),
+    limit: z.number().int().positive().max(65536).optional().describe("Maximum rows (history, default 100, maximum 2000) or characters (raw, default 16384)."),
+  }),
+]).describe("Pass null for the current screen, or {\"source\":\"history\"} / {\"source\":\"raw\"} with an optional range. Reads observe the current shell instance, including the final screen of an exited shell; buffers are retained only during this application run. Terminal content has no edit anchors.");
 export const terminalReadResultSchema = terminalStatusSchema.extend({
-  mode: z.enum(["screen", "history", "raw"]), text: z.string(), cols: z.number(), rows: z.number(),
+  source: z.enum(["screen", "history", "raw"]), text: z.string(), cols: z.number(), rows: z.number(),
   cursor: z.strictObject({ x: z.number(), y: z.number() }), offset: z.number(), nextOffset: z.number(), truncated: z.boolean(),
 }).describe("Observed terminal content, cursor, dimensions, state and retained range.");
 export const TerminalRead = defineImplementation({ ...builtin.data("terminal.read-result", terminalReadResultSchema), resource: TerminalResource,
-  tool: Read, targetSchema: z.null().describe("Select the terminal itself."), effect: "read", execution: "parallel" });
-const Wait = defineTool({ id: builtin.name("tool.wait_idle"), name: "wait_idle", description: "Wait for the interactive shell to return to its command prompt, up to a timeout.",
-  guidelines: ["Idle means the shell is ready for another foreground command; lastExitCode reports the preceding command's exit status when shell integration provides it. Background jobs may still exist.", "Timeout or cancellation ends the wait while the terminal continues running. Shell integration supplies the state."],
-  argsSchema: z.strictObject({ timeout: z.number().positive().max(2147483).describe("Maximum wait in seconds.") }).describe("A bounded wait for the shell prompt.") });
-export const TerminalWait = defineImplementation({ ...builtin.data("terminal.wait-result", terminalStatusSchema.extend({ elapsedMs: z.number() }).describe("Observed terminal state and elapsed wait time.")), resource: TerminalResource,
-  tool: Wait, targetSchema: z.null().describe("Select the terminal itself."), effect: "read", execution: "sequential" });
-const See = defineTool({ id: builtin.name("tool.terminal_see"), name: "terminal_see", description: "View the current terminal screen as a PNG image, including colors and cursor.",
-  guidelines: ["The image represents the parsed terminal screen at capture time, including full-screen applications."], argsSchema: z.strictObject({}).describe("Empty parameter object.") });
+  tool: Read, targetSchema: terminalReadTargetSchema, effect: "read", execution: "parallel" });
+export const TerminalWait = defineImplementation({ ...builtin.data("terminal.wait-result", terminalStatusSchema.extend({ elapsedMs: z.number() })
+  .describe("Observed terminal state and elapsed wait time. lastExitCode reports the preceding command's exit status when shell integration provides it.")), resource: TerminalResource,
+  tool: Wait, targetSchema: z.null().describe("Null waits until the shell returns to its command prompt (idle). Background jobs may still exist; shell integration supplies the state, and timeout or cancellation leaves the terminal running."),
+  effect: "read", execution: "sequential" });
 export const TerminalSee = defineImplementation({ ...builtin.data("terminal.image-result", z.strictObject({ image: contentRefSchema, cols: z.number(), rows: z.number(), state: terminalStateSchema }).describe("Captured terminal image and screen dimensions.")), resource: TerminalResource,
-  tool: See, targetSchema: z.null().describe("Select the terminal itself."), effect: "read", execution: "parallel" });
+  tool: See, targetSchema: z.null().describe("Null captures the parsed terminal screen at this moment as a PNG, including colors, cursor and full-screen applications."), effect: "read", execution: "parallel" });
 
 const cellSchema = z.strictObject({ text: z.string(), width: z.number(), fg: z.string(), bg: z.string(), bold: z.boolean(), italic: z.boolean(), underline: z.boolean(), strike: z.boolean() });
 export const terminalImageSchema = z.strictObject({ cols: z.number(), rows: z.number(), cursor: z.strictObject({ x: z.number(), y: z.number(), visible: z.boolean() }), cells: z.array(z.array(cellSchema)) });

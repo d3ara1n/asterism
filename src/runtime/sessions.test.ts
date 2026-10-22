@@ -217,6 +217,53 @@ describe("会话运行时", () => {
     } finally { release(); }
   });
 
+  // docs/runtime.md#代理通信：wait 等待被链接代理收束；超时只结束等待并报告运行中状态，代理继续执行。
+  it("wait 等到被链接代理收束，超时返回运行中状态且不打断代理", async () => {
+    let release!: () => void, receiverId = "";
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    const { service, start } = await setup({ validate() {}, version: "test/wait", prepare(input) {
+      const last = input.messages.at(-1);
+      const message = last?.kind === "input" ? last.parts.flatMap(part => part.kind === "text" ? [part.text] : []).join("\n") : "";
+      return { async *stream(signal) {
+        if (message === "Block") {
+          await Promise.race([gate, new Promise<void>(resolve => {
+            if (signal.aborted) resolve(); else signal.addEventListener("abort", () => resolve(), { once: true });
+          })]);
+          signal.throwIfAborted(); yield* reply(); return;
+        }
+        const timeout = message === "Short" ? 0.05 : message === "Long" ? 5 : 0;
+        if (!timeout) { yield* reply(); return; }
+        yield { type: "part.start", part: { id: "w", kind: "toolcall", callId: `wait-${timeout}`, name: "resource_call" } };
+        yield { type: "part.end", partId: "w", arguments: { resource_id: receiverId, tool: "wait", args: { timeout } } };
+        yield { type: "finish", reason: "tool-calls", usage: null };
+      } };
+    } });
+    try {
+      const snap = await execute(service, start); await settled(service);
+      const sessionId = snap.sessionId, senderId = agentOf(snap);
+      const created = await execute(service, { type: "resource.create", sessionId, kind: Agent.kind, creation: { id: CreateAgent.id },
+        input: { title: "Reviewer", selection: selectionOf(snap) }, position: { x: 600, y: 0 } });
+      receiverId = created.workbench.objects.find(object => object.id !== senderId)!.id;
+      await execute(service, { type: "link.set", sessionId, receiverId: senderId, resourceId: receiverId, linked: true });
+      const submit = (objectId: string, text: string) => execute(service, actionCommand(sessionId, objectId, SubmitAgentInput, {
+        submissionId: randomUUID(), mode: "follow", parts: [{ kind: "text", text }],
+      }));
+      const waits = () => service.sessions.tree.timeline(sessionId).map(flat).filter(record => record.kind === "toolcall");
+      await submit(receiverId, "Block");
+      await submit(senderId, "Short");
+      await vi.waitFor(() => expect(waits()).toHaveLength(1));
+      expect(waits()[0]!.outcome).toMatchObject({ kind: "failed", error: { code: "agent_timeout" }, data: { name: "Reviewer", executionState: "running" } });
+      await submit(senderId, "Long");
+      // 等待调用确实在执行中再放行接收代理，确认 wait 是被收束唤醒而不是立即返回。
+      await vi.waitFor(() => expect(service.sessions.current(sessionId).progress.live
+        .some(block => block.kind === "toolcall" && block.state === "executing")).toBe(true));
+      release();
+      await vi.waitFor(() => expect(waits()).toHaveLength(2));
+      expect(waits()[1]!.outcome).toMatchObject({ kind: "succeeded", data: { name: "Reviewer", executionState: "completed" } });
+      await settled(service);
+    } finally { release(); }
+  });
+
   // docs/workbench.md#代理草稿箱：取回只交接原文，交换回箱与重新发送均为用户消息；取消／重启保留原来源。
   it("中继来源随队列跨重启保存，取回编辑与交换移除发送者信封", async () => {
     let release!: () => void;

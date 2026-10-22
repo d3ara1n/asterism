@@ -24,18 +24,40 @@ interface AgentLoopDependencies {
 export function createAgentLoop(deps: AgentLoopDependencies) {
   // 资源输入受理依赖仍会消费消息的循环；宿主任务稍后的清理仍由其生命周期跟踪。
   const active = new Map<string, { key: string; entered: boolean }>();
+  const waiters = new Map<string, Set<() => void>>();
+  // 循环退出（正常结束、失败、取消或未能启动）都经此移除运行，并唤醒等待该代理收束的调用。
+  const finish = (id: string) => {
+    active.delete(id);
+    const pending = waiters.get(id);
+    waiters.delete(id);
+    for (const wake of pending ?? []) wake();
+  };
   let execution = 0;
+  const running = (object: ObjectReader) => {
+    const run = active.get(object.ref.id);
+    return !!run && deps.tasks.has(run.key);
+  };
   return {
-    running: (object: ObjectReader) => {
-      const run = active.get(object.ref.id);
-      return !!run && deps.tasks.has(run.key);
+    running,
+    /** 等待当前执行循环退出；未运行时立即兑现。退出后交付的新输入开启新循环，由调用方按需再次等待。 */
+    settled(object: ObjectReader, signal: AbortSignal): Promise<void> {
+      signal.throwIfAborted();
+      if (!running(object)) return Promise.resolve();
+      return new Promise((resolve, reject) => {
+        const set = waiters.get(object.ref.id) ?? new Set<() => void>();
+        waiters.set(object.ref.id, set);
+        const abort = () => { set.delete(wake); reject(signal.reason); };
+        const wake = () => { signal.removeEventListener("abort", abort); resolve(); };
+        set.add(wake);
+        signal.addEventListener("abort", abort, { once: true });
+      });
     },
     cancel(object: ObjectExecutor) {
       const run = active.get(object.ref.id);
       if (!run) return;
       deps.tasks.cancel(run.key);
       // 宿主在调用任务体之前就收到取消时，不会进入任务体的 finally。
-      if (!run.entered) { active.delete(object.ref.id); object.invalidate(); }
+      if (!run.entered) { finish(object.ref.id); object.invalidate(); }
     },
     start(object: ObjectExecutor) {
       const previous = active.get(object.ref.id);
@@ -135,15 +157,15 @@ export function createAgentLoop(deps: AgentLoopDependencies) {
           feedback(error, signal);
         } finally {
           // 从此处开始的新输入启动新循环，不会落入已经停止消费的旧循环。
-          active.delete(object.ref.id);
+          finish(object.ref.id);
           object.invalidate();
           publish(status);
           // Agent settled 由宿主等待任务和相关活动真实结束后判定。
         }
       }, { object: object.ref }); }
-      catch (error) { active.delete(object.ref.id); throw error; }
+      catch (error) { finish(object.ref.id); throw error; }
       if (!started) {
-        active.delete(object.ref.id);
+        finish(object.ref.id);
         throw new PluginApiError("unavailable", "The agent execution could not be started.");
       }
       object.invalidate();

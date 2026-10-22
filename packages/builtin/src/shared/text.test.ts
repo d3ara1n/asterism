@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { applyPatch } from "diff";
-import { Read, Edit, Write } from "./declarations.ts";
+import { Read, Edit, Write } from "@atelier/builtin-api/contracts";
 import { readText, readToModel, editText, textChange, writeToModel, editToModel } from "./text.ts";
 
 // 预期来自工具契约：定位不进 args、失败整批不写、锚点指向完整正文、编辑保留原始换行。

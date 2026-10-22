@@ -1,10 +1,14 @@
 import { z } from "zod";
 import { defineTool } from "@atelier/sdk/contracts";
-import { editOperationSchema } from "./text-contract.ts";
+import { builtin } from "./identity.ts";
+import { editOperationSchema } from "./text.ts";
 
-/** 内置共享工具；模块也可声明独特工具或引用其他模块导出的定义。 */
+/**
+ * 公共资源工具：声明只规定参数与语义；target 选择什么、结果包含什么由各资源实现声明。
+ * 第三方资源可实现同一声明，模型以同一工具名操作不同资源。
+ */
 export const List = defineTool({
-  id: "atelier.builtin/tool.list",
+  id: builtin.name("tool.list"),
   name: "list",
   description: "List the entries in a container to discover its contents and entry types.",
   guidelines: [
@@ -15,25 +19,25 @@ export const List = defineTool({
 });
 
 export const Read = defineTool({
-  id: "atelier.builtin/tool.read",
+  id: builtin.name("tool.read"),
   name: "read",
-  description: "Read the selected text content, with edit anchors by default.",
+  description: "Read the selected content as text.",
   guidelines: [
-    "target selects the content and range. Note read uses target:null for the complete note; directory read accepts {\"path\":\"src/main.ts\",\"offset\":100,\"limit\":80}.",
-    "args:{} returns LINE#HASH│content with edit anchors; args:{\"anchored\":false} returns line numbers and content.",
-    "Line numbers refer to the full text. A file result's nextOffset identifies the start of the remaining content.",
+    "target selects the content and its range according to the resource implementation's schema.",
+    "Editable text includes LINE#HASH edit anchors by default; args:{\"anchored\":false} omits them. Content that cannot be edited has no anchors.",
+    "The result reports positions and a continuation point where the implementation supports ranges.",
   ],
   argsSchema: z.strictObject({
-    anchored: z.boolean().optional().describe("Include edit anchors in the returned content; defaults to true. false returns line numbers and content."),
+    anchored: z.boolean().optional().describe("Include edit anchors for editable text; defaults to true."),
   }).describe("Reading behavior. Content selection and range belong to target."),
 });
 
 export const Edit = defineTool({
-  id: "atelier.builtin/tool.edit",
+  id: builtin.name("tool.edit"),
   name: "edit",
   description: "Apply a batch of line-anchored text edits to an existing target, and return the actual diff and fresh anchors.",
   guidelines: [
-    "target:null selects an existing note; target:{\"path\":\"src/main.ts\"} selects a file. args.edits contains the operations.",
+    "target selects existing editable text according to the resource implementation's schema. args.edits contains the operations.",
     "Anchors contain a line number and its content hash, as returned by read or edit.",
     "replace/delete affect the inclusive anchor..end range. An omitted end selects one line. Validation checks the cited endpoints.",
     "insert_before/insert_after preserve the anchor line. body contains the new lines.",
@@ -47,12 +51,12 @@ export const Edit = defineTool({
 });
 
 export const Write = defineTool({
-  id: "atelier.builtin/tool.write",
+  id: builtin.name("tool.write"),
   name: "write",
   description: "Write the complete text to a target, creating it where supported or overwriting its existing content.",
   guidelines: [
     "args.content is the complete desired text, including line endings and final newline.",
-    "target:null selects an existing note; target:{\"path\":\"docs/new.md\"} selects a file. File write creates missing parent directories within the linked directory.",
+    "target selects the destination according to the resource implementation's schema, which states whether missing targets are created.",
     "An existing target is overwritten. Success returns a brief confirmation and change statistics.",
   ],
   argsSchema: z.strictObject({
@@ -61,12 +65,24 @@ export const Write = defineTool({
 });
 
 export const See = defineTool({
-  id: "atelier.builtin/tool.see",
+  id: builtin.name("tool.see"),
   name: "see",
   description: "View an image so its pixels are attached to the tool result for you to inspect.",
   guidelines: [
-    "Supported image formats are PNG, JPEG, GIF, and WebP.",
-    "target selects the image, e.g. {\"path\":\"docs/screenshot.png\"}. args is an empty object.",
+    "target selects the image according to the resource implementation's schema. args is an empty object.",
   ],
   argsSchema: z.strictObject({}).describe("Empty parameter object."),
+});
+
+export const Wait = defineTool({
+  id: builtin.name("tool.wait"),
+  name: "wait",
+  description: "Wait until a resource reaches its resting state, up to a timeout.",
+  guidelines: [
+    "The resource implementation defines its resting state. A resource already at rest returns immediately.",
+    "Timeout or cancellation ends only the wait; the resource continues its own work. The result reports the observed state.",
+  ],
+  argsSchema: z.strictObject({
+    timeout: z.number().positive().max(2147483).describe("Maximum wait in seconds."),
+  }).describe("A bounded wait."),
 });

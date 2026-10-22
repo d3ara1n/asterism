@@ -5,7 +5,7 @@ import { useI18n, type ToolRenderProps, type ToolRendererDefinition } from "@ate
 import type { Json, ToolResult } from "@atelier/sdk/contracts";
 import { useMemo } from "react";
 import { FileDiff, type FileDiffOptions } from "@pierre/diffs/react";
-import type { TextRead, TextChange } from "./shared/text-contract";
+import type { TextRead, TextChange } from "@atelier/builtin-api/contracts";
 import { inputField, inputText, characterCount, toolTextTail } from "./shared/tool-preview";
 import { TOOL_BODY_LINE_LIMIT, diffBodyPreview, textBodyPreview } from "./shared/tool-body";
 import { CodeRows } from "./code-view";

@@ -40,6 +40,8 @@ provider 的 `stop_reason=end_turn` 等终态只表示 request 的协议结局�
 
 内置 `send` 是写操作，按顺序执行，复用 `SubmitAgentInput` 的 `steer` 受理、准备与幂等机制。空闲代理开始执行，运行中代理在请求边界消费；返回成功只表示输入已受理，接收代理的独立执行继续由自身控制器管理。模型参数只填写资源 ID 与正文，发送者来自 [宿主绑定的调用者身份](plugin-sdk.md#工具贡献)。
 
+内置 `wait`（共享声明 `Wait`）是读操作，按顺序执行，参数为必填秒数 `timeout`，target 为 null。等待被链接代理收束：执行循环已停止，且已受理的输入不再开启新循环；未运行时立即成功。结果含代理名称、`executionState` 与等待时长。超时只结束等待、报告 `running`，被等待的代理继续执行；代理等待自身直接失败。先 `send` 再 `wait` 可等待对方处理完毕。
+
 输入记录与草稿的 `sender` 为 `{ kind: "user" }` 或 `{ kind: "agent", resource: ResourceRef, name: string }`。后者保存通信资源与发送代理名称；直接发送时取调用者资源及其 title，后台适配者可显式提供发送者。名称用于来源表达，不构成通用寻址条件。来源信息不授予回复访问权，反向发送仍需有效资源授权。已保存的名字不随资源后续变动改写。记录的 `source` 仍表示接收消息并写入记录的代理，两者职责分别见 [时间线](timeline.md)。
 
 持久 parts 保留原始正文与附件，模型投影为 `input`（协议 `user` 通道），代理来源附加 `<agent-message sender-id="…" sender-name="…">…</agent-message>` 信封。属性与文本采用 XML 转义，文件部件保持原引用。系统提示只陈述信封的来源含义；发送与接收定位规则由工具说明及具体资源的 target schema 表达。UI 使用结构化 sender 渲染，不解析正文中的标签。上下文摘要和代理调查保留发送者区分，命名只使用真实用户输入，见 [会话命名](session-naming.md)。取回编辑的来源处理见 [草稿箱](workbench.md#代理草稿箱)。
@@ -148,6 +150,10 @@ Agent 从当前时间线中属于自身的记录投影回合状态（`empty / co
 替换者为顶层工具、资源工具实现或新工具契约使用自己的稳定 ID。资源实现的装配状态记录是否生效及覆盖者；调用预览、执行与结局均携带选定实现的稳定 ID，历史展示按当次保存的身份匹配，不随当前覆盖结果改变。
 
 覆盖不消除声明校验：单个插件内重复顶层工具名或 ID、同名异资源工具契约、重复实现 ID、同一资源类型上的重复同名实现均属于装配错误。宿主 `resource_list / resource_inspect / resource_call` 是保留入口，与其重名仍使插件装配失败。
+
+### 资源工具共享声明
+
+可跨资源复用的资源工具声明位于内置公共 API（`@atelier/builtin-api/contracts`）：`list / read / edit / write / see / wait`，以及代理通信的 `send`。声明只规定参数（args）与语义，说明文字不涉及具体资源；选择哪块内容的 target 与结果 schema 由各资源实现声明，例如目录 `read` 以 `{ path, offset, limit }` 选择行范围，终端 `read` 以 null 或 `{ source, offset, limit }` 选择屏幕、缓冲或原始输出。`wait` 的静止状态由资源定义：终端为回到提示符，代理为收束。参数或语义只属于某类资源的工具留在实现包内，例如终端的 `terminal_input`。第三方资源可实现同一共享声明。
 
 ### 能力视图匹配
 
@@ -331,10 +337,10 @@ Zsh、Bash、PowerShell 使用注入集成：标记携带本实例 nonce，程�
 
 | 工具 | 契约 |
 | --- | --- |
-| `terminal_input` | 可选 `text / key / enter`，至少提供一项；按文本、按键、可选 Enter 的顺序发送，支持仅输入不提交。未开启时开启终端；shell 已退出或开启失败时返回失败，由用户在卡片中重新开启 |
-| `terminal_read` | `mode: screen / history / raw`，可选 offset/limit。screen 为解析后的当前字符网格，包含尺寸和光标；history 为当前保留的缓冲行；raw 为包含控制序列的原始输出，在 JSON 模型结果中转义 |
-| `terminal_see` | 当前屏幕的 PNG，通过 `ContentRef` 作为文件部件交付模型；渲染使用同一后台字符、颜色、样式及光标快照，独立于卡片是否挂载 |
-| `wait_idle` | 必填秒数 timeout；已空闲立即成功，否则等新提示符，结果含 `lastExitCode`。超时、未开启、已退出或不支持检测分别返回失败原因。取消只结束等待，终端继续运行 |
+| `terminal_input` | 终端专用。可选 `text / key / enter`，至少提供一项；按文本、按键、可选 Enter 的顺序发送，支持仅输入不提交。未开启时开启终端；shell 已退出或开启失败时返回失败，由用户在卡片中重新开启 |
+| `read` | 共享声明。target 为 null 读当前屏幕（解析后的字符网格，含尺寸和光标）；`{ source: history }` 读保留的缓冲行，`{ source: raw }` 读含控制序列的原始输出（在 JSON 结果中转义），均可带 offset/limit。终端内容没有编辑锚点 |
+| `see` | 共享声明，target 为 null。当前屏幕的 PNG，通过 `ContentRef` 作为文件部件交付模型；渲染使用同一后台字符、颜色、样式及光标快照，独立于卡片是否挂载 |
+| `wait` | 共享声明，target 为 null，静止状态为 shell 回到提示符。必填秒数 timeout；已空闲立即成功，否则等新提示符，结果含 `lastExitCode`。超时、未开启、已退出或不支持检测分别返回失败原因。取消只结束等待，终端继续运行 |
 
 后台以 xterm headless 解析控制序列，前端以同版本 xterm 展示。滚动缓冲保留 5,000 行，原始输出保留最后 1 Mi UTF-16 code units，读范围注明截断；历史行号是当前缓冲内位置，raw 偏移是本实例累计字符位置。屏幕覆盖、清屏和备用屏幕按终端语义生效，不提供命令归属或画面录像。读取 raw 不把删掉控制字符后的字符串冒充当前屏幕。
 

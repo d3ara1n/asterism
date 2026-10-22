@@ -1,8 +1,6 @@
 import { z } from "zod";
 import { defineImplementation, defineCreation, contentRefSchema } from "@atelier/sdk/contracts";
-import { builtin } from "@atelier/builtin-api/contracts";
-import { List, Read, Edit, Write, See } from "../shared/declarations.ts";
-import { textReadSchema, textChangeSchema } from "../shared/text-contract.ts";
+import { builtin, List, Read, Edit, Write, See, textReadSchema, textChangeSchema } from "@atelier/builtin-api/contracts";
 
 export const Directory = builtin.resource("directory", z.object({ path: z.string() }));
 export const CreateDirectory = defineCreation(Directory, { id: builtin.name("directory.create"),
@@ -61,6 +59,6 @@ export const DirectorySee = defineImplementation({
     image: contentRefSchema.describe("Immutable content captured when the image was viewed."),
   }).describe("The viewed image, attached to the result for the model.")),
   resource: Directory, tool: See,
-  targetSchema: z.strictObject({ path: filePath }).describe("Select one image with {\"path\":\"relative/image.png\"}. Images are limited to 5 MiB."),
+  targetSchema: z.strictObject({ path: filePath }).describe("Select one image with {\"path\":\"relative/image.png\"}. Supported formats are PNG, JPEG, GIF and WebP; images are limited to 5 MiB."),
   effect: "read", execution: "parallel",
 });

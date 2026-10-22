@@ -21,6 +21,8 @@
   "terminal.noIntegration": "此 Shell 未提供状态检测；仍可正常输入并读取屏幕。",
   "agent_send_title": "发送消息",
   "agent_send_accepted": "已受理",
+  "agent_wait_title": "等待代理",
+  "agent_wait_state": "{state, select, completed {已完成} incomplete {未完成} empty {尚无回合} other {仍在运行}}",
   "context.agentMessage": "代理消息",
   "agent_drafts_title": "草稿箱",
   "agent_drafts_save": "存入草稿",

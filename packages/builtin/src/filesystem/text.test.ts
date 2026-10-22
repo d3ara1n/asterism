@@ -8,7 +8,7 @@ import { ApplicationService } from "../../../../src/runtime/service.ts";
 import { AgentCapabilities } from "../../../../src/execution/capabilities.ts";
 import { executeCoreBatch } from "../../../../src/execution/core.ts";
 import type { Json, ToolOutcome } from "../../../../src/shared/model.ts";
-import { textReadSchema } from "../shared/text-contract.ts";
+import { textReadSchema } from "@atelier/builtin-api/contracts";
 import { readTextFile, commitTextFile } from "./text-io.ts";
 import { writableTarget } from "./paths.ts";
 
