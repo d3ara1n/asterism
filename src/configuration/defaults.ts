@@ -47,7 +47,7 @@ export const defaultAgents: AgentConfiguration[] = [
       "bash"
     ],
     "excludeTools": null,
-    "subagentRoles": null,
+    "subagentRoles": [],
     "maxTurns": null
   },
   {
