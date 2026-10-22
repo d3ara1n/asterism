@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     "./tool-header": "./src/tool-header.tsx",
+    "./streaming-preview": "./src/streaming-preview.tsx",
     "./json-view": "./src/json-view.tsx",
     "./utils": "./src/utils.ts",
     "./format-count": "./src/format-count.ts",

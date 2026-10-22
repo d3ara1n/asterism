@@ -6,13 +6,11 @@ import { execResultSchema, OUTPUT_CHAR_LIMIT, MAX_TIMEOUT_SECONDS } from "../she
 
 export const Exec = defineTool({
   id: builtin.name("tool.exec"), name: "exec",
-  description: "Execute a command in a fresh non-interactive shell, starting in the directory resource.",
+  description: "Execute a shell command starting in the directory resource and return its output and exit status.",
   guidelines: [
-    "The directory supplies the initial working directory. Shell syntax, cd, pipelines and redirection are interpreted by the selected shell. Each invocation starts a fresh process.",
-    "Directory inspect reports the selected shell executable and platform. Shell profiles are configured in Builtin settings.",
-    `Output is processed for display. Text exceeding ${OUTPUT_CHAR_LIMIT} Unicode characters retains its tail; [Output truncated: ... Full output: <path>] identifies truncation and the temporary full output log.`,
-    "The temporary log is an ordinary file available to subsequent shell commands while it exists. System cleanup may remove temporary logs; saved history retains the processed output tail.",
-    "timeout is an optional total execution limit in seconds. Omitting it waits until the command exits or execution is cancelled. Timeout and cancellation terminate the command's process group.",
+    "Each invocation starts a fresh non-interactive shell process in the directory resource. Shell syntax, cd, pipelines and redirection are interpreted by that shell. Directory inspect reports the shell executable and platform.",
+    "Timeout and cancellation terminate the command's process group.",
+    `If output exceeds ${OUTPUT_CHAR_LIMIT} Unicode characters, the result retains its tail and includes a truncation notice with the path to the temporary full output log, readable with subsequent shell commands.`,
   ],
   argsSchema: z.strictObject({
     command: z.string().min(1).describe("Command text interpreted by the configured shell."),

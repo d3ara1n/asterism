@@ -84,20 +84,20 @@ describe("工具调用的展示投影", () => {
   });
 
   it("填充结束只折叠一次，增量与设置更新不覆盖手动选择", () => {
-    const preferences = { toolInputAutoExpand: true, toolInputAutoCollapse: true };
+    const preferences = { autoExpand: true, autoCollapse: true };
     const initial = initialToolDisclosure(true, preferences, true);
     expect(initial.open).toBe(true);
     const closed = { ...initial, open: false };
     expect(advanceToolDisclosure(closed, true, preferences, true)).toBe(closed);
     expect(advanceToolDisclosure(initial, false, preferences, false)).toMatchObject({ filling: false, open: false });
-    const reopened = { ...initial, filling: false, open: true };
+    const reopened = { ...advanceToolDisclosure(initial, false, preferences, false), open: true };
     expect(advanceToolDisclosure(reopened, false, preferences, false)).toBe(reopened);
-    expect(advanceToolDisclosure(initial, false, { ...preferences, toolInputAutoCollapse: false }, false).open).toBe(true);
-    expect(initialToolDisclosure(true, { ...preferences, toolInputAutoExpand: false }, true).open).toBe(false);
+    expect(advanceToolDisclosure(initial, false, { ...preferences, autoCollapse: false }, false).open).toBe(true);
+    expect(initialToolDisclosure(true, { ...preferences, autoExpand: false }, true).open).toBe(false);
     expect(initialToolDisclosure(false, preferences, false).open).toBe(false);
     const unidentified = initialToolDisclosure(true, preferences, false);
     expect(unidentified.open).toBe(false);
     expect(advanceToolDisclosure(unidentified, true, preferences, true).open).toBe(true);
-    expect(advanceToolDisclosure(unidentified, false, { ...preferences, toolInputAutoCollapse: false }, false).open).toBe(false);
+    expect(advanceToolDisclosure(unidentified, false, { ...preferences, autoCollapse: false }, false).open).toBe(false);
   });
 });

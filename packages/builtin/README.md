@@ -26,12 +26,14 @@
 | `src/shell/` | Shell profile、非交互管道进程、显式终止与 IO 收束、有界输出及临时日志；目录 `exec` 经同一服务执行，契约见 [目录命令执行](../../docs/runtime.md#目录命令执行exec) |
 | `src/resources/` | Agent 创建目录查询、创建和统一移除顶层工具及三态视图；通过 SDK 绑定会话门面消费宿主生命周期 |
 | `src/naming/` | 自动命名、人工命名接口和标题投影；记录契约由公共包提供 |
-| `src/settings/` | 内置插件托管配置与按思考／工具调用／代理调查／Shell 分组的自定义设置页；配置在插件根入口登记 |
+| `src/settings/` | 内置插件托管配置与按流式预览／Shell 分组的自定义设置页；配置在插件根入口登记 |
 | `src/providers/` | 提供商预设、主动余额／套餐查询及 `headers.ts` 的被动限流解析；各服务独立解析，主动 HTTP 共用 `usage-http.ts`，通过 SDK 贡献登记，不拥有缓存或跨进程消费 |
 | `src/usage/` | 独立的账户用量消费者：从 SDK 目录取实现，管理缓存、解析 Agent 显式交付的响应结果，通过自有调用／事件向共享订阅和 toolbar 交付状态；不导入提供方实现 |
-| `src/shared/` | 正文算法、共享工具声明、预览规则与创建表单 |
+| `src/shared/` | 正文算法、共享工具声明、预览规则、公共流式开合状态机与创建表单 |
 | `src/messages/`、`src/locales/` | 内置插件自有文案与翻译 |
 
 功能按契约、后台、前端分入口，不建立同时加载 Node 与 React 实现的 barrel。工具作者的参数说明、错误自愈与 `toModel` 规则见 [运行时](../../docs/runtime.md#原生正文工具与目录操作)；代码编写时 args、target、result schema 必须有完整描述，错误须区分失败、取消与无法确认写入影响。
 
 模型提示块的通用序列化属于宿主模型适配层；Agent 只组合领域提示内容。命名、压缩与执行请求的应用身份通过工厂参数传入，不读取应用 package.json。
+
+流式正文统一使用 `@atelier/ui/streaming-preview` 的 `StreamingPreview`，调用方提供正文渲染；预览阶段通过 `shared/streaming-disclosure.ts` 消费同一对设置。内置工具的首段执行产出由 `agent/conversation/tool-output.ts` 识别，输入预览沿用 `tool-state.ts`。交互与呈现分别见 [工具调用三态视图](../../docs/workbench.md#工具调用三态视图) 和 [对话过程视图](../../docs/design-system.md#对话过程视图)。

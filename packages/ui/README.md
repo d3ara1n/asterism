@@ -5,3 +5,5 @@
 通过 package.json 中的显式子入口消费，例如 `@atelier/ui/ui/button`、`@atelier/ui/ConfigurationChoice`。依赖 React、通用 SDK 的展示／本地化接口与既有 UI 库。本包不是插件，也不是对外插件作者的稳定 UI SDK。
 
 应用负责加载主题样式与 `atelier.host` 翻译目录；Tailwind 源扫描包含本包与内置实现。需要访问应用状态的组合（如主题绑定的 toast）留在应用侧。
+
+流式尾部预览使用 `@atelier/ui/streaming-preview` 的 `StreamingPreview`，传入 Markdown、代码或纯文本正文。组件统一维护窗口布局与预览可访问性，开合状态和终结正文由调用方管理；视觉契约见 [对话过程视图](../../docs/design-system.md#对话过程视图)。

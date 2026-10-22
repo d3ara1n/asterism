@@ -1,9 +1,9 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { useReducedMotion } from "motion/react";
+import { useEffect, useState } from "react";
 import { Terminal, FileText } from "lucide-react";
 import { toolRenderer, useI18n, type ToolRenderProps } from "@atelier/sdk/renderer";
 import { Button } from "@atelier/ui/ui/button";
 import { ToolHeader } from "@atelier/ui/tool-header";
+import { StreamingPreview } from "@atelier/ui/streaming-preview";
 import { DirectoryExec } from "./exec-contract";
 import type { ExecResult } from "../shell/contract";
 import { shellMessages as messages } from "../messages/shell";
@@ -28,17 +28,6 @@ function Header({ args, phase, invocation, result }: ToolRenderProps<ExecResult>
     meta={data && i18n.formatMessage(label, { seconds, code: data.exitCode ?? data.signal ?? "—" })} />;
 }
 
-/** 纯文本直接跟随浏览器滚动视口；与 Markdown 排版和流式解析无关。 */
-function StreamingOutput({ output }: { output: string }) {
-  const viewport = useRef<HTMLPreElement>(null);
-  const reducedMotion = useReducedMotion();
-  useLayoutEffect(() => {
-    const element = viewport.current;
-    element?.scrollTo({ top: element.scrollHeight, behavior: reducedMotion ? "instant" : "smooth" });
-  }, [output, reducedMotion]);
-  return <pre ref={viewport} className="type-code m-0 h-32 overflow-auto whitespace-pre-wrap break-all">{output}</pre>;
-}
-
 function Body({ phase, result }: ToolRenderProps<ExecResult>) {
   const i18n = useI18n(), services = useBuiltinRendererServices();
   const [opening, setOpening] = useState(false), [error, setError] = useState(false);
@@ -47,7 +36,7 @@ function Body({ phase, result }: ToolRenderProps<ExecResult>) {
   return <div className="flex flex-col gap-2">
     <div className="min-w-0 text-xs leading-relaxed">
       {phase === "executing"
-        ? <StreamingOutput output={data.output} />
+        ? <StreamingPreview><pre className="type-code m-0 whitespace-pre-wrap break-all">{data.output}</pre></StreamingPreview>
         : <pre className="type-code m-0 max-h-96 overflow-auto whitespace-pre-wrap break-all">{data.output || i18n.text(messages.empty)}</pre>}
     </div>
     {data.truncation && <div className="flex flex-wrap items-center gap-x-3 gap-y-1 type-caption">

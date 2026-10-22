@@ -4,6 +4,7 @@ import { memo, useEffect, useState } from "react";
 
 import { Badge } from "@atelier/ui/ui/badge";
 import { Spinner } from "@atelier/ui/ui/spinner";
+import { StreamingPreview } from "@atelier/ui/streaming-preview";
 import { thinkingMessages } from "../../messages/thinking";
 import { BuiltinSettings } from "../../settings/contract";
 import { Disclosure } from "./Disclosure";
@@ -58,8 +59,6 @@ function ThinkingHeader({ streaming, startedAt, endedAt, interrupted }: {
 
 const ThinkingBody = memo(function ThinkingBody({ streaming, text }: { streaming: boolean; text: string }) {
   return streaming
-    ? <div className="thinking-preview" inert aria-hidden="true">
-      <div className="min-w-0 shrink-0"><Markdown streaming>{text}</Markdown></div>
-    </div>
+    ? <StreamingPreview><Markdown streaming>{text}</Markdown></StreamingPreview>
     : <Markdown>{text}</Markdown>;
 });

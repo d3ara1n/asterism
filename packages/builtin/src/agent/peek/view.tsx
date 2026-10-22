@@ -1,6 +1,7 @@
 import { ScanSearch } from "lucide-react";
 import { toolRenderer, useI18n, type ToolRenderProps } from "@atelier/sdk/renderer";
 import { ToolHeader } from "@atelier/ui/tool-header";
+import { StreamingPreview } from "@atelier/ui/streaming-preview";
 import { AgentPeek, type PeekResult } from "./contract";
 import { peekMessages as messages } from "../../messages/peek";
 import { Markdown } from "../conversation/Markdown";
@@ -20,9 +21,7 @@ function Body({ phase, result }: ToolRenderProps<PeekResult>) {
   if (!report) return null;
   const streaming = phase === "executing";
   return streaming
-    ? <div className="thinking-preview" inert aria-hidden="true">
-      <div className="min-w-0 shrink-0"><Markdown streaming>{report}</Markdown></div>
-    </div>
+    ? <StreamingPreview><Markdown streaming>{report}</Markdown></StreamingPreview>
     : <Markdown>{report}</Markdown>;
 }
 

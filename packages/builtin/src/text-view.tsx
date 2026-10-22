@@ -11,6 +11,7 @@ import { TOOL_BODY_LINE_LIMIT, diffBodyPreview, textBodyPreview } from "./shared
 import { CodeRows } from "./code-view";
 import { codeViewOptions } from "./shared/code-view";
 import { ToolHeader } from "@atelier/ui/tool-header";
+import { StreamingPreview } from "@atelier/ui/streaming-preview";
 
 /** 三态复用摘要结构，已有路径、输入数量在执行和结束时继续保留。 */
 function TextReadHeader({ target, invocation, result }: ToolRenderProps<TextRead>) {
@@ -46,9 +47,7 @@ function TextEditHeader({ target, args, invocation, result }: ToolRenderProps<Te
 function InputTail({ text, filename }: { text: string; filename?: string }) {
   const tail = toolTextTail(text).split("\n");
   const firstLine = text.split("\n").length - tail.length + 1;
-  return <div className="tool-input-preview" aria-live="off">
-    <div className="min-w-0 shrink-0"><CodeRows rows={tail.map((content, index) => ({ line: firstLine + index, content }))} filename={filename} /></div>
-  </div>;
+  return <StreamingPreview><CodeRows rows={tail.map((content, index) => ({ line: firstLine + index, content }))} filename={filename} /></StreamingPreview>;
 }
 function EditPreview({ args }: { args: Json }) {
   const edits = inputField(args, "edits");
