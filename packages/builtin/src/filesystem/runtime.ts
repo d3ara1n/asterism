@@ -6,10 +6,9 @@ import { Directory, CreateDirectory, DirectoryView, DirectoryList, DirectoryRead
 import { readImageFile } from "./image-io.ts";
 import { withinDirectory, writableTarget } from "./paths.ts";
 import { failed, filesystemFailure } from "./errors.ts";
-import { readTextFile, commitTextFile, validateTextSize, UnconfirmedWriteError } from "./text-io.ts";
+import { readTextFile, commitTextFile, validateTextSize } from "./text-io.ts";
 
 function textFailure(error: unknown, signal: AbortSignal, operation: string): CallResult<never> {
-  if (error instanceof UnconfirmedWriteError) return { kind: "unknown", message: error.message };
   if (signal.aborted) return { kind: "cancelled", message: `${operation} was cancelled before committing file content.` };
   return error instanceof TextError ? error.outcome() : filesystemFailure(error, operation);
 }
@@ -88,7 +87,7 @@ export default defineModule(() => ({
           const edited = editText(before.text, args.edits);
           validateTextSize(edited.text);
           const data = { path: target.path, ...textChange(before.text, edited.text, target.path, edited.touchedLines) };
-          await commitTextFile(selected, before, edited.text, signal);
+          await commitTextFile(selected.path, before, edited.text, signal);
           return { kind: "succeeded" as const, data };
         } catch (error) { return textFailure(error, signal, "Edit target file"); }
       },
@@ -108,7 +107,7 @@ export default defineModule(() => ({
           }
           const change = textChange(before?.text ?? "", args.content, target.path);
           const data = { path: target.path, created: before === null, ...change, changed: before === null || change.changed };
-          if (before === null || data.changed) await commitTextFile(selected, before, args.content, signal);
+          if (before === null || data.changed) await commitTextFile(selected.path, before, args.content, signal);
           return { kind: "succeeded" as const, data };
         } catch (error) { return textFailure(error, signal, "Write target file"); }
       },

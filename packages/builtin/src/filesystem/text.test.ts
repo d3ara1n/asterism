@@ -109,35 +109,27 @@ describe("目录正文工具", () => {
   });
 
 
-  // 原生正文工具采用后写为准；已有目标和新建目标都通过 rename 提交。
-  it("准备后的外部写入可被覆盖，新建同样原子替换目标", async () => {
-    const { directory, call } = setup();
+  // 原生正文工具采用后写为准：读取后的外部写入被本次提交覆盖。
+  it("准备后的外部写入被覆盖", async () => {
+    const { directory } = setup();
     const signal = new AbortController().signal;
     const file = join(directory, "text.txt");
     writeFileSync(file, "initial");
     const selected = await writableTarget(directory, "text.txt");
     const before = await readTextFile(selected.path, signal);
     writeFileSync(file, "external");
-    await commitTextFile(selected, before, "ours", signal);
+    await commitTextFile(selected.path, before, "ours", signal);
     expect(readFileSync(file, "utf8")).toBe("ours");
     expect(readdirSync(directory)).toEqual(["text.txt"]);
-    const actual = await vi.importActual<typeof fs>("node:fs/promises");
-    vi.mocked(fs.rename).mockImplementationOnce(async (source, target) => {
-      writeFileSync(target, "external");
-      await actual.rename(source, target);
-    });
-    expect(await call("write", { path: "new.txt" }, { content: "ours" })).toMatchObject({
-      kind: "succeeded",
-    });
-    expect(readFileSync(join(directory, "new.txt"), "utf8")).toBe("ours");
-    expect(readdirSync(directory).sort()).toEqual(["new.txt", "text.txt"]);
   });
 
-  it("最终替换无法确认时返回 unknown 并清理暂存", async () => {
+  // rename 原子替换：失败时目标保持原内容，结局为已知失败。
+  it("替换失败时目标保持原样并清理暂存", async () => {
     const { directory, call } = setup();
     writeFileSync(join(directory, "text.txt"), "initial");
     vi.mocked(fs.rename).mockRejectedValueOnce(Object.assign(new Error("I/O failure"), { code: "EIO" }));
-    expect(await call("write", { path: "text.txt" }, { content: "ours" })).toMatchObject({ kind: "unknown" });
+    expect(await call("write", { path: "text.txt" }, { content: "ours" })).toMatchObject({ kind: "failed" });
+    expect(readFileSync(join(directory, "text.txt"), "utf8")).toBe("initial");
     expect(readdirSync(directory)).toEqual(["text.txt"]);
   });
 });

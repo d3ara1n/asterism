@@ -1,7 +1,6 @@
 import { isUtf8 } from "node:buffer";
-import { constants } from "node:fs";
-import { open, mkdir, rename, unlink, rmdir } from "node:fs/promises";
-import { dirname, join, relative, sep } from "node:path";
+import { chmod, mkdir, readFile, rename, stat, unlink, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { TextError } from "../shared/text.ts";
 import { FilesystemError, failed } from "./errors.ts";
@@ -9,7 +8,6 @@ import { FilesystemError, failed } from "./errors.ts";
 export const MAX_TEXT_BYTES = 8 * 1024 * 1024;
 const temporaryFilePrefix = ".builtin-";
 export interface TextFile { text: string; mode: number }
-export class UnconfirmedWriteError extends Error {}
 export function validateTextSize(text: string): void {
   if (Buffer.byteLength(text) > MAX_TEXT_BYTES) throw new TextError("file_too_large", "Text operations are limited to 8 MiB.");
   const bytes = Buffer.from(text);
@@ -22,65 +20,31 @@ function decodeText(bytes: Buffer): string {
   }
   return bytes.toString("utf8");
 }
-/** 读取操作开始时已解析的真实路径，以固定句柄限制实际字节量。 */
+/** 读取操作开始时已解析的真实路径。 */
 export async function readTextFile(path: string, signal: AbortSignal): Promise<TextFile> {
   signal.throwIfAborted();
-  const handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
-  try {
-    const info = await handle.stat();
-    if (!info.isFile()) throw new FilesystemError(failed("not_file", "The target requires a regular UTF-8 text file."));
-    if (info.size > MAX_TEXT_BYTES) throw new TextError("file_too_large", "The target exceeds the 8 MiB text file limit.");
-    const chunks: Buffer[] = [];
-    let length = 0;
-    while (length <= MAX_TEXT_BYTES) {
-      signal.throwIfAborted();
-      const buffer = Buffer.alloc(Math.min(64 * 1024, MAX_TEXT_BYTES + 1 - length));
-      const { bytesRead } = await handle.read(buffer, 0, buffer.length, null);
-      if (!bytesRead) break;
-      chunks.push(buffer.subarray(0, bytesRead)); length += bytesRead;
-    }
-    if (length > MAX_TEXT_BYTES) throw new TextError("file_too_large", "The target exceeds the 8 MiB text file limit.");
-    signal.throwIfAborted();
-    return { text: decodeText(Buffer.concat(chunks, length)), mode: info.mode };
-  } finally { await handle.close(); }
+  const info = await stat(path);
+  if (!info.isFile()) throw new FilesystemError(failed("not_file", "The target requires a regular UTF-8 text file."));
+  if (info.size > MAX_TEXT_BYTES) throw new TextError("file_too_large", "The target exceeds the 8 MiB text file limit.");
+  const bytes = await readFile(path, { signal });
+  if (bytes.length > MAX_TEXT_BYTES) throw new TextError("file_too_large", "The target exceeds the 8 MiB text file limit.");
+  return { text: decodeText(bytes), mode: info.mode };
 }
 
-/** 向已解析的目标写入；同目录暂存后原子替换，失败清理暂存及空的新目录。 */
-export async function commitTextFile(selected: { root: string; path: string }, before: TextFile | null, text: string, signal: AbortSignal): Promise<void> {
+/** 同目录写入暂存文件并落盘，再以 rename 原子替换目标；失败时目标保持原样并清理暂存。 */
+export async function commitTextFile(path: string, before: TextFile | null, text: string, signal: AbortSignal): Promise<void> {
   validateTextSize(text);
-  const parent = dirname(selected.path);
-  const createdParents: string[] = [];
-  let temp: string | null = null;
-  let committing = false;
-  let committed = false;
+  signal.throwIfAborted();
+  const parent = dirname(path);
+  await mkdir(parent, { recursive: true });
+  const temp = join(parent, `${temporaryFilePrefix}${randomUUID()}.tmp`);
   try {
+    await writeFile(temp, text, { encoding: "utf8", flush: true, signal });
+    if (before) await chmod(temp, before.mode & 0o777);
     signal.throwIfAborted();
-    let current = selected.root;
-    for (const component of relative(selected.root, parent).split(sep).filter(Boolean)) {
-      current = join(current, component);
-      try { await mkdir(current); createdParents.push(current); }
-      catch (error) { if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error; }
-      signal.throwIfAborted();
-    }
-    temp = join(parent, `${temporaryFilePrefix}${randomUUID()}.tmp`);
-    const handle = await open(temp, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, before ? before.mode & 0o777 : 0o666);
-    try {
-      signal.throwIfAborted();
-      await handle.writeFile(text, "utf8");
-      if (before) await handle.chmod(before.mode & 0o777);
-      await handle.sync();
-    } finally { await handle.close(); }
-    signal.throwIfAborted();
-    committing = true;
-    await rename(temp, selected.path);
-    temp = null;
-    committed = true;
+    await rename(temp, path);
   } catch (error) {
-    if (committing) throw new UnconfirmedWriteError("The final file replacement has an unknown outcome.");
+    await unlink(temp).catch(() => {});
     throw error;
-  } finally {
-    // 提交已经确认时，清理失败不能把已知成功改为失败。
-    if (temp) await unlink(temp).catch(() => {});
-    if (!committed) for (const directory of createdParents.reverse()) await rmdir(directory).catch(() => {});
   }
 }

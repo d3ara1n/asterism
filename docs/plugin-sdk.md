@@ -53,7 +53,7 @@ SDK 的 `contracts`、`runtime`、`renderer` 三个子路径分别承担纯契�
 
 后台目录与 `plugin.models` 采用同一边界：宿主负责登记、查找、契约校验和生命周期，消费方式由插件决定。
 
-- `plugin.providers.presets()` 返回组合后的预设；`list()`／`get(id)` 返回不含凭据的当前连接配置（含 `usage` 引用）；`credential(id, { signal? })` 显式读取该连接的当前凭据，无鉴权连接返回 null。这是受信后台插件的能力，不向前端暴露凭据库引用或原始密钥。
+- `plugin.providers.presets()` 返回组合后的预设；`list()`／`get(id)` 返回不含凭据的当前连接配置（含 `usage` 引用）；`credential(id, { signal? })`（API 14.0）显式读取该连接的当前凭据，无鉴权连接返回 null。这是受信后台插件的能力，不向前端暴露凭据库引用或原始密钥。
 - `plugin.usages.list()` 返回提供方描述；`get(id)` 返回可调用的 query／headers 实现或 null。句柄绑定登记实例，撤销后不能接管同 ID 的新实现。query 参与提供方和调用方的取消与真实收束，headers 同步执行；宿主不代选连接、不代取凭据、不保存结果。
 - 两个目录均提供 `subscribe(listener)`，返回取消函数，插件关闭时自动释放。连接或预设变更通知 providers，提供方增删通知 usages；消费者按需清理自己的状态。
 

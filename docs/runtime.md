@@ -274,5 +274,5 @@ type ModelInputPart =
 - **`read`**：`args` 只有 `anchored?`（默认 true，输出 `LINE#HASH│正文`，四位 Crockford Base32 短哈希；false 输出行号与正文）。文件的 `{path, offset?, limit?}` 属于 `target`，使用完整文件的绝对行号；笔记以 `null` 选择完整正文。文件单次读取返回最多指定行数与 64 KiB 完整行文本，`nextOffset` 指向首个未返回行；无法容纳的单行明确报错，不将截断内容标成可编辑行。
 - **`edit`**：以 `{line, hash}` 引用当前正文；`replace / delete` 的 `anchor..end` 范围含端点（仅校验被引用的端点行），`insert_before / insert_after` 保留锚点行，`append / prepend` 无需锚点。整批基于同一份当前正文校验，任一锚点或重叠范围失败则整批拒绝不写入；位移扫描仅给出重试候选，不自动移动目标。成功结果的 `data` 保存实际 unified diff 与受影响行的新锚点；`toModel` 返回摘要、按预算截取的完整行 diff（最多 64 KiB）与新锚点（最多 40 行 / 16 KiB），省略时明确提示。
 - **`write`**：直接创建或覆盖完整正文，不要求也不返回锚点；相同正文返回无变化。目录 `write` 可创建根内缺失的父目录。`toModel` 成功只返回简短确认与少量统计，不回传 diff、正文或锚点。
-- **限额与写入**：文件文本操作限于 8 MiB UTF-8，笔记限于 100,000 UTF-16 code units；差异由 `diff`（jsdiff）按计算预算生成。路径在操作开始时解析一次真实路径，限制在目录根内并处理符号链接越界，但并非操作系统级沙箱。写入经同目录暂存后原子替换，避免进程中断留下半截文件；外部程序或其他代理同时修改时后写为准。提交阶段抛错返回 `unknown`。
+- **限额与写入**：文件文本操作限于 8 MiB UTF-8，笔记限于 100,000 UTF-16 code units；差异由 `diff`（jsdiff）按计算预算生成。路径在操作开始时解析一次真实路径，限制在目录根内并处理符号链接越界，但并非操作系统级沙箱。写入先在同目录暂存并落盘，再以 rename 原子替换目标，进程中断不留下半截文件；替换失败时目标保持原样，返回 `failed`。外部程序或其他代理同时修改时后写为准。
 - **笔记状态边界**：笔记保存只更新会话数据（`session_data`）中该对象的 `atelier.builtin/note.content` 并通知视图，不追加时间线事件或维护历史版本；回溯后的卡片与实时 inspect/read 均读取最新当前内容。GUI 的 120 行预览预算与 Pierre Diffs 代码着色见 [界面设计系统](design-system.md#对话过程视图)。

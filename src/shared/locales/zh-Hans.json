@@ -560,7 +560,7 @@
   "paletteDusk": "暮紫",
   "error.invalidRequest": "请求无效，请检查输入后重试。",
   "error.notFound": "请求的项目已不可用。",
-  "error.conflict": "状态已改变，请刷新后重试。",
+  "error.conflict": "当前状态下无法执行此操作。",
   "error.unavailable": "当前无法执行此操作，请重新加载后再试。",
   "error.internal": "操作无法完成，请查看应用日志。",
   "paletteTundra": "苔原",
