@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { presentationSchema } from "@atelier/sdk/contracts";
+import { presentationSchema, uiTextSchema } from "@atelier/sdk/contracts";
 
 const id = z.string().min(1).max(160);
 const sessionId = z.string().uuid();
@@ -31,7 +31,8 @@ export type WorkbenchCommand = z.infer<typeof workbenchCommandSchema>;
 export function isLayoutCommand(command: { type: string }): boolean {
   return command.type === "view.set" || command.type === "viewport.set";
 }
-const objectSchema = z.strictObject({ id, kind: z.string().min(1).max(160), title: z.string(), presentation: presentationSchema });
+const objectSchema = z.strictObject({ id, kind: z.string().min(1).max(160), title: z.string(), presentation: presentationSchema,
+  disposalWarning: uiTextSchema.nullable().optional() });
 export type WorkbenchObject = z.infer<typeof objectSchema>;
 const viewSchema = z.strictObject({ objectId: id, position: pointSchema, hidden: z.boolean(),
   collapsed: z.boolean(), size: cardSizeSchema.nullable().default(null) });

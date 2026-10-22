@@ -11,7 +11,7 @@ import type { ContentBridge } from "./content.ts";
 import type { EventBridge } from "./plugin-events.ts";
 import type { CallBridge } from "./plugin-calls.ts";
 
-export const protocolVersion = 7;
+export const protocolVersion = 8;
 export const commandChannel = coreChannel("command");
 export const statusChannel = coreChannel("runtime-status");
 export const pickDirectoryChannel = coreChannel("pick-directory");
@@ -21,6 +21,7 @@ const id = z.string().uuid();
 /** 应用入口只读取工作区身份和会话摘要，不持有已打开会话的正文。 */
 export const commandSchema = z.discriminatedUnion("type", [
   z.strictObject({ type: z.literal("workspace.read") }),
+  z.strictObject({ type: z.literal("workspace.prepare-close") }),
   // 插件包管理：只改包列表，重启后生效；路径必须是含 Atelier 清单的包根。
   z.strictObject({ type: z.literal("plugin.add"), path: z.string().min(1).max(4096) }),
   z.strictObject({ type: z.literal("plugin.enable"), index: z.number().int().nonnegative(), enabled: z.boolean() }),
@@ -40,6 +41,7 @@ export const snapshotSchema = z.strictObject({
   /** 包列表与本次启动不同：需要重启生效。 */
   restartRequired: z.boolean(),
   catalogs: z.array(translationCatalogSchema).optional(),
+  disposalWarnings: z.array(z.strictObject({ title: z.string(), warning: uiTextSchema })).optional(),
 });
 export type AppSnapshot = z.infer<typeof snapshotSchema>;
 export const errorSchema = z.strictObject({ code: z.string().min(1), message: z.string(), display: uiTextSchema.optional() });

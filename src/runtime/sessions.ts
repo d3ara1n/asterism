@@ -153,8 +153,15 @@ export class SessionService {
     this.pluginActivity = modules.activity;
     this.workbench = new SessionWorkbench(db, this.tree, this.resources,
       (sessionId, receiverId, resource) => this.linkTools(sessionId, receiverId, resource), this.content);
+    modules.initialize();
   }
   get running(): boolean { return this.tree.list().some(session => !this.settled(session.id)); }
+  disposalWarnings() {
+    return this.tree.list().flatMap(session => this.tree.workbench(session.id).objects.flatMap(object => {
+      const warning = this.resources.disposalWarning(object);
+      return warning ? [{ title: object.title, warning }] : [];
+    }));
+  }
   private transaction<T>(work: () => T): T {
     this.db.exec("BEGIN IMMEDIATE");
     try { const result = work(); this.db.exec("COMMIT"); return result; }

@@ -13,6 +13,10 @@ export function errorDisplay(error: { code: string; message: string; display?: U
   return error.display ?? (Object.hasOwn(errorMessages, error.code) ? errorMessages[error.code as keyof typeof errorMessages] : error.message);
 }
 export const startupMessages = pluginNamespace("atelier.host").messages("en", defineMessages({
+  quitTitle: { id: "shutdown.title", defaultMessage: "Close running resources?" },
+  quitDescription: { id: "shutdown.description", defaultMessage: "These resources may still have running programs. Quitting will end their live instances:\n\n{resources}" },
+  quitConfirm: { id: "shutdown.confirm", defaultMessage: "Quit" },
+  quitCancel: { id: "shutdown.cancel", defaultMessage: "Cancel" },
   windowLoadFailed: { id: "startup.windowLoadFailed", defaultMessage: "The application window could not be loaded." },
   workspaceOpenFailed: { id: "startup.workspaceOpenFailed", defaultMessage: "The workspace could not be opened." },
 }));

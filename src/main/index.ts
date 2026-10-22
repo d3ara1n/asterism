@@ -26,6 +26,7 @@ import { allowRendererPermission } from "./permissions.ts";
 const here = dirname(fileURLToPath(import.meta.url));
 let window: BrowserWindow | null = null;
 let quitting = false;
+let quitRequest: Promise<void> | null = null;
 /** 受信渲染页地址（不含 hash），供权限判定使用。 */
 let trustedURL: string | null = null;
 const runtime = new RuntimeHost(status => {
@@ -44,6 +45,30 @@ const runtime = new RuntimeHost(status => {
 }, frame => {
   if (window && !window.isDestroyed()) window.webContents.send(pluginCallsChannel, frame);
 });
+
+/** 用户退出先读取资源的当前提示；确认后按原关闭流程等待后台清理。 */
+function requestQuit(): void {
+  if (quitting || quitRequest) return;
+  quitRequest = (async () => {
+    const result = await runtime.execute({ type: "workspace.prepare-close" });
+    const warnings = result.ok ? result.snapshot.disposalWarnings ?? [] : [];
+    if (warnings.length) {
+      const locale = () => readLanguage().locale;
+      const options: Electron.MessageBoxOptions = {
+        type: "warning", title: applicationBrand.en,
+        message: startupText(startupMessages.quitTitle, locale),
+        detail: startupText({ ...startupMessages.quitDescription, values: { resources: warnings.map(item => item.title).join("\n") } }, locale),
+        buttons: [startupText(startupMessages.quitCancel, locale), startupText(startupMessages.quitConfirm, locale)],
+        defaultId: 0, cancelId: 0,
+      };
+      const answer = window && !window.isDestroyed() ? await dialog.showMessageBox(window, options) : await dialog.showMessageBox(options);
+      if (answer.response !== 1) return;
+    }
+    quitting = true;
+    await runtime.stop();
+    app.quit();
+  })().catch(error => { console.error("Application shutdown failed.", error); }).finally(() => { quitRequest = null; });
+}
 
 function createWindow(): void {
   applyThemeSource();
@@ -65,6 +90,7 @@ function createWindow(): void {
     },
   });
   const current = window;
+  current.on("close", event => { if (!quitting) { event.preventDefault(); requestQuit(); } });
   if (state.maximized) current.maximize();
   trackWindowState(current);
   const refreshAppearance = followWindowAppearance(current, titleBar);
@@ -224,7 +250,6 @@ if (!app.requestSingleInstanceLock()) {
   app.on("before-quit", event => {
     if (quitting) return;
     event.preventDefault();
-    quitting = true;
-    void runtime.stop().finally(() => app.quit());
+    requestQuit();
   });
 }

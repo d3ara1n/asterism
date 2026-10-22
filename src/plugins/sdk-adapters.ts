@@ -54,6 +54,10 @@ export function adaptResource(contribution: ResourceContribution, sdk: SdkContex
       const captured = snapshot(host, object);
       return contribution.context?.(captured, sdk.reader(captured.ref, undefined, captured)) ?? Promise.resolve([]);
     },
+    disposalWarning: object => {
+      const captured = snapshot(host, object);
+      return contribution.disposalWarning?.(captured, sdk.reader(captured.ref, undefined, captured)) ?? null;
+    },
     controller: {
       creationId: creation?.contract.id,
       creationContract: creation?.contract,

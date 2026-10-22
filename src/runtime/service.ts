@@ -110,6 +110,7 @@ export class ApplicationService {
     const builtIn = this.sessions.plugins.find(plugin => plugin.id === builtin.id);
     plugins.push({ index: null, source: "@atelier/builtin", id: builtin.id, metadata: builtinMetadata,
       status: builtIn?.status ?? "failed", enabled: true, error: builtIn?.error ?? null, renderer: null, dependencies: [] });
-    return snapshotSchema.parse({ workspace, sessions, plugins, catalogs: this.options.catalogs ?? [], restartRequired: JSON.stringify(current) !== this.started });
+    return snapshotSchema.parse({ workspace, sessions, plugins, catalogs: this.options.catalogs ?? [], restartRequired: JSON.stringify(current) !== this.started,
+      ...(command.type === "workspace.prepare-close" ? { disposalWarnings: this.sessions.disposalWarnings() } : {}) });
   }
 }

@@ -1,4 +1,8 @@
 {
+  "shutdown.title": "关闭运行中的资源？",
+  "shutdown.description": "以下资源可能仍有程序运行。退出软件将结束它们的运行实例：\n\n{resources}",
+  "shutdown.confirm": "退出",
+  "shutdown.cancel": "取消",
   "providerUsage.selection": "用量查询",
   "providerUsage.off": "关闭",
   "providerUsage.missing": "{id}（不可用）",

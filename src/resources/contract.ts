@@ -44,5 +44,6 @@ export interface ResourceBackend {
   project(resource: FoldedObject): Presentation;
   inspect(resource: FoldedObject): Promise<Json>;
   context(resource: FoldedObject): Promise<ContextFile[]>;
+  disposalWarning?(resource: FoldedObject): import("@atelier/sdk/contracts").UiText | null;
   controller?: ResourceController;
 }

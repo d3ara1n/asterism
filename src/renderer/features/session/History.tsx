@@ -20,6 +20,8 @@ import type { SessionController } from "./controller";
 import { branchContains, historyBranches, branchForNode, type HistoryBranch } from "./history-branches";
 import { historyBefore, historyEntries, historyResources, historyResourceViews, matchesHistoryView, type HistoryView, type HistoryEntry } from "./history-navigation";
 import { useSession, useSessionProgress } from "./state";
+import { sessionTimeline } from "../../../shared/session-timeline";
+import { foldWorkbench } from "../../../session/fold";
 
 const branchLabel = (branch: HistoryBranch) => branch.number === 0 ? getI18n().formatMessage(historyMessages.historyMainBranch) : getI18n().formatMessage(historyMessages.historyBranch, { number: branch.number });
 
@@ -210,10 +212,13 @@ function ContinueAction({ controller, nodeId }: { controller: SessionController;
   const disabled = saving || unsettled || state.navigating || state.status !== "ready";
   const actual = target?.id ?? null;
   const actualEntry = target ? historyEntries(snapshot.nodes, registry).find(entry => entry.node.id === actual) : undefined;
+  const retained = target ? new Set(foldWorkbench(sessionTimeline(snapshot.nodes, actual)).objects.map(object => object.id)) : null;
+  const warnings = retained ? snapshot.workbench.objects.filter(object => !retained.has(object.id) && object.disposalWarning) : [];
   return <><span title={unsettled ? wait : i18n.formatMessage(historyMessages.continueFromHere)}><Button size="xs" disabled={nodeId === snapshot.cursor || disabled} onClick={() => setTarget({ id: nodeId })}><GitBranch />{i18n.formatMessage(historyMessages.continueFromHere)}</Button></span>
     <AlertDialog open={target !== null} onOpenChange={open => { if (!open && !saving) setTarget(null); }}><AlertDialogContent>
       <AlertDialogHeader><AlertDialogTitle>{i18n.formatMessage(historyMessages.continueTitle)}</AlertDialogTitle><AlertDialogDescription>{i18n.formatMessage(historyMessages.continueDescription)}</AlertDialogDescription></AlertDialogHeader>
       <p className="type-body break-words">{actualEntry?.label ?? i18n.formatMessage(historyMessages.historyStart)}</p>
+      {warnings.map(object => <p key={object.id} className="type-body break-words text-destructive">{object.title}: {i18n.text(object.disposalWarning!)}</p>)}
       {unsettled && <p className="type-caption">{wait}</p>}
       <AlertDialogFooter><AlertDialogCancel disabled={saving}>{i18n.formatMessage(commonMessages.cancel)}</AlertDialogCancel><AlertDialogAction disabled={disabled} aria-busy={saving} onClick={event => {
         event.preventDefault(); if (!target) return; setSaving(true);

@@ -16,6 +16,8 @@ import providers from "./providers/runtime.ts";
 import { UsageConsumer } from "./usage/service.ts";
 import { ReadUsage, UsageChanged } from "./usage/contract.ts";
 import { ShellService } from "./shell/service.ts";
+import { createTerminalModule } from "./terminal/runtime.ts";
+import { CreateTerminal } from "./terminal/contract.ts";
 
 /** 仅组合插件业务；加载、宿主服务及外部插件依赖由应用负责。 */
 export function createBuiltin(options: { application: BuiltinApplication; connectNaming(api: NamingApi): () => void }) {
@@ -32,7 +34,11 @@ export function createBuiltin(options: { application: BuiltinApplication; connec
         calls: [implementCall(ReadUsage, (input, { signal }) => usage.query(input.providerId, { refresh: input.refresh, signal }))],
         async closing() { usage.close(); },
         modules: [providers, createAgentModule(options.application, usage), createFilesystemModule(shell), createNamingModule(options.connectNaming, options.application.userAgent), notes, questions,
-        resourceOperations,
+        resourceOperations, createTerminalModule(() => settings.get().shell),
+        defineAgentCreation({ id: builtin.name("terminal.create"), creation: CreateTerminal,
+          description: "Create a shared interactive terminal. Its shell and screen remain available between tool calls and while viewing other sessions.",
+          guidelines: ["The terminal runs as the current OS user. Input, screen observation and waiting for the shell are separate resource tools.",
+            "Removing the resource ends its shell and child processes. Application restart retains the resource configuration."] }),
         defineAgentCreation({ id: builtin.name("agent.create"), creation: CreateAgent,
           description: "Create an Agent with a selected agent configuration, optional model/thinking overrides, and initial resource links.",
           inputSchema: agentCreateSchema.extend({

@@ -94,10 +94,13 @@ headers 来源需要消费者持有自己的模型调用结果，因此自然用
 - **非事务与按序消费**：`publish` 只做校验、打戳与路由，立即入队并返回，不参与事务回滚（需对应已生效变化时在提交成功后发布）。每个订阅串行等待自己的异步 handler，失败或断连只结束该订阅。
 - **生命周期与恢复**：后台在 `setup` 中订阅，前端在 `prepare({ events })` 或组件 `useRendererEvents()` 中订阅。取消订阅停止新投递并传取消信号，宿主等待运行中的回调真实结束后释放设施。总线不保留供晚订阅读取的状态，断连不补发；需要当前值的消费者先订阅再读取领域当前值。
 - **宿主公共事件**：`@atelier/sdk/contracts` 导出 `SessionTitleChanged`（`atelier/session-title`，最外层提交后实际标题变化时发布）与 `ResourceStatusChanged`（`atelier/resource-status`，资源级 snapshot，发布 `running / failed / awaiting / completed` 及可选 `progress`，外壳消费规则见 [工作台](workbench.md#会话列表状态与资源通知)）。
+- `ResourcePresenceChanged`（API 14.1，`atelier/resource-presence`）为宿主发布的 occurrence，携带 `sessionId / appeared / disappeared` 资源 ID 集合；跨会话界面据此释放已消失对象的状态标记。后台资源实例使用下述具型存在性观察。
 
 ### 具型插件调用
 
 `defineCall` 声明具型请求、结果与调用作用域，后台用 `implementCall(contract, handler)` 经插件级装配或 `ModuleContribution.calls` 注册。契约归贡献插件所有，重复注册明确失败；后台消费者必须引用同一声明实例，跨进程按稳定 ID 路由。输入在后台按声明校验，输出在后台验证后通过 JSON 交付，消费者解码，不跨进程传递函数或服务实例。
+
+前端插件及模块的 `prepare` 上下文提供 `calls`（API 14.1），与组件中的 `useRendererCalls()` 消费同一调用机制；调用信号绑定准备作用域。可据此建立独立于卡片挂载的前端服务，初始化／释放仍由插件生命周期负责。
 
 后台 `plugin.ipc.calls.invoke(...)` 与前端 `useRendererCalls().invoke(...)` 使用同一具型调用机制。调用契约明确声明作用域：
 
@@ -132,6 +135,9 @@ headers 来源需要消费者持有自己的模型调用结果，因此自然用
 - **记录提交与游标观察（`SessionObserver`）**：在原事务提交后同步排队执行，失败记日志、不回滚原提交：
   - `committed({ records, snapshot, session })`：仅在新记录提交时调用，交付本批新增记录。
   - `cursorChanged({ snapshot, session })`：仅在提交前后执行游标改变时调用（正常追加、回溯与分叉选择统一为此入口，一次外层事务只通知最终位置）。依赖历史的派生当前值（如会话标题）在此重建。
+  - `resourcesChanged({ session, appeared, disappeared, initial })`（API 14.1）：当前资源身份集合变化时，先于该批记录／游标观察调用；`appeared / disappeared` 为资源快照数组。宿主设施就绪后枚举已有会话并交付 `initial: true` 的初始出现，其后为 `false`。回调同步接收通知，资源提供方自行启动和跟踪异步初始化／清理。通知不占用时间线，不写历史，隐藏卡片和切换会话不触发。
+
+资源贡献可声明同步 `disposalWarning(data, object): UiText | null`（API 14.1），提供结束当前外部实例前的用户提示。宿主将其用于移除、回溯导致消失和软件退出的确认；它不作为后台移除授权或收束门禁。类型和模型工具声明保持静态，资源提供方自行定义外部实例的初始化策略。
 
 ## 具型创建、动作与准备管线
 

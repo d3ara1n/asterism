@@ -29,7 +29,7 @@
   "version": "1.0.0",
   "type": "module",
   "peerDependencies": {
-    "@atelier/sdk": "^0.34.0",
+    "@atelier/sdk": "^0.35.0",
     "@atelier/builtin-api": "^0.13.0"
   },
   "atelier": {

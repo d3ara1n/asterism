@@ -1,4 +1,4 @@
-import { ResourceStatusChanged, SessionTitleChanged, type EventSubscriber, type UiText } from "@atelier/sdk/contracts";
+import { ResourceStatusChanged, ResourcePresenceChanged, SessionTitleChanged, type EventSubscriber, type UiText } from "@atelier/sdk/contracts";
 
 import type { AppSnapshot, DesktopBridge, RuntimeStatus } from "../../shared/contracts";
 import { errorDisplay } from "../../shared/error-display";
@@ -43,6 +43,10 @@ export class ApplicationController {
     return () => subscription?.close();
   }
   private watchResourceStatuses(): () => void {
+    const presence = this.events?.subscribe(ResourcePresenceChanged, {}, ({ data }) => {
+      const removed = new Set(data.disappeared);
+      this.setResourceStatuses(this.state.resourceStatuses.filter(mark => mark.resource.sessionId !== data.sessionId || !removed.has(mark.resource.id)));
+    });
     const subscription = this.events?.subscribe(ResourceStatusChanged, { delivery: "latest" }, event => {
       // 公共契约要求资源来源，身份由宿主发布入口校验。
       const resource = event.source!.resource!;
@@ -53,7 +57,7 @@ export class ApplicationController {
       else marks[index] = mark;
       this.setResourceStatuses(marks);
     });
-    return () => subscription?.close();
+    return () => { subscription?.close(); presence?.close(); };
   }
   /** 四种状态统一替换后，消费已查看的终态；相同展示数据不触发刷新。 */
   private setResourceStatuses(marks: readonly ResourceStatusMark[]): void {

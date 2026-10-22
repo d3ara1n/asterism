@@ -1,4 +1,4 @@
-import { belongsTo, type ActionContract, type Json, type ResourceCall, type SessionRecord, type SessionSnapshot, type ToolContract } from "@atelier/sdk/contracts";
+import { belongsTo, ResourcePresenceChanged, type ActionContract, type Json, type ResourceCall, type SessionRecord, type SessionSnapshot, type ToolContract } from "@atelier/sdk/contracts";
 import { PluginApiError, type PluginDefinition, type PluginContext, type PluginLogger, type PluginTasks,
   type ResourceRef, type SessionObserver, type CommandPreparer, type ModuleContribution } from "@atelier/sdk/runtime";
 import type { CredentialVault } from "../configuration/credentials.ts";
@@ -15,6 +15,7 @@ import type { CatalogHost, SessionHost } from "./host.ts";
 import { toRecord, sessionSnapshot } from "./records.ts";
 import { createSdkContext, type SdkContext } from "./sdk-context.ts";
 import { synchronous } from "./synchronous.ts";
+import { ResourcePresence } from "./presence.ts";
 import { adaptResource, adaptTool } from "./sdk-adapters.ts";
 import type { ParsedCall } from "./commands.ts";
 import type { PluginConfiguration, PluginConfigurationCommand } from "../shared/plugin-configuration.ts";
@@ -58,6 +59,7 @@ export interface LoadedPlugins {
   resources: ResourceRegistry;
   tools: ToolRegistry;
   manifest: readonly PluginManifest[];
+  initialize(): void;
   /** 提交后派发观察；队列排空后对涉及的会话各调用一次 publish。 */
   afterCommit(sessionId: string, change: { records: readonly SessionNode[]; cursorChanged: boolean }, publish: (sessionId: string) => void): void;
   prepare(kind: string, command: ResourceCall, context: { sessionId: string; objectId: string; signal: AbortSignal; content?: ContentLease }): Promise<ParsedCall>;
@@ -120,6 +122,7 @@ function initializationOrder(plugins: readonly PluginDefinition[]) {
 export function loadPlugins(plugins: readonly PluginDefinition[], services: PluginHostServices): LoadedPlugins {
   const directory = Object.freeze({ list: () => services.sessions.list() });
   const events = services.events ?? new EventBus();
+  events.declarePublic(ResourcePresenceChanged);
   const calls = new CallRegistry(services);
   let topLevelTools: readonly RegisteredTopLevelTool[] = [];
   const manifest: PluginManifest[] = [], collected: Collected[] = [];
@@ -271,6 +274,18 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
   const notifications: Notification[] = [];
   const touched = new Set<string>();
   const observers = collected.flatMap(entry => entry.observers);
+  const presence = new ResourcePresence();
+  const notifyPresence = (sessionId: string, snapshot: SessionSnapshot, initial: boolean) => {
+    const change = presence.update(sessionId, snapshot.resources.all());
+    if (!change.appeared.length && !change.disappeared.length) return;
+    events.publish(ResourcePresenceChanged, null, { sessionId,
+      appeared: change.appeared.map(resource => resource.ref.id), disappeared: change.disappeared.map(resource => resource.ref.id) });
+    for (const entry of collected) for (const observer of entry.observers) {
+      if (!observer.resourcesChanged) continue;
+      try { synchronous(() => observer.resourcesChanged!({ ...change, initial, session: entry.sdk.context.session(sessionId) })); }
+      catch (error) { (services.log ?? defaultLog)(entry.plugin.namespace.id, "error", `Observer ${observer.id} resourcesChanged callback failed.`, error); }
+    }
+  };
   let dispatching = false;
   let closed = false;
   let closing: Promise<void> | undefined;
@@ -297,10 +312,13 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
         live: model.flatMap(run => run.live) };
     },
     resources, tools: new ToolRegistry(resolvedTools.tools), manifest: Object.freeze(manifest.map(entry => Object.freeze(entry))),
+    initialize() {
+      for (const session of services.sessions.list()) notifyPresence(session.id, sessionSnapshot(services.sessions.view(session.id)), true);
+    },
     afterCommit(sessionId, { records: nodes, cursorChanged }, publish) {
       touched.add(sessionId);
       const observed = (nodes.length > 0 && observers.some(observer => observer.committed))
-        || (cursorChanged && observers.some(observer => observer.cursorChanged));
+        || (cursorChanged && observers.some(observer => observer.cursorChanged || observer.resourcesChanged));
       if (observed) {
         // 快照固定在本次提交时刻，后续排队的提交不改写它。
         const sequences = services.sessions.sequences(sessionId, nodes);
@@ -312,6 +330,7 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
       try {
         while (notifications.length) {
           const event = notifications.shift()!;
+          if (event.cursorChanged) notifyPresence(event.sessionId, event.snapshot, false);
           for (const entry of collected) for (const observer of entry.observers) {
             const session = entry.sdk.context.session(event.sessionId);
             const run = (name: string, call: () => undefined) => {

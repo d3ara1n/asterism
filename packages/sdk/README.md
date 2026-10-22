@@ -4,7 +4,7 @@
 
 SDK 包版本见 [package.json](package.json)，宿主 API 版本见 [`sdkApi`](../../src/plugins/packages.ts)。内置插件领域契约独立在 [`@atelier/builtin-api`](../builtin-api/README.md)，不进入通用 SDK。
 
-当前宿主 API 为 **14.0**，插件声明 `{ "major": 14, "minMinor": 0 }`，依赖 `@atelier/sdk: ^0.34.0`。后台通过 `session.invoke` 调用资源动作；公共模型终态通过具型扩展携带领域数据；前端入口默认导出 `defineRendererPlugin(...)`，功能视图放入其 `modules`，调用契约显式声明 `scope`。
+当前宿主 API 为 **14.1**，插件声明 `{ "major": 14, "minMinor": 1 }`，依赖 `@atelier/sdk: ^0.35.0`。后台通过 `session.invoke` 调用资源动作；资源存在性通过 `resourcesChanged` 观察；前端入口默认导出 `defineRendererPlugin(...)`，`prepare` 上下文提供 `events / calls / signal`，调用契约显式声明 `scope`。
 
 ## 子路径入口
 
@@ -51,6 +51,7 @@ export default definePlugin({
 ### 1. 会话、对象、创建与动作
 - **读取与提交**：`plugin.session(id)` 与 `plugin.object(sessionId, ResourceContract, id)` 提供 `snapshot()`、`get(DataContract)` 与同步 `commit(writer => { writer.set(...); writer.append(...); })`。快照按需读取 `records.all / query / first / last`（支持 `scope: "timeline" | "session"`）。
 - **时间线占用与内存投影**：`object.withBusy(async signal => { ... }, { signal? })` 保护依赖当前路径的异步工作；`object.invalidate()` 交付该资源当前投影。两者分别用于宿主时间线保护和资源自己的领域视图，完整语义见 [宿主运行生命周期](../../docs/plugin-sdk.md#宿主运行生命周期)。
+- **存在性与释放提示（API 14.1）**：`SessionObserver.resourcesChanged({ appeared, disappeared, initial, session })` 在启动及提交后交付对象集合变化；外部实例按自身规则初始化，观察到消失后跟踪异步清理，模块 `closing` 等待剩余清理。`implementResource` 的可选 `disposalWarning` 提供用户结束实例的确认说明，规则见 [对象读取、执行与时间线查询](../../docs/plugin-sdk.md#对象读取执行与时间线查询)。
 - **会话目录与资源管理（API 9.1，初始资源链接为 10.1，创建标题为 10.2）**：`plugin.sessions.list()` 读取全部会话摘要；`session.create(CreationContract, input, { signal?, content?, linkTo?, resources? })` 返回 `ResourceCreationResult`（兼容 `ResourceRef`，附带提交时的 `title`），`resources` 是新资源接收的引用列表。工具的 `context.session.create(contract, input, { resources?, exposeSelf? })` 返回同一结果，接收本请求有效范围内的资源 ID 列表；API 11.2 的 `exposeSelf` 选项由宿主绑定发起者身份，语义见会话资源接口。`session.link(receiver, resource)`、`unlink(receiver, resource)`、`remove(resource)` 使用完整引用，作用域、原子性与收束规则见 [会话资源接口](../../docs/plugin-sdk.md#会话目录与资源操作api-91)，可编译示例见 `examples/session-resources.ts`。
 - **具型创建与动作**：在 `contracts` 中用 `defineCreation(resource, { id, schema })` 与 `defineAction(resource, { id, schema })` 声明；在 `runtime` 中用 `implementResource` 聚合 `creation`、`actions`、`project`、`inspect`、`context`；在 `renderer` 中用 `session.create(CreationContract, input, position)` 与 `object.invoke(ActionContract, input)` 调用。
 - **后台资源动作（API 11.1）**：`plugin.session(sessionId).invoke(ActionContract, target, input, { signal?, content? })` 返回 `Promise<void>`，复用完整准备和对象队列。调用其他插件资源不取得其私有对象门面；返回表示动作处理完成，独立托管工作由资源继续管理。取消、附件交接和重入规则见 [后台资源动作](../../docs/plugin-sdk.md#后台资源动作api-111)，可编译示例见 [`examples/session-resources.ts`](examples/session-resources.ts)。

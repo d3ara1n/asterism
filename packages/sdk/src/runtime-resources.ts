@@ -43,6 +43,7 @@ export function implementResource<S extends Json, V extends Json>(
     project(data: NoInfer<S>, object: ObjectReader): NoInfer<V>;
     inspect(data: NoInfer<S>, object: ObjectReader): Promise<Json>;
     context?(data: NoInfer<S>, object: ObjectReader): Promise<ContextFile[]>;
+    disposalWarning?(data: NoInfer<S>, object: ObjectReader): import("./i18n.ts").UiText | null;
   },
 ): ResourceContribution {
   return {
@@ -51,6 +52,7 @@ export function implementResource<S extends Json, V extends Json>(
     project: (snapshot, object) => present(view, definition.project(parse(resource.stateSchema, snapshot.data, "resource"), object)),
     inspect: async (snapshot, object) => jsonSchema.parse(await definition.inspect(parse(resource.stateSchema, snapshot.data, "resource"), object)),
     context: async (snapshot, object) => definition.context?.(parse(resource.stateSchema, snapshot.data, "resource"), object) ?? [],
+    disposalWarning: (snapshot, object) => definition.disposalWarning?.(parse(resource.stateSchema, snapshot.data, "resource"), object) ?? null,
   };
 }
 export function implementTool<S extends Json, T extends Json, A extends Json, D extends Json>(

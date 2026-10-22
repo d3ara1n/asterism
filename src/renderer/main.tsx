@@ -54,7 +54,7 @@ window.addEventListener("pagehide", () => { void (async () => {
     try { await close(); } catch (error) { console.error("Renderer plugin cleanup failed.", error); }
   }
 })(); }, { once: true });
-await preparePlugin(builtinRenderer, events, lifetime.signal, undefined, close => cleanup.push(close));
+await preparePlugin(builtinRenderer, events, lifetime.signal, undefined, close => cleanup.push(close), calls);
 if (builtinRenderer.settings) pages.set(builtin.id, builtinRenderer.settings);
 new ViewRegistry(accepted);
 const releasePublic = bindPublicProvider("renderer", builtinPublicProvider, {
@@ -64,7 +64,7 @@ const releasePublic = bindPublicProvider("renderer", builtinPublicProvider, {
 window.addEventListener("pagehide", releasePublic, { once: true });
 const rendererPlugins = await loadPluginRenderers(plugins, { available: [builtin.id], async accept(plugin, id) {
   new ViewRegistry([...accepted, ...plugin.modules ?? []]);
-  await preparePlugin(plugin, events, lifetime.signal, undefined, close => cleanup.push(close));
+  await preparePlugin(plugin, events, lifetime.signal, undefined, close => cleanup.push(close), calls);
   accepted.push(...plugin.modules ?? []);
   if (plugin.settings) pages.set(id, plugin.settings);
 } });

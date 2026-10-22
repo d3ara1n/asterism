@@ -54,10 +54,18 @@ export interface SessionCursorChanged {
   readonly snapshot: SessionSnapshot;
   readonly session: SessionExecutor;
 }
+/** 当前资源集合的存在性变化；initial 表示宿主启动时从存储构造对象。 */
+export interface SessionResourcesChanged {
+  readonly session: SessionExecutor;
+  readonly appeared: readonly ResourceSnapshot[];
+  readonly disappeared: readonly ResourceSnapshot[];
+  readonly initial: boolean;
+}
 export interface SessionObserver {
   readonly id: string;
   committed?(event: SessionCommitted): undefined;
   cursorChanged?(event: SessionCursorChanged): undefined;
+  resourcesChanged?(event: SessionResourcesChanged): undefined;
 }
 export type Preparation<C extends Json = Json> =
   | { action: "accept" }
@@ -93,6 +101,8 @@ export interface ResourceContribution {
   project(resource: ResourceSnapshot, object: ObjectReader): Presentation;
   inspect(resource: ResourceSnapshot, object: ObjectReader): Promise<Json>;
   context?(resource: ResourceSnapshot, object: ObjectReader): Promise<ContextFile[]>;
+  /** 结束当前实例前呈现给用户的说明；不阻止后台移除或等待外部清理。 */
+  disposalWarning?(resource: ResourceSnapshot, object: ObjectReader): UiText | null;
 }
 type OptionalData<T, D> = T extends unknown ? Omit<T, "data"> & { data?: D | null } : never;
 export type CallResult<D extends Json = Json> =

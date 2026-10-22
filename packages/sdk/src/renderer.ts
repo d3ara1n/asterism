@@ -21,6 +21,7 @@ export type { ContentReader } from "./content-runtime.ts";
 import type { CreationEntry } from "./renderer-creation.ts";
 import type { ToolRenderer } from "./renderer-tools.ts";
 import type { EventSubscriber } from "./events.ts";
+import type { PluginCalls } from "./calls.ts";
 
 export type RendererReceipt = { ok: true } | { ok: false; error: { code: string; message: string; display?: UiText } };
 /**
@@ -51,6 +52,7 @@ export interface RendererObjectContext {
     refresh(): Promise<void>;
   };
   invoke<I, O extends Json>(contract: ActionContract<I, O>, input: NoInfer<I> & Json, options?: RendererInputOptions): Promise<RendererReceipt>;
+  /** channel 使用插件内短名，与 object.streams.publish 相同；宿主自动补全插件命名空间。 */
   onStream(channel: string, listener: (data: Uint8Array) => void): () => void;
   /** 对象级保留状态，生命周期由宿主统一管理。 */
   readonly retained: RendererRetained;
@@ -113,6 +115,8 @@ export interface RendererPlugin {
 }
 export function defineRendererPlugin(plugin: RendererPlugin): RendererPlugin { return plugin; }
 export interface RendererPrepareContext {
+  /** 前端模块级服务使用的具型调用；取消随准备作用域传播。 */
+  readonly calls: PluginCalls;
   /** 与模块生命周期绑定的全局订阅，失败、超时和应用关闭时清理。 */
   readonly events: EventSubscriber;
   /** 宿主放弃等待（超时或关闭）时触发；模块应尽快停止。 */

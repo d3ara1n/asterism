@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { AppSnapshot, CommandResult } from "../../shared/contracts.ts";
 import { ApplicationController } from "./controller.ts";
-import { ResourceStatusChanged, type EventHandler, type EventSubscriber, type ResourceStatus } from "@atelier/sdk/contracts";
+import { ResourceStatusChanged, ResourcePresenceChanged, type EventHandler, type EventSubscriber, type ResourceStatus } from "@atelier/sdk/contracts";
 import { summarizeResourceStatus } from "./resource-status.ts";
 
 const snapshot: AppSnapshot = { workspace: { id: "w", title: "Workspace" }, sessions: [], plugins: [], restartRequired: false };
@@ -22,9 +22,12 @@ describe("应用会话列表", () => {
   // 工作台契约：同资源完整替换，查看只消费终态；相同数据不刷新，进度不单独持有。
   it("按资源保留最新状态，running 跨查看保留，终态查看即清除", () => {
     let receive!: EventHandler<ResourceStatus>;
+    let presence!: EventHandler<{ sessionId: string; appeared: string[]; disappeared: string[] }>;
     const events: EventSubscriber = { subscribe(contract, _options, handler) {
       if (contract.id === ResourceStatusChanged.id)
         receive = (event, context) => handler({ ...event, data: contract.schema.parse(event.data) }, context);
+      if (contract.id === ResourcePresenceChanged.id)
+        presence = (event, context) => handler({ ...event, data: contract.schema.parse(event.data) }, context);
       return { ready: Promise.resolve(), closed: new Promise(() => {}), close() {} };
     } };
     const execute = vi.fn(async () => ({ ok: true as const, snapshot }));
@@ -66,6 +69,11 @@ describe("应用会话列表", () => {
       expect(controller.getSnapshot().resourceStatuses[1]).not.toHaveProperty("progress");
       controller.setVisibleSession("a");
       expect(controller.getSnapshot().resourceStatuses.map(mark => mark.resource.id)).toEqual(["three"]);
+      // 未查看会话的外部资源也能被移除；其 running 标记随存在性通知释放。
+      send("b", "three", "running");
+      presence({ contract: { id: ResourcePresenceChanged.id }, emittedAt: "", source: null,
+        data: { sessionId: "b", appeared: [], disappeared: ["three"] } }, { signal: new AbortController().signal });
+      expect(controller.getSnapshot().resourceStatuses).toEqual([]);
       // 只有连接时的列表读取；每条状态及查看操作都不发查询或命令。
       expect(execute.mock.calls).toHaveLength(1);
     } finally { disconnect(); }
