@@ -15,7 +15,7 @@ const outward: Record<Position, readonly [number, number]> = {
  * 边缘位于锚点内侧半个盒宽；箭头尖端停在可见圆点（含描边）外沿。
  */
 const handleBox = 7;
-const handleDot = 10;
+const handleDot = 7;
 export const handleSizeVariables = { "--handle-box": `${handleBox}px`, "--handle-dot": `${handleDot}px` } as CSSProperties;
 const anchorInset = handleBox / 2;
 const dotRadius = handleDot / 2;
