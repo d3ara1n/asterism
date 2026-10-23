@@ -17,8 +17,8 @@ function textFailure(error: unknown, signal: AbortSignal, operation: string): Ca
   return error instanceof TextError ? error.outcome() : filesystemFailure(error, operation);
 }
 
-/** 目录树唯一排除的条目名，任意层级生效（含子模块与 worktree 的 .git 文件）。 */
-const TREE_EXCLUDED = new Set([".git"]);
+/** 目录树排除的条目名，任意层级生效：`.git`（含子模块与 worktree 的 .git 文件）与 macOS Finder 元数据 `.DS_Store`。 */
+const TREE_EXCLUDED = new Set([".git", ".DS_Store"]);
 
 /** 递归读取目录树路径，目录路径以 '/' 结尾。深度上限 5。 */
 async function readTreePaths(rootPath: string, relPath: string, depth: number, signal: AbortSignal): Promise<string[]> {
