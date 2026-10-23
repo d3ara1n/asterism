@@ -76,9 +76,7 @@ function DirectoryTreeBody(_: { data: { path: string } }) {
   useEffect(() => {
     if (!state.data) return;
     model.resetPaths(state.data.paths);
-    if (state.data.hasGit && state.data.gitStatus.length > 0) {
-      model.setGitStatus(state.data.gitStatus.map(e => ({ path: e.path, status: e.status as GitStatus })));
-    }
+    model.setGitStatus(state.data.gitStatus.map(e => ({ path: e.path, status: e.status as GitStatus })));
   }, [model, state.data]);
 
   if (state.error) {
