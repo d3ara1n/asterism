@@ -17,7 +17,10 @@ function textFailure(error: unknown, signal: AbortSignal, operation: string): Ca
   return error instanceof TextError ? error.outcome() : filesystemFailure(error, operation);
 }
 
-/** 递归读取目录树路径，目录路径以 '/' 结尾。深度上限 5，避免遍历 node_modules 等深层结构。 */
+/** 目录树唯一排除的条目名，任意层级生效（含子模块与 worktree 的 .git 文件）。 */
+const TREE_EXCLUDED = new Set([".git"]);
+
+/** 递归读取目录树路径，目录路径以 '/' 结尾。深度上限 5。 */
 async function readTreePaths(rootPath: string, relPath: string, depth: number, signal: AbortSignal): Promise<string[]> {
   if (depth > 5) return [];
   signal.throwIfAborted();
@@ -28,6 +31,7 @@ async function readTreePaths(rootPath: string, relPath: string, depth: number, s
   const paths: string[] = [];
   for (const entry of entries) {
     signal.throwIfAborted();
+    if (TREE_EXCLUDED.has(entry.name)) continue;
     const rel = relPath === "." ? entry.name : `${relPath}/${entry.name}`;
     if (entry.isDirectory()) {
       paths.push(`${rel}/`);
