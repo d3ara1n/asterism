@@ -5,7 +5,7 @@ import { coreChannel } from "./core.ts";
 import type { DesktopPlatform, DesktopWindowBridge } from "./desktop.ts";
 import type { AppearanceBridge } from "./theme.ts";
 
-export const protocolVersion = 8;
+export const protocolVersion = 9;
 export const statusChannel = coreChannel("runtime-status");
 export const pickDirectoryChannel = coreChannel("pick-directory");
 export const openLocalFileChannel = coreChannel("open-local-file");

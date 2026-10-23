@@ -9,8 +9,8 @@
     "./locales/zh-Hans.json": "./src/locales/zh-Hans.json"
   },
   "dependencies": {
-    "@atelier/builtin-api": "^0.14.0",
-    "@atelier/sdk": "^0.39.0",
+    "@atelier/builtin-api": "^0.15.0",
+    "@atelier/sdk": "^0.40.0",
     "@atelier/ui": "^0.1.0",
     "@lobehub/streamdown": "1.4.1",
     "@modelcontextprotocol/client": "2.3.1",
@@ -25,6 +25,7 @@
     "lucide-react": "1.55.0",
     "mermaid": "12.2.0",
     "motion": "14.1.0",
+    "nanoid": "6.0.2",
     "node-pty": "1.1.0",
     "rehype-katex": "7.0.1",
     "remark-gfm": "4.0.1",

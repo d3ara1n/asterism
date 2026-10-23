@@ -55,7 +55,7 @@ export async function listShellProfiles(settings: ShellSettings, inherited: Node
   const profiles = await Promise.all(settings.profiles.map(async profile => {
     const resolved = await resolveProfile(profile, inherited);
     return {
-      id: profile.id, name: profile.name, executable: profile.executable,
+      id: profile.id, executable: profile.executable,
       args: [...profile.args], commandArgs: [...profile.commandArgs],
       available: resolved !== null, resolvedExecutable: resolved?.executable ?? null,
     };

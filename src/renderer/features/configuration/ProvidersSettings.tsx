@@ -318,7 +318,7 @@ function ModelEditor({ initialId, providerId }: { initialId: string | null; prov
   return <Editor form="model-form" title={current?.name ?? i18n.formatMessage(providersMessages.newModel)} description={provider?.name} dirty={dirty}
     remove={current ? { title: i18n.formatMessage(providersMessages.deleteModelTitle),
       description: users.length
-        ? i18n.formatMessage(providersMessages.deleteModelWithRolesDescription, { current_name: current.name, roles: users.map(role => role.name).join(", ") })
+        ? i18n.formatMessage(providersMessages.deleteModelWithRolesDescription, { current_name: current.name, roles: users.map(role => role.id).join(", ") })
         : i18n.formatMessage(providersMessages.deleteUnusedModelDescription, { current_name: current.name }),
       onConfirm: async () => { const result = await run({ type: "remove", kind: "model", id: modelReference(current) }); if (result.ok) void island.close({ force: true }); } } : undefined}>
     <form id="model-form" onSubmit={async event => {
@@ -334,7 +334,7 @@ function ModelEditor({ initialId, providerId }: { initialId: string | null; prov
       <TextField label={i18n.formatMessage(providersMessages.serverModelId)} value={value.modelId} onChange={next => { setIdEdited(true); set("modelId", next); }} required hint={i18n.formatMessage(providersMessages.serverModelIdHint)} />
       {current && <Field><FieldLabel>{i18n.formatMessage(providersMessages.usedBy)}</FieldLabel>
         {users.length ? <ul className="flex flex-wrap gap-1.5" aria-label={i18n.formatMessage(providersMessages.rolesUsingModel)}>
-          {users.map(role => <li key={role.id}><Badge variant="secondary">{role.name}</Badge></li>)}
+          {users.map(role => <li key={role.id}><Badge variant="secondary">{role.id}</Badge></li>)}
         </ul> : <FieldDescription>{i18n.formatMessage(providersMessages.noRolesUsingModel)}</FieldDescription>}
       </Field>}
     </FieldGroup>

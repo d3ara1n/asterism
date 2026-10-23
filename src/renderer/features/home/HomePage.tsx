@@ -72,9 +72,9 @@ export function HomePage({ active, draft, onSettings, ready, busy, submitError, 
         </InputGroupAddon>
       </InputGroup>
       <div className="flex min-w-0 flex-wrap items-center gap-0.5 px-1.5 py-1">
-        <Choice icon={<Bot />} label={i18n.formatMessage(commonMessages.agent)} value={agent?.name ?? i18n.formatMessage(commonMessages.agent)} disabled={!snapshot || busy}
+        <Choice icon={<Bot />} label={i18n.formatMessage(commonMessages.agent)} value={agent?.id ?? i18n.formatMessage(commonMessages.agent)} disabled={!snapshot || busy}
           selected={agent?.id ?? ""} onSelect={setAgentId}
-          options={snapshot?.agents.filter(item => item.enabled).map(item => ({ value: item.id, label: item.name })) ?? []} />
+          options={snapshot?.agents.filter(item => item.enabled).map(item => ({ value: item.id, label: item.id })) ?? []} />
         <ModelChoices configuration={snapshot} agent={agentId} model={modelId} thinking={thinking} disabled={busy}
           onModelChange={setModelId} onThinkingChange={setThinking} />
       </div>

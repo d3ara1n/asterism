@@ -22,6 +22,8 @@ provider 的 `stop_reason=end_turn` 等终态只表示 request 的协议结局�
 
 ## 输入调度与草稿箱
 
+提交身份 `submissionId` 使用 Nano ID 默认 URL 安全字符集生成 16 位随机值；草稿 ID 复用该提交身份。
+
 `SubmitAgentInput` 是 Agent 资源动作，输入包含 `submissionId / parts / mode / sender`，mode 为 `steer | follow`；省略 sender 表示用户输入。`ContinueAgent / CancelAgent` 的输入为 `{}`，`ConfigureAgent` 的输入为 `{ selection }`；操作身份遵循 [按契约调用](plugin-sdk.md#具型创建动作与准备管线)。空闲时受理输入、先写输入消息再启动执行；运行中原子保存到资源草稿箱，回执表示已受理，不等待执行结束。同一 submission 身份绑定动作契约与完整输入（含模式与发送者），重复提交只受理一次，复用身份切换动作或输入明确失败。
 
 草稿箱是 Agent 自有的有序当前数据，每项包含身份、完整输入消息部件（文字与附件引用）、发送者及 `none | steer | follow` 模式。保存与修改草稿不进入会话时间线，不作为模型上下文；重启恢复内容、发送者与模式，恢复本身不触发发送。当前数据及附件归属遵循 [内容存储](content.md#持久归属与门面作用域)，回溯不恢复旧草稿。
@@ -296,7 +298,9 @@ type ModelInputPart =
 
 ### Shell 配置与进程
 
-内置插件托管 `shell.selected / shell.profiles`。每份 profile 包含稳定 ID、名称、可执行文件、启动参数 `args`、命令参数 `commandArgs` 与环境覆盖 `env`。实际 argv 为 `args + commandArgs + [command]`，命令作为一个完整参数传递。可执行文件支持绝对路径、`~/` 与 PATH 名称；继承应用环境，profile 的环境变量覆盖同名值。
+内置插件托管 `shell.selected / shell.profiles`。每份 profile 以可读 slug ID 供用户与模型识别，包含可执行文件、启动参数 `args`、命令参数 `commandArgs` 与环境覆盖 `env`。实际 argv 为 `args + commandArgs + [command]`，命令作为一个完整参数传递。可执行文件支持绝对路径、`~/` 与 PATH 名称；继承应用环境，profile 的环境变量覆盖同名值。
+
+profile ID 采用小写字母、数字及分隔用的 `-`、`_`，没有独立显示名；`auto` 是保留值。预设使用 `bash / zsh / pwsh / nu / fish / sh`。新增和复制使用来源 ID，重名时追加从 `-2` 开始的未占用数字后缀。编辑 ID 时拒绝重名，当前默认选择随之更新；已保存终端中的 profile 引用保持原值。
 
 `selected` 为 profile ID 或 `auto`。自动模式在已配置的 profile 中按平台顺序查找实际存在的可执行文件，最后再尝试其余自定义 profile：
 
@@ -308,7 +312,7 @@ type ModelInputPart =
 
 预设均以非交互方式运行：PowerShell 7 使用 `-NonInteractive -Command` 并保留 profile；Nushell 使用 `-l -c` 读取用户配置，登录模式与交互模式分别表达；其他预设使用 `-c`，配置文件加载遵循 shell 自身的非交互规则。用户可通过启动参数与环境变量配置所需环境。显式 profile 不可用时明确失败，自动模式才继续查找。目录 inspect 报告当时解析的 profile、可执行文件与平台；每次执行取用当前 profile 并使用到底。
 
-`shell_profile_list` 是内置插件静态注册的只读、可并行顶层工具，参数为 `{}`，供目录命令执行与终端创建共用，无需已有资源链接。查询取用当前 Shell 配置，返回默认选择 `selected`、按同一执行解析规则得到的 `resolvedProfile`（无可用默认项时为 null），以及按配置顺序排列的 `profiles`。每项包含 `id / name / executable / args / commandArgs / available / resolvedExecutable`；列表保留不可用项，可用性只表示查询时找到可执行文件，不启动 Shell。解析使用 profile 的环境覆盖，结果不包含 `env`。目录 `exec` 使用默认选择；终端创建可传列表中的 ID 或 `auto`，省略时沿用创建时的默认选择。
+`shell_profile_list` 是内置插件静态注册的只读、可并行顶层工具，参数为 `{}`，供目录命令执行与终端创建共用，无需已有资源链接。查询取用当前 Shell 配置，返回默认选择 `selected`、按同一执行解析规则得到的 `resolvedProfile`（无可用默认项时为 null），以及按配置顺序排列的 `profiles`。每项包含 `id / executable / args / commandArgs / available / resolvedExecutable`；列表保留不可用项，可用性只表示查询时找到可执行文件，不启动 Shell。解析使用 profile 的环境覆盖，结果不包含 `env`。目录 `exec` 使用默认选择；终端创建可传列表中的 ID 或 `auto`，省略时沿用创建时的默认选择。
 
 每次 `exec` 启动独立进程，stdin 关闭、stdout/stderr 使用管道；工作目录和 shell 状态随该次进程结束。shell 模块提供配置解析、进程句柄、输出消费和进程清理；单次调用持有进程，宿主负责调用取消与真实收束，不另设活动进程登记。进程退出观察、IO 收束观察与 `stop()` 相互独立，等待本身不终止进程。
 

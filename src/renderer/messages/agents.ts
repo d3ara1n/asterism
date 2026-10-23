@@ -81,9 +81,9 @@ export const agentsMessages = pluginNamespace("atelier.host").messages("en", def
     id: "features_configuration_AgentsSettings_22",
     defaultMessage: "Basics",
   },
-  name: {
+  id: {
     id: "features_configuration_AgentsSettings_23",
-    defaultMessage: "Name",
+    defaultMessage: "ID",
   },
   description: {
     id: "features_configuration_AgentsSettings_24",

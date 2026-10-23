@@ -75,7 +75,7 @@ export function createModelServices(configuration: ConfigurationService, adapter
     return { settings, adapter };
   };
   const catalog = {
-    roles: () => current().roles.filter(role => role.enabled).map(role => ({ id: role.id, name: role.name, description: role.description,
+    roles: () => current().roles.filter(role => role.enabled).map(role => ({ id: role.id, description: role.description,
       hidden: role.hidden, model: role.model, thinking: role.thinking })),
     models: () => {
       const config = current();

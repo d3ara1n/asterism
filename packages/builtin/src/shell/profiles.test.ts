@@ -10,7 +10,7 @@ beforeEach(async () => { root = await mkdtemp(join(tmpdir(), "atelier-profiles-t
 afterEach(async () => { await rm(root, { recursive: true, force: true }); });
 
 const profile = (id: string, executable: string, env: Record<string, string> = {}): ShellProfile =>
-  ({ id, name: id, executable, args: [], commandArgs: ["-c"], env });
+  ({ id, executable, args: [], commandArgs: ["-c"], env });
 async function executable(name: string) {
   const path = join(root, name);
   await writeFile(path, "", { mode: 0o755 });

@@ -1,3 +1,4 @@
+import { nanoid } from "nanoid";
 import { thinkingLevels } from "@atelier/sdk/contracts";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -178,7 +179,7 @@ describe("工作台 SDK 的宿主实现", () => {
       .rejects.toMatchObject({ reason: "counter_blocked", display: "Changes are paused." });
     await expect(consumer.session(sessionId).invoke({ ...ChangeCount }, target, { amount: 1 })).rejects.toMatchObject({ code: "invalid_argument" });
     await expect(consumer.session(sessionId).invoke(SubmitAgentInput, target, {
-      submissionId: crypto.randomUUID(), mode: "follow", parts: [{ kind: "text", text: "Wrong type" }],
+      submissionId: nanoid(16), mode: "follow", parts: [{ kind: "text", text: "Wrong type" }],
     })).rejects.toMatchObject({ code: "invalid_argument" });
     const other = service.sessions.tree.create("Other");
     await expect(consumer.session(other).invoke(ChangeCount, target, { amount: 1 })).rejects.toMatchObject({ code: "invalid_argument" });
@@ -528,7 +529,7 @@ describe("工作台 SDK 的宿主实现", () => {
     const { service } = open([plugin]);
     const target = await configureModel(service);
     const before = service.sessions.tree.list();
-    await expect(service.sessions.execute({ type: "start", submissionId: crypto.randomUUID(),
+    await expect(service.sessions.execute({ type: "start", submissionId: nanoid(16),
       agent: "worker", model: target.model, thinking: null, parts: [{ kind: "text", text: "First" }] })).rejects.toMatchObject({ code: "invalid_request" });
     expect(service.sessions.tree.list()).toEqual(before);
     expect(service.sessions.running).toBe(false);

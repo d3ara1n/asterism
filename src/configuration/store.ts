@@ -7,13 +7,14 @@ import { applicationStorage } from "../shared/application.ts";
 import { agentOverridesSchema, canEditProviderField, modelReference, modelRoleOverridesSchema, modelSchema, providerInputSchema,
   type AgentOverrides, type ModelRoleOverrides, type ProviderInput, type ProviderModel } from "../shared/configuration.ts";
 import { modelCostSchema } from "@atelier/sdk/contracts";
+import { configurationIdSchema } from "@atelier/builtin-api/contracts";
 import { defaultAgents, defaultRoles } from "./defaults.ts";
 import { ConfigurationError } from "./errors.ts";
 import { normalizeOverrides, resolveAgentConfiguration, resolveRoleConfiguration } from "./layers.ts";
 import { migrateModelCost } from "./model-cost-migration.ts";
 import { providerEditingMessages } from "../shared/provider-editing-messages.ts";
 
-const identity = { id: z.string().min(1).max(160) };
+const identity = { id: configurationIdSchema };
 const storedProviderSchema = providerInputSchema.extend({ credentialRef: z.string().uuid().nullable() }).strip();
 const storedRoleSchema = z.object({ ...identity, builtin: z.boolean(), overrides: modelRoleOverridesSchema });
 const storedAgentSchema = z.object({ ...identity, builtin: z.boolean(), overrides: agentOverridesSchema });
@@ -21,7 +22,7 @@ const storedModelSchema = modelSchema.extend({ cost: z.preprocess(migrateModelCo
 /** 模型以 `<providerId>/<modelId>` 识别，其余以 id 识别。 */
 const keyOf = (item: { id: string } | { providerId: string; modelId: string }): string => "id" in item ? item.id : modelReference(item);
 const documentSchema = z.strictObject({
-  version: z.literal(7),
+  version: z.literal(8),
   providers: z.array(storedProviderSchema), models: z.array(storedModelSchema),
   roles: z.array(storedRoleSchema), agents: z.array(storedAgentSchema),
 }).superRefine((document, context) => {
@@ -43,17 +44,15 @@ type Entry = { [K in ConfigurationKind]: ConfigurationDocument[(typeof collectio
 type ConfigurationSave =
   | { kind: "provider"; id: string | null; value: ProviderInput; credentialRef: string | null }
   | { kind: "model"; id: string | null; value: ProviderModel }
-  | { kind: "role"; id: string; value: ModelRoleOverrides }
-  | { kind: "agent"; id: string; value: AgentOverrides };
+  | { kind: "role"; id: string | null; value: ModelRoleOverrides & { id: string } }
+  | { kind: "agent"; id: string | null; value: AgentOverrides & { id: string } };
 
 function validate(raw: unknown): ConfigurationDocument {
   const document = documentSchema.parse(raw);
   for (const role of document.roles) {
-    if (!role.builtin && !role.overrides.name?.trim()) throw new ConfigurationError("invalid_request", "Custom configurations require a name.");
     resolveRoleConfiguration(role);
   }
   for (const agent of document.agents) {
-    if (!agent.builtin && !agent.overrides.name?.trim()) throw new ConfigurationError("invalid_request", "Custom configurations require a name.");
     resolveAgentConfiguration(agent);
   }
   return document;
@@ -80,7 +79,7 @@ export class ConfigurationStore {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw new ConfigurationError("unavailable", "The application configuration could not be read.");
       // 只有文件不存在才初始化；已有文件中的删除状态不会重新播种。
       this.document = {
-        version: 7, providers: [], models: [],
+        version: 8, providers: [], models: [],
         roles: defaultRoles.map(({ id, builtin }) => ({ id, builtin, overrides: {} })),
         agents: defaultAgents.map(({ id, builtin }) => ({ id, builtin, overrides: {} })),
       };
@@ -108,8 +107,13 @@ export class ConfigurationStore {
         if (id !== null && id !== input.value.id) for (const model of next.models) if (model.providerId === id) model.providerId = input.value.id;
         break;
       case "model": upsert(next.models, id, input.value); break;
-      case "role": upsert(next.roles, id, { id: id!, builtin: this.get("role", id!)?.builtin ?? false, overrides: normalizeOverrides(input.value) }); break;
-      case "agent": upsert(next.agents, id, { id: id!, builtin: this.get("agent", id!)?.builtin ?? false, overrides: normalizeOverrides(input.value) }); break;
+      case "role": case "agent": {
+        const { id: nextId, ...overrides } = input.value;
+        const builtin = id !== null && (this.get(input.kind, id)?.builtin ?? false);
+        if (builtin && id !== nextId) throw new ConfigurationError("invalid_request", "Built-in configuration IDs are fixed.");
+        upsert(next[collections[input.kind]], id, { id: nextId, builtin, overrides: normalizeOverrides(overrides) });
+        break;
+      }
     }
     this.commit(next);
   }

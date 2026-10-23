@@ -30,7 +30,7 @@ export default defineModule(plugin => ({
       execute(_args, { signal }) {
         return attempt(signal, () => (plugin.catalogs.get(AgentConfigurations) ?? [])
           .filter(agent => agent.enabled)
-          .map(({ id, name, description, examples }) => ({ id, name, description, examples })));
+          .map(({ id, description, examples }) => ({ id, description, examples })));
       },
     }),
     defineTopLevelTool({

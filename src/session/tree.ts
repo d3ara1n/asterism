@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { nanoid } from "nanoid";
 import type { DatabaseSync } from "node:sqlite";
 import { sessionNodeSchema, type NewNode, type SessionNode } from "../shared/session.ts";
 import { SessionError } from "../shared/session-timeline.ts";
@@ -148,7 +149,7 @@ export class SessionTree {
   /** 向提交时的当前时间线末端追加并推进游标；不提供向任意树节点写入的能力。 */
   appendToTimeline(sessionId: string, node: NewNode): SessionNode {
     const parentId = this.cursor(sessionId);
-    const full = sessionNodeSchema.parse({ ...node, id: randomUUID(), sessionId, parentId, createdAt: new Date().toISOString() });
+    const full = sessionNodeSchema.parse({ ...node, id: nanoid(16), sessionId, parentId, createdAt: new Date().toISOString() });
     // savepoint 可嵌在应用事务中；节点与游标要么同时保存，要么同时回退。
     this.db.exec("SAVEPOINT append_session_node");
     try {

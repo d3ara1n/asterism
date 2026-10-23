@@ -41,11 +41,31 @@ async function addModel(service: ConfigurationService, auth: "none" | "api_key" 
   return { providerId: provider.savedId!, modelId: model.savedId!, snapshot: model.snapshot };
 }
 function roleValue(snapshot: ConfigurationSnapshot, id: string) {
-  const { id: _id, builtin: _builtin, ...value } = snapshot.roles.find(role => role.id === id)!;
+  const { builtin: _builtin, ...value } = snapshot.roles.find(role => role.id === id)!;
   return value;
 }
 
 describe("真实配置与消费边界", () => {
+  // 配置 ID 直接用于模型选择；新增重名不能覆盖旧项，改名必须替换原项且保留其行为覆盖。
+  it.each(["agent", "role"] as const)("%s 以显式 slug 创建、拒绝重名并持久保存改名", async kind => {
+    const { service, root, protector } = setup();
+    const created = await service.execute({ type: `${kind}.save`, id: null, value: { id: "code-review", description: "Review code" } });
+    expect(created.savedId).toBe("code-review");
+    await expect(service.execute({ type: `${kind}.save`, id: null, value: { id: "code-review", description: "Overwrite" } }))
+      .rejects.toMatchObject({ code: "conflict" });
+    const renamed = await service.execute({ type: `${kind}.save`, id: "code-review", value: { id: "review-code", description: "Review code" } });
+    const entries = kind === "agent" ? renamed.snapshot.agents : renamed.snapshot.roles;
+    expect(entries.some(item => item.id === "code-review")).toBe(false);
+    expect(entries.find(item => item.id === "review-code")).toMatchObject({ description: "Review code", builtin: false });
+    const builtinId = kind === "agent" ? "worker" : "default";
+    await expect(service.execute({ type: `${kind}.save`, id: builtinId, value: { id: "renamed-builtin" } }))
+      .rejects.toMatchObject({ code: "invalid_request" });
+    service.close();
+    const reopened = new ConfigurationService(root, protector);
+    cleanups.push(() => reopened.close());
+    const saved = kind === "agent" ? reopened.current().agents : reopened.current().roles;
+    expect(saved.find(item => item.id === "review-code")).toEqual(entries.find(item => item.id === "review-code"));
+  });
   // 编辑规则须随连接独立持久化；固定认证方式不能阻止改名、启停和凭据管理。
   it("预设固定项跨重开保留，连接身份和密钥仍可修改", async () => {
     const { service, root, protector } = setup();
@@ -266,42 +286,42 @@ describe("真实配置与消费边界", () => {
     const { service } = setup();
     const initial = await service.execute({ type: "read" });
     expect(initial.snapshot.overrides.agents.worker).toEqual({});
-    const saved = await service.execute({ type: "agent.save", id: "worker", value: {
+    const saved = await service.execute({ type: "agent.save", id: "worker", value: { id: "worker",
       systemPrompt: "Custom instructions", enabled: false, tools: [], subagentRoles: [],
     } });
     expect(saved.snapshot.agents.find(agent => agent.id === "worker")).toMatchObject({
       systemPrompt: "Custom instructions", enabled: false, tools: [], subagentRoles: [],
     });
-    const cleared = await service.execute({ type: "agent.save", id: "worker", value: { systemPrompt: " \n " } });
+    const cleared = await service.execute({ type: "agent.save", id: "worker", value: { id: "worker", systemPrompt: " \n " } });
     expect(cleared.snapshot.overrides.agents.worker).toEqual({});
     expect(cleared.snapshot.agents.find(agent => agent.id === "worker")?.systemPrompt).toBe(initial.snapshot.defaults.agents.worker!.systemPrompt);
     expect(saved.snapshot.agents.find(agent => agent.id === "worker")?.systemPrompt).toBe("Custom instructions");
   });
   it("自定义配置始终继承原始基准；worker 被修改或删除不改变新代理", async () => {
     const { service } = setup();
-    await service.execute({ type: "agent.save", id: "worker", value: { systemPrompt: "Changed worker", maxTurns: 1, enabled: false } });
-    await service.execute({ type: "role.save", id: "default", value: { thinking: "off", enabled: false } });
-    const agent = await service.execute({ type: "agent.save", id: null, value: { name: "Supervisor", tools: [] } });
+    await service.execute({ type: "agent.save", id: "worker", value: { id: "worker", systemPrompt: "Changed worker", maxTurns: 1, enabled: false } });
+    await service.execute({ type: "role.save", id: "default", value: { id: "default", thinking: "off", enabled: false } });
+    const agent = await service.execute({ type: "agent.save", id: null, value: { id: "supervisor", tools: [] } });
     expect(agent.snapshot.agents.find(item => item.id === agent.savedId)).toMatchObject({
-      name: "Supervisor", tools: [], systemPrompt: configurationDefaults.agents.worker!.systemPrompt, maxTurns: configurationDefaults.agents.worker!.maxTurns, enabled: true,
+      id: "supervisor", tools: [], systemPrompt: configurationDefaults.agents.worker!.systemPrompt, maxTurns: configurationDefaults.agents.worker!.maxTurns, enabled: true,
     });
-    const role = await service.execute({ type: "role.save", id: null, value: { name: "Custom" } });
-    expect(role.snapshot.roles.find(item => item.id === role.savedId)).toMatchObject({ name: "Custom", thinking: configurationDefaults.roles.default!.thinking, enabled: true });
+    const role = await service.execute({ type: "role.save", id: null, value: { id: "custom" } });
+    expect(role.snapshot.roles.find(item => item.id === role.savedId)).toMatchObject({ id: "custom", thinking: configurationDefaults.roles.default!.thinking, enabled: true });
     await service.execute({ type: "remove", kind: "agent", id: "worker" });
-    const after = await service.execute({ type: "agent.save", id: null, value: { name: "Independent" } });
+    const after = await service.execute({ type: "agent.save", id: null, value: { id: "independent" } });
     expect(after.snapshot.agents.find(item => item.id === after.savedId)?.systemPrompt).toBe(configurationDefaults.agents.worker!.systemPrompt);
     await expect(service.execute({ type: "role.save", id: null, value: {} })).rejects.toMatchObject({ code: "invalid_request" });
   });
   it("工具策略覆盖替换内置策略；显式 null 与缺省分别表示调用方继承和内置值", async () => {
     const { service } = setup();
-    const saved = await service.execute({ type: "agent.save", id: "explorer", value: { excludeTools: ["bash"] } });
+    const saved = await service.execute({ type: "agent.save", id: "explorer", value: { id: "explorer", excludeTools: ["bash"] } });
     expect(saved.snapshot.agents.find(item => item.id === "explorer")).toMatchObject({ tools: null, excludeTools: ["bash"] });
-    const empty = await service.execute({ type: "agent.save", id: "explorer", value: { tools: [] } });
+    const empty = await service.execute({ type: "agent.save", id: "explorer", value: { id: "explorer", tools: [] } });
     expect(empty.snapshot.agents.find(item => item.id === "explorer")).toMatchObject({ tools: [], excludeTools: null });
-    await expect(service.execute({ type: "agent.save", id: "explorer", value: { tools: [], excludeTools: [] } })).rejects.toMatchObject({ code: "invalid_request" });
-    const inherited = await service.execute({ type: "role.save", id: "heavy", value: { thinking: null, hidden: false } });
+    await expect(service.execute({ type: "agent.save", id: "explorer", value: { id: "explorer", tools: [], excludeTools: [] } })).rejects.toMatchObject({ code: "invalid_request" });
+    const inherited = await service.execute({ type: "role.save", id: "heavy", value: { id: "heavy", thinking: null, hidden: false } });
     expect(resolveModelRole(inherited.snapshot, "heavy", { model: null, thinking: "low" }).thinking).toBe("low");
-    const reset = await service.execute({ type: "role.save", id: "heavy", value: {} });
+    const reset = await service.execute({ type: "role.save", id: "heavy", value: { id: "heavy",} });
     expect(resolveModelRole(reset.snapshot, "heavy", { model: null, thinking: "low" }).thinking).toBe("high");
   });
   it("内置升级只改变未覆盖字段，已取得的生效配置保持稳定", () => {
@@ -311,12 +331,12 @@ describe("真实配置与消费边界", () => {
     nextDefaults.agents.worker!.maxTurns = 3000;
     nextDefaults.agents.worker!.systemPrompt = "New built-in prompt";
     nextDefaults.roles.default!.thinking = "high";
-    const agent = { id: "custom-agent", builtin: false, overrides: { name: "Custom", systemPrompt: "Pinned prompt" } };
+    const agent = { id: "custom-agent", builtin: false, overrides: { systemPrompt: "Pinned prompt" } };
     const before = resolveAgentConfiguration(agent, oldDefaults);
     const after = resolveAgentConfiguration(agent, nextDefaults);
     expect(before.maxTurns).toBe(1200);
     expect(after).toMatchObject({ maxTurns: 3000, systemPrompt: "Pinned prompt" });
-    const role = { id: "custom-role", builtin: false, overrides: { name: "Custom", hidden: false } };
+    const role = { id: "custom-role", builtin: false, overrides: { hidden: false } };
     expect(resolveRoleConfiguration(role, nextDefaults)).toMatchObject({ thinking: "high", hidden: false });
   });
   it("初始化五种模型角色和五种 agent；worker 默认可用，utility 可管理且隐藏", async () => {
@@ -332,8 +352,8 @@ describe("真实配置与消费边界", () => {
   it("配置独立于数据库重开；密钥只进入加密文件，不进入配置和界面响应", async () => {
     const { service, root, protector } = setup();
     const { providerId } = await addModel(service, "api_key");
-    await service.execute({ type: "agent.save", id: "worker", value: { systemPrompt: "Pinned", enabled: false, tools: [] } });
-    await service.execute({ type: "role.save", id: "heavy", value: { thinking: null, hidden: false } });
+    await service.execute({ type: "agent.save", id: "worker", value: { id: "worker", systemPrompt: "Pinned", enabled: false, tools: [] } });
+    await service.execute({ type: "role.save", id: "heavy", value: { id: "heavy", thinking: null, hidden: false } });
     // 等级空集属于合法配置；保存与重开不因当前角色等级不可用而改写配置。
     const model = service.current().models[0]!;
     const modelValue = model;
@@ -382,7 +402,7 @@ describe("真实配置与消费边界", () => {
     const { service, root, protector } = setup();
     await expect(service.execute({ type: "remove", kind: "role", id: "smart"})).rejects.toMatchObject({ code: "invalid_request" });
     const { snapshot } = await service.execute({ type: "read" });
-    const custom = await service.execute({ type: "role.save", id: null, value: { ...roleValue(snapshot, "default"), name: "Custom" } });
+    const custom = await service.execute({ type: "role.save", id: null, value: { ...roleValue(snapshot, "default"), id: "custom" } });
     await service.execute({ type: "remove", kind: "role", id: custom.savedId!});
     await service.execute({ type: "remove", kind: "agent", id: "advisor"});
     service.close();

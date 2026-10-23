@@ -40,7 +40,7 @@ export function createAgentModule(application: BuiltinApplication, usage: UsageC
           prepare(input) { selection.validate(input.selection); return { action: "accept" }; },
           create(input, object) {
             object.commit(writer => { writer.set(AgentSelection, { selection: input.selection }); });
-            return { title: input.title ?? selection.agent(input.selection).name, data: {} };
+            return { title: input.title ?? selection.agent(input.selection).id, data: {} };
           },
         }),
         project(_data, object) {

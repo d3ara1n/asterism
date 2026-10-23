@@ -5,7 +5,7 @@ import { builtin } from "@atelier/builtin-api/contracts";
 /** 顶层工具的结果身份由后台与视图共享，保留实际调用时的目录与资源信息。 */
 export const AgentListResult = builtin.data("agent.list",
   z.array(z.strictObject({
-    id: z.string(), name: z.string(), description: z.string(),
+    id: z.string(), description: z.string(),
     examples: z.array(z.string()),
   })).describe("Available agent configuration identities, purposes, and task examples."));
 const creationEntrySchema = z.strictObject({

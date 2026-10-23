@@ -13,17 +13,19 @@ export const defaultAgentPreset = "worker";
 export const startAgentContentTarget = { contractId: builtin.name("session.start"), resourceKind: Agent.kind } as const;
 /** 待发送输入在请求边界或回合边界交付；空闲时直接开始执行。 */
 export const agentInputModeSchema = z.enum(["steer", "follow"]);
-/** title 可选，不填时用 agent 配置名。 */
+/** 提交与草稿共用 16 位 Nano ID 身份。 */
+export const submissionIdSchema = z.string().regex(/^[A-Za-z0-9_-]{16}$/u);
+/** title 可选，不填时用 agent 配置 ID。 */
 export const agentCreateSchema = z.strictObject({
   selection: agentSelectionSchema,
-  title: z.string().trim().min(1).max(160).optional().describe("Display title for the new Agent. Defaults to the selected configuration's name."),
+  title: z.string().trim().min(1).max(160).optional().describe("Display title for the new Agent. Defaults to the selected configuration ID."),
 }).describe("Agent configuration and title.");
 
 export const CreateAgent = defineCreation(Agent, { id: builtin.name("agent.create"), schema: agentCreateSchema });
 export const SubmitAgentInput = defineAction(Agent, {
   id: builtin.name("agent.submit"),
   schema: z.strictObject({
-    submissionId: z.string().uuid(), parts: userInputPartsSchema, mode: agentInputModeSchema,
+    submissionId: submissionIdSchema, parts: userInputPartsSchema, mode: agentInputModeSchema,
     sender: agentMessageSenderSchema.default({ kind: "user" }),
   }),
 });

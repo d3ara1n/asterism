@@ -28,15 +28,22 @@ export function ShellSettings({ value, disabled, save }: {
   value: Settings; disabled: boolean; save(value: Settings): Promise<boolean>;
 }) {
   const i18n = useI18n(), island = useRendererIsland();
+  const [editingId, setEditingId] = useState<string | null>(null);
   const presetTrigger = useRef<HTMLButtonElement>(null);
-  const open = (profile: ShellProfile, origin?: HTMLElement | null) => island.open({ key: islandKey(profile.id), label: messages.profile, origin,
-    render: () => <ShellProfileEditor id={profile.id} initial={profile} /> });
+  const open = async (profile: ShellProfile, origin?: HTMLElement | null) => {
+    const opened = await island.open({ key: islandKey(profile.id), label: messages.profile, origin,
+      render: () => <ShellProfileEditor id={profile.id} initial={profile} onSaved={setEditingId} /> });
+    if (opened) setEditingId(profile.id);
+    return opened;
+  };
   const commit = (next: Settings) => {
     const parsed = shellSettingsSchema.safeParse(next);
     return parsed.success ? save(parsed.data) : Promise.resolve(false);
   };
   const append = async (profile: ShellProfile, origin?: HTMLElement | null) => {
-    const added = { ...structuredClone(profile), id: crypto.randomUUID() };
+    let id = profile.id;
+    for (let suffix = 2; value.profiles.some(item => item.id === id); suffix++) id = `${profile.id}-${suffix}`;
+    const added = { ...structuredClone(profile), id };
     if (await commit({ ...value, profiles: [...value.profiles, added] })) void open(added, origin);
   };
   // 移除后，编辑该 profile 的浮岛自行关闭。
@@ -46,8 +53,8 @@ export function ShellSettings({ value, disabled, save }: {
   const preview = (item: ShellProfile) =>
     [item.executable, ...item.args, ...item.commandArgs].filter(Boolean).join(" ") + ` ${i18n.text(messages.command)}`;
   const row = (saved: ShellProfile) => <div key={saved.id} role="listitem">
-    <ListRow selected={island.child === islandKey(saved.id)} onOpen={origin => { void open(saved, origin); }}
-      title={<>{saved.name || saved.executable}{value.selected === saved.id && <Badge variant="secondary">{i18n.text(messages.isDefault)}</Badge>}</>}
+    <ListRow selected={!!island.child && editingId === saved.id} onOpen={origin => { void open(saved, origin); }}
+      title={<>{saved.id}{value.selected === saved.id && <Badge variant="secondary">{i18n.text(messages.isDefault)}</Badge>}</>}
       description={<span className="font-mono text-xs">{preview(saved)}</span>}
       actions={<>
         <IconButton label={i18n.text(messages.add)} disabled={disabled} onClick={event => { void append(saved, event.currentTarget); }}><Copy /></IconButton>
@@ -69,7 +76,7 @@ export function ShellSettings({ value, disabled, save }: {
             <SelectTrigger aria-label={selectedLabel} className="min-w-40"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="auto">{i18n.text(messages.auto)}</SelectItem>
-              {value.profiles.map(item => <SelectItem key={item.id} value={item.id}>{item.name || item.executable}</SelectItem>)}
+              {value.profiles.map(item => <SelectItem key={item.id} value={item.id}>{item.id}</SelectItem>)}
             </SelectContent>
           </Select>
         </ItemActions>
@@ -80,7 +87,7 @@ export function ShellSettings({ value, disabled, save }: {
         <h4 className="type-label">{i18n.text(messages.profiles)}</h4>
         <Select value="" disabled={disabled} onValueChange={preset => { void append(shellPresets.find(item => item.id === preset)!, presetTrigger.current); }}>
           <SelectTrigger ref={presetTrigger} size="sm" aria-label={i18n.text(messages.preset)}><SelectValue placeholder={i18n.text(messages.preset)} /></SelectTrigger>
-          <SelectContent align="end">{shellPresets.map(item => <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>)}</SelectContent>
+          <SelectContent align="end">{shellPresets.map(item => <SelectItem key={item.id} value={item.id}>{item.id}</SelectItem>)}</SelectContent>
         </Select>
       </div>
       {value.profiles.length > 0 && <ItemGroup className="surface">
@@ -94,8 +101,9 @@ export function ShellSettings({ value, disabled, save }: {
  * profile 编辑浮岛：读取当前配置，保存后保持打开并以保存结果为新的基准；关闭由浮岛的关闭按钮完成。
  * profile 在别处被移除（例如恢复默认设置）时关闭浮岛。
  */
-function ShellProfileEditor({ id, initial }: { id: string; initial: ShellProfile }) {
+function ShellProfileEditor({ id: initialId, initial, onSaved }: { id: string; initial: ShellProfile; onSaved(id: string): void }) {
   const i18n = useI18n(), island = useRendererIsland(), fieldId = useId();
+  const [id, setId] = useState(initialId);
   const config = useRendererConfiguration(BuiltinSettings);
   const saved = config.value.shell.profiles.find(item => item.id === id);
   const [baseline, setBaseline] = useState(() => draftOf(saved ?? initial));
@@ -106,8 +114,8 @@ function ShellProfileEditor({ id, initial }: { id: string; initial: ShellProfile
   const seen = useRef(false);
   useEffect(() => {
     if (saved) seen.current = true;
-    else if (seen.current) void island.close({ force: true });
-  }, [saved, island]);
+    else if (seen.current && !saving) void island.close({ force: true });
+  }, [saved, island, saving]);
   const dirty = JSON.stringify(draft) !== JSON.stringify(baseline);
   const disabled = saving || !config.ready;
 
@@ -120,17 +128,21 @@ function ShellProfileEditor({ id, initial }: { id: string; initial: ShellProfile
       entries.push([line.slice(0, equals), line.slice(equals + 1)]);
     }
     const { profile } = draft;
-    const edited = { ...profile, args: profile.args.filter(Boolean), commandArgs: profile.commandArgs.filter(Boolean), env: Object.fromEntries(entries) };
+    const edited = { ...profile, id: profile.id.trim(), args: profile.args.filter(Boolean), commandArgs: profile.commandArgs.filter(Boolean), env: Object.fromEntries(entries) };
     const current = config.value;
-    const profiles = current.shell.profiles.some(item => item.id === edited.id)
-      ? current.shell.profiles.map(item => item.id === edited.id ? edited : item)
+    const profiles = current.shell.profiles.some(item => item.id === id)
+      ? current.shell.profiles.map(item => item.id === id ? edited : item)
       : [...current.shell.profiles, edited];
-    const next = shellSettingsSchema.safeParse({ ...current.shell, profiles });
+    const next = shellSettingsSchema.safeParse({ ...current.shell, profiles,
+      selected: current.shell.selected === id ? edited.id : current.shell.selected });
     if (!next.success) { setInvalid(true); return; }
     setInvalid(false); setFailure(null); setSaving(true);
     try {
       await config.save({ ...current, shell: next.data });
-      const normalized = draftOf(edited);
+      const persisted = next.data.profiles.find(item => item.id === edited.id)!;
+      setId(persisted.id);
+      onSaved(persisted.id);
+      const normalized = draftOf(persisted);
       setBaseline(normalized); setDraft(normalized);
     } catch (error) {
       setFailure((error as { display?: UiText }).display ?? settingsMessages.saveFailed);
@@ -138,22 +150,24 @@ function ShellProfileEditor({ id, initial }: { id: string; initial: ShellProfile
   };
 
   const update = (patch: Partial<ShellProfile>) => setDraft(current => ({ ...current, profile: { ...current.profile, ...patch } }));
-  const field = (key: "name" | "executable" | "args" | "commandArgs") => {
+  const field = (key: "id" | "executable" | "args" | "commandArgs") => {
     const control = `${fieldId}-${key}`, item = draft.profile;
     return <div className="flex flex-col gap-2">
       <Label htmlFor={control}>{i18n.text(messages[key])}</Label>
-      {key === "name" || key === "executable"
-        ? <Input id={control} disabled={disabled} value={item[key]} onChange={event => update({ [key]: event.target.value })} />
+      {key === "id" || key === "executable"
+        ? <Input id={control} disabled={disabled} value={item[key]}
+          {...(key === "id" ? { required: true, maxLength: 160, pattern: "[a-z0-9]+((_|-)[a-z0-9]+)*", className: "font-mono" } : {})}
+          onChange={event => update({ [key]: event.target.value })} />
         : <Textarea id={control} disabled={disabled} rows={2} className="font-mono" value={item[key].join("\n")}
           placeholder={i18n.text(key === "args" ? messages.argsPlaceholder : messages.commandArgsPlaceholder)}
           onChange={event => update({ [key]: event.target.value ? event.target.value.split("\n") : [] })} />}
     </div>;
   };
   const form = `${fieldId}-form`;
-  return <IslandPanel title={(saved ?? initial).name || (saved ?? initial).executable} description={i18n.text(messages.profile)} dirty={dirty}
+  return <IslandPanel title={(saved ?? initial).id} description={i18n.text(messages.profile)} dirty={dirty}
     action={<Button type="submit" form={form} size="sm" disabled={disabled || !dirty} aria-busy={saving}>{saving && <Spinner />}{i18n.text(messages.save)}</Button>}>
     <form id={form} className="flex flex-col gap-4" onSubmit={event => { event.preventDefault(); void submit(); }}>
-      {field("name")}{field("executable")}{field("args")}{field("commandArgs")}
+      {field("id")}{field("executable")}{field("args")}{field("commandArgs")}
       <div className="flex flex-col gap-2">
         <Label htmlFor={`${fieldId}-env`}>{i18n.text(messages.env)}</Label>
         <Textarea id={`${fieldId}-env`} rows={3} className="font-mono" disabled={disabled} value={draft.env} placeholder={i18n.text(messages.envPlaceholder)}

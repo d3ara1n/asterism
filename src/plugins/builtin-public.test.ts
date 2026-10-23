@@ -1,3 +1,4 @@
+import { nanoid } from "nanoid";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync, readFileSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -27,7 +28,7 @@ function fixture(ranges: (string | null)[] = [compatibleRange, `~${builtinPublic
     const root = temp(), id = `fixture.consumer${index}`;
     file(root, "package.json", JSON.stringify({ name: `@fixture/consumer${index}`, version: "1.0.0",
       ...(range === null ? {} : { peerDependencies: { "@atelier/builtin-api": range } }),
-      atelier: { id, api: { major: 15, minMinor: 0 }, runtime: "runtime.ts", renderer: "renderer.ts" } }));
+      atelier: { id, api: { major: 16, minMinor: 0 }, runtime: "runtime.ts", renderer: "renderer.ts" } }));
     file(root, "public.ts", 'export { SubmitAgentInput } from "@atelier/builtin-api/contracts";');
     file(root, "runtime.ts", `
       import { pluginNamespace } from "@atelier/sdk/contracts";
@@ -93,7 +94,7 @@ describe("内置公共包", () => {
         input: { selection: { agent: "worker", model: null, thinking: null } }, position: { x: 0, y: 0 } });
       const before = service.sessions.current(sessionId), objectId = before.workbench.objects[0]!.id;
       await expect(service.sessions.execute({ type: "resource.command", sessionId, objectId,
-        command: resourceCall(SubmitAgentInput, { mode: "follow", submissionId: crypto.randomUUID(), parts: [{ kind: "text", text: "Hello" }] }) }))
+        command: resourceCall(SubmitAgentInput, { mode: "follow", submissionId: nanoid(16), parts: [{ kind: "text", text: "Hello" }] }) }))
         .rejects.toThrow("Blocked by external preparer.");
       expect(probes.map(probe => probe.calls.length)).toEqual([1, 1]);
       expect(service.sessions.current(sessionId).nodes).toEqual(before.nodes);

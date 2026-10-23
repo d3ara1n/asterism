@@ -1,13 +1,12 @@
 import { z } from "zod";
-import { builtin } from "@atelier/builtin-api/contracts";
+import { builtin, configurationIdSchema } from "@atelier/builtin-api/contracts";
 
 export const OUTPUT_CHAR_LIMIT = 16_384;
 export const MAX_TIMEOUT_SECONDS = 2_147_483_647 / 1000;
 
 /** 启动参数与命令参数分开，profile 可供不同 shell 使用方式共享。 */
 export const shellProfileSchema = z.strictObject({
-  id: z.string().trim().min(1).refine(value => value !== "auto", "The profile ID 'auto' is reserved."),
-  name: z.string().trim().min(1),
+  id: configurationIdSchema.refine(value => value !== "auto", "The profile ID 'auto' is reserved."),
   executable: z.string().trim().min(1),
   args: z.array(z.string()),
   commandArgs: z.array(z.string()),
@@ -16,12 +15,12 @@ export const shellProfileSchema = z.strictObject({
 export type ShellProfile = z.infer<typeof shellProfileSchema>;
 
 export const shellPresets: ShellProfile[] = [
-  { id: "pwsh", name: "PowerShell 7", executable: "pwsh", args: [], commandArgs: ["-NonInteractive", "-Command"], env: {} },
-  { id: "nu", name: "Nushell", executable: "nu", args: ["-l"], commandArgs: ["-c"], env: {} },
-  { id: "fish", name: "Fish", executable: "fish", args: [], commandArgs: ["-c"], env: {} },
-  { id: "zsh", name: "Zsh", executable: "zsh", args: [], commandArgs: ["-c"], env: {} },
-  { id: "bash", name: "Bash", executable: "bash", args: [], commandArgs: ["-c"], env: {} },
-  { id: "sh", name: "POSIX sh", executable: "sh", args: [], commandArgs: ["-c"], env: {} },
+  { id: "pwsh", executable: "pwsh", args: [], commandArgs: ["-NonInteractive", "-Command"], env: {} },
+  { id: "nu", executable: "nu", args: ["-l"], commandArgs: ["-c"], env: {} },
+  { id: "fish", executable: "fish", args: [], commandArgs: ["-c"], env: {} },
+  { id: "zsh", executable: "zsh", args: [], commandArgs: ["-c"], env: {} },
+  { id: "bash", executable: "bash", args: [], commandArgs: ["-c"], env: {} },
+  { id: "sh", executable: "sh", args: [], commandArgs: ["-c"], env: {} },
 ];
 export const defaultShellSettings = { selected: "auto", profiles: shellPresets };
 export const shellSettingsSchema = z.strictObject({
@@ -43,7 +42,6 @@ export const ShellProfileListResult = builtin.data("shell.profile-list", z.stric
   resolvedProfile: z.string().nullable().describe("Profile ID currently resolved for the default selection; null when its executable is unavailable."),
   profiles: z.array(z.strictObject({
     id: z.string().describe("Profile ID accepted by terminal creation."),
-    name: z.string().describe("Display name."),
     executable: z.string().describe("Configured executable path or command name."),
     args: z.array(z.string()).describe("Configured shell startup arguments."),
     commandArgs: z.array(z.string()).describe("Arguments added before command text for directory exec."),

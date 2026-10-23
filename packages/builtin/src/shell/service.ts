@@ -12,7 +12,7 @@ export class ShellService {
   async inspect(): Promise<Json> {
     try {
       const shell = await resolveShell(this.settings());
-      return { profile: shell.profile.name, executable: shell.executable, platform: process.platform, interactive: false };
+      return { profile: shell.profile.id, executable: shell.executable, platform: process.platform, interactive: false };
     } catch (error) { return { platform: process.platform, error: String(error) }; }
   }
   async execute(cwd: string, args: { command: string; timeout?: number }, options: {

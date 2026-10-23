@@ -1,12 +1,11 @@
 import type { CSSProperties, ReactNode } from "react";
 import { motion } from "motion/react";
-import { useI18n, useRendererCatalogs, type I18n } from "@atelier/sdk/renderer";
+import { useI18n, type I18n } from "@atelier/sdk/renderer";
 import type { AgentRequestContextData } from "@atelier/builtin-api/contracts";
 import { Badge } from "@atelier/ui/ui/badge";
 import { cn } from "@atelier/ui/utils";
 import { formatCount } from "@atelier/ui/format-count";
 import { contextMessages as messages } from "../messages/context";
-import { ModelConfiguration } from "@atelier/builtin-api/contracts";
 
 /** 代理辅助面板共用的版式与图表部件；视觉规范见 docs/design-system.md#数据图表。 */
 export const ease = [0.2, 0.8, 0.2, 1] as const;
@@ -56,12 +55,11 @@ function SystemRow({ label, detail, value, total, color, nested = false }: { lab
 /** 一次请求实际发出的系统提示块与工具名称；只显示字数与占比，不换算 token。 */
 export function SystemComposition({ diagnostics }: { diagnostics: AgentRequestContextData }) {
   const i18n = useI18n();
-  const configuration = useRendererCatalogs().get(ModelConfiguration);
   const blocks = diagnostics.system ?? [];
   const total = blocks.reduce((sum, block) => sum + block.characters, 0);
   const sum = (kind: string) => blocks.filter(block => block.kind === kind).reduce((value, block) => value + block.characters, 0);
   const files = blocks.flatMap(block => block.kind === "context" ? [block] : []);
-  const roles = blocks.flatMap(block => block.kind === "agent" ? [configuration?.agents.find(agent => agent.id === block.role)?.name ?? block.role] : []);
+  const roles = blocks.flatMap(block => block.kind === "agent" ? [block.role] : []);
   const tools = diagnostics.tools;
   return <div className="space-y-4">
     {diagnostics.system && <ul className="space-y-3">

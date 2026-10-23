@@ -1,3 +1,4 @@
+import { nanoid } from "nanoid";
 import { describe, expect, it } from "vitest";
 import type { RendererContentInput } from "@atelier/sdk/renderer";
 import type { ModelInputPart } from "@atelier/sdk/contracts";
@@ -19,7 +20,7 @@ describe("草稿交换受理确认", () => {
     const incoming: CopiedDraft = { parts: [{ kind: "text", text: "Original" }, file], text: "Original",
       files: [{ part: file, size: 3 }], content: content() };
     const exchange = new DraftExchange(editor, () => {});
-    const input = { submissionId: crypto.randomUUID(), id: crypto.randomUUID(), replacement: null };
+    const input = { submissionId: nanoid(16), id: nanoid(16), replacement: null };
     exchange.begin({ input, incoming, replacement: null });
     let committed: string | null = null, writes = 0;
     const invoke = async (value: { submissionId: string }) => {
@@ -42,7 +43,7 @@ describe("草稿交换受理确认", () => {
   it("条目不存在的明确拒绝保留编辑器并结束待确认操作", async () => {
     const editor = createMessageDraft(content); editor.setText("Editor");
     const exchange = new DraftExchange(editor, () => {});
-    exchange.begin({ input: { submissionId: crypto.randomUUID(), id: crypto.randomUUID(), replacement: null },
+    exchange.begin({ input: { submissionId: nanoid(16), id: nanoid(16), replacement: null },
       incoming: { parts: [{ kind: "text", text: "Old" }], text: "Old", files: [], content: content() }, replacement: null });
     await exchange.retry(async () => ({ ok: false, error: { code: "not_found", message: "Already sent" } }));
     expect(exchange.pending).toBeNull();

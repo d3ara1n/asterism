@@ -59,7 +59,7 @@ export function AgentConfigurationPicker({ selection, disabled, onChange }: {
   const labels = { agent: i18n.text(commonMessages.agent), model: i18n.text(commonMessages.model), thinking: i18n.text(commonMessages.thinkingTitle) };
   const icons = { agent: Bot, model: Cpu, thinking: Brain };
   const values = {
-    agent: selectedAgent?.name ?? i18n.text(configurationMessages.unavailableAgent),
+    agent: selectedAgent?.id ?? i18n.text(configurationMessages.unavailableAgent),
     model: modelName,
     thinking: thinkingName,
   };
@@ -69,7 +69,7 @@ export function AgentConfigurationPicker({ selection, disabled, onChange }: {
   const defaultThinking = configuration ? resolveAgentModelSelection(configuration, { ...selection, thinking: null }).thinking : null;
   const options: Record<Exclude<Page, "model">, ConfigurationChoice[]> = {
     agent: configuration?.agents.filter(agent => agent.enabled).map(agent => ({
-      value: agent.id, label: agent.name, description: agent.description,
+      value: agent.id, label: agent.id, description: agent.description,
     })) ?? [],
     thinking: [{ value: FOLLOW, label: follow, description: thinkingLabel(defaultThinking) },
       ...levels.map(level => ({ value: level, label: i18n.text(thinkingLabels[level]) }))],

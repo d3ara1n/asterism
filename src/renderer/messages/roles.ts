@@ -65,9 +65,9 @@ export const rolesMessages = pluginNamespace("atelier.host").messages("en", defi
     id: "features_configuration_RolesSettings_22",
     defaultMessage: "“{current_name}” will be removed. Agents that reference it will fail until they choose another role.",
   },
-  name: {
+  id: {
     id: "features_configuration_RolesSettings_23",
-    defaultMessage: "Name",
+    defaultMessage: "ID",
   },
   purpose: {
     id: "features_configuration_RolesSettings_24",

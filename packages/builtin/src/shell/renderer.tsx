@@ -14,7 +14,7 @@ function Header({ result }: Props) {
   const i18n = useI18n();
   const data = result?.data;
   const selected = data?.selected === "auto" ? i18n.text(messages.auto)
-    : data?.profiles.find(profile => profile.id === data.selected)?.name ?? data?.selected;
+    : data?.selected;
   return <ToolHeader label={i18n.text(messages.profiles)}
     meta={selected && `${i18n.text(messages.selected)}: ${selected}`} />;
 }
@@ -27,7 +27,7 @@ function Body({ result }: Props) {
   return <div className="space-y-2"><ItemGroup>{data.profiles.slice(0, TOOL_BODY_LINE_LIMIT).map(profile => <Item key={profile.id} size="sm" className="px-0">
     <ItemContent className="min-w-0">
       <ItemTitle className="flex-wrap">
-        {profile.name}
+        {profile.id}
         {profile.id === data.resolvedProfile && <Badge variant="secondary">{i18n.text(messages.isDefault)}</Badge>}
         <Badge variant="outline">{i18n.text(profile.available ? messages.profileAvailable : messages.profileUnavailable)}</Badge>
       </ItemTitle>

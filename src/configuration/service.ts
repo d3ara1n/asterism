@@ -158,9 +158,8 @@ export class ConfigurationService {
     if (command.id && !this.store.get(saveKinds[command.type], command.id)) throw new ConfigurationError("not_found", "This configuration no longer exists. Reload settings.");
     switch (command.type) {
       case "role.save": case "agent.save": {
-        const id = command.id ?? randomUUID();
-        this.store.save({ kind: command.type === "role.save" ? "role" : "agent", id, value: command.value } as never);
-        return id;
+        this.store.save({ kind: command.type === "role.save" ? "role" : "agent", id: command.id, value: command.value } as never);
+        return command.value.id;
       }
       case "model.save":
         if (!this.store.get("provider", command.value.providerId)) throw new ConfigurationError("not_found", "The provider no longer exists. Reload settings.");

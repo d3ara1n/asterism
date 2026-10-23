@@ -226,16 +226,16 @@ describe("Agent 创建与移除入口", () => {
   it("agent_list 公开选择字段并隔离系统提示词和执行配置", async () => {
     const f = open({ adapter: adapter(() => [{ name: "agent_list", args: {} }]) });
     const target = await model(f.app), actor = await f.session.create(Create, 0);
-    await f.app.configuration.execute({ type: "agent.save", id: "worker", value: {
+    await f.app.configuration.execute({ type: "agent.save", id: "worker", value: { id: "worker",
       description: "Public purpose", examples: ["Public example"],
       systemPrompt: "PRIVATE_AGENT_INSTRUCTIONS", maxTurns: 123,
     } });
-    await f.app.configuration.execute({ type: "agent.save", id: "reviewer", value: { enabled: false } });
+    await f.app.configuration.execute({ type: "agent.save", id: "reviewer", value: { id: "reviewer", enabled: false } });
     const result = await runner(f, actor, target)();
     expect(result.tools[0]?.kind).toBe("succeeded");
     const entries = result.tools[0]!.data as { id: string }[];
     expect(entries.find(entry => entry.id === "worker")).toEqual({
-      id: "worker", name: "worker", description: "Public purpose",
+      id: "worker", description: "Public purpose",
       examples: ["Public example"],
     });
     expect(entries.some(entry => entry.id === "reviewer")).toBe(false);

@@ -1,5 +1,5 @@
 import { Plus } from "lucide-react";
-import { useState } from "react";
+import { useId, useState } from "react";
 
 import { availableThinkingLevels, modelReference, type ProviderModel, type ModelRole, type ModelRoleOverrides, type ThinkingLevel } from "../../../shared/configuration";
 import { rolesMessages } from "../../messages/roles";
@@ -7,6 +7,7 @@ import { modelSelectionMessages, thinkingLabels } from "@atelier/ui/messages/mod
 import { getI18n, useI18n } from "../../shared/i18n";
 import { Badge } from "@atelier/ui/ui/badge";
 import { Button } from "@atelier/ui/ui/button";
+import { Input } from "@atelier/ui/ui/input";
 import { FieldGroup, Field, FieldLabel, FieldDescription } from "@atelier/ui/ui/field";
 import { ItemGroup, ItemSeparator } from "@atelier/ui/ui/item";
 import { ListRow } from "@atelier/ui/ui/list-row";
@@ -69,8 +70,13 @@ export function RolesSettings() {
   const i18n = useI18n();
   const { snapshot, run, busy } = useSettingsConfiguration();
   const island = useIsland();
-  const open = (id: string | null, origin?: HTMLElement | null) => island.open({ id: `role-${id ?? "new"}`, label: rolesMessages.modelRole, width: panelIslandWidth, origin,
-    render: () => <RoleEditor key={id ?? "new"} initialId={id} /> });
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const open = async (id: string | null, origin?: HTMLElement | null) => {
+    const opened = await island.open({ id: `role-${id ?? "new"}`, label: rolesMessages.modelRole, width: panelIslandWidth, origin,
+      render: () => <RoleEditor key={id ?? "new"} initialId={id} onSaved={setEditingId} /> });
+    if (opened) setEditingId(id);
+    return opened;
+  };
   // 行内修改即时保存：在现有覆盖上替换单个字段，与内置值相同则撤下。
   const patch = <K extends keyof ModelRoleOverrides>(role: ModelRole, field: K, next: ModelRoleOverrides[K]) => {
     if (!snapshot) return;
@@ -78,53 +84,55 @@ export function RolesSettings() {
     const overrides = { ...snapshot.overrides.roles[role.id] };
     const value = toOverride(next, base[field as keyof typeof base] as ModelRoleOverrides[K]);
     if (value === undefined) delete overrides[field]; else overrides[field] = value;
-    if (!role.builtin) overrides.name ??= role.name;
-    void run({ type: "role.save", id: role.id, value: overrides });
+    void run({ type: "role.save", id: role.id, value: { ...overrides, id: role.id } });
   };
   const roles = snapshot?.roles ?? [];
   return <Section title={i18n.formatMessage(rolesMessages.modelRoles)} hint={i18n.formatMessage(rolesMessages.summary)}
     action={<Button size="sm" disabled={!snapshot} onClick={event => open(null, event.currentTarget)}><Plus />{i18n.formatMessage(rolesMessages.addRole)}</Button>}>
     {snapshot && <ItemGroup className="surface">{roles.map((role, index) => {
       return <div key={role.id}>{index > 0 && <ItemSeparator />}
-        <ListRow className="flex-wrap" contentClassName="min-w-40" selected={island.child === `role-${role.id}`} inactive={!role.enabled} onOpen={origin => open(role.id, origin)}
-          title={<>{role.name}{role.hidden && <Badge variant="secondary">{i18n.formatMessage(rolesMessages.internal)}</Badge>}</>}
+        <ListRow className="flex-wrap" contentClassName="min-w-40" selected={!!island.child && editingId === role.id} inactive={!role.enabled} onOpen={origin => open(role.id, origin)}
+          title={<>{role.id}{role.hidden && <Badge variant="secondary">{i18n.formatMessage(rolesMessages.internal)}</Badge>}</>}
           description={role.description}
           actions={<>
             <ModelSelect value={role.model} disabled={busy} onChange={next => patch(role, "model", next)} />
             <ThinkingSelect value={role.thinking} model={snapshot.models.find(model => modelReference(model) === role.model) ?? null}
               disabled={busy} onChange={next => patch(role, "thinking", next)} />
-            <Switch aria-label={i18n.formatMessage(rolesMessages.enableRole, { role_name: role.name })} checked={role.enabled} disabled={busy} onCheckedChange={next => patch(role, "enabled", next)} />
+            <Switch aria-label={i18n.formatMessage(rolesMessages.enableRole, { role_name: role.id })} checked={role.enabled} disabled={busy} onCheckedChange={next => patch(role, "enabled", next)} />
           </>} /></div>;
     })}</ItemGroup>}
   </Section>;
 }
 /** 详情只放低频字段；模型、思考与启用是行内即时操作，草稿不持有，避免互相覆盖。 */
-function RoleEditor({ initialId }: { initialId: string | null }) {
+function RoleEditor({ initialId, onSaved }: { initialId: string | null; onSaved(id: string): void }) {
   const i18n = useI18n();
+  const slugField = useId();
   const { snapshot, run } = useSettingsConfiguration();
   const island = useIsland();
   const [id, setId] = useState(initialId);
+  const [slug, setSlug] = useState(initialId ?? "");
   const current = snapshot?.roles.find(role => role.id === id);
   const stored = id ? snapshot?.overrides.roles[id] ?? {} : {};
-  const pick = (overrides: ModelRoleOverrides) => ({ name: overrides.name, description: overrides.description, hidden: overrides.hidden });
+  const pick = (overrides: ModelRoleOverrides) => ({ description: overrides.description, hidden: overrides.hidden });
   const [value, setValue] = useState(() => pick(stored));
   const base = snapshot?.defaults.roles[current?.builtin ? current.id : "default"];
   if (!base || !snapshot) return null;
-  const dirty = JSON.stringify(pick(stored)) !== JSON.stringify(value);
+  const dirty = !current || slug !== id || JSON.stringify(pick(stored)) !== JSON.stringify(value);
   const users = current ? snapshot.agents.filter(agent => agent.modelRole === current.id || agent.fallbackRole === current.id) : [];
-  return <Editor form="role-form" title={current?.name ?? i18n.formatMessage(rolesMessages.newRole)} description={current?.builtin ? i18n.formatMessage(rolesMessages.builtinRole) : undefined} dirty={dirty}
+  return <Editor form="role-form" title={current?.id ?? i18n.formatMessage(rolesMessages.newRole)} description={current?.builtin ? i18n.formatMessage(rolesMessages.builtinRole) : undefined} dirty={dirty}
     remove={current && !current.builtin ? { title: i18n.formatMessage(rolesMessages.deleteTitle),
-      description: i18n.formatMessage(rolesMessages.deleteDescription, { current_name: current.name }),
+      description: i18n.formatMessage(rolesMessages.deleteDescription, { current_name: current.id }),
       onConfirm: async () => { const result = await run({ type: "remove", kind: "role", id: current.id }); if (result.ok) void island.close({ force: true }); } } : undefined}>
     <form id="role-form" onSubmit={async event => {
       event.preventDefault();
       const latest = id ? snapshot.overrides.roles[id] ?? {} : {};
       const next: ModelRoleOverrides = { ...latest };
-      for (const field of ["name", "description", "hidden"] as const) { if (value[field] === undefined) delete next[field]; else (next as Record<string, unknown>)[field] = value[field]; }
-      const result = await run({ type: "role.save", id, value: next });
-      if (result.ok && result.savedId) { setId(result.savedId); setValue(pick(result.snapshot.overrides.roles[result.savedId]!)); }
+      for (const field of ["description", "hidden"] as const) { if (value[field] === undefined) delete next[field]; else (next as Record<string, unknown>)[field] = value[field]; }
+      const result = await run({ type: "role.save", id, value: { ...next, id: slug } });
+      if (result.ok && result.savedId) { setId(result.savedId); setSlug(result.savedId); onSaved(result.savedId); setValue(pick(result.snapshot.overrides.roles[result.savedId]!)); }
     }}><FieldGroup>
-      <TextField label={i18n.formatMessage(rolesMessages.name)} value={value.name ?? ""} placeholder={current?.builtin ? base.name : undefined} onChange={next => setValue(v => ({ ...v, name: next || undefined }))} required={!current?.builtin} />
+      <Field><FieldLabel htmlFor={slugField}>{i18n.formatMessage(rolesMessages.id)}</FieldLabel>
+        <Input id={slugField} value={slug} readOnly={current?.builtin} required maxLength={160} pattern="[a-z0-9]+((_|-)[a-z0-9]+)*" className="font-mono" onChange={event => setSlug(event.target.value)} /></Field>
       <TextField label={i18n.formatMessage(rolesMessages.purpose)} value={value.description ?? ""} placeholder={base.description} onChange={next => setValue(v => ({ ...v, description: next || undefined }))} multiline
         hint={current?.builtin ? i18n.formatMessage(rolesMessages.purposeHint) : undefined} />
       <OverrideToggleField label={i18n.formatMessage(rolesMessages.availableToAgents)} hint={i18n.formatMessage(rolesMessages.availableToAgentsHint)}
@@ -132,7 +140,7 @@ function RoleEditor({ initialId }: { initialId: string | null }) {
       {current && <Field><FieldLabel>{i18n.formatMessage(rolesMessages.usedBy)}</FieldLabel>
         {users.length ? <ul className="flex flex-wrap gap-1.5" aria-label={i18n.formatMessage(rolesMessages.agentsUsingRole)}>
           {users.map(agent => <li key={agent.id}><Badge variant="secondary" className="gap-1">
-            {agent.name}
+            {agent.id}
             {agent.modelRole !== current.id && <span className="text-muted-foreground">· {i18n.formatMessage(rolesMessages.fallback)}</span>}
           </Badge></li>)}
         </ul> : <FieldDescription>{i18n.formatMessage(rolesMessages.noAgentsUsingRole)}</FieldDescription>}

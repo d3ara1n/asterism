@@ -1,4 +1,4 @@
-import { agentInputSchema, agentSchema, agentOverridesSchema } from "@atelier/builtin-api/contracts";
+import { agentInputSchema, agentSchema, agentOverridesSchema, configurationIdSchema } from "@atelier/builtin-api/contracts";
 export { agentInputSchema, agentSchema, agentOverridesSchema, type AgentConfiguration, type AgentOverrides } from "@atelier/builtin-api/contracts";
 import {
   modelExpressionSchema, parseModelExpression, thinkingSchema, type ThinkingLevel,
@@ -46,11 +46,10 @@ export const modelInputSchema = z.strictObject({
 });
 export const modelSchema = modelInputSchema;
 export const modelRoleInputSchema = z.strictObject({
-  name, model: modelExpressionSchema.nullable(), thinking: thinkingSchema.nullable(), enabled: z.boolean(), description: z.string().max(20_000), hidden: z.boolean(),
+  model: modelExpressionSchema.nullable(), thinking: thinkingSchema.nullable(), enabled: z.boolean(), description: z.string().max(20_000), hidden: z.boolean(),
 });
-export const modelRoleSchema = modelRoleInputSchema.extend({ id, builtin: z.boolean() });
-const overrideName = z.string().trim().max(160).optional();
-export const modelRoleOverridesSchema = modelRoleInputSchema.partial().extend({ name: overrideName });
+export const modelRoleSchema = modelRoleInputSchema.extend({ id: configurationIdSchema, builtin: z.boolean() });
+export const modelRoleOverridesSchema = modelRoleInputSchema.partial();
 export const testErrorSchema = z.enum(["configuration", "credential", "authentication", "model_unavailable", "rate_limit", "network", "timeout", "protocol", "server", "cancelled"]);
 export const connectionTestSchema = z.strictObject({
   id, providerId: providerIdSchema, model: modelExpressionSchema,
@@ -103,8 +102,8 @@ export const configurationCommandSchema = z.discriminatedUnion("type", [
   // 保存目标是当前 ID；value 中的 ID 可以不同，即改名。
   z.strictObject({ type: z.literal("provider.save"), id: providerIdSchema.nullable(), value: providerInputSchema, credential: credentialUpdateSchema }),
   z.strictObject({ type: z.literal("model.save"), id: modelExpressionSchema.nullable(), value: modelInputSchema }),
-  z.strictObject({ type: z.literal("role.save"), ...target, value: modelRoleOverridesSchema }),
-  z.strictObject({ type: z.literal("agent.save"), ...target, value: agentOverridesSchema }),
+  z.strictObject({ type: z.literal("role.save"), ...target, value: modelRoleOverridesSchema.extend({ id: configurationIdSchema }) }),
+  z.strictObject({ type: z.literal("agent.save"), ...target, value: agentOverridesSchema.safeExtend({ id: configurationIdSchema }) }),
   z.strictObject({ type: z.literal("remove"), kind: z.enum(["provider", "model", "role", "agent"]), id: z.string().min(1).max(321) }),
   z.strictObject({ type: z.literal("test.start"), model: modelExpressionSchema }),
   z.strictObject({ type: z.literal("test.cancel"), id }),

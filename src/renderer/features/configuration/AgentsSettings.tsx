@@ -27,18 +27,15 @@ const NONE = "__none";
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 const baseOf = (snapshot: ConfigurationSnapshot, agent?: AgentConfiguration): Base => snapshot.defaults.agents[agent?.builtin ? agent.id : "worker"]!;
 
-/**
- * 覆盖归一：空白文本撤下；与内置值相同的字段撤下；工具允许/排除作为一组比较。
- * 自定义代理必须保留名称。
- */
-function normalize(draft: AgentOverrides, base: Base, builtin: boolean): AgentOverrides {
+/** 覆盖归一：空白文本撤下；与内置值相同的字段撤下；工具允许/排除作为一组比较。 */
+function normalize(draft: AgentOverrides, base: Base): AgentOverrides {
   const result: Record<string, unknown> = {};
   for (const [key, raw] of Object.entries(draft)) {
     if (raw === undefined || key === "tools" || key === "excludeTools") continue;
     let value = raw;
-    if (typeof value === "string") { if (!value.trim()) continue; value = key === "name" ? value.trim() : value; }
+    if (typeof value === "string" && !value.trim()) continue;
     if (Array.isArray(value)) value = [...new Set(value.map(item => String(item).trim()).filter(Boolean))];
-    if (!(key === "name" && !builtin) && same(value, base[key as keyof Base])) continue;
+    if (same(value, base[key as keyof Base])) continue;
     result[key] = value;
   }
   if (draft.tools !== undefined || draft.excludeTools !== undefined) {
@@ -55,12 +52,17 @@ export function AgentsSettings() {
   const i18n = useI18n();
   const { snapshot, run, busy } = useSettingsConfiguration();
   const island = useIsland();
-  const open = (id: string | null, origin?: HTMLElement | null) => island.open({ id: `agent-${id ?? "new"}`, label: agentsMessages.agent, width: { min: 440, grow: 1, max: 720 }, origin,
-    render: () => <AgentEditor key={id ?? "new"} initialId={id} /> });
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const open = async (id: string | null, origin?: HTMLElement | null) => {
+    const opened = await island.open({ id: `agent-${id ?? "new"}`, label: agentsMessages.agent, width: { min: 440, grow: 1, max: 720 }, origin,
+      render: () => <AgentEditor key={id ?? "new"} initialId={id} onSaved={setEditingId} /> });
+    if (opened) setEditingId(id);
+    return opened;
+  };
   const setEnabled = (agent: AgentConfiguration, enabled: boolean) => {
     if (!snapshot) return;
     const stored = snapshot.overrides.agents[agent.id] ?? {};
-    void run({ type: "agent.save", id: agent.id, value: normalize({ ...stored, enabled }, baseOf(snapshot, agent), agent.builtin) });
+    void run({ type: "agent.save", id: agent.id, value: { ...normalize({ ...stored, enabled }, baseOf(snapshot, agent)), id: agent.id } });
   };
   const agents = snapshot?.agents ?? [];
   return <Section title={i18n.formatMessage(agentsMessages.agents)} hint={i18n.formatMessage(agentsMessages.summary)}
@@ -68,14 +70,14 @@ export function AgentsSettings() {
     {snapshot && <ItemGroup className="surface">{agents.map((agent, index) => {
       const role = agent.modelRole === null ? null : snapshot.roles.find(item => item.id === agent.modelRole);
       return <div key={agent.id}>{index > 0 && <ItemSeparator />}
-        <ListRow selected={island.child === `agent-${agent.id}`} inactive={!agent.enabled} onOpen={origin => open(agent.id, origin)}
-          title={<>{agent.name}{agent.id === "worker" && <Badge variant="secondary">{i18n.formatMessage(agentsMessages.default)}</Badge>}</>}
+        <ListRow selected={!!island.child && editingId === agent.id} inactive={!agent.enabled} onOpen={origin => open(agent.id, origin)}
+          title={<>{agent.id}{agent.id === "worker" && <Badge variant="secondary">{i18n.formatMessage(agentsMessages.default)}</Badge>}</>}
           description={agent.description}
           actions={<>
             {agent.modelRole !== null && !role
               ? <StatusBadge tone="error">{i18n.formatMessage(agentsMessages.unavailableRole)}</StatusBadge>
-              : <Badge variant="secondary">{role ? role.name : i18n.formatMessage(agentsMessages.noRole)}</Badge>}
-            <Switch aria-label={i18n.formatMessage(agentsMessages.enableAgent, { agent_name: agent.name })} checked={agent.enabled} disabled={busy} onCheckedChange={next => setEnabled(agent, next)} />
+              : <Badge variant="secondary">{role ? role.id : i18n.formatMessage(agentsMessages.noRole)}</Badge>}
+            <Switch aria-label={i18n.formatMessage(agentsMessages.enableAgent, { agent_name: agent.id })} checked={agent.enabled} disabled={busy} onCheckedChange={next => setEnabled(agent, next)} />
           </>} /></div>;
     })}</ItemGroup>}
   </Section>;
@@ -107,9 +109,9 @@ function RoleSelect({ id, value, onChange }: { id: string; value: string | null;
     <SelectContent><SelectGroup>
       <SelectItem value={NONE}>{i18n.formatMessage(agentsMessages.none)}</SelectItem>
       {missing && <SelectItem value={value} disabled>{i18n.formatMessage(agentsMessages.unavailableRoleOption)} · {value}</SelectItem>}
-      {blocked && <SelectItem value={blocked.id} disabled>{blocked.name}{!blocked.enabled ? i18n.formatMessage(agentsMessages.disabledSuffix) : i18n.formatMessage(agentsMessages.internalSuffix)}</SelectItem>}
+      {blocked && <SelectItem value={blocked.id} disabled>{blocked.id}{!blocked.enabled ? i18n.formatMessage(agentsMessages.disabledSuffix) : i18n.formatMessage(agentsMessages.internalSuffix)}</SelectItem>}
     </SelectGroup><SelectSeparator /><SelectGroup>
-      {selectable.map(role => <SelectItem key={role.id} value={role.id}>{role.name}</SelectItem>)}
+      {selectable.map(role => <SelectItem key={role.id} value={role.id}>{role.id}</SelectItem>)}
     </SelectGroup></SelectContent>
   </Select>;
 }
@@ -140,12 +142,13 @@ function TagInput({ id, value, onChange, placeholder }: { id: string; value: str
 type ToolMode = "all" | "allow" | "exclude";
 type DelegateMode = "all" | "list" | "none";
 
-function AgentEditor({ initialId }: { initialId: string | null }) {
+function AgentEditor({ initialId, onSaved }: { initialId: string | null; onSaved(id: string): void }) {
   const i18n = useI18n();
   const { snapshot, run, busy } = useSettingsConfiguration();
   const island = useIsland();
-  const ids = { name: useId(), description: useId(), prompt: useId(), role: useId(), fallback: useId(), tools: useId() };
+  const ids = { identity: useId(), description: useId(), prompt: useId(), role: useId(), fallback: useId(), tools: useId() };
   const [id, setId] = useState(initialId);
+  const [slug, setSlug] = useState(initialId ?? "");
   const current = snapshot?.agents.find(agent => agent.id === id);
   // 启用是列表行内的即时操作，草稿不持有，避免互相覆盖。
   const strip = ({ enabled: _enabled, ...rest }: AgentOverrides): AgentOverrides => rest;
@@ -159,9 +162,9 @@ function AgentEditor({ initialId }: { initialId: string | null }) {
     const updated = { ...previous }; if (next === undefined) delete updated[field]; else updated[field] = next; return updated;
   });
   const effective = <K extends keyof Base>(field: K): Base[K] => (draft[field as keyof AgentOverrides] !== undefined ? draft[field as keyof AgentOverrides] : base[field]) as Base[K];
-  const normalized = normalize(draft, base, builtin);
-  const stored = normalize(strip(id ? snapshot.overrides.agents[id] ?? {} : {}), base, builtin);
-  const dirty = !current || !same(normalized, stored);
+  const normalized = normalize(draft, base);
+  const stored = normalize(strip(id ? snapshot.overrides.agents[id] ?? {} : {}), base);
+  const dirty = !current || slug !== id || !same(normalized, stored);
   const modified = (field: keyof AgentOverrides) => field in normalized;
 
   // 工具策略：两侧一组
@@ -188,22 +191,23 @@ function AgentEditor({ initialId }: { initialId: string | null }) {
   const examples = effective("examples");
   const restore = (...fields: (keyof AgentOverrides)[]) => setDraft(previous => { const updated = { ...previous }; for (const field of fields) delete updated[field]; return updated; });
 
-  return <Editor form="agent-form" title={current?.name ?? i18n.formatMessage(agentsMessages.newAgent)} description={builtin ? i18n.formatMessage(agentsMessages.builtinAgent) : undefined} dirty={dirty}
+  return <Editor form="agent-form" title={current?.id ?? i18n.formatMessage(agentsMessages.newAgent)} description={builtin ? i18n.formatMessage(agentsMessages.builtinAgent) : undefined} dirty={dirty}
     restore={builtin && Object.keys(normalized).length > 0 ? () => { setDraft({}); setDelegateMode(null); setToolLists({ allow: [], exclude: [] }); } : undefined}
     remove={current ? { title: i18n.formatMessage(agentsMessages.deleteTitle),
       description: builtin
-        ? i18n.formatMessage(agentsMessages.deleteBuiltinDescription, { current_name: current.name })
-        : i18n.formatMessage(agentsMessages.deleteDescription, { current_name: current.name }),
+        ? i18n.formatMessage(agentsMessages.deleteBuiltinDescription, { current_name: current.id })
+        : i18n.formatMessage(agentsMessages.deleteDescription, { current_name: current.id }),
       onConfirm: async () => { const result = await run({ type: "remove", kind: "agent", id: current.id }); if (result.ok) void island.close({ force: true }); } } : undefined}>
     <form id="agent-form" onSubmit={async event => {
       event.preventDefault();
-      const result = await run({ type: "agent.save", id, value: current ? { ...normalized, ...(snapshot.overrides.agents[current.id]?.enabled !== undefined ? { enabled: snapshot.overrides.agents[current.id]!.enabled } : {}) } : normalized });
-      if (result.ok && result.savedId) { setId(result.savedId); setDraft(strip(result.snapshot.overrides.agents[result.savedId] ?? {})); setDelegateMode(null); }
+      const result = await run({ type: "agent.save", id, value: { ...normalized, id: slug,
+        ...(current && snapshot.overrides.agents[current.id]?.enabled !== undefined ? { enabled: snapshot.overrides.agents[current.id]!.enabled } : {}) } });
+      if (result.ok && result.savedId) { setId(result.savedId); setSlug(result.savedId); onSaved(result.savedId); setDraft(strip(result.snapshot.overrides.agents[result.savedId] ?? {})); setDelegateMode(null); }
     }}><fieldset disabled={busy}>
 
       <EditorSection title={i18n.formatMessage(agentsMessages.basics)}><FieldGroup>
-        <Field><Label htmlFor={ids.name} modified={builtin && modified("name")} onRestore={() => restore("name")}>{i18n.formatMessage(agentsMessages.name)}</Label>
-          <Input id={ids.name} value={draft.name ?? ""} placeholder={builtin ? base.name : undefined} required={!builtin} maxLength={160} onChange={event => set("name", event.target.value)} /></Field>
+        <Field><Label htmlFor={ids.identity}>{i18n.formatMessage(agentsMessages.id)}</Label>
+          <Input id={ids.identity} value={slug} readOnly={builtin} required maxLength={160} pattern="[a-z0-9]+((_|-)[a-z0-9]+)*" className="font-mono" onChange={event => setSlug(event.target.value)} /></Field>
         <Field><Label htmlFor={ids.description} modified={modified("description")} onRestore={() => restore("description")}>{i18n.formatMessage(agentsMessages.description)}</Label>
           <Textarea id={ids.description} rows={3} value={draft.description ?? ""} placeholder={base.description} onChange={event => set("description", event.target.value)} /></Field>
       </FieldGroup></EditorSection>
@@ -262,7 +266,7 @@ function AgentEditor({ initialId }: { initialId: string | null }) {
             {others.length ? others.map(agent => <Field key={agent.id} orientation="horizontal">
               <Checkbox id={`${ids.tools}-a-${agent.id}`} checked={!!delegates?.includes(agent.id)}
                 onCheckedChange={next => set("subagentRoles", next === true ? [...(delegates ?? []), agent.id] : (delegates ?? []).filter(item => item !== agent.id))} />
-              <FieldLabel htmlFor={`${ids.tools}-a-${agent.id}`} className="font-normal">{agent.name}</FieldLabel>
+              <FieldLabel htmlFor={`${ids.tools}-a-${agent.id}`} className="font-normal">{agent.id}</FieldLabel>
             </Field>) : <FieldDescription>{i18n.formatMessage(agentsMessages.noOtherAgents)}</FieldDescription>}
           </FieldGroup>}
           <FieldDescription>{i18n.formatMessage(agentsMessages.delegationHint)}</FieldDescription>

@@ -4,7 +4,7 @@
 
 SDK 包版本见 [package.json](package.json)，宿主 API 版本见 [`sdkApi`](../../src/plugins/packages.ts)。内置插件领域契约独立在 [`@atelier/builtin-api`](../builtin-api/README.md)，不进入通用 SDK。
 
-当前宿主 API 为 **15.3**，插件声明 `{ "major": 15, "minMinor": 0 }`（使用浮岛接口时 `minMinor: 1`，读取成型块生成起止或条目视图状态时 `minMinor: 2`，使用工具流式预览声明时 `minMinor: 3`），依赖 `@atelier/sdk: ^0.39.0`。后台通过 `session.invoke` 调用资源动作；资源存在性通过 `resourcesChanged` 观察；前端入口默认导出 `defineRendererPlugin(...)`，`prepare` 上下文提供 `events / calls / signal`，调用契约显式声明 `scope`。
+当前宿主 API 为 **16.0**，插件声明 `{ "major": 16, "minMinor": 0 }`，依赖 `@atelier/sdk: ^0.40.0`。后台通过 `session.invoke` 调用资源动作；资源存在性通过 `resourcesChanged` 观察；前端入口默认导出 `defineRendererPlugin(...)`，`prepare` 上下文提供 `events / calls / signal`，调用契约显式声明 `scope`。
 
 ## 子路径入口
 
@@ -66,7 +66,7 @@ export default definePlugin({
   "exports": { "./public": "./src/public.ts" },
   "atelier": {
     "id": "example.tools",
-    "api": { "major": 15, "minMinor": 0 },
+    "api": { "major": 16, "minMinor": 0 },
     "runtime": "./src/runtime.ts"
   }
 }
@@ -106,7 +106,7 @@ export default definePlugin({
 
 ### 6. 可选模型分支（`plugin.models`）
 不依赖内置 Agent 的无状态模型服务（详细协议与续接规则见 [运行时](../../docs/runtime.md#用户输入文件与模型协议适配)）：
-- `models.roles()` / `models.list()`：读取模型角色与可用模型目录。
+- `models.roles()` / `models.list()`：读取模型角色与可用模型目录。角色条目返回 `id / description / hidden / model / thinking`，身份语义见 [模型角色](../../docs/model-configuration.md#模型角色)。
 - `resolveModelSelection(defaults, overrides)`（`contracts`）：展示与请求共用的模型／思考等级覆盖计算，空值沿用默认值；可用性与凭据由消费边界校验。
 - `models.validate(request, { content? })`：校验模型目标、续接资料与文件引用资格，不发送网络请求。
 - `models.stream(request, { content? })`：执行单次模型请求（支持可选 `tools` 声明、`maxOutputTokens`、`userAgent`、`sessionId`），流式交付正文、思考、工具调用与终态协议事件；工具执行、结果配对及续轮由消费者负责。`finish.timing`（API 8.6）可携带请求计时，与 usage 一起按 `ModelCompletion` 保存。

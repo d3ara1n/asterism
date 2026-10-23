@@ -39,7 +39,7 @@ function TerminalCreation({ initialInput, busy, resolve, cancel }: CreationInput
     <Field><FieldLabel>{i18n.formatMessage(terminalMessages.profile)}</FieldLabel>
       <Select value={profile} onValueChange={setProfile}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent>
         <SelectItem value="default">{i18n.formatMessage(terminalMessages.defaultProfile)}</SelectItem>
-        {settings.shell.profiles.map(item => <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>)}
+        {settings.shell.profiles.map(item => <SelectItem key={item.id} value={item.id}>{item.id}</SelectItem>)}
       </SelectContent></Select></Field>
     {error && <p className="type-caption text-destructive">{error}</p>}
   </CreationForm>;

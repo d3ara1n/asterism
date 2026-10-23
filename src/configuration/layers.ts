@@ -18,7 +18,7 @@ export function normalizeOverrides<T extends ModelRoleOverrides | AgentOverrides
     item !== undefined && !(typeof item === "string" && item.trim() === ""))) as T;
 }
 
-/** 新自定义项的名称由用户提供；只继承行为字段，不继承内置身份。 */
+/** 自定义项只继承行为字段，身份由用户提供。 */
 function baseId(item: { id: string; builtin: boolean }, fallback: string): string {
   return item.builtin ? item.id : fallback;
 }
@@ -28,7 +28,7 @@ export function resolveRoleConfiguration(role: RoleConfigurationEntry, defaults 
   const inherited = defaults.roles[base];
   if (!inherited) throw new Error("Built-in role definition is unavailable.");
   return modelRoleSchema.parse({
-    ...inherited, ...overrides, name: overrides.name ?? (role.builtin ? inherited.name : role.id),
+    ...inherited, ...overrides,
     id: role.id, builtin: role.builtin,
   });
 }
@@ -41,7 +41,7 @@ export function resolveAgentConfiguration(agent: AgentConfigurationEntry, defaul
   const policy = overrides.tools !== undefined || overrides.excludeTools !== undefined
     ? { tools: overrides.tools ?? null, excludeTools: overrides.excludeTools ?? null } : {};
   return agentSchema.parse({
-    ...inherited, ...overrides, ...policy, name: overrides.name ?? (agent.builtin ? inherited.name : agent.id),
+    ...inherited, ...overrides, ...policy,
     id: agent.id, builtin: agent.builtin,
   });
 }

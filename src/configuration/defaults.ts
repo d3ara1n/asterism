@@ -5,7 +5,6 @@ export const defaultAgents: AgentConfiguration[] = [
   {
     "id": "worker",
     "builtin": true,
-    "name": "worker",
     "enabled": true,
     "description": "Implementation of features, fixes, refactors, and content changes.",
     "systemPrompt": "Implementation worker. The task deliverable is the requested change, with a concise account of the changes and verification evidence.",
@@ -26,7 +25,6 @@ export const defaultAgents: AgentConfiguration[] = [
   {
     "id": "explorer",
     "builtin": true,
-    "name": "explorer",
     "enabled": true,
     "description": "Codebase exploration: file locations, symbols, dependencies, structure, and change history.",
     "systemPrompt": "Code explorer. The task deliverable is a factual report of relevant files, symbols, relationships, and history, with source locations.",
@@ -53,7 +51,6 @@ export const defaultAgents: AgentConfiguration[] = [
   {
     "id": "reviewer",
     "builtin": true,
-    "name": "reviewer",
     "enabled": true,
     "description": "Code review and analysis of correctness, security, performance, and maintainability.",
     "systemPrompt": "Code reviewer. The task deliverable is a review with evidence, severity, source locations, and suggested fixes for each finding.",
@@ -81,7 +78,6 @@ export const defaultAgents: AgentConfiguration[] = [
   {
     "id": "researcher",
     "builtin": true,
-    "name": "researcher",
     "enabled": true,
     "description": "Research into documentation, external sources, and repositories, with source citations.",
     "systemPrompt": "Researcher. The task deliverable is a report of verified facts and sources, with explicit gaps and uncertainty.",
@@ -113,7 +109,6 @@ export const defaultAgents: AgentConfiguration[] = [
   {
     "id": "advisor",
     "builtin": true,
-    "name": "advisor",
     "enabled": true,
     "description": "Advice on architecture, design, and migration decisions, including tradeoffs and risks.",
     "systemPrompt": "Expert advisor. The task deliverable is a recommendation grounded in the available evidence, with alternatives, tradeoffs, risks, and supporting source locations.",
@@ -147,7 +142,6 @@ export const defaultRoles: ModelRole[] = [
   {
     "id": "default",
     "builtin": true,
-    "name": "default",
     "enabled": true,
     "model": null,
     "thinking": "medium",
@@ -157,7 +151,6 @@ export const defaultRoles: ModelRole[] = [
   {
     "id": "heavy",
     "builtin": true,
-    "name": "heavy",
     "enabled": true,
     "model": null,
     "thinking": "high",
@@ -167,7 +160,6 @@ export const defaultRoles: ModelRole[] = [
   {
     "id": "fast",
     "builtin": true,
-    "name": "fast",
     "enabled": true,
     "model": null,
     "thinking": "low",
@@ -177,7 +169,6 @@ export const defaultRoles: ModelRole[] = [
   {
     "id": "utility",
     "builtin": true,
-    "name": "utility",
     "enabled": true,
     "model": null,
     "thinking": "off",
@@ -187,7 +178,6 @@ export const defaultRoles: ModelRole[] = [
   {
     "id": "smart",
     "builtin": true,
-    "name": "smart",
     "enabled": true,
     "model": null,
     "thinking": "high",

@@ -59,9 +59,7 @@ function AgentListBody({ result }: AgentListProps) {
         <div className="flex min-w-0 items-center gap-3">
           <ItemMedia variant="icon" className="text-muted-foreground"><Bot aria-hidden="true" /></ItemMedia>
           <ItemContent className="min-w-0">
-            <ItemTitle className="w-full break-words">{entry.name}</ItemTitle>
-            {entry.id !== entry.name && <code className="type-caption break-all text-muted-foreground"
-              title={i18n.text(messages.agentId)}>{entry.id}</code>}
+            <ItemTitle className="w-full break-words">{entry.id}</ItemTitle>
           </ItemContent>
         </div>
         {entry.description && <p className="type-caption whitespace-pre-wrap break-words text-pretty text-muted-foreground">

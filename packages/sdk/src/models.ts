@@ -131,6 +131,6 @@ export interface ModelServices {
   stream(request: StreamRequest, options?: ModelInputOptions): AsyncIterable<ModelEvent>;
   /** 一次请求及其工具批次；不保存历史，不推动下一次请求。 */
   run(request: ModelRunRequest): Promise<ModelRunResult>;
-  roles(): readonly { id: string; name: string; description: string; hidden: boolean; model: string | null; thinking: ThinkingLevel | null }[];
+  roles(): readonly { id: string; description: string; hidden: boolean; model: string | null; thinking: ThinkingLevel | null }[];
   list(): readonly { model: string; provider: string; name: string; contextWindow: number | null; capabilities: { reasoning: boolean; tools: boolean; thinkingLevels: readonly ThinkingLevel[] } }[];
 }

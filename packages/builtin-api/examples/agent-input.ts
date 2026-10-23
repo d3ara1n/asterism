@@ -1,3 +1,4 @@
+import { nanoid } from "nanoid";
 import { SubmitAgentInput, CancelAgent, type AgentMessageSender } from "@atelier/builtin-api/contracts";
 import type { ModelInputPart } from "@atelier/sdk/contracts";
 import type { PluginContext, ResourceRef, ResourceActionOptions } from "@atelier/sdk/runtime";
@@ -5,7 +6,7 @@ import type { PluginContext, ResourceRef, ResourceActionOptions } from "@atelier
 /** 后台插件凭资源引用提交完整输入；返回表示已受理，执行状态由 Agent 自身维护。 */
 export async function steerAgent(plugin: PluginContext, agent: ResourceRef, parts: ModelInputPart[], options?: ResourceActionOptions) {
   await plugin.session(agent.sessionId).invoke(SubmitAgentInput, agent, {
-    submissionId: crypto.randomUUID(), mode: "steer", parts,
+    submissionId: nanoid(16), mode: "steer", parts,
   }, options);
 }
 
@@ -13,7 +14,7 @@ export async function steerAgent(plugin: PluginContext, agent: ResourceRef, part
 export async function deliverAgentMessage(plugin: PluginContext, agent: ResourceRef,
   sender: Extract<AgentMessageSender, { kind: "agent" }>, parts: ModelInputPart[], options?: ResourceActionOptions) {
   await plugin.session(agent.sessionId).invoke(SubmitAgentInput, agent, {
-    submissionId: crypto.randomUUID(), mode: "steer", sender, parts,
+    submissionId: nanoid(16), mode: "steer", sender, parts,
   }, options);
 }
 

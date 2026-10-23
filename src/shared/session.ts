@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { LivePatch } from "./live-patch.ts";
-import { userInputPartsSchema } from "@atelier/builtin-api/contracts";
+import { userInputPartsSchema, submissionIdSchema } from "@atelier/builtin-api/contracts";
 import {
   resourceCallSchema, contractReferenceSchema, toolInvocationSchema,
   toolRunningResultSchema, uiTextSchema,
@@ -27,7 +27,7 @@ export type NewNode = Omit<SessionNode, "id" | "sessionId" | "parentId" | "creat
 const uuid = z.string().uuid();
 export const sessionCommandSchema = z.discriminatedUnion("type", [
   // 首页组合入口：建立会话、创建第一个代理资源并向它提交首条输入。
-  z.strictObject({ type: z.literal("start"), submissionId: uuid, agent: id, model: modelExpressionSchema.nullable(), thinking: thinkingSchema.nullable(), parts: userInputPartsSchema, contentScopeId: uuid.optional() }),
+  z.strictObject({ type: z.literal("start"), submissionId: submissionIdSchema, agent: id, model: modelExpressionSchema.nullable(), thinking: thinkingSchema.nullable(), parts: userInputPartsSchema, contentScopeId: uuid.optional() }),
   z.strictObject({ type: z.literal("read"), sessionId: id }),
   z.strictObject({ type: z.literal("watch"), sessionId: id }),
   z.strictObject({ type: z.literal("unwatch"), sessionId: id }),

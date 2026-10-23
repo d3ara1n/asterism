@@ -123,7 +123,7 @@ renderer 与任务进程经一对 `MessagePort` 直连（`src/shared/connection.
 
 ### 状态协调与流式进度衔接
 
-- **动作与显示分离**：命令完成后返回 `accepted` 与会话身份，普通动作不触发读取或等待同步；`start / submit` 以 `submissionId`（UUID）保证幂等重试，同 ID 沿用已受理结果。入口用 pending 禁止重入，异步订阅与读取沿挂载生命周期取消。真实写入仍由后台按资源处理，当前数据更新独立交付。
+- **动作与显示分离**：命令完成后返回 `accepted` 与会话身份，普通动作不触发读取或等待同步；`start / submit` 以 `submissionId` 保证幂等重试，同 ID 沿用已受理结果。入口用 pending 禁止重入，异步订阅与读取沿挂载生命周期取消。真实写入仍由后台按资源处理，当前数据更新独立交付。
 - **当前数据与按序更新**：前端先订阅会话通道，再以 `watch` 打开；后台同步交付一次 `session.opened` 当前数据，之后 `session.changed` 直接携带新增记录、当前游标／标题和发生变化的资源投影。结构变化与回溯交付当前工作台，布局修改只交付布局。普通资源数据写入不读取或传输历史；资源身份按稳定创建记录定位并复用。最后一个查看者离开后 `unwatch` 停止推送，重开重新取得当前数据。
 - **流式进度**：`session.progress` 与初始数据、记录追加使用同一后台出口按发生顺序投递，携带资源占用 `busyObjectIds`、创建占用 `timelineBusy` 与 `live` 增量。增量相对上一次交付按块 ID 对齐（`src/shared/live-patch.ts`）：新块整块发送；块内按 JSON 路径比较，字符串只追加时发送尾部，数组增长时只发送新元素，对象按键比较，其余变化在最深的变化位置整值替换（含工具执行中的 `result`），未变化的块与字段不出现；`null` 表示流式正文未变化。输入阶段的工具调用只传 `argumentsText`，`arguments` 为 null；宿主前端按块宽容解析（`src/shared/partial-arguments.ts`，`partial-json`，不接受 NaN／Infinity）补回预览参数后交给插件，进入 ready 后采用后台的完整参数。后台同一解析只用于调用身份。接收端从 `session.opened` 的完整列表开始依次应用，未变化的块保持对象身份。记录提交先交付，随后移除对应流式块；展示身份使用 `responseId + ordinal`，流式生成与落库保持同一组件。占用语义见 [宿主运行生命周期](plugin-sdk.md#宿主运行生命周期)。
 
