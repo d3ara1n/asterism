@@ -7,8 +7,9 @@ import { Item, ItemActions, ItemContent, ItemDescription, ItemMedia, ItemTitle }
  * 可打开详情的列表行：官方 Item 组合，标题按钮的命中区铺满整行，行内操作位于其上层。
  * 整行可点的列表统一使用此组合，业务代码不另写可点击的行。
  */
-export function ListRow({ title, description, media, mediaVariant, actions, selected = false, disabled, inactive, onOpen, className, contentClassName, variant = "default", buttonProps }: {
+export function ListRow({ title, description, details, media, mediaVariant, actions, selected = false, disabled, inactive, onOpen, className, contentClassName, variant = "default", buttonProps }: {
   title: ReactNode; description?: ReactNode; media?: ReactNode; mediaVariant?: "default" | "icon"; actions?: ReactNode;
+  /** 描述下方的次要信息行。 */ details?: ReactNode;
   selected?: boolean; disabled?: boolean; inactive?: boolean; onOpen: (origin: HTMLElement) => void;
   className?: string; contentClassName?: string;
   variant?: "default" | "navigation";
@@ -26,6 +27,7 @@ export function ListRow({ title, description, media, mediaVariant, actions, sele
         className={cn("min-w-0 text-left outline-none after:absolute after:inset-0 focus-visible:underline", disabled && "opacity-50", buttonProps?.className)}
         onClick={event => onOpen(event.currentTarget)}>{navigation ? <span className="block min-w-0">{title}</span> : <ItemTitle>{title}</ItemTitle>}</button>
       {description && <ItemDescription className="truncate">{description}</ItemDescription>}
+      {details && <ItemDescription className="type-caption truncate">{details}</ItemDescription>}
     </ItemContent>
     {actions && <ItemActions className={cn("relative shrink-0", navigation && "gap-0")}>{actions}</ItemActions>}
   </Item>;

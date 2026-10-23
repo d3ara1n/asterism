@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@atelier/builtin-api": "^0.14.0",
-    "@atelier/sdk": "^0.36.0",
+    "@atelier/sdk": "^0.37.0",
     "@atelier/ui": "^0.1.0",
     "@lobehub/streamdown": "1.4.1",
     "@modelcontextprotocol/client": "2.3.1",

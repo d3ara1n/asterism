@@ -17,7 +17,6 @@ import { Spinner } from "@atelier/ui/ui/spinner";
 import { Switch } from "@atelier/ui/ui/switch";
 import { Textarea } from "@atelier/ui/ui/textarea";
 import { IslandPanel } from "../../shared/weave/IslandPanel";
-import { useCloseGuard } from "../../shared/weave/Screen";
 import { useSettingsConfiguration } from "./state";
 
 export function TextField({ label, value, onChange, multiline = false, required = false, hint, placeholder }: {
@@ -120,17 +119,14 @@ export function OverrideListField({ label, value, inherited, onChange, empty, hi
 }
 /**
  * 配置编辑器：套用面板浮岛；保存位于标题栏，经 form 属性提交内容区中的表单。
- * 传入 dirty 时：无修改禁用保存；有修改时关闭本浮岛（含上级关闭或替换）先确认放弃。
+ * 传入 dirty 时：无修改禁用保存；有修改时由面板浮岛在关闭前确认放弃。
  */
 export interface RemoveAction { title: string; description: string; onConfirm: () => void }
 export function Editor({ title, description, form, dirty, remove, restore, children }: { title: string; description?: string; form: string; dirty?: boolean; remove?: RemoveAction; restore?: () => void; children: ReactNode }) {
   const i18n = useI18n();
   const { busy } = useSettingsConfiguration();
-  const [asking, setAsking] = useState<((discard: boolean) => void) | null>(null);
   const [removing, setRemoving] = useState(false);
-  useCloseGuard(dirty ? () => new Promise<boolean>(resolve => setAsking(() => resolve)) : null);
-  const answer = (discard: boolean) => { asking?.(discard); setAsking(null); };
-  return <IslandPanel title={title} description={description}
+  return <IslandPanel title={title} description={description} dirty={dirty}
     action={<>
       {restore && <IconButton type="button" label={i18n.formatMessage(formsMessages.restoreAll)} tooltip={i18n.formatMessage(formsMessages.restoreAllLabel)} disabled={busy} onClick={restore}><RotateCcw /></IconButton>}
       {remove && <IconButton type="button" className="text-destructive" label={i18n.formatMessage(formsMessages.deleteLabel)} tooltip={i18n.formatMessage(formsMessages.deleteButton)} disabled={busy} onClick={() => setRemoving(true)}><Trash2 /></IconButton>}
@@ -149,18 +145,6 @@ export function Editor({ title, description, form, dirty, remove, restore, child
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>}
-    <AlertDialog open={asking !== null} onOpenChange={open => { if (!open) answer(false); }}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>{i18n.formatMessage(formsMessages.discardTitle)}</AlertDialogTitle>
-          <AlertDialogDescription>{i18n.formatMessage(formsMessages.discardDescription, { title })}</AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>{i18n.formatMessage(formsMessages.keepEditing)}</AlertDialogCancel>
-          <AlertDialogAction variant="destructive" onClick={() => answer(true)}>{i18n.formatMessage(formsMessages.discard)}</AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
   </IslandPanel>;
 }
 /** 次要的删除操作随表单内容放在末尾。 */

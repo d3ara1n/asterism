@@ -14,6 +14,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem, SelectGr
 import { Switch } from "@atelier/ui/ui/switch";
 import { cn } from "@atelier/ui/utils";
 import { useIsland } from "../../shared/weave/Screen";
+import { panelIslandWidth } from "../../shared/weave/IslandPanel";
 import { Section } from "../settings/layout";
 import { Editor, TextField, OverrideToggleField } from "./forms";
 import { useSettingsConfiguration } from "./state";
@@ -68,7 +69,7 @@ export function RolesSettings() {
   const i18n = useI18n();
   const { snapshot, run, busy } = useSettingsConfiguration();
   const island = useIsland();
-  const open = (id: string | null, origin?: HTMLElement | null) => island.open({ id: `role-${id ?? "new"}`, label: rolesMessages.modelRole, width: { min: 400, grow: 1, max: 620 }, origin,
+  const open = (id: string | null, origin?: HTMLElement | null) => island.open({ id: `role-${id ?? "new"}`, label: rolesMessages.modelRole, width: panelIslandWidth, origin,
     render: () => <RoleEditor key={id ?? "new"} initialId={id} /> });
   // 行内修改即时保存：在现有覆盖上替换单个字段，与内置值相同则撤下。
   const patch = <K extends keyof ModelRoleOverrides>(role: ModelRole, field: K, next: ModelRoleOverrides[K]) => {

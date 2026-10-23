@@ -51,8 +51,8 @@ export class ServerSession {
 
   get id() { return this.config.id; }
   state(): McpServerState {
-    const { id, name, description, enabled, mode } = this.config;
-    return { id, name, description, enabled, mode, connection: this.phase, indexed: !!this.directory,
+    const { id, name, enabled, mode } = this.config;
+    return { id, name, enabled, mode, connection: this.phase, indexed: !!this.directory,
       toolCount: this.directory?.tools.length ?? 0, error: this.error, authorizationUrl: this.authorizationUrl };
   }
   tool(name: string): CachedTool | undefined { return this.directory?.tools.find(tool => tool.name === name); }

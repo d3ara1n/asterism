@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { draftOf, validateDraft } from "./form.ts";
 import type { McpServerConfig } from "./contract.ts";
 
-const server: McpServerConfig = { id: "github", name: "GitHub", description: "", enabled: true, mode: "lazy", idleSeconds: 300,
+const server: McpServerConfig = { id: "github", name: "GitHub", enabled: true, mode: "lazy", idleSeconds: 300,
   transport: "stdio", command: "npx", args: [], cwd: "", url: "", auth: "none" };
 
 describe("MCP 设置表单校验", () => {

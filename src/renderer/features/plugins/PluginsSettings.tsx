@@ -1,9 +1,10 @@
 import { runtime } from "../../runtime";
-import { Component, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
 import { Plus, Puzzle, RefreshCw } from "lucide-react";
-import { RendererCallsProvider, RendererPreferencesProvider, useRendererCalls, type PluginSettingsPage } from "@atelier/sdk/renderer";
-import type { PluginCalls, UiText } from "@atelier/sdk/contracts";
+import { RendererPreferencesProvider, type PluginSettingsPage } from "@atelier/sdk/renderer";
+import type { UiText } from "@atelier/sdk/contracts";
+import { PluginCallScope, PluginIslandProvider, SettingsBoundary } from "./scope";
 import { pluginPreferences } from "../creation/preferences";
 import type { AppSnapshot, Command } from "../../../shared/contracts";
 import { errorDisplay } from "../../../shared/error-display";
@@ -108,32 +109,12 @@ export function PluginsOverview({ manager, onOpen, cardRef, query, filter, onQue
   </section>;
 }
 
-class SettingsBoundary extends Component<{ children: ReactNode; fallback: ReactNode }, { failed: boolean }> {
-  state = { failed: false };
-  static getDerivedStateFromError() { return { failed: true }; }
-  componentDidCatch(error: Error) { console.error("Plugin settings page failed.", error); }
-  render() { return this.state.failed ? this.props.fallback : this.props.children; }
-}
-/** 页面的通信随卸载取消；后台独立业务服务仍由插件生命周期拥有。 */
-function SettingsBody({ page, location }: { page: PluginSettingsPage; location?: string }) {
-  const parent = useRendererCalls();
-  const pending = useRef(new Set<AbortController>());
-  const calls = useMemo<PluginCalls>(() => ({ invoke: (contract, input, options) => {
-    const controller = new AbortController();
-    const active = pending.current;
-    active.add(controller);
-    return parent.invoke(contract, input, { ...options,
-      signal: options.signal ? AbortSignal.any([options.signal, controller.signal]) : controller.signal,
-    }).finally(() => active.delete(controller));
-  } }), [parent]);
-  useEffect(() => {
-    const active = pending.current;
-    return () => { for (const controller of active) controller.abort(); active.clear(); };
-  }, []);
+/** 页面的通信随卸载取消；页面打开的浮岛按插件身份隔离，并随页面卸载关闭。 */
+function SettingsBody({ pluginId, page, location }: { pluginId: string; page: PluginSettingsPage; location?: string }) {
   const Body = page.Body;
-  return <RendererCallsProvider value={calls}>
+  return <PluginCallScope><PluginIslandProvider pluginId={pluginId} page>
     <Body location={location} />
-  </RendererCallsProvider>;
+  </PluginIslandProvider></PluginCallScope>;
 }
 export function PluginDetails({ plugin, manager, location }: { plugin: PluginInfo; manager: PluginManager; location?: string }) {
   const i18n = useI18n();
@@ -164,7 +145,7 @@ export function PluginDetails({ plugin, manager, location }: { plugin: PluginInf
       <Button variant="outline" size="sm" onClick={() => setPageGeneration(value => value + 1)}>{i18n.text(messages.retry)}</Button>
     </AlertDescription></Alert>}>
       <RendererPreferencesProvider value={pluginPreferences(plugin.id)}>
-        <SettingsBody page={page} location={location} />
+        <SettingsBody pluginId={plugin.id} page={page} location={location} />
       </RendererPreferencesProvider>
     </SettingsBoundary> : <p className="type-caption">{i18n.text(available ? messages.noPage : messages.pageUnavailable)}</p>}
   </div>;

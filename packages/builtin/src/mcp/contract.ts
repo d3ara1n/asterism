@@ -8,7 +8,7 @@ export const serverIdSchema = z.string().min(1).max(64).regex(SERVER_ID_PATTERN)
 
 /** 连接参数由工坊管理，环境变量与 HTTP 请求头单独进入凭据存储。 */
 export const mcpServerSchema = z.strictObject({
-  id: serverIdSchema, name: z.string().trim().min(1), description: z.string(), enabled: z.boolean(),
+  id: serverIdSchema, name: z.string().trim().min(1), enabled: z.boolean(),
   mode: z.enum(["eager", "lazy"]), idleSeconds: z.number().int().min(1).max(86_400),
   transport: z.enum(["stdio", "http"]), command: z.string(), args: z.array(z.string()), cwd: z.string(),
   url: z.string(), auth: z.enum(["none", "oauth"]),
@@ -26,7 +26,7 @@ export const credentialsSchema = z.record(z.string(), z.string());
 export const connectionPhases = ["disconnected", "connecting", "awaiting_auth", "connected", "error"] as const;
 export type ConnectionPhase = typeof connectionPhases[number];
 export const mcpServerStateSchema = z.object({
-  id: z.string(), name: z.string(), description: z.string(), enabled: z.boolean(), mode: z.enum(["eager", "lazy"]),
+  id: z.string(), name: z.string(), enabled: z.boolean(), mode: z.enum(["eager", "lazy"]),
   connection: z.enum(connectionPhases),
   indexed: z.boolean(), toolCount: z.number(), error: z.string().nullable(), authorizationUrl: z.string().nullable(),
 });

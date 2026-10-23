@@ -4,7 +4,7 @@
 
 SDK 包版本见 [package.json](package.json)，宿主 API 版本见 [`sdkApi`](../../src/plugins/packages.ts)。内置插件领域契约独立在 [`@atelier/builtin-api`](../builtin-api/README.md)，不进入通用 SDK。
 
-当前宿主 API 为 **15.0**，插件声明 `{ "major": 15, "minMinor": 0 }`，依赖 `@atelier/sdk: ^0.36.0`。后台通过 `session.invoke` 调用资源动作；资源存在性通过 `resourcesChanged` 观察；前端入口默认导出 `defineRendererPlugin(...)`，`prepare` 上下文提供 `events / calls / signal`，调用契约显式声明 `scope`。
+当前宿主 API 为 **15.1**，插件声明 `{ "major": 15, "minMinor": 0 }`（使用浮岛接口时 `minMinor: 1`），依赖 `@atelier/sdk: ^0.37.0`。后台通过 `session.invoke` 调用资源动作；资源存在性通过 `resourcesChanged` 观察；前端入口默认导出 `defineRendererPlugin(...)`，`prepare` 上下文提供 `events / calls / signal`，调用契约显式声明 `scope`。
 
 ## 子路径入口
 
@@ -85,6 +85,8 @@ export default definePlugin({
 前端 `defineRendererPlugin({ modules?, settings?, prepare?, closing? })` 是插件入口。`settings: { Body, locations? }` 与模块平级；页面组件接收可选 `location`，无会话或对象上下文，能使用全局调用、事件、i18n、本插件偏好和托管配置。插件 `prepare({ events, signal })` 先于自己的模块准备；失败阻止该插件及依赖方装配，关闭在取消后等待实际准备结束再调用 `closing`。页面卸载取消页面发起的通信调用，不销毁后台服务。
 
 `useRendererSettings().open(pluginId, location?)` 打开已登记设置页；非根位置须列入 `settings.locations`，未知插件或位置明确报错。完整可编译示例按进程拆分为 `examples/settings-contract.ts`、`examples/settings-runtime.ts`、`examples/settings-renderer.ts`。
+
+设置页内可用浮岛接口（API 15.1）：`useRendererIsland()` 返回 `{ child, open, close, closeChild, guard }`，`open({ key, label, origin?, render })` 在所在浮岛右侧打开更深浮岛，`child` 为当前打开的子浮岛 `key`，可用于行选中。浮岛内容使用宿主注入的 `IslandPanel({ title, description?, action?, toolbar?, dirty?, children })`；`dirty` 为 true 时宿主在关闭前确认放弃修改，`useRendererCloseGuard(guard)` 注册自定义守卫。`render` 在宿主每次渲染时调用，内容应按身份读取最新数据而非依赖打开时的快照。语义见 [插件浮岛](../../docs/plugin-sdk.md#插件配置与界面本地化)。
 
 信息卡片从包读取元信息：标准 `name / description / version / author`，可用 `atelier.displayName / description`（接受 `UiText`）覆盖显示文案；`atelier.icon` 是包内 PNG、JPEG、WebP 或 SVG 图片的相对路径。宿主读取静态信息不执行插件代码，配置页面由 renderer 单独提供。
 

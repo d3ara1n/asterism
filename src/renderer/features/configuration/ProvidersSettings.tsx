@@ -21,6 +21,7 @@ import { Spinner } from "@atelier/ui/ui/spinner";
 import { Switch } from "@atelier/ui/ui/switch";
 import { cn } from "@atelier/ui/utils";
 import { useIsland } from "../../shared/weave/Screen";
+import { panelIslandWidth } from "../../shared/weave/IslandPanel";
 import { Section } from "../settings/layout";
 import { Editor, EditorSection, TextField, ChoiceField, NumberField } from "./forms";
 import { useSettingsConfiguration } from "./state";
@@ -34,7 +35,6 @@ import { ProviderAuthentication, type ProviderCredentialDraft } from "./Provider
 
 const protocols = Object.entries(modelProtocolLabels).map(([value, label]) => ({ value, label }));
 const protocolLabel = (value: string) => protocols.find(item => item.value === value)?.label ?? value;
-const islandWidth = { min: 400, grow: 1, max: 620 };
 type ProviderValue = ProviderDraft;
 
 /* ---------- 状态推导：列表与详情共用，均直接读取最新快照 ---------- */
@@ -96,7 +96,7 @@ export function ProvidersSettings() {
   const { snapshot, busy } = useSettingsConfiguration();
   const island = useIsland();
   const quick = useQuickActions();
-  const open = (id: string | null, origin?: HTMLElement | null) => island.open({ id: `provider-${id ?? "new"}`, label: providersMessages.provider, width: islandWidth, origin,
+  const open = (id: string | null, origin?: HTMLElement | null) => island.open({ id: `provider-${id ?? "new"}`, label: providersMessages.provider, width: panelIslandWidth, origin,
     render: () => id === null ? <ProviderCreation /> : <ProviderEditor key={id} initialId={id} /> });
   const providers = snapshot?.providers ?? [];
   return <Section title={i18n.formatMessage(providersMessages.connections)} hint={i18n.formatMessage(providersMessages.summary)}
@@ -212,7 +212,7 @@ function ProviderEditor({ initialId, initialValue = blank }: { initialId: string
   const dirty = !saved || JSON.stringify(saved) !== JSON.stringify(value) || credentialChanged;
 
   const openModel = (modelId: string | null, origin?: HTMLElement | null) => {
-    if (id) island.open({ id: `model-${modelId ?? "new"}`, label: providersMessages.model, width: islandWidth, origin,
+    if (id) island.open({ id: `model-${modelId ?? "new"}`, label: providersMessages.model, width: panelIslandWidth, origin,
       render: () => <ModelEditor key={modelId ?? "new"} initialId={modelId} providerId={id} /> });
   };
   const models = snapshot?.models.filter(model => model.providerId === id) ?? [];
@@ -259,7 +259,7 @@ function ProviderEditor({ initialId, initialValue = blank }: { initialId: string
         <Button size="sm" variant="outline" disabled={busy || dirty} onClick={async event => {
           const origin = event.currentTarget;
           const result = await run({ type: "discovery.start", providerId: current.id });
-          if (result.ok) island.open({ id: `discover-${current.id}`, label: providersMessages.fetchModels, width: islandWidth, origin,
+          if (result.ok) island.open({ id: `discover-${current.id}`, label: providersMessages.fetchModels, width: panelIslandWidth, origin,
             render: () => <ModelDiscoveryPicker providerId={current.id} /> });
         }}><Search />{i18n.text(providersMessages.fetchModels)}</Button>
         <Button size="sm" variant="outline" disabled={busy} onClick={event => openModel(null, event.currentTarget)}><Plus />{i18n.formatMessage(providersMessages.addModel)}</Button>

@@ -1,112 +1,59 @@
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Copy, Trash2 } from "lucide-react";
-import { useI18n } from "@atelier/sdk/renderer";
+import { IslandPanel, useI18n, useRendererConfiguration, useRendererIsland } from "@atelier/sdk/renderer";
+import type { UiText } from "@atelier/sdk/contracts";
 import { Button } from "@atelier/ui/ui/button";
 import { IconButton } from "@atelier/ui/ui/icon-button";
 import { Input } from "@atelier/ui/ui/input";
 import { Textarea } from "@atelier/ui/ui/textarea";
 import { Label } from "@atelier/ui/ui/label";
 import { Badge } from "@atelier/ui/ui/badge";
+import { Spinner } from "@atelier/ui/ui/spinner";
+import { ListRow } from "@atelier/ui/ui/list-row";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemSeparator, ItemTitle } from "@atelier/ui/ui/item";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@atelier/ui/ui/select";
 import { shellMessages as messages } from "../messages/shell";
+import { BuiltinSettings, settingsMessages } from "../settings/contract";
 import { shellPresets, shellSettingsSchema, type ShellSettings as Settings, type ShellProfile } from "./contract";
 
-/** 单行展开编辑中的 profile；环境变量保留原始文本，完成时再解析。 */
+/** 编辑中的 profile；环境变量保留原始文本，保存时再解析。 */
 interface Draft { profile: ShellProfile; env: string }
 
 const environmentText = (env: Record<string, string>) => Object.entries(env).map(([key, value]) => `${key}=${value}`).join("\n");
+const draftOf = (profile: ShellProfile): Draft => ({ profile: structuredClone(profile), env: environmentText(profile.env) });
+const islandKey = (id: string) => `shell:${id}`;
 
-/** 默认 Shell、复制、移除与预设添加即时保存；展开的 profile 以「完成」保存、「取消」放弃。 */
+/** 默认 Shell、复制、移除与预设添加即时保存；点击 profile 在右侧浮岛中编辑，新增的 profile 随即打开。 */
 export function ShellSettings({ value, disabled, save }: {
   value: Settings; disabled: boolean; save(value: Settings): Promise<boolean>;
 }) {
-  const i18n = useI18n(), id = useId();
-  const [draft, setDraft] = useState<Draft | null>(null);
-  const [invalid, setInvalid] = useState(false);
-  // 编辑中的 profile 被移除（例如恢复默认设置）时关闭编辑区。
-  useEffect(() => {
-    if (draft && !value.profiles.some(item => item.id === draft.profile.id)) { setDraft(null); setInvalid(false); }
-  }, [value]);
-
-  const open = (profile: ShellProfile) => { setDraft({ profile, env: environmentText(profile.env) }); setInvalid(false); };
-  const close = () => { setDraft(null); setInvalid(false); };
+  const i18n = useI18n(), island = useRendererIsland();
+  const presetTrigger = useRef<HTMLButtonElement>(null);
+  const open = (profile: ShellProfile, origin?: HTMLElement | null) => island.open({ key: islandKey(profile.id), label: messages.profile, origin,
+    render: () => <ShellProfileEditor id={profile.id} initial={profile} /> });
   const commit = (next: Settings) => {
     const parsed = shellSettingsSchema.safeParse(next);
     return parsed.success ? save(parsed.data) : Promise.resolve(false);
   };
-  const append = async (profile: ShellProfile) => {
+  const append = async (profile: ShellProfile, origin?: HTMLElement | null) => {
     const added = { ...structuredClone(profile), id: crypto.randomUUID() };
-    if (await commit({ ...value, profiles: [...value.profiles, added] })) open(added);
+    if (await commit({ ...value, profiles: [...value.profiles, added] })) void open(added, origin);
   };
+  // 移除后，编辑该 profile 的浮岛自行关闭。
   const remove = (target: string) => {
-    if (draft?.profile.id === target) close();
     void commit({ profiles: value.profiles.filter(item => item.id !== target), selected: value.selected === target ? "auto" : value.selected });
   };
-  const complete = async () => {
-    if (!draft) return;
-    const entries: [string, string][] = [];
-    for (const line of draft.env.split("\n").filter(Boolean)) {
-      const equals = line.indexOf("=");
-      if (equals < 1) { setInvalid(true); return; }
-      entries.push([line.slice(0, equals), line.slice(equals + 1)]);
-    }
-    const { profile } = draft;
-    const edited = { ...profile, args: profile.args.filter(Boolean), commandArgs: profile.commandArgs.filter(Boolean), env: Object.fromEntries(entries) };
-    const profiles = value.profiles.some(item => item.id === edited.id)
-      ? value.profiles.map(item => item.id === edited.id ? edited : item)
-      : [...value.profiles, edited];
-    const next = shellSettingsSchema.safeParse({ ...value, profiles });
-    if (!next.success) { setInvalid(true); return; }
-    if (await save(next.data)) close();
-  };
-
-  const update = (patch: Partial<ShellProfile>) => setDraft(current => current && { ...current, profile: { ...current.profile, ...patch } });
   const preview = (item: ShellProfile) =>
     [item.executable, ...item.args, ...item.commandArgs].filter(Boolean).join(" ") + ` ${i18n.text(messages.command)}`;
-  const field = (item: ShellProfile, key: "name" | "executable" | "args" | "commandArgs") => {
-    const fieldId = `${id}-${key}`;
-    return <div className="flex flex-col gap-2">
-      <Label htmlFor={fieldId}>{i18n.text(messages[key])}</Label>
-      {key === "name" || key === "executable"
-        ? <Input id={fieldId} disabled={disabled} value={item[key]} onChange={event => update({ [key]: event.target.value })} />
-        : <Textarea id={fieldId} disabled={disabled} rows={2} className="font-mono" value={item[key].join("\n")}
-          onChange={event => update({ [key]: event.target.value ? event.target.value.split("\n") : [] })} />}
-    </div>;
-  };
-  const editor = ({ profile, env }: Draft) => <div className="flex flex-col gap-3 px-4 pb-4">
-    {field(profile, "name")}{field(profile, "executable")}{field(profile, "args")}{field(profile, "commandArgs")}
-    <div className="flex flex-col gap-2">
-      <Label htmlFor={`${id}-env`}>{i18n.text(messages.env)}</Label>
-      <Textarea id={`${id}-env`} rows={3} className="font-mono" disabled={disabled} value={env}
-        onChange={event => setDraft(current => current && { ...current, env: event.target.value })} />
-    </div>
-    {invalid && <p role="alert" className="type-caption text-destructive">{i18n.text(messages.invalid)}</p>}
+  const row = (saved: ShellProfile) => <div key={saved.id} role="listitem">
+    <ListRow selected={island.child === islandKey(saved.id)} onOpen={origin => { void open(saved, origin); }}
+      title={<>{saved.name || saved.executable}{value.selected === saved.id && <Badge variant="secondary">{i18n.text(messages.isDefault)}</Badge>}</>}
+      description={<span className="font-mono text-xs">{preview(saved)}</span>}
+      actions={<>
+        <IconButton label={i18n.text(messages.add)} disabled={disabled} onClick={event => { void append(saved, event.currentTarget); }}><Copy /></IconButton>
+        <IconButton label={i18n.text(messages.remove)} disabled={disabled} onClick={() => remove(saved.id)}><Trash2 /></IconButton>
+      </>} />
   </div>;
-  const row = (saved: ShellProfile) => {
-    const editing = draft?.profile.id === saved.id ? draft : null;
-    const item = editing?.profile ?? saved;
-    return <div key={saved.id} role="listitem">
-      <Item size="sm">
-        <ItemContent className="min-w-0">
-          <ItemTitle>{item.name || item.executable}
-            {value.selected === saved.id && <Badge variant="secondary">{i18n.text(messages.isDefault)}</Badge>}
-          </ItemTitle>
-          <ItemDescription className="truncate font-mono text-xs">{preview(item)}</ItemDescription>
-        </ItemContent>
-        <ItemActions>
-          {editing ? <>
-            <Button variant="outline" size="sm" disabled={disabled} onClick={close}>{i18n.text(messages.cancel)}</Button>
-            <Button size="sm" disabled={disabled} onClick={() => { void complete(); }}>{i18n.text(messages.done)}</Button>
-          </> : <Button variant="ghost" size="sm" disabled={disabled} aria-expanded={false}
-            onClick={() => open(structuredClone(saved))}>{i18n.text(messages.edit)}</Button>}
-          <IconButton label={i18n.text(messages.add)} disabled={disabled} onClick={() => { void append(saved); }}><Copy /></IconButton>
-          <IconButton label={i18n.text(messages.remove)} disabled={disabled} onClick={() => remove(saved.id)}><Trash2 /></IconButton>
-        </ItemActions>
-      </Item>
-      {editing && editor(editing)}
-    </div>;
-  };
 
   const selectedLabel = i18n.text(messages.selected);
   return <div className="flex flex-col gap-4">
@@ -131,8 +78,8 @@ export function ShellSettings({ value, disabled, save }: {
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between gap-2">
         <h4 className="type-label">{i18n.text(messages.profiles)}</h4>
-        <Select value="" disabled={disabled} onValueChange={preset => { void append(shellPresets.find(item => item.id === preset)!); }}>
-          <SelectTrigger size="sm" aria-label={i18n.text(messages.preset)}><SelectValue placeholder={i18n.text(messages.preset)} /></SelectTrigger>
+        <Select value="" disabled={disabled} onValueChange={preset => { void append(shellPresets.find(item => item.id === preset)!, presetTrigger.current); }}>
+          <SelectTrigger ref={presetTrigger} size="sm" aria-label={i18n.text(messages.preset)}><SelectValue placeholder={i18n.text(messages.preset)} /></SelectTrigger>
           <SelectContent align="end">{shellPresets.map(item => <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>)}</SelectContent>
         </Select>
       </div>
@@ -141,4 +88,79 @@ export function ShellSettings({ value, disabled, save }: {
       </ItemGroup>}
     </div>
   </div>;
+}
+
+/**
+ * profile 编辑浮岛：读取当前配置，保存后保持打开并以保存结果为新的基准；关闭由浮岛的关闭按钮完成。
+ * profile 在别处被移除（例如恢复默认设置）时关闭浮岛。
+ */
+function ShellProfileEditor({ id, initial }: { id: string; initial: ShellProfile }) {
+  const i18n = useI18n(), island = useRendererIsland(), fieldId = useId();
+  const config = useRendererConfiguration(BuiltinSettings);
+  const saved = config.value.shell.profiles.find(item => item.id === id);
+  const [baseline, setBaseline] = useState(() => draftOf(saved ?? initial));
+  const [draft, setDraft] = useState(baseline);
+  const [invalid, setInvalid] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [failure, setFailure] = useState<UiText | null>(null);
+  const seen = useRef(false);
+  useEffect(() => {
+    if (saved) seen.current = true;
+    else if (seen.current) void island.close({ force: true });
+  }, [saved, island]);
+  const dirty = JSON.stringify(draft) !== JSON.stringify(baseline);
+  const disabled = saving || !config.ready;
+
+  const submit = async () => {
+    if (!dirty || disabled) return;
+    const entries: [string, string][] = [];
+    for (const line of draft.env.split("\n").filter(Boolean)) {
+      const equals = line.indexOf("=");
+      if (equals < 1) { setInvalid(true); return; }
+      entries.push([line.slice(0, equals), line.slice(equals + 1)]);
+    }
+    const { profile } = draft;
+    const edited = { ...profile, args: profile.args.filter(Boolean), commandArgs: profile.commandArgs.filter(Boolean), env: Object.fromEntries(entries) };
+    const current = config.value;
+    const profiles = current.shell.profiles.some(item => item.id === edited.id)
+      ? current.shell.profiles.map(item => item.id === edited.id ? edited : item)
+      : [...current.shell.profiles, edited];
+    const next = shellSettingsSchema.safeParse({ ...current.shell, profiles });
+    if (!next.success) { setInvalid(true); return; }
+    setInvalid(false); setFailure(null); setSaving(true);
+    try {
+      await config.save({ ...current, shell: next.data });
+      const normalized = draftOf(edited);
+      setBaseline(normalized); setDraft(normalized);
+    } catch (error) {
+      setFailure((error as { display?: UiText }).display ?? settingsMessages.saveFailed);
+    } finally { setSaving(false); }
+  };
+
+  const update = (patch: Partial<ShellProfile>) => setDraft(current => ({ ...current, profile: { ...current.profile, ...patch } }));
+  const field = (key: "name" | "executable" | "args" | "commandArgs") => {
+    const control = `${fieldId}-${key}`, item = draft.profile;
+    return <div className="flex flex-col gap-2">
+      <Label htmlFor={control}>{i18n.text(messages[key])}</Label>
+      {key === "name" || key === "executable"
+        ? <Input id={control} disabled={disabled} value={item[key]} onChange={event => update({ [key]: event.target.value })} />
+        : <Textarea id={control} disabled={disabled} rows={2} className="font-mono" value={item[key].join("\n")}
+          placeholder={i18n.text(key === "args" ? messages.argsPlaceholder : messages.commandArgsPlaceholder)}
+          onChange={event => update({ [key]: event.target.value ? event.target.value.split("\n") : [] })} />}
+    </div>;
+  };
+  const form = `${fieldId}-form`;
+  return <IslandPanel title={(saved ?? initial).name || (saved ?? initial).executable} description={i18n.text(messages.profile)} dirty={dirty}
+    action={<Button type="submit" form={form} size="sm" disabled={disabled || !dirty} aria-busy={saving}>{saving && <Spinner />}{i18n.text(messages.save)}</Button>}>
+    <form id={form} className="flex flex-col gap-4" onSubmit={event => { event.preventDefault(); void submit(); }}>
+      {field("name")}{field("executable")}{field("args")}{field("commandArgs")}
+      <div className="flex flex-col gap-2">
+        <Label htmlFor={`${fieldId}-env`}>{i18n.text(messages.env)}</Label>
+        <Textarea id={`${fieldId}-env`} rows={3} className="font-mono" disabled={disabled} value={draft.env} placeholder={i18n.text(messages.envPlaceholder)}
+          onChange={event => setDraft(current => ({ ...current, env: event.target.value }))} />
+      </div>
+      {invalid && <p role="alert" className="type-caption text-destructive">{i18n.text(messages.invalid)}</p>}
+      {failure && <p role="alert" className="type-caption text-destructive">{i18n.text(failure)}</p>}
+    </form>
+  </IslandPanel>;
 }

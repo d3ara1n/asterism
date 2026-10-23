@@ -39,7 +39,7 @@ function brief(server: CatalogServer, tool: CachedTool) {
 }
 /** 模型侧只消费发现所需状态，浏览器授权地址留在设置界面。 */
 export function describeServer(state: McpServerState) {
-  return { server_id: state.id, name: state.name, description: clip(state.description, 240), enabled: state.enabled,
+  return { server_id: state.id, name: state.name, enabled: state.enabled,
     mode: state.mode, connection: state.connection, indexed: state.indexed, tool_count: state.toolCount,
     error: state.error?.slice(0, 500) ?? null };
 }
@@ -64,14 +64,13 @@ export function searchCatalog(all: CatalogServer[], args: { query: string; serve
   const servers = all.filter(server => server.config.enabled && (!args.server_id || server.config.id === args.server_id));
   const words = terms(args.query);
   const ranked = servers.flatMap(server => (server.directory?.tools ?? []).map(tool => ({ entry: brief(server, tool),
-    score: score(words, `${tool.name} ${tool.title ?? ""}`, `${server.config.name} ${server.config.description}`, tool.description ?? "") })))
+    score: score(words, `${tool.name} ${tool.title ?? ""}`, server.config.name, tool.description ?? "") })))
     .filter(item => item.score > 0).sort((a, b) => b.score - a.score || a.entry.tool_id.localeCompare(b.entry.tool_id));
   const unindexed = servers.filter(server => !server.directory).map(server => ({ server,
-    score: score(words, server.config.name, "", server.config.description) }))
+    score: score(words, server.config.name, "", "") }))
     .sort((a, b) => b.score - a.score || a.server.config.id.localeCompare(b.server.config.id));
   return { matches: pageOf(ranked.map(item => item.entry), args.offset, args.limit),
-    unindexed_servers: (args.offset === 0 ? unindexed.slice(0, args.limit) : []).map(({ server }) => ({ server_id: server.config.id, name: server.config.name,
-      description: clip(server.config.description, 240), connection: server.state.connection })),
+    unindexed_servers: (args.offset === 0 ? unindexed.slice(0, args.limit) : []).map(({ server }) => ({ server_id: server.config.id, name: server.config.name, connection: server.state.connection })),
     coverage: { indexed_servers: servers.length - unindexed.length, unindexed_servers: unindexed.length } };
 }
 

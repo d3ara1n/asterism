@@ -6,7 +6,9 @@ import { IconButton } from "@atelier/ui/ui/icon-button";
 import { Spinner } from "@atelier/ui/ui/spinner";
 import { StatusIcon } from "@atelier/ui/ui/status";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@atelier/ui/ui/collapsible";
+import { ToolHeader } from "@atelier/ui/tool-header";
 import { cn } from "@atelier/ui/utils";
+import type { Json, UiText } from "@atelier/sdk/contracts";
 import { McpHost, CreateMcpHost, McpHostView, McpList, McpSearch, McpInspect, McpConnect, McpCall, ConnectMcpServer,
   type McpCallData, type McpServerState } from "./contract";
 import { mcpMessages as messages } from "../messages/mcp";
@@ -14,19 +16,43 @@ import { phaseTone, useMcpTools } from "./status";
 
 const appearance = { width: 360, height: 300, minWidth: 280, minHeight: 160 };
 
+/** 参数在填充阶段可能不完整，只取已成形的字符串字段。 */
+const field = (args: Json, key: string) => args && typeof args === "object" && !Array.isArray(args) && typeof args[key] === "string" && args[key] ? args[key] : undefined;
+const toolIcon = <Network className="size-3.5" />;
+
+/** 目录工具的标题显示操作对象：服务器、查询词或工具句柄。 */
+function directoryHeader(label: UiText, subjectKey: string, metaKey?: string) {
+  return function DirectoryHeader({ args }: ToolRenderProps) {
+    const i18n = useI18n();
+    return <ToolHeader label={i18n.text(label)} subject={field(args, subjectKey)} meta={metaKey && field(args, metaKey)} monospace={subjectKey !== "query"} />;
+  };
+}
 function DirectoryBody({ result }: ToolRenderProps) {
   return result?.data == null ? null : <pre className="type-caption select-text whitespace-pre-wrap break-words">{JSON.stringify(result.data, null, 2)}</pre>;
+}
+function directory(contract: typeof McpList | typeof McpSearch | typeof McpInspect | typeof McpConnect, label: UiText, subjectKey: string, metaKey?: string) {
+  const headerRenderer = directoryHeader(label, subjectKey, metaKey);
+  return toolRenderer(contract, { label, icon: toolIcon, input: { headerRenderer }, execution: { headerRenderer }, result: { headerRenderer, bodyRenderer: DirectoryBody } });
+}
+
+/** 调用标题：结果到达前显示参数中的工具句柄，之后显示服务器名称与远端工具名；执行中附带进度。 */
+function CallHeader({ args, result }: ToolRenderProps<McpCallData>) {
+  const i18n = useI18n();
+  const data = result?.data;
+  const progress = data?.progress;
+  return <ToolHeader label={i18n.text(messages.call)} subject={data ? `${data.serverName} · ${data.toolName}` : field(args, "tool_id")} monospace={!data}
+    meta={progress && `${progress.completed}${progress.total !== undefined ? ` / ${progress.total}` : ""}`} />;
 }
 function CallBody({ result }: ToolRenderProps<McpCallData>) {
   const data = result?.data;
   return data ? <div className="type-caption flex flex-col gap-2 select-text">
-    <p>{data.serverName} / {data.toolName}</p>
-    {data.progress && <p>{data.progress.message} {data.progress.completed}{data.progress.total !== undefined ? ` / ${data.progress.total}` : ""}</p>}
+    {data.progress?.message && <p>{data.progress.message}</p>}
     {data.parts.map((part, index) => part.kind === "text" ? <p key={index} className="whitespace-pre-wrap break-words">{part.text}</p>
       : <p key={index}>{part.filename ?? part.mediaType}</p>)}
     {data.structuredContent !== undefined && <pre className="whitespace-pre-wrap break-words">{JSON.stringify(data.structuredContent, null, 2)}</pre>}
   </div> : null;
 }
+const callView = { headerRenderer: CallHeader, bodyRenderer: CallBody };
 
 /** 标题栏入口：服务器管理位于内置插件设置的 MCP 分区。 */
 function HostActions() {
@@ -110,11 +136,11 @@ export default {
   resources: [{ kind: McpHost.kind, label: messages.title, icon: <Network className="size-4" />, card: appearance }],
   cards: [cardRenderer(McpHostView, { ...appearance, Body: HostBody, Actions: HostActions })],
   tools: [
-    toolRenderer(McpList, { label: messages.list, result: { bodyRenderer: DirectoryBody } }),
-    toolRenderer(McpSearch, { label: messages.search, result: { bodyRenderer: DirectoryBody } }),
-    toolRenderer(McpInspect, { label: messages.inspect, result: { bodyRenderer: DirectoryBody } }),
-    toolRenderer(McpConnect, { label: messages.connect, result: { bodyRenderer: DirectoryBody } }),
-    toolRenderer(McpCall, { label: messages.call, execution: { bodyRenderer: CallBody }, result: { bodyRenderer: CallBody } }),
+    directory(McpList, messages.list, "server_id"),
+    directory(McpSearch, messages.search, "query", "server_id"),
+    directory(McpInspect, messages.inspect, "tool_id"),
+    directory(McpConnect, messages.connect, "server_id"),
+    toolRenderer(McpCall, { label: messages.call, icon: toolIcon, input: { headerRenderer: CallHeader }, execution: callView, result: callView }),
   ],
   creations: [creationEntry(CreateMcpHost, { id: "atelier.builtin/mcp.blank", label: messages.title, icon: <Network className="size-4" />, group: "resources", triggers: { menu: { initialInput: { title: "MCP Host" } } } })],
 } satisfies RendererModule;
