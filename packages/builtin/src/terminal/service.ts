@@ -4,6 +4,7 @@ import serialize from "@xterm/addon-serialize";
 import { randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { setTimeout as delay } from "node:timers/promises";
 import type { ShellSettings } from "../shell/contract.ts";
 import { resolveShell } from "../shell/profiles.ts";
 import { prepareLaunch, type IntegrationMode } from "./integration.ts";
@@ -16,6 +17,8 @@ const SCROLLBACK_LINES = 5000;
 const RAW_CHARACTERS = 1024 * 1024;
 /** 输出合批：短时间内的 PTY 块合成一帧；单帧超过上限立即交付。 */
 const BATCH_MS = 5, BATCH_CHARACTERS = 64 * 1024;
+/** 模型输入后收集 shell 反馈，再观察状态。 */
+const INPUT_OBSERVATION_MS = 250;
 /** 流控水位：未解析与未确认字符超过高水位暂停 PTY，降到低水位恢复。 */
 const HIGH_WATERMARK = 100_000, LOW_WATERMARK = 5_000;
 /** 注入集成等待首个标记的上限；超时降级为无状态检测。 */
@@ -234,6 +237,17 @@ export class ShellInstance {
       if (this.statusValue.state === "idle") this.setState("unknown");
     }
     this.process!.write(data);
+  }
+  async input(data: string, signal: AbortSignal): Promise<TerminalStatus> {
+    const combined = AbortSignal.any([signal, this.lifetime.signal]);
+    combined.throwIfAborted();
+    this.write(data);
+    try { await delay(INPUT_OBSERVATION_MS, undefined, { signal: combined }); }
+    catch (error) { combined.throwIfAborted(); throw error; }
+    return this.enqueue(() => {
+      combined.throwIfAborted();
+      return this.status;
+    });
   }
   resize(cols: number, rows: number) {
     if (cols === this.terminal.cols && rows === this.terminal.rows) return;
@@ -518,8 +532,7 @@ export class SharedTerminal {
     const instance = this.instance;
     if (!instance) throw new TerminalError("terminal_closed", "The terminal was closed.");
     if (!instance.running) throw new TerminalError("terminal_exited", "The shell has exited. The user can restart it from the terminal card.");
-    instance.write(data);
-    return instance.status;
+    return instance.input(data, signal);
   }
   get applicationCursor(): boolean { return this.instance?.applicationCursor ?? false; }
   private require(): ShellInstance {

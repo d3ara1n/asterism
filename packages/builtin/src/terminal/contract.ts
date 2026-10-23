@@ -57,10 +57,12 @@ export const terminalInputSchema = z.strictObject({
 const Input = defineTool({ id: builtin.name("tool.terminal_input"), name: "terminal_input",
   description: "Send text or keys to a shared interactive terminal.",
   guidelines: ["Input goes to the current foreground program. Success means the input was delivered to the PTY.",
+    "Input returns the terminal status observed after a brief 250 ms collection window. Short commands may already have returned to idle.",
+    "Idle means the shell is at its command prompt; text entered without submission can also leave it idle. The read tool provides current terminal content; wait observes the shell until it returns to its prompt.",
     "A terminal that has not started starts a new shell on input. After its shell exits, the user restarts it from the terminal card.",
     "Shell variables and working directory persist within one shell instance."],
   argsSchema: terminalInputSchema });
-export const TerminalInput = defineImplementation({ ...builtin.data("terminal.input-result", terminalStatusSchema.describe("Terminal status after input was accepted.")),
+export const TerminalInput = defineImplementation({ ...builtin.data("terminal.input-result", terminalStatusSchema.describe("Terminal status observed after input was delivered and shell feedback was collected for 250 ms.")),
   resource: TerminalResource, tool: Input, targetSchema: z.null().describe("Select the terminal itself."), effect: "write", execution: "sequential" });
 /** 终端读取的内容选择：null 为当前屏幕；history 为保留的缓冲行；raw 为原始输出流。 */
 export const terminalReadTargetSchema = z.union([
