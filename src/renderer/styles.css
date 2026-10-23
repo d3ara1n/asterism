@@ -317,7 +317,35 @@
 .react-flow__edge-textbg { fill: var(--canvas); }
 /* 画布底色只来自 canvas token；xyflow 暗色模式自带的 #141414 不另起一层。 */
 .react-flow { --xy-background-color: var(--canvas); }
-.react-flow__handle { width: 7px; height: 7px; background: var(--primary); border: 2px solid var(--card); }
+/*
+ * 端点盒跨在卡片边缘上：xyflow 以盒外沿作为连线锚点，连线据此贴住卡片边缘。尺寸由 LinkEdge.tsx 经变量注入。
+ * 可见圆点与命中区由伪元素放大；常态位于 isolate 卡片之下只露出外半圆，悬停或拖线时浮到卡片之上。
+ */
+.react-flow__handle { width: var(--handle-box); height: var(--handle-box); background: transparent; border: 0; }
+.react-flow__handle:hover, .react-flow__handle.connectingfrom, .react-flow__handle.connectingto { z-index: 1; }
+.react-flow__handle::before, .react-flow__handle::after { content: ""; position: absolute; top: 50%; left: 50%; border-radius: 9999px; translate: -50% -50%; }
+.react-flow__handle::before {
+  width: var(--handle-dot); height: var(--handle-dot); background: var(--primary); border: 2px solid var(--card);
+  box-shadow: 0 0 0 0 color-mix(in oklab, var(--primary) 25%, transparent);
+  transition: scale var(--motion-fast) var(--ease-out), box-shadow var(--motion-fast) var(--ease-out);
+}
+/* 透明命中区，卡片外侧的部分比可见圆点宽。 */
+.react-flow__handle::after { width: 20px; height: 20px; }
+.react-flow__handle:hover::before, .react-flow__handle.connectingto::before { scale: 1.3; box-shadow: 0 0 0 3px color-mix(in oklab, var(--primary) 25%, transparent); }
+/* 连线：常态主题色半透明，悬停与选中时实色加粗；光晕用画布底色把线与纹理、交叉线分开。 */
+.link-edge { --link-opacity: 0.6; --link-width: 1.5px; }
+.react-flow__edge:hover .link-edge { --link-opacity: 0.9; }
+.link-edge[data-selected] { --link-opacity: 1; --link-width: 2.25px; }
+.link-edge :where(.link-edge-halo, .link-edge-line, .link-edge-flow, .link-edge-chevron) { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.link-edge-halo { stroke: var(--canvas); stroke-width: calc(var(--link-width) + 4px); }
+.link-edge-line, .link-edge-chevron {
+  stroke: var(--primary); stroke-opacity: var(--link-opacity); stroke-width: var(--link-width);
+  transition: stroke-opacity var(--motion-fast) var(--ease-out), stroke-width var(--motion-fast) var(--ease-out);
+}
+.link-edge-head { fill: var(--primary); fill-opacity: var(--link-opacity); stroke: var(--primary); stroke-opacity: var(--link-opacity); stroke-width: 1px; stroke-linejoin: round; transition: fill-opacity var(--motion-fast) var(--ease-out); }
+/* 选中时线身上的画布底色缺口沿起点流向终点。 */
+.link-edge-flow { stroke: var(--canvas); stroke-linecap: butt; stroke-width: calc(var(--link-width) + 0.5px); stroke-dasharray: 3 11; animation: link-edge-flow 0.9s linear infinite; }
+@keyframes link-edge-flow { to { stroke-dashoffset: -14; } }
 /* 复用画布缩放控件；右下角独立命中区与四边的连线端点分开。 */
 .react-flow__resize-control.object-resize-handle {
   display: flex; align-items: center; justify-content: center;

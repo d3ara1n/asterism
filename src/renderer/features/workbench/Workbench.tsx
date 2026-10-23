@@ -1,5 +1,5 @@
 import { RendererNavigationProvider, type DropItem } from "@atelier/sdk/renderer";
-import { ReactFlowProvider, ReactFlow, Panel, useReactFlow, applyNodeChanges, applyEdgeChanges, MarkerType, ConnectionMode, ConnectionLineType, type NodeChange, type EdgeChange, type Edge, type Connection, type IsValidConnection } from "@xyflow/react";
+import { ReactFlowProvider, ReactFlow, Panel, useReactFlow, applyNodeChanges, applyEdgeChanges, ConnectionMode, ConnectionLineType, type NodeChange, type EdgeChange, type Edge, type Connection, type IsValidConnection } from "@xyflow/react";
 import { Crosshair, Maximize, Minus, Plus, RotateCcw } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useImperativeHandle, useMemo, useRef, useState, type ReactNode, type Ref } from "react";
 
@@ -23,6 +23,7 @@ import { SessionHistoryPanel } from "../session/History";
 import { AccessPanel } from "./AccessPanel";
 import { useWorkbenchCanvas, type WorkbenchCanvas } from "./canvas";
 import { layoutConnections, type ConnectionEdge } from "./connections";
+import { handleSizeVariables, linkEdgeTypes } from "./LinkEdge";
 import { WorkbenchScope, WorkbenchContext, useWorkbench, type WorkbenchEnvironment, type WorkbenchStore, type WorkbenchView } from "./context";
 import { workbenchNodes } from "./nodes";
 import { type ViewPatch } from "./ObjectCard";
@@ -135,9 +136,6 @@ function Canvas({ ref, session, run, writable, canDrop, onDropItems }: DropHandl
   const [selectedEdges, setSelectedEdges] = useState<ReadonlySet<string>>(new Set());
   const edges: WorkbenchEdge[] = useMemo(() => connections.edges.map(edge => ({
     ...edge, type: edgeStyle, selected: selectedEdges.has(edge.id),
-    style: { stroke: "var(--primary)", strokeWidth: selectedEdges.has(edge.id) ? 2.5 : 1.5 },
-    markerEnd: { type: MarkerType.ArrowClosed, color: "var(--primary)" },
-    markerStart: edge.data.links.length === 2 ? { type: MarkerType.ArrowClosed, color: "var(--primary)", orient: "auto-start-reverse" } : undefined,
     selectable: writable, deletable: writable, interactionWidth: 16,
   })), [connections, writable, selectedEdges, edgeStyle]);
   const onEdgesChange = useCallback((changes: EdgeChange<WorkbenchEdge>[]) => {
@@ -195,7 +193,7 @@ function Canvas({ ref, session, run, writable, canDrop, onDropItems }: DropHandl
   {dropping && <div className="pointer-events-none absolute inset-2 z-20 flex items-center justify-center rounded-lg border-2 border-dashed border-primary bg-primary/5">
     <p className="type-body">{i18n.formatMessage(workbenchMessages.dropHint)}</p></div>}
   <ReactFlow<ObjectNodeType, WorkbenchEdge>
-    colorMode={scheme} nodes={canvasNodes} edges={edges} nodeTypes={nodeTypes} onNodesChange={onNodesChange}
+    colorMode={scheme} style={handleSizeVariables} nodes={canvasNodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={linkEdgeTypes} onNodesChange={onNodesChange}
     defaultViewport={session.viewport} minZoom={minZoom} maxZoom={maximumViewportZoom}
     nodesDraggable nodesConnectable={writable} connectionMode={ConnectionMode.Loose} edgesReconnectable={false} isValidConnection={isValidConnection}
     connectionLineType={connectionLineTypes[edgeStyle]}
