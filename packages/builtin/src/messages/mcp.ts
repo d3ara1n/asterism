@@ -60,6 +60,7 @@ export const mcpMessages = builtin.messages("en", defineMessages({
   unindexedHint: { id: "mcp.unindexedHint", defaultMessage: "Connect to discover this server's tools." },
   noTools: { id: "mcp.noTools", defaultMessage: "This server provides no tools." },
   instructions: { id: "mcp.instructions", defaultMessage: "Server instructions" },
+  parameters: { id: "mcp.parameters", defaultMessage: "Parameters" },
   list: { id: "mcp.list", defaultMessage: "Browse MCP" },
   search: { id: "mcp.search", defaultMessage: "Search MCP tools" },
   inspect: { id: "mcp.inspect", defaultMessage: "Inspect MCP tool" },
