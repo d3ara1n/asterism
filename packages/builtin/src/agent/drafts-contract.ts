@@ -27,3 +27,11 @@ export const ExchangeAgentDraft = defineAction(Agent, {
     replacement: userInputPartsSchema.nullable(),
   }),
 });
+export const DiscardAgentDraft = defineAction(Agent, {
+  id: builtin.name("agent.draft.discard"),
+  schema: z.strictObject({ id: z.string().uuid() }),
+});
+export const MoveAgentDraft = defineAction(Agent, {
+  id: builtin.name("agent.draft.move"),
+  schema: z.strictObject({ id: z.string().uuid(), before: z.string().uuid().nullable() }),
+});

@@ -35,6 +35,25 @@ export function exchangeDraft(object: ObjectExecutor, input: {
     rememberSubmission(object, writer, input);
   });
 }
+/** 丢弃与排序按身份作用，重放同一意图得到同一结果；条目已消费时返回 not_found。 */
+export function discardDraft(object: ObjectExecutor, input: { id: string }): void {
+  object.commit(writer => {
+    const { drafts } = currentDraft(object, input.id);
+    writer.set(AgentDrafts, drafts.filter(item => item.id !== input.id));
+  });
+}
+export function moveDraft(object: ObjectExecutor, input: { id: string; before: string | null }): void {
+  object.commit(writer => {
+    const { drafts, draft } = currentDraft(object, input.id);
+    if (input.before === input.id) return;
+    const rest = drafts.filter(item => item.id !== input.id);
+    // 顺序即交付顺序；锚点已被消费时退回末尾，不丢条目。
+    const index = input.before === null ? rest.length : rest.findIndex(item => item.id === input.before);
+    const next = [...rest];
+    next.splice(index < 0 ? rest.length : index, 0, draft);
+    writer.set(AgentDrafts, next);
+  });
+}
 /** 先形成完整批次，再允许循环取上下文；消息与持久附件的归属在同一事务交接。 */
 export function deliverDrafts(object: ObjectExecutor, boundary: "request" | "turn"): boolean {
   const drafts = object.get(AgentDrafts) ?? [];

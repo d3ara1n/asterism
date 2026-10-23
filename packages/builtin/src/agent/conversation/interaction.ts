@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { SubmissionIdentity } from "./submission";
 import { createMessageDraft, copyDraft, type CopiedDraft } from "./draft";
 import type { AgentExecutionState } from "../state";
-import { ExchangeAgentDraft, SaveAgentDraft, SetAgentDraftMode, type AgentDraft, type DraftMode } from "../drafts-contract";
+import { DiscardAgentDraft, ExchangeAgentDraft, MoveAgentDraft, SaveAgentDraft, SetAgentDraftMode, type AgentDraft, type DraftMode } from "../drafts-contract";
 import { conversationMessages } from "../../messages/conversation";
 import { DraftExchange } from "./draft-exchange";
 
@@ -113,6 +113,16 @@ export function useAgentConversation(object: RendererObjectContext, hasSelection
     async setMode(item: AgentDraft, mode: DraftMode) {
       if (!editable || mode === item.mode) return false;
       try { return accepted(await object.invoke(SetAgentDraftMode, { id: item.id, mode })); }
+      catch { toast.error(i18n.text(conversationMessages.modeUpdateFailed)); return false; }
+    },
+    async discard(item: AgentDraft): Promise<boolean> {
+      if (!editable) return false;
+      try { return accepted(await object.invoke(DiscardAgentDraft, { id: item.id })); }
+      catch { toast.error(i18n.text(conversationMessages.draftTransferFailed)); return false; }
+    },
+    async move(item: AgentDraft, before: string | null): Promise<boolean> {
+      if (!editable) return false;
+      try { return accepted(await object.invoke(MoveAgentDraft, { id: item.id, before })); }
       catch { toast.error(i18n.text(conversationMessages.draftTransferFailed)); return false; }
     },
     async take(item: AgentDraft): Promise<boolean> {

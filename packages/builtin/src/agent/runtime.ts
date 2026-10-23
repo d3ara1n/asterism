@@ -15,8 +15,8 @@ import type { AgentTurnState } from "./state.ts";
 import type { UsageConsumer } from "../usage/service.ts";
 import { createPeekTool } from "./peek/runtime.ts";
 import { AgentExecutionFeedback } from "./feedback.ts";
-import { SaveAgentDraft, SetAgentDraftMode, ExchangeAgentDraft } from "./drafts-contract.ts";
-import { saveDraft, setDraftMode, exchangeDraft } from "./drafts.ts";
+import { SaveAgentDraft, SetAgentDraftMode, ExchangeAgentDraft, DiscardAgentDraft, MoveAgentDraft } from "./drafts-contract.ts";
+import { saveDraft, setDraftMode, exchangeDraft, discardDraft, moveDraft } from "./drafts.ts";
 import { createSendTool } from "./send/runtime.ts";
 import { createWaitTool } from "./wait/runtime.ts";
 
@@ -64,6 +64,8 @@ export function createAgentModule(application: BuiltinApplication, usage: UsageC
           implementAction(SaveAgentDraft, { async execute(input, object) { saveDraft(object, input); } }),
           implementAction(SetAgentDraftMode, { async execute(input, object) { setDraftMode(object, input); } }),
           implementAction(ExchangeAgentDraft, { async execute(input, object) { exchangeDraft(object, input); } }),
+          implementAction(DiscardAgentDraft, { async execute(input, object) { discardDraft(object, input); } }),
+          implementAction(MoveAgentDraft, { async execute(input, object) { moveDraft(object, input); } }),
           implementAction(SubmitAgentInput, {
             async prepare(input, { object, signal, content }) { await admission.prepareSubmit(input, object, signal, content); return { action: "accept" }; },
             async execute(input, object) { if (admission.submit(input, object)) loop.start(object); },
