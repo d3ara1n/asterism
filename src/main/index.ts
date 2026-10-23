@@ -17,6 +17,7 @@ import { serveLanguage, readLanguage } from "./language.ts";
 import { startupText } from "./startup-text.ts";
 import { startupMessages } from "../shared/error-display.ts";
 import { allowRendererPermission } from "./permissions.ts";
+import { adoptLoginShellEnvironment } from "./shell-environment.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 let window: BrowserWindow | null = null;
@@ -164,6 +165,8 @@ if (!app.requestSingleInstanceLock()) {
     if (window?.isMinimized()) window.restore();
     window?.focus();
   });
+  // 登录 shell 环境与 Electron 初始化并行解析，任务进程 fork 前写回 process.env。
+  const environment = adoptLoginShellEnvironment();
   app.whenReady().then(async () => {
     if (quitting) return;
     // 权限检查和请求共用同一策略；只放行受信主框架的字体枚举与剪贴板写入。
@@ -175,6 +178,7 @@ if (!app.requestSingleInstanceLock()) {
     session.defaultSession.setPermissionCheckHandler((contents, permission, _origin, details) =>
       permitted(contents, permission, details.isMainFrame));
     servePluginArtifacts(dataRoot);
+    await environment;
     try { await runtime.start(join(here, "runtime.js"), dataRoot); }
     catch (error) {
       console.error("Application startup failed.", error);

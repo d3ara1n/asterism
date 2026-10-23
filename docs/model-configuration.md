@@ -241,7 +241,7 @@
 
 `agent_list` 枚举启用的代理配置，逐项只投影 `id / name / description / examples`，分别提供引用身份、显示名、用途与任务示例。描述概括适用场景，示例提供具体任务，两者共同支持选择。系统提示词、模型角色、工具策略、委派范围与请求上限留在配置消费边界；工作方式和输出要求由被选代理自己的系统提示词承载。
 
-内置 agent 为 `worker`（默认）、`explorer`、`reviewer`、`researcher`、`advisor`（使用 `smart` 角色）。agent 可删除，删除内置 agent 后不自动重现。只读代理（如 `advisor`）受工具策略、委派范围与资源执行层授权三重约束，不能通过创建可写代理或切换强模型绕过限制。
+内置 agent 为 `worker`（默认）、`explorer`、`reviewer`、`researcher`、`advisor`（使用 `smart` 角色）。agent 可删除，删除内置 agent 后不自动重现。只读代理（如 `advisor`）的工具范围由工具策略、委派范围与资源执行层授权共同决定，创建可写代理或切换强模型不改变这一范围；这是工具范围的一致性规则，不是安全保证。
 
 ## 内置定义与用户覆盖
 

@@ -12,6 +12,8 @@ export const mcpMessages = builtin.messages("en", defineMessages({
   save: { id: "mcp.save", defaultMessage: "Save" },
   cancel: { id: "mcp.cancel", defaultMessage: "Cancel" },
   name: { id: "mcp.name", defaultMessage: "Name" },
+  serverId: { id: "mcp.serverId", defaultMessage: "Server ID" },
+  serverIdHint: { id: "mcp.serverIdHint", defaultMessage: "Lowercase letters, digits, - and _. Tool IDs use server_id/tool_name; the ID is fixed after creation." },
   purpose: { id: "mcp.purpose", defaultMessage: "Description for discovery" },
   enabled: { id: "mcp.enabled", defaultMessage: "Enabled" },
   transport: { id: "mcp.transport", defaultMessage: "Transport" },

@@ -10,10 +10,11 @@ import { Item, ItemContent, ItemTitle, ItemDescription, ItemActions, ItemGroup }
 import { mcpMessages as messages } from "../messages/mcp";
 import { BuiltinSettings } from "../settings/contract";
 import { SaveMcpServer, RemoveMcpServer, ConnectMcpServer, DisconnectMcpServer, ResetMcpAuth, mcpServerSchema, type McpServerConfig } from "./contract";
-import { parseCredentialLines } from "./catalog";
+import { parseArgumentLines, parseCredentialLines, slugifyServerId } from "./catalog";
 import { useMcpStatus } from "./status";
 
-interface Draft { server: McpServerConfig; credentials: string; clear: boolean }
+/** args 以原文编辑，保存时再按行切分，输入中的换行不被即时规整。新增时 ID 跟随名称生成，直到用户手动修改。 */
+interface Draft { server: McpServerConfig; args: string; credentials: string; clear: boolean; create: boolean; idEdited: boolean }
 export function McpSettings() {
   const i18n = useI18n(), calls = useRendererCalls(), config = useRendererConfig(BuiltinSettings), id = useId();
   const status = useMcpStatus();
@@ -27,15 +28,19 @@ export function McpSettings() {
     finally { if (!lifetime.current.signal.aborted) setBusy(false); }
   };
   const update = (patch: Partial<McpServerConfig>) => setDraft(current => current && { ...current, server: { ...current.server, ...patch } });
-  const open = (server: McpServerConfig) => { setDraft({ server: structuredClone(server), credentials: "", clear: false }); setError(null); };
+  const rename = (name: string) => setDraft(current => current && { ...current, server: { ...current.server, name,
+    ...(current.create && !current.idEdited && { id: slugifyServerId(name, config.mcp.servers.map(server => server.id)) }) } });
+  const open = (server: McpServerConfig, create: boolean) => {
+    setDraft({ server: structuredClone(server), args: server.args.join("\n"), credentials: "", clear: false, create, idEdited: false }); setError(null);
+  };
   const save = async () => {
     if (!draft) return;
     let server: McpServerConfig, credentials: Record<string, string> | undefined;
-    try { server = mcpServerSchema.parse(draft.server); credentials = draft.clear ? {} : draft.credentials.trim() ? parseCredentialLines(draft.credentials) : undefined; }
+    try { server = mcpServerSchema.parse({ ...draft.server, args: parseArgumentLines(draft.args) }); credentials = draft.clear ? {} : draft.credentials.trim() ? parseCredentialLines(draft.credentials) : undefined; }
     catch { setError(i18n.text(messages.invalid)); return; }
-    if (await work(signal => calls.invoke(SaveMcpServer, { server, ...(credentials !== undefined && { credentials }) }, { signal }))) setDraft(null);
+    if (await work(signal => calls.invoke(SaveMcpServer, { server, create: draft.create, ...(credentials !== undefined && { credentials }) }, { signal }))) setDraft(null);
   };
-  const field = (key: "name" | "description" | "command" | "cwd" | "url", label: keyof typeof messages) => <div className="flex flex-col gap-2">
+  const field = (key: "description" | "command" | "cwd" | "url", label: keyof typeof messages) => <div className="flex flex-col gap-2">
     <Label htmlFor={`${id}-${key}`}>{i18n.text(messages[label])}</Label>
     <Input id={`${id}-${key}`} value={draft!.server[key]} disabled={busy} onChange={event => update({ [key]: event.target.value })} />
   </div>;
@@ -61,21 +66,27 @@ export function McpSettings() {
           <ItemActions className="flex-wrap">
             <Button variant="outline" size="sm" disabled={busy || !server.enabled} onClick={() => { void work(signal => calls.invoke(ConnectMcpServer, { serverId: server.id }, { signal })); }}>{i18n.text(messages.connect)}</Button>
             {state && state.connection !== "disconnected" && <Button variant="ghost" size="sm" disabled={busy} onClick={() => { void work(signal => calls.invoke(DisconnectMcpServer, { serverId: server.id }, { signal })); }}>{i18n.text(messages.disconnect)}</Button>}
-            <Button variant="ghost" size="sm" disabled={busy} onClick={() => open(server)}>{i18n.text(messages.edit)}</Button>
+            <Button variant="ghost" size="sm" disabled={busy} onClick={() => open(server, false)}>{i18n.text(messages.edit)}</Button>
             <Button variant="ghost" size="sm" disabled={busy} onClick={() => { void work(signal => calls.invoke(RemoveMcpServer, { serverId: server.id }, { signal })); }}>{i18n.text(messages.remove)}</Button>
             {server.auth === "oauth" && <Button variant="ghost" size="sm" disabled={busy} onClick={() => { void work(signal => calls.invoke(ResetMcpAuth, { serverId: server.id }, { signal })); }}>{i18n.text(messages.resetAuth)}</Button>}
           </ItemActions>
         </Item>;
       })}
     </ItemGroup>
-    {!draft ? <Button variant="outline" className="self-start" disabled={busy} onClick={() => open({ id: crypto.randomUUID(), name: "", description: "", enabled: true, mode: "lazy", idleSeconds: 300, transport: "stdio", command: "", args: [], cwd: "", url: "", auth: "none" })}>{i18n.text(messages.add)}</Button>
+    {!draft ? <Button variant="outline" className="self-start" disabled={busy} onClick={() => open({ id: slugifyServerId("", config.mcp.servers.map(server => server.id)), name: "", description: "", enabled: true, mode: "lazy", idleSeconds: 300, transport: "stdio", command: "", args: [], cwd: "", url: "", auth: "none" }, true)}>{i18n.text(messages.add)}</Button>
       : <div className="surface flex flex-col gap-4 p-4">
-        {field("name", "name")}{field("description", "purpose")}
+        <div className="flex flex-col gap-2"><Label htmlFor={`${id}-name`}>{i18n.text(messages.name)}</Label>
+          <Input id={`${id}-name`} value={draft.server.name} disabled={busy} onChange={event => rename(event.target.value)} /></div>
+        <div className="flex flex-col gap-2"><Label htmlFor={`${id}-server-id`}>{i18n.text(messages.serverId)}</Label>
+          <Input id={`${id}-server-id`} className="font-mono" value={draft.server.id} disabled={busy} readOnly={!draft.create} spellCheck={false}
+            onChange={event => setDraft(current => current && { ...current, idEdited: true, server: { ...current.server, id: event.target.value } })} />
+          <p className="type-caption text-muted-foreground">{i18n.text(messages.serverIdHint)}</p></div>
+        {field("description", "purpose")}
         <div className="flex items-center justify-between"><Label htmlFor={`${id}-enabled`}>{i18n.text(messages.enabled)}</Label><Switch id={`${id}-enabled`} checked={draft.server.enabled} disabled={busy} onCheckedChange={enabled => update({ enabled })} /></div>
         {select("transport", [["stdio", "stdio"], ["http", "http"]])}
         {draft.server.transport === "stdio" ? <>
           {field("command", "command")}
-          <div className="flex flex-col gap-2"><Label htmlFor={`${id}-args`}>{i18n.text(messages.args)}</Label><Textarea id={`${id}-args`} rows={3} className="font-mono" disabled={busy} value={draft.server.args.join("\n")} onChange={event => update({ args: event.target.value ? event.target.value.split("\n") : [] })} /></div>
+          <div className="flex flex-col gap-2"><Label htmlFor={`${id}-args`}>{i18n.text(messages.args)}</Label><Textarea id={`${id}-args`} rows={3} className="font-mono" disabled={busy} value={draft.args} onChange={event => setDraft(current => current && { ...current, args: event.target.value })} /></div>
           {field("cwd", "cwd")}
         </> : <>{field("url", "url")}{select("auth", [["none", "none"], ["oauth", "oauth"]])}</>}
         {select("mode", [["lazy", "lazy"], ["eager", "eager"]])}

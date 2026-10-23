@@ -24,7 +24,7 @@
 | 资源存在性 | resource presence | 资源在某会话当前路径上的存在；集合中的出现／消失决定后台对象生命周期，区别于历史动作与卡片显隐 |
 | 终端 | terminal | 用户与模型共用的交互 PTY、shell 和屏幕；资源只是入口，配置持久化，运行实例与缓冲属于本次应用运行，可关闭后重新开启 |
 | MCP 接口资源 | MCP Host resource | 访问内置 MCP 模块共享服务器集合的资源入口；不同对象共用配置、连接与工具目录，访问仍经资源链接授权 |
-| MCP 连接模式 | MCP connection mode | eager 在应用启动时连接并拉取工具目录，lazy 从持久缓存发现工具、按需连接并在空闲 TTL 后关闭 |
+| MCP 连接模式 | MCP connection mode | 只决定连接时机：eager 在应用启动时连接并刷新目录，lazy 按需连接并在空闲 TTL 后关闭；两种模式都从持久缓存发现工具 |
 | 直连传输 | runtime connection | renderer 与任务进程间由主进程交接的 MessagePort；业务消息不经主进程转发 |
 | 对象通道 | object channel | 按对象打开的有序双工消息流，承载高频对象数据；对象离开当前集合或连接断开时结束 |
 | 终端就绪 | terminal idle | shell 回到命令提示符；区别于宿主时间线收束，也不表示后台作业结束 |

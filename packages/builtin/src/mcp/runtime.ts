@@ -1,16 +1,17 @@
-import { defineModule, implementResource, implementCreation, implementTool, implementCall, type CallResult } from "@atelier/sdk/runtime";
+import { defineModule, implementResource, implementCreation, implementTool, implementCall, PluginApiError, type CallResult } from "@atelier/sdk/runtime";
 import { type Json, type ResourceRef } from "@atelier/sdk/contracts";
 import { McpHost, CreateMcpHost, McpHostView, McpList, McpSearch, McpInspect, McpConnect, McpCall, McpChanged,
   ReadMcp, SaveMcpServer, RemoveMcpServer, ConnectMcpServer, DisconnectMcpServer, ResetMcpAuth, type McpCallData } from "./contract.ts";
-import { McpHostService, McpCallError, credentialKey, oauthKey } from "./service.ts";
+import { McpHostService, McpCallError, credentialKey, oauthKey, type CallTarget } from "./service.ts";
 import { convertMcpResult, mcpResultToModel } from "./result.ts";
 import { BuiltinSettings } from "../settings/contract.ts";
 import { describeServer } from "./catalog.ts";
 
+const messageOf = (error: unknown) => error instanceof Error ? error.message : String(error);
 async function readResult(work: () => Json | Promise<Json>, signal: AbortSignal): Promise<CallResult> {
   try { signal.throwIfAborted(); return { kind: "succeeded", data: await work() }; }
   catch (error) { return signal.aborted ? { kind: "cancelled", message: "The MCP operation was cancelled." }
-    : { kind: "failed", error: { code: "mcp_error", message: error instanceof Error ? error.message : String(error) } }; }
+    : { kind: "failed", error: { code: "mcp_error", message: messageOf(error) } }; }
 }
 
 export default defineModule(plugin => {
@@ -24,6 +25,7 @@ export default defineModule(plugin => {
   plugin.signal.addEventListener("abort", stop, { once: true });
   // 任务在同步装配完成后启动，状态事件与资源契约已登记。
   plugin.tasks.start("mcp.start", async signal => { await Promise.resolve(); signal.throwIfAborted(); service.configure(config.get().mcp.servers); });
+  const servers = () => config.get().mcp.servers;
   return {
     events: [McpChanged],
     observers: [{ id: "mcp.presence", resourcesChanged({ appeared, disappeared }) {
@@ -32,25 +34,39 @@ export default defineModule(plugin => {
     } }],
     calls: [
       implementCall(ReadMcp, async () => service.states()),
-      implementCall(SaveMcpServer, async ({ server, credentials }) => {
-        if (credentials !== undefined) {
-          const exists = config.get().mcp.servers.some(item => item.id === server.id);
-          if (exists) await service.disconnect(server.id);
+      implementCall(SaveMcpServer, async ({ server, create, credentials }) => {
+        const exists = servers().some(item => item.id === server.id);
+        if (create && exists) throw new PluginApiError("conflict", `An MCP server with ID '${server.id}' already exists.`);
+        if (!create && !exists) throw new PluginApiError("not_found", `The MCP server '${server.id}' is not configured.`);
+        // 新增服务器从空凭据开始，不继承同 ID 旧服务器遗留的值。
+        if (create) await Promise.all([plugin.secrets.set(credentialKey(server.id), JSON.stringify(credentials ?? {})), plugin.secrets.delete(oauthKey(server.id))]);
+        else if (credentials !== undefined) {
           await plugin.secrets.set(credentialKey(server.id), JSON.stringify(credentials));
+          await service.credentialsChanged(server.id);
         }
-        config.update(current => ({ ...current, mcp: { servers: current.mcp.servers.some(item => item.id === server.id)
-          ? current.mcp.servers.map(item => item.id === server.id ? server : item) : [...current.mcp.servers, server] } }));
+        config.update(current => ({ ...current, mcp: { servers: create ? [...current.mcp.servers, server]
+          : current.mcp.servers.map(item => item.id === server.id ? server : item) } }));
         return null;
       }),
       implementCall(RemoveMcpServer, async ({ serverId }) => {
-        await service.disconnect(serverId);
         config.update(current => ({ ...current, mcp: { servers: current.mcp.servers.filter(item => item.id !== serverId) } }));
+        await service.settled();
         await Promise.all([plugin.secrets.delete(credentialKey(serverId)), plugin.secrets.delete(oauthKey(serverId))]);
         return null;
       }),
-      implementCall(ConnectMcpServer, async ({ serverId }, { signal }) => { await service.connect(serverId, signal); return null; }),
+      // 设置页的连接在后台进行：等待浏览器授权期间页面其他操作照常可用，结果经状态事件呈现。
+      implementCall(ConnectMcpServer, async ({ serverId }) => {
+        const signal = plugin.signal;
+        void service.connect(serverId, signal).catch(error => { if (!signal.aborted) plugin.log.warn(`MCP connection to ${serverId} failed: ${messageOf(error)}`); });
+        return null;
+      }),
       implementCall(DisconnectMcpServer, async ({ serverId }) => { await service.disconnect(serverId); return null; }),
-      implementCall(ResetMcpAuth, async ({ serverId }) => { await service.resetCredentials(serverId); return null; }),
+      implementCall(ResetMcpAuth, async ({ serverId }) => {
+        await service.disconnect(serverId);
+        await plugin.secrets.delete(oauthKey(serverId));
+        service.invalidateDirectory(serverId);
+        return null;
+      }),
     ],
     resources: [implementResource(McpHost, McpHostView, {
       creation: implementCreation(CreateMcpHost, { create: ({ title }) => ({ title, data: {} }) }),
@@ -67,15 +83,20 @@ export default defineModule(plugin => {
       }, signal) }),
       implementTool(McpCall, {
         async call(_data, _target, args, { signal, object, publish }): Promise<CallResult<McpCallData>> {
+          let target: CallTarget;
+          try { target = service.resolve(args.tool_id); }
+          catch (error) { return { kind: "rejected", error: { code: "mcp_call_error", message: messageOf(error) } }; }
+          const identity = { serverId: target.serverId, serverName: target.serverName, toolName: target.toolName };
           try {
-            const output = await service.call(args.tool_id, args.arguments, signal, progress => {
-              const tool = service.inspect(args.tool_id);
-              publish({ serverId: tool.server_id, serverName: tool.server, toolName: tool.name, parts: [],
-                progress: { completed: progress.progress, ...(progress.total !== undefined && { total: progress.total }), ...(progress.message && { message: progress.message }) } });
+            const result = await service.call(target, args.arguments, signal, progress => {
+              // 进度只是临时展示；发布失败不影响远端调用本身。
+              try {
+                publish({ ...identity, parts: [], progress: { completed: progress.progress,
+                  ...(progress.total !== undefined && { total: progress.total }), ...(progress.message && { message: progress.message }) } });
+              } catch (error) { plugin.log.warn(`MCP progress could not be published: ${messageOf(error)}`); }
             });
-            const data: McpCallData = { serverId: output.serverId, serverName: output.serverName, toolName: output.toolName,
-              ...await convertMcpResult(output.result, object.content) };
-            return output.result.isError ? { kind: "failed", data, error: { code: "mcp_tool_error", message: "The MCP server reported a tool error." } }
+            const data: McpCallData = { ...identity, ...await convertMcpResult(result, object.content) };
+            return result.isError ? { kind: "failed", data, error: { code: "mcp_tool_error", message: "The MCP server reported a tool error." } }
               : { kind: "succeeded", data };
           } catch (error) {
             if (!(error instanceof McpCallError)) throw error;

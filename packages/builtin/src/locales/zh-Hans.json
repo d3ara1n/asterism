@@ -488,6 +488,8 @@
   "mcp.save": "保存",
   "mcp.cancel": "取消",
   "mcp.name": "名称",
+  "mcp.serverId": "服务器 ID",
+  "mcp.serverIdHint": "小写字母、数字、- 与 _。工具 ID 采用 server_id/tool_name，创建后 ID 固定。",
   "mcp.purpose": "供发现使用的用途说明",
   "mcp.enabled": "启用",
   "mcp.transport": "传输方式",
