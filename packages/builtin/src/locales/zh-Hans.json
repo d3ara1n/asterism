@@ -18,6 +18,8 @@
   "terminal.unknownWarning": "终端中可能仍有程序运行。关闭后将终止它的 shell 和子进程。",
   "terminal.failed": "终端操作失败：{error}",
   "terminal.exited": "Shell 已退出，退出码为 {code}。",
+  "terminal.lastExit": "退出码 {code}",
+  "terminal.elapsed": "{seconds}s",
   "terminal.noIntegration": "此 Shell 未提供状态检测；仍可正常输入并读取屏幕。",
   "agent_send_title": "发送消息",
   "agent_send_accepted": "已受理",

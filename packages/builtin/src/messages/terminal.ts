@@ -22,4 +22,6 @@ export const terminalMessages = builtin.messages("en", defineMessages({
   unknownWarning: { id: "terminal.unknownWarning", defaultMessage: "This terminal may have running programs. Closing it will terminate its shell and child processes." },
   failed: { id: "terminal.failed", defaultMessage: "Terminal operation failed: {error}" },
   exited: { id: "terminal.exited", defaultMessage: "Shell exited with code {code}." },
+  lastExit: { id: "terminal.lastExit", defaultMessage: "Exit {code}" },
+  elapsed: { id: "terminal.elapsed", defaultMessage: "{seconds}s" },
 }));
