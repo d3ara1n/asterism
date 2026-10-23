@@ -1,7 +1,7 @@
 import { defineModule, implementResource, implementCreation, implementTool, implementCall, PluginApiError, type CallResult } from "@atelier/sdk/runtime";
 import { type Json, type ResourceRef } from "@atelier/sdk/contracts";
 import { McpHost, CreateMcpHost, McpHostView, McpList, McpSearch, McpInspect, McpConnect, McpCall, McpChanged,
-  ReadMcp, SaveMcpServer, RemoveMcpServer, ConnectMcpServer, DisconnectMcpServer, ResetMcpAuth, type McpCallData } from "./contract.ts";
+  ReadMcp, SaveMcpServer, ReadMcpCredentials, ReadMcpTools, SetMcpServerEnabled, RemoveMcpServer, ConnectMcpServer, DisconnectMcpServer, ResetMcpAuth, type McpCallData } from "./contract.ts";
 import { McpHostService, McpCallError, credentialKey, oauthKey, type CallTarget } from "./service.ts";
 import { convertMcpResult, mcpResultToModel } from "./result.ts";
 import { BuiltinSettings } from "../settings/contract.ts";
@@ -34,18 +34,28 @@ export default defineModule(plugin => {
     } }],
     calls: [
       implementCall(ReadMcp, async () => service.states()),
+      implementCall(ReadMcpTools, async ({ serverId }) => service.tools(serverId)),
+      implementCall(ReadMcpCredentials, async ({ serverId }) => {
+        if (!servers().some(item => item.id === serverId)) throw new PluginApiError("not_found", `The MCP server '${serverId}' is not configured.`);
+        return service.credentials(serverId);
+      }),
       implementCall(SaveMcpServer, async ({ server, create, credentials }) => {
         const exists = servers().some(item => item.id === server.id);
         if (create && exists) throw new PluginApiError("conflict", `An MCP server with ID '${server.id}' already exists.`);
         if (!create && !exists) throw new PluginApiError("not_found", `The MCP server '${server.id}' is not configured.`);
-        // 新增服务器从空凭据开始，不继承同 ID 旧服务器遗留的值。
-        if (create) await Promise.all([plugin.secrets.set(credentialKey(server.id), JSON.stringify(credentials ?? {})), plugin.secrets.delete(oauthKey(server.id))]);
-        else if (credentials !== undefined) {
+        // 新增服务器不继承同 ID 旧服务器遗留的授权；编辑时值有变化才失效目录并以新值重连。
+        if (create) await Promise.all([plugin.secrets.set(credentialKey(server.id), JSON.stringify(credentials)), plugin.secrets.delete(oauthKey(server.id))]);
+        else if (JSON.stringify(await service.credentials(server.id)) !== JSON.stringify(credentials)) {
           await plugin.secrets.set(credentialKey(server.id), JSON.stringify(credentials));
           await service.credentialsChanged(server.id);
         }
         config.update(current => ({ ...current, mcp: { servers: create ? [...current.mcp.servers, server]
           : current.mcp.servers.map(item => item.id === server.id ? server : item) } }));
+        return null;
+      }),
+      implementCall(SetMcpServerEnabled, async ({ serverId, enabled }) => {
+        if (!servers().some(item => item.id === serverId)) throw new PluginApiError("not_found", `The MCP server '${serverId}' is not configured.`);
+        config.update(current => ({ ...current, mcp: { servers: current.mcp.servers.map(item => item.id === serverId ? { ...item, enabled } : item) } }));
         return null;
       }),
       implementCall(RemoveMcpServer, async ({ serverId }) => {

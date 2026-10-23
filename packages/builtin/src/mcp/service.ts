@@ -95,6 +95,12 @@ export class McpHostService implements SessionHost {
     return session;
   }
   states(): McpServerState[] { return [...this.sessions.values()].map(session => session.state()); }
+  /** 展示用目录摘要：读取当前缓存，不建立连接。 */
+  tools(id: string) {
+    const directory = this.get(id).directory;
+    return directory ? { tools: directory.tools.map(({ name, title, description }) => ({ name, ...(title && { title }), ...(description && { description }) })),
+      ...(directory.instructions && { instructions: directory.instructions }) } : null;
+  }
   private catalog(): CatalogServer[] {
     return [...this.sessions.values()].map(session => ({ config: session.config, state: session.state(), directory: session.directory }));
   }

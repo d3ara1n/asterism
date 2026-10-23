@@ -1,102 +1,250 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { MoreHorizontal, Pencil, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
 import { useI18n, useRendererCalls, useRendererConfig } from "@atelier/sdk/renderer";
 import { Button } from "@atelier/ui/ui/button";
+import { IconButton } from "@atelier/ui/ui/icon-button";
 import { Input } from "@atelier/ui/ui/input";
 import { Textarea } from "@atelier/ui/ui/textarea";
-import { Label } from "@atelier/ui/ui/label";
 import { Switch } from "@atelier/ui/ui/switch";
+import { Badge } from "@atelier/ui/ui/badge";
+import { Spinner } from "@atelier/ui/ui/spinner";
+import { StatusIcon } from "@atelier/ui/ui/status";
+import { Field, FieldDescription, FieldError, FieldLabel, FieldLegend, FieldSet } from "@atelier/ui/ui/field";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@atelier/ui/ui/select";
-import { Item, ItemContent, ItemTitle, ItemDescription, ItemActions, ItemGroup } from "@atelier/ui/ui/item";
+import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemSeparator, ItemTitle } from "@atelier/ui/ui/item";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@atelier/ui/ui/dropdown-menu";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@atelier/ui/ui/alert-dialog";
 import { mcpMessages as messages } from "../messages/mcp";
 import { BuiltinSettings } from "../settings/contract";
-import { SaveMcpServer, RemoveMcpServer, ConnectMcpServer, DisconnectMcpServer, ResetMcpAuth, mcpServerSchema, type McpServerConfig } from "./contract";
-import { parseArgumentLines, parseCredentialLines, slugifyServerId } from "./catalog";
-import { useMcpStatus } from "./status";
+import { SaveMcpServer, ReadMcpCredentials, SetMcpServerEnabled, RemoveMcpServer, ConnectMcpServer, DisconnectMcpServer, ResetMcpAuth,
+  type McpServerConfig, type McpServerState } from "./contract";
+import { slugifyServerId } from "./catalog";
+import { draftOf, validateDraft, type McpDraft, type McpField, type McpFieldError } from "./form";
+import { phaseTone, useMcpStatus } from "./status";
 
-/** args 以原文编辑，保存时再按行切分，输入中的换行不被即时规整。新增时 ID 跟随名称生成，直到用户手动修改。 */
-interface Draft { server: McpServerConfig; args: string; credentials: string; clear: boolean; create: boolean; idEdited: boolean }
+/** 编辑区：已有服务器读回保存的键值后才可完成；新增服务器从空白开始。 */
+interface Editor { draft: McpDraft; ready: boolean; errors: Partial<Record<McpField, McpFieldError>>; failure: string | null; saving: boolean }
+const blank = (taken: string[]): McpServerConfig => ({ id: slugifyServerId("", taken), name: "", description: "", enabled: true, mode: "lazy",
+  idleSeconds: 300, transport: "stdio", command: "", args: [], cwd: "", url: "", auth: "none" });
+const messageOf = (error: unknown) => error instanceof Error ? error.message : String(error);
+const summary = (server: McpServerConfig) => server.transport === "stdio" ? [server.command, ...server.args].filter(Boolean).join(" ") : server.url;
+
+/**
+ * 服务器逐行列出：启用开关与连接操作即时生效，编辑在行内展开，以「完成」保存、「取消」放弃。
+ * 各服务器的操作分别 pending，等待浏览器授权不阻塞其他服务器。
+ */
 export function McpSettings() {
   const i18n = useI18n(), calls = useRendererCalls(), config = useRendererConfig(BuiltinSettings), id = useId();
   const status = useMcpStatus();
-  const [draft, setDraft] = useState<Draft | null>(null), [busy, setBusy] = useState(false), [error, setError] = useState<string | null>(null);
-  const lifetime = useRef(new AbortController());
+  const [editor, setEditor] = useState<Editor | null>(null);
+  const [pending, setPending] = useState<ReadonlySet<string>>(new Set());
+  const [failures, setFailures] = useState<Readonly<Record<string, string>>>({});
+  const [removing, setRemoving] = useState<McpServerConfig | null>(null);
+  const lifetime = useRef<AbortController>(new AbortController());
   useEffect(() => { const controller = new AbortController(); lifetime.current = controller; return () => controller.abort(); }, []);
-  const work = async (action: (signal: AbortSignal) => Promise<unknown>) => {
-    setBusy(true); setError(null);
-    try { await action(lifetime.current.signal); return true; }
-    catch (failure) { if (!lifetime.current.signal.aborted) setError(failure instanceof Error ? failure.message : String(failure)); return false; }
-    finally { if (!lifetime.current.signal.aborted) setBusy(false); }
+  const servers = config.mcp.servers;
+  // 编辑中的服务器在别处被移除时关闭编辑区。
+  useEffect(() => {
+    if (editor && !editor.draft.create && !servers.some(server => server.id === editor.draft.server.id)) setEditor(null);
+  }, [servers]);
+
+  const run = async (serverId: string, action: (signal: AbortSignal) => Promise<unknown>) => {
+    const signal = lifetime.current.signal;
+    setPending(current => new Set(current).add(serverId));
+    setFailures(({ [serverId]: _, ...rest }) => rest);
+    try { await action(signal); return true; }
+    catch (error) { if (!signal.aborted) setFailures(current => ({ ...current, [serverId]: messageOf(error) })); return false; }
+    finally { if (!signal.aborted) setPending(current => { const next = new Set(current); next.delete(serverId); return next; }); }
   };
-  const update = (patch: Partial<McpServerConfig>) => setDraft(current => current && { ...current, server: { ...current.server, ...patch } });
-  const rename = (name: string) => setDraft(current => current && { ...current, server: { ...current.server, name,
-    ...(current.create && !current.idEdited && { id: slugifyServerId(name, config.mcp.servers.map(server => server.id)) }) } });
-  const open = (server: McpServerConfig, create: boolean) => {
-    setDraft({ server: structuredClone(server), args: server.args.join("\n"), credentials: "", clear: false, create, idEdited: false }); setError(null);
+  const patch = (next: (draft: McpDraft) => McpDraft) => setEditor(current => current && { ...current, draft: next(current.draft) });
+  const update = (value: Partial<McpServerConfig>) => patch(draft => ({ ...draft, server: { ...draft.server, ...value } }));
+  const edit = (server: McpServerConfig) => {
+    const signal = lifetime.current.signal;
+    setEditor({ draft: draftOf(server, {}, false), ready: false, errors: {}, failure: null, saving: false });
+    void calls.invoke(ReadMcpCredentials, { serverId: server.id }, { signal }).then(values => {
+      if (!signal.aborted) setEditor(current => current?.draft.server.id === server.id && !current.draft.create
+        ? { ...current, ready: true, draft: { ...current.draft, entries: draftOf(server, values, false).entries } } : current);
+    }, error => {
+      if (!signal.aborted) setEditor(current => current?.draft.server.id === server.id ? { ...current, failure: messageOf(error) } : current);
+    });
   };
-  const save = async () => {
-    if (!draft) return;
-    let server: McpServerConfig, credentials: Record<string, string> | undefined;
-    try { server = mcpServerSchema.parse({ ...draft.server, args: parseArgumentLines(draft.args) }); credentials = draft.clear ? {} : draft.credentials.trim() ? parseCredentialLines(draft.credentials) : undefined; }
-    catch { setError(i18n.text(messages.invalid)); return; }
-    if (await work(signal => calls.invoke(SaveMcpServer, { server, create: draft.create, ...(credentials !== undefined && { credentials }) }, { signal }))) setDraft(null);
+  const add = () => setEditor({ draft: draftOf(blank(servers.map(server => server.id)), {}, true), ready: true, errors: {}, failure: null, saving: false });
+  const complete = async () => {
+    if (!editor?.ready) return;
+    const result = validateDraft(editor.draft, servers.map(server => server.id).filter(item => editor.draft.create || item !== editor.draft.server.id));
+    if (!result.ok) { setEditor({ ...editor, errors: result.errors, failure: null }); return; }
+    const signal = lifetime.current.signal;
+    setEditor({ ...editor, errors: {}, failure: null, saving: true });
+    try {
+      await calls.invoke(SaveMcpServer, { server: result.server, create: editor.draft.create, credentials: result.credentials }, { signal });
+      if (!signal.aborted) setEditor(null);
+    } catch (error) {
+      if (!signal.aborted) setEditor(current => current && { ...current, saving: false, failure: messageOf(error) });
+    }
   };
-  const field = (key: "description" | "command" | "cwd" | "url", label: keyof typeof messages) => <div className="flex flex-col gap-2">
-    <Label htmlFor={`${id}-${key}`}>{i18n.text(messages[label])}</Label>
-    <Input id={`${id}-${key}`} value={draft!.server[key]} disabled={busy} onChange={event => update({ [key]: event.target.value })} />
-  </div>;
-  const select = (key: "transport" | "mode" | "auth", values: [string, keyof typeof messages][]) => <div className="flex flex-col gap-2">
-    <Label htmlFor={`${id}-${key}`}>{i18n.text(messages[key])}</Label>
-    <Select value={draft!.server[key]} disabled={busy} onValueChange={value => update({ [key]: value })}>
-      <SelectTrigger id={`${id}-${key}`}><SelectValue /></SelectTrigger><SelectContent>{values.map(([value, label]) => <SelectItem key={value} value={value}>{i18n.text(messages[label])}</SelectItem>)}</SelectContent>
-    </Select>
-  </div>;
+
+  const editorView = ({ draft, ready, errors, failure, saving }: Editor) => {
+    const disabled = saving || !ready, server = draft.server;
+    const field = (key: string, label: ReactNode, control: ReactNode, hint?: ReactNode) => {
+      const error = errors[key as McpField];
+      return <Field data-invalid={error ? true : undefined}>
+        <FieldLabel htmlFor={`${id}-${key}`}>{label}</FieldLabel>
+        {control}
+        {error ? <FieldError>{i18n.text(messages[error])}</FieldError> : hint && <FieldDescription>{hint}</FieldDescription>}
+      </Field>;
+    };
+    const input = (key: "name" | "description" | "command" | "cwd" | "url", mono = false) =>
+      <Input id={`${id}-${key}`} value={server[key]} disabled={disabled} spellCheck={!mono} className={mono ? "font-mono" : undefined}
+        aria-invalid={key in errors || undefined}
+        onChange={event => key === "name"
+          ? patch(current => ({ ...current, server: { ...current.server, name: event.target.value,
+            ...(current.create && !current.idEdited && { id: slugifyServerId(event.target.value, servers.map(item => item.id)) }) } }))
+          : update({ [key]: event.target.value })} />;
+    const select = <K extends "transport" | "mode" | "auth">(key: K, options: [McpServerConfig[K], keyof typeof messages][]) =>
+      <Select value={server[key]} disabled={disabled} onValueChange={value => update({ [key]: value } as Partial<McpServerConfig>)}>
+        <SelectTrigger id={`${id}-${key}`} className="w-full"><SelectValue /></SelectTrigger>
+        <SelectContent>{options.map(([value, label]) => <SelectItem key={value} value={value}>{i18n.text(messages[label])}</SelectItem>)}</SelectContent>
+      </Select>;
+    return <div className="flex flex-col gap-6 px-4 pb-4">
+      <FieldSet>
+        <FieldLegend variant="label">{i18n.text(messages.general)}</FieldLegend>
+        {field("name", i18n.text(messages.name), input("name"))}
+        {field("id", i18n.text(messages.serverId),
+          <Input id={`${id}-id`} className="font-mono" value={server.id} disabled={disabled} readOnly={!draft.create} spellCheck={false}
+            aria-invalid={"id" in errors || undefined}
+            onChange={event => patch(current => ({ ...current, idEdited: true, server: { ...current.server, id: event.target.value } }))} />,
+          i18n.text(messages.serverIdHint))}
+        {field("description", i18n.text(messages.purpose), input("description"), i18n.text(messages.purposeHint))}
+      </FieldSet>
+      <FieldSet>
+        <FieldLegend variant="label">{i18n.text(messages.connection)}</FieldLegend>
+        {field("transport", i18n.text(messages.transport), select("transport", [["stdio", "stdio"], ["http", "http"]]))}
+        {server.transport === "stdio" ? <>
+          {field("command", i18n.text(messages.command), input("command", true))}
+          {field("args", i18n.text(messages.args),
+            <Textarea id={`${id}-args`} rows={3} className="font-mono" disabled={disabled} spellCheck={false} value={draft.args}
+              onChange={event => patch(current => ({ ...current, args: event.target.value }))} />, i18n.text(messages.argsHint))}
+          {field("cwd", i18n.text(messages.cwd), input("cwd", true), i18n.text(messages.cwdHint))}
+        </> : <>
+          {field("url", i18n.text(messages.url), input("url", true))}
+          {field("auth", i18n.text(messages.auth), select("auth", [["none", "none"], ["oauth", "oauth"]]))}
+        </>}
+        {field("mode", i18n.text(messages.mode), select("mode", [["lazy", "lazy"], ["eager", "eager"]]))}
+        {server.mode === "lazy" && field("idle", i18n.text(messages.ttl),
+          <Input id={`${id}-idle`} inputMode="numeric" disabled={disabled} value={draft.idle} aria-invalid={"idle" in errors || undefined}
+            onChange={event => patch(current => ({ ...current, idle: event.target.value }))} />)}
+        {field("entries", i18n.text(server.transport === "stdio" ? messages.env : messages.headers),
+          <Textarea id={`${id}-entries`} rows={4} className="font-mono" disabled={disabled} spellCheck={false} autoComplete="off"
+            value={draft.entries} aria-invalid={"entries" in errors || undefined}
+            onChange={event => patch(current => ({ ...current, entries: event.target.value }))} />,
+          ready ? i18n.text(messages.entriesHint) : i18n.text(messages.loadingEntries))}
+      </FieldSet>
+      {failure && <p role="alert" className="type-caption text-destructive break-words">{failure}</p>}
+      <div className="flex justify-end gap-2">
+        <Button variant="outline" size="sm" disabled={saving} onClick={() => setEditor(null)}>{i18n.text(messages.cancel)}</Button>
+        <Button size="sm" disabled={disabled} aria-busy={saving} onClick={() => { void complete(); }}>{saving && <Spinner />}{i18n.text(messages.done)}</Button>
+      </div>
+    </div>;
+  };
+
+  const connection = (server: McpServerConfig, state: McpServerState | undefined, busy: boolean) => {
+    if (!server.enabled || !state) return null;
+    const invoke = (contract: typeof ConnectMcpServer | typeof DisconnectMcpServer) =>
+      () => { void run(server.id, signal => calls.invoke(contract, { serverId: server.id }, { signal })); };
+    switch (state.connection) {
+      case "awaiting_auth": return <>
+        {state.authorizationUrl && <Button variant="outline" size="sm" asChild>
+          <a href={state.authorizationUrl} target="_blank" rel="noopener noreferrer">{i18n.text(messages.authorize)}</a></Button>}
+        <Button variant="ghost" size="sm" disabled={busy} onClick={invoke(DisconnectMcpServer)}>{i18n.text(messages.cancel)}</Button>
+      </>;
+      case "connecting": return <Button variant="ghost" size="sm" disabled={busy} onClick={invoke(DisconnectMcpServer)}>{i18n.text(messages.cancel)}</Button>;
+      case "connected": return <>
+        <IconButton label={i18n.text(messages.refresh)} disabled={busy} onClick={invoke(ConnectMcpServer)}><RefreshCw /></IconButton>
+        <Button variant="ghost" size="sm" disabled={busy} onClick={invoke(DisconnectMcpServer)}>{i18n.text(messages.disconnect)}</Button>
+      </>;
+      default: return <Button variant="outline" size="sm" disabled={busy} onClick={invoke(ConnectMcpServer)}>{i18n.text(messages.connect)}</Button>;
+    }
+  };
+  const row = (server: McpServerConfig) => {
+    const state = status.servers.find(item => item.id === server.id);
+    const editing = editor && !editor.draft.create && editor.draft.server.id === server.id ? editor : null;
+    const busy = pending.has(server.id), error = failures[server.id] ?? state?.error;
+    const phase = state?.connection ?? "disconnected";
+    return <div key={server.id} role="listitem">
+      <Item size="sm">
+        <StatusIcon tone={server.enabled ? phaseTone[phase] : "neutral"} className="size-4 shrink-0" />
+        <ItemContent className="min-w-0">
+          <ItemTitle className="min-w-0">
+            <span className="truncate">{server.name}</span>
+            {!server.enabled && <Badge variant="secondary">{i18n.text(messages.disabled)}</Badge>}
+          </ItemTitle>
+          <ItemDescription className="truncate font-mono text-xs">{server.id} · {summary(server)}</ItemDescription>
+          <ItemDescription className="type-caption">
+            {i18n.formatMessage(messages.state, { state: phase })}{" · "}
+            {state?.indexed ? i18n.formatMessage(messages.tools, { count: state.toolCount }) : i18n.text(messages.unindexed)}
+          </ItemDescription>
+        </ItemContent>
+        <ItemActions>
+          {connection(server, state, busy || !!editing)}
+          <Switch checked={server.enabled} disabled={busy || !!editing} aria-label={i18n.text(messages.enabled)}
+            onCheckedChange={enabled => { void run(server.id, signal => calls.invoke(SetMcpServerEnabled, { serverId: server.id, enabled }, { signal })); }} />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon-sm" disabled={busy} aria-label={i18n.text(messages.actions)}><MoreHorizontal /></Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem disabled={!!editor} onSelect={() => edit(server)}><Pencil />{i18n.text(messages.edit)}</DropdownMenuItem>
+              {server.transport === "http" && server.auth === "oauth" && <DropdownMenuItem
+                onSelect={() => { void run(server.id, signal => calls.invoke(ResetMcpAuth, { serverId: server.id }, { signal })); }}>
+                <RotateCcw />{i18n.text(messages.resetAuth)}</DropdownMenuItem>}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem variant="destructive" onSelect={() => setRemoving(server)}><Trash2 />{i18n.text(messages.remove)}…</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </ItemActions>
+      </Item>
+      {error && !editing && <pre className="type-caption mx-4 mb-3 max-h-32 overflow-auto whitespace-pre-wrap break-words text-destructive select-text">{error}</pre>}
+      {editing && editorView(editing)}
+    </div>;
+  };
+
+  const creating = editor?.draft.create ? editor : null;
   return <div className="flex flex-col gap-4">
     <p className="type-caption">{i18n.text(messages.description)}</p>
-    {(error || status.error) && <p role="alert" className="type-caption text-destructive">{error ?? status.error}</p>}
-    <ItemGroup className="surface">
-      {config.mcp.servers.map(server => {
-        const state = status.servers.find(item => item.id === server.id);
-        return <Item key={server.id} className="flex-wrap">
-          <ItemContent><ItemTitle>{server.name}</ItemTitle><ItemDescription>
-            {i18n.formatMessage(messages.state, { state: state?.connection ?? "disconnected" })}{" · "}
-            {state?.indexed ? i18n.formatMessage(messages.tools, { count: state.toolCount }) : i18n.text(messages.unindexed)}
-          </ItemDescription>{state?.error && <p className="type-caption text-destructive break-words">{state.error}</p>}
-          {state?.authorizationUrl && <a href={state.authorizationUrl} target="_blank" rel="noopener noreferrer" className="type-caption text-primary-text underline">{i18n.text(messages.authorize)}</a>}
-          </ItemContent>
-          <ItemActions className="flex-wrap">
-            <Button variant="outline" size="sm" disabled={busy || !server.enabled} onClick={() => { void work(signal => calls.invoke(ConnectMcpServer, { serverId: server.id }, { signal })); }}>{i18n.text(messages.connect)}</Button>
-            {state && state.connection !== "disconnected" && <Button variant="ghost" size="sm" disabled={busy} onClick={() => { void work(signal => calls.invoke(DisconnectMcpServer, { serverId: server.id }, { signal })); }}>{i18n.text(messages.disconnect)}</Button>}
-            <Button variant="ghost" size="sm" disabled={busy} onClick={() => open(server, false)}>{i18n.text(messages.edit)}</Button>
-            <Button variant="ghost" size="sm" disabled={busy} onClick={() => { void work(signal => calls.invoke(RemoveMcpServer, { serverId: server.id }, { signal })); }}>{i18n.text(messages.remove)}</Button>
-            {server.auth === "oauth" && <Button variant="ghost" size="sm" disabled={busy} onClick={() => { void work(signal => calls.invoke(ResetMcpAuth, { serverId: server.id }, { signal })); }}>{i18n.text(messages.resetAuth)}</Button>}
-          </ItemActions>
-        </Item>;
-      })}
-    </ItemGroup>
-    {!draft ? <Button variant="outline" className="self-start" disabled={busy} onClick={() => open({ id: slugifyServerId("", config.mcp.servers.map(server => server.id)), name: "", description: "", enabled: true, mode: "lazy", idleSeconds: 300, transport: "stdio", command: "", args: [], cwd: "", url: "", auth: "none" }, true)}>{i18n.text(messages.add)}</Button>
-      : <div className="surface flex flex-col gap-4 p-4">
-        <div className="flex flex-col gap-2"><Label htmlFor={`${id}-name`}>{i18n.text(messages.name)}</Label>
-          <Input id={`${id}-name`} value={draft.server.name} disabled={busy} onChange={event => rename(event.target.value)} /></div>
-        <div className="flex flex-col gap-2"><Label htmlFor={`${id}-server-id`}>{i18n.text(messages.serverId)}</Label>
-          <Input id={`${id}-server-id`} className="font-mono" value={draft.server.id} disabled={busy} readOnly={!draft.create} spellCheck={false}
-            onChange={event => setDraft(current => current && { ...current, idEdited: true, server: { ...current.server, id: event.target.value } })} />
-          <p className="type-caption text-muted-foreground">{i18n.text(messages.serverIdHint)}</p></div>
-        {field("description", "purpose")}
-        <div className="flex items-center justify-between"><Label htmlFor={`${id}-enabled`}>{i18n.text(messages.enabled)}</Label><Switch id={`${id}-enabled`} checked={draft.server.enabled} disabled={busy} onCheckedChange={enabled => update({ enabled })} /></div>
-        {select("transport", [["stdio", "stdio"], ["http", "http"]])}
-        {draft.server.transport === "stdio" ? <>
-          {field("command", "command")}
-          <div className="flex flex-col gap-2"><Label htmlFor={`${id}-args`}>{i18n.text(messages.args)}</Label><Textarea id={`${id}-args`} rows={3} className="font-mono" disabled={busy} value={draft.args} onChange={event => setDraft(current => current && { ...current, args: event.target.value })} /></div>
-          {field("cwd", "cwd")}
-        </> : <>{field("url", "url")}{select("auth", [["none", "none"], ["oauth", "oauth"]])}</>}
-        {select("mode", [["lazy", "lazy"], ["eager", "eager"]])}
-        {draft.server.mode === "lazy" && <div className="flex flex-col gap-2"><Label htmlFor={`${id}-ttl`}>{i18n.text(messages.ttl)}</Label><Input id={`${id}-ttl`} type="number" min={1} max={86400} disabled={busy} value={draft.server.idleSeconds} onChange={event => update({ idleSeconds: Number(event.target.value) })} /></div>}
-        <div className="flex flex-col gap-2"><Label htmlFor={`${id}-credentials`}>{i18n.text(draft.server.transport === "stdio" ? messages.env : messages.headers)}</Label>
-          <Textarea id={`${id}-credentials`} className="font-mono" rows={3} autoComplete="off" disabled={busy} value={draft.credentials} onChange={event => setDraft({ ...draft, credentials: event.target.value, clear: false })} />
-          <p className="type-caption text-muted-foreground">{i18n.text(messages.secretHint)}</p>
-          <Button variant={draft.clear ? "secondary" : "ghost"} size="sm" className="self-start" disabled={busy} onClick={() => setDraft({ ...draft, credentials: "", clear: !draft.clear })}>{i18n.text(messages.clear)}</Button>
-        </div>
-        <div className="flex justify-end gap-2"><Button variant="outline" disabled={busy} onClick={() => setDraft(null)}>{i18n.text(messages.cancel)}</Button><Button disabled={busy} onClick={() => { void save(); }}>{i18n.text(messages.save)}</Button></div>
-      </div>}
+    {status.error && <p role="alert" className="type-caption text-destructive">{status.error}</p>}
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center justify-between gap-2">
+        <h4 className="type-label">{i18n.text(messages.servers)}</h4>
+        <Button size="sm" disabled={!!editor} onClick={add}>{i18n.text(messages.add)}</Button>
+      </div>
+      {servers.length > 0 || creating ? <ItemGroup className="surface">
+        {servers.flatMap((server, index) => index ? [<ItemSeparator key={`${server.id}-separator`} />, row(server)] : [row(server)])}
+        {creating && <div role="listitem">
+          {servers.length > 0 && <ItemSeparator />}
+          <Item size="sm"><ItemContent><ItemTitle>{creating.draft.server.name || i18n.text(messages.add)}</ItemTitle></ItemContent></Item>
+          {editorView(creating)}
+        </div>}
+      </ItemGroup> : <p className="type-caption text-muted-foreground">{i18n.text(messages.empty)}</p>}
+    </div>
+    {removing && <RemoveServer server={removing} onClose={() => setRemoving(null)}
+      remove={() => run(removing.id, signal => calls.invoke(RemoveMcpServer, { serverId: removing.id }, { signal }))} />}
   </div>;
+}
+
+function RemoveServer({ server, remove, onClose }: { server: McpServerConfig; remove(): Promise<boolean>; onClose(): void }) {
+  const i18n = useI18n();
+  const [saving, setSaving] = useState(false);
+  return <AlertDialog open onOpenChange={open => { if (!open && !saving) onClose(); }}><AlertDialogContent>
+    <AlertDialogHeader>
+      <AlertDialogTitle>{i18n.text(messages.removeTitle)}</AlertDialogTitle>
+      <AlertDialogDescription>{i18n.formatMessage(messages.removeDescription, { name: server.name })}</AlertDialogDescription>
+    </AlertDialogHeader>
+    <AlertDialogFooter>
+      <AlertDialogCancel disabled={saving}>{i18n.text(messages.cancel)}</AlertDialogCancel>
+      <AlertDialogAction variant="destructive" disabled={saving} aria-busy={saving} onClick={event => {
+        event.preventDefault(); setSaving(true);
+        void remove().then(removed => { if (removed) onClose(); else setSaving(false); });
+      }}>{saving && <Spinner />}{i18n.text(messages.remove)}</AlertDialogAction>
+    </AlertDialogFooter>
+  </AlertDialogContent></AlertDialog>;
 }

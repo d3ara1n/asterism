@@ -36,9 +36,17 @@ export const CreateMcpHost = defineCreation(McpHost, { id: builtin.name("mcp.cre
 export const McpHostView = builtin.data("mcp.card", z.object({ servers: z.array(mcpServerStateSchema) }));
 export const McpChanged = builtin.event("mcp.changed", { schema: z.object({}), source: "plugin", semantics: { kind: "snapshot", key: [] } });
 export const ReadMcp = defineCall(builtin.name("mcp.status"), { scope: "plugin", input: z.object({}), output: z.array(mcpServerStateSchema) });
-/** create 区分新增与编辑；新增遇到已有 ID 时拒绝，避免覆盖另一台服务器。 */
+/** 编辑表单整块写回环境变量／请求头；create 区分新增与编辑，新增遇到已有 ID 时拒绝。 */
 export const SaveMcpServer = defineCall(builtin.name("mcp.save-server"), { scope: "plugin",
-  input: z.object({ server: mcpServerSchema, create: z.boolean(), credentials: credentialsSchema.optional() }), output: z.null() });
+  input: z.object({ server: mcpServerSchema, create: z.boolean(), credentials: credentialsSchema }), output: z.null() });
+/** 设置页读回自己保存的环境变量／请求头明文；vault 只保证落盘加密。 */
+export const ReadMcpCredentials = defineCall(builtin.name("mcp.read-credentials"), { scope: "plugin", input: z.object({ serverId: z.string() }), output: credentialsSchema });
+export const mcpToolSummarySchema = z.object({ name: z.string(), title: z.string().optional(), description: z.string().optional() });
+export type McpToolSummary = z.infer<typeof mcpToolSummarySchema>;
+/** 缓存目录的展示摘要；未建立目录时为 null。 */
+export const ReadMcpTools = defineCall(builtin.name("mcp.read-tools"), { scope: "plugin", input: z.object({ serverId: z.string() }),
+  output: z.object({ tools: z.array(mcpToolSummarySchema), instructions: z.string().optional() }).nullable() });
+export const SetMcpServerEnabled = defineCall(builtin.name("mcp.set-enabled"), { scope: "plugin", input: z.object({ serverId: z.string(), enabled: z.boolean() }), output: z.null() });
 export const RemoveMcpServer = defineCall(builtin.name("mcp.remove-server"), { scope: "plugin", input: z.object({ serverId: z.string() }), output: z.null() });
 export const ConnectMcpServer = defineCall(builtin.name("mcp.connect-server"), { scope: "plugin", input: z.object({ serverId: z.string() }), output: z.null() });
 export const DisconnectMcpServer = defineCall(builtin.name("mcp.disconnect-server"), { scope: "plugin", input: z.object({ serverId: z.string() }), output: z.null() });
