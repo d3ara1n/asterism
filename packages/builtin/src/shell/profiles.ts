@@ -2,7 +2,7 @@ import { access, stat } from "node:fs/promises";
 import { constants } from "node:fs";
 import { homedir } from "node:os";
 import { delimiter, isAbsolute, join, resolve } from "node:path";
-import type { ShellProfile, ShellSettings } from "./contract.ts";
+import type { ShellProfile, ShellProfileList, ShellSettings } from "./contract.ts";
 
 export interface ResolvedShell { profile: ShellProfile; executable: string; env: NodeJS.ProcessEnv }
 
@@ -34,18 +34,41 @@ async function executablePath(executable: string, env: NodeJS.ProcessEnv): Promi
   return null;
 }
 
-export async function resolveShell(settings: ShellSettings, inherited: NodeJS.ProcessEnv = process.env): Promise<ResolvedShell> {
+function orderedProfiles(settings: ShellSettings): ShellProfile[] {
   const order = process.platform === "win32" ? ["pwsh", "nu", "fish", "bash", "zsh", "sh"]
     : process.platform === "darwin" ? ["zsh", "bash", "pwsh", "fish", "nu", "sh"]
       : ["bash", "zsh", "pwsh", "fish", "nu", "sh"];
-  const profiles = settings.selected === "auto"
+  return settings.selected === "auto"
     ? [...order.flatMap(id => settings.profiles.filter(profile => profile.id === id)),
       ...settings.profiles.filter(profile => !order.includes(profile.id))]
     : settings.profiles.filter(profile => profile.id === settings.selected);
-  for (const profile of profiles) {
-    const env = environment(profile.env, inherited);
-    const executable = await executablePath(profile.executable, env);
-    if (executable) return { profile, executable, env };
+}
+
+async function resolveProfile(profile: ShellProfile, inherited: NodeJS.ProcessEnv): Promise<ResolvedShell | null> {
+  const env = environment(profile.env, inherited);
+  const executable = await executablePath(profile.executable, env);
+  return executable ? { profile, executable, env } : null;
+}
+
+/** 查询与执行共用解析规则；模型结果只投影配置元数据与发现结果。 */
+export async function listShellProfiles(settings: ShellSettings, inherited: NodeJS.ProcessEnv = process.env): Promise<ShellProfileList> {
+  const profiles = await Promise.all(settings.profiles.map(async profile => {
+    const resolved = await resolveProfile(profile, inherited);
+    return {
+      id: profile.id, name: profile.name, executable: profile.executable,
+      args: [...profile.args], commandArgs: [...profile.commandArgs],
+      available: resolved !== null, resolvedExecutable: resolved?.executable ?? null,
+    };
+  }));
+  const available = new Set(profiles.filter(profile => profile.available).map(profile => profile.id));
+  const resolvedProfile = orderedProfiles(settings).find(profile => available.has(profile.id))?.id ?? null;
+  return { selected: settings.selected, resolvedProfile, profiles };
+}
+
+export async function resolveShell(settings: ShellSettings, inherited: NodeJS.ProcessEnv = process.env): Promise<ResolvedShell> {
+  for (const profile of orderedProfiles(settings)) {
+    const resolved = await resolveProfile(profile, inherited);
+    if (resolved) return resolved;
   }
   throw new Error(settings.selected === "auto"
     ? "No configured shell executable was found. Configure a shell profile in Builtin settings."

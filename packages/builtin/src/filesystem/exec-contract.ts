@@ -9,6 +9,7 @@ export const Exec = defineTool({
   description: "Execute a shell command starting in the directory resource and return its output and exit status.",
   guidelines: [
     "Each invocation starts a fresh non-interactive shell process in the directory resource. Shell syntax, cd, pipelines and redirection are interpreted by that shell. Directory inspect reports the shell executable and platform.",
+    "shell_profile_list reports shared shell profiles and the default selection used by directory exec.",
     "Timeout and cancellation terminate the command's process group.",
     `If output exceeds ${OUTPUT_CHAR_LIMIT} Unicode characters, the result retains its tail and includes a truncation notice with the path to the temporary full output log, readable with subsequent shell commands.`,
   ],

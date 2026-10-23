@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { builtin } from "@atelier/builtin-api/contracts";
 
 export const OUTPUT_CHAR_LIMIT = 16_384;
 export const MAX_TIMEOUT_SECONDS = 2_147_483_647 / 1000;
@@ -36,6 +37,21 @@ export const shellSettingsSchema = z.strictObject({
     ctx.addIssue({ code: "custom", path: ["selected"], message: "Select an existing shell profile or auto." });
 });
 export type ShellSettings = z.infer<typeof shellSettingsSchema>;
+
+export const ShellProfileListResult = builtin.data("shell.profile-list", z.strictObject({
+  selected: z.string().describe("Default profile ID, or 'auto' for the first available profile in platform preference order."),
+  resolvedProfile: z.string().nullable().describe("Profile ID currently resolved for the default selection; null when its executable is unavailable."),
+  profiles: z.array(z.strictObject({
+    id: z.string().describe("Profile ID accepted by terminal creation."),
+    name: z.string().describe("Display name."),
+    executable: z.string().describe("Configured executable path or command name."),
+    args: z.array(z.string()).describe("Configured shell startup arguments."),
+    commandArgs: z.array(z.string()).describe("Arguments added before command text for directory exec."),
+    available: z.boolean().describe("Whether an executable file was found using this profile's environment."),
+    resolvedExecutable: z.string().nullable().describe("Resolved absolute executable path, or null when unavailable."),
+  })).describe("Configured profiles in settings order, including unavailable executables."),
+}).describe("Shared shell profiles for directory exec and terminal creation. Availability reflects executable discovery at query time."));
+export type ShellProfileList = z.infer<typeof ShellProfileListResult.schema>;
 
 export const shellOutputSchema = z.strictObject({
   output: z.string().describe(`Processed output, retaining at most the last ${OUTPUT_CHAR_LIMIT} Unicode characters.`),
