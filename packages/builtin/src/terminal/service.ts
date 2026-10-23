@@ -5,6 +5,7 @@ import { randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { setTimeout as delay } from "node:timers/promises";
+import { descendantsOf } from "../shared/process-tree.ts";
 import type { ShellSettings } from "../shell/contract.ts";
 import { resolveShell } from "../shell/profiles.ts";
 import { prepareLaunch, type IntegrationMode } from "./integration.ts";
@@ -380,16 +381,6 @@ async function terminate(process: pty.IPty, exited: Promise<void>) {
   if (clean) return;
   try { process.kill("SIGKILL"); } catch { /* 已退出。 */ }
   if (!await within(exited, KILL_WAIT_MS)) throw new Error("The shell process did not exit.");
-}
-async function descendantsOf(root: number): Promise<number[]> {
-  const { stdout } = await execute("ps", ["-axo", "pid=,ppid="]);
-  const children = new Map<number, number[]>();
-  for (const line of stdout.trim().split("\n")) {
-    const [pid, parent] = line.trim().split(/\s+/).map(Number);
-    if (pid && parent) children.set(parent, [...children.get(parent) ?? [], pid]);
-  }
-  const walk = (pid: number): number[] => (children.get(pid) ?? []).flatMap(child => [...walk(child), child]);
-  return walk(root);
 }
 
 export interface TerminalViewer { send(frame: TerminalDown): void }

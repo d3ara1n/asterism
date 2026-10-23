@@ -2,6 +2,7 @@ import { z } from "zod";
 import { defineMessages } from "@atelier/sdk/contracts";
 import { builtin } from "@atelier/builtin-api/contracts";
 import { defaultShellSettings, shellSettingsSchema } from "../shell/contract.ts";
+import { defaultMcpSettings, mcpSettingsSchema } from "../mcp/contract.ts";
 
 export const settingsMessages = builtin.messages("en", defineMessages({
   streaming: { id: "settings.streaming", defaultMessage: "Streaming previews" },
@@ -18,4 +19,5 @@ export const settingsMessages = builtin.messages("en", defineMessages({
 export const BuiltinSettings = builtin.config(z.object({
   autoExpand: z.boolean().default(true), autoCollapse: z.boolean().default(true),
   shell: shellSettingsSchema.default(defaultShellSettings),
-}), { autoExpand: true, autoCollapse: true, shell: defaultShellSettings });
+  mcp: mcpSettingsSchema.default(defaultMcpSettings),
+}), { autoExpand: true, autoCollapse: true, shell: defaultShellSettings, mcp: defaultMcpSettings });

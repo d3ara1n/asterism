@@ -31,6 +31,7 @@
 | `src/settings/` | 内置插件托管配置与按流式预览／Shell 分组的自定义设置页；配置在插件根入口登记 |
 | `src/providers/` | 提供商预设、主动余额／套餐查询及 `headers.ts` 的被动限流解析；各服务独立解析，主动 HTTP 共用 `usage-http.ts`，通过 SDK 贡献登记，不拥有缓存或跨进程消费 |
 | `src/usage/` | 独立的账户用量消费者：从 SDK 目录取实现，管理缓存、解析 Agent 显式交付的响应结果，通过自有调用／事件向共享订阅和 toolbar 交付状态；不导入提供方实现 |
+| `src/mcp/` | MCP Host 资源、五个固定资源工具、共享 MCP 客户端、stdio/HTTP 连接与认证、持久目录与搜索、服务器设置；契约见 [MCP 模块](../../docs/mcp.md) |
 | `src/shared/` | 正文算法、预览规则、公共流式开合状态机与创建表单 |
 | `src/messages/`、`src/locales/` | 内置插件自有文案与翻译 |
 

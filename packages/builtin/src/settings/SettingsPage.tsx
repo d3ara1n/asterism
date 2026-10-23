@@ -9,6 +9,8 @@ import { Spinner } from "@atelier/ui/ui/spinner";
 import type { UiText } from "@atelier/sdk/contracts";
 import { ShellSettings } from "../shell/Settings";
 import { shellMessages } from "../messages/shell";
+import { McpSettings } from "../mcp/Settings";
+import { mcpMessages } from "../messages/mcp";
 
 /** 页面自行分组，普通偏好即时提交；配置存储和通知由宿主托管。 */
 export function BuiltinSettingsPage({ location }: { location?: string }) {
@@ -16,9 +18,9 @@ export function BuiltinSettingsPage({ location }: { location?: string }) {
   const config = useRendererConfiguration(BuiltinSettings);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<UiText | null>(null);
-  const streaming = useRef<HTMLElement>(null), shell = useRef<HTMLElement>(null);
+  const streaming = useRef<HTMLElement>(null), shell = useRef<HTMLElement>(null), mcp = useRef<HTMLElement>(null);
   useEffect(() => {
-    const target = location === "streaming" ? streaming.current : location === "shell" ? shell.current : null;
+    const target = location === "streaming" ? streaming.current : location === "shell" ? shell.current : location === "mcp" ? mcp.current : null;
     target?.scrollIntoView({ block: "nearest" }); target?.focus({ preventScroll: true });
   }, [location]);
   /** 返回是否保存成功，展开编辑的 profile 失败时保留草稿。 */
@@ -28,7 +30,7 @@ export function BuiltinSettingsPage({ location }: { location?: string }) {
     catch (failure) { setError((failure as { display?: UiText }).display ?? messages.saveFailed); return false; }
     finally { setBusy(false); }
   };
-  const row = (key: Exclude<keyof typeof config.value, "shell">, label: UiText) => <Item key={key}>
+  const row = (key: "autoExpand" | "autoCollapse", label: UiText) => <Item key={key}>
     <ItemContent><ItemTitle>{i18n.text(label)}</ItemTitle></ItemContent>
     <ItemActions><Switch checked={config.value[key]} disabled={busy || !config.ready} aria-label={i18n.text(label)}
       onCheckedChange={checked => { void save(() => config.save({ ...config.value, [key]: checked })); }} /></ItemActions>
@@ -51,6 +53,10 @@ export function BuiltinSettingsPage({ location }: { location?: string }) {
       <h3 className="type-section mb-2">{i18n.text(shellMessages.title)}</h3>
       <ShellSettings value={config.value.shell} disabled={busy || !config.ready}
         save={value => save(() => config.save({ ...config.value, shell: value }))} />
+    </section>
+    <section ref={mcp} tabIndex={-1} className="outline-none">
+      <h3 className="type-section mb-2">{i18n.text(mcpMessages.settings)}</h3>
+      {config.ready && <McpSettings />}
     </section>
   </div>;
 }
