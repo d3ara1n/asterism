@@ -16,7 +16,7 @@ export default {
   resources: [{ kind: "atelier.builtin/note", label: commonMessages.kindNote, icon: <FileText className="size-4" />, card: appearance }],
   cards: [cardRenderer(NoteView, {
     ...appearance,
-    Body: ({ data }) => { const i18n = useI18n(); return <div className="min-h-0 flex-1 select-text overflow-auto p-3">
+    Body: ({ data }) => { const i18n = useI18n(); return <div className="content-scrollbar min-h-0 flex-1 select-text overflow-auto p-3">
       {data.text !== null ? <Markdown>{data.text}</Markdown>
         : <p className="type-body text-muted-foreground">{i18n.formatMessage(textMessages.contentUnavailable)}</p>}
     </div>; },

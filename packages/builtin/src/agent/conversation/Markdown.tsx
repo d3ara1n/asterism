@@ -26,7 +26,7 @@ const components: NonNullable<StreamdownProps["components"]> = {
     const text = code.children.map(child => child.type === "text" ? child.value : "").join("");
     return <MarkdownCode code={text} language={language} />;
   },
-  table: ({ children }) => <div className="my-4 overflow-x-auto"><table>{children}</table></div>,
+  table: ({ children }) => <div className="content-scrollbar my-4 overflow-x-auto"><table>{children}</table></div>,
 };
 
 /** 解析、补全与渐入由库负责；首次挂载的历史内容静态显示。 */

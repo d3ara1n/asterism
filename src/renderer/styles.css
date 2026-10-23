@@ -281,6 +281,18 @@
    否则内容区会显示并无拖动行为的抓取手型。拖动中指针常移出拖动柄，仍给出 grabbing。 */
 .react-flow .react-flow__node.draggable { cursor: default; }
 .react-flow .react-flow__node.draggable.dragging { cursor: grabbing; }
+/* 原生滚动条保留可拖动轨道，内容溢出时直接提供入口。 */
+.content-scrollbar::-webkit-scrollbar { width: 0.625rem; height: 0.625rem; }
+.content-scrollbar::-webkit-scrollbar-track,
+.content-scrollbar::-webkit-scrollbar-corner { background: transparent; }
+.content-scrollbar::-webkit-scrollbar-thumb {
+  border: 0.125rem solid transparent;
+  border-radius: 999px;
+  background: var(--muted-foreground);
+  background-clip: padding-box;
+}
+.content-scrollbar::-webkit-scrollbar-thumb:hover { background-color: var(--foreground); }
+
 /* 无样式 Markdown 引擎只输出语义节点，排版沿用公共文字与表面 token。 */
 .markdown-content :where(p, ul, ol, blockquote, hr) { margin-block: 1rem; }
 .markdown-content :where(h1, h2, h3, h4, h5, h6) { margin-block: 1.25rem 0.5rem; font-weight: 600; line-height: 1.3; }

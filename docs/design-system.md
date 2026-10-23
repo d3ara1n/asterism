@@ -134,6 +134,7 @@ Agent overlay 的外壳由内置 Agent 统一提供，插件只组织内部内�
 - `packages/ui/src/ui/` 以 shadcn（new-york-v4）官方 registry 源码为基础，保持官方结构、尺寸与交互；公共语义扩展集中在此维护：Button 的 `selected`、Badge 的 `success / warning`、实色表面前景配对与链接文字 token。升级时保留这些语义映射，不在业务调用处覆盖配色。主题绑定的 `src/renderer/shared/ui/sonner.tsx` 留在应用组合侧：主题取自 `useScheme()` 而不引入 `next-themes`，状态图标按状态 token 着色。官方没有的组合（如 `PageState`、`StatusBadge`、`IconButton`、`ListRow`）放在 `packages/ui/src/ui/` 内，复用公共组件与 token。
 - 业务代码只用官方组件与公共组合，不使用裸 button/select 等控件，不写控件颜色、阴影或圆角。可点击的卡片用 `Item variant="outline" asChild` 包裹 button。
 - 表面只有两种：`surface`（边框 + 卡片底，无阴影，用于浮岛、顶栏部件、卡片、画布）与 `surface-floating`（加阴影，用于悬浮面板、浮条、通知）；对话框、菜单、下拉由官方组件提供浮层外观。
+- 笔记正文与 Markdown 表格使用原生滚动条，内容溢出时滑块持续可见并可直接拖动；轨道厚度 `0.625rem`，滑块使用 `muted-foreground`、悬停使用 `foreground`，轨道背景透明。
 
 ## 按钮层级
 
