@@ -1,16 +1,14 @@
 import { Client, StreamableHTTPClientTransport, UnauthorizedError, type CallToolResult, type Progress, type Transport } from "@modelcontextprotocol/client";
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
 import type { AjvJsonSchemaValidator } from "@modelcontextprotocol/client/validators/ajv";
-import { PluginApiError, type PluginContext } from "@atelier/sdk/runtime";
+import type { PluginContext } from "@atelier/sdk/runtime";
 import type { Json } from "@atelier/sdk/contracts";
 import type { ConnectionPhase, McpServerConfig, McpServerState } from "./contract.ts";
 import { directorySchema, type CachedTool, type Directory } from "./catalog.ts";
+import { McpError, McpInterrupted } from "./errors.ts";
 import { McpOAuth } from "./auth.ts";
 import { closeProcessTree } from "../shared/process-tree.ts";
 
-export class McpCallError extends Error {
-  constructor(readonly outcome: "rejected" | "failed" | "cancelled" | "unknown", message: string) { super(message); }
-}
 export const credentialKey = (id: string) => `mcp.${id}.credentials`;
 export const oauthKey = (id: string) => `mcp.${id}.oauth`;
 /** 连接参数身份；变化时旧连接与缓存目录都不再适用。凭据变化由保存入口单独失效。 */
@@ -71,8 +69,16 @@ export class ServerSession {
   invalidateDirectory() { this.directory = undefined; this.host.saveDirectory(this.config, undefined); this.host.notify(); }
 
   private usable() {
-    if (this.retired || this.host.closed || this.host.plugin.signal.aborted) throw new PluginApiError("unavailable", "The MCP server configuration changed or the service is closing.");
-    if (!this.config.enabled) throw new PluginApiError("unavailable", "The MCP server is disabled.");
+    if (this.retired || this.host.closed || this.host.plugin.signal.aborted) throw new McpError("service_unavailable", "The MCP server configuration changed or the service is closing.");
+    if (!this.config.enabled) throw new McpError("server_disabled", `The MCP server '${this.id}' is disabled.`);
+  }
+  /** 取得连接；连接过程的失败统一为 connection_failed，取消保留中止原因。 */
+  private async connection(signal: AbortSignal): Promise<Live> {
+    try { return await this.acquire(signal); }
+    catch (error) {
+      if (error instanceof McpError || signal.aborted) throw error;
+      throw new McpError("connection_failed", messageOf(error));
+    }
   }
   /** 取得已建立连接：正在连接或等待授权时等待该过渡，断开过渡结束后按需重新连接。 */
   private async acquire(signal: AbortSignal): Promise<Live> {
@@ -219,9 +225,11 @@ export class ServerSession {
     this.active++; clearTimeout(this.timer);
     try {
       const connected = this.live && this.phase === "connected" && !this.transition;
-      const live = await this.acquire(signal);
+      const live = await this.connection(signal);
       if (connected) {
-        const listed = await live.client.listTools(undefined, { signal: AbortSignal.any([signal, live.scope.signal]), cacheMode: "refresh" });
+        let listed;
+        try { listed = await live.client.listTools(undefined, { signal: AbortSignal.any([signal, live.scope.signal]), cacheMode: "refresh" }); }
+        catch (error) { if (signal.aborted) throw error; throw new McpError("request_failed", messageOf(error)); }
         if (this.live === live) this.storeDirectory(listed.tools, live.client.getInstructions());
       }
     } finally { this.active--; this.armIdle(); }
@@ -231,10 +239,10 @@ export class ServerSession {
     this.active++; clearTimeout(this.timer);
     try {
       let live: Live;
-      try { live = await this.acquire(signal); }
-      catch (error) { throw signal.aborted ? new McpCallError("cancelled", "The MCP call was cancelled before it was sent.") : new McpCallError("failed", messageOf(error)); }
+      try { live = await this.connection(signal); }
+      catch (error) { throw signal.aborted ? new McpInterrupted("cancelled", "The MCP call was cancelled before it was sent.") : error; }
       const tool = this.tool(name);
-      if (!tool) throw new McpCallError("rejected", "The MCP tool is not in the server's current directory. mcp_connect refreshes it.");
+      if (!tool) throw new McpError("tool_not_found", "The MCP tool is not in the server's cached directory. mcp_connect refreshes it.");
       this.validate(tool, args);
       const scope = AbortSignal.any([signal, live.scope.signal]);
       scope.throwIfAborted();
@@ -244,12 +252,17 @@ export class ServerSession {
         return await live.client.callTool({ name, arguments: args }, { signal: scope, timeout: 2_147_483_647, onprogress: progress });
       } catch (error) {
         // 令牌失效且需要重新授权：请求被认证层拒绝，远端工具未执行。关闭连接，下次调用重新授权。
-        if (isUnauthorized(error)) { this.lost(live, "MCP authorization expired. The next call starts a new authorization."); sent = false; }
+        if (isUnauthorized(error)) {
+          const message = "MCP authorization expired. The next call starts a new authorization.";
+          this.lost(live, message);
+          throw new McpError("authorization_expired", message);
+        }
         throw error;
       }
     } catch (error) {
-      if (error instanceof McpCallError) throw error;
-      throw new McpCallError(sent ? "unknown" : signal.aborted ? "cancelled" : "failed", messageOf(error));
+      if (error instanceof McpError || error instanceof McpInterrupted) throw error;
+      if (sent) throw new McpInterrupted("unknown", messageOf(error));
+      throw signal.aborted ? new McpInterrupted("cancelled", "The MCP call was cancelled before it was sent.") : new McpError("request_failed", messageOf(error));
     } finally { this.active--; this.armIdle(); }
   }
   /** 本地校验按远端输入 schema 拒绝参数；schema 本身无法编译时交由服务器校验。 */
@@ -258,7 +271,7 @@ export class ServerSession {
     try { check = this.host.validator.getValidator(tool.inputSchema); }
     catch (error) { this.host.plugin.log.warn(`MCP input schema for ${this.id}/${tool.name} could not be compiled: ${messageOf(error)}`); return; }
     const result = check(args);
-    if (!result.valid) throw new McpCallError("rejected", result.errorMessage ?? "MCP tool arguments are invalid.");
+    if (!result.valid) throw new McpError("invalid_tool_arguments", result.errorMessage ?? "MCP tool arguments are invalid.");
   }
   private armIdle() {
     clearTimeout(this.timer);

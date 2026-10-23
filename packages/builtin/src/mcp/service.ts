@@ -4,9 +4,10 @@ import { PluginApiError, type PluginContext } from "@atelier/sdk/runtime";
 import type { Json } from "@atelier/sdk/contracts";
 import { credentialsSchema, type McpServerConfig, type McpServerState } from "./contract.ts";
 import { directorySchema, inspectTool, listCatalog, parseToolIdentity, searchCatalog, type CatalogServer, type Directory } from "./catalog.ts";
-import { ServerSession, McpCallError, credentialKey, endpointOf, type SessionHost } from "./session.ts";
+import { ServerSession, credentialKey, endpointOf, type SessionHost } from "./session.ts";
+import { McpError } from "./errors.ts";
 
-export { McpCallError, credentialKey, oauthKey } from "./session.ts";
+export { credentialKey, oauthKey } from "./session.ts";
 export interface CallTarget { session: ServerSession; serverId: string; serverName: string; toolName: string }
 
 /**
@@ -94,6 +95,14 @@ export class McpHostService implements SessionHost {
     if (!session) throw new PluginApiError("not_found", `The MCP server '${id}' is not configured.`);
     return session;
   }
+  /** 资源工具入口的服务器身份：五个入口对同一原因给出相同错误码。 */
+  private enabled(id: string) {
+    if (this.closed || this.plugin.signal.aborted) throw new McpError("service_unavailable", "The MCP service is closing.");
+    const session = this.sessions.get(id);
+    if (!session) throw new McpError("server_not_found", `The MCP server '${id}' is not configured.`);
+    if (!session.config.enabled) throw new McpError("server_disabled", `The MCP server '${id}' is disabled.`);
+    return session;
+  }
   states(): McpServerState[] { return [...this.sessions.values()].map(session => session.state()); }
   /** 展示用目录摘要：读取当前缓存，不建立连接。 */
   tools(id: string) {
@@ -104,29 +113,31 @@ export class McpHostService implements SessionHost {
   private catalog(): CatalogServer[] {
     return [...this.sessions.values()].map(session => ({ config: session.config, state: session.state(), directory: session.directory }));
   }
-  list(args: { server_id?: string; offset: number; limit: number }) { return listCatalog(this.catalog(), args); }
-  search(args: { query: string; server_id?: string; offset: number; limit: number }) { return searchCatalog(this.catalog(), args); }
+  list(args: { server_id?: string; offset: number; limit: number }) {
+    if (args.server_id) this.enabled(args.server_id);
+    return listCatalog(this.catalog(), args);
+  }
+  search(args: { query: string; server_id?: string; offset: number; limit: number }) {
+    if (args.server_id) this.enabled(args.server_id);
+    return searchCatalog(this.catalog(), args);
+  }
   inspect(toolId: string) {
-    const [serverId, name] = parseToolIdentity(toolId), session = this.get(serverId);
-    if (!session.config.enabled) throw new PluginApiError("unavailable", "The MCP server is disabled.");
+    const [serverId, name] = parseToolIdentity(toolId), session = this.enabled(serverId);
     const tool = session.tool(name);
-    if (!tool) throw new PluginApiError("not_found", "The MCP tool is not indexed. mcp_connect refreshes the server's directory.");
+    if (!tool) throw new McpError("tool_not_found", "The MCP tool is not in the server's cached directory. mcp_connect refreshes it.");
     return inspectTool({ config: session.config, state: session.state(), directory: session.directory }, tool);
   }
   /** 调用开始前固定服务器与工具身份；之后服务器改名或移除不影响本次结果与进度。 */
   resolve(toolId: string): CallTarget {
-    let serverId: string, toolName: string;
-    try { [serverId, toolName] = parseToolIdentity(toolId); }
-    catch (error) { throw new McpCallError("rejected", error instanceof Error ? error.message : String(error)); }
-    const session = this.sessions.get(serverId);
-    if (!session || this.closed) throw new McpCallError("rejected", `The MCP server '${serverId}' is not configured.`);
-    if (!session.config.enabled) throw new McpCallError("rejected", "The MCP server is disabled.");
+    const [serverId, toolName] = parseToolIdentity(toolId), session = this.enabled(serverId);
     return { session, serverId, serverName: session.config.name, toolName };
   }
   call(target: CallTarget, args: Record<string, Json>, signal: AbortSignal, progress: (value: Progress) => void): Promise<CallToolResult> {
     return target.session.call(target.toolName, args, signal, progress);
   }
   connect(id: string, signal: AbortSignal) { return this.get(id).connect(signal); }
+  /** mcp_connect 入口：服务器身份按资源工具错误码解析。 */
+  connectTool(id: string, signal: AbortSignal) { return this.enabled(id).connect(signal); }
   disconnect(id: string) { return this.get(id).disconnect(); }
   invalidateDirectory(id: string) { this.sessions.get(id)?.invalidateDirectory(); }
 

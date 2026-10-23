@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { jsonSchema, type Json } from "@atelier/sdk/contracts";
 import { SERVER_ID_PATTERN, type McpServerConfig, type McpServerState } from "./contract.ts";
+import { McpError } from "./errors.ts";
 
 export const cachedToolSchema = z.object({
   name: z.string(), title: z.string().optional(), description: z.string().optional(),
@@ -17,7 +18,7 @@ export function toolIdentity(serverId: string, name: string): string { return `$
 export function parseToolIdentity(value: string): [string, string] {
   const split = value.indexOf("/");
   const serverId = value.slice(0, split), name = value.slice(split + 1);
-  if (split < 1 || !name || !SERVER_ID_PATTERN.test(serverId)) throw new Error("tool_id uses the form server_id/tool_name.");
+  if (split < 1 || !name || !SERVER_ID_PATTERN.test(serverId)) throw new McpError("invalid_tool_id", "tool_id uses the form server_id/tool_name.");
   return [serverId, name];
 }
 
@@ -46,7 +47,7 @@ export function describeServer(state: McpServerState) {
 export function listCatalog(servers: CatalogServer[], args: { server_id?: string; offset: number; limit: number }) {
   if (!args.server_id) return pageOf(servers.map(server => describeServer(server.state)), args.offset, args.limit);
   const server = servers.find(item => item.config.id === args.server_id);
-  if (!server) throw new Error("The MCP server is unavailable.");
+  if (!server) throw new McpError("server_not_found", `The MCP server '${args.server_id}' is not configured.`);
   return { server: describeServer(server.state), ...pageOf((server.directory?.tools ?? []).map(tool => brief(server, tool)), args.offset, args.limit) };
 }
 export function inspectTool(server: CatalogServer, tool: CachedTool) {

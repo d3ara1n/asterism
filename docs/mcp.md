@@ -66,7 +66,7 @@ stdio 使用官方客户端 transport 的默认 initialize 握手，每次连接
 
 `tool_id` 为 `server_id/tool_name`，按第一个 `/` 切分；远端工具名自身可以包含 `/`。服务器改名不改变身份。工具发现不授予资源访问资格；无需强制先 list、search 或 inspect 才能调用。
 
-工具命中按 `offset / limit` 分页。未建立目录的已启用服务器只随第一页交付（受 `limit` 约束，按名称相关性排序），同时返回整体覆盖数量；即使已有工具命中也交付未索引候选，使模型能够 connect 后继续搜索，完整服务器清单由 `mcp_list` 提供。停用服务器不参与搜索。
+工具命中按 `offset / limit` 分页。未建立目录的已启用服务器只随第一页交付（受 `limit` 约束，按名称相关性排序），同时返回整体覆盖数量；即使已有工具命中也交付未索引候选，使模型能够 connect 后继续搜索，完整服务器清单由 `mcp_list` 提供。停用服务器不参与搜索；显式指定的 `server_id` 未配置或已停用时，list 与 search 同其他入口一样拒绝。
 
 本地参数校验在发送前进行；远端 schema 无法编译时跳过本地校验，交由服务器校验。调用不设期限，结束由调用取消与连接作用域决定；调用的服务器与工具身份在开始时固定，进度沿用该身份。
 
@@ -77,3 +77,18 @@ stdio 使用官方客户端 transport 的默认 initialize 握手，每次连接
 MCP 结果保存当次服务器身份／名称、远端工具名和内容；远端目录或服务器移除不改变历史。文字进入模型文字部件；图片、音频与内嵌二进制资源经 `object.content.stage` 保存为不可变内容引用；资源链接只交付 URI 与说明。结构化输出保存原始 JSON，与文字中的相同 JSON 副本合并投影。进度通过工具 `publish` 交付，不写入独立历史，发布失败不影响调用本身。
 
 远端明确的 `isError` 映射为失败；本地参数拒绝发生在发送之前。认证层拒绝的请求未到达远端工具，按失败处理。已发出的调用中止或通信失败，无法确认副作用时保存影响未知结局，不自动重放远端操作。执行与模型反馈沿用宿主工具结局与内容归属规则。
+
+五个入口共用一组错误码，同一原因在任何入口得到相同结局与错误码。拒绝由服务器身份、工具身份或参数决定，发生在请求发往远端工具之前；失败来自服务状态、连接或远端请求。取消与影响未知不携带错误码。
+
+| 错误码 | 结局 | 原因 |
+| --- | --- | --- |
+| `invalid_tool_id` | rejected | `tool_id` 不符合 `server_id/tool_name` |
+| `server_not_found` | rejected | 服务器未配置 |
+| `server_disabled` | rejected | 服务器已停用 |
+| `tool_not_found` | rejected | 工具不在该服务器的缓存目录 |
+| `invalid_tool_arguments` | rejected | 参数未通过远端输入 schema 的本地校验 |
+| `service_unavailable` | failed | 服务正在关闭，或服务器配置在操作期间变化 |
+| `connection_failed` | failed | 建立连接或授权失败 |
+| `authorization_expired` | failed | 令牌失效且无法刷新，请求被认证层拒绝 |
+| `request_failed` | failed | 发送前或刷新目录时的通信失败 |
+| `tool_error` | failed | 远端返回 `isError` |

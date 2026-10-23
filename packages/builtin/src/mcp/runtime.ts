@@ -2,16 +2,23 @@ import { defineModule, implementResource, implementCreation, implementTool, impl
 import { type Json, type ResourceRef } from "@atelier/sdk/contracts";
 import { McpHost, CreateMcpHost, McpHostView, McpList, McpSearch, McpInspect, McpConnect, McpCall, McpChanged,
   ReadMcp, SaveMcpServer, ReadMcpCredentials, ReadMcpTools, SetMcpServerEnabled, RemoveMcpServer, ConnectMcpServer, DisconnectMcpServer, ResetMcpAuth, type McpCallData } from "./contract.ts";
-import { McpHostService, McpCallError, credentialKey, oauthKey, type CallTarget } from "./service.ts";
+import { McpHostService, credentialKey, oauthKey, type CallTarget } from "./service.ts";
+import { McpError, McpInterrupted, mcpErrorCodes } from "./errors.ts";
 import { convertMcpResult, mcpResultToModel } from "./result.ts";
 import { BuiltinSettings } from "../settings/contract.ts";
 import { describeServer } from "./catalog.ts";
 
 const messageOf = (error: unknown) => error instanceof Error ? error.message : String(error);
+type McpFailure = Extract<CallResult<never>, { kind: "rejected" | "failed" | "cancelled" | "unknown" }>;
+function mcpOutcome(error: unknown, signal: AbortSignal): McpFailure {
+  if (error instanceof McpInterrupted) return { kind: error.outcome, message: error.message };
+  if (error instanceof McpError) return { kind: mcpErrorCodes[error.code], error: { code: error.code, message: error.message } };
+  if (signal.aborted) return { kind: "cancelled", message: "The MCP operation was cancelled." };
+  return { kind: "failed", error: { code: "request_failed", message: messageOf(error) } };
+}
 async function readResult(work: () => Json | Promise<Json>, signal: AbortSignal): Promise<CallResult> {
   try { signal.throwIfAborted(); return { kind: "succeeded", data: await work() }; }
-  catch (error) { return signal.aborted ? { kind: "cancelled", message: "The MCP operation was cancelled." }
-    : { kind: "failed", error: { code: "mcp_error", message: messageOf(error) } }; }
+  catch (error) { return mcpOutcome(error, signal); }
 }
 
 export default defineModule(plugin => {
@@ -88,14 +95,14 @@ export default defineModule(plugin => {
       implementTool(McpSearch, { call: (_data, _target, args, { signal }) => readResult(() => service.search(args), signal) }),
       implementTool(McpInspect, { call: (_data, _target, args, { signal }) => readResult(() => service.inspect(args.tool_id), signal) }),
       implementTool(McpConnect, { call: (_data, _target, args, { signal }) => readResult(async () => {
-        await service.connect(args.server_id, signal);
+        await service.connectTool(args.server_id, signal);
         return describeServer(service.states().find(state => state.id === args.server_id)!);
       }, signal) }),
       implementTool(McpCall, {
         async call(_data, _target, args, { signal, object, publish }): Promise<CallResult<McpCallData>> {
           let target: CallTarget;
           try { target = service.resolve(args.tool_id); }
-          catch (error) { return { kind: "rejected", error: { code: "mcp_call_error", message: messageOf(error) } }; }
+          catch (error) { return mcpOutcome(error, signal); }
           const identity = { serverId: target.serverId, serverName: target.serverName, toolName: target.toolName };
           try {
             const result = await service.call(target, args.arguments, signal, progress => {
@@ -106,12 +113,12 @@ export default defineModule(plugin => {
               } catch (error) { plugin.log.warn(`MCP progress could not be published: ${messageOf(error)}`); }
             });
             const data: McpCallData = { ...identity, ...await convertMcpResult(result, object.content) };
-            return result.isError ? { kind: "failed", data, error: { code: "mcp_tool_error", message: "The MCP server reported a tool error." } }
+            return result.isError ? { kind: "failed", data, error: { code: "tool_error", message: "The MCP server reported a tool error." } }
               : { kind: "succeeded", data };
           } catch (error) {
-            if (!(error instanceof McpCallError)) throw error;
-            if (error.outcome === "unknown" || error.outcome === "cancelled") return { kind: error.outcome, message: error.message };
-            return { kind: error.outcome, error: { code: "mcp_call_error", message: error.message } };
+            // 远端已返回后的内容转换失败属于宿主内部错误，不伪装成远端请求失败。
+            if (!(error instanceof McpError || error instanceof McpInterrupted)) throw error;
+            return mcpOutcome(error, signal);
           }
         },
         toModel: mcpResultToModel,
