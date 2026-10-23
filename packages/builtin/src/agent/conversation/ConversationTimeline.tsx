@@ -1,6 +1,6 @@
 import { useI18n, useRendererObject } from "@atelier/sdk/renderer";
 import { TriangleAlert, Info } from "lucide-react";
-import { useState } from "react";
+import { memo, useState } from "react";
 
 import { Alert, AlertDescription } from "@atelier/ui/ui/alert";
 import { Badge } from "@atelier/ui/ui/badge";
@@ -18,7 +18,8 @@ export function ConversationTimeline({ items }: { items: readonly TimelineItem[]
   return <>{items.map(node => <NodeView key={timelineKey(node)} node={node} />)}</>;
 }
 
-function NodeView({ node }: { node: TimelineItem }) {
+/** 时间线条目由快照投影且身份稳定；画布拖动等外层重渲染不重算已有条目。 */
+const NodeView = memo(function NodeView({ node }: { node: TimelineItem }) {
   const i18n = useI18n();
   const object = useRendererObject();
   const incomplete = "complete" in node && !node.complete;
@@ -41,7 +42,7 @@ function NodeView({ node }: { node: TimelineItem }) {
       {node.level === "error" ? <TriangleAlert /> : <Info />}<AlertDescription>{node.message}</AlertDescription></Alert>;
     default: return null;
   }
-}
+});
 function Summary({ text }: { text: string }) {
   const [open, setOpen] = useState(false);
   const i18n = useI18n();

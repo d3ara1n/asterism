@@ -1,7 +1,7 @@
 import { CachedMarkdown, Streamdown, type StreamdownProps } from "@lobehub/streamdown";
 import { useI18n } from "@atelier/sdk/renderer";
 import { useReducedMotion } from "motion/react";
-import { memo, useState } from "react";
+import { memo, useEffect, useState } from "react";
 
 import { externalWebUrl } from "@atelier/ui/links";
 import { markdownMessages } from "../../messages/markdown";
@@ -29,10 +29,23 @@ const components: NonNullable<StreamdownProps["components"]> = {
   table: ({ children }) => <div className="content-scrollbar my-4 overflow-x-auto"><table>{children}</table></div>,
 };
 
-/** 解析、补全与渐入由库负责；首次挂载的历史内容静态显示。 */
+/** 流式结束后平滑输出的排空窗口（balanced 预设上限约 880ms），之后换回静态渲染。 */
+const streamSettleMs = 1000;
+
+/**
+ * 解析、补全与渐入由库负责；历史内容静态显示。
+ * Streamdown 没有结束信号，尾块挂载期间始终保留逐词动画，因此只在生成期间及排空窗口内挂载它。
+ */
 export const Markdown = memo(function Markdown({ children, streaming = false }: { children: string; streaming?: boolean }) {
   // 实时块落库后仍由同一渲染器收完平滑输出，避免切静态时把尚未显示的尾部直接弹出。
-  const [live] = useState(streaming);
+  const [settling, setSettling] = useState(streaming);
+  useEffect(() => {
+    if (streaming) { setSettling(true); return; }
+    if (!settling) return;
+    const timer = window.setTimeout(() => setSettling(false), streamSettleMs);
+    return () => window.clearTimeout(timer);
+  }, [streaming, settling]);
+  const live = streaming || settling;
   const reducedMotion = useReducedMotion();
   return <MarkdownStreamingContext value={streaming}>
     <div className="markdown-content type-body min-w-0 break-words [overflow-wrap:anywhere]">

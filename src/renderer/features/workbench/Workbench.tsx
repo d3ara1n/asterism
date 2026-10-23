@@ -22,7 +22,7 @@ import type { WorkbenchOperation } from "../session/controller";
 import { SessionHistoryPanel } from "../session/History";
 import { AccessPanel } from "./AccessPanel";
 import { useWorkbenchCanvas, type WorkbenchCanvas } from "./canvas";
-import { layoutConnections, type ConnectionEdge } from "./connections";
+import { layoutConnections, samePorts, type ConnectionEdge } from "./connections";
 import { handleSizeVariables, linkEdgeTypes } from "./LinkEdge";
 import { WorkbenchScope, WorkbenchContext, useWorkbench, type WorkbenchEnvironment, type WorkbenchStore, type WorkbenchView } from "./context";
 import { workbenchNodes } from "./nodes";
@@ -129,9 +129,23 @@ function Canvas({ ref, session, run, writable, canDrop, onDropItems }: DropHandl
   const { api: canvas, minZoom } = useWorkbenchCanvas(nodes, setNodes, viewportElement);
   useImperativeHandle(ref, () => canvas, [canvas]);
   const connections = useMemo(() => layoutConnections(nodes, session.links), [nodes, session.links]);
-  const canvasNodes = useMemo(() => nodes.map(node => ({
-    ...node, data: { ...node.data, ports: connections.ports.get(node.id) },
-  })), [nodes, connections]);
+  // 端点未变时沿用上一份 data，拖动一张卡片不让其余卡片的内容逐帧重渲染。
+  const nodeData = useRef(new Map<string, ObjectNodeType["data"]>());
+  const canvasNodes = useMemo(() => {
+    const cache = nodeData.current;
+    const next = new Map<string, ObjectNodeType["data"]>();
+    const result = nodes.map(node => {
+      const ports = connections.ports.get(node.id);
+      const previous = cache.get(node.id);
+      const data = previous && previous.object === node.data.object && previous.collapsed === node.data.collapsed
+        && previous.onView === node.data.onView && samePorts(previous.ports, ports)
+        ? previous : { ...node.data, ports };
+      next.set(node.id, data);
+      return { ...node, data };
+    });
+    nodeData.current = next;
+    return result;
+  }, [nodes, connections]);
   // 连线由快照决定，选中状态留在本地；否则受控连线永远选不中，Delete 无从生效。
   const [selectedEdges, setSelectedEdges] = useState<ReadonlySet<string>>(new Set());
   const edges: WorkbenchEdge[] = useMemo(() => connections.edges.map(edge => ({

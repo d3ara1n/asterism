@@ -57,3 +57,10 @@ export function layoutConnections(nodes: readonly LayoutNode[], links: Workbench
   }
   return { edges, ports };
 }
+
+/** 端点按身份、边与偏移逐项比较；用于在布局重算后沿用未变化节点的数据身份。 */
+export function samePorts(a: readonly ConnectionPort[] | undefined, b: readonly ConnectionPort[] | undefined) {
+  if (a === b) return true;
+  if (!a || !b || a.length !== b.length) return false;
+  return a.every((port, index) => port.id === b[index]!.id && port.side === b[index]!.side && port.offset === b[index]!.offset);
+}

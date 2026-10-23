@@ -11,7 +11,7 @@ import { useI18n, useRendererObject, useRendererModels } from "@atelier/sdk/rend
 import { useOutputFollow } from "./output-follow";
 import { useMemo, useRef } from "react";
 
-import { conversationTimeline } from "./timeline";
+import { savedTimeline, withLive, type TimelineItem } from "./timeline";
 
 import { useConversationInteraction } from "./interaction";
 import { AgentToolbar, AgentUIRegion, useComposerHidden } from "../ui/AgentUI";
@@ -30,6 +30,8 @@ export function ConversationActions({ data }: { data: { executionState: AgentExe
   </StatusBadge>;
 }
 
+const emptyTimeline: readonly TimelineItem[] = [];
+
 /** 代理卡片内容：当前路径的最终视图与输入区；没有分支感，回溯在会话历史中进行。 */
 export function Conversation() {
   const i18n = useI18n();
@@ -42,7 +44,9 @@ export function Conversation() {
   const agentId = object.ref.id;
   const snapshot = session.snapshot();
   const running = executionState === "running";
-  const timeline = useMemo(() => snapshot ? conversationTimeline(snapshot, agentId, models.blocks, running) : [], [snapshot, agentId, models.blocks, running]);
+  // 已保存部分只随快照与运行状态重算；流式增量只追加实时块，历史条目保持身份。
+  const saved = useMemo(() => snapshot ? savedTimeline(snapshot, agentId, running) : null, [snapshot, agentId, running]);
+  const timeline = useMemo(() => saved ? withLive(saved, models.blocks) : [], [saved, models.blocks]);
   const { scroll, contentRef, awayFromBottom, latest, jumpTo, onScroll } = useOutputFollow(timeline);
   const composer = useRef<HTMLTextAreaElement>(null);
   const composerHidden = useComposerHidden();
@@ -68,7 +72,7 @@ export function Conversation() {
           {!timeline.length && !running && <p className="type-caption">{i18n.formatMessage(conversationMessages.emptyHint)}</p>}
         </div>
       </div>
-      <ConversationMinimap timeline={timeline} onSelect={id => {
+      <ConversationMinimap timeline={saved?.items ?? emptyTimeline} onSelect={id => {
         const target = scroll.current?.querySelector<HTMLElement>(`[data-conversation-message="${CSS.escape(id)}"]`);
         if (target) jumpTo(target);
       }} />

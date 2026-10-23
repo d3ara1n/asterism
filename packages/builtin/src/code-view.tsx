@@ -23,22 +23,27 @@ export function CodeRows({ rows, filename }: { rows: readonly { line: number; co
 
 const textOptions = { ...codeViewOptions, disableLineNumbers: true, overflow: "scroll" } satisfies FileOptions<undefined, undefined>;
 
+/** 已解析的语言；重新挂载（如流式结束换回静态渲染）时直接着色，不先回退纯文本。 */
+const resolvedLanguages = new Map<string, string>();
+
 /** 无文件名的 Markdown 代码使用显式语言；Pierre 自行解析别名和加载语法。 */
 export function CodeText({ contents, language }: { contents: string; language: string }) {
   const requested = language.toLowerCase();
-  const [resolved, setResolved] = useState({ requested: "", language: "text" });
+  const [, setResolved] = useState<string>();
   useEffect(() => {
     let active = true;
-    if (!requested || requested === "text") return;
+    if (!requested || requested === "text" || resolvedLanguages.has(requested)) return;
     void resolveLanguage(requested).then(() => {
-      if (active) setResolved({ requested, language: requested });
+      resolvedLanguages.set(requested, requested);
+      if (active) setResolved(requested);
     }, () => {
       // 未识别的语言保留原标签，正文仍可按纯文本阅读和复制。
-      if (active) setResolved({ requested, language: "text" });
+      resolvedLanguages.set(requested, "text");
+      if (active) setResolved(requested);
     });
     return () => { active = false; };
   }, [requested]);
-  const lang = resolved.requested === requested ? resolved.language : "text";
+  const lang = resolvedLanguages.get(requested) ?? "text";
   const file = useMemo(() => ({ name: "code", contents, lang }), [contents, lang]);
   return <File file={file} options={textOptions} className="pierre-code type-code" disableWorkerPool />;
 }

@@ -36,11 +36,13 @@ function item(record: SessionRecord, agentId: string): TimelineItem | null {
   if (execution?.status === "known" && execution.data.type === "block") return savedTimelineBlock(record, execution.data.block);
   return null;
 }
-/** 所有已保存块直接来自当前路径；实时块以响应身份接续。 */
-export function conversationTimeline(snapshot: SessionSnapshot, agentId: string, live: readonly ModelLiveBlock[], running = live.length > 0): TimelineItem[] {
+/** 已保存部分：只随快照与运行状态变化，流式增量期间保持条目身份，供界面按引用跳过重渲染。 */
+export interface SavedTimeline { items: readonly TimelineItem[]; keys: ReadonlySet<string>; tail: TimelineItem | null }
+
+/** 所有已保存块直接来自当前路径；轮次概要插在下一轮输入之前，末轮概要作为尾项。 */
+export function savedTimeline(snapshot: SessionSnapshot, agentId: string, running: boolean): SavedTimeline {
   const path = snapshot.records.all({ scope: "timeline" });
   const saved = path.flatMap(record => { const value = item(record, agentId); return value ? [value] : []; });
-  const keys = new Set(saved.map(timelineKey));
   const summaries = turnMetrics(snapshot, agentId, running);
   const before = new Map(summaries.map(turn => [turn.nextInputId, turn]));
   const measured = (turn: typeof summaries[number]): TimelineItem => ({
@@ -52,5 +54,14 @@ export function conversationTimeline(snapshot: SessionSnapshot, agentId: string,
     return turn ? [measured(turn), value] : [value];
   });
   const last = before.get(null);
-  return [...items, ...live.filter(block => !keys.has(timelineKey(block))), ...(last ? [measured(last)] : [])];
+  return { items, keys: new Set(saved.map(timelineKey)), tail: last ? measured(last) : null };
+}
+
+/** 实时块以响应身份接续在已保存条目之后；已落库的同一块不重复展示。 */
+export function withLive(saved: SavedTimeline, live: readonly ModelLiveBlock[]): TimelineItem[] {
+  return [...saved.items, ...live.filter(block => !saved.keys.has(timelineKey(block))), ...(saved.tail ? [saved.tail] : [])];
+}
+
+export function conversationTimeline(snapshot: SessionSnapshot, agentId: string, live: readonly ModelLiveBlock[], running = live.length > 0): TimelineItem[] {
+  return withLive(savedTimeline(snapshot, agentId, running), live);
 }
