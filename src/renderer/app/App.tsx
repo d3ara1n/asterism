@@ -169,7 +169,8 @@ export function App({ controller }: { controller: ApplicationController }) {
     <Button variant="ghost" size="sm" onClick={event => workbench.current?.togglePanel("history", event.currentTarget)} aria-label={i18n.formatMessage(historyMessages.history)}><History /><span className="toolbar-label">{i18n.formatMessage(historyMessages.history)}</span></Button>
   </> : undefined;
 
-  const conversation = <WorkbenchSurface overlay={<WorkbenchFeedback key={active?.sessionId} phase={phase} hasContent={!!session}
+  // 反馈层与会话画布是同级子节点，各自按会话重置，键空间须互不重叠。
+  const conversation = <WorkbenchSurface overlay={<WorkbenchFeedback key={`feedback:${active?.sessionId ?? ""}`} phase={phase} hasContent={!!session}
     error={phase === "unavailable" ? state.error : sessionState?.readError ?? null} onRetry={() => { void active?.refresh(); }} />}>
     {session && active ? <motion.div key={session.id} className="h-full" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
       <Workbench ref={workbench} session={session} controller={active}
