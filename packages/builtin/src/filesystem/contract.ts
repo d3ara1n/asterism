@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { defineImplementation, defineCreation, contentRefSchema } from "@atelier/sdk/contracts";
+import { defineImplementation, defineCreation, defineCall, contentRefSchema } from "@atelier/sdk/contracts";
 import { builtin, List, Read, Edit, Write, See, textReadSchema, textChangeSchema } from "@atelier/builtin-api/contracts";
 
 export const Directory = builtin.resource("directory", z.object({ path: z.string() }));
@@ -61,4 +61,14 @@ export const DirectorySee = defineImplementation({
   resource: Directory, tool: See,
   targetSchema: z.strictObject({ path: filePath }).describe("Select one image with {\"path\":\"relative/image.png\"}. Supported formats are PNG, JPEG, GIF and WebP; images are limited to 5 MiB."),
   effect: "read", execution: "parallel",
+});
+
+export const DirectoryTree = defineCall(builtin.name("directory.tree"), {
+  scope: "object",
+  input: z.strictObject({}),
+  output: z.strictObject({
+    paths: z.array(z.string()),
+    gitStatus: z.array(z.strictObject({ path: z.string(), status: z.string() })),
+    hasGit: z.boolean(),
+  }),
 });

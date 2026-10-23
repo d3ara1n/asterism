@@ -1,8 +1,8 @@
 import { readdir, readFile, stat } from "node:fs/promises";
-import { basename, isAbsolute } from "node:path";
-import { defineModule, implementResource, implementCreation, implementTool, PluginApiError, type CallResult } from "@atelier/sdk/runtime";
+import { basename, isAbsolute, join } from "node:path";
+import { defineModule, implementResource, implementCreation, implementTool, implementCall, PluginApiError, type CallResult } from "@atelier/sdk/runtime";
 import { TextError, readText, readToModel, editText, textChange, writeToModel, editToModel } from "../shared/text.ts";
-import { Directory, CreateDirectory, DirectoryView, DirectoryList, DirectoryRead, DirectoryEdit, DirectoryWrite, DirectorySee } from "./contract.ts";
+import { Directory, CreateDirectory, DirectoryView, DirectoryList, DirectoryRead, DirectoryEdit, DirectoryWrite, DirectorySee, DirectoryTree } from "./contract.ts";
 import { readImageFile } from "./image-io.ts";
 import { withinDirectory, writableTarget } from "./paths.ts";
 import { failed, filesystemFailure } from "./errors.ts";
@@ -10,10 +10,47 @@ import { readTextFile, commitTextFile, validateTextSize } from "./text-io.ts";
 import { DirectoryExec } from "./exec-contract.ts";
 import { execToModel } from "../shell/contract.ts";
 import type { ShellService } from "../shell/service.ts";
+import { simpleGit } from "simple-git";
 
 function textFailure(error: unknown, signal: AbortSignal, operation: string): CallResult<never> {
   if (signal.aborted) return { kind: "cancelled", message: `${operation} was cancelled before committing file content.` };
   return error instanceof TextError ? error.outcome() : filesystemFailure(error, operation);
+}
+
+/** 递归读取目录树路径，目录路径以 '/' 结尾。深度上限 5，避免遍历 node_modules 等深层结构。 */
+async function readTreePaths(rootPath: string, relPath: string, depth: number, signal: AbortSignal): Promise<string[]> {
+  if (depth > 5) return [];
+  signal.throwIfAborted();
+  const absPath = relPath === "." ? rootPath : join(rootPath, ...relPath.split("/"));
+  let entries: import("node:fs").Dirent[];
+  try { entries = await readdir(absPath, { withFileTypes: true }); }
+  catch { return []; }
+  const paths: string[] = [];
+  for (const entry of entries) {
+    signal.throwIfAborted();
+    const rel = relPath === "." ? entry.name : `${relPath}/${entry.name}`;
+    if (entry.isDirectory()) {
+      paths.push(`${rel}/`);
+      paths.push(...await readTreePaths(rootPath, rel, depth + 1, signal));
+    } else paths.push(rel);
+  }
+  return paths;
+}
+
+/** 读取 git 状态并映射为 pierre trees 的 GitStatusEntry 格式。非 git 仓库返回空。 */
+async function readGitStatus(rootPath: string): Promise<{ entries: Array<{ path: string; status: string }>; hasGit: boolean }> {
+  const git = simpleGit(rootPath);
+  const hasGit = await git.checkIsRepo().catch(() => false);
+  if (!hasGit) return { entries: [], hasGit: false };
+  const status = await git.status();
+  const entries: Array<{ path: string; status: string }> = [
+    ...status.modified.map(path => ({ path, status: "modified" })),
+    ...status.not_added.map(path => ({ path, status: "untracked" })),
+    ...status.created.map(path => ({ path, status: "added" })),
+    ...status.deleted.map(path => ({ path, status: "deleted" })),
+    ...status.renamed.map(({ to }) => ({ path: to, status: "renamed" })),
+  ];
+  return { entries, hasGit: true };
 }
 
 export function createFilesystemModule(shell: ShellService) { return defineModule(() => ({
@@ -130,6 +167,24 @@ export function createFilesystemModule(shell: ShellService) { return defineModul
       },
       toModel: data => [{ kind: "text", text: `${data.path} (${data.mediaType}, ${data.size} bytes)` },
         { kind: "file", file: data.image, mediaType: data.mediaType, filename: basename(data.path) }],
+    }),
+  ],
+  calls: [
+    implementCall(DirectoryTree, async (_input, { object, signal }) => {
+      const snapshot = object.snapshot();
+      if (!snapshot) throw new PluginApiError("unavailable", "The directory is not available on this session path.");
+      const rootPath = Directory.stateSchema.parse(snapshot.data).path;
+      signal.throwIfAborted();
+      const [pathsResult, gitResult] = await Promise.allSettled([
+        readTreePaths(rootPath, ".", 0, signal),
+        readGitStatus(rootPath),
+      ]);
+      signal.throwIfAborted();
+      return {
+        paths: pathsResult.status === "fulfilled" ? pathsResult.value : [],
+        gitStatus: gitResult.status === "fulfilled" ? gitResult.value.entries : [],
+        hasGit: gitResult.status === "fulfilled" ? gitResult.value.hasGit : false,
+      };
     }),
   ],
 })); }
