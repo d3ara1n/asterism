@@ -34,9 +34,17 @@ export function sessionSnapshot(source: NodeView): SessionSnapshot {
     },
   };
 }
-/** 快照只持有固定位置的读取柄；每次查询只映射和解码被选中的记录。 */
+/**
+ * 快照只持有固定位置的读取柄；每次查询只映射和解码被选中的记录。
+ * 位置与节点均不可变、记录已深冻结，同一快照内相同的 `all` 查询复用结果，多个投影不重复复制整条历史。
+ */
 export function sessionView(source: NodeView): SessionView {
-  const all = (query: RecordQuery) => Object.freeze(source.read(query).map(({ node, sequence }) => toRecord(node, sequence)));
+  const cache = new Map<RecordQuery["scope"], readonly SessionRecord[]>();
+  const all = ({ scope }: RecordQuery) => {
+    let records = cache.get(scope);
+    if (!records) cache.set(scope, records = Object.freeze(source.read({ scope }).map(({ node, sequence }) => toRecord(node, sequence))));
+    return records;
+  };
   const query = <D extends Json>(contract: RecordContract<D>, q: RecordQuery) =>
     source.read({ ...q, contracts: [contract.id] }).flatMap(({ node, sequence }) => {
       const decoded = contract.decode(toRecord(node, sequence));

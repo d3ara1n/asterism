@@ -59,7 +59,7 @@ describe("响应块状态机", () => {
     expect(response.live()[0]).toMatchObject({ state: "ready", arguments: { path: "first.txt" } });
     expect(response.calls()[0]!.arguments).toEqual({ path: "first.txt" });
   });
-  it("即时思考携带运行时块起点，读取和增量不会重新计时；结束后保留全文", () => {
+  it("即时思考携带运行时块起点，读取和增量不会重新计时；成型块保存同一对起止，供重启后显示与审计", () => {
     const clock = vi.spyOn(Date, "now").mockReturnValue(1000);
     try {
       const { response, nodes } = setup();
@@ -75,7 +75,7 @@ describe("响应块状态机", () => {
       expect(nodes).toEqual([]);
       response.accept(finish);
       expect(response.live()).toEqual([]);
-      expect(nodes[0]).toMatchObject({ kind: "thinking", text: "First second", complete: true });
+      expect(modelBlockSchema.parse(nodes[0])).toMatchObject({ kind: "thinking", text: "First second", complete: true, startedAt: 1000, endedAt: 9000 });
     } finally { clock.mockRestore(); }
   });
 

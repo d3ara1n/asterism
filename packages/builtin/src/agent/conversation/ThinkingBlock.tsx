@@ -1,4 +1,4 @@
-import { useI18n, useRendererConfig } from "@atelier/sdk/renderer";
+import { useI18n, useRendererConfig, useRendererViewState } from "@atelier/sdk/renderer";
 import { Brain } from "lucide-react";
 import { memo, useEffect, useState } from "react";
 
@@ -10,22 +10,22 @@ import { BuiltinSettings } from "../../settings/contract";
 import { Disclosure } from "./Disclosure";
 import { Markdown } from "./Markdown";
 import { advanceThinkingDisclosure, initialThinkingDisclosure, thinkingDuration } from "./thinking-state";
-import type { TimelineItem } from "./timeline";
+import { generating, type TimelineItem } from "./timeline";
+import { viewStateKeys } from "./view-state";
 
 type ThinkingNode = Extract<TimelineItem, { kind: "thinking" }>;
 
 /** 外壳的开合偏好与正文的过程/终结渲染相互独立。 */
 export function ThinkingBlock({ node }: { node: ThinkingNode }) {
-  const streaming = "endedAt" in node && node.endedAt === null;
+  const streaming = generating(node);
   const preferences = useRendererConfig(BuiltinSettings);
-  const [disclosure, setDisclosure] = useState(() => initialThinkingDisclosure(streaming, preferences));
+  // 展开状态按条目保留，随滚动重新挂载时恢复；阶段偏好仍只在开始与结束时应用。
+  const [disclosure, setDisclosure] = useRendererViewState(viewStateKeys.disclosure, () => initialThinkingDisclosure(streaming, preferences));
   const next = advanceThinkingDisclosure(disclosure, streaming, preferences);
   if (next !== disclosure) setDisclosure(next);
-  // 同一块落库保留本次实时计时；历史没有保存起点时不补造耗时。
-  const [startedAt] = useState(() => "startedAt" in node ? node.startedAt : null);
-  const finished = "endedAt" in node ? node.endedAt : Date.parse(node.createdAt);
-  const [endedAt, setEndedAt] = useState(finished);
-  if (endedAt === null && finished !== null) setEndedAt(finished);
+  // 实时块与成型块都携带生成起止；历史未记录时间时不补造耗时。
+  const startedAt = node.startedAt ?? null;
+  const endedAt = node.endedAt ?? null;
   const interrupted = "complete" in node && !node.complete;
 
   return <Disclosure open={next.open} onOpenChange={open => setDisclosure({ streaming, open })}
@@ -46,7 +46,9 @@ function ThinkingHeader({ streaming, startedAt, endedAt, interrupted }: {
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
   }, [streaming, startedAt]);
-  const duration = thinkingDuration(startedAt, endedAt ?? now);
+  // 只有生成中的块以当前时间计时；未结束就中断的成型块不推算用时。
+  const end = endedAt ?? (streaming ? now : null);
+  const duration = end === null ? null : thinkingDuration(startedAt, end);
   return <>
     <span className="inline-flex shrink-0" aria-hidden="true">
       {streaming ? <Spinner className="size-3.5 motion-reduce:animate-none" /> : <Brain className="size-3.5" />}

@@ -1,5 +1,5 @@
-import { type ToolRenderProps, useI18n } from "@atelier/sdk/renderer";
-import { useId, useState, type ReactNode } from "react";
+import { type ToolRenderProps, useI18n, useRendererViewState } from "@atelier/sdk/renderer";
+import { useId, type ReactNode } from "react";
 
 import { toolsMessages } from "./messages/tools";
 import { JsonView } from "./json-view";
@@ -8,14 +8,18 @@ import { Button } from "./ui/button";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "./ui/collapsible";
 import { ToggleGroup, ToggleGroupItem } from "./ui/toggle-group";
 
-export function ToolDetails({ label, children }: { label: string; children: ReactNode }) {
-  return <Collapsible>
+/** stateKey 在所在条目内唯一时，展开状态随条目重新挂载保留；省略时只作组件状态。 */
+export function ToolDetails({ label, stateKey = null, children }: { label: string; stateKey?: string | null; children: ReactNode }) {
+  const [open, setOpen] = useRendererViewState(stateKey, false);
+  return <Collapsible open={open} onOpenChange={setOpen}>
     <CollapsibleTrigger asChild><Button variant="ghost" size="xs">{label}</Button></CollapsibleTrigger>
     <CollapsibleContent className="space-y-2 pt-2">{children}</CollapsibleContent>
   </Collapsible>;
 }
-export function ToolDetailsSwitcher({ items }: { items: readonly { value: string; label: string; render(): ReactNode }[] }) {
-  const [value, setValue] = useState("");
+export function ToolDetailsSwitcher({ items, stateKey = null }: {
+  items: readonly { value: string; label: string; render(): ReactNode }[]; stateKey?: string | null;
+}) {
+  const [value, setValue] = useRendererViewState(stateKey, "");
   const panelId = useId();
   const selected = items.find(item => item.value === value);
   return <div className="space-y-2">

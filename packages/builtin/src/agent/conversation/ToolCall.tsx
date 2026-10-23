@@ -1,7 +1,6 @@
-import { useI18n, useRendererTools, useRendererConfig } from "@atelier/sdk/renderer";
+import { useI18n, useRendererTools, useRendererConfig, useRendererViewState } from "@atelier/sdk/renderer";
 import { TextCursorInput, Wrench } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
-import { useState } from "react";
 
 import { JsonView } from "@atelier/ui/json-view";
 import { DefaultToolHeader, DefaultToolBody, ToolDetailsSwitcher } from "@atelier/ui/tool-content";
@@ -13,6 +12,7 @@ import { Disclosure } from "./Disclosure";
 import { advanceToolDisclosure, initialToolDisclosure, toolCallState, type ToolCallNode } from "./tool-state";
 import { BuiltinSettings } from "../../settings/contract";
 import { advanceToolOutputDisclosure, type ToolOutputDisclosure } from "./tool-output";
+import { viewStateKeys } from "./view-state";
 
 const labels = {
   partial: toolsMessages.toolPartial, failed: toolsMessages.toolFailed,
@@ -29,7 +29,8 @@ export function ToolCall({ node }: { node: ToolCallNode }) {
   const filling = state.phase === "input";
   const view = state.props ? tools.resolve(state.props) : null;
   const hasInputBody = filling && view?.body !== undefined && view.body !== null;
-  const [disclosure, setDisclosure] = useState<ToolOutputDisclosure>(() => initialToolDisclosure(filling, preferences, hasInputBody));
+  const [disclosure, setDisclosure] = useRendererViewState<ToolOutputDisclosure>(viewStateKeys.disclosure,
+    () => initialToolDisclosure(filling, preferences, hasInputBody));
   const next = advanceToolOutputDisclosure(advanceToolDisclosure(disclosure, filling, preferences, hasInputBody), view?.props, preferences);
   if (next !== disclosure) setDisclosure(next);
   const result = state.props?.result;
@@ -59,7 +60,7 @@ export function ToolCall({ node }: { node: ToolCallNode }) {
     <div className="space-y-3">
       {view && (view.body ?? (!filling && <DefaultToolBody {...view.props} />))}
       {diagnostic && <Alert variant={error ? "destructive" : "default"}><AlertDescription className="whitespace-pre-wrap">{diagnostic}</AlertDescription></Alert>}
-      {state.phase === "settled" && <ToolDetailsSwitcher items={[
+      {state.phase === "settled" && <ToolDetailsSwitcher stateKey={viewStateKeys.toolDetails} items={[
         { value: "call", label: i18n.formatMessage(toolsMessages.toolCallDetails),
           render: () => <JsonView value={{ tool: node.name, arguments: node.arguments ?? node.argumentsText }} /> },
         ...(hasResultDetails ? [{ value: "result", label: i18n.formatMessage(toolsMessages.toolResultDetails),

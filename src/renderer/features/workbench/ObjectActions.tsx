@@ -13,7 +13,7 @@ import { useState } from "react";
 
 import { maximumCardDimension, type CardSize, type WorkbenchObject } from "../../../shared/workbench";
 
-import { useSessionProgress } from "../session/state";
+import { useSessionActivity } from "../session/state";
 import { useDisposalWarnings } from "../session/disposal";
 import { useWorkbench } from "./context";
 import type { ViewPatch } from "./ObjectCard";
@@ -46,7 +46,7 @@ export function ObjectActions({ object, defaultSize, onView }: {
 function RemoveObject({ object, onClose }: { object: WorkbenchObject; onClose: () => void }) {
   const i18n = useI18n();
   const { controller, session, ready, run } = useWorkbench();
-  const progress = useSessionProgress(controller);
+  const progress = useSessionActivity(controller);
   const [saving, setSaving] = useState(false);
   const unsettled = progress.busyObjectIds.includes(object.id);
   const [warning] = useDisposalWarnings(session.id, [object.id]);

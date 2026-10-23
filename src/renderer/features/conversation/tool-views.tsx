@@ -71,7 +71,7 @@ function ResourceInspectBody({ result }: InspectProps) {
         <ItemContent>
           <ItemTitle>{tool.name}</ItemTitle>
           <ItemDescription className="line-clamp-none">{tool.description}</ItemDescription>
-          <ToolDetails label={i18n.formatMessage(toolsMessages.toolUsageDetails)}>
+          <ToolDetails label={i18n.formatMessage(toolsMessages.toolUsageDetails)} stateKey={`atelier/tool-usage:${tool.name}`}>
             {!!tool.guidelines.length && <ul className="list-disc space-y-1 pl-4 type-caption">{tool.guidelines.map((line, index) => <li key={index}>{line}</li>)}</ul>}
             <p className="type-label">{i18n.formatMessage(toolsMessages.toolArguments)}</p><JsonView value={tool.args} />
             <p className="type-label">{i18n.formatMessage(toolsMessages.toolTarget)}</p><JsonView value={tool.target} />

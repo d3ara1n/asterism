@@ -1,29 +1,59 @@
-import { useI18n, useRendererObject } from "@atelier/sdk/renderer";
+import { RendererViewStateProvider, useI18n, useRendererObject, useRendererViewState, type RendererViewStateEntry } from "@atelier/sdk/renderer";
 import { TriangleAlert, Info } from "lucide-react";
-import { memo, useState } from "react";
+import { memo, useMemo, useState, type Ref, type RefObject } from "react";
+import { Virtualizer, type VirtualizerHandle } from "virtua";
 
 import { Alert, AlertDescription } from "@atelier/ui/ui/alert";
 import { Badge } from "@atelier/ui/ui/badge";
 import { conversationMessages } from "../../messages/conversation";
 import { Markdown } from "./Markdown";
 import { ThinkingBlock } from "./ThinkingBlock";
-import { timelineKey, type TimelineItem } from "./timeline";
+import { generating, mountedTimelineIndexes, timelineKey, type TimelineItem } from "./timeline";
 import { ToolCall } from "./ToolCall";
 import { FilePreview } from "./Files";
 import { Disclosure } from "./Disclosure";
 import { TurnFooter } from "./TurnFooter";
 import { MessageSender } from "./MessageSender";
+import { TimelineViewState, viewStateKeys } from "./view-state";
 
-export function ConversationTimeline({ items }: { items: readonly TimelineItem[] }) {
-  return <>{items.map(node => <NodeView key={timelineKey(node)} node={node} />)}</>;
+/** 条目视图状态由调用方提供时跨重新挂载保留；未提供时随本组件存在。 */
+export function ConversationTimeline({ items, viewState }: { items: readonly TimelineItem[]; viewState?: TimelineViewState }) {
+  const [local] = useState(() => new TimelineViewState());
+  const store = viewState ?? local;
+  return <>{items.map(node => {
+    const key = timelineKey(node);
+    return <NodeView key={key} node={node} entry={store.entry(key)} />;
+  })}</>;
+}
+
+/**
+ * 虚拟化时间线：只挂载视口附近的条目，DOM 规模不随对话长度增长。
+ * 条目随滚动卸载与重新挂载，视图状态经 viewState 按条目恢复；实时块与末项始终挂载。
+ * 条目间距由每项自身的上内边距提供，绝对定位的条目不能依赖兄弟选择器。
+ */
+export function VirtualConversationTimeline({ items, viewState, scrollRef, ref, onResize, onScrollEnd }: {
+  items: readonly TimelineItem[]; viewState: TimelineViewState; scrollRef: RefObject<HTMLElement | null>;
+  ref?: Ref<VirtualizerHandle>; onResize?: () => void; onScrollEnd?: () => void;
+}) {
+  const keepMounted = useMemo(() => mountedTimelineIndexes(items), [items]);
+  return <Virtualizer ref={ref} data={items} scrollRef={scrollRef} keepMounted={keepMounted} onResize={onResize} onScrollEnd={onScrollEnd}>
+    {node => {
+      const key = timelineKey(node);
+      return <div key={key} className="px-4 pt-4"><NodeView node={node} entry={viewState.entry(key)} /></div>;
+    }}
+  </Virtualizer>;
 }
 
 /** 时间线条目由快照投影且身份稳定；画布拖动等外层重渲染不重算已有条目。 */
-const NodeView = memo(function NodeView({ node }: { node: TimelineItem }) {
+const NodeView = memo(function NodeView({ node, entry }: { node: TimelineItem; entry: RendererViewStateEntry }) {
+  return <RendererViewStateProvider value={entry}><NodeContent node={node} /></RendererViewStateProvider>;
+});
+
+function NodeContent({ node }: { node: TimelineItem }) {
   const i18n = useI18n();
   const object = useRendererObject();
   const incomplete = "complete" in node && !node.complete;
-  const streaming = (node.kind === "text" || node.kind === "thinking") && "endedAt" in node && node.endedAt === null;
+  const streaming = generating(node);
   const tag = incomplete ? <Badge variant="outline">{i18n.formatMessage(conversationMessages.incomplete)}</Badge> : null;
   switch (node.kind) {
     case "message": return <article data-conversation-message={node.id}
@@ -42,9 +72,9 @@ const NodeView = memo(function NodeView({ node }: { node: TimelineItem }) {
       {node.level === "error" ? <TriangleAlert /> : <Info />}<AlertDescription>{node.message}</AlertDescription></Alert>;
     default: return null;
   }
-});
+}
 function Summary({ text }: { text: string }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useRendererViewState(viewStateKeys.disclosure, false);
   const i18n = useI18n();
   return <Disclosure open={open} onOpenChange={setOpen} header={<><Info className="size-3.5" />
     <span className="min-w-0 flex-1 text-left">{i18n.formatMessage(conversationMessages.contextSummary)}</span></>}>

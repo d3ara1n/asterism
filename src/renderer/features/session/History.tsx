@@ -19,7 +19,7 @@ import { IslandPanel } from "../../shared/weave/IslandPanel";
 import type { SessionController } from "./controller";
 import { branchContains, historyBranches, branchForNode, type HistoryBranch } from "./history-branches";
 import { historyBefore, historyEntries, historyResources, historyResourceViews, matchesHistoryView, type HistoryView, type HistoryEntry } from "./history-navigation";
-import { useSession, useSessionProgress } from "./state";
+import { useSession, useSessionActivity } from "./state";
 import { useDisposalWarnings } from "./disposal";
 import { sessionTimeline } from "../../../shared/session-timeline";
 import { foldWorkbench } from "../../../session/fold";
@@ -202,7 +202,7 @@ function HistoryViewPicker({ entries, value, onChange }: { entries: HistoryEntry
 function ContinueAction({ controller, nodeId }: { controller: SessionController; nodeId: string | null }) {
   const i18n = useI18n();
   const { snapshot, state } = useSession(controller);
-  const progress = useSessionProgress(controller);
+  const progress = useSessionActivity(controller);
   const registry = useModuleViews();
   const [target, setTarget] = useState<{ id: string | null } | null>(null);
   const [saving, setSaving] = useState(false);

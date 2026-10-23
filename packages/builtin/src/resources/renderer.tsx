@@ -126,7 +126,7 @@ function InspectBody({ result }: InspectProps) {
         {entry.guidelines.map((line, index) => <li key={index}>{line}</li>)}
       </ul>
     </section>}
-    <ToolDetails label={i18n.text(messages.inputSchema)}><JsonView value={entry.input} /></ToolDetails>
+    <ToolDetails label={i18n.text(messages.inputSchema)} stateKey="atelier.builtin/inspect-schema"><JsonView value={entry.input} /></ToolDetails>
   </div>;
 }
 

@@ -37,7 +37,9 @@ export function completionData<T extends Json>(completion: ModelCompletion | nul
   return result.success ? result.data : null;
 }
 const block = { responseId: id, requestParentId: id.nullable(), ordinal: z.number().int().nonnegative(),
-  complete: z.boolean(), continuation: jsonSchema, source: modelSourceSchema, completion: modelCompletionSchema.nullable().optional() };
+  complete: z.boolean(), continuation: jsonSchema, source: modelSourceSchema, completion: modelCompletionSchema.nullable().optional(),
+  /** 块的生成起止（毫秒时间戳）；未结束即收束的块结束时间为 null，未记录时缺省。工具执行时间见 outcome。 */
+  startedAt: z.number().nonnegative().optional(), endedAt: z.number().nonnegative().nullable().optional() };
 export const modelBlockSchema = z.discriminatedUnion("kind", [
   z.strictObject({ ...block, kind: z.literal("thinking"), text: z.string(), summary: z.string() }),
   z.strictObject({ ...block, kind: z.literal("text"), text: z.string() }),

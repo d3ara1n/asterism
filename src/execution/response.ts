@@ -143,7 +143,8 @@ export class ResponseBuffer {
   private emitBlock(block: BufferedBlock, complete: boolean, outcome: ToolOutcome | null = null): void {
     if (block.emitted) throw new ModelFailure("protocol", "The response block has already been emitted.");
     const common = { ...this.identity, ordinal: block.ordinal, complete, continuation: block.continuation,
-      completion: block.ordinal === this.blocks.size - 1 ? this.completion : null };
+      completion: block.ordinal === this.blocks.size - 1 ? this.completion : null,
+      startedAt: block.startedAt, endedAt: block.endedAt };
     this.onBlock(block.part.kind === "toolcall"
       ? { ...common, kind: "toolcall" as const, callId: block.part.callId, name: block.part.name, argumentsText: block.arguments === null ? block.text : null, arguments: block.arguments, outcome }
       : block.part.kind === "thinking" ? { ...common, kind: "thinking", text: block.text, summary: block.summary }

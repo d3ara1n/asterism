@@ -13,6 +13,7 @@ export * from "./renderer-tools.ts";
 export * from "./renderer-records.ts";
 export * from "./renderer-card.ts";
 export * from "./renderer-island.ts";
+export * from "./renderer-view-state.ts";
 import type { CardPanelDefinition, CardPanelView } from "./renderer-card.ts";
 import type { RecordRenderer } from "./renderer-records.ts";
 export type * from "./renderer-content.ts";

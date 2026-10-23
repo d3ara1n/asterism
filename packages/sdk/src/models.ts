@@ -52,6 +52,8 @@ export type ModelBlock = {
   responseId: string; requestParentId: string | null; ordinal: number; complete: boolean; continuation: Json; source: ModelSource;
   /** 终态随响应最高序号的实际块一次交付；其他块为 null。 */
   completion?: ModelCompletion | null;
+  /** 块的生成起止（毫秒时间戳）；未结束即收束的块结束时间为 null，未记录时缺省。工具执行时间见 outcome。 */
+  startedAt?: number; endedAt?: number | null;
 } & (
   | { kind: "thinking"; text: string; summary: string }
   | { kind: "text"; text: string }

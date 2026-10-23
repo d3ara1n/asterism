@@ -68,7 +68,7 @@ describe("会话当前数据", () => {
     f.notify({ kind: "session.changed", sessionId: "s", nodes: [], cursor: null, title: "Renamed", objects: [] });
     f.notify({ kind: "session.progress", sessionId: "s", busyObjectIds: ["a"], timelineBusy: false, live: null });
     expect(f.controller.getSnapshot().data?.title).toBe("Renamed");
-    expect(f.controller.getProgress().busyObjectIds).toEqual(["a"]);
+    expect(f.controller.getActivity().busyObjectIds).toEqual(["a"]);
     expect(f.requests).toHaveLength(1);
     disconnect();
   });
@@ -82,7 +82,7 @@ describe("会话当前数据", () => {
     f.notify({ kind: "session.changed", sessionId: "s", nodes: [node], cursor: "n", title: "Session", objects: [] });
     expect(f.controller.getSnapshot().data?.nodes).toEqual([node]);
     f.notify({ kind: "session.progress", sessionId: "s", busyObjectIds: [], timelineBusy: false, live: { order: [], changes: [] } });
-    expect(f.controller.getProgress().live).toEqual([]);
+    expect(f.controller.liveOf("a")).toEqual([]);
     expect(f.controller.getSnapshot().data?.nodes).toEqual([node]);
     disconnect();
   });
@@ -93,11 +93,31 @@ describe("会话当前数据", () => {
     const block = { id: "r:0", objectId: "a", responseId: "r", ordinal: 0, kind: "toolcall" as const, name: "write", argumentsText: '{"path":"a.txt","content":"hel',
       arguments: null, state: "input" as const, invocation: null, result: null };
     f.notify({ kind: "session.progress", sessionId: "s", busyObjectIds: ["a"], timelineBusy: false, live: { order: [block.id], changes: [{ id: block.id, kind: "put", block }] } });
-    expect(f.controller.getProgress().live[0]).toMatchObject({ arguments: { path: "a.txt", content: "hel" } });
+    expect(f.controller.liveOf("a")[0]).toMatchObject({ arguments: { path: "a.txt", content: "hel" } });
     f.notify({ kind: "session.progress", sessionId: "s", busyObjectIds: ["a"], timelineBusy: false, live: { order: [block.id], changes: [{ id: block.id, kind: "update", ops: [{ path: ["argumentsText"], append: 'lo"}' }] }] } });
-    expect(f.controller.getProgress().live[0]).toMatchObject({ argumentsText: '{"path":"a.txt","content":"hello"}', arguments: { path: "a.txt", content: "hello" } });
+    expect(f.controller.liveOf("a")[0]).toMatchObject({ argumentsText: '{"path":"a.txt","content":"hello"}', arguments: { path: "a.txt", content: "hello" } });
     f.notify({ kind: "session.progress", sessionId: "s", busyObjectIds: ["a"], timelineBusy: false, live: { order: [block.id], changes: [{ id: block.id, kind: "update", ops: [{ path: ["state"], set: "ready" }, { path: ["arguments"], set: { path: "b.txt" } }] }] } });
-    expect(f.controller.getProgress().live[0]).toMatchObject({ state: "ready", arguments: { path: "b.txt" } });
+    expect(f.controller.liveOf("a")[0]).toMatchObject({ state: "ready", arguments: { path: "b.txt" } });
+    disconnect();
+  });
+
+  // 流式增量逐 token 到达：其他对象的实时块与运行状态若每次换新身份，所有卡片和忙碌订阅者都会随之重渲染。
+  it("一个对象的增量不改变其他对象的实时块与未变化的运行状态身份", () => {
+    const f = fixture(), disconnect = f.open();
+    const a = { id: "r:0", objectId: "a", responseId: "r", ordinal: 0, kind: "text" as const, text: "A", endedAt: null };
+    const b = { id: "q:0", objectId: "b", responseId: "q", ordinal: 0, kind: "text" as const, text: "B", endedAt: null };
+    f.notify({ kind: "session.progress", sessionId: "s", busyObjectIds: ["a", "b"], timelineBusy: false,
+      live: { order: [a.id, b.id], changes: [{ id: a.id, kind: "put", block: a }, { id: b.id, kind: "put", block: b }] } });
+    const liveA = f.controller.liveOf("a"), liveB = f.controller.liveOf("b"), activity = f.controller.getActivity();
+    f.notify({ kind: "session.progress", sessionId: "s", busyObjectIds: ["b", "a"], timelineBusy: false,
+      live: { order: [a.id, b.id], changes: [{ id: a.id, kind: "update", ops: [{ path: ["text"], append: "+" }] }] } });
+    expect(f.controller.liveOf("a")).not.toBe(liveA);
+    expect(f.controller.liveOf("a")[0]).toMatchObject({ text: "A+" });
+    expect(f.controller.liveOf("b")).toBe(liveB);
+    expect(f.controller.getActivity()).toBe(activity);
+    f.notify({ kind: "session.progress", sessionId: "s", busyObjectIds: ["a"], timelineBusy: false, live: null });
+    expect(f.controller.getActivity()).toEqual({ busyObjectIds: ["a"], timelineBusy: false });
+    expect(f.controller.liveOf("b")).toBe(liveB);
     disconnect();
   });
 

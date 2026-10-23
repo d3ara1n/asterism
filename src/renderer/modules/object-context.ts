@@ -6,7 +6,7 @@ import { ModelConfiguration } from "@atelier/builtin-api/contracts";
 import { sessionSnapshot } from "../../plugins/records";
 import { nodeView } from "../../session/view";
 import { useWorkbench } from "../features/workbench/context";
-import { useSession, useSessionProgress } from "../features/session/state";
+import { useObjectLive, useSession } from "../features/session/state";
 import { useConfiguration } from "../features/configuration/state";
 import { resolveToolView, toolPreparation } from "../features/conversation/tool-views";
 import { useModuleViews } from "./views";
@@ -65,9 +65,10 @@ export function useObjectContext(object: WorkbenchObject): RendererObjectContext
 /** 专门能力按对象绑定，读取与基础对象接口相同的宿主状态源。 */
 export function ObjectServices({ object, children }: { object: WorkbenchObject; children: ReactNode }) {
   const { controller } = useWorkbench();
-  const progress = useSessionProgress(controller);
+  const live = useObjectLive(controller, object.id);
   const registry = useModuleViews();
-  const models = useMemo(() => ({ blocks: progress.live.filter(block => block.objectId === object.id) }), [progress.live, object.id]);
+  // 只订阅本对象的实时块：其他对象生成时，本卡片的模型上下文保持身份。
+  const models = useMemo(() => ({ blocks: live }), [live]);
   const tools = useMemo(() => ({ resolve: (props: Parameters<typeof resolveToolView>[0]) => resolveToolView(props, registry), preparation: toolPreparation }), [registry]);
   const preferences = useMemo(() => pluginPreferences(pluginOf(object.kind) ?? "unknown"), [object.kind]);
   return createElement(RendererModelsProvider, { value: models }, createElement(RendererToolsProvider, { value: tools },

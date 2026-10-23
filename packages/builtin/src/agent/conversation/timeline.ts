@@ -14,6 +14,10 @@ export type TimelineItem = SavedBlock | ModelLiveBlock
 export function timelineKey(item: TimelineItem): string {
   return "responseId" in item ? JSON.stringify([item.responseId, item.ordinal]) : item.id;
 }
+/** 正在生成：只有实时块（尚未落库、无 createdAt）且未结束；已保存的未完成块不算生成中。 */
+export function generating(item: TimelineItem): boolean {
+  return (item.kind === "text" || item.kind === "thinking") && !("createdAt" in item) && item.endedAt === null;
+}
 /** 对话与诊断共用历史块的展示转换；摘要式思考也能阅读，原始记录不改写。 */
 export function savedTimelineBlock(record: Pick<SessionRecord, "id" | "createdAt">,
   block: Extract<z.infer<typeof Execution.schema>, { type: "block" }>["block"]): SavedBlock {
@@ -62,6 +66,14 @@ export function withLive(saved: SavedTimeline, live: readonly ModelLiveBlock[]):
   return [...saved.items, ...live.filter(block => !saved.keys.has(timelineKey(block))), ...(saved.tail ? [saved.tail] : [])];
 }
 
-export function conversationTimeline(snapshot: SessionSnapshot, agentId: string, live: readonly ModelLiveBlock[], running = live.length > 0): TimelineItem[] {
-  return withLive(savedTimeline(snapshot, agentId, running), live);
+/** 有可显示内容的条目；空思考块不占列表位置，避免虚拟列表留下只有间距的空项。 */
+export function displayedTimeline(items: readonly TimelineItem[]): TimelineItem[] {
+  return items.filter(item => item.kind !== "thinking" || item.text.trim() !== "");
+}
+
+/** 虚拟列表中始终挂载的条目：尚未落库的实时块（流式动画与计时不能随卸载重放）与末项（跟随输出的锚点）。 */
+export function mountedTimelineIndexes(items: readonly TimelineItem[]): number[] {
+  const indexes = items.flatMap((item, index) => "responseId" in item && !("createdAt" in item) ? [index] : []);
+  if (items.length && indexes.at(-1) !== items.length - 1) indexes.push(items.length - 1);
+  return indexes;
 }

@@ -4,7 +4,7 @@
 
 SDK 包版本见 [package.json](package.json)，宿主 API 版本见 [`sdkApi`](../../src/plugins/packages.ts)。内置插件领域契约独立在 [`@atelier/builtin-api`](../builtin-api/README.md)，不进入通用 SDK。
 
-当前宿主 API 为 **15.1**，插件声明 `{ "major": 15, "minMinor": 0 }`（使用浮岛接口时 `minMinor: 1`），依赖 `@atelier/sdk: ^0.37.0`。后台通过 `session.invoke` 调用资源动作；资源存在性通过 `resourcesChanged` 观察；前端入口默认导出 `defineRendererPlugin(...)`，`prepare` 上下文提供 `events / calls / signal`，调用契约显式声明 `scope`。
+当前宿主 API 为 **15.2**，插件声明 `{ "major": 15, "minMinor": 0 }`（使用浮岛接口时 `minMinor: 1`，读取成型块生成起止时 `minMinor: 2`），依赖 `@atelier/sdk: ^0.38.0`。后台通过 `session.invoke` 调用资源动作；资源存在性通过 `resourcesChanged` 观察；前端入口默认导出 `defineRendererPlugin(...)`，`prepare` 上下文提供 `events / calls / signal`，调用契约显式声明 `scope`。
 
 ## 子路径入口
 
@@ -98,6 +98,7 @@ export default definePlugin({
 - **滚动与缩放**：卡片内交互遵循 [画布与对象卡片](../../docs/workbench.md#画布与对象卡片) 的手势归属规则。
 - **辅助面板（API 8.2）**：`panels: [{ id: "details", label: "Details", icon, Body: Details }]`；主体与面板通过 `useRendererCard().openPanel("details") / closePanel()` 控制卡片局部视图。面板注册、数据绑定与生命周期见 [前端视图与扩展入口](../../docs/plugin-sdk.md#前端视图与扩展入口)，可编译示例见 `examples/renderer.ts`。
 - **工具视图**：`toolRenderer(ToolContract, { label?, icon?, input?, execution?, result? })`，三阶段平行可选，每阶段提供 `{ headerRenderer?, bodyRenderer? }`，可用 `ToolRenderProps<D, T, A>` 跨阶段复用组件。
+- **条目视图状态**（API 15.2）：对话时间线是虚拟列表，工具视图会随滚动重新挂载；需要保留的展开、选项等状态用 `useRendererViewState(key, initial)` 存取，key 以插件 ID 为前缀。语义见 [虚拟化与条目视图状态](../../docs/plugin-sdk.md#前端视图与扩展入口)。
 - **顶层工具**：`defineTopLevelTool` 一次提供定义、参数／结果 schema 和 `execute`，经 `ModuleContribution.topLevelTools` 注册；每次调用取得只读 `object`、受本次执行约束的 `session`（API 9.1）、`callId`、`signal`、`publish`。展示可共享具有相同稳定 ID 的数据契约。详见 [工具贡献](../../docs/plugin-sdk.md#工具贡献)。
 - **资源工具调用者（API 11.3）**：`implementTool` 的 `call` 上下文包含 `caller: ToolCaller`，其 `ref / title` 由宿主在请求边界捕获；`object` 仍为工具目标。身份与权限边界见 [工具贡献](../../docs/plugin-sdk.md#工具贡献)。
 - **替换已有工具**：顶层工具替换、资源实现替换与全局 schema 替换的注册规则，以及稳定 ID、装配顺序和历史展示的边界，见 [工具覆盖](../../docs/runtime.md#工具覆盖)。
