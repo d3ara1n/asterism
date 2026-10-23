@@ -1,6 +1,7 @@
 import { useI18n, creationEntry, cardRenderer, toolRenderer, type RendererModule } from "@atelier/sdk/renderer";
 import { FileText, BookOpen, FilePenLine, FilePlus2 } from "lucide-react";
 
+import { Markdown } from "../agent/conversation/Markdown";
 import { commonMessages } from "../messages/common";
 import { textMessages } from "../messages/text";
 import { prepareCodeView } from "../shared/code-view";
@@ -16,7 +17,7 @@ export default {
   cards: [cardRenderer(NoteView, {
     ...appearance,
     Body: ({ data }) => { const i18n = useI18n(); return <div className="min-h-0 flex-1 select-text overflow-auto p-3">
-      {data.text !== null ? <p className="type-body whitespace-pre-wrap break-words">{data.text}</p>
+      {data.text !== null ? <Markdown>{data.text}</Markdown>
         : <p className="type-body text-muted-foreground">{i18n.formatMessage(textMessages.contentUnavailable)}</p>}
     </div>; },
   })],
