@@ -1,11 +1,14 @@
-import { useEffect } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { useI18n, useRendererObject, creationEntry, cardRenderer, toolRenderer, type RendererModule, type ToolRenderProps } from "@atelier/sdk/renderer";
 import type { z } from "zod";
 import { Eye, Folder, BookOpen, FilePenLine, FilePlus2, ListTree, RefreshCw } from "lucide-react";
-import { FileTree, useFileTree } from "@pierre/trees/react";
+import { FileTree, useFileTree, useFileTreeSearch } from "@pierre/trees/react";
 import type { GitStatus } from "@pierre/trees";
 
 import { ToolHeader } from "@atelier/ui/tool-header";
+import { IconButton } from "@atelier/ui/ui/icon-button";
+import { SearchInput } from "@atelier/ui/ui/search-input";
+import { cn } from "@atelier/ui/utils";
 import { filesystemMessages } from "../messages/filesystem";
 import { textMessages } from "../messages/text";
 import { prepareCodeView } from "../shared/code-view";
@@ -56,22 +59,44 @@ const listView = { headerRenderer: ListHeader, bodyRenderer: ListBody };
 
 /** 标题栏刷新按钮：与 Body 共享同一 DirectoryTreeLink 实例。 */
 function DirectoryTreeActions(_: { data: { path: string } }) {
+  const i18n = useI18n();
   const { link, state } = useDirectoryTreeLink();
-  return <button
-    className="text-muted-foreground hover:text-foreground rounded p-1 transition-colors disabled:opacity-40"
-    disabled={state.loading}
-    onClick={() => link.reload()}
-    aria-label="Refresh"
-  >
-    <RefreshCw className={`size-3 ${state.loading ? "animate-spin" : ""}`} />
-  </button>;
+  return <IconButton size="icon-xs" label={i18n.formatMessage(filesystemMessages.directoryRefresh)} disabled={state.loading} onClick={() => link.reload()}>
+    <RefreshCw className={cn(state.loading && "animate-spin")} />
+  </IconButton>;
 }
 
-/** 卡片正文：边到边的文件树，无子标题。 */
-function DirectoryTreeBody(_: { data: { path: string } }) {
-  const { state } = useDirectoryTreeLink();
+/**
+ * 文件树外观映射到公共 token：行背景内缩为圆角块（与侧栏列表一致），图标与文字分别对齐
+ * 标题栏的图标列（12px）与名称列（36px）。滚动区左右内边距 6px + 行外边距 2px + 行内边距 4px。
+ */
+const treeStyle = {
+  height: "100%",
+  "--trees-bg-override": "var(--card)",
+  "--trees-fg-override": "var(--card-foreground)",
+  "--trees-fg-muted-override": "var(--muted-foreground)",
+  "--trees-bg-muted-override": "var(--accent)",
+  "--trees-selected-bg-override": "var(--selected)",
+  "--trees-selected-fg-override": "var(--selected-foreground)",
+  "--trees-selected-focused-border-color-override": "transparent",
+  "--trees-focus-ring-color-override": "var(--ring)",
+  "--trees-indent-guide-bg-override": "var(--border)",
+  "--trees-border-radius-override": "calc(var(--radius) - 2px)",
+  "--trees-font-family-override": "var(--font-sans)",
+  "--trees-font-size-override": "0.875rem",
+  "--trees-padding-inline-override": "8px",
+  "--trees-item-padding-x-override": "4px",
+  "--trees-item-row-gap-override": "8px",
+} as CSSProperties;
 
-  const { model } = useFileTree({ paths: [], initialExpansion: "closed", search: true });
+/** 卡片正文：贴边筛选条 + 文件树；空目录、无匹配与读取失败以说明文字占位。 */
+function DirectoryTreeBody(_: { data: { path: string } }) {
+  const i18n = useI18n();
+  const { state } = useDirectoryTreeLink();
+  const { model } = useFileTree({ paths: [], initialExpansion: "closed", itemHeight: 28, icons: { set: "complete", colored: false } });
+  const search = useFileTreeSearch(model);
+  // 输入框保留用户原样输入；模型内部 trim 并小写化后匹配，不回填到输入框。
+  const [query, setQuery] = useState("");
 
   useEffect(() => {
     if (!state.data) return;
@@ -79,21 +104,20 @@ function DirectoryTreeBody(_: { data: { path: string } }) {
     model.setGitStatus(state.data.gitStatus.map(e => ({ path: e.path, status: e.status as GitStatus })));
   }, [model, state.data]);
 
-  if (state.error) {
-    return <p className="type-caption m-3 text-destructive">{state.error}</p>;
-  }
+  const empty = state.data?.paths.length === 0;
+  const noMatches = !empty && query.trim() !== "" && search.matchingPaths.length === 0;
+  const notice = state.error ?? (empty ? i18n.formatMessage(filesystemMessages.toolDirectoryEmpty)
+    : noMatches ? i18n.formatMessage(filesystemMessages.directoryNoMatches) : null);
 
-  return <div className="nodrag nopan nowheel min-h-0 flex-1">
-    <FileTree
-      model={model}
-      style={{
-        height: "100%",
-        "--trees-bg-override": "var(--card)",
-        "--trees-fg-override": "var(--foreground)",
-        "--trees-padding-inline-override": "0px",
-        "--trees-border-radius-override": "0px",
-      } as React.CSSProperties}
-    />
+  return <div className="nodrag nopan nowheel flex min-h-0 flex-1 flex-col">
+    <div className="shrink-0 border-b">
+      <SearchInput variant="inline" value={query} onChange={value => { setQuery(value); search.setValue(value === "" ? null : value); }}
+        label={i18n.formatMessage(filesystemMessages.directorySearch)} />
+    </div>
+    <div className="relative min-h-0 flex-1 pt-1">
+      <div className={cn("h-full", notice && "invisible")}><FileTree model={model} style={treeStyle} /></div>
+      {notice && <p className={cn("type-caption absolute inset-x-0 top-0 px-3 py-2", state.error && "text-destructive")}>{notice}</p>}
+    </div>
   </div>;
 }
 

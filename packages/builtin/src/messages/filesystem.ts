@@ -1,6 +1,18 @@
 import { defineMessages, pluginNamespace } from "@atelier/sdk/contracts";
 
 export const filesystemMessages = pluginNamespace("atelier.builtin").messages("en", defineMessages({
+  directoryRefresh: {
+    id: "directoryRefresh",
+    defaultMessage: "Refresh",
+  },
+  directorySearch: {
+    id: "directorySearch",
+    defaultMessage: "Filter files",
+  },
+  directoryNoMatches: {
+    id: "directoryNoMatches",
+    defaultMessage: "No matching files.",
+  },
   directoryBrowseFailed: {
     id: "directoryBrowseFailed",
     defaultMessage: "The directory picker could not be opened. Try again or enter a path.",
