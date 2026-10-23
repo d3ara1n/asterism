@@ -33,11 +33,16 @@ export interface ToolPhaseView<P> {
   headerRenderer?: ComponentType<P>;
   bodyRenderer?: ComponentType<P>;
 }
+/** 输入与执行视图声明可预览内容，正文布局仍由 bodyRenderer 拥有。 */
+export interface ToolStreamingPhaseView<P> extends ToolPhaseView<P> {
+  /** 纯函数：已有适合流式预览的正文时返回 true；同阶段首次命中后由外壳按用户偏好管理开合。 */
+  streaming?: (props: P) => boolean;
+}
 export interface ToolRendererDefinition<D = Json, T = Json, A = Json> {
   label?: UiText;
   icon?: ReactNode;
-  input?: ToolPhaseView<ToolInputRenderProps>;
-  execution?: ToolPhaseView<ToolExecutionRenderProps<D, T, A>>;
+  input?: ToolStreamingPhaseView<ToolInputRenderProps>;
+  execution?: ToolStreamingPhaseView<ToolExecutionRenderProps<D, T, A>>;
   result?: ToolPhaseView<ToolResultRenderProps<D, T, A>>;
 }
 export interface ToolView {
@@ -45,17 +50,23 @@ export interface ToolView {
   icon?: ReactNode;
   header?: ReactNode;
   body?: ReactNode;
+  /** 输入或执行中的正文可参与流式预览开合；false 表示本次未命中，阶段结束由调用生命周期决定。 */
+  streaming?: boolean;
 }
 export interface ToolRenderer {
   contract: ContractReference;
   resolve(props: ToolRenderProps): ToolView | null;
 }
 
-function render<P extends object>(definition: Pick<ToolView, "label" | "icon">, view: ToolPhaseView<P> | undefined, props: P): ToolView {
+function render<P extends { phase: ToolRenderProps["phase"] }>(
+  definition: Pick<ToolView, "label" | "icon">, view: ToolStreamingPhaseView<P> | undefined, props: P,
+): ToolView {
   return {
     label: definition.label, icon: definition.icon,
     header: view?.headerRenderer ? createElement(view.headerRenderer, props) : undefined,
     body: view?.bodyRenderer ? createElement(view.bodyRenderer, props) : undefined,
+    streaming: (props.phase === "input" || props.phase === "executing")
+      && !!view?.bodyRenderer && (view.streaming?.(props) ?? false),
   };
 }
 

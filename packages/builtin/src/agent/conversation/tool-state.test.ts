@@ -7,7 +7,7 @@ import { DirectoryList, DirectoryWrite } from "../../filesystem/contract";
 import filesystem from "../../filesystem/renderer";
 import { ViewRegistry } from "../../../../../src/renderer/modules/registry";
 import type { ToolRenderProps, ToolInputRenderProps } from "@atelier/sdk/renderer";
-import { advanceToolDisclosure, initialToolDisclosure, toolCallState } from "./tool-state";
+import { toolCallState } from "./tool-state";
 import { resolveToolView, toolPreparation } from "../../../../../src/renderer/features/conversation/tool-views";
 
 const args = { resource_id: "directory", tool: "list", target: { path: "src" }, args: {} };
@@ -83,21 +83,4 @@ describe("工具调用的展示投影", () => {
     expect(resolveToolView({ ...props, invocation: {} }, registry).body).toBeUndefined();
   });
 
-  it("填充结束只折叠一次，增量与设置更新不覆盖手动选择", () => {
-    const preferences = { autoExpand: true, autoCollapse: true };
-    const initial = initialToolDisclosure(true, preferences, true);
-    expect(initial.open).toBe(true);
-    const closed = { ...initial, open: false };
-    expect(advanceToolDisclosure(closed, true, preferences, true)).toBe(closed);
-    expect(advanceToolDisclosure(initial, false, preferences, false)).toMatchObject({ filling: false, open: false });
-    const reopened = { ...advanceToolDisclosure(initial, false, preferences, false), open: true };
-    expect(advanceToolDisclosure(reopened, false, preferences, false)).toBe(reopened);
-    expect(advanceToolDisclosure(initial, false, { ...preferences, autoCollapse: false }, false).open).toBe(true);
-    expect(initialToolDisclosure(true, { ...preferences, autoExpand: false }, true).open).toBe(false);
-    expect(initialToolDisclosure(false, preferences, false).open).toBe(false);
-    const unidentified = initialToolDisclosure(true, preferences, false);
-    expect(unidentified.open).toBe(false);
-    expect(advanceToolDisclosure(unidentified, true, preferences, true).open).toBe(true);
-    expect(advanceToolDisclosure(unidentified, false, { ...preferences, autoCollapse: false }, false).open).toBe(false);
-  });
 });

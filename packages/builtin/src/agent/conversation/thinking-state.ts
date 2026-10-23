@@ -1,8 +1,3 @@
-export {
-  initialStreamingDisclosure as initialThinkingDisclosure,
-  advanceStreamingDisclosure as advanceThinkingDisclosure,
-} from "../../shared/streaming-disclosure";
-
 export function thinkingDuration(startedAt: number | null, endedAt: number): string | null {
   if (startedAt === null || !Number.isFinite(startedAt) || !Number.isFinite(endedAt)) return null;
   const seconds = Math.max(0, Math.floor((endedAt - startedAt) / 1000));

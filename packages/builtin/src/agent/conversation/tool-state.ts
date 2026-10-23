@@ -1,10 +1,6 @@
 import type { TimelineItem } from "./timeline";
 import type { ToolInvocationInfo } from "@atelier/sdk/contracts";
 import type { ToolRenderProps } from "@atelier/sdk/renderer";
-import {
-  advanceStreamingDisclosure, initialStreamingDisclosure,
-  type StreamingDisclosure, type StreamingPreferences,
-} from "../../shared/streaming-disclosure";
 
 export type ToolCallNode = Extract<TimelineItem, { kind: "toolcall" }>;
 export interface ToolCallState {
@@ -27,17 +23,4 @@ export function toolCallState(node: ToolCallNode): ToolCallState {
   const invocation: ToolInvocationInfo = { implementation, resource, startedAt, finishedAt };
   return { phase: "settled",
     props: { phase: "settled", name: node.name, args: node.arguments, target: null, invocation, result: node.outcome } };
-}
-
-export interface ToolDisclosure extends StreamingDisclosure { filling: boolean; previewSeen: boolean }
-export function initialToolDisclosure(filling: boolean, preferences: StreamingPreferences, hasInputBody: boolean): ToolDisclosure {
-  return { ...initialStreamingDisclosure(filling && hasInputBody, preferences), filling, previewSeen: filling && hasInputBody };
-}
-/** 只在离开填充态时自动折叠一次；后续执行、结束与增量均保留手动选择。 */
-export function advanceToolDisclosure(state: ToolDisclosure, filling: boolean, preferences: StreamingPreferences, hasInputBody: boolean): ToolDisclosure {
-  if (state.filling !== filling) return filling ? initialToolDisclosure(true, preferences, hasInputBody)
-    : { ...advanceStreamingDisclosure(state, false, preferences), filling };
-  // 身份可能晚于块起点才明确；只在第一个可展开预览出现时应用自动展开。
-  if (filling && hasInputBody && !state.previewSeen) return { ...advanceStreamingDisclosure(state, true, preferences), previewSeen: true };
-  return state;
 }

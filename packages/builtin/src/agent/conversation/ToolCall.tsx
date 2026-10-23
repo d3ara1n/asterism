@@ -1,4 +1,4 @@
-import { useI18n, useRendererTools, useRendererConfig, useRendererViewState } from "@atelier/sdk/renderer";
+import { useI18n, useRendererTools, useRendererConfig } from "@atelier/sdk/renderer";
 import { TextCursorInput, Wrench } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 
@@ -9,9 +9,9 @@ import { Alert, AlertDescription } from "@atelier/ui/ui/alert";
 import { StatusBadge, StatusIcon, type StatusTone } from "@atelier/ui/ui/status";
 import { toolsMessages } from "../../messages/tools";
 import { Disclosure } from "./Disclosure";
-import { advanceToolDisclosure, initialToolDisclosure, toolCallState, type ToolCallNode } from "./tool-state";
+import { toolCallState, type ToolCallNode } from "./tool-state";
 import { BuiltinSettings } from "../../settings/contract";
-import { advanceToolOutputDisclosure, type ToolOutputDisclosure } from "./tool-output";
+import { useStreamingDisclosure } from "../../shared/use-streaming-disclosure";
 import { viewStateKeys } from "./view-state";
 
 const labels = {
@@ -29,10 +29,9 @@ export function ToolCall({ node }: { node: ToolCallNode }) {
   const filling = state.phase === "input";
   const view = state.props ? tools.resolve(state.props) : null;
   const hasInputBody = filling && view?.body !== undefined && view.body !== null;
-  const [disclosure, setDisclosure] = useRendererViewState<ToolOutputDisclosure>(viewStateKeys.disclosure,
-    () => initialToolDisclosure(filling, preferences, hasInputBody));
-  const next = advanceToolOutputDisclosure(advanceToolDisclosure(disclosure, filling, preferences, hasInputBody), view?.props, preferences);
-  if (next !== disclosure) setDisclosure(next);
+  const stage = filling ? "input" : state.phase === "executing" ? "output" : null;
+  const disclosure = useStreamingDisclosure(viewStateKeys.disclosure, stage,
+    view?.streaming === true && view.body != null, preferences);
   const result = state.props?.result;
   const outcome = "outcome" in node ? node.outcome : null;
   const hasResultDetails = outcome && outcome.data !== null && outcome.model.every(part => part.kind === "text");
@@ -55,7 +54,7 @@ export function ToolCall({ node }: { node: ToolCallNode }) {
     {status && <StatusBadge tone={tone}>{status}</StatusBadge>}
     {state.phase === "settled" && result?.kind === "succeeded" && <span className="sr-only">{i18n.formatMessage(toolsMessages.toolSucceeded)}</span>}
   </>;
-  return <Disclosure header={header} open={next.open} onOpenChange={open => setDisclosure({ ...next, open })} expandable={!filling || hasInputBody}
+  return <Disclosure header={header} {...disclosure} expandable={!filling || hasInputBody}
     pending={state.phase === "input" || state.phase === "ready"}>
     <div className="space-y-3">
       {view && (view.body ?? (!filling && <DefaultToolBody {...view.props} />))}

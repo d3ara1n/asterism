@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ComponentType } from "react";
 import { ChevronRight, Network, RefreshCw, Settings } from "lucide-react";
-import { useI18n, useRendererCalls, useRendererSettings, creationEntry, cardRenderer, toolRenderer, type RendererModule, type ToolRenderProps } from "@atelier/sdk/renderer";
+import { useI18n, useRendererCalls, useRendererSettings, creationEntry, cardRenderer, toolRenderer, type RendererModule, type ToolRenderProps, type ToolResultRenderProps } from "@atelier/sdk/renderer";
 import { Button } from "@atelier/ui/ui/button";
 import { IconButton } from "@atelier/ui/ui/icon-button";
 import { Spinner } from "@atelier/ui/ui/spinner";
@@ -35,7 +35,7 @@ function directoryHeader(label: UiText, subjectKey: string, metaKey?: string) {
     return <ToolHeader label={i18n.text(label)} subject={field(args, subjectKey)} meta={metaKey && field(args, metaKey)} monospace={subjectKey !== "query"} />;
   };
 }
-function directory(contract: typeof McpList | typeof McpSearch | typeof McpInspect | typeof McpConnect, label: UiText, subjectKey: string, metaKey?: string, bodyRenderer?: ComponentType<ToolRenderProps>) {
+function directory(contract: typeof McpList | typeof McpSearch | typeof McpInspect | typeof McpConnect, label: UiText, subjectKey: string, metaKey?: string, bodyRenderer?: ComponentType<ToolResultRenderProps>) {
   const headerRenderer = directoryHeader(label, subjectKey, metaKey);
   return toolRenderer(contract, { label, icon: toolIcon, input: { headerRenderer }, execution: { headerRenderer }, result: { headerRenderer, bodyRenderer } });
 }

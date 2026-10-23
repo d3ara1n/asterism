@@ -1,4 +1,4 @@
-import { useI18n, useRendererConfig, useRendererViewState } from "@atelier/sdk/renderer";
+import { useI18n, useRendererConfig } from "@atelier/sdk/renderer";
 import { Brain } from "lucide-react";
 import { memo, useEffect, useState } from "react";
 
@@ -9,7 +9,8 @@ import { thinkingMessages } from "../../messages/thinking";
 import { BuiltinSettings } from "../../settings/contract";
 import { Disclosure } from "./Disclosure";
 import { Markdown } from "./Markdown";
-import { advanceThinkingDisclosure, initialThinkingDisclosure, thinkingDuration } from "./thinking-state";
+import { thinkingDuration } from "./thinking-state";
+import { useStreamingDisclosure } from "../../shared/use-streaming-disclosure";
 import { generating, type TimelineItem } from "./timeline";
 import { viewStateKeys } from "./view-state";
 
@@ -19,16 +20,13 @@ type ThinkingNode = Extract<TimelineItem, { kind: "thinking" }>;
 export function ThinkingBlock({ node }: { node: ThinkingNode }) {
   const streaming = generating(node);
   const preferences = useRendererConfig(BuiltinSettings);
-  // 展开状态按条目保留，随滚动重新挂载时恢复；阶段偏好仍只在开始与结束时应用。
-  const [disclosure, setDisclosure] = useRendererViewState(viewStateKeys.disclosure, () => initialThinkingDisclosure(streaming, preferences));
-  const next = advanceThinkingDisclosure(disclosure, streaming, preferences);
-  if (next !== disclosure) setDisclosure(next);
+  const disclosure = useStreamingDisclosure(viewStateKeys.disclosure, streaming ? "thinking" : null, node.text.length > 0, preferences);
   // 实时块与成型块都携带生成起止；历史未记录时间时不补造耗时。
   const startedAt = node.startedAt ?? null;
   const endedAt = node.endedAt ?? null;
   const interrupted = "complete" in node && !node.complete;
 
-  return <Disclosure open={next.open} onOpenChange={open => setDisclosure({ streaming, open })}
+  return <Disclosure {...disclosure}
     header={<ThinkingHeader streaming={streaming} startedAt={startedAt} endedAt={endedAt} interrupted={interrupted} />}>
     <ThinkingBody streaming={streaming} text={node.text} />
   </Disclosure>;

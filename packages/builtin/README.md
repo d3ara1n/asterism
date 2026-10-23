@@ -39,4 +39,4 @@
 
 模型提示块的通用序列化属于宿主模型适配层；Agent 只组合领域提示内容。命名、压缩与执行请求的应用身份通过工厂参数传入，不读取应用 package.json。
 
-流式正文统一使用 `@atelier/ui/streaming-preview` 的 `StreamingPreview`，调用方提供正文渲染；预览阶段通过 `shared/streaming-disclosure.ts` 消费同一对设置。内置工具的首段执行产出由 `agent/conversation/tool-output.ts` 识别，输入预览沿用 `tool-state.ts`。交互与呈现分别见 [工具调用三态视图](../../docs/workbench.md#工具调用三态视图) 和 [对话过程视图](../../docs/design-system.md#对话过程视图)。
+内置流式尾部正文使用 `@atelier/ui/streaming-preview` 的 `StreamingPreview`，调用方提供正文渲染；`shared/use-streaming-disclosure.ts` 配合公共状态机统一管理延迟开合、手动选择与条目状态保留。工具在各自的输入／执行视图上通过 SDK `streaming(props)` 声明可预览内容；Agent 外壳只消费声明和调用阶段，内置与第三方工具同等接入。领域正文提取与对应渲染共用，思考复用相同的开合 hook。接口、交互与呈现分别见 [插件 SDK](../../docs/plugin-sdk.md#前端视图与扩展入口)、[工具调用三态视图](../../docs/workbench.md#工具调用三态视图) 和 [对话过程视图](../../docs/design-system.md#对话过程视图)。

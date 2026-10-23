@@ -1,21 +1,13 @@
 import { ArrowDownToLine, MessageCircleQuestion } from "lucide-react";
 import { toolRenderer, useI18n, useRendererObject, type ToolRenderProps } from "@atelier/sdk/renderer";
-import type { Json } from "@atelier/sdk/contracts";
 import { Button } from "@atelier/ui/ui/button";
 import { StatusText } from "@atelier/ui/ui/status";
 import { ToolHeader } from "@atelier/ui/tool-header";
 import { questionMessages as messages } from "../messages/questions";
 import { AskUserResult, type Answer } from "./contract";
 import { questionFocus } from "./focus";
+import { questionTitles } from "./preview";
 
-/** 部分参数没有通过 schema；只消费已出现的字符串，不将填充视图当作待回答表单。 */
-function questionTitles(args: Json): string[] {
-  if (!args || typeof args !== "object" || Array.isArray(args)) return [];
-  if (typeof args.question === "string") return [args.question];
-  if (!Array.isArray(args.questions)) return [];
-  return args.questions.flatMap(question => question && typeof question === "object" && !Array.isArray(question)
-    && typeof question.question === "string" ? [question.question] : []);
-}
 function Header({ phase, args, result }: ToolRenderProps<Answer>) {
   const i18n = useI18n();
   const titles = questionTitles(args);
@@ -58,7 +50,7 @@ function Body({ args, phase, result }: ToolRenderProps<Answer>) {
 }
 export const questionToolRenderer = toolRenderer(AskUserResult, {
   label: messages.navigation, icon: <MessageCircleQuestion className="size-3.5" />,
-  input: { headerRenderer: Header, bodyRenderer: Body },
+  input: { headerRenderer: Header, bodyRenderer: Body, streaming: ({ args }) => questionTitles(args).some(title => title.length > 0) },
   execution: { headerRenderer: Header, bodyRenderer: Body },
   result: { headerRenderer: Header, bodyRenderer: Body },
 });

@@ -65,6 +65,6 @@ function Body({ args, phase, result }: ToolRenderProps<ExecResult>) {
 export const execToolRenderer = toolRenderer(DirectoryExec, {
   label: messages.exec, icon: <Terminal className="size-3.5" />,
   input: { headerRenderer: Header },
-  execution: { headerRenderer: Header, bodyRenderer: Body },
+  execution: { headerRenderer: Header, bodyRenderer: Body, streaming: ({ result }) => !!result?.data?.output },
   result: { headerRenderer: Header, bodyRenderer: Body },
 });

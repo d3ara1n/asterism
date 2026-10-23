@@ -28,6 +28,6 @@ function Body({ phase, result }: ToolRenderProps<PeekResult>) {
 export const peekToolRenderer = toolRenderer(AgentPeek, {
   label: messages.title, icon: <ScanSearch className="size-3.5" />,
   input: { headerRenderer: Header },
-  execution: { headerRenderer: Header, bodyRenderer: Body },
+  execution: { headerRenderer: Header, bodyRenderer: Body, streaming: ({ result }) => !!result?.data?.report },
   result: { headerRenderer: Header, bodyRenderer: Body },
 });

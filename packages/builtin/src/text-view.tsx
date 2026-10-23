@@ -6,7 +6,7 @@ import type { Json, ToolResult } from "@atelier/sdk/contracts";
 import { useMemo } from "react";
 import { FileDiff, type FileDiffOptions } from "@pierre/diffs/react";
 import type { TextRead, TextChange } from "@atelier/builtin-api/contracts";
-import { inputField, inputText, characterCount, toolTextTail } from "./shared/tool-preview";
+import { inputField, inputText, characterCount, toolTextTail, editPreviewText } from "./shared/tool-preview";
 import { TOOL_BODY_LINE_LIMIT, diffBodyPreview, textBodyPreview } from "./shared/tool-body";
 import { CodeRows } from "./code-view";
 import { codeViewOptions } from "./shared/code-view";
@@ -50,16 +50,7 @@ function InputTail({ text, filename }: { text: string; filename?: string }) {
   return <StreamingPreview><CodeRows rows={tail.map((content, index) => ({ line: firstLine + index, content }))} filename={filename} /></StreamingPreview>;
 }
 function EditPreview({ args }: { args: Json }) {
-  const edits = inputField(args, "edits");
-  const text = Array.isArray(edits) ? edits.slice(-8).map(edit => {
-    const body = inputField(edit, "body");
-    const anchor = inputField(edit, "anchor");
-    const line = anchor === undefined ? undefined : inputField(anchor, "line");
-    return [inputText(edit, "op"), typeof line === "number" ? `L${line}` : null,
-      Array.isArray(body) ? body.slice(-80).filter((row): row is string => typeof row === "string").map(toolTextTail).join("\n") : null]
-      .filter(value => value !== null && value !== undefined).join("\n");
-  }).join("\n\n") : "";
-  return <InputTail text={text} />;
+  return <InputTail text={editPreviewText(args)} />;
 }
 function TextWriteBody(props: ToolRenderProps<TextChange>) {
   const content = inputText(props.args, "content");
@@ -126,8 +117,10 @@ export const textReadViews = {
   input: { headerRenderer: TextReadHeader }, execution: readView, result: readView,
 } satisfies ToolRendererDefinition<TextRead>;
 export const textWriteViews = {
-  input: writeView, execution: writeView, result: writeView,
+  input: { ...writeView, streaming: ({ args }) => !!inputText(args, "content") },
+  execution: writeView, result: writeView,
 } satisfies ToolRendererDefinition<TextChange>;
 export const textEditViews = {
-  input: editView, execution: editView, result: editView,
+  input: { ...editView, streaming: ({ args }) => editPreviewText(args).trim().length > 0 },
+  execution: editView, result: editView,
 } satisfies ToolRendererDefinition<TextChange>;

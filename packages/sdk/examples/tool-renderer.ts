@@ -1,13 +1,17 @@
 /** 工具视图作者用例：三态平行声明，同一组件可以跨阶段复用。 */
 import { createElement } from "react";
 import { z } from "zod";
-import { defineData } from "@atelier/sdk/contracts";
+import { defineData, type Json } from "@atelier/sdk/contracts";
 import { toolRenderer, type ToolRenderProps, type ToolRendererDefinition } from "@atelier/sdk/renderer";
 
 const Result = defineData("example.writer/write", z.object({ written: z.number() }));
 const targetSchema = z.object({ path: z.string() });
 const argsSchema = z.object({ content: z.string() });
 type Props = ToolRenderProps<z.infer<typeof Result.schema>, z.infer<typeof targetSchema>, z.infer<typeof argsSchema>>;
+
+function inputContent(args: Json): string {
+  return args !== null && typeof args === "object" && !Array.isArray(args) && typeof args.content === "string" ? args.content : "";
+}
 
 function Header(props: Props) {
   let path: string | undefined;
@@ -19,15 +23,27 @@ function Header(props: Props) {
 }
 function Body(props: Props) {
   if (props.phase === "input") {
-    const args = props.args;
-    const content = args !== null && typeof args === "object" && !Array.isArray(args) && typeof args.content === "string" ? args.content : "";
-    return createElement("pre", null, content.slice(-2_000));
+    return createElement("pre", null, inputContent(props.args).slice(-2_000));
   }
   return createElement("pre", null, props.result?.data?.written ?? props.args.content);
 }
 const view = { headerRenderer: Header, bodyRenderer: Body };
 export const writerView = toolRenderer({ ...Result, targetSchema, tool: { argsSchema } }, {
-  label: "Write", input: view, execution: view, result: view,
+  label: "Write",
+  input: { ...view, streaming: ({ args }) => inputContent(args).length > 0 },
+  execution: view, result: view,
+});
+
+/** 插件自行渲染渐进输出；外壳根据声明与用户设置管理自动开合。 */
+const Report = defineData("example.writer/report", z.object({ text: z.string() }));
+function ReportBody({ phase, result }: ToolRenderProps<z.infer<typeof Report.schema>>) {
+  const text = result?.data?.text ?? "";
+  return createElement("pre", null, phase === "executing" ? text.slice(-2_000) : text);
+}
+export const reportView = toolRenderer(Report, {
+  label: "Report",
+  execution: { bodyRenderer: ReportBody, streaming: ({ result }) => !!result?.data?.text },
+  result: { bodyRenderer: ReportBody },
 });
 
 export const checkedStages = {
