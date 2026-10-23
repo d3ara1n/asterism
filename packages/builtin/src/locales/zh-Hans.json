@@ -539,6 +539,7 @@
   "mcp.unindexedHint": "连接后即可发现这台服务器的工具。",
   "mcp.noTools": "这台服务器没有提供工具。",
   "mcp.instructions": "服务器说明",
+  "mcp.parameters": "参数",
   "mcp.list": "浏览 MCP",
   "mcp.search": "搜索 MCP 工具",
   "mcp.inspect": "查看 MCP 工具",
