@@ -2,7 +2,9 @@ import { defineMessages, pluginNamespace } from "@atelier/sdk/contracts";
 
 export const pluginsMessages = pluginNamespace("atelier.host").messages("en", defineMessages({
   application: { id: "settings.application", defaultMessage: "Application" },
+  applicationSummary: { id: "settings.applicationSummary", defaultMessage: "Manage Atelier’s preferences and shared configuration." },
   plugins: { id: "settings.plugins", defaultMessage: "Plugins" },
+  pluginsSummary: { id: "settings.pluginsSummary", defaultMessage: "Plugins provide Atelier’s core features and extensions. Find their settings in the corresponding plugin." },
   search: { id: "plugins.search", defaultMessage: "Search plugins…" },
   filter: { id: "plugins.filter", defaultMessage: "Filter plugins" },
   all: { id: "plugins.all", defaultMessage: "All plugins" },

@@ -90,7 +90,10 @@ function SettingsRoot({ openId, onOpen, onClosed, manager, location }: { openId:
         onScroll={event => { overviewScroll.current = event.currentTarget.scrollTop; }}
         initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={fadeTransition}>
         <section className="shrink-0" aria-labelledby="application-settings-title">
-          <header className="mb-4"><h2 id="application-settings-title" className="type-section">{i18n.text(pluginsMessages.application)}</h2></header>
+          <header className="mb-4 space-y-2">
+            <h2 id="application-settings-title" className="type-section">{i18n.text(pluginsMessages.application)}</h2>
+            <p className="type-caption">{i18n.text(pluginsMessages.applicationSummary)}</p>
+          </header>
           <div className="settings-grid">
         {categories.map(({ id, title, summary, icon: Icon }) => <Item key={id} variant="outline" asChild className="surface h-full hover:bg-accent"><motion.button type="button" className="settings-card group"
           layoutId={`settings-card-${id}`} transition={islandTransition}

@@ -89,6 +89,7 @@ export function PluginsOverview({ manager, onOpen, cardRef, query, filter, onQue
         <SelectContent><SelectItem value="all">{i18n.text(messages.all)}</SelectItem>{Object.entries(labels).map(([value, label]) => <SelectItem key={value} value={value}>{i18n.text(label)}</SelectItem>)}</SelectContent>
       </Select>
       <Button size="sm" disabled={manager.busy} onClick={() => { void manager.add(); }}>{manager.busy ? <Spinner /> : <Plus />}{i18n.text(messages.addPackage)}</Button>
+      <p className="type-caption w-full">{i18n.text(messages.pluginsSummary)}</p>
     </header>
     <PluginFeedback manager={manager} />
     <div className="settings-grid">

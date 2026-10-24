@@ -15,7 +15,11 @@ export const settingsMessages = pluginNamespace("atelier.host").messages("en", d
   },
   generalSummary: {
     id: "generalSummary",
-    defaultMessage: "Language and appearance",
+    defaultMessage: "App preferences and management",
+  },
+  languageTitle: {
+    id: "languageTitle",
+    defaultMessage: "Language",
   },
   languageLabel: {
     id: "languageLabel",

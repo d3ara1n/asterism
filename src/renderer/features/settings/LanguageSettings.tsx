@@ -17,7 +17,7 @@ export function LanguageSettings() {
     void window.host.language.get().then(value => { if (active) setState(value); }).catch(() => { if (active) setFailed(true); });
     return () => { active = false; stop(); };
   }, []);
-  return <Section title={i18n.text(settingsMessages.generalTitle)}>
+  return <Section title={i18n.text(settingsMessages.languageTitle)}>
     <Row label={i18n.text(settingsMessages.languageLabel)} hint={i18n.text(settingsMessages.languageSummary)}>
       <Select value={state?.preference ?? "system"} disabled={!state || busy} onValueChange={preference => {
         setBusy(true); setFailed(false);
