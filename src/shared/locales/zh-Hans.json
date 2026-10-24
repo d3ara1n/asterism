@@ -4,6 +4,7 @@
   "templates.description": "保存对象数据、链接和排列，供新会话使用。不包含对话历史和运行实例。",
   "templates.name": "模板名称",
   "templates.objects": "对象",
+  "templates.objectCount": "{count, plural, other {# 个对象}}",
   "templates.info": "模板信息",
   "templates.actions": "模板操作",
   "templates.created": "创建于 {time, date, medium} {time, time, short}",
