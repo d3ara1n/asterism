@@ -9,7 +9,7 @@ export const webUrlSchema = z.string().url().refine(value => {
 export const webHintSchema = z.object({ code: z.string(), message: z.string(), parameter: z.string().optional() });
 export const webContentPartSchema = z.object({
   kind: z.enum(["snippet", "excerpt", "body", "summary"]), format: z.enum(["text", "markdown"]), text: z.string(),
-  truncated: z.boolean().optional(),
+  truncated: z.boolean().optional().describe("Known content truncation. Omitted when completeness is unknown."),
 });
 /** 日期保留上游精度与种类；未知日期种类使用 unknown。 */
 export const webDateSchema = z.object({ kind: z.enum(["published", "modified", "fetched", "unknown"]), value: z.string() });
@@ -41,8 +41,9 @@ export const webSearchRequestSchema = z.object({
 }).describe("Search terms and optional filters. Result hints describe conditions that were not applied.");
 export const webFetchRequestSchema = z.object({
   url: webUrlSchema.describe("URL to retrieve."),
-  query: z.string().trim().min(1).optional().describe("Optional focus for relevant excerpts."),
-}).describe("URL and optional excerpt focus.");
+  query: z.string().trim().min(1).optional().describe("Optional focus for additional excerpts delivered alongside the page body. Excerpt retrieval may incur additional provider charges."),
+  maxCharacters: z.number().int().positive().optional().describe("Maximum body characters per document, counted as Unicode code points across body parts. Excerpts and metadata are separate. Omitted uses provider defaults."),
+}).describe("URL, optional additional excerpt focus and body character limit.");
 
 /** 提供方声明凭据类型；UI 按类型渲染对应输入，不接受任意 JSON。 */
 export const webCredentialDefinitionSchema = z.object({

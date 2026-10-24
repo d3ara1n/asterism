@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { matchesWebUrl, matchWebProvider } from "./web-providers.ts";
+import type { WebResponse } from "@atelier/sdk/contracts";
+import { limitWebBody, matchesWebUrl, matchWebProvider } from "./web-providers.ts";
 
 const types = [
   { id: "specific", fetch: true, urlPatterns: ["https://other.test/*", "https://docs.test/*"] },
@@ -27,5 +28,49 @@ describe("Web URL 路由", () => {
     const states = [state("generic", false), state("search"), state("specific")];
     expect(matchWebProvider(states, types, "https://docs.test/page")).toBe("specific");
     expect(matchWebProvider(states, types, "https://news.test/page")).toBeNull();
+  });
+});
+
+describe("Web 获取正文预算", () => {
+  // 一个文档可以包含多个正文块；逐块重新分配预算会突破上限，按 UTF-16 截取则可能拆开 emoji。
+  it("按文档共享正文预算，保留摘录和其他字段", () => {
+    const response: WebResponse = {
+      documents: [
+        { url: "https://docs.test/a", content: [
+          { kind: "body", format: "text", text: "甲😀" },
+          { kind: "excerpt", format: "text", text: "额外摘录" },
+          { kind: "body", format: "markdown", text: "乙丙丁" },
+          { kind: "body", format: "text", text: "剩余正文" },
+        ] },
+        { url: "https://docs.test/b", content: [{ kind: "body", format: "text", text: "ab😀d" }] },
+      ],
+      hints: [{ code: "notice", message: "Provider notice." }],
+      usage: [{ name: "total", amount: 0.001, unit: "currency", currency: "USD" }],
+    };
+    const result = limitWebBody(response, 3);
+    expect(result.documents.map(document => document.content)).toEqual([
+      [
+        { kind: "body", format: "text", text: "甲😀" },
+        { kind: "excerpt", format: "text", text: "额外摘录" },
+        { kind: "body", format: "markdown", text: "乙", truncated: true },
+        { kind: "body", format: "text", text: "", truncated: true },
+      ],
+      [{ kind: "body", format: "text", text: "ab😀", truncated: true }],
+    ]);
+    expect(result.hints).toEqual(response.hints);
+    expect(result.usage).toEqual(response.usage);
+    expect(response.documents[0]?.content[2]?.text).toBe("乙丙丁");
+  });
+
+  // 达到字符上限不是上游还有正文的证据；本地未裁剪时沿用原有截断信息。
+  it("缺省、恰好到限和已报告截断时保留原有语义", () => {
+    const response: WebResponse = { hints: [], documents: [{ url: "https://docs.test/a", content: [
+      { kind: "body", format: "text", text: "abc" },
+      { kind: "summary", format: "text", text: "Generated summary" },
+    ] }, { url: "https://docs.test/b", content: [
+      { kind: "body", format: "text", text: "ab", truncated: true },
+    ] }] };
+    expect(limitWebBody(response)).toEqual(response);
+    expect(limitWebBody(response, 3)).toEqual(response);
   });
 });

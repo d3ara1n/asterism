@@ -25,6 +25,37 @@ describe("Exa 结果归一化", () => {
     await instance.fetch!({ url: "https://page.test/" }, options);
     expect(paths).toEqual(["/exa/search", "/exa/contents"]);
   });
+  // 缺省获取应保持正文请求；query 只添加摘录，字符上限还需适配 Exa 自身的参数范围。
+  it("按获取参数选择正文选项与附加摘录，显式报告上游上限调整", async () => {
+    const requests: unknown[] = [];
+    http.transport.mockImplementation(async (_url, init) => {
+      requests.push(JSON.parse(String(init?.body)));
+      return new Response(JSON.stringify({ results: [{ url: "https://page.test/", text: "Page content" }] }),
+        { headers: { "content-type": "application/json" } });
+    });
+    const instance = exaWebProvider.create({ baseUrl: "https://proxy.test", credential: "test-key" });
+    const options = { signal: new AbortController().signal };
+    await instance.fetch!({ url: "https://page.test/" }, options);
+    await instance.fetch!({ url: "https://page.test/", query: "focus", maxCharacters: 300 }, options);
+    const adjusted = await instance.fetch!({ url: "https://page.test/", maxCharacters: 2_000_000 }, options);
+    expect(requests).toEqual([
+      { urls: ["https://page.test/"], text: true, filterEmptyResults: false },
+      { urls: ["https://page.test/"], text: { maxCharacters: 300 }, highlights: { query: "focus" }, filterEmptyResults: false },
+      { urls: ["https://page.test/"], text: { maxCharacters: 1_000_000 }, filterEmptyResults: false },
+    ]);
+    expect(adjusted.hints).toMatchObject([{ code: "parameter_adjusted", parameter: "maxCharacters" }]);
+  });
+  // 首页和 PDF 的 author:null 曾使整份响应失败；元数据缺失应省略字段，正文仍正常交付。
+  it("空值与缺省元数据都不影响正文归一化", () => {
+    const result = exaResponse({ results: [
+      { url: "https://page.test/", title: null, author: null, publishedDate: null, image: null, favicon: null, text: "Page content" },
+      { url: "https://page.test/paper.pdf", text: "Paper content" },
+    ] });
+    expect(result.documents.map(({ details: _details, ...document }) => document)).toEqual([
+      { url: "https://page.test/", content: [{ kind: "body", format: "text", text: "Page content" }] },
+      { url: "https://page.test/paper.pdf", content: [{ kind: "body", format: "text", text: "Paper content" }] },
+    ]);
+  });
   // Exa text、highlights、summary 含义不同；合并成单个 content 会把生成摘要伪装成原文。
   it("分别保留正文、摘录、摘要与具型来源数据", () => {
     const result = exaResponse({ requestId: "request-1", results: [{ id: "source-1", url: "https://example.test/page", title: "Title",
@@ -56,6 +87,9 @@ describe("Exa 结果归一化", () => {
       ["IGNORED_FIELD", "publishedAfter"], ["RESTRICTIONS_RELAXED", "query"], ["content_unavailable", undefined],
     ]);
     expect(result.hints.at(-1)?.message).toContain("CRAWL_NOT_FOUND");
+    expect(result.details?.[0]?.data).toMatchObject({
+      statuses: [{ id: "https://example.test/page", status: "error", error: { tag: "CRAWL_NOT_FOUND" } }],
+    });
     expect(result.usage).toBeUndefined();
   });
 });

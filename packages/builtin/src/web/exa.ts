@@ -4,10 +4,12 @@ import { jsonSchema, present, webUrlSchema, type WebDocument, type WebHint, type
 import { WebError, type WebProviderDefinition } from "@atelier/sdk/runtime";
 import { builtin } from "@atelier/builtin-api/contracts";
 
+const MAX_TEXT_CHARACTERS = 1_000_000;
+
 const resultSchema = z.object({
-  id: z.string().optional(), url: webUrlSchema, title: z.string().nullable().optional(), author: z.string().optional(),
-  publishedDate: z.string().optional(), text: z.string().optional(), highlights: z.array(z.string()).optional(),
-  summary: jsonSchema.optional(), score: z.number().optional(), image: z.string().optional(), favicon: z.string().optional(),
+  id: z.string().optional(), url: webUrlSchema, title: z.string().nullish(), author: z.string().nullish(),
+  publishedDate: z.string().nullish(), text: z.string().optional(), highlights: z.array(z.string()).optional(),
+  summary: jsonSchema.optional(), score: z.number().optional(), image: z.string().nullish(), favicon: z.string().nullish(),
 }).catchall(jsonSchema);
 const responseSchema = z.object({
   results: z.array(resultSchema), requestId: z.string().optional(),
@@ -24,7 +26,7 @@ export const ExaResponseDetails = builtin.data("web.exa.response", z.object({
   costDollars: jsonSchema.optional(), statuses: jsonSchema.optional(), resolvedSearchType: z.string().optional(),
   searchTime: z.number().optional(), output: jsonSchema.optional(),
 }).catchall(jsonSchema));
-const hintParameter: Record<string, string> = { startPublishedDate: "publishedAfter", endPublishedDate: "publishedBefore", numResults: "maxResults", userLocation: "region" };
+const hintParameter: Record<string, string> = { startPublishedDate: "publishedAfter", endPublishedDate: "publishedBefore", numResults: "maxResults", userLocation: "region", "text/maxCharacters": "maxCharacters" };
 
 function mapDocument(result: z.infer<typeof resultSchema>): WebDocument {
   const { url, title, author, publishedDate, text, highlights, summary, score, image, favicon, ...extra } = result;
@@ -36,11 +38,11 @@ function mapDocument(result: z.infer<typeof resultSchema>): WebDocument {
     if (typeof summary !== "string") extra.summary = summary;
   }
   const media: { image?: string; favicon?: string } = {};
-  for (const [key, value] of [["image", image], ["favicon", favicon]] as const) if (value !== undefined) {
+  for (const [key, value] of [["image", image], ["favicon", favicon]] as const) if (value != null) {
     if (webUrlSchema.safeParse(value).success) media[key] = value;
     else extra[key] = value;
   }
-  return { url, ...(title != null && { title }), ...(author !== undefined && { author }), content,
+  return { url, ...(title != null && { title }), ...(author != null && { author }), content,
     ...(publishedDate && { dates: [{ kind: "published" as const, value: publishedDate }] }),
     ...(score !== undefined && { score }), ...media, details: [present(ExaDocumentDetails, extra)] };
 }
@@ -60,13 +62,14 @@ function mapHints(
 }
 
 export function exaResponse(raw: unknown, leadingHints: WebHint[] = []): WebResponse {
-  const { results, requestId, warnings, notices, statuses, ...rest } = responseSchema.parse(raw);
+  const { results, requestId, ...details } = responseSchema.parse(raw);
+  const { warnings, notices, statuses, costDollars } = details;
   return {
     documents: results.map(mapDocument),
     hints: mapHints(warnings, notices, statuses, leadingHints),
     ...(requestId && { requestId }),
-    ...(rest.costDollars && { usage: [{ name: "total", amount: rest.costDollars.total, unit: "currency", currency: "USD" }] }),
-    details: [present(ExaResponseDetails, { ...rest, ...(notices && { notices }), ...(warnings && { warnings }) })],
+    ...(costDollars && { usage: [{ name: "total", amount: costDollars.total, unit: "currency", currency: "USD" }] }),
+    details: [present(ExaResponseDetails, details)],
   };
 }
 
@@ -94,9 +97,15 @@ export const exaWebProvider: WebProviderDefinition = {
         return exaResponse(await client.search(request.query, options, { signal }), hints);
       },
       async fetch(request, { signal }) {
+        const maxCharacters = request.maxCharacters === undefined ? undefined : Math.min(request.maxCharacters, MAX_TEXT_CHARACTERS);
+        const hints: WebHint[] = [];
+        if (maxCharacters !== request.maxCharacters) {
+          hints.push({ code: "parameter_adjusted", parameter: "maxCharacters", message: `Exa accepts at most ${MAX_TEXT_CHARACTERS} body characters per page; the requested maximum was reduced to ${MAX_TEXT_CHARACTERS}.` });
+        }
         const response = exaResponse(await client.getContents([request.url], {
-          text: true, ...(request.query && { highlights: { query: request.query } }), filterEmptyResults: false,
-        }, { signal }));
+          text: maxCharacters === undefined ? true : { maxCharacters },
+          ...(request.query && { highlights: { query: request.query } }), filterEmptyResults: false,
+        }, { signal }), hints);
         if (!response.documents.length) throw new WebError("request_failed", response.hints.map(hint => hint.message).join("\n") || "Exa returned no content for this URL.");
         return response;
       },

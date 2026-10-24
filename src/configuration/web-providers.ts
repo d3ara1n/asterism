@@ -1,5 +1,5 @@
 import { webProviderTypeSchema, webResponseSchema, webSearchRequestSchema, webFetchRequestSchema,
-  type WebProviderState, type WebProviderType, type WebSearchRequest, type WebFetchRequest } from "@atelier/sdk/contracts";
+  type WebProviderState, type WebProviderType, type WebSearchRequest, type WebFetchRequest, type WebResponse } from "@atelier/sdk/contracts";
 import { WebError, type WebProviderDefinition, type WebProviderInstance, type WebProviderServices, type WebServices } from "@atelier/sdk/runtime";
 import type { RunGroup } from "../plugins/lifecycle.ts";
 
@@ -20,6 +20,21 @@ export function matchWebProvider(
     for (const pattern of type.urlPatterns) if (matchesWebUrl(pattern, url)) return state.id;
   }
   return null;
+}
+
+/** 每份文档的正文块共享字符预算；只标记实际裁掉的内容，保留上游已有标记。 */
+export function limitWebBody(response: WebResponse, maxCharacters?: number): WebResponse {
+  if (maxCharacters === undefined) return response;
+  return { ...response, documents: response.documents.map(document => {
+    let remaining = maxCharacters;
+    return { ...document, content: document.content.map(part => {
+      if (part.kind !== "body") return part;
+      const characters = Array.from(part.text);
+      const length = Math.min(characters.length, remaining);
+      remaining -= length;
+      return length < characters.length ? { ...part, text: characters.slice(0, length).join(""), truncated: true } : part;
+    }) };
+  }) };
 }
 
 interface Entry { owner: string; definition: WebProviderDefinition; info: WebProviderType; runs: RunGroup }
@@ -80,10 +95,10 @@ export class WebProviderRegistry implements WebProviderServices, WebServices {
       return work(instance, scope);
     }, { signal, affectsHistory: false }).done;
   }
-  private parseResponse(raw: unknown) {
+  private parseResponse(raw: unknown, maxCharacters?: number) {
     const parsed = webResponseSchema.safeParse(raw);
     if (!parsed.success) throw new WebError("protocol", `Invalid web provider result: ${parsed.error.message}`);
-    return parsed.data;
+    return limitWebBody(parsed.data, maxCharacters);
   }
   async resolve(id: string, options: { signal: AbortSignal }): Promise<WebProviderInstance> {
     const { entry } = this.captureEntry(id);
@@ -106,8 +121,11 @@ export class WebProviderRegistry implements WebProviderServices, WebServices {
     const result: WebProviderInstance = {};
     if (entry.info.search && instance.search) result.search = (req, { signal }) =>
       guard(scope => instance.search!(webSearchRequestSchema.parse(req), { signal: scope }), signal).then(decode);
-    if (entry.info.fetch && instance.fetch) result.fetch = (req, { signal }) =>
-      guard(scope => instance.fetch!(webFetchRequestSchema.parse(req), { signal: scope }), signal).then(decode);
+    if (entry.info.fetch && instance.fetch) result.fetch = async (req, { signal }) => {
+      const input = webFetchRequestSchema.parse(req);
+      return guard(scope => instance.fetch!(input, { signal: scope }), signal)
+        .then(raw => this.parseResponse(raw, input.maxCharacters));
+    };
     return result;
   }
   async search(request: WebSearchRequest, options: { signal: AbortSignal }) {
@@ -125,6 +143,6 @@ export class WebProviderRegistry implements WebProviderServices, WebServices {
     if (id === null) throw new WebError("provider_unavailable", "No enabled web provider matches this URL. Configure a web provider in Settings → Providers → Web providers.");
     const entry = this.entries.get(id)!;
     const raw = await this.call(id, options.signal, (inst, scope) => inst.fetch!(input, { signal: scope }));
-    return { ...this.parseResponse(raw), requestedUrl: input.url, provider: entry.info.id };
+    return { ...this.parseResponse(raw, input.maxCharacters), requestedUrl: input.url, provider: entry.info.id };
   }
 }

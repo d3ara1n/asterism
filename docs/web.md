@@ -11,7 +11,7 @@
 | 工具 | 输入与行为 |
 | --- | --- |
 | `web_search` | `query`、`maxResults` 及可选过滤参数；自动使用列表中首个已启用且支持搜索的提供方 |
-| `web_fetch` | `url` 与可选摘录目标 `query`；按下节路由规则选定提供方，取得可读内容与结构化信息 |
+| `web_fetch` | `url`、可选附加摘录目标 `query` 与正文上限 `maxCharacters`；按下节路由规则选定提供方，取得可读内容与结构化信息 |
 
 搜索日期采用 ISO 日期或带时区的日期时间，保留调用者精度；region 是两位大写国家代码。HTTP(S) URL 以 URL 解析规则校验，不包含内嵌用户名或密码。
 
@@ -43,10 +43,12 @@ Pattern 是完整 URL 的 glob：`*` 匹配任意字符，其余字符按字面�
 
 SDK 的 `WebServices` 提供 `search / fetch`，`WebProviderServices` 提供 `types / list / get / resolve / subscribe`。服务负责选择、分派与公共结果校验，提供方适配协议并返回 `WebResponse`。
 
+获取的 `query` 请求正文之外的相关摘录，提供方可据此产生额外费用。`maxCharacters` 为可选正整数，以 Unicode 码点计算每份文档全部 `body` 块共享的字符上限；摘录、摘要、元数据独立于正文预算。省略时沿用提供方默认行为。服务在公共结果校验后按内容顺序裁剪正文，统一应用于 `fetch` 与 `resolve().fetch`；提供方可将该参数映射给上游以减少传输量，其协议限制与调整说明留在适配层。
+
 | 字段 | 语义 |
 | --- | --- |
 | `documents` | 有序来源列表；每项包含 URL、可选标题／作者／日期／媒体／链接／分数，以及 `content` 和可选 `details` |
-| `content` | 明确区分 `snippet / excerpt / body / summary`，以 `text / markdown` 表达格式，实际截断可标注 `truncated` |
+| `content` | 明确区分 `snippet / excerpt / body / summary`，以 `text / markdown` 表达格式；服务实际裁剪的块标记 `truncated: true`，保留提供方已有标记；仅请求长度限制或内容恰好达到上限不构成截断证据 |
 | `dates` | `published / modified / fetched / unknown` 日期；值保留上游精度，不补造日期种类与时区 |
 | `details` | `Presentation[]`；提供方用 `DataContract` 声明具型领域数据，通过 `present` 校验后交付，来源与响应均可附带 |
 | `hints` | `{ code, message, parameter? }`，说明未应用的条件、参数调整及其他实际执行差异；同时交给用户与模型 |
@@ -61,9 +63,9 @@ Web 不设响应缓存。工具结果的保存、后续模型上下文与压缩�
 内置类型 `exa` 使用官方 `exa-js`，支持 search 和 fetch，URL patterns 为 `["*"]`。内部端点为 `https://api.exa.ai`，使用 API key。
 
 - 搜索通过 `search` 请求 `auto` 搜索和相关摘录；映射数量、域名、发布日期与地区参数。超过 100 条时调为 100 并返回 hint；语言条件未应用时返回 hint。
-- 获取通过 `getContents` 请求正文；传入 query 时附带相关摘录请求。关闭 SDK 的空内容结果过滤，以保留上游实际结果和状态。
-- `text / highlights / summary` 分别转换为正文、摘录、摘要。作者、发布日期、分数与有效媒体链接进入公共字段；来源 ID、快照时间、实体及其他领域字段保留在 `ExaDocumentDetails`。
-- 上游 warnings 和 notices 进入 hints，原始补充信息、费用分项与响应字段保留在 `ExaResponseDetails`。总金额以 USD 实报用量交付。
+- 获取通过 `getContents` 请求正文；传入 query 时附带相关摘录请求。`maxCharacters` 映射到 `text.maxCharacters`，超过 Exa 的 1,000,000 字符上限时调至该值并返回 hint。关闭 SDK 的空内容结果过滤，以保留上游实际结果和状态。Exa 未报告实际截断时，适配层保持 `truncated` 缺省。
+- `text / highlights / summary` 分别转换为正文、摘录、摘要。标题、作者、发布日期与媒体的空值或缺省值作为元数据缺失处理；有效值、分数与有效媒体链接进入公共字段。来源 ID、快照时间、实体及其他领域字段保留在 `ExaDocumentDetails`。
+- 上游 warnings、notices 和非成功 statuses 进入 hints，原始状态、补充信息、费用分项与响应字段保留在 `ExaResponseDetails`。总金额以 USD 实报用量交付。
 - SDK 请求接收工具取消信号；空获取结果明确失败，成功空搜索是合法结果。API 失败按普通工具错误交付。
 
 官方接口依据：[搜索](https://exa.ai/docs/reference/search)、[内容获取](https://exa.ai/docs/reference/get-contents)、[TypeScript SDK](https://github.com/exa-labs/exa-js)。
