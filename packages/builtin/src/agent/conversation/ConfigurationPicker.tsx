@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { ArrowLeft, Bot, Brain, ChevronDown, ChevronRight, Cpu, type LucideIcon } from "lucide-react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { availableThinkingLevels, type ThinkingLevel } from "@atelier/sdk/contracts";
 import { useI18n, useRendererCatalogs } from "@atelier/sdk/renderer";
 import { type AgentSelection, ModelConfiguration, resolveAgentModelSelection } from "@atelier/builtin-api/contracts";
@@ -21,6 +22,27 @@ import { ProviderOptions, ProviderModels } from "./ModelPicker";
 type Page = "agent" | "model" | "thinking";
 const FOLLOW = "__agent_default";
 
+/** forward(+1): 新页从右入，旧页向左出；back(-1): 反向。 */
+const SLIDE_X = 8;
+
+const pageVariants = {
+  enter: (dir: number) => ({ opacity: 0, x: dir * SLIDE_X }),
+  center: {
+    opacity: 1, x: 0,
+    transition: { type: "tween", duration: 0.18, ease: [0, 0, 0.2, 1] },
+  },
+  exit: (dir: number) => ({
+    opacity: 0, x: dir * -SLIDE_X,
+    transition: { type: "tween", duration: 0.1, ease: [0.4, 0, 1, 1] },
+  }),
+} as const;
+
+const reducedPageVariants = {
+  enter: () => ({ opacity: 1, x: 0 }),
+  center: { opacity: 1, x: 0 },
+  exit: () => ({ opacity: 1, x: 0 }),
+} as const;
+
 export function AgentConfigurationPicker({ selection, disabled, onChange }: {
   selection: AgentSelection; disabled: boolean;
   onChange(selection: AgentSelection): Promise<boolean>;
@@ -37,6 +59,9 @@ export function AgentConfigurationPicker({ selection, disabled, onChange }: {
   const submitting = useRef(false);
   const returnTo = useRef<Page>("agent");
   const rows = useRef<Partial<Record<Page, HTMLButtonElement | null>>>({});
+  const direction = useRef<1 | -1>(1);
+  const prefersReducedMotion = useReducedMotion();
+  const variants = prefersReducedMotion ? reducedPageVariants : pageVariants;
   const blocked = disabled || saving || !configuration;
   const selectedAgent = configuration?.agents.find(agent => agent.id === selection.agent && agent.enabled);
   const model = resolved?.model ?? null;
@@ -78,6 +103,7 @@ export function AgentConfigurationPicker({ selection, disabled, onChange }: {
   const provider = configuration?.providers.find(item => item.id === providerId);
   const browsingModels = page === "model" && providerId !== null;
   function back() {
+    direction.current = -1;
     if (browsingModels) setProviderId(null);
     else setPage(null);
   }
@@ -134,34 +160,69 @@ export function AgentConfigurationPicker({ selection, disabled, onChange }: {
       onEscapeKeyDown={event => {
         if (page !== null) { event.preventDefault(); back(); }
       }}>
-      {page === null ? <div className="flex flex-col gap-0.5 overflow-y-auto p-1">
-        {(["agent", "model", "thinking"] as const).map(field => <ConfigurationRow key={field}
-          ref={element => { rows.current[field] = element; }} icon={icons[field]} label={labels[field]} value={values[field]}
-          disabled={blocked || (field === "thinking" && unsupported)}
-          onClick={() => {
-            returnTo.current = field;
-            setProviderId(null);
-            providerFocus.current = model ? `provider:${model.providerId}` : FOLLOW;
-            setPage(field);
-          }} />)}
-      </div> : <>
-        <div className="flex shrink-0 items-center gap-2 px-2 py-1.5">
-          <IconButton label={i18n.text(commonMessages.back)} size="icon-xs" onClick={back}><ArrowLeft /></IconButton>
-          <span className="type-label truncate">{browsingModels ? provider?.name ?? providerId : labels[page]}</span>
-        </div>
-        <Separator />
-        {page === "model" ? (providerId !== null
-          ? <ProviderModels key={providerId} configuration={configuration} providerId={providerId}
-              selected={selection.model} effectiveModel={model} disabled={blocked}
-              onSelect={value => { void choose("model", value); }} />
-          : <ProviderOptions configuration={configuration} follow={{ value: FOLLOW, label: follow, description: modelLabel(defaultModel) }}
-              selected={selected.model} initialActive={providerFocus.current} disabled={blocked}
-              onFollow={() => { void choose("model", FOLLOW); }}
-              onProvider={id => { providerFocus.current = `provider:${id}`; setProviderId(id); }} />)
-          : <ConfigurationOptions key={page} label={labels[page]} options={options[page]} selected={selected[page]}
-              disabled={blocked || (page === "thinking" && unsupported)}
-              onSelect={value => { void choose(page, value); }} />}
-      </>}
+      <AnimatePresence initial={false} mode="wait" custom={direction.current}>
+        {page === null ? (
+          <motion.div key="home"
+            custom={direction.current}
+            variants={variants}
+            initial="enter" animate="center" exit="exit"
+            className="flex flex-col gap-0.5 overflow-y-auto p-1">
+            {(["agent", "model", "thinking"] as const).map(field => <ConfigurationRow key={field}
+              ref={element => { rows.current[field] = element; }} icon={icons[field]} label={labels[field]} value={values[field]}
+              disabled={blocked || (field === "thinking" && unsupported)}
+              onClick={() => {
+                direction.current = 1;
+                returnTo.current = field;
+                setProviderId(null);
+                providerFocus.current = model ? `provider:${model.providerId}` : FOLLOW;
+                setPage(field);
+              }} />)}
+          </motion.div>
+        ) : (
+          <motion.div key={page}
+            custom={direction.current}
+            variants={variants}
+            initial="enter" animate="center" exit="exit"
+            className="flex min-h-0 flex-col">
+            <div className="flex shrink-0 items-center gap-2 px-2 py-1.5">
+              <IconButton label={i18n.text(commonMessages.back)} size="icon-xs" onClick={back}><ArrowLeft /></IconButton>
+              <span className="type-label truncate">{browsingModels ? provider?.name ?? providerId : labels[page]}</span>
+            </div>
+            <Separator />
+            {page === "model" ? (
+              <AnimatePresence initial={false} mode="wait" custom={direction.current}>
+                {providerId !== null
+                  ? <motion.div key={providerId}
+                      custom={direction.current}
+                      variants={variants}
+                      initial="enter" animate="center" exit="exit">
+                      <ProviderModels key={providerId} configuration={configuration} providerId={providerId}
+                        selected={selection.model} effectiveModel={model} disabled={blocked}
+                        onSelect={value => { void choose("model", value); }} />
+                    </motion.div>
+                  : <motion.div key="providers"
+                      custom={direction.current}
+                      variants={variants}
+                      initial="enter" animate="center" exit="exit">
+                      <ProviderOptions configuration={configuration}
+                        follow={{ value: FOLLOW, label: follow, description: modelLabel(defaultModel) }}
+                        selected={selected.model} initialActive={providerFocus.current} disabled={blocked}
+                        onFollow={() => { void choose("model", FOLLOW); }}
+                        onProvider={id => {
+                          direction.current = 1;
+                          providerFocus.current = `provider:${id}`;
+                          setProviderId(id);
+                        }} />
+                    </motion.div>}
+              </AnimatePresence>
+            ) : (
+              <ConfigurationOptions key={page} label={labels[page]} options={options[page]} selected={selected[page]}
+                disabled={blocked || (page === "thinking" && unsupported)}
+                onSelect={value => { void choose(page, value); }} />
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
       <Separator />
       <p aria-live="polite" className="type-caption shrink-0 px-3 py-2 text-muted-foreground">
         {i18n.text(saving ? commonMessages.statusBusy : configurationMessages.nextRequestHint)}
