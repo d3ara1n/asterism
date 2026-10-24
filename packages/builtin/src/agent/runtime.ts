@@ -4,7 +4,7 @@ import { AgentView, AgentSelection, AgentDrafts } from "./data.ts";
 import { defineModule, implementResource, implementCreation, implementAction } from "@atelier/sdk/runtime";
 import {
   Agent, CreateAgent, SubmitAgentInput, ContinueAgent, ConfigureAgent, CancelAgent, AgentConfigurations,
-  AgentInputMessage, Execution, Notice, ContextSummary,
+  AgentInputMessage, Execution, ContextSummary,
 } from "@atelier/builtin-api/contracts";
 import { createSelection, selectionOf } from "./selection.ts";
 import { createAgentLoop } from "./loop.ts";
@@ -14,7 +14,8 @@ import { agentExecutionState } from "./state.ts";
 import type { AgentTurnState } from "./state.ts";
 import type { UsageConsumer } from "../usage/service.ts";
 import { createPeekTool } from "./peek/runtime.ts";
-import { AgentExecutionFeedback } from "./feedback.ts";
+import { AgentSoftwareFeedback } from "./feedback.ts";
+import { createAgentFeedback } from "./feedback-state.ts";
 import { SaveAgentDraft, SetAgentDraftMode, ExchangeAgentDraft, DiscardAgentDraft, MoveAgentDraft } from "./drafts-contract.ts";
 import { saveDraft, setDraftMode, exchangeDraft, discardDraft, moveDraft } from "./drafts.ts";
 import { createSendTool } from "./send/runtime.ts";
@@ -25,16 +26,24 @@ export function createAgentModule(application: BuiltinApplication, usage: UsageC
   return defineModule(plugin => {
     const systemPrompt = (agent: Parameters<typeof composeSystemPrompt>[0]) => composeSystemPrompt(agent, application.name);
     const selection = createSelection({ agents: () => plugin.catalogs.get(AgentConfigurations) ?? [] });
+    const feedback = createAgentFeedback();
     const loop = createAgentLoop({ selection, tasks: plugin.tasks, models: plugin.models, systemPrompt, userAgent: application.userAgent,
-      usage });
+      usage, feedback });
     const admission = createAdmission({ selection, validate: plugin.models.validate, running: loop.running, systemPrompt });
     // 草稿与配置更新复用当前路径的回合状态；历史位置改变时才重新推导。
-    const turns = new Map<string, { nodeId: string | null; state: AgentTurnState }>();
+    const turns = new Map<string, { nodeId: string | null; interruptions: readonly (string | null)[]; state: AgentTurnState }>();
     return {
-      events: [AgentExecutionFeedback],
+      events: [AgentSoftwareFeedback],
+      async closing() { feedback.clear(); turns.clear(); },
+      observers: [{ id: "agent-feedback", resourcesChanged({ disappeared }) {
+        for (const resource of disappeared) {
+          if (resource.ref.kind !== Agent.kind) continue;
+          feedback.delete(resource.ref.id); turns.delete(resource.ref.id);
+        }
+      } }],
       tools: [createPeekTool(plugin.models, application.userAgent, usage), createSendTool(), createWaitTool(loop)],
       resources: [implementResource(Agent, AgentView, {
-        records: [AgentInputMessage, Execution, Notice, ContextSummary],
+        records: [AgentInputMessage, Execution, ContextSummary],
         links: { receive: true, tools: object => selection.tools(selection.agent(selectionOf(object).selection)) },
         creation: implementCreation(CreateAgent, {
           prepare(input) { selection.validate(input.selection); return { action: "accept" }; },
@@ -46,16 +55,18 @@ export function createAgentModule(application: BuiltinApplication, usage: UsageC
         project(_data, object) {
           const value = object.get(AgentSelection);
           const drafts = object.get(AgentDrafts) ?? [];
+          const transient = feedback.get(object);
           if (loop.running(object))
-            return { agentId: object.ref.id, selection: value?.selection ?? null, executionState: "running" as const, drafts };
+            return { agentId: object.ref.id, selection: value?.selection ?? null, executionState: "running" as const, drafts, feedback: [...transient.inline] };
           const history = object.session.snapshot();
           let turn = turns.get(object.ref.id);
-          if (!turn || turn.nodeId !== history.position.nodeId) {
-            turn = { nodeId: history.position.nodeId, state: projectAgentTurnState(history, object.ref.id) };
+          if (!turn || turn.nodeId !== history.position.nodeId || turn.interruptions !== transient.interruptions) {
+            turn = { nodeId: history.position.nodeId, interruptions: transient.interruptions,
+              state: projectAgentTurnState(history, object.ref.id, transient.interruptions) };
             turns.set(object.ref.id, turn);
           }
           return { agentId: object.ref.id, selection: value?.selection ?? null,
-            executionState: agentExecutionState(turn.state, false), drafts };
+            executionState: agentExecutionState(turn.state, false), drafts, feedback: [...transient.inline] };
         },
         async inspect(_data, object) {
           return { type: Agent.kind, title: object.snapshot()?.title ?? "Agent" };

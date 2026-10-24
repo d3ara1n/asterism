@@ -1,7 +1,7 @@
 import { recordRenderer, useI18n, type RecordRenderer } from "@atelier/sdk/renderer";
-import { Brain, MessageSquareText, User, Bot, Wrench, TriangleAlert, Info } from "lucide-react";
+import { Brain, MessageSquareText, User, Bot, Wrench, Info } from "lucide-react";
 
-import { inputSummary, Execution, AgentInputMessage, Notice, ContextSummary } from "@atelier/builtin-api/contracts";
+import { inputSummary, Execution, AgentInputMessage, ContextSummary } from "@atelier/builtin-api/contracts";
 import { Badge } from "@atelier/ui/ui/badge";
 import { conversationMessages } from "../messages/conversation";
 
@@ -20,11 +20,9 @@ export const agentRecordViews: RecordRenderer[] = [
     Row: ({ label }) => <RowText label={label} className="font-medium" />,
   }),
   recordRenderer(Execution, {
-    icon: data => data.type !== "block" ? <TriangleAlert className="size-4" />
-      : data.block.kind === "thinking" ? <Brain className="size-4" />
+    icon: data => data.block.kind === "thinking" ? <Brain className="size-4" />
       : data.block.kind === "toolcall" ? <Wrench className="size-4" /> : <MessageSquareText className="size-4" />,
     label: data => {
-      if (data.type === "diagnostic") return data.message;
       const block = data.block;
       if (block.kind !== "toolcall") return block.kind === "thinking" ? block.text || block.summary : block.text;
       const args = record(block.arguments), target = record(args.target);
@@ -34,13 +32,9 @@ export const agentRecordViews: RecordRenderer[] = [
     Row: ({ data, label }) => {
       const i18n = useI18n();
       return <span className="flex min-w-0 items-center gap-2">
-        <RowText label={label} className={data.type === "block" && data.block.kind === "thinking" ? "italic text-muted-foreground" : undefined} />
-        {data.type === "block" && !data.block.complete && <Badge variant="outline">{i18n.formatMessage(conversationMessages.incomplete)}</Badge>}
+        <RowText label={label} className={data.block.kind === "thinking" ? "italic text-muted-foreground" : undefined} />
+        {!data.block.complete && <Badge variant="outline">{i18n.formatMessage(conversationMessages.incomplete)}</Badge>}
       </span>;
     },
-  }),
-  recordRenderer(Notice, {
-    icon: data => data.level === "info" ? <Info className="size-4" /> : <TriangleAlert className="size-4" />,
-    label: data => data.message,
   }),
 ];

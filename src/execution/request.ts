@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import {
   presentationSchema, type ModelRunRequest, type ModelRunResult, type ModelRunEvent, type ModelSource,
   type ModelCompletion, type ModelResponse, type SystemPrompt, type ModelRequestIdentity, type RequestTiming,
+  describeError, type ErrorDetails,
 } from "@atelier/sdk/contracts";
 import { modelExpression, modelScope, type ModelSettings, type ToolOutcome } from "../shared/model.ts";
 import { ModelFailure, type ModelAdapter, type ResolvedModelItem } from "../model/contract.ts";
@@ -25,12 +26,20 @@ export async function runModelRequest(request: ModelRunRequest, environment: Pro
   const controller = new AbortController();
   const signal = AbortSignal.any([request.signal, controller.signal]);
   let deliveryFailed = false;
+  let deliveryError: ErrorDetails | undefined;
   const emit = (event: ModelRunEvent) => {
     if (deliveryFailed) return;
     try { synchronous(() => request.observer.event(structuredClone(event))); }
-    catch { deliveryFailed = true; controller.abort(); }
+    catch (error) {
+      deliveryFailed = true;
+      deliveryError = describeError(error);
+      console.error("Model event delivery failed.", { type: event.type,
+        ...(event.type === "block" ? { kind: event.block.kind, responseId: event.block.responseId, ordinal: event.block.ordinal } : {}),
+        details: deliveryError });
+      controller.abort();
+    }
   };
-  const diagnostic = (code: string, message: string, level: "error" | "warning" = "error") => emit({ type: "diagnostic", code, message, level });
+  const diagnostic = (code: string, message: string, level: "error" | "warning" = "error") => emit({ type: "diagnostic", origin: "model", code, message, level });
   let source: ModelSource | null = null;
   let responseId: string | null = null;
   let completion: ModelCompletion | null = null;
@@ -38,7 +47,7 @@ export async function runModelRequest(request: ModelRunRequest, environment: Pro
   let responseMetadata: ModelResponse | null = null;
   const outcomes = new Map<string, ToolOutcome>();
   let callIds: string[] = [];
-  let termination: { reason: "completed" } | { reason: "cancelled" } | { reason: "failed"; code: string } = { reason: "completed" };
+  let termination: { reason: "completed" } | { reason: "cancelled" } | { reason: "failed"; code: string; details?: ErrorDetails } = { reason: "completed" };
   try {
     // 即使已取消也消费准备 Promise 的拒绝，避免遗留未处理异常。
     const { adapter, settings, capabilities, system, messages, userAgent, sessionId, topLevelTools = [] } = await environment;
@@ -81,9 +90,11 @@ export async function runModelRequest(request: ModelRunRequest, environment: Pro
       }
       signal.throwIfAborted();
       const finish = response.finish;
-      if (!finish) throw new ModelFailure("interrupted", "The model stream ended without a terminal response.");
-      if (response.empty) throw new ModelFailure("empty_response", "The model response ended without any content blocks.");
-      if (!["stop", "tool-calls"].includes(finish.reason)) throw new ModelFailure("incomplete", "The model response did not finish normally. No tools were executed.");
+      if (!finish) throw new ModelFailure("interrupted", "The model stream ended without a terminal response.", undefined, "model");
+      if (response.empty) throw new ModelFailure("empty_response", "The model response ended without any content blocks.", undefined, "model");
+      if (!["stop", "tool-calls"].includes(finish.reason)) throw new ModelFailure("incomplete",
+        `The model response ended with finish reason "${finish.reason}"${finish.rawFinishReason ? ` (${finish.rawFinishReason})` : ""}. No tools were executed.`,
+        undefined, "model");
       const calls = response.calls();
       callIds = calls.map(call => call.part.callId);
       const byCall = new Map(calls.map(call => [call.part.callId, call]));
@@ -112,11 +123,13 @@ export async function runModelRequest(request: ModelRunRequest, environment: Pro
       diagnostic("cancelled", "Execution was cancelled.", "warning"); termination = { reason: "cancelled" };
     } else {
       const code = error instanceof ModelFailure ? error.code : "execution_failed";
-      emit({ type: "diagnostic", code, message: error instanceof ModelFailure ? error.message : "Execution could not be completed.", level: "error" });
-      termination = { reason: "failed", code };
+      const details = describeError(error);
+      emit({ type: "diagnostic", origin: error instanceof ModelFailure ? error.origin : "software",
+        code, message: error instanceof Error ? error.message : details.message, level: "error", details });
+      termination = { reason: "failed", code, details };
     }
   } finally { emit({ type: "progress", blocks: [] }); }
-  if (deliveryFailed) termination = { reason: "failed", code: "event_delivery" };
+  if (deliveryFailed) termination = { reason: "failed", code: "event_delivery", details: deliveryError };
   return { ...termination, responseId, source, completion, timing: completion?.timing ?? timing, response: responseMetadata,
     tools: callIds.flatMap(id => outcomes.has(id) ? [structuredClone(outcomes.get(id)!)] : []) };
 }

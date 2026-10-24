@@ -4,6 +4,7 @@ import { jsonSchema, type Json } from "./json.ts";
 import { toolOutcomeSchema } from "./tool-result.ts";
 import { presentationSchema, type DataContract } from "./presentation.ts";
 import type { ModelCompletion } from "./models.ts";
+import { errorDetailsSchema } from "./error-details.ts";
 
 const id = z.string().min(1).max(160);
 export const modelUsageSchema = z.strictObject({
@@ -51,5 +52,5 @@ export const modelBlockSchema = z.discriminatedUnion("kind", [
 /** 终态内含于成型块；执行通知只携带反馈，不承载响应身份或计量。 */
 export const modelRunRecordSchema = z.discriminatedUnion("type", [
   z.strictObject({ type: z.literal("block"), block: modelBlockSchema }),
-  z.strictObject({ type: z.literal("diagnostic"), code: z.string(), message: z.string(), level: z.enum(["error", "warning"]) }),
+  z.strictObject({ type: z.literal("diagnostic"), origin: z.enum(["model", "software"]), code: z.string(), message: z.string(), level: z.enum(["error", "warning"]), details: errorDetailsSchema.optional() }),
 ]);

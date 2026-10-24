@@ -13,10 +13,9 @@ import { formatCount } from "@atelier/ui/format-count";
 import { diagnosticMessages as messages } from "../../messages/diagnostics";
 import { ConversationTimeline } from "../conversation/ConversationTimeline";
 import { savedTimelineBlock, type TimelineItem } from "../conversation/timeline";
-import { Disclosure } from "../conversation/Disclosure";
 import { PanelBody, percent, Section, Stat, Stats, SystemComposition } from "../panel-kit";
 import { useDiagnostics, type PricedRequest } from "./use-diagnostics";
-import type { DiagnosticNotice, DiagnosticScope } from "./history";
+import type { DiagnosticScope } from "./history";
 import type { DiagnosticOverview } from "./overview";
 import { InputTrend } from "./InputTrend";
 import { formatEstimate, formatMoney, formatPrice, formatQuantity, formatDuration } from "./format";
@@ -39,12 +38,6 @@ function requestState(request: PricedRequest): { label: UiMessage; tone: StatusT
 }
 const cacheRate = (i18n: I18n, usage: Usage | null) =>
   usage?.input != null && usage.cacheRead != null ? percent(i18n, usage.cacheRead, usage.input) : "—";
-
-function Notices({ notices }: { notices: readonly DiagnosticNotice[] }) {
-  return <div className="space-y-2">{notices.map(notice => <Alert key={notice.id} variant={notice.level === "error" ? "destructive" : "default"}>
-    <AlertDescription><span className="type-label">{notice.code}</span><p className="break-words">{notice.message}</p></AlertDescription>
-  </Alert>)}</div>;
-}
 
 function RequestDetails({ request, onBack }: { request: PricedRequest; onBack(): void }) {
   const i18n = useI18n();
@@ -175,7 +168,6 @@ export function Diagnostics() {
   const i18n = useI18n();
   const [scope, setScope] = useState<DiagnosticScope>("timeline");
   const [selection, setSelection] = useState<string | null>(null);
-  const [noticesOpen, setNoticesOpen] = useState(false);
   const listHeading = useRef<HTMLDivElement>(null);
   const restoreListFocus = useRef(false);
   const data = useDiagnostics(scope);
@@ -203,10 +195,6 @@ export function Diagnostics() {
             onOpen={() => setSelection(request.id)} />
         </div>)}</ItemGroup>}
     </Section>
-    {data.notices.length > 0 && <Disclosure open={noticesOpen} onOpenChange={setNoticesOpen}
-      header={<span className="type-label">{i18n.text(messages.notices)} ({data.notices.length})</span>}>
-      <div className="space-y-2"><p className="type-caption">{i18n.text(messages.noticesHint)}</p><Notices notices={data.notices} /></div>
-    </Disclosure>}
   </>;
   return <Tabs className="flex min-h-0 min-w-0 flex-1 flex-col gap-0" value={scope}
     onValueChange={value => { if (value === "timeline" || value === "session") { setScope(value); setSelection(null); } }}>

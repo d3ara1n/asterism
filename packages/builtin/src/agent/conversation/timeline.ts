@@ -1,7 +1,8 @@
 import type { z } from "zod";
 import type { ModelLiveBlock, SessionSnapshot, SessionRecord, ModelInputPart } from "@atelier/sdk/contracts";
-import { ContextSummary, Execution, Notice, AgentInputMessage, type AgentMessageSender } from "@atelier/builtin-api/contracts";
+import { ContextSummary, Execution, AgentInputMessage, type AgentMessageSender } from "@atelier/builtin-api/contracts";
 import { turnMetrics, type TurnMetricsData } from "./turn-metrics";
+import type { InlineFeedback } from "../feedback";
 
 type SavedBlock = Extract<z.infer<typeof Execution.schema>, { type: "block" }>["block"] & {
   id: string; createdAt: string;
@@ -10,7 +11,7 @@ export type TimelineItem = SavedBlock | ModelLiveBlock
   | { kind: "message"; id: string; parts: readonly ModelInputPart[]; sender: AgentMessageSender }
   | { kind: "summary"; id: string; text: string }
   | { kind: "turn-metrics"; id: string; metrics: TurnMetricsData; incomplete: boolean; replyMarkdown: string | null }
-  | ({ kind: "notice"; id: string } & z.infer<typeof Notice.schema>);
+  | ({ kind: "notice" } & InlineFeedback);
 export function timelineKey(item: TimelineItem): string {
   return "responseId" in item ? JSON.stringify([item.responseId, item.ordinal]) : item.id;
 }
@@ -27,26 +28,31 @@ export function savedTimelineBlock(record: Pick<SessionRecord, "id" | "createdAt
   };
 }
 function item(record: SessionRecord, agentId: string): TimelineItem | null {
-  const notice = Notice.decode(record);
-  if (notice?.status === "known" && (!record.source?.resource || record.source?.resource.id === agentId)) return { kind: "notice", id: record.id, ...notice.data };
   if (record.source?.resource?.id !== agentId) return null;
   const summary = ContextSummary.decode(record);
   if (summary?.status === "known") return { kind: "summary", id: record.id, text: summary.data.summary };
   const message = AgentInputMessage.decode(record);
   if (message?.status === "known") return { kind: "message", id: record.id, parts: message.data.parts, sender: message.data.sender };
   const execution = Execution.decode(record);
-  if (execution?.status === "known" && execution.data.type === "diagnostic")
-    return { ...execution.data, kind: "notice", id: record.id };
-  if (execution?.status === "known" && execution.data.type === "block") return savedTimelineBlock(record, execution.data.block);
+  if (execution?.status === "known") return savedTimelineBlock(record, execution.data.block);
   return null;
 }
-/** 已保存部分：只随快照与运行状态变化，流式增量期间保持条目身份，供界面按引用跳过重渲染。 */
+/** 历史与临时反馈的组合：流式增量期间保持条目身份，供界面按引用跳过重渲染。 */
 export interface SavedTimeline { items: readonly TimelineItem[]; keys: ReadonlySet<string>; tail: TimelineItem | null }
 
-/** 所有已保存块直接来自当前路径；轮次概要插在下一轮输入之前，末轮概要作为尾项。 */
-export function savedTimeline(snapshot: SessionSnapshot, agentId: string, running: boolean): SavedTimeline {
+/** 真实块来自当前路径，临时反馈插在已有节点之后；轮次概要位于轮尾。 */
+export function savedTimeline(snapshot: SessionSnapshot, agentId: string, running: boolean, feedback: readonly InlineFeedback[] = []): SavedTimeline {
   const path = snapshot.records.all({ scope: "timeline" });
-  const saved = path.flatMap(record => { const value = item(record, agentId); return value ? [value] : []; });
+  const after = new Map<string | null, TimelineItem[]>();
+  for (const value of feedback) {
+    const items = after.get(value.afterNodeId) ?? [];
+    items.push({ ...value, kind: "notice" });
+    after.set(value.afterNodeId, items);
+  }
+  const saved = [...(after.get(null) ?? []), ...path.flatMap(record => {
+    const value = item(record, agentId);
+    return [...(value ? [value] : []), ...(after.get(record.id) ?? [])];
+  })];
   const summaries = turnMetrics(snapshot, agentId, running);
   const before = new Map(summaries.map(turn => [turn.nextInputId, turn]));
   const measured = (turn: typeof summaries[number]): TimelineItem => ({

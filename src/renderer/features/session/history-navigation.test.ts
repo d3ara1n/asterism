@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { node, created as make, text, thinking, call, message, notice, event, attached, removed } from "../../../session/test-nodes";
+import { node, created as make, text, thinking, call, message, event, attached, removed } from "../../../session/test-nodes";
 import { ViewRegistry } from "../../modules/registry";
 import { builtinViews } from "../../../../packages/builtin/src/renderer";
 import { workbenchRecordViews } from "../workbench/records";
@@ -19,7 +19,7 @@ describe("历史导航契约", () => {
       node("5", "4", attached("a", "n", null)),
       node("6", "5", call("a", "r", 1, "call", { name: "resource_call", arguments: { resource_id: "n", tool: "read", args: {} } })),
       node("7", "6", text("b", "r", 0, "B output")),
-      node("8", "7", notice(null, "session", "Session notice", "info")),
+      node("8", "7", event("example/session-event", {})),
     ];
     const entries = historyEntries(nodes, label);
     expect(entries.filter(entry => matchesHistoryView(entry, { kind: "resource", resourceId: "a" })).map(entry => entry.node.id)).toEqual(["4", "6"]);

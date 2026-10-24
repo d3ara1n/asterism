@@ -15,6 +15,7 @@ import { Disclosure } from "./Disclosure";
 import { TurnFooter } from "./TurnFooter";
 import { MessageSender } from "./MessageSender";
 import { TimelineViewState, viewStateKeys } from "./view-state";
+import { ExecutionErrorDetails } from "../ErrorDetails";
 
 /** 条目视图状态由调用方提供时跨重新挂载保留；未提供时随本组件存在。 */
 export function ConversationTimeline({ items, viewState }: { items: readonly TimelineItem[]; viewState?: TimelineViewState }) {
@@ -69,7 +70,10 @@ function NodeContent({ node }: { node: TimelineItem }) {
     case "summary": return <Summary text={node.text} />;
     case "turn-metrics": return <TurnFooter metrics={node.metrics} incomplete={node.incomplete} replyMarkdown={node.replyMarkdown} />;
     case "notice": return <Alert variant={node.level === "error" ? "destructive" : "default"}>
-      {node.level === "error" ? <TriangleAlert /> : <Info />}<AlertDescription>{node.message}</AlertDescription></Alert>;
+      {node.level === "error" ? <TriangleAlert /> : <Info />}<AlertDescription>
+        <p className="whitespace-pre-wrap break-words">{node.message}</p>
+        {node.details && <ExecutionErrorDetails code={node.code} details={node.details} />}
+      </AlertDescription></Alert>;
     default: return null;
   }
 }

@@ -1,4 +1,5 @@
-import { jsonSchema as sdkJsonSchema, streamText, tool, type ModelMessage, type ToolResultPart, type ToolSet, type LanguageModel } from "ai";
+import { jsonSchema as sdkJsonSchema, streamText, tool, JSONParseError, TypeValidationError, InvalidResponseDataError,
+  type ModelMessage, type ToolResultPart, type ToolSet, type LanguageModel } from "ai";
 import { jsonSchema, unauthenticatedApiKey, type Json } from "../shared/model.ts";
 import { ModelFailure, type ModelAdapter, type ModelEvent, type ModelInput, type ResolvedInputPart, type PreparedModel, type ModelValidationInput } from "./contract.ts";
 import { createProviderModel, validateProviderTransport } from "./provider.ts";
@@ -8,9 +9,18 @@ import { aiSdkAdapterVersion, pickContinuation } from "./continuation.ts";
 import { projectHistory, validateProjection } from "./projection.ts";
 import { validateRequestIdentity } from "./request-identity.ts";
 import { measureModel, RequestTimer } from "./request-timing.ts";
-import type { ModelResponse } from "@atelier/sdk/contracts";
+import { describeError, type ModelResponse } from "@atelier/sdk/contracts";
+import { ZodError } from "zod";
 
 function json(value: unknown): Json { return jsonSchema.parse(JSON.parse(JSON.stringify(value))); }
+/** SDK 解码失败属于软件处理错误；服务端拒绝和传输失败属于模型请求结果。 */
+function providerFailure(error: unknown): ModelFailure {
+  if (error instanceof ModelFailure) return error;
+  const details = describeError(error);
+  const parsing = error instanceof SyntaxError || error instanceof ZodError
+    || JSONParseError.isInstance(error) || TypeValidationError.isInstance(error) || InvalidResponseDataError.isInstance(error);
+  return new ModelFailure(parsing ? "response_parsing" : "provider_error", details.message, details, parsing ? "software" : "model");
+}
 export function sdkMessages(input: ModelInput): ModelMessage[] {
   const messages: ModelMessage[] = [];
   const chat = input.settings.provider.protocol === "openai-chat";
@@ -89,12 +99,24 @@ export class AiSdkAdapter implements ModelAdapter {
     const controller = new AbortController();
     const streamSignal = AbortSignal.any([signal, controller.signal]);
     let responseMetadata: ModelResponse | null = null;
+    // SDK 可在 doStream 返回前消费首个 SSE 错误；保留已收到的前缀，首块交付即释放。
+    let capturePrefix = true, responsePrefix = "";
+    const decoder = new TextDecoder();
     const transport: typeof fetch = async (url, init) => {
       const response = await this.transport(url, init);
       responseMetadata = {
         connection: { id: provider.id }, endpoint: provider.baseUrl, model: model.modelId,
         status: response.status, receivedAt: Date.now(), headers: Object.fromEntries(response.headers),
       };
+      if (response.body && response.headers.get("content-type")?.includes("text/event-stream")) {
+        return new Response(response.body.pipeThrough(new TransformStream<Uint8Array, Uint8Array>({
+          transform(chunk, output) {
+            if (capturePrefix) responsePrefix += decoder.decode(chunk, { stream: true });
+            output.enqueue(chunk);
+          },
+          flush() { if (capturePrefix) responsePrefix += decoder.decode(); },
+        })), { status: response.status, statusText: response.statusText, headers: response.headers });
+      }
       return response;
     };
     const languageModel = this.languageModelFactory?.(input, key) ?? createProviderModel(provider, model, key, transport, input);
@@ -105,16 +127,30 @@ export class AiSdkAdapter implements ModelAdapter {
     const cancelled = () => { timing.end("cancelled"); };
     signal.addEventListener("abort", cancelled, { once: true });
     try {
-      for await (const event of this.decode(measured, messages, tools, options, provider.protocol, streamSignal))
+      for await (const event of this.decode(measured, messages, tools, options, provider.protocol, streamSignal)) {
+        capturePrefix = false; responsePrefix = "";
         yield event.type === "finish" ? { ...event, response: responseMetadata } : event;
+      }
     } catch (error) {
       // 模型终态可能早于连接关闭或用户取消；已取得的计量仍须交付。
       if (measured.completion) yield { ...measured.completion, response: responseMetadata };
-      const failure = error instanceof ModelFailure ? error : new ModelFailure("execution_failed", "The model request failed.");
+      const failure = providerFailure(error);
+      failure.details ??= describeError(error);
+      if (responsePrefix) failure.details.rawResponse = responsePrefix;
+      // 响应由异步 transport 回调赋值，类型收窄以回调之后实际取得的值为准。
+      const received = responseMetadata as ModelResponse | null;
+      if (received) {
+        failure.details = { ...failure.details,
+          httpStatus: received.status,
+          responseHeaders: failure.details.responseHeaders
+            ?? describeError({ message: "", responseHeaders: received.headers }).responseHeaders! };
+      }
+      if (!failure.message) failure.message = received ? `HTTP ${received.status}` : failure.details.name ?? "Error";
       failure.response = responseMetadata;
       if (!measured.completion) failure.timing = timing.end(signal.aborted ? "cancelled" : "failed");
       throw failure;
     } finally {
+      capturePrefix = false;
       signal.removeEventListener("abort", cancelled);
       controller.abort();
     }
@@ -142,6 +178,7 @@ export class AiSdkAdapter implements ModelAdapter {
       return accumulated;
     };
     const rejectedBySdk = new Set<string>();
+    let rawFailure: string | undefined;
     for await (const event of result.stream) {
       signal.throwIfAborted();
       switch (event.type) {
@@ -154,8 +191,11 @@ export class AiSdkAdapter implements ModelAdapter {
           break;
         }
         case "raw": {
-          if (protocol !== "openai-responses" || !event.rawValue || typeof event.rawValue !== "object") break;
+          if (!event.rawValue || typeof event.rawValue !== "object") break;
           const raw = event.rawValue as Record<string, unknown>;
+          if (raw.type === "error" || raw.type === "response.failed" || raw.error != null)
+            rawFailure = JSON.stringify(raw);
+          if (protocol !== "openai-responses") break;
           // 按 Responses item 收束，全文与摘要分别接收；SDK 的摘要分段不另建思考块。
           if (raw.type === "response.output_item.added" || raw.type === "response.output_item.done") {
             const item = raw.item as Record<string, unknown> | undefined;
@@ -226,9 +266,13 @@ export class AiSdkAdapter implements ModelAdapter {
           }
           yield { type: "part.end", partId: `tool:${event.toolCallId}`, arguments: json(event.input), continuation: pickContinuation(event.providerMetadata) }; break;
         case "error":
-          // 宿主编码错误已含可公开诊断；第三方错误仍不能泄漏请求正文或凭据。
-          if (event.error instanceof ModelFailure) throw event.error;
-          throw new ModelFailure("provider_error", "The provider request failed. Check provider configuration and connectivity.");
+          // 服务端与传输错误保留原始诊断；程序分类不替换其消息与响应正文。
+          {
+            const failure = providerFailure(event.error);
+            failure.details ??= describeError(event.error);
+            if (rawFailure !== undefined) failure.details.rawEvent = rawFailure;
+            throw failure;
+          }
         case "abort": throw new ModelFailure("cancelled", "The provider stream was cancelled.");
         case "tool-error":
           // SDK 会为解析/目录错误合成结果；正式拒绝由工坊记录，避免保存 SDK 错误对象。
@@ -243,7 +287,7 @@ export class AiSdkAdapter implements ModelAdapter {
       }
     }
     // 已收到的终态必须交付；ResponseBuffer 先保留计量，再拒绝仍未闭合的块。
-    if (!measured.completion) throw new ModelFailure("interrupted", "The provider stream ended without a finish event.");
+    if (!measured.completion) throw new ModelFailure("interrupted", "The provider stream ended without a finish event.", undefined, "model");
     yield measured.completion;
   }
 }

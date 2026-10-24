@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { present, type ModelCompletion } from "@atelier/sdk/contracts";
 import { sessionView } from "../../../../../src/plugins/records.ts";
 import { nodeView } from "../../../../../src/session/view.ts";
-import { agentSource, call, event, message, node, notice, text, thinking } from "../../../../../src/session/test-nodes.ts";
+import { agentSource, call, event, message, node, text, thinking } from "../../../../../src/session/test-nodes.ts";
 import { ContextSummary, Execution, AgentRequestContext, AgentInputMessage } from "@atelier/builtin-api/contracts";
 import { diagnosticHistory } from "./history.ts";
 
@@ -48,22 +48,19 @@ describe("代理诊断历史", () => {
     expect(all.requests.map(request => [request.responseId, request.onTimeline])).toEqual([["branch-b", false], ["branch-a", true], ["shared", true]]);
   });
 
-  // 执行通知不能被统计为请求；无法解码的记录独立报告，不能污染实际响应计量。
-  it("执行通知单列且不参与请求计量，无法解码的记录保持可见", () => {
+  // 无法解码的记录独立报告，不能污染实际响应计量。
+  it("无法解码的记录保持可见，不参与实际请求计量", () => {
     const nodes = [
       node("input", null, message("a", "Start")),
       node("answer", "input", text("a", "r", 0, "Done", { requestParentId: "input", completion })),
-      node("cache", "answer", event(Execution.id, { type: "diagnostic", code: "cache_miss", message: "Cache missed", level: "warning" }, { source: agentSource("a") })),
-      node("summary", "cache", event(ContextSummary.id, { summary: "Summary", keptFrom: "input", model: "p/m:off", tokensBefore: 1000, completion }, { source: agentSource("a") })),
-      node("failure", "summary", notice("a", "request_limit", "Request limit reached", "error")),
-      node("invalid", "failure", event(Execution.id, {}, { source: agentSource("a") })),
+      node("summary", "answer", event(ContextSummary.id, { summary: "Summary", keptFrom: "input", model: "p/m:off", tokensBefore: 1000, completion }, { source: agentSource("a") })),
+      node("invalid", "summary", event(Execution.id, {}, { source: agentSource("a") })),
     ];
     const result = diagnosticHistory(sessionView(nodeView("s", "", nodes, "invalid")), "a", "timeline");
     expect(result.requests).toHaveLength(2);
     expect(result.requests.map(request => request.completion?.usage)).toEqual([completion.usage, completion.usage]);
     expect(result.requests[0]).toMatchObject({ kind: "compression", model: "p/m:off", summary: "Summary", inputHasFiles: false });
     expect(result.requests[1]).toMatchObject({ responseId: "r", blocks: [{ record: { id: "answer" } }] });
-    expect(result.notices).toMatchObject([{ code: "request_limit" }, { code: "cache_miss" }]);
     expect(result.unreadable).toBe(1);
   });
 

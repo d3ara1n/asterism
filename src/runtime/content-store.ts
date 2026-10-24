@@ -31,7 +31,7 @@ interface Upload { id: string; scope: ContentLease; file: FileHandle; path: stri
 const unavailable = (message: string): never => { throw new PluginApiError("unavailable", message); };
 const invalid = (message: string): never => { throw new PluginApiError("invalid_argument", message); };
 
-/** 只识别 SDK 保留值；普通字符串与插件字段不具有隐式引用语义。 */
+/** 只识别完整的 SDK 引用值；schema 字段定义等普通 JSON 继续递归扫描。 */
 export function contentReferences(value: Json): ContentRef[] {
   const refs = new Map<string, ContentRef>();
   const pending: Json[] = [value];
@@ -41,9 +41,12 @@ export function contentReferences(value: Json): ContentRef[] {
     if (Array.isArray(item)) { for (const value of item) pending.push(value); continue; }
     if (Object.hasOwn(item, "$atelier.content")) {
       const parsed = contentRefSchema.safeParse(item);
-      if (!parsed.success) invalid("Invalid reserved content reference.");
-      refs.set(parsed.data!["$atelier.content"], parsed.data!);
-    } else for (const value of Object.values(item)) pending.push(value);
+      if (parsed.success) {
+        refs.set(parsed.data["$atelier.content"], parsed.data);
+        continue;
+      }
+    }
+    for (const value of Object.values(item)) pending.push(value);
   }
   return [...refs.values()];
 }

@@ -60,7 +60,7 @@ export function contextInsight(snapshot: Pick<SessionSnapshot, "records">, agent
     if (record.source?.resource?.id !== agentId) continue;
     if (ContextSummary.decode(record)?.status === "known") compressedAfter = true;
     const execution = Execution.decode(record);
-    if (execution?.status !== "known" || execution.data.type !== "block") continue;
+    if (execution?.status !== "known") continue;
     const block = execution.data.block;
     if (!block.completion) continue;
     const diagnostics = completionData(block.completion, AgentRequestContext);

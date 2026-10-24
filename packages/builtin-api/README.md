@@ -8,6 +8,7 @@
 
 - `builtin` 命名空间、Agent 资源与创建／提交／继续／配置／取消动作。
 - Agent 输入、配置、选择和历史记录契约，以及会话命名记录与 `NamingApi` 接口类型。
+- `Execution` 记录只包含实际模型输出块；执行诊断为内置 Agent 的临时反馈，规则见 [错误详情](../../docs/runtime.md#错误详情)。
 - `SubmitAgentInput` 的 `mode: "steer" | "follow"` 与 `AgentInputMessage.startsTurn` 的语义见 [输入调度与执行轮次](../../docs/runtime.md#输入调度与草稿箱)。草稿箱界面动作属于内置实现，不从公共包导出。
 - `AgentInputMessage` 记录用户与代理输入，`AgentMessageSender / agentMessageSenderSchema` 表达发送者，`Send` 为通信资源共享的发送契约，各实现独立声明 target schema；语义见 [代理通信](../../docs/runtime.md#代理通信)。`SubmitAgentInput.sender` 省略时为用户，后台适配者显式提供发送者。
 - 资源工具共享声明 `List / Read / Edit / Write / See / Wait`：只定义参数与语义，target 与结果由各资源实现声明；配套正文结果 `textReadSchema / textChangeSchema` 与编辑操作 `editOperationSchema`。第三方资源可实现同一声明。规则见 [资源工具共享声明](../../docs/runtime.md#资源工具共享声明)。

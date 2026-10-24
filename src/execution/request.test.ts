@@ -1,4 +1,4 @@
-import { thinkingLevels, present, completionData, modelCompletionSchema, type RequestTiming } from "@atelier/sdk/contracts";
+import { thinkingLevels, present, completionData, modelCompletionSchema, modelRunRecordSchema, type RequestTiming } from "@atelier/sdk/contracts";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { defineData, defineResource, defineTool, defineImplementation, type ModelRunEvent, type ModelRunRequest } from "@atelier/sdk/contracts";
@@ -45,6 +45,19 @@ const write = defineImplementation({ ...defineData("example.resource/write", z.n
   targetSchema: z.null().describe("The whole item."), effect: "write", execution: "sequential" });
 
 describe("无状态的单次模型执行", () => {
+  // 中途断流时已有块仍交付；原始错误经过事件和记录校验后仍可供界面读取。
+  it("部分响应失败的详情同时保留在返回值与可保存诊断中", async () => {
+    const details = { message: "Upstream overloaded", statusCode: 503, responseBody: '{"error":"busy"}' };
+    const failure = new ModelFailure("provider_error", details.message, details, "model");
+    const events: ModelRunEvent[] = [];
+    const result = await execute(input(events), { validate() {}, version: "test", prepare() { return {
+      async *stream() { yield* text.slice(0, -1); throw failure; },
+    }; } });
+    expect(result).toMatchObject({ reason: "failed", code: "provider_error", details });
+    const records = events.filter(event => event.type !== "progress").map(event => modelRunRecordSchema.parse(event));
+    expect(records).toContainEqual({ type: "diagnostic", origin: "model", code: "provider_error", message: details.message, level: "error", details });
+    expect(records[0]).toMatchObject({ type: "block", block: { kind: "text", text: "Hello", complete: true } });
+  });
   // 响应元信息只随返回结果交付发起者，不进入可保存的块、诊断或进度事件。
   it.each(["completed", "failed"] as const)("%s 结果保留 HTTP 元信息，观察事件不包含 headers", async outcome => {
     const response = { connection: { id: "p" }, endpoint: settings.provider.baseUrl, model: "test",
@@ -129,6 +142,7 @@ describe("无状态的单次模型执行", () => {
     } } });
     const result = await execute(request, model(calls(["first", "second"], "resource_call", { resource_id: "r", tool: "write", args: {} })), capabilities);
     expect(result).toMatchObject({ reason: "failed", code: "event_delivery", tools: [{ kind: "unknown", data: 1 }, { kind: "cancelled" }] });
+    expect(result).toMatchObject({ details: { message: "The event consumer failed." } });
     expect(started).toBe(1);
     expect(later).toBe(0);
   });

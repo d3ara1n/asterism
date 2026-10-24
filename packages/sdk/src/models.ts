@@ -6,6 +6,7 @@ import type { ToolOutcome, ToolInvocationInfo, ToolResult } from "./tool-result.
 import type { ResourceRef } from "./workspace.ts";
 import type { RequestTiming } from "./model-records.ts";
 import type { Presentation } from "./presentation.ts";
+import type { ErrorDetails } from "./error-details.ts";
 
 /** 全软件共用的标准等级；协议编码不改变公共取值。 */
 export const thinkingLevels = ["off", "minimal", "low", "medium", "high", "xhigh", "max"] as const;
@@ -69,7 +70,7 @@ export type ModelLiveBlock = { id: string; responseId: string; ordinal: number }
 export type ModelRunEvent =
   | { type: "block"; block: ModelBlock }
   | { type: "progress"; blocks: readonly ModelLiveBlock[] }
-  | { type: "diagnostic"; code: string; message: string; level: "error" | "warning" };
+  | { type: "diagnostic"; origin: "model" | "software"; code: string; message: string; level: "error" | "warning"; details?: ErrorDetails };
 /** 同步交付执行事件；消费者保存成型记录，异常将停止执行，返回后不再交付。 */
 export interface ModelRunObserver { event(event: ModelRunEvent): undefined }
 /** 仅用于 HTTP 请求身份，不进入模型消息、历史或资源授权。 */
@@ -109,7 +110,7 @@ export type ModelRunResult = {
   response: ModelResponse | null;
   /** 当次调用的实测计时；未取得终态时仍可用于瞬态反馈。 */
   timing: RequestTiming | null;
-} & ({ reason: "completed" } | { reason: "cancelled" } | { reason: "failed"; code: string });
+} & ({ reason: "completed" } | { reason: "cancelled" } | { reason: "failed"; code: string; details?: ErrorDetails });
 /** 最终请求的输入现场；独立副本供领域扩展生产者读取。 */
 export interface ModelRequestContext {
   system: SystemPrompt;

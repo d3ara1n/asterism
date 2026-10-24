@@ -33,7 +33,7 @@ export function projectAgentContext(snapshot: Pick<SessionSnapshot, "records">, 
     if (checkpoint?.status === "unknown") throw new ContextProjectionError("The context summary could not be decoded.");
     if (checkpoint?.status === "known") summary = checkpoint;
     const decoded = Execution.decode(record);
-    if (decoded?.status !== "known" || decoded.data.type !== "block" || !decoded.data.block.complete) continue;
+    if (decoded?.status !== "known" || !decoded.data.block.complete) continue;
     const block = decoded.data.block;
     const blocks = responses.get(block.responseId) ?? [];
     blocks.push({ record, block }); responses.set(block.responseId, blocks);

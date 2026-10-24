@@ -50,8 +50,6 @@ export const diagnosticMessages = pluginNamespace("atelier.builtin").messages("e
   reasoningIncluded: { id: "diagnostics.reasoningIncluded", defaultMessage: "Without a separate reasoning price, reported output is charged once at the output price." },
   contents: { id: "diagnostics.contents", defaultMessage: "Related content" },
   noContent: { id: "diagnostics.noContent", defaultMessage: "No response content was saved." },
-  notices: { id: "diagnostics.notices", defaultMessage: "Unlinked execution notices" },
-  noticesHint: { id: "diagnostics.noticesHint", defaultMessage: "These records have no request identity. They are not counted as additional requests or assigned a cost." },
   overview: { id: "diagnostics.overview", defaultMessage: "Overview" },
   requests: { id: "diagnostics.requests", defaultMessage: "Requests" },
   cacheHit: { id: "diagnostics.cacheHit", defaultMessage: "Cache hit rate" },

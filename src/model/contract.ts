@@ -1,10 +1,11 @@
 import type { Json, ModelSettings } from "../shared/model.ts";
-import type { ModelItem, SystemPrompt, ModelInputPart, ModelRequestIdentity, ModelResponse, ModelEvent, RequestTiming } from "@atelier/sdk/contracts";
+import type { ModelItem, SystemPrompt, ModelInputPart, ModelRequestIdentity, ModelResponse, ModelEvent, RequestTiming, ErrorDetails } from "@atelier/sdk/contracts";
 
 export class ModelFailure extends Error {
   timing?: RequestTiming;
   response?: ModelResponse | null;
-  constructor(readonly code: string, message: string) { super(message); }
+  constructor(readonly code: string, message: string, public details?: ErrorDetails,
+    readonly origin: "model" | "software" = "software") { super(message); }
 }
 export interface ToolDeclaration { name: string; description: string; parameters: Json }
 export type { ModelEvent, StreamPart } from "@atelier/sdk/contracts";

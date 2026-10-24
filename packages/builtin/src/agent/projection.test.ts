@@ -100,5 +100,8 @@ describe("代理模型投影", () => {
 
   it("末尾思考不作为续接输出结尾", () => {
     expect(project(records(message("a", "go"), thinking("a", "r1", 0, "reasoning"))).map(item => item.kind)).toEqual(["input"]);
+    // 正文填充中断时先跳过未完成块，再清除由此暴露出来的末尾思考。
+    expect(project(records(message("a", "go"), thinking("a", "r1", 0, "reasoning"),
+      text("a", "r1", 1, "partial", { complete: false }))).map(item => item.kind)).toEqual(["input"]);
   });
 });

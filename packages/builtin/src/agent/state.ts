@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-/** 当前路径的回合状态，由历史投影得到；不另行持久化。 */
+/** 当前路径的回合状态，由历史和运行时中断位置投影得到；不另行持久化。 */
 export const agentTurnStateSchema = z.enum(["empty", "completed", "incomplete"]);
 export type AgentTurnState = z.infer<typeof agentTurnStateSchema>;
 export const agentExecutionStateSchema = z.enum(["empty", "completed", "incomplete", "running"]);

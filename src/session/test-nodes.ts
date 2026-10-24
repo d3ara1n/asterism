@@ -1,6 +1,6 @@
 /** 测试夹具：按通用记录节点构造 agent 与工作台记录，形状只在此维护。 */
 import type { Json, ModelCompletion, ToolOutcome } from "@atelier/sdk/contracts";
-import { Execution, Notice, AgentInputMessage, type AgentMessageSender } from "@atelier/builtin-api/contracts";
+import { Execution, AgentInputMessage, type AgentMessageSender } from "@atelier/builtin-api/contracts";
 import type { NewNode, SessionNode } from "../shared/session.ts";
 
 export const agentSource = (id: string) => ({ plugin: "atelier.builtin", resource: { sessionId: "s", id, kind: "atelier.builtin/agent" } });
@@ -26,8 +26,6 @@ export const call = (agentId: string, responseId: string, ordinal: number, callI
     { ...extra, complete: extra.complete ?? (extra.outcome !== null) });
 export const message = (agentId: string, value: string, startsTurn = true, sender: AgentMessageSender = { kind: "user" }): NewNode =>
   record(AgentInputMessage.id, { startsTurn, parts: [{ kind: "text", text: value }], sender }, agentSource(agentId));
-export const notice = (agentId: string | null, code: string, value: string, level: "info" | "warning" | "error" = "error"): NewNode =>
-  record(Notice.id, { code, message: value, level }, agentId ? agentSource(agentId) : hostSource);
 export const event = (type: string, data: Json, options: { source?: NewNode["source"]; model?: string | null; recipient?: string | null } = {}): NewNode =>
   ({ contract: type, data, source: options.source ?? hostSource, model: options.model ?? null, recipient: options.recipient ?? null });
 export const created = (id: string, title: string, kind = "atelier.builtin/agent") => event("resource_created", { id, title, type: kind });
@@ -38,14 +36,12 @@ export const removed = (id: string) => event("object_removed", { id });
 export const node = (id: string, parentId: string | null, value: NewNode, createdAt = "2026-10-10T10:00:00Z"): SessionNode =>
   ({ ...value, id, parentId, sessionId: "s", createdAt });
 /** 测试读取：把通用记录节点展开为便于断言的扁平视图（kind 由契约与载荷推出），只用于测试。 */
-export type FlatNode = SessionNode & { kind: "message" | "thinking" | "text" | "toolcall" | "notice" | "event" } & Record<string, any>;
+export type FlatNode = SessionNode & { kind: "message" | "thinking" | "text" | "toolcall" | "event" } & Record<string, any>;
 export function flat(node: SessionNode): FlatNode {
   const data = (node.data ?? {}) as Record<string, any>;
   if (node.contract === AgentInputMessage.id) return { ...node, kind: "message", parts: data.parts, sender: data.sender } as FlatNode;
-  if (node.contract === Notice.id) return { ...node, ...data, kind: "notice" } as FlatNode;
   if (node.contract === Execution.id) {
     if (data.type === "block") return { ...node, ...data.block, source: node.source, kind: data.block.kind } as FlatNode;
-    if (data.type === "diagnostic") return { ...node, ...data, kind: "notice" } as FlatNode;
   }
   return { ...node, kind: "event", type: node.contract } as FlatNode;
 }

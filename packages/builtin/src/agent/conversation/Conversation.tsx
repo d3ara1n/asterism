@@ -18,6 +18,7 @@ import { useConversationInteraction } from "./interaction";
 import { AgentToolbar, AgentUIRegion, useComposerHidden } from "../ui/AgentUI";
 import { AgentDraftsPanel } from "./Drafts";
 import type { AgentExecutionState } from "../state";
+import type { InlineFeedback } from "../feedback";
 
 /** 卡片标题栏中的执行状态；历史属于会话，入口在窗口标题栏。 */
 export function ConversationActions({ data }: { data: { executionState: AgentExecutionState } }) {
@@ -36,7 +37,7 @@ const emptyTimeline: readonly TimelineItem[] = [];
 const viewStateKey = "atelier.builtin/agent.timeline-view";
 
 /** 代理卡片内容：当前路径的最终视图与输入区；没有分支感，回溯在会话历史中进行。 */
-export function Conversation() {
+export function Conversation({ feedback }: { feedback: readonly InlineFeedback[] }) {
   const i18n = useI18n();
   const object = useRendererObject();
   const { view: state, session } = object;
@@ -49,7 +50,7 @@ export function Conversation() {
   const viewState = object.retained.get(viewStateKey, () => new TimelineViewState());
   const running = executionState === "running";
   // 已保存部分只随快照与运行状态重算；流式增量只追加实时块，历史条目保持身份。
-  const saved = useMemo(() => snapshot ? savedTimeline(snapshot, agentId, running) : null, [snapshot, agentId, running]);
+  const saved = useMemo(() => snapshot ? savedTimeline(snapshot, agentId, running, feedback) : null, [snapshot, agentId, running, feedback]);
   const timeline = useMemo(() => saved ? displayedTimeline(withLive(saved, models.blocks)) : [], [saved, models.blocks]);
   const { scroll, list, awayFromBottom, latest, jumpTo, onScroll, onResize, onScrollEnd } = useOutputFollow(timeline);
   const composer = useRef<HTMLTextAreaElement>(null);

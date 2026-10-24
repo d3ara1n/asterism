@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { sessionSnapshot } from "../../../../../src/plugins/records";
 import { nodeView } from "../../../../../src/session/view";
-import { node, text, thinking, message as input, notice as noticeNode } from "../../../../../src/session/test-nodes";
+import { node, text, thinking, message as input } from "../../../../../src/session/test-nodes";
 import type { ModelLiveBlock, SessionSnapshot } from "@atelier/sdk/contracts";
 import { displayedTimeline, generating, mountedTimelineIndexes, savedTimeline, timelineKey, withLive } from "./timeline";
+import type { InlineFeedback } from "../feedback";
 
 /** 与代理卡片相同的两层组合：已保存部分加实时块。 */
 const conversationTimeline = (snapshot: SessionSnapshot, agentId: string, live: readonly ModelLiveBlock[], running = live.length > 0) =>
@@ -39,14 +40,21 @@ describe("代理的具型记录视图", () => {
     expect(after[0]).toMatchObject({ id: saved.id, kind: "thinking", text: "thinking", complete: true });
   });
 
-  it("当前路径包含未完成块和执行通知，其他分支与代理隐藏", () => {
+  it("临时反馈固定在发生位置，重试不搬动，其他分支隐藏且不产生历史", () => {
     const message = node("input", null, input("a", "Question"));
     const block = node("partial", message.id, text("a", "r", 0, "Partial", { complete: false, requestParentId: message.id }));
-    const notice = node("notice", block.id, noticeNode("a", "interrupted", "The response was interrupted.", "error"));
-    const nodes = [message, block, { ...block, id: "other-agent", source: { plugin: "atelier.builtin", resource: { sessionId: "s", id: "b", kind: "atelier.builtin/agent" } } }, { ...block, id: "other-branch", parentId: "elsewhere" }, notice];
-    const timeline = conversationTimeline(sessionSnapshot(nodeView("s", "", nodes, notice.id)), "a", []);
-    expect(timeline.map(item => item.id)).toEqual([message.id, block.id, notice.id, "turn-metrics:input"]);
-    expect(timeline.find(item => item.kind === "notice")).toMatchObject({ kind: "notice", code: "interrupted" });
+    const retried = node("retried", block.id, text("a", "next-response", 0, "Retried", { requestParentId: block.id }));
+    const nodes = [message, block, retried];
+    const feedback: InlineFeedback[] = [
+      { id: "early", afterNodeId: message.id, origin: "model", code: "provider_error", level: "error", message: "HTTP 429" },
+      { id: "interrupted", afterNodeId: block.id, origin: "model", code: "interrupted", level: "error", message: "Interrupted" },
+      { id: "other", afterNodeId: "other-branch", origin: "model", code: "provider_error", level: "error", message: "Other branch" },
+    ];
+    const snapshot = sessionSnapshot(nodeView("s", "", nodes, retried.id));
+    const items = savedTimeline(snapshot, "a", false, feedback).items;
+    expect(items.map(item => item.id)).toEqual(["input", "early", "partial", "interrupted", "retried"]);
+    expect(snapshot.records.all({ scope: "timeline" }).map(record => record.id)).toEqual(["input", "partial", "retried"]);
+    expect(savedTimeline(snapshot, "a", false).items.map(item => item.id)).toEqual(["input", "partial", "retried"]);
   });
 
   // docs/workbench.md#对话计量：同轮多个请求只有一份尾部概要，历史概要不因下一轮执行而消失。

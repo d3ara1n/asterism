@@ -20,19 +20,61 @@ async function consume(events: AsyncIterable<ModelEvent>) { for await (const _ev
 const transportInput: ModelInput = { ...input, settings: { ...input.settings, thinking: "off" } };
 
 describe("AI SDK 适配契约", () => {
-  // HTTP 失败仍把已收到的元信息保留给 run 的失败结果，不需要旁路回调。
-  it("请求失败携带响应元信息，不包含请求凭据", async () => {
-    const response = new Response('{"error":{"type":"authentication_error","message":"denied"}}', {
-      status: 401, headers: { "content-type": "application/json", "X-Test-Metadata": "value" },
+  // 上游状态与原文是诊断依据；HTTP 429 和 500 不能退化为同一个配置/网络猜测。
+  it.each([429, 500])("HTTP %s 保留原始错误正文与响应标识，不包含请求凭据", async status => {
+    const body = '{"type":"error","error":{"type":"upstream_error","message":"Original provider message","request_id":"req-1","extra":{"limit":12}}}';
+    const response = new Response(body, {
+      status, headers: { "content-type": "application/json", "X-Request-Id": "req-1" },
     });
     const transport = vi.fn<typeof fetch>(async () => response);
     const adapter = new AiSdkAdapter(async () => "synthetic-key", undefined, transport);
     const failure = await consume(adapter.prepare(transportInput).stream(new AbortController().signal)).catch(error => error);
     expect(failure).toBeInstanceOf(ModelFailure);
     expect(failure.response).toMatchObject({ connection: { id: "p" }, endpoint: input.settings.provider.baseUrl,
-      model: "test", status: 401, headers: { "x-test-metadata": "value" } });
+      model: "test", status, headers: { "x-request-id": "req-1" } });
+    expect(failure).toMatchObject({ origin: "model", message: "Original provider message", details: {
+      message: "Original provider message", statusCode: status, httpStatus: status, responseBody: body,
+      responseHeaders: { "x-request-id": "req-1" },
+    } });
+    expect(JSON.stringify(failure.details)).not.toContain("synthetic-key");
+    expect(failure.details).not.toHaveProperty("requestBodyValues");
     expect(failure.response.headers).not.toHaveProperty("x-api-key");
     expect(transport).toHaveBeenCalledTimes(1);
+  });
+  // 代理网关可以直接返回 HTML；正文不是 JSON 也应完整保留。
+  it("非 JSON 的 HTTP 错误保留响应正文", async () => {
+    const body = "<html><body>upstream unavailable</body></html>";
+    const adapter = new AiSdkAdapter(async () => "synthetic-key", undefined, async () => new Response(body, { status: 502 }));
+    await expect(consume(adapter.prepare(transportInput).stream(new AbortController().signal)))
+      .rejects.toMatchObject({ details: { statusCode: 502, httpStatus: 502, responseBody: body } });
+  });
+  // 服务端拒绝是模型结果；SDK 无法解析响应的 JSON 或结构时是软件处理失败。
+  it.each(["not JSON", '{"choices":"invalid"}'])("响应解析失败显式标注软件来源：%s", async chunk => {
+    const current = structuredClone(transportInput);
+    current.settings.provider.protocol = "openai-chat";
+    const adapter = new AiSdkAdapter(async () => "synthetic-key", undefined, async () => new Response(
+      `data: ${chunk}\n\n`, { headers: { "content-type": "text/event-stream" } }));
+    await expect(consume(adapter.prepare(current).stream(new AbortController().signal)))
+      .rejects.toMatchObject({ origin: "software", code: "response_parsing", details: { httpStatus: 200 } });
+  });
+  // Anthropic SDK 在 doStream 内消费首个错误并裁剪字段；传输前缀保留实际收到的资料。
+  it("首个 SSE 事件失败时保留原始响应，区分实际 HTTP 与 SDK 推导状态", async () => {
+    const raw = 'event: error\ndata: {"type":"error","error":{"type":"overloaded_error","message":"Server busy","extra":{"retry_after":5}}}\n\n';
+    const adapter = new AiSdkAdapter(async () => "synthetic-key", undefined, async () =>
+      new Response(raw, { headers: { "content-type": "text/event-stream" } }));
+    await expect(consume(adapter.prepare(transportInput).stream(new AbortController().signal)))
+      .rejects.toMatchObject({ details: { message: "Server busy", statusCode: 529, httpStatus: 200, rawResponse: raw } });
+  });
+  // HTTP 200 之后仍可能通过 SSE 报错；SDK 解码会裁剪未知字段，raw error 留作权威资料。
+  it("流内错误保留 HTTP 状态和完整服务端事件", async () => {
+    const raw = { type: "error", error: { type: "overloaded_error", message: "Server busy", extra: { retry_after: 5 } } };
+    const start = { type: "message_start", message: { id: "m1", type: "message", role: "assistant", model: "test",
+      content: [], stop_reason: null, stop_sequence: null, usage: { input_tokens: 2, output_tokens: 0 } } };
+    const adapter = new AiSdkAdapter(async () => "synthetic-key", undefined, async () => new Response(
+      `event: message_start\ndata: ${JSON.stringify(start)}\n\nevent: error\ndata: ${JSON.stringify(raw)}\n\n`,
+      { headers: { "content-type": "text/event-stream", "x-request-id": "stream-1" } }));
+    await expect(consume(adapter.prepare(transportInput).stream(new AbortController().signal)))
+      .rejects.toMatchObject({ details: { statusCode: 529, httpStatus: 200, rawEvent: JSON.stringify(raw), responseHeaders: { "x-request-id": "stream-1" } } });
   });
   // 模型终态是请求边界：客户端暂停消费与连接延后关闭不延长耗时；终态之后取消也不能丢失已实报用量。
   it.each(["close", "cancel"] as const)("消费者等待和终态之后的 %s 不改变已接收的计量", async action => {
@@ -474,14 +516,18 @@ describe("AI SDK 适配契约", () => {
     expect(messages[1]).toMatchObject({ role: "user", content: [{ type: "text" }, { type: "file", data: png, mediaType: "image/png", filename: "a.png" }] });
   });
 
-  it("provider 错误脱敏且不自动重试", async () => {
-    const model = new MockLanguageModelV4({ doStream: async () => { throw new Error("secret-provider-header"); } });
+  // 网络错误没有 HTTP 响应，原始 cause 才能区分 DNS、连接和其他传输失败。
+  it("传输失败保留原始消息及 cause，不自动重试", async () => {
+    const cause = Object.assign(new Error("getaddrinfo ENOTFOUND example.invalid"), { code: "ENOTFOUND" });
+    const model = new MockLanguageModelV4({ doStream: async () => { throw new Error("fetch failed", { cause }); } });
     const adapter = new AiSdkAdapter(async () => "credential", () => model);
     let failure: unknown;
     try { for await (const _event of adapter.prepare(input).stream(new AbortController().signal)) { /* 消费流。 */ } }
     catch (error) { failure = error; }
     expect(failure).toBeInstanceOf(Error);
-    expect(String(failure)).not.toContain("secret-provider-header");
+    expect(failure).toMatchObject({ message: "fetch failed", details: {
+      message: "fetch failed", causes: [{ message: "getaddrinfo ENOTFOUND example.invalid", code: "ENOTFOUND" }],
+    } });
     expect(model.doStreamCalls).toHaveLength(1);
   });
 

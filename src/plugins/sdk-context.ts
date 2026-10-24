@@ -1,4 +1,4 @@
-import { belongsTo, jsonSchema, type DataContract, type Json, type RecordContract, type SessionDirectory } from "@atelier/sdk/contracts";
+import { belongsTo, jsonSchema, validationMessage, type DataContract, type Json, type RecordContract, type SessionDirectory } from "@atelier/sdk/contracts";
 import { PluginApiError, type ContentReader, type ContentScope, type ObjectReader, type ObjectExecutor, type PluginContext, type ResourceRef, type ResourceSnapshot, type SessionExecutor, type ObjectWriter, type ToolSession } from "@atelier/sdk/runtime";
 import type { RunGroup } from "./lifecycle.ts";
 import type { ObjectScope } from "./host.ts";
@@ -165,7 +165,7 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
             if (contract !== declared)
               throw new PluginApiError("invalid_argument", "Use the declared record contract instance.");
             const parsed = declared.schema.safeParse(data);
-            if (!parsed.success) throw new PluginApiError("invalid_argument", "The record does not match its declared schema.");
+            if (!parsed.success) throw new PluginApiError("invalid_argument", validationMessage(parsed.error, declared.id));
             const value = jsonSchema.parse(parsed.data);
             // 来源由写入通道打戳：插件身份来自操作柄，资源来自已校验的对象引用。
             const recordId = writer.append({ contract: declared.id, data: value, model: null, recipient: null,

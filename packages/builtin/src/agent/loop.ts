@@ -1,8 +1,9 @@
 import { PluginApiError, type ObjectExecutor, type ObjectReader, type PluginTasks, type ModelServices } from "@atelier/sdk/runtime";
-import { ResourceStatusChanged, type ResourceStatus, type ModelRunObserver } from "@atelier/sdk/contracts";
-import { Execution, Notice } from "@atelier/builtin-api/contracts";
+import { ResourceStatusChanged, describeError, type ResourceStatus, type ModelRunObserver } from "@atelier/sdk/contracts";
+import { Execution } from "@atelier/builtin-api/contracts";
 import { agentRequestExtensions } from "./request-context.ts";
-import { AgentExecutionFeedback } from "./feedback.ts";
+import { feedbackOrigin } from "./feedback.ts";
+import type { createAgentFeedback } from "./feedback-state.ts";
 import { selectionOf, type AgentSelectionService } from "./selection.ts";
 import type { composeSystemPrompt } from "./system-prompt.ts";
 import { projectForAgent } from "./projection.ts";
@@ -18,6 +19,7 @@ interface AgentLoopDependencies {
   systemPrompt: (agent: AgentDefinition) => ReturnType<typeof composeSystemPrompt>;
   userAgent: string;
   usage?: Pick<UsageConsumer, "consume">;
+  feedback: ReturnType<typeof createAgentFeedback>;
 }
 
 /** 循环持有执行计数；消息和回合边界从时间线读取，待发送输入由资源持有。 */
@@ -57,7 +59,10 @@ export function createAgentLoop(deps: AgentLoopDependencies) {
       if (!run) return;
       deps.tasks.cancel(run.key);
       // 宿主在调用任务体之前就收到取消时，不会进入任务体的 finally。
-      if (!run.entered) { finish(object.ref.id); object.invalidate(); }
+      if (!run.entered) {
+        deps.feedback.report(object, { origin: "model", level: "warning", code: "cancelled", message: "Execution was cancelled." }, true);
+        finish(object.ref.id); object.invalidate();
+      }
     },
     start(object: ObjectExecutor) {
       const previous = active.get(object.ref.id);
@@ -67,15 +72,22 @@ export function createAgentLoop(deps: AgentLoopDependencies) {
         const selection = selectionOf(object).selection;
         const system = deps.systemPrompt(deps.selection.agent(selection));
         const tokens = Math.ceil(system.blocks.reduce((size, block) => size + block.text.length, 0) / 4);
-        return compressContext(object, deps.selection.target(selection), tokens, deps.models, signal, deps.userAgent);
+        return compressContext(object, deps.selection.target(selection), tokens, deps.models, signal,
+          value => deps.feedback.report(object, value), deps.userAgent);
       };
       const publish = (status: ResourceStatus["status"]) => object.events.publish(ResourceStatusChanged, {
         title: object.snapshot()!.title, status,
       });
-      const feedback = (error: unknown, signal: AbortSignal) => object.events.publish(AgentExecutionFeedback, signal.aborted
-        ? { level: "warning", code: "cancelled", message: "Execution was cancelled." }
-        : { level: "error", code: error instanceof PluginApiError ? error.code : "execution_failed",
-          message: error instanceof PluginApiError ? error.message : "Execution could not be completed." });
+      const feedback = (error: unknown, signal: AbortSignal) => {
+        if (signal.aborted) {
+          deps.feedback.report(object, { origin: "model", level: "warning", code: "cancelled", message: "Execution was cancelled." }, true);
+          return;
+        }
+        const details = describeError(error);
+        deps.feedback.report(object, { origin: feedbackOrigin(error), level: "error",
+          code: error instanceof PluginApiError ? error.code : "execution_failed",
+          message: error instanceof Error ? error.message : details.message, details }, true);
+      };
       active.set(object.ref.id, run);
       let started: boolean;
       try { started = deps.tasks.start(run.key, async signal => {
@@ -91,25 +103,24 @@ export function createAgentLoop(deps: AgentLoopDependencies) {
             let cancelled = false, completed = false, hasTools = false;
             const requestLimit = deps.selection.agent(selectionOf(object).selection).maxTurns ?? 32;
             if (request >= requestLimit) {
-              object.commit(writer => { writer.append(Notice, { level: "error", code: "request_limit",
-                message: "The agent reached the model request limit. Continue explicitly to resume." }); });
+              deps.feedback.report(object, { origin: "model", level: "warning", code: "request_limit",
+                message: "The agent reached the model request limit. Continue explicitly to resume." }, true);
               status = "awaiting";
             } else {
-              // 摘要和通知的持久写入失败直接结束执行，不进入模型错误的消费分支。
+              // 摘要持久写入失败直接结束执行，不进入模型错误的消费分支。
               const compressed = await compress(signal);
               // Request start 的扩展位置：摘要完成后固定本次上下文、配置与授权。
               const selection = selectionOf(object).selection, agent = deps.selection.agent(selection);
               const snapshot = object.session.snapshot();
-              let hasBlocks = false;
               const observer: ModelRunObserver = {
                 event(event) {
                   if (event.type === "progress") return;
-                  if (event.type === "diagnostic" && !hasBlocks) {
-                    object.events.publish(AgentExecutionFeedback, { code: event.code, message: event.message, level: event.level });
+                  if (event.type === "diagnostic") {
+                    deps.feedback.report(object, { origin: event.origin, code: event.code, message: event.message, level: event.level,
+                      ...(event.details ? { details: event.details } : {}) }, event.level === "error" || event.code === "cancelled");
                     return;
                   }
                   object.commit(writer => { writer.append(Execution, event); });
-                  if (event.type === "block") hasBlocks = true;
                 },
               };
               let result: Awaited<ReturnType<ModelServices["run"]>> | undefined;
@@ -129,8 +140,9 @@ export function createAgentLoop(deps: AgentLoopDependencies) {
                 if (result.response) deps.usage?.consume(result.response);
                 if (result.reason === "failed" && result.code === "event_delivery") {
                   status = "failed";
-                  object.events.publish(AgentExecutionFeedback, { level: "error", code: "event_delivery",
-                    message: "The model response could not be saved to the timeline. Execution stopped." });
+                  deps.feedback.report(object, { origin: "software", level: "error", code: "event_delivery",
+                    message: "The model response could not be saved to the timeline. Execution stopped.",
+                    ...(result.details ? { details: result.details } : {}) }, true);
                   return;
                 }
                 // Request end：包含该响应的完整工具批次；取消后保留所有待发送输入。

@@ -1,7 +1,7 @@
-import { thinkingLevels, type ModelItem, type ModelTarget, type ModelEvent } from "@atelier/sdk/contracts";
+import { thinkingLevels, describeError, type ModelItem, type ModelTarget, type ModelEvent } from "@atelier/sdk/contracts";
 import type { ModelServices, ObjectExecutor } from "@atelier/sdk/runtime";
 import { ContextSummary, Execution } from "@atelier/builtin-api/contracts";
-import { AgentExecutionFeedback } from "./feedback.ts";
+import { feedbackOrigin, type AgentFeedback } from "./feedback.ts";
 import { summaryPrompt, summarySystemPrompt } from "./compression-prompt.ts";
 import { contextMessages, projectAgentContext, type AgentContext } from "./projection.ts";
 
@@ -25,7 +25,7 @@ export function estimateContext(context: AgentContext, agentId: string, model: s
     const record = context.path[index]!;
     if (record.source?.resource?.id !== agentId) continue;
     const decoded = Execution.decode(record);
-    if (decoded?.status !== "known" || decoded.data.type !== "block") continue;
+    if (decoded?.status !== "known") continue;
     const block = decoded.data.block, input = block.completion?.usage?.input;
     if (input == null || !(block.source.model === model || thinkingLevels.some(level => block.source.model === `${model}:${level}`))) continue;
     const origin = block.requestParentId === null ? -1 : positions.get(block.requestParentId);
@@ -62,7 +62,8 @@ export function planCompression(context: AgentContext): CompressionPlan | null {
 /** 运行在代理托管任务内；仅完整成功的摘要一次提交，取消沿用代理生命周期。 */
 export async function compressContext(
   object: ObjectExecutor, target: ModelTarget, systemTokens: number,
-  models: Pick<ModelServices, "stream" | "list" | "roles">, signal: AbortSignal, userAgent?: string,
+  models: Pick<ModelServices, "stream" | "list" | "roles">, signal: AbortSignal,
+  feedback: (value: AgentFeedback) => void, userAgent?: string,
 ): Promise<boolean> {
   signal.throwIfAborted();
   const model = target.model ?? models.roles().find(role => role.id === target.role)?.model;
@@ -104,8 +105,9 @@ export async function compressContext(
       throw new Error("Context summarization did not produce a complete non-empty summary.");
   } catch (error) {
     signal.throwIfAborted();
-    object.events.publish(AgentExecutionFeedback, { code: "context_compression_failed", level: "warning",
-      message: `Context compression failed; the existing context is unchanged. ${error instanceof Error ? error.message : "The summary request failed."}` });
+    const details = describeError(error);
+    feedback({ origin: feedbackOrigin(error), code: "context_compression_failed", level: "warning",
+      message: `Context compression failed; the existing context is unchanged. ${details.message}`, details });
     return false;
   }
   // 提交失败交给代理循环报告；不能把持久化故障伪装成可继续的摘要失败。

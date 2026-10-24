@@ -1,22 +1,25 @@
 import type { ModelBlock, SessionRecord, SessionSnapshot } from "@atelier/sdk/contracts";
-import { Execution, Notice, AgentInputMessage } from "@atelier/builtin-api/contracts";
+import { Execution, AgentInputMessage } from "@atelier/builtin-api/contracts";
 import type { AgentTurnState } from "./state.ts";
 
-/** 从当前路径推导回合状态；不完整块参与判断，模型输入仍由上下文投影独立生成。 */
+/** 当前路径叠加本次运行时的中断位置；模型输入由上下文投影独立生成。 */
 export function projectAgentTurnState(
   snapshot: Pick<SessionSnapshot, "records">,
   agentId: string,
+  interruptions: readonly (string | null)[] = [],
 ): AgentTurnState {
-  return projectTurnState(snapshot.records.all({ scope: "timeline" }), agentId);
+  return projectTurnState(snapshot.records.all({ scope: "timeline" }), agentId, interruptions);
 }
 
 /** 同一状态规则也用于历史轮次；传入该轮的记录区间，不创建历史快照副本。 */
-export function projectTurnState(records: readonly SessionRecord[], agentId: string): AgentTurnState {
+export function projectTurnState(records: readonly SessionRecord[], agentId: string, interruptions: readonly (string | null)[] = []): AgentTurnState {
   let hasInput = false;
   let responseId: string | null = null;
   let interrupted = false;
   const blocks = new Map<number, ModelBlock>();
+  const stopped = new Set(interruptions);
   for (const record of records) {
+    if (stopped.has(record.parentId)) interrupted = true;
     if (record.source?.resource?.id !== agentId) continue;
     if (AgentInputMessage.decode(record)?.status === "known") {
       hasInput = true;
@@ -27,7 +30,7 @@ export function projectTurnState(records: readonly SessionRecord[], agentId: str
     }
     if (!hasInput) continue;
     const execution = Execution.decode(record);
-    if (execution?.status === "known" && execution.data.type === "block") {
+    if (execution?.status === "known") {
       const block = execution.data.block;
       if (block.responseId !== responseId) {
         responseId = block.responseId;
@@ -35,13 +38,9 @@ export function projectTurnState(records: readonly SessionRecord[], agentId: str
         interrupted = false;
       }
       blocks.set(block.ordinal, block);
-      continue;
     }
-    const notice = Notice.decode(record);
-    const diagnostic = execution?.status === "known" && execution.data.type === "diagnostic"
-      ? execution.data : notice?.status === "known" ? notice.data : null;
-    if (diagnostic && (diagnostic.level === "error" || diagnostic.code === "cancelled")) interrupted = true;
   }
+  if (stopped.has(records.at(-1)?.id ?? null)) interrupted = true;
   if (!hasInput) return "empty";
   if (interrupted) return "incomplete";
   const response = [...blocks.values()];

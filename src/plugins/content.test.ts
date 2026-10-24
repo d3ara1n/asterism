@@ -7,7 +7,7 @@ import { z } from "zod";
 import { contentRefSchema, defineCall, defineAction, defineCreation, defineRecord, pluginNamespace, resourceCall, type ContentRef } from "@atelier/sdk/contracts";
 import { implementCall, defineModule, definePlugin, implementAction, implementCreation, implementPreparer, implementResource, type ObjectExecutor, type ContentScope, type PluginContext } from "@atelier/sdk/runtime";
 import { ApplicationService } from "../runtime/service.ts";
-import { contentReferences, contentLimits } from "../runtime/content-store.ts";
+import { contentLimits } from "../runtime/content-store.ts";
 import { serveContent } from "../runtime/dispatch.ts";
 import { contentResultSchema } from "../shared/content.ts";
 import { randomUUID } from "node:crypto";
@@ -173,12 +173,6 @@ describe("宿主不可变内容", () => {
     } finally { await Promise.all([draft.close(), handover.close(), lease.close()]); }
   });
 
-  it("保留值只识别严格 SDK 对象，普通文本没有引用语义", () => {
-    const ref = { "$atelier.content": randomUUID() };
-    expect(contentReferences({ nested: [ref, ref], text: JSON.stringify(ref) })).toEqual([ref]);
-    expect(() => contentReferences({ ...ref, extra: true })).toThrow();
-    expect(() => contentReferences({ "$atelier.content": "../file" })).toThrow();
-  });
   it("二进制导入经准备、同步创建、当前数据读取持久化，并支持缺席插件重开", async () => {
     const f = fixture(), draft = f.input();
     const source = new Uint8Array([99, 0, 255, 128, 42]);
@@ -271,7 +265,7 @@ describe("宿主不可变内容", () => {
     const Raw = ns.data("raw", z.json());
     f.object(id).commit(writer => { writer.set(Stripped, { file: ref }); });
     expect(f.object(id).get(Stripped)).toEqual({});
-    expect(() => f.object(id).commit(writer => { writer.set(Raw, { ...ref, extra: true }); })).toThrow();
+    f.object(id).commit(writer => { writer.set(Raw, { ...ref, extra: true }); });
     await f.replace(id, { file: null }); f.store.collect();
     expect(() => f.object(id).content.read(ref)).toThrow();
   });

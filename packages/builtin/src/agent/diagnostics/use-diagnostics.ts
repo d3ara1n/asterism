@@ -13,7 +13,7 @@ export function useDiagnostics(scope: DiagnosticScope) {
   const snapshot = object.session.snapshot();
   const configuration = useMemo(() => catalogs.get(ModelConfiguration), [catalogs]);
   const history = useMemo(() => snapshot ? diagnosticHistory(snapshot, object.ref.id, scope)
-    : { requests: [], notices: [], unreadable: 0 }, [snapshot, object.ref.id, scope]);
+    : { requests: [], unreadable: 0 }, [snapshot, object.ref.id, scope]);
   const requests = useMemo(() => history.requests.map(request => {
     const model = diagnosticModel(request, configuration?.models ?? []);
     return { ...request, configuredModel: model, estimate: estimateUsageCost(request.completion?.usage ?? null, model?.cost ?? null, request.inputHasFiles) };

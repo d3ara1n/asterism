@@ -1,5 +1,5 @@
 import type { ModelInputPart, SessionSnapshot } from "@atelier/sdk/contracts";
-import { ContextSummary, Execution, Notice, AgentInputMessage } from "@atelier/builtin-api/contracts";
+import { ContextSummary, Execution, AgentInputMessage } from "@atelier/builtin-api/contracts";
 import { projectInputMessage } from "../input-message.ts";
 
 export interface PeekRecord {
@@ -22,34 +22,29 @@ export function projectPeekRecords(snapshot: Pick<SessionSnapshot, "records">, a
       const message = AgentInputMessage.decode(record);
       const execution = Execution.decode(record);
       const summary = ContextSummary.decode(record);
-      const notice = Notice.decode(record);
-      if ([message, execution, summary, notice].some(value => value?.status === "unknown")) {
+      if ([message, execution, summary].some(value => value?.status === "unknown")) {
         add("notice", `Saved record ${record.contract.id} could not be decoded.`, "unreadable");
       } else if (message?.status === "known") {
         const projected = projectInputMessage(message.data);
         add(message.data.sender.kind, partsText(projected.parts));
       }
       else if (summary?.status === "known") add("summary", summary.data.summary);
-      else if (notice?.status === "known") add("notice", `${notice.data.code}: ${notice.data.message}`, notice.data.level);
       else if (execution?.status === "known") {
-        if (execution.data.type === "diagnostic") add("notice", `${execution.data.code}: ${execution.data.message}`, execution.data.level);
-        else {
-          const block = execution.data.block, status = block.complete ? "complete" : "incomplete";
-          if (block.kind === "text") add("assistant", block.text, status);
-          else if (block.kind === "thinking") {
-            if (includeThinking && (block.text || block.summary))
-              add("thinking", [block.text, block.summary && `Saved thinking summary:\n${block.summary}`].filter(Boolean).join("\n\n"), status);
-          } else add("tool", JSON.stringify({
-            name: block.name, callId: block.callId,
-            arguments: block.arguments ?? block.argumentsText,
-            outcome: block.outcome ? {
-              kind: block.outcome.kind, resource: block.outcome.resource,
-              data: block.outcome.data, text: partsText(block.outcome.model),
-              ...("error" in block.outcome ? { error: block.outcome.error } : {}),
-              ...("message" in block.outcome ? { message: block.outcome.message } : {}),
-            } : null,
-          }), block.outcome?.kind ?? status);
-        }
+        const block = execution.data.block, status = block.complete ? "complete" : "incomplete";
+        if (block.kind === "text") add("assistant", block.text, status);
+        else if (block.kind === "thinking") {
+          if (includeThinking && (block.text || block.summary))
+            add("thinking", [block.text, block.summary && `Saved thinking summary:\n${block.summary}`].filter(Boolean).join("\n\n"), status);
+        } else add("tool", JSON.stringify({
+          name: block.name, callId: block.callId,
+          arguments: block.arguments ?? block.argumentsText,
+          outcome: block.outcome ? {
+            kind: block.outcome.kind, resource: block.outcome.resource,
+            data: block.outcome.data, text: partsText(block.outcome.model),
+            ...("error" in block.outcome ? { error: block.outcome.error } : {}),
+            ...("message" in block.outcome ? { message: block.outcome.message } : {}),
+          } : null,
+        }), block.outcome?.kind ?? status);
       }
     }
     if (record.context && (record.context.recipient === null || record.context.recipient === agentId))

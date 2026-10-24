@@ -111,6 +111,7 @@ export default definePlugin({
 - `models.validate(request, { content? })`：校验模型目标、续接资料与文件引用资格，不发送网络请求。
 - `models.stream(request, { content? })`：执行单次模型请求（支持可选 `tools` 声明、`maxOutputTokens`、`userAgent`、`sessionId`），流式交付正文、思考、工具调用与终态协议事件；工具执行、结果配对及续轮由消费者负责。`finish.timing`（API 8.6）可携带请求计时，与 usage 一起按 `ModelCompletion` 保存。
 - `models.run(request)`：绑定具体资源对象（`object`）与请求起点（`requestParentId`），执行一次模型请求及该响应的完整资源工具批次，经 `ModelRunObserver.event` 同步交付 `block`（最高序号块内含 `completion` 终态）、`diagnostic` 与 `progress`。终态包含 `usage`、可选 `timing` 和具型 `extensions`；结果的 `timing` 提供当次实测计时，无终态时也可瞬态消费。外层多轮循环与时间线提交由调用方插件自行驱动。
+- **错误详情**：`contracts` 导出 `ErrorDetails / errorDetailsSchema / describeError`；`run` 的失败结果与 `diagnostic` 可携带 `details`，诊断的 `origin: model | software` 区分模型执行与软件处理边界。`stream` 抛出的异常可经 `describeError(error)` 取得详情，模型适配异常同时声明 `origin`。字段与保存边界见 [错误详情](../../docs/runtime.md#错误详情)。
 - **终态领域扩展（API 11.0）**：调用方通过 `completionExtensions(context)` 同步读取最终系统提示与工具声明的独立副本，返回 `present(DataContract, data)` 数组。宿主将它随终态块交付，领域消费者用 `completionData(completion, DataContract)` 读取，未知或无法解码的扩展返回 null，公共计量仍可读取。完整边界见 [请求诊断](../../docs/runtime.md#请求诊断)，可编译示例见 [`examples/model-completion.ts`](examples/model-completion.ts)。
 
 ### 7. 提供商与用量目录（API 10.0）

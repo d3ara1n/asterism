@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { defineRecord, modelRunRecordSchema, modelCompletionSchema, modelInputPartsSchema } from "@atelier/sdk/contracts";
+import { defineRecord, modelBlockSchema, modelCompletionSchema, modelInputPartsSchema } from "@atelier/sdk/contracts";
 import { builtin } from "./identity.ts";
 import { agentMessageSenderSchema } from "./messaging.ts";
 
@@ -7,7 +7,9 @@ import { agentMessageSenderSchema } from "./messaging.ts";
 export const AgentInputMessage = defineRecord(builtin.name("agent.input-message"), {
   schema: z.object({ parts: modelInputPartsSchema, startsTurn: z.boolean(), sender: agentMessageSenderSchema }),
 });
-export const Execution = defineRecord(builtin.name("agent.execution"), { schema: modelRunRecordSchema });
+export const Execution = defineRecord(builtin.name("agent.execution"), {
+  schema: z.strictObject({ type: z.literal("block"), block: modelBlockSchema }),
+});
 /** 摘要只替换模型输入的前缀；keptFrom 指向原样保留的首个历史节点。 */
 export const ContextSummary = defineRecord(builtin.name("agent.context-summary"), {
   schema: z.strictObject({
@@ -17,7 +19,4 @@ export const ContextSummary = defineRecord(builtin.name("agent.context-summary")
     tokensBefore: z.number().nonnegative(),
     completion: modelCompletionSchema,
   }),
-});
-export const Notice = defineRecord(builtin.name("agent.notice"), {
-  schema: z.strictObject({ code: z.string(), message: z.string(), level: z.enum(["info", "warning", "error"]) }),
 });
