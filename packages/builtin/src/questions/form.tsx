@@ -1,8 +1,9 @@
-import { useEffect, useId, useRef, type FormEvent } from "react";
-import { ArrowLeft, ArrowRight, MessageSquarePlus, Pencil, Send } from "lucide-react";
+import { useEffect, useId, useRef, type FormEvent, type ReactNode } from "react";
+import { ArrowLeft, ArrowRight, Maximize2, MessageSquarePlus, Pencil, Send } from "lucide-react";
 import { useI18n } from "@atelier/sdk/renderer";
 import { AgentScrollArea } from "@atelier/builtin-api/renderer";
 import { Button } from "@atelier/ui/ui/button";
+import { IconButton } from "@atelier/ui/ui/icon-button";
 import { Textarea } from "@atelier/ui/ui/textarea";
 import { Field, FieldDescription, FieldLabel } from "@atelier/ui/ui/field";
 import { StatusText } from "@atelier/ui/ui/status";
@@ -10,26 +11,27 @@ import { Spinner } from "@atelier/ui/ui/spinner";
 import { Separator } from "@atelier/ui/ui/separator";
 import { questionMessages as messages } from "../messages/questions";
 import { answerIssue } from "./answers";
-import type { PendingQuestion, Submission } from "./contract";
+import { AnswerSummary } from "./answer-summary";
+import type { Question, Submission } from "./contract";
 import { draftSubmission, type QuestionDraft } from "./drafts";
 import { QuestionFields } from "./question-fields";
+import { submissionRows } from "./summary";
 
-export function QuestionForm({ pending, draft, update, answer, cancel, busy, failed, invalidId, setInvalidId, expanded, focusVersion }: {
-  pending: PendingQuestion; draft: QuestionDraft; update(value: QuestionDraft): void;
+/** 内联时随对话流自然撑开；放大视图内使用局部滚动区。 */
+export function QuestionForm({ questions, draft, update, answer, cancel, busy, failed, invalidId, setInvalidId, expanded, onEnlarge }: {
+  questions: Question[]; draft: QuestionDraft; update(value: QuestionDraft): void;
   answer(value: Submission): void; cancel(): void; busy: boolean; failed: boolean;
-  invalidId: string | null; setInvalidId(id: string | null): void; expanded: boolean; focusVersion: number;
+  invalidId: string | null; setInvalidId(id: string | null): void; expanded: boolean; onEnlarge?(): void;
 }) {
   const i18n = useI18n();
   const messageId = useId();
   const region = useRef<HTMLDivElement>(null);
   const scroller = useRef<HTMLDivElement>(null);
-  const { questions } = pending;
   const review = draft.page >= questions.length;
   const question = questions[draft.page];
   const submission = draftSubmission(questions, draft);
-  useEffect(() => { if (focusVersion) region.current?.focus({ preventScroll: true }); }, [focusVersion]);
   useEffect(() => { scroller.current?.scrollTo({ top: 0 }); }, [draft.page]);
-  const navigate = (page: number) => update({ ...draft, page, detail: null });
+  const navigate = (page: number) => update({ ...draft, page });
   const submit = (event?: FormEvent) => {
     event?.preventDefault();
     if (busy) return;
@@ -46,6 +48,23 @@ export function QuestionForm({ pending, draft, update, answer, cancel, busy, fai
     setInvalidId(null);
     answer(submission);
   };
+  const content: ReactNode = <div className="space-y-4">
+    {question && <QuestionFields key={question.id} question={question} value={draft.answers[draft.page]!}
+      update={value => { setInvalidId(null); update({ ...draft, answers: draft.answers.map((answer, index) => index === draft.page ? value : answer) }); }}
+      invalid={invalidId === question.id} />}
+    {review && <div className="space-y-3">
+      <p className="type-section">{i18n.text(messages.review)}</p>
+      <AnswerSummary rows={submissionRows(questions, submission)} action={index =>
+        <Button type="button" size="xs" variant="ghost" onClick={() => navigate(index)}><Pencil />{i18n.text(messages.edit)}</Button>} />
+    </div>}
+    {(review || questions.length === 1) && (draft.messageOpen ? <Field>
+      <FieldLabel htmlFor={messageId}>{i18n.text(messages.message)}</FieldLabel>
+      <FieldDescription>{i18n.text(messages.messageHint)}</FieldDescription>
+      <Textarea id={messageId} rows={2} value={draft.message} onChange={event => update({ ...draft, message: event.target.value })} />
+    </Field> : <Button type="button" variant="ghost" size="sm" onClick={() => update({ ...draft, messageOpen: true })}>
+      <MessageSquarePlus />{i18n.text(messages.message)}
+    </Button>)}
+  </div>;
   return <div ref={region} tabIndex={-1} className="min-h-0 outline-none" aria-label={i18n.text(messages.navigation)}>
     <form onSubmit={submit} onKeyDown={event => {
       if (event.key === "Enter" && (event.metaKey || event.ctrlKey) && !event.nativeEvent.isComposing) { event.preventDefault(); submit(); }
@@ -65,47 +84,19 @@ export function QuestionForm({ pending, draft, update, answer, cancel, busy, fai
           <Button type="button" size="xs" variant={review ? "selected" : "ghost"} aria-current={review ? "step" : undefined}
             onClick={() => navigate(questions.length)}>{i18n.text(messages.review)}</Button>
         </nav></AgentScrollArea>}
-        <AgentScrollArea ref={scroller} className={`@container/questions ${expanded ? "max-h-[60dvh]" : "max-h-[min(16rem,30cqh)]"}`}>
-          <div className="space-y-4">
-            {question && <QuestionFields key={question.id} question={question} value={draft.answers[draft.page]!}
-              update={value => { setInvalidId(null); update({ ...draft, answers: draft.answers.map((answer, index) => index === draft.page ? value : answer) }); }}
-              invalid={invalidId === question.id} detail={draft.detail} setDetail={detail => update({ ...draft, detail })} />}
-            {review && <div className="space-y-4">
-              <p className="type-section">{i18n.text(messages.review)}</p>
-              {questions.map((item, index) => {
-                const response = submission.answers[index]!;
-                const missing = answerIssue(item, response);
-                return <div key={item.id} className="space-y-2">
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="type-label break-words">{index + 1}. {item.question}</p>
-                    <Button type="button" size="xs" variant="ghost" onClick={() => navigate(index)}><Pencil />{i18n.text(messages.edit)}</Button>
-                  </div>
-                  {response.status === "skipped" ? <StatusText tone="neutral">{i18n.text(messages.skipped)}</StatusText>
-                    : missing ? <StatusText tone="warning">{i18n.text(messages.pending)}</StatusText>
-                    : <div className="space-y-1 type-body whitespace-pre-wrap break-words">
-                      {item.type !== "text" && item.options.filter(option => response.selected.includes(option.id)).map(option => <p key={option.id}>{option.label}</p>)}
-                      {response.text && <p>{response.text}</p>}
-                    </div>}
-                  <Separator />
-                </div>;
-              })}
-            </div>}
-            {(review || questions.length === 1) && (draft.messageOpen ? <Field>
-              <FieldLabel htmlFor={messageId}>{i18n.text(messages.message)}</FieldLabel>
-              <FieldDescription>{i18n.text(messages.messageHint)}</FieldDescription>
-              <Textarea id={messageId} rows={2} value={draft.message} onChange={event => update({ ...draft, message: event.target.value })} />
-            </Field> : <Button type="button" variant="ghost" size="sm" onClick={() => update({ ...draft, messageOpen: true })}>
-              <MessageSquarePlus />{i18n.text(messages.message)}
-            </Button>)}
-          </div>
-        </AgentScrollArea>
+        {expanded
+          ? <AgentScrollArea ref={scroller} className="max-h-[60dvh]">{content}</AgentScrollArea>
+          : <div className="min-w-0">{content}</div>}
         {failed && <StatusText tone="error">{i18n.text(messages.submitFailed)}</StatusText>}
         <Separator />
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <Button type="button" size="sm" variant="ghost" onClick={cancel}>{i18n.text(messages.cancel)}</Button>
+          <div className="flex items-center gap-1">
+            <Button type="button" size="sm" variant="ghost" onClick={cancel}>{i18n.text(messages.cancel)}</Button>
+            {onEnlarge && <IconButton type="button" label={i18n.text(messages.enlarge)} onClick={onEnlarge}><Maximize2 /></IconButton>}
+          </div>
           <div className="flex flex-wrap items-center gap-2">
             {question && !question.required && !draft.answers[draft.page]!.skipped && <Button type="button" size="sm" variant="ghost"
-              onClick={() => { setInvalidId(null); update({ ...draft, detail: null,
+              onClick={() => { setInvalidId(null); update({ ...draft,
                 answers: draft.answers.map((answer, index) => index === draft.page ? { ...answer, skipped: true } : answer),
                 page: questions.length > 1 ? draft.page + 1 : draft.page,
               }); }}>{i18n.text(messages.skip)}</Button>}

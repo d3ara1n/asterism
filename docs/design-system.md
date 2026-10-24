@@ -99,7 +99,7 @@ Window          平台差异、拖动区域、窗口几何变量
 
 Agent overlay 的外壳由内置 Agent 统一提供，插件只组织内部内容。三个位置均使用 `surface-floating` 的圆角、边框、表面与阴影；呈现区域四周使用与 composer 外层一致的 `p-3` 留白，多个面板之间使用 `gap-3`，为阴影保留空间。外壳不额外建立滚动裁切边界；overlay 与 modal 的局部滚动统一使用 `AgentScrollArea`，由内置 Agent 的同一个实现提供滚动视口、四边焦点光圈留白及对齐补偿。插件只指定滚动轴和尺寸，不重复编写留白；自行增加嵌套裁切容器时，外层留白不保证其内部光圈可见。底部面板在隐藏 composer 后仍保留侧边与底部留白，视觉上承接输入区，不贴住卡片边框。位置与输入区控制见 [Agent 扩展界面](workbench.md#agent-扩展界面)。
 
-结构化问答复用该外壳，内部以问题、选项和说明的字号层级组织，不叠加浮动卡片。普通选项与自定义项共用官方 FieldLabel／Field／FieldContent 的外框、内边距、选择控件列和文字列；自定义项通过 FieldLabel 的 `asChild` 组合 InputGroup 与无独立边框的编辑器，保留统一选中外观及编辑焦点反馈，不使用 addon 的按钮偏移。题目区和横向导航使用 `AgentScrollArea`，操作区保持可见；底部呈现保留上方历史阅读空间，主动放大使用宽版 Agent modal（`size: wide`），详情分栏按作答容器宽度决定。交互见 [结构化问答](workbench.md#结构化问答)。
+结构化问答位于工具调用的执行正文内，内部以问题、选项和说明的字号层级组织，不叠加浮动卡片。普通选项与自定义项共用官方 FieldLabel／Field／FieldContent 的外框、内边距、选择控件列和文字列；自定义项通过 FieldLabel 的 `asChild` 组合 InputGroup 与无独立边框的编辑器，保留统一选中外观及编辑焦点反馈，不使用 addon 的按钮偏移。多题横向导航使用 `AgentScrollArea`；内联题目区随对话流撑开，主动放大使用宽版 Agent modal（`size: wide`），其中题目区使用 `AgentScrollArea` 局部滚动，操作区保持可见；选项详情使用公共 Popover，info 图标为弱化的 `icon-xs` ghost 按钮。终结回执以勾选图标标记所选项，未选项以次要文字列出。交互见 [结构化问答](workbench.md#结构化问答)。
 
 ## 连线外观
 

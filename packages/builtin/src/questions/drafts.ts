@@ -11,7 +11,6 @@ export interface QuestionDraft {
   page: number;
   message: string;
   messageOpen: boolean;
-  detail: string | null;
 }
 export function emptyAnswer(): AnswerDraft {
   return { selected: [], custom: false, text: "", skipped: false };
@@ -34,9 +33,11 @@ export function draftSubmission(questions: Question[], draft: QuestionDraft): Su
     ...(draft.message.trim() ? { message: draft.message.trim() } : {}),
   };
 }
-function createEntry(pending: PendingQuestion) {
+/** 草稿只依赖等待实例身份与题目。 */
+export type DraftRequest = Pick<PendingQuestion, "id" | "questions">;
+function createEntry(pending: DraftRequest) {
   let value: QuestionDraft = {
-    answers: pending.questions.map(emptyAnswer), page: 0, message: "", messageOpen: false, detail: null,
+    answers: pending.questions.map(emptyAnswer), page: 0, message: "", messageOpen: false,
   };
   const listeners = new Set<() => void>();
   let operation = { busy: false, failed: false };
@@ -63,7 +64,7 @@ export function createQuestionDrafts() {
   const drafts = new Map<string, { owner: string; id: string; entry: ReturnType<typeof createEntry> }>();
   const owner = (sessionId: string, agentId: string) => JSON.stringify([sessionId, agentId]);
   return {
-    get(sessionId: string, agentId: string, pending: PendingQuestion) {
+    get(sessionId: string, agentId: string, pending: DraftRequest) {
       const key = JSON.stringify([sessionId, agentId, pending.id]);
       let draft = drafts.get(key);
       if (!draft) {

@@ -72,4 +72,21 @@ describe("公共流式预览开合", () => {
     expect(executing.open).toBe(true);
     expect(advance(executing, null, false, preferences, 3000).open).toBe(true);
   });
+
+  it("需要处理的正文立即展开一次，不受偏好与此前手动折叠影响", () => {
+    const off = { autoExpand: false, autoCollapse: true };
+    const closed = change(advance(initial(), "output", false, off, 0), false);
+    const attention = advance(closed, "output", false, off, 10, true);
+    expect(attention).toMatchObject({ open: true, expandAt: null });
+    // 用户随后折叠，同阶段持续的需要处理状态不再重开。
+    expect(advance(change(attention, false), "output", false, off, 20, true).open).toBe(false);
+  });
+
+  it("需要处理的阶段结束保持开合，处理结果在原位呈现", () => {
+    const attention = advance(initial(), "output", true, preferences, 0, true);
+    expect(advance(attention, null, false, preferences, 5000).open).toBe(true);
+    // 新阶段重新计算，旧阶段的标记不阻止下一次展开。
+    const next = advance(change(advance(attention, null, false, preferences, 5000), false), "output", false, preferences, 6000, true);
+    expect(next.open).toBe(true);
+  });
 });

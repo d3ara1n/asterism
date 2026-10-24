@@ -71,12 +71,6 @@ export const AskUserResult = builtin.data("ask-user", z.union([
 export const pendingQuestionSchema = z.strictObject({
   id: z.string().uuid(), callId: z.string(), questions: z.array(questionSchema),
 });
-export const questionSnapshotSchema = z.strictObject({
-  pending: z.array(pendingQuestionSchema),
-});
-export const ReadQuestions = defineCall(builtin.name("questions.read"), { scope: "object",
-  input: z.null(), output: questionSnapshotSchema,
-});
 export const AnswerQuestion = defineCall(builtin.name("questions.answer"), { scope: "object",
   input: z.strictObject({ id: z.string().uuid(), submission: submissionSchema }), output: z.null(),
 });
@@ -94,5 +88,4 @@ export type Submission = z.infer<typeof submissionSchema>;
 export type SubmittedAnswer = z.infer<typeof submittedAnswerSchema>;
 export type StructuredAnswer = z.infer<typeof structuredAnswerSchema>;
 export type PendingQuestion = z.infer<typeof pendingQuestionSchema>;
-export type QuestionSnapshot = z.infer<typeof questionSnapshotSchema>;
 export type Answer = z.infer<typeof AskUserResult.schema>;

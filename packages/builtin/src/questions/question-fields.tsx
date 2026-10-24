@@ -1,5 +1,5 @@
 import { useId } from "react";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { Info } from "lucide-react";
 import { useI18n } from "@atelier/sdk/renderer";
 import { Button } from "@atelier/ui/ui/button";
 import { Badge } from "@atelier/ui/ui/badge";
@@ -8,21 +8,38 @@ import { RadioGroup, RadioGroupItem } from "@atelier/ui/ui/radio-group";
 import { Textarea } from "@atelier/ui/ui/textarea";
 import { InputGroup, InputGroupTextarea } from "@atelier/ui/ui/input-group";
 import { Field, FieldContent, FieldDescription, FieldError, FieldLabel, FieldLegend, FieldSet, FieldTitle } from "@atelier/ui/ui/field";
+import { Popover, PopoverContent, PopoverTrigger } from "@atelier/ui/ui/popover";
 import { Markdown } from "../agent/conversation/Markdown";
 import { questionMessages as messages } from "../messages/questions";
 import type { Question } from "./contract";
 import type { AnswerDraft } from "./drafts";
 
-export function QuestionFields({ question, value, update, detail, setDetail, invalid }: {
-  question: Question; value: AnswerDraft; update(value: AnswerDraft): void;
-  detail: string | null; setDetail(id: string | null): void; invalid: boolean;
+/** 选项详情以弹层阅读；触发器位于选项标签内，阻止冒泡使点击不改变选择。 */
+function OptionDetail({ label, detail }: { label: string; detail: string }) {
+  const i18n = useI18n();
+  return <Popover>
+    <PopoverTrigger asChild>
+      <Button type="button" variant="ghost" size="icon-xs" className="-my-1 text-muted-foreground"
+        aria-label={i18n.formatMessage(messages.detail, { option: label })} onClick={event => event.stopPropagation()}>
+        <Info />
+      </Button>
+    </PopoverTrigger>
+    <PopoverContent align="start" collisionPadding={8} aria-label={label}
+      className="w-[min(28rem,calc(100vw-2rem))] max-h-[min(24rem,60dvh)] space-y-2 overflow-y-auto">
+      <p className="type-label break-words">{label}</p>
+      <Markdown>{detail}</Markdown>
+    </PopoverContent>
+  </Popover>;
+}
+
+export function QuestionFields({ question, value, update, invalid }: {
+  question: Question; value: AnswerDraft; update(value: AnswerDraft): void; invalid: boolean;
 }) {
   const i18n = useI18n();
   const id = useId();
   const patch = (next: Partial<AnswerDraft>) => update({ ...value, skipped: false, ...next });
-  const optionDetail = question.type === "text" ? undefined : question.options.find(option => option.id === detail);
   const options = question.type === "text" ? null : <div className="space-y-2">
-    {question.options.map((option, index) => <div key={option.id} className="space-y-1">
+    {question.options.map((option, index) => <div key={option.id}>
       <FieldLabel htmlFor={`${id}-${index}`} className="w-full">
         <Field orientation="horizontal">
           {question.type === "single"
@@ -33,20 +50,13 @@ export function QuestionFields({ question, value, update, detail, setDetail, inv
           <FieldContent>
             <FieldTitle className="flex-wrap break-words">{option.label}
               {question.recommendation?.optionId === option.id && <Badge variant="secondary">{i18n.text(messages.recommended)}</Badge>}
+              {option.detail && <OptionDetail label={option.label} detail={option.detail} />}
             </FieldTitle>
             {option.description && <FieldDescription id={`${id}-description-${index}`}>{option.description}</FieldDescription>}
             {question.recommendation?.optionId === option.id && <FieldDescription>{question.recommendation.reason}</FieldDescription>}
           </FieldContent>
         </Field>
       </FieldLabel>
-      {option.detail && <Button type="button" variant="ghost" size="xs" aria-expanded={detail === option.id}
-        aria-controls={detail === option.id ? `${id}-detail-inline ${id}-detail-wide` : undefined} onClick={() => setDetail(detail === option.id ? null : option.id)}>
-        {detail === option.id ? <ChevronUp /> : <ChevronDown />}{i18n.text(detail === option.id ? messages.closeDetail : messages.detail)}
-        <span className="sr-only"> · {option.label}</span>
-      </Button>}
-      {detail === option.id && option.detail && <div className="px-3 py-2 @3xl/questions:hidden" id={`${id}-detail-inline`}>
-        <Markdown>{option.detail}</Markdown>
-      </div>}
     </div>)}
     <FieldLabel asChild className="w-full">
       <InputGroup className="h-auto">
@@ -85,18 +95,13 @@ export function QuestionFields({ question, value, update, detail, setDetail, inv
       <p className="type-body text-muted-foreground">{i18n.text(messages.skipped)}</p>
       <Button type="button" variant="outline" size="sm" onClick={() => patch({ skipped: false })}>{i18n.text(messages.resume)}</Button>
     </div> : <>
-      <div className={optionDetail?.detail ? "grid min-w-0 gap-4 @3xl/questions:grid-cols-2" : "min-w-0"}>
-        <div className="min-w-0 space-y-3">
-          {choiceFields}
-          {question.type === "text" && <Field>
-            <FieldLabel htmlFor={`${id}-text`}>{i18n.text(messages.text)}</FieldLabel>
-            <Textarea id={`${id}-text`} value={value.text} rows={3} aria-invalid={invalid}
-              aria-describedby={invalid ? `${id}-error` : undefined} onChange={event => patch({ text: event.target.value })} />
-          </Field>}
-        </div>
-        {optionDetail?.detail && <aside id={`${id}-detail-wide`} className="hidden min-w-0 space-y-3 border-l pl-4 @3xl/questions:block" aria-label={optionDetail.label}>
-          <p className="type-label">{optionDetail.label}</p><Markdown>{optionDetail.detail}</Markdown>
-        </aside>}
+      <div className="min-w-0 space-y-3">
+        {choiceFields}
+        {question.type === "text" && <Field>
+          <FieldLabel htmlFor={`${id}-text`}>{i18n.text(messages.text)}</FieldLabel>
+          <Textarea id={`${id}-text`} value={value.text} rows={3} aria-invalid={invalid}
+            aria-describedby={invalid ? `${id}-error` : undefined} onChange={event => patch({ text: event.target.value })} />
+        </Field>}
       </div>
       {invalid && <FieldError id={`${id}-error`}>{i18n.text(messages.invalid)}</FieldError>}
     </>}

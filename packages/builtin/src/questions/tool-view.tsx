@@ -1,56 +1,73 @@
-import { ArrowDownToLine, MessageCircleQuestion } from "lucide-react";
-import { toolRenderer, useI18n, useRendererObject, type ToolRenderProps } from "@atelier/sdk/renderer";
-import { Button } from "@atelier/ui/ui/button";
+import { MessageCircleQuestion } from "lucide-react";
+import type { Json } from "@atelier/sdk/contracts";
+import { toolRenderer, useI18n, type ToolExecutionRenderProps, type ToolResultRenderProps } from "@atelier/sdk/renderer";
 import { StatusText } from "@atelier/ui/ui/status";
 import { ToolHeader } from "@atelier/ui/tool-header";
 import { questionMessages as messages } from "../messages/questions";
-import { AskUserResult, type Answer } from "./contract";
-import { questionFocus } from "./focus";
+import { AnswerSummary } from "./answer-summary";
+import { askUserArgs, AskUserResult, type Answer, type Question } from "./contract";
+import { QuestionPanel } from "./panel";
 import { questionTitles } from "./preview";
+import { resultRows } from "./summary";
 
-function Header({ phase, args, result }: ToolRenderProps<Answer>) {
-  const i18n = useI18n();
-  const titles = questionTitles(args);
-  const data = result?.data;
-  const summary = data && "answers" in data
-    ? i18n.formatMessage(messages.progress, { done: data.answers.filter(answer => answer.status === "answered").length, total: data.answers.length })
-    : phase === "input" ? i18n.text(messages.preparing)
-      : phase === "ready" ? i18n.text(messages.queued)
-        : phase === "executing" ? i18n.text(messages.waiting) : undefined;
-  return <ToolHeader label={i18n.text(messages.navigation)} subject={titles[0]} meta={summary} />;
+type ExecutionProps = ToolExecutionRenderProps<Answer>;
+type ResultProps = ToolResultRenderProps<Answer>;
+
+/** 历史参数可能来自旧版契约；无法解析时只展示保存的答案与题目文字。 */
+function parseQuestions(args: Json): Question[] | null {
+  const parsed = askUserArgs.safeParse(args);
+  return parsed.success ? parsed.data.questions : null;
 }
-function Body({ args, phase, result }: ToolRenderProps<Answer>) {
+/** 执行中已发布等待实例身份即可作答。 */
+function waitingRequest(props: ExecutionProps): string | null {
+  const data = props.result?.data;
+  return props.phase === "executing" && data && "requestId" in data ? data.requestId : null;
+}
+
+function ExecutionHeader({ phase, args }: ExecutionProps) {
   const i18n = useI18n();
-  const { ref } = useRendererObject();
-  const titles = questionTitles(args);
-  const data = result?.data;
-  if (data && "answers" in data) return <div className="space-y-4">
-    {data.answers.map(answer => <div key={answer.id} className="space-y-1 type-body whitespace-pre-wrap break-words">
-      <p className="type-label">{answer.question}</p>
-      {answer.status === "skipped" ? <StatusText tone="neutral">{i18n.text(messages.skipped)}</StatusText> : <>
-        {answer.selected.map(option => <p key={option.id}>{option.label}</p>)}
-        {answer.text && <p>{answer.text}</p>}
-        {answer.comment && <p className="text-muted-foreground">{answer.comment}</p>}
-      </>}
-    </div>)}
-    {data.message && <div className="space-y-1 type-body whitespace-pre-wrap break-words">
-      <p className="type-label">{i18n.text(messages.message)}</p><p>{data.message}</p>
-    </div>}
+  return <ToolHeader label={i18n.text(messages.navigation)} subject={questionTitles(args)[0]}
+    meta={i18n.text(phase === "ready" ? messages.queued : messages.waiting)} />;
+}
+function ResultHeader({ args, result }: ResultProps) {
+  const i18n = useI18n();
+  const data = result.data;
+  const meta = data && "answers" in data
+    ? i18n.formatMessage(messages.answeredCount, { done: data.answers.filter(answer => answer.status === "answered").length, total: data.answers.length })
+    : undefined;
+  return <ToolHeader label={i18n.text(messages.navigation)} subject={questionTitles(args)[0]} meta={meta} />;
+}
+
+function Titles({ args }: { args: Json }) {
+  return <div className="space-y-2">
+    {questionTitles(args).map((title, index) => <p key={index} className="type-body whitespace-pre-wrap break-words">{title}</p>)}
   </div>;
-  if (data && "answer" in data) return <div className="space-y-1 type-body whitespace-pre-wrap break-words">
-    {titles[0] && <p className="type-label">{titles[0]}</p>}<p>{data.answer}</p>
-  </div>;
+}
+function ExecutionBody(props: ExecutionProps) {
+  const requestId = waitingRequest(props);
+  const questions = parseQuestions(props.args);
+  if (requestId && questions) return <QuestionPanel requestId={requestId} questions={questions} />;
+  return <Titles args={props.args} />;
+}
+function ResultBody({ args, result }: ResultProps) {
+  const i18n = useI18n();
+  const data = result.data;
+  if (data && "answers" in data) return <AnswerSummary rows={resultRows(parseQuestions(args), data)} message={data.message} />;
+  if (data && "answer" in data) {
+    const title = questionTitles(args)[0];
+    return <div className="space-y-1 type-body whitespace-pre-wrap break-words">
+      {title && <p className="type-label">{title}</p>}<p>{data.answer}</p>
+    </div>;
+  }
   return <div className="space-y-3">
-    {titles.map((title, index) => <p key={index} className="type-body whitespace-pre-wrap break-words">{title}</p>)}
-    {phase === "executing" && data && "requestId" in data && <Button type="button" size="sm" variant="outline" onClick={() => questionFocus.open(ref, data.requestId)}>
-      <ArrowDownToLine />{i18n.text(messages.locate)}
-    </Button>}
-    {phase === "settled" && <StatusText tone="neutral">{i18n.text(result.kind === "cancelled" ? messages.cancelled : messages.unanswered)}</StatusText>}
+    <Titles args={args} />
+    <StatusText tone="neutral">{i18n.text(result.kind === "cancelled" ? messages.cancelled : messages.unanswered)}</StatusText>
   </div>;
 }
+
+/** 参数填充使用默认视图；执行中的正文即作答界面，提交后原位变为只读回执。 */
 export const questionToolRenderer = toolRenderer(AskUserResult, {
   label: messages.navigation, icon: <MessageCircleQuestion className="size-3.5" />,
-  input: { headerRenderer: Header, bodyRenderer: Body, streaming: ({ args }) => questionTitles(args).some(title => title.length > 0) },
-  execution: { headerRenderer: Header, bodyRenderer: Body },
-  result: { headerRenderer: Header, bodyRenderer: Body },
+  execution: { headerRenderer: ExecutionHeader, bodyRenderer: ExecutionBody, attention: props => waitingRequest(props) !== null },
+  result: { headerRenderer: ResultHeader, bodyRenderer: ResultBody },
 });

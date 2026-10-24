@@ -31,7 +31,7 @@ export function ToolCall({ node }: { node: ToolCallNode }) {
   const hasInputBody = filling && view?.body !== undefined && view.body !== null;
   const stage = filling ? "input" : state.phase === "executing" ? "output" : null;
   const disclosure = useStreamingDisclosure(viewStateKeys.disclosure, stage,
-    view?.streaming === true && view.body != null, preferences);
+    view?.streaming === true && view.body != null, preferences, view?.attention === true && view.body != null);
   const result = state.props?.result;
   const outcome = "outcome" in node ? node.outcome : null;
   const hasResultDetails = outcome && outcome.data !== null && outcome.model.every(part => part.kind === "text");

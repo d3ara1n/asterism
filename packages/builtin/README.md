@@ -22,7 +22,7 @@
 | `src/agent/wait/` | 共享 `Wait` 工具的 Agent 实现与三态视图；等待被链接代理收束，超时报告运行中状态 |
 | `src/agent/ui/` | Agent 自有 toolbar／overlay／modal 布局、贡献组件挂载、当前模型选择注入与输入区隐藏请求；公共作者接口在 `@atelier/builtin-api/renderer`，内置工具栏贡献在 `conversation/Toolbar.tsx` |
 | `src/agent/conversation/Markdown.tsx`、`MarkdownCode.tsx`、`MermaidDiagram.tsx` | Markdown 图片与代码组件、Mermaid 按需渲染；`markdown-options.ts` 声明历史与实时内容共用的插件，交互见[对话视图](../../docs/workbench.md#代理卡片与工具调用视图) |
-| `src/questions/` | `ask_user` 三题型与结构化答案、内存问答服务及具型调用、可保留草稿的底部／模态作答界面和工具三态视图；契约见[等待用户回答](../../docs/runtime.md#等待用户回答)，交互见[结构化问答](../../docs/workbench.md#结构化问答) |
+| `src/questions/` | `ask_user` 三题型与结构化答案、内存问答服务及具型调用、工具执行正文内可保留草稿的作答界面（可放大为模态窗）与只读回执；契约见[等待用户回答](../../docs/runtime.md#等待用户回答)，交互见[结构化问答](../../docs/workbench.md#结构化问答) |
 | `src/notes/`、`src/filesystem/` | 资源与正文工具实现、创建入口与三态工具视图 |
 | `src/shell/` | 共用 Shell profile 解析、`shell_profile_list` 顶层查询与三态视图、非交互管道进程、显式终止与 IO 收束、有界输出及临时日志；目录 `exec` 经同一服务执行，契约见 [目录命令执行](../../docs/runtime.md#目录命令执行exec) |
 | `src/terminal/` | 交互 PTY、后台屏幕、最小 shell 状态集成、人机共享输入、文字／图片观察与等待；资源对象只是入口，实例在新建或用户开启时创建，关闭、移除或回溯时结束；屏幕、输入与状态经终端通道传输，契约见 [终端资源](../../docs/runtime.md#终端资源) |

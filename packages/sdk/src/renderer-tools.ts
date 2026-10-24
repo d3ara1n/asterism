@@ -38,11 +38,16 @@ export interface ToolStreamingPhaseView<P> extends ToolPhaseView<P> {
   /** 纯函数：已有适合流式预览的正文时返回 true；同阶段首次命中后由外壳按用户偏好管理开合。 */
   streaming?: (props: P) => boolean;
 }
+/** 执行视图另可声明需要用户处理的正文。 */
+export interface ToolExecutionPhaseView<P> extends ToolStreamingPhaseView<P> {
+  /** 纯函数：正文需要用户处理时返回 true；外壳在执行阶段首次命中时立即展开一次，不受流式偏好影响，用户仍可折叠。 */
+  attention?: (props: P) => boolean;
+}
 export interface ToolRendererDefinition<D = Json, T = Json, A = Json> {
   label?: UiText;
   icon?: ReactNode;
   input?: ToolStreamingPhaseView<ToolInputRenderProps>;
-  execution?: ToolStreamingPhaseView<ToolExecutionRenderProps<D, T, A>>;
+  execution?: ToolExecutionPhaseView<ToolExecutionRenderProps<D, T, A>>;
   result?: ToolPhaseView<ToolResultRenderProps<D, T, A>>;
 }
 export interface ToolView {
@@ -52,6 +57,8 @@ export interface ToolView {
   body?: ReactNode;
   /** 输入或执行中的正文可参与流式预览开合；false 表示本次未命中，阶段结束由调用生命周期决定。 */
   streaming?: boolean;
+  /** 执行中的正文需要用户处理；外壳在该阶段首次为 true 时展开一次。 */
+  attention?: boolean;
 }
 export interface ToolRenderer {
   contract: ContractReference;
@@ -59,7 +66,7 @@ export interface ToolRenderer {
 }
 
 function render<P extends { phase: ToolRenderProps["phase"] }>(
-  definition: Pick<ToolView, "label" | "icon">, view: ToolStreamingPhaseView<P> | undefined, props: P,
+  definition: Pick<ToolView, "label" | "icon">, view: ToolExecutionPhaseView<P> | undefined, props: P,
 ): ToolView {
   return {
     label: definition.label, icon: definition.icon,
@@ -67,6 +74,7 @@ function render<P extends { phase: ToolRenderProps["phase"] }>(
     body: view?.bodyRenderer ? createElement(view.bodyRenderer, props) : undefined,
     streaming: (props.phase === "input" || props.phase === "executing")
       && !!view?.bodyRenderer && (view.streaming?.(props) ?? false),
+    attention: props.phase === "executing" && !!view?.bodyRenderer && (view.attention?.(props) ?? false),
   };
 }
 

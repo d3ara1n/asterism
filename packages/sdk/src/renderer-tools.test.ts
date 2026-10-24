@@ -36,14 +36,18 @@ describe("工具流式预览声明", () => {
   });
 
   // 等待与执行共享入口、多个阶段可复用对象；阶段分派必须拦住等待、终结及没有正文的声明。
-  it("等待、终结与无正文视图不触发流式判断", () => {
+  it("等待、终结与无正文视图不触发流式与需要处理判断", () => {
     const streaming = vi.fn(() => true);
-    const shared = { bodyRenderer: () => null, streaming };
+    const attention = vi.fn(() => true);
+    const shared = { bodyRenderer: () => null, streaming, attention };
     const renderer = toolRenderer(contract, { execution: shared, result: shared });
-    expect(renderer.resolve({ ...input, phase: "ready", args: { content: "" } })?.streaming).toBe(false);
+    expect(renderer.resolve({ ...input, phase: "ready", args: { content: "" } })).toMatchObject({ streaming: false, attention: false });
     expect(renderer.resolve({ ...input, phase: "settled", args: { content: "" },
-      result: { kind: "succeeded", data: { text: "saved" } } })?.streaming).toBe(false);
+      result: { kind: "succeeded", data: { text: "saved" } } })).toMatchObject({ streaming: false, attention: false });
     expect(toolRenderer(contract, { input: { streaming } }).resolve(input)?.streaming).toBe(false);
+    expect(toolRenderer(contract, { execution: { attention } }).resolve({ ...input, phase: "executing", args: { content: "" } })?.attention).toBe(false);
     expect(streaming).not.toHaveBeenCalled();
+    expect(attention).not.toHaveBeenCalled();
+    expect(renderer.resolve({ ...input, phase: "executing", args: { content: "" } })?.attention).toBe(true);
   });
 });

@@ -1,6 +1,6 @@
 import { defineModule, defineTopLevelTool, implementCall, PluginApiError } from "@atelier/sdk/runtime";
 import { Agent } from "@atelier/builtin-api/contracts";
-import { AnswerQuestion, AskUserResult, CancelQuestion, QuestionsChanged, ReadQuestions, askUserArgs } from "./contract.ts";
+import { AnswerQuestion, AskUserResult, CancelQuestion, QuestionsChanged, askUserArgs } from "./contract.ts";
 import { createQuestionService } from "./service.ts";
 
 export default defineModule(plugin => {
@@ -32,10 +32,6 @@ export default defineModule(plugin => {
       },
     })],
     calls: [
-      implementCall(ReadQuestions, async (_input, { object }) => {
-        questions.publish(object.ref);
-        return questions.read(object.ref);
-      }),
       implementCall(AnswerQuestion, async (input, { object }) => { questions.answer(object.ref, input.id, input.submission); return null; }),
       implementCall(CancelQuestion, async (input, { object }) => { questions.cancel(object.ref, input.id); return null; }),
     ],

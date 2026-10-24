@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { ResourceRef } from "@atelier/sdk/contracts";
 import { PluginApiError, type CallResult } from "@atelier/sdk/runtime";
-import type { Answer, PendingQuestion, Question, QuestionSnapshot, Submission } from "./contract.ts";
+import type { Answer, PendingQuestion, Question, Submission } from "./contract.ts";
 import { AnswerValidationError, resolveAnswers } from "./answers.ts";
 
 interface Waiting {
@@ -22,10 +22,9 @@ export function createQuestionService(changed: (object: ResourceRef, pending: Pe
     return entry;
   };
   return {
-    read(object: ResourceRef): QuestionSnapshot {
+    read(object: ResourceRef): { pending: PendingQuestion[] } {
       return { pending: current(object) };
     },
-    publish: notify,
     ask(object: ResourceRef, callId: string, questions: Question[], signal: AbortSignal, publish?: (id: string) => void): Promise<CallResult<Answer>> {
       signal.throwIfAborted();
       const id = randomUUID();
@@ -33,7 +32,7 @@ export function createQuestionService(changed: (object: ResourceRef, pending: Pe
         const finish = (result: CallResult<Answer>) => {
           if (!waiting.delete(id)) return;
           signal.removeEventListener("abort", abort);
-          // 答案或取消已被受理；通知失败不改变工具结局，界面可通过快照重读同步。
+          // 答案或取消已被受理；通知失败不改变工具结局，界面随工具历史终结，通知只用于清理草稿。
           resolve(result);
           try { notify(object); }
           catch (error) { console.error("Question state notification failed after settlement.", error); }

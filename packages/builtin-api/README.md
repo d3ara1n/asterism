@@ -17,7 +17,7 @@
 - `ReadAgentCreations`：通过 SDK 具型调用查询模型创建入口与资源类型的关联，供前后端公共消费者使用。
 - `resolveAgentModelSelection`：按目录解析代理选择的模型引用、可用模型与思考等级，供摘要展示；`resolveAgentModel` 只取其中的模型。展示结果不改写原始选择，也不替代请求边界校验。
 
-`@atelier/builtin-api/renderer` 依赖宿主共享的 React，提供 Agent 界面登记和呈现 API，只允许前端导入。执行循环、压缩策略、提交去重、卡片投影及实际布局属于实现包。取得契约不授予对象写权限；外部准备者仍只能读取宿主绑定的对象门面。顶层工具与插件调用接口属于 [SDK](../sdk/README.md)，内置 ask_user 通过这些公共接口消费 Agent UI。
+`@atelier/builtin-api/renderer` 依赖宿主共享的 React，提供 Agent 界面登记和呈现 API，只允许前端导入。执行循环、压缩策略、提交去重、卡片投影及实际布局属于实现包。取得契约不授予对象写权限；外部准备者仍只能读取宿主绑定的对象门面。顶层工具与插件调用接口属于 [SDK](../sdk/README.md)。
 
 `@atelier/builtin-api/runtime` 只允许后台导入，导出 `defineAgentCreation` 与 `agentCreations`，供插件声明 Agent 创建入口及内置工具消费目录。通用会话创建、链接和移除仍属于 SDK。
 
