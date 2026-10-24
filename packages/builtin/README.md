@@ -30,7 +30,7 @@
 | `src/resources/` | Agent 创建目录查询、创建和统一移除顶层工具及三态视图；通过 SDK 绑定会话门面消费宿主生命周期 |
 | `src/naming/` | 自动命名、人工命名接口、`session_name / session_rename` 顶层工具及标题投影；契约见[会话命名](../../docs/session-naming.md)，记录契约由公共包提供 |
 | `src/settings/` | 内置插件托管配置与按流式预览／Shell／MCP／技能分组的自定义设置页；配置在插件根入口登记 |
-| `src/skills/` | 启动构建的共享技能目录、YAML 元数据解析、`skill_read / skill_refresh` 顶层工具与视图、设置概要；请求环境与边界见 [技能目录与读取](../../docs/runtime.md#技能目录与读取) |
+| `src/skills/` | 启动构建的共享技能目录、YAML 元数据解析、`skill_read / skill_refresh` 顶层工具与视图、按来源分组的设置概要与来源浮岛；请求环境与边界见 [技能目录与读取](../../docs/runtime.md#技能目录与读取) |
 | `src/providers/` | 提供商预设、主动余额／套餐查询及 `headers.ts` 的被动限流解析；各服务独立解析，主动 HTTP 共用 `usage-http.ts`，通过 SDK 贡献登记，不拥有缓存或跨进程消费 |
 | `src/usage/` | 独立的账户用量消费者：从 SDK 目录取实现，管理缓存、解析 Agent 显式交付的响应结果，通过自有调用／事件向共享订阅和 toolbar 交付状态；不导入提供方实现 |
 | `src/web/` | Web 资源、搜索／URL 获取工具与视图、Exa SDK 适配；类型与连接契约见 [Web 资源](../../docs/web.md) |

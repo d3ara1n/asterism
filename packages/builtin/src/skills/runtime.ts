@@ -23,7 +23,7 @@ export function createSkillsModule(catalog: SkillCatalog) {
         name: "skill_read",
         description: "Read a skill's instructions or a supporting UTF-8 file within its package.",
         guidelines: [
-          "The system prompt contains the skill catalog with names, descriptions and SKILL.md locations.",
+          "The system prompt contains the skill catalog with names and descriptions.",
           "path is relative to the selected skill's directory. Package file reads stay within that directory, including symbolic link resolution.",
           "offset and limit select complete lines. nextOffset identifies where remaining content starts.",
         ],
@@ -42,12 +42,13 @@ export function createSkillsModule(catalog: SkillCatalog) {
       }), defineTopLevelTool({
         id: SkillRefresh.id, name: "skill_refresh",
         description: "Refresh the shared skill catalog from installed skills after adding, editing or removing a skill.",
-        guidelines: ["The updated catalog is shared by all Agents and settings. Subsequent model requests receive its names and descriptions."],
+        guidelines: ["The updated catalog is shared by all Agents and settings. Subsequent model requests receive its names and descriptions. The result reports the skill count and discovery issues."],
         argsSchema: z.strictObject({}).describe("Empty parameter object."),
         resultSchema: SkillRefresh.schema, effect: "write", execution: "sequential",
         async execute(_args, { signal }) {
           signal.throwIfAborted();
-          return { kind: "succeeded", data: refresh(signal) };
+          refresh(signal);
+          return { kind: "succeeded", data: catalog.summary() };
         },
       })],
     };

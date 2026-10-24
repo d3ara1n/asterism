@@ -20,19 +20,35 @@ export const SkillRead = builtin.data("skill.read", textReadSchema.extend({
   directory: z.string(),
 }).describe("Selected skill file lines, absolute skill directory, total line count, and nextOffset for remaining text."));
 
-export const skillOverviewSchema = z.strictObject({
+const skillIssueSchema = z.strictObject({ file: z.string(), message: z.string() });
+export type SkillIssue = z.infer<typeof skillIssueSchema>;
+
+/** 来源只是分组与审计用的标识：目录来源为绝对路径，插件来源为插件 ID，软件内置为 builtin。 */
+export const skillSourceOverviewSchema = z.strictObject({
   source: z.string(),
-  skills: z.array(skillMetadataSchema),
-  issues: z.array(z.strictObject({ file: z.string(), message: z.string() })),
-}).describe("Loaded skill names and descriptions, source directory, and discovery issues.");
+  skills: z.array(z.strictObject({
+    name: z.string(),
+    description: z.string(),
+    /** 同名技能由更高优先级来源提供时，记录生效来源。 */
+    overriddenBy: z.string().optional(),
+  })),
+  issues: z.array(skillIssueSchema),
+});
+export type SkillSourceOverview = z.infer<typeof skillSourceOverviewSchema>;
+/** 来源按覆盖优先级从低到高排列：内置、插件、用户目录。 */
+export const skillOverviewSchema = z.strictObject({ sources: z.array(skillSourceOverviewSchema) });
 export type SkillOverview = z.infer<typeof skillOverviewSchema>;
+
 export const ReadSkills = defineCall(builtin.name("skills.list"), {
   scope: "plugin", input: z.strictObject({}), output: skillOverviewSchema,
 });
 export const RefreshSkills = defineCall(builtin.name("skills.refresh"), {
   scope: "plugin", input: z.strictObject({}), output: skillOverviewSchema,
 });
-export const SkillRefresh = builtin.data("skill.refresh", skillOverviewSchema);
+export const SkillRefresh = builtin.data("skill.refresh", z.strictObject({
+  count: z.number().int().nonnegative(),
+  issues: z.array(skillIssueSchema),
+}).describe("Number of skills in the rebuilt catalog and discovery issues by file."));
 export const SkillsChanged = builtin.event("skills.changed", {
   schema: skillOverviewSchema, source: "plugin", semantics: { kind: "snapshot", key: [] },
 });

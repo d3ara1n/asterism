@@ -25,15 +25,13 @@ function SkillReadBody({ result }: ReadProps) {
 function RefreshHeader({ result }: RefreshProps) {
   const i18n = useI18n();
   return <ToolHeader label={i18n.text(skillsMessages.refresh)}
-    meta={result?.data && i18n.formatMessage(skillsMessages.count, { count: result.data.skills.length })} />;
+    meta={result?.data && i18n.formatMessage(skillsMessages.count, { count: result.data.count })} />;
 }
+/** 刷新结果只保存技能数与发现问题；完整目录在设置中查看。 */
 function RefreshBody({ result }: RefreshProps) {
   const data = result?.data;
-  return data ? <div className="space-y-2">
-    {data.skills.map(skill => <div key={skill.name}>
-      <p className="type-label">{skill.name}</p><p className="type-caption whitespace-pre-wrap">{skill.description}</p>
-    </div>)}
-    {data.issues.map((issue, index) => <p key={index} className="type-caption break-all text-destructive">{issue.file}: {issue.message}</p>)}
+  return data?.issues.length ? <div className="space-y-1">
+    {data.issues.map((issue, index) => <p key={index} className="type-caption break-all text-destructive select-text">{issue.file}: {issue.message}</p>)}
   </div> : null;
 }
 const readHeader = { headerRenderer: SkillReadHeader };

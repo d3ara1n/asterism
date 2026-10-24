@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { SkillCatalog, parseSkillMetadata } from "./catalog.ts";
 import { readToModel } from "../shared/text.ts";
+import type { SkillOverview } from "./contract.ts";
 
 const roots: string[] = [];
 const signal = new AbortController().signal;
@@ -12,8 +13,10 @@ function setup() {
   const base = realpathSync(mkdtempSync(join(tmpdir(), "atelier-skills-"))); roots.push(base);
   const source = join(base, "skills");
   mkdirSync(source);
-  return { base, source, catalog: new SkillCatalog(source) };
+  return { base, source, catalog: new SkillCatalog([{ id: source, directory: source }]) };
 }
+/** 单来源目录的唯一分组。 */
+const only = (overview: SkillOverview) => overview.sources[0]!;
 function skill(source: string, directory: string, name = directory, description = "A useful skill") {
   const root = join(source, directory);
   mkdirSync(root, { recursive: true });
@@ -48,8 +51,8 @@ describe("技能目录与读取", () => {
     writeFileSync(join(broken, "SKILL.md"), "---\nname: missing-description\n---");
     const first = catalog.refresh(signal);
     const prompt = catalog.prompt();
-    expect(first.skills.map(skill => skill.name)).toEqual(["a", "z"]);
-    expect(first.issues).toEqual([expect.objectContaining({ file: join(broken, "SKILL.md") })]);
+    expect(only(first).skills.map(skill => skill.name)).toEqual(["a", "z"]);
+    expect(only(first).issues).toEqual([expect.objectContaining({ file: join(broken, "SKILL.md") })]);
     writeFileSync(join(a, "SKILL.md"), "---\nname: a\ndescription: Updated\n---\nNew instructions");
     rmSync(join(source, "z"), { recursive: true });
     skill(source, "b");
@@ -57,14 +60,16 @@ describe("技能目录与读取", () => {
     expect(catalog.prompt()).toEqual(prompt);
     await expect(catalog.read({ name: "b", path: "SKILL.md", offset: 1, limit: 10 }, signal))
       .rejects.toMatchObject({ code: "skill_not_found" });
-    expect(catalog.refresh(signal).skills).toEqual([
+    expect(only(catalog.refresh(signal)).skills).toEqual([
       { name: "a", description: "Updated" }, { name: "b", description: "A useful skill" },
     ]);
-    expect(catalog.prompt().text).toContain('"description":"Updated"');
+    expect(catalog.prompt().text).toContain('{"name":"a","description":"Updated"}');
+    // 模型只按名称取用技能，目录提示不携带来源与路径。
+    expect(catalog.prompt().text).not.toContain(source);
     expect(prompt.text).toContain('"description":"A useful skill"');
     rmSync(source, { recursive: true });
-    expect(catalog.overview().skills.map(skill => skill.name)).toEqual(["a", "b"]);
-    expect(catalog.refresh(signal)).toEqual({ source, skills: [], issues: [] });
+    expect(only(catalog.overview()).skills.map(skill => skill.name)).toEqual(["a", "b"]);
+    expect(catalog.refresh(signal)).toEqual({ sources: [{ source, skills: [], issues: [] }] });
   });
 
   it("同名技能全部标为歧义，读取不会任意选中某个目录", async () => {
@@ -73,11 +78,33 @@ describe("技能目录与读取", () => {
     skill(source, "one", "same");
     skill(source, "two", "same");
     skill(source, "unique");
-    const overview = catalog.refresh(signal);
+    const overview = only(catalog.refresh(signal));
     expect(overview.skills.map(skill => skill.name)).toEqual(["unique"]);
     expect(overview.issues.map(issue => issue.file)).toEqual([join(source, "one", "SKILL.md"), join(source, "two", "SKILL.md")]);
     await expect(catalog.read({ name: "same", path: "SKILL.md", offset: 1, limit: 10 }, signal))
       .rejects.toMatchObject({ code: "skill_not_found" });
+  });
+
+  it("跨来源同名按优先级覆盖，被覆盖条目保留在原来源中并标明生效来源", async () => {
+    // 来源是分组而非命名空间：模型按名称读取时只能得到高优先级来源的包，被覆盖条目仍在设置中按来源可见。
+    const { base } = setup();
+    const plugin = join(base, "plugin"), user = join(base, "user");
+    skill(plugin, "shared", "shared", "From plugin");
+    skill(plugin, "plugin-only");
+    const winner = skill(user, "shared", "shared", "From user");
+    const catalog = new SkillCatalog([{ id: "example.plugin", directory: plugin }, { id: user, directory: user }]);
+    const overview = catalog.refresh(signal);
+    expect(overview.sources).toEqual([
+      { source: "example.plugin", issues: [], skills: [
+        { name: "plugin-only", description: "A useful skill" },
+        { name: "shared", description: "From plugin", overriddenBy: user },
+      ] },
+      { source: user, issues: [], skills: [{ name: "shared", description: "From user" }] },
+    ]);
+    expect(catalog.summary()).toEqual({ count: 2, issues: [] });
+    expect(catalog.prompt().text).toContain('{"name":"shared","description":"From user"}');
+    expect(catalog.prompt().text).not.toContain("From plugin");
+    expect((await catalog.read({ name: "shared", path: "SKILL.md", offset: 1, limit: 10 }, signal)).directory).toBe(winner);
   });
 
   it("包内参考文件按绝对行号分页，续读提示使用顶层 offset 参数，重新读取取得新正文", async () => {
@@ -123,7 +150,7 @@ describe("技能目录与读取", () => {
     const outside = skill(base, "outside");
     mkdirSync(join(source, "escape"));
     symlinkSync(join(outside, "SKILL.md"), join(source, "escape", "SKILL.md"), "file");
-    const overview = catalog.refresh(signal);
+    const overview = only(catalog.refresh(signal));
     expect(overview.skills).toEqual([]);
     expect(overview.issues).toEqual([{
       file: join(source, "escape", "SKILL.md"), message: "The file's symbolic link resolves outside the selected skill package.",
