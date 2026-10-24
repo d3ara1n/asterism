@@ -28,7 +28,7 @@
 | `src/terminal/` | 交互 PTY、后台屏幕、最小 shell 状态集成、人机共享输入、文字／图片观察与等待；资源对象只是入口，实例在新建或用户开启时创建，关闭、移除或回溯时结束；屏幕、输入与状态经终端通道传输，契约见 [终端资源](../../docs/runtime.md#终端资源) |
 | `src/terminal/service.ts`、`screen.ts`、`raw-buffer.ts`、`screen-writer.ts` | 分别管理 PTY 与共享实例、后台网格与观察投影、原始输出范围、前端帧消费队列；资源与工具装配位于 `runtime.ts` |
 | `src/resources/` | Agent 创建目录查询、创建和统一移除顶层工具及三态视图；通过 SDK 绑定会话门面消费宿主生命周期 |
-| `src/naming/` | 自动命名、人工命名接口和标题投影；记录契约由公共包提供 |
+| `src/naming/` | 自动命名、人工命名接口、`session_name / session_rename` 顶层工具及标题投影；契约见[会话命名](../../docs/session-naming.md)，记录契约由公共包提供 |
 | `src/settings/` | 内置插件托管配置与按流式预览／Shell 分组的自定义设置页；配置在插件根入口登记 |
 | `src/providers/` | 提供商预设、主动余额／套餐查询及 `headers.ts` 的被动限流解析；各服务独立解析，主动 HTTP 共用 `usage-http.ts`，通过 SDK 贡献登记，不拥有缓存或跨进程消费 |
 | `src/usage/` | 独立的账户用量消费者：从 SDK 目录取实现，管理缓存、解析 Agent 显式交付的响应结果，通过自有调用／事件向共享订阅和 toolbar 交付状态；不导入提供方实现 |

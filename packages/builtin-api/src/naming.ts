@@ -9,7 +9,7 @@ import { builtin } from "./identity.ts";
 export const SessionNamed = defineRecord(builtin.name("session.named"), {
   schema: z.strictObject({
     title: z.string().min(1).max(160),
-    source: z.enum(["user", "auto"]),
+    source: z.enum(["user", "agent", "auto"]),
     auto: z.strictObject({
       level: z.enum(["initial", "refined"]),
       messageId: z.string(),

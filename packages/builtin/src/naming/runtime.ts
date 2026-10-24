@@ -1,7 +1,9 @@
-import { defineModule, type ModelServices } from "@atelier/sdk/runtime";
+import { z } from "zod";
+import { defineModule, defineTopLevelTool, type ModelServices } from "@atelier/sdk/runtime";
 import { inputSummary, builtin, SessionNamed, type NamingApi } from "@atelier/builtin-api/contracts";
 import type { SessionSnapshot } from "@atelier/sdk/contracts";
 import { cleanTitle, collectTurns, namingInstruction, namingPrompt, renameCheckpoints, userMessages } from "./policy.ts";
+import { SessionNameResult, SessionRenameResult } from "./contract.ts";
 
 const timeoutMs = 10_000;
 const responseLimit = 4000;
@@ -32,20 +34,53 @@ async function generateTitle(models: Pick<ModelServices, "stream">, prompt: stri
   return title;
 }
 
-
 /** 在实际插件 setup 中交付具身份的接口；连接的清理由模块生命周期负责。 */
 export function createNamingModule(connect: (api: NamingApi) => () => void, userAgent?: string) {
   return defineModule(plugin => {
+    function nameSession(sessionId: string, input: string, source: "user" | "agent") {
+      const title = input.replace(/\s+/gu, " ").trim();
+      plugin.session(sessionId).commit(writer => {
+        writer.append(SessionNamed, { title, source });
+      });
+      return { title };
+    }
     const disconnect = connect({
       nameByUser(sessionId, title) {
-        plugin.session(sessionId).commit(writer => {
-          writer.append(SessionNamed, { title: title.replace(/\s+/gu, " ").trim(), source: "user" });
-        });
+        nameSession(sessionId, title, "user");
       },
     });
     plugin.lifetime.defer(disconnect);
     return {
       records: [SessionNamed],
+      topLevelTools: [
+        defineTopLevelTool({
+          id: SessionNameResult.id, name: "session_name",
+          description: "Read the current session's title.", guidelines: [],
+          argsSchema: z.strictObject({}).describe("Empty parameter object."),
+          resultSchema: SessionNameResult.schema,
+          effect: "read", execution: "parallel",
+          async execute(_args, { session }) {
+            return { kind: "succeeded", data: { title: session.title.get() } };
+          },
+        }),
+        defineTopLevelTool({
+          id: SessionRenameResult.id, name: "session_rename",
+          description: "Set the current session's title to the name you choose.",
+          guidelines: [
+            "A concise title in the user's language helps identify the work; the conversation and the user's naming preferences guide the choice.",
+            "The title is recorded in the timeline as an agent choice and takes precedence over automatic naming. Later user or agent choices can replace it.",
+          ],
+          argsSchema: z.strictObject({
+            title: z.string().min(1).max(160).regex(/\S/u, "The title must contain non-whitespace text.")
+              .describe("The chosen session title, up to 160 UTF-16 code units. Whitespace is trimmed and collapsed."),
+          }).describe("The title to save for the current session."),
+          resultSchema: SessionRenameResult.schema,
+          effect: "write", execution: "sequential",
+          async execute({ title }, { session }) {
+            return { kind: "succeeded", data: nameSession(session.id, title, "agent") };
+          },
+        }),
+      ],
       observers: [{
         id: "session-naming",
         committed({ records, snapshot, session }) {
@@ -53,20 +88,20 @@ export function createNamingModule(connect: (api: NamingApi) => () => void, user
           const latest = inputs.at(-1);
           if (latest?.status !== "known" || !records.some(record => record.id === latest.record.id)) return;
           const named = snapshot.records.last(SessionNamed, { scope: "timeline" });
-          if (named?.status === "unknown" || named?.data.source === "user") return;
+          if (named && (named.status === "unknown" || named.data.source !== "auto")) return;
           const first = userMessages(snapshot, "session")[0];
           const initial = first?.status === "known" && records.some(record => record.id === first.record.id);
           const message = initial ? first : latest;
           const level = initial ? "initial" : "refined";
           if (level === "refined" && !renameCheckpoints.has(inputs.length)) return;
-          if (named?.status === "known" && named.data.auto?.messageId === message.record.id) return;
+          if (named?.data.auto?.messageId === message.record.id) return;
           const model = plugin.models.roles().find(role => role.id === "utility")?.model ?? null;
           if (model === null) return;
           const prompt = namingPrompt(level === "initial" ? [{ user: inputSummary(message.data.parts) }]
             : collectTurns(snapshot.records.all({ scope: "timeline" })));
           const applicable = (view: SessionSnapshot) => {
             const named = view.records.last(SessionNamed, { scope: "timeline" });
-            return named?.status !== "unknown" && named?.data.source !== "user" &&
+            return (!named || (named.status === "known" && named.data.source === "auto")) &&
               userMessages(view, "timeline").some(input => input.record.id === message.record.id);
           };
           plugin.tasks.start(`naming:${session.id}:${message.record.id}`, async signal => {

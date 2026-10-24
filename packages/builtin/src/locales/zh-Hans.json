@@ -321,6 +321,8 @@
   "markdownDiagramRendering": "正在渲染图表…",
   "markdownDiagramFailed": "无法渲染此图表，下方保留源码。",
   "recordSessionNamed": "会话命名为「{title}」",
+  "naming.name": "会话名称",
+  "naming.rename": "重命名会话",
   "context.window": "上下文窗口",
   "context.windowOf": "/ {window} toks",
   "context.tokens": "toks",
