@@ -93,4 +93,20 @@ export const appMessages = pluginNamespace("atelier.host").messages("en", define
     id: "conversation.moreActions",
     defaultMessage: "More actions",
   },
+  archiveConversation: {
+    id: "conversation.archive",
+    defaultMessage: "Archive conversation",
+  },
+  archiveConversationTitle: {
+    id: "conversation.archive.title",
+    defaultMessage: "Archive this conversation?",
+  },
+  archiveConversationDescription: {
+    id: "conversation.archive.description",
+    defaultMessage: "Archiving ends the running instances of its resources. The conversation moves to the recycle bin in Settings and is removed after about a month.",
+  },
+  archiveConfirm: {
+    id: "conversation.archive.confirm",
+    defaultMessage: "Archive",
+  },
 }));

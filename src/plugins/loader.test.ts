@@ -61,13 +61,16 @@ describe("插件装配", () => {
   it.each([false, true])("插件根共享服务在模块之后清理，重复登记失败=%s", async conflict => {
     const ns = pluginNamespace("test.composition"), order: string[] = [];
     const query = defineCall(ns.name("query"), { scope: "plugin", input: z.null(), output: z.number() });
-    const loaded = load([definePlugin({ namespace: ns, version: "1", setup() {
+    const loaded = load([definePlugin({ namespace: ns, version: "1", setup(plugin) {
       const service = { value: 1 };
+      // 根先于模块登记，逆序清理使模块先释放。
+      plugin.lifetime.defer(async () => { service.value = 0; order.push("plugin"); });
       return {
         calls: [implementCall(query, async () => service.value)],
-        modules: [defineModule(() => ({ calls: conflict ? [implementCall(query, async () => 2)] : [],
-          closing: async () => { expect(service.value).toBe(1); order.push("module"); } }))],
-        closing: async () => { service.value = 0; order.push("plugin"); },
+        modules: [defineModule(module => {
+          module.lifetime.defer(async () => { expect(service.value).toBe(1); order.push("module"); });
+          return { calls: conflict ? [implementCall(query, async () => 2)] : [] };
+        })],
       };
     } })]);
     expect(loaded.manifest[0]?.status).toBe(conflict ? "failed" : "loaded");
@@ -83,13 +86,13 @@ describe("插件装配", () => {
     const held = new Promise<void>(resolve => { release = resolve; });
     const abort = new Promise<void>(resolve => { cancelled = resolve; });
     const order: string[] = [];
-    const loaded = load([definePlugin({ namespace: ns, version: "1", setup: () => ({
-      calls: [implementCall(wait, async (_, { signal }) => {
+    const loaded = load([definePlugin({ namespace: ns, version: "1", setup: plugin => {
+      plugin.lifetime.defer(async () => { order.push("plugin"); });
+      return { calls: [implementCall(wait, async (_, { signal }) => {
         signal.addEventListener("abort", cancelled, { once: true }); started();
         await held; order.push("handler"); return null;
-      })],
-      closing: async () => { order.push("plugin"); },
-    }) })]);
+      })] };
+    } })]);
     const result = expect(loaded.calls.invoke(wait.id, null, {}, null)).rejects.toThrow();
     await start;
     const closing = loaded.close();
@@ -117,8 +120,8 @@ describe("插件装配", () => {
   it("后续模块失败时逆序清理已初始化模块，关闭不会重复清理", async () => {
     const calls: string[] = [];
     const broken = definePlugin({ namespace: pluginNamespace("acme.cleanup"), version: "1", modules: [
-      defineModule(plugin => ({ closing: async () => { plugin.models.list(); calls.push("first"); } })),
-      defineModule(() => ({ closing: async () => { calls.push("second"); } })),
+      defineModule(plugin => { plugin.lifetime.defer(async () => { plugin.models.list(); calls.push("first"); }); return {}; }),
+      defineModule(plugin => { plugin.lifetime.defer(async () => { calls.push("second"); }); return {}; }),
       defineModule(() => { throw new Error("setup failed"); }),
     ] });
     const loaded = load([broken]);
@@ -131,10 +134,10 @@ describe("插件装配", () => {
     let release!: () => void;
     const held = new Promise<void>(resolve => { release = resolve; });
     const provider = definePlugin({ namespace: pluginNamespace("acme.provider"), version: "1",
-      modules: [defineModule(() => ({ closing: async () => { calls.push("provider"); } }))] });
+      modules: [defineModule(plugin => { plugin.lifetime.defer(async () => { calls.push("provider"); }); return {}; })] });
     const consumer = definePlugin({ namespace: pluginNamespace("acme.consumer"), version: "1", dependencies: ["acme.provider"],
       modules: [
-        defineModule(() => ({ closing: async () => { await held; calls.push("consumer"); } })),
+        defineModule(plugin => { plugin.lifetime.defer(async () => { await held; calls.push("consumer"); }); return {}; }),
         defineModule(() => { throw new Error("setup failed"); }),
       ] });
     const loaded = load([consumer, provider]);
@@ -148,12 +151,12 @@ describe("插件装配", () => {
   it("后置契约校验失败先收集依赖失败，再按消费者到提供方清理", async () => {
     const calls: string[] = [], ns = pluginNamespace("acme.provider");
     const action = defineAction(ns.resource("thing", z.object({})), { id: ns.name("missing"), schema: z.null() });
-    const provider = definePlugin({ namespace: ns, version: "1", modules: [defineModule(() => ({
-      preparers: [{ id: "missing", contract: action, prepare: () => ({ action: "accept" }) }],
-      closing: async () => { calls.push("provider"); },
-    }))] });
+    const provider = definePlugin({ namespace: ns, version: "1", modules: [defineModule(plugin => {
+      plugin.lifetime.defer(async () => { calls.push("provider"); });
+      return { preparers: [{ id: "missing", contract: action, prepare: () => ({ action: "accept" }) }] };
+    })] });
     const consumer = definePlugin({ namespace: pluginNamespace("acme.consumer"), version: "1", dependencies: [ns.id],
-      modules: [defineModule(() => ({ closing: async () => { calls.push("consumer"); } }))] });
+      modules: [defineModule(plugin => { plugin.lifetime.defer(async () => { calls.push("consumer"); }); return {}; })] });
     const loaded = load([consumer, provider]);
     expect(loaded.manifest.map(plugin => plugin.status)).toEqual(["failed", "failed"]);
     await loaded.close();
@@ -166,12 +169,12 @@ describe("插件装配", () => {
     const held = new Promise<void>(resolve => { release = resolve; });
     const cleaning = new Promise<void>(resolve => { started = resolve; });
     const action = defineAction(ns.resource("thing", z.object({})), { id: ns.name("missing"), schema: z.null() });
-    const provider = definePlugin({ namespace: ns, version: "1", modules: [defineModule(() => ({
-      preparers: [{ id: "missing", contract: action, prepare: () => ({ action: "accept" }) }],
-      closing: async () => { calls.push("provider"); },
-    }))] });
+    const provider = definePlugin({ namespace: ns, version: "1", modules: [defineModule(plugin => {
+      plugin.lifetime.defer(async () => { calls.push("provider"); });
+      return { preparers: [{ id: "missing", contract: action, prepare: () => ({ action: "accept" }) }] };
+    })] });
     const consumer = definePlugin({ namespace: pluginNamespace("acme.consumer"), version: "1", dependencies: [ns.id], modules: [
-      defineModule(() => ({ closing: async () => { started(); await held; calls.push("consumer"); } })),
+      defineModule(plugin => { plugin.lifetime.defer(async () => { started(); await held; calls.push("consumer"); }); return {}; }),
       defineModule(() => { throw new Error("Consumer setup failed."); }),
     ] });
     const loaded = load([consumer, provider]);

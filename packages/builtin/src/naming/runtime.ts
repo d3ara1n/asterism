@@ -43,6 +43,7 @@ export function createNamingModule(connect: (api: NamingApi) => () => void, user
         });
       },
     });
+    plugin.lifetime.defer(disconnect);
     return {
       records: [SessionNamed],
       observers: [{
@@ -86,7 +87,6 @@ export function createNamingModule(connect: (api: NamingApi) => () => void, user
           if (title !== null) session.title.set(title);
         },
       }],
-      async closing() { disconnect(); },
     };
   });
 }

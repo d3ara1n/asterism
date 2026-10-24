@@ -26,6 +26,8 @@ export type RuntimeStatus = z.infer<typeof runtimeStatusSchema>;
 export const snapshotSchema = z.strictObject({
   workspace: z.strictObject({ id, title: z.string() }),
   sessions: z.array(z.strictObject({ id, title: z.string(), created_at: z.string() })),
+  /** 回收站目录：只含会话本身，供设置页计数与恢复。 */
+  archivedSessions: z.array(z.strictObject({ id, title: z.string(), created_at: z.string(), archived_at: z.string() })),
   /** 插件包：启动时状态；renderer 为 atelier-plugin:// 下的入口路径。 */
   plugins: z.array(z.strictObject({ index: z.number().int().nonnegative().nullable(), id: z.string().nullable(), source: z.string(),
     status: z.enum(["loaded", "disabled", "invalid", "failed", "pending"]), enabled: z.boolean(), error: z.string().nullable(), renderer: z.string().nullable(),

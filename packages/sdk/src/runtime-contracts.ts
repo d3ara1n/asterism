@@ -24,10 +24,19 @@ import type { ProviderPresetContribution } from "./provider-usage.ts";
 export type * from "./objects.ts";
 export type { ResourceRef, ResourceCreationResult, ResourceSnapshot, SessionSnapshot } from "./workspace.ts";
 
+/**
+ * 生命周期作用域：结束时先中止 signal，再按登记逆序等待全部清理完成。
+ * 宿主维护应用、会话、对象三层作用域，父作用域结束前先结束子作用域；退出、归档与对象移除共用同一清理路径。
+ */
+export interface Lifetime {
+  readonly signal: AbortSignal;
+  /** 登记清理；作用域已结束时抛出 unavailable。清理失败只记录日志，不阻止其余清理。 */
+  defer(cleanup: () => void | Promise<void>): void;
+}
 export interface PluginContext {
   readonly id: string;
-  /** 装配失败或关闭时取消；用于释放插件自己的公共服务登记。 */
-  readonly signal: AbortSignal;
+  /** 插件级生命周期：与宿主运行实例同寿；插件共享服务（连接池、订阅、公共登记）挂在这里。 */
+  readonly lifetime: Lifetime;
   readonly sessions: SessionDirectory;
   readonly dir: string;
   readonly log: PluginLogger;
@@ -54,18 +63,10 @@ export interface SessionCursorChanged {
   readonly snapshot: SessionSnapshot;
   readonly session: SessionExecutor;
 }
-/** 当前资源集合的存在性变化；initial 表示宿主启动时从存储构造对象。 */
-export interface SessionResourcesChanged {
-  readonly session: SessionExecutor;
-  readonly appeared: readonly ResourceSnapshot[];
-  readonly disappeared: readonly ResourceSnapshot[];
-  readonly initial: boolean;
-}
 export interface SessionObserver {
   readonly id: string;
   committed?(event: SessionCommitted): undefined;
   cursorChanged?(event: SessionCursorChanged): undefined;
-  resourcesChanged?(event: SessionResourcesChanged): undefined;
 }
 export type Preparation<C extends Json = Json> =
   | { action: "accept" }
@@ -103,6 +104,11 @@ export interface ResourceContribution {
   context?(resource: ResourceSnapshot, object: ObjectReader): Promise<ContextFile[]>;
   /** 结束当前实例前呈现给用户的说明；不阻止后台移除或等待外部清理。 */
   disposalWarning?(resource: ResourceSnapshot, object: ObjectReader): UiText | null;
+  /**
+   * 对象进入当前集合时同步调用（启动、创建、恢复、回溯使其重新出现）；lifetime 在对象离开当前集合、
+   * 所属会话归档或应用退出时结束。对象独占的外部实例在此登记清理。
+   */
+  attach?(resource: ResourceSnapshot, object: ObjectReader, lifetime: Lifetime): void;
 }
 type OptionalData<T, D> = T extends unknown ? Omit<T, "data"> & { data?: D | null } : never;
 export type CallResult<D extends Json = Json> =
@@ -135,7 +141,6 @@ export interface ModuleContribution {
   tools?: readonly ToolContribution[];
   observers?: readonly SessionObserver[];
   preparers?: readonly CommandPreparer[];
-  closing?(): Promise<void>;
 }
 /** 具名模块入口：插件提供贡献，宿主负责装配与调用。 */
 export interface PluginModule { setup(plugin: PluginContext): ModuleContribution }

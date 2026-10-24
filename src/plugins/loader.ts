@@ -1,4 +1,4 @@
-import { belongsTo, ResourcePresenceChanged, type ActionContract, type ResourceCall, type SessionRecord, type SessionSnapshot, type ToolContract } from "@atelier/sdk/contracts";
+import { belongsTo, ResourcePresenceChanged, type ActionContract, type ResourceCall, type ResourceSnapshot, type SessionRecord, type SessionSnapshot, type ToolContract } from "@atelier/sdk/contracts";
 import { PluginApiError, type PluginDefinition, type PluginLogger, type PluginTasks,
   type ResourceRef, type SessionObserver, type CommandPreparer, type ModuleContribution } from "@atelier/sdk/runtime";
 import type { CredentialVault } from "../configuration/credentials.ts";
@@ -9,6 +9,7 @@ import type { ToolImplementation } from "../tools/contract.ts";
 import { ToolRegistry } from "../tools/registry.ts";
 import type { SessionNode, LiveBlock } from "../shared/session.ts";
 import { RunLifecycle, type RunGroup, type RunningWork } from "./lifecycle.ts";
+import { LifetimeScope } from "./lifetime.ts";
 import { PluginStorage } from "./storage.ts";
 import type { HostModels } from "./models.ts";
 import type { CatalogHost, SessionHost } from "./host.ts";
@@ -60,6 +61,10 @@ export interface LoadedPlugins {
   tools: ToolRegistry;
   manifest: readonly PluginManifest[];
   initialize(): void;
+  /** 结束会话全部对象的生命周期：取消绑定运行、发布消失、等待清理；归档前调用。 */
+  release(sessionId: string): Promise<void>;
+  /** 恢复会话后重新发布全部对象出现。 */
+  restore(sessionId: string): void;
   /** 提交后派发观察；队列排空后对涉及的会话各调用一次 publish。 */
   afterCommit(sessionId: string, change: { records: readonly SessionNode[]; cursorChanged: boolean }, publish: (sessionId: string) => void): void;
   prepare(kind: string, command: ResourceCall, context: { sessionId: string; objectId: string; signal: AbortSignal; content?: ContentLease }): Promise<ParsedCall>;
@@ -71,7 +76,7 @@ interface Collected {
   topLevelTools: RegisteredTopLevelTool[];
   actions: readonly ActionContract<unknown>[];
   observers: readonly SessionObserver[]; preparers: readonly CommandPreparer[];
-  sdk: SdkContext; tasks: TaskHost; storage: PluginStorage; lifecycle: RunLifecycle; preparations: RunGroup; closing: (() => Promise<void>)[];
+  sdk: SdkContext; tasks: TaskHost; storage: PluginStorage; lifecycle: RunLifecycle; preparations: RunGroup; lifetime: LifetimeScope;
 }
 
 class TaskHost implements PluginTasks {
@@ -120,7 +125,7 @@ function initializationOrder(plugins: readonly PluginDefinition[]) {
 
 /** 启动时收集 SDK 贡献，按插件顺序解析覆盖并冻结目录。 */
 export function loadPlugins(plugins: readonly PluginDefinition[], services: PluginHostServices): LoadedPlugins {
-  const directory = Object.freeze({ list: () => services.sessions.list() });
+  const directory = Object.freeze({ list: () => services.sessions.list(), archived: () => services.sessions.archived() });
   const events = services.events ?? new EventBus();
   events.declarePublic(ResourcePresenceChanged);
   const calls = new CallRegistry(services);
@@ -146,21 +151,21 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
       const storage = new PluginStorage(services.extensionsDirectory, id, services.vault ?? null, log.warn);
       storage.onChanged = () => services.configurationChanged?.(id);
       const lifecycle = new RunLifecycle(sessionId => services.sessions.progressChanged(sessionId)); lifecycles.push(lifecycle);
+      // 插件级生命周期随运行登记一同中止信号，清理在插件释放时按登记逆序执行。
+      const lifetime = new LifetimeScope((message, error) => log.error(message, error), lifecycle.signal);
       const taskHost = new TaskHost(log, lifecycle.group("task"));
       const eventScope = new PluginEventScope(events, id, lifecycle.group("event"));
-      const sdk = createSdkContext({ id, signal: lifecycle.signal, dir: storage.dir, log, config: contract => storage.config(contract),
+      const sdk = createSdkContext({ id, lifetime, dir: storage.dir, log, config: contract => storage.config(contract),
         secrets: storage.secrets, db: () => storage.db(), tasks: taskHost }, services, lifecycle.group("model"), lifecycle.group("action"), directory, eventScope,
         calls.client(id, lifecycle.group("call")), (ref, policy, linked) => bindTopLevelTools(topLevelTools, ref, policy, linked));
       const resources: ResourceBackend[] = [], tools: ToolImplementation[] = [], observers: SessionObserver[] = [], preparers: CommandPreparer[] = [];
       const actions: ActionContract<unknown>[] = [];
-      entry = { plugin, resources, tools, topLevelTools: [], actions, observers, preparers, sdk, tasks: taskHost, storage, lifecycle, events: eventScope, preparations: lifecycle.group("prepare"), closing: [] };
+      entry = { plugin, resources, tools, topLevelTools: [], actions, observers, preparers, sdk, tasks: taskHost, storage, lifecycle, events: eventScope, preparations: lifecycle.group("prepare"), lifetime };
       initialized.push(entry);
       const commandIds = new Set<string>();
-      const closing = entry.closing;
       const pluginTools = entry.topLevelTools;
-      // 根入口与功能模块共用登记管线，清理责任先于其贡献校验登记。
+      // 根入口与功能模块共用登记管线；清理责任由各模块在 setup 内向 plugin.lifetime 登记。
       const register = (contribution: ModuleContribution) => {
-        if (contribution.closing) closing.push(contribution.closing);
         if (contribution.usageProviders?.length || contribution.providerPresets?.length) {
           if (!services.providerExtensions) throw new Error("Provider contributions are unavailable.");
           services.providerExtensions.declare(id, contribution.usageProviders ?? [], contribution.providerPresets ?? [],
@@ -227,9 +232,7 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
   async function dispose(entry: Collected) {
     entry.events.stop();
     await entry.lifecycle.close();
-    for (const close of [...entry.closing].reverse()) {
-      try { await close(); } catch (error) { (services.log ?? defaultLog)(entry.plugin.namespace.id, "error", "Plugin closing callback failed.", error); }
-    }
+    await entry.lifetime.end();
     entry.sdk.disable();
     entry.storage.close();
   }
@@ -277,19 +280,47 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
   const touched = new Set<string>();
   const observers = collected.flatMap(entry => entry.observers);
   const presence = new ResourcePresence();
-  const notifyPresence = (sessionId: string, snapshot: SessionSnapshot, initial: boolean) => {
-    const change = presence.update(sessionId, snapshot.resources.all());
-    if (!change.appeared.length && !change.disappeared.length) return;
-    // 对象离开当前集合即结束其前端通道，先于插件观察者释放外部实例。
+  /** 对象生命周期：只为声明 attach 的资源建立；父信号取所属插件的生命周期。 */
+  const objectScopes = new Map<string, LifetimeScope>();
+  const ending = new Set<Promise<void>>();
+  const attach = (resource: ResourceSnapshot) => {
+    const owner = collected.find(entry => entry.resources.some(item => item.kind === resource.ref.kind));
+    const backend = owner?.resources.find(item => item.kind === resource.ref.kind);
+    if (!owner || !backend?.attach) return;
+    const log = (message: string, error: unknown) => (services.log ?? defaultLog)(owner.plugin.namespace.id, "error", message, error);
+    const scope = new LifetimeScope(log, owner.lifetime.signal);
+    objectScopes.set(resource.ref.id, scope);
+    try { backend.attach(resource, scope); }
+    catch (error) { log(`Resource ${resource.ref.kind} attach failed.`, error); }
+  };
+  /** 结束对象生命周期：先中止信号并取消绑定这些对象的运行，收束后再执行清理。 */
+  const detach = (refs: readonly ResourceSnapshot["ref"][]): Promise<void> => {
+    const ids = new Set(refs.map(ref => ref.id));
+    const scopes = refs.flatMap(ref => {
+      const scope = objectScopes.get(ref.id);
+      objectScopes.delete(ref.id);
+      return scope ? [scope] : [];
+    });
+    for (const scope of scopes) scope.abort();
+    const work = (async () => {
+      await Promise.allSettled(collected.map(entry => entry.lifecycle.cancel(object => ids.has(object.id))));
+      await Promise.allSettled(scopes.map(scope => scope.end()));
+    })();
+    ending.add(work); void work.finally(() => ending.delete(work));
+    return work;
+  };
+  const publishPresence = (sessionId: string, change: { appeared: readonly ResourceSnapshot[]; disappeared: readonly ResourceSnapshot[] }): Promise<void> => {
+    if (!change.appeared.length && !change.disappeared.length) return Promise.resolve();
+    // 对象离开当前集合即结束其前端通道，再结束对象生命周期释放外部实例。
     if (change.disappeared.length) channels.release(sessionId, change.disappeared.map(resource => resource.ref.id));
     events.publish(ResourcePresenceChanged, null, { sessionId,
       appeared: change.appeared.map(resource => resource.ref.id), disappeared: change.disappeared.map(resource => resource.ref.id) });
-    for (const entry of collected) for (const observer of entry.observers) {
-      if (!observer.resourcesChanged) continue;
-      try { synchronous(() => observer.resourcesChanged!({ ...change, initial, session: entry.sdk.context.session(sessionId) })); }
-      catch (error) { (services.log ?? defaultLog)(entry.plugin.namespace.id, "error", `Observer ${observer.id} resourcesChanged callback failed.`, error); }
-    }
+    const detached = change.disappeared.length ? detach(change.disappeared.map(resource => resource.ref)) : Promise.resolve();
+    for (const resource of change.appeared) attach(resource);
+    return detached;
   };
+  const notifyPresence = (sessionId: string, snapshot: SessionSnapshot) =>
+    void publishPresence(sessionId, presence.update(sessionId, snapshot.resources.all()));
   let dispatching = false;
   let closed = false;
   let closing: Promise<void> | undefined;
@@ -317,7 +348,13 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
     },
     resources, tools: new ToolRegistry(resolvedTools.tools), manifest: Object.freeze(manifest.map(entry => Object.freeze(entry))),
     initialize() {
-      for (const session of services.sessions.list()) notifyPresence(session.id, sessionSnapshot(services.sessions.view(session.id)), true);
+      for (const session of services.sessions.list()) notifyPresence(session.id, sessionSnapshot(services.sessions.view(session.id)));
+    },
+    async release(sessionId) {
+      await publishPresence(sessionId, { appeared: [], disappeared: presence.forget(sessionId) });
+    },
+    restore(sessionId) {
+      notifyPresence(sessionId, sessionSnapshot(services.sessions.view(sessionId)));
     },
     afterCommit(sessionId, { records: nodes, cursorChanged }, publish) {
       touched.add(sessionId);
@@ -335,7 +372,7 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
       try {
         while (notifications.length) {
           const event = notifications.shift()!;
-          if (event.cursorChanged) notifyPresence(event.sessionId, event.snapshot, false);
+          if (event.cursorChanged) notifyPresence(event.sessionId, event.snapshot);
           for (const entry of collected) for (const observer of entry.observers) {
             const session = entry.sdk.context.session(event.sessionId);
             const run = (name: string, call: () => undefined) => {
@@ -388,6 +425,10 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
       closing = (async () => {
         await Promise.allSettled(collected.map(entry => entry.lifecycle.close()));
         await failedCleanup;
+        // 退出与归档共用对象生命周期清理；对象先于其所属插件的生命周期结束。
+        const scopes = [...objectScopes.values()];
+        objectScopes.clear();
+        await Promise.allSettled([...scopes.map(scope => scope.end()), ...ending]);
         for (const entry of disposalOrder) await dispose(entry);
       })();
       return closing;

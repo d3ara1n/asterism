@@ -28,17 +28,13 @@ export default defineModule(plugin => {
     for (const ref of objects.values()) plugin.object(ref.sessionId, McpHost, ref.id).invalidate();
   });
   const unsubscribe = config.subscribe(value => service.configure(value.mcp.servers));
-  const stop = () => { void service.close().catch(error => plugin.log.error("MCP shutdown failed.", error)); };
-  plugin.signal.addEventListener("abort", stop, { once: true });
+  // 连接池挂在插件生命周期：会话归档或对象移除只注销登记，不断开其他会话仍在使用的连接。
+  plugin.lifetime.defer(async () => { unsubscribe(); await service.close(); });
   // 任务在同步装配完成后启动，状态事件与资源契约已登记。
   plugin.tasks.start("mcp.start", async signal => { await Promise.resolve(); signal.throwIfAborted(); service.configure(config.get().mcp.servers); });
   const servers = () => config.get().mcp.servers;
   return {
     events: [McpChanged],
-    observers: [{ id: "mcp.presence", resourcesChanged({ appeared, disappeared }) {
-      for (const resource of disappeared) if (resource.ref.kind === McpHost.kind) objects.delete(resource.ref.id);
-      for (const resource of appeared) if (resource.ref.kind === McpHost.kind) objects.set(resource.ref.id, resource.ref);
-    } }],
     calls: [
       implementCall(ReadMcp, async () => service.states()),
       implementCall(ReadMcpTools, async ({ serverId }) => service.tools(serverId)),
@@ -73,7 +69,7 @@ export default defineModule(plugin => {
       }),
       // 设置页的连接在后台进行：等待浏览器授权期间页面其他操作照常可用，结果经状态事件呈现。
       implementCall(ConnectMcpServer, async ({ serverId }) => {
-        const signal = plugin.signal;
+        const signal = plugin.lifetime.signal;
         void service.connect(serverId, signal).catch(error => { if (!signal.aborted) plugin.log.warn(`MCP connection to ${serverId} failed: ${messageOf(error)}`); });
         return null;
       }),
@@ -89,6 +85,10 @@ export default defineModule(plugin => {
       creation: implementCreation(CreateMcpHost, { create: ({ title }) => ({ title, data: {} }) }),
       project: () => ({ servers: service.states() }),
       inspect: async () => ({ servers: service.list({ offset: 0, limit: 20 }) }),
+      attach(_data, object, lifetime) {
+        objects.set(object.ref.id, object.ref);
+        lifetime.defer(() => { objects.delete(object.ref.id); });
+      },
     })],
     tools: [
       implementTool(McpList, { call: (_data, _target, args, { signal }) => readResult(() => service.list(args), signal) }),
@@ -124,6 +124,5 @@ export default defineModule(plugin => {
         toModel: mcpResultToModel,
       }),
     ],
-    async closing() { unsubscribe(); plugin.signal.removeEventListener("abort", stop); await service.close(); },
   };
 });

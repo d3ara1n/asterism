@@ -608,5 +608,18 @@
   "plugins.removeHint": "重启后生效。插件数据与会话历史将保留。",
   "plugins.cancel": "取消",
   "plugins.operationFailed": "插件操作失败，请重试。",
-  "plugins.configurationUnavailable": "此插件尚未登记所请求的配置。"
+  "plugins.configurationUnavailable": "此插件尚未登记所请求的配置。",
+  "conversation.archive": "归档会话",
+  "conversation.archive.title": "归档此会话？",
+  "conversation.archive.description": "归档会结束其资源的运行实例。会话将移入设置中的回收站，大约一个月后清除。",
+  "conversation.archive.confirm": "归档",
+  "conversations.title": "会话管理",
+  "conversations.count": "{count} 个会话",
+  "conversations.archivedCount": "{count, plural, =0 {回收站为空} other {已归档 # 个会话}}",
+  "conversations.recycleBin": "回收站",
+  "conversations.recycleBin.hint": "已归档的会话大约一个月后清除。",
+  "conversations.recycleBin.empty": "没有已归档的会话。",
+  "conversations.archivedAt": "归档于 {date}",
+  "conversations.restore": "恢复",
+  "conversations.restore.label": "恢复“{title}”"
 }

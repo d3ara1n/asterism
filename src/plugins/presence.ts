@@ -13,4 +13,10 @@ export class ResourcePresence {
       disappeared: [...previous.values()].filter(resource => !current.has(resource.ref.id)),
     };
   }
+  /** 会话离开在场集合（归档）：返回此前的全部资源并清除登记。 */
+  forget(sessionId: string): ResourceSnapshot[] {
+    const previous = this.sessions.get(sessionId);
+    this.sessions.delete(sessionId);
+    return [...previous?.values() ?? []];
+  }
 }

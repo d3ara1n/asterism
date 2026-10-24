@@ -23,7 +23,7 @@
 
 ## 核心调用路径
 
-`renderer/features/session → preload → main/RuntimeHost → utilityProcess → SessionService → SessionTree / SessionWorkbench / ObjectStore`
+`renderer/features/session → preload → main/RuntimeHost → utilityProcess → SessionService → SessionTree / SessionWorkbench`
 
 - **插件工具装配**：`plugins/loader.ts` 收集贡献、处理依赖与生命周期；`plugins/tool-contributions.ts` 校验插件内工具声明，并按用户列表解析覆盖与实现状态；`plugins/top-level-tools.ts` 绑定顶层工具调用上下文，`tools/registry.ts` 提供有效资源实现目录。覆盖契约见 [工具覆盖](../docs/runtime.md#工具覆盖)。
 - **会话写入与观察**：会话命令经 Zod 校验后交运行时单一写入者同步事务处理。路径遍历位于 `shared/session-timeline.ts`（前后台共用）。`SessionTree.select` 将游标选择审计与游标更新原子提交；提交后分别派发新增记录观察 `committed` 与最终游标变化观察 `cursorChanged`（命名模块据此同步会话标题）。`SessionTree.workbench` 沿当前游标全量重放资源与链接事件，供工作台展示与执行校验共用。

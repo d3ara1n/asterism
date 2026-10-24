@@ -27,6 +27,7 @@ export function createAgentModule(application: BuiltinApplication, usage: UsageC
     const systemPrompt = (agent: Parameters<typeof composeSystemPrompt>[0]) => composeSystemPrompt(agent, application.name);
     const selection = createSelection({ agents: () => plugin.catalogs.get(AgentConfigurations) ?? [] });
     const feedback = createAgentFeedback();
+    plugin.lifetime.defer(feedback.clear);
     const loop = createAgentLoop({ selection, tasks: plugin.tasks, models: plugin.models, systemPrompt, userAgent: application.userAgent,
       usage, feedback });
     const admission = createAdmission({ selection, validate: plugin.models.validate, running: loop.running, systemPrompt });
@@ -34,16 +35,12 @@ export function createAgentModule(application: BuiltinApplication, usage: UsageC
     const turns = new Map<string, { nodeId: string | null; interruptions: readonly (string | null)[]; state: AgentTurnState }>();
     return {
       events: [AgentSoftwareFeedback],
-      async closing() { feedback.clear(); turns.clear(); },
-      observers: [{ id: "agent-feedback", resourcesChanged({ disappeared }) {
-        for (const resource of disappeared) {
-          if (resource.ref.kind !== Agent.kind) continue;
-          feedback.delete(resource.ref.id); turns.delete(resource.ref.id);
-        }
-      } }],
       tools: [createPeekTool(plugin.models, application.userAgent, usage), createSendTool(), createWaitTool(loop)],
       resources: [implementResource(Agent, AgentView, {
         records: [AgentInputMessage, Execution, ContextSummary],
+        attach(_data, object, lifetime) {
+          lifetime.defer(() => { feedback.delete(object.ref.id); turns.delete(object.ref.id); });
+        },
         links: { receive: true, tools: object => selection.tools(selection.agent(selectionOf(object).selection)) },
         creation: implementCreation(CreateAgent, {
           prepare(input) { selection.validate(input.selection); return { action: "accept" }; },

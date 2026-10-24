@@ -6,7 +6,7 @@ import type { ResourceContract, ImplementationContract } from "./module-contract
 import type { RecordContract } from "./records.ts";
 import { reference, present, type DataContract } from "./presentation.ts";
 import { PluginApiError } from "./runtime.ts";
-import type { ContextFile, ObjectReader, ObjectExecutor, CreationContribution, ActionContribution, CommandPreparer, CreationPreparation, ActionPreparation, ExternalPreparation, ResourceContribution, ToolContribution, Preparation, CallResult } from "./runtime-contracts.ts";
+import type { ContextFile, ObjectReader, ObjectExecutor, CreationContribution, ActionContribution, CommandPreparer, CreationPreparation, ActionPreparation, ExternalPreparation, ResourceContribution, ToolContribution, Preparation, CallResult, Lifetime } from "./runtime-contracts.ts";
 import { validationMessage, jsonArgumentHint } from "./tool-validation.ts";
 import type { ToolCaller } from "./runtime-contracts.ts";
 
@@ -44,8 +44,11 @@ export function implementResource<S extends Json, V extends Json>(
     inspect(data: NoInfer<S>, object: ObjectReader): Promise<Json>;
     context?(data: NoInfer<S>, object: ObjectReader): Promise<ContextFile[]>;
     disposalWarning?(data: NoInfer<S>, object: ObjectReader): import("./i18n.ts").UiText | null;
+    /** 对象进入当前集合时调用；对象独占的外部实例向 lifetime 登记清理。 */
+    attach?(data: NoInfer<S>, object: ObjectReader, lifetime: Lifetime): void;
   },
 ): ResourceContribution {
+  const attach = definition.attach;
   return {
     resource, records: [...definition.records ?? []], links: definition.links,
     creation: definition.creation, actions: definition.actions,
@@ -53,6 +56,8 @@ export function implementResource<S extends Json, V extends Json>(
     inspect: async (snapshot, object) => jsonSchema.parse(await definition.inspect(parse(resource.stateSchema, snapshot.data, "resource"), object)),
     context: async (snapshot, object) => definition.context?.(parse(resource.stateSchema, snapshot.data, "resource"), object) ?? [],
     disposalWarning: (snapshot, object) => definition.disposalWarning?.(parse(resource.stateSchema, snapshot.data, "resource"), object) ?? null,
+    ...(attach ? { attach: (snapshot: Parameters<NonNullable<ResourceContribution["attach"]>>[0], object: ObjectReader, lifetime: Lifetime) =>
+      attach(parse(resource.stateSchema, snapshot.data, "resource"), object, lifetime) } : {}),
   };
 }
 export function implementTool<S extends Json, T extends Json, A extends Json, D extends Json>(

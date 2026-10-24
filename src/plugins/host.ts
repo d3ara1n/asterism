@@ -14,6 +14,7 @@ export interface SessionHostWriter {
 }
 export interface SessionHost {
   list: SessionDirectory["list"];
+  archived: SessionDirectory["archived"];
   create(sessionId: string, contract: CreationContract<unknown>, input: Json, options: ResourceCreationOptions & { owner: string; check(): void }): Promise<ResourceCreationResult>;
   invoke(sessionId: string, contract: ActionContract<unknown>, target: ResourceRef, input: Json, options: ResourceActionOptions & { owner: string; check(): void }): Promise<void>;
   link(sessionId: string, receiver: ResourceRef, resource: ResourceRef, linked: boolean): void;

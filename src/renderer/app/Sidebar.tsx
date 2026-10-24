@@ -16,10 +16,11 @@ import { SessionStatus } from "./SessionStatus";
 import type { ResourceStatusMark } from "./resource-status";
 
 /** 应用导航只消费会话摘要；选择会话后由应用层显式加载工作台。 */
-export function Sidebar({ snapshot, status, busy, resourceStatuses, selectedSessionId, renameDisabledSessionId, homeActive, onHome, onSession, onRename, onSettings, onHide, onRetry }: {
+export function Sidebar({ snapshot, status, busy, resourceStatuses, selectedSessionId, renameDisabledSessionId, homeActive, onHome, onSession, onRename, onArchive, onSettings, onHide, onRetry }: {
   snapshot: AppSnapshot | null; status: RuntimeStatus; busy: boolean; selectedSessionId: string | null;
   resourceStatuses: readonly ResourceStatusMark[];
   renameDisabledSessionId: string | null; onRename: (sessionId: string, title: string) => Promise<SessionResult>;
+  onArchive: (sessionId: string) => Promise<SessionResult>;
   homeActive: boolean; onHome: () => void; onSession: (id: string) => void;
   onSettings: () => void; onHide: () => void; onRetry: () => void;
 }) {
@@ -44,8 +45,8 @@ export function Sidebar({ snapshot, status, busy, resourceStatuses, selectedSess
             media={<MessageSquare className="text-muted-foreground" />} title={<span className="block truncate">{session.title}</span>}
             actions={<>
               <SessionStatus marks={marks} />
-              <SessionActions title={session.title} disabled={disabled} renameDisabled={renameDisabledSessionId === session.id}
-                onRename={title => onRename(session.id, title)} />
+              <SessionActions sessionId={session.id} title={session.title} disabled={disabled} renameDisabled={renameDisabledSessionId === session.id}
+                onRename={title => onRename(session.id, title)} onArchive={() => onArchive(session.id)} />
             </>} />;
         })}
         {snapshot?.sessions.length === 0 && <p className="type-caption px-2 py-3">{i18n.formatMessage(appMessages.noConversations)}</p>}

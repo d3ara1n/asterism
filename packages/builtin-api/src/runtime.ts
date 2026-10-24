@@ -17,7 +17,7 @@ type CreationOptions = Parameters<TopLevelToolContext["session"]["create"]>[2];
 /** 目录按宿主运行实例隔离；共享公共导出不使不同宿主的插件登记串线。 */
 const directories = new WeakMap<SessionDirectory, Map<string, Entry>>();
 function directory(plugin: PluginContext): Map<string, Entry> {
-  plugin.signal.throwIfAborted();
+  plugin.lifetime.signal.throwIfAborted();
   let entries = directories.get(plugin.sessions);
   if (!entries) { entries = new Map(); directories.set(plugin.sessions, entries); }
   return entries;
@@ -60,7 +60,7 @@ export function defineAgentCreation<I, S extends Json, O extends Json, A extends
       description: { id: definition.id, resourceKind: definition.creation.resource.kind,
         description: definition.description, guidelines: [...definition.guidelines ?? []], input },
       create(raw, context) {
-        plugin.signal.throwIfAborted(); context.signal.throwIfAborted();
+        plugin.lifetime.signal.throwIfAborted(); context.signal.throwIfAborted();
         let converted: I & Json;
         let options: CreationOptions;
         if (definition.inputSchema) {
@@ -73,11 +73,8 @@ export function defineAgentCreation<I, S extends Json, O extends Json, A extends
       },
     };
     entries.set(definition.id, value);
-    const release = () => {
-      plugin.signal.removeEventListener("abort", release);
-      if (entries.get(definition.id) === value) entries.delete(definition.id);
-    };
-    plugin.signal.addEventListener("abort", release, { once: true });
-    return { async closing() { release(); } };
+    // 插件中止即撤下登记：装配失败的插件不得在异步清理期间仍被公开查询到。
+    plugin.lifetime.signal.addEventListener("abort", () => { if (entries.get(definition.id) === value) entries.delete(definition.id); }, { once: true });
+    return {};
   });
 }

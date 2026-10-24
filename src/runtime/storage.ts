@@ -1,12 +1,12 @@
-import { createHash, randomUUID } from "node:crypto";
-import { mkdirSync, readFileSync, writeFileSync, renameSync, rmSync } from "node:fs";
+import { randomUUID } from "node:crypto";
+import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { sessionSchemaSql } from "../session/schema.ts";
-import { applicationBrand, applicationStorage } from "../shared/application.ts";
+import { applicationStorage, sessionRetentionMs } from "../shared/application.ts";
 import { contentSchemaSql } from "./content-store.ts";
 
-const workspaceDatabaseVersion = 23;
+const workspaceDatabaseVersion = 24;
 
 /** 开发期库格式不符：发布前不迁移，提示开发者删除 db 目录重建。 */
 export class DatabaseVersionError extends Error {
@@ -60,30 +60,8 @@ export function openDatabase(root: string): DatabaseSync {
   }
 }
 
-/** 不可变内容先落盘再引用；失败留下的无引用 blob 不影响事件，后续可回收。 */
-export class ObjectStore {
-  constructor(private readonly root: string) { mkdirSync(root, { recursive: true }); }
-  put(content: string): string {
-    const hash = createHash("sha256").update(content).digest("hex");
-    const target = join(this.root, hash);
-    const temp = join(this.root, `.${randomUUID()}.tmp`);
-    try {
-      writeFileSync(temp, content, { encoding: "utf8", flag: "wx", mode: 0o600, flush: true });
-      renameSync(temp, target);
-    } finally {
-      rmSync(temp, { force: true });
-    }
-    return hash;
-  }
-  get(ref: string): string | null {
-    if (!/^[a-f0-9]{64}$/.test(ref)) throw new Error("Invalid object reference.");
-    try {
-      const content = readFileSync(join(this.root, ref), "utf8");
-      if (createHash("sha256").update(content).digest("hex") !== ref) return null;
-      return content;
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
-      throw error;
-    }
-  }
+/** 启动清理：硬删超过冷静期的归档会话，关联行随外键级联删除；孤儿内容由随后构造的内容存储回收。 */
+export function collectExpiredSessions(db: DatabaseSync, now = Date.now()): number {
+  const cutoff = new Date(now - sessionRetentionMs).toISOString();
+  return Number(db.prepare("DELETE FROM sessions WHERE archived_at IS NOT NULL AND archived_at <= ?").run(cutoff).changes);
 }

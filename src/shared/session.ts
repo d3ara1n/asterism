@@ -31,11 +31,15 @@ export const sessionCommandSchema = z.discriminatedUnion("type", [
   z.strictObject({ type: z.literal("read"), sessionId: id }),
   z.strictObject({ type: z.literal("watch"), sessionId: id }),
   z.strictObject({ type: z.literal("unwatch"), sessionId: id }),
-  // 结束提示在确认时读取实例当前状态；不进入投影，状态变化不触发重投影。
-  z.strictObject({ type: z.literal("disposal.warnings"), sessionId: id, objectIds: z.array(id).max(1000) }),
+  // 结束提示在确认时读取实例当前状态；不进入投影，状态变化不触发重投影。省略 objectIds 时取当前路径上的全部对象。
+  z.strictObject({ type: z.literal("disposal.warnings"), sessionId: id, objectIds: z.array(id).max(1000).optional() }),
   z.strictObject({ type: z.literal("select"), sessionId: id, nodeId: id.nullable() }),
   // 应用组合入口：将人工命名交给内置命名模块追加领域记录。
   z.strictObject({ type: z.literal("rename"), sessionId: id, title: z.string().max(160).refine(value => value.trim().length > 0) }),
+  // 归档：清理会话全部对象后标记归档时间；此后业务读取一律视为不存在。
+  z.strictObject({ type: z.literal("archive"), sessionId: id }),
+  // 回收站恢复：只清除归档时间，对象重新进入当前集合。
+  z.strictObject({ type: z.literal("restore"), sessionId: id }),
   // 资源卡片的行为入口：按对象类型路由到资源控制器，command 由该资源模块校验。
   z.strictObject({ type: z.literal("resource.command"), sessionId: id, objectId: id, command: resourceCallSchema, contentScopeId: uuid.optional() }),
   // 向工作台添加资源；input 由该资源模块校验。

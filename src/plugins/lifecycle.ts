@@ -52,6 +52,12 @@ export class RunLifecycle {
   async settle(group?: RunGroup): Promise<void> {
     await Promise.allSettled([...this.entries].filter(entry => !group || entry.group === group).map(entry => entry.done));
   }
+  /** 取消绑定在匹配对象上的运行并等待收束；对象作用域结束与会话归档共用。 */
+  async cancel(match: (object: ResourceRef) => boolean): Promise<void> {
+    const bound = [...this.entries].filter(entry => entry.object && match(entry.object));
+    for (const entry of bound) entry.cancel();
+    await Promise.allSettled(bound.map(entry => entry.done));
+  }
   async close(): Promise<void> { this.stop(); await this.settle(); }
 }
 /** 执行方式只持自身调度规则，活动与收束委托同一个生命周期。 */

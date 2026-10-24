@@ -69,7 +69,7 @@ export class ServerSession {
   invalidateDirectory() { this.directory = undefined; this.host.saveDirectory(this.config, undefined); this.host.notify(); }
 
   private usable() {
-    if (this.retired || this.host.closed || this.host.plugin.signal.aborted) throw new McpError("service_unavailable", "The MCP server configuration changed or the service is closing.");
+    if (this.retired || this.host.closed || this.host.plugin.lifetime.signal.aborted) throw new McpError("service_unavailable", "The MCP server configuration changed or the service is closing.");
     if (!this.config.enabled) throw new McpError("server_disabled", `The MCP server '${this.id}' is disabled.`);
   }
   /** 取得连接；连接过程的失败统一为 connection_failed，取消保留中止原因。 */
@@ -104,7 +104,7 @@ export class ServerSession {
   }
   private async open(signal: AbortSignal): Promise<void> {
     const config = this.config;
-    const scope = AbortSignal.any([signal, this.host.plugin.signal]);
+    const scope = AbortSignal.any([signal, this.host.plugin.lifetime.signal]);
     this.setPhase("connecting", null, null);
     let oauth: McpOAuth | undefined, attempt: Live | undefined, stderr = "";
     try {
@@ -160,7 +160,7 @@ export class ServerSession {
   }
   private createLive(config: McpServerConfig, values: Record<string, string>, oauth: McpOAuth | undefined, transitionScope: AbortSignal): Live {
     const scope = new AbortController();
-    const lifetime = AbortSignal.any([scope.signal, this.host.plugin.signal]);
+    const lifetime = AbortSignal.any([scope.signal, this.host.plugin.lifetime.signal]);
     const client = new Client({ name: "Atelier", version: "0.1.0" }, {
       // stdio 使用默认 initialize 握手，每次连接只启动实际服务器进程；HTTP 在原连接上探测协议版本。
       capabilities: {}, ...(config.transport === "http" && { versionNegotiation: { mode: "auto" as const } }),

@@ -25,7 +25,7 @@ export class McpHostService implements SessionHost {
     this.db = plugin.db();
     this.db.exec("CREATE TABLE IF NOT EXISTS mcp_catalog (server_id TEXT PRIMARY KEY, endpoint TEXT NOT NULL, directory TEXT NOT NULL)");
   }
-  notify() { if (!this.closed && !this.plugin.signal.aborted) this.changed(); }
+  notify() { if (!this.closed && !this.plugin.lifetime.signal.aborted) this.changed(); }
   async credentials(id: string): Promise<Record<string, string>> {
     const raw = await this.plugin.secrets.get(credentialKey(id));
     if (!raw) return {};
@@ -74,8 +74,8 @@ export class McpHostService implements SessionHost {
   private startEager(session: ServerSession) {
     const phase = session.state().connection;
     if (phase !== "disconnected" && phase !== "error") return;
-    void session.connect(this.plugin.signal).catch(error => {
-      if (!this.plugin.signal.aborted) this.plugin.log.warn(`MCP eager connection to ${session.id} failed: ${String(error)}`);
+    void session.connect(this.plugin.lifetime.signal).catch(error => {
+      if (!this.plugin.lifetime.signal.aborted) this.plugin.log.warn(`MCP eager connection to ${session.id} failed: ${String(error)}`);
     });
   }
   /** 凭据变化后旧目录可能不再对应可见工具；断开后 eager 以新凭据重新连接。 */
@@ -90,14 +90,14 @@ export class McpHostService implements SessionHost {
   async settled() { await Promise.allSettled([...this.retiring]); }
 
   private get(id: string) {
-    if (this.closed || this.plugin.signal.aborted) throw new PluginApiError("unavailable", "The MCP service is closing.");
+    if (this.closed || this.plugin.lifetime.signal.aborted) throw new PluginApiError("unavailable", "The MCP service is closing.");
     const session = this.sessions.get(id);
     if (!session) throw new PluginApiError("not_found", `The MCP server '${id}' is not configured.`);
     return session;
   }
   /** 资源工具入口的服务器身份：五个入口对同一原因给出相同错误码。 */
   private enabled(id: string) {
-    if (this.closed || this.plugin.signal.aborted) throw new McpError("service_unavailable", "The MCP service is closing.");
+    if (this.closed || this.plugin.lifetime.signal.aborted) throw new McpError("service_unavailable", "The MCP service is closing.");
     const session = this.sessions.get(id);
     if (!session) throw new McpError("server_not_found", `The MCP server '${id}' is not configured.`);
     if (!session.config.enabled) throw new McpError("server_disabled", `The MCP server '${id}' is disabled.`);

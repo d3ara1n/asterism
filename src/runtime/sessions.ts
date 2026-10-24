@@ -55,6 +55,10 @@ export class SessionService {
   readonly plugins: readonly PluginManifest[];
   readonly configurePlugins: LoadedPlugins["configure"];
   private readonly closePlugins: () => Promise<void>;
+  private readonly releasePlugins: LoadedPlugins["release"];
+  private readonly restorePlugins: LoadedPlugins["restore"];
+  /** 入口 pending：同一会话的归档清理进行中不重入。 */
+  private readonly archiving = new Set<string>();
   private readonly naming: NamingApi;
   private readonly prepare: LoadedPlugins["prepare"];
   private readonly afterCommit: LoadedPlugins["afterCommit"];
@@ -71,6 +75,10 @@ export class SessionService {
       list: () => {
         if (this.writesClosed) throw new PluginApiError("unavailable", "The session service is closed.");
         return this.tree.list();
+      },
+      archived: () => {
+        if (this.writesClosed) throw new PluginApiError("unavailable", "The session service is closed.");
+        return this.tree.archived();
       },
       create: (sessionId, contract, input, options) => this.createFromPlugin(sessionId, contract, input, options),
       invoke: (sessionId, contract, target, input, options) => this.invokeFromPlugin(sessionId, contract, target, input, options),
@@ -150,6 +158,8 @@ export class SessionService {
     this.plugins = modules.manifest;
     this.configurePlugins = modules.configure;
     this.closePlugins = modules.close;
+    this.releasePlugins = modules.release;
+    this.restorePlugins = modules.restore;
     this.naming = modules.naming;
     this.afterCommit = modules.afterCommit;
     this.prepare = modules.prepare;
@@ -461,12 +471,19 @@ export class SessionService {
         return { kind: "accepted", sessionId: command.sessionId };
       case "start": return this.start(command);
       case "disposal.warnings": {
-        const ids = new Set(command.objectIds);
+        const ids = command.objectIds ? new Set(command.objectIds) : null;
         return { kind: "warnings", warnings: this.tree.workbench(command.sessionId).objects.flatMap(object => {
-          const warning = ids.has(object.id) ? this.resources.disposalWarning(object) : null;
+          const warning = !ids || ids.has(object.id) ? this.resources.disposalWarning(object) : null;
           return warning ? [{ objectId: object.id, title: object.title, warning }] : [];
         }) };
       }
+      case "archive":
+        await this.archive(command.sessionId);
+        return { kind: "accepted", sessionId: command.sessionId };
+      case "restore":
+        this.tree.restore(command.sessionId);
+        this.restorePlugins(command.sessionId);
+        return { kind: "accepted", sessionId: command.sessionId };
       case "rename":
         try { this.naming.nameByUser(command.sessionId, command.title); }
         catch (error) {
@@ -571,6 +588,22 @@ export class SessionService {
       await agents.execute!({ sessionId, resource }, submit, before);
       return { kind: "accepted", sessionId };
     } finally { await content.close(); }
+  }
+  /** 归档与退出共用清理：中止在途创建、结束会话全部对象作用域，再标记归档时间。 */
+  private async archive(sessionId: string): Promise<void> {
+    this.tree.cursor(sessionId);
+    if (this.archiving.has(sessionId)) throw new SessionError("conflict", "This session is already being archived.");
+    this.archiving.add(sessionId);
+    try {
+      for (const [key, controller] of this.creating) if (key.startsWith(`${sessionId}/`)) controller.abort();
+      const creations = [...this.pendingCreations.values()].filter(pending => pending.sessionId === sessionId);
+      for (const pending of creations) pending.controller.abort();
+      await Promise.allSettled(creations.map(pending => pending.done));
+      await this.releasePlugins(sessionId);
+      this.tree.archive(sessionId);
+      this.watching.delete(sessionId);
+      this.updates.delete(sessionId);
+    } finally { this.archiving.delete(sessionId); }
   }
   async close(): Promise<void> {
     this.closed = true;

@@ -36,7 +36,7 @@
   },
   "atelier": {
     "id": "example.input-review",
-    "api": { "major": 16, "minMinor": 0 },
+    "api": { "major": 17, "minMinor": 0 },
     "runtime": "./src/runtime.ts"
   }
 }

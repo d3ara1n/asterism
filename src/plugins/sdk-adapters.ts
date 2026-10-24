@@ -1,5 +1,5 @@
 import { jsonSchema, reference, type ResourceCall, type Json, type ContractReference } from "@atelier/sdk/contracts";
-import { PluginApiError, type ResourceContribution, type ResourceRef, type ToolContribution, type ResourceSnapshot } from "@atelier/sdk/runtime";
+import { PluginApiError, type Lifetime, type ResourceContribution, type ResourceRef, type ToolContribution, type ResourceSnapshot } from "@atelier/sdk/runtime";
 import { SessionError } from "../session/tree.ts";
 import type { FoldedObject } from "../session/fold.ts";
 import type { ResourceBackend } from "../resources/contract.ts";
@@ -58,6 +58,8 @@ export function adaptResource(contribution: ResourceContribution, sdk: SdkContex
       const captured = snapshot(host, object);
       return contribution.disposalWarning?.(captured, sdk.reader(captured.ref, undefined, captured)) ?? null;
     },
+    ...(contribution.attach ? { attach: (captured: ResourceSnapshot, lifetime: Lifetime) =>
+      synchronous(() => contribution.attach!(captured, sdk.reader(captured.ref, undefined, captured), lifetime)) } : {}),
     controller: {
       creationId: creation?.contract.id,
       creationContract: creation?.contract,

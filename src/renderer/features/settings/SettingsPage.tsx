@@ -1,4 +1,5 @@
 import { LanguageSettings } from "./LanguageSettings";
+import { SessionsSettings } from "./SessionsSettings";
 import { AppearanceSettings } from "../appearance/AppearanceSettings";
 import { ProvidersSettings } from "../configuration/ProvidersSettings";
 import { RolesSettings } from "../configuration/RolesSettings";
@@ -31,7 +32,7 @@ import { fadeTransition, islandTransition } from "../../shared/weave/motion";
 interface SettingsCategory { id: string; title: import("@atelier/sdk/contracts").UiText; summary: import("@atelier/sdk/contracts").UiText; icon: ComponentType<LucideProps>; content: () => ReactNode }
 
 const categories: SettingsCategory[] = [
-  { id: "general", title: settingsMessages.generalTitle, summary: settingsMessages.generalSummary, icon: Info, content: () => <LanguageSettings /> },
+  { id: "general", title: settingsMessages.generalTitle, summary: settingsMessages.generalSummary, icon: Info, content: () => <><LanguageSettings /><SessionsSettings /></> },
   { id: "appearance", title: settingsMessages.appearance, summary: settingsMessages.appearanceSummary, icon: Palette, content: () => <AppearanceSettings /> },
   { id: "providers", title: settingsMessages.providers, summary: settingsMessages.providersSummary, icon: PlugZap, content: () => <ProvidersSettings /> },
   { id: "roles", title: settingsMessages.rolesTitle, summary: settingsMessages.rolesSummary, icon: Cpu, content: () => <RolesSettings /> },

@@ -16,7 +16,6 @@ export function applicationDataDirectory(isPackaged: boolean): string {
 export const applicationStorage = {
   databaseDirectory: "db",
   databaseFile: "workspace.sqlite",
-  objectsDirectory: "objects",
   contentDirectory: "content",
   credentialsDirectory: "credentials",
   configurationFile: "configuration.json",
@@ -27,3 +26,6 @@ export const applicationStorage = {
   logsDirectory: "logs",
   runtimeLogFile: "runtime.log",
 } as const;
+
+/** 归档会话的冷静期；仅在启动清理时判定，不是定时任务，界面只表达为约一个月。 */
+export const sessionRetentionMs = 30 * 24 * 60 * 60 * 1000;

@@ -26,15 +26,15 @@ export function createBuiltin(options: { application: BuiltinApplication; connec
   return definePlugin({ namespace: builtin, version: metadata.version,
     setup(plugin) {
       const settings = plugin.config(BuiltinSettings);
-      const shell = new ShellService(() => settings.get().shell, plugin.signal);
+      const shell = new ShellService(() => settings.get().shell, plugin.lifetime.signal);
       const usage = new UsageConsumer(plugin.providers, plugin.usages, providerId => {
         try { plugin.ipc.events.publish(UsageChanged, { providerId }); }
         catch (error) { if (!(error instanceof PluginApiError && error.code === "unavailable")) throw error; }
       });
-      plugin.signal.addEventListener("abort", () => usage.close(), { once: true });
+      // 根入口先于功能模块登记，清理逆序执行：共享服务在模块之后释放。
+      plugin.lifetime.defer(() => usage.close());
       return { events: [UsageChanged],
         calls: [implementCall(ReadUsage, (input, { signal }) => usage.query(input.providerId, { refresh: input.refresh, signal }))],
-        async closing() { usage.close(); },
         modules: [providers, createAgentModule(options.application, usage), createFilesystemModule(shell), createNamingModule(options.connectNaming, options.application.userAgent), notes, questions,
         resourceOperations, mcp, createShellModule(() => settings.get().shell), createTerminalModule(() => settings.get().shell),
         defineAgentCreation({ id: builtin.name("terminal.create"), creation: CreateTerminal,

@@ -45,5 +45,7 @@ export interface ResourceBackend {
   inspect(resource: FoldedObject): Promise<Json>;
   context(resource: FoldedObject): Promise<ContextFile[]>;
   disposalWarning?(resource: FoldedObject): import("@atelier/sdk/contracts").UiText | null;
+  /** 对象进入当前集合时由宿主调用；lifetime 结束即释放对象独占的外部实例。 */
+  attach?(resource: import("@atelier/sdk/contracts").ResourceSnapshot, lifetime: import("@atelier/sdk/runtime").Lifetime): void;
   controller?: ResourceController;
 }

@@ -19,7 +19,7 @@ SDK 的 `contracts`、`runtime`、`renderer` 三个子路径分别承担纯契�
 - **后台装配**：插件具有自身的装配入口，可初始化共享业务服务、登记可选托管配置、插件级调用与清理责任，再通过显式参数将共享服务交给功能模块。插件可以没有功能模块。
 - **前端装配**：插件前端入口拥有可选设置页面及插件级准备与清理责任，并组合功能视图模块；设置页面不要求关联资源，也不要求伪装为卡片 renderer。
 
-后台以 `definePlugin({ namespace, version, setup?, modules? })` 声明，插件 `setup` 同步返回贡献、可选功能模块及 `closing`；根入口返回的模块先于静态 `modules` 装配。前端以 `defineRendererPlugin({ modules?, settings?, prepare?, closing? })` 声明，`settings` 包含 `Body` 与可选内部定位 `locations`，组件接收 `location`。具体作者用例与包清单见 [SDK 作者指南](../packages/sdk/README.md#4-插件装配与设置页面)。
+后台以 `definePlugin({ namespace, version, setup?, modules? })` 声明，插件 `setup` 同步返回贡献与可选功能模块，清理登记到 `plugin.lifetime`（见 [生命周期作用域](#生命周期作用域)）；根入口返回的模块先于静态 `modules` 装配。前端以 `defineRendererPlugin({ modules?, settings?, prepare?, closing? })` 声明，`settings` 包含 `Body` 与可选内部定位 `locations`，组件接收 `location`。具体作者用例与包清单见 [SDK 作者指南](../packages/sdk/README.md#4-插件装配与设置页面)。
 
 `PluginModule.setup` 是功能贡献装配入口，接收完整 `PluginContext`，创建业务模块、连接依赖并返回 `ModuleContribution`。业务模块是普通函数、闭包或对象，只接收需要的具名接口；复用一个业务模块不要求将它注册为 `PluginModule`。调用或事件由插件入口还是功能模块登记，不改变契约归属与作用域；宿主共用身份检查、冲突校验和生命周期机制。
 
@@ -143,9 +143,23 @@ headers 来源需要消费者持有自己的模型调用结果，因此自然用
 - **记录提交与游标观察（`SessionObserver`）**：在原事务提交后同步排队执行，失败记日志、不回滚原提交：
   - `committed({ records, snapshot, session })`：仅在新记录提交时调用，交付本批新增记录。
   - `cursorChanged({ snapshot, session })`：仅在提交前后执行游标改变时调用（正常追加、回溯与分叉选择统一为此入口，一次外层事务只通知最终位置）。依赖历史的派生当前值（如会话标题）在此重建。
-  - `resourcesChanged({ session, appeared, disappeared, initial })`（API 14.1）：当前资源身份集合变化时，先于该批记录／游标观察调用；`appeared / disappeared` 为资源快照数组。宿主设施就绪后枚举已有会话并交付 `initial: true` 的初始出现，其后为 `false`。回调同步接收通知，资源提供方自行启动和跟踪异步初始化／清理。通知不占用时间线，不写历史，隐藏卡片和切换会话不触发。
 
-资源贡献可声明同步 `disposalWarning(data, object): UiText | null`（API 14.1），提供结束当前外部实例前的用户提示。宿主不把它写入工作台投影：移除与回溯确认框打开时经会话命令 `disposal.warnings` 按对象查询，软件退出时由主进程读取当前提示。它不作为后台移除授权或收束门禁。类型和模型工具声明保持静态，资源提供方自行定义外部实例的初始化策略。
+资源贡献可声明同步 `disposalWarning(data, object): UiText | null`（API 14.1），提供结束当前外部实例前的用户提示。宿主不把它写入工作台投影：移除、回溯与归档确认框打开时经会话命令 `disposal.warnings` 查询（省略对象列表即取会话当前全部对象），软件退出时由主进程读取当前提示。它不作为后台移除授权或收束门禁。类型和模型工具声明保持静态，资源提供方自行定义外部实例的初始化策略。
+
+### 生命周期作用域
+
+`Lifetime { signal, defer(cleanup) }`（API 17.0）是插件清理的唯一机制：作用域结束时先中止 `signal`，再按登记逆序等待全部清理；单个清理失败只记录日志。作用域结束后再登记抛出 `unavailable`。宿主维护三层作用域，清理统一归结为结束某一层：
+
+| 层级 | 结束时机 | 插件入口 |
+| --- | --- | --- |
+| 应用 | 插件装配失败或软件退出；`signal` 在开始关闭时即中止，清理在在途工作与全部对象作用域收束后执行 | `plugin.lifetime` |
+| 会话 | 会话归档或软件退出；宿主内部层级，结束其下全部对象作用域 | 不暴露 |
+| 对象 | 对象离开当前集合（移除、游标移走）、所属会话归档或软件退出 | `implementResource({ attach(data, object, lifetime) })` |
+
+- **应用级**：连接池、配置订阅、公共领域登记等插件共享服务挂在 `plugin.lifetime`。需要在中止时立即撤下的公共登记监听 `lifetime.signal`；`defer` 用于等待式清理。根入口先于模块登记，逆序清理使模块先于根服务释放。
+- **对象级**：对象进入当前集合时（启动、创建、恢复、回溯使其重新出现）宿主同步调用 `attach`，对象独占的外部实例（如终端进程）向 `lifetime` 登记清理。结束对象作用域时宿主先取消绑定在该对象上的运行并等待收束，再执行清理。共享对象只在此登记／注销引用，共享实例仍挂在应用级，不随单个会话结束。
+- **统一清理**：退出与归档走同一路径，资源随时可被清理，不设阻拦；外部实例丢失的后果由 `disposalWarning` 在确认前呈现。恢复会话时对象重新 `attach`，与软件重启后相同，不自动恢复已结束的外部实例。
+- 前端资源存在性仍由公共事件 `ResourcePresenceChanged` 交付，供界面释放状态标记，不承担后台释放职责。
 
 ## 具型创建、动作与准备管线
 
@@ -162,12 +176,12 @@ headers 来源需要消费者持有自己的模型调用结果，因此自然用
 
 `SessionExecutor` 与 `ToolSession` 指向同一会话，分别提供会话层面的通用操作与工具调用发起者视角下的操作。`ToolSession` 由宿主绑定发起资源、本次请求开始时的有效链接范围和工具执行作用域，使工具作者直接从当前发起资源出发组织操作，身份解析、授权范围校验与取消处理由宿主统一完成。后续扩展 `ToolSession` 时，每项操作均明确由调用上下文隐式绑定的端点、可操作资源范围及执行作用域；需要调用者主动选择的关系通过显式参数表达。请求授权的取用时机见 [代理控制器与请求环境](runtime.md#代理控制器与请求环境)，现有操作语义如下。
 
-- `plugin.sessions.list()` 返回当前全部会话的 `{ id, title, createdAt }` 摘要，按创建时间从新到旧排列；不加载历史、不改变前端视图。`SessionDirectory` 在同一宿主运行实例内共享，生命周期与该实例一致；公共领域服务可据此隔离自己的登记。
+- `plugin.sessions.list()` 返回活跃会话的 `{ id, title, createdAt }` 摘要，按创建时间从新到旧排列；不加载历史、不改变前端视图。`plugin.sessions.archived()` 返回回收站中的 `{ id, title, createdAt, archivedAt }`，按归档时间从新到旧排列。两者都不含的会话 ID 已被删除，插件据此清理自己按会话保存的数据，清理时机与方式由插件决定；`plugin.session(id)` 对归档会话视为不存在。`SessionDirectory` 在同一宿主运行实例内共享，生命周期与该实例一致；公共领域服务可据此隔离自己的登记。
 - `plugin.session(id)` 取得指定会话的执行门面。`session.create(CreationContract, input, { signal?, content?, linkTo?, resources? })` 引用已装配的真实声明实例，允许调用其他插件公开的契约；输入由资源提供方校验和初始化，成功返回 `ResourceCreationResult`（API 10.2）：包含 `ResourceRef` 的全部字段及创建事务内捕获的通用 `title`，不返回资源私有数据或执行门面。标题由资源创建实现决定，创建输入是否含标题字段由各契约定义。`resources`（API 10.1）为新资源接收的初始 `ResourceRef` 列表。
 - `create` 的异步准备参与调用插件及资源提供方的关闭收束。准备期间阻止会话游标回溯，提交时重验会话、执行作用域与初始链接的全部端点；失败或取消不提交创建。`linkTo / resources` 与身份、初始数据和创建事件同事务写入。后台位置复用工作台空位算法，按已保存尺寸或公共回退尺寸安排，不要求调用者提供画布坐标。内容资格交接见 [不可变内容](content.md#临时占用与提交)。
 - `session.link(receiver, resource)`、`session.unlink(receiver, resource)` 使用完整资源引用，校验双方属于当前会话和当前路径、类型一致且接收者支持链接。接收者的后台声明为 `ResourceContribution.links.receive`，前端静态描述通过 `ResourceDescription.receivesLinks` 表达同一资格；关系语义见 [资源链接](object-model.md#资源链接宿主公共关系)。`session.remove(resource)` 与前端共用宿主移除操作；对象生命周期语义见 [资源](object-model.md#resource可被操作的对象)。
 - 顶层工具的 `context.session` 固定执行会话和发起对象，`create(contract, input, { resources?, exposeSelf? })` 自动将新资源链接给发起者，返回同一 `ResourceCreationResult`；可选 `resources`（API 10.1）接收本请求有效链接范围内的资源 ID。`exposeSelf`（API 11.2）省略为 `false`，为 `true` 时由宿主将绑定的发起者作为新资源接收的初始资源，与创建及全部链接原子提交；接收资格与端点校验沿用同一创建管线。`remove(resourceId)` 采用本请求有效链接范围，并在提交时验证当前存在性与收束。模型创建的完整规则见 [Agent 创建与移除](runtime.md#agent-创建与移除)。普通 `ObjectReader.session` 仍为只读。
-- `plugin.signal` 在装配失败或开始关闭时取消，用于撤销插件自有公共登记；取消不代表活动已结束。宿主保留在途执行所需的提交设施，等待其真实收束后才释放，不因该信号提前阻断最终记录保存。
+- `plugin.lifetime.signal` 在装配失败或开始关闭时中止；中止不代表活动已结束。宿主保留在途执行所需的提交设施，等待其真实收束后才释放，不因该信号提前阻断最终记录保存。
 
 ### 后台资源动作（API 11.1）
 

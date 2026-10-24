@@ -32,7 +32,8 @@ export class SessionTree {
     if (known) return known;
     const row = this.db.prepare(`SELECT session_id AS sessionId, json_extract(payload, '$.data.type') AS kind
       FROM session_nodes WHERE json_extract(payload, '$.contract') = 'resource_created'
-      AND json_extract(payload, '$.data.id') = ? LIMIT 1`).get(id) as { sessionId: string; kind: string } | undefined;
+      AND json_extract(payload, '$.data.id') = ?
+      AND EXISTS (SELECT 1 FROM sessions s WHERE s.id = session_nodes.session_id AND s.archived_at IS NULL) LIMIT 1`).get(id) as { sessionId: string; kind: string } | undefined;
     if (!row) return null;
     const ref = { ...row, id };
     if (!this.db.isTransaction) this.identities.set(id, ref);
@@ -55,12 +56,31 @@ export class SessionTree {
     this.db.prepare("INSERT INTO sessions (id, title, created_at, cursor) VALUES (?, ?, ?, NULL)").run(id, title, new Date().toISOString());
     return id;
   }
+  /** 活跃会话目录；归档会话只经 archived 读取。 */
   list(): { id: string; title: string; createdAt: string }[] {
-    return (this.db.prepare("SELECT id, title, created_at FROM sessions ORDER BY created_at DESC, rowid DESC").all() as
+    return (this.db.prepare("SELECT id, title, created_at FROM sessions WHERE archived_at IS NULL ORDER BY created_at DESC, rowid DESC").all() as
       { id: string; title: string; created_at: string }[]).map(r => ({ id: r.id, title: r.title, createdAt: r.created_at }));
   }
+  /** 回收站目录：只列会话本身，不读取会话内容。 */
+  archived(): { id: string; title: string; createdAt: string; archivedAt: string }[] {
+    return (this.db.prepare("SELECT id, title, created_at, archived_at FROM sessions WHERE archived_at IS NOT NULL ORDER BY archived_at DESC, rowid DESC").all() as
+      { id: string; title: string; created_at: string; archived_at: string }[])
+      .map(r => ({ id: r.id, title: r.title, createdAt: r.created_at, archivedAt: r.archived_at }));
+  }
+  /** 标记归档；此后该会话的读取、写入与对象身份解析一律视为不存在。 */
+  archive(sessionId: string, at = new Date().toISOString()): void {
+    if (!this.db.prepare("UPDATE sessions SET archived_at = ? WHERE id = ? AND archived_at IS NULL").run(at, sessionId).changes)
+      throw new SessionError("not_found", "Session not found.");
+    this.workbenches.delete(sessionId);
+    for (const [id, ref] of this.identities) if (ref.sessionId === sessionId) this.identities.delete(id);
+  }
+  /** 取消归档；只清除字段，不读取会话内容。 */
+  restore(sessionId: string): void {
+    if (!this.db.prepare("UPDATE sessions SET archived_at = NULL WHERE id = ? AND archived_at IS NOT NULL").run(sessionId).changes)
+      throw new SessionError("not_found", "Archived session not found.");
+  }
   cursor(sessionId: string): string | null {
-    const row = this.db.prepare("SELECT cursor FROM sessions WHERE id = ?").get(sessionId) as { cursor: string | null } | undefined;
+    const row = this.db.prepare("SELECT cursor FROM sessions WHERE id = ? AND archived_at IS NULL").get(sessionId) as { cursor: string | null } | undefined;
     if (!row) throw new SessionError("not_found", "Session not found.");
     return row.cursor;
   }
@@ -72,7 +92,7 @@ export class SessionTree {
 
   /** 节点不可变：固定末端与追加上界即可延后读取，无需持有事务或复制历史。 */
   view(sessionId: string): NodeView {
-    const row = this.db.prepare("SELECT title, cursor FROM sessions WHERE id = ?").get(sessionId) as
+    const row = this.db.prepare("SELECT title, cursor FROM sessions WHERE id = ? AND archived_at IS NULL").get(sessionId) as
       { title: string; cursor: string | null } | undefined;
     if (!row) throw new SessionError("not_found", "Session not found.");
     const upperSeq = this.head(sessionId);
@@ -203,11 +223,11 @@ export class SessionTree {
   }
   /** 执行游标；会话尚未创建时为 undefined，供提交前后比较。 */
   position(sessionId: string): string | null | undefined {
-    return (this.db.prepare("SELECT cursor FROM sessions WHERE id = ?").get(sessionId) as { cursor: string | null } | undefined)?.cursor;
+    return (this.db.prepare("SELECT cursor FROM sessions WHERE id = ? AND archived_at IS NULL").get(sessionId) as { cursor: string | null } | undefined)?.cursor;
   }
   /** 会话尚未创建时为 null，供提交前后比较。 */
   titleOf(sessionId: string): string | null {
-    return (this.db.prepare("SELECT title FROM sessions WHERE id = ?").get(sessionId) as { title: string } | undefined)?.title ?? null;
+    return (this.db.prepare("SELECT title FROM sessions WHERE id = ? AND archived_at IS NULL").get(sessionId) as { title: string } | undefined)?.title ?? null;
   }
   title(sessionId: string): string {
     const title = this.titleOf(sessionId);

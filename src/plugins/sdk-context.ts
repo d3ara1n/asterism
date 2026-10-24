@@ -13,7 +13,7 @@ import type { PluginCalls } from "@atelier/sdk/contracts";
 import type { BoundTopLevelTool } from "./top-level-tools.ts";
 import { SessionError } from "../session/tree.ts";
 
-type PluginServices = Pick<PluginContext, "id" | "dir" | "log" | "config" | "secrets" | "db" | "tasks" | "signal">;
+type PluginServices = Pick<PluginContext, "id" | "dir" | "log" | "config" | "secrets" | "db" | "tasks" | "lifetime">;
 export function createSdkContext(internal: PluginServices, host: PluginHostServices, modelRuns: RunGroup, sessionRuns: RunGroup, directory: SessionDirectory, eventScope: PluginEventScope,
   calls: PluginCalls, topLevelTools: (ref: ResourceRef, policy: (name: string) => boolean, linked: readonly ResourceRef[]) => BoundTopLevelTool[]) {
   const records = new Map<string, RecordContract>();
@@ -243,13 +243,13 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
   const subscribeRegistry = (registry: { subscribe(listener: () => void): () => void } | undefined, listener: () => void) => {
     checkAvailable();
     const unsubscribe = registry?.subscribe(() => { checkAvailable(); synchronous(listener); }) ?? (() => {});
-    const release = () => { unsubscribe(); internal.signal.removeEventListener("abort", release); };
-    internal.signal.addEventListener("abort", release, { once: true });
+    const release = () => { unsubscribe(); internal.lifetime.signal.removeEventListener("abort", release); };
+    internal.lifetime.signal.addEventListener("abort", release, { once: true });
     return release;
   };
   const context: PluginContext = {
     ipc: { events: eventScope.api, calls },
-    id: internal.id, signal: internal.signal, sessions: directory, dir: internal.dir, log: internal.log,
+    id: internal.id, lifetime: internal.lifetime, sessions: directory, dir: internal.dir, log: internal.log,
     config: contract => {
       checkAvailable();
       if (contract.plugin !== internal.id) throw new PluginApiError("foreign_resource", "The configuration belongs to another plugin.");

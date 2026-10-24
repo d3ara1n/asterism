@@ -23,12 +23,12 @@ describe("插件目录与展示 IPC", () => {
   it("公共消息保留提供方归属，renderer 的 React Intl 来自宿主实例", async () => {
     const provider = temp(), consumer = temp(), data = temp(), cache = join(data, "cache");
     writeFileSync(join(provider, "package.json"), JSON.stringify({ name: "@example/messages", exports: { "./public": "./public.ts" },
-      atelier: { id: "example.messages", api: { major: 16, minMinor: 0 }, i18n: { catalogs: { "zh-Hans": "zh.json" } } } }));
+      atelier: { id: "example.messages", api: { major: 17, minMinor: 0 }, i18n: { catalogs: { "zh-Hans": "zh.json" } } } }));
     writeFileSync(join(provider, "public.ts"), `import {pluginNamespace,defineMessages} from '@atelier/sdk/contracts';
       export const messages=pluginNamespace('example.messages').messages('en',defineMessages({title:{id:'title',defaultMessage:'Shared title'}}));`);
     writeFileSync(join(provider, "zh.json"), JSON.stringify({ title: "共享标题" }));
     writeFileSync(join(consumer, "package.json"), JSON.stringify({ name: "@example/consumer", dependencies: { "@example/messages": "*" },
-      atelier: { id: "example.consumer", api: { major: 16, minMinor: 0 }, renderer: "renderer.ts" } }));
+      atelier: { id: "example.consumer", api: { major: 17, minMinor: 0 }, renderer: "renderer.ts" } }));
     writeFileSync(join(consumer, "renderer.ts"), `export {messages} from '@example/messages/public';
       export {IntlProvider, useIntl} from 'react-intl'; export default {modules:[{resources:[],cards:[],tools:[]}]};`);
     const list = new PackageList(join(data, "plugins.json"));
@@ -46,7 +46,7 @@ describe("插件目录与展示 IPC", () => {
   });
   it("无 renderer 的源码插件通过公开 SDK 声明消息与配置，目录内容独立更新", async () => {
     const root = temp(), data = temp(); mkdirSync(join(root, "locales"));
-    writeFileSync(join(root, "package.json"), JSON.stringify({ name: "@example/backend", atelier: { id: "example.backend", api: { major: 16, minMinor: 0 },
+    writeFileSync(join(root, "package.json"), JSON.stringify({ name: "@example/backend", atelier: { id: "example.backend", api: { major: 17, minMinor: 0 },
       runtime: "runtime.ts", i18n: { catalogs: { "zh-Hans": "locales/zh.json" } } } }));
     writeFileSync(join(root, "runtime.ts"), `import { z } from 'zod';
       import {pluginNamespace,defineMessages} from '@atelier/sdk/contracts';
@@ -82,7 +82,7 @@ describe("插件目录与展示 IPC", () => {
     writeFileSync(join(outside, "catalog.json"), "{}"); symlinkSync(join(outside, "catalog.json"), join(root, "linked.json"));
     expect(loadCatalogs(root, "example.test", { en: "linked.json", fr: "missing.json" }, message => diagnostics.push(message))).toEqual([]);
     expect(diagnostics.length).toBeGreaterThan(0);
-    writeFileSync(join(root, "package.json"), JSON.stringify({ name: "x", atelier: { id: "example.test", api: { major: 16, minMinor: 0 }, i18n: { catalogs: { en: "a.json", EN: "b.json" } } } }));
+    writeFileSync(join(root, "package.json"), JSON.stringify({ name: "x", atelier: { id: "example.test", api: { major: 17, minMinor: 0 }, i18n: { catalogs: { en: "a.json", EN: "b.json" } } } }));
     expect(() => readManifest(root)).toThrow();
   });
   it("准备业务原因码和 display 穿过命令 IPC；无 display 自定义原因保留英文回退", async () => {

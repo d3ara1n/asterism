@@ -16,7 +16,7 @@ import type { SecretProtector } from "../shared/secrets.ts";
 import type { SessionChanged } from "../shared/session.ts";
 import { pluginErrorDisplay } from "./plugin-errors.ts";
 import { SessionService } from "./sessions.ts";
-import { openDatabase } from "./storage.ts";
+import { collectExpiredSessions, openDatabase } from "./storage.ts";
 import { ContentTransferService } from "./content-transfer.ts";
 
 export class ApplicationError extends Error {
@@ -41,6 +41,8 @@ export class ApplicationService {
     this.started = JSON.stringify(this.list.read());
     this.npmRoot = join(root, "plugins");
     try {
+      // 启动期统一清理：先删过期归档会话，内容存储构造时随之回收失去引用的内容。
+      collectExpiredSessions(this.db);
       const unavailable = async (): Promise<string> => { throw new Error("System credential protection is unavailable."); };
       this.configuration = new ConfigurationService(root, options.protector ?? { available: async () => false, encrypt: unavailable, decrypt: unavailable }, options.onConfigurationChanged);
       this.sessions = new SessionService(this.db, root, this.configuration, options.onSessionChanged, options.adapterFactory, options.plugins, options.onPluginConfigurationChanged);
@@ -91,6 +93,7 @@ export class ApplicationService {
     }
     const workspace = this.db.prepare("SELECT * FROM workspace LIMIT 1").get();
     const sessions = this.sessions.tree.list().map(session => ({ id: session.id, title: session.title, created_at: session.createdAt }));
+    const archivedSessions = this.sessions.tree.archived().map(session => ({ id: session.id, title: session.title, created_at: session.createdAt, archived_at: session.archivedAt }));
     const current = this.list.read();
     // 列表项按来源匹配本次启动结果；新加入或改动的项显示为待重启。
     const plugins: AppSnapshot["plugins"] = current.map((entry, index) => {
@@ -109,7 +112,7 @@ export class ApplicationService {
     const builtIn = this.sessions.plugins.find(plugin => plugin.id === builtin.id);
     plugins.push({ index: null, source: "@atelier/builtin", id: builtin.id, metadata: builtinMetadata,
       status: builtIn?.status ?? "failed", enabled: true, error: builtIn?.error ?? null, renderer: null, dependencies: [] });
-    return snapshotSchema.parse({ workspace, sessions, plugins, catalogs: this.options.catalogs ?? [], restartRequired: JSON.stringify(current) !== this.started,
+    return snapshotSchema.parse({ workspace, sessions, archivedSessions, plugins, catalogs: this.options.catalogs ?? [], restartRequired: JSON.stringify(current) !== this.started,
       ...(command.type === "workspace.prepare-close" ? { disposalWarnings: this.sessions.disposalWarnings() } : {}) });
   }
 }

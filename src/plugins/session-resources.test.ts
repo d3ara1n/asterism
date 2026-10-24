@@ -412,3 +412,42 @@ describe("Agent 创建与移除入口", () => {
     expect(await first.plugin.ipc.calls.invoke(ReadAgentCreations, {}, {})).toEqual(directory);
   });
 });
+
+// 预期来自生命周期契约：归档、恢复与退出共用对象作用域；归档会话对插件目录与会话读取不存在。
+describe("对象生命周期与会话归档", () => {
+  it("归档结束对象作用域并从插件目录消失，恢复重新 attach，退出再次结束", async () => {
+    const probe = pluginNamespace("test.lifetime");
+    const Probe = probe.resource("probe", z.strictObject({}));
+    const CreateProbe = defineCreation(Probe, { id: probe.name("create"), schema: z.null() });
+    const events: string[] = [];
+    let context!: PluginContext, signal: AbortSignal | undefined;
+    const lifetime = definePlugin({ namespace: probe, version: "1", setup(plugin) {
+      context = plugin;
+      return { resources: [implementResource(Probe, probe.data("view", z.null()), {
+        creation: implementCreation(CreateProbe, { create: () => ({ title: "Probe", data: {} }) }),
+        project: () => null, inspect: async () => null,
+        attach(_data, object, scope) {
+          events.push(`attach:${object.ref.id}`); signal = scope.signal;
+          scope.defer(() => { events.push(`end:${object.ref.id}`); });
+        },
+      })] };
+    } });
+    const { app, sessionId } = open({ plugins: [lifetime] });
+    const { id } = await context.session(sessionId).create(CreateProbe, null);
+    expect(events).toEqual([`attach:${id}`]);
+
+    await app.sessions.execute({ type: "archive", sessionId });
+    expect(events).toEqual([`attach:${id}`, `end:${id}`]);
+    expect(signal?.aborted).toBe(true);
+    expect(context.sessions.list().map(item => item.id)).not.toContain(sessionId);
+    expect(context.sessions.archived().map(item => item.id)).toEqual([sessionId]);
+    expect(() => context.session(sessionId).snapshot()).toThrow();
+
+    await app.sessions.execute({ type: "restore", sessionId });
+    expect(events).toEqual([`attach:${id}`, `end:${id}`, `attach:${id}`]);
+    expect(context.sessions.archived()).toEqual([]);
+
+    await app.close(); apps.splice(apps.indexOf(app), 1);
+    expect(events.at(-1)).toBe(`end:${id}`);
+  });
+});

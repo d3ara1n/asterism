@@ -133,10 +133,10 @@ describe("插件提供预设与账户用量", () => {
     const began = new Promise<void>(resolve => { started = resolve; });
     const held = new Promise<void>(resolve => { release = resolve; });
     const order: string[] = [];
-    const { service, close, observer } = open([definePlugin({ namespace: pluginNamespace("test.wait"), version: "1", setup: () => ({
-      usageProviders: [{ id: "test-usage", label: "Wait", async query(context) { signal = context.signal; started(); await held; order.push("query"); return items; } }],
-      async closing() { order.push("closing"); },
-    }) })]);
+    const { service, close, observer } = open([definePlugin({ namespace: pluginNamespace("test.wait"), version: "1", setup: plugin => {
+      plugin.lifetime.defer(() => { order.push("closing"); });
+      return { usageProviders: [{ id: "test-usage", label: "Wait", async query(context) { signal = context.signal; started(); await held; order.push("query"); return items; } }] };
+    } })]);
     await save(service);
     const provider = observer.usages.get("test-usage")!;
     if (provider.source === "headers") throw new Error("Expected query provider");

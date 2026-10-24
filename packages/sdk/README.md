@@ -4,7 +4,7 @@
 
 SDK 包版本见 [package.json](package.json)，宿主 API 版本见 [`sdkApi`](../../src/plugins/packages.ts)。内置插件领域契约独立在 [`@atelier/builtin-api`](../builtin-api/README.md)，不进入通用 SDK。
 
-当前宿主 API 为 **16.0**，插件声明 `{ "major": 16, "minMinor": 0 }`，依赖 `@atelier/sdk: ^0.40.0`。后台通过 `session.invoke` 调用资源动作；资源存在性通过 `resourcesChanged` 观察；前端入口默认导出 `defineRendererPlugin(...)`，`prepare` 上下文提供 `events / calls / signal`，调用契约显式声明 `scope`。
+当前宿主 API 为 **17.0**，插件声明 `{ "major": 17, "minMinor": 0 }`，依赖 `@atelier/sdk: ^0.41.0`。后台通过 `session.invoke` 调用资源动作；清理登记到 `plugin.lifetime` 与资源 `attach` 的对象生命周期；前端入口默认导出 `defineRendererPlugin(...)`，`prepare` 上下文提供 `events / calls / signal`，调用契约显式声明 `scope`。
 
 ## 子路径入口
 
@@ -51,8 +51,8 @@ export default definePlugin({
 ### 1. 会话、对象、创建与动作
 - **读取与提交**：`plugin.session(id)` 与 `plugin.object(sessionId, ResourceContract, id)` 提供 `snapshot()`、`get(DataContract)` 与同步 `commit(writer => { writer.set(...); writer.append(...); })`。快照按需读取 `records.all / query / first / last`（支持 `scope: "timeline" | "session"`）。
 - **时间线占用与内存投影**：`object.withBusy(async signal => { ... }, { signal? })` 保护依赖当前路径的异步工作；`object.invalidate()` 交付该资源当前投影。两者分别用于宿主时间线保护和资源自己的领域视图，完整语义见 [宿主运行生命周期](../../docs/plugin-sdk.md#宿主运行生命周期)。
-- **存在性与释放提示（API 14.1）**：`SessionObserver.resourcesChanged({ appeared, disappeared, initial, session })` 在启动及提交后交付对象集合变化；外部实例按自身规则初始化，观察到消失后跟踪异步清理，模块 `closing` 等待剩余清理。`implementResource` 的可选 `disposalWarning` 提供用户结束实例的确认说明，规则见 [对象读取、执行与时间线查询](../../docs/plugin-sdk.md#对象读取执行与时间线查询)。
-- **会话目录与资源管理（API 9.1，初始资源链接为 10.1，创建标题为 10.2）**：`plugin.sessions.list()` 读取全部会话摘要；`session.create(CreationContract, input, { signal?, content?, linkTo?, resources? })` 返回 `ResourceCreationResult`（兼容 `ResourceRef`，附带提交时的 `title`），`resources` 是新资源接收的引用列表。工具的 `context.session.create(contract, input, { resources?, exposeSelf? })` 返回同一结果，接收本请求有效范围内的资源 ID 列表；API 11.2 的 `exposeSelf` 选项由宿主绑定发起者身份，语义见会话资源接口。`session.link(receiver, resource)`、`unlink(receiver, resource)`、`remove(resource)` 使用完整引用，作用域、原子性与收束规则见 [会话资源接口](../../docs/plugin-sdk.md#会话目录与资源操作api-91)，可编译示例见 `examples/session-resources.ts`。
+- **生命周期与释放提示（API 17.0）**：`plugin.lifetime` 承载插件共享服务的清理；`implementResource({ attach(data, object, lifetime) })` 在对象进入当前集合时调用，对象独占的外部实例向 `lifetime.defer` 登记清理，对象移除、会话归档与退出共用同一路径。`implementResource` 的可选 `disposalWarning` 提供用户结束实例的确认说明，规则见 [生命周期作用域](../../docs/plugin-sdk.md#生命周期作用域)。
+- **会话目录与资源管理（API 9.1，初始资源链接为 10.1，创建标题为 10.2）**：`plugin.sessions.list()` 读取活跃会话摘要，`archived()` 读取回收站会话（API 17.0），两者都不含的会话已删除；`session.create(CreationContract, input, { signal?, content?, linkTo?, resources? })` 返回 `ResourceCreationResult`（兼容 `ResourceRef`，附带提交时的 `title`），`resources` 是新资源接收的引用列表。工具的 `context.session.create(contract, input, { resources?, exposeSelf? })` 返回同一结果，接收本请求有效范围内的资源 ID 列表；API 11.2 的 `exposeSelf` 选项由宿主绑定发起者身份，语义见会话资源接口。`session.link(receiver, resource)`、`unlink(receiver, resource)`、`remove(resource)` 使用完整引用，作用域、原子性与收束规则见 [会话资源接口](../../docs/plugin-sdk.md#会话目录与资源操作api-91)，可编译示例见 `examples/session-resources.ts`。
 - **具型创建与动作**：在 `contracts` 中用 `defineCreation(resource, { id, schema })` 与 `defineAction(resource, { id, schema })` 声明；在 `runtime` 中用 `implementResource` 聚合 `creation`、`actions`、`project`、`inspect`、`context`；在 `renderer` 中用 `session.create(CreationContract, input, position)` 与 `object.invoke(ActionContract, input)` 调用。
 - **后台资源动作（API 11.1）**：`plugin.session(sessionId).invoke(ActionContract, target, input, { signal?, content? })` 返回 `Promise<void>`，复用完整准备和对象队列。调用其他插件资源不取得其私有对象门面；返回表示动作处理完成，独立托管工作由资源继续管理。取消、附件交接和重入规则见 [后台资源动作](../../docs/plugin-sdk.md#后台资源动作api-111)，可编译示例见 [`examples/session-resources.ts`](examples/session-resources.ts)。
 - **不可变内容（`ContentRef`）**：在 schema 中组合 `contentRefSchema`；在 `prepare / create / execute` 或前端 `InputView / object.input` 中通过 `content` 门面调用 `read / open / stage`（作用域规则见 [不可变内容](../../docs/content.md)）。
@@ -66,7 +66,7 @@ export default definePlugin({
   "exports": { "./public": "./src/public.ts" },
   "atelier": {
     "id": "example.tools",
-    "api": { "major": 16, "minMinor": 0 },
+    "api": { "major": 17, "minMinor": 0 },
     "runtime": "./src/runtime.ts"
   }
 }
@@ -80,7 +80,7 @@ export default definePlugin({
 
 ### 4. 插件装配与设置页面
 
-后台 `definePlugin({ namespace, version, setup?, modules? })` 的同步 `setup(plugin)` 创建插件级共享服务，返回 `PluginContribution`：与模块共用具型贡献字段，并可返回 `modules` 与 `closing`。根入口返回的模块先装配，再装配静态 `modules`；关闭先收束工作，再逆序清理模块、最后释放根服务。服务通过普通函数参数或闭包传给模块，不需要服务注册表。
+后台 `definePlugin({ namespace, version, setup?, modules? })` 的同步 `setup(plugin)` 创建插件级共享服务，返回 `PluginContribution`：与模块共用具型贡献字段，并可返回 `modules`；清理登记到 `plugin.lifetime.defer`。根入口返回的模块先装配，再装配静态 `modules`；关闭先收束工作与全部对象生命周期，再逆序执行登记的清理，模块先于根服务释放。服务通过普通函数参数或闭包传给模块，不需要服务注册表。
 
 前端 `defineRendererPlugin({ modules?, settings?, prepare?, closing? })` 是插件入口。`settings: { Body, locations? }` 与模块平级；页面组件接收可选 `location`，无会话或对象上下文，能使用全局调用、事件、i18n、本插件偏好和托管配置。插件 `prepare({ events, signal })` 先于自己的模块准备；失败阻止该插件及依赖方装配，关闭在取消后等待实际准备结束再调用 `closing`。页面卸载取消页面发起的通信调用，不销毁后台服务。
 

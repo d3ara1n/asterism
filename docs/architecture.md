@@ -63,7 +63,6 @@ Atelier 分为**应用组合层**、**通用宿主机制**与**插件**三层：
 | `ui-state.json` | 窗口位置/尺寸与受控 `preferences` 容器（`creation-route/` 路由记忆与 `plugin/<pluginId>/` 插件偏好） | 主进程，`electron-store` |
 | `credentials/` | `safeStorage` 加密密文；配置文件只保存引用 | 运行时凭据模块 + 主进程加解密 |
 | `db/workspace.sqlite` | 工作区身份、会话树节点、当前会话/对象数据、内容依赖索引与工作台视图布局 | 任务运行时 |
-| `objects/<sha256>` | 宿主不可变 UTF-8 正文（先落盘重命名，再提交事件引用；读取校验 hash） | 任务运行时 |
 | `content/` | 插件不可变字节内容（`temporary/` 暂存，`sealed/<id>` 封存，见 [不可变内容](content.md)） | 任务运行时 |
 | `extensions/<pluginId>/` | 插件自管文件与数据；其中 `.atelier/` 保留给按需选用的托管配置、数据库与凭据引用，使用规则见 [插件 SDK](plugin-sdk.md#插件配置与界面本地化) | 插件与运行时托管设施 |
 | `logs/runtime.log` | 运行时正式英文日志 | 任务运行时 |
@@ -74,12 +73,14 @@ Atelier 分为**应用组合层**、**通用宿主机制**与**插件**三层：
 ### 工作数据库（`workspace.sqlite`）表职责
 
 数据库开启 WAL 与外键，由任务运行时单实例独占写入：
-- `workspace` / `sessions`：本地工作区身份与会话查询索引（含当前 `cursor` 与 `title`）。
+- `workspace` / `sessions`：本地工作区身份与会话查询索引（含当前 `cursor`、`title` 与归档时间 `archived_at`）。会话的全部关联表以 `ON DELETE CASCADE` 引用 `sessions`，删除会话即整体删除其历史、游标选择日志、当前数据、布局与内容依赖根。
 - `session_nodes`：保存全部不可变历史节点（`seq`、`id`、`session_id`、`parent_id`、JSON `payload` 及虚拟生成列 `contract`）。载荷含宿主写入的 `source: { plugin, resource } | null`、契约身份与数据；宿主不为特定执行体的输出建列或约束。
 - `cursor_selections`：显式执行游标选择的追加审计日志，与 `sessions.cursor` 更新处于同一事务；不进入会话树或模型上下文。
 - `session_data`：保存当前会话或对象数据，以 `(session_id, object_id, contract_id)` 定位（空 `object_id` 表示会话级，如笔记正文存对象级 `atelier.builtin/note.content`）。纯数据保存可与事件同事务提交，只通知视图、不追加历史，回溯或分叉不恢复当前值。
 - `contents` / `content_roots`：不可变内容元数据及记录／当前数据的引用依赖根（见 [不可变内容](content.md)）。
 - `object_views` / `viewports`：当前卡片位置、隐藏、折叠、宽高覆盖与会话画布视口；独立于任务历史。
+
+**启动清理**：开库后、构造会话服务之前，删除归档时间早于冷静期的会话（级联删除关联行）；随后内容存储构造时回收失去依赖根的内容与暂存文件。清理集中在启动期执行一次，运行期不定时扫描。插件自管的按会话数据由插件对照会话目录自行清理，见 [插件 SDK](plugin-sdk.md#会话目录与资源操作api-91)。
 
 业务提交中的应用元数据与事件处于同一 SQLite 事务，历史内核用保存点嵌入外层事务；游标观察者重建的标题等派生当前值在原提交后排队写入。数据库与外部文件系统没有跨介质原子事务，文件写入语义见 [运行时](runtime.md#原生正文工具与目录操作)。
 

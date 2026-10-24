@@ -24,6 +24,7 @@ import { Window, Titlebar } from "./Window";
 
 import { Space } from "../shared/weave/Space";
 import { SettingsPage, type SettingsTarget } from "../features/settings/SettingsPage";
+import { SessionArchiveContext } from "../features/settings/SessionsSettings";
 import { usePluginSettingsRegistry } from "../modules/settings";
 import { Screen, type IslandSpec } from "../shared/weave/Screen";
 import { Toaster } from "../shared/ui/sonner";
@@ -123,6 +124,18 @@ export function App({ controller }: { controller: ApplicationController }) {
     const command = { type: "rename" as const, sessionId, title };
     return active?.sessionId === sessionId ? active.execute(command) : runtime.session.execute(command);
   };
+  /** 归档当前会话先回到首页，再清理并重读会话目录。 */
+  const archiveSession = async (sessionId: string) => {
+    if (view.kind === "conversation" && view.sessionId === sessionId) goHome();
+    const result = await runtime.session.execute({ type: "archive", sessionId });
+    void controller.refresh();
+    return result;
+  };
+  const restoreSession = async (sessionId: string) => {
+    const result = await runtime.session.execute({ type: "restore", sessionId });
+    void controller.refresh();
+    return result;
+  };
   const startConversation = async (input: StartInput) => {
     if (!ready) return;
     const token = navigation.current;
@@ -184,6 +197,7 @@ export function App({ controller }: { controller: ApplicationController }) {
       selectedSessionId={view.kind === "conversation" ? view.sessionId : null}
       renameDisabledSessionId={active && !writable ? active.sessionId : null}
       onRename={renameSession}
+      onArchive={archiveSession}
       homeActive={view.kind === "home"}
       onHome={goHome} onSession={openSession} onSettings={() => go("settings")} onHide={hideSidebar}
       onRetry={() => { void controller.refresh(); }} />,
@@ -225,7 +239,8 @@ export function App({ controller }: { controller: ApplicationController }) {
   } }}>
     <Window skipTarget={`screen-${page}`} titlebar={<Titlebar navigation={titleNavigation} actions={actions} actionsHidden={inSettings} />}>
       <Space active={page} screens={[
-        { id: "settings", label: i18n.formatMessage(settingsMessages.settings), surface: false, content: <SettingsPage active={inSettings} target={settingsTarget} /> },
+        { id: "settings", label: i18n.formatMessage(settingsMessages.settings), surface: false, content:
+          <SessionArchiveContext.Provider value={{ snapshot, restore: restoreSession }}><SettingsPage active={inSettings} target={settingsTarget} /></SessionArchiveContext.Provider> },
         { id: "main", label: mainTitle, surface: false,
           // 切换会话时关闭工作台右侧的更深浮岛。
           content: <Screen label={i18n.formatMessage(appMessages.appNavigation)} leading={[...(sidebarVisible ? [sidebar] : []), ...(focus ? [focus] : [])]} root={main} resetKey={view.kind === "conversation" ? view.sessionId : "home"} className="h-full" /> },
