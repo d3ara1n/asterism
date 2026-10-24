@@ -45,6 +45,7 @@ export async function preparePlugin(plugin: RendererPlugin, events: EventSubscri
     })]);
     signal.throwIfAborted();
     await prepareModules(plugin.modules ?? [], scoped, timeout, lifetime, track, calls);
+    signal.throwIfAborted();
     return close;
   } catch (error) {
     // 超时不假装工作已结束；取消后等待实际准备退出再释放共享服务。
@@ -78,10 +79,4 @@ export async function prepareModules(modules: readonly RendererModule[], events:
       clearTimeout(timer);
     }
   }));
-}
-
-/** 静态启动屏的阶段文案；语言就绪前只显示指示器。 */
-export function showStartupStage(text: string): void {
-  const label = document.getElementById("startup-stage");
-  if (label) label.textContent = text;
 }

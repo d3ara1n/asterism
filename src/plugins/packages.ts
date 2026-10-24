@@ -180,7 +180,8 @@ export interface ResolvedPackage {
 }
 
 /** 读取列表、校验清单与冲突、打包并导入启用的插件；失败传播给依赖方。 */
-export async function loadPackages(list: PackageList, npmRoot: string, cacheRoot: string, reserved: readonly string[], publicProviders: readonly PublicProvider[] = []): Promise<ResolvedPackage[]> {
+export async function loadPackages(list: PackageList, npmRoot: string, cacheRoot: string, reserved: readonly string[],
+  publicProviders: readonly PublicProvider[] = [], progress: (id: string) => void = () => {}): Promise<ResolvedPackage[]> {
   const result: ResolvedPackage[] = [];
   const ids = new Map<string, number>();
   for (const entry of list.read()) {
@@ -205,7 +206,10 @@ export async function loadPackages(list: PackageList, npmRoot: string, cacheRoot
       item.status = "failed"; item.error = error instanceof Error ? error.message : String(error);
     }
   }
-  const compiled = await compileModules(modules, new Set(result.filter(item => item.status === "loaded").map(item => item.manifest!.id)), cacheRoot, hostModules, publicProviders);
+  const hostIdentity = JSON.stringify({ sdkApi, runtime: Object.keys(shared).sort().map(id => sharedModuleSource(id)),
+    renderer: rendererShared.map(id => rendererModuleSource(id)) });
+  const compiled = await compileModules(modules, new Set(result.filter(item => item.status === "loaded").map(item => item.manifest!.id)),
+    cacheRoot, hostModules, publicProviders, hostIdentity, progress);
   for (const item of result) {
     if (item.status !== "loaded") continue;
     const id = item.manifest!.id;
@@ -217,7 +221,12 @@ export async function loadPackages(list: PackageList, npmRoot: string, cacheRoot
       if (renderer) item.renderer = relative(cacheRoot, renderer).split("\\").join("/");
       const file = compiled.runtime.get(id);
       if (!file) continue;
-      const module = await import(pathToFileURL(file).href) as { default?: unknown };
+      progress(id);
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const module = await Promise.race([
+        import(pathToFileURL(file).href) as Promise<{ default?: unknown }>,
+        new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error(`Plugin ${id} runtime import timed out.`)), 10_000); }),
+      ]).finally(() => clearTimeout(timer));
       const definition = module.default as PluginDefinition | undefined;
       if (!definition || typeof definition !== "object" || definition.namespace?.id !== id
         || typeof definition.version !== "string" || !definition.version.trim()

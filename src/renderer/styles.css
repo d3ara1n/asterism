@@ -262,8 +262,9 @@
   .settings-card { @apply text-left; }
   .settings-detail { @apply absolute inset-x-0 top-0 max-h-full overflow-y-auto overscroll-contain; }
 }
-/* 启动屏：静态 HTML，React 挂载时替换；只使用主题 token。 */
-.startup-screen { display: flex; height: 100%; flex-direction: column; align-items: center; justify-content: center; gap: 0.75rem; color: var(--muted-foreground); font-family: var(--font-sans); font-size: 0.8125rem; }
+/* 启动屏在工作台装载前独立显示，保留原生窗口拖动与控件。 */
+.startup-screen { display: flex; height: 100%; padding: 3rem 1.5rem; flex-direction: column; align-items: center; justify-content: center; gap: 0.75rem; color: var(--muted-foreground); font-family: var(--font-sans); font-size: 0.8125rem; -webkit-app-region: drag; }
+.startup-content { width: min(100%, 32rem); text-align: center; -webkit-app-region: no-drag; }
 .startup-indicator { width: 1.25rem; height: 1.25rem; border-radius: 9999px; border: 2px solid var(--border); border-top-color: var(--muted-foreground); animation: startup-spin 0.8s linear infinite; }
 .startup-stage { margin: 0; min-height: 1.25em; }
 @keyframes startup-spin { to { transform: rotate(360deg); } }

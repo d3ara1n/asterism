@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { runtimeMessageSchema, type Command, type CommandResult, type RuntimeStatus } from "../shared/contracts.ts";
 import { RuntimeRequests } from "./requests.ts";
 import { handleSecretRequest } from "./secrets.ts";
+import type { StartupStage } from "../shared/startup.ts";
 
 /**
  * 任务进程监护与控制链路：启动、存活、退出流程与凭据解密留在主进程。
@@ -20,11 +21,13 @@ export class RuntimeHost {
    * renderer 直连请求不设等待期限，任务进程失联由此转为 unavailable 状态通知。
    */
   constructor(private readonly onStatus: (status: RuntimeStatus) => void,
-    private readonly liveness = { intervalMs: 5_000, timeoutMs: 15_000 }) {}
+    private readonly liveness = { intervalMs: 5_000, timeoutMs: 15_000 },
+    private readonly onStage: (stage: StartupStage, detail?: string) => void = () => {}) {}
   private setStatus(status: RuntimeStatus): void { this.status = status; this.onStatus(status); }
   get ready(): boolean { return this.status === "ready" && this.child !== null; }
 
   start(entry: string, root: string): Promise<void> {
+    if (this.status !== "starting") return Promise.reject(new Error("Task runtime startup was cancelled."));
     mkdirSync(join(root, applicationStorage.logsDirectory), { recursive: true });
     const log = createWriteStream(join(root, applicationStorage.logsDirectory, applicationStorage.runtimeLogFile), { flags: "a", mode: 0o600 });
     // 流错误必须有监听器，不能把日志故障变成未捕获异常。
@@ -52,7 +55,8 @@ export class RuntimeHost {
         child.kill();
         reject(error);
       };
-      const timeout = setTimeout(() => fail(new Error("Task runtime initialization timed out.")), 15_000);
+      // 总等待期限覆盖构建、导入与同步装配，进度消息不延长它。
+      const timeout = setTimeout(() => fail(Object.assign(new Error("Task runtime initialization timed out after 60 seconds."), { reason: "timeout" })), 60_000);
       let lastPong = 0;
       const watch = () => {
         lastPong = Date.now();
@@ -86,7 +90,9 @@ export class RuntimeHost {
         if (raw?.kind === "response") { requests.receive(raw); return; }
         const parsed = runtimeMessageSchema.safeParse(raw);
         if (!parsed.success) return;
-        if (parsed.data.kind === "ready") {
+        if (parsed.data.kind === "startup") {
+          if (this.status === "starting") this.onStage(parsed.data.stage, parsed.data.detail);
+        } else if (parsed.data.kind === "ready") {
           clearTimeout(timeout);
           if (this.status !== "starting") return;
           this.setStatus("ready");

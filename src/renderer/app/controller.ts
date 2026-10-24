@@ -71,7 +71,7 @@ export class ApplicationController {
     this.visibleSessionId = sessionId;
     this.setResourceStatuses(this.state.resourceStatuses);
   }
-  connect(): () => void {
+  connect({ read = true }: { read?: boolean } = {}): () => void {
     let stopTitles = this.watchTitles();
     let stopResourceStatuses = this.watchResourceStatuses();
     const unsubscribe = this.bridge.onStatus(status => {
@@ -87,7 +87,7 @@ export class ApplicationController {
       if (event.kind !== "session.changed" || this.pending) return;
       this.pending = setTimeout(() => { this.pending = null; void this.refresh({ quiet: true }); }, this.settleMs);
     });
-    void this.refresh();
+    if (read) void this.refresh();
     return () => {
       unsubscribe(); stopSessions(); stopTitles(); stopResourceStatuses();
       if (this.pending) { clearTimeout(this.pending); this.pending = null; }

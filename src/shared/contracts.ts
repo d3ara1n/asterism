@@ -5,8 +5,9 @@ import { coreChannel } from "./core.ts";
 import type { DesktopPlatform, DesktopWindowBridge } from "./desktop.ts";
 import type { AppearanceBridge } from "./theme.ts";
 import { templateSummarySchema } from "./templates.ts";
+import { startupStageSchema, type StartupBridge } from "./startup.ts";
 
-export const protocolVersion = 10;
+export const protocolVersion = 11;
 export const statusChannel = coreChannel("runtime-status");
 export const pickDirectoryChannel = coreChannel("pick-directory");
 export const openLocalFileChannel = coreChannel("open-local-file");
@@ -52,6 +53,7 @@ export type CommandResult = z.infer<typeof resultSchema>;
 export const requestSchema = z.strictObject({ version: z.literal(protocolVersion), id, command: z.unknown() });
 export const responseSchema = z.strictObject({ version: z.literal(protocolVersion), id, result: resultSchema });
 export const runtimeMessageSchema = z.discriminatedUnion("kind", [
+  z.strictObject({ kind: z.literal("startup"), stage: startupStageSchema, detail: z.string().optional() }),
   z.strictObject({ kind: z.literal("ready"), version: z.literal(protocolVersion) }),
   z.strictObject({ kind: z.literal("response"), ...responseSchema.shape }),
   // reason 为启动失败类别，main 按类别选择提示；迁移上线时扩展类别值，不改消息形状。
@@ -60,6 +62,7 @@ export const runtimeMessageSchema = z.discriminatedUnion("kind", [
 export type RuntimeMessage = z.infer<typeof runtimeMessageSchema>;
 /** 主进程能力：窗口、外观、语言、偏好与系统对话框。任务进程能力经 connectRuntime 交接的直连端口使用。 */
 export interface DesktopBridge {
+  startup: StartupBridge;
   language: LanguageBridge;
   appearance: AppearanceBridge;
   /** 受控偏好容器：只能读写 preferences 内宿主规定前缀的键。 */

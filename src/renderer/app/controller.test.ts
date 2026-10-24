@@ -6,6 +6,21 @@ import { summarizeResourceStatus } from "./resource-status.ts";
 
 const snapshot: AppSnapshot = { workspace: { id: "w", title: "Workspace" }, sessions: [], templates: [], archivedSessions: [], plugins: [], restartRequired: false };
 describe("应用会话列表", () => {
+  // 启动读取和首页共享同一个控制器，提前订阅后的一次读取即可交付首屏。
+  it("启动阶段先订阅再读取，首页复用快照且保持后续变化订阅", async () => {
+    const order: string[] = [];
+    const execute = vi.fn(async () => { order.push("read"); return { ok: true as const, snapshot }; });
+    const controller = new ApplicationController({ execute, onStatus: () => () => {},
+      session: { execute: vi.fn(), onChanged: () => { order.push("subscribe"); return () => { order.push("close"); }; } } });
+    const stop = controller.connect({ read: false });
+    try {
+      await controller.refresh();
+      expect(order).toEqual(["subscribe", "read"]);
+      expect(controller.getSnapshot().snapshot).toEqual(snapshot);
+      expect(execute).toHaveBeenCalledTimes(1);
+    } finally { stop(); }
+    expect(order.at(-1)).toBe("close");
+  });
   // 工作台状态反馈：成功读取恢复可用后，旧连接错误必须撤下，不能转为过期的全局通知。
   it("后台恢复后的静默读取清除连接错误", async () => {
     const execute = vi.fn<() => Promise<CommandResult>>()

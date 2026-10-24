@@ -1,106 +1,54 @@
-import { StrictMode } from "react";
-import { RendererEventsProvider, RendererCallsProvider } from "@atelier/sdk/renderer";
-import { EventClient } from "../shared/event-client";
-import { CallClient } from "../shared/call-client";
-import { HostI18nProvider, startLanguage } from "./shared/i18n";
-import { ErrorBoundary } from "./app/ErrorBoundary";
-import { MotionConfig } from "motion/react";
-import { TooltipProvider } from "@atelier/ui/ui/tooltip";
-import { ModuleViewsProvider } from "./modules/views";
-import { HostConfigsProvider } from "./modules/configs";
-import { App } from "./app/App";
-
 import { createRoot } from "react-dom/client";
-
-import { ApplicationController } from "./app/controller";
+import { HostI18nProvider, startLanguage } from "./shared/i18n";
+import { startAppearance } from "./features/appearance/state";
 import { startDesktopWindow } from "./app/window-state";
-
+import { loadPreferences } from "./features/creation/preferences";
+import { StartupScreen, type StartupFailure } from "./app/StartupScreen";
+import { StartupError, awaitStartup, waitForRuntime } from "./app/boot";
+import { startupMessages } from "../shared/error-display";
+import type { UiText } from "@atelier/sdk/contracts";
 import "./styles.css";
 
-import { startAppearance } from "./features/appearance/state";
-
-import { builtinRenderer, BuiltinRendererProvider } from "@atelier/builtin/renderer";
-import * as builtinRendererAPI from "@atelier/builtin-api/renderer";
-import { ViewRegistry } from "./modules/registry";
-import { workbenchRecordViews } from "./features/workbench/records";
-import { loadPluginRenderers } from "./modules/plugins";
-import { loadPreferences, pluginPreferences } from "./features/creation/preferences";
-import { preparePlugin, showStartupStage } from "./app/startup";
-import { PluginSettingsProvider } from "./modules/settings";
-import type { PluginSettingsPage } from "@atelier/sdk/renderer";
-import { getI18n } from "./shared/i18n";
-import { appMessages } from "./messages/app";
-import { builtin } from "@atelier/builtin-api/contracts";
-import { bindPublicProvider } from "../shared/public-modules";
-import { builtinPublicProvider, builtinPublicModules } from "../builtin-public";
-
-import { runtime } from "./runtime";
-
-startAppearance();
-const events = new EventClient(runtime.events);
-const calls = new CallClient(runtime.calls);
-const controller = new ApplicationController({ execute: runtime.execute, session: runtime.session, onStatus: window.host.onStatus }, events);
+const root = createRoot(document.getElementById("root")!);
 const lifetime = new AbortController();
-const stopEventStatus = window.host.onStatus(status => { if (status !== "ready") { events.disconnect(); calls.disconnect(); } });
-window.addEventListener("pagehide", () => { lifetime.abort(); events.close(); calls.close(); stopEventStatus(); }, { once: true });
-// 插件视图只在启动时加载；内置视图之后合并，重复契约使该插件视图被忽略。
-const initial = await runtime.execute({ type: "workspace.read" }).catch(() => null);
-await startLanguage(initial?.ok ? initial.snapshot.catalogs ?? [] : []).catch(error => console.error("Language settings could not be loaded. English is used.", error));
-showStartupStage(getI18n().formatMessage(appMessages.startupPlugins));
-const plugins = initial?.ok ? initial.snapshot.plugins.flatMap(p => p.status === "loaded" && p.id ? [{ id: p.id, renderer: p.renderer, dependencies: p.dependencies }] : []) : [];
-const accepted = [...builtinRenderer.modules ?? [], workbenchRecordViews];
-const pages = new Map<string, PluginSettingsPage>();
-const cleanup: (() => Promise<void>)[] = [];
-window.addEventListener("pagehide", () => { void (async () => {
-  for (const close of cleanup.reverse()) {
-    try { await close(); } catch (error) { console.error("Renderer plugin cleanup failed.", error); }
-  }
-})(); }, { once: true });
-await preparePlugin(builtinRenderer, events, lifetime.signal, undefined, close => cleanup.push(close), calls);
-if (builtinRenderer.settings) pages.set(builtin.id, builtinRenderer.settings);
-new ViewRegistry(accepted);
-const releasePublic = bindPublicProvider("renderer", builtinPublicProvider, {
-  ...builtinPublicModules,
-  "@atelier/builtin-api/renderer": builtinRendererAPI,
+window.addEventListener("pagehide", () => lifetime.abort(), { once: true });
+const show = (stage: UiText, detail?: string, failure?: StartupFailure) => {
+  root.render(<HostI18nProvider><StartupScreen stage={stage} detail={detail} failure={failure} /></HostI18nProvider>);
+};
+show(startupMessages.environment);
+
+async function boot(): Promise<void> {
+  startAppearance();
+  const keep = (stop: () => void) => {
+    if (lifetime.signal.aborted) stop();
+    else lifetime.signal.addEventListener("abort", stop, { once: true });
+  };
+  const desktopSignal = AbortSignal.any([lifetime.signal, AbortSignal.timeout(90_000)]);
+  await awaitStartup(Promise.all([
+    startLanguage([]).then(keep).catch(error => console.error("Language settings could not be loaded. English is used.", error)),
+    loadPreferences(),
+    startDesktopWindow(window.host.window).then(keep),
+    waitForRuntime(window.host.startup, desktopSignal, state => show(startupMessages[state.stage], state.detail)),
+  ]), desktopSignal);
+  show(startupMessages.interface);
+  // 页面装载和前端插件准备共用总等待期限，单个插件另有更短的准备期限。
+  const deadline = new AbortController();
+  const signal = AbortSignal.any([lifetime.signal, deadline.signal]);
+  const timer = setTimeout(() => deadline.abort(new DOMException("Interface initialization timed out after 60 seconds.", "TimeoutError")), 60_000);
+  try {
+    await awaitStartup(import("./application").then(module => {
+      signal.throwIfAborted();
+      return module.startApplication(root, (message, detail) => show(message, detail), signal);
+    }), signal);
+  } finally { clearTimeout(timer); }
+}
+
+void boot().catch(error => {
+  if (lifetime.signal.aborted) return;
+  lifetime.abort();
+  console.error("Application interface initialization failed.", error);
+  const failure: StartupFailure = error instanceof StartupError ? error.failure
+    : { reason: error instanceof DOMException && error.name === "TimeoutError" ? "timeout" : "initialization",
+      detail: error instanceof Error ? error.message : String(error) };
+  show(startupMessages.failed, undefined, failure);
 });
-window.addEventListener("pagehide", releasePublic, { once: true });
-const rendererPlugins = await loadPluginRenderers(plugins, { available: [builtin.id], async accept(plugin, id) {
-  new ViewRegistry([...accepted, ...plugin.modules ?? []]);
-  await preparePlugin(plugin, events, lifetime.signal, undefined, close => cleanup.push(close), calls);
-  accepted.push(...plugin.modules ?? []);
-  if (plugin.settings) pages.set(id, plugin.settings);
-} });
-const moduleViews = new ViewRegistry(accepted);
-const builtinRendererServices = { preferences: pluginPreferences, async openLocalFile(path: string) {
-  const error = await window.host.openLocalFile(path);
-  if (error) throw new Error(error);
-} };
-showStartupStage(getI18n().formatMessage(appMessages.startupEnvironment));
-await loadPreferences();
-const stopDesktopWindow = await startDesktopWindow(window.host.window);
-window.addEventListener("pagehide", stopDesktopWindow, { once: true });
-createRoot(document.getElementById("root")!).render(
-  <StrictMode>
-    <HostI18nProvider>
-      <ErrorBoundary>
-        <MotionConfig reducedMotion="user">
-          <TooltipProvider>
-            <RendererEventsProvider value={events}>
-              <RendererCallsProvider value={calls}>
-                <HostConfigsProvider>
-                  <ModuleViewsProvider registry={moduleViews}>
-                    <BuiltinRendererProvider services={builtinRendererServices}>
-                      <PluginSettingsProvider value={{ pages, failures: new Map(rendererPlugins.failures.map(failure => [failure.id, failure.error])) }}>
-                        <App controller={controller} />
-                      </PluginSettingsProvider>
-                    </BuiltinRendererProvider>
-                  </ModuleViewsProvider>
-                </HostConfigsProvider>
-              </RendererCallsProvider>
-            </RendererEventsProvider>
-          </TooltipProvider>
-        </MotionConfig>
-      </ErrorBoundary>
-    </HostI18nProvider>
-  </StrictMode>,
-);

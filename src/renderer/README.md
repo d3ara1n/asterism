@@ -6,11 +6,13 @@
 
 | 位置 | 职责 |
 | --- | --- |
+| `main.tsx` / `app/StartupScreen.tsx` / `app/boot.ts` | 独立启动页、后台阶段订阅、等待与失败恢复；启动页不依赖工作台和插件视图 |
+| `application.tsx` | 后台就绪后装载的应用组合；前端插件准备、公共提供方与视图注册、首页挂载 |
 | `app/App.tsx` | 首页与会话导航、应用级草稿、首次发送和设置屏切换 |
 | `app/Sidebar.tsx` | 首页入口、会话摘要列表、设置入口与侧栏显隐 |
 | `app/Window.tsx` | `Window / Titlebar`、平台原生控件留白和窗口拖动区域 |
 | `app/window-state.ts` | 原生窗口状态的初始化与订阅，向窗口层提供标题栏模式和全屏状态 |
-| `app/controller.ts` | 会话列表读取、运行时连接状态与公共事件订阅，不持有已打开会话正文 |
+| `app/controller.ts` | 从启动阶段持续持有的会话列表、运行时连接状态与公共事件订阅；首次快照同时供插件装配与首页使用，不持有已打开会话正文 |
 | `app/SessionStatus.tsx` / `resource-status.ts` | 会话行状态徽标、资源进度 popup 与 `latest` 状态聚合 |
 | `app/SessionActions.tsx` / `features/session/RenameSession.tsx` | 会话行 more 菜单与人工重命名对话框 |
 | `app/ErrorBoundary.tsx` | 渲染异常后的重新加载入口 |

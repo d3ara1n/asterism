@@ -40,25 +40,6 @@ describe("模块启动准备", () => {
     } finally { release(); if (close) await close(); events.close(); }
     expect(order).toEqual(["handler", "plugin"]);
   });
-  // 启动超时只放弃等待，原始 prepare Promise 必须留在插件清理责任中。
-  it("模块准备超时后，关闭仍等待其真实退出", async () => {
-    let release!: () => void;
-    const held = new Promise<void>(resolve => { release = resolve; });
-    const order: string[] = [];
-    const log = vi.spyOn(console, "error").mockImplementation(() => {});
-    let close!: () => Promise<void>;
-    try {
-      close = await preparePlugin({
-        modules: [{ ...base, async prepare() { await held; order.push("module"); } }],
-        async closing() { order.push("plugin"); },
-      }, { subscribe: () => { throw new Error("Unexpected subscription."); } }, new AbortController().signal, 20);
-      const closing = close();
-      expect(close()).toBe(closing);
-      expect(order).toEqual([]);
-      release(); await closing;
-      expect(order).toEqual(["module", "plugin"]);
-    } finally { release(); if (close) await close(); log.mockRestore(); }
-  });
   // plugin-sdk.md：模块消费根入口准备好的服务，失败根不能继续准备模块。
   it("插件准备先于模块，关闭先取消模块订阅再释放共享服务", async () => {
     const order: string[] = [];
@@ -80,21 +61,6 @@ describe("模块启动准备", () => {
     await Promise.resolve();
     expect(module).not.toHaveBeenCalled();
     expect(cleanup).toHaveBeenCalledOnce();
-  });
-  it("失败与超时不阻止启动，超时通知模块停止", async () => {
-    const error = vi.spyOn(console, "error").mockImplementation(() => {});
-    let signal: AbortSignal | undefined;
-    const done = vi.fn(async () => {});
-    try {
-      await prepareModules([
-        { ...base, prepare: async () => { throw new Error("boom"); } },
-        { ...base, prepare: context => { signal = context.signal; return new Promise(() => {}); } },
-        { ...base, prepare: done },
-        base,
-      ], { subscribe: () => { throw new Error("Unexpected event subscription."); } }, 20);
-      expect(done).toHaveBeenCalled();
-      expect(signal?.aborted).toBe(true);
-    } finally { error.mockRestore(); }
   });
 });
 

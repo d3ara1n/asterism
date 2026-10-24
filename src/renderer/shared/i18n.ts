@@ -36,6 +36,12 @@ let current = environment();
 /** 宿主非 React 展示计算；插件通过公开 hook 取得同一展示环境。 */
 export const getI18n = (): I18n => current;
 
+/** 插件目录到达时补充语言环境；主进程语言只在启动页读取和订阅一次。 */
+export function setLanguageCatalogs(entries: readonly TranslationCatalog[]): void {
+  catalogs = [...entries];
+  publish();
+}
+
 function publish(): void {
   revision++;
   current = environment();

@@ -7,6 +7,7 @@ import * as zod from "zod";
 import * as sdkContracts from "@atelier/sdk/contracts";
 import * as sdkRenderer from "@atelier/sdk/renderer";
 import type { RendererModule, RendererPlugin } from "@atelier/sdk/renderer";
+import { awaitStartup } from "../app/boot.ts";
 
 /** 共享模块白名单：插件 bundle 的这些导入解析到宿主同一实例，保证只有一个 React。 */
 (globalThis as Record<string, unknown>).__atelierRendererModules = {
@@ -44,6 +45,8 @@ export function validateRendererPlugin(plugin: RendererPlugin | undefined): asse
 /** 按公共依赖装配；导入、视图冲突或提供方失败均阻止其消费者。 */
 export async function loadPluginRenderers(entries: readonly RendererEntry[], options: {
   available?: readonly string[];
+  signal?: AbortSignal;
+  progress?(id: string): void;
   accept?(plugin: RendererPlugin, id: string): void | Promise<void>;
   load?(path: string): Promise<{ default?: RendererPlugin }>;
 } = {}):
@@ -55,6 +58,7 @@ export async function loadPluginRenderers(entries: readonly RendererEntry[], opt
   const failed = new Set<string>();
   const load = options.load ?? (path => import(/* @vite-ignore */ `atelier-plugin://${path}`));
   const visit = async (id: string): Promise<void> => {
+    options.signal?.throwIfAborted();
     if (available.has(id)) return;
     if (failed.has(id)) throw new Error(`Public renderer dependency ${id} is unavailable.`);
     if (visiting.has(id)) throw new Error(`Circular renderer dependency: ${id}.`);
@@ -64,7 +68,12 @@ export async function loadPluginRenderers(entries: readonly RendererEntry[], opt
     try {
       for (const dependency of entry.dependencies) await visit(dependency);
       if (!entry.renderer) { available.add(id); return; }
-      const loaded = await load(entry.renderer);
+      options.progress?.(id);
+      const deadline = new AbortController();
+      const timer = setTimeout(() => deadline.abort(new Error(`Plugin ${id} renderer import timed out.`)), 10_000);
+      const signal = options.signal ? AbortSignal.any([options.signal, deadline.signal]) : deadline.signal;
+      const loaded = await awaitStartup(load(entry.renderer), signal).finally(() => clearTimeout(timer));
+      options.signal?.throwIfAborted();
       const plugin = loaded.default;
       validateRendererPlugin(plugin);
       await options.accept?.(plugin, id);
@@ -77,7 +86,8 @@ export async function loadPluginRenderers(entries: readonly RendererEntry[], opt
     } finally { visiting.delete(id); }
   };
   for (const entry of entries) {
-    try { await visit(entry.id); } catch { /* 本插件及依赖失败均已记录；继续装配无关插件。 */ }
+    try { await visit(entry.id); }
+    catch { options.signal?.throwIfAborted(); /* 本插件及依赖失败均已记录；继续装配无关插件。 */ }
   }
   return { modules, failures };
 }

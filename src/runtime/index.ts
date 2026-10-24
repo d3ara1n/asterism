@@ -24,14 +24,18 @@ const broadcast = (frame: RuntimeFrame) => { for (const connection of connection
 try {
   const root = process.argv[2];
   if (!root) throw new Error("Application data directory is required.");
+  const started = performance.now();
   // 插件包只在启动时解析、打包与导入；列表变化重启后生效。
-  const packages = await loadPackages(new PackageList(join(root, "plugins.json")), join(root, "plugins"), join(root, "plugins", ".cache"), [builtin.id], [builtinPublicProvider])
-    .catch(error => { console.error("Plugin packages could not be loaded.", error); return []; });
+  port.postMessage({ kind: "startup", stage: "plugins" });
+  const packages = await loadPackages(new PackageList(join(root, "plugins.json")), join(root, "plugins"), join(root, "plugins", ".cache"),
+    [builtin.id], [builtinPublicProvider], detail => port.postMessage({ kind: "startup", stage: "plugins", detail }));
+  console.info(`Plugin package preparation completed in ${Math.round(performance.now() - started)} ms.`);
   for (const item of packages) if (item.error) console.error(`Plugin package ${item.root} is ${item.status}: ${item.error}`);
   const listed = packages.map(item => ({ enabled: item.entry.enabled, id: item.manifest?.id ?? null,
     source: item.entry.source.kind === "path" ? item.entry.source.path : `${item.entry.source.name}@${item.entry.source.version}`,
     status: item.status, error: item.error ?? null, renderer: item.status === "loaded" ? item.renderer ?? null : null,
     dependencies: item.dependencies ?? [], rendererDependencies: item.rendererDependencies ?? [] }));
+  port.postMessage({ kind: "startup", stage: "workspace" });
   service = new ApplicationService(root, { catalogs: packages.flatMap(item => item.catalogs ?? []), packages: listed,
     plugins: packages.flatMap(item => item.definition ? [item.definition] : []), protector: secrets,
     onConfigurationChanged: () => broadcast({ kind: "configuration.changed" }),
@@ -65,6 +69,7 @@ try {
     const response = dispatch(service, data);
     if (response) port.postMessage(response);
   });
+  console.info(`Task runtime initialization completed in ${Math.round(performance.now() - started)} ms.`);
   port.postMessage({ kind: "ready", version: protocolVersion });
 } catch (error) {
   releasePublic();

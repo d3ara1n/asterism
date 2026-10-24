@@ -74,7 +74,6 @@ export function App({ controller }: { controller: ApplicationController }) {
   // 每次导航递增；异步创建完成时据此判断用户是否已离开，不夺走当前视图。
   const navigation = useRef(0);
   const run = useCallback(async (command: WorkbenchOperation) => operationSucceeded(await sessionController(command.sessionId).execute(command)), []);
-  useEffect(() => controller.connect(), [controller]);
   const active = view.kind === "conversation" ? sessionController(view.sessionId) : null;
   const sessionState = useSyncExternalStore(active?.subscribe ?? idleSubscribe, active?.getSnapshot ?? noSession);
   useEffect(() => active?.connect(), [active]);

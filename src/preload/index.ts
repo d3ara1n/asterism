@@ -6,6 +6,7 @@ import { pickDirectoryChannel, openLocalFileChannel, openLogsChannel, localFileP
 import { connectionPortMessage, connectionRequestChannel } from "../shared/connection.ts";
 import { appearanceChangedChannel, appearanceGetChannel, appearancePatchSchema, appearanceSetChannel, parseAppearance } from "../shared/theme.ts";
 import { preferencesGetChannel, preferencesSetChannel, preferenceWriteSchema, uiStateSchemas } from "../shared/ui-state.ts";
+import { startupGetChannel, startupChangedChannel, startupRestartChannel, startupDataDirectoryChannel, startupStateSchema } from "../shared/startup.ts";
 
 let connectionRequested = false;
 // 端口直接交给页面：业务消息不经 contextBridge 二次克隆。主进程只接受受信主框架的请求。
@@ -13,6 +14,22 @@ ipcRenderer.on(connectionRequestChannel, event => {
   window.postMessage({ type: connectionPortMessage }, "*", event.ports.length ? [event.ports[0]!] : []);
 });
 const bridge: DesktopBridge = {
+  startup: {
+    async get() { return startupStateSchema.parse(await ipcRenderer.invoke(startupGetChannel)); },
+    onChanged(listener) {
+      const handler = (_event: Electron.IpcRendererEvent, raw: unknown) => {
+        const parsed = startupStateSchema.safeParse(raw);
+        if (parsed.success) listener(parsed.data);
+      };
+      ipcRenderer.on(startupChangedChannel, handler);
+      return () => ipcRenderer.removeListener(startupChangedChannel, handler);
+    },
+    async restart() { await ipcRenderer.invoke(startupRestartChannel); },
+    async openDataDirectory() {
+      const result: unknown = await ipcRenderer.invoke(startupDataDirectoryChannel);
+      return typeof result === "string" ? result : "The data folder could not be opened.";
+    },
+  },
   language: {
     async get() { return languageStateSchema.parse(await ipcRenderer.invoke(languageGetChannel)); },
     async set(preference) { return languageStateSchema.parse(await ipcRenderer.invoke(languageSetChannel, languagePreferenceSchema.parse(preference))); },

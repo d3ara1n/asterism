@@ -18,6 +18,7 @@ import { startupText } from "./startup-text.ts";
 import { startupMessages } from "../shared/error-display.ts";
 import { allowRendererPermission } from "./permissions.ts";
 import { adoptLoginShellEnvironment } from "./shell-environment.ts";
+import { startupGetChannel, startupChangedChannel, startupRestartChannel, startupDataDirectoryChannel, type StartupState } from "../shared/startup.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 let window: BrowserWindow | null = null;
@@ -25,12 +26,21 @@ let quitting = false;
 let quitRequest: Promise<void> | null = null;
 /** 受信渲染页地址（不含 hash），供权限判定使用。 */
 let trustedURL: string | null = null;
+let startup: StartupState = { status: "starting", stage: "environment" };
+const startupLifetime = new AbortController();
+function publishStartup(state: StartupState): void {
+  startup = state;
+  if (window && !window.isDestroyed()) window.webContents.send(startupChangedChannel, state);
+}
 const runtime = new RuntimeHost(status => {
   if (window && !window.isDestroyed()) window.webContents.send(statusChannel, status);
-});
+  if (status === "ready") publishStartup({ status: "ready" });
+  else if (status === "unavailable" && startup.status === "ready")
+    publishStartup({ status: "failed", reason: "runtime", detail: "The task runtime has stopped." });
+}, undefined, (stage, detail) => publishStartup({ status: "starting", stage, ...(detail ? { detail } : {}) }));
 
 /** 用户退出先读取资源的当前提示；确认后按原关闭流程等待后台清理。 */
-function requestQuit(): void {
+function requestQuit(restart = false): void {
   if (quitting || quitRequest) return;
   quitRequest = (async () => {
     const result = await runtime.execute({ type: "workspace.prepare-close" });
@@ -48,7 +58,9 @@ function requestQuit(): void {
       if (answer.response !== 1) return;
     }
     quitting = true;
+    startupLifetime.abort();
     await runtime.stop();
+    if (restart) app.relaunch();
     app.quit();
   })().catch(error => { console.error("Application shutdown failed.", error); }).finally(() => { quitRequest = null; });
 }
@@ -89,6 +101,16 @@ function createWindow(): void {
   ipcMain.removeHandler(openLogsChannel);
   const trusted = (event: Electron.IpcMainInvokeEvent | Electron.IpcMainEvent) => event.sender === current.webContents &&
     event.senderFrame === current.webContents.mainFrame && event.senderFrame?.url === allowedURL;
+  ipcMain.handle(startupGetChannel, event => {
+    if (!trusted(event)) throw new Error("Untrusted application frame.");
+    return startup;
+  });
+  ipcMain.handle(startupRestartChannel, event => { if (trusted(event)) requestQuit(true); });
+  ipcMain.handle(startupDataDirectoryChannel, event => {
+    if (!trusted(event) || startup.status !== "failed" || startup.reason !== "database_version")
+      return "The data folder is unavailable.";
+    return shell.openPath(dataRoot);
+  });
   // renderer 与任务进程直连：只在交接端口时校验来源；页面重载、跳转或崩溃时关闭旧连接。
   let connection: string | null = null;
   const closeConnection = () => { if (connection) { runtime.disconnect(connection); connection = null; } };
@@ -110,7 +132,15 @@ function createWindow(): void {
   const stopDesktopWindow = serveDesktopWindow(current, titleBar, trusted);
   const stopPreferences = servePreferences(trusted);
   const stopLanguage = serveLanguage(current, trusted);
-  current.webContents.on("render-process-gone", closeConnection);
+  current.webContents.on("render-process-gone", (_event, details) => {
+    closeConnection();
+    if (!quitting && details.reason !== "clean-exit")
+      dialog.showErrorBox(applicationBrand.en, startupText(startupMessages.windowLoadFailed, () => readLanguage().locale));
+  });
+  current.webContents.on("preload-error", (_event, _path, error) => {
+    console.error("Desktop bridge initialization failed.", error);
+    dialog.showErrorBox(applicationBrand.en, startupText(startupMessages.windowLoadFailed, () => readLanguage().locale));
+  });
   current.webContents.on("did-start-navigation", (_event, _url, inPlace, mainFrame) => {
     if (mainFrame && !inPlace) closeConnection();
   });
@@ -136,6 +166,7 @@ function createWindow(): void {
   current.on("closed", () => {
     stopDesktopWindow();
     ipcMain.removeListener(connectionRequestChannel, requestConnection);
+    for (const channel of [startupGetChannel, startupRestartChannel, startupDataDirectoryChannel]) ipcMain.removeHandler(channel);
     closeConnection();
     window = null; ipcMain.removeHandler(pickDirectoryChannel); ipcMain.removeHandler(openLocalFileChannel); ipcMain.removeHandler(openLogsChannel);
     stopAppearance(); stopPreferences(); stopLanguage();
@@ -174,7 +205,7 @@ if (!app.requestSingleInstanceLock()) {
     window?.focus();
   });
   // 登录 shell 环境与 Electron 初始化并行解析，任务进程 fork 前写回 process.env。
-  const environment = adoptLoginShellEnvironment();
+  const environment = adoptLoginShellEnvironment(startupLifetime.signal);
   app.whenReady().then(async () => {
     if (quitting) return;
     // 权限检查和请求共用同一策略；只放行受信主框架的字体枚举与剪贴板写入。
@@ -186,21 +217,32 @@ if (!app.requestSingleInstanceLock()) {
     session.defaultSession.setPermissionCheckHandler((contents, permission, _origin, details) =>
       permitted(contents, permission, details.isMainFrame));
     servePluginArtifacts(dataRoot);
-    await environment;
-    try { await runtime.start(join(here, "runtime.js"), dataRoot); }
-    catch (error) {
-      console.error("Application startup failed.", error);
-      const { reason, directory } = error as { reason?: string; directory?: string };
-      if (reason === "database_version" && directory) {
-        // 开发者机制，文案不本地化；正式版由迁移机制处理。
-        const { response } = await dialog.showMessageBox({ type: "error", title: applicationBrand.en, message: "Development data format mismatch",
-          detail: error instanceof Error ? error.message : "", buttons: ["Open Data Folder", "OK"], defaultId: 0 });
-        if (response === 0) await shell.openPath(directory);
-      } else dialog.showErrorBox(applicationBrand.en, error instanceof Error ? error.message : startupText(startupMessages.workspaceOpenFailed, () => readLanguage().locale));
-    }
-    if (!quitting) createWindow();
+    createWindow();
     app.on("activate", () => { if (!quitting && BrowserWindow.getAllWindows().length === 0) createWindow(); });
-  }).catch(error => { console.error("Electron initialization failed.", error); app.quit(); });
+    let environmentTimer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await Promise.race([environment, new Promise<never>((_, reject) => {
+        environmentTimer = setTimeout(() => {
+          startupLifetime.abort();
+          reject(Object.assign(new Error("Login shell initialization timed out after 20 seconds."), { reason: "timeout" }));
+        }, 20_000);
+      })]).finally(() => clearTimeout(environmentTimer));
+      if (quitting) return;
+      publishStartup({ status: "starting", stage: "plugins" });
+      await runtime.start(join(here, "runtime.js"), dataRoot);
+    }
+    catch (error) {
+      if (quitting) return;
+      console.error("Application startup failed.", error);
+      const reason = (error as { reason?: string })?.reason;
+      publishStartup({ status: "failed", reason: reason === "database_version" || reason === "timeout" ? reason : "initialization",
+        detail: error instanceof Error ? error.message : String(error) });
+    }
+  }).catch(error => {
+    console.error("Electron initialization failed.", error);
+    dialog.showErrorBox(applicationBrand.en, startupText(startupMessages.windowLoadFailed, () => readLanguage().locale));
+    app.quit();
+  });
   app.on("window-all-closed", () => app.quit());
   app.on("before-quit", event => {
     if (quitting) return;
