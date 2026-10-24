@@ -1,4 +1,12 @@
 {
+  "skills.title": "技能",
+  "skills.loading": "正在加载技能…",
+  "skills.empty": "未发现技能。",
+  "skills.failed": "无法加载技能。",
+  "skills.issues": "部分技能无法加载。",
+  "skills.refresh": "刷新技能",
+  "skills.count": "{count} 项技能",
+  "skills.read": "读取技能",
   "error.details.view": "查看错误详情",
   "error.details.title": "错误详情",
   "error.details.body": "原始响应正文",

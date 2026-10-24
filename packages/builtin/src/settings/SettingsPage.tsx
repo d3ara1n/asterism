@@ -11,6 +11,8 @@ import { ShellSettings } from "../shell/Settings";
 import { shellMessages } from "../messages/shell";
 import { McpSettings } from "../mcp/Settings";
 import { mcpMessages } from "../messages/mcp";
+import { SkillSettings } from "../skills/Settings";
+import { skillsMessages } from "../messages/skills";
 
 /** 页面自行分组，普通偏好即时提交；配置存储和通知由宿主托管。 */
 export function BuiltinSettingsPage({ location }: { location?: string }) {
@@ -18,9 +20,9 @@ export function BuiltinSettingsPage({ location }: { location?: string }) {
   const config = useRendererConfiguration(BuiltinSettings);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<UiText | null>(null);
-  const streaming = useRef<HTMLElement>(null), shell = useRef<HTMLElement>(null), mcp = useRef<HTMLElement>(null);
+  const streaming = useRef<HTMLElement>(null), shell = useRef<HTMLElement>(null), mcp = useRef<HTMLElement>(null), skills = useRef<HTMLElement>(null);
   useEffect(() => {
-    const target = location === "streaming" ? streaming.current : location === "shell" ? shell.current : location === "mcp" ? mcp.current : null;
+    const target = location === "streaming" ? streaming.current : location === "shell" ? shell.current : location === "mcp" ? mcp.current : location === "skills" ? skills.current : null;
     target?.scrollIntoView({ block: "nearest" }); target?.focus({ preventScroll: true });
   }, [location]);
   /** 返回是否保存成功，展开编辑的 profile 失败时保留草稿。 */
@@ -57,6 +59,10 @@ export function BuiltinSettingsPage({ location }: { location?: string }) {
     <section ref={mcp} tabIndex={-1} className="outline-none">
       <h3 className="type-section mb-2">{i18n.text(mcpMessages.settings)}</h3>
       {config.ready && <McpSettings />}
+    </section>
+    <section ref={skills} tabIndex={-1} className="outline-none">
+      <h3 className="type-section mb-2">{i18n.text(skillsMessages.title)}</h3>
+      <SkillSettings />
     </section>
   </div>;
 }

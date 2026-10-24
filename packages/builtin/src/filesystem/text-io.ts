@@ -1,4 +1,5 @@
 import { isUtf8 } from "node:buffer";
+import { readFileSync, statSync, type Stats } from "node:fs";
 import { chmod, mkdir, readFile, rename, stat, unlink, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { randomUUID } from "node:crypto";
@@ -20,15 +21,26 @@ function decodeText(bytes: Buffer): string {
   }
   return bytes.toString("utf8");
 }
+function validateFile(info: Stats): void {
+  if (!info.isFile()) throw new FilesystemError(failed("not_file", "The target requires a regular UTF-8 text file."));
+  if (info.size > MAX_TEXT_BYTES) throw new TextError("file_too_large", "The target exceeds the 8 MiB text file limit.");
+}
+function textFile(bytes: Buffer, mode: number): TextFile {
+  if (bytes.length > MAX_TEXT_BYTES) throw new TextError("file_too_large", "The target exceeds the 8 MiB text file limit.");
+  return { text: decodeText(bytes), mode };
+}
+/** 同步装配与显式目录刷新使用同一文本格式校验。 */
+export function readTextFileSync(path: string): TextFile {
+  const info = statSync(path);
+  validateFile(info);
+  return textFile(readFileSync(path), info.mode);
+}
 /** 读取操作开始时已解析的真实路径。 */
 export async function readTextFile(path: string, signal: AbortSignal): Promise<TextFile> {
   signal.throwIfAborted();
   const info = await stat(path);
-  if (!info.isFile()) throw new FilesystemError(failed("not_file", "The target requires a regular UTF-8 text file."));
-  if (info.size > MAX_TEXT_BYTES) throw new TextError("file_too_large", "The target exceeds the 8 MiB text file limit.");
-  const bytes = await readFile(path, { signal });
-  if (bytes.length > MAX_TEXT_BYTES) throw new TextError("file_too_large", "The target exceeds the 8 MiB text file limit.");
-  return { text: decodeText(bytes), mode: info.mode };
+  validateFile(info);
+  return textFile(await readFile(path, { signal }), info.mode);
 }
 
 /** 同目录写入暂存文件并落盘，再以 rename 原子替换目标；失败时目标保持原样并清理暂存。 */

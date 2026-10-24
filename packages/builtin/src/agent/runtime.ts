@@ -20,11 +20,15 @@ import { SaveAgentDraft, SetAgentDraftMode, ExchangeAgentDraft, DiscardAgentDraf
 import { saveDraft, setDraftMode, exchangeDraft, discardDraft, moveDraft } from "./drafts.ts";
 import { createSendTool } from "./send/runtime.ts";
 import { createWaitTool } from "./wait/runtime.ts";
+import type { SkillCatalog } from "../skills/catalog.ts";
 
 /** 资源入口只装配领域模块与贡献；业务模块不依赖完整插件上下文。 */
-export function createAgentModule(application: BuiltinApplication, usage: UsageConsumer) {
+export function createAgentModule(application: BuiltinApplication, usage: UsageConsumer, skills: SkillCatalog) {
   return defineModule(plugin => {
-    const systemPrompt = (agent: Parameters<typeof composeSystemPrompt>[0]) => composeSystemPrompt(agent, application.name);
+    const systemPrompt = (agent: Parameters<typeof composeSystemPrompt>[0]) => {
+      const system = composeSystemPrompt(agent, application.name);
+      return { blocks: [...system.blocks, skills.prompt()] };
+    };
     const selection = createSelection({ agents: () => plugin.catalogs.get(AgentConfigurations) ?? [] });
     const feedback = createAgentFeedback();
     plugin.lifetime.defer(feedback.clear);

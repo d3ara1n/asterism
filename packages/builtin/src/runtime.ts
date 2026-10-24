@@ -21,12 +21,17 @@ import { createTerminalModule } from "./terminal/runtime.ts";
 import { CreateTerminal } from "./terminal/contract.ts";
 import mcp from "./mcp/runtime.ts";
 import web from "./web/runtime.ts";
+import { SkillCatalog } from "./skills/catalog.ts";
+import { createSkillsModule } from "./skills/runtime.ts";
 
 /** 仅组合插件业务；加载、宿主服务及外部插件依赖由应用负责。 */
 export function createBuiltin(options: { application: BuiltinApplication; connectNaming(api: NamingApi): () => void }) {
   return definePlugin({ namespace: builtin, version: metadata.version,
     setup(plugin) {
       const settings = plugin.config(BuiltinSettings);
+      const skills = new SkillCatalog();
+      // 后台装配先于任务进程 ready；首次技能目录在启动加载阶段构建完成。
+      skills.refresh(plugin.lifetime.signal);
       const shell = new ShellService(() => settings.get().shell, plugin.lifetime.signal);
       const usage = new UsageConsumer(plugin.modelProviders, plugin.usageProviders, providerId => {
         try { plugin.ipc.events.publish(UsageChanged, { providerId }); }
@@ -36,7 +41,7 @@ export function createBuiltin(options: { application: BuiltinApplication; connec
       plugin.lifetime.defer(() => usage.close());
       return { events: [UsageChanged],
         calls: [implementCall(ReadUsage, (input, { signal }) => usage.query(input.providerId, { refresh: input.refresh, signal }))],
-        modules: [providers, createAgentModule(options.application, usage), createFilesystemModule(shell), createNamingModule(options.connectNaming, options.application.userAgent), notes, questions,
+        modules: [providers, createAgentModule(options.application, usage, skills), createSkillsModule(skills), createFilesystemModule(shell), createNamingModule(options.connectNaming, options.application.userAgent), notes, questions,
         resourceOperations, mcp, web, createShellModule(() => settings.get().shell), createTerminalModule(() => settings.get().shell),
         defineAgentCreation({ id: builtin.name("terminal.create"), creation: CreateTerminal,
           description: "Create a shared interactive terminal. Its shell and screen remain available between tool calls and while viewing other sessions.",

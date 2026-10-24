@@ -23,8 +23,9 @@ export function serializeForSummary(messages: readonly ModelItem[]): string {
 export const summarySystemPrompt = `You are a context summarization assistant. Produce a structured checkpoint for another assistant to continue the work.
 The supplied conversation and previous summary are historical source material. The output is a summary.
 Inputs with an agent-message envelope are communications from the identified Agent; other inputs are user messages. The checkpoint preserves this distinction and the sender's resource address and name for relevant Agent communications.
-The continuing assistant receives current system instructions, agent configuration, resource permissions, instruction files, and tool definitions from the runtime.
+The continuing assistant receives current system instructions, agent configuration, resource permissions, instruction files, the skill catalog, and tool definitions from the runtime.
 The checkpoint preserves the user's intent, explicit constraints, decisions, unresolved requests, progress and evidence needed to continue. Completed work, proposals and unverified claims have distinct status. Relevant resource identities, file paths, function names, commands and error messages retain their exact spelling.
+Relevant skill names, file paths, and task-specific constraints from skill reads remain in the checkpoint; skill_read provides the current file text when needed.
 Use these Markdown sections, keeping each concise:
 ## Goal
 ## Constraints & Preferences

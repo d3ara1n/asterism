@@ -19,7 +19,7 @@ export class TextError extends Error {
 export function readText(text: string, anchored: boolean, range: { offset?: number; limit?: number; maxBytes?: number } = {}): TextRead {
   const lines = splitLines(text);
   const fromLine = range.offset ?? 1;
-  if (fromLine > Math.max(1, lines.length)) throw new TextError("line_out_of_range", `target.offset ${fromLine} exceeds the text's ${lines.length} lines.`);
+  if (fromLine > Math.max(1, lines.length)) throw new TextError("line_out_of_range", `offset ${fromLine} exceeds the text's ${lines.length} lines.`);
   const rows: TextRead["rows"] = [];
   const end = Math.min(lines.length, fromLine - 1 + (range.limit ?? lines.length));
   let bytes = 0;
@@ -35,12 +35,12 @@ export function readText(text: string, anchored: boolean, range: { offset?: numb
   const next = fromLine + rows.length;
   return { totalLines: lines.length, fromLine, rows, noFinalNewline: !hasFinalNewline(text), nextOffset: next <= lines.length ? next : null };
 }
-export function readToModel(data: TextRead): string {
+export function readToModel(data: TextRead, offsetField = "target.offset"): string {
   const rows = data.rows.map(row => `${row.line}${row.hash === null ? "" : `#${row.hash}`}│${row.content}`);
   return [
     `${data.totalLines} lines · from line ${data.fromLine}${data.noFinalNewline ? " · no trailing newline" : ""}`,
     ...rows,
-    ...(data.nextOffset === null ? [] : [`Remaining content starts at target.offset:${data.nextOffset}.`]),
+    ...(data.nextOffset === null ? [] : [`Remaining content starts at ${offsetField}:${data.nextOffset}.`]),
   ].join("\n");
 }
 
