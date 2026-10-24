@@ -7,7 +7,7 @@ import {
 } from "@atelier/sdk/contracts";
 export { modelExpressionSchema, parseModelExpression, formatModelExpression, modelReference, thinkingSchema, type ModelExpression, type ThinkingLevel } from "@atelier/sdk/contracts";
 import { z } from "zod";
-import { webProviderConnectionSchema, webProviderTypeSchema } from "@atelier/sdk/contracts";
+import { webProviderStateSchema, webProviderTypeSchema } from "@atelier/sdk/contracts";
 import { modelCompatibilitySchema } from "./model-compatibility.ts";
 
 const id = z.string().min(1).max(160);
@@ -33,7 +33,7 @@ export const modelProviderInputSchema = z.strictObject({
 });
 export const credentialStateSchema = z.enum(["not_required", "missing", "available", "storage_unavailable", "decryption_failed"]);
 export type CredentialState = z.infer<typeof credentialStateSchema>;
-export const webProviderSchema = webProviderConnectionSchema.extend({ credentialState: credentialStateSchema });
+export const webProviderSchema = webProviderStateSchema.extend({ credentialState: credentialStateSchema });
 export type WebProviderConfiguration = z.infer<typeof webProviderSchema>;
 export const modelProviderSchema = modelProviderInputSchema.extend({ credentialState: credentialStateSchema });
 export const modelInputSchema = z.strictObject({
@@ -104,8 +104,7 @@ const credentialUpdateSchema = z.discriminatedUnion("action", [
   z.strictObject({ action: z.literal("replace"), value: z.string().trim().min(1).max(16_384) }),
 ]);
 export const configurationCommandSchema = z.discriminatedUnion("type", [
-  z.strictObject({ type: z.literal("webProvider.save"), id: z.string().nullable(), value: webProviderConnectionSchema, credential: credentialUpdateSchema }),
-  z.strictObject({ type: z.literal("webProvider.move"), id: z.string(), direction: z.enum(["up", "down"]) }),
+  z.strictObject({ type: z.literal("webProvider.save"), id: z.string().trim().min(1), enabled: z.boolean(), credential: credentialUpdateSchema }),
   z.strictObject({ type: z.literal("read") }),
   // 保存目标是当前 ID；value 中的 ID 可以不同，即改名。
   z.strictObject({ type: z.literal("modelProvider.save"), id: modelProviderIdSchema.nullable(), value: modelProviderInputSchema, credential: credentialUpdateSchema }),

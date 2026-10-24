@@ -15,22 +15,19 @@ import { ModelProviderExtensions } from "./provider-extensions.ts";
 import { WebProviderRegistry } from "./web-providers.ts";
 import { WebError } from "@atelier/sdk/runtime";
 
-const saveKinds = { "modelProvider.save": "modelProvider", "webProvider.save": "webProvider", "model.save": "model", "role.save": "role", "agent.save": "agent" } as const;
+const saveKinds = { "modelProvider.save": "modelProvider", "model.save": "model", "role.save": "role", "agent.save": "agent" } as const;
 
 export class ConfigurationService {
   readonly extensions = new ModelProviderExtensions();
   readonly web = new WebProviderRegistry({
-    list: () => this.store.list("webProvider").map(({ credentialRef: _ref, ...value }) => value),
-    capture: id => {
+    list: () => this.store.list("webProvider").map(({ credentialRef: _ref, ...state }) => state),
+    credential: async id => {
       this.assertOpen();
       const stored = this.store.get("webProvider", id);
       if (!stored) throw new WebError("provider_unavailable", `Web provider '${id}' is not configured.`);
-      const { credentialRef, ...connection } = stored;
-      return { connection, credential: async () => {
-        if (connection.auth === "none") return null;
-        try { return credentialRef ? await this.vault.read(credentialRef) : null; }
-        catch { throw new WebError("credential_unavailable", "The web provider credential could not be read."); }
-      } };
+      if (!stored.credentialRef) return null;
+      try { return await this.vault.read(stored.credentialRef); }
+      catch { throw new WebError("credential_unavailable", "The web provider credential could not be read."); }
     },
   });
   private readonly providerListeners = new Set<() => void>();
@@ -67,7 +64,7 @@ export class ConfigurationService {
       this.assertOpen();
       const savedId = await this.perform(command);
       if (command.type === "modelProvider.save" || command.type === "remove" && command.kind === "modelProvider") this.providersChanged();
-      if (command.type === "webProvider.save" || command.type === "webProvider.move" || command.type === "remove" && command.kind === "webProvider") this.web.changed();
+      if (command.type === "webProvider.save" || command.type === "remove" && command.kind === "webProvider") this.web.changed();
       if (command.type !== "read") this.onChanged();
       return { snapshot: this.snapshot(), savedId };
     });
@@ -123,9 +120,11 @@ export class ConfigurationService {
     const roles = this.store.list("role");
     const agents = this.store.list("agent");
     return {
-      webProviders: this.store.list("webProvider").map(({ credentialRef, ...connection }) => ({
-        ...connection, credentialState: this.credentialState(connection.auth, credentialRef),
-      })),
+      webProviders: this.store.list("webProvider").map(({ credentialRef, ...state }) => {
+        const type = this.web.types().find(t => t.id === state.id);
+        const needsCredential = type ? type.credential !== null : credentialRef !== null;
+        return { ...state, credentialState: needsCredential ? this.credentialState("api_key", credentialRef) : "not_required" as const };
+      }),
       webProviderTypes: this.web.types(),
       modelProviders: this.store.list("modelProvider").map(provider => this.provider(provider)),
       modelProviderPresets: this.extensions.presets(), usageProviders: this.extensions.usageProviders(),
@@ -142,7 +141,27 @@ export class ConfigurationService {
   }
   private async perform(command: Exclude<ConfigurationCommand, { type: "model.parameters" }>): Promise<string | null> {
     if (command.type === "read") return null;
-    if (command.type === "webProvider.move") { this.store.moveWebProvider(command.id, command.direction); return command.id; }
+    if (command.type === "webProvider.save") {
+      const { id, enabled } = command;
+      const oldRef = this.store.get("webProvider", id)?.credentialRef ?? null;
+      let ref = oldRef, newRef: string | null = null;
+      try {
+        if (command.credential.action === "clear") ref = null;
+        else if (command.credential.action === "replace") {
+          if (!this.storageAvailable) throw new Error("System credential protection is unavailable.");
+          newRef = await this.vault.write(command.credential.value);
+          ref = newRef;
+        }
+        this.assertOpen();
+        this.store.save({ kind: "webProvider", id, value: { id, enabled }, credentialRef: ref });
+      } catch (error) {
+        if (newRef) this.removeCredential(newRef);
+        if (error instanceof ConfigurationError) throw error;
+        throw new ConfigurationError("unavailable", "The web provider could not be saved.");
+      }
+      if (oldRef && oldRef !== ref) this.removeCredential(oldRef);
+      return id;
+    }
     if (command.type === "test.start") return this.startTest(command.model);
     if (command.type === "test.cancel") { this.cancelTest(command.id); return command.id; }
     if (command.type === "discovery.start") {
@@ -177,7 +196,7 @@ export class ConfigurationService {
       if (credentialRef) this.removeCredential(credentialRef);
       return command.id;
     }
-    if (command.id && !this.store.get(saveKinds[command.type], command.id)) throw new ConfigurationError("not_found", "This configuration no longer exists. Reload settings.");
+    if (command.id && !this.store.get(saveKinds[command.type as keyof typeof saveKinds], command.id)) throw new ConfigurationError("not_found", "This configuration no longer exists. Reload settings.");
     switch (command.type) {
       case "role.save": case "agent.save": {
         this.store.save({ kind: command.type === "role.save" ? "role" : "agent", id: command.id, value: command.value } as never);
@@ -188,19 +207,10 @@ export class ConfigurationService {
         this.store.save({ kind: "model", id: command.id, value: command.value });
         this.clearFinishedTests("model", command.id ?? modelReference(command.value));
         return modelReference(command.value);
-      case "webProvider.save": case "modelProvider.save": break;
+      case "modelProvider.save": break;
     }
     const id = command.value.id;
-    const kind = command.type === "webProvider.save" ? "webProvider" : "modelProvider";
-    let value = command.value;
-    if (command.type === "webProvider.save") {
-      try { value = this.web.validate(command.value); }
-      catch (error) {
-        if (error instanceof WebError) throw new ConfigurationError(error.code === "invalid_request" ? "invalid_request" : "unavailable", error.message);
-        throw error;
-      }
-    }
-    const oldRef = command.id ? this.store.get(kind, command.id)?.credentialRef ?? null : null;
+    const oldRef = command.id ? this.store.get("modelProvider", command.id)?.credentialRef ?? null : null;
     let ref = oldRef;
     let newRef: string | null = null;
     try {
@@ -211,8 +221,8 @@ export class ConfigurationService {
         ref = newRef;
       }
       this.assertOpen();
-      this.store.save({ kind, id: command.id, value, credentialRef: ref } as Parameters<ConfigurationStore["save"]>[0]);
-      this.clearFinishedTests(kind, command.id ?? id);
+      this.store.save({ kind: "modelProvider", id: command.id, value: command.value, credentialRef: ref });
+      this.clearFinishedTests("modelProvider", command.id ?? id);
     } catch (error) {
       if (newRef) this.removeCredential(newRef);
       if (error instanceof ConfigurationError) throw error;

@@ -49,33 +49,29 @@ function roleValue(snapshot: ConfigurationSnapshot, id: string) {
 
 describe("真实配置与消费边界", () => {
   // Web 与模型连接可能同名；重排必须持久保留，解析各自的凭据而不是借用模型连接。
-  it("Web 连接独立保存凭据与路由顺序，重开后按连接实例解析", async () => {
+  it("Web 提供方以类型 slug 保存凭据，重开后按 id 解析", async () => {
     const { service, root, protector } = setup();
-    await addModel(service, "api_key");
     const life = new RunLifecycle(() => {});
     cleanups.push(() => life.stop());
     const create = vi.fn(() => ({ fetch: async () => ({ documents: [], hints: [] }) }));
     const definition = { id: "test-web", label: "Test web", search: false, fetch: true, urlPatterns: ["*"],
-      settingsSchema: z.object({ region: z.string() }), defaults: { baseUrl: "https://web.test", auth: "api_key" as const, settings: { region: "US" } }, create };
+      defaultBaseUrl: "https://web.test", credential: { kind: "api_key" as const }, create };
     service.web.declare("test.web", [definition], life.group("call"));
-    for (const id of ["local", "second"]) await service.execute({ type: "webProvider.save", id: null,
-      value: { id, name: id, type: definition.id, enabled: true, ...definition.defaults },
-      credential: { action: "replace", value: `web-key-${id}` } });
-    await service.execute({ type: "webProvider.move", id: "second", direction: "up" });
-    expect(service.current().modelProviders.map(item => item.id)).toEqual(["local"]);
+    await service.execute({ type: "webProvider.save", id: definition.id, enabled: true,
+      credential: { action: "replace", value: "web-key" } });
     const disk = readFileSync(join(root, "configuration.json"), "utf8");
     expect(disk).not.toContain("web-key");
     service.close();
     const reopened = new ConfigurationService(root, protector);
     cleanups.push(() => reopened.close());
     reopened.web.declare("test.web", [definition], life.group("call"));
-    expect(reopened.current().webProviders.map(item => item.id)).toEqual(["second", "local"]);
-    await reopened.web.resolve("local", { signal: new AbortController().signal });
-    expect(create).toHaveBeenCalledWith(expect.objectContaining({ credential: "web-key-local", connection: expect.objectContaining({ id: "local" }) }));
-    await expect(reopened.execute({ type: "webProvider.save", id: "local",
-      value: { ...reopened.web.get("local"), settings: { region: 10 } }, credential: { action: "replace", value: "invalid-key" } })).rejects.toThrow();
-    await reopened.web.resolve("local", { signal: new AbortController().signal });
-    expect(create).toHaveBeenLastCalledWith(expect.objectContaining({ credential: "web-key-local" }));
+    expect(reopened.current().webProviders.map(item => item.id)).toEqual([definition.id]);
+    await reopened.web.resolve(definition.id, { signal: new AbortController().signal });
+    expect(create).toHaveBeenCalledWith(expect.objectContaining({ credential: "web-key", baseUrl: definition.defaultBaseUrl }));
+    // 凭据与状态正确更新：替换密钥后旧密钥不可用
+    await reopened.execute({ type: "webProvider.save", id: definition.id, enabled: false,
+      credential: { action: "replace", value: "new-key" } });
+    expect(reopened.current().webProviders[0]).toMatchObject({ id: definition.id, enabled: false, credentialState: "available" });
   });
   // 配置 ID 直接用于模型选择；新增重名不能覆盖旧项，改名必须替换原项且保留其行为覆盖。
   it.each(["agent", "role"] as const)("%s 以显式 slug 创建、拒绝重名并持久保存改名", async kind => {

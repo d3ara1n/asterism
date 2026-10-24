@@ -46,6 +46,9 @@ function About() {
   return <>
     <p className="type-body py-4 text-muted-foreground">{i18n.text(settingsMessages.aboutBody)}</p>
     <Row label={i18n.text(settingsMessages.aboutIdentity)}><code className="text-xs">{applicationId}</code></Row>
+    <Row label={i18n.text(settingsMessages.aboutLogs)} hint={i18n.text(settingsMessages.aboutLogsHint)}>
+      <Button size="sm" variant="outline" onClick={() => void window.host.openLogs().then(error => { if (error) console.error(`Log folder could not be opened: ${error}`); })}>
+        {i18n.text(settingsMessages.aboutOpenLogs)}</Button></Row>
   </>;
 }
 

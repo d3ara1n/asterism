@@ -1,21 +1,19 @@
-import { z } from "zod";
 import { pluginNamespace, present, webResponseSchema } from "@atelier/sdk/contracts";
 import { definePlugin, WebError, type WebProviderDefinition } from "@atelier/sdk/runtime";
+import { z } from "zod";
 
 const ns = pluginNamespace("example.web");
 const Metadata = ns.data("metadata", z.object({ sourceId: z.string() }));
-const settingsSchema = z.object({ collection: z.string() });
 const responseSchema = z.object({ id: z.string(), title: z.string(), text: z.string() });
 const provider: WebProviderDefinition = {
   id: "example.web/pages", label: "Example pages", search: false, fetch: true,
   urlPatterns: ["https://docs.example.test/*", "https://help.example.test/*"],
-  settingsSchema, defaults: { baseUrl: "https://api.example.test", auth: "api_key", settings: { collection: "public" } },
-  create({ connection, credential }) {
-    const settings = settingsSchema.parse(connection.settings);
+  defaultBaseUrl: "https://api.example.test", credential: { kind: "api_key", keyUrl: "https://example.test/api-keys" },
+  create({ baseUrl, credential }) {
     return { async fetch(request, { signal }) {
-      const response = await fetch(new URL("/read", connection.baseUrl), {
+      const response = await fetch(new URL("/read", baseUrl), {
         method: "POST", signal, headers: { "Content-Type": "application/json", Authorization: `Bearer ${credential}` },
-        body: JSON.stringify({ url: request.url, collection: settings.collection }),
+        body: JSON.stringify({ url: request.url }),
       });
       if (!response.ok) throw new WebError("request_failed", `Page service returned HTTP ${response.status}.`);
       const page = responseSchema.parse(await response.json());

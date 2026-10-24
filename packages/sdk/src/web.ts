@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { jsonSchema } from "./json.ts";
 import { presentationSchema } from "./presentation.ts";
 import { uiTextSchema } from "./i18n.ts";
 
@@ -44,28 +43,32 @@ export const webFetchRequestSchema = z.object({
   url: webUrlSchema.describe("URL to retrieve."),
   query: z.string().trim().min(1).optional().describe("Optional focus for relevant excerpts."),
 }).describe("URL and optional excerpt focus.");
-export const webProviderConnectionSchema = z.strictObject({
-  id: z.string().trim().min(1).max(160).regex(/^[^/\s]+$/u), name: z.string().trim().min(1).max(160),
-  type: z.string().min(1), enabled: z.boolean(), baseUrl: webUrlSchema.refine(value => {
-    const url = new URL(value); return !url.search && !url.hash;
-  }, "An API base URL has no query or fragment."), auth: z.enum(["api_key", "none"]),
-  settings: jsonSchema,
+
+/** 提供方声明凭据类型；UI 按类型渲染对应输入，不接受任意 JSON。 */
+export const webCredentialDefinitionSchema = z.object({
+  kind: z.enum(["api_key"]),
+  keyUrl: webUrlSchema.optional(),
+});
+/** 每个提供方类型至多一份配置；id 与类型 slug 相同。 */
+export const webProviderStateSchema = z.strictObject({
+  id: z.string().trim().min(1),
+  enabled: z.boolean(),
 });
 export const webProviderTypeSchema = z.object({
   id: z.string().min(1), label: uiTextSchema, owner: z.string(),
   search: z.boolean(), fetch: z.boolean(), urlPatterns: z.array(z.string().min(1)),
-  defaults: webProviderConnectionSchema.pick({ baseUrl: true, auth: true, settings: true }),
-  settingsSchema: jsonSchema, keyUrl: webUrlSchema.optional(),
+  credential: webCredentialDefinitionSchema.nullable(),
 });
-export const webProviderIdentitySchema = z.object({ id: z.string(), name: z.string(), type: z.string() });
-export const webSearchResultSchema = webResponseSchema.extend({ query: z.string(), provider: webProviderIdentitySchema });
-export const webFetchResultSchema = webResponseSchema.extend({ requestedUrl: webUrlSchema, provider: webProviderIdentitySchema });
+/** 结果中的 provider 为实际处理请求的提供方类型 slug。 */
+export const webSearchResultSchema = webResponseSchema.extend({ query: z.string(), provider: z.string() });
+export const webFetchResultSchema = webResponseSchema.extend({ requestedUrl: webUrlSchema, provider: z.string() });
 export type WebHint = z.infer<typeof webHintSchema>;
 export type WebDocument = z.infer<typeof webDocumentSchema>;
 export type WebResponse = z.infer<typeof webResponseSchema>;
 export type WebSearchRequest = z.infer<typeof webSearchRequestSchema>;
 export type WebFetchRequest = z.infer<typeof webFetchRequestSchema>;
-export type WebProviderConnection = z.infer<typeof webProviderConnectionSchema>;
+export type WebCredentialDefinition = z.infer<typeof webCredentialDefinitionSchema>;
+export type WebProviderState = z.infer<typeof webProviderStateSchema>;
 export type WebProviderType = z.infer<typeof webProviderTypeSchema>;
 export type WebSearchResult = z.infer<typeof webSearchResultSchema>;
 export type WebFetchResult = z.infer<typeof webFetchResultSchema>;

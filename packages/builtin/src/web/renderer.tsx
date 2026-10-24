@@ -41,15 +41,14 @@ export default {
   cards: [cardRenderer(WebView, { ...appearance, Body: ({ data }) => {
     const i18n = useI18n();
     return <div className="nodrag nopan nowheel flex min-h-0 flex-1 flex-col gap-2 overflow-auto p-3">
-      {!data.connections.length && <p className="type-caption text-muted-foreground">{i18n.text(messages.empty)}</p>}
-      {data.connections.map(connection => {
-        const type = data.types.find(type => type.id === connection.type);
-        return <div key={connection.id} className="flex items-center justify-between gap-2">
-          <span className="type-body truncate">{connection.name}</span>
-          <span className="type-caption text-muted-foreground">{!connection.enabled ? i18n.text(messages.disabled) : !type ? i18n.text(messages.unavailable)
+      {!data.types.length && <p className="type-caption text-muted-foreground">{i18n.text(messages.empty)}</p>}
+      {data.types.map(type => (
+        <div key={type.id} className="flex items-center justify-between gap-2">
+          <span className="type-body truncate">{i18n.text(type.label)}</span>
+          <span className="type-caption text-muted-foreground">{!type.enabled ? i18n.text(messages.disabled)
             : [type.search && i18n.text(messages.search), type.fetch && i18n.text(messages.fetch)].filter(Boolean).join(" · ")}</span>
-        </div>;
-      })}
+        </div>
+      ))}
     </div>;
   } })],
   tools: [

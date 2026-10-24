@@ -159,9 +159,9 @@ API 14.0 的 `modelProviders.credential(id, { signal? })` 读取当前连接凭�
 
 ### 8. 网络提供方与 Web 服务（API 18.0）
 
-- `ModuleContribution.webProviders` 贡献 `WebProviderDefinition`，包括身份、能力、URL patterns、设置 schema、默认连接值与同步实例工厂。
-- `plugin.webProviders.types / list / get` 分别读取类型与连接；`resolve(id, { signal })` 取得保持本次配置与凭据的 `WebProviderInstance`；`subscribe` 观察目录或连接变化。
-- `plugin.web.search(request, { provider, signal })` 使用指定连接；`plugin.web.fetch(request, { signal })` 按连接与 patterns 的列表顺序分派。
+- `ModuleContribution.webProviders` 贡献 `WebProviderDefinition`，包括类型 slug、能力、URL patterns、内部端点、凭据声明与同步实例工厂。
+- `plugin.webProviders.types / list / get` 分别读取类型与已添加配置；`resolve(id, { signal })` 取得保持本次凭据的 `WebProviderInstance`；`subscribe` 观察目录或配置变化。
+- `plugin.web.search(request, { signal })` 使用首个启用的搜索提供方；`plugin.web.fetch(request, { signal })` 按配置与 patterns 的列表顺序分派。
 - `WebResponse` 的公共内容、`Presentation[]` 领域数据和 `hints` 共同组成结果；提供方通过 `present(DataContract, value)` 交付具型数据。Web 服务本身不缓存结果。
 - `plugin.usages.query(id, context) / parseHeaders(id, context)` 承担无状态用量调用，`plugin.usageProviders` 承担提供方目录；消费者负责自己的刷新与展示状态。
 

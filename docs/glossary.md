@@ -167,9 +167,9 @@
 | 模型提供商连接 | model provider connection | 应用级模型接入配置，关联具体协议、服务端点、模型列表与凭据引用；不构成任务资源授权 |
 | 模型提供商预设 | model provider preset | 一次性生成普通模型连接值与编辑规则的组合模板；连接不持久化预设或提供商类型身份，见 `docs/model-configuration.md` |
 | 网络提供方（网络提供商） | web provider | 提供搜索或 URL 获取能力的服务接入方；公开契约见 `docs/web.md` |
-| 网络提供方类型 | web provider definition | 插件贡献的能力、URL patterns、配置 schema 与实例工厂 |
-| 网络提供方连接 | web provider connection | 用户配置的类型引用、端点、凭据与设置；列表顺序参与 URL 分派 |
-| 网络提供方实例 | web provider instance | 用连接与凭据解析出的可调用句柄，保持解析时取用的配置 |
+| 网络提供方类型 | web provider definition | 插件贡献的类型 slug、能力、URL patterns、凭据声明与实例工厂 |
+| 网络提供方配置 | web provider state | 以类型 slug 为 id 的启用状态与凭据引用，每类型至多一份；列表顺序参与 URL 分派 |
+| 网络提供方实例 | web provider instance | 用类型与凭据解析出的可调用句柄，保持解析时取用的凭据 |
 | 固定字段 | fixed fields | 连接自身保存的有限编辑规则 `fixedFields`；通用编辑器隐藏对应配置项，保存边界保留已固定值，不改变执行消费语义 |
 | 账户用量 | account usage | 提供商余额、套餐／密钥额度及响应头报告的限流余量快照；连接以 `usage` 选择提供方，区别于模型响应 token 用量及费用估算 |
 | 用量查询提供方 | usage provider | 插件按全局目录 ID 提供的主动查询或被动响应头解析；返回统一 `balance / quota` 结果，消费方不依赖具体厂商 |

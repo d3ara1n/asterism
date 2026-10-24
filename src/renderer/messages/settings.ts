@@ -41,6 +41,18 @@ export const settingsMessages = pluginNamespace("atelier.host").messages("en", d
     id: "aboutIdentity",
     defaultMessage: "Application ID",
   },
+  aboutLogs: {
+    id: "aboutLogs",
+    defaultMessage: "Logs",
+  },
+  aboutLogsHint: {
+    id: "aboutLogsHint",
+    defaultMessage: "Background errors and diagnostics are written here.",
+  },
+  aboutOpenLogs: {
+    id: "aboutOpenLogs",
+    defaultMessage: "Open folder",
+  },
   appearance: {
     id: "features_settings_SettingsPage_1",
     defaultMessage: "Appearance",

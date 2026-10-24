@@ -6,7 +6,7 @@ import { z } from "zod";
 import { applicationStorage } from "../shared/application.ts";
 import { agentOverridesSchema, canEditModelProviderField, modelReference, modelRoleOverridesSchema, modelSchema, modelProviderInputSchema,
   type AgentOverrides, type ModelRoleOverrides, type ModelProviderInput, type ProviderModel } from "../shared/configuration.ts";
-import { modelCostSchema, webProviderConnectionSchema, type WebProviderConnection } from "@atelier/sdk/contracts";
+import { modelCostSchema, webProviderStateSchema, type WebProviderState } from "@atelier/sdk/contracts";
 import { configurationIdSchema } from "@atelier/builtin-api/contracts";
 import { defaultAgents, defaultRoles } from "./defaults.ts";
 import { ConfigurationError } from "./errors.ts";
@@ -16,14 +16,14 @@ import { providerEditingMessages } from "../shared/provider-editing-messages.ts"
 
 const identity = { id: configurationIdSchema };
 const storedProviderSchema = modelProviderInputSchema.extend({ credentialRef: z.string().uuid().nullable() }).strip();
-const storedWebProviderSchema = webProviderConnectionSchema.extend({ credentialRef: z.string().uuid().nullable() });
+const storedWebProviderSchema = webProviderStateSchema.extend({ credentialRef: z.string().uuid().nullable() });
 const storedRoleSchema = z.object({ ...identity, builtin: z.boolean(), overrides: modelRoleOverridesSchema });
 const storedAgentSchema = z.object({ ...identity, builtin: z.boolean(), overrides: agentOverridesSchema });
 const storedModelSchema = modelSchema.extend({ cost: z.preprocess(migrateModelCost, modelCostSchema.nullable().default(null)) }).strip();
 /** 模型以 `<providerId>/<modelId>` 识别，其余以 id 识别。 */
 const keyOf = (item: { id: string } | { providerId: string; modelId: string }): string => "id" in item ? item.id : modelReference(item);
 const documentSchema = z.strictObject({
-  version: z.literal(9),
+  version: z.literal(11),
   webProviders: z.array(storedWebProviderSchema),
   modelProviders: z.array(storedProviderSchema), models: z.array(storedModelSchema),
   roles: z.array(storedRoleSchema), agents: z.array(storedAgentSchema),
@@ -44,7 +44,7 @@ const collections = { modelProvider: "modelProviders", webProvider: "webProvider
 export type ConfigurationKind = keyof typeof collections;
 type Entry = { [K in ConfigurationKind]: ConfigurationDocument[(typeof collections)[K]][number] };
 type ConfigurationSave =
-  | { kind: "webProvider"; id: string | null; value: WebProviderConnection; credentialRef: string | null }
+  | { kind: "webProvider"; id: string; value: WebProviderState; credentialRef: string | null }
   | { kind: "modelProvider"; id: string | null; value: ModelProviderInput; credentialRef: string | null }
   | { kind: "model"; id: string | null; value: ProviderModel }
   | { kind: "role"; id: string | null; value: ModelRoleOverrides & { id: string } }
@@ -82,7 +82,7 @@ export class ConfigurationStore {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw new ConfigurationError("unavailable", "The application configuration could not be read.");
       // 只有文件不存在才初始化；已有文件中的删除状态不会重新播种。
       this.document = {
-        version: 9, modelProviders: [], webProviders: [], models: [],
+        version: 11, modelProviders: [], webProviders: [], models: [],
         roles: defaultRoles.map(({ id, builtin }) => ({ id, builtin, overrides: {} })),
         agents: defaultAgents.map(({ id, builtin }) => ({ id, builtin, overrides: {} })),
       };
@@ -104,7 +104,7 @@ export class ConfigurationStore {
     const next = structuredClone(this.document);
     const { id } = input;
     switch (input.kind) {
-      case "webProvider": upsert(next.webProviders, id, { ...input.value, credentialRef: input.credentialRef }); break;
+      case "webProvider": upsert(next.webProviders, input.id, { ...input.value, credentialRef: input.credentialRef }); break;
       case "modelProvider":
         upsert(next.modelProviders, id, { ...input.value, credentialRef: input.credentialRef });
         // 提供商拥有其模型：改名时模型随之迁移；角色等引用不改写。
@@ -166,15 +166,6 @@ export class ConfigurationStore {
       existing.add(modelReference(model));
     }
     if (next.models.length !== this.document.models.length) this.commit(next);
-  }
-  moveWebProvider(id: string, direction: "up" | "down"): void {
-    const next = structuredClone(this.document);
-    const index = next.webProviders.findIndex(item => item.id === id);
-    if (index < 0) throw new ConfigurationError("not_found", "The web provider no longer exists.");
-    const target = index + (direction === "up" ? -1 : 1);
-    if (target < 0 || target >= next.webProviders.length) return;
-    [next.webProviders[index], next.webProviders[target]] = [next.webProviders[target]!, next.webProviders[index]!];
-    this.commit(next);
   }
   private commit(raw: ConfigurationDocument): void {
     let next: ConfigurationDocument;

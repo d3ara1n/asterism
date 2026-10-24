@@ -257,18 +257,17 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
       async resolve(id, options) {
         checkAvailable();
         if (!host.webProviders) throw new WebError("provider_unavailable", "Web providers are unavailable.");
-        const instance = await sessionRuns.start(signal => host.webProviders!.resolve(id, { signal }),
-          { signal: options.signal, affectsHistory: false }).done;
+        const instance = await host.webProviders.resolve(id, options);
         const bound: WebProviderInstance = {};
-        if (instance.search) bound.search = (request, options) => {
+        if (instance.search) bound.search = (request, opts) => {
           checkAvailable();
           const input = structuredClone(request);
-          return sessionRuns.start(signal => instance.search!(input, { signal }), { signal: options.signal, affectsHistory: false }).done;
+          return sessionRuns.start(scope => instance.search!(input, { signal: scope }), { signal: opts.signal, affectsHistory: false }).done;
         };
-        if (instance.fetch) bound.fetch = (request, options) => {
+        if (instance.fetch) bound.fetch = (request, opts) => {
           checkAvailable();
           const input = structuredClone(request);
-          return sessionRuns.start(signal => instance.fetch!(input, { signal }), { signal: options.signal, affectsHistory: false }).done;
+          return sessionRuns.start(scope => instance.fetch!(input, { signal: scope }), { signal: opts.signal, affectsHistory: false }).done;
         };
         return bound;
       },
@@ -277,8 +276,8 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
       search(request, options) {
         checkAvailable();
         if (!host.webProviders) throw new WebError("provider_unavailable", "Web providers are unavailable.");
-        const input = structuredClone(request), provider = options.provider;
-        return sessionRuns.start(signal => host.webProviders!.search(input, { provider, signal }), { signal: options.signal, affectsHistory: false }).done;
+        const input = structuredClone(request);
+        return sessionRuns.start(scope => host.webProviders!.search(input, { signal: scope }), { signal: options.signal, affectsHistory: false }).done;
       },
       fetch(request, options) {
         checkAvailable();

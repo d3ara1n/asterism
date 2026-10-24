@@ -15,10 +15,11 @@ export default defineModule(plugin => {
   plugin.lifetime.defer(plugin.webProviders.subscribe(() => {
     for (const ref of objects.values()) plugin.object(ref.sessionId, WebResource, ref.id).invalidate();
   }));
-  const view = () => ({
-    connections: plugin.webProviders.list().map(({ settings: _settings, baseUrl: _baseUrl, auth: _auth, ...connection }) => connection),
-    types: plugin.webProviders.types().map(({ id, label, search, fetch, urlPatterns }) => ({ id, label, search, fetch, urlPatterns })),
-  });
+  const view = () => {
+    const types = plugin.webProviders.types();
+    const states = new Map(plugin.webProviders.list().map(s => [s.id, s]));
+    return { types: types.map(type => ({ id: type.id, label: type.label, search: type.search, fetch: type.fetch, enabled: states.get(type.id)?.enabled ?? false })) };
+  };
   return {
     webProviders: [exaWebProvider],
     resources: [implementResource(WebResource, WebView, {
@@ -28,16 +29,13 @@ export default defineModule(plugin => {
     })],
     tools: [
       implementTool(WebSearch, {
-        call: (_data, _target, { provider, ...request }, { signal }) => result(async () => {
-          const types = plugin.webProviders.types();
-          const selected = provider ?? plugin.webProviders.list().find(connection => connection.enabled && types.some(type => type.id === connection.type && type.search))?.id;
-          if (!selected) throw new WebError("provider_unavailable", "Configure an enabled search provider in Providers settings.");
-          return plugin.web.search(request, { provider: selected, signal });
-        }, signal),
+        call: (_data, _target, request, { signal }) => result(() => plugin.web.search(request, { signal }), signal),
         toModel: data => JSON.stringify(data),
       }),
-      implementTool(WebFetch, { call: (_data, _target, request, { signal }) => result(() => plugin.web.fetch(request, { signal }), signal),
-        toModel: data => JSON.stringify(data) }),
+      implementTool(WebFetch, {
+        call: (_data, _target, request, { signal }) => result(() => plugin.web.fetch(request, { signal }), signal),
+        toModel: data => JSON.stringify(data),
+      }),
     ],
   };
 });

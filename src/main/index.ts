@@ -4,7 +4,7 @@ import { externalWebUrl } from "@atelier/ui/links";
 import { mkdirSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { pickDirectoryChannel, openLocalFileChannel, localFilePathSchema, statusChannel } from "../shared/contracts.ts";
+import { pickDirectoryChannel, openLocalFileChannel, openLogsChannel, localFilePathSchema, statusChannel } from "../shared/contracts.ts";
 import { connectionRequestChannel } from "../shared/connection.ts";
 import { RuntimeHost } from "./runtime-host.ts";
 import { applicationBrand, applicationDataDirectory, applicationId, applicationStorage } from "../shared/application.ts";
@@ -86,6 +86,7 @@ function createWindow(): void {
   current.webContents.on("will-attach-webview", event => event.preventDefault());
   ipcMain.removeHandler(pickDirectoryChannel);
   ipcMain.removeHandler(openLocalFileChannel);
+  ipcMain.removeHandler(openLogsChannel);
   const trusted = (event: Electron.IpcMainInvokeEvent | Electron.IpcMainEvent) => event.sender === current.webContents &&
     event.senderFrame === current.webContents.mainFrame && event.senderFrame?.url === allowedURL;
   // renderer 与任务进程直连：只在交接端口时校验来源；页面重载、跳转或崩溃时关闭旧连接。
@@ -125,11 +126,18 @@ function createWindow(): void {
     if (!parsed.success || !isAbsolute(parsed.data)) return "An absolute local file path is required.";
     return shell.openPath(parsed.data);
   });
+  // 日志目录由主进程按数据根解析；渲染端只发起打开请求。
+  ipcMain.handle(openLogsChannel, event => {
+    if (!trusted(event)) return "Untrusted application frame.";
+    const directory = join(dataRoot, applicationStorage.logsDirectory);
+    mkdirSync(directory, { recursive: true });
+    return shell.openPath(directory);
+  });
   current.on("closed", () => {
     stopDesktopWindow();
     ipcMain.removeListener(connectionRequestChannel, requestConnection);
     closeConnection();
-    window = null; ipcMain.removeHandler(pickDirectoryChannel); ipcMain.removeHandler(openLocalFileChannel);
+    window = null; ipcMain.removeHandler(pickDirectoryChannel); ipcMain.removeHandler(openLocalFileChannel); ipcMain.removeHandler(openLogsChannel);
     stopAppearance(); stopPreferences(); stopLanguage();
   });
   const loading = developmentURL ? current.loadURL(developmentURL) : current.loadFile(rendererFile);

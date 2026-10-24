@@ -1,4 +1,4 @@
-import type { z } from "zod";
+import { z } from "zod";
 import type { Json } from "./json.ts";
 import { contractReferenceSchema, type ContractReference, type DataContract } from "./presentation.ts";
 
@@ -23,8 +23,10 @@ export interface ImplementationContract<S extends Json, T extends Json, A extend
 export function defineResource<S extends Json>(kind: string, stateSchema: z.ZodType<S>): ResourceContract<S> {
   return { kind, stateSchema };
 }
+/** 工具 args/target/result 会投影为 JSON Schema 交给模型；声明时即校验可表示，避免调用期才失败。 */
 function requireDescription(schema: z.ZodType, subject: string): void {
   if (!schema.description?.trim()) throw new Error(`Missing schema description: ${subject}`);
+  try { z.toJSONSchema(schema); } catch (error) { throw new Error(`Schema is not representable as JSON Schema: ${subject}`, { cause: error }); }
 }
 export function defineTool<A extends Json>(definition: ToolContract<A>): ToolContract<A> {
   if (!definition.name.trim() || !definition.description.trim()) throw new Error("Tool name and description must not be empty.");

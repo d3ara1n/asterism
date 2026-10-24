@@ -2,7 +2,7 @@ import { contextBridge, ipcRenderer, webUtils } from "electron";
 import { languageGetChannel, languageSetChannel, languageChangedChannel, languagePreferenceSchema, languageStateSchema } from "../shared/language.ts";
 import { desktopBridgeKey } from "../shared/core.ts";
 import { desktopWindowChangedChannel, desktopWindowGetChannel, desktopWindowStateSchema } from "../shared/desktop.ts";
-import { pickDirectoryChannel, openLocalFileChannel, localFilePathSchema, statusChannel, runtimeStatusSchema, type DesktopBridge } from "../shared/contracts.ts";
+import { pickDirectoryChannel, openLocalFileChannel, openLogsChannel, localFilePathSchema, statusChannel, runtimeStatusSchema, type DesktopBridge } from "../shared/contracts.ts";
 import { connectionPortMessage, connectionRequestChannel } from "../shared/connection.ts";
 import { appearanceChangedChannel, appearanceGetChannel, appearancePatchSchema, appearanceSetChannel, parseAppearance } from "../shared/theme.ts";
 import { preferencesGetChannel, preferencesSetChannel, preferenceWriteSchema, uiStateSchemas } from "../shared/ui-state.ts";
@@ -52,6 +52,10 @@ const bridge: DesktopBridge = {
   async openLocalFile(path) {
     const result: unknown = await ipcRenderer.invoke(openLocalFileChannel, localFilePathSchema.parse(path));
     return typeof result === "string" ? result : "The local file could not be opened.";
+  },
+  async openLogs() {
+    const result: unknown = await ipcRenderer.invoke(openLogsChannel);
+    return typeof result === "string" ? result : "The log folder could not be opened.";
   },
   pathForFile: file => webUtils.getPathForFile(file),
   platform: process.platform === "darwin" ? "darwin" : process.platform === "win32" ? "win32" : "linux",

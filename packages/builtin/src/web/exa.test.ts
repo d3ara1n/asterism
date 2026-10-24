@@ -11,16 +11,15 @@ afterEach(() => http.transport.mockReset());
 afterAll(() => { globalThis.fetch = http.original; });
 
 describe("Exa 结果归一化", () => {
-  // Exa SDK 直接拼接 baseURL 与路径；尾斜杠曾产生 //search，带前缀中转地址同样受影响。
-  it("官方 SDK 在尾斜杠端点下仍请求准确的 search 与 contents 路径", async () => {
+  // 注册表在调用 create 前去除尾斜杠；此处验证不含尾斜杠的代理地址能正确路由 search 与 contents 路径。
+  it("代理端点下仍请求准确的 search 与 contents 路径", async () => {
     const paths: string[] = [];
     http.transport.mockImplementation(async url => {
       paths.push(new URL(typeof url === "string" ? url : url instanceof URL ? url.href : url.url).pathname);
       return new Response(JSON.stringify({ results: [{ id: "page", url: "https://page.test/", text: "Page content" }] }),
         { headers: { "content-type": "application/json" } });
     });
-    const instance = exaWebProvider.create({ connection: { id: "exa", name: "Exa", type: "exa", enabled: true,
-      baseUrl: "https://proxy.test/exa/", auth: "api_key", settings: {} }, credential: "test-key" });
+    const instance = exaWebProvider.create({ baseUrl: "https://proxy.test/exa", credential: "test-key" });
     const options = { signal: new AbortController().signal };
     await instance.search!({ query: "test", maxResults: 1 }, options);
     await instance.fetch!({ url: "https://page.test/" }, options);

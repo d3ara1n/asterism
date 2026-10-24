@@ -68,7 +68,7 @@ headers 来源需要消费者持有自己的模型调用结果，因此自然用
 
 ## 网络提供方与服务（API 18.0）
 
-`ModuleContribution.webProviders` 注册 `WebProviderDefinition`；`plugin.webProviders` 提供类型目录、已配置连接与实例解析，`plugin.web` 提供统一搜索与 URL 获取。类型工厂同步返回实现，异步方法接收调用信号；宿主将解析与执行绑定到提供方和调用方生命周期。配置与调用结果契约见 [Web 资源](web.md)，作者示例见 [`web-provider.ts`](../packages/sdk/examples/web-provider.ts)。
+`ModuleContribution.webProviders` 注册 `WebProviderDefinition`；`plugin.webProviders` 提供类型目录、已添加配置与实例解析，`plugin.web` 提供统一搜索与 URL 获取。类型工厂同步返回实现，异步方法接收调用信号；宿主将解析与执行绑定到提供方和调用方生命周期。配置与调用结果契约见 [Web 资源](web.md)，作者示例见 [`web-provider.ts`](../packages/sdk/examples/web-provider.ts)。
 
 ## 公共模块与契约身份
 
