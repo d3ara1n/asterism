@@ -31,4 +31,6 @@ export const startupMessages = pluginNamespace("atelier.host").messages("en", de
   openLogs: { id: "startup.openLogs", defaultMessage: "Open logs" },
   openData: { id: "startup.openData", defaultMessage: "Open data folder" },
   details: { id: "startup.details", defaultMessage: "Details" },
+  copyDetails: { id: "startup.copyDetails", defaultMessage: "Copy details" },
+  copiedDetails: { id: "startup.copiedDetails", defaultMessage: "Copied" },
 }));

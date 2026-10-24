@@ -623,6 +623,8 @@
   "startup.openLogs": "打开日志",
   "startup.openData": "打开数据文件夹",
   "startup.details": "详情",
+  "startup.copyDetails": "复制详情",
+  "startup.copiedDetails": "已复制",
   "unknownRecord": "未知记录 · {id}",
   "settings.application": "应用",
   "settings.plugins": "插件",

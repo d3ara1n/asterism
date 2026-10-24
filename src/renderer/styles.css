@@ -267,6 +267,9 @@
 .startup-content { width: min(100%, 32rem); text-align: center; -webkit-app-region: no-drag; }
 .startup-indicator { width: 1.25rem; height: 1.25rem; border-radius: 9999px; border: 2px solid var(--border); border-top-color: var(--muted-foreground); animation: startup-spin 0.8s linear infinite; }
 .startup-stage { margin: 0; min-height: 1.25em; }
+/* 等待内容延迟显现：快速启动在显现前完成，不闪现加载画面；React 接管时以内联负延迟续接静态占位的计时。 */
+.startup-reveal { display: flex; flex-direction: column; align-items: center; gap: 0.75rem; animation: startup-reveal var(--motion-fast) var(--ease-out) 300ms backwards; }
+@keyframes startup-reveal { from { opacity: 0; } }
 @keyframes startup-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .startup-indicator { animation-duration: 2.4s; } }
 .react-flow__attribution { background: transparent !important; font-size: 9px !important; }
