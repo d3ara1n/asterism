@@ -9,6 +9,7 @@ import { McpList, McpSearch, McpInspect, McpConnect, McpCall, connectionPhases, 
 import { mcpMessages as messages } from "../messages/mcp";
 import { textMessages } from "../messages/text";
 import { inputField, inputText, characterCount } from "../shared/tool-preview";
+import { settledBodyViews } from "../shared/tool-views";
 import { FilePreview } from "../agent/conversation/Files";
 import { extraStructured, displayText } from "./content";
 import { Instructions, PageNote, ServerLine, ToolList, type ServerSummaryData, type ToolEntryData } from "./views";
@@ -189,17 +190,12 @@ function CallBody({ args, phase, result }: ToolRenderProps<McpCallData>) {
   </div>;
 }
 
-/** 目录工具在结果到达前没有正文；以组件形式传入，避免执行中回落到 DefaultToolBody 的“没有输出”。 */
-const noBody = () => null;
-type View = (props: ToolRenderProps) => ReactNode;
-const view = (headerRenderer: View, bodyRenderer: View) =>
-  ({ input: { headerRenderer }, execution: { headerRenderer, bodyRenderer: noBody }, result: { headerRenderer, bodyRenderer } });
 const callView = { headerRenderer: CallHeader, bodyRenderer: CallBody };
 
 export const mcpToolRenderers = [
-  toolRenderer(McpList, { label: messages.list, icon: <ListTree className="size-3.5" />, ...view(ListHeader, ListBody) }),
-  toolRenderer(McpSearch, { label: messages.search, icon: <Search className="size-3.5" />, ...view(SearchHeader, SearchBody) }),
-  toolRenderer(McpInspect, { label: messages.inspect, icon: <FileSearch className="size-3.5" />, ...view(InspectHeader, InspectBody) }),
-  toolRenderer(McpConnect, { label: messages.connectTool, icon: <Plug className="size-3.5" />, ...view(ConnectHeader, ConnectBody) }),
+  toolRenderer(McpList, { label: messages.list, icon: <ListTree className="size-3.5" />, ...settledBodyViews(ListHeader, ListBody) }),
+  toolRenderer(McpSearch, { label: messages.search, icon: <Search className="size-3.5" />, ...settledBodyViews(SearchHeader, SearchBody) }),
+  toolRenderer(McpInspect, { label: messages.inspect, icon: <FileSearch className="size-3.5" />, ...settledBodyViews(InspectHeader, InspectBody) }),
+  toolRenderer(McpConnect, { label: messages.connectTool, icon: <Plug className="size-3.5" />, ...settledBodyViews(ConnectHeader, ConnectBody) }),
   toolRenderer(McpCall, { label: messages.call, icon: <Zap className="size-3.5" />, input: { headerRenderer: CallHeader }, execution: callView, result: callView }),
 ];

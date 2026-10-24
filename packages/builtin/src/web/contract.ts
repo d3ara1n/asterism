@@ -1,13 +1,23 @@
 import { z } from "zod";
 import { defineCreation, defineImplementation, defineTool, webSearchRequestSchema, webFetchRequestSchema,
-  webSearchResultSchema, webFetchResultSchema, webProviderTypeSchema } from "@atelier/sdk/contracts";
+  webSearchResultSchema, webFetchResultSchema } from "@atelier/sdk/contracts";
 import { builtin } from "@atelier/builtin-api/contracts";
 
 export const WebResource = builtin.resource("web", z.object({}));
 export const CreateWeb = defineCreation(WebResource, { id: builtin.name("web.create"), schema: z.object({ title: z.string().trim().min(1).default("Web") }) });
+const countsSchema = z.object({ succeeded: z.number(), failed: z.number(), cancelled: z.number() });
+const costSchema = z.object({ currency: z.string(), amount: z.number() });
+/** 卡片投影：是否有启用的提供方，以及所在会话在本次运行内的请求统计（仅在后台内存中，不进入资源数据）。 */
 export const WebView = builtin.data("web.card", z.object({
-  types: z.array(webProviderTypeSchema.pick({ id: true, label: true, search: true, fetch: true }).extend({ enabled: z.boolean() })),
+  configured: z.boolean(),
+  stats: z.object({
+    search: countsSchema, fetch: countsSchema, inFlight: z.number(),
+    averageMs: z.number().nullable(), lastMs: z.number().nullable(), cost: z.array(costSchema),
+    recent: z.array(z.object({ kind: z.enum(["search", "fetch"]), subject: z.string(), outcome: z.enum(["succeeded", "failed", "cancelled"]),
+      at: z.number(), durationMs: z.number(), cost: z.array(costSchema) })),
+  }),
 }));
+export type WebCardData = z.infer<typeof WebView.schema>;
 const targetSchema = z.null().describe("The Web resource provides access to all configured web providers.");
 export const WebSearch = defineImplementation({
   ...builtin.data("web.search", webSearchResultSchema.describe("Search sources, typed details, actual provider, usage and execution hints.")),

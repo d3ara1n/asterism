@@ -22,6 +22,7 @@ import { SaveMcpServer, ReadMcpCredentials, SetMcpServerEnabled, RemoveMcpServer
 import { slugifyServerId } from "./catalog";
 import { draftOf, validateDraft, type McpDraft, type McpField, type McpFieldError } from "./form";
 import { phaseTone, useMcpStatus } from "./status";
+import { useLifetimeSignal } from "../shared/use-lifetime";
 
 const blank = (taken: string[]): McpServerConfig => ({ id: slugifyServerId("", taken), name: "", enabled: true, mode: "lazy",
   idleSeconds: 300, transport: "stdio", command: "", args: [], cwd: "", url: "", auth: "none" });
@@ -39,8 +40,7 @@ export function McpSettings() {
   const [pending, setPending] = useState<ReadonlySet<string>>(new Set());
   const [failures, setFailures] = useState<Readonly<Record<string, string>>>({});
   const [removing, setRemoving] = useState<McpServerConfig | null>(null);
-  const lifetime = useRef<AbortController>(new AbortController());
-  useEffect(() => { const controller = new AbortController(); lifetime.current = controller; return () => controller.abort(); }, []);
+  const lifetime = useLifetimeSignal();
   const servers = config.mcp.servers;
 
   /** 新增保存成功后以服务器身份重新打开，与点击该行打开的是同一浮岛。 */
@@ -48,7 +48,7 @@ export function McpSettings() {
     render: () => <McpServerEditor serverId={serverId} initial={initial}
       onCreated={server => { void open(server.id, origin, server); }} /> });
   const run = async (serverId: string, action: (signal: AbortSignal) => Promise<unknown>) => {
-    const signal = lifetime.current.signal;
+    const signal = lifetime();
     setPending(current => new Set(current).add(serverId));
     setFailures(({ [serverId]: _, ...rest }) => rest);
     try { await action(signal); return true; }

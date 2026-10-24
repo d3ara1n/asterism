@@ -1,3 +1,4 @@
+import { Virtualizer } from "virtua";
 import { useI18n } from "@atelier/sdk/renderer";
 import { StatusIcon } from "@atelier/ui/ui/status";
 import { cn } from "@atelier/ui/utils";
@@ -35,16 +36,27 @@ export function ServerLine({ server }: { server: ServerSummaryData }) {
 
 export interface ToolEntryData { name: string; title?: string; description?: string; server?: string }
 
-export function ToolEntry({ name, title, description, server }: ToolEntryData) {
-  return <li className="flex min-w-0 flex-col gap-0.5">
-    <span className="type-code truncate text-xs" title={name}>{title ? `${title} · ${name}` : name}</span>
-    {server && <span className="type-caption text-muted-foreground">{server}</span>}
+function ToolEntry({ name, title, description, server }: ToolEntryData) {
+  return <div className="flex min-w-0 flex-col gap-0.5">
+    <span className="type-code truncate text-xs" title={name} translate="no">{title ? `${title} · ${name}` : name}</span>
+    {server && <span className="type-caption text-muted-foreground" translate="no">{server}</span>}
     {description && <span className="type-caption line-clamp-2 text-muted-foreground select-text" title={description}>{description}</span>}
-  </li>;
+  </div>;
+}
+const toolKey = (tool: ToolEntryData, index: number) => `${tool.server ?? ""}/${tool.name}/${index}`;
+
+/** 分页结果中的工具条目；条目数受单页限制，直接渲染。 */
+export function ToolList({ tools }: { tools: readonly ToolEntryData[] }) {
+  return <ul className="flex flex-col gap-2">{tools.map((tool, index) => <li key={toolKey(tool, index)}><ToolEntry {...tool} /></li>)}</ul>;
 }
 
-export function ToolList({ tools }: { tools: readonly ToolEntryData[] }) {
-  return <ul className="flex flex-col gap-2">{tools.map((tool, index) => <ToolEntry key={`${tool.server ?? ""}/${tool.name}/${index}`} {...tool} />)}</ul>;
+/** 卡片中的完整缓存目录可达数百条：在有界的局部滚动区内虚拟化，少量条目时高度随内容收缩。 */
+export function VirtualToolList({ tools }: { tools: readonly ToolEntryData[] }) {
+  return <div className="max-h-72 overflow-y-auto overscroll-contain">
+    <Virtualizer as="ul" item="li" data={tools}>
+      {(tool, index) => <div key={toolKey(tool, index)} className="pb-2"><ToolEntry {...tool} /></div>}
+    </Virtualizer>
+  </div>;
 }
 
 export function Instructions({ text }: { text: string }) {

@@ -6,8 +6,10 @@ import { ToolHeader } from "@atelier/ui/tool-header";
 import { WebResource, CreateWeb, WebView, WebSearch, WebFetch } from "./contract";
 import { webMessages as messages } from "../messages/web";
 import { Markdown } from "../agent/conversation/Markdown";
+import { settledBodyViews } from "../shared/tool-views";
+import { WebCard } from "./WebCard";
 
-const appearance = { width: 340, height: 220, minWidth: 260, minHeight: 140 };
+const appearance = { width: 340, height: 300, minWidth: 260, minHeight: 160 };
 const field = (value: Json, key: string) => value && typeof value === "object" && !Array.isArray(value) && typeof value[key] === "string" ? value[key] : undefined;
 const parseResponse = (data: Json | undefined) => { const parsed = webResponseSchema.safeParse(data); return parsed.success ? parsed.data : undefined; };
 
@@ -70,28 +72,12 @@ function SearchHeader({ args, result }: ToolRenderProps) {
 function FetchHeader({ args }: ToolRenderProps) {
   return <ToolHeader label={useI18n().text(messages.fetch)} subject={field(args, "url")} />;
 }
-/** 结果到达前没有正文；以组件形式传入，避免执行中回落到 DefaultToolBody 的“没有输出”。 */
-const noBody = () => null;
 export default {
   resources: [{ kind: WebResource.kind, label: messages.title, icon: <Globe className="size-4" />, card: appearance }],
-  cards: [cardRenderer(WebView, { ...appearance, Body: ({ data }) => {
-    const i18n = useI18n();
-    return <div className="nodrag nopan nowheel flex min-h-0 flex-1 flex-col gap-2 overflow-auto p-3">
-      {!data.types.length && <p className="type-caption text-muted-foreground">{i18n.text(messages.empty)}</p>}
-      {data.types.map(type => (
-        <div key={type.id} className="flex items-center justify-between gap-2">
-          <span className="type-body truncate">{i18n.text(type.label)}</span>
-          <span className="type-caption text-muted-foreground">{!type.enabled ? i18n.text(messages.disabled)
-            : [type.search && i18n.text(messages.search), type.fetch && i18n.text(messages.fetch)].filter(Boolean).join(" · ")}</span>
-        </div>
-      ))}
-    </div>;
-  } })],
+  cards: [cardRenderer(WebView, { ...appearance, Body: WebCard })],
   tools: [
-    toolRenderer(WebSearch, { label: messages.search, icon: <Search className="size-3.5" />, input: { headerRenderer: SearchHeader },
-      execution: { headerRenderer: SearchHeader, bodyRenderer: noBody }, result: { headerRenderer: SearchHeader, bodyRenderer: SearchBody } }),
-    toolRenderer(WebFetch, { label: messages.fetch, icon: <Download className="size-3.5" />, input: { headerRenderer: FetchHeader },
-      execution: { headerRenderer: FetchHeader, bodyRenderer: noBody }, result: { headerRenderer: FetchHeader, bodyRenderer: FetchBody } }),
+    toolRenderer(WebSearch, { label: messages.search, icon: <Search className="size-3.5" />, ...settledBodyViews(SearchHeader, SearchBody) }),
+    toolRenderer(WebFetch, { label: messages.fetch, icon: <Download className="size-3.5" />, ...settledBodyViews(FetchHeader, FetchBody) }),
   ],
   creations: [creationEntry(CreateWeb, { id: "atelier.builtin/web.blank", label: messages.title, icon: <Globe className="size-4" />, group: "resources", triggers: { menu: { initialInput: { title: "Web" } } } })],
 } satisfies RendererModule;
