@@ -20,7 +20,7 @@ import { Textarea } from "@atelier/ui/ui/textarea";
 import { useIsland } from "../../shared/weave/Screen";
 import { Section } from "../settings/layout";
 import { Editor, EditorSection, ModifiedNote, OverrideNumberField } from "./forms";
-import { useSettingsConfiguration } from "./state";
+import { useConfigurationAction, useSettingsConfiguration } from "./state";
 
 type Base = Omit<AgentConfiguration, "id" | "builtin">;
 const NONE = "__none";
@@ -50,7 +50,7 @@ function normalize(draft: AgentOverrides, base: Base): AgentOverrides {
 
 export function AgentsSettings() {
   const i18n = useI18n();
-  const { snapshot, run, busy } = useSettingsConfiguration();
+  const { snapshot } = useSettingsConfiguration();
   const island = useIsland();
   const [editingId, setEditingId] = useState<string | null>(null);
   const open = async (id: string | null, origin?: HTMLElement | null) => {
@@ -59,28 +59,35 @@ export function AgentsSettings() {
     if (opened) setEditingId(id);
     return opened;
   };
-  const setEnabled = (agent: AgentConfiguration, enabled: boolean) => {
-    if (!snapshot) return;
-    const stored = snapshot.overrides.agents[agent.id] ?? {};
-    void run({ type: "agent.save", id: agent.id, value: { ...normalize({ ...stored, enabled }, baseOf(snapshot, agent)), id: agent.id } });
-  };
   const agents = snapshot?.agents ?? [];
   return <Section title={i18n.formatMessage(agentsMessages.agents)} hint={i18n.formatMessage(agentsMessages.summary)}
     action={<Button size="sm" disabled={!snapshot} onClick={event => open(null, event.currentTarget)}><Plus />{i18n.formatMessage(agentsMessages.addAgent)}</Button>}>
-    {snapshot && <ItemGroup className="surface">{agents.map((agent, index) => {
-      const role = agent.modelRole === null ? null : snapshot.roles.find(item => item.id === agent.modelRole);
-      return <div key={agent.id}>{index > 0 && <ItemSeparator />}
-        <ListRow selected={!!island.child && editingId === agent.id} inactive={!agent.enabled} onOpen={origin => open(agent.id, origin)}
-          title={<>{agent.id}{agent.id === "worker" && <Badge variant="secondary">{i18n.formatMessage(agentsMessages.default)}</Badge>}</>}
-          description={agent.description}
-          actions={<>
-            {agent.modelRole !== null && !role
-              ? <StatusBadge tone="error">{i18n.formatMessage(agentsMessages.unavailableRole)}</StatusBadge>
-              : <Badge variant="secondary">{role ? role.id : i18n.formatMessage(agentsMessages.noRole)}</Badge>}
-            <Switch aria-label={i18n.formatMessage(agentsMessages.enableAgent, { agent_name: agent.id })} checked={agent.enabled} disabled={busy} onCheckedChange={next => setEnabled(agent, next)} />
-          </>} /></div>;
-    })}</ItemGroup>}
+    {snapshot && <ItemGroup className="surface">{agents.map((agent, index) =>
+      <div key={agent.id}>{index > 0 && <ItemSeparator />}
+        <AgentRow agent={agent} snapshot={snapshot} selected={!!island.child && editingId === agent.id} onOpen={origin => open(agent.id, origin)} />
+      </div>)}</ItemGroup>}
   </Section>;
+}
+
+function AgentRow({ agent, snapshot, selected, onOpen }: {
+  agent: AgentConfiguration; snapshot: ConfigurationSnapshot; selected: boolean; onOpen: (origin: HTMLElement) => void;
+}) {
+  const i18n = useI18n();
+  const { run, busy } = useConfigurationAction("toast");
+  const setEnabled = (enabled: boolean) => {
+    const stored = snapshot.overrides.agents[agent.id] ?? {};
+    void run({ type: "agent.save", id: agent.id, value: { ...normalize({ ...stored, enabled }, baseOf(snapshot, agent)), id: agent.id } });
+  };
+  const role = agent.modelRole === null ? null : snapshot.roles.find(item => item.id === agent.modelRole);
+  return <ListRow selected={selected} inactive={!agent.enabled} onOpen={onOpen}
+    title={<>{agent.id}{agent.id === "worker" && <Badge variant="secondary">{i18n.formatMessage(agentsMessages.default)}</Badge>}</>}
+    description={agent.description}
+    actions={<>
+      {agent.modelRole !== null && !role
+        ? <StatusBadge tone="error">{i18n.formatMessage(agentsMessages.unavailableRole)}</StatusBadge>
+        : <Badge variant="secondary">{role ? role.id : i18n.formatMessage(agentsMessages.noRole)}</Badge>}
+      <Switch aria-label={i18n.formatMessage(agentsMessages.enableAgent, { agent_name: agent.id })} checked={agent.enabled} disabled={busy} onCheckedChange={setEnabled} />
+    </>} />;
 }
 
 /* ---------- 编辑器公共件 ---------- */
@@ -144,7 +151,8 @@ type DelegateMode = "all" | "list" | "none";
 
 function AgentEditor({ initialId, onSaved }: { initialId: string | null; onSaved(id: string): void }) {
   const i18n = useI18n();
-  const { snapshot, run, busy } = useSettingsConfiguration();
+  const { snapshot } = useSettingsConfiguration();
+  const { run, busy, error } = useConfigurationAction("inline");
   const island = useIsland();
   const ids = { identity: useId(), description: useId(), prompt: useId(), role: useId(), fallback: useId(), tools: useId() };
   const [id, setId] = useState(initialId);
@@ -191,18 +199,18 @@ function AgentEditor({ initialId, onSaved }: { initialId: string | null; onSaved
   const examples = effective("examples");
   const restore = (...fields: (keyof AgentOverrides)[]) => setDraft(previous => { const updated = { ...previous }; for (const field of fields) delete updated[field]; return updated; });
 
-  return <Editor form="agent-form" title={current?.id ?? i18n.formatMessage(agentsMessages.newAgent)} description={builtin ? i18n.formatMessage(agentsMessages.builtinAgent) : undefined} dirty={dirty}
+  return <Editor form="agent-form" title={current?.id ?? i18n.formatMessage(agentsMessages.newAgent)} description={builtin ? i18n.formatMessage(agentsMessages.builtinAgent) : undefined} dirty={dirty} busy={busy} error={error}
     restore={builtin && Object.keys(normalized).length > 0 ? () => { setDraft({}); setDelegateMode(null); setToolLists({ allow: [], exclude: [] }); } : undefined}
     remove={current ? { title: i18n.formatMessage(agentsMessages.deleteTitle),
       description: builtin
         ? i18n.formatMessage(agentsMessages.deleteBuiltinDescription, { current_name: current.id })
         : i18n.formatMessage(agentsMessages.deleteDescription, { current_name: current.id }),
-      onConfirm: async () => { const result = await run({ type: "remove", kind: "agent", id: current.id }); if (result.ok) void island.close({ force: true }); } } : undefined}>
+      onConfirm: async () => { const result = await run({ type: "remove", kind: "agent", id: current.id }); if (result?.ok) void island.close({ force: true }); } } : undefined}>
     <form id="agent-form" onSubmit={async event => {
       event.preventDefault();
       const result = await run({ type: "agent.save", id, value: { ...normalized, id: slug,
         ...(current && snapshot.overrides.agents[current.id]?.enabled !== undefined ? { enabled: snapshot.overrides.agents[current.id]!.enabled } : {}) } });
-      if (result.ok && result.savedId) { setId(result.savedId); setSlug(result.savedId); onSaved(result.savedId); setDraft(strip(result.snapshot.overrides.agents[result.savedId] ?? {})); setDelegateMode(null); }
+      if (result?.ok && result.savedId) { setId(result.savedId); setSlug(result.savedId); onSaved(result.savedId); setDraft(strip(result.snapshot.overrides.agents[result.savedId] ?? {})); setDelegateMode(null); }
     }}><fieldset disabled={busy}>
 
       <EditorSection title={i18n.formatMessage(agentsMessages.basics)}><FieldGroup>

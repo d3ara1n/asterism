@@ -1,5 +1,6 @@
 import { ChevronDown, RotateCcw, Trash2 } from "lucide-react";
 import { useId, useState, type ReactNode } from "react";
+import type { UiText } from "@atelier/sdk/contracts";
 
 import { formsMessages } from "../../messages/forms";
 import { useI18n } from "../../shared/i18n";
@@ -120,19 +121,22 @@ export function OverrideListField({ label, value, inherited, onChange, empty, hi
 /**
  * 配置编辑器：套用面板浮岛；保存位于标题栏，经 form 属性提交内容区中的表单。
  * 传入 dirty 时：无修改禁用保存；有修改时由面板浮岛在关闭前确认放弃。
+ * busy / error 来自本表单的操作实例；disabled 表达同一编辑器内其他操作对表单的占用。
  */
 export interface RemoveAction { title: string; description: string; onConfirm: () => void }
-export function Editor({ title, description, form, dirty, remove, restore, children }: { title: string; description?: string; form: string; dirty?: boolean; remove?: RemoveAction; restore?: () => void; children: ReactNode }) {
+export function Editor({ title, description, form, dirty, busy, error, disabled = false, remove, restore, children }: {
+  title: string; description?: string; form: string; dirty?: boolean; busy: boolean; error: UiText | null; disabled?: boolean;
+  remove?: RemoveAction; restore?: () => void; children: ReactNode;
+}) {
   const i18n = useI18n();
-  const { busy } = useSettingsConfiguration();
   const [removing, setRemoving] = useState(false);
   return <IslandPanel title={title} description={description} dirty={dirty}
     action={<>
-      {restore && <IconButton type="button" label={i18n.formatMessage(formsMessages.restoreAll)} tooltip={i18n.formatMessage(formsMessages.restoreAllLabel)} disabled={busy} onClick={restore}><RotateCcw /></IconButton>}
-      {remove && <IconButton type="button" className="text-destructive" label={i18n.formatMessage(formsMessages.deleteLabel)} tooltip={i18n.formatMessage(formsMessages.deleteButton)} disabled={busy} onClick={() => setRemoving(true)}><Trash2 /></IconButton>}
-      <Button type="submit" form={form} size="sm" disabled={busy || dirty === false}>{busy ? i18n.formatMessage(formsMessages.saving) : i18n.formatMessage(formsMessages.save)}</Button>
+      {restore && <IconButton type="button" label={i18n.formatMessage(formsMessages.restoreAll)} tooltip={i18n.formatMessage(formsMessages.restoreAllLabel)} disabled={busy || disabled} onClick={restore}><RotateCcw /></IconButton>}
+      {remove && <IconButton type="button" className="text-destructive" label={i18n.formatMessage(formsMessages.deleteLabel)} tooltip={i18n.formatMessage(formsMessages.deleteButton)} disabled={busy || disabled} onClick={() => setRemoving(true)}><Trash2 /></IconButton>}
+      <Button type="submit" form={form} size="sm" disabled={busy || disabled || dirty === false}>{busy ? i18n.formatMessage(formsMessages.saving) : i18n.formatMessage(formsMessages.save)}</Button>
     </>}>
-    <ConfigurationStatus />{children}
+    <ConfigurationActionError error={error} />{children}
     {remove && <AlertDialog open={removing} onOpenChange={setRemoving}>
       <AlertDialogContent>
         <AlertDialogHeader>
@@ -147,21 +151,17 @@ export function Editor({ title, description, form, dirty, remove, restore, child
     </AlertDialog>}
   </IslandPanel>;
 }
-/** 次要的删除操作随表单内容放在末尾。 */
-export function SaveActions({ onRemove, cannotRemove = false, onReset }: { onRemove?: () => void; cannotRemove?: boolean; onReset?: () => void }) {
+/** 表单与区块显式呈现所属操作的失败；重试由原操作入口发起。 */
+export function ConfigurationActionError({ error }: { error: UiText | null }) {
   const i18n = useI18n();
-  const { busy } = useSettingsConfiguration();
-  if (!onRemove && !cannotRemove && !onReset) return null;
-  return <div className="mt-5 flex items-center gap-3">
-    {onRemove && <Button type="button" variant="ghost" className="-ml-2 text-destructive" disabled={busy || cannotRemove} onClick={onRemove}>{i18n.formatMessage(formsMessages.confirmDelete)}</Button>}
-    {cannotRemove && <span className="type-caption">{i18n.formatMessage(formsMessages.builtinRole)}</span>}
-    {onReset && <Button type="button" variant="ghost" disabled={busy} onClick={onReset}>{i18n.formatMessage(formsMessages.restoreBuiltin)}</Button>}
-  </div>;
+  return error && <Alert variant="destructive" className="mb-4"><AlertDescription>{i18n.text(error)}</AlertDescription></Alert>;
 }
-export function ConfigurationStatus() {
+
+/** 共享读取状态由设置分类页承接一次。 */
+export function ConfigurationReadStatus() {
   const i18n = useI18n();
-  const { snapshot, error, load } = useSettingsConfiguration();
-  if (error) return <Alert variant="destructive" className="mb-4"><AlertDescription>{i18n.text(error)}<Button variant="outline" size="sm" className="mt-2" onClick={() => void load()}>{i18n.formatMessage(formsMessages.reload)}</Button></AlertDescription></Alert>;
+  const { snapshot, readError, load } = useSettingsConfiguration();
+  if (readError) return <Alert variant="destructive" className="mb-4"><AlertDescription>{i18n.text(readError)}<Button variant="outline" size="sm" className="mt-2" onClick={() => void load()}>{i18n.formatMessage(formsMessages.reload)}</Button></AlertDescription></Alert>;
   return !snapshot ? <p role="status" className="type-caption flex items-center gap-2 py-4"><Spinner aria-hidden="true" />{i18n.formatMessage(formsMessages.loading)}</p> : null;
 }
 /** 字段偏离内置或继承值时的“已修改 · 恢复”。 */

@@ -27,7 +27,7 @@ export function HomePage({ active, draft, onSettings, ready, busy, submitError, 
 }) {
   const i18n = useI18n();
   const inputState = useSyncExternalStore(draft.subscribe, draft.getSnapshot);
-  const { snapshot, error } = useConfiguration(active);
+  const { snapshot, readError } = useConfiguration(active);
   const initialized = useRef(false);
   const [agentId, setAgentId] = useState<string | null>(null);
   const [modelId, setModelId] = useState<string | null>(null);
@@ -80,7 +80,7 @@ export function HomePage({ active, draft, onSettings, ready, busy, submitError, 
       </div>
     </form>
     <DraftFileError draft={draft} className="mt-2" />
-    {(submitError || error) && <p role="alert" className="mt-3 text-center"><StatusText tone="error">{i18n.text(submitError ?? error ?? "")}</StatusText></p>}
+    {(submitError || readError) && <p role="alert" className="mt-3 text-center"><StatusText tone="error">{i18n.text(submitError ?? readError ?? "")}</StatusText></p>}
     <div className="mt-4 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-center">
       <p id="home-availability" role="status" className="type-caption">{busy ? i18n.formatMessage(homeMessages.startingConversation) : !ready ? i18n.formatMessage(commonMessages.statusUnavailable) : i18n.formatMessage(homeMessages.keyboardHint)}</p>
       <Button variant="ghost" size="sm" onClick={onSettings}><Settings />{i18n.formatMessage(appMessages.menuSettings)}</Button>

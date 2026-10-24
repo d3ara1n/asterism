@@ -13,8 +13,8 @@ import { Spinner } from "@atelier/ui/ui/spinner";
 import { Alert, AlertDescription } from "@atelier/ui/ui/alert";
 import { toast } from "../../shared/toast";
 import { IslandPanel } from "../../shared/weave/IslandPanel";
-import { ConfigurationStatus } from "./forms";
-import { useSettingsConfiguration } from "./state";
+import { ConfigurationActionError } from "./forms";
+import { useConfigurationAction, useSettingsConfiguration } from "./state";
 
 const errors = {
   configuration: messages.invalidSettings, credential: messages.saveApiKey, authentication: messages.keyRejected,
@@ -32,7 +32,8 @@ export function ModelDiscoveryPicker({ providerId }: { providerId: string }) {
 
 function DiscoveryContent({ provider, discovery }: { provider: Provider | undefined; discovery: ModelDiscovery | undefined }) {
   const i18n = useI18n();
-  const { snapshot, run, busy } = useSettingsConfiguration();
+  const { snapshot } = useSettingsConfiguration();
+  const { run, busy, error } = useConfigurationAction("inline");
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const running = discovery?.state === "running";
@@ -43,7 +44,7 @@ function DiscoveryContent({ provider, discovery }: { provider: Provider | undefi
   const add = async () => {
     if (!discovery || discovery.state !== "succeeded") return;
     const result = await run({ type: "discovery.add", id: discovery.id, modelIds: selectedIds });
-    if (result.ok) { setSelected(new Set()); toast.success(i18n.formatMessage(messages.modelsAdded, { count: selectedIds.length })); }
+    if (result?.ok) { setSelected(new Set()); toast.success(i18n.formatMessage(messages.modelsAdded, { count: selectedIds.length })); }
   };
   return <IslandPanel title={i18n.text(messages.fetchModels)} description={provider?.name}
     action={<>
@@ -55,7 +56,7 @@ function DiscoveryContent({ provider, discovery }: { provider: Provider | undefi
         <Download />{i18n.formatMessage(messages.addSelectedModels, { count: selectedIds.length })}
       </Button>}
     </>}>
-    <ConfigurationStatus />
+    <ConfigurationActionError error={error} />
     <p className="type-caption mb-4">{i18n.text(messages.discoveryHint)}</p>
     {running && <p role="status" className="type-caption flex items-center gap-2"><Spinner aria-hidden="true" />{i18n.text(messages.fetchingModels)}</p>}
     {discovery?.error && <Alert variant="destructive"><AlertDescription>{i18n.text(errors[discovery.error])}</AlertDescription></Alert>}

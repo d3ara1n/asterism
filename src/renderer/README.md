@@ -51,3 +51,12 @@
 - **记录与流式进度衔接**：初始数据与后续变化使用同一通道按序交付；保存的记录先追加，随后移除对应流式块，无动态版本比较或追赶重读。输出块以 `responseId + ordinal` 为稳定 key，从流式生成到落库保持同一组件实例与展开状态。
 - **草稿与附件生命周期**：首页草稿由应用持有；代理卡片的输入草稿、文件上传占用和 `submissionId`（重试幂等身份）经 `object.retained` 按对象保留，跨页面切换、卡片重挂载、聚焦与会话视图释放不丢失，对象离开当前投影时关闭草稿；用户消息中的图片通过受控 `object.content` 读取生成短期 Blob URL，卸载时回收。
 - **覆盖表单与本地化**：角色与代理编辑器只提交用户显式覆盖（placeholder 显示内置基准，不回填保存）。组件在 render 中通过 `useI18n()` 格式化 `UiText`，不以 locale 或译后文本作为业务组件 key。
+
+## 配置操作接入
+
+反馈归属与生命周期见[配置操作反馈](../../docs/workbench.md#配置操作反馈)。`features/configuration/state.ts` 提供两个分开的入口：
+
+- `useSettingsConfiguration()`：只读消费 `snapshot / readError`，通过 `load()` 重读。`ConfigurationReadStatus` 由设置分类页挂载一次。
+- `useConfigurationAction("inline" | "toast")`：每个表单、区块或列表行创建独立实例，反馈通道必填。`run()` 仅接收非 `read` 命令，返回成功回执；失败和同一入口重入返回 `null`，失败已按所选通道处理。`busy` 供本入口禁用控件。
+- `inline`：将实例的 `error` 交给所属 `Editor`、`ConfigurationActionError` 或区块反馈；`Editor` 的 `busy / error` 为必填属性。例子见 `ProvidersSettings.tsx` 的编辑器及 `ModelParameters.tsx`。
+- `toast`：hook 直接发送一次失败通知，调用方只处理成功结果。例子见 `ProvidersSettings.tsx` 的快捷操作及角色、代理列表行。

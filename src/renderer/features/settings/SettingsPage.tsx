@@ -15,7 +15,7 @@ import { Card } from "@atelier/ui/ui/card";
 
 import { Button } from "@atelier/ui/ui/button";
 import { ArrowLeft, Info, Palette, Cpu, PlugZap, Bot, type LucideProps } from "lucide-react";
-import { ConfigurationStatus } from "../configuration/forms";
+import { ConfigurationReadStatus } from "../configuration/forms";
 import { ConfigurationContext, useConfiguration } from "../configuration/state";
 import { Screen, useIsland, type IslandSpec } from "../../shared/weave/Screen";
 import { settingsMessages } from "../../messages/settings";
@@ -108,7 +108,7 @@ function SettingsRoot({ openId, onOpen, onClosed, manager, location }: { openId:
         <motion.div className="p-6" initial={{ opacity: 0 }} animate={{ opacity: 1, transition: { ...islandTransition, delay: 0.18 } }} exit={{ opacity: 0, transition: fadeTransition }}>
           <Button variant="ghost" size="sm" className="-ml-2 mb-4" onClick={() => void close()}><ArrowLeft />{i18n.formatMessage(settingsMessages.allSettings)}</Button>
           <h2 ref={heading} tabIndex={-1} className="type-page mb-2 outline-none">{i18n.text(open.title)}</h2>
-          {["providers", "roles", "agents"].includes(open.id) && <ConfigurationStatus />}
+          {["providers", "roles", "agents"].includes(open.id) && <ConfigurationReadStatus />}
           {open.content()}
         </motion.div>
       </MotionCard>}

@@ -23,8 +23,8 @@ import { cn } from "@atelier/ui/utils";
 import { useIsland } from "../../shared/weave/Screen";
 import { panelIslandWidth } from "../../shared/weave/IslandPanel";
 import { Section } from "../settings/layout";
-import { Editor, EditorSection, TextField, ChoiceField, NumberField } from "./forms";
-import { useSettingsConfiguration } from "./state";
+import { ConfigurationActionError, Editor, EditorSection, TextField, ChoiceField, NumberField } from "./forms";
+import { useConfigurationAction, useSettingsConfiguration } from "./state";
 import { ModelCompatibilityEditor } from "./ModelCompatibilityEditor";
 import { ModelCostEditor } from "./ModelCostEditor";
 import { modelProtocolLabels } from "./protocols";
@@ -69,8 +69,10 @@ const testHints = (): Record<TestError, string> => ({
 /* ---------- 即时操作：与编辑草稿分离，任何浮岛中触发都写回同一快照 ---------- */
 
 function useQuickActions() {
-  const { snapshot, run } = useSettingsConfiguration();
+  const { snapshot } = useSettingsConfiguration();
+  const { run, busy } = useConfigurationAction("toast");
   return {
+    busy,
     setProviderEnabled: (provider: Provider, enabled: boolean) => run({ type: "provider.save", id: provider.id, credential: { action: "keep" },
       value: { ...providerValue(provider), enabled } }),
     setModelEnabled: (model: ProviderModel, enabled: boolean) => run({ type: "model.save", id: modelReference(model), value: { ...modelValue(model), enabled } }),
@@ -93,9 +95,8 @@ const modelValue = (model: ProviderModel): ProviderModel => structuredClone(mode
 
 export function ProvidersSettings() {
   const i18n = useI18n();
-  const { snapshot, busy } = useSettingsConfiguration();
+  const { snapshot } = useSettingsConfiguration();
   const island = useIsland();
-  const quick = useQuickActions();
   const open = (id: string | null, origin?: HTMLElement | null) => island.open({ id: `provider-${id ?? "new"}`, label: providersMessages.provider, width: panelIslandWidth, origin,
     render: () => id === null ? <ProviderCreation /> : <ProviderEditor key={id} initialId={id} /> });
   const providers = snapshot?.providers ?? [];
@@ -105,19 +106,28 @@ export function ProvidersSettings() {
       <EmptyHeader><EmptyMedia variant="icon"><Zap /></EmptyMedia><EmptyDescription>{i18n.formatMessage(providersMessages.emptyConnections)}</EmptyDescription></EmptyHeader>
       <EmptyContent><Button size="sm" variant="outline" onClick={event => open(null, event.currentTarget)}><Plus />{i18n.formatMessage(providersMessages.addFirstProvider)}</Button></EmptyContent>
     </Empty> : snapshot && <ItemGroup className="surface">{providers.map((provider, index) => {
-      const count = snapshot.models.filter(model => model.providerId === provider.id).length;
-      const health = providerHealth(snapshot, provider);
       return <div key={provider.id}>{index > 0 && <ItemSeparator />}
-        <ListRow mediaVariant="icon" media={<span className="text-sm font-medium text-muted-foreground">{provider.name.trim().charAt(0).toUpperCase() || "?"}</span>}
-          title={provider.name} selected={island.child === `provider-${provider.id}`} onOpen={origin => open(provider.id, origin)}
-          description={<>{canEditProviderField(provider, "protocol") && <>{protocolLabel(provider.protocol)} · </>}{i18n.formatMessage(providersMessages.modelCount, { count: count })}</>}
-          actions={<>
-            <StatusBadge tone={health.tone}>{health.label}</StatusBadge>
-            <Switch aria-label={i18n.formatMessage(providersMessages.enableProvider, { provider_name: provider.name })} checked={provider.enabled} disabled={busy}
-              onCheckedChange={next => void quick.setProviderEnabled(provider, next)} />
-          </>} /></div>;
+        <ProviderRow provider={provider} snapshot={snapshot} selected={island.child === `provider-${provider.id}`} onOpen={origin => open(provider.id, origin)} />
+      </div>;
     })}</ItemGroup>}
   </Section>;
+}
+
+function ProviderRow({ provider, snapshot, selected, onOpen }: {
+  provider: Provider; snapshot: ConfigurationSnapshot; selected: boolean; onOpen: (origin: HTMLElement) => void;
+}) {
+  const i18n = useI18n();
+  const quick = useQuickActions();
+  const count = snapshot.models.filter(model => model.providerId === provider.id).length;
+  const health = providerHealth(snapshot, provider);
+  return <ListRow mediaVariant="icon" media={<span className="text-sm font-medium text-muted-foreground">{provider.name.trim().charAt(0).toUpperCase() || "?"}</span>}
+    title={provider.name} selected={selected} onOpen={onOpen}
+    description={<>{canEditProviderField(provider, "protocol") && <>{protocolLabel(provider.protocol)} · </>}{i18n.formatMessage(providersMessages.modelCount, { count })}</>}
+    actions={<>
+      <StatusBadge tone={health.tone}>{health.label}</StatusBadge>
+      <Switch aria-label={i18n.formatMessage(providersMessages.enableProvider, { provider_name: provider.name })} checked={provider.enabled} disabled={quick.busy}
+        onCheckedChange={next => void quick.setProviderEnabled(provider, next)} />
+    </>} />;
 }
 
 /* ---------- 预设选择：按计费方式分组，自适应网格与跨组搜索 ---------- */
@@ -185,7 +195,7 @@ function ProviderCreation() {
   const { snapshot } = useSettingsConfiguration();
   const [initialValue, setInitialValue] = useState<ProviderValue | null>(null);
   if (initialValue) return <ProviderEditor initialId={null} initialValue={initialValue} />;
-  return <Editor form="provider-form" title={i18n.formatMessage(providersMessages.confirmAddProvider)} dirty={false}>
+  return <Editor form="provider-form" title={i18n.formatMessage(providersMessages.confirmAddProvider)} dirty={false} busy={false} error={null}>
     <PresetPicker onPick={picked => setInitialValue(picked ? {
       ...providerPresetDraft(picked, snapshot?.providers.map(provider => provider.id)),
       name: `${picked.name} · ${presetDescription(picked)}`,
@@ -195,7 +205,9 @@ function ProviderCreation() {
 
 function ProviderEditor({ initialId, initialValue = blank }: { initialId: string | null; initialValue?: ProviderValue }) {
   const i18n = useI18n();
-  const { snapshot, run, busy } = useSettingsConfiguration();
+  const { snapshot } = useSettingsConfiguration();
+  const { run, busy, error } = useConfigurationAction("inline");
+  const discoveryAction = useConfigurationAction("inline");
   const island = useIsland();
   const [id, setId] = useState(initialId);
   const current = snapshot?.providers.find(item => item.id === id);
@@ -217,17 +229,17 @@ function ProviderEditor({ initialId, initialValue = blank }: { initialId: string
   };
   const models = snapshot?.models.filter(model => model.providerId === id) ?? [];
 
-  return <Editor form="provider-form" title={current?.name ?? i18n.formatMessage(providersMessages.newProvider)} dirty={dirty}
+  return <Editor form="provider-form" title={current?.name ?? i18n.formatMessage(providersMessages.newProvider)} dirty={dirty} busy={busy} error={error}
     description={canEditProviderField(value, "protocol") ? protocolLabel(value.protocol) : undefined}
     remove={current ? { title: i18n.formatMessage(providersMessages.deleteProviderTitle),
       description: i18n.formatMessage(providersMessages.deleteProviderDescription, { current_name: current.name, models_length: models.length }),
-      onConfirm: async () => { const result = await run({ type: "remove", kind: "provider", id: current.id }); if (result.ok) void island.close({ force: true }); } } : undefined}>
+      onConfirm: async () => { const result = await run({ type: "remove", kind: "provider", id: current.id }); if (result?.ok) void island.close({ force: true }); } } : undefined}>
     <form id="provider-form" onSubmit={async event => {
       event.preventDefault();
       const result = await run({ type: "provider.save", id, value: { ...value, enabled: current?.enabled ?? true },
         credential: value.auth === "none" || credential.action === "clear" ? { action: "clear" }
           : credential.action === "replace" && credential.key.trim() ? { action: "replace", value: credential.key } : { action: "keep" } });
-      if (result.ok) {
+      if (result?.ok) {
         const persisted = result.snapshot.providers.find(item => item.id === result.savedId);
         if (persisted) setValue(providerValue(persisted));
         setId(result.savedId);
@@ -255,11 +267,12 @@ function ProviderEditor({ initialId, initialValue = blank }: { initialId: string
 
     {current && snapshot && <EditorSection title={i18n.formatMessage(providersMessages.models)}
       hint={dirty ? i18n.text(providersMessages.saveBeforeDiscovery) : undefined}
+      status={<ConfigurationActionError error={discoveryAction.error} />}
       action={<>
-        <Button size="sm" variant="outline" disabled={busy || dirty} onClick={async event => {
+        <Button size="sm" variant="outline" disabled={busy || dirty || discoveryAction.busy} onClick={async event => {
           const origin = event.currentTarget;
-          const result = await run({ type: "discovery.start", providerId: current.id });
-          if (result.ok) island.open({ id: `discover-${current.id}`, label: providersMessages.fetchModels, width: panelIslandWidth, origin,
+          const result = await discoveryAction.run({ type: "discovery.start", providerId: current.id });
+          if (result?.ok) island.open({ id: `discover-${current.id}`, label: providersMessages.fetchModels, width: panelIslandWidth, origin,
             render: () => <ModelDiscoveryPicker providerId={current.id} /> });
         }}><Search />{i18n.text(providersMessages.fetchModels)}</Button>
         <Button size="sm" variant="outline" disabled={busy} onClick={event => openModel(null, event.currentTarget)}><Plus />{i18n.formatMessage(providersMessages.addModel)}</Button>
@@ -281,8 +294,9 @@ function TestResult({ test }: { test: ConnectionTest }) {
 
 function ModelRow({ model, provider, selected, onOpen }: { model: ProviderModel; provider: Provider; selected: boolean; onOpen: (origin: HTMLElement) => void }) {
   const i18n = useI18n();
-  const { snapshot, busy } = useSettingsConfiguration();
+  const { snapshot } = useSettingsConfiguration();
   const quick = useQuickActions();
+  const { busy } = quick;
   const test = snapshot ? latestTest(snapshot, modelReference(model)) : undefined;
   const running = test?.state === "running";
   return <ListRow title={model.name} selected={selected} disabled={busy} onOpen={onOpen}
@@ -298,7 +312,8 @@ function ModelRow({ model, provider, selected, onOpen }: { model: ProviderModel;
 
 function ModelEditor({ initialId, providerId }: { initialId: string | null; providerId: string }) {
   const i18n = useI18n();
-  const { snapshot, run, busy } = useSettingsConfiguration();
+  const { snapshot } = useSettingsConfiguration();
+  const { run, busy, error } = useConfigurationAction("inline");
   const island = useIsland();
   const quick = useQuickActions();
   const [id, setId] = useState(initialId);
@@ -313,23 +328,24 @@ function ModelEditor({ initialId, providerId }: { initialId: string | null; prov
   const dirty = useMemo(() => !current || JSON.stringify({ ...modelValue(current), enabled: 0 }) !== JSON.stringify({ ...value, enabled: 0 }), [current, value]);
   const test = current && snapshot ? latestTest(snapshot, modelReference(current)) : undefined;
   const users = current && snapshot ? snapshot.roles.filter(role => role.model === modelReference(current)) : [];
-  const parameters = useModelParameters(current, dirty, updated => setValue(modelValue(updated)));
+  const parameters = useModelParameters(current, dirty || busy, updated => setValue(modelValue(updated)));
 
   return <Editor form="model-form" title={current?.name ?? i18n.formatMessage(providersMessages.newModel)} description={provider?.name} dirty={dirty}
+    busy={busy} error={error} disabled={parameters.pending}
     remove={current ? { title: i18n.formatMessage(providersMessages.deleteModelTitle),
       description: users.length
         ? i18n.formatMessage(providersMessages.deleteModelWithRolesDescription, { current_name: current.name, roles: users.map(role => role.id).join(", ") })
         : i18n.formatMessage(providersMessages.deleteUnusedModelDescription, { current_name: current.name }),
-      onConfirm: async () => { const result = await run({ type: "remove", kind: "model", id: modelReference(current) }); if (result.ok) void island.close({ force: true }); } } : undefined}>
+      onConfirm: async () => { const result = await run({ type: "remove", kind: "model", id: modelReference(current) }); if (result?.ok) void island.close({ force: true }); } } : undefined}>
     <form id="model-form" onSubmit={async event => {
       event.preventDefault();
       const result = await run({ type: "model.save", id, value: { ...value, enabled: current?.enabled ?? true } });
-      if (result.ok) {
+      if (result?.ok) {
         const persisted = result.snapshot.models.find(item => modelReference(item) === result.savedId);
         if (persisted) setValue(modelValue(persisted));
         setId(result.savedId);
       }
-    }}><fieldset disabled={parameters.pending} className="contents"><FieldGroup>
+    }}><fieldset disabled={busy || parameters.pending} className="contents"><FieldGroup>
       <TextField label={i18n.formatMessage(providersMessages.modelDisplayName)} value={value.name} onChange={setName} required />
       <TextField label={i18n.formatMessage(providersMessages.serverModelId)} value={value.modelId} onChange={next => { setIdEdited(true); set("modelId", next); }} required hint={i18n.formatMessage(providersMessages.serverModelIdHint)} />
       {current && <Field><FieldLabel>{i18n.formatMessage(providersMessages.usedBy)}</FieldLabel>
@@ -388,7 +404,7 @@ function ModelEditor({ initialId, providerId }: { initialId: string | null; prov
     </form>
     {current && <EditorSection title={i18n.formatMessage(providersMessages.connectionTest)}
       hint={<>{i18n.formatMessage(providersMessages.testHint)}{dirty && <> {i18n.formatMessage(providersMessages.saveBeforeTest)}</>}</>}
-      action={<Button size="sm" variant="outline" disabled={busy || (test?.state !== "running" && (!current.enabled || !provider?.enabled))} onClick={() => void quick.test(current)}>
+      action={<Button size="sm" variant="outline" disabled={quick.busy || (test?.state !== "running" && (!current.enabled || !provider?.enabled))} onClick={() => void quick.test(current)}>
         {test?.state === "running" ? <><Spinner data-icon="inline-start" />{i18n.formatMessage(providersMessages.cancelTest)}</> : <><PlugZap data-icon="inline-start" />{i18n.formatMessage(providersMessages.testConnection)}</>}</Button>}>
       {test && <div role="status" className="flex flex-col gap-1">
         <TestResult test={test} />

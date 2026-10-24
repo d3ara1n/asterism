@@ -18,13 +18,13 @@ import { channels } from "../runtime";
 export function RendererCatalogProvider({ ready, children }: { ready: boolean; children: ReactNode }) {
   const configuration = useConfiguration(ready);
   const value = useMemo<RendererCatalogs>(() => ({
-    error: configuration.error,
+    error: configuration.readError,
     get(contract) {
       const raw = Object.is(contract, ModelConfiguration) ? configuration.snapshot : null;
       const parsed = contract.schema.safeParse(raw);
       return parsed.success ? parsed.data : null;
     },
-  }), [configuration.error, configuration.snapshot]);
+  }), [configuration.readError, configuration.snapshot]);
   return createElement(RendererCatalogsProvider, { value }, children);
 }
 
