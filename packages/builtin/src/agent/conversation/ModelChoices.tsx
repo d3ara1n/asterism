@@ -27,7 +27,7 @@ export function ModelChoices({ configuration, agent, model, thinking, disabled, 
       value={model === null ? follow : selectedModel?.name ?? i18n.formatMessage(modelSelectionMessages.unavailable, { value: model })}
       selected={model ?? FOLLOW} onSelect={value => onModelChange(value === FOLLOW ? null : value)}
       options={[{ value: FOLLOW, label: follow }, ...models.map(item => ({ value: modelReference(item),
-        label: `${configuration?.providers.find(provider => provider.id === item.providerId)?.name ?? ""} / ${item.name}` }))]} />
+        label: `${configuration?.modelProviders.find(provider => provider.id === item.providerId)?.name ?? ""} / ${item.name}` }))]} />
     <ConfigurationChoice icon={<Brain />} label={i18n.text(commonMessages.thinkingTitle)} disabled={disabled || !configuration || unsupported}
       value={unsupported ? i18n.text(modelSelectionMessages.thinkingUnsupported)
         : thinking !== null && !levels.includes(thinking) ? i18n.formatMessage(modelSelectionMessages.unavailable, { value: thinkingLabel }) : thinkingLabel}

@@ -36,7 +36,7 @@ function ModelSelect({ value, onChange, disabled }: { value: string | null; onCh
     <SelectContent>
       <SelectItem value={FOLLOW}>{i18n.formatMessage(rolesMessages.followConversation)}</SelectItem>
       {missing && <SelectItem value={value} disabled>{i18n.formatMessage(rolesMessages.unavailableModel)}</SelectItem>}
-      {snapshot.providers.map(provider => {
+      {snapshot.modelProviders.map(provider => {
         const models = snapshot.models.filter(model => model.providerId === provider.id);
         if (!models.length) return null;
         return <SelectGroup key={provider.id}><SelectSeparator /><SelectLabel>{provider.name}</SelectLabel>

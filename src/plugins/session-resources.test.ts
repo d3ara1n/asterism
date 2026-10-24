@@ -48,7 +48,7 @@ function latch() {
   return { promise, release };
 }
 async function model(app: ApplicationService) {
-  await app.configuration.execute({ type: "provider.save", id: null, credential: { action: "keep" }, value: {
+  await app.configuration.execute({ type: "modelProvider.save", id: null, credential: { action: "keep" }, value: {
     id: "test", name: "Test", protocol: "openai-responses", baseUrl: "https://example.invalid", auth: "none", enabled: true, compatibility: [],
   } });
   const saved = await app.configuration.execute({ type: "model.save", id: null, value: {

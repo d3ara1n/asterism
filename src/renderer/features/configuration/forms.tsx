@@ -124,8 +124,8 @@ export function OverrideListField({ label, value, inherited, onChange, empty, hi
  * busy / error 来自本表单的操作实例；disabled 表达同一编辑器内其他操作对表单的占用。
  */
 export interface RemoveAction { title: string; description: string; onConfirm: () => void }
-export function Editor({ title, description, form, dirty, busy, error, disabled = false, remove, restore, children }: {
-  title: string; description?: string; form: string; dirty?: boolean; busy: boolean; error: UiText | null; disabled?: boolean;
+export function Editor({ title, description, form, dirty, busy, error, disabled = false, saveDisabled = false, remove, restore, children }: {
+  title: string; description?: string; form: string; dirty?: boolean; busy: boolean; error: UiText | null; disabled?: boolean; saveDisabled?: boolean;
   remove?: RemoveAction; restore?: () => void; children: ReactNode;
 }) {
   const i18n = useI18n();
@@ -134,7 +134,7 @@ export function Editor({ title, description, form, dirty, busy, error, disabled 
     action={<>
       {restore && <IconButton type="button" label={i18n.formatMessage(formsMessages.restoreAll)} tooltip={i18n.formatMessage(formsMessages.restoreAllLabel)} disabled={busy || disabled} onClick={restore}><RotateCcw /></IconButton>}
       {remove && <IconButton type="button" className="text-destructive" label={i18n.formatMessage(formsMessages.deleteLabel)} tooltip={i18n.formatMessage(formsMessages.deleteButton)} disabled={busy || disabled} onClick={() => setRemoving(true)}><Trash2 /></IconButton>}
-      <Button type="submit" form={form} size="sm" disabled={busy || disabled || dirty === false}>{busy ? i18n.formatMessage(formsMessages.saving) : i18n.formatMessage(formsMessages.save)}</Button>
+      <Button type="submit" form={form} size="sm" disabled={busy || disabled || saveDisabled || dirty === false}>{busy ? i18n.formatMessage(formsMessages.saving) : i18n.formatMessage(formsMessages.save)}</Button>
     </>}>
     <ConfigurationActionError error={error} />{children}
     {remove && <AlertDialog open={removing} onOpenChange={setRemoving}>

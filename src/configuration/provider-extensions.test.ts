@@ -1,15 +1,15 @@
 import { describe, expect, it } from "vitest";
-import type { ProviderPreset, UsageItem } from "@atelier/sdk/contracts";
+import type { ModelProviderPreset, UsageItem } from "@atelier/sdk/contracts";
 import type { QueryUsageProvider } from "@atelier/sdk/runtime";
-import { ProviderExtensions } from "./provider-extensions.ts";
+import { ModelProviderExtensions } from "./provider-extensions.ts";
 import { RunLifecycle } from "../plugins/lifecycle.ts";
 
-const preset: ProviderPreset = { id: " p ", name: "P", billing: "none", sources: ["https://example.test/docs"], verifiedOn: "2026-10-20",
+const preset: ModelProviderPreset = { id: " p ", name: "P", billing: "none", sources: ["https://example.test/docs"], verifiedOn: "2026-10-20",
   connection: { protocol: "openai-chat", baseUrl: "https://example.test", auth: "none", compatibility: [] } };
 describe("提供商贡献目录", () => {
   // schema 会 trim 身份；去重、patch 和寻址必须都消费同一归一化值。
   it("归一化身份用于注册、修改和去重，失败不留下半份目录", async () => {
-    const registry = new ProviderExtensions(), lifecycle = new RunLifecycle(() => {});
+    const registry = new ModelProviderExtensions(), lifecycle = new RunLifecycle(() => {});
     try {
       registry.declare("test.a", [{ id: " q ", label: "Q", query: async () => [] }], [
         { type: "add", preset }, { type: "patch", id: " p ", patch: { name: "Patched" } },
@@ -28,7 +28,7 @@ describe("提供商贡献目录", () => {
       id = "balance"; label = "Balance"; #remaining = 12;
       async query(): Promise<UsageItem[]> { return [{ id: "wallet", type: "balance", scope: "account", label: "Wallet", remaining: this.#remaining, currency: "USD" }]; }
     }
-    const registry = new ProviderExtensions(), lifecycle = new RunLifecycle(() => {});
+    const registry = new ModelProviderExtensions(), lifecycle = new RunLifecycle(() => {});
     try {
       registry.declare("test.a", [new Balance()], [], lifecycle.group("call"));
       const provider = registry.get("balance")!;

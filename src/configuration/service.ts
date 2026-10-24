@@ -1,22 +1,38 @@
 import { randomUUID } from "node:crypto";
-import { configurationCommandSchema, createModelInput, modelReference, providerSchema, resolveProviderModel,
-  type ConfigurationCommand, type ConfigurationSnapshot, type ConnectionTest, type Provider, type ProviderModel, type ModelParameterUpdate } from "../shared/configuration.ts";
+import { configurationCommandSchema, createModelInput, modelReference, modelProviderSchema, resolveProviderModel,
+  type ConfigurationCommand, type ConfigurationSnapshot, type ConnectionTest, type ModelProvider, type ProviderModel, type ModelParameterUpdate } from "../shared/configuration.ts";
 import type { SecretProtector } from "../shared/secrets.ts";
 import { unauthenticatedApiKey } from "../shared/model.ts";
 import { ConfigurationError } from "./errors.ts";
-import { ConfigurationStore, type ConfigurationKind, type StoredProvider } from "./store.ts";
+import { ConfigurationStore, type ConfigurationKind, type StoredModelProvider } from "./store.ts";
 import { CredentialVault } from "./credentials.ts";
 import { classifyProbeError, runConnectionProbe, type ConnectionProbe } from "./probe.ts";
 import { configurationDefaults, resolveAgentConfiguration, resolveRoleConfiguration } from "./layers.ts";
 import { discoverModels, ModelDiscoveries, type DiscoverModels } from "./discovery.ts";
 import { loadModelCatalog, modelParameters, type LoadModelCatalog } from "./model-catalog.ts";
 import { modelCatalogMessages } from "../shared/model-catalog-messages.ts";
-import { ProviderExtensions } from "./provider-extensions.ts";
+import { ModelProviderExtensions } from "./provider-extensions.ts";
+import { WebProviderRegistry } from "./web-providers.ts";
+import { WebError } from "@atelier/sdk/runtime";
 
-const saveKinds = { "provider.save": "provider", "model.save": "model", "role.save": "role", "agent.save": "agent" } as const;
+const saveKinds = { "modelProvider.save": "modelProvider", "webProvider.save": "webProvider", "model.save": "model", "role.save": "role", "agent.save": "agent" } as const;
 
 export class ConfigurationService {
-  readonly extensions = new ProviderExtensions();
+  readonly extensions = new ModelProviderExtensions();
+  readonly web = new WebProviderRegistry({
+    list: () => this.store.list("webProvider").map(({ credentialRef: _ref, ...value }) => value),
+    capture: id => {
+      this.assertOpen();
+      const stored = this.store.get("webProvider", id);
+      if (!stored) throw new WebError("provider_unavailable", `Web provider '${id}' is not configured.`);
+      const { credentialRef, ...connection } = stored;
+      return { connection, credential: async () => {
+        if (connection.auth === "none") return null;
+        try { return credentialRef ? await this.vault.read(credentialRef) : null; }
+        catch { throw new WebError("credential_unavailable", "The web provider credential could not be read."); }
+      } };
+    },
+  });
   private readonly providerListeners = new Set<() => void>();
   subscribeProviders(listener: () => void): () => void {
     this.providerListeners.add(listener);
@@ -50,7 +66,8 @@ export class ConfigurationService {
       this.storageAvailable = await this.vault.available();
       this.assertOpen();
       const savedId = await this.perform(command);
-      if (command.type === "provider.save" || command.type === "remove" && command.kind === "provider") this.providersChanged();
+      if (command.type === "modelProvider.save" || command.type === "remove" && command.kind === "modelProvider") this.providersChanged();
+      if (command.type === "webProvider.save" || command.type === "webProvider.move" || command.type === "remove" && command.kind === "webProvider") this.web.changed();
       if (command.type !== "read") this.onChanged();
       return { snapshot: this.snapshot(), savedId };
     });
@@ -64,7 +81,7 @@ export class ConfigurationService {
     await this.enqueue(() => {
       this.assertOpen();
       const model = this.store.get("model", reference);
-      const provider = model && this.store.get("provider", model.providerId);
+      const provider = model && this.store.get("modelProvider", model.providerId);
       if (!model || !provider) throw new ConfigurationError("not_found", "The model or provider no longer exists.");
     });
     const timeout = AbortSignal.timeout(10_000);
@@ -91,23 +108,27 @@ export class ConfigurationService {
   current(): ConfigurationSnapshot { this.assertOpen(); return this.snapshot(); }
   async executionCredential(providerId: string): Promise<string | null> {
     this.assertOpen();
-    const provider = this.store.get("provider", providerId);
+    const provider = this.store.get("modelProvider", providerId);
     if (!provider) throw new ConfigurationError("not_found", "The provider no longer exists.");
     if (provider.auth === "none") return unauthenticatedApiKey;
     return provider.credentialRef ? this.vault.read(provider.credentialRef) : null;
   }
-  private provider(stored: StoredProvider): Provider {
+  private provider(stored: StoredModelProvider): ModelProvider {
     const { credentialRef: ref, ...value } = stored;
     const credentialState = stored.auth === "none" ? "not_required" : !ref || !this.vault.exists(ref) ? "missing"
       : !this.storageAvailable ? "storage_unavailable" : this.vault.failures.has(ref) ? "decryption_failed" : "available";
-    return providerSchema.parse({ ...value, credentialState });
+    return modelProviderSchema.parse({ ...value, credentialState });
   }
   private snapshot(): ConfigurationSnapshot {
     const roles = this.store.list("role");
     const agents = this.store.list("agent");
     return {
-      providers: this.store.list("provider").map(provider => this.provider(provider)),
-      providerPresets: this.extensions.presets(), usageProviders: this.extensions.usageProviders(),
+      webProviders: this.store.list("webProvider").map(({ credentialRef, ...connection }) => ({
+        ...connection, credentialState: this.credentialState(connection.auth, credentialRef),
+      })),
+      webProviderTypes: this.web.types(),
+      modelProviders: this.store.list("modelProvider").map(provider => this.provider(provider)),
+      modelProviderPresets: this.extensions.presets(), usageProviders: this.extensions.usageProviders(),
       models: this.store.list("model"),
       roles: roles.map(role => resolveRoleConfiguration(role)),
       agents: agents.map(agent => resolveAgentConfiguration(agent)),
@@ -121,10 +142,11 @@ export class ConfigurationService {
   }
   private async perform(command: Exclude<ConfigurationCommand, { type: "model.parameters" }>): Promise<string | null> {
     if (command.type === "read") return null;
+    if (command.type === "webProvider.move") { this.store.moveWebProvider(command.id, command.direction); return command.id; }
     if (command.type === "test.start") return this.startTest(command.model);
     if (command.type === "test.cancel") { this.cancelTest(command.id); return command.id; }
     if (command.type === "discovery.start") {
-      const stored = this.store.get("provider", command.providerId);
+      const stored = this.store.get("modelProvider", command.providerId);
       if (!stored) throw new ConfigurationError("not_found", "The provider no longer exists. Reload settings.");
       return this.discoveries.start(this.provider(stored), async () => {
         if (stored.auth === "none") return "";
@@ -135,7 +157,7 @@ export class ConfigurationService {
     if (command.type === "discovery.cancel") { this.discoveries.cancel(command.id); return command.id; }
     if (command.type === "discovery.add") {
       const discovery = this.discoveries.get(command.id);
-      const provider = this.store.get("provider", discovery.providerId);
+      const provider = this.store.get("modelProvider", discovery.providerId);
       if (!provider) throw new ConfigurationError("not_found", "The provider no longer exists.");
       if (discovery.state !== "succeeded")
         throw new ConfigurationError("invalid_request", "Model discovery has not succeeded.");
@@ -151,7 +173,7 @@ export class ConfigurationService {
     if (command.type === "remove") {
       const { credentialRef } = this.store.remove(command.kind, command.id);
       this.clearFinishedTests(command.kind, command.id);
-      if (command.kind === "provider") this.discoveries.clearProvider(command.id);
+      if (command.kind === "modelProvider") this.discoveries.clearProvider(command.id);
       if (credentialRef) this.removeCredential(credentialRef);
       return command.id;
     }
@@ -162,14 +184,23 @@ export class ConfigurationService {
         return command.value.id;
       }
       case "model.save":
-        if (!this.store.get("provider", command.value.providerId)) throw new ConfigurationError("not_found", "The provider no longer exists. Reload settings.");
+        if (!this.store.get("modelProvider", command.value.providerId)) throw new ConfigurationError("not_found", "The provider no longer exists. Reload settings.");
         this.store.save({ kind: "model", id: command.id, value: command.value });
         this.clearFinishedTests("model", command.id ?? modelReference(command.value));
         return modelReference(command.value);
-      case "provider.save": break;
+      case "webProvider.save": case "modelProvider.save": break;
     }
     const id = command.value.id;
-    const oldRef = command.id ? this.store.get("provider", command.id)?.credentialRef ?? null : null;
+    const kind = command.type === "webProvider.save" ? "webProvider" : "modelProvider";
+    let value = command.value;
+    if (command.type === "webProvider.save") {
+      try { value = this.web.validate(command.value); }
+      catch (error) {
+        if (error instanceof WebError) throw new ConfigurationError(error.code === "invalid_request" ? "invalid_request" : "unavailable", error.message);
+        throw error;
+      }
+    }
+    const oldRef = command.id ? this.store.get(kind, command.id)?.credentialRef ?? null : null;
     let ref = oldRef;
     let newRef: string | null = null;
     try {
@@ -180,8 +211,8 @@ export class ConfigurationService {
         ref = newRef;
       }
       this.assertOpen();
-      this.store.save({ kind: "provider", id: command.id, value: command.value, credentialRef: ref });
-      this.clearFinishedTests("provider", command.id ?? id);
+      this.store.save({ kind, id: command.id, value, credentialRef: ref } as Parameters<ConfigurationStore["save"]>[0]);
+      this.clearFinishedTests(kind, command.id ?? id);
     } catch (error) {
       if (newRef) this.removeCredential(newRef);
       if (error instanceof ConfigurationError) throw error;
@@ -190,6 +221,10 @@ export class ConfigurationService {
     if (oldRef && oldRef !== ref) this.removeCredential(oldRef);
     return id;
   }
+  private credentialState(auth: "api_key" | "none", ref: string | null): ModelProvider["credentialState"] {
+    return auth === "none" ? "not_required" : !ref || !this.vault.exists(ref) ? "missing"
+      : !this.storageAvailable ? "storage_unavailable" : this.vault.failures.has(ref) ? "decryption_failed" : "available";
+  }
   private removeCredential(ref: string): void {
     try { this.vault.remove(ref); }
     catch { console.error("Unreferenced encrypted credential cleanup failed."); }
@@ -197,7 +232,7 @@ export class ConfigurationService {
   private clearFinishedTests(kind: ConfigurationKind, id: string): void {
     for (const [key, test] of this.tests) {
       if (test.value.state !== "running" &&
-          (kind === "provider" && test.value.providerId === id || kind === "model" && test.value.model === id))
+          (kind === "modelProvider" && test.value.providerId === id || kind === "model" && test.value.model === id))
         this.tests.delete(key);
     }
   }
@@ -205,7 +240,7 @@ export class ConfigurationService {
     const resolved = resolveProviderModel(this.snapshot(), modelId);
     if (!resolved) throw new ConfigurationError("not_found", "The model or provider no longer exists or is disabled. Reload settings.");
     const { model, provider } = resolved;
-    const storedProvider = this.store.get("provider", provider.id)!;
+    const storedProvider = this.store.get("modelProvider", provider.id)!;
     for (const [key, test] of this.tests) {
       if (this.tests.size < 50) break;
       if (test.value.state !== "running") this.tests.delete(key);
@@ -223,7 +258,7 @@ export class ConfigurationService {
     void this.runTest(id, provider, model, storedProvider.credentialRef, controller.signal);
     return id;
   }
-  private async runTest(id: string, provider: Provider, model: ProviderModel, reference: string | null, signal: AbortSignal): Promise<void> {
+  private async runTest(id: string, provider: ModelProvider, model: ProviderModel, reference: string | null, signal: AbortSignal): Promise<void> {
     let apiKey = "";
     if (provider.auth === "api_key") {
       try {

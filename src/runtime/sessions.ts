@@ -131,24 +131,25 @@ export class SessionService {
     };
     const modules = createModules({ events: this.events, extensionsDirectory: join(dataRoot, "extensions"), data: new SessionDataStore(db), content: this.content, refOf, vault: configuration.vault, configurationChanged,
       sessions: host, models, catalogs: createBuiltinCatalogs(configuration),
-      providerExtensions: configuration.extensions, providers: {
+      webProviders: configuration.web,
+      modelProviderExtensions: configuration.extensions, modelProviders: {
         presets: () => configuration.extensions.presets(),
-        list: () => configuration.current().providers.map(({ credentialState: _state, ...connection }) => connection),
+        list: () => configuration.current().modelProviders.map(({ credentialState: _state, ...connection }) => connection),
         get: id => {
-          const provider = configuration.current().providers.find(item => item.id === id);
+          const provider = configuration.current().modelProviders.find(item => item.id === id);
           if (!provider) return null;
           const { credentialState: _state, ...connection } = provider;
           return connection;
         },
         credential: async (id, options) => {
           options?.signal?.throwIfAborted();
-          const provider = configuration.current().providers.find(item => item.id === id);
+          const provider = configuration.current().modelProviders.find(item => item.id === id);
           const value = await configuration.executionCredential(id);
           options?.signal?.throwIfAborted();
           return provider?.auth === "none" ? null : value;
         },
         subscribe: listener => configuration.subscribeProviders(listener),
-      }, usages: {
+      }, usageProviders: {
         list: () => configuration.extensions.usageProviders(),
         get: id => configuration.extensions.get(id),
         subscribe: listener => configuration.extensions.subscribe(listener),

@@ -1,5 +1,5 @@
 import { defineModule } from "@atelier/sdk/runtime";
-import { providerPresets } from "./presets.ts";
+import { modelProviderPresets } from "./presets.ts";
 import { createZhipuUsage } from "./zhipu.ts";
 import { createDeepSeekUsage } from "./deepseek.ts";
 import { createMoonshotUsage } from "./moonshot.ts";
@@ -18,6 +18,6 @@ export const createBuiltinUsageProviders = (transport: typeof fetch = fetch) => 
 
 /** 预设和查询提供方属于内置插件；与第三方经过同一贡献登记和校验。 */
 export default defineModule(() => ({
-  providerPresets: providerPresets.map(preset => ({ type: "add" as const, preset })),
+  modelProviderPresets: modelProviderPresets.map(preset => ({ type: "add" as const, preset })),
   usageProviders: createBuiltinUsageProviders(),
 }));

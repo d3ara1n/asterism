@@ -1,4 +1,4 @@
-import type { Provider, ProviderInput } from "../../../shared/configuration";
+import type { CredentialState } from "../../../shared/configuration";
 import { commonMessages } from "@atelier/ui/messages/common";
 import { Alert, AlertDescription } from "@atelier/ui/ui/alert";
 import { Button } from "@atelier/ui/ui/button";
@@ -9,20 +9,20 @@ import { providersMessages } from "../../messages/providers";
 import { useI18n } from "../../shared/i18n";
 import { ChoiceField } from "./forms";
 
-export interface ProviderCredentialDraft {
+export interface ConnectionCredentialDraft {
   action: "keep" | "replace" | "clear";
   key: string;
 }
 
 /** 认证控件按认证方式组合；固定方式仍允许填写、更换和清除凭据。 */
-export function ProviderAuthentication({ auth, editable, credentialState, storageAvailable, draft, onAuthChange, onDraftChange }: {
-  auth: ProviderInput["auth"];
+export function ConnectionAuthentication({ auth, editable, credentialState, storageAvailable, draft, onAuthChange, onDraftChange }: {
+  auth: "api_key" | "none";
   editable: boolean;
-  credentialState?: Provider["credentialState"];
+  credentialState?: CredentialState;
   storageAvailable: boolean;
-  draft: ProviderCredentialDraft;
-  onAuthChange(auth: ProviderInput["auth"]): void;
-  onDraftChange(draft: ProviderCredentialDraft): void;
+  draft: ConnectionCredentialDraft;
+  onAuthChange(auth: "api_key" | "none"): void;
+  onDraftChange(draft: ConnectionCredentialDraft): void;
 }) {
   const i18n = useI18n();
   const storedKey = credentialState === "available";

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Download, RefreshCw } from "lucide-react";
-import type { ModelDiscovery, Provider } from "../../../shared/configuration";
+import type { ModelDiscovery, ModelProvider } from "../../../shared/configuration";
 import { providersMessages as messages } from "../../messages/providers";
 import { useI18n } from "../../shared/i18n";
 import { Button } from "@atelier/ui/ui/button";
@@ -25,12 +25,12 @@ const errors = {
 
 export function ModelDiscoveryPicker({ providerId }: { providerId: string }) {
   const { snapshot } = useSettingsConfiguration();
-  const provider = snapshot?.providers.find(provider => provider.id === providerId);
+  const provider = snapshot?.modelProviders.find(provider => provider.id === providerId);
   const discovery = snapshot?.discoveries.find(discovery => discovery.providerId === providerId);
   return <DiscoveryContent key={discovery?.id ?? "empty"} provider={provider} discovery={discovery} />;
 }
 
-function DiscoveryContent({ provider, discovery }: { provider: Provider | undefined; discovery: ModelDiscovery | undefined }) {
+function DiscoveryContent({ provider, discovery }: { provider: ModelProvider | undefined; discovery: ModelDiscovery | undefined }) {
   const i18n = useI18n();
   const { snapshot } = useSettingsConfiguration();
   const { run, busy, error } = useConfigurationAction("inline");

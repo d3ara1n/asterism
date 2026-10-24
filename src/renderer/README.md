@@ -34,7 +34,7 @@
 | `../../packages/builtin/src/agent/context/` / `panel-kit.tsx` | 代理上下文面板的窗口占用、对话与系统构成；两个代理面板共用的版式、数值与系统构成部件 |
 | `../../packages/builtin/src/text-view.tsx` / `code-view.tsx` / `shared/tool-body.ts` | 内置正文工具三态视图与 120 行预览预算；工具和 Markdown 共用 Pierre 代码视图，支持文件名推断或显式语言着色 |
 | `modules/registry.ts` / `views.tsx` / `object-context.ts` | 静态资源展示描述、卡片／工具／历史记录视图注册表与 SDK 前端对象接口注入 |
-| `features/configuration/` | 提供商编辑器消费插件预设／用量目录及连接编辑规则，认证方式与凭据由 `ProviderAuthentication.tsx` 组合；模型发现、参数获取、模型兼容设置及模型角色／agent 表单；用量订阅与展示由消费插件自己管理 |
+| `features/configuration/` | 提供商编辑器消费插件预设／用量目录及连接编辑规则，认证方式与凭据由 `ConnectionAuthentication.tsx` 组合；模型发现、参数获取、模型兼容设置及模型角色／agent 表单；用量订阅与展示由消费插件自己管理 |
 | `features/plugins/` | 插件信息卡片、搜索筛选、包管理与自定义设置页承载 |
 | `modules/plugins.ts` / `modules/settings.tsx` / `modules/configs.tsx` | 插件前端入口装载、设置页面目录与托管配置读写通知 |
 | `shared/ConfigurationValue.tsx` | 模型兼容配置使用的 schema 驱动字段编辑器 |
@@ -59,5 +59,5 @@
 
 - `useSettingsConfiguration()`：只读消费 `snapshot / readError`，通过 `load()` 重读。`ConfigurationReadStatus` 由设置分类页挂载一次。
 - `useConfigurationAction("inline" | "toast")`：每个表单、区块或列表行创建独立实例，反馈通道必填。`run()` 仅接收非 `read` 命令，返回成功回执；失败和同一入口重入返回 `null`，失败已按所选通道处理。`busy` 供本入口禁用控件。
-- `inline`：将实例的 `error` 交给所属 `Editor`、`ConfigurationActionError` 或区块反馈；`Editor` 的 `busy / error` 为必填属性。例子见 `ProvidersSettings.tsx` 的编辑器及 `ModelParameters.tsx`。
-- `toast`：hook 直接发送一次失败通知，调用方只处理成功结果。例子见 `ProvidersSettings.tsx` 的快捷操作及角色、代理列表行。
+- `inline`：将实例的 `error` 交给所属 `Editor`、`ConfigurationActionError` 或区块反馈；`Editor` 的 `busy / error` 为必填属性。例子见 `ModelProvidersSettings.tsx` 的编辑器及 `ModelParameters.tsx`。
+- `toast`：hook 直接发送一次失败通知，调用方只处理成功结果。例子见 `ModelProvidersSettings.tsx` 的快捷操作及角色、代理列表行。

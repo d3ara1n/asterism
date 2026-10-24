@@ -8,6 +8,7 @@ export * from "./runtime-calls.ts";
 export * from "./runtime-channels.ts";
 export * from "./runtime-tools.ts";
 export * from "./runtime-providers.ts";
+export * from "./runtime-web.ts";
 export type * from "./content-runtime.ts";
 export type * from "./models.ts";
 export { validationMessage, jsonArgumentHint } from "./tool-validation.ts";

@@ -6,7 +6,7 @@ import { createOpenCodeUsage, parseOpenCodeQuota } from "./opencode.ts";
 import { createMoonshotUsage, parseMoonshotBalance } from "./moonshot.ts";
 import { createOpenRouterUsage, parseOpenRouterKey } from "./openrouter.ts";
 import { createBuiltinUsageProviders } from "./runtime.ts";
-import { providerPresets } from "./presets.ts";
+import { modelProviderPresets } from "./presets.ts";
 
 const deepseek = { is_available: true, balance_infos: [
   { currency: "CNY", total_balance: "12.50", granted_balance: "2.50", topped_up_balance: "10.00" },
@@ -102,7 +102,7 @@ describe("内置余额与套餐查询", () => {
   it("支持的预设与查询目录同名绑定，未支持的预设保持关闭", () => {
     const ids = createBuiltinUsageProviders().map(provider => provider.id).sort();
     expect(ids).toEqual(["openai", "anthropic", "xai", "deepseek", "kimi", "kimi-cn", "kimi-plan", "kimi-plan-cn", "opencode-plan", "openrouter", "zai-plan", "zai-plan-cn"].sort());
-    for (const preset of providerPresets) {
+    for (const preset of modelProviderPresets) {
       expect(preset.connection.usage ?? null).toBe(ids.includes(preset.id) ? preset.id : null);
     }
   });

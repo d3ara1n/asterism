@@ -390,7 +390,7 @@ describe("模型消费不可变内容", () => {
     signal: new AbortController().signal,
   } satisfies StreamRequest);
   async function configure(f: ReturnType<typeof fixture>) {
-    await f.service.configuration.execute({ type: "provider.save", id: null,
+    await f.service.configuration.execute({ type: "modelProvider.save", id: null,
       value: { id: "media", name: "Media", protocol: "openai-responses", baseUrl: "https://example.invalid", enabled: true, auth: "none", compatibility: [] }, credential: { action: "keep" } });
     await f.service.configuration.execute({ type: "model.save", id: null, value: { providerId: "media", name: "Model", modelId: "model", enabled: true, contextWindow: null, cost: null, compatibility: [],
       capabilities: { reasoning: false, tools: false, thinkingLevels: [...thinkingLevels] }, generation: { temperature: null, topP: null, maxOutputTokens: null } } });

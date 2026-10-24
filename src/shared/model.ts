@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { modelExpressionSchema, modelSchema, providerInputSchema, thinkingSchema } from "./configuration.ts";
+import { modelExpressionSchema, modelSchema, modelProviderInputSchema, thinkingSchema } from "./configuration.ts";
 export { jsonSchema, type Json } from "@atelier/sdk/contracts";
 export { toolOutcomeSchema, type ToolOutcome } from "@atelier/sdk/contracts";
 
@@ -9,7 +9,7 @@ export const unauthenticatedApiKey = "no-auth";
 const id = z.string().min(1).max(160);
 export { modelUsageSchema as usageSchema, type Usage } from "@atelier/sdk/contracts";
 export const modelSettingsSchema = z.strictObject({
-  provider: providerInputSchema,
+  provider: modelProviderInputSchema,
   model: modelSchema, thinking: thinkingSchema.nullable(),
 });
 export type ModelSettings = z.infer<typeof modelSettingsSchema>;

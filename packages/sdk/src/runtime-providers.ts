@@ -1,4 +1,4 @@
-import type { ProviderConnection, ProviderPreset, ProviderUsageError, UsageItem, UsageProviderInfo } from "./provider-usage.ts";
+import type { ModelProviderConnection, ModelProviderPreset, ProviderUsageError, UsageItem, UsageProviderInfo } from "./provider-usage.ts";
 import type { UiText } from "./i18n.ts";
 
 /** 消费者显式提供查询所需的连接与凭据。 */
@@ -33,23 +33,28 @@ export type UsageProvider = QueryUsageProvider | HeadersUsageProvider;
 export class UsageQueryError extends Error {
   constructor(readonly code: ProviderUsageError) { super(`Provider usage query failed: ${code}.`); }
 }
-export interface ProviderServices {
-  presets(): readonly ProviderPreset[];
-  list(): readonly ProviderInfo[];
-  get(id: string): ProviderInfo | null;
+export interface ModelProviderServices {
+  presets(): readonly ModelProviderPreset[];
+  list(): readonly ModelProviderInfo[];
+  get(id: string): ModelProviderInfo | null;
   /** 仅后台可用；读取该连接的当前凭据，无鉴权连接返回 null。 */
   credential(id: string, options?: { signal?: AbortSignal }): Promise<string | null>;
   /** 连接或预设目录变化；返回取消订阅函数，插件关闭时自动取消。 */
   subscribe(listener: () => void): () => void;
 }
-export interface ProviderInfo extends ProviderConnection {
+export interface ModelProviderInfo extends ModelProviderConnection {
   id: string;
   name: string;
   enabled: boolean;
 }
-export interface UsageServices {
+export interface UsageProviderServices {
   list(): readonly UsageProviderInfo[];
   /** 取得绑定提供方生命周期的实现；不选择连接、读取凭据或保存结果。 */
   get(id: string): UsageProvider | null;
   subscribe(listener: () => void): () => void;
+}
+/** 无状态调用门面；连接、凭据和响应由消费方显式交付。 */
+export interface UsageServices {
+  query(providerId: string, context: UsageQueryContext): Promise<UsageItem[]>;
+  parseHeaders(providerId: string, context: UsageHeadersContext): UsageItem[] | null;
 }

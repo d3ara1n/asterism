@@ -12,6 +12,7 @@ import type { PluginEventScope } from "./event-scope.ts";
 import type { PluginCalls } from "@atelier/sdk/contracts";
 import type { BoundTopLevelTool } from "./top-level-tools.ts";
 import { SessionError } from "../session/tree.ts";
+import { UsageQueryError, WebError, type WebProviderInstance } from "@atelier/sdk/runtime";
 
 type PluginServices = Pick<PluginContext, "id" | "dir" | "log" | "config" | "secrets" | "db" | "tasks" | "lifetime">;
 export function createSdkContext(internal: PluginServices, host: PluginHostServices, modelRuns: RunGroup, sessionRuns: RunGroup, directory: SessionDirectory, eventScope: PluginEventScope,
@@ -248,6 +249,58 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
     return release;
   };
   const context: PluginContext = {
+    webProviders: {
+      types: () => { checkAvailable(); return host.webProviders?.types() ?? []; },
+      list: () => { checkAvailable(); return host.webProviders?.list() ?? []; },
+      get: id => { checkAvailable(); return host.webProviders?.get(id) ?? null; },
+      subscribe: listener => subscribeRegistry(host.webProviders, listener),
+      async resolve(id, options) {
+        checkAvailable();
+        if (!host.webProviders) throw new WebError("provider_unavailable", "Web providers are unavailable.");
+        const instance = await sessionRuns.start(signal => host.webProviders!.resolve(id, { signal }),
+          { signal: options.signal, affectsHistory: false }).done;
+        const bound: WebProviderInstance = {};
+        if (instance.search) bound.search = (request, options) => {
+          checkAvailable();
+          const input = structuredClone(request);
+          return sessionRuns.start(signal => instance.search!(input, { signal }), { signal: options.signal, affectsHistory: false }).done;
+        };
+        if (instance.fetch) bound.fetch = (request, options) => {
+          checkAvailable();
+          const input = structuredClone(request);
+          return sessionRuns.start(signal => instance.fetch!(input, { signal }), { signal: options.signal, affectsHistory: false }).done;
+        };
+        return bound;
+      },
+    },
+    web: {
+      search(request, options) {
+        checkAvailable();
+        if (!host.webProviders) throw new WebError("provider_unavailable", "Web providers are unavailable.");
+        const input = structuredClone(request), provider = options.provider;
+        return sessionRuns.start(signal => host.webProviders!.search(input, { provider, signal }), { signal: options.signal, affectsHistory: false }).done;
+      },
+      fetch(request, options) {
+        checkAvailable();
+        if (!host.webProviders) throw new WebError("provider_unavailable", "Web providers are unavailable.");
+        const input = structuredClone(request);
+        return sessionRuns.start(signal => host.webProviders!.fetch(input, { signal }), { signal: options.signal, affectsHistory: false }).done;
+      },
+    },
+    usages: {
+      query(id, input) {
+        const provider = context.usageProviders.get(id);
+        if (!provider) throw new UsageQueryError("unavailable");
+        if (provider.source === "headers") throw new UsageQueryError("unsupported");
+        return provider.query(input);
+      },
+      parseHeaders(id, input) {
+        const provider = context.usageProviders.get(id);
+        if (!provider) throw new UsageQueryError("unavailable");
+        if (provider.source !== "headers") throw new UsageQueryError("unsupported");
+        return provider.parseHeaders(input);
+      },
+    },
     ipc: { events: eventScope.api, calls },
     id: internal.id, lifetime: internal.lifetime, sessions: directory, dir: internal.dir, log: internal.log,
     config: contract => {
@@ -266,23 +319,23 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
       has: key => internal.tasks.has(key),
     },
     catalogs: { get: contract => { checkAvailable(); return host.catalogs?.get(contract) ?? null; } },
-    providers: {
-      presets: () => { checkAvailable(); return host.providers?.presets() ?? []; },
-      list: () => { checkAvailable(); return structuredClone(host.providers?.list() ?? []); },
-      get: id => { checkAvailable(); return structuredClone(host.providers?.get(id) ?? null); },
+    modelProviders: {
+      presets: () => { checkAvailable(); return host.modelProviders?.presets() ?? []; },
+      list: () => { checkAvailable(); return structuredClone(host.modelProviders?.list() ?? []); },
+      get: id => { checkAvailable(); return structuredClone(host.modelProviders?.get(id) ?? null); },
       credential: (id, options = {}) => {
         checkAvailable();
-        if (!host.providers) throw new PluginApiError("unavailable", "Provider connections are unavailable.");
-        return sessionRuns.start(signal => host.providers!.credential(id, { signal }),
+        if (!host.modelProviders) throw new PluginApiError("unavailable", "Provider connections are unavailable.");
+        return sessionRuns.start(signal => host.modelProviders!.credential(id, { signal }),
           { signal: options.signal, affectsHistory: false }).done;
       },
-      subscribe: listener => subscribeRegistry(host.providers, listener),
+      subscribe: listener => subscribeRegistry(host.modelProviders, listener),
     },
-    usages: {
-      list: () => { checkAvailable(); return host.usages?.list() ?? []; },
+    usageProviders: {
+      list: () => { checkAvailable(); return host.usageProviders?.list() ?? []; },
       get: id => {
         checkAvailable();
-        const provider = host.usages?.get(id);
+        const provider = host.usageProviders?.get(id);
         if (!provider) return null;
         if (provider.source === "headers") return { ...provider, parseHeaders(value) {
           checkAvailable(); return provider.parseHeaders(value);
@@ -294,7 +347,7 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
             { signal: value.signal, affectsHistory: false }).done;
         } };
       },
-      subscribe: listener => subscribeRegistry(host.usages, listener),
+      subscribe: listener => subscribeRegistry(host.usageProviders, listener),
     },
     models: {
       validate: (request, options) => {

@@ -1,7 +1,8 @@
 import { LanguageSettings } from "./LanguageSettings";
 import { SessionsSettings } from "./SessionsSettings";
 import { AppearanceSettings } from "../appearance/AppearanceSettings";
-import { ProvidersSettings } from "../configuration/ProvidersSettings";
+import { ModelProvidersSettings } from "../configuration/ModelProvidersSettings";
+import { WebProvidersSettings } from "../configuration/WebProvidersSettings";
 import { RolesSettings } from "../configuration/RolesSettings";
 import { AgentsSettings } from "../configuration/AgentsSettings";
 import { PluginsOverview, PluginDetails, usePlugins, pluginKey, type PluginManager } from "../plugins/PluginsSettings";
@@ -34,7 +35,7 @@ interface SettingsCategory { id: string; title: import("@atelier/sdk/contracts")
 const categories: SettingsCategory[] = [
   { id: "general", title: settingsMessages.generalTitle, summary: settingsMessages.generalSummary, icon: Info, content: () => <><LanguageSettings /><SessionsSettings /></> },
   { id: "appearance", title: settingsMessages.appearance, summary: settingsMessages.appearanceSummary, icon: Palette, content: () => <AppearanceSettings /> },
-  { id: "providers", title: settingsMessages.providers, summary: settingsMessages.providersSummary, icon: PlugZap, content: () => <ProvidersSettings /> },
+  { id: "providers", title: settingsMessages.providers, summary: settingsMessages.providersSummary, icon: PlugZap, content: () => <><ModelProvidersSettings /><WebProvidersSettings /></> },
   { id: "roles", title: settingsMessages.rolesTitle, summary: settingsMessages.rolesSummary, icon: Cpu, content: () => <RolesSettings /> },
   { id: "agents", title: settingsMessages.agents, summary: settingsMessages.agentsSummary, icon: Bot, content: () => <AgentsSettings /> },
   { id: "about", title: settingsMessages.aboutTitle, summary: settingsMessages.aboutSummary, icon: Info, content: () => <About /> },

@@ -1,9 +1,9 @@
-import type { ProviderInput, ProviderModel, ThinkingLevel } from "../shared/configuration.ts";
+import type { ModelProviderInput, ProviderModel, ThinkingLevel } from "../shared/configuration.ts";
 import type { Json } from "../shared/model.ts";
 import { ModelFailure } from "./contract.ts";
 import { compatibilityForTarget } from "./projection.ts";
 
-type Connection = Pick<ProviderInput, "protocol" | "compatibility">;
+type Connection = Pick<ModelProviderInput, "protocol" | "compatibility">;
 type RequestPurpose = { purpose: "probe" } | { purpose: "execution"; thinking: ThinkingLevel | null; system?: string; maxOutputTokens?: number };
 interface RequestOptions {
   maxRetries: 0;

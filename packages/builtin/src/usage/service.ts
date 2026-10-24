@@ -1,5 +1,5 @@
 import type { ModelResponse } from "@atelier/sdk/contracts";
-import { UsageQueryError, type ProviderInfo, type ProviderServices, type UsageServices } from "@atelier/sdk/runtime";
+import { UsageQueryError, type ModelProviderInfo, type ModelProviderServices, type UsageProviderServices } from "@atelier/sdk/runtime";
 import type { ProviderUsageState } from "./contract.ts";
 
 interface Entry { value: ProviderUsageState; attemptedAt: number; controller: AbortController; pending?: Promise<ProviderUsageState> }
@@ -19,20 +19,20 @@ export class UsageConsumer {
   private entries = new Map<string, Entry>();
   private closed = false;
   private readonly unsubscribe: (() => void)[];
-  constructor(private readonly providers: ProviderServices, private readonly usages: UsageServices,
+  constructor(private readonly modelProviders: ModelProviderServices, private readonly usageProviders: UsageProviderServices,
     private readonly changed: (providerId: string | null) => void = () => {},
     private readonly timeout = 10_000, private readonly freshness = 60_000) {
-    this.unsubscribe = [providers.subscribe(() => this.clear()), usages.subscribe(() => this.clear())];
+    this.unsubscribe = [modelProviders.subscribe(() => this.clear()), usageProviders.subscribe(() => this.clear())];
   }
-  private empty(id: string, connection: ProviderInfo | null, source?: "query" | "headers"): ProviderUsageState {
+  private empty(id: string, connection: ModelProviderInfo | null, source?: "query" | "headers"): ProviderUsageState {
     return { providerId: id, usage: connection?.usage ?? null,
       ...(source && { source }), state: "disabled", items: [], updatedAt: null, error: null };
   }
   async query(id: string, options: { signal?: AbortSignal; refresh?: boolean } = {}): Promise<ProviderUsageState> {
     options.signal?.throwIfAborted();
     if (this.closed) throw new UsageQueryError("unavailable");
-    const connection = this.providers.get(id);
-    const provider = connection?.usage ? this.usages.get(connection.usage) : null;
+    const connection = this.modelProviders.get(id);
+    const provider = connection?.usage ? this.usageProviders.get(connection.usage) : null;
     const empty = this.empty(id, connection, provider?.source ?? (provider ? "query" : undefined));
     if (!connection?.enabled || !connection.usage) return empty;
     if (!provider) return { ...empty, state: "error", error: "unavailable" };
@@ -56,7 +56,7 @@ export class UsageConsumer {
       try {
         signal.throwIfAborted();
         let credential: string | null;
-        try { credential = await waitForUsage(this.providers.credential(connection.id, { signal }), signal); }
+        try { credential = await waitForUsage(this.modelProviders.credential(connection.id, { signal }), signal); }
         catch { throw new UsageQueryError("credential"); }
         if (connection.auth === "api_key" && !credential) throw new UsageQueryError("credential");
         signal.throwIfAborted();
@@ -73,9 +73,9 @@ export class UsageConsumer {
   /** 发起调用的 Agent 取得结果后，显式交付自己的响应元信息。 */
   consume(response: ModelResponse): void {
     if (this.closed) return;
-    const connection = this.providers.get(response.connection.id);
+    const connection = this.modelProviders.get(response.connection.id);
     if (!connection?.enabled) return;
-    const provider = connection.usage ? this.usages.get(connection.usage) : null;
+    const provider = connection.usage ? this.usageProviders.get(connection.usage) : null;
     if (provider?.source !== "headers") return;
     const previous = this.entries.get(connection.id);
     const value = { ...(previous?.value ?? this.empty(connection.id, connection, "headers")),

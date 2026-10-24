@@ -19,8 +19,9 @@ import type { PluginCalls } from "./calls.ts";
 import type { CallContribution } from "./runtime-calls.ts";
 import type { ChannelContribution } from "./runtime-channels.ts";
 import type { TopLevelTool } from "./runtime-tools.ts";
-import type { ProviderServices, UsageServices, UsageProvider } from "./runtime-providers.ts";
-import type { ProviderPresetContribution } from "./provider-usage.ts";
+import type { ModelProviderServices, UsageProviderServices, UsageProvider, UsageServices } from "./runtime-providers.ts";
+import type { WebServices, WebProviderServices, WebProviderDefinition } from "./runtime-web.ts";
+import type { ModelProviderPresetContribution } from "./provider-usage.ts";
 export type * from "./objects.ts";
 export type { ResourceRef, ResourceCreationResult, ResourceSnapshot, SessionSnapshot } from "./workspace.ts";
 
@@ -46,8 +47,11 @@ export interface PluginContext {
   db(): DatabaseSync;
   readonly tasks: PluginTasks;
   readonly models: ModelServices;
-  readonly providers: ProviderServices;
+  readonly modelProviders: ModelProviderServices;
+  readonly usageProviders: UsageProviderServices;
   readonly usages: UsageServices;
+  readonly webProviders: WebProviderServices;
+  readonly web: WebServices;
   readonly catalogs: { get<T extends Json>(contract: DataContract<T>): T | null };
   session(id: string): SessionExecutor;
   /** 以具名资源契约取得对象操作柄；宿主校验契约属于本插件、对象存在且类型一致，写入记录以此打戳。 */
@@ -129,8 +133,9 @@ export interface ToolContribution {
   prepare(resource: ResourceSnapshot, object: ObjectExecutor, target: Json, args: Json, caller: ToolCaller): ToolInvocation | PreparedResult;
 }
 export interface ModuleContribution {
+  webProviders?: readonly WebProviderDefinition[];
   usageProviders?: readonly UsageProvider[];
-  providerPresets?: readonly ProviderPresetContribution[];
+  modelProviderPresets?: readonly ModelProviderPresetContribution[];
   calls?: readonly CallContribution[];
   /** 对象级双工通道；契约归本插件，按对象类型所属插件路由。 */
   channels?: readonly ChannelContribution[];

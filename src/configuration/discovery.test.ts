@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import type { Provider } from "../shared/configuration.ts";
+import type { ModelProvider } from "../shared/configuration.ts";
 import { discoverModels } from "./discovery.ts";
 
-const provider: Provider = {
+const provider: ModelProvider = {
   id: "relay", name: "Relay", baseUrl: "https://example.test/proxy/v1/", protocol: "openai-responses",
   enabled: true, auth: "api_key", credentialState: "available", compatibility: [],
 };

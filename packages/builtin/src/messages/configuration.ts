@@ -3,8 +3,8 @@ import { defineMessages, pluginNamespace } from "@atelier/sdk/contracts";
 export const configurationMessages = pluginNamespace("atelier.builtin").messages("en", defineMessages({
   selectionTitle: { id: "agent.configuration.selectionTitle", defaultMessage: "Agent, model and thinking" },
   searchModels: { id: "agent.configuration.searchModels", defaultMessage: "Search models…" },
-  providers: { id: "agent.configuration.providers", defaultMessage: "Model providers" },
-  searchProviders: { id: "agent.configuration.searchProviders", defaultMessage: "Search providers…" },
+  modelProviders: { id: "agent.configuration.modelProviders", defaultMessage: "Model providers" },
+  searchProviders: { id: "agent.configuration.searchProviders", defaultMessage: "Search model providers…" },
   modelCount: { id: "agent.configuration.modelCount", defaultMessage: "{count, plural, one {# model} other {# models}}" },
   modelDetails: { id: "agent.configuration.modelDetails", defaultMessage: "Model details" },
   noPreview: { id: "agent.configuration.noPreview", defaultMessage: "Browse a model to preview its details." },

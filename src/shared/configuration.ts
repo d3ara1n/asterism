@@ -3,37 +3,41 @@ export { agentInputSchema, agentSchema, agentOverridesSchema, type AgentConfigur
 import {
   modelExpressionSchema, parseModelExpression, thinkingSchema, type ThinkingLevel,
   thinkingLevels, modelCostSchema, uiTextSchema,
-  providerFixedFields, providerUsageIdSchema, usageProviderInfoSchema, providerPresetSchema,
+  modelProviderFixedFields, providerUsageIdSchema, usageProviderInfoSchema, modelProviderPresetSchema,
 } from "@atelier/sdk/contracts";
 export { modelExpressionSchema, parseModelExpression, formatModelExpression, modelReference, thinkingSchema, type ModelExpression, type ThinkingLevel } from "@atelier/sdk/contracts";
 import { z } from "zod";
+import { webProviderConnectionSchema, webProviderTypeSchema } from "@atelier/sdk/contracts";
 import { modelCompatibilitySchema } from "./model-compatibility.ts";
 
 const id = z.string().min(1).max(160);
 const name = z.string().trim().min(1).max(160);
 /** 提供商 ID：程序与用户共用的可读 slug，可编辑，不含 `/` 与空白。 */
-export const providerIdSchema = z.string().trim().min(1).max(160).regex(/^[^/\s]+$/u, "Provider IDs cannot contain '/' or whitespace.");
+export const modelProviderIdSchema = z.string().trim().min(1).max(160).regex(/^[^/\s]+$/u, "ModelProvider IDs cannot contain '/' or whitespace.");
 /** 服务端模型 ID：全局共识的模型名，可含 `/`，不含空白。 */
 const serverModelId = z.string().trim().min(1).max(160).regex(/^\S+$/u, "Model IDs cannot contain whitespace.");
 export const protocolSchema = z.enum(["openai-responses", "openai-chat", "anthropic"]);
 /** 连接可固定的配置项；认证方式不包含凭据，兼容设置同时约束模型编辑。 */
-export const providerFixedFieldSchema = z.enum(providerFixedFields);
-export type ProviderFixedField = z.infer<typeof providerFixedFieldSchema>;
+export const modelProviderFixedFieldSchema = z.enum(modelProviderFixedFields);
+export type ModelProviderFixedField = z.infer<typeof modelProviderFixedFieldSchema>;
 const endpoint = z.string().trim().url().refine(value => {
   const url = new URL(value);
   return ["http:", "https:"].includes(url.protocol) && !url.username && !url.password && !url.search && !url.hash;
 }, "Use an HTTP(S) base URL without credentials, query, or fragment.");
-export const providerInputSchema = z.strictObject({
-  id: providerIdSchema, name, protocol: protocolSchema, baseUrl: endpoint, enabled: z.boolean(), auth: z.enum(["api_key", "none"]),
+export const modelProviderInputSchema = z.strictObject({
+  id: modelProviderIdSchema, name, protocol: protocolSchema, baseUrl: endpoint, enabled: z.boolean(), auth: z.enum(["api_key", "none"]),
   compatibility: modelCompatibilitySchema,
   usage: providerUsageIdSchema.nullable().optional(),
-  fixedFields: z.array(providerFixedFieldSchema).refine(fields => new Set(fields).size === fields.length,
+  fixedFields: z.array(modelProviderFixedFieldSchema).refine(fields => new Set(fields).size === fields.length,
     "Fixed fields must be unique.").optional(),
 });
 export const credentialStateSchema = z.enum(["not_required", "missing", "available", "storage_unavailable", "decryption_failed"]);
-export const providerSchema = providerInputSchema.extend({ credentialState: credentialStateSchema });
+export type CredentialState = z.infer<typeof credentialStateSchema>;
+export const webProviderSchema = webProviderConnectionSchema.extend({ credentialState: credentialStateSchema });
+export type WebProviderConfiguration = z.infer<typeof webProviderSchema>;
+export const modelProviderSchema = modelProviderInputSchema.extend({ credentialState: credentialStateSchema });
 export const modelInputSchema = z.strictObject({
-  providerId: providerIdSchema, name, modelId: serverModelId, enabled: z.boolean(),
+  providerId: modelProviderIdSchema, name, modelId: serverModelId, enabled: z.boolean(),
   contextWindow: z.number().int().positive().nullable(),
   cost: modelCostSchema.nullable().default(null),
   // 只保留改变请求内容的能力；文件是否被接受由服务端决定。
@@ -52,7 +56,7 @@ export const modelRoleSchema = modelRoleInputSchema.extend({ id: configurationId
 export const modelRoleOverridesSchema = modelRoleInputSchema.partial();
 export const testErrorSchema = z.enum(["configuration", "credential", "authentication", "model_unavailable", "rate_limit", "network", "timeout", "protocol", "server", "cancelled"]);
 export const connectionTestSchema = z.strictObject({
-  id, providerId: providerIdSchema, model: modelExpressionSchema,
+  id, providerId: modelProviderIdSchema, model: modelExpressionSchema,
   state: z.enum(["running", "succeeded", "failed", "cancelled"]), startedAt: z.string(),
   durationMs: z.number().nonnegative().nullable(), error: testErrorSchema.nullable(), message: z.string().nullable(),
 });
@@ -64,7 +68,7 @@ export const discoveredModelSchema = z.strictObject({
   thinkingLevels: z.array(thinkingSchema).optional(),
 });
 export const modelDiscoverySchema = z.strictObject({
-  id, providerId: providerIdSchema,
+  id, providerId: modelProviderIdSchema,
   state: z.enum(["running", "succeeded", "failed", "cancelled"]),
   models: z.array(discoveredModelSchema),
   error: z.enum(["configuration", "credential", "authentication", "unsupported", "rate_limit", "network", "timeout", "protocol", "server", "cancelled"]).nullable(),
@@ -81,9 +85,11 @@ export function createModelInput(providerId: string, model: DiscoveredModel): z.
   };
 }
 export const configurationSnapshotSchema = z.strictObject({
-  providers: z.array(providerSchema), models: z.array(modelSchema), roles: z.array(modelRoleSchema), agents: z.array(agentSchema),
+  webProviders: z.array(webProviderSchema),
+  webProviderTypes: z.array(webProviderTypeSchema),
+  modelProviders: z.array(modelProviderSchema), models: z.array(modelSchema), roles: z.array(modelRoleSchema), agents: z.array(agentSchema),
   tests: z.array(connectionTestSchema), discoveries: z.array(modelDiscoverySchema), credentialStorageAvailable: z.boolean(),
-  providerPresets: z.array(providerPresetSchema).optional(),
+  modelProviderPresets: z.array(modelProviderPresetSchema).optional(),
   usageProviders: z.array(usageProviderInfoSchema).optional(),
   defaults: z.strictObject({
     roles: z.record(id, modelRoleInputSchema), agents: z.record(id, agentInputSchema),
@@ -98,16 +104,18 @@ const credentialUpdateSchema = z.discriminatedUnion("action", [
   z.strictObject({ action: z.literal("replace"), value: z.string().trim().min(1).max(16_384) }),
 ]);
 export const configurationCommandSchema = z.discriminatedUnion("type", [
+  z.strictObject({ type: z.literal("webProvider.save"), id: z.string().nullable(), value: webProviderConnectionSchema, credential: credentialUpdateSchema }),
+  z.strictObject({ type: z.literal("webProvider.move"), id: z.string(), direction: z.enum(["up", "down"]) }),
   z.strictObject({ type: z.literal("read") }),
   // 保存目标是当前 ID；value 中的 ID 可以不同，即改名。
-  z.strictObject({ type: z.literal("provider.save"), id: providerIdSchema.nullable(), value: providerInputSchema, credential: credentialUpdateSchema }),
+  z.strictObject({ type: z.literal("modelProvider.save"), id: modelProviderIdSchema.nullable(), value: modelProviderInputSchema, credential: credentialUpdateSchema }),
   z.strictObject({ type: z.literal("model.save"), id: modelExpressionSchema.nullable(), value: modelInputSchema }),
   z.strictObject({ type: z.literal("role.save"), ...target, value: modelRoleOverridesSchema.extend({ id: configurationIdSchema }) }),
   z.strictObject({ type: z.literal("agent.save"), ...target, value: agentOverridesSchema.safeExtend({ id: configurationIdSchema }) }),
-  z.strictObject({ type: z.literal("remove"), kind: z.enum(["provider", "model", "role", "agent"]), id: z.string().min(1).max(321) }),
+  z.strictObject({ type: z.literal("remove"), kind: z.enum(["modelProvider", "webProvider", "model", "role", "agent"]), id: z.string().min(1).max(321) }),
   z.strictObject({ type: z.literal("test.start"), model: modelExpressionSchema }),
   z.strictObject({ type: z.literal("test.cancel"), id }),
-  z.strictObject({ type: z.literal("discovery.start"), providerId: providerIdSchema }),
+  z.strictObject({ type: z.literal("discovery.start"), providerId: modelProviderIdSchema }),
   z.strictObject({ type: z.literal("discovery.cancel"), id }),
   z.strictObject({ type: z.literal("discovery.add"), id, modelIds: z.array(serverModelId).min(1) }),
   z.strictObject({ type: z.literal("model.parameters"), model: modelExpressionSchema }),
@@ -124,10 +132,10 @@ export const configurationResultSchema = z.discriminatedUnion("ok", [
   z.strictObject({ ok: z.literal(true), snapshot: configurationSnapshotSchema, savedId: z.string().max(321).nullable(), parameterUpdate: modelParameterUpdateSchema.optional() }),
   z.strictObject({ ok: z.literal(false), error: configurationErrorSchema }),
 ]);
-export type Provider = z.infer<typeof providerSchema>;
-export type ProviderInput = z.infer<typeof providerInputSchema>;
+export type ModelProvider = z.infer<typeof modelProviderSchema>;
+export type ModelProviderInput = z.infer<typeof modelProviderInputSchema>;
 /** 缺少编辑规则的连接保持自由配置，不按名称、端点或目录反推来源。 */
-export function canEditProviderField(provider: Pick<ProviderInput, "fixedFields">, field: ProviderFixedField): boolean {
+export function canEditModelProviderField(provider: Pick<ModelProviderInput, "fixedFields">, field: ModelProviderFixedField): boolean {
   return !provider.fixedFields?.includes(field);
 }
 export type ProviderModel = z.infer<typeof modelSchema>;
@@ -144,12 +152,12 @@ export interface ConfigurationBridge {
 }
 
 /** 选择器和执行消费共用这一存在性/启用检查，不维护配置引用或级联状态。 */
-export function resolveProviderModel(snapshot: ConfigurationSnapshot, reference: string | null): { model: ProviderModel; provider: Provider } | null {
+export function resolveProviderModel(snapshot: ConfigurationSnapshot, reference: string | null): { model: ProviderModel; provider: ModelProvider } | null {
   const expression = reference === null ? null : parseModelExpression(reference);
   if (!expression) return null;
   const model = snapshot.models.find(item => item.providerId === expression.provider && item.modelId === expression.model);
   if (!model?.enabled) return null;
-  const provider = snapshot.providers.find(item => item.id === model.providerId);
+  const provider = snapshot.modelProviders.find(item => item.id === model.providerId);
   return provider?.enabled ? { model, provider } : null;
 }
 

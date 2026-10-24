@@ -1,19 +1,19 @@
-import { providerPresetSchema, usageProviderInfoSchema, usageItemsSchema, type ProviderPreset, type ProviderPresetContribution } from "@atelier/sdk/contracts";
+import { modelProviderPresetSchema, usageProviderInfoSchema, usageItemsSchema, type ModelProviderPreset, type ModelProviderPresetContribution } from "@atelier/sdk/contracts";
 import { UsageQueryError, type UsageProvider } from "@atelier/sdk/runtime";
 import type { RunGroup } from "../plugins/lifecycle.ts";
 import { defineProviderPresets } from "../shared/provider-presets.ts";
 import { synchronous } from "../plugins/synchronous.ts";
 
-interface Layer { owner: string; changes: readonly ProviderPresetContribution[] }
+interface Layer { owner: string; changes: readonly ModelProviderPresetContribution[] }
 /** 插件贡献的目录：按装配次序覆盖预设；查询身份唯一，不以覆盖预设隐式替换实现。 */
-export class ProviderExtensions {
+export class ModelProviderExtensions {
   private layers: Layer[] = [];
   private queries = new Map<string, { owner: string; provider: UsageProvider; runs: RunGroup }>();
   private listeners = new Set<() => void>();
   subscribe(listener: () => void): () => void { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; }
   private changed() { for (const listener of this.listeners) listener(); }
   private resolve(layers = this.layers) {
-    const presets = new Map<string, ProviderPreset>();
+    const presets = new Map<string, ModelProviderPreset>();
     for (const layer of layers) for (const change of layer.changes) {
       if (change.type === "add") {
         if (presets.has(change.preset.id)) throw new Error(`Duplicate provider preset: ${change.preset.id}`);
@@ -30,7 +30,7 @@ export class ProviderExtensions {
   presets() { return this.resolve(); }
   usageProviders() { return [...this.queries.values()].map(({ owner, provider }) =>
     usageProviderInfoSchema.parse({ id: provider.id, label: provider.label, owner, source: provider.source })); }
-  declare(owner: string, providers: readonly UsageProvider[], changes: readonly ProviderPresetContribution[], runs: RunGroup, dependencies: readonly string[] = []): void {
+  declare(owner: string, providers: readonly UsageProvider[], changes: readonly ModelProviderPresetContribution[], runs: RunGroup, dependencies: readonly string[] = []): void {
     const ids = new Set(this.queries.keys());
     const normalizedProviders = providers.map((provider): UsageProvider => {
       const info = usageProviderInfoSchema.parse({ id: provider.id, label: provider.label, owner, source: provider.source });
@@ -43,9 +43,9 @@ export class ProviderExtensions {
       if (typeof provider.query !== "function") throw new Error(`Usage provider ${provider.id} has no query function.`);
       return { id: info.id, label: info.label, source: "query", query: provider.query.bind(provider) };
     });
-    const normalizedChanges: ProviderPresetContribution[] = changes.map(change => {
-      if (change.type === "add") return { type: "add", preset: providerPresetSchema.parse(change.preset) };
-      if (change.type === "patch") return { ...change, id: providerPresetSchema.shape.id.parse(change.id) };
+    const normalizedChanges: ModelProviderPresetContribution[] = changes.map(change => {
+      if (change.type === "add") return { type: "add", preset: modelProviderPresetSchema.parse(change.preset) };
+      if (change.type === "patch") return { ...change, id: modelProviderPresetSchema.shape.id.parse(change.id) };
       throw new Error("Invalid provider preset contribution.");
     });
     // 修改其他插件新增的预设需要声明依赖，保证失败撤销和关闭次序可确定。

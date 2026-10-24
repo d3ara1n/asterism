@@ -4,9 +4,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createModelInput, resolveModelRole, type ConfigurationSnapshot, type ProviderInput } from "../shared/configuration.ts";
-import { providerPresetDraft } from "../shared/provider-presets.ts";
-import { providerPresets } from "../../packages/builtin/src/providers/presets.ts";
+import { createModelInput, resolveModelRole, type ConfigurationSnapshot, type ModelProviderInput } from "../shared/configuration.ts";
+import { modelProviderPresetDraft } from "../shared/provider-presets.ts";
+import { modelProviderPresets } from "../../packages/builtin/src/providers/presets.ts";
 import { ConfigurationService } from "./service.ts";
 import type { ConnectionProbe } from "./probe.ts";
 import { configurationDefaults, resolveAgentConfiguration, resolveRoleConfiguration } from "./layers.ts";
@@ -14,6 +14,8 @@ import type { ModelCompatibility } from "../shared/model-compatibility.ts";
 import type { DiscoverModels } from "./discovery.ts";
 import type { LoadModelCatalog } from "./model-catalog.ts";
 import type { Catalog } from "@opencode-ai/models";
+import { z } from "zod";
+import { RunLifecycle } from "../plugins/lifecycle.ts";
 
 const cleanups: (() => void)[] = [];
 afterEach(() => { cleanups.splice(0).reverse().forEach(cleanup => cleanup()); vi.useRealTimers(); });
@@ -32,7 +34,7 @@ function setup(probe: ConnectionProbe = async () => {}, available = true, timeou
 }
 const providerValue = { id: "local", name: "Local", protocol: "openai-chat" as const, baseUrl: "http://127.0.0.1:1234/v1", enabled: true, auth: "none" as "none" | "api_key", compatibility: [] };
 async function addModel(service: ConfigurationService, auth: "none" | "api_key" = "none") {
-  const provider = await service.execute({ type: "provider.save", id: null, value: { ...providerValue, auth },
+  const provider = await service.execute({ type: "modelProvider.save", id: null, value: { ...providerValue, auth },
     credential: auth === "none" ? { action: "keep" } : { action: "replace", value: "test-key-not-for-network" } });
   const model = await service.execute({ type: "model.save", id: null, value: {
     providerId: provider.savedId!, name: "Test model", modelId: "test-model", enabled: true, contextWindow: 32000, cost: null, compatibility: [],
@@ -46,6 +48,35 @@ function roleValue(snapshot: ConfigurationSnapshot, id: string) {
 }
 
 describe("真实配置与消费边界", () => {
+  // Web 与模型连接可能同名；重排必须持久保留，解析各自的凭据而不是借用模型连接。
+  it("Web 连接独立保存凭据与路由顺序，重开后按连接实例解析", async () => {
+    const { service, root, protector } = setup();
+    await addModel(service, "api_key");
+    const life = new RunLifecycle(() => {});
+    cleanups.push(() => life.stop());
+    const create = vi.fn(() => ({ fetch: async () => ({ documents: [], hints: [] }) }));
+    const definition = { id: "test-web", label: "Test web", search: false, fetch: true, urlPatterns: ["*"],
+      settingsSchema: z.object({ region: z.string() }), defaults: { baseUrl: "https://web.test", auth: "api_key" as const, settings: { region: "US" } }, create };
+    service.web.declare("test.web", [definition], life.group("call"));
+    for (const id of ["local", "second"]) await service.execute({ type: "webProvider.save", id: null,
+      value: { id, name: id, type: definition.id, enabled: true, ...definition.defaults },
+      credential: { action: "replace", value: `web-key-${id}` } });
+    await service.execute({ type: "webProvider.move", id: "second", direction: "up" });
+    expect(service.current().modelProviders.map(item => item.id)).toEqual(["local"]);
+    const disk = readFileSync(join(root, "configuration.json"), "utf8");
+    expect(disk).not.toContain("web-key");
+    service.close();
+    const reopened = new ConfigurationService(root, protector);
+    cleanups.push(() => reopened.close());
+    reopened.web.declare("test.web", [definition], life.group("call"));
+    expect(reopened.current().webProviders.map(item => item.id)).toEqual(["second", "local"]);
+    await reopened.web.resolve("local", { signal: new AbortController().signal });
+    expect(create).toHaveBeenCalledWith(expect.objectContaining({ credential: "web-key-local", connection: expect.objectContaining({ id: "local" }) }));
+    await expect(reopened.execute({ type: "webProvider.save", id: "local",
+      value: { ...reopened.web.get("local"), settings: { region: 10 } }, credential: { action: "replace", value: "invalid-key" } })).rejects.toThrow();
+    await reopened.web.resolve("local", { signal: new AbortController().signal });
+    expect(create).toHaveBeenLastCalledWith(expect.objectContaining({ credential: "web-key-local" }));
+  });
   // 配置 ID 直接用于模型选择；新增重名不能覆盖旧项，改名必须替换原项且保留其行为覆盖。
   it.each(["agent", "role"] as const)("%s 以显式 slug 创建、拒绝重名并持久保存改名", async kind => {
     const { service, root, protector } = setup();
@@ -69,40 +100,40 @@ describe("真实配置与消费边界", () => {
   // 编辑规则须随连接独立持久化；固定认证方式不能阻止改名、启停和凭据管理。
   it("预设固定项跨重开保留，连接身份和密钥仍可修改", async () => {
     const { service, root, protector } = setup();
-    const value = { ...providerPresetDraft(providerPresets.find(preset => preset.id === "kimi")!), enabled: true };
-    await service.execute({ type: "provider.save", id: null, value, credential: { action: "replace", value: "first-key" } });
+    const value = { ...modelProviderPresetDraft(modelProviderPresets.find(preset => preset.id === "kimi")!), enabled: true };
+    await service.execute({ type: "modelProvider.save", id: null, value, credential: { action: "replace", value: "first-key" } });
     const renamed = { ...value, id: "personal-kimi", name: "Personal", enabled: false };
-    await service.execute({ type: "provider.save", id: value.id, value: renamed, credential: { action: "replace", value: "replacement-key" } });
-    const saved = service.current().providers[0]!;
+    await service.execute({ type: "modelProvider.save", id: value.id, value: renamed, credential: { action: "replace", value: "replacement-key" } });
+    const saved = service.current().modelProviders[0]!;
     expect(saved).toMatchObject({ ...renamed, credentialState: "available" });
     expect(await service.executionCredential(saved.id)).toBe("replacement-key");
-    expect(JSON.parse(readFileSync(join(root, "configuration.json"), "utf8")).providers[0]).not.toHaveProperty("kind");
+    expect(JSON.parse(readFileSync(join(root, "configuration.json"), "utf8")).modelProviders[0]).not.toHaveProperty("kind");
     service.close();
     const reopened = new ConfigurationService(root, protector);
     cleanups.push(() => reopened.close());
-    expect(reopened.current().providers[0]).toMatchObject(renamed);
-    await reopened.execute({ type: "provider.save", id: renamed.id, value: { ...renamed, enabled: true }, credential: { action: "clear" } });
-    expect(reopened.current().providers[0]).toMatchObject({ enabled: true, credentialState: "missing", fixedFields: value.fixedFields });
+    expect(reopened.current().modelProviders[0]).toMatchObject(renamed);
+    await reopened.execute({ type: "modelProvider.save", id: renamed.id, value: { ...renamed, enabled: true }, credential: { action: "clear" } });
+    expect(reopened.current().modelProviders[0]).toMatchObject({ enabled: true, credentialState: "missing", fixedFields: value.fixedFields });
   });
 
   // 隐藏不等于不可改：命令边界须拒绝更改固定值或撤下规则，失败不污染配置和凭据。
   it("固定字段与规则不可通过保存命令改写，模型也不能覆盖固定兼容设置", async () => {
     const { service, root } = setup();
-    const value = { ...providerPresetDraft(providerPresets.find(preset => preset.id === "kimi")!), enabled: true };
-    await service.execute({ type: "provider.save", id: null, value, credential: { action: "replace", value: "original-key" } });
+    const value = { ...modelProviderPresetDraft(modelProviderPresets.find(preset => preset.id === "kimi")!), enabled: true };
+    await service.execute({ type: "modelProvider.save", id: null, value, credential: { action: "replace", value: "original-key" } });
     const original = readFileSync(join(root, "configuration.json"), "utf8");
-    const changes: Partial<ProviderInput>[] = [
+    const changes: Partial<ModelProviderInput>[] = [
       { protocol: "openai-chat" }, { baseUrl: "https://relay.test/v1" }, { auth: "none" },
       { compatibility: [] }, { fixedFields: [] }, { fixedFields: undefined },
     ];
     for (const change of changes) {
-      await expect(service.execute({ type: "provider.save", id: value.id, value: { ...value, ...change },
+      await expect(service.execute({ type: "modelProvider.save", id: value.id, value: { ...value, ...change },
         credential: { action: "replace", value: "must-not-replace" } })).rejects.toMatchObject({
         code: "invalid_request", display: { id: "providerEditing.fixed" },
       });
     }
     expect(readFileSync(join(root, "configuration.json"), "utf8")).toBe(original);
-    const saved = service.current().providers[0]!;
+    const saved = service.current().modelProviders[0]!;
     expect(await service.executionCredential(saved.id)).toBe("original-key");
     expect(readdirSync(join(root, "credentials"))).toHaveLength(1);
     const model = createModelInput(value.id, { modelId: "test", name: "Test" });
@@ -117,15 +148,15 @@ describe("真实配置与消费边界", () => {
   it("未声明规则的连接可修改全部接入字段", async () => {
     const { service, root, protector } = setup();
     const value = { ...providerValue, id: "kimi", baseUrl: "https://api.moonshot.ai/v1" };
-    await service.execute({ type: "provider.save", id: null, value, credential: { action: "keep" } });
+    await service.execute({ type: "modelProvider.save", id: null, value, credential: { action: "keep" } });
     service.close();
     const reopened = new ConfigurationService(root, protector);
     cleanups.push(() => reopened.close());
-    expect(reopened.current().providers[0]?.fixedFields).toBeUndefined();
-    const changed: ProviderInput = { ...value, protocol: "anthropic", baseUrl: "https://relay.test/v1", auth: "api_key",
+    expect(reopened.current().modelProviders[0]?.fixedFields).toBeUndefined();
+    const changed: ModelProviderInput = { ...value, protocol: "anthropic", baseUrl: "https://relay.test/v1", auth: "api_key",
       compatibility: [{ id: "customUserAgent", value: { userAgent: "Atelier" } }] };
-    await reopened.execute({ type: "provider.save", id: value.id, value: changed, credential: { action: "replace", value: "custom-key" } });
-    expect(reopened.current().providers[0]).toMatchObject(changed);
+    await reopened.execute({ type: "modelProvider.save", id: value.id, value: changed, credential: { action: "replace", value: "custom-key" } });
+    expect(reopened.current().modelProviders[0]).toMatchObject(changed);
     const model = createModelInput(value.id, { modelId: "test", name: "Test" });
     await reopened.execute({ type: "model.save", id: null, value: { ...model, compatibility: [{ id: "systemMessageInMessages" }] } });
     expect(reopened.current().models[0]?.compatibility).toEqual([{ id: "systemMessageInMessages" }]);
@@ -255,12 +286,12 @@ describe("真实配置与消费边界", () => {
   });
 
   // 两层独立保存显式条目；参考协议不拦截保存，非法候选不能污染已保存数据。
-  it.each(["provider", "model"] as const)("%s 兼容条目独立保存并重开，非法条目拒绝且移除后不重现", async kind => {
+  it.each(["modelProvider", "model"] as const)("%s 兼容条目独立保存并重开，非法条目拒绝且移除后不重现", async kind => {
     const { service, root, protector } = setup();
     const { providerId, modelId, snapshot } = await addModel(service);
     const value = snapshot.models[0]!;
-    const save = (target: ConfigurationService, compatibility: ModelCompatibility[]) => kind === "provider"
-      ? target.execute({ type: "provider.save", id: providerId, value: { ...providerValue, compatibility }, credential: { action: "keep" } })
+    const save = (target: ConfigurationService, compatibility: ModelCompatibility[]) => kind === "modelProvider"
+      ? target.execute({ type: "modelProvider.save", id: providerId, value: { ...providerValue, compatibility }, credential: { action: "keep" } })
       : target.execute({ type: "model.save", id: modelId, value: { ...value, compatibility } });
     const compatibility = [{ id: "responsesReasoning", value: {} }, { id: "systemMessageInMessages" }];
     await save(service, compatibility);
@@ -273,13 +304,13 @@ describe("真实配置与消费边界", () => {
     }
     const reopened = new ConfigurationService(root, protector);
     cleanups.push(() => reopened.close());
-    expect(reopened.current()[kind === "provider" ? "providers" : "models"][0]?.compatibility).toEqual(compatibility);
-    expect(reopened.current()[kind === "provider" ? "models" : "providers"][0]?.compatibility).toEqual([]);
-    expect(reopened.current().providers[0]?.protocol).toBe("openai-chat");
+    expect(reopened.current()[kind === "modelProvider" ? "modelProviders" : "models"][0]?.compatibility).toEqual(compatibility);
+    expect(reopened.current()[kind === "modelProvider" ? "models" : "modelProviders"][0]?.compatibility).toEqual([]);
+    expect(reopened.current().modelProviders[0]?.protocol).toBe("openai-chat");
     await save(reopened, []);
     const again = new ConfigurationService(root, protector);
     cleanups.push(() => again.close());
-    expect(again.current()[kind === "provider" ? "providers" : "models"][0]?.compatibility).toEqual([]);
+    expect(again.current()[kind === "modelProvider" ? "modelProviders" : "models"][0]?.compatibility).toEqual([]);
   });
 
   it("只保存用户覆盖，空提示词恢复内置，显式 false 与空列表不丢失", async () => {
@@ -342,7 +373,7 @@ describe("真实配置与消费边界", () => {
   it("初始化五种模型角色和五种 agent；worker 默认可用，utility 可管理且隐藏", async () => {
     const { service } = setup();
     const { snapshot } = await service.execute({ type: "read" });
-    expect(snapshot.providers).toEqual([]);
+    expect(snapshot.modelProviders).toEqual([]);
     expect(new Set(snapshot.roles.map(role => role.id))).toEqual(new Set(["default", "heavy", "fast", "utility", "smart"]));
     expect(snapshot.roles.find(role => role.id === "utility")).toMatchObject({ hidden: true, builtin: true, model: null });
     expect(snapshot.agents.map(agent => agent.id)).toEqual(["worker", "explorer", "reviewer", "researcher", "advisor"]);
@@ -367,7 +398,7 @@ describe("真实配置与消费边界", () => {
     const reopened = new ConfigurationService(root, protector);
     try {
       const result = await reopened.execute({ type: "read" });
-      expect(result.snapshot.providers[0]).toMatchObject({ id: providerId, credentialState: "available" });
+      expect(result.snapshot.modelProviders[0]).toMatchObject({ id: providerId, credentialState: "available" });
       expect(result.snapshot.models).toHaveLength(1);
       expect(result.snapshot.models[0]!.capabilities).toMatchObject({ reasoning: true, thinkingLevels: [] });
       expect(result.snapshot.overrides.agents.worker).toEqual({ systemPrompt: "Pinned", enabled: false, tools: [] });
@@ -380,7 +411,7 @@ describe("真实配置与消费边界", () => {
     const { service } = setup();
     const { providerId, modelId, snapshot } = await addModel(service);
     const assigned = await service.execute({ type: "role.save", id: "heavy", value: { ...roleValue(snapshot, "heavy"), model: modelId } });
-    const removed = await service.execute({ type: "remove", kind: "provider", id: providerId});
+    const removed = await service.execute({ type: "remove", kind: "modelProvider", id: providerId});
     expect(removed.snapshot.models).toEqual([]);
     expect(removed.snapshot.roles.find(role => role.id === "heavy")?.model).toBe(modelId);
     expect(assigned.snapshot.models).toHaveLength(1);
@@ -434,7 +465,7 @@ describe("真实配置与消费边界", () => {
     const { service, root, protector } = setup();
     const { providerId } = await addModel(service, "api_key");
     const first = readdirSync(join(root, "credentials"))[0]!;
-    const save = { type: "provider.save" as const, id: providerId, value: { ...providerValue, auth: "api_key" as const },
+    const save = { type: "modelProvider.save" as const, id: providerId, value: { ...providerValue, auth: "api_key" as const },
       credential: { action: "replace" as const, value: "replacement-test-key" } };
     protector.encrypt.mockRejectedValueOnce(new Error("Sensitive system detail"));
     await expect(service.execute(save)).rejects.toThrow();
@@ -443,15 +474,15 @@ describe("真实配置与消费边界", () => {
     const files = readdirSync(join(root, "credentials"));
     expect(files).toHaveLength(1);
     expect(files[0]).not.toBe(first);
-    await service.execute({ type: "remove", kind: "provider", id: providerId});
+    await service.execute({ type: "remove", kind: "modelProvider", id: providerId});
     expect(readdirSync(join(root, "credentials"))).toEqual([]);
   });
   it("无鉴权配置忽略替换密钥意图并移除旧凭据", async () => {
     const { service, root, protector } = setup();
     const { providerId } = await addModel(service, "api_key");
     protector.encrypt.mockClear();
-    const result = await service.execute({ type: "provider.save", id: providerId, value: providerValue, credential: { action: "replace", value: "must-not-be-stored" } });
-    expect(result.snapshot.providers[0]?.credentialState).toBe("not_required");
+    const result = await service.execute({ type: "modelProvider.save", id: providerId, value: providerValue, credential: { action: "replace", value: "must-not-be-stored" } });
+    expect(result.snapshot.modelProviders[0]?.credentialState).toBe("not_required");
     expect(protector.encrypt).not.toHaveBeenCalled();
     expect(readdirSync(join(root, "credentials"))).toEqual([]);
   });
@@ -466,10 +497,10 @@ describe("真实配置与消费边界", () => {
     rmSync(path);
     mkdirSync(path);
     try {
-      await expect(service.execute({ type: "provider.save", id: providerId,
+      await expect(service.execute({ type: "modelProvider.save", id: providerId,
         value: { ...providerValue, name: "Must not commit", auth: "api_key" },
         credential: { action: "replace", value: "replacement-test-key" } })).rejects.toThrow();
-      expect((await service.execute({ type: "read" })).snapshot.providers).toEqual(before.providers);
+      expect((await service.execute({ type: "read" })).snapshot.modelProviders).toEqual(before.modelProviders);
       expect(readdirSync(join(root, "credentials"))).toEqual(credentials);
       expect(readdirSync(root).some(file => file.endsWith(".tmp"))).toBe(false);
     } finally {
@@ -479,7 +510,7 @@ describe("真实配置与消费边界", () => {
     service.close();
     const reopened = new ConfigurationService(root, { available: async () => false, encrypt: async () => "", decrypt: async () => "" });
     try {
-      expect((await reopened.execute({ type: "read" })).snapshot.providers[0]).toMatchObject({ id: providerId, name: "Local" });
+      expect((await reopened.execute({ type: "read" })).snapshot.modelProviders[0]).toMatchObject({ id: providerId, name: "Local" });
     } finally { reopened.close(); }
   });
   it.each(["无效 JSON", "不支持的版本", "缺失配置类别", "身份重复"])("%s 不触发重置或覆盖原配置", scenario => {

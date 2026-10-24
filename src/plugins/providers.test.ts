@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { pluginNamespace, type UsageItem, type ModelEvent } from "@atelier/sdk/contracts";
 import { definePlugin, defineModule, type PluginContext, type PluginDefinition, type UsageQueryContext } from "@atelier/sdk/runtime";
 import { ApplicationService } from "../runtime/service.ts";
-import { providerPresetDraft } from "../shared/provider-presets.ts";
+import { modelProviderPresetDraft } from "../shared/provider-presets.ts";
 import { createModelInput } from "../shared/configuration.ts";
 import { createModelServices } from "./models.ts";
 import { ReadUsage } from "../../packages/builtin/src/usage/contract.ts";
@@ -32,7 +32,7 @@ const items: UsageItem[] = [
 const value = { id: "my-glm", name: "My GLM", protocol: "openai-chat" as const, auth: "api_key" as const,
   baseUrl: "https://example.test/v1", enabled: true, compatibility: [], usage: "test-usage" };
 const save = (service: ApplicationService, id: string | null = null, name = "My GLM") => service.configuration.execute({
-  type: "provider.save", id, value: { ...value, name }, credential: { action: "replace", value: "private-test-key" },
+  type: "modelProvider.save", id, value: { ...value, name }, credential: { action: "replace", value: "private-test-key" },
 });
 const read = (plugin: PluginContext, refresh = false) => plugin.ipc.calls.invoke(ReadUsage, { providerId: value.id, refresh }, {});
 
@@ -40,7 +40,7 @@ describe("插件提供预设与账户用量", () => {
   // 模型只交付公共响应元信息，调用插件自行选择消费；正文与 token usage 保持独立。
   it("调用插件取得响应头并显式消费，模型服务不自动更新其他消费者", async () => {
     const { service, observer } = open([]);
-    await service.configuration.execute({ type: "provider.save", id: null, value: { ...value, auth: "none", usage: "openai" }, credential: { action: "keep" } });
+    await service.configuration.execute({ type: "modelProvider.save", id: null, value: { ...value, auth: "none", usage: "openai" }, credential: { action: "keep" } });
     const model = createModelInput(value.id, { name: "Test", modelId: "test" });
     model.capabilities.reasoning = false; model.capabilities.tools = false;
     await service.configuration.execute({ type: "model.save", id: null, value: model });
@@ -54,7 +54,7 @@ describe("插件提供预设与账户用量", () => {
       headers: { "content-type": "text/event-stream", "x-ratelimit-limit-tokens": "100", "x-ratelimit-remaining-tokens": "40" },
     }));
     vi.stubGlobal("fetch", transport);
-    const usage = new UsageConsumer(observer.providers, observer.usages);
+    const usage = new UsageConsumer(observer.modelProviders, observer.usageProviders);
     cleanups.push(async () => usage.close());
     const events: ModelEvent[] = [];
     for await (const event of createModelServices(service.configuration).stream({
@@ -79,7 +79,7 @@ describe("插件提供预设与账户用量", () => {
     const { service } = open([
       definePlugin({ namespace: pluginNamespace("test.producer"), version: "1", dependencies: ["atelier.builtin"], setup: () => ({
         usageProviders: [{ id: "test-usage", label: "Test", query }],
-        providerPresets: [
+        modelProviderPresets: [
           { type: "patch", id: "zai-plan-cn", patch: { connection: { usage: "test-usage" } } },
           { type: "add", preset: { id: "custom-plan", name: "Custom plan", billing: "subscription", connection: {
             protocol: "openai-chat", baseUrl: "https://example.test/v1", auth: "api_key", compatibility: [], usage: "test-usage",
@@ -89,18 +89,18 @@ describe("插件提供预设与账户用量", () => {
       definePlugin({ namespace: pluginNamespace("test.consumer"), version: "1", setup(context) { consumer = context; return {}; } }),
     ]);
     const snapshot = service.configuration.current();
-    expect(snapshot.providerPresets?.find(preset => preset.id === "zai-plan-cn")?.connection.usage).toBe("test-usage");
-    expect(snapshot.providerPresets?.some(preset => preset.id === "custom-plan")).toBe(true);
-    expect(consumer.usages.list().map(provider => provider.id)).toEqual(expect.arrayContaining(["zai-plan-cn", "test-usage"]));
-    const preset = consumer.providers.presets().find(preset => preset.id === "zai-plan-cn")!;
-    const draft = providerPresetDraft(preset);
+    expect(snapshot.modelProviderPresets?.find(preset => preset.id === "zai-plan-cn")?.connection.usage).toBe("test-usage");
+    expect(snapshot.modelProviderPresets?.some(preset => preset.id === "custom-plan")).toBe(true);
+    expect(consumer.usageProviders.list().map(provider => provider.id)).toEqual(expect.arrayContaining(["zai-plan-cn", "test-usage"]));
+    const preset = consumer.modelProviders.presets().find(preset => preset.id === "zai-plan-cn")!;
+    const draft = modelProviderPresetDraft(preset);
     expect(draft.usage).toBe("test-usage");
     await save(service);
-    const connection = consumer.providers.get(value.id)!;
-    expect(consumer.providers.list()).toContainEqual(connection);
-    const provider = consumer.usages.get(connection.usage!)!;
+    const connection = consumer.modelProviders.get(value.id)!;
+    expect(consumer.modelProviders.list()).toContainEqual(connection);
+    const provider = consumer.usageProviders.get(connection.usage!)!;
     if (provider.source === "headers") throw new Error("Expected query provider");
-    const credential = await consumer.providers.credential(connection.id);
+    const credential = await consumer.modelProviders.credential(connection.id);
     expect(await provider.query({ connection: { id: connection.id, endpoint: connection.baseUrl }, credential, signal: new AbortController().signal })).toEqual(items);
     const [runtime, desktop] = await Promise.all([read(consumer), read(consumer)]);
     expect(runtime.items).toEqual(items);
@@ -108,20 +108,20 @@ describe("插件提供预设与账户用量", () => {
     expect(query).toHaveBeenCalledTimes(2);
     expect(query.mock.calls[0]![0]).toMatchObject({ connection: { id: value.id, endpoint: value.baseUrl }, credential: "private-test-key" });
     expect(JSON.stringify(desktop)).not.toContain("private-test-key");
-    expect(consumer.providers.presets().find(preset => preset.id === "zai-plan-cn")?.connection.usage).toBe("test-usage");
+    expect(consumer.modelProviders.presets().find(preset => preset.id === "zai-plan-cn")?.connection.usage).toBe("test-usage");
   });
 
   // 注册后 setup 失败必须撤销同插件全部贡献；不能留下幽灵提供方或预设覆盖。
   it("失败插件的新增和覆盖全部撤回，重复查询 ID 不能替换已有实现", () => {
     const { service } = open([definePlugin({ namespace: pluginNamespace("test.failed"), version: "1", dependencies: ["atelier.builtin"],
       setup: () => ({ usageProviders: [{ id: "temporary", label: "Temporary", query: async () => [] }],
-        providerPresets: [{ type: "patch", id: "zai-plan-cn", patch: { connection: { usage: "temporary" } } }] }),
+        modelProviderPresets: [{ type: "patch", id: "zai-plan-cn", patch: { connection: { usage: "temporary" } } }] }),
       modules: [defineModule(() => { throw new Error("setup failed"); })],
     }), definePlugin({ namespace: pluginNamespace("test.duplicate"), version: "1", setup: () => ({
       usageProviders: [{ id: "zai-plan-cn", label: "Duplicate", query: async () => [] }],
     }) })]);
     expect(service.sessions.plugins.filter(plugin => ["test.failed", "test.duplicate"].includes(plugin.id)).map(plugin => plugin.status)).toEqual(["failed", "failed"]);
-    expect(service.configuration.current().providerPresets?.find(preset => preset.id === "zai-plan-cn")?.connection.usage).toBe("zai-plan-cn");
+    expect(service.configuration.current().modelProviderPresets?.find(preset => preset.id === "zai-plan-cn")?.connection.usage).toBe("zai-plan-cn");
     expect(service.configuration.current().usageProviders?.map(provider => provider.id)).not.toContain("temporary");
     expect(service.configuration.current().usageProviders?.filter(provider => provider.id === "zai-plan-cn")).toHaveLength(1);
   });
@@ -138,7 +138,7 @@ describe("插件提供预设与账户用量", () => {
       return { usageProviders: [{ id: "test-usage", label: "Wait", async query(context) { signal = context.signal; started(); await held; order.push("query"); return items; } }] };
     } })]);
     await save(service);
-    const provider = observer.usages.get("test-usage")!;
+    const provider = observer.usageProviders.get("test-usage")!;
     if (provider.source === "headers") throw new Error("Expected query provider");
     const pending = provider.query({ connection: { id: value.id, endpoint: value.baseUrl }, credential: null, signal: new AbortController().signal });
     const settled = pending.catch(() => {});

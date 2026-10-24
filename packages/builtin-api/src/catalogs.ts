@@ -5,7 +5,7 @@ import { builtin } from "./identity.ts";
 
 /** 应用投影给内置插件的目录；不包含配置文件格式、凭据、连接测试或覆盖编辑状态。 */
 export const AgentConfigurations = builtin.data("agent.configurations", z.array(agentSchema));
-const providerSchema = z.object({ id: z.string(), name: z.string(), enabled: z.boolean() });
+const modelProviderSchema = z.object({ id: z.string(), name: z.string(), enabled: z.boolean() });
 const modelSchema = z.object({
   providerId: z.string(), modelId: z.string(), name: z.string(), enabled: z.boolean(),
   contextWindow: z.number().nullable(), cost: modelCostSchema.nullable(),
@@ -14,14 +14,14 @@ const modelSchema = z.object({
 });
 const roleSchema = z.object({ id: z.string(), enabled: z.boolean(), model: z.string().nullable(), thinking: thinkingSchema.nullable() });
 export const ModelConfiguration = builtin.data("model.configuration", z.object({
-  providers: z.array(providerSchema), models: z.array(modelSchema), roles: z.array(roleSchema), agents: z.array(agentSchema),
+  modelProviders: z.array(modelProviderSchema), models: z.array(modelSchema), roles: z.array(roleSchema), agents: z.array(agentSchema),
 }));
 export type ModelConfigurationSnapshot = z.infer<typeof ModelConfiguration.schema>;
 export type CatalogModel = z.infer<typeof modelSchema>;
 
 export function resolveCatalogModel<M extends CatalogModel>(snapshot: Omit<ModelConfigurationSnapshot, "models"> & { models: M[] }, reference: string | null): M | null {
   return snapshot.models.find(model => model.enabled && modelReference(model) === reference
-    && snapshot.providers.some(provider => provider.id === model.providerId && provider.enabled)) ?? null;
+    && snapshot.modelProviders.some(provider => provider.id === model.providerId && provider.enabled)) ?? null;
 }
 export function resolveAgentModel<M extends CatalogModel>(snapshot: Omit<ModelConfigurationSnapshot, "models"> & { models: M[] }, selection: { agent: string | null; model: string | null }): M | null {
   return resolveAgentModelSelection(snapshot, { ...selection, thinking: null }).model;

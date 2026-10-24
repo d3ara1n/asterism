@@ -60,6 +60,7 @@
 | `docs/session-naming.md` | 修改标题逻辑：两级自动命名、`SessionNamed` 事件、游标标题同步与人工重命名 |
 | `docs/context-compression.md` | 修改长对话压缩：上下文压缩预算、保留边界、独立摘要提示与历史投影 |
 | `docs/mcp.md` | 修改 MCP Host 资源、服务器配置与认证、eager/lazy 连接、工具缓存及 MCP 发现与调用 |
+| `docs/web.md` | 修改 WebResource、网络提供方类型与连接、URL 分派、Exa 适配及统一搜索／获取结果 |
 
 ### 3. 决策归档、路线与调研（非当前契约真值）
 

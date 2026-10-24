@@ -57,7 +57,7 @@ Atelier 分为**应用组合层**、**通用宿主机制**与**插件**三层：
 
 | 路径 | 内容 | 管理方 |
 | --- | --- | --- |
-| `configuration.json` | 全局提供商、具体模型、模型角色与代理配置（角色与代理只存用户覆盖），原子临时文件重命名保存 | 运行时配置模块 |
+| `configuration.json` | 模型提供商与网络提供商连接、具体模型、模型角色与代理配置（角色与代理只存用户覆盖），原子临时文件重命名保存 | 运行时配置模块 |
 | `appearance.json` | 外观主题与过程视图自动开合偏好 | 主进程，`electron-store` |
 | `language.json` | 界面语言偏好 `preference`（`system` 或 BCP47 标签） | 主进程，`electron-store` |
 | `ui-state.json` | 窗口位置/尺寸与受控 `preferences` 容器（`creation-route/` 路由记忆与 `plugin/<pluginId>/` 插件偏好） | 主进程，`electron-store` |
@@ -103,7 +103,7 @@ renderer 与任务进程经一对 `MessagePort` 直连（`src/shared/connection.
 - **应用列表（`src/shared/contracts.ts`）**：提供工作区身份、会话列表摘要与启动时装载的插件静态翻译目录，不持有已打开会话的正文。
 - **桌面窗口（`window.host.window`，`src/shared/desktop.ts`）**：由主进程提供只读窗口状态及变更订阅，不进入任务运行时；布局规则见 [原生窗口与 Web 内容](design-system.md#原生窗口与-web-内容)。
 - **本机文件打开（`core:open-local-file`）**：受信主 frame 通过 preload 提交绝对路径，主进程调用系统关联应用打开并返回错误文字；不读取文件内容、不进入任务运行时。内置插件前端通过应用组合注入的方法消费，网页链接继续只接受 HTTP(S)。
-- **全局配置（`src/shared/configuration.ts`）** 与 **插件配置**：分别管理提供商／角色／代理配置（含插件提供的预设与用量目录、模型发现、参数获取与异步连接测试）及插件 `.atelier/config.json`；读写不触发工作台重载。用量结果由消费插件通过具型调用和事件交付自己的界面；后台目录及凭据边界见 [插件 SDK](plugin-sdk.md#提供商与用量目录api-100)。
+- **全局配置（`src/shared/configuration.ts`）** 与 **插件配置**：分别管理模型提供商／网络提供商／角色／代理配置（含插件提供的预设与用量目录、模型发现、参数获取与异步连接测试）及插件 `.atelier/config.json`；读写不触发工作台重载。用量结果由消费插件通过具型调用和事件交付自己的界面；后台目录及凭据边界见 [插件 SDK](plugin-sdk.md#提供商与用量目录api-100)。
 - **插件调用（`src/shared/plugin-calls.ts`）**：独立传递具型请求、结果与取消；不占用会话命令队列。业务契约与生命周期见 [具型插件调用](plugin-sdk.md#具型插件调用)。
 - **对象通道**：按对象打开的双工消息流，宿主校验对象位于当前路径并路由到所属插件；接口见 [对象级双工通道](plugin-sdk.md#对象级双工通道api-150)。
 - **会话（`src/shared/session.ts` / `workbench.ts`）**：统一处理会话生命周期、资源创建与动作、工作台关系与视图布局：

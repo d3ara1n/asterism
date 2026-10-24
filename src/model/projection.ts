@@ -1,12 +1,12 @@
 import { createHash } from "node:crypto";
 import type { ModelPart } from "@atelier/sdk/contracts";
-import type { ProviderInput, ProviderModel } from "../shared/configuration.ts";
+import type { ModelProviderInput, ProviderModel } from "../shared/configuration.ts";
 import { mergeModelCompatibility } from "../shared/model-compatibility.ts";
 import { ModelFailure, type ModelInput, type ModelValidationInput, type ResolvedModelItem } from "./contract.ts";
 import { canReuseContinuation, continuationForTarget } from "./continuation.ts";
 
 export function compatibilityForTarget(settings: {
-  provider: Pick<ProviderInput, "protocol" | "compatibility">; model: Pick<ProviderModel, "compatibility">;
+  provider: Pick<ModelProviderInput, "protocol" | "compatibility">; model: Pick<ProviderModel, "compatibility">;
 }) {
   const entries = mergeModelCompatibility(settings.provider.compatibility, settings.model.compatibility);
   const has = (id: string) => entries.some(entry => entry.id === id);

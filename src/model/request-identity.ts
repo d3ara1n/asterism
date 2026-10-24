@@ -1,10 +1,10 @@
 import { randomUUID } from "node:crypto";
 import type { ModelRequestIdentity } from "@atelier/sdk/contracts";
 import { mergeModelCompatibility } from "../shared/model-compatibility.ts";
-import type { ProviderInput, ProviderModel } from "../shared/configuration.ts";
+import type { ModelProviderInput, ProviderModel } from "../shared/configuration.ts";
 import { ModelFailure } from "./contract.ts";
 
-type Target = { provider: Pick<ProviderInput, "compatibility">; model: Pick<ProviderModel, "compatibility"> };
+type Target = { provider: Pick<ModelProviderInput, "compatibility">; model: Pick<ProviderModel, "compatibility"> };
 
 /** 先合并显式覆盖，再检查最终发送值；不根据端点或模型名称启用行为。 */
 function requestIdentity(target: Target, identity: ModelRequestIdentity) {

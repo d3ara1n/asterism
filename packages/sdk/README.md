@@ -4,7 +4,7 @@
 
 SDK 包版本见 [package.json](package.json)，宿主 API 版本见 [`sdkApi`](../../src/plugins/packages.ts)。内置插件领域契约独立在 [`@atelier/builtin-api`](../builtin-api/README.md)，不进入通用 SDK。
 
-当前宿主 API 为 **17.0**，插件声明 `{ "major": 17, "minMinor": 0 }`，依赖 `@atelier/sdk: ^0.41.0`。后台通过 `session.invoke` 调用资源动作；清理登记到 `plugin.lifetime` 与资源 `attach` 的对象生命周期；前端入口默认导出 `defineRendererPlugin(...)`，`prepare` 上下文提供 `events / calls / signal`，调用契约显式声明 `scope`。
+当前宿主 API 为 **18.0**，插件声明 `{ "major": 18, "minMinor": 0 }`，依赖 `@atelier/sdk: ^0.42.0`。后台通过 `session.invoke` 调用资源动作；清理登记到 `plugin.lifetime` 与资源 `attach` 的对象生命周期；前端入口默认导出 `defineRendererPlugin(...)`，`prepare` 上下文提供 `events / calls / signal`，调用契约显式声明 `scope`。
 
 ## 子路径入口
 
@@ -66,7 +66,7 @@ export default definePlugin({
   "exports": { "./public": "./src/public.ts" },
   "atelier": {
     "id": "example.tools",
-    "api": { "major": 17, "minMinor": 0 },
+    "api": { "major": 18, "minMinor": 0 },
     "runtime": "./src/runtime.ts"
   }
 }
@@ -116,12 +116,12 @@ export default definePlugin({
 
 ### 7. 提供商与用量目录（API 10.0）
 
-`contracts` 导出 `ProviderPreset`、`ProviderPresetContribution`、`UsageItem` 及对应 schema；`runtime` 导出 `UsageProvider`（`QueryUsageProvider | HeadersUsageProvider`）、对应上下文、`UsageQueryError`、`ProviderServices`、`UsageServices`。通过 `ModuleContribution.usageProviders / providerPresets` 贡献实现和预设，编译示例见 [`examples/provider-usage.ts`](examples/provider-usage.ts)。
+`contracts` 导出 `ModelProviderPreset`、`ModelProviderPresetContribution`、`UsageItem` 及对应 schema；`runtime` 导出 `UsageProvider`（`QueryUsageProvider | HeadersUsageProvider`）、对应上下文、`UsageQueryError`、`ModelProviderServices`、`UsageProviderServices`。通过 `ModuleContribution.usageProviders / modelProviderPresets` 贡献实现和预设，编译示例见 [`examples/provider-usage.ts`](examples/provider-usage.ts)。
 
 修改其他插件预设时，通过公共包导入建立对提供方插件的依赖。例如依赖 `@atelier/builtin-api` 的插件可导入 `builtin`，在 `definePlugin` 中声明 `dependencies: [builtin.id]`，贡献：
 
 ```ts
-providerPresets: [{
+modelProviderPresets: [{
   type: "patch",
   id: "zai-plan-cn",
   patch: { connection: { usage: "my-glm-query" } },
@@ -133,11 +133,11 @@ providerPresets: [{
 后台消费者从目录显式组合调用：
 
 ```ts
-const connection = plugin.providers.get(connectionId);
-const usage = connection?.usage ? plugin.usages.get(connection.usage) : null;
+const connection = plugin.modelProviders.get(connectionId);
+const usage = connection?.usage ? plugin.usageProviders.get(connection.usage) : null;
 if (connection?.enabled && usage && usage.source !== "headers") {
-  const credential = await plugin.providers.credential(connection.id, { signal });
-  const items = await usage.query({
+  const credential = await plugin.modelProviders.credential(connection.id, { signal });
+  const items = await plugin.usages.query(usage.id, {
     connection: { id: connection.id, endpoint: connection.baseUrl },
     credential, signal,
   });
@@ -145,9 +145,9 @@ if (connection?.enabled && usage && usage.source !== "headers") {
 }
 ```
 
-`providers.list / presets`、`usages.list` 提供目录；两者的 `subscribe` 通知变更，关闭时自动清理。凭据仅经后台 `providers.credential` 显式读取；registry 不代选连接、缓存结果或轮询。消费者用自己的具型调用和事件向前端交付状态。内置实例见 `packages/builtin/src/providers/`（提供）和 `packages/builtin/src/usage/`（消费）。
+`modelProviders.list / presets`、`usageProviders.list` 提供目录；两者的 `subscribe` 通知变更，关闭时自动清理。凭据仅经后台 `modelProviders.credential` 显式读取；registry 不代选连接、缓存结果或轮询。消费者用自己的具型调用和事件向前端交付状态。内置实例见 `packages/builtin/src/providers/`（提供）和 `packages/builtin/src/usage/`（消费）。
 
-API 14.0 的 `providers.credential(id, { signal? })` 读取当前连接凭据；连接信息和模型响应的 `connection` 以 ID 标识，模型请求在开始时取用连接配置与凭据。消费规则见 [提供商与用量目录](../../docs/plugin-sdk.md#提供商与用量目录api-100)。
+API 14.0 的 `modelProviders.credential(id, { signal? })` 读取当前连接凭据；连接信息和模型响应的 `connection` 以 ID 标识，模型请求在开始时取用连接配置与凭据。消费规则见 [提供商与用量目录](../../docs/plugin-sdk.md#提供商与用量目录api-100)。
 
 响应头来源使用 `source: "headers"` 和同步 `parseHeaders`，参见 [`examples/provider-usage-headers.ts`](examples/provider-usage-headers.ts)。返回 null 表示本次没有新数据，返回空列表明确清空。来源不限制结果类型；示例通过响应头提供 balance，内置 OpenAI／Anthropic／xAI 提供 `category: "rate_limit"` 的 quota。query 提供方可省略 source。
 
@@ -156,3 +156,13 @@ API 14.0 的 `providers.credential(id, { signal? })` 读取当前连接凭据；
 仅列出连接的 dashboard 可以主动调用 query 来源；headers 来源需要模型调用结果，通常由 Agent 消费。目录提供解析实现，不提供其他插件的响应或缓存。
 
 使用类实现提供方时，分别声明 `implements QueryUsageProvider` 或 `implements HeadersUsageProvider`；`UsageProvider` 是两者的联合类型，不能直接用于类的 implements。
+
+### 8. 网络提供方与 Web 服务（API 18.0）
+
+- `ModuleContribution.webProviders` 贡献 `WebProviderDefinition`，包括身份、能力、URL patterns、设置 schema、默认连接值与同步实例工厂。
+- `plugin.webProviders.types / list / get` 分别读取类型与连接；`resolve(id, { signal })` 取得保持本次配置与凭据的 `WebProviderInstance`；`subscribe` 观察目录或连接变化。
+- `plugin.web.search(request, { provider, signal })` 使用指定连接；`plugin.web.fetch(request, { signal })` 按连接与 patterns 的列表顺序分派。
+- `WebResponse` 的公共内容、`Presentation[]` 领域数据和 `hints` 共同组成结果；提供方通过 `present(DataContract, value)` 交付具型数据。Web 服务本身不缓存结果。
+- `plugin.usages.query(id, context) / parseHeaders(id, context)` 承担无状态用量调用，`plugin.usageProviders` 承担提供方目录；消费者负责自己的刷新与展示状态。
+
+完整契约见 [Web 资源](../../docs/web.md)，可编译的类型注册示例见 [`examples/web-provider.ts`](examples/web-provider.ts)。

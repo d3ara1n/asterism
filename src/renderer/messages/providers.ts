@@ -125,11 +125,11 @@ export const providersMessages = pluginNamespace("atelier.host").messages("en", 
   },
   provider: {
     id: "features_configuration_ProvidersSettings_22",
-    defaultMessage: "Provider",
+    defaultMessage: "Model provider",
   },
   connections: {
     id: "features_configuration_ProvidersSettings_23",
-    defaultMessage: "Connections",
+    defaultMessage: "Model providers",
   },
   summary: {
     id: "features_configuration_ProvidersSettings_24",
@@ -137,7 +137,7 @@ export const providersMessages = pluginNamespace("atelier.host").messages("en", 
   },
   addProvider: {
     id: "features_configuration_ProvidersSettings_25",
-    defaultMessage: "Add provider",
+    defaultMessage: "Add model provider",
   },
   emptyConnections: {
     id: "features_configuration_ProvidersSettings_26",
@@ -145,7 +145,7 @@ export const providersMessages = pluginNamespace("atelier.host").messages("en", 
   },
   addFirstProvider: {
     id: "features_configuration_ProvidersSettings_27",
-    defaultMessage: "Add provider",
+    defaultMessage: "Add model provider",
   },
   modelCount: {
     id: "features_configuration_ProvidersSettings_28",
@@ -164,11 +164,11 @@ export const providersMessages = pluginNamespace("atelier.host").messages("en", 
   noBilling: { id: "providerPreset.noBilling", defaultMessage: "No billing" },
   searchProviders: {
     id: "features_configuration_ProvidersSettings_34",
-    defaultMessage: "Search providers",
+    defaultMessage: "Search model providers",
   },
   searchProvidersLabel: {
     id: "features_configuration_ProvidersSettings_35",
-    defaultMessage: "Search providers",
+    defaultMessage: "Search model providers",
   },
   noMatchingProvider: {
     id: "features_configuration_ProvidersSettings_37",
@@ -184,7 +184,7 @@ export const providersMessages = pluginNamespace("atelier.host").messages("en", 
   },
   confirmAddProvider: {
     id: "features_configuration_ProvidersSettings_40",
-    defaultMessage: "Add provider",
+    defaultMessage: "Add model provider",
   },
   model: {
     id: "features_configuration_ProvidersSettings_41",
@@ -192,7 +192,7 @@ export const providersMessages = pluginNamespace("atelier.host").messages("en", 
   },
   newProvider: {
     id: "features_configuration_ProvidersSettings_42",
-    defaultMessage: "New provider",
+    defaultMessage: "New model provider",
   },
   deleteProviderTitle: {
     id: "features_configuration_ProvidersSettings_44",

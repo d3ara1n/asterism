@@ -100,7 +100,7 @@ export function AgentConfigurationPicker({ selection, disabled, onChange }: {
       ...levels.map(level => ({ value: level, label: i18n.text(thinkingLabels[level]) }))],
   };
   const selected = { agent: selection.agent, model: selection.model ?? FOLLOW, thinking: selection.thinking ?? FOLLOW };
-  const provider = configuration?.providers.find(item => item.id === providerId);
+  const provider = configuration?.modelProviders.find(item => item.id === providerId);
   const browsingModels = page === "model" && providerId !== null;
   function back() {
     direction.current = -1;

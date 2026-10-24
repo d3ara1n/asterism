@@ -55,7 +55,7 @@ export const settingsMessages = pluginNamespace("atelier.host").messages("en", d
   },
   providersSummary: {
     id: "features_settings_SettingsPage_4",
-    defaultMessage: "Connections and available models",
+    defaultMessage: "Model and web service connections",
   },
   rolesSummary: {
     id: "features_settings_SettingsPage_5",

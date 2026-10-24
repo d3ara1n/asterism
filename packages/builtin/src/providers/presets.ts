@@ -1,4 +1,4 @@
-import { defineMessages, type ProviderPreset, type ProviderConnection } from "@atelier/sdk/contracts";
+import { defineMessages, type ModelProviderPreset, type ModelProviderConnection } from "@atelier/sdk/contracts";
 import { builtin } from "@atelier/builtin-api/contracts";
 
 const presetMessages = builtin.messages("en", defineMessages({
@@ -8,15 +8,15 @@ const presetMessages = builtin.messages("en", defineMessages({
 }));
 
 /** 官方入口固定接入细节；编辑器只消费规则，不识别预设身份。 */
-const fixedFields: NonNullable<ProviderConnection["fixedFields"]> = ["protocol", "baseUrl", "auth", "compatibility", "usage"];
+const fixedFields: NonNullable<ModelProviderConnection["fixedFields"]> = ["protocol", "baseUrl", "auth", "compatibility", "usage"];
 
 /** 智谱与 Z.ai 采用同一 Responses 适配；地区只选择地址，计费产品保留独立凭据说明。 */
-const zaiResponses = (baseUrl: string): ProviderPreset["connection"] => ({
+const zaiResponses = (baseUrl: string): ModelProviderPreset["connection"] => ({
   protocol: "openai-responses", baseUrl, auth: "api_key", fixedFields,
   compatibility: [{ id: "responsesReasoning", value: { content: "object", encryptedContent: false, summary: false } }],
 });
 
-export const providerPresets: readonly ProviderPreset[] = [
+export const modelProviderPresets: readonly ModelProviderPreset[] = [
   {
     id: "openai", name: "OpenAI", billing: "usage",
     connection: { fixedFields, protocol: "openai-responses", baseUrl: "https://api.openai.com/v1", auth: "api_key", compatibility: [], usage: "openai" },

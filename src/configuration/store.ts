@@ -4,9 +4,9 @@ import { join } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import { z } from "zod";
 import { applicationStorage } from "../shared/application.ts";
-import { agentOverridesSchema, canEditProviderField, modelReference, modelRoleOverridesSchema, modelSchema, providerInputSchema,
-  type AgentOverrides, type ModelRoleOverrides, type ProviderInput, type ProviderModel } from "../shared/configuration.ts";
-import { modelCostSchema } from "@atelier/sdk/contracts";
+import { agentOverridesSchema, canEditModelProviderField, modelReference, modelRoleOverridesSchema, modelSchema, modelProviderInputSchema,
+  type AgentOverrides, type ModelRoleOverrides, type ModelProviderInput, type ProviderModel } from "../shared/configuration.ts";
+import { modelCostSchema, webProviderConnectionSchema, type WebProviderConnection } from "@atelier/sdk/contracts";
 import { configurationIdSchema } from "@atelier/builtin-api/contracts";
 import { defaultAgents, defaultRoles } from "./defaults.ts";
 import { ConfigurationError } from "./errors.ts";
@@ -15,18 +15,20 @@ import { migrateModelCost } from "./model-cost-migration.ts";
 import { providerEditingMessages } from "../shared/provider-editing-messages.ts";
 
 const identity = { id: configurationIdSchema };
-const storedProviderSchema = providerInputSchema.extend({ credentialRef: z.string().uuid().nullable() }).strip();
+const storedProviderSchema = modelProviderInputSchema.extend({ credentialRef: z.string().uuid().nullable() }).strip();
+const storedWebProviderSchema = webProviderConnectionSchema.extend({ credentialRef: z.string().uuid().nullable() });
 const storedRoleSchema = z.object({ ...identity, builtin: z.boolean(), overrides: modelRoleOverridesSchema });
 const storedAgentSchema = z.object({ ...identity, builtin: z.boolean(), overrides: agentOverridesSchema });
 const storedModelSchema = modelSchema.extend({ cost: z.preprocess(migrateModelCost, modelCostSchema.nullable().default(null)) }).strip();
 /** 模型以 `<providerId>/<modelId>` 识别，其余以 id 识别。 */
 const keyOf = (item: { id: string } | { providerId: string; modelId: string }): string => "id" in item ? item.id : modelReference(item);
 const documentSchema = z.strictObject({
-  version: z.literal(8),
-  providers: z.array(storedProviderSchema), models: z.array(storedModelSchema),
+  version: z.literal(9),
+  webProviders: z.array(storedWebProviderSchema),
+  modelProviders: z.array(storedProviderSchema), models: z.array(storedModelSchema),
   roles: z.array(storedRoleSchema), agents: z.array(storedAgentSchema),
 }).superRefine((document, context) => {
-  for (const key of ["providers", "models", "roles", "agents"] as const) {
+  for (const key of ["modelProviders", "webProviders", "models", "roles", "agents"] as const) {
     const ids = new Set<string>();
     document[key].forEach((item, index) => {
       const key_ = keyOf(item);
@@ -37,12 +39,13 @@ const documentSchema = z.strictObject({
 });
 
 type ConfigurationDocument = z.infer<typeof documentSchema>;
-export type StoredProvider = z.infer<typeof storedProviderSchema>;
-const collections = { provider: "providers", model: "models", role: "roles", agent: "agents" } as const;
+export type StoredModelProvider = z.infer<typeof storedProviderSchema>;
+const collections = { modelProvider: "modelProviders", webProvider: "webProviders", model: "models", role: "roles", agent: "agents" } as const;
 export type ConfigurationKind = keyof typeof collections;
 type Entry = { [K in ConfigurationKind]: ConfigurationDocument[(typeof collections)[K]][number] };
 type ConfigurationSave =
-  | { kind: "provider"; id: string | null; value: ProviderInput; credentialRef: string | null }
+  | { kind: "webProvider"; id: string | null; value: WebProviderConnection; credentialRef: string | null }
+  | { kind: "modelProvider"; id: string | null; value: ModelProviderInput; credentialRef: string | null }
   | { kind: "model"; id: string | null; value: ProviderModel }
   | { kind: "role"; id: string | null; value: ModelRoleOverrides & { id: string } }
   | { kind: "agent"; id: string | null; value: AgentOverrides & { id: string } };
@@ -79,7 +82,7 @@ export class ConfigurationStore {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw new ConfigurationError("unavailable", "The application configuration could not be read.");
       // 只有文件不存在才初始化；已有文件中的删除状态不会重新播种。
       this.document = {
-        version: 8, providers: [], models: [],
+        version: 9, modelProviders: [], webProviders: [], models: [],
         roles: defaultRoles.map(({ id, builtin }) => ({ id, builtin, overrides: {} })),
         agents: defaultAgents.map(({ id, builtin }) => ({ id, builtin, overrides: {} })),
       };
@@ -101,8 +104,9 @@ export class ConfigurationStore {
     const next = structuredClone(this.document);
     const { id } = input;
     switch (input.kind) {
-      case "provider":
-        upsert(next.providers, id, { ...input.value, credentialRef: input.credentialRef });
+      case "webProvider": upsert(next.webProviders, id, { ...input.value, credentialRef: input.credentialRef }); break;
+      case "modelProvider":
+        upsert(next.modelProviders, id, { ...input.value, credentialRef: input.credentialRef });
         // 提供商拥有其模型：改名时模型随之迁移；角色等引用不改写。
         if (id !== null && id !== input.value.id) for (const model of next.models) if (model.providerId === id) model.providerId = input.value.id;
         break;
@@ -121,8 +125,8 @@ export class ConfigurationStore {
   private validateEdit(input: ConfigurationSave): void {
     const reject = () => { throw new ConfigurationError("invalid_request",
       "Fixed connection settings cannot be changed.", providerEditingMessages.fixed); };
-    if (input.kind === "provider" && input.id !== null) {
-      const previous = this.get("provider", input.id);
+    if (input.kind === "modelProvider" && input.id !== null) {
+      const previous = this.get("modelProvider", input.id);
       if (!previous) return;
       const fixed = previous.fixedFields ?? [];
       const nextFixed = input.value.fixedFields ?? [];
@@ -130,8 +134,8 @@ export class ConfigurationStore {
       for (const field of fixed) if (!isDeepStrictEqual(previous[field], input.value[field])) reject();
     }
     if (input.kind === "model") {
-      const provider = this.get("provider", input.value.providerId);
-      if (!provider || canEditProviderField(provider, "compatibility")) return;
+      const provider = this.get("modelProvider", input.value.providerId);
+      if (!provider || canEditModelProviderField(provider, "compatibility")) return;
       const previous = input.id === null ? null : this.get("model", input.id);
       const compatibility = previous?.providerId === provider.id ? previous.compatibility : [];
       if (!isDeepStrictEqual(compatibility, input.value.compatibility)) reject();
@@ -144,7 +148,8 @@ export class ConfigurationStore {
     const next = structuredClone(this.document);
     // 提供商与它拥有的模型在同一次保存中删除，不修改角色或会话的选择。
     switch (kind) {
-      case "provider": next.providers = next.providers.filter(item => item.id !== id); next.models = next.models.filter(item => item.providerId !== id); break;
+      case "webProvider": next.webProviders = next.webProviders.filter(item => item.id !== id); break;
+      case "modelProvider": next.modelProviders = next.modelProviders.filter(item => item.id !== id); next.models = next.models.filter(item => item.providerId !== id); break;
       case "model": next.models = next.models.filter(item => modelReference(item) !== id); break;
       case "role": next.roles = next.roles.filter(item => item.id !== id); break;
       case "agent": next.agents = next.agents.filter(item => item.id !== id); break;
@@ -161,6 +166,15 @@ export class ConfigurationStore {
       existing.add(modelReference(model));
     }
     if (next.models.length !== this.document.models.length) this.commit(next);
+  }
+  moveWebProvider(id: string, direction: "up" | "down"): void {
+    const next = structuredClone(this.document);
+    const index = next.webProviders.findIndex(item => item.id === id);
+    if (index < 0) throw new ConfigurationError("not_found", "The web provider no longer exists.");
+    const target = index + (direction === "up" ? -1 : 1);
+    if (target < 0 || target >= next.webProviders.length) return;
+    [next.webProviders[index], next.webProviders[target]] = [next.webProviders[target]!, next.webProviders[index]!];
+    this.commit(next);
   }
   private commit(raw: ConfigurationDocument): void {
     let next: ConfigurationDocument;

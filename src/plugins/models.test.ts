@@ -10,9 +10,10 @@ import { resolveTarget } from "./models.ts";
 
 function configuration(): ConfigurationSnapshot {
   return {
+    webProviders: [], webProviderTypes: [],
     agents: defaultAgents.map(agent => ({ ...agent })),
     roles: defaultRoles.map(role => ({ ...role, model: "p/test", thinking: "high" })),
-    providers: [{ id: "p", name: "Test", protocol: "openai-responses", baseUrl: "https://example.invalid",
+    modelProviders: [{ id: "p", name: "Test", protocol: "openai-responses", baseUrl: "https://example.invalid",
       enabled: true, auth: "none", compatibility: [], credentialState: "not_required" }],
     models: [{ providerId: "p", name: "Test", modelId: "test", enabled: true, contextWindow: null, cost: null, compatibility: [],
       capabilities: { reasoning: true, tools: true, thinkingLevels: [...thinkingLevels] },
@@ -76,7 +77,7 @@ describe("模型选择的继承与末端校验", () => {
       expect(result.ok).toBe(true);
       if (!result.ok) throw new Error("Unexpected resolution failure");
       expect(resolveAgentModelSelection(ModelConfiguration.schema.parse(config), selection).thinking).toBe(result.thinking);
-      const input = { settings: { provider: config.providers[0]!, model: config.models[0]!, thinking: result.thinking },
+      const input = { settings: { provider: config.modelProviders[0]!, model: config.models[0]!, thinking: result.thinking },
         system: { blocks: [] }, messages: [], tools: [] };
       const adapter = new AiSdkAdapter(async () => { throw new Error("Validation must not read credentials"); });
       expect(() => adapter.validate(input)).toThrow(expect.objectContaining({ code: "thinking_unavailable" }));

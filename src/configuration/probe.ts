@@ -1,10 +1,10 @@
 import { APICallError, generateText } from "ai";
 import { createProviderModel, ProviderTransportError } from "../model/provider.ts";
 import { requestOptions } from "../model/request-options.ts";
-import type { Provider, ProviderModel, TestError } from "../shared/configuration.ts";
+import type { ModelProvider, ProviderModel, TestError } from "../shared/configuration.ts";
 import { applicationUserAgent } from "../shared/application.ts";
 
-export interface ProbeInput { provider: Provider; model: ProviderModel; apiKey: string; signal: AbortSignal }
+export interface ProbeInput { provider: ModelProvider; model: ProviderModel; apiKey: string; signal: AbortSignal }
 export type ConnectionProbe = (input: ProbeInput) => Promise<void>;
 
 /** 显式协议实例，不使用 Gateway 或环境变量中的模型/凭据。无鉴权连接删除鉴权头。 */

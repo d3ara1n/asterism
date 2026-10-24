@@ -1,6 +1,6 @@
 import { wrapLanguageModel, type LanguageModelMiddleware } from "ai";
 import type { ThinkingLevel } from "@atelier/sdk/contracts";
-import type { ProviderInput, ProviderModel } from "../shared/configuration.ts";
+import type { ModelProviderInput, ProviderModel } from "../shared/configuration.ts";
 import { mergeModelCompatibility, type CustomThinkingLevels, type CustomThinkingBudgets } from "../shared/model-compatibility.ts";
 import { ModelFailure } from "./contract.ts";
 
@@ -31,7 +31,7 @@ function setEffort(body: Body, field: "reasoning" | "output_config", effort: str
   else delete body[field];
 }
 
-function resolveEffort(protocol: ProviderInput["protocol"], level: ThinkingLevel, override: string | null | undefined) {
+function resolveEffort(protocol: ModelProviderInput["protocol"], level: ThinkingLevel, override: string | null | undefined) {
   if (override !== undefined) return override;
   if (level === "off") return "none";
   return protocol === "anthropic" && level === "minimal" ? "low" : level;
@@ -73,7 +73,7 @@ function encodeAnthropicThinking(body: Body, level: ThinkingLevel, maxOutputToke
  */
 export function withThinkingOptions(
   createModel: (transport: typeof fetch) => Model, transport: typeof fetch,
-  provider: Pick<ProviderInput, "protocol" | "compatibility">, model: Pick<ProviderModel, "compatibility">,
+  provider: Pick<ModelProviderInput, "protocol" | "compatibility">, model: Pick<ProviderModel, "compatibility">,
 ) {
   const entries = mergeModelCompatibility(provider.compatibility, model.compatibility);
   const levelsEntry = entries.find(entry => entry.id === "customThinkingLevels");

@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { DiscoveredModel, ModelDiscovery, Provider } from "../shared/configuration.ts";
+import type { DiscoveredModel, ModelDiscovery, ModelProvider } from "../shared/configuration.ts";
 import { validateProviderTransport, ProviderTransportError } from "../model/provider.ts";
 import { ConfigurationError } from "./errors.ts";
 import { parseModelListPage, type ModelListPage } from "./discovery-format.ts";
@@ -8,7 +8,7 @@ type DiscoveryError = NonNullable<ModelDiscovery["error"]>;
 export class ModelDiscoveryError extends Error {
   constructor(readonly code: DiscoveryError) { super(`Model discovery failed: ${code}.`); }
 }
-export interface DiscoveryInput { provider: Provider; apiKey: string; signal: AbortSignal }
+export interface DiscoveryInput { provider: ModelProvider; apiKey: string; signal: AbortSignal }
 export type DiscoverModels = (input: DiscoveryInput) => Promise<DiscoveredModel[]>;
 
 /** 保留连接路径与鉴权约定，目录响应格式由独立解析器识别。 */
@@ -60,7 +60,7 @@ export class ModelDiscoveries {
     if (!entry) throw new ConfigurationError("not_found", "The model list is no longer available. Fetch models again.");
     return structuredClone(entry.value);
   }
-  start(provider: Provider, credential: () => Promise<string>): string {
+  start(provider: ModelProvider, credential: () => Promise<string>): string {
     this.clearProvider(provider.id);
     const id = randomUUID();
     const controller = new AbortController();
@@ -74,7 +74,7 @@ export class ModelDiscoveries {
     void this.run(id, provider, credential, controller.signal);
     return id;
   }
-  private async run(id: string, provider: Provider, credential: () => Promise<string>, signal: AbortSignal): Promise<void> {
+  private async run(id: string, provider: ModelProvider, credential: () => Promise<string>, signal: AbortSignal): Promise<void> {
     let apiKey: string;
     try { apiKey = await credential(); }
     catch { this.finish(id, { state: "failed", error: "credential", models: [] }); return; }

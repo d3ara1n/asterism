@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { pluginNamespace, type ProviderPreset, type UsageItem } from "@atelier/sdk/contracts";
+import { pluginNamespace, type ModelProviderPreset, type UsageItem } from "@atelier/sdk/contracts";
 import { definePlugin, UsageQueryError, type UsageProvider } from "@atelier/sdk/runtime";
 
 const ns = pluginNamespace("example.allowance");
@@ -23,12 +23,12 @@ const usage: UsageProvider = {
     ] satisfies UsageItem[];
   },
 };
-const preset: ProviderPreset = {
+const preset: ModelProviderPreset = {
   id: "example-plan", name: "Example plan", billing: "subscription",
   connection: { protocol: "openai-responses", baseUrl: "https://example.invalid/v1", auth: "api_key", compatibility: [],
     usage: usage.id, fixedFields: ["protocol", "baseUrl", "auth", "compatibility", "usage"] },
   sources: ["https://example.invalid/docs"], verifiedOn: "2026-10-20",
 };
 export default definePlugin({ namespace: ns, version: "1.0.0", setup: () => ({
-  usageProviders: [usage], providerPresets: [{ type: "add", preset }],
+  usageProviders: [usage], modelProviderPresets: [{ type: "add", preset }],
 }) });

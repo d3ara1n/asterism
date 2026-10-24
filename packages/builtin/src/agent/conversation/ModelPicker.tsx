@@ -15,13 +15,13 @@ export function ProviderOptions({ configuration, follow, selected, initialActive
   onFollow(): void; onProvider(id: string): void;
 }) {
   const i18n = useI18n();
-  const providers = configuration?.providers.filter(provider => provider.enabled).flatMap(provider => {
+  const modelProviders = configuration?.modelProviders.filter(provider => provider.enabled).flatMap(provider => {
     const count = configuration.models.filter(model => model.enabled && model.providerId === provider.id).length;
     return count ? [{ value: `provider:${provider.id}`, label: provider.name, navigation: true,
       description: i18n.formatMessage(messages.modelCount, { count }), keywords: [provider.id] }] : [];
   }) ?? [];
-  const options = [follow, ...providers];
-  return <ConfigurationOptions label={i18n.text(messages.providers)} options={options} selected={selected}
+  const options = [follow, ...modelProviders];
+  return <ConfigurationOptions label={i18n.text(messages.modelProviders)} options={options} selected={selected}
     initialActive={options.some(option => option.value === initialActive) ? initialActive : follow.value}
     searchPlaceholder={i18n.text(messages.searchProviders)} disabled={disabled}
     onSelect={value => value === follow.value ? onFollow() : onProvider(value.slice("provider:".length))} />;
@@ -33,7 +33,7 @@ export function ProviderModels({ configuration, providerId, selected, effectiveM
   onSelect(value: string): void;
 }) {
   const i18n = useI18n();
-  const provider = configuration?.providers.find(item => item.id === providerId && item.enabled);
+  const provider = configuration?.modelProviders.find(item => item.id === providerId && item.enabled);
   const models = configuration && provider ? configuration.models.filter(model => model.enabled && model.providerId === providerId) : [];
   const [active, setActive] = useState(() => {
     const initial = models.find(model => modelReference(model) === selected)

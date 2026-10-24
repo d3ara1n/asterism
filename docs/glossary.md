@@ -30,6 +30,7 @@
 | 资源存在性 | resource presence | 资源在某会话当前路径上的存在；集合中的出现／消失决定后台对象生命周期，区别于历史动作与卡片显隐 |
 | 终端 | terminal | 用户与模型共用的交互 PTY、shell 和屏幕；资源只是入口，配置持久化，运行实例与缓冲属于本次应用运行，可关闭后重新开启 |
 | MCP 主机 | MCP Host resource | 访问内置 MCP 模块共享服务器集合的资源入口；不同对象共用配置、连接与工具目录，访问仍经资源链接授权 |
+| 网络检索 | Web resource / WebResource | 访问已配置网络提供方的资源入口，提供搜索与 URL 内容获取，见 `docs/web.md` |
 | MCP 连接模式 | MCP connection mode | 只决定连接时机：eager 在应用启动时连接并刷新目录，lazy 按需连接并在空闲 TTL 后关闭；两种模式都从持久缓存发现工具 |
 | 直连传输 | runtime connection | renderer 与任务进程间由主进程交接的 MessagePort；业务消息不经主进程转发 |
 | 对象通道 | object channel | 按对象打开的有序双工消息流，承载高频对象数据；对象离开当前集合或连接断开时结束 |
@@ -162,9 +163,13 @@
 
 | 中文 | 英文 | 含义 |
 | --- | --- | --- |
-| 提供商（提供方） | provider | 模型服务的接入方；不等同于协议类型，一家服务可以支持多种协议 |
-| 提供商连接 | provider connection | 应用级接入配置，关联具体协议、服务端点、模型列表与凭据引用；不构成任务资源授权 |
-| 提供商预设 | provider preset | 一次性生成普通连接值与编辑规则的组合模板；连接不持久化预设或提供商类型身份，见 `docs/model-configuration.md` |
+| 模型提供商 | model provider | 模型服务的接入方；不等同于协议类型，一家服务可以支持多种协议 |
+| 模型提供商连接 | model provider connection | 应用级模型接入配置，关联具体协议、服务端点、模型列表与凭据引用；不构成任务资源授权 |
+| 模型提供商预设 | model provider preset | 一次性生成普通模型连接值与编辑规则的组合模板；连接不持久化预设或提供商类型身份，见 `docs/model-configuration.md` |
+| 网络提供方（网络提供商） | web provider | 提供搜索或 URL 获取能力的服务接入方；公开契约见 `docs/web.md` |
+| 网络提供方类型 | web provider definition | 插件贡献的能力、URL patterns、配置 schema 与实例工厂 |
+| 网络提供方连接 | web provider connection | 用户配置的类型引用、端点、凭据与设置；列表顺序参与 URL 分派 |
+| 网络提供方实例 | web provider instance | 用连接与凭据解析出的可调用句柄，保持解析时取用的配置 |
 | 固定字段 | fixed fields | 连接自身保存的有限编辑规则 `fixedFields`；通用编辑器隐藏对应配置项，保存边界保留已固定值，不改变执行消费语义 |
 | 账户用量 | account usage | 提供商余额、套餐／密钥额度及响应头报告的限流余量快照；连接以 `usage` 选择提供方，区别于模型响应 token 用量及费用估算 |
 | 用量查询提供方 | usage provider | 插件按全局目录 ID 提供的主动查询或被动响应头解析；返回统一 `balance / quota` 结果，消费方不依赖具体厂商 |

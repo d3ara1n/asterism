@@ -1,20 +1,20 @@
 import { describe, expect, it, vi } from "vitest";
 import type { ModelResponse, UsageItem } from "@atelier/sdk/contracts";
-import { UsageQueryError, type ProviderInfo, type ProviderServices, type UsageProvider, type UsageServices } from "@atelier/sdk/runtime";
+import { UsageQueryError, type ModelProviderInfo, type ModelProviderServices, type UsageProvider, type UsageProviderServices } from "@atelier/sdk/runtime";
 import { waitForUsage, UsageConsumer } from "./service.ts";
 
 const items: UsageItem[] = [{ id: "quota", label: "Quota", scope: "connection", type: "quota", category: "rate_limit",
   value: { type: "ratio", remaining: 0.4 }, window: { mode: "unknown", durationMs: null, resetAt: null } }];
 function setup(provider: UsageProvider) {
-  let connection: ProviderInfo = { id: "p", name: "P", protocol: "openai-chat", baseUrl: "https://example.test/v1",
+  let connection: ModelProviderInfo = { id: "p", name: "P", protocol: "openai-chat", baseUrl: "https://example.test/v1",
     auth: "api_key", enabled: true, compatibility: [], usage: provider.id };
   const listeners = new Set<() => void>();
   const subscribe = (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener); }; };
   const credential = vi.fn(async () => "private-key");
-  const providers: ProviderServices = { list: () => [connection], get: () => connection, presets: () => [], credential, subscribe };
-  const usages: UsageServices = { list: () => [], get: () => provider, subscribe };
+  const modelProviders: ModelProviderServices = { list: () => [connection], get: () => connection, presets: () => [], credential, subscribe };
+  const usageProviders: UsageProviderServices = { list: () => [], get: () => provider, subscribe };
   const changed = vi.fn();
-  const usage = new UsageConsumer(providers, usages, changed);
+  const usage = new UsageConsumer(modelProviders, usageProviders, changed);
   return { usage, credential, changed, response: (): ModelResponse => ({ connection: { id: connection.id },
     endpoint: connection.baseUrl, model: "model", receivedAt: Date.now(), status: 429, headers: { quota: "yes" } }),
     change(next = provider) {
