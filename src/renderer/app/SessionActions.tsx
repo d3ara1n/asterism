@@ -1,7 +1,9 @@
-import { Archive, MoreHorizontal, Pencil } from "lucide-react";
+import { Archive, LayoutTemplate, MoreHorizontal, Pencil } from "lucide-react";
 import { useRef, useState } from "react";
 import type { SessionResult } from "../../shared/session";
 import { RenameSession } from "../features/session/RenameSession";
+import { SaveTemplate } from "../features/templates/SaveTemplate";
+import { templateMessages } from "../../shared/template-messages";
 import { useDisposalWarnings } from "../features/session/disposal";
 import { appMessages } from "../messages/app";
 import { useI18n } from "../shared/i18n";
@@ -11,15 +13,17 @@ import { Spinner } from "@atelier/ui/ui/spinner";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@atelier/ui/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@atelier/ui/ui/alert-dialog";
 
-/** 会话行菜单：重命名与归档；操作独立于会话导航。 */
-export function SessionActions({ sessionId, title, disabled, renameDisabled, onRename, onArchive }: {
+/** 会话行菜单：重命名、保存模板与归档；操作独立于会话导航。 */
+export function SessionActions({ sessionId, title, disabled, renameDisabled, onRename, onArchive, onTemplateSaved }: {
   sessionId: string; title: string; disabled: boolean; renameDisabled: boolean;
   onRename: (title: string) => Promise<SessionResult>;
   onArchive: () => Promise<SessionResult>;
+  onTemplateSaved: () => void;
 }) {
   const i18n = useI18n();
   const trigger = useRef<HTMLButtonElement>(null);
   const [renaming, setRenaming] = useState(false);
+  const [savingTemplate, setSavingTemplate] = useState(false);
   /** 归档总要二次确认；资源声明了结束提示时额外列出，内容与退出确认一致。 */
   const [confirming, setConfirming] = useState(false);
   const [archiving, setArchiving] = useState(false);
@@ -38,9 +42,12 @@ export function SessionActions({ sessionId, title, disabled, renameDisabled, onR
           <MoreHorizontal />
         </ListRowAction>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" onCloseAutoFocus={event => { if (renaming || confirming) event.preventDefault(); }}>
+      <DropdownMenuContent align="end" onCloseAutoFocus={event => { if (renaming || confirming || savingTemplate) event.preventDefault(); }}>
         <DropdownMenuItem disabled={cannotRename} onSelect={() => setRenaming(true)}>
           <Pencil />{i18n.text(appMessages.renameConversation)}…
+        </DropdownMenuItem>
+        <DropdownMenuItem disabled={disabled} onSelect={() => setSavingTemplate(true)}>
+          <LayoutTemplate />{i18n.text(templateMessages.saveAs)}…
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem variant="destructive" disabled={disabled || archiving} onSelect={() => setConfirming(true)}>
@@ -50,6 +57,8 @@ export function SessionActions({ sessionId, title, disabled, renameDisabled, onR
     </DropdownMenu>
     {renaming && <RenameSession title={title} disabled={cannotRename} onSave={onRename}
       onClose={() => setRenaming(false)} onRestoreFocus={() => trigger.current?.focus({ preventScroll: true })} />}
+    {savingTemplate && <SaveTemplate sessionId={sessionId} title={title} disabled={disabled} onSaved={onTemplateSaved}
+      onClose={() => setSavingTemplate(false)} onRestoreFocus={() => trigger.current?.focus({ preventScroll: true })} />}
     <AlertDialog open={confirming} onOpenChange={open => { if (!open && !archiving) { setConfirming(false); trigger.current?.focus({ preventScroll: true }); } }}>
       <AlertDialogContent>
         <AlertDialogHeader>

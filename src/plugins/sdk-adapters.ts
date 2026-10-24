@@ -41,6 +41,10 @@ export function adaptResource(contribution: ResourceContribution, sdk: SdkContex
   };
   return {
     kind: resource.kind,
+    validateState(data) {
+      if (!resource.stateSchema.safeParse(data).success)
+        throw new SessionError("invalid_request", "Saved resource state does not match its schema.");
+    },
     receivesLinks: contribution.links?.receive === true,
     project: object => {
       const captured = snapshot(host, object);

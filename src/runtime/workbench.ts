@@ -6,7 +6,7 @@ import { SessionError, type SessionTree } from "../session/tree.ts";
 import type { Json } from "@atelier/sdk/contracts";
 
 import { type WorkbenchCommand, type WorkbenchSnapshot, type Point, type Viewport } from "../shared/workbench.ts";
-import type { ContentStore, ContentLease } from "./content-store.ts";
+import type { ContentStore, ContentLease, ContentAccess } from "./content-store.ts";
 import { defaultCardPosition, fallbackCardWidth, fallbackCardHeight } from "../shared/workbench-layout.ts";
 import { placeObject } from "../shared/workbench-placement.ts";
 
@@ -30,8 +30,15 @@ export class SessionWorkbench {
     const controller = this.resources.controller(kind);
     if (!controller?.create) throw new SessionError("invalid_request", "This resource type cannot be created here.");
     const { title, data } = controller.create(sessionId, id, input, content);
+    return this.insert(sessionId, { id, kind, title, data: data ?? {} }, position, { scope: content });
+  }
+
+  /** 将已初始化的对象数据建立为新身份；普通创建与模板实例化共用历史和内容登记。 */
+  insert(sessionId: string, object: { id: string; kind: string; title: string; data: Record<string, Json> },
+    position: Point, access: Pick<ContentAccess, "scope" | "templateId"> = {}): string {
+    const { id, kind, title, data } = object;
     const node = this.tree.appendToTimeline(sessionId, { source: host, recipient: null, contract: "resource_created", data: { ...data, id, type: kind, title }, model: null });
-    this.content?.bind({ sessionId, objectId: id, scope: content }, { kind: "record", id: node.id }, data ?? {});
+    this.content?.bind({ sessionId, objectId: id, ...access }, { kind: "record", id: node.id }, data);
     this.addView(sessionId, id, position);
     return id;
   }

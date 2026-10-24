@@ -45,14 +45,14 @@ export interface WorkbenchHandle {
 
 type DropHandlers = { canDrop(kinds: readonly DragKind[]): boolean; onDropItems(items: readonly DropItem[], origin: Point): void };
 type Props = WorkbenchEnvironment & DropHandlers & {
-  ref?: Ref<WorkbenchHandle>; onHome(): void;
+  ref?: Ref<WorkbenchHandle>; onHome(): void; overview?: boolean;
   /** 应用持有的环境出口：更深浮岛与聚焦浮岛在工作台子树之外经它取得同一份环境。 */ store: WorkbenchStore;
 };
 type Run = (command: WorkbenchOperation) => Promise<boolean>;
 type WorkbenchEdge = Edge<ConnectionEdge["data"]>;
 
 /** 工作台根浮岛：投影平级对象和关系；代理对话只是代理对象的卡片内容。 */
-export function Workbench({ ref, controller, session, ready, run, onHome, store, canDrop, onDropItems }: Props) {
+export function Workbench({ ref, controller, session, ready, run, onHome, store, canDrop, onDropItems, overview }: Props) {
   const i18n = useI18n();
   const canvasRef = useRef<WorkbenchCanvas>(null);
   const canvas = useMemo<WorkbenchCanvas>(() => ({
@@ -82,7 +82,7 @@ export function Workbench({ ref, controller, session, ready, run, onHome, store,
 
   return <RendererNavigationProvider value={{ home: onHome }}><RendererCatalogProvider ready={ready}><WorkbenchContext.Provider value={context}>
     <div className="relative h-full">
-      <ReactFlowProvider><Canvas ref={canvasRef} session={session} run={run} writable={ready} canDrop={canDrop} onDropItems={onDropItems} /></ReactFlowProvider>
+      <ReactFlowProvider><Canvas ref={canvasRef} session={session} run={run} writable={ready} canDrop={canDrop} onDropItems={onDropItems} overview={overview} /></ReactFlowProvider>
       {session.objects.length === 0 && <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
         <p className="type-caption">{i18n.formatMessage(workbenchMessages.emptyHint)}</p>
       </div>}
@@ -90,8 +90,8 @@ export function Workbench({ ref, controller, session, ready, run, onHome, store,
   </WorkbenchContext.Provider></RendererCatalogProvider></RendererNavigationProvider>;
 }
 
-function Canvas({ ref, session, run, writable, canDrop, onDropItems }: DropHandlers & {
-  ref?: Ref<WorkbenchCanvas>; session: WorkbenchSnapshot; run: Run; writable: boolean;
+function Canvas({ ref, session, run, writable, canDrop, onDropItems, overview }: DropHandlers & {
+  ref?: Ref<WorkbenchCanvas>; session: WorkbenchSnapshot; run: Run; writable: boolean; overview?: boolean;
 }) {
   const i18n = useI18n();
   const flow = useReactFlow();
@@ -127,6 +127,14 @@ function Canvas({ ref, session, run, writable, canDrop, onDropItems }: DropHandl
     setNodes(previous => toNodes(session, previous));
   }, [session, toNodes]);
   const { api: canvas, minZoom } = useWorkbenchCanvas(nodes, setNodes, viewportElement);
+  // 模板进入时定位初始可见对象，视口按当前窗口计算并由公共定位入口保存。
+  const [initialObjects, setInitialObjects] = useState(() => overview ? nodes.filter(node => !node.hidden).map(node => node.id) : []);
+  useEffect(() => {
+    if (writable && initialObjects.length) {
+      void canvas.locateObjects(initialObjects);
+      setInitialObjects([]);
+    }
+  }, [canvas, writable, initialObjects]);
   useImperativeHandle(ref, () => canvas, [canvas]);
   const connections = useMemo(() => layoutConnections(nodes, session.links), [nodes, session.links]);
   // 端点未变时沿用上一份 data，拖动一张卡片不让其余卡片的内容逐帧重渲染。

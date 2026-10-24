@@ -34,7 +34,7 @@ const pageVariants = {
   exit: (dir: number) => ({
     opacity: 0, x: dir * -SLIDE_X,
     transition: { type: "tween", duration: 0.1, ease: [0.4, 0, 1, 1] },
-  }),
+  } as const),
 } as const;
 
 const reducedPageVariants = {

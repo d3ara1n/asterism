@@ -15,6 +15,7 @@
 | `app/SessionActions.tsx` / `features/session/RenameSession.tsx` | 会话行 more 菜单与人工重命名对话框 |
 | `app/ErrorBoundary.tsx` | 渲染异常后的重新加载入口 |
 | `features/home/HomePage.tsx` | 首页草稿、agent/模型/思考选择及首次发送 |
+| `features/templates/` | 会话保存模板对话框、首页模板卡片、资源信息浮层与模板删除 |
 | `features/workbench/Workbench.tsx` / `WorkbenchSurface.tsx` / `context.ts` | 对象与关系到 React Flow 画布的投影、过渡底板与视图保存；应用持有的工作台环境出口（`WorkbenchStore`）与按会话绑定的 `WorkbenchScope` |
 | `features/workbench/feedback.ts` / `WorkbenchFeedback.tsx` | 独立于操作门禁的状态分类、延迟同步提示、读取异常与恢复入口；应用层协调通知去重 |
 | `features/workbench/canvas.ts` / `viewport.ts` / `placement.ts` | `WorkbenchCanvas` 接口（`findPlacement` 最近空位、`locateObjects` 对象定位、动态缩放下限与视口保存）；空位算法与布局常量从 `shared/workbench-placement.ts`、`shared/workbench-layout.ts` 复用 |

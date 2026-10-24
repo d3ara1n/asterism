@@ -4,7 +4,7 @@ import { ApplicationController } from "./controller.ts";
 import { ResourceStatusChanged, ResourcePresenceChanged, type EventHandler, type EventSubscriber, type ResourceStatus } from "@atelier/sdk/contracts";
 import { summarizeResourceStatus } from "./resource-status.ts";
 
-const snapshot: AppSnapshot = { workspace: { id: "w", title: "Workspace" }, sessions: [], archivedSessions: [], plugins: [], restartRequired: false };
+const snapshot: AppSnapshot = { workspace: { id: "w", title: "Workspace" }, sessions: [], templates: [], archivedSessions: [], plugins: [], restartRequired: false };
 describe("应用会话列表", () => {
   // 工作台状态反馈：成功读取恢复可用后，旧连接错误必须撤下，不能转为过期的全局通知。
   it("后台恢复后的静默读取清除连接错误", async () => {

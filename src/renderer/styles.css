@@ -217,10 +217,10 @@
   }
   [data-slot$="-content"] * { window-drag: initial; }
 
-  /* 应用导航与主内容为相邻浮岛；首页只让输入框形成表面，其余透出窗口材质。 */
+  /* 应用导航与主内容为相邻浮岛；首页输入框与模板卡片形成表面，其余透出窗口材质。 */
   .app-sidebar { @apply flex h-full min-h-0 flex-col p-3; }
   .home-page { @apply flex h-full overflow-y-auto px-6 py-10; padding-inline: calc(1.5rem + var(--space-inset)); }
-  .home-content { @apply m-auto w-full max-w-2xl shrink-0; }
+  .home-content { @apply m-auto w-full max-w-5xl shrink-0; }
 
   /* 设置：分类卡片平铺在材质上；选中卡片底板扩展为内容区，其余收缩消失。 */
   /* 浮岛编织：屏内浮岛自左向右；放得下时分栏居中，放不下时溢出并跟随焦点。 */

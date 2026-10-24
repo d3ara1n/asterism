@@ -8,6 +8,7 @@ import {
 import { jsonSchema } from "./model.ts";
 import { modelExpressionSchema, thinkingSchema } from "./configuration.ts";
 import { pointSchema, workbenchCommands, workbenchSnapshotSchema, type WorkbenchSnapshot } from "./workbench.ts";
+import { templateCommands, templateObjectSummarySchema } from "./templates.ts";
 
 const id = z.string().min(1).max(160);
 /** 来源：null 表示软件本身；否则 plugin 由宿主按写入通道打戳，resource 为经校验的发出资源。记录与事件共用。 */
@@ -49,9 +50,10 @@ export const sessionCommandSchema = z.discriminatedUnion("type", [
   // 取消仍在准备中的创建；已进入事务或不存在的请求不受影响。
   z.strictObject({ type: z.literal("resource.create.cancel"), sessionId: id, requestId: uuid }),
   ...workbenchCommands,
+  ...templateCommands,
 ]);
 export type SessionCommand = z.infer<typeof sessionCommandSchema>;
-export type SessionMutation = Exclude<SessionCommand, { type: "read" | "watch" | "unwatch" | "disposal.warnings" }>;
+export type SessionMutation = Exclude<SessionCommand, { type: "read" | "watch" | "unwatch" | "disposal.warnings" | `template.${string}` }>;
 /** 仅在运行时存在的输出投影；没有父指针，不属于可选择的历史节点。 */
 const liveBase = { id, objectId: id, responseId: id, ordinal: z.number().int().nonnegative() };
 export const liveBlockSchema = z.discriminatedUnion("kind", [
@@ -80,6 +82,9 @@ export const sessionDataSchema = z.strictObject({
 });
 export type SessionData = z.infer<typeof sessionDataSchema>;
 export const sessionReplySchema = z.discriminatedUnion("kind", [
+  z.strictObject({ kind: z.literal("template.source"), objects: z.array(templateObjectSummarySchema) }),
+  z.strictObject({ kind: z.literal("template.saved"), templateId: uuid }),
+  z.strictObject({ kind: z.literal("template.deleted") }),
   z.strictObject({ kind: z.literal("view"), data: sessionDataSchema }),
   z.strictObject({ kind: z.literal("accepted"), sessionId: id }),
   z.strictObject({ kind: z.literal("warnings"), warnings: z.array(z.strictObject({ objectId: id, title: z.string(), warning: uiTextSchema })) }),

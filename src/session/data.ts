@@ -4,6 +4,11 @@ import { jsonSchema, type Json } from "@atelier/sdk/contracts";
 /** 会话当前数据；空对象作用域表示会话本身。与历史事件独立保存。 */
 export class SessionDataStore {
   constructor(private readonly db: DatabaseSync) {}
+  entries(sessionId: string, objectId: string): { contract: string; data: Json }[] {
+    const rows = this.db.prepare("SELECT contract_id, data_json FROM session_data WHERE session_id = ? AND object_id = ? ORDER BY contract_id")
+      .all(sessionId, objectId) as { contract_id: string; data_json: string }[];
+    return rows.map(row => ({ contract: row.contract_id, data: jsonSchema.parse(JSON.parse(row.data_json)) }));
+  }
   get(sessionId: string, objectId: string | null, key: string): Json | null {
     const row = this.db.prepare("SELECT data_json FROM session_data WHERE session_id = ? AND object_id = ? AND contract_id = ?")
       .get(sessionId, objectId ?? "", key) as { data_json: string } | undefined;

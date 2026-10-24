@@ -5,8 +5,9 @@ import { DatabaseSync } from "node:sqlite";
 import { sessionSchemaSql } from "../session/schema.ts";
 import { applicationStorage, sessionRetentionMs } from "../shared/application.ts";
 import { contentSchemaSql } from "./content-store.ts";
+import { templateSchemaSql } from "./templates.ts";
 
-const workspaceDatabaseVersion = 24;
+const workspaceDatabaseVersion = 25;
 
 /** 开发期库格式不符：发布前不迁移，提示开发者删除 db 目录重建。 */
 export class DatabaseVersionError extends Error {
@@ -46,6 +47,7 @@ export function openDatabase(root: string): DatabaseSync {
         data_json TEXT NOT NULL,
         PRIMARY KEY(session_id, object_id, contract_id)
       ) STRICT;
+      ${templateSchemaSql}
       ${contentSchemaSql}
       PRAGMA user_version = ${workspaceDatabaseVersion};
       COMMIT;`);

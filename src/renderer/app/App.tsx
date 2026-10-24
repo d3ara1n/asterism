@@ -51,7 +51,7 @@ import { sessionController } from "../features/session/registry";
 import { islandTransition } from "../shared/weave/motion";
 
 /** 主屏包含侧栏与首页/工作台；设置为左侧独立屏，切换时主屏整体平移。 */
-type MainView = { kind: "home" } | { kind: "conversation"; sessionId: string };
+type MainView = { kind: "home" } | { kind: "conversation"; sessionId: string; overview?: boolean };
 type PageId = "settings" | "main";
 const idleSubscribe = () => () => {};
 const noSession = () => null;
@@ -145,6 +145,15 @@ export function App({ controller }: { controller: ApplicationController }) {
     if (token === navigation.current) openSession(created);
     void controller.refresh();
   };
+  const startTemplate = async (templateId: string) => {
+    const token = navigation.current;
+    const result = await runtime.session.execute({ type: "template.start", templateId });
+    if (!result.ok) return errorDisplay(result.error);
+    if (result.reply.kind !== "accepted") throw new Error("Invalid template creation receipt.");
+    if (token === navigation.current) navigate({ kind: "conversation", sessionId: result.reply.sessionId, overview: true });
+    void controller.refresh();
+    return null;
+  };
   const creation = useCreationCoordinator({ controller: active, canvas: () => workbench.current?.canvas ?? null, writable, ready });
   const menuGroup = (group: "agents" | "resources") => creation.menu.filter(entry => (entry.group ?? "resources") === group)
     .map(entry => <DropdownMenuItem key={entry.id} disabled={creation.pending} onSelect={() => creation.open(entry)}>{entry.icon}{i18n.text(entry.label)}{entry.InputView ? "…" : ""}</DropdownMenuItem>);
@@ -187,6 +196,7 @@ export function App({ controller }: { controller: ApplicationController }) {
     error={phase === "unavailable" ? state.error : sessionState?.readError ?? null} onRetry={() => { void active?.refresh(); }} />}>
     {session && active ? <motion.div key={session.id} className="h-full" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
       <Workbench ref={workbench} session={session} controller={active}
+      overview={view.kind === "conversation" && view.overview}
       ready={writable} run={run} store={workbenchStore}
       onHome={goHome} canDrop={creation.canDrop} onDropItems={creation.drop} /></motion.div> : null}
   </WorkbenchSurface>;
@@ -198,6 +208,7 @@ export function App({ controller }: { controller: ApplicationController }) {
       renameDisabledSessionId={active && !writable ? active.sessionId : null}
       onRename={renameSession}
       onArchive={archiveSession}
+      onTemplateSaved={() => { void controller.refresh({ quiet: true }); }}
       homeActive={view.kind === "home"}
       onHome={goHome} onSession={openSession} onSettings={() => go("settings")} onHide={hideSidebar}
       onRetry={() => { void controller.refresh(); }} />,
@@ -216,6 +227,7 @@ export function App({ controller }: { controller: ApplicationController }) {
         ? <motion.div key="home" className="h-full" initial={{ opacity: 0, scale: 1.04 }} animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 1.04 }} transition={islandTransition}>
           <HomePage active={!inSettings} draft={draft} onSettings={() => go("settings")}
+            templates={snapshot?.templates ?? []} onTemplateStart={startTemplate} onTemplatesChanged={() => { void controller.refresh({ quiet: true }); }}
             ready={ready} busy={start.busy} submitError={start.error} onStart={startConversation} /></motion.div>
         : <motion.div key="conversation" className="h-full" initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.96 }} transition={islandTransition}>

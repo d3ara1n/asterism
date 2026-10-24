@@ -9,6 +9,7 @@
 | `main/` | Electron 窗口、平台材质、单实例锁、数据目录、运行时进程生命周期、可信 IPC 路由、`safeStorage` 加解密 | `shared`，不调用数据库 |
 | `preload/` | 沙箱桥，受控命令与状态订阅 | `shared`，只暴露 `window.host` |
 | `runtime/` | 应用组合与会话列表；会话命令、历史查询、资源与布局、执行进度；SQLite、`objects/`、`content/` 存储与私有凭据客户端 | `shared`、`session`、`configuration`、内置实现后台入口、Node API |
+| `runtime/templates.ts` | 静态工作台模板的保存、目录、实例化与删除；复用对象数据、资源身份、关系和内容依赖机制 | `shared/templates`、`session`、`resources`、运行时存储 |
 | `configuration/` | 全局配置、密文凭据、插件提供商目录与共享账户查询、模型发现、参数获取、连接测试及默认角色（见 `configuration/README.md`） | `shared`、Node 文件系统、模型 SDK；不依赖 Electron 或数据库 |
 | `session/` | 会话树存储（`session_nodes`）、当前时间线追加与游标选择、工作台存在性与链接重放 | `shared`、SDK 纯契约、Node SQLite；不依赖 UI 或插件运行时 |
 | `model/` | 单次请求契约、文件输入检查、请求身份头、跨模型目标投影、思考等级／预算编码（`thinking-options.ts`）、思考续接中间件、请求接收计时与三协议 AI SDK 编解码 | `shared`、`session`、AI SDK |

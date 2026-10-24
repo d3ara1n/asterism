@@ -62,7 +62,7 @@ Atelier 分为**应用组合层**、**通用宿主机制**与**插件**三层：
 | `language.json` | 界面语言偏好 `preference`（`system` 或 BCP47 标签） | 主进程，`electron-store` |
 | `ui-state.json` | 窗口位置/尺寸与受控 `preferences` 容器（`creation-route/` 路由记忆与 `plugin/<pluginId>/` 插件偏好） | 主进程，`electron-store` |
 | `credentials/` | `safeStorage` 加密密文；配置文件只保存引用 | 运行时凭据模块 + 主进程加解密 |
-| `db/workspace.sqlite` | 工作区身份、会话树节点、当前会话/对象数据、内容依赖索引与工作台视图布局 | 任务运行时 |
+| `db/workspace.sqlite` | 工作区身份、会话树节点、当前会话/对象数据、模板、内容依赖索引与工作台视图布局 | 任务运行时 |
 | `content/` | 插件不可变字节内容（`temporary/` 暂存，`sealed/<id>` 封存，见 [不可变内容](content.md)） | 任务运行时 |
 | `extensions/<pluginId>/` | 插件自管文件与数据；其中 `.atelier/` 保留给按需选用的托管配置、数据库与凭据引用，使用规则见 [插件 SDK](plugin-sdk.md#插件配置与界面本地化) | 插件与运行时托管设施 |
 | `logs/runtime.log` | 运行时正式英文日志 | 任务运行时 |
@@ -79,6 +79,8 @@ Atelier 分为**应用组合层**、**通用宿主机制**与**插件**三层：
 - `session_data`：保存当前会话或对象数据，以 `(session_id, object_id, contract_id)` 定位（空 `object_id` 表示会话级，如笔记正文存对象级 `atelier.builtin/note.content`）。纯数据保存可与事件同事务提交，只通知视图、不追加历史，回溯或分叉不恢复当前值。
 - `contents` / `content_roots`：不可变内容元数据及记录／当前数据的引用依赖根（见 [不可变内容](content.md)）。
 - `object_views` / `viewports`：当前卡片位置、隐藏、折叠、宽高覆盖与会话画布视口；独立于任务历史。
+- `templates`：静态模板记录，名称与创建时间独立列出，JSON 保存对象数据与关系；目录查询只投影对象类型和标题，不交付对象正文。语义见 [工作台模板](object-model.md#工作台模板资源数据与关系)。
+- `template_content_roots`：模板的不可变内容依赖，与会话级内容根共同参与回收，见 [不可变内容](content.md)。
 
 **启动清理**：开库后、构造会话服务之前，删除归档时间早于冷静期的会话（级联删除关联行）；随后内容存储构造时回收失去依赖根的内容与暂存文件。清理集中在启动期执行一次，运行期不定时扫描。插件自管的按会话数据由插件对照会话目录自行清理，见 [插件 SDK](plugin-sdk.md#会话目录与资源操作api-91)。
 
@@ -109,6 +111,8 @@ renderer 与任务进程经一对 `MessagePort` 直连（`src/shared/connection.
 | 命令 | 行为 |
 | --- | --- |
 | `start` | 显式 agent 配置，模型与 thinking 可为 null 并在请求时继承；原子保存 Session、首个代理、首条输入并开始执行 |
+| `template.source / template.save` | 读取当前对象摘要／保存所选对象数据与关系为模板 |
+| `template.start / template.delete` | 原子从模板创建新会话／删除模板及其内容依赖根 |
 | `resource.command` | 路由到对象所属资源控制器（如内置代理的 `submit`、`continue`、`configure`、`cancel`） |
 | `resource.create` | 由资源模块校验输入并原子提交对象创建事件、资源初始数据与初始视图布局 |
 | `read` | 同次读取返回会话树、执行游标、工作台投影和当前进度，不接受独立历史位置参数 |

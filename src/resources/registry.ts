@@ -3,6 +3,8 @@ import { missingResourceContract, pluginOf } from "@atelier/sdk/contracts";
 import type { Presentation } from "@atelier/sdk/contracts";
 import type { FoldedObject } from "../session/fold.ts";
 import type { ContextFile, ResourceBackend, ResourceController } from "./contract.ts";
+import { SessionError } from "../session/tree.ts";
+import { templateMessages } from "../shared/template-messages.ts";
 
 /** 后台资源 adapter 目录；资源内容投影由对应模块负责。 */
 export class ResourceRegistry {
@@ -23,6 +25,12 @@ export class ResourceRegistry {
   }
 
   has(kind: string): boolean { return this.backends.has(kind); }
+  validateState(kind: string, data: Json): void {
+    const backend = this.backends.get(kind);
+    if (!backend) throw new SessionError("unavailable", `Resource type ${kind} is unavailable.`, templateMessages.unavailable);
+    try { backend.validateState?.(data); }
+    catch { throw new SessionError("invalid_request", `Saved state for ${kind} is invalid.`, templateMessages.invalidData); }
+  }
   disposalWarning(resource: FoldedObject) { return this.backends.get(resource.kind)?.disposalWarning?.(resource) ?? null; }
   receivesLinks(kind: string): boolean { return this.backends.get(kind)?.receivesLinks === true; }
   controller(kind: string): ResourceController | undefined { return this.backends.get(kind)?.controller; }

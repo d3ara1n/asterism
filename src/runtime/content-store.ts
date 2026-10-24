@@ -18,8 +18,14 @@ export const contentSchemaSql = `
     PRIMARY KEY(session_id, object_id, kind, root_id, content_id)
   ) STRICT;
   CREATE INDEX content_roots_content ON content_roots(content_id);
+  CREATE TABLE template_content_roots (
+    template_id TEXT NOT NULL REFERENCES templates(id) ON DELETE CASCADE,
+    content_id TEXT NOT NULL REFERENCES contents(id),
+    PRIMARY KEY(template_id, content_id)
+  ) STRICT;
+  CREATE INDEX template_content_roots_content ON template_content_roots(content_id);
 `;
-export interface ContentAccess { owner?: string; sessionId?: string; objectId?: string; scope?: ContentLease; recordIds?: ReadonlySet<string>; allowHandover?: boolean; check?(): void }
+export interface ContentAccess { owner?: string; sessionId?: string; objectId?: string; templateId?: string; scope?: ContentLease; recordIds?: ReadonlySet<string>; allowHandover?: boolean; check?(): void }
 export interface ContentTarget { contractId: string; resourceKind: string; sessionId?: string; objectId?: string }
 export interface CapturedContent {
   reader: ContentReader;
@@ -108,14 +114,18 @@ export class ContentStore {
     // 崩溃可能发生在封存之后、索引之前；只清理由本模块拥有的文件。
     const known = new Set((db.prepare("SELECT id FROM contents").all() as { id: string }[]).map(row => row.id));
     for (const name of readdirSync(join(root, "sealed"))) if (!known.has(name)) rmSync(join(root, "sealed", name), { force: true });
-    for (const { id } of db.prepare("SELECT id FROM contents WHERE NOT EXISTS (SELECT 1 FROM content_roots r WHERE r.content_id = contents.id)").all() as { id: string }[])
+    for (const { id } of db.prepare(`SELECT id FROM contents
+      WHERE NOT EXISTS (SELECT 1 FROM content_roots r WHERE r.content_id = contents.id)
+      AND NOT EXISTS (SELECT 1 FROM template_content_roots r WHERE r.content_id = contents.id)`).all() as { id: string }[])
       this.candidates.add(id);
     this.collect();
   }
   /** 未建立根的已封存内容总量；仅在根或内容集合变化后重算，分块写入不逐块扫表。 */
   private unrooted?: number;
   private unrootedSize(): number {
-    return this.unrooted ??= (this.db.prepare("SELECT COALESCE(SUM(size), 0) AS size FROM contents WHERE NOT EXISTS (SELECT 1 FROM content_roots r WHERE r.content_id = contents.id)").get() as { size: number }).size;
+    return this.unrooted ??= (this.db.prepare(`SELECT COALESCE(SUM(size), 0) AS size FROM contents
+      WHERE NOT EXISTS (SELECT 1 FROM content_roots r WHERE r.content_id = contents.id)
+      AND NOT EXISTS (SELECT 1 FROM template_content_roots r WHERE r.content_id = contents.id)`).get() as { size: number }).size;
   }
   private path(id: string): string { return join(this.root, "sealed", id); }
   scope(target?: ContentTarget): ContentLease {
@@ -150,7 +160,7 @@ export class ContentStore {
     if (this.db.isTransaction) return;
     for (const id of [...this.candidates]) {
       if (this.pins.has(id)) continue;
-      if (this.db.prepare("SELECT 1 FROM content_roots WHERE content_id = ? LIMIT 1").get(id)) { this.candidates.delete(id); continue; }
+      if (this.db.prepare("SELECT 1 FROM content_roots WHERE content_id = ? UNION ALL SELECT 1 FROM template_content_roots WHERE content_id = ? LIMIT 1").get(id, id)) { this.candidates.delete(id); continue; }
       try { rmSync(this.path(id), { force: true }); this.db.prepare("DELETE FROM contents WHERE id = ?").run(id); this.unrooted = undefined; }
       catch { console.error("Unreferenced content could not be removed."); }
       this.candidates.delete(id);
@@ -167,6 +177,8 @@ export class ContentStore {
     access.check?.(); access.scope?.check();
     const row = this.stored(ref);
     if (access.scope?.refs.has(row.id)) return row;
+    if (access.templateId && this.db.prepare("SELECT 1 FROM template_content_roots WHERE template_id = ? AND content_id = ?")
+      .get(access.templateId, row.id)) return row;
     if (access.allowHandover !== false && access.sessionId && this.handovers.get(`${access.sessionId}\0${access.objectId ?? ""}`)?.refs.has(row.id)) return row;
     if (access.sessionId) {
       const roots = this.db.prepare("SELECT kind, root_id FROM content_roots WHERE session_id = ? AND object_id = ? AND content_id = ?")
@@ -178,6 +190,24 @@ export class ContentStore {
     throw new PluginApiError("foreign_resource", "The content does not belong to this input or object.");
   }
   validate(value: Json, access: ContentAccess): void { for (const ref of contentReferences(value)) this.assert(ref, access); }
+  /** 模板持有独立的持久依赖根；源会话删除后仍可建立新的对象内容根。 */
+  bindTemplate(templateId: string, access: ContentAccess, value: Json): void {
+    if (!this.db.isTransaction) throw new Error("Template content roots require a transaction.");
+    const insert = this.db.prepare("INSERT OR IGNORE INTO template_content_roots VALUES (?, ?)");
+    for (const ref of contentReferences(value)) {
+      const row = this.assert(ref, access);
+      insert.run(templateId, row.id);
+    }
+    this.unrooted = undefined;
+  }
+  releaseTemplate(templateId: string): void {
+    if (!this.db.isTransaction) throw new Error("Template content roots require a transaction.");
+    for (const row of this.db.prepare("SELECT content_id FROM template_content_roots WHERE template_id = ?").all(templateId) as { content_id: string }[])
+      this.candidates.add(row.content_id);
+    this.db.prepare("DELETE FROM template_content_roots WHERE template_id = ?").run(templateId);
+    this.unrooted = undefined;
+    this.scheduleCollection();
+  }
   /** 在首次异步等待前检查并保留整批内容，后续读取不借用输入草稿的生命周期。 */
   capture(refs: readonly ContentRef[], access: ContentAccess): CapturedContent {
     const sizes = new Map<string, number>();

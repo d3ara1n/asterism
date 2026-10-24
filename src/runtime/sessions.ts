@@ -33,6 +33,7 @@ import { SessionWorkbench } from "./workbench.ts";
 import { ContentStore, contentReferences, type ContentLease, type ContentTarget } from "./content-store.ts";
 import { applicationStorage, applicationBrand } from "../shared/application.ts";
 import { EventBus } from "../plugins/events.ts";
+import { TemplateStore } from "./templates.ts";
 
 const agentKind = Agent.kind;
 
@@ -49,6 +50,7 @@ export class SessionService {
   private closed = false;
   readonly tree: SessionTree;
   readonly content: ContentStore;
+  readonly templates: TemplateStore;
   private readonly workbench: SessionWorkbench;
   private readonly resources: ResourceRegistry;
   private readonly tools: ToolRegistry;
@@ -166,6 +168,7 @@ export class SessionService {
     this.pluginActivity = modules.activity;
     this.workbench = new SessionWorkbench(db, this.tree, this.resources,
       (sessionId, receiverId, resource) => this.linkTools(sessionId, receiverId, resource), this.content);
+    this.templates = new TemplateStore(db, this.tree, this.workbench, this.content, this.resources);
     modules.initialize();
   }
   get running(): boolean { return this.tree.list().some(session => !this.settled(session.id)); }
@@ -455,6 +458,17 @@ export class SessionService {
     if (!parsed.success) throw new SessionError("invalid_request", "Invalid session command.");
     const command = parsed.data;
     switch (command.type) {
+      case "template.source": return { kind: "template.source", objects: this.templates.source(command.sessionId) };
+      case "template.save": return { kind: "template.saved", templateId: this.transaction(() =>
+        this.templates.save(command.sessionId, command.title, command.objectIds)) };
+      case "template.delete":
+        this.transaction(() => this.templates.delete(command.templateId));
+        return { kind: "template.deleted" };
+      case "template.start": {
+        const sessionId = randomUUID();
+        this.commit(sessionId, () => this.templates.instantiate(command.templateId, sessionId), { workbench: true });
+        return { kind: "accepted", sessionId };
+      }
       case "read": return { kind: "view", data: this.current(command.sessionId) };
       case "watch": {
         const data = this.current(command.sessionId);

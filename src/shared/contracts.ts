@@ -4,8 +4,9 @@ import { translationCatalogSchema, type LanguageBridge } from "./language.ts";
 import { coreChannel } from "./core.ts";
 import type { DesktopPlatform, DesktopWindowBridge } from "./desktop.ts";
 import type { AppearanceBridge } from "./theme.ts";
+import { templateSummarySchema } from "./templates.ts";
 
-export const protocolVersion = 9;
+export const protocolVersion = 10;
 export const statusChannel = coreChannel("runtime-status");
 export const pickDirectoryChannel = coreChannel("pick-directory");
 export const openLocalFileChannel = coreChannel("open-local-file");
@@ -26,6 +27,7 @@ export type RuntimeStatus = z.infer<typeof runtimeStatusSchema>;
 export const snapshotSchema = z.strictObject({
   workspace: z.strictObject({ id, title: z.string() }),
   sessions: z.array(z.strictObject({ id, title: z.string(), created_at: z.string() })),
+  templates: z.array(templateSummarySchema),
   /** 回收站目录：只含会话本身，供设置页计数与恢复。 */
   archivedSessions: z.array(z.strictObject({ id, title: z.string(), created_at: z.string(), archived_at: z.string() })),
   /** 插件包：启动时状态；renderer 为 atelier-plugin:// 下的入口路径。 */

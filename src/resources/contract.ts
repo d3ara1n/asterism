@@ -41,6 +41,7 @@ export interface ResourceController {
 export interface ResourceBackend {
   kind: string;
   receivesLinks?: boolean;
+  validateState?(data: Json): void;
   project(resource: FoldedObject): Presentation;
   inspect(resource: FoldedObject): Promise<Json>;
   context(resource: FoldedObject): Promise<ContextFile[]>;
