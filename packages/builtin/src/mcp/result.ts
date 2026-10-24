@@ -1,7 +1,8 @@
-import { jsonSchema, type ModelInputPart, type Json } from "@atelier/sdk/contracts";
+import { jsonSchema, type ModelInputPart } from "@atelier/sdk/contracts";
 import type { ContentScope } from "@atelier/sdk/runtime";
 import type { CallToolResult } from "@modelcontextprotocol/client";
 import type { McpCallData } from "./contract.ts";
+import { extraStructured } from "./content.ts";
 
 /** MCP 字节进入宿主不可变内容，历史与模型共用相同引用。资源链接保留 URI，不自动读取。 */
 export async function convertMcpResult(result: CallToolResult, content: ContentScope): Promise<Pick<McpCallData, "parts" | "structuredContent">> {
@@ -22,13 +23,7 @@ export async function convertMcpResult(result: CallToolResult, content: ContentS
   }
   return { parts, ...(result.structuredContent !== undefined && { structuredContent: jsonSchema.parse(result.structuredContent) }) };
 }
-function containsStructured(parts: ModelInputPart[], value: Json): boolean {
-  return parts.some(part => {
-    if (part.kind !== "text") return false;
-    try { return JSON.stringify(JSON.parse(part.text)) === JSON.stringify(value); } catch { return false; }
-  });
-}
 export function mcpResultToModel(data: McpCallData): ModelInputPart[] {
-  return [...data.parts, ...(data.structuredContent !== undefined && !containsStructured(data.parts, data.structuredContent)
-    ? [{ kind: "text" as const, text: JSON.stringify(data.structuredContent) }] : [])];
+  const extra = extraStructured(data);
+  return [...data.parts, ...(extra ? [{ kind: "text" as const, text: JSON.stringify(extra.value) }] : [])];
 }
