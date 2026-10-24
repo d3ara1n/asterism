@@ -26,6 +26,7 @@
 | `src/notes/`、`src/filesystem/` | 资源与正文工具实现、创建入口与三态工具视图 |
 | `src/shell/` | 共用 Shell profile 解析、`shell_profile_list` 顶层查询与三态视图、非交互管道进程、显式终止与 IO 收束、有界输出及临时日志；目录 `exec` 经同一服务执行，契约见 [目录命令执行](../../docs/runtime.md#目录命令执行exec) |
 | `src/terminal/` | 交互 PTY、后台屏幕、最小 shell 状态集成、人机共享输入、文字／图片观察与等待；资源对象只是入口，实例在新建或用户开启时创建，关闭、移除或回溯时结束；屏幕、输入与状态经终端通道传输，契约见 [终端资源](../../docs/runtime.md#终端资源) |
+| `src/terminal/service.ts`、`screen.ts`、`raw-buffer.ts`、`screen-writer.ts` | 分别管理 PTY 与共享实例、后台网格与观察投影、原始输出范围、前端帧消费队列；资源与工具装配位于 `runtime.ts` |
 | `src/resources/` | Agent 创建目录查询、创建和统一移除顶层工具及三态视图；通过 SDK 绑定会话门面消费宿主生命周期 |
 | `src/naming/` | 自动命名、人工命名接口和标题投影；记录契约由公共包提供 |
 | `src/settings/` | 内置插件托管配置与按流式预览／Shell 分组的自定义设置页；配置在插件根入口登记 |

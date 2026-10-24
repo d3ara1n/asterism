@@ -12,7 +12,8 @@ import { Play, Power, RotateCcw } from "lucide-react";
 import { commonMessages } from "@atelier/ui/messages/common";
 import { terminalMessages } from "../messages/terminal";
 import { CloseTerminal, StartTerminal, type TerminalConfig, type TerminalState } from "./contract";
-import { useTerminalLink, type TerminalScreen } from "./link";
+import { useTerminalLink } from "./link";
+import { ScreenWriter } from "./screen-writer";
 
 /** 浏览器副本保留输入能力；终端协议查询由后台的唯一解析器应答。 */
 function passiveProtocol(terminal: Terminal) {
@@ -72,14 +73,7 @@ export function TerminalCard() {
       terminal.loadAddon(webgl);
     } catch (failure) { console.warn("Terminal WebGL rendering is unavailable; using DOM rendering.", failure); }
     terminalRef.current = terminal;
-    // 后台以通道顺序交付帧；xterm 写入异步，重置与尺寸排在已写入内容之后。
-    const screen: TerminalScreen = { receive(frame, done) {
-      if (frame.type === "output") { terminal.write(frame.data, done); return; }
-      terminal.write("", () => {
-        if (frame.type === "reset") { terminal.reset(); terminal.resize(frame.cols, frame.rows); terminal.write(frame.data, done); }
-        else { terminal.resize(frame.cols, frame.rows); done(); }
-      });
-    } };
+    const screen = new ScreenWriter(terminal);
     const detach = link.attach(screen);
     const input = terminal.onData(text => link.send({ type: "input", data: text }));
     const binary = terminal.onBinary(text => link.send({ type: "binary", data: text }));
@@ -102,7 +96,7 @@ export function TerminalCard() {
     observer.observe(host);
     return () => {
       observer.disconnect(); cancelAnimationFrame(scheduled);
-      input.dispose(); binary.dispose(); detach();
+      input.dispose(); binary.dispose(); detach(); screen.dispose();
       terminal.dispose(); terminalRef.current = null;
     };
   }, [link]);

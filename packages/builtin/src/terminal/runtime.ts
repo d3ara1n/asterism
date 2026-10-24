@@ -19,26 +19,19 @@ export function createTerminalModule(settings: () => ShellSettings) { return def
   const terminals = new Map<string, SharedTerminal>();
   /** 本次运行中新建、尚待出现通知的资源；出现时自动开启。 */
   const pendingStart = new Set<string>();
-  const cleanups = new Set<Promise<void>>();
   const images = new Map<string, { resolve(png: Uint8Array): void; reject(error: Error): void }>();
   const root = join(plugin.dir, "shell-integration");
-  const track = (work: Promise<void>): Promise<void> => {
-    const cleanup = work.catch(error => plugin.log.error("Terminal cleanup failed.", error));
-    cleanups.add(cleanup); void cleanup.finally(() => cleanups.delete(cleanup));
-    return cleanup;
-  };
   const release = (id: string): Promise<void> => {
     pendingStart.delete(id);
     const terminal = terminals.get(id);
     if (!terminal) return Promise.resolve();
     terminals.delete(id);
-    return track(terminal.dispose());
+    return terminal.dispose();
   };
   function terminal(config: TerminalConfig, ref: ObjectReader["ref"]): SharedTerminal {
     const existing = terminals.get(ref.id);
     if (existing) return existing;
     const created = new SharedTerminal(config, settings, root, {
-      changed() {},
       // 会话列表只标记启动失败；交互 shell 的每条命令不构成完成或常驻运行标记。
       failed(error) {
         if (plugin.lifetime.signal.aborted || terminals.get(ref.id) !== created) return;
@@ -57,12 +50,10 @@ export function createTerminalModule(settings: () => ShellSettings) { return def
     return terminal(TerminalResource.stateSchema.parse(data), object.ref);
   }
   const statusOf = (object: ObjectReader) => terminals.get(object.ref.id)?.status ?? { ...inactiveStatus };
-  const close = async () => {
-    for (const id of [...terminals.keys()]) void release(id);
+  plugin.lifetime.defer(() => {
+    // 终端实例由对象作用域释放；宿主先等待对象清理，再结束插件作用域。
     for (const image of images.values()) image.reject(new TerminalError("renderer_unavailable", "The terminal image service is closing."));
-    await Promise.all([...cleanups]);
-  };
-  plugin.lifetime.defer(close);
+  });
 
   async function outcome<T extends Json>(signal: AbortSignal, work: () => Promise<T>): Promise<CallResult<T>> {
     try { signal.throwIfAborted(); return { kind: "succeeded", data: await work() }; }

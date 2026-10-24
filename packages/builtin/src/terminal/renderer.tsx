@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import { TerminalSquare, Eye, Keyboard, Clock, BookOpen } from "lucide-react";
 import { cardRenderer, creationEntry, toolRenderer, useI18n, useRendererConfig, type CreationInputProps, type RendererModule, type ToolRenderProps } from "@atelier/sdk/renderer";
 import { Input } from "@atelier/ui/ui/input";
@@ -20,13 +20,17 @@ import { useRendererObject } from "@atelier/sdk/renderer";
 import { mediaMessages } from "../messages/media";
 import { inputField, inputText } from "../shared/tool-preview";
 
+// Select 的非空占位值独立于实际 profile ID；选项值统一加前缀。
+const DEFAULT_PROFILE = "default";
+const profileValue = (id: string) => `profile:${id}`;
+
 function TerminalCreation({ initialInput, busy, resolve, cancel }: CreationInputProps<{ title?: string; cwd?: string; profile?: string }>) {
   const i18n = useI18n(), settings = useRendererConfig(BuiltinSettings);
   const [title, setTitle] = useState(initialInput?.title ?? ""), [cwd, setCwd] = useState(initialInput?.cwd ?? "");
-  const [profile, setProfile] = useState(initialInput?.profile ?? "default"), [browsing, setBrowsing] = useState(false);
+  const [profile, setProfile] = useState<string | undefined>(initialInput?.profile), [browsing, setBrowsing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   return <CreationForm busy={busy} disabled={browsing} onCancel={cancel} onSubmit={() => resolve({
-    ...(title.trim() ? { title: title.trim() } : {}), ...(cwd.trim() ? { cwd: cwd.trim() } : {}), ...(profile !== "default" ? { profile } : {}),
+    ...(title.trim() ? { title: title.trim() } : {}), ...(cwd.trim() ? { cwd: cwd.trim() } : {}), ...(profile !== undefined ? { profile } : {}),
   })}>
     <Field><FieldLabel htmlFor="terminal-title">{i18n.formatMessage(commonMessages.name)}</FieldLabel>
       <Input id="terminal-title" value={title} autoFocus maxLength={160} placeholder={i18n.formatMessage(terminalMessages.terminal)} onChange={event => setTitle(event.target.value)} /></Field>
@@ -37,9 +41,9 @@ function TerminalCreation({ initialInput, busy, resolve, cancel }: CreationInput
         void window.host.pickDirectory().then(path => { if (path) setCwd(path); }).catch(failure => setError(String(failure))).finally(() => setBrowsing(false));
       }}>{i18n.formatMessage(filesystemMessages.browse)}</Button></div></Field>
     <Field><FieldLabel>{i18n.formatMessage(terminalMessages.profile)}</FieldLabel>
-      <Select value={profile} onValueChange={setProfile}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent>
-        <SelectItem value="default">{i18n.formatMessage(terminalMessages.defaultProfile)}</SelectItem>
-        {settings.shell.profiles.map(item => <SelectItem key={item.id} value={item.id}>{item.id}</SelectItem>)}
+      <Select value={profile === undefined ? DEFAULT_PROFILE : profileValue(profile)} onValueChange={value => setProfile(value === DEFAULT_PROFILE ? undefined : value.slice("profile:".length))}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent>
+        <SelectItem value={DEFAULT_PROFILE}>{i18n.formatMessage(terminalMessages.defaultProfile)}</SelectItem>
+        {settings.shell.profiles.map(item => <SelectItem key={item.id} value={profileValue(item.id)}>{item.id}</SelectItem>)}
       </SelectContent></Select></Field>
     {error && <p className="type-caption text-destructive">{error}</p>}
   </CreationForm>;
@@ -84,13 +88,14 @@ function ImageBody({ result }: ToolRenderProps<z.infer<typeof TerminalSee.schema
   </div>;
 }
 /** 终端状态行：state · cwd（集成时）· 末次退出码（集成时）· 错误信息 */
-function StatusRow({ data }: { data: TerminalStatus }) {
+function StatusRow({ data, children }: { data: TerminalStatus; children?: ReactNode }) {
   const i18n = useI18n();
   return <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 type-caption text-muted-foreground">
     <span>{i18n.formatMessage(terminalMessages.state, { state: data.state })}</span>
     {data.integration && data.cwd && <span className="min-w-0 break-all font-mono">{data.cwd}</span>}
     {data.integration && data.lastExitCode !== null && <span>{i18n.formatMessage(terminalMessages.lastExit, { code: data.lastExitCode })}</span>}
     {data.error && <span className="text-destructive break-all">{data.error}</span>}
+    {children}
   </div>;
 }
 /** 输入内容预览：text → [key] → ↵，按发送顺序拼接 */
@@ -113,13 +118,9 @@ function InputBody({ args, result }: ToolRenderProps<z.infer<typeof TerminalInpu
 function WaitBody({ result }: ToolRenderProps<z.infer<typeof TerminalWait.schema>>) {
   const i18n = useI18n(), data = result?.data;
   if (!data) return null;
-  return <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 type-caption text-muted-foreground">
-    <span>{i18n.formatMessage(terminalMessages.state, { state: data.state })}</span>
-    {data.integration && data.cwd && <span className="min-w-0 break-all font-mono">{data.cwd}</span>}
-    {data.integration && data.lastExitCode !== null && <span>{i18n.formatMessage(terminalMessages.lastExit, { code: data.lastExitCode })}</span>}
-    {data.error && <span className="text-destructive break-all">{data.error}</span>}
+  return <StatusRow data={data}>
     <span>{i18n.formatMessage(terminalMessages.elapsed, { seconds: (data.elapsedMs / 1000).toFixed(1) })}</span>
-  </div>;
+  </StatusRow>;
 }
 const appearance = { width: 720, height: 440, minWidth: 360, minHeight: 220 };
 const header = (label: typeof terminalMessages.input) => function Header({ invocation }: ToolRenderProps) {

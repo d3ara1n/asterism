@@ -69,8 +69,8 @@ export const terminalReadTargetSchema = z.union([
   z.null().describe("Select the visible screen: the parsed character grid with spaces and cursor coordinates."),
   z.strictObject({
     source: z.enum(["history", "raw"]).describe("history: retained terminal rows; raw: original output with control sequences, escaped in the JSON result."),
-    offset: z.number().int().nonnegative().optional().describe("Zero-based row for history, or stream character offset (UTF-16 code units) for raw. Omitted selects the most recent content."),
-    limit: z.number().int().positive().max(65536).optional().describe("Maximum rows (history, default 100, maximum 2000) or characters (raw, default 16384)."),
+    offset: z.number().int().nonnegative().optional().describe("Zero-based row for history, or stream character offset (UTF-16 code units) for raw. Raw offsets inside a surrogate pair align to its start. Omitted selects the most recent content."),
+    limit: z.number().int().positive().max(65536).optional().describe("Maximum rows (history, default 100, maximum 2000) or UTF-16 code units (raw, default 16384). Raw reads may include one extra code unit to complete a surrogate pair; nextOffset continues after the returned text."),
   }),
 ]).describe("Pass null for the current screen, or {\"source\":\"history\"} / {\"source\":\"raw\"} with an optional range. Reads observe the current shell instance, including the final screen of an exited shell; buffers are retained only during this application run. Terminal reads return content without edit anchors. The anchored option has no effect.");
 export const terminalReadResultSchema = terminalStatusSchema.extend({

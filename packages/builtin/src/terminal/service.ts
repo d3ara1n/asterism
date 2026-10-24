@@ -1,6 +1,4 @@
 import * as pty from "node-pty";
-import headless from "@xterm/headless";
-import serialize from "@xterm/addon-serialize";
 import { randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -9,13 +7,10 @@ import { descendantsOf } from "../shared/process-tree.ts";
 import type { ShellSettings } from "../shell/contract.ts";
 import { resolveShell } from "../shell/profiles.ts";
 import { prepareLaunch, type IntegrationMode } from "./integration.ts";
-import { inactiveStatus, type TerminalConfig, type TerminalDown, type TerminalImage, type TerminalState, type TerminalStatus, type TerminalUp, type keyNames } from "./contract.ts";
+import { HeadlessScreen } from "./screen.ts";
+import { inactiveStatus, type TerminalConfig, type TerminalDown, type TerminalState, type TerminalStatus, type TerminalUp, type keyNames } from "./contract.ts";
 
-const { Terminal } = headless;
-const { SerializeAddon } = serialize;
 const execute = promisify(execFile);
-const SCROLLBACK_LINES = 5000;
-const RAW_CHARACTERS = 1024 * 1024;
 /** 输出合批：短时间内的 PTY 块合成一帧；单帧超过上限立即交付。 */
 const BATCH_MS = 5, BATCH_CHARACTERS = 64 * 1024;
 /** 模型输入后收集 shell 反馈，再观察状态。 */
@@ -27,41 +22,8 @@ const HANDSHAKE_MS = 10_000, NATIVE_HANDSHAKE_MS = 3_000;
 /** 结束实例：SIGHUP 后的宽限期与强制结束后的等待上限。 */
 const HANGUP_GRACE_MS = 2_000, KILL_WAIT_MS = 2_000;
 const DEFAULT_COLS = 100, DEFAULT_ROWS = 28;
-const terminalPalette = ["#1e1e1e", "#cd3131", "#0dbc79", "#e5e510", "#2472c8", "#bc3fbc", "#11a8cd", "#e5e5e5", "#666666", "#f14c4c", "#23d18b", "#f5f543", "#3b8eea", "#d670d6", "#29b8db", "#ffffff"];
-const foreground = "#d4d4d4", background = "#1e1e1e";
 
 export class TerminalError extends Error { constructor(readonly code: string, message: string) { super(message); } }
-
-/** 原始输出的有界保留：按块存储，超出预算时丢弃最旧的整块，不逐块复制全量字符串。 */
-class RawBuffer {
-  private chunks: string[] = [];
-  private size = 0;
-  private start = 0;
-  get end() { return this.start + this.size; }
-  get first() { return this.start; }
-  push(data: string) {
-    this.chunks.push(data); this.size += data.length;
-    while (this.chunks.length > 1 && this.size - this.chunks[0]!.length >= RAW_CHARACTERS) {
-      const dropped = this.chunks.shift()!;
-      this.size -= dropped.length; this.start += dropped.length;
-    }
-  }
-  slice(from: number, to: number): string {
-    const parts: string[] = [];
-    let offset = this.start;
-    for (const chunk of this.chunks) {
-      const next = offset + chunk.length;
-      if (next > from && offset < to) parts.push(chunk.slice(Math.max(0, from - offset), Math.min(chunk.length, to - offset)));
-      offset = next;
-      if (offset >= to) break;
-    }
-    let text = parts.join("");
-    // 不从代理对中间切开。
-    if (/^[\uDC00-\uDFFF]/u.test(text)) text = text.slice(1);
-    if (/[\uD800-\uDBFF]$/u.test(text)) text = text.slice(0, -1);
-    return text;
-  }
-}
 
 interface InstanceHooks {
   output(data: string): void;
@@ -71,8 +33,7 @@ interface InstanceHooks {
 
 /** 一个 shell 进程及其后台屏幕；退出后保留最后屏幕供读取，直到被替换或关闭。 */
 export class ShellInstance {
-  private readonly terminal: InstanceType<typeof Terminal>;
-  private readonly serializer = new SerializeAddon();
+  private readonly screen: HeadlessScreen;
   private process?: pty.IPty;
   private alive = false;
   private paused = false;
@@ -86,8 +47,6 @@ export class ShellInstance {
   private batch?: ReturnType<typeof setTimeout>;
   private parsing = 0;
   private backlog = 0;
-  private readonly raw = new RawBuffer();
-  private cursorVisible = true;
   private readonly waiters = new Set<() => void>();
   private readonly lifetime = new AbortController();
   private disposing?: Promise<void>;
@@ -96,22 +55,18 @@ export class ShellInstance {
 
   constructor(private readonly config: TerminalConfig, private readonly settings: () => ShellSettings, private readonly root: string,
     private readonly hooks: InstanceHooks, size: { cols: number; rows: number }) {
-    this.terminal = new Terminal({ cols: size.cols, rows: size.rows, scrollback: SCROLLBACK_LINES, allowProposedApi: true });
-    this.terminal.loadAddon(this.serializer);
-    this.terminal.parser.registerOscHandler(133, data => this.promptMark(data));
-    this.terminal.parser.registerOscHandler(633, data => this.property(data));
-    this.terminal.parser.registerOscHandler(7, data => this.location(data));
+    this.screen = new HeadlessScreen(size);
+    const { terminal } = this.screen;
+    terminal.parser.registerOscHandler(133, data => this.promptMark(data));
+    terminal.parser.registerOscHandler(633, data => this.property(data));
+    terminal.parser.registerOscHandler(7, data => this.location(data));
     // 后台是终端协议自动回复的唯一发送者；前端副本只转发用户输入。
-    this.terminal.onData(data => { if (this.alive) this.process!.write(data); });
-    for (const final of ["h", "l"]) this.terminal.parser.registerCsiHandler({ prefix: "?", final }, params => {
-      if (params.includes(25)) this.cursorVisible = final === "h";
-      return false;
-    });
+    terminal.onData(data => { if (this.alive) this.process!.write(data); });
   }
   get status(): TerminalStatus { return { ...this.statusValue }; }
   get running(): boolean { return this.alive; }
-  get applicationCursor(): boolean { return this.terminal.modes.applicationCursorKeysMode; }
-  get size() { return { cols: this.terminal.cols, rows: this.terminal.rows }; }
+  get applicationCursor(): boolean { return this.screen.terminal.modes.applicationCursorKeysMode; }
+  get size() { return this.screen.size; }
 
   private setState(state: TerminalState, extra: Partial<TerminalStatus> = {}) {
     if (this.lifetime.signal.aborted) return;
@@ -173,7 +128,7 @@ export class ShellInstance {
       let resolveExit!: () => void;
       this.exited = new Promise<void>(resolve => { resolveExit = resolve; });
       try {
-        this.process = pty.spawn(shell.executable, launch.args, { name: "xterm-256color", cols: this.terminal.cols, rows: this.terminal.rows,
+        this.process = pty.spawn(shell.executable, launch.args, { name: "xterm-256color", ...this.size,
           cwd: this.config.cwd, env: launch.env });
       } catch (error) { resolveExit(); throw error; }
       this.alive = true;
@@ -199,7 +154,6 @@ export class ShellInstance {
   }
 
   private receive(data: string) {
-    this.raw.push(data);
     this.pending += data;
     if (this.pending.length >= BATCH_CHARACTERS) this.flush();
     else this.batch ??= setTimeout(() => this.flush(), BATCH_MS);
@@ -212,7 +166,7 @@ export class ShellInstance {
     this.parsing += data.length;
     this.regulate();
     this.chain = this.chain.then(() => new Promise<void>(resolve => {
-      this.terminal.write(data, () => {
+      this.screen.write(data, () => {
         this.parsing -= data.length;
         if (!this.lifetime.signal.aborted) this.hooks.output(data);
         this.regulate();
@@ -251,9 +205,9 @@ export class ShellInstance {
     });
   }
   resize(cols: number, rows: number) {
-    if (cols === this.terminal.cols && rows === this.terminal.rows) return;
     this.enqueue(() => {
-      this.terminal.resize(cols, rows);
+      if (cols === this.size.cols && rows === this.size.rows) return;
+      this.screen.terminal.resize(cols, rows);
       if (this.alive) this.process!.resize(cols, rows);
       this.hooks.resize(cols, rows);
     });
@@ -266,44 +220,14 @@ export class ShellInstance {
     return result;
   }
   snapshot() {
-    return { cols: this.terminal.cols, rows: this.terminal.rows, data: this.serializer.serialize() };
+    return this.screen.snapshot();
   }
 
   read(source: "screen" | "history" | "raw", offset?: number, limit?: number) {
-    return this.enqueue(() => {
-      const buffer = this.terminal.buffer.active;
-      let text: string, start: number, end: number, truncated: boolean;
-      if (source === "raw") {
-        const first = this.raw.first, last = this.raw.end;
-        const requested = offset ?? Math.max(first, last - (limit ?? 16384));
-        start = Math.max(first, Math.min(requested, last)); end = Math.min(last, start + (limit ?? 16384));
-        text = this.raw.slice(start, end); truncated = requested < first || end < last;
-      } else {
-        start = source === "screen" ? buffer.baseY : Math.max(0, Math.min(offset ?? Math.max(0, buffer.length - (limit ?? 100)), buffer.length));
-        end = Math.min(buffer.length, start + (source === "screen" ? this.terminal.rows : Math.min(limit ?? 100, 2000)));
-        text = Array.from({ length: end - start }, (_, row) => buffer.getLine(start + row)?.translateToString(source !== "screen") ?? "").join("\n");
-        truncated = source === "history" && (start > 0 || end < buffer.length);
-      }
-      return { ...this.status, source, text, cols: this.terminal.cols, rows: this.terminal.rows,
-        cursor: { x: buffer.cursorX, y: buffer.cursorY }, offset: start, nextOffset: end, truncated };
-    });
+    return this.enqueue(() => ({ ...this.status, ...this.screen.read(source, offset, limit) }));
   }
-  image(): Promise<TerminalImage> {
-    return this.enqueue(() => {
-      const buffer = this.terminal.buffer.active, cell = buffer.getNullCell();
-      const cells = Array.from({ length: this.terminal.rows }, (_, y) => {
-        const line = buffer.getLine(buffer.baseY + y);
-        return Array.from({ length: this.terminal.cols }, (_, x) => {
-          if (!line?.getCell(x, cell)) return { text: "", width: 1, fg: foreground, bg: background, bold: false, italic: false, underline: false, strike: false };
-          let fg = color(cell.getFgColor(), cell.isFgRGB(), cell.isFgDefault(), foreground);
-          let bg = color(cell.getBgColor(), cell.isBgRGB(), cell.isBgDefault(), background);
-          if (cell.isInverse()) [fg, bg] = [bg, fg];
-          return { text: cell.isInvisible() ? "" : cell.getChars(), width: cell.getWidth(), fg, bg,
-            bold: !!cell.isBold(), italic: !!cell.isItalic(), underline: !!cell.isUnderline(), strike: !!cell.isStrikethrough() };
-        });
-      });
-      return { cols: this.terminal.cols, rows: this.terminal.rows, cursor: { x: buffer.cursorX, y: buffer.cursorY, visible: this.cursorVisible }, cells };
-    });
+  image() {
+    return this.enqueue(() => this.screen.image());
   }
   waitIdle(timeout: number, signal: AbortSignal): Promise<string> {
     const check = () => {
@@ -336,20 +260,12 @@ export class ShellInstance {
           await terminate(this.process, this.exited);
         }
         await this.chain;
-      } finally { this.terminal.dispose(); }
+      } finally { this.screen.terminal.dispose(); }
     })();
     return this.disposing;
   }
 }
 
-function color(value: number, rgb: boolean, isDefault: boolean, fallback: string): string {
-  if (isDefault || value < 0) return fallback;
-  if (rgb) return `#${value.toString(16).padStart(6, "0")}`;
-  if (value < 16) return terminalPalette[value]!;
-  if (value >= 232) { const gray = (8 + (value - 232) * 10).toString(16).padStart(2, "0"); return `#${gray}${gray}${gray}`; }
-  const levels = [0, 95, 135, 175, 215, 255], index = value - 16;
-  return `#${[Math.floor(index / 36), Math.floor(index / 6) % 6, index % 6].map(component => levels[component]!.toString(16).padStart(2, "0")).join("")}`;
-}
 export function keySequence(key: typeof keyNames[number], applicationCursor: boolean): string {
   const prefix = applicationCursor ? "\x1bO" : "\x1b[";
   const keys: Record<typeof keyNames[number], string> = {
@@ -397,7 +313,7 @@ export class SharedTerminal {
   private size = { cols: DEFAULT_COLS, rows: DEFAULT_ROWS };
   private closed = false;
   constructor(private readonly config: TerminalConfig, private readonly settings: () => ShellSettings, private readonly root: string,
-    private readonly events: { changed(status: TerminalStatus): void; failed(error: unknown): void; log(message: string, error: unknown): void }) {}
+    private readonly events: { failed(error: unknown): void; log(message: string, error: unknown): void }) {}
   get status(): TerminalStatus { return this.instance?.status ?? { ...inactiveStatus }; }
   get started(): boolean { return this.instance !== null; }
 
@@ -414,7 +330,6 @@ export class SharedTerminal {
       if (this.instance === instance) this.events.failed(error);
       throw error;
     }).finally(() => { if (this.launching === launching) this.launching = null; });
-    this.events.changed(instance.status);
     return launching;
   }
   private hooks(current: () => ShellInstance): InstanceHooks {
@@ -432,7 +347,6 @@ export class SharedTerminal {
       changed: status => {
         if (this.instance !== current()) return;
         for (const state of this.viewers) if (state.live) this.send(state, { type: "status", status });
-        this.events.changed(status);
       },
     };
   }
@@ -467,7 +381,6 @@ export class SharedTerminal {
     const instance = this.instance;
     this.instance = null; this.launching = null;
     this.replay();
-    this.events.changed(this.status);
     await instance?.dispose();
   }
   dispose(): Promise<void> {
