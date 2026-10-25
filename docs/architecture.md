@@ -70,6 +70,12 @@ Atelier 分为**应用组合层**、**通用宿主机制**与**插件**三层：
 
 内置实现位于 `packages/builtin/`，公开领域声明位于 `packages/builtin-api/`，应用与内置界面共享控件位于内部 `packages/ui/`。内置后台与前端保持静态构建，应用组合层通过包入口安装内置插件并登记公共提供方；通用加载器只消费提供方描述，不导入 Agent。公共实例、依赖及版本规则见 [公共模块与契约身份](plugin-sdk.md#公共模块与契约身份)。外部插件构建与缓存见 [启动与加载](#启动与加载)，前端静态资源经 `atelier-plugin://` 只读提供，高频数据经 [对象级双工通道](plugin-sdk.md#对象级双工通道api-150) 传输。
 
+### 目录搜索进程与分发
+
+目录搜索由内置 `filesystem/` 模块启动独立 rg 子进程，参数经 argv 直接传入，任务进程消费 NUL 路径记录或 JSON 行协议；工具语义见 [目录搜索](runtime.md#目录搜索findgrep)。
+
+生产依赖 `@vscode/ripgrep` 使用平台可选依赖携带 `rg / rg.exe`；安装保留目标平台的 optional dependencies，应用运行不下载或查找系统 rg。electron-vite 将包装包保留为外部依赖，Forge 将 `@vscode/ripgrep*` 包解到 asar 外，进程启动路径映射到 `.asar.unpacked`。发布按目标 OS／架构安装与打包，跨平台构建不能复用只有构建机平台二进制的 `node_modules`。
+
 ## 存储归属与数据事务
 
 | 路径 | 内容 | 管理方 |

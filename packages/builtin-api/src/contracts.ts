@@ -3,6 +3,7 @@ export * from "./agent.ts";
 export * from "./messaging.ts";
 export * from "./text.ts";
 export * from "./tools.ts";
+export * from "./search.ts";
 export * from "./configuration.ts";
 export * from "./input.ts";
 export * from "./records.ts";

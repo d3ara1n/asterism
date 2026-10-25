@@ -11,6 +11,7 @@ import { DirectoryExec } from "./exec-contract.ts";
 import { execToModel } from "../shell/contract.ts";
 import type { ShellService } from "../shell/service.ts";
 import { simpleGit } from "simple-git";
+import { searchTools } from "./search.ts";
 
 function textFailure(error: unknown, signal: AbortSignal, operation: string): CallResult<never> {
   if (signal.aborted) return { kind: "cancelled", message: `${operation} was cancelled before committing file content.` };
@@ -94,6 +95,7 @@ export function createFilesystemModule(shell: ShellService) { return defineModul
     },
   })],
   tools: [
+    ...searchTools,
     implementTool(DirectoryExec, {
       call: (directory, _target, args, context) => shell.execute(directory.path, args, context),
       toModel: execToModel,

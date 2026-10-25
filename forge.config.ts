@@ -5,7 +5,7 @@ import { applicationBrand, applicationId } from "./src/shared/application.ts";
 const config: ForgeConfig = {
   packagerConfig: {
     // 原生模块及其平台辅助程序在 asar 外加载、执行。
-    asar: { unpack: "**/node_modules/{esbuild,@esbuild,node-pty}/**" },
+    asar: { unpack: "**/node_modules/{esbuild,@esbuild,node-pty,@vscode/ripgrep*}/**" },
     // 打包器以可执行文件名生成 macOS 显示名，统一使用正式品牌大小写。
     executableName: applicationBrand.en,
     name: applicationBrand.en,

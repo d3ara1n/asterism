@@ -29,6 +29,42 @@ export const filesystemMessages = pluginNamespace("atelier.builtin").messages("e
     id: "toolDirectoryList",
     defaultMessage: "List directory",
   },
+  toolDirectoryFind: {
+    id: "toolDirectoryFind",
+    defaultMessage: "Find files",
+  },
+  toolDirectoryGrep: {
+    id: "toolDirectoryGrep",
+    defaultMessage: "Search content",
+  },
+  toolSearchSummary: {
+    id: "toolSearchSummary",
+    defaultMessage: "{unit, select, rows {{count, plural, one {# row returned} other {# rows returned}} ({matches} matching)} other {{count, plural, one {# file returned} other {# files returned}}}} · {complete, select, true {search complete} other {search incomplete}}",
+  },
+  toolSearchLimit: {
+    id: "toolSearchLimit",
+    defaultMessage: "Search stopped at the result limit.",
+  },
+  toolSearchOutputBytes: {
+    id: "toolSearchOutputBytes",
+    defaultMessage: "Search stopped at the 64 KiB output budget.",
+  },
+  toolSearchRecordBytes: {
+    id: "toolSearchRecordBytes",
+    defaultMessage: "Search stopped because a process output record exceeded 1 MiB. That record could not be decoded.",
+  },
+  toolSearchLineOmitted: {
+    id: "toolSearchLineOmitted",
+    defaultMessage: "{match, select, true {Matching line} other {Context line}}; content omitted because the complete row exceeds the 64 KiB output budget.",
+  },
+  toolSearchEmptyIncomplete: {
+    id: "toolSearchEmptyIncomplete",
+    defaultMessage: "No results returned; the search is incomplete.",
+  },
+  toolSearchNoLines: {
+    id: "toolSearchNoLines",
+    defaultMessage: "No matching lines.",
+  },
   toolDirectorySee: {
     id: "toolDirectorySee",
     defaultMessage: "View image",

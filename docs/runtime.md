@@ -191,7 +191,7 @@ Agent 从当前时间线中属于自身的记录投影回合状态（`empty / co
 
 ### 资源工具共享声明
 
-可跨资源复用的资源工具声明位于内置公共 API（`@atelier/builtin-api/contracts`）：`list / read / edit / write / see / wait`，以及代理通信的 `send`。声明只规定参数（args）与语义，说明文字不涉及具体资源；选择哪块内容的 target 与结果 schema 由各资源实现声明，例如目录 `read` 以 `{ path, offset, limit }` 选择行范围，终端 `read` 以 null 或 `{ source, offset, limit }` 选择屏幕、缓冲或原始输出。`wait` 的静止状态由资源定义：终端为回到提示符，代理为收束。参数或语义只属于某类资源的工具留在实现包内，例如终端的 `terminal_input`。第三方资源可实现同一共享声明。
+可跨资源复用的资源工具声明位于内置公共 API（`@atelier/builtin-api/contracts`）：`list / find / grep / read / edit / write / see / wait`，以及代理通信的 `send`。声明只规定参数（args）与语义，说明文字不涉及具体资源；选择哪块内容的 target 与结果 schema 由各资源实现声明，例如目录 `read` 以 `{ path, offset, limit }` 选择行范围，终端 `read` 以 null 或 `{ source, offset, limit }` 选择屏幕、缓冲或原始输出。`wait` 的静止状态由资源定义：终端为回到提示符，代理为收束。参数或语义只属于某类资源的工具留在实现包内，例如终端的 `terminal_input`。第三方资源可实现同一共享声明。
 
 ### 能力视图匹配
 
@@ -315,13 +315,27 @@ type ModelInputPart =
 
 ## 原生正文工具与目录操作
 
-内置目录与笔记共享正文的 `read / edit / write` 工具契约，目录另提供 `list`、图片查看 `see`（按文件头识别 PNG、JPEG、GIF、WebP 并输出文件部件）与 [命令执行 `exec`](#目录命令执行exec)。
+内置目录与笔记共享正文的 `read / edit / write` 工具契约，目录另提供 `list`、[搜索 `find / grep`](#目录搜索findgrep)、图片查看 `see`（按文件头识别 PNG、JPEG、GIF、WebP 并输出文件部件）与 [命令执行 `exec`](#目录命令执行exec)。
 
 - **`read`**：`args` 只有 `anchored?`（默认 true，输出 `LINE#HASH│正文`，四位 Crockford Base32 短哈希；false 输出行号与正文）。文件的 `{path, offset?, limit?}` 属于 `target`，使用完整文件的绝对行号；笔记以 `null` 选择完整正文。文件单次读取返回最多指定行数与 64 KiB 完整行文本，`nextOffset` 指向首个未返回行；无法容纳的单行明确报错，不将截断内容标成可编辑行。
 - **`edit`**：以 `{line, hash}` 引用当前正文；`replace / delete` 的 `anchor..end` 范围含端点（仅校验被引用的端点行），`insert_before / insert_after` 保留锚点行，`append / prepend` 无需锚点。整批基于同一份当前正文校验，任一锚点或重叠范围失败则整批拒绝不写入；位移扫描仅给出重试候选，不自动移动目标。成功结果的 `data` 保存实际 unified diff 与受影响行的新锚点；`toModel` 返回摘要、按预算截取的完整行 diff（最多 64 KiB）与新锚点（最多 40 行 / 16 KiB），省略时明确提示。
 - **`write`**：直接创建或覆盖完整正文，不要求也不返回锚点；相同正文返回无变化。目录 `write` 可创建根内缺失的父目录。`toModel` 成功只返回简短确认与少量统计，不回传 diff、正文或锚点。
 - **限额与写入**：文件文本操作限于 8 MiB UTF-8，笔记限于 100,000 UTF-16 code units；差异由 `diff`（jsdiff）按计算预算生成。路径在操作开始时解析一次真实路径，限制在目录根内并处理符号链接越界，但并非操作系统级沙箱。写入先在同目录暂存并落盘，再以 rename 原子替换目标，进程中断不留下半截文件；替换失败时目标保持原样，返回 `failed`。外部程序或其他代理同时修改时后写为准。
 - **笔记状态边界**：笔记保存只更新会话数据（`session_data`）中该对象的 `atelier.builtin/note.content` 并通知视图，不追加时间线事件或维护历史版本；回溯后的卡片与实时 inspect/read 均读取最新当前内容。GUI 的 120 行预览预算与 Pierre Diffs 代码着色见 [界面设计系统](design-system.md#对话过程视图)。
+
+## 目录搜索（find／grep）
+
+`Find / Grep` 是公共资源工具声明，目录实现为只读、可并行工具，经已有资源链接与工具策略授权。每次调用直接扫描文件系统；搜索不建立索引或保存独立缓存。
+
+- **目标与路径**：`target: null` 选择资源根，`{path}` 选择根内相对路径。`find` 选择目录，`grep` 可选择目录或一个普通文件。目标按现有目录解析规则取真实路径；递归遍历不跟随符号链接，显式选中的链接须解析到资源根内。结果路径相对资源根、统一用 `/`；glob 相对选中的搜索目录，单文件目标的 glob 基准为所在目录。
+- **`find`**：`pattern` 为 glob，例如 `**/*.ts`；只返回文件路径。不含 `/` 的模式（如 `*.md`）按文件名匹配各层级。实现消费 `rg --files --null`，换行属于文件名时仍保留完整身份。
+- **`grep`**：`pattern` 默认按 ripgrep 的 Rust 正则语法逐行匹配，`literal` 切换字面量，`ignoreCase / word` 分别指定忽略大小写与单词边界；`glob` 为可选文件模式数组，`!` 前缀排除，后项优先。`outputMode` 默认 `content`，返回完整命中与上下文行；`context` 为前后各 0–20 行。`files` 只返回命中文件路径；`count` 消费 `rg --count --null --with-filename` 的原生计数，返回各文件的命中行数，同一行多个匹配仍只计一行。
+- **忽略规则**：沿用 ripgrep 的隐藏文件和 ignore 文件筛选，非 Git 目录中的 `.gitignore` 也生效；`hidden / noIgnore` 分别关闭隐藏条目与 ignore 文件筛选，两者独立。正向 glob 对其匹配到的条目优先于隐藏与 ignore 判定；仍被排除的目录会连同后代跳过，内部文件没有机会再匹配。递归搜索排除 `.git`，显式目标解析到资源内 `.git` 条目或其后代时也拒绝搜索。显式单文件目标遵循 ripgrep 的直接目标语义。调用固定 `--no-config`，用户的 rg 配置文件不改变工具参数。
+- **正文与锚点**：正文模式消费 `rg --json`，关闭转码与 BOM 嗅探，二进制检测沿用 ripgrep。`rows` 中 `kind: line` 为完整 UTF-8 行，默认附与 `read / edit` 相同的 `LINE#HASH`，`anchored: false` 仅保留行号；CRLF 去除行终止符，末行独立 CR 保留。单行序列化记录本身超过 64 KiB 时，返回 `kind: omitted`，仅保留路径、行号和命中／上下文身份，省略正文及锚点；该记录计入预算，搜索继续。正文省略与搜索停止分别表达，搜索可以正常完成且包含省略记录。命中路径或正文无法以 UTF-8 表示时明确失败，不以替换字符伪造路径或锚点。搜索不继承 `read / edit` 的 8 MiB 文件上限，后续编辑仍受正文工具限制。
+- **预算与终态**：默认最多 500 行或文件，可指定 `limit` 至 2000；正文模式的上下文行和省略记录均计入条数预算。结果条目总序列化预算 64 KiB。`stopReason: null` 表示完成搜索，`limit / output_bytes / record_bytes` 分别表示因返回条数、累计输出字节、单条管道记录超过 1 MiB 而停止。后者的记录尚未解码，不声明其文件、行号或命中身份。正常行仅因剩余预算不足时以 `output_bytes` 停止，不标记成单行超长。取消或预算停止时结束对应进程，待管道关闭后收束；正则错误、无法读取或进程失败明确报告失败。
+- **结果表达**：顺序沿用 rg，不作排序或稳定性保证。头部数量明确为已返回行／文件数，正文另计其中的命中行，包含正文省略但身份已知的命中；上下文不计作命中。停止后不推测总数。模型与界面共用计数和空结果判定；只有正常完成的空结果报告“没有匹配”，停止后的空结果报告“没有返回结果，搜索未完成”。停止原因按实际限制陈述。
+
+工具三态视图沿用现有工具标题与正文预览预算；安装与分发规则见 [技术架构](architecture.md#目录搜索进程与分发)。
 
 ## 目录命令执行（exec）
 

@@ -20,6 +20,7 @@ import { FilePreview } from "../agent/conversation/Files";
 import { DirectoryInput } from "./creation";
 import { execToolRenderer } from "./exec-view";
 import { useDirectoryTreeLink } from "./tree-link";
+import { searchToolRenderers } from "./search-view";
 
 const appearance = { width: 340, height: 360, minWidth: 280, minHeight: 200 };
 
@@ -130,6 +131,7 @@ export default {
     Actions: DirectoryTreeActions,
   })],
   tools: [
+    ...searchToolRenderers,
     execToolRenderer,
     toolRenderer(DirectoryRead, {
       label: textMessages.toolTextRead, icon: <BookOpen className="size-3.5" />,

@@ -113,6 +113,8 @@
 | 输出块 | block | 思考、正文、工具调用等输出组织与渲染单位；内部 delta 表示增量展示 |
 | Shell 配置 | shell profile | 可复用的 shell 可执行文件、启动参数、命令参数与环境变量；执行时按选择或平台顺序解析，见 [目录命令执行](runtime.md#目录命令执行exec) |
 | 命令执行 | exec | 从目录资源 cwd 启动一次非交互 shell；过程流式交付，历史只保留有界输出与执行结局 |
+| 文件查找 | find | 按 glob 查找目录资源中的文件路径；见 [目录搜索](runtime.md#目录搜索findgrep) |
+| 正文搜索 | grep | 按正则或字面量搜索目录资源中的文件正文，可返回内容行、文件名或逐文件命中行数；见 [目录搜索](runtime.md#目录搜索findgrep) |
 | 模型请求 | request | 一次实际模型 API 请求，可产生多个输出块；协议终态不划分用户回合 |
 | API 参考价格 | API reference prices | 具体模型的应用层单价与输入长度档位，用于估算而非实际账单；结构见 `docs/model-configuration.md` |
 | 计价单位 | pricing unit | 单个计费项的数量单位（token、张或秒），与价格表统一使用的币种分开；单价同时声明金额和计价基数 |
