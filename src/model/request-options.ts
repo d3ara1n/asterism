@@ -36,13 +36,10 @@ export function requestOptions(provider: Connection, model: ProviderModel, reque
   const compatibility = compatibilityForTarget({ provider, model });
   if (provider.protocol !== "openai-responses" || compatibility.systemMessage) options.system = request.system;
 
-  const { reasoning, thinkingLevels } = model.capabilities;
+  const { reasoning } = model.capabilities;
   const thinking = request.thinking;
-  // 所有继承已经完成；关闭思考能力时，等级不参与校验或编码。
-  if (reasoning) {
-    if (thinking === null || !thinkingLevels.includes(thinking)) {
-      throw new ModelFailure("thinking_unavailable", "The thinking level is unavailable for this model. Choose an enabled thinking level or update the role configuration.");
-    }
+  // 等级集合仅用于选择器；继承后的显式等级按协议编码，由上游判断是否接受。
+  if (reasoning && thinking !== null) {
     options.reasoning = thinking === "off" ? "none" : thinking;
   }
   if (provider.protocol === "anthropic") return options;

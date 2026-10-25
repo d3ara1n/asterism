@@ -22,8 +22,8 @@ function configuration(): ConfigurationSnapshot {
   };
 }
 
-// 模型配置契约：空选择逐层继承，保存不检查等级可用性，末端按本次模型能力拒绝。
-describe("模型选择的继承与末端校验", () => {
+// 模型配置契约：空选择逐层继承，等级集合只影响菜单，显式等级由上游判断是否接受。
+describe("模型选择的继承与请求解析", () => {
   it("摘要与请求独立解析同一配置，空选择保留继承，角色修改生效，失效模型不回退", () => {
     const config = configuration();
     const service = createSelection({ agents: () => config.agents });
@@ -66,7 +66,7 @@ describe("模型选择的继承与末端校验", () => {
     { override: null, inherited: null, levels: [...thinkingLevels] },
     { override: "off", inherited: "high", levels: [] },
   ] as { override: ThinkingLevel | null; inherited: ThinkingLevel | null; levels: ThinkingLevel[] }[])(
-    "等级 $override / 继承 $inherited 到末端才检查，不回退到其他等级", ({ override, inherited, levels }) => {
+    "等级 $override / 继承 $inherited 不因可用集合被拒绝或替换", ({ override, inherited, levels }) => {
       const config = configuration();
       config.models[0]!.capabilities.thinkingLevels = levels;
       config.roles.find(role => role.id === "default")!.thinking = inherited;
@@ -76,12 +76,11 @@ describe("模型选择的继承与末端校验", () => {
       const result = resolveTarget(config, service.target(selection));
       expect(result.ok).toBe(true);
       if (!result.ok) throw new Error("Unexpected resolution failure");
+      expect(result.thinking).toBe(override ?? inherited);
       expect(resolveAgentModelSelection(ModelConfiguration.schema.parse(config), selection).thinking).toBe(result.thinking);
       const input = { settings: { provider: config.modelProviders[0]!, model: config.models[0]!, thinking: result.thinking },
         system: { blocks: [] }, messages: [], tools: [] };
       const adapter = new AiSdkAdapter(async () => { throw new Error("Validation must not read credentials"); });
-      expect(() => adapter.validate(input)).toThrow(expect.objectContaining({ code: "thinking_unavailable" }));
-      input.settings.model.capabilities.reasoning = false;
       expect(() => adapter.validate(input)).not.toThrow();
       expect(selection.thinking).toBe(override);
     });

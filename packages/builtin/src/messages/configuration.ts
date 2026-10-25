@@ -21,7 +21,6 @@ export const configurationMessages = pluginNamespace("atelier.builtin").messages
   priceTiersHint: { id: "agent.configuration.priceTiersHint", defaultMessage: "{count, plural, one {# input-length price tier is configured.} other {# input-length price tiers are configured.}} Base text prices are shown here." },
   noModel: { id: "agent.configuration.noModel", defaultMessage: "No model" },
   noThinking: { id: "agent.configuration.noThinking", defaultMessage: "No thinking" },
-  noThinkingLevel: { id: "agent.configuration.noThinkingLevel", defaultMessage: "Not set" },
   unavailable: { id: "agent.configuration.unavailable", defaultMessage: "Unavailable" },
   selected: { id: "agent.configuration.selected", defaultMessage: "Selected" },
   unavailableAgent: {

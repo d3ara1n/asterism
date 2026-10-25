@@ -20,21 +20,21 @@ import { Section } from "../settings/layout";
 import { Editor, TextField, OverrideToggleField } from "./forms";
 import { useConfigurationAction, useSettingsConfiguration } from "./state";
 
-const FOLLOW = "__follow";
+const UNSET = "__unset";
 const thinkingLabel = (level: ThinkingLevel) => getI18n().text(thinkingLabels[level]);
 /** 角色值等于内置值时撤下覆盖，界面只显示生效值。 */
 const toOverride = <T,>(next: T, inherited: T): T | undefined => next === inherited ? undefined : next;
 
-/** 行内模型选择：唯一的“跟随对话”项表示 null；失效引用单独警示。 */
+/** 行内模型选择：未设置表示 null；失效引用单独警示。 */
 function ModelSelect({ value, onChange, disabled }: { value: string | null; onChange: (value: string | null) => void; disabled?: boolean }) {
   const i18n = useI18n();
   const { snapshot } = useSettingsConfiguration();
   if (!snapshot) return null;
   const missing = value !== null && !snapshot.models.some(model => modelReference(model) === value);
-  return <Select value={value ?? FOLLOW} disabled={disabled} onValueChange={next => onChange(next === FOLLOW ? null : next)}>
+  return <Select value={value ?? UNSET} disabled={disabled} onValueChange={next => onChange(next === UNSET ? null : next)}>
     <SelectTrigger size="sm" className="w-48" aria-invalid={missing || undefined} aria-label={i18n.formatMessage(rolesMessages.model)}><SelectValue /></SelectTrigger>
     <SelectContent>
-      <SelectItem value={FOLLOW}>{i18n.formatMessage(rolesMessages.followConversation)}</SelectItem>
+      <SelectItem value={UNSET}>{i18n.formatMessage(rolesMessages.noModel)}</SelectItem>
       {missing && <SelectItem value={value} disabled>{i18n.formatMessage(rolesMessages.unavailableModel)}</SelectItem>}
       {snapshot.modelProviders.map(provider => {
         const models = snapshot.models.filter(model => model.providerId === provider.id);
@@ -51,15 +51,13 @@ function ThinkingSelect({ value, model, onChange, disabled }: { value: ThinkingL
   const i18n = useI18n();
   const levels = availableThinkingLevels(model);
   const unsupported = model?.capabilities.reasoning === false;
-  const unavailable = value !== null && !levels.includes(value);
-  return <Select value={value ?? FOLLOW} disabled={disabled || unsupported} onValueChange={next => onChange(next === FOLLOW ? null : next as ThinkingLevel)}>
+  return <Select value={value ?? UNSET} disabled={disabled || unsupported} onValueChange={next => onChange(next === UNSET ? null : next as ThinkingLevel)}>
     <SelectTrigger size="sm" className="w-32" aria-label={i18n.formatMessage(rolesMessages.thinkingLevel)}>
       <SelectValue>{unsupported ? i18n.text(modelSelectionMessages.thinkingUnsupported)
-        : unavailable ? i18n.formatMessage(modelSelectionMessages.unavailable, { value: thinkingLabel(value) })
-          : value === null ? i18n.text(rolesMessages.followConversationThinking) : thinkingLabel(value)}</SelectValue>
+        : value === null ? i18n.text(modelSelectionMessages.providerDefault) : thinkingLabel(value)}</SelectValue>
     </SelectTrigger>
     <SelectContent>
-      <SelectItem value={FOLLOW}>{i18n.formatMessage(rolesMessages.followConversationThinking)}</SelectItem>
+      <SelectItem value={UNSET}>{i18n.text(modelSelectionMessages.providerDefault)}</SelectItem>
       <SelectSeparator />
       {levels.map(level => <SelectItem key={level} value={level}>{thinkingLabel(level)}</SelectItem>)}
     </SelectContent>

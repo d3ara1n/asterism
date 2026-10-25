@@ -15,7 +15,7 @@
 - `AgentRequestContext`：工作请求终态中的具型领域资料，生产与读取遵循 [请求诊断](../../docs/runtime.md#请求诊断)，不构成独立历史记录。
 - `AgentConfigurations` 与 `ModelConfiguration` 目录契约；只包含内置领域需要的配置视图，不暴露配置文件、凭据、测试与覆盖编辑状态。
 - `ReadAgentCreations`：通过 SDK 具型调用查询模型创建入口与资源类型的关联，供前后端公共消费者使用。
-- `resolveAgentModelSelection`：按目录解析代理选择的模型引用、可用模型与思考等级，供摘要展示；`resolveAgentModel` 只取其中的模型。展示结果不改写原始选择，也不替代请求边界校验。
+- `resolveAgentModelSelection`：按目录解析代理选择的模型引用、可用模型与思考等级，供摘要展示；`resolveAgentModel` 只取其中的模型。展示结果保留原始选择；请求取用时仍解析模型、角色与凭据的可用性，思考等级遵循[模型配置](../../docs/model-configuration.md#输入能力与思考等级)。
 
 `@atelier/builtin-api/renderer` 依赖宿主共享的 React，提供 Agent 界面登记和呈现 API，只允许前端导入。执行循环、压缩策略、提交去重、卡片投影及实际布局属于实现包。取得契约不授予对象写权限；外部准备者仍只能读取宿主绑定的对象门面。顶层工具与插件调用接口属于 [SDK](../sdk/README.md)。
 

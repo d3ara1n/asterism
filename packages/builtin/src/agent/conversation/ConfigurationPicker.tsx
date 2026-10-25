@@ -73,9 +73,8 @@ export function AgentConfigurationPicker({ selection, disabled, onChange }: {
   const thinkingLabel = (thinking: ThinkingLevel | null) => {
     if (!model) return unavailable;
     if (unsupported) return i18n.text(configurationMessages.noThinking);
-    if (thinking === null) return i18n.text(configurationMessages.noThinkingLevel);
-    const label = i18n.text(thinkingLabels[thinking]);
-    return levels.includes(thinking) ? label : i18n.formatMessage(modelSelectionMessages.unavailable, { value: label });
+    if (thinking === null) return i18n.text(modelSelectionMessages.providerDefault);
+    return i18n.text(thinkingLabels[thinking]);
   };
   const modelName = modelLabel(resolved);
   const thinkingName = thinkingLabel(resolved?.thinking ?? null);

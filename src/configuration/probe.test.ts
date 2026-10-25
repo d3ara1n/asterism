@@ -45,7 +45,7 @@ describe("协议连接测试", () => {
     vi.stubEnv("OPENAI_API_KEY", "environment-key-must-not-be-used");
     vi.stubEnv("ANTHROPIC_API_KEY", "environment-key-must-not-be-used");
     const transport = vi.fn<typeof fetch>(async () => Response.json(responses[protocol]));
-    // probe 只验证连通性；即使执行没有可用思考等级，也不参与等级选择或能力校验。
+    // probe 只验证连通性；模型菜单等级为空时也发送最小请求，省略思考选项。
     await runConnectionProbe({ provider: { ...provider(protocol), compatibility: [{ id: "systemMessageInMessages" }, { id: "responsesReasoning", value: {} }] }, model: { ...model,
       capabilities: { ...model.capabilities, reasoning: true, thinkingLevels: [] },
       compatibility: [{ id: "systemMessageInMessages" }, { id: "responsesReasoning", value: {} }, { id: "toolFilesAsUserMessage" }],

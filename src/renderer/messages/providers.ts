@@ -340,11 +340,11 @@ export const providersMessages = pluginNamespace("atelier.host").messages("en", 
   },
   thinkingLevelsHint: {
     id: "model.thinkingLevelsHint",
-    defaultMessage: "Select the levels this model supports. Save to make them available in conversations and model roles.",
+    defaultMessage: "Choose which thinking levels appear in conversations and model roles. Existing selections are sent even if they are not listed.",
   },
   noThinkingLevels: {
     id: "model.noThinkingLevels",
-    defaultMessage: "No levels selected. Select at least one before using this model with reasoning enabled.",
+    defaultMessage: "No levels selected for the menus. Existing selections still apply; requests without a level use the provider default.",
   },
   toolCalls: {
     id: "features_configuration_ProvidersSettings_81",

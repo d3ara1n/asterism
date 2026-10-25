@@ -27,7 +27,7 @@ export function resolveModelSelection(
   };
 }
 
-/** 只投影菜单能力；执行时仍由模型适配层校验。 */
+/** 仅生成菜单选项，不参与已有选择的解析或请求校验。 */
 export function availableThinkingLevels(model: { capabilities: { reasoning: boolean; thinkingLevels: readonly typeof thinkingLevels[number][] } } | null) {
   if (!model) return thinkingLevels;
   return model.capabilities.reasoning ? thinkingLevels.filter(level => model.capabilities.thinkingLevels.includes(level)) : [];

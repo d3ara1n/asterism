@@ -136,12 +136,11 @@ describe("思考等级与预算映射", () => {
     expect(adaptive.thinking).toMatchObject({ type: "adaptive" });
     expect(adaptive.thinking).not.toHaveProperty("budget_tokens");
     expect(adaptive.output_config).toMatchObject({ effort: "custom-low" });
+    current.settings.model.capabilities.thinkingLevels = ["low"];
     current.settings.thinking = "off";
     const disabled = await request(current);
     expect(disabled.thinking).toEqual({ type: "disabled" });
     expect(disabled.output_config).toBeUndefined();
-    current.settings.model.capabilities.thinkingLevels = ["low"];
-    expect(() => new AiSdkAdapter(async () => "unused").validate(current)).toThrow("thinking level is unavailable");
   });
 
   // SDK 对未知模型把默认输出上限与预算相加、对已知模型另作截断；两者都不能成为宿主默认预算的基数。
@@ -298,19 +297,20 @@ describe("显式兼容与目标投影", () => {
     ] }]);
   });
 
-  // 标准等级契约：max 与 xhigh 独立；在支持两者的协议／型号上，真实 SDK 不得丢失或混同它们。
-  it.each(["openai-responses", "openai-chat", "anthropic"] as const)("%s 编码独立的 max 与 xhigh 等级", async protocol => {
+  // utility 与对话共用编码入口；等级列表不能拒绝或钳制 max / xhigh，空等级由上游自行选择。
+  it.each(["openai-responses", "openai-chat", "anthropic"] as const)("%s 原样编码列表外等级，未设置时省略 effort", async protocol => {
     const current = input(protocol);
-    if (protocol === "anthropic") current.settings.model.modelId = "claude-opus-4-7";
+    current.settings.model.modelId = protocol === "anthropic" ? "claude-opus-4-7" : "gpt-5.1";
+    current.settings.model.capabilities.thinkingLevels = ["low"];
+    const effort = (body: Record<string, unknown>) => protocol === "openai-chat" ? body.reasoning_effort
+      : (body[protocol === "anthropic" ? "output_config" : "reasoning"] as Record<string, unknown> | undefined)?.effort;
     for (const level of ["xhigh", "max"] as const) {
       current.settings.thinking = level;
-      const body = await request(current);
-      if (protocol === "anthropic") expect(body.output_config).toMatchObject({ effort: level });
-      else if (protocol === "openai-chat") expect(body.reasoning_effort).toBe(level);
-      else expect(body.reasoning).toMatchObject({ effort: level });
+      expect(effort(await request(current))).toBe(level);
     }
-    current.settings.model.capabilities.thinkingLevels = ["xhigh"];
-    expect(() => new AiSdkAdapter(async () => "unused").validate(current)).toThrow("thinking level is unavailable");
+    current.settings.model.capabilities.thinkingLevels = [];
+    current.settings.thinking = null;
+    expect(effort(await request(current))).toBeUndefined();
   });
 
   // 两层合并不能深合并参数、把空列表当禁用，或把生效条目回写到任一来源。

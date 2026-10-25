@@ -3,6 +3,7 @@ import { commonMessages } from "@atelier/ui/messages/common";
 
 export const modelSelectionMessages = pluginNamespace("atelier.host").messages("en", defineMessages({
   agentDefault: { id: "modelSelection.agentDefault", defaultMessage: "Agent default" },
+  providerDefault: { id: "modelSelection.providerDefault", defaultMessage: "Provider default" },
   unavailable: { id: "modelSelection.unavailable", defaultMessage: "{value} (unavailable)" },
   thinkingUnsupported: { id: "modelSelection.thinkingUnsupported", defaultMessage: "Thinking not supported" },
 }));

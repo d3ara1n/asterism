@@ -85,7 +85,7 @@ export function withThinkingOptions(
   const protocol = provider.protocol;
 
   const project = (params: CallOptions) => {
-    // probe 与 reasoning:false 都不携带显式等级，也不消费自定义映射。
+    // probe、关闭思考及未设置等级时，沿用 SDK 默认请求，不消费等级或预算映射。
     if (params.reasoning === undefined || params.reasoning === "provider-default") return null;
     const level: ThinkingLevel = params.reasoning === "none" ? "off" : params.reasoning;
     const effort = resolveEffort(protocol, level, mappings.levels[level]);

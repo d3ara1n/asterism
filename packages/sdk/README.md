@@ -108,7 +108,7 @@ export default definePlugin({
 ### 6. 可选模型分支（`plugin.models`）
 不依赖内置 Agent 的无状态模型服务（详细协议与续接规则见 [运行时](../../docs/runtime.md#用户输入文件与模型协议适配)）：
 - `models.roles()` / `models.list()`：读取模型角色与可用模型目录。角色条目返回 `id / description / hidden / model / thinking`，身份语义见 [模型角色](../../docs/model-configuration.md#模型角色)。
-- `resolveModelSelection(defaults, overrides)`（`contracts`）：展示与请求共用的模型／思考等级覆盖计算，空值沿用默认值；可用性与凭据由消费边界校验。
+- `resolveModelSelection(defaults, overrides)`（`contracts`）：展示与请求共用的模型／思考等级覆盖计算，空值沿用默认值。模型、角色与凭据的可用性由消费边界校验；思考等级的发送规则见[模型配置](../../docs/model-configuration.md#输入能力与思考等级)。
 - `models.validate(request, { content? })`：校验模型目标、续接资料与文件引用资格，不发送网络请求。
 - `models.stream(request, { content? })`：执行单次模型请求（支持可选 `tools` 声明、`maxOutputTokens`、`userAgent`、`sessionId`），流式交付正文、思考、工具调用与终态协议事件；工具执行、结果配对及续轮由消费者负责。`finish.timing`（API 8.6）可携带请求计时，与 usage 一起按 `ModelCompletion` 保存。
 - `models.run(request)`：绑定具体资源对象（`object`）与请求起点（`requestParentId`），执行一次模型请求及该响应的完整资源工具批次，经 `ModelRunObserver.event` 同步交付 `block`（最高序号块内含 `completion` 终态）、`diagnostic` 与 `progress`。终态包含 `usage`、可选 `timing` 和具型 `extensions`；结果的 `timing` 提供当次实测计时，无终态时也可瞬态消费。外层多轮循环与时间线提交由调用方插件自行驱动。

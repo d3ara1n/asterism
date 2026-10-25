@@ -202,7 +202,7 @@ describe("无状态的单次模型执行", () => {
     expect(completionData(saved, defineData("missing/plugin", z.string()))).toBeNull();
     expect(completionData(saved, defineData(contract.id, z.number()))).toBeNull();
     extensions.mockClear();
-    const rejected = await execute(input([], { completionExtensions: extensions }), model(text, () => { throw new ModelFailure("thinking_unavailable", "No."); }));
+    const rejected = await execute(input([], { completionExtensions: extensions }), model(text, () => { throw new ModelFailure("invalid_argument", "Invalid request."); }));
     expect(rejected).toMatchObject({ reason: "failed", completion: null });
     expect(extensions).not.toHaveBeenCalled();
   });

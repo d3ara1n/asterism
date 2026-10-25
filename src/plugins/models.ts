@@ -44,7 +44,7 @@ export interface HostModels {
   list: ModelServices["list"];
 }
 
-/** 按角色与覆盖解析，思考可用性与请求过滤由模型适配层解释。 */
+/** 按角色与覆盖解析，思考等级编码与请求过滤由模型适配层解释。 */
 export function resolveTarget(snapshot: ConfigurationSnapshot, target: ModelTarget):
   { ok: true; model: string; thinking: ThinkingLevel | null } | { ok: false; reason: ModelTargetError } {
   const role = snapshot.roles.find(item => item.id === target.role);
@@ -114,8 +114,7 @@ export function createModelServices(configuration: ConfigurationService, adapter
         if (request.signal.aborted) throw error;
         throw new PluginApiError("invalid_argument", error instanceof ModelFailure ? error.message : "The model request could not be prepared.",
           error instanceof ModelFailure ? error.code : undefined,
-          error instanceof ModelFailure && error.code === "thinking_unavailable" ? errorMessages.thinking_unavailable
-            : error instanceof ModelFailure && error.code === "tool_files_unsupported" ? errorMessages.tool_files_unsupported : undefined);
+          error instanceof ModelFailure && error.code === "tool_files_unsupported" ? errorMessages.tool_files_unsupported : undefined);
       } finally { await content?.close(); }
     },
     async *stream(request, options) {

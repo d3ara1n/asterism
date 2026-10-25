@@ -323,7 +323,6 @@
   "agent.configuration.priceTiersHint": "{count, plural, other {已配置 # 个按输入长度划分的价格档位。}}此处仅展示文本基础价。",
   "agent.configuration.noModel": "未配置模型",
   "agent.configuration.noThinking": "不支持思考",
-  "agent.configuration.noThinkingLevel": "未设置",
   "agent.configuration.unavailable": "不可用",
   "agent.configuration.selected": "已选择",
   "agent_conversation_ConfigurationPicker_8": "修改于下一次请求生效",

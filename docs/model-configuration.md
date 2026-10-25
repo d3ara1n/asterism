@@ -165,16 +165,23 @@
 
 具体模型的能力声明 `reasoning`、`thinkingLevels` 与 `tools`。输入模态属于服务端能力，不在客户端配置：文件（首批适配 JPEG、PNG、GIF、WebP、PDF）按 `mediaType` 如实发送，由服务端反馈是否接受（见 [模型输入与协议适配](runtime.md#用户输入文件与模型协议适配)）。
 
-标准思考等级全局统一为 `off / minimal / low / medium / high / xhigh / max`（`xhigh` 与 `max` 的公共身份独立，不隐式互换）。模型的 `thinkingLevels` 保存可用等级集合，新建时全开，空集合合法；关闭思考总开关保留集合与已有选择。选择器只提供可用等级，配置保存与选择传递不拦截等级可用性。
+标准思考等级全局统一为 `off / minimal / low / medium / high / xhigh / max`。`xhigh` 与 `max` 是独立等级；`off` 表示显式关闭思考，与未设置等级不同。
 
-请求末端解析模型和等级继承后校验：`reasoning: true` 时，最终等级为空或不在可用集合中均以 `thinking_unavailable` 失败，不自动降档；`reasoning: false` 时省略等级及历史思考部件；`off` 是普通等级，不触发历史过滤。所有情况下均正常接收、保存和展示服务端返回的思考。
+对话与 utility 等角色共用以下规则：
+
+- **菜单选项**：模型的 `thinkingLevels` 指定选择器提供的等级，新建时全开，空集合合法。已有选择即使不在集合中，也按原等级展示和传递。
+- **请求等级**：`reasoning: true` 时，最终显式等级按协议及兼容映射发送。等级集合不参与请求校验，宿主不据此拒绝、钳制或替换等级，是否接受由上游判断。
+- **未设置等级**：按[模型目标](#模型引用与模型目标)完成继承后仍为空时，省略等级参数，由上游使用默认值；界面显示「上游默认」。
+- **思考总开关**：`reasoning: false` 时省略等级参数及历史思考部件，保留配置中的等级集合与已有选择。`off` 只控制本次请求的思考方式，历史思考仍按协议续接。
+
+所有情况下均正常接收、保存和展示服务端返回的思考。
 
 ### 思考等级与预算映射
 
 标准等级是角色、对话选择与历史的公共值；effort 字符串和思考预算只在请求编码时生成，不回写公共等级。协议适配自带默认映射，兼容包仅覆盖映射值，不选择或切换思考模式。
 
 - **等级映射**：Responses 编码 `reasoning.effort`，Chat 编码 `reasoning_effort`；默认 `off` 为 `none`，其他等级同名。Anthropic 自适应思考编码 `output_config.effort`，默认 `minimal` 为 `low`，其他非 off 等级同名；手动预算模式默认不附带 effort。Anthropic 的 `off` 编码 `thinking.type: disabled`，默认省略 effort。
-- **`customThinkingLevels`**：以标准等级为可选键，值为去除首尾空白后的非空上游字符串，`null` 明确省略 effort，缺项使用协议默认。手动预算模式也可通过显式条目附带 effort；省略 effort 不等于关闭思考。模型不接受某等级时，应从可用集合中移除；不自动降级，不将服务端拒绝解释成切换协议或重试的信号。
+- **`customThinkingLevels`**：以标准等级为可选键，值为去除首尾空白后的非空上游字符串，`null` 明确省略 effort，缺项使用协议默认。手动预算模式也可通过显式条目附带 effort；省略 effort 不等于关闭思考。上游拒绝时保留该错误，不自动降级、切换协议或重试。
 - **默认预算**：Anthropic 的手动预算模式无需兼容包即可使用。按本次有效总输出上限 `L` 乘下表比例、向下取整并至少取 1024 tokens；`L` 使用调用方与模型配置取较小值后的上限，两者均未设置时固定为 4096 tokens，不从 SDK 已叠加预算的请求字段反推。工坊的输出上限包含思考，不再额外叠加预算。
 
 | 标准等级 | minimal | low | medium | high | xhigh | max |
@@ -193,7 +200,11 @@
 - **模型 ID**：发往服务端的模型名，可含 `/`；显示名仅供阅读。
 - **模型表达式（`ModelExpression`）**：`<providerId>/<modelId>`，结构化为 `{ provider, model }`，按第一个 `/` 切分。思考等级不属于模型表达式（记录用串可附加 `:<thinking>`）。
 
-请求以模型目标 `ModelTarget = { role, model?, thinking? }` 表达选择：给出的字段覆盖角色，未给出的沿用角色。代理选择 `AgentSelection = { agent, model, thinking }` 允许 `model / thinking` 为 null，转换为 `ModelTarget` 时省略相应覆盖。最终仍无模型，或角色／模型／凭据不可用时，分别以 `role_unavailable`、`model_unavailable`、`credential_unavailable` 明确失败；非空失效引用不降级为继承。
+请求以模型目标 `ModelTarget = { role, model?, thinking? }` 表达选择：给出的字段覆盖角色，未给出的沿用角色。代理选择 `AgentSelection = { agent, model, thinking }` 允许 `model / thinking` 为 null，转换为 `ModelTarget` 时省略相应覆盖。
+
+角色是这层解析的默认值来源，不隐式读取发起者的对话配置。角色模型为空时，调用方须显式提供模型覆盖；两处均为空时请求以 `model_unavailable` 失败。角色与调用方均未设置思考等级时，按[未设置等级规则](#输入能力与思考等级)发送请求。
+
+角色、模型或凭据不可用时，分别以 `role_unavailable`、`model_unavailable`、`credential_unavailable` 明确失败。非空失效引用保留原值，不回退到角色默认值。
 
 ## 模型兼容包
 
@@ -220,8 +231,8 @@
 
 | 字段 | 含义 |
 | --- | --- |
-| 模型引用 | 指向提供商下的具体模型；可为空，继承发起调用的当前对话模型 |
-| 思考等级 | 可为空，继承当前对话的思考等级；空值与明确关闭思考（`off`）不同 |
+| 模型引用 | 默认的具体模型引用；可为空，解析规则见[模型引用与模型目标](#模型引用与模型目标) |
+| 思考等级 | 默认的思考等级；可为空，空值与明确关闭思考（`off`）不同 |
 | 启用 | 停用后在软件内不可用，代理、功能模块与对话均不能选用或解析，只在设置中保留 |
 | 用途描述 | 说明角色适合什么工作，供用户理解和功能、代理选择 |
 | 隐藏 | 不向代理开放为可选择的模型角色；软件内部功能仍可按 ID 使用，设置中仍可管理 |

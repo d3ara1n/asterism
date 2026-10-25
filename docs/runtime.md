@@ -306,7 +306,7 @@ type ModelInputPart =
 - **原生资料作用域**：签名、密文等 `continuation` 仅在来源作用域（provider 身份、协议、端点、模型）与适配版本均一致时复用；跨来源只省略不适用的原生资料，切回原模型时原先的资料仍可复用。
 - **工具调用 ID 配对**：外来工具调用 ID 不满足通用字符／长度范围或与已有身份冲突时，在本次请求内确定性转换，调用和结果成对使用；本来源原始 ID 优先保留。
 - **文件部件编码**：Responses 与 Anthropic 使用 SDK 原生文件表达。Chat Completions 无法承载工具结果文件时，默认在准备阶段以 `tool_files_unsupported` 拒绝；仅当显式添加 `toolFilesAsUserMessage` 兼容包时，才将同批文件搬到紧随该批工具结果之后的一条 user 消息，并在 tool 结果中保留关联说明。
-- **思考能力与续接编码**：模型声明 `reasoning: true` 时校验继承后的思考等级属于可用集合；`reasoning: false` 时当前请求省略思考选项及全部历史思考部件（不改写历史或展示）。思考续接属于协议基线：
+- **思考能力与续接编码**：等级的继承与发送遵循 [输入能力与思考等级](model-configuration.md#输入能力与思考等级)；`reasoning: false` 时当前请求省略思考选项及全部历史思考部件（不改写历史或展示）。思考续接属于协议基线：
   - **Responses**：原始流按 reasoning item 的 added/done 生命周期交付一个 thinking 块（`reasoning_text.delta` 进 `text`，`reasoning_summary_text.delta` 进 `summary`，密文在结束时交付）。输入有可复用密文时发送密文与独立摘要；否则将非空 `text` 编码为 `reasoning_text`、非空 `summary` 编码为 `summary_text`。
   - **Anthropic Messages**：流增量进 `text`，签名与遮蔽资料按白名单累积。输入有可复用签名时连同原始明文发送，有 `redactedData` 时发送遮蔽块；无签名明文直接编码为 `thinking`，不伪造签名；独立摘要无法表达时省略。
   - **Chat Completions**：尚无公共思考输入编码，省略历史思考。

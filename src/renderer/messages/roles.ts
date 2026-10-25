@@ -5,9 +5,9 @@ export const rolesMessages = pluginNamespace("atelier.host").messages("en", defi
     id: "features_configuration_RolesSettings_7",
     defaultMessage: "Model",
   },
-  followConversation: {
+  noModel: {
     id: "features_configuration_RolesSettings_8",
-    defaultMessage: "Follow conversation",
+    defaultMessage: "Not set",
   },
   unavailableModel: {
     id: "features_configuration_RolesSettings_9",
@@ -21,10 +21,6 @@ export const rolesMessages = pluginNamespace("atelier.host").messages("en", defi
     id: "features_configuration_RolesSettings_11",
     defaultMessage: "Thinking level",
   },
-  followConversationThinking: {
-    id: "features_configuration_RolesSettings_12",
-    defaultMessage: "Follow conversation",
-  },
   modelRole: {
     id: "features_configuration_RolesSettings_13",
     defaultMessage: "Model role",
@@ -35,7 +31,7 @@ export const rolesMessages = pluginNamespace("atelier.host").messages("en", defi
   },
   summary: {
     id: "features_configuration_RolesSettings_15",
-    defaultMessage: "Reusable model choices for agents and features. “Follow conversation” uses the model of the calling conversation.",
+    defaultMessage: "Default models and thinking levels for agents and features. Thinking uses the provider default when no level is set.",
   },
   addRole: {
     id: "features_configuration_RolesSettings_16",
