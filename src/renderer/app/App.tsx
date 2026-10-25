@@ -225,7 +225,10 @@ export function App({ controller }: { controller: ApplicationController }) {
       {view.kind === "home"
         ? <motion.div key="home" className="h-full" initial={{ opacity: 0, scale: 1.04 }} animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 1.04 }} transition={islandTransition}>
-          <HomePage active={!inSettings} draft={draft} onSettings={() => go("settings")}
+          <HomePage active={!inSettings} draft={draft} onSettings={category => {
+            go("settings");
+            setSettingsTarget({ category, sequence: ++navigation.current });
+          }}
             templates={snapshot?.templates ?? []} onTemplateStart={startTemplate} onTemplatesChanged={() => { void controller.refresh({ quiet: true }); }}
             ready={ready} busy={start.busy} submitError={start.error} onStart={startConversation} /></motion.div>
         : <motion.div key="conversation" className="h-full" initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }}

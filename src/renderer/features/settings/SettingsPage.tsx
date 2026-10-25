@@ -30,7 +30,8 @@ const MotionCard = motion.create(Card);
 import { fadeTransition, islandTransition } from "../../shared/weave/motion";
 
 /** 设置分类注册表：新增分类只需追加一项。仅列入有明确用途的分类。 */
-interface SettingsCategory { id: string; title: import("@atelier/sdk/contracts").UiText; summary: import("@atelier/sdk/contracts").UiText; icon: ComponentType<LucideProps>; content: () => ReactNode }
+export type SettingsCategoryId = "general" | "appearance" | "providers" | "roles" | "agents" | "about";
+interface SettingsCategory { id: SettingsCategoryId; title: import("@atelier/sdk/contracts").UiText; summary: import("@atelier/sdk/contracts").UiText; icon: ComponentType<LucideProps>; content: () => ReactNode }
 
 const categories: SettingsCategory[] = [
   { id: "general", title: settingsMessages.generalTitle, summary: settingsMessages.generalSummary, icon: Info, content: () => <><LanguageSettings /><SessionsSettings /></> },
@@ -56,7 +57,7 @@ function About() {
  * 设置屏：根浮岛先是平铺在材质上的分类卡片；打开分类时选中卡片经共享布局（layoutId）放大为分类内容，
  * 其余卡片收缩消失。分类内容可在右侧打开更深的浮岛（如提供商详情）。
  */
-export interface SettingsTarget { pluginId: string; location?: string; sequence: number }
+export type SettingsTarget = ({ category: SettingsCategoryId } | { pluginId: string; location?: string }) & { sequence: number };
 function SettingsRoot({ openId, onOpen, onClosed, manager, location }: { openId: string | null; onOpen: (id: string) => void; onClosed: () => void; manager: PluginManager; location?: string }) {
   const i18n = useI18n();
   const island = useIsland();
@@ -136,6 +137,10 @@ export function SettingsPage({ active, target }: { active: boolean; target: Sett
   const appliedTarget = useRef<SettingsTarget | null>(null);
   useEffect(() => {
     if (!active || !target || appliedTarget.current === target) return;
+    if ("category" in target) {
+      appliedTarget.current = target; setLocation(undefined); setOpenId(target.category);
+      return;
+    }
     const plugin = manager.list.find(plugin => plugin.id === target.pluginId);
     if (plugin) { appliedTarget.current = target; setLocation(target.location); setOpenId(pluginKey(plugin)); }
   }, [active, target, manager.list]);

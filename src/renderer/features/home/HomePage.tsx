@@ -20,12 +20,13 @@ import { useConfiguration } from "../configuration/state";
 import { Showcase, showcaseSpell } from "../showcase/Showcase";
 import type { TemplateSummary } from "../../../shared/templates";
 import { TemplateCards } from "../templates/TemplateCards";
+import type { SettingsCategoryId } from "../settings/SettingsPage";
 
 export type StartInput = Omit<Extract<SessionCommand, { type: "start" }>, "type" | "submissionId" | "contentScopeId">;
 
 /** 应用级草稿只保存显式覆盖；默认模型和等级在请求时解析。 */
 export function HomePage({ active, draft, onSettings, ready, busy, submitError, onStart, templates, onTemplateStart, onTemplatesChanged }: {
-  active: boolean; draft: MessageDraft; onSettings: () => void;
+  active: boolean; draft: MessageDraft; onSettings: (category: SettingsCategoryId) => void;
   ready: boolean; busy: boolean; submitError: UiText | null; onStart: (input: StartInput) => Promise<void>;
   templates: readonly TemplateSummary[]; onTemplateStart: (id: string) => Promise<UiText | null>; onTemplatesChanged: () => void;
 }) {
@@ -48,6 +49,12 @@ export function HomePage({ active, draft, onSettings, ready, busy, submitError, 
   }, [snapshot]);
   const agent = snapshot?.agents.find(item => item.id === agentId && item.enabled);
   const canSend = ready && !busy && !inputState.uploading && !!agent && (!!inputState.text.trim() || !!inputState.files.length);
+  // 配置存在即表示用户已接触对应概念；引导进度独立于请求可用性。
+  const guidance = !snapshot ? null
+    : !snapshot.modelProviders.length ? { message: homeMessages.setupProvider, action: homeMessages.openProviders, category: "providers" as const }
+    : !snapshot.models.length ? { message: homeMessages.setupModel, action: homeMessages.openModels, category: "providers" as const }
+    : !snapshot.roles.some(role => role.model !== null) ? { message: homeMessages.setupRole, action: homeMessages.openRoles, category: "roles" as const }
+    : null;
   return <div className="home-page"><div className="home-content">
     <div className="mx-auto w-full max-w-2xl">
       <header className="mb-8 flex flex-col items-center text-center">
@@ -87,8 +94,11 @@ export function HomePage({ active, draft, onSettings, ready, busy, submitError, 
       <DraftFileError draft={draft} className="mt-2" />
       {(submitError || readError) && <p role="alert" className="mt-3 text-center"><StatusText tone="error">{i18n.text(submitError ?? readError ?? "")}</StatusText></p>}
       <div className="mt-4 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-center">
-        <p id="home-availability" role="status" className="type-caption">{busy ? i18n.formatMessage(homeMessages.startingConversation) : !ready ? i18n.formatMessage(commonMessages.statusUnavailable) : i18n.formatMessage(homeMessages.keyboardHint)}</p>
-        <Button variant="ghost" size="sm" onClick={onSettings}><Settings />{i18n.formatMessage(appMessages.menuSettings)}</Button>
+        <p id="home-availability" role="status" className="type-caption">{i18n.text(busy ? homeMessages.startingConversation
+          : !ready ? commonMessages.statusUnavailable : !snapshot ? (readError ? commonMessages.statusUnavailable : commonMessages.loading)
+          : guidance?.message ?? homeMessages.workshopHint)}</p>
+        {ready && !busy && guidance && <Button variant="ghost" size="sm" onClick={() => onSettings(guidance.category)}>
+          <Settings />{i18n.text(guidance.action)}</Button>}
       </div>
     </div>
     <TemplateCards templates={templates} ready={ready} onStart={onTemplateStart} onChanged={onTemplatesChanged} />
