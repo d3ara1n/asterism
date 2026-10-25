@@ -42,10 +42,10 @@ const bridge: DesktopBridge = {
     },
   },
   appearance: {
-    async get() { return parseAppearance(await ipcRenderer.invoke(appearanceGetChannel)); },
-    async set(patch) { return parseAppearance(await ipcRenderer.invoke(appearanceSetChannel, appearancePatchSchema.parse(patch))); },
+    async get() { return parseAppearance(await ipcRenderer.invoke(appearanceGetChannel), process.platform); },
+    async set(patch) { return parseAppearance(await ipcRenderer.invoke(appearanceSetChannel, appearancePatchSchema.parse(patch)), process.platform); },
     onChanged(listener) {
-      const handler = (_event: Electron.IpcRendererEvent, raw: unknown) => listener(parseAppearance(raw));
+      const handler = (_event: Electron.IpcRendererEvent, raw: unknown) => listener(parseAppearance(raw, process.platform));
       ipcRenderer.on(appearanceChangedChannel, handler);
       return () => ipcRenderer.removeListener(appearanceChangedChannel, handler);
     },

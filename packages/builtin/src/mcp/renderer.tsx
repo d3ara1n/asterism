@@ -80,11 +80,11 @@ function ServerRow({ server }: { server: McpServerState }) {
 
 function HostBody({ data }: { data: { servers: McpServerState[] } }) {
   const i18n = useI18n(), openSettings = useOpenSettings();
-  if (!data.servers.length) return <div className="nodrag nopan nowheel flex min-h-0 flex-1 flex-col items-center justify-center gap-2 p-3">
+  if (!data.servers.length) return <div className="nodrag nopan flex min-h-0 flex-1 flex-col items-center justify-center gap-2 p-3">
     <p className="type-caption text-center text-balance text-muted-foreground">{i18n.text(messages.empty)}</p>
     <Button variant="outline" size="xs" onClick={openSettings}><Settings />{i18n.text(messages.openSettings)}</Button>
   </div>;
-  return <div className={cn("nodrag nopan nowheel min-h-0 flex-1 content-start overflow-auto px-2.5 py-1.5", columns)}>
+  return <div className={cn("nodrag nopan min-h-0 flex-1 content-start overflow-auto px-2.5 py-1.5", columns)}>
     {data.servers.map(server => <ServerRow key={server.id} server={server} />)}
   </div>;
 }

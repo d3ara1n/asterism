@@ -11,8 +11,9 @@ import {
  * 校验只走 Zod；损坏或未知字段逐项回退为默认值。
  */
 let store: Store<{ appearance: Appearance }> | null = null;
+const defaults = defaultAppearance(process.platform);
 function open(): Store<{ appearance: Appearance }> {
-  store ??= new Store<{ appearance: Appearance }>({ cwd: app.getPath("userData"), name: applicationStorage.appearanceStore, defaults: { appearance: defaultAppearance }, clearInvalidConfig: true });
+  store ??= new Store<{ appearance: Appearance }>({ cwd: app.getPath("userData"), name: applicationStorage.appearanceStore, defaults: { appearance: defaults }, clearInvalidConfig: true });
   return store;
 }
 
@@ -23,8 +24,8 @@ export function applyThemeSource(appearance: Appearance = readAppearance()): voi
 }
 
 export function readAppearance(): Appearance {
-  try { return parseAppearance(open().get("appearance")); }
-  catch (error) { console.error("Appearance settings could not be read.", error); return defaultAppearance; }
+  try { return parseAppearance(open().get("appearance"), process.platform); }
+  catch (error) { console.error("Appearance settings could not be read.", error); return defaults; }
 }
 
 /** 注册 IPC；仅接受来自受信主框架的请求。返回注销函数。 */
@@ -36,7 +37,7 @@ export function serveAppearance(window: BrowserWindow, trusted: (event: Electron
     if (!trusted(event)) return null;
     const patch = appearancePatchSchema.safeParse(raw);
     if (!patch.success) return readAppearance();
-    const next = parseAppearance({ ...readAppearance(), ...patch.data });
+    const next = parseAppearance({ ...readAppearance(), ...patch.data }, process.platform);
     open().set("appearance", next);
     applyThemeSource(next);
     onChange(next);

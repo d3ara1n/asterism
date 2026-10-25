@@ -5,7 +5,7 @@ import { defaultAppearance, densityRootPx, fontStack, monoStack, sansStack, them
  * 外观的唯一 renderer 入口：读取、写入并把 token 应用到 :root。
  * 亮暗由主进程 nativeTheme.themeSource 决定，这里只读 prefers-color-scheme，与系统材质同源。
  */
-let current: Appearance = defaultAppearance;
+let current: Appearance = defaultAppearance(window.host.platform);
 const darkQuery = window.matchMedia("(prefers-color-scheme: dark)");
 let scheme: Scheme = darkQuery.matches ? "dark" : "light";
 const listeners = new Set<() => void>();

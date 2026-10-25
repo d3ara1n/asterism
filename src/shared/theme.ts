@@ -33,10 +33,11 @@ export function fontStack(family: string | null, fallback: string): string {
 
 export const appearanceSchema = z.object({
   mode: z.enum(modes).catch("system"),
-  accent: z.enum(accentIds).catch("jade"),
+  accent: z.enum(accentIds).catch("graphite"),
   gray: z.enum(grayIds).catch("gray"),
   density: z.enum(densities).catch("standard"),
-  radius: z.enum(radii).catch("md"),
+  /** 未设置或无效时，由读取入口按平台补全。 */
+  radius: z.enum(radii).optional().catch(undefined),
   canvas: z.enum(canvasPatterns).catch("dots"),
   edgeStyle: z.enum(edgeStyles).catch("default"),
   /** 本机字体家族名；null 为系统默认栈。 */
@@ -45,13 +46,17 @@ export const appearanceSchema = z.object({
   /** 代码字号（px），null 跟随所在界面文字。 */
   codeFontSize: z.number().int().min(codeFontSizes[0]).max(codeFontSizes[codeFontSizes.length - 1]).nullable().default(null).catch(null),
 });
-export type Appearance = z.infer<typeof appearanceSchema>;
-export const defaultAppearance: Appearance = { mode: "system", accent: "jade", gray: "gray", density: "standard", radius: "md", canvas: "dots", edgeStyle: "default", uiFont: null, codeFont: null, codeFontSize: null };
+export type Appearance = z.infer<typeof appearanceSchema> & { radius: (typeof radii)[number] };
+
+export function defaultAppearance(platform: string): Appearance {
+  return parseAppearance({}, platform);
+}
 
 /** 读取的原始数据不可信：逐项回退到默认值，不因单项损坏丢弃整份设置。 */
-export function parseAppearance(raw: unknown): Appearance {
+export function parseAppearance(raw: unknown, platform: string): Appearance {
   const result = appearanceSchema.safeParse(raw && typeof raw === "object" ? raw : {});
-  return result.success ? result.data : defaultAppearance;
+  const data = result.success ? result.data : appearanceSchema.parse({});
+  return { ...data, radius: data.radius ?? (platform === "darwin" ? "lg" : platform === "win32" ? "md" : "sm") };
 }
 
 export const appearancePatchSchema = appearanceSchema.partial().strict();

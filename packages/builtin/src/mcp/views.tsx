@@ -52,7 +52,7 @@ export function ToolList({ tools }: { tools: readonly ToolEntryData[] }) {
 
 /** 卡片中的完整缓存目录可达数百条：在有界的局部滚动区内虚拟化，少量条目时高度随内容收缩。 */
 export function VirtualToolList({ tools }: { tools: readonly ToolEntryData[] }) {
-  return <div className="max-h-72 overflow-y-auto overscroll-contain">
+  return <div className="max-h-72 overflow-y-auto">
     <Virtualizer as="ul" item="li" data={tools}>
       {(tool, index) => <div key={toolKey(tool, index)} className="pb-2"><ToolEntry {...tool} /></div>}
     </Virtualizer>

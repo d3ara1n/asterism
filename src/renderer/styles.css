@@ -15,13 +15,13 @@
   --card-foreground: #202020;
   --popover: #ffffff;
   --popover-foreground: #202020;
-  --primary: #208368;
+  --primary: #202020;
   --primary-foreground: #ffffff;
-  --primary-text: #1d3b31;
+  --primary-text: #202020;
   --secondary: #f0f0f0;
   --secondary-foreground: #202020;
-  --selected: #e6f7ed;
-  --selected-foreground: #1d3b31;
+  --selected: #e0e0e0;
+  --selected-foreground: #202020;
   --muted: #f0f0f0;
   --muted-foreground: #646464;
   --external-message: #f4f0fe;
@@ -36,11 +36,11 @@
   --warning-foreground: #ffffff;
   --border: #e0e0e0;
   --input: #d9d9d9;
-  --ring: #56ba9f;
+  --ring: #bbbbbb;
   /* 工坊扩展：画布底色、纹理与选区。 */
   --canvas: #f0f0f0;
   --canvas-grid: #d9d9d9;
-  --selection: #c3e9d7;
+  --selection: #d9d9d9;
   /* 图表分类色：Radix 第 9 级，亮暗同值；运行时由 themeTokens 写入。 */
   --chart-1: #0090ff; --chart-2: #12a594; --chart-3: #ffc53d; --chart-4: #6e56cf;
   --chart-5: #e93d82; --chart-6: #f76b15; --chart-7: #00a2c7; --chart-8: #ab4aba;
@@ -50,24 +50,24 @@
   --motion-page: 380ms;
   --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
-/* 暗色首帧兜底（jade + gray）；运行时由 themeTokens 覆盖。 */
+/* 暗色首帧兜底（graphite + gray）；运行时由 themeTokens 覆盖。 */
 @media (prefers-color-scheme: dark) {
   :root {
     color-scheme: dark;
     --background: #111111; --foreground: #eeeeee;
     --card: #191919; --card-foreground: #eeeeee;
     --popover: #222222; --popover-foreground: #eeeeee;
-    --primary: #29a383; --primary-foreground: #111111;
-    --primary-text: #1fd8a4;
+    --primary: #eeeeee; --primary-foreground: #111111;
+    --primary-text: #eeeeee;
     --secondary: #222222; --secondary-foreground: #eeeeee;
-    --selected: #0f2e22; --selected-foreground: #1fd8a4;
+    --selected: #313131; --selected-foreground: #eeeeee;
     --muted: #222222; --muted-foreground: #b4b4b4;
     --external-message: #291f43; --external-message-foreground: #e2ddfe;
     --accent: #2a2a2a; --accent-foreground: #eeeeee;
-    --destructive: #ff9592; --border: #3a3a3a; --input: #484848; --ring: #2a7e68;
+    --destructive: #ff9592; --border: #3a3a3a; --input: #484848; --ring: #606060;
     --success: #3dd68c; --warning: #ffca16;
     --destructive-foreground: #111111; --success-foreground: #111111; --warning-foreground: #111111;
-    --canvas: #111111; --canvas-grid: #3a3a3a; --selection: #114837;
+    --canvas: #111111; --canvas-grid: #3a3a3a; --selection: #3a3a3a;
   }
 }
 /* shadcn 组件自带的 dark: 类绑定到解析后的亮暗；业务代码不写 dark:。 */
