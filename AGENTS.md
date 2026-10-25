@@ -18,7 +18,7 @@
 
 ## 环境与工作台基线
 
-- **入口与技术基线**：开发入口 `npm run dev`。Electron + React + TypeScript，shadcn/ui（Radix）+ Tailwind CSS 与 `@xyflow/react`，SQLite（`node:sqlite`）与本地对象存储，Zod，独立 Node.js 任务运行时，模型请求适配使用 Vercel AI SDK；构建 `electron-vite`，打包 Electron Forge。测试以 macOS 为主，发布目标覆盖 macOS、Windows 与 Linux。选型与职责见 `docs/architecture.md`，已安装版本见 `package-lock.json`。
+- **入口与技术基线**：开发入口 `npm run dev`。Electron + React + TypeScript，shadcn/ui（Radix）+ Tailwind CSS 与 `@xyflow/react`，SQLite（`node:sqlite`）与本地对象存储，Zod，独立 Node.js 任务运行时，模型请求适配使用 Vercel AI SDK；构建、打包与自动更新选型见 `docs/architecture.md`。测试以 macOS 为主，发布目标覆盖 macOS、Windows 与 Linux。已安装版本见 `package-lock.json`。
 - **身份与数据隔离**：品牌、固定应用身份与数据布局维护在 `src/shared/application.ts`，内部契约与通道身份见 `src/shared/core.ts`。开发数据与发布数据隔离，均使用 Electron 数据目录；测试使用独立临时目录并清理。真实会话、资源快照与任何凭据不进入源码仓库。一次性原型仅留于 `feat/ux-prototype`，正式分支不依赖其代码。
 - **工作台与占位边界**：工作台中的笔记与可添加资源种类仍用于基础能力验证，不得以这些占位内容反推最终资源需求。对象、历史与授权面板按 `docs/workbench.md` 维护（对象快速定位、历史逐节点导航、授权消费真实链接），代理卡片已接入真实对话。工作台作为根浮岛，卡片统一使用 `ObjectCard`，辅助视图以更深浮岛打开；首页、导航、设置与公共视觉沿用已确认约定。
 - **视觉与 UI 控件**：视觉以 `docs/design-system.md` 为准（原生材质底座、独立内容表面、统一 token 与公共控件）；新功能复用现有风格，整体视觉变更须由用户确认。控件先查 shadcn registry：`packages/ui/src/ui/` 缺少时用 `npx shadcn@latest add <name>` 拉取（官方控件不算新依赖），拉取后核对导入路径为相对路径，并清理 CLI 误加的依赖或目录。
@@ -68,6 +68,7 @@
 | --- | --- |
 | `docs/decisions.md` | **历史决策归档与未决问题**：记录为什么这样选、排除了什么替代方案，避免重走弯路。**不是当前规格说明书**，当前契约以第 2 类真值文档为准 |
 | `docs/roadmap.md` | 实施阶段划分、里程碑验收场景与必测边界 |
+| `docs/releasing.md` | 维护者发布操作：GitHub Secrets、工作流触发、产物与首包验收 |
 | `docs/mcp-caching.md` | MCP 延迟加载与提示缓存机制调研（时点固化，接入时核验） |
 | `docs/agent-transcript-research.md` | 开源项目（pi、OpenCode、Cline、Codex、AI SDK）源码调研（仅作背景参考） |
 | `plans/` | 跨会话延续的待办任务与已归档实施记录，规则见下方 `plans 纪律` |

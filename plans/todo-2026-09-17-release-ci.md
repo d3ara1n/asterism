@@ -1,18 +1,50 @@
-# 接入 PR label 分组与 release CI
+# 接入 GitHub 发布与自动更新
 
-> 立案 2026-09-17，暂缓。桌面工程已有可运行入口与本地打包，CI 基础设施尚未接入；本计划继续跟踪发布自动化，不作为当前 UI 壳子阶段的前置。
+立案日期：2026-09-17。
 
-## 背景
+状态：本地打包、更新设置与发布工作流已实现，待配置签名 Secrets、运行 CI 与发布首包。设计真值见 [发布与自动更新](../docs/architecture.md#发布与自动更新)，取舍见 [决策归档](../docs/decisions.md#github-发布自签证书与更新通道2026-10-25)。
 
-沿用 TideBar 的发版机制：PR 打 label 进 release note 分组（`feature`/`enhancement` → Features、`bug`/`fix` → Bug Fixes、`documentation` → Documentation），release CI 按合并提交自动计算版本并定期发版，不手动打 tag。
+## 实现现状
 
-## 前置条件
+- 本地使用 electron-builder 26.18.0，macOS arm64 已生成 DMG、ZIP、blockmap 与更新元数据；electron-updater 6.8.11 已接入主进程与设置页。
+- `.github/` 包含普通检查、三平台打包和完整产物发布工作流；签名 Secrets 尚未配置。
+- 开发数据后缀已改为 `.dev`，未移动或清理旧开发数据。
+- 存储格式不符时拒绝打开，没有升级迁移；版本升级的数据保留由 [存储演进](todo-2026-10-12-storage-migration.md) 跟踪。
 
-- roadmap 阶段 1 完成，存在首个可运行里程碑。
-- 发布覆盖 macOS、Windows、Linux；Electron 打包工具已选定。
+## 待实施
 
-## 范围
+- [x] 以 electron-builder 替换 Forge 配置与依赖，保留 electron-vite；配置约定的平台安装与更新产物，同步更新开发命令和 README。
+- [ ] 保留原生模块、辅助程序的 asar 解包与执行权限处理，核对 node-pty、rg、esbuild 在产物中的加载和执行。
+- [x] 调整开发数据目录后缀；更新通道与安装身份、数据根分别处理，同步更新身份测试与实际路径说明。真实开发数据的移动或清理单独授权。
+- [x] 接入 electron-updater 主进程服务、设置中的「包含预发布版本」选项及其持久化、更新状态展示。
+- [x] 配置 GitHub Actions 的检查、各平台构建、版本计算、更新元数据与 Release 产物发布；GitHub 预发布标记、版本号与客户端通道匹配保持一致。
+- [ ] 通过 CI Secrets 导入固定 macOS 自签身份，完成应用及嵌套代码签名；明确所需 secret 名称与格式。Secret 设置与远端发布单独授权。
+- [ ] 在未导入开发者证书的用户环境验证 macOS 两个真实版本的下载、替换与重启；验证 Windows NSIS 和 Linux AppImage 更新，以及更新前任务退出和存储关闭。
+- [ ] 验证预发布筛选与 SemVer 版本选择，关闭预发布选项后保持当前版本且不降级；GUI 与真实安装交互由用户验收。
+- [x] 补全首次安装放行说明、平台支持范围和更新说明，维护者操作见 [发布操作说明](../docs/releasing.md)。
 
-- `.github/release.yml`：label 分组配置。
-- release CI：按合并提交计算版本、自动发版。
-- 分支保护与 PR 流程细节随实际协作方式一并确定。
+本地类型检查、777 个单元／契约用例与翻译检查通过，工作流 YAML 已解析检查。DMG 完整性与 ad-hoc 应用签名校验通过；固定自签与真实更新尚未验收。安装失败后的恢复入口已按代码复核结果修复。公开前模式扫描未发现凭据、私钥或真实运行数据入库；公开历史包含维护者提交邮箱与归档文档中的本地用户名。
+
+## 发布自动化约定
+
+沿用 TideBar 的发版机制：PR label 进入 release note 分组（`feature`/`enhancement` → Features、`bug`/`fix` → Bug Fixes、`documentation` → Documentation），release CI 按合并提交自动计算版本并定期发版，不手动打 tag。分组配置位于 `.github/release.yml`；首次发布前后的分支流程衔接按项目约定确定。
+
+## 首轮内测推进
+
+发布仓库采用 `d3ara1n/atelier`，目标为公开仓库，通过 GitHub Prerelease 自用内测，公开宣发留待以后。公开前检查仓库及提交历史中的私有资料、凭据和真实运行数据，并核对安装说明；公开仓库、提交与首发产物分别在准备完成后执行。
+
+建议按以下顺序推进：
+
+1. 本地完成打包器迁移、更新服务与设置入口、`.dev` 数据隔离，跑完检查并生成安装包。
+2. 接入 CI 检查与发布工作流。首轮由 `workflow_dispatch` 触发预发布，工作流生成版本和 tag；验证后再启用约定的定时发布。普通提交运行检查，不逐提交发布安装包。
+3. 配置固定签名身份的 Secrets，完成三平台构建；所有目标产物与更新元数据上传完成后再公开对应 Release。
+4. 公开仓库并发布首个预发布，建议版本为 `0.1.0-beta.1`；手动安装该 CI 产物，在设置中开启包含预发布。
+5. 以一次实际修改发布 `0.1.0-beta.2`，从首包验证检查、下载、退出安装与重启，确认版本变化且工作数据保留。
+6. 日常继续使用安装版内测，通过 `npm run dev` 开发；继续发布递增预发布版本，正式发布使用相同代码库和版本序列。
+
+TideBar 的 `.github/workflows/release.yml` 已使用 `MAC_SIGNING_P12`（base64 P12）与 `MAC_SIGNING_P12_PASSWORD` 导入签名身份，可沿用命名和注入方式；该项目的 Sparkle 更新实现不直接复制。Secrets 的实际值不从仓库 API 读取或写入计划。
+
+## 后续事项
+
+- 首包目标为 macOS arm64、Windows x64、Linux x64；其他架构按需要扩展。
+- 发布先通过手动工作流触发，定时发布频率在首轮链路验证后确定。

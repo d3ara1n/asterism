@@ -1,5 +1,6 @@
 import { LanguageSettings } from "./LanguageSettings";
 import { SessionsSettings } from "./SessionsSettings";
+import { UpdateSettings } from "./UpdateSettings";
 import { AppearanceSettings } from "../appearance/AppearanceSettings";
 import { ModelProvidersSettings } from "../configuration/ModelProvidersSettings";
 import { WebProvidersSettings } from "../configuration/WebProvidersSettings";
@@ -34,7 +35,7 @@ export type SettingsCategoryId = "general" | "appearance" | "providers" | "roles
 interface SettingsCategory { id: SettingsCategoryId; title: import("@atelier/sdk/contracts").UiText; summary: import("@atelier/sdk/contracts").UiText; icon: ComponentType<LucideProps>; content: () => ReactNode }
 
 const categories: SettingsCategory[] = [
-  { id: "general", title: settingsMessages.generalTitle, summary: settingsMessages.generalSummary, icon: Info, content: () => <><LanguageSettings /><SessionsSettings /></> },
+  { id: "general", title: settingsMessages.generalTitle, summary: settingsMessages.generalSummary, icon: Info, content: () => <><LanguageSettings /><UpdateSettings /><SessionsSettings /></> },
   { id: "appearance", title: settingsMessages.appearance, summary: settingsMessages.appearanceSummary, icon: Palette, content: () => <AppearanceSettings /> },
   { id: "providers", title: settingsMessages.providers, summary: settingsMessages.providersSummary, icon: PlugZap, content: () => <><ModelProvidersSettings /><WebProvidersSettings /></> },
   { id: "roles", title: settingsMessages.rolesTitle, summary: settingsMessages.rolesSummary, icon: Cpu, content: () => <RolesSettings /> },

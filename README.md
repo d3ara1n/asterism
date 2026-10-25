@@ -6,7 +6,7 @@ Atelier 是一个本地优先、以对象为中心的个人 agent 工作台。�
 
 整理信息、维护文件、开展研究、编写程序，都可以从一件具体的工作开始。Atelier 关注你交给代理什么、代理做了什么，以及留下的结果如何参与下一步。
 
-> 当前为私有孵化项目，尚未发布稳定版本。本仓库用于产品定义、实现与开发验收；能力状态和待办以设计文档及 `plans/` 为准。
+> 当前处于早期内测，尚未发布稳定版本。预发布版本用于持续开发和真实使用验证；能力状态和待办以设计文档及 `plans/` 为准。
 
 ## 在工坊里做一件事
 
@@ -39,6 +39,16 @@ Atelier 是一个本地优先、以对象为中心的个人 agent 工作台。�
 
 ## 开发与体验
 
+安装包由 [GitHub Releases](https://github.com/d3ara1n/atelier/releases) 提供：macOS（Apple Silicon）下载 DMG，Windows（x64）下载 EXE 安装包，Linux（x64）下载 AppImage。更新 ZIP、blockmap 与 YAML 文件供应用自动更新使用。
+
+macOS 将 `Atelier.app` 从 DMG 拖入「应用程序」后运行。应用采用固定自签证书；如系统因隔离标记阻止首次打开，确认下载来源后可手动执行：
+
+```bash
+xattr -dr com.apple.quarantine /Applications/Atelier.app
+```
+
+在「设置 → 通用 → 软件更新」查看当前版本、检查更新或重启安装。应用启动后检查并下载更新，由用户选择安装时机；安装前沿用运行中资源的退出确认。「包含预发布版本」允许提前接收新功能，关闭后保留当前版本，只接收更高的正式版本。初次安装预发布时该选项默认开启，之后保留用户选择。
+
 需要 Node.js 22.13+ 与 npm。安装依赖后启动桌面应用：
 
 ```bash
@@ -59,15 +69,15 @@ npm run build
 npm run i18n:check
 ```
 
-`npm run package` 生成当前平台的未签名应用目录，`npm run make` 进一步生成 ZIP。编译产物位于 `dist/`，Forge 产物位于 `out/`。
+`npm run package` 生成当前平台的应用目录，`npm run make` 生成安装包与更新产物；命令支持追加 electron-builder 平台和架构选项。编译产物位于 `dist/`，打包产物位于 `out/`。macOS 本地无固定证书时使用 ad-hoc 签名，仅用于打包检查；发布由 CI 注入固定签名身份。CI 发布操作见 [发布操作说明](docs/releasing.md)。
 
 应用图标的源图与各平台产物位于 `assets/icon/`，修改方法见 [应用图标](docs/design-system.md#应用图标)。
 
 ## 数据与运行边界
 
-工作数据与应用配置保存到本设备的 Electron 数据目录，源码目录和安装目录不承担数据存储。开发版使用 `appData/dev.dearain.atelier-development`，发布版使用 `appData/dev.dearain.atelier`；两者由固定应用身份 `dev.dearain.atelier` 生成，不随显示名称或仓库文件夹变化。
+工作数据与应用配置保存到本设备的 Electron 数据目录，源码目录和安装目录不承担数据存储。`npm run dev` 使用 `appData/dev.dearain.atelier.dev`，安装版使用 `appData/dev.dearain.atelier`；两者由固定应用身份 `dev.dearain.atelier` 生成，不随显示名称或仓库文件夹变化。更新通道共用安装版数据。
 
-全局模型与代理配置保存在 `configuration.json`，外观在 `appearance.json`，界面语言在 `language.json`，窗口状态在 `ui-state.json`，密钥独立加密保存于 `credentials/`。工作数据库为 `db/workspace.sqlite`，不可变正文位于 `objects/`，插件内容位于 `content/`，运行日志位于 `logs/runtime.log`，Chromium 数据位于 `chromium/`。重建会话数据库不重置全局配置；关闭最后一个窗口会退出应用和任务进程。
+全局模型与代理配置保存在 `configuration.json`，外观在 `appearance.json`，界面语言在 `language.json`，更新偏好在 `updates.json`，窗口状态在 `ui-state.json`，密钥独立加密保存于 `credentials/`。工作数据库为 `db/workspace.sqlite`，不可变正文位于 `objects/`，插件内容位于 `content/`，运行日志位于 `logs/runtime.log`，Chromium 数据位于 `chromium/`。重建会话数据库不重置全局配置；关闭最后一个窗口会退出应用和任务进程。
 
 开发前期只支持当前存储与协议版本（具体版本号定义于源码常量），不提供旧数据兼容或迁移；版本不符时明确报错，关闭应用后备份、清理并重新初始化开发数据。完整的存储与副作用约定见 [技术架构](docs/architecture.md) 和 [运行时](docs/runtime.md)。
 

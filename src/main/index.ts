@@ -18,12 +18,14 @@ import { startupText } from "./startup-text.ts";
 import { startupMessages } from "../shared/error-display.ts";
 import { allowRendererPermission } from "./permissions.ts";
 import { adoptLoginShellEnvironment } from "./shell-environment.ts";
+import { ApplicationUpdates } from "./updates.ts";
 import { startupGetChannel, startupChangedChannel, startupRestartChannel, startupDataDirectoryChannel, type StartupState } from "../shared/startup.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 let window: BrowserWindow | null = null;
 let quitting = false;
 let quitRequest: Promise<void> | null = null;
+let updates: ApplicationUpdates | null = null;
 /** 受信渲染页地址（不含 hash），供权限判定使用。 */
 let trustedURL: string | null = null;
 let startup: StartupState = { status: "starting", stage: "environment" };
@@ -40,7 +42,7 @@ const runtime = new RuntimeHost(status => {
 }, undefined, (stage, detail) => publishStartup({ status: "starting", stage, ...(detail ? { detail } : {}) }));
 
 /** 用户退出先读取资源的当前提示；确认后按原关闭流程等待后台清理。 */
-function requestQuit(restart = false): void {
+function requestQuit(restart = false, installUpdate = false): void {
   if (quitting || quitRequest) return;
   quitRequest = (async () => {
     const result = await runtime.execute({ type: "workspace.prepare-close" });
@@ -60,6 +62,15 @@ function requestQuit(restart = false): void {
     quitting = true;
     startupLifetime.abort();
     await runtime.stop();
+    if (installUpdate && updates?.ready) {
+      updates.install(error => {
+        quitting = false;
+        publishStartup({ status: "failed", reason: "runtime", detail: error.message });
+        // 工作台已结束启动订阅，重新进入启动入口以呈现失败与重启操作。
+        if (window && !window.isDestroyed()) window.webContents.reload();
+      });
+      return;
+    }
     if (restart) app.relaunch();
     app.quit();
   })().catch(error => { console.error("Application shutdown failed.", error); }).finally(() => { quitRequest = null; });
@@ -139,6 +150,7 @@ function createWindow(): void {
   const stopDesktopWindow = serveDesktopWindow(current, titleBar, trusted);
   const stopPreferences = servePreferences(trusted);
   const stopLanguage = serveLanguage(current, trusted);
+  const stopUpdates = updates!.serve(current, trusted, () => requestQuit(false, true));
   current.webContents.on("render-process-gone", (_event, details) => {
     closeConnection();
     if (!quitting && details.reason !== "clean-exit")
@@ -176,7 +188,7 @@ function createWindow(): void {
     for (const channel of [startupGetChannel, startupRestartChannel, startupDataDirectoryChannel]) ipcMain.removeHandler(channel);
     closeConnection();
     window = null; ipcMain.removeHandler(pickDirectoryChannel); ipcMain.removeHandler(openLocalFileChannel); ipcMain.removeHandler(openLogsChannel);
-    stopAppearance(); stopPreferences(); stopLanguage();
+    stopAppearance(); stopPreferences(); stopLanguage(); stopUpdates();
   });
   const loading = developmentURL ? current.loadURL(developmentURL) : current.loadFile(rendererFile);
   loading.catch(error => { console.error("Renderer initialization failed.", error); dialog.showErrorBox(applicationBrand.en, startupText(startupMessages.windowLoadFailed, () => readLanguage().locale)); });
@@ -226,6 +238,7 @@ if (!app.requestSingleInstanceLock()) {
     servePluginArtifacts(dataRoot);
     // 开发运行没有应用包图标，Dock 显式使用正式图标。
     if (process.platform === "darwin" && !app.isPackaged) app.dock?.setIcon(applicationIconFile("atelier.png"));
+    updates = new ApplicationUpdates();
     createWindow();
     app.on("activate", () => { if (!quitting && BrowserWindow.getAllWindows().length === 0) createWindow(); });
     let environmentTimer: ReturnType<typeof setTimeout> | undefined;
@@ -239,6 +252,7 @@ if (!app.requestSingleInstanceLock()) {
       if (quitting) return;
       publishStartup({ status: "starting", stage: "plugins" });
       await runtime.start(join(here, "runtime.js"), dataRoot);
+      void updates.check();
     }
     catch (error) {
       if (quitting) return;

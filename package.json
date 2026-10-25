@@ -17,8 +17,8 @@
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
-    "package": "npm run build && electron-forge package",
-    "make": "npm run build && electron-forge make",
+    "package": "npm run build && electron-builder --config electron-builder.config.ts --dir --publish never",
+    "make": "npm run build && electron-builder --config electron-builder.config.ts --publish never",
     "i18n:extract": "node scripts/i18n.ts extract",
     "i18n:check": "node scripts/i18n.ts check",
     "icon": "node scripts/app-icon.ts"
@@ -45,6 +45,7 @@
     "cmdk": "1.1.1",
     "diff": "9.0.0",
     "electron-store": "11.0.2",
+    "electron-updater": "6.8.11",
     "elkjs": "0.12.0",
     "esbuild": "0.28.2",
     "katex": "0.16.47",
@@ -69,9 +70,6 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
-    "@electron-forge/cli": "8.0.1",
-    "@electron-forge/maker-zip": "8.0.1",
-    "@electron-forge/shared-types": "8.0.1",
     "@formatjs/cli": "6.16.34",
     "@tailwindcss/vite": "4.3.3",
     "@types/node": "^26.6.1",
@@ -80,6 +78,7 @@
     "@types/semver": "7.8.0",
     "@vitejs/plugin-react": "6.1.2",
     "electron": "44.7.0",
+    "electron-builder": "26.18.0",
     "electron-vite": "6.0.0-beta.8",
     "tailwindcss": "4.3.3",
     "typescript": "^7.0.2",

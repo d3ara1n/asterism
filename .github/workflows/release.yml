@@ -1,0 +1,152 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Release type
+        type: choice
+        options: [prerelease, release]
+        default: prerelease
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      skip: ${{ steps.version.outputs.skip }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26.12.0
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run i18n:check
+      - id: version
+        env:
+          RELEASE_MODE: ${{ inputs.mode }}
+        run: node scripts/prepare-release.ts "$RELEASE_MODE"
+
+  build:
+    needs: prepare
+    if: needs.prepare.outputs.skip != 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15
+            platform: mac
+            arch: arm64
+          - os: windows-2025
+            platform: win
+            arch: x64
+          - os: ubuntu-24.04
+            platform: linux
+            arch: x64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26.12.0
+          cache: npm
+      - run: npm ci
+      - name: Set release version
+        env:
+          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+        shell: bash
+        run: npm version "$RELEASE_VERSION" --no-git-tag-version --ignore-scripts
+      - name: Import macOS signing identity
+        if: runner.os == 'macOS'
+        env:
+          MAC_SIGNING_P12: ${{ secrets.MAC_SIGNING_P12 }}
+          MAC_SIGNING_P12_PASSWORD: ${{ secrets.MAC_SIGNING_P12_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$MAC_SIGNING_P12"
+          test -n "$MAC_SIGNING_P12_PASSWORD"
+          signing="$RUNNER_TEMP/atelier-signing"
+          mkdir -p "$signing"
+          printf '%s' "$MAC_SIGNING_P12" | base64 --decode > "$signing/identity.p12"
+          keychain_password="$(openssl rand -hex 24)"
+          echo "::add-mask::$keychain_password"
+          security create-keychain -p "$keychain_password" "$signing/build.keychain-db"
+          security set-keychain-settings -lut 21600 "$signing/build.keychain-db"
+          security unlock-keychain -p "$keychain_password" "$signing/build.keychain-db"
+          security import "$signing/identity.p12" -k "$signing/build.keychain-db" \
+            -P "$MAC_SIGNING_P12_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$keychain_password" "$signing/build.keychain-db"
+          security list-keychains -d user -s "$signing/build.keychain-db" "$HOME/Library/Keychains/login.keychain-db"
+          security find-certificate -a -p "$signing/build.keychain-db" > "$signing/identity.pem"
+          security add-trusted-cert -r trustRoot -p codeSign -k "$signing/build.keychain-db" "$signing/identity.pem"
+          identity="$(security find-identity -v -p codesigning "$signing/build.keychain-db" | sed -n 's/.*"\(.*\)".*/\1/p' | head -1)"
+          test -n "$identity"
+          echo "CSC_NAME=$identity" >> "$GITHUB_ENV"
+      - name: Build distributables
+        shell: bash
+        env:
+          RELEASE_PLATFORM: ${{ matrix.platform }}
+          RELEASE_ARCH: ${{ matrix.arch }}
+        run: npm run make -- "--$RELEASE_PLATFORM" "--$RELEASE_ARCH"
+      - name: Verify macOS signature
+        if: runner.os == 'macOS'
+        run: codesign --verify --deep --strict out/mac-arm64/Atelier.app
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.platform }}-${{ matrix.arch }}
+          if-no-files-found: error
+          path: |
+            out/*.dmg
+            out/*.zip
+            out/*.exe
+            out/*.AppImage
+            out/*.blockmap
+            out/latest*.yml
+      - name: Remove macOS signing identity
+        if: always() && runner.os == 'macOS'
+        shell: bash
+        run: |
+          security delete-keychain "$RUNNER_TEMP/atelier-signing/build.keychain-db" || true
+          rm -rf "$RUNNER_TEMP/atelier-signing"
+
+  publish:
+    needs: [prepare, build]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          path: artifacts
+          merge-multiple: true
+      - name: Publish complete release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+          RELEASE_PRERELEASE: ${{ needs.prepare.outputs.prerelease }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="v$RELEASE_VERSION"
+          flags=()
+          if [[ "$RELEASE_PRERELEASE" == "true" ]]; then flags+=(--prerelease); fi
+          gh release create "$tag" artifacts/* --draft --target "$GITHUB_SHA" \
+            --title "Atelier $tag" --generate-notes "${flags[@]}"
+          gh release edit "$tag" --draft=false

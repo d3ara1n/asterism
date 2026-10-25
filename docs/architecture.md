@@ -16,7 +16,8 @@
 | 结构化持久化 | SQLite（`node:sqlite`） | 工作区身份、会话节点树、当前数据、内容依赖索引与视图布局 |
 | 校验 | Zod | 事件、工具参数、IPC 与配置的运行时校验 |
 | 代码构建 | electron-vite | 主进程、preload、renderer 与任务运行时的开发与构建 |
-| 打包分发 | Electron Forge | 跨平台打包；只打包 `dist/`、清单和生产依赖，不叠加 Vite 插件 |
+| 打包分发 | electron-builder | 生成平台安装包与更新产物；打包 `dist/`、清单和生产依赖 |
+| 自动更新 | electron-updater | 通过 GitHub Releases 检查、下载和安装更新；契约见 [发布与自动更新](#发布与自动更新) |
 | 大内容 | 本地对象文件存储 | 宿主正文（`objects/`）与插件不可变字节内容（`content/`） |
 | 任务运行时 | 独立 Node.js 进程（utilityProcess） | 执行不依赖 React 生命周期，不阻塞主进程 |
 | 模型接入 | Vercel AI SDK | 无状态适配：流式、工具调用、多 provider；不拥有任务历史 |
@@ -33,10 +34,32 @@
 | `src/runtime/index.ts` | `dist/main/runtime.js` | Electron `utilityProcess` 入口，拥有应用服务、SQLite 数据库、模型循环、工具调度与插件宿主 |
 | `src/renderer/main.tsx` / `application.tsx` | `dist/renderer/` | 轻量启动页与延后装载的应用组合、工作台视图和用户意图，不直接访问任意文件或凭据 |
 
-- **应用标识與数据根**：正式标识固定为 `dev.dearain.atelier`（集中于 `src/shared/application.ts`，内部契约与通道通过 `src/shared/core.ts` 生成 `core.* / core:*`）。应用数据统一位于 Electron `app.getPath('userData')` 下：发布版为 `appData/dev.dearain.atelier`，开发版为 `appData/dev.dearain.atelier-development`，在获取单实例锁前创建并显式设置，不写入源码仓库或安装目录。
+- **应用标识与数据根**：应用标识固定为 `dev.dearain.atelier`（集中于 `src/shared/application.ts`，内部契约与通道通过 `src/shared/core.ts` 生成 `core.* / core:*`）。应用数据统一位于 Electron `app.getPath('userData')` 下：安装版为 `appData/dev.dearain.atelier`，`npm run dev` 开发版为 `appData/dev.dearain.atelier.dev`，在获取单实例锁前创建并显式设置，不写入源码仓库或安装目录。更新通道与数据归属见 [发布与自动更新](#发布与自动更新)。
 - **进程生命周期**：Electron 就绪后先创建窗口，启动屏承接任务进程与界面的初始化，顺序及等待边界见 [启动与加载](#启动与加载)。主进程与任务进程之间保留控制链路（启动阶段、就绪、退出确认读取、关闭与凭据请求），请求带协议版本与关联 ID，只发送一次，超时或退出使在途请求失败，不自动重放。renderer 业务流量走直连端口，见 [直连传输](#直连传输)。关闭最后一个窗口时先要求任务进程关闭数据库再退出应用；任务进程崩溃后要求重启应用。
 - **启动环境**：主进程在 fork 任务进程前以 `shell-env` 读取用户登录 shell 的环境并写回 `process.env`（Windows 原样保留）。从 Finder／Dock 启动的应用由此取得与终端一致的 PATH 等变量；任务进程及其派生的 shell、终端、MCP 与插件子进程继承同一份环境，插件无需另行解析。解析失败时沿用原环境并记录日志。
 - **凭据隔离**：凭据加解密由主进程调用 `safeStorage` 提供私有接口供任务运行时使用，不向 renderer 开放解密命令。加密不可用或 Linux 仅提供 `basic_text` 时拒绝保存明文 key。
+
+### 发布与自动更新
+
+`electron-vite` 承担编译，`electron-builder` 承担打包与发布产物生成，`electron-updater` 承担应用内更新。GitHub Releases 托管安装包、更新包与更新元数据，客户端完成检查、下载与安装。
+
+设置中的「包含预发布版本」决定检查更新时是否纳入 GitHub Prerelease；关闭时仅检查正式 Release。所有产物来自同一代码库，沿用同一个应用身份、安装位置和数据目录，无通道后缀。更新统一按 SemVer 选择更高版本，例如 `1.0.0 < 1.1.0-beta.8 < 1.1.0`；关闭预发布选项保留当前版本，后续只接收更高的正式版本，不降级。
+
+偏好保存在 `updates.json`，初次安装预发布时默认开启，初次安装正式版时默认关闭，已有选择优先。安装版启动就绪后检查并下载更新，也可从设置手动检查；在途检查与下载使用开始时的偏好，后续检查使用新值。安装由用户显式触发，复用资源退出确认并等待任务进程关闭后调用更新器。macOS 原生安装校验失败时进入启动失败页，可重新启动应用。
+
+开发版是 `npm run dev` 的运行形态，数据目录使用 `.dev` 后缀，与安装版隔离；它不属于第三个更新通道。
+
+各平台提供以下安装与更新产物：
+
+| 平台 | 用户安装入口 | 更新所需产物 |
+| --- | --- | --- |
+| macOS | DMG | ZIP 与更新元数据 |
+| Windows | NSIS EXE 安装包 | 安装包与更新元数据 |
+| Linux | AppImage | AppImage 与更新元数据 |
+
+框架需要的 blockmap、差分产物等可与完整安装包共同发布；产物数量不限定为每平台一个文件。
+
+macOS 使用长期固定的自签代码证书，各版本保持可匹配的签名身份。证书、私钥与导入密码由 GitHub Actions Secrets 提供给 CI；应用包与仓库只包含运行所需的公开签名信息。分发采用站外自签方式，首次启动由用户按安装说明手动放行或移除隔离标记；Apple Developer ID、公证与 App Store 分发不作为发布前提。
 
 ### 启动与加载
 
@@ -75,7 +98,7 @@ Atelier 分为**应用组合层**、**通用宿主机制**与**插件**三层：
 
 目录搜索由内置 `filesystem/` 模块启动独立 rg 子进程，参数经 argv 直接传入，任务进程消费 NUL 路径记录或 JSON 行协议；工具语义见 [目录搜索](runtime.md#目录搜索findgrep)。
 
-生产依赖 `@vscode/ripgrep` 使用平台可选依赖携带 `rg / rg.exe`；安装保留目标平台的 optional dependencies，应用运行不下载或查找系统 rg。electron-vite 将包装包保留为外部依赖，Forge 将 `@vscode/ripgrep*` 包解到 asar 外，进程启动路径映射到 `.asar.unpacked`。发布按目标 OS／架构安装与打包，跨平台构建不能复用只有构建机平台二进制的 `node_modules`。
+生产依赖 `@vscode/ripgrep` 使用平台可选依赖携带 `rg / rg.exe`；安装保留目标平台的 optional dependencies，应用运行不下载或查找系统 rg。electron-vite 将包装包保留为外部依赖，打包器将 `@vscode/ripgrep*` 包解到 asar 外，进程启动路径映射到 `.asar.unpacked`。发布按目标 OS／架构安装与打包，跨平台构建不能复用只有构建机平台二进制的 `node_modules`。
 
 ## 存储归属与数据事务
 

@@ -6,6 +6,7 @@ import type { DesktopPlatform, DesktopWindowBridge } from "./desktop.ts";
 import type { AppearanceBridge } from "./theme.ts";
 import { templateSummarySchema } from "./templates.ts";
 import { startupStageSchema, type StartupBridge } from "./startup.ts";
+import type { UpdatesBridge } from "./updates.ts";
 
 export const protocolVersion = 11;
 export const statusChannel = coreChannel("runtime-status");
@@ -63,6 +64,7 @@ export type RuntimeMessage = z.infer<typeof runtimeMessageSchema>;
 /** 主进程能力：窗口、外观、语言、偏好与系统对话框。任务进程能力经 connectRuntime 交接的直连端口使用。 */
 export interface DesktopBridge {
   startup: StartupBridge;
+  updates: UpdatesBridge;
   language: LanguageBridge;
   appearance: AppearanceBridge;
   /** 受控偏好容器：只能读写 preferences 内宿主规定前缀的键。 */

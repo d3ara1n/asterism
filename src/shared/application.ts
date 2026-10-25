@@ -9,7 +9,7 @@ export const applicationUserAgent = `${applicationBrand.en}/${packageMetadata.ve
 
 /** 数据根使用固定身份，开发与发布显式隔离；调用方在 Electron appData 下解析。 */
 export function applicationDataDirectory(isPackaged: boolean): string {
-  return isPackaged ? applicationId : `${applicationId}-development`;
+  return isPackaged ? applicationId : `${applicationId}.dev`;
 }
 
 /** 同一应用数据根下的固定布局，不以品牌显示名命名文件。 */
@@ -22,6 +22,7 @@ export const applicationStorage = {
   appearanceStore: "appearance",
   languageStore: "language",
   uiStateStore: "ui-state",
+  updatesStore: "updates",
   chromiumDirectory: "chromium",
   logsDirectory: "logs",
   runtimeLogFile: "runtime.log",
