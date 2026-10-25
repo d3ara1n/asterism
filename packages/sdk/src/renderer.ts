@@ -1,6 +1,8 @@
 /** SDK renderer 入口：卡片、工具视图与绑定对象的前端能力；React 由宿主共享。 */
 import { createContext, createElement, useContext, type ComponentType, type ReactNode } from "react";
 import type { UiText } from "./i18n.ts";
+import type { CardAppearance } from "./card.ts";
+export type { CardAppearance } from "./card.ts";
 export * from "./renderer-i18n.ts";
 import type { ActionContract, CreationContract } from "./commands.ts";
 import type { Json } from "./json.ts";
@@ -84,13 +86,6 @@ export interface ResourceDescription {
   card?: CardAppearance;
   /** 本资源可作为有向链接终点，与后台 links.receive 一致。 */
   receivesLinks?: boolean;
-}
-export interface CardAppearance {
-  /** 画布单位下的默认尺寸；用户覆盖由工作台保存。 */
-  width: number;
-  height: number;
-  minWidth?: number;
-  minHeight?: number;
 }
 export interface CardView extends CardAppearance {
   body: ReactNode;

@@ -12,7 +12,7 @@ import { textReadViews, textWriteViews, textEditViews } from "../text-view";
 import { CreateNote, NoteView, NoteRead, NoteEdit, NoteWrite } from "./contract";
 import { NoteInput } from "./creation";
 
-const appearance = { width: 340, height: 320, minWidth: 280, minHeight: 160 };
+import { noteCard as appearance } from "../shared/card-appearance.ts";
 
 function NoteActions({ data }: { data: { text: string | null } }) {
   const i18n = useI18n();

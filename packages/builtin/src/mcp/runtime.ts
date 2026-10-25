@@ -1,3 +1,4 @@
+import { mcpCard } from "../shared/card-appearance.ts";
 import { defineModule, implementResource, implementCreation, implementTool, implementCall, PluginApiError, type CallResult } from "@atelier/sdk/runtime";
 import { type Json, type ResourceRef } from "@atelier/sdk/contracts";
 import { McpHost, CreateMcpHost, McpHostView, McpList, McpSearch, McpInspect, McpConnect, McpCall, McpChanged,
@@ -82,6 +83,7 @@ export default defineModule(plugin => {
       }),
     ],
     resources: [implementResource(McpHost, McpHostView, {
+      card: mcpCard,
       creation: implementCreation(CreateMcpHost, { create: ({ title }) => ({ title, data: {} }) }),
       project: () => ({ servers: service.states() }),
       inspect: async () => ({ servers: service.list({ offset: 0, limit: 20 }) }),

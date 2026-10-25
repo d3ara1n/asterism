@@ -13,7 +13,7 @@ import { Instructions, ServerError, ServerSummary, VirtualToolList } from "./vie
 import { mcpToolRenderers } from "./tool-views";
 import { useLifetimeSignal } from "../shared/use-lifetime";
 
-const appearance = { width: 360, height: 300, minWidth: 280, minHeight: 160 };
+import { mcpCard as appearance } from "../shared/card-appearance.ts";
 /** 列：展开箭头 · 状态 · 名称 · 工具数 · 操作；各行以 subgrid 共用列宽，展开区从名称列起对齐。 */
 const columns = "grid grid-cols-[auto_auto_minmax(0,1fr)_auto_auto] gap-x-1.5";
 const detail = "col-[3/-1] min-w-0";

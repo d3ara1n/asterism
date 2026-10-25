@@ -3,6 +3,8 @@ import { pluginNamespace, defineCreation, defineAction, defineRecord, defineChan
 
 export const sample = pluginNamespace("example.counter");
 export const Counter = sample.resource("counter", z.strictObject({}));
+/** 前后台共用，供创建空位与实际卡片使用。 */
+export const counterCard = { width: 300, height: 200 };
 export const Count = sample.data("count", z.strictObject({ value: z.number().int() }));
 export const CounterView = sample.data("card", Count.schema);
 export const CountChanged = defineRecord(sample.name("count-changed"), {

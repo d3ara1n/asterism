@@ -10,6 +10,7 @@ import { CreateAgent, ReadAgentCreations } from "@atelier/builtin-api/contracts"
 import { CreateNote } from "../../packages/builtin/src/notes/contract.ts";
 import { ApplicationService } from "../runtime/service.ts";
 import type { ModelAdapter } from "../model/contract.ts";
+import { placementGap } from "../shared/workbench-layout.ts";
 
 const ns = pluginNamespace("test.resources");
 const Item = ns.resource("item", z.strictObject({}));
@@ -77,6 +78,59 @@ function runner(f: ReturnType<typeof open>, actor: ResourceRef, target: Awaited<
 }
 
 describe("SDK 会话资源生命周期", () => {
+  // 后台曾把所有默认卡片视作 340×200；真实 Agent 与新建 Agent 的右下区域因此互相遮挡。
+  // 使用实际注册的内置资源验证尺寸声明穿过 SDK 装配，连续创建按完整矩形避让且靠近创建者。
+  it("后台连续创建按各类型完整默认尺寸避让，并优先放在创建者附近", async () => {
+    const f = open();
+    const input = { selection: { agent: "worker", model: null, thinking: null } };
+    const actor = await f.session.create(CreateAgent, input);
+    await f.app.sessions.execute({ type: "view.set", sessionId: f.sessionId, objectId: actor.id,
+      position: { x: 4000, y: 3000 }, collapsed: true });
+    const boxes = [{ id: actor.id, position: { x: 4000, y: 3000 }, width: 560, height: 640 }];
+    const creations = [
+      { create: () => f.session.create(CreateAgent, input, { linkTo: actor }), width: 560, height: 640 },
+      { create: () => f.session.create(CreateNote, { title: "Note", content: "" }, { linkTo: actor }), width: 340, height: 320 },
+    ];
+    for (const entry of creations) {
+      const before = f.app.sessions.current(f.sessionId).workbench.views;
+      const resource = await entry.create();
+      const views = f.app.sessions.current(f.sessionId).workbench.views;
+      const position = views.find(view => view.objectId === resource.id)!.position;
+      expect(Math.hypot(position.x - 4000, position.y - 3000)).toBeLessThan(1500);
+      for (const box of boxes) expect(position.x + entry.width + placementGap.x <= box.position.x
+        || box.position.x + box.width + placementGap.x <= position.x
+        || position.y + entry.height + placementGap.y <= box.position.y
+        || box.position.y + box.height + placementGap.y <= position.y).toBe(true);
+      expect(views.filter(view => view.objectId !== resource.id)).toEqual(before);
+      boxes.push({ id: resource.id, position, width: entry.width, height: entry.height });
+    }
+    // 用户覆盖后的尺寸继续参与后台放置，折叠也预留展开区域。
+    await f.app.sessions.execute({ type: "view.set", sessionId: f.sessionId, objectId: actor.id,
+      size: { width: 1200, height: 1000 } });
+    const note = await f.session.create(CreateNote, { title: "After resize", content: "" }, { linkTo: actor });
+    const position = f.app.sessions.current(f.sessionId).workbench.views.find(view => view.objectId === note.id)!.position;
+    expect(position.x + 340 + placementGap.x <= 4000 || position.x >= 5200 + placementGap.x
+      || position.y + 320 + placementGap.y <= 3000 || position.y >= 4000 + placementGap.y).toBe(true);
+  });
+
+  // 整理必须以单一事务保存；逐张写入中途失败会留下半张被整理的画布。
+  it("批量位置写入原子生效，保留其他视图字段与任务历史", async () => {
+    const f = open(), a = await f.session.create(Create, 0), b = await f.session.create(Create, 1);
+    await f.app.sessions.execute({ type: "view.set", sessionId: f.sessionId, objectId: a.id,
+      size: { width: 800, height: 600 }, collapsed: true, hidden: true });
+    const before = f.app.sessions.current(f.sessionId);
+    const positions = [{ objectId: a.id, position: { x: -500, y: -600 } }, { objectId: b.id, position: { x: 600, y: 700 } }];
+    await expect(f.app.sessions.execute({ type: "views.position", sessionId: f.sessionId,
+      positions: [...positions, { objectId: "missing", position: { x: 0, y: 0 } }] })).rejects.toThrow("Object does not belong");
+    expect(f.app.sessions.current(f.sessionId).workbench.views).toEqual(before.workbench.views);
+    expect((await f.app.sessions.execute({ type: "views.position", sessionId: f.sessionId, positions })).kind).toBe("accepted");
+    const after = f.app.sessions.current(f.sessionId);
+    expect(after.nodes).toEqual(before.nodes);
+    expect(after.workbench.views).toEqual(before.workbench.views.map(view => ({
+      ...view, position: positions.find(item => item.objectId === view.objectId)!.position,
+    })));
+  });
+
   // 依据资源链接契约：第三方资源可接收链接，两个方向分别授权；字段错配会丢失访问范围或通知接收者。
   it("通用资源链接跨 SDK 与会话命令保持方向、授权和通知接收者一致", async () => {
     let resourceId = "";

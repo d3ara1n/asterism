@@ -9,7 +9,7 @@ import { Markdown } from "../agent/conversation/Markdown";
 import { settledBodyViews } from "../shared/tool-views";
 import { WebCard } from "./WebCard";
 
-const appearance = { width: 340, height: 300, minWidth: 260, minHeight: 160 };
+import { webCard as appearance } from "../shared/card-appearance.ts";
 const field = (value: Json, key: string) => value && typeof value === "object" && !Array.isArray(value) && typeof value[key] === "string" ? value[key] : undefined;
 const parseResponse = (data: Json | undefined) => { const parsed = webResponseSchema.safeParse(data); return parsed.success ? parsed.data : undefined; };
 

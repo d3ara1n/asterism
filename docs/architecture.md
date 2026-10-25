@@ -9,6 +9,7 @@
 | 对话渲染 | LobeHub Streamdown（`@lobehub/streamdown`） | Markdown、GFM、流式未闭合语法与平滑渐入，应用不自建解析器或动画队列 |
 | 设计系统 | shadcn/ui（Radix）+ Tailwind CSS | 组件源码纳入仓库；统一使用 Tailwind 与设计 token，不并行维护另一套组件样式体系 |
 | 节点工作台 | @xyflow/react | DOM 卡片、端点与连线的视图投影，不拥有业务对象、授权或历史 |
+| 全图整理 | elkjs | 前端按需加载分层布局引擎，计算不同尺寸卡片的位置；交互见 [画布与对象卡片](workbench.md#画布与对象卡片) |
 | 代码与差异展示 | Pierre Diffs（`@pierre/diffs`） | 代码语法着色与 stacked unified diff 视图，按需渲染 |
 | Markdown 富内容 | remark-math、rehype-katex、KaTeX、Mermaid | 标准数学语法与 Mermaid 图形；通过渲染器公开插件和组件入口接入 |
 | 文本差异生成 | diff（jsdiff） | 后端按行生成标准 unified diff，保留换行差异并限制计算预算 |
@@ -146,6 +147,7 @@ renderer 与任务进程经一对 `MessagePort` 直连（`src/shared/connection.
 | `object.remove` | 对象 settled 后移除，并解除全部入向、出向链接；未收束时返回 `conflict` |
 | `link.set` | 变更指定会话的资源有向链接，事务提交后通知 |
 | `view.set` / `viewport.set` | 保存卡片布局（位置、折叠、隐藏、尺寸覆盖）或画布视口，不修改历史 |
+| `views.position` | 在一个事务中保存多张卡片的位置，沿用单对象的身份检查和视图更新，不修改其他视图字段或任务历史 |
 | `rename` | 调用命名模块追加 `source: user` 的 `SessionNamed` 事件并同步标题 |
 
 前端的资源创建、链接与移除和后台 SDK 使用同一宿主操作，统一完成身份、事务与收束检查；后台接口见 [会话目录与资源操作](plugin-sdk.md#会话目录与资源操作api-91)。

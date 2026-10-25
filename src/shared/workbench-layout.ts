@@ -8,4 +8,4 @@ export const minimumCardHeight = 160;
 /** 缺少视图行的早期对象按默认可见处理，位置在用户首次移动时保存。 */
 export const defaultCardPosition: Point = { x: 48, y: 48 };
 /** 相邻卡片之间的水平与垂直空隙。 */
-export const placementGap = { x: 60, y: 280 };
+export const placementGap = { x: 80, y: 80 };

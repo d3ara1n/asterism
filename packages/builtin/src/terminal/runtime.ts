@@ -1,3 +1,4 @@
+import { terminalCard } from "../shared/card-appearance.ts";
 import { stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { isAbsolute, join } from "node:path";
@@ -81,6 +82,7 @@ export function createTerminalModule(settings: () => ShellSettings) { return def
   return {
     events: [TerminalImageRequested],
     resources: [implementResource(TerminalResource, TerminalView, {
+      card: terminalCard,
       creation: implementCreation(CreateTerminal, {
         async prepare(input) {
           if (input.cwd && (!isAbsolute(input.cwd) || !(await stat(input.cwd).catch(() => null))?.isDirectory()))

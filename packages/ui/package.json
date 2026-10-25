@@ -24,7 +24,7 @@
     "lucide-react": "1.55.0",
     "radix-ui": "1.8.0",
     "tailwind-merge": "3.7.0",
-    "@atelier/sdk": "^0.42.0"
+    "@atelier/sdk": "^0.43.0"
   },
   "peerDependencies": {
     "react": "19.3.0",

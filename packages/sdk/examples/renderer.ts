@@ -1,4 +1,4 @@
-import { Counter, CounterView as Card, CreateCounter, ChangeCount, CounterUpdates } from "./counter-contract.ts";
+import { Counter, CounterView as Card, CreateCounter, ChangeCount, CounterUpdates, counterCard } from "./counter-contract.ts";
 /** 前端作者用例：仅依赖 React、Zod 和公开 SDK，不取用 window.host。 */
 import { createElement, useEffect, useState } from "react";
 import { z } from "zod";
@@ -30,8 +30,8 @@ function CounterDetails({ data }: { data: z.infer<typeof Card.schema> }) {
     createElement("button", { onClick: card.closePanel }, "Close"));
 }
 export const renderer = {
-  resources: [{ kind: Counter.kind, label: "Counter", icon: null }],
-  cards: [cardRenderer(Card, { width: 300, height: 200, Body: CounterBody,
+  resources: [{ kind: Counter.kind, label: "Counter", icon: null, card: counterCard }],
+  cards: [cardRenderer(Card, { ...counterCard, Body: CounterBody,
     panels: [{ id: "details", label: "Details", icon: null, Body: CounterDetails }] })],
   tools: [],
 } satisfies RendererModule;

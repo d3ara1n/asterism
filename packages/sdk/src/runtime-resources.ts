@@ -36,6 +36,7 @@ export function implementPreparer<I, O extends Json>(contract: ActionContract<I,
 }
 export function implementResource<S extends Json, V extends Json>(
   resource: ResourceContract<S>, view: DataContract<V>, definition: {
+    card?: ResourceContribution["card"];
     records?: readonly RecordContract[];
     links?: ResourceContribution["links"];
     creation?: CreationContribution;
@@ -50,7 +51,7 @@ export function implementResource<S extends Json, V extends Json>(
 ): ResourceContribution {
   const attach = definition.attach;
   return {
-    resource, records: [...definition.records ?? []], links: definition.links,
+    resource, card: definition.card, records: [...definition.records ?? []], links: definition.links,
     creation: definition.creation, actions: definition.actions,
     project: (snapshot, object) => present(view, definition.project(parse(resource.stateSchema, snapshot.data, "resource"), object)),
     inspect: async (snapshot, object) => jsonSchema.parse(await definition.inspect(parse(resource.stateSchema, snapshot.data, "resource"), object)),

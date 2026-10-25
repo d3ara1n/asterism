@@ -7,7 +7,10 @@ import type { ObjectNodeType } from "./ObjectNode";
 import { placeObject } from "./placement";
 import { cardSize, fallbackCardAppearance } from "./sizing";
 import { defaultOverviewMinZoom, locateViewport, overviewMinZoom } from "./viewport";
-import { operationSucceeded } from "../../shared/toast";
+import { operationSucceeded, toast } from "../../shared/toast";
+import { useI18n } from "../../shared/i18n";
+import { workbenchMessages } from "../../messages/workbench";
+import { arrangeObjects } from "./arrange";
 
 export type ObjectPlacement = { sessionId: string; position: Point; selectedObjectIds: string[] };
 
@@ -17,25 +20,30 @@ export interface WorkbenchCanvas {
   findPlacement: (options?: { kind?: string; size?: CardSize }) => ObjectPlacement | null;
   /** 打开隐藏对象，等待投影和测量后共同入镜；空列表或失效对象不移动视图。 */
   locateObjects: (objectIds: readonly string[], options?: { select?: boolean }) => Promise<void>;
+  /** 显式整理当前可见卡片，保存全部位置后共同入镜。 */
+  arrange: () => Promise<void>;
 }
 
 type LocateRequest = { objectIds: string[]; select: boolean; token: number };
 
 /** 下游只消费 WorkbenchCanvas；React Flow 的视口操作与等待集中在此。 */
-export function useWorkbenchCanvas(nodes: ObjectNodeType[], setNodes: Dispatch<SetStateAction<ObjectNodeType[]>>, element: RefObject<HTMLDivElement | null>) {
+export function useWorkbenchCanvas(nodes: ObjectNodeType[], setNodes: Dispatch<SetStateAction<ObjectNodeType[]>>, element: RefObject<HTMLDivElement | null>, active: boolean) {
   const { session, controller, run, ready } = useWorkbench();
   const registry = useModuleViews();
+  const i18n = useI18n();
   const flow = useReactFlow<ObjectNodeType>();
   const width = useStore(state => state.width);
   const height = useStore(state => state.height);
-  const available = useRef(ready);
-  available.current = ready;
+  const available = useRef(ready && active);
+  available.current = ready && active;
   const [locating, setLocating] = useState<LocateRequest | null>(null);
   const sequence = useRef(0);
   const mounted = useRef(true);
+  const arrangement = useRef<AbortController | null>(null);
+  useLayoutEffect(() => () => { arrangement.current?.abort(); }, [ready, active]);
   useLayoutEffect(() => {
-    if (!ready) { sequence.current++; setLocating(null); }
-  }, [ready]);
+    if (!ready || !active) { sequence.current++; setLocating(null); }
+  }, [ready, active]);
   useEffect(() => {
     mounted.current = true;
     return () => { mounted.current = false; sequence.current++; };
@@ -50,9 +58,17 @@ export function useWorkbenchCanvas(nodes: ObjectNodeType[], setNodes: Dispatch<S
     const center = { x: (host.clientWidth / 2 - viewport.x) / viewport.zoom, y: (host.clientHeight / 2 - viewport.y) / viewport.zoom };
     const appearance = options.kind ? registry.resource(options.kind).card ?? fallbackCardAppearance : fallbackCardAppearance;
     const current = flow.getNodes();
+    // 新增预留展开尺寸，折叠后的测量高度不会成为未来展开时的占位上限。
+    const views = new Map(state.data?.workbench.views.map(view => [view.objectId, view]));
+    const occupied = current.map(node => {
+      const appearance = registry.card(node.data.object.presentation) ?? fallbackCardAppearance;
+      const size = cardSize(appearance, views.get(node.id)?.size);
+      return { id: node.id, position: node.position, width: node.width ?? size.width,
+        height: node.data.collapsed ? size.height : node.height ?? size.height };
+    });
     return {
       sessionId: controller.sessionId,
-      position: placeObject(center, cardSize(appearance, options.size), current),
+      position: placeObject(center, cardSize(appearance, options.size), occupied),
       selectedObjectIds: current.filter(node => node.selected).map(node => node.id),
     };
   }, [controller, element, flow, registry]);
@@ -79,6 +95,39 @@ export function useWorkbenchCanvas(nodes: ObjectNodeType[], setNodes: Dispatch<S
     // 受理与节点投影分离；画布等待全部目标测量，而非猜测某一帧已经渲染完。
     if (valid()) setLocating({ objectIds, select: options?.select ?? false, token });
   }, [controller]);
+
+  const arrange = useCallback(async () => {
+    const state = controller.getSnapshot();
+    const current = flow.getNodes();
+    if (arrangement.current || !mounted.current || !available.current || state.navigating
+      || state.status !== "ready" || !state.data || !current.length) return;
+    const scope = new AbortController();
+    arrangement.current = scope;
+    try {
+      const views = new Map(state.data.workbench.views.map(view => [view.objectId, view]));
+      const positions = await arrangeObjects(current.map(node => {
+        const size = cardSize(registry.card(node.data.object.presentation) ?? fallbackCardAppearance, views.get(node.id)?.size);
+        return {
+          id: node.id, position: node.position, width: node.width ?? node.measured?.width ?? size.width,
+          height: node.data.collapsed ? node.measured?.height ?? size.height : node.height ?? node.measured?.height ?? size.height,
+        };
+      }), state.data.workbench.links, scope.signal);
+      scope.signal.throwIfAborted();
+      if (!await run({ type: "views.position", sessionId: controller.sessionId, positions }) || scope.signal.aborted) return;
+      // 整理后的入镜只取仍可见的参与对象，沿用用户在计算期间作出的隐藏或移除操作。
+      const latest = controller.getSnapshot().data?.workbench;
+      const hidden = new Set(latest?.views.filter(view => view.hidden).map(view => view.objectId));
+      const visible = new Set(latest?.objects.filter(object => !hidden.has(object.id)).map(object => object.id));
+      await locateObjects(positions.filter(item => visible.has(item.objectId)).map(item => item.objectId));
+    } catch (error) {
+      if (!scope.signal.aborted) {
+        console.error("Workbench layout failed.", error);
+        toast.error(i18n.formatMessage(workbenchMessages.arrangeFailed));
+      }
+    } finally {
+      arrangement.current = null;
+    }
+  }, [controller, flow, run, locateObjects, i18n, registry]);
 
   const targetsReady = !!locating && locating.objectIds.every(id => {
     const node = nodes.find(node => node.id === id);
@@ -109,6 +158,6 @@ export function useWorkbenchCanvas(nodes: ObjectNodeType[], setNodes: Dispatch<S
   const minZoom = width && height
     ? overviewMinZoom(flow.getNodesBounds(nodes), width, height)
     : Math.min(defaultOverviewMinZoom, session.viewport.zoom);
-  const api = useMemo<WorkbenchCanvas>(() => ({ findPlacement, locateObjects }), [findPlacement, locateObjects]);
+  const api = useMemo<WorkbenchCanvas>(() => ({ findPlacement, locateObjects, arrange }), [findPlacement, locateObjects, arrange]);
   return { api, minZoom };
 }

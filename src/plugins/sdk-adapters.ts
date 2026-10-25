@@ -41,6 +41,7 @@ export function adaptResource(contribution: ResourceContribution, sdk: SdkContex
   };
   return {
     kind: resource.kind,
+    card: contribution.card,
     validateState(data) {
       if (!resource.stateSchema.safeParse(data).success)
         throw new SessionError("invalid_request", "Saved resource state does not match its schema.");

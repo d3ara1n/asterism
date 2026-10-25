@@ -7,8 +7,9 @@ import type { Json } from "@atelier/sdk/contracts";
 
 import { type WorkbenchCommand, type WorkbenchSnapshot, type Point, type Viewport } from "../shared/workbench.ts";
 import type { ContentStore, ContentLease, ContentAccess } from "./content-store.ts";
-import { defaultCardPosition, fallbackCardWidth, fallbackCardHeight } from "../shared/workbench-layout.ts";
+import { defaultCardPosition } from "../shared/workbench-layout.ts";
 import { placeObject } from "../shared/workbench-placement.ts";
+import { cardSize } from "../shared/workbench-sizing.ts";
 
 /** 宿主工作台写入的会话级来源。 */
 const host = null;
@@ -43,15 +44,24 @@ export class SessionWorkbench {
     return id;
   }
 
-  /** 后台没有鼠标与实时测量，复用空位算法并按已保存尺寸或公共回退尺寸放置。 */
-  placement(sessionId: string): Point {
-    const ids = new Set(this.tree.workbench(sessionId).objects.map(object => object.id));
+  /** 按资源声明与用户覆盖预留完整展开尺寸，创建者附近优先，已有对象保持原位。 */
+  placement(sessionId: string, kind: string, nearObjectId?: string): Point {
+    const objects = this.tree.workbench(sessionId).objects;
     const views = this.db.prepare("SELECT * FROM object_views WHERE session_id = ?").all(sessionId) as ViewRow[];
-    const size = { width: fallbackCardWidth, height: fallbackCardHeight };
-    return placeObject({ x: defaultCardPosition.x + size.width / 2, y: defaultCardPosition.y + size.height / 2 }, size,
-      views.filter(view => ids.has(view.object_id) && !view.hidden).map(view => ({
-        id: view.object_id, position: { x: view.x, y: view.y }, width: view.width ?? fallbackCardWidth, height: view.height ?? fallbackCardHeight,
-      })));
+    const byId = new Map(views.map(view => [view.object_id, view]));
+    const nodes = objects.flatMap(object => {
+      const view = byId.get(object.id);
+      if (view?.hidden) return [];
+      const override = view?.width != null && view.height != null ? { width: view.width, height: view.height } : null;
+      return [{ id: object.id, position: view ? { x: view.x, y: view.y } : defaultCardPosition,
+        ...cardSize(this.resources.card(object.kind), override) }];
+    });
+    const size = cardSize(this.resources.card(kind));
+    const near = nodes.find(node => node.id === nearObjectId);
+    const center = near
+      ? { x: near.position.x + near.width / 2, y: near.position.y + near.height / 2 }
+      : { x: defaultCardPosition.x + size.width / 2, y: defaultCardPosition.y + size.height / 2 };
+    return placeObject(center, size, nodes);
   }
 
   mutate(command: WorkbenchCommand): void {
@@ -99,6 +109,10 @@ export class SessionWorkbench {
             command.collapsed === undefined ? previous?.collapsed ?? 0 : Number(command.collapsed), size.width, size.height);
         break;
       }
+      case "views.position":
+        for (const { objectId, position } of command.positions)
+          this.mutate({ type: "view.set", sessionId: command.sessionId, objectId, position });
+        break;
       case "viewport.set":
         this.db.prepare("INSERT INTO viewports VALUES (?, ?, ?, ?) ON CONFLICT(session_id) DO UPDATE SET x=excluded.x, y=excluded.y, zoom=excluded.zoom")
           .run(command.sessionId, command.viewport.x, command.viewport.y, command.viewport.zoom);

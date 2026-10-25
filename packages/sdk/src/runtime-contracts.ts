@@ -1,5 +1,6 @@
 /** 插件与宿主共用的后台接口；存储、事务和授权由宿主实现。 */
 import type { UiText } from "./i18n.ts";
+import type { CardAppearance } from "./card.ts";
 import type { ConfigContract } from "./config.ts";
 import type { DatabaseSync } from "node:sqlite";
 import type { Json } from "./json.ts";
@@ -98,6 +99,8 @@ export interface ActionContribution {
 }
 export interface ResourceContribution {
   readonly resource: ResourceContract;
+  /** 后台放置使用的几何声明，与 ResourceDescription 和 cardRenderer 共用。 */
+  readonly card?: CardAppearance;
   readonly records: readonly RecordContract[];
   /** 声明本资源可作为链接接收者，并提供接收端工具策略；与 Agent 领域类型无关。 */
   readonly links?: { receive: boolean; tools?(object: ObjectReader): { allow?: readonly string[]; exclude?: readonly string[] } };

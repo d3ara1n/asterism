@@ -1,4 +1,4 @@
-import { sample, Counter, Count, CounterView, CountChanged, CreateCounter, ChangeCount, CounterUpdates } from "./counter-contract.ts";
+import { sample, Counter, Count, CounterView, CountChanged, CreateCounter, ChangeCount, CounterUpdates, counterCard } from "./counter-contract.ts";
 /** SDK 作者用例与类型反例：只编译，不执行插件、数据库或真实模型请求。 */
 import { z } from "zod";
 import { pluginNamespace, defineAction, resourceCall, defineRecord, defineTool, defineImplementation, modelRunRecordSchema, type ModelItem } from "@atelier/sdk/contracts";
@@ -90,6 +90,7 @@ export const counterPlugin = definePlugin({
     const settings = plugin.config(CounterConfig);
     return {
       resources: [implementResource(Counter, CounterView, {
+        card: counterCard,
         records: [CountChanged],
         creation: implementCreation(CreateCounter, {
           create(input, object) {

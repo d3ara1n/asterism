@@ -74,7 +74,7 @@ export class TemplateStore {
         this.data.set(sessionId, id, entry.contract, entry.data);
       }
       this.workbench.insert(sessionId, { id, kind: object.kind, title: object.title, data: object.data },
-        value.views.find(view => view.objectId === object.id)?.position ?? this.workbench.placement(sessionId), { templateId });
+        value.views.find(view => view.objectId === object.id)?.position ?? this.workbench.placement(sessionId, object.kind), { templateId });
     }
     for (const view of value.views) this.workbench.mutate({
       type: "view.set", sessionId, ...view, objectId: identities.get(view.objectId)!,

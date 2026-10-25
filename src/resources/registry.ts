@@ -25,6 +25,7 @@ export class ResourceRegistry {
   }
 
   has(kind: string): boolean { return this.backends.has(kind); }
+  card(kind: string) { return this.backends.get(kind)?.card; }
   validateState(kind: string, data: Json): void {
     const backend = this.backends.get(kind);
     if (!backend) throw new SessionError("unavailable", `Resource type ${kind} is unavailable.`, templateMessages.unavailable);

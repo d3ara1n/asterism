@@ -421,7 +421,7 @@ export class SessionService {
           if (this.closed) throw new SessionError("unavailable", "The session service is closed.");
           if (options.linkTo) this.requireRef(sessionId, options.linkTo);
           for (const resource of options.resources ?? []) this.requireRef(sessionId, resource);
-          const id = this.workbench.create(sessionId, kind, input, options.position ?? this.workbench.placement(sessionId), content);
+          const id = this.workbench.create(sessionId, kind, input, options.position ?? this.workbench.placement(sessionId, kind, options.linkTo?.id), content);
           const ref = { sessionId, id, kind };
           if (options.linkTo) this.setLink(sessionId, options.linkTo, ref, true);
           for (const resource of options.resources ?? []) this.setLink(sessionId, ref, resource, true);

@@ -1,3 +1,4 @@
+import { terminalCard as appearance } from "../shared/card-appearance.ts";
 import { useState, useEffect, type ReactNode } from "react";
 import { TerminalSquare, Eye, Keyboard, Clock, BookOpen } from "lucide-react";
 import { cardRenderer, creationEntry, toolRenderer, useI18n, useRendererConfig, type CreationInputProps, type RendererModule, type ToolRenderProps } from "@atelier/sdk/renderer";
@@ -122,7 +123,6 @@ function WaitBody({ result }: ToolRenderProps<z.infer<typeof TerminalWait.schema
     <span>{i18n.formatMessage(terminalMessages.elapsed, { seconds: (data.elapsedMs / 1000).toFixed(1) })}</span>
   </StatusRow>;
 }
-const appearance = { width: 720, height: 440, minWidth: 360, minHeight: 220 };
 const header = (label: typeof terminalMessages.input) => function Header({ invocation }: ToolRenderProps) {
   const i18n = useI18n(); return <ToolHeader label={i18n.formatMessage(label)} subject={invocation.resource?.title} monospace />;
 };

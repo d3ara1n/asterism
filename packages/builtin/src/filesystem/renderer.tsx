@@ -22,7 +22,7 @@ import { execToolRenderer } from "./exec-view";
 import { useDirectoryTreeLink } from "./tree-link";
 import { searchToolRenderers } from "./search-view";
 
-const appearance = { width: 340, height: 360, minWidth: 280, minHeight: 200 };
+import { directoryCard as appearance } from "../shared/card-appearance.ts";
 
 type ListProps = ToolRenderProps<z.infer<typeof DirectoryList.schema>>;
 function ListHeader({ target, invocation, result }: ListProps) {

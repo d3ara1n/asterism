@@ -24,12 +24,14 @@ export const workbenchCommands = [
   z.strictObject({ type: z.literal("link.set"), sessionId, receiverId: id, resourceId: id, linked: z.boolean() }),
   z.strictObject({ type: z.literal("view.set"), sessionId, objectId: id, position: pointSchema.optional(),
     hidden: z.boolean().optional(), collapsed: z.boolean().optional(), size: cardSizeSchema.nullable().optional() }),
+  z.strictObject({ type: z.literal("views.position"), sessionId,
+    positions: z.array(z.strictObject({ objectId: id, position: pointSchema })) }),
   z.strictObject({ type: z.literal("viewport.set"), sessionId, viewport: viewportSchema }),
 ] as const;
 export const workbenchCommandSchema = z.discriminatedUnion("type", workbenchCommands);
 export type WorkbenchCommand = z.infer<typeof workbenchCommandSchema>;
 export function isLayoutCommand(command: { type: string }): boolean {
-  return command.type === "view.set" || command.type === "viewport.set";
+  return command.type === "view.set" || command.type === "views.position" || command.type === "viewport.set";
 }
 const objectSchema = z.strictObject({ id, kind: z.string().min(1).max(160), title: z.string(), presentation: presentationSchema });
 export type WorkbenchObject = z.infer<typeof objectSchema>;

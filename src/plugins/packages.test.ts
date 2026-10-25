@@ -44,13 +44,13 @@ describe("插件包", () => {
     expect(() => list.add({ source: { kind: "path", path: dir } }, data)).toThrow();
     expect(list.read()).toEqual([]);
   });
-  it("API 16.0 接受同主版本接口并拒绝旧主版本与更高小版本", () => {
+  it("API 18.1 接受同主版本接口并拒绝旧主版本与更高小版本", () => {
     const dir = temp();
     pkg(dir, { id: "acme.x", api: { major: 18, minMinor: 0 } });
     expect(readManifest(dir).api).toEqual({ major: 18, minMinor: 0 });
     pkg(dir, { id: "acme.x", api: { major: 15, minMinor: 0 } });
     expect(() => readManifest(dir)).toThrow();
-    pkg(dir, { id: "acme.x", api: { major: 18, minMinor: 1 } });
+    pkg(dir, { id: "acme.x", api: { major: 18, minMinor: 2 } });
     expect(() => readManifest(dir)).toThrow();
   });
   it("源码包经 esbuild 打包导入，SDK 解析到宿主实例；禁用与重复 ID 不加载", async () => {

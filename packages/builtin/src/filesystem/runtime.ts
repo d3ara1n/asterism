@@ -1,3 +1,4 @@
+import { directoryCard } from "../shared/card-appearance.ts";
 import { readdir, readFile, stat } from "node:fs/promises";
 import { basename, isAbsolute, join } from "node:path";
 import { defineModule, implementResource, implementCreation, implementTool, implementCall, PluginApiError, type CallResult } from "@atelier/sdk/runtime";
@@ -60,6 +61,7 @@ async function readGitStatus(rootPath: string): Promise<{ entries: Array<{ path:
 
 export function createFilesystemModule(shell: ShellService) { return defineModule(() => ({
   resources: [implementResource(Directory, DirectoryView, {
+    card: directoryCard,
     project: directory => ({ path: directory.path }),
     async inspect(directory, object) {
       const resource = object.snapshot();

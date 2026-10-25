@@ -1,3 +1,4 @@
+import { webCard } from "../shared/card-appearance.ts";
 import { defineModule, implementResource, implementCreation, implementTool, WebError, type CallResult } from "@atelier/sdk/runtime";
 import type { Json, ResourceRef, WebFetchResult, WebSearchResult } from "@atelier/sdk/contracts";
 import { WebResource, CreateWeb, WebView, WebSearch, WebFetch } from "./contract.ts";
@@ -42,6 +43,7 @@ export default defineModule(plugin => {
   return {
     webProviders: [exaWebProvider],
     resources: [implementResource(WebResource, WebView, {
+      card: webCard,
       creation: implementCreation(CreateWeb, { create: ({ title }) => ({ title, data: {} }) }),
       project: (_data, object) => ({
         configured: plugin.webProviders.list().some(state => state.enabled),

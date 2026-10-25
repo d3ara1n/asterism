@@ -3,6 +3,7 @@ export * from "./json.ts";
 export * from "./error-details.ts";
 export * from "./presentation.ts";
 export * from "./module-contract.ts";
+export type { CardAppearance } from "./card.ts";
 export * from "./plugin.ts";
 export * from "./records.ts";
 export * from "./events.ts";

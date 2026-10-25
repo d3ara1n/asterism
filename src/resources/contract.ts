@@ -40,6 +40,7 @@ export interface ResourceController {
 /** 后台资源 adapter 的擦除接口；不会跨进程传递函数。 */
 export interface ResourceBackend {
   kind: string;
+  card?: import("@atelier/sdk/contracts").CardAppearance;
   receivesLinks?: boolean;
   validateState?(data: Json): void;
   project(resource: FoldedObject): Presentation;

@@ -1,6 +1,10 @@
 import { defineMessages, pluginNamespace } from "@atelier/sdk/contracts";
 
 export const workbenchMessages = pluginNamespace("atelier.host").messages("en", defineMessages({
+  layout: { id: "workbench.layout", defaultMessage: "Layout" },
+  arrange: { id: "workbench.arrange", defaultMessage: "Arrange" },
+  arranging: { id: "workbench.arranging", defaultMessage: "Arranging…" },
+  arrangeFailed: { id: "workbench.arrangeFailed", defaultMessage: "Unable to arrange the cards. Try again." },
   emptyHint: {
     id: "features_workbench_Workbench_1",
     defaultMessage: "Use Add, or drop content here.",

@@ -1,3 +1,4 @@
+import { noteCard } from "../shared/card-appearance.ts";
 import { defineModule, implementResource, implementCreation, implementTool, PluginApiError, type ObjectReader, type ObjectExecutor, type CallResult } from "@atelier/sdk/runtime";
 import { Note, CreateNote, NoteContent, NoteView, NoteRead, NoteEdit, NoteWrite, MAX_NOTE_LENGTH } from "./contract.ts";
 import { TextError, readText, readToModel, editText, textChange, writeToModel, editToModel } from "../shared/text.ts";
@@ -34,6 +35,7 @@ function mutationFailure(error: unknown, signal: AbortSignal, operation: string)
 /** 笔记只保存当前可变正文；游标回溯不恢复正文。 */
 export default defineModule(() => ({
   resources: [implementResource(Note, NoteView, {
+    card: noteCard,
     creation: implementCreation(CreateNote, {
       create({ title, content }, object) {
         save(object, content);

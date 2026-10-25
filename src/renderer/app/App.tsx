@@ -10,6 +10,7 @@ import { WorkbenchSurface } from "../features/workbench/WorkbenchSurface";
 import { WorkbenchFeedback } from "../features/workbench/WorkbenchFeedback";
 import { workbenchPhase } from "../features/workbench/feedback";
 import { Workbench, type WorkbenchHandle } from "../features/workbench/Workbench";
+import { LayoutMenu } from "../features/workbench/LayoutMenu";
 import { WorkbenchStore } from "../features/workbench/context";
 import { FocusIsland } from "../features/workbench/FocusIsland";
 import { focusIslandId, useFocusedObject } from "../features/workbench/focus";
@@ -185,6 +186,8 @@ export function App({ controller }: { controller: ApplicationController }) {
       {agentItems.length > 0 && resourceItems.length > 0 && <DropdownMenuSeparator />}
       {resourceItems.length > 0 && <><DropdownMenuLabel>{i18n.formatMessage(appMessages.resources)}</DropdownMenuLabel>{resourceItems}</>}
     </DropdownMenuContent></DropdownMenu>
+    <LayoutMenu key={session.id} canvas={() => workbench.current?.canvas ?? null}
+      disabled={!writable || !session.objects.some(object => !session.views.find(view => view.objectId === object.id)?.hidden)} />
     <Button variant="ghost" size="sm" onClick={event => workbench.current?.togglePanel("access", event.currentTarget)} aria-label={i18n.formatMessage(accessMessages.accessLabel)}><KeyRound /><span className="toolbar-label">{i18n.formatMessage(accessMessages.access)}</span></Button>
     <Button variant="ghost" size="sm" onClick={event => workbench.current?.togglePanel("objects", event.currentTarget)} aria-label={i18n.formatMessage(objectsMessages.objects)}><ListTree /><span className="toolbar-label">{i18n.formatMessage(objectsMessages.objects)}</span></Button>
     <Button variant="ghost" size="sm" onClick={event => workbench.current?.togglePanel("history", event.currentTarget)} aria-label={i18n.formatMessage(historyMessages.history)}><History /><span className="toolbar-label">{i18n.formatMessage(historyMessages.history)}</span></Button>
@@ -195,6 +198,7 @@ export function App({ controller }: { controller: ApplicationController }) {
     error={phase === "unavailable" ? state.error : sessionState?.readError ?? null} onRetry={() => { void active?.refresh(); }} />}>
     {session && active ? <motion.div key={session.id} className="h-full" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
       <Workbench ref={workbench} session={session} controller={active}
+      active={!inSettings && view.kind === "conversation" && view.sessionId === session.id}
       overview={view.kind === "conversation" && view.overview}
       ready={writable} run={run} store={workbenchStore}
       onHome={goHome} canDrop={creation.canDrop} onDropItems={creation.drop} /></motion.div> : null}

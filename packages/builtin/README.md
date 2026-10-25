@@ -36,7 +36,7 @@
 | `src/usage/` | 独立的账户用量消费者：从 SDK 目录取实现，管理缓存、解析 Agent 显式交付的响应结果，通过自有调用／事件向共享订阅和 toolbar 交付状态；不导入提供方实现 |
 | `src/web/` | Web 资源、搜索／URL 获取工具与视图、Exa SDK 适配；类型与连接契约见 [Web 资源](../../docs/web.md) |
 | `src/mcp/` | MCP 主机资源、五个固定资源工具、共享 MCP 客户端、stdio/HTTP 连接与认证、持久目录与搜索、服务器设置；契约见 [MCP 模块](../../docs/mcp.md) |
-| `src/shared/` | 正文算法、预览规则、公共流式开合状态机与创建表单 |
+| `src/shared/` | 正文算法、预览规则、公共流式开合状态机与创建表单；`card-appearance.ts` 为资源后台放置与前端卡片提供同一份几何声明 |
 | `src/messages/`、`src/locales/` | 内置插件自有文案与翻译 |
 
 功能按契约、后台、前端分入口，不建立同时加载 Node 与 React 实现的 barrel。工具作者的参数说明、错误自愈与 `toModel` 规则见 [运行时](../../docs/runtime.md#原生正文工具与目录操作)；代码编写时 args、target、result schema 必须有完整描述，错误须区分失败、取消与无法确认写入影响。

@@ -4,7 +4,7 @@
 
 SDK 包版本见 [package.json](package.json)，宿主 API 版本见 [`sdkApi`](../../src/plugins/packages.ts)。内置插件领域契约独立在 [`@atelier/builtin-api`](../builtin-api/README.md)，不进入通用 SDK。
 
-当前宿主 API 为 **18.0**，插件声明 `{ "major": 18, "minMinor": 0 }`，依赖 `@atelier/sdk: ^0.42.0`。后台通过 `session.invoke` 调用资源动作；清理登记到 `plugin.lifetime` 与资源 `attach` 的对象生命周期；前端入口默认导出 `defineRendererPlugin(...)`，`prepare` 上下文提供 `events / calls / signal`，调用契约显式声明 `scope`。
+当前宿主 API 为 **18.1**，插件声明 `{ "major": 18, "minMinor": 1 }`，依赖 `@atelier/sdk: ^0.43.0`。后台通过 `session.invoke` 调用资源动作；清理登记到 `plugin.lifetime` 与资源 `attach` 的对象生命周期；前端入口默认导出 `defineRendererPlugin(...)`，`prepare` 上下文提供 `events / calls / signal`，调用契约显式声明 `scope`。
 
 ## 子路径入口
 
@@ -91,6 +91,7 @@ export default definePlugin({
 信息卡片从包读取元信息：标准 `name / description / version / author`，可用 `atelier.displayName / description`（接受 `UiText`）覆盖显示文案；`atelier.icon` 是包内 PNG、JPEG、WebP 或 SVG 图片的相对路径。宿主读取静态信息不执行插件代码，配置页面由 renderer 单独提供。
 
 ### 5. 前端卡片与工具三态视图
+- **卡片几何（API 18.1）**：从 `contracts` 导入 `CardAppearance`，在共享文件声明默认尺寸和下限，交给后台 `implementResource` 的 `card`、前端资源描述的 `card` 与 `cardRenderer`。声明和放置契约见 [卡片几何声明](../../docs/plugin-sdk.md#前端视图与扩展入口)，完整例子见 `examples/counter-contract.ts`、`examples/author.ts` 与 `examples/renderer.ts`。
 - **资源展示目录（API 10.2）**：`useRendererResources().list()` 枚举已登记的 `ResourceDescription`，`get(kind)` 查询单一类型（缺失时返回宿主通用描述）。组件用 `useI18n().text(description.label)` 取得当前语言名称，`description.icon` 可直接渲染；不需要资源实例或卡片投影。
 - **卡片视图**：`cardRenderer(ViewContract, { width, height, minWidth?, minHeight?, Body, Actions?, panels? })`，内部通过 `useRendererObject()` 访问对象数据、动作调用与对象级双工通道 `openChannel(contract)`（API 15.0，后台以 `implementChannel` 登记，见 [对象级双工通道](../../docs/plugin-sdk.md#对象级双工通道api-150)）。
 - **局部操作（API 13.0）**：`object.view.ready` 表示视图可操作；按钮自行管理 `await object.invoke(...)` 期间的 pending。动作完成直接返回，数据变化通过宿主通道交付，调用不隐含会话读取。资源业务状态通过自己的展示契约交付，宿主 busy 不作为卡片的运行或加载状态。

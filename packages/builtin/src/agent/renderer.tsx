@@ -17,7 +17,7 @@ import { peekToolRenderer } from "./peek/view";
 import { sendToolRenderer } from "./send/view";
 import { waitToolRenderer } from "./wait/view";
 
-const appearance = { width: 560, height: 640, minWidth: 480, minHeight: 480 };
+import { agentCard as appearance } from "../shared/card-appearance.ts";
 
 export default {
   resources: [{ kind: "atelier.builtin/agent", label: commonMessages.kindAgent, icon: <Bot className="size-4" />, card: appearance, receivesLinks: true }],
