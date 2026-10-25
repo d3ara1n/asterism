@@ -8,6 +8,7 @@ import {
   AgentInputMessage, Execution, ContextSummary,
 } from "@atelier/builtin-api/contracts";
 import { createSelection, selectionOf } from "./selection.ts";
+import { generateAgentName } from "./name.ts";
 import { createAgentLoop } from "./loop.ts";
 import { createAdmission } from "./admission.ts";
 import { projectAgentTurnState } from "./state-projection.ts";
@@ -52,7 +53,7 @@ export function createAgentModule(application: BuiltinApplication, usage: UsageC
           prepare(input) { selection.validate(input.selection); return { action: "accept" }; },
           create(input, object) {
             object.commit(writer => { writer.set(AgentSelection, { selection: input.selection }); });
-            return { title: input.title ?? selection.agent(input.selection).id, data: {} };
+            return { title: input.title ?? generateAgentName(), data: {} };
           },
         }),
         project(_data, object) {

@@ -15,10 +15,10 @@ export const startAgentContentTarget = { contractId: builtin.name("session.start
 export const agentInputModeSchema = z.enum(["steer", "follow"]);
 /** 提交与草稿共用 16 位 Nano ID 身份。 */
 export const submissionIdSchema = z.string().regex(/^[A-Za-z0-9_-]{16}$/u);
-/** title 可选，不填时用 agent 配置 ID。 */
+/** title 可选，省略时由创建入口随机生成展示名称。 */
 export const agentCreateSchema = z.strictObject({
   selection: agentSelectionSchema,
-  title: z.string().trim().min(1).max(160).optional().describe("Display title for the new Agent. Defaults to the selected configuration ID."),
+  title: z.string().trim().min(1).max(160).optional().describe("Display title for the new Agent. When omitted, a random adjective-and-noun name such as HardStone is generated."),
 }).describe("Agent configuration and title.");
 
 export const CreateAgent = defineCreation(Agent, { id: builtin.name("agent.create"), schema: agentCreateSchema });

@@ -19,7 +19,7 @@ import { ModelChoices } from "./conversation/ModelChoices";
 
 
 /**
- * 模型与等级留空时沿用代理角色，每次请求重新解析。名称可选，留空时用 agent 配置 ID。
+ * 模型与等级留空时沿用代理角色，每次请求重新解析。名称可选，留空时由创建入口随机生成。
  */
 export function AgentInput({ busy, resolve, cancel }: CreationInputProps<{ selection: AgentSelection; title?: string }>) {
   const i18n = useI18n();
