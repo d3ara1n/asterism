@@ -4,6 +4,7 @@ import packageMetadata from "../../package.json" with { type: "json" };
 export const applicationId = "dev.dearain.atelier";
 export const applicationBrand = { en: "Atelier", zh: "工坊" } as const;
 export const applicationSlug = "atelier";
+export const applicationRepository = { owner: "d3ara1n", name: "atelier" } as const;
 /** 内置模型调用声明真实应用身份；第三方调用方可提供自己的 UA。 */
 export const applicationUserAgent = `${applicationBrand.en}/${packageMetadata.version}`;
 
