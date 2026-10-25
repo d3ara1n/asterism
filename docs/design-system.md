@@ -136,6 +136,16 @@ Agent overlay 的外壳由内置 Agent 统一提供，插件只组织内部内�
 - 表面只有两种：`surface`（边框 + 卡片底，无阴影，用于浮岛、顶栏部件、卡片、画布）与 `surface-floating`（加阴影，用于悬浮面板、浮条、通知）；对话框、菜单、下拉由官方组件提供浮层外观。
 - 笔记正文与 Markdown 表格使用原生滚动条，内容溢出时滑块持续可见并可直接拖动；轨道厚度 `0.625rem`，滑块使用 `muted-foreground`、悬停使用 `foreground`，轨道背景透明。
 
+## 应用图标
+
+应用图标与界面内的 `brand-mark.tsx` 相互独立，只用于系统 Dock、任务栏、窗口与安装包。
+
+- **构成**：前层是横版厚画框，为毛玻璃材质，透出背后的模糊色晕并带白色细边；后层是实色蓝画布（`#2F6BFF`），向右上探出画框；画中的两点一线从画布上镂空，透出底板。毛玻璃与镂空直接烘焙进 SVG，不依赖系统材质渲染。
+- **配色**：正式图标使用浅蓝雾底板；深夜蓝作为备用素材，各平台都不按外观切换。
+- **版式**：macOS 版按系统图标网格，在 1024 画布内放 824 底板、圆角 185，并带底部投影；Windows 与 Linux 版底板铺满画布，不带投影。
+- **文件**：`assets/icon/` 存放生成产物并随仓库提交，打包不依赖本机工具。`atelier.svg / .png / .icns` 为 macOS 版；`atelier-full.svg / .png` 与 `atelier.ico` 为铺满版，PNG 同时作为 Linux 窗口图标；`atelier-dark.*` 为备用深色版。
+- **修改**：几何与配色只在 `scripts/app-icon.ts` 中维护，修改后运行 `npm run icon` 重新生成全部产物。该命令需要本机安装 `rsvg-convert`（Homebrew `librsvg`）和 macOS `iconutil`。打包配置见 `forge.config.ts`。
+
 ## 按钮层级
 
 按钮变体只表达所在区域内的强调层级与角色，不区分操作是否改写数据。
@@ -235,6 +245,7 @@ Agent overlay 的外壳由内置 Agent 统一提供，插件只组织内部内�
 | 受管空间、屏与浮岛编织 | `src/renderer/shared/weave/` |
 | 动效时长与曲线 | `styles.css` 的 `--motion-*`，Motion 侧镜像于 `shared/weave/motion.ts` |
 | 界面文案 | [公共 i18n 契约](i18n.md)；宿主与各插件各自持有消息声明和目录 |
+| 应用图标几何、配色与各平台产物 | `scripts/app-icon.ts`（生成 `assets/icon/`），见 [应用图标](#应用图标) |
 
 ## 演进与验证
 

@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+<defs>
+  <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F2F6FF"/><stop offset="1" stop-color="#D9E5FF"/></linearGradient>
+  <filter id="blur" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="30"/></filter>
+  <filter id="soft" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="22"/></filter>
+  <filter id="drop" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="14"/></filter>
+  <clipPath id="ring"><path d="M322 262H662A150 150 0 0 1 812 412V632A150 150 0 0 1 662 782H322A150 150 0 0 1 172 632V412A150 150 0 0 1 322 262ZM342 382H642A50 50 0 0 1 692 432V612A50 50 0 0 1 642 662H342A50 50 0 0 1 292 612V432A50 50 0 0 1 342 382Z" clip-rule="evenodd"/></clipPath>
+  <mask id="cut" maskUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024"><rect width="1024" height="1024" fill="#fff"/><path d="M395 560 L590 445" stroke="#000" stroke-width="34" stroke-linecap="round"/><circle cx="395" cy="560" r="42" fill="#000"/><circle cx="590" cy="445" r="42" fill="#000"/></mask>
+</defs>
+<rect x="100" y="100" width="824" height="824" rx="185" fill="#000" opacity="0.18" transform="translate(0 12)" filter="url(#drop)"/>
+<rect x="100" y="100" width="824" height="824" rx="185" fill="url(#bg)"/>
+<g transform="translate(512 512) scale(0.8046875) translate(-512 -512)">
+  <g mask="url(#cut)">
+    <path d="M362 190H742A110 110 0 0 1 852 300V600A110 110 0 0 1 742 710H362A110 110 0 0 1 252 600V300A110 110 0 0 1 362 190Z" fill="#2F6BFF" opacity="0.22" filter="url(#soft)"/>
+    <path d="M362 172H742A110 110 0 0 1 852 282V582A110 110 0 0 1 742 692H362A110 110 0 0 1 252 582V282A110 110 0 0 1 362 172Z" fill="#2F6BFF"/>
+  </g>
+  <path d="M322 262H662A150 150 0 0 1 812 412V632A150 150 0 0 1 662 782H322A150 150 0 0 1 172 632V412A150 150 0 0 1 322 262ZM342 382H642A50 50 0 0 1 692 432V612A50 50 0 0 1 642 662H342A50 50 0 0 1 292 612V432A50 50 0 0 1 342 382Z" fill-rule="evenodd" fill="#1B3A8C" opacity="0.14" filter="url(#soft)" transform="translate(0 16)"/>
+  <g clip-path="url(#ring)">
+    <rect width="1024" height="1024" fill="url(#bg)"/>
+    <rect width="1024" height="1024" fill="#FFFFFF" opacity="0.45"/>
+    <g filter="url(#blur)" opacity="0.9"><path d="M362 172H742A110 110 0 0 1 852 282V582A110 110 0 0 1 742 692H362A110 110 0 0 1 252 582V282A110 110 0 0 1 362 172Z" fill="#2F6BFF"/></g>
+    <rect width="1024" height="1024" fill="#fff" opacity="0.3"/>
+  </g>
+  <path d="M322 262H662A150 150 0 0 1 812 412V632A150 150 0 0 1 662 782H322A150 150 0 0 1 172 632V412A150 150 0 0 1 322 262ZM342 382H642A50 50 0 0 1 692 432V612A50 50 0 0 1 642 662H342A50 50 0 0 1 292 612V432A50 50 0 0 1 342 382Z" fill-rule="evenodd" fill="none" stroke="#fff" stroke-width="4" opacity="0.9"/>
+</g>
+</svg>

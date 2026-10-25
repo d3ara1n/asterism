@@ -65,6 +65,11 @@ function requestQuit(restart = false): void {
   })().catch(error => { console.error("Application shutdown failed.", error); }).finally(() => { quitRequest = null; });
 }
 
+/** 应用图标文件：发布包从 resources 读取 extraResource，开发时取仓库 assets/icon。 */
+function applicationIconFile(name: string): string {
+  return app.isPackaged ? join(process.resourcesPath, name) : join(here, "../../assets/icon", name);
+}
+
 function createWindow(): void {
   applyThemeSource();
   const rendererFile = join(here, "../renderer/index.html");
@@ -75,6 +80,8 @@ function createWindow(): void {
   const titleBar = titleBarMode();
   window = new BrowserWindow({
     ...state.bounds, minWidth: state.minWidth, minHeight: state.minHeight, title: applicationBrand.en,
+    // macOS 与 Windows 使用打包内嵌图标；Linux 窗口需显式指定。
+    ...(process.platform === "linux" ? { icon: applicationIconFile("atelier-full.png") } : {}),
     ...initialWindowAppearance(),
     ...initialTitleBar(titleBar),
     autoHideMenuBar: true,
@@ -217,6 +224,8 @@ if (!app.requestSingleInstanceLock()) {
     session.defaultSession.setPermissionCheckHandler((contents, permission, _origin, details) =>
       permitted(contents, permission, details.isMainFrame));
     servePluginArtifacts(dataRoot);
+    // 开发运行没有应用包图标，Dock 显式使用正式图标。
+    if (process.platform === "darwin" && !app.isPackaged) app.dock?.setIcon(applicationIconFile("atelier.png"));
     createWindow();
     app.on("activate", () => { if (!quitting && BrowserWindow.getAllWindows().length === 0) createWindow(); });
     let environmentTimer: ReturnType<typeof setTimeout> | undefined;

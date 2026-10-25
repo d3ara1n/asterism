@@ -20,7 +20,8 @@
     "package": "npm run build && electron-forge package",
     "make": "npm run build && electron-forge make",
     "i18n:extract": "node scripts/i18n.ts extract",
-    "i18n:check": "node scripts/i18n.ts check"
+    "i18n:check": "node scripts/i18n.ts check",
+    "icon": "node scripts/app-icon.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "4.0.78",

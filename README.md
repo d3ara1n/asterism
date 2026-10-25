@@ -61,6 +61,8 @@ npm run i18n:check
 
 `npm run package` 生成当前平台的未签名应用目录，`npm run make` 进一步生成 ZIP。编译产物位于 `dist/`，Forge 产物位于 `out/`。
 
+应用图标的源图与各平台产物位于 `assets/icon/`，修改方法见 [应用图标](docs/design-system.md#应用图标)。
+
 ## 数据与运行边界
 
 工作数据与应用配置保存到本设备的 Electron 数据目录，源码目录和安装目录不承担数据存储。开发版使用 `appData/dev.dearain.atelier-development`，发布版使用 `appData/dev.dearain.atelier`；两者由固定应用身份 `dev.dearain.atelier` 生成，不随显示名称或仓库文件夹变化。

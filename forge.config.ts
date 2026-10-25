@@ -10,6 +10,10 @@ const config: ForgeConfig = {
     executableName: applicationBrand.en,
     name: applicationBrand.en,
     appBundleId: applicationId,
+    // 不带扩展名：macOS 取 .icns，Windows 取 .ico；源图与生成方法见 docs/design-system.md#应用图标。
+    icon: "assets/icon/atelier",
+    // Linux 可执行文件不内嵌图标，窗口图标由主进程从 resources 读取。
+    extraResource: ["assets/icon/atelier-full.png"],
     // electron-vite 已完成构建；包只含运行产物、清单与生产依赖。
     ignore: (path) => !!path && !/^\/(dist|node_modules)(\/|$)/.test(path) && !["/package.json", "/THIRD_PARTY_NOTICES.md"].includes(path),
   },
