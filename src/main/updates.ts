@@ -1,8 +1,9 @@
-import { app, ipcMain, type BrowserWindow } from "electron";
+import { app, ipcMain, net, type BrowserWindow } from "electron";
 import Store from "electron-store";
 import electronUpdater from "electron-updater";
 import { prerelease } from "semver";
-import { applicationStorage } from "../shared/application.ts";
+import { applicationStorage, applicationRepository, applicationUserAgent } from "../shared/application.ts";
+import { githubReleasesSchema, selectUpdateRelease, type GitHubUpdateRelease } from "./update-release.ts";
 import {
   updatesGetChannel, updatesSetChannel, updatesCheckChannel, updatesInstallChannel, updatesChangedChannel,
   type UpdateState,
@@ -60,10 +61,32 @@ export class ApplicationUpdates {
   }
 
   private async checkAndDownload(): Promise<UpdateState> {
-    this.updater.allowPrerelease = this.state.includePrerelease;
+    const includePrerelease = this.state.includePrerelease;
+    this.updater.allowPrerelease = includePrerelease;
     this.updater.allowDowngrade = false;
     this.patch({ status: "checking", availableVersion: null, progress: 0, error: null });
     try {
+      const releases: GitHubUpdateRelease[] = [];
+      const repository = `${applicationRepository.owner}/${applicationRepository.name}`;
+      for (let page = 1; ; page++) {
+        const response = await net.fetch(`https://api.github.com/repos/${repository}/releases?per_page=100&page=${page}`, {
+          headers: { Accept: "application/vnd.github+json", "User-Agent": applicationUserAgent },
+          signal: AbortSignal.timeout(30_000),
+        });
+        if (!response.ok) throw new Error(`GitHub release discovery failed (HTTP ${response.status}).`);
+        const entries = githubReleasesSchema.parse(await response.json());
+        releases.push(...entries);
+        if (entries.length < 100) break;
+      }
+      const candidate = selectUpdateRelease(releases, this.state.version, includePrerelease);
+      if (!candidate) { this.patch({ status: "current" }); return this.state; }
+      // 通用 HTTP 提供方消费选定 Release 的标准更新清单，下载、差分与安装仍由框架完成。
+      this.updater.setFeedURL({
+        provider: "generic",
+        url: `https://github.com/${repository}/releases/download/${encodeURIComponent(candidate.tag_name)}/`,
+        channel: "latest",
+        useMultipleRangeRequest: false,
+      });
       const result = await this.updater.checkForUpdates();
       if (!result?.isUpdateAvailable) {
         this.patch({ status: "current" });

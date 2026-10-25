@@ -1,0 +1,21 @@
+name: Promote Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_tag:
+        description: Published prerelease tag to promote (for example v0.1.0-prerelease.3)
+        type: string
+        required: true
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  promote:
+    if: github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/release.yml
+    with:
+      source_tag: ${{ inputs.source_tag }}
+    secrets: inherit

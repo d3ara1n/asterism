@@ -1,5 +1,5 @@
 import type { Configuration } from "electron-builder";
-import { applicationBrand, applicationId } from "./src/shared/application.ts";
+import { applicationBrand, applicationId, applicationRepository } from "./src/shared/application.ts";
 
 const config: Configuration = {
   appId: applicationId,
@@ -9,7 +9,7 @@ const config: Configuration = {
   asarUnpack: ["**/node_modules/{esbuild,@esbuild,node-pty,@vscode/ripgrep*}/**"],
   extraResources: [{ from: "assets/icon/atelier-full.png", to: "atelier-full.png" }],
   artifactName: "Atelier-${version}-${os}-${arch}.${ext}",
-  publish: { provider: "github", owner: "d3ara1n", repo: "atelier", channel: "latest" },
+  publish: { provider: "github", owner: applicationRepository.owner, repo: applicationRepository.name, channel: "latest" },
   mac: {
     target: ["dmg", "zip"],
     icon: "assets/icon/atelier.icns",

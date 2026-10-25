@@ -15,19 +15,25 @@
 
 各次发布使用同一份证书与私钥；CI 从导入证书取得身份名称。私钥由维护者保存，CI 在临时钥匙串中导入、构建结束后清理。普通 PR 检查不使用签名秘密。
 
-## 发布
+## 预发布
 
-1. 将已检查的改动合入 `main`。
-2. 在 Actions → Release → Run workflow 选择 `main`，`mode` 默认 `prerelease`；正式发布时选择 `release`。
-3. 工作流执行类型、单元与翻译检查，计算版本，分别构建 macOS arm64、Windows x64、Linux x64。
-4. 全部构建成功后创建 draft Release 并上传完整产物，上传成功才公开 Release。手动触发不需要手动指定版本或创建 tag。
+1. 通过 PR 将已检查的改动 squash 合入 `main`，标题使用 Conventional Commits，例如 `feat: 添加搜索`、`fix: 修复输入`、`refactor(storage)!: 调整存储格式`。
+2. Release 工作流每周一 UTC 02:00（北京时间 10:00）检查新 PR；需要提前发布时，在 Actions → Release → Run workflow 选择 `main`。
+3. 没有新的有效 PR 时，工作流在 `npm ci` 前结束。有有效变更才计算版本、生成说明、执行检查，并分别构建 macOS arm64、Windows x64、Linux x64。
+4. 全部构建成功后创建 draft Release 并上传完整产物，上传成功才公开为 Prerelease。版本和 tag 由工作流生成。
 
-无 tag 时首个版本为 `0.1.0-beta.1`；预发布期间依次递增 beta 序号，正式发布去掉预发布后缀。已有正式版后，Conventional Commits 中破坏性变更、`feat`、`fix/perf/refactor` 分别决定 major、minor、patch。仅文档等无可发布变更时跳过；已验证的 beta 可在没有新提交时发布为正式版。
+类型影响、累计基线和 Release Notes 范围见 [发布契约](architecture.md#发布与自动更新)。版本脚本为 `scripts/collect-release.ts`（轻量收集与跳过）、`scripts/release-version.ts`（版本计算）、`scripts/release-prs.ts`（PR 分类与说明）。
+
+## 正式版晋级
+
+在 Actions → Promote Release → Run workflow 选择 `main`，填写已试用的预发布标签，如 `v0.1.0-prerelease.3`。工作流从该标签对应的提交重建正式安装包，重新汇总正式版说明。所选标签须为该目标版本的最新预发布候选，晋级后的正式版本须高于已有正式版。
+
+晋级使用已有候选，不要求新的 PR，也不读取当前主干的新功能。版本号、签名、构建与发布全部自动完成；没有按月自动晋级任务。
 
 构建失败不会发布 Release。若上传失败留下 draft，维护者检查并删除该次未完成草稿后再重试；已公开版本使用新版本发布修复，保留原有产物。
 
 ## 首包验收
 
-从 Release 手动下载安装 beta.1，macOS 按 README 处理首次启动的隔离标记。建立一段测试会话后发布 beta.2，检查下载、重启安装、版本变化和会话保留。macOS 需在未导入开发者证书的用户环境验收固定自签更新；本地 ad-hoc 包不能替代该验收。
+从 Release 手动下载安装一个预发布，macOS 按 README 处理首次启动的隔离标记。建立一段测试会话后，用下一次预发布检查下载、重启安装、版本变化和会话保留。macOS 需在未导入开发者证书的用户环境验收固定自签更新；本地 ad-hoc 包不能替代该验收。
 
 关闭「包含预发布版本」后确认当前版本保留，后续正式版本按正常版本序列接续。升级数据格式的规则见 [存储演进计划](../plans/todo-2026-10-12-storage-migration.md)。

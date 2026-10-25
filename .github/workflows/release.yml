@@ -1,16 +1,24 @@
 name: Release
 
 on:
+  schedule:
+    - cron: "0 2 * * 1"
   workflow_dispatch:
+  workflow_call:
     inputs:
-      mode:
-        description: Release type
-        type: choice
-        options: [prerelease, release]
-        default: prerelease
+      source_tag:
+        description: Published prerelease tag to promote
+        type: string
+        default: ""
+    secrets:
+      MAC_SIGNING_P12:
+        required: true
+      MAC_SIGNING_P12_PASSWORD:
+        required: true
 
 permissions:
   contents: read
+  pull-requests: read
 
 concurrency:
   group: release
@@ -22,8 +30,9 @@ jobs:
     runs-on: ubuntu-24.04
     outputs:
       version: ${{ steps.version.outputs.version }}
-      skip: ${{ steps.version.outputs.skip }}
+      skip: ${{ steps.collect.outputs.skip }}
       prerelease: ${{ steps.version.outputs.prerelease }}
+      source_sha: ${{ steps.version.outputs.source_sha }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -32,14 +41,33 @@ jobs:
         with:
           node-version: 26.12.0
           cache: npm
-      - run: npm ci
-      - run: npm run typecheck
-      - run: npm test
-      - run: npm run i18n:check
-      - id: version
+      - name: Collect pull requests and published versions
+        id: collect
         env:
-          RELEASE_MODE: ${{ inputs.mode }}
-        run: node scripts/prepare-release.ts "$RELEASE_MODE"
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_TAG: ${{ inputs.source_tag || '' }}
+        run: |
+          mode=prerelease
+          if [[ -n "$SOURCE_TAG" ]]; then mode=release; fi
+          node scripts/collect-release.ts "$mode" "$SOURCE_TAG"
+      - if: steps.collect.outputs.skip != 'true'
+        run: npm ci
+      - id: version
+        if: steps.collect.outputs.skip != 'true'
+        run: node scripts/prepare-release.ts
+      - if: steps.collect.outputs.skip != 'true'
+        run: npm run typecheck
+      - if: steps.collect.outputs.skip != 'true'
+        run: npm test
+      - if: steps.collect.outputs.skip != 'true'
+        run: npm run i18n:check
+      - uses: actions/upload-artifact@v4
+        if: steps.collect.outputs.skip != 'true'
+        with:
+          name: notes
+          path: .local/release/notes.md
+          include-hidden-files: true
+          if-no-files-found: error
 
   build:
     needs: prepare
@@ -60,6 +88,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.source_sha }}
       - uses: actions/setup-node@v4
         with:
           node-version: 26.12.0
@@ -69,7 +99,7 @@ jobs:
         env:
           RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
         shell: bash
-        run: npm version "$RELEASE_VERSION" --no-git-tag-version --ignore-scripts
+        run: npm version "$RELEASE_VERSION" --no-git-tag-version --ignore-scripts --allow-same-version
       - name: Import macOS signing identity
         if: runner.os == 'macOS'
         timeout-minutes: 5
@@ -136,18 +166,23 @@ jobs:
           pattern: release-*
           path: artifacts
           merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          name: notes
+          path: release-notes
       - name: Publish complete release
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
           RELEASE_PRERELEASE: ${{ needs.prepare.outputs.prerelease }}
+          RELEASE_SHA: ${{ needs.prepare.outputs.source_sha }}
         shell: bash
         run: |
           set -euo pipefail
           tag="v$RELEASE_VERSION"
           flags=()
           if [[ "$RELEASE_PRERELEASE" == "true" ]]; then flags+=(--prerelease); fi
-          gh release create "$tag" artifacts/* --draft --target "$GITHUB_SHA" \
-            --title "Atelier $tag" --generate-notes "${flags[@]}"
+          gh release create "$tag" artifacts/* --draft --target "$RELEASE_SHA" \
+            --title "Atelier $tag" --notes-file release-notes/notes.md "${flags[@]}"
           gh release edit "$tag" --draft=false
