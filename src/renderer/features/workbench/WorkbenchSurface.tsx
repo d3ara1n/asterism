@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
 import { Background, BackgroundVariant, ReactFlow, ReactFlowProvider } from "@xyflow/react";
-import "@xyflow/react/dist/style.css";
 import { useAppearance, useScheme } from "../appearance/state";
 
 /** 工作台底板随导航入场，内容读取不影响页面过渡。 */

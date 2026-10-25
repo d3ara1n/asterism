@@ -45,7 +45,7 @@
 | `../../packages/ui/src/ui/` | 本地维护的 shadcn/ui 官方源码与公共状态组合；主题绑定的 `sonner.tsx` 留在应用 `shared/ui/` |
 | `shared/i18n.ts` / `messages/` | 应用级语言环境订阅、共享 `react-intl` context 与按功能组织的宿主消息声明 |
 | `@atelier/ui/ConfigurationChoice` / `@atelier/builtin/renderer` / `@atelier/ui/tool-header` | 首页与创建表单的配置／模型／等级选择器及工具单行标题组件；对话专用摘要与浮层位于内置 Agent 的 `conversation/ConfigurationPicker.tsx` |
-| `styles.css` | Tailwind、主题 token、窗口拖动重置与编织布局样式 |
+| `styles.css` | 统一导入 Tailwind 与第三方基础 CSS，再声明主题 token、窗口拖动重置与组件覆盖样式；React Flow 基础样式随此入口加载，顺序独立于工作台的异步装载 |
 
 ## 前端状态协调要点
 

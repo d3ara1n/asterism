@@ -1,6 +1,8 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "katex/dist/katex.min.css";
+/* 画布基础样式先于下方覆盖规则加载，顺序独立于工作台的异步装载。 */
+@import "@xyflow/react/dist/style.css";
 @source "../../packages/builtin/src";
 @source "../../packages/ui/src";
 
