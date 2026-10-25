@@ -1,7 +1,6 @@
 import { inputSummary, Execution, AgentInputMessage } from "@atelier/builtin-api/contracts";
 import type { SessionRecord, SessionSnapshot } from "@atelier/sdk/contracts";
 
-export const renameCheckpoints = new Set([5, 10, 20, 50, 100]);
 const windowEdge = 4;
 const maxTitleLength = 50;
 const userBudget = 200;

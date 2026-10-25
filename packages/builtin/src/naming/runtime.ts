@@ -2,7 +2,7 @@ import { z } from "zod";
 import { defineModule, defineTopLevelTool, type ModelServices } from "@atelier/sdk/runtime";
 import { inputSummary, builtin, SessionNamed, type NamingApi } from "@atelier/builtin-api/contracts";
 import type { SessionSnapshot } from "@atelier/sdk/contracts";
-import { cleanTitle, collectTurns, namingInstruction, namingPrompt, renameCheckpoints, userMessages } from "./policy.ts";
+import { cleanTitle, collectTurns, namingInstruction, namingPrompt, userMessages } from "./policy.ts";
 import { SessionNameResult, SessionRenameResult } from "./contract.ts";
 
 const timeoutMs = 10_000;
@@ -93,7 +93,7 @@ export function createNamingModule(connect: (api: NamingApi) => () => void, user
           const initial = first?.status === "known" && records.some(record => record.id === first.record.id);
           const message = initial ? first : latest;
           const level = initial ? "initial" : "refined";
-          if (level === "refined" && !renameCheckpoints.has(inputs.length)) return;
+          if (level === "refined" && inputs.length !== 5 && inputs.length % 10 !== 0) return;
           if (named?.data.auto?.messageId === message.record.id) return;
           const model = plugin.models.roles().find(role => role.id === "utility")?.model ?? null;
           if (model === null) return;
