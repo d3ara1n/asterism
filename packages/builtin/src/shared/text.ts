@@ -1,7 +1,7 @@
 import { Buffer } from "node:buffer";
 import { structuredPatch, formatPatch } from "diff";
 import { applyEdits } from "./hashline/apply.ts";
-import { computeLineHash } from "./hashline/hash.ts";
+import { clipDiffLine, excerptNote, READ_EXCERPT_THRESHOLD, rowText, textRow } from "./text-row.ts";
 import { hasFinalNewline, splitLines } from "./hashline/lines.ts";
 import type { ApplyFailure, Edit } from "./hashline/types.ts";
 import type { TextRead, TextChange } from "@atelier/builtin-api/contracts";
@@ -24,10 +24,11 @@ export function readText(text: string, anchored: boolean, range: { offset?: numb
   const end = Math.min(lines.length, fromLine - 1 + (range.limit ?? lines.length));
   let bytes = 0;
   for (let i = fromLine - 1; i < end; i++) {
-    const row = { line: i + 1, content: lines[i], hash: anchored ? computeLineHash(i + 1, lines[i]) : null };
-    const cost = Buffer.byteLength(`${row.line}${row.hash ? `#${row.hash}` : ""}│${row.content}\n`);
+    // 超长行返回带完整行锚点的片段，字节预算按片段计算，单行不再占满或阻断整次读取。
+    const row = textRow(i + 1, lines[i], anchored, READ_EXCERPT_THRESHOLD);
+    const cost = Buffer.byteLength(`${rowText(row)}\n`);
     if (range.maxBytes !== undefined && bytes + cost > range.maxBytes) {
-      if (rows.length === 0) throw new TextError("line_too_large", "The selected line exceeds the text read output limit. This tool returns complete lines.");
+      if (rows.length === 0) throw new TextError("line_too_large", "The selected line exceeds the text read output limit.");
       break;
     }
     rows.push(row); bytes += cost;
@@ -36,10 +37,10 @@ export function readText(text: string, anchored: boolean, range: { offset?: numb
   return { totalLines: lines.length, fromLine, rows, noFinalNewline: !hasFinalNewline(text), nextOffset: next <= lines.length ? next : null };
 }
 export function readToModel(data: TextRead, offsetField = "target.offset"): string {
-  const rows = data.rows.map(row => `${row.line}${row.hash === null ? "" : `#${row.hash}`}│${row.content}`);
   return [
     `${data.totalLines} lines · from line ${data.fromLine}${data.noFinalNewline ? " · no trailing newline" : ""}`,
-    ...rows,
+    ...data.rows.map(rowText),
+    ...data.rows.flatMap(row => excerptNote(row) ?? []),
     ...(data.nextOffset === null ? [] : [`Remaining content starts at ${offsetField}:${data.nextOffset}.`]),
   ].join("\n");
 }
@@ -50,7 +51,9 @@ function failureMessage(failure: ApplyFailure): string {
     const prefix = `edits[${f.opIndex}].${f.which} (${f.cited.line}#${f.cited.hash})`;
     if (f.recovery.kind === "found") return `${prefix}: matching nearby line: {\"line\":${f.recovery.newLine},\"hash\":\"${f.recovery.newHash}\"}.`;
     if (f.recovery.kind === "ambiguous") return `${prefix}: several nearby lines match: ${JSON.stringify(f.recovery.candidates)}.`;
-    return `${prefix}: ${f.current ? `current line is ${f.cited.line}#${f.current.hash}│${f.current.content}` : "line is out of range"}.`;
+    if (!f.current) return `${prefix}: line is out of range.`;
+    const current = { ...textRow(f.cited.line, f.current.content, false, READ_EXCERPT_THRESHOLD), hash: f.current.hash };
+    return `${prefix}: current line is ${rowText(current)}.${current.excerpt ? ` ${excerptNote(current, "The current line")}` : ""}`;
   })].join("\n");
 }
 export function editText(text: string, edits: Edit[]): { text: string; touchedLines: readonly number[] } {
@@ -73,8 +76,8 @@ export function textChange(before: string, after: string, label: string, touched
   const anchors: TextChange["anchors"] = [];
   let anchorBytes = 0;
   for (const i of indices) {
-    const row = { line: i + 1, content: lines[i], hash: computeLineHash(i + 1, lines[i]) };
-    const cost = Buffer.byteLength(`${row.line}#${row.hash}│${row.content}\n`);
+    const row = textRow(i + 1, lines[i], true, READ_EXCERPT_THRESHOLD);
+    const cost = Buffer.byteLength(`${rowText(row)}\n`);
     if (anchors.length === MAX_ANCHOR_LINES || anchorBytes + cost > MAX_ANCHOR_BYTES) break;
     anchors.push(row); anchorBytes += cost;
   }
@@ -89,21 +92,39 @@ function changeSummary(data: TextChange): string {
 export function writeToModel(data: TextChange): string {
   return changeSummary(data);
 }
+/** 统一 diff 中超长行从行首截取，按 hunk 头推算行号，在 diff 之后逐条陈述截取范围。 */
+function boundedDiff(diff: string): { lines: string[]; notes: string[]; truncated: boolean } {
+  const lines: string[] = [], notes: string[] = [];
+  let bytes = 0, oldLine = 0, newLine = 0, inHunk = false;
+  for (const raw of diff.split("\n")) {
+    const hunk = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(raw);
+    // 首个 hunk 之前只有 ---／+++ 文件头；之后以 -- 开头的删除行仍是正文。
+    const clipped = hunk || !inHunk ? null : clipDiffLine(raw);
+    const text = clipped?.text ?? raw;
+    const cost = Buffer.byteLength(text) + 1;
+    if (bytes + cost > MAX_MODEL_DIFF_BYTES) return { lines, notes, truncated: true };
+    lines.push(text); bytes += cost;
+    if (hunk) { oldLine = Number(hunk[1]); newLine = Number(hunk[2]); inHunk = true; continue; }
+    if (!inHunk) continue;
+    const kind = raw[0];
+    if (clipped) {
+      const label = kind === "-" ? `Removed line ${oldLine}` : kind === "+" ? `Added line ${newLine}` : `Context line ${newLine}`;
+      notes.push(`${label} is shown as its first ${clipped.text.length - 1} of ${clipped.length} characters.`);
+    }
+    if (kind === " " || kind === "-") oldLine++;
+    if (kind === " " || kind === "+") newLine++;
+  }
+  return { lines, notes, truncated: false };
+}
 export function editToModel(data: TextChange): string {
   // 历史保留完整 diff；模型收到有界 diff 与可继续编辑的新锚点。
-  const diffLines: string[] = [];
-  let bytes = 0;
-  for (const line of data.diff.split("\n")) {
-    const cost = Buffer.byteLength(line) + 1;
-    if (bytes + cost > MAX_MODEL_DIFF_BYTES) break;
-    diffLines.push(line); bytes += cost;
-  }
-  const diff = diffLines.join("\n");
+  const diff = boundedDiff(data.diff);
   return [
     changeSummary(data),
-    diff,
-    ...(diff !== data.diff ? ["Diff output was truncated; the full diff is saved in the tool result."] : []),
-    ...(data.anchors.length ? ["Updated anchors:", ...data.anchors.map(row => `${row.line}#${row.hash}│${row.content}`)] : []),
+    diff.lines.join("\n"),
+    ...diff.notes,
+    ...(diff.truncated ? ["Diff output was truncated; the full diff is saved in the tool result."] : []),
+    ...(data.anchors.length ? ["Updated anchors:", ...data.anchors.map(rowText), ...data.anchors.flatMap(row => excerptNote(row) ?? [])] : []),
     ...(data.anchorsTruncated ? ["Some updated anchors were omitted."] : []),
   ].filter(Boolean).join("\n");
 }

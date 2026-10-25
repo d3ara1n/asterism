@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { applyPatch } from "diff";
 import { Read, Edit, Write } from "@atelier/builtin-api/contracts";
 import { readText, readToModel, editText, textChange, writeToModel, editToModel } from "./text.ts";
+import { computeLineHash } from "./hashline/hash.ts";
 
 // 预期来自工具契约：定位不进 args、失败整批不写、锚点指向完整正文、编辑保留原始换行。
 describe("正文工具契约", () => {
@@ -28,9 +29,36 @@ describe("正文工具契约", () => {
   it("按完整行限制输出，提供能继续读取的位置，不截断带锚点的内容", () => {
     expect(readText("a\nb\nc", true, { maxBytes: 16 }).rows).toHaveLength(1);
     expect(readText("a\nb\nc", true, { maxBytes: 16 }).nextOffset).toBe(2);
-    expect(() => readText("long line", true, { maxBytes: 2 })).toThrow("complete lines");
+    expect(() => readText("long line", true, { maxBytes: 2 })).toThrow("output limit");
     expect(() => readText("a", true, { offset: 2 })).toThrow("exceeds");
     expect(readText("", true)).toMatchObject({ rows: [], nextOffset: null });
+  });
+
+  // 压缩产物的单行曾让 read 整次拒绝或吃掉预算；片段的锚点必须按完整行计算，否则 edit 会拒绝或改错行。
+  it("超长行返回带完整行锚点的片段，不阻断前后行，锚点可直接用于 edit", () => {
+    const long = "x".repeat(231_654), text = `short\n${long}\nafter`;
+    const data = readText(text, true, { limit: 30, maxBytes: 64 * 1024 });
+    expect(data.rows.map(row => row.line)).toEqual([1, 2, 3]);
+    expect(data.rows[1]).toMatchObject({ hash: computeLineHash(2, long), excerpt: { start: 0, length: 231_654 } });
+    expect(data.rows[1].content).toHaveLength(400);
+    expect(readToModel(data)).toContain("Line 2 is an excerpt (characters 0–400 of 231654); its anchor refers to the complete line.");
+    expect(editText(text, [{ op: "delete", anchor: { line: 2, hash: data.rows[1].hash! } }]).text).toBe("short\nafter");
+    // 正常长段落不应被截断，否则笔记无法直接编辑。
+    expect(readText("p".repeat(5000), true).rows[0].excerpt).toBeNull();
+  });
+
+  // 删除或保留超长行时，diff 与锚点失配报错曾原样回显整行。
+  it("edit 的模型 diff 与失配报错把超长行截为片段并陈述范围", () => {
+    const long = "x".repeat(60_000), before = `first\n${long}\nlast`;
+    const change = textChange(before, "first\nlast", "a.txt");
+    const model = editToModel(change);
+    expect(model).toContain("Removed line 2 is shown as its first 400 of 60000 characters.");
+    expect(model.length).toBeLessThan(2000);
+    expect(applyPatch(before, change.diff)).toBe("first\nlast");
+    let message = "";
+    try { editText(before, [{ op: "delete", anchor: { line: 2, hash: "ZZZZ" } }]); } catch (error) { message = (error as Error).message; }
+    expect(message).toContain("The current line is an excerpt");
+    expect(message.length).toBeLessThan(2000);
   });
 
   it("同一批次校验全部锚点；位移仅提供重试信息，重复候选要求重新确认", () => {

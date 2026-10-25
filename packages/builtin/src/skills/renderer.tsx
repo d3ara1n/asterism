@@ -5,6 +5,7 @@ import { ToolHeader } from "@atelier/ui/tool-header";
 import { CodeRows } from "../code-view";
 import { prepareCodeView } from "../shared/code-view";
 import { inputField, inputText } from "../shared/tool-preview";
+import { displayText } from "../shared/text-row";
 import { skillsMessages } from "../messages/skills";
 import { SkillRead, SkillRefresh } from "./contract";
 
@@ -20,7 +21,7 @@ function SkillReadHeader({ args, result }: ReadProps) {
 }
 function SkillReadBody({ result }: ReadProps) {
   const data = result?.data;
-  return data ? <CodeRows rows={data.rows} filename={data.path} /> : null;
+  return data ? <CodeRows rows={data.rows.map(row => ({ line: row.line, content: displayText(row) }))} filename={data.path} /> : null;
 }
 function RefreshHeader({ result }: RefreshProps) {
   const i18n = useI18n();

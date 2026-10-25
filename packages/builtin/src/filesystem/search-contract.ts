@@ -8,7 +8,7 @@ const target = z.union([z.null(), z.strictObject({
   path: z.string().min(1).max(4096).describe("Relative directory or file path within the directory resource; '.' selects its root."),
 })]).describe("Null selects the resource root. find selects a directory; grep selects a directory or one file. Selected symbolic links resolve inside the resource root; recursive traversal skips symbolic links. Git metadata entries are excluded from search targets.");
 const stopReasonSchema = z.enum(["limit", "output_bytes", "record_bytes"]).nullable()
-  .describe("Null means the search completed. Otherwise it stopped at the returned-entry limit, the 64 KiB serialized-entry budget, or the 1 MiB process-record limit. Total matching rows or files are unknown after an early stop.");
+  .describe("Null means the search completed. Otherwise it stopped at the requested limit of matching lines or files, the 64 KiB result budget, or the 1 MiB process-record limit. Total matching rows or files are unknown after an early stop.");
 const common = {
   path: z.string().describe("Selected search path relative to the resource root."),
   stopReason: stopReasonSchema,
@@ -17,17 +17,9 @@ const rowIdentity = {
   path,
   match: z.boolean().describe("True for a matching line, false for surrounding context."),
 };
-const searchRowSchema = z.discriminatedUnion("kind", [
-  textRowSchema.extend({
-    ...rowIdentity,
-    kind: z.literal("line").describe("Complete line content with its optional edit anchor."),
-  }),
-  z.strictObject({
-    ...rowIdentity,
-    kind: z.literal("omitted").describe("The complete serialized row exceeds 64 KiB. Its path, line number and match status are preserved; the content and edit anchor are omitted."),
-    line: z.number().int().positive().describe("Absolute 1-based line number in the file."),
-  }),
-]);
+const searchRowSchema = textRowSchema.extend({
+  ...rowIdentity,
+}).describe("A matching or context row. Lines longer than 1000 UTF-16 code units are excerpts around the first match (or the line start for context); their anchor still refers to the complete line.");
 
 export const DirectoryFind = defineImplementation({
   ...builtin.data("directory.find", z.strictObject({
@@ -39,7 +31,7 @@ export const DirectoryGrep = defineImplementation({
   ...builtin.data("directory.grep", z.strictObject({
     ...common,
     mode: z.enum(["content", "files", "count"]).describe("The requested output format."),
-    rows: z.array(searchRowSchema).describe("Returned matching and context rows in content mode, including explicit records for oversized lines. Omitted content is independent of stopReason: the search can complete with omitted content. Order is unspecified; empty in files and count modes."),
+    rows: z.array(searchRowSchema).describe("Returned matching and context rows in content mode. Long lines are returned as excerpts. Order is unspecified; empty in files and count modes."),
     files: z.array(z.strictObject({
       path,
       count: z.number().int().nonnegative().nullable().describe("Number of matching lines in count mode; null in files mode."),

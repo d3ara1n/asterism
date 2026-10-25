@@ -11,7 +11,7 @@ export const skillReadArgsSchema = z.strictObject({
   name: z.string().min(1).describe("Skill name from the system prompt's skill catalog."),
   path: z.string().min(1).default("SKILL.md").describe("UTF-8 file path relative to the selected skill's directory. Defaults to SKILL.md; references and scripts use paths within the same skill package."),
   offset: z.number().int().positive().default(1).describe("First line to read, 1-based in the complete file. Defaults to 1."),
-  limit: z.number().int().positive().max(2000).default(1000).describe("Maximum complete lines to read. Defaults to 1000, maximum 2000; output also has a 64 KiB limit."),
+  limit: z.number().int().positive().max(2000).default(1000).describe("Maximum lines to read. Defaults to 1000, maximum 2000; output also has a 64 KiB limit."),
 }).describe("Select a skill, a file within its package, and a line range.");
 export type SkillReadArgs = z.infer<typeof skillReadArgsSchema>;
 export const SkillRead = builtin.data("skill.read", textReadSchema.extend({

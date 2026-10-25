@@ -37,25 +37,65 @@ export const filesystemMessages = pluginNamespace("atelier.builtin").messages("e
     id: "toolDirectoryGrep",
     defaultMessage: "Search content",
   },
-  toolSearchSummary: {
-    id: "toolSearchSummary",
-    defaultMessage: "{unit, select, rows {{count, plural, one {# row returned} other {# rows returned}} ({matches} matching)} other {{count, plural, one {# file returned} other {# files returned}}}} · {complete, select, true {search complete} other {search incomplete}}",
+  toolSearchFiles: {
+    id: "toolSearchFiles",
+    defaultMessage: "{count, plural, one {#{truncated, select, true {+} other {}} file} other {#{truncated, select, true {+} other {}} files}}",
+  },
+  toolSearchMatches: {
+    id: "toolSearchMatches",
+    defaultMessage: "{count, plural, one {#{truncated, select, true {+} other {}} match} other {#{truncated, select, true {+} other {}} matches}}",
+  },
+  toolSearchFilesOmitted: {
+    id: "toolSearchFilesOmitted",
+    defaultMessage: "{count, plural, one {# more file is not shown.} other {# more files are not shown.}}",
+  },
+  toolSearchOptionFiles: {
+    id: "toolSearchOptionFiles",
+    defaultMessage: "Files only",
+  },
+  toolSearchOptionCount: {
+    id: "toolSearchOptionCount",
+    defaultMessage: "Count per file",
+  },
+  toolSearchOptionLiteral: {
+    id: "toolSearchOptionLiteral",
+    defaultMessage: "Literal",
+  },
+  toolSearchOptionIgnoreCase: {
+    id: "toolSearchOptionIgnoreCase",
+    defaultMessage: "Ignore case",
+  },
+  toolSearchOptionWord: {
+    id: "toolSearchOptionWord",
+    defaultMessage: "Whole word",
+  },
+  toolSearchOptionHidden: {
+    id: "toolSearchOptionHidden",
+    defaultMessage: "Include hidden",
+  },
+  toolSearchOptionNoIgnore: {
+    id: "toolSearchOptionNoIgnore",
+    defaultMessage: "Include ignored",
+  },
+  toolSearchOptionContext: {
+    id: "toolSearchOptionContext",
+    defaultMessage: "{count, plural, one {# context line} other {# context lines}}",
+  },
+  toolSearchOptionLimit: {
+    id: "toolSearchOptionLimit",
+    defaultMessage: "Limit {count}",
   },
   toolSearchLimit: {
     id: "toolSearchLimit",
-    defaultMessage: "Search stopped at the result limit.",
+    defaultMessage: "{unit, select, rows {Search stopped at the matching-line limit.} other {Search stopped at the file limit.}}",
   },
   toolSearchOutputBytes: {
     id: "toolSearchOutputBytes",
-    defaultMessage: "Search stopped at the 64 KiB output budget.",
+    defaultMessage: "Search stopped when the returned results reached the 64 KiB budget.",
   },
   toolSearchRecordBytes: {
     id: "toolSearchRecordBytes",
     defaultMessage: "Search stopped because a process output record exceeded 1 MiB. That record could not be decoded.",
-  },
-  toolSearchLineOmitted: {
-    id: "toolSearchLineOmitted",
-    defaultMessage: "{match, select, true {Matching line} other {Context line}}; content omitted because the complete row exceeds the 64 KiB output budget.",
   },
   toolSearchEmptyIncomplete: {
     id: "toolSearchEmptyIncomplete",
@@ -64,6 +104,10 @@ export const filesystemMessages = pluginNamespace("atelier.builtin").messages("e
   toolSearchNoLines: {
     id: "toolSearchNoLines",
     defaultMessage: "No matching lines.",
+  },
+  toolSearchFiltered: {
+    id: "toolSearchFiltered",
+    defaultMessage: "{filters, select, hidden {Hidden entries were skipped. Set hidden to include them.} ignored {Ignore-file rules were applied. Set noIgnore to include ignored entries.} other {Hidden entries and ignore-file rules were skipped. Set hidden or noIgnore to include them.}}",
   },
   toolDirectorySee: {
     id: "toolDirectorySee",

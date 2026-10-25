@@ -1,12 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { readText } from "../shared/text.ts";
 import { findOutput, grepOutput, SearchRecords } from "./search-output.ts";
+import { excerptWindow } from "../shared/text-row.ts";
+import { computeLineHash } from "../shared/hashline/hash.ts";
 import { findToModel, grepToModel, searchSummary } from "./search-presentation.ts";
+import { displayPath, grepFiles, groupByDirectory, searchFilters, searchOptions } from "./search-layout.ts";
 import { executablePath, searchArguments } from "./search-process.ts";
 import type { SearchStopReason } from "./search-contract.ts";
 
-const event = (type: "match" | "context", text: string, line: number) => Buffer.from(`${JSON.stringify({
-  type, data: { path: { text: "./file.txt" }, lines: { text }, line_number: line },
+const event = (type: "match" | "context", text: string, line: number, submatch?: number) => Buffer.from(`${JSON.stringify({
+  type, data: { path: { text: "./file.txt" }, lines: { text }, line_number: line,
+    ...(submatch === undefined ? {} : { submatches: [{ start: submatch }] }) },
 })}\n`);
 
 /** 只交付字节协议，在调用方相同的边界记录停止原因；不启动真实进程。 */
@@ -35,35 +39,53 @@ describe("搜索输出协议", () => {
     const data = collect(grepOutput(".", "", { pattern: "中文" }),
       event("context", "\uFEFFfirst\r\n", 1), event("match", "中文\r\n", 2), event("context", "last\r", 3));
     const read = readText(source, true);
-    expect(data.rows.map(({ path: _path, match: _match, kind: _kind, ...row }) => row)).toEqual(read.rows);
+    expect(data.rows.map(({ path: _path, match: _match, ...row }) => row)).toEqual(read.rows);
     expect(data.rows.map(row => row.match)).toEqual([false, true, false]);
     expect(grepToModel(data)).toContain(`2#${read.rows[1].hash}│中文`);
-    expect(searchSummary(data)).toMatchObject({ returned: 3, matching: 1, omitted: 0, complete: true });
+    expect(searchSummary(data)).toMatchObject({ returned: 3, matches: 1, excerpts: 0, complete: true });
+    // 有上下文时文件标题列出命中行号，模型无需靠位置推断哪一行是命中。
+    expect(grepToModel(data)).toContain('"file.txt" · 1 matching line: 2');
   });
 
-  // 真实报告中的压缩 JS/SVG 命中被正文预算吞掉；匹配事实必须存在，省略内容不生成假锚点。
-  it("超长命中行保留身份并继续搜索，完成状态与正文省略互不混淆", () => {
+  // 压缩 JS/SVG 的单行可达数百 KiB；命中必须可见，片段围绕命中而非行首，rg 偏移是 UTF-8 字节；锚点按完整行计算，片段不能产生假锚点。
+  it("超长命中行返回命中附近片段，按 UTF-8 字节偏移定位，锚点指向完整行", () => {
+    const long = `${"中".repeat(2000)}svg${"x".repeat(2000)}`;
     const data = collect(grepOutput("assets", "assets", { pattern: "svg" }),
-      event("match", `${"x".repeat(229 * 1024)}svg\n`, 1), event("match", "svg\n", 2));
-    expect(data.rows[0]).toEqual({ kind: "omitted", path: "assets/file.txt", line: 1, match: true });
-    expect(data.rows[1]).toMatchObject({ kind: "line", content: "svg", line: 2 });
-    expect(searchSummary(data)).toMatchObject({ returned: 2, matching: 2, omitted: 1, complete: true, empty: null });
+      event("match", `${long}\n`, 1, 6000), event("match", "svg\n", 2));
+    const excerpt = data.rows[0];
+    expect(excerpt).toMatchObject({ path: "assets/file.txt", line: 1, match: true, hash: computeLineHash(1, long),
+      excerpt: { start: 1880, length: long.length } });
+    expect(excerpt.content.slice(120, 123)).toBe("svg");
+    expect(data.rows[1]).toMatchObject({ content: "svg", line: 2, excerpt: null });
+    expect(searchSummary(data)).toMatchObject({ returned: 2, matches: 2, excerpts: 1, complete: true, empty: null });
     const model = grepToModel(data);
-    expect(model).toContain("2 rows returned (2 matching) · search complete");
-    expect(model).toContain("1 — matching line; content omitted");
-    expect(model).not.toContain("No matching");
-    expect(model).not.toContain("1#");
+    expect(model).toContain("2 matching lines in 1 file · search complete");
+    // 全部是命中行时标题不重复列出行号。
+    expect(model).toContain('"assets/file.txt" · 2 matching lines\n');
+    // 行内只有窗口文字，范围在行外陈述，避免与正文混淆。
+    expect(model).toContain(`1#${excerpt.hash}│中`);
+    expect(model).toContain('"assets/file.txt" line 1 is an excerpt (characters 1880–2280 of 4003); its anchor refers to the complete line.');
   });
 
-  // 预算按 JSON 字节计算，转义可让不足 64 KiB 的正文超限；上下文的省略不能被计成命中。
-  it("转义后的超长上下文保留上下文身份，省略记录计入条数预算", () => {
-    const data = collect(grepOutput(".", "", { pattern: "found", limit: 1 }),
+  // 上下文长行没有命中可居中，从行首截取；片段不能被计成命中，也不占命中行上限。
+  it("超长上下文行从行首截取，且不占命中行上限", () => {
+    const data = collect(grepOutput(".", "", { pattern: "found", limit: 1, context: 1 }),
       event("context", `${'"'.repeat(40 * 1024)}\n`, 1), event("match", "found\n", 2));
-    expect(data.rows).toEqual([{ kind: "omitted", path: "file.txt", line: 1, match: false }]);
+    expect(data.rows.map(row => [row.excerpt !== null, row.line, row.match])).toEqual([[true, 1, false], [false, 2, true]]);
+    expect(data.rows[0]).toMatchObject({ content: '"'.repeat(400), excerpt: { start: 0, length: 40 * 1024 } });
+    expect(data.stopReason).toBeNull();
+    expect(searchSummary(data)).toMatchObject({ returned: 2, matches: 1, excerpts: 1, complete: true });
+    expect(grepToModel(data)).toContain(`characters 0–400 of ${40 * 1024}`);
+  });
+
+  // limit 只数命中行：上限前的命中保留完整后文；停在下一命中时，它已送达的前文不属于任何返回的命中，须裁掉。
+  it("命中行上限不计上下文，停止时裁掉未返回命中的前文", () => {
+    const data = collect(grepOutput(".", "", { pattern: "x", limit: 1, context: 1 }),
+      event("context", "a\n", 1), event("match", "x\n", 2), event("context", "b\n", 3),
+      event("context", "c\n", 5), event("match", "x\n", 6));
+    expect(data.rows.map(row => row.line)).toEqual([1, 2, 3]);
     expect(data.stopReason).toBe("limit");
-    expect(searchSummary(data)).toMatchObject({ returned: 1, matching: 0, omitted: 1, complete: false });
-    expect(grepToModel(data)).toContain("context line; content omitted");
-    expect(grepToModel(data)).not.toContain("No matching");
+    expect(grepToModel(data)).toContain("Search stopped at the matching-line limit.");
   });
 
   // 正常行仅因剩余预算不足时应报告搜索停止，不应冒充单行超长后继续扫描。
@@ -73,14 +95,15 @@ describe("搜索输出协议", () => {
     const limited = collect(findOutput(".", "", 1), Buffer.from("./a\0./b\0"));
     expect(limited.stopReason).toBe("limit");
     expect(limited.files).toEqual(["a"]);
-    expect(findToModel(limited)).toContain("1 file returned · search incomplete");
-    expect(findToModel(limited)).toContain("result limit");
-    const data = collect(grepOutput(".", "", { pattern: "." }),
-      event("match", `${"a".repeat(40 * 1024)}\n`, 1), event("match", `${"b".repeat(30 * 1024)}\n`, 2));
+    expect(findToModel(limited)).toContain("1 file · search incomplete");
+    expect(findToModel(limited)).toContain("Search stopped at the file limit.");
+    const lines = Array.from({ length: 80 }, (_, index) => event("match", `${"a".repeat(900)}\n`, index + 1));
+    const data = collect(grepOutput(".", "", { pattern: "." }), ...lines);
     expect(data.stopReason).toBe("output_bytes");
-    expect(data.rows).toHaveLength(1);
-    expect(data.rows[0].kind).toBe("line");
-    expect(grepToModel(data)).toContain("Search stopped at the 64 KiB output budget.");
+    expect(data.rows.length).toBeGreaterThan(0);
+    expect(data.rows.length).toBeLessThan(80);
+    expect(data.rows.every(row => row.excerpt === null)).toBe(true);
+    expect(grepToModel(data)).toContain("Search stopped when the returned results reached the 64 KiB budget.");
     expect(grepToModel(data)).not.toContain("narrower");
   });
 
@@ -117,7 +140,7 @@ describe("搜索输出协议", () => {
       type: "match", data: { path: { text: "a" }, lines: { bytes: bytes.toString("base64") }, line_number: 1 },
     })}\n`);
     output.records.push(encode(Buffer.from("中文\n")));
-    expect(output.result.rows[0]).toMatchObject({ kind: "line", content: "中文", hash: null });
+    expect(output.result.rows[0]).toMatchObject({ content: "中文", hash: null, excerpt: null });
     expect(() => output.records.push(encode(Buffer.from([0xff])))).toThrow(/not UTF-8/);
     expect(() => findOutput(".", "", 10).records.push(Buffer.from([0xff, 0]))).toThrow(/not UTF-8/);
   });
@@ -132,7 +155,8 @@ describe("搜索输出协议", () => {
     expect(counts.files).toEqual([{ path: "中文\n文件", count: 2 }, { path: "b", count: 10 }]);
     expect(counts.rows).toEqual([]);
     expect(counts.stopReason).toBe("limit");
-    expect(grepToModel(counts)).toContain("2 files returned · search incomplete");
+    expect(grepToModel(counts)).toContain("12 matching lines in 2 files · search incomplete");
+    expect(grepToModel(counts)).toContain("Search stopped at the file limit.");
     const partial = grepOutput(".", "", { pattern: ".", outputMode: "count" });
     partial.records.push(Buffer.from("./a\0"));
     expect(() => partial.records.finish()).toThrow(/incomplete/);
@@ -172,5 +196,69 @@ describe("搜索参数与分发路径", () => {
     expect(executablePath("C:\\app\\app.asar\\node_modules\\rg.exe")).toBe("C:\\app\\app.asar.unpacked\\node_modules\\rg.exe");
     expect(executablePath("/project.asar.backup/rg")).toBe("/project.asar.backup/rg");
     expect(executablePath("/app/app.asar.unpacked/rg")).toBe("/app/app.asar.unpacked/rg");
+  });
+});
+
+describe("搜索结果界面布局", () => {
+  // 路径相对所选目标显示；单文件 grep 的行路径等于目标本身，去前缀后会变成空串。
+  it("显示路径相对搜索目标，单文件目标保留文件名，前缀相同的兄弟目录不被误裁", () => {
+    expect(displayPath(".", "src/a.ts")).toBe("src/a.ts");
+    expect(displayPath("src", "src/lib/a.ts")).toBe("lib/a.ts");
+    expect(displayPath("src/a.ts", "src/a.ts")).toBe("a.ts");
+    expect(displayPath("src", "srcx/a.ts")).toBe("srcx/a.ts");
+  });
+
+  // rg 并行输出顺序不定，纯字符串排序会让根层文件插进子目录之间、同一目录被拆成多组。
+  it("同一目录的条目连续成组，根层在前，预算在排序后截取", () => {
+    const { groups, omitted } = groupByDirectory(["b/z.ts", "a.ts", "b/c/d.ts", "b/a.ts", "b.ts"], path => path, 4);
+    expect(groups.map(group => [group.directory, group.entries.map(entry => entry.name)])).toEqual([
+      ["", ["a.ts", "b.ts"]], ["b", ["a.ts", "z.ts"]],
+    ]);
+    expect(omitted).toBe(1);
+  });
+
+  // 片段起止若落在代理对中间，会留下孤立代理并显示为乱码。
+  it("片段窗口不拆开代理对", () => {
+    expect(excerptWindow("😀".repeat(1000), 1001)).toEqual({ start: 882, end: 1280 });
+  });
+
+  // 不连续行若并入同一段会被 CodeRows 连续编号，显示出错误的行号；长行片段与完整行一样参与连续分段，两端以省略号标出。
+  it("文件内按行号排序，连续行合段，行号断开处分段，预算按文件独立", () => {
+    const row = (line: number, match = true) => ({ path: "a.ts", line, content: `l${line}`, hash: null, excerpt: null, match });
+    const files = grepFiles([row(6), row(2, false), row(3),
+      { path: "a.ts", line: 4, match: false, content: "mid", hash: null, excerpt: { start: 5, length: 20 } },
+      row(9), { ...row(1), path: "b.ts" }], 4);
+    expect(files.map(file => file.path)).toEqual(["a.ts", "b.ts"]);
+    expect(files[0].segments).toEqual([
+      { rows: [{ line: 2, content: "l2", match: false }, { line: 3, content: "l3", match: true }, { line: 4, content: "…mid…", match: false }] },
+      { rows: [{ line: 6, content: "l6", match: true }] },
+    ]);
+    expect(files[0]).toMatchObject({ matches: 3, omitted: 1 });
+    expect(files[1]).toMatchObject({ matches: 1, omitted: 0 });
+  });
+
+  // header 摘要不能把上下文行算成命中，也不能把行数当作文件数。
+  it("content 摘要统计命中行与涉及文件，count 摘要合计每文件命中数", () => {
+    const content = collect(grepOutput(".", "", { pattern: "x", context: 1 }),
+      event("context", "a\n", 1), event("match", "x\n", 2), event("match", "x\n", 3));
+    expect(searchSummary(content)).toMatchObject({ files: 1, matches: 2, complete: true });
+    const counts = collect(grepOutput(".", "", { pattern: ".", outputMode: "count" }), Buffer.from("./a\0" + "2\n./b\0" + "10\n"));
+    expect(searchSummary(counts)).toMatchObject({ files: 2, matches: 12, complete: true });
+  });
+
+  // 选项行只提示偏离默认值的参数；填充阶段的部分 JSON 可能含形状不明的字段。
+  it("只列出非默认参数并忽略形状不明的字段", () => {
+    expect(searchOptions({ pattern: "x", ignoreCase: true, literal: false, context: 0, limit: 500, outputMode: "content" })).toEqual([
+      { kind: "flag", flag: "ignoreCase" },
+    ]);
+    expect(searchOptions({ outputMode: "count", context: 2, limit: 50, glob: ["*.ts", 3] })).toEqual([
+      { kind: "mode", value: "count" }, { kind: "context", value: 2 }, { kind: "limit", value: 50 }, { kind: "glob", value: "*.ts" },
+    ]);
+    expect(searchOptions(null)).toEqual([]);
+    // 空结果提示只列出仍生效的筛选；两者都已关闭时没有可提示的筛选。
+    expect(searchFilters({})).toBe("both");
+    expect(searchFilters({ hidden: true })).toBe("ignored");
+    expect(searchFilters({ noIgnore: true })).toBe("hidden");
+    expect(searchFilters({ hidden: true, noIgnore: true })).toBeNull();
   });
 });

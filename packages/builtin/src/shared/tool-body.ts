@@ -2,6 +2,7 @@ import { parsePatchFiles, type FileDiffMetadata } from "@pierre/diffs";
 import { formatPatch, parsePatch, type StructuredPatchHunk } from "diff";
 
 import { splitLines } from "./hashline/lines.ts";
+import { displayLine } from "./text-row.ts";
 
 /** 内置插件正文的逻辑行预算；不约束工具外壳、原始详情或模型输出。 */
 export const TOOL_BODY_LINE_LIMIT = 120;
@@ -9,7 +10,7 @@ export const TOOL_BODY_LINE_LIMIT = 120;
 export function textBodyPreview(text: string) {
   const lines = splitLines(text);
   return {
-    rows: lines.slice(0, TOOL_BODY_LINE_LIMIT).map((content, index) => ({ line: index + 1, content })),
+    rows: lines.slice(0, TOOL_BODY_LINE_LIMIT).map((content, index) => ({ line: index + 1, content: displayLine(content) })),
     omitted: Math.max(0, lines.length - TOOL_BODY_LINE_LIMIT),
   };
 }
@@ -34,7 +35,7 @@ export function diffBodyPreview(diff: string): { fileDiff: FileDiffMetadata; omi
         if (prefix !== " " && prefix !== "+" && prefix !== "-") return null;
         previousShown = shown < TOOL_BODY_LINE_LIMIT;
         if (!previousShown) { omitted++; continue; }
-        lines.push(line);
+        lines.push(`${prefix}${displayLine(line.slice(1))}`);
         shown++;
         if (prefix !== "+") oldLines++;
         if (prefix !== "-") newLines++;

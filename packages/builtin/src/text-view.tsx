@@ -8,6 +8,7 @@ import { FileDiff, type FileDiffOptions } from "@pierre/diffs/react";
 import type { TextRead, TextChange } from "@atelier/builtin-api/contracts";
 import { inputField, inputText, characterCount, toolTextTail, editPreviewText } from "./shared/tool-preview";
 import { TOOL_BODY_LINE_LIMIT, diffBodyPreview, textBodyPreview } from "./shared/tool-body";
+import { displayText } from "./shared/text-row";
 import { CodeRows } from "./code-view";
 import { codeViewOptions } from "./shared/code-view";
 import { ToolHeader } from "@atelier/ui/tool-header";
@@ -68,7 +69,7 @@ function TextEditBody(props: ToolRenderProps<TextChange>) {
 function TextReadBody({ result, target }: ToolRenderProps<TextRead>) {
   const i18n = useI18n();
   const data = result?.data;
-  const rows = data?.rows.slice(0, TOOL_BODY_LINE_LIMIT);
+  const rows = data?.rows.slice(0, TOOL_BODY_LINE_LIMIT).map(row => ({ line: row.line, content: displayText(row) }));
   return data ? <div className="flex flex-col gap-2">
     <CodeRows rows={rows ?? []} filename={inputText(target, "path")} />
     <OmittedLines count={data.rows.length - (rows?.length ?? 0)} />

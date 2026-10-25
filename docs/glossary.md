@@ -115,6 +115,7 @@
 | 命令执行 | exec | 从目录资源 cwd 启动一次非交互 shell；过程流式交付，历史只保留有界输出与执行结局 |
 | 文件查找 | find | 按 glob 查找目录资源中的文件路径；见 [目录搜索](runtime.md#目录搜索findgrep) |
 | 正文搜索 | grep | 按正则或字面量搜索目录资源中的文件正文，可返回内容行、文件名或逐文件命中行数；见 [目录搜索](runtime.md#目录搜索findgrep) |
+| 长行片段 | excerpt row | `read / grep / edit` 对超长行（压缩产物、内联 base64）只返回一段窗口（read 与 edit 从行首、grep 围绕命中），记录窗口在整行中的位置；锚点仍按完整行计算；见 [正文工具](runtime.md) 与 [目录搜索](runtime.md#目录搜索findgrep) |
 | 模型请求 | request | 一次实际模型 API 请求，可产生多个输出块；协议终态不划分用户回合 |
 | API 参考价格 | API reference prices | 具体模型的应用层单价与输入长度档位，用于估算而非实际账单；结构见 `docs/model-configuration.md` |
 | 计价单位 | pricing unit | 单个计费项的数量单位（token、张或秒），与价格表统一使用的币种分开；单价同时声明金额和计价基数 |

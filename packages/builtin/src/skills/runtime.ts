@@ -25,7 +25,7 @@ export function createSkillsModule(catalog: SkillCatalog) {
         guidelines: [
           "The system prompt contains the skill catalog with names and descriptions.",
           "path is relative to the selected skill's directory. Package file reads stay within that directory, including symbolic link resolution.",
-          "offset and limit select complete lines. nextOffset identifies where remaining content starts.",
+          "offset and limit select lines; lines longer than 16000 characters are returned as excerpts. nextOffset identifies where remaining content starts.",
         ],
         argsSchema: skillReadArgsSchema, resultSchema: SkillRead.schema,
         effect: "read", execution: "parallel",

@@ -19,13 +19,18 @@ export const editOperationSchema = z.discriminatedUnion("op", [
 
 export const textRowSchema = z.strictObject({
   line: z.number().int().positive().describe("The absolute 1-based line number in the complete text."),
-  content: z.string().describe("The complete line content, without its terminator."),
-  hash: z.string().nullable().describe("LINE#HASH content hash, or null when read was requested with anchored:false."),
+  content: z.string().describe("The line content without its terminator; for an excerpt, only the excerpt window."),
+  hash: z.string().nullable().describe("LINE#HASH content hash of the complete line, also for an excerpt; null when anchors were not requested."),
+  excerpt: z.strictObject({
+    start: z.number().int().nonnegative().describe("UTF-16 offset of content within the complete line."),
+    length: z.number().int().positive().describe("UTF-16 length of the complete line."),
+  }).nullable().describe("Present when the line is too long to return in full; content is then a window of the complete line. Null for a complete line."),
 });
+export type TextRow = z.infer<typeof textRowSchema>;
 export const textReadSchema = z.strictObject({
   totalLines: z.number().int().nonnegative().describe("Number of logical lines in the complete text; empty text has zero lines."),
   fromLine: z.number().int().positive().describe("First requested line, counted from 1 in the complete text."),
-  rows: z.array(textRowSchema).describe("Selected complete lines and their available edit anchors."),
+  rows: z.array(textRowSchema).describe("Selected lines and their available edit anchors; long lines are returned as excerpts."),
   noFinalNewline: z.boolean().describe("Whether non-empty text lacks a final newline."),
   nextOffset: z.number().int().positive().nullable().describe("First unread line after the returned range, or null at end of text. Use as target.offset only when this implementation supports line selection."),
 }).describe("Selected text lines and edit anchors, final-newline information and a continuation position.");

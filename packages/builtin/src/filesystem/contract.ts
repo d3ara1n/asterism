@@ -36,7 +36,7 @@ export const DirectoryRead = defineImplementation({
   targetSchema: z.strictObject({
     path: filePath,
     offset: z.number().int().positive().optional().describe("First line to read, 1-based in the complete file; defaults to 1."),
-    limit: z.number().int().positive().max(2000).optional().describe("Maximum complete lines to read; defaults to 1000, maximum 2000. The output is also limited to 64 KiB of line text."),
+    limit: z.number().int().positive().max(2000).optional().describe("Maximum lines to read; defaults to 1000, maximum 2000. The output is also limited to 64 KiB of line text; lines longer than 16000 characters are returned as excerpts with anchors for the complete line."),
   }).describe("Select file content and its line range, e.g. {\"path\":\"src/main.ts\",\"offset\":100,\"limit\":80}. Content is UTF-8 text; nextOffset marks the start of remaining lines."),
   effect: "read", execution: "parallel",
 });

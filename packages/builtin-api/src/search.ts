@@ -6,7 +6,7 @@ const pattern = z.string().min(1).refine(value => !value.includes("\0"), "Patter
 const selection = {
   hidden: z.boolean().optional().describe("Disable hidden-entry filtering; defaults to false. Ignore-file filtering is controlled separately by noIgnore."),
   noIgnore: z.boolean().optional().describe("Disable ignore-file filtering; defaults to false. Hidden-entry filtering is controlled separately by hidden."),
-  limit: z.number().int().positive().max(2000).optional().describe("Maximum returned rows or files, including context and omitted-content rows; defaults to 500, maximum 2000. The implementation also bounds output bytes."),
+  limit: z.number().int().positive().max(2000).optional().describe("Maximum returned matching lines in grep content mode, or files otherwise; defaults to 500, maximum 2000. Context lines are bounded only by the output-byte budget. Matching lines with omitted content count toward the limit."),
 };
 const globGuidelines = [
   "Globs use ripgrep semantics. A pattern without '/' such as '*.md' matches filenames at any depth.",
@@ -27,7 +27,7 @@ export const Grep = defineTool({
   id: builtin.name("tool.grep"), name: "grep",
   description: "Search file content for a regular expression or literal text within a resource.",
   guidelines: [
-    "content mode reports matching and context lines; files mode returns matching paths; count mode returns the number of matching lines per file.",
+    "content mode groups matching and context lines under a per-file heading; when context lines are present, the heading lists the matching line numbers. files mode returns matching paths; count mode returns the number of matching lines per file.",
     "Regular expressions use ripgrep's default Rust regex syntax. Matching is line-oriented.",
     "Complete UTF-8 content rows include LINE#HASH edit anchors by default, shared with read and edit.",
     ...globGuidelines,
