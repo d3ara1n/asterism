@@ -40,7 +40,7 @@ provider 的 `stop_reason=end_turn` 等终态只表示 request 的协议结局�
 
 代理通过 `resource_call(resource_id, tool: "send", args: { message })` 向 Agent 资源发送文本消息。`resource_id` 已唯一确定接收代理，`target` 省略或为 null，代理名称不参与接收方校验。宿主按既有工具支持关系、请求有效链接和工具策略授权。共享工具契约 `Send` 属于内置公共 API，具体资源实现独立声明 target schema，共享契约不规定资源内部的定位字段。
 
-内置 `send` 是写操作，按顺序执行，复用 `SubmitAgentInput` 的 `steer` 受理、准备与幂等机制。空闲代理开始执行，运行中代理在请求边界消费；返回成功只表示输入已受理，接收代理的独立执行继续由自身控制器管理。模型参数只填写资源 ID 与正文，发送者来自 [宿主绑定的调用者身份](plugin-sdk.md#工具贡献)。
+内置 `send` 是写操作，按顺序执行，复用 `SubmitAgentInput` 的 `steer` 受理、准备与幂等机制。空闲代理开始执行，运行中代理在请求边界消费；返回成功只表示输入已受理，结果数据为 `{ name }`（接收代理名称），接收代理的独立执行继续由自身控制器管理。`submissionId` 由实现内部生成并用于输入受理。模型参数只填写资源 ID 与正文，发送者来自 [宿主绑定的调用者身份](plugin-sdk.md#工具贡献)。
 
 内置 `wait`（共享声明 `Wait`）是读操作，按顺序执行，参数为必填秒数 `timeout`，target 为 null。等待被链接代理收束：执行循环已停止，且已受理的输入不再开启新循环；未运行时立即成功。结果含代理名称、`executionState` 与等待时长。超时只结束等待、报告 `running`，被等待的代理继续执行；代理等待自身直接失败。先 `send` 再 `wait` 可等待对方处理完毕。
 
