@@ -1,6 +1,18 @@
 import { defineMessages, pluginNamespace } from "@atelier/sdk/contracts";
 
 export const textMessages = pluginNamespace("atelier.builtin").messages("en", defineMessages({
+  copyNoteMarkdown: {
+    id: "note.copyMarkdown",
+    defaultMessage: "Copy Markdown",
+  },
+  noteCopied: {
+    id: "note.copied",
+    defaultMessage: "Note copied",
+  },
+  noteCopyFailed: {
+    id: "note.copyFailed",
+    defaultMessage: "Could not copy note",
+  },
   toolTextCharacters: {
     id: "toolTextCharacters",
     defaultMessage: "{count} chars",

@@ -1,5 +1,8 @@
+import { useState } from "react";
 import { useI18n, creationEntry, cardRenderer, toolRenderer, type RendererModule } from "@atelier/sdk/renderer";
-import { FileText, BookOpen, FilePenLine, FilePlus2 } from "lucide-react";
+import { FileText, BookOpen, FilePenLine, FilePlus2, Copy } from "lucide-react";
+import { toast } from "sonner";
+import { IconButton } from "@atelier/ui/ui/icon-button";
 
 import { Markdown } from "../agent/conversation/Markdown";
 import { commonMessages } from "../messages/common";
@@ -11,11 +14,34 @@ import { NoteInput } from "./creation";
 
 const appearance = { width: 340, height: 320, minWidth: 280, minHeight: 160 };
 
+function NoteActions({ data }: { data: { text: string | null } }) {
+  const i18n = useI18n();
+  const [copying, setCopying] = useState(false);
+  const copy = async () => {
+    if (data.text === null || copying) return;
+    setCopying(true);
+    try {
+      await navigator.clipboard.writeText(data.text);
+      toast.success(i18n.text(textMessages.noteCopied));
+    } catch (error) {
+      console.error("Note could not be copied.", error);
+      toast.error(i18n.text(textMessages.noteCopyFailed));
+    } finally {
+      setCopying(false);
+    }
+  };
+  return <IconButton size="icon-xs" label={i18n.text(textMessages.copyNoteMarkdown)}
+    disabled={data.text === null || copying} onClick={() => { void copy(); }}>
+    <Copy />
+  </IconButton>;
+}
+
 export default {
   prepare: prepareCodeView,
   resources: [{ kind: "atelier.builtin/note", label: commonMessages.kindNote, icon: <FileText className="size-4" />, card: appearance }],
   cards: [cardRenderer(NoteView, {
     ...appearance,
+    Actions: NoteActions,
     Body: ({ data }) => { const i18n = useI18n(); return <div className="content-scrollbar min-h-0 flex-1 select-text overflow-auto p-3">
       {data.text !== null ? <Markdown>{data.text}</Markdown>
         : <p className="type-body text-muted-foreground">{i18n.formatMessage(textMessages.contentUnavailable)}</p>}

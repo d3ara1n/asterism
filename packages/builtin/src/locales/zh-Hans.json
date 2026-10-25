@@ -1,4 +1,7 @@
 {
+  "note.copyMarkdown": "复制 Markdown",
+  "note.copied": "已复制笔记",
+  "note.copyFailed": "无法复制笔记",
   "skills.title": "技能",
   "skills.loading": "正在加载技能…",
   "skills.empty": "未发现技能。",
