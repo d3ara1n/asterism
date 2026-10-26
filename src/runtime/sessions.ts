@@ -16,7 +16,7 @@ import { createModules } from "./builtin.ts";
 import type { ParsedCall } from "../plugins/commands.ts";
 import { createBuiltinCatalogs } from "./builtin-catalogs.ts";
 import type { SessionHost, SessionHostWriter as SessionWriter } from "../plugins/host.ts";
-import type { PluginManifest, LoadedPlugins } from "../plugins/loader.ts";
+import type { PluginManifest, LoadedPlugins, PreparedPluginStorage } from "../plugins/loader.ts";
 import { createModelServices } from "../plugins/models.ts";
 import { createResourceId } from "../resources/id.ts";
 import type { ResourceRegistry } from "../resources/registry.ts";
@@ -68,7 +68,7 @@ export class SessionService {
   private readonly validateInitialInput: (selection: AgentSelection, parts: ModelInputPart[], content: ContentLease) => Promise<void>;
   constructor(private readonly db: DatabaseSync, dataRoot: string, configuration: ConfigurationService,
     private readonly changed: (event: SessionChanged) => void = () => {}, adapterFactory?: (settings: ModelSettings) => ModelAdapter, external: readonly PluginDefinition[] = [],
-    configurationChanged?: (pluginId: string) => void) {
+    configurationChanged?: (pluginId: string) => void, preparedStorage?: PreparedPluginStorage) {
     this.tree = new SessionTree(db);
     this.events.declarePublic(SessionTitleChanged);
     this.events.declarePublic(ResourceStatusChanged);
@@ -130,7 +130,7 @@ export class SessionService {
         throw error;
       }
     };
-    const modules = createModules({ events: this.events, extensionsDirectory: join(dataRoot, "extensions"), data: new SessionDataStore(db), content: this.content, refOf, vault: configuration.vault, configurationChanged,
+    const modules = createModules({ events: this.events, extensionsDirectory: join(dataRoot, "extensions"), data: new SessionDataStore(db), content: this.content, refOf, vault: configuration.vault, configurationChanged, preparedStorage,
       sessions: host, models, catalogs: createBuiltinCatalogs(configuration),
       webProviders: configuration.web,
       modelProviderExtensions: configuration.extensions, modelProviders: {

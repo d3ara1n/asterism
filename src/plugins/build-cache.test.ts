@@ -20,7 +20,7 @@ function fixture() {
   put(join(root, "node_modules/dependency/index.js"), "export const value = 1;");
   put(entry, 'export { value } from "./shared.mjs";'); put(chunk, "export const value = 1;");
   const result: CompiledModules = {
-    runtime: new Map([["fixture", entry]]), renderer: new Map(),
+    runtime: new Map([["fixture", entry]]), storage: new Map(), renderer: new Map(),
     dependencies: new Map([["fixture", new Set(["provider"])]]),
     runtimeDependencies: new Map([["fixture", new Set(["provider"])]]),
     rendererDependencies: new Map(), failures: new Map(),

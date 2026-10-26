@@ -19,6 +19,8 @@ export interface PackageModule extends PackageDependencyOwner {
   public: boolean;
   runtime?: string;
   renderer?: string;
+  /** 存储声明入口；与后台入口同一 runtime 构建，不依赖插件运行时。 */
+  storage?: string;
 }
 interface DependencyManifest {
   dependencies?: Record<string, string>;
@@ -29,7 +31,7 @@ function dependencyRanges(pkg: DependencyManifest): Map<string, readonly string[
   return new Map([...new Set([...Object.keys(pkg.dependencies ?? {}), ...Object.keys(pkg.peerDependencies ?? {}), ...Object.keys(pkg.optionalDependencies ?? {})])]
     .map(name => [name, [pkg.dependencies?.[name], pkg.peerDependencies?.[name], pkg.optionalDependencies?.[name]].filter(value => value !== undefined)]));
 }
-export function packageModule(root: string, entry: { id: string; runtime?: string; renderer?: string }): PackageModule {
+export function packageModule(root: string, entry: { id: string; runtime?: string; renderer?: string; storage?: string }): PackageModule {
   const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
   const exported = pkg.exports && typeof pkg.exports === "object" && "./public" in pkg.exports;
   if (exported && (typeof pkg.name !== "string" || !/^(?:@[^/\s]+\/)?[^/\s]+$/u.test(pkg.name)))
@@ -63,6 +65,7 @@ function createDependencyOwnerLookup() {
 }
 export interface CompiledModules {
   runtime: Map<string, string>;
+  storage: Map<string, string>;
   renderer: Map<string, string>;
   dependencies: Map<string, Set<string>>;
   runtimeDependencies: Map<string, Set<string>>;
@@ -78,6 +81,14 @@ export function unpackedArchivePath(entry: string): string | null {
   if (archive < 0) return null;
   const separator = entry.match(/[\\/]/u)?.[0] ?? "/";
   return [...segments.slice(0, archive), `${segments[archive]}.unpacked`, ...segments.slice(archive + 1)].join(separator);
+}
+
+/** 存储入口与后台入口共处 runtime 构建；`@` 不出现在插件 ID 中，输出名不会冲突。 */
+const storageEntry = (id: string) => `${id}@storage`;
+function realmEntries(realm: ModuleRealm, pkg: PackageModule): [string, string][] {
+  if (realm === "renderer") return pkg.renderer ? [[pkg.id, resolve(pkg.root, pkg.renderer)]] : [];
+  return [...pkg.runtime ? [[pkg.id, resolve(pkg.root, pkg.runtime)] as [string, string]] : [],
+    ...pkg.storage ? [[storageEntry(pkg.id), resolve(pkg.root, pkg.storage)] as [string, string]] : []];
 }
 
 /**
@@ -103,11 +114,11 @@ export async function compileModules(packages: readonly PackageModule[], enabled
       throw new Error(`Invalid or duplicate public provider: ${provider.name}@${provider.version}.`);
     preloaded.set(provider.name, provider);
   }
-  const result: CompiledModules = { runtime: new Map(), renderer: new Map(), dependencies: new Map(), runtimeDependencies: new Map(), rendererDependencies: new Map(), failures: new Map() };
+  const result: CompiledModules = { runtime: new Map(), storage: new Map(), renderer: new Map(), dependencies: new Map(), runtimeDependencies: new Map(), rendererDependencies: new Map(), failures: new Map() };
   if (!packages.some(pkg => enabled.has(pkg.id))) return result;
   const cache = new PluginBuildCache(cacheRoot, packages.filter(pkg => enabled.has(pkg.id)).map(pkg => pkg.root), {
     // 构建选项、解析器或宿主转接规则变化时递增配方版本。
-    recipe: 1, esbuild: createRequire(import.meta.url)("esbuild/package.json").version, platform: process.platform, arch: process.arch,
+    recipe: 2, esbuild: createRequire(import.meta.url)("esbuild/package.json").version, platform: process.platform, arch: process.arch,
     cwd: process.cwd(), nodePath: process.env.NODE_PATH,
     packages: packages.map(pkg => ({ ...pkg, dependencies: [...pkg.dependencies] })), enabled: [...enabled], publicProviders, hostIdentity,
   });
@@ -186,7 +197,7 @@ export async function compileModules(packages: readonly PackageModule[], enabled
       });
     } });
     const options = (realm: ModuleRealm, entries: readonly PackageModule[]): BuildOptions => ({
-      entryPoints: Object.fromEntries(entries.filter(pkg => pkg[realm]).map(pkg => [pkg.id, resolve(pkg.root, pkg[realm]!)])),
+      entryPoints: Object.fromEntries(entries.flatMap(pkg => realmEntries(realm, pkg))),
       outdir: resolve(cacheRoot, "build", realm), entryNames: "[name]", chunkNames: "chunks/[name]-[hash]", assetNames: "assets/[name]-[hash]",
       outExtension: { ".js": ".mjs" }, bundle: true, splitting: true, format: "esm", write: false,
       platform: realm === "runtime" ? "node" : "browser", target: realm === "runtime" ? "node22" : "chrome130",
@@ -204,7 +215,7 @@ export async function compileModules(packages: readonly PackageModule[], enabled
       if (result.failures.has(pkg.id)) continue;
       progress(pkg.id);
       try {
-        for (const realm of ["runtime", "renderer"] as const) if (pkg[realm]) await esbuild.build(options(realm, [pkg]));
+        for (const realm of ["runtime", "renderer"] as const) if (realmEntries(realm, pkg).length) await esbuild.build(options(realm, [pkg]));
       } catch (error) { result.failures.set(pkg.id, error instanceof Error ? error.message : String(error)); }
     }
     let changed = true;
@@ -231,7 +242,7 @@ export async function compileModules(packages: readonly PackageModule[], enabled
       progress(component.map(pkg => pkg.id).join(", "));
       try {
         for (const realm of ["runtime", "renderer"] as const) {
-          if (!component.some(pkg => pkg[realm])) continue;
+          if (!component.some(pkg => realmEntries(realm, pkg).length)) continue;
           const built = await esbuild.build(options(realm, component));
           const base = resolve(cacheRoot, "build", realm);
           const hash = createHash("sha256");
@@ -242,12 +253,16 @@ export async function compileModules(packages: readonly PackageModule[], enabled
             mkdirSync(dirname(destination), { recursive: true }); writeFileSync(destination, file.contents);
             outputFiles.push(destination);
           }
-          for (const pkg of component) if (pkg[realm]) result[realm].set(pkg.id, join(directory, `${pkg.id}.mjs`));
+          for (const pkg of component) {
+            if (realm === "renderer") { if (pkg.renderer) result.renderer.set(pkg.id, join(directory, `${pkg.id}.mjs`)); continue; }
+            if (pkg.runtime) result.runtime.set(pkg.id, join(directory, `${pkg.id}.mjs`));
+            if (pkg.storage) result.storage.set(pkg.id, join(directory, `${storageEntry(pkg.id)}.mjs`));
+          }
         }
       } catch (error) {
         for (const pkg of component) {
           result.failures.set(pkg.id, error instanceof Error ? error.message : String(error));
-          result.runtime.delete(pkg.id); result.renderer.delete(pkg.id);
+          result.runtime.delete(pkg.id); result.storage.delete(pkg.id); result.renderer.delete(pkg.id);
         }
       }
     }

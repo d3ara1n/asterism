@@ -11,20 +11,21 @@ import { configurationIdSchema } from "@atelier/builtin-api/contracts";
 import { defaultAgents, defaultRoles } from "./defaults.ts";
 import { ConfigurationError } from "./errors.ts";
 import { normalizeOverrides, resolveAgentConfiguration, resolveRoleConfiguration } from "./layers.ts";
-import { migrateModelCost } from "./model-cost-migration.ts";
 import { providerEditingMessages } from "../shared/provider-editing-messages.ts";
 import { jsonStorage } from "../storage/migrations.ts";
 
+/** 全局配置格式；变化时递增并在 `configurationStorage` 追加 n → n+1 迁移。 */
+export const configurationVersion = 11;
 const identity = { id: configurationIdSchema };
 const storedProviderSchema = modelProviderInputSchema.extend({ credentialRef: z.string().uuid().nullable() }).strip();
 const storedWebProviderSchema = webProviderStateSchema.extend({ credentialRef: z.string().uuid().nullable() });
 const storedRoleSchema = z.object({ ...identity, builtin: z.boolean(), overrides: modelRoleOverridesSchema });
 const storedAgentSchema = z.object({ ...identity, builtin: z.boolean(), overrides: agentOverridesSchema });
-const storedModelSchema = modelSchema.extend({ cost: z.preprocess(migrateModelCost, modelCostSchema.nullable().default(null)) }).strip();
+const storedModelSchema = modelSchema.extend({ cost: modelCostSchema.nullable().default(null) }).strip();
 /** 模型以 `<providerId>/<modelId>` 识别，其余以 id 识别。 */
 const keyOf = (item: { id: string } | { providerId: string; modelId: string }): string => "id" in item ? item.id : modelReference(item);
 const documentSchema = z.strictObject({
-  version: z.literal(11),
+  version: z.literal(configurationVersion),
   webProviders: z.array(storedWebProviderSchema),
   modelProviders: z.array(storedProviderSchema), models: z.array(storedModelSchema),
   roles: z.array(storedRoleSchema), agents: z.array(storedAgentSchema),
@@ -63,14 +64,13 @@ function validate(raw: unknown): ConfigurationDocument {
 }
 
 function initialConfiguration(): ConfigurationDocument {
-  return { version: 11, modelProviders: [], webProviders: [], models: [],
+  return { version: configurationVersion, modelProviders: [], webProviders: [], models: [],
     roles: defaultRoles.map(({ id, builtin }) => ({ id, builtin, overrides: {} })),
     agents: defaultAgents.map(({ id, builtin }) => ({ id, builtin, overrides: {} })) };
 }
-/** 已发布格式的转换在此追加，业务读写始终消费当前文档。 */
+/** 已发布格式的转换在此追加；业务读写始终消费当前文档。 */
 export function configurationStorage(root: string) {
-  return jsonStorage({ id: "configuration", file: join(root, applicationStorage.configurationFile),
-    version: 11, initial: initialConfiguration, migrations: {}, validate });
+  return jsonStorage({ id: "configuration", file: join(root, applicationStorage.configurationFile), version: configurationVersion, migrations: {} });
 }
 
 /** 以旧身份定位并替换；新身份与其他项冲突时拒绝。 */

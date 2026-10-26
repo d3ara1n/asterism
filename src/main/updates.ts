@@ -2,7 +2,7 @@ import { app, ipcMain, net, type BrowserWindow } from "electron";
 import Store from "electron-store";
 import electronUpdater from "electron-updater";
 import { prerelease } from "semver";
-import { applicationStorage, applicationRepository, applicationUserAgent } from "../shared/application.ts";
+import { applicationStorage, applicationRepository, applicationUserAgent, preferenceVersion } from "../shared/application.ts";
 import { githubReleasesSchema, selectUpdateRelease, type GitHubUpdateRelease } from "./update-release.ts";
 import {
   updatesGetChannel, updatesSetChannel, updatesCheckChannel, updatesInstallChannel, updatesChangedChannel,
@@ -12,9 +12,9 @@ import {
 /** 更新服务由主进程持有；下载完成后通过应用已有退出流程安装。 */
 export class ApplicationUpdates {
   private readonly updater = electronUpdater.autoUpdater;
-  private readonly store = new Store<{ includePrerelease: boolean }>({
+  private readonly store = new Store<{ version: number; includePrerelease: boolean }>({
     cwd: app.getPath("userData"), name: applicationStorage.updatesStore,
-    defaults: { includePrerelease: prerelease(app.getVersion()) !== null },
+    defaults: { version: preferenceVersion, includePrerelease: prerelease(app.getVersion()) !== null },
   });
   private state: UpdateState = {
     version: app.getVersion(), enabled: app.isPackaged,

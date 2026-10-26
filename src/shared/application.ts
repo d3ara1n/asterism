@@ -30,5 +30,8 @@ export const applicationStorage = {
   runtimeLogFile: "runtime.log",
 } as const;
 
+/** 主进程设置文件（外观、语言、更新）的平铺格式版本；electron-store 默认值随新文件写入。界面状态是缓存，不带版本。 */
+export const preferenceVersion = 1;
+
 /** 归档会话的冷静期；仅在启动清理时判定，不是定时任务，界面只表达为约一个月。 */
 export const sessionRetentionMs = 30 * 24 * 60 * 60 * 1000;

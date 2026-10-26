@@ -1,32 +1,26 @@
 import { z } from "zod";
-import { pluginNamespace } from "@atelier/sdk/contracts";
-import { definePlugin, type PluginStorageDeclaration } from "@atelier/sdk/runtime";
+import { defineStorage } from "@atelier/sdk/runtime";
 
-const ns = pluginNamespace("example.storage");
-const schema = z.object({ greeting: z.string(), enabled: z.boolean() });
-const Settings = ns.config(schema, { greeting: "Hello", enabled: true });
-
-/** 无信封正文是第 0 版；每一步仅解释自己接收的历史形状。 */
-const storage: readonly PluginStorageDeclaration[] = [{
-  kind: "json", path: ".atelier/config.json", version: 2, unversioned: true,
-  initial: () => Settings.defaults,
-  migrations: {
-    0: raw => {
-      const old = z.object({ title: z.string() }).parse(raw);
-      return { greeting: old.title };
-    },
-    1: raw => {
-      const old = z.object({ greeting: z.string() }).parse(raw);
-      return { ...old, enabled: true };
+/**
+ * 存储入口：package.json 中 `"atelier": { "storage": "./src/storage.ts" }` 指向本文件。
+ * 宿主在插件运行时之前单独导入它，只依赖格式声明本身；每一步只解释自己接收的历史形状。
+ */
+export default defineStorage([
+  {
+    // 托管配置：`plugin.config` 读写时处理 `{ version, data }` 信封，插件仍消费配置值。
+    kind: "json", path: ".atelier/config.json", version: 2,
+    migrations: {
+      1: raw => {
+        const old = z.object({ greeting: z.string() }).parse(raw);
+        return { ...old, enabled: true };
+      },
     },
   },
-  validate: raw => schema.parse(raw),
-}];
-
-export default definePlugin({ namespace: ns, version: "1.0.0", storage,
-  setup(plugin) {
-    const settings = plugin.config(Settings);
-    plugin.log.info(settings.get().greeting);
-    return {};
+  {
+    // 托管数据库：首次创建时宿主写入当前 `user_version`，迁移在宿主事务内执行同步 SQL。
+    kind: "sqlite", path: ".atelier/db.sqlite", version: 2,
+    migrations: {
+      1: db => db.exec("ALTER TABLE notes ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0;"),
+    },
   },
-});
+]);

@@ -156,23 +156,25 @@ export interface PluginModule { setup(plugin: PluginContext): ModuleContribution
 export interface PluginContribution extends ModuleContribution {
   modules?: readonly PluginModule[];
 }
-/** 窗口前准备的插件存储；路径相对于 extensions/<pluginId>，迁移键 n 表示 n → n+1。 */
+/**
+ * 插件持久文件的格式声明；路径相对于 extensions/<pluginId>，迁移键 n 表示 n → n+1。
+ * 版本由写入方盖章：JSON 为 `{ version, data }` 信封，SQLite 为 `PRAGMA user_version`。
+ */
 export type PluginStorageDeclaration = {
   kind: "json"; path: string; version: number;
-  initial(): Json;
   migrations: Readonly<Record<number, (data: unknown) => Json>>;
-  validate(data: unknown): unknown;
-  /** 无信封的既有文档以版本 0 进入迁移链。 */
-  unversioned?: boolean;
 } | {
   kind: "sqlite"; path: string; version: number;
-  initialize(db: DatabaseSync): void;
   migrations: Readonly<Record<number, (db: DatabaseSync) => void>>;
-  validate?(db: DatabaseSync): void;
 };
+/** 存储入口（manifest `atelier.storage`）的默认导出；宿主在插件运行时之前单独导入。 */
+export function defineStorage(declarations: readonly PluginStorageDeclaration[]): readonly PluginStorageDeclaration[] {
+  for (const item of declarations) if (!Number.isSafeInteger(item.version) || item.version < 1)
+    throw new Error(`Storage ${item.path} must declare a positive integer version.`);
+  return Object.freeze([...declarations]);
+}
 export interface PluginDefinition {
   namespace: PluginNamespace; version: string; modules?: readonly PluginModule[];
-  storage?: readonly PluginStorageDeclaration[];
   setup?(plugin: PluginContext): PluginContribution;
   /** 包加载器从公共模块导入关系填充；提供方先 setup，消费者先清理。 */
   dependencies?: readonly string[];

@@ -8,7 +8,7 @@ const entries = z.array(z.tuple([z.string(), z.string()]));
 const dependencies = z.array(z.tuple([z.string(), z.array(z.string())]));
 const cacheSchema = z.object({
   key: z.string(), files: z.array(z.string()),
-  runtime: entries, renderer: entries, dependencies, runtimeDependencies: dependencies, rendererDependencies: dependencies,
+  runtime: entries, storage: entries, renderer: entries, dependencies, runtimeDependencies: dependencies, rendererDependencies: dependencies,
 });
 function inside(root: string, path: string): boolean {
   const part = relative(root, path);
@@ -113,7 +113,7 @@ export class PluginBuildCache {
     try {
       const cached = cacheSchema.parse(JSON.parse(readFileSync(this.index, "utf8")));
       if (cached.key !== this.key || !cached.files.every(path => existsSync(path))) return null;
-      return { runtime: new Map(cached.runtime), renderer: new Map(cached.renderer),
+      return { runtime: new Map(cached.runtime), storage: new Map(cached.storage), renderer: new Map(cached.renderer),
         dependencies: new Map(cached.dependencies.map(([id, values]) => [id, new Set(values)])),
         runtimeDependencies: new Map(cached.runtimeDependencies.map(([id, values]) => [id, new Set(values)])),
         rendererDependencies: new Map(cached.rendererDependencies.map(([id, values]) => [id, new Set(values)])),
@@ -127,7 +127,7 @@ export class PluginBuildCache {
       mkdirSync(this.directory, { recursive: true });
       const temporary = `${this.index}.tmp`;
       writeFileSync(temporary, JSON.stringify({ key: this.key, files,
-        runtime: [...result.runtime], renderer: [...result.renderer], dependencies: serialize(result.dependencies),
+        runtime: [...result.runtime], storage: [...result.storage], renderer: [...result.renderer], dependencies: serialize(result.dependencies),
         runtimeDependencies: serialize(result.runtimeDependencies), rendererDependencies: serialize(result.rendererDependencies) }));
       renameSync(temporary, this.index);
     } catch (error) { console.warn("Plugin build cache index could not be saved.", error); }

@@ -1,23 +1,25 @@
-import { prepareApplicationData } from "../storage/application.ts";
-import { acknowledgeMigration, readMigrationReport, recoverData } from "../storage/preparation.ts";
+import { prepareApplicationData, restoreApplicationData, startFreshApplicationData } from "../storage/application.ts";
+import { clearPause } from "../storage/preparation.ts";
+import type { PreparationMessage } from "../shared/recovery.ts";
 
-/** 独立准备进程在主窗口与业务运行时之前结束；其数据库连接不跨进程交付。 */
+/** 独立准备进程在业务运行时之前结束；其数据库连接不跨进程交付。参数：数据根、应用版本、操作及还原目标。 */
 const port = process.parentPort;
 if (!port) throw new Error("Data preparation requires an Electron utility process.");
-const [root, version, action = "prepare"] = process.argv.slice(2);
+const post = (message: PreparationMessage) => port.postMessage(message);
+const [root, version, action = "prepare", point] = process.argv.slice(2);
 try {
   if (!root || !version) throw new Error("Data preparation requires the data directory and application version.");
-  if (action === "restore" || action === "fresh") {
-    recoverData(root, action);
-    port.postMessage({ ok: true, report: readMigrationReport(root) });
-  } else if (action === "acknowledge") {
-    acknowledgeMigration(root);
-    port.postMessage({ ok: true, report: readMigrationReport(root) });
+  if (action === "prepare") {
+    post({ kind: "result", result: await prepareApplicationData(root, version, status => post({ kind: "host", status })) });
   } else {
-    port.postMessage(await prepareApplicationData(root, version, action === "retry"));
+    if (action === "retry") clearPause(root);
+    else if (action === "fresh") startFreshApplicationData(root, version);
+    else if (action === "restore" && point) restoreApplicationData(root, point, version);
+    else throw new Error(`Unknown data preparation action: ${action}.`);
+    post({ kind: "result", result: { ok: true, plugins: [] } });
   }
 } catch (error) {
   console.error("Data preparation failed.", error);
-  port.postMessage({ error: error instanceof Error ? error.message : String(error) });
+  post({ kind: "error", error: error instanceof Error ? error.message : String(error) });
   process.exitCode = 1;
 }

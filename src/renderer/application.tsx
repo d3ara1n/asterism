@@ -23,7 +23,8 @@ import { pluginPreferences } from "./features/creation/preferences";
 import { preparePlugin } from "./app/startup";
 import { PluginSettingsProvider } from "./modules/settings";
 import type { PluginSettingsPage } from "@atelier/sdk/renderer";
-import { getI18n } from "./shared/i18n";
+import { getI18n, useI18n } from "./shared/i18n";
+import { toast } from "./shared/toast";
 import { startupMessages } from "../shared/error-display";
 import type { UiText } from "@atelier/sdk/contracts";
 import { builtin } from "@atelier/builtin-api/contracts";
@@ -32,8 +33,15 @@ import { builtinPublicProvider, builtinPublicModules } from "../builtin-public";
 
 import { runtime } from "./runtime";
 
+/** 首页挂载后取得一次启动通知：存储准备失败而停用的插件以持续错误提示呈现。 */
 function StartupNotification() {
-  useEffect(() => { void window.host.startup.initialized().catch(error => console.error("Migration notification failed.", error)); }, []);
+  const i18n = useI18n();
+  useEffect(() => {
+    void window.host.startup.initialized().then(failures => {
+      for (const failure of failures) toast.error(i18n.text({ ...startupMessages.pluginStorageFailed, values: failure }),
+        { id: `plugin-storage:${failure.id}`, duration: Infinity, closeButton: true });
+    }).catch(error => console.error("Startup notifications could not be read.", error));
+  }, [i18n]);
   return null;
 }
 /** 工作台及插件在轻量启动页出现后装载；应用控制器从首次读取起持续订阅。 */

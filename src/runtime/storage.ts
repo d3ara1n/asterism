@@ -22,7 +22,7 @@ export function openDatabase(root: string): DatabaseSync {
   const db = new DatabaseSync(join(root, applicationStorage.databaseDirectory, applicationStorage.databaseFile));
   try {
     db.exec("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;");
-    // 独立服务测试可创建新库；已有库升级由统一数据准备完成。
+    // 新库在此唯一建立并盖章；已有库升级由窗口前数据准备完成。
     const version = (db.prepare("PRAGMA user_version").get() as { user_version: number }).user_version;
     if (version === 0 && !db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").get()) {
       db.exec("BEGIN IMMEDIATE;");
@@ -67,16 +67,10 @@ function initializeWorkspace(db: DatabaseSync): void {
   db.prepare("INSERT INTO workspace VALUES (?, ?)").run(randomUUID(), "Personal workspace");
 }
 
-/** 已发布的每一步迁移固定保留；键 25 表示 25 → 26。 */
-export const workspaceMigrations: Readonly<Record<number, (db: DatabaseSync) => void>> = {};
+/** 已发布的每一步迁移固定保留；键 25 表示 25 → 26。新库只由 `openDatabase` 建立。 */
 export function workspaceStorage(root: string) {
   return sqliteStorage({ id: "workspace", file: join(root, applicationStorage.databaseDirectory, applicationStorage.databaseFile),
-    version: workspaceDatabaseVersion, initialize: initializeWorkspace, migrations: workspaceMigrations,
-    validate(db) {
-      for (const table of ["workspace", "sessions", "session_nodes", "cursor_selections", "session_data", "contents", "content_roots", "templates", "template_content_roots", "object_views", "viewports", "session_submissions"])
-        db.prepare(`SELECT * FROM ${table} LIMIT 0`).all();
-      if (!db.prepare("SELECT id FROM workspace LIMIT 1").get()) throw new Error("The workspace identity is missing.");
-    } });
+    version: workspaceDatabaseVersion, migrations: {} });
 }
 /** 启动清理：硬删超过冷静期的归档会话，关联行随外键级联删除；孤儿内容由随后构造的内容存储回收。 */
 export function collectExpiredSessions(db: DatabaseSync, now = Date.now()): number {

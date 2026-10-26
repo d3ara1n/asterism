@@ -13,6 +13,7 @@ import { localeSchema, uiTextSchema, pluginMetadataSchema, type PluginMetadata }
 import type { TranslationCatalog } from "../shared/i18n.ts";
 import type { PublicProvider } from "../shared/public-modules.ts";
 import { jsonStorage } from "../storage/migrations.ts";
+import type { PluginStorageDeclaration } from "@atelier/sdk/runtime";
 
 /** SDK API 版本；插件清单的 api.major 必须相同，minMinor 不得高于宿主。 */
 export const sdkApi = { major: 18, minor: 2 } as const;
@@ -23,6 +24,8 @@ export const manifestSchema = z.strictObject({
   api: z.strictObject({ major: z.number().int().nonnegative(), minMinor: z.number().int().nonnegative() }),
   runtime: z.string().min(1).optional(),
   renderer: z.string().min(1).optional(),
+  /** 存储声明入口：默认导出 `defineStorage([...])`，宿主在插件运行时之前单独导入。 */
+  storage: z.string().min(1).optional(),
   displayName: uiTextSchema.optional(),
   description: uiTextSchema.optional(),
   icon: z.string().min(1).optional(),
@@ -64,10 +67,11 @@ export const packageEntrySchema = z.strictObject({
   enabled: z.boolean(),
 });
 export type PackageEntry = z.infer<typeof packageEntrySchema>;
-const listSchema = z.strictObject({ version: z.literal(1), packages: z.array(packageEntrySchema) });
+/** 插件列表格式；变化时递增并在 `packageListStorage` 追加迁移。 */
+const packageListVersion = 1;
+const listSchema = z.strictObject({ version: z.literal(packageListVersion), packages: z.array(packageEntrySchema) });
 export function packageListStorage(root: string) {
-  return jsonStorage({ id: "plugins", file: join(root, "plugins.json"), version: 1,
-    initial: () => ({ version: 1, packages: [] }), migrations: {}, validate: raw => listSchema.parse(raw) });
+  return jsonStorage({ id: "plugins", file: join(root, "plugins.json"), version: packageListVersion, migrations: {} });
 }
 
 export class PluginPackageError extends Error {
@@ -95,7 +99,7 @@ export function readManifest(root: string): PluginPackageManifest {
   if (manifest.api.major !== sdkApi.major || manifest.api.minMinor > sdkApi.minor) {
     throw new PluginPackageError("incompatible_api", `Plugin ${manifest.id} requires SDK API ${manifest.api.major}.${manifest.api.minMinor}; host provides ${sdkApi.major}.${sdkApi.minor}.`);
   }
-  for (const entry of [manifest.runtime, manifest.renderer]) {
+  for (const entry of [manifest.runtime, manifest.renderer, manifest.storage]) {
     if (entry && relative(root, resolve(root, entry)).startsWith("..")) throw new PluginPackageError("invalid_entry", `Entry ${entry} is outside the package.`);
   }
   return manifest;
@@ -111,7 +115,7 @@ export class PackageList {
   private write(packages: PackageEntry[]): void {
     mkdirSync(join(this.file, ".."), { recursive: true });
     const temporary = `${this.file}.tmp`;
-    writeFileSync(temporary, JSON.stringify({ version: 1, packages }, null, 2), { flush: true });
+    writeFileSync(temporary, JSON.stringify({ version: packageListVersion, packages }, null, 2), { flush: true });
     renameSync(temporary, this.file);
   }
   /** 添加即校验：无效包直接失败，不留条目；新添加默认启用。 */
@@ -180,13 +184,33 @@ export interface ResolvedPackage {
   status: "loaded" | "disabled" | "invalid" | "failed";
   error?: string;
   definition?: PluginDefinition;
+  /** 存储入口的默认导出；运行时与准备进程都按同一份声明处理格式版本。 */
+  storage?: readonly PluginStorageDeclaration[];
   /** 相对 renderer 缓存根的入口路径。 */
   renderer?: string;
 }
 
-/** 读取列表、校验清单与冲突、打包并导入启用的插件；失败传播给依赖方。 */
+/** 导入一个已构建入口；单个插件的导入等待有固定期限。 */
+async function importEntry(id: string, file: string, label: string): Promise<unknown> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const module = await Promise.race([
+    import(pathToFileURL(file).href) as Promise<{ default?: unknown }>,
+    new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error(`Plugin ${id} ${label} import timed out.`)), 10_000); }),
+  ]).finally(() => clearTimeout(timer));
+  return module.default;
+}
+/** 存储声明只核对结构形状；格式内容由迁移链与插件自身负责。 */
+function storageDeclarations(id: string, value: unknown): readonly PluginStorageDeclaration[] {
+  if (!Array.isArray(value) || value.some(item => !item || typeof item !== "object" || (item.kind !== "json" && item.kind !== "sqlite")
+    || typeof item.path !== "string" || !Number.isSafeInteger(item.version) || item.version < 1 || !item.migrations || typeof item.migrations !== "object"))
+    throw new PluginPackageError("invalid_entry", `Storage entry of ${id} must default-export defineStorage([...]).`);
+  return value as readonly PluginStorageDeclaration[];
+}
+
+/** 读取列表、校验清单与冲突、打包并导入启用的插件；失败传播给依赖方。`runtime: false` 只导入存储入口。 */
 export async function loadPackages(list: PackageList, npmRoot: string, cacheRoot: string, reserved: readonly string[],
-  publicProviders: readonly PublicProvider[] = [], progress: (id: string) => void = () => {}): Promise<ResolvedPackage[]> {
+  publicProviders: readonly PublicProvider[] = [], progress: (id: string) => void = () => {},
+  options: { runtime?: boolean } = {}): Promise<ResolvedPackage[]> {
   const result: ResolvedPackage[] = [];
   const ids = new Map<string, number>();
   for (const entry of list.read()) {
@@ -224,15 +248,12 @@ export async function loadPackages(list: PackageList, npmRoot: string, cacheRoot
       if (compiled.failures.has(id)) throw new PluginPackageError("build_failed", compiled.failures.get(id)!);
       const renderer = compiled.renderer.get(id);
       if (renderer) item.renderer = relative(cacheRoot, renderer).split("\\").join("/");
+      const storage = compiled.storage.get(id);
+      if (storage) item.storage = storageDeclarations(id, await importEntry(id, storage, "storage"));
       const file = compiled.runtime.get(id);
-      if (!file) continue;
+      if (!file || options.runtime === false) continue;
       progress(id);
-      let timer: ReturnType<typeof setTimeout> | undefined;
-      const module = await Promise.race([
-        import(pathToFileURL(file).href) as Promise<{ default?: unknown }>,
-        new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error(`Plugin ${id} runtime import timed out.`)), 10_000); }),
-      ]).finally(() => clearTimeout(timer));
-      const definition = module.default as PluginDefinition | undefined;
+      const definition = await importEntry(id, file, "runtime") as PluginDefinition | undefined;
       if (!definition || typeof definition !== "object" || definition.namespace?.id !== id
         || typeof definition.version !== "string" || !definition.version.trim()
         || (definition.setup !== undefined && typeof definition.setup !== "function")
@@ -251,7 +272,7 @@ export async function loadPackages(list: PackageList, npmRoot: string, cacheRoot
       const failed = [...compiled.dependencies.get(item.manifest!.id) ?? []].find(id => result.some(provider => provider.manifest?.id === id && provider.status !== "loaded"));
       if (failed) {
         item.status = "failed"; item.error = `Public dependency ${failed} is unavailable.`;
-        delete item.definition; delete item.renderer; changed = true;
+        delete item.definition; delete item.renderer; delete item.storage; changed = true;
       }
     }
   }

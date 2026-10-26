@@ -6,6 +6,7 @@ import { runtimeMessageSchema, type Command, type CommandResult, type RuntimeSta
 import { RuntimeRequests } from "./requests.ts";
 import { handleSecretRequest } from "./secrets.ts";
 import type { StartupStage } from "../shared/startup.ts";
+import type { PluginStorageFailure } from "../shared/recovery.ts";
 
 /**
  * 任务进程监护与控制链路：启动、存活、退出流程与凭据解密留在主进程。
@@ -26,7 +27,7 @@ export class RuntimeHost {
   private setStatus(status: RuntimeStatus): void { this.status = status; this.onStatus(status); }
   get ready(): boolean { return this.status === "ready" && this.child !== null; }
 
-  start(entry: string, root: string): Promise<void> {
+  start(entry: string, root: string, storageFailures: readonly PluginStorageFailure[] = []): Promise<void> {
     if (this.status !== "starting") return Promise.reject(new Error("Task runtime startup was cancelled."));
     mkdirSync(join(root, applicationStorage.logsDirectory), { recursive: true });
     const log = createWriteStream(join(root, applicationStorage.logsDirectory, applicationStorage.runtimeLogFile), { flags: "a", mode: 0o600 });
@@ -34,7 +35,7 @@ export class RuntimeHost {
     log.on("error", error => console.error("Runtime log write failed.", error));
     let child: UtilityProcess;
     try {
-      child = utilityProcess.fork(entry, [root], { serviceName: `${applicationBrand.en} task runtime`, stdio: "pipe" });
+      child = utilityProcess.fork(entry, [root, JSON.stringify(storageFailures)], { serviceName: `${applicationBrand.en} task runtime`, stdio: "pipe" });
     } catch (error) {
       log.end();
       this.setStatus("unavailable");

@@ -11,6 +11,8 @@ import type { RendererFrame, RuntimeFrame } from "../shared/connection.ts";
 import { bindPublicProvider } from "../shared/public-modules.ts";
 import { builtinPublicProvider } from "../builtin-public.ts";
 import { builtinRuntimePublicModules } from "../builtin-runtime-public.ts";
+import { z } from "zod";
+import { pluginStorageFailureSchema } from "../shared/recovery.ts";
 
 // 任务进程只接收主进程给出的应用数据根目录，不接受 renderer 文件路径。
 const port = process.parentPort;
@@ -24,6 +26,8 @@ const broadcast = (frame: RuntimeFrame) => { for (const connection of connection
 try {
   const root = process.argv[2];
   if (!root) throw new Error("Application data directory is required.");
+  // 窗口前数据准备未能升级存储的插件；本次启动不进入 setup。
+  const storageFailures = new Map(z.array(pluginStorageFailureSchema).parse(JSON.parse(process.argv[3] ?? "[]")).map(item => [item.id, item.error]));
   const started = performance.now();
   // 插件包只在启动时解析、打包与导入；列表变化重启后生效。
   port.postMessage({ kind: "startup", stage: "plugins" });
@@ -38,6 +42,8 @@ try {
   port.postMessage({ kind: "startup", stage: "workspace" });
   service = new ApplicationService(root, { catalogs: packages.flatMap(item => item.catalogs ?? []), packages: listed,
     plugins: packages.flatMap(item => item.definition ? [item.definition] : []), protector: secrets,
+    preparedStorage: { failures: storageFailures,
+      declarations: new Map(packages.flatMap(item => item.manifest && item.storage ? [[item.manifest.id, item.storage] as const] : [])) },
     onConfigurationChanged: () => broadcast({ kind: "configuration.changed" }),
     onSessionChanged: event => broadcast({ kind: "session", event }),
     onPluginConfigurationChanged: id => broadcast({ kind: "plugin-configuration.changed", id }) });

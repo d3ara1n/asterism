@@ -15,7 +15,6 @@
 | `discovery.ts` | `GET /models` 列表请求、连接鉴权、游标分页、取消与 30 秒超时管理 |
 | `discovery-format.ts` | 独立于消息协议，按响应结构识别模型目录并归一化已适配元数据；支持范围见 [模型发现与添加](../../docs/model-configuration.md#模型发现与添加) |
 | `model-catalog.ts` | 调用官方 `@opencode-ai/models` 客户端，按剥离路由前缀后的模型名精确匹配并映射可覆盖参数 |
-| `model-cost-migration.ts` | 在配置存储边界把旧平铺 token 单价转换为按模态、计费项和单位组织的参考价格 |
 | `web-providers.ts` | 网络类型贡献、实例解析、按序 URL 匹配与公共结果校验；业务契约见 [Web 资源](../../docs/web.md) |
 | `provider-extensions.ts` | 插件预设与用量提供方目录、原子登记、预设修改、失败撤销与绑定生命周期的调用句柄；不包含厂商实现或消费者状态 |
 | `../shared/provider-presets.ts` | 插件提供的连接预设校验与配置／编辑规则的独立草稿生成（`modelProviderPresetDraft`）；内置目录位于 `packages/builtin/src/providers/presets.ts` |

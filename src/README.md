@@ -10,7 +10,7 @@
 | `main/updates.ts` / `update-release.ts` | 更新偏好持久化、GitHub Release 候选选择、electron-updater 下载与设置页 IPC；安装由主进程退出流程收束后台后触发 | `shared/updates`、Electron、electron-updater |
 | `preload/` | 沙箱桥，受控命令与状态订阅 | `shared`，只暴露 `window.host` |
 | `runtime/` | 应用组合与会话列表；会话命令、历史查询、资源与布局、执行进度；SQLite、`objects/`、`content/` 存储与私有凭据客户端 | `shared`、`session`、`configuration`、内置实现后台入口、Node API |
-| `storage/` / `runtime/prepare-data.ts` | 窗口前统一数据准备、JSON／SQLite 迁移链、文件备份、结果记录与恢复；主进程经独立准备进程调用 | Node API、各存储所属模块的声明；业务服务在准备完成后启动 |
+| `storage/` / `runtime/prepare-data.ts` | 按版本号的统一数据准备、JSON／SQLite 迁移链、恢复点、还原与重新开始；主进程经独立准备进程调用 | Node API、各存储所属模块的版本声明；业务服务在准备完成后启动 |
 | `runtime/templates.ts` | 静态工作台模板的保存、目录、实例化与删除；复用对象数据、资源身份、关系和内容依赖机制 | `shared/templates`、`session`、`resources`、运行时存储 |
 | `configuration/` | 全局配置、密文凭据、插件提供商目录与共享账户查询、模型发现、参数获取、连接测试及默认角色（见 `configuration/README.md`） | `shared`、Node 文件系统、模型 SDK；不依赖 Electron 或数据库 |
 | `session/` | 会话树存储（`session_nodes`）、当前时间线追加与游标选择、工作台存在性与链接重放 | `shared`、SDK 纯契约、Node SQLite；不依赖 UI 或插件运行时 |
@@ -29,7 +29,7 @@
 `renderer/features/session → preload → main/RuntimeHost → utilityProcess → SessionService → SessionTree / SessionWorkbench`
 
 - **插件工具装配**：`plugins/loader.ts` 收集贡献、处理依赖与生命周期；`plugins/tool-contributions.ts` 校验插件内工具声明，并按用户列表解析覆盖与实现状态；`plugins/top-level-tools.ts` 绑定顶层工具调用上下文，`tools/registry.ts` 提供有效资源实现目录。覆盖契约见 [工具覆盖](../docs/runtime.md#工具覆盖)。
-- **启动与插件构建**：主进程先调用 `prepare-data` 准备进程，完成存储迁移与校验后才读取偏好、创建窗口。`renderer/main.tsx` 承接后续启动阶段与数据恢复视图，后台就绪后装载 `renderer/application.tsx`；`plugins/build-cache.ts` 持有构建输入指纹与完整产物索引，`plugins/package-modules.ts` 在命中时跳过编译。契约见 [启动与加载](../docs/architecture.md#启动与加载)。
+- **启动与插件构建**：主进程先调用 `prepare-data` 准备进程，按其对宿主存储的回报创建窗口（需要迁移时先用系统默认外观），宿主存储就绪后才开放外观、语言与更新设置。`renderer/main.tsx` 承接后续启动阶段与数据恢复视图，后台就绪后装载 `renderer/application.tsx`；`plugins/build-cache.ts` 持有构建输入指纹与完整产物索引，`plugins/package-modules.ts` 在命中时跳过编译。契约见 [启动与加载](../docs/architecture.md#启动与加载)。
 - **会话写入与观察**：会话命令经 Zod 校验后交运行时单一写入者同步事务处理。路径遍历位于 `shared/session-timeline.ts`（前后台共用）。`SessionTree.select` 将游标选择审计与游标更新原子提交；提交后分别派发新增记录观察 `committed` 与最终游标变化观察 `cursorChanged`（命名模块据此同步会话标题）。`SessionTree.workbench` 沿当前游标全量重放资源与链接事件，供工作台展示与执行校验共用。
 - **代理执行循环**：`execution/request.ts` 完成单次补全及工具批次，`execution/response.ts` 维护该响应的临时流状态，终态内含于最高序号块交付。内置 Agent 由 `../packages/builtin/src/agent/runtime.ts` 装配：`selection.ts` 解析选择与工具策略，`admission.ts` 原子受理输入，`loop.ts` 驱动多轮请求，`compression.ts` 在请求间检查预算并生成摘要，`projection.ts` 负责响应分组、期间事件后置与上下文截取。在途输出经 `session.progress` 的 `live` 字段按 `objectId` 送达界面。
 - **直连传输与插件事件**：renderer 经 `renderer/runtime.ts` 与任务进程 `runtime/connection.ts` 以 MessagePort 直连（协议见 `shared/connection.ts`），主进程只交接端口。全局具型瞬态事件由 `plugins/events.ts` 登记路由，前后台共用 `shared/event-queue.ts`（支持 `all` 与 `latest` 合并），经 `runtime/event-peer.ts → 直连 → shared/event-client.ts` 投递。Agent 经此发布 `ResourceStatusChanged` 供侧栏 `SessionStatus.tsx` 消费。高频对象数据经 `plugins/channels.ts` 的对象级双工通道传输，不进历史。
@@ -49,4 +49,4 @@
 - **新增应用命令**：先在 `shared/` 定义命令与响应 schema，再在 `runtime/` 实现事务或查询，最后接入 `renderer/`。
 - **新增资源与工具**：按 [功能模块指南](../packages/builtin/README.md) 添加 `contract.ts`、`runtime.ts` 与 `renderer.tsx`。
 - **外部插件开发**：消费 [公开 SDK](../packages/sdk/README.md)，不依赖宿主内部控制器或物理节点表。
-- **数据 schema 变更**：增加对应存储格式版本与连续迁移步骤，保留已发布的转换和旧格式夹具；实现入口见 [`storage/README.md`](storage/README.md)，契约见[数据准备与迁移](../docs/architecture.md#数据准备与迁移)。
+- **数据 schema 变更**：递增所属存储的格式版本常量；首个版本发布后同时追加连续迁移步骤与旧格式夹具。实现入口见 [`storage/README.md`](storage/README.md)，契约见[数据准备与迁移](../docs/architecture.md#数据准备与迁移)。

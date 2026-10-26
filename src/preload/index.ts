@@ -6,7 +6,8 @@ import { pickDirectoryChannel, openLocalFileChannel, openLogsChannel, localFileP
 import { connectionPortMessage, connectionRequestChannel } from "../shared/connection.ts";
 import { appearanceChangedChannel, appearanceGetChannel, appearancePatchSchema, appearanceSetChannel, parseAppearance } from "../shared/theme.ts";
 import { preferencesGetChannel, preferencesSetChannel, preferenceWriteSchema, uiStateSchemas } from "../shared/ui-state.ts";
-import { startupGetChannel, startupChangedChannel, startupRestartChannel, startupDataDirectoryChannel, startupStateSchema, startupBackupChannel, startupRecoveryChannel, startupInitializedChannel } from "../shared/startup.ts";
+import { startupGetChannel, startupChangedChannel, startupRestartChannel, startupDataDirectoryChannel, startupStateSchema, startupRecoveryChannel, startupRecoveryPointChannel, startupInitializedChannel, startupNotificationsSchema } from "../shared/startup.ts";
+import { recoveryActionSchema } from "../shared/recovery.ts";
 import { updatesGetChannel, updatesSetChannel, updatesCheckChannel, updatesInstallChannel, updatesChangedChannel, updateStateSchema } from "../shared/updates.ts";
 
 let connectionRequested = false;
@@ -30,9 +31,18 @@ const bridge: DesktopBridge = {
     },
   },
   startup: {
-    async initialized() { await ipcRenderer.invoke(startupInitializedChannel); },
-    async recover(action) { return ipcRenderer.invoke(startupRecoveryChannel, action); },
-    async openBackup() { return ipcRenderer.invoke(startupBackupChannel); },
+    async initialized() {
+      const parsed = startupNotificationsSchema.safeParse(await ipcRenderer.invoke(startupInitializedChannel));
+      return parsed.success ? parsed.data : [];
+    },
+    async recover(action) {
+      const result: unknown = await ipcRenderer.invoke(startupRecoveryChannel, recoveryActionSchema.parse(action));
+      return typeof result === "string" ? result : undefined;
+    },
+    async openRecoveryPoint(id) {
+      const result: unknown = await ipcRenderer.invoke(startupRecoveryPointChannel, id);
+      return typeof result === "string" ? result : "The recovery point could not be opened.";
+    },
     async get() { return startupStateSchema.parse(await ipcRenderer.invoke(startupGetChannel)); },
     onChanged(listener) {
       const handler = (_event: Electron.IpcRendererEvent, raw: unknown) => {

@@ -15,6 +15,7 @@ import { pluginConfigurationCommandSchema, type PluginConfiguration } from "../s
 import type { SecretProtector } from "../shared/secrets.ts";
 import type { SessionChanged } from "../shared/session.ts";
 import { pluginErrorDisplay } from "./plugin-errors.ts";
+import type { PreparedPluginStorage } from "../plugins/loader.ts";
 import { SessionService } from "./sessions.ts";
 import { collectExpiredSessions, openDatabase } from "./storage.ts";
 import { ContentTransferService } from "./content-transfer.ts";
@@ -34,7 +35,7 @@ export class ApplicationService {
   private readonly packages: StartupPackage[];
   private readonly list: PackageList;
   private readonly started: string;
-  constructor(root: string, private readonly options: { catalogs?: TranslationCatalog[]; packages?: StartupPackage[]; protector?: SecretProtector; onConfigurationChanged?: () => void; onSessionChanged?: (event: SessionChanged) => void; adapterFactory?: (settings: ModelSettings) => ModelAdapter; plugins?: readonly PluginDefinition[]; onPluginConfigurationChanged?: (pluginId: string) => void } = {}) {
+  constructor(root: string, private readonly options: { catalogs?: TranslationCatalog[]; packages?: StartupPackage[]; protector?: SecretProtector; onConfigurationChanged?: () => void; onSessionChanged?: (event: SessionChanged) => void; adapterFactory?: (settings: ModelSettings) => ModelAdapter; plugins?: readonly PluginDefinition[]; onPluginConfigurationChanged?: (pluginId: string) => void; preparedStorage?: PreparedPluginStorage } = {}) {
     this.db = openDatabase(root);
     this.packages = options.packages ?? [];
     this.list = new PackageList(join(root, "plugins.json"));
@@ -43,9 +44,9 @@ export class ApplicationService {
     try {
       const unavailable = async (): Promise<string> => { throw new Error("System credential protection is unavailable."); };
       this.configuration = new ConfigurationService(root, options.protector ?? { available: async () => false, encrypt: unavailable, decrypt: unavailable }, options.onConfigurationChanged);
-      // 宿主数据已完成准备与校验；归档清理先释放引用，随后显式回收内容。
+      // 归档清理先释放引用，随后由会话服务显式回收内容。
       collectExpiredSessions(this.db);
-      this.sessions = new SessionService(this.db, root, this.configuration, options.onSessionChanged, options.adapterFactory, options.plugins, options.onPluginConfigurationChanged);
+      this.sessions = new SessionService(this.db, root, this.configuration, options.onSessionChanged, options.adapterFactory, options.plugins, options.onPluginConfigurationChanged, options.preparedStorage);
       // setup 与贡献登记也可能失败；纯前端消费者同样不能使用失败提供方。
       let changed = true;
       while (changed) {

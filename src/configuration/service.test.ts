@@ -208,42 +208,6 @@ describe("真实配置与消费边界", () => {
     expect(readFileSync(path, "utf8")).toBe(original);
   });
 
-  // 存储边界转换旧单价但不重写读取文件；显式保存后须持久化新单位，不能恢复成百万 token。
-  it("旧平铺价格读取为明确单位，编辑后按模态和单位持久化", async () => {
-    const { service, root, protector } = setup();
-    const { modelId } = await addModel(service);
-    service.close();
-    const path = join(root, "configuration.json");
-    const document = JSON.parse(readFileSync(path, "utf8"));
-    const rates = { input: 1, output: 2, cacheRead: 0, cacheWrite: null, reasoning: 3,
-      inputAudio: 4, outputAudio: null, inputImage: null, outputImage: 5, inputVideo: 6, outputVideo: 7 };
-    document.models[0].cost = { currency: "USD", rates, tiers: [{ fromInputTokens: 200000, rates: { ...rates, input: 8 } }] };
-    const original = JSON.stringify(document);
-    writeFileSync(path, original);
-    const reopened = new ConfigurationService(root, protector);
-    cleanups.push(() => reopened.close());
-    const model = reopened.current().models[0]!;
-    expect(model.cost).toMatchObject({
-      rates: {
-        text: { input: { amount: 1, unit: "token", per: 1_000_000 }, cacheRead: { amount: 0, unit: "token", per: 1_000_000 }, cacheWrite: null },
-        image: { output: { amount: 5, unit: "token", per: 1_000_000 } },
-        audio: { input: { amount: 4, unit: "token", per: 1_000_000 } },
-        video: { input: { amount: 6, unit: "token", per: 1_000_000 }, output: { amount: 7, unit: "token", per: 1_000_000 } },
-      },
-      tiers: [{ fromInputTokens: 200000, rates: { text: { input: { amount: 8, unit: "token", per: 1_000_000 } } } }],
-    });
-    expect(readFileSync(path, "utf8")).toBe(original);
-    model.cost!.rates.image.output = { amount: 0.04, unit: "image", per: 1 };
-    model.cost!.rates.audio.input = { amount: 0.006, unit: "second", per: 60 };
-    await reopened.execute({ type: "model.save", id: modelId, value: model });
-    const saved = JSON.parse(readFileSync(path, "utf8")).models[0].cost;
-    expect(saved).toEqual(model.cost);
-    reopened.close();
-    const final = new ConfigurationService(root, protector);
-    cleanups.push(() => final.close());
-    expect(final.current().models[0]?.cost).toEqual(model.cost);
-  });
-
   // 参数契约要求合并当前模型：期间改名保留，目录提供的参数后写生效；关闭仍取消请求。
   it("目录等待不阻塞配置，返回后合并当前模型，退出取消请求", async () => {
     let finish!: (catalog: Catalog) => void;

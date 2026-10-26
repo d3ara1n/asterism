@@ -7,7 +7,7 @@ it("读取已经发生的后台启动失败，保留原因并撤销订阅", asyn
   const close = vi.fn();
   const failure = { status: "failed", reason: "database_version", detail: "Format mismatch." } as const;
   const bridge: StartupBridge = { get: async () => failure, onChanged: () => close,
-    restart: async () => {}, openDataDirectory: async () => "", openBackup: async () => "", recover: async () => {}, initialized: async () => {} };
+    restart: async () => {}, openDataDirectory: async () => "", recover: async () => {}, openRecoveryPoint: async () => "", initialized: async () => [] };
   await expect(waitForRuntime(bridge, new AbortController().signal, () => {})).rejects.toEqual(new StartupError(failure));
   expect(close).toHaveBeenCalledTimes(1);
 });
@@ -20,7 +20,7 @@ it("就绪通知完成等待，迟到的初始读取不再发布进度", async (
   const bridge: StartupBridge = {
     onChanged(listener) { receive = listener; return close; },
     get: () => new Promise(resolve => { respond = resolve; }),
-    restart: async () => {}, openDataDirectory: async () => "", openBackup: async () => "", recover: async () => {}, initialized: async () => {},
+    restart: async () => {}, openDataDirectory: async () => "", recover: async () => {}, openRecoveryPoint: async () => "", initialized: async () => [],
   };
   const ready = waitForRuntime(bridge, new AbortController().signal, progress);
   receive({ status: "starting", stage: "plugins" });

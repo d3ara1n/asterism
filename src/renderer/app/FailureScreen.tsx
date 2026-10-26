@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Button } from "@atelier/ui/ui/button";
 import { startupMessages } from "../../shared/error-display";
 import { useI18n } from "../shared/i18n";
@@ -13,8 +13,10 @@ export interface FailureAction {
  * 致命状态共用布局：启动失败与渲染崩溃都直接位于窗口材质上，保留窗口拖动。
  * 首个操作为主操作并取得焦点，其余为辅助操作；诊断详情默认折叠，可复制。
  */
-export function FailureScreen({ title, body, actions, details }: {
+export function FailureScreen({ title, body, actions, details, children }: {
   title: string; body: string; actions: readonly FailureAction[]; details: string;
+  /** 操作与详情之间的补充内容，例如数据恢复点列表。 */
+  children?: ReactNode;
 }) {
   const i18n = useI18n();
   const [actionError, setActionError] = useState<string | null>(null);
@@ -36,6 +38,7 @@ export function FailureScreen({ title, body, actions, details }: {
         {actions.map((action, index) => <Button key={action.label} variant={index === 0 ? "default" : "outline"}
           autoFocus={index === 0} disabled={busy} onClick={() => { void run(action.run); }}>{action.label}</Button>)}
       </div>
+      {children}
       <details className="text-left">
         <summary>{i18n.text(startupMessages.details)}</summary>
         <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-words select-text type-caption">{details}</pre>

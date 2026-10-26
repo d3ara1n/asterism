@@ -80,7 +80,7 @@ export default definePlugin({
 
 ### 4. 插件装配与设置页面
 
-窗口前存储准备（API 18.2）通过 `definePlugin({ storage })` 静态声明，支持 JSON 与 SQLite 的连续版本迁移。宿主统一备份和恢复，领域转换由插件提供；见[插件存储准备](../../docs/plugin-sdk.md#插件存储准备api-182)及可编译示例 [`storage.ts`](examples/storage.ts)。
+存储准备（API 18.2）：清单 `atelier.storage` 指向默认导出 `defineStorage([...])` 的轻量入口，按格式版本号为 JSON 与 SQLite 声明连续迁移；宿主在插件运行时之前导入并执行，失败只停用该插件。见[插件存储准备](../../docs/plugin-sdk.md#插件存储准备api-182)及可编译示例 [`storage.ts`](examples/storage.ts)。
 
 后台 `definePlugin({ namespace, version, setup?, modules? })` 的同步 `setup(plugin)` 创建插件级共享服务，返回 `PluginContribution`：与模块共用具型贡献字段，并可返回 `modules`；清理登记到 `plugin.lifetime.defer`。根入口返回的模块先装配，再装配静态 `modules`；关闭先收束工作与全部对象生命周期，再逆序执行登记的清理，模块先于根服务释放。服务通过普通函数参数或闭包传给模块，不需要服务注册表。
 

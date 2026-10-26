@@ -63,8 +63,13 @@ export class PluginStorage {
         }
         if (raw === undefined) return { value: fallback(), status: "defaults" };
         if (declaration) {
-          const envelope = z.object({ version: z.literal(declaration.version), data: jsonSchema }).parse(raw);
-          raw = envelope.data;
+          // 信封版本由准备阶段对齐；不符时与正文损坏同样回退默认值。
+          const envelope = z.object({ version: z.literal(declaration.version), data: jsonSchema }).safeParse(raw);
+          if (!envelope.success) {
+            this.warn("Plugin configuration has an unexpected format version; defaults are used.");
+            return { value: fallback(), status: "invalid" };
+          }
+          raw = envelope.data.data;
         }
         const parsed = contract.schema.safeParse(raw);
         if (parsed.success) return { value: jsonSchema.parse(parsed.data), status: "saved" };
@@ -140,9 +145,16 @@ export class PluginStorage {
     },
   };
 
-  /** 插件专属 SQLite，与宿主数据库为独立文件；首次访问时打开。 */
+  /** 插件专属 SQLite，与宿主数据库为独立文件；首次访问时打开。声明格式时，未盖章的库写入当前版本。 */
   db(): DatabaseSync {
-    this.database ??= new DatabaseSync(join(this.ensure(), "db.sqlite"));
+    if (!this.database) {
+      const file = join(this.ensure(), "db.sqlite");
+      const db = new DatabaseSync(file);
+      const declaration = this.declarations.find(item => item.kind === "sqlite" && resolve(this.dir, item.path) === file);
+      if (declaration && Number(db.prepare("PRAGMA user_version").get()!.user_version) === 0)
+        db.exec(`PRAGMA user_version = ${declaration.version};`);
+      this.database = db;
+    }
     return this.database;
   }
   close(): void { this.database?.close(); this.database = null; }

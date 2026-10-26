@@ -1,7 +1,7 @@
 import Store from "electron-store";
 import { app, ipcMain, nativeTheme, type BrowserWindow } from "electron";
-import { applicationStorage } from "../shared/application.ts";
-import { persistentStateReady } from "./persistent-state.ts";
+import { applicationStorage, preferenceVersion } from "../shared/application.ts";
+import { settingsReady } from "./settings-state.ts";
 import {
   appearanceChangedChannel, appearanceGetChannel, appearancePatchSchema, appearanceSetChannel,
   defaultAppearance, parseAppearance, type Appearance,
@@ -11,21 +11,22 @@ import {
  * 外观设置：electron-store 负责原子写入，文件位于 userData（平台用户数据目录）下的 appearance.json。
  * 文件准备由启动层完成；单项显示值按 Zod 解析。
  */
-let store: Store<{ appearance: Appearance }> | null = null;
+type AppearanceStore = { version: number; appearance: Appearance };
+let store: Store<AppearanceStore> | null = null;
 const defaults = defaultAppearance(process.platform);
-function open(): Store<{ appearance: Appearance }> {
-  store ??= new Store<{ appearance: Appearance }>({ cwd: app.getPath("userData"), name: applicationStorage.appearanceStore, defaults: { appearance: defaults } });
+function open(): Store<AppearanceStore> {
+  store ??= new Store<AppearanceStore>({ cwd: app.getPath("userData"), name: applicationStorage.appearanceStore, defaults: { version: preferenceVersion, appearance: defaults } });
   return store;
 }
 
-/** 同步读取，供创建窗口前决定实色回退色。 */
 /** 三态模式交给 nativeTheme：系统材质与 renderer 的 prefers-color-scheme 同源。 */
 export function applyThemeSource(appearance: Appearance = readAppearance()): void {
   nativeTheme.themeSource = appearance.mode;
 }
 
+/** 同步读取，供创建窗口前决定实色回退色。 */
 export function readAppearance(): Appearance {
-  if (!persistentStateReady()) return defaults;
+  if (!settingsReady()) return defaults;
   try { return parseAppearance(open().get("appearance"), process.platform); }
   catch (error) { console.error("Appearance settings could not be read.", error); return defaults; }
 }
@@ -36,7 +37,7 @@ export function serveAppearance(window: BrowserWindow, trusted: (event: Electron
   ipcMain.removeHandler(appearanceSetChannel);
   ipcMain.handle(appearanceGetChannel, event => trusted(event) ? readAppearance() : null);
   ipcMain.handle(appearanceSetChannel, (event, raw) => {
-    if (!trusted(event) || !persistentStateReady()) return null;
+    if (!trusted(event) || !settingsReady()) return null;
     const patch = appearancePatchSchema.safeParse(raw);
     if (!patch.success) return readAppearance();
     const next = parseAppearance({ ...readAppearance(), ...patch.data }, process.platform);

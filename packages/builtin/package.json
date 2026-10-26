@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     "./runtime": "./src/runtime.ts",
+    "./storage": "./src/storage.ts",
     "./renderer": "./src/renderer.ts",
     "./locales/zh-Hans.json": "./src/locales/zh-Hans.json"
   },

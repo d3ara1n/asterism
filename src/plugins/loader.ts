@@ -28,9 +28,13 @@ import { CallRegistry } from "./calls.ts";
 import { bindTopLevelTools, type RegisteredTopLevelTool } from "./top-level-tools.ts";
 import { resolveToolContributions, validateToolContributions, type ToolImplementationStatus } from "./tool-contributions.ts";
 import type { ModelProviderExtensions } from "../configuration/provider-extensions.ts";
-import type { ModelProviderServices, UsageProviderServices } from "@atelier/sdk/runtime";
+import type { ModelProviderServices, PluginStorageDeclaration, UsageProviderServices } from "@atelier/sdk/runtime";
 import type { WebProviderRegistry } from "../configuration/web-providers.ts";
 
+export interface PreparedPluginStorage {
+  declarations: ReadonlyMap<string, readonly PluginStorageDeclaration[]>;
+  failures: ReadonlyMap<string, string>;
+}
 export interface PluginHostServices {
   events?: EventBus;
   extensionsDirectory: string;
@@ -47,6 +51,8 @@ export interface PluginHostServices {
   vault?: CredentialVault | null;
   /** 插件配置变更：设置页保存、恢复默认与后台 update 都经此通知。 */
   configurationChanged?: (pluginId: string) => void;
+  /** 窗口前准备的插件存储：格式声明供托管配置与数据库盖章，失败的插件本次启动不进入 setup。 */
+  preparedStorage?: PreparedPluginStorage;
   log?: (pluginId: string, level: "info" | "warn" | "error", message: string, error?: unknown) => void;
 }
 export interface PluginManifest {
@@ -144,13 +150,15 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
     let entry: Collected | undefined;
     try {
       if (initialization.failures.has(id)) throw new Error(initialization.failures.get(id)!);
+      const storageFailure = services.preparedStorage?.failures.get(id);
+      if (storageFailure !== undefined) throw new Error(`Plugin storage could not be prepared: ${storageFailure}`);
       const unavailable = plugin.dependencies?.find(dependency => !collected.some(item => item.plugin.namespace.id === dependency));
       if (unavailable) throw new Error(`Public dependency ${unavailable} failed to initialize.`);
       if (manifest.some(entry => entry.id === id)) throw new Error(`Duplicate plugin ID: ${id}`);
       const write = services.log ?? defaultLog;
       const log: PluginLogger = { info: message => write(id, "info", message), warn: message => write(id, "warn", message),
         error: (message, error) => write(id, "error", message, error) };
-      const storage = new PluginStorage(services.extensionsDirectory, id, services.vault ?? null, log.warn, plugin.storage);
+      const storage = new PluginStorage(services.extensionsDirectory, id, services.vault ?? null, log.warn, services.preparedStorage?.declarations.get(id) ?? []);
       storage.onChanged = () => services.configurationChanged?.(id);
       const lifecycle = new RunLifecycle(sessionId => services.sessions.progressChanged(sessionId)); lifecycles.push(lifecycle);
       // 插件级生命周期随运行登记一同中止信号，清理在插件释放时按登记逆序执行。
