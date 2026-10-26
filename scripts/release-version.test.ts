@@ -145,4 +145,30 @@ describe("提交解析、范围与说明", () => {
     expect(notes).toContain("/commit/abcdef123456");
     expect(notes).toContain("/commits/v0.1.0");
   });
+  it("恰好二十条时完整保留，不显示省略提示", () => {
+    const commits = Array.from({ length: 20 }, (_, index) => commit(`feature-${index}`, `feat: 功能 ${index}`));
+    const notes = releaseNotes(commits, "example/app", null, "v0.1.0");
+    expect(notes.split("\n").filter(line => line.startsWith("- "))).toHaveLength(20);
+    expect(notes).toContain("/commit/feature-19)");
+    expect(notes).not.toContain("more commit");
+  });
+  it.each([
+    [21, "1 more commit"],
+    [25, "5 more commits"],
+  ])("同类 %i 条时保留最新二十条，去重后计算省略数量且各类独立限额", (count, omission) => {
+    const features = Array.from({ length: count }, (_, index) => commit(`feature-${index}`, `feat: 功能 ${index}`));
+    const fixes = Array.from({ length: 21 }, (_, index) => commit(`fix-${index}`, `fix: 修复 ${index}`));
+    const commits = [features[0]!, ...features, ...fixes];
+    const notes = releaseNotes(commits, "example/app", "v1.0.0", "v1.1.0");
+    const [featureSection, fixSection] = notes.split("## Bug Fixes");
+    expect(featureSection!.match(/\/commit\/feature-\d+\)/g)).toEqual(
+      Array.from({ length: 20 }, (_, index) => `/commit/feature-${index})`),
+    );
+    expect(featureSection).toContain(`… and ${omission}. See the Full Changelog below.`);
+    expect(fixSection!.match(/\/commit\/fix-\d+\)/g)).toEqual(
+      Array.from({ length: 20 }, (_, index) => `/commit/fix-${index})`),
+    );
+    expect(fixSection).toContain("… and 1 more commit. See the Full Changelog below.");
+    expect(notes).toContain("**Full Changelog**: https://github.com/example/app/compare/v1.0.0...v1.1.0");
+  });
 });

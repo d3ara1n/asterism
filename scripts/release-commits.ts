@@ -63,8 +63,9 @@ export function hasReleasableChanges(input: ReleaseInput): boolean {
   return commitsAfter(input.commits, previousRelease(input)?.sha).some(commit => commit.level !== null);
 }
 
-/** 输入范围由调用方确定，提交 SHA 是说明条目的身份。 */
+/** 输入范围由调用方按从新到旧提供，提交 SHA 是说明条目的身份。 */
 export function releaseNotes(commits: ReleaseCommit[], repository: string, from: string | null, to: string): string {
+  const sectionLimit = 20;
   const groups = new Map<ReleaseSection, ReleaseCommit[]>();
   for (const commit of new Map(commits.map(commit => [commit.sha, commit])).values()) {
     const entries = groups.get(commit.section) ?? [];
@@ -75,8 +76,11 @@ export function releaseNotes(commits: ReleaseCommit[], repository: string, from:
   for (const section of ["Breaking Changes", "Features", "Bug Fixes", "Refactoring", "Documentation", "Maintenance"] as const) {
     const entries = groups.get(section);
     if (!entries) continue;
-    lines.push(`## ${section}`, "", ...entries.map(commit =>
+    lines.push(`## ${section}`, "", ...entries.slice(0, sectionLimit).map(commit =>
       `- ${commit.subject} ([${commit.sha.slice(0, 7)}](${base}/commit/${commit.sha}))`), "");
+    const omitted = entries.length - sectionLimit;
+    if (omitted > 0)
+      lines.push(`… and ${omitted} more ${omitted === 1 ? "commit" : "commits"}. See the Full Changelog below.`, "");
   }
   if (!lines.length) lines.push("No commits in this release range.", "");
   lines.push(`**Full Changelog**: ${from ? `${base}/compare/${encodeURIComponent(from)}...${encodeURIComponent(to)}` : `${base}/commits/${encodeURIComponent(to)}`}`, "");

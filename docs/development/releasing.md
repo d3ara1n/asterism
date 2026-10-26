@@ -30,6 +30,8 @@ After that baseline, apply the highest impact once across the accumulated range.
 
 Prerelease notes cover new commits since the latest applicable published release. Stable notes cover the whole range since the previous stable release through the promoted commit. Deduplicate by commit SHA.
 
+Each category displays its latest 20 commits at most. Categories with additional commits show the omitted count and direct readers to the Full Changelog link. Version calculation and publication eligibility use the complete commit range.
+
 ## Promote a candidate
 
 Run Promote Release with a tested prerelease tag. The workflow builds that exact commit and removes its prerelease suffix.
