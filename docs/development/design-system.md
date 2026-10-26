@@ -75,7 +75,7 @@ User input and external Agent messages differ through placement, labels, and ico
 
 ## Controls and feedback
 
-Use shared shadcn controls backed by Radix or Base UI, and shared combinations in `packages/ui/src/ui/`. Feature code does not create parallel button, select, border, or shadow styles.
+Use shadcn/Radix controls and shared combinations in `packages/ui/src/ui/`. Feature code does not create parallel button, select, border, or shadow styles.
 
 | Button variant | Role |
 | --- | --- |
@@ -95,7 +95,7 @@ A workbench reread does not become a global saving badge or block ordinary inter
 
 ## Typography, charts, and editors
 
-Use the shared display, page, section, body, caption, label, and code roles. Interface, terminal, and code fonts have independent settings. Code and terminal sizes accept fractional pixel values. Automatic code sizing inherits the surrounding text; clearing the code size restores this behavior. Terminal size is independent of interface density and defaults to 12 pixels. Read-only count abbreviations use the common formatter; editable and raw values remain complete.
+Use the shared display, page, section, body, caption, label, and code roles. Interface, terminal, and code fonts have independent settings. Code and terminal sizes accept pixel values from 1 to 100 with up to two decimal places in a single compact field with keyboard stepping and a reset action that appears once the value differs from its baseline. Automatic code sizing inherits the surrounding text and appears as placeholder text; clearing or resetting the code size restores it. Terminal size is independent of interface density and resets to 12 pixels. Read-only count abbreviations use the common formatter; editable and raw values remain complete.
 
 The host publishes typography through root CSS tokens. Plugin DOM content inherits those styles; renderers that require explicit font options consume the resolved tokens and apply changes to existing views. Interactive terminals and terminal images use the same font settings. Font changes recalculate terminal geometry without restarting the shell.
 

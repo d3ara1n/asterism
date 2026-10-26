@@ -18,7 +18,7 @@ export type Scheme = "light" | "dark";
 export type AccentId = (typeof accentIds)[number];
 export type GrayId = (typeof grayIds)[number];
 
-export const fontSizeRange = { min: 8, max: 24 } as const;
+export const fontSizeRange = { min: 1, max: 100 } as const;
 export const defaultFontSize = 12;
 const fontFamilySchema = z.string().trim().min(1).max(128).nullable().default(null);
 
