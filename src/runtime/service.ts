@@ -25,7 +25,7 @@ export class ApplicationError extends Error {
 }
 
 /** 应用组合根与会话索引；会话内容、操作和查询由 SessionService 拥有。 */
-export interface StartupPackage { source: string; enabled: boolean; id: string | null; status: "loaded" | "disabled" | "invalid" | "failed"; error: string | null; renderer: string | null; dependencies?: string[]; rendererDependencies?: string[] }
+export interface StartupPackage { source: string; enabled: boolean; id: string | null; status: "loaded" | "disabled" | "invalid" | "failed"; error: string | null; renderer: string | null; stylesheet: string | null; dependencies?: string[]; rendererDependencies?: string[] }
 
 export class ApplicationService {
   readonly configuration: ConfigurationService;
@@ -108,11 +108,12 @@ export class ApplicationService {
       if (!id) { try { id = readManifest(root).id; } catch { /* 加载状态保留包校验失败原因。 */ } }
       return { index, source, metadata, enabled: entry.enabled, id, status: pending ? "pending" as const : startup.status,
         error: (pending ? null : startup.error) ?? metadataError, renderer: pending ? null : startup.renderer,
+        stylesheet: pending ? null : startup.stylesheet,
         dependencies: startup?.rendererDependencies ?? [] };
     });
     const builtIn = this.sessions.plugins.find(plugin => plugin.id === builtin.id);
     plugins.push({ index: null, source: "@asterism/builtin", id: builtin.id, metadata: builtinMetadata,
-      status: builtIn?.status ?? "failed", enabled: true, error: builtIn?.error ?? null, renderer: null, dependencies: [] });
+      status: builtIn?.status ?? "failed", enabled: true, error: builtIn?.error ?? null, renderer: null, stylesheet: null, dependencies: [] });
     return snapshotSchema.parse({ workspace, sessions, templates: this.sessions.templates.list(), archivedSessions, plugins, catalogs: this.options.catalogs ?? [], restartRequired: JSON.stringify(current) !== this.started,
       ...(command.type === "workspace.prepare-close" ? { disposalWarnings: this.sessions.disposalWarnings() } : {}) });
   }

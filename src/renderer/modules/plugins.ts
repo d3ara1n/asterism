@@ -8,6 +8,7 @@ import * as sdkContracts from "@asterism/sdk/contracts";
 import * as sdkRenderer from "@asterism/sdk/renderer";
 import type { RendererModule, RendererPlugin } from "@asterism/sdk/renderer";
 import { awaitStartup } from "../app/boot.ts";
+import { loadPluginStylesheet } from "./plugin-styles.ts";
 
 /** 共享模块白名单：插件 bundle 的这些导入解析到宿主同一实例，保证只有一个 React。 */
 (globalThis as Record<string, unknown>).__asterismRendererModules = {
@@ -17,7 +18,7 @@ import { awaitStartup } from "../app/boot.ts";
 };
 
 export interface PluginRendererFailure { id: string; error: string }
-export interface RendererEntry { id: string; renderer: string | null; dependencies: readonly string[] }
+export interface RendererEntry { id: string; renderer: string | null; stylesheet?: string | null; dependencies: readonly string[] }
 export function validateRendererPlugin(plugin: RendererPlugin | undefined): asserts plugin is RendererPlugin {
   if (!plugin || typeof plugin !== "object" || "resources" in plugin || "cards" in plugin || "tools" in plugin
     || (plugin.modules !== undefined && !Array.isArray(plugin.modules))
@@ -49,6 +50,7 @@ export async function loadPluginRenderers(entries: readonly RendererEntry[], opt
   progress?(id: string): void;
   accept?(plugin: RendererPlugin, id: string): void | Promise<void>;
   load?(path: string): Promise<{ default?: RendererPlugin }>;
+  loadStylesheet?(path: string, signal: AbortSignal): Promise<() => void>;
 } = {}):
   Promise<{ modules: RendererModule[]; failures: PluginRendererFailure[] }> {
   const modules: RendererModule[] = [];
@@ -57,6 +59,7 @@ export async function loadPluginRenderers(entries: readonly RendererEntry[], opt
   const visiting = new Set<string>();
   const failed = new Set<string>();
   const load = options.load ?? (path => import(/* @vite-ignore */ `asterism-plugin://${path}`));
+  const loadStylesheet = options.loadStylesheet ?? loadPluginStylesheet;
   const visit = async (id: string): Promise<void> => {
     options.signal?.throwIfAborted();
     if (available.has(id)) return;
@@ -65,20 +68,26 @@ export async function loadPluginRenderers(entries: readonly RendererEntry[], opt
     const entry = entries.find(entry => entry.id === id);
     if (!entry) throw new Error(`Public renderer dependency ${id} is unavailable.`);
     visiting.add(id);
+    let releaseStylesheet: (() => void) | undefined;
     try {
       for (const dependency of entry.dependencies) await visit(dependency);
       if (!entry.renderer) { available.add(id); return; }
       options.progress?.(id);
       const deadline = new AbortController();
-      const timer = setTimeout(() => deadline.abort(new Error(`Plugin ${id} renderer import timed out.`)), 10_000);
+      const timer = setTimeout(() => deadline.abort(new Error(`Plugin ${id} renderer loading timed out.`)), 10_000);
       const signal = options.signal ? AbortSignal.any([options.signal, deadline.signal]) : deadline.signal;
-      const loaded = await awaitStartup(load(entry.renderer), signal).finally(() => clearTimeout(timer));
+      let loaded: { default?: RendererPlugin };
+      try {
+        if (entry.stylesheet) releaseStylesheet = await loadStylesheet(entry.stylesheet, signal);
+        loaded = await awaitStartup(load(entry.renderer), signal);
+      } finally { clearTimeout(timer); }
       options.signal?.throwIfAborted();
       const plugin = loaded.default;
       validateRendererPlugin(plugin);
       await options.accept?.(plugin, id);
       modules.push(...plugin.modules ?? []); available.add(id);
     } catch (error) {
+      releaseStylesheet?.();
       console.error(`Plugin ${entry.id} renderer could not be loaded.`, error);
       failed.add(id);
       failures.push({ id: entry.id, error: error instanceof Error ? error.message : String(error) });

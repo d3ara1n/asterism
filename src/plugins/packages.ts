@@ -1,11 +1,13 @@
 import { existsSync, mkdirSync, readFileSync, realpathSync, renameSync, writeFileSync } from "node:fs";
 import { extname, join, relative, resolve, isAbsolute } from "node:path";
 import { pathToFileURL } from "node:url";
+import { satisfies, validRange } from "semver";
 import { z } from "zod";
 import * as zod from "zod";
 import * as sdkContracts from "@asterism/sdk/contracts";
 import * as sdkRuntime from "@asterism/sdk/runtime";
-import type { PluginDefinition } from "@asterism/sdk/runtime";
+import sdkMetadata from "@asterism/sdk/package.json" with { type: "json" };
+import type { PluginDefinition, PluginStorageDeclaration } from "@asterism/sdk/runtime";
 import type { Plugin } from "esbuild";
 import { compileModules, packageModule, type PackageModule } from "./package-modules.ts";
 import { loadCatalogs } from "./catalogs.ts";
@@ -13,15 +15,10 @@ import { localeSchema, uiTextSchema, pluginMetadataSchema, type PluginMetadata }
 import type { TranslationCatalog } from "../shared/i18n.ts";
 import type { PublicProvider } from "../shared/public-modules.ts";
 import { jsonStorage } from "../storage/migrations.ts";
-import type { PluginStorageDeclaration } from "@asterism/sdk/runtime";
-
-/** SDK API 版本；插件清单的 api.major 必须相同，minMinor 不得高于宿主。 */
-export const sdkApi = { major: 19, minor: 0 } as const;
 
 /** 插件包清单：package.json 的 asterism 字段；源码与发布产物读同一份。 */
 export const manifestSchema = z.strictObject({
   id: z.string().regex(/^[a-z0-9][a-z0-9-]*(?:\.[a-z0-9][a-z0-9-]*)+$/u),
-  api: z.strictObject({ major: z.number().int().nonnegative(), minMinor: z.number().int().nonnegative() }),
   runtime: z.string().min(1).optional(),
   renderer: z.string().min(1).optional(),
   /** 存储声明入口：默认导出 `defineStorage([...])`，宿主在插件运行时之前单独导入。 */
@@ -37,6 +34,7 @@ export const manifestSchema = z.strictObject({
   }).optional(),
 });
 export type PluginPackageManifest = z.infer<typeof manifestSchema>;
+const sdkRequirementSchema = z.object({ peerDependencies: z.object({ "@asterism/sdk": z.string().trim().min(1) }) });
 
 /** 包信息独立于 API 兼容和代码装载，失败或禁用的插件也能显示。 */
 export function readPackageMetadata(root: string): PluginMetadata {
@@ -96,9 +94,12 @@ export function readManifest(root: string): PluginPackageManifest {
     throw new PluginPackageError("invalid_manifest", `Package at ${root} has no valid Asterism manifest: ${fields}.`);
   }
   const manifest = parsed.data;
-  if (manifest.api.major !== sdkApi.major || manifest.api.minMinor > sdkApi.minor) {
-    throw new PluginPackageError("incompatible_api", `Plugin ${manifest.id} requires SDK API ${manifest.api.major}.${manifest.api.minMinor}; host provides ${sdkApi.major}.${sdkApi.minor}.`);
-  }
+  const requirement = sdkRequirementSchema.safeParse(raw);
+  const range = requirement.success ? requirement.data.peerDependencies["@asterism/sdk"] : undefined;
+  if (!range || !validRange(range))
+    throw new PluginPackageError("invalid_manifest", `Plugin ${manifest.id} must declare a semantic version range in peerDependencies["@asterism/sdk"]; host provides ${sdkMetadata.version}.`);
+  if (!satisfies(sdkMetadata.version, range))
+    throw new PluginPackageError("incompatible_api", `Plugin ${manifest.id} requires @asterism/sdk ${range}; host provides ${sdkMetadata.version}.`);
   for (const entry of [manifest.runtime, manifest.renderer, manifest.storage]) {
     if (entry && relative(root, resolve(root, entry)).startsWith("..")) throw new PluginPackageError("invalid_entry", `Entry ${entry} is outside the package.`);
   }
@@ -188,6 +189,7 @@ export interface ResolvedPackage {
   storage?: readonly PluginStorageDeclaration[];
   /** 相对 renderer 缓存根的入口路径。 */
   renderer?: string;
+  stylesheet?: string;
 }
 
 /** 导入一个已构建入口；单个插件的导入等待有固定期限。 */
@@ -235,7 +237,7 @@ export async function loadPackages(list: PackageList, npmRoot: string, cacheRoot
       item.status = "failed"; item.error = error instanceof Error ? error.message : String(error);
     }
   }
-  const hostIdentity = JSON.stringify({ sdkApi, runtime: Object.keys(shared).sort().map(id => sharedModuleSource(id)),
+  const hostIdentity = JSON.stringify({ sdkVersion: sdkMetadata.version, runtime: Object.keys(shared).sort().map(id => sharedModuleSource(id)),
     renderer: rendererShared.map(id => rendererModuleSource(id)) });
   const compiled = await compileModules(modules, new Set(result.filter(item => item.status === "loaded").map(item => item.manifest!.id)),
     cacheRoot, hostModules, publicProviders, hostIdentity, progress);
@@ -248,6 +250,8 @@ export async function loadPackages(list: PackageList, npmRoot: string, cacheRoot
       if (compiled.failures.has(id)) throw new PluginPackageError("build_failed", compiled.failures.get(id)!);
       const renderer = compiled.renderer.get(id);
       if (renderer) item.renderer = relative(cacheRoot, renderer).split("\\").join("/");
+      const stylesheet = compiled.stylesheets.get(id);
+      if (stylesheet) item.stylesheet = relative(cacheRoot, stylesheet).split("\\").join("/");
       const storage = compiled.storage.get(id);
       if (storage) item.storage = storageDeclarations(id, await importEntry(id, storage, "storage"));
       const file = compiled.runtime.get(id);
@@ -272,7 +276,7 @@ export async function loadPackages(list: PackageList, npmRoot: string, cacheRoot
       const failed = [...compiled.dependencies.get(item.manifest!.id) ?? []].find(id => result.some(provider => provider.manifest?.id === id && provider.status !== "loaded"));
       if (failed) {
         item.status = "failed"; item.error = `Public dependency ${failed} is unavailable.`;
-        delete item.definition; delete item.renderer; delete item.storage; changed = true;
+        delete item.definition; delete item.renderer; delete item.stylesheet; delete item.storage; changed = true;
       }
     }
   }

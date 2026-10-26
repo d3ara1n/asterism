@@ -10,6 +10,10 @@ Read package metadata independently of executable entries so disabled or failed 
 
 Assembly freezes the registered contributions. Package installation, enablement, and upgrades take effect after restart. Failed providers block their dependents while unrelated plugins continue.
 
+The bundled SDK package version is the source of truth for host compatibility. Each plugin declares a semantic version range in its SDK peer dependency; package admission and startup both check that range before executable entries load. Local development dependencies provide source and types without changing the compatibility requirement.
+
+Before SDK version 1.0, incompatible changes advance the minor version; compatible additions and fixes advance the patch version. Stable SDK releases use major versions for incompatible changes, minor versions for compatible additions, and patch versions for fixes. Application releases and plugin-private storage formats are versioned independently.
+
 The host attributes contribution identities to the plugin namespace and rejects conflicting declarations. Missing implementations retain saved data and use missing-resource or raw-data presentation.
 
 ## Public modules
@@ -18,7 +22,7 @@ Public imports establish explicit package dependencies. The host validates decla
 
 Each backend or frontend environment has one module instance for a shared declaration. Identical textual IDs in copied declarations do not establish identity. Stable IDs serve routing, persistence, and cross-process association.
 
-The built-in public API is a separate package associated with the built-in implementation plugin. Its version is checked independently of the host SDK API version.
+The built-in public API is a separate package associated with the built-in implementation plugin. Its version is checked independently of the SDK package version.
 
 Provider initialization precedes consumers. Shutdown waits for managed work, then cleans up in reverse dependency order. Public exports do not grant resource access or another plugin’s private state.
 
@@ -101,6 +105,12 @@ The content service manages byte references and temporary retention. Public IDs 
 ## Renderer contributions
 
 The renderer can contribute cards, tool phases, history records, creation entries, and settings. Frontend preparation can establish services independently of card mounting and binds them to a cancellation scope.
+
+Imported styles are frontend build dependencies. The host preserves each entry's CSS association through compilation, caching, and startup projection, and loads styles in dependency and registration order before preparing the frontend. Initialization failures and frontend shutdown release the associated styles; individual view mounting does not own them.
+
+Individual preflight builds isolate source errors and exclude failed providers and their consumers. Ready renderer entries then compile together so CSS Modules receive distinct names across the shared document. A failure of this final shared build affects its frontend-bearing packages; unrelated backend-only packages retain their successful builds.
+
+Plugins share the document's CSS cascade and host theme variables. CSS Modules localize class names without creating a separate rendering environment. Preprocessors remain the plugin's responsibility; the host consumes their CSS output and serves bundled assets with their relative paths intact.
 
 Resource descriptions supply stable type presentation. Cards and auxiliary panels consume projected data; the host owns their surrounding layout, focus, and lifecycle.
 

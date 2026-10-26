@@ -61,7 +61,7 @@ export async function startApplication(root: Root, progress: (message: UiText, d
   if (!initial.snapshot || initial.error) throw new Error(initial.error ? getI18n().text(initial.error) : "The workspace could not be read.");
   setLanguageCatalogs(initial.snapshot.catalogs ?? []);
   progress(startupMessages.plugins);
-  const plugins = initial.snapshot.plugins.flatMap(p => p.status === "loaded" && p.id ? [{ id: p.id, renderer: p.renderer, dependencies: p.dependencies }] : []);
+  const plugins = initial.snapshot.plugins.flatMap(p => p.status === "loaded" && p.id ? [{ id: p.id, renderer: p.renderer, stylesheet: p.stylesheet, dependencies: p.dependencies }] : []);
   const accepted = [...builtinRenderer.modules ?? [], workbenchRecordViews];
   const pages = new Map<string, PluginSettingsPage>();
   const cleanup: (() => Promise<void>)[] = [];

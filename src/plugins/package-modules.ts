@@ -67,6 +67,7 @@ export interface CompiledModules {
   runtime: Map<string, string>;
   storage: Map<string, string>;
   renderer: Map<string, string>;
+  stylesheets: Map<string, string>;
   dependencies: Map<string, Set<string>>;
   runtimeDependencies: Map<string, Set<string>>;
   rendererDependencies: Map<string, Set<string>>;
@@ -114,11 +115,11 @@ export async function compileModules(packages: readonly PackageModule[], enabled
       throw new Error(`Invalid or duplicate public provider: ${provider.name}@${provider.version}.`);
     preloaded.set(provider.name, provider);
   }
-  const result: CompiledModules = { runtime: new Map(), storage: new Map(), renderer: new Map(), dependencies: new Map(), runtimeDependencies: new Map(), rendererDependencies: new Map(), failures: new Map() };
+  const result: CompiledModules = { runtime: new Map(), storage: new Map(), renderer: new Map(), stylesheets: new Map(), dependencies: new Map(), runtimeDependencies: new Map(), rendererDependencies: new Map(), failures: new Map() };
   if (!packages.some(pkg => enabled.has(pkg.id))) return result;
   const cache = new PluginBuildCache(cacheRoot, packages.filter(pkg => enabled.has(pkg.id)).map(pkg => pkg.root), {
     // 构建选项、解析器或宿主转接规则变化时递增配方版本。
-    recipe: 2, esbuild: createRequire(import.meta.url)("esbuild/package.json").version, platform: process.platform, arch: process.arch,
+    recipe: 3, esbuild: createRequire(import.meta.url)("esbuild/package.json").version, platform: process.platform, arch: process.arch,
     cwd: process.cwd(), nodePath: process.env.NODE_PATH,
     packages: packages.map(pkg => ({ ...pkg, dependencies: [...pkg.dependencies] })), enabled: [...enabled], publicProviders, hostIdentity,
   });
@@ -203,7 +204,11 @@ export async function compileModules(packages: readonly PackageModule[], enabled
       platform: realm === "runtime" ? "node" : "browser", target: realm === "runtime" ? "node22" : "chrome130",
       logLevel: "silent", sourcemap: "linked", metafile: true,
       ...(realm === "runtime" ? { external: ["*.node"], banner: { js: "import { createRequire as __asterismCreateRequire } from 'node:module'; const require = __asterismCreateRequire(import.meta.url);" } }
-        : { jsx: "automatic", loader: { ".png": "file", ".jpg": "file", ".svg": "file", ".wasm": "file", ".woff2": "file", ".mp3": "file", ".ogg": "file" } }),
+        : { jsx: "automatic", loader: {
+          ".png": "file", ".jpg": "file", ".jpeg": "file", ".gif": "file", ".webp": "file", ".avif": "file", ".svg": "file", ".ico": "file",
+          ".woff": "file", ".woff2": "file", ".ttf": "file", ".otf": "file", ".eot": "file",
+          ".wasm": "file", ".mp3": "file", ".ogg": "file",
+        } }),
       plugins: [{ name: "asterism-cache-inputs", setup(build) {
         build.onResolve({ filter: /.*/ }, args => { cache.resolution(args.path, args.importer, args.resolveDir); });
         build.onEnd(result => { if (result.metafile) cache.inputs(Object.keys(result.metafile.inputs)); });
@@ -227,7 +232,42 @@ export async function compileModules(packages: readonly PackageModule[], enabled
       }
     }
     const ready = active.filter(pkg => !result.failures.has(pkg.id));
-    // 公共依赖相连的入口必须一起构建；不相连的图分别失败，避免拖垮无关插件。
+    const compile = async (realm: ModuleRealm, component: readonly PackageModule[]) => {
+      if (!component.some(pkg => realmEntries(realm, pkg).length)) return;
+      progress(component.map(pkg => pkg.id).join(", "));
+      try {
+        const built = await esbuild.build(options(realm, component));
+        const base = resolve(cacheRoot, "build", realm);
+        const hash = createHash("sha256");
+        for (const file of built.outputFiles!) hash.update(relative(base, file.path)).update(file.contents);
+        const directory = join(cacheRoot, `modules-${hash.digest("hex").slice(0, 32)}`, realm);
+        for (const file of built.outputFiles!) {
+          const destination = join(directory, relative(base, file.path));
+          mkdirSync(dirname(destination), { recursive: true }); writeFileSync(destination, file.contents);
+          outputFiles.push(destination);
+        }
+        const outputMetadata = new Map(Object.entries(built.metafile!.outputs).map(([file, output]) => [resolve(file), output]));
+        for (const pkg of component) {
+          if (realm === "renderer") {
+            if (pkg.renderer) {
+              result.renderer.set(pkg.id, join(directory, `${pkg.id}.mjs`));
+              const output = outputMetadata.get(resolve(base, `${pkg.id}.mjs`));
+              if (output?.cssBundle) result.stylesheets.set(pkg.id, join(directory, relative(base, resolve(output.cssBundle))));
+            }
+            continue;
+          }
+          if (pkg.runtime) result.runtime.set(pkg.id, join(directory, `${pkg.id}.mjs`));
+          if (pkg.storage) result.storage.set(pkg.id, join(directory, `${storageEntry(pkg.id)}.mjs`));
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        for (const pkg of component) {
+          result.failures.set(pkg.id, realm === "renderer" ? `Shared renderer build failed: ${message}` : message);
+          result.runtime.delete(pkg.id); result.storage.delete(pkg.id); result.renderer.delete(pkg.id); result.stylesheets.delete(pkg.id);
+        }
+      }
+    };
+    // 后台按公共依赖分组；预检已将损坏插件及其消费者排除。
     const pending = new Set(ready.map(pkg => pkg.id));
     while (pending.size) {
       const ids = new Set<string>(), queue = [pending.values().next().value!];
@@ -238,34 +278,10 @@ export async function compileModules(packages: readonly PackageModule[], enabled
         queue.push(...result.dependencies.get(id) ?? [],
           ...ready.filter(pkg => result.dependencies.get(pkg.id)?.has(id)).map(pkg => pkg.id));
       }
-      const component = ready.filter(pkg => ids.has(pkg.id));
-      progress(component.map(pkg => pkg.id).join(", "));
-      try {
-        for (const realm of ["runtime", "renderer"] as const) {
-          if (!component.some(pkg => realmEntries(realm, pkg).length)) continue;
-          const built = await esbuild.build(options(realm, component));
-          const base = resolve(cacheRoot, "build", realm);
-          const hash = createHash("sha256");
-          for (const file of built.outputFiles!) hash.update(relative(base, file.path)).update(file.contents);
-          const directory = join(cacheRoot, `modules-${hash.digest("hex").slice(0, 32)}`, realm);
-          for (const file of built.outputFiles!) {
-            const destination = join(directory, relative(base, file.path));
-            mkdirSync(dirname(destination), { recursive: true }); writeFileSync(destination, file.contents);
-            outputFiles.push(destination);
-          }
-          for (const pkg of component) {
-            if (realm === "renderer") { if (pkg.renderer) result.renderer.set(pkg.id, join(directory, `${pkg.id}.mjs`)); continue; }
-            if (pkg.runtime) result.runtime.set(pkg.id, join(directory, `${pkg.id}.mjs`));
-            if (pkg.storage) result.storage.set(pkg.id, join(directory, `${storageEntry(pkg.id)}.mjs`));
-          }
-        }
-      } catch (error) {
-        for (const pkg of component) {
-          result.failures.set(pkg.id, error instanceof Error ? error.message : String(error));
-          result.runtime.delete(pkg.id); result.storage.delete(pkg.id); result.renderer.delete(pkg.id);
-        }
-      }
+      await compile("runtime", ready.filter(pkg => ids.has(pkg.id)));
     }
+    // 前端共享同一文档的类名空间；统一构建使无依赖关系的 CSS Modules 也不会重名。
+    await compile("renderer", ready.filter(pkg => pkg.renderer && !result.failures.has(pkg.id)));
     cache.write(result, outputFiles);
     return result;
   } finally {

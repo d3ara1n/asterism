@@ -38,6 +38,7 @@ try {
   const listed = packages.map(item => ({ enabled: item.entry.enabled, id: item.manifest?.id ?? null,
     source: item.entry.source.kind === "path" ? item.entry.source.path : `${item.entry.source.name}@${item.entry.source.version}`,
     status: item.status, error: item.error ?? null, renderer: item.status === "loaded" ? item.renderer ?? null : null,
+    stylesheet: item.status === "loaded" ? item.stylesheet ?? null : null,
     dependencies: item.dependencies ?? [], rendererDependencies: item.rendererDependencies ?? [] }));
   port.postMessage({ kind: "startup", stage: "workspace" });
   service = new ApplicationService(root, { catalogs: packages.flatMap(item => item.catalogs ?? []), packages: listed,

@@ -9,6 +9,7 @@ import * as builtinRendererAPI from "@asterism/builtin-api/renderer";
 import { agentCreations, defineAgentCreation } from "@asterism/builtin-api/runtime";
 import { resourceCall } from "@asterism/sdk/contracts";
 import type { PluginDefinition } from "@asterism/sdk/runtime";
+import sdkMetadata from "@asterism/sdk/package.json" with { type: "json" };
 import { PackageList, loadPackages } from "./packages.ts";
 import { ApplicationService } from "../runtime/service.ts";
 import { bindPublicProvider } from "../shared/public-modules.ts";
@@ -27,8 +28,8 @@ function fixture(ranges: (string | null)[] = [compatibleRange, `~${builtinPublic
   const consumers = ranges.map((range, index) => {
     const root = temp(), id = `fixture.consumer${index}`;
     file(root, "package.json", JSON.stringify({ name: `@fixture/consumer${index}`, version: "1.0.0",
-      ...(range === null ? {} : { peerDependencies: { "@asterism/builtin-api": range } }),
-      asterism: { id, api: { major: 19, minMinor: 0 }, runtime: "runtime.ts", renderer: "renderer.ts" } }));
+      peerDependencies: { "@asterism/sdk": `^${sdkMetadata.version}`, ...(range === null ? {} : { "@asterism/builtin-api": range }) },
+      asterism: { id, runtime: "runtime.ts", renderer: "renderer.ts" } }));
     file(root, "public.ts", 'export { SubmitAgentInput } from "@asterism/builtin-api/contracts";');
     file(root, "runtime.ts", `
       import { pluginNamespace } from "@asterism/sdk/contracts";

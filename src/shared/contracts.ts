@@ -8,7 +8,7 @@ import { templateSummarySchema } from "./templates.ts";
 import { startupStageSchema, type StartupBridge } from "./startup.ts";
 import type { UpdatesBridge } from "./updates.ts";
 
-export const protocolVersion = 11;
+export const protocolVersion = 12;
 export const statusChannel = coreChannel("runtime-status");
 export const pickDirectoryChannel = coreChannel("pick-directory");
 export const openLocalFileChannel = coreChannel("open-local-file");
@@ -36,6 +36,7 @@ export const snapshotSchema = z.strictObject({
   /** 插件包：启动时状态；renderer 为 asterism-plugin:// 下的入口路径。 */
   plugins: z.array(z.strictObject({ index: z.number().int().nonnegative().nullable(), id: z.string().nullable(), source: z.string(),
     status: z.enum(["loaded", "disabled", "invalid", "failed", "pending"]), enabled: z.boolean(), error: z.string().nullable(), renderer: z.string().nullable(),
+    stylesheet: z.string().nullable(),
     metadata: pluginMetadataSchema.default({}),
     dependencies: z.array(z.string()).default([]) })),
   /** 包列表与本次启动不同：需要重启生效。 */

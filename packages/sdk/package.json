@@ -1,9 +1,10 @@
 {
   "name": "@asterism/sdk",
   "private": true,
-  "version": "0.45.0",
+  "version": "0.46.0",
   "type": "module",
   "exports": {
+    "./package.json": "./package.json",
     "./contracts": "./src/contracts.ts",
     "./runtime": "./src/runtime.ts",
     "./renderer": "./src/renderer.ts"

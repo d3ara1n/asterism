@@ -1,8 +1,9 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync, readFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync, readFileSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { PackageList, loadPackages, readManifest, readPackageMetadata, sdkApi } from "./packages.ts";
+import { PackageList, loadPackages, readManifest, readPackageMetadata } from "./packages.ts";
+import sdkMetadata from "@asterism/sdk/package.json" with { type: "json" };
 import { ApplicationService } from "../runtime/service.ts";
 import { pathToFileURL } from "node:url";
 import type { PluginDefinition } from "@asterism/sdk/runtime";
@@ -12,21 +13,22 @@ afterEach(() => { for (const r of roots.splice(0)) rmSync(r, { recursive: true, 
 function temp() { const r = mkdtempSync(join(tmpdir(), "plugin-pkg-")); roots.push(r); return r; }
 function pkg(root: string, asterism: unknown, source?: string) {
   mkdirSync(join(root, "src"), { recursive: true });
-  writeFileSync(join(root, "package.json"), JSON.stringify({ name: "x", asterism }));
+  writeFileSync(join(root, "package.json"), JSON.stringify({ name: "x", peerDependencies: { "@asterism/sdk": `^${sdkMetadata.version}` }, asterism }));
   if (source) writeFileSync(join(root, "src", "runtime.ts"), source);
 }
-const runtime = (id: string) => `import { pluginNamespace, defineCreation, defineAction } from "@asterism/sdk/contracts";
+const runtime = (id: string) => `import { pluginNamespace } from "@asterism/sdk/contracts";
 import { definePlugin, defineModule } from "@asterism/sdk/runtime";
-const ns: { id: string } = pluginNamespace(${JSON.stringify(id)});
+const ns = pluginNamespace(${JSON.stringify(id)});
 export default definePlugin({ namespace: ns, version: "0.0.1", modules: [defineModule(() => ({}))] });`;
 
 describe("插件包", () => {
   // 信息卡片必须独立于代码与 API 兼容读取；禁用、失败插件仍显示真实身份资料。
-  it("元信息不执行插件代码，旧 API 的包也可读取名称、作者和包内图标", () => {
+  it("元信息不执行插件代码，不兼容的包也可读取名称、作者和包内图标", () => {
     const root = temp();
     writeFileSync(join(root, "package.json"), JSON.stringify({
       name: "@example/info", version: "1.2.3", description: "Package description", author: { name: "Author" },
-      asterism: { id: "example.info", api: { major: 8, minMinor: 0 }, displayName: "Display name", icon: "icon.svg", runtime: "runtime.ts" },
+      peerDependencies: { "@asterism/sdk": "^0.1.0" },
+      asterism: { id: "example.info", displayName: "Display name", icon: "icon.svg", runtime: "runtime.ts" },
     }));
     writeFileSync(join(root, "runtime.ts"), 'throw new Error("Must not execute.");');
     writeFileSync(join(root, "icon.svg"), '<svg xmlns="http://www.w3.org/2000/svg"/>');
@@ -40,25 +42,41 @@ describe("插件包", () => {
     const data = temp(); const dir = temp();
     const list = new PackageList(join(data, "plugins.json"));
     expect(() => list.add({ source: { kind: "path", path: dir } }, data)).toThrow();
-    pkg(dir, { id: "acme.x" });
+    pkg(dir, undefined);
     expect(() => list.add({ source: { kind: "path", path: dir } }, data)).toThrow();
     expect(list.read()).toEqual([]);
   });
-  // 插件声明更高接口要求时拒绝加载，同主版本已提供的接口可以使用。
-  it("接受同主版本接口并拒绝旧主版本与更高小版本", () => {
+  // 本地源码依赖不能替代宿主兼容声明；0.x 的 caret 范围不能越过 minor。
+  it.each([
+    [undefined, "invalid_manifest"],
+    ["file:../sdk", "invalid_manifest"],
+    ["^0.1.0", "incompatible_api"],
+    [">=99.0.0", "incompatible_api"],
+  ])("拒绝 SDK peer 声明 %s 并报告宿主版本", (range, code) => {
     const dir = temp();
-    pkg(dir, { id: "acme.x", api: { major: sdkApi.major, minMinor: 0 } });
-    expect(readManifest(dir).api).toEqual({ major: sdkApi.major, minMinor: 0 });
-    pkg(dir, { id: "acme.x", api: { major: sdkApi.major - 1, minMinor: 0 } });
-    expect(() => readManifest(dir)).toThrow();
-    pkg(dir, { id: "acme.x", api: { major: sdkApi.major, minMinor: sdkApi.minor + 1 } });
-    expect(() => readManifest(dir)).toThrow();
+    writeFileSync(join(dir, "package.json"), JSON.stringify({
+      asterism: { id: "acme.x" }, peerDependencies: { "@asterism/sdk": range },
+      devDependencies: { "@asterism/sdk": "file:../sdk" },
+    }));
+    expect(() => readManifest(dir)).toThrow(expect.objectContaining({ code, message: expect.stringContaining(`host provides ${sdkMetadata.version}`) }));
+  });
+  it("兼容范围与本地开发依赖独立，启动重新检查修改后的要求", async () => {
+    const dir = temp(), data = temp();
+    const metadata = { asterism: { id: "acme.x" }, peerDependencies: { "@asterism/sdk": `^${sdkMetadata.version}` },
+      devDependencies: { "@asterism/sdk": "file:../sdk" } };
+    writeFileSync(join(dir, "package.json"), JSON.stringify(metadata));
+    const list = new PackageList(join(data, "plugins.json"));
+    expect(list.add({ source: { kind: "path", path: dir } }, data).id).toBe("acme.x");
+    metadata.peerDependencies["@asterism/sdk"] = ">=99.0.0";
+    writeFileSync(join(dir, "package.json"), JSON.stringify(metadata));
+    const [loaded] = await loadPackages(list, data, join(data, "cache"), []);
+    expect(loaded).toMatchObject({ status: "invalid", error: expect.stringContaining("requires @asterism/sdk >=99.0.0") });
   });
   it("源码包经 esbuild 打包导入，SDK 解析到宿主实例；禁用与重复 ID 不加载", async () => {
     const data = temp(); const a = temp(); const b = temp(); const c = temp();
-    pkg(a, { id: "acme.a", api: { major: 19, minMinor: 0 }, runtime: "src/runtime.ts" }, runtime("acme.a"));
-    pkg(b, { id: "acme.b", api: { major: 19, minMinor: 0 }, runtime: "src/runtime.ts" }, runtime("acme.b"));
-    pkg(c, { id: "acme.b", api: { major: 19, minMinor: 0 }, runtime: "src/runtime.ts" }, runtime("acme.b"));
+    pkg(a, { id: "acme.a", runtime: "src/runtime.ts" }, runtime("acme.a"));
+    pkg(b, { id: "acme.b", runtime: "src/runtime.ts" }, runtime("acme.b"));
+    pkg(c, { id: "acme.b", runtime: "src/runtime.ts" }, runtime("acme.b"));
     const list = new PackageList(join(data, "plugins.json"));
     list.add({ source: { kind: "path", path: a } }, data);
     list.add({ source: { kind: "path", path: b } }, data);
@@ -70,7 +88,7 @@ describe("插件包", () => {
   });
   it("构建失败只标记该包", async () => {
     const data = temp(); const a = temp();
-    pkg(a, { id: "acme.a", api: { major: 19, minMinor: 0 }, runtime: "src/runtime.ts" }, "export default {{;");
+    pkg(a, { id: "acme.a", runtime: "src/runtime.ts" }, "export default {{;");
     const list = new PackageList(join(data, "plugins.json"));
     list.add({ source: { kind: "path", path: a } }, data);
     const [item] = await loadPackages(list, data, join(data, "cache"), []);
@@ -79,7 +97,7 @@ describe("插件包", () => {
   });
   it("源码包仅引入公开 SDK 即可提供真实资源，不需要宿主内部工厂", async () => {
     const data = temp(); const root = temp();
-    pkg(root, { id: "acme.sdk", api: { major: 19, minMinor: 0 }, runtime: "src/runtime.ts" }, `
+    pkg(root, { id: "acme.sdk", runtime: "src/runtime.ts" }, `
       import { z } from "zod";
       import { pluginNamespace, defineCreation, defineAction } from "@asterism/sdk/contracts";
       import { definePlugin, defineModule, implementResource, implementCreation, implementAction } from "@asterism/sdk/runtime";
@@ -114,9 +132,55 @@ describe("插件包", () => {
   });
 });
 
+// 符号链接入口的源码路径会被解析；CSS 归属仍按输出入口登记，搬移后类名和 url() 保持有效。
+it("登记独立样式、保留 CSS Modules 类名与资源路径，缓存复用后仍能读取样式", async () => {
+  const root = temp(), plain = temp(), other = temp(), broken = temp(), data = temp(), cache = join(data, "cache");
+  pkg(root, { id: "acme.styled", renderer: "src/renderer.ts" });
+  pkg(plain, { id: "acme.plain", renderer: "src/renderer.ts" });
+  pkg(other, { id: "acme.other", renderer: "src/renderer.ts" });
+  pkg(broken, { id: "acme.broken-style", renderer: "src/renderer.ts" });
+  writeFileSync(join(root, "src/entry.ts"), 'import "./base.css"; export { default as styles } from "./panel.module.css"; export default {};');
+  symlinkSync("entry.ts", join(root, "src/renderer.ts"));
+  writeFileSync(join(plain, "src/renderer.ts"), "export default {};");
+  writeFileSync(join(other, "src/renderer.ts"), 'export { default as styles } from "./panel.module.css"; export default {};');
+  writeFileSync(join(other, "src/panel.module.css"), ".card { color: #abcdef; }");
+  writeFileSync(join(broken, "src/renderer.ts"), 'import "./missing.css"; export default {};');
+  writeFileSync(join(root, "src/base.css"), '@font-face { font-family: Example; src: url("./font.woff"); }');
+  writeFileSync(join(root, "src/panel.module.css"), '.card { color: #123456; background-image: url("./image.webp"); }');
+  writeFileSync(join(root, "src/font.woff"), "font-fixture");
+  writeFileSync(join(root, "src/image.webp"), "image-fixture");
+  const list = new PackageList(join(data, "plugins.json"));
+  for (const path of [root, plain, other, broken]) list.add({ source: { kind: "path", path } }, data);
+  const load = () => loadPackages(list, data, cache, []);
+  const first = await load();
+  expect(first.map(item => item.status)).toEqual(["loaded", "loaded", "loaded", "failed"]);
+  expect(first[3]!.error).toContain("missing.css");
+  expect(first[1]!.stylesheet).toBeUndefined();
+  const stylesheet = join(cache, first[0]!.stylesheet!);
+  const css = readFileSync(stylesheet, "utf8");
+  const module = await import(pathToFileURL(join(cache, first[0]!.renderer!)).href) as { styles: { card: string } };
+  const otherModule = await import(pathToFileURL(join(cache, first[2]!.renderer!)).href) as { styles: { card: string } };
+  expect(otherModule.styles.card).not.toBe(module.styles.card);
+  expect(readFileSync(join(cache, first[2]!.stylesheet!), "utf8")).toContain(`.${otherModule.styles.card}`);
+  expect(module.styles.card).not.toBe("card");
+  expect(css).toContain(`.${module.styles.card}`);
+  expect(css).toContain("#123456");
+  const assets = [...css.matchAll(/url\(["']?([^"')]+)["']?\)/gu)].map(match =>
+    readFileSync(resolve(dirname(stylesheet), match[1]!), "utf8"));
+  expect(assets.sort()).toEqual(["font-fixture", "image-fixture"]);
+  list.remove(3);
+  await load();
+  const cached = await load();
+  expect(cached.map(item => [item.renderer, item.stylesheet])).toEqual(first.slice(0, 3).map(item => [item.renderer, item.stylesheet]));
+  writeFileSync(join(root, "src/panel.module.css"), ".card { color: #654321; }");
+  const updated = await load();
+  expect(updated[0]!.stylesheet).not.toBe(first[0]!.stylesheet);
+  expect(readFileSync(join(cache, updated[0]!.stylesheet!), "utf8")).toContain("#654321");
+});
+
 function publicFixture() {
   const data = temp(), provider = temp(), consumer = temp();
-  pkg(provider, { id: "acme.provider", api: { major: 19, minMinor: 0 }, runtime: "src/runtime.ts", renderer: "src/renderer.ts" }, `
+  pkg(provider, { id: "acme.provider", runtime: "src/runtime.ts", renderer: "src/renderer.ts" }, `
     import { pluginNamespace } from "@asterism/sdk/contracts";
     import { Read, settings, Marker, events } from "./state.ts";
     export default { namespace: pluginNamespace("acme.provider"), version: "1",
@@ -139,7 +203,7 @@ function publicFixture() {
   `);
   writeFileSync(join(provider, "src/public.ts"), 'export { Read, settings, Marker, events } from "./state.ts";');
   writeFileSync(join(provider, "src/renderer.ts"), 'export { Read, settings, Marker } from "./state.ts"; export default { modules: [{ resources: [], cards: [], tools: [] }] };');
-  pkg(consumer, { id: "acme.consumer", api: { major: 19, minMinor: 0 }, runtime: "src/runtime.ts", renderer: "src/renderer.ts" }, `
+  pkg(consumer, { id: "acme.consumer", runtime: "src/runtime.ts", renderer: "src/renderer.ts" }, `
     import { pluginNamespace, defineImplementation } from "@asterism/sdk/contracts";
     import { implementTool } from "@asterism/sdk/runtime";
     import { z } from "zod";
@@ -157,7 +221,7 @@ function publicFixture() {
       } }] };
   `);
   const consumerInfo = JSON.parse(readFileSync(join(consumer, "package.json"), "utf8"));
-  writeFileSync(join(consumer, "package.json"), JSON.stringify({ ...consumerInfo, name: "@fixture/consumer", peerDependencies: { "@fixture/provider": "*" } }));
+  writeFileSync(join(consumer, "package.json"), JSON.stringify({ ...consumerInfo, name: "@fixture/consumer", peerDependencies: { ...consumerInfo.peerDependencies, "@fixture/provider": "*" } }));
   writeFileSync(join(consumer, "src/renderer.ts"), 'export { Read, settings, Marker } from "@fixture/provider/public"; export default { modules: [{ resources: [], cards: [], tools: [] }] };');
   const list = new PackageList(join(data, "plugins.json"));
   list.add({ source: { kind: "path", path: consumer } }, data);
@@ -209,7 +273,7 @@ describe("公共模块", () => {
   });
   it("提供方禁用明确阻断消费者；损坏的无关插件不阻断公共模块图", async () => {
     const fixture = publicFixture(), broken = temp();
-    pkg(broken, { id: "acme.broken", api: { major: 19, minMinor: 0 }, runtime: "src/runtime.ts" }, "invalid }");
+    pkg(broken, { id: "acme.broken", runtime: "src/runtime.ts" }, "invalid }");
     fixture.list.add({ source: { kind: "path", path: broken } }, fixture.data);
     let packages = await loadPackages(fixture.list, fixture.data, fixture.cache, []);
     expect(packages.map(pkg => pkg.status)).toEqual(["loaded", "loaded", "failed"]);
@@ -227,7 +291,7 @@ describe("公共模块", () => {
     const metadata = JSON.parse(readFileSync(join(fixture.consumer, "package.json"), "utf8"));
     delete metadata.asterism.renderer;
     writeFileSync(join(fixture.consumer, "package.json"), JSON.stringify(metadata));
-    pkg(healthy, { id: "acme.healthy", api: { major: 19, minMinor: 0 }, runtime: "src/runtime.ts" }, runtime("acme.healthy"));
+    pkg(healthy, { id: "acme.healthy", runtime: "src/runtime.ts" }, runtime("acme.healthy"));
     fixture.list.add({ source: { kind: "path", path: healthy } }, fixture.data);
     let packages = await loadPackages(fixture.list, fixture.data, fixture.cache, []);
     expect(packages[0]!.definition?.dependencies).toEqual(["acme.provider"]);
@@ -242,7 +306,7 @@ describe("公共模块", () => {
     writeFileSync(join(fixture.consumer, "package.json"), JSON.stringify(consumer));
     writeFileSync(join(fixture.consumer, "src/public.ts"), "export const label = 'Consumer';");
     const provider = JSON.parse(readFileSync(join(fixture.provider, "package.json"), "utf8"));
-    provider.peerDependencies = { "@fixture/consumer": "*" };
+    provider.peerDependencies = { ...provider.peerDependencies, "@fixture/consumer": "*" };
     writeFileSync(join(fixture.provider, "package.json"), JSON.stringify(provider));
     writeFileSync(join(fixture.provider, "src/renderer.ts"),
       'export { label } from "@fixture/consumer/public"; export default { modules: [{ resources: [], cards: [], tools: [] }] };');
@@ -260,7 +324,7 @@ describe("公共模块", () => {
     writeFileSync(join(fixture.provider, "package.json"), JSON.stringify(provider));
     const source = join(fixture.provider, "src/runtime.ts");
     writeFileSync(source, readFileSync(source, "utf8").replace('"./state.ts"', '"@fixture/provider/internal"'));
-    writeFileSync(join(disabled, "package.json"), JSON.stringify({ ...provider, asterism: { id: "acme.disabled", api: { major: 19, minMinor: 0 } } }));
+    writeFileSync(join(disabled, "package.json"), JSON.stringify({ ...provider, asterism: { id: "acme.disabled" } }));
     const list = new PackageList(join(fixture.data, "other-plugins.json"));
     list.add({ source: { kind: "path", path: disabled } }, fixture.data); list.setEnabled(0, false);
     list.add({ source: { kind: "path", path: fixture.consumer } }, fixture.data);
