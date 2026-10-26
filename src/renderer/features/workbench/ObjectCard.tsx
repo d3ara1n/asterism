@@ -1,9 +1,11 @@
 import type { CardPanelView } from "@asterism/sdk/renderer";
-import { ChevronRight, ChevronDown } from "lucide-react";
+import { ChevronRight } from "lucide-react";
+import { motion, useReducedMotion } from "motion/react";
 import { memo, useCallback, useEffect, useRef, type ReactNode } from "react";
 
 import { commonMessages } from "@asterism/ui/messages/common";
 import { useI18n } from "../../shared/i18n";
+import { fadeTransition } from "../../shared/weave/motion";
 import { Card } from "@asterism/ui/ui/card";
 import { IconButton } from "@asterism/ui/ui/icon-button";
 import { cn } from "@asterism/ui/utils";
@@ -15,12 +17,14 @@ export const cardDragHandle = ".card-drag-handle";
 export type ViewPatch = { collapsed?: boolean; size?: CardSize | null };
 
 /** 画布上的对象容器：在公共外壳外加拖动柄、折叠与画布滚轮归属。 */
-export const ObjectCard = memo(function ObjectCard({ icon, kind, title, actions, controls, panels, collapsed, selected, onView, children }: {
+export const ObjectCard = memo(function ObjectCard({ icon, kind, title, actions, controls, panels, collapsed, expandedHeight, resizing, selected, onView, children }: {
   icon: ReactNode; kind: string; title: string; actions?: ReactNode; controls?: ReactNode; panels?: readonly CardPanelView[];
   collapsed: boolean; selected: boolean;
+  expandedHeight: number; resizing: boolean;
   onView: (patch: ViewPatch) => void; children: ReactNode;
 }) {
   const i18n = useI18n();
+  const reducedMotion = useReducedMotion();
   const root = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const element = root.current;
@@ -37,11 +41,13 @@ export const ObjectCard = memo(function ObjectCard({ icon, kind, title, actions,
   }, []);
   const expand = useCallback(() => onView({ collapsed: false }), [onView]);
   const toggleLabel = collapsed ? i18n.text(commonMessages.expand) : i18n.text(commonMessages.collapse);
-  return <Card ref={root} className={cn("isolate w-full gap-0 overflow-hidden py-0", !collapsed && "h-full", selected && "border-ring")}>
+  return <Card ref={root} className={cn("isolate w-full gap-0 overflow-hidden bg-muted py-0", selected && "border-ring")}>
     <ObjectSurface icon={icon} kind={kind} title={title} actions={actions} panels={panels} collapsed={collapsed} onExpand={expand}
+      expandedHeight={expandedHeight - 2} resizing={resizing}
       headerClassName="card-drag-handle cursor-grab active:cursor-grabbing"
       controls={<>{controls}<IconButton size="icon-xs" label={toggleLabel} aria-expanded={!collapsed} onClick={() => onView({ collapsed: !collapsed })}>
-        {collapsed ? <ChevronRight /> : <ChevronDown />}
+        <motion.span className="flex" initial={false} animate={{ rotate: collapsed ? 0 : 90 }}
+          transition={reducedMotion ? { duration: 0 } : fadeTransition}><ChevronRight className="size-3.5" /></motion.span>
       </IconButton></>}>
       {children}
     </ObjectSurface>

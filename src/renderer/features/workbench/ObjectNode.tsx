@@ -18,7 +18,8 @@ import { useObjectView } from "./object-view";
 import { cardSize } from "./sizing";
 
 export type ObjectNodeType = Node<{
-  object: WorkbenchObject; collapsed: boolean;
+  object: WorkbenchObject; collapsed: boolean; expandedHeight: number;
+  resizing?: boolean;
   ports?: ConnectionPort[];
   /** 工作台提供的稳定回调，按对象 ID 分派视图变更。 */
   onView: (objectId: string, patch: ViewPatch) => void;
@@ -71,7 +72,7 @@ const ObjectNodeContent = memo(function ObjectNodeContent({ id, data, selected }
   const toggleFocus = () => focused ? exitFocus(session.id, object.id) : enterFocus(session.id, object.id);
   const focusLabel = i18n.text(focused ? objectsMessages.returnToCard : objectsMessages.openInIsland);
   return <>
-    <ObjectCard title={object.title} collapsed={collapsed} selected={!!selected} onView={onObjectView}
+    <ObjectCard title={object.title} collapsed={collapsed} expandedHeight={data.expandedHeight} resizing={!!data.resizing} selected={!!selected} onView={onObjectView}
       icon={content.icon} kind={content.kind}
       panels={focused ? undefined : content.panels}
       actions={<>{!focused && content.actions}<ObjectActions object={object} defaultSize={cardSize(content.view)} onView={onObjectView} /></>}

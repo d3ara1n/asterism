@@ -145,12 +145,16 @@ function Canvas({ ref, session, run, writable, canDrop, onDropItems, overview, a
     const next = new Map<string, ObjectNodeType["data"]>();
     const result = nodes.map(node => {
       const ports = connections.ports.get(node.id);
+      const expandedHeight = node.height ?? node.data.expandedHeight;
+      const resizing = !!node.resizing;
       const previous = cache.get(node.id);
       const data = previous && previous.object === node.data.object && previous.collapsed === node.data.collapsed
+        && previous.expandedHeight === expandedHeight && previous.resizing === resizing
         && previous.onView === node.data.onView && samePorts(previous.ports, ports)
-        ? previous : { ...node.data, ports };
+        ? previous : { ...node.data, expandedHeight, resizing, ports };
       next.set(node.id, data);
-      return { ...node, data };
+      // 卡片驱动可见高度，React Flow 测量真实外壳并更新端点；目标高度只传给卡片。
+      return { ...node, height: undefined, data };
     });
     nodeData.current = next;
     return result;

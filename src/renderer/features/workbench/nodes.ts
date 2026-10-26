@@ -19,8 +19,8 @@ export function workbenchNodes(
     const pending = pendingSizes.get(object.id);
     const appearance = registry.card(object.presentation) ?? fallbackCardAppearance;
     const size = cardSize(appearance, pending ? pending.size : view.size);
-    const data = current && current.data.object === object && current.data.collapsed === view.collapsed
-      ? current.data : { object, collapsed: view.collapsed, onView };
+    const data = current && current.data.object === object && current.data.collapsed === view.collapsed && current.data.expandedHeight === size.height
+      ? current.data : { object, collapsed: view.collapsed, expandedHeight: size.height, onView };
     const resizing = !!current?.resizing && !view.collapsed;
     const node: ObjectNodeType = {
       id: object.id, type: "object", position: current?.dragging ? current.position : view.position,
