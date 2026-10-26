@@ -22,6 +22,8 @@ import { startAgentContentTarget } from "@asterism/builtin-api/contracts";
 import { contentInput, contentScopeId } from "../features/creation/content";
 import { RendererSettingsNavigationProvider, type RendererContentInput } from "@asterism/sdk/renderer";
 import { Window, Titlebar } from "./Window";
+import { UpdateIndicator } from "./UpdateIndicator";
+import { UpdatesProvider } from "../features/updates/state";
 
 import { Space } from "../shared/weave/Space";
 import { SettingsPage, type SettingsTarget } from "../features/settings/SettingsPage";
@@ -175,6 +177,10 @@ export function App({ controller }: { controller: ApplicationController }) {
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={() => go("settings")}><Settings />{i18n.formatMessage(appMessages.menuSettings)}</DropdownMenuItem>
       </DropdownMenuContent></DropdownMenu>}
+    <UpdateIndicator onSettings={() => {
+      go("settings");
+      setSettingsTarget({ category: "about", sequence: ++navigation.current });
+    }} />
     <span className="h-4 w-px shrink-0 bg-border" />
     <span className="window-session-title" title={inSettings ? i18n.formatMessage(settingsMessages.settings) : mainTitle}>{inSettings ? i18n.formatMessage(settingsMessages.settings) : mainTitle}</span>
   </>;
@@ -248,7 +254,7 @@ export function App({ controller }: { controller: ApplicationController }) {
     onDismiss: controller.clearError,
   });
 
-  return <RendererSettingsNavigationProvider value={{ open(pluginId, location) {
+  return <UpdatesProvider><RendererSettingsNavigationProvider value={{ open(pluginId, location) {
     const settings = pluginSettings.pages.get(pluginId);
     if (!settings) throw new Error(`Plugin ${pluginId} has no available settings page.`);
     if (location !== undefined && !settings.locations?.includes(location)) throw new Error(`Unknown settings location: ${location}`);
@@ -267,7 +273,7 @@ export function App({ controller }: { controller: ApplicationController }) {
     <Toaster position="bottom-center" containerAriaLabel={i18n.formatMessage(commonMessages.notifications)}
       toastOptions={{ closeButtonAriaLabel: i18n.formatMessage(commonMessages.close) }} />
     {creation.element}
-  </RendererSettingsNavigationProvider>;
+  </RendererSettingsNavigationProvider></UpdatesProvider>;
 }
 
 /** 首次发送：同一时刻只提交一次；连接中断后相同输入复用提交身份以找回已创建的会话。 */

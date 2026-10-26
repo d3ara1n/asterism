@@ -1,0 +1,42 @@
+import { Button } from "@asterism/ui/ui/button";
+import { Alert, AlertDescription } from "@asterism/ui/ui/alert";
+import { commonMessages } from "@asterism/ui/messages/common";
+import { updatesMessages as messages } from "../../messages/updates";
+import { useI18n } from "../../shared/i18n";
+import { useUpdates } from "./state";
+
+export function useUpdateSummary() {
+  const i18n = useI18n();
+  const { state, failure } = useUpdates();
+  if (failure) return i18n.text(failure.kind === "load" ? messages.loadFailed : messages.failed);
+  if (!state) return "";
+  const message = !state.enabled ? messages.unavailable
+    : state.status === "error" ? messages.failed : messages[state.status];
+  return i18n.formatMessage(message, { version: state.availableVersion ?? "", percent: Math.floor(state.progress) });
+}
+
+export function UpdateAction() {
+  const i18n = useI18n();
+  const { state, failure, checking, installing, check, install } = useUpdates();
+  if (state?.status === "ready") return <Button size="sm" disabled={installing} onClick={() => void install()}>
+    {i18n.text(messages.install)}
+  </Button>;
+  return <Button size="sm" variant="outline" disabled={state?.enabled === false || checking}
+    onClick={() => void check()}>
+    {i18n.text(failure || state?.status === "error" ? commonMessages.retry : messages.check)}
+  </Button>;
+}
+
+export function UpdateError() {
+  const i18n = useI18n();
+  const { state, failure } = useUpdates();
+  const detail = failure?.detail ?? state?.error;
+  if (!detail) return null;
+  return <Alert variant="destructive"><AlertDescription>
+    {i18n.text(failure?.kind === "load" ? messages.loadFailed : messages.failed)}
+    <details className="mt-2">
+      <summary>{i18n.text(messages.details)}</summary>
+      <pre className="mt-1 whitespace-pre-wrap break-all text-xs">{detail}</pre>
+    </details>
+  </AlertDescription></Alert>;
+}

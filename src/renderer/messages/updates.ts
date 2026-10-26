@@ -16,4 +16,8 @@ export const updatesMessages = pluginNamespace("asterism.host").messages("en", d
   unavailable: { id: "updates.unavailable", defaultMessage: "Updates are available in the installed app." },
   loadFailed: { id: "updates.loadFailed", defaultMessage: "Update settings could not be loaded." },
   details: { id: "updates.details", defaultMessage: "Error details" },
+  indicatorLabel: { id: "updates.indicatorLabel", defaultMessage: "Software updates: {status}" },
+  versionChange: { id: "updates.versionChange", defaultMessage: "{current} → {next}" },
+  installHint: { id: "updates.installHint", defaultMessage: "Restart Asterism to install the update." },
+  settings: { id: "updates.settings", defaultMessage: "Update settings" },
 }));

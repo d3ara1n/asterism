@@ -12,6 +12,7 @@
 | `app/Sidebar.tsx` | 首页入口、会话摘要列表、设置入口与侧栏显隐 |
 | `app/Window.tsx` | `Window / Titlebar`、平台原生控件留白和窗口拖动区域 |
 | `app/window-state.ts` | 原生窗口状态的初始化与订阅，向窗口层提供标题栏模式和全屏状态 |
+| `app/UpdateIndicator.tsx` / `features/updates/` | 标题栏更新浮层、更新状态的共享读取与订阅、设置页共用的更新操作和错误反馈 |
 | `app/controller.ts` | 从启动阶段持续持有的会话列表、运行时连接状态与公共事件订阅；首次快照同时供插件装配与首页使用，不持有已打开会话正文 |
 | `app/SessionStatus.tsx` / `resource-status.ts` | 会话行状态徽标、资源进度 popup 与 `latest` 状态聚合 |
 | `app/SessionActions.tsx` / `features/session/RenameSession.tsx` | 会话行 more 菜单与人工重命名对话框 |
