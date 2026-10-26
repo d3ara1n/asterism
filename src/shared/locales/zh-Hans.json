@@ -1,10 +1,8 @@
 {
   "appearance.terminalFont": "终端字体",
-  "appearance.decreaseCodeFontSize": "减小代码字号",
-  "appearance.increaseCodeFontSize": "增大代码字号",
+  "appearance.resetCodeFontSize": "代码字号还原为自动",
   "appearance.terminalFontSize": "终端字号（px）",
-  "appearance.decreaseTerminalFontSize": "减小终端字号",
-  "appearance.increaseTerminalFontSize": "增大终端字号",
+  "appearance.resetTerminalFontSize": "还原终端字号",
   "updates.title": "软件更新",
   "updates.version": "版本 {version}",
   "updates.currentVersion": "当前版本",
