@@ -48,8 +48,7 @@ function roleValue(snapshot: ConfigurationSnapshot, id: string) {
 }
 
 describe("真实配置与消费边界", () => {
-  // Web 与模型连接可能同名；重排必须持久保留，解析各自的凭据而不是借用模型连接。
-  it("Web 提供方以类型 slug 保存凭据，重开后按 id 解析", async () => {
+  it("persists web provider order without changing credentials or enablement", async () => {
     const { service, root, protector } = setup();
     const life = new RunLifecycle(() => {});
     cleanups.push(() => life.stop());
@@ -59,19 +58,24 @@ describe("真实配置与消费边界", () => {
     service.web.declare("test.web", [definition], life.group("call"));
     await service.execute({ type: "webProvider.save", id: definition.id, enabled: true,
       credential: { action: "replace", value: "web-key" } });
+    await service.execute({ type: "webProvider.save", id: "other", enabled: false, credential: { action: "keep" } });
+    await service.execute({ type: "webProvider.reorder", ids: ["other", definition.id] });
+    for (const ids of [[definition.id], ["other", "other"], ["other", "unknown"]]) {
+      await expect(service.execute({ type: "webProvider.reorder", ids })).rejects.toMatchObject({ code: "invalid_request" });
+    }
     const disk = readFileSync(join(root, "configuration.json"), "utf8");
     expect(disk).not.toContain("web-key");
     service.close();
     const reopened = new ConfigurationService(root, protector);
     cleanups.push(() => reopened.close());
     reopened.web.declare("test.web", [definition], life.group("call"));
-    expect(reopened.current().webProviders.map(item => item.id)).toEqual([definition.id]);
+    expect(reopened.current().webProviders.map(item => [item.id, item.enabled])).toEqual([["other", false], [definition.id, true]]);
     await reopened.web.resolve(definition.id, { signal: new AbortController().signal });
     expect(create).toHaveBeenCalledWith(expect.objectContaining({ credential: "web-key", baseUrl: definition.defaultBaseUrl }));
-    // 凭据与状态正确更新：替换密钥后旧密钥不可用
+    // Updating a reordered provider preserves its position.
     await reopened.execute({ type: "webProvider.save", id: definition.id, enabled: false,
       credential: { action: "replace", value: "new-key" } });
-    expect(reopened.current().webProviders[0]).toMatchObject({ id: definition.id, enabled: false, credentialState: "available" });
+    expect(reopened.current().webProviders[1]).toMatchObject({ id: definition.id, enabled: false, credentialState: "available" });
   });
   // 配置 ID 直接用于模型选择；新增重名不能覆盖旧项，改名必须替换原项且保留其行为覆盖。
   it.each(["agent", "role"] as const)("%s 以显式 slug 创建、拒绝重名并持久保存改名", async kind => {

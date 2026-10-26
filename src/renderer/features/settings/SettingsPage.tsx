@@ -106,7 +106,7 @@ function SettingsRoot({ openId, onOpen, onClosed, manager, location }: { openId:
         <Separator />
         <PluginsOverview manager={manager} query={query} filter={filter} onQuery={setQuery} onFilter={setFilter}
           onOpen={openCard} cardRef={(id, node) => { if (node) cards.current.set(id, node); else cards.current.delete(id); }} />
-      </motion.div> : <MotionCard key={`detail-${open.id}`} className="settings-detail gap-0 py-0" style={{ transformOrigin: origin }}
+      </motion.div> : <MotionCard layoutScroll key={`detail-${open.id}`} className="settings-detail gap-0 py-0" style={{ transformOrigin: origin }}
         initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.96, transition: fadeTransition }}
         transition={islandTransition}>
         <div className="p-6">

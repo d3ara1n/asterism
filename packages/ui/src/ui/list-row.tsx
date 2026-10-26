@@ -4,12 +4,12 @@ import { Button, buttonVariants } from "./button";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemMedia, ItemTitle } from "./item";
 
 /**
- * 可打开详情的列表行：官方 Item 组合，标题按钮的命中区铺满整行，行内操作位于其上层。
- * 整行可点的列表统一使用此组合，业务代码不另写可点击的行。
+ * Compose an openable row from Item primitives. The title's hit area spans the row;
+ * action slots sit above it, keeping interactive controls separate from decorative media.
  */
-export function ListRow({ title, description, details, media, mediaVariant, actions, selected = false, disabled, inactive, onOpen, className, contentClassName, variant = "default", buttonProps }: {
-  title: ReactNode; description?: ReactNode; media?: ReactNode; mediaVariant?: "default" | "icon"; actions?: ReactNode;
-  /** 描述下方的次要信息行。 */ details?: ReactNode;
+export function ListRow({ title, description, details, media, mediaVariant, leadingActions, actions, selected = false, disabled, inactive, onOpen, className, contentClassName, variant = "default", buttonProps }: {
+  title: ReactNode; description?: ReactNode; media?: ReactNode; mediaVariant?: "default" | "icon"; leadingActions?: ReactNode; actions?: ReactNode;
+  /** Additional information below the description. */ details?: ReactNode;
   selected?: boolean; disabled?: boolean; inactive?: boolean; onOpen: (origin: HTMLElement) => void;
   className?: string; contentClassName?: string;
   variant?: "default" | "navigation";
@@ -20,6 +20,7 @@ export function ListRow({ title, description, details, media, mediaVariant, acti
     selected && "bg-selected text-selected-foreground hover:bg-selected has-[[data-slot=list-row-open]:focus-visible]:bg-selected", inactive && "opacity-70",
     navigation && cn(buttonVariants({ variant: selected ? "selected" : "ghost" }), "flex w-full min-w-0 flex-nowrap gap-0 border-0 px-3"),
     className)}>
+    {leadingActions && <ItemActions className="relative z-10 shrink-0">{leadingActions}</ItemActions>}
     {media && <ItemMedia variant={mediaVariant} className={cn(navigation && "mr-2 [&_svg]:size-4")}>{media}</ItemMedia>}
     <ItemContent className={cn("min-w-0", contentClassName)}>
       <button type="button" data-slot="list-row-open" disabled={disabled} aria-current={selected || undefined}
@@ -33,7 +34,7 @@ export function ListRow({ title, description, details, media, mediaVariant, acti
   </Item>;
 }
 
-/** 按需占位的行内操作；收起时保留可聚焦性，支持键盘导航与弹层焦点恢复。 */
+/** Reveal row actions on hover or focus while retaining keyboard focusability. */
 export function ListRowAction({ className, ...props }: Omit<ComponentProps<typeof Button>, "variant" | "size">) {
   return <Button type="button" variant="ghost" size="icon-xs" {...props}
     className={cn("w-0 overflow-hidden p-0 opacity-0 transition-none group-hover/list-row:w-6 group-hover/list-row:opacity-100 group-focus-within/list-row:w-6 group-focus-within/list-row:opacity-100 data-[state=open]:w-6 data-[state=open]:opacity-100", className)} />;

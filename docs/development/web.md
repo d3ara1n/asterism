@@ -10,15 +10,17 @@ The type slug is its configured identity. Users enable the service and supply cr
 
 Saved unavailable types remain visible. Duplicate type registration fails. Provider shutdown revokes contributions and waits for in-flight work.
 
-Search selects the first enabled search-capable provider. Fetch scans enabled providers and their patterns in order, choosing the first match against the normalized full URL.
+The saved provider list defines priority and can be reordered in settings. Search tries enabled, registered search-capable providers in that order. Fetch uses the same order after filtering for fetch capability and a pattern matching the normalized full URL. Multiple matching patterns do not cause duplicate attempts.
 
-Patterns use the declared wildcard semantics without specificity sorting. No match fails explicitly. A failed selected provider does not silently fall back to another.
+Patterns use the declared wildcard semantics without specificity sorting. Requests with no eligible provider fail explicitly. Credential, request, and response-validation failures advance to the next eligible provider. The first valid response ends the sequence, including an empty search result. Caller cancellation stops the sequence. Invalid input fails before any provider is invoked.
+
+Successful results identify the provider that handled the request and include hints for earlier failures. If all candidates fail, the error includes each provider's failure and retains the final failure's error code when available. Usage contains only quantities reported by the successful response; failed attempts may still incur upstream charges.
 
 ## Invocation and resources
 
 All Web objects share the same provider service. Each object stores identity and title. Linking it grants access through the ordinary captured resource scope.
 
-Provider resolution, credential reading, and requests share the provider/caller cancellation scope. Explicit resolved handles bind the selected instance and lifecycle.
+Candidate instances and credentials are resolved at the request boundary, before sequential requests begin. Configuration edits affect subsequent requests. Provider resolution, credential reading, and requests use the provider/caller cancellation scope. Explicit resolved handles bind one instance and lifecycle; they do not perform provider fallback.
 
 Web search and fetch remain read-only resource tools. HTTP URLs reject embedded credentials.
 

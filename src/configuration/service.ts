@@ -64,7 +64,7 @@ export class ConfigurationService {
       this.assertOpen();
       const savedId = await this.perform(command);
       if (command.type === "modelProvider.save" || command.type === "remove" && command.kind === "modelProvider") this.providersChanged();
-      if (command.type === "webProvider.save" || command.type === "remove" && command.kind === "webProvider") this.web.changed();
+      if (command.type === "webProvider.save" || command.type === "webProvider.reorder" || command.type === "remove" && command.kind === "webProvider") this.web.changed();
       if (command.type !== "read") this.onChanged();
       return { snapshot: this.snapshot(), savedId };
     });
@@ -141,6 +141,10 @@ export class ConfigurationService {
   }
   private async perform(command: Exclude<ConfigurationCommand, { type: "model.parameters" }>): Promise<string | null> {
     if (command.type === "read") return null;
+    if (command.type === "webProvider.reorder") {
+      this.store.reorderWebProviders(command.ids);
+      return null;
+    }
     if (command.type === "webProvider.save") {
       const { id, enabled } = command;
       const oldRef = this.store.get("webProvider", id)?.credentialRef ?? null;

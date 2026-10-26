@@ -105,6 +105,7 @@ const credentialUpdateSchema = z.discriminatedUnion("action", [
 ]);
 export const configurationCommandSchema = z.discriminatedUnion("type", [
   z.strictObject({ type: z.literal("webProvider.save"), id: z.string().trim().min(1), enabled: z.boolean(), credential: credentialUpdateSchema }),
+  z.strictObject({ type: z.literal("webProvider.reorder"), ids: z.array(z.string().min(1)) }),
   z.strictObject({ type: z.literal("read") }),
   // 保存目标是当前 ID；value 中的 ID 可以不同，即改名。
   z.strictObject({ type: z.literal("modelProvider.save"), id: modelProviderIdSchema.nullable(), value: modelProviderInputSchema, credential: credentialUpdateSchema }),

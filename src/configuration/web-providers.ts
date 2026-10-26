@@ -3,26 +3,24 @@ import { webProviderTypeSchema, webResponseSchema, webSearchRequestSchema, webFe
 import { WebError, type WebProviderDefinition, type WebProviderInstance, type WebProviderServices, type WebServices } from "@asterism/sdk/runtime";
 import type { RunGroup } from "../plugins/lifecycle.ts";
 
-/** 完整 URL glob：仅 * 为通配符，其余字符按字面匹配。 */
+/** Match the full normalized URL, treating only asterisks as wildcards. */
 export function matchesWebUrl(pattern: string, url: string): boolean {
   const expression = pattern.split("*").map(part => part.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")).join(".*");
   return new RegExp(`^${expression}$`, "u").test(new URL(url).href);
 }
-export function matchWebProvider(
+export function matchWebProviders(
   states: readonly Pick<WebProviderState, "id" | "enabled">[],
   types: readonly Pick<WebProviderType, "id" | "fetch" | "urlPatterns">[],
   url: string,
-): string | null {
-  for (const state of states) {
-    if (!state.enabled) continue;
+): string[] {
+  return states.filter(state => {
+    if (!state.enabled) return false;
     const type = types.find(type => type.id === state.id);
-    if (!type?.fetch) continue;
-    for (const pattern of type.urlPatterns) if (matchesWebUrl(pattern, url)) return state.id;
-  }
-  return null;
+    return type?.fetch && type.urlPatterns.some(pattern => matchesWebUrl(pattern, url));
+  }).map(state => state.id);
 }
 
-/** 每份文档的正文块共享字符预算；只标记实际裁掉的内容，保留上游已有标记。 */
+/** Share the body budget within each document and preserve upstream truncation markers. */
 export function limitWebBody(response: WebResponse, maxCharacters?: number): WebResponse {
   if (maxCharacters === undefined) return response;
   return { ...response, documents: response.documents.map(document => {
@@ -43,7 +41,7 @@ interface Connections {
   credential(id: string): Promise<string | null>;
 }
 
-/** 目录只保存类型；每次调用取用当前状态与凭据，不缓存实例。 */
+/** Store provider types; resolve current configuration and credentials for each request. */
 export class WebProviderRegistry implements WebProviderServices, WebServices {
   private entries = new Map<string, Entry>();
   private listeners = new Set<() => void>();
@@ -81,19 +79,7 @@ export class WebProviderRegistry implements WebProviderServices, WebServices {
     if (!state?.enabled) throw new WebError("provider_unavailable", `Web provider '${id}' is ${state ? "disabled" : "not configured"}.`);
     const entry = this.entries.get(id);
     if (!entry || entry.runs.closed) throw new WebError("provider_unavailable", `Web provider type '${id}' is unavailable.`);
-    return { state, entry };
-  }
-  /** 在 entry.runs 作用域内取用凭据、创建实例并执行调用；所有步骤共用同一取消信号。 */
-  private call<T>(id: string, signal: AbortSignal, work: (instance: WebProviderInstance, scope: AbortSignal) => Promise<T>): Promise<T> {
-    const { entry } = this.captureEntry(id);
-    return entry.runs.start(async scope => {
-      scope.throwIfAborted();
-      const credential = entry.info.credential?.kind === "api_key" ? await this.connections.credential(id) : null;
-      scope.throwIfAborted();
-      const baseUrl = entry.definition.defaultBaseUrl.replace(/\/+$/u, "");
-      const instance = entry.definition.create({ baseUrl, credential });
-      return work(instance, scope);
-    }, { signal, affectsHistory: false }).done;
+    return entry;
   }
   private parseResponse(raw: unknown, maxCharacters?: number) {
     const parsed = webResponseSchema.safeParse(raw);
@@ -101,10 +87,8 @@ export class WebProviderRegistry implements WebProviderServices, WebServices {
     return limitWebBody(parsed.data, maxCharacters);
   }
   async resolve(id: string, options: { signal: AbortSignal }): Promise<WebProviderInstance> {
-    const { entry } = this.captureEntry(id);
-    if (!entry.info.fetch && !entry.info.search)
-      throw new WebError("unsupported", "This provider declares no operations.");
-    // 在 entry.runs 作用域内取用凭据与创建实例；后续调用复用该实例的闭包状态。
+    const entry = this.captureEntry(id);
+    // Resolve credentials and create the instance within its provider lifecycle.
     const instance = await entry.runs.start(async scope => {
       scope.throwIfAborted();
       const credential = entry.info.credential?.kind === "api_key" ? await this.connections.credential(id) : null;
@@ -112,15 +96,17 @@ export class WebProviderRegistry implements WebProviderServices, WebServices {
       const baseUrl = entry.definition.defaultBaseUrl.replace(/\/+$/u, "");
       return entry.definition.create({ baseUrl, credential });
     }, { signal: options.signal, affectsHistory: false }).done;
-    const decode = (raw: unknown) => this.parseResponse(raw);
     const guard = <T>(work: (scope: AbortSignal) => Promise<T>, signal: AbortSignal) =>
       entry.runs.start(async scope => {
         scope.throwIfAborted();
-        return work(scope);
+        const result = await work(scope);
+        scope.throwIfAborted();
+        return result;
       }, { signal, affectsHistory: false }).done;
     const result: WebProviderInstance = {};
     if (entry.info.search && instance.search) result.search = (req, { signal }) =>
-      guard(scope => instance.search!(webSearchRequestSchema.parse(req), { signal: scope }), signal).then(decode);
+      guard(scope => instance.search!(webSearchRequestSchema.parse(req), { signal: scope }), signal)
+        .then(raw => this.parseResponse(raw));
     if (entry.info.fetch && instance.fetch) result.fetch = async (req, { signal }) => {
       const input = webFetchRequestSchema.parse(req);
       return guard(scope => instance.fetch!(input, { signal: scope }), signal)
@@ -128,21 +114,42 @@ export class WebProviderRegistry implements WebProviderServices, WebServices {
     };
     return result;
   }
+  private async tryProviders(ids: string[], signal: AbortSignal, work: (instance: WebProviderInstance) => Promise<WebResponse>) {
+    signal.throwIfAborted();
+    // Resolve at the request boundary so later attempts retain the captured configuration and credentials.
+    const candidates = await Promise.allSettled(ids.map(id => this.resolve(id, { signal })));
+    const failures: WebResponse["hints"] = [];
+    let lastError: unknown;
+    for (const [index, candidate] of candidates.entries()) {
+      signal.throwIfAborted();
+      const id = ids[index]!;
+      try {
+        if (candidate.status === "rejected") throw candidate.reason;
+        const response = await work(candidate.value);
+        signal.throwIfAborted();
+        return { ...response, provider: id, hints: [...failures, ...response.hints] };
+      } catch (error) {
+        signal.throwIfAborted();
+        lastError = error;
+        failures.push({ code: "provider_failed", message: `Web provider '${id}' failed: ${error instanceof Error ? error.message : String(error)}` });
+      }
+    }
+    throw new WebError(lastError instanceof WebError ? lastError.code : "request_failed",
+      `All eligible web providers failed. ${failures.map(failure => failure.message).join(" ")}`);
+  }
   async search(request: WebSearchRequest, options: { signal: AbortSignal }) {
-    const states = this.list(), types = this.types();
-    const id = states.find(s => s.enabled && types.some(t => t.id === s.id && t.search))?.id;
-    if (!id) throw new WebError("provider_unavailable", "No enabled search provider configured. Add a web provider in Settings → Providers → Web providers.");
-    const entry = this.entries.get(id)!;
     const parsed = webSearchRequestSchema.parse(request);
-    const raw = await this.call(id, options.signal, (inst, scope) => inst.search!(parsed, { signal: scope }));
-    return { ...this.parseResponse(raw), query: parsed.query, provider: entry.info.id };
+    const types = this.types();
+    const ids = this.list().filter(state => state.enabled && types.some(type => type.id === state.id && type.search)).map(state => state.id);
+    if (!ids.length) throw new WebError("provider_unavailable", "No enabled search provider configured. Add a web provider in Settings → Providers → Web providers.");
+    const response = await this.tryProviders(ids, options.signal, instance => instance.search!(parsed, options));
+    return { ...response, query: parsed.query };
   }
   async fetch(request: WebFetchRequest, options: { signal: AbortSignal }) {
     const input = webFetchRequestSchema.parse(request);
-    const id = matchWebProvider(this.list(), this.types(), input.url);
-    if (id === null) throw new WebError("provider_unavailable", "No enabled web provider matches this URL. Configure a web provider in Settings → Providers → Web providers.");
-    const entry = this.entries.get(id)!;
-    const raw = await this.call(id, options.signal, (inst, scope) => inst.fetch!(input, { signal: scope }));
-    return { ...this.parseResponse(raw, input.maxCharacters), requestedUrl: input.url, provider: entry.info.id };
+    const ids = matchWebProviders(this.list(), this.types(), input.url);
+    if (!ids.length) throw new WebError("provider_unavailable", "No enabled web provider matches this URL. Configure a web provider in Settings → Providers → Web providers.");
+    const response = await this.tryProviders(ids, options.signal, instance => instance.fetch!(input, options));
+    return { ...response, requestedUrl: input.url };
   }
 }

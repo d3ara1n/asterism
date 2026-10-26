@@ -129,6 +129,14 @@ export class ConfigurationStore {
     }
     this.commit(next);
   }
+  reorderWebProviders(ids: string[]): void {
+    const providers = new Map(this.document.webProviders.map(provider => [provider.id, provider]));
+    if (ids.length !== providers.size || new Set(ids).size !== ids.length || ids.some(id => !providers.has(id)))
+      throw new ConfigurationError("invalid_request", "The order must contain each configured web provider exactly once.");
+    const next = structuredClone(this.document);
+    next.webProviders = ids.map(id => providers.get(id)!);
+    this.commit(next);
+  }
   /** 编辑限制随连接保存；比较已保存值，不依赖当前预设目录。 */
   private validateEdit(input: ConfigurationSave): void {
     const reject = () => { throw new ConfigurationError("invalid_request",
