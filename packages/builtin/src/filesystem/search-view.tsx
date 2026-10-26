@@ -146,17 +146,24 @@ function Body({ args, result }: Props) {
   </div>;
 }
 
+export const findViews = {
+  input: { headerRenderer: FindHeader },
+  execution: { headerRenderer: FindHeader, bodyRenderer: Body },
+  result: { headerRenderer: FindHeader, bodyRenderer: Body },
+};
+export const grepViews = {
+  input: { headerRenderer: GrepHeader },
+  execution: { headerRenderer: GrepHeader, bodyRenderer: Body },
+  result: { headerRenderer: GrepHeader, bodyRenderer: Body },
+};
+
 export const searchToolRenderers = [
   toolRenderer(DirectoryFind, {
     label: messages.toolDirectoryFind, icon: <FileSearch className="size-3.5" />,
-    input: { headerRenderer: FindHeader },
-    execution: { headerRenderer: FindHeader, bodyRenderer: Body },
-    result: { headerRenderer: FindHeader, bodyRenderer: Body },
+    ...findViews,
   }),
   toolRenderer(DirectoryGrep, {
     label: messages.toolDirectoryGrep, icon: <Search className="size-3.5" />,
-    input: { headerRenderer: GrepHeader },
-    execution: { headerRenderer: GrepHeader, bodyRenderer: Body },
-    result: { headerRenderer: GrepHeader, bodyRenderer: Body },
+    ...grepViews,
   }),
 ];

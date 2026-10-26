@@ -1,4 +1,5 @@
 import { stat } from "node:fs/promises";
+import type { z } from "zod";
 import { basename, dirname, relative, sep } from "node:path";
 import { implementTool, type CallResult } from "@asterism/sdk/runtime";
 import { DirectoryFind, DirectoryGrep } from "./search-contract.ts";
@@ -28,29 +29,35 @@ function failure(error: unknown, signal: AbortSignal): CallResult<never> {
     : filesystemFailure(error, "Search directory");
 }
 
+export async function findFiles(root: string, target: z.infer<typeof DirectoryFind.targetSchema>,
+  args: z.infer<typeof DirectoryFind.tool.argsSchema>, signal: AbortSignal): Promise<CallResult<z.infer<typeof DirectoryFind.schema>>> {
+  const path = target?.path ?? ".";
+  try {
+    const selected = await scope(root, path, true);
+    const output = findOutput(path, selected.prefix, args.limit ?? 500);
+    output.result.stopReason = await runSearch(selected.cwd, searchArguments("find", args, selected.operand), output.records, signal);
+    return { kind: "succeeded", data: output.result };
+  } catch (error) { return failure(error, signal); }
+}
+
+export async function grepFiles(root: string, target: z.infer<typeof DirectoryGrep.targetSchema>,
+  args: z.infer<typeof DirectoryGrep.tool.argsSchema>, signal: AbortSignal): Promise<CallResult<z.infer<typeof DirectoryGrep.schema>>> {
+  const path = target?.path ?? ".";
+  try {
+    const selected = await scope(root, path, false);
+    const output = grepOutput(path, selected.prefix, args);
+    output.result.stopReason = await runSearch(selected.cwd, searchArguments("grep", args, selected.operand), output.records, signal);
+    return { kind: "succeeded", data: output.result };
+  } catch (error) { return failure(error, signal); }
+}
+
 export const searchTools = [
   implementTool(DirectoryFind, {
-    async call(directory, target, args, { signal }) {
-      const path = target?.path ?? ".";
-      try {
-        const selected = await scope(directory.path, path, true);
-        const output = findOutput(path, selected.prefix, args.limit ?? 500);
-        output.result.stopReason = await runSearch(selected.cwd, searchArguments("find", args, selected.operand), output.records, signal);
-        return { kind: "succeeded", data: output.result };
-      } catch (error) { return failure(error, signal); }
-    },
+    call: (directory, target, args, { signal }) => findFiles(directory.path, target, args, signal),
     toModel: findToModel,
   }),
   implementTool(DirectoryGrep, {
-    async call(directory, target, args, { signal }) {
-      const path = target?.path ?? ".";
-      try {
-        const selected = await scope(directory.path, path, false);
-        const output = grepOutput(path, selected.prefix, args);
-        output.result.stopReason = await runSearch(selected.cwd, searchArguments("grep", args, selected.operand), output.records, signal);
-        return { kind: "succeeded", data: output.result };
-      } catch (error) { return failure(error, signal); }
-    },
+    call: (directory, target, args, { signal }) => grepFiles(directory.path, target, args, signal),
     toModel: grepToModel,
   }),
 ];

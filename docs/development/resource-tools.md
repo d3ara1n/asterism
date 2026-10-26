@@ -1,6 +1,6 @@
 # Built-in resource tools
 
-Filesystem, note, shell, and terminal operations share resource dispatch while retaining domain-specific behavior. Their outcomes describe actual results and uncertain effects.
+Filesystem, manual, note, shell, and terminal operations share resource dispatch while retaining domain-specific behavior. Their outcomes describe actual results and uncertain effects.
 
 ## Text operations
 
@@ -21,6 +21,8 @@ Notes store current text in object data. Saving does not append a note-content h
 ## Directory search
 
 Find and grep are read-only resource implementations backed by packaged ripgrep. Every call searches current files; it creates no separate index.
+
+The manual is a separate static resource with empty state and parameterless creation. It exposes list, find, grep, and read over the application-bundled manual using the same filesystem mechanisms as directories. The application supplies the manual root during composition; resource state contains neither an installation path nor captured documents. Its tool implementations provide read-only access, and linking and agent policy determine availability as for other resources. Manual files are unpacked installation assets so native search can read them. Updates replace the manual with the application's edition; saved tool results retain their original content.
 
 Targets resolve within the resource root. Recursive traversal does not follow symlinks; an explicitly selected link must resolve inside the root. Returned paths are root-relative with normalized separators.
 

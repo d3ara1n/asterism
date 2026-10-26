@@ -15,6 +15,7 @@ Resource creation has its own discovery and inspection tools. The available crea
 | Resource or input | Use |
 | --- | --- |
 | Directory | Read, search, edit, and create files, or run commands from a working directory |
+| Manual | Browse the bundled Asterism usage and plugin-development documentation |
 | Note | Keep editable text in the session |
 | Terminal | Share an interactive shell and screen between the user and model |
 | Web | Search or fetch URLs through configured web providers |
@@ -25,6 +26,12 @@ Resource creation has its own discovery and inspection tools. The available crea
 Directory and terminal operations affect the actual machine. Check an operation’s result when its effects are uncertain. A history branch does not create an isolated copy of those files or processes.
 
 Notes retain current text. Their earlier tool results may appear in history, but browsing that history does not restore note contents.
+
+## Consult the manual
+
+Add a Manual resource and link it to an agent, or let the agent create one through the resource creation tools. Creation takes no parameters. The resource provides access to the documentation bundled with the installed application.
+
+The agent can list a directory, find files by path pattern, search their contents, and read selected lines. Paths are relative to the manual root. The manual supports reading and searching; its contents update with the application. The resource stores no document copy, so browsing an earlier session does not select an earlier edition of the manual.
 
 ## Use network capabilities
 

@@ -14,36 +14,16 @@ import { textMessages } from "../messages/text";
 import { prepareCodeView } from "../shared/code-view";
 import { textReadViews, textWriteViews, textEditViews } from "../text-view";
 import { inputText } from "../shared/tool-preview";
-import { TOOL_BODY_LINE_LIMIT } from "../shared/tool-body";
 import { CreateDirectory, DirectoryView, DirectoryList, DirectoryRead, DirectoryEdit, DirectoryWrite, DirectorySee } from "./contract";
 import { FilePreview } from "../agent/conversation/Files";
 import { DirectoryInput } from "./creation";
 import { execToolRenderer } from "./exec-view";
 import { useDirectoryTreeLink } from "./tree-link";
 import { searchToolRenderers } from "./search-view";
+import { listViews } from "./list-view";
 
 import { directoryCard as appearance } from "../shared/card-appearance.ts";
 
-type ListProps = ToolRenderProps<z.infer<typeof DirectoryList.schema>>;
-function ListHeader({ target, invocation, result }: ListProps) {
-  const i18n = useI18n();
-  const path = inputText(target, "path");
-  return <ToolHeader label={i18n.formatMessage(filesystemMessages.toolDirectoryList)} monospace
-    subject={[invocation.resource?.title, path && path !== "." ? path : null].filter(Boolean).join(" / ")}
-    meta={result?.data && i18n.formatMessage(filesystemMessages.toolEntryCount, { count: result.data.entries.length, truncated: result.data.truncated })} />;
-}
-function ListBody({ result }: ListProps) {
-  const i18n = useI18n();
-  const data = result?.data;
-  return data ? <div className="flex flex-col gap-2">
-    <p className="type-caption break-all">{data.path}</p>
-    {!data.entries.length && <p className="type-caption">{i18n.formatMessage(filesystemMessages.toolDirectoryEmpty)}</p>}
-    <ul className="type-code">{data.entries.slice(0, TOOL_BODY_LINE_LIMIT).map(entry =>
-      <li key={entry.name} className="break-all">{entry.name}{entry.type === "directory" ? "/" : ""}</li>)}</ul>
-    {data.entries.length > TOOL_BODY_LINE_LIMIT && <p className="type-caption">{i18n.formatMessage(textMessages.toolTextPreviewOmitted, { count: data.entries.length - TOOL_BODY_LINE_LIMIT })}</p>}
-    {data.truncated && <p className="type-caption">{i18n.formatMessage(filesystemMessages.toolDirectoryTruncated)}</p>}
-  </div> : null;
-}
 type SeeProps = ToolRenderProps<z.infer<typeof DirectorySee.schema>>;
 function SeeHeader({ target, invocation }: SeeProps) {
   const i18n = useI18n();
@@ -56,7 +36,6 @@ function SeeBody({ result }: SeeProps) {
   return data ? <FilePreview part={{ kind: "file", file: data.image, mediaType: data.mediaType, filename: data.path }} content={object.content} /> : null;
 }
 const seeView = { headerRenderer: SeeHeader, bodyRenderer: SeeBody };
-const listView = { headerRenderer: ListHeader, bodyRenderer: ListBody };
 
 /** 标题栏刷新按钮：与 Body 共享同一 DirectoryTreeLink 实例。 */
 function DirectoryTreeActions(_: { data: { path: string } }) {
@@ -152,7 +131,7 @@ export default {
     toolRenderer(DirectoryList, {
       label: filesystemMessages.toolDirectoryList,
       icon: <ListTree className="size-3.5" />,
-      input: { headerRenderer: ListHeader }, execution: listView, result: listView,
+      ...listViews,
     }),
   ],
   creations: [creationEntry(CreateDirectory, { id: "asterism.builtin/directory.local", label: filesystemMessages.directoryLabel, icon: <Folder className="size-4" />, group: "resources", InputView: DirectoryInput,

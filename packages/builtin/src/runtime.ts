@@ -6,6 +6,8 @@ import metadata from "../package.json" with { type: "json" };
 import type { BuiltinApplication } from "./application.ts";
 import { createAgentModule } from "./agent/runtime.ts";
 import { createFilesystemModule } from "./filesystem/runtime.ts";
+import { createManualModule } from "./manual/runtime.ts";
+import { CreateManual } from "./manual/contract.ts";
 import notes from "./notes/runtime.ts";
 import { BuiltinSettings } from "./settings/contract.ts";
 import { createNamingModule } from "./naming/runtime.ts";
@@ -25,7 +27,7 @@ import { SkillCatalog } from "./skills/catalog.ts";
 import { createSkillsModule } from "./skills/runtime.ts";
 
 /** 仅组合插件业务；加载、宿主服务及外部插件依赖由应用负责。 */
-export function createBuiltin(options: { application: BuiltinApplication; connectNaming(api: NamingApi): () => void }) {
+export function createBuiltin(options: { application: BuiltinApplication; manualDirectory: string; connectNaming(api: NamingApi): () => void }) {
   return definePlugin({ namespace: builtin, version: metadata.version,
     setup(plugin) {
       const settings = plugin.config(BuiltinSettings);
@@ -42,7 +44,10 @@ export function createBuiltin(options: { application: BuiltinApplication; connec
       return { events: [UsageChanged],
         calls: [implementCall(ReadUsage, (input, { signal }) => usage.query(input.providerId, { refresh: input.refresh, signal }))],
         modules: [providers, createAgentModule(options.application, usage, skills), createSkillsModule(skills), createFilesystemModule(shell), createNamingModule(options.connectNaming, options.application.userAgent), notes, questions,
-        resourceOperations, mcp, web, createShellModule(() => settings.get().shell), createTerminalModule(() => settings.get().shell),
+        resourceOperations, mcp, web, createManualModule(options.manualDirectory, options.application.name), createShellModule(() => settings.get().shell), createTerminalModule(() => settings.get().shell),
+        defineAgentCreation({ id: CreateManual.id, creation: CreateManual,
+          description: "Open the Asterism manual for software use and plugin development. Provides list, find, grep, and read over the bundled documentation.",
+          guidelines: [] }),
         defineAgentCreation({ id: builtin.name("terminal.create"), creation: CreateTerminal,
           description: "Create a shared interactive terminal. Its shell and screen remain available between tool calls and while viewing other sessions.",
           guidelines: ["The terminal runs as the current OS user. Input, screen observation and waiting for the shell are separate resource tools.",

@@ -1,4 +1,6 @@
 {
+  "manual.title": "手册",
+  "manual.description": "Asterism 使用说明和插件开发指南。将手册连接到 Agent，即可查阅相关主题。",
   "note.copyMarkdown": "复制 Markdown",
   "note.copied": "已复制笔记",
   "note.copyFailed": "无法复制笔记",

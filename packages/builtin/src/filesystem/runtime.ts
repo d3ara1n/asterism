@@ -2,7 +2,7 @@ import { directoryCard } from "../shared/card-appearance.ts";
 import { readdir, readFile, stat } from "node:fs/promises";
 import { basename, isAbsolute, join } from "node:path";
 import { defineModule, implementResource, implementCreation, implementTool, implementCall, PluginApiError, type CallResult } from "@asterism/sdk/runtime";
-import { TextError, readText, readToModel, editText, textChange, writeToModel, editToModel } from "../shared/text.ts";
+import { TextError, readToModel, editText, textChange, writeToModel, editToModel } from "../shared/text.ts";
 import { Directory, CreateDirectory, DirectoryView, DirectoryList, DirectoryRead, DirectoryEdit, DirectoryWrite, DirectorySee, DirectoryTree } from "./contract.ts";
 import { readImageFile } from "./image-io.ts";
 import { withinDirectory, writableTarget } from "./paths.ts";
@@ -13,6 +13,7 @@ import { execToModel } from "../shell/contract.ts";
 import type { ShellService } from "../shell/service.ts";
 import { simpleGit } from "simple-git";
 import { searchTools } from "./search.ts";
+import { listFiles, readFileContent } from "./read.ts";
 
 function textFailure(error: unknown, signal: AbortSignal, operation: string): CallResult<never> {
   if (signal.aborted) return { kind: "cancelled", message: `${operation} was cancelled before committing file content.` };
@@ -103,32 +104,10 @@ export function createFilesystemModule(shell: ShellService) { return defineModul
       toModel: execToModel,
     }),
     implementTool(DirectoryList, {
-      async call(directory, target, _args, { signal }) {
-        const path = target?.path ?? ".";
-        try {
-          const resolved = await withinDirectory(directory.path, path);
-          signal.throwIfAborted();
-          const entries = await readdir(resolved, { withFileTypes: true });
-          return { kind: "succeeded", data: { path, truncated: entries.length > 500,
-            entries: entries.slice(0, 500).map(entry => ({
-              name: entry.name, type: entry.isDirectory() ? "directory" : entry.isFile() ? "file" : "other",
-            } as const)) } };
-        } catch (error) {
-          signal.throwIfAborted();
-          return filesystemFailure(error, "List target directory");
-        }
-      },
+      call: (directory, target, _args, { signal }) => listFiles(directory.path, target, signal),
     }),
     implementTool(DirectoryRead, {
-      async call(directory, target, args, { signal }) {
-        try {
-          const file = await readTextFile(await withinDirectory(directory.path, target.path), signal);
-          const data = readText(file.text, args.anchored !== false, {
-            offset: target.offset, limit: target.limit ?? 1000, maxBytes: 64 * 1024,
-          });
-          return { kind: "succeeded", data: { path: target.path, ...data } };
-        } catch (error) { return textFailure(error, signal, "Read target file"); }
-      },
+      call: (directory, target, args, { signal }) => readFileContent(directory.path, target, args, signal),
       toModel: data => `${data.path}\n${readToModel(data)}`,
     }),
     implementTool(DirectoryEdit, {
