@@ -79,7 +79,7 @@ npm run i18n:check
 
 全局模型与代理配置保存在 `configuration.json`，外观在 `appearance.json`，界面语言在 `language.json`，更新偏好在 `updates.json`，窗口状态在 `ui-state.json`，密钥独立加密保存于 `credentials/`。工作数据库为 `db/workspace.sqlite`，不可变正文位于 `objects/`，插件内容位于 `content/`，运行日志位于 `logs/runtime.log`，Chromium 数据位于 `chromium/`。重建会话数据库不重置全局配置；关闭最后一个窗口会退出应用和任务进程。
 
-开发前期只支持当前存储与协议版本（具体版本号定义于源码常量），不提供旧数据兼容或迁移；版本不符时明确报错，关闭应用后备份、清理并重新初始化开发数据。完整的存储与副作用约定见 [技术架构](docs/architecture.md) 和 [运行时](docs/runtime.md)。
+窗口出现前统一检查数据格式，需要升级时先备份文件，再逐步迁移。成功后提示格式变化与备份位置；失败时进入恢复页面，可重试、还原备份，或保留旧文件后使用新数据开始。备份与保留现场位于数据目录的 `recovery/` 下，不自动删除。兼容基线、更早开发格式的处理及外部文件边界见[数据准备与迁移](docs/architecture.md#数据准备与迁移)。
 
 ## 文档导航
 

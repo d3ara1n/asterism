@@ -2,6 +2,7 @@ import { app, ipcMain, type BrowserWindow } from "electron";
 import Store from "electron-store";
 
 import { applicationStorage } from "../shared/application.ts";
+import { persistentStateReady } from "./persistent-state.ts";
 import { resolveLanguage } from "../shared/i18n.ts";
 import {
   languageGetChannel, languageSetChannel, languageChangedChannel,
@@ -12,12 +13,12 @@ let store: Store<{ preference: string }> | null = null;
 
 export function readLanguage(): LanguageState {
   let preference = "system";
+  if (!persistentStateReady()) return { preference, ...resolveLanguage(preference, app.getPreferredSystemLanguages()) };
   try {
     store ??= new Store<{ preference: string }>({
       cwd: app.getPath("userData"),
       name: applicationStorage.languageStore,
       defaults: { preference: "system" },
-      clearInvalidConfig: true,
     });
     const parsed = languagePreferenceSchema.safeParse(store.get("preference"));
     if (parsed.success) preference = parsed.data;
@@ -35,7 +36,7 @@ export function serveLanguage(window: BrowserWindow, trusted: (event: Electron.I
   };
   ipcMain.handle(languageGetChannel, event => trusted(event) ? readLanguage() : null);
   ipcMain.handle(languageSetChannel, (event, raw) => {
-    if (!trusted(event)) return null;
+    if (!trusted(event) || !persistentStateReady()) return null;
     const parsed = languagePreferenceSchema.safeParse(raw);
     if (parsed.success) {
       readLanguage();

@@ -150,7 +150,7 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
       const write = services.log ?? defaultLog;
       const log: PluginLogger = { info: message => write(id, "info", message), warn: message => write(id, "warn", message),
         error: (message, error) => write(id, "error", message, error) };
-      const storage = new PluginStorage(services.extensionsDirectory, id, services.vault ?? null, log.warn);
+      const storage = new PluginStorage(services.extensionsDirectory, id, services.vault ?? null, log.warn, plugin.storage);
       storage.onChanged = () => services.configurationChanged?.(id);
       const lifecycle = new RunLifecycle(sessionId => services.sessions.progressChanged(sessionId)); lifecycles.push(lifecycle);
       // 插件级生命周期随运行登记一同中止信号，清理在插件释放时按登记逆序执行。

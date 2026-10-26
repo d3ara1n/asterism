@@ -23,10 +23,13 @@ import mcp from "./mcp/runtime.ts";
 import web from "./web/runtime.ts";
 import { SkillCatalog } from "./skills/catalog.ts";
 import { createSkillsModule } from "./skills/runtime.ts";
+import { builtinStorage } from "./settings/storage.ts";
+export { builtinStorage } from "./settings/storage.ts";
 
 /** 仅组合插件业务；加载、宿主服务及外部插件依赖由应用负责。 */
 export function createBuiltin(options: { application: BuiltinApplication; connectNaming(api: NamingApi): () => void }) {
   return definePlugin({ namespace: builtin, version: metadata.version,
+    storage: builtinStorage,
     setup(plugin) {
       const settings = plugin.config(BuiltinSettings);
       const skills = new SkillCatalog();

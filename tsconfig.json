@@ -24,6 +24,7 @@
     "packages/sdk/examples",
     "src/shared",
     "src/runtime",
+    "src/storage",
     "src/main",
     "src/preload",
     "src/session",

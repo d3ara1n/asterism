@@ -12,9 +12,10 @@ import { loadCatalogs } from "./catalogs.ts";
 import { localeSchema, uiTextSchema, pluginMetadataSchema, type PluginMetadata } from "@atelier/sdk/contracts";
 import type { TranslationCatalog } from "../shared/i18n.ts";
 import type { PublicProvider } from "../shared/public-modules.ts";
+import { jsonStorage } from "../storage/migrations.ts";
 
 /** SDK API 版本；插件清单的 api.major 必须相同，minMinor 不得高于宿主。 */
-export const sdkApi = { major: 18, minor: 1 } as const;
+export const sdkApi = { major: 18, minor: 2 } as const;
 
 /** 插件包清单：package.json 的 atelier 字段；源码与发布产物读同一份。 */
 export const manifestSchema = z.strictObject({
@@ -64,6 +65,10 @@ export const packageEntrySchema = z.strictObject({
 });
 export type PackageEntry = z.infer<typeof packageEntrySchema>;
 const listSchema = z.strictObject({ version: z.literal(1), packages: z.array(packageEntrySchema) });
+export function packageListStorage(root: string) {
+  return jsonStorage({ id: "plugins", file: join(root, "plugins.json"), version: 1,
+    initial: () => ({ version: 1, packages: [] }), migrations: {}, validate: raw => listSchema.parse(raw) });
+}
 
 export class PluginPackageError extends Error {
   constructor(readonly code: "not_a_package" | "invalid_manifest" | "incompatible_api" | "duplicate" | "build_failed" | "invalid_entry", message: string) { super(message); }

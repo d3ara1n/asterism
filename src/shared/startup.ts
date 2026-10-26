@@ -1,16 +1,20 @@
 import { z } from "zod";
 import { coreChannel } from "./core.ts";
+import { migrationReportSchema, type RecoveryAction } from "./migrations.ts";
 
 export const startupGetChannel = coreChannel("startup-get");
 export const startupChangedChannel = coreChannel("startup-changed");
 export const startupRestartChannel = coreChannel("startup-restart");
 export const startupDataDirectoryChannel = coreChannel("startup-data-directory");
+export const startupRecoveryChannel = coreChannel("startup-recovery");
+export const startupInitializedChannel = coreChannel("startup-initialized");
+export const startupBackupChannel = coreChannel("startup-backup");
 export const startupStageSchema = z.enum(["environment", "plugins", "workspace"]);
 export type StartupStage = z.infer<typeof startupStageSchema>;
 export const startupStateSchema = z.discriminatedUnion("status", [
   z.strictObject({ status: z.literal("starting"), stage: startupStageSchema, detail: z.string().optional() }),
   z.strictObject({ status: z.literal("ready") }),
-  z.strictObject({ status: z.literal("failed"), reason: z.enum(["initialization", "database_version", "timeout", "runtime"]), detail: z.string() }),
+  z.strictObject({ status: z.literal("failed"), reason: z.enum(["initialization", "database_version", "data", "timeout", "runtime"]), detail: z.string(), migration: migrationReportSchema.optional() }),
 ]);
 export type StartupState = z.infer<typeof startupStateSchema>;
 
@@ -20,4 +24,7 @@ export interface StartupBridge {
   onChanged(listener: (state: StartupState) => void): () => void;
   restart(): Promise<void>;
   openDataDirectory(): Promise<string>;
+  openBackup(): Promise<string>;
+  recover(action: RecoveryAction): Promise<string | void>;
+  initialized(): Promise<void>;
 }

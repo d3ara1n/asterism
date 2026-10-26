@@ -73,6 +73,7 @@ export class SessionService {
     this.events.declarePublic(SessionTitleChanged);
     this.events.declarePublic(ResourceStatusChanged);
     this.content = new ContentStore(db, join(dataRoot, applicationStorage.contentDirectory));
+    this.content.collectStartup();
     const host: SessionHost = {
       list: () => {
         if (this.writesClosed) throw new PluginApiError("unavailable", "The session service is closed.");

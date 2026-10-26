@@ -1,10 +1,10 @@
 import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { z } from "zod";
 import type { CredentialVault } from "../configuration/credentials.ts";
 import { jsonSchema, type Json, type ConfigContract } from "@atelier/sdk/contracts";
-import { PluginApiError, validationMessage, type PluginConfig, type PluginSecrets } from "@atelier/sdk/runtime";
+import { PluginApiError, validationMessage, type PluginConfig, type PluginSecrets, type PluginStorageDeclaration } from "@atelier/sdk/runtime";
 import type { PluginConfiguration } from "../shared/plugin-configuration.ts";
 
 /** 宿主托管目录名；插件目录其余部分归插件自由写入。 */
@@ -36,7 +36,8 @@ export class PluginStorage {
     write(value: unknown): void;
   } | null = null;
   constructor(extensionsDirectory: string, pluginId: string, private readonly vault: CredentialVault | null,
-    private readonly warn: (message: string, error?: unknown) => void) {
+    private readonly warn: (message: string, error?: unknown) => void,
+    private readonly declarations: readonly PluginStorageDeclaration[] = []) {
     this.dir = join(extensionsDirectory, pluginId);
     this.managed = join(this.dir, managedDirectory);
   }
@@ -50,6 +51,7 @@ export class PluginStorage {
     if (this.settings && this.settings.source !== contract)
       throw new PluginApiError("invalid_argument", "A plugin has one configuration. Import the same contract.");
     if (!this.settings) {
+      const declaration = this.declarations.find(item => item.kind === "json" && resolve(this.dir, item.path) === resolve(this.managed, "config.json"));
       const file = () => join(this.ensure(), "config.json");
       const fallback = () => jsonSchema.parse(contract.schema.parse(structuredClone(contract.defaults)));
       const read = (): { value: Json; status: PluginConfiguration["status"] } => {
@@ -60,6 +62,10 @@ export class PluginStorage {
           return { value: fallback(), status: "invalid" };
         }
         if (raw === undefined) return { value: fallback(), status: "defaults" };
+        if (declaration) {
+          const envelope = z.object({ version: z.literal(declaration.version), data: jsonSchema }).parse(raw);
+          raw = envelope.data;
+        }
         const parsed = contract.schema.safeParse(raw);
         if (parsed.success) return { value: jsonSchema.parse(parsed.data), status: "saved" };
         this.warn("Plugin configuration does not match its schema; defaults are used.");
@@ -68,7 +74,8 @@ export class PluginStorage {
       const write = (value: unknown) => {
         const parsed = contract.schema.safeParse(value);
         if (!parsed.success) throw new PluginApiError("invalid_argument", validationMessage(parsed.error, "configuration"));
-        writeJson(file(), jsonSchema.parse(parsed.data));
+        const data = jsonSchema.parse(parsed.data);
+        writeJson(file(), declaration ? { version: declaration.version, data } : data);
         this.changed();
       };
       this.settings = { source: contract, defaults: fallback(), read, write };

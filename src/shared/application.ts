@@ -26,6 +26,7 @@ export const applicationStorage = {
   updatesStore: "updates",
   chromiumDirectory: "chromium",
   logsDirectory: "logs",
+  recoveryDirectory: "recovery",
   runtimeLogFile: "runtime.log",
 } as const;
 

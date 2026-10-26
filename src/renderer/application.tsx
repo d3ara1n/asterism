@@ -1,4 +1,4 @@
-import { StrictMode } from "react";
+import { StrictMode, useEffect } from "react";
 import { RendererEventsProvider, RendererCallsProvider } from "@atelier/sdk/renderer";
 import { EventClient } from "../shared/event-client";
 import { CallClient } from "../shared/call-client";
@@ -32,6 +32,10 @@ import { builtinPublicProvider, builtinPublicModules } from "../builtin-public";
 
 import { runtime } from "./runtime";
 
+function StartupNotification() {
+  useEffect(() => { void window.host.startup.initialized().catch(error => console.error("Migration notification failed.", error)); }, []);
+  return null;
+}
 /** 工作台及插件在轻量启动页出现后装载；应用控制器从首次读取起持续订阅。 */
 export async function startApplication(root: Root, progress: (message: UiText, detail?: string) => void, signal: AbortSignal): Promise<void> {
   signal.throwIfAborted();
@@ -92,6 +96,7 @@ export async function startApplication(root: Root, progress: (message: UiText, d
                       <BuiltinRendererProvider services={builtinRendererServices}>
                         <PluginSettingsProvider value={{ pages, failures: new Map(rendererPlugins.failures.map(failure => [failure.id, failure.error])) }}>
                           <App controller={controller} />
+                          <StartupNotification />
                         </PluginSettingsProvider>
                       </BuiltinRendererProvider>
                     </ModuleViewsProvider>

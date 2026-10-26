@@ -19,13 +19,19 @@ import { startupMessages } from "../shared/error-display.ts";
 import { allowRendererPermission } from "./permissions.ts";
 import { adoptLoginShellEnvironment } from "./shell-environment.ts";
 import { ApplicationUpdates } from "./updates.ts";
-import { startupGetChannel, startupChangedChannel, startupRestartChannel, startupDataDirectoryChannel, type StartupState } from "../shared/startup.ts";
+import { startupGetChannel, startupChangedChannel, startupRestartChannel, startupDataDirectoryChannel, startupBackupChannel, startupRecoveryChannel, startupInitializedChannel, type StartupState } from "../shared/startup.ts";
+import { recoveryActionSchema, type MigrationReport } from "../shared/migrations.ts";
+import { prepareDataProcess } from "./data-preparation.ts";
+import { enablePersistentState } from "./persistent-state.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 let window: BrowserWindow | null = null;
 let quitting = false;
 let quitRequest: Promise<void> | null = null;
 let updates: ApplicationUpdates | null = null;
+let migration: MigrationReport | null = null;
+let recoveryPending = false;
+let migrationNoticePending = false;
 /** 受信渲染页地址（不含 hash），供权限判定使用。 */
 let trustedURL: string | null = null;
 let startup: StartupState = { status: "starting", stage: "environment" };
@@ -125,9 +131,58 @@ function createWindow(): void {
   });
   ipcMain.handle(startupRestartChannel, event => { if (trusted(event)) requestQuit(true); });
   ipcMain.handle(startupDataDirectoryChannel, event => {
-    if (!trusted(event) || startup.status !== "failed" || startup.reason !== "database_version")
+    if (!trusted(event) || startup.status !== "failed")
       return "The data folder is unavailable.";
     return shell.openPath(dataRoot);
+  });
+  ipcMain.handle(startupBackupChannel, event => {
+    if (!trusted(event) || !migration?.backup) return "A backup folder is unavailable.";
+    return shell.openPath(migration.backup);
+  });
+  ipcMain.handle(startupRecoveryChannel, async (event, raw) => {
+    if (!trusted(event) || startup.status !== "failed" || startup.reason !== "data" || recoveryPending) return "Data recovery is unavailable.";
+    const action = recoveryActionSchema.parse(raw);
+    recoveryPending = true;
+    try {
+      if (action !== "retry") {
+        const locale = () => readLanguage().locale;
+        const answer = await dialog.showMessageBox(current, {
+          type: "warning", title: applicationBrand.en,
+          message: startupText(action === "restore" ? startupMessages.restoreTitle : startupMessages.freshTitle, locale),
+          detail: startupText(action === "restore" ? startupMessages.restoreBody : startupMessages.freshBody, locale),
+          buttons: [startupText(startupMessages.quitCancel, locale), startupText(startupMessages.recoveryConfirm, locale)],
+          defaultId: 0, cancelId: 0,
+        });
+        if (answer.response !== 1) return;
+      }
+      const result = await prepareDataProcess(join(here, "prepare-data.js"), dataRoot, app.getVersion(), action, startupLifetime.signal);
+      migration = result.report;
+      if (!result.ok) {
+        publishStartup({ status: "failed", reason: "data", detail: result.report.error ?? "", migration: result.report });
+        return result.report.error ?? "Data preparation failed.";
+      }
+      requestQuit(true);
+    } catch (error) { return error instanceof Error ? error.message : String(error); }
+    finally { recoveryPending = false; }
+  });
+  ipcMain.handle(startupInitializedChannel, async event => {
+    if (!trusted(event) || startup.status !== "ready" || migration?.status !== "succeeded" || migration.acknowledged || migrationNoticePending) return;
+    migrationNoticePending = true;
+    try {
+      const locale = () => readLanguage().locale;
+      const answer = await dialog.showMessageBox(current, { type: "info", title: applicationBrand.en,
+        message: startupText(startupMessages.migratedTitle, locale),
+        detail: startupText({ ...startupMessages.migratedBody, values: {
+          changes: migration.changes.map(change => `${change.id}: ${change.from} → ${change.to}`).join("\n"),
+          backup: migration.backup ?? "",
+        } }, locale),
+        buttons: [startupText(startupMessages.migratedConfirm, locale), startupText(startupMessages.openBackup, locale)],
+      });
+      if (answer.response === 1 && migration.backup) await shell.openPath(migration.backup);
+      // 成功回执只改迁移记录，业务数据仍由已运行的服务拥有。
+      const result = await prepareDataProcess(join(here, "prepare-data.js"), dataRoot, app.getVersion(), "acknowledge", startupLifetime.signal);
+      migration = result.report;
+    } finally { migrationNoticePending = false; }
   });
   // renderer 与任务进程直连：只在交接端口时校验来源；页面重载、跳转或崩溃时关闭旧连接。
   let connection: string | null = null;
@@ -150,7 +205,7 @@ function createWindow(): void {
   const stopDesktopWindow = serveDesktopWindow(current, titleBar, trusted);
   const stopPreferences = servePreferences(trusted);
   const stopLanguage = serveLanguage(current, trusted);
-  const stopUpdates = updates!.serve(current, trusted, () => requestQuit(false, true));
+  const stopUpdates = updates?.serve(current, trusted, () => requestQuit(false, true)) ?? (() => {});
   current.webContents.on("render-process-gone", (_event, details) => {
     closeConnection();
     if (!quitting && details.reason !== "clean-exit")
@@ -185,7 +240,7 @@ function createWindow(): void {
   current.on("closed", () => {
     stopDesktopWindow();
     ipcMain.removeListener(connectionRequestChannel, requestConnection);
-    for (const channel of [startupGetChannel, startupRestartChannel, startupDataDirectoryChannel]) ipcMain.removeHandler(channel);
+    for (const channel of [startupGetChannel, startupRestartChannel, startupDataDirectoryChannel, startupBackupChannel, startupRecoveryChannel, startupInitializedChannel]) ipcMain.removeHandler(channel);
     closeConnection();
     window = null; ipcMain.removeHandler(pickDirectoryChannel); ipcMain.removeHandler(openLocalFileChannel); ipcMain.removeHandler(openLogsChannel);
     stopAppearance(); stopPreferences(); stopLanguage(); stopUpdates();
@@ -223,8 +278,6 @@ if (!app.requestSingleInstanceLock()) {
     if (window?.isMinimized()) window.restore();
     window?.focus();
   });
-  // 登录 shell 环境与 Electron 初始化并行解析，任务进程 fork 前写回 process.env。
-  const environment = adoptLoginShellEnvironment(startupLifetime.signal);
   app.whenReady().then(async () => {
     if (quitting) return;
     // 权限检查和请求共用同一策略；只放行受信主框架的字体枚举与剪贴板写入。
@@ -238,9 +291,21 @@ if (!app.requestSingleInstanceLock()) {
     servePluginArtifacts(dataRoot);
     // 开发运行没有应用包图标，Dock 显式使用正式图标。
     if (process.platform === "darwin" && !app.isPackaged) app.dock?.setIcon(applicationIconFile("atelier.png"));
-    updates = new ApplicationUpdates();
+    // 所有偏好消费与窗口创建之前完成统一数据准备；失败窗口只读取内存默认值。
+    try {
+      const result = await prepareDataProcess(join(here, "prepare-data.js"), dataRoot, app.getVersion(), "prepare", startupLifetime.signal);
+      migration = result.report;
+      if (!result.ok) publishStartup({ status: "failed", reason: "data", detail: result.report.error ?? "", migration: result.report });
+      else { enablePersistentState(); updates = new ApplicationUpdates(); }
+    } catch (error) {
+      if (quitting) return;
+      publishStartup({ status: "failed", reason: "data", detail: error instanceof Error ? error.message : String(error) });
+    }
+    if (quitting) return;
     createWindow();
     app.on("activate", () => { if (!quitting && BrowserWindow.getAllWindows().length === 0) createWindow(); });
+    if (startup.status === "failed") return;
+    const environment = adoptLoginShellEnvironment(startupLifetime.signal);
     let environmentTimer: ReturnType<typeof setTimeout> | undefined;
     try {
       await Promise.race([environment, new Promise<never>((_, reject) => {
@@ -252,7 +317,7 @@ if (!app.requestSingleInstanceLock()) {
       if (quitting) return;
       publishStartup({ status: "starting", stage: "plugins" });
       await runtime.start(join(here, "runtime.js"), dataRoot);
-      void updates.check();
+      void updates?.check();
     }
     catch (error) {
       if (quitting) return;

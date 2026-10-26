@@ -130,6 +130,18 @@ headers 来源需要消费者持有自己的模型调用结果，因此自然用
 
 契约不要求手填数据版本。宿主按资源、记录、实现或数据的稳定 ID 找到对应消费方，实际兼容性由其 schema 解码决定；兼容旧数据继续读取（插件可用 union/transform 转换旧形状，读取不改写原始存储），不能解码时返回 `unknown`、不可用或回退默认视图并保留原始数据。宿主 SDK、IPC 与数据库的格式版本独立维护。
 
+### 插件存储准备（API 18.2）
+
+后台 `definePlugin({ storage })` 静态声明需要窗口前准备的持久化文件，条目类型为 `PluginStorageDeclaration`。声明随后台入口导入取得，`setup` 在数据准备成功后的业务运行时中执行；模块导入用于定义声明，业务读写放在 `setup` 或之后。
+
+- `path` 相对于 `extensions/<pluginId>/`；宿主解析到插件目录内的文件，同一准备批次每个文件只有一份声明。
+- JSON 声明 `kind: "json"`、`version`、`initial()`、`migrations` 和 `validate(data)`，持久信封为 `{ version, data }`。每个迁移键 n 将第 n 版正文转换为第 n+1 版，业务读取自管 JSON 时消费 `data`。`unversioned: true` 将既有无信封正文作为格式 0 接入。
+- SQLite 声明 `kind: "sqlite"`、`version`、`initialize(db)`、`migrations` 及可选 `validate(db)`，版本保存在 `PRAGMA user_version`；初始化与迁移函数在宿主事务内执行同步 SQL，连接和提交归宿主管理。
+- 托管配置使用 `.atelier/config.json` 路径声明时，`plugin.config` 在读写边界处理信封，插件及前端仍消费原配置值。托管数据库对应 `.atelier/db.sqlite`。
+- 每份声明独立升级；领域转换由插件提供。未声明的自管文件继续由插件负责兼容。历史记录的读取适配沿用上面的数据兼容规则。
+
+宿主统一提供备份、失败恢复和结果展示，完整生命周期见 [数据准备与迁移](architecture.md#数据准备与迁移)。可编译声明示例见 [`storage.ts`](../packages/sdk/examples/storage.ts)。
+
 ## 对象读取、执行与时间线查询
 
 | 接口 | 能力 |

@@ -41,10 +41,10 @@ export class ApplicationService {
     this.started = JSON.stringify(this.list.read());
     this.npmRoot = join(root, "plugins");
     try {
-      // 启动期统一清理：先删过期归档会话，内容存储构造时随之回收失去引用的内容。
-      collectExpiredSessions(this.db);
       const unavailable = async (): Promise<string> => { throw new Error("System credential protection is unavailable."); };
       this.configuration = new ConfigurationService(root, options.protector ?? { available: async () => false, encrypt: unavailable, decrypt: unavailable }, options.onConfigurationChanged);
+      // 宿主数据已完成准备与校验；归档清理先释放引用，随后显式回收内容。
+      collectExpiredSessions(this.db);
       this.sessions = new SessionService(this.db, root, this.configuration, options.onSessionChanged, options.adapterFactory, options.plugins, options.onPluginConfigurationChanged);
       // setup 与贡献登记也可能失败；纯前端消费者同样不能使用失败提供方。
       let changed = true;

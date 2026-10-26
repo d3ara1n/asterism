@@ -13,6 +13,7 @@ import { ConfigurationError } from "./errors.ts";
 import { normalizeOverrides, resolveAgentConfiguration, resolveRoleConfiguration } from "./layers.ts";
 import { migrateModelCost } from "./model-cost-migration.ts";
 import { providerEditingMessages } from "../shared/provider-editing-messages.ts";
+import { jsonStorage } from "../storage/migrations.ts";
 
 const identity = { id: configurationIdSchema };
 const storedProviderSchema = modelProviderInputSchema.extend({ credentialRef: z.string().uuid().nullable() }).strip();
@@ -61,6 +62,17 @@ function validate(raw: unknown): ConfigurationDocument {
   return document;
 }
 
+function initialConfiguration(): ConfigurationDocument {
+  return { version: 11, modelProviders: [], webProviders: [], models: [],
+    roles: defaultRoles.map(({ id, builtin }) => ({ id, builtin, overrides: {} })),
+    agents: defaultAgents.map(({ id, builtin }) => ({ id, builtin, overrides: {} })) };
+}
+/** 已发布格式的转换在此追加，业务读写始终消费当前文档。 */
+export function configurationStorage(root: string) {
+  return jsonStorage({ id: "configuration", file: join(root, applicationStorage.configurationFile),
+    version: 11, initial: initialConfiguration, migrations: {}, validate });
+}
+
 /** 以旧身份定位并替换；新身份与其他项冲突时拒绝。 */
 function upsert<T extends { id: string } | { providerId: string; modelId: string }>(items: T[], previous: string | null, item: T): void {
   const index = previous === null ? -1 : items.findIndex(value => keyOf(value) === previous);
@@ -81,11 +93,7 @@ export class ConfigurationStore {
     catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw new ConfigurationError("unavailable", "The application configuration could not be read.");
       // 只有文件不存在才初始化；已有文件中的删除状态不会重新播种。
-      this.document = {
-        version: 11, modelProviders: [], webProviders: [], models: [],
-        roles: defaultRoles.map(({ id, builtin }) => ({ id, builtin, overrides: {} })),
-        agents: defaultAgents.map(({ id, builtin }) => ({ id, builtin, overrides: {} })),
-      };
+      this.document = initialConfiguration();
       this.commit(this.document);
       return;
     }

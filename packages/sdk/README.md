@@ -80,6 +80,8 @@ export default definePlugin({
 
 ### 4. 插件装配与设置页面
 
+窗口前存储准备（API 18.2）通过 `definePlugin({ storage })` 静态声明，支持 JSON 与 SQLite 的连续版本迁移。宿主统一备份和恢复，领域转换由插件提供；见[插件存储准备](../../docs/plugin-sdk.md#插件存储准备api-182)及可编译示例 [`storage.ts`](examples/storage.ts)。
+
 后台 `definePlugin({ namespace, version, setup?, modules? })` 的同步 `setup(plugin)` 创建插件级共享服务，返回 `PluginContribution`：与模块共用具型贡献字段，并可返回 `modules`；清理登记到 `plugin.lifetime.defer`。根入口返回的模块先装配，再装配静态 `modules`；关闭先收束工作与全部对象生命周期，再逆序执行登记的清理，模块先于根服务释放。服务通过普通函数参数或闭包传给模块，不需要服务注册表。
 
 前端 `defineRendererPlugin({ modules?, settings?, prepare?, closing? })` 是插件入口。`settings: { Body, locations? }` 与模块平级；页面组件接收可选 `location`，无会话或对象上下文，能使用全局调用、事件、i18n、本插件偏好和托管配置。插件 `prepare({ events, signal })` 先于自己的模块准备；失败阻止该插件及依赖方装配，关闭在取消后等待实际准备结束再调用 `closing`。页面卸载取消页面发起的通信调用，不销毁后台服务。

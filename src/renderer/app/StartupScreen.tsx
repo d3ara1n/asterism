@@ -3,11 +3,10 @@ import type { UiText } from "@atelier/sdk/contracts";
 import { startupMessages } from "../../shared/error-display";
 import { useI18n } from "../shared/i18n";
 import { FailureScreen, type FailureAction } from "./FailureScreen";
+import type { StartupState } from "../../shared/startup";
+import { DataRecoveryScreen } from "./DataRecoveryScreen";
 
-export interface StartupFailure {
-  reason: "initialization" | "database_version" | "timeout" | "runtime";
-  detail: string;
-}
+export type StartupFailure = Omit<Extract<StartupState, { status: "failed" }>, "status">;
 
 /** 等待指示延迟显现的时长，与 styles.css 中 `.startup-reveal` 一致；快速启动不闪现加载画面。 */
 const REVEAL_DELAY_MS = 300;
@@ -17,6 +16,7 @@ export function StartupScreen({ stage, detail, failure }: { stage: UiText; detai
   const i18n = useI18n();
   // 静态占位的显现动画从页面载入开始计时；React 接管后按已过时间续接，不重新等待。
   const [revealDelay] = useState(() => REVEAL_DELAY_MS - performance.now());
+  if (failure?.reason === "data") return <DataRecoveryScreen failure={failure} />;
   if (failure) {
     const actions: FailureAction[] = [
       { label: i18n.text(startupMessages.restart), run: () => window.host.startup.restart() },

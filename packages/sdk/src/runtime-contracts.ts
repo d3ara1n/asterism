@@ -156,8 +156,23 @@ export interface PluginModule { setup(plugin: PluginContext): ModuleContribution
 export interface PluginContribution extends ModuleContribution {
   modules?: readonly PluginModule[];
 }
+/** 窗口前准备的插件存储；路径相对于 extensions/<pluginId>，迁移键 n 表示 n → n+1。 */
+export type PluginStorageDeclaration = {
+  kind: "json"; path: string; version: number;
+  initial(): Json;
+  migrations: Readonly<Record<number, (data: unknown) => Json>>;
+  validate(data: unknown): unknown;
+  /** 无信封的既有文档以版本 0 进入迁移链。 */
+  unversioned?: boolean;
+} | {
+  kind: "sqlite"; path: string; version: number;
+  initialize(db: DatabaseSync): void;
+  migrations: Readonly<Record<number, (db: DatabaseSync) => void>>;
+  validate?(db: DatabaseSync): void;
+};
 export interface PluginDefinition {
   namespace: PluginNamespace; version: string; modules?: readonly PluginModule[];
+  storage?: readonly PluginStorageDeclaration[];
   setup?(plugin: PluginContext): PluginContribution;
   /** 包加载器从公共模块导入关系填充；提供方先 setup，消费者先清理。 */
   dependencies?: readonly string[];

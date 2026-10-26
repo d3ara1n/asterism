@@ -109,6 +109,11 @@ export class ContentStore {
   private closed = false;
   constructor(private readonly db: DatabaseSync, private readonly root: string) {
     mkdirSync(join(root, "sealed"), { recursive: true });
+    mkdirSync(join(root, "temporary"), { recursive: true });
+  }
+  /** 数据准备与引用校验完成后，由应用启动层显式调用。 */
+  collectStartup(): void {
+    const { db, root } = this;
     rmSync(join(root, "temporary"), { recursive: true, force: true });
     mkdirSync(join(root, "temporary"), { recursive: true });
     // 崩溃可能发生在封存之后、索引之前；只清理由本模块拥有的文件。

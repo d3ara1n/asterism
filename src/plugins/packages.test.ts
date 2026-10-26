@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync, readFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { PackageList, loadPackages, readManifest, readPackageMetadata } from "./packages.ts";
+import { PackageList, loadPackages, readManifest, readPackageMetadata, sdkApi } from "./packages.ts";
 import { ApplicationService } from "../runtime/service.ts";
 import { pathToFileURL } from "node:url";
 import type { PluginDefinition } from "@atelier/sdk/runtime";
@@ -44,13 +44,14 @@ describe("插件包", () => {
     expect(() => list.add({ source: { kind: "path", path: dir } }, data)).toThrow();
     expect(list.read()).toEqual([]);
   });
-  it("API 18.1 接受同主版本接口并拒绝旧主版本与更高小版本", () => {
+  // 插件声明更高接口要求时拒绝加载，同主版本已提供的接口可以使用。
+  it("接受同主版本接口并拒绝旧主版本与更高小版本", () => {
     const dir = temp();
-    pkg(dir, { id: "acme.x", api: { major: 18, minMinor: 0 } });
-    expect(readManifest(dir).api).toEqual({ major: 18, minMinor: 0 });
-    pkg(dir, { id: "acme.x", api: { major: 15, minMinor: 0 } });
+    pkg(dir, { id: "acme.x", api: { major: sdkApi.major, minMinor: 0 } });
+    expect(readManifest(dir).api).toEqual({ major: sdkApi.major, minMinor: 0 });
+    pkg(dir, { id: "acme.x", api: { major: sdkApi.major - 1, minMinor: 0 } });
     expect(() => readManifest(dir)).toThrow();
-    pkg(dir, { id: "acme.x", api: { major: 18, minMinor: 2 } });
+    pkg(dir, { id: "acme.x", api: { major: sdkApi.major, minMinor: sdkApi.minor + 1 } });
     expect(() => readManifest(dir)).toThrow();
   });
   it("源码包经 esbuild 打包导入，SDK 解析到宿主实例；禁用与重复 ID 不加载", async () => {

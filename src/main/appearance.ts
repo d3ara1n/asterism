@@ -1,6 +1,7 @@
 import Store from "electron-store";
 import { app, ipcMain, nativeTheme, type BrowserWindow } from "electron";
 import { applicationStorage } from "../shared/application.ts";
+import { persistentStateReady } from "./persistent-state.ts";
 import {
   appearanceChangedChannel, appearanceGetChannel, appearancePatchSchema, appearanceSetChannel,
   defaultAppearance, parseAppearance, type Appearance,
@@ -8,12 +9,12 @@ import {
 
 /**
  * 外观设置：electron-store 负责原子写入，文件位于 userData（平台用户数据目录）下的 appearance.json。
- * 校验只走 Zod；损坏或未知字段逐项回退为默认值。
+ * 文件准备由启动层完成；单项显示值按 Zod 解析。
  */
 let store: Store<{ appearance: Appearance }> | null = null;
 const defaults = defaultAppearance(process.platform);
 function open(): Store<{ appearance: Appearance }> {
-  store ??= new Store<{ appearance: Appearance }>({ cwd: app.getPath("userData"), name: applicationStorage.appearanceStore, defaults: { appearance: defaults }, clearInvalidConfig: true });
+  store ??= new Store<{ appearance: Appearance }>({ cwd: app.getPath("userData"), name: applicationStorage.appearanceStore, defaults: { appearance: defaults } });
   return store;
 }
 
@@ -24,6 +25,7 @@ export function applyThemeSource(appearance: Appearance = readAppearance()): voi
 }
 
 export function readAppearance(): Appearance {
+  if (!persistentStateReady()) return defaults;
   try { return parseAppearance(open().get("appearance"), process.platform); }
   catch (error) { console.error("Appearance settings could not be read.", error); return defaults; }
 }
@@ -34,7 +36,7 @@ export function serveAppearance(window: BrowserWindow, trusted: (event: Electron
   ipcMain.removeHandler(appearanceSetChannel);
   ipcMain.handle(appearanceGetChannel, event => trusted(event) ? readAppearance() : null);
   ipcMain.handle(appearanceSetChannel, (event, raw) => {
-    if (!trusted(event)) return null;
+    if (!trusted(event) || !persistentStateReady()) return null;
     const patch = appearancePatchSchema.safeParse(raw);
     if (!patch.success) return readAppearance();
     const next = parseAppearance({ ...readAppearance(), ...patch.data }, process.platform);

@@ -15,7 +15,7 @@ export default defineConfig({
       },
       outDir: resolve("dist/main"),
       rolldownOptions: {
-        input: { index: resolve("src/main/index.ts"), runtime: resolve("src/runtime/index.ts") },
+        input: { index: resolve("src/main/index.ts"), runtime: resolve("src/runtime/index.ts"), "prepare-data": resolve("src/runtime/prepare-data.ts") },
         output: { format: "es", entryFileNames: "[name].js" },
       },
     },
