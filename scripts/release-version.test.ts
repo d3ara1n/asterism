@@ -1,92 +1,148 @@
 import { describe, expect, it } from "vitest";
 import { planRelease } from "./release-version.ts";
-import { pullRequestsInHistory, releaseNotes, type PublishedRelease, type ReleaseInput, type ReleasePullRequest } from "./release-prs.ts";
+import { commitsAfter, hasReleasableChanges, parseCommit, parseGitLog, previousRelease, releaseNotes, type PublishedRelease, type ReleaseInput } from "./release-commits.ts";
 
-const pr = (number: number, title: string): ReleasePullRequest => ({ number, title, mergeCommit: `commit-${number}`, url: `https://github.com/example/app/pull/${number}`, author: "author" });
-const released = (tag: string, pullRequests: number[] = [], preview = tag.includes("-")): PublishedRelease =>
-  ({ tag, pullRequests, prerelease: preview, sha: `sha-${tag}`, publishedAt: "2026-10-25T00:00:00Z" });
+const commit = (sha: string, message: string) => parseCommit(sha, message);
+const released = (tag: string, sha: string, publishedAt = "2026-10-25T00:00:00Z"): PublishedRelease =>
+  ({ tag, sha, prerelease: tag.includes("-"), publishedAt });
+const root = commit("root", "feat: 初始功能");
 const input = (patch: Partial<ReleaseInput> = {}): ReleaseInput => ({
   mode: "prerelease", repository: "example/app", sourceSha: "head", sourceTag: null,
-  releases: [], pullRequests: [], previousTag: null, newPullRequests: [], ...patch,
+  releases: [], commits: [root], ...patch,
 });
 
-describe("PR 驱动的发布版本", () => {
-  it("首次发布从零基线按 PR 计算，个人零散提交不另外触发", () => {
-    expect(planRelease(input({ pullRequests: [pr(1, "feat: 工作台")], newPullRequests: [1] }))?.version).toBe("0.1.0-prerelease.1");
-    expect(planRelease(input())).toBeNull();
+// 预期来自发布规则：首次固定版本，随后按 main 第一父链的累计变更与发布边界计算。
+describe("main 提交驱动的发布版本", () => {
+  it("没有 tag 时忽略所有消息的版本影响，破坏性或纯维护历史都以 0.1.0 起步", () => {
+    for (const message of ["feat!: 新协议", "fix: 修复", "ci: 发布流程"]) {
+      const value = input({ commits: [commit("head", message)] });
+      expect(hasReleasableChanges(value)).toBe(true);
+      const plan = planRelease(value);
+      expect(plan?.version).toBe("0.1.0-prerelease.1");
+      expect(plan?.notes).toContain(message);
+    }
   });
-  it("多个 feat 相对同一个正式版只升一次 minor，预发布序号按数值递增", () => {
+  it("首个 tag 后只计算新增提交，旧的破坏性提交不会使第二包跳到 major", () => {
+    const initial = commit("initial", "refactor!: 开发期重构");
+    const releases = [released("v0.1.0-prerelease.1", initial.sha)];
+    expect(planRelease(input({ releases, commits: [initial] }))).toBeNull();
+    expect(planRelease(input({ releases, commits: [commit("head", "fix: 修复"), initial] }))?.version)
+      .toBe("0.1.1-prerelease.1");
+    expect(planRelease(input({ releases, commits: [commit("head", "feat: 新功能"), initial] }))?.version)
+      .toBe("0.2.0-prerelease.1");
+  });
+  it("正式版前仍累计首个 tag 后的变更，同目标继续增长预发布序号", () => {
+    const initial = commit("initial", "feat!: 开发期功能");
+    const first = commit("first", "feat: 新功能");
+    expect(planRelease(input({
+      releases: [released("v0.1.0-prerelease.1", initial.sha), released("v0.2.0-prerelease.1", first.sha)],
+      commits: [commit("head", "fix: 修复"), first, initial],
+    }))?.version).toBe("0.2.0-prerelease.2");
+  });
+  it("多个 feat 相对同一正式版只升一次 minor，预发布序号按数值递增且说明只列新提交", () => {
+    const first = commit("first", "feat: 编辑");
     const plan = planRelease(input({
-      releases: [released("v1.0.0"), released("v1.1.0-prerelease.9", [1]), released("v1.1.0-prerelease.2", [1])],
-      pullRequests: [pr(1, "feat: 编辑"), pr(2, "feat: 搜索")], newPullRequests: [2], previousTag: "v1.1.0-prerelease.9",
+      releases: [released("v1.0.0", root.sha), released("v1.1.0-prerelease.9", first.sha), released("v1.1.0-prerelease.2", first.sha)],
+      commits: [commit("head", "feat: 搜索"), first, root],
     }));
     expect(plan?.version).toBe("1.1.0-prerelease.10");
-    expect(plan?.notes).toContain("[#2]");
-    expect(plan?.notes).not.toContain("[#1]");
+    expect(plan?.notes).toContain("feat: 搜索");
+    expect(plan?.notes).not.toContain("feat: 编辑");
   });
-  it("累计变更从 fix 提升到 feat 或破坏性变更时，更换目标并重置序号", () => {
-    const patch = input({ releases: [released("v1.0.0"), released("v1.0.1-prerelease.2", [1])],
-      pullRequests: [pr(1, "fix: 修复"), pr(2, "feat(ui): 新功能")], newPullRequests: [2] });
-    expect(planRelease(patch)?.version).toBe("1.1.0-prerelease.1");
-    patch.pullRequests.push(pr(3, "refactor(storage)!: 新格式"));
-    patch.newPullRequests.push(3);
-    expect(planRelease(patch)?.version).toBe("2.0.0-prerelease.1");
+  it("累计变更提升为 feat 或 breaking 时，更换目标并重置序号", () => {
+    const fix = commit("fix", "fix: 修复");
+    const value = input({ releases: [released("v1.0.0", root.sha), released("v1.0.1-prerelease.2", fix.sha)],
+      commits: [commit("head", "feat(ui): 新功能"), fix, root] });
+    expect(planRelease(value)?.version).toBe("1.1.0-prerelease.1");
+    value.commits.unshift(commit("breaking", "refactor(storage)!: 新格式"));
+    expect(planRelease(value)?.version).toBe("2.0.0-prerelease.1");
   });
-  it("已发布功能不使只有 docs、chore、ci 的后续周次再次发包", () => {
-    expect(planRelease(input({ releases: [released("v1.0.0"), released("v1.1.0-prerelease.1", [1])],
-      pullRequests: [pr(1, "feat: 新功能"), pr(2, "docs: 说明"), pr(3, "chore: 整理"), pr(4, "ci: 工作流")],
-      newPullRequests: [2, 3, 4] }))).toBeNull();
-  });
-  it("refactor 触发 patch，维护 PR 随同有效发布进入说明", () => {
-    const plan = planRelease(input({ releases: [released("v1.0.0", [1])],
-      pullRequests: [pr(1, "feat: 上版功能"), pr(2, "refactor: 优化实现"), pr(3, "docs: 使用说明")], newPullRequests: [2, 3] }));
+  it("已有发布后纯维护提交不触发发包，维护条目随下次有效变更进入说明", () => {
+    const value = input({ releases: [released("v1.0.0", root.sha)],
+      commits: [commit("ci", "ci: 工作流"), commit("docs", "docs: 说明"), commit("chore", "chore: 整理"), root] });
+    expect(hasReleasableChanges(value)).toBe(false);
+    expect(planRelease(value)).toBeNull();
+    value.commits.unshift(commit("head", "refactor: 优化实现"));
+    const plan = planRelease(value);
     expect(plan?.version).toBe("1.0.1-prerelease.1");
+    expect(plan?.notes).toContain("ci: 工作流");
     expect(plan?.notes).toContain("## Documentation");
-    expect(plan?.notes).not.toContain("上版功能");
+    expect(plan?.notes).not.toContain("feat: 初始功能");
   });
-  it("晋级固定所选预发布提交，正式说明覆盖中间所有预发布的 PR", () => {
-    const stable = released("v1.0.0", [1]);
-    const first = released("v1.1.0-prerelease.1", [1, 2]);
-    const selected = released("v1.1.0-prerelease.2", [1, 2, 3]);
-    const later = released("v2.0.0-prerelease.1", [1, 2, 3, 4]);
-    const plan = planRelease(input({ mode: "release", sourceTag: selected.tag, sourceSha: selected.sha,
-      releases: [stable, first, selected, later], pullRequests: [pr(1, "feat: 旧版"), pr(2, "feat: 功能"), pr(3, "fix: 修复")],
-      previousTag: selected.tag, newPullRequests: [] }));
+  it("晋级固定候选提交，说明覆盖上个正式版以来所有提交而不带入主干后续开发", () => {
+    const first = commit("first", "feat: 功能");
+    const selected = commit("selected", "fix: 修复");
+    const preview = released("v1.1.0-prerelease.2", selected.sha);
+    const plan = planRelease(input({ mode: "release", sourceTag: preview.tag, sourceSha: selected.sha,
+      releases: [released("v1.0.0", root.sha), released("v1.1.0-prerelease.1", first.sha), preview, released("v2.0.0-prerelease.1", "later")],
+      commits: [selected, first, root] }));
     expect(plan?.version).toBe("1.1.0");
     expect(plan?.sourceSha).toBe(selected.sha);
-    expect(plan?.notes).toContain("[#2]");
-    expect(plan?.notes).toContain("[#3]");
-    expect(plan?.notes).not.toContain("[#1]");
-    expect(plan?.notes).not.toContain("[#4]");
+    expect(plan?.notes).toContain("feat: 功能");
+    expect(plan?.notes).toContain("fix: 修复");
+    expect(plan?.notes).not.toContain("初始功能");
+    expect(plan?.notes).not.toContain("/commit/later");
     expect(plan?.notes).toContain("compare/v1.0.0...v1.1.0");
   });
-  it("正式版之后重新计算累计范围，不重复计算之前的 feat", () => {
-    expect(planRelease(input({ releases: [released("v1.1.0", [1])],
-      pullRequests: [pr(1, "feat: 已发布"), pr(2, "fix: 修复")], newPullRequests: [2] }))?.version).toBe("1.1.1-prerelease.1");
+  it("首次正式说明包含初始发布前的历史，即使该历史未参与版本计算", () => {
+    const preview = released("v0.1.1-prerelease.1", "head");
+    const plan = planRelease(input({ mode: "release", sourceTag: preview.tag, sourceSha: preview.sha,
+      releases: [released("v0.1.0-prerelease.1", root.sha), preview],
+      commits: [commit("head", "fix: 修复"), root] }));
+    expect(plan?.version).toBe("0.1.1");
+    expect(plan?.notes).toContain("feat: 初始功能");
+    expect(plan?.notes).toContain("fix: 修复");
+    expect(plan?.notes).toContain("/commits/v0.1.1");
   });
-  it("晋级只接受真实的预发布且正式版单调增长", () => {
-    const preview = released("v1.1.0-prerelease.1");
+  it("有正式版后重新建立计算基线，不重复计算之前的 feat", () => {
+    const stable = commit("stable", "feat: 已发布");
+    expect(planRelease(input({ releases: [released("v0.1.0-prerelease.1", root.sha), released("v1.1.0", stable.sha)],
+      commits: [commit("head", "fix: 修复"), stable, root] }))?.version).toBe("1.1.1-prerelease.1");
+  });
+  it("晋级须使用已发布候选、对应提交且高于最新正式版", () => {
+    const preview = released("v1.1.0-prerelease.1", "head");
     expect(() => planRelease(input({ mode: "release", sourceTag: "unknown" }))).toThrow("Select a published prerelease");
+    expect(() => planRelease(input({ mode: "release", sourceTag: preview.tag, sourceSha: "different", releases: [preview] })))
+      .toThrow("Select a published prerelease");
     expect(() => planRelease(input({ mode: "release", sourceTag: preview.tag, sourceSha: preview.sha,
-      releases: [preview, released("v1.1.0")] }))).toThrow("newer than the latest stable");
+      releases: [preview, released("v1.1.0", preview.sha)] }))).toThrow("newer than the latest stable");
   });
-  it("同目标已有更新预发布时拒绝晋级旧代码，避免较新预发布用户收到功能倒退的正式版", () => {
-    const older = released("v1.1.0-prerelease.1", [1]);
+  it("同目标已有新候选时拒绝晋级旧代码，避免更新后的用户收到功能倒退的正式版", () => {
+    const older = released("v1.1.0-prerelease.1", root.sha);
     expect(() => planRelease(input({ mode: "release", sourceTag: older.tag, sourceSha: older.sha,
-      releases: [older, released("v1.1.0-prerelease.2", [1, 2])] }))).toThrow("newest prerelease for this target");
+      releases: [older, released("v1.1.0-prerelease.2", "later")] }))).toThrow("newest prerelease for this target");
   });
 });
 
-describe("PR 发布范围与说明", () => {
-  it("按目标提交的祖先过滤，排除后来合入 main 的 PR 和重复关联", () => {
-    const first = pr(1, "feat: 已验证功能");
-    expect(pullRequestsInHistory([first, pr(2, "feat: 后续开发"), first], ["root", first.mergeCommit])).toEqual([first]);
+// 范围来自提交拓扑而非发布时刻；解析覆盖 git 的多行消息与 Conventional Commits 格式。
+describe("提交解析、范围与说明", () => {
+  it("NUL 分隔保留多行正文，squash 和直接提交共用类型、破坏性标记与分类规则", () => {
+    const commits = parseGitLog("squash\0feat(ui): 新功能 (#7)\n\n详细说明\n\0direct\0ci: 打包\n\0breaking\0refactor: 协议\n\nBREAKING CHANGE: 新协议\n\0");
+    expect(commits.map(({ sha, subject, level, section }) => ({ sha, subject, level, section }))).toEqual([
+      { sha: "squash", subject: "feat(ui): 新功能 (#7)", level: "minor", section: "Features" },
+      { sha: "direct", subject: "ci: 打包", level: null, section: "Maintenance" },
+      { sha: "breaking", subject: "refactor: 协议", level: "major", section: "Breaking Changes" },
+    ]);
+    expect(parseCommit("hyphen", "chore: 协议\n\nBREAKING-CHANGE: 新协议").level).toBe("major");
   });
-  it("同一 PR 只出现一次，首次正式发布使用完整提交历史链接", () => {
-    const first = pr(1, "feat!: 新协议");
-    const notes = releaseNotes([first, first], "example/app", null, "v1.0.0");
-    expect(notes.match(/\[#1\]/g)).toHaveLength(1);
+  it("较旧提交后来晋级不会让更靠近 HEAD 的已发布提交再次触发", () => {
+    const latest = commit("latest", "feat: 下一版功能");
+    const old = commit("old", "feat: 旧候选");
+    const value = input({ releases: [released("v2.0.0-prerelease.1", latest.sha, "2026-10-24T00:00:00Z"),
+      released("v1.0.0", old.sha, "2026-10-25T00:00:00Z")],
+      commits: [commit("head", "docs: 说明"), latest, old, root] });
+    expect(previousRelease(value)?.tag).toBe("v2.0.0-prerelease.1");
+    expect(planRelease(value)).toBeNull();
+    expect(commitsAfter(value.commits, latest.sha).map(commit => commit.sha)).toEqual(["head"]);
+  });
+  it("每个 SHA 只列一次，未分类消息保留，条目链接直接指向提交", () => {
+    const feature = commit("abcdef123456", "feat!: 新协议 (#9)");
+    const notes = releaseNotes([feature, feature, commit("other", "调整构建")], "example/app", null, "v0.1.0");
+    expect(notes.match(/\[abcdef1\]/g)).toHaveLength(1);
     expect(notes).toContain("## Breaking Changes");
-    expect(notes).toContain("/commits/v1.0.0");
+    expect(notes).toContain("## Maintenance");
+    expect(notes).toContain("调整构建");
+    expect(notes).toContain("/commit/abcdef123456");
+    expect(notes).toContain("/commits/v0.1.0");
   });
 });

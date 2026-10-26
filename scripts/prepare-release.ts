@@ -1,6 +1,6 @@
 import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
 import { planRelease } from "./release-version.ts";
-import type { ReleaseInput } from "./release-prs.ts";
+import type { ReleaseInput } from "./release-commits.ts";
 
 const inputFile = process.argv[2] ?? ".local/release/input.json";
 const notesFile = process.argv[3] ?? ".local/release/notes.md";
