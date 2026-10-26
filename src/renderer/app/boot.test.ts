@@ -41,3 +41,41 @@ it("取消结束启动等待，随后到达的导入结果不改变失败结果"
   finish("loaded");
   await expect(pending).rejects.toBe(reason);
 });
+
+// 数据迁移可以长于桌面桥初始化期限；首次读取结束后，该作用域取消不能撤销后台订阅。
+it("桌面桥读取完成后只由后台状态结束数据准备等待", async () => {
+  const initialization = new AbortController(), lifetime = new AbortController();
+  let receive!: (state: StartupState) => void;
+  let observed!: () => void;
+  const initial = new Promise<void>(resolve => { observed = resolve; });
+  const close = vi.fn();
+  const bridge: StartupBridge = {
+    get: async () => ({ status: "starting", stage: "dataBackup" }),
+    onChanged(listener) { receive = listener; return close; },
+    restart: async () => {}, openDataDirectory: async () => "", recover: async () => {}, openRecoveryPoint: async () => "", initialized: async () => [],
+  };
+  const ready = waitForRuntime(bridge, lifetime.signal, observed, initialization.signal);
+  await initial;
+  initialization.abort(new Error("Desktop initialization scope ended."));
+  expect(close).not.toHaveBeenCalled();
+  receive({ status: "ready" });
+  await expect(ready).resolves.toBeUndefined();
+  expect(close).toHaveBeenCalledOnce();
+});
+
+// 初始 IPC 未响应时仍需结束等待，且不能留下状态订阅；直接取消作用域，无需真实计时器。
+it("桌面桥读取未完成时取消初始化会撤销后台订阅", async () => {
+  const initialization = new AbortController();
+  let respond!: (state: StartupState) => void;
+  const close = vi.fn();
+  const bridge: StartupBridge = {
+    get: () => new Promise(resolve => { respond = resolve; }), onChanged: () => close,
+    restart: async () => {}, openDataDirectory: async () => "", recover: async () => {}, openRecoveryPoint: async () => "", initialized: async () => [],
+  };
+  const ready = waitForRuntime(bridge, new AbortController().signal, () => {}, initialization.signal);
+  const reason = new Error("Desktop bridge unavailable.");
+  initialization.abort(reason);
+  await expect(ready).rejects.toBe(reason);
+  expect(close).toHaveBeenCalledOnce();
+  respond({ status: "ready" });
+});

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { coreChannel } from "./core.ts";
-import { pluginStorageFailureSchema, recoveryPointSchema, type PluginStorageFailure, type RecoveryAction } from "./recovery.ts";
+import { pluginStorageFailureSchema, preparationStageSchema, recoveryPointSchema, type PluginStorageFailure, type RecoveryAction } from "./recovery.ts";
 
 export const startupGetChannel = coreChannel("startup-get");
 export const startupChangedChannel = coreChannel("startup-changed");
@@ -9,8 +9,8 @@ export const startupDataDirectoryChannel = coreChannel("startup-data-directory")
 export const startupRecoveryChannel = coreChannel("startup-recovery");
 export const startupRecoveryPointChannel = coreChannel("startup-recovery-point");
 export const startupInitializedChannel = coreChannel("startup-initialized");
-/** `data` 为宿主存储迁移期间；窗口此时使用系统主题与语言。 */
-export const startupStageSchema = z.enum(["data", "environment", "plugins", "workspace"]);
+/** 数据准备阶段独立于宿主设置可读性；环境阶段从实际读取登录环境开始。 */
+export const startupStageSchema = z.enum([...preparationStageSchema.options, "dataFinalizing", "environment", "plugins", "workspace"]);
 export type StartupStage = z.infer<typeof startupStageSchema>;
 /** 数据准备失败时附带可选恢复点；`paused` 表示还原后等待用户重试。 */
 export const startupRecoverySchema = z.strictObject({ paused: z.boolean(), points: z.array(recoveryPointSchema) });

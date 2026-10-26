@@ -1,7 +1,6 @@
 import { utilityProcess, type MessagePortMain, type UtilityProcess } from "electron";
-import { applicationBrand, applicationStorage } from "../shared/application.ts";
-import { createWriteStream, mkdirSync } from "node:fs";
-import { join } from "node:path";
+import { applicationBrand } from "../shared/application.ts";
+import { observeProcess } from "./logging.ts";
 import { runtimeMessageSchema, type Command, type CommandResult, type RuntimeStatus } from "../shared/contracts.ts";
 import { RuntimeRequests } from "./requests.ts";
 import { handleSecretRequest } from "./secrets.ts";
@@ -29,21 +28,15 @@ export class RuntimeHost {
 
   start(entry: string, root: string, storageFailures: readonly PluginStorageFailure[] = []): Promise<void> {
     if (this.status !== "starting") return Promise.reject(new Error("Task runtime startup was cancelled."));
-    mkdirSync(join(root, applicationStorage.logsDirectory), { recursive: true });
-    const log = createWriteStream(join(root, applicationStorage.logsDirectory, applicationStorage.runtimeLogFile), { flags: "a", mode: 0o600 });
-    // 流错误必须有监听器，不能把日志故障变成未捕获异常。
-    log.on("error", error => console.error("Runtime log write failed.", error));
     let child: UtilityProcess;
     try {
       child = utilityProcess.fork(entry, [root, JSON.stringify(storageFailures)], { serviceName: `${applicationBrand.en} task runtime`, stdio: "pipe" });
     } catch (error) {
-      log.end();
       this.setStatus("unavailable");
       return Promise.reject(error);
     }
     this.child = child;
-    child.stdout?.pipe(log, { end: false });
-    child.stderr?.pipe(log, { end: false });
+    observeProcess(child, "runtime");
     const requests = this.requests = new RuntimeRequests(message => child.postMessage(message), () => {
       this.setStatus("unavailable");
       child.kill();
@@ -106,7 +99,6 @@ export class RuntimeHost {
       child.once("exit", code => {
         clearTimeout(timeout);
         this.stopHeartbeat();
-        log.end();
         this.child = null;
         requests.close();
         if (this.status !== "stopping") this.setStatus("unavailable");

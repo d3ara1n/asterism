@@ -17,13 +17,13 @@ import { serveLanguage, readLanguage } from "./language.ts";
 import { startupText } from "./startup-text.ts";
 import { startupMessages } from "../shared/error-display.ts";
 import { allowRendererPermission } from "./permissions.ts";
-import { adoptLoginShellEnvironment } from "./shell-environment.ts";
+import { StartupCoordinator } from "./startup-coordinator.ts";
+import { initializeApplicationLog } from "./logging.ts";
 import { ApplicationUpdates } from "./updates.ts";
-import { startupGetChannel, startupChangedChannel, startupRestartChannel, startupDataDirectoryChannel, startupRecoveryChannel, startupRecoveryPointChannel, startupInitializedChannel, type StartupState } from "../shared/startup.ts";
-import { recoveryActionSchema, type PluginStorageFailure, type PreparationResult, type RecoveryPoint } from "../shared/recovery.ts";
+import { startupGetChannel, startupChangedChannel, startupRestartChannel, startupDataDirectoryChannel, startupRecoveryChannel, startupRecoveryPointChannel, startupInitializedChannel } from "../shared/startup.ts";
+import { recoveryActionSchema, type RecoveryPoint } from "../shared/recovery.ts";
 import { appearanceChangedChannel } from "../shared/theme.ts";
 import { languageChangedChannel } from "../shared/language.ts";
-import { prepareDataProcess } from "./data-preparation.ts";
 import { enableSettings } from "./settings-state.ts";
 import { acknowledgeNotice, listRecoveryPoints, pendingNotice, recoveryPointDirectory } from "../storage/preparation.ts";
 
@@ -32,26 +32,18 @@ let window: BrowserWindow | null = null;
 let quitting = false;
 let quitRequest: Promise<void> | null = null;
 let updates: ApplicationUpdates | null = null;
-/** 窗口前准备未能升级存储的插件；首页挂载后一次性提示。 */
-let storageFailures: PluginStorageFailure[] = [];
 let notificationsDelivered = false;
 let recoveryPending = false;
 /** 宿主存储在窗口出现后才就绪时，重新接入外观、语言与更新设置。 */
 let connectSettings: (() => void) | null = null;
 /** 受信渲染页地址（不含 hash），供权限判定使用。 */
 let trustedURL: string | null = null;
-let startup: StartupState = { status: "starting", stage: "environment" };
-const startupLifetime = new AbortController();
-function publishStartup(state: StartupState): void {
-  startup = state;
-  if (window && !window.isDestroyed()) window.webContents.send(startupChangedChannel, state);
-}
 const runtime = new RuntimeHost(status => {
   if (window && !window.isDestroyed()) window.webContents.send(statusChannel, status);
-  if (status === "ready") publishStartup({ status: "ready" });
-  else if (status === "unavailable" && startup.status === "ready")
-    publishStartup({ status: "failed", reason: "runtime", detail: "The task runtime has stopped." });
-}, undefined, (stage, detail) => publishStartup({ status: "starting", stage, ...(detail ? { detail } : {}) }));
+  if (status === "ready") startup.publish({ status: "ready" });
+  else if (status === "unavailable" && startup.state.status === "ready")
+    startup.publish({ status: "failed", reason: "runtime", detail: "The task runtime has stopped." });
+}, undefined, (stage, detail) => startup.stage(stage, detail));
 
 /** 用户退出先读取资源的当前提示；确认后按原关闭流程等待后台清理。 */
 function requestQuit(restart = false, installUpdate = false): void {
@@ -72,12 +64,11 @@ function requestQuit(restart = false, installUpdate = false): void {
       if (answer.response !== 1) return;
     }
     quitting = true;
-    startupLifetime.abort();
-    await runtime.stop();
+    await Promise.all([startup.stop(), runtime.stop()]);
     if (installUpdate && updates?.ready) {
       updates.install(error => {
         quitting = false;
-        publishStartup({ status: "failed", reason: "runtime", detail: error.message });
+        startup.publish({ status: "failed", reason: "runtime", detail: error.message });
         // 工作台已结束启动订阅，重新进入启动入口以呈现失败与重启操作。
         if (window && !window.isDestroyed()) window.webContents.reload();
       });
@@ -109,13 +100,6 @@ async function showMigrationNotice(current: BrowserWindow): Promise<void> {
   });
   try { acknowledgeNotice(dataRoot); } catch (error) { console.error("The migration notice could not be acknowledged.", error); }
   if (answer.response === 1) await shell.openPath(recoveryPointDirectory(dataRoot, point.id));
-}
-
-/** 数据准备失败进入恢复视图；恢复点列表读取失败时仍提供重试与重新开始。 */
-function publishDataFailure(detail: string, paused: boolean): void {
-  let points: RecoveryPoint[] = [];
-  try { points = listRecoveryPoints(dataRoot); } catch (error) { console.error("Recovery points could not be read.", error); }
-  publishStartup({ status: "failed", reason: "data", detail, recovery: { paused, points } });
 }
 
 function createWindow(): void {
@@ -158,11 +142,11 @@ function createWindow(): void {
     event.senderFrame === current.webContents.mainFrame && event.senderFrame?.url === allowedURL;
   ipcMain.handle(startupGetChannel, event => {
     if (!trusted(event)) throw new Error("Untrusted application frame.");
-    return startup;
+    return startup.state;
   });
   ipcMain.handle(startupRestartChannel, event => { if (trusted(event)) requestQuit(true); });
   ipcMain.handle(startupDataDirectoryChannel, event => {
-    if (!trusted(event) || startup.status !== "failed")
+    if (!trusted(event) || startup.state.status !== "failed")
       return "The data folder is unavailable.";
     return shell.openPath(dataRoot);
   });
@@ -172,7 +156,7 @@ function createWindow(): void {
     return shell.openPath(recoveryPointDirectory(dataRoot, id));
   });
   ipcMain.handle(startupRecoveryChannel, async (event, raw) => {
-    if (!trusted(event) || startup.status !== "failed" || startup.reason !== "data" || recoveryPending) return "Data recovery is unavailable.";
+    if (!trusted(event) || startup.state.status !== "failed" || startup.state.reason !== "data" || recoveryPending) return "Data recovery is unavailable.";
     const action = recoveryActionSchema.parse(raw);
     recoveryPending = true;
     try {
@@ -188,16 +172,16 @@ function createWindow(): void {
         if (answer.response !== 1) return;
       }
       // 恢复操作只改动文件；随后重启，由下一次启动的数据准备接续。
-      await prepareDataProcess(join(here, "prepare-data.js"), dataRoot, app.getVersion(), action, startupLifetime.signal);
+      await startup.recover(action);
       requestQuit(true);
     } catch (error) { return error instanceof Error ? error.message : String(error); }
     finally { recoveryPending = false; }
   });
   ipcMain.handle(startupInitializedChannel, event => {
-    if (!trusted(event) || startup.status !== "ready" || notificationsDelivered) return [];
+    if (!trusted(event) || startup.state.status !== "ready" || notificationsDelivered) return [];
     notificationsDelivered = true;
     void showMigrationNotice(current);
-    return storageFailures;
+    return startup.storageFailures;
   });
   // renderer 与任务进程直连：只在交接端口时校验来源；页面重载、跳转或崩溃时关闭旧连接。
   let connection: string | null = null;
@@ -295,9 +279,26 @@ if (process.platform === "win32") app.setAppUserModelId(applicationId);
 const dataRoot = join(app.getPath("appData"), applicationDataDirectory(app.isPackaged));
 mkdirSync(dataRoot, { recursive: true });
 app.setPath("userData", dataRoot);
+const startup = new StartupCoordinator({
+  directory: here, root: dataRoot, version: app.getVersion(),
+  publish: state => {
+    if (window && !window.isDestroyed()) window.webContents.send(startupChangedChannel, state);
+  },
+  showWindow: () => { if (!quitting && !window) createWindow(); },
+  settingsReady: () => {
+    enableSettings();
+    try { updates = new ApplicationUpdates(); } catch (error) { console.error("Update settings could not be opened.", error); }
+    connectSettings?.();
+  },
+  startRuntime: async failures => {
+    await runtime.start(join(here, "runtime.js"), dataRoot, failures);
+    void updates?.check();
+  },
+});
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
+  initializeApplicationLog(dataRoot, app.getVersion());
   const sessionRoot = join(dataRoot, applicationStorage.chromiumDirectory);
   mkdirSync(sessionRoot, { recursive: true });
   app.setPath("sessionData", sessionRoot);
@@ -318,54 +319,8 @@ if (!app.requestSingleInstanceLock()) {
     servePluginArtifacts(dataRoot);
     // 开发运行没有应用包图标，Dock 显式使用正式图标。
     if (process.platform === "darwin" && !app.isPackaged) app.dock?.setIcon(applicationIconFile("atelier.png"));
-    // 宿主存储无需迁移时直接按真实设置创建窗口；需要迁移时先用系统主题与语言显示，提交后再接入设置。
-    const settingsAvailable = () => {
-      enableSettings();
-      try { updates = new ApplicationUpdates(); } catch (error) { console.error("Update settings could not be opened.", error); }
-    };
-    const show = () => {
-      if (quitting || window) return;
-      createWindow();
-      app.on("activate", () => { if (!quitting && BrowserWindow.getAllWindows().length === 0) createWindow(); });
-    };
-    let result: PreparationResult;
-    try {
-      result = await prepareDataProcess(join(here, "prepare-data.js"), dataRoot, app.getVersion(), { kind: "prepare" }, startupLifetime.signal, status => {
-        if (status === "migrating") { publishStartup({ status: "starting", stage: "data" }); show(); return; }
-        settingsAvailable();
-        if (window) connectSettings?.();
-        else show();
-        publishStartup({ status: "starting", stage: "environment" });
-      });
-    } catch (error) {
-      if (quitting) return;
-      result = { ok: false, error: error instanceof Error ? error.message : String(error), paused: false };
-    }
-    if (quitting) return;
-    if (!result.ok) { publishDataFailure(result.error, result.paused); show(); return; }
-    storageFailures = result.plugins;
-    show();
-    const environment = adoptLoginShellEnvironment(startupLifetime.signal);
-    let environmentTimer: ReturnType<typeof setTimeout> | undefined;
-    try {
-      await Promise.race([environment, new Promise<never>((_, reject) => {
-        environmentTimer = setTimeout(() => {
-          startupLifetime.abort();
-          reject(Object.assign(new Error("Login shell initialization timed out after 20 seconds."), { reason: "timeout" }));
-        }, 20_000);
-      })]).finally(() => clearTimeout(environmentTimer));
-      if (quitting) return;
-      publishStartup({ status: "starting", stage: "plugins" });
-      await runtime.start(join(here, "runtime.js"), dataRoot, storageFailures);
-      void updates?.check();
-    }
-    catch (error) {
-      if (quitting) return;
-      console.error("Application startup failed.", error);
-      const reason = (error as { reason?: string })?.reason;
-      publishStartup({ status: "failed", reason: reason === "database_version" || reason === "timeout" ? reason : "initialization",
-        detail: error instanceof Error ? error.message : String(error) });
-    }
+    await startup.run();
+    app.on("activate", () => { if (!quitting && BrowserWindow.getAllWindows().length === 0) createWindow(); });
   }).catch(error => {
     console.error("Electron initialization failed.", error);
     dialog.showErrorBox(applicationBrand.en, startupText(startupMessages.windowLoadFailed, () => readLanguage().locale));

@@ -5,7 +5,8 @@ export class StartupError extends Error {
 }
 
 /** 先订阅再读取当前启动状态；重载页面同样能取得已经发生的失败。 */
-export function waitForRuntime(bridge: StartupBridge, signal: AbortSignal, progress: (state: Extract<StartupState, { status: "starting" }>) => void): Promise<void> {
+export function waitForRuntime(bridge: StartupBridge, signal: AbortSignal, progress: (state: Extract<StartupState, { status: "starting" }>) => void,
+  readSignal: AbortSignal = signal): Promise<void> {
   return new Promise((resolve, reject) => {
     let stop = () => {};
     let finished = false;
@@ -24,7 +25,7 @@ export function waitForRuntime(bridge: StartupBridge, signal: AbortSignal, progr
     signal.addEventListener("abort", abort, { once: true });
     if (signal.aborted) { abort(); return; }
     stop = bridge.onChanged(receive);
-    void bridge.get().then(receive, finish);
+    void awaitStartup(bridge.get(), readSignal).then(receive, finish);
   });
 }
 

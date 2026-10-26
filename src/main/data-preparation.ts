@@ -1,39 +1,73 @@
 import { utilityProcess } from "electron";
-import { createWriteStream, mkdirSync } from "node:fs";
-import { join } from "node:path";
-import { preparationMessageSchema, type PreparationResult, type RecoveryAction } from "../shared/recovery.ts";
-import { applicationBrand, applicationStorage } from "../shared/application.ts";
+import { preparationMessageSchema, type PreparationProgress, type PreparationResult, type RecoveryAction } from "../shared/recovery.ts";
+import { applicationBrand } from "../shared/application.ts";
+import { observeProcess } from "./logging.ts";
 
 export type PreparationAction = { kind: "prepare" } | RecoveryAction;
 
-/** 数据准备无普通启动期限；退出时终止，下一次启动按持久状态续接。宿主存储状态先于结果回报。 */
+/** 尚未确认进程退出时只允许重启应用，恢复操作仍需独占数据目录。 */
+export class PreparationTerminationError extends Error {}
+
+/** 工作期间无启动期限；最终结果到达后由主进程终止，确认退出才交付结果。 */
 export function prepareDataProcess(entry: string, root: string, version: string, action: PreparationAction, signal: AbortSignal,
-  onHost: (status: "migrating" | "ready") => void = () => {}): Promise<PreparationResult> {
+  onHost: (status: "migrating" | "ready") => void = () => {},
+  onProgress: (progress: PreparationProgress) => void = () => {},
+  onFinalizing: () => void = () => {}): Promise<PreparationResult> {
   signal.throwIfAborted();
-  mkdirSync(join(root, applicationStorage.logsDirectory), { recursive: true });
-  const log = createWriteStream(join(root, applicationStorage.logsDirectory, applicationStorage.runtimeLogFile), { flags: "a", mode: 0o600 });
-  log.on("error", error => console.error("Data preparation log failed.", error));
   const args = [root, version, action.kind, ...action.kind === "restore" ? [action.point] : []];
+  console.info(`Data preparation starting. action=${action.kind}`);
   return new Promise((resolve, reject) => {
-    let child: ReturnType<typeof utilityProcess.fork>;
-    try { child = utilityProcess.fork(entry, args, { serviceName: `${applicationBrand.en} data preparation`, stdio: "pipe" }); }
-    catch (error) { log.end(); reject(error); return; }
-    child.stdout?.pipe(log, { end: false }); child.stderr?.pipe(log, { end: false });
+    const child = utilityProcess.fork(entry, args, { serviceName: `${applicationBrand.en} data preparation`, stdio: "pipe" });
+    observeProcess(child, "preparation");
     let result: PreparationResult | undefined, failure: Error | undefined;
-    const abort = () => { failure = new Error("Data preparation was cancelled."); child.kill(); };
+    let stopping = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const stop = () => {
+      if (stopping) return;
+      stopping = true;
+      console.info("Data preparation process termination requested.");
+      timer = setTimeout(() => {
+        signal.removeEventListener("abort", abort);
+        const error = new PreparationTerminationError("Data preparation process did not exit within 5 seconds of termination. Restart the application before trying again.");
+        console.error(error);
+        reject(error);
+      }, 5_000);
+      child.kill();
+    };
+    const abort = () => { failure = new Error("Data preparation was cancelled."); stop(); };
     signal.addEventListener("abort", abort, { once: true });
     child.on("message", raw => {
-      const parsed = preparationMessageSchema.safeParse(raw);
-      if (!parsed.success) return;
-      const message = parsed.data;
-      if (message.kind === "host") onHost(message.status);
-      else if (message.kind === "result") result = message.result;
-      else failure = new Error(message.error);
+      if (stopping) return;
+      try {
+        const message = preparationMessageSchema.parse(raw);
+        if (message.kind === "host") {
+          console.info(`Host storage status received. status=${message.status}`);
+          onHost(message.status);
+        } else if (message.kind === "progress") onProgress(message);
+        else {
+          if (message.kind === "result") {
+            result = message.result;
+            console.info(`Data preparation result received. ok=${result.ok}`);
+            if (!result.ok) console.error(`Data preparation failed. ${result.error}`);
+          } else {
+            failure = new Error(message.error);
+            console.error("Data preparation failed.", failure);
+          }
+          onFinalizing();
+          stop();
+        }
+      } catch (error) {
+        failure = error instanceof Error ? error : new Error(String(error));
+        console.error("Data preparation message handling failed.", failure);
+        stop();
+      }
     });
-    child.once("error", error => { failure = new Error(String(error)); child.kill(); });
+    child.once("error", error => { failure = new Error(String(error)); stop(); });
     child.once("exit", code => {
-      signal.removeEventListener("abort", abort); log.end();
-      if (failure || code !== 0 || !result) reject(failure ?? new Error(`Data preparation exited with code ${code}.`));
+      signal.removeEventListener("abort", abort);
+      clearTimeout(timer);
+      // 收到最终结果后的主动结束允许非零退出码；提前退出始终失败。
+      if (failure || !result) reject(failure ?? new Error(`Data preparation exited before delivering its result. code=${code}`));
       else resolve(result);
     });
   });

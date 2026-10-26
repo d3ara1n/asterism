@@ -11,6 +11,7 @@ import { bindPublicProvider } from "../shared/public-modules.ts";
 import { applicationStorage, preferenceVersion } from "../shared/application.ts";
 import { jsonStorage, sqliteStorage, type StorageDefinition } from "./migrations.ts";
 import { prepareData, restorePoint, startFresh, type DataPath, type PluginStorageGroup } from "./preparation.ts";
+import type { PreparationProgress } from "../shared/recovery.ts";
 
 /**
  * 恢复点覆盖的应用数据；缓存（`ui-state.json`、插件构建缓存、Chromium、日志）不迁移也不备份。
@@ -51,9 +52,9 @@ export function pluginStorages(root: string, id: string, declarations: readonly 
 }
 
 /** 只构建并导入存储入口；插件运行时与 setup 留给任务进程。 */
-async function discoverPluginStorage(root: string): Promise<PluginStorageGroup[]> {
+async function discoverPluginStorage(root: string, onProgress?: (progress: PreparationProgress) => void): Promise<PluginStorageGroup[]> {
   const packages = await loadPackages(new PackageList(join(root, "plugins.json")), join(root, "plugins"), join(root, "plugins", ".cache"),
-    [builtin.id], [builtinPublicProvider], undefined, { runtime: false });
+    [builtin.id], [builtinPublicProvider], id => onProgress?.({ stage: "dataPlugins", detail: id }), { runtime: false });
   const groups: PluginStorageGroup[] = [{ id: builtin.id, stores: pluginStorages(root, builtin.id, builtinStorage) }];
   for (const item of packages) {
     if (!item.manifest?.storage || item.status === "disabled") continue;
@@ -66,11 +67,12 @@ async function discoverPluginStorage(root: string): Promise<PluginStorageGroup[]
   return groups;
 }
 
-export async function prepareApplicationData(root: string, version: string, onHost?: (status: "migrating" | "ready") => void) {
+export async function prepareApplicationData(root: string, version: string, onHost?: (status: "migrating" | "ready") => void,
+  onProgress?: (progress: PreparationProgress) => void) {
   const release = bindPublicProvider("runtime", builtinPublicProvider, builtinRuntimePublicModules);
   try {
-    return await prepareData(root, { version, paths: applicationDataPaths, stores: hostStorages(root), onHost,
-      discover: () => discoverPluginStorage(root) });
+    return await prepareData(root, { version, paths: applicationDataPaths, stores: hostStorages(root), onHost, onProgress,
+      discover: () => discoverPluginStorage(root, onProgress) });
   } finally { release(); }
 }
 export function restoreApplicationData(root: string, point: string, version: string): void {

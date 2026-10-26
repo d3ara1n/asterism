@@ -24,9 +24,15 @@ export const preparationResultSchema = z.discriminatedUnion("ok", [
 ]);
 export type PreparationResult = z.infer<typeof preparationResultSchema>;
 
-/** 准备进程消息：宿主存储就绪状态先于最终结果发出。 */
+/** 数据准备的实际工作阶段；宿主设置可读性通过独立消息回报。 */
+export const preparationStageSchema = z.enum(["dataCheck", "dataBackup", "data", "dataPlugins"]);
+export type PreparationStage = z.infer<typeof preparationStageSchema>;
+export interface PreparationProgress { stage: PreparationStage; detail?: string }
+
+/** 最终结果表示提交与资源清理均已结束；主进程接收后终止准备进程。 */
 export const preparationMessageSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("host"), status: z.enum(["migrating", "ready"]) }),
+  z.object({ kind: z.literal("progress"), stage: preparationStageSchema, detail: z.string().optional() }),
   z.object({ kind: z.literal("result"), result: preparationResultSchema }),
   z.object({ kind: z.literal("error"), error: z.string() }),
 ]);

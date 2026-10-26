@@ -9,7 +9,7 @@
 | `application.ts` | 恢复点数据范围、宿主存储声明、只导入插件存储入口的发现 |
 | `preparation.ts` | 恢复点创建与保留、还原与重新开始的可续接操作、还原后暂停、宿主与插件分级失败 |
 | `../runtime/prepare-data.ts` | 独立准备进程入口 |
-| `../main/data-preparation.ts` | 主进程启动准备进程、转发宿主就绪回报与结果 |
+| `../main/data-preparation.ts` | 启动准备进程、转发设置可用性与实际进度；收到最终结果后结束进程并确认退出 |
 
 各存储的当前版本常量由所属模块维护：工作库在 `runtime/storage.ts`，全局配置在 `configuration/store.ts`，插件列表在 `plugins/packages.ts`，外观、语言与更新设置共用 `shared/application.ts` 的 `preferenceVersion`，内置插件在 `packages/builtin/src/storage.ts`。写入方负责盖章；准备阶段不创建文件、不检查数据形状。
 

@@ -3,7 +3,7 @@ import { constants, copyFileSync, cpSync, existsSync, linkSync, lstatSync, mkdir
 import { dirname, join } from "node:path";
 import { z } from "zod";
 import { applicationStorage } from "../shared/application.ts";
-import { recoveryPointSchema, type PluginStorageFailure, type PreparationResult, type RecoveryPoint } from "../shared/recovery.ts";
+import { recoveryPointSchema, type PluginStorageFailure, type PreparationProgress, type PreparationResult, type RecoveryPoint } from "../shared/recovery.ts";
 import { readJson, writeJson } from "./files.ts";
 import type { StorageChange, StorageDefinition, StoragePlan } from "./migrations.ts";
 
@@ -159,6 +159,7 @@ export interface PreparationOptions {
   discover?: () => Promise<readonly PluginStorageGroup[]>;
   /** 宿主存储检查完成即通知；需要迁移时先报告 migrating，提交后报告 ready。 */
   onHost?: (status: "migrating" | "ready") => void;
+  onProgress?: (progress: PreparationProgress) => void;
 }
 const plansOf = (stores: readonly StorageDefinition[]): StoragePlan[] => stores.flatMap(store => store.inspect() ?? []);
 const sameChange = (a: StorageChange, b: StorageChange) => a.id === b.id && a.from === b.from && a.to === b.to;
@@ -167,6 +168,7 @@ const message = (error: unknown) => error instanceof Error ? error.message : Str
 export async function prepareData(root: string, options: PreparationOptions): Promise<PreparationResult> {
   let paused = false;
   try {
+    options.onProgress?.({ stage: "dataCheck" });
     continueRecovery(root, options.paths, options.version);
     paused = readState(root)?.phase === "restored";
     const host = plansOf(options.stores);
@@ -183,19 +185,31 @@ export async function prepareData(root: string, options: PreparationOptions): Pr
       }
       const latest = listRecoveryPoints(root)[0];
       if (latest?.kind === "migration" && changes.every(change => latest.changes.some(old => sameChange(old, change)))) point = latest;
-      else point = readPoint(root, snapshot(root, options.paths, options.version, changes));
+      else {
+        options.onProgress?.({ stage: "dataBackup" });
+        point = readPoint(root, snapshot(root, options.paths, options.version, changes));
+      }
+    };
+    const apply = (plan: StoragePlan) => {
+      options.onProgress?.({ stage: "data", detail: plan.change.id });
+      const started = performance.now();
+      console.info(`Storage migration started. storage=${plan.change.id} from=${plan.change.from} to=${plan.change.to}`);
+      plan.apply();
+      console.info(`Storage migration completed. storage=${plan.change.id} elapsedMs=${Math.round(performance.now() - started)}`);
     };
     record(host.map(plan => plan.change));
-    for (const plan of host) plan.apply();
+    for (const plan of host) apply(plan);
     if (paused) saveState(root, null);
     if (host.length) options.onHost?.("ready");
     const plugins: PluginStorageFailure[] = [];
+    options.onProgress?.({ stage: "dataPlugins" });
     for (const group of options.discover ? await options.discover() : []) {
       try {
+        options.onProgress?.({ stage: "dataPlugins", detail: group.id });
         if (group.error) throw new Error(group.error);
         const plans = plansOf(group.stores);
         record(plans.map(plan => plan.change));
-        for (const plan of plans) plan.apply();
+        for (const plan of plans) apply(plan);
       } catch (error) {
         console.error(`Storage of plugin ${group.id} could not be prepared.`, error);
         plugins.push({ id: group.id, error: message(error) });
