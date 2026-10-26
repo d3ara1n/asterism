@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import type { z } from "zod";
-import { ListPlus, ScanSearch, CirclePlus, CircleMinus, Users, Bot, MessageSquareText } from "lucide-react";
+import { ListPlus, ScanSearch, CirclePlus, CircleMinus, Users, Bot, MessageSquareText, PenLine } from "lucide-react";
 import { toolRenderer, useI18n, useRendererResources, type RendererModule, type ToolRenderProps } from "@asterism/sdk/renderer";
 import { JsonView } from "@asterism/ui/json-view";
 import { ToolDetails } from "@asterism/ui/tool-content";
@@ -11,7 +11,7 @@ import { Badge } from "@asterism/ui/ui/badge";
 import { resourceMessages as messages } from "../messages/resources";
 import { inputText } from "../shared/tool-preview";
 import { TOOL_BODY_LINE_LIMIT } from "../shared/tool-body";
-import { AgentListResult, CreationListResult, CreationInspectResult, ResourceCreateResult, ResourceRemoveResult } from "./contract";
+import { AgentListResult, CreationListResult, CreationInspectResult, ResourceCreateResult, ResourceRemoveResult, ResourceRenameResult } from "./contract";
 import { useCreationDirectory } from "./directory";
 
 function ResourceType({ kind }: { kind: string }) {
@@ -162,6 +162,12 @@ function RemoveBody({ result }: RemoveProps) {
   </div>;
 }
 
+function RenameHeader({ args, result }: ToolRenderProps<z.infer<typeof ResourceRenameResult.schema>>) {
+  return <ToolHeader label={useI18n().text(messages.rename)}
+    subject={result?.data?.title ?? inputText(args, "title")}
+    meta={result?.data?.resource_id ?? inputText(args, "resource_id")} />;
+}
+const renameView = { headerRenderer: RenameHeader };
 const listView = { headerRenderer: ListHeader, bodyRenderer: ListBody };
 const agentListView = { headerRenderer: AgentListHeader, bodyRenderer: AgentListBody };
 const inspectView = { headerRenderer: InspectHeader, bodyRenderer: InspectBody };
@@ -190,6 +196,10 @@ export default {
     toolRenderer(ResourceRemoveResult, {
       label: messages.remove, icon: <CircleMinus className="size-3.5" />,
       input: { headerRenderer: RemoveHeader }, execution: removeView, result: removeView,
+    }),
+    toolRenderer(ResourceRenameResult, {
+      label: messages.rename, icon: <PenLine className="size-3.5" />,
+      input: renameView, execution: renameView, result: renameView,
     }),
   ],
 } satisfies RendererModule;

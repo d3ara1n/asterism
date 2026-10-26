@@ -15,7 +15,7 @@ export function resourceSnapshot(ref: ResourceRef, resource: FoldedObject): Reso
   return deepFreeze({ ref: { ...ref }, title: resource.title, data: structuredClone(data) as Json });
 }
 export function sessionSnapshot(source: NodeView): SessionSnapshot {
-  const resources = () => foldWorkbench(source.read({ scope: "timeline", contracts: ["resource_created", "object_removed"] })
+  const resources = () => foldWorkbench(source.read({ scope: "timeline", contracts: ["resource_created", "resource_renamed", "object_removed"] })
     .map(({ node }) => node)).objects;
   const snapshot = (object: FoldedObject) => resourceSnapshot({ sessionId: source.id, id: object.id, kind: object.kind }, object);
   return {

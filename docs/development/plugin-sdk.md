@@ -50,7 +50,7 @@ Frontend and backend operations use the same host mechanisms. A backend action c
 
 Creation can establish initial links and return the new identity plus its creation-time title. Tool creation automatically links the new object to the caller; optional initial resources stay within captured request access. Exposing the caller creates only that explicit reverse relationship.
 
-Removal and link operations use shared host mechanisms for resource identity, presence, and lifecycle. Caller knowledge of an ID does not establish scope.
+Renaming, removal, and link operations use shared host mechanisms for resource identity, presence, and lifecycle. Renaming appends a title event; existing snapshots retain the title at their captured timeline endpoint. Tool renaming and removal resolve targets within captured request links. Caller knowledge of an ID does not establish scope.
 
 ## Lifetimes and busy work
 

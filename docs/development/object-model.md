@@ -30,7 +30,7 @@ An agent is an execution object and can also be a linked resource. Its controlle
 
 Agents have no intrinsic parent-child hierarchy. Delegation composes creation, links, and communication. Creating another agent does not expand the caller’s own tool policy.
 
-An explicit creation title is preserved; otherwise the built-in Agent chooses a display name once. Display names can repeat and do not identify operation targets.
+An explicit creation title supplies the initial name; otherwise the built-in Agent chooses a display name once. Display names can repeat and do not identify operation targets.
 
 System instructions belong to the request environment. The timeline stores actual input and output records, not a second copy of the environment.
 
@@ -39,6 +39,8 @@ System instructions belong to the request environment. The timeline stores actua
 A resource has stable identity, type, lifecycle, and presentation. Tools independently declare which resource types they support. Resource definitions contain neither a tool catalog nor a tool policy.
 
 Creation establishes identity, initial data, history, and optional links together. A resource’s static display descriptor supplies its type name and icon independently of its current data or card renderer.
+
+Resource titles belong to the timeline. Renaming appends an event, and each branch reconstructs the title from its own path. Identity, type, links, creation data, and external locators remain unchanged. Frontend and tool operations share the host rename mechanism; tool targets must belong to the request's captured linked resources.
 
 Resource categories differ in what Asterism owns:
 

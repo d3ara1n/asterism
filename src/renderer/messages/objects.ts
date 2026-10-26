@@ -1,6 +1,9 @@
 import { defineMessages, pluginNamespace } from "@asterism/sdk/contracts";
 
 export const objectsMessages = pluginNamespace("asterism.host").messages("en", defineMessages({
+  renameObject: { id: "objects.rename", defaultMessage: "Rename resource" },
+  renameObjectDescription: { id: "objects.rename.description", defaultMessage: "Set the resource title shown on its card and in resource lists." },
+  objectTitle: { id: "objects.title", defaultMessage: "Title" },
   auxiliaryPanels: { id: "objects.auxiliaryPanels", defaultMessage: "Auxiliary panels" },
   openInIsland: { id: "objects.openInIsland", defaultMessage: "Open in island" },
   returnToCard: { id: "objects.returnToCard", defaultMessage: "Return to card" },

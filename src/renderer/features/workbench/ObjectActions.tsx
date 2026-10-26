@@ -1,7 +1,7 @@
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent, DropdownMenuItem, DropdownMenuSeparator } from "@asterism/ui/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuGroup, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent, DropdownMenuItem, DropdownMenuSeparator } from "@asterism/ui/ui/dropdown-menu";
 
 import { Button } from "@asterism/ui/ui/button";
-import { MoreHorizontal, Scaling, RotateCcw, Trash2 } from "lucide-react";
+import { MoreHorizontal, PenLine, Scaling, RotateCcw, Trash2 } from "lucide-react";
 
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@asterism/ui/ui/alert-dialog";
 
@@ -9,7 +9,7 @@ import { Spinner } from "@asterism/ui/ui/spinner";
 import { commonMessages } from "@asterism/ui/messages/common";
 import { objectsMessages } from "../../messages/objects";
 import { useI18n } from "../../shared/i18n";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { maximumCardDimension, type CardSize, type WorkbenchObject } from "../../../shared/workbench";
 
@@ -17,31 +17,45 @@ import { useSessionActivity } from "../session/state";
 import { useDisposalWarnings } from "../session/disposal";
 import { useWorkbench } from "./context";
 import type { ViewPatch } from "./ObjectCard";
+import { RenameObject } from "./RenameObject";
 
-/** 卡片菜单集中管理视图尺寸与对象移除。 */
+/** 卡片菜单集中管理名称、视图尺寸与对象移除。 */
 export function ObjectActions({ object, defaultSize, onView }: {
   object: WorkbenchObject; defaultSize: CardSize; onView: (patch: ViewPatch) => void;
 }) {
   const i18n = useI18n();
   const { ready } = useWorkbench();
-  const [open, setOpen] = useState(false);
-  return <><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon-xs" aria-label={i18n.formatMessage(objectsMessages.objectActions)}><MoreHorizontal /></Button></DropdownMenuTrigger>
-    <DropdownMenuContent align="end">
+  const [dialog, setDialog] = useState<"rename" | "remove" | null>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const openingRename = useRef(false);
+  return <><DropdownMenu><DropdownMenuTrigger asChild><Button ref={trigger} variant="ghost" size="icon-xs" aria-label={i18n.formatMessage(objectsMessages.objectActions)}><MoreHorizontal /></Button></DropdownMenuTrigger>
+    <DropdownMenuContent align="end" onCloseAutoFocus={event => {
+      if (openingRename.current) { event.preventDefault(); openingRename.current = false; }
+    }}>
+      <DropdownMenuGroup>
+        <DropdownMenuItem disabled={!ready} onSelect={() => { openingRename.current = true; setDialog("rename"); }}>
+          <PenLine />{i18n.text(objectsMessages.renameObject)}…
+        </DropdownMenuItem>
+      </DropdownMenuGroup>
+      <DropdownMenuSeparator />
       <DropdownMenuSub><DropdownMenuSubTrigger><Scaling />{i18n.formatMessage(objectsMessages.cardSize)}</DropdownMenuSubTrigger>
         <DropdownMenuSubContent>
-          {[{ label: i18n.formatMessage(objectsMessages.cardSizeLarge), scale: 1.5 }, { label: i18n.formatMessage(objectsMessages.cardSizeExtraLarge), scale: 2 }].map(({ label, scale }) =>
-            <DropdownMenuItem key={scale} onSelect={() => onView({ size: {
-              width: Math.min(maximumCardDimension, Math.round(defaultSize.width * scale)),
-              height: Math.min(maximumCardDimension, Math.round(defaultSize.height * scale)),
-            } })}>{label}</DropdownMenuItem>)}
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onSelect={() => onView({ size: null })}><RotateCcw />{i18n.formatMessage(objectsMessages.restoreCardSize)}</DropdownMenuItem>
+          <DropdownMenuGroup>
+            {[{ label: i18n.formatMessage(objectsMessages.cardSizeLarge), scale: 1.5 }, { label: i18n.formatMessage(objectsMessages.cardSizeExtraLarge), scale: 2 }].map(({ label, scale }) =>
+              <DropdownMenuItem key={scale} onSelect={() => onView({ size: {
+                width: Math.min(maximumCardDimension, Math.round(defaultSize.width * scale)),
+                height: Math.min(maximumCardDimension, Math.round(defaultSize.height * scale)),
+              } })}>{label}</DropdownMenuItem>)}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={() => onView({ size: null })}><RotateCcw />{i18n.formatMessage(objectsMessages.restoreCardSize)}</DropdownMenuItem>
+          </DropdownMenuGroup>
         </DropdownMenuSubContent>
       </DropdownMenuSub>
       <DropdownMenuSeparator />
-      <DropdownMenuItem disabled={!ready} onSelect={() => setOpen(true)}><Trash2 />{i18n.formatMessage(objectsMessages.removeObject, { title: object.title })}…</DropdownMenuItem>
+      <DropdownMenuGroup><DropdownMenuItem disabled={!ready} onSelect={() => setDialog("remove")}><Trash2 />{i18n.formatMessage(objectsMessages.removeObject, { title: object.title })}…</DropdownMenuItem></DropdownMenuGroup>
     </DropdownMenuContent>
-  </DropdownMenu>{open && <RemoveObject object={object} onClose={() => setOpen(false)} />}</>;
+  </DropdownMenu>{dialog === "remove" && <RemoveObject object={object} onClose={() => setDialog(null)} />}
+    {dialog === "rename" && <RenameObject object={object} onClose={() => setDialog(null)} onRestoreFocus={() => trigger.current?.focus()} />}</>;
 }
 function RemoveObject({ object, onClose }: { object: WorkbenchObject; onClose: () => void }) {
   const i18n = useI18n();

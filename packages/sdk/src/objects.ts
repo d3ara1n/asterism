@@ -46,6 +46,8 @@ export interface SessionExecutor extends SessionReader {
   unlink(receiver: ResourceRef, resource: ResourceRef): void;
   /** 移除已收束对象并解除所有链接；保留历史与外部实体。 */
   remove(resource: ResourceRef): void;
+  /** 标题变化时追加资源改名事件，返回去除首尾空白后的标题。 */
+  rename(resource: ResourceRef, title: string): string;
   commit(work: (writer: SessionWriter) => undefined): void;
   /** set 直接覆盖会话标题；可在同步 commit 内调用并随其提交或回滚。 */
   readonly title: SessionReader["title"] & { set(text: string): void };
@@ -53,7 +55,7 @@ export interface SessionExecutor extends SessionReader {
 /**
  * 同一会话在工具调用发起者与本次请求视角下的操作门面。
  * 宿主绑定发起资源、请求开始时的有效链接范围和工具执行作用域，统一处理身份与执行校验。
- * 操作从发起资源出发：创建后链接给发起者，移除目标从本请求有效链接范围内解析。
+ * 操作从发起资源出发：创建后链接给发起者，移除与改名目标从本请求有效链接范围内解析。
  * 新增操作沿用此视角，明确隐式绑定的端点、可操作资源范围及执行作用域。
  */
 export interface ToolSession extends SessionReader {
@@ -63,6 +65,7 @@ export interface ToolSession extends SessionReader {
     exposeSelf?: boolean;
   }): Promise<ResourceCreationResult>;
   remove(resourceId: string): void;
+  rename(resourceId: string, title: string): string;
 }
 export interface ObjectReader {
   readonly ref: ResourceRef;

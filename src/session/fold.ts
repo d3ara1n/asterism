@@ -17,6 +17,11 @@ export function foldWorkbench(path: readonly SessionNode[]): FoldedState {
         objects.set(id, { id, kind: d.type, title: String(d.title ?? "Resource"), data: d });
         break;
       }
+      case "resource_renamed": {
+        const object = objects.get(id);
+        if (object) object.title = String(d.title);
+        break;
+      }
       case "object_removed": objects.delete(id); for (const [k, l] of links) if (l.receiverId === id || l.resourceId === id) links.delete(k); break;
       // 链接两端都是资源，接收者保存在载荷中；来源是宿主工作台。
       case "resource_attached": if (typeof d.receiverId === "string") links.set(`${d.receiverId}:${id}`, { receiverId: d.receiverId, resourceId: id }); break;

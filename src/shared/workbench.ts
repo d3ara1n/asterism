@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { presentationSchema } from "@asterism/sdk/contracts";
+import { presentationSchema, resourceTitleSchema } from "@asterism/sdk/contracts";
 
 const id = z.string().min(1).max(160);
 const sessionId = z.string().uuid();
@@ -21,6 +21,7 @@ export type Viewport = z.infer<typeof viewportSchema>;
 /** 资源变更与布局属于指定会话；操作始终针对执行游标。 */
 export const workbenchCommands = [
   z.strictObject({ type: z.literal("object.remove"), sessionId, objectId: id }),
+  z.strictObject({ type: z.literal("object.rename"), sessionId, objectId: id, title: resourceTitleSchema }),
   z.strictObject({ type: z.literal("link.set"), sessionId, receiverId: id, resourceId: id, linked: z.boolean() }),
   z.strictObject({ type: z.literal("view.set"), sessionId, objectId: id, position: pointSchema.optional(),
     hidden: z.boolean().optional(), collapsed: z.boolean().optional(), size: cardSizeSchema.nullable().optional() }),

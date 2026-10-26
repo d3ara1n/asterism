@@ -42,7 +42,7 @@ Explicit cursor changes write a separate selection log in the same transaction a
 
 ## Reconstruct and project
 
-The host reconstructs resource presence and links by replaying workbench events along the selected path. Display, object operations, and the next request’s access share that result. Reconstruction failure must not retain old authorization as a fallback.
+The host reconstructs resource presence, titles, and links by replaying workbench events along the selected path. Display, object operations, and the next request’s access share that result. Reconstruction failure must not retain old authorization as a fallback.
 
 Presence notifications compare resource identity sets after commit. They do not replay external operations or append new creation/removal events.
 

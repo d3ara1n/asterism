@@ -9,6 +9,7 @@ export const resourceMessages = pluginNamespace("asterism.builtin").messages("en
   inspect: { id: "resources.creationInspect", defaultMessage: "Inspect creation entry" },
   create: { id: "resources.create", defaultMessage: "Create resource" },
   remove: { id: "resources.remove", defaultMessage: "Remove resource" },
+  rename: { id: "resources.rename", defaultMessage: "Rename resource" },
   count: { id: "resources.creationCount", defaultMessage: "{count, plural, one {# entry} other {# entries}}" },
   empty: { id: "resources.noCreations", defaultMessage: "No creation entries are available." },
   directoryUnavailable: { id: "resources.directoryUnavailable", defaultMessage: "Resource types unavailable" },

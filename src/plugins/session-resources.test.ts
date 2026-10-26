@@ -78,6 +78,51 @@ function runner(f: ReturnType<typeof open>, actor: ResourceRef, target: Awaited<
 }
 
 describe("SDK 会话资源生命周期", () => {
+  // 资源标题属于历史路径；前端命令、SDK 读取和分叉必须观察同一事件结果，旧快照固定不变。
+  it("改名追加历史并按路径恢复标题，保留身份、链接与当前数据", async () => {
+    const f = open(), actor = await f.session.create(Create, 0), resource = await f.session.create(Create, 4);
+    f.session.link(actor, resource);
+    const before = f.session.snapshot(), initial = f.app.sessions.current(f.sessionId);
+    await f.app.sessions.execute({ type: "object.rename", sessionId: f.sessionId, objectId: resource.id, title: "  Research  " });
+    const renamed = f.session.snapshot();
+    expect(renamed.resources.all().find(item => item.ref.id === resource.id)?.title).toBe("Research");
+    expect(before.resources.all().find(item => item.ref.id === resource.id)?.title).toBe("Item");
+    expect(renamed.records.all({ scope: "timeline" }).at(-1)).toMatchObject({
+      contract: { id: "resource_renamed" }, data: { id: resource.id, title: "Research" },
+    });
+    const current = f.app.sessions.current(f.sessionId);
+    expect(current.workbench.objects.find(item => item.id === resource.id)).toEqual({
+      ...initial.workbench.objects.find(item => item.id === resource.id), title: "Research",
+    });
+    expect(current.workbench.links).toEqual(initial.workbench.links);
+    expect(current.workbench.views).toEqual(initial.workbench.views);
+    f.session.rename(resource, "Research");
+    expect(f.session.snapshot().position).toEqual(renamed.position);
+    await f.app.sessions.execute({ type: "select", sessionId: f.sessionId, nodeId: before.position.nodeId });
+    expect(f.app.sessions.current(f.sessionId).workbench.objects.find(item => item.id === resource.id)?.title).toBe("Item");
+    f.session.rename(resource, "Alternative");
+    const branch = f.session.snapshot();
+    await f.app.sessions.execute({ type: "select", sessionId: f.sessionId, nodeId: renamed.position.nodeId });
+    expect(f.session.snapshot().resources.all().find(item => item.ref.id === resource.id)?.title).toBe("Research");
+    expect(branch.resources.all().find(item => item.ref.id === resource.id)?.title).toBe("Alternative");
+    expect(f.plugin.object(f.sessionId, Item, resource.id).get(State)).toBe(5);
+  });
+
+  // 公开 SDK 不能绕过前端输入约束或跨会话身份检查；失败写入不得留下历史。
+  it("改名拒绝非法标题、错误身份和已移除对象", async () => {
+    const f = open(), resource = await f.session.create(Create, 0);
+    const head = f.session.snapshot().position;
+    expect(() => f.session.rename(resource, " \t ")).toThrow("non-whitespace");
+    expect(() => f.session.rename(resource, "x".repeat(161))).toThrow("160");
+    expect(() => f.session.rename({ ...resource, sessionId: f.app.sessions.tree.create("Other") }, "New")).toThrow("another session");
+    expect(() => f.session.rename({ ...resource, kind: "wrong/type" }, "New")).toThrow("type");
+    expect(f.session.snapshot().position).toEqual(head);
+    f.session.remove(resource);
+    const removed = f.session.snapshot().position;
+    expect(() => f.session.rename(resource, "New")).toThrow("not found");
+    expect(f.session.snapshot().position).toEqual(removed);
+  });
+
   // 后台曾把所有默认卡片视作 340×200；真实 Agent 与新建 Agent 的右下区域因此互相遮挡。
   // 使用实际注册的内置资源验证尺寸声明穿过 SDK 装配，连续创建按完整矩形避让且靠近创建者。
   it("后台连续创建按各类型完整默认尺寸避让，并优先放在创建者附近", async () => {
@@ -251,7 +296,31 @@ describe("SDK 会话资源生命周期", () => {
   });
 });
 
-describe("Agent 创建与移除入口", () => {
+describe("Agent 资源操作入口", () => {
+  // 顶级改名必须使用请求捕获的链接；同批新链接不授权，后续请求读取新名称。
+  it("resource_rename 沿用请求授权并返回实际保存的标题", async () => {
+    let mutate: (() => void) | undefined;
+    let calls: { name: string; args: Json }[] = [];
+    const f = open({ adapter: adapter(() => { mutate?.(); return calls; }) });
+    const target = await model(f.app), actor = await f.session.create(Create, 0), resource = await f.session.create(Create, 1);
+    const resourceId = resource.id;
+    calls = [{ name: "resource_rename", args: { resource_id: resourceId, title: "  Renamed  " } }];
+    const run = runner(f, actor, target);
+    mutate = () => f.session.link(actor, resource);
+    expect((await run()).tools[0]).toMatchObject({ kind: "rejected", error: { code: "access_denied" } });
+    expect(f.session.snapshot().resources.all().find(item => item.ref.id === resourceId)?.title).toBe("Item");
+    mutate = undefined;
+    calls.push({ name: "resource_list", args: {} });
+    const result = await run();
+    expect(result.tools[0]).toMatchObject({ kind: "succeeded", data: { resource_id: resourceId, title: "Renamed" } });
+    expect(result.tools[1]).toMatchObject({ kind: "succeeded", data: { resources: [
+      { resource_id: resourceId, type: Item.kind, title: "Item" },
+    ] } });
+    calls = [{ name: "resource_list", args: {} }];
+    expect((await run()).tools[0]).toMatchObject({ kind: "succeeded", data: { resources: [
+      { resource_id: resourceId, type: Item.kind, title: "Renamed" },
+    ] } });
+  });
   // 依据入口拥有领域输入：资源列表只在选择的入口显式声明，通用创建参数和笔记输入保持各自的结构。
   it("代理入口声明资源列表，笔记入口按自身 schema 创建", async () => {
     let calls: { name: string; args: Json }[] = [];
@@ -444,6 +513,7 @@ describe("Agent 创建与移除入口", () => {
     await runner(f, actor, target)();
     expect(() => saved.create(Create, 1)).toThrow("scope is closed");
     expect(() => saved.remove(actor.id)).toThrow("scope is closed");
+    expect(() => saved.rename(actor.id, "New")).toThrow("scope is closed");
   });
 
   // 依据插件生命周期与公共服务作用域：失败贡献即时移除，不串入另一个宿主实例。

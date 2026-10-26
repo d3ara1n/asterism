@@ -10,6 +10,24 @@ const created = (id: string, title: string, kind = "agent") => make(id, title, k
 const label = new ViewRegistry([...builtinViews, workbenchRecordViews]);
 
 describe("历史导航契约", () => {
+  // 改名只影响该事件的后代；整棵树按追加次序展示时也不能把旁支名称带到其他分支。
+  it("历史标题沿父节点继承改名，旧记录和旁支保持各自名称", () => {
+    const nodes = [
+      node("1", null, created("a", "Alpha")),
+      node("2", "1", created("n", "Original", "note")),
+      node("3", "2", attached("a", "n", null)),
+      node("4", "3", event("resource_renamed", { id: "n", title: "Revised" })),
+      node("5", "4", attached("a", "n", null)),
+      node("6", "3", event("resource_renamed", { id: "n", title: "Alternative" })),
+      node("7", "6", attached("a", "n", null)),
+      node("8", "5", attached("a", "n", null)),
+    ];
+    const entries = historyEntries(nodes, label);
+    expect([entries[2].label, entries[4].label, entries[6].label, entries[7].label]).toEqual([
+      "Linked Original to Alpha", "Linked Revised to Alpha", "Linked Alternative to Alpha", "Linked Revised to Alpha",
+    ]);
+    expect(entries[3].label).toBe("Renamed resource: Revised");
+  });
   it("资源视图按来源身份筛选，不混入同名代理、链接事件或工具目标", () => {
     const nodes = [
       node("1", null, created("a", "Same name")),

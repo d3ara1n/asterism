@@ -1,9 +1,9 @@
 import { z } from "zod";
-import { jsonSchema, type Json } from "@asterism/sdk/contracts";
+import { jsonSchema, resourceTitleSchema, type Json } from "@asterism/sdk/contracts";
 import { defineModule, defineTopLevelTool, implementCall, PluginApiError, type CallResult } from "@asterism/sdk/runtime";
 import { agentCreations } from "@asterism/builtin-api/runtime";
 import { AgentConfigurations, ReadAgentCreations } from "@asterism/builtin-api/contracts";
-import { AgentListResult, CreationListResult, CreationInspectResult, ResourceCreateResult, ResourceRemoveResult } from "./contract.ts";
+import { AgentListResult, CreationListResult, CreationInspectResult, ResourceCreateResult, ResourceRemoveResult, ResourceRenameResult } from "./contract.ts";
 
 /** 已知拒绝不伪装为未知写入；资源初始化异常仍沿用工具执行器的未知结局。 */
 async function attempt<T extends Json>(signal: AbortSignal, work: () => T | Promise<T>): Promise<CallResult<T>> {
@@ -69,6 +69,23 @@ export default defineModule(plugin => ({
         const resource = await agentCreations.create(plugin, args.creation_id, args.input, context);
         return { resource_id: resource.id, type: resource.kind, title: resource.title };
       }); },
+    }),
+    defineTopLevelTool({
+      id: ResourceRenameResult.id, name: "resource_rename",
+      description: "Rename the title of a resource linked to you in this session.",
+      guidelines: [
+        "The title change is recorded in session history. Resource identity, links, and underlying files or remote entities are preserved.",
+        "The new title appears in subsequent request snapshots.",
+      ],
+      argsSchema: z.strictObject({
+        resource_id: z.string().min(1).describe("ID of a resource linked at the start of this request."),
+        title: resourceTitleSchema.describe("New resource title, up to 160 characters. Leading and trailing whitespace is trimmed."),
+      }).describe("The linked resource and its new title."),
+      resultSchema: ResourceRenameResult.schema,
+      effect: "write", execution: "sequential",
+      execute(args, { session, signal }) {
+        return attempt(signal, () => ({ resource_id: args.resource_id, title: session.rename(args.resource_id, args.title) }));
+      },
     }),
     defineTopLevelTool({
       id: ResourceRemoveResult.id, name: "resource_remove",

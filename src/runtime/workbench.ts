@@ -68,6 +68,14 @@ export class SessionWorkbench {
     const folded = this.tree.workbench(command.sessionId);
     const tree = this.tree;
     switch (command.type) {
+      case "object.rename": {
+        const target = folded.objects.find(o => o.id === command.objectId);
+        if (!target) throw new SessionError("not_found", "Object does not belong to this session.");
+        if (target.title === command.title) break;
+        tree.appendToTimeline(command.sessionId, { source: host, recipient: null, contract: "resource_renamed",
+          data: { id: target.id, title: command.title }, model: null });
+        break;
+      }
       case "object.remove": {
         const target = folded.objects.find(o => o.id === command.objectId);
         if (!target) throw new SessionError("not_found", "Object does not belong to this session.");

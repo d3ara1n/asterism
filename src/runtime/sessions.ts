@@ -1,4 +1,4 @@
-import { resourceCall, jsonSchema, type ActionContract, type CreationContract, type ResourceCall, type ResourceCreationResult, type Json, type ModelInputPart, ResourceStatusChanged, SessionTitleChanged } from "@asterism/sdk/contracts";
+import { resourceCall, resourceTitleSchema, jsonSchema, type ActionContract, type CreationContract, type ResourceCall, type ResourceCreationResult, type Json, type ModelInputPart, ResourceStatusChanged, SessionTitleChanged } from "@asterism/sdk/contracts";
 import { type ResourceRef, type PluginDefinition, type ResourceCreationOptions, type ResourceActionOptions, PluginApiError } from "@asterism/sdk/runtime";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
@@ -87,6 +87,7 @@ export class SessionService {
       invoke: (sessionId, contract, target, input, options) => this.invokeFromPlugin(sessionId, contract, target, input, options),
       link: (sessionId, receiver, resource, linked) => this.setLink(sessionId, receiver, resource, linked),
       remove: (sessionId, resource) => this.removeResource(sessionId, resource),
+      rename: (sessionId, resource, title) => this.renameResource(sessionId, resource, title),
       view: sessionId => this.tree.view(sessionId),
       sequences: (sessionId, nodes) => this.tree.sequences(sessionId, nodes),
       timeline: sessionId => this.tree.timeline(sessionId),
@@ -234,7 +235,7 @@ export class SessionService {
         if (node.source?.resource) update.objects.add(node.source.resource.id);
       }
       update.workbench ||= !!scope.workbench || change.records.some(node =>
-        ["resource_created", "object_removed", "resource_attached", "resource_detached"].includes(node.contract));
+        ["resource_created", "resource_renamed", "object_removed", "resource_attached", "resource_detached"].includes(node.contract));
       update.layout ||= !!scope.layout;
     }
     if (this.closed) this.notify(sessionId);
@@ -394,6 +395,16 @@ export class SessionService {
       this.workbench.mutate({ type: "object.remove", sessionId, objectId: ref.id });
     });
   }
+  private renameResource(sessionId: string, ref: ResourceRef, text: string): string {
+    const parsed = resourceTitleSchema.safeParse(text);
+    if (!parsed.success) throw new SessionError("invalid_request", "The resource title must contain non-whitespace text and be at most 160 characters.");
+    const title = parsed.data.trim();
+    this.commit(sessionId, () => {
+      this.requireRef(sessionId, ref);
+      this.workbench.mutate({ type: "object.rename", sessionId, objectId: ref.id, title });
+    });
+    return title;
+  }
   private readonly pendingActions = new Map<symbol, ResourceRef>();
   private readonly pendingCreations = new Map<symbol, { sessionId: string; controller: AbortController; done: Promise<ResourceCreationResult> }>();
   private createResource(sessionId: string, kind: string, call: ResourceCall, content: ContentLease,
@@ -540,6 +551,9 @@ export class SessionService {
         if (command.type === "object.remove") {
           const target = this.object(command.sessionId, command.objectId);
           this.removeResource(command.sessionId, { sessionId: command.sessionId, id: target.id, kind: target.kind });
+        } else if (command.type === "object.rename") {
+          const target = this.object(command.sessionId, command.objectId);
+          this.renameResource(command.sessionId, { sessionId: command.sessionId, id: target.id, kind: target.kind }, command.title);
         } else if (command.type === "link.set") {
           const receiver = this.object(command.sessionId, command.receiverId), resource = this.object(command.sessionId, command.resourceId);
           this.setLink(command.sessionId, { sessionId: command.sessionId, id: receiver.id, kind: receiver.kind },

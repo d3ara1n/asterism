@@ -1,9 +1,9 @@
 import { recordRenderer, type RendererModule } from "@asterism/sdk/renderer";
 import { withValues } from "@asterism/sdk/contracts";
-import { Link, Unlink, Plus, Minus, PanelsTopLeft } from "lucide-react";
+import { Link, Unlink, Plus, Minus, PanelsTopLeft, PenLine } from "lucide-react";
 
 import { historyMessages } from "../../messages/history";
-import { ResourceCreated, ObjectAdded, ObjectRemoved, ResourceAttached, ResourceDetached } from "../../../shared/workbench-records";
+import { ResourceCreated, ResourceRenamed, ObjectAdded, ObjectRemoved, ResourceAttached, ResourceDetached } from "../../../shared/workbench-records";
 
 /** 宿主工作台事件的历史视图；与插件记录走同一注册表。 */
 export const workbenchRecordViews: RendererModule = {
@@ -11,6 +11,8 @@ export const workbenchRecordViews: RendererModule = {
   records: [
     recordRenderer(ResourceCreated, { icon: <PanelsTopLeft className="size-4" />,
       label: (data, ctx) => withValues(historyMessages.eventCreated, { kind: ctx.text(ctx.resourceLabel(data.type)), title: ctx.resourceTitle(data.id) }) }),
+    recordRenderer(ResourceRenamed, { icon: <PenLine className="size-4" />,
+      label: data => withValues(historyMessages.eventRenamed, { title: data.title }) }),
     recordRenderer(ObjectAdded, { icon: <Plus className="size-4" />, label: (data, ctx) => withValues(historyMessages.eventAdded, { title: ctx.resourceTitle(data.id) }) }),
     recordRenderer(ObjectRemoved, { icon: <Minus className="size-4" />, label: (data, ctx) => withValues(historyMessages.eventRemoved, { title: ctx.resourceTitle(data.id) }) }),
     recordRenderer(ResourceAttached, { icon: <Link className="size-4" />, label: (data, ctx) =>

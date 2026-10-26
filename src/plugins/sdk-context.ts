@@ -131,6 +131,10 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
       checkMutation();
       try { host.sessions.remove(id, resource); } catch (error) { sessionError(error); }
     },
+    rename(resource, title) {
+      checkMutation();
+      try { return host.sessions.rename(id, resource, title); } catch (error) { return sessionError(error); }
+    },
     get: contract => readData(id, null, contract),
     snapshot() {
       checkAvailable();
@@ -435,6 +439,10 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
         remove(resourceId: string) {
           check();
           source.remove(authorized(resourceId));
+        },
+        rename(resourceId: string, title: string) {
+          check();
+          return source.rename(authorized(resourceId), title);
         },
       });
     },

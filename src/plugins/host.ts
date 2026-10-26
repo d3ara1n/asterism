@@ -19,6 +19,7 @@ export interface SessionHost {
   invoke(sessionId: string, contract: ActionContract<unknown>, target: ResourceRef, input: Json, options: ResourceActionOptions & { owner: string; check(): void }): Promise<void>;
   link(sessionId: string, receiver: ResourceRef, resource: ResourceRef, linked: boolean): void;
   remove(sessionId: string, resource: ResourceRef): void;
+  rename(sessionId: string, resource: ResourceRef, title: string): string;
   view(sessionId: string): NodeView;
   sequences(sessionId: string, nodes: readonly SessionNode[]): number[];
   timeline(sessionId: string): SessionNode[];

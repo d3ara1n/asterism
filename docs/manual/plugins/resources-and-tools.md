@@ -10,11 +10,13 @@ The resource's lifetime follows its presence in the session. A hidden card does 
 
 Creation supplies initial state. Actions change the object through typed application or plugin operations. Views present the resulting state.
 
+Resource titles belong to session history. Use the session's rename operation with a resource reference to change a title; the host appends the event and reconstructs names along each history path. Tool sessions accept a resource ID within the request's captured links. Existing snapshots keep their captured titles.
+
 ## Add a model operation
 
 Use a resource tool when an operation targets a linked object. A shared tool can have implementations for different resource types, each with an appropriate internal target and result.
 
-Use a top-level tool when the operation belongs to the execution context without selecting a target resource. The host supplies caller identity and execution scope.
+Use a top-level tool for operations on the execution context or shared resource lifecycle, such as creation and renaming. The host supplies caller identity and execution scope.
 
 Describe the operation's purpose and observable behavior. Parameters should explain business meaning that names and types alone do not express. Results should distinguish known success, failure, cancellation, partial output, and uncertain effects.
 

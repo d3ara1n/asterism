@@ -1,4 +1,8 @@
 {
+  "objects.rename": "重命名资源",
+  "objects.rename.description": "设置卡片和资源列表中显示的资源标题。",
+  "objects.title": "标题",
+  "eventRenamed": "资源已重命名：{title}",
   "appearance.terminalFont": "终端字体",
   "appearance.resetCodeFontSize": "代码字号还原为自动",
   "appearance.terminalFontSize": "终端字号（px）",

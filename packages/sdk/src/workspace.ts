@@ -2,7 +2,10 @@
 import type { Json } from "./json.ts";
 import type { ResourceContract } from "./module-contract.ts";
 import type { SessionView } from "./records.ts";
+import { z } from "zod";
 
+/** 资源改名输入；身份和外部定位不随名称改变。 */
+export const resourceTitleSchema = z.string().max(160).regex(/\S/u, "The title must contain non-whitespace text.");
 export interface ResourceRef { readonly sessionId: string; readonly id: string; readonly kind: string }
 /** 已提交创建的身份与当时标题；标题是结果摘要，不参与资源身份校验。 */
 export interface ResourceCreationResult extends ResourceRef { readonly title: string }

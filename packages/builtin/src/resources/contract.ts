@@ -23,3 +23,5 @@ export const ResourceCreateResult = builtin.data("resource.create",
   ]).describe("Resource type during creation; committed resource identity, type, and title on success."));
 export const ResourceRemoveResult = builtin.data("resource.remove",
   z.strictObject({ resource_id: z.string() }).describe("Identity of the removed resource."));
+export const ResourceRenameResult = builtin.data("resource.rename",
+  z.strictObject({ resource_id: z.string(), title: z.string() }).describe("Resource identity and committed title."));

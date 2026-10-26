@@ -50,3 +50,5 @@ Inspect the available agent tools for sending, waiting, or reading its records. 
 ## Manage resource views
 
 Use the object panel to find resources and reopen their cards. Hiding a card retains the object. Removing a resource removes it from the current workbench and clears its links; historical records remain.
+
+Choose **Rename resource** from a card's action menu to change its title. Models can rename a linked resource with `resource_rename`, supplying its `resource_id` and new `title`. Names are limited to 160 characters and must contain non-whitespace text. Renaming records an event, so historical views and branches retain the names on their own paths. The resource ID, links, and underlying files or paths stay the same.

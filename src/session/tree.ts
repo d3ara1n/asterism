@@ -46,7 +46,7 @@ export class SessionTree {
     const previous = this.workbenches.get(sessionId);
     if (previous?.cursor === cursor) return previous.state;
     const state = deepFreeze(foldWorkbench(this.view(sessionId).read({
-      scope: "timeline", contracts: ["resource_created", "object_removed", "resource_attached", "resource_detached"],
+      scope: "timeline", contracts: ["resource_created", "resource_renamed", "object_removed", "resource_attached", "resource_detached"],
     }).map(({ node }) => node)));
     this.workbenches.set(sessionId, { cursor, state });
     return state;
