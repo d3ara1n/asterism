@@ -1,6 +1,5 @@
 import { runtime } from "../../runtime";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { motion } from "motion/react";
 import { Plus, Puzzle, RefreshCw } from "lucide-react";
 import { RendererPreferencesProvider, type PluginSettingsPage } from "@asterism/sdk/renderer";
 import type { UiText } from "@asterism/sdk/contracts";
@@ -20,7 +19,6 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@
 import { Switch } from "@asterism/ui/ui/switch";
 import { Spinner } from "@asterism/ui/ui/spinner";
 import { AlertDialog, AlertDialogTrigger, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@asterism/ui/ui/alert-dialog";
-import { islandTransition } from "../../shared/weave/motion";
 import { usePluginSettingsRegistry } from "../../modules/settings";
 
 export type PluginInfo = AppSnapshot["plugins"][number];
@@ -94,8 +92,7 @@ export function PluginsOverview({ manager, onOpen, cardRef, query, filter, onQue
     <PluginFeedback manager={manager} />
     <div className="settings-grid">
       {list.map(plugin => <Item key={pluginKey(plugin)} variant="outline" asChild className="surface grid h-full grid-cols-[auto_minmax(0,1fr)] items-start text-left hover:bg-accent">
-        <motion.button type="button" ref={node => cardRef(pluginKey(plugin), node)} onClick={() => onOpen(pluginKey(plugin))}
-          layoutId={`settings-card-${pluginKey(plugin)}`} transition={islandTransition}>
+        <button type="button" ref={node => cardRef(pluginKey(plugin), node)} onClick={() => onOpen(pluginKey(plugin))}>
           {plugin.metadata.icon ? <img src={plugin.metadata.icon} alt="" className="size-10 shrink-0 object-contain" /> : <Puzzle className="size-8 shrink-0 text-muted-foreground" />}
           <ItemContent className="min-w-0 w-full">
             <ItemTitle className="min-w-0 w-full break-words">{plugin.metadata.name ? i18n.text(plugin.metadata.name) : plugin.id ?? i18n.text(messages.unknownPlugin)}</ItemTitle>
@@ -103,7 +100,7 @@ export function PluginsOverview({ manager, onOpen, cardRef, query, filter, onQue
             <span className="type-caption">{[plugin.metadata.author, plugin.metadata.version].filter(Boolean).join(" · ")}</span>
             <span className="mt-1 flex flex-wrap gap-2"><PluginStatus plugin={plugin} />{plugin.index === null && <Badge variant="secondary">{i18n.text(messages.builtIn)}</Badge>}</span>
           </ItemContent>
-        </motion.button>
+        </button>
       </Item>)}
     </div>
     {!list.length && !manager.busy && <p className="type-caption py-6 text-center">{i18n.text(messages.noResults)}</p>}

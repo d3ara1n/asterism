@@ -227,7 +227,7 @@
   .home-page { @apply flex h-full overflow-y-auto px-6 py-10; padding-inline: calc(1.5rem + var(--space-inset)); }
   .home-content { @apply m-auto w-full max-w-5xl shrink-0; }
 
-  /* 设置：分类卡片平铺在材质上；选中卡片底板扩展为内容区，其余收缩消失。 */
+  /* 设置：分类卡片平铺在材质上；分类详情绝对定位叠在总览之上，以卡片为原点淡入放大。 */
   /* 浮岛编织：屏内浮岛自左向右；放得下时分栏居中，放不下时溢出并跟随焦点。 */
   .weave-viewport { @apply relative min-h-0 min-w-0 overflow-clip; }
   .weave-strip { position: absolute; inset: 0 var(--space-inset) var(--space-inset); }

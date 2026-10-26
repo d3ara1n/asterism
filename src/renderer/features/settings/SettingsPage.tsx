@@ -10,7 +10,7 @@ import { PluginsOverview, PluginDetails, usePlugins, pluginKey, type PluginManag
 import { pluginsMessages } from "../../messages/plugins";
 import { Item, ItemContent, ItemTitle, ItemDescription } from "@asterism/ui/ui/item";
 import { Separator } from "@asterism/ui/ui/separator";
-import { LayoutGroup, AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 
 import { Card } from "@asterism/ui/ui/card";
 
@@ -23,7 +23,7 @@ import { settingsMessages } from "../../messages/settings";
 import { useI18n } from "../../shared/i18n";
 import { useEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
 
-/** 官方 Card 作为共享元素动画的承载元素；组件源码不改。 */
+/** 官方 Card 作为详情动画的承载元素；组件源码不改。 */
 const MotionCard = motion.create(Card);
 import { fadeTransition, islandTransition } from "../../shared/weave/motion";
 
@@ -41,17 +41,20 @@ const categories: SettingsCategory[] = [
 ];
 
 /**
- * 设置屏：根浮岛先是平铺在材质上的分类卡片；打开分类时选中卡片经共享布局（layoutId）放大为分类内容，
- * 其余卡片收缩消失。分类内容可在右侧打开更深的浮岛（如提供商详情）。
+ * 设置屏：根浮岛先是平铺在材质上的分类卡片；打开分类时总览淡出，分类内容以被点击卡片为变换原点放大淡入，
+ * 关闭时沿同一原点收回。只动 opacity/transform，不做布局插值。分类内容可在右侧打开更深的浮岛（如提供商详情）。
  */
 export type SettingsTarget = ({ category: SettingsCategoryId } | { pluginId: string; location?: string }) & { sequence: number };
 function SettingsRoot({ openId, onOpen, onClosed, manager, location }: { openId: string | null; onOpen: (id: string) => void; onClosed: () => void; manager: PluginManager; location?: string }) {
   const i18n = useI18n();
   const island = useIsland();
+  const stage = useRef<HTMLDivElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   const cards = useRef(new Map<string, HTMLButtonElement>());
   const lastCard = useRef<string | null>(null);
   const overviewScroll = useRef(0);
+  // 详情与总览共用的变换原点（相对舞台）：取最近一次点击的卡片中心；外部直接打开时沿用上次或顶部居中。
+  const [origin, setOrigin] = useState("50% 0px");
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("all");
   const plugin = manager.list.find(plugin => pluginKey(plugin) === openId);
@@ -61,55 +64,61 @@ function SettingsRoot({ openId, onOpen, onClosed, manager, location }: { openId:
   } : undefined);
 
   useEffect(() => { if (openId) heading.current?.focus({ preventScroll: true }); }, [openId]);
+  const openCard = (id: string) => {
+    const card = cards.current.get(id)?.getBoundingClientRect(), base = stage.current?.getBoundingClientRect();
+    if (card && base) setOrigin(`${card.left + card.width / 2 - base.left}px ${card.top + card.height / 2 - base.top}px`);
+    onOpen(id);
+  };
   const close = async () => {
     if (!openId || !(await island.closeChild())) return;
     lastCard.current = openId;
     onClosed();
   };
 
-  return <LayoutGroup id="settings"><div className="settings-stage" onKeyDown={event => {
+  return <div ref={stage} className="settings-stage" onKeyDown={event => {
     if (event.key === "Escape" && open && !event.defaultPrevented) { event.preventDefault(); event.stopPropagation(); close(); }
   }}>
     <h1 className="sr-only">{i18n.formatMessage(settingsMessages.settings)}</h1>
-    <AnimatePresence mode="popLayout" initial={false}
+    {/* 详情绝对定位叠在总览之上，两者同时进出场；总览随原点轻微后退，详情从卡片位置长出。 */}
+    <AnimatePresence initial={false}
       onExitComplete={() => { const id = lastCard.current; if (id) cards.current.get(id)?.focus({ preventScroll: true }); lastCard.current = null; }}>
       {!open ? <motion.div key="grid" className="flex h-full flex-col gap-8 overflow-y-auto"
         ref={node => { if (node) node.scrollTop = overviewScroll.current; }}
         onScroll={event => { overviewScroll.current = event.currentTarget.scrollTop; }}
-        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={fadeTransition}>
+        style={{ transformOrigin: origin }}
+        initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.98 }} transition={fadeTransition}>
         <section className="shrink-0" aria-labelledby="application-settings-title">
           <header className="mb-4 space-y-2">
             <h2 id="application-settings-title" className="type-section">{i18n.text(pluginsMessages.application)}</h2>
             <p className="type-caption">{i18n.text(pluginsMessages.applicationSummary)}</p>
           </header>
           <div className="settings-grid">
-        {categories.map(({ id, title, summary, icon: Icon }) => <Item key={id} variant="outline" asChild className="surface h-full hover:bg-accent"><motion.button type="button" className="settings-card group"
-          layoutId={`settings-card-${id}`} transition={islandTransition}
-          initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.85 }}
+        {categories.map(({ id, title, summary, icon: Icon }) => <Item key={id} variant="outline" asChild className="surface h-full hover:bg-accent"><button type="button" className="settings-card group"
           ref={node => { if (node) cards.current.set(id, node); else cards.current.delete(id); }}
-          onClick={() => onOpen(id)}>
+          onClick={() => openCard(id)}>
           <ItemContent>
             <Icon className="mb-2 size-4 text-muted-foreground" aria-hidden="true" />
             <ItemTitle>{i18n.text(title)}</ItemTitle><ItemDescription>{i18n.text(summary)}</ItemDescription>
           </ItemContent>
-        </motion.button></Item>)}
+        </button></Item>)}
           </div>
         </section>
         <Separator />
         <PluginsOverview manager={manager} query={query} filter={filter} onQuery={setQuery} onFilter={setFilter}
-          onOpen={onOpen} cardRef={(id, node) => { if (node) cards.current.set(id, node); else cards.current.delete(id); }} />
-      </motion.div> : <MotionCard key={`detail-${open.id}`} layoutId={`settings-card-${open.id}`} transition={islandTransition}
-        className="settings-detail gap-0 py-0" style={{ borderRadius: "calc(var(--radius) + 4px)" }}>
-        <motion.div className="p-6" initial={{ opacity: 0 }} animate={{ opacity: 1, transition: { ...islandTransition, delay: 0.18 } }} exit={{ opacity: 0, transition: fadeTransition }}>
+          onOpen={openCard} cardRef={(id, node) => { if (node) cards.current.set(id, node); else cards.current.delete(id); }} />
+      </motion.div> : <MotionCard key={`detail-${open.id}`} className="settings-detail gap-0 py-0" style={{ transformOrigin: origin }}
+        initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.96, transition: fadeTransition }}
+        transition={islandTransition}>
+        <div className="p-6">
           <Button variant="ghost" size="sm" className="-ml-2 mb-4" onClick={() => void close()}><ArrowLeft />{i18n.formatMessage(settingsMessages.allSettings)}</Button>
           {/* 关于页以应用名片作为可见标题，分类标题只保留给辅助技术与焦点落点。 */}
           <h2 ref={heading} tabIndex={-1} className={open.id === "about" ? "sr-only" : "type-page mb-2 outline-none"}>{i18n.text(open.title)}</h2>
           {["providers", "roles", "agents"].includes(open.id) && <ConfigurationReadStatus />}
           {open.content()}
-        </motion.div>
+        </div>
       </MotionCard>}
     </AnimatePresence>
-  </div></LayoutGroup>;
+  </div>;
 }
 
 const pageMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0
