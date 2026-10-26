@@ -6,6 +6,9 @@ export const Directory = builtin.resource("directory", z.object({ path: z.string
 export const CreateDirectory = defineCreation(Directory, { id: builtin.name("directory.create"),
   schema: z.strictObject({ path: z.string().min(1).max(4096), title: z.string().trim().min(1).max(160).optional() }),
 });
+export const ReadDirectoryDefaults = defineCall(builtin.name("directory.defaults"), {
+  scope: "plugin", input: z.strictObject({}), output: z.strictObject({ path: z.string() }),
+});
 export const DirectoryView = builtin.data("directory.card", z.strictObject({ path: z.string() }));
 export const DirectoryList = defineImplementation({
   ...builtin.data("directory.list", z.strictObject({
