@@ -50,8 +50,10 @@
   /* 受管空间内边距：浮岛顶边与页面顶边对齐。 */
   --space-inset: 0px;
   --motion-fast: 200ms;
-  --motion-page: 380ms;
+  --motion-page: 560ms;
   --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  /* 屏切换：指数型缓出，起步迅速、长尾缓慢落定，不越过终点。 */
+  --ease-page: cubic-bezier(0.16, 1, 0.3, 1);
 }
 /* 暗色首帧兜底（graphite + gray）；运行时由 themeTokens 覆盖。 */
 @media (prefers-color-scheme: dark) {
@@ -199,7 +201,7 @@
     @apply flex h-full;
     gap: var(--window-gap);
     transform: translateX(calc(var(--screen-index) * -1 * (100% + var(--window-gap))));
-    transition: transform var(--motion-page) var(--ease-out);
+    transition: transform var(--motion-page) var(--ease-page);
   }
   .space-screen { @apply relative isolate h-full min-h-0 w-full shrink-0 overflow-hidden rounded-lg outline-none; }
   /* 屏铺满 Space、贴住窗口边缘；滚动容器在屏内部留出 --space-inset。带底板的屏自身让出边距。 */
