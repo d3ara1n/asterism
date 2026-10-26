@@ -14,6 +14,7 @@ import { terminalMessages } from "../messages/terminal";
 import { CloseTerminal, StartTerminal, type TerminalConfig, type TerminalState } from "./contract";
 import { useTerminalLink } from "./link";
 import { ScreenWriter } from "./screen-writer";
+import { terminalTypography } from "./typography";
 
 /** 浏览器副本保留输入能力；终端协议查询由后台的唯一解析器应答。 */
 function passiveProtocol(terminal: Terminal) {
@@ -61,7 +62,7 @@ export function TerminalCard() {
     const host = container.current;
     if (!host) return;
     const terminal = new Terminal({ cols: 100, rows: 28, scrollback: 5000, allowProposedApi: true,
-      fontFamily: 'Menlo, Consolas, "Liberation Mono", monospace', fontSize: 14, cursorBlink: true,
+      ...terminalTypography(), cursorBlink: true,
       theme: { background: "#1e1e1e", foreground: "#d4d4d4", cursor: "#d4d4d4" } });
     const fit = new FitAddon();
     terminal.loadAddon(fit); passiveProtocol(terminal);
@@ -85,17 +86,26 @@ export function TerminalCard() {
     });
     let scheduled = 0;
     // 尺寸以后台回传为准；本地只提出建议。
-    const observer = new ResizeObserver(() => {
+    const fitScreen = () => {
       cancelAnimationFrame(scheduled);
       scheduled = requestAnimationFrame(() => {
         if (!host.clientWidth || !host.clientHeight) return;
         const size = fit.proposeDimensions();
         if (size && (size.cols !== terminal.cols || size.rows !== terminal.rows)) link.send({ type: "resize", cols: size.cols, rows: size.rows });
       });
+    };
+    const observer = new ResizeObserver(fitScreen);
+    const typographyObserver = new MutationObserver(() => {
+      const { fontFamily, fontSize } = terminalTypography();
+      if (terminal.options.fontFamily === fontFamily && terminal.options.fontSize === fontSize) return;
+      terminal.options.fontFamily = fontFamily;
+      terminal.options.fontSize = fontSize;
+      fitScreen();
     });
+    typographyObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["style"] });
     observer.observe(host);
     return () => {
-      observer.disconnect(); cancelAnimationFrame(scheduled);
+      observer.disconnect(); typographyObserver.disconnect(); cancelAnimationFrame(scheduled);
       input.dispose(); binary.dispose(); detach(); screen.dispose();
       terminal.dispose(); terminalRef.current = null;
     };

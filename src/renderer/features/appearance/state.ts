@@ -14,6 +14,8 @@ function render() {
   const root = document.documentElement;
   for (const [name, value] of Object.entries(themeTokens(current, scheme))) root.style.setProperty(`--${name}`, value);
   root.style.setProperty("--app-font-sans", fontStack(current.uiFont, sansStack));
+  root.style.setProperty("--app-font-terminal", fontStack(current.terminalFont, monoStack));
+  root.style.setProperty("--terminal-font-size", `${current.terminalFontSize}px`);
   root.style.setProperty("--app-font-mono", fontStack(current.codeFont, monoStack));
   if (current.codeFontSize) root.style.setProperty("--code-font-size", `${current.codeFontSize}px`);
   else root.style.removeProperty("--code-font-size");

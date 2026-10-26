@@ -18,8 +18,8 @@ export type Scheme = "light" | "dark";
 export type AccentId = (typeof accentIds)[number];
 export type GrayId = (typeof grayIds)[number];
 
-export const codeFontSizes = [11, 12, 13, 14, 15, 16, 18] as const;
-export type CodeFontSize = (typeof codeFontSizes)[number];
+export const fontSizeRange = { min: 8, max: 24 } as const;
+export const defaultFontSize = 12;
 const fontFamilySchema = z.string().trim().min(1).max(128).nullable().default(null);
 
 /** 默认字体栈；用户字体只前置，不替换回退。 */
@@ -42,9 +42,12 @@ export const appearanceSchema = z.object({
   edgeStyle: z.enum(edgeStyles).catch("default"),
   /** 本机字体家族名；null 为系统默认栈。 */
   uiFont: fontFamilySchema.catch(null),
+  terminalFont: fontFamilySchema.catch(null),
+  /** 终端字号固定为 px，独立于界面密度和代码字号。 */
+  terminalFontSize: z.number().min(fontSizeRange.min).max(fontSizeRange.max).default(defaultFontSize).catch(defaultFontSize),
   codeFont: fontFamilySchema.catch(null),
   /** 代码字号（px），null 跟随所在界面文字。 */
-  codeFontSize: z.number().int().min(codeFontSizes[0]).max(codeFontSizes[codeFontSizes.length - 1]).nullable().default(null).catch(null),
+  codeFontSize: z.number().min(fontSizeRange.min).max(fontSizeRange.max).nullable().default(null).catch(null),
 });
 export type Appearance = z.infer<typeof appearanceSchema> & { radius: (typeof radii)[number] };
 

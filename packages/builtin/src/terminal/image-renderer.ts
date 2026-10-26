@@ -1,14 +1,15 @@
 import type { RendererPrepareContext } from "@asterism/sdk/renderer";
 import { CompleteTerminalImage, TerminalImageRequested, type TerminalImage } from "./contract.ts";
+import { terminalTypography } from "./typography.ts";
 
 /** 画布仅渲染已解析的字符网格；截图服务独立于卡片挂载。 */
 export function renderTerminalImage(screen: TerminalImage): string {
   const canvas = document.createElement("canvas");
   const context = canvas.getContext("2d");
   if (!context) throw new Error("Canvas rendering is unavailable.");
-  const font = 'Menlo, Consolas, "Liberation Mono", monospace';
-  context.font = `14px ${font}`;
-  const width = Math.ceil(context.measureText("M").width), height = 20, padding = 8;
+  const { fontFamily, fontSize } = terminalTypography();
+  context.font = `${fontSize}px ${fontFamily}`;
+  const width = Math.ceil(context.measureText("M").width), height = Math.ceil(fontSize * 1.5), padding = 8;
   canvas.width = screen.cols * width + padding * 2;
   canvas.height = screen.rows * height + padding * 2;
   context.fillStyle = "#1e1e1e"; context.fillRect(0, 0, canvas.width, canvas.height);
@@ -19,7 +20,7 @@ export function renderTerminalImage(screen: TerminalImage): string {
     const x = padding + col * width, y = padding + row * height, cellWidth = width * cell.width;
     context.fillStyle = cell.bg; context.fillRect(x, y, cellWidth, height);
     context.save(); context.beginPath(); context.rect(x, y, cellWidth, height); context.clip();
-    context.font = `${cell.italic ? "italic " : ""}${cell.bold ? "bold " : ""}14px ${font}`;
+    context.font = `${cell.italic ? "italic " : ""}${cell.bold ? "bold " : ""}${fontSize}px ${fontFamily}`;
     context.fillStyle = cell.fg; context.fillText(cell.text, x, y + height / 2);
     if (cell.underline) context.fillRect(x, y + height - 3, cellWidth, 1);
     if (cell.strike) context.fillRect(x, y + height / 2, cellWidth, 1);

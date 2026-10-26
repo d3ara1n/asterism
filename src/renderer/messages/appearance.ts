@@ -213,9 +213,33 @@ export const appearanceMessages = pluginNamespace("asterism.host").messages("en"
     id: "features_appearance_AppearanceSettings_47",
     defaultMessage: "Code font",
   },
+  terminalFont: {
+    id: "appearance.terminalFont",
+    defaultMessage: "Terminal font",
+  },
+  terminalFontSize: {
+    id: "appearance.terminalFontSize",
+    defaultMessage: "Terminal font size (px)",
+  },
+  decreaseTerminalFontSize: {
+    id: "appearance.decreaseTerminalFontSize",
+    defaultMessage: "Decrease terminal font size",
+  },
+  increaseTerminalFontSize: {
+    id: "appearance.increaseTerminalFontSize",
+    defaultMessage: "Increase terminal font size",
+  },
   codeFontSize: {
     id: "features_appearance_AppearanceSettings_48",
-    defaultMessage: "Code font size",
+    defaultMessage: "Code font size (px)",
+  },
+  decreaseCodeFontSize: {
+    id: "appearance.decreaseCodeFontSize",
+    defaultMessage: "Decrease code font size",
+  },
+  increaseCodeFontSize: {
+    id: "appearance.increaseCodeFontSize",
+    defaultMessage: "Increase code font size",
   },
   auto: {
     id: "features_appearance_AppearanceSettings_49",

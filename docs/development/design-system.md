@@ -75,7 +75,7 @@ User input and external Agent messages differ through placement, labels, and ico
 
 ## Controls and feedback
 
-Use shadcn/Radix controls and shared combinations in `packages/ui/src/ui/`. Feature code does not create parallel button, select, border, or shadow styles.
+Use shared shadcn controls backed by Radix or Base UI, and shared combinations in `packages/ui/src/ui/`. Feature code does not create parallel button, select, border, or shadow styles.
 
 | Button variant | Role |
 | --- | --- |
@@ -95,7 +95,9 @@ A workbench reread does not become a global saving badge or block ordinary inter
 
 ## Typography, charts, and editors
 
-Use the shared display, page, section, body, caption, label, and code roles. UI and code fonts have separate tokens. Read-only count abbreviations use the common formatter; editable and raw values remain complete.
+Use the shared display, page, section, body, caption, label, and code roles. Interface, terminal, and code fonts have independent settings. Code and terminal sizes accept fractional pixel values. Automatic code sizing inherits the surrounding text; clearing the code size restores this behavior. Terminal size is independent of interface density and defaults to 12 pixels. Read-only count abbreviations use the common formatter; editable and raw values remain complete.
+
+The host publishes typography through root CSS tokens. Plugin DOM content inherits those styles; renderers that require explicit font options consume the resolved tokens and apply changes to existing views. Interactive terminals and terminal images use the same font settings. Font changes recalculate terminal geometry without restarting the shell.
 
 Use Lucide icons. Chart category colors are independent of status and accent colors. Pair each graphic with visible labels and values; colors alone do not encode meaning.
 

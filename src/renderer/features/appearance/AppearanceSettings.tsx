@@ -1,15 +1,16 @@
 import { Monitor, Sun, Moon, FileText, Bot, Palette } from "lucide-react";
-import { useState, type CSSProperties } from "react";
+import { useEffect, useState, type ComponentProps, type CSSProperties } from "react";
 import { getBezierPath, getSmoothStepPath, Position } from "@xyflow/react";
 
-import { accentIds, codeFontSizes, grayIds, palettes, themeTokens, type AccentId, type CodeFontSize, type Appearance, type GrayId } from "../../../shared/theme";
+import { accentIds, defaultFontSize, fontSizeRange, grayIds, palettes, themeTokens, type AccentId, type Appearance, type GrayId } from "../../../shared/theme";
 import { appearanceMessages } from "../../messages/appearance";
 import { getI18n, useI18n } from "../../shared/i18n";
 import { Button } from "@asterism/ui/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@asterism/ui/ui/dialog";
 import { FontPicker } from "@asterism/ui/ui/font-picker";
+import { NumberField, NumberFieldGroup, NumberFieldInput, NumberFieldDecrement, NumberFieldIncrement } from "@asterism/ui/ui/number-field";
+import { cn } from "@asterism/ui/utils";
 import { ItemGroup, ItemSeparator, Item, ItemContent, ItemTitle, ItemDescription, ItemActions } from "@asterism/ui/ui/item";
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@asterism/ui/ui/select";
 import { SwatchGroup, ColorSwatch, TileSwatch } from "@asterism/ui/ui/swatch";
 import { ToggleGroup, ToggleGroupItem } from "@asterism/ui/ui/toggle-group";
 import { Section } from "../settings/layout";
@@ -43,6 +44,57 @@ const getFontText = () => ({
   unavailableText: getI18n().formatMessage(appearanceMessages.fontsUnavailable),
 });
 const radiusCorner: Record<Appearance["radius"], string> = { none: "0px", sm: "3px", md: "5px", lg: "8px" };
+
+/** 两种字号共用布局；代码允许自动，终端清空后恢复已保存的值。 */
+function FontSizeField({ kind, value }: { kind: "terminal"; value: number } | { kind: "code"; value: number | null }) {
+  const i18n = useI18n();
+  const [draft, setDraft] = useState<number | null>(value);
+  useEffect(() => { setDraft(value); }, [value]);
+  const commit = (next: number | null) => {
+    setDraft(kind === "code" ? next : next ?? value);
+    if (next === value) return;
+    if (kind === "code") void updateAppearance({ codeFontSize: next });
+    else if (next !== null) void updateAppearance({ terminalFontSize: next });
+  };
+  const stepFromAuto = (direction: 1 | -1, event: { altKey: boolean; shiftKey: boolean }) => {
+    const step = event.altKey ? 0.1 : event.shiftKey ? 10 : 1;
+    commit(Math.min(fontSizeRange.max, Math.max(fontSizeRange.min, defaultFontSize + direction * step)));
+  };
+  const stepperProps = (direction: 1 | -1): Pick<ComponentProps<typeof NumberFieldIncrement>, "onPointerDown" | "onClick"> => ({
+    // 空值的首步由自动字号语义决定；数值状态的步进与长按交给 Base UI。
+    onPointerDown: event => {
+      if (kind === "code" && draft === null) event.preventBaseUIHandler();
+    },
+    onClick: event => {
+      if (kind !== "code" || draft !== null) return;
+      event.preventBaseUIHandler();
+      stepFromAuto(direction, event);
+    },
+  });
+  return <NumberField value={draft} onValueChange={setDraft} {...fontSizeRange}
+    step="any" locale={i18n.locale} format={{ maximumFractionDigits: 20, useGrouping: false }}
+    onValueCommitted={commit}>
+    <NumberFieldGroup size="sm">
+      <NumberFieldDecrement {...stepperProps(-1)}
+        aria-label={i18n.formatMessage(kind === "code" ? appearanceMessages.decreaseCodeFontSize : appearanceMessages.decreaseTerminalFontSize)} />
+      <NumberFieldInput aria-label={i18n.formatMessage(kind === "code" ? appearanceMessages.codeFontSize : appearanceMessages.terminalFontSize)}
+        placeholder={kind === "code" ? i18n.formatMessage(appearanceMessages.auto) : undefined}
+        onKeyDown={event => {
+          if (event.key === "Enter" && !event.nativeEvent.isComposing) {
+            event.preventDefault();
+            event.currentTarget.blur();
+          } else if (kind === "code" && draft === null && (event.key === "ArrowUp" || event.key === "ArrowDown")) {
+            event.preventDefault();
+            event.preventBaseUIHandler();
+            stepFromAuto(event.key === "ArrowUp" ? 1 : -1, event);
+          }
+        }} />
+      <span aria-hidden="true" className={cn("flex items-center pr-2 text-xs text-muted-foreground", kind === "code" && draft === null && "invisible")}>px</span>
+      <NumberFieldIncrement {...stepperProps(1)}
+        aria-label={i18n.formatMessage(kind === "code" ? appearanceMessages.increaseCodeFontSize : appearanceMessages.increaseTerminalFontSize)} />
+    </NumberFieldGroup>
+  </NumberField>;
+}
 
 /** 画布纹理的 CSS 示意，与 React Flow Background 三种变体对应；颜色取 --canvas-grid。 */
 function texture(kind: Appearance["canvas"], gap = 12): CSSProperties {
@@ -153,15 +205,14 @@ export function AppearanceSettings() {
           <FontPicker aria-label={i18n.formatMessage(appearanceMessages.interfaceFontLabel)} value={appearance.uiFont} onValueChange={uiFont => void updateAppearance({ uiFont })} {...getFontText()} />
         </Row>
         <ItemSeparator />
+        <Row label={i18n.formatMessage(appearanceMessages.terminalFont)}>
+          <FontSizeField kind="terminal" value={appearance.terminalFontSize} />
+          <FontPicker aria-label={i18n.formatMessage(appearanceMessages.terminalFont)} monospaceOnly showAllLabel={i18n.formatMessage(appearanceMessages.showAllFonts)}
+            value={appearance.terminalFont} onValueChange={terminalFont => void updateAppearance({ terminalFont })} {...getFontText()} />
+        </Row>
+        <ItemSeparator />
         <Row label={i18n.formatMessage(appearanceMessages.codeFont)}>
-          <Select value={appearance.codeFontSize ? String(appearance.codeFontSize) : "auto"}
-            onValueChange={v => void updateAppearance({ codeFontSize: v === "auto" ? null : Number(v) as CodeFontSize })}>
-            <SelectTrigger size="sm" className="w-24" aria-label={i18n.formatMessage(appearanceMessages.codeFontSize)}><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="auto">{i18n.formatMessage(appearanceMessages.auto)}</SelectItem>
-              {codeFontSizes.map(size => <SelectItem key={size} value={String(size)}>{size} px</SelectItem>)}
-            </SelectContent>
-          </Select>
+          <FontSizeField kind="code" value={appearance.codeFontSize} />
           <FontPicker aria-label={i18n.formatMessage(appearanceMessages.codeFontLabel)} monospaceOnly showAllLabel={i18n.formatMessage(appearanceMessages.showAllFonts)}
             value={appearance.codeFont} onValueChange={codeFont => void updateAppearance({ codeFont })} {...getFontText()} />
         </Row>
