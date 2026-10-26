@@ -30,14 +30,16 @@ Results preserve ordered source documents and distinguish snippets, excerpts, bo
 
 Typed presentation details retain provider-specific data. Hints report actual ignored filters, adjusted parameters, or other execution differences. Usage records reported quantities and units rather than estimating them.
 
+Adapters normalize diagnostics when upstream codes and structured fields establish their meaning. Recognized request fields map to public parameters; provider-only fields remain in the original diagnostic details. Unknown diagnostics retain their upstream meaning, and cancellation remains distinct from failure.
+
 An optional fetch body budget counts Unicode code points across all body blocks of each document. Excerpts, summaries, and metadata remain separate. The common service enforces the budget after validation, including resolved-handle calls.
 
 Providers may pass the budget upstream to reduce transfer. Only actual clipping establishes service-side truncation; asking for a limit or receiving exactly that length does not prove omitted content.
 
 Scores retain their provider meaning and do not establish cross-provider ranking. Ordinary tool history and Agent compaction handle saved results. There is no separate Web response cache or result database.
 
-## Exa adapter
+## Built-in adapters
 
-The built-in Exa provider uses the official SDK for search and contents. It maps supported filters, text, highlights, summaries, metadata, warnings, status, and reported cost.
+Exa and Parallel use their official SDKs for search and URL content retrieval. Both preserve supported filters, source metadata, provider warnings, and reported usage. Exa distinguishes text, highlights, and summaries; its API failures retain available upstream error codes, details, and request identifiers. Parallel distinguishes Markdown excerpts from page bodies and reports SKU counts without estimating currency costs.
 
-Unsupported filters and parameter adjustments become hints. Provider-specific limits stay in the adapter. Empty search is valid; an empty fetch fails. Cancellation passes to the SDK.
+Unsupported filters and parameter adjustments become hints. Provider-specific limits and filter precedence stay in the adapter. Empty search is valid; failed content retrieval remains an error. Cancellation passes to each SDK.

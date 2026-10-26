@@ -13,6 +13,7 @@ import { Input } from "@asterism/ui/ui/input";
 import { Editor, ChoiceField, ToggleField } from "./forms";
 import { useConfigurationAction, useSettingsConfiguration } from "./state";
 import { Section } from "../settings/layout";
+import { ProviderKeyLink } from "./ProviderKeyLink";
 
 export function WebProvidersSettings() {
   const i18n = useI18n(), island = useIsland();
@@ -79,8 +80,7 @@ function WebProviderEditor({ id }: { id: string | null }) {
         <Field><FieldLabel htmlFor="web-provider-api-key">{i18n.text(messages.apiKey)}</FieldLabel>
           <Input id="web-provider-api-key" type="password" autoComplete="off" value={apiKey} onChange={event => setApiKey(event.target.value)}
             placeholder={keyConfigured ? i18n.text(messages.apiKeySet) : i18n.text(messages.apiKeyEmpty)} /></Field>
-        {type.credential.keyUrl && <a className="type-caption text-primary-text hover:underline"
-          href={type.credential.keyUrl} target="_blank" rel="noopener noreferrer">{i18n.text(messages.keyLink)}</a>}
+        {type.credential.keyUrl && <ProviderKeyLink href={type.credential.keyUrl}>{i18n.text(messages.keyLink)}</ProviderKeyLink>}
       </>}
     </fieldset></form>
   </Editor>;

@@ -1,4 +1,4 @@
-import { Plus, Zap, Search, ExternalLink, PlugZap } from "lucide-react";
+import { Plus, Zap, Search, PlugZap } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { canEditModelProviderField, createModelInput, modelReference, thinkingSchema, type ConfigurationSnapshot, type ConnectionTest, type ModelProvider, type ModelProviderInput, type ProviderModel, type TestError } from "../../../shared/configuration";
@@ -32,6 +32,7 @@ import { ModelDiscoveryPicker } from "./ModelDiscoveryPicker";
 import { useModelParameters } from "./ModelParameters";
 import { modelCatalogMessages } from "../../../shared/model-catalog-messages";
 import { ConnectionAuthentication, type ConnectionCredentialDraft } from "./ConnectionAuthentication";
+import { ProviderKeyLink } from "./ProviderKeyLink";
 
 const protocols = Object.entries(modelProtocolLabels).map(([value, label]) => ({ value, label }));
 const protocolLabel = (value: string) => protocols.find(item => item.value === value)?.label ?? value;
@@ -166,9 +167,7 @@ function PresetPicker({ onPick }: { onPick: (preset: ModelProviderPreset | null)
             <span className="type-section max-w-full truncate">{preset.name}</span>
             {(preset.region || preset.plan) && <span className="type-caption">{presetDescription(preset, false)}</span>}
           </button></Item>
-          {preset.keyUrl && <a href={preset.keyUrl} target="_blank" rel="noreferrer" className="type-caption inline-flex items-center gap-1 self-start px-1 hover:text-foreground">
-            {i18n.formatMessage(providersMessages.getKey)}<ExternalLink className="size-3" aria-hidden="true" />
-          </a>}
+          {preset.keyUrl && <ProviderKeyLink href={preset.keyUrl}>{i18n.formatMessage(providersMessages.getKey)}</ProviderKeyLink>}
         </div>)}
       </div>
     </section>)}

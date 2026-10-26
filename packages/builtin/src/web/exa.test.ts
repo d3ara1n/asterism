@@ -1,5 +1,6 @@
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
-import { exaResponse, exaSearchOptions, exaWebProvider } from "./exa.ts";
+import { ExaAbortError, ExaError, ExaTimeoutError } from "exa-js";
+import { exaError, exaResponse, exaSearchOptions, exaWebProvider } from "./exa.ts";
 
 // SDK 在模块加载时取用 fetch；提前替换保证请求验证始终留在本地。
 const http = vi.hoisted(() => {
@@ -84,12 +85,62 @@ describe("Exa 结果归一化", () => {
     }, hints);
     expect(result.hints.map(hint => [hint.code, hint.parameter])).toEqual([
       ["unsupported_parameter", "language"], ["parameter_adjusted", "maxResults"],
-      ["IGNORED_FIELD", "publishedAfter"], ["RESTRICTIONS_RELAXED", "query"], ["content_unavailable", undefined],
+      ["unsupported_parameter", "publishedAfter"], ["restrictions_relaxed", "query"], ["content_unavailable", undefined],
     ]);
     expect(result.hints.at(-1)?.message).toContain("CRAWL_NOT_FOUND");
     expect(result.details?.[0]?.data).toMatchObject({
       statuses: [{ id: "https://example.test/page", status: "error", error: { tag: "CRAWL_NOT_FOUND" } }],
     });
     expect(result.usage).toBeUndefined();
+  });
+
+  // Known upstream fields map to public parameters; private fields are not tool arguments.
+  it("normalizes known diagnostics and preserves unrecognized upstream information", () => {
+    const warnings = [
+      { code: "IGNORED_FIELD", path: "/contents/text/maxCharacters", message: "contents.text.maxCharacters is ignored." },
+      { code: "IGNORED_FIELD", path: "/highlights/query", message: "highlights.query is ignored." },
+      { code: "IGNORED_FIELD", path: "/includeDomains", message: "Included domains ignored." },
+      { code: "IGNORED_FIELD", path: "/type", message: "type is ignored.", detail: { value: "auto" } },
+      { code: "NEW_WARNING", path: "/newOption", message: "Provider-specific warning.", detail: { reason: "new_reason" } },
+    ];
+    const notices = [{ code: "RESTRICTIONS_RELAXED", path: "/query", message: "The exact phrase restriction was relaxed.", details: { restriction: "exact_phrase" } }];
+    const result = exaResponse({ results: [], warnings, notices });
+    expect(result.hints).toEqual([
+      { code: "unsupported_parameter", parameter: "maxCharacters", message: "Exa did not apply the requested maxCharacters parameter." },
+      { code: "unsupported_parameter", parameter: "query", message: "Exa did not apply the requested query parameter." },
+      { code: "unsupported_parameter", parameter: "includeDomains", message: "Exa did not apply the requested includeDomains parameter." },
+      { code: "unsupported_parameter", message: "type is ignored." },
+      { code: "NEW_WARNING", message: "Provider-specific warning." },
+      { code: "restrictions_relaxed", parameter: "query", message: "The exact phrase restriction was relaxed." },
+    ]);
+    expect(result.details?.[0]?.data).toMatchObject({ warnings, notices });
+  });
+
+  // The real SDK decodes the error envelope; the adapter must retain its request identity.
+  it("maps SDK request validation failures without losing the upstream envelope", async () => {
+    http.transport.mockResolvedValue(new Response(JSON.stringify({
+      requestId: "req-invalid", error: { type: "INVALID_REQUEST", code: "INVALID_ARGUMENT",
+        message: "Invalid publication date.", detail: { field: "startPublishedDate" } },
+    }), { status: 400, headers: { "content-type": "application/json" } }));
+    const instance = exaWebProvider.create({ baseUrl: "https://proxy.test", credential: "test-key" });
+    await expect(instance.search!({ query: "test", maxResults: 1 }, { signal: new AbortController().signal })).rejects.toMatchObject({
+      code: "invalid_request",
+      message: 'Exa request failed (HTTP 400, INVALID_REQUEST, INVALID_ARGUMENT, requestId: req-invalid): Invalid publication date. Details: {"field":"startPublishedDate"}',
+      cause: { statusCode: 400, requestId: "req-invalid", code: "INVALID_ARGUMENT", detail: { field: "startPublishedDate" } },
+    });
+  });
+
+  // Rejected credentials are distinct from unavailable local credentials; timeouts are not cancellation.
+  it("keeps authentication, rate-limit and timeout failures in the request-failure category", () => {
+    for (const error of [new ExaError("Unauthorized.", 401), new ExaError("Rate limit exceeded.", 429), new ExaTimeoutError(1000)]) {
+      expect(exaError(error)).toMatchObject({ code: "request_failed", message: expect.stringContaining(`HTTP ${error.statusCode}`), cause: error });
+    }
+  });
+
+  // Message wording cannot establish a typed diagnostic, and cancellation must reach the owning scope.
+  it("preserves cancellation and unknown exceptions without interpreting their messages", () => {
+    const cancelled = new ExaAbortError(), unknown = new Error("INVALID_REQUEST: objective is missing.");
+    expect(exaError(cancelled)).toBe(cancelled);
+    expect(exaError(unknown)).toBe(unknown);
   });
 });

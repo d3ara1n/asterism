@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { Exa } from "exa-js";
+import { Exa, ExaError, type ApiWarning, type SearchNotice } from "exa-js";
 import { jsonSchema, present, webUrlSchema, type WebDocument, type WebHint, type WebResponse, type WebSearchRequest } from "@asterism/sdk/contracts";
 import { WebError, type WebProviderDefinition } from "@asterism/sdk/runtime";
 import { builtin } from "@asterism/builtin-api/contracts";
@@ -15,7 +15,7 @@ const responseSchema = z.object({
   results: z.array(resultSchema), requestId: z.string().optional(),
   costDollars: z.object({ total: z.number() }).catchall(jsonSchema).optional(),
   statuses: z.array(z.object({ id: z.string(), status: z.string(), error: jsonSchema.optional().nullable() }).catchall(jsonSchema)).optional(),
-  warnings: z.array(z.object({ code: z.string(), message: z.string(), path: z.string().optional() })).optional(),
+  warnings: z.array(z.object({ code: z.string(), message: z.string(), path: z.string().optional() }).catchall(jsonSchema)).optional(),
   notices: z.array(z.object({ code: z.string(), message: z.string(), path: z.string().optional() }).catchall(jsonSchema)).optional(),
 }).catchall(jsonSchema);
 /** Exa 专属字段保留其原始含义，公共字段由 webDocumentSchema 统一解释。 */
@@ -26,7 +26,43 @@ export const ExaResponseDetails = builtin.data("web.exa.response", z.object({
   costDollars: jsonSchema.optional(), statuses: jsonSchema.optional(), resolvedSearchType: z.string().optional(),
   searchTime: z.number().optional(), output: jsonSchema.optional(),
 }).catchall(jsonSchema));
-const hintParameter: Record<string, string> = { startPublishedDate: "publishedAfter", endPublishedDate: "publishedBefore", numResults: "maxResults", userLocation: "region", "text/maxCharacters": "maxCharacters" };
+const hintParameter: Record<string, string> = {
+  query: "query", includeDomains: "includeDomains", excludeDomains: "excludeDomains",
+  startPublishedDate: "publishedAfter", endPublishedDate: "publishedBefore", numResults: "maxResults",
+  userLocation: "region", "userLocation/country": "region",
+  "text/maxCharacters": "maxCharacters", "contents/text/maxCharacters": "maxCharacters", "highlights/query": "query",
+};
+type Diagnostic = Pick<ApiWarning | SearchNotice, "code" | "message"> & { path?: string };
+
+function mapDiagnostic(note: Diagnostic): WebHint {
+  const field = note.path?.replace(/^\//u, "");
+  const parameter = field ? hintParameter[field] : undefined;
+  if (note.code === "IGNORED_FIELD") return {
+    code: "unsupported_parameter",
+    message: parameter ? `Exa did not apply the requested ${parameter} parameter.` : note.message,
+    ...(parameter && { parameter }),
+  };
+  if (note.code === "RESTRICTIONS_RELAXED") return {
+    code: "restrictions_relaxed", message: note.message, ...(parameter && { parameter }),
+  };
+  return { code: note.code, message: note.message, ...(parameter && { parameter }) };
+}
+
+export function exaError(error: unknown): unknown {
+  // SDK cancellation and unknown exceptions retain their identity.
+  if (!(error instanceof ExaError)) return error;
+  const context = [`HTTP ${error.statusCode}`, error.type, error.code, error.requestId && `requestId: ${error.requestId}`].filter(Boolean).join(", ");
+  const detail = error.detail === undefined ? "" : ` Details: ${JSON.stringify(error.detail)}`;
+  const result = new WebError(error.statusCode === 400 || error.statusCode === 422 ? "invalid_request" : "request_failed",
+    `Exa request failed (${context}): ${error.message}${detail}`);
+  result.cause = error;
+  return result;
+}
+
+async function exaRequest<T>(request: Promise<T>): Promise<T> {
+  try { return await request; }
+  catch (error) { throw exaError(error); }
+}
 
 function mapDocument(result: z.infer<typeof resultSchema>): WebDocument {
   const { url, title, author, publishedDate, text, highlights, summary, score, image, favicon, ...extra } = result;
@@ -48,14 +84,11 @@ function mapDocument(result: z.infer<typeof resultSchema>): WebDocument {
 }
 
 function mapHints(
-  warnings: readonly { code: string; message: string; path?: string }[] | undefined,
-  notices: readonly { code: string; message: string; path?: string; [k: string]: unknown }[] | undefined,
+  warnings: readonly Diagnostic[] | undefined,
+  notices: readonly Diagnostic[] | undefined,
   statuses: readonly { id: string; status: string; error?: unknown }[] | undefined,
   leading: WebHint[]): WebHint[] {
-  const notes: WebHint[] = [...leading, ...[...warnings ?? [], ...notices ?? []].map(note => {
-    const field = note.path?.replace(/^\//u, "");
-    return { code: note.code, message: note.message, ...(field && { parameter: hintParameter[field] ?? field }) };
-  })];
+  const notes: WebHint[] = [...leading, ...[...warnings ?? [], ...notices ?? []].map(mapDiagnostic)];
   for (const status of statuses ?? []) if (status.status !== "success") notes.push({ code: "content_unavailable",
     message: `Content retrieval for ${status.id} reported ${status.status}${status.error ? `: ${JSON.stringify(status.error)}` : "."}` });
   return notes;
@@ -94,7 +127,7 @@ export const exaWebProvider: WebProviderDefinition = {
     return {
       async search(request, { signal }) {
         const { options, hints } = exaSearchOptions(request);
-        return exaResponse(await client.search(request.query, options, { signal }), hints);
+        return exaResponse(await exaRequest(client.search(request.query, options, { signal })), hints);
       },
       async fetch(request, { signal }) {
         const maxCharacters = request.maxCharacters === undefined ? undefined : Math.min(request.maxCharacters, MAX_TEXT_CHARACTERS);
@@ -102,10 +135,10 @@ export const exaWebProvider: WebProviderDefinition = {
         if (maxCharacters !== request.maxCharacters) {
           hints.push({ code: "parameter_adjusted", parameter: "maxCharacters", message: `Exa accepts at most ${MAX_TEXT_CHARACTERS} body characters per page; the requested maximum was reduced to ${MAX_TEXT_CHARACTERS}.` });
         }
-        const response = exaResponse(await client.getContents([request.url], {
+        const response = exaResponse(await exaRequest(client.getContents([request.url], {
           text: maxCharacters === undefined ? true : { maxCharacters },
           ...(request.query && { highlights: { query: request.query } }), filterEmptyResults: false,
-        }, { signal }), hints);
+        }, { signal })), hints);
         if (!response.documents.length) throw new WebError("request_failed", response.hints.map(hint => hint.message).join("\n") || "Exa returned no content for this URL.");
         return response;
       },

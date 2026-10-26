@@ -3,6 +3,7 @@ import { defineModule, implementResource, implementCreation, implementTool, WebE
 import type { Json, ResourceRef, WebFetchResult, WebSearchResult } from "@asterism/sdk/contracts";
 import { WebResource, CreateWeb, WebView, WebSearch, WebFetch } from "./contract.ts";
 import { exaWebProvider } from "./exa.ts";
+import { parallelWebProvider } from "./parallel.ts";
 import { costOf, emptyWebStats, finishRequest, projectStats, startRequest, type WebRequestKind, type WebSessionStats } from "./stats.ts";
 
 async function result<T extends Json>(work: () => Promise<T>, signal: AbortSignal): Promise<CallResult<T>> {
@@ -41,7 +42,7 @@ export default defineModule(plugin => {
     return { types: plugin.webProviders.types().map(type => ({ id: type.id, label: type.label, search: type.search, fetch: type.fetch, enabled: states.get(type.id)?.enabled ?? false })) };
   };
   return {
-    webProviders: [exaWebProvider],
+    webProviders: [exaWebProvider, parallelWebProvider],
     resources: [implementResource(WebResource, WebView, {
       card: webCard,
       creation: implementCreation(CreateWeb, { create: ({ title }) => ({ title, data: {} }) }),
