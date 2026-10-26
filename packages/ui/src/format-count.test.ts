@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { formatCount } from "./format-count";
 
-// docs/design-system.md：只读 token／字数使用十进制 k/M/G/T，符号不随界面语言变化。
+// 只读 token／字数使用十进制 k/M/G/T，符号不随界面语言变化。
 describe("只读计数的工程缩写", () => {
   it("千以下不缩写，较大数采用固定工程符号", () => {
     expect([0, 999, 1_000, 128_000, 1_000_000, 1_000_000_000, 1_000_000_000_000].map(value => formatCount(value)))

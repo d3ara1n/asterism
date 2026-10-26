@@ -1,13 +1,7 @@
-# 会话加载与切换时的代理卡片闪烁
+# Session-load card flicker
 
-> 立案 2026-10-16，2026-10-19 补记完成并归档。用户确认问题已经修复，此前计划未同步完成状态。
+Filed on 2026-10-16. Completion was recorded and the issue archived on 2026-10-19.
 
-## 原始现象
+The user observed brief Agent card flicker when loading or switching sessions. Comparison with the earlier baseline showed that the issue did not originate in the concurrent compact configuration-selector change.
 
-- 加载会话、切换会话时，代理卡片会短暂闪烁。
-- 用户曾将紧凑配置选择器改动暂存后对比基线，确认原版本同样存在闪烁，与当时的选择器改动无关。
-
-## 完成记录
-
-- 用户于 2026-10-19 确认该问题已经修复，关闭本项待办。
-- 本次仅补齐计划状态，未修改代码或重新执行 GUI 验收。
+On 2026-10-19, the user confirmed it was fixed. Updating this record did not change code or perform a fresh GUI verification.

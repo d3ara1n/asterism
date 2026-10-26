@@ -11,7 +11,7 @@ const content = (): RendererContentInput => ({
 });
 
 describe("草稿交换受理确认", () => {
-  // docs/workbench.md：条目已经移除但回执丢失时，恢复入口仍保留原操作和附件，重试不再次交换。
+  // 条目已经移除但回执丢失时，恢复入口仍保留原操作和附件，重试不再次交换。
   it("未知回执后编辑器保持锁定，以同一提交重试并恢复已取出的完整草稿", async () => {
     const editor = createMessageDraft(content);
     const file: Extract<ModelInputPart, { kind: "file" }> = {

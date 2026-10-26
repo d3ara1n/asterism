@@ -1,78 +1,15 @@
-# 内置插件公共包、顶层工具与 Agent 界面扩展
+# Built-in public extensions and questions
 
-立案日期：2026-10-15。
+Filed on 2026-10-15. Completed with user acceptance of the delivered question interaction.
 
-## 状态与用途
+The implementation separated built-in code, public domain API, and internal UI packages. External consumers could share real declarations, extend Agent input, and register Agent UI without importing the implementation.
 
-**已完成并由用户确认本轮验收通过。** A/B 分包、C3 Agent 界面扩展、C1 顶层工具、C2 对象关联调用和 D 内置 ask_user 构成完整公共扩展链路。ask_user 只提供单题文本回答，后续产品交互由用户继续完善。
+Static plugin top-level tools received host-bound execution context. Typed object-associated calls independently connected frontend and backend without occupying the resource action queue. Dependencies, identity, cancellation, and actual completion remained host responsibilities.
 
-本文归档实施与验收结果；已定规则分别见：
+Agent overlays and modals combined independent hide-composer requests. Plugin services owned waiting state; view unmount did not itself conclude the work.
 
-- [工具边界与选择](../../docs/runtime.md#工具匹配与宿主操作入口)、[工具贡献](../../docs/plugin-sdk.md#工具贡献)。
-- [公共模块与契约身份](../../docs/plugin-sdk.md#公共模块与契约身份)。
-- [具型插件调用](../../docs/plugin-sdk.md#具型插件调用)。
-- [Agent 扩展界面](../../docs/workbench.md#agent-扩展界面)、[作者 API](../../packages/builtin-api/README.md#agent-界面扩展)。
-- [用户等待](../../docs/runtime.md#等待用户回答)、[Agent 执行循环](../../docs/runtime.md#执行轮次与循环)。
+The first question consumer offered one text question and explicit cancellation. User waiting had no blanket Agent or transport deadline. Runtime restart was not required to resume the waiting promise.
 
-## 已完成
+Typechecks, the suite, and build passed. The user confirmed the bottom panel, composer behavior, and adjusted container spacing. That did not itemize every placement, simultaneous contribution, machine-sleep, or installed-package scenario.
 
-### A/B 内置分包与公共提供方
-
-- [x] `@atelier/builtin`、`@atelier/builtin-api`、内部 `@atelier/ui` 物理分包；宿主与内置插件身份分离。
-- [x] 公共 Agent 动作／输入／配置／记录与私有状态分离；应用信息注入。
-- [x] 公共依赖、版本、环境出口、真实导出实例、re-export 与私有安装副本隔离。
-- [x] 独立中间 npm 库按包自身依赖校验；提供方失败传播、关闭按依赖逆序清理。
-- [x] 独立源码消费者在真实 Agent 动作上扩展输入准备。
-
-### C3 Agent 界面扩展
-
-- [x] 前端公共出口、`agentUI.register` 与准备生命周期绑定、重复身份拒绝。
-- [x] 每张 Agent 卡片挂载贡献组件，支持 overlay、modal、按卡片组合的 `hideComposer`。
-- [x] 贡献者偏好按自身插件绑定，关联对象为当前 Agent。
-- [x] 可编译示例展示问题、待办位置和模态窗，业务状态由插件提供。
-- [x] 三个位置统一使用带留白与阴影的悬浮外壳，底部面板隐藏 composer 后保留卡片边距；用户确认调整后的观感。
-
-### C1 顶层工具
-
-- [x] `defineTopLevelTool` 一次声明定义与 handler，`ModuleContribution.topLevelTools` 静态装配。
-- [x] 绑定当前执行对象的只读门面、调用 ID、取消信号和过程产出。
-- [x] 重名拒绝、名称筛选、请求起点捕获、参数／产出校验、工具三态视图与历史链路。
-- [x] 独立插件用例验证首个请求即声明、无链接调用、筛选拒绝与私有数据隔离。
-
-### C2 通用调用与关联状态
-
-- [x] `defineCall / implementCall`、后台 `plugin.ipc.calls` 与前端 `useRendererCalls`。
-- [x] 独立请求／结果／取消信封贯穿 renderer、preload、main 和 runtime，不占用对象动作队列。
-- [x] 契约归属、真实关联对象、后台来源、当前路径、输入／输出校验及关闭收束。
-- [x] 业务服务由插件持有，查询和事件配合；不借其他资源运输 UI，不用事件拼请求／应答。
-- [x] 关联不开放其他插件私有数据、会话数据内容或在途交接内容。
-- [x] 前端取消、断连及迟到结果测试；取消后宿主等待实际处理器收束。
-
-### D 内置 ask_user
-
-- [x] 内置 `questions` 模块使用上述公共能力注册工具和 Agent overlay。
-- [x] 单题、文本回答、取消提问；最终答案通过既有工具历史进入下一模型请求。
-- [x] 按会话、Agent 和交互身份隔离；拒绝重复／迟到答案。
-- [x] 后台内存等待、先订阅再查询、通知与查询交错时串行重读。
-- [x] 前端重挂载可重读待回答项；工具取消、插件关闭和运行时退出结束等待。
-- [x] 移除 Agent timeout 配置与整轮计时，托管任务缺省不设置超时。
-- [x] 隔离会话测试模拟等待一年、重建前端连接、回答续轮及关闭收束。
-- [x] 类型检查、相关契约测试和中英文文案检查。
-
-## 验收结论与边界
-
-- [x] 最终全量测试与生产构建（84 个测试文件、541 项测试通过）。
-- [x] 用户试用内置 ask_user，确认底部面板及 composer 隐藏行为；公共外壳增加留白后，用户确认满意并授权提交。
-- 自动验证覆盖问答结果续轮、取消、重建连接、关联隔离、重复提交及模拟长时间等待；不将这些结果表述为真实 GUI 自动化验证。
-- 本轮没有逐项记录 top／center／modal、多个贡献、真实机器休眠及分包后所有页面的人工操作结果；这些是验证边界，不把首个问答消费者扩展为完整交互测试产品。
-
-配置存储格式为 v7，Agent 配置不含 timeout；按仓库孵化期约定不做旧格式迁移。验收使用当前格式的开发配置，不修改真实凭据或会话数据。
-
-## 范围边界与相关计划
-
-- 多题、选项、复杂表单与问答持久化恢复不属于这次验收实现；todo 仍只保留界面表达示例。
-- 通用对象关联数据的持久化 API 不在本轮增加；内存业务状态已满足 ask_user。
-- [插件系统](../todo-2026-10-12-plugin-system.md)：npm 安装和升级不是前置。
-- [事件与插件调用](../todo-2026-10-13-event-bus-plugin-calls.md)：对象关联调用已交付，其余真实消费者按需扩展同一机制。
-- [运行时能力](../todo-2026-10-01-runtime-capabilities.md)：多代理通信、资源工具和提示块由该计划跟踪。
-- 本专项结束，后续能力按已有领域计划推进。
+Multi-question forms and persistent question recovery were outside this delivery. Later question UI changes do not rewrite the scope accepted here.

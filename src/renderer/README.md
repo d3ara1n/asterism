@@ -1,66 +1,9 @@
-# 应用界面（Renderer）
+# Application interface
 
-桌面入口由 Electron 加载，通过 `window.host` 受控桌面桥消费真实能力，不存在浏览器模拟回退。交互规范见 [工作台交互](../../docs/workbench.md)，视觉与组件规范见 [界面设计系统](../../docs/design-system.md)。
+The renderer presents application navigation, workbench objects, and plugin views. It uses controlled desktop and runtime capabilities rather than general Node access.
 
-## 目录与模块职责
+View subscriptions follow visibility. User-created drafts and view choices can follow object presence when they must survive remounts. Backend execution has its own lifetime.
 
-| 位置 | 职责 |
-| --- | --- |
-| `main.tsx` / `app/StartupScreen.tsx` / `app/boot.ts` | 独立启动页、后台阶段订阅、等待与失败恢复；启动页不依赖工作台和插件视图 |
-| `application.tsx` | 后台就绪后装载的应用组合；前端插件准备、公共提供方与视图注册、首页挂载 |
-| `app/App.tsx` | 首页与会话导航、应用级草稿、首次发送和设置屏切换 |
-| `app/Sidebar.tsx` | 首页入口、会话摘要列表、设置入口与侧栏显隐 |
-| `app/Window.tsx` | `Window / Titlebar`、平台原生控件留白和窗口拖动区域 |
-| `app/window-state.ts` | 原生窗口状态的初始化与订阅，向窗口层提供标题栏模式和全屏状态 |
-| `app/UpdateIndicator.tsx` / `features/updates/` | 标题栏更新浮层、更新状态的共享读取与订阅、设置页共用的更新操作和错误反馈 |
-| `app/controller.ts` | 从启动阶段持续持有的会话列表、运行时连接状态与公共事件订阅；首次快照同时供插件装配与首页使用，不持有已打开会话正文 |
-| `app/SessionStatus.tsx` / `resource-status.ts` | 会话行状态徽标、资源进度 popup 与 `latest` 状态聚合 |
-| `app/SessionActions.tsx` / `features/session/RenameSession.tsx` | 会话行 more 菜单与人工重命名对话框 |
-| `app/ErrorBoundary.tsx` | 渲染异常后的重新加载入口 |
-| `features/home/HomePage.tsx` | 首页草稿、agent/模型/思考选择及首次发送 |
-| `features/templates/` | 会话保存模板对话框、首页模板卡片、资源信息浮层与模板删除 |
-| `features/workbench/Workbench.tsx` / `WorkbenchSurface.tsx` / `context.ts` | 对象与关系到 React Flow 画布的投影、过渡底板与视图保存；应用持有的工作台环境出口（`WorkbenchStore`）与按会话绑定的 `WorkbenchScope` |
-| `features/workbench/feedback.ts` / `WorkbenchFeedback.tsx` | 独立于操作门禁的状态分类、延迟同步提示、读取异常与恢复入口；应用层协调通知去重 |
-| `features/workbench/canvas.ts` / `viewport.ts` / `placement.ts` / `arrange.ts` / `LayoutMenu.tsx` | `WorkbenchCanvas` 接口（`findPlacement` 最近空位、`locateObjects` 对象定位、`arrange` 显式整理、动态缩放下限与视口保存）；右上角「布局」菜单触发 ELK 排列，空位算法、几何解析与间距从 `shared/workbench-placement.ts`、`shared/workbench-sizing.ts`、`shared/workbench-layout.ts` 复用 |
-| `features/workbench/ObjectNode.tsx` / `ObjectCard.tsx` / `ObjectSurface.tsx` / `object-view.tsx` / `ObjectActions.tsx` | 已注册卡片分派、对象视图解析（`useObjectView`）、卡片外壳（拖动柄、折叠、画布滚轮归属）、卡片与聚焦浮岛共用的对象外壳（标题栏、辅助面板布局／焦点）、右下角缩放柄与尺寸预设／移除菜单 |
-| `features/workbench/focus.ts` / `FocusIsland.tsx` | 以对象保留状态登记的聚焦身份与工作台左侧聚焦浮岛 |
-| `features/workbench/layout.ts` / `sizing.ts` / `nodes.ts` / `size-intents.ts` | 卡片默认尺寸与下限、本地缩放拖动与后台布局同步协调 |
-| `features/workbench/connections.ts` | 双向链接合并显示与卡片四边动态端点排序分布 |
-| `features/workbench/ObjectsPanel.tsx` / `AccessPanel.tsx` | 右侧对象快速定位浮岛与有向授权管理浮岛 |
-| `features/creation/` | 创建协调器：添加菜单、拖放与图片粘贴的候选仲裁、路由记忆、内容草稿（`content.ts`）与提交 |
-| `features/session/controller.ts` / `registry.ts` / `retention.ts` / `state.ts` | 当前会话数据与进度的按序订阅、局部动作调用；离开会话且命令收束后释放控制器；对象保留表及按当前对象集合释放 |
-| `features/session/History.tsx` / `history-navigation.ts` / `history-branches.ts` | 历史浮岛面板：分支 Tab、分叉点双向导航、两行逐节点列表、来源筛选与「从这里继续」跳转 |
-| `features/conversation/tool-views.tsx` / `../../packages/ui/src/tool-content.tsx` | 三个宿主固定入口（`resource_*`）的内置视图、`resource_call` 转交适配与调用／结果原始详情切换 |
-| `../../packages/builtin/src/agent/conversation/` | 内置 Agent 对话、输入与配置组件；`timeline.ts / turn-metrics.ts` 投影历史轮次与计量，`TurnMetrics.tsx / MetricTooltip.tsx` 展示轮尾只读概要与悬停详情，`ContextUsage.tsx` 展示输入区上下文占用 |
-| `../../packages/builtin/src/agent/ui/` | Agent 扩展组件挂载、toolbar／overlay／modal 呈现、当前模型选择注入及输入区控制；作者通过 `@asterism/builtin-api/renderer` 接入，内置工具栏贡献在 `conversation/Toolbar.tsx`，应用注入贡献者偏好门面 |
-| `../../packages/builtin/src/agent/diagnostics/` | 代理诊断的历史请求投影、当前价格计量、缓存与增长概览及面板内的列表／详情／汇总；`usage.ts / performance.ts` 供诊断和对话轮次共用实报用量及速率计算 |
-| `../../packages/builtin/src/agent/context/` / `panel-kit.tsx` | 代理上下文面板的窗口占用、对话与系统构成；两个代理面板共用的版式、数值与系统构成部件 |
-| `../../packages/builtin/src/text-view.tsx` / `code-view.tsx` / `shared/tool-body.ts` | 内置正文工具三态视图与 120 行预览预算；工具和 Markdown 共用 Pierre 代码视图，支持文件名推断或显式语言着色 |
-| `modules/registry.ts` / `views.tsx` / `object-context.ts` | 静态资源展示描述、卡片／工具／历史记录视图注册表与 SDK 前端对象接口注入 |
-| `features/configuration/` | 提供商编辑器消费插件预设／用量目录及连接编辑规则，认证方式与凭据由 `ConnectionAuthentication.tsx` 组合；模型发现、参数获取、模型兼容设置及模型角色／agent 表单；用量订阅与展示由消费插件自己管理 |
-| `features/plugins/` | 插件信息卡片、搜索筛选、包管理与自定义设置页承载 |
-| `modules/plugins.ts` / `modules/settings.tsx` / `modules/configs.tsx` | 插件前端入口装载、设置页面目录与托管配置读写通知 |
-| `shared/ConfigurationValue.tsx` | 模型兼容配置使用的 schema 驱动字段编辑器 |
-| `features/settings/` | 应用／插件分区的设置总览、分类与插件页导航、语言设置（`LanguageSettings.tsx`） |
-| `shared/weave/` | `Space` 屏间平移、`Screen` 浮岛编织纯布局模型（`model.ts`）与动效参数 |
-| `../../packages/ui/src/ui/` | 本地维护的 shadcn/ui 官方源码与公共状态组合；主题绑定的 `sonner.tsx` 留在应用 `shared/ui/` |
-| `shared/i18n.ts` / `messages/` | 应用级语言环境订阅、共享 `react-intl` context 与按功能组织的宿主消息声明 |
-| `@asterism/ui/ConfigurationChoice` / `@asterism/builtin/renderer` / `@asterism/ui/tool-header` | 首页与创建表单的配置／模型／等级选择器及工具单行标题组件；对话专用摘要与浮层位于内置 Agent 的 `conversation/ConfigurationPicker.tsx` |
-| `styles.css` | 统一导入 Tailwind 与第三方基础 CSS，再声明主题 token、窗口拖动重置与组件覆盖样式；React Flow 基础样式随此入口加载，顺序独立于工作台的异步装载 |
+Read errors belong to the view reader. An operation's pending state and failure belong to its entry. Ordered current-state updates do not require repeatedly reloading the entire history.
 
-## 前端状态协调要点
-
-- **当前数据与局部提交**：会话控制器打开时取得当前数据，随后直接应用同一通道交付的记录、资源、布局与进度变化。`execute` 只等待动作完成，按钮自行防止重入，独立对象不在前端排队。游标切换期间取消旧定位意图；首次无内容时才呈现加载画面。
-- **失败反馈**：控制器只保存读取异常 `readError`；操作失败随回执返回，由发起入口处理，分工见[工作台状态反馈](../../docs/workbench.md#工作台状态反馈)。
-- **记录与流式进度衔接**：初始数据与后续变化使用同一通道按序交付；保存的记录先追加，随后移除对应流式块，无动态版本比较或追赶重读。输出块以 `responseId + ordinal` 为稳定 key，从流式生成到落库保持同一组件实例与展开状态。
-- **草稿与附件生命周期**：首页草稿由应用持有；代理卡片的输入草稿、文件上传占用和 `submissionId`（重试幂等身份）经 `object.retained` 按对象保留，跨页面切换、卡片重挂载、聚焦与会话视图释放不丢失，对象离开当前投影时关闭草稿；用户消息中的图片通过受控 `object.content` 读取生成短期 Blob URL，卸载时回收。
-- **覆盖表单与本地化**：角色与代理编辑器只提交用户显式覆盖（placeholder 显示内置基准，不回填保存）。组件在 render 中通过 `useI18n()` 格式化 `UiText`，不以 locale 或译后文本作为业务组件 key。
-
-## 配置操作接入
-
-反馈归属与生命周期见[配置操作反馈](../../docs/workbench.md#配置操作反馈)。`features/configuration/state.ts` 提供两个分开的入口：
-
-- `useSettingsConfiguration()`：只读消费 `snapshot / readError`，通过 `load()` 重读。`ConfigurationReadStatus` 由设置分类页挂载一次。
-- `useConfigurationAction("inline" | "toast")`：每个表单、区块或列表行创建独立实例，反馈通道必填。`run()` 仅接收非 `read` 命令，返回成功回执；失败和同一入口重入返回 `null`，失败已按所选通道处理。`busy` 供本入口禁用控件。
-- `inline`：将实例的 `error` 交给所属 `Editor`、`ConfigurationActionError` 或区块反馈；`Editor` 的 `busy / error` 为必填属性。例子见 `ModelProvidersSettings.tsx` 的编辑器及 `ModelParameters.tsx`。
-- `toast`：hook 直接发送一次失败通知，调用方只处理成功结果。例子见 `ModelProvidersSettings.tsx` 的快捷操作及角色、代理列表行。
+Shared containers own layout and focus. Domain views own their content. Language and theme changes update presentation without replacing business identity.

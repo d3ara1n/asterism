@@ -16,7 +16,7 @@ const summary = event(ContextSummary.id, {
   completion: { usage: null, finishReason: "stop", rawFinishReason: null, providerResponseId: null },
 }, { source: agentSource("a") });
 
-// docs/runtime.md 的代理调查契约：记录投影保留原文、时间线顺序和状态，访问范围封闭在目标快照。
+// 代理调查契约：记录投影保留原文、时间线顺序和状态，访问范围封闭在目标快照。
 describe("peek 记录投影与检索", () => {
   it("压缩前原文和不完整记录仍可读，其他代理及私有事件不进入投影", () => {
     const records = projectPeekRecords(snapshot(

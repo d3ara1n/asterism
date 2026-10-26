@@ -1,26 +1,27 @@
-# 存储格式演进与启动恢复
+# Storage evolution and recovery acceptance
 
-立案日期：2026-10-12。
+Filed on 2026-10-12.
 
-状态：按版本号的数据准备、连续迁移链、恢复点（保留 7 个、可选还原）、插件独立存储入口与失败隔离已实现，隔离存储验证完成。GUI 与安装版迁移恢复由维护者在 prerelease 内部验证中验收，分发门槛见[阶段清单](todo-2026-10-26-release-readiness.md)。未完成项目继续在此跟踪，不阻塞实现提交。当前契约见[数据准备与迁移](../docs/architecture.md#数据准备与迁移)与[启动屏](../docs/workbench.md#启动屏)，代码入口见[存储实现](../src/storage/README.md)。
+Version-based preparation, consecutive migrations, recovery points, isolated plugin storage entries, and plugin failure isolation are implemented and verified with isolated data. Installed-build and GUI acceptance remains pending.
 
-## 已完成
+## Implemented
 
-- [x] 工作数据库、全局配置、插件列表与三份设置按版本号准备；`ui-state.json` 作为缓存不迁移、损坏即重置。
-- [x] 插件通过 manifest `asterism.storage` 独立存储入口声明格式；准备进程不导入插件运行时，失败只停用该插件并在首页通知。
-- [x] 逐版本迁移、SQLite 整链事务、JSON 原子替换；版本缺失、过新与路径缺失在转换前失败。
-- [x] 迁移前整组冷备份为恢复点，封存内容硬链接共享、其余写时复制；保留最近 7 个。
-- [x] 恢复视图列出全部恢复点，可选还原；还原与重新开始前当前数据先存为恢复点，中断可续接，还原后暂停自动迁移。
-- [x] 迁移链、恢复点保留与复用、还原续接、重新开始和插件失败隔离的隔离测试。
+- [x] Host persistent formats declare versions; missing files remain uncreated during preparation.
+- [x] JSON replacement is atomic and SQLite migration chains are transactional.
+- [x] Missing, newer, or unreachable versions fail before conversion.
+- [x] Plugin storage preparation avoids importing ordinary plugin runtime and isolates plugin failure.
+- [x] Recovery points preserve the data group, retain recent complete points, and share immutable bytes where supported.
+- [x] Restore/reset preserves current data, resumes interrupted work, and pauses automatic migration after restoration.
+- [x] Isolated tests cover migration, retention, reuse, recovery resumption, and failure isolation.
 
-## Prerelease 内部验收
+## Remaining acceptance
 
-- [ ] 使用隔离数据验收安装包更新中的真实格式迁移，以及跳过中间应用版本的连续迁移；确认会话、附件、配置与插件数据保留，不为演示虚增生产格式版本。
-- [ ] 无迁移启动窗口直接以最终外观出现；需要迁移时先显示「正在升级数据」，迁移后切换到用户外观与语言，窗口尺寸不跳变。
-- [ ] 迁移成功提示在首页挂载后出现一次，确认后重启不重复。
-- [ ] 数据恢复页面的恢复点列表、打开目录、重试及两类原生确认框。
-- [ ] 还原并重启停留在恢复页面；明确重试后才继续迁移。
-- [ ] 使用新数据后进入空工作区，原数据在新的恢复点中。
-- [ ] 插件存储迁移失败时该插件停用、首页出现错误通知，其他功能正常。
+- [ ] Use isolated data to verify a real format-changing installed update and an upgrade skipping intermediate app versions. Preserve sessions, attachments, settings, and plugin data without inventing production version changes for a demonstration.
+- [ ] Verify saved appearance on a no-migration startup and transitional appearance/language during migration, without a window-size jump.
+- [ ] Verify the one-time successful-migration notice after Home appears.
+- [ ] Exercise recovery-point listing, opening directories, retry, and native confirmations.
+- [ ] Restore and restart into paused recovery, then explicitly retry migration.
+- [ ] Start with new data and confirm the old data remains recoverable.
+- [ ] Confirm one plugin's failed migration disables it while other features remain usable.
 
-真实开发数据未用于自动验证。上述场景由用户在 prerelease 内测中逐项验收，失败与重新开始场景使用隔离测试数据；验收方式见[发布操作](../docs/releasing.md#首包验收)。三平台安装包与自动更新验收继续由[发布计划](todo-2026-09-17-release-ci.md)跟踪。
+Real development data was not used by automated verification. Failure and reset acceptance must also use isolated data.

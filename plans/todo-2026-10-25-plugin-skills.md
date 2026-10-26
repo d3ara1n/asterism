@@ -1,13 +1,14 @@
-# 插件携带技能与注册接口
+# Plugin-carried skills
 
-立案日期：2026-10-25
+Filed on 2026-10-25.
 
-## 已确认方向
+A shared runtime catalog already supplies skill summaries at request boundaries and reads package text on demand. Plugin registration remains unimplemented.
 
-技能由运行时共享目录集中持有，插件通过计划中的 `plugin.skills` 登记自身携带的技能；请求边界消费目录，插件无需逐次拦截请求注入技能。当前只实现内部共享服务，暂不暴露插件 API。现有规则见 [技能目录与读取](../docs/runtime.md#技能目录与读取)。
+The confirmed source priority is user directories above plugins above built-in skills. Source identity describes provenance and grouping; skill names select effective entries.
 
-## 待办
+- [ ] Decide how a plugin declares its skill directory.
+- [ ] Define registration and cleanup with plugin lifetime.
+- [ ] Define local refresh scope.
+- [ ] Expose the plugin registration capability once those contracts are settled.
 
-- 确定插件技能目录的声明方式；来源标识（插件 ID）与覆盖优先级已定，见 [技能目录与读取](../docs/runtime.md#技能目录与读取)。
-- 确定登记与插件装配、关闭的生命周期关系，以及本地技能刷新范围。
-- 在明确上述契约后开放 `plugin.skills`，接入统一目录。
+Plugins should not need to intercept every model request to inject their skill catalog.

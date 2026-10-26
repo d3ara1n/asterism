@@ -32,7 +32,7 @@ function plugin(id: string, contract: ToolContract, options: { extra?: ToolContr
 }
 
 describe("插件装配", () => {
-  // plugin-sdk.md：插件级调用无需对象，契约作用域不能被调用参数降级。
+  // 插件级调用无需对象，契约作用域不能被调用参数降级。
   it("无模块的插件声明全局服务，后台和桌面调用共用作用域校验", async () => {
     const ns = pluginNamespace("test.global");
     const query = defineCall(ns.name("query"), { scope: "plugin", input: z.string().trim(), output: z.string() });
@@ -185,7 +185,7 @@ describe("插件装配", () => {
     } finally { release(); await loaded.close(); }
     expect(calls).toEqual(["consumer", "provider"]);
   });
-  // runtime.md：新契约全局替换 schema；后续引用旧声明不能把旧契约重新激活。
+  // 新契约全局替换 schema；后续引用旧声明不能把旧契约重新激活。
   it("同名新契约全局生效，旧契约的后续引用保持下线", () => {
     const shared = tool("Shared read.");
     const replacement = defineTool({ ...tool("Other read.", "test.tools/other-read"),
@@ -236,7 +236,7 @@ describe("插件装配", () => {
     expect(loaded.manifest[0]!.status).toBe("loaded");
     expect(loaded.manifest[1]).toMatchObject({ status: "failed", error: expect.any(String) });
   });
-  // runtime.md：同插件内的名称／身份冲突及宿主保留名不参与覆盖，错误仅禁用贡献插件。
+  // 同插件内的名称／身份冲突及宿主保留名不参与覆盖，错误仅禁用贡献插件。
   it.each(["name", "id", "host"] as const)("顶层工具 %s 冲突使插件装配失败", conflict => {
     const ns = pluginNamespace("acme.bad");
     const declaration = defineTopLevelTool({

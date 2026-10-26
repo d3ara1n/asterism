@@ -16,7 +16,7 @@ const project = (path: SessionNode[], agent = "a") => projectForAgent(sessionVie
 
 // 预期来自时间线投影契约；存储、路径选择和通用信封转换由各自边界守护。
 describe("代理模型投影", () => {
-  // docs/runtime.md#代理通信：地址允许中继类型，身份与正文分别转义，UI 与历史调查消费同一保存来源。
+  // 地址允许中继类型，身份与正文分别转义，UI 与历史调查消费同一保存来源。
   it("中继资源与具名代理的信封只在模型投影生成，展示保留原文与来源", () => {
     const sender = { kind: "agent" as const, resource: { sessionId: "s", id: "relay", kind: "example/relay" }, name: '审查 "A" & B' };
     const body = "  <agent-message>raw & text</agent-message>\n";

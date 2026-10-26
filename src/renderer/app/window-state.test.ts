@@ -2,7 +2,7 @@ import { expect, it, vi } from "vitest";
 import type { DesktopWindowState } from "../../shared/desktop";
 import { getDesktopWindowState, startDesktopWindow } from "./window-state";
 
-// design-system.md：首帧前先订阅再读取，初始读取与事件按收到的顺序采用。
+// 首帧前先订阅再读取，初始读取与事件按收到的顺序采用。
 it("先订阅再读取，直接采用每次收到的窗口状态", async () => {
   let receive!: (state: DesktopWindowState) => void;
   let resolve!: (state: DesktopWindowState) => void;

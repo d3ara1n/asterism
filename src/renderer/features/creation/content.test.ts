@@ -7,7 +7,7 @@ vi.mock("../../runtime", () => ({ runtime: { content: { execute: (command: unkno
 
 afterEach(() => { backend.execute = async () => { throw new Error("Unset."); }; });
 
-// docs/content.md：关闭内容作用域取消其在途操作，上传和读取均以取消收束。
+// 关闭内容作用域取消其在途操作，上传和读取均以取消收束。
 // 后台拒绝可能晚于 close 返回；不能把它呈现为普通创建失败。
 it.each(["upload.begin", "read.open"] as const)("内容关闭后 %s 的后台拒绝作为取消交付", async operation => {
   let finish!: (result: ContentResult) => void;

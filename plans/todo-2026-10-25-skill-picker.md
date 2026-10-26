@@ -1,14 +1,10 @@
-# 输入框技能选择入口
+# Composer skill selection
 
-立案日期：2026-10-25
+Filed on 2026-10-25. Deferred and unimplemented.
 
-## 已确认范围
+The intended feature lets a user explicitly choose a skill while composing input. The runtime already has a discoverable skill catalog and on-demand reading.
 
-用户决定后续再接入输入框技能选择器。本任务尚未实施；当前技能目录与读取契约见 [技能目录与读取](../docs/runtime.md#技能目录与读取)。
+- [ ] Decide the selection interaction and how the chosen skill is expressed in submitted input.
+- [ ] Reuse the shared catalog in the input flow.
 
-## 待办
-
-- 确定输入框的技能选择交互与提交表达。
-- 复用当前技能目录，接入用户明确指定技能的输入流程。
-
-具体交互及消息语义待用户确认。
+Interaction and message semantics require a user decision before implementation.

@@ -1,28 +1,15 @@
-# 插件参与 Agent 系统提示组合
+# Plugin system-prompt contributions
 
-立案日期：2026-10-21
+Filed on 2026-10-21. Direction only; no public contribution interface is established.
 
-## 目标与范围
+Plugins should be able to contribute instructions that the Agent composes at a request boundary. Built-in descriptions such as message-envelope meaning should use the same mechanism.
 
-为插件提供系统提示说明的贡献入口，由 Agent 在每次模型请求边界组合为系统提示。内置插件通过同一机制贡献消息信封等说明。当前仅立案，尚未确定公共接口或实现。
+Envelope meaning is separate from a send tool's use. A direct Agent resource already identifies the receiver; internal addressing within a future relay belongs to that relay.
 
-## 已确认的边界
+- [ ] Decide contribution identity, declaration, order, applicability, and release.
+- [ ] Separate static registration from values captured for each request.
+- [ ] Integrate built-in envelope descriptions through the same contribution mechanism.
+- [ ] Clarify implementation-specific tool guidance needed by future relay resources.
+- [ ] Verify request stability, public identity, and lifecycle behavior.
 
-- 信封的来源语义与发送工具的用法分别维护；具体资源的发送与定位规则属于工具说明，不作为常驻系统提示。
-- 直接 Agent 发送通过资源身份确定接收者，无 target，也不校验代理名称。
-- 中继资源尚未实现；其上多个代理的名称定位由中继实现定义，不预设为共享 `Send` 的固定 target 形状。
-- 组合遵守请求边界固定环境和稳定上下文原则，插件贡献沿用公共身份与生命周期规则。
-
-## 待设计与实施
-
-- [ ] 确定插件贡献声明、稳定身份、排列顺序、适用条件与释放方式。
-- [ ] 明确静态登记和请求时取值的边界，由 Agent 组合实际提示块。
-- [ ] 将内置的消息信封说明接入同一贡献入口。
-- [ ] 核对资源工具按实现提供说明的表达方式，供以后中继接入时使用。
-- [ ] 在对应真值文档中确认契约，并验证请求内稳定性与插件生命周期。
-
-## 参考入口
-
-- [运行时环境与代理通信](../docs/runtime.md)
-- [插件 SDK](../docs/plugin-sdk.md)
-- [Agent 系统提示组装](../packages/builtin/src/agent/system-prompt.ts)
+The contribution should preserve the captured request environment and stable top-level context.

@@ -16,7 +16,7 @@ const completion = (input: number, output: number, cacheRead: number, durationMs
 const snapshot = (path: ReturnType<typeof node>[]) => sessionSnapshot(nodeView("s", "", path, path.at(-1)?.id ?? null));
 
 describe("对话中的逐轮计量", () => {
-  // docs/runtime.md：同批独立消息和请求之间的 steer 都归入一个回合，follow 才开始下一回合。
+  // 同批独立消息和请求之间的 steer 都归入一个回合，follow 才开始下一回合。
   it("连续输入与插话不产生空回合或拆分请求计量", () => {
     const path = [
       node("u1", null, message("a", "First")),
@@ -35,7 +35,7 @@ describe("对话中的逐轮计量", () => {
     expect(turnMetrics(snapshot(path), "a", true)).toHaveLength(1);
   });
 
-  // docs/workbench.md：只隐藏当前运行轮，历史轮次的计量保留在对话中。
+  // 只隐藏当前运行轮，历史轮次的计量保留在对话中。
   it("当前轮运行期间隐藏计量，开启下一轮时保留上一轮概要", () => {
     const path = [
       node("u1", null, message("a", "First")),
@@ -95,7 +95,7 @@ describe("对话中的逐轮计量", () => {
     expect(tokensPerSecond(resumed.performance.rates.output)).toBe(10);
   });
 
-  // docs/workbench.md#对话计量：复制最终响应的所有正文，避免漏块或混入思考、过程、工具与其他轮次。
+  // 复制最终响应的所有正文，避免漏块或混入思考、过程、工具与其他轮次。
   it("最终回复按块序号保留 Markdown，历史轮次分别保留自己的回复", () => {
     const first = "# 结果\n\n- **已修复**";
     const second = "```ts\nconst ready = true;\n```\n";

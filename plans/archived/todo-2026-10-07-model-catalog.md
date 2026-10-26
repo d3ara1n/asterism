@@ -1,42 +1,13 @@
-# 模型自动获取与添加
+# Model discovery and parameter lookup
 
-> 立案 2026-10-07，完成归档。端点模型发现、选择添加与 models.dev 参数覆盖已实现，用户于 2026-10-14 确认功能与 GUI 验收通过。价格与费用计量移至[独立计划](../todo-2026-10-14-model-costs.md)，兼容设置的选择边界见[提供商预设](../../docs/model-configuration.md#提供商预设)。
+Filed on 2026-10-07. Completed and archived after user confirmation of function and GUI behavior on 2026-10-14.
 
-## 目标
+Saved connections could discover endpoint models, search and select additions, and atomically add them without overwriting existing entries. Manual model addition remained available.
 
-用户完成提供商连接后，通过 `/models` 选择添加模型，再按需从 models.dev 获取参数并覆盖现值；无匹配或无法表示的字段交由用户填写。提供商预设只维护连接与共用兼容设置，不附带或维护各家的模型清单和参数。
+Provider presets described connections rather than maintaining model catalogs. Lookup used models.dev with exact model-name matching after removing routing prefixes for comparison only; stored service IDs remained unchanged. Missing or ambiguous information was reported instead of guessed.
 
-## 已确定的边界
+Explicit lookup overwrote representable parameters, while network failure retained current values. No background configuration refresh or implicit catalog cache was introduced. Price consumption was deferred from this delivery.
 
-- 提供商目录随应用发布，仅纳入参数与兼容要求已核实、所需包已实现的连接产品；地区、按量／订阅分别声明。
-- 现有目录包含 OpenAI、Anthropic、DeepSeek、xAI 按量 API。选择预设只生成独立连接草稿，目录更新不覆盖已有连接。
-- 模型能力、可用思考等级、上下文与生成参数属于具体模型，不从提供商预设推断。
-- `/models` 等发现接口不一定提供能力、上下文或思考等级，不将模型名匹配当成能力事实。
-- 保留自定义模型与参数覆盖；未知数据不伪造，官方标价不当作中转站实际计费价格。
+Focused tests covered protocols, matching, mapping, persistence, and then-current request invalidation behavior. Typechecks, the suite, localization checks, and build passed. Automation used injected transport and isolated configuration; GUI confirmation came from the user.
 
-## 已完成范围
-
-- [x] 端点发现：OpenAI Responses／Chat Completions 共用 `/models`，Anthropic 使用自己的鉴权与元数据；无鉴权不发认证头，支持同端点分页，不加入 Google 原生协议。
-- [x] 选择式添加：搜索、多选、标记已添加、整批原子保存且不覆盖已有模型；手动添加保留，未知参数明确采用手动初始值，添加后可编辑。
-- [x] 请求生命周期：后台执行、取消与整次超时、固定错误分类；连接变更使旧列表失效，迟到结果不复活。
-- [x] 外部模型资料：采用官方 `@opencode-ai/models`，点击「获取参数」覆盖所有已返回且可映射的参数，cost 不消费；只在查询时去掉模型 ID 的厂商／路由前缀，再按模型本身精确匹配，保存与请求 ID 保持原样。未知或歧义匹配明确失败，参数缺失／无法映射时提示手动检查。
-- [x] 新建默认思考开启；能力字段保持 bool，不新增“未填写”状态，也不区分参数来源优先级。
-- [x] 参数获取入口只在模型设置中提供，列表／卡片不提供覆盖操作；获取后表单更新并显示成功、失败或需手动检查的参数。
-- [x] 端点刷新与离线：仅内存保留每个连接最新结果，明确刷新；失败有提示、手动仍可用，刷新不改已有配置。
-- [x] 外部资料更新与离线行为：每次点击请求在线目录，超时／网络失败明确提示并保留现值；不使用隐式缓存或快照兜底，不后台更新配置。
-
-## 后续范围归属
-
-1. 兼容设置的选择边界见[提供商预设](../../docs/model-configuration.md#提供商预设)，无模型级兼容推荐待办。
-2. 价格资料、cost 字段和费用计量由[费用计划](../todo-2026-10-14-model-costs.md)跟踪；用户明确延后。
-
-## 验证与验收
-
-- 常用模型无需逐项手填参数即可添加；可检查来源并覆盖已知不符的数据。
-- 提供商目录不承载模型清单，后台不修改配置；明确获取参数时按约定覆盖现值。
-- 模型发现失败时有明确反馈，手动添加仍可使用。
-- 用户于 2026-10-14 确认本轮功能与 GUI 无问题；模型设置是唯一参数获取入口。
-
-端点发现与参数覆盖的协议、匹配、字段映射、持久化与迟到保护已通过针对性测试。2026-10-14 收尾验证：类型检查、全量测试（73 个文件、484 项）、中英目录检查与构建通过。构建保留既有的部分产物超过 500 kB 提示。自动化使用注入传输与临时配置，不访问真实提供商或凭据；GUI 验收由用户完成。
-
-关联：[配置语义](../../docs/model-configuration.md)、[提供商目录声明](../../src/configuration/README.md#声明提供商预设)。
+The record predates later simplification of runtime revision checks and later pricing support.

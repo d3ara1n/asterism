@@ -105,7 +105,7 @@ async function create(service: ApplicationService, sessionId: string, input = 1)
 }
 
 describe("工作台 SDK 的宿主实现", () => {
-  // docs/plugin-sdk.md：提交内通知随事务一起生效，回滚的数据不能交付到界面。
+  // 提交内通知随事务一起生效，回滚的数据不能交付到界面。
   it("事务中的资源投影通知在提交后交付，失败回滚不推送", async () => {
     const c = counter(), changed = vi.fn();
     const { service, sessionId } = open([c.plugin], undefined, changed);
@@ -125,7 +125,7 @@ describe("工作台 SDK 的宿主实现", () => {
       objects: [expect.objectContaining({ presentation: expect.objectContaining({ data: { value: 2 } }) })] }));
   });
 
-  // docs/plugin-sdk.md：busy 只保护当前路径；重叠占用独立释放，取消等到清理完成。
+  // busy 只保护当前路径；重叠占用独立释放，取消等到清理完成。
   it("withBusy 重叠占用保护回溯，内存投影通知不写历史", async () => {
     const c = counter();
     const changed = vi.fn();
@@ -155,7 +155,7 @@ describe("工作台 SDK 的宿主实现", () => {
     await service.sessions.execute({ type: "select", sessionId, nodeId: before.cursor });
   });
 
-  // docs/plugin-sdk.md：后台动作消费真实契约并复用全部准备流水线，调用不取得目标私有门面。
+  // 后台动作消费真实契约并复用全部准备流水线，调用不取得目标私有门面。
   it("session.invoke 跨插件复用准备与记录来源，拒绝声明副本和错误目标", async () => {
     const c = counter(), caller = pluginNamespace("test.action-caller");
     let consumer!: PluginContext, prepared = 0, reject = false;
@@ -229,7 +229,7 @@ describe("工作台 SDK 的宿主实现", () => {
     expect(c.context().object(sessionId, Counter, id).get(State)).toBe(1);
   });
 
-  // docs/plugin-sdk.md 的关闭契约：已进入动作可以提交收尾事实，新调用门禁不阻断第一次收尾提交。
+  // 关闭契约：已进入动作可以提交收尾事实，新调用门禁不阻断第一次收尾提交。
   it("关闭时已进入的后台动作可以保存最终记录", async () => {
     const entered = deferred<AbortSignal>(), end = actionGate();
     let saved: number | null = null;
@@ -305,7 +305,7 @@ describe("工作台 SDK 的宿主实现", () => {
     expect(invoked).toBe(1);
   });
 
-  // runtime.md：顶层工具按用户列表覆盖完整声明，失败贡献不占用名称；模型声明与执行身份必须来自同一胜者。
+  // 顶层工具按用户列表覆盖完整声明，失败贡献不占用名称；模型声明与执行身份必须来自同一胜者。
   it.each(["loaded", "setup-failed", "validation-failed"] as const)("同名顶层工具替换内置 ask_user，后者状态为 %s", async state => {
     const c = counter(), first = pluginNamespace("test.first"), last = pluginNamespace("test.last");
     const invoked: string[] = [];
@@ -386,7 +386,7 @@ describe("工作台 SDK 的宿主实现", () => {
     await expect(service.sessions.calls.invoke(invalid.id, null, { object }, null)).rejects.toThrow();
   });
 
-  // docs/plugin-sdk.md：只读调用不占用时间线；取消与宿主关闭仍等待 handler 真正结束。
+  // 只读调用不占用时间线；取消与宿主关闭仍等待 handler 真正结束。
   it.each(["renderer", "plugin"] as const)("%s 只读调用不标记资源 busy，取消后仍等待实际清理", async source => {
     const c = counter(), other = pluginNamespace("test.questions");
     const wait = defineCall(other.name("wait"), { scope: "object", input: z.null(), output: z.null() });

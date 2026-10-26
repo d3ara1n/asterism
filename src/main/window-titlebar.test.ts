@@ -7,7 +7,7 @@ import { serveDesktopWindow } from "./window-titlebar.ts";
 const ipc = vi.hoisted(() => ({ handle: vi.fn(), removeHandler: vi.fn() }));
 vi.mock("electron", () => ({ ipcMain: ipc }));
 
-// design-system.md：全屏状态来自原生窗口，重读与事件必须一致；architecture.md：只允许受信主框架读取。
+// 全屏状态来自原生窗口，重读与事件必须一致；只允许受信主框架读取。
 it("提供当前全屏快照与原生切换通知，关闭后释放 IPC 与窗口监听", () => {
   let fullScreen = true;
   const send = vi.fn();

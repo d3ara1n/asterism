@@ -11,7 +11,7 @@ const conversationTimeline = (snapshot: SessionSnapshot, agentId: string, live: 
   withLive(savedTimeline(snapshot, agentId, running), live);
 
 describe("代理的具型记录视图", () => {
-  // docs/workbench.md：显示来源读取结构化 sender，正文内的信封字样不决定归属。
+  // 显示来源读取结构化 sender，正文内的信封字样不决定归属。
   it("输入视图保留代理来源及原始正文，用户写入的标签仍是用户消息", () => {
     const sender = { kind: "agent" as const, resource: { sessionId: "s", id: "relay", kind: "example/relay" }, name: "Reviewer" };
     const body = "<agent-message>Literal text</agent-message>";
@@ -57,7 +57,7 @@ describe("代理的具型记录视图", () => {
     expect(savedTimeline(snapshot, "a", false).items.map(item => item.id)).toEqual(["input", "partial", "retried"]);
   });
 
-  // docs/workbench.md#对话计量：同轮多个请求只有一份尾部概要，历史概要不因下一轮执行而消失。
+  // 同轮多个请求只有一份尾部概要，历史概要不因下一轮执行而消失。
   it("各轮计量插入对应轮尾，运行中只隐藏当前轮的概要", () => {
     const completion = { finishReason: "stop", rawFinishReason: null, providerResponseId: null,
       usage: { input: 100, output: 10, total: 110, cacheRead: 50, cacheWrite: null, reasoning: null } };

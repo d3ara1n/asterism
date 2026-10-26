@@ -12,7 +12,7 @@ const questions = askUserArgs.parse({ questions: [
 ] }).questions;
 
 describe("结构化问答契约", () => {
-  // runtime.md：身份唯一、推荐必须引用实际选项；否则结果无法稳定关联提问。
+  // 身份唯一、推荐必须引用实际选项；否则结果无法稳定关联提问。
   it("拒绝歧义身份及不存在的推荐，文本题不接受选择题参数", () => {
     expect(askUserArgs.safeParse({ questions: [questions[0], questions[0]] }).success).toBe(false);
     expect(askUserArgs.safeParse({ questions: [{ ...questions[0], options: [choices[0], choices[0]] }] }).success).toBe(false);
@@ -20,7 +20,7 @@ describe("结构化问答契约", () => {
     expect(askUserArgs.safeParse({ questions: [{ ...questions[2], options: choices }] }).success).toBe(false);
   });
 
-  // runtime.md：整体校验后才返回；标题来自原提问，选择、自定义与整组意见不能相互覆盖。
+  // 整体校验后才返回；标题来自原提问，选择、自定义与整组意见不能相互覆盖。
   it("按原题顺序返回选择与用户原文，显式保留跳过状态", async () => {
     const service = createQuestionService(() => {});
     const waiting = service.ask(object, "call", questions, new AbortController().signal);
@@ -53,7 +53,7 @@ describe("结构化问答契约", () => {
     ["文本题携带选项", questions[2]!, { answers: [{ id: "text", status: "answered", selected: ["a"], text: "Text" }] }],
     ["可选题留空冒充跳过", questions[2]!, { answers: [{ id: "text", status: "answered", selected: [] }] }],
   ];
-  // runtime.md：无效提交不得消费等待；空答案、跳过和取消各有明确语义。
+  // 无效提交不得消费等待；空答案、跳过和取消各有明确语义。
   it.each(cases)("%s不结束等待", async (_name, question, submission) => {
     const service = createQuestionService(() => {});
     const controller = new AbortController();
@@ -65,7 +65,7 @@ describe("结构化问答契约", () => {
     } finally { controller.abort(); await waiting; }
   });
 
-  // workbench.md：每题始终允许自定义回答；选项不能限制用户表达。
+  // 每题始终允许自定义回答；选项不能限制用户表达。
   it("单选可完全使用自定义答案", async () => {
     const service = createQuestionService(() => {});
     const waiting = service.ask(object, "custom", [questions[0]!], new AbortController().signal);
@@ -73,7 +73,7 @@ describe("结构化问答契约", () => {
     await expect(waiting).resolves.toMatchObject({ kind: "succeeded", data: { answers: [{ selected: [], text: "Neither; use another approach" }] } });
   });
 
-  // workbench.md：同一 Agent 多组提问独立，取消不提交部分草稿、不消费其他等待。
+  // 同一 Agent 多组提问独立，取消不提交部分草稿、不消费其他等待。
   it("取消只结束指定实例，变化事件和工具过程态关联同一等待身份", async () => {
     const events: string[][] = [];
     const published: string[] = [];
@@ -89,7 +89,7 @@ describe("结构化问答契约", () => {
     await second;
   });
 
-  // runtime.md：通知不回滚已受理答案，否则 UI 提交成功而模型收到工具失败。
+  // 通知不回滚已受理答案，否则 UI 提交成功而模型收到工具失败。
   it("结束通知失败仍交付已受理答案，记录错误且快照可恢复界面", async () => {
     const error = new Error("Event delivery failed.");
     const log = vi.spyOn(console, "error").mockImplementation(() => {});
@@ -109,7 +109,7 @@ describe("结构化问答契约", () => {
     }
   });
 
-  // plugin-sdk.md 数据兼容：新版展示继续解码原有工具记录，不改写已保存结果。
+  // 数据兼容：新版展示继续解码原有工具记录，不改写已保存结果。
   it("继续解码旧版文本答案", () => {
     expect(AskUserResult.schema.parse({ answer: "Legacy answer" })).toEqual({ answer: "Legacy answer" });
     const legacy = { answers: [{ id: "text", question: "Any context?", type: "text", status: "answered", selected: [], text: "Context", comment: "Original qualification" }] };

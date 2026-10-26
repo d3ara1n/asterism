@@ -1,6 +1,6 @@
-# 第三方源码声明
+# Third-party source notices
 
-`packages/ui/src/ui/button.tsx` 与 `dialog.tsx` 基于 [shadcn/ui](https://github.com/shadcn-ui/ui) 的控件模式和源码适配。npm 依赖的许可文件随依赖分发。
+Shared UI controls include adaptations of [shadcn/ui](https://github.com/shadcn-ui/ui). npm dependencies distribute their own license files.
 
 ## shadcn/ui
 

@@ -5,7 +5,7 @@ import type { LiveBlock } from "./session.ts";
 const tool = (result: unknown, extra: Partial<LiveBlock> = {}) => ({ id: "r:0", objectId: "a", responseId: "r", ordinal: 0, kind: "toolcall", name: "exec",
   argumentsText: "", arguments: { command: "ls" }, state: "executing", invocation: null, result: { kind: "running", data: result }, ...extra }) as LiveBlock;
 
-// docs/architecture.md 流式进度：接收端从基线依次应用补丁必须重建后台的当前列表；只追加的内容只传尾部。
+// 流式进度：接收端从基线依次应用补丁必须重建后台的当前列表；只追加的内容只传尾部。
 it.each([
   ["运行结果的字符串尾部追加", tool({ output: "a" }), tool({ output: "abc", lines: 1 })],
   ["数组增长与元素内部变化", tool({ items: [{ text: "x" }] }), tool({ items: [{ text: "xy" }, { text: "z" }] })],

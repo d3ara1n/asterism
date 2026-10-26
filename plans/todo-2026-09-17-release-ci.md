@@ -1,53 +1,27 @@
-# 接入 GitHub 发布与自动更新
+# Release automation and installed updates
 
-立案日期：2026-09-17。
+Filed on 2026-09-17.
 
-状态：打包、签名与三平台发布已完成首次链路测试；main 提交驱动的周更预发布、版本与说明、手动晋级已实现，待真实发布及安装验收。设计真值见 [发布与自动更新](../docs/architecture.md#发布与自动更新)，维护者操作见 [发布操作说明](../docs/releasing.md)。
+Packaging, fixed macOS signing, and a three-platform release pipeline have passed an initial end-to-end trial. Commit-driven prereleases and manual promotion are implemented. Their complete installed-update acceptance remains pending.
 
-## 实现现状
+## Implemented
 
-- 使用 electron-builder 26.18.0 与 electron-updater 6.8.11。应用内只有「包含预发布版本」设置，安装身份与数据保持一致；开发运行使用 `.dev` 数据目录。
-- 仓库 `d3ara1n/asterism` 已公开，固定 macOS 自签身份由 Actions Secrets 提供；CI 通过非交互的管理员信任设置导入证书。
-- 三平台安装包、更新元数据与 macOS 固定自签曾通过完整 CI 发布测试。用户确认没有下载者后，测试 Release 及标签已删除，不保留其兼容逻辑。
-- Release 工作流支持周更预发布，Promote Release 提供手动晋级；版本与说明读取 main 第一父链，发布 tag 来自 GitHub 非草稿 Release，收集阶段只依赖 Node 内置模块与 gh。
-- 更新候选按 GitHub 标记与 SemVer 选择，标准清单、下载、差分与安装交给 electron-updater 通用 HTTP 提供方。
-- 按版本号的数据准备、连续迁移与恢复点已实现；首发前格式变更直接递增版本，GUI 验收由[存储演进](todo-2026-10-12-storage-migration.md)跟踪。旧开发数据未移动或清理。
+- [x] Platform installers and update metadata through electron-builder; electron-vite retains compilation.
+- [x] Main-process update service, exit confirmation, runtime shutdown, and shared settings/titlebar state.
+- [x] Fixed signing secrets and signature verification during the pipeline trial.
+- [x] Weekly and manual release eligibility from main commits, shared version/notes computation, and an initial fixed target.
+- [x] Promotion of an existing tested candidate, excluding later main changes and older same-target candidates.
+- [x] Stable/prerelease selection with one application identity and separate development data.
+- [x] Pure release-logic tests and typechecks.
+- [x] Repository identity alignment. Trial releases were removed after confirmation that no users depended on them.
 
-## 已完成
+## Remaining acceptance
 
-- [x] 替换 Forge，保留 electron-vite，配置 DMG＋ZIP、NSIS EXE、AppImage 与更新元数据。
-- [x] 接入主进程更新服务、退出前资源确认与后台清理、设置页偏好和状态反馈。
-- [x] 接入标题栏更新指示器与详情浮层，共享设置页状态及更新操作；图标 UI 已验收。
-- [x] 配置固定自签 Secrets，完成应用及嵌套代码签名校验。
-- [x] 接入每周预发布检查，已有发布且无新有效提交时在依赖安装前结束。
-- [x] 共用提交解析计算版本与说明，首次固定 `0.1.0` 目标；累计、触发与说明范围见[发布契约](../docs/architecture.md#发布与自动更新)。
-- [x] 增加手动晋级入口，固定所选预发布提交构建；阻止同目标较旧候选晋级导致代码倒退。
-- [x] 统一 `prerelease.N` 命名与客户端更新选择，不设置 alpha／beta 子通道。
-- [x] 补全安装、签名、更新与发布操作说明。
+- [ ] Verify the first prerelease version and notes, then a manual promotion and its cumulative stable notes.
+- [ ] Verify packaged PTY, search, and plugin-build helpers actually load and execute.
+- [ ] Install a prerelease, configure a model, run a task, and reopen saved work.
+- [ ] Update between two real installed versions. On macOS, use a user environment without the developer certificate installed; also accept Windows and Linux on real machines.
+- [ ] Exercise titlebar download progress, ready/failure states, retry, settings navigation, cancelled exit, and confirmed restart installation.
+- [ ] Disable prereleases, retain the installed version, and verify later higher stable versions continue normally.
 
-## 待推进与验收
-
-### 仓库名称对齐
-
-- [x] GitHub 仓库名称与本地 remote 统一为 `d3ara1n/asterism`。
-- [x] `src/shared/application.ts` 的实际仓库名、`scripts/collect-release.ts` 的默认仓库、README 下载链接和发布操作说明统一指向现有仓库。
-- [x] 本机检出目录为 `/Users/chien/Projects/asterism`。
-
-### 发布验收
-
-验收顺序见[首包验收](../docs/releasing.md#首包验收)，小范围分发与正式版范围见[阶段清单](todo-2026-10-26-release-readiness.md)。未验收项保留待办，不阻塞已通过自动检查的实现提交。
-
-- [x] 提交解析、首次固定版本、累计版本、发布范围与晋级约束的针对性纯逻辑测试及类型检查。
-- [x] main 提交来源与首次版本规则已实施，workflow 使用同一计算结果构建与生成说明。
-- [ ] 按确认的规则验证首次预发布的版本与 Release Notes，再手动晋级指定候选验证正式版累计说明。
-- [ ] 核对 node-pty、rg、esbuild 在安装产物中的真实加载与执行。
-- [ ] 用户通过 DMG 安装预发布，确认配置模型、真实对话与会话保存。
-- [ ] 在未导入开发者证书的用户环境验证 macOS 两个真实版本的下载、替换与重启；Windows NSIS 与 Linux AppImage 的更新同样待实机验收。
-- [ ] 后续内测版本交接时验收标题栏真实下载进度、待安装与失败状态、浮层重试、设置跳转，以及退出确认取消后继续工作与确认后的重启安装；本轮仅静态检查与逻辑复核。
-- [ ] 验证关闭预发布后保持当前版本，后续正式版正常接续；GUI 与真实安装交互由用户验收。
-
-## 后续边界
-
-- 目标平台为 macOS arm64、Windows x64、Linux x64，其他架构按需要扩展。
-- 周更具体时间与手动晋级操作维护在发布操作说明；epic 流程以后再讨论，本计划不扩展目标管理机制。
-- 项目源文件、提交历史的公开前扫描未发现凭据、私钥或真实运行数据入库。
+Target platforms are macOS arm64, Windows x64, and Linux x64. Automated pipeline success does not establish every platform interaction. Publishing, remote configuration, and cleanup require their own explicit authorization.

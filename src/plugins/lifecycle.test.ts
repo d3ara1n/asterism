@@ -3,7 +3,7 @@ import { RunLifecycle } from "./lifecycle.ts";
 
 const object = { sessionId: "session", id: "object", kind: "test.resource/object" };
 describe("共享运行生命周期", () => {
-  // docs/plugin-sdk.md：只读查询不占用时间线，宿主关闭仍等待它真实结束。
+  // 只读查询不占用时间线，宿主关闭仍等待它真实结束。
   it("只读通信等待不占用时间线，资源工作单独登记 busy", async () => {
     const lifecycle = new RunLifecycle(() => {});
     let finishCall!: () => void, finishTask!: () => void;

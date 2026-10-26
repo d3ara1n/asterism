@@ -1,45 +1,15 @@
-# 插件内容导入与持久引用
+# Plugin content ingestion
 
-> 立案 2026-10-12，2026-10-19 归档。设计与代码已实现，GUI 主路径已验收；上传中取消与准备失败重试的逻辑已由隔离测试覆盖，界面状态采用延迟验收，在真实插件与文件使用中发现具体问题后处理。归档不表示这两个界面状态已亲眼确认。
+Filed on 2026-10-12; archived on 2026-10-19 after implementation and main-path user acceptance.
 
-设计真值见[不可变内容](../../docs/content.md)、[插件 SDK](../../docs/plugin-sdk.md)与[架构](../../docs/architecture.md)；作者入口见[SDK 作者指南](../../packages/sdk/README.md)。
+The host managed staging, sealing, reading, and retention of immutable bytes. Persistent JSON contained exact reserved content references; the host discovered roots from final validated values rather than a second plugin-maintained manifest.
 
-## 已确定方案
+References were neither resources nor credentials. Drafts, attempts, and active reads held distinct leases. Preparation did not prematurely release content, and failed attempts retained retryable drafts.
 
-- 宿主统一管理不可变字节，来源、存储与业务消费分开。资源和历史继续使用 JSON。
-- `ContentRef` 为严格单键保留值 `{ "$atelier.content": "<opaque UUID>" }`；宿主从实际保存的 schema 输出自动登记依赖，不要求作者双写清单或提供提取函数，不猜测普通字符串／路径／哈希。
-- 内容引用不是资源或访问凭据。输入资格留在宿主草稿和命令信封；对象内容按对象归属与可见历史路径检查，不隐式支持跨对象或跨会话共享。
-- 草稿、提交尝试和读取各自持有占用；准备结束不释放尝试，失败保留草稿可重试，取消等待真实工作结束。
-- 字节先异步封存，再在同步事务中提交 JSON 与依赖。当前数据替换整组依赖，历史记录只增加依赖；create 返回 data 属于创建事件，writer.set 属于当前数据，不自动双写。
-- 资源自身准备可读和暂存，外部准备者只读。后台执行中的对象门面可暂存生成内容；实时流与模型协议保持各自领域职责。
-- 沿用开发期存储约定，不迁移真实开发数据；当前 SDK 与宿主 API 版本见[SDK 作者指南](../../packages/sdk/README.md)，IPC 与数据格式分别由宿主维护。
+Bytes were prepared outside synchronous transactions; saved data and dependency roots committed together. Current data replaced its roots, while historical records retained theirs. Object and session ownership remained explicit.
 
-## 实施与验证
+Backend and frontend author examples, input transport, image paste, and resource actions were delivered. Isolated tests covered cancellation, retry, isolation, rollback, transforms, history roots, reopen with absent plugins, and active-read retention.
 
-- [x] 与 FairCrane 收敛设计；消除清单漏报风险，明确对象归属、共享当前数据、真实读取占用与同步创建。
-- [x] 更新内容设计、决策、词汇、对象／历史／架构文档和 SDK 作者说明。
-- [x] 宿主内容存储：有界分块、封存、摘要与长度、临时占用、当前数据／记录依赖、事务回滚与孤儿回收。
-- [x] SDK 创建与动作完整路径：准备上下文、执行暂存、同步写入、持久读取和历史路径检查。
-- [x] renderer → preload → main → runtime 独立内容 IPC，信封校验、分块确认、读取关闭与渲染页重载清理。
-- [x] 创建输入视图取得内容草稿；toInput 可异步受理且只计算一次；无路径 File 不再丢弃；对象动作可携带内容输入。
-- [x] 工作台图片粘贴复用无路径 file 入口；自动输入准备显示等待与取消，失败有宿主错误展示，文本编辑控件保留自身粘贴。
-- [x] 公开 SDK 作者用例：`content-contract.ts`、`content-author.ts`、`content-renderer.ts`；不新增内置图片／PDF 等占位资源。
-- [x] 隔离测试覆盖二进制与空内容、正常分块与乱序拒绝、创建与动作、后台生成、取消和失败重试、对象隔离、嵌套回滚、转换后的引用、历史根、活动读取保护、缺席插件重开与共享创建祖先。
-- [x] 类型检查、51 个测试文件的 369 项测试、生产构建与 diff 空白检查通过；构建有产物体积提示，无构建错误。
-- [x] GUI：安装声明 `accepts.files`（不要求路径）的插件，拖入无路径文件、粘贴图片、动作替换与历史展示已由用户验收（2026-10-13）；作者示例是插件代码片段，不是新增默认资源。
+The user accepted the normal plugin import/action/history path on 2026-10-13. Large-upload cancellation and preparation-failure UI remained real-use observation targets. Archival did not claim those states had been manually reproduced.
 
-测试使用独立临时目录并清理，不读写真实会话或凭据，未启动 GUI 自动冒烟。
-
-## 延迟验收
-
-真实使用中观察大文件上传时的等待与取消、插件准备失败后的提示与重试。本地小文件瞬间完成且未遇到失败，因此尚未自然观察到这两个界面状态；不为归档另造故障注入插件或穷尽文件与插件组合。发现问题后按具体文件条件与插件行为处理，需跨会话处理的缺陷另行立案。
-
-## 后续开发归属
-
-尚未实施的内容导入、共享与媒体能力统一由[运行时能力计划](../todo-2026-10-01-runtime-capabilities.md#内容后续能力)跟踪，不因本次归档视为完成。
-
-## 关联
-
-- 模型图片／文件输入与 provider 编码已接通，专项端点与 GUI 验收已完成，记录见[模型内容输入计划](todo-2026-10-12-model-media-input.md)。
-- [插件系统计划](../todo-2026-10-12-plugin-system.md)：包管理与插件卸载；会话内容不随插件私有目录删除。
-- [运行时](../../docs/runtime.md)：资源授权与请求边界；内容 ID 不绕过工具执行授权。
+Real-time media, broader sharing, and other media input/output capabilities were outside this delivery.

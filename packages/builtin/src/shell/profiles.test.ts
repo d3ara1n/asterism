@@ -42,7 +42,7 @@ it("查询按执行环境发现可执行文件，保留不可用配置且不交�
   expect(result.profiles[0]).not.toHaveProperty("env");
 });
 
-// docs/runtime.md：auto 先按平台预设顺序选，再尝试自定义项；配置排列不代表自动选择优先级。
+// auto 先按平台预设顺序选，再尝试自定义项；配置排列不代表自动选择优先级。
 it("自动选择跳过缺失预设，优先可用预设，并与实际执行解析一致", async () => {
   const custom = profile("custom", await executable("custom.exe"));
   const sh = profile("sh", await executable("sh.exe"));

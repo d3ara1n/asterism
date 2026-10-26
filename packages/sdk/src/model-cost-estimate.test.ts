@@ -7,7 +7,7 @@ const quantities = (input: number, output: number): CostQuantity[] => [
   { modality: "text", item: "input", quantity: input, unit: "token" },
   { modality: "text", item: "output", quantity: output, unit: "token" },
 ];
-// docs/model-configuration.md：先逐请求整次选档，数量与单价单位必须一致，未知资料不能变成免费。
+// 先逐请求整次选档，数量与单价单位必须一致，未知资料不能变成免费。
 describe("参考费用计算", () => {
   it("逐请求选档后汇总，阈值含边界，修改价格可重算", () => {
     const cost = modelCostSchema.parse({ currency: "USD", rates: { text: { input: price(2), output: price(10) } },

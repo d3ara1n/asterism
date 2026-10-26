@@ -16,7 +16,7 @@ import { ease, PanelBody, percent, Section, stripes, Swatch, SystemComposition }
 import { allocateTiles, contextInsight, conversationCategories, type ContextInsight, type ConversationCategory } from "./insight";
 
 const COLUMNS = 20, ROWS = 5;
-/** 类别按固定顺序取图表色；docs/design-system.md#数据图表。 */
+/** 类别按固定顺序取图表色。 */
 const fill: Record<ConversationCategory, string> = {
   user: "bg-chart-1", assistant: "bg-chart-2", thinking: "bg-chart-4", toolcall: "bg-chart-6",
   result: "bg-chart-3", context: "bg-chart-7", summary: "bg-chart-8", agentMessage: "bg-chart-5",

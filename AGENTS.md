@@ -1,101 +1,67 @@
-# 星图 Asterism 项目规范
+# Asterism project conventions
 
-以对象为中心的个人 agent 工作台：代理、资源与操作以卡片和连线呈现，任务过程可查看、分叉，资源支持时可恢复。定位与边界见 `docs/product.md`。
+Asterism is an object-centered personal agent workbench for organizing work, resources, and execution history.
 
-## 心智模型
+## Engineering principles
 
-实现取舍与文档修订以此为准。
+- **Authorization is a context boundary.** Explicit resource identity and runtime authorization determine the objects visible and usable in a request. Storage directories, cards, links as visual elements, and tool catalog visibility are not implicit access grants or an operating system sandbox. Asterism has no general permission model or agent behavior audit. Shells, terminals, and MCP run as the current user.
+- **Resources and tools are peers.** Tool implementations declare supported resources. Links activate matching capabilities; agent policy independently filters them. Resource definitions contain neither tools nor tool policy.
+- **History is immutable.** Asterism owns its records independently of provider or agent-framework session formats. Detach appends an event. History browsing does not change reality, and restoration requires resource support.
+- **Capture the environment at request boundaries.** A request and its tool batch use the captured path, configuration, credentials, and access until completion. Intervening changes take effect in the next request.
+- **Local operations follow processing order.** Later backend-processed writes win. Reads return current values at handling time. Pending prevents reentry at the same UI entry; cancellation scopes own asynchronous work. Runtime revisions, generations, precommit rechecks, and hypothetical conflict defenses are not the coordination model. Fixed storage, IPC, and API versions describe software formats.
+- **The harness describes primitives.** Host prompts, tool descriptions, and feedback use declarative input/output and infrastructure facts. Users compose workflows. Remove host-authored negative instructions, temporary missing-capability restrictions, and workflow prescriptions when maintaining harness text; preserve user instructions.
+- **Keep top-level context stable.** Host and plugin top-level tools register statically. Resource changes affect secondary tools and subsequent projection without interrupting one response.
+- **Trust plugins and expose failures.** Installed plugins are trusted. Protect identity, authorization contracts, and immutable history; avoid speculative quotas, fairness layers, and silent fallback.
+- **Separate composition from mechanism.** Application composition can use host interfaces and built-in public domain APIs. Generic host code and plugins depend on the SDK. Built-in distribution grants no special lifecycle or validation bypass.
 
-- **授权是上下文边界**：资源操作凭显式资源身份加执行层授权完成，授权决定模型可见、可操作的对象集合以控制上下文，不是安全边界。Workspace 存储目录、卡片与连线的可见性、工具出现在目录中，都只是视图，不构成授权。星图没有权限模型、不审计代理行为，shell、终端与 MCP 以当前系统用户能力运行，见 `docs/architecture.md#安全边界与非目标`。
-- **资源与工具平级**：资源工具独立声明可操作的资源，链接资源激活匹配工具；支持关系不等于白名单。`agent.tools` 等外部策略另行筛选，资源定义不包含工具或工具策略。
-- **历史是事件，永不改写**：任务历史由星图拥有，不以某个 provider 或 agent 框架的会话格式作为唯一存储。查看历史不改变现实；detach 以生效事件表达而非删除旧消息；不可恢复资源不宣称回滚。
-- **环境在请求边界取用**：每次模型请求固定消息路径、代理配置、连接凭据与资源授权，连同该响应的工具批次使用到底；取用后不再复核是否仍为当前值。期间变化按发生顺序记录，下次请求重新取用。
-- **本地操作按处理顺序生效**：星图是单用户本地软件。用户、代理与插件的写入按后台实际处理顺序生效，后写为准；读取返回处理时的当前值，变化通知后再次读取即得最新值。人与代理同时修改、迟到结果覆盖属于用户可观察、可预期的体验，不属于安全问题，按普通写入处理，不以修订号、代次、复核或冲突报错拦截。入口 pending 防止同一入口重入，异步工作随所属取消作用域结束。存储、IPC 与 API 的固定格式版本表示软件代际，与运行时数据无关。
-- **Harness 提供原语**：宿主注入的提示、工具说明与反馈只用陈述句描述原语、输入输出和基础设施规则，workflow 由用户组合；否定式要求仅来自用户提示词。维护 harness 文本时删去否定指令、未实现能力的限制说明和流程安排，见 `docs/runtime.md#代理控制器与请求环境`。
-- **稳定上下文优先**：顶层工具由宿主或插件模块静态声明、注册，运行期间不动态增删；资源变化只影响二级工具，经投影进入响应之外，不打断同一 response 的连续性。两类工具边界见 `docs/runtime.md`。
-- **信任插件，暴露问题**：插件由用户主动安装、授权，不是需要防御的互联网客户端。宿主不为插件的极端行为设置配额、公平调度或静默兜底；插件出问题时让后果直接可见，由用户判断并卸载。宿主只守护自身契约（授权、身份与历史不可改写）。
-- **应用组合与宿主机制分层**：应用组合层可以依赖宿主接口与内置插件公开领域接口；通用宿主机制与插件共同依赖 SDK，领域规则留在插件。随软件分发不赋予插件绕过身份、校验或生命周期的特权，见 `docs/architecture.md#应用组合与宿主机制`。
+## Environment and implementation
 
-## 环境与工作台基线
+Development starts with `npm run dev`. The stack is Electron, React, TypeScript, shadcn/Radix, Tailwind, React Flow, SQLite, Zod, an independent task runtime, and AI SDK adaptation. Installed versions belong to the lockfile. macOS is the main test platform; releases target macOS, Windows, and Linux.
 
-- **入口与技术基线**：开发入口 `npm run dev`。Electron + React + TypeScript，shadcn/ui（Radix）+ Tailwind CSS 与 `@xyflow/react`，SQLite（`node:sqlite`）与本地对象存储，Zod，独立 Node.js 任务运行时，模型请求适配使用 Vercel AI SDK；构建、打包与自动更新选型见 `docs/architecture.md`。测试以 macOS 为主，发布目标覆盖 macOS、Windows 与 Linux。已安装版本见 `package-lock.json`。
-- **身份与数据隔离**：品牌、固定应用身份与数据布局维护在 `src/shared/application.ts`，内部契约与通道身份见 `src/shared/core.ts`。开发数据与发布数据隔离，均使用 Electron 数据目录；测试使用独立临时目录并清理。真实会话、资源快照与任何凭据不进入源码仓库。一次性原型仅留于 `feat/ux-prototype`，正式分支不依赖其代码。
-- **工作台与占位边界**：工作台中的笔记与可添加资源种类仍用于基础能力验证，不得以这些占位内容反推最终资源需求。对象、历史与授权面板按 `docs/workbench.md` 维护（对象快速定位、历史逐节点导航、授权消费真实链接），代理卡片已接入真实对话。工作台作为根浮岛，卡片统一使用 `ObjectCard`，辅助视图以更深浮岛打开；首页、导航、设置与公共视觉沿用已确认约定。
-- **视觉与 UI 控件**：视觉以 `docs/design-system.md` 为准（原生材质底座、独立内容表面、统一 token 与公共控件）；新功能复用现有风格，整体视觉变更须由用户确认。控件先查 shadcn registry：`packages/ui/src/ui/` 缺少时用 `npx shadcn@latest add <name>` 拉取（官方控件不算新依赖），拉取后核对导入路径为相对路径，并清理 CLI 误加的依赖或目录。
-- **依赖优先**：优先采用成熟、维护活跃的现有库解决通用问题（控件、动画、布局测量、拖拽、虚拟列表等），不自行实现同类机制。引入依赖按决策边界单独确认，说明选型理由与替代方案。
+Keep fixed application identity, data layout, and internal channel identities centralized. Development and installed data are separate. Tests use isolated temporary data and clean up. Real sessions, resource snapshots, and credentials stay outside source control. The one-off prototype remains on `feat/ux-prototype`; production code does not depend on it.
 
-## 仓库与文档地图
+Current example resources validate foundations and do not define the final product catalog. Workbench cards and auxiliary surfaces reuse the shared object and island presentation. Overall visual changes require user confirmation.
 
-每一项概念或契约只在唯一真值文档中维护，跨文档引用只保留链接，不复制规则正文。代码与文档描述最终状态，不写变更过程；移除功能时同步清理实现与文档。产品与代码词汇查 `docs/glossary.md`，新增概念先入表。
+Reuse maintained libraries for general controls, animation, layout, drag, and virtualization. Confirm new dependencies separately with rationale and alternatives. For a missing shadcn control, check the registry and use `npx shadcn@latest add <name>`; official controls do not count as new dependencies. Verify relative imports and remove accidental CLI additions.
 
-### 1. 源码入口地图
+## Documentation ownership
 
-| 路径 | 触发场景与职责 |
-| --- | --- |
-| `README.md` | 产品概览、本地开发命令与数据目录说明 |
-| `src/README.md` | 查改主进程／preload／runtime 职责、跨层调用路径与开发扩展入口 |
-| `src/renderer/README.md` | 查改前端目录结构、工作台状态协调与界面组件 |
-| `src/configuration/README.md` | 查改提供商预设声明、全局配置存储与连接测试实现 |
-| `packages/sdk/README.md` | 查改 `@asterism/sdk` 插件接口、作者指南与代码示例 |
-| `packages/builtin-api/README.md` | 查改 `@asterism/builtin-api` 公共 Agent 契约、Agent 创建入口与界面扩展 API |
-| `packages/builtin/README.md` | 查改内置 `asterism.builtin` 模块（Agent、资源、工具）实现与视图规范 |
-| `packages/ui/README.md` | 查改 `@asterism/ui` 共享基础控件、布局 helper 与工具展示组件 |
+All repository documentation is English, including manuals, engineering documents, source/package README files, plans, and archives. Code comments and commit subjects retain the existing Chinese convention. User-facing application copy remains bilingual, English first; runtime logs use formal English.
 
-### 2. 设计契约真值（`docs/`）
+The collections have distinct writing requirements:
 
-| 文档 | 触发场景（唯一真值范围） |
-| --- | --- |
-| `docs/product.md` | 核对产品定位、核心体验、首批验证资源与产品边界 |
-| `docs/glossary.md` | 新增或核对领域／代码命名与中英对照定义 |
-| `docs/object-model.md` | 修改 Workspace、Session、Agent、Resource、工具匹配或 View 领域语义 |
-| `docs/timeline.md` | 修改会话树节点、时间线、执行游标、状态投影、回溯或分叉语义 |
-| `docs/runtime.md` | 修改执行轮次、代理循环、系统提示词、工具批次、执行授权、模型协议适配或原生正文工具 |
-| `docs/model-configuration.md` | 修改提供商预设、模型发现、models.dev 参数、输入能力、模型角色、代理配置或用户覆盖 |
-| `docs/workbench.md` | 修改首页、会话列表、工作台画布、代理卡片、工具三态视图、对象／授权／历史面板或 Agent 扩展界面 |
-| `docs/design-system.md` | 修改原生窗口材质、窗口层次、浮岛编织、动效、主题 token、按钮或状态反馈样式 |
-| `docs/architecture.md` | 修改进程职责、应用组合与宿主分层、SQLite／文件存储归属、会话 IPC 契约或安全边界 |
-| `docs/plugin-sdk.md` | 修改插件 SDK 架构、公共模块、瞬态事件总线、门面与生命周期、具型创建／动作或工具视图接口 |
-| `docs/content.md` | 修改二进制／文件流转：`ContentRef` 不可变字节导入、草稿与运行占用、持久依赖根与回收 |
-| `docs/i18n.md` | 修改多语言：`UiText` 消息声明、插件翻译目录、语言匹配回退与 FormatJS 抽取 |
-| `docs/session-naming.md` | 修改标题逻辑：两级自动命名、`SessionNamed` 事件、游标标题同步与人工重命名 |
-| `docs/context-compression.md` | 修改长对话压缩：上下文压缩预算、保留边界、独立摘要提示与历史投影 |
-| `docs/mcp.md` | 修改 MCP Host 资源、服务器配置与认证、eager/lazy 连接、工具缓存及 MCP 发现与调用 |
-| `docs/web.md` | 修改 WebResource、网络提供方类型与连接、URL 分派、Exa 适配及统一搜索／获取结果 |
+- `docs/manual/`: concise guides for models helping users use Asterism or develop plugins. Explain purpose, concepts, and working methods. No localized editions or public documentation site.
+- `docs/development/`: internal software engineering principles, responsibility boundaries, and design constraints. These are not plugin-author or software-use guides.
+- `plans/`: deferred tasks (`todo`), research and reference material (`ref`), and review findings (`review`), archived when their work or use ends.
 
-### 3. 决策归档、路线与调研（非当前契约真值）
+Manual and engineering pages are independently readable. Include enough context to explain each topic. Stable directory maps may describe organization and responsibilities. Keep these pages free of cross-document references, research-source trails, per-file source indexes, and API inventories. Models can search files and integrate information themselves.
 
-| 文档 | 用途与边界 |
-| --- | --- |
-| `docs/decisions.md` | **历史决策归档与未决问题**：记录为什么这样选、排除了什么替代方案，避免重走弯路。**不是当前规格说明书**，当前契约以第 2 类真值文档为准 |
-| `docs/roadmap.md` | 实施阶段划分、里程碑验收场景与必测边界 |
-| `docs/releasing.md` | 维护者发布操作：GitHub Secrets、工作流触发、产物与首包验收 |
-| `docs/mcp-caching.md` | MCP 延迟加载与提示缓存机制调研（时点固化，接入时核验） |
-| `docs/agent-transcript-research.md` | 开源项目（pi、OpenCode、Cline、Codex、AI SDK）源码调研（仅作背景参考） |
-| `plans/` | 跨会话延续的待办任务与已归档实施记录，规则见下方 `plans 纪律` |
+Prefer stable meaning over implementation detail. A code move, parameter change, or edit to another document should not require updates here. Update a page when the concept or design it explains changes. Verify claims while writing; do not silently promote a proposal or old acceptance record into current behavior.
 
-## plans 纪律
+## Plans
 
-- **`plans/todo-<日期>-<主题>.md`**：跨会话延续任务的唯一真值；完成即移入 `plans/archived/`，有留存价值的结论转入对应真值文档，不在真值文档中保留验收日期流水账。文件名与文内日期用立案当天的真实日期，不推算、不占位，不出现未来日期。
-- **`plans/archived/`**：已结束的计划，只进不出。
-- **延后才立案**：本轮会话内完成的任务直接做，不立案；确定留待以后的事才落到 `plans/`。聊天即焚，延后却未入档的决策视为未发生。
-- **文件名即性质**：从名字直接读出生命周期；新类型前缀按需增设（常驻手册用全大写），须能一句话说清其生命周期。
+Use `todo-<date>-<topic>.md` for deferred work, `ref-<date>-<topic>.md` for research or reference material, and `review-<date>-<topic>.md` for review findings. Use the actual filing date; preserve existing dates when moving records. File tasks only for work deliberately deferred beyond the current session.
 
-## 验证职责
+Plans may cite reference and review material as working inputs. Archive completed tasks, consumed references, and reviews whose findings have a disposition in `plans/archived/`; archived records stay there. New investigations start new records. Preserve historical evidence and acceptance caveats. Lasting documentation states generalized conclusions without research-basis sections or dependency on those records.
 
-- **文档阶段**：验证止于新内容与既有 `docs/` 语义一致、术语与 `docs/glossary.md` 一致。
-- **实现阶段**：验证止于 typecheck、单元与契约测试；GUI 交互由用户操作确认，不做「启动→等待→杀掉」式自动冒烟。
-- **UI 与样式改动**：样式、布局、窗口材质与位置由用户直接验收；此类改动只做必要的类型检查和构建，不默认运行整套历史／运行时测试。
-- **测试对象**：测试守护含分支或计算、回归可能悄无声息发生的纯函数与确定性逻辑（解析、补丁、折叠、匹配、格式化等），以输入和预期输出断言。能可靠判定的才测，允许不测。
-- **不写测试的范围**：以下行为由代码审查、类型检查与人工验收确认，既有用例删除，也不新增：
-  - 一眼可证的确定事实：常量、schema 与契约声明、类型系统已保证的约束、直接装配与转发，以及照抄实现或把当前输出当作答案的断言。
-  - UI：组件渲染、交互、样式、布局与视觉效果。界面依赖的计算抽成纯函数后按「测试对象」处理。
-  - 真实进程（shell、PTY、子进程）与时间（真实或假计时器、期限、`waitFor`／`expect.poll` 轮询、`setTimeout` 等待）。
-- **用例要求**：每个用例说明具体失败机制与预期依据，断言可观察的结果，说不清的用例删除或合并。失败机制来自真实调用路径或已出现的问题，假设性的并发交错与巧合时序不构成测试或防御机制的依据；审查意见只作线索，按实际调用路径判断。同一契约在一处覆盖，下游信任上游；下游必须重测时先查明并修复契约封装缺口。按独立契约组织用例，保持独立运行，覆盖率与测试数量不作为目标。
+## Validation
 
-## 决策、操作与提交约定
+Documentation work requires semantic, terminology, language, and standalone-readability checks. Implementation work requires appropriate typechecks and focused unit/contract tests. GUI interaction is accepted by the user; do not automate launch-wait-kill smoke cycles.
 
-- **决策边界**：文档措辞与结构、仓库文件组织、实现期的内部拆分／命名／代码组织／实现层参数由 agent 自主；产品定位与交互范式、对象模型语义、provider 与消息／工具协议、存储格式、依赖引入、授权模型、对外行为必须由用户拍板。拍板后将最终规则写入对应设计真值文档，并在 `docs/decisions.md` 归档取舍理由。
-- **操作确认**：实施前说明范围与关键取舍并获得确认，已确认范围内的细节自行决定。提交前展示 diff 或摘要并获得明确许可；提交许可不含 push、发布与远端操作。
-- **兼容边界**：当前内部开发、尚无用户，内部测试 Release 不构成兼容承诺；不兼容数据直接删除重建，测试 Release 可直接删除，接口和行为采用当前契约。持久格式变化只递增所属版本常量，不补迁移步骤。首次面向用户分发后，持久格式变化提供连续的 n → n+1 迁移并以旧格式夹具验证，规则见 [数据准备与迁移](docs/architecture.md#数据准备与迁移)。真实开发数据与远端 Release 的清理按本次会话已明确授权的范围执行。
-- **分支与提交**：主干 `main`。首个版本发布前直接在 `main` 上开发与提交，不开分支、不走 PR；首个版本发布后改为按 type 开分支（`feat/`、`fix/`、`docs/`…），经 PR squash merge 回 `main`，一个 PR 对应一个合并提交。提交信息用 Conventional Commits（type 英文小写，主题中文）。AI 辅助的提交加 `Co-Authored-By: <模型名> <邮箱>` trailer（模型身份查 `PI_*` 环境变量，邮箱用提供方官方 noreply 地址，无法确定时用 `noreply@pi.dev`）。
-- **语言规范**：开发文档（`docs/`、`plans/`、代码注释、提交主题）用中文，词汇对照以 `docs/glossary.md` 为准；对外文案双语、英文为主（孵化期 README 中文先行，发布前补英文）；运行时日志用正式英文，保证可 grep。
+UI and style work uses necessary typechecks and builds, not an unrelated full history/runtime suite. Visual configuration and rendering are manually accepted.
+
+Tests target deterministic logic with meaningful branches or calculations: parsing, patches, folding, matching, and formatting. Each case identifies a concrete failure mechanism and an independent expected result.
+
+Remove rather than add tests for constants, schemas, type-guaranteed facts, direct forwarding/assembly, implementation-mirroring assertions, UI rendering/interaction, real processes, and real or fake timing. Extract meaningful pure UI calculations when appropriate.
+
+Cover a contract once at its owning boundary. Repeated downstream tests should reveal an encapsulation gap before adding duplication. Review comments are leads, not automatic requirements; speculative interleavings do not justify defensive mechanisms or tests. Test count and coverage are not goals.
+
+## Decisions and operations
+
+Internal wording, file organization, naming, decomposition, and implementation parameters are autonomous. Product positioning, interaction paradigms, domain semantics, provider/message/tool protocols, storage formats, dependencies, authorization, and external behavior require user decisions. Describe approved design principles in independently readable engineering documents; retain decision rationale as a reference record when useful.
+
+Explain implementation scope and tradeoffs before proceeding; confirmed scope authorizes its routine details. Show the diff or a summary and obtain explicit permission before committing. Commit permission does not include push, release, or other remote writes.
+
+Before user distribution, incompatible development formats can be rebuilt without migration, with explicit authorization for real data cleanup. Internal test releases do not establish compatibility. First user distribution, including friend-facing prereleases, requires continuous n-to-n+1 migrations and old-format fixtures thereafter.
+
+Main is the trunk. Before the first release, develop and commit directly on main. After the first release, use type-prefixed branches and squash-merged PRs, one merge commit per PR. Use Conventional Commits with a lowercase English type and Chinese subject. AI-assisted commits include a Co-Authored-By trailer using the actual model identity from PI_* and its provider noreply address, or noreply@pi.dev when unknown.

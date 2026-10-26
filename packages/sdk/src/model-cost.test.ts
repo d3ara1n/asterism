@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { emptyModelRates, modelCostSchema, unitPriceSchema } from "./model-cost.ts";
 
-// 价格结构的预期依据为 docs/model-configuration.md「API 参考价格」。
+// 价格结构按模态、计费项和计量单位分别表达。
 describe("模型 API 参考价格契约", () => {
   // 各计费项独立持有单位和基数，避免图片输入 token 与输出张数、音频时长被混为一类数量。
   it("同一模态支持不同单位，基础价和档位保留单位与基数", () => {

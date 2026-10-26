@@ -1,7 +1,7 @@
 import { expect, it } from "vitest";
 import { workbenchPhase } from "./feedback";
 
-// docs/workbench.md：loading 只表示首次内容尚未就绪；后台更新保持现有工作台。
+// loading 只表示首次内容尚未就绪；后台更新保持现有工作台。
 it("首次读取、读取错误与后台不可用分别呈现", () => {
   expect(workbenchPhase("starting", null)).toBe("starting");
   expect(workbenchPhase("ready", null)).toBe("loading");

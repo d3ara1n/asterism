@@ -1,9 +1,12 @@
-# 应用图标
+# Official application icon
 
-> 立案 2026-10-01。正式 Logo 延后设计；品牌图形方向与占位约定见 [设计系统](../docs/design-system.md#应用图标)。
+Filed on 2026-10-01.
 
-## 待办
+The official logo is deferred. The approved direction is a three-star arrangement; existing interface and application graphics remain placeholders.
 
-- [ ] 设计三星构图的正式 Logo，确定星形、比例、配色与系统图标底板，并由用户确认；设计完成前保留界面经纬线框与现有应用图标。
-- [ ] 同步界面品牌标识与应用图标，生成 macOS `.icns`、Windows `.ico`、Linux `.png`，接入 `electron-builder.config.ts` 与 BrowserWindow 图标。
-- [ ] 用户在各平台 Dock/任务栏验收；不为图标编写测试。
+- [ ] Design star geometry, proportions, color, and platform backing with user confirmation.
+- [ ] Align interface branding and platform icon assets.
+- [ ] Generate and wire the required macOS, Windows, and Linux assets.
+- [ ] Obtain user acceptance in the actual Dock/taskbar and application surfaces.
+
+Visual acceptance is manual. Icon generation does not require tests that restate its geometry.

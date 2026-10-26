@@ -72,7 +72,7 @@ describe("无状态的单次模型执行", () => {
     expect(result).toMatchObject({ reason: outcome, response });
     expect(JSON.stringify(events)).not.toContain("private-response");
   });
-  // docs/runtime.md#响应计量与请求计时：终态计时与 usage 一起交付，执行工具不重置时间；失败也保留计时。
+  // 终态计时与 usage 一起交付，执行工具不重置时间；失败也保留计时。
   it("保留模型终态和失败携带的计时，不用工具批次结束时间覆盖", async () => {
     const timing: RequestTiming = { startedAt: "2026-01-01T00:00:00.000Z", endedAt: "2026-01-01T00:00:01.000Z",
       durationMs: 1000, firstOutputMs: 100, firstTextMs: null, firstReasoningMs: null, lastOutputMs: 900, outputChunks: 2, outcome: "completed" };
@@ -147,7 +147,7 @@ describe("无状态的单次模型执行", () => {
     expect(later).toBe(0);
   });
 
-  // docs/runtime.md：工具结局是模型反馈；显式未知与写工具抛错均不改变模型请求结局。
+  // 工具结局是模型反馈；显式未知与写工具抛错均不改变模型请求结局。
   it("未知工具结局和写工具异常正常交付，整批完成供代理继续处理", async () => {
     let executions = 0;
     const tool = implement(write, { async call() {
@@ -175,7 +175,7 @@ describe("无状态的单次模型执行", () => {
     expect(second.filter(event => event.type === "diagnostic")).toMatchObject([{ code: "cache_miss", level: "warning" }]);
     expect(third.filter(event => event.type === "diagnostic")).toEqual([]);
   });
-  // docs/runtime.md：领域扩展消费最终现场的独立副本，与 usage 同时交付最高序号块，公共层只保留封装。
+  // 领域扩展消费最终现场的独立副本，与 usage 同时交付最高序号块，公共层只保留封装。
   it("领域扩展在准备后生成，随终态块一次交付，未知或不兼容扩展不破坏公共计量", async () => {
     const contract = defineData("example.agent/request", z.object({ tools: z.array(z.string()) }));
     const unknown = { contract: { id: "other.plugin/opaque" }, data: { version: 42 } };

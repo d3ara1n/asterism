@@ -3,7 +3,7 @@ import { AgentRequestContext } from "@asterism/builtin-api/contracts";
 import { agentRequestExtensions } from "./request-context.ts";
 
 describe("Agent 请求上下文扩展", () => {
-  // docs/runtime.md：按 Unicode 码点保存分区字数和实际声明名称，不持久化提示正文或工具 schema。
+  // 按 Unicode 码点保存分区字数和实际声明名称，不持久化提示正文或工具 schema。
   it("保存来源与码点计量，领域扩展省略原始正文", () => {
     const [extension] = agentRequestExtensions({
       system: { blocks: [

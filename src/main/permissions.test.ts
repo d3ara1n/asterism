@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { allowRendererPermission } from "./permissions.ts";
 
 describe("主窗口浏览器权限", () => {
-  // docs/architecture.md#安全边界与非目标：复制要求放行写入，开发 URL 与发布 file URL 都须可用。
+  // 复制要求放行写入，开发 URL 与发布 file URL 都须可用。
   it.each(["http://127.0.0.1:5173/", "file:///app/renderer/index.html"])("受信主框架可写剪贴板并枚举字体：%s", trustedURL => {
     const contents = { getURL: () => `${trustedURL}#workbench` };
     const frame = { contents, mainContents: contents, trustedURL, isMainFrame: true };

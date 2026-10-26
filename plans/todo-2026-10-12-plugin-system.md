@@ -1,105 +1,30 @@
-# 插件系统
+# Plugin system follow-up
 
-设计真值见 [插件 SDK 与功能组合](../docs/plugin-sdk.md)、`docs/decisions.md` 与 `docs/architecture.md#插件`；作者入口见 [SDK 说明](../packages/sdk/README.md)。历史提案与声明原型留在 `plans/archived/`。本计划是当前实施进度的唯一真值，设计文档描述最终契约，不能将未勾选的迁移项视为已经实现。
+Filed on 2026-10-12.
 
-## 已实现、待 GUI 验收：插件作用域与自定义设置页（2026-10-18）
+The SDK, package loader, shared public modules, typed creation/actions/calls/events, renderer contributions, top-level tools, and built-in public extensions are implemented.
 
-代码与作者文档已实现，SDK 0.22.0／宿主 API 9.0，旧主版本在装载前明确拒绝。交互见 [设置总览与插件管理](../docs/workbench.md#设置总览与插件管理)，SDK 归属与存储见 [插件 SDK](../docs/plugin-sdk.md#模块与装配)。本节是该项实现进度的唯一入口。
+## Recorded completion
 
-- [x] 插件包元信息：独立于插件代码执行读取信息卡片；使用标准包元信息与 `asterism.displayName / description / icon`，贯通已启用、禁用、失败与内置插件展示。
-- [x] 扩展前后台插件入口：插件级装配、共享服务、可选配置与设置页登记、准备及清理；功能模块沿用显式组合。加载器、内置插件与可编译作者示例已同步。
-- [x] 在现有具型调用内支持明确声明的插件级与对象级作用域；全局操作无需资源，对象级调用保留引用校验，统一取消与真实收束。
-- [x] 配置存储与 UI 解耦：保留可选托管配置，补前端正式保存／恢复默认／刷新能力；移除自动生成插件表单及配置专用布局声明。模型兼容设置仍使用的通用字段编辑与本地化设施保留。
-- [x] 设置总览：应用区和插件区分别设置 header；插件信息卡片、搜索、状态筛选、添加与管理操作，统一打开设置导航和返回。市场入口待有可用目标再展示，市场服务不在本项范围。
-- [x] 内置插件提供真实自定义设置页，按思考和工具过程偏好分组；自管数据沿现有私有目录能力，不强制使用数据库。
-- [x] 自动验证：typecheck、插件／调用／前端装配／内置消费者等 22 个测试文件共 221 项通过；i18n 抽取与检查、生产构建通过。覆盖全局调用、对象引用拒绝、配置校验与通知、根与模块逆序清理、事件回调和超时准备的真实收束、React 包装组件。
-- [ ] GUI 验收：总览分区、卡片样式与转场；搜索筛选与返回位置；启停／移除与重启状态；内置配置即时保存和恢复默认；外部设置页、内部定位与页面异常恢复。
+The user accepted the core card, creation/action, first-input, stop/continue, history, and reopen path on 2026-10-13. Loading an external source plugin from a packaged application was also accepted.
 
-## 已完成：职责分离与功能组合
+The implementation separated read and execution facades, shared actual contract instances, parsed owner input once, supported explicit preparation replacement, and coordinated cancellation with real completion.
 
-职责分离与功能组合已完成，保留三个 SDK 入口、资源内联贡献、时间线与授权模型、一插件一份配置；实现沿用显式依赖组合。后续事项见文末。
+Built-in public packages and the initial question consumer later verified cross-plugin actions, top-level tools, and Agent UI extensions. More advanced interactions require their own evidence.
 
-1. 文档与接口约定。
-   - [x] 固化读取／执行门面、具型创建／动作、校验与准备阶段、宿主运行生命周期、配置注入、Agent 与前端组合。
-   - [x] 文档语义和本地引用检查通过；文档独立提交作为代码实施前置。
-2. SDK 与命令完整路径。
-   - [x] `SessionReader / SessionExecutor / ObjectReader / ObjectExecutor`；实际只读门面，包括嵌套 session。
-   - [x] 创建／动作契约、实现包装、资源内联动作集合、绑定动作的外部准备者；前端契约调用与宿主身份／真实类型检查。
-   - [x] 区分原始输入与解析结果，schema 支持默认值与转换；统一调度与解析责任，移除重复解析。
-   - [x] 同步迁移笔记、目录、Agent、测试消费者及 SDK 作者用例；错误参数和读取门面写操作的类型反例。
-3. 宿主运行与业务组合。
-   - [x] 集中活动登记、取消、收束与关闭；任务保留去重／超时，动作保留队列，模型保留互斥／授权批次。
-   - [x] 成功 setup 清理立即登记，装配失败取消并逆序收束，等待后释放存储；验证失败路径和关闭门禁。
-   - [x] Agent 的选择与策略、原子输入受理、执行循环、资源装配各自内聚；链接说明和执行使用同一策略规则。
-   - [x] 配置从装配位置按需注入；core 物理存储映射明确归属，不扩散到通用门面。
-4. 前端与完整验证。
-   - [x] 基础对象接口精简，模型进度／工具展示／目录按需取得，草稿／提交身份与导航由交互组合。
-   - [x] 对话展示、输出跟随、消息输入、配置选择、Agent 交互协调组合，保留跨卡片重挂载状态和重试身份。
-   - [x] 类型检查、针对性单元／契约测试、源码插件实际加载测试、必要构建；完成后更新本计划和作者说明。
-   - [x] GUI 验收：卡片、创建／动作、首页首次提交、重试、停止／继续、历史查看与重开；用户确认通过（2026-10-13）。
-5. 架构收尾。
-   - [x] 契约身份通过公共模块真实实例共享；独立声明占用同一身份明确报错。
-   - [x] 收敛输入解析职责：允许常用 schema 默认值与转换；区分调用输入和解析结果，接受沿用结果，替换作为新输入解析，执行层不重复解析。
-   - [x] 输入解析设计与作者示例已同步；公共模块与身份规则的作者用例同步到第 6 项。
-6. 公共模块与数据兼容。
-   - [x] 公共入口通过普通 export／import 暴露插件愿意共享的契约、配置访问接口、状态或服务；同一运行环境的提供方与消费者取得同一次模块执行的真实导出。设计见 `docs/plugin-sdk.md#公共模块与契约身份`。
-   - [x] 使用 `exports["./public"]` 声明公共入口，消费者正常导入 `<包名>/public`；统一解析来源与依赖，公共模块及其共享依赖不重复内联到消费者或提供方私有 bundle，re-export 保留真实实例关系。前后台分别保证，跨进程不宣称共享内存对象。
-   - [x] 契约实现绑定实际声明对象，不同声明占用同一身份、依赖缺失或冲突时明确报错；撤销以 ID 相同接受独立副本的规则，不增加 schema 或函数指纹。
-   - [x] 数据兼容按所属资源／记录类型的 schema 或解码器判断，能读则继续，不能读则明确失败并保留原数据；插件负责兼容与迁移，不以手填版本或插件发行版本作为统一读取门禁。领域契约不带 version 参数，设计与作者说明已同步。
-   - [x] 复用源码插件加载测试验证提供方与两个消费者取得严格相等的契约和共享状态；覆盖公共入口 re-export、冲突报错与实际数据兼容，不以模拟 ID 相等替代。
+## Pending settings acceptance
 
-职责拆分、公共模块加载与数据兼容已完成。源码包测试覆盖公共实例、共享状态、类身份、前后台隔离、间接依赖、失败传播与清理次序；契约测试覆盖独立声明冲突、schema 解码与解析次数。当前 SDK 与宿主 API 版本见 [SDK 作者指南](../packages/sdk/README.md)，IPC 与数据库格式分别由宿主维护。该阶段 GUI 与发布包加载验收已完成；内置分包与问答扩展的实施及验收边界见 [归档记录](archived/todo-2026-10-15-plugin-tools-ui.md)。
+Plugin-owned settings pages and shared service scopes are implemented.
 
-具体验收以 `docs/plugin-sdk.md` 的验证接口为准；重点保留首页原子性、嵌套回滚、幂等、请求边界授权、迟到更新与未知写入影响语义。开发期不兼容数据库明确拒绝打开，用户自行重建开发数据。
+- [ ] Accept settings sections, plugin cards, transitions, searching/filtering, and preserved navigation position.
+- [ ] Accept enable/disable/removal and restart feedback.
+- [ ] Accept immediate built-in settings changes and restoring defaults.
+- [ ] Accept external settings pages, internal navigation, and page-failure recovery.
 
-## 工具三态视图
+## Deferred implementation
 
-- [x] SDK 平行提供 input/execution/result，每阶段使用相同的 headerRenderer/bodyRenderer 结构；ToolRenderProps 按 phase 区分部分 JSON、已校验参数与终结结局，等待调度归 execution。
-- [x] 统一阶段分派和独立回退；目录、笔记与宿主固定入口共用同一机制，正文工具复用三态声明，移除顶层视图接口和重复填充组件。当前 SDK 版本见 [SDK 作者指南](../packages/sdk/README.md)，旧主版本在装配前拒绝。
-- [x] 作者示例与类型反例、阶段分派、部分参数隔离、自动开合、合并更新与中断收束验证；设计、作者文档与模块指南同步。
-- [x] GUI 与真实参数流验收已由用户确认（2026-10-13），记录见 [模型接入计划第 9 节](archived/todo-2026-10-01-model-protocol-storage.md#9-第一批交付与验收)。
+- [ ] Complete acquisition and upgrade from npm sources, including exact versions and integrity. The current UI adds local package directories.
+- [ ] Decide and implement optional cleanup of plugin-private data and credentials during removal, preserving session objects and history.
+- [ ] Add provider-specific model-cache controls when actual support and consumers justify them. Existing diagnostics are not complete cache management.
 
-## 已完成
-
-- [x] `@asterism/sdk` workspace 包：`contracts` / `runtime` / `renderer` 三入口；记录契约按 schema 解码，保留 null／known／unknown 三态。
-- [x] 宿主存储到公开记录信封的 adapter（`src/plugins/records.ts`），公开接口不依赖物理节点。
-- [x] 提交后观察、托管任务（进程内，关闭取消）、标题比较更新、core `naming` 模块；会话命名使用配置了模型的 `utility` 角色，用户确认实现无故障。
-- [x] 资源动作 prepare（接受／替换／拒绝）与前端对象 `invoke`。
-- [x] 后台 `session.invoke` 接通公开资源动作；契约与作者入口见 [后台资源动作](../docs/plugin-sdk.md#后台资源动作api-111)。
-- [x] 插件包：清单校验（只认包根）、`plugins.json` 列表、添加与启用分离、重启生效、esbuild 打包与缓存。
-- [x] renderer 插件：`asterism-plugin://` 协议、共享模块表、卡片错误边界。
-- [x] 按对象的二进制流通道；插件页（添加、启用、禁用、移除、失败原因）。
-- [x] 单次模型执行返回终止原因和工具结局，Agent 据此决定是否继续。
-
-## 已完成接入
-
-- [x] 资源创建入口：renderer `creations` 贡献（菜单／拖放触发、可选插件 `InputView`），宿主创建协调器负责仲裁、路由记忆、外壳、放置与取消；创建准备支持请求级取消；`ui-state.json` 受控 `preferences` 容器承载路由记忆与插件偏好。内置代理、笔记、目录已迁移，契约见 [插件 SDK](../docs/plugin-sdk.md)。
-按会话／事件／资源主干、可选模型分支、内置消费者迁移与管理验收的顺序推进：
-
-- [x] SDK 架构方向收敛：工作台、会话、时间线事件与资源为主干，模型能力为可选分支；宿主实现服务，插件提供贡献。具名、具型扩展；资源 creation／actions 内联；run 无跨调用状态，只执行一次补全及完整工具批次，外层 Agent 推动循环。context 唯一真值在时间线，Agent 只持非 context 状态。纯会话事件、独立资源与自有 Agent 用例及类型反例纳入项目类型检查。
-- [x] SDK 与宿主 adapter 主干：会话／对象快照、具型事件与当前数据同步提交、资源内联 creation／actions、工具贡献、提交后观察、prepare 与 closing 已接到宿主。公开接口不含 `SessionNode`、`FoldedObject` 或裸节点写入；未知记录保留，解码失败回退 unknown。数据与事件保存稳定契约身份，创建数据采用 JSON 对象编码，具体限制见 [SDK 说明](../packages/sdk/README.md)。纯事件／独立资源／工具适配与只依赖 SDK 的源码包已通过自动测试。
-- [x] 可选模型分支的单次执行：无状态 run 已接到公开 SDK，内置 Agent 自行推动多次调用，每次从时间线重建消息；stream 用于命名等一次性补全。具型输出交付消费者保存，共识载荷 schema、模型来源、既有模型块与终态映射、对象活动／取消／关闭已实现；请求输入固定，消费者失败时批次仍收束，不增设独立环境、批次、记录或活动服务。
-- [x] 内置消费者：目录、笔记、命名与 Agent 通过公开 SDK 接入；装配只接受 SDK 模块描述。原有模型／代理配置和注册机制保留，首页原子提交与幂等由宿主协调；普通动作按对象排队，Agent 再检查去重与执行冲突。core 的模型与对话投影消费具型记录，存储编码由宿主承担。renderer 对象接口提供创建、动作、事件读取、流订阅、配置目录与通用进度。链接接收使用静态声明；已捕获授权的批次保留资源快照与调用期间的数据提交能力。自动测试覆盖这些行为，GUI 仍由用户验收。
-  - [x] 目录与笔记：共享正文契约与算法归 core；保留路径边界、冲突和 unknown 分类。笔记正文用 `NoteContent` 保存于 `session_data` 对象作用域，不追加正文历史。工作数据库只支持当前格式；应用配置格式仍为 1。
-  - [x] 命名与 Agent：命名使用具型首条用户输入和 stream；Agent 自推循环，选择及提交去重保存于对象数据，每次从时间线重建消息。续接吸附后重新确认对象存在，失败同事务回滚。
-- [x] 插件托管配置：独立配置 IPC、原始 schema 校验与变更通知已接入。设置页面及其验收统一由上方「插件作用域与自定义设置页」跟踪。
-- [x] 流通道：main／preload 共用严格消息 schema，校验后按会话与对象交付 `Uint8Array`；无效信封不转发。自动测试覆盖入口拒绝、二进制视图与空帧、对象订阅隔离与取消。
-- [x] 内置消费者自动验证：复用目录、笔记、Agent、SDK 与视图注册的现有测试，覆盖对象创建／动作、prepare、授权、当前数据、事件与记录投影；二进制流与插件配置有专项契约测试。类型检查、单元／契约测试和构建通过。
-
-## 待验收
-
-既有 SDK 接入保留以下真实交互和发布构建验收；职责分离与功能组合的新增实施项见上方当前任务。
-
-- [x] GUI 验收：以 `asterism.core` 的目录、笔记、Agent 与命名确认卡片、添加菜单与拖放创建（含选择记忆与准备中取消）、创建／动作、首页发送、停止／继续、重开与历史查看；用户确认通过（2026-10-13）。
-- [x] 打包验证：用户已在打包产物中加载外部源码插件确认通过（2026-10-13）。过程中发现并修复真实缺陷：asar 归档内 esbuild 无法 spawn 服务进程（ENOTDIR，Electron 不为 spawn 改写归档路径），修复为从 `app.asar.unpacked` 实体路径加载 esbuild 入口（`src/plugins/package-modules.ts`），开发环境路径不变；构建批次收束后统一停止 esbuild 服务。
-
-## 未来事项
-
-以下能力已延后，按后续需求分别推进。
-
-
-- [ ] npm 插件安装与升级：接通 npm 来源的添加、安装、精确版本锁定、完整性管理与升级流程；沿用同一包清单、装配与重启生效规则。当前仅有来源数据结构和包根解析，管理页只支持本地包目录。
-- [ ] 卸载数据清理：移除插件时可选择同时删除其私有目录与凭据，会话对象与历史保留。当前移除只删除管理列表项。
-- 后台跨插件通信由 [事件投递与插件互相调用计划](todo-2026-10-13-event-bus-plugin-calls.md) 跟踪：全局具型事件、对象关联调用、公共会话标题和资源状态 badge 已实现；资源通知 toast 等待真实消费者，标题与 badge 的独立 GUI 验收由该计划维护。
-- 内置插件公共包、插件顶层工具、通用调用与 Agent 界面扩展已经完成，见 [实施记录](archived/todo-2026-10-15-plugin-tools-ui.md)。后续领域共识需求沿公共边界扩展，不再重复建设这些注册与通信机制。
-- [ ] 模型请求缓存控制：按实际 provider 支持补充显式缓存策略、必要句柄与续接资料的输入／输出和失效规则；不得在 Agent 或 run 内维护第二份 context。当前只有缓存命中预期和用量诊断，不能视为完整缓存管理；与模型兼容层一并核验，暂不实施。
+Further domain extensions should use the established contribution and communication mechanisms. This task does not authorize a marketplace service or another parallel registration framework.

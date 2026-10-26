@@ -1,27 +1,11 @@
-# 会话观察协议
+# Session observation proposal
 
-本计划已由 [事件投递与插件互相调用](../todo-2026-10-13-event-bus-plugin-calls.md) 承接，原立案结束；不表示功能已实现。下文保留原计划，当前事实、已确认方向与待办以新计划为准。
+Filed on 2026-10-13. Closed as a superseded proposal, not as an implemented feature.
 
-## 目标
+The proposal sought a generic way for the application shell to observe titles and resource activity without reading complete session bodies or depending on Agent-specific semantics.
 
-应用层（侧栏、运行状态指示器、更新指示器等）通过通用协议观察业务层的会话变化。依赖方向只有一个：应用层订阅业务层发出的事件，业务层不感知任何应用层视图。
+At filing, generic session-change notifications caused throttled sidebar rereads, while progress reporting was tied to agents. The proposed work separated precise changes such as title updates from broader state refresh.
 
-## 现状
+Open design choices included event classification, resource-owned status reporting, dispatch ownership, and whether progress would share the same protocol.
 
-- 运行时只发 `session.changed`（会话 id + revision）与 `session.progress`（`src/shared/session.ts`），看不出变化种类。
-- `ApplicationController` 监听全部 `session.changed`，合并 300ms 后重读 `workspace.read` 刷新侧栏标题。这是暂行做法：不区分改名，会话流式运行时会反复重读。
-- 运行状态只来自代理的 progress；以后会话内会有其他带状态的对象，状态不能只为代理定义。
-
-## 待定设计（协议改动，需用户拍板）
-
-- 事件分类：在会话变更通知里带上变化摘要，或拆成独立事件。候选：标题变更（携带新标题）、会话活动状态（是否有对象在运行）、对象级状态（对象 id、通用状态枚举，不绑定代理）。
-- 状态由谁声明：对象或插件通过 SDK 上报通用状态，运行时汇总成会话级活动状态，不在协议里写死代理语义。
-- 应用层分发：应用层只有一个会话事件入口，按事件种类分发给订阅者。能精确识别的事件（如改名）直接处理，不节流；只有无法区分的通用变更才走节流后重读。
-- 与 `session.progress`、会话视图控制器现有订阅的关系：合并还是并存。
-
-## 落地
-
-1. 定协议形状，写入 `docs/runtime.md` 与 `docs/decisions.md`，更新 `docs/glossary.md` 的相关术语。
-2. 运行时发出标题变更事件，侧栏改为按事件更新，去掉节流重读。
-3. 接入会话级运行状态，侧栏显示运行指示器。
-4. 再按需加入对象级状态与更新指示器。
+The intended result was application subscription to business events with one dependency direction. A later event-and-call effort took over implementation; this archive does not establish its completion.

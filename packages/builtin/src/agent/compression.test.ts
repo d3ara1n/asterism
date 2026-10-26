@@ -21,7 +21,7 @@ function append(path: SessionNode[], value: NewNode) {
   path.push(node(String(path.length), path.at(-1)?.id ?? null, value));
 }
 
-// docs/context-compression.md：压缩只替换前缀，原文、工具配对、分支与请求起点不变。
+// 压缩只替换前缀，原文、工具配对、分支与请求起点不变。
 describe("上下文压缩边界", () => {
   it("保留近期原文、原生资料和完整工具批次；交错事件不被丢失", () => {
     const path = pathOf(message("a", "Old goal"), text("a", "old", 0, "Old answer", { requestParentId: "0" }),

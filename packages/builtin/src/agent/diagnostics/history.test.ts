@@ -8,7 +8,7 @@ import { diagnosticHistory } from "./history.ts";
 
 const completion: ModelCompletion = { finishReason: "stop", rawFinishReason: null, providerResponseId: "upstream-id",
   usage: { input: 100, output: 10, total: 110, cacheRead: 0, cacheWrite: 0, reasoning: 0 } };
-// docs/workbench.md 诊断契约：按实际响应身份计数，用真实父链区分分支。
+// 诊断契约：按实际响应身份计数，用真实父链区分分支。
 describe("代理诊断历史", () => {
   // 只有用户输入不构成已保存响应；成功摘要的真实计时仍可消费。
   it("无回复时没有诊断请求，成功压缩保留计时", () => {
@@ -80,7 +80,7 @@ describe("代理诊断历史", () => {
     expect(result.requests.find(request => request.responseId === "branch")?.inputHasFiles).toBe(true);
   });
 
-  // docs/workbench.md#代理上下文：诊断来自同一终态；回溯到块就有完整资料。
+  // 诊断来自同一终态；回溯到块就有完整资料。
   it("请求诊断随终态保存，回溯和分支只消费自身扩展", () => {
     const sent = { system: [{ kind: "agent", role: "worker", characters: 4 }], tools: ["resource_list"] };
     const nodes = [

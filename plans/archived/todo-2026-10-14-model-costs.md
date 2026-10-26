@@ -1,24 +1,11 @@
-# 模型费用与诊断后续：代理上下文面板
+# Model cost and context-panel follow-up
 
-> 立案 2026-10-14。价格配置、models.dev 导入、卡片辅助面板机制、诊断请求列表与详情及费用汇总已完成；本计划只保留上下文面板实际功能。
+Filed on 2026-10-14. Archived historical record. The original file retained two pending context-panel items without a completion statement.
 
-## 已确认边界
+Price configuration, parameter import, auxiliary panels, request diagnostics, and cost summaries were already implemented. The remaining work was to display the current context projection and accurately available configuration, compaction, and resource information.
 
-- 价格结构、来源、分档与估算口径以[模型配置](../docs/model-configuration.md#api-参考价格)为唯一真值。
-- 诊断与上下文使用[卡片辅助面板](../docs/workbench.md#卡片辅助面板)机制，作为 agent 的两个独立面板。
-- 复用时间线中的模型、响应身份与已报告用量，不建立独立消费记录，不保存历史价格快照；诊断的展示边界见[代理诊断](../docs/workbench.md#代理诊断)。
-- 诊断面板展示历史调用、关联内容、模型、用量与参考费用；上下文面板展示当前上下文投影。历史内容按已有记录展示，不宣称完整原始请求快照。
-- 订阅余量与账户余额不属于本次计量能力，不恢复执行费用预算，不引入执行限额。
+The intended distinction was current-context inspection versus historical request diagnostics. Current settings were not to be presented as an exact past request snapshot. Opening the panel should not run models, alter access, or modify history.
 
-## 待完成
+The design reused recorded model identity and usage with current reference prices. It did not introduce a second billing ledger, historical price snapshots, subscription balances, or execution-cost limits.
 
-1. 在已有上下文占位面板中展示当前上下文投影，明确它是下一次请求的预览，不是历史请求快照。
-2. 接入当前代理配置、上下文压缩与资源环境的适用信息；只展示能够从当前状态准确取得的材料。
-
-## 验收方向
-
-- 明确当前预览与诊断历史的区别，不把当前配置回填成过去的请求环境。
-- 压缩后展示摘要与保留内容，回溯或切换配置后依据当前状态重新读取。
-- 打开和浏览面板不发起模型请求、不修改资源授权或任务历史。
-
-关联：[时间线](../docs/timeline.md)、[工作台](../docs/workbench.md)。
+The unfinished status in this archived record is preserved as historical evidence, not a claim that the current panel is absent.

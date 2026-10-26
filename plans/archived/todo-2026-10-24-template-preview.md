@@ -1,12 +1,9 @@
-# 模板封面与预览
+# Template covers and preview
 
-立案日期：2026-10-24
+Filed on 2026-10-24. Implemented and archived.
 
-状态：已实现并归档。当前交互见 [首页模板与保存入口](../../docs/workbench.md#首页模板与保存入口)，取舍见 [静态工作台模板](../../docs/decisions.md#2026-10-24静态工作台模板)。
+Template covers grouped resource icons and counts by type, bounded the visible type set, and indicated omitted types. Empty templates retained a placeholder.
 
-## 完成范围
+Cards showed the template name and total object count. An information view exposed the full resource list and creation time.
 
-- 封面按资源类型聚合图标与数量，限制展示类型数并提示省略数量，空模板保留占位。
-- 卡片显示名称与对象总数，信息浮层提供完整资源列表和创建时间。
-
-实现入口：[TemplateCards.tsx](../../src/renderer/features/templates/TemplateCards.tsx)。
+This record concerns presentation of static templates, not cloning conversation history or running resource instances.

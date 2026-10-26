@@ -55,7 +55,6 @@ export interface SessionExecutor extends SessionReader {
  * 宿主绑定发起资源、请求开始时的有效链接范围和工具执行作用域，统一处理身份与执行校验。
  * 操作从发起资源出发：创建后链接给发起者，移除目标从本请求有效链接范围内解析。
  * 新增操作沿用此视角，明确隐式绑定的端点、可操作资源范围及执行作用域。
- * 完整契约见 docs/plugin-sdk.md「会话目录与资源操作」。
  */
 export interface ToolSession extends SessionReader {
   create<I, S extends Json, O extends Json>(contract: CreationContract<I, S, O>, input: NoInfer<I> & Json, options?: {

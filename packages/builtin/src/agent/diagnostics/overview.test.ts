@@ -19,7 +19,7 @@ const compression = (sequence: number, tokensBefore: number) => request(sequence
   id: `s${sequence}`, kind: "compression", responseId: null, sent: null, tokensBefore,
 });
 
-// docs/workbench.md#代理诊断：只用实报用量；增量仅在模型与系统快照一致、期间无压缩时成立。
+// 只用实报用量；增量仅在模型与系统快照一致、期间无压缩时成立。
 describe("诊断概览", () => {
   it("增量只在可比的相邻请求之间给出；压缩历史配对下一次实报 input", () => {
     const requests = [

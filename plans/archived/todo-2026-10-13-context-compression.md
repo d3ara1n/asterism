@@ -1,27 +1,11 @@
-# 上下文自动压缩
+# Automatic context compaction
 
-> 立案 2026-10-13，自模型接入计划拆出，2026-10-19 归档。实现与自动化验证已完成；长对话质量、真实端点和相关 GUI 行为采用延迟验收，在实际使用中发现具体问题后处理，不要求穷尽场景后才归档。最终契约、参数及调研依据统一维护在[上下文自动压缩](../../docs/context-compression.md)。
+Filed on 2026-10-13 and archived on 2026-10-19. Implementation and automated verification completed; long-term quality and real endpoint behavior remained subject to observation.
 
-## 已交付
+The Agent checked context between requests, summarized an older prefix, retained recent original material and complete tool batches, and saved the summary as a historical record. The summary used an independent prompt and output budget.
 
-- 代理请求之间的预算检查、旧前缀摘要、近期原文与工具批次保留；摘要记录、分支投影及对话折叠展示。
-- 一次性模型补全的输出上限；摘要提示与材料序列化独立维护，不混入普通工作系统提示。
-- 自动化覆盖交错事件、长回合切分、连续压缩、其他代理隔离、旧历史不变、实报用量口径、输出预算，以及失败／取消后重试。
-- 类型检查、单元／契约测试、i18n 检查与构建已通过；测试使用隔离数据库和合成模型流，不访问真实提供商。
+Tests covered interleaved events, boundaries inside long turns, repeated compaction, agent isolation, unchanged historical records, reported usage, output budgets, failure, and cancellation. Typechecks, tests, localization, and build passed with synthetic streams.
 
-实现入口：`packages/builtin/src/agent/compression.ts`（策略与执行）、`compression-prompt.ts`（摘要提示与材料）、`projection.ts`（响应分组与保留边界）。记录、任务与视图沿该模块的 `records.ts`、`loop.ts` 和 `conversation/` 接入；源码分工见[模块指南](../../packages/builtin/README.md#会话数据与-agent)。
+Deferred observation covered summary presentation, old-history reading, stop/continue around compaction, branch behavior, three-protocol continuation, and retention of goals, constraints, resource identities, and unfinished work.
 
-## 延迟验收
-
-以下是实际使用的观察范围，不表示已逐项验收通过，也不单独保留验收待办：
-
-- 长对话触发压缩后，摘要折叠／展开、计量、旧消息和工具结果查看。
-- 压缩期间停止与继续，从摘要之前和之后的节点继续时工作台和对话的路径对应。
-- 三种协议的摘要生成与长工具循环续接，保留部分能否正常消费工具结果。
-- 连续压缩后对用户目标、明确约束、关键决定、资源身份与未完成事项的保留质量。
-
-发现缺陷时按实际模型、配置和对话条件定位修复；需跨会话处理的具体问题另行立案，不重开本归档。不把自动化通过视为真实模型或 GUI 验收完成。
-
-## 后续开发归属
-
-未实现的压缩增强统一由[运行时能力计划](../todo-2026-10-01-runtime-capabilities.md#上下文压缩后续能力)跟踪，不因本次归档视为完成。
+Archival did not claim exhaustive GUI or real-model acceptance. Manual controls and further compaction enhancements were not included.

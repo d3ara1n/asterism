@@ -40,7 +40,7 @@ describe("模块启动准备", () => {
     } finally { release(); if (close) await close(); events.close(); }
     expect(order).toEqual(["handler", "plugin"]);
   });
-  // plugin-sdk.md：模块消费根入口准备好的服务，失败根不能继续准备模块。
+  // 模块消费根入口准备好的服务，失败根不能继续准备模块。
   it("插件准备先于模块，关闭先取消模块订阅再释放共享服务", async () => {
     const order: string[] = [];
     let moduleSignal!: AbortSignal;

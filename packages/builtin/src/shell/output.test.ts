@@ -5,7 +5,7 @@ import { expect, it } from "vitest";
 import { ShellOutputBuffer } from "./output.ts";
 import { OUTPUT_CHAR_LIMIT, execToModel } from "./contract.ts";
 
-// docs/runtime.md：字符按 Unicode 码点计；跨流 UTF-8 与控制序列不能污染正文，超限才产生临时日志。
+// 字符按 Unicode 码点计；跨流 UTF-8 与控制序列不能污染正文，超限才产生临时日志。
 it("流式解码、尾部预算与临时日志保留处理后的完整文本，提示只在模型投影中加入", async () => {
   const root = await mkdtemp(join(tmpdir(), "asterism-output-test-"));
   const output = new ShellOutputBuffer(root);

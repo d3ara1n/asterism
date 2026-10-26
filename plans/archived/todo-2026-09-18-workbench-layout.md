@@ -1,17 +1,11 @@
-# 工作台布局
+# Workbench layout
 
-> 立案 2026-09-18。实现完成，用户确认效果并授权提交，计划归档。当前契约见 [工作台](../../docs/workbench.md#画布与对象卡片)，取舍见 [决策归档](../../docs/decisions.md#2026-10-25新卡片避让与显式全图整理)。
+Filed on 2026-09-18. Implementation completed; the user confirmed the result and authorized a commit before archival.
 
-## 完成范围
+New cards used complete declared geometry to find nearby free space. Backend and frontend shared size information, model-created objects preferred the caller's location, and existing cards retained their positions.
 
-- 新卡片按完整尺寸寻找最近空位，默认尺寸与用户覆盖在前后台一致；模型创建优先靠近发起者，已有卡片保持位置。
-- 右上角「布局 → 整理」使用 ELK 排列可见卡片，支持不同尺寸、双向链接与孤立对象，批量保存位置后适配视口。
-- 整理保留卡片尺寸、折叠、显隐与选择，反复执行保持卡片边界中心；离开工作台或切换执行游标取消尚未提交的整理。
-- 插件几何声明、SDK 作者示例、中英文文案与设计契约同步完成。
-- 对象在浮岛中打开、与工作台并列的聚焦能力已实现，当前交互见 [对象聚焦](../../docs/workbench.md#对象聚焦)。
+Explicit arrangement used ELK over visible cards, including different sizes, bidirectional links, and isolated objects. Positions committed together; size, folding, visibility, and selection remained unchanged. Repeated arrangement preserved graph center. Navigation or cursor changes cancelled uncommitted work.
 
-## 验证
+Object focus in a separate leading island was also available. Shared geometry declarations and author examples were updated.
 
-- 类型检查、构建与中英文覆盖检查通过。
-- 针对性测试覆盖矩形避让、后台连续创建、尺寸覆盖、批量位置事务与回滚、不同尺寸图布局，以及连线路由空间导致的重复整理漂移。
-- 用户确认实际使用效果；未执行自动 GUI 验证，也未将一般体验确认视为所有主题、窗口尺寸或规模组合的逐项测试。
+Typechecks, build, and localization checks passed. Focused tests covered placement, sequential creation, size overrides, atomic position writes, rollback, and layout drift. User confirmation did not claim exhaustive theme, window-size, or scale testing.

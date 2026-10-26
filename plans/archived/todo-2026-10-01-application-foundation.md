@@ -1,34 +1,11 @@
-# 搭建正式应用框架
+# Production application foundation
 
-> 已授权：从 main 创建 feat/workbench，建设可持续演进的完整应用工程。原型保留在 feat/ux-prototype，不合并其实现。
+Historical record filed on 2026-10-01. The authorized work established a production application separately from the disposable UX prototype.
 
-## 范围
+Delivered scope included Electron main, sandboxed preload, React renderer, independent task runtime, validated commands, SQLite transactions, local content storage, and a React Flow workbench. The application owned real persistence rather than a parallel in-memory demonstration.
 
-- Electron 主进程、沙箱 preload、React renderer、独立任务运行时；electron-vite 构建，Forge 本地打包入口。
-- Zod 校验的版本化应用命令与响应；运行时拥有事件和持久化，主进程只管理窗口、进程与路由。
-- SQLite 迁移与事务组合、本地对象存储、任务与对象查询；复用 src/history，不创建平行的模拟历史。
-- 从首页和应用侧栏进入，已有会话显式打开；首次发送创建由模型计划接入。工作台支持笔记、显式绑定、历史查看、对象视图与布局持久化。
-- React Flow 承载会话工作台；应用导航与主内容以浮岛并列，侧栏可隐藏，工作台辅助面板按需打开。UI 使用 Tailwind token 与 shadcn/ui 的 Radix 基础。
-- 未配置模型时明确显示不可执行，不生成固定回复。资源操作与模型接入预留边界，未实现能力不宣称可用。
+Home and the sidebar introduced application-level navigation. The workbench supported notes, explicit resource links, object/history views, and saved layout. Unconfigured model capability was presented as unavailable rather than simulated.
 
-## 验证
+The recorded delivery passed typechecks, history and runtime contract tests, a macOS arm64 build/package, and artifact inspection. The record still listed user checks for windows, card operations, links/history, close/reopen persistence, and packaged startup.
 
-- 类型检查、既有历史契约测试。
-- 新增测试聚焦：重开数据库读取用户对象、事务失败不留半个任务、历史不混入未来对象、跨任务身份拒绝、移动卡片不追加历史、非法 IPC 拒绝及运行时断开不重放命令。
-- 验证构建及本地包内容；GUI、真实 Electron 生命周期与跨平台运行由用户确认，不进行启动等待杀进程式冒烟。
-
-## 后续
-
-- 基础 [UI 壳子与设置入口](todo-2026-10-01-ui-shell-settings.md) 已实现，剩余交互验收继续跟踪；配置与模型能力按 [模型接入计划](todo-2026-10-01-model-protocol-storage.md) 推进。
-
-- 功能接入已独立立案：`todo-2026-10-01-runtime-capabilities.md`，包括 provider、目录 IO、取消与崩溃对账、分叉/恢复、资源版本、编辑器和消息视图。
-- 自动布局、动态端点沿 `todo-2026-09-18-workbench-layout.md` 推进。
-- 签名、分发与 CI 沿 release 立案；本次不提交、不 push、不创建 PR。
-
-## 交付与待验收
-
-- 工程框架、基础工作台与应用级设置壳子已实现，源码地图见 `src/README.md`；架构、存储版本与界面约定已同步 docs。设置业务仍为预览，UI 剩余交互验收由独立计划跟踪。
-- 已通过 `npm run typecheck`、`npm test`（15 项）、`npm run make`（含构建、macOS arm64 打包与 ZIP），以及 diff 格式检查。
-- 应用包内容已检查：main、runtime、preload、renderer、运行时依赖和第三方许可均应存在；源码和运行数据不进入包。
-- 待用户运行 `npm run dev` 验证窗口、卡片操作、绑定与历史、关闭重开后的持久化；同时检查打包应用能否正常启动。
-- GUI 验收完成后归档本计划；更深入的功能与跨平台事项由各自立案继续跟踪。
+Model integration, layout, deeper resource behavior, signing, and cross-platform delivery were separate future scopes. Archival does not turn the remaining GUI checklist into a recorded pass.

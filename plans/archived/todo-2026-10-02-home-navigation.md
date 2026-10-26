@@ -1,42 +1,13 @@
-# 首页与应用侧边栏
+# Home and application sidebar
 
-> 立案 2026-10-02。状态：基础视觉与整屏切换已获用户认可，边界交互仍待验收。首页已接入真实 agent/模型选择；发送、会话创建事务与 utility 命名由 [模型接入计划](todo-2026-10-01-model-protocol-storage.md) 负责。
+Filed on 2026-10-02. Basic appearance and screen transitions received user approval; boundary interactions remained pending in the archived record.
 
-## 已确认约定
+Startup displayed Home and session summaries without automatically opening a saved workbench. Home had no session identity; acceptance of its first input would create the session, Agent, and input. Names were not identity and were not required in advance.
 
-- 启动永远进入应用首页，不自动打开或恢复已有会话。侧栏可以读取会话列表摘要，正文仅在明确选择时读取。
-- 首页不属于任何会话，是发送首条输入、触发创建的应用入口。会话使用生成的稳定 ID，名称不是身份，不要求提前填写名称。
-- 左侧应用导航与右侧主内容是两个浮岛。首页无背景；输入框本身有表面。侧栏可隐藏，也能从顶栏重新显示。
-- 侧栏与首页/工作台属于同一个主屏；设置为独立屏，切换时侧栏随主屏一起平移，返回时一起移回。
-- 工作台是应用主视图的一种；首页、设置及未来页面不依附于工作台。
-- 首次发送获接受后创建会话、主代理与首条输入，主内容从首页转为工作台；utility 异步命名。展开过渡随真实创建接入，不以动画冒充创建或执行。
-- 参考 `feat/ux-prototype` 的侧栏职责，正式实现复用当前浮岛、控件与视觉，不引入原型数据或状态模型。
+The sidebar and main content occupied one screen, with settings on another. Sidebar visibility and the application draft survived ordinary navigation. Real agent/model/thinking selectors replaced preview choices.
 
-## 已实现
+Typechecks, build, and focused runtime tests passed. User approval covered the initial Home composition and transparent background.
 
-- [x] 应用级侧栏：首页、新会话入口、已有会话列表和设置；隐藏与恢复侧栏。
-- [x] 无背景首页：织台标识、输入框、agent 与模型位置、发送按钮、设置入口。
-- [x] agent/模型/思考等级选择读取真实配置，默认 worker；选择 agent 时取用角色默认值，允许手动覆盖，不级联刷新。
-- [x] 草稿保存在应用视图状态，切换设置、已有会话及隐藏侧栏不丢失；不生成任务或历史。
-- [x] 启动仅获取摘要；显式选择会话才加载工作台，回首页清除已打开正文。
-- [x] 移除命名任务和手动创建代理的测试入口、工作台内部的任务切换面板及恢复上次任务的设置预览。
-- [x] 已有工作台继续支持笔记、显式绑定、对象与历史查看。
-- [x] 类型检查、构建和运行时针对性测试通过；构建仍提示依赖注释与大 chunk，未新增依赖。
+Still listed for acceptance were restart with saved data, sidebar resizing and keyboard focus, navigation among Home/settings/sessions, missing-model behavior without empty sessions, dragging, deeper islands, Escape, and focus restoration.
 
-## 用户验收
-
-- [ ] 已有保存数据时，重启仍显示侧栏与首页，不自动加载任何工作台。
-- [x] 首页文字、输入区、透明背景、两个浮岛的基本形式符合预期，后续可继续打磨。
-- [ ] 侧栏隐藏/恢复后主内容正确分配空间，键盘焦点可见；窄窗口下内容和输入不被遮挡。
-- [ ] 显式打开已有会话、回首页、进入/离开设置均正确，首页草稿保留，工作台专属操作不出现在首页。
-- [ ] 无可用模型时提示前往设置添加；发送保持禁用，输入、Enter 和点击不会产生空会话。
-- [ ] 窗口拖动区域、设置深层浮岛、Esc 与焦点归还正常。
-- [ ] 设置切换时整个主屏（含侧栏）一起移走，设置占据完整内容区；返回后恢复原侧栏显隐状态与首页草稿。
-
-## 后续接入
-
-首页选择已接入。消息存储与执行契约明确后，按模型计划接入首次发送的创建事务、utility 命名，以及首页到工作台的表面展开动画。当前不提供假模型、模拟回复或临时消息存储格式。
-
-现有 `task.create` / `agent.create` 内部命令仍支撑历史与持久化测试，产品界面不再调用。首次发送能力接入时替换或收回这两个临时创建入口，并调整测试准备数据的方式。
-
-GUI 验收完成后，将剩余能力项保留在模型计划，本计划归档。
+The first-input transaction, utility naming, and transition integration were subsequent capability work. No fake model or temporary transcript format was introduced.

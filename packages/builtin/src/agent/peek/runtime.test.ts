@@ -33,7 +33,7 @@ function target() {
   return { nodes, object: { ref: { sessionId: "s", id: "a", kind: "asterism.builtin/agent" }, session: { snapshot } } };
 }
 
-// docs/runtime.md 的代理调查契约：增量进入工具进度，完整终态才执行检索；取消和失败保持真实结局。
+// 代理调查契约：增量进入工具进度，完整终态才执行检索；取消和失败保持真实结局。
 describe("peek 调查流", () => {
   it("报告标签跨增量和文本边界解析，报告外文字不发布", () => {
     const parser = new PeekReport();

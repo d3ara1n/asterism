@@ -1,107 +1,38 @@
-# Asterism · 星图
+# Asterism
 
-与代理一起做事的个人工作台。
+A local-first personal workbench for working with agents.
 
-Asterism 是一个本地优先、以对象为中心的个人 agent 工作台。把代理、工作材料和操作过程放在同一张台面上：用目录和笔记提供材料，用明确的链接授予访问权，用卡片查看产出，再沿着历史继续工作或另起一个分支。
+Agents, resources, and work history share one canvas. Supply material, link it to the agents that need it, inspect operations, and continue from saved work or another history branch.
 
-整理信息、维护文件、开展研究、编写程序，都可以从一件具体的工作开始。Asterism 关注你交给代理什么、代理做了什么，以及留下的结果如何参与下一步。
+The project is in early development.
 
-> 当前处于早期内测，尚未发布稳定版本。预发布版本用于持续开发和真实使用验证；能力状态和待办以设计文档及 `plans/` 为准。
+## Install
 
-## 在星图里做一件事
+Installers are available from [GitHub Releases](https://github.com/d3ara1n/asterism/releases): DMG for macOS Apple Silicon, EXE for Windows x64, and AppImage for Linux x64.
 
-1. **说明要做什么。** 从首页写下工作，选择代理与模型，发送后进入这件工作的会话。
-2. **把材料放上台面。** 添加目录、笔记等资源，明确链接给需要使用它们的代理；代理只能操作执行层授权的资源。
-3. **查看正在发生什么。** 代理卡片保留连续的对话，工具过程按需展开。对象、历史和授权面板帮助你找到材料、查看操作、管理访问。
-4. **沿着过程继续。** 重开会话查看已保存的工作，或从完整的历史位置另起分支。浏览记录不会改变工作台；明确跳转会重建对象与关系，当前文件不随之恢复。资源状态恢复只在资源明确支持时提供。
-
-“星图”的命名含义见[产品定义](docs/product.md)。卡片与连线让工作中的对象和关系可见，每件事都由自己的会话承接。
-
-## 工作台的约定
-
-- **操作有对象。** 工具调用明确指向资源，执行时检查资源身份、支持关系与授权。应用的数据目录不自动成为代理可以访问的目录。
-- **授权有边界。** 链接资源后，匹配工具仍受代理策略与执行层授权约束。卡片可见或工具可见都不构成访问许可。
-- **视图可以收纳。** 卡片可以展开、折叠或关闭；关闭视图保留对象。工具过程默认收在代理对话里，需要时再查看细节。
-- **历史保留过程。** 资源链接与解绑、用户输入、模型输出和工具结果按真实次序记录。解绑撤销后续访问，既有记录仍可查看。
-- **执行取用明确的环境。** 每次模型请求固定当次配置与资源授权，同一响应的工具批次沿用该环境；期间变化由下一次请求取用。
-
-## 已接通的核心能力
-
-- **代理与模型配置：** 支持 OpenAI Responses、OpenAI Chat Completions 与 Anthropic Messages 的连接配置与测试；支持提供商预设、端点模型发现、从 models.dev 获取参考参数，以及模型角色与代理配置的内置继承和局部覆盖。
-- **真实会话与流式执行：** 首页发送、流式 Markdown 回复、思考与工具三态视图、停止、继续、持久化重开、两级自动命名和历史分支已接通。模型执行由独立任务进程承载，切换页面不停止执行。
-- **上下文自动压缩：** 长对话在请求之间摘要旧内容，近期原文与工具批次继续保留，摘要可展开查看，旧历史不改写。
-- **会话状态与通知：** 侧栏通过瞬态事件总线聚合资源的运行、失败、待操作与完成状态，点击徽标查看具体资源与可选进度。
-- **资源与工作台：** 代理、笔记和授权目录使用统一对象卡片。目录支持列举、UTF-8 文本读写编辑与图片查看（`see`），笔记支持正文读写编辑；对象定位、卡片尺寸缩放、逐节点历史导航和有向授权链接已实现。
-- **图片与文件输入：** 首页与代理对话可粘贴图片、拖入或选择图片和 PDF，允许纯文件消息；输入以不可变内容引用存入时间线，并在请求边界编码发送。
-- **工作台模板：** 从会话菜单保存对象数据、链接与排列，首页点击模板卡片即可建立新会话；信息图标显示所含资源，模板不携带对话历史。
-
-检查点与资源恢复、MCP、代理间通信等后续能力按 [实施路线](docs/roadmap.md) 与 `plans/` 推进。当前资源种类用于验证基础能力，不代表最终的资源目录。
-
-## 开发与体验
-
-安装包由 [GitHub Releases](https://github.com/d3ara1n/asterism/releases) 提供：macOS（Apple Silicon）下载 DMG，Windows（x64）下载 EXE 安装包，Linux（x64）下载 AppImage。更新 ZIP、blockmap 与 YAML 文件供应用自动更新使用。
-
-macOS 将 `Asterism.app` 从 DMG 拖入「应用程序」后运行。应用采用固定自签证书；如系统因隔离标记阻止首次打开，确认下载来源后可手动执行：
+On macOS, drag Asterism into Applications. Builds use a fixed self-signed certificate. If quarantine prevents opening a download whose source you trust:
 
 ```bash
 xattr -dr com.apple.quarantine /Applications/Asterism.app
 ```
 
-在「设置 → 通用 → 软件更新」查看当前版本、检查更新或重启安装。应用启动后检查并下载更新，由用户选择安装时机；安装前沿用运行中资源的退出确认。「包含预发布版本」允许提前接收新功能，关闭后保留当前版本，只接收更高的正式版本。初次安装预发布时该选项默认开启，之后保留用户选择。
+Configure a model connection in Settings, then start a task from Home. Add resources and link them to the agent that needs them.
 
-需要 Node.js 22.13+ 与 npm。安装依赖后启动桌面应用：
+Resource access controls model context and operation scope. Shells, terminals, plugins, and MCP servers run with the current operating system user's capabilities. Branching history does not roll back external files.
+
+## Develop locally
+
+Use npm and a Node version compatible with the package's engine requirement:
 
 ```bash
 npm install
 npm run dev
 ```
 
-首次使用，在设置中添加提供商与模型，再从首页选择代理、模型和思考等级。Enter 发送，Shift+Enter 换行；连接测试和模型执行可能产生提供商费用。应用启动进入首页，已有会话从侧栏明确选择后打开。
+The package scripts define checks, builds, and packaging. Development and installed runs use separate application data. Real sessions and credentials stay outside the repository.
 
-窗口主进程配置变更后需要退出并重新运行 `npm run dev`。界面使用平台原生材质与统一控件；Linux 系统标题栏启动选项及跨平台避让规则见 [原生窗口与 Web 内容](docs/design-system.md#原生窗口与-web-内容)。
+## Documentation
 
-检查与构建：
+The project maintains an English internal manual for models to consult when helping with software use or plugin development. Its resource/tool integration is planned.
 
-```bash
-npm test
-npm run typecheck
-npm run build
-npm run i18n:check
-```
-
-`npm run package` 生成当前平台的应用目录，`npm run make` 生成安装包与更新产物；命令支持追加 electron-builder 平台和架构选项。编译产物位于 `dist/`，打包产物位于 `out/`。macOS 本地无固定证书时使用 ad-hoc 签名，仅用于打包检查；发布由 CI 注入固定签名身份。CI 发布操作见 [发布操作说明](docs/releasing.md)。
-
-应用图标的源图与各平台产物位于 `assets/icon/`，修改方法见 [应用图标](docs/design-system.md#应用图标)。
-
-## 数据与运行边界
-
-工作数据与应用配置保存到本设备的 Electron 数据目录，源码目录和安装目录不承担数据存储。`npm run dev` 使用 `appData/dev.dearain.asterism.dev`，安装版使用 `appData/dev.dearain.asterism`；两者由固定应用身份 `dev.dearain.asterism` 生成，不随显示名称或仓库文件夹变化。更新通道共用安装版数据。
-
-全局模型与代理配置保存在 `configuration.json`，外观在 `appearance.json`，界面语言在 `language.json`，更新偏好在 `updates.json`，窗口状态在 `ui-state.json`，密钥独立加密保存于 `credentials/`。工作数据库为 `db/workspace.sqlite`，不可变正文位于 `objects/`，插件内容位于 `content/`，运行日志位于 `logs/runtime.log`，Chromium 数据位于 `chromium/`。重建会话数据库不重置全局配置；关闭最后一个窗口会退出应用和任务进程。
-
-启动时按各份数据的格式版本号检查是否需要升级；需要时先把整组数据保存为恢复点，再逐步迁移。成功后提示格式变化与恢复点位置；宿主数据失败时进入恢复页面，可重试、任选恢复点还原或使用新数据开始；单个插件的数据升级失败只停用该插件。恢复点位于数据目录的 `recovery/points/`，保留最近 7 个。`ui-state.json` 等缓存不迁移，损坏即重置。首个版本发布前格式变化不提供迁移，开发数据删除重建。规则见[数据准备与迁移](docs/architecture.md#数据准备与迁移)。
-
-## 文档导航
-
-完整仓库地图与文档维护纪律见 [AGENTS.md](AGENTS.md)。
-
-| 文档 | 内容 |
-| --- | --- |
-| [产品定义](docs/product.md) | 星图的定位、工作方式、边界与成功标准 |
-| [词汇表](docs/glossary.md) | 产品与代码词汇的中英对照与含义 |
-| [对象模型](docs/object-model.md) | Workspace、Session、Agent、Resource、工具匹配与视图语义 |
-| [时间线与回溯](docs/timeline.md) | 会话树节点、时间线、执行游标、投影、回溯与分叉 |
-| [运行时与模型执行](docs/runtime.md) | 执行轮次、状态投影、环境与提示词、工具批次、授权、模型协议适配与原生正文工具 |
-| [模型与代理配置](docs/model-configuration.md) | 提供商预设、模型发现、参数获取、模型角色、代理配置与覆盖规则 |
-| [工作台交互](docs/workbench.md) | 首页、会话列表状态、画布、代理卡片、工具视图与辅助面板交互 |
-| [界面设计系统](docs/design-system.md) | 原生窗口材质、浮岛编织、动效、主题 token 与公共控件约束 |
-| [技术架构](docs/architecture.md) | 桌面技术栈、进程职责、数据存储归属、会话 IPC 与安全边界 |
-| [插件 SDK 与功能组合](docs/plugin-sdk.md) | 插件装配、公共模块、瞬态事件总线、门面生命周期与具型创建／动作 |
-| [不可变内容与导入](docs/content.md) | `ContentRef` 字节暂存、封存、持久依赖根与回收 |
-| [公共 i18n](docs/i18n.md) | 语言环境、插件可选本地化、消息归属与展示契约 |
-| [自动会话命名](docs/session-naming.md) | 两级自动命名、标题来源事件、游标同步与人工命名 |
-| [上下文自动压缩](docs/context-compression.md) | 触发预算、摘要提示、近期原文保留与历史边界 |
-| [实施路线](docs/roadmap.md) | 阶段划分、里程碑验收场景与必测边界 |
-| [历史决策与开放问题](docs/decisions.md) | 架构演进中的取舍归档与待验证问题 |
-| [源码地图](src/README.md) / [界面维护](src/renderer/README.md) | 代码目录职责、数据流路径与扩展指南 |
-| [SDK 作者指南](packages/sdk/README.md) | `@asterism/sdk` 入口说明与插件编写示例 |
+Engineering documents serve development of Asterism itself. Each document explains its own topic independently, without a required reading sequence, source-file index, or cross-document dependency.

@@ -1,62 +1,13 @@
-# 补齐 UI 壳子与设置入口
+# Application shell and settings
 
-> 立案 2026-10-01。状态：基础 UI 壳子与设置入口已实现，本计划保留剩余交互验收。提供商、模型角色与 agent 真实配置已按 [模型接入计划](todo-2026-10-01-model-protocol-storage.md) 接入；通用偏好仍为预览。保留已确认的原生材质、内容表面与公共控件风格。
+Filed on 2026-10-01. The basic shell and settings entry were implemented. The archived record retained outstanding interaction checks.
 
-## 已实现与剩余工作
+The shell established native-window surfaces, separate main/settings screens, island layout, shared controls, sidebar navigation, and expandable settings categories. Real provider, role, and Agent configuration was integrated while some general settings still represented previews.
 
-已实现 Window/Titlebar/Space 窗口层次、设置屏（菜单或侧栏进入，在主屏左侧）、浮岛编织、shadcn 公共控件、lucide 图标、Motion 动效与单语文案；对象与历史面板在 `SidePanel.tsx`，会话导航在应用侧栏。首页与侧栏的形式及按需加载见 [首页计划](todo-2026-10-02-home-navigation.md)。约定见 `docs/design-system.md`。通用分类仍为示意内容，提供商/模型/代理已接入真实能力。
+The design separated an unimplemented capability from missing user configuration. Settings remained accessible without a session. Navigation and view layout were independent of business history.
 
-真实配置复用现有设置屏、分类注册表与浮岛，按“提供商 / 模型 / 代理”分别消费对应能力。键盘、窄窗口与完整交互仍需用户验收，不将基础框架完成等同于全部验收完成。
+Typechecks and builds passed. The remaining checklist covered keyboard navigation, focus return, scrolling, narrow windows, window dragging, close/reopen behavior, coordination with object/history panels, and returning to the previous main view without losing saved state.
 
-## 新会话衔接
+Final completion required concrete fixes or separately filed follow-up, not treating the shell scaffold as full acceptance.
 
-- 阅读顺序：本计划 → [设计系统](../docs/design-system.md) → [界面源码地图](../src/renderer/README.md) → [公共组件待办](todo-2026-10-01-ui-design-system.md)。窗口材质与待验收事项见 [窗口计划](todo-2026-10-01-native-window.md)。
-- 当前实现入口是 `src/renderer/app/App.tsx`、`Window.tsx`、`shared/weave/`、`shared/ui/` 与 `features/settings/`；具体文件拆分由 UI 实施决定，文档中的后续页面不视为已经存在。
-- 提供商的应用级作用域、协议范围和加密存储方案已确认，无需因补 UI 重新选择；能力字段细化与接入在 [模型计划](todo-2026-10-01-model-protocol-storage.md) 继续。
-- 阶段状态与源码地图已同步；后续按实际验收结果勾选下方项目。配置页面复用现有 `SettingsPage.tsx` 分类注册表与 Screen/浮岛，不将预览中的字段和交互自动视为业务契约。
-
-## 待办
-
-- [x] 梳理应用级导航、任务级操作和设置入口的职责，保证无任务时也能访问应用设置。
-- [x] 确定设置的容器与导航方式，以及进入、切换、关闭/返回工作台的完整路径；沿用当前视觉，具体布局另行确认。
-- [x] 建立可扩展的设置页面组织，能承载后续提供商/模型管理；仅列入有明确用途的分类，不机械生成大量空白页面。
-- [x] 明确页面的加载、空态、未接入、错误和操作中状态，区分“尚未实现能力”与“用户尚未配置”。
-- [x] 按实际页面需要补齐公共输入框、选择框、图标按钮和表单反馈；具体公共组件工作复用 [设计系统待办](todo-2026-10-01-ui-design-system.md)。
-- [x] 同步 README、源码地图、路线图和模型计划，区分“壳子已实现”“设置业务未接入”与“交互待验收”。
-- [ ] 明确键盘导航、焦点返回、滚动和窄窗口行为；设置与工作台之间切换不产生业务历史或丢失已保存视图。
-- [ ] 检查应用侧栏、对象/历史面板、对话框、错误提示和全局状态是否与设置壳子协调，收尾具体交互缺口。
-- [ ] 完成窗口拖动、部件交互与关闭重开等用户验收，沿 [窗口待办](todo-2026-10-01-native-window.md) 和 [应用框架待办](todo-2026-10-01-application-foundation.md) 记录结果。
-
-## 已知遗留
-
-- 设置中的示意内容（`features/settings/preview.tsx`）有预览提示、按钮无动作；各分类接入真实能力后替换对应预览并移除提示，不沿用假按钮。通用设置的偏好保存仍由本计划跟踪，字段与行为在接入前确认，不作为提供商接入前提。
-- 键盘导航、焦点返回、窄窗口与溢出交互仍待用户完整验收；左下状态条与画布控件是否重叠待确认。
-- 次要文字对比度（`--muted-foreground`）尚未调整，待设计系统计划处理。
-- 对象聚焦已接入浮岛编织，与工作台并列展示，见 [对象聚焦](../../docs/workbench.md#对象聚焦)。
-
-## 能力与界面的边界
-
-- 设置界面组织页面与交互，不直接调用 provider SDK、读写数据库或解密凭据。
-- 后续配置页消费提供商管理、凭据状态、连接测试等能力接口；接口不绑定某种设置容器或表单组件。
-- 本阶段提供商业务未接入时，明确显示尚未接入；不提供伪保存、伪连接成功或无效的可操作按钮，不在 renderer/localStorage 另存一份提供商配置。
-- 本阶段完成的是可用的应用导航与设置壳子。真实的“添加提供商 → 保存 → 重开 → 测试连接”由后续提供商阶段验收。
-
-## 阶段完成标准
-
-- [ ] 用户能从应用中找到并进入设置，切换已提供页面，再返回进入前的主视图；首页和已有工作台均可操作。
-- [ ] 设置页有稳定的导航与布局承载方式，后续添加提供商页面无需重做应用壳子。
-- [ ] 页面状态与能力实际情况一致；公共控件、键盘、焦点与窄窗口交互经用户确认。
-- [ ] 已发现的壳子交互缺口完成或另行明确立案；不将尚未验收的内容标为完成。
-- [x] agent 完成必要的类型检查和构建；GUI 由用户操作验收，不为视觉配置新增测试，不进行启动等待杀进程式冒烟。
-
-## 后续顺序
-
-1. 本计划：保留 UI 壳子的剩余交互验收与通用设置遗留项。
-2. [提供商配置与模型协议计划](todo-2026-10-01-model-protocol-storage.md)：接入提供商与具体模型、SQLite 普通配置、系统加密凭据及三种协议的连接测试，随后接入模型角色与 agent 配置。
-3. 能力层契约与单代理执行：平铺 transcript、真实模型输入、错误/取消/恢复、工具批次共同收束后统一交付结果。
-
-自动布局、完整暗色主题、多代理、MCP 与资源恢复仍由现有计划跟踪，不并入壳子阶段作为完成前提。
-
-## 收尾
-
-UI 实施与用户验收完成后，持久交互约定同步 `docs/workbench.md` 与 `docs/design-system.md`，再归档本计划；提供商计划保持待办，不提前归档。
+Automatic layout, full dark themes, multi-agent work, MCP, and state restoration were outside the shell task.

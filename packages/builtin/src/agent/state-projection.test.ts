@@ -16,7 +16,7 @@ function project(values: NewNode[], running = false, interruptions: readonly (st
   return agentExecutionState(projectAgentTurnState(sessionView(nodeView("s", "", path, path.at(-1)?.id ?? null)), "a", interruptions), running);
 }
 
-// 预期来自 docs/runtime.md 的执行状态投影；只验证领域判断，不模拟组件或瞬态状态总线。
+// 执行状态投影；只验证领域判断，不模拟组件或瞬态状态总线。
 describe("代理执行状态投影", () => {
   it("没有自身用户输入时等待输入；已受理输入尚无回复时可继续，实际运行时优先显示停止", () => {
     expect(project([message("b", "For B")], false, ["0"])).toBe("empty");

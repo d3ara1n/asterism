@@ -1,83 +1,48 @@
-# 接入运行时执行与资源能力
+# Remaining runtime and resource work
 
-> 单代理能力层与会话 IPC 已实现：会话节点树、三协议请求适配、目录授权、工具批次、取消与中断恢复。两层工具定义与提示契约已统一，原生二级工具包括目录 list 与文件、笔记的 read/edit/write。首页发送和主代理 GUI 执行流已接通，真实端点与 GUI 验收已确认（2026-10-13）。契约见 `docs/conversation-core.md`；本计划继续跟踪目录操作、多代理、MCP、资源恢复及自模型接入计划移入的后续能力，内部应用命令不等同于模型协议。
+Filed on 2026-10-01.
 
-## 自模型接入计划移入（2026-10-13）
+The implementation now includes model requests, tool batches, persistent drafts and steering, agent creation/communication, context compaction, filesystem search and commands, terminals, MCP, Web, skills, naming, archiving, and conversation virtualization. These capabilities must not be treated as absent because early task notes predated their implementation.
 
-模型接入计划归档后，以下未完成事项由本计划继续跟踪：
+## Product and extension decisions
 
-- 运行中输入队列、steering、部分节点恢复流程；当前运行中输入返回 conflict，不完整节点只可查看。
-- 更完整的 context 文件发现、层级作用域、加载顺序与诊断规则；skills 目录提示块与按需加载。
-- 插件提示块追加与拦截替换的具名、具型契约设计；不能用字符串 hook 代替（SDK 收尾见插件计划）。
-- 插件顶层工具、调用上下文与内置问答已完成，见 [实施记录](archived/todo-2026-10-15-plugin-tools-ui.md)；资源工具继续走链接与支持关系，不开放自身访问例外。
-- 委派细节：接受目标 agent 与本次模型覆盖，未覆盖时解析目标 agent 的角色、空值继承委派方对话；只读 agent 的工具与委派限制在执行层生效，嵌套委派不绕过资源授权。
-- 附件、服务端工具、动态插件加载、请求/历史清理策略及长会话索引优化（图片/文件输入已交付）。
-- 重新确定正式可添加资源、添加方式及授权交互；直接文件资源与目录内 path 定位的身份关系、edit 的前置版本条件。
-- 首页到主代理的表面展开动效、Markdown 代码高亮与长对话阅读优化。
-- 备用角色映射到执行契约；Agent timeout 与费用预算字段 maxCost 已移除，执行边界见 [运行时](../docs/runtime.md#执行轮次与循环)。
-- 模型说明的原语边界与默认提示清理见[模型说明与指导收敛](#模型说明与指导收敛)；工具策略与委派范围仍随执行能力推进。
-- 上下文自动压缩、跨模型续接、模型兼容包与标准思考等级已实现并通过自动验证，长期真实使用覆盖采用延迟验收，分别见[压缩归档](archived/todo-2026-10-13-context-compression.md)、[续接归档](archived/todo-2026-10-13-cross-model-continuation.md)、[模型兼容归档](archived/todo-2026-10-10-model-compatibility.md)。尚未实现的后续能力由本计划继续跟踪。
+- [ ] Decide the formal resource catalog, creation paths, and resource-access interaction; validation examples do not settle the final catalog.
+- [ ] Clarify direct-file resource identity versus locating a file within a directory.
+- [ ] Design captured virtual resources, checkpoints, explicit state restoration, and isolated restored instances.
+- [ ] Extend context-file discovery, hierarchical scope, ordering, and diagnostics where real tasks require them.
+- [ ] Verify default agent tool and delegation policies against the available capabilities.
+- [ ] Design higher-level delegation/skill composition and relay resources when needed; basic direct communication already exists.
+- [ ] Clarify whether and how backup model roles participate in execution.
 
-## 模型说明与指导收敛
+Plugin prompt contributions, plugin-carried skills, and explicit skill picking remain deferred extension work. Their existence in a design discussion does not establish an exposed API.
 
-提示文本的原语边界见[请求环境](../docs/runtime.md#代理控制器与请求环境)，选择与使用信息的边界见[工具说明](../docs/runtime.md#工具匹配与宿主操作入口)。
+## Model and context follow-up
 
-- [x] 默认描述与提示词清理 pi 专用流程和否定指令，分别保留选择信息及角色交付内容。
-- [x] harness、创建入口、资源工具、ask_user、错误与结果投影及摘要提示收敛为原语和输入输出说明。
-- [ ] 工具目录与委派能力成型后核验默认配置的工具名单与委派范围。
+- [ ] Add native-protocol continuation namespaces when introducing another protocol, including selection and opaque-data whitelists.
+- [ ] Add manual compaction or configurable budgets when justified by usage.
+- [ ] Evaluate over-window retry and repeated-compaction behavior.
+- [ ] Measure budget accuracy with small windows, media, and changing environments, including actual cache effects.
+- [ ] Decide server-side tools, dynamic plugin-loading requirements, complete request retention, and sensitive-content retention.
+- [ ] Investigate concrete cancellation, crash, and unknown-effect reconciliation gaps without automatically replaying commands.
 
-## 执行与模型
+Cross-model continuation and compaction are implemented. Long-term quality across provider/model combinations remains observational acceptance, not an unimplemented feature.
 
-- 提供商配置、保存与连接测试，以及模型角色与 agent 配置已实现；模型接入计划已完成并归档（2026-10-13），实施记录见 [archived/todo-2026-10-01-model-protocol-storage.md](archived/todo-2026-10-01-model-protocol-storage.md)。配置语义见 [模型与代理配置](../docs/model-configuration.md)。
-- 代理共用 agent 配置；创建对话选择 agent + 模型，对话期间可切换配置、模型与思考等级，下一次请求生效。工具策略已有执行层筛选；委派尚未接入，其只读与资源授权约束须随委派实施。
-- [x] 用户输入与成型模型块、工具调用／结果写入会话树；UI 执行流消费真实投影，未成型增量保留在内存进度。
-- 取消、等待、进程崩溃、未知副作用需独立状态与对账，不自动重放命令。
-- [x] `agent_list` 代理配置发现与创建时显式初始资源授权；契约见 [运行时](../docs/runtime.md#agent-创建与移除)。
-- 多代理结果交付、并发资源冲突沿 docs/runtime.md 实施。
-- 代理间通信工具与“子代理” skill；对象自身事件机制（如象棋）随多代理与资源事件语义实施（自会话树计划移入）。
-- [ ] 新增原生协议时扩展续接资料命名空间：`continuationForTarget` 当前按协议二分（anthropic 之外归 openai），`pickContinuation` 白名单也只有这两个命名空间；接入 Gemini 等原生协议时同步扩展选择与白名单，公共块结构不变。
+## Content and storage follow-up
 
-### 上下文压缩后续能力
+- [ ] Define continuous audio/video, richer media output/display, session export, and cross-device synchronization when they enter scope.
+- [ ] Design explicit content sharing across objects, plugins, and sessions.
+- [ ] Establish creation retry semantics after lost receipts where submission deduplication is not already provided.
+- [ ] Investigate concrete power-loss reconciliation across database and files.
+- [ ] Verify cross-platform filesystem, permission, and symlink behavior.
 
-以下是尚未实现或需实际需求推动的增强，区别于已交付能力的延迟验收：
+Current content collection and application recovery are implemented. Resource-state restoration is a different capability. Last-write-wins is the agreed local-write behavior; this task does not authorize reinstating file revision conflicts or speculative commit rechecks.
 
-- [ ] 手动压缩入口与可配置预算，待真实使用需要时处理。
-- [ ] 超窗错误后的压缩重试、反复回填导致的连续压缩防抖。
-- [ ] 小窗口、多模态与环境提示变化下的预算估算，以及缓存影响的实测调优。
+## Workbench and scale acceptance
 
-## 资源、历史与存储
+- [ ] Accept hidden-card recovery, concurrent-branch navigation, authorization write failure, and feedback during navigation.
+- [ ] Accept narrow windows, keyboard access, focus, and both schemes for object/access/history panels.
+- [ ] Measure large history queries, branch density, and many simultaneously visible cards. Conversation virtualization does not establish bounded database reads.
+- [ ] Exercise real multi-agent and dynamic-tool tasks, fixing concrete reliability problems.
+- [ ] Decide log retention and remaining diagnostic needs.
 
-- [x] 工具定义机制：一级与二级共用 ToolContract/defineTool；description、guidelines 与 args 由共享定义提供，target/result schema 与描述由实现提供；统一模型投影，校验同名完整契约与读写属性。目录 list 与文件、笔记的 read/edit/write 已接入。
-- [x] 文件与笔记 read/edit/write 已接入，用户已现场确认工具、UI 及长标题省略与摘要对齐可用。hashline、参数定位、目录 IO 与笔记当前内容语义见 docs/runtime.md；header 单行设计规范见 docs/design-system.md。
-- 目录 IO 后续：跨平台权限与链接行为、外部并发最终提交竞争的隔离能力；当前应用层边界见 docs/runtime.md。
-- 动态资源工具调用可靠性采用延迟验收：宿主一级入口固定，通过资源工具目录与 inspect 提供动态 schema；在真实任务与模型组合中发现具体问题后处理，不以一次性穷尽实测作为完成条件。
-- 可捕获虚拟资源：资源版本、快照、恢复与隔离实例契约；笔记不捕获、不维护内容历史，不承担恢复验证。
-- [x] 会话树历史分叉与逐节点导航已实现；当前授权按继续路径重新投影。
-- [ ] 检查点格式、捕获资源的恢复与未来迁移规则；不恢复已撤销的当前授权。
-- 发布前数据库只支持当前格式，不做迁移或兼容读取；版本与重建边界见 `docs/architecture.md`。历史内核不另维护独立应用数据库。
-- 不可变对象存储的无引用对象回收、断电后跨文件/数据库对账、备份与恢复。
-- 设置壳子由 UI 计划负责；提供商配置、凭据保存、模型列表、模型角色与 agent 配置由模型接入计划负责。本计划负责执行时消费与授权，配置生效语义在模型计划收敛。
-
-### 内容后续能力
-
-内容导入与持久引用已完成，稀有取消／失败界面采用延迟验收，见[归档记录](archived/todo-2026-10-12-plugin-binary-ingestion.md)。以下能力尚未实施：
-
-- [ ] 创建回执丢失后的持久提交身份去重；内容草稿可重试不等于业务幂等，宿主不自动重放命令。
-- [ ] 持续实时音视频、媒体专用展示、会话导出与跨设备同步。
-- [ ] 跨对象、跨插件、跨会话的显式内容共享。
-
-## 工作台
-
-- [x] 代理卡片已有连续执行流，工具过程可展开查看正文差异；对象可在工作台左侧浮岛中打开，交互见 [对象聚焦](../docs/workbench.md#对象聚焦)。
-- [x] 工具产出经 publish 动态更新；过程与终结共用数据契约，失败/取消保留有效产出。统一调用外壳、独立 header/body 覆盖与固定资源入口视图已接通，目录 list 使用专用视图；GUI 验收见模型接入计划。
-- 长历史分页与虚拟化；紧凑逐节点导航和静态资源展示描述已实现，见 [面板交付记录](archived/todo-2026-10-10-workbench-panels.md)。不按执行段聚合历史，也不以裁剪渲染代替按需读取。
-- [x] 面板基础交互由用户确认：对象定位过渡、紧凑历史与来源视图筛选。
-- [ ] 面板专项验收：隐藏卡片找回、并发分支跳转、授权保存失败与导航期间反馈，以及窄窗口、键盘和亮暗主题。
-- 输入草稿、任务重命名与归档、多种资源视图。
-- 工作台布局已完成，见 [布局计划归档](archived/todo-2026-09-18-workbench-layout.md)；当前契约见 [工作台](../docs/workbench.md#画布与对象卡片)。
-
-## 工程
-
-- 日志保留策略与错误诊断界面；敏感输入不默认进入日志。
-- 模型/MCP SDK 与 Monaco worker 在模块接入时验证。
-- GUI、跨平台、签名与发布沿桌面工程和 release CI 立案。
+Basic panel locating/filtering and core model execution received earlier user acceptance. Those confirmations do not cover all listed edge interactions.

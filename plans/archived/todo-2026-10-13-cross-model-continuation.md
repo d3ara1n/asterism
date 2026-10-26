@@ -1,42 +1,13 @@
-# 跨模型续接
+# Cross-model continuation
 
-> 立案 2026-10-13，自模型接入计划拆出，2026-10-19 归档。已与[模型兼容实现](todo-2026-10-10-model-compatibility.md)共用单次目标投影并通过自动验证。不同模型、端点及工具循环组合采用延迟验收，在真实使用中发现具体问题后处理；归档不表示全部组合已验收通过。上下文压缩不属于本计划。
+Filed on 2026-10-13 and archived on 2026-10-19. Shared target projection was implemented and automatically verified; real endpoint/model/tool combinations remained subject to observation.
 
-## 已实现机制
+Every request projected public history toward the selected model without rewriting stored content. Model changes did not invalidate all common text and tool history.
 
-- 时间线保存公共 thinking／text／toolcall 内容及原生附加资料，不保存第二份模型上下文。每次请求从当前时间线向目标模型投影，转换不回写历史、不追加桥接消息、不生成摘要或来源水印。
-- 取消整段历史必须与目标 scope／adapter 一致的拒绝。来源作用域（provider 身份、协议、端点、模型）和适配版本只决定原生附加资料能否复用；其他来源的公共回答、工具调用与结果继续参与请求。
-- OpenAI Responses 无状态基线回传可复用密文，Anthropic 回传可复用的签名或 redactedData；这些是正常协议行为，不需要兼容包。只有 item ID 而没有密文，不能替代 store:false 的原生思考续接。
-- thinking 的 text、summary 分别保存明文与摘要，不需要兼容包即可参与目标投影。Responses 无可复用密文时分别编码 content 与 summary；Messages 无可复用签名时编码无签名明文，独立摘要省略；Chat 暂不编码历史思考。不将摘要当作明文、不伪造助手正文或原生资料，不宣称能从密文恢复文字。
-- reasoning:false 仍过滤当前请求的全部历史思考；公共模型／等级 null 继承和 off 语义不变。
-- 外来工具调用 ID 若不满足通用字符／长度范围，或与原生／先前调用身份冲突，则确定性转换，并将结果同步映射到相同 ID。本来源原始身份优先保留。
-- A → B → A 不会逐次转换保存内容；A 原先的原生资料一直留在时间线，切回时可重新使用。B 产生的公共回答保留，不携带不适用的 B 原生资料。
-- 实现入口：src/model/projection.ts、src/model/continuation.ts、src/model/responses-reasoning.ts、src/model/anthropic-thinking.ts；公共 SDK ModelBlock／ModelPart 必填 summary。SDK 0.14.0、宿主 API 8.0、数据库 19，不推断或迁移旧思考记录。
+Native signatures, ciphertext, and identifiers were reusable only within their recorded source scope and adapter version. Switching from A to B and back to A preserved A's original native data for reuse. Text and summary remained separate and were not fabricated from ciphertext.
 
-## 后续开发归属
+Tool identifiers transformed deterministically where necessary, keeping each call/result pair aligned. Protocols differed in their supported historical reasoning representations.
 
-新增原生协议时的续接资料命名空间扩展尚未实施，统一由[运行时能力计划](../todo-2026-10-01-runtime-capabilities.md#执行与模型)跟踪。
+Isolated protocol tests covered cross-source filtering, original-prefix preservation, adapter changes, reasoning separation, and tool pairing. They did not prove every live provider combination.
 
-## 已完成的自动验证
-
-- [x] 隔离协议测试：跨模型或适配版本变化不阻断公共正文，不泄漏来源签名／密文／item ID。
-- [x] 隔离协议测试：OpenAI 与 Anthropic 原生续接无需兼容包；A → B → A 中 A 的原有输入前缀一致，B 的公共回答继续参与，历史不改写。
-- [x] 隔离协议测试：外来工具 ID 规范化与冲突处理后，调用和结果仍配对；本来源 ID 保留。
-- [x] 公共思考：明文／摘要／密文分别编码，无签名文字不丢失，摘要不填充明文；跨来源不泄漏签名与密文。
-
-## 延迟验收
-
-- 实际对话中切换模型继续、再切回时的历史展示。
-- 跨 OpenAI／Anthropic／DeepSeek 等端点的续接与工具循环。
-
-以上为真实使用的观察范围，不再作为归档前置或独立验收待办；发现问题后按模型、端点和复现路径处理，需跨会话处理的具体缺陷另行立案。
-
-自动化使用合成协议样本和注入传输；不以它替代真实端点与 GUI 验收。SDK 对模型名称的内置推断、各端点的实际限制仍可能影响请求接受情况，不宣称任意来源的全部不透明资料都可移植。
-
-## 调研依据
-
-核验日期 2026-10-14；外部源码只作机制参考。
-
-- [pi transformMessages，固定提交 3daa202](https://github.com/badlogic/pi-mono/blob/3daa20280f6a7c7cbe0935680c9a38fdc3863005/packages/ai/src/api/transform-messages.ts)：请求时转换思考、签名和工具 ID，不改写原消息。
-- [Roo Code 消息转换，快照 137d3f4f](https://github.com/RooCodeInc/Roo-Code/blob/137d3f4f/src/api/transform/openai-format.ts)：保存规范历史，按 API 配置在请求时转换。
-- [OpenCode 上下文契约](https://github.com/anomalyco/opencode/blob/dev/CONTEXT.md)：持久历史与目标请求投影分离；链接随上游变化。
+Future native protocols would need their own continuation namespace handling. Research informed the design but did not make other agents' persistence formats part of Asterism.

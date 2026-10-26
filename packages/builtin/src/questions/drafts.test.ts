@@ -8,7 +8,7 @@ const pending: PendingQuestion = {
     options: [{ id: "a", label: "A" }, { id: "b", label: "B" }] }],
 };
 describe("问答草稿连续性", () => {
-  // workbench.md：提交仍在通信中时重挂载不能再次编辑或提交，否则界面草稿与已发送答案会分离。
+  // 提交仍在通信中时重挂载不能再次编辑或提交，否则界面草稿与已发送答案会分离。
   it("操作锁跨重挂载保留，失败后保留原草稿并允许重试", async () => {
     const drafts = createQuestionDrafts();
     const entry = drafts.get("session", "agent", pending);
@@ -30,7 +30,7 @@ describe("问答草稿连续性", () => {
     expect(remounted.getOperationSnapshot()).toEqual({ busy: false, failed: false });
   });
 
-  // workbench.md：卡片卸载与视图切换不丢草稿；完成通知清理当前实例，不能跨 Agent 串答。
+  // 卡片卸载与视图切换不丢草稿；完成通知清理当前实例，不能跨 Agent 串答。
   it("重挂载取得同一草稿，完成后释放且不影响其他 Agent", () => {
     const drafts = createQuestionDrafts();
     const entry = drafts.get("session", "agent", pending);
@@ -49,7 +49,7 @@ describe("问答草稿连续性", () => {
     drafts.clear();
   });
 
-  // workbench.md：自定义与单选互斥；已编辑但未选中的自定义草稿不能悄悄成为答案。
+  // 自定义与单选互斥；已编辑但未选中的自定义草稿不能悄悄成为答案。
   it("切回选项保留自定义草稿但不提交，显式跳过不携带草稿答案", () => {
     const entry = createQuestionDrafts().get("session", "agent", pending);
     const draft = entry.getSnapshot();
@@ -65,7 +65,7 @@ describe("问答草稿连续性", () => {
     expect(draftSubmission(pending.questions, draft).answers).toEqual([{ id: "choice", status: "skipped" }]);
   });
 
-  // workbench.md：可选文本留空应可复核与提交，后端仍收到明确 skipped；必填题不能同样跳过。
+  // 可选文本留空应可复核与提交，后端仍收到明确 skipped；必填题不能同样跳过。
   it("可选文本留空转换为跳过，必填文本只在提交校验时要求内容", () => {
     const request: PendingQuestion = { ...pending, questions: [
       { id: "optional", type: "text", question: "Anything else?", required: false },
@@ -83,7 +83,7 @@ describe("问答草稿连续性", () => {
     ]);
   });
 
-  // workbench.md：多选的可编辑选项只有勾选才提交；已选空白自定义项须提示，不能悄悄省略。
+  // 多选的可编辑选项只有勾选才提交；已选空白自定义项须提示，不能悄悄省略。
   it("多选自定义项独立勾选，取消勾选保留草稿但不发送", () => {
     const choice = pending.questions[0]!;
     if (choice.type !== "single") throw new Error("Expected choice question.");

@@ -82,7 +82,7 @@ const text = (data: Uint8Array) => new TextDecoder().decode(data);
 
 // 预期来自内容归属、同步提交和历史契约；验证公开 SDK 完整调用路径。
 describe("宿主不可变内容", () => {
-  // docs/content.md：跨插件动作在首次等待前捕获调用者合法内容，后续失去原根仍可完成交接。
+  // 跨插件动作在首次等待前捕获调用者合法内容，后续失去原根仍可完成交接。
   it("后台跨插件动作要求合法内容来源，并独立保留输入直到提交", async () => {
     const ns = pluginNamespace("test.action-source");
     const Source = ns.resource("source", z.object({}));

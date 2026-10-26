@@ -7,7 +7,7 @@ import { cn } from "@asterism/ui/utils";
 import { formatCount } from "@asterism/ui/format-count";
 import { contextMessages as messages } from "../messages/context";
 
-/** 代理辅助面板共用的版式与图表部件；视觉规范见 docs/design-system.md#数据图表。 */
+/** 代理辅助面板共用的版式与图表部件。 */
 export const ease = [0.2, 0.8, 0.2, 1] as const;
 export const stripes: CSSProperties = { backgroundImage: "repeating-linear-gradient(-45deg, var(--border) 0 2px, transparent 2px 5px)" };
 export const percent = (i18n: I18n, part: number, total: number, digits?: number) =>

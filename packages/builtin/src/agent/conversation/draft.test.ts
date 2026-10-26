@@ -6,7 +6,7 @@ import type { ContentRef } from "@asterism/sdk/contracts";
 const ref: ContentRef = { "$asterism.content": "00000000-0000-4000-8000-000000000001" };
 const reader = { read: async () => new Uint8Array(), async *open() {} };
 describe("消息文件草稿", () => {
-  // docs/workbench.md：取出前完成附件占用交接，恢复完整文字和文件信息；保存不规整原始文字。
+  // 取出前完成附件占用交接，恢复完整文字和文件信息；保存不规整原始文字。
   it("取回的附件进入独立编辑器占用，原始文字、名称与媒体类型可再次保存或发送", async () => {
     const bytes = new Uint8Array([1, 2, 3]);
     let closed = false;

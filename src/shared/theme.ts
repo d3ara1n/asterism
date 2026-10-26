@@ -114,7 +114,7 @@ export function contrastRatio(a: string, b: string): number {
 function onSolid(background: string, dark: string): string {
   return contrastRatio(background, "#ffffff") >= contrastRatio(background, dark) ? "#ffffff" : dark;
 }
-/** 图表分类色相顺序；docs/design-system.md#数据图表。 */
+/** 图表分类色相顺序。 */
 export const chartHues = ["blue", "teal", "amber", "violet", "crimson", "orange", "cyan", "plum"] as const;
 /** 语义层：唯一一份映射，把 accent/gray 色阶按亮暗解析为 shadcn token；token 名不随任何选择改变。 */
 export function themeTokens(appearance: Appearance, scheme: Scheme): Record<string, string> {

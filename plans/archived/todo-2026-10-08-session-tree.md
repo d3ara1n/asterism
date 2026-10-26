@@ -1,39 +1,17 @@
-# 会话级扁平树改造
+# Flat session-tree implementation
 
-> 立案 2026-10-08，2026-10-10 归档：会话级扁平树改造完成并经实现核对；未竟事项已移入对应计划（见「实测后再定」与末条注记）。语义见 `docs/timeline.md`、`docs/object-model.md`、`docs/conversation-core.md`。当前存储版本见 `docs/architecture.md`，开发数据不做迁移，重建由用户操作。
+Filed on 2026-10-08 and archived on 2026-10-10 after implementation review. Outstanding capabilities were deferred rather than counted as complete.
 
-## 第一批：存储、运行时、投影（一起交付）
+The migration replaced per-Agent conversation storage with a session-owned append tree. Agent selection belonged to its resource. Model output grouped by request and ordinal, while historical append order retained interleaved workbench events.
 
-- [x] `sessions` 索引与会话级节点表；移除 `tasks.branch_id`、线性 `events` 与每代理 conversation 事件；代理选择按代理对象保存。
-- [x] `history/` 与 `conversation/` 合并为会话树模块：追加校验、祖先路径、路径折叠出工作台对象与链接。
-- [x] 运行时：流增量只在内存，块完成追加；中断时以 complete=false 追加；toolcall 取得结局后与结果一并追加；无块失败发错误级 notice。
-- [x] 模型投影：按 agent 过滤、按 response_id/序号归组、展开 tool 结果、响应期间事件延后、跳过不完整块。
-- [x] 回溯：会话 settled 才可 select；继续点 thinking 结尾时退到合法祖先。
-- [x] 应用与会话 IPC 分离（当前协议见 shared 契约）：应用只读取列表；会话统一历史查询、资源与布局命令、版本化资源投影与独立进度。
-- [x] Task 全面改名 Session（代码、命令、测试）。
-- [x] typecheck 与契约测试：投影归组与延后、序号排序、不完整块跳过、吸附、并行代理节点交错、settled 约束、幂等提交。
+Streaming increments remained temporary. Incomplete blocks and tool outcomes had explicit persistence behavior. Resource creation/removal and directed links rebuilt the workbench along the selected path.
 
-## 第二批
+The implementation added resource discovery/inspection/call entries, shared tool contracts, implementation-specific targets, independent resource and tool registries, and plugin-organized backend/frontend views.
 
-- [x] 资源 created / 加入移除工作台 / attach / detach 事件节点；链接通知投影给模型，加入移除只重建视图。
-- [x] `resource_list` / `resource_inspect` / `resource_call` 骨架与目录 list；两层共用工具定义和指导投影。
-- [x] 代理控制器读取已链接目录的 AGENTS.md 组装系统提示词。
-- [x] notice 通道接入错误、缓存过期、预算提示。
+Request path, configuration, and access were captured per model request, correcting the earlier whole-turn boundary. Response projection placed intervening events after the associated response to retain the previously sent prefix.
 
-## 实测后再定
+Typechecks and contract tests covered projection order, incomplete output, interleaved agents, settled-state checks, transactions, and submission behavior. Later review added cursor-selection records and stable display identity.
 
-- [ ] 动态资源工具调用可靠性；保持宿主一级入口固定，通过资源工具目录与 inspect 提供动态 schema。（移入运行时能力计划）
-- [ ] 只截掉末尾 toolcall 的投影在三协议的接受情况。（移入模型接入计划，随真实端点验收）
-- [ ] 代理间通信工具与“子代理” skill；对象自身事件机制（如象棋）。（移入运行时能力计划，随多代理实施）
+Some delivered mechanisms in this record were later replaced: historical preview state, continuation snapping, separate completion storage, revision-based synchronization, and restricted top-level registration. They remain historical facts.
 
-## 审查整修与后续契约
-
-- [x] **会话与历史管理收敛**：查看位置由独立会话视图模块拥有，工作台与对话同次读取；命令只返回受理结果，删除应用快照中的当前会话与跨控制器刷新。流式进度独立订阅，按持久修订协调落库，统一块展示身份；覆盖历史切换竞态、历史布局保存、分叉、断开重连与流式更新。GUI 待用户验收。
-- [x] **游标选择审计**：独立追加日志记录原位置、请求位置、吸附结果、原因与时间；与游标更新同事务，支持外层事务回退，不进入树或模型上下文。覆盖显式选择、返回起点、自动续接吸附与数据库重开。
-- [x] **块级计量与响应投影**：移除 response_end；迟到终态只追加一次并绑定响应最高序号块，查询时合并 usage、服务端 responseId 与原始/归一化结束原因。唯一约束防止重复计量，原始块与游标不变；SQL 视图支持筛选汇总，无块异常由诊断 notice 留档。
-- [x] **请求起点关联**：块保存请求取用的路径末端；投影据此组合响应并后置期间事件，包括首块前事件、并行代理的不可见起点和工具执行期间事件。原始时序不改，下一请求保留已发送消息前缀，历史分叉只消费当前路径。
-- [x] **资源变更的生效边界**：消息路径、配置与资源授权在每次模型请求开始时固定，连同该响应的工具批次使用；期间事件按真实顺序记录，下一次请求重新取用。已修正整轮冻结并同步文档；同一轮内的下一请求采用新授权已有契约测试。
-- [x] **资源、工具与外部策略分离**：ResourceRegistry 与 ToolRegistry 平级；共享工具契约固定 description、guidelines 与 args，后端实现定义含描述的 target/result、支持关系和 handler。请求能力视图先匹配已链接资源，再应用 agent.tools/excludeTools 等外部策略；通知、inspect 与 call 共用同一结果。固定宿主入口不进入工具目录，不开放插件注册；批次采用实际实现的副作用与调度策略。
-- [x] **模块化调用与展示**：纯契约、runtime、renderer 同目录分入口；资源卡片携带版本化投影，工具结果保存实现 ID/版本与当次数据。笔记、目录、代理卡片及工具结果改走注册目录；无对应 renderer 时回退原始数据。
-- [x] **target 定位参数**：resource_call 独立携带 target，由工具实现解释；目录 list 使用 null 或 target.path，args 保持共享工具契约。
-- [ ] **直接文件资源身份**：另行确定直接文件资源与目录内 path 定位的身份关系，以及 edit 的前置版本条件；target 接口已定，不因目录包含可编辑文件而把目录自身当作文本。（移入模型接入计划，随正式资源目录确定）
+Deferred questions included dynamic-tool reliability, real-protocol continuation edges, agent communication and skills, captured-resource events, direct-file identity, and formal resource selection.

@@ -17,7 +17,7 @@ function pathOf(...values: NewNode[]): SessionNode[] {
 }
 const insight = (path: SessionNode[], agent = "a") => contextInsight(sessionView(nodeView("s", "", path, path.at(-1)?.id ?? null)), agent);
 
-// docs/workbench.md#代理上下文：构成按下一次请求的模型投影计字，窗口与系统部分只取已保存的真实计量。
+// 构成按下一次请求的模型投影计字，窗口与系统部分只取已保存的真实计量。
 describe("代理上下文洞察", () => {
   it("对话按投影分类计码点；未完成块、其他代理与摘要替换的前缀不计入", () => {
     const path = pathOf(

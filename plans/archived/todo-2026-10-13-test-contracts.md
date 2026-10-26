@@ -1,22 +1,11 @@
-# 测试契约化清理
+# Test-contract cleanup
 
-已完成。原则统一见 [AGENTS.md 的验证职责](../../AGENTS.md#验证职责)，逐用例处置与完成结果见 [清理清单](draft-2026-10-13-test-contracts-inventory.md)。
+Filed on 2026-10-13. Completed after user confirmation of the case-disposition inventory.
 
-## 完成范围
+Tests moved to their owning boundaries: text, paths, projection, workbench reconstruction, decoding, assembly, and resources. Integration tests focused on admission, persistence, lifecycle, request capture, and content transfer.
 
-- 常驻测试规则已补入项目 AGENTS.md：明确契约、具体失败与预期依据；同一契约一处覆盖，下游信任上游，保持独立运行。
-- 正文算法、目录路径、代理投影、工作台折叠、记录解码、声明装配及领域资源分别在所属边界验证；集成测试聚焦受理、保存、生命周期、环境取用和跨边界内容交接。
-- 合并等价用例与下游重测，清理非契约诊断原文、内部字段和固定组件身份；保留解析一次、不重试、索引只解码目标等公开要求。
-- 修正配置损坏和旁支内容资格夹具，移除标题中没有实际验证的承诺；目录 see 图片用例独立运行通过并保留。
-- 并行历史修复的已确认新契约及对应测试已纳入，实施记录见清理清单；没有未解决的契约封装缺口。
+Equivalent cases and repeated downstream checks were consolidated. Literal diagnostic formatting, private fields, and fixed component identity ceased to be accidental contracts. Fixtures were corrected to exercise their claimed failure mechanisms.
 
-## 验收
+The completed suite contained 386 expanded cases across 62 files, versus 395 across 55 beforehand. The changed count reflected responsibility boundaries rather than a target.
 
-- [x] 逐文件列出用例，标注保留／合并／删除及对应契约。
-- [x] 清单经用户确认。
-- [x] 按清单清理；重叠测试等并行历史修复提交后收尾。
-- [x] typecheck、测试、i18n 检查通过，计划与清单归档。
-
-清理前 55 个文件、354 个声明／395 个展开用例；完成后 62 个文件、342 个声明／386 个展开用例。新增文件是契约迁移的归属拆分，数量不是目标。
-
-`npm run typecheck`、`npm test -- --reporter=dot`、`npm run i18n:check`、`git diff --check` 全部通过。GUI 与真实提供商端点未在本任务自动验收。
+Typechecks, tests, localization checks, and whitespace checks passed. The task did not automatically accept GUI or real-provider behavior.

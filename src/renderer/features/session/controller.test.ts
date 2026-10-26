@@ -31,7 +31,7 @@ function fixture() {
 }
 const command = (objectId: string) => ({ type: "resource.command" as const, sessionId: "s", objectId, command: resourceCall(ContinueAgent, {}) });
 
-// docs/workbench.md：打开后直接接收当前数据变化，局部操作不读取完整历史或改变工作台加载状态。
+// 打开后直接接收当前数据变化，局部操作不读取完整历史或改变工作台加载状态。
 describe("会话当前数据", () => {
   it("资源变化只替换对应对象，动作回执不发起读取", async () => {
     const f = fixture(), initial = data();
@@ -73,7 +73,7 @@ describe("会话当前数据", () => {
     disconnect();
   });
 
-  // docs/timeline.md：成型记录先交付，随后移除对应流式块；保存节点不丢失。
+  // 成型记录先交付，随后移除对应流式块；保存节点不丢失。
   it("历史追加与流式块结束按消息顺序交付", () => {
     const f = fixture(), disconnect = f.open();
     const block = { id: "r:0", objectId: "a", responseId: "r", ordinal: 0, kind: "text" as const, text: "Hello", endedAt: null };
@@ -87,7 +87,7 @@ describe("会话当前数据", () => {
     disconnect();
   });
 
-  // docs/architecture.md 流式进度：输入阶段的工具参数只以 argumentsText 增量传输，前端推导预览；参数文本只发送追加部分。
+  // 流式进度：输入阶段的工具参数只以 argumentsText 增量传输，前端推导预览；参数文本只发送追加部分。
   it("输入阶段工具参数由前端从追加的参数文本推导，进入 ready 后采用后台完整参数", () => {
     const f = fixture(), disconnect = f.open();
     const block = { id: "r:0", objectId: "a", responseId: "r", ordinal: 0, kind: "toolcall" as const, name: "write", argumentsText: '{"path":"a.txt","content":"hel',
@@ -133,7 +133,7 @@ describe("会话当前数据", () => {
     disconnect();
   });
 
-  // docs/workbench.md：卸载取消接收旧结果，重开只认新连接的数据。
+  // 卸载取消接收旧结果，重开只认新连接的数据。
   it("断开后迟到的打开结果不影响新连接", async () => {
     const f = fixture();
     const oldDisconnect = f.controller.connect(), oldListener = f.listener();

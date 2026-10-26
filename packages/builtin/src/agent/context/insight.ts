@@ -2,7 +2,7 @@ import { completionData, type ModelInputPart, type ModelItem, type SessionSnapsh
 import { contextMessages, projectAgentContext } from "../context-projection.ts";
 import { ContextSummary, Execution, AgentRequestContext, AgentInputMessage, type AgentRequestContextData } from "@asterism/builtin-api/contracts";
 
-/** 对话构成的固定类别与展示顺序；docs/workbench.md#代理上下文。 */
+/** 对话构成的固定类别与展示顺序。 */
 export const conversationCategories = ["user", "agentMessage", "assistant", "thinking", "toolcall", "result", "context", "summary"] as const;
 export type ConversationCategory = typeof conversationCategories[number];
 

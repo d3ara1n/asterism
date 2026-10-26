@@ -1,22 +1,7 @@
-# 无模型的任务历史骨架
+# History foundation without models
 
-> 立案 2026-09-18。路线图第 1 阶段。实现中：契约测试在 `src/history/`。
+Filed on 2026-09-18. Archived historical scope record. The original entry still described implementation in progress and contained no final acceptance statement.
 
-## 范围
+The planned foundation covered persistent history reconstruction, pending versus effective resource access, stable business objects behind multiple cards, and the separation of history browsing from real resource mutation.
 
-语义契约落入：
-
-- `docs/timeline.md`：事件种类、历史位置、重建
-- `docs/runtime.md`：轮次冻结、绑定请求与生效
-- `docs/glossary.md`：历史位置、分支、绑定版本、规则版本
-
-契约测试兑付 `docs/roadmap.md` §1：
-
-- 持久化并重建指定历史位置
-- pending 不进入该轮有效绑定
-- 打开卡片不创建重复业务对象
-- 回看不改变现实资源
-
-## 不包含
-
-provider、工具协议、目录真实 IO、工作台画布、Electron 工程脚手架。
+Providers, model protocols, real directory I/O, the canvas, and the Electron scaffold were outside this task. Its early turn-level terminology records the original proposal rather than the later request-boundary design.

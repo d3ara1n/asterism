@@ -123,7 +123,7 @@ describe("AI SDK 适配契约", () => {
       else expect(failure).toBeUndefined();
     } finally { controller.abort(); clock.mockRestore(); }
   });
-  // docs/runtime.md#请求诊断：实际适配流在失败/取消时仍交付计时，不把空流或错误当成零 token 成功。
+  // 实际适配流在失败/取消时仍交付计时，不把空流或错误当成零 token 成功。
   it.each(["failed", "cancelled"] as const)("保留%s流的计时", async outcome => {
     const controller = new AbortController();
     const model = new MockLanguageModelV4({ doStream: async () => {

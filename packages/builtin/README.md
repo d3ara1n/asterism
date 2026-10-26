@@ -1,46 +1,25 @@
-# 内置插件实现（`@asterism/builtin`）
+# Built-in plugin
 
-内置 Agent、问答、笔记、目录、命名与设置组成插件 `asterism.builtin`。实现通过 `@asterism/sdk` 使用宿主能力，通过 `@asterism/builtin-api/contracts` 消费公共领域契约，基础控件来自内部 `@asterism/ui`。本包不反向导入应用 `src/` 的生产代码；测试可复用宿主集成设施。
+The built-in plugin implements Agent conversations and the resource capabilities distributed with Asterism. It uses the same host mechanisms as external plugins.
 
-## 应用组合入口
+Domain modules own their data, execution policy, and views. Shared plugin services have plugin lifetime; object-owned processes and connections have resource lifetime.
 
-- `@asterism/builtin/runtime`：`createBuiltin({ application, connectNaming })` 返回插件定义；应用显式传入展示名称、请求 User-Agent，并连接命名接口。`createSelection`、`composeSystemPrompt` 为首页首次提交提供与 Agent 相同的领域准备规则。
-- `@asterism/builtin/renderer`：`builtinRenderer` 聚合功能视图 `builtinViews` 与设置页；另提供 `BuiltinRendererProvider` 及首页复用的输入草稿、文件输入、模型选择和提交身份工具。应用通过 provider 注入按插件绑定的偏好门面，供 Agent 扩展组件使用。
-- `@asterism/builtin/locales/zh-Hans.json`：由应用装配的内置翻译目录。
+Application composition supplies the application-specific capabilities the plugin needs. Distribution with the application does not grant an exemption from identity, validation, or lifecycle rules.
 
-`agent/renderer.tsx` 同步登记配置与上下文工具栏项；`agent/feedback-state.ts` 保留资源生命周期内的模型反馈并投影到对话发生位置；`agent/feedback-renderer.tsx` 作为独立模块订阅软件故障通知，由插件入口显式组合，订阅的准备与清理作用域独立于视图登记。
+Keep backend work independent of card mounting. Views can disappear or move while resources continue running.
 
-宿主加载、外部插件依赖、公共提供方登记与关闭协调留在应用组合层。外部插件使用 [公共 API 包](../builtin-api/README.md)，不依赖实现包。
+## Capability directories
 
-## 功能目录
-
-| 目录 | 职责 |
+| Directory under `src/` | Responsibility |
 | --- | --- |
-| `src/agent/` | 选择、输入受理、执行循环、上下文压缩、历史投影与对话视图；`data.ts` 保存私有状态，`submissions.ts` 按提交身份去重，`drafts.ts / drafts-contract.ts` 管理持久输入调度与内部草稿动作，公共动作与记录在公共 API 包 |
-| `src/agent/peek/` | Agent 资源的只读调查工具、时间线记录快照、内部检索与 utility 流式报告；报告视图复用对话折叠外壳与思考预览 |
-| `src/agent/send/` | 共享 `Send` 工具的 Agent 实现与三态视图；通过资源身份直接发送、从调用者上下文填写来源并复用 `SubmitAgentInput` |
-| `src/agent/wait/` | 共享 `Wait` 工具的 Agent 实现与三态视图；等待被链接代理收束，超时报告运行中状态 |
-| `src/agent/ui/` | Agent 自有 toolbar／overlay／modal 布局、贡献组件挂载、当前模型选择注入与输入区隐藏请求；公共作者接口在 `@asterism/builtin-api/renderer`，内置工具栏贡献在 `conversation/Toolbar.tsx` |
-| `src/agent/conversation/Markdown.tsx`、`MarkdownCode.tsx`、`MermaidDiagram.tsx` | Markdown 图片与代码组件、Mermaid 按需渲染；`markdown-options.ts` 声明历史与实时内容共用的插件，交互见[对话视图](../../docs/workbench.md#代理卡片与工具调用视图) |
-| `src/questions/` | `ask_user` 三题型与结构化答案、内存问答服务及具型调用、工具执行正文内可保留草稿的作答界面（可放大为模态窗）与只读回执；契约见[等待用户回答](../../docs/runtime.md#等待用户回答)，交互见[结构化问答](../../docs/workbench.md#结构化问答) |
-| `src/notes/`、`src/filesystem/` | 资源与正文工具实现、创建入口与三态工具视图 |
-| `src/filesystem/search.ts`、`search-process.ts`、`search-output.ts`、`search-presentation.ts` | 目录 `find / grep` 的资源接入、随应用分发的 rg 子进程、有界协议解析与模型／界面共用的结果解释；公共参数来自 `@asterism/builtin-api`，契约见 [目录搜索](../../docs/runtime.md#目录搜索findgrep) |
-| `src/shell/` | 共用 Shell profile 解析、`shell_profile_list` 顶层查询与三态视图、非交互管道进程、显式终止与 IO 收束、有界输出及临时日志；目录 `exec` 经同一服务执行，契约见 [目录命令执行](../../docs/runtime.md#目录命令执行exec) |
-| `src/terminal/` | 交互 PTY、后台屏幕、最小 shell 状态集成、人机共享输入、文字／图片观察与等待；资源对象只是入口，实例在新建或用户开启时创建，关闭、移除或回溯时结束；屏幕、输入与状态经终端通道传输，契约见 [终端资源](../../docs/runtime.md#终端资源) |
-| `src/terminal/service.ts`、`screen.ts`、`raw-buffer.ts`、`screen-writer.ts` | 分别管理 PTY 与共享实例、后台网格与观察投影、原始输出范围、前端帧消费队列；资源与工具装配位于 `runtime.ts` |
-| `src/resources/` | Agent 创建目录查询、创建和统一移除顶层工具及三态视图；通过 SDK 绑定会话门面消费宿主生命周期 |
-| `src/naming/` | 自动命名、人工命名接口、`session_name / session_rename` 顶层工具及标题投影；契约见[会话命名](../../docs/session-naming.md)，记录契约由公共包提供 |
-| `src/settings/` | 内置插件托管配置与按流式预览／Shell／MCP／技能分组的自定义设置页；配置在插件根入口登记 |
-| `src/skills/` | 启动构建的共享技能目录、YAML 元数据解析、`skill_read / skill_refresh` 顶层工具与视图、按来源分组的设置概要与来源浮岛；请求环境与边界见 [技能目录与读取](../../docs/runtime.md#技能目录与读取) |
-| `src/providers/` | 提供商预设、主动余额／套餐查询及 `headers.ts` 的被动限流解析；各服务独立解析，主动 HTTP 共用 `usage-http.ts`，通过 SDK 贡献登记，不拥有缓存或跨进程消费 |
-| `src/usage/` | 独立的账户用量消费者：从 SDK 目录取实现，管理缓存、解析 Agent 显式交付的响应结果，通过自有调用／事件向共享订阅和 toolbar 交付状态；不导入提供方实现 |
-| `src/web/` | Web 资源、搜索／URL 获取工具与视图、Exa SDK 适配；类型与连接契约见 [Web 资源](../../docs/web.md) |
-| `src/mcp/` | MCP 主机资源、五个固定资源工具、共享 MCP 客户端、stdio/HTTP 连接与认证、持久目录与搜索、服务器设置；契约见 [MCP 模块](../../docs/mcp.md) |
-| `src/shared/` | 正文算法、预览规则、公共流式开合状态机与创建表单；`card-appearance.ts` 为资源后台放置与前端卡片提供同一份几何声明 |
-| `src/messages/`、`src/locales/` | 内置插件自有文案与翻译 |
-
-功能按契约、后台、前端分入口，不建立同时加载 Node 与 React 实现的 barrel。工具作者的参数说明、错误自愈与 `toModel` 规则见 [运行时](../../docs/runtime.md#原生正文工具与目录操作)；代码编写时 args、target、result schema 必须有完整描述，错误须区分失败、取消与无法确认写入影响。
-
-模型提示块的通用序列化属于宿主模型适配层；Agent 只组合领域提示内容。命名、压缩与执行请求的应用身份通过工厂参数传入，不读取应用 package.json。
-
-内置流式尾部正文使用 `@asterism/ui/streaming-preview` 的 `StreamingPreview`，调用方提供正文渲染；`shared/use-streaming-disclosure.ts` 配合公共状态机统一管理延迟开合、手动选择与条目状态保留。工具在各自的输入／执行视图上通过 SDK `streaming(props)` 声明可预览内容；Agent 外壳只消费声明和调用阶段，内置与第三方工具同等接入。领域正文提取与对应渲染共用，思考复用相同的开合 hook。接口、交互与呈现分别见 [插件 SDK](../../docs/plugin-sdk.md#前端视图与扩展入口)、[工具调用三态视图](../../docs/workbench.md#工具调用三态视图) 和 [对话过程视图](../../docs/design-system.md#对话过程视图)。
+| `agent/` | Agent execution and conversation |
+| `questions/` | Structured user interaction |
+| `notes/` and `filesystem/` | Working text and local files |
+| `shell/` and `terminal/` | Commands and interactive processes |
+| `resources/` | Model-facing resource operations |
+| `naming/` | Session title behavior |
+| `skills/` | Skill discovery and reading |
+| `providers/` and `usage/` | Provider contributions and usage consumption |
+| `web/` and `mcp/` | Network and external-tool capabilities |
+| `settings/` | Built-in preferences |
+| `shared/`, `messages/`, and `locales/` | Shared behavior and interface text |

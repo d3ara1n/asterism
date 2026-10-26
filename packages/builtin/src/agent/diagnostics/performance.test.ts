@@ -20,7 +20,7 @@ const request = (clock: RequestTiming | undefined, counts: Usage | null): Diagno
 });
 
 describe("诊断速率", () => {
-  // docs/workbench.md#代理诊断：分清请求总耗时和输出持续时间，缓存输入不重复加进总量。
+  // 分清请求总耗时和输出持续时间，缓存输入不重复加进总量。
   it("E2E、思考细分和流式速率使用各自的计量范围", () => {
     expect(outputDuration(timing)).toBe(5000);
     expect(rates()).toEqual({ output: 10, nonReasoning: 10, reasoning: 0, total: 110, streaming: 20 });

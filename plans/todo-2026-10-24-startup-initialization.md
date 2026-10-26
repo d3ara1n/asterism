@@ -1,12 +1,11 @@
-# 启动初始化与加载屏
+# Startup presentation acceptance
 
-立案日期：2026-10-24。
+Filed on 2026-10-24.
 
-状态：启动屏、阶段反馈、失败页面和插件构建缓存已实现；窗口在宿主存储检查后出现，迁移期间显示数据升级阶段。当前顺序以[启动与加载](../docs/architecture.md#启动与加载)为准，迁移与恢复验收见[存储计划](todo-2026-10-12-storage-migration.md)。
+The startup view, phase reporting, failure pages, and plugin build cache are implemented. The window can show preparation progress before business services are ready.
 
-## Prerelease 内测验收
+- [ ] Accept loading indicators and actual phase text, including upgrades and delayed feedback on fast startup.
+- [ ] Accept initialization failure and timeout presentation.
+- [ ] Verify native controls and dragging remain available during loading and failure.
 
-- [ ] 窗口加载指示与阶段文案（含数据升级阶段），以及快速启动时的延迟显现。
-- [ ] 普通初始化失败与超时页面、原生窗口控件与拖动。
-
-GUI 交互延后至正式对外发布前的 prerelease 内测迭代，由用户直接验收，不阻塞实现提交。未验收项保留待办，验收方式见[发布操作](../docs/releasing.md#首包验收)。
+These are user-operated prerelease checks. A successful implementation commit does not close them.
