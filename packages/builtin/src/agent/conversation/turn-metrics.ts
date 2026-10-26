@@ -1,5 +1,5 @@
-import type { SessionSnapshot, Usage } from "@atelier/sdk/contracts";
-import { AgentInputMessage } from "@atelier/builtin-api/contracts";
+import type { SessionSnapshot, Usage } from "@asterism/sdk/contracts";
+import { AgentInputMessage } from "@asterism/builtin-api/contracts";
 import { diagnosticHistory, type DiagnosticRequest } from "../diagnostics/history";
 import { performanceOverview } from "../diagnostics/performance";
 import { cacheUsage } from "../diagnostics/usage";

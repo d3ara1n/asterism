@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { defineTool } from "@atelier/sdk/contracts";
+import { defineTool } from "@asterism/sdk/contracts";
 import { builtin } from "./identity.ts";
 import { editOperationSchema } from "./text.ts";
 

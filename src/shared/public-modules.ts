@@ -7,7 +7,7 @@ export interface PublicProvider {
   pluginId: string;
   modules: Partial<Record<ModuleRealm, Readonly<Record<string, readonly string[]>>>>;
 }
-const registryKey = "__atelierPublicModules";
+const registryKey = "__asterismPublicModules";
 type Binding = { version: string; pluginId: string; modules: Readonly<Record<string, ModuleExports>> };
 type Registry = Partial<Record<ModuleRealm, Record<string, Binding>>>;
 

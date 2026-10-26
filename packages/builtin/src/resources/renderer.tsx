@@ -1,13 +1,13 @@
 import type { ReactNode } from "react";
 import type { z } from "zod";
 import { ListPlus, ScanSearch, CirclePlus, CircleMinus, Users, Bot, MessageSquareText } from "lucide-react";
-import { toolRenderer, useI18n, useRendererResources, type RendererModule, type ToolRenderProps } from "@atelier/sdk/renderer";
-import { JsonView } from "@atelier/ui/json-view";
-import { ToolDetails } from "@atelier/ui/tool-content";
-import { ToolHeader } from "@atelier/ui/tool-header";
-import { ItemGroup, Item, ItemContent, ItemTitle, ItemDescription, ItemMedia } from "@atelier/ui/ui/item";
-import { Separator } from "@atelier/ui/ui/separator";
-import { Badge } from "@atelier/ui/ui/badge";
+import { toolRenderer, useI18n, useRendererResources, type RendererModule, type ToolRenderProps } from "@asterism/sdk/renderer";
+import { JsonView } from "@asterism/ui/json-view";
+import { ToolDetails } from "@asterism/ui/tool-content";
+import { ToolHeader } from "@asterism/ui/tool-header";
+import { ItemGroup, Item, ItemContent, ItemTitle, ItemDescription, ItemMedia } from "@asterism/ui/ui/item";
+import { Separator } from "@asterism/ui/ui/separator";
+import { Badge } from "@asterism/ui/ui/badge";
 import { resourceMessages as messages } from "../messages/resources";
 import { inputText } from "../shared/tool-preview";
 import { TOOL_BODY_LINE_LIMIT } from "../shared/tool-body";
@@ -124,7 +124,7 @@ function InspectBody({ result }: InspectProps) {
         {entry.guidelines.map((line, index) => <li key={index}>{line}</li>)}
       </ul>
     </section>}
-    <ToolDetails label={i18n.text(messages.inputSchema)} stateKey="atelier.builtin/inspect-schema"><JsonView value={entry.input} /></ToolDetails>
+    <ToolDetails label={i18n.text(messages.inputSchema)} stateKey="asterism.builtin/inspect-schema"><JsonView value={entry.input} /></ToolDetails>
   </div>;
 }
 

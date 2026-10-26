@@ -5,7 +5,7 @@ import { modelCompatibilitySchema } from "../shared/model-compatibility.ts";
 import type { ModelInput } from "./contract.ts";
 
 describe("模型请求身份", () => {
-  // SDK 公共接口不强加 Atelier 身份，也不按域名自动发送会话头。
+  // SDK 公共接口不强加 Asterism 身份，也不按域名自动发送会话头。
   it("未声明身份或兼容包时不生成身份头", () => {
     expect([...modelRequestHeaders({ provider: { compatibility: [] }, model: { compatibility: [] } })]).toEqual([]);
   });

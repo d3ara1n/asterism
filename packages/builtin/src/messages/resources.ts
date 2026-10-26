@@ -1,6 +1,6 @@
-import { defineMessages, pluginNamespace } from "@atelier/sdk/contracts";
+import { defineMessages, pluginNamespace } from "@asterism/sdk/contracts";
 
-export const resourceMessages = pluginNamespace("atelier.builtin").messages("en", defineMessages({
+export const resourceMessages = pluginNamespace("asterism.builtin").messages("en", defineMessages({
   agents: { id: "resources.agentList", defaultMessage: "List agent configurations" },
   agentCount: { id: "resources.agentCount", defaultMessage: "{count, plural, one {# agent} other {# agents}}" },
   noAgents: { id: "resources.noAgents", defaultMessage: "No agent configurations are available." },

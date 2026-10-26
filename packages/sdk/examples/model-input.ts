@@ -1,5 +1,5 @@
-import type { ContentRef, ModelItem, ModelInputPart } from "@atelier/sdk/contracts";
-import type { ContentScope, ModelServices } from "@atelier/sdk/runtime";
+import type { ContentRef, ModelItem, ModelInputPart } from "@asterism/sdk/contracts";
+import type { ContentScope, ModelServices } from "@asterism/sdk/runtime";
 
 /** 准备阶段已取得 content；文件不需要先成为对象或历史记录才能用于一次性补全。 */
 export async function describeFile(models: ModelServices, content: ContentScope, bytes: Uint8Array, signal: AbortSignal) {

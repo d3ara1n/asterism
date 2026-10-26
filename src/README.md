@@ -19,8 +19,8 @@
 | `execution/` | 单次模型请求与工具批次（`models.run`）、流块状态机、请求能力视图、工具策略、固定宿主入口与插件顶层工具调度 | `model`、`resources`、`tools`、存储格式 adapter |
 | `resources/` | 资源身份生成（Nano ID）、后台契约、注册目录、卡片投影与环境聚合 | `shared`、`session` 对象类型 |
 | `tools/` | 两层共用的工具定义投影、实现注册与产出校验、终结 `toModel` 投影、支持关系 | `shared`、`session` 对象类型 |
-| `plugins/` | 包与公共模块图加载、配置／凭据托管、读取／执行门面、具型命令准备、插件调用与顶层工具、共享运行生命周期、瞬态事件路由与提交后派发 | `@atelier/sdk`、`session`、`resources`、`tools` |
-| `../packages/builtin/` | 内置 `atelier.builtin` 插件的资源（`notes`、`filesystem`）、代理（`agent`）、会话命名（`naming`）与共享正文工具（见 `../packages/builtin/README.md`） | 后台/前端分入口；通过公开 SDK 消费宿主能力 |
+| `plugins/` | 包与公共模块图加载、配置／凭据托管、读取／执行门面、具型命令准备、插件调用与顶层工具、共享运行生命周期、瞬态事件路由与提交后派发 | `@asterism/sdk`、`session`、`resources`、`tools` |
+| `../packages/builtin/` | 内置 `asterism.builtin` 插件的资源（`notes`、`filesystem`）、代理（`agent`）、会话命名（`naming`）与共享正文工具（见 `../packages/builtin/README.md`） | 后台/前端分入口；通过公开 SDK 消费宿主能力 |
 | `../packages/builtin-api/` | 内置领域的公共资源、动作、记录、配置目录及作者示例 | SDK、Zod；不依赖内置实现或宿主 |
 | `../packages/ui/` | 应用与内置插件共用的内部 UI 控件与展示 helper | React、SDK 展示接口与既有 UI 库；不访问宿主状态 |
 | `renderer/` | 应用视图、浮岛编织、视图注册表、React Flow 工作台与用户意图（见 `renderer/README.md`） | `shared`、内置实现前端入口、React 与 UI 库；不访问 Node/数据库 |
@@ -50,4 +50,4 @@
 - **新增应用命令**：先在 `shared/` 定义命令与响应 schema，再在 `runtime/` 实现事务或查询，最后接入 `renderer/`。
 - **新增资源与工具**：按 [功能模块指南](../packages/builtin/README.md) 添加 `contract.ts`、`runtime.ts` 与 `renderer.tsx`。
 - **外部插件开发**：消费 [公开 SDK](../packages/sdk/README.md)，不依赖宿主内部控制器或物理节点表。
-- **数据 schema 变更**：递增所属存储的格式版本常量；首个版本发布后同时追加连续迁移步骤与旧格式夹具。实现入口见 [`storage/README.md`](storage/README.md)，契约见[数据准备与迁移](../docs/architecture.md#数据准备与迁移)。
+- **数据 schema 变更**：递增所属存储的格式版本常量；首次面向用户分发后同时追加连续迁移步骤与旧格式夹具。实现入口见 [`storage/README.md`](storage/README.md)，契约见[数据准备与迁移](../docs/architecture.md#数据准备与迁移)。

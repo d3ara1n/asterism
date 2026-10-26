@@ -1,4 +1,4 @@
-import type { CallResult } from "@atelier/sdk/runtime";
+import type { CallResult } from "@asterism/sdk/runtime";
 
 type Failure = Extract<CallResult<never>, { kind: "failed" | "rejected" }>;
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ModelCompletion } from "@atelier/sdk/contracts";
+import type { ModelCompletion } from "@asterism/sdk/contracts";
 import { projectAgentTurnState } from "./state-projection.ts";
 import { agentExecutionState } from "./state.ts";
 import { sessionView } from "../../../../src/plugins/records.ts";

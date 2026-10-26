@@ -1,6 +1,6 @@
-import { defineMessages, pluginNamespace } from "@atelier/sdk/contracts";
+import { defineMessages, pluginNamespace } from "@asterism/sdk/contracts";
 
-export const settingsMessages = pluginNamespace("atelier.host").messages("en", defineMessages({
+export const settingsMessages = pluginNamespace("asterism.host").messages("en", defineMessages({
   settings: {
     id: "settings",
     defaultMessage: "Settings",
@@ -35,11 +35,11 @@ export const settingsMessages = pluginNamespace("atelier.host").messages("en", d
   },
   aboutSummary: {
     id: "aboutSummary",
-    defaultMessage: "A personal AI workshop",
+    defaultMessage: "A personal AI workbench",
   },
   aboutBody: {
     id: "aboutBody",
-    defaultMessage: "Atelier brings agents, working materials and their progress to one workbench. Use your models, link the resources they need, and follow the work through cards and history. Conversations, notes and layout are saved on this device; resource operations require explicit authorization.",
+    defaultMessage: "Asterism brings agents, working materials and their progress to one workbench. Use your models, link the resources they need, and follow the work through cards and history. Conversations, notes and layout are saved on this device; resource operations require explicit authorization.",
   },
   aboutIdentity: {
     id: "aboutIdentity",

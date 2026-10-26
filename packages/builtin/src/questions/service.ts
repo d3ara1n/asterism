@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
-import type { ResourceRef } from "@atelier/sdk/contracts";
-import { PluginApiError, type CallResult } from "@atelier/sdk/runtime";
+import type { ResourceRef } from "@asterism/sdk/contracts";
+import { PluginApiError, type CallResult } from "@asterism/sdk/runtime";
 import type { Answer, PendingQuestion, Question, Submission } from "./contract.ts";
 import { AnswerValidationError, resolveAnswers } from "./answers.ts";
 

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { UiText } from "@atelier/sdk/contracts";
+import type { UiText } from "@asterism/sdk/contracts";
 import { startupMessages } from "../../shared/error-display";
 import { useI18n } from "../shared/i18n";
 import { FailureScreen, type FailureAction } from "./FailureScreen";

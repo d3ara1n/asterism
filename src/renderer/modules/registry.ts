@@ -1,5 +1,5 @@
-import { pluginOf, withValues, type ContractReference, type Presentation, type SessionRecord } from "@atelier/sdk/contracts";
-import type { RecordRenderer, RecordRenderContext, RecordView, CardRenderer, CardView, CreationEntry, ResourceDescription, RendererModule, RendererObjectContext, ToolRenderProps, ToolRenderer, ToolView } from "@atelier/sdk/renderer";
+import { pluginOf, withValues, type ContractReference, type Presentation, type SessionRecord } from "@asterism/sdk/contracts";
+import type { RecordRenderer, RecordRenderContext, RecordView, CardRenderer, CardView, CreationEntry, ResourceDescription, RendererModule, RendererObjectContext, ToolRenderProps, ToolRenderer, ToolView } from "@asterism/sdk/renderer";
 import { Box } from "lucide-react";
 import { createElement } from "react";
 

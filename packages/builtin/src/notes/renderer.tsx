@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { useI18n, creationEntry, cardRenderer, toolRenderer, type RendererModule } from "@atelier/sdk/renderer";
+import { useI18n, creationEntry, cardRenderer, toolRenderer, type RendererModule } from "@asterism/sdk/renderer";
 import { FileText, BookOpen, FilePenLine, FilePlus2, Copy } from "lucide-react";
 import { toast } from "sonner";
-import { IconButton } from "@atelier/ui/ui/icon-button";
+import { IconButton } from "@asterism/ui/ui/icon-button";
 
 import { Markdown } from "../agent/conversation/Markdown";
 import { commonMessages } from "../messages/common";
@@ -38,7 +38,7 @@ function NoteActions({ data }: { data: { text: string | null } }) {
 
 export default {
   prepare: prepareCodeView,
-  resources: [{ kind: "atelier.builtin/note", label: commonMessages.kindNote, icon: <FileText className="size-4" />, card: appearance }],
+  resources: [{ kind: "asterism.builtin/note", label: commonMessages.kindNote, icon: <FileText className="size-4" />, card: appearance }],
   cards: [cardRenderer(NoteView, {
     ...appearance,
     Actions: NoteActions,
@@ -61,6 +61,6 @@ export default {
       ...textWriteViews,
     }),
   ],
-  creations: [creationEntry(CreateNote, { id: "atelier.builtin/note.blank", label: commonMessages.kindNote, icon: <FileText className="size-4" />, group: "resources", InputView: NoteInput,
+  creations: [creationEntry(CreateNote, { id: "asterism.builtin/note.blank", label: commonMessages.kindNote, icon: <FileText className="size-4" />, group: "resources", InputView: NoteInput,
     triggers: { menu: {}, drop: { accepts: { text: true }, toInput: item => item.kind === "text" ? { title: item.text.split("\n")[0]!.trim().slice(0, 160) || "Untitled note", content: item.text.slice(0, 100_000) } : null } } })],
 } satisfies RendererModule;

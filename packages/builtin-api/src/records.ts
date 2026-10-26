@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { defineRecord, modelBlockSchema, modelCompletionSchema, modelInputPartsSchema } from "@atelier/sdk/contracts";
+import { defineRecord, modelBlockSchema, modelCompletionSchema, modelInputPartsSchema } from "@asterism/sdk/contracts";
 import { builtin } from "./identity.ts";
 import { agentMessageSenderSchema } from "./messaging.ts";
 

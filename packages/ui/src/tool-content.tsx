@@ -1,4 +1,4 @@
-import { type ToolRenderProps, useI18n, useRendererViewState } from "@atelier/sdk/renderer";
+import { type ToolRenderProps, useI18n, useRendererViewState } from "@asterism/sdk/renderer";
 import { useId, type ReactNode } from "react";
 
 import { toolsMessages } from "./messages/tools";
@@ -31,7 +31,7 @@ export function ToolDetailsSwitcher({ items, stateKey = null }: {
     {selected && <div id={panelId} role="region" aria-labelledby={`${panelId}-${selected.value}`}>{selected.render()}</div>}
   </div>;
 }
-export function DefaultToolHeader({ props, label }: { props: ToolRenderProps; label?: import("@atelier/sdk/contracts").UiText }) {
+export function DefaultToolHeader({ props, label }: { props: ToolRenderProps; label?: import("@asterism/sdk/contracts").UiText }) {
   const i18n = useI18n();
   return <ToolHeader label={label === undefined ? props.name : i18n.text(label)} subject={props.invocation.resource?.title} />;
 }

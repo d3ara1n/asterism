@@ -2,7 +2,7 @@ import { createServer, type Server } from "node:http";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { OAuthClientProvider, OAuthDiscoveryState, StoredOAuthTokens, StoredOAuthClientInformation } from "@modelcontextprotocol/client";
-import type { PluginSecrets } from "@atelier/sdk/runtime";
+import type { PluginSecrets } from "@asterism/sdk/runtime";
 
 const savedSchema = z.object({
   token: z.looseObject({ access_token: z.string(), token_type: z.string() }).optional(),
@@ -58,7 +58,7 @@ export class McpOAuth implements OAuthClientProvider {
 
   get redirectUrl() { return `http://127.0.0.1:${this.port}/callback`; }
   get clientMetadata() {
-    return { client_name: "Atelier", redirect_uris: [this.redirectUrl], grant_types: ["authorization_code", "refresh_token"],
+    return { client_name: "Asterism", redirect_uris: [this.redirectUrl], grant_types: ["authorization_code", "refresh_token"],
       response_types: ["code"], token_endpoint_auth_method: "none", application_type: "native" as const };
   }
   state() { return this.nonce; }
@@ -91,7 +91,7 @@ export class McpOAuth implements OAuthClientProvider {
         response.writeHead(400, { "Content-Type": "text/plain; charset=utf-8" }).end("Invalid authorization callback."); return;
       }
       response.writeHead(200, { "Content-Type": "text/plain; charset=utf-8", Connection: "close" })
-        .end("Authorization received. Return to Atelier. / 已收到授权，请返回工坊。", () => { void this.close(); });
+        .end("Authorization received. Return to Asterism. / 已收到授权，请返回星图。", () => { void this.close(); });
       deliver(received.searchParams);
     });
     await new Promise<void>((resolve, reject) => {

@@ -1,7 +1,7 @@
 import { useState, type KeyboardEvent, type PointerEvent } from "react";
 import { motion, useReducedMotion } from "motion/react";
-import { useI18n } from "@atelier/sdk/renderer";
-import { formatCount } from "@atelier/ui/format-count";
+import { useI18n } from "@asterism/sdk/renderer";
+import { formatCount } from "@asterism/ui/format-count";
 import { diagnosticMessages as messages } from "../../messages/diagnostics";
 import { ease, percent, Swatch } from "../panel-kit";
 import type { CompressionEntry, TrendPoint } from "./overview";

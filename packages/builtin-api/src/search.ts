@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { defineTool } from "@atelier/sdk/contracts";
+import { defineTool } from "@asterism/sdk/contracts";
 import { builtin } from "./identity.ts";
 
 const pattern = z.string().min(1).refine(value => !value.includes("\0"), "Patterns must be free of NUL characters.");

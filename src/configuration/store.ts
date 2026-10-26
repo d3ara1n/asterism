@@ -6,8 +6,8 @@ import { z } from "zod";
 import { applicationStorage } from "../shared/application.ts";
 import { agentOverridesSchema, canEditModelProviderField, modelReference, modelRoleOverridesSchema, modelSchema, modelProviderInputSchema,
   type AgentOverrides, type ModelRoleOverrides, type ModelProviderInput, type ProviderModel } from "../shared/configuration.ts";
-import { modelCostSchema, webProviderStateSchema, type WebProviderState } from "@atelier/sdk/contracts";
-import { configurationIdSchema } from "@atelier/builtin-api/contracts";
+import { modelCostSchema, webProviderStateSchema, type WebProviderState } from "@asterism/sdk/contracts";
+import { configurationIdSchema } from "@asterism/builtin-api/contracts";
 import { defaultAgents, defaultRoles } from "./defaults.ts";
 import { ConfigurationError } from "./errors.ts";
 import { normalizeOverrides, resolveAgentConfiguration, resolveRoleConfiguration } from "./layers.ts";

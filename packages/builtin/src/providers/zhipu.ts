@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { withValues, type UsageItem } from "@atelier/sdk/contracts";
-import type { QueryUsageProvider } from "@atelier/sdk/runtime";
+import { withValues, type UsageItem } from "@asterism/sdk/contracts";
+import type { QueryUsageProvider } from "@asterism/sdk/runtime";
 import { jsonUsage, parseUsageResponse } from "./usage-http.ts";
 import { usageMessages as messages } from "../messages/usage.ts";
 

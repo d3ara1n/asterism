@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ContentScope } from "@atelier/sdk/runtime";
+import type { ContentScope } from "@asterism/sdk/runtime";
 import { convertMcpResult, mcpResultToModel } from "./result.ts";
 
 const identity = { serverId: "server", serverName: "Server", toolName: "read" };
@@ -7,7 +7,7 @@ describe("MCP 结果适配", () => {
   // 工具图片的 base64 不能作为模型文字或历史大字段保存，必须导入宿主内容。
   it("混合内容保持顺序，图片保存为字节引用，资源链接不触发读取", async () => {
     const bytes: Uint8Array[] = [];
-    const file = { "$atelier.content": "00000000-0000-4000-8000-000000000001" };
+    const file = { "$asterism.content": "00000000-0000-4000-8000-000000000001" };
     const content: ContentScope = {
       stage: async source => { if (!(source instanceof Uint8Array)) throw new Error("Unexpected stream"); bytes.push(source); return file; },
       read: async () => { throw new Error("Unexpected content read"); }, open: async function* () { throw new Error("Unexpected content read"); },

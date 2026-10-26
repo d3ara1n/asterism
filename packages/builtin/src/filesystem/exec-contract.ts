@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { defineImplementation, defineTool } from "@atelier/sdk/contracts";
-import { builtin } from "@atelier/builtin-api/contracts";
+import { defineImplementation, defineTool } from "@asterism/sdk/contracts";
+import { builtin } from "@asterism/builtin-api/contracts";
 import { Directory } from "./contract.ts";
 import { execResultSchema, OUTPUT_CHAR_LIMIT, MAX_TIMEOUT_SECONDS } from "../shell/contract.ts";
 

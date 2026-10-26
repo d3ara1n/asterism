@@ -1,4 +1,4 @@
-import type { CardPanelView } from "@atelier/sdk/renderer";
+import type { CardPanelView } from "@asterism/sdk/renderer";
 import type { ReactNode } from "react";
 
 import type { WorkbenchObject } from "../../../shared/workbench";

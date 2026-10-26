@@ -1,5 +1,5 @@
-import { belongsTo, type ChannelEnd, type ChannelValue, type ResourceRef } from "@atelier/sdk/contracts";
-import { PluginApiError, type ChannelContribution, type ObjectChannel } from "@atelier/sdk/runtime";
+import { belongsTo, type ChannelEnd, type ChannelValue, type ResourceRef } from "@asterism/sdk/contracts";
+import { PluginApiError, type ChannelContribution, type ObjectChannel } from "@asterism/sdk/runtime";
 import type { SdkContext } from "./sdk-context.ts";
 import type { PluginHostServices } from "./loader.ts";
 

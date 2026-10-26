@@ -1,6 +1,6 @@
 # 插件 SDK 与功能组合
 
-本文规定插件 SDK（`@atelier/sdk`）的接口、模块组合方式与宿主职责。产品与授权原则见 [运行时](runtime.md)，宿主进程与打包机制见 [技术架构](architecture.md#应用组合与宿主机制)，作者快速上手与代码示例见 [SDK 作者指南](../packages/sdk/README.md)。
+本文规定插件 SDK（`@asterism/sdk`）的接口、模块组合方式与宿主职责。产品与授权原则见 [运行时](runtime.md)，宿主进程与打包机制见 [技术架构](architecture.md#应用组合与宿主机制)，作者快速上手与代码示例见 [SDK 作者指南](../packages/sdk/README.md)。
 
 ## 模块与装配
 
@@ -11,7 +11,7 @@ SDK 的 `contracts`、`runtime`、`renderer` 三个子路径分别承担纯契�
 | SDK 契约 | 资源、创建、动作、记录、宿主服务与功能贡献的稳定接口 | 宿主、插件与应用组合层 |
 | 宿主机制 | 路由、校验、事务、授权、运行生命周期、传输与存储编码 | SDK 的宿主实现 |
 | 插件业务模块 | 配置选择、输入受理、执行循环、正文编辑与视图等领域功能 | 插件自己的装配入口和其他业务模块；公开领域接口也可由应用组合层消费 |
-| 应用组合层 | 连接宿主能力与内置插件公开领域接口，组成用户操作入口 | Atelier 应用 |
+| 应用组合层 | 连接宿主能力与内置插件公开领域接口，组成用户操作入口 | Asterism 应用 |
 
 插件是身份、设置与生命周期的归属单位，功能模块是插件内部的组合单位。插件级能力不要求通过占位模块登记：
 
@@ -23,7 +23,7 @@ SDK 的 `contracts`、`runtime`、`renderer` 三个子路径分别承担纯契�
 
 `PluginModule.setup` 是功能贡献装配入口，接收完整 `PluginContext`，创建业务模块、连接依赖并返回 `ModuleContribution`。业务模块是普通函数、闭包或对象，只接收需要的具名接口；复用一个业务模块不要求将它注册为 `PluginModule`。调用或事件由插件入口还是功能模块登记，不改变契约归属与作用域；宿主共用身份检查、冲突校验和生命周期机制。
 
-一项功能的纯契约、后台实现和前端视图共置、分入口编译。组合以显式导入和参数传递完成，不引入通用服务查找、动态依赖注入容器、无具型契约的字符串事件总线或任意生命周期 hook 集合。宿主在启动时装配并冻结贡献，安装、启用、禁用与升级重启后生效。贡献身份由宿主按插件命名空间补全为 `<pluginId>/<name>`（工具契约 `name` 为模型可见全局短名）。插件缺席时历史与对象保留，资源投影为 `atelier.builtin/missing-resource`，视图回退默认渲染与原始数据。
+一项功能的纯契约、后台实现和前端视图共置、分入口编译。组合以显式导入和参数传递完成，不引入通用服务查找、动态依赖注入容器、无具型契约的字符串事件总线或任意生命周期 hook 集合。宿主在启动时装配并冻结贡献，安装、启用、禁用与升级重启后生效。贡献身份由宿主按插件命名空间补全为 `<pluginId>/<name>`（工具契约 `name` 为模型可见全局短名）。插件缺席时历史与对象保留，资源投影为 `asterism.builtin/missing-resource`，视图回退默认渲染与原始数据。
 
 单个后台或前端入口导入的等待上限为 10 秒；导入失败或超时标记该插件失败，并阻止依赖方装配，无关插件继续。插件后台 `setup` 仍同步完成贡献登记，联网等异步工作由插件托管任务承载。整个应用的启动期限、进度和编译缓存见 [启动与加载](architecture.md#启动与加载)。
 
@@ -76,7 +76,7 @@ headers 来源需要消费者持有自己的模型调用结果，因此自然用
 
 插件通过 `package.json` 的 `exports["./public"]` 导出愿意共享的契约、配置访问接口、服务或状态，消费者在依赖中声明提供方包并使用 `import { ... } from "<包名>/public"`。
 
-内置插件由 `@atelier/builtin` 实现，稳定身份为 `atelier.builtin`；独立 `@atelier/builtin-api` 提供公共契约／领域接口，内置实现和外部插件共同消费。公共包不依赖实现，也不注册第二个插件。纯声明从 `/contracts` 导出，Agent 创建入口从仅后台可用的 `/runtime` 导出，Agent 界面扩展从仅前端可用的 `/renderer` 导出。Agent UI 的登记、呈现位置和输入区控制均归内置插件，SDK 不设跨资源的通用槽位。作者入口与当前导出见 [内置公共 API](../packages/builtin-api/README.md)。
+内置插件由 `@asterism/builtin` 实现，稳定身份为 `asterism.builtin`；独立 `@asterism/builtin-api` 提供公共契约／领域接口，内置实现和外部插件共同消费。公共包不依赖实现，也不注册第二个插件。纯声明从 `/contracts` 导出，Agent 创建入口从仅后台可用的 `/runtime` 导出，Agent 界面扩展从仅前端可用的 `/renderer` 导出。Agent UI 的登记、呈现位置和输入区控制均归内置插件，SDK 不设跨资源的通用槽位。作者入口与当前导出见 [内置公共 API](../packages/builtin-api/README.md)。
 
 内置实现保持静态构建，由应用组合层向通用公共模块机制登记包名、semver 版本、实现提供方插件 ID、按运行环境划分的明确子入口与导出名。应用在各环境绑定实际导出；外部构建按导入文件所属 npm 包检查依赖声明、npm semver 范围与环境出口，再生成指向已绑定导出的转接模块，不从消费者私有安装取另一份源码。没有插件清单的中间 npm 库按自身依赖声明校验，运行依赖仍归承载它的插件。未声明依赖、不兼容版本、重复提供方和未公开入口明确失败；不将内置 API 加入免校验的宿主库白名单。公共包版本与宿主 SDK API 版本独立校验。
 
@@ -100,8 +100,8 @@ headers 来源需要消费者持有自己的模型调用结果，因此自然用
 
 - **非事务与按序消费**：`publish` 只做校验、打戳与路由，立即入队并返回，不参与事务回滚（需对应已生效变化时在提交成功后发布）。每个订阅串行等待自己的异步 handler，失败或断连只结束该订阅。
 - **生命周期与恢复**：后台在 `setup` 中订阅，前端在 `prepare({ events })` 或组件 `useRendererEvents()` 中订阅。取消订阅停止新投递并传取消信号，宿主等待运行中的回调真实结束后释放设施。总线不保留供晚订阅读取的状态，断连不补发；需要当前值的消费者先订阅再读取领域当前值。
-- **宿主公共事件**：`@atelier/sdk/contracts` 导出 `SessionTitleChanged`（`atelier/session-title`，最外层提交后实际标题变化时发布）与 `ResourceStatusChanged`（`atelier/resource-status`，资源级 snapshot，发布 `running / failed / awaiting / completed` 及可选 `progress`，外壳消费规则见 [工作台](workbench.md#会话列表状态与资源通知)）。
-- `ResourcePresenceChanged`（API 14.1，`atelier/resource-presence`）为宿主发布的 occurrence，携带 `sessionId / appeared / disappeared` 资源 ID 集合；跨会话界面据此释放已消失对象的状态标记。后台资源实例使用下述具型存在性观察。
+- **宿主公共事件**：`@asterism/sdk/contracts` 导出 `SessionTitleChanged`（`asterism/session-title`，最外层提交后实际标题变化时发布）与 `ResourceStatusChanged`（`asterism/resource-status`，资源级 snapshot，发布 `running / failed / awaiting / completed` 及可选 `progress`，外壳消费规则见 [工作台](workbench.md#会话列表状态与资源通知)）。
+- `ResourcePresenceChanged`（API 14.1，`asterism/resource-presence`）为宿主发布的 occurrence，携带 `sessionId / appeared / disappeared` 资源 ID 集合；跨会话界面据此释放已消失对象的状态标记。后台资源实例使用下述具型存在性观察。
 
 ### 具型插件调用
 
@@ -132,12 +132,12 @@ headers 来源需要消费者持有自己的模型调用结果，因此自然用
 
 ### 插件存储准备（API 18.2）
 
-插件清单 `atelier.storage` 指向一个存储入口，默认导出 `defineStorage([...])`，条目类型为 `PluginStorageDeclaration`。宿主在插件运行时之前单独构建并导入该入口，与后台入口同属 runtime 构建；入口只声明格式，不导入插件业务模块。
+插件清单 `asterism.storage` 指向一个存储入口，默认导出 `defineStorage([...])`，条目类型为 `PluginStorageDeclaration`。宿主在插件运行时之前单独构建并导入该入口，与后台入口同属 runtime 构建；入口只声明格式，不导入插件业务模块。
 
 - `path` 相对于 `extensions/<pluginId>/`，必须位于插件目录内。
 - 声明只有 `kind`（`json` 或 `sqlite`）、`version`（正整数）与 `migrations`。迁移键 n 将第 n 版转换为第 n+1 版；JSON 步骤接收并返回正文，SQLite 步骤在宿主事务内对传入连接执行同步 SQL，连接、提交与 `user_version` 归宿主管理。
 - 准备阶段只读取版本号：文件不存在或已是当前版本时不做任何事，版本落后时执行整条链，版本缺失或高于声明时停用该插件。
-- 版本由写入方盖章。JSON 持久形状为 `{ version, data }` 信封，插件自管 JSON 写入时自行包上信封；托管配置使用 `.atelier/config.json` 路径声明时，`plugin.config` 在读写边界处理信封，插件及前端仍消费原配置值，信封版本不符时按配置无效回退默认值。托管数据库对应 `.atelier/db.sqlite`，首次打开时宿主写入声明版本；自管 SQLite 由插件自行设置 `user_version`。
+- 版本由写入方盖章。JSON 持久形状为 `{ version, data }` 信封，插件自管 JSON 写入时自行包上信封；托管配置使用 `.asterism/config.json` 路径声明时，`plugin.config` 在读写边界处理信封，插件及前端仍消费原配置值，信封版本不符时按配置无效回退默认值。托管数据库对应 `.asterism/db.sqlite`，首次打开时宿主写入声明版本；自管 SQLite 由插件自行设置 `user_version`。
 - 存储准备失败的插件本次启动不进入 `setup`，首页提示失败原因，下次启动重试；宿主与其他插件不受影响。
 
 宿主统一提供恢复点与恢复视图，完整生命周期见 [数据准备与迁移](architecture.md#数据准备与迁移)。可编译示例见 [`storage.ts`](../packages/sdk/examples/storage.ts)。
@@ -233,7 +233,7 @@ headers 来源需要消费者持有自己的模型调用结果，因此自然用
 - **插件自有设置页面**：插件可在前端插件入口提供设置页面，自行组织分组、子页、草稿、保存及业务操作；宿主负责承载、导航与页面异常展示，不根据配置 schema 自动生成表单。页面关闭释放组件与页面订阅，不替代插件级服务关闭。设置页登记与托管配置登记相互独立。
 - **打开设置**：宿主提供按插件身份打开设置页面的导航能力，卡片入口和插件界面内的“打开设置”操作进入同一个页面，可定位插件声明的内部位置。该能力不要求当前会话或资源，不构成资源授权。界面入口与管理行为见 [设置总览与插件管理](workbench.md#设置总览与插件管理)。
 - **插件浮岛（API 15.1）**：设置页可在其所在浮岛右侧打开更深的浮岛，浮岛内可继续打开。插件提供插件内唯一的浮岛身份、无障碍名称、打开它的元素与内容；宽度、位置、动效、焦点与外框由宿主统一，身份按插件隔离，同一身份再次打开时替换内容而保留组件状态。面板外框由宿主绘制，插件声明标题、说明、标题栏主操作、工具区与是否有未保存修改；有未保存修改时，关闭、上级关闭或替换先由宿主确认放弃。插件也可注册自己的关闭守卫。浮岛内容在宿主屏内渲染，宿主为其重新提供插件偏好、随浮岛卸载取消的通信作用域与异常边界；设置页卸载时关闭它打开的浮岛。SDK 只声明契约与 hooks，外框实现由宿主注入，规则见 [浮岛编织](design-system.md#浮岛编织)。
-- **可选托管配置**：采用托管配置的插件在纯契约中以 `ns.config(schema, defaults)` 声明一份配置契约，保存在 `<data>/extensions/<pluginId>/.atelier/config.json`。后台通过 `plugin.config(contract)` 取得 `get / update / subscribe`；前端 `useRendererConfig` 读取值，`useRendererConfiguration` 提供值、状态、就绪与错误信息及 `save / reset / refresh`，写入仍由后台按原始 schema 校验。宿主负责原子存储、校验及前后台变更通知；插件决定何时保存及如何响应变化。配置契约不携带自动表单布局职责。
+- **可选托管配置**：采用托管配置的插件在纯契约中以 `ns.config(schema, defaults)` 声明一份配置契约，保存在 `<data>/extensions/<pluginId>/.asterism/config.json`。后台通过 `plugin.config(contract)` 取得 `get / update / subscribe`；前端 `useRendererConfig` 读取值，`useRendererConfiguration` 提供值、状态、就绪与错误信息及 `save / reset / refresh`，写入仍由后台按原始 schema 校验。宿主负责原子存储、校验及前后台变更通知；插件决定何时保存及如何响应变化。配置契约不携带自动表单布局职责。
 - **私有业务数据**：插件也可自行维护配置与数据，在自有目录选择文件、数据库等持久化方式，负责业务同步；需要随版本升级的文件通过[存储准备](#插件存储准备api-182)声明迁移。托管 SQLite 按需打开，不使用时不创建数据库；托管配置、私有存储与凭据服务可独立选用。自管数据不替代宿主拥有的资源身份、授权、会话历史与内容引用契约。
 - **界面偏好**：`useRendererPreferences` 存于 `ui-state.json` 的 `plugin/<pluginId>/` 下，不属于配置。
 - **可选界面本地化**：公共展示字段接受 `UiText`（普通字符串或 `ns.messages(sourceLocale, defineMessages(...))` 声明的具归属消息描述），前端组件通过 `useI18n()` 格式化。完整规范见 [公共 i18n](i18n.md)。

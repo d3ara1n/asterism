@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { UsageItem } from "@atelier/sdk/contracts";
+import type { UsageItem } from "@asterism/sdk/contracts";
 import { decimal, jsonUsage, parseUsageResponse } from "./usage-http.ts";
 import { usageMessages as messages } from "../messages/usage.ts";
 

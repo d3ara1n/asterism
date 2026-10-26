@@ -1,4 +1,4 @@
-import type { RequestTiming, Usage } from "@atelier/sdk/contracts";
+import type { RequestTiming, Usage } from "@asterism/sdk/contracts";
 import type { DiagnosticRequest } from "./history";
 
 export const rateKeys = ["output", "nonReasoning", "reasoning", "total", "streaming"] as const;

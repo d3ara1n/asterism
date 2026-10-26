@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { WebResponse } from "@atelier/sdk/contracts";
+import type { WebResponse } from "@asterism/sdk/contracts";
 import { limitWebBody, matchesWebUrl, matchWebProvider } from "./web-providers.ts";
 
 const types = [

@@ -1,5 +1,5 @@
 import { Allow, parse } from "partial-json";
-import type { Json } from "@atelier/sdk/contracts";
+import type { Json } from "@asterism/sdk/contracts";
 import type { LiveBlock } from "./session.ts";
 
 /** 宽容解析流式工具参数，只用于展示与调用身份；空文本或无法解析时为 null。NaN／Infinity 不属于 JSON，不接受。 */

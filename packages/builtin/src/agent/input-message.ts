@@ -1,5 +1,5 @@
-import type { ModelInputPart } from "@atelier/sdk/contracts";
-import type { AgentMessageSender } from "@atelier/builtin-api/contracts";
+import type { ModelInputPart } from "@asterism/sdk/contracts";
+import type { AgentMessageSender } from "@asterism/builtin-api/contracts";
 
 const escape = (text: string) => text.replace(/[&<>"']/g, char =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;" })[char]!);

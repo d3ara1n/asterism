@@ -1,4 +1,4 @@
-import type { RendererRetained } from "@atelier/sdk/renderer";
+import type { RendererRetained } from "@asterism/sdk/renderer";
 
 type Entry = { value: unknown; release?: (value: never) => void | Promise<void> };
 

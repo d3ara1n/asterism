@@ -1,10 +1,10 @@
 import packageMetadata from "../../package.json" with { type: "json" };
 
-/** 对外品牌集中于此；系统身份发布后保持稳定，不随显示名称变动。 */
-export const applicationId = "dev.dearain.atelier";
-export const applicationBrand = { en: "Atelier", zh: "工坊" } as const;
-export const applicationSlug = "atelier";
-export const applicationRepository = { owner: "d3ara1n", name: "atelier" } as const;
+/** 对外品牌集中于此；系统身份面向用户分发后保持稳定，不随显示名称变动。 */
+export const applicationId = "dev.dearain.asterism";
+export const applicationBrand = { en: "Asterism", zh: "星图" } as const;
+export const applicationSlug = "asterism";
+export const applicationRepository = { owner: "d3ara1n", name: "asterism" } as const;
 /** 内置模型调用声明真实应用身份；第三方调用方可提供自己的 UA。 */
 export const applicationUserAgent = `${applicationBrand.en}/${packageMetadata.version}`;
 

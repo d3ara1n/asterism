@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { defineImplementation, defineTool, jsonSchema, modelCompletionSchema, modelSourceSchema } from "@atelier/sdk/contracts";
-import { Agent, builtin } from "@atelier/builtin-api/contracts";
+import { defineImplementation, defineTool, jsonSchema, modelCompletionSchema, modelSourceSchema } from "@asterism/sdk/contracts";
+import { Agent, builtin } from "@asterism/builtin-api/contracts";
 
 export const Peek = defineTool({
   id: builtin.name("tool.peek"), name: "peek",

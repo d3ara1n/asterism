@@ -4,8 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { z } from "zod";
-import { defineConfig, pluginNamespace } from "@atelier/sdk/contracts";
-import { definePlugin, type PluginConfig } from "@atelier/sdk/runtime";
+import { defineConfig, pluginNamespace } from "@asterism/sdk/contracts";
+import { definePlugin, type PluginConfig } from "@asterism/sdk/runtime";
 import { ApplicationService } from "../runtime/service.ts";
 import { servePluginConfiguration } from "../runtime/dispatch.ts";
 

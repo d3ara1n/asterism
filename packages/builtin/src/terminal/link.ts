@@ -1,6 +1,6 @@
 import { useEffect, useSyncExternalStore } from "react";
-import type { ChannelEnd, ResourceRef } from "@atelier/sdk/contracts";
-import type { RendererChannel, RendererObjectContext } from "@atelier/sdk/renderer";
+import type { ChannelEnd, ResourceRef } from "@asterism/sdk/contracts";
+import type { RendererChannel, RendererObjectContext } from "@asterism/sdk/renderer";
 import { TerminalChannel, inactiveStatus, type TerminalDown, type TerminalStatus, type TerminalUp } from "./contract.ts";
 
 /** 已渲染字符的确认粒度；须小于后台低水位，确认滞留不阻止恢复。 */

@@ -7,11 +7,11 @@ import { templateMessages } from "../../shared/template-messages";
 import { useDisposalWarnings } from "../features/session/disposal";
 import { appMessages } from "../messages/app";
 import { useI18n } from "../shared/i18n";
-import { commonMessages } from "@atelier/ui/messages/common";
-import { ListRowAction } from "@atelier/ui/ui/list-row";
-import { Spinner } from "@atelier/ui/ui/spinner";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@atelier/ui/ui/dropdown-menu";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@atelier/ui/ui/alert-dialog";
+import { commonMessages } from "@asterism/ui/messages/common";
+import { ListRowAction } from "@asterism/ui/ui/list-row";
+import { Spinner } from "@asterism/ui/ui/spinner";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@asterism/ui/ui/dropdown-menu";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@asterism/ui/ui/alert-dialog";
 
 /** 会话行菜单：重命名、保存模板与归档；操作独立于会话导航。 */
 export function SessionActions({ sessionId, title, disabled, renameDisabled, onRename, onArchive, onTemplateSaved }: {

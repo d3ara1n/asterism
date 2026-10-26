@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { jsonSchema, uiTextSchema } from "@atelier/sdk/contracts";
+import { jsonSchema, uiTextSchema } from "@asterism/sdk/contracts";
 
 const id = z.string().min(1).max(160);
 export const pluginConfigurationSchema = z.strictObject({

@@ -6,7 +6,7 @@
 
 | 中文 | 英文 | 含义 |
 | --- | --- | --- |
-| 工坊 | Atelier | 产品名；本地优先、以对象为中心的个人 agent 工作台。品牌表达为与代理一起做事的个人工坊，资源是可操作的工作材料 |
+| 星图 | Asterism | 产品名；本地优先、以对象为中心的个人 agent 工作台，命名含义见 `docs/product.md` |
 | 工作台 | workbench | 卡片与连线的画布交互层，见 `docs/workbench.md` |
 | 首页 | home | 应用启动与新会话创建入口，不属于任何会话；首次发送或使用模板后主内容切换为工作台 |
 | 启动屏 | startup screen | 工作台装载前独立显示的等待与失败界面，覆盖环境准备、后台初始化与前端插件装配 |
@@ -189,7 +189,7 @@
 | 账户用量 | account usage | 提供商余额、套餐／密钥额度及响应头报告的限流余量快照；连接以 `usage` 选择提供方，区别于模型响应 token 用量及费用估算 |
 | 用量查询提供方 | usage provider | 插件按全局目录 ID 提供的主动查询或被动响应头解析；返回统一 `balance / quota` 结果，消费方不依赖具体厂商 |
 | 提供商模型 | provider model | 某连接下可调用的具体模型，具有服务端模型 ID、能力与生成参数 |
-| 标准思考等级 | thinking level | 工坊在角色、对话选择与历史中使用的公共等级；请求时映射为上游 effort 或思考预算 |
+| 标准思考等级 | thinking level | 星图在角色、对话选择与历史中使用的公共等级；请求时映射为上游 effort 或思考预算 |
 | 思考预算 | thinking budget | 手动思考模式的 token 上限；与 effort 字符串及思考模式独立，映射规则见 `docs/model-configuration.md` |
 | 明文思考 | reasoning text | 协议交付的可见思考文字，保存于 thinking.text；不宣称包含模型全部内部推理 |
 | 思考摘要 | reasoning summary | 协议交付的独立摘要，保存于 thinking.summary；不作为明文思考的替代值 |
@@ -204,7 +204,7 @@
 | 中文 | 英文 | 含义 |
 | --- | --- | --- |
 | 目录资源 | directory resource | 首批验证资源：提供列举、读取、写入、编辑等操作 |
-| 虚拟资源 | virtual resource | 工坊持有完整状态的资源，用于验证历史重建与状态恢复 |
+| 虚拟资源 | virtual resource | 星图持有完整状态的资源，用于验证历史重建与状态恢复 |
 
 ## 界面结构
 

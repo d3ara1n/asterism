@@ -1,21 +1,21 @@
-# Atelier · 工坊
+# Asterism · 星图
 
-与代理一起做事的个人工坊。
+与代理一起做事的个人工作台。
 
-Atelier 是一个本地优先、以对象为中心的个人 agent 工作台。把代理、工作材料和操作过程放在同一张台面上：用目录和笔记提供材料，用明确的链接授予访问权，用卡片查看产出，再沿着历史继续工作或另起一个分支。
+Asterism 是一个本地优先、以对象为中心的个人 agent 工作台。把代理、工作材料和操作过程放在同一张台面上：用目录和笔记提供材料，用明确的链接授予访问权，用卡片查看产出，再沿着历史继续工作或另起一个分支。
 
-整理信息、维护文件、开展研究、编写程序，都可以从一件具体的工作开始。Atelier 关注你交给代理什么、代理做了什么，以及留下的结果如何参与下一步。
+整理信息、维护文件、开展研究、编写程序，都可以从一件具体的工作开始。Asterism 关注你交给代理什么、代理做了什么，以及留下的结果如何参与下一步。
 
 > 当前处于早期内测，尚未发布稳定版本。预发布版本用于持续开发和真实使用验证；能力状态和待办以设计文档及 `plans/` 为准。
 
-## 在工坊里做一件事
+## 在星图里做一件事
 
 1. **说明要做什么。** 从首页写下工作，选择代理与模型，发送后进入这件工作的会话。
 2. **把材料放上台面。** 添加目录、笔记等资源，明确链接给需要使用它们的代理；代理只能操作执行层授权的资源。
 3. **查看正在发生什么。** 代理卡片保留连续的对话，工具过程按需展开。对象、历史和授权面板帮助你找到材料、查看操作、管理访问。
 4. **沿着过程继续。** 重开会话查看已保存的工作，或从完整的历史位置另起分支。浏览记录不会改变工作台；明确跳转会重建对象与关系，当前文件不随之恢复。资源状态恢复只在资源明确支持时提供。
 
-“工坊”指向工作的组织方式：资源是可操作的材料，代理在材料上开展工作，产出和过程留在工作台中。卡片与连线让这些对象和关系可见，每件事都由自己的会话承接。
+“星图”的命名含义见[产品定义](docs/product.md)。卡片与连线让工作中的对象和关系可见，每件事都由自己的会话承接。
 
 ## 工作台的约定
 
@@ -39,12 +39,12 @@ Atelier 是一个本地优先、以对象为中心的个人 agent 工作台。�
 
 ## 开发与体验
 
-安装包由 [GitHub Releases](https://github.com/d3ara1n/atelier/releases) 提供：macOS（Apple Silicon）下载 DMG，Windows（x64）下载 EXE 安装包，Linux（x64）下载 AppImage。更新 ZIP、blockmap 与 YAML 文件供应用自动更新使用。
+安装包由 [GitHub Releases](https://github.com/d3ara1n/asterism/releases) 提供：macOS（Apple Silicon）下载 DMG，Windows（x64）下载 EXE 安装包，Linux（x64）下载 AppImage。更新 ZIP、blockmap 与 YAML 文件供应用自动更新使用。
 
-macOS 将 `Atelier.app` 从 DMG 拖入「应用程序」后运行。应用采用固定自签证书；如系统因隔离标记阻止首次打开，确认下载来源后可手动执行：
+macOS 将 `Asterism.app` 从 DMG 拖入「应用程序」后运行。应用采用固定自签证书；如系统因隔离标记阻止首次打开，确认下载来源后可手动执行：
 
 ```bash
-xattr -dr com.apple.quarantine /Applications/Atelier.app
+xattr -dr com.apple.quarantine /Applications/Asterism.app
 ```
 
 在「设置 → 通用 → 软件更新」查看当前版本、检查更新或重启安装。应用启动后检查并下载更新，由用户选择安装时机；安装前沿用运行中资源的退出确认。「包含预发布版本」允许提前接收新功能，关闭后保留当前版本，只接收更高的正式版本。初次安装预发布时该选项默认开启，之后保留用户选择。
@@ -75,7 +75,7 @@ npm run i18n:check
 
 ## 数据与运行边界
 
-工作数据与应用配置保存到本设备的 Electron 数据目录，源码目录和安装目录不承担数据存储。`npm run dev` 使用 `appData/dev.dearain.atelier.dev`，安装版使用 `appData/dev.dearain.atelier`；两者由固定应用身份 `dev.dearain.atelier` 生成，不随显示名称或仓库文件夹变化。更新通道共用安装版数据。
+工作数据与应用配置保存到本设备的 Electron 数据目录，源码目录和安装目录不承担数据存储。`npm run dev` 使用 `appData/dev.dearain.asterism.dev`，安装版使用 `appData/dev.dearain.asterism`；两者由固定应用身份 `dev.dearain.asterism` 生成，不随显示名称或仓库文件夹变化。更新通道共用安装版数据。
 
 全局模型与代理配置保存在 `configuration.json`，外观在 `appearance.json`，界面语言在 `language.json`，更新偏好在 `updates.json`，窗口状态在 `ui-state.json`，密钥独立加密保存于 `credentials/`。工作数据库为 `db/workspace.sqlite`，不可变正文位于 `objects/`，插件内容位于 `content/`，运行日志位于 `logs/runtime.log`，Chromium 数据位于 `chromium/`。重建会话数据库不重置全局配置；关闭最后一个窗口会退出应用和任务进程。
 
@@ -87,7 +87,7 @@ npm run i18n:check
 
 | 文档 | 内容 |
 | --- | --- |
-| [产品定义](docs/product.md) | 工坊的定位、工作方式、边界与成功标准 |
+| [产品定义](docs/product.md) | 星图的定位、工作方式、边界与成功标准 |
 | [词汇表](docs/glossary.md) | 产品与代码词汇的中英对照与含义 |
 | [对象模型](docs/object-model.md) | Workspace、Session、Agent、Resource、工具匹配与视图语义 |
 | [时间线与回溯](docs/timeline.md) | 会话树节点、时间线、执行游标、投影、回溯与分叉 |
@@ -104,4 +104,4 @@ npm run i18n:check
 | [实施路线](docs/roadmap.md) | 阶段划分、里程碑验收场景与必测边界 |
 | [历史决策与开放问题](docs/decisions.md) | 架构演进中的取舍归档与待验证问题 |
 | [源码地图](src/README.md) / [界面维护](src/renderer/README.md) | 代码目录职责、数据流路径与扩展指南 |
-| [SDK 作者指南](packages/sdk/README.md) | `@atelier/sdk` 入口说明与插件编写示例 |
+| [SDK 作者指南](packages/sdk/README.md) | `@asterism/sdk` 入口说明与插件编写示例 |

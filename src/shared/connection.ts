@@ -1,4 +1,4 @@
-import type { ChannelEnd, ChannelValue } from "@atelier/sdk/contracts";
+import type { ChannelEnd, ChannelValue } from "@asterism/sdk/contracts";
 import { coreChannel } from "./core.ts";
 import type { Command, CommandResult } from "./contracts.ts";
 import type { SessionBridge, SessionChanged, SessionCommand, SessionResult } from "./session.ts";
@@ -15,7 +15,7 @@ import type { CallControl, CallFrame } from "./plugin-calls.ts";
  */
 export const connectionRequestChannel = coreChannel("runtime-connection");
 /** preload 向页面转交端口时使用的 window 消息标记。 */
-export const connectionPortMessage = "atelier:runtime-port";
+export const connectionPortMessage = "asterism:runtime-port";
 
 export interface ConnectionServices {
   workspace: { command: Command; result: CommandResult };

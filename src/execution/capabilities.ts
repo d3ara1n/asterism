@@ -1,12 +1,12 @@
 import type { AgentConfiguration } from "../shared/configuration.ts";
 import type { Json } from "../shared/model.ts";
-import type { ToolInvocationInfo } from "@atelier/sdk/contracts";
+import type { ToolInvocationInfo } from "@asterism/sdk/contracts";
 import type { FoldedObject } from "../session/fold.ts";
 import type { ResourceRegistry } from "../resources/registry.ts";
 import type { ToolRegistry } from "../tools/registry.ts";
 import type { Invocation, PreparedResult, ToolImplementation } from "../tools/contract.ts";
 import { projectTool, schemaOf } from "../tools/definition.ts";
-import type { ToolCaller } from "@atelier/sdk/runtime";
+import type { ToolCaller } from "@asterism/sdk/runtime";
 
 /** 外部工具策略；支持关系、资源链接与这层策略分别判断。 */
 export type ToolPolicy = (name: string) => boolean;

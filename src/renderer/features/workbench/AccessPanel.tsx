@@ -1,21 +1,21 @@
 import { IslandPanel } from "../../shared/weave/IslandPanel";
-import { Button } from "@atelier/ui/ui/button";
-import { SearchInput } from "@atelier/ui/ui/search-input";
-import { Popover, PopoverTrigger, PopoverContent } from "@atelier/ui/ui/popover";
+import { Button } from "@asterism/ui/ui/button";
+import { SearchInput } from "@asterism/ui/ui/search-input";
+import { Popover, PopoverTrigger, PopoverContent } from "@asterism/ui/ui/popover";
 
 import { ChevronDown, Check, Link2 } from "lucide-react";
 
-import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from "@atelier/ui/ui/command";
+import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from "@asterism/ui/ui/command";
 
-import { Separator } from "@atelier/ui/ui/separator";
-import { StatusText } from "@atelier/ui/ui/status";
-import { ToggleGroup, ToggleGroupItem } from "@atelier/ui/ui/toggle-group";
+import { Separator } from "@asterism/ui/ui/separator";
+import { StatusText } from "@asterism/ui/ui/status";
+import { ToggleGroup, ToggleGroupItem } from "@asterism/ui/ui/toggle-group";
 
-import { Switch } from "@atelier/ui/ui/switch";
+import { Switch } from "@asterism/ui/ui/switch";
 import { errorDisplay } from "../../../shared/error-display.ts";
-import type { UiText } from "@atelier/sdk/contracts";
+import type { UiText } from "@asterism/sdk/contracts";
 import { accessMessages } from "../../messages/access";
-import { commonMessages } from "@atelier/ui/messages/common";
+import { commonMessages } from "@asterism/ui/messages/common";
 import { objectsMessages } from "../../messages/objects";
 import { useI18n } from "../../shared/i18n";
 import { useEffect, useRef, useState } from "react";
@@ -83,7 +83,7 @@ function AccessRow({ receiver, resource, object }: { receiver: WorkbenchObject; 
   const linked = session.links.some(link => link.receiverId === receiver.id && link.resourceId === resource.id);
   const [pending, setPending] = useState<{ desired: boolean } | null>(null);
   const [error, setError] = useState<UiText | null>(null);
-  const [saved, setSaved] = useState<import("@atelier/sdk/contracts").UiText | null>(null);
+  const [saved, setSaved] = useState<import("@asterism/sdk/contracts").UiText | null>(null);
   const submitting = useRef(false);
   const operation = useRef<AbortController | null>(null);
   useEffect(() => () => operation.current?.abort(), []);

@@ -2,11 +2,11 @@ import { agentCard } from "../shared/card-appearance.ts";
 import { composeSystemPrompt } from "./system-prompt.ts";
 import type { BuiltinApplication } from "../application.ts";
 import { AgentView, AgentSelection, AgentDrafts } from "./data.ts";
-import { defineModule, implementResource, implementCreation, implementAction } from "@atelier/sdk/runtime";
+import { defineModule, implementResource, implementCreation, implementAction } from "@asterism/sdk/runtime";
 import {
   Agent, CreateAgent, SubmitAgentInput, ContinueAgent, ConfigureAgent, CancelAgent, AgentConfigurations,
   AgentInputMessage, Execution, ContextSummary,
-} from "@atelier/builtin-api/contracts";
+} from "@asterism/builtin-api/contracts";
 import { createSelection, selectionOf } from "./selection.ts";
 import { generateAgentName } from "./name.ts";
 import { createAgentLoop } from "./loop.ts";

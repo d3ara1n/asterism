@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { defineCall, pluginNamespace } from "@atelier/sdk/contracts";
-import { defineModule, defineTopLevelTool, implementCall } from "@atelier/sdk/runtime";
+import { defineCall, pluginNamespace } from "@asterism/sdk/contracts";
+import { defineModule, defineTopLevelTool, implementCall } from "@asterism/sdk/runtime";
 
 const ns = pluginNamespace("example.interaction");
 export const ReadState = defineCall(ns.name("read"), { scope: "object", input: z.null(), output: z.string() });

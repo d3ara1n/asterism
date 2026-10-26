@@ -1,6 +1,6 @@
-import { defineMessages, pluginNamespace } from "@atelier/sdk/contracts";
+import { defineMessages, pluginNamespace } from "@asterism/sdk/contracts";
 
-export const toolsMessages = pluginNamespace("atelier.host").messages("en", defineMessages({
+export const toolsMessages = pluginNamespace("asterism.host").messages("en", defineMessages({
   toolPreparing: {
     id: "toolPreparing",
     defaultMessage: "Preparing resource operation…",

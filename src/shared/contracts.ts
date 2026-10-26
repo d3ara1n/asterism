@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { uiTextSchema, pluginMetadataSchema, type Json } from "@atelier/sdk/contracts";
+import { uiTextSchema, pluginMetadataSchema, type Json } from "@asterism/sdk/contracts";
 import { translationCatalogSchema, type LanguageBridge } from "./language.ts";
 import { coreChannel } from "./core.ts";
 import type { DesktopPlatform, DesktopWindowBridge } from "./desktop.ts";
@@ -19,7 +19,7 @@ const id = z.string().uuid();
 export const commandSchema = z.discriminatedUnion("type", [
   z.strictObject({ type: z.literal("workspace.read") }),
   z.strictObject({ type: z.literal("workspace.prepare-close") }),
-  // 插件包管理：只改包列表，重启后生效；路径必须是含 Atelier 清单的包根。
+  // 插件包管理：只改包列表，重启后生效；路径必须是含 Asterism 清单的包根。
   z.strictObject({ type: z.literal("plugin.add"), path: z.string().min(1).max(4096) }),
   z.strictObject({ type: z.literal("plugin.enable"), index: z.number().int().nonnegative(), enabled: z.boolean() }),
   z.strictObject({ type: z.literal("plugin.remove"), index: z.number().int().nonnegative() }),
@@ -33,7 +33,7 @@ export const snapshotSchema = z.strictObject({
   templates: z.array(templateSummarySchema),
   /** 回收站目录：只含会话本身，供设置页计数与恢复。 */
   archivedSessions: z.array(z.strictObject({ id, title: z.string(), created_at: z.string(), archived_at: z.string() })),
-  /** 插件包：启动时状态；renderer 为 atelier-plugin:// 下的入口路径。 */
+  /** 插件包：启动时状态；renderer 为 asterism-plugin:// 下的入口路径。 */
   plugins: z.array(z.strictObject({ index: z.number().int().nonnegative().nullable(), id: z.string().nullable(), source: z.string(),
     status: z.enum(["loaded", "disabled", "invalid", "failed", "pending"]), enabled: z.boolean(), error: z.string().nullable(), renderer: z.string().nullable(),
     metadata: pluginMetadataSchema.default({}),

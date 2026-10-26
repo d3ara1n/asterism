@@ -1,6 +1,6 @@
-import { defineMessages, pluginNamespace } from "@atelier/sdk/contracts";
+import { defineMessages, pluginNamespace } from "@asterism/sdk/contracts";
 
-export const conversationMessages = pluginNamespace("atelier.builtin").messages("en", defineMessages({
+export const conversationMessages = pluginNamespace("asterism.builtin").messages("en", defineMessages({
   executionProcess: { id: "agent_conversation_executionProcess", defaultMessage: "Execution process" },
   compressing: { id: "agent_conversation_compressing", defaultMessage: "Compacting context…" },
   compressedHistory: { id: "agent_conversation_compressedHistory", defaultMessage: "Earlier conversation compacted" },

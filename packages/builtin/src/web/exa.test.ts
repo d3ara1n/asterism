@@ -68,7 +68,7 @@ describe("Exa 结果归一化", () => {
       { kind: "summary", format: "text", text: '{"finding":"Generated summary"}' },
     ]);
     expect(result.documents[0]).toMatchObject({ dates: [{ kind: "published", value: "2026-01-01" }], author: "Author", score: 0.8,
-      details: [{ contract: { id: "atelier.builtin/web.exa.document" }, data: { id: "source-1", snapshotAt: "2026-01-02T00:00:00Z",
+      details: [{ contract: { id: "asterism.builtin/web.exa.document" }, data: { id: "source-1", snapshotAt: "2026-01-02T00:00:00Z",
         entities: [{ type: "company", properties: { name: "Example" } }], summary: { finding: "Generated summary" } } }] });
     expect(result.usage).toEqual([{ name: "total", amount: 0.005, unit: "currency", currency: "USD" }]);
     expect(result.details?.[0]?.data).toMatchObject({ costDollars: { total: 0.005, contents: { text: 0.001 } } });

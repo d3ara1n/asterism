@@ -1,6 +1,6 @@
-import { thinkingLevels, describeError, type ModelItem, type ModelTarget, type ModelEvent } from "@atelier/sdk/contracts";
-import type { ModelServices, ObjectExecutor } from "@atelier/sdk/runtime";
-import { ContextSummary, Execution } from "@atelier/builtin-api/contracts";
+import { thinkingLevels, describeError, type ModelItem, type ModelTarget, type ModelEvent } from "@asterism/sdk/contracts";
+import type { ModelServices, ObjectExecutor } from "@asterism/sdk/runtime";
+import { ContextSummary, Execution } from "@asterism/builtin-api/contracts";
 import { feedbackOrigin, type AgentFeedback } from "./feedback.ts";
 import { summaryPrompt, summarySystemPrompt } from "./compression-prompt.ts";
 import { contextMessages, projectAgentContext, type AgentContext } from "./projection.ts";
@@ -99,7 +99,7 @@ async function summarizeContext(
   try {
     for await (const event of models.stream({ target: { ...target, model, thinking: "off" },
       userAgent, sessionId: object.ref.sessionId,
-      system: { blocks: [{ id: "context-summary", kind: "system", from: "atelier.builtin", text: summarySystemPrompt }] },
+      system: { blocks: [{ id: "context-summary", kind: "system", from: "asterism.builtin", text: summarySystemPrompt }] },
       messages: [{ kind: "input", parts: [{ kind: "text", text: summaryPrompt(plan) }] }],
       maxOutputTokens: COMPRESSION_MAX_OUTPUT, signal,
     })) {

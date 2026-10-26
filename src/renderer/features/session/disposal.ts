@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { UiText } from "@atelier/sdk/contracts";
+import type { UiText } from "@asterism/sdk/contracts";
 import { runtime } from "../../runtime";
 
 export type DisposalWarning = { objectId: string; title: string; warning: UiText };

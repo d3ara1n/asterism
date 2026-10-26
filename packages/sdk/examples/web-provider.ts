@@ -1,5 +1,5 @@
-import { pluginNamespace, present, webResponseSchema } from "@atelier/sdk/contracts";
-import { definePlugin, WebError, type WebProviderDefinition } from "@atelier/sdk/runtime";
+import { pluginNamespace, present, webResponseSchema } from "@asterism/sdk/contracts";
+import { definePlugin, WebError, type WebProviderDefinition } from "@asterism/sdk/runtime";
 import { z } from "zod";
 
 const ns = pluginNamespace("example.web");

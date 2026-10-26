@@ -1,6 +1,6 @@
-import { defineMessages, pluginNamespace } from "@atelier/sdk/contracts";
+import { defineMessages, pluginNamespace } from "@asterism/sdk/contracts";
 
-export const thinkingMessages = pluginNamespace("atelier.builtin").messages("en", defineMessages({
+export const thinkingMessages = pluginNamespace("asterism.builtin").messages("en", defineMessages({
   thinkingTitle: {
     id: "thinkingTitle",
     defaultMessage: "Thinking",

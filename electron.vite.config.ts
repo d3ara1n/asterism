@@ -10,7 +10,7 @@ export default defineConfig({
     build: {
       // 工作区源码包随应用静态编译，发布产物不在运行时读取仓库中的 .ts。
       externalizeDeps: {
-        exclude: ["@atelier/sdk", "@atelier/builtin-api", "@atelier/builtin", "@atelier/ui"],
+        exclude: ["@asterism/sdk", "@asterism/builtin-api", "@asterism/builtin", "@asterism/ui"],
         include: ["node-pty", "@xterm/headless", "@xterm/addon-serialize", "@vscode/ripgrep"],
       },
       outDir: resolve("dist/main"),
@@ -46,7 +46,7 @@ export default defineConfig({
         name: coreId("development-csp"),
         apply: "serve",
         // React Fast Refresh 的开发入口包含内联 preamble；发布构建不放宽脚本策略。
-        transformIndexHtml: html => html.replace("script-src 'self' atelier-plugin:;", "script-src 'self' atelier-plugin: 'unsafe-inline';"),
+        transformIndexHtml: html => html.replace("script-src 'self' asterism-plugin:;", "script-src 'self' asterism-plugin: 'unsafe-inline';"),
       },
     ],
     server: { host: "127.0.0.1" },

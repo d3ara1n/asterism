@@ -132,7 +132,7 @@ export function themeTokens(appearance: Appearance, scheme: Scheme): Record<stri
   const darkForeground = scale(appearance.gray, "dark")(1);
   const solidForeground = (background: string) => onSolid(background, darkForeground);
   return {
-    // background 遵循 shadcn 约定作页面底色（亮色白）；canvas 为工坊扩展，只给工作台底板等画布区域。
+    // background 遵循 shadcn 约定作页面底色（亮色白）；canvas 为星图扩展，只给工作台底板等画布区域。
     background: dark ? g(1) : "#ffffff", foreground: fg, canvas: dark ? g(1) : g(3),
     card: dark ? g(2) : "#ffffff", "card-foreground": fg,
     popover: dark ? g(3) : "#ffffff", "popover-foreground": fg,

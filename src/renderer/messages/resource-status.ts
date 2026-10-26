@@ -1,6 +1,6 @@
-import { defineMessages, pluginNamespace } from "@atelier/sdk/contracts";
+import { defineMessages, pluginNamespace } from "@asterism/sdk/contracts";
 
-export const resourceStatusMessages = pluginNamespace("atelier.host").messages("en", defineMessages({
+export const resourceStatusMessages = pluginNamespace("asterism.host").messages("en", defineMessages({
   title: { id: "resourceStatus.title", defaultMessage: "Resource status" },
   summary: { id: "resourceStatus.summary", defaultMessage: "{status} · {count, plural, one {# resource} other {# resources}}" },
   running: { id: "resourceStatus.running", defaultMessage: "Running" },

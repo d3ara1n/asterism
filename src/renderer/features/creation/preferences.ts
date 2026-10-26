@@ -1,5 +1,5 @@
-import type { Json } from "@atelier/sdk/contracts";
-import type { RendererPreferences } from "@atelier/sdk/renderer";
+import type { Json } from "@asterism/sdk/contracts";
+import type { RendererPreferences } from "@asterism/sdk/renderer";
 
 /**
  * 受控偏好容器的 renderer 缓存：启动时读取一次，写入先更新缓存再经桥保存。

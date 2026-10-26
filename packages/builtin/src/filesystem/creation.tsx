@@ -1,12 +1,12 @@
 import { CreationForm } from "../shared/creation-form";
-import { Field, FieldLabel, FieldError } from "@atelier/ui/ui/field";
+import { Field, FieldLabel, FieldError } from "@asterism/ui/ui/field";
 
-import { Input } from "@atelier/ui/ui/input";
-import { Button } from "@atelier/ui/ui/button";
+import { Input } from "@asterism/ui/ui/input";
+import { Button } from "@asterism/ui/ui/button";
 
 import { commonMessages } from "../messages/common";
 import { filesystemMessages } from "../messages/filesystem";
-import { useI18n, type CreationInputProps } from "@atelier/sdk/renderer";
+import { useI18n, type CreationInputProps } from "@asterism/sdk/renderer";
 import { useState } from "react";
 
 /** 路径示例按平台给出；仅作提示，不参与校验。 */
@@ -19,7 +19,7 @@ export function DirectoryInput({ initialInput, busy, resolve, cancel }: Creation
   const [path, setPath] = useState(initialInput?.path ?? "");
   const [title, setTitle] = useState(initialInput?.title ?? "");
   const [browsing, setBrowsing] = useState(false);
-  const [browseError, setBrowseError] = useState<import("@atelier/sdk/contracts").UiText | null>(null);
+  const [browseError, setBrowseError] = useState<import("@asterism/sdk/contracts").UiText | null>(null);
   const browse = async () => {
     setBrowsing(true);
     setBrowseError(null);

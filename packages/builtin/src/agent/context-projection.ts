@@ -1,6 +1,6 @@
-import type { SessionRecord, SessionSnapshot, ModelBlock, ModelItem, ModelPart } from "@atelier/sdk/contracts";
+import type { SessionRecord, SessionSnapshot, ModelBlock, ModelItem, ModelPart } from "@asterism/sdk/contracts";
 import type { z } from "zod";
-import { ContextSummary, Execution, AgentInputMessage } from "@atelier/builtin-api/contracts";
+import { ContextSummary, Execution, AgentInputMessage } from "@asterism/builtin-api/contracts";
 import { projectInputMessage } from "./input-message.ts";
 
 /** 投影只依赖纯契约，后台请求与前端上下文面板共用同一规则；后台入口把失败转换为插件错误。 */

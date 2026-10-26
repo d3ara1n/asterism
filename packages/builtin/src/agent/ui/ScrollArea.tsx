@@ -1,5 +1,5 @@
-import type { AgentScrollAreaProps } from "@atelier/builtin-api/renderer";
-import { cn } from "@atelier/ui/utils";
+import type { AgentScrollAreaProps } from "@asterism/builtin-api/renderer";
+import { cn } from "@asterism/ui/utils";
 
 /** 同一视口负责滚动和焦点光圈留白；负边距保持正文与固定区域对齐。 */
 export function ScrollArea({ axis = "vertical", className, ...props }: AgentScrollAreaProps) {

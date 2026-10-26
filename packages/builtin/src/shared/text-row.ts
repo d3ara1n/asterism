@@ -1,4 +1,4 @@
-import type { TextRow } from "@atelier/builtin-api/contracts";
+import type { TextRow } from "@asterism/builtin-api/contracts";
 import { computeLineHash } from "./hashline/hash.ts";
 
 /** read／edit 回显的长行阈值：放过正常的长段落，截住压缩产物与内联 base64。 */

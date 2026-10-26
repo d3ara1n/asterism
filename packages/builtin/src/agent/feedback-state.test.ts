@@ -1,5 +1,5 @@
 import { expect, it, vi } from "vitest";
-import type { ObjectExecutor } from "@atelier/sdk/runtime";
+import type { ObjectExecutor } from "@asterism/sdk/runtime";
 import { AgentSoftwareFeedback } from "./feedback.ts";
 import { createAgentFeedback } from "./feedback-state.ts";
 

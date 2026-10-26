@@ -1,4 +1,4 @@
-import type { ResourceRef, ResourceStatus } from "@atelier/sdk/contracts";
+import type { ResourceRef, ResourceStatus } from "@asterism/sdk/contracts";
 
 export type ResourceStatusMark = ResourceStatus & {
   resource: ResourceRef;

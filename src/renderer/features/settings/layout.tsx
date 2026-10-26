@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Item, ItemContent, ItemTitle, ItemDescription, ItemActions } from "@atelier/ui/ui/item";
+import { Item, ItemContent, ItemTitle, ItemDescription, ItemActions } from "@asterism/ui/ui/item";
 
 /** 设置分组：标题 + 圆角分组底板，行之间用分隔线。 */
 export function Section({ title, hint, action, children }: { title: string; hint?: string; action?: ReactNode; children: ReactNode }) {

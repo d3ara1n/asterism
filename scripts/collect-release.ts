@@ -6,7 +6,7 @@ import { hasReleasableChanges, pullRequestsInHistory, type PublishedRelease, typ
 // 只用 Node 内置模块与 gh；无新 PR 的每周检查在 npm ci 前结束。
 const [mode = "prerelease", sourceTag = "", outputFile = ".local/release/input.json"] = process.argv.slice(2);
 if (mode !== "prerelease" && mode !== "release") throw new Error("Expected prerelease or release.");
-const repository = process.env.GITHUB_REPOSITORY ?? "d3ara1n/atelier";
+const repository = process.env.GITHUB_REPOSITORY ?? "d3ara1n/asterism";
 const [owner, name] = repository.split("/");
 if (!owner || !name) throw new Error("GITHUB_REPOSITORY must identify a repository.");
 const git = (...args: string[]) => execFileSync("git", args, { encoding: "utf8" }).trim();

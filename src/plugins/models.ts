@@ -3,21 +3,21 @@ import type { ContentLease } from "../runtime/content-store.ts";
 import { AiSdkAdapter } from "../model/ai-sdk.ts";
 import { ModelFailure, type ModelAdapter, type ModelEvent } from "../model/contract.ts";
 import { runModelRequest } from "../execution/request.ts";
-import { resolveModelSelection, type ModelRunRequest, type ModelRunResult, type ModelTarget, type StreamRequest } from "@atelier/sdk/contracts";
+import { resolveModelSelection, type ModelRunRequest, type ModelRunResult, type ModelTarget, type StreamRequest } from "@asterism/sdk/contracts";
 import type { AgentCapabilities } from "../execution/capabilities.ts";
 import { modelReference, parseModelExpression, resolveProviderModel, type ConfigurationSnapshot, type ThinkingLevel } from "../shared/configuration.ts";
 import { modelExpression, modelScope, type ModelSettings } from "../shared/model.ts";
-import { PluginApiError } from "@atelier/sdk/runtime";
-import type { ModelServices } from "@atelier/sdk/runtime";
+import { PluginApiError } from "@asterism/sdk/runtime";
+import type { ModelServices } from "@asterism/sdk/runtime";
 import { coreDeclarations } from "../execution/core.ts";
 import { coreId } from "../shared/core.ts";
 import { inputReferences, validateInput, resolveInput, type ModelContent } from "../model/input.ts";
-import type { ModelItem } from "@atelier/sdk/contracts";
+import type { ModelItem } from "@asterism/sdk/contracts";
 import { errorMessages } from "../shared/error-display.ts";
 import type { BoundTopLevelTool } from "./top-level-tools.ts";
 
 /** 模型目标：选择一个角色，可覆盖模型表达式或思考等级；未给出的沿用角色。 */
-export type { ModelTarget, StreamRequest } from "@atelier/sdk/contracts";
+export type { ModelTarget, StreamRequest } from "@asterism/sdk/contracts";
 export type ModelTargetError = "role_unavailable" | "model_unavailable" | "credential_unavailable";
 export class ModelTargetFailure extends PluginApiError {
   constructor(readonly reason: ModelTargetError, message: string) { super("unavailable", message); }

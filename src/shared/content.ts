@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { contentRefSchema } from "@atelier/sdk/contracts";
+import { contentRefSchema } from "@asterism/sdk/contracts";
 
 /** 单块传输上限；分块确认形成背压。 */
 export const contentChunkSize = 1024 * 1024;

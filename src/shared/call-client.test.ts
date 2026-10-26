@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import { defineCall } from "@atelier/sdk/contracts";
+import { defineCall } from "@asterism/sdk/contracts";
 import { CallClient } from "./call-client.ts";
 import { callControlSchema, callFrameSchema, type CallControl, type CallFrame } from "./plugin-calls.ts";
 

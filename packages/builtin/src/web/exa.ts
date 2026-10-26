@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { Exa } from "exa-js";
-import { jsonSchema, present, webUrlSchema, type WebDocument, type WebHint, type WebResponse, type WebSearchRequest } from "@atelier/sdk/contracts";
-import { WebError, type WebProviderDefinition } from "@atelier/sdk/runtime";
-import { builtin } from "@atelier/builtin-api/contracts";
+import { jsonSchema, present, webUrlSchema, type WebDocument, type WebHint, type WebResponse, type WebSearchRequest } from "@asterism/sdk/contracts";
+import { WebError, type WebProviderDefinition } from "@asterism/sdk/runtime";
+import { builtin } from "@asterism/builtin-api/contracts";
 
 const MAX_TEXT_CHARACTERS = 1_000_000;
 

@@ -1,4 +1,4 @@
-import type { EventSubscription, SubscriptionEnd } from "@atelier/sdk/contracts";
+import type { EventSubscription, SubscriptionEnd } from "@asterism/sdk/contracts";
 
 /** 订阅建立、结束与取消的共同状态；运行中工作的真实收束由调用方管理。 */
 export class EventSubscriptionState {

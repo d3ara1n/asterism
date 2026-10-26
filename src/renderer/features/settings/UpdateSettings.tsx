@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
-import { useI18n } from "@atelier/sdk/renderer";
-import { Button } from "@atelier/ui/ui/button";
-import { Switch } from "@atelier/ui/ui/switch";
-import { Progress } from "@atelier/ui/ui/progress";
-import { Alert, AlertDescription } from "@atelier/ui/ui/alert";
+import { useI18n } from "@asterism/sdk/renderer";
+import { Button } from "@asterism/ui/ui/button";
+import { Switch } from "@asterism/ui/ui/switch";
+import { Progress } from "@asterism/ui/ui/progress";
+import { Alert, AlertDescription } from "@asterism/ui/ui/alert";
 import { updatesMessages as messages } from "../../messages/updates";
 import type { UpdateState } from "../../../shared/updates";
 import { Section, Row } from "./layout";

@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { Button } from "@atelier/ui/ui/button";
+import { Button } from "@asterism/ui/ui/button";
 import { startupMessages } from "../../shared/error-display";
 import { useI18n } from "../shared/i18n";
 

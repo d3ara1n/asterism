@@ -1,13 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { defineData, reference } from "@atelier/sdk/contracts";
-import { defineImplementation, defineResource, defineTool } from "@atelier/sdk/contracts";
+import { defineData, reference } from "@asterism/sdk/contracts";
+import { defineImplementation, defineResource, defineTool } from "@asterism/sdk/contracts";
 import type { Json, ToolOutcome } from "../shared/model.ts";
-import type { ToolModelOutput } from "@atelier/sdk/contracts";
+import type { ToolModelOutput } from "@asterism/sdk/contracts";
 const text = (outcome: ToolOutcome) => outcome.model.flatMap(part => part.kind === "text" ? [part.text] : []).join("\n");
-import type { ToolInvocationInfo } from "@atelier/sdk/contracts";
+import type { ToolInvocationInfo } from "@asterism/sdk/contracts";
 import { implement, toolCaller } from "../tools/testing.ts";
-import type { CallResult } from "@atelier/sdk/runtime";
+import type { CallResult } from "@asterism/sdk/runtime";
 import { ToolRegistry } from "../tools/registry.ts";
 import { ResourceRegistry } from "../resources/registry.ts";
 import { AgentCapabilities } from "./capabilities.ts";

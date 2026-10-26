@@ -1,5 +1,5 @@
 import type { DatabaseSync } from "node:sqlite";
-import { jsonSchema, type Json } from "@atelier/sdk/contracts";
+import { jsonSchema, type Json } from "@asterism/sdk/contracts";
 
 /** 会话当前数据；空对象作用域表示会话本身。与历史事件独立保存。 */
 export class SessionDataStore {

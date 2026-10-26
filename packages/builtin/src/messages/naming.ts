@@ -1,6 +1,6 @@
-import { defineMessages, pluginNamespace } from "@atelier/sdk/contracts";
+import { defineMessages, pluginNamespace } from "@asterism/sdk/contracts";
 
-export const namingMessages = pluginNamespace("atelier.builtin").messages("en", defineMessages({
+export const namingMessages = pluginNamespace("asterism.builtin").messages("en", defineMessages({
   name: { id: "naming.name", defaultMessage: "Session name" },
   rename: { id: "naming.rename", defaultMessage: "Rename session" },
 }));

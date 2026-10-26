@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { generateText } from "ai";
 import { z } from "zod";
-import { thinkingLevels } from "@atelier/sdk/contracts";
+import { thinkingLevels } from "@asterism/sdk/contracts";
 import { AiSdkAdapter, sdkMessages } from "./ai-sdk.ts";
 import { createProviderModel } from "./provider.ts";
 import { aiSdkAdapterVersion } from "./continuation.ts";
@@ -470,7 +470,7 @@ describe("显式兼容与目标投影", () => {
     const current = input("openai-chat");
     const adapter = new AiSdkAdapter(async () => { throw new Error("Must fail before reading credentials"); });
     const saved = { ...current, messages: [{ kind: "result" as const, callId: "call", name: "lookup", outcome: {
-      kind: "succeeded" as const, data: null, model: [{ kind: "file" as const, file: { "$atelier.content": "c4b22b60-ae71-4e92-9823-2223b48a8327" }, mediaType: "image/png" }],
+      kind: "succeeded" as const, data: null, model: [{ kind: "file" as const, file: { "$asterism.content": "c4b22b60-ae71-4e92-9823-2223b48a8327" }, mediaType: "image/png" }],
     } }] };
     expect(() => adapter.validate(saved)).toThrow("Tool files in a user message");
     current.messages = [{ kind: "result", callId: "call", name: "lookup", error: false,

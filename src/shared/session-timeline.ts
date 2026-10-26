@@ -1,5 +1,5 @@
 import type { SessionNode } from "./session.ts";
-import type { UiText } from "@atelier/sdk/contracts";
+import type { UiText } from "@asterism/sdk/contracts";
 
 export class SessionError extends Error {
   constructor(readonly code: string, message: string, readonly display?: UiText) {

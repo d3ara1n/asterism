@@ -1,8 +1,8 @@
 import { rmSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { pluginNamespace, type EventSubscription } from "@atelier/sdk/contracts";
-import { defineModule, definePlugin } from "@atelier/sdk/runtime";
+import { pluginNamespace, type EventSubscription } from "@asterism/sdk/contracts";
+import { defineModule, definePlugin } from "@asterism/sdk/runtime";
 import { ApplicationService } from "../runtime/service.ts";
 import { loadPlugins, type PluginHostServices } from "./loader.ts";
 

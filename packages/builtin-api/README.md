@@ -1,10 +1,10 @@
-# 内置插件公共 API（`@atelier/builtin-api`）
+# 内置插件公共 API（`@asterism/builtin-api`）
 
-内置实现与外部插件共同消费的领域契约、后台创建入口与前端扩展 API，当前版本 **0.17.0**。插件身份为 `atelier.builtin`；本包不注册第二个插件，也不依赖 `@atelier/builtin` 实现。公共加载与生命周期规则见 [插件 SDK](../../docs/plugin-sdk.md#公共模块与契约身份)。
+内置实现与外部插件共同消费的领域契约、后台创建入口与前端扩展 API，当前版本 **0.18.0**。插件身份为 `asterism.builtin`；本包不注册第二个插件，也不依赖 `@asterism/builtin` 实现。公共加载与生命周期规则见 [插件 SDK](../../docs/plugin-sdk.md#公共模块与契约身份)。
 
 ## 入口与边界
 
-`@atelier/builtin-api/contracts` 不依赖 Node 或 React，导出：
+`@asterism/builtin-api/contracts` 不依赖 Node 或 React，导出：
 
 - `builtin` 命名空间、Agent 资源与创建／提交／继续／配置／取消动作。
 - Agent 输入、配置、选择和历史记录契约，以及会话命名记录与 `NamingApi` 接口类型。
@@ -17,9 +17,9 @@
 - `ReadAgentCreations`：通过 SDK 具型调用查询模型创建入口与资源类型的关联，供前后端公共消费者使用。
 - `resolveAgentModelSelection`：按目录解析代理选择的模型引用、可用模型与思考等级，供摘要展示；`resolveAgentModel` 只取其中的模型。展示结果保留原始选择；请求取用时仍解析模型、角色与凭据的可用性，思考等级遵循[模型配置](../../docs/model-configuration.md#输入能力与思考等级)。
 
-`@atelier/builtin-api/renderer` 依赖宿主共享的 React，提供 Agent 界面登记和呈现 API，只允许前端导入。执行循环、压缩策略、提交去重、卡片投影及实际布局属于实现包。取得契约不授予对象写权限；外部准备者仍只能读取宿主绑定的对象门面。顶层工具与插件调用接口属于 [SDK](../sdk/README.md)。
+`@asterism/builtin-api/renderer` 依赖宿主共享的 React，提供 Agent 界面登记和呈现 API，只允许前端导入。执行循环、压缩策略、提交去重、卡片投影及实际布局属于实现包。取得契约不授予对象写权限；外部准备者仍只能读取宿主绑定的对象门面。顶层工具与插件调用接口属于 [SDK](../sdk/README.md)。
 
-`@atelier/builtin-api/runtime` 只允许后台导入，导出 `defineAgentCreation` 与 `agentCreations`，供插件声明 Agent 创建入口及内置工具消费目录。通用会话创建、链接和移除仍属于 SDK。
+`@asterism/builtin-api/runtime` 只允许后台导入，导出 `defineAgentCreation` 与 `agentCreations`，供插件声明 Agent 创建入口及内置工具消费目录。通用会话创建、链接和移除仍属于 SDK。
 
 ## 作者接入
 
@@ -31,12 +31,12 @@
   "version": "1.0.0",
   "type": "module",
   "peerDependencies": {
-    "@atelier/sdk": "^0.43.0",
-    "@atelier/builtin-api": "^0.17.0"
+    "@asterism/sdk": "^0.45.0",
+    "@asterism/builtin-api": "^0.18.0"
   },
-  "atelier": {
+  "asterism": {
     "id": "example.input-review",
-    "api": { "major": 18, "minMinor": 0 },
+    "api": { "major": 19, "minMinor": 0 },
     "runtime": "./src/runtime.ts"
   }
 }
@@ -46,16 +46,16 @@
 
 后台插件通过 SDK API 11.1 的 `session.invoke(SubmitAgentInput, agentRef, input, options)` 提交输入，通过同一入口调用 `CancelAgent` 等资源动作。调用不取得 Agent 私有门面；提交受理与独立执行的边界见 [输入调度](../../docs/runtime.md#输入调度与草稿箱)，可编译示例见 [`examples/agent-input.ts`](examples/agent-input.ts)。
 
-开发时可在本仓库使用 npm workspace；独立作者可用 `npm pack --workspace @atelier/sdk` 与 `npm pack --workspace @atelier/builtin-api` 生成本地包并安装。当前为孵化期私有包，不依赖 npm registry 发布。作者如预先打包插件，须将 `@atelier/sdk/*`、`@atelier/builtin-api/*` 保留为外部导入，不内联声明源码；包清单仍保留 peerDependencies。
+开发时可在本仓库使用 npm workspace；独立作者可用 `npm pack --workspace @asterism/sdk` 与 `npm pack --workspace @asterism/builtin-api` 生成本地包并安装。当前为孵化期私有包，不依赖 npm registry 发布。作者如预先打包插件，须将 `@asterism/sdk/*`、`@asterism/builtin-api/*` 保留为外部导入，不内联声明源码；包清单仍保留 peerDependencies。
 
-宿主采用已登记公共包版本检查 npm semver 范围，依赖缺失、不兼容或未公开子入口明确失败。消费者自己的安装副本仅用于作者开发，执行时由宿主转接到本环境已经加载的同一份声明。后台、前端分别共享，不跨进程共享对象。公共包版本与 `atelier.api` 的宿主 SDK API 版本分别校验。
+宿主采用已登记公共包版本检查 npm semver 范围，依赖缺失、不兼容或未公开子入口明确失败。消费者自己的安装副本仅用于作者开发，执行时由宿主转接到本环境已经加载的同一份声明。后台、前端分别共享，不跨进程共享对象。公共包版本与 `asterism.api` 的宿主 SDK API 版本分别校验。
 
 ## Agent 创建入口
 
 资源实现继续使用 SDK 的 `CreationContract`。需要向 Agent 提供创建方式时，在插件 `modules` 中加入 `defineAgentCreation(...)` 返回的模块：
 
 ```ts
-import { defineAgentCreation } from "@atelier/builtin-api/runtime";
+import { defineAgentCreation } from "@asterism/builtin-api/runtime";
 
 const agentCreation = defineAgentCreation({
   id: ns.name("document.create"),
@@ -72,11 +72,11 @@ const agentCreation = defineAgentCreation({
 
 ## Agent 界面扩展
 
-在插件清单的 `atelier.renderer` 指定前端入口，并在 `prepare` 中登记组件：
+在插件清单的 `asterism.renderer` 指定前端入口，并在 `prepare` 中登记组件：
 
 ```tsx
-import { agentUI, AgentOverlay } from "@atelier/builtin-api/renderer";
-import { defineRendererPlugin, useRendererObject } from "@atelier/sdk/renderer";
+import { agentUI, AgentOverlay } from "@asterism/builtin-api/renderer";
+import { defineRendererPlugin, useRendererObject } from "@asterism/sdk/renderer";
 
 function Questions() {
   const agent = useRendererObject();

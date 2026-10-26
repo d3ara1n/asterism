@@ -1,12 +1,12 @@
-import { StatusBadge, StatusIcon } from "@atelier/ui/ui/status";
+import { StatusBadge, StatusIcon } from "@asterism/ui/ui/status";
 import { ArrowDown } from "lucide-react";
-import { Button } from "@atelier/ui/ui/button";
+import { Button } from "@asterism/ui/ui/button";
 import { VirtualConversationTimeline } from "./ConversationTimeline";
 import { ConversationMinimap } from "./ConversationMinimap";
 
 import { MessageComposer } from "./Composer";
 import { conversationMessages } from "../../messages/conversation";
-import { useI18n, useRendererObject, useRendererModels } from "@atelier/sdk/renderer";
+import { useI18n, useRendererObject, useRendererModels } from "@asterism/sdk/renderer";
 
 import { useOutputFollow } from "./output-follow";
 import { useMemo, useRef } from "react";
@@ -37,7 +37,7 @@ export function ConversationActions({ data }: { data: { executionState: AgentExe
 
 const emptyTimeline: readonly TimelineItem[] = [];
 /** 条目视图状态随代理对象保留：虚拟列表回收条目、卡片重挂载与聚焦切换都不丢展开状态。 */
-const viewStateKey = "atelier.builtin/agent.timeline-view";
+const viewStateKey = "asterism.builtin/agent.timeline-view";
 
 /** 代理卡片内容：当前路径的最终视图与输入区；没有分支感，回溯在会话历史中进行。 */
 export function Conversation({ feedback, compressions }: { feedback: readonly InlineFeedback[]; compressions: readonly CompressionActivity[] }) {

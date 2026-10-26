@@ -1,13 +1,13 @@
 import { Hand } from "lucide-react";
-import type { ResourceStatus } from "@atelier/sdk/contracts";
+import type { ResourceStatus } from "@asterism/sdk/contracts";
 import { useId } from "react";
 import { resourceStatusMessages as messages } from "../messages/resource-status";
 import { useI18n } from "../shared/i18n";
-import { Button } from "@atelier/ui/ui/button";
-import { Item, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@atelier/ui/ui/item";
-import { Popover, PopoverContent, PopoverTrigger } from "@atelier/ui/ui/popover";
-import { StatusIcon as SharedStatusIcon, type StatusTone } from "@atelier/ui/ui/status";
-import { Progress } from "@atelier/ui/ui/progress";
+import { Button } from "@asterism/ui/ui/button";
+import { Item, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@asterism/ui/ui/item";
+import { Popover, PopoverContent, PopoverTrigger } from "@asterism/ui/ui/popover";
+import { StatusIcon as SharedStatusIcon, type StatusTone } from "@asterism/ui/ui/status";
+import { Progress } from "@asterism/ui/ui/progress";
 import { summarizeResourceStatus, type ResourceStatusMark } from "./resource-status";
 
 const tones: Record<ResourceStatus["status"], StatusTone> = { running: "progress", failed: "error", awaiting: "warning", completed: "success" };

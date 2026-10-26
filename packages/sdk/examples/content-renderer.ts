@@ -1,4 +1,4 @@
-import { creationEntry, type RendererObjectContext } from "@atelier/sdk/renderer";
+import { creationEntry, type RendererObjectContext } from "@asterism/sdk/renderer";
 import { CreateDocument, ReplaceDocument } from "./content-contract.ts";
 
 /** 该入口受理拖入文件（有无本机路径均可）与工作台剪贴板图片。 */

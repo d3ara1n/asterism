@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { jsonSchema, thinkingLevels, type Json, type ThinkingLevel } from "@atelier/sdk/contracts";
+import { jsonSchema, thinkingLevels, type Json, type ThinkingLevel } from "@asterism/sdk/contracts";
 import type { ModelProviderInput } from "./configuration.ts";
 
 /** 应用预定义的声明目录；参数与展示同源，行为由请求投影层按 id 解释。 */

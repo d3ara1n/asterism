@@ -1,6 +1,6 @@
-import { defineMessages, pluginNamespace } from "@atelier/sdk/contracts";
+import { defineMessages, pluginNamespace } from "@asterism/sdk/contracts";
 
-export const diagnosticMessages = pluginNamespace("atelier.builtin").messages("en", defineMessages({
+export const diagnosticMessages = pluginNamespace("asterism.builtin").messages("en", defineMessages({
   currentPath: { id: "diagnostics.currentPath", defaultMessage: "Current path" },
   allBranches: { id: "diagnostics.allBranches", defaultMessage: "All branches" },
   scope: { id: "diagnostics.scope", defaultMessage: "Request scope" },

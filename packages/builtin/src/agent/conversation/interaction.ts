@@ -1,6 +1,6 @@
-import { useI18n, type RendererObjectContext, type RendererReceipt, type ContentReader, type RendererContentInput } from "@atelier/sdk/renderer";
-import { SubmitAgentInput, ConfigureAgent, ContinueAgent, CancelAgent, type AgentSelection } from "@atelier/builtin-api/contracts";
-import type { ModelInputPart } from "@atelier/sdk/contracts";
+import { useI18n, type RendererObjectContext, type RendererReceipt, type ContentReader, type RendererContentInput } from "@asterism/sdk/renderer";
+import { SubmitAgentInput, ConfigureAgent, ContinueAgent, CancelAgent, type AgentSelection } from "@asterism/builtin-api/contracts";
+import type { ModelInputPart } from "@asterism/sdk/contracts";
 import { createContext, useContext, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 import { SubmissionIdentity } from "./submission";
@@ -19,7 +19,7 @@ export function useConversationInteraction() {
 }
 
 /** 草稿、交接占用和提交身份跨卡片重挂载保留；成功后统一交接，失败保持可重试。 */
-const interactionKey = "atelier.builtin/agent.interaction";
+const interactionKey = "asterism.builtin/agent.interaction";
 export function useAgentConversation(object: RendererObjectContext, hasSelection: boolean, executionState: AgentExecutionState, drafts: readonly AgentDraft[]) {
   const i18n = useI18n();
   const current = object.retained.get(interactionKey,

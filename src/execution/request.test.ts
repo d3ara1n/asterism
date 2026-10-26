@@ -1,7 +1,7 @@
-import { thinkingLevels, present, completionData, modelCompletionSchema, modelRunRecordSchema, type RequestTiming } from "@atelier/sdk/contracts";
+import { thinkingLevels, present, completionData, modelCompletionSchema, modelRunRecordSchema, type RequestTiming } from "@asterism/sdk/contracts";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { defineData, defineResource, defineTool, defineImplementation, type ModelRunEvent, type ModelRunRequest } from "@atelier/sdk/contracts";
+import { defineData, defineResource, defineTool, defineImplementation, type ModelRunEvent, type ModelRunRequest } from "@asterism/sdk/contracts";
 import { implement, toolCaller } from "../tools/testing.ts";
 import { ResourceRegistry } from "../resources/registry.ts";
 import { ToolRegistry } from "../tools/registry.ts";

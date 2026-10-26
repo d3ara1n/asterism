@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { defineAction } from "@atelier/sdk/contracts";
-import { Agent, builtin, userInputPartsSchema, agentMessageSenderSchema, submissionIdSchema } from "@atelier/builtin-api/contracts";
+import { defineAction } from "@asterism/sdk/contracts";
+import { Agent, builtin, userInputPartsSchema, agentMessageSenderSchema, submissionIdSchema } from "@asterism/builtin-api/contracts";
 
 /** 草稿箱属于资源当前数据；界面动作只在内置包内共享。 */
 export const draftModeSchema = z.enum(["none", "steer", "follow"]);

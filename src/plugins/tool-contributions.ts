@@ -1,4 +1,4 @@
-import { belongsTo, type ToolContract } from "@atelier/sdk/contracts";
+import { belongsTo, type ToolContract } from "@asterism/sdk/contracts";
 import { coreDeclarations } from "../execution/core.ts";
 import type { ToolImplementation } from "../tools/contract.ts";
 import { ToolRegistry } from "../tools/registry.ts";

@@ -2,7 +2,7 @@ import { Models, type Catalog, type Model, type ModelMetadata } from "@opencode-
 import { z } from "zod";
 import { modelInputSchema, thinkingSchema, type ProviderModel, type ModelParameterUpdate } from "../shared/configuration.ts";
 import { modelCatalogMessages as messages } from "../shared/model-catalog-messages.ts";
-import { emptyModelRates, modelCostSchema, type ModelCost, type ModelRates, type UnitPrice } from "@atelier/sdk/contracts";
+import { emptyModelRates, modelCostSchema, type ModelCost, type ModelRates, type UnitPrice } from "@asterism/sdk/contracts";
 import { ConfigurationError } from "./errors.ts";
 
 export type LoadModelCatalog = (signal: AbortSignal) => Promise<Catalog>;
@@ -46,7 +46,7 @@ const entrySchema = z.object({
   ])).optional(),
 });
 
-// 外部目录的形状只存在于转换边界，配置与消费者使用工坊自己的价格契约。
+// 外部目录的形状只存在于转换边界，配置与消费者使用星图自己的价格契约。
 const catalogPrice = z.number().nonnegative();
 const catalogRatesSchema = z.strictObject({
   input: catalogPrice, output: catalogPrice,
@@ -112,7 +112,7 @@ export function modelParameters(catalog: Catalog, current: ProviderModel): {
       const values = efforts?.flatMap(option => option.values);
       const levels = new Set(values?.map(level => level === null || level === "none" ? "off" : level));
       const mapped = thinkingSchema.options.filter(level => levels.has(level));
-      // toggle/budget 不能直接推导工坊等级；default 也不等于任何固定等级。
+      // toggle/budget 不能直接推导星图等级；default 也不等于任何固定等级。
       if (!mapped.length || [...levels].some(level => !thinkingSchema.safeParse(level).success)) unfilled.push("thinkingLevels");
       else value.capabilities.thinkingLevels = mapped;
     }

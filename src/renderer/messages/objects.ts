@@ -1,6 +1,6 @@
-import { defineMessages, pluginNamespace } from "@atelier/sdk/contracts";
+import { defineMessages, pluginNamespace } from "@asterism/sdk/contracts";
 
-export const objectsMessages = pluginNamespace("atelier.host").messages("en", defineMessages({
+export const objectsMessages = pluginNamespace("asterism.host").messages("en", defineMessages({
   auxiliaryPanels: { id: "objects.auxiliaryPanels", defaultMessage: "Auxiliary panels" },
   openInIsland: { id: "objects.openInIsland", defaultMessage: "Open in island" },
   returnToCard: { id: "objects.returnToCard", defaultMessage: "Return to card" },

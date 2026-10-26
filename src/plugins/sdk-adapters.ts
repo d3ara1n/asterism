@@ -1,5 +1,5 @@
-import { jsonSchema, reference, type ResourceCall, type Json, type ContractReference } from "@atelier/sdk/contracts";
-import { PluginApiError, type Lifetime, type ResourceContribution, type ResourceRef, type ToolContribution, type ResourceSnapshot } from "@atelier/sdk/runtime";
+import { jsonSchema, reference, type ResourceCall, type Json, type ContractReference } from "@asterism/sdk/contracts";
+import { PluginApiError, type Lifetime, type ResourceContribution, type ResourceRef, type ToolContribution, type ResourceSnapshot } from "@asterism/sdk/runtime";
 import { SessionError } from "../session/tree.ts";
 import type { FoldedObject } from "../session/fold.ts";
 import type { ResourceBackend } from "../resources/contract.ts";

@@ -1,4 +1,4 @@
-import { modelInputPartsSchema, modelInputText, type ModelInputPart } from "@atelier/sdk/contracts";
+import { modelInputPartsSchema, modelInputText, type ModelInputPart } from "@asterism/sdk/contracts";
 
 /** 单次用户输入的业务限额；模型请求另行累计历史内容。 */
 export const userInputPartsSchema = modelInputPartsSchema.max(128)

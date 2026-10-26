@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { modelReference } from "@atelier/sdk/contracts";
-import { useI18n } from "@atelier/sdk/renderer";
-import type { CatalogModel, ModelConfigurationSnapshot } from "@atelier/builtin-api/contracts";
-import { commonMessages } from "@atelier/ui/messages/common";
-import { Separator } from "@atelier/ui/ui/separator";
+import { modelReference } from "@asterism/sdk/contracts";
+import { useI18n } from "@asterism/sdk/renderer";
+import type { CatalogModel, ModelConfigurationSnapshot } from "@asterism/builtin-api/contracts";
+import { commonMessages } from "@asterism/ui/messages/common";
+import { Separator } from "@asterism/ui/ui/separator";
 import { configurationMessages as messages } from "../../messages/configuration";
 import { ConfigurationOptions, type ConfigurationChoice } from "./ConfigurationOptions";
 import { ModelPreview } from "./ModelPreview";

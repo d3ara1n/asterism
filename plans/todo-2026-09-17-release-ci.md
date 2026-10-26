@@ -7,7 +7,7 @@
 ## 实现现状
 
 - 使用 electron-builder 26.18.0 与 electron-updater 6.8.11。应用内只有「包含预发布版本」设置，安装身份与数据保持一致；开发运行使用 `.dev` 数据目录。
-- 仓库 `d3ara1n/atelier` 已公开，固定 macOS 自签身份由 Actions Secrets 提供；CI 通过非交互的管理员信任设置导入证书。
+- 仓库 `d3ara1n/asterism` 已公开，固定 macOS 自签身份由 Actions Secrets 提供；CI 通过非交互的管理员信任设置导入证书。
 - 三平台安装包、更新元数据与 macOS 固定自签曾通过完整 CI 发布测试。用户确认没有下载者后，测试 Release 及标签已删除，不保留其兼容逻辑。
 - Release 工作流支持周更预发布，Promote Release 提供手动晋级；已在真实仓库只读执行轻量收集，验证没有新有效 PR 时在依赖安装前跳过。
 - 更新候选按 GitHub 标记与 SemVer 选择，标准清单、下载、差分与安装交给 electron-updater 通用 HTTP 提供方。
@@ -26,6 +26,14 @@
 
 ## 待推进与验收
 
+### 仓库名称对齐
+
+- [x] GitHub 仓库名称与本地 remote 统一为 `d3ara1n/asterism`。
+- [x] `src/shared/application.ts` 的实际仓库名、`scripts/collect-release.ts` 的默认仓库、README 下载链接和发布操作说明统一指向现有仓库。
+- [ ] 如需将本机检出目录改为 `asterism`，在关闭使用该目录的开发进程后操作；当前检出目录为 `atelier`。
+
+### 发布验收
+
 真实安装、迁移恢复和 GUI 场景安排在正式对外发布前的 prerelease 内测迭代中验收；具体方式见[首包验收](../docs/releasing.md#首包验收)。未验收项保留待办，不阻塞已通过自动检查的实现提交。
 
 - [x] 完成代码复核、15 项针对性纯逻辑测试、类型检查和生产构建。
@@ -34,8 +42,6 @@
 - [ ] 用户通过 DMG 安装预发布，确认配置模型、真实对话与会话保存。
 - [ ] 在未导入开发者证书的用户环境验证 macOS 两个真实版本的下载、替换与重启；Windows NSIS 与 Linux AppImage 的更新同样待实机验收。
 - [ ] 验证关闭预发布后保持当前版本，后续正式版正常接续；GUI 与真实安装交互由用户验收。
-
-首轮三平台构建、固定签名与上传的验证记录见 [发布工作流](https://github.com/d3ara1n/atelier/actions/runs/40205535546)。本轮验证以纯版本／PR 范围／候选选择测试、类型检查和生产构建为主；未创建新的远端 Release。
 
 ## 后续边界
 

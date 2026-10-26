@@ -1,8 +1,8 @@
 import { z } from "zod";
-import { jsonSchema, type Json } from "@atelier/sdk/contracts";
-import { defineModule, defineTopLevelTool, implementCall, PluginApiError, type CallResult } from "@atelier/sdk/runtime";
-import { agentCreations } from "@atelier/builtin-api/runtime";
-import { AgentConfigurations, ReadAgentCreations } from "@atelier/builtin-api/contracts";
+import { jsonSchema, type Json } from "@asterism/sdk/contracts";
+import { defineModule, defineTopLevelTool, implementCall, PluginApiError, type CallResult } from "@asterism/sdk/runtime";
+import { agentCreations } from "@asterism/builtin-api/runtime";
+import { AgentConfigurations, ReadAgentCreations } from "@asterism/builtin-api/contracts";
 import { AgentListResult, CreationListResult, CreationInspectResult, ResourceCreateResult, ResourceRemoveResult } from "./contract.ts";
 
 /** 已知拒绝不伪装为未知写入；资源初始化异常仍沿用工具执行器的未知结局。 */

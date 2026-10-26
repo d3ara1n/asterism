@@ -1,4 +1,4 @@
-import type { Json } from "@atelier/sdk/contracts";
+import type { Json } from "@asterism/sdk/contracts";
 
 export function objectValue(value: Json | undefined): Record<string, Json> | null {
   return value !== null && typeof value === "object" && !Array.isArray(value) ? value : null;

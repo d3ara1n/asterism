@@ -1,5 +1,5 @@
 import { wrapLanguageModel, type LanguageModelMiddleware } from "ai";
-import type { ThinkingLevel } from "@atelier/sdk/contracts";
+import type { ThinkingLevel } from "@asterism/sdk/contracts";
 import type { ModelProviderInput, ProviderModel } from "../shared/configuration.ts";
 import { mergeModelCompatibility, type CustomThinkingLevels, type CustomThinkingBudgets } from "../shared/model-compatibility.ts";
 import { ModelFailure } from "./contract.ts";
@@ -54,7 +54,7 @@ function encodeAnthropicThinking(body: Body, level: ThinkingLevel, maxOutputToke
     if (!Number.isSafeInteger(budget) || budget < 1024 || budget >= limit)
       throw new ModelFailure("thinking_budget_unavailable", "The thinking budget must be at least 1024 tokens and smaller than the output token limit. Adjust the budget or output limit.");
     body.thinking = { ...thinking, budget_tokens: budget };
-    // SDK 会将思考预算额外加到 max_tokens；工坊的上限包含思考，不能被扩大。
+    // SDK 会将思考预算额外加到 max_tokens；星图的上限包含思考，不能被扩大。
     body.max_tokens = limit;
     // 手动预算本身不需要 effort；仅显式映射时才附带，支持两者并存的端点。
     setEffort(body, "output_config", customEffort ?? null);
@@ -68,7 +68,7 @@ function encodeAnthropicThinking(body: Body, level: ThinkingLevel, maxOutputToke
 }
 
 /**
- * SDK 继续识别 Anthropic 模型的思考模式；工坊拥有 effort 与手动预算映射。
+ * SDK 继续识别 Anthropic 模型的思考模式；星图拥有 effort 与手动预算映射。
  * 每次调用单独捕获选项和传输，不以共享可变状态关联并发请求。
  */
 export function withThinkingOptions(

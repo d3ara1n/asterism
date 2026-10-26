@@ -1,4 +1,4 @@
-import type { Json } from "@atelier/sdk/contracts";
+import type { Json } from "@asterism/sdk/contracts";
 
 /** 预览字段尚未通过完整 schema；仅取形状已明确的内容，不补造必填值。 */
 export function inputField(value: Json, key: string): Json | undefined {

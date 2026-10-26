@@ -1,7 +1,7 @@
 import { ScanSearch } from "lucide-react";
-import { toolRenderer, useI18n, type ToolRenderProps } from "@atelier/sdk/renderer";
-import { ToolHeader } from "@atelier/ui/tool-header";
-import { StreamingPreview } from "@atelier/ui/streaming-preview";
+import { toolRenderer, useI18n, type ToolRenderProps } from "@asterism/sdk/renderer";
+import { ToolHeader } from "@asterism/ui/tool-header";
+import { StreamingPreview } from "@asterism/ui/streaming-preview";
 import { AgentPeek, type PeekResult } from "./contract";
 import { peekMessages as messages } from "../../messages/peek";
 import { Markdown } from "../conversation/Markdown";

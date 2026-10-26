@@ -1,6 +1,6 @@
-import { defineMessages, pluginNamespace } from "@atelier/sdk/contracts";
+import { defineMessages, pluginNamespace } from "@asterism/sdk/contracts";
 
-export const agentsMessages = pluginNamespace("atelier.host").messages("en", defineMessages({
+export const agentsMessages = pluginNamespace("asterism.host").messages("en", defineMessages({
   agent: {
     id: "features_configuration_AgentsSettings_1",
     defaultMessage: "Agent",

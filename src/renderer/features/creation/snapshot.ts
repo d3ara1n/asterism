@@ -1,4 +1,4 @@
-import type { DropItem } from "@atelier/sdk/renderer";
+import type { DropItem } from "@asterism/sdk/renderer";
 import type { DragKind } from "./routing";
 
 /** 悬停阶段只能读取类型列表；文件优先，其次 URL，再次纯文本。 */

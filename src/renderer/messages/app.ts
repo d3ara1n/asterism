@@ -1,13 +1,13 @@
-import { defineMessages, pluginNamespace } from "@atelier/sdk/contracts";
+import { defineMessages, pluginNamespace } from "@asterism/sdk/contracts";
 
-export const appMessages = pluginNamespace("atelier.host").messages("en", defineMessages({
+export const appMessages = pluginNamespace("asterism.host").messages("en", defineMessages({
   appName: {
     id: "appName",
-    defaultMessage: "Atelier",
+    defaultMessage: "Asterism",
   },
   menu: {
     id: "menu",
-    defaultMessage: "Atelier menu",
+    defaultMessage: "Asterism menu",
   },
   menuSettings: {
     id: "menuSettings",

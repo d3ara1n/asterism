@@ -8,7 +8,7 @@ import { contentSchemaSql } from "./content-store.ts";
 import { templateSchemaSql } from "./templates.ts";
 import { sqliteStorage } from "../storage/migrations.ts";
 
-export const workspaceDatabaseVersion = 25;
+export const workspaceDatabaseVersion = 26;
 
 /** 业务开库只消费已准备好的格式；升级由窗口前的数据准备执行。 */
 export class DatabaseVersionError extends Error {

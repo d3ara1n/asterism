@@ -1,6 +1,6 @@
-import { completionData, type ModelInputPart, type ModelItem, type SessionSnapshot } from "@atelier/sdk/contracts";
+import { completionData, type ModelInputPart, type ModelItem, type SessionSnapshot } from "@asterism/sdk/contracts";
 import { contextMessages, projectAgentContext } from "../context-projection.ts";
-import { ContextSummary, Execution, AgentRequestContext, AgentInputMessage, type AgentRequestContextData } from "@atelier/builtin-api/contracts";
+import { ContextSummary, Execution, AgentRequestContext, AgentInputMessage, type AgentRequestContextData } from "@asterism/builtin-api/contracts";
 
 /** 对话构成的固定类别与展示顺序；docs/workbench.md#代理上下文。 */
 export const conversationCategories = ["user", "agentMessage", "assistant", "thinking", "toolcall", "result", "context", "summary"] as const;

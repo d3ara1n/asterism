@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { startupText } from "./startup-text.ts";
-import { defineMessages, pluginNamespace } from "@atelier/sdk/contracts";
+import { defineMessages, pluginNamespace } from "@asterism/sdk/contracts";
 import { MessageFormatter } from "../shared/i18n.ts";
 const message = pluginNamespace("example.startup").messages("en", defineMessages({ failure: { id: "failure", defaultMessage: "Open failed: {object}" } })).failure;
 describe("启动失败提示的本地化边界", () => {

@@ -1,9 +1,9 @@
-import { ResourceStatusChanged, ResourcePresenceChanged, SessionTitleChanged, type EventSubscriber, type UiText } from "@atelier/sdk/contracts";
+import { ResourceStatusChanged, ResourcePresenceChanged, SessionTitleChanged, type EventSubscriber, type UiText } from "@asterism/sdk/contracts";
 
 import type { AppSnapshot, DesktopBridge, RuntimeStatus } from "../../shared/contracts";
 import type { RuntimeBridge } from "../../shared/connection";
 import { errorDisplay } from "../../shared/error-display";
-import { commonMessages } from "@atelier/ui/messages/common";
+import { commonMessages } from "@asterism/ui/messages/common";
 import type { ResourceStatusMark } from "./resource-status";
 
 export type ApplicationState = {

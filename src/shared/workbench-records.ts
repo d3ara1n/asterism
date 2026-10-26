@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { defineRecord } from "@atelier/sdk/contracts";
+import { defineRecord } from "@asterism/sdk/contracts";
 
 /** 宿主工作台事件的记录契约；载荷由运行时工作台写入，展示由宿主工作台模块提供。 */
 const target = z.object({ id: z.string() });

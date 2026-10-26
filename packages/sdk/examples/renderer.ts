@@ -2,7 +2,7 @@ import { Counter, CounterView as Card, CreateCounter, ChangeCount, CounterUpdate
 /** 前端作者用例：仅依赖 React、Zod 和公开 SDK，不取用 window.host。 */
 import { createElement, useEffect, useState } from "react";
 import { z } from "zod";
-import { defineRendererPlugin, cardRenderer, useRendererCard, useRendererObject, type RendererModule, type RendererObjectContext } from "@atelier/sdk/renderer";
+import { defineRendererPlugin, cardRenderer, useRendererCard, useRendererObject, type RendererModule, type RendererObjectContext } from "@asterism/sdk/renderer";
 
 function CounterBody({ data }: { data: z.infer<typeof Card.schema> }) {
   const { openChannel, invoke, view, session } = useRendererObject();

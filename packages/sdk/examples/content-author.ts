@@ -1,4 +1,4 @@
-import { defineModule, definePlugin, implementAction, implementCreation, implementResource, type ObjectReader } from "@atelier/sdk/runtime";
+import { defineModule, definePlugin, implementAction, implementCreation, implementResource, type ObjectReader } from "@asterism/sdk/runtime";
 import { CreateDocument, Document, DocumentContent, Imported, ReplaceDocument, files } from "./content-contract.ts";
 
 /** 会话持有内容，插件只解释业务格式；示例不访问宿主源码或私有路径。 */

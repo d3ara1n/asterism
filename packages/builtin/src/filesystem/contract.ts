@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { defineImplementation, defineCreation, defineCall, contentRefSchema } from "@atelier/sdk/contracts";
-import { builtin, List, Read, Edit, Write, See, textReadSchema, textChangeSchema } from "@atelier/builtin-api/contracts";
+import { defineImplementation, defineCreation, defineCall, contentRefSchema } from "@asterism/sdk/contracts";
+import { builtin, List, Read, Edit, Write, See, textReadSchema, textChangeSchema } from "@asterism/builtin-api/contracts";
 
 export const Directory = builtin.resource("directory", z.object({ path: z.string() }));
 export const CreateDirectory = defineCreation(Directory, { id: builtin.name("directory.create"),

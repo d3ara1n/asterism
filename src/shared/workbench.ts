@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { presentationSchema } from "@atelier/sdk/contracts";
+import { presentationSchema } from "@asterism/sdk/contracts";
 
 const id = z.string().min(1).max(160);
 const sessionId = z.string().uuid();

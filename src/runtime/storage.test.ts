@@ -14,7 +14,7 @@ afterEach(() => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
 function setup() {
-  const root = mkdtempSync(join(tmpdir(), "atelier-storage-")); roots.push(root);
+  const root = mkdtempSync(join(tmpdir(), "asterism-storage-")); roots.push(root);
   const db = openDatabase(root); databases.push(db);
   return { db, tree: new SessionTree(db) };
 }

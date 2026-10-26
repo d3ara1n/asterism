@@ -1,6 +1,6 @@
-import { defineMessages, pluginNamespace } from "@atelier/sdk/contracts";
+import { defineMessages, pluginNamespace } from "@asterism/sdk/contracts";
 
-export const providersMessages = pluginNamespace("atelier.host").messages("en", defineMessages({
+export const providersMessages = pluginNamespace("asterism.host").messages("en", defineMessages({
   usage: { id: "providerUsage.selection", defaultMessage: "Usage query" },
   usageOff: { id: "providerUsage.off", defaultMessage: "Off" },
   usageMissing: { id: "providerUsage.missing", defaultMessage: "{id} (unavailable)" },

@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { useRendererCalls } from "@atelier/sdk/renderer";
-import { ReadAgentCreations } from "@atelier/builtin-api/contracts";
+import { useRendererCalls } from "@asterism/sdk/renderer";
+import { ReadAgentCreations } from "@asterism/builtin-api/contracts";
 
 interface CreationDirectory {
   readonly kinds: ReadonlyMap<string, string>;

@@ -3,12 +3,12 @@ import { join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { z } from "zod";
 import type { CredentialVault } from "../configuration/credentials.ts";
-import { jsonSchema, type Json, type ConfigContract } from "@atelier/sdk/contracts";
-import { PluginApiError, validationMessage, type PluginConfig, type PluginSecrets, type PluginStorageDeclaration } from "@atelier/sdk/runtime";
+import { jsonSchema, type Json, type ConfigContract } from "@asterism/sdk/contracts";
+import { PluginApiError, validationMessage, type PluginConfig, type PluginSecrets, type PluginStorageDeclaration } from "@asterism/sdk/runtime";
 import type { PluginConfiguration } from "../shared/plugin-configuration.ts";
 
 /** 宿主托管目录名；插件目录其余部分归插件自由写入。 */
-export const managedDirectory = ".atelier";
+export const managedDirectory = ".asterism";
 const secretKey = z.string().min(1).max(160).regex(/^[A-Za-z0-9._-]+$/u);
 const references = z.record(z.string(), z.string().uuid());
 
@@ -23,7 +23,7 @@ function writeJson(file: string, value: unknown): void {
 }
 
 /**
- * 单个插件的托管存储：`<extensions>/<pluginId>/` 与其中的 `.atelier/`。
+ * 单个插件的托管存储：`<extensions>/<pluginId>/` 与其中的 `.asterism/`。
  * 目录、配置、凭据引用与数据库均懒创建；凭据明文只在 vault 中。
  */
 export class PluginStorage {

@@ -1,6 +1,6 @@
-import { defineMessages, pluginNamespace } from "@atelier/sdk/contracts";
+import { defineMessages, pluginNamespace } from "@asterism/sdk/contracts";
 
-export const rolesMessages = pluginNamespace("atelier.host").messages("en", defineMessages({
+export const rolesMessages = pluginNamespace("asterism.host").messages("en", defineMessages({
   model: {
     id: "features_configuration_RolesSettings_7",
     defaultMessage: "Model",

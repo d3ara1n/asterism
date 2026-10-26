@@ -1,8 +1,8 @@
 import { MessageCircleQuestion } from "lucide-react";
-import type { Json } from "@atelier/sdk/contracts";
-import { toolRenderer, useI18n, type ToolExecutionRenderProps, type ToolResultRenderProps } from "@atelier/sdk/renderer";
-import { StatusText } from "@atelier/ui/ui/status";
-import { ToolHeader } from "@atelier/ui/tool-header";
+import type { Json } from "@asterism/sdk/contracts";
+import { toolRenderer, useI18n, type ToolExecutionRenderProps, type ToolResultRenderProps } from "@asterism/sdk/renderer";
+import { StatusText } from "@asterism/ui/ui/status";
+import { ToolHeader } from "@asterism/ui/tool-header";
 import { questionMessages as messages } from "../messages/questions";
 import { AnswerSummary } from "./answer-summary";
 import { askUserArgs, AskUserResult, type Answer, type Question } from "./contract";

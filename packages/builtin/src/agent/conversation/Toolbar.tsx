@@ -1,4 +1,4 @@
-import { AgentToolbarItem, useAgentModelSelection } from "@atelier/builtin-api/renderer";
+import { AgentToolbarItem, useAgentModelSelection } from "@asterism/builtin-api/renderer";
 import { AgentConfigurationPicker } from "./ConfigurationPicker";
 import { ContextUsage } from "./ContextUsage";
 import { useConversationInteraction } from "./interaction";

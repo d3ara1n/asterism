@@ -3,10 +3,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { z } from "zod";
-import { defineCreation, defineAction, defineRecord, pluginNamespace, thinkingLevels, type Json, type ResourceRef } from "@atelier/sdk/contracts";
-import { definePlugin, defineModule, implementCreation, implementResource, implementPreparer, type PluginContext, type PluginDefinition, type ObjectExecutor, type ToolSession, defineTopLevelTool } from "@atelier/sdk/runtime";
-import { agentCreations, defineAgentCreation } from "@atelier/builtin-api/runtime";
-import { CreateAgent, ReadAgentCreations } from "@atelier/builtin-api/contracts";
+import { defineCreation, defineAction, defineRecord, pluginNamespace, thinkingLevels, type Json, type ResourceRef } from "@asterism/sdk/contracts";
+import { definePlugin, defineModule, implementCreation, implementResource, implementPreparer, type PluginContext, type PluginDefinition, type ObjectExecutor, type ToolSession, defineTopLevelTool } from "@asterism/sdk/runtime";
+import { agentCreations, defineAgentCreation } from "@asterism/builtin-api/runtime";
+import { CreateAgent, ReadAgentCreations } from "@asterism/builtin-api/contracts";
 import { CreateNote } from "../../packages/builtin/src/notes/contract.ts";
 import { ApplicationService } from "../runtime/service.ts";
 import type { ModelAdapter } from "../model/contract.ts";
@@ -38,7 +38,7 @@ function open(options: { prepare?: (signal: AbortSignal) => Promise<void>; creat
       inputSchema: z.strictObject({ initial: z.number(), sources: z.array(z.string()).optional() }),
       toInput: ({ initial }) => initial, toOptions: ({ sources }) => ({ resources: sources }) })] };
   } });
-  const root = mkdtempSync(join(tmpdir(), "atelier-session-resources-")); roots.push(root);
+  const root = mkdtempSync(join(tmpdir(), "asterism-session-resources-")); roots.push(root);
   const app = new ApplicationService(root, { plugins: [definition, ...options.plugins ?? []], adapterFactory: options.adapter ? () => options.adapter! : undefined }); apps.push(app);
   const sessionId = app.sessions.tree.create("Resources");
   return { app, sessionId, plugin, session: plugin.session(sessionId) };
@@ -256,13 +256,13 @@ describe("Agent 创建与移除入口", () => {
   it("代理入口声明资源列表，笔记入口按自身 schema 创建", async () => {
     let calls: { name: string; args: Json }[] = [];
     const f = open({ adapter: adapter(() => calls) }), target = await model(f.app), actor = await f.session.create(Create, 0);
-    expect(agentCreations.inspect(f.plugin, "atelier.builtin/agent.create").input).toHaveProperty("properties.resources");
-    expect(agentCreations.inspect(f.plugin, "atelier.builtin/agent.create").input).toHaveProperty("properties.expose_self.type", "boolean");
-    expect(agentCreations.inspect(f.plugin, "atelier.builtin/note.create").input).toMatchObject({
+    expect(agentCreations.inspect(f.plugin, "asterism.builtin/agent.create").input).toHaveProperty("properties.resources");
+    expect(agentCreations.inspect(f.plugin, "asterism.builtin/agent.create").input).toHaveProperty("properties.expose_self.type", "boolean");
+    expect(agentCreations.inspect(f.plugin, "asterism.builtin/note.create").input).toMatchObject({
       type: "object", additionalProperties: false, properties: { title: { type: "string" }, content: { type: "string" } },
     });
-    expect(agentCreations.inspect(f.plugin, "atelier.builtin/note.create").input).not.toHaveProperty("properties.resources");
-    const input = { title: "A note", content: "Note text" }, creation_id = "atelier.builtin/note.create";
+    expect(agentCreations.inspect(f.plugin, "asterism.builtin/note.create").input).not.toHaveProperty("properties.resources");
+    const input = { title: "A note", content: "Note text" }, creation_id = "asterism.builtin/note.create";
     const run = runner(f, actor, target), before = f.session.snapshot().position.nodeId;
     calls = [{ name: "resource_create", args: { creation_id, input, resources: [] } }];
     expect((await run()).tools[0]?.kind).toBe("rejected");
@@ -303,7 +303,7 @@ describe("Agent 创建与移除入口", () => {
     const actor = await f.session.create(Create, 0), shared = await f.session.create(Create, 1), other = await f.session.create(Create, 2);
     f.session.link(actor, shared); f.session.link(actor, other);
     calls = [{ name: "resource_create", args: {
-      creation_id: "atelier.builtin/agent.create",
+      creation_id: "asterism.builtin/agent.create",
       input: { selection: { agent: "worker", model: null, thinking: null }, resources: [shared.id, shared.id],
         ...(exposeSelf === undefined ? {} : { expose_self: exposeSelf }) },
     } }];
@@ -323,7 +323,7 @@ describe("Agent 创建与移除入口", () => {
   it("暴露自身不扩大初始资源列表的授权范围", async () => {
     let resourceId = "";
     const f = open({ adapter: adapter(() => [{ name: "resource_create", args: {
-      creation_id: "atelier.builtin/agent.create",
+      creation_id: "asterism.builtin/agent.create",
       input: { selection: { agent: "worker", model: null, thinking: null }, expose_self: true, resources: [resourceId] },
     } }]) });
     const target = await model(f.app), actor = await f.session.create(Create, 0), other = await f.session.create(Create, 1);
@@ -364,7 +364,7 @@ describe("Agent 创建与移除入口", () => {
     let resourceId = "", mutate: (() => void) | undefined;
     const f = open({ adapter: adapter(() => {
       mutate?.();
-      return [{ name: "resource_create", args: { creation_id: "atelier.builtin/agent.create",
+      return [{ name: "resource_create", args: { creation_id: "asterism.builtin/agent.create",
         input: { selection: { agent: "worker", model: null, thinking: null }, resources: [resourceId] } } }];
     }) });
     const target = await model(f.app), actor = await f.session.create(Create, 0), resource = await f.session.create(Create, 1);

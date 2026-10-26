@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { jsonSchema } from "@atelier/sdk/contracts";
-import { builtin } from "@atelier/builtin-api/contracts";
+import { jsonSchema } from "@asterism/sdk/contracts";
+import { builtin } from "@asterism/builtin-api/contracts";
 
 /** 顶层工具的结果身份由后台与视图共享，保留实际调用时的目录与资源信息。 */
 export const AgentListResult = builtin.data("agent.list",

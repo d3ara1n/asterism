@@ -1,6 +1,6 @@
-import { defineMessages, pluginNamespace } from "@atelier/sdk/contracts";
+import { defineMessages, pluginNamespace } from "@asterism/sdk/contracts";
 
-export const formsMessages = pluginNamespace("atelier.host").messages("en", defineMessages({
+export const formsMessages = pluginNamespace("asterism.host").messages("en", defineMessages({
   default: {
     id: "features_configuration_forms_1",
     defaultMessage: "Default",

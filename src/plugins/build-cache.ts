@@ -87,7 +87,7 @@ export class PluginBuildCache {
   }
   inputs(paths: readonly string[]): void {
     for (const path of paths) {
-      if (path.startsWith("atelier-host:") || path.startsWith("atelier-public:")) continue;
+      if (path.startsWith("asterism-host:") || path.startsWith("asterism-public:")) continue;
       const file = resolve(path);
       if (!this.covers(file)) { this.reusable = false; continue; }
       let parent = dirname(file);

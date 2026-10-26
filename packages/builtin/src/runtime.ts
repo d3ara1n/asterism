@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { definePlugin, implementCall, PluginApiError } from "@atelier/sdk/runtime";
-import { builtin, CreateAgent, agentCreateSchema, type NamingApi } from "@atelier/builtin-api/contracts";
-import { defineAgentCreation } from "@atelier/builtin-api/runtime";
+import { definePlugin, implementCall, PluginApiError } from "@asterism/sdk/runtime";
+import { builtin, CreateAgent, agentCreateSchema, type NamingApi } from "@asterism/builtin-api/contracts";
+import { defineAgentCreation } from "@asterism/builtin-api/runtime";
 import metadata from "../package.json" with { type: "json" };
 import type { BuiltinApplication } from "./application.ts";
 import { createAgentModule } from "./agent/runtime.ts";

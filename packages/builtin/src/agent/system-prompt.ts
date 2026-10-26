@@ -1,7 +1,7 @@
-import { type AgentConfiguration, builtin } from "@atelier/builtin-api/contracts";
-import type { PromptBlock, SystemPrompt } from "@atelier/sdk/contracts";
+import { type AgentConfiguration, builtin } from "@asterism/builtin-api/contracts";
+import type { PromptBlock, SystemPrompt } from "@asterism/sdk/contracts";
 
-export type { PromptBlock, SystemPrompt } from "@atelier/sdk/contracts";
+export type { PromptBlock, SystemPrompt } from "@asterism/sdk/contracts";
 
 const environment = (applicationName: string): PromptBlock => ({
   id: builtin.name("environment"),

@@ -1,10 +1,10 @@
 import { createContext, useContext, useId, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { pluginOf } from "@atelier/sdk/contracts";
-import { RendererPreferencesProvider, useI18n, useRendererCatalogs } from "@atelier/sdk/renderer";
-import { ModelConfiguration, resolveAgentModelSelection, type AgentSelection } from "@atelier/builtin-api/contracts";
-import { agentUI, AgentUIRendererProvider, AgentModelSelectionProvider, type AgentModelSelection, type AgentToolbarItemProps, type AgentUIContribution, type AgentOverlayPosition, type AgentOverlayProps, type AgentModalProps } from "@atelier/builtin-api/renderer";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@atelier/ui/ui/dialog";
+import { pluginOf } from "@asterism/sdk/contracts";
+import { RendererPreferencesProvider, useI18n, useRendererCatalogs } from "@asterism/sdk/renderer";
+import { ModelConfiguration, resolveAgentModelSelection, type AgentSelection } from "@asterism/builtin-api/contracts";
+import { agentUI, AgentUIRendererProvider, AgentModelSelectionProvider, type AgentModelSelection, type AgentToolbarItemProps, type AgentUIContribution, type AgentOverlayPosition, type AgentOverlayProps, type AgentModalProps } from "@asterism/builtin-api/renderer";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@asterism/ui/ui/dialog";
 import { useBuiltinRendererServices } from "../../renderer-context";
 import { createComposerVisibility } from "./composer-visibility";
 import { ScrollArea } from "./ScrollArea";

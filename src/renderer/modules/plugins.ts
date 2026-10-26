@@ -4,15 +4,15 @@ import * as ReactDom from "react-dom";
 import * as ReactDomClient from "react-dom/client";
 import * as ReactIntl from "react-intl";
 import * as zod from "zod";
-import * as sdkContracts from "@atelier/sdk/contracts";
-import * as sdkRenderer from "@atelier/sdk/renderer";
-import type { RendererModule, RendererPlugin } from "@atelier/sdk/renderer";
+import * as sdkContracts from "@asterism/sdk/contracts";
+import * as sdkRenderer from "@asterism/sdk/renderer";
+import type { RendererModule, RendererPlugin } from "@asterism/sdk/renderer";
 import { awaitStartup } from "../app/boot.ts";
 
 /** 共享模块白名单：插件 bundle 的这些导入解析到宿主同一实例，保证只有一个 React。 */
-(globalThis as Record<string, unknown>).__atelierRendererModules = {
+(globalThis as Record<string, unknown>).__asterismRendererModules = {
   react: React, "react/jsx-runtime": ReactJsx, "react-dom": ReactDom, "react-dom/client": ReactDomClient,
-  zod, "@atelier/sdk/contracts": sdkContracts, "@atelier/sdk/renderer": sdkRenderer,
+  zod, "@asterism/sdk/contracts": sdkContracts, "@asterism/sdk/renderer": sdkRenderer,
   "react-intl": ReactIntl,
 };
 
@@ -56,7 +56,7 @@ export async function loadPluginRenderers(entries: readonly RendererEntry[], opt
   const available = new Set(options.available);
   const visiting = new Set<string>();
   const failed = new Set<string>();
-  const load = options.load ?? (path => import(/* @vite-ignore */ `atelier-plugin://${path}`));
+  const load = options.load ?? (path => import(/* @vite-ignore */ `asterism-plugin://${path}`));
   const visit = async (id: string): Promise<void> => {
     options.signal?.throwIfAborted();
     if (available.has(id)) return;

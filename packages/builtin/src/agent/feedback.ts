@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { builtin } from "@atelier/builtin-api/contracts";
-import { errorDetailsSchema } from "@atelier/sdk/contracts";
+import { builtin } from "@asterism/builtin-api/contracts";
+import { errorDetailsSchema } from "@asterism/sdk/contracts";
 
 export const agentFeedbackSchema = z.strictObject({
   origin: z.enum(["model", "software"]), code: z.string(), message: z.string(),

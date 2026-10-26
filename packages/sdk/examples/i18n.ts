@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { defineMessages, pluginNamespace, withValues, type UiText } from "@atelier/sdk/contracts";
-import type { PluginContext } from "@atelier/sdk/runtime";
+import { defineMessages, pluginNamespace, withValues, type UiText } from "@asterism/sdk/contracts";
+import type { PluginContext } from "@asterism/sdk/runtime";
 export const namespace = pluginNamespace("example.counter");
 /** 公共导出保持来源；普通字符串无需目录或初始化。 */
 export const messages = namespace.messages("en", defineMessages({

@@ -1,5 +1,5 @@
-import { defineMessages } from "@atelier/sdk/contracts";
-import { builtin } from "@atelier/builtin-api/contracts";
+import { defineMessages } from "@asterism/sdk/contracts";
+import { builtin } from "@asterism/builtin-api/contracts";
 
 export const peekMessages = builtin.messages("en", defineMessages({
   title: { id: "peek.title", defaultMessage: "Peek" },

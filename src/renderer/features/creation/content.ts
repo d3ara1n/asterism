@@ -1,6 +1,6 @@
 import { runtime } from "../../runtime";
-import type { ContentRange, ContentRef } from "@atelier/sdk/contracts";
-import type { ContentReader, RendererContentInput, RendererReceipt } from "@atelier/sdk/renderer";
+import type { ContentRange, ContentRef } from "@asterism/sdk/contracts";
+import type { ContentReader, RendererContentInput, RendererReceipt } from "@asterism/sdk/renderer";
 import { contentChunkSize, contentReadLimit, type ContentCommand, type ContentReply } from "../../../shared/content";
 
 type Target = Extract<ContentCommand, { type: "input.open" }>["target"];

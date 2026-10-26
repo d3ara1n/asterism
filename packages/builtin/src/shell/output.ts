@@ -48,7 +48,7 @@ export class ShellOutputBuffer {
     if (!text) return;
     const chars = Array.from(text);
     if (!this.file && this.totalChars + chars.length > OUTPUT_CHAR_LIMIT) {
-      const directory = await mkdtemp(join(this.temporaryRoot, "atelier-exec-"));
+      const directory = await mkdtemp(join(this.temporaryRoot, "asterism-exec-"));
       this.path = join(directory, "output.log");
       this.file = await open(this.path, "wx", 0o600);
       await this.file.writeFile(this.tail);

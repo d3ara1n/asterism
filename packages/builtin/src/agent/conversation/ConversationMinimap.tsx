@@ -1,6 +1,6 @@
 import { useMemo } from "react";
-import { useI18n } from "@atelier/sdk/renderer";
-import { ChatMinimap } from "@atelier/ui/ui/chat-minimap";
+import { useI18n } from "@asterism/sdk/renderer";
+import { ChatMinimap } from "@asterism/ui/ui/chat-minimap";
 import { conversationMessages } from "../../messages/conversation";
 import type { TimelineItem } from "./timeline";
 

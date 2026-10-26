@@ -1,6 +1,6 @@
-import { defineMessages, pluginNamespace } from "@atelier/sdk/contracts";
+import { defineMessages, pluginNamespace } from "@asterism/sdk/contracts";
 
-export const homeMessages = pluginNamespace("atelier.host").messages("en", defineMessages({
+export const homeMessages = pluginNamespace("asterism.host").messages("en", defineMessages({
   homePrompt: {
     id: "homePrompt",
     defaultMessage: "What would you like to work on?",
@@ -19,7 +19,7 @@ export const homeMessages = pluginNamespace("atelier.host").messages("en", defin
   },
   setupProvider: {
     id: "home.setup.provider",
-    defaultMessage: "Add a model provider to connect Atelier to your AI service.",
+    defaultMessage: "Add a model provider to connect Asterism to your AI service.",
   },
   openProviders: {
     id: "home.setup.openProviders",
@@ -41,8 +41,8 @@ export const homeMessages = pluginNamespace("atelier.host").messages("en", defin
     id: "home.setup.openRoles",
     defaultMessage: "Configure model roles",
   },
-  workshopHint: {
-    id: "home.workshopHint",
+  workbenchHint: {
+    id: "home.workbenchHint",
     defaultMessage: "Start with a task. Organize materials, explore results, and follow the process with your agent.",
   },
 }));

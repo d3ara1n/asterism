@@ -8,14 +8,14 @@ import { RolesSettings } from "../configuration/RolesSettings";
 import { AgentsSettings } from "../configuration/AgentsSettings";
 import { PluginsOverview, PluginDetails, usePlugins, pluginKey, type PluginManager } from "../plugins/PluginsSettings";
 import { pluginsMessages } from "../../messages/plugins";
-import { Item, ItemContent, ItemTitle, ItemDescription } from "@atelier/ui/ui/item";
-import { Separator } from "@atelier/ui/ui/separator";
+import { Item, ItemContent, ItemTitle, ItemDescription } from "@asterism/ui/ui/item";
+import { Separator } from "@asterism/ui/ui/separator";
 import { Row } from "./layout";
 import { LayoutGroup, AnimatePresence, motion } from "motion/react";
 
-import { Card } from "@atelier/ui/ui/card";
+import { Card } from "@asterism/ui/ui/card";
 
-import { Button } from "@atelier/ui/ui/button";
+import { Button } from "@asterism/ui/ui/button";
 import { ArrowLeft, Info, Palette, Cpu, PlugZap, Bot, type LucideProps } from "lucide-react";
 import { ConfigurationReadStatus } from "../configuration/forms";
 import { ConfigurationContext, useConfiguration } from "../configuration/state";
@@ -32,7 +32,7 @@ import { fadeTransition, islandTransition } from "../../shared/weave/motion";
 
 /** 设置分类注册表：新增分类只需追加一项。仅列入有明确用途的分类。 */
 export type SettingsCategoryId = "general" | "appearance" | "providers" | "roles" | "agents" | "about";
-interface SettingsCategory { id: SettingsCategoryId; title: import("@atelier/sdk/contracts").UiText; summary: import("@atelier/sdk/contracts").UiText; icon: ComponentType<LucideProps>; content: () => ReactNode }
+interface SettingsCategory { id: SettingsCategoryId; title: import("@asterism/sdk/contracts").UiText; summary: import("@asterism/sdk/contracts").UiText; icon: ComponentType<LucideProps>; content: () => ReactNode }
 
 const categories: SettingsCategory[] = [
   { id: "general", title: settingsMessages.generalTitle, summary: settingsMessages.generalSummary, icon: Info, content: () => <><LanguageSettings /><UpdateSettings /><SessionsSettings /></> },

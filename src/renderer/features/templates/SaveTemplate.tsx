@@ -1,19 +1,19 @@
 import { useEffect, useId, useRef, useState } from "react";
-import type { UiText } from "@atelier/sdk/contracts";
+import type { UiText } from "@asterism/sdk/contracts";
 import type { TemplateObjectSummary } from "../../../shared/templates";
 import { templateMessages } from "../../../shared/template-messages";
 import { errorDisplay } from "../../../shared/error-display";
 import { runtime } from "../../runtime";
 import { useI18n } from "../../shared/i18n";
-import { commonMessages } from "@atelier/ui/messages/common";
+import { commonMessages } from "@asterism/ui/messages/common";
 import { formsMessages } from "../../messages/forms";
-import { Button } from "@atelier/ui/ui/button";
-import { Checkbox } from "@atelier/ui/ui/checkbox";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@atelier/ui/ui/dialog";
-import { Field, FieldLabel } from "@atelier/ui/ui/field";
-import { Input } from "@atelier/ui/ui/input";
-import { Alert, AlertDescription } from "@atelier/ui/ui/alert";
-import { Spinner } from "@atelier/ui/ui/spinner";
+import { Button } from "@asterism/ui/ui/button";
+import { Checkbox } from "@asterism/ui/ui/checkbox";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@asterism/ui/ui/dialog";
+import { Field, FieldLabel } from "@asterism/ui/ui/field";
+import { Input } from "@asterism/ui/ui/input";
+import { Alert, AlertDescription } from "@asterism/ui/ui/alert";
+import { Spinner } from "@asterism/ui/ui/spinner";
 import { TemplateObjectLabel } from "./TemplateObjects";
 
 export function SaveTemplate({ sessionId, title, disabled, onSaved, onClose, onRestoreFocus }: {

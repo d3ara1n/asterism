@@ -1,7 +1,7 @@
 import { Info } from "lucide-react";
-import { useI18n, type I18n } from "@atelier/sdk/renderer";
-import type { UiMessage } from "@atelier/sdk/contracts";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@atelier/ui/ui/tooltip";
+import { useI18n, type I18n } from "@asterism/sdk/renderer";
+import type { UiMessage } from "@asterism/sdk/contracts";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@asterism/ui/ui/tooltip";
 import { performanceMessages as messages } from "../../messages/performance";
 import { Section, Stat, Stats } from "../panel-kit";
 import type { DiagnosticRequest } from "./history";

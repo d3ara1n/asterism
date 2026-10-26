@@ -23,7 +23,7 @@ describe("目录创建", () => {
     const { root, service, sessionId } = open();
     const directory = join(root, "directory"); mkdirSync(directory);
     for (const title of [undefined, "  Materials  "]) {
-      await service.sessions.execute({ type: "resource.create", sessionId, kind: Directory.kind, creation: { id: "atelier.builtin/directory.create" },
+      await service.sessions.execute({ type: "resource.create", sessionId, kind: Directory.kind, creation: { id: "asterism.builtin/directory.create" },
         input: { path: directory, ...(title ? { title } : {}) }, position: { x: 0, y: 0 } });
     }
     const snapshot = service.sessions.current(sessionId);
@@ -39,7 +39,7 @@ describe("目录创建", () => {
     const { root, service, sessionId } = open();
     const file = join(root, "file.txt"); writeFileSync(file, "text");
     for (const input of [{ path: "relative" }, { path: join(root, "missing") }, { path: file }]) {
-      await expect(service.sessions.execute({ type: "resource.create", sessionId, kind: Directory.kind, creation: { id: "atelier.builtin/directory.create" },
+      await expect(service.sessions.execute({ type: "resource.create", sessionId, kind: Directory.kind, creation: { id: "asterism.builtin/directory.create" },
         input, position: { x: 0, y: 0 } })).rejects.toMatchObject({ code: "invalid_request" });
     }
     expect(service.sessions.tree.nodes(sessionId)).toEqual([]);

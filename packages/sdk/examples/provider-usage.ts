@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { pluginNamespace, type ModelProviderPreset, type UsageItem } from "@atelier/sdk/contracts";
-import { definePlugin, UsageQueryError, type UsageProvider } from "@atelier/sdk/runtime";
+import { pluginNamespace, type ModelProviderPreset, type UsageItem } from "@asterism/sdk/contracts";
+import { definePlugin, UsageQueryError, type UsageProvider } from "@asterism/sdk/runtime";
 
 const ns = pluginNamespace("example.allowance");
 // 示例站点约定：GET /account/allowance 返回余额与五小时剩余比例；由提供方负责协议解析。

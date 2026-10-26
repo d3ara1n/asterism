@@ -1,6 +1,6 @@
-import { defineMessages, pluginNamespace } from "@atelier/sdk/contracts";
+import { defineMessages, pluginNamespace } from "@asterism/sdk/contracts";
 
-export const markdownMessages = pluginNamespace("atelier.builtin").messages("en", defineMessages({
+export const markdownMessages = pluginNamespace("asterism.builtin").messages("en", defineMessages({
   markdownImage: {
     id: "markdownImage",
     defaultMessage: "View image",

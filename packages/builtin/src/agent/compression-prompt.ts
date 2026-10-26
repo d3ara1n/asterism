@@ -1,4 +1,4 @@
-import type { ModelInputPart, ModelItem } from "@atelier/sdk/contracts";
+import type { ModelInputPart, ModelItem } from "@asterism/sdk/contracts";
 
 const TOOL_RESULT_CHARS = 2_000;
 

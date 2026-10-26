@@ -1,7 +1,7 @@
 {
-  "name": "@atelier/builtin-api",
+  "name": "@asterism/builtin-api",
   "private": true,
-  "version": "0.17.0",
+  "version": "0.18.0",
   "type": "module",
   "exports": {
     "./contracts": "./src/contracts.ts",
@@ -10,7 +10,7 @@
   },
   "dependencies": {},
   "peerDependencies": {
-    "@atelier/sdk": "^0.44.0",
+    "@asterism/sdk": "^0.45.0",
     "react": "^19.3.0",
     "zod": "^4.6.5"
   },

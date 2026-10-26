@@ -55,14 +55,14 @@ export interface EventPublisher {
 export interface PluginEvents extends EventSubscriber, EventPublisher {}
 
 /** 软件本身发布的公共事件：会话标题实际变化后发出，无插件与资源来源。 */
-export const SessionTitleChanged = defineEvent("atelier/session-title", {
+export const SessionTitleChanged = defineEvent("asterism/session-title", {
   schema: z.strictObject({ sessionId: z.string(), title: z.string() }),
   source: "host",
   semantics: { kind: "snapshot", key: ["sessionId"] },
 });
 
 /** 当前资源集合的瞬态变化；供跨会话的 UI 状态释放使用。 */
-export const ResourcePresenceChanged = defineEvent("atelier/resource-presence", {
+export const ResourcePresenceChanged = defineEvent("asterism/resource-presence", {
   schema: z.strictObject({
     sessionId: z.string(),
     appeared: z.array(z.string()),
@@ -73,7 +73,7 @@ export const ResourcePresenceChanged = defineEvent("atelier/resource-presence", 
 });
 
 /** 每次发布完整替换资源状态；running 持续展示，其他状态在查看会话时消费。 */
-export const ResourceStatusChanged = defineEvent("atelier/resource-status", {
+export const ResourceStatusChanged = defineEvent("asterism/resource-status", {
   schema: z.discriminatedUnion("status", [
     z.strictObject({
       title: uiTextSchema,

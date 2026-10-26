@@ -1,6 +1,6 @@
-import { defineMessages, pluginNamespace } from "@atelier/sdk/contracts";
+import { defineMessages, pluginNamespace } from "@asterism/sdk/contracts";
 
-export const webProviderMessages = pluginNamespace("atelier.host").messages("en", defineMessages({
+export const webProviderMessages = pluginNamespace("asterism.host").messages("en", defineMessages({
   title: { id: "webProviders.title", defaultMessage: "Web providers" },
   hint: { id: "webProviders.hint", defaultMessage: "The first enabled search provider is used for web search. Providers are matched in order for URL fetch." },
   edit: { id: "webProviders.edit", defaultMessage: "Web provider" },

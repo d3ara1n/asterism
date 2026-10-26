@@ -1,5 +1,5 @@
-import type { SessionRecord } from "@atelier/sdk/contracts";
-import { ContextSummary } from "@atelier/builtin-api/contracts";
+import type { SessionRecord } from "@asterism/sdk/contracts";
+import { ContextSummary } from "@asterism/builtin-api/contracts";
 
 export interface HistoryBoundary { summaryId: string; keptFrom: string }
 

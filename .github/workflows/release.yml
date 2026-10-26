@@ -111,7 +111,7 @@ jobs:
           set -euo pipefail
           test -n "$MAC_SIGNING_P12"
           test -n "$MAC_SIGNING_P12_PASSWORD"
-          signing="$RUNNER_TEMP/atelier-signing"
+          signing="$RUNNER_TEMP/asterism-signing"
           mkdir -p "$signing"
           printf '%s' "$MAC_SIGNING_P12" | base64 --decode > "$signing/identity.p12"
           keychain_password="$(openssl rand -hex 24)"
@@ -136,7 +136,7 @@ jobs:
         run: npm run make -- "--$RELEASE_PLATFORM" "--$RELEASE_ARCH"
       - name: Verify macOS signature
         if: runner.os == 'macOS'
-        run: codesign --verify --deep --strict out/mac-arm64/Atelier.app
+        run: codesign --verify --deep --strict out/mac-arm64/Asterism.app
       - uses: actions/upload-artifact@v4
         with:
           name: release-${{ matrix.platform }}-${{ matrix.arch }}
@@ -152,8 +152,8 @@ jobs:
         if: always() && runner.os == 'macOS'
         shell: bash
         run: |
-          security delete-keychain "$RUNNER_TEMP/atelier-signing/build.keychain-db" || true
-          rm -rf "$RUNNER_TEMP/atelier-signing"
+          security delete-keychain "$RUNNER_TEMP/asterism-signing/build.keychain-db" || true
+          rm -rf "$RUNNER_TEMP/asterism-signing"
 
   publish:
     needs: [prepare, build]
@@ -184,5 +184,5 @@ jobs:
           flags=()
           if [[ "$RELEASE_PRERELEASE" == "true" ]]; then flags+=(--prerelease); fi
           gh release create "$tag" artifacts/* --draft --target "$RELEASE_SHA" \
-            --title "Atelier $tag" --notes-file release-notes/notes.md "${flags[@]}"
+            --title "Asterism $tag" --notes-file release-notes/notes.md "${flags[@]}"
           gh release edit "$tag" --draft=false

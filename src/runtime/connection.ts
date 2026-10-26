@@ -1,5 +1,5 @@
-import { PluginApiError } from "@atelier/sdk/runtime";
-import type { ChannelValue } from "@atelier/sdk/contracts";
+import { PluginApiError } from "@asterism/sdk/runtime";
+import type { ChannelValue } from "@asterism/sdk/contracts";
 import { connectionServices, type ChannelControl, type ConnectionPort, type RendererFrame, type RuntimeFrame } from "../shared/connection.ts";
 import { eventControlSchema } from "../shared/plugin-events.ts";
 import { callControlSchema } from "../shared/plugin-calls.ts";

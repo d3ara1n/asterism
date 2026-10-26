@@ -1,7 +1,7 @@
 import { nanoid } from "nanoid";
-import { SubmitAgentInput, CancelAgent, type AgentMessageSender } from "@atelier/builtin-api/contracts";
-import type { ModelInputPart } from "@atelier/sdk/contracts";
-import type { PluginContext, ResourceRef, ResourceActionOptions } from "@atelier/sdk/runtime";
+import { SubmitAgentInput, CancelAgent, type AgentMessageSender } from "@asterism/builtin-api/contracts";
+import type { ModelInputPart } from "@asterism/sdk/contracts";
+import type { PluginContext, ResourceRef, ResourceActionOptions } from "@asterism/sdk/runtime";
 
 /** 后台插件凭资源引用提交完整输入；返回表示已受理，执行状态由 Agent 自身维护。 */
 export async function steerAgent(plugin: PluginContext, agent: ResourceRef, parts: ModelInputPart[], options?: ResourceActionOptions) {

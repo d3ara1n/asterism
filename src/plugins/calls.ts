@@ -1,5 +1,5 @@
-import { belongsTo, jsonSchema, type CallContract, type CallOptions, type Json, type PluginCalls, type ResourceRef, type Source } from "@atelier/sdk/contracts";
-import { PluginApiError, type CallContribution } from "@atelier/sdk/runtime";
+import { belongsTo, jsonSchema, type CallContract, type CallOptions, type Json, type PluginCalls, type ResourceRef, type Source } from "@asterism/sdk/contracts";
+import { PluginApiError, type CallContribution } from "@asterism/sdk/runtime";
 import type { SdkContext } from "./sdk-context.ts";
 import type { RunGroup } from "./lifecycle.ts";
 import type { PluginHostServices } from "./loader.ts";

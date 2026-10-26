@@ -7,7 +7,7 @@ import { objectRetention } from "../session/retention";
  */
 const focused = new Map<string, string>();
 const listeners = new Set<() => void>();
-const retentionKey = "atelier.host/focus";
+const retentionKey = "asterism.host/focus";
 
 export function focusedObject(sessionId: string): string | null {
   return focused.get(sessionId) ?? null;

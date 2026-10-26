@@ -1,6 +1,6 @@
-import { useI18n } from "@atelier/sdk/renderer";
-import { Marker, MarkerContent, MarkerIcon } from "@atelier/ui/ui/marker";
-import { StatusIcon } from "@atelier/ui/ui/status";
+import { useI18n } from "@asterism/sdk/renderer";
+import { Marker, MarkerContent, MarkerIcon } from "@asterism/ui/ui/marker";
+import { StatusIcon } from "@asterism/ui/ui/status";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { conversationMessages } from "../../messages/conversation";
 import type { TimelineItem } from "./timeline";

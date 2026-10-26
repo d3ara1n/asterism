@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Catalog, Model } from "@opencode-ai/models";
 import { createModelInput, modelReference, type ProviderModel } from "../shared/configuration.ts";
 import { loadModelCatalog, modelParameters } from "./model-catalog.ts";
-import { emptyModelRates, emptyModalityRates, type ModelCost } from "@atelier/sdk/contracts";
+import { emptyModelRates, emptyModalityRates, type ModelCost } from "@asterism/sdk/contracts";
 
 const current: ProviderModel = {
   ...createModelInput("my-connection", { modelId: "test-model", name: "My model" }),

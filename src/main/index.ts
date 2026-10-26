@@ -1,6 +1,6 @@
 import { app, BrowserWindow, dialog, ipcMain, MessageChannelMain, net, protocol, session, shell } from "electron";
 import { randomUUID } from "node:crypto";
-import { externalWebUrl } from "@atelier/ui/links";
+import { externalWebUrl } from "@asterism/ui/links";
 import { mkdirSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -113,7 +113,7 @@ function createWindow(): void {
   window = new BrowserWindow({
     ...state.bounds, minWidth: state.minWidth, minHeight: state.minHeight, title: applicationBrand.en,
     // macOS 与 Windows 使用打包内嵌图标；Linux 窗口需显式指定。
-    ...(process.platform === "linux" ? { icon: applicationIconFile("atelier-full.png") } : {}),
+    ...(process.platform === "linux" ? { icon: applicationIconFile("asterism-full.png") } : {}),
     ...initialWindowAppearance(),
     ...initialTitleBar(titleBar),
     autoHideMenuBar: true,
@@ -261,10 +261,10 @@ function createWindow(): void {
 }
 
 // 插件产物协议：只读提供启动时打包的插件缓存目录，不访问其他路径。
-protocol.registerSchemesAsPrivileged([{ scheme: "atelier-plugin", privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } }]);
+protocol.registerSchemesAsPrivileged([{ scheme: "asterism-plugin", privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } }]);
 function servePluginArtifacts(root: string): void {
   const cache = resolve(root, "plugins", ".cache");
-  protocol.handle("atelier-plugin", request => {
+  protocol.handle("asterism-plugin", request => {
     const url = new URL(request.url);
     const file = resolve(cache, url.hostname, `.${decodeURIComponent(url.pathname)}`);
     const inside = relative(cache, file);
@@ -318,7 +318,7 @@ if (!app.requestSingleInstanceLock()) {
       permitted(contents, permission, details.isMainFrame));
     servePluginArtifacts(dataRoot);
     // 开发运行没有应用包图标，Dock 显式使用正式图标。
-    if (process.platform === "darwin" && !app.isPackaged) app.dock?.setIcon(applicationIconFile("atelier.png"));
+    if (process.platform === "darwin" && !app.isPackaged) app.dock?.setIcon(applicationIconFile("asterism.png"));
     await startup.run();
     app.on("activate", () => { if (!quitting && BrowserWindow.getAllWindows().length === 0) createWindow(); });
   }).catch(error => {

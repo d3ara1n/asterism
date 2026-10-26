@@ -1,5 +1,5 @@
-import type { ChannelContract, ChannelEnd, ChannelValue, ResourceRef } from "@atelier/sdk/contracts";
-import type { RendererChannel } from "@atelier/sdk/renderer";
+import type { ChannelContract, ChannelEnd, ChannelValue, ResourceRef } from "@asterism/sdk/contracts";
+import type { RendererChannel } from "@asterism/sdk/renderer";
 import type { ChannelBridge, ChannelFrame } from "./connection.ts";
 
 class ClientChannel implements RendererChannel {

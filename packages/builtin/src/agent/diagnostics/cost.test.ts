@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { Usage } from "@atelier/sdk/contracts";
+import type { Usage } from "@asterism/sdk/contracts";
 import { createModelInput } from "../../../../../src/shared/configuration.ts";
-import { modelCostSchema } from "@atelier/sdk/contracts";
+import { modelCostSchema } from "@asterism/sdk/contracts";
 import { diagnosticModel, estimateUsageCost } from "./cost.ts";
 
 const usage: Usage = { input: 1000, output: 100, total: 1100, cacheRead: 200, cacheWrite: 100, reasoning: 40 };

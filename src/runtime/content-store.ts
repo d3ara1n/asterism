@@ -3,8 +3,8 @@ import { mkdirSync, readdirSync, renameSync, rmSync } from "node:fs";
 import { open, type FileHandle } from "node:fs/promises";
 import { join } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
-import { belongsTo, contentRefSchema, type ContentRef, type ContentRange, type Json } from "@atelier/sdk/contracts";
-import { PluginApiError, type ContentReader, type ContentScope } from "@atelier/sdk/runtime";
+import { belongsTo, contentRefSchema, type ContentRef, type ContentRange, type Json } from "@asterism/sdk/contracts";
+import { PluginApiError, type ContentReader, type ContentScope } from "@asterism/sdk/runtime";
 import { contentChunkSize, contentReadLimit } from "../shared/content.ts";
 
 /** 宿主实现参数：单块 1 MiB、单份 256 MiB、临时总额 1 GiB、单次 read 16 MiB。 */
@@ -45,10 +45,10 @@ export function contentReferences(value: Json): ContentRef[] {
     const item = pending.pop()!;
     if (item === null || typeof item !== "object") continue;
     if (Array.isArray(item)) { for (const value of item) pending.push(value); continue; }
-    if (Object.hasOwn(item, "$atelier.content")) {
+    if (Object.hasOwn(item, "$asterism.content")) {
       const parsed = contentRefSchema.safeParse(item);
       if (parsed.success) {
-        refs.set(parsed.data["$atelier.content"], parsed.data);
+        refs.set(parsed.data["$asterism.content"], parsed.data);
         continue;
       }
     }
@@ -174,7 +174,7 @@ export class ContentStore {
   private stored(ref: ContentRef): Stored {
     const parsed = contentRefSchema.safeParse(ref);
     if (!parsed.success) invalid("Invalid content reference.");
-    const row = this.db.prepare("SELECT id, size, digest FROM contents WHERE id = ?").get(parsed.data!["$atelier.content"]) as Stored | undefined;
+    const row = this.db.prepare("SELECT id, size, digest FROM contents WHERE id = ?").get(parsed.data!["$asterism.content"]) as Stored | undefined;
     if (!row) unavailable("The referenced content is unavailable.");
     return row!;
   }
@@ -244,7 +244,7 @@ export class ContentStore {
     }
     // 记录只追加；终态元数据可能再次指向同一物理块，不撤回其正文依赖。
     const insert = this.db.prepare("INSERT OR IGNORE INTO content_roots VALUES (?, ?, ?, ?, ?)");
-    for (const ref of refs) insert.run(sessionId, objectId, root.kind, root.id, ref["$atelier.content"]);
+    for (const ref of refs) insert.run(sessionId, objectId, root.kind, root.id, ref["$asterism.content"]);
     this.unrooted = undefined; this.scheduleCollection();
   }
   async begin(scope: ContentLease): Promise<string> {
@@ -303,7 +303,7 @@ export class ContentStore {
         this.db.prepare("INSERT INTO contents VALUES (?, ?, ?)").run(contentId, digest, upload.size); this.unrooted = undefined;
       }
       scope.add(contentId); this.uploads.delete(id);
-      return { "$atelier.content": contentId };
+      return { "$asterism.content": contentId };
     });
     upload.tail = work; return scope.track(work);
   }

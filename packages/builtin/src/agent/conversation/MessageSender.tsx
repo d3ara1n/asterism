@@ -1,6 +1,6 @@
 import { Bot } from "lucide-react";
-import { useI18n } from "@atelier/sdk/renderer";
-import type { AgentMessageSender } from "@atelier/builtin-api/contracts";
+import { useI18n } from "@asterism/sdk/renderer";
+import type { AgentMessageSender } from "@asterism/builtin-api/contracts";
 import { conversationMessages } from "../../messages/conversation";
 
 /** 对话与草稿箱共用发送者标识；不向用户展示路由句柄。 */

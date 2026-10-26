@@ -1,5 +1,5 @@
-import type { ModelInputPart, SessionSnapshot } from "@atelier/sdk/contracts";
-import { ContextSummary, Execution, AgentInputMessage } from "@atelier/builtin-api/contracts";
+import type { ModelInputPart, SessionSnapshot } from "@asterism/sdk/contracts";
+import { ContextSummary, Execution, AgentInputMessage } from "@asterism/builtin-api/contracts";
 import { projectInputMessage } from "../input-message.ts";
 
 export interface PeekRecord {

@@ -1,6 +1,6 @@
 import { webProviderTypeSchema, webResponseSchema, webSearchRequestSchema, webFetchRequestSchema,
-  type WebProviderState, type WebProviderType, type WebSearchRequest, type WebFetchRequest, type WebResponse } from "@atelier/sdk/contracts";
-import { WebError, type WebProviderDefinition, type WebProviderInstance, type WebProviderServices, type WebServices } from "@atelier/sdk/runtime";
+  type WebProviderState, type WebProviderType, type WebSearchRequest, type WebFetchRequest, type WebResponse } from "@asterism/sdk/contracts";
+import { WebError, type WebProviderDefinition, type WebProviderInstance, type WebProviderServices, type WebServices } from "@asterism/sdk/runtime";
 import type { RunGroup } from "../plugins/lifecycle.ts";
 
 /** 完整 URL glob：仅 * 为通配符，其余字符按字面匹配。 */

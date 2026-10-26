@@ -1,6 +1,6 @@
-import { defineMessages, pluginNamespace } from "@atelier/sdk/contracts";
+import { defineMessages, pluginNamespace } from "@asterism/sdk/contracts";
 
-export const performanceMessages = pluginNamespace("atelier.builtin").messages("en", defineMessages({
+export const performanceMessages = pluginNamespace("asterism.builtin").messages("en", defineMessages({
   timing: { id: "diagnostics.timing", defaultMessage: "Timing" },
   rates: { id: "diagnostics.rates", defaultMessage: "Token rates" },
   performance: { id: "diagnostics.performance", defaultMessage: "Time & throughput" },

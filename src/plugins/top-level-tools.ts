@@ -1,5 +1,5 @@
-import { jsonSchema, reference, type Json, type ResourceRef, type ToolContract } from "@atelier/sdk/contracts";
-import type { TopLevelTool } from "@atelier/sdk/runtime";
+import { jsonSchema, reference, type Json, type ResourceRef, type ToolContract } from "@asterism/sdk/contracts";
+import type { TopLevelTool } from "@asterism/sdk/runtime";
 import type { Invocation } from "../tools/contract.ts";
 import type { SdkContext } from "./sdk-context.ts";
 import type { RunGroup } from "./lifecycle.ts";

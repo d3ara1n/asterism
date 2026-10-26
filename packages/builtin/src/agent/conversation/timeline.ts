@@ -1,6 +1,6 @@
 import type { z } from "zod";
-import type { ModelLiveBlock, SessionSnapshot, SessionRecord, ModelInputPart } from "@atelier/sdk/contracts";
-import { ContextSummary, Execution, AgentInputMessage, type AgentMessageSender } from "@atelier/builtin-api/contracts";
+import type { ModelLiveBlock, SessionSnapshot, SessionRecord, ModelInputPart } from "@asterism/sdk/contracts";
+import { ContextSummary, Execution, AgentInputMessage, type AgentMessageSender } from "@asterism/builtin-api/contracts";
 import { turnMetrics, type TurnMetricsData } from "./turn-metrics";
 import type { CompressionActivity, InlineFeedback } from "../feedback";
 import type { HistoryBoundary } from "./history-window";

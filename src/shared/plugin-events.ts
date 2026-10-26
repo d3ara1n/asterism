@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { jsonSchema } from "@atelier/sdk/contracts";
+import { jsonSchema } from "@asterism/sdk/contracts";
 import { sourceSchema } from "./session.ts";
 
 const id = z.string().uuid();

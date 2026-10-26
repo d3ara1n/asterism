@@ -1,8 +1,8 @@
 import { Client, StreamableHTTPClientTransport, UnauthorizedError, type CallToolResult, type Progress, type Transport } from "@modelcontextprotocol/client";
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
 import type { AjvJsonSchemaValidator } from "@modelcontextprotocol/client/validators/ajv";
-import type { PluginContext } from "@atelier/sdk/runtime";
-import type { Json } from "@atelier/sdk/contracts";
+import type { PluginContext } from "@asterism/sdk/runtime";
+import type { Json } from "@asterism/sdk/contracts";
 import type { ConnectionPhase, McpServerConfig, McpServerState } from "./contract.ts";
 import { directorySchema, type CachedTool, type Directory } from "./catalog.ts";
 import { McpError, McpInterrupted } from "./errors.ts";
@@ -161,7 +161,7 @@ export class ServerSession {
   private createLive(config: McpServerConfig, values: Record<string, string>, oauth: McpOAuth | undefined, transitionScope: AbortSignal): Live {
     const scope = new AbortController();
     const lifetime = AbortSignal.any([scope.signal, this.host.plugin.lifetime.signal]);
-    const client = new Client({ name: "Atelier", version: "0.1.0" }, {
+    const client = new Client({ name: "Asterism", version: "0.1.0" }, {
       // stdio 使用默认 initialize 握手，每次连接只启动实际服务器进程；HTTP 在原连接上探测协议版本。
       capabilities: {}, ...(config.transport === "http" && { versionNegotiation: { mode: "auto" as const } }),
       listMaxPages: 0, jsonSchemaValidator: this.host.validator,

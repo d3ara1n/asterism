@@ -1,5 +1,5 @@
-import { completionData, type ModelBlock, type ModelCompletion, type ModelInputPart, type SessionRecord, type SessionView } from "@atelier/sdk/contracts";
-import { ContextSummary, Execution, AgentRequestContext, AgentInputMessage, type AgentRequestContextData, type AgentMessageSender } from "@atelier/builtin-api/contracts";
+import { completionData, type ModelBlock, type ModelCompletion, type ModelInputPart, type SessionRecord, type SessionView } from "@asterism/sdk/contracts";
+import { ContextSummary, Execution, AgentRequestContext, AgentInputMessage, type AgentRequestContextData, type AgentMessageSender } from "@asterism/builtin-api/contracts";
 
 export type DiagnosticScope = "timeline" | "session";
 export interface DiagnosticRequest {

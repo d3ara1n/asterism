@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { defineCreation, defineImplementation, defineTool, webSearchRequestSchema, webFetchRequestSchema,
-  webSearchResultSchema, webFetchResultSchema } from "@atelier/sdk/contracts";
-import { builtin } from "@atelier/builtin-api/contracts";
+  webSearchResultSchema, webFetchResultSchema } from "@asterism/sdk/contracts";
+import { builtin } from "@asterism/builtin-api/contracts";
 
 export const WebResource = builtin.resource("web", z.object({}));
 export const CreateWeb = defineCreation(WebResource, { id: builtin.name("web.create"), schema: z.object({ title: z.string().trim().min(1).default("Web") }) });

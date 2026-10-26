@@ -8,7 +8,7 @@ import { ApplicationService } from "../../../../src/runtime/service.ts";
 import { AgentCapabilities } from "../../../../src/execution/capabilities.ts";
 import { executeCoreBatch } from "../../../../src/execution/core.ts";
 import type { Json, ToolOutcome } from "../../../../src/shared/model.ts";
-import { textReadSchema } from "@atelier/builtin-api/contracts";
+import { textReadSchema } from "@asterism/builtin-api/contracts";
 import { readTextFile, commitTextFile } from "./text-io.ts";
 import { writableTarget } from "./paths.ts";
 
@@ -27,7 +27,7 @@ function setup() {
   const root = mkdtempSync(join(tmpdir(), "builtin-text-")); roots.push(root);
   const directory = join(root, "directory"), outside = join(root, "outside");
   mkdirSync(directory); mkdirSync(outside);
-  const resource = { id: "directory", kind: "atelier.builtin/directory", title: "Directory", data: { path: directory } };
+  const resource = { id: "directory", kind: "asterism.builtin/directory", title: "Directory", data: { path: directory } };
   let modules!: ReturnType<typeof runtimeModules.createModules>;
   const createModules = runtimeModules.createModules;
   const capture = vi.spyOn(runtimeModules, "createModules").mockImplementation((...args) => {

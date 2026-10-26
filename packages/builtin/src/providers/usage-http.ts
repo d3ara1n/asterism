@@ -1,6 +1,6 @@
 import { z } from "zod";
-import type { UiText, UsageItem } from "@atelier/sdk/contracts";
-import { UsageQueryError, type QueryUsageProvider, type UsageQueryContext } from "@atelier/sdk/runtime";
+import type { UiText, UsageItem } from "@asterism/sdk/contracts";
+import { UsageQueryError, type QueryUsageProvider, type UsageQueryContext } from "@asterism/sdk/runtime";
 
 /** 金额接口可用十进制字符串，空串、布尔值和非有限数不能被当成零余额。 */
 export const decimal = z.union([z.number(), z.string().trim().regex(/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/u).transform(Number)])

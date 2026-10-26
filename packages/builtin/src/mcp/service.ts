@@ -1,7 +1,7 @@
 import { AjvJsonSchemaValidator } from "@modelcontextprotocol/client/validators/ajv";
 import type { Progress, CallToolResult } from "@modelcontextprotocol/client";
-import { PluginApiError, type PluginContext } from "@atelier/sdk/runtime";
-import type { Json } from "@atelier/sdk/contracts";
+import { PluginApiError, type PluginContext } from "@asterism/sdk/runtime";
+import type { Json } from "@asterism/sdk/contracts";
 import { credentialsSchema, type McpServerConfig, type McpServerState } from "./contract.ts";
 import { directorySchema, inspectTool, listCatalog, parseToolIdentity, searchCatalog, type CatalogServer, type Directory } from "./catalog.ts";
 import { ServerSession, credentialKey, endpointOf, type SessionHost } from "./session.ts";

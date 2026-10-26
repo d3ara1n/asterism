@@ -1,9 +1,9 @@
 import type { ReactNode } from "react";
 import { Download, Search } from "lucide-react";
-import { useI18n, type I18n } from "@atelier/sdk/renderer";
-import { StatusIcon, type StatusTone } from "@atelier/ui/ui/status";
-import { Spinner } from "@atelier/ui/ui/spinner";
-import { cn } from "@atelier/ui/utils";
+import { useI18n, type I18n } from "@asterism/sdk/renderer";
+import { StatusIcon, type StatusTone } from "@asterism/ui/ui/status";
+import { Spinner } from "@asterism/ui/ui/spinner";
+import { cn } from "@asterism/ui/utils";
 import type { WebCardData } from "./contract";
 import { webMessages as messages } from "../messages/web";
 

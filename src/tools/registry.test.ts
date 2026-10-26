@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import { defineImplementation, defineResource, defineTool } from "@atelier/sdk/contracts";
-import { defineData } from "@atelier/sdk/contracts";
+import { defineImplementation, defineResource, defineTool } from "@asterism/sdk/contracts";
+import { defineData } from "@asterism/sdk/contracts";
 import { implement, toolCaller } from "./testing.ts";
 import { declareTool, projectTool } from "./definition.ts";
 import { ToolRegistry } from "./registry.ts";

@@ -1,4 +1,4 @@
-import type { CardAppearance } from "@atelier/sdk/contracts";
+import type { CardAppearance } from "@asterism/sdk/contracts";
 
 /** 内置资源的几何声明，后台放置与前端卡片共用。 */
 export const agentCard = { width: 560, height: 640, minWidth: 480, minHeight: 480 } satisfies CardAppearance;

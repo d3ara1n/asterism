@@ -1,13 +1,13 @@
-import type { UiText } from "@atelier/sdk/contracts";
-import { type PluginDefinition, PluginApiError } from "@atelier/sdk/runtime";
+import type { UiText } from "@asterism/sdk/contracts";
+import { type PluginDefinition, PluginApiError } from "@asterism/sdk/runtime";
 import { join } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 
 import { ConfigurationService } from "../configuration/service.ts";
 import type { ModelAdapter } from "../model/contract.ts";
 import { PackageList, PluginPackageError, readManifest, readPackageMetadata, packageRoot } from "../plugins/packages.ts";
-import { builtinMetadata } from "@atelier/builtin/runtime";
-import { builtin } from "@atelier/builtin-api/contracts";
+import { builtinMetadata } from "@asterism/builtin/runtime";
+import { builtin } from "@asterism/builtin-api/contracts";
 import { commandSchema, snapshotSchema, type AppSnapshot, type AppError } from "../shared/contracts.ts";
 import type { TranslationCatalog } from "../shared/i18n.ts";
 import type { ModelSettings } from "../shared/model.ts";
@@ -111,7 +111,7 @@ export class ApplicationService {
         dependencies: startup?.rendererDependencies ?? [] };
     });
     const builtIn = this.sessions.plugins.find(plugin => plugin.id === builtin.id);
-    plugins.push({ index: null, source: "@atelier/builtin", id: builtin.id, metadata: builtinMetadata,
+    plugins.push({ index: null, source: "@asterism/builtin", id: builtin.id, metadata: builtinMetadata,
       status: builtIn?.status ?? "failed", enabled: true, error: builtIn?.error ?? null, renderer: null, dependencies: [] });
     return snapshotSchema.parse({ workspace, sessions, templates: this.sessions.templates.list(), archivedSessions, plugins, catalogs: this.options.catalogs ?? [], restartRequired: JSON.stringify(current) !== this.started,
       ...(command.type === "workspace.prepare-close" ? { disposalWarnings: this.sessions.disposalWarnings() } : {}) });

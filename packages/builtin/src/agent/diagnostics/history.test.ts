@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { present, type ModelCompletion } from "@atelier/sdk/contracts";
+import { present, type ModelCompletion } from "@asterism/sdk/contracts";
 import { sessionView } from "../../../../../src/plugins/records.ts";
 import { nodeView } from "../../../../../src/session/view.ts";
 import { agentSource, call, event, message, node, text, thinking } from "../../../../../src/session/test-nodes.ts";
-import { ContextSummary, Execution, AgentRequestContext, AgentInputMessage } from "@atelier/builtin-api/contracts";
+import { ContextSummary, Execution, AgentRequestContext, AgentInputMessage } from "@asterism/builtin-api/contracts";
 import { diagnosticHistory } from "./history.ts";
 
 const completion: ModelCompletion = { finishReason: "stop", rawFinishReason: null, providerResponseId: "upstream-id",
@@ -65,7 +65,7 @@ describe("代理诊断历史", () => {
   });
 
   it("输入模态沿请求真实父链判断，压缩移除旧附件后不再影响新请求", () => {
-    const file = { kind: "file", file: { "$atelier.content": "00000000-0000-4000-8000-000000000001" }, mediaType: "image/png" };
+    const file = { kind: "file", file: { "$asterism.content": "00000000-0000-4000-8000-000000000001" }, mediaType: "image/png" };
     const nodes = [
       node("file", null, event(AgentInputMessage.id, { sender: { kind: "user" }, startsTurn: true, parts: [file] }, { source: agentSource("a") })),
       node("before", "file", text("a", "before", 0, "Read file", { requestParentId: "file", completion })),

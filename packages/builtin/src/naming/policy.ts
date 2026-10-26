@@ -1,5 +1,5 @@
-import { inputSummary, Execution, AgentInputMessage } from "@atelier/builtin-api/contracts";
-import type { SessionRecord, SessionSnapshot } from "@atelier/sdk/contracts";
+import { inputSummary, Execution, AgentInputMessage } from "@asterism/builtin-api/contracts";
+import type { SessionRecord, SessionSnapshot } from "@asterism/sdk/contracts";
 
 const windowEdge = 4;
 const maxTitleLength = 50;

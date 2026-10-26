@@ -1,5 +1,5 @@
-import { modelInputPartsSchema, type ContentRef, type ModelInputPart, type ModelItem, modelInputLimits } from "@atelier/sdk/contracts";
-import type { ContentReader } from "@atelier/sdk/runtime";
+import { modelInputPartsSchema, type ContentRef, type ModelInputPart, type ModelItem, modelInputLimits } from "@asterism/sdk/contracts";
+import type { ContentReader } from "@asterism/sdk/runtime";
 import { ModelFailure, type ResolvedInputPart, type ResolvedModelItem } from "./contract.ts";
 
 export interface ModelContent {
@@ -26,7 +26,7 @@ export function validateInput(messages: readonly ModelItem[], content?: ModelCon
   for (const item of messages) {
     for (const part of itemParts(item) ?? []) {
       if (part.kind === "text") continue;
-      const size = content?.sizes.get(part.file["$atelier.content"]);
+      const size = content?.sizes.get(part.file["$asterism.content"]);
       if (size === undefined) throw new ModelFailure("content_scope", "The model input requires an authorized content reader.");
       total += size; count++;
       if (size > modelInputLimits.file || total > modelInputLimits.total || count > modelInputLimits.files)
@@ -47,7 +47,7 @@ export async function resolveInput(messages: readonly ModelItem[], content: Mode
     for (const part of itemParts(item)!) {
       signal.throwIfAborted();
       if (part.kind === "text") { parts.push(part); continue; }
-      const id = part.file["$atelier.content"];
+      const id = part.file["$asterism.content"];
       let data = bytes.get(id);
       if (!data) {
         try { data = await content!.reader.read(part.file); }

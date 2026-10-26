@@ -1,15 +1,15 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
-import { jsonSchema, type UiText, type Json } from "@atelier/sdk/contracts";
+import { jsonSchema, type UiText, type Json } from "@asterism/sdk/contracts";
 import { configurationField, configurationLabel, configurationProperty, objectValue } from "../../shared/configuration-fields";
 import { configurationFieldMessages } from "../messages/configuration-fields";
 import { useI18n } from "./i18n";
-import { Field, FieldLabel, FieldDescription, FieldError, FieldSet, FieldLegend, FieldGroup, FieldContent } from "@atelier/ui/ui/field";
-import { Textarea } from "@atelier/ui/ui/textarea";
-import { Button } from "@atelier/ui/ui/button";
-import { Switch } from "@atelier/ui/ui/switch";
-import { Input } from "@atelier/ui/ui/input";
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectGroup, SelectItem } from "@atelier/ui/ui/select";
-import { cn } from "@atelier/ui/utils";
+import { Field, FieldLabel, FieldDescription, FieldError, FieldSet, FieldLegend, FieldGroup, FieldContent } from "@asterism/ui/ui/field";
+import { Textarea } from "@asterism/ui/ui/textarea";
+import { Button } from "@asterism/ui/ui/button";
+import { Switch } from "@asterism/ui/ui/switch";
+import { Input } from "@asterism/ui/ui/input";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectGroup, SelectItem } from "@asterism/ui/ui/select";
+import { cn } from "@asterism/ui/utils";
 
 /** 复杂值保留完整文本；无效输入阻止提交，不把部分值或旧值保存为新配置。 */
 function JsonInput({ id, value, onChange, required, title, description, actions }: {

@@ -1,10 +1,10 @@
-import { recordRenderer, toolRenderer, useI18n, type RendererModule, type ToolRenderProps } from "@atelier/sdk/renderer";
-import { withValues } from "@atelier/sdk/contracts";
+import { recordRenderer, toolRenderer, useI18n, type RendererModule, type ToolRenderProps } from "@asterism/sdk/renderer";
+import { withValues } from "@asterism/sdk/contracts";
 import { PenLine, TextCursorInput } from "lucide-react";
-import { ToolHeader } from "@atelier/ui/tool-header";
+import { ToolHeader } from "@asterism/ui/tool-header";
 
 import { recordMessages } from "../messages/records";
-import { SessionNamed } from "@atelier/builtin-api/contracts";
+import { SessionNamed } from "@asterism/builtin-api/contracts";
 import { namingMessages } from "../messages/naming";
 import { inputText } from "../shared/tool-preview";
 import { SessionNameResult, SessionRenameResult } from "./contract";

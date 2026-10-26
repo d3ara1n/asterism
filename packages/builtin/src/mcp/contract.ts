@@ -1,12 +1,12 @@
 import { z } from "zod";
-import { defineCall, defineCreation, defineImplementation, defineTool, jsonSchema, modelInputPartsSchema, type Json } from "@atelier/sdk/contracts";
-import { builtin } from "@atelier/builtin-api/contracts";
+import { defineCall, defineCreation, defineImplementation, defineTool, jsonSchema, modelInputPartsSchema, type Json } from "@asterism/sdk/contracts";
+import { builtin } from "@asterism/builtin-api/contracts";
 
 /** 服务器 ID 是创建时确定的可读 slug，与远端工具名组成 `server_id/tool_name` 句柄；名称可随时修改。 */
 export const SERVER_ID_PATTERN = /^[a-z0-9][a-z0-9_-]*$/u;
 export const serverIdSchema = z.string().min(1).max(64).regex(SERVER_ID_PATTERN);
 
-/** 连接参数由工坊管理，环境变量与 HTTP 请求头单独进入凭据存储。 */
+/** 连接参数由星图管理，环境变量与 HTTP 请求头单独进入凭据存储。 */
 export const mcpServerSchema = z.strictObject({
   id: serverIdSchema, name: z.string().trim().min(1), enabled: z.boolean(),
   mode: z.enum(["eager", "lazy"]), idleSeconds: z.number().int().min(1).max(86_400),

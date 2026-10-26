@@ -1,14 +1,14 @@
 import { useEffect, useState, type CSSProperties } from "react";
-import { useI18n, useRendererObject, creationEntry, cardRenderer, toolRenderer, type RendererModule, type ToolRenderProps } from "@atelier/sdk/renderer";
+import { useI18n, useRendererObject, creationEntry, cardRenderer, toolRenderer, type RendererModule, type ToolRenderProps } from "@asterism/sdk/renderer";
 import type { z } from "zod";
 import { Eye, Folder, BookOpen, FilePenLine, FilePlus2, ListTree, RefreshCw } from "lucide-react";
 import { FileTree, useFileTree, useFileTreeSearch } from "@pierre/trees/react";
 import type { GitStatus } from "@pierre/trees";
 
-import { ToolHeader } from "@atelier/ui/tool-header";
-import { IconButton } from "@atelier/ui/ui/icon-button";
-import { SearchInput } from "@atelier/ui/ui/search-input";
-import { cn } from "@atelier/ui/utils";
+import { ToolHeader } from "@asterism/ui/tool-header";
+import { IconButton } from "@asterism/ui/ui/icon-button";
+import { SearchInput } from "@asterism/ui/ui/search-input";
+import { cn } from "@asterism/ui/utils";
 import { filesystemMessages } from "../messages/filesystem";
 import { textMessages } from "../messages/text";
 import { prepareCodeView } from "../shared/code-view";
@@ -124,7 +124,7 @@ function DirectoryTreeBody(_: { data: { path: string } }) {
 
 export default {
   prepare: prepareCodeView,
-  resources: [{ kind: "atelier.builtin/directory", label: filesystemMessages.directory, icon: <Folder className="size-4" />, card: appearance }],
+  resources: [{ kind: "asterism.builtin/directory", label: filesystemMessages.directory, icon: <Folder className="size-4" />, card: appearance }],
   cards: [cardRenderer(DirectoryView, {
     ...appearance,
     Body: DirectoryTreeBody,
@@ -155,6 +155,6 @@ export default {
       input: { headerRenderer: ListHeader }, execution: listView, result: listView,
     }),
   ],
-  creations: [creationEntry(CreateDirectory, { id: "atelier.builtin/directory.local", label: filesystemMessages.directoryLabel, icon: <Folder className="size-4" />, group: "resources", InputView: DirectoryInput,
+  creations: [creationEntry(CreateDirectory, { id: "asterism.builtin/directory.local", label: filesystemMessages.directoryLabel, icon: <Folder className="size-4" />, group: "resources", InputView: DirectoryInput,
     triggers: { menu: {}, drop: { accepts: { files: { directories: true } }, toInput: item => item.kind === "file" && item.directory && item.path ? { path: item.path } : null } } })],
 } satisfies RendererModule;

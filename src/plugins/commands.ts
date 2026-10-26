@@ -1,6 +1,6 @@
-import { jsonSchema, type ActionContract, type CreationContract, type ContractReference, type Json, type ResourceCall } from "@atelier/sdk/contracts";
+import { jsonSchema, type ActionContract, type CreationContract, type ContractReference, type Json, type ResourceCall } from "@asterism/sdk/contracts";
 import { deepFreeze } from "../shared/immutable.ts";
-import { PluginApiError, validationMessage, type Preparation } from "@atelier/sdk/runtime";
+import { PluginApiError, validationMessage, type Preparation } from "@asterism/sdk/runtime";
 import type { ContentLease } from "../runtime/content-store.ts";
 
 type InputContract = ActionContract<unknown> | CreationContract<unknown>;

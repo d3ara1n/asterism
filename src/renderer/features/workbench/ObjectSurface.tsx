@@ -1,13 +1,13 @@
-import { RendererCardProvider, type CardPanelView, type RendererCard } from "@atelier/sdk/renderer";
+import { RendererCardProvider, type CardPanelView, type RendererCard } from "@asterism/sdk/renderer";
 import { PanelsTopLeft, X } from "lucide-react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { objectsMessages } from "../../messages/objects";
 import { useI18n } from "../../shared/i18n";
-import { Button } from "@atelier/ui/ui/button";
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem } from "@atelier/ui/ui/dropdown-menu";
-import { IconButton } from "@atelier/ui/ui/icon-button";
-import { cn } from "@atelier/ui/utils";
+import { Button } from "@asterism/ui/ui/button";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem } from "@asterism/ui/ui/dropdown-menu";
+import { IconButton } from "@asterism/ui/ui/icon-button";
+import { cn } from "@asterism/ui/utils";
 
 const noPanels: readonly CardPanelView[] = [];
 

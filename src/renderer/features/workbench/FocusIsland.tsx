@@ -1,4 +1,4 @@
-import { RendererNavigationProvider } from "@atelier/sdk/renderer";
+import { RendererNavigationProvider } from "@asterism/sdk/renderer";
 import { AnimatePresence, motion } from "motion/react";
 import { PanelLeftClose } from "lucide-react";
 import { useMemo } from "react";
@@ -8,7 +8,7 @@ import { objectsMessages } from "../../messages/objects";
 import { RendererCatalogProvider } from "../../modules/object-context";
 import { useI18n } from "../../shared/i18n";
 import { fadeTransition } from "../../shared/weave/motion";
-import { IconButton } from "@atelier/ui/ui/icon-button";
+import { IconButton } from "@asterism/ui/ui/icon-button";
 import { useWorkbench, WorkbenchScope, type WorkbenchStore } from "./context";
 import { exitFocus } from "./focus";
 import { useObjectView } from "./object-view";

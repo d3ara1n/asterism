@@ -1,9 +1,9 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { Check, ChevronRight } from "lucide-react";
-import { useI18n } from "@atelier/sdk/renderer";
-import { commonMessages } from "@atelier/ui/messages/common";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@atelier/ui/ui/command";
-import { cn } from "@atelier/ui/utils";
+import { useI18n } from "@asterism/sdk/renderer";
+import { commonMessages } from "@asterism/ui/messages/common";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@asterism/ui/ui/command";
+import { cn } from "@asterism/ui/utils";
 import { configurationMessages } from "../../messages/configuration";
 
 export interface ConfigurationChoice {

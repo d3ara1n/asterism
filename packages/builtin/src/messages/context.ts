@@ -1,6 +1,6 @@
-import { defineMessages, pluginNamespace } from "@atelier/sdk/contracts";
+import { defineMessages, pluginNamespace } from "@asterism/sdk/contracts";
 
-export const contextMessages = pluginNamespace("atelier.builtin").messages("en", defineMessages({
+export const contextMessages = pluginNamespace("asterism.builtin").messages("en", defineMessages({
   window: { id: "context.window", defaultMessage: "Context window" },
   windowOf: { id: "context.windowOf", defaultMessage: "of {window} toks" },
   tokens: { id: "context.tokens", defaultMessage: "toks" },

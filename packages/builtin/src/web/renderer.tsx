@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
 import { Globe, Search, Download } from "lucide-react";
-import { cardRenderer, creationEntry, toolRenderer, useI18n, type RendererModule, type ToolRenderProps } from "@atelier/sdk/renderer";
-import { webResponseSchema, type Json, type WebDocument, type WebResponse } from "@atelier/sdk/contracts";
-import { ToolHeader } from "@atelier/ui/tool-header";
+import { cardRenderer, creationEntry, toolRenderer, useI18n, type RendererModule, type ToolRenderProps } from "@asterism/sdk/renderer";
+import { webResponseSchema, type Json, type WebDocument, type WebResponse } from "@asterism/sdk/contracts";
+import { ToolHeader } from "@asterism/ui/tool-header";
 import { WebResource, CreateWeb, WebView, WebSearch, WebFetch } from "./contract";
 import { webMessages as messages } from "../messages/web";
 import { Markdown } from "../agent/conversation/Markdown";
@@ -79,5 +79,5 @@ export default {
     toolRenderer(WebSearch, { label: messages.search, icon: <Search className="size-3.5" />, ...settledBodyViews(SearchHeader, SearchBody) }),
     toolRenderer(WebFetch, { label: messages.fetch, icon: <Download className="size-3.5" />, ...settledBodyViews(FetchHeader, FetchBody) }),
   ],
-  creations: [creationEntry(CreateWeb, { id: "atelier.builtin/web.blank", label: messages.title, icon: <Globe className="size-4" />, group: "resources", triggers: { menu: { initialInput: { title: "Web" } } } })],
+  creations: [creationEntry(CreateWeb, { id: "asterism.builtin/web.blank", label: messages.title, icon: <Globe className="size-4" />, group: "resources", triggers: { menu: { initialInput: { title: "Web" } } } })],
 } satisfies RendererModule;

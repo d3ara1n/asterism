@@ -1,5 +1,5 @@
-import { belongsTo, jsonSchema, validationMessage, type DataContract, type Json, type RecordContract, type SessionDirectory } from "@atelier/sdk/contracts";
-import { PluginApiError, type ContentReader, type ContentScope, type ObjectReader, type ObjectExecutor, type PluginContext, type ResourceRef, type ResourceSnapshot, type SessionExecutor, type ObjectWriter, type ToolSession } from "@atelier/sdk/runtime";
+import { belongsTo, jsonSchema, validationMessage, type DataContract, type Json, type RecordContract, type SessionDirectory } from "@asterism/sdk/contracts";
+import { PluginApiError, type ContentReader, type ContentScope, type ObjectReader, type ObjectExecutor, type PluginContext, type ResourceRef, type ResourceSnapshot, type SessionExecutor, type ObjectWriter, type ToolSession } from "@asterism/sdk/runtime";
 import type { RunGroup } from "./lifecycle.ts";
 import type { ObjectScope } from "./host.ts";
 import type { PluginHostServices } from "./loader.ts";
@@ -9,10 +9,10 @@ import type { LiveBlock } from "../shared/session.ts";
 import type { ContentLease } from "../runtime/content-store.ts";
 import { inputReferences } from "../model/input.ts";
 import type { PluginEventScope } from "./event-scope.ts";
-import type { PluginCalls } from "@atelier/sdk/contracts";
+import type { PluginCalls } from "@asterism/sdk/contracts";
 import type { BoundTopLevelTool } from "./top-level-tools.ts";
 import { SessionError } from "../session/tree.ts";
-import { UsageQueryError, WebError, type WebProviderInstance } from "@atelier/sdk/runtime";
+import { UsageQueryError, WebError, type WebProviderInstance } from "@asterism/sdk/runtime";
 
 type PluginServices = Pick<PluginContext, "id" | "dir" | "log" | "config" | "secrets" | "db" | "tasks" | "lifetime">;
 export function createSdkContext(internal: PluginServices, host: PluginHostServices, modelRuns: RunGroup, sessionRuns: RunGroup, directory: SessionDirectory, eventScope: PluginEventScope,

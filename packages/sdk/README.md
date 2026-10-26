@@ -1,18 +1,18 @@
-# 插件 SDK（`@atelier/sdk`）
+# 插件 SDK（`@asterism/sdk`）
 
-`@atelier/sdk` 是宿主与插件共用的独立类型与契约包。宿主实现服务接口，插件贡献模块、资源、工具、视图与生命周期处理器。完整架构与宿主机制见 [插件 SDK 与功能组合](../../docs/plugin-sdk.md)。
+`@asterism/sdk` 是宿主与插件共用的独立类型与契约包。宿主实现服务接口，插件贡献模块、资源、工具、视图与生命周期处理器。完整架构与宿主机制见 [插件 SDK 与功能组合](../../docs/plugin-sdk.md)。
 
-SDK 包版本见 [package.json](package.json)，宿主 API 版本见 [`sdkApi`](../../src/plugins/packages.ts)。内置插件领域契约独立在 [`@atelier/builtin-api`](../builtin-api/README.md)，不进入通用 SDK。
+SDK 包版本见 [package.json](package.json)，宿主 API 版本见 [`sdkApi`](../../src/plugins/packages.ts)。内置插件领域契约独立在 [`@asterism/builtin-api`](../builtin-api/README.md)，不进入通用 SDK。
 
-当前宿主 API 为 **18.1**，插件声明 `{ "major": 18, "minMinor": 1 }`，依赖 `@atelier/sdk: ^0.43.0`。后台通过 `session.invoke` 调用资源动作；清理登记到 `plugin.lifetime` 与资源 `attach` 的对象生命周期；前端入口默认导出 `defineRendererPlugin(...)`，`prepare` 上下文提供 `events / calls / signal`，调用契约显式声明 `scope`。
+当前宿主 API 为 **19.0**，插件声明 `{ "major": 19, "minMinor": 0 }`，依赖 `@asterism/sdk: ^0.45.0`。后台通过 `session.invoke` 调用资源动作；清理登记到 `plugin.lifetime` 与资源 `attach` 的对象生命周期；前端入口默认导出 `defineRendererPlugin(...)`，`prepare` 上下文提供 `events / calls / signal`，调用契约显式声明 `scope`。
 
 ## 子路径入口
 
 | 入口 | 内容 |
 | --- | --- |
-| `@atelier/sdk/contracts` | JSON、数据（`ns.data`）、配置（`ns.config`）、消息（`ns.messages`）、瞬态事件（`ns.event`）、资源／创建／动作／工具／记录契约、工作台快照与公共模型协议、模型表达式／输入媒体 helper、参考价格与计价；不依赖 Node 或 React |
-| `@atelier/sdk/runtime` | `definePlugin`、`defineModule`、资源／创建／动作／工具实现 helper、`SessionReader / SessionExecutor`、`ObjectReader / ObjectExecutor` 与宿主服务接口；后台可使用 Node |
-| `@atelier/sdk/renderer` | `defineRendererPlugin`、设置页面、功能视图（`cardRenderer`、`toolRenderer`、`recordRenderer`、`creationEntry`）、对象与全局 hooks；React 由宿主共享 |
+| `@asterism/sdk/contracts` | JSON、数据（`ns.data`）、配置（`ns.config`）、消息（`ns.messages`）、瞬态事件（`ns.event`）、资源／创建／动作／工具／记录契约、工作台快照与公共模型协议、模型表达式／输入媒体 helper、参考价格与计价；不依赖 Node 或 React |
+| `@asterism/sdk/runtime` | `definePlugin`、`defineModule`、资源／创建／动作／工具实现 helper、`SessionReader / SessionExecutor`、`ObjectReader / ObjectExecutor` 与宿主服务接口；后台可使用 Node |
+| `@asterism/sdk/renderer` | `defineRendererPlugin`、设置页面、功能视图（`cardRenderer`、`toolRenderer`、`recordRenderer`、`creationEntry`）、对象与全局 hooks；React 由宿主共享 |
 
 `packages/sdk/examples/` 下的可编译作者用例（`author.ts`、`renderer.ts`、`events.ts`、`tool-renderer.ts`、`content-*.ts`、`model-input.ts`、`i18n.ts`）随 `npm run typecheck` 直接验证。
 
@@ -20,8 +20,8 @@ SDK 包版本见 [package.json](package.json)，宿主 API 版本见 [`sdkApi`](
 
 ```ts
 import { z } from "zod";
-import { defineRecord, pluginNamespace } from "@atelier/sdk/contracts";
-import { defineModule, definePlugin } from "@atelier/sdk/runtime";
+import { defineRecord, pluginNamespace } from "@asterism/sdk/contracts";
+import { defineModule, definePlugin } from "@asterism/sdk/runtime";
 
 const ns = pluginNamespace("example.journal");
 const Entry = defineRecord(ns.name("entry"), {
@@ -64,9 +64,9 @@ export default definePlugin({
 {
   "name": "@example/tools",
   "exports": { "./public": "./src/public.ts" },
-  "atelier": {
+  "asterism": {
     "id": "example.tools",
-    "api": { "major": 18, "minMinor": 0 },
+    "api": { "major": 19, "minMinor": 0 },
     "runtime": "./src/runtime.ts"
   }
 }
@@ -76,11 +76,11 @@ export default definePlugin({
 - **瞬态事件**：`ns.event(name, { schema, source, semantics })` 声明 `occurrence` 或 `snapshot` 事件；后台用 `plugin.ipc.events.publish / subscribe` 或 `object.events.publish`，前端用 `prepare({ events })` 或 `useRendererEvents()`。资源可直接发布宿主公共 `ResourceStatusChanged`。
 - **具型调用**：`defineCall(id, { scope: "plugin" | "object", input, output })` 声明，`implementCall(contract, handler)` 经插件 `setup` 或模块返回的 `calls` 登记。后台 `plugin.ipc.calls.invoke`、前端 `useRendererCalls().invoke` 均传入契约、输入和选项：插件级使用 `{ signal? }`，对象级使用 `{ object: ResourceRef, signal? }`。只有对象级处理器具有只读关联对象。规则见 [插件调用](../../docs/plugin-sdk.md#具型插件调用)，可编译示例见 `examples/plugin-calls.ts` 与 `examples/settings-runtime.ts`。
 - **插件配置**：`ns.config(schema, defaults)` 声明可选托管配置，后台 `plugin.config(contract)` 提供 `get / update / subscribe`。`useRendererConfig(contract)` 读取值；设置页面使用 `useRendererConfiguration(contract)` 取得 `value / status / ready / error / save / reset / refresh`。保存与恢复默认返回 Promise，写入在后台校验，并更新前后台订阅；界面读取未就绪时不应以默认值提交。配置契约不包含布局或标签，插件自行组织页面。
-- **界面本地化（`UiText`）**：普通字符串直接可用；需多语言时用 `ns.messages("en", defineMessages({ ... }))` 声明，在 `atelier.i18n.catalogs` 登记译文 JSON，前端通过 `useI18n()` 格式化（详见 [公共 i18n](../../docs/i18n.md)）。
+- **界面本地化（`UiText`）**：普通字符串直接可用；需多语言时用 `ns.messages("en", defineMessages({ ... }))` 声明，在 `asterism.i18n.catalogs` 登记译文 JSON，前端通过 `useI18n()` 格式化（详见 [公共 i18n](../../docs/i18n.md)）。
 
 ### 4. 插件装配与设置页面
 
-存储准备（API 18.2）：清单 `atelier.storage` 指向默认导出 `defineStorage([...])` 的轻量入口，按格式版本号为 JSON 与 SQLite 声明连续迁移；宿主在插件运行时之前导入并执行，失败只停用该插件。见[插件存储准备](../../docs/plugin-sdk.md#插件存储准备api-182)及可编译示例 [`storage.ts`](examples/storage.ts)。
+存储准备（API 18.2）：清单 `asterism.storage` 指向默认导出 `defineStorage([...])` 的轻量入口，按格式版本号为 JSON 与 SQLite 声明连续迁移；宿主在插件运行时之前导入并执行，失败只停用该插件。见[插件存储准备](../../docs/plugin-sdk.md#插件存储准备api-182)及可编译示例 [`storage.ts`](examples/storage.ts)。
 
 后台 `definePlugin({ namespace, version, setup?, modules? })` 的同步 `setup(plugin)` 创建插件级共享服务，返回 `PluginContribution`：与模块共用具型贡献字段，并可返回 `modules`；清理登记到 `plugin.lifetime.defer`。根入口返回的模块先装配，再装配静态 `modules`；关闭先收束工作与全部对象生命周期，再逆序执行登记的清理，模块先于根服务释放。服务通过普通函数参数或闭包传给模块，不需要服务注册表。
 
@@ -90,7 +90,7 @@ export default definePlugin({
 
 设置页内可用浮岛接口（API 15.1）：`useRendererIsland()` 返回 `{ child, open, close, closeChild, guard }`，`open({ key, label, origin?, render })` 在所在浮岛右侧打开更深浮岛，`child` 为当前打开的子浮岛 `key`，可用于行选中。浮岛内容使用宿主注入的 `IslandPanel({ title, description?, action?, toolbar?, dirty?, children })`；`dirty` 为 true 时宿主在关闭前确认放弃修改，`useRendererCloseGuard(guard)` 注册自定义守卫。`render` 在宿主每次渲染时调用，内容应按身份读取最新数据而非依赖打开时的快照。语义见 [插件浮岛](../../docs/plugin-sdk.md#插件配置与界面本地化)。
 
-信息卡片从包读取元信息：标准 `name / description / version / author`，可用 `atelier.displayName / description`（接受 `UiText`）覆盖显示文案；`atelier.icon` 是包内 PNG、JPEG、WebP 或 SVG 图片的相对路径。宿主读取静态信息不执行插件代码，配置页面由 renderer 单独提供。
+信息卡片从包读取元信息：标准 `name / description / version / author`，可用 `asterism.displayName / description`（接受 `UiText`）覆盖显示文案；`asterism.icon` 是包内 PNG、JPEG、WebP 或 SVG 图片的相对路径。宿主读取静态信息不执行插件代码，配置页面由 renderer 单独提供。
 
 ### 5. 前端卡片与工具三态视图
 - **卡片几何（API 18.1）**：从 `contracts` 导入 `CardAppearance`，在共享文件声明默认尺寸和下限，交给后台 `implementResource` 的 `card`、前端资源描述的 `card` 与 `cardRenderer`。声明和放置契约见 [卡片几何声明](../../docs/plugin-sdk.md#前端视图与扩展入口)，完整例子见 `examples/counter-contract.ts`、`examples/author.ts` 与 `examples/renderer.ts`。
@@ -121,7 +121,7 @@ export default definePlugin({
 
 `contracts` 导出 `ModelProviderPreset`、`ModelProviderPresetContribution`、`UsageItem` 及对应 schema；`runtime` 导出 `UsageProvider`（`QueryUsageProvider | HeadersUsageProvider`）、对应上下文、`UsageQueryError`、`ModelProviderServices`、`UsageProviderServices`。通过 `ModuleContribution.usageProviders / modelProviderPresets` 贡献实现和预设，编译示例见 [`examples/provider-usage.ts`](examples/provider-usage.ts)。
 
-修改其他插件预设时，通过公共包导入建立对提供方插件的依赖。例如依赖 `@atelier/builtin-api` 的插件可导入 `builtin`，在 `definePlugin` 中声明 `dependencies: [builtin.id]`，贡献：
+修改其他插件预设时，通过公共包导入建立对提供方插件的依赖。例如依赖 `@asterism/builtin-api` 的插件可导入 `builtin`，在 `definePlugin` 中声明 `dependencies: [builtin.id]`，贡献：
 
 ```ts
 modelProviderPresets: [{

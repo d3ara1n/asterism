@@ -1,6 +1,6 @@
-import type { ModelItem, ModelTarget } from "@atelier/sdk/contracts";
-import { implementTool, type CallResult, type ModelServices, type ObjectReader } from "@atelier/sdk/runtime";
-import { builtin } from "@atelier/builtin-api/contracts";
+import type { ModelItem, ModelTarget } from "@asterism/sdk/contracts";
+import { implementTool, type CallResult, type ModelServices, type ObjectReader } from "@asterism/sdk/runtime";
+import { builtin } from "@asterism/builtin-api/contracts";
 import type { z } from "zod";
 import { AgentPeek, Peek, type PeekResult } from "./contract.ts";
 import { peekOverview, projectPeekRecords } from "./snapshot.ts";

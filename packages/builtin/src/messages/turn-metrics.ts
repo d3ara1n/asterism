@@ -1,6 +1,6 @@
-import { defineMessages, pluginNamespace } from "@atelier/sdk/contracts";
+import { defineMessages, pluginNamespace } from "@asterism/sdk/contracts";
 
-export const turnMetricMessages = pluginNamespace("atelier.builtin").messages("en", defineMessages({
+export const turnMetricMessages = pluginNamespace("asterism.builtin").messages("en", defineMessages({
   cache: { id: "turnMetrics.cache", defaultMessage: "Cache hit rate" },
   throughput: { id: "turnMetrics.throughput", defaultMessage: "Output throughput · E2E" },
   turn: { id: "turnMetrics.turn", defaultMessage: "This turn" },

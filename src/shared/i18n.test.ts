@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { defineMessages, pluginNamespace, uiTextSchema, withValues } from "@atelier/sdk/contracts";
+import { defineMessages, pluginNamespace, uiTextSchema, withValues } from "@asterism/sdk/contracts";
 import { MessageFormatter, compatibleMessage, matchLocale, resolveLanguage } from "./i18n.ts";
 const ns = pluginNamespace("example.counter");
 const messages = ns.messages("en", defineMessages({

@@ -2,8 +2,8 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { pluginNamespace, type UsageItem, type ModelEvent } from "@atelier/sdk/contracts";
-import { definePlugin, defineModule, type PluginContext, type PluginDefinition, type UsageQueryContext } from "@atelier/sdk/runtime";
+import { pluginNamespace, type UsageItem, type ModelEvent } from "@asterism/sdk/contracts";
+import { definePlugin, defineModule, type PluginContext, type PluginDefinition, type UsageQueryContext } from "@asterism/sdk/runtime";
 import { ApplicationService } from "../runtime/service.ts";
 import { modelProviderPresetDraft } from "../shared/provider-presets.ts";
 import { createModelInput } from "../shared/configuration.ts";
@@ -14,7 +14,7 @@ import { UsageConsumer } from "../../packages/builtin/src/usage/service.ts";
 const cleanups: (() => Promise<void>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); vi.unstubAllGlobals(); });
 function open(plugins: PluginDefinition[]) {
-  const root = mkdtempSync(join(tmpdir(), "atelier-provider-usage-"));
+  const root = mkdtempSync(join(tmpdir(), "asterism-provider-usage-"));
   let observer!: PluginContext;
   const service = new ApplicationService(root, { plugins: [...plugins,
     definePlugin({ namespace: pluginNamespace("test.observer"), version: "1", setup(context) { observer = context; return {}; } })], protector: {
@@ -77,7 +77,7 @@ describe("插件提供预设与账户用量", () => {
     let consumer!: PluginContext;
     const query = vi.fn(async (_: UsageQueryContext) => items);
     const { service } = open([
-      definePlugin({ namespace: pluginNamespace("test.producer"), version: "1", dependencies: ["atelier.builtin"], setup: () => ({
+      definePlugin({ namespace: pluginNamespace("test.producer"), version: "1", dependencies: ["asterism.builtin"], setup: () => ({
         usageProviders: [{ id: "test-usage", label: "Test", query }],
         modelProviderPresets: [
           { type: "patch", id: "zai-plan-cn", patch: { connection: { usage: "test-usage" } } },
@@ -113,7 +113,7 @@ describe("插件提供预设与账户用量", () => {
 
   // 注册后 setup 失败必须撤销同插件全部贡献；不能留下幽灵提供方或预设覆盖。
   it("失败插件的新增和覆盖全部撤回，重复查询 ID 不能替换已有实现", () => {
-    const { service } = open([definePlugin({ namespace: pluginNamespace("test.failed"), version: "1", dependencies: ["atelier.builtin"],
+    const { service } = open([definePlugin({ namespace: pluginNamespace("test.failed"), version: "1", dependencies: ["asterism.builtin"],
       setup: () => ({ usageProviders: [{ id: "temporary", label: "Temporary", query: async () => [] }],
         modelProviderPresets: [{ type: "patch", id: "zai-plan-cn", patch: { connection: { usage: "temporary" } } }] }),
       modules: [defineModule(() => { throw new Error("setup failed"); })],

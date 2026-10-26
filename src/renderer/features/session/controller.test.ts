@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { resourceCall } from "@atelier/sdk/contracts";
-import { ContinueAgent } from "@atelier/builtin-api/contracts";
+import { resourceCall } from "@asterism/sdk/contracts";
+import { ContinueAgent } from "@asterism/builtin-api/contracts";
 import type { SessionBridge, SessionChanged, SessionCommand, SessionResult, SessionData } from "../../../shared/session.ts";
 import { SessionController } from "./controller.ts";
 

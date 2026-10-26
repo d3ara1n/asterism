@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@atelier/ui/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@asterism/ui/ui/tooltip";
 
 /** 只读计量：悬停或键盘聚焦查看详情，不提供点击操作。 */
 export function MetricTooltip({ label, icon, value, children }: {

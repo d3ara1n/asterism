@@ -1,5 +1,5 @@
 import type { Json, ModelSettings } from "../shared/model.ts";
-import type { ModelItem, SystemPrompt, ModelInputPart, ModelRequestIdentity, ModelResponse, ModelEvent, RequestTiming, ErrorDetails } from "@atelier/sdk/contracts";
+import type { ModelItem, SystemPrompt, ModelInputPart, ModelRequestIdentity, ModelResponse, ModelEvent, RequestTiming, ErrorDetails } from "@asterism/sdk/contracts";
 
 export class ModelFailure extends Error {
   timing?: RequestTiming;
@@ -8,7 +8,7 @@ export class ModelFailure extends Error {
     readonly origin: "model" | "software" = "software") { super(message); }
 }
 export interface ToolDeclaration { name: string; description: string; parameters: Json }
-export type { ModelEvent, StreamPart } from "@atelier/sdk/contracts";
+export type { ModelEvent, StreamPart } from "@asterism/sdk/contracts";
 export type ResolvedInputPart = Extract<ModelInputPart, { kind: "text" }> | { kind: "file"; data: Uint8Array; mediaType: string; filename?: string };
 /** 工具结果只保留模型需要的成败与部件；界面数据与执行元数据不进入请求。 */
 export type ResolvedModelItem = Extract<ModelItem, { kind: "output" }>

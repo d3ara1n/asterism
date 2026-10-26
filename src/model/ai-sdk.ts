@@ -9,7 +9,7 @@ import { aiSdkAdapterVersion, pickContinuation } from "./continuation.ts";
 import { projectHistory, validateProjection } from "./projection.ts";
 import { validateRequestIdentity } from "./request-identity.ts";
 import { measureModel, RequestTimer } from "./request-timing.ts";
-import { describeError, type ModelResponse } from "@atelier/sdk/contracts";
+import { describeError, type ModelResponse } from "@asterism/sdk/contracts";
 import { ZodError } from "zod";
 
 function json(value: unknown): Json { return jsonSchema.parse(JSON.parse(JSON.stringify(value))); }
@@ -43,7 +43,7 @@ export function sdkMessages(input: ModelInput): ModelMessage[] {
       if (parts.length) messages.push({ role: "assistant", content: parts.map(p => {
         const providerOptions = {
           ...p.continuation as Record<string, Record<string, Json>>,
-          ...(p.kind === "thinking" ? { atelier: { summary: p.summary } } : {}),
+          ...(p.kind === "thinking" ? { asterism: { summary: p.summary } } : {}),
         };
         return p.kind === "toolcall" ? { type: "tool-call" as const, toolCallId: p.callId, toolName: p.name, input: p.arguments, providerOptions }
           : { type: p.kind === "text" ? "text" as const : "reasoning" as const, text: p.text, providerOptions };
@@ -161,7 +161,7 @@ export class AiSdkAdapter implements ModelAdapter {
     const result = streamText({ model: measured.model, messages, tools,
       ...options, abortSignal: signal,
       include: { rawChunks: true },
-      // SDK 不执行工具；单步结果交还工坊循环，工具注册中不提供 execute。
+      // SDK 不执行工具；单步结果交还星图循环，工具注册中不提供 execute。
       onError: () => {},
     });
     // 使用 SDK 自带消费分支持续接收，避免调用方等待进度处理时拖慢采样。
@@ -275,7 +275,7 @@ export class AiSdkAdapter implements ModelAdapter {
           }
         case "abort": throw new ModelFailure("cancelled", "The provider stream was cancelled.");
         case "tool-error":
-          // SDK 会为解析/目录错误合成结果；正式拒绝由工坊记录，避免保存 SDK 错误对象。
+          // SDK 会为解析/目录错误合成结果；正式拒绝由星图记录，避免保存 SDK 错误对象。
           if (!event.providerExecuted && rejectedBySdk.has(event.toolCallId)) break;
           throw new ModelFailure("unsupported_content", "The provider returned an unexpected tool result.");
         // custom 是 provider 扩展元数据（如 Anthropic message_start 的早期用量），非正文内容；

@@ -8,7 +8,7 @@ import { clearPause, listRecoveryPoints, prepareData, recoveryPointDirectory, re
 import { readJson, writeJson } from "./files.ts";
 
 const roots: string[] = [];
-function root() { const value = mkdtempSync(join(tmpdir(), "atelier-migration-")); roots.push(value); return value; }
+function root() { const value = mkdtempSync(join(tmpdir(), "asterism-migration-")); roots.push(value); return value; }
 afterEach(() => { for (const path of roots.splice(0)) rmSync(path, { recursive: true, force: true }); });
 
 const paths: DataPath[] = [{ path: "configuration.json" }, { path: "db" }, { path: "extensions" }, { path: join("content", "sealed"), link: true }];

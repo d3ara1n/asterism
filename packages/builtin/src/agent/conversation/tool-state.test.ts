@@ -1,17 +1,17 @@
 import { isValidElement } from "react";
 import { describe, expect, it } from "vitest";
-import { reference, type ModelLiveBlock } from "@atelier/sdk/contracts";
+import { reference, type ModelLiveBlock } from "@asterism/sdk/contracts";
 import type { TimelineItem } from "./timeline";
 
 import { DirectoryList, DirectoryWrite } from "../../filesystem/contract";
 import filesystem from "../../filesystem/renderer";
 import { ViewRegistry } from "../../../../../src/renderer/modules/registry";
-import type { ToolRenderProps, ToolInputRenderProps } from "@atelier/sdk/renderer";
+import type { ToolRenderProps, ToolInputRenderProps } from "@asterism/sdk/renderer";
 import { toolCallState } from "./tool-state";
 import { resolveToolView, toolPreparation } from "../../../../../src/renderer/features/conversation/tool-views";
 
 const args = { resource_id: "directory", tool: "list", target: { path: "src" }, args: {} };
-const invocation = { implementation: reference(DirectoryList), resource: { id: "directory", kind: "atelier.builtin/directory", title: "Saved title" }, startedAt: 100 };
+const invocation = { implementation: reference(DirectoryList), resource: { id: "directory", kind: "asterism.builtin/directory", title: "Saved title" }, startedAt: 100 };
 const live: Extract<ModelLiveBlock, { kind: "toolcall" }> = {
   id: "r:0", responseId: "r", ordinal: 0, kind: "toolcall", name: "resource_call", argumentsText: "", arguments: null,
   state: "input", invocation: null, result: null,

@@ -1,5 +1,5 @@
 import type { CSSProperties, ReactNode } from "react";
-import { cn } from "@atelier/ui/utils";
+import { cn } from "@asterism/ui/utils";
 
 /** 屏声明：Space 中的一站。surface=false 时无底板，内容直接位于窗口材质上。 */
 export interface ScreenSpec { id: string; label: string; surface?: boolean; content: ReactNode }

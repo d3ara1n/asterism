@@ -1,11 +1,11 @@
 import { motion, AnimatePresence } from "motion/react";
 
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import type { UiText } from "@atelier/sdk/contracts";
-import { useI18n } from "@atelier/sdk/renderer";
+import type { UiText } from "@asterism/sdk/contracts";
+import { useI18n } from "@asterism/sdk/renderer";
 import { windowGeometry } from "../../../shared/desktop";
-import { cn } from "@atelier/ui/utils";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@atelier/ui/ui/tooltip";
+import { cn } from "@asterism/ui/utils";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@asterism/ui/ui/tooltip";
 
 import { fadeTransition, islandTransition } from "./motion";
 import { closeIsland, focusIsland, follow, layout, openIsland, type IslandWidth } from "./model";

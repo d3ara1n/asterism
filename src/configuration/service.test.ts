@@ -1,4 +1,4 @@
-import { thinkingLevels } from "@atelier/sdk/contracts";
+import { thinkingLevels } from "@asterism/sdk/contracts";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -150,7 +150,7 @@ describe("真实配置与消费边界", () => {
     cleanups.push(() => reopened.close());
     expect(reopened.current().modelProviders[0]?.fixedFields).toBeUndefined();
     const changed: ModelProviderInput = { ...value, protocol: "anthropic", baseUrl: "https://relay.test/v1", auth: "api_key",
-      compatibility: [{ id: "customUserAgent", value: { userAgent: "Atelier" } }] };
+      compatibility: [{ id: "customUserAgent", value: { userAgent: "Asterism" } }] };
     await reopened.execute({ type: "modelProvider.save", id: value.id, value: changed, credential: { action: "replace", value: "custom-key" } });
     expect(reopened.current().modelProviders[0]).toMatchObject(changed);
     const model = createModelInput(value.id, { modelId: "test", name: "Test" });

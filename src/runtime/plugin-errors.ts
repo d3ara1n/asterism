@@ -1,5 +1,5 @@
-import type { UiText } from "@atelier/sdk/contracts";
-import type { PluginApiError } from "@atelier/sdk/runtime";
+import type { UiText } from "@asterism/sdk/contracts";
+import type { PluginApiError } from "@asterism/sdk/runtime";
 import { SessionError } from "../shared/session-timeline.ts";
 
 /** 自定义业务原因没有展示描述时，保留插件原文，避免套用宿主同名错误码。 */

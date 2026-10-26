@@ -10,10 +10,10 @@
     "cssVariables": true
   },
   "aliases": {
-    "components": "@atelier/ui/ui",
-    "ui": "@atelier/ui/ui",
-    "utils": "@atelier/ui/utils",
-    "lib": "@atelier/ui/lib",
-    "hooks": "@atelier/ui/hooks"
+    "components": "@asterism/ui/ui",
+    "ui": "@asterism/ui/ui",
+    "utils": "@asterism/ui/utils",
+    "lib": "@asterism/ui/lib",
+    "hooks": "@asterism/ui/hooks"
   }
 }

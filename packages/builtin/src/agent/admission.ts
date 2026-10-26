@@ -1,6 +1,6 @@
 import { AgentSelection, AgentDrafts } from "./data.ts";
-import { PluginApiError, type ModelServices, type ObjectReader, type ObjectExecutor, type ContentReader } from "@atelier/sdk/runtime";
-import { type SubmitAgentInputData, AgentInputMessage } from "@atelier/builtin-api/contracts";
+import { PluginApiError, type ModelServices, type ObjectReader, type ObjectExecutor, type ContentReader } from "@asterism/sdk/runtime";
+import { type SubmitAgentInputData, AgentInputMessage } from "@asterism/builtin-api/contracts";
 import { selectionOf, type AgentSelectionService } from "./selection.ts";
 import type { composeSystemPrompt } from "./system-prompt.ts";
 import { projectForAgent } from "./projection.ts";

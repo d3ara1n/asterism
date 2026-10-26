@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import { AlertCircle, Coins, CircleDashed } from "lucide-react";
-import { primaryQuota, quotaRemaining, type UsageItem } from "@atelier/sdk/contracts";
-import { useI18n } from "@atelier/sdk/renderer";
+import { primaryQuota, quotaRemaining, type UsageItem } from "@asterism/sdk/contracts";
+import { useI18n } from "@asterism/sdk/renderer";
 import { useProviderUsage } from "./use-usage";
-import { AgentToolbarItem, useAgentModelSelection } from "@atelier/builtin-api/renderer";
-import { Progress } from "@atelier/ui/ui/progress";
-import { Spinner } from "@atelier/ui/ui/spinner";
+import { AgentToolbarItem, useAgentModelSelection } from "@asterism/builtin-api/renderer";
+import { Progress } from "@asterism/ui/ui/progress";
+import { Spinner } from "@asterism/ui/ui/spinner";
 import { MetricTooltip } from "../agent/conversation/MetricTooltip";
 import { usageMessages as messages } from "../messages/usage";
 

@@ -1,6 +1,6 @@
-import { defineMessages, pluginNamespace } from "@atelier/sdk/contracts";
+import { defineMessages, pluginNamespace } from "@asterism/sdk/contracts";
 
-export const templateMessages = pluginNamespace("atelier.host").messages("en", defineMessages({
+export const templateMessages = pluginNamespace("asterism.host").messages("en", defineMessages({
   templates: { id: "templates.title", defaultMessage: "Templates" },
   saveAs: { id: "templates.saveAs", defaultMessage: "Save as template" },
   description: { id: "templates.description", defaultMessage: "Save object data, links, and arrangement for new conversations. Conversation history and running instances are excluded." },

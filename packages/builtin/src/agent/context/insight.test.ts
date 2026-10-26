@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { present, type ModelCompletion } from "@atelier/sdk/contracts";
+import { present, type ModelCompletion } from "@asterism/sdk/contracts";
 import { sessionView } from "../../../../../src/plugins/records.ts";
 import { nodeView } from "../../../../../src/session/view.ts";
 import { agentSource, attached, call, event, message, node, text, thinking } from "../../../../../src/session/test-nodes.ts";
 import type { NewNode, SessionNode } from "../../../../../src/shared/session.ts";
-import { ContextSummary, AgentRequestContext } from "@atelier/builtin-api/contracts";
+import { ContextSummary, AgentRequestContext } from "@asterism/builtin-api/contracts";
 import { allocateTiles, contextInsight } from "./insight.ts";
 
 const completion = (input: number, file?: string): ModelCompletion => ({ finishReason: "stop", rawFinishReason: null, providerResponseId: null,

@@ -1,10 +1,10 @@
-import { useI18n, useRendererConfig } from "@atelier/sdk/renderer";
+import { useI18n, useRendererConfig } from "@asterism/sdk/renderer";
 import { Brain } from "lucide-react";
 import { memo, useEffect, useState } from "react";
 
-import { Badge } from "@atelier/ui/ui/badge";
-import { Spinner } from "@atelier/ui/ui/spinner";
-import { StreamingPreview } from "@atelier/ui/streaming-preview";
+import { Badge } from "@asterism/ui/ui/badge";
+import { Spinner } from "@asterism/ui/ui/spinner";
+import { StreamingPreview } from "@asterism/ui/streaming-preview";
 import { thinkingMessages } from "../../messages/thinking";
 import { BuiltinSettings } from "../../settings/contract";
 import { Disclosure } from "./Disclosure";

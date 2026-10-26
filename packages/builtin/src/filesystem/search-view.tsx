@@ -1,10 +1,10 @@
 import type { ReactNode } from "react";
 import { ChevronRight, FileSearch, Search } from "lucide-react";
-import { toolRenderer, useI18n, useRendererViewState, type ToolRenderProps } from "@atelier/sdk/renderer";
-import { ToolHeader } from "@atelier/ui/tool-header";
-import { Button } from "@atelier/ui/ui/button";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@atelier/ui/ui/collapsible";
-import { cn } from "@atelier/ui/utils";
+import { toolRenderer, useI18n, useRendererViewState, type ToolRenderProps } from "@asterism/sdk/renderer";
+import { ToolHeader } from "@asterism/ui/tool-header";
+import { Button } from "@asterism/ui/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@asterism/ui/ui/collapsible";
+import { cn } from "@asterism/ui/utils";
 import { CodeRows } from "../code-view";
 import { filesystemMessages as messages } from "../messages/filesystem";
 import { textMessages } from "../messages/text";
@@ -79,7 +79,7 @@ function DirectoryGroups<T>({ groups, children }: { groups: DirectoryGroup<T>[];
 /** 文件行可展开查看命中片段；开合按文件路径保存在对话条目视图状态中，代码片段只在展开时挂载。 */
 function GrepFileRow({ file, name, initialOpen }: { file: GrepFile; name: string; initialOpen: boolean }) {
   const i18n = useI18n();
-  const [open, setOpen] = useRendererViewState(`atelier.builtin/search-file:${file.path}`, initialOpen);
+  const [open, setOpen] = useRendererViewState(`asterism.builtin/search-file:${file.path}`, initialOpen);
   return <Collapsible open={open} onOpenChange={setOpen}>
     <CollapsibleTrigger asChild>
       <Button variant="ghost" size="xs" className="h-auto min-h-6 w-full justify-start px-1 font-mono font-normal">

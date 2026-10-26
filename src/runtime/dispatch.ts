@@ -1,4 +1,4 @@
-import { PluginApiError } from "@atelier/sdk/runtime";
+import { PluginApiError } from "@asterism/sdk/runtime";
 
 import { ConfigurationError } from "../configuration/errors.ts";
 import { SessionError } from "../session/tree.ts";

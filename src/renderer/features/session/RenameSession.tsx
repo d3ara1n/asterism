@@ -1,16 +1,16 @@
 import { useId, useRef, useState } from "react";
-import type { UiText } from "@atelier/sdk/contracts";
+import type { UiText } from "@asterism/sdk/contracts";
 import type { SessionResult } from "../../../shared/session";
 import { errorDisplay } from "../../../shared/error-display";
 import { appMessages } from "../../messages/app";
-import { commonMessages } from "@atelier/ui/messages/common";
+import { commonMessages } from "@asterism/ui/messages/common";
 import { formsMessages } from "../../messages/forms";
 import { useI18n } from "../../shared/i18n";
-import { Alert, AlertDescription } from "@atelier/ui/ui/alert";
-import { Button } from "@atelier/ui/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@atelier/ui/ui/dialog";
-import { Field, FieldLabel } from "@atelier/ui/ui/field";
-import { Input } from "@atelier/ui/ui/input";
+import { Alert, AlertDescription } from "@asterism/ui/ui/alert";
+import { Button } from "@asterism/ui/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@asterism/ui/ui/dialog";
+import { Field, FieldLabel } from "@asterism/ui/ui/field";
+import { Input } from "@asterism/ui/ui/input";
 
 /** 草稿只在打开时取当前标题；后续自动命名和视图刷新不覆盖用户输入。 */
 export function RenameSession({ title, disabled, onSave, onClose, onRestoreFocus }: {

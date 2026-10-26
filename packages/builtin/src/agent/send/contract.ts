@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { defineImplementation } from "@atelier/sdk/contracts";
-import { Agent, builtin, Send } from "@atelier/builtin-api/contracts";
+import { defineImplementation } from "@asterism/sdk/contracts";
+import { Agent, builtin, Send } from "@asterism/builtin-api/contracts";
 
 export const sendResultSchema = z.strictObject({
   name: z.string(),

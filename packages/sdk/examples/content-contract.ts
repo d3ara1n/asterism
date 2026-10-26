@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { contentRefSchema, defineAction, defineCreation, defineRecord, pluginNamespace } from "@atelier/sdk/contracts";
+import { contentRefSchema, defineAction, defineCreation, defineRecord, pluginNamespace } from "@asterism/sdk/contracts";
 
 /** 内容身份可嵌入普通契约；作者无需另外声明持久附件清单。 */
 export const files = pluginNamespace("example.content");

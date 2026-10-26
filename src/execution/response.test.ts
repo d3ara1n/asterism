@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { modelBlockSchema, type ModelBlock } from "@atelier/sdk/contracts";
+import { modelBlockSchema, type ModelBlock } from "@asterism/sdk/contracts";
 import type { ModelEvent } from "../model/contract.ts";
 import { ResponseBuffer } from "./response.ts";
 

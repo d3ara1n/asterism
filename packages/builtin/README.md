@@ -1,12 +1,12 @@
-# 内置插件实现（`@atelier/builtin`）
+# 内置插件实现（`@asterism/builtin`）
 
-内置 Agent、问答、笔记、目录、命名与设置组成插件 `atelier.builtin`。实现通过 `@atelier/sdk` 使用宿主能力，通过 `@atelier/builtin-api/contracts` 消费公共领域契约，基础控件来自内部 `@atelier/ui`。本包不反向导入应用 `src/` 的生产代码；测试可复用宿主集成设施。
+内置 Agent、问答、笔记、目录、命名与设置组成插件 `asterism.builtin`。实现通过 `@asterism/sdk` 使用宿主能力，通过 `@asterism/builtin-api/contracts` 消费公共领域契约，基础控件来自内部 `@asterism/ui`。本包不反向导入应用 `src/` 的生产代码；测试可复用宿主集成设施。
 
 ## 应用组合入口
 
-- `@atelier/builtin/runtime`：`createBuiltin({ application, connectNaming })` 返回插件定义；应用显式传入展示名称、请求 User-Agent，并连接命名接口。`createSelection`、`composeSystemPrompt` 为首页首次提交提供与 Agent 相同的领域准备规则。
-- `@atelier/builtin/renderer`：`builtinRenderer` 聚合功能视图 `builtinViews` 与设置页；另提供 `BuiltinRendererProvider` 及首页复用的输入草稿、文件输入、模型选择和提交身份工具。应用通过 provider 注入按插件绑定的偏好门面，供 Agent 扩展组件使用。
-- `@atelier/builtin/locales/zh-Hans.json`：由应用装配的内置翻译目录。
+- `@asterism/builtin/runtime`：`createBuiltin({ application, connectNaming })` 返回插件定义；应用显式传入展示名称、请求 User-Agent，并连接命名接口。`createSelection`、`composeSystemPrompt` 为首页首次提交提供与 Agent 相同的领域准备规则。
+- `@asterism/builtin/renderer`：`builtinRenderer` 聚合功能视图 `builtinViews` 与设置页；另提供 `BuiltinRendererProvider` 及首页复用的输入草稿、文件输入、模型选择和提交身份工具。应用通过 provider 注入按插件绑定的偏好门面，供 Agent 扩展组件使用。
+- `@asterism/builtin/locales/zh-Hans.json`：由应用装配的内置翻译目录。
 
 `agent/renderer.tsx` 同步登记配置与上下文工具栏项；`agent/feedback-state.ts` 保留资源生命周期内的模型反馈并投影到对话发生位置；`agent/feedback-renderer.tsx` 作为独立模块订阅软件故障通知，由插件入口显式组合，订阅的准备与清理作用域独立于视图登记。
 
@@ -20,11 +20,11 @@
 | `src/agent/peek/` | Agent 资源的只读调查工具、时间线记录快照、内部检索与 utility 流式报告；报告视图复用对话折叠外壳与思考预览 |
 | `src/agent/send/` | 共享 `Send` 工具的 Agent 实现与三态视图；通过资源身份直接发送、从调用者上下文填写来源并复用 `SubmitAgentInput` |
 | `src/agent/wait/` | 共享 `Wait` 工具的 Agent 实现与三态视图；等待被链接代理收束，超时报告运行中状态 |
-| `src/agent/ui/` | Agent 自有 toolbar／overlay／modal 布局、贡献组件挂载、当前模型选择注入与输入区隐藏请求；公共作者接口在 `@atelier/builtin-api/renderer`，内置工具栏贡献在 `conversation/Toolbar.tsx` |
+| `src/agent/ui/` | Agent 自有 toolbar／overlay／modal 布局、贡献组件挂载、当前模型选择注入与输入区隐藏请求；公共作者接口在 `@asterism/builtin-api/renderer`，内置工具栏贡献在 `conversation/Toolbar.tsx` |
 | `src/agent/conversation/Markdown.tsx`、`MarkdownCode.tsx`、`MermaidDiagram.tsx` | Markdown 图片与代码组件、Mermaid 按需渲染；`markdown-options.ts` 声明历史与实时内容共用的插件，交互见[对话视图](../../docs/workbench.md#代理卡片与工具调用视图) |
 | `src/questions/` | `ask_user` 三题型与结构化答案、内存问答服务及具型调用、工具执行正文内可保留草稿的作答界面（可放大为模态窗）与只读回执；契约见[等待用户回答](../../docs/runtime.md#等待用户回答)，交互见[结构化问答](../../docs/workbench.md#结构化问答) |
 | `src/notes/`、`src/filesystem/` | 资源与正文工具实现、创建入口与三态工具视图 |
-| `src/filesystem/search.ts`、`search-process.ts`、`search-output.ts`、`search-presentation.ts` | 目录 `find / grep` 的资源接入、随应用分发的 rg 子进程、有界协议解析与模型／界面共用的结果解释；公共参数来自 `@atelier/builtin-api`，契约见 [目录搜索](../../docs/runtime.md#目录搜索findgrep) |
+| `src/filesystem/search.ts`、`search-process.ts`、`search-output.ts`、`search-presentation.ts` | 目录 `find / grep` 的资源接入、随应用分发的 rg 子进程、有界协议解析与模型／界面共用的结果解释；公共参数来自 `@asterism/builtin-api`，契约见 [目录搜索](../../docs/runtime.md#目录搜索findgrep) |
 | `src/shell/` | 共用 Shell profile 解析、`shell_profile_list` 顶层查询与三态视图、非交互管道进程、显式终止与 IO 收束、有界输出及临时日志；目录 `exec` 经同一服务执行，契约见 [目录命令执行](../../docs/runtime.md#目录命令执行exec) |
 | `src/terminal/` | 交互 PTY、后台屏幕、最小 shell 状态集成、人机共享输入、文字／图片观察与等待；资源对象只是入口，实例在新建或用户开启时创建，关闭、移除或回溯时结束；屏幕、输入与状态经终端通道传输，契约见 [终端资源](../../docs/runtime.md#终端资源) |
 | `src/terminal/service.ts`、`screen.ts`、`raw-buffer.ts`、`screen-writer.ts` | 分别管理 PTY 与共享实例、后台网格与观察投影、原始输出范围、前端帧消费队列；资源与工具装配位于 `runtime.ts` |
@@ -43,4 +43,4 @@
 
 模型提示块的通用序列化属于宿主模型适配层；Agent 只组合领域提示内容。命名、压缩与执行请求的应用身份通过工厂参数传入，不读取应用 package.json。
 
-内置流式尾部正文使用 `@atelier/ui/streaming-preview` 的 `StreamingPreview`，调用方提供正文渲染；`shared/use-streaming-disclosure.ts` 配合公共状态机统一管理延迟开合、手动选择与条目状态保留。工具在各自的输入／执行视图上通过 SDK `streaming(props)` 声明可预览内容；Agent 外壳只消费声明和调用阶段，内置与第三方工具同等接入。领域正文提取与对应渲染共用，思考复用相同的开合 hook。接口、交互与呈现分别见 [插件 SDK](../../docs/plugin-sdk.md#前端视图与扩展入口)、[工具调用三态视图](../../docs/workbench.md#工具调用三态视图) 和 [对话过程视图](../../docs/design-system.md#对话过程视图)。
+内置流式尾部正文使用 `@asterism/ui/streaming-preview` 的 `StreamingPreview`，调用方提供正文渲染；`shared/use-streaming-disclosure.ts` 配合公共状态机统一管理延迟开合、手动选择与条目状态保留。工具在各自的输入／执行视图上通过 SDK `streaming(props)` 声明可预览内容；Agent 外壳只消费声明和调用阶段，内置与第三方工具同等接入。领域正文提取与对应渲染共用，思考复用相同的开合 hook。接口、交互与呈现分别见 [插件 SDK](../../docs/plugin-sdk.md#前端视图与扩展入口)、[工具调用三态视图](../../docs/workbench.md#工具调用三态视图) 和 [对话过程视图](../../docs/design-system.md#对话过程视图)。

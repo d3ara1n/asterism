@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { pluginNamespace, ResourceStatusChanged, type ResourceStatus } from "@atelier/sdk/contracts";
-import { defineModule, type ObjectExecutor } from "@atelier/sdk/runtime";
-import type { RendererModule } from "@atelier/sdk/renderer";
+import { pluginNamespace, ResourceStatusChanged, type ResourceStatus } from "@asterism/sdk/contracts";
+import { defineModule, type ObjectExecutor } from "@asterism/sdk/runtime";
+import type { RendererModule } from "@asterism/sdk/renderer";
 
 const ns = pluginNamespace("example.downloads");
 export const Progress = ns.event("progress", {

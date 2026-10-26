@@ -1,5 +1,5 @@
-import type { ModelBlock, SessionRecord, SessionSnapshot } from "@atelier/sdk/contracts";
-import { Execution, AgentInputMessage } from "@atelier/builtin-api/contracts";
+import type { ModelBlock, SessionRecord, SessionSnapshot } from "@asterism/sdk/contracts";
+import { Execution, AgentInputMessage } from "@asterism/builtin-api/contracts";
 import type { AgentTurnState } from "./state.ts";
 
 /** 当前路径叠加本次运行时的中断位置；模型输入由上下文投影独立生成。 */

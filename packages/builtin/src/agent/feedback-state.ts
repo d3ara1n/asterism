@@ -1,4 +1,4 @@
-import type { ObjectExecutor, ObjectReader } from "@atelier/sdk/runtime";
+import type { ObjectExecutor, ObjectReader } from "@asterism/sdk/runtime";
 import { AgentSoftwareFeedback, type AgentFeedback, type InlineFeedback, type CompressionActivity } from "./feedback.ts";
 
 type FeedbackState = { inline: readonly InlineFeedback[]; interruptions: readonly (string | null)[]; compressions: readonly CompressionActivity[] };

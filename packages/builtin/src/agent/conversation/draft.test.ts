@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { createMessageDraft, copyDraft } from "./draft.ts";
-import type { RendererContentInput } from "@atelier/sdk/renderer";
-import type { ContentRef } from "@atelier/sdk/contracts";
+import type { RendererContentInput } from "@asterism/sdk/renderer";
+import type { ContentRef } from "@asterism/sdk/contracts";
 
-const ref: ContentRef = { "$atelier.content": "00000000-0000-4000-8000-000000000001" };
+const ref: ContentRef = { "$asterism.content": "00000000-0000-4000-8000-000000000001" };
 const reader = { read: async () => new Uint8Array(), async *open() {} };
 describe("消息文件草稿", () => {
   // docs/workbench.md：取出前完成附件占用交接，恢复完整文字和文件信息；保存不规整原始文字。

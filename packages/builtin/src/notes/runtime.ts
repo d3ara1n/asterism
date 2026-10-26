@@ -1,5 +1,5 @@
 import { noteCard } from "../shared/card-appearance.ts";
-import { defineModule, implementResource, implementCreation, implementTool, PluginApiError, type ObjectReader, type ObjectExecutor, type CallResult } from "@atelier/sdk/runtime";
+import { defineModule, implementResource, implementCreation, implementTool, PluginApiError, type ObjectReader, type ObjectExecutor, type CallResult } from "@asterism/sdk/runtime";
 import { Note, CreateNote, NoteContent, NoteView, NoteRead, NoteEdit, NoteWrite, MAX_NOTE_LENGTH } from "./contract.ts";
 import { TextError, readText, readToModel, editText, textChange, writeToModel, editToModel } from "../shared/text.ts";
 

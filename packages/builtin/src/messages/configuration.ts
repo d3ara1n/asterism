@@ -1,6 +1,6 @@
-import { defineMessages, pluginNamespace } from "@atelier/sdk/contracts";
+import { defineMessages, pluginNamespace } from "@asterism/sdk/contracts";
 
-export const configurationMessages = pluginNamespace("atelier.builtin").messages("en", defineMessages({
+export const configurationMessages = pluginNamespace("asterism.builtin").messages("en", defineMessages({
   selectionTitle: { id: "agent.configuration.selectionTitle", defaultMessage: "Agent, model and thinking" },
   searchModels: { id: "agent.configuration.searchModels", defaultMessage: "Search models…" },
   modelProviders: { id: "agent.configuration.modelProviders", defaultMessage: "Model providers" },

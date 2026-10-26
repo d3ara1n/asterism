@@ -1,5 +1,5 @@
-import { defineMessages } from "@atelier/sdk/contracts";
-import { builtin } from "@atelier/builtin-api/contracts";
+import { defineMessages } from "@asterism/sdk/contracts";
+import { builtin } from "@asterism/builtin-api/contracts";
 
 export const sendMessages = builtin.messages("en", defineMessages({
   title: { id: "agent_send_title", defaultMessage: "Send" },

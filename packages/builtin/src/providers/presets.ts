@@ -1,5 +1,5 @@
-import { defineMessages, type ModelProviderPreset, type ModelProviderConnection } from "@atelier/sdk/contracts";
-import { builtin } from "@atelier/builtin-api/contracts";
+import { defineMessages, type ModelProviderPreset, type ModelProviderConnection } from "@asterism/sdk/contracts";
+import { builtin } from "@asterism/builtin-api/contracts";
 
 const presetMessages = builtin.messages("en", defineMessages({
   mainlandChina: { id: "providerPreset.mainlandChina", defaultMessage: "Mainland China" },

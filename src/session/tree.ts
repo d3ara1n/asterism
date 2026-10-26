@@ -6,7 +6,7 @@ import { SessionError } from "../shared/session-timeline.ts";
 import type { NodeQuery, NodeView, SequencedNode } from "./view.ts";
 import { foldWorkbench, type FoldedState } from "./fold.ts";
 import { deepFreeze } from "../shared/immutable.ts";
-import type { ResourceRef } from "@atelier/sdk/contracts";
+import type { ResourceRef } from "@asterism/sdk/contracts";
 export { SessionError } from "../shared/session-timeline.ts";
 
 export type CursorSelection = {

@@ -1,12 +1,12 @@
-import { useI18n, useRendererTools, useRendererConfig } from "@atelier/sdk/renderer";
+import { useI18n, useRendererTools, useRendererConfig } from "@asterism/sdk/renderer";
 import { TextCursorInput, Wrench } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 
-import { JsonView } from "@atelier/ui/json-view";
-import { DefaultToolHeader, DefaultToolBody, ToolDetailsSwitcher } from "@atelier/ui/tool-content";
-import { ToolHeader } from "@atelier/ui/tool-header";
-import { Alert, AlertDescription } from "@atelier/ui/ui/alert";
-import { StatusBadge, StatusIcon, type StatusTone } from "@atelier/ui/ui/status";
+import { JsonView } from "@asterism/ui/json-view";
+import { DefaultToolHeader, DefaultToolBody, ToolDetailsSwitcher } from "@asterism/ui/tool-content";
+import { ToolHeader } from "@asterism/ui/tool-header";
+import { Alert, AlertDescription } from "@asterism/ui/ui/alert";
+import { StatusBadge, StatusIcon, type StatusTone } from "@asterism/ui/ui/status";
 import { toolsMessages } from "../../messages/tools";
 import { Disclosure } from "./Disclosure";
 import { toolCallState, type ToolCallNode } from "./tool-state";

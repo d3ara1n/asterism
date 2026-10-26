@@ -1,8 +1,8 @@
-import { recordRenderer, useI18n, type RecordRenderer } from "@atelier/sdk/renderer";
+import { recordRenderer, useI18n, type RecordRenderer } from "@asterism/sdk/renderer";
 import { Brain, MessageSquareText, User, Bot, Wrench, Info } from "lucide-react";
 
-import { inputSummary, Execution, AgentInputMessage, ContextSummary } from "@atelier/builtin-api/contracts";
-import { Badge } from "@atelier/ui/ui/badge";
+import { inputSummary, Execution, AgentInputMessage, ContextSummary } from "@asterism/builtin-api/contracts";
+import { Badge } from "@asterism/ui/ui/badge";
 import { conversationMessages } from "../messages/conversation";
 
 /** 代理记录的历史行：以样式区分用户、思考与输出，不依赖文字前缀。 */

@@ -1,5 +1,5 @@
-import type { CallResult } from "@atelier/sdk/runtime";
-import type { Json } from "@atelier/sdk/contracts";
+import type { CallResult } from "@asterism/sdk/runtime";
+import type { Json } from "@asterism/sdk/contracts";
 import { MAX_TIMEOUT_SECONDS, type ExecResult, type ShellSettings } from "./contract.ts";
 import { ShellOutputBuffer } from "./output.ts";
 import { resolveShell } from "./profiles.ts";

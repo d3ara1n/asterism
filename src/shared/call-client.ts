@@ -1,4 +1,4 @@
-import { jsonSchema, type CallContract, type CallOptions, type CallScope, type Json, type PluginCalls } from "@atelier/sdk/contracts";
+import { jsonSchema, type CallContract, type CallOptions, type CallScope, type Json, type PluginCalls } from "@asterism/sdk/contracts";
 import type { CallBridge } from "./connection.ts";
 
 /** 请求与取消独立传输；不为进程内业务等待设置期限，不自动重放提交。 */

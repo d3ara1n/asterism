@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
-import { jsonSchema, type Json } from "@atelier/sdk/contracts";
+import { jsonSchema, type Json } from "@asterism/sdk/contracts";
 import { SessionDataStore } from "../session/data.ts";
 import { SessionError, type SessionTree } from "../session/tree.ts";
 import { templateDataSchema, type TemplateSummary, type TemplateData } from "../shared/templates.ts";

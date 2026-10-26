@@ -1,11 +1,11 @@
 import { AgentView } from "./data.ts";
-import { creationEntry, cardRenderer, useRendererObject, type RendererModule } from "@atelier/sdk/renderer";
+import { creationEntry, cardRenderer, useRendererObject, type RendererModule } from "@asterism/sdk/renderer";
 import { Bot } from "lucide-react";
 import type { z } from "zod";
 
 import { commonMessages } from "../messages/common";
-import { builtin, CreateAgent } from "@atelier/builtin-api/contracts";
-import { agentUI } from "@atelier/builtin-api/renderer";
+import { builtin, CreateAgent } from "@asterism/builtin-api/contracts";
+import { agentUI } from "@asterism/builtin-api/renderer";
 import { Conversation, ConversationActions } from "./conversation/Conversation";
 import { AgentInput } from "./creation";
 import { agentRecordViews } from "./history";
@@ -20,7 +20,7 @@ import { waitToolRenderer } from "./wait/view";
 import { agentCard as appearance } from "../shared/card-appearance.ts";
 
 export default {
-  resources: [{ kind: "atelier.builtin/agent", label: commonMessages.kindAgent, icon: <Bot className="size-4" />, card: appearance, receivesLinks: true }],
+  resources: [{ kind: "asterism.builtin/agent", label: commonMessages.kindAgent, icon: <Bot className="size-4" />, card: appearance, receivesLinks: true }],
   cards: [cardRenderer(AgentView, {
     ...appearance,
     Body: AgentBody,
@@ -29,7 +29,7 @@ export default {
   })],
   tools: [peekToolRenderer, sendToolRenderer, waitToolRenderer],
   records: agentRecordViews,
-  creations: [creationEntry(CreateAgent, { id: "atelier.builtin/agent.configured", label: commonMessages.kindAgent, icon: <Bot className="size-4" />, group: "agents", InputView: AgentInput, triggers: { menu: {} } })],
+  creations: [creationEntry(CreateAgent, { id: "asterism.builtin/agent.configured", label: commonMessages.kindAgent, icon: <Bot className="size-4" />, group: "agents", InputView: AgentInput, triggers: { menu: {} } })],
   async prepare({ signal }) {
     agentUI.register({ id: builtin.name("agent.configuration"), Component: ConfigurationToolbarItem }, { signal });
     agentUI.register({ id: builtin.name("agent.context"), Component: ContextToolbarItem }, { signal });

@@ -28,7 +28,7 @@ function prepare(options: CallOptions, contentShape: "array" | "object"): { prom
       const content = message.content.filter(part => {
         if (part.type === "reasoning") {
           const native = part.providerOptions?.openai;
-          const summary = part.providerOptions?.atelier?.summary;
+          const summary = part.providerOptions?.asterism?.summary;
           const encrypted = native?.reasoningEncryptedContent;
           const item: Record<string, unknown> = { type: "reasoning" };
           if (typeof encrypted === "string") {

@@ -1,5 +1,5 @@
-import { recordRenderer, type RendererModule } from "@atelier/sdk/renderer";
-import { withValues } from "@atelier/sdk/contracts";
+import { recordRenderer, type RendererModule } from "@asterism/sdk/renderer";
+import { withValues } from "@asterism/sdk/contracts";
 import { Link, Unlink, Plus, Minus, PanelsTopLeft } from "lucide-react";
 
 import { historyMessages } from "../../messages/history";

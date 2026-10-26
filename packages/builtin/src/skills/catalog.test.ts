@@ -10,7 +10,7 @@ const roots: string[] = [];
 const signal = new AbortController().signal;
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
 function setup() {
-  const base = realpathSync(mkdtempSync(join(tmpdir(), "atelier-skills-"))); roots.push(base);
+  const base = realpathSync(mkdtempSync(join(tmpdir(), "asterism-skills-"))); roots.push(base);
   const source = join(base, "skills");
   mkdirSync(source);
   return { base, source, catalog: new SkillCatalog([{ id: source, directory: source }]) };

@@ -9,8 +9,8 @@ describe("asar 解包路径改写", () => {
       .toBe("/Applications/A.app/Contents/Resources/app.asar.unpacked/node_modules/esbuild/lib/main.js");
   });
   it("Windows 反斜杠路径按原分隔符改写", () => {
-    expect(unpackedArchivePath("C:\\Apps\\Atelier\\resources\\app.asar\\node_modules\\esbuild\\lib\\main.js"))
-      .toBe("C:\\Apps\\Atelier\\resources\\app.asar.unpacked\\node_modules\\esbuild\\lib\\main.js");
+    expect(unpackedArchivePath("C:\\Apps\\Asterism\\resources\\app.asar\\node_modules\\esbuild\\lib\\main.js"))
+      .toBe("C:\\Apps\\Asterism\\resources\\app.asar.unpacked\\node_modules\\esbuild\\lib\\main.js");
   });
   it("无归档段与 .asar 后缀目录不改动", () => {
     expect(unpackedArchivePath("/repo/node_modules/esbuild/lib/main.js")).toBeNull();

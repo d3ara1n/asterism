@@ -2,8 +2,6 @@ import { EventEmitter } from "node:events";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { Writable } from "node:stream";
-import { finished } from "node:stream/promises";
 import { expect, it, vi } from "vitest";
 import type { MessagePortMain } from "electron";
 import { protocolVersion } from "../shared/contracts.ts";
@@ -13,18 +11,17 @@ const { fork } = vi.hoisted(() => ({ fork: vi.fn() }));
 vi.mock("electron", () => ({ utilityProcess: { fork } }));
 
 function fakeChild() {
-  let logClosed: Promise<void> | undefined;
   const child = Object.assign(new EventEmitter(), {
-    stdout: { pipe(log: Writable) { logClosed = finished(log); } }, stderr: null, kill: vi.fn(),
+    stdout: null, stderr: null, kill: vi.fn(),
     postMessage: vi.fn((message: { kind?: string }) => { if (message.kind === "shutdown") child.emit("exit", 0); }),
   });
-  return { child, closed: () => logClosed };
+  return child;
 }
 
 // 端口交接契约：任务进程就绪前不交出端口（调用方据此通知 renderer 不可用）；就绪后端口随转移列表交给任务进程。
 it("就绪前拒绝交接直连端口，就绪后随转移列表交给任务进程", async () => {
-  const root = mkdtempSync(join(tmpdir(), "atelier-connect-"));
-  const { child, closed } = fakeChild();
+  const root = mkdtempSync(join(tmpdir(), "asterism-connect-"));
+  const child = fakeChild();
   fork.mockReturnValue(child);
   const host = new RuntimeHost(() => {});
   const port = {} as MessagePortMain;
@@ -39,7 +36,7 @@ it("就绪前拒绝交接直连端口，就绪后随转移列表交给任务进�
     host.disconnect("a");
     expect(child.postMessage).toHaveBeenLastCalledWith({ kind: "connection.close", id: "a" });
   } finally {
-    await host.stop(); await closed(); rmSync(root, { recursive: true, force: true }); vi.clearAllMocks();
+    await host.stop(); rmSync(root, { recursive: true, force: true }); vi.clearAllMocks();
   }
 });
 

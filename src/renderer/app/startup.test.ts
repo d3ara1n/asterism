@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { prepareModules, preparePlugin } from "./startup";
-import { pluginNamespace, type EventSubscriber } from "@atelier/sdk/contracts";
+import { pluginNamespace, type EventSubscriber } from "@asterism/sdk/contracts";
 import { z } from "zod";
-import { agentUI } from "@atelier/builtin-api/renderer";
+import { agentUI } from "@asterism/builtin-api/renderer";
 import { EventClient } from "../../shared/event-client";
 import type { EventFrame } from "../../shared/plugin-events";
 

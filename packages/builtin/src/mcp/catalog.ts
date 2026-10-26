@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { jsonSchema, type Json } from "@atelier/sdk/contracts";
+import { jsonSchema, type Json } from "@asterism/sdk/contracts";
 import { SERVER_ID_PATTERN, type McpServerConfig, type McpServerState } from "./contract.ts";
 import { McpError } from "./errors.ts";
 

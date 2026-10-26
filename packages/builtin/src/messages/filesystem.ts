@@ -1,6 +1,6 @@
-import { defineMessages, pluginNamespace } from "@atelier/sdk/contracts";
+import { defineMessages, pluginNamespace } from "@asterism/sdk/contracts";
 
-export const filesystemMessages = pluginNamespace("atelier.builtin").messages("en", defineMessages({
+export const filesystemMessages = pluginNamespace("asterism.builtin").messages("en", defineMessages({
   directoryRefresh: {
     id: "directoryRefresh",
     defaultMessage: "Refresh",

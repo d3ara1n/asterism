@@ -1,6 +1,6 @@
-import { defineMessages, pluginNamespace } from "@atelier/sdk/contracts";
+import { defineMessages, pluginNamespace } from "@asterism/sdk/contracts";
 
-export const commonMessages = pluginNamespace("atelier.builtin").messages("en", defineMessages({
+export const commonMessages = pluginNamespace("asterism.builtin").messages("en", defineMessages({
   newConversation: {
     id: "newConversation",
     defaultMessage: "New conversation",

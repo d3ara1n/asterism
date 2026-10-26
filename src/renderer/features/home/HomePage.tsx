@@ -1,21 +1,21 @@
 import { ArrowUp, Bot, Settings } from "lucide-react";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { type MessageDraft, AttachFiles, DraftFiles, DraftFileError, fileInputEvents, ModelChoices } from "@atelier/builtin/renderer";
-import { defaultAgentPreset } from "@atelier/builtin-api/contracts";
-import type { UiText } from "@atelier/sdk/contracts";
+import { type MessageDraft, AttachFiles, DraftFiles, DraftFileError, fileInputEvents, ModelChoices } from "@asterism/builtin/renderer";
+import { defaultAgentPreset } from "@asterism/builtin-api/contracts";
+import type { UiText } from "@asterism/sdk/contracts";
 
 import type { ThinkingLevel } from "../../../shared/configuration";
 import type { SessionCommand } from "../../../shared/session";
 import { appMessages } from "../../messages/app";
-import { commonMessages } from "@atelier/ui/messages/common";
+import { commonMessages } from "@asterism/ui/messages/common";
 import { homeMessages } from "../../messages/home";
-import { ConfigurationChoice as Choice } from "@atelier/ui/ConfigurationChoice";
+import { ConfigurationChoice as Choice } from "@asterism/ui/ConfigurationChoice";
 import { useI18n } from "../../shared/i18n";
-import { BrandMark } from "@atelier/ui/ui/brand-mark";
-import { StatusText } from "@atelier/ui/ui/status";
-import { Button } from "@atelier/ui/ui/button";
-import { IconButton } from "@atelier/ui/ui/icon-button";
-import { InputGroup, InputGroupTextarea, InputGroupAddon } from "@atelier/ui/ui/input-group";
+import { BrandMark } from "@asterism/ui/ui/brand-mark";
+import { StatusText } from "@asterism/ui/ui/status";
+import { Button } from "@asterism/ui/ui/button";
+import { IconButton } from "@asterism/ui/ui/icon-button";
+import { InputGroup, InputGroupTextarea, InputGroupAddon } from "@asterism/ui/ui/input-group";
 import { useConfiguration } from "../configuration/state";
 import { Showcase, showcaseSpell } from "../showcase/Showcase";
 import type { TemplateSummary } from "../../../shared/templates";
@@ -96,7 +96,7 @@ export function HomePage({ active, draft, onSettings, ready, busy, submitError, 
       <div className="mt-4 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-center">
         <p id="home-availability" role="status" className="type-caption">{i18n.text(busy ? homeMessages.startingConversation
           : !ready ? commonMessages.statusUnavailable : !snapshot ? (readError ? commonMessages.statusUnavailable : commonMessages.loading)
-          : guidance?.message ?? homeMessages.workshopHint)}</p>
+          : guidance?.message ?? homeMessages.workbenchHint)}</p>
         {ready && !busy && guidance && <Button variant="ghost" size="sm" onClick={() => onSettings(guidance.category)}>
           <Settings />{i18n.text(guidance.action)}</Button>}
       </div>

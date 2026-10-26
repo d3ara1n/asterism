@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import type { ModelEvent, StreamRequest } from "@atelier/sdk/contracts";
-import type { ModelServices } from "@atelier/sdk/runtime";
+import type { ModelEvent, StreamRequest } from "@asterism/sdk/contracts";
+import type { ModelServices } from "@asterism/sdk/runtime";
 import { sessionSnapshot } from "../../../../../src/plugins/records.ts";
 import { nodeView } from "../../../../../src/session/view.ts";
 import { message, node } from "../../../../../src/session/test-nodes.ts";
@@ -25,12 +25,12 @@ const role = { id: "utility", name: "utility", description: "", hidden: true, mo
 const model = { model: "p/m", provider: "p", name: "Model", contextWindow: 65536,
   capabilities: { reasoning: false, tools: true, thinkingLevels: [] } };
 const deps = (stream: ModelServices["stream"]) => ({
-  models: { stream, roles: () => [role], list: () => [model] }, userAgent: "Atelier/test",
+  models: { stream, roles: () => [role], list: () => [model] }, userAgent: "Asterism/test",
 });
 function target() {
   const nodes = [node("saved", null, message("a", "Original evidence"))];
   const snapshot = vi.fn(() => sessionSnapshot(nodeView("s", "", [...nodes], nodes.at(-1)!.id)));
-  return { nodes, object: { ref: { sessionId: "s", id: "a", kind: "atelier.builtin/agent" }, session: { snapshot } } };
+  return { nodes, object: { ref: { sessionId: "s", id: "a", kind: "asterism.builtin/agent" }, session: { snapshot } } };
 }
 
 // docs/runtime.md 的代理调查契约：增量进入工具进度，完整终态才执行检索；取消和失败保持真实结局。

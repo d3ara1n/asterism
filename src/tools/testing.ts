@@ -1,6 +1,6 @@
 /** 执行器测试只需资源 data 与工具 handler；校验和终结仍使用真实 SDK 实现。 */
-import { implementTool, type ObjectExecutor, type CallResult } from "@atelier/sdk/runtime";
-import { reference, type Json, type ImplementationContract, type ToolModelOutput } from "@atelier/sdk/contracts";
+import { implementTool, type ObjectExecutor, type CallResult } from "@asterism/sdk/runtime";
+import { reference, type Json, type ImplementationContract, type ToolModelOutput } from "@asterism/sdk/contracts";
 import { resourceSnapshot } from "../plugins/records.ts";
 import type { ToolImplementation } from "./contract.ts";
 

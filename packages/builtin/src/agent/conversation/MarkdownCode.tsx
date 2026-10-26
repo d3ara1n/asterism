@@ -1,9 +1,9 @@
-import { useI18n } from "@atelier/sdk/renderer";
+import { useI18n } from "@asterism/sdk/renderer";
 import { Copy } from "lucide-react";
 import { createContext, useContext, useState } from "react";
 import { toast } from "sonner";
 
-import { IconButton } from "@atelier/ui/ui/icon-button";
+import { IconButton } from "@asterism/ui/ui/icon-button";
 import { CodeText } from "../../code-view";
 import { markdownMessages } from "../../messages/markdown";
 import { MermaidDiagram } from "./MermaidDiagram";

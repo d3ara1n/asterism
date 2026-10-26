@@ -167,7 +167,7 @@ export type PluginStorageDeclaration = {
   kind: "sqlite"; path: string; version: number;
   migrations: Readonly<Record<number, (db: DatabaseSync) => void>>;
 };
-/** 存储入口（manifest `atelier.storage`）的默认导出；宿主在插件运行时之前单独导入。 */
+/** 存储入口（manifest `asterism.storage`）的默认导出；宿主在插件运行时之前单独导入。 */
 export function defineStorage(declarations: readonly PluginStorageDeclaration[]): readonly PluginStorageDeclaration[] {
   for (const item of declarations) if (!Number.isSafeInteger(item.version) || item.version < 1)
     throw new Error(`Storage ${item.path} must declare a positive integer version.`);

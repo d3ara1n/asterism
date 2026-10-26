@@ -1,19 +1,19 @@
-import { thinkingLevels } from "@atelier/sdk/contracts";
+import { thinkingLevels } from "@asterism/sdk/contracts";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { contentRefSchema, defineCall, defineAction, defineCreation, defineRecord, pluginNamespace, resourceCall, type ContentRef } from "@atelier/sdk/contracts";
-import { implementCall, defineModule, definePlugin, implementAction, implementCreation, implementPreparer, implementResource, type ObjectExecutor, type ContentScope, type PluginContext } from "@atelier/sdk/runtime";
+import { contentRefSchema, defineCall, defineAction, defineCreation, defineRecord, pluginNamespace, resourceCall, type ContentRef } from "@asterism/sdk/contracts";
+import { implementCall, defineModule, definePlugin, implementAction, implementCreation, implementPreparer, implementResource, type ObjectExecutor, type ContentScope, type PluginContext } from "@asterism/sdk/runtime";
 import { ApplicationService } from "../runtime/service.ts";
 import { contentLimits } from "../runtime/content-store.ts";
 import { serveContent } from "../runtime/dispatch.ts";
 import { contentResultSchema } from "../shared/content.ts";
 import { randomUUID } from "node:crypto";
 import type { ModelAdapter, ModelInput } from "../model/contract.ts";
-import type { StreamRequest } from "@atelier/sdk/contracts";
-import { modelInputLimits } from "@atelier/sdk/contracts";
+import type { StreamRequest } from "@asterism/sdk/contracts";
+import { modelInputLimits } from "@asterism/sdk/contracts";
 import { applicationStorage } from "../shared/application.ts";
 
 const ns = pluginNamespace("test.content");
@@ -30,7 +30,7 @@ afterEach(async () => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
 function fixture(options: { prepare?: (content: ContentScope, signal: AbortSignal) => Promise<void>; prepareAction?: (content: ContentScope, signal: AbortSignal) => Promise<void>; onCreate?: (object: ObjectExecutor) => void; extra?: ReturnType<typeof definePlugin>[]; adapter?: ModelAdapter } = {}) {
-  const root = mkdtempSync(join(tmpdir(), "atelier-content-")); roots.push(root);
+  const root = mkdtempSync(join(tmpdir(), "asterism-content-")); roots.push(root);
   let context!: PluginContext;
   const plugin = definePlugin({ namespace: ns, version: "1", modules: [defineModule(value => {
     context = value;
@@ -165,7 +165,7 @@ describe("宿主不可变内容", () => {
       await expect(read(file)).rejects.toMatchObject({ code: "foreign_resource" });
       await expect(read(file, true)).rejects.toMatchObject({ code: "foreign_resource" });
       const temporary = await f.store.writer({ scope: lease }).stage(bytes("handover"));
-      handover.add(temporary["$atelier.content"]);
+      handover.add(temporary["$asterism.content"]);
       await expect(read(temporary)).rejects.toMatchObject({ code: "foreign_resource" });
       await f.replace(id, { file, history: true });
       expect(await read(file)).toBe("private");
@@ -460,7 +460,7 @@ describe("模型消费不可变内容", () => {
     const seen: ModelInput[] = [], f = fixture({ adapter: adapter(seen) }); await configure(f);
     const draft = f.input(), file = await f.store.writer({ scope: draft }).stage(bytes("intact"));
     const id = await f.create(file, draft.id), content = f.object(id).content;
-    writeFileSync(join(f.root, applicationStorage.contentDirectory, "sealed", file["$atelier.content"]), bytes("broken"));
+    writeFileSync(join(f.root, applicationStorage.contentDirectory, "sealed", file["$asterism.content"]), bytes("broken"));
     await f.context.models.validate(request(file), { content });
     await expect((async () => { for await (const _ of f.context.models.stream(request(file), { content })) {} })()).rejects.toMatchObject({ code: "content_unavailable" });
     // 使用同一对象的动作草稿建立合法归属，避免把越权误当成大小校验。

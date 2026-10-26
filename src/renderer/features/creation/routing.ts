@@ -1,4 +1,4 @@
-import type { CreationEntry, DropAccepts, DropItem } from "@atelier/sdk/renderer";
+import type { CreationEntry, DropAccepts, DropItem } from "@asterism/sdk/renderer";
 
 /**
  * 拖放仲裁的纯逻辑：声明式匹配、候选集与路由记忆键。

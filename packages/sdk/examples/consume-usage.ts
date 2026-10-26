@@ -1,5 +1,5 @@
-import type { StreamRequest, UsageItem } from "@atelier/sdk/contracts";
-import type { PluginContext } from "@atelier/sdk/runtime";
+import type { StreamRequest, UsageItem } from "@asterism/sdk/contracts";
+import type { PluginContext } from "@asterism/sdk/runtime";
 
 /** 示例消费者：请求前主动查询，按响应连接的当前目录解析响应头。 */
 export async function* streamWithUsage(plugin: PluginContext, connectionId: string, request: StreamRequest,

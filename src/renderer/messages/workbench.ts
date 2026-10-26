@@ -1,6 +1,6 @@
-import { defineMessages, pluginNamespace } from "@atelier/sdk/contracts";
+import { defineMessages, pluginNamespace } from "@asterism/sdk/contracts";
 
-export const workbenchMessages = pluginNamespace("atelier.host").messages("en", defineMessages({
+export const workbenchMessages = pluginNamespace("asterism.host").messages("en", defineMessages({
   layout: { id: "workbench.layout", defaultMessage: "Layout" },
   arrange: { id: "workbench.arrange", defaultMessage: "Arrange" },
   arranging: { id: "workbench.arranging", defaultMessage: "Arranging…" },

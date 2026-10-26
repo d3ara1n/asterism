@@ -1,6 +1,6 @@
 import { useEffect, useRef, type MouseEvent } from "react";
 import { toast } from "sonner";
-import type { RendererReceipt } from "@atelier/sdk/renderer";
+import type { RendererReceipt } from "@asterism/sdk/renderer";
 import { errorDisplay } from "../../shared/error-display";
 import { getI18n } from "./i18n";
 

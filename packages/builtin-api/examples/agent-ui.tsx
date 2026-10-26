@@ -1,7 +1,7 @@
 import { useState } from "react";
-import type { ResourceRef } from "@atelier/sdk/contracts";
-import { AgentModal, AgentOverlay, AgentScrollArea, agentUI, type AgentOverlayPosition } from "@atelier/builtin-api/renderer";
-import { useRendererObject, type RendererModule } from "@atelier/sdk/renderer";
+import type { ResourceRef } from "@asterism/sdk/contracts";
+import { AgentModal, AgentOverlay, AgentScrollArea, agentUI, type AgentOverlayPosition } from "@asterism/builtin-api/renderer";
+import { useRendererObject, type RendererModule } from "@asterism/sdk/renderer";
 
 /** 插件按关联 Agent 提供业务状态与提交回调，界面只消费该接口。 */
 export interface AgentUIState {

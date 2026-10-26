@@ -4,11 +4,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { Agent, CreateAgent, SubmitAgentInput, builtin } from "@atelier/builtin-api/contracts";
-import * as builtinRendererAPI from "@atelier/builtin-api/renderer";
-import { agentCreations, defineAgentCreation } from "@atelier/builtin-api/runtime";
-import { resourceCall } from "@atelier/sdk/contracts";
-import type { PluginDefinition } from "@atelier/sdk/runtime";
+import { Agent, CreateAgent, SubmitAgentInput, builtin } from "@asterism/builtin-api/contracts";
+import * as builtinRendererAPI from "@asterism/builtin-api/renderer";
+import { agentCreations, defineAgentCreation } from "@asterism/builtin-api/runtime";
+import { resourceCall } from "@asterism/sdk/contracts";
+import type { PluginDefinition } from "@asterism/sdk/runtime";
 import { PackageList, loadPackages } from "./packages.ts";
 import { ApplicationService } from "../runtime/service.ts";
 import { bindPublicProvider } from "../shared/public-modules.ts";
@@ -27,12 +27,12 @@ function fixture(ranges: (string | null)[] = [compatibleRange, `~${builtinPublic
   const consumers = ranges.map((range, index) => {
     const root = temp(), id = `fixture.consumer${index}`;
     file(root, "package.json", JSON.stringify({ name: `@fixture/consumer${index}`, version: "1.0.0",
-      ...(range === null ? {} : { peerDependencies: { "@atelier/builtin-api": range } }),
-      atelier: { id, api: { major: 18, minMinor: 0 }, runtime: "runtime.ts", renderer: "renderer.ts" } }));
-    file(root, "public.ts", 'export { SubmitAgentInput } from "@atelier/builtin-api/contracts";');
+      ...(range === null ? {} : { peerDependencies: { "@asterism/builtin-api": range } }),
+      asterism: { id, api: { major: 19, minMinor: 0 }, runtime: "runtime.ts", renderer: "renderer.ts" } }));
+    file(root, "public.ts", 'export { SubmitAgentInput } from "@asterism/builtin-api/contracts";');
     file(root, "runtime.ts", `
-      import { pluginNamespace } from "@atelier/sdk/contracts";
-      import { definePlugin, defineModule, implementPreparer } from "@atelier/sdk/runtime";
+      import { pluginNamespace } from "@asterism/sdk/contracts";
+      import { definePlugin, defineModule, implementPreparer } from "@asterism/sdk/runtime";
       import { SubmitAgentInput } from "./public.ts";
       const calls = [];
       export default { ...definePlugin({ namespace: pluginNamespace(${JSON.stringify(id)}), version: "1.0.0",
@@ -45,8 +45,8 @@ function fixture(ranges: (string | null)[] = [compatibleRange, `~${builtinPublic
     `);
     file(root, "renderer.ts", 'export { SubmitAgentInput } from "./public.ts"; export default { modules: [{ resources: [], cards: [], tools: [] }] };');
     // 消费者的本地安装副本不能抢占应用已经加载的声明。
-    file(root, "node_modules/@atelier/builtin-api/package.json", JSON.stringify({ name: "@atelier/builtin-api", version: builtinPublicProvider.version, exports: { "./contracts": "./copy.js" } }));
-    file(root, "node_modules/@atelier/builtin-api/copy.js", 'throw new Error("A private copy must not execute.");');
+    file(root, "node_modules/@asterism/builtin-api/package.json", JSON.stringify({ name: "@asterism/builtin-api", version: builtinPublicProvider.version, exports: { "./contracts": "./copy.js" } }));
+    file(root, "node_modules/@asterism/builtin-api/copy.js", 'throw new Error("A private copy must not execute.");');
     list.add({ source: { kind: "path", path: root } }, data);
     return root;
   });
@@ -61,9 +61,9 @@ describe("内置公共包", () => {
   it("独立插件从后台公共入口取得相同的创建声明与目录服务", async () => {
     const f = fixture([compatibleRange]);
     file(f.consumers[0]!, "runtime.ts", `
-      import { agentCreations, defineAgentCreation } from "@atelier/builtin-api/runtime";
-      import { pluginNamespace } from "@atelier/sdk/contracts";
-      import { definePlugin } from "@atelier/sdk/runtime";
+      import { agentCreations, defineAgentCreation } from "@asterism/builtin-api/runtime";
+      import { pluginNamespace } from "@asterism/sdk/contracts";
+      import { definePlugin } from "@asterism/sdk/runtime";
       export default { ...definePlugin({ namespace: pluginNamespace("fixture.consumer0"), version: "1" }),
         probe: { agentCreations, defineAgentCreation } };
     `);
@@ -72,7 +72,7 @@ describe("内置公共包", () => {
     const probe = (loaded!.definition as PluginDefinition & { probe: { agentCreations: unknown; defineAgentCreation: unknown } }).probe;
     expect(probe.agentCreations).toBe(agentCreations);
     expect(probe.defineAgentCreation).toBe(defineAgentCreation);
-    file(f.consumers[0]!, "renderer.ts", 'import { agentCreations } from "@atelier/builtin-api/runtime"; export default agentCreations;');
+    file(f.consumers[0]!, "renderer.ts", 'import { agentCreations } from "@asterism/builtin-api/runtime"; export default agentCreations;');
     expect((await f.load())[0]?.error).toContain("not exported");
   });
 
@@ -102,8 +102,8 @@ describe("内置公共包", () => {
     // 前端产物从其环境绑定取实例；刻意使用不同对象，防止误取后台绑定。
     const frontendAction = { ...SubmitAgentInput };
     release.push(bindPublicProvider("renderer", builtinPublicProvider, {
-      "@atelier/builtin-api/contracts": { ...builtinPublicModules["@atelier/builtin-api/contracts"], SubmitAgentInput: frontendAction },
-      "@atelier/builtin-api/renderer": builtinRendererAPI,
+      "@asterism/builtin-api/contracts": { ...builtinPublicModules["@asterism/builtin-api/contracts"], SubmitAgentInput: frontendAction },
+      "@asterism/builtin-api/renderer": builtinRendererAPI,
     }));
     for (const item of packages) {
       const frontend = await import(pathToFileURL(join(f.cache, item.renderer!)).href);
@@ -114,7 +114,7 @@ describe("内置公共包", () => {
   // 依赖包名、版本范围和环境出口均是加载门禁；本地副本不能成为失败后的兜底。
   it("拒绝缺少依赖、不兼容版本和未公开入口，保留无关消费者", async () => {
     const f = fixture([null, incompatibleRange, compatibleRange, compatibleRange]);
-    file(f.consumers[2]!, "public.ts", 'export { SubmitAgentInput } from "@atelier/builtin-api/private";');
+    file(f.consumers[2]!, "public.ts", 'export { SubmitAgentInput } from "@asterism/builtin-api/private";');
     const packages = await f.load();
     expect(packages.map(item => item.status)).toEqual(["failed", "failed", "failed", "loaded"]);
     expect(packages[0]!.error).toContain("must declare a dependency");
@@ -126,7 +126,7 @@ describe("内置公共包", () => {
     const f = fixture([compatibleRange, compatibleRange]);
     for (const [index, root] of f.consumers.entries()) {
       file(root, "renderer.ts", `
-        import { agentUI, AgentOverlay, AgentScrollArea, AgentToolbarItem, useAgentModelSelection } from "@atelier/builtin-api/renderer";
+        import { agentUI, AgentOverlay, AgentScrollArea, AgentToolbarItem, useAgentModelSelection } from "@asterism/builtin-api/renderer";
         import { createElement } from "react";
         export { agentUI, AgentOverlay, AgentScrollArea, AgentToolbarItem, useAgentModelSelection };
         export default { modules: [{ resources: [], cards: [], tools: [] }], async prepare({ signal }) {
@@ -140,7 +140,7 @@ describe("内置公共包", () => {
     const packages = await f.load();
     expect(packages.map(item => item.error)).toEqual([undefined, undefined]);
     release.push(bindPublicProvider("renderer", builtinPublicProvider, {
-      ...builtinPublicModules, "@atelier/builtin-api/renderer": builtinRendererAPI,
+      ...builtinPublicModules, "@asterism/builtin-api/renderer": builtinRendererAPI,
     }));
     const loaded = await Promise.all(packages.map(item => import(pathToFileURL(join(f.cache, item.renderer!)).href)));
     expect(loaded.every(module => module.agentUI === builtinRendererAPI.agentUI
@@ -159,12 +159,12 @@ describe("内置公共包", () => {
   // 公共前端服务不能进入后台模块图，避免 React/界面状态跨环境混用。
   it("后台消费者不能导入 Agent UI 前端出口", async () => {
     const f = fixture([compatibleRange]);
-    file(f.consumers[0]!, "runtime.ts", 'import { agentUI } from "@atelier/builtin-api/renderer"; export default agentUI;');
+    file(f.consumers[0]!, "runtime.ts", 'import { agentUI } from "@asterism/builtin-api/renderer"; export default agentUI;');
     const [item] = await f.load();
     expect(item!.status).toBe("failed");
     expect(item!.error).toContain("not exported");
   });
-  // 中间库没有 atelier 清单；校验它自己的 npm 依赖，运行依赖仍归实际消费者插件。
+  // 中间库没有 asterism 清单；校验它自己的 npm 依赖，运行依赖仍归实际消费者插件。
   it.each(["nested", "symlink"] as const)("独立中间 npm 包的 %s 导入按包归属校验版本", async mode => {
     const f = fixture([null, compatibleRange]);
     for (const [index, root] of f.consumers.entries()) {
@@ -173,8 +173,8 @@ describe("内置公共包", () => {
       file(root, "package.json", JSON.stringify(metadata));
       const helper = mode === "nested" ? join(root, "node_modules/@fixture/helper") : temp();
       file(helper, "package.json", JSON.stringify({ name: "@fixture/helper", version: "1.0.0", type: "module",
-        exports: "./index.js", peerDependencies: { "@atelier/builtin-api": index === 0 ? compatibleRange : incompatibleRange } }));
-      file(helper, "index.js", 'export { SubmitAgentInput } from "@atelier/builtin-api/contracts";');
+        exports: "./index.js", peerDependencies: { "@asterism/builtin-api": index === 0 ? compatibleRange : incompatibleRange } }));
+      file(helper, "index.js", 'export { SubmitAgentInput } from "@asterism/builtin-api/contracts";');
       if (mode === "symlink") {
         mkdirSync(join(root, "node_modules/@fixture"), { recursive: true });
         symlinkSync(helper, join(root, "node_modules/@fixture/helper"), "dir");
@@ -186,7 +186,7 @@ describe("内置公共包", () => {
     expect(compatible!.definition!.dependencies).toEqual([builtin.id]);
     expect((compatible!.definition as PluginDefinition & { probe: Probe }).probe.SubmitAgentInput).toBe(SubmitAgentInput);
     expect(incompatible!.status).toBe("failed");
-    expect(incompatible!.error).toContain(`Package @fixture/helper requires @atelier/builtin-api ${incompatibleRange}`);
+    expect(incompatible!.error).toContain(`Package @fixture/helper requires @asterism/builtin-api ${incompatibleRange}`);
   });
   // 声明导入成功不等于实现可用；缺失或 setup 失败都必须沿实际实现依赖传播。
   it("实现提供方 setup 失败时消费者不初始化", async () => {

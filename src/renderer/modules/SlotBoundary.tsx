@@ -1,4 +1,4 @@
-import { commonMessages } from "@atelier/ui/messages/common";
+import { commonMessages } from "@asterism/ui/messages/common";
 import { useI18n } from "../shared/i18n";
 import { Component, type ReactNode } from "react";
 

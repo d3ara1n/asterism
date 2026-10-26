@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { pluginNamespace, type UsageItem } from "@atelier/sdk/contracts";
-import { definePlugin, UsageQueryError, type HeadersUsageProvider } from "@atelier/sdk/runtime";
+import { pluginNamespace, type UsageItem } from "@asterism/sdk/contracts";
+import { definePlugin, UsageQueryError, type HeadersUsageProvider } from "@asterism/sdk/runtime";
 
 const ns = pluginNamespace("example.header-usage");
 const balance = z.coerce.number();

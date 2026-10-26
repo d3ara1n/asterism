@@ -3,9 +3,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, it } from "vitest";
 import { z } from "zod";
-import { contentRefSchema, defineAction, defineCreation, defineRecord, pluginNamespace, type ResourceRef } from "@atelier/sdk/contracts";
-import { definePlugin, implementAction, implementCreation, implementResource, type PluginContext } from "@atelier/sdk/runtime";
-import { CreateAgent, defaultAgentPreset } from "@atelier/builtin-api/contracts";
+import { contentRefSchema, defineAction, defineCreation, defineRecord, pluginNamespace, type ResourceRef } from "@asterism/sdk/contracts";
+import { definePlugin, implementAction, implementCreation, implementResource, type PluginContext } from "@asterism/sdk/runtime";
+import { CreateAgent, defaultAgentPreset } from "@asterism/builtin-api/contracts";
 import { CreateNote } from "../../packages/builtin/src/notes/contract.ts";
 import { ApplicationService } from "./service.ts";
 import { openDatabase } from "./storage.ts";
@@ -27,7 +27,7 @@ afterEach(async () => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
 function open(root?: string, receive = true) {
-  if (!root) { root = mkdtempSync(join(tmpdir(), "atelier-templates-")); roots.push(root); }
+  if (!root) { root = mkdtempSync(join(tmpdir(), "asterism-templates-")); roots.push(root); }
   let plugin!: PluginContext;
   const definition = definePlugin({ namespace: ns, version: "1", setup(context) {
     plugin = context;

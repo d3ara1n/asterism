@@ -3,22 +3,22 @@ import { extname, join, relative, resolve, isAbsolute } from "node:path";
 import { pathToFileURL } from "node:url";
 import { z } from "zod";
 import * as zod from "zod";
-import * as sdkContracts from "@atelier/sdk/contracts";
-import * as sdkRuntime from "@atelier/sdk/runtime";
-import type { PluginDefinition } from "@atelier/sdk/runtime";
+import * as sdkContracts from "@asterism/sdk/contracts";
+import * as sdkRuntime from "@asterism/sdk/runtime";
+import type { PluginDefinition } from "@asterism/sdk/runtime";
 import type { Plugin } from "esbuild";
 import { compileModules, packageModule, type PackageModule } from "./package-modules.ts";
 import { loadCatalogs } from "./catalogs.ts";
-import { localeSchema, uiTextSchema, pluginMetadataSchema, type PluginMetadata } from "@atelier/sdk/contracts";
+import { localeSchema, uiTextSchema, pluginMetadataSchema, type PluginMetadata } from "@asterism/sdk/contracts";
 import type { TranslationCatalog } from "../shared/i18n.ts";
 import type { PublicProvider } from "../shared/public-modules.ts";
 import { jsonStorage } from "../storage/migrations.ts";
-import type { PluginStorageDeclaration } from "@atelier/sdk/runtime";
+import type { PluginStorageDeclaration } from "@asterism/sdk/runtime";
 
 /** SDK API 版本；插件清单的 api.major 必须相同，minMinor 不得高于宿主。 */
-export const sdkApi = { major: 18, minor: 2 } as const;
+export const sdkApi = { major: 19, minor: 0 } as const;
 
-/** 插件包清单：package.json 的 atelier 字段；源码与发布产物读同一份。 */
+/** 插件包清单：package.json 的 asterism 字段；源码与发布产物读同一份。 */
 export const manifestSchema = z.strictObject({
   id: z.string().regex(/^[a-z0-9][a-z0-9-]*(?:\.[a-z0-9][a-z0-9-]*)+$/u),
   api: z.strictObject({ major: z.number().int().nonnegative(), minMinor: z.number().int().nonnegative() }),
@@ -43,18 +43,18 @@ export function readPackageMetadata(root: string): PluginMetadata {
   const pkg = z.object({
     name: z.string().optional(), version: z.string().optional(), description: z.string().optional(),
     author: z.union([z.string(), z.object({ name: z.string() })]).optional(),
-    atelier: z.object({ displayName: uiTextSchema.optional(), description: uiTextSchema.optional(), icon: z.string().optional() }).optional(),
+    asterism: z.object({ displayName: uiTextSchema.optional(), description: uiTextSchema.optional(), icon: z.string().optional() }).optional(),
   }).parse(JSON.parse(readFileSync(join(root, "package.json"), "utf8")));
   let icon: string | undefined;
-  if (pkg.atelier?.icon) {
-    const file = realpathSync(resolve(root, pkg.atelier.icon));
+  if (pkg.asterism?.icon) {
+    const file = realpathSync(resolve(root, pkg.asterism.icon));
     const inside = relative(realpathSync(root), file);
     if (!inside || inside.startsWith("..") || isAbsolute(inside)) throw new Error("Plugin icon must be inside the package.");
     const mime = ({ ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".svg": "image/svg+xml" } as Record<string, string>)[extname(file).toLowerCase()];
     if (!mime) throw new Error("Plugin icon must be a PNG, JPEG, WebP or SVG image.");
     icon = `data:${mime};base64,${readFileSync(file).toString("base64")}`;
   }
-  return pluginMetadataSchema.parse({ name: pkg.atelier?.displayName ?? pkg.name, description: pkg.atelier?.description ?? pkg.description,
+  return pluginMetadataSchema.parse({ name: pkg.asterism?.displayName ?? pkg.name, description: pkg.asterism?.description ?? pkg.description,
     version: pkg.version, author: typeof pkg.author === "string" ? pkg.author : pkg.author?.name, icon });
 }
 
@@ -90,10 +90,10 @@ export function readManifest(root: string): PluginPackageManifest {
   let raw: unknown;
   try { raw = JSON.parse(readFileSync(file, "utf8")); }
   catch { throw new PluginPackageError("invalid_manifest", `package.json at ${root} is not valid JSON.`); }
-  const parsed = manifestSchema.safeParse((raw as { atelier?: unknown } | null)?.atelier);
+  const parsed = manifestSchema.safeParse((raw as { asterism?: unknown } | null)?.asterism);
   if (!parsed.success) {
-    const fields = parsed.error.issues.map(issue => `atelier.${issue.path.join(".") || "(root)"}`).join(", ");
-    throw new PluginPackageError("invalid_manifest", `Package at ${root} has no valid Atelier manifest: ${fields}.`);
+    const fields = parsed.error.issues.map(issue => `asterism.${issue.path.join(".") || "(root)"}`).join(", ");
+    throw new PluginPackageError("invalid_manifest", `Package at ${root} has no valid Asterism manifest: ${fields}.`);
   }
   const manifest = parsed.data;
   if (manifest.api.major !== sdkApi.major || manifest.api.minMinor > sdkApi.minor) {
@@ -144,10 +144,10 @@ export class PackageList {
  */
 const shared: Record<string, Record<string, unknown>> = {
   zod: zod as Record<string, unknown>,
-  "@atelier/sdk/contracts": sdkContracts as Record<string, unknown>,
-  "@atelier/sdk/runtime": sdkRuntime as Record<string, unknown>,
+  "@asterism/sdk/contracts": sdkContracts as Record<string, unknown>,
+  "@asterism/sdk/runtime": sdkRuntime as Record<string, unknown>,
 };
-const sharedGlobal = "__atelierSharedModules";
+const sharedGlobal = "__asterismSharedModules";
 (globalThis as Record<string, unknown>)[sharedGlobal] = shared;
 function sharedModuleSource(id: string): string {
   const names = Object.keys(shared[id]!).filter(name => name !== "default" && /^[A-Za-z_$][\w$]*$/u.test(name));
@@ -156,19 +156,19 @@ function sharedModuleSource(id: string): string {
       `const shared${index} = m[${JSON.stringify(name)}]; export { shared${index} as ${name} };`)].join("\n");
 }
 
-/** renderer 共享模块：由宿主页面在 window.__atelierRendererModules 提供同一实例。 */
-export const rendererShared: readonly string[] = ["react", "react/jsx-runtime", "react-dom", "react-dom/client", "react-intl", "zod", "@atelier/sdk/contracts", "@atelier/sdk/renderer"];
+/** renderer 共享模块：由宿主页面在 window.__asterismRendererModules 提供同一实例。 */
+export const rendererShared: readonly string[] = ["react", "react/jsx-runtime", "react-dom", "react-dom/client", "react-intl", "zod", "@asterism/sdk/contracts", "@asterism/sdk/renderer"];
 function rendererModuleSource(id: string): string {
   // CJS 形态转发：esbuild 的互操作让具名导入按属性读取同一实例。
-  return `const m = globalThis.__atelierRendererModules[${JSON.stringify(id)}]; module.exports = m;`;
+  return `const m = globalThis.__asterismRendererModules[${JSON.stringify(id)}]; module.exports = m;`;
 }
 
 /** 宿主库保留既有实例；插件公共模块通过同一 ESM 图共享。 */
 function hostModules(realm: "runtime" | "renderer"): Plugin {
-  return { name: "atelier-host-modules", setup(build) {
+  return { name: "asterism-host-modules", setup(build) {
     build.onResolve({ filter: /.*/ }, args => (realm === "runtime" ? args.path in shared : rendererShared.includes(args.path))
-      ? { path: args.path, namespace: "atelier-host" } : undefined);
-    build.onLoad({ filter: /.*/, namespace: "atelier-host" }, args => ({
+      ? { path: args.path, namespace: "asterism-host" } : undefined);
+    build.onLoad({ filter: /.*/, namespace: "asterism-host" }, args => ({
       contents: realm === "runtime" ? sharedModuleSource(args.path) : rendererModuleSource(args.path), loader: "js",
     }));
   } };

@@ -1,7 +1,7 @@
-import { defineMessages, pluginNamespace } from "@atelier/sdk/contracts";
-import { commonMessages } from "@atelier/ui/messages/common";
+import { defineMessages, pluginNamespace } from "@asterism/sdk/contracts";
+import { commonMessages } from "@asterism/ui/messages/common";
 
-export const modelSelectionMessages = pluginNamespace("atelier.host").messages("en", defineMessages({
+export const modelSelectionMessages = pluginNamespace("asterism.host").messages("en", defineMessages({
   agentDefault: { id: "modelSelection.agentDefault", defaultMessage: "Agent default" },
   providerDefault: { id: "modelSelection.providerDefault", defaultMessage: "Provider default" },
   unavailable: { id: "modelSelection.unavailable", defaultMessage: "{value} (unavailable)" },

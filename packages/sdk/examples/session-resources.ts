@@ -1,4 +1,4 @@
-import type { PluginContext, ResourceRef, ObjectReader, ToolSession } from "@atelier/sdk/runtime";
+import type { PluginContext, ResourceRef, ObjectReader, ToolSession } from "@asterism/sdk/runtime";
 import { CreateCounter, ChangeCount } from "./counter-contract.ts";
 
 /** 调用者填写公开创建输入，资源提供方负责初始化；返回值只有身份。 */

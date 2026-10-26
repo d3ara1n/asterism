@@ -1,10 +1,10 @@
-import { defineMessages, pluginNamespace } from "@atelier/sdk/contracts";
+import { defineMessages, pluginNamespace } from "@asterism/sdk/contracts";
 
-export const pluginsMessages = pluginNamespace("atelier.host").messages("en", defineMessages({
+export const pluginsMessages = pluginNamespace("asterism.host").messages("en", defineMessages({
   application: { id: "settings.application", defaultMessage: "Application" },
-  applicationSummary: { id: "settings.applicationSummary", defaultMessage: "Manage Atelier’s preferences and shared configuration." },
+  applicationSummary: { id: "settings.applicationSummary", defaultMessage: "Manage Asterism’s preferences and shared configuration." },
   plugins: { id: "settings.plugins", defaultMessage: "Plugins" },
-  pluginsSummary: { id: "settings.pluginsSummary", defaultMessage: "Plugins provide Atelier’s core features and extensions. Find their settings in the corresponding plugin." },
+  pluginsSummary: { id: "settings.pluginsSummary", defaultMessage: "Plugins provide Asterism’s core features and extensions. Find their settings in the corresponding plugin." },
   search: { id: "plugins.search", defaultMessage: "Search plugins…" },
   filter: { id: "plugins.filter", defaultMessage: "Filter plugins" },
   all: { id: "plugins.all", defaultMessage: "All plugins" },
@@ -41,7 +41,7 @@ export const pluginsMessages = pluginNamespace("atelier.host").messages("en", de
   },
   restartHint: {
     id: "features_plugins_PluginsSettings_7",
-    defaultMessage: "Restart Atelier to apply plugin changes.",
+    defaultMessage: "Restart Asterism to apply plugin changes.",
   },
   unknownPlugin: {
     id: "features_plugins_PluginsSettings_9",

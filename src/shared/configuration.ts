@@ -1,13 +1,13 @@
-import { agentInputSchema, agentSchema, agentOverridesSchema, configurationIdSchema } from "@atelier/builtin-api/contracts";
-export { agentInputSchema, agentSchema, agentOverridesSchema, type AgentConfiguration, type AgentOverrides } from "@atelier/builtin-api/contracts";
+import { agentInputSchema, agentSchema, agentOverridesSchema, configurationIdSchema } from "@asterism/builtin-api/contracts";
+export { agentInputSchema, agentSchema, agentOverridesSchema, type AgentConfiguration, type AgentOverrides } from "@asterism/builtin-api/contracts";
 import {
   modelExpressionSchema, parseModelExpression, thinkingSchema, type ThinkingLevel,
   thinkingLevels, modelCostSchema, uiTextSchema,
   modelProviderFixedFields, providerUsageIdSchema, usageProviderInfoSchema, modelProviderPresetSchema,
-} from "@atelier/sdk/contracts";
-export { modelExpressionSchema, parseModelExpression, formatModelExpression, modelReference, thinkingSchema, type ModelExpression, type ThinkingLevel } from "@atelier/sdk/contracts";
+} from "@asterism/sdk/contracts";
+export { modelExpressionSchema, parseModelExpression, formatModelExpression, modelReference, thinkingSchema, type ModelExpression, type ThinkingLevel } from "@asterism/sdk/contracts";
 import { z } from "zod";
-import { webProviderStateSchema, webProviderTypeSchema } from "@atelier/sdk/contracts";
+import { webProviderStateSchema, webProviderTypeSchema } from "@asterism/sdk/contracts";
 import { modelCompatibilitySchema } from "./model-compatibility.ts";
 
 const id = z.string().min(1).max(160);
@@ -160,8 +160,8 @@ export function resolveProviderModel(snapshot: ConfigurationSnapshot, reference:
   return provider?.enabled ? { model, provider } : null;
 }
 
-export { resolveAgentModel } from "@atelier/builtin-api/contracts";
-export { availableThinkingLevels } from "@atelier/sdk/contracts";
+export { resolveAgentModel } from "@asterism/builtin-api/contracts";
+export { availableThinkingLevels } from "@asterism/sdk/contracts";
 
 /**
  * 空值才继承；丢失、停用的配置必须由消费方显式处理，不能偷偷换成其他模型。

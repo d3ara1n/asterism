@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { ModelPart } from "@atelier/sdk/contracts";
+import type { ModelPart } from "@asterism/sdk/contracts";
 import type { ModelProviderInput, ProviderModel } from "../shared/configuration.ts";
 import { mergeModelCompatibility } from "../shared/model-compatibility.ts";
 import { ModelFailure, type ModelInput, type ModelValidationInput, type ResolvedModelItem } from "./contract.ts";

@@ -1,9 +1,9 @@
-import type { UiText } from "@atelier/sdk/contracts";
-import { Alert, AlertDescription, AlertTitle } from "@atelier/ui/ui/alert";
-import { Button } from "@atelier/ui/ui/button";
-import { PageState } from "@atelier/ui/ui/page-state";
-import { StatusIcon, StatusText } from "@atelier/ui/ui/status";
-import { commonMessages } from "@atelier/ui/messages/common";
+import type { UiText } from "@asterism/sdk/contracts";
+import { Alert, AlertDescription, AlertTitle } from "@asterism/ui/ui/alert";
+import { Button } from "@asterism/ui/ui/button";
+import { PageState } from "@asterism/ui/ui/page-state";
+import { StatusIcon, StatusText } from "@asterism/ui/ui/status";
+import { commonMessages } from "@asterism/ui/messages/common";
 import { workbenchMessages as messages } from "../../messages/workbench";
 import { useI18n } from "../../shared/i18n";
 import type { WorkbenchPhase } from "./feedback";

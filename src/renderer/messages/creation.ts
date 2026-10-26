@@ -1,6 +1,6 @@
-import { defineMessages, pluginNamespace } from "@atelier/sdk/contracts";
+import { defineMessages, pluginNamespace } from "@asterism/sdk/contracts";
 
-export const creationMessages = pluginNamespace("atelier.host").messages("en", defineMessages({
+export const creationMessages = pluginNamespace("asterism.host").messages("en", defineMessages({
   workbenchNotReady: {
     id: "features_creation_coordinator_1",
     defaultMessage: "The workbench is not ready. Try again.",

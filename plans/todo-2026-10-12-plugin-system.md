@@ -6,7 +6,7 @@
 
 代码与作者文档已实现，SDK 0.22.0／宿主 API 9.0，旧主版本在装载前明确拒绝。交互见 [设置总览与插件管理](../docs/workbench.md#设置总览与插件管理)，SDK 归属与存储见 [插件 SDK](../docs/plugin-sdk.md#模块与装配)。本节是该项实现进度的唯一入口。
 
-- [x] 插件包元信息：独立于插件代码执行读取信息卡片；使用标准包元信息与 `atelier.displayName / description / icon`，贯通已启用、禁用、失败与内置插件展示。
+- [x] 插件包元信息：独立于插件代码执行读取信息卡片；使用标准包元信息与 `asterism.displayName / description / icon`，贯通已启用、禁用、失败与内置插件展示。
 - [x] 扩展前后台插件入口：插件级装配、共享服务、可选配置与设置页登记、准备及清理；功能模块沿用显式组合。加载器、内置插件与可编译作者示例已同步。
 - [x] 在现有具型调用内支持明确声明的插件级与对象级作用域；全局操作无需资源，对象级调用保留引用校验，统一取消与真实收束。
 - [x] 配置存储与 UI 解耦：保留可选托管配置，补前端正式保存／恢复默认／刷新能力；移除自动生成插件表单及配置专用布局声明。模型兼容设置仍使用的通用字段编辑与本地化设施保留。
@@ -61,13 +61,13 @@
 
 ## 已完成
 
-- [x] `@atelier/sdk` workspace 包：`contracts` / `runtime` / `renderer` 三入口；记录契约按 schema 解码，保留 null／known／unknown 三态。
+- [x] `@asterism/sdk` workspace 包：`contracts` / `runtime` / `renderer` 三入口；记录契约按 schema 解码，保留 null／known／unknown 三态。
 - [x] 宿主存储到公开记录信封的 adapter（`src/plugins/records.ts`），公开接口不依赖物理节点。
 - [x] 提交后观察、托管任务（进程内，关闭取消）、标题比较更新、core `naming` 模块；会话命名使用配置了模型的 `utility` 角色，用户确认实现无故障。
 - [x] 资源动作 prepare（接受／替换／拒绝）与前端对象 `invoke`。
 - [x] 后台 `session.invoke` 接通公开资源动作；契约与作者入口见 [后台资源动作](../docs/plugin-sdk.md#后台资源动作api-111)。
 - [x] 插件包：清单校验（只认包根）、`plugins.json` 列表、添加与启用分离、重启生效、esbuild 打包与缓存。
-- [x] renderer 插件：`atelier-plugin://` 协议、共享模块表、卡片错误边界。
+- [x] renderer 插件：`asterism-plugin://` 协议、共享模块表、卡片错误边界。
 - [x] 按对象的二进制流通道；插件页（添加、启用、禁用、移除、失败原因）。
 - [x] 单次模型执行返回终止原因和工具结局，Agent 据此决定是否继续。
 
@@ -90,7 +90,7 @@
 
 既有 SDK 接入保留以下真实交互和发布构建验收；职责分离与功能组合的新增实施项见上方当前任务。
 
-- [x] GUI 验收：以 `atelier.core` 的目录、笔记、Agent 与命名确认卡片、添加菜单与拖放创建（含选择记忆与准备中取消）、创建／动作、首页发送、停止／继续、重开与历史查看；用户确认通过（2026-10-13）。
+- [x] GUI 验收：以 `asterism.core` 的目录、笔记、Agent 与命名确认卡片、添加菜单与拖放创建（含选择记忆与准备中取消）、创建／动作、首页发送、停止／继续、重开与历史查看；用户确认通过（2026-10-13）。
 - [x] 打包验证：用户已在打包产物中加载外部源码插件确认通过（2026-10-13）。过程中发现并修复真实缺陷：asar 归档内 esbuild 无法 spawn 服务进程（ENOTDIR，Electron 不为 spawn 改写归档路径），修复为从 `app.asar.unpacked` 实体路径加载 esbuild 入口（`src/plugins/package-modules.ts`），开发环境路径不变；构建批次收束后统一停止 esbuild 服务。
 
 ## 未来事项

@@ -111,33 +111,33 @@ function ico(images: { size: number; data: Buffer }[]): Buffer {
 
 mkdirSync(output, { recursive: true });
 const sources = {
-  "atelier.svg": svg(themes.light, layouts.mac),
-  "atelier-dark.svg": svg(themes.dark, layouts.mac),
-  "atelier-full.svg": svg(themes.light, layouts.full),
+  "asterism.svg": svg(themes.light, layouts.mac),
+  "asterism-dark.svg": svg(themes.dark, layouts.mac),
+  "asterism-full.svg": svg(themes.light, layouts.full),
 };
 for (const [name, content] of Object.entries(sources)) {
   writeFileSync(join(output, name), content);
   rasterize(join(output, name), join(output, name.replace(/\.svg$/u, ".png")), 1024);
 }
 
-const work = mkdtempSync(join(tmpdir(), "atelier-icon-"));
+const work = mkdtempSync(join(tmpdir(), "asterism-icon-"));
 try {
   // macOS：iconset 全尺寸交给 iconutil 打包。
-  const iconset = join(work, "atelier.iconset");
+  const iconset = join(work, "asterism.iconset");
   mkdirSync(iconset);
   for (const size of [16, 32, 128, 256, 512]) {
-    rasterize(join(output, "atelier.svg"), join(iconset, `icon_${size}x${size}.png`), size);
-    rasterize(join(output, "atelier.svg"), join(iconset, `icon_${size}x${size}@2x.png`), size * 2);
+    rasterize(join(output, "asterism.svg"), join(iconset, `icon_${size}x${size}.png`), size);
+    rasterize(join(output, "asterism.svg"), join(iconset, `icon_${size}x${size}@2x.png`), size * 2);
   }
-  execFileSync("iconutil", ["-c", "icns", iconset, "-o", join(output, "atelier.icns")]);
+  execFileSync("iconutil", ["-c", "icns", iconset, "-o", join(output, "asterism.icns")]);
 
   // Windows：铺满版各尺寸写入同一个 ICO。
   const images = [16, 24, 32, 48, 64, 128, 256].map(size => {
     const file = join(work, `full-${size}.png`);
-    rasterize(join(output, "atelier-full.svg"), file, size);
+    rasterize(join(output, "asterism-full.svg"), file, size);
     return { size, data: readFileSync(file) };
   });
-  writeFileSync(join(output, "atelier.ico"), ico(images));
+  writeFileSync(join(output, "asterism.ico"), ico(images));
 } finally {
   rmSync(work, { recursive: true, force: true });
 }

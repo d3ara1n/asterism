@@ -1,5 +1,5 @@
 {
-  "name": "@atelier/builtin",
+  "name": "@asterism/builtin",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -10,9 +10,9 @@
     "./locales/zh-Hans.json": "./src/locales/zh-Hans.json"
   },
   "dependencies": {
-    "@atelier/builtin-api": "^0.17.0",
-    "@atelier/sdk": "^0.44.0",
-    "@atelier/ui": "^0.1.0",
+    "@asterism/builtin-api": "^0.18.0",
+    "@asterism/sdk": "^0.45.0",
+    "@asterism/ui": "^0.1.0",
     "@lobehub/streamdown": "1.4.1",
     "@modelcontextprotocol/client": "2.3.1",
     "@pierre/diffs": "1.5.2",

@@ -11,12 +11,12 @@ describe("持久 JSON 中的内容引用", () => {
 
   // 保留值按完整形状识别；同名普通字段仍可包含真正引用，扫描不能提前停止。
   it("只收集精确引用，穿过普通同名字段并去重", () => {
-    const ref = { "$atelier.content": "c8ded95c-2061-4bc3-8744-3efb7aa1eb69" };
+    const ref = { "$asterism.content": "c8ded95c-2061-4bc3-8744-3efb7aa1eb69" };
     expect(contentReferences({
-      schema: { "$atelier.content": { nested: [ref] } },
+      schema: { "$asterism.content": { nested: [ref] } },
       text: JSON.stringify(ref),
       extra: { ...ref, description: "ordinary object" },
-      invalid: { "$atelier.content": "not-a-uuid" },
+      invalid: { "$asterism.content": "not-a-uuid" },
       files: [ref],
     })).toEqual([ref]);
   });

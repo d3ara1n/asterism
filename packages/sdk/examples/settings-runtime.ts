@@ -1,4 +1,4 @@
-import { definePlugin, implementCall } from "@atelier/sdk/runtime";
+import { definePlugin, implementCall } from "@asterism/sdk/runtime";
 import { Settings, ReadLabel, settingsPlugin } from "./settings-contract.ts";
 
 /** 没有功能模块的插件也能维护配置并提供全局业务调用。 */

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { useRendererCalls, useRendererEvents } from "@atelier/sdk/renderer";
-import type { StatusTone } from "@atelier/ui/ui/status";
+import { useRendererCalls, useRendererEvents } from "@asterism/sdk/renderer";
+import type { StatusTone } from "@asterism/ui/ui/status";
 import { McpChanged, ReadMcp, ReadMcpTools, type ConnectionPhase, type McpServerState, type McpToolSummary } from "./contract.ts";
 
 export const phaseTone: Record<ConnectionPhase, StatusTone> = {

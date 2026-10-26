@@ -1,6 +1,6 @@
-import { defineMessages, pluginNamespace } from "@atelier/sdk/contracts";
+import { defineMessages, pluginNamespace } from "@asterism/sdk/contracts";
 
-export const modelCostMessages = pluginNamespace("atelier.host").messages("en", defineMessages({
+export const modelCostMessages = pluginNamespace("asterism.host").messages("en", defineMessages({
   title: { id: "modelCost.title", defaultMessage: "Reference prices" },
   hint: { id: "modelCost.hint", defaultMessage: "All amounts are in USD, for estimates only. Enter an amount, then choose its unit and quantity (for example, 1,000,000 tokens, 1 image or 60 seconds). Blank means unknown; zero means free. Fetch parameters to fill published API prices." },
   base: { id: "modelCost.base", defaultMessage: "Base prices" },

@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { belongsTo, jsonSchema, type CreationContract, type Json, type SessionDirectory } from "@atelier/sdk/contracts";
-import { defineModule, PluginApiError, type PluginContext, type PluginModule, type ObjectReader, type TopLevelToolContext } from "@atelier/sdk/runtime";
+import { belongsTo, jsonSchema, type CreationContract, type Json, type SessionDirectory } from "@asterism/sdk/contracts";
+import { defineModule, PluginApiError, type PluginContext, type PluginModule, type ObjectReader, type TopLevelToolContext } from "@asterism/sdk/runtime";
 
 export interface AgentCreationDescription {
   readonly id: string;

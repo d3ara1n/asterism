@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { ChevronRight, Network, RefreshCw, Settings } from "lucide-react";
-import { useI18n, useRendererCalls, useRendererSettings, creationEntry, cardRenderer, type RendererModule } from "@atelier/sdk/renderer";
-import { Button } from "@atelier/ui/ui/button";
-import { IconButton } from "@atelier/ui/ui/icon-button";
-import { Spinner } from "@atelier/ui/ui/spinner";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@atelier/ui/ui/collapsible";
-import { cn } from "@atelier/ui/utils";
+import { useI18n, useRendererCalls, useRendererSettings, creationEntry, cardRenderer, type RendererModule } from "@asterism/sdk/renderer";
+import { Button } from "@asterism/ui/ui/button";
+import { IconButton } from "@asterism/ui/ui/icon-button";
+import { Spinner } from "@asterism/ui/ui/spinner";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@asterism/ui/ui/collapsible";
+import { cn } from "@asterism/ui/utils";
 import { McpHost, CreateMcpHost, McpHostView, ConnectMcpServer, type McpServerState } from "./contract";
 import { mcpMessages as messages } from "../messages/mcp";
 import { useMcpTools } from "./status";
@@ -20,7 +20,7 @@ const detail = "col-[3/-1] min-w-0";
 
 function useOpenSettings() {
   const settings = useRendererSettings();
-  return () => settings.open("atelier.builtin", "mcp");
+  return () => settings.open("asterism.builtin", "mcp");
 }
 
 /** 标题栏入口：服务器管理位于内置插件设置的 MCP 分区。 */
@@ -93,5 +93,5 @@ export default {
   resources: [{ kind: McpHost.kind, label: messages.title, icon: <Network className="size-4" />, card: appearance }],
   cards: [cardRenderer(McpHostView, { ...appearance, Body: HostBody, Actions: HostActions })],
   tools: mcpToolRenderers,
-  creations: [creationEntry(CreateMcpHost, { id: "atelier.builtin/mcp.blank", label: messages.title, icon: <Network className="size-4" />, group: "resources", triggers: { menu: { initialInput: { title: "MCP Host" } } } })],
+  creations: [creationEntry(CreateMcpHost, { id: "asterism.builtin/mcp.blank", label: messages.title, icon: <Network className="size-4" />, group: "resources", triggers: { menu: { initialInput: { title: "MCP Host" } } } })],
 } satisfies RendererModule;

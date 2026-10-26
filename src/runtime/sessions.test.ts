@@ -15,10 +15,10 @@ it("应用命令登记和移除插件包，正确表达重启标记", () => {
   const root = mkdtempSync(join(tmpdir(), "core-session-")); roots.push(root);
   const service = new ApplicationService(root); services.push(service);
   const dir = join(root, "pkg"); mkdirSync(dir);
-  writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "p", atelier: { id: "acme.p", api: { major: 18, minMinor: 0 } } }));
+  writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "p", asterism: { id: "acme.p", api: { major: 19, minMinor: 0 } } }));
   const added = service.execute({ type: "plugin.add", path: dir });
   expect(added.plugins.filter(p => p.index !== null).map(p => [p.source, p.status, p.enabled])).toEqual([[dir, "pending", true]]);
-  expect(added.plugins.find(p => p.index === null)).toMatchObject({ id: "atelier.builtin", status: "loaded" });
+  expect(added.plugins.find(p => p.index === null)).toMatchObject({ id: "asterism.builtin", status: "loaded" });
   expect(added.restartRequired).toBe(true);
   expect(service.execute({ type: "plugin.remove", index: 0 }).restartRequired).toBe(false);
 });

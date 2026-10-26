@@ -1,5 +1,5 @@
-import type { Json, ModelInputPart, ToolModelOutput } from "@atelier/sdk/contracts";
-import { toolCompletionSchema, toolOutcomeSchema, type ToolInvocationInfo, type ToolOutcome } from "@atelier/sdk/contracts";
+import type { Json, ModelInputPart, ToolModelOutput } from "@asterism/sdk/contracts";
+import { toolCompletionSchema, toolOutcomeSchema, type ToolInvocationInfo, type ToolOutcome } from "@asterism/sdk/contracts";
 import type { CallResult } from "./contract.ts";
 
 /** 只有非成功结局可以继承过程产出；预览不能隐式升级为成功结果。 */

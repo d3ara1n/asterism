@@ -1,5 +1,5 @@
-import { PluginApiError, type ObjectExecutor, type ObjectReader } from "@atelier/sdk/runtime";
-import { AgentInputMessage } from "@atelier/builtin-api/contracts";
+import { PluginApiError, type ObjectExecutor, type ObjectReader } from "@asterism/sdk/runtime";
+import { AgentInputMessage } from "@asterism/builtin-api/contracts";
 import { AgentDrafts } from "./data.ts";
 import type { AgentDraft, DraftMode } from "./drafts-contract.ts";
 import { duplicateSubmission, rememberSubmission } from "./submissions.ts";

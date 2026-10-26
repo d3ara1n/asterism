@@ -6,9 +6,9 @@ import { settingsMessages } from "../../messages/settings";
 import { useI18n } from "../../shared/i18n";
 import { useIsland } from "../../shared/weave/Screen";
 import { IslandPanel, panelIslandWidth } from "../../shared/weave/IslandPanel";
-import { Button } from "@atelier/ui/ui/button";
-import { Spinner } from "@atelier/ui/ui/spinner";
-import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemSeparator, ItemTitle } from "@atelier/ui/ui/item";
+import { Button } from "@asterism/ui/ui/button";
+import { Spinner } from "@asterism/ui/ui/spinner";
+import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemSeparator, ItemTitle } from "@asterism/ui/ui/item";
 import { Section, Row } from "./layout";
 
 /** 会话管理所需的应用数据：会话目录由应用层持有，恢复后由应用层重读。 */

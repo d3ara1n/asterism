@@ -1,5 +1,5 @@
-import { modelProviderPresetSchema, usageProviderInfoSchema, usageItemsSchema, type ModelProviderPreset, type ModelProviderPresetContribution } from "@atelier/sdk/contracts";
-import { UsageQueryError, type UsageProvider } from "@atelier/sdk/runtime";
+import { modelProviderPresetSchema, usageProviderInfoSchema, usageItemsSchema, type ModelProviderPreset, type ModelProviderPresetContribution } from "@asterism/sdk/contracts";
+import { UsageQueryError, type UsageProvider } from "@asterism/sdk/runtime";
 import type { RunGroup } from "../plugins/lifecycle.ts";
 import { defineProviderPresets } from "../shared/provider-presets.ts";
 import { synchronous } from "../plugins/synchronous.ts";

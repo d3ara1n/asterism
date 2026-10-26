@@ -1,4 +1,4 @@
-import { thinkingLevels } from "@atelier/sdk/contracts";
+import { thinkingLevels } from "@asterism/sdk/contracts";
 import { describe, expect, it, vi } from "vitest";
 import { setImmediate } from "node:timers/promises";
 import { MockLanguageModelV4, simulateReadableStream } from "ai/test";
@@ -7,13 +7,13 @@ import { modelScope } from "../shared/model.ts";
 import { ModelFailure, type ModelInput, type ModelEvent } from "./contract.ts";
 import { createProviderModel } from "./provider.ts";
 import { projectSystemPrompt } from "./system-prompt.ts";
-import { composeSystemPrompt } from "@atelier/builtin/runtime";
+import { composeSystemPrompt } from "@asterism/builtin/runtime";
 
 const input: ModelInput = {
   settings: { provider: { id: "p", name: "Provider", enabled: true, baseUrl: "https://example.invalid", protocol: "anthropic", auth: "api_key", compatibility: [] },
     model: { name: "Model", modelId: "test", providerId: "p", enabled: true, contextWindow: null, cost: null, compatibility: [],
       capabilities: { reasoning: true, tools: true, thinkingLevels: [...thinkingLevels] }, generation: { temperature: 0.2, topP: null, maxOutputTokens: 1000 } }, thinking: "low" },
-  system: composeSystemPrompt({ id: "worker", systemPrompt: "System" }, "Atelier"), messages: [{ kind: "input", parts: [{ kind: "text", text: "Read" }] }],
+  system: composeSystemPrompt({ id: "worker", systemPrompt: "System" }, "Asterism"), messages: [{ kind: "input", parts: [{ kind: "text", text: "Read" }] }],
   tools: [{ name: "read", description: "Read", parameters: { type: "object", properties: { resource_id: { type: "string" } }, required: ["resource_id"] } }],
 };
 async function consume(events: AsyncIterable<ModelEvent>) { for await (const _event of events) { /* 消费到终态或错误。 */ } }
@@ -542,7 +542,7 @@ describe("AI SDK 适配契约", () => {
     }] };
     expect(() => adapter.prepare(current)).not.toThrow();
     expect(sdkMessages(current)).toEqual([{ role: "assistant", content: [
-      { type: "reasoning", text: "Foreign thought", providerOptions: { atelier: { summary: "" } } },
+      { type: "reasoning", text: "Foreign thought", providerOptions: { asterism: { summary: "" } } },
       { type: "text", text: "Portable answer", providerOptions: {} },
     ] }]);
   });

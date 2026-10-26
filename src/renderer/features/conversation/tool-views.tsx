@@ -1,17 +1,17 @@
 import { Boxes, ScanSearch, Wrench } from "lucide-react";
 import type { ReactNode } from "react";
 import type { z } from "zod";
-import type { Json, UiText } from "@atelier/sdk/contracts";
-import { toolRenderer, type ToolRenderProps, type ToolRenderer, type ToolView } from "@atelier/sdk/renderer";
+import type { Json, UiText } from "@asterism/sdk/contracts";
+import { toolRenderer, type ToolRenderProps, type ToolRenderer, type ToolView } from "@asterism/sdk/renderer";
 
 import { ResourceCall, ResourceInspectResult, ResourceListResult } from "../../../tools/core";
 import { toolsMessages } from "../../messages/tools";
 import { JsonView, useModuleViews } from "../../modules/views";
 import type { ViewRegistry } from "../../modules/registry";
 import { getI18n, useI18n } from "../../shared/i18n";
-import { ToolDetails } from "@atelier/ui/tool-content";
-import { ToolHeader } from "@atelier/ui/tool-header";
-import { ItemGroup, Item, ItemMedia, ItemContent, ItemTitle, ItemDescription } from "@atelier/ui/ui/item";
+import { ToolDetails } from "@asterism/ui/tool-content";
+import { ToolHeader } from "@asterism/ui/tool-header";
+import { ItemGroup, Item, ItemMedia, ItemContent, ItemTitle, ItemDescription } from "@asterism/ui/ui/item";
 
 /** 状态字段可能来自任何资源；常规标量直接阅读，复合值保留完整数据。 */
 function ResourceFields({ value }: { value: Json }) {
@@ -71,7 +71,7 @@ function ResourceInspectBody({ result }: InspectProps) {
         <ItemContent>
           <ItemTitle>{tool.name}</ItemTitle>
           <ItemDescription className="line-clamp-none">{tool.description}</ItemDescription>
-          <ToolDetails label={i18n.formatMessage(toolsMessages.toolUsageDetails)} stateKey={`atelier/tool-usage:${tool.name}`}>
+          <ToolDetails label={i18n.formatMessage(toolsMessages.toolUsageDetails)} stateKey={`asterism/tool-usage:${tool.name}`}>
             {!!tool.guidelines.length && <ul className="list-disc space-y-1 pl-4 type-caption">{tool.guidelines.map((line, index) => <li key={index}>{line}</li>)}</ul>}
             <p className="type-label">{i18n.formatMessage(toolsMessages.toolArguments)}</p><JsonView value={tool.args} />
             <p className="type-label">{i18n.formatMessage(toolsMessages.toolTarget)}</p><JsonView value={tool.target} />

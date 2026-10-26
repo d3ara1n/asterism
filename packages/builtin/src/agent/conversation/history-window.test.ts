@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ContextSummary } from "@atelier/builtin-api/contracts";
+import { ContextSummary } from "@asterism/builtin-api/contracts";
 import { sessionSnapshot } from "../../../../../src/plugins/records";
 import { nodeView } from "../../../../../src/session/view";
 import { agentSource, call, event, message, node, text } from "../../../../../src/session/test-nodes";

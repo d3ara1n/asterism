@@ -1,6 +1,6 @@
-import { defineMessages, pluginNamespace } from "@atelier/sdk/contracts";
+import { defineMessages, pluginNamespace } from "@asterism/sdk/contracts";
 
-export const historyMessages = pluginNamespace("atelier.host").messages("en", defineMessages({
+export const historyMessages = pluginNamespace("asterism.host").messages("en", defineMessages({
   history: {
     id: "history",
     defaultMessage: "History",

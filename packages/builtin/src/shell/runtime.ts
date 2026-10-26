@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { defineModule, defineTopLevelTool } from "@atelier/sdk/runtime";
+import { defineModule, defineTopLevelTool } from "@asterism/sdk/runtime";
 import { ShellProfileListResult, type ShellSettings } from "./contract.ts";
 import { listShellProfiles } from "./profiles.ts";
 

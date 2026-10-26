@@ -1,5 +1,5 @@
-import { present, type ModelRequestContext } from "@atelier/sdk/contracts";
-import { AgentRequestContext } from "@atelier/builtin-api/contracts";
+import { present, type ModelRequestContext } from "@asterism/sdk/contracts";
+import { AgentRequestContext } from "@asterism/builtin-api/contracts";
 
 /** 从宿主交付的最终请求现场提取领域资料，随终态一次保存。 */
 export function agentRequestExtensions({ system, tools }: ModelRequestContext) {

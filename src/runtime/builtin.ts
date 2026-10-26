@@ -1,7 +1,7 @@
-import { PluginApiError, type PluginDefinition } from "@atelier/sdk/runtime";
-import { builtin, type NamingApi } from "@atelier/builtin-api/contracts";
-import { createBuiltin } from "@atelier/builtin/runtime";
-import builtinStorage from "@atelier/builtin/storage";
+import { PluginApiError, type PluginDefinition } from "@asterism/sdk/runtime";
+import { builtin, type NamingApi } from "@asterism/builtin-api/contracts";
+import { createBuiltin } from "@asterism/builtin/runtime";
+import builtinStorage from "@asterism/builtin/storage";
 import { loadPlugins, type PluginHostServices } from "../plugins/loader.ts";
 import { applicationBrand, applicationUserAgent } from "../shared/application.ts";
 

@@ -1,5 +1,5 @@
-import { type ModelFilePart, type ModelInputPart, type UiText, fileMediaType, modelInputLimits } from "@atelier/sdk/contracts";
-import type { RendererContentInput, ContentReader } from "@atelier/sdk/renderer";
+import { type ModelFilePart, type ModelInputPart, type UiText, fileMediaType, modelInputLimits } from "@asterism/sdk/contracts";
+import type { RendererContentInput, ContentReader } from "@asterism/sdk/renderer";
 import { mediaMessages } from "../../messages/media.ts";
 
 interface DraftFile { part: ModelFilePart; size: number }

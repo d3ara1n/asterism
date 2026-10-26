@@ -1,6 +1,6 @@
-import { modelProviderPresetSchema, type ModelProviderPreset } from "@atelier/sdk/contracts";
+import { modelProviderPresetSchema, type ModelProviderPreset } from "@asterism/sdk/contracts";
 import { modelProviderInputSchema, type ModelProviderInput } from "./configuration.ts";
-export type { ModelProviderPreset } from "@atelier/sdk/contracts";
+export type { ModelProviderPreset } from "@asterism/sdk/contracts";
 export type ModelProviderDraft = Omit<ModelProviderInput, "enabled">;
 
 /** 深复制配置与编辑规则；目录身份和资料不进入已保存连接。 */

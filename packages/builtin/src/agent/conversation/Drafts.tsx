@@ -1,29 +1,29 @@
 import { useState, useRef, type DragEvent, type KeyboardEvent } from "react";
-import { useI18n } from "@atelier/sdk/renderer";
-import { modelInputText } from "@atelier/sdk/contracts";
+import { useI18n } from "@asterism/sdk/renderer";
+import { modelInputText } from "@asterism/sdk/contracts";
 import {
   GripVertical, Inbox, ChevronDown, Paperclip,
   Bot, User, ArrowDownToLine, ArrowLeftRight, Trash2, MoreHorizontal,
   AlertTriangle,
 } from "lucide-react";
-import { Button } from "@atelier/ui/ui/button";
-import { Badge } from "@atelier/ui/ui/badge";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@atelier/ui/ui/collapsible";
-import { Tooltip, TooltipTrigger, TooltipContent } from "@atelier/ui/ui/tooltip";
+import { Button } from "@asterism/ui/ui/button";
+import { Badge } from "@asterism/ui/ui/badge";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@asterism/ui/ui/collapsible";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@asterism/ui/ui/tooltip";
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
   DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator,
   DropdownMenuItem, DropdownMenuGroup,
-} from "@atelier/ui/ui/dropdown-menu";
+} from "@asterism/ui/ui/dropdown-menu";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-} from "@atelier/ui/ui/alert-dialog";
-import { StatusText } from "@atelier/ui/ui/status";
-import { cn } from "@atelier/ui/utils";
+} from "@asterism/ui/ui/alert-dialog";
+import { StatusText } from "@asterism/ui/ui/status";
+import { cn } from "@asterism/ui/utils";
 import { conversationMessages as messages } from "../../messages/conversation";
 import { useConversationInteraction } from "./interaction";
-import { commonMessages } from "@atelier/ui/messages/common";
+import { commonMessages } from "@asterism/ui/messages/common";
 import type { AgentDraft, DraftMode } from "../drafts-contract";
 
 /** 草稿箱面板；有条目或待确认交换时显示，其余时候不占空间。 */

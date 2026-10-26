@@ -1,6 +1,6 @@
 import { isUtf8 } from "node:buffer";
 import { posix } from "node:path";
-import type { GrepArgs } from "@atelier/builtin-api/contracts";
+import type { GrepArgs } from "@asterism/builtin-api/contracts";
 import { SEARCH_EXCERPT_THRESHOLD, textRow } from "../shared/text-row.ts";
 import type { FindResult, GrepResult, SearchStopReason } from "./search-contract.ts";
 import { FilesystemError, failed } from "./errors.ts";

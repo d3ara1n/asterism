@@ -1,4 +1,4 @@
-import type { Json } from "@atelier/sdk/contracts";
+import type { Json } from "@asterism/sdk/contracts";
 
 export type WebRequestKind = "search" | "fetch";
 export type WebRequestOutcome = "succeeded" | "failed" | "cancelled";

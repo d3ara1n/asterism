@@ -1,6 +1,6 @@
-import { defineMessages, pluginNamespace } from "@atelier/sdk/contracts";
+import { defineMessages, pluginNamespace } from "@asterism/sdk/contracts";
 
-export const appearanceMessages = pluginNamespace("atelier.host").messages("en", defineMessages({
+export const appearanceMessages = pluginNamespace("asterism.host").messages("en", defineMessages({
   jade: {
     id: "features_appearance_AppearanceSettings_1",
     defaultMessage: "Jade",

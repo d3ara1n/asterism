@@ -1,4 +1,4 @@
-import type { RendererPrepareContext } from "@atelier/sdk/renderer";
+import type { RendererPrepareContext } from "@asterism/sdk/renderer";
 import { CompleteTerminalImage, TerminalImageRequested, type TerminalImage } from "./contract.ts";
 
 /** 画布仅渲染已解析的字符网格；截图服务独立于卡片挂载。 */

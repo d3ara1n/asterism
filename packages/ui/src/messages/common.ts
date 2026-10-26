@@ -1,6 +1,6 @@
-import { defineMessages, pluginNamespace } from "@atelier/sdk/contracts";
+import { defineMessages, pluginNamespace } from "@asterism/sdk/contracts";
 
-export const commonMessages = pluginNamespace("atelier.host").messages("en", defineMessages({
+export const commonMessages = pluginNamespace("asterism.host").messages("en", defineMessages({
   workbench: {
     id: "workbench",
     defaultMessage: "Workbench",
@@ -115,11 +115,11 @@ export const commonMessages = pluginNamespace("atelier.host").messages("en", def
   },
   runtimeStopped: {
     id: "runtimeStopped",
-    defaultMessage: "The task runtime stopped. Restart Atelier to reopen your workspace.",
+    defaultMessage: "The task runtime stopped. Restart Asterism to reopen your workspace.",
   },
   connectionLost: {
     id: "connectionLost",
-    defaultMessage: "The application connection was lost. Restart Atelier before retrying.",
+    defaultMessage: "The application connection was lost. Restart Asterism before retrying.",
   },
   remove: {
     id: "remove",

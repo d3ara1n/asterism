@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { defineImplementation } from "@atelier/sdk/contracts";
-import { builtin, Find, Grep, textRowSchema } from "@atelier/builtin-api/contracts";
+import { defineImplementation } from "@asterism/sdk/contracts";
+import { builtin, Find, Grep, textRowSchema } from "@asterism/builtin-api/contracts";
 import { Directory } from "./contract.ts";
 
 const path = z.string().describe("File path relative to the directory resource root, with '/' separators.");

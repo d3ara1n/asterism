@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { defineCall } from "@atelier/sdk/contracts";
-import { builtin, textReadSchema } from "@atelier/builtin-api/contracts";
+import { defineCall } from "@asterism/sdk/contracts";
+import { builtin, textReadSchema } from "@asterism/builtin-api/contracts";
 
 export const skillMetadataSchema = z.object({
   name: z.string().trim().min(1),

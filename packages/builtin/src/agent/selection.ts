@@ -1,6 +1,6 @@
 import { AgentSelection } from "./data.ts";
-import { PluginApiError, type ObjectReader } from "@atelier/sdk/runtime";
-import type { AgentSelection as Selection, AgentConfiguration } from "@atelier/builtin-api/contracts";
+import { PluginApiError, type ObjectReader } from "@asterism/sdk/runtime";
+import type { AgentSelection as Selection, AgentConfiguration } from "@asterism/builtin-api/contracts";
 
 
 export function selectionOf(object: ObjectReader) {

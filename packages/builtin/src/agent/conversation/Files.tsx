@@ -1,22 +1,22 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type ClipboardEvent, type DragEvent } from "react";
-import { useI18n, type ContentReader } from "@atelier/sdk/renderer";
-import { type ModelFilePart, previewsAsImage } from "@atelier/sdk/contracts";
+import { useI18n, type ContentReader } from "@asterism/sdk/renderer";
+import { type ModelFilePart, previewsAsImage } from "@asterism/sdk/contracts";
 import { File as FileIcon, Image as ImageIcon, Paperclip, X } from "lucide-react";
-import { Button } from "@atelier/ui/ui/button";
-import { Attachment, AttachmentGroup, AttachmentMedia, AttachmentContent, AttachmentTitle, AttachmentDescription, AttachmentActions, AttachmentAction, AttachmentTrigger } from "@atelier/ui/ui/attachment";
-import { Tooltip, TooltipTrigger, TooltipContent } from "@atelier/ui/ui/tooltip";
-import { Spinner } from "@atelier/ui/ui/spinner";
-import { cn } from "@atelier/ui/utils";
+import { Button } from "@asterism/ui/ui/button";
+import { Attachment, AttachmentGroup, AttachmentMedia, AttachmentContent, AttachmentTitle, AttachmentDescription, AttachmentActions, AttachmentAction, AttachmentTrigger } from "@asterism/ui/ui/attachment";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@asterism/ui/ui/tooltip";
+import { Spinner } from "@asterism/ui/ui/spinner";
+import { cn } from "@asterism/ui/utils";
 import { mediaMessages } from "../../messages/media";
 import type { MessageDraft } from "./draft";
 
 function useFileImage(part: ModelFilePart, content: ContentReader) {
   const [preview, setPreview] = useState<{ url?: string; failed?: boolean }>({});
-  const id = part.file["$atelier.content"];
+  const id = part.file["$asterism.content"];
   useEffect(() => {
     setPreview({});
     let active = true, url: string | undefined;
-    if (previewsAsImage(part.mediaType)) void content.read({ "$atelier.content": id }).then(bytes => {
+    if (previewsAsImage(part.mediaType)) void content.read({ "$asterism.content": id }).then(bytes => {
       if (!active) return;
       url = URL.createObjectURL(new Blob([Uint8Array.from(bytes).buffer], { type: part.mediaType }));
       setPreview({ url });
@@ -86,7 +86,7 @@ function DraftFile({ part, content, disabled, onRemove }: {
 export function DraftFiles({ draft, disabled, className }: { draft: MessageDraft; disabled: boolean; className?: string }) {
   const state = useSyncExternalStore(draft.subscribe, draft.getSnapshot);
   return <AttachmentGroup className={cn("h-8 min-w-0 flex-1 items-center gap-1 px-1 py-0", className)} style={{ scrollbarWidth: "thin" }}>
-    {state.files.map(({ part }, index) => <DraftFile key={`${part.file["$atelier.content"]}:${index}`} part={part} content={draft.content()}
+    {state.files.map(({ part }, index) => <DraftFile key={`${part.file["$asterism.content"]}:${index}`} part={part} content={draft.content()}
       disabled={disabled || state.uploading} onRemove={() => draft.remove(index)} />)}
   </AttachmentGroup>;
 }

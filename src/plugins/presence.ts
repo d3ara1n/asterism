@@ -1,4 +1,4 @@
-import type { ResourceSnapshot } from "@atelier/sdk/contracts";
+import type { ResourceSnapshot } from "@asterism/sdk/contracts";
 
 /** 资源存在性独立于事件动作；回溯与普通提交比较同一份当前集合。 */
 export class ResourcePresence {

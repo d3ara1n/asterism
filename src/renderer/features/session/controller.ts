@@ -1,4 +1,4 @@
-import type { UiText } from "@atelier/sdk/contracts";
+import type { UiText } from "@asterism/sdk/contracts";
 import { errorDisplay } from "../../../shared/error-display.ts";
 import { applyLive } from "../../../shared/live-patch.ts";
 import { viewLive } from "../../../shared/partial-arguments.ts";

@@ -1,6 +1,6 @@
-import { defineMessages, pluginNamespace } from "@atelier/sdk/contracts";
+import { defineMessages, pluginNamespace } from "@asterism/sdk/contracts";
 
-export const textMessages = pluginNamespace("atelier.builtin").messages("en", defineMessages({
+export const textMessages = pluginNamespace("asterism.builtin").messages("en", defineMessages({
   copyNoteMarkdown: {
     id: "note.copyMarkdown",
     defaultMessage: "Copy Markdown",

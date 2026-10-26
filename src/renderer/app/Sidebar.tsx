@@ -1,11 +1,11 @@
-import { BrandMark } from "@atelier/ui/ui/brand-mark";
-import { Button } from "@atelier/ui/ui/button";
-import { IconButton } from "@atelier/ui/ui/icon-button";
-import { ListRow } from "@atelier/ui/ui/list-row";
+import { BrandMark } from "@asterism/ui/ui/brand-mark";
+import { Button } from "@asterism/ui/ui/button";
+import { IconButton } from "@asterism/ui/ui/icon-button";
+import { ListRow } from "@asterism/ui/ui/list-row";
 import { PanelLeftClose, House, MessageSquare, Settings } from "lucide-react";
 
 import { appMessages } from "../messages/app";
-import { commonMessages } from "@atelier/ui/messages/common";
+import { commonMessages } from "@asterism/ui/messages/common";
 import { settingsMessages } from "../messages/settings";
 import { useI18n } from "../shared/i18n";
 

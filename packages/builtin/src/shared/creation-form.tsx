@@ -1,12 +1,12 @@
-import { FieldSet, FieldGroup } from "@atelier/ui/ui/field";
+import { FieldSet, FieldGroup } from "@asterism/ui/ui/field";
 
-import { DialogFooter } from "@atelier/ui/ui/dialog";
-import { Button } from "@atelier/ui/ui/button";
-import { Spinner } from "@atelier/ui/ui/spinner";
+import { DialogFooter } from "@asterism/ui/ui/dialog";
+import { Button } from "@asterism/ui/ui/button";
+import { Spinner } from "@asterism/ui/ui/spinner";
 import { useRef, useState, type ReactNode } from "react";
 
-import { commonMessages } from "@atelier/ui/messages/common";
-import { useI18n } from "@atelier/sdk/renderer";
+import { commonMessages } from "@asterism/ui/messages/common";
+import { useI18n } from "@asterism/sdk/renderer";
 
 /**
  * 内置创建视图共用的表单与提交门禁；外壳（标题、错误、关闭）由宿主创建协调器提供。

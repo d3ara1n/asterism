@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
-import type { RecordRenderContext } from "@atelier/sdk/renderer";
+import type { RecordRenderContext } from "@asterism/sdk/renderer";
 import { toRecord } from "../../../plugins/records";
 import type { ViewRegistry } from "../../modules/registry";
-import type { Json } from "@atelier/sdk/contracts";
+import type { Json } from "@asterism/sdk/contracts";
 
 import type { SessionNode } from "../../../shared/session";
 import { historyMessages } from "../../messages/history";

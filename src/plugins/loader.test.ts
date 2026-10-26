@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { z } from "zod";
-import { belongsTo, pluginNamespace, defineCall, defineAction, defineRecord, defineImplementation, defineTool, type ResourceContract, type ToolContract } from "@atelier/sdk/contracts";
-import { defineTopLevelTool, definePlugin, defineModule, implementCall, implementTool, implementResource, type PluginDefinition, type PluginContext } from "@atelier/sdk/runtime";
+import { belongsTo, pluginNamespace, defineCall, defineAction, defineRecord, defineImplementation, defineTool, type ResourceContract, type ToolContract } from "@asterism/sdk/contracts";
+import { defineTopLevelTool, definePlugin, defineModule, implementCall, implementTool, implementResource, type PluginDefinition, type PluginContext } from "@asterism/sdk/runtime";
 import { loadPlugins, type PluginHostServices } from "./loader.ts";
 
 const services = { extensionsDirectory: "/unused", data: null as never, refOf: () => null, sessions: { progressChanged() {} } as never,
@@ -266,7 +266,7 @@ describe("插件缺席", () => {
     const { AgentCapabilities } = await import("../execution/capabilities.ts");
     const resources = new ResourceRegistry([]);
     const object = { id: "x", kind: "acme.gone/thing", title: "Gone", data: { value: 1 } };
-    expect(resources.project(object)).toEqual({ contract: { id: "atelier.builtin/missing-resource" },
+    expect(resources.project(object)).toEqual({ contract: { id: "asterism.builtin/missing-resource" },
       data: { plugin: "acme.gone", kind: "acme.gone/thing", data: { value: 1 } } });
     expect(await resources.inspect(object)).toMatchObject({ available: false, error: { code: "implementation_missing" } });
     const capabilities = new AgentCapabilities(resources, new ToolRegistry([]), [object], () => true);

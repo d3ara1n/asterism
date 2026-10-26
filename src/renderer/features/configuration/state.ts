@@ -1,6 +1,6 @@
 import { runtime } from "../../runtime";
 import { errorDisplay } from "../../../shared/error-display.ts";
-import type { UiText } from "@atelier/sdk/contracts";
+import type { UiText } from "@asterism/sdk/contracts";
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import type { ConfigurationCommand, ConfigurationResult, ConfigurationSnapshot } from "../../../shared/configuration";
 import { getI18n } from "../../shared/i18n";

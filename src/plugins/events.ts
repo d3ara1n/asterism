@@ -1,6 +1,6 @@
 import { belongsTo, jsonSchema, type EventContract, type EventEnvelope, type EventFilter, type Source,
-  type EventSubscribeOptions, type Json, type SubscriptionEnd } from "@atelier/sdk/contracts";
-import { PluginApiError } from "@atelier/sdk/runtime";
+  type EventSubscribeOptions, type Json, type SubscriptionEnd } from "@asterism/sdk/contracts";
+import { PluginApiError } from "@asterism/sdk/runtime";
 import { deepFreeze } from "../shared/immutable.ts";
 import { EventQueue, eventKey } from "../shared/event-queue.ts";
 import { eventFilterSchema } from "../shared/plugin-events.ts";

@@ -1,10 +1,10 @@
 import type { CSSProperties, ReactNode } from "react";
 import { motion } from "motion/react";
-import { useI18n, type I18n } from "@atelier/sdk/renderer";
-import type { AgentRequestContextData } from "@atelier/builtin-api/contracts";
-import { Badge } from "@atelier/ui/ui/badge";
-import { cn } from "@atelier/ui/utils";
-import { formatCount } from "@atelier/ui/format-count";
+import { useI18n, type I18n } from "@asterism/sdk/renderer";
+import type { AgentRequestContextData } from "@asterism/builtin-api/contracts";
+import { Badge } from "@asterism/ui/ui/badge";
+import { cn } from "@asterism/ui/utils";
+import { formatCount } from "@asterism/ui/format-count";
 import { contextMessages as messages } from "../messages/context";
 
 /** 代理辅助面板共用的版式与图表部件；视觉规范见 docs/design-system.md#数据图表。 */

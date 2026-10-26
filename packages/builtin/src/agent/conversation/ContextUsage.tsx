@@ -1,9 +1,9 @@
 import { useMemo } from "react";
-import { modelReference } from "@atelier/sdk/contracts";
-import { useI18n, useRendererCatalogs, useRendererObject } from "@atelier/sdk/renderer";
-import { ModelConfiguration } from "@atelier/builtin-api/contracts";
-import { useAgentModelSelection } from "@atelier/builtin-api/renderer";
-import { formatCount } from "@atelier/ui/format-count";
+import { modelReference } from "@asterism/sdk/contracts";
+import { useI18n, useRendererCatalogs, useRendererObject } from "@asterism/sdk/renderer";
+import { ModelConfiguration } from "@asterism/builtin-api/contracts";
+import { useAgentModelSelection } from "@asterism/builtin-api/renderer";
+import { formatCount } from "@asterism/ui/format-count";
 import { contextMessages as messages } from "../../messages/context";
 import { contextInsight } from "../context/insight";
 import { ContextProjectionError } from "../context-projection";

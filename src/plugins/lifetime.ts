@@ -1,4 +1,4 @@
-import { PluginApiError, type Lifetime } from "@atelier/sdk/runtime";
+import { PluginApiError, type Lifetime } from "@asterism/sdk/runtime";
 
 /**
  * 宿主生命周期作用域：end 先中止 signal，再按登记逆序等待清理。

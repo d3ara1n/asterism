@@ -1,12 +1,12 @@
 import { terminalCard as appearance } from "../shared/card-appearance.ts";
 import { useState, useEffect, type ReactNode } from "react";
 import { TerminalSquare, Eye, Keyboard, Clock, BookOpen } from "lucide-react";
-import { cardRenderer, creationEntry, toolRenderer, useI18n, useRendererConfig, type CreationInputProps, type RendererModule, type ToolRenderProps } from "@atelier/sdk/renderer";
-import { Input } from "@atelier/ui/ui/input";
-import { Button } from "@atelier/ui/ui/button";
-import { Field, FieldLabel } from "@atelier/ui/ui/field";
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@atelier/ui/ui/select";
-import { ToolHeader } from "@atelier/ui/tool-header";
+import { cardRenderer, creationEntry, toolRenderer, useI18n, useRendererConfig, type CreationInputProps, type RendererModule, type ToolRenderProps } from "@asterism/sdk/renderer";
+import { Input } from "@asterism/ui/ui/input";
+import { Button } from "@asterism/ui/ui/button";
+import { Field, FieldLabel } from "@asterism/ui/ui/field";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@asterism/ui/ui/select";
+import { ToolHeader } from "@asterism/ui/tool-header";
 import { CreationForm } from "../shared/creation-form";
 import { commonMessages } from "../messages/common";
 import { filesystemMessages } from "../messages/filesystem";
@@ -16,8 +16,8 @@ import { TerminalActions, TerminalCard } from "./TerminalCard";
 import { prepareTerminalImages } from "./image-renderer";
 import { CreateTerminal, TerminalResource, TerminalView, TerminalInput, TerminalRead, TerminalWait, TerminalSee, type TerminalStatus } from "./contract";
 import type { z } from "zod";
-import { Spinner } from "@atelier/ui/ui/spinner";
-import { useRendererObject } from "@atelier/sdk/renderer";
+import { Spinner } from "@asterism/ui/ui/spinner";
+import { useRendererObject } from "@asterism/sdk/renderer";
 import { mediaMessages } from "../messages/media";
 import { inputField, inputText } from "../shared/tool-preview";
 
@@ -57,14 +57,14 @@ function ImageBody({ result }: ToolRenderProps<z.infer<typeof TerminalSee.schema
   const i18n = useI18n();
   const object = useRendererObject();
   const data = result?.data;
-  const imageId = data?.image["$atelier.content"];
+  const imageId = data?.image["$asterism.content"];
   const [url, setUrl] = useState<string | undefined>();
   const [failed, setFailed] = useState(false);
   useEffect(() => {
     if (!imageId) return;
     let active = true, blobUrl: string | undefined;
     setUrl(undefined); setFailed(false);
-    void object.content.read({ "$atelier.content": imageId }).then(bytes => {
+    void object.content.read({ "$asterism.content": imageId }).then(bytes => {
       if (!active) return;
       blobUrl = URL.createObjectURL(new Blob([Uint8Array.from(bytes).buffer], { type: "image/png" }));
       setUrl(blobUrl);
@@ -136,7 +136,7 @@ export default {
   prepare: prepareTerminalImages,
   resources: [{ kind: TerminalResource.kind, label: terminalMessages.terminal, icon: <TerminalSquare className="size-4" />, card: appearance }],
   cards: [cardRenderer(TerminalView, { ...appearance, Body: TerminalCard, Actions: TerminalActions })],
-  creations: [creationEntry(CreateTerminal, { id: "atelier.builtin/terminal.local", label: terminalMessages.terminal, icon: <TerminalSquare className="size-4" />, group: "resources", InputView: TerminalCreation, triggers: { menu: {} } })],
+  creations: [creationEntry(CreateTerminal, { id: "asterism.builtin/terminal.local", label: terminalMessages.terminal, icon: <TerminalSquare className="size-4" />, group: "resources", InputView: TerminalCreation, triggers: { menu: {} } })],
   tools: [
     toolRenderer(TerminalInput, { label: terminalMessages.input, icon: <Keyboard className="size-3.5" />, input: inputHeader, execution: inputBody, result: inputBody }),
     toolRenderer(TerminalWait, { label: terminalMessages.wait, icon: <Clock className="size-3.5" />, input: waitHeader, execution: waitHeader, result: waitResult }),

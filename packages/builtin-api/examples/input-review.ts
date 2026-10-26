@@ -1,6 +1,6 @@
-import { SubmitAgentInput } from "@atelier/builtin-api/contracts";
-import { pluginNamespace } from "@atelier/sdk/contracts";
-import { defineModule, definePlugin, implementPreparer } from "@atelier/sdk/runtime";
+import { SubmitAgentInput } from "@asterism/builtin-api/contracts";
+import { pluginNamespace } from "@asterism/sdk/contracts";
+import { defineModule, definePlugin, implementPreparer } from "@asterism/sdk/runtime";
 
 /** 外部插件消费内置动作声明；不声明第二种 Agent，也不导入其实现目录。 */
 export default definePlugin({

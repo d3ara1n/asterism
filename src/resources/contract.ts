@@ -1,9 +1,9 @@
-import type { Json, CreationContract, ActionContract, ResourceCall } from "@atelier/sdk/contracts";
+import type { Json, CreationContract, ActionContract, ResourceCall } from "@asterism/sdk/contracts";
 import type { ParsedCall } from "../plugins/commands.ts";
-import type { Presentation } from "@atelier/sdk/contracts";
+import type { Presentation } from "@asterism/sdk/contracts";
 import type { LiveBlock } from "../shared/session.ts";
 import type { FoldedObject } from "../session/fold.ts";
-import type { ResourceRef } from "@atelier/sdk/runtime";
+import type { ResourceRef } from "@asterism/sdk/runtime";
 import type { ContentLease } from "../runtime/content-store.ts";
 
 export interface ContextFile { file: string; text: string }
@@ -40,14 +40,14 @@ export interface ResourceController {
 /** 后台资源 adapter 的擦除接口；不会跨进程传递函数。 */
 export interface ResourceBackend {
   kind: string;
-  card?: import("@atelier/sdk/contracts").CardAppearance;
+  card?: import("@asterism/sdk/contracts").CardAppearance;
   receivesLinks?: boolean;
   validateState?(data: Json): void;
   project(resource: FoldedObject): Presentation;
   inspect(resource: FoldedObject): Promise<Json>;
   context(resource: FoldedObject): Promise<ContextFile[]>;
-  disposalWarning?(resource: FoldedObject): import("@atelier/sdk/contracts").UiText | null;
+  disposalWarning?(resource: FoldedObject): import("@asterism/sdk/contracts").UiText | null;
   /** 对象进入当前集合时由宿主调用；lifetime 结束即释放对象独占的外部实例。 */
-  attach?(resource: import("@atelier/sdk/contracts").ResourceSnapshot, lifetime: import("@atelier/sdk/runtime").Lifetime): void;
+  attach?(resource: import("@asterism/sdk/contracts").ResourceSnapshot, lifetime: import("@asterism/sdk/runtime").Lifetime): void;
   controller?: ResourceController;
 }

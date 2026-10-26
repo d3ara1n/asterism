@@ -1,4 +1,4 @@
-import { localeSchema } from "@atelier/sdk/contracts";
+import { localeSchema } from "@asterism/sdk/contracts";
 import { parse } from "@formatjs/icu-messageformat-parser";
 import { execFileSync } from "node:child_process";
 import { readdirSync, readFileSync, writeFileSync, mkdirSync, mkdtempSync, rmSync, realpathSync } from "node:fs";
@@ -33,17 +33,17 @@ function groups(packageRoot?: string): Group[] {
   if (packageRoot) {
     const root = resolve(packageRoot);
     const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
-    if (typeof pkg.atelier?.id !== "string") throw new Error("The package requires an Atelier identity.");
+    if (typeof pkg.asterism?.id !== "string") throw new Error("The package requires an Asterism identity.");
     return [{
-      owner: pkg.atelier.id,
+      owner: pkg.asterism.id,
       root,
       files: files(root),
-      catalogs: pkg.atelier.i18n?.catalogs ?? {},
+      catalogs: pkg.asterism.i18n?.catalogs ?? {},
       complete: false
     }];
   }
   return [{
-    owner: "atelier.host",
+    owner: "asterism.host",
     root: project,
     files: [...files(join(project, "src/renderer")), ...files(join(project, "src/shared")), ...files(join(project, "packages/ui/src"))],
     catalogs: {
@@ -51,7 +51,7 @@ function groups(packageRoot?: string): Group[] {
     },
     complete: true
   }, {
-    owner: "atelier.builtin",
+    owner: "asterism.builtin",
     root: project,
     files: files(join(project, "packages/builtin/src")),
     catalogs: {

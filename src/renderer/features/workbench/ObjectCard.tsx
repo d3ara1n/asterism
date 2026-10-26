@@ -1,12 +1,12 @@
-import type { CardPanelView } from "@atelier/sdk/renderer";
+import type { CardPanelView } from "@asterism/sdk/renderer";
 import { ChevronRight, ChevronDown } from "lucide-react";
 import { memo, useCallback, useEffect, useRef, type ReactNode } from "react";
 
-import { commonMessages } from "@atelier/ui/messages/common";
+import { commonMessages } from "@asterism/ui/messages/common";
 import { useI18n } from "../../shared/i18n";
-import { Card } from "@atelier/ui/ui/card";
-import { IconButton } from "@atelier/ui/ui/icon-button";
-import { cn } from "@atelier/ui/utils";
+import { Card } from "@asterism/ui/ui/card";
+import { IconButton } from "@asterism/ui/ui/icon-button";
+import { cn } from "@asterism/ui/utils";
 import type { CardSize } from "../../../shared/workbench";
 import { ObjectSurface } from "./ObjectSurface";
 

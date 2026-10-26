@@ -1,6 +1,6 @@
-import { defineMessages, pluginNamespace } from "@atelier/sdk/contracts";
+import { defineMessages, pluginNamespace } from "@asterism/sdk/contracts";
 
-export const modelCatalogMessages = pluginNamespace("atelier.host").messages("en", defineMessages({
+export const modelCatalogMessages = pluginNamespace("asterism.host").messages("en", defineMessages({
   fetch: { id: "modelCatalog.fetch", defaultMessage: "Fetch parameters" },
   fetching: { id: "modelCatalog.fetching", defaultMessage: "Fetching…" },
   hint: { id: "modelCatalog.hint", defaultMessage: "Fetch parameters and API reference prices from models.dev and overwrite current values. You can edit them afterwards." },

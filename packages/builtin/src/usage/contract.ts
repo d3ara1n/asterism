@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { defineCall, providerUsageIdSchema, usageItemsSchema, providerUsageErrorSchema } from "@atelier/sdk/contracts";
-import { builtin } from "@atelier/builtin-api/contracts";
+import { defineCall, providerUsageIdSchema, usageItemsSchema, providerUsageErrorSchema } from "@asterism/sdk/contracts";
+import { builtin } from "@asterism/builtin-api/contracts";
 
 /** 内置消费者的展示状态；不约束其他插件的缓存或刷新策略。 */
 export const providerUsageStateSchema = z.strictObject({

@@ -1,6 +1,6 @@
 # 会话命名
 
-会话命名由内置插件 `atelier.builtin` 的 `naming` 模块提供，包含自动命名、人工命名与 Agent 命名工具。模块理解同一插件的 Agent 记录契约，通过记录提交观察生成名称，通过执行游标变化观察重建当前标题；回合含义见 [运行时](runtime.md#执行轮次与循环)，公共会话 API 不解释 Agent 的 block／request／turn 或命名事件。
+会话命名由内置插件 `asterism.builtin` 的 `naming` 模块提供，包含自动命名、人工命名与 Agent 命名工具。模块理解同一插件的 Agent 记录契约，通过记录提交观察生成名称，通过执行游标变化观察重建当前标题；回合含义见 [运行时](runtime.md#执行轮次与循环)，公共会话 API 不解释 Agent 的 block／request／turn 或命名事件。
 
 ## 触发与材料
 
@@ -21,7 +21,7 @@
 
 ## 标题来源与不可变事件
 
-`SessionNamed`（`atelier.builtin/session.named`）是会话级记录（经 `session.commit` 写入，来源 `resource` 为 null），记录每次命名的 `{ title, source, auto? }`：
+`SessionNamed`（`asterism.builtin/session.named`）是会话级记录（经 `session.commit` 写入，来源 `resource` 为 null），记录每次命名的 `{ title, source, auto? }`：
 
 | source | 含义 | 自动更新 |
 | --- | --- | --- |

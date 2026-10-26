@@ -1,5 +1,5 @@
 import { createContext, useContext, type ReactNode } from "react";
-import type { PluginSettingsPage } from "@atelier/sdk/renderer";
+import type { PluginSettingsPage } from "@asterism/sdk/renderer";
 
 export interface PluginSettingsRegistry {
   pages: ReadonlyMap<string, PluginSettingsPage>;

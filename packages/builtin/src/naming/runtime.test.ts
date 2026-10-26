@@ -2,9 +2,9 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { defineModule, type PluginContext, type SessionExecutor, type SessionWriter, type ModelServices } from "@atelier/sdk/runtime";
-import { AgentInputMessage, SessionNamed } from "@atelier/builtin-api/contracts";
-import type { SessionSnapshot } from "@atelier/sdk/contracts";
+import { defineModule, type PluginContext, type SessionExecutor, type SessionWriter, type ModelServices } from "@asterism/sdk/runtime";
+import { AgentInputMessage, SessionNamed } from "@asterism/builtin-api/contracts";
+import type { SessionSnapshot } from "@asterism/sdk/contracts";
 import { ApplicationService } from "../../../../src/runtime/service.ts";
 import * as pluginLoader from "../../../../src/plugins/loader.ts";
 import { sessionSnapshot } from "../../../../src/plugins/records.ts";
@@ -84,7 +84,7 @@ describe("人工命名入口", () => {
       { ...builtin!, modules: [...builtin!.modules ?? [], defineModule(() => { throw new Error("Setup failed."); })] },
       ...external,
     ], host));
-    const root = mkdtempSync(join(tmpdir(), "atelier-naming-failed-")); roots.push(root);
+    const root = mkdtempSync(join(tmpdir(), "asterism-naming-failed-")); roots.push(root);
     const service = new ApplicationService(root); services.push(service);
     const sessionId = service.sessions.tree.create("Unchanged");
     await expect(service.sessions.execute({ type: "rename", sessionId, title: "Rejected" })).rejects.toMatchObject({ code: "unavailable" });

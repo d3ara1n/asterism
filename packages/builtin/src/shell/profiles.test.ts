@@ -6,7 +6,7 @@ import { listShellProfiles, resolveShell } from "./profiles.ts";
 import type { ShellProfile } from "./contract.ts";
 
 let root: string;
-beforeEach(async () => { root = await mkdtemp(join(tmpdir(), "atelier-profiles-test-")); });
+beforeEach(async () => { root = await mkdtemp(join(tmpdir(), "asterism-profiles-test-")); });
 afterEach(async () => { await rm(root, { recursive: true, force: true }); });
 
 const profile = (id: string, executable: string, env: Record<string, string> = {}): ShellProfile =>
@@ -19,7 +19,7 @@ async function executable(name: string) {
 
 // 查询必须应用 profile 的 PATH 覆盖；仅把已配置项视为可用会误导终端创建，目录也不是可执行文件。
 it("查询按执行环境发现可执行文件，保留不可用配置且不交付环境变量", async () => {
-  const name = "atelier-test-shell.exe";
+  const name = "asterism-test-shell.exe";
   const path = await executable(name);
   const directory = join(root, "directory");
   await mkdir(directory);

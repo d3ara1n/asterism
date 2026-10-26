@@ -1,8 +1,8 @@
 import {
   thinkingLevels, type Usage, modelReference, type ModelCost, estimateModelCost, selectModelRates,
   type CostQuantity,
-} from "@atelier/sdk/contracts";
-import { type CatalogModel } from "@atelier/builtin-api/contracts";
+} from "@asterism/sdk/contracts";
+import { type CatalogModel } from "@asterism/builtin-api/contracts";
 import type { DiagnosticRequest } from "./history.ts";
 
 /** scope 保存实际模型身份；旧记录只有表达式时必须唯一匹配，不能随意剥掉模型名中的冒号。 */

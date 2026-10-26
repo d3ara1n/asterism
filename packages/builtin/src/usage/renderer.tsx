@@ -1,6 +1,6 @@
-import type { RendererModule } from "@atelier/sdk/renderer";
-import { agentUI } from "@atelier/builtin-api/renderer";
-import { builtin } from "@atelier/builtin-api/contracts";
+import type { RendererModule } from "@asterism/sdk/renderer";
+import { agentUI } from "@asterism/builtin-api/renderer";
+import { builtin } from "@asterism/builtin-api/contracts";
 import { UsageToolbarItem } from "./Toolbar";
 
 export default {

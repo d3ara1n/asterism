@@ -144,7 +144,7 @@ export async function compileModules(packages: readonly PackageModule[], enabled
     const roots = [...packages].sort((a, b) => b.root.length - a.root.length);
     const pluginOwner = (path: string) => roots.find(pkg => { const r = relative(pkg.root, path); return r === "" || (!r.startsWith("..") && !r.startsWith("/")); });
     const npmOwner = createDependencyOwnerLookup();
-    const resolver = (realm: ModuleRealm, entry?: PackageModule): Plugin => ({ name: "atelier-public-modules", setup(build) {
+    const resolver = (realm: ModuleRealm, entry?: PackageModule): Plugin => ({ name: "asterism-public-modules", setup(build) {
       const depend = (source: PackageModule | undefined, provider: string) => {
         for (const consumer of [source, entry]) if (consumer && consumer.id !== provider) {
           for (const map of [result.dependencies, realm === "runtime" ? result.runtimeDependencies : result.rendererDependencies]) {
@@ -153,7 +153,7 @@ export async function compileModules(packages: readonly PackageModule[], enabled
           }
         }
       };
-      build.onLoad({ filter: /.*/, namespace: "atelier-public" }, args => {
+      build.onLoad({ filter: /.*/, namespace: "asterism-public" }, args => {
         const provider = publicProviders.find(provider => Object.hasOwn(provider.modules[realm] ?? {}, args.path))!;
         return { contents: publicModuleSource(provider, realm, args.path), loader: "js" };
       });
@@ -177,7 +177,7 @@ export async function compileModules(packages: readonly PackageModule[], enabled
               return { errors: [{ text: `Package ${consumer.name} requires ${name} ${ranges.join(" and ")}; application provides ${loaded.version}.` }] };
           }
           depend(source, loaded.pluginId);
-          return { path: args.path, namespace: "atelier-public" };
+          return { path: args.path, namespace: "asterism-public" };
         }
         if (source?.name === name && subpath !== "/public") return;
         const candidate = providers.get(name) ?? packages.find(pkg => pkg.name === name && pkg.public);
@@ -202,9 +202,9 @@ export async function compileModules(packages: readonly PackageModule[], enabled
       outExtension: { ".js": ".mjs" }, bundle: true, splitting: true, format: "esm", write: false,
       platform: realm === "runtime" ? "node" : "browser", target: realm === "runtime" ? "node22" : "chrome130",
       logLevel: "silent", sourcemap: "linked", metafile: true,
-      ...(realm === "runtime" ? { external: ["*.node"], banner: { js: "import { createRequire as __atelierCreateRequire } from 'node:module'; const require = __atelierCreateRequire(import.meta.url);" } }
+      ...(realm === "runtime" ? { external: ["*.node"], banner: { js: "import { createRequire as __asterismCreateRequire } from 'node:module'; const require = __asterismCreateRequire(import.meta.url);" } }
         : { jsx: "automatic", loader: { ".png": "file", ".jpg": "file", ".svg": "file", ".wasm": "file", ".woff2": "file", ".mp3": "file", ".ogg": "file" } }),
-      plugins: [{ name: "atelier-cache-inputs", setup(build) {
+      plugins: [{ name: "asterism-cache-inputs", setup(build) {
         build.onResolve({ filter: /.*/ }, args => { cache.resolution(args.path, args.importer, args.resolveDir); });
         build.onEnd(result => { if (result.metafile) cache.inputs(Object.keys(result.metafile.inputs)); });
       } }, hostModule(realm), resolver(realm, entries.length === 1 ? entries[0] : undefined)],

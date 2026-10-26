@@ -25,7 +25,7 @@ it.each(["upload.begin", "read.open"] as const)("内容关闭后 %s 的后台拒
   const content = contentInput({ resourceKind: "example/document", contractId: "example/create" });
   try {
     const pending = operation === "upload.begin"
-      ? content.stage(new Uint8Array([1])) : content.read({ "$atelier.content": "file" });
+      ? content.stage(new Uint8Array([1])) : content.read({ "$asterism.content": "file" });
     const cancelled = expect(pending).rejects.toMatchObject({ name: "AbortError" });
     await began;
     await content.close();

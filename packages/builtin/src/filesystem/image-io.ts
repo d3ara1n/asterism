@@ -2,7 +2,7 @@ import { readFile, stat } from "node:fs/promises";
 import { TextError } from "../shared/text.ts";
 import { FilesystemError, failed } from "./errors.ts";
 import { withinDirectory } from "./paths.ts";
-import { modelInputLimits } from "@atelier/sdk/contracts";
+import { modelInputLimits } from "@asterism/sdk/contracts";
 
 /** 按文件头识别图片，不信任扩展名；非图片不作为工具文件返回。 */
 export function imageMediaType(bytes: Uint8Array): string | null {

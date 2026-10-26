@@ -1,15 +1,15 @@
-import * as contracts from "@atelier/builtin-api/contracts";
+import * as contracts from "@asterism/builtin-api/contracts";
 import metadata from "../packages/builtin-api/package.json" with { type: "json" };
 import type { PublicProvider } from "./shared/public-modules.ts";
 
 /** 应用组合声明静态内置公共提供方，宿主加载器不导入内置领域。 */
-export const builtinPublicModules = { "@atelier/builtin-api/contracts": contracts };
-const exports = { "@atelier/builtin-api/contracts": Object.keys(contracts) };
+export const builtinPublicModules = { "@asterism/builtin-api/contracts": contracts };
+const exports = { "@asterism/builtin-api/contracts": Object.keys(contracts) };
 export const builtinPublicProvider: PublicProvider = {
   name: metadata.name, version: metadata.version, pluginId: contracts.builtin.id,
-  modules: { runtime: { ...exports, "@atelier/builtin-api/runtime": ["agentCreations", "defineAgentCreation"] }, renderer: {
+  modules: { runtime: { ...exports, "@asterism/builtin-api/runtime": ["agentCreations", "defineAgentCreation"] }, renderer: {
     ...exports,
-    "@atelier/builtin-api/renderer": ["agentUI", "AgentToolbarItem", "AgentOverlay", "AgentModal", "AgentScrollArea",
+    "@asterism/builtin-api/renderer": ["agentUI", "AgentToolbarItem", "AgentOverlay", "AgentModal", "AgentScrollArea",
       "useAgentModelSelection", "AgentModelSelectionProvider", "AgentUIRendererProvider"],
   } },
 };

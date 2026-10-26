@@ -471,7 +471,7 @@
   "settings.invalid": "无法读取已保存的设置，当前显示默认值。",
   "settings.saveFailed": "无法保存设置，请重试。",
   "settings.retry": "重试",
-  "plugin.name": "工坊基础功能",
+  "plugin.name": "星图基础功能",
   "plugin.description": "代理、对话、笔记、文件与交互工具。",
   "shell.title": "Shell",
   "shell.exec": "执行",

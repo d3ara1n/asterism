@@ -1,4 +1,4 @@
-import type { SystemPrompt } from "@atelier/sdk/contracts";
+import type { SystemPrompt } from "@asterism/sdk/contracts";
 
 /** 正文为 Markdown；只中和标签语法 `<name` 与 `</name`，其余字符原样保留。 */
 function escapeTags(value: string): string {

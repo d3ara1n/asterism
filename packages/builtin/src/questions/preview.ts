@@ -1,4 +1,4 @@
-import type { Json } from "@atelier/sdk/contracts";
+import type { Json } from "@asterism/sdk/contracts";
 
 /** 部分参数只消费已出现的问题文字，供正文与预览阶段识别共用。 */
 export function questionTitles(args: Json): string[] {

@@ -1,5 +1,5 @@
 import { createContext, useContext, useMemo, type ReactNode } from "react";
-import { RendererResourcesProvider } from "@atelier/sdk/renderer";
+import { RendererResourcesProvider } from "@asterism/sdk/renderer";
 import type { ViewRegistry } from "./registry";
 
 const Views = createContext<ViewRegistry | null>(null);
@@ -15,4 +15,4 @@ export function useModuleViews(): ViewRegistry {
   if (!registry) throw new Error("Module views must be provided by the application root.");
   return registry;
 }
-export { JsonView } from "@atelier/ui/json-view";
+export { JsonView } from "@asterism/ui/json-view";

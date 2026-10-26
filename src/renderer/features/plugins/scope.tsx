@@ -2,9 +2,9 @@ import { Component, useEffect, useMemo, useRef, type ReactNode } from "react";
 import {
   RendererCallsProvider, RendererIslandPanelProvider, RendererIslandProvider, RendererPreferencesProvider, useRendererCalls,
   type RendererIsland, type RendererIslandSpec,
-} from "@atelier/sdk/renderer";
-import type { PluginCalls } from "@atelier/sdk/contracts";
-import { Alert, AlertDescription } from "@atelier/ui/ui/alert";
+} from "@asterism/sdk/renderer";
+import type { PluginCalls } from "@asterism/sdk/contracts";
+import { Alert, AlertDescription } from "@asterism/ui/ui/alert";
 import { pluginsMessages as messages } from "../../messages/plugins";
 import { useI18n } from "../../shared/i18n";
 import { IslandPanel, panelIslandWidth } from "../../shared/weave/IslandPanel";

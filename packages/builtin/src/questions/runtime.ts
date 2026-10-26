@@ -1,5 +1,5 @@
-import { defineModule, defineTopLevelTool, implementCall, PluginApiError } from "@atelier/sdk/runtime";
-import { Agent } from "@atelier/builtin-api/contracts";
+import { defineModule, defineTopLevelTool, implementCall, PluginApiError } from "@asterism/sdk/runtime";
+import { Agent } from "@asterism/builtin-api/contracts";
 import { AnswerQuestion, AskUserResult, CancelQuestion, QuestionsChanged, askUserArgs } from "./contract.ts";
 import { createQuestionService } from "./service.ts";
 

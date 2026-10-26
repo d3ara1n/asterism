@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AgentRequestContext } from "@atelier/builtin-api/contracts";
+import { AgentRequestContext } from "@asterism/builtin-api/contracts";
 import { agentRequestExtensions } from "./request-context.ts";
 
 describe("Agent 请求上下文扩展", () => {

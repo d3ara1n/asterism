@@ -1,5 +1,5 @@
 import type { z } from "zod";
-import type { RendererContentInput, RendererReceipt } from "@atelier/sdk/renderer";
+import type { RendererContentInput, RendererReceipt } from "@asterism/sdk/renderer";
 import type { ExchangeAgentDraft } from "../drafts-contract.ts";
 import type { CopiedDraft, MessageDraft } from "./draft.ts";
 

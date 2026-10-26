@@ -9,7 +9,7 @@ const temporary: string[] = [];
 afterEach(() => { for (const path of temporary.splice(0)) rmSync(path, { recursive: true, force: true }); });
 function put(path: string, value: string) { mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, value); }
 function fixture() {
-  const root = realpathSync(mkdtempSync(join(tmpdir(), "atelier-build-cache-")));
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "asterism-build-cache-")));
   temporary.push(root);
   const plugin = join(root, "plugin"), cache = join(root, "cache");
   const entry = join(cache, "modules-one", "runtime.mjs"), chunk = join(cache, "modules-one", "shared.mjs");

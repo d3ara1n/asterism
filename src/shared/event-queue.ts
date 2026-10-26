@@ -1,4 +1,4 @@
-import type { EventContract, Source, Json, SubscriptionEnd } from "@atelier/sdk/contracts";
+import type { EventContract, Source, Json, SubscriptionEnd } from "@asterism/sdk/contracts";
 import { EventSubscriptionState } from "./event-subscription.ts";
 
 /** latest 合并键：同来源、同 snapshot 键的值互相替换；occurrence 契约返回空串，不参与合并。 */

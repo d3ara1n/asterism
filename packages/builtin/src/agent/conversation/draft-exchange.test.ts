@@ -1,13 +1,13 @@
 import { nanoid } from "nanoid";
 import { describe, expect, it } from "vitest";
-import type { RendererContentInput } from "@atelier/sdk/renderer";
-import type { ModelInputPart } from "@atelier/sdk/contracts";
+import type { RendererContentInput } from "@asterism/sdk/renderer";
+import type { ModelInputPart } from "@asterism/sdk/contracts";
 import { DraftExchange } from "./draft-exchange";
 import { createMessageDraft, type CopiedDraft } from "./draft";
 
 const content = (): RendererContentInput => ({
   read: async () => new Uint8Array(), async *open() {},
-  stage: async () => ({ "$atelier.content": "00000000-0000-4000-8000-000000000001" }), close: async () => {},
+  stage: async () => ({ "$asterism.content": "00000000-0000-4000-8000-000000000001" }), close: async () => {},
 });
 
 describe("草稿交换受理确认", () => {
@@ -15,7 +15,7 @@ describe("草稿交换受理确认", () => {
   it("未知回执后编辑器保持锁定，以同一提交重试并恢复已取出的完整草稿", async () => {
     const editor = createMessageDraft(content);
     const file: Extract<ModelInputPart, { kind: "file" }> = {
-      kind: "file", file: { "$atelier.content": "00000000-0000-4000-8000-000000000001" }, mediaType: "image/png", filename: "a.png",
+      kind: "file", file: { "$asterism.content": "00000000-0000-4000-8000-000000000001" }, mediaType: "image/png", filename: "a.png",
     };
     const incoming: CopiedDraft = { parts: [{ kind: "text", text: "Original" }, file], text: "Original",
       files: [{ part: file, size: 3 }], content: content() };

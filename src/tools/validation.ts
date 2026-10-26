@@ -1,1 +1,1 @@
-export { validationMessage, jsonArgumentHint } from "@atelier/sdk/contracts";
+export { validationMessage, jsonArgumentHint } from "@asterism/sdk/contracts";

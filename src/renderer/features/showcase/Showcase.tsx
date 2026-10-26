@@ -1,16 +1,16 @@
 import { Bot, Info } from "lucide-react";
-import { Alert, AlertDescription, AlertTitle } from "@atelier/ui/ui/alert";
-import { Badge } from "@atelier/ui/ui/badge";
-import { Button } from "@atelier/ui/ui/button";
-import { Card, CardDescription, CardHeader, CardTitle } from "@atelier/ui/ui/card";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@atelier/ui/ui/dialog";
-import { Input } from "@atelier/ui/ui/input";
-import { Item, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@atelier/ui/ui/item";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@atelier/ui/ui/select";
-import { Separator } from "@atelier/ui/ui/separator";
-import { Switch } from "@atelier/ui/ui/switch";
-import { StatusBadge } from "@atelier/ui/ui/status";
-import { Textarea } from "@atelier/ui/ui/textarea";
+import { Alert, AlertDescription, AlertTitle } from "@asterism/ui/ui/alert";
+import { Badge } from "@asterism/ui/ui/badge";
+import { Button } from "@asterism/ui/ui/button";
+import { Card, CardDescription, CardHeader, CardTitle } from "@asterism/ui/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@asterism/ui/ui/dialog";
+import { Input } from "@asterism/ui/ui/input";
+import { Item, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@asterism/ui/ui/item";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@asterism/ui/ui/select";
+import { Separator } from "@asterism/ui/ui/separator";
+import { Switch } from "@asterism/ui/ui/switch";
+import { StatusBadge } from "@asterism/ui/ui/status";
+import { Textarea } from "@asterism/ui/ui/textarea";
 
 /** 隐藏口令，在首页输入框完整输入后回车触发；纯前端彩蛋，不进入命令系统。 */
 export const showcaseSpell = "/gamemode 1";

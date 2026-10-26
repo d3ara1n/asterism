@@ -1,6 +1,6 @@
-import { defineMessages, pluginNamespace } from "@atelier/sdk/contracts";
+import { defineMessages, pluginNamespace } from "@asterism/sdk/contracts";
 
-export const accessMessages = pluginNamespace("atelier.host").messages("en", defineMessages({
+export const accessMessages = pluginNamespace("asterism.host").messages("en", defineMessages({
   access: {
     id: "access",
     defaultMessage: "Access",

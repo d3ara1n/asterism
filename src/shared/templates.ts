@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { jsonSchema } from "@atelier/sdk/contracts";
+import { jsonSchema } from "@asterism/sdk/contracts";
 import { workbenchSnapshotSchema } from "./workbench.ts";
 
 const id = z.string().min(1).max(160);

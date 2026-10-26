@@ -1,7 +1,7 @@
 import { useMemo } from "react";
-import { useRendererCatalogs, useRendererObject } from "@atelier/sdk/renderer";
-import { totalEstimatedCost } from "@atelier/sdk/contracts";
-import { ModelConfiguration } from "@atelier/builtin-api/contracts";
+import { useRendererCatalogs, useRendererObject } from "@asterism/sdk/renderer";
+import { totalEstimatedCost } from "@asterism/sdk/contracts";
+import { ModelConfiguration } from "@asterism/builtin-api/contracts";
 import { diagnosticHistory, type DiagnosticScope } from "./history.ts";
 import { diagnosticModel, estimateUsageCost } from "./cost.ts";
 import { diagnosticOverview } from "./overview.ts";

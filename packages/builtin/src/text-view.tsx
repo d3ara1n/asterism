@@ -1,18 +1,18 @@
 import { textMessages } from "./messages/text";
-import { formatCount } from "@atelier/ui/format-count";
+import { formatCount } from "@asterism/ui/format-count";
 import { toolsMessages } from "./messages/tools";
-import { useI18n, type ToolRenderProps, type ToolRendererDefinition } from "@atelier/sdk/renderer";
-import type { Json, ToolResult } from "@atelier/sdk/contracts";
+import { useI18n, type ToolRenderProps, type ToolRendererDefinition } from "@asterism/sdk/renderer";
+import type { Json, ToolResult } from "@asterism/sdk/contracts";
 import { useMemo } from "react";
 import { FileDiff, type FileDiffOptions } from "@pierre/diffs/react";
-import type { TextRead, TextChange } from "@atelier/builtin-api/contracts";
+import type { TextRead, TextChange } from "@asterism/builtin-api/contracts";
 import { inputField, inputText, characterCount, toolTextTail, editPreviewText } from "./shared/tool-preview";
 import { TOOL_BODY_LINE_LIMIT, diffBodyPreview, textBodyPreview } from "./shared/tool-body";
 import { displayText } from "./shared/text-row";
 import { CodeRows } from "./code-view";
 import { codeViewOptions } from "./shared/code-view";
-import { ToolHeader } from "@atelier/ui/tool-header";
-import { StreamingPreview } from "@atelier/ui/streaming-preview";
+import { ToolHeader } from "@asterism/ui/tool-header";
+import { StreamingPreview } from "@asterism/ui/streaming-preview";
 
 /** 三态复用摘要结构，已有路径、输入数量在执行和结束时继续保留。 */
 function TextReadHeader({ target, invocation, result }: ToolRenderProps<TextRead>) {

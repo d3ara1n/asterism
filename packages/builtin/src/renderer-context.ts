@@ -1,5 +1,5 @@
 import { createContext, createElement, useContext, type ReactNode } from "react";
-import type { RendererPreferences } from "@atelier/sdk/renderer";
+import type { RendererPreferences } from "@asterism/sdk/renderer";
 import { CreationDirectoryProvider } from "./resources/directory";
 
 /** 应用组合注入宿主服务；内置插件不读取宿主存储实现。 */

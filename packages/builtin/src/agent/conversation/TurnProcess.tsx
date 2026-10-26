@@ -1,6 +1,6 @@
-import { useI18n } from "@atelier/sdk/renderer";
-import { Button } from "@atelier/ui/ui/button";
-import { Marker, MarkerContent, MarkerIcon } from "@atelier/ui/ui/marker";
+import { useI18n } from "@asterism/sdk/renderer";
+import { Button } from "@asterism/ui/ui/button";
+import { Marker, MarkerContent, MarkerIcon } from "@asterism/ui/ui/marker";
 import { ChevronRight } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import { conversationMessages } from "../../messages/conversation";

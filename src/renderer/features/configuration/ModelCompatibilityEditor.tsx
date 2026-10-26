@@ -1,14 +1,14 @@
 import { z } from "zod";
 import { Plus, X } from "lucide-react";
-import { jsonSchema } from "@atelier/sdk/contracts";
+import { jsonSchema } from "@asterism/sdk/contracts";
 import { mergeModelCompatibility, modelCompatibilityDefinition, modelCompatibilityDefinitions, type ModelCompatibility, type ModelCompatibilityDefinition } from "../../../shared/model-compatibility";
 import { providersMessages } from "../../messages/providers";
 import { ConfigurationValue } from "../../shared/ConfigurationValue";
 import { useI18n } from "../../shared/i18n";
-import { Badge } from "@atelier/ui/ui/badge";
-import { Button } from "@atelier/ui/ui/button";
-import { Card } from "@atelier/ui/ui/card";
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@atelier/ui/ui/dropdown-menu";
+import { Badge } from "@asterism/ui/ui/badge";
+import { Button } from "@asterism/ui/ui/button";
+import { Card } from "@asterism/ui/ui/card";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@asterism/ui/ui/dropdown-menu";
 import { EditorSection } from "./forms";
 import { modelProtocolLabels } from "./protocols";
 

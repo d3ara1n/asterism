@@ -4,9 +4,9 @@
 
 ## 内容身份与引用值
 
-`ContentRef` 是 SDK 保留的 JSON 值，严格形状为 `{ "$atelier.content": "<opaque UUID>" }`，所在对象仅含这一字段。宿主只将完整匹配 `contentRefSchema` 的对象识别为引用；其余对象作为普通 JSON 递归扫描，包括同名字段的 schema 定义、额外字段与非 UUID 值。需要引用的业务字段仍由其 `contentRefSchema` 校验，合法引用仍须通过存在性与调用归属检查。普通字符串、路径、URL 与哈希没有引用语义；需要保存精确保留形状的字面资料时，将其编码为字符串。
+`ContentRef` 是 SDK 保留的 JSON 值，严格形状为 `{ "$asterism.content": "<opaque UUID>" }`，所在对象仅含这一字段。宿主只将完整匹配 `contentRefSchema` 的对象识别为引用；其余对象作为普通 JSON 递归扫描，包括同名字段的 schema 定义、额外字段与非 UUID 值。需要引用的业务字段仍由其 `contentRefSchema` 校验，合法引用仍须通过存在性与调用归属检查。普通字符串、路径、URL 与哈希没有引用语义；需要保存精确保留形状的字面资料时，将其编码为字符串。
 
-SDK 导出 `contentRefSchema` 供业务 schema 组合。保留的是完整引用值，而非 `$atelier.content` 字段名本身。将引用字符串化或写入插件私有目录不建立持久依赖；transform 若移除引用，宿主不再为移除的引用登记根。投影、系统提示与普通文本也不建立根。
+SDK 导出 `contentRefSchema` 供业务 schema 组合。保留的是完整引用值，而非 `$asterism.content` 字段名本身。将引用字符串化或写入插件私有目录不建立持久依赖；transform 若移除引用，宿主不再为移除的引用登记根。投影、系统提示与普通文本也不建立根。
 
 宿主在最终校验过的持久 JSON 中识别保留引用值，验证其可用性与调用归属，自动生成依赖清单。清单与业务 JSON 在同一事务保存；不要求插件逐次填写清单、声明提取函数或暴露 schema 内部结构。插件缺席或数据无法解码时，已保存的依赖清单仍有效。
 

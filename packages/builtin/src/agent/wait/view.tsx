@@ -1,6 +1,6 @@
 import { Hourglass } from "lucide-react";
-import { toolRenderer, useI18n, type ToolRenderProps } from "@atelier/sdk/renderer";
-import { ToolHeader } from "@atelier/ui/tool-header";
+import { toolRenderer, useI18n, type ToolRenderProps } from "@asterism/sdk/renderer";
+import { ToolHeader } from "@asterism/ui/tool-header";
 import { AgentWait, type AgentWaitResult } from "./contract";
 import { waitMessages as messages } from "../../messages/wait";
 

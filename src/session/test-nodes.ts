@@ -1,9 +1,9 @@
 /** 测试夹具：按通用记录节点构造 agent 与工作台记录，形状只在此维护。 */
-import type { Json, ModelCompletion, ToolOutcome } from "@atelier/sdk/contracts";
-import { Execution, AgentInputMessage, type AgentMessageSender } from "@atelier/builtin-api/contracts";
+import type { Json, ModelCompletion, ToolOutcome } from "@asterism/sdk/contracts";
+import { Execution, AgentInputMessage, type AgentMessageSender } from "@asterism/builtin-api/contracts";
 import type { NewNode, SessionNode } from "../shared/session.ts";
 
-export const agentSource = (id: string) => ({ plugin: "atelier.builtin", resource: { sessionId: "s", id, kind: "atelier.builtin/agent" } });
+export const agentSource = (id: string) => ({ plugin: "asterism.builtin", resource: { sessionId: "s", id, kind: "asterism.builtin/agent" } });
 export const hostSource = null;
 const modelSource = { model: "p/m", adapter: "test/1", scope: "s" };
 type BlockOptions = { requestParentId?: string | null; complete?: boolean; continuation?: Json; completion?: ModelCompletion | null };
@@ -28,7 +28,7 @@ export const message = (agentId: string, value: string, startsTurn = true, sende
   record(AgentInputMessage.id, { startsTurn, parts: [{ kind: "text", text: value }], sender }, agentSource(agentId));
 export const event = (type: string, data: Json, options: { source?: NewNode["source"]; model?: string | null; recipient?: string | null } = {}): NewNode =>
   ({ contract: type, data, source: options.source ?? hostSource, model: options.model ?? null, recipient: options.recipient ?? null });
-export const created = (id: string, title: string, kind = "atelier.builtin/agent") => event("resource_created", { id, title, type: kind });
+export const created = (id: string, title: string, kind = "asterism.builtin/agent") => event("resource_created", { id, title, type: kind });
 export const attached = (receiverId: string, resourceId: string, model: string | null = `${resourceId} attached`) =>
   event("resource_attached", { id: resourceId, receiverId }, { model, recipient: receiverId });
 export const removed = (id: string) => event("object_removed", { id });
