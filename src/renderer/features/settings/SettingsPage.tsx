@@ -1,6 +1,6 @@
 import { LanguageSettings } from "./LanguageSettings";
 import { SessionsSettings } from "./SessionsSettings";
-import { UpdateSettings } from "./UpdateSettings";
+import { AboutSettings } from "./AboutSettings";
 import { AppearanceSettings } from "../appearance/AppearanceSettings";
 import { ModelProvidersSettings } from "../configuration/ModelProvidersSettings";
 import { WebProvidersSettings } from "../configuration/WebProvidersSettings";
@@ -10,7 +10,6 @@ import { PluginsOverview, PluginDetails, usePlugins, pluginKey, type PluginManag
 import { pluginsMessages } from "../../messages/plugins";
 import { Item, ItemContent, ItemTitle, ItemDescription } from "@asterism/ui/ui/item";
 import { Separator } from "@asterism/ui/ui/separator";
-import { Row } from "./layout";
 import { LayoutGroup, AnimatePresence, motion } from "motion/react";
 
 import { Card } from "@asterism/ui/ui/card";
@@ -23,8 +22,6 @@ import { Screen, useIsland, type IslandSpec } from "../../shared/weave/Screen";
 import { settingsMessages } from "../../messages/settings";
 import { useI18n } from "../../shared/i18n";
 import { useEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
-
-import { applicationId } from "../../../shared/application";
 
 /** 官方 Card 作为共享元素动画的承载元素；组件源码不改。 */
 const MotionCard = motion.create(Card);
@@ -40,20 +37,8 @@ const categories: SettingsCategory[] = [
   { id: "providers", title: settingsMessages.providers, summary: settingsMessages.providersSummary, icon: PlugZap, content: () => <><ModelProvidersSettings /><WebProvidersSettings /></> },
   { id: "roles", title: settingsMessages.rolesTitle, summary: settingsMessages.rolesSummary, icon: Cpu, content: () => <RolesSettings /> },
   { id: "agents", title: settingsMessages.agents, summary: settingsMessages.agentsSummary, icon: Bot, content: () => <AgentsSettings /> },
-  { id: "about", title: settingsMessages.aboutTitle, summary: settingsMessages.aboutSummary, icon: Info, content: () => <About /> },
+  { id: "about", title: settingsMessages.aboutTitle, summary: settingsMessages.aboutSummary, icon: Info, content: () => <AboutSettings /> },
 ];
-
-function About() {
-  const i18n = useI18n();
-  return <>
-    <p className="type-body py-4 text-muted-foreground">{i18n.text(settingsMessages.aboutBody)}</p>
-    <Row label={i18n.text(settingsMessages.aboutIdentity)}><code className="text-xs">{applicationId}</code></Row>
-    <Row label={i18n.text(settingsMessages.aboutLogs)} hint={i18n.text(settingsMessages.aboutLogsHint)}>
-      <Button size="sm" variant="outline" onClick={() => void window.host.openLogs().then(error => { if (error) console.error(`Log folder could not be opened: ${error}`); })}>
-        {i18n.text(settingsMessages.aboutOpenLogs)}</Button></Row>
-    <UpdateSettings />
-  </>;
-}
 
 /**
  * 设置屏：根浮岛先是平铺在材质上的分类卡片；打开分类时选中卡片经共享布局（layoutId）放大为分类内容，
@@ -117,7 +102,8 @@ function SettingsRoot({ openId, onOpen, onClosed, manager, location }: { openId:
         className="settings-detail gap-0 py-0" style={{ borderRadius: "calc(var(--radius) + 4px)" }}>
         <motion.div className="p-6" initial={{ opacity: 0 }} animate={{ opacity: 1, transition: { ...islandTransition, delay: 0.18 } }} exit={{ opacity: 0, transition: fadeTransition }}>
           <Button variant="ghost" size="sm" className="-ml-2 mb-4" onClick={() => void close()}><ArrowLeft />{i18n.formatMessage(settingsMessages.allSettings)}</Button>
-          <h2 ref={heading} tabIndex={-1} className="type-page mb-2 outline-none">{i18n.text(open.title)}</h2>
+          {/* 关于页以应用名片作为可见标题，分类标题只保留给辅助技术与焦点落点。 */}
+          <h2 ref={heading} tabIndex={-1} className={open.id === "about" ? "sr-only" : "type-page mb-2 outline-none"}>{i18n.text(open.title)}</h2>
           {["providers", "roles", "agents"].includes(open.id) && <ConfigurationReadStatus />}
           {open.content()}
         </motion.div>

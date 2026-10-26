@@ -135,7 +135,8 @@
   ::selection { background: var(--selection); }
 }
 @layer components {
-  /* 字号层级：页面标题 / 区块标题 / 正文 / 说明 / 标签。 */
+  /* 字号层级：展示数字 / 页面标题 / 区块标题 / 正文 / 说明 / 标签。 */
+  .type-display { @apply text-4xl font-light leading-none tracking-tight tabular-nums; }
   .type-page { @apply text-xl font-semibold tracking-tight; }
   .type-section { @apply text-sm font-semibold; }
   /* 代码文字：代码字体 + 代码字号（未设置时跟随所在文字）；代码块、行内代码与编辑器统一使用。 */
