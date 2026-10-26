@@ -1,6 +1,12 @@
 import { defineMessages, pluginNamespace } from "@atelier/sdk/contracts";
 
 export const conversationMessages = pluginNamespace("atelier.builtin").messages("en", defineMessages({
+  executionProcess: { id: "agent_conversation_executionProcess", defaultMessage: "Execution process" },
+  compressing: { id: "agent_conversation_compressing", defaultMessage: "Compacting context…" },
+  compressedHistory: { id: "agent_conversation_compressedHistory", defaultMessage: "Earlier conversation compacted" },
+  compressionFailed: { id: "agent_conversation_compressionFailed", defaultMessage: "Context compaction failed" },
+  compressionCancelled: { id: "agent_conversation_compressionCancelled", defaultMessage: "Context compaction cancelled" },
+  processToolCount: { id: "agent_conversation_processToolCount", defaultMessage: "{count, plural, one {# tool call} other {# tool calls}}" },
   drafts: { id: "agent_drafts_title", defaultMessage: "Drafts" },
   saveDraft: { id: "agent_drafts_save", defaultMessage: "Save draft" },
   draftMode: { id: "agent_drafts_mode", defaultMessage: "Send timing" },

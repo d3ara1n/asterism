@@ -25,6 +25,7 @@ export interface TurnMeasurement {
   incomplete: boolean;
   metrics: TurnMetricsData;
   replyMarkdown: string | null;
+  finalResponseId: string | null;
 }
 
 /** 历史轮次保留；批次中的连续输入和 steer 属于同轮，只有当前运行轮隐藏。 */
@@ -50,6 +51,7 @@ export function turnMetrics(snapshot: SessionSnapshot, agentId: string, running:
       incomplete,
       metrics: summarizeRequests(current),
       replyMarkdown: reply.trim() ? reply : null,
+      finalResponseId: reply.trim() ? current[0]!.responseId : null,
     }];
   });
 }

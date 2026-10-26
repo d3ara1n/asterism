@@ -73,7 +73,7 @@ export function createAgentLoop(deps: AgentLoopDependencies) {
         const system = deps.systemPrompt(deps.selection.agent(selection));
         const tokens = Math.ceil(system.blocks.reduce((size, block) => size + block.text.length, 0) / 4);
         return compressContext(object, deps.selection.target(selection), tokens, deps.models, signal,
-          value => deps.feedback.report(object, value), deps.userAgent);
+          value => deps.feedback.report(object, value), deps.userAgent, () => deps.feedback.beginCompression(object));
       };
       const publish = (status: ResourceStatus["status"]) => object.events.publish(ResourceStatusChanged, {
         title: object.snapshot()!.title, status,

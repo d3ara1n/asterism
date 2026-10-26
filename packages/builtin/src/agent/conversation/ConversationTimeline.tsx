@@ -1,6 +1,7 @@
 import { RendererViewStateProvider, useI18n, useRendererObject, useRendererViewState, type RendererViewStateEntry } from "@atelier/sdk/renderer";
 import { TriangleAlert, Info } from "lucide-react";
-import { memo, useMemo, useState, type Ref, type RefObject } from "react";
+import { memo, useLayoutEffect, useMemo, useState, type ReactNode, type Ref, type RefObject } from "react";
+import { AnimatePresence, motion } from "motion/react";
 import { Virtualizer, type VirtualizerHandle } from "virtua";
 
 import { Alert, AlertDescription } from "@atelier/ui/ui/alert";
@@ -16,6 +17,10 @@ import { TurnFooter } from "./TurnFooter";
 import { MessageSender } from "./MessageSender";
 import { TimelineViewState, viewStateKeys } from "./view-state";
 import { ExecutionErrorDetails } from "../ErrorDetails";
+import { TurnProcess } from "./TurnProcess";
+import { CompressionMarker } from "./CompressionMarker";
+import type { useTimelinePresence } from "./timeline-presence";
+import { conversationTransition, immediateTransition } from "./motion";
 
 /** 条目视图状态由调用方提供时跨重新挂载保留；未提供时随本组件存在。 */
 export function ConversationTimeline({ items, viewState }: { items: readonly TimelineItem[]; viewState?: TimelineViewState }) {
@@ -32,17 +37,45 @@ export function ConversationTimeline({ items, viewState }: { items: readonly Tim
  * 条目随滚动卸载与重新挂载，视图状态经 viewState 按条目恢复；实时块与末项始终挂载。
  * 条目间距由每项自身的上内边距提供，绝对定位的条目不能依赖兄弟选择器。
  */
-export function VirtualConversationTimeline({ items, viewState, scrollRef, ref, onResize, onScrollEnd }: {
+export function VirtualConversationTimeline({ items, target, presence, reducedMotion, viewState, scrollRef, ref, onResize, onScrollEnd, onToggleProcess, onProcessMount }: {
   items: readonly TimelineItem[]; viewState: TimelineViewState; scrollRef: RefObject<HTMLElement | null>;
+  target: readonly TimelineItem[]; presence: ReturnType<typeof useTimelinePresence>; reducedMotion: boolean;
   ref?: Ref<VirtualizerHandle>; onResize?: () => void; onScrollEnd?: () => void;
+  onToggleProcess(id: string): void;
+  onProcessMount(id: string, button: HTMLButtonElement): void;
 }) {
-  const keepMounted = useMemo(() => mountedTimelineIndexes(items), [items]);
+  const present = useMemo(() => new Set(target.map(timelineKey)), [target]);
+  const keepMounted = useMemo(() => [...new Set([...mountedTimelineIndexes(items),
+    ...items.flatMap((item, index) => present.has(timelineKey(item)) ? [] : [index])])].sort((a, b) => a - b), [items, present]);
   return <Virtualizer ref={ref} data={items} scrollRef={scrollRef} keepMounted={keepMounted} onResize={onResize} onScrollEnd={onScrollEnd}>
     {node => {
       const key = timelineKey(node);
-      return <div key={key} className="px-4 pt-4"><NodeView node={node} entry={viewState.entry(key)} /></div>;
+      return <TimelinePresenceItem key={key} itemKey={key} present={present.has(key)} enter={presence.entering.has(key)}
+        overlayExit={node.kind === "compression"}
+        reducedMotion={reducedMotion} onMount={presence.onMount} onExitComplete={presence.onExitComplete}>{node.kind === "turn-process"
+        ? <TurnProcess node={node} onToggle={() => onToggleProcess(node.id)} onMount={onProcessMount} />
+        : <NodeView node={node} entry={viewState.entry(key)} />}</TimelinePresenceItem>;
     }}
   </Virtualizer>;
+}
+
+function TimelinePresenceItem({ itemKey, present, enter, overlayExit, reducedMotion, onMount, onExitComplete, children }: {
+  itemKey: string; present: boolean; enter: boolean; overlayExit: boolean; reducedMotion: boolean; children: ReactNode;
+  onMount(key: string): () => void; onExitComplete(key: string): void;
+}) {
+  const [animateEntrance] = useState(enter);
+  useLayoutEffect(() => onMount(itemKey), [itemKey, onMount]);
+  return <div className="relative" inert={!present} aria-hidden={!present || undefined}>
+    <AnimatePresence initial={animateEntrance} mode={overlayExit ? "popLayout" : "sync"} onExitComplete={() => onExitComplete(itemKey)}>
+      {present && <motion.div key={itemKey} className="px-4 pt-4"
+        initial={reducedMotion ? false : { opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: reducedMotion ? 1 : 0, y: reducedMotion ? 0 : 6 }}
+        transition={reducedMotion ? immediateTransition : conversationTransition}>
+        {children}
+      </motion.div>}
+    </AnimatePresence>
+  </div>;
 }
 
 /** 时间线条目由快照投影且身份稳定；画布拖动等外层重渲染不重算已有条目。 */
@@ -68,6 +101,7 @@ function NodeContent({ node }: { node: TimelineItem }) {
     case "thinking": return node.text.trim() ? <ThinkingBlock node={node} /> : null;
     case "toolcall": return <ToolCall node={node} />;
     case "summary": return <Summary text={node.text} />;
+    case "compression": return <CompressionMarker node={node} />;
     case "turn-metrics": return <TurnFooter metrics={node.metrics} incomplete={node.incomplete} replyMarkdown={node.replyMarkdown} />;
     case "notice": return <Alert variant={node.level === "error" ? "destructive" : "default"}>
       {node.level === "error" ? <TriangleAlert /> : <Info />}<AlertDescription>

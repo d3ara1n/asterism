@@ -64,6 +64,7 @@ export async function compressContext(
   object: ObjectExecutor, target: ModelTarget, systemTokens: number,
   models: Pick<ModelServices, "stream" | "list" | "roles">, signal: AbortSignal,
   feedback: (value: AgentFeedback) => void, userAgent?: string,
+  onStart?: () => (status: "completed" | "failed" | "cancelled") => void,
 ): Promise<boolean> {
   signal.throwIfAborted();
   const model = target.model ?? models.roles().find(role => role.id === target.role)?.model;
@@ -75,6 +76,23 @@ export async function compressContext(
   if (tokensBefore <= window - COMPRESSION_RESERVE) return false;
   const plan = planCompression(context);
   if (!plan) return false;
+  const end = onStart?.();
+  let completed = false;
+  try {
+    const result = await summarizeContext(object, target, model, models, signal, feedback, plan, tokensBefore, userAgent);
+    completed = result;
+    return result;
+  } finally {
+    end?.(completed ? "completed" : signal.aborted ? "cancelled" : "failed");
+  }
+}
+
+/** 完整摘要保存后才交付成功；生成失败保留原模型投影。 */
+async function summarizeContext(
+  object: ObjectExecutor, target: ModelTarget, model: string,
+  models: Pick<ModelServices, "stream">, signal: AbortSignal, feedback: (value: AgentFeedback) => void,
+  plan: CompressionPlan, tokensBefore: number, userAgent?: string,
+): Promise<boolean> {
   let text = "";
   const parts = new Map<string, { kind: "text" | "thinking"; ended: boolean }>();
   let finish: Extract<ModelEvent, { type: "finish" }> | undefined;

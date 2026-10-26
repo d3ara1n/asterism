@@ -40,6 +40,6 @@ function AgentBody({ data }: { data: z.infer<typeof AgentView.schema> }) {
   const object = useRendererObject();
   const interaction = useAgentConversation(object, data.selection !== null, data.executionState, data.drafts);
   return <AgentConversationProvider value={interaction}>
-    <AgentUI selection={data.selection}><Conversation feedback={data.feedback} /></AgentUI>
+    <AgentUI selection={data.selection}><Conversation feedback={data.feedback} compressions={data.compressions} /></AgentUI>
   </AgentConversationProvider>;
 }

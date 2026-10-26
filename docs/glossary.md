@@ -217,3 +217,6 @@
 | 插件浮岛 | plugin island | 插件设置页经 SDK 打开的更深浮岛；身份按插件隔离，宽度与面板外框由宿主统一，见 `docs/plugin-sdk.md#插件配置与界面本地化` |
 | 工具摘要 / 工具正文 | tool header / body | 调用外壳中的两个独立渲染入口，消费同一份工具结果；各自可覆盖宿主默认视图 |
 | 对话导航 | chat minimap | 代理阅读区边缘的输入消息短柱导航，用于预览与定位当前对话中的消息，见 `docs/workbench.md` |
+| 执行过程收纳 | turn process | 通过末尾概要行控制一轮过程条目的显隐，恢复时内容在行上方出现；沿用原有工具与思考组件，见 [执行过程收纳](workbench.md#执行过程收纳) |
+| 对话标记 | conversation marker | 以 Marker 呈现的会话状态、事件或带字分隔线；是否可点击由具体用途决定，见 [对话过程视图](design-system.md#对话过程视图) |
+| 对话阅读范围 | conversation history window | Agent 对话当前展示的历史区间，按对象保留在前端内存，重载时按最新压缩保留边界选取，见 [压缩标记与阅读范围](workbench.md#压缩标记与阅读范围) |

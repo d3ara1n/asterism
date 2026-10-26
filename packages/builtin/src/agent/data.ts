@@ -2,7 +2,7 @@ import { z } from "zod";
 import { builtin, agentSelectionSchema } from "@atelier/builtin-api/contracts";
 import { agentExecutionStateSchema } from "./state.ts";
 import { agentDraftSchema } from "./drafts-contract.ts";
-import { inlineFeedbackSchema } from "./feedback.ts";
+import { inlineFeedbackSchema, compressionActivitySchema } from "./feedback.ts";
 
 export const AgentSelection = builtin.data("agent.selection", z.object({
   selection: agentSelectionSchema,
@@ -15,4 +15,5 @@ export const AgentView = builtin.data("agent.card", z.strictObject({
   executionState: agentExecutionStateSchema,
   drafts: z.array(agentDraftSchema),
   feedback: z.array(inlineFeedbackSchema),
+  compressions: z.array(compressionActivitySchema),
 }));

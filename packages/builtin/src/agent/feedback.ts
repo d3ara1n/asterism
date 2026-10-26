@@ -12,6 +12,13 @@ export const inlineFeedbackSchema = agentFeedbackSchema.extend({
 });
 export type InlineFeedback = z.infer<typeof inlineFeedbackSchema>;
 
+/** 压缩活动属于运行时反馈；成功后由持久摘要记录承接。 */
+export const compressionActivitySchema = z.strictObject({
+  id: z.string(), afterNodeId: z.string().nullable(),
+  status: z.enum(["running", "failed", "cancelled"]),
+});
+export type CompressionActivity = z.infer<typeof compressionActivitySchema>;
+
 /** 软件故障通过在线通知交付；模型反馈由 Agent 的内存投影交付。 */
 export const AgentSoftwareFeedback = builtin.event("agent.software-feedback", {
   source: "resource",

@@ -61,7 +61,8 @@ export function createAgentModule(application: BuiltinApplication, usage: UsageC
           const drafts = object.get(AgentDrafts) ?? [];
           const transient = feedback.get(object);
           if (loop.running(object))
-            return { agentId: object.ref.id, selection: value?.selection ?? null, executionState: "running" as const, drafts, feedback: [...transient.inline] };
+            return { agentId: object.ref.id, selection: value?.selection ?? null, executionState: "running" as const, drafts,
+              feedback: [...transient.inline], compressions: [...transient.compressions] };
           const history = object.session.snapshot();
           let turn = turns.get(object.ref.id);
           if (!turn || turn.nodeId !== history.position.nodeId || turn.interruptions !== transient.interruptions) {
@@ -70,7 +71,8 @@ export function createAgentModule(application: BuiltinApplication, usage: UsageC
             turns.set(object.ref.id, turn);
           }
           return { agentId: object.ref.id, selection: value?.selection ?? null,
-            executionState: agentExecutionState(turn.state, false), drafts, feedback: [...transient.inline] };
+            executionState: agentExecutionState(turn.state, false), drafts,
+            feedback: [...transient.inline], compressions: [...transient.compressions] };
         },
         async inspect(_data, object) {
           return { type: Agent.kind, title: object.snapshot()?.title ?? "Agent" };
