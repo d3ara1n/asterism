@@ -65,7 +65,7 @@ export function ObjectSurface({ icon, kind, title, actions, controls, panels = n
   }, [activeId, collapse.interactive]);
 
   return <RendererCardProvider value={card}>
-    <motion.div ref={root} className="@container/card min-w-0 overflow-hidden bg-muted"
+    <motion.div ref={root} className="@container/card min-w-0 overflow-hidden bg-card-shell"
       style={{ height: expandedHeight === undefined ? "100%" : collapse.height, minHeight: collapse.headerHeight ?? undefined }}
       onKeyDown={event => {
         // 菜单和对话框的 portal 不属于内容区，先由它们自行处理 Esc。
@@ -74,9 +74,10 @@ export function ObjectSurface({ icon, kind, title, actions, controls, panels = n
       }}>
       <div className="flex min-h-0 min-w-0 flex-col" style={{ height: expandedHeight ?? "100%" }}>
         <header ref={collapse.header} className={cn("flex shrink-0 items-center gap-2 px-3 py-2", headerClassName)}>
-          <span className="flex size-4 shrink-0 items-center justify-center text-muted-foreground [&_svg]:size-4" aria-hidden="true">{icon}</span>
+          {/* 窄容器只留图标表达类型，把宽度让给标题；类型名始终作为图标的可访问名称与提示。 */}
+          <span role="img" aria-label={kind} title={kind} className="flex size-4 shrink-0 items-center justify-center text-muted-foreground [&_svg]:size-4">{icon}</span>
           <div className="flex min-w-0 flex-1 items-baseline gap-2">
-            <p className="type-label max-w-1/3 shrink-0 truncate" title={kind}>{kind}</p>
+            <p aria-hidden="true" className="type-label hidden max-w-1/3 shrink-0 truncate @min-[24rem]/card:block">{kind}</p>
             <h2 className="type-section min-w-0 flex-1 truncate" title={title}>{title}</h2>
           </div>
           <div className="nodrag flex shrink-0 items-center gap-0.5">
@@ -102,7 +103,8 @@ export function ObjectSurface({ icon, kind, title, actions, controls, panels = n
         </header>
         {collapse.mounted && <motion.div data-object-content="" inert={!collapse.interactive}
           style={{ opacity: collapse.opacity, y: collapse.y }}
-          className="nodrag nopan relative mx-1 mb-1 flex min-h-0 min-w-0 flex-1 overflow-hidden rounded-lg border bg-card shadow-sm">
+          // 内容面与外壳只靠底色区分，不加边框；四周柔和的淡阴影承担颜色过渡，不形成切线。
+          className="nodrag nopan relative mx-1 mb-1 flex min-h-0 min-w-0 flex-1 overflow-hidden rounded-lg bg-card shadow-[0_1px_3px_0_rgb(0_0_0/0.06),0_0_2px_0_rgb(0_0_0/0.04)]">
           <div className={cn("flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden", active && "invisible @min-[52rem]/card:visible")}>{children}</div>
           {active && <aside ref={panelElement} tabIndex={-1} aria-labelledby={headingId}
             className="absolute inset-0 z-10 flex min-h-0 min-w-0 flex-col bg-card outline-none @min-[52rem]/card:static @min-[52rem]/card:w-80 @min-[52rem]/card:shrink-0 @min-[52rem]/card:border-l">

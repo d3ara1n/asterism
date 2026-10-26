@@ -15,6 +15,8 @@ import { ObjectSurface } from "./ObjectSurface";
 /** 卡片拖动柄选择器；画布只认它，卡片内容不感知拖动。 */
 export const cardDragHandle = ".card-drag-handle";
 export type ViewPatch = { collapsed?: boolean; size?: CardSize | null };
+/** Card 上下各一条 1px 边框；外壳高度按边框内尺寸计算。 */
+const cardBorderBlock = 2;
 
 /** 画布上的对象容器：在公共外壳外加拖动柄、折叠与画布滚轮归属。 */
 export const ObjectCard = memo(function ObjectCard({ icon, kind, title, actions, controls, panels, collapsed, expandedHeight, resizing, selected, onView, children }: {
@@ -41,9 +43,9 @@ export const ObjectCard = memo(function ObjectCard({ icon, kind, title, actions,
   }, []);
   const expand = useCallback(() => onView({ collapsed: false }), [onView]);
   const toggleLabel = collapsed ? i18n.text(commonMessages.expand) : i18n.text(commonMessages.collapse);
-  return <Card ref={root} className={cn("isolate w-full gap-0 overflow-hidden bg-muted py-0", selected && "border-ring")}>
+  return <Card ref={root} className={cn("isolate w-full gap-0 overflow-hidden py-0 shadow-none", selected && "border-ring ring-1 ring-ring")}>
     <ObjectSurface icon={icon} kind={kind} title={title} actions={actions} panels={panels} collapsed={collapsed} onExpand={expand}
-      expandedHeight={expandedHeight - 2} resizing={resizing}
+      expandedHeight={expandedHeight - cardBorderBlock} resizing={resizing}
       headerClassName="card-drag-handle cursor-grab active:cursor-grabbing"
       controls={<>{controls}<IconButton size="icon-xs" label={toggleLabel} aria-expanded={!collapsed} onClick={() => onView({ collapsed: !collapsed })}>
         <motion.span className="flex" initial={false} animate={{ rotate: collapsed ? 0 : 90 }}

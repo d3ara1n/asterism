@@ -39,10 +39,10 @@ const total = (counts: Counts) => counts.succeeded + counts.failed + counts.canc
 export function WebCard({ data }: { data: WebCardData }) {
   const i18n = useI18n(), { stats } = data;
   const requests = total(stats.search) + total(stats.fetch);
-  if (!data.configured && !requests) return <div className="nodrag nopan nowheel flex min-h-0 flex-1 flex-col justify-center p-3">
+  if (!data.configured && !requests) return <div className="nodrag nopan flex min-h-0 flex-1 flex-col justify-center p-2">
     <p className="type-caption text-center text-balance">{i18n.text(messages.empty)}</p>
   </div>;
-  return <div className="nodrag nopan nowheel flex min-h-0 flex-1 flex-col gap-3 overflow-auto p-2">
+  return <div className="nodrag nopan flex min-h-0 flex-1 flex-col gap-3 overflow-auto p-2">
     <dl className="grid grid-cols-3 gap-1.5">
       <Metric label={i18n.text(messages.searches)} value={i18n.formatNumber(total(stats.search))} note={countNote(i18n, stats.search)} />
       <Metric label={i18n.text(messages.fetches)} value={i18n.formatNumber(total(stats.fetch))} note={countNote(i18n, stats.fetch)} />

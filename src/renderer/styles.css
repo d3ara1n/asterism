@@ -14,6 +14,7 @@
   --background: #ffffff;
   --foreground: #202020;
   --card: #ffffff;
+  --card-shell: #f9f9f9;
   --card-foreground: #202020;
   --popover: #ffffff;
   --popover-foreground: #202020;
@@ -57,7 +58,7 @@
   :root {
     color-scheme: dark;
     --background: #111111; --foreground: #eeeeee;
-    --card: #191919; --card-foreground: #eeeeee;
+    --card: #191919; --card-shell: #222222; --card-foreground: #eeeeee;
     --popover: #222222; --popover-foreground: #eeeeee;
     --primary: #eeeeee; --primary-foreground: #111111;
     --primary-text: #eeeeee;
@@ -79,6 +80,7 @@
   --color-canvas: var(--canvas);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
+  --color-card-shell: var(--card-shell);
   --color-card-foreground: var(--card-foreground);
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
@@ -365,13 +367,15 @@
 /* 选中时线身上的画布底色缺口沿起点流向终点。 */
 .link-edge-flow { stroke: var(--canvas); stroke-linecap: butt; stroke-width: calc(var(--link-width) + 0.5px); stroke-dasharray: 3 11; animation: link-edge-flow 0.9s linear infinite; }
 @keyframes link-edge-flow { to { stroke-dashoffset: -14; } }
-/* 复用画布缩放控件；右下角独立命中区与四边的连线端点分开。 */
+/* 复用画布缩放控件；右下角独立命中区与四边的连线端点分开。圆形小角标跨在卡片圆角上，与端点圆点同一语汇。 */
 .react-flow__resize-control.object-resize-handle {
   display: flex; align-items: center; justify-content: center;
-  width: 24px; height: 24px;
-  border: 1px solid var(--border); border-radius: var(--radius);
+  width: 18px; height: 18px;
+  border: 1px solid var(--border); border-radius: 9999px;
   background: var(--card); color: var(--muted-foreground);
+  box-shadow: 0 1px 2px color-mix(in oklab, var(--foreground) 8%, transparent);
   z-index: 5;
+  transition: color var(--motion-fast) var(--ease-out), border-color var(--motion-fast) var(--ease-out);
 }
 .react-flow__resize-control.object-resize-handle:hover { color: var(--foreground); border-color: var(--ring); }
 @media (max-width: 1100px) {

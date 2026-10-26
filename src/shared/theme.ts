@@ -135,6 +135,8 @@ export function themeTokens(appearance: Appearance, scheme: Scheme): Record<stri
     // background 遵循 shadcn 约定作页面底色（亮色白）；canvas 为星图扩展，只给工作台底板等画布区域。
     background: dark ? g(1) : "#ffffff", foreground: fg, canvas: dark ? g(1) : g(3),
     card: dark ? g(2) : "#ffffff", "card-foreground": fg,
+    // 画布卡片外壳：介于画布与内容面之间，亮色不能与 canvas 同级，否则轮廓只剩边框。
+    "card-shell": dark ? g(3) : g(2),
     popover: dark ? g(3) : "#ffffff", "popover-foreground": fg,
     primary, "primary-foreground": solidForeground(primary),
     // 实色填充与表面上的强调文字分别取色，避免暗色 9 级作为小字时对比度不足。

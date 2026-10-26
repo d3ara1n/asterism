@@ -108,8 +108,9 @@ export function TerminalCard() {
   };
   const stopped = status.state === "exited" || status.state === "failed";
   const message = end ? end.message ?? end.reason : error ?? status.error;
-  return <div className="flex min-h-0 flex-1 flex-col">
-    <div className="nodrag nopan nowheel relative min-h-0 flex-1 bg-[#1e1e1e] p-2" onKeyDown={event => event.stopPropagation()}>
+  // 终端屏幕固定深色（ANSI 配色按深底设计）；底部提示条并入同一块深色屏幕，不与卡片内容面割裂。
+  return <div className="flex min-h-0 flex-1 flex-col bg-[#1e1e1e] text-[#d4d4d4]">
+    <div className="nodrag nopan relative min-h-0 flex-1 p-2" onKeyDown={event => event.stopPropagation()}>
       {/* xterm 内部层带 z-index；隔离为独立层叠上下文，覆盖层按文档顺序位于其上。 */}
       <div ref={container} className="isolate h-full w-full" />
       {status.state === "inactive" && <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-[#1e1e1e] p-6 text-[#d4d4d4]">
@@ -117,13 +118,13 @@ export function TerminalCard() {
         <Button variant="secondary" size="sm" disabled={starting || !object.view.ready || !!end} onClick={() => { void start(); }}><Play />{i18n.formatMessage(terminalMessages.start)}</Button>
       </div>}
     </div>
-    {stopped && <div className="flex shrink-0 items-center gap-2 border-t px-3 py-1.5">
-      <p className="type-caption min-w-0 flex-1">{status.state === "exited"
+    {stopped && <div className="flex shrink-0 items-center gap-2 border-t border-white/10 px-3 py-1.5">
+      <p className="type-caption min-w-0 flex-1 text-[#a0a0a0]">{status.state === "exited"
         ? i18n.formatMessage(terminalMessages.exited, { code: status.exitCode ?? "?" })
         : i18n.formatMessage(terminalMessages.failed, { error: status.error ?? "" })}</p>
       <Button size="xs" variant="secondary" disabled={starting || !object.view.ready || !!end} onClick={() => { void start(); }}><RotateCcw />{i18n.formatMessage(terminalMessages.restart)}</Button>
     </div>}
-    {status.state === "unknown" && !status.integration && <p className="type-caption shrink-0 px-3 py-2">{i18n.formatMessage(terminalMessages.noIntegration)}</p>}
-    {message && !stopped && <p className="type-caption shrink-0 break-words px-3 py-2 text-destructive">{i18n.formatMessage(terminalMessages.failed, { error: message })}</p>}
+    {status.state === "unknown" && !status.integration && <p className="type-caption shrink-0 border-t border-white/10 px-3 py-2 text-[#a0a0a0]">{i18n.formatMessage(terminalMessages.noIntegration)}</p>}
+    {message && !stopped && <p className="type-caption shrink-0 break-words border-t border-white/10 px-3 py-2 text-[#f48771]">{i18n.formatMessage(terminalMessages.failed, { error: message })}</p>}
   </div>;
 }

@@ -110,14 +110,14 @@ function DirectoryTreeBody(_: { data: { path: string } }) {
   const notice = state.error ?? (empty ? i18n.formatMessage(filesystemMessages.toolDirectoryEmpty)
     : noMatches ? i18n.formatMessage(filesystemMessages.directoryNoMatches) : null);
 
-  return <div className="nodrag nopan nowheel flex min-h-0 flex-1 flex-col">
+  return <div className="nodrag nopan flex min-h-0 flex-1 flex-col">
     <div className="shrink-0 border-b">
       <SearchInput variant="inline" value={query} onChange={value => { setQuery(value); search.setValue(value === "" ? null : value); }}
         label={i18n.formatMessage(filesystemMessages.directorySearch)} />
     </div>
     <div className="relative min-h-0 flex-1 pt-1">
       <div className={cn("h-full", notice && "invisible")}><FileTree model={model} style={treeStyle} /></div>
-      {notice && <p className={cn("type-caption absolute inset-x-0 top-0 px-3 py-2", state.error && "text-destructive")}>{notice}</p>}
+      {notice && <p className={cn("type-caption absolute inset-x-0 top-0 px-2 py-2", state.error && "text-destructive")}>{notice}</p>}
     </div>
   </div>;
 }

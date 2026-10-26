@@ -89,7 +89,7 @@ const ObjectNodeContent = memo(function ObjectNodeContent({ id, data, selected }
     {selected && !collapsed && <NodeResizeControl position="bottom-right"
       className="object-resize-handle nopan" minWidth={content.view.minWidth ?? minimumCardWidth}
       minHeight={content.view.minHeight ?? minimumCardHeight} maxWidth={maximumCardDimension} maxHeight={maximumCardDimension}>
-      <Grip className="size-3" aria-label={i18n.formatMessage(objectsMessages.resizeCard)}><title>{i18n.formatMessage(objectsMessages.resizeCard)}</title></Grip>
+      <Grip className="size-2.5" aria-hidden="true"><title>{i18n.formatMessage(objectsMessages.resizeCard)}</title></Grip>
     </NodeResizeControl>}
   </>;
 });
