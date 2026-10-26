@@ -19,7 +19,7 @@ export class ApplicationUpdates {
   private state: UpdateState = {
     version: app.getVersion(), enabled: app.isPackaged,
     includePrerelease: this.store.get("includePrerelease") === true,
-    status: "idle", availableVersion: null, progress: 0, error: null,
+    status: "idle", availableVersion: null, releaseUrl: null, progress: 0, error: null,
   };
   private operation: Promise<UpdateState> | null = null;
   private readonly listeners = new Set<(state: UpdateState) => void>();
@@ -49,7 +49,7 @@ export class ApplicationUpdates {
     this.store.set("includePrerelease", includePrerelease);
     this.patch({ includePrerelease });
     // 在途检查和下载完成本次工作，下一次检查使用新偏好。
-    if (!this.operation) this.patch({ status: "idle", availableVersion: null, progress: 0, error: null });
+    if (!this.operation) this.patch({ status: "idle", availableVersion: null, releaseUrl: null, progress: 0, error: null });
     return this.state;
   }
 
@@ -64,7 +64,7 @@ export class ApplicationUpdates {
     const includePrerelease = this.state.includePrerelease;
     this.updater.allowPrerelease = includePrerelease;
     this.updater.allowDowngrade = false;
-    this.patch({ status: "checking", availableVersion: null, progress: 0, error: null });
+    this.patch({ status: "checking", availableVersion: null, releaseUrl: null, progress: 0, error: null });
     try {
       const releases: GitHubUpdateRelease[] = [];
       const repository = `${applicationRepository.owner}/${applicationRepository.name}`;
@@ -91,7 +91,7 @@ export class ApplicationUpdates {
       if (!result?.isUpdateAvailable) {
         this.patch({ status: "current" });
       } else {
-        this.patch({ status: "downloading", availableVersion: result.updateInfo.version });
+        this.patch({ status: "downloading", availableVersion: result.updateInfo.version, releaseUrl: candidate.html_url });
         await this.updater.downloadUpdate();
         this.patch({ status: "ready", progress: 100 });
       }

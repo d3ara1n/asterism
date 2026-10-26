@@ -25,4 +25,5 @@ export const updatesMessages = pluginNamespace("asterism.host").messages("en", d
   versionChange: { id: "updates.versionChange", defaultMessage: "{current} → {next}" },
   installHint: { id: "updates.installHint", defaultMessage: "Restart Asterism to install the update." },
   settings: { id: "updates.settings", defaultMessage: "Update settings" },
+  releaseNotes: { id: "updates.releaseNotes", defaultMessage: "What’s new" },
 }));

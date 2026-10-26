@@ -3,6 +3,7 @@ import { z } from "zod";
 
 export const githubReleasesSchema = z.array(z.object({
   tag_name: z.string(),
+  html_url: z.string(),
   draft: z.boolean(),
   prerelease: z.boolean(),
 }));

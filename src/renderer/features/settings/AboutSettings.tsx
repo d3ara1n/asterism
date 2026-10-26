@@ -1,7 +1,8 @@
-import { useId } from "react";
+import { useId, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { ArrowRight, CircleArrowUp } from "lucide-react";
+import { ArrowRight, CircleArrowUp, Copy } from "lucide-react";
 import { Button } from "@asterism/ui/ui/button";
+import { IconButton } from "@asterism/ui/ui/icon-button";
 import { Progress } from "@asterism/ui/ui/progress";
 import { Separator } from "@asterism/ui/ui/separator";
 import { StatusIcon, type StatusTone } from "@asterism/ui/ui/status";
@@ -13,8 +14,9 @@ import { settingsMessages } from "../../messages/settings";
 import { updatesMessages as messages } from "../../messages/updates";
 import { useI18n } from "../../shared/i18n";
 import { fadeTransition } from "../../shared/weave/motion";
+import { toast } from "../../shared/toast";
 import { useUpdates } from "../updates/state";
-import { UpdateAction, UpdateError, useUpdateSummary } from "../updates/controls";
+import { UpdateAction, UpdateError, UpdateNotesLink, useUpdateSummary } from "../updates/controls";
 import { Row } from "./layout";
 
 /** 关于页：应用名片（图标、名称、版本）承接更新状态，次要信息以紧凑行收在其后。 */
@@ -31,7 +33,10 @@ export function AboutSettings() {
     <Separator />
     <ChannelRow />
     <Separator />
-    <Row label={i18n.text(settingsMessages.aboutIdentity)}><code className="type-code select-all text-xs text-muted-foreground">{applicationId}</code></Row>
+    <Row label={i18n.text(settingsMessages.aboutIdentity)}>
+      <code className="type-code select-all text-xs text-muted-foreground">{applicationId}</code>
+      <CopyIdentity />
+    </Row>
     <Separator />
     <Row label={i18n.text(settingsMessages.aboutLogs)} hint={i18n.text(settingsMessages.aboutLogsHint)}>
       <Button size="sm" variant="outline" onClick={() => void window.host.openLogs().then(error => { if (error) console.error(`Log folder could not be opened: ${error}`); })}>
@@ -66,17 +71,19 @@ function UpdatePanel() {
       <UpdateAction />
     </div>
     <div className="mt-4 space-y-2">
+      {/* 失败说明与原始错误由 UpdateError 承接（role=alert），状态行只表达其余状态，避免同一句话出现两次。 */}
       <div role="status" aria-live="polite">
         <AnimatePresence mode="wait" initial={false}>
-          <motion.p key={status ?? "loading"} className="type-body flex min-h-5 items-center gap-2"
+          {status !== "error" && <motion.p key={status ?? "loading"} className="type-body flex min-h-5 items-center gap-2"
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={fadeTransition}>
             {status && <StatusIcon tone={tone} icon={status === "ready" ? CircleArrowUp : undefined} className="size-4 shrink-0" />}
             <span className="min-w-0 break-words">{summary}</span>
-          </motion.p>
+          </motion.p>}
         </AnimatePresence>
       </div>
       {state?.status === "downloading" && <Progress value={state.progress} aria-label={i18n.text(messages.title)} className="h-1.5" />}
       {state?.status === "ready" && <p className="type-caption">{i18n.text(messages.installHint)}</p>}
+      <UpdateNotesLink />
       <UpdateError />
     </div>
   </section>;
@@ -95,4 +102,25 @@ function ChannelRow() {
       <ToggleGroupItem value="prerelease">{i18n.text(messages.channelPrerelease)}</ToggleGroupItem>
     </ToggleGroup>
   </Row>;
+}
+
+/** 复制应用标识：结果用临时通知反馈，进行中禁用以防重复触发。 */
+function CopyIdentity() {
+  const i18n = useI18n();
+  const [copying, setCopying] = useState(false);
+  const copy = async () => {
+    setCopying(true);
+    try {
+      await navigator.clipboard.writeText(applicationId);
+      toast.success(i18n.text(settingsMessages.aboutIdentityCopied));
+    } catch (error) {
+      console.error("Application ID could not be copied.", error);
+      toast.error(i18n.text(settingsMessages.aboutIdentityCopyFailed));
+    } finally {
+      setCopying(false);
+    }
+  };
+  return <IconButton size="icon-xs" label={i18n.text(settingsMessages.aboutCopyIdentity)} disabled={copying} onClick={() => { void copy(); }}>
+    <Copy />
+  </IconButton>;
 }

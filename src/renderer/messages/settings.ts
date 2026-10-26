@@ -57,6 +57,18 @@ export const settingsMessages = pluginNamespace("asterism.host").messages("en", 
     id: "aboutOpenLogs",
     defaultMessage: "Open folder",
   },
+  aboutCopyIdentity: {
+    id: "aboutCopyIdentity",
+    defaultMessage: "Copy application ID",
+  },
+  aboutIdentityCopied: {
+    id: "aboutIdentityCopied",
+    defaultMessage: "Application ID copied",
+  },
+  aboutIdentityCopyFailed: {
+    id: "aboutIdentityCopyFailed",
+    defaultMessage: "Application ID could not be copied",
+  },
   appearance: {
     id: "features_settings_SettingsPage_1",
     defaultMessage: "Appearance",

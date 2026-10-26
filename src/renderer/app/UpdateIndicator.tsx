@@ -10,7 +10,7 @@ import { updatesMessages as messages } from "../messages/updates";
 import { useI18n } from "../shared/i18n";
 import { fadeTransition } from "../shared/weave/motion";
 import { useUpdates } from "../features/updates/state";
-import { UpdateAction, UpdateError, useUpdateSummary } from "../features/updates/controls";
+import { UpdateAction, UpdateError, UpdateNotesLink, useUpdateSummary } from "../features/updates/controls";
 
 /** 更新入口在浮层打开期间保持可见，承接重试后的检查与结果。 */
 export function UpdateIndicator({ onSettings }: { onSettings: () => void }) {
@@ -63,6 +63,7 @@ export function UpdateIndicator({ onSettings }: { onSettings: () => void }) {
       </div>
       {state.status === "downloading" && <Progress value={state.progress} aria-label={i18n.text(messages.title)} />}
       {state.status === "ready" && <p className="type-caption">{i18n.text(messages.installHint)}</p>}
+      <UpdateNotesLink />
       <UpdateError />
       <div className="flex flex-wrap items-center justify-between gap-2">
         <Button variant="ghost" size="sm" onClick={() => {

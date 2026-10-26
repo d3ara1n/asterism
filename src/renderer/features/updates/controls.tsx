@@ -1,5 +1,6 @@
 import { Button } from "@asterism/ui/ui/button";
 import { Alert, AlertDescription } from "@asterism/ui/ui/alert";
+import { ExternalLink } from "lucide-react";
 import { commonMessages } from "@asterism/ui/messages/common";
 import { updatesMessages as messages } from "../../messages/updates";
 import { useI18n } from "../../shared/i18n";
@@ -39,4 +40,15 @@ export function UpdateError() {
       <pre className="mt-1 whitespace-pre-wrap break-all text-xs">{detail}</pre>
     </details>
   </AlertDescription></Alert>;
+}
+
+/** 目标版本的发布说明在 GitHub Release 页面查看；窗口打开处理器交给系统浏览器。 */
+export function UpdateNotesLink() {
+  const i18n = useI18n();
+  const { state } = useUpdates();
+  if (!state?.releaseUrl) return null;
+  return <a href={state.releaseUrl} target="_blank" rel="noreferrer"
+    className="type-caption inline-flex items-center gap-1 self-start hover:text-foreground">
+    {i18n.text(messages.releaseNotes)}<ExternalLink className="size-3" aria-hidden="true" />
+  </a>;
 }

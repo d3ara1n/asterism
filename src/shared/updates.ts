@@ -13,6 +13,7 @@ export const updateStateSchema = z.strictObject({
   includePrerelease: z.boolean(),
   status: z.enum(["idle", "checking", "current", "downloading", "ready", "error"]),
   availableVersion: z.string().nullable(),
+  releaseUrl: z.string().nullable(),
   progress: z.number(),
   error: z.string().nullable(),
 });

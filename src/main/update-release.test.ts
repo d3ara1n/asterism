@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { selectUpdateRelease } from "./update-release.ts";
 
-const release = (tag_name: string, prerelease = false, draft = false) => ({ tag_name, prerelease, draft });
+const release = (tag_name: string, prerelease = false, draft = false) => ({ tag_name, html_url: `https://example.com/${tag_name}`, prerelease, draft });
 
 describe("更新候选选择", () => {
   it("预发布开关控制 GitHub 标记，开启后能从正式版进入预发布并接续正式版", () => {
