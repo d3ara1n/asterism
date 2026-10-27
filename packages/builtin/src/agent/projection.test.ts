@@ -35,6 +35,17 @@ describe("Agent model projection", () => {
     expect(path[1]!.data).toMatchObject({ sender, parts: [{ text: body }] });
   });
 
+  it("identifies Mesh senders by their channel address without projecting internal resource IDs", () => {
+    const sender = { kind: "agent" as const, resource: { sessionId: "private-session", id: "private-agent", kind: "asterism.builtin/agent" },
+      name: "Atlas", mesh: { channel: "Research & review", id: 1 } };
+    const path = records(message("a", "Hello", false, sender),
+      message("a", "One-way message", false, { ...sender, mesh: { ...sender.mesh, id: null } }));
+    const projected = project(path);
+    expect(projected[0]).toMatchObject({ parts: [{ text: '<agent-message channel="Research &amp; review" sender-id="1" sender-name="Atlas">' }, { text: "Hello" }, { text: "</agent-message>" }] });
+    expect(projected[1]).toMatchObject({ parts: [{ text: '<agent-message channel="Research &amp; review" sender-visible="false" sender-name="Atlas">' }, { text: "One-way message" }, { text: "</agent-message>" }] });
+    expect(JSON.stringify(projected)).not.toContain("private-agent");
+  });
+
   // After public payloads pass through Execution decoding and reconstruction, summaries and full text must remain independent and cannot be overwritten by display choices.
   it("Historical thinking preserves separate full text, summaries, and continuation data", () => {
     const continuation = { openai: { reasoningEncryptedContent: "cipher" } };

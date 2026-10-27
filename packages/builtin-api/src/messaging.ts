@@ -9,6 +9,10 @@ export const agentMessageSenderSchema = z.discriminatedUnion("kind", [
     kind: z.literal("agent"),
     resource: z.strictObject({ sessionId: z.string().min(1), id: z.string().min(1), kind: z.string().min(1) }),
     name: z.string().min(1),
+    mesh: z.strictObject({
+      channel: z.string().min(1),
+      id: z.number().int().nonnegative().nullable(),
+    }).optional().describe("Mesh channel name and sender's numeric name disambiguator. Null means the sender is not exposed to the channel."),
   }),
 ]);
 export type AgentMessageSender = z.infer<typeof agentMessageSenderSchema>;
@@ -27,4 +31,24 @@ export const Send = defineTool({
     message: z.string().min(1).refine(value => value.trim().length > 0, "A message must contain text.")
       .describe("Message text for the recipient Agent."),
   }).describe("The message to send."),
+});
+
+export const sendResultSchema = z.strictObject({ name: z.string() })
+  .describe("Recipient Agent name for the accepted message. Processing proceeds independently.");
+export type SendResult = z.infer<typeof sendResultSchema>;
+
+export const GetProfile = defineTool({
+  id: builtin.name("tool.get_profile"), name: "get_profile",
+  description: "Read an Agent's name, configured type, and task description through a resource.",
+  guidelines: ["Null target selects your own profile on this resource. Other targets follow the resource's addressing schema."],
+  argsSchema: z.strictObject({}).describe("Empty parameter object."),
+});
+export const SetProfile = defineTool({
+  id: builtin.name("tool.set_profile"), name: "set_profile",
+  description: "Set your own task description on this resource.",
+  guidelines: ["The runtime identifies the caller. Name and configured Agent type come from the Agent.",
+    "Descriptions belong to this resource. An empty description clears your description."],
+  argsSchema: z.strictObject({
+    description: z.string().trim().max(1000).describe("A brief description of your current task. Empty text clears it."),
+  }).describe("Your task description on this resource."),
 });

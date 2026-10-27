@@ -1,6 +1,6 @@
 {
   "name": "@asterism-app/sdk",
-  "version": "0.47.0",
+  "version": "0.47.1",
   "description": "Public contracts and host capabilities for Asterism plugins",
   "license": "MIT",
   "author": "Chien Zhang",

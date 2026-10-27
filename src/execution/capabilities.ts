@@ -26,7 +26,8 @@ export class AgentCapabilities {
     this.caller = caller && Object.freeze({ ref: Object.freeze({ ...caller.ref }), title: caller.title });
     for (const source of linked) {
       const resource = structuredClone(source);
-      this.linked.set(resource.id, { resource, tools: tools.match(resource).filter(implementation => policy(implementation.tool.name)) });
+      this.linked.set(resource.id, { resource, tools: tools.match(resource).filter(implementation => policy(implementation.tool.name))
+        .map(implementation => this.caller ? implementation.capture?.(resource, this.caller) ?? implementation : implementation) });
     }
   }
 

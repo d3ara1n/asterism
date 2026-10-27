@@ -2,7 +2,8 @@ import { agentCard } from "../shared/card-appearance.ts";
 import { composeSystemPrompt } from "./system-prompt.ts";
 import type { BuiltinApplication } from "../application.ts";
 import { AgentView, AgentSelection, AgentDrafts } from "./data.ts";
-import { defineModule, implementResource, implementCreation, implementAction } from "@asterism-app/sdk/runtime";
+import { defineModule, implementResource, implementCreation, implementAction, PluginApiError, type ResourceRef } from "@asterism-app/sdk/runtime";
+import { registerAgentServices } from "@asterism-app/builtin-api/runtime";
 import {
   Agent, CreateAgent, SubmitAgentInput, ContinueAgent, ConfigureAgent, CancelAgent, AgentConfigurations,
   AgentInputMessage, Execution, ContextSummary,
@@ -15,7 +16,7 @@ import { projectAgentTurnState } from "./state-projection.ts";
 import { agentExecutionState } from "./state.ts";
 import type { AgentTurnState } from "./state.ts";
 import type { UsageConsumer } from "../usage/service.ts";
-import { createPeekTool } from "./peek/runtime.ts";
+import { createPeekTool, investigateAgent } from "./peek/runtime.ts";
 import { AgentSoftwareFeedback } from "./feedback.ts";
 import { createAgentFeedback } from "./feedback-state.ts";
 import { SaveAgentDraft, SetAgentDraftMode, ExchangeAgentDraft, DiscardAgentDraft, MoveAgentDraft } from "./drafts-contract.ts";
@@ -37,6 +38,17 @@ export function createAgentModule(application: BuiltinApplication, usage: UsageC
     const loop = createAgentLoop({ selection, tasks: plugin.tasks, models: plugin.models, systemPrompt, userAgent: application.userAgent,
       usage, feedback });
     const admission = createAdmission({ selection, validate: plugin.models.validate, running: loop.running, systemPrompt });
+    const agentObject = (ref: ResourceRef) => {
+      if (ref.kind !== Agent.kind) throw new PluginApiError("invalid_argument", "The target is not an Agent.");
+      const object = plugin.object(ref.sessionId, Agent, ref.id);
+      if (!object.snapshot()) throw new PluginApiError("not_found", "The Agent is unavailable on its current session path.");
+      return object;
+    };
+    registerAgentServices(plugin, {
+      describe: ref => ({ type: selectionOf(agentObject(ref)).selection.agent }),
+      peek: (ref, args, signal, publish) => investigateAgent(
+        { models: plugin.models, userAgent: application.userAgent, usage }, agentObject(ref), args, signal, publish),
+    });
     // Draft and configuration updates reuse the current path's turn state; rederive it only when the history position changes.
     const turns = new Map<string, { nodeId: string | null; interruptions: readonly (string | null)[]; state: AgentTurnState }>();
     return {

@@ -139,6 +139,8 @@ export interface ToolInvocation extends ToolInvocationInfo {
 }
 export interface ToolContribution {
   readonly contract: ImplementationContract<Json, Json, Json, Json>;
+  /** Bind resource-specific access and configuration at the model request boundary. The returned contribution handles that request's calls. */
+  capture?(resource: ResourceSnapshot, object: ObjectReader, caller: ToolCaller): ToolContribution;
   prepare(resource: ResourceSnapshot, object: ObjectExecutor, target: Json, args: Json, caller: ToolCaller): ToolInvocation | PreparedResult;
 }
 export interface ModuleContribution {

@@ -21,6 +21,7 @@ Resource creation has its own discovery and inspection tools. The available crea
 | Web | Search or fetch URLs through configured web providers |
 | MCP Host | Access tools from configured Model Context Protocol servers |
 | Agent | Send work to another conversation and inspect or wait for its progress |
+| Mesh | Discover and contact agents across sessions through a shared channel |
 | Message attachment | Supply a file or image as part of a particular input |
 
 Directory and terminal operations affect the actual machine. Check an operation’s result when its effects are uncertain. A history branch does not create an isolated copy of those files or processes.
@@ -52,6 +53,20 @@ MCP Host resources share the configured servers. External server state can there
 Create or select another agent, establish the required links, and send it the task and relevant context. Access is directional: linking an agent as a resource does not automatically share all of the caller’s resources.
 
 Inspect the available agent tools for sending, waiting, or reading its records. Sending an input and completing the resulting work are separate events.
+
+## Share a Mesh channel
+
+Add a Mesh resource in each participating session and select the same channel in their cards. New Mesh resources select Default. Create and rename channels from the card; selecting a channel requires no copied identifier. Each card shows the number of distinct agents exposed to each channel.
+
+Expose the Mesh to an agent to let it use the network. Expose an agent to the Mesh to make that agent discoverable and operable through the channel. These directions are independent: an agent can receive messages without having a Mesh tool entry or a return route. Use both directions for mutual communication.
+
+The Mesh tools list members, send messages, investigate saved agent records, and read or set task descriptions. Named targets use `{ "title": "Atlas", "id": 1 }`. Omitted `id` means zero. Names and numeric disambiguators are returned separately in member listings and profiles; internal agent resource IDs are not included.
+
+The first agent with a name receives zero. Later agents with the same name receive increasing numbers. A remaining member keeps its number even when another leaves. Once everyone with that name leaves the channel, numbering can restart at zero. These numbers identify current channel members, not permanent agents.
+
+Task descriptions belong to each Mesh resource and agent pair. `get_profile` with a null target reads your description on that Mesh; `set_profile` updates it using the caller's identity and accepts no named target. Names and configured agent types are read from the agents. A caller that is not exposed to the channel has a null profile ID. If multiple Mesh resources expose the same agent to one channel, listings show that agent once and combine its distinct descriptions.
+
+Switching a Mesh's channel keeps its workbench links and local task descriptions. Requests already in progress retain their captured channel and members; the next request uses the new selection. Hiding a card retains membership. Removing its last exposure path or archiving its session removes the member.
 
 ## Manage resource views
 

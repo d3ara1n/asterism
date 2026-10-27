@@ -24,6 +24,8 @@ import mcp from "./mcp/runtime.ts";
 import web from "./web/runtime.ts";
 import { SkillCatalog } from "./skills/catalog.ts";
 import { createSkillsModule } from "./skills/runtime.ts";
+import mesh from "./mesh/runtime.ts";
+import { CreateMesh } from "./mesh/contract.ts";
 
 /** Composes only plugin business logic; the application owns loading, host services, and external plugin dependencies. */
 export function createBuiltin(options: { application: BuiltinApplication; manualSources(): readonly ManualSource[]; connectNaming(api: NamingApi): () => void }) {
@@ -43,7 +45,10 @@ export function createBuiltin(options: { application: BuiltinApplication; manual
       return { events: [UsageChanged],
         calls: [implementCall(ReadUsage, (input, { signal }) => usage.query(input.providerId, { refresh: input.refresh, signal }))],
         modules: [providers, createAgentModule(options.application, usage, skills), createSkillsModule(skills), createFilesystemModule(shell), createNamingModule(options.connectNaming, options.application.userAgent), notes, questions,
-        resourceOperations, mcp, web, createManualModule(options.manualSources, options.application.name), createShellModule(() => settings.get().shell), createTerminalModule(() => settings.get().shell),
+        resourceOperations, mcp, web, mesh, createManualModule(options.manualSources, options.application.name), createShellModule(() => settings.get().shell), createTerminalModule(() => settings.get().shell),
+        defineAgentCreation({ id: CreateMesh.id, creation: CreateMesh,
+          description: "Create a Mesh resource in the default channel. Mesh provides list, send, peek, get_profile, and set_profile for Agents exposed to its channel across sessions.",
+          guidelines: ["The Mesh card selects its channel. Link direction independently controls use of the Mesh and exposure of Agents to its channel."] }),
         defineAgentCreation({ id: CreateManual.id, creation: CreateManual,
           description: "Open the Asterism manual for software use and plugin development. Provides list, find, grep, and read over application guides, public package examples, and documentation exposed by loaded plugins.",
           guidelines: [] }),

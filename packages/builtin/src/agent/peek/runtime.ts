@@ -1,6 +1,6 @@
 import type { ModelItem, ModelTarget } from "@asterism-app/sdk/contracts";
 import { implementTool, type CallResult, type ModelServices, type ObjectReader } from "@asterism-app/sdk/runtime";
-import { builtin } from "@asterism-app/builtin-api/contracts";
+import { builtin, peekToModel } from "@asterism-app/builtin-api/contracts";
 import type { z } from "zod";
 import { AgentPeek, Peek, type PeekResult } from "./contract.ts";
 import { peekOverview, projectPeekRecords } from "./snapshot.ts";
@@ -122,8 +122,6 @@ export function createPeekTool(models: ModelServices, userAgent: string, usage: 
     call(_resource, _target, args, { object, signal, publish }) {
       return investigateAgent({ models, userAgent, usage }, object, args, signal, publish);
     },
-    toModel(data) {
-      return `Snapshot: ${data.snapshot.capturedAt}; timeline position: ${data.snapshot.nodeId ?? "origin"}.\n${data.report}`;
-    },
+    toModel: peekToModel,
   });
 }

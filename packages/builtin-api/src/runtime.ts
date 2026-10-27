@@ -3,6 +3,7 @@ import { belongsTo, jsonSchema, type CreationContract, type Json, type SessionDi
 import { defineModule, PluginApiError, type PluginContext, type PluginModule, type ObjectReader, type TopLevelToolContext } from "@asterism-app/sdk/runtime";
 
 export type { ManualSource } from "./manual.ts";
+export { agentServices, registerAgentServices, type AgentServices } from "./agent-services.ts";
 
 export interface AgentCreationDescription {
   readonly id: string;

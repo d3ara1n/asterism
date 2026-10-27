@@ -18,6 +18,16 @@ Each input submission has a submission identity, parts, a delivery mode, and a s
 
 File parts use content references with explicit read eligibility. Pass the appropriate content source with the action when forwarding files. Cancellation of the submission is separate from cancellation of the agent's independent execution, which has its own public action.
 
+## Implement communication resources
+
+Use the public Send, Peek, GetProfile, and SetProfile tool declarations when a resource provides those operations. Each resource implementation owns its addressing schema and resolves targets within its authorized scope. A shared tool name does not grant direct access to the addressed agent or its linked resources.
+
+For cross-session messaging, obtain the target session executor and submit input through the agent's public action. The public agent service supplies an agent's configured type and investigates its saved records without exposing private agent state. Obtain it from the plugin context, pass a resolved agent reference, and forward cancellation and investigation progress. Investigation captures a fresh record snapshot and does not start a turn on the target.
+
+Mesh messages retain internal sender attribution in history and project the channel name, sender name, and numeric disambiguator to the receiving model. A sender not exposed to the channel is marked as not visible. The message itself does not grant a reply route.
+
+Communication resources own their member directory and task descriptions. Resolve member names and any disambiguators against the request's captured access scope before calling agent services. Read current task descriptions when handling an operation; identity resolution and mutable profile text have separate lifetimes.
+
 ## Prepare incoming input
 
 An external preparer can inspect, replace, or reject input using the original built-in action contract. Its replacement supplies raw action input that will be parsed again. Preparation has read capabilities and does not commit session mutations.

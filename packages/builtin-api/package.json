@@ -1,6 +1,6 @@
 {
   "name": "@asterism-app/builtin-api",
-  "version": "0.19.1",
+  "version": "0.19.2",
   "description": "Public domain contracts and extensions for Asterism built-in features",
   "license": "MIT",
   "author": "Chien Zhang",

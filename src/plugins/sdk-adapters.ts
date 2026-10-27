@@ -1,5 +1,5 @@
 import { reference, type ResourceCall, type Json, type ContractReference } from "@asterism-app/sdk/contracts";
-import { PluginApiError, type Lifetime, type ResourceContribution, type ResourceRef, type ToolContribution, type ResourceSnapshot } from "@asterism-app/sdk/runtime";
+import { PluginApiError, type Lifetime, type ResourceContribution, type ResourceRef, type ToolContribution, type ResourceSnapshot, type ToolCaller } from "@asterism-app/sdk/runtime";
 import { SessionError } from "../session/tree.ts";
 import type { FoldedObject } from "../session/fold.ts";
 import type { ResourceBackend } from "../resources/contract.ts";
@@ -173,6 +173,12 @@ export function adaptTool(contribution: ToolContribution, sdk: SdkContext, host:
   return {
     reference: reference(contract), resourceKind: contract.resource.kind, tool: contract.tool,
     effect: contract.effect, targetSchema: contract.targetSchema, resultSchema: contract.schema,
+    ...(contribution.capture ? { capture(resource: FoldedObject, caller: ToolCaller) {
+      const captured = snapshot(host, resource);
+      const bound = contribution.capture!(captured, sdk.reader(captured.ref, undefined, captured), caller);
+      if (bound.contract !== contract) throw new PluginApiError("invalid_argument", "Request capture must preserve the tool implementation contract.");
+      return adaptTool(bound, sdk, host);
+    } } : {}),
     prepare(resource, target, args, caller) {
       const captured = snapshot(host, resource);
       const scope: ObjectScope = { active: false, execution: true };

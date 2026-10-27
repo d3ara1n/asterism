@@ -1,6 +1,7 @@
 export * from "./identity.ts";
 export * from "./agent.ts";
 export * from "./messaging.ts";
+export * from "./peek.ts";
 export * from "./text.ts";
 export * from "./tools.ts";
 export * from "./search.ts";

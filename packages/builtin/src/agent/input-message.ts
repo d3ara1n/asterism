@@ -8,8 +8,11 @@ const escape = (text: string) => text.replace(/[&<>"']/g, char =>
 export function projectInputMessage(message: { sender: AgentMessageSender; parts: readonly ModelInputPart[] }): { kind: "input"; parts: ModelInputPart[] } {
   const { sender, parts } = message;
   if (sender.kind === "user") return { kind: "input", parts: [...parts] };
+  const address = sender.mesh
+    ? `channel="${escape(sender.mesh.channel)}" ${sender.mesh.id === null ? 'sender-visible="false"' : `sender-id="${sender.mesh.id}"`}`
+    : `sender-id="${escape(sender.resource.id)}"`;
   return { kind: "input", parts: [
-    { kind: "text", text: `<agent-message sender-id="${escape(sender.resource.id)}" sender-name="${escape(sender.name)}">` },
+    { kind: "text", text: `<agent-message ${address} sender-name="${escape(sender.name)}">` },
     ...parts.map(part => part.kind === "text" ? { ...part, text: escape(part.text) } : part),
     { kind: "text", text: "</agent-message>" },
   ] };

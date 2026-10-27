@@ -22,6 +22,8 @@ Use a top-level tool for operations on the execution context or shared resource 
 
 Describe the operation's purpose and observable behavior. Parameters should explain business meaning that names and types alone do not express. Results should distinguish known success, failure, cancellation, partial output, and uncertain effects.
 
+A tool contribution can capture resource-specific configuration and access at the start of each model request. Return a bound contribution using the same implementation contract; the host uses it for that request's tool batch. This is useful for a resource whose selected network or reachable objects can change while a model is responding. Capture addressing and authorization facts, while reading ordinary mutable content when the operation runs.
+
 ## Connect other interactions
 
 Typed calls connect request and response between services or views. Events announce transient changes. Object channels support sustained data such as an interactive screen.
