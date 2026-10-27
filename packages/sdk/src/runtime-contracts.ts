@@ -102,6 +102,8 @@ export interface ResourceContribution {
   /** Geometry declarations for backend placement, shared with ResourceDescription and cardRenderer. */
   readonly card?: CardAppearance;
   readonly records: readonly RecordContract[];
+  /** Opt into templates that copy encoded resource state and only these current-data contracts, preserving their values under new host identities. */
+  readonly template?: { readonly current: readonly DataContract[] };
   /** Declare that this resource can receive links and provide the recipient's tool policy; independent of Agent domain types. */
   readonly links?: { receive: boolean; tools?(object: ObjectReader): { allow?: readonly string[]; exclude?: readonly string[] } };
   readonly creation?: CreationContribution;
@@ -174,16 +176,13 @@ export function defineStorage(declarations: readonly PluginStorageDeclaration[])
   return Object.freeze([...declarations]);
 }
 export interface PluginDefinition {
-  namespace: PluginNamespace; version: string; modules?: readonly PluginModule[];
+  namespace: PluginNamespace; modules?: readonly PluginModule[];
   setup?(plugin: PluginContext): PluginContribution;
-  /** Populated by the package loader from public module imports; providers run setup first, and consumers clean up first. */
-  dependencies?: readonly string[];
 }
 export function defineModule(setup: PluginModule["setup"]): PluginModule {
   if (typeof setup !== "function") throw new Error("A plugin module must declare a setup function.");
   return { setup };
 }
 export function definePlugin(definition: PluginDefinition): PluginDefinition & { modules: readonly PluginModule[] } {
-  if (!definition.version.trim()) throw new Error(`Plugin ${definition.namespace.id} must declare a version.`);
   return { ...definition, modules: [...definition.modules ?? []] };
 }

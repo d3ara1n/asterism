@@ -17,14 +17,11 @@ export interface UiMessage extends SourceMessage {
 
 export type UiText = string | UiMessage;
 
-export const localeSchema = z.string().transform((value, context) => {
-  try {
-    return Intl.getCanonicalLocales(value)[0]!;
-  } catch {
-    context.addIssue({ code: "custom", message: "Invalid language tag." });
-    return z.NEVER;
-  }
-});
+export const localeSchema = z.string().refine(value => {
+  try { Intl.getCanonicalLocales(value); return true; }
+  catch { return false; }
+}, { message: "Invalid language tag.", abort: true })
+  .overwrite(value => Intl.getCanonicalLocales(value)[0]!);
 
 export const messageValuesSchema = z.record(z.string(), z.union([z.string(), z.number().finite(), z.boolean()]));
 export const uiMessageSchema = z.strictObject({

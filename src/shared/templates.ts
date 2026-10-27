@@ -14,7 +14,7 @@ export type TemplateSummary = z.infer<typeof templateSummarySchema>;
 /** Static object data and relationships; entry identities serve internal template association only. */
 export const templateDataSchema = z.strictObject({
   objects: z.array(templateObjectSummarySchema.extend({
-    data: z.record(z.string(), jsonSchema),
+    data: jsonSchema,
     current: z.array(z.strictObject({ contract: id, data: jsonSchema })),
   })),
   links: workbenchSnapshotSchema.shape.links,

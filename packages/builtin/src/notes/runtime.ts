@@ -36,6 +36,7 @@ function mutationFailure(error: unknown, signal: AbortSignal, operation: string)
 export default defineModule(() => ({
   resources: [implementResource(Note, NoteView, {
     card: noteCard,
+    template: { current: [NoteContent] },
     creation: implementCreation(CreateNote, {
       create({ title, content }, object) {
         save(object, content);

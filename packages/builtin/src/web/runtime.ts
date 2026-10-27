@@ -45,6 +45,7 @@ export default defineModule(plugin => {
     webProviders: [exaWebProvider, parallelWebProvider],
     resources: [implementResource(WebResource, WebView, {
       card: webCard,
+      template: { current: [] },
       creation: implementCreation(CreateWeb, { create: ({ title }) => ({ title, data: {} }) }),
       project: (_data, object) => ({
         configured: plugin.webProviders.list().some(state => state.enabled),
@@ -57,12 +58,10 @@ export default defineModule(plugin => {
       implementTool(WebSearch, {
         call: (_data, _target, request, { object, signal }) =>
           tracked(object.ref.sessionId, "search", request.query, () => plugin.web.search(request, { signal }), signal),
-        toModel: data => JSON.stringify(data),
       }),
       implementTool(WebFetch, {
         call: (_data, _target, request, { object, signal }) =>
           tracked(object.ref.sessionId, "fetch", request.url, () => plugin.web.fetch(request, { signal }), signal),
-        toModel: data => JSON.stringify(data),
       }),
     ],
   };

@@ -1,4 +1,4 @@
-import { belongsTo, jsonSchema, validationMessage, type DataContract, type Json, type RecordContract, type SessionDirectory } from "@asterism/sdk/contracts";
+import { belongsTo, jsonSchema, type DataContract, type Json, type RecordContract, type SessionDirectory } from "@asterism/sdk/contracts";
 import { PluginApiError, type ContentReader, type ContentScope, type ObjectReader, type ObjectExecutor, type PluginContext, type ResourceRef, type ResourceSnapshot, type SessionExecutor, type ObjectWriter, type ToolSession } from "@asterism/sdk/runtime";
 import type { RunGroup } from "./lifecycle.ts";
 import type { ObjectScope } from "./host.ts";
@@ -13,6 +13,7 @@ import type { PluginCalls } from "@asterism/sdk/contracts";
 import type { BoundTopLevelTool } from "./top-level-tools.ts";
 import { SessionError } from "../session/tree.ts";
 import { UsageQueryError, WebError, type WebProviderInstance } from "@asterism/sdk/runtime";
+import { encodePluginData } from "./data-encoding.ts";
 
 type PluginServices = Pick<PluginContext, "id" | "dir" | "log" | "config" | "secrets" | "db" | "tasks" | "lifetime">;
 export function createSdkContext(internal: PluginServices, host: PluginHostServices, modelRuns: RunGroup, sessionRuns: RunGroup, directory: SessionDirectory, eventScope: PluginEventScope,
@@ -46,10 +47,10 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
   const readData = <T extends Json>(id: string, objectId: string | null, contract: DataContract<T>): T | null => {
     checkAvailable(); checkData(contract);
     host.sessions.title(id);
-    let raw: Json | null;
+    let raw: Json | undefined;
     try { raw = host.data.get(id, objectId, contract.id); }
     catch { throw new PluginApiError("unavailable", "The stored session data is unavailable."); }
-    if (raw === null) return null;
+    if (raw === undefined) return null;
     const parsed = contract.schema.safeParse(raw);
     if (!parsed.success) throw new PluginApiError("unavailable", "The stored session data does not match its contract schema.");
     return parsed.data;
@@ -169,9 +170,7 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
               throw new PluginApiError("foreign_event", "The plugin did not declare this record contract.");
             if (contract !== declared)
               throw new PluginApiError("invalid_argument", "Use the declared record contract instance.");
-            const parsed = declared.schema.safeParse(data);
-            if (!parsed.success) throw new PluginApiError("invalid_argument", validationMessage(parsed.error, declared.id));
-            const value = jsonSchema.parse(parsed.data);
+            const value = encodePluginData(declared, data);
             // Write channels stamp origins: operation handles supply plugin identity and validated object references supply resources.
             const recordId = writer.append({ contract: declared.id, data: value, model: null, recipient: null,
               source: { plugin: internal.id, resource: ref ?? null } });
@@ -181,9 +180,7 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
           set(contract, data) {
             check();
             checkData(contract);
-            const parsed = contract.schema.safeParse(data);
-            if (!parsed.success) throw new PluginApiError("invalid_argument", "The data does not match its contract schema.");
-            const value = jsonSchema.parse(parsed.data);
+            const value = encodePluginData(contract, data);
             host.content?.bind(access(id, ref?.id, scope), { kind: "data", id: contract.id }, value);
             host.data.set(id, ref?.id ?? null, contract.id, value);
           },

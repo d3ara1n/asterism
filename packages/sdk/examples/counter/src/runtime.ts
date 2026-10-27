@@ -10,13 +10,14 @@ import {
 const current = (object: ObjectReader) => object.get(Value) ?? 0;
 
 export default definePlugin({
-  namespace: ns, version: "0.0.1",
+  namespace: ns,
   setup(plugin) {
     const settings = plugin.config(Settings);
     return {
       calls: [implementCall(ReadStep, async () => settings.get().step)],
       resources: [implementResource(Counter, View, {
         card, records: [Changed],
+        template: { current: [Value] },
         creation: implementCreation(Create, {
           create: () => ({ title: "Counter", data: {} }),
         }),

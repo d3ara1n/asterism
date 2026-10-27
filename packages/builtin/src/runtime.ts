@@ -2,7 +2,6 @@ import { z } from "zod";
 import { definePlugin, implementCall, PluginApiError } from "@asterism/sdk/runtime";
 import { builtin, CreateAgent, agentCreateSchema, type NamingApi } from "@asterism/builtin-api/contracts";
 import { defineAgentCreation, type ManualSource } from "@asterism/builtin-api/runtime";
-import metadata from "../package.json" with { type: "json" };
 import type { BuiltinApplication } from "./application.ts";
 import { createAgentModule } from "./agent/runtime.ts";
 import { createFilesystemModule } from "./filesystem/runtime.ts";
@@ -28,7 +27,7 @@ import { createSkillsModule } from "./skills/runtime.ts";
 
 /** Composes only plugin business logic; the application owns loading, host services, and external plugin dependencies. */
 export function createBuiltin(options: { application: BuiltinApplication; manualSources(): readonly ManualSource[]; connectNaming(api: NamingApi): () => void }) {
-  return definePlugin({ namespace: builtin, version: metadata.version,
+  return definePlugin({ namespace: builtin,
     setup(plugin) {
       const settings = plugin.config(BuiltinSettings);
       const skills = new SkillCatalog();

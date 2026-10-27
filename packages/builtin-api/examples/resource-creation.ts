@@ -11,7 +11,7 @@ export const CreateDocument = defineCreation(Document, { id: ns.name("create"),
 });
 
 export default definePlugin({
-  namespace: ns, version: "1.0.0",
+  namespace: ns,
   setup() {
     return {
       resources: [implementResource(Document, View, {

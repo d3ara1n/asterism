@@ -5,9 +5,9 @@ import { AgentRequestContext } from "@asterism/builtin-api/contracts";
 export function agentRequestExtensions({ system, tools }: ModelRequestContext) {
   const characters = (text: string) => [...text].length;
   return [present(AgentRequestContext, {
-    system: system.blocks.map(block => block.kind === "system" ? { kind: "system", from: block.from, characters: characters(block.text) }
-      : block.kind === "agent" ? { kind: "agent", role: block.role, characters: characters(block.text) }
-        : { kind: "context", file: block.file, characters: characters(block.text) }),
+    system: system.blocks.map(block => block.kind === "system" ? { kind: block.kind, from: block.from, characters: characters(block.text) }
+      : block.kind === "agent" ? { kind: block.kind, role: block.role, characters: characters(block.text) }
+        : { kind: block.kind, file: block.file, characters: characters(block.text) }),
     tools: tools.map(tool => tool.name),
   })];
 }

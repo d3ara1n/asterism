@@ -30,7 +30,7 @@ function setup() {
   mkdirSync(root); mkdirSync(outside);
   mkdirSync(join(root, "subdir"));
   writeFileSync(join(root, "a.txt"), "hello"); writeFileSync(join(outside, "secret.txt"), "secret");
-  const resource: FoldedObject = { id: "d1", kind: "asterism.builtin/directory", title: "root", data: { path: root } };
+  const resource = { id: "d1", kind: "asterism.builtin/directory", title: "root", data: { path: root } } satisfies FoldedObject;
   const note: FoldedObject = { id: "n1", kind: "asterism.builtin/note", title: "Note", data: {} };
   let modules!: ReturnType<typeof runtimeModules.createModules>;
   const createModules = runtimeModules.createModules;
@@ -42,7 +42,7 @@ function setup() {
   const sessionId = service.sessions.tree.create("Resources");
   for (const object of [resource, note]) service.sessions.tree.appendToTimeline(sessionId, {
     contract: "resource_created", source: null, recipient: null, model: null,
-    data: { ...object.data, id: object.id, type: object.kind, title: object.title },
+    data: { id: object.id, type: object.kind, title: object.title, data: object.data },
   });
   const { resources, tools } = modules;
   const scope = (linked: readonly FoldedObject[] = [resource], policy: Parameters<typeof agentToolPolicy>[0] = unrestricted) =>

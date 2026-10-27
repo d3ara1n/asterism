@@ -177,7 +177,9 @@ describe("Stateless single model execution", () => {
   });
   // Domain extensions consume an independent copy of the final state and accompany usage on the highest-index block; the public layer retains only the envelope.
   it("generates domain extensions after preparation and delivers them once with the terminal block; unknown or incompatible extensions preserve public metering", async () => {
-    const contract = defineData("example.agent/request", z.object({ tools: z.array(z.string()) }));
+    const contract = defineData("example.agent/request", z.codec(z.array(z.string()), z.object({ tools: z.array(z.string()) }), {
+      decode: tools => ({ tools }), encode: value => value.tools,
+    }));
     const unknown = { contract: { id: "other.plugin/opaque" }, data: { version: 42 } };
     const system = { blocks: [{ id: "s", kind: "system" as const, from: "core", text: "Environment" }] };
     let prepared = false;
@@ -197,6 +199,7 @@ describe("Stateless single model execution", () => {
     expect(extensions).toHaveBeenCalledTimes(1);
     expect(system.blocks[0]?.text).toBe("Environment");
     const saved = modelCompletionSchema.parse(result.completion);
+    expect(saved.extensions).toContainEqual({ contract: { id: contract.id }, data: ["resource_list", "resource_inspect", "resource_call"] });
     expect(saved.extensions).toContainEqual(unknown);
     expect(completionData(saved, contract)).toEqual({ tools: ["resource_list", "resource_inspect", "resource_call"] });
     expect(completionData(saved, defineData("missing/plugin", z.string()))).toBeNull();

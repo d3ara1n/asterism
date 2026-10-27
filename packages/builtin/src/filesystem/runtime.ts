@@ -64,6 +64,7 @@ async function readGitStatus(rootPath: string): Promise<{ entries: Array<{ path:
 export function createFilesystemModule(shell: ShellService) { return defineModule(() => ({
   resources: [implementResource(Directory, DirectoryView, {
     card: directoryCard,
+    template: { current: [] },
     project: directory => ({ path: directory.path }),
     async inspect(directory, object) {
       const resource = object.snapshot();

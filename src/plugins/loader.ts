@@ -36,6 +36,8 @@ export interface PreparedPluginStorage {
   failures: ReadonlyMap<string, string>;
 }
 export interface PluginHostServices {
+  /** Backend provider dependencies derived from public imports, separate from author definitions. */
+  pluginDependencies?: ReadonlyMap<string, readonly string[]>;
   events?: EventBus;
   extensionsDirectory: string;
   data: SessionDataStore;
@@ -56,7 +58,7 @@ export interface PluginHostServices {
   log?: (pluginId: string, level: "info" | "warn" | "error", message: string, error?: unknown) => void;
 }
 export interface PluginManifest {
-  id: string; version: string; status: "loaded" | "failed"; error?: string; resources: string[];
+  id: string; status: "loaded" | "failed"; error?: string; resources: string[];
   implementations: ToolImplementationStatus[];
 }
 export interface LoadedPlugins {
@@ -109,7 +111,7 @@ const defaultLog: NonNullable<PluginHostServices["log"]> = (id, level, message, 
   console[level](`[plugin ${id}] ${message}`, ...(error === undefined ? [] : [error]));
 
 /** Initialize in public dependency order; contribution override order still follows the user list. */
-function initializationOrder(plugins: readonly PluginDefinition[]) {
+function initializationOrder(plugins: readonly PluginDefinition[], dependencies: ReadonlyMap<string, readonly string[]>) {
   const ordered: PluginDefinition[] = [], failures = new Map<string, string>(), done = new Set<string>();
   for (const plugin of plugins) if (plugins.filter(item => item.namespace.id === plugin.namespace.id).length > 1)
     failures.set(plugin.namespace.id, `Duplicate plugin ID: ${plugin.namespace.id}`);
@@ -118,7 +120,7 @@ function initializationOrder(plugins: readonly PluginDefinition[]) {
     if (done.has(id)) return;
     if (path.includes(id)) throw new Error(`Circular plugin dependency: ${[...path, id].join(" -> ")}`);
     try {
-      for (const dependency of plugin.dependencies ?? []) {
+      for (const dependency of dependencies.get(id) ?? []) {
         const provider = plugins.find(item => item.namespace.id === dependency);
         if (!provider) throw new Error(`Public dependency ${dependency} is unavailable.`);
         visit(provider, [...path, id]);
@@ -133,6 +135,7 @@ function initializationOrder(plugins: readonly PluginDefinition[]) {
 
 /** Collect SDK contributions at startup, resolve overrides in plugin order, and freeze the catalog. */
 export function loadPlugins(plugins: readonly PluginDefinition[], services: PluginHostServices): LoadedPlugins {
+  const dependencies = services.pluginDependencies ?? new Map<string, readonly string[]>();
   const directory = Object.freeze({ list: () => services.sessions.list(), archived: () => services.sessions.archived() });
   const events = services.events ?? new EventBus();
   events.declarePublic(ResourcePresenceChanged);
@@ -144,7 +147,7 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
   const initialized: Collected[] = [], invalidEntries = new Set<Collected>();
   const kinds = new Set<string>(), identities = new Set<string>();
   const toolContracts = new Map<string, ToolContract>();
-  const initialization = initializationOrder(plugins);
+  const initialization = initializationOrder(plugins, dependencies);
   for (const plugin of initialization.ordered) {
     const id = plugin.namespace.id;
     let entry: Collected | undefined;
@@ -152,7 +155,7 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
       if (initialization.failures.has(id)) throw new Error(initialization.failures.get(id)!);
       const storageFailure = services.preparedStorage?.failures.get(id);
       if (storageFailure !== undefined) throw new Error(`Plugin storage could not be prepared: ${storageFailure}`);
-      const unavailable = plugin.dependencies?.find(dependency => !collected.some(item => item.plugin.namespace.id === dependency));
+      const unavailable = dependencies.get(id)?.find(dependency => !collected.some(item => item.plugin.namespace.id === dependency));
       if (unavailable) throw new Error(`Public dependency ${unavailable} failed to initialize.`);
       if (manifest.some(entry => entry.id === id)) throw new Error(`Duplicate plugin ID: ${id}`);
       const write = services.log ?? defaultLog;
@@ -183,7 +186,7 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
         if (contribution.usageProviders?.length || contribution.modelProviderPresets?.length) {
           if (!services.modelProviderExtensions) throw new Error("Provider contributions are unavailable.");
           services.modelProviderExtensions.declare(id, contribution.usageProviders ?? [], contribution.modelProviderPresets ?? [],
-            lifecycle.group("call"), plugin.dependencies);
+            lifecycle.group("call"), dependencies.get(id));
         }
         for (const call of contribution.calls ?? []) calls.declare(id, call, sdk, lifecycle.group("call"));
         for (const channel of contribution.channels ?? []) channels.declare(id, channel, sdk);
@@ -193,6 +196,11 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
         for (const contract of contribution.events ?? []) events.declare(id, contract);
         for (const record of contribution.records ?? []) sdk.declare(record);
         for (const resource of contribution.resources ?? []) {
+          const current = resource.template?.current ?? [];
+          if (current.some(contract => !belongsTo(id, contract.id)))
+            throw new Error(`Template data contracts must belong to resource plugin ${id}.`);
+          if (new Set(current.map(contract => contract.id)).size !== current.length)
+            throw new Error(`Duplicate template data contracts for ${resource.resource.kind}.`);
           for (const record of resource.records) sdk.declare(record);
           const calls = [...(resource.creation ? [resource.creation.contract] : []), ...(resource.actions ?? []).map(action => action.contract)];
           actions.push(...(resource.actions ?? []).map(action => action.contract));
@@ -230,7 +238,7 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
       ownKinds.forEach(kind => kinds.add(kind)); ownIds.forEach(key => identities.add(key));
       tools.forEach(tool => toolContracts.set(tool.tool.id, tool.tool));
       eventScope.activate();
-      collected.push(entry); manifest.push({ id, version: plugin.version, status: "loaded", resources: ownKinds, implementations: [] });
+      collected.push(entry); manifest.push({ id, status: "loaded", resources: ownKinds, implementations: [] });
     } catch (error) {
       if (entry) {
         services.modelProviderExtensions?.removeOwners([id]);
@@ -241,7 +249,7 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
         invalidEntries.add(entry);
       }
       (services.log ?? defaultLog)(id, "error", "Plugin failed to load and was disabled.", error);
-      manifest.push({ id, version: plugin.version, status: "failed", error: error instanceof Error ? error.message : String(error), resources: [], implementations: [] });
+      manifest.push({ id, status: "failed", error: error instanceof Error ? error.message : String(error), resources: [], implementations: [] });
     }
   }
   async function dispose(entry: Collected) {
@@ -258,7 +266,7 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
     for (let i = collected.length - 1; i >= 0; i--) {
       const entry = collected[i]!;
       const invalid = entry.preparers.find(preparer => actionContracts.get(preparer.contract.id) !== preparer.contract);
-      const unavailable = entry.plugin.dependencies?.find(id => !collected.some(provider => provider.plugin.namespace.id === id));
+      const unavailable = dependencies.get(entry.plugin.namespace.id)?.find(id => !collected.some(provider => provider.plugin.namespace.id === id));
       if (!invalid && !unavailable) continue;
       const error = invalid ? `Preparer ${invalid.id} must import the registered action declaration: ${invalid.contract.id}.`
         : `Public dependency ${unavailable} is unavailable.`;

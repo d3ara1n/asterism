@@ -3,6 +3,8 @@ import { z } from "zod";
 import { belongsTo, pluginNamespace, defineCall, defineAction, defineRecord, defineImplementation, defineTool, type ResourceContract, type ToolContract } from "@asterism/sdk/contracts";
 import { defineTopLevelTool, definePlugin, defineModule, implementCall, implementTool, implementResource, type PluginDefinition, type PluginContext } from "@asterism/sdk/runtime";
 import { loadPlugins, type PluginHostServices } from "./loader.ts";
+import { CallClient } from "../shared/call-client.ts";
+import type { CallFrame } from "../shared/plugin-calls.ts";
 
 const services = { extensionsDirectory: "/unused", data: null as never, refOf: () => null, sessions: { progressChanged() {} } as never,
   models: { list: () => [] } as never, log: () => {} } satisfies PluginHostServices;
@@ -10,8 +12,8 @@ const instances: ReturnType<typeof loadPlugins>[] = [];
 afterEach(async () => {
   for (const instance of instances.splice(0).reverse()) await instance.close();
 });
-function load(plugins: readonly PluginDefinition[]) {
-  const instance = loadPlugins(plugins, services);
+function load(plugins: readonly PluginDefinition[], pluginDependencies?: ReadonlyMap<string, readonly string[]>) {
+  const instance = loadPlugins(plugins, { ...services, pluginDependencies });
   instances.push(instance);
   return instance;
 }
@@ -24,7 +26,7 @@ function plugin(id: string, contract: ToolContract, options: { extra?: ToolContr
     ...ns.data(name, z.null().describe("No result.")), resource, tool: t,
     targetSchema: z.null().describe("Whole resource."), effect: "read", execution: "parallel",
   }), { async call() { return { kind: "succeeded", data: null }; } });
-  return definePlugin({ namespace: ns, version: "1.0.0", modules: [defineModule(() => ({
+  return definePlugin({ namespace: ns, modules: [defineModule(() => ({
     resources: belongsTo(id, resource.kind)
       ? [implementResource(resource, ns.data("view", z.null()), { project: () => null, inspect: async () => null })] : [],
     tools: [impl("thing.read", contract), ...(options.extra ?? []).map((t, i) => impl(`thing.extra${i}`, t))],
@@ -32,13 +34,58 @@ function plugin(id: string, contract: ToolContract, options: { extra?: ToolContr
 }
 
 describe("Plugin assembly", () => {
+  // A resource's template policy cannot select another plugin's data or give one saved ID ambiguous schemas.
+  it.each(["foreign", "duplicate"] as const)("rejects %s template data declarations", mode => {
+    const ns = pluginNamespace("test.templates");
+    const own = ns.data("state", z.string());
+    const current = mode === "foreign" ? [pluginNamespace("test.other").data("state", z.string())] : [own, own];
+    const loaded = load([definePlugin({ namespace: ns, setup: () => ({
+      resources: [implementResource(ns.resource("item", z.null()), ns.data("view", z.null()), {
+        template: { current }, project: () => null, inspect: async () => null,
+      })],
+    }) })]);
+    expect(loaded.manifest[0]).toMatchObject({ status: "failed" });
+    expect(loaded.manifest[0]!.error).toContain(mode === "foreign" ? "must belong" : "Duplicate template data");
+  });
+
+  // Schema input/output differ on both sides; reparsing a decoded value would reject it, and omitted defaults belong to the input parser.
+  it("typed backend and frontend calls transform raw JSON at their receiving boundaries", async () => {
+    const ns = pluginNamespace("test.call-transforms");
+    const query = defineCall(ns.name("calculate"), {
+      scope: "plugin",
+      input: z.object({ value: z.string().transform(Number), increment: z.number().default(2) }),
+      output: z.string().transform(Number),
+    });
+    let context!: PluginContext;
+    const loaded = load([definePlugin({ namespace: ns, setup(plugin) {
+      context = plugin;
+      return { calls: [implementCall(query, async input => {
+        expect(input).toEqual({ value: 40, increment: 2 });
+        return String(input.value + input.increment);
+      })] };
+    } })]);
+    expect(await context.ipc.calls.invoke(query, { value: "40" }, {})).toBe(42);
+    let receive!: (frame: CallFrame) => void;
+    const frontend = new CallClient({
+      onFrame(listener) { receive = listener; return () => {}; },
+      send(control) {
+        if (control.type !== "invoke") return;
+        void loaded.calls.invoke(control.contract, control.input, {}, null).then(
+          data => receive({ type: "result", id: control.id, data }),
+          error => receive({ type: "error", id: control.id, code: "failed", message: String(error) }),
+        );
+      },
+    });
+    try { expect(await frontend.invoke(query, { value: "40" }, {})).toBe(42); }
+    finally { frontend.close(); }
+  });
   // Plugin-level calls need no object; call arguments cannot downgrade contract scope.
   it("plugins without modules declare global services and share scope validation between backend and desktop calls", async () => {
     const ns = pluginNamespace("test.global");
     const query = defineCall(ns.name("query"), { scope: "plugin", input: z.string().trim(), output: z.string() });
     const objectQuery = defineCall(ns.name("object"), { scope: "object", input: z.null(), output: z.null() });
     let context!: PluginContext;
-    const loaded = load([definePlugin({ namespace: ns, version: "1", setup(plugin) {
+    const loaded = load([definePlugin({ namespace: ns, setup(plugin) {
       context = plugin;
       return { calls: [
         implementCall(query, async (input, call) => {
@@ -61,7 +108,7 @@ describe("Plugin assembly", () => {
   it.each([false, true])("plugin root shared services clean up after modules; duplicate registration failure=%s", async conflict => {
     const ns = pluginNamespace("test.composition"), order: string[] = [];
     const query = defineCall(ns.name("query"), { scope: "plugin", input: z.null(), output: z.number() });
-    const loaded = load([definePlugin({ namespace: ns, version: "1", setup(plugin) {
+    const loaded = load([definePlugin({ namespace: ns, setup(plugin) {
       const service = { value: 1 };
       // Roots register before modules so reverse cleanup releases modules first.
       plugin.lifetime.defer(async () => { service.value = 0; order.push("plugin"); });
@@ -86,7 +133,7 @@ describe("Plugin assembly", () => {
     const held = new Promise<void>(resolve => { release = resolve; });
     const abort = new Promise<void>(resolve => { cancelled = resolve; });
     const order: string[] = [];
-    const loaded = load([definePlugin({ namespace: ns, version: "1", setup: plugin => {
+    const loaded = load([definePlugin({ namespace: ns, setup: plugin => {
       plugin.lifetime.defer(async () => { order.push("plugin"); });
       return { calls: [implementCall(wait, async (_, { signal }) => {
         signal.addEventListener("abort", cancelled, { once: true }); started();
@@ -102,7 +149,7 @@ describe("Plugin assembly", () => {
   });
   it("records can reuse the same declaration; independent copies fail assembly even with identical IDs", () => {
     const ns = pluginNamespace("test.records"), record = defineRecord(ns.name("record"), { schema: z.number() });
-    const plugin = (other: typeof record) => definePlugin({ namespace: ns, version: "1", modules: [
+    const plugin = (other: typeof record) => definePlugin({ namespace: ns, modules: [
       defineModule(() => ({ records: [record] })), defineModule(() => ({ records: [other] })),
     ] });
     const shared = load([plugin(record)]);
@@ -111,7 +158,7 @@ describe("Plugin assembly", () => {
     expect(conflict.manifest[0]?.status).toBe("failed");
   });
   it("assembly failure disables only the affected plugin", () => {
-    const broken = definePlugin({ namespace: pluginNamespace("acme.broken"), version: "1.0.0", modules: [defineModule(() => { throw new Error("boom"); })] });
+    const broken = definePlugin({ namespace: pluginNamespace("acme.broken"), modules: [defineModule(() => { throw new Error("boom"); })] });
     const loaded = load([broken, plugin("acme.ok", tool("Read."))]);
     expect(loaded.manifest.map(entry => [entry.id, entry.status])).toEqual([["acme.broken", "failed"], ["acme.ok", "loaded"]]);
     expect(loaded.resources.controller("acme.ok/thing")?.create).toBeUndefined();
@@ -119,7 +166,7 @@ describe("Plugin assembly", () => {
   });
   it("later module failure cleans initialized modules in reverse order and close does not clean them twice", async () => {
     const calls: string[] = [];
-    const broken = definePlugin({ namespace: pluginNamespace("acme.cleanup"), version: "1", modules: [
+    const broken = definePlugin({ namespace: pluginNamespace("acme.cleanup"), modules: [
       defineModule(plugin => { plugin.lifetime.defer(async () => { plugin.models.list(); calls.push("first"); }); return {}; }),
       defineModule(plugin => { plugin.lifetime.defer(async () => { calls.push("second"); }); return {}; }),
       defineModule(() => { throw new Error("setup failed"); }),
@@ -133,14 +180,14 @@ describe("Plugin assembly", () => {
     const calls: string[] = [];
     let release!: () => void;
     const held = new Promise<void>(resolve => { release = resolve; });
-    const provider = definePlugin({ namespace: pluginNamespace("acme.provider"), version: "1",
+    const provider = definePlugin({ namespace: pluginNamespace("acme.provider"),
       modules: [defineModule(plugin => { plugin.lifetime.defer(async () => { calls.push("provider"); }); return {}; })] });
-    const consumer = definePlugin({ namespace: pluginNamespace("acme.consumer"), version: "1", dependencies: ["acme.provider"],
+    const consumer = definePlugin({ namespace: pluginNamespace("acme.consumer"),
       modules: [
         defineModule(plugin => { plugin.lifetime.defer(async () => { await held; calls.push("consumer"); }); return {}; }),
         defineModule(() => { throw new Error("setup failed"); }),
       ] });
-    const loaded = load([consumer, provider]);
+    const loaded = load([consumer, provider], new Map([["acme.consumer", ["acme.provider"]]]));
     const closing = loaded.close();
     try {
       await Promise.resolve();
@@ -151,13 +198,13 @@ describe("Plugin assembly", () => {
   it("post-assembly contract validation failures collect dependency failures before cleaning consumers ahead of providers", async () => {
     const calls: string[] = [], ns = pluginNamespace("acme.provider");
     const action = defineAction(ns.resource("thing", z.object({})), { id: ns.name("missing"), schema: z.null() });
-    const provider = definePlugin({ namespace: ns, version: "1", modules: [defineModule(plugin => {
+    const provider = definePlugin({ namespace: ns, modules: [defineModule(plugin => {
       plugin.lifetime.defer(async () => { calls.push("provider"); });
       return { preparers: [{ id: "missing", contract: action, prepare: () => ({ action: "accept" }) }] };
     })] });
-    const consumer = definePlugin({ namespace: pluginNamespace("acme.consumer"), version: "1", dependencies: [ns.id],
+    const consumer = definePlugin({ namespace: pluginNamespace("acme.consumer"),
       modules: [defineModule(plugin => { plugin.lifetime.defer(async () => { calls.push("consumer"); }); return {}; })] });
-    const loaded = load([consumer, provider]);
+    const loaded = load([consumer, provider], new Map([["acme.consumer", [ns.id]]]));
     expect(loaded.manifest.map(plugin => plugin.status)).toEqual(["failed", "failed"]);
     await loaded.close();
     expect(calls).toEqual(["consumer", "provider"]);
@@ -169,15 +216,15 @@ describe("Plugin assembly", () => {
     const held = new Promise<void>(resolve => { release = resolve; });
     const cleaning = new Promise<void>(resolve => { started = resolve; });
     const action = defineAction(ns.resource("thing", z.object({})), { id: ns.name("missing"), schema: z.null() });
-    const provider = definePlugin({ namespace: ns, version: "1", modules: [defineModule(plugin => {
+    const provider = definePlugin({ namespace: ns, modules: [defineModule(plugin => {
       plugin.lifetime.defer(async () => { calls.push("provider"); });
       return { preparers: [{ id: "missing", contract: action, prepare: () => ({ action: "accept" }) }] };
     })] });
-    const consumer = definePlugin({ namespace: pluginNamespace("acme.consumer"), version: "1", dependencies: [ns.id], modules: [
+    const consumer = definePlugin({ namespace: pluginNamespace("acme.consumer"), modules: [
       defineModule(plugin => { plugin.lifetime.defer(async () => { started(); await held; calls.push("consumer"); }); return {}; }),
       defineModule(() => { throw new Error("Consumer setup failed."); }),
     ] });
-    const loaded = load([consumer, provider]);
+    const loaded = load([consumer, provider], new Map([["acme.consumer", [ns.id]]]));
     try {
       await cleaning;
       expect(loaded.manifest.map(plugin => plugin.status)).toEqual(["failed", "failed"]);
@@ -208,7 +255,7 @@ describe("Plugin assembly", () => {
     const resource = pluginNamespace("acme.a").resource("thing", z.object({}));
     const original = plugin("acme.a", shared, { resource });
     const replacement = plugin("acme.c", shared, { resource });
-    const loaded = load([{ ...original, dependencies: ["acme.c"] }, plugin("acme.b", shared), replacement]);
+    const loaded = load([original, plugin("acme.b", shared), replacement], new Map([["acme.a", ["acme.c"]]]));
     expect(loaded.manifest.map(entry => entry.status)).toEqual(["loaded", "loaded", "loaded"]);
     expect(loaded.manifest.flatMap(entry => entry.implementations.map(item => [item.id, item.active, item.overriddenBy ?? null])))
       .toEqual([["acme.a/thing.read", false, "acme.c"], ["acme.b/thing.read", true, null], ["acme.c/thing.read", true, null]]);
@@ -249,7 +296,7 @@ describe("Plugin assembly", () => {
       id: conflict === "id" ? declaration.id : ns.name("second"),
       name: conflict === "id" ? "another_question" : declaration.name,
     });
-    const bad = definePlugin({ namespace: ns, version: "1", modules: [
+    const bad = definePlugin({ namespace: ns, modules: [
       defineModule(() => ({ topLevelTools: [declaration] })),
       defineModule(() => ({ topLevelTools: conflict === "host" ? [] : [duplicate] })),
     ] });

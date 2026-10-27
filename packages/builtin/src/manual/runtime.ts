@@ -10,6 +10,7 @@ export function createManualModule(sources: () => readonly ManualSource[], appli
   return defineModule(() => ({
     resources: [implementResource(Manual, ManualView, {
       card: manualCard,
+      template: { current: [] },
       creation: implementCreation(CreateManual, { create: () => ({ title: `${applicationName} manual`, data: {} }) }),
       project: () => ({}),
       inspect: async () => ({

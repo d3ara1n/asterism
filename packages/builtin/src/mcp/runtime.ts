@@ -84,6 +84,7 @@ export default defineModule(plugin => {
     ],
     resources: [implementResource(McpHost, McpHostView, {
       card: mcpCard,
+      template: { current: [] },
       creation: implementCreation(CreateMcpHost, { create: ({ title }) => ({ title, data: {} }) }),
       project: () => ({ servers: service.states() }),
       inspect: async () => ({ servers: service.list({ offset: 0, limit: 20 }) }),

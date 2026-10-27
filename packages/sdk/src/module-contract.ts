@@ -4,6 +4,7 @@ import { contractReferenceSchema, type ContractReference, type DataContract } fr
 
 export interface ResourceContract<S extends Json = Json> {
   kind: string;
+  /** Decodes saved state; creation callbacks return S for encoding before persistence. State is arbitrary JSON, stored separately from host identity and title. */
   stateSchema: z.ZodType<S>;
 }
 export interface ToolContract<A extends Json = Json> extends ContractReference {

@@ -36,7 +36,7 @@ export class ApplicationService {
   private readonly packages: StartupPackage[];
   private readonly list: PackageList;
   private readonly started: string;
-  constructor(root: string, private readonly options: { catalogs?: TranslationCatalog[]; packages?: StartupPackage[]; manualSources?: readonly (ManualSource & { pluginId: string })[]; protector?: SecretProtector; onConfigurationChanged?: () => void; onSessionChanged?: (event: SessionChanged) => void; adapterFactory?: (settings: ModelSettings) => ModelAdapter; plugins?: readonly PluginDefinition[]; onPluginConfigurationChanged?: (pluginId: string) => void; preparedStorage?: PreparedPluginStorage } = {}) {
+  constructor(root: string, private readonly options: { catalogs?: TranslationCatalog[]; packages?: StartupPackage[]; manualSources?: readonly (ManualSource & { pluginId: string })[]; protector?: SecretProtector; onConfigurationChanged?: () => void; onSessionChanged?: (event: SessionChanged) => void; adapterFactory?: (settings: ModelSettings) => ModelAdapter; plugins?: readonly PluginDefinition[]; pluginDependencies?: ReadonlyMap<string, readonly string[]>; onPluginConfigurationChanged?: (pluginId: string) => void; preparedStorage?: PreparedPluginStorage } = {}) {
     this.db = openDatabase(root);
     this.packages = options.packages ?? [];
     this.list = new PackageList(join(root, "plugins.json"));
@@ -49,7 +49,7 @@ export class ApplicationService {
       collectExpiredSessions(this.db);
       this.sessions = new SessionService(this.db, root, this.configuration, options.onSessionChanged, options.adapterFactory, options.plugins, options.onPluginConfigurationChanged, options.preparedStorage,
         () => (options.manualSources ?? []).filter(source => this.packages.some(item => item.id === source.pluginId && item.status === "loaded")
-          && !options.preparedStorage?.failures.has(source.pluginId)));
+          && !options.preparedStorage?.failures.has(source.pluginId)), options.pluginDependencies);
       // setup and contribution registration may also fail; frontend-only consumers cannot use failed providers either.
       let changed = true;
       while (changed) {

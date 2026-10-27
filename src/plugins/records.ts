@@ -11,8 +11,7 @@ export function toRecord(node: SessionNode, sequence: number): SessionRecord {
     source: structuredClone(source), data: structuredClone(data), context: model === null ? null : { text: model, recipient } });
 }
 export function resourceSnapshot(ref: ResourceRef, resource: FoldedObject): ResourceSnapshot {
-  const { id: _id, type: _type, title: _title, ...data } = resource.data;
-  return deepFreeze({ ref: { ...ref }, title: resource.title, data: structuredClone(data) as Json });
+  return deepFreeze({ ref: { ...ref }, title: resource.title, data: structuredClone(resource.data) });
 }
 export function sessionSnapshot(source: NodeView): SessionSnapshot {
   const workbench = () => foldWorkbench(source.read({ scope: "timeline",

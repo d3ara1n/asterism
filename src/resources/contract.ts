@@ -25,7 +25,7 @@ export interface ResourceController {
   /** Validate creation input, optionally reading configuration or files asynchronously, then pass the result to create. */
   prepareCreate?(input: ResourceCall, signal?: AbortSignal, content?: ContentLease): Promise<Json>;
   /** Run within the creation transaction: return the title and immutable resource data for the creation event, optionally saving private state too. */
-  create?(sessionId: string, objectId: string, input: Json, content?: ContentLease): { title: string; data?: { [key: string]: Json } };
+  create?(sessionId: string, objectId: string, input: Json, content?: ContentLease): { title: string; data: Json };
   execute?(context: ResourceCommandContext, command: ParsedCall, before?: () => void): Promise<void>;
   /**
    * busy contains object IDs still depending on the current timeline path, including agents and other captured resources.
@@ -40,6 +40,7 @@ export interface ResourceController {
 /** Erased backend resource adapter interface; functions do not cross process boundaries. */
 export interface ResourceBackend {
   kind: string;
+  template?: import("@asterism/sdk/runtime").ResourceContribution["template"];
   card?: import("@asterism/sdk/contracts").CardAppearance;
   receivesLinks?: boolean;
   validateState?(data: Json): void;

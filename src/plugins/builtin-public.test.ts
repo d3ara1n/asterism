@@ -15,15 +15,16 @@ import { ApplicationService } from "../runtime/service.ts";
 import { bindPublicProvider } from "../shared/public-modules.ts";
 import { builtinPublicModules, builtinPublicProvider } from "../builtin-public.ts";
 import { builtinRuntimePublicModules } from "../builtin-runtime-public.ts";
+import builtinApiMetadata from "../../packages/builtin-api/package.json" with { type: "json" };
 import { loadPluginRenderers } from "../renderer/modules/plugins.ts";
 
 const roots: string[] = [], release: (() => void)[] = [];
-const compatibleRange = `^${builtinPublicProvider.version}`;
-const incompatibleRange = `<${builtinPublicProvider.version}`;
+const currentRange = `^${builtinApiMetadata.version}`;
+const olderRange = `<${builtinApiMetadata.version}`;
 afterEach(() => { for (const close of release.splice(0).reverse()) close(); for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
 function temp() { const root = mkdtempSync(join(tmpdir(), "builtin-public-")); roots.push(root); return root; }
 function file(root: string, path: string, content: string) { const destination = join(root, path); mkdirSync(join(destination, ".."), { recursive: true }); writeFileSync(destination, content); }
-function fixture(ranges: (string | null)[] = [compatibleRange, `~${builtinPublicProvider.version}`]) {
+function fixture(ranges: (string | null)[] = [currentRange, `~${builtinApiMetadata.version}`]) {
   const data = temp(), list = new PackageList(join(data, "plugins.json"));
   const consumers = ranges.map((range, index) => {
     const root = temp(), id = `fixture.consumer${index}`;
@@ -36,7 +37,7 @@ function fixture(ranges: (string | null)[] = [compatibleRange, `~${builtinPublic
       import { definePlugin, defineModule, implementPreparer } from "@asterism/sdk/runtime";
       import { SubmitAgentInput } from "./public.ts";
       const calls = [];
-      export default { ...definePlugin({ namespace: pluginNamespace(${JSON.stringify(id)}), version: "1.0.0",
+      export default { ...definePlugin({ namespace: pluginNamespace(${JSON.stringify(id)}),
         modules: [defineModule(() => ({ preparers: [implementPreparer(SubmitAgentInput, {
           id: "input", prepare(input, context) {
             calls.push({ input, resource: context.object.ref });
@@ -46,7 +47,7 @@ function fixture(ranges: (string | null)[] = [compatibleRange, `~${builtinPublic
     `);
     file(root, "renderer.ts", 'export { SubmitAgentInput } from "./public.ts"; export default { modules: [{ resources: [], cards: [], tools: [] }] };');
     // A consumer's local installation copy must not displace declarations already loaded by the app.
-    file(root, "node_modules/@asterism/builtin-api/package.json", JSON.stringify({ name: "@asterism/builtin-api", version: builtinPublicProvider.version, exports: { "./contracts": "./copy.js" } }));
+    file(root, "node_modules/@asterism/builtin-api/package.json", JSON.stringify({ name: "@asterism/builtin-api", version: "0.0.0", exports: { "./contracts": "./copy.js" } }));
     file(root, "node_modules/@asterism/builtin-api/copy.js", 'throw new Error("A private copy must not execute.");');
     list.add({ source: { kind: "path", path: root } }, data);
     return root;
@@ -60,12 +61,12 @@ type Probe = { SubmitAgentInput: typeof SubmitAgentInput; calls: unknown[] };
 describe("Built-in public packages", () => {
   // Backend creation entry services must share exported instances with built-in implementations rather than using consumer-private installations.
   it("independent plugins obtain the same creation declarations and catalog services from backend public entries", async () => {
-    const f = fixture([compatibleRange]);
+    const f = fixture([currentRange]);
     file(f.consumers[0]!, "runtime.ts", `
       import { agentCreations, defineAgentCreation } from "@asterism/builtin-api/runtime";
       import { pluginNamespace } from "@asterism/sdk/contracts";
       import { definePlugin } from "@asterism/sdk/runtime";
-      export default { ...definePlugin({ namespace: pluginNamespace("fixture.consumer0"), version: "1" }),
+      export default { ...definePlugin({ namespace: pluginNamespace("fixture.consumer0") }),
         probe: { agentCreations, defineAgentCreation } };
     `);
     const [loaded] = await f.load();
@@ -85,9 +86,10 @@ describe("Built-in public packages", () => {
     const probes = packages.map(item => (item.definition as PluginDefinition & { probe: Probe }).probe);
     for (const [index, probe] of probes.entries()) {
       expect(probe.SubmitAgentInput).toBe(SubmitAgentInput);
-      expect(packages[index]!.definition!.dependencies).toEqual([builtin.id]);
+      expect(packages[index]!.runtimeDependencies).toEqual([builtin.id]);
     }
-    const service = new ApplicationService(f.data, { plugins: packages.map(item => item.definition!) });
+    const service = new ApplicationService(f.data, { plugins: packages.map(item => item.definition!),
+      pluginDependencies: new Map(packages.map(item => [item.manifest!.id, item.runtimeDependencies ?? []])) });
     try {
       expect(service.sessions.plugins.every(item => item.status === "loaded")).toBe(true);
       const sessionId = service.sessions.tree.create("Public API");
@@ -112,19 +114,19 @@ describe("Built-in public packages", () => {
       expect(frontend.SubmitAgentInput).not.toBe(SubmitAgentInput);
     }
   });
-  // Dependency package names, version ranges, and environment exports are loading gates; local copies cannot serve as fallbacks after failure.
-  it("rejects missing dependencies, incompatible versions, and private entries while retaining unrelated consumers", async () => {
-    const f = fixture([null, incompatibleRange, compatibleRange, compatibleRange]);
+  // Public bindings follow actual exports, independently of peer ranges; private entries remain unavailable.
+  it("loads available APIs despite absent or older peer ranges and rejects private entries", async () => {
+    const f = fixture([null, olderRange, currentRange, currentRange]);
     file(f.consumers[2]!, "public.ts", 'export { SubmitAgentInput } from "@asterism/builtin-api/private";');
     const packages = await f.load();
-    expect(packages.map(item => item.status)).toEqual(["failed", "failed", "failed", "loaded"]);
-    expect(packages[0]!.error).toContain("must declare a dependency");
-    expect(packages[1]!.error).toContain(`application provides ${builtinPublicProvider.version}`);
+    expect(packages.map(item => item.status)).toEqual(["loaded", "loaded", "failed", "loaded"]);
+    for (const index of [0, 1, 3])
+      expect((packages[index]!.definition as PluginDefinition & { probe: Probe }).probe.SubmitAgentInput).toBe(SubmitAgentInput);
     expect(packages[2]!.error).toContain("not exported");
   });
   // Agent UI loads only through frontend public exports; two source plugins register with the same service consumed by built-in implementations.
   it("frontend consumers share Agent UI services and release contributions with registration lifetime", async () => {
-    const f = fixture([compatibleRange, compatibleRange]);
+    const f = fixture([currentRange, currentRange]);
     for (const [index, root] of f.consumers.entries()) {
       file(root, "renderer.ts", `
         import { agentUI, AgentOverlay, AgentScrollArea, AgentToolbarItem, useAgentModelSelection } from "@asterism/builtin-api/renderer";
@@ -159,22 +161,22 @@ describe("Built-in public packages", () => {
 
   // Public frontend services must not enter backend module graphs, preventing React/UI state from mixing across environments.
   it("backend consumers cannot import Agent UI frontend exports", async () => {
-    const f = fixture([compatibleRange]);
+    const f = fixture([currentRange]);
     file(f.consumers[0]!, "runtime.ts", 'import { agentUI } from "@asterism/builtin-api/renderer"; export default agentUI;');
     const [item] = await f.load();
     expect(item!.status).toBe("failed");
     expect(item!.error).toContain("not exported");
   });
-  // Intermediate libraries lack asterism manifests; validate their own npm dependencies while runtime dependencies remain with actual consumer plugins.
-  it.each(["nested", "symlink"] as const)("independent intermediate npm packages validate versions for %s imports by package ownership", async mode => {
-    const f = fixture([null, compatibleRange]);
+  // Intermediate libraries participate in the same host binding, while lifecycle dependencies remain with their consumer plugins.
+  it.each(["nested", "symlink"] as const)("independent %s npm helpers share host declarations regardless of peer ranges", async mode => {
+    const f = fixture([null, currentRange]);
     for (const [index, root] of f.consumers.entries()) {
       const metadata = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
       metadata.dependencies = { "@fixture/helper": "1.0.0" };
       file(root, "package.json", JSON.stringify(metadata));
       const helper = mode === "nested" ? join(root, "node_modules/@fixture/helper") : temp();
       file(helper, "package.json", JSON.stringify({ name: "@fixture/helper", version: "1.0.0", type: "module",
-        exports: "./index.js", peerDependencies: { "@asterism/builtin-api": index === 0 ? compatibleRange : incompatibleRange } }));
+        exports: "./index.js", peerDependencies: { "@asterism/builtin-api": index === 0 ? currentRange : olderRange } }));
       file(helper, "index.js", 'export { SubmitAgentInput } from "@asterism/builtin-api/contracts";');
       if (mode === "symlink") {
         mkdirSync(join(root, "node_modules/@fixture"), { recursive: true });
@@ -182,22 +184,22 @@ describe("Built-in public packages", () => {
       }
       file(root, "public.ts", 'export { SubmitAgentInput } from "@fixture/helper";');
     }
-    const [compatible, incompatible] = await f.load();
-    expect(compatible!.status, compatible!.error).toBe("loaded");
-    expect(compatible!.definition!.dependencies).toEqual([builtin.id]);
-    expect((compatible!.definition as PluginDefinition & { probe: Probe }).probe.SubmitAgentInput).toBe(SubmitAgentInput);
-    expect(incompatible!.status).toBe("failed");
-    expect(incompatible!.error).toContain(`Package @fixture/helper requires @asterism/builtin-api ${incompatibleRange}`);
+    for (const item of await f.load()) {
+      expect(item.status, item.error).toBe("loaded");
+      expect(item.runtimeDependencies).toEqual([builtin.id]);
+      expect((item.definition as PluginDefinition & { probe: Probe }).probe.SubmitAgentInput).toBe(SubmitAgentInput);
+    }
   });
   // Importing declarations successfully does not imply implementation availability; missing or failed setup propagates along actual implementation dependencies.
   it("consumers do not initialize when implementation provider setup fails", async () => {
-    const f = fixture([compatibleRange]), [consumer] = await f.load();
+    const f = fixture([currentRange]), [consumer] = await f.load();
     const { loadPlugins } = await import("./loader.ts");
     const { SessionDataStore } = await import("../session/data.ts");
     const { openDatabase } = await import("../runtime/storage.ts");
     const db = openDatabase(f.data);
-    const failed: PluginDefinition = { namespace: builtin, version: "0.2.0", modules: [{ setup() { throw new Error("Provider setup failed."); } }] };
+    const failed: PluginDefinition = { namespace: builtin, modules: [{ setup() { throw new Error("Provider setup failed."); } }] };
     const loaded = loadPlugins([consumer!.definition!, failed], {
+      pluginDependencies: new Map([[consumer!.manifest!.id, consumer!.runtimeDependencies ?? []]]),
       extensionsDirectory: join(f.data, "extensions"), data: new SessionDataStore(db), refOf: () => null,
       sessions: {} as never, models: {} as never, log() {},
     });

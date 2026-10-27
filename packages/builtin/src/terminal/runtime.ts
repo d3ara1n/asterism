@@ -83,6 +83,7 @@ export function createTerminalModule(settings: () => ShellSettings) { return def
     events: [TerminalImageRequested],
     resources: [implementResource(TerminalResource, TerminalView, {
       card: terminalCard,
+      template: { current: [] },
       creation: implementCreation(CreateTerminal, {
         async prepare(input) {
           if (input.cwd && (!isAbsolute(input.cwd) || !(await stat(input.cwd).catch(() => null))?.isDirectory()))

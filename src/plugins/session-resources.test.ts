@@ -24,7 +24,7 @@ afterEach(async () => {
 });
 function open(options: { prepare?: (signal: AbortSignal) => Promise<void>; create?: (object: ObjectExecutor) => void; plugins?: PluginDefinition[]; adapter?: ModelAdapter } = {}) {
   let plugin!: PluginContext;
-  const definition = definePlugin({ namespace: ns, version: "1", setup(context) {
+  const definition = definePlugin({ namespace: ns, setup(context) {
     plugin = context;
     return { resources: [implementResource(Item, View, {
       links: { receive: true },
@@ -212,7 +212,7 @@ describe("SDK session resource lifetimes", () => {
   it("managed tasks can enumerate sessions and save final records during close", async () => {
     const owner = pluginNamespace("test.cleanup"), Final = defineRecord(owner.name("final"), { schema: z.null() });
     let context!: PluginContext;
-    const f = open({ plugins: [definePlugin({ namespace: owner, version: "1", setup(plugin) {
+    const f = open({ plugins: [definePlugin({ namespace: owner, setup(plugin) {
       context = plugin; return { records: [Final] };
     } })] });
     const ready = latch();
@@ -235,7 +235,7 @@ describe("SDK session resource lifetimes", () => {
   it("cross-plugin creation parses once, returns identity and actual titles without private data, and enumerates session summaries", async () => {
     let consumer!: PluginContext;
     const caller = pluginNamespace("test.caller");
-    const f = open({ plugins: [definePlugin({ namespace: caller, version: "1", setup(plugin) { consumer = plugin; return {}; } })] });
+    const f = open({ plugins: [definePlugin({ namespace: caller, setup(plugin) { consumer = plugin; return {}; } })] });
     const other = f.app.sessions.tree.create("Other");
     const ref = await consumer.session(f.sessionId).create(Create, 4);
     expect(ref).toEqual({ sessionId: f.sessionId, kind: Item.kind, id: expect.any(String), title: "Item" });
@@ -411,7 +411,7 @@ describe("Agent resource operation entries", () => {
   it("self-authorized targets without link reception roll back entirely", async () => {
     const extra = pluginNamespace("test.expose");
     const f = open({
-      plugins: [definePlugin({ namespace: extra, version: "1", modules: [
+      plugins: [definePlugin({ namespace: extra, modules: [
         defineAgentCreation({ id: extra.name("note"), creation: CreateNote, description: "Create an exposed note.",
           inputSchema: CreateNote.schema, toInput: input => input,
           toOptions: () => ({ exposeSelf: true }) }),
@@ -507,7 +507,7 @@ describe("Agent resource operation entries", () => {
       argsSchema: z.null().describe("No input."), resultSchema: z.null().describe("No output."), effect: "read", execution: "parallel",
       async execute(_args, context) { saved = context.session; return { kind: "succeeded", data: null }; },
     });
-    const f = open({ plugins: [definePlugin({ namespace: pluginNamespace("test.context"), version: "1", modules: [defineModule(() => ({ topLevelTools: [{ ...tool, id: "test.context/save" }] }))] })],
+    const f = open({ plugins: [definePlugin({ namespace: pluginNamespace("test.context"), modules: [defineModule(() => ({ topLevelTools: [{ ...tool, id: "test.context/save" }] }))] })],
       adapter: adapter(() => [{ name: "save_session", args: null }]) });
     const target = await model(f.app), actor = await f.session.create(Create, 0);
     await runner(f, actor, target)();
@@ -519,7 +519,7 @@ describe("Agent resource operation entries", () => {
   // Plugin lifetime and public service scope contract: failed contributions disappear immediately without leaking into another host instance.
   it("creation catalogs are isolated by host and public queries include third-party types but exclude failed registrations", async () => {
     const extra = pluginNamespace("test.extra"), missing = defineAction(extra.resource("missing", z.object({})), { id: extra.name("missing"), schema: z.null() });
-    const failed = definePlugin({ namespace: extra, version: "1", modules: [
+    const failed = definePlugin({ namespace: extra, modules: [
       defineAgentCreation({ id: extra.name("new"), description: "Invalid contribution.", creation: Create }),
       defineModule(() => ({ preparers: [implementPreparer(missing, { id: "missing", prepare: () => ({ action: "accept" }) })] })),
     ] });
@@ -545,7 +545,7 @@ describe("Object lifetimes and session archival", () => {
     const CreateProbe = defineCreation(Probe, { id: probe.name("create"), schema: z.null() });
     const events: string[] = [];
     let context!: PluginContext, signal: AbortSignal | undefined;
-    const lifetime = definePlugin({ namespace: probe, version: "1", setup(plugin) {
+    const lifetime = definePlugin({ namespace: probe, setup(plugin) {
       context = plugin;
       return { resources: [implementResource(Probe, probe.data("view", z.null()), {
         creation: implementCreation(CreateProbe, { create: () => ({ title: "Probe", data: {} }) }),

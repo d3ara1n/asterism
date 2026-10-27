@@ -18,7 +18,9 @@ Use a domain extension when adding to that feature. A plugin with its own resour
 
 ## Share contracts and services
 
-A public package can expose declarations or services for other plugins. Consumers declare that dependency and import the original public values.
+A public package can expose declarations or services for other plugins. Consumers declare ordinary package dependencies in `package.json` and import the original public values. The host derives initialization and cleanup dependencies from those imports, including imports through intermediate packages.
+
+Expose shared values through `./public` in the package's standard exports. Public imports bind to the enabled provider's actual exports, including imports through intermediate npm packages. The host uses the import graph for initialization order and reports missing exports or unavailable providers. Package versions and dependency ranges remain package-management metadata; local development copies do not replace the active provider.
 
 A shared declaration has runtime identity as well as a name. Copying it under the same name does not establish shared identity. Backend and frontend environments are separate even when they use the same contract.
 

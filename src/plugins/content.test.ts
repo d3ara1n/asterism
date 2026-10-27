@@ -32,7 +32,7 @@ afterEach(async () => {
 function fixture(options: { prepare?: (content: ContentScope, signal: AbortSignal) => Promise<void>; prepareAction?: (content: ContentScope, signal: AbortSignal) => Promise<void>; onCreate?: (object: ObjectExecutor) => void; extra?: ReturnType<typeof definePlugin>[]; adapter?: ModelAdapter } = {}) {
   const root = mkdtempSync(join(tmpdir(), "asterism-content-")); roots.push(root);
   let context!: PluginContext;
-  const plugin = definePlugin({ namespace: ns, version: "1", modules: [defineModule(value => {
+  const plugin = definePlugin({ namespace: ns, modules: [defineModule(value => {
     context = value;
     return { resources: [implementResource(Document, View, {
       records: [Saved],
@@ -93,7 +93,7 @@ describe("Host immutable content", () => {
     const entered = new Promise<void>(resolve => { started = resolve; });
     const f = fixture({
       async prepareAction() { started(); await gate; },
-      extra: [definePlugin({ namespace: ns, version: "1", setup(plugin) {
+      extra: [definePlugin({ namespace: ns, setup(plugin) {
         caller = plugin;
         return { resources: [implementResource(Source, SourceFile, {
           creation: implementCreation(CreateSource, { create(file, object) {
@@ -149,7 +149,7 @@ describe("Host immutable content", () => {
     const Read = defineCall(foreign.name("read"), { scope: "object",
       input: z.strictObject({ ref: contentRefSchema, session: z.boolean() }), output: z.string(),
     });
-    const plugin = definePlugin({ namespace: foreign, version: "1", modules: [defineModule(() => ({
+    const plugin = definePlugin({ namespace: foreign, modules: [defineModule(() => ({
       calls: [implementCall(Read, async (input, { object }) =>
         text(await (input.session ? object.session.content : object.content).read(input.ref)))],
     }))] });
@@ -257,16 +257,24 @@ describe("Host immutable content", () => {
     expect(text(await f.object(id).content.read(file))).toBe("new");
     expect(() => f.object(id).content.read(old)).toThrow();
   });
-  it("dependencies derive from actual saved schema output; removing references during transformation releases bytes", async () => {
+  it("retention follows encoded JSON and decoding a reference cannot recreate its ownership", async () => {
     const f = fixture(), draft = f.input();
     const ref = await f.store.writer({ scope: draft }).stage(bytes("stripped"));
     const id = await f.create(ref, draft.id); await draft.close();
-    const Stripped = ns.data("stripped", z.object({ file: contentRefSchema.optional() }).transform(() => ({})));
+    const Encoded = ns.data("encoded", z.codec(z.object({ saved: contentRefSchema.nullable() }), z.object({ file: contentRefSchema.nullable() }), {
+      decode: value => ({ file: value.saved }), encode: value => ({ saved: value.file }),
+    }));
+    const Stripped = ns.data("stripped", z.codec(z.object({}), z.object({ file: contentRefSchema }), {
+      decode: () => ({ file: ref }), encode: () => ({}),
+    }));
     const Raw = ns.data("raw", z.json());
-    f.object(id).commit(writer => { writer.set(Stripped, { file: ref }); });
-    expect(f.object(id).get(Stripped)).toEqual({});
+    f.object(id).commit(writer => { writer.set(Encoded, { file: ref }); writer.set(Stripped, { file: ref }); });
     f.object(id).commit(writer => { writer.set(Raw, { ...ref, extra: true }); });
     await f.replace(id, { file: null }); f.store.collect();
+    expect(text(await f.object(id).content.read(ref))).toBe("stripped");
+    f.object(id).commit(writer => { writer.set(Encoded, { file: null }); });
+    f.store.collect();
+    expect(f.object(id).get(Stripped)).toEqual({ file: ref });
     expect(() => f.object(id).content.read(ref)).toThrow();
   });
   it("read holds protect replaced content until reads finish", async () => {
@@ -338,7 +346,7 @@ describe("Host immutable content", () => {
   });
   it("external preparers can only read and replacement references cannot expand attempt eligibility", async () => {
     let replacement: ContentRef | null = null;
-    const extra = definePlugin({ namespace: pluginNamespace("test.preparer"), version: "1", modules: [defineModule(() => ({ preparers: [implementPreparer(Replace, {
+    const extra = definePlugin({ namespace: pluginNamespace("test.preparer"), modules: [defineModule(() => ({ preparers: [implementPreparer(Replace, {
       id: "replace", prepare(_input, { object, content }) {
         expect(content).not.toHaveProperty("stage");
         expect(object.content).not.toHaveProperty("stage");

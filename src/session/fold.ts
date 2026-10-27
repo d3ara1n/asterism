@@ -1,7 +1,9 @@
 import type { SessionNode } from "../shared/session.ts";
+import type { Json } from "@asterism/sdk/contracts";
+import { ResourceCreated } from "../shared/workbench-records.ts";
 
 /** Workbench objects result from folding event nodes along paths and appear or disappear with paths during backtracking. */
-export interface FoldedObject { id: string; kind: string; title: string; data: Record<string, unknown> }
+export interface FoldedObject { id: string; kind: string; title: string; data: Json }
 export interface FoldedState { objects: FoldedObject[]; links: { receiverId: string; resourceId: string }[] }
 
 export function foldWorkbench(path: readonly SessionNode[]): FoldedState {
@@ -13,8 +15,8 @@ export function foldWorkbench(path: readonly SessionNode[]): FoldedState {
     switch (node.contract) {
       // Agents and other resources both use resource_created; only data.type distinguishes types.
       case "resource_created": {
-        if (typeof d.type !== "string" || !d.type) throw new Error("Resource creation is missing its type.");
-        objects.set(id, { id, kind: d.type, title: String(d.title ?? "Resource"), data: d });
+        const created = ResourceCreated.schema.parse(node.data);
+        objects.set(created.id, { id: created.id, kind: created.type, title: created.title, data: created.data });
         break;
       }
       case "resource_renamed": {

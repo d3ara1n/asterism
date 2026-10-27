@@ -16,7 +16,7 @@ describe("Event SDK and host boundaries", () => {
 
   it("later module failures clean up pending subscriptions and contracts from setup", async () => {
     let subscription!: EventSubscription;
-    const broken = definePlugin({ namespace: ns, version: "1", modules: [
+    const broken = definePlugin({ namespace: ns, modules: [
       defineModule(plugin => { subscription = plugin.ipc.events.subscribe(Update, {}, () => {}); return { events: [Update] }; }),
       defineModule(() => { throw new Error("Setup failed."); }),
     ] });

@@ -1,4 +1,5 @@
 import { jsonSchema, type CallContract, type CallOptions, type CallScope, type Json, type PluginCalls } from "@asterism/sdk/contracts";
+import type { z } from "zod";
 import type { CallBridge } from "./connection.ts";
 
 /** Requests and cancellation travel independently; no deadlines for in-process business waits or automatic submission replay. */
@@ -13,7 +14,9 @@ export class CallClient implements PluginCalls {
       else pending?.reject(Object.assign(new Error(frame.message), { code: frame.code }));
     });
   }
-  async invoke<I extends Json, O extends Json, S extends CallScope>(contract: CallContract<I, O, S>, input: I, options: CallOptions<S>): Promise<O> {
+  async invoke<Input extends z.ZodType<Json>, Output extends z.ZodType<Json>, S extends CallScope>(
+    contract: CallContract<Input, Output, S>, input: NoInfer<z.input<Input>> & Json, options: CallOptions<NoInfer<S>>,
+  ): Promise<z.output<Output>> {
     if (this.closed) throw new Error("The plugin connection is closed.");
     options.signal?.throwIfAborted();
     const id = crypto.randomUUID();

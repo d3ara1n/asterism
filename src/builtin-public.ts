@@ -6,7 +6,7 @@ import type { PublicProvider } from "./shared/public-modules.ts";
 export const builtinPublicModules = { "@asterism/builtin-api/contracts": contracts };
 const exports = { "@asterism/builtin-api/contracts": Object.keys(contracts) };
 export const builtinPublicProvider: PublicProvider = {
-  name: metadata.name, version: metadata.version, pluginId: contracts.builtin.id,
+  name: metadata.name, pluginId: contracts.builtin.id,
   modules: { runtime: { ...exports, "@asterism/builtin-api/runtime": ["agentCreations", "defineAgentCreation"] }, renderer: {
     ...exports,
     "@asterism/builtin-api/renderer": ["agentUI", "AgentToolbarItem", "AgentOverlay", "AgentModal", "AgentScrollArea",

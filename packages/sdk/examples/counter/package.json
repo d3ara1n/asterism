@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": { "typecheck": "tsc --noEmit" },
   "peerDependencies": {
-    "@asterism/sdk": "^0.46.1",
+    "@asterism/sdk": "*",
     "react": "^19.3.0",
     "react-intl": "^12.1.4",
     "zod": "^4.6.5"

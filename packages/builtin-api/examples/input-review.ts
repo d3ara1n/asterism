@@ -4,7 +4,7 @@ import { defineModule, definePlugin, implementPreparer } from "@asterism/sdk/run
 
 /** External plugins consume built-in action declarations; they neither declare a second Agent type nor import its implementation directory. */
 export default definePlugin({
-  namespace: pluginNamespace("example.input-review"), version: "1.0.0",
+  namespace: pluginNamespace("example.input-review"),
   modules: [defineModule(plugin => ({
     preparers: [implementPreparer(SubmitAgentInput, {
       id: "review-input",

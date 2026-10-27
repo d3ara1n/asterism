@@ -2,6 +2,7 @@ import { z } from "zod";
 import { jsonSchema, uiTextSchema } from "@asterism/sdk/contracts";
 
 const id = z.string().min(1).max(160);
+/** Responses carry encoded configuration values; save commands submit decoded domain values for backend encoding. */
 export const pluginConfigurationSchema = z.strictObject({
   id, defaults: jsonSchema, value: jsonSchema,
   status: z.enum(["saved", "defaults", "invalid"]),

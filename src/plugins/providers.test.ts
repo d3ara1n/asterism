@@ -13,11 +13,11 @@ import { UsageConsumer } from "../../packages/builtin/src/usage/service.ts";
 
 const cleanups: (() => Promise<void>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); vi.unstubAllGlobals(); });
-function open(plugins: PluginDefinition[]) {
+function open(plugins: PluginDefinition[], pluginDependencies?: ReadonlyMap<string, readonly string[]>) {
   const root = mkdtempSync(join(tmpdir(), "asterism-provider-usage-"));
   let observer!: PluginContext;
-  const service = new ApplicationService(root, { plugins: [...plugins,
-    definePlugin({ namespace: pluginNamespace("test.observer"), version: "1", setup(context) { observer = context; return {}; } })], protector: {
+  const service = new ApplicationService(root, { pluginDependencies, plugins: [...plugins,
+    definePlugin({ namespace: pluginNamespace("test.observer"), setup(context) { observer = context; return {}; } })], protector: {
     available: async () => true, encrypt: async value => Buffer.from(value).toString("base64"), decrypt: async value => Buffer.from(value, "base64").toString(),
   } });
   let closing: Promise<void> | undefined;
@@ -77,7 +77,7 @@ describe("Plugin presets and account usage", () => {
     let consumer!: PluginContext;
     const query = vi.fn(async (_: UsageQueryContext) => items);
     const { service } = open([
-      definePlugin({ namespace: pluginNamespace("test.producer"), version: "1", dependencies: ["asterism.builtin"], setup: () => ({
+      definePlugin({ namespace: pluginNamespace("test.producer"), setup: () => ({
         usageProviders: [{ id: "test-usage", label: "Test", query }],
         modelProviderPresets: [
           { type: "patch", id: "zai-plan-cn", patch: { connection: { usage: "test-usage" } } },
@@ -86,8 +86,8 @@ describe("Plugin presets and account usage", () => {
           }, sources: ["https://example.test/docs"], verifiedOn: "2026-10-20" } },
         ],
       }) }),
-      definePlugin({ namespace: pluginNamespace("test.consumer"), version: "1", setup(context) { consumer = context; return {}; } }),
-    ]);
+      definePlugin({ namespace: pluginNamespace("test.consumer"), setup(context) { consumer = context; return {}; } }),
+    ], new Map([["test.producer", ["asterism.builtin"]]]));
     const snapshot = service.configuration.current();
     expect(snapshot.modelProviderPresets?.find(preset => preset.id === "zai-plan-cn")?.connection.usage).toBe("test-usage");
     expect(snapshot.modelProviderPresets?.some(preset => preset.id === "custom-plan")).toBe(true);
@@ -113,13 +113,13 @@ describe("Plugin presets and account usage", () => {
 
   // setup failure after registration must revoke all contributions from that plugin without leaving ghost providers or preset overrides.
   it("failed plugins retract all additions and overrides and duplicate query IDs cannot replace existing implementations", () => {
-    const { service } = open([definePlugin({ namespace: pluginNamespace("test.failed"), version: "1", dependencies: ["asterism.builtin"],
+    const { service } = open([definePlugin({ namespace: pluginNamespace("test.failed"),
       setup: () => ({ usageProviders: [{ id: "temporary", label: "Temporary", query: async () => [] }],
         modelProviderPresets: [{ type: "patch", id: "zai-plan-cn", patch: { connection: { usage: "temporary" } } }] }),
       modules: [defineModule(() => { throw new Error("setup failed"); })],
-    }), definePlugin({ namespace: pluginNamespace("test.duplicate"), version: "1", setup: () => ({
+    }), definePlugin({ namespace: pluginNamespace("test.duplicate"), setup: () => ({
       usageProviders: [{ id: "zai-plan-cn", label: "Duplicate", query: async () => [] }],
-    }) })]);
+    }) })], new Map([["test.failed", ["asterism.builtin"]]]));
     expect(service.sessions.plugins.filter(plugin => ["test.failed", "test.duplicate"].includes(plugin.id)).map(plugin => plugin.status)).toEqual(["failed", "failed"]);
     expect(service.configuration.current().modelProviderPresets?.find(preset => preset.id === "zai-plan-cn")?.connection.usage).toBe("zai-plan-cn");
     expect(service.configuration.current().usageProviders?.map(provider => provider.id)).not.toContain("temporary");
@@ -133,7 +133,7 @@ describe("Plugin presets and account usage", () => {
     const began = new Promise<void>(resolve => { started = resolve; });
     const held = new Promise<void>(resolve => { release = resolve; });
     const order: string[] = [];
-    const { service, close, observer } = open([definePlugin({ namespace: pluginNamespace("test.wait"), version: "1", setup: plugin => {
+    const { service, close, observer } = open([definePlugin({ namespace: pluginNamespace("test.wait"), setup: plugin => {
       plugin.lifetime.defer(() => { order.push("closing"); });
       return { usageProviders: [{ id: "test-usage", label: "Wait", async query(context) { signal = context.signal; started(); await held; order.push("query"); return items; } }] };
     } })]);

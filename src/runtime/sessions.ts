@@ -69,7 +69,8 @@ export class SessionService {
   private readonly validateInitialInput: (selection: AgentSelection, parts: ModelInputPart[], content: ContentLease) => Promise<void>;
   constructor(private readonly db: DatabaseSync, dataRoot: string, configuration: ConfigurationService,
     private readonly changed: (event: SessionChanged) => void = () => {}, adapterFactory?: (settings: ModelSettings) => ModelAdapter, external: readonly PluginDefinition[] = [],
-    configurationChanged?: (pluginId: string) => void, preparedStorage?: PreparedPluginStorage, manualSources: () => readonly ManualSource[] = () => []) {
+    configurationChanged?: (pluginId: string) => void, preparedStorage?: PreparedPluginStorage, manualSources: () => readonly ManualSource[] = () => [],
+    pluginDependencies?: ReadonlyMap<string, readonly string[]>) {
     this.tree = new SessionTree(db);
     this.events.declarePublic(SessionTitleChanged);
     this.events.declarePublic(ResourceStatusChanged);
@@ -132,7 +133,7 @@ export class SessionService {
         throw error;
       }
     };
-    const modules = createModules({ events: this.events, extensionsDirectory: join(dataRoot, "extensions"), data: new SessionDataStore(db), content: this.content, refOf, vault: configuration.vault, configurationChanged, preparedStorage,
+    const modules = createModules({ events: this.events, extensionsDirectory: join(dataRoot, "extensions"), data: new SessionDataStore(db), content: this.content, refOf, vault: configuration.vault, configurationChanged, preparedStorage, pluginDependencies,
       sessions: host, models, catalogs: createBuiltinCatalogs(configuration),
       webProviders: configuration.web,
       modelProviderExtensions: configuration.extensions, modelProviders: {

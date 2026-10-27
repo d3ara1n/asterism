@@ -10,6 +10,17 @@ const contract = {
 const input: ToolRenderProps = { phase: "input", name: "preview", target: null, args: {}, invocation: {}, result: null };
 
 describe("Tool streaming preview declarations", () => {
+  // Published values are encoded; the disclosure calculation receives decoded domain data.
+  it("decodes codec progress for typed disclosure without accepting decoded data as wire input", () => {
+    const data = defineData("example.preview/codec", z.codec(z.string(), z.number(), { decode: Number, encode: String }));
+    const streaming = vi.fn(({ result }: { result: { data: number | null } | null }) => (result?.data ?? 0) >= 4);
+    const renderer = toolRenderer(data, { execution: { bodyRenderer: () => null, streaming } });
+    expect(renderer.resolve({ ...input, phase: "executing", result: { kind: "running", data: "4" } })?.streaming).toBe(true);
+    expect(streaming.mock.lastCall?.[0].result?.data).toBe(4);
+    streaming.mockClear();
+    expect(renderer.resolve({ ...input, phase: "executing", result: { kind: "running", data: 4 } })).toBeNull();
+    expect(streaming).not.toHaveBeenCalled();
+  });
   // Input streaming precedes complete arguments, so declarations must accept partial JSON; a body component alone cannot substitute for an explicit plugin declaration.
   it("plugins decide whether partial input is previewable, while undeclared bodies retain ordinary views", () => {
     const bodyRenderer = vi.fn(() => null);

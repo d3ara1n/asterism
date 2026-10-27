@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
-import { jsonSchema, type Json } from "@asterism/sdk/contracts";
 import { SessionDataStore } from "../session/data.ts";
 import { SessionError, type SessionTree } from "../session/tree.ts";
 import { templateDataSchema, type TemplateSummary, type TemplateData } from "../shared/templates.ts";
@@ -34,7 +33,8 @@ export class TemplateStore {
     return rows.map(row => ({ ...row, objects: JSON.parse(row.objects) }));
   }
   source(sessionId: string) {
-    return this.tree.workbench(sessionId).objects.map(({ id, kind, title }) => ({ id, kind, title }));
+    return this.tree.workbench(sessionId).objects.filter(object => this.resources.template(object.kind))
+      .map(({ id, kind, title }) => ({ id, kind, title }));
   }
   save(sessionId: string, title: string, objectIds: readonly string[]): string {
     const state = this.tree.workbench(sessionId);
@@ -44,10 +44,10 @@ export class TemplateStore {
       throw new SessionError("not_found", "A selected template object is no longer present.", templateMessages.sourceChanged);
     const value: TemplateData = {
       objects: objects.map(object => {
-        const { id: _id, type: _type, title: _title, ...data } = object.data;
-        return { id: object.id, kind: object.kind, title: object.title,
-          data: jsonSchema.parse(data) as Record<string, Json>,
-          current: this.data.entries(sessionId, object.id) };
+        const contracts = new Set(this.resources.template(object.kind)?.current.map(contract => contract.id));
+        const current = this.data.entries(sessionId, object.id).filter(entry => contracts.has(entry.contract));
+        this.resources.validateTemplate(object.kind, object.data, current);
+        return { id: object.id, kind: object.kind, title: object.title, data: object.data, current };
       }),
       links: state.links.filter(link => selected.has(link.receiverId) && selected.has(link.resourceId)),
       views: this.workbench.layout(sessionId).views.filter(view => selected.has(view.objectId)),
@@ -64,7 +64,7 @@ export class TemplateStore {
       { title: string; data_json: string } | undefined;
     if (!row) throw new SessionError("not_found", "Template not found.");
     const value = templateDataSchema.parse(JSON.parse(row.data_json));
-    for (const object of value.objects) this.resources.validateState(object.kind, object.data);
+    for (const object of value.objects) this.resources.validateTemplate(object.kind, object.data, object.current);
     const identities = new Map(value.objects.map(object => [object.id, createResourceId()]));
     this.tree.create(row.title, sessionId);
     for (const object of value.objects) {

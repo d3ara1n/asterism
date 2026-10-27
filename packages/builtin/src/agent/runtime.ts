@@ -44,6 +44,7 @@ export function createAgentModule(application: BuiltinApplication, usage: UsageC
       tools: [createPeekTool(plugin.models, application.userAgent, usage), createSendTool(), createWaitTool(loop)],
       resources: [implementResource(Agent, AgentView, {
         card: agentCard,
+        template: { current: [AgentSelection] },
         records: [AgentInputMessage, Execution, ContextSummary],
         attach(_data, object, lifetime) {
           lifetime.defer(() => { feedback.delete(object.ref.id); turns.delete(object.ref.id); });

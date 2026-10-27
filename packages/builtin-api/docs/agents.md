@@ -4,7 +4,7 @@ The built-in public API lets plugins interact with Asterism's existing agents th
 
 ## Declare the dependency
 
-Declare compatible peer ranges for `@asterism/builtin-api` and `@asterism/sdk`. For local development, source-package dependencies supply editor types while the running application provides the public package instances. Import public contracts from the domain package so every participant uses the same declarations.
+Declare `@asterism/builtin-api` and `@asterism/sdk` in `peerDependencies` with `"*"`; the running application provides the public package instances, and the host does not gate loading on these ranges. For local development, source-package dependencies supply editor types. Import public contracts from the domain package so every participant uses the same declarations.
 
 Examples are TypeScript and TSX fragments for a plugin's backend or renderer. They use public packages; install additional libraries imported by the chosen example, such as Nano ID for submission identities, in the plugin project. A plugin still supplies its manifest and composition entry points.
 

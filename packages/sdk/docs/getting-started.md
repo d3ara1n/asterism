@@ -6,9 +6,11 @@ A plugin adds resources, tools, views, settings, or services through Asterism's 
 
 Use a TypeScript package and the public SDK compatible with the application you intend to run. A package declaration identifies the plugin and its backend, frontend, and optional storage entries.
 
-Declare the supported SDK range in `peerDependencies["@asterism/sdk"]`. Asterism checks that range against its bundled SDK package version when adding the directory and again at startup. The application version and the plugin's own package version have separate meanings.
+Set the plugin's release version in `package.json.version`. That version identifies distributed releases and updates; it does not affect loading or execution. The runtime definition declares its namespace and behavior. Keep ordinary runtime libraries in `dependencies`; npm or another package manager installs them using its usual dependency and lockfile rules.
 
-For local development, install the SDK source package through a `file:` reference in `devDependencies`, while keeping a semantic version range in `peerDependencies`. This gives the editor and type checker local declarations; the running plugin uses the host's SDK instance. Extensions to built-in features can use the same arrangement for `@asterism/builtin-api`.
+Declare host-provided packages such as `@asterism/sdk` in `peerDependencies` with `"*"`. The running plugin always uses the host's instance, so a narrower range adds maintenance without changing behavior. Install the SDK source package through a `file:` reference in `devDependencies` while it remains unpublished. This gives the editor and type checker local declarations. Extensions to built-in features can use the same arrangement for `@asterism/builtin-api`.
+
+Asterism binds shared public imports to the active host or plugin provider. Dependency ranges do not reject loading; missing modules, missing exports, invalid contributions, and initialization errors produce loading failures. Check the APIs your plugin actually uses with TypeScript and exercise them in the target application.
 
 The `asterism` field declares a namespaced `id` and the needed `runtime`, `renderer`, and `storage` entry paths, relative to the package root. Runtime and renderer entries default-export their SDK plugin definitions. The runtime namespace must match the manifest ID.
 

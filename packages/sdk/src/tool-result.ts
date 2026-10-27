@@ -39,3 +39,7 @@ export const toolOutcomeSchema = z.discriminatedUnion("kind",
 export type ToolOutcome = z.infer<typeof toolOutcomeSchema>;
 /** Content passed from a tool to the model: a string becomes one text part; file parts reference immutable content staged during execution or already owned by the object. */
 export type ToolModelOutput = string | ModelInputPart[];
+/** Projection used when a tool declares no toModel: strings are text, other decoded values are JSON text. */
+export function defaultToolModel(data: Json): string {
+  return typeof data === "string" ? data : JSON.stringify(data);
+}

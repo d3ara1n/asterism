@@ -4,17 +4,13 @@ import { createRequire } from "node:module";
 import { dirname, join, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { BuildOptions, Plugin } from "esbuild";
-import { satisfies, valid, validRange } from "semver";
 import { publicModuleSource, type PublicProvider, type ModuleRealm } from "../shared/public-modules.ts";
 import { PluginBuildCache } from "./build-cache.ts";
 
 /** Package public entry is standard exports["./public"]; types and runtime share ordinary package imports. */
-interface PackageDependencyOwner {
-  name: string;
-  dependencies: ReadonlyMap<string, readonly string[]>;
-}
-export interface PackageModule extends PackageDependencyOwner {
+export interface PackageModule {
   id: string;
+  name: string;
   root: string;
   public: boolean;
   runtime?: string;
@@ -22,46 +18,12 @@ export interface PackageModule extends PackageDependencyOwner {
   /** Storage declaration entry; shares the backend runtime build without depending on the plugin runtime. */
   storage?: string;
 }
-interface DependencyManifest {
-  dependencies?: Record<string, string>;
-  peerDependencies?: Record<string, string>;
-  optionalDependencies?: Record<string, string>;
-}
-function dependencyRanges(pkg: DependencyManifest): Map<string, readonly string[]> {
-  return new Map([...new Set([...Object.keys(pkg.dependencies ?? {}), ...Object.keys(pkg.peerDependencies ?? {}), ...Object.keys(pkg.optionalDependencies ?? {})])]
-    .map(name => [name, [pkg.dependencies?.[name], pkg.peerDependencies?.[name], pkg.optionalDependencies?.[name]].filter(value => value !== undefined)]));
-}
 export function packageModule(root: string, entry: { id: string; runtime?: string; renderer?: string; storage?: string }): PackageModule {
   const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
   const exported = pkg.exports && typeof pkg.exports === "object" && "./public" in pkg.exports;
   if (exported && (typeof pkg.name !== "string" || !/^(?:@[^/\s]+\/)?[^/\s]+$/u.test(pkg.name)))
     throw new Error(`Plugin ${entry.id} must declare a package name for its public export.`);
-  return { ...entry, root: realpathSync(root), name: typeof pkg.name === "string" ? pkg.name : "", public: Boolean(exported),
-    dependencies: dependencyRanges(pkg) };
-}
-/** Resolve code dependencies from the nearest npm package declaration; lifetimes remain bound to the hosting plugin. */
-function createDependencyOwnerLookup() {
-  const npmOwners = new Map<string, PackageDependencyOwner | null>();
-  return (importer: string): PackageDependencyOwner | null => {
-    let directory = dirname(importer);
-    const visited: string[] = [];
-    let found: PackageDependencyOwner | null = null;
-    while (true) {
-      if (npmOwners.has(directory)) { found = npmOwners.get(directory)!; break; }
-      visited.push(directory);
-      const manifest = join(directory, "package.json");
-      if (existsSync(manifest)) {
-        const pkg = JSON.parse(readFileSync(manifest, "utf8"));
-        found = { name: typeof pkg.name === "string" ? pkg.name : directory, dependencies: dependencyRanges(pkg) };
-        break;
-      }
-      const parent = dirname(directory);
-      if (parent === directory) break;
-      directory = parent;
-    }
-    for (const directory of visited) npmOwners.set(directory, found);
-    return found;
-  };
+  return { ...entry, root: realpathSync(root), name: typeof pkg.name === "string" ? pkg.name : "", public: Boolean(exported) };
 }
 export interface CompiledModules {
   runtime: Map<string, string>;
@@ -111,17 +73,17 @@ export async function compileModules(packages: readonly PackageModule[], enabled
   progress: (id: string) => void = () => {}): Promise<CompiledModules> {
   const preloaded = new Map<string, PublicProvider>();
   for (const provider of publicProviders) {
-    if (preloaded.has(provider.name) || !valid(provider.version))
-      throw new Error(`Invalid or duplicate public provider: ${provider.name}@${provider.version}.`);
+    if (preloaded.has(provider.name))
+      throw new Error(`Duplicate public provider: ${provider.name}.`);
     preloaded.set(provider.name, provider);
   }
   const result: CompiledModules = { runtime: new Map(), storage: new Map(), renderer: new Map(), stylesheets: new Map(), dependencies: new Map(), runtimeDependencies: new Map(), rendererDependencies: new Map(), failures: new Map() };
   if (!packages.some(pkg => enabled.has(pkg.id))) return result;
   const cache = new PluginBuildCache(cacheRoot, packages.filter(pkg => enabled.has(pkg.id)).map(pkg => pkg.root), {
     // Increment the recipe version when build options, resolvers, or host bridging rules change.
-    recipe: 3, esbuild: createRequire(import.meta.url)("esbuild/package.json").version, platform: process.platform, arch: process.arch,
+    recipe: 5, esbuild: createRequire(import.meta.url)("esbuild/package.json").version, platform: process.platform, arch: process.arch,
     cwd: process.cwd(), nodePath: process.env.NODE_PATH,
-    packages: packages.map(pkg => ({ ...pkg, dependencies: [...pkg.dependencies] })), enabled: [...enabled], publicProviders, hostIdentity,
+    packages, enabled: [...enabled], publicProviders, hostIdentity,
   });
   const cached = cache.read();
   if (cached) { console.info("Plugin build cache hit."); return cached; }
@@ -144,7 +106,6 @@ export async function compileModules(packages: readonly PackageModule[], enabled
     }
     const roots = [...packages].sort((a, b) => b.root.length - a.root.length);
     const pluginOwner = (path: string) => roots.find(pkg => { const r = relative(pkg.root, path); return r === "" || (!r.startsWith("..") && !r.startsWith("/")); });
-    const npmOwner = createDependencyOwnerLookup();
     const resolver = (realm: ModuleRealm, entry?: PackageModule): Plugin => ({ name: "asterism-public-modules", setup(build) {
       const depend = (source: PackageModule | undefined, provider: string) => {
         for (const consumer of [source, entry]) if (consumer && consumer.id !== provider) {
@@ -168,15 +129,6 @@ export async function compileModules(packages: readonly PackageModule[], enabled
         if (loaded) {
           if (!Object.hasOwn(loaded.modules[realm] ?? {}, args.path))
             return { errors: [{ text: `Public module ${args.path} is not exported in ${realm}.` }] };
-          // Independent npm libraries use their own dependencies; helpers without package ownership fall back to the hosting plugin.
-          const consumer = npmOwner(args.importer) ?? source ?? entry;
-          if (consumer) {
-            const ranges = consumer.dependencies.get(name);
-            if (!ranges?.length)
-              return { errors: [{ text: `Package ${consumer.name} must declare a dependency on ${name}.` }] };
-            if (ranges.some(range => typeof range !== "string" || !validRange(range) || !satisfies(loaded.version, range)))
-              return { errors: [{ text: `Package ${consumer.name} requires ${name} ${ranges.join(" and ")}; application provides ${loaded.version}.` }] };
-          }
           depend(source, loaded.pluginId);
           return { path: args.path, namespace: "asterism-public" };
         }
@@ -189,8 +141,6 @@ export async function compileModules(packages: readonly PackageModule[], enabled
         if (subpath !== "/public") return;
         const provider = providers.get(name);
         if (!provider || result.failures.has(provider.id)) return { errors: [{ text: `Public module ${name}/public has no available enabled provider.` }] };
-        if (source && source.id !== provider.id && !source.dependencies.has(name))
-          return { errors: [{ text: `Plugin ${source.id} must declare a dependency on ${name}.` }] };
         // Preflight entries also retain indirect dependencies: symlinks/shared helpers may live outside every plugin root.
         depend(source, provider.id);
         // Resolve under the provider's own package exports rather than another copy in consumer-private node_modules.

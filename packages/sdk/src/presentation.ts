@@ -1,8 +1,10 @@
 import { z } from "zod";
 import { jsonSchema, type Json } from "./json.ts";
+import { encodeJson } from "./data-encoding.ts";
 
 export const contractReferenceSchema = z.strictObject({ id: z.string().min(1).max(160) });
 export type ContractReference = z.infer<typeof contractReferenceSchema>;
+/** The schema decodes stored or transported JSON into T; producers encode T through the same schema. */
 export interface DataContract<T extends Json = Json> extends ContractReference { schema: z.ZodType<T> }
 export const presentationSchema = z.strictObject({ contract: contractReferenceSchema, data: jsonSchema });
 export type Presentation = z.infer<typeof presentationSchema>;
@@ -14,6 +16,6 @@ export function defineData<T extends Json>(id: string, schema: z.ZodType<T>): Da
 export function reference(contract: ContractReference): ContractReference {
   return { id: contract.id };
 }
-export function present<T extends Json>(contract: DataContract<T>, value: unknown): Presentation {
-  return { contract: reference(contract), data: contract.schema.parse(value) };
+export function present<T extends Json>(contract: DataContract<T>, value: NoInfer<T>): Presentation {
+  return { contract: reference(contract), data: encodeJson(contract.schema, value, contract.id) };
 }

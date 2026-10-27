@@ -10,9 +10,9 @@
     "./locales/zh-Hans.json": "./src/locales/zh-Hans.json"
   },
   "dependencies": {
-    "@asterism/builtin-api": "^0.19.0",
-    "@asterism/sdk": "^0.46.0",
-    "@asterism/ui": "^0.1.0",
+    "@asterism/builtin-api": "*",
+    "@asterism/sdk": "*",
+    "@asterism/ui": "*",
     "@lobehub/streamdown": "1.4.1",
     "@modelcontextprotocol/client": "2.3.1",
     "@pierre/diffs": "1.5.2",

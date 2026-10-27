@@ -8,7 +8,7 @@ import { contentSchemaSql } from "./content-store.ts";
 import { templateSchemaSql } from "./templates.ts";
 import { sqliteStorage } from "../storage/migrations.ts";
 
-export const workspaceDatabaseVersion = 26;
+export const workspaceDatabaseVersion = 27;
 
 /** Business database opening consumes prepared formats only; pre-window data preparation handles upgrades. */
 export class DatabaseVersionError extends Error {

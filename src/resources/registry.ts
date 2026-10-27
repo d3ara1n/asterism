@@ -26,10 +26,19 @@ export class ResourceRegistry {
 
   has(kind: string): boolean { return this.backends.has(kind); }
   card(kind: string) { return this.backends.get(kind)?.card; }
-  validateState(kind: string, data: Json): void {
+  template(kind: string) { return this.backends.get(kind)?.template; }
+  validateTemplate(kind: string, data: Json, current: readonly { contract: string; data: Json }[]): void {
     const backend = this.backends.get(kind);
     if (!backend) throw new SessionError("unavailable", `Resource type ${kind} is unavailable.`, templateMessages.unavailable);
-    try { backend.validateState?.(data); }
+    if (!backend.template) throw new SessionError("invalid_request", `Resource type ${kind} does not support templates.`, templateMessages.unsupported);
+    try {
+      backend.validateState?.(data);
+      for (const entry of current) {
+        const contract = backend.template.current.find(contract => contract.id === entry.contract);
+        if (!contract || !contract.schema.safeParse(entry.data).success)
+          throw new Error(`Invalid template data contract: ${entry.contract}.`);
+      }
+    }
     catch { throw new SessionError("invalid_request", `Saved state for ${kind} is invalid.`, templateMessages.invalidData); }
   }
   disposalWarning(resource: FoldedObject) { return this.backends.get(resource.kind)?.disposalWarning?.(resource) ?? null; }

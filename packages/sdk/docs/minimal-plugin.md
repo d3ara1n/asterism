@@ -4,7 +4,7 @@ A counter plugin demonstrates the complete path from shared declarations to back
 
 ## Prepare the package
 
-Copy the counter directory to a writable development location. Point its `file:` SDK development dependency at a local SDK source package and keep its SDK peer range compatible with the application. The SDK is currently a private source package. React, React Intl, and Zod are shared public dependencies supplied by the host when the plugin runs.
+Copy the counter directory to a writable development location. Point its `file:` SDK development dependency at a local SDK source package. The SDK is currently a private source package; its peer dependency describes a host-provided package, and the host does not use its version range to gate loading. React, React Intl, and Zod are also shared public dependencies supplied by the host when the plugin runs.
 
 Run `npm install` and `npm run typecheck` in the copied directory. The host compiles the TypeScript, TSX, and imported CSS entries, so a separate JavaScript build is optional. Add the package directory in Asterism's plugin settings and restart the application to load it.
 

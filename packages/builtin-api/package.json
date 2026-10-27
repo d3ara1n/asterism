@@ -10,7 +10,7 @@
   },
   "dependencies": {},
   "peerDependencies": {
-    "@asterism/sdk": "^0.46.0",
+    "@asterism/sdk": "*",
     "react": "^19.3.0",
     "zod": "^4.6.5"
   },

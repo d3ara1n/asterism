@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { afterEach, describe, expect, it } from "vitest";
-import { defineMessages, defineAction, pluginNamespace, withValues } from "@asterism/sdk/contracts";
+import { defineMessages, defineAction, pluginNamespace, withValues, uiTextSchema, localeSchema, present } from "@asterism/sdk/contracts";
 import { z } from 'zod';
 import { applyPreparation } from "./commands.ts";
 import { PackageList, loadPackages, readManifest } from "./packages.ts";
@@ -21,6 +21,16 @@ const temp = () => { const root = mkdtempSync(join(tmpdir(), "asterism-i18n-"));
 afterEach(async () => { for (const service of services.splice(0)) await service.close(); for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
 
 describe("Plugin catalogs and presentation IPC", () => {
+  // Localized messages can be nested in persisted/presented data; locale normalization must encode as well as decode.
+  it("round-trips localized presentation data and validates locale tags before normalization", () => {
+    const ns = pluginNamespace("example.localized");
+    const message = ns.messages("EN-us", { title: { id: "title", defaultMessage: "Shared title" } }).title;
+    const contract = ns.data("label", z.object({ label: uiTextSchema }));
+    const encoded = present(contract, { label: message });
+    expect(contract.schema.parse(encoded.data)).toEqual({ label: { ...message, sourceLocale: "en-US" } });
+    expect(localeSchema.safeParse("not_a_locale").success).toBe(false);
+    expect(z.safeEncode(localeSchema, "not_a_locale").success).toBe(false);
+  });
   it("public messages retain provider ownership and renderer React Intl comes from the host instance", async () => {
     const provider = temp(), consumer = temp(), data = temp(), cache = join(data, "cache");
     writeFileSync(join(provider, "package.json"), JSON.stringify({ name: "@example/messages", peerDependencies: { "@asterism/sdk": `^${sdkMetadata.version}` }, exports: { "./public": "./public.ts" },
@@ -54,7 +64,7 @@ describe("Plugin catalogs and presentation IPC", () => {
       import { definePlugin, defineModule, PluginApiError } from '@asterism/sdk/runtime';
       const ns = pluginNamespace('example.backend');
       const messages = ns.messages('en', defineMessages({ limit: { id: 'limit', defaultMessage: 'Limit' } }));
-      export default definePlugin({namespace: ns, version: '1', modules: [defineModule(plugin => {
+      export default definePlugin({namespace: ns, modules: [defineModule(plugin => {
         plugin.config(ns.config(z.object({limit: z.number().max(10)}).superRefine(value => {
           if (value.limit > 5) throw new PluginApiError('rejected', 'The limit exceeds the policy.', 'policy_limit', messages.limit);
         }), {limit: 3})); return {};

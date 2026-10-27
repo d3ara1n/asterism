@@ -47,9 +47,10 @@ afterEach(async () => {
   vi.restoreAllMocks();
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
-function open(plugins: PluginDefinition[], adapterFactory?: () => ModelAdapter, onSessionChanged?: NonNullable<ConstructorParameters<typeof ApplicationService>[1]>["onSessionChanged"]) {
+function open(plugins: PluginDefinition[], adapterFactory?: () => ModelAdapter, onSessionChanged?: NonNullable<ConstructorParameters<typeof ApplicationService>[1]>["onSessionChanged"],
+  pluginDependencies?: ReadonlyMap<string, readonly string[]>) {
   const root = mkdtempSync(join(tmpdir(), "sdk-runtime-")); roots.push(root);
-  const service = new ApplicationService(root, { plugins, adapterFactory, onSessionChanged }); services.push(service);
+  const service = new ApplicationService(root, { plugins, adapterFactory, onSessionChanged, pluginDependencies }); services.push(service);
   const sessionId = service.sessions.tree.create("Counter");
   return { root, service, sessionId };
 }
@@ -66,7 +67,7 @@ function counter(options: { onRead?: (object: ObjectReader) => void; failCreate?
   prepare?: (signal: AbortSignal) => Promise<void>; execute?: (object: ObjectExecutor, signal: AbortSignal, amount: number) => Promise<void>;
 } = {}) {
   let context!: PluginContext;
-  const plugin = definePlugin({ namespace: ns, version: "1.0.0", modules: [defineModule(plugin => {
+  const plugin = definePlugin({ namespace: ns, modules: [defineModule(plugin => {
     context = plugin;
     return {
       resources: [implementResource(Counter, View, {
@@ -105,6 +106,48 @@ async function create(service: ApplicationService, sessionId: string, input = 1)
 }
 
 describe("Host implementation of the workbench SDK", () => {
+  // Writers receive domain objects; state, records, and resource projections must decode their distinct stored shapes exactly once.
+  it("round-trips codec state, records, resource creation and presentations while preserving encoded JSON", async () => {
+    const codecNs = pluginNamespace("test.codec");
+    const stateSchema = z.codec(z.object({ stored: z.string() }), z.object({ text: z.string() }), {
+      decode: value => ({ text: value.stored }), encode: value => ({ stored: value.text }),
+    });
+    const Item = codecNs.resource("item", stateSchema);
+    const Value = codecNs.data("value", z.codec(z.string(), z.object({ text: z.string() }), {
+      decode: text => ({ text }), encode: value => value.text,
+    }));
+    const Empty = codecNs.data("empty", z.codec(z.null(), z.literal("present"), { decode: () => "present" as const, encode: () => null }));
+    const Entry = defineRecord(codecNs.name("entry"), { schema: Value.schema });
+    const Create = defineCreation(Item, { id: codecNs.name("create"), schema: z.null() });
+    let plugin!: PluginContext;
+    const { service, sessionId } = open([definePlugin({ namespace: codecNs, setup(context) {
+      plugin = context;
+      return { resources: [implementResource(Item, Value, {
+        records: [Entry],
+        creation: implementCreation(Create, { create: () => ({ title: "Encoded", data: { text: "seed" } }) }),
+        project: state => state, inspect: async state => state,
+      })] };
+    } })]);
+    const created = await plugin.session(sessionId).create(Create, null);
+    const object = plugin.object(sessionId, Item, created.id);
+    expect(object.snapshot()?.data).toEqual({ stored: "seed" });
+    expect(object.session.snapshot().resources.get(Item, created.id)).toMatchObject({ status: "known", resource: { data: { text: "seed" } } });
+    expect(service.sessions.current(sessionId).workbench.objects.find(item => item.id === created.id)?.presentation.data).toBe("seed");
+    expect(object.get(Empty)).toBeNull();
+    object.commit(writer => { writer.set(Value, { text: "current" }); writer.set(Empty, "present"); writer.append(Entry, { text: "record" }); });
+    expect(object.get(Value)).toEqual({ text: "current" });
+    expect(object.get(Empty)).toBe("present");
+    const record = object.session.snapshot().records.last(Entry, { scope: "timeline" });
+    expect(record).toMatchObject({ status: "known", data: { text: "record" }, record: { data: "record" } });
+    const before = object.session.snapshot().records.all({ scope: "session" });
+    const Broken = codecNs.data("broken", z.string().transform(text => ({ text })));
+    expect(() => object.commit(writer => {
+      writer.set(Value, { text: "changed" });
+      writer.set(Broken, { text: "cannot encode" });
+    })).toThrow(Broken.id);
+    expect(object.get(Value)).toEqual({ text: "current" });
+    expect(object.session.snapshot().records.all({ scope: "session" })).toEqual(before);
+  });
   // Notifications within commits take effect with the transaction; rolled-back data must not reach the UI.
   it("transactional resource projection notifications arrive after commit and failed rollbacks push nothing", async () => {
     const c = counter(), changed = vi.fn();
@@ -159,7 +202,7 @@ describe("Host implementation of the workbench SDK", () => {
   it("session.invoke reuses preparation and record origins across plugins and rejects declaration copies and invalid targets", async () => {
     const c = counter(), caller = pluginNamespace("test.action-caller");
     let consumer!: PluginContext, prepared = 0, reject = false;
-    const { service, sessionId } = open([c.plugin, definePlugin({ namespace: caller, version: "1", setup(plugin) {
+    const { service, sessionId } = open([c.plugin, definePlugin({ namespace: caller, setup(plugin) {
       consumer = plugin;
       return { preparers: [implementPreparer(ChangeCount, { id: "adjust", prepare(input) {
         prepared++;
@@ -265,21 +308,25 @@ describe("Host implementation of the workbench SDK", () => {
   it("external top-level tools are declared from the first request, bind calling objects, and follow tool filtering", async () => {
     const c = counter(), other = pluginNamespace("test.questions");
     let invoked = 0;
+    let emptyEncoding = false;
+    const cached = { kind: "succeeded" as const, data: { answer: "Answer: Hello" } };
     const declaration = defineTopLevelTool({
       id: other.name("prompt"), name: "prompt", description: "Return an answer.", guidelines: [],
       argsSchema: z.strictObject({ text: z.string() }).describe("Question text."),
-      resultSchema: z.string().describe("Answer text."), effect: "read", execution: "parallel",
+      resultSchema: z.codec(z.string().nullable(), z.object({ answer: z.string() }), {
+        decode: answer => ({ answer: answer ?? "null" }), encode: value => value.answer === "null" ? null : value.answer,
+      }).describe("Answer text."), effect: "read", execution: "parallel",
       async execute(args, context) {
         invoked++;
         expect(context.object.ref.kind).toBe(Counter.kind);
         expect(context.callId).toBe("question");
         expect(context.object).not.toHaveProperty("commit");
         expect(() => context.object.get(State)).toThrow("another plugin");
-        context.publish("Waiting");
-        return { kind: "succeeded", data: `Answer: ${args.text}` };
+        context.publish({ answer: "Waiting" });
+        return emptyEncoding ? { kind: "succeeded", data: { answer: "null" } } : cached;
       },
     });
-    const plugin = definePlugin({ namespace: other, version: "1.0.0", modules: [defineModule(() => ({ topLevelTools: [declaration] }))] });
+    const plugin = definePlugin({ namespace: other, modules: [defineModule(() => ({ topLevelTools: [declaration] }))] });
     const requests: ModelInput[] = [];
     const { service, sessionId } = open([c.plugin, plugin], () => ({ version: "test/1", validate() {}, prepare(input) {
       requests.push(input);
@@ -297,12 +344,19 @@ describe("Host implementation of the workbench SDK", () => {
     });
     const allowed = await run(["prompt"]);
     expect(requests[0]!.tools.map(tool => tool.name)).toEqual(["resource_list", "resource_inspect", "resource_call", "prompt"]);
-    expect(allowed.tools[0]).toMatchObject({ kind: "succeeded", implementation: { id: declaration.id }, data: "Answer: Hello" });
+    expect(allowed.tools[0]).toMatchObject({ kind: "succeeded", implementation: { id: declaration.id }, data: "Answer: Hello",
+      model: [{ kind: "text", text: '{"answer":"Answer: Hello"}' }] });
+    expect(cached.data).toEqual({ answer: "Answer: Hello" });
     expect(allowed.tools[0]).not.toHaveProperty("resource");
     const denied = await run([]);
     expect(requests[1]!.tools.map(tool => tool.name)).toEqual(["resource_list", "resource_inspect", "resource_call"]);
     expect(denied.tools[0]?.kind).toBe("rejected");
     expect(invoked).toBe(1);
+    expect((await run(["prompt"])).tools[0]).toMatchObject({ kind: "succeeded", data: "Answer: Hello" });
+    // Null means absent tool output; an unrepresentable final encoding fails while retaining the last valid progress value.
+    emptyEncoding = true;
+    const failed = await run(["prompt"]);
+    expect(failed.tools[0]).toMatchObject({ kind: "failed", data: "Waiting" });
   });
 
   // Top-level tools override complete declarations in user-list order; failed contributions reserve no names, and model declarations and execution identities share the same winner.
@@ -322,13 +376,13 @@ describe("Host implementation of the workbench SDK", () => {
       async execute(value) { invoked.push(last.id); return { kind: "succeeded", data: value.prompt }; },
     });
     const missingAction = defineAction(last.resource("missing", z.object({})), { id: last.name("missing"), schema: z.null() });
-    const later = definePlugin({ namespace: last, version: "1", modules: [
+    const later = definePlugin({ namespace: last, modules: [
       defineModule(() => ({ topLevelTools: [replacement],
         ...(state === "validation-failed" ? { preparers: [{ id: "invalid", contract: missingAction, prepare: () => ({ action: "accept" as const }) }] } : {}) })),
       defineModule(() => { if (state === "setup-failed") throw new Error("Setup failed."); return {}; }),
     ] });
     // The normal case deliberately initializes the later entry first to verify user-list precedence; failure cases keep the first entry independently available.
-    const earlier = definePlugin({ namespace: first, version: "1", dependencies: state === "loaded" ? [last.id] : [],
+    const earlier = definePlugin({ namespace: first,
       modules: [defineModule(() => ({ topLevelTools: [previous] }))] });
     const requests: ModelInput[] = [];
     const { service, sessionId } = open([c.plugin, earlier, later], () => ({
@@ -340,7 +394,7 @@ describe("Host implementation of the workbench SDK", () => {
           yield { type: "finish", reason: "tool-calls", usage: null };
         } };
       },
-    }));
+    }), undefined, new Map([[first.id, state === "loaded" ? [last.id] : []]]));
     const target = await configureModel(service);
     const object = { id: await create(service, sessionId), sessionId, kind: Counter.kind };
     const result = await c.context().models.run({
@@ -363,7 +417,7 @@ describe("Host implementation of the workbench SDK", () => {
     const c = counter(), other = pluginNamespace("test.questions");
     const query = defineCall(other.name("query"), { scope: "object", input: z.string().trim(), output: z.string() });
     const invalid = defineCall(other.name("invalid"), { scope: "object", input: z.null(), output: z.number() });
-    const plugin = definePlugin({ namespace: other, version: "1.0.0", modules: [defineModule(() => ({
+    const plugin = definePlugin({ namespace: other, modules: [defineModule(() => ({
       calls: [
         implementCall(query, async (input, context) => {
           expect(context.source).toEqual({ plugin: ns.id, resource: null });
@@ -392,7 +446,7 @@ describe("Host implementation of the workbench SDK", () => {
     const wait = defineCall(other.name("wait"), { scope: "object", input: z.null(), output: z.null() });
     let signal!: AbortSignal, release!: () => void;
     const gate = new Promise<void>(resolve => { release = resolve; });
-    const plugin = definePlugin({ namespace: other, version: "1.0.0", modules: [defineModule(() => ({
+    const plugin = definePlugin({ namespace: other, modules: [defineModule(() => ({
       calls: [implementCall(wait, async (_input, context) => { signal = context.signal; await gate; return null; })],
     }))] });
     const { service, sessionId } = open([c.plugin, plugin]);
@@ -446,7 +500,7 @@ describe("Host implementation of the workbench SDK", () => {
     const contract = defineCreation(Counter, { id: ns.name("transform"), schema: z.number().transform(transform) });
     const created = vi.fn((_value: number) => ({ title: "Counter", data: {} }));
     const prepare = vi.fn((_value: number) => ({ action: "accept" as const }));
-    const plugin = definePlugin({ namespace: ns, version: "1", modules: [defineModule(() => ({
+    const plugin = definePlugin({ namespace: ns, modules: [defineModule(() => ({
       resources: [implementResource(Counter, View, {
         creation: implementCreation(contract, { prepare, create: created }), project: () => ({ value: 0 }), inspect: async () => null,
       })],
@@ -473,7 +527,7 @@ describe("Host implementation of the workbench SDK", () => {
       })) };
     })] });
     let replacement = "10", rejected = false;
-    const preparers = definePlugin({ namespace: pluginNamespace("test.prepare"), version: "1", modules: [defineModule(() => ({
+    const preparers = definePlugin({ namespace: pluginNamespace("test.prepare"), modules: [defineModule(() => ({
       preparers: [
         implementPreparer(action, { id: "accept", prepare(value) { seen.push(value); return { action: "accept" }; } }),
         implementPreparer(action, { id: "replace", prepare() { return { action: "replace" as const, input: replacement }; } }),
@@ -500,7 +554,7 @@ describe("Host implementation of the workbench SDK", () => {
     let begin!: () => void, release!: () => void;
     const started = new Promise<void>(resolve => { begin = resolve; });
     const held = new Promise<void>(resolve => { release = resolve; });
-    const observer = definePlugin({ namespace: pluginNamespace("test.prepare-close"), version: "1", modules: [defineModule(() => ({
+    const observer = definePlugin({ namespace: pluginNamespace("test.prepare-close"), modules: [defineModule(() => ({
       preparers: [{ id: "hold", contract: ChangeCount, async prepare(_input, { signal }) {
         preparationSignal = signal; begin(); await held; return { action: "accept" };
       } }],
@@ -522,7 +576,7 @@ describe("Host implementation of the workbench SDK", () => {
   });
   it("home input preparation replacements must satisfy submission contracts and failures create no sessions", async () => {
     const namespace = pluginNamespace("test.first-input");
-    const plugin = definePlugin({ namespace, version: "1", modules: [defineModule(() => ({
+    const plugin = definePlugin({ namespace, modules: [defineModule(() => ({
       preparers: [{ id: "empty-input", contract: SubmitAgentInput,
         prepare: () => ({ action: "replace", input: {} }) }],
     }))] });
@@ -633,7 +687,7 @@ describe("Host implementation of the workbench SDK", () => {
     const tool = defineTool({ id: "test.tools/counter_read", name: "counter_read", description: "Read the counter.", guidelines: [],
       argsSchema: z.strictObject({}).describe("No arguments.") });
     const implementation = defineImplementation({
-      ...ns.data("read-result", z.number().describe("The current counter value.")),
+      ...ns.data("read-result", z.codec(z.string(), z.number(), { decode: Number, encode: String }).describe("The current counter value.")),
       resource: Counter, tool, targetSchema: z.null().describe("The whole counter."), effect: "read", execution: "parallel",
     });
     let toolObject!: ObjectExecutor;
@@ -645,7 +699,7 @@ describe("Host implementation of the workbench SDK", () => {
         expect(Object.isFrozen(context.caller.ref)).toBe(true);
         context.publish(context.object.get(State)!);
         return { kind: "succeeded", data: context.object.get(State)! };
-      } })],
+      }, toModel: value => String(value + 1) })],
     }))] });
     let tools!: ToolRegistry;
     const original = runtimeModules.createModules;
@@ -659,8 +713,9 @@ describe("Host implementation of the workbench SDK", () => {
     const invocation = adapted.prepare(resource, null, {}, { ref: { sessionId, id: "caller", kind: "test/agent" }, title: "Caller" });
     if (!("execute" in invocation)) throw new Error("Expected a tool invocation.");
     const progress: unknown[] = [];
-    expect(await invocation.execute(new AbortController().signal, data => progress.push(data))).toEqual({ kind: "succeeded", data: 4 });
-    expect(progress).toEqual([4]);
+    expect(await invocation.execute(new AbortController().signal, data => progress.push(data))).toEqual({ kind: "succeeded", data: "4" });
+    expect(progress).toEqual(["4"]);
+    expect(invocation.toModel!("4")).toBe("5");
     expect(() => toolObject.commit(writer => { writer.set(State, 5); })).toThrow();
     expect(() => toolObject.session.commit(writer => { writer.set(State, 5); })).toThrow();
     expect(() => toolObject.session.title.set("Late")).toThrow();
@@ -720,7 +775,7 @@ describe("Host implementation of the workbench SDK", () => {
     let context!: PluginContext;
     const seen: [string, number][] = [];
     const positions: number[] = [];
-    const plugin = definePlugin({ namespace: eventNs, version: "1", modules: [defineModule(plugin => {
+    const plugin = definePlugin({ namespace: eventNs, modules: [defineModule(plugin => {
       context = plugin;
       return { records: [Input, Follow], observers: [
         { id: "append", committed(event) {
@@ -747,7 +802,7 @@ describe("Host implementation of the workbench SDK", () => {
     const Current = eventNs.data("current", z.number());
     let context!: PluginContext;
     const commits: string[][] = [], paths: string[][] = [], published: string[] = [];
-    const plugin = definePlugin({ namespace: eventNs, version: "1", modules: [defineModule(plugin => {
+    const plugin = definePlugin({ namespace: eventNs, modules: [defineModule(plugin => {
       context = plugin;
       return { records: [Entry], observers: [{
         id: "cursor",

@@ -1,7 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, realpathSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { extname, join, relative, resolve, isAbsolute, posix, win32 } from "node:path";
 import { pathToFileURL } from "node:url";
-import { satisfies, validRange } from "semver";
 import { z } from "zod";
 import * as zod from "zod";
 import * as sdkContracts from "@asterism/sdk/contracts";
@@ -36,9 +35,8 @@ export const manifestSchema = z.strictObject({
   }).optional(),
 });
 export type PluginPackageManifest = z.infer<typeof manifestSchema>;
-const sdkRequirementSchema = z.object({ peerDependencies: z.object({ "@asterism/sdk": z.string().trim().min(1) }) });
 
-/** Package information is independent of API compatibility and code loading, so failed or disabled plugins can still display. */
+/** Package information is independent of code loading, so failed or disabled plugins can still display. */
 export function readPackageMetadata(root: string): PluginMetadata {
   const pkg = z.object({
     name: z.string().optional(), version: z.string().optional(), description: z.string().optional(),
@@ -75,7 +73,7 @@ export function packageListStorage(root: string) {
 }
 
 export class PluginPackageError extends Error {
-  constructor(readonly code: "not_a_package" | "invalid_manifest" | "incompatible_api" | "duplicate" | "build_failed" | "invalid_entry", message: string) { super(message); }
+  constructor(readonly code: "not_a_package" | "invalid_manifest" | "duplicate" | "build_failed" | "invalid_entry", message: string) { super(message); }
 }
 
 /** Source adapter: yields only a package root; later stages no longer distinguish sources. */
@@ -96,12 +94,6 @@ export function readManifest(root: string): PluginPackageManifest {
     throw new PluginPackageError("invalid_manifest", `Package at ${root} has no valid Asterism manifest: ${fields}.`);
   }
   const manifest = parsed.data;
-  const requirement = sdkRequirementSchema.safeParse(raw);
-  const range = requirement.success ? requirement.data.peerDependencies["@asterism/sdk"] : undefined;
-  if (!range || !validRange(range))
-    throw new PluginPackageError("invalid_manifest", `Plugin ${manifest.id} must declare a semantic version range in peerDependencies["@asterism/sdk"]; host provides ${sdkMetadata.version}.`);
-  if (!satisfies(sdkMetadata.version, range))
-    throw new PluginPackageError("incompatible_api", `Plugin ${manifest.id} requires @asterism/sdk ${range}; host provides ${sdkMetadata.version}.`);
   for (const entry of [manifest.runtime, manifest.renderer, manifest.storage]) {
     if (entry && relative(root, resolve(root, entry)).startsWith("..")) throw new PluginPackageError("invalid_entry", `Entry ${entry} is outside the package.`);
   }
@@ -196,6 +188,8 @@ function hostModules(realm: "runtime" | "renderer"): Plugin {
 
 export interface ResolvedPackage {
   dependencies?: string[];
+  /** Runtime providers requiring setup, including providers reached through public-only packages. */
+  runtimeDependencies?: string[];
   rendererDependencies?: string[];
   catalogs?: TranslationCatalog[];
   entry: PackageEntry;
@@ -278,7 +272,6 @@ export async function loadPackages(list: PackageList, npmRoot: string, cacheRoot
       progress(id);
       const definition = await importEntry(id, file, "runtime") as PluginDefinition | undefined;
       if (!definition || typeof definition !== "object" || definition.namespace?.id !== id
-        || typeof definition.version !== "string" || !definition.version.trim()
         || (definition.setup !== undefined && typeof definition.setup !== "function")
         || (definition.modules !== undefined && (!Array.isArray(definition.modules) || definition.modules.some(module => !module || typeof module.setup !== "function"))))
         throw new PluginPackageError("invalid_entry", `Runtime entry of ${id} must default-export definePlugin(...) with namespace ${id}.`);
@@ -307,7 +300,7 @@ export async function loadPackages(list: PackageList, npmRoot: string, cacheRoot
       publicProviders.some(provider => provider.pluginId === dependency) || result.some(item => item.manifest?.id === dependency && item.definition)
         ? [dependency] : dependenciesOf(dependency, visited));
   };
-  for (const item of result) if (item.definition) item.definition = { ...item.definition, dependencies: dependenciesOf(item.manifest!.id) };
+  for (const item of result) if (item.definition) item.runtimeDependencies = dependenciesOf(item.manifest!.id);
   for (const item of result) if (item.status === "loaded" && item.manifest?.i18n)
     item.catalogs = loadCatalogs(item.root, item.manifest.id, item.manifest.i18n.catalogs);
   return result;

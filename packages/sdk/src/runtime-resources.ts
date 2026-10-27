@@ -1,7 +1,7 @@
 import type { ActionContract, CreationContract } from "./commands.ts";
 import type { z } from "zod";
 import { jsonSchema, type Json } from "./json.ts";
-import type { ToolModelOutput } from "./tool-result.ts";
+import { defaultToolModel, type ToolModelOutput } from "./tool-result.ts";
 import type { ResourceContract, ImplementationContract } from "./module-contract.ts";
 import type { RecordContract } from "./records.ts";
 import { reference, present, type DataContract } from "./presentation.ts";
@@ -9,6 +9,7 @@ import { PluginApiError } from "./runtime.ts";
 import type { ContextFile, ObjectReader, ObjectExecutor, CreationContribution, ActionContribution, CommandPreparer, CreationPreparation, ActionPreparation, ExternalPreparation, ResourceContribution, ToolContribution, Preparation, CallResult, Lifetime } from "./runtime-contracts.ts";
 import { validationMessage, jsonArgumentHint } from "./tool-validation.ts";
 import type { ToolCaller } from "./runtime-contracts.ts";
+import { encodeJson } from "./data-encoding.ts";
 
 function parse<T>(schema: z.ZodType<T>, input: unknown, subject: string): T {
   const result = schema.safeParse(input);
@@ -38,6 +39,7 @@ export function implementResource<S extends Json, V extends Json>(
   resource: ResourceContract<S>, view: DataContract<V>, definition: {
     card?: ResourceContribution["card"];
     records?: readonly RecordContract[];
+    template?: ResourceContribution["template"];
     links?: ResourceContribution["links"];
     creation?: CreationContribution;
     actions?: readonly ActionContribution[];
@@ -51,7 +53,7 @@ export function implementResource<S extends Json, V extends Json>(
 ): ResourceContribution {
   const attach = definition.attach;
   return {
-    resource, card: definition.card, records: [...definition.records ?? []], links: definition.links,
+    resource, card: definition.card, records: [...definition.records ?? []], links: definition.links, template: definition.template,
     creation: definition.creation, actions: definition.actions,
     project: (snapshot, object) => present(view, definition.project(parse(resource.stateSchema, snapshot.data, "resource"), object)),
     inspect: async (snapshot, object) => jsonSchema.parse(await definition.inspect(parse(resource.stateSchema, snapshot.data, "resource"), object)),
@@ -87,11 +89,19 @@ export function implementTool<S extends Json, T extends Json, A extends Json, D 
         ].join("\n") } };
       return {
         effect: contract.effect, execution: contract.execution, implementation: identity,
-        // When no projection is declared, pass JSON text to the model; preserve strings and parts unchanged without serializing them twice.
-        toModel: data => definition.toModel ? definition.toModel(contract.schema.parse(data)) : JSON.stringify(data),
+        // Model projections consume decoded values.
+        toModel: data => {
+          const decoded = contract.schema.parse(data);
+          return definition.toModel ? definition.toModel(decoded) : defaultToolModel(decoded);
+        },
         async execute(signal, publish) {
           let active = true;
-          const snapshot = (data: unknown) => jsonSchema.parse(contract.schema.parse(data));
+          const snapshot = (data: Json) => {
+            const encoded = encodeJson<Json>(contract.schema, data, contract.id);
+            if (encoded === null && data !== null)
+              throw new PluginApiError("invalid_argument", `${contract.id}: non-null tool results require a non-null encoding; null denotes absent output.`);
+            return encoded;
+          };
           try {
             const result = await definition.call(state.data, parsedTarget.data, parsedArgs.data, { object, caller, signal,
               publish(data) { if (active) publish?.(snapshot(data)); } });

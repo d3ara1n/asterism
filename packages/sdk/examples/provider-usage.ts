@@ -29,6 +29,6 @@ const preset: ModelProviderPreset = {
     usage: usage.id, fixedFields: ["protocol", "baseUrl", "auth", "compatibility", "usage"] },
   sources: ["https://example.invalid/docs"], verifiedOn: "2026-10-20",
 };
-export default definePlugin({ namespace: ns, version: "1.0.0", setup: () => ({
+export default definePlugin({ namespace: ns, setup: () => ({
   usageProviders: [usage], modelProviderPresets: [{ type: "add", preset }],
 }) });

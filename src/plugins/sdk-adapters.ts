@@ -1,4 +1,4 @@
-import { jsonSchema, reference, type ResourceCall, type Json, type ContractReference } from "@asterism/sdk/contracts";
+import { reference, type ResourceCall, type Json, type ContractReference } from "@asterism/sdk/contracts";
 import { PluginApiError, type Lifetime, type ResourceContribution, type ResourceRef, type ToolContribution, type ResourceSnapshot } from "@asterism/sdk/runtime";
 import { SessionError } from "../session/tree.ts";
 import type { FoldedObject } from "../session/fold.ts";
@@ -14,6 +14,7 @@ import type { ObjectScope } from "./host.ts";
 import type { ContentLease } from "../runtime/content-store.ts";
 import { contentReferences } from "../runtime/content-store.ts";
 import { AsyncLocalStorage } from "node:async_hooks";
+import { encodePluginData } from "./data-encoding.ts";
 
 function address(host: PluginHostServices, resource: FoldedObject): ResourceRef {
   const ref = host.refOf(resource.id);
@@ -42,6 +43,7 @@ export function adaptResource(contribution: ResourceContribution, sdk: SdkContex
   return {
     kind: resource.kind,
     card: contribution.card,
+    template: contribution.template,
     validateState(data) {
       if (!resource.stateSchema.safeParse(data).success)
         throw new SessionError("invalid_request", "Saved resource state does not match its schema.");
@@ -94,9 +96,7 @@ export function adaptResource(contribution: ResourceContribution, sdk: SdkContex
           try {
             let result!: { title: string; data: Json };
             synchronous(() => { result = creation.create(input, sdk.object({ sessionId, id, kind: resource.kind }, scope)); return result; });
-            const data = jsonSchema.parse(resource.stateSchema.parse(result.data));
-            if (!data || typeof data !== "object" || Array.isArray(data) || ["id", "type", "title"].some(key => key in data))
-              throw new PluginApiError("invalid_argument", "Resource creation data must be an object without reserved id, type or title fields.");
+            const data = encodePluginData({ id: resource.kind, schema: resource.stateSchema }, result.data);
             if (typeof result.title !== "string") throw new PluginApiError("invalid_argument", "The resource title must be a string.");
             return { title: result.title, data };
           } finally { scope.active = false; }

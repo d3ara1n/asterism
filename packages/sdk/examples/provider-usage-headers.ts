@@ -17,4 +17,4 @@ const usage: HeadersUsageProvider = {
       remaining: value.data, currency: code.data }] satisfies UsageItem[];
   },
 };
-export default definePlugin({ namespace: ns, version: "1.0.0", setup: () => ({ usageProviders: [usage] }) });
+export default definePlugin({ namespace: ns, setup: () => ({ usageProviders: [usage] }) });

@@ -1,5 +1,5 @@
 import type { Json, ModelInputPart, ToolModelOutput } from "@asterism/sdk/contracts";
-import { toolCompletionSchema, toolOutcomeSchema, type ToolInvocationInfo, type ToolOutcome } from "@asterism/sdk/contracts";
+import { defaultToolModel, toolCompletionSchema, toolOutcomeSchema, type ToolInvocationInfo, type ToolOutcome } from "@asterism/sdk/contracts";
 import type { CallResult } from "./contract.ts";
 
 /** Only unsuccessful outcomes may inherit intermediate output; previews cannot implicitly become successful results. */
@@ -14,12 +14,9 @@ export function resolveToolCompletion(result: CallResult, latest: Json = null) {
   });
 }
 
-/** Serialize text once: strings become text parts unchanged, and data without declared projection reaches models as JSON text. */
-function parts(output: ToolModelOutput | Json): ModelInputPart[] {
-  if (typeof output === "string") return [{ kind: "text", text: output }];
-  if (Array.isArray(output) && output.length && output.every(part => part && typeof part === "object" && "kind" in part))
-    return output as ModelInputPart[];
-  return [{ kind: "text", text: JSON.stringify(output) }];
+/** Declared projections may return parts; tool data is never interpreted as parts without a projection. */
+function toolModelParts(output: ToolModelOutput): ModelInputPart[] {
+  return typeof output === "string" ? [{ kind: "text", text: output }] : output;
 }
 
 /** Finalize once, fixing model projections and GUI data together without depending on active objects afterward. */
@@ -30,7 +27,7 @@ export function finishToolResult(result: CallResult, info: ToolInvocationInfo = 
   let projectionFailed = false;
   try {
     projected = completion.data === null && completion.kind !== "succeeded" && completion.kind !== "partial"
-      ? null : parts(toModel ? toModel(completion.data) : completion.data);
+      ? null : toolModelParts(toModel ? toModel(completion.data) : defaultToolModel(completion.data));
   } catch {
     // Known execution outcomes cannot become execution failures due to presentation projection failure; do not bypass projections and leak raw data either.
     projected = null; projectionFailed = true;

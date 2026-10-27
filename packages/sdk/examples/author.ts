@@ -13,7 +13,7 @@ const Annotation = defineRecord(journal.name("annotation"), {
   schema: z.strictObject({ text: z.string() }),
 });
 export const journalPlugin = definePlugin({
-  namespace: journal, version: "0.0.1", modules: [defineModule(plugin => ({
+  namespace: journal, modules: [defineModule(plugin => ({
     records: [Annotation],
     observers: [{
       id: "observe-annotations",
@@ -86,7 +86,7 @@ function counterChange(limit: () => number) {
   });
 }
 export const counterPlugin = definePlugin({
-  namespace: sample, version: "0.0.1", modules: [defineModule(plugin => {
+  namespace: sample, modules: [defineModule(plugin => {
     const settings = plugin.config(CounterConfig);
     return {
       resources: [implementResource(Counter, CounterView, {

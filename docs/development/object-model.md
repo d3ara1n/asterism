@@ -16,11 +16,11 @@ Startup collection deletes sessions older than the retention threshold. It remov
 
 ## Workbench templates
 
-A template is workspace-owned static data: selected resource types, titles, creation data, object-scoped current data, links, and card arrangement. It contains no conversation history, session-scoped current data, viewport, local panel state, or running external instance.
+A template is workspace-owned static data: selected resource types, titles, creation data, explicitly selected object-scoped current data, links, and card arrangement. Resources opt into this copying behavior and declare their reusable current-data contracts. It contains no conversation history, session-scoped current data, private files, viewport, local panel state, or running external instance.
 
 Saving captures current values independently of later source changes. Instantiation creates a session and fresh resource identities in one transaction. Internal object references in the template’s relationship structure map to new identities; arbitrary domain JSON retains its values.
 
-The host validates resource types, creation data, and link eligibility. It initializes objects from saved data without rerunning creation forms or handlers. Failure rolls back the transaction. New history records object creation and links.
+The host validates resource availability, template support, creation data, declared current data, and link eligibility. Saved data that the installed resource no longer accepts fails explicitly. The host initializes objects from saved data without rerunning creation forms or handlers. Failure rolls back the transaction. New history records object creation and links.
 
 Templates independently retain the immutable bytes referenced by their saved data. Deleting a template does not affect sessions already created from it.
 

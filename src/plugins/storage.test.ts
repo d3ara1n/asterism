@@ -32,6 +32,25 @@ function setup() {
 }
 
 describe("Plugin managed storage", () => {
+  // Missing fields in older files use forward defaults; saving the resulting complete value must remain stable.
+  it("decodes defaults from older configuration without rewriting on read and encodes identity updates", () => {
+    const { open } = setup();
+    const storage = open("test.config-defaults");
+    const contract = defineConfig("test.config-defaults", z.object({ label: z.string().trim(), limit: z.number().default(3) }),
+      { label: " default ", limit: 3 });
+    const config = storage.config(contract);
+    expect(config.get()).toEqual({ label: "default", limit: 3 });
+    const file = join(storage.dir, managedDirectory, "config.json");
+    const old = '{"label":" old "}';
+    writeFileSync(file, old);
+    expect(config.get()).toEqual({ label: "old", limit: 3 });
+    expect(readFileSync(file, "utf8")).toBe(old);
+    config.update(value => value);
+    expect(JSON.parse(readFileSync(file, "utf8"))).toEqual({ label: "old", limit: 3 });
+    expect(config.get()).toEqual({ label: "old", limit: 3 });
+    storage.resetConfiguration();
+    expect(config.get()).toEqual({ label: "default", limit: 3 });
+  });
   it("one configuration contract per plugin; defaults and UI snapshots do not mutate declarations", () => {
     const { open } = setup();
     const storage = open("acme.settings");

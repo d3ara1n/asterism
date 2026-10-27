@@ -23,7 +23,7 @@ export class SessionWorkbench {
     private readonly tools: (sessionId: string, receiverId: string, resource: FoldedObject) => Json,
     private readonly content?: ContentStore) {}
 
-  /** Generic resource creation: contributions supply titles and save object data; creation events retain identity, type, and title. */
+  /** Generic resource creation: contributions supply titles and encoded state; creation events retain metadata separately. */
   create(sessionId: string, kind: string, input: Json, position: Point, content?: ContentLease): string {
     return this.createWith(sessionId, kind, createResourceId(), input, position, content);
   }
@@ -31,14 +31,14 @@ export class SessionWorkbench {
     const controller = this.resources.controller(kind);
     if (!controller?.create) throw new SessionError("invalid_request", "This resource type cannot be created here.");
     const { title, data } = controller.create(sessionId, id, input, content);
-    return this.insert(sessionId, { id, kind, title, data: data ?? {} }, position, { scope: content });
+    return this.insert(sessionId, { id, kind, title, data }, position, { scope: content });
   }
 
   /** Establish initialized object data under new identities; ordinary creation and template instantiation share history and content registration. */
-  insert(sessionId: string, object: { id: string; kind: string; title: string; data: Record<string, Json> },
+  insert(sessionId: string, object: { id: string; kind: string; title: string; data: Json },
     position: Point, access: Pick<ContentAccess, "scope" | "templateId"> = {}): string {
     const { id, kind, title, data } = object;
-    const node = this.tree.appendToTimeline(sessionId, { source: host, recipient: null, contract: "resource_created", data: { ...data, id, type: kind, title }, model: null });
+    const node = this.tree.appendToTimeline(sessionId, { source: host, recipient: null, contract: "resource_created", data: { id, type: kind, title, data }, model: null });
     this.content?.bind({ sessionId, objectId: id, ...access }, { kind: "record", id: node.id }, data);
     this.addView(sessionId, id, position);
     return id;

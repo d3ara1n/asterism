@@ -25,6 +25,19 @@ const value = (id: string, parentId: string | null, data: unknown, type = contra
   node(id, parentId, event(type, data as never, { source: { plugin: "example.plugin", resource: null } }));
 
 describe("Contract decoding on shared timelines", () => {
+  // A new codec reads old payloads without migrating immutable records in place.
+  it("decodes old and current payload shapes while preserving original record data", () => {
+    const current = z.object({ text: z.string() });
+    const schema = z.codec(z.union([z.string(), current]), current, {
+      decode: value => typeof value === "string" ? { text: value } : value,
+      encode: value => value,
+    });
+    const upgraded = defineRecord(contract.id, { schema });
+    const old = { ...record, data: "old text" };
+    expect(upgraded.decode(old)).toMatchObject({ status: "known", data: { text: "old text" }, record: { data: "old text" } });
+    expect(old.data).toBe("old text");
+    expect(upgraded.decode({ ...record, data: { text: "new text" } })).toMatchObject({ status: "known", data: { text: "new text" } });
+  });
   it("decodes by domain identity and actual shape; schema-invalid data returns unknown while retaining original records", () => {
     expect(contract.decode({ ...record, contract: { id: "another.plugin/event" } })).toBeNull();
     expect(contract.decode(record)).toMatchObject({ status: "known", data: { value: 1 } });

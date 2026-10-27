@@ -28,7 +28,8 @@ export const message = (agentId: string, value: string, startsTurn = true, sende
   record(AgentInputMessage.id, { startsTurn, parts: [{ kind: "text", text: value }], sender }, agentSource(agentId));
 export const event = (type: string, data: Json, options: { source?: NewNode["source"]; model?: string | null; recipient?: string | null } = {}): NewNode =>
   ({ contract: type, data, source: options.source ?? hostSource, model: options.model ?? null, recipient: options.recipient ?? null });
-export const created = (id: string, title: string, kind = "asterism.builtin/agent") => event("resource_created", { id, title, type: kind });
+export const created = (id: string, title: string, kind = "asterism.builtin/agent", data: Json = {}) =>
+  event("resource_created", { id, title, type: kind, data });
 export const attached = (receiverId: string, resourceId: string, model: string | null = `${resourceId} attached`) =>
   event("resource_attached", { id: resourceId, receiverId }, { model, recipient: receiverId });
 export const removed = (id: string) => event("object_removed", { id });

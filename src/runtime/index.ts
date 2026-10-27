@@ -47,6 +47,8 @@ try {
         pluginId: item.manifest!.id, path: `plugins/${item.manifest!.id}/${path}`, directory: join(item.root, path),
       })) : []),
     plugins: packages.flatMap(item => item.definition ? [item.definition] : []), protector: secrets,
+    pluginDependencies: new Map(packages.flatMap(item => item.definition
+      ? [[item.definition.namespace.id, item.runtimeDependencies ?? []] as const] : [])),
     preparedStorage: { failures: storageFailures,
       declarations: new Map(packages.flatMap(item => item.manifest && item.storage ? [[item.manifest.id, item.storage] as const] : [])) },
     onConfigurationChanged: () => broadcast({ kind: "configuration.changed" }),

@@ -9,10 +9,10 @@ export class SessionDataStore {
       .all(sessionId, objectId) as { contract_id: string; data_json: string }[];
     return rows.map(row => ({ contract: row.contract_id, data: jsonSchema.parse(JSON.parse(row.data_json)) }));
   }
-  get(sessionId: string, objectId: string | null, key: string): Json | null {
+  get(sessionId: string, objectId: string | null, key: string): Json | undefined {
     const row = this.db.prepare("SELECT data_json FROM session_data WHERE session_id = ? AND object_id = ? AND contract_id = ?")
       .get(sessionId, objectId ?? "", key) as { data_json: string } | undefined;
-    if (!row) return null;
+    if (!row) return undefined;
     return jsonSchema.parse(JSON.parse(row.data_json));
   }
   set(sessionId: string, objectId: string | null, key: string, value: Json): void {

@@ -31,7 +31,9 @@ A marketplace service is outside the confirmed initial scope.
 
 ## Public API stability
 
-- [ ] Close the freeze decisions, compatibility defects, and old-plugin evidence in `plans/todo-2026-10-27-public-api-stability.md` before declaring stable public interfaces. Proven additive extensions may remain deferred.
+- [ ] Complete public-package delivery and record the compatibility scope supported by internal plugin development in `plans/todo-2026-10-27-public-api-stability.md` before declaring stable public interfaces.
+
+Confirmed SDK boundary defects and the template-copy participation boundary are resolved. Protocol, authentication, output, and external-message extensions remain driven by concrete integrations. Shared-environment and unchanged-plugin evidence accumulate during internal development; future feature completeness is not a condition for delivering the current SDK.
 
 ## Product acceptance
 

@@ -14,6 +14,7 @@ export interface TopLevelToolContext<D extends Json = Json> {
 }
 /** Top-level tools declare their definition and implementation together, independently of resource support relationships. */
 export interface TopLevelTool<A extends Json = Json, D extends Json = Json> extends ToolContract<A> {
+  /** Encodes D for progress/history and decodes it for views and model projection. */
   readonly resultSchema: z.ZodType<D>;
   readonly effect: "read" | "write";
   readonly execution: "parallel" | "sequential";

@@ -12,6 +12,7 @@ import { ToolRegistry } from "../tools/registry.ts";
 import { ResourceRegistry } from "../resources/registry.ts";
 import { AgentCapabilities } from "./capabilities.ts";
 import { executeCoreBatch, previewCoreCall, type ToolObserver } from "./core.ts";
+import { finishToolResult } from "../tools/result.ts";
 
 const contract = defineImplementation({
   ...defineData("test.stream", z.strictObject({ text: z.string() }).describe("Current captured text.")),
@@ -35,6 +36,12 @@ async function run(handler: Handler, options: { effect?: "read" | "write"; signa
 }
 
 describe("Tool output and completion", () => {
+  // Without a declared projection, domain data shaped like model parts must not become file parts that bypass the tool's projection.
+  it("undeclared projections send strings as text and other data as JSON text, never as model parts", () => {
+    const partsLike = [{ kind: "file", content: { id: "x" } }];
+    expect(finishToolResult({ kind: "succeeded", data: partsLike }).model).toEqual([{ kind: "text", text: JSON.stringify(partsLike) }]);
+    expect(finishToolResult({ kind: "succeeded", data: "plain" }).model).toEqual([{ kind: "text", text: "plain" }]);
+  });
   it("previews only consult the captured catalog without preparation or execution; unknown resources and policy-excluded tools have no implementation identity", () => {
     const tool = implement(contract, { call: async () => ({ kind: "succeeded", data: { text: "" } }) });
     const prepare = vi.spyOn(tool, "prepare");

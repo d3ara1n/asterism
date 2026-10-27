@@ -10,19 +10,25 @@ Read package metadata independently of executable entries so disabled or failed 
 
 Assembly freezes the registered contributions. Package installation, enablement, and upgrades take effect after restart. Failed providers block their dependents while unrelated plugins continue.
 
-The bundled SDK package version is the source of truth for host compatibility. Each plugin declares a semantic version range in its SDK peer dependency; package admission and startup both check that range before executable entries load. Local development dependencies provide source and types without changing the compatibility requirement.
+The package manifest owns the plugin's release version. Runtime definitions declare behavior and identity without repeating that version. Standard package dependencies and lockfiles describe installation; development dependencies provide the declarations used by TypeScript.
+
+Loading depends on the available modules, exports, and valid contributions. The host does not reject a plugin because its declared dependency range excludes the active package version. Type checking and focused execution checks establish compatibility with the APIs a plugin actually uses; a successful import alone does not prove unchanged behavior.
 
 Before SDK version 1.0, incompatible changes advance the minor version; compatible additions and fixes advance the patch version. Stable SDK releases use major versions for incompatible changes, minor versions for compatible additions, and patch versions for fixes. Application releases and plugin-private storage formats are versioned independently.
+
+Compatibility describes the supported meaning of each operation and value. Shared React, React DOM, React Intl, Zod, and synchronous SQLite interfaces are direct integration choices, validated through plugin development and supported runtime updates. Independent plugin artifacts and saved data provide evidence across host changes; changing host and plugin together proves only their current agreement.
+
+Model protocols, authentication methods, generated outputs, and external senders evolve with concrete domain integrations. Existing closed contracts retain their supported scope until that work defines the representation and routing for new consumers. Future capabilities do not require speculative replacement of the generic plugin lifecycle or communication mechanisms.
 
 The host attributes contribution identities to the plugin namespace and rejects conflicting declarations. Missing implementations retain saved data and use missing-resource or raw-data presentation.
 
 ## Public modules
 
-Public imports establish explicit package dependencies. The host validates declared version ranges and environment-specific exports, then binds consumers to the provider’s actual exports.
+Public imports establish runtime dependencies. The host resolves environment-specific exports and binds consumers to the provider's actual exports. The import graph determines initialization order and propagates provider failures. This graph belongs to host loading metadata, separate from author-provided runtime definitions. Package-manager dependency declarations describe how to acquire those packages, without becoming a second runtime admission policy.
 
 Each backend or frontend environment has one module instance for a shared declaration. Identical textual IDs in copied declarations do not establish identity. Stable IDs serve routing, persistence, and cross-process association.
 
-The built-in public API is a separate package associated with the built-in implementation plugin. Its version is checked independently of the SDK package version.
+The built-in public API is a separate package associated with the built-in implementation plugin. Its release version is independent of the SDK package version.
 
 Public packages own their development guides and source examples according to domain responsibility. Generic authoring material belongs to the SDK; built-in domain material belongs to the built-in public API. Package contents include that material for development outside the application. The manual exposes source directories directly without copying or merging their contents. Compile-time counterexamples remain internal verification material.
 
@@ -76,6 +82,8 @@ Invalidating a projection publishes current domain state without creating a reco
 
 Calls declare plugin or object scope. Object calls validate a full resource reference; omitting that reference does not turn them into plugin calls. Inputs and outputs validate at their responsible boundaries.
 
+Call declarations retain both sides of their schemas. Invocation accepts raw JSON input and implementations receive parsed input. Implementations return raw JSON accepted by the response schema; each caller decodes that response into its result type. Schema inference preserves these distinctions for backend and frontend clients.
+
 Calls remain independent of the object action queue, allowing answers to reach a waiting tool. Communication cancellation and business cancellation are separate. There is no default timeout or automatic replay.
 
 Events carry contract, timestamp, host-stamped origin, and typed data. They are transient, nontransactional, and absent from history and model context.
@@ -106,7 +114,19 @@ Storage preparation imports a separate declaration entry before runtime setup. J
 
 Historical payload compatibility comes from schema decoding. Unknown or unavailable data retains its original payload. Private file migration and historical record decoding are distinct responsibilities.
 
+Data write boundaries encode decoded domain values through the declared Zod schema and validate the resulting JSON before saving or publishing it. Readers decode stored or transported JSON. Ordinary schemas use the same representation in both directions; synchronous codecs explicitly convert between representations. Operation-input parsing remains a forward-only boundary.
+
+Configuration defaults and update callbacks use decoded values. File writes and configuration responses encode those values; frontend configuration readers decode the responses. Missing current-data rows remain distinct from a saved JSON null. Templates copy encoded state and data without applying another encoding pass.
+
+Resource creation records separate host identity, kind, and card title from plugin-owned encoded state. The state accepts any JSON value and has no reserved business field names. Historical folding and snapshots preserve that separation. Renaming changes only the host title; template instantiation replaces host identities and relationships while preserving plugin state. Content retention follows references in the encoded state.
+
+Template participation is explicit resource behavior. The resource declares which plugin-owned current-data contracts are reusable alongside its creation state. Object writers already require matching resource and data ownership; the resource author determines its own copy policy. Saving selects only those current entries. Instantiation validates the saved state and current entries against the installed policy before creating a session, preserves their encoded values, and remaps only host identities and links. Historical records, private storage, and running instances are excluded. Creation handlers are not replayed. External cloning, embedded-reference mapping, and restoration require explicit domain capabilities.
+
+Tool progress and terminal data carry encoded payloads. Typed renderers and model projections decode them. Without a declared projection, a decoded string reaches the model as text and any other value as JSON text; only a declared projection can return model parts such as files. Resource tools and top-level tools share this rule. Non-null tool data cannot encode as null because the tool-result protocol reserves null for absent output.
+
 The content service manages byte references and temporary retention. Public IDs alone grant neither access nor retention.
+
+Content roots follow the actual encoded persistent JSON within the owning transaction. Historical decoding neither changes those roots nor grants access to references synthesized by a decoder.
 
 ## Renderer contributions
 

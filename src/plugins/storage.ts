@@ -4,8 +4,9 @@ import { DatabaseSync } from "node:sqlite";
 import { z } from "zod";
 import type { CredentialVault } from "../configuration/credentials.ts";
 import { jsonSchema, type Json, type ConfigContract } from "@asterism/sdk/contracts";
-import { PluginApiError, validationMessage, type PluginConfig, type PluginSecrets, type PluginStorageDeclaration } from "@asterism/sdk/runtime";
+import { PluginApiError, type PluginConfig, type PluginSecrets, type PluginStorageDeclaration } from "@asterism/sdk/runtime";
 import type { PluginConfiguration } from "../shared/plugin-configuration.ts";
+import { encodePluginData } from "./data-encoding.ts";
 
 /** Host-managed directory name; plugins may freely write elsewhere in their directories. */
 export const managedDirectory = ".asterism";
@@ -34,6 +35,7 @@ export class PluginStorage {
     source: object; defaults: Json;
     read(): { value: Json; status: PluginConfiguration["status"] };
     write(value: unknown): void;
+    encode(value: Json): Json;
   } | null = null;
   constructor(extensionsDirectory: string, pluginId: string, private readonly vault: CredentialVault | null,
     private readonly warn: (message: string, error?: unknown) => void,
@@ -53,7 +55,8 @@ export class PluginStorage {
     if (!this.settings) {
       const declaration = this.declarations.find(item => item.kind === "json" && resolve(this.dir, item.path) === resolve(this.managed, "config.json"));
       const file = () => join(this.ensure(), "config.json");
-      const fallback = () => jsonSchema.parse(contract.schema.parse(structuredClone(contract.defaults)));
+      const fallback = () => structuredClone(contract.defaults);
+      const encode = (value: unknown) => encodePluginData({ id: `${contract.plugin}.configuration`, schema: contract.schema }, value as T);
       const read = (): { value: Json; status: PluginConfiguration["status"] } => {
         let raw: unknown;
         try { raw = readJson(file()); }
@@ -77,13 +80,11 @@ export class PluginStorage {
         return { value: fallback(), status: "invalid" };
       };
       const write = (value: unknown) => {
-        const parsed = contract.schema.safeParse(value);
-        if (!parsed.success) throw new PluginApiError("invalid_argument", validationMessage(parsed.error, "configuration"));
-        const data = jsonSchema.parse(parsed.data);
+        const data = encode(value);
         writeJson(file(), declaration ? { version: declaration.version, data } : data);
         this.changed();
       };
-      this.settings = { source: contract, defaults: fallback(), read, write };
+      this.settings = { source: contract, defaults: fallback(), read, write, encode };
     }
     const settings = this.settings!;
     return {
@@ -105,7 +106,9 @@ export class PluginStorage {
   }
 
   configuration(id: string): PluginConfiguration | null {
-    return this.settings ? { id, defaults: structuredClone(this.settings.defaults), ...this.settings.read() } : null;
+    if (!this.settings) return null;
+    const { value, status } = this.settings.read();
+    return { id, defaults: this.settings.encode(this.settings.defaults), value: this.settings.encode(value), status };
   }
   saveConfiguration(value: Json): void {
     if (!this.settings) throw new PluginApiError("not_found", "The plugin has no configuration.");

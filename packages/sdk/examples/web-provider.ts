@@ -24,4 +24,4 @@ const provider: WebProviderDefinition = {
     } };
   },
 };
-export default definePlugin({ namespace: ns, version: "1.0.0", setup: () => ({ webProviders: [provider] }) });
+export default definePlugin({ namespace: ns, setup: () => ({ webProviders: [provider] }) });

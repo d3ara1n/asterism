@@ -22,6 +22,7 @@ export type Decoded<D> =
   | { readonly status: "known"; readonly record: SessionRecord; readonly data: D }
   | { readonly status: "unknown"; readonly record: SessionRecord; readonly reason: "invalid_data" };
 export interface RecordContract<D extends Json = Json> extends RecordRef {
+  /** Decodes persisted JSON into D; record writers encode D through the same schema. */
   readonly schema: z.ZodType<D>;
   /** Return null when the record does not belong to this contract; compatibility and transformations are determined by the schema, and failure preserves the raw record. */
   decode(record: SessionRecord): Decoded<D> | null;

@@ -38,7 +38,7 @@ function setup() {
   const sessionId = service.sessions.tree.create("Files");
   for (const object of [resource, { ...resource, id: "other", title: "Other resource" }]) service.sessions.tree.appendToTimeline(sessionId, {
     contract: "resource_created", source: null, recipient: null, model: null,
-    data: { ...object.data, id: object.id, type: object.kind, title: object.title },
+    data: { id: object.id, type: object.kind, title: object.title, data: object.data },
   });
   const caller = { ref: { sessionId, id: resource.id, kind: resource.kind }, title: resource.title };
   const capabilities = new AgentCapabilities(modules.resources, modules.tools, [resource], () => true, caller);

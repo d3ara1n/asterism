@@ -24,7 +24,7 @@ A compaction marker identifies the summary and reading boundary. Compaction chan
 
 ## Reuse a workbench setup
 
-Save a template from the session menu and choose the objects to include. A template stores resource data, links, and card arrangement.
+Save a template from the session menu and choose from the objects that support templates. Each resource defines its reusable data: for example, a note keeps its body and an agent keeps its configuration. The template also stores links and card arrangement.
 
 Select the template on **Home** to create a new session. The new session has fresh resource identities and no copied conversation history or running process instances. Referenced external locations still refer to the external world.
 
