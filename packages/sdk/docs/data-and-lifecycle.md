@@ -28,6 +28,8 @@ A resource opts into data-copy templates with `template: { current: [Settings, C
 
 Templates retain encoded creation state and the listed current values that exist at save time. Unlisted current data, history, private files, and running instances are excluded. Instantiation creates new host identities and remaps host links; it preserves domain values and content references without rewriting embedded resource IDs or duplicating external services. Creation callbacks are not rerun, and ordinary presence lifetimes apply to the new objects.
 
+To give each template instance a new title, add a synchronous `createTitle(): string` function to the resource's `template` declaration. Saving then omits the source title, including a user-assigned title. The host calls the function once for each new object when instantiating a template, and uses its result even if an older template contains a title. Saving and previewing templates do not call it. Without this function, templates preserve source titles; a saved entry without a title requires the generator to remain available.
+
 Opt in when those copied values are reusable under new identities. For example, a note can retain its body, and an agent can retain its configuration while leaving submission receipts and drafts behind. Resources needing external cloning, reference mapping, or private-state reconstruction need an explicit domain operation. Historical observation does not perform restoration.
 
 The installed resource must still support templates and decode all saved state and selected current data when the template is used. Unsupported or invalid saved entries fail explicitly before a new session is created.

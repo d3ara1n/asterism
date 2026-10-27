@@ -3,7 +3,7 @@ import { jsonSchema } from "@asterism-app/sdk/contracts";
 import { workbenchSnapshotSchema } from "./workbench.ts";
 
 const id = z.string().min(1).max(160);
-export const templateObjectSummarySchema = z.strictObject({ id, kind: id, title: z.string() });
+export const templateObjectSummarySchema = z.strictObject({ id, kind: id, title: z.string().optional() });
 export const templateSummarySchema = z.strictObject({
   id: z.string().uuid(), title: z.string(), createdAt: z.string(),
   objects: z.array(templateObjectSummarySchema),

@@ -103,7 +103,11 @@ export interface ResourceContribution {
   readonly card?: CardAppearance;
   readonly records: readonly RecordContract[];
   /** Opt into templates that copy encoded resource state and only these current-data contracts, preserving their values under new host identities. */
-  readonly template?: { readonly current: readonly DataContract[] };
+  readonly template?: {
+    readonly current: readonly DataContract[];
+    /** Omit the source title when saving; generate a title for each template instance, overriding any previously saved title. */
+    createTitle?(): string;
+  };
   /** Declare that this resource can receive links and provide the recipient's tool policy; independent of Agent domain types. */
   readonly links?: { receive: boolean; tools?(object: ObjectReader): { allow?: readonly string[]; exclude?: readonly string[] } };
   readonly creation?: CreationContribution;

@@ -30,7 +30,12 @@ export class TemplateStore {
         FROM json_each(templates.data_json, '$.objects')) AS objects
       FROM templates ORDER BY created_at DESC, rowid DESC`).all() as
       { id: string; title: string; createdAt: string; objects: string }[];
-    return rows.map(row => ({ ...row, objects: JSON.parse(row.objects) }));
+    return rows.map(row => {
+      const objects = JSON.parse(row.objects) as { id: string; kind: string; title: string | null }[];
+      return { ...row, objects: objects.map(({ id, kind, title }) => ({
+        id, kind, ...(!this.resources.template(kind)?.createTitle && title !== null ? { title } : {}),
+      })) };
+    });
   }
   source(sessionId: string) {
     return this.tree.workbench(sessionId).objects.filter(object => this.resources.template(object.kind))
@@ -44,10 +49,11 @@ export class TemplateStore {
       throw new SessionError("not_found", "A selected template object is no longer present.", templateMessages.sourceChanged);
     const value: TemplateData = {
       objects: objects.map(object => {
-        const contracts = new Set(this.resources.template(object.kind)?.current.map(contract => contract.id));
+        const template = this.resources.template(object.kind);
+        const contracts = new Set(template?.current.map(contract => contract.id));
         const current = this.data.entries(sessionId, object.id).filter(entry => contracts.has(entry.contract));
         this.resources.validateTemplate(object.kind, object.data, current);
-        return { id: object.id, kind: object.kind, title: object.title, data: object.data, current };
+        return { id: object.id, kind: object.kind, ...(!template?.createTitle ? { title: object.title } : {}), data: object.data, current };
       }),
       links: state.links.filter(link => selected.has(link.receiverId) && selected.has(link.resourceId)),
       views: this.workbench.layout(sessionId).views.filter(view => selected.has(view.objectId)),
@@ -69,11 +75,14 @@ export class TemplateStore {
     this.tree.create(row.title, sessionId);
     for (const object of value.objects) {
       const id = identities.get(object.id)!;
+      const title = this.resources.template(object.kind)?.createTitle?.() ?? object.title;
+      if (title === undefined)
+        throw new SessionError("invalid_request", `Template resource ${object.kind} has no saved title or title generator.`, templateMessages.invalidData);
       for (const entry of object.current) {
         this.content.bind({ sessionId, objectId: id, templateId }, { kind: "data", id: entry.contract }, entry.data);
         this.data.set(sessionId, id, entry.contract, entry.data);
       }
-      this.workbench.insert(sessionId, { id, kind: object.kind, title: object.title, data: object.data },
+      this.workbench.insert(sessionId, { id, kind: object.kind, title, data: object.data },
         value.views.find(view => view.objectId === object.id)?.position ?? this.workbench.placement(sessionId, object.kind), { templateId });
     }
     for (const view of value.views) this.workbench.mutate({

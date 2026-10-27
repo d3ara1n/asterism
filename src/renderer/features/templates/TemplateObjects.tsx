@@ -10,7 +10,7 @@ export function TemplateObjectLabel({ object }: { object: TemplateObjectSummary 
     <span aria-hidden="true" className="mt-0.5 shrink-0 [&_svg]:size-4">{descriptor.icon}</span>
     <span className="min-w-0 break-words">
       <span className="opacity-70">{i18n.text(descriptor.label)}</span>
-      <span className="ml-2">{object.title}</span>
+      {object.title !== undefined ? <span className="ml-2">{object.title}</span> : null}
     </span>
   </span>;
 }

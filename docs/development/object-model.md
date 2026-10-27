@@ -16,7 +16,7 @@ Startup collection deletes sessions older than the retention threshold. It remov
 
 ## Workbench templates
 
-A template is workspace-owned static data: selected resource types, titles, creation data, explicitly selected object-scoped current data, links, and card arrangement. Resources opt into this copying behavior and declare their reusable current-data contracts. It contains no conversation history, session-scoped current data, private files, viewport, local panel state, or running external instance.
+A template is workspace-owned static data: selected resource types, reusable titles, creation data, explicitly selected object-scoped current data, links, and card arrangement. Resources opt into this copying behavior and declare their reusable current-data contracts. A resource may also declare title generation for template instances: saving then omits its title, and each instance receives a generated title. Resources without this declaration retain their saved titles. It contains no conversation history, session-scoped current data, private files, viewport, local panel state, or running external instance.
 
 Saving captures current values independently of later source changes. Instantiation creates a session and fresh resource identities in one transaction. Internal object references in the template’s relationship structure map to new identities; arbitrary domain JSON retains its values.
 
@@ -30,7 +30,7 @@ An agent is an execution object and can also be a linked resource. Its controlle
 
 Agents have no intrinsic parent-child hierarchy. Delegation composes creation, links, and communication. Creating another agent does not expand the caller’s own tool policy.
 
-An explicit creation title supplies the initial name; otherwise the built-in Agent chooses a display name once. Display names can repeat and do not identify operation targets.
+An explicit creation title supplies the initial name; otherwise the built-in Agent chooses a display name once. Agents created from templates always generate a random display name, including when the source agent was explicitly named. Display names can repeat and do not identify operation targets.
 
 System instructions belong to the request environment. The timeline stores actual input and output records, not a second copy of the environment.
 

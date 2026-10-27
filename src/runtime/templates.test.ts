@@ -1,10 +1,10 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, expect, it } from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { contentRefSchema, defineAction, defineCreation, defineRecord, jsonSchema, pluginNamespace, type DataContract, type ResourceRef } from "@asterism-app/sdk/contracts";
-import { definePlugin, implementAction, implementCreation, implementResource, type PluginContext } from "@asterism-app/sdk/runtime";
+import { contentRefSchema, defineAction, defineCreation, defineRecord, jsonSchema, pluginNamespace, type ResourceRef } from "@asterism-app/sdk/contracts";
+import { definePlugin, implementAction, implementCreation, implementResource, type PluginContext, type ResourceContribution } from "@asterism-app/sdk/runtime";
 import { CreateAgent, defaultAgentPreset } from "@asterism-app/builtin-api/contracts";
 import { CreateNote } from "../../packages/builtin/src/notes/contract.ts";
 import { ApplicationService } from "./service.ts";
@@ -36,7 +36,7 @@ afterEach(async () => {
   apps.clear();
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
-function open(root?: string, receive = true, template: { current: readonly DataContract[] } | null = { current: [State] }) {
+function open(root?: string, receive = true, template: ResourceContribution["template"] | null = { current: [State] }) {
   if (!root) { root = mkdtempSync(join(tmpdir(), "asterism-templates-")); roots.push(root); }
   let plugin!: PluginContext;
   const definition = definePlugin({ namespace: ns, setup(context) {
@@ -83,7 +83,7 @@ it("saves declared reusable data and selected relationships; reuse excludes unde
   const b = await session.create(Create, { title: "B", seed: "other", file: null });
   const excluded = await session.create(Create, { title: "Excluded", seed: "", file: null });
   const note = await session.create(CreateNote, { title: "Checklist", content: "- [ ] Review" });
-  const agent = await session.create(CreateAgent, { selection: { agent: defaultAgentPreset, model: null, thinking: null } });
+  const agent = await session.create(CreateAgent, { title: "Source agent", selection: { agent: defaultAgentPreset, model: null, thinking: null } });
   session.link(a, b); session.link(b, a); session.link(a, excluded); session.link(agent, note);
   plugin.object(sessionId, Item, a.id).commit(writer => {
     writer.set(State, { text: "saved content", file: null });
@@ -104,7 +104,8 @@ it("saves declared reusable data and selected relationships; reuse excludes unde
   const newNote = objects.find(object => object.title === "Checklist")!;
   const newAgent = objects.find(object => object.kind === agent.kind)!;
   expect(data.title).toBe("Reusable workbench");
-  expect(objects.map(object => object.title)).toEqual(["A", "B", "Checklist", agent.title]);
+  expect(objects.slice(0, 3).map(object => object.title)).toEqual(["A", "B", "Checklist"]);
+  expect(newAgent.title).not.toBe("Source agent");
   expect(new Set([...objects.map(object => object.id), ...app.sessions.current(again).workbench.objects.map(object => object.id),
     a.id, b.id, note.id, agent.id]).size).toBe(12);
   expect(plugin.object(created, Item, newA.id).get(State)).toEqual({ text: "saved content", file: null });
@@ -131,7 +132,60 @@ it("saves declared reusable data and selected relationships; reuse excludes unde
   });
   plugin.object(created, Item, newA.id).commit(writer => { writer.set(State, { text: "new work", file: null }); });
   expect(plugin.object(sessionId, Item, a.id).get(State)?.text).toBe("later source content");
-  expect(app.execute({ type: "workspace.read" }).templates[0]?.objects.map(object => object.title)).toEqual(["A", "B", "Checklist", agent.title]);
+  expect(app.execute({ type: "workspace.read" }).templates[0]?.objects.map(object => object.title)).toEqual(["A", "B", "Checklist", undefined]);
+});
+
+it("omits generated titles from storage and previews and generates each instance title only when starting", async () => {
+  const createTitle = vi.fn<() => string>()
+    .mockReturnValueOnce("Cedar").mockReturnValueOnce("Birch")
+    .mockReturnValueOnce("Maple").mockReturnValueOnce("Willow");
+  const { root, app, plugin } = open(undefined, true, { current: [State], createTitle });
+  const sessionId = app.sessions.tree.create("Source");
+  const session = plugin.session(sessionId);
+  const a = await session.create(Create, { title: "Original A", seed: "a" });
+  const b = await session.create(Create, { title: "Original B", seed: "b" });
+  const templateId = await save(app, sessionId, [a, b]);
+  const db = openDatabase(root);
+  try {
+    const row = db.prepare("SELECT data_json FROM templates WHERE id = ?").get(templateId) as { data_json: string };
+    const saved = JSON.parse(row.data_json);
+    for (const object of saved.objects) expect(object).not.toHaveProperty("title");
+  } finally { db.close(); }
+  expect(app.execute({ type: "workspace.read" }).templates[0]?.objects).toEqual([
+    { id: a.id, kind: Item.kind }, { id: b.id, kind: Item.kind },
+  ]);
+  expect(createTitle).not.toHaveBeenCalled();
+  const first = await start(app, templateId);
+  const second = await start(app, templateId);
+  expect(app.sessions.current(first).workbench.objects.map(object => object.title)).toEqual(["Cedar", "Birch"]);
+  expect(app.sessions.current(second).workbench.objects.map(object => object.title)).toEqual(["Maple", "Willow"]);
+  expect(createTitle).toHaveBeenCalledTimes(4);
+  expect(app.sessions.current(sessionId).workbench.objects.map(object => object.title)).toEqual(["Original A", "Original B"]);
+});
+
+it("uses the installed title generator for templates saved with a title", async () => {
+  const first = open();
+  const sessionId = first.app.sessions.tree.create("Source");
+  const item = await first.plugin.session(sessionId).create(Create, { title: "Saved title", seed: "seed" });
+  const templateId = await save(first.app, sessionId, [item]);
+  await close(first.app);
+  const createTitle = vi.fn(() => "Fresh title");
+  const second = open(first.root, true, { current: [State], createTitle });
+  expect(second.app.execute({ type: "workspace.read" }).templates[0]?.objects).toEqual([{ id: item.id, kind: Item.kind }]);
+  expect(createTitle).not.toHaveBeenCalled();
+  const created = await start(second.app, templateId);
+  expect(second.app.sessions.current(created).workbench.objects[0]?.title).toBe("Fresh title");
+});
+
+it("rejects a template with no saved title when its resource withdraws title generation", async () => {
+  const first = open(undefined, true, { current: [State], createTitle: () => "Generated" });
+  const sessionId = first.app.sessions.tree.create("Source");
+  const item = await first.plugin.session(sessionId).create(Create, { title: "Source", seed: "seed" });
+  const templateId = await save(first.app, sessionId, [item]);
+  await close(first.app);
+  const second = open(first.root);
+  await expect(start(second.app, templateId)).rejects.toThrow("no saved title or title generator");
+  expect(second.app.sessions.tree.list().map(session => session.id)).toEqual([sessionId]);
 });
 
 // Templates retain files outside source sessions; record/current-data roots alone would allow startup reclamation to delete content after source-session deletion.
