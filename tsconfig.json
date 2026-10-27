@@ -21,7 +21,8 @@
   "include": [
     "scripts",
     "packages/sdk/src",
-    "packages/sdk/examples",
+    "packages/sdk/examples/**/*.ts",
+    "packages/sdk/typechecks",
     "src/shared",
     "src/runtime",
     "src/storage",

@@ -1,0 +1,27 @@
+{
+  "name": "asterism-example-counter",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": { "typecheck": "tsc --noEmit" },
+  "peerDependencies": {
+    "@asterism/sdk": "^0.46.1",
+    "react": "^19.3.0",
+    "react-intl": "^12.1.4",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@asterism/sdk": "file:../asterism/packages/sdk",
+    "typescript": "^7.0.2",
+    "@types/node": "^26.6.1",
+    "@types/react": "^19.3.0"
+  },
+  "asterism": {
+    "id": "example.counter",
+    "displayName": "Example counter",
+    "runtime": "src/runtime.ts",
+    "renderer": "src/renderer.tsx",
+    "storage": "src/storage.ts",
+    "manual": ["docs"]
+  }
+}

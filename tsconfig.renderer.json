@@ -22,6 +22,7 @@
     "src/renderer",
     "packages/sdk/src/contracts.ts",
     "packages/sdk/src/renderer.ts",
+    "packages/sdk/examples/**/*.tsx",
     "src/shared",
     "packages/builtin-api/src/contracts.ts",
     "packages/builtin-api/src/renderer.ts",

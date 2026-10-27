@@ -1,5 +1,5 @@
 import { sample, Counter, Count, CounterView, CountChanged, CreateCounter, ChangeCount, CounterUpdates, counterCard } from "./counter-contract.ts";
-/** SDK author examples and type counterexamples: compile only, without executing plugins, databases, or real model requests. */
+/** Independent examples of session records, resource behavior, and model execution. */
 import { z } from "zod";
 import { pluginNamespace, defineAction, resourceCall, defineRecord, defineTool, defineImplementation, modelRunRecordSchema, type ModelItem } from "@asterism/sdk/contracts";
 import {
@@ -123,8 +123,8 @@ const research = pluginNamespace("example.research");
 const Execution = defineRecord(research.name("execution"), { schema: modelRunRecordSchema });
 export const modelRecordsModule = defineModule(() => ({ records: [Execution] }));
 /** The domain plugin constructs the projection from its own input/execution events; it is not stored in Agent or run. */
-declare function projectOwnContext(snapshot: SessionSnapshot, object: ResourceRef): ModelItem[];
-export async function modelWork(plugin: PluginContext, object: ObjectExecutor, signal: AbortSignal) {
+export async function modelWork(plugin: PluginContext, object: ObjectExecutor, signal: AbortSignal,
+  projectOwnContext: (snapshot: SessionSnapshot, object: ResourceRef) => ModelItem[]) {
   for (let request = 0; request < 8; request++) {
     const snapshot = object.session.snapshot();
     const result = await plugin.models.run({
@@ -141,38 +141,6 @@ export async function modelWork(plugin: PluginContext, object: ObjectExecutor, s
   throw new Error("The model request limit was reached.");
 }
 
-/** Counterexample basis: typed events, synchronous commits/observation, explicit model input, and resource input. */
-export function rejectInvalidUsage(plugin: PluginContext, object: ObjectExecutor, reader: ObjectReader) {
-  // @ts-expect-error The read facade cannot commit.
-  reader.commit(() => {});
-  // @ts-expect-error A read-only title cannot be written.
-  reader.session.title.set("New");
-  // @ts-expect-error The lifecycle is not a string-based event bus.
-  plugin.on("start", () => {});
-  // @ts-expect-error The base object interface does not handle model execution.
-  object.run({}, new AbortController().signal);
-  // @ts-expect-error The internal session node array is not exposed.
-  object.session.nodes();
-  // @ts-expect-error Session data must also match the held contract.
-  object.session.commit(writer => { writer.set(Count, { value: "wrong" }); });
-  // @ts-expect-error The synchronous callback contract does not accept a Promise.
-  object.commit(async writer => { writer.set(Count, { value: 1 }); });
-  const invalidObserver: SessionObserver = {
-    id: "invalid-observer",
-    // @ts-expect-error Delegate long-running work to managed tasks instead of returning a Promise from synchronous observers.
-    async committed() {},
-  };
-  void invalidObserver;
-  object.commit(writer => {
-    // @ts-expect-error State values must match the held contract.
-    writer.set(Count, { value: "wrong" });
-    // @ts-expect-error Event data must match the held contract.
-    writer.append(CountChanged, { value: "wrong" });
-  });
-  // @ts-expect-error Each call must explicitly provide the target, prompt, projected input, and event consumer.
-  plugin.models.run({ object: object.ref, signal: new AbortController().signal });
-}
-
 /** External preparers also infer input from the action contract they hold, without redeclaring the schema. */
 export const counterLimit = implementPreparer(ChangeCount, {
   id: "clamp-change",
@@ -180,20 +148,11 @@ export const counterLimit = implementPreparer(ChangeCount, {
 });
 
 /** Invocation and replacement receive raw strings; preparation and execution receive numbers transformed by the schema. */
-const FromText = defineAction(Counter, { id: sample.name("from-text"),
+export const FromText = defineAction(Counter, { id: sample.name("from-text"),
   schema: z.string().regex(/^\d+$/u).transform(Number),
 });
 export const parsedAction = implementAction(FromText, {
   prepare(value) { return value > 10 ? { action: "replace", input: "10" } : { action: "accept" }; },
   async execute(value, object) { object.commit(writer => { writer.set(Count, { value }); }); },
 });
-export function parsedInputExamples() {
-  resourceCall(FromText, "5");
-  // @ts-expect-error Callers submit raw input and cannot substitute parsed results.
-  resourceCall(FromText, 5);
-  implementPreparer(FromText, {
-    id: "invalid-replacement",
-    // @ts-expect-error replace supplies new input and must match the raw input type.
-    prepare(value) { return { action: "replace", input: value }; },
-  });
-}
+export const parsedInput = resourceCall(FromText, "5");

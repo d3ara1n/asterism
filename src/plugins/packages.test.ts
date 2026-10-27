@@ -22,6 +22,22 @@ const ns = pluginNamespace(${JSON.stringify(id)});
 export default definePlugin({ namespace: ns, version: "0.0.1", modules: [defineModule(() => ({}))] });`;
 
 describe("Plugin packages", () => {
+  // Manual entries expose only declared package subdirectories; overlapping roots and escaping symlinks are ambiguous or broaden exposure.
+  it("validates documentation directories independently of executable entries", () => {
+    const root = temp(), outside = temp();
+    mkdirSync(join(root, "docs/examples"), { recursive: true });
+    mkdirSync(join(root, "examples"));
+    const manifest = (manual: string[]) => { pkg(root, { id: "example.manual", manual }); return readManifest(root); };
+    expect(manifest(["docs", "examples"]).manual).toEqual(["docs", "examples"]);
+    for (const paths of [["."], ["../outside"], ["/absolute"], ["C:\\outside"], ["docs/../examples"], ["missing"],
+      ["docs", "docs"], ["docs", "docs/examples"]])
+      expect(() => manifest(paths)).toThrow();
+    symlinkSync(outside, join(root, "external"));
+    expect(() => manifest(["external"])).toThrow("inside the package");
+    writeFileSync(join(root, "article.md"), "Article");
+    expect(() => manifest(["article.md"])).toThrow("directory");
+  });
+
   // Information cards must load independently of code and API compatibility; disabled or failed plugins still show real identity metadata.
   it("metadata reads execute no plugin code and can read names, authors, and package icons from incompatible packages", () => {
     const root = temp();

@@ -1,0 +1,2 @@
+.panel { display: grid; gap: 8px; padding: 12px; color: var(--foreground); }
+.panel button { font: inherit; }

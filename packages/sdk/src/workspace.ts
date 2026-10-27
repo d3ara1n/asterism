@@ -29,6 +29,12 @@ export interface SessionSnapshot extends SessionView {
   readonly position: { readonly nodeId: string | null };
   readonly resources: {
     all(): readonly ResourceSnapshot[];
+    /**
+     * Resources directly linked to this receiver on the snapshot's timeline path, with captured titles and public data.
+     * Reverse and transitive links are independent. Returns an empty list if the receiver's session, identity, or kind does not match a present resource.
+     * Observing links does not expand a model request's captured operation scope.
+     */
+    linkedTo(receiver: ResourceRef): readonly ResourceSnapshot[];
     get<S extends Json>(contract: ResourceContract<S>, id: string):
       | { status: "known"; resource: ResourceSnapshot<S> }
       | { status: "unknown"; resource: ResourceSnapshot; reason: "invalid_data" }

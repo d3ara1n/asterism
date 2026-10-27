@@ -15,15 +15,23 @@ export function resourceSnapshot(ref: ResourceRef, resource: FoldedObject): Reso
   return deepFreeze({ ref: { ...ref }, title: resource.title, data: structuredClone(data) as Json });
 }
 export function sessionSnapshot(source: NodeView): SessionSnapshot {
-  const resources = () => foldWorkbench(source.read({ scope: "timeline", contracts: ["resource_created", "resource_renamed", "object_removed"] })
-    .map(({ node }) => node)).objects;
+  const workbench = () => foldWorkbench(source.read({ scope: "timeline",
+    contracts: ["resource_created", "resource_renamed", "object_removed", "resource_attached", "resource_detached"],
+  }).map(({ node }) => node));
   const snapshot = (object: FoldedObject) => resourceSnapshot({ sessionId: source.id, id: object.id, kind: object.kind }, object);
   return {
     ...sessionView(source), position: Object.freeze({ nodeId: source.nodeId }),
     resources: {
-      all: () => Object.freeze(resources().map(snapshot)),
+      all: () => Object.freeze(workbench().objects.map(snapshot)),
+      linkedTo(receiver) {
+        if (receiver.sessionId !== source.id) return Object.freeze([]);
+        const { objects, links } = workbench();
+        if (!objects.some(object => object.id === receiver.id && object.kind === receiver.kind)) return Object.freeze([]);
+        const linked = new Set(links.filter(link => link.receiverId === receiver.id).map(link => link.resourceId));
+        return Object.freeze(objects.filter(object => linked.has(object.id)).map(snapshot));
+      },
       get(contract, objectId) {
-        const object = resources().find(object => object.id === objectId && object.kind === contract.kind);
+        const object = workbench().objects.find(object => object.id === objectId && object.kind === contract.kind);
         if (!object) return null;
         const resource = snapshot(object);
         const parsed = contract.stateSchema.safeParse(resource.data);

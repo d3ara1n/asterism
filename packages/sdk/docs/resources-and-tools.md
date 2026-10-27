@@ -12,6 +12,8 @@ Creation supplies initial state. Actions change the object through typed applica
 
 Resource titles belong to session history. Use the session's rename operation with a resource reference to change a title; the host appends the event and reconstructs names along each history path. Tool sessions accept a resource ID within the request's captured links. Existing snapshots keep their captured titles.
 
+Use a session snapshot to query the resources directly linked to a receiver. Results contain resource references, titles, and public data on that snapshot's timeline path. Reverse links and links through another resource are independent. For external event handling, such as forwarding network messages to linked agents, read a fresh snapshot for each event. Session observers can also query their supplied snapshot after commits or cursor changes. The query exposes relationships without granting access to private state or expanding a model request's operation scope.
+
 ## Add a model operation
 
 Use a resource tool when an operation targets a linked object. A shared tool can have implementations for different resource types, each with an appropriate internal target and result.
@@ -25,9 +27,3 @@ Describe the operation's purpose and observable behavior. Parameters should expl
 Typed calls connect request and response between services or views. Events announce transient changes. Object channels support sustained data such as an interactive screen.
 
 An action or service call is not automatically a model tool. Expose it deliberately when the model needs that operation.
-
-## Extend an agent
-
-An existing Agent can expose public actions, input preparation, creation entries, and UI extension points. Use those when modifying its interaction.
-
-Creating another agent and granting it resources are explicit operations. The new agent does not automatically inherit every capability of its creator.

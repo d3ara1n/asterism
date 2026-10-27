@@ -9,7 +9,7 @@ import { findOutput, grepOutput } from "./search-output.ts";
 import { findToModel, grepToModel } from "./search-presentation.ts";
 import { runSearch, searchArguments } from "./search-process.ts";
 
-async function scope(rootPath: string, path: string, directoryOnly: boolean) {
+export async function searchScope(rootPath: string, path: string, directoryOnly: boolean) {
   const root = await directoryRoot(rootPath);
   const selected = await withinDirectory(root, path);
   if (relative(root, selected).split(sep).includes(".git")) {
@@ -33,7 +33,7 @@ export async function findFiles(root: string, target: z.infer<typeof DirectoryFi
   args: z.infer<typeof DirectoryFind.tool.argsSchema>, signal: AbortSignal): Promise<CallResult<z.infer<typeof DirectoryFind.schema>>> {
   const path = target?.path ?? ".";
   try {
-    const selected = await scope(root, path, true);
+    const selected = await searchScope(root, path, true);
     const output = findOutput(path, selected.prefix, args.limit ?? 500);
     output.result.stopReason = await runSearch(selected.cwd, searchArguments("find", args, selected.operand), output.records, signal);
     return { kind: "succeeded", data: output.result };
@@ -44,7 +44,7 @@ export async function grepFiles(root: string, target: z.infer<typeof DirectoryGr
   args: z.infer<typeof DirectoryGrep.tool.argsSchema>, signal: AbortSignal): Promise<CallResult<z.infer<typeof DirectoryGrep.schema>>> {
   const path = target?.path ?? ".";
   try {
-    const selected = await scope(root, path, false);
+    const selected = await searchScope(root, path, false);
     const output = grepOutput(path, selected.prefix, args);
     output.result.stopReason = await runSearch(selected.cwd, searchArguments("grep", args, selected.operand), output.records, signal);
     return { kind: "succeeded", data: output.result };

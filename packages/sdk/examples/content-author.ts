@@ -1,4 +1,4 @@
-import { defineModule, definePlugin, implementAction, implementCreation, implementResource, type ObjectReader } from "@asterism/sdk/runtime";
+import { defineModule, definePlugin, implementAction, implementCreation, implementResource } from "@asterism/sdk/runtime";
 import { CreateDocument, Document, DocumentContent, Imported, ReplaceDocument, files } from "./content-contract.ts";
 
 /** The session owns content, and plugins only interpret business formats; this example does not access host source code or private paths. */
@@ -27,8 +27,3 @@ export default definePlugin({ namespace: files, version: "1", modules: [defineMo
     inspect: async (_data, object) => object.get(DocumentContent),
   })],
 }))] });
-
-export function rejectReadOnlyStaging(object: ObjectReader) {
-  // @ts-expect-error The read facade cannot stage content.
-  void object.content.stage(new Uint8Array());
-}

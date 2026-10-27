@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { definePlugin, implementCall, PluginApiError } from "@asterism/sdk/runtime";
 import { builtin, CreateAgent, agentCreateSchema, type NamingApi } from "@asterism/builtin-api/contracts";
-import { defineAgentCreation } from "@asterism/builtin-api/runtime";
+import { defineAgentCreation, type ManualSource } from "@asterism/builtin-api/runtime";
 import metadata from "../package.json" with { type: "json" };
 import type { BuiltinApplication } from "./application.ts";
 import { createAgentModule } from "./agent/runtime.ts";
@@ -27,7 +27,7 @@ import { SkillCatalog } from "./skills/catalog.ts";
 import { createSkillsModule } from "./skills/runtime.ts";
 
 /** Composes only plugin business logic; the application owns loading, host services, and external plugin dependencies. */
-export function createBuiltin(options: { application: BuiltinApplication; manualDirectory: string; connectNaming(api: NamingApi): () => void }) {
+export function createBuiltin(options: { application: BuiltinApplication; manualSources(): readonly ManualSource[]; connectNaming(api: NamingApi): () => void }) {
   return definePlugin({ namespace: builtin, version: metadata.version,
     setup(plugin) {
       const settings = plugin.config(BuiltinSettings);
@@ -44,9 +44,9 @@ export function createBuiltin(options: { application: BuiltinApplication; manual
       return { events: [UsageChanged],
         calls: [implementCall(ReadUsage, (input, { signal }) => usage.query(input.providerId, { refresh: input.refresh, signal }))],
         modules: [providers, createAgentModule(options.application, usage, skills), createSkillsModule(skills), createFilesystemModule(shell), createNamingModule(options.connectNaming, options.application.userAgent), notes, questions,
-        resourceOperations, mcp, web, createManualModule(options.manualDirectory, options.application.name), createShellModule(() => settings.get().shell), createTerminalModule(() => settings.get().shell),
+        resourceOperations, mcp, web, createManualModule(options.manualSources, options.application.name), createShellModule(() => settings.get().shell), createTerminalModule(() => settings.get().shell),
         defineAgentCreation({ id: CreateManual.id, creation: CreateManual,
-          description: "Open the Asterism manual for software use and plugin development. Provides list, find, grep, and read over the bundled documentation.",
+          description: "Open the Asterism manual for software use and plugin development. Provides list, find, grep, and read over application guides, public package examples, and documentation exposed by loaded plugins.",
           guidelines: [] }),
         defineAgentCreation({ id: builtin.name("terminal.create"), creation: CreateTerminal,
           description: "Create a shared interactive terminal. Its shell and screen remain available between tool calls and while viewing other sessions.",

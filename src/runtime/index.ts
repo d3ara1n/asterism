@@ -42,6 +42,10 @@ try {
     dependencies: item.dependencies ?? [], rendererDependencies: item.rendererDependencies ?? [] }));
   port.postMessage({ kind: "startup", stage: "workspace" });
   service = new ApplicationService(root, { catalogs: packages.flatMap(item => item.catalogs ?? []), packages: listed,
+    manualSources: packages.flatMap(item => item.status === "loaded" && item.manifest
+      ? (item.manifest.manual ?? []).map(path => ({
+        pluginId: item.manifest!.id, path: `plugins/${item.manifest!.id}/${path}`, directory: join(item.root, path),
+      })) : []),
     plugins: packages.flatMap(item => item.definition ? [item.definition] : []), protector: secrets,
     preparedStorage: { failures: storageFailures,
       declarations: new Map(packages.flatMap(item => item.manifest && item.storage ? [[item.manifest.id, item.storage] as const] : [])) },

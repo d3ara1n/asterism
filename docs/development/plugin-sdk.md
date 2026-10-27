@@ -24,6 +24,10 @@ Each backend or frontend environment has one module instance for a shared declar
 
 The built-in public API is a separate package associated with the built-in implementation plugin. Its version is checked independently of the SDK package version.
 
+Public packages own their development guides and source examples according to domain responsibility. Generic authoring material belongs to the SDK; built-in domain material belongs to the built-in public API. Package contents include that material for development outside the application. The manual exposes source directories directly without copying or merging their contents. Compile-time counterexamples remain internal verification material.
+
+Plugins declare manual directories in package metadata. Admission validates existing, non-overlapping subdirectories within the package. The application exposes directories from successfully loaded packages under plugin-qualified paths; disabled plugins and plugins with loading or storage failures contribute none. Declarations follow the startup package snapshot, while file contents are read at operation time. Articles carry their own context and remain independently readable.
+
 Provider initialization precedes consumers. Shutdown waits for managed work, then cleans up in reverse dependency order. Public exports do not grant resource access or another plugin’s private state.
 
 ## Readers, executors, and snapshots
@@ -31,6 +35,8 @@ Provider initialization precedes consumers. Shutdown waits for managed work, the
 Read interfaces expose bound identity, current data, and snapshot queries. Execution interfaces add controlled commits and operations. The tool session interface has a narrower scope based on the invoking object and captured request access.
 
 Snapshot creation captures the history endpoint, record upper bound, and title without loading the whole history. Timeline queries read the ancestor path; session queries include branches up to the captured append bound.
+
+Resource relationship queries use that same captured timeline path. They return present resources directly linked to a receiver whose full identity matches the snapshot, with captured titles and public data. Reverse and transitive relationships remain independent. Observing relationships neither exposes private state nor changes a model request's captured operation scope.
 
 First/last queries decode their selected record and preserve unknown status rather than skipping damaged records. Current-data reads return current values at handling time, independently of historical snapshots.
 

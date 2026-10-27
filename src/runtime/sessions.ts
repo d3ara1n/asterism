@@ -34,6 +34,7 @@ import { ContentStore, contentReferences, type ContentLease, type ContentTarget 
 import { applicationStorage, applicationBrand } from "../shared/application.ts";
 import { EventBus } from "../plugins/events.ts";
 import { TemplateStore } from "./templates.ts";
+import type { ManualSource } from "@asterism/builtin-api/runtime";
 
 const agentKind = Agent.kind;
 
@@ -68,7 +69,7 @@ export class SessionService {
   private readonly validateInitialInput: (selection: AgentSelection, parts: ModelInputPart[], content: ContentLease) => Promise<void>;
   constructor(private readonly db: DatabaseSync, dataRoot: string, configuration: ConfigurationService,
     private readonly changed: (event: SessionChanged) => void = () => {}, adapterFactory?: (settings: ModelSettings) => ModelAdapter, external: readonly PluginDefinition[] = [],
-    configurationChanged?: (pluginId: string) => void, preparedStorage?: PreparedPluginStorage) {
+    configurationChanged?: (pluginId: string) => void, preparedStorage?: PreparedPluginStorage, manualSources: () => readonly ManualSource[] = () => []) {
     this.tree = new SessionTree(db);
     this.events.declarePublic(SessionTitleChanged);
     this.events.declarePublic(ResourceStatusChanged);
@@ -155,7 +156,7 @@ export class SessionService {
         list: () => configuration.extensions.usageProviders(),
         get: id => configuration.extensions.get(id),
         subscribe: listener => configuration.extensions.subscribe(listener),
-      } }, external);
+      } }, external, manualSources);
     this.resources = modules.resources;
     this.calls = modules.calls;
     this.channels = modules.channels;

@@ -1,5 +1,5 @@
-import { existsSync, mkdirSync, readFileSync, realpathSync, renameSync, writeFileSync } from "node:fs";
-import { extname, join, relative, resolve, isAbsolute } from "node:path";
+import { existsSync, mkdirSync, readFileSync, realpathSync, renameSync, statSync, writeFileSync } from "node:fs";
+import { extname, join, relative, resolve, isAbsolute, posix, win32 } from "node:path";
 import { pathToFileURL } from "node:url";
 import { satisfies, validRange } from "semver";
 import { z } from "zod";
@@ -23,6 +23,8 @@ export const manifestSchema = z.strictObject({
   renderer: z.string().min(1).optional(),
   /** Storage declaration entry: default export `defineStorage([...])`, imported separately by the host before plugin runtime. */
   storage: z.string().min(1).optional(),
+  /** Package-relative directories exposed by the manual without executing plugin code. */
+  manual: z.array(z.string().min(1)).optional(),
   displayName: uiTextSchema.optional(),
   description: uiTextSchema.optional(),
   icon: z.string().min(1).optional(),
@@ -102,6 +104,23 @@ export function readManifest(root: string): PluginPackageManifest {
     throw new PluginPackageError("incompatible_api", `Plugin ${manifest.id} requires @asterism/sdk ${range}; host provides ${sdkMetadata.version}.`);
   for (const entry of [manifest.runtime, manifest.renderer, manifest.storage]) {
     if (entry && relative(root, resolve(root, entry)).startsWith("..")) throw new PluginPackageError("invalid_entry", `Entry ${entry} is outside the package.`);
+  }
+  const paths: string[] = [];
+  for (const path of manifest.manual ?? []) {
+    if (path.includes("\\") || path.includes("\0") || posix.isAbsolute(path) || win32.isAbsolute(path)
+      || path !== posix.normalize(path) || path.split("/").some(part => !part || part === "." || part === ".."))
+      throw new PluginPackageError("invalid_entry", `Manual directory ${path} must be a normalized package-relative subdirectory.`);
+    if (paths.some(other => path === other || path.startsWith(`${other}/`) || other.startsWith(`${path}/`)))
+      throw new PluginPackageError("invalid_entry", `Manual directory ${path} overlaps another declared directory.`);
+    try {
+      const directory = realpathSync(resolve(root, path));
+      const inside = relative(realpathSync(root), directory);
+      if (!inside || inside.split(/[\\/]/u).includes("..") || isAbsolute(inside) || !statSync(directory).isDirectory())
+        throw new Error("Not a package subdirectory.");
+    } catch {
+      throw new PluginPackageError("invalid_entry", `Manual directory ${path} must resolve to an existing directory inside the package.`);
+    }
+    paths.push(path);
   }
   return manifest;
 }

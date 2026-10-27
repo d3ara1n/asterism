@@ -22,7 +22,9 @@ Notes store current text in object data. Saving does not append a note-content h
 
 Find and grep are read-only resource implementations backed by packaged ripgrep. Every call searches current files; it creates no separate index.
 
-The manual is a separate static resource with empty state and parameterless creation. It exposes list, find, grep, and read over the application-bundled manual using the same filesystem mechanisms as directories. The application supplies the manual root during composition; resource state contains neither an installation path nor captured documents. Its tool implementations provide read-only access, and linking and agent policy determine availability as for other resources. Manual files are unpacked installation assets so native search can read them. Updates replace the manual with the application's edition; saved tool results retain their original content.
+The manual is a separate resource with empty state and parameterless creation. It exposes list, find, grep, and read over a virtual directory of application guides, public-package material, and directories declared by loaded plugins. Application composition supplies source paths; resource state contains neither installation paths nor captured documents. Files remain at their original locations, with installed application sources unpacked for native search. Linking and agent policy determine tool availability as for other resources.
+
+Virtual ancestors list source directories. A source-local target resolves inside that source's real directory. Searches over virtual ancestors visit their descendant sources and share one result limit and byte budget. Globs apply within each selected physical search directory; result paths include the source prefix and can be passed directly to read. A source failure fails the search rather than presenting an incomplete search as complete. File reads use current contents; saved tool results retain their original content.
 
 Targets resolve within the resource root. Recursive traversal does not follow symlinks; an explicitly selected link must resolve inside the root. Returned paths are root-relative with normalized separators.
 

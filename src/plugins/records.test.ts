@@ -113,6 +113,55 @@ describe("Contract decoding on shared timelines", () => {
     expect(current.records.query(contract, { scope: "timeline" }).map(record => record.record.id)).toEqual([first.id, branch.id]);
   });
 
+  // A receiver's scope contains only explicit direct targets; incoming edges, transitive edges, and foreign identities cannot select it.
+  it("queries direct resource links by the receiver's full identity", () => {
+    const { tree, sessionId } = stored();
+    const receiver = { sessionId, id: "bridge", kind: "example.plugin/bridge" };
+    tree.appendToTimeline(sessionId, created(receiver.id, "Bridge", receiver.kind));
+    tree.appendToTimeline(sessionId, created("agent", "Worker"));
+    tree.appendToTimeline(sessionId, created("note", "Notes", "example.plugin/note"));
+    tree.appendToTimeline(sessionId, created("incoming", "Incoming"));
+    tree.appendToTimeline(sessionId, attached(receiver.id, "agent"));
+    tree.appendToTimeline(sessionId, attached("agent", "note"));
+    tree.appendToTimeline(sessionId, attached("incoming", receiver.id));
+    const snapshot = sessionSnapshot(tree.view(sessionId));
+    expect(snapshot.resources.linkedTo(receiver)).toEqual([
+      { ref: { sessionId, id: "agent", kind: "asterism.builtin/agent" }, title: "Worker", data: {} },
+    ]);
+    expect(snapshot.resources.linkedTo({ ...receiver, sessionId: "other" })).toEqual([]);
+    expect(snapshot.resources.linkedTo({ ...receiver, kind: "example.plugin/other" })).toEqual([]);
+    expect(snapshot.resources.linkedTo({ ...receiver, id: "missing" })).toEqual([]);
+    tree.appendToTimeline(sessionId, attached(receiver.id, "note"));
+    expect(sessionSnapshot(tree.view(sessionId)).resources.linkedTo(receiver).map(resource => resource.ref.id)).toEqual(["agent", "note"]);
+  });
+
+  // Link queries share snapshot isolation: later detach/removal and cursor changes must not replace the captured path.
+  it("keeps captured links and titles while new snapshots follow detach, removal, and branching", () => {
+    const { tree, sessionId } = stored();
+    const receiver = { sessionId, id: "bridge", kind: "example.plugin/bridge" };
+    tree.appendToTimeline(sessionId, created(receiver.id, "Bridge", receiver.kind));
+    tree.appendToTimeline(sessionId, created("agent", "Worker"));
+    const linked = tree.appendToTimeline(sessionId, attached(receiver.id, "agent"));
+    const before = sessionSnapshot(tree.view(sessionId));
+    tree.appendToTimeline(sessionId, event("resource_renamed", { id: "agent", title: "Renamed" }));
+    const renamed = sessionSnapshot(tree.view(sessionId));
+    tree.appendToTimeline(sessionId, event("resource_detached", { id: "agent", receiverId: receiver.id }));
+    expect(sessionSnapshot(tree.view(sessionId)).resources.linkedTo(receiver)).toEqual([]);
+
+    tree.select(sessionId, linked.id);
+    tree.appendToTimeline(sessionId, removed("agent"));
+    expect(sessionSnapshot(tree.view(sessionId)).resources.linkedTo(receiver)).toEqual([]);
+    tree.select(sessionId, linked.id);
+    tree.appendToTimeline(sessionId, removed(receiver.id));
+    expect(sessionSnapshot(tree.view(sessionId)).resources.linkedTo(receiver)).toEqual([]);
+
+    tree.select(sessionId, linked.id);
+    tree.appendToTimeline(sessionId, event("example.plugin/message", { text: "Another branch" }));
+    expect(sessionSnapshot(tree.view(sessionId)).resources.linkedTo(receiver).map(resource => resource.title)).toEqual(["Worker"]);
+    expect(before.resources.linkedTo(receiver).map(resource => resource.title)).toEqual(["Worker"]);
+    expect(renamed.resources.linkedTo(receiver).map(resource => resource.title)).toEqual(["Renamed"]);
+  });
+
   // Sequence numbers follow session append order, not cross-session database seq or current-path indices.
   it("interleaved appends to side branches and other sessions do not alter public record sequence numbers", () => {
     const { tree, sessionId } = stored();

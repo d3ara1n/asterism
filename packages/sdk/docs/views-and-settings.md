@@ -28,12 +28,6 @@ Managed configuration suits schema-validated settings. Other plugin data can use
 
 Closing a page releases its view subscriptions. It does not end every service the plugin uses.
 
-## Extend Agent interaction
-
-Agent UI extensions can add compact controls, supplemental content, or modal interaction. Their business state remains owned by the contributing plugin.
-
-A component becoming invisible does not mean a waiting tool has completed or been cancelled. Reopening a view should reflect the current business state.
-
 ## Write interface text
 
 Plain text is valid. Message declarations and translation catalogs support plugins that need localized interfaces.

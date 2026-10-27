@@ -24,6 +24,23 @@ function collect<T extends { stopReason: SearchStopReason }>(output: { result: T
 }
 
 describe("Search output protocol", () => {
+  // Federated manual searches share one budget while each process reports paths relative to a different source.
+  it("qualifies equal filenames across sources and shares find and grep limits", () => {
+    let prefix = "sdk/docs";
+    const find = findOutput(".", () => prefix, 2);
+    const grep = grepOutput(".", () => prefix, { pattern: "match", limit: 2 });
+    collect(find, Buffer.from("./usage.md\0"));
+    collect(grep, event("match", "match\n", 1));
+    prefix = "plugins/example.bridge/docs";
+    collect(find, Buffer.from("./usage.md\0./extra.md\0"));
+    collect(grep, event("match", "match\n", 1), event("match", "match\n", 2));
+    expect(find.result).toEqual({
+      path: ".", files: ["sdk/docs/usage.md", "plugins/example.bridge/docs/usage.md"], stopReason: "limit",
+    });
+    expect(grep.result.rows.map(row => row.path)).toEqual(["sdk/docs/file.txt", "plugins/example.bridge/docs/file.txt"]);
+    expect(grep.result.stopReason).toBe("limit");
+  });
+
   // OS pipes split at arbitrary bytes; filenames may contain newlines, so NUL is the actual find boundary.
   it("Preserves UTF-8 across chunks and paths containing newlines, mapping them back to the resource root", () => {
     const output = findOutput("src", "src", 10);

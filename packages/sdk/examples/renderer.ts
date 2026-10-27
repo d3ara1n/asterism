@@ -45,12 +45,3 @@ export function createCounter(object: RendererObjectContext) {
 export function counterNote(object: RendererObjectContext) {
   return object.retained.get("example.counter/note", () => ({ text: "" }), note => { note.text = ""; });
 }
-
-export function rejectInvalidCalls(object: RendererObjectContext) {
-  // @ts-expect-error Action parameters are inferred from the shared contract; misspelled fields do not compile.
-  void object.invoke(ChangeCount, { amout: 1 });
-  // @ts-expect-error Creation parameters cannot bypass the contract using only the resource kind.
-  void object.session.create(Counter.kind, {}, { x: 0, y: 0 });
-  // @ts-expect-error The ordinary object interface does not include model output or conversation drafts.
-  object.activity.blocks;
-}

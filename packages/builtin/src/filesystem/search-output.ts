@@ -41,8 +41,8 @@ function dataText(value: { text?: string; bytes?: string }): string {
   throw new FilesystemError(failed("search_protocol", "The search process returned an invalid text field."));
 }
 /** rg consistently outputs '/' separators; paths relative to the search cwd are mapped back to the resource root. */
-export function searchPath(prefix: string, path: string): string {
-  return posix.join(prefix, path);
+export function searchPath(prefix: string | (() => string), path: string): string {
+  return posix.join(typeof prefix === "function" ? prefix() : prefix, path);
 }
 
 function entryBytes(value: unknown): number { return Buffer.byteLength(JSON.stringify(value)) + 1; }
@@ -61,7 +61,7 @@ class Budget {
   }
 }
 
-export function findOutput(path: string, prefix: string, limit: number) {
+export function findOutput(path: string, prefix: string | (() => string), limit: number) {
   const result: FindResult = { path, files: [], stopReason: null };
   const budget = new Budget(limit);
   const records = new SearchRecords(0, record => {
@@ -84,7 +84,7 @@ interface RgEvent {
   };
 }
 
-export function grepOutput(path: string, prefix: string, args: GrepArgs) {
+export function grepOutput(path: string, prefix: string | (() => string), args: GrepArgs) {
   const mode = args.outputMode ?? "content";
   const result: GrepResult = { path, mode, rows: [], files: [], stopReason: null };
   const budget = new Budget(args.limit ?? 500);

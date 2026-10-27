@@ -15,7 +15,7 @@ Resource creation has its own discovery and inspection tools. The available crea
 | Resource or input | Use |
 | --- | --- |
 | Directory | Read, search, edit, and create files, or run commands from a working directory |
-| Manual | Browse the bundled Asterism usage and plugin-development documentation |
+| Manual | Browse Asterism guides, public-package examples, and documentation exposed by loaded plugins |
 | Note | Keep editable text in the session |
 | Terminal | Share an interactive shell and screen between the user and model |
 | Web | Search or fetch URLs through configured web providers |
@@ -29,9 +29,11 @@ Notes retain current text. Their earlier tool results may appear in history, but
 
 ## Consult the manual
 
-Add a Manual resource and link it to an agent, or let the agent create one through the resource creation tools. Creation takes no parameters. The resource provides access to the documentation bundled with the installed application.
+Add a Manual resource and link it to an agent, or let the agent create one through the resource creation tools. Creation takes no parameters. The resource provides access to application guides, public-package development material, and documentation directories declared by loaded plugins.
 
-The agent can list a directory, find files by path pattern, search their contents, and read selected lines. Paths are relative to the manual root. The manual supports reading and searching; its contents update with the application. The resource stores no document copy, so browsing an earlier session does not select an earlier edition of the manual.
+The agent can list a directory, find files by path pattern, search their contents, and read selected lines. Root entries identify sources: `app`, `sdk`, `builtin-api`, and, when available, `plugins`. Searches at the root cover all sources; a narrower target selects one source or subdirectory. Search globs apply within each selected source directory, and returned paths include their source prefix.
+
+The manual reads files directly from their source locations. Application updates replace application guides; plugin updates replace their own documents. Plugin enablement and directory declarations take effect after restart. The resource stores no document copy, so browsing an earlier session does not select an earlier edition.
 
 ## Use network capabilities
 
