@@ -39,7 +39,7 @@ export function DirectoryInput({ initialInput, busy, resolve, cancel }: Creation
     setBrowsing(true);
     setPathError(null);
     try {
-      const picked = await window.host.pickDirectory();
+      const picked = await window.host.pickDirectory(path);
       if (picked) setPath(picked);
     } catch {
       setPathError(filesystemMessages.directoryBrowseFailed);

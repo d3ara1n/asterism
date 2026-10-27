@@ -72,8 +72,8 @@ export interface DesktopBridge {
   preferences: { read(): Promise<Record<string, Json>>; write(key: string, value: Json | null): Promise<boolean> };
   window: DesktopWindowBridge;
   readonly platform: DesktopPlatform;
-  /** System directory picker; returns null on cancellation. */
-  pickDirectory(): Promise<string | null>;
+  /** System directory picker; starts at an existing absolute directory or the user's home. Returns null on cancellation. */
+  pickDirectory(initialPath?: string): Promise<string | null>;
   /** Open user-clicked local files with system-associated apps; return error text on failure. */
   openLocalFile(path: string): Promise<string>;
   /** Open the application log directory in the system file manager; return error text on failure. */

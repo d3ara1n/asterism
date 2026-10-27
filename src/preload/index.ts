@@ -90,8 +90,8 @@ const bridge: DesktopBridge = {
       return (await ipcRenderer.invoke(preferencesSetChannel, parsed.data).catch(() => false)) === true;
     },
   },
-  async pickDirectory() {
-    const path = await ipcRenderer.invoke(pickDirectoryChannel);
+  async pickDirectory(initialPath) {
+    const path = await ipcRenderer.invoke(pickDirectoryChannel, initialPath);
     return typeof path === "string" ? path : null;
   },
   async openLocalFile(path) {

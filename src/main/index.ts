@@ -2,6 +2,8 @@ import { app, BrowserWindow, dialog, ipcMain, MessageChannelMain, net, protocol,
 import { randomUUID } from "node:crypto";
 import { externalWebUrl } from "@asterism/ui/links";
 import { mkdirSync } from "node:fs";
+import { stat } from "node:fs/promises";
+import { homedir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { pickDirectoryChannel, openLocalFileChannel, openLogsChannel, localFilePathSchema, statusChannel } from "../shared/contracts.ts";
@@ -229,9 +231,14 @@ function createWindow(): void {
     if (mainFrame && !inPlace) closeConnection();
   });
   // Return only paths selected in the system dialog; the renderer cannot use this to read files.
-  ipcMain.handle(pickDirectoryChannel, async event => {
+  ipcMain.handle(pickDirectoryChannel, async (event, raw: unknown) => {
     if (!trusted(event)) return null;
-    const result = await dialog.showOpenDialog(current, { properties: ["openDirectory"] });
+    const candidate = typeof raw === "string" ? raw.trim() : "";
+    const isDirectory = isAbsolute(candidate) && await stat(candidate).then(info => info.isDirectory()).catch(() => false);
+    const result = await dialog.showOpenDialog(current, {
+      properties: ["openDirectory"],
+      defaultPath: isDirectory ? candidate : homedir(),
+    });
     return result.canceled ? null : result.filePaths[0] ?? null;
   });
   ipcMain.handle(openLocalFileChannel, async (event, raw: unknown) => {
