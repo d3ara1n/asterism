@@ -11,8 +11,8 @@ afterEach(async () => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
 
-// 插件包管理契约：只改包列表，重启后生效；内置插件不在可管理列表中。
-it("应用命令登记和移除插件包，正确表达重启标记", () => {
+// Plugin package management contract: change only package lists, taking effect after restart; built-ins are outside the manageable list.
+it("application commands register and remove plugin packages and represent restart markers correctly", () => {
   const root = mkdtempSync(join(tmpdir(), "core-session-")); roots.push(root);
   const service = new ApplicationService(root); services.push(service);
   const dir = join(root, "pkg"); mkdirSync(dir);

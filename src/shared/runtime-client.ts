@@ -8,8 +8,8 @@ import type { SessionChanged } from "./session.ts";
 type Result = ConnectionServices[ConnectionService]["result"];
 
 /**
- * renderer 侧直连客户端：端口到达前按序排队，失败后所有在途与后续请求以 unavailable 结算。
- * 不为进程内业务等待设置期限；任务进程失联由端口关闭或运行状态通知结束。
+ * Renderer direct client: queue in order before port arrival; after failure settle all in-flight and subsequent requests as unavailable.
+ * No deadlines for in-process business waits; port close or runtime status notifications end waits when the task process is lost.
  */
 export class RuntimeClient implements RuntimeBridge {
   private port: ConnectionPort<RuntimeFrame, RendererFrame> | null = null;
@@ -32,14 +32,14 @@ export class RuntimeClient implements RuntimeBridge {
     this.queued = [];
     for (const frame of queued) this.post(frame);
   }
-  /** 端口不可用：结算在途请求，之后的发送立即失败。 */
+  /** Port unavailable: settle in-flight requests and fail subsequent sends immediately. */
   fail(message: string): void {
     if (this.failure) return;
     this.failure = message;
     this.queued = [];
     const port = this.port;
     this.port = null;
-    try { port?.close(); } catch { /* 端口已关闭。 */ }
+    try { port?.close(); } catch { /* The port is closed. */ }
     const pending = [...this.pending.values()];
     this.pending.clear();
     for (const resolve of pending) resolve({ ok: false, error: { code: "unavailable", message } });

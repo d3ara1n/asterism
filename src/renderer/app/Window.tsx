@@ -9,16 +9,16 @@ import { useDesktopWindow } from "./window-state";
 const geometry = {
   "--window-gutter": `${windowGeometry.gutter}px`,
   "--window-gap": `${windowGeometry.gap}px`,
-  // 窗口边距由 Space 内的滚动容器提供，滚动条与指示条因此贴住窗口边缘。
+  // The scroll container inside Space provides window margins, keeping scrollbars and indicators against the window edges.
   "--space-inset": `${windowGeometry.gutter}px`,
   "--window-header-height": `${windowGeometry.headerHeight}px`,
-  // 导航部件内：按钮组左侧留白与右侧留白相等。
+  // Within the navigation component: spacing to the left of the button group equals spacing to its right.
   "--mac-controls-inset": `${2 * windowGeometry.macControlsPosition.x - 2 * windowGeometry.gutter + windowGeometry.macControlsWidth}px`,
 } as CSSProperties;
 
 /**
- * 窗口：组合 Titlebar 与 Space，并处理平台差异（原生控件留白、拖动区域）。
- * 原生材质由主进程绘制；本层无不透明底色。全屏或浮动标题栏只改这里两者的排布。
+ * Window: composes Titlebar and Space and handles platform differences (spacing for native controls and drag regions).
+ * The main process draws the native material; this layer has no opaque background. Fullscreen or floating titlebars change only their arrangement here.
  */
 export function Window({ titlebar, children, skipTarget }: { titlebar: ReactNode; children: ReactNode; skipTarget: string }) {
   const i18n = useI18n();
@@ -30,7 +30,7 @@ export function Window({ titlebar, children, skipTarget }: { titlebar: ReactNode
   </main>;
 }
 
-/** 全局标题栏：不随屏平移。左侧导航，右侧操作（可隐藏但保留占位）。 */
+/** Global titlebar: does not slide with screens. Navigation on the left, actions on the right (can be hidden while retaining space). */
 export function Titlebar({ navigation, actions, actionsHidden }: { navigation: ReactNode; actions?: ReactNode; actionsHidden?: boolean }) {
   const i18n = useI18n();
   return <header className="titlebar">

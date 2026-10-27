@@ -14,7 +14,7 @@ import { FilePreview } from "../agent/conversation/Files";
 import { extraStructured, displayText } from "./content";
 import { Instructions, PageNote, ServerLine, ToolList, type ServerSummaryData, type ToolEntryData } from "./views";
 
-// --- 保存结果的展示解析：字段宽松，无法识别的结果只保留原始详情 ---
+// --- Display parsing of saved results: permissive fields; unrecognized results retain only raw details ---
 
 const serverSchema = z.object({
   name: z.string(), enabled: z.boolean(), connection: z.enum(connectionPhases),
@@ -51,7 +51,7 @@ function Empty({ text }: { text: UiText }) {
   return <p className="type-caption text-muted-foreground">{useI18n().text(text)}</p>;
 }
 
-// --- 标题：操作名 · 操作对象 · 右侧结果数量或进度 ---
+// --- Header: action name · action target · result count or progress on the right ---
 
 function ListHeader({ args, result }: ToolRenderProps) {
   const i18n = useI18n(), data = parse(listSchema, result?.data);
@@ -75,7 +75,7 @@ function ConnectHeader({ args, result }: ToolRenderProps) {
     meta={data?.indexed && i18n.formatMessage(messages.tools, { count: data.tool_count })} />;
 }
 
-/** 执行中显示远端进度；终结后汇总返回内容的字数与文件数。标题始终保留调用的工具句柄。 */
+/** Shows remote progress during execution; summarizes returned character and file counts after completion. The header always retains the called tool's handle. */
 function CallHeader({ args, phase, result }: ToolRenderProps<McpCallData>) {
   const i18n = useI18n(), data = result?.data;
   const progress = phase === "executing" ? data?.progress : undefined;
@@ -87,7 +87,7 @@ function CallHeader({ args, phase, result }: ToolRenderProps<McpCallData>) {
     meta={progress ? `${progress.completed}${progress.total !== undefined ? ` / ${progress.total}` : ""}` : summary || undefined} />;
 }
 
-// --- 目录工具正文：消费保存的结果，空结果显式说明 ---
+// --- Catalog tool body: consumes saved results and explicitly explains empty results ---
 
 function ListBody({ result }: ToolRenderProps) {
   const data = parse(listSchema, result?.data);
@@ -155,7 +155,7 @@ function ConnectBody({ result }: ToolRenderProps) {
   return data ? <ServerLine server={toSummary(data)} /> : null;
 }
 
-// --- 调用正文：参数、进度与远端返回的内容 ---
+// --- Call body: arguments, progress, and remotely returned content ---
 
 function Section({ label, children }: { label: UiText; children: ReactNode }) {
   return <section className="min-w-0 space-y-1 text-xs leading-relaxed">
@@ -165,7 +165,7 @@ function Section({ label, children }: { label: UiText; children: ReactNode }) {
 }
 const codeBlock = "type-code m-0 max-h-96 overflow-auto whitespace-pre-wrap break-all";
 
-/** 参数来自调用本身；结果按部件顺序展示文字与文件，结构化输出只在文字中没有相同 JSON 时追加。 */
+/** Arguments come from the call itself; results show text and files in part order, appending structured output only when the text contains no equivalent JSON. */
 function CallBody({ args, phase, result }: ToolRenderProps<McpCallData>) {
   const i18n = useI18n(), object = useRendererObject();
   if (phase === "input") return null;

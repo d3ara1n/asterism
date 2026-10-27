@@ -14,18 +14,18 @@ import { useObjectCollapse } from "./object-collapse";
 const noPanels: readonly CardPanelView[] = [];
 
 /**
- * 对象内容的公共外壳：标题栏、辅助面板容器与焦点管理。卡片与聚焦浮岛是它的两种容器，
- * 内容同一份；`@container/card` 由外壳提供，内容按所在容器宽度自适应，不感知容器种类。
+ * Shared shell for object content: titlebar, auxiliary panel container, and focus management. Cards and focus islands are its two container types,
+ * sharing the same content; the shell provides `@container/card`, and content adapts to its container width without knowing the container type.
  */
 export function ObjectSurface({ icon, kind, title, actions, controls, panels = noPanels, collapsed = false, expandedHeight, resizing = false, onExpand, headerClassName, children }: {
   icon: ReactNode; kind: string; title: string;
-  /** 资源与宿主操作，位于辅助面板菜单左侧。 */ actions?: ReactNode;
-  /** 容器自身的控制（聚焦切换、折叠），位于标题栏最右侧。 */ controls?: ReactNode;
+  /** Resource and host actions, to the left of the auxiliary panel menu. */ actions?: ReactNode;
+  /** Container controls (focus toggle and collapse), at the far right of the titlebar. */ controls?: ReactNode;
   panels?: readonly CardPanelView[];
   collapsed?: boolean;
-  /** 画布提供去除外边框后的展开高度；浮岛由父容器分配高度。 */ expandedHeight?: number;
+  /** The canvas provides expanded height excluding the outer border; an island receives its height from its parent container. */ expandedHeight?: number;
   resizing?: boolean;
-  /** 折叠时选取面板需先展开。 */ onExpand?: () => void;
+  /** Selecting a panel while collapsed requires expanding first. */ onExpand?: () => void;
   headerClassName?: string; children: ReactNode;
 }) {
   const i18n = useI18n();
@@ -68,13 +68,13 @@ export function ObjectSurface({ icon, kind, title, actions, controls, panels = n
     <motion.div ref={root} className="@container/card min-w-0 overflow-hidden bg-card-shell"
       style={{ height: expandedHeight === undefined ? "100%" : collapse.height, minHeight: collapse.headerHeight ?? undefined }}
       onKeyDown={event => {
-        // 菜单和对话框的 portal 不属于内容区，先由它们自行处理 Esc。
+        // Menu and dialog portals are outside the content area; let them handle Esc first.
         if (event.key !== "Escape" || event.defaultPrevented || !active || !event.currentTarget.contains(event.target as Node)) return;
         event.preventDefault(); event.stopPropagation(); closePanel();
       }}>
       <div className="flex min-h-0 min-w-0 flex-col" style={{ height: expandedHeight ?? "100%" }}>
         <header ref={collapse.header} className={cn("flex shrink-0 items-center gap-2 px-3 py-2", headerClassName)}>
-          {/* 窄容器只留图标表达类型，把宽度让给标题；类型名始终作为图标的可访问名称与提示。 */}
+          {/* Narrow containers show only the type icon, leaving width for the title; the type name always remains the icon's accessible name and tooltip. */}
           <span role="img" aria-label={kind} title={kind} className="flex size-4 shrink-0 items-center justify-center text-muted-foreground [&_svg]:size-4">{icon}</span>
           <div className="flex min-w-0 flex-1 items-baseline gap-2">
             <p aria-hidden="true" className="type-label hidden max-w-1/3 shrink-0 truncate @min-[24rem]/card:block">{kind}</p>
@@ -103,7 +103,7 @@ export function ObjectSurface({ icon, kind, title, actions, controls, panels = n
         </header>
         {collapse.mounted && <motion.div data-object-content="" inert={!collapse.interactive}
           style={{ opacity: collapse.opacity, y: collapse.y }}
-          // 内容面与外壳只靠底色区分，不加边框；四周柔和的淡阴影承担颜色过渡，不形成切线。
+          // Distinguish content surface and shell by background color alone, without a border; soft, faint shadows around the edges transition colors without a hard dividing line.
           className="nodrag nopan relative mx-1 mb-1 flex min-h-0 min-w-0 flex-1 overflow-hidden rounded-lg bg-card shadow-[0_1px_3px_0_rgb(0_0_0/0.06),0_0_2px_0_rgb(0_0_0/0.04)]">
           <div className={cn("flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden", active && "invisible @min-[52rem]/card:visible")}>{children}</div>
           {active && <aside ref={panelElement} tabIndex={-1} aria-labelledby={headingId}

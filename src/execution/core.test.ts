@@ -34,8 +34,8 @@ async function run(handler: Handler, options: { effect?: "read" | "write"; signa
   return results[0]!;
 }
 
-describe("工具产出与终结", () => {
-  it("预览只查捕获目录，不准备或执行；未知资源和被策略排除的工具无实现身份", () => {
+describe("Tool output and completion", () => {
+  it("previews only consult the captured catalog without preparation or execution; unknown resources and policy-excluded tools have no implementation identity", () => {
     const tool = implement(contract, { call: async () => ({ kind: "succeeded", data: { text: "" } }) });
     const prepare = vi.spyOn(tool, "prepare");
     const snapshot = { ...resource };
@@ -49,7 +49,7 @@ describe("工具产出与终结", () => {
     expect(previewCoreCall("resource_call", call.arguments, denied).implementation).toBeUndefined();
     expect(prepare).not.toHaveBeenCalled();
   });
-  it("publish 是独立快照，只在终结时投影模型；终结后的回调失效", async () => {
+  it("publish creates independent snapshots projected to the model only at completion; callbacks expire after completion", async () => {
     const updates: Json[] = [];
     const order: string[] = [];
     const waiting: ToolInvocationInfo[] = [];
@@ -84,7 +84,7 @@ describe("工具产出与终结", () => {
     { kind: "rejected", error: { code: "test_rejection", message: "Rejected after inspection." } },
     { kind: "cancelled", message: "Stopped after producing text." },
     { kind: "unknown", message: "Effects are unknown." },
-  ] as const)("$kind 保留最近的合法产出，模型投影包含结局和产出", async completion => {
+  ] as const)("$kind retains the latest valid output and model projection includes outcome and output", async completion => {
     const outcome = await run(async ({ publish }) => { publish({ text: "captured" }); return completion; }, { toModel: data => data.text });
     expect(outcome).toMatchObject({ ...completion, data: { text: "captured" } });
     expect(text(outcome)).toContain(completion.kind);
@@ -92,7 +92,7 @@ describe("工具产出与终结", () => {
     expect(text(outcome)).toContain("captured");
   });
 
-  it("部分完成明确保存最终产出；显式 null 可以清空过期的过程产出", async () => {
+  it("partial completion explicitly saves final output; explicit null clears stale intermediate output", async () => {
     await run(async ({ publish }) => {
       publish({ text: "preliminary" });
       return { kind: "partial", data: { text: "committed portion" }, message: "Only some work completed." };
@@ -112,7 +112,7 @@ describe("工具产出与终结", () => {
   it.each([
     { effect: "read", abort: false, kind: "failed" }, { effect: "write", abort: false, kind: "unknown" },
     { effect: "read", abort: true, kind: "cancelled" }, { effect: "write", abort: true, kind: "unknown" },
-  ] as const)("$effect 执行抛错（中止=$abort）按副作用分类，保留已取得产出", async ({ effect, abort, kind }) => {
+  ] as const)("$effect execution throws (abort=$abort) are classified by side effects and retain acquired output", async ({ effect, abort, kind }) => {
     const controller = new AbortController();
     const outcome = await run(async ({ publish, signal }) => {
       publish({ text: "captured" });
@@ -123,7 +123,7 @@ describe("工具产出与终结", () => {
     expect(text(outcome)).toContain(kind); expect(text(outcome)).toContain("captured");
   });
 
-  it.each(["publish", "return"] as const)("%s 的不合法数据不会覆盖之前的有效快照", async where => {
+  it.each(["publish", "return"] as const)("invalid %s data does not overwrite the previous valid snapshot", async where => {
     const outcome = await run(async ({ publish }) => {
       publish({ text: "valid" });
       if (where === "publish") publish({ text: 42 } as never);
@@ -135,7 +135,7 @@ describe("工具产出与终结", () => {
   it.each([
     { kind: "succeeded", preview: true },
     { kind: "partial", preview: false },
-  ] as const)("$kind 缺少最终 data 时不能将预览或 null 当作成功产出", async ({ kind, preview }) => {
+  ] as const)("$kind without final data cannot treat a preview or null as successful output", async ({ kind, preview }) => {
     const outcome = await run(async ({ publish }) => {
       if (preview) publish({ text: "preview only" });
       return { kind, ...(kind === "partial" ? { message: "Missing final data." } : {}) } as never;
@@ -146,7 +146,7 @@ describe("工具产出与终结", () => {
     expect(text(outcome).includes("preview only")).toBe(preview);
   });
 
-  it("模型投影失败保留已知执行结局，不绕过投影发送原始数据", async () => {
+  it("model projection failures preserve known execution outcomes without bypassing projection to send raw data", async () => {
     const outcome = await run(async () => ({ kind: "succeeded", data: { text: "UI only" } }), { effect: "write", toModel() { throw new Error("Internal exception"); } });
     expect(outcome).toMatchObject({ kind: "succeeded", data: { text: "UI only" }, });
     expect(text(outcome)).toContain("succeeded");

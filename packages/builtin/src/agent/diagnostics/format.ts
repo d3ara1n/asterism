@@ -11,7 +11,7 @@ export function formatMoney(i18n: I18n, amount: number): string {
   const options = { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 8 } as const;
   return amount > 0 && amount < 0.00000001 ? `< ${i18n.formatNumber(0.00000001, options)}` : i18n.formatNumber(amount, options);
 }
-/** token 基数使用统一工程缩写，其他计费单位保留其原始数值尺度。 */
+/** Token bases use consistent engineering abbreviations; other billing units retain their original numeric scale. */
 export function formatQuantity(i18n: I18n, value: number, unit: UnitPrice["unit"]): string {
   return unit === "token" ? formatCount(value) : i18n.formatNumber(value);
 }

@@ -21,9 +21,9 @@ import { definePlugin, defineModule } from "@asterism/sdk/runtime";
 const ns = pluginNamespace(${JSON.stringify(id)});
 export default definePlugin({ namespace: ns, version: "0.0.1", modules: [defineModule(() => ({}))] });`;
 
-describe("插件包", () => {
-  // 信息卡片必须独立于代码与 API 兼容读取；禁用、失败插件仍显示真实身份资料。
-  it("元信息不执行插件代码，不兼容的包也可读取名称、作者和包内图标", () => {
+describe("Plugin packages", () => {
+  // Information cards must load independently of code and API compatibility; disabled or failed plugins still show real identity metadata.
+  it("metadata reads execute no plugin code and can read names, authors, and package icons from incompatible packages", () => {
     const root = temp();
     writeFileSync(join(root, "package.json"), JSON.stringify({
       name: "@example/info", version: "1.2.3", description: "Package description", author: { name: "Author" },
@@ -38,7 +38,7 @@ describe("插件包", () => {
       icon: `data:image/svg+xml;base64,${Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>').toString("base64")}`,
     });
   });
-  it("只认包根：无清单的目录添加失败且不留条目", () => {
+  it("accepts package roots only; adding directories without manifests fails without retaining entries", () => {
     const data = temp(); const dir = temp();
     const list = new PackageList(join(data, "plugins.json"));
     expect(() => list.add({ source: { kind: "path", path: dir } }, data)).toThrow();
@@ -46,13 +46,13 @@ describe("插件包", () => {
     expect(() => list.add({ source: { kind: "path", path: dir } }, data)).toThrow();
     expect(list.read()).toEqual([]);
   });
-  // 本地源码依赖不能替代宿主兼容声明；0.x 的 caret 范围不能越过 minor。
+  // Local source dependencies cannot replace host compatibility declarations; 0.x caret ranges cannot cross minor versions.
   it.each([
     [undefined, "invalid_manifest"],
     ["file:../sdk", "invalid_manifest"],
     ["^0.1.0", "incompatible_api"],
     [">=99.0.0", "incompatible_api"],
-  ])("拒绝 SDK peer 声明 %s 并报告宿主版本", (range, code) => {
+  ])("rejects SDK peer declaration %s and reports the host version", (range, code) => {
     const dir = temp();
     writeFileSync(join(dir, "package.json"), JSON.stringify({
       asterism: { id: "acme.x" }, peerDependencies: { "@asterism/sdk": range },
@@ -60,7 +60,7 @@ describe("插件包", () => {
     }));
     expect(() => readManifest(dir)).toThrow(expect.objectContaining({ code, message: expect.stringContaining(`host provides ${sdkMetadata.version}`) }));
   });
-  it("兼容范围与本地开发依赖独立，启动重新检查修改后的要求", async () => {
+  it("compatibility ranges are independent of local development dependencies and startup rechecks modified requirements", async () => {
     const dir = temp(), data = temp();
     const metadata = { asterism: { id: "acme.x" }, peerDependencies: { "@asterism/sdk": `^${sdkMetadata.version}` },
       devDependencies: { "@asterism/sdk": "file:../sdk" } };
@@ -72,7 +72,7 @@ describe("插件包", () => {
     const [loaded] = await loadPackages(list, data, join(data, "cache"), []);
     expect(loaded).toMatchObject({ status: "invalid", error: expect.stringContaining("requires @asterism/sdk >=99.0.0") });
   });
-  it("源码包经 esbuild 打包导入，SDK 解析到宿主实例；禁用与重复 ID 不加载", async () => {
+  it("esbuild bundles and imports source packages with the host SDK instance; disabled and duplicate IDs do not load", async () => {
     const data = temp(); const a = temp(); const b = temp(); const c = temp();
     pkg(a, { id: "acme.a", runtime: "src/runtime.ts" }, runtime("acme.a"));
     pkg(b, { id: "acme.b", runtime: "src/runtime.ts" }, runtime("acme.b"));
@@ -86,7 +86,7 @@ describe("插件包", () => {
     expect(loaded.map(item => [item.manifest?.id, item.status])).toEqual([["acme.a", "loaded"], ["acme.b", "disabled"]]);
     expect(loaded[0]!.definition?.namespace.id).toBe("acme.a");
   });
-  it("构建失败只标记该包", async () => {
+  it("build failures mark only the affected package", async () => {
     const data = temp(); const a = temp();
     pkg(a, { id: "acme.a", runtime: "src/runtime.ts" }, "export default {{;");
     const list = new PackageList(join(data, "plugins.json"));
@@ -95,7 +95,7 @@ describe("插件包", () => {
     expect(item!.status).toBe("failed");
     expect(item!.error).toMatch(/Build failed/);
   });
-  it("源码包仅引入公开 SDK 即可提供真实资源，不需要宿主内部工厂", async () => {
+  it("source packages provide real resources using only the public SDK without host-internal factories", async () => {
     const data = temp(); const root = temp();
     pkg(root, { id: "acme.sdk", runtime: "src/runtime.ts" }, `
       import { z } from "zod";
@@ -132,8 +132,8 @@ describe("插件包", () => {
   });
 });
 
-// 符号链接入口的源码路径会被解析；CSS 归属仍按输出入口登记，搬移后类名和 url() 保持有效。
-it("登记独立样式、保留 CSS Modules 类名与资源路径，缓存复用后仍能读取样式", async () => {
+// Symlink entry source paths resolve; CSS ownership still follows output entries so class names and url() remain valid after relocation.
+it("registers independent styles, preserves CSS Module names and asset paths, and reads styles after cache reuse", async () => {
   const root = temp(), plain = temp(), other = temp(), broken = temp(), data = temp(), cache = join(data, "cache");
   pkg(root, { id: "acme.styled", renderer: "src/renderer.ts" });
   pkg(plain, { id: "acme.plain", renderer: "src/renderer.ts" });
@@ -229,8 +229,8 @@ function publicFixture() {
   return { data, provider, consumer, list, cache: join(data, "cache") };
 }
 type Probe = { Read: object; settings: Map<string, number>; Marker: new () => object; events: string[] };
-describe("公共模块", () => {
-  it("提供方内部引用、两个消费者与 re-export 共享真实声明、状态和类身份", async () => {
+describe("Public modules", () => {
+  it("provider internal references, two consumers, and re-exports share real declarations, state, and class identity", async () => {
     const fixture = publicFixture(), second = temp();
     const metadata = JSON.parse(readFileSync(join(fixture.consumer, "package.json"), "utf8"));
     pkg(second, { ...metadata.asterism, id: "acme.second", renderer: undefined },
@@ -253,10 +253,10 @@ describe("公共模块", () => {
         .flatMap(pkg => pkg.implementations).map(implementation => implementation.active)).toEqual([true, true]);
     } finally { await service.close(); }
   });
-  it("前端产物共享真实导出，后台与前端保持各自实例", async () => {
+  it("frontend artifacts share real exports while backend and frontend keep separate instances", async () => {
     const fixture = publicFixture();
     const packages = await loadPackages(fixture.list, fixture.data, fixture.cache, []);
-    // 在隔离的测试进程中提供前端依赖表，直接验证构建产物，不启动 GUI。
+    // Supply the frontend dependency table in an isolated test process to verify build artifacts directly without launching a GUI.
     const globals = globalThis as Record<string, unknown>, previous = globals.__asterismRendererModules;
     globals.__asterismRendererModules = { zod: await import("zod"), "@asterism/sdk/contracts": await import("@asterism/sdk/contracts") };
     try {
@@ -271,7 +271,7 @@ describe("公共模块", () => {
       else globals.__asterismRendererModules = previous;
     }
   });
-  it("提供方禁用明确阻断消费者；损坏的无关插件不阻断公共模块图", async () => {
+  it("disabled providers explicitly block consumers while unrelated broken plugins preserve the public module graph", async () => {
     const fixture = publicFixture(), broken = temp();
     pkg(broken, { id: "acme.broken", runtime: "src/runtime.ts" }, "invalid }");
     fixture.list.add({ source: { kind: "path", path: broken } }, fixture.data);
@@ -282,7 +282,7 @@ describe("公共模块", () => {
     expect(packages.map(pkg => pkg.status)).toEqual(["failed", "disabled", "failed"]);
     expect(packages[0]!.error).toEqual(expect.any(String));
   });
-  it("插件根目录外的 re-export 仍登记间接依赖，提供方损坏不拖垮无关插件", async () => {
+  it("re-exports outside plugin roots register indirect dependencies and broken providers do not disrupt unrelated plugins", async () => {
     const fixture = publicFixture(), outside = temp(), healthy = temp();
     const helper = join(outside, "helper.ts");
     writeFileSync(helper, 'export * from "@fixture/provider/public";');
@@ -299,7 +299,7 @@ describe("公共模块", () => {
     packages = await loadPackages(fixture.list, fixture.data, fixture.cache, []);
     expect(packages.map(pkg => pkg.status)).toEqual(["failed", "failed", "loaded"]);
   });
-  it("前端的反向导入不制造后台初始化循环", async () => {
+  it("frontend reverse imports do not create backend initialization cycles", async () => {
     const fixture = publicFixture();
     const consumer = JSON.parse(readFileSync(join(fixture.consumer, "package.json"), "utf8"));
     consumer.exports = { "./public": "./src/public.ts" };
@@ -317,7 +317,7 @@ describe("公共模块", () => {
     try { expect(service.sessions.plugins.every(pkg => pkg.status === "loaded")).toBe(true); }
     finally { await service.close(); }
   });
-  it("禁用的同名包不影响启用提供方的合法私有自引用", async () => {
+  it("disabled same-name packages do not affect enabled providers' valid private self-references", async () => {
     const fixture = publicFixture(), disabled = temp();
     const provider = JSON.parse(readFileSync(join(fixture.provider, "package.json"), "utf8"));
     provider.exports["./internal"] = "./src/state.ts";

@@ -3,9 +3,9 @@ import type { z } from "zod";
 import { ContextSummary, Execution, AgentInputMessage } from "@asterism/builtin-api/contracts";
 import { projectInputMessage } from "./input-message.ts";
 
-/** 投影只依赖纯契约，后台请求与前端上下文面板共用同一规则；后台入口把失败转换为插件错误。 */
+/** Projection depends only on pure contracts; background requests and the frontend context panel share the same rules, and the background entry point converts failures to plugin errors. */
 export class ContextProjectionError extends Error {}
-/** 一个响应及其全部工具结果不可拆开；索引始终指向完整时间线。 */
+/** A response and all its tool results are indivisible; indices always refer to the full timeline. */
 export interface ContextGroup { items: ModelItem[]; first: number; last: number }
 export interface AgentContext {
   path: readonly SessionRecord[];
@@ -21,7 +21,7 @@ export function contextMessages(context: AgentContext): ModelItem[] {
 export function projectForAgent(snapshot: Pick<SessionSnapshot, "records">, agentId: string): ModelItem[] {
   return contextMessages(projectAgentContext(snapshot, agentId));
 }
-/** 按请求起点组合响应，事件顺序不改变；边界检查在完整路径上进行，不丢失请求起点。 */
+/** Groups responses by request starting point without changing event order; boundaries are checked on the full path so request starting points are preserved. */
 export function projectAgentContext(snapshot: Pick<SessionSnapshot, "records">, agentId: string): AgentContext {
   const path = snapshot.records.all({ scope: "timeline" });
   const positions = new Map(path.map((record, index) => [record.id, index]));
@@ -51,7 +51,7 @@ export function projectAgentContext(snapshot: Pick<SessionSnapshot, "records">, 
   const emit = (origin: string | null) => {
     for (const blocks of after.get(origin) ?? []) {
       const first = blocks[0]!.block;
-      // 回溯、断网或取消可停在思考之后，末尾思考不作为模型输出结尾。
+      // Rewinding, disconnection, or cancellation may stop after thinking; trailing thinking is not used as the ending of model output.
       const parts = blocks.map(({ block }) => part(block));
       while (parts.at(-1)?.kind === "thinking") parts.pop();
       const items: ModelItem[] = [];

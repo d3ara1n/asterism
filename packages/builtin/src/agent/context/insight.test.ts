@@ -17,9 +17,9 @@ function pathOf(...values: NewNode[]): SessionNode[] {
 }
 const insight = (path: SessionNode[], agent = "a") => contextInsight(sessionView(nodeView("s", "", path, path.at(-1)?.id ?? null)), agent);
 
-// 构成按下一次请求的模型投影计字，窗口与系统部分只取已保存的真实计量。
-describe("代理上下文洞察", () => {
-  it("对话按投影分类计码点；未完成块、其他代理与摘要替换的前缀不计入", () => {
+// Composition counts characters in the next request's model projection; the window and system sections use only saved actual measurements.
+describe("Agent context insights", () => {
+  it("Counts projected conversation code points by category, excluding incomplete blocks, other agents, and prefixes replaced by summaries", () => {
     const path = pathOf(
       message("a", "旧问题"), text("a", "old", 0, "old answer", { requestParentId: "0", completion: completion(900, "/old/AGENTS.md") }),
       message("a", "问题😀"), attached("a", "dir", "linked"),
@@ -36,12 +36,12 @@ describe("代理上下文洞察", () => {
       summary: expect.any(Number),
     });
     expect(result.conversation.characters.summary).toBeGreaterThan(2);
-    // 摘要在最近一次计量之后，旧 input 不再代表窗口占用。
+    // The summary follows the latest measurement, so the old input no longer represents window usage.
     expect(result.usage).toMatchObject({ input: 900, compressedAfter: true });
     expect(result.system).toMatchObject({ responseId: "old", diagnostics: { tools: ["resource_list"] } });
   });
 
-  it("回溯到终态块同时取得用量和扩展，缺失扩展时不借用前次请求", () => {
+  it("Rewinding to a terminal block retrieves both usage and extensions; a missing extension is not borrowed from an earlier request", () => {
     const nodes = [
       node("0", null, message("a", "go")),
       node("1", "0", text("a", "first", 0, "one", { requestParentId: "0", completion: completion(100, "/a/AGENTS.md") })),
@@ -61,7 +61,7 @@ describe("代理上下文洞察", () => {
     expect(insight(pathOf(message("a", "new")))).toMatchObject({ usage: null, system: null });
   });
 
-  it("瓷砖按最大余数分配且总数固定，非零类别至少一格", () => {
+  it("Allocates a fixed total of tiles by largest remainder, with at least one tile per nonzero category", () => {
     expect(allocateTiles([1, 1000, 0], 100)).toEqual([1, 99, 0]);
     expect(allocateTiles([1, 1, 1], 100).reduce((sum, value) => sum + value, 0)).toBe(100);
     expect(allocateTiles([0, 0], 100)).toEqual([0, 0]);

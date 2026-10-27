@@ -14,7 +14,7 @@ const config: Configuration = {
     target: ["dmg", "zip"],
     icon: "assets/icon/asterism.icns",
     category: "public.app-category.productivity",
-    // 固定自签身份由 CI 导入；本地无证书时仅作 ad-hoc 打包验证。
+    // CI imports the fixed self-signed identity; local builds without a certificate only validate ad-hoc packaging.
     identity: process.env.CSC_NAME ?? "-",
     hardenedRuntime: false,
     gatekeeperAssess: false,

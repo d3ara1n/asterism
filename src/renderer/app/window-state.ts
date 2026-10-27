@@ -6,7 +6,7 @@ const listeners = new Set<() => void>();
 const subscribe = (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener); }; };
 const publish = (state: DesktopWindowState) => { current = state; listeners.forEach(listener => listener()); };
 
-/** 首帧前先订阅再读取，直接采用收到的当前状态。 */
+/** Subscribe before reading ahead of the first frame, and directly adopt the current state received. */
 export async function startDesktopWindow(bridge: DesktopWindowBridge): Promise<() => void> {
   const stop = bridge.onChanged(publish);
   try {

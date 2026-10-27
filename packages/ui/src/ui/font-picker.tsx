@@ -6,14 +6,14 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Popover, PopoverContent, PopoverTrigger } from "./popover"
 import { Switch } from "./switch"
 
-/** Local Font Access API（Chromium）；TS 标准库尚未收录。 */
+/** Local Font Access API (Chromium); not yet included in the TS standard library. */
 type LocalFont = { family: string }
 declare global { interface Window { queryLocalFonts?: () => Promise<LocalFont[]> } }
 
 type FontList = { families: string[]; available: boolean }
 let cache: Promise<FontList> | null = null
 
-/** 枚举本机字体家族，按名称去重排序；不可用或被拒绝时返回空列表。全进程只查询一次。 */
+/** Enumerate local font families, deduplicated and sorted by name; return an empty list when unavailable or denied. Query only once per process. */
 function loadFonts(): Promise<FontList> {
   cache ??= (async () => {
     if (!window.queryLocalFonts) return { families: [], available: false }
@@ -32,7 +32,7 @@ function loadFonts(): Promise<FontList> {
 
 const monoCache = new Map<string, boolean>()
 let context: CanvasRenderingContext2D | null = null
-/** 窄字与宽字等宽即视为等宽字体；未安装的字体会落到回退字体，结果按回退判定。 */
+/** Treat a font as monospace when narrow and wide characters have equal width; uninstalled fonts use a fallback, so the result reflects that fallback. */
 function isMonospace(family: string): boolean {
   const known = monoCache.get(family)
   if (known !== undefined) return known
@@ -45,10 +45,10 @@ function isMonospace(family: string): boolean {
 }
 
 export interface FontPickerProps {
-  /** null 表示系统默认。 */
+  /** null means the system default. */
   value: string | null
   onValueChange: (value: string | null) => void
-  /** 默认只列等宽字体，可切换显示全部。 */
+  /** Lists only monospace fonts by default; can switch to showing all fonts. */
   monospaceOnly?: boolean
   defaultLabel: string
   searchPlaceholder: string
@@ -59,7 +59,7 @@ export interface FontPickerProps {
   className?: string
 }
 
-/** 本机字体选择：可搜索的下拉列表，每项以自身字体渲染；首项为系统默认。 */
+/** Local font selection: a searchable dropdown with each item rendered in its own font; the first item is the system default. */
 export function FontPicker({ value, onValueChange, monospaceOnly = false, defaultLabel, searchPlaceholder, emptyText, unavailableText, showAllLabel, className, ...props }: FontPickerProps) {
   const [open, setOpen] = React.useState(false)
   const [fonts, setFonts] = React.useState<FontList | null>(null)

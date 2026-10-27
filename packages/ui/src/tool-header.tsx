@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { cn } from "./utils";
 
-/** 工具标题统一单行：名称和路径让出空间，尾部摘要保持可见并右对齐。 */
+/** Tool headers consistently use one line: names and paths yield space, while the trailing summary stays visible and right-aligned. */
 export function ToolHeader({ label, subject, badge, meta, monospace = false }: {
   label: string;
   subject?: string;

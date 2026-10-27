@@ -2,7 +2,7 @@ import type { RendererPrepareContext } from "@asterism/sdk/renderer";
 import { CompleteTerminalImage, TerminalImageRequested, type TerminalImage } from "./contract.ts";
 import { terminalTypography } from "./typography.ts";
 
-/** 画布仅渲染已解析的字符网格；截图服务独立于卡片挂载。 */
+/** The canvas renders only the parsed character grid; the screenshot service is independent of card mounting. */
 export function renderTerminalImage(screen: TerminalImage): string {
   const canvas = document.createElement("canvas");
   const context = canvas.getContext("2d");

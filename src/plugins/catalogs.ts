@@ -10,7 +10,7 @@ function inside(base: string, file: string): boolean {
   return path !== ".." && !path.startsWith(`..${sep}`) && !isAbsolute(path);
 }
 
-/** 静态目录读取与业务装配独立；规范化路径和真实路径都限于包根。 */
+/** Static catalog reads are independent of business assembly; normalized and real paths remain inside package roots. */
 export function loadCatalogs(
   root: string,
   owner: string,

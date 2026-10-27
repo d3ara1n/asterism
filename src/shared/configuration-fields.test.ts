@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import type { Json } from "@asterism/sdk/contracts";
 import { configurationField, configurationLabel, configurationProperty } from "./configuration-fields.ts";
 
-describe("配置 schema 控件选择", () => {
-  it("普通字段按明确类型显示，引用、联合和动态对象保留完整值编辑", () => {
+describe("Configuration schema control selection", () => {
+  it("ordinary fields use explicit types while references, unions, and dynamic objects retain full-value editing", () => {
     expect(configurationField({ type: "boolean" })).toEqual({ kind: "boolean" });
     expect(configurationField({ type: "integer", minimum: 0 })).toEqual({ kind: "integer" });
     const complex: Json[] = [{ $ref: "#/$defs/value" }, { anyOf: [{ type: "string" }, { type: "number" }] },
@@ -13,11 +13,11 @@ describe("配置 schema 控件选择", () => {
     expect(configurationField({ type: "object", properties: { limit: { type: "number" } }, required: ["limit"], additionalProperties: false }))
       .toMatchObject({ kind: "object", required: ["limit"] });
     expect(configurationLabel({ title: "Limits" }, "limit")).toBe("Limits");
-    // 等级映射需区分缺省、null 与字符串；识别 nullable 不能丢失输入约束。
+    // Level mappings distinguish omission, null, and strings; recognizing nullable must preserve input constraints.
     expect(configurationField({ anyOf: [{ type: "string", minLength: 1 }, { type: "null" }] }))
       .toEqual({ kind: "nullable-string", schema: { type: "string", minLength: 1 } });
   });
-  it("false、0、空字符串与 null 保持原类型，未设置只删除指定字段", () => {
+  it("false, 0, empty strings, and null retain original types and unset removes only the specified field", () => {
     const original = { limit: 5, enabled: true, label: "Name", timeout: 1 };
     expect(configurationProperty(original, "limit", 0)).toMatchObject({ limit: 0 });
     expect(configurationProperty(original, "enabled", false)).toMatchObject({ enabled: false });

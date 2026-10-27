@@ -22,7 +22,7 @@ import { CompressionMarker } from "./CompressionMarker";
 import type { useTimelinePresence } from "./timeline-presence";
 import { conversationTransition, immediateTransition } from "./motion";
 
-/** 条目视图状态由调用方提供时跨重新挂载保留；未提供时随本组件存在。 */
+/** Item view state survives remounts when supplied by the caller; otherwise it lives with this component. */
 export function ConversationTimeline({ items, viewState }: { items: readonly TimelineItem[]; viewState?: TimelineViewState }) {
   const [local] = useState(() => new TimelineViewState());
   const store = viewState ?? local;
@@ -33,9 +33,9 @@ export function ConversationTimeline({ items, viewState }: { items: readonly Tim
 }
 
 /**
- * 虚拟化时间线：只挂载视口附近的条目，DOM 规模不随对话长度增长。
- * 条目随滚动卸载与重新挂载，视图状态经 viewState 按条目恢复；实时块与末项始终挂载。
- * 条目间距由每项自身的上内边距提供，绝对定位的条目不能依赖兄弟选择器。
+ * Virtualized timeline: mounts only items near the viewport, so DOM size does not grow with conversation length.
+ * Items unmount and remount during scrolling, restoring per-item view state through viewState; live blocks and the last item stay mounted.
+ * Item spacing comes from each item's own top padding; absolutely positioned items cannot rely on sibling selectors.
  */
 export function VirtualConversationTimeline({ items, target, presence, reducedMotion, viewState, scrollRef, ref, onResize, onScrollEnd, onToggleProcess, onProcessMount }: {
   items: readonly TimelineItem[]; viewState: TimelineViewState; scrollRef: RefObject<HTMLElement | null>;
@@ -78,7 +78,7 @@ function TimelinePresenceItem({ itemKey, present, enter, overlayExit, reducedMot
   </div>;
 }
 
-/** 时间线条目由快照投影且身份稳定；画布拖动等外层重渲染不重算已有条目。 */
+/** Timeline items are projected from snapshots with stable identities; outer rerenders such as canvas dragging do not recompute existing items. */
 const NodeView = memo(function NodeView({ node, entry }: { node: TimelineItem; entry: RendererViewStateEntry }) {
   return <RendererViewStateProvider value={entry}><NodeContent node={node} /></RendererViewStateProvider>;
 });

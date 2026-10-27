@@ -4,7 +4,7 @@ import { AgentSoftwareFeedback, type AgentFeedback, type InlineFeedback, type Co
 type FeedbackState = { inline: readonly InlineFeedback[]; interruptions: readonly (string | null)[]; compressions: readonly CompressionActivity[] };
 const empty: FeedbackState = { inline: [], interruptions: [], compressions: [] };
 
-/** 资源生命周期内的反馈；位置只关联已有节点，保存和回溯均不制造历史记录。 */
+/** Feedback within the resource lifecycle; positions reference only existing nodes, and neither saving nor rewinding creates history records. */
 export function createAgentFeedback() {
   const states = new Map<string, FeedbackState>();
   let nextId = 0;

@@ -2,19 +2,19 @@ import { completionData, type ModelInputPart, type ModelItem, type SessionSnapsh
 import { contextMessages, projectAgentContext } from "../context-projection.ts";
 import { ContextSummary, Execution, AgentRequestContext, AgentInputMessage, type AgentRequestContextData } from "@asterism/builtin-api/contracts";
 
-/** 对话构成的固定类别与展示顺序。 */
+/** Fixed categories and display order for conversation composition. */
 export const conversationCategories = ["user", "agentMessage", "assistant", "thinking", "toolcall", "result", "context", "summary"] as const;
 export type ConversationCategory = typeof conversationCategories[number];
 
 export interface ContextInsight {
-  /** 最近一次本代理工作请求的实报 input；没有可用计量时为 null。 */
+  /** Reported input from this agent's latest work request; null when no measurement is available. */
   usage: { input: number; model: string; scope: string; compressedAfter: boolean } | null;
   conversation: { characters: Record<ConversationCategory, number>; total: number; files: number };
-  /** 与窗口占用取自同一个工作请求的终态扩展。 */
+  /** Terminal extension from the same work request used for window usage. */
   system: { responseId: string; diagnostics: AgentRequestContextData } | null;
 }
 
-/** 字数按 Unicode 码点计，与请求诊断一致。 */
+/** Character counts use Unicode code points, matching request diagnostics. */
 export const characters = (text: string) => [...text].length;
 
 function addParts(parts: readonly ModelInputPart[], category: ConversationCategory, target: ContextInsight["conversation"]) {
@@ -35,7 +35,7 @@ function addItem(item: ModelItem, inputCategory: "user" | "agentMessage", target
   }
 }
 
-/** 只读当前路径；对话构成复用下一次请求的模型投影，窗口占用与系统部分只取已保存的真实计量。 */
+/** Reads only the current path; conversation composition reuses the next request's model projection, while window usage and the system section use only saved actual measurements. */
 export function contextInsight(snapshot: Pick<SessionSnapshot, "records">, agentId: string): ContextInsight {
   const context = projectAgentContext(snapshot, agentId);
   const conversation: ContextInsight["conversation"] = {
@@ -43,7 +43,7 @@ export function contextInsight(snapshot: Pick<SessionSnapshot, "records">, agent
     total: 0, files: 0,
   };
   if (context.summary) {
-    // 摘要计量包含实际投影的提示信封。
+    // Summary measurements include the prompt envelope actually projected.
     const summary = contextMessages(context)[0]!;
     if (summary.kind === "context") addParts(summary.parts, "summary", conversation);
   }
@@ -72,7 +72,7 @@ export function contextInsight(snapshot: Pick<SessionSnapshot, "records">, agent
   return { usage, conversation, system };
 }
 
-/** 最大余数法分配瓷砖；非零类别至少一格，确切数值由明细给出。 */
+/** Allocates tiles by largest remainder, with at least one tile per nonzero category; details provide exact values. */
 export function allocateTiles(values: readonly number[], tiles: number): number[] {
   const total = values.reduce((sum, value) => sum + value, 0);
   if (total <= 0) return values.map(() => 0);
@@ -82,7 +82,7 @@ export function allocateTiles(values: readonly number[], tiles: number): number[
   const order = exact.map((value, index) => ({ index, remainder: value - Math.floor(value) })).filter(({ index }) => values[index]! > 0);
   order.sort((a, b) => b.remainder - a.remainder);
   for (let i = 0; rest > 0 && order.length; i = (i + 1) % order.length, rest--) counts[order[i]!.index]!++;
-  // 保底格超出时从最大类别回收。
+  // Reclaim tiles from the largest category when minimum allocations exceed the total.
   while (rest < 0) { const largest = counts.indexOf(Math.max(...counts)); counts[largest]!--; rest++; }
   return counts;
 }

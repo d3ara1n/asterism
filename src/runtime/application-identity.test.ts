@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { applicationDataDirectory } from "../shared/application.ts";
 
-describe("应用身份与工程清单", () => {
-  it("开发与发布使用固定身份目录，不依赖品牌显示名或仓库目录", () => {
+describe("Application identity and engineering manifest", () => {
+  it("development and release use fixed identity directories independently of brand display names and repository directories", () => {
     expect(applicationDataDirectory(false)).toBe("dev.dearain.asterism.dev");
     expect(applicationDataDirectory(true)).toBe("dev.dearain.asterism");
   });

@@ -1,19 +1,19 @@
 import packageMetadata from "../../package.json" with { type: "json" };
 
-/** 对外品牌集中于此；系统身份面向用户分发后保持稳定，不随显示名称变动。 */
+/** Centralized public branding; system identity stays stable after user distribution and does not follow display-name changes. */
 export const applicationId = "dev.dearain.asterism";
 export const applicationBrand = { en: "Asterism", zh: "星图" } as const;
 export const applicationSlug = "asterism";
 export const applicationRepository = { owner: "d3ara1n", name: "asterism" } as const;
-/** 内置模型调用声明真实应用身份；第三方调用方可提供自己的 UA。 */
+/** Built-in model calls declare the actual app identity; third-party callers may supply their own UA. */
 export const applicationUserAgent = `${applicationBrand.en}/${packageMetadata.version}`;
 
-/** 数据根使用固定身份，开发与发布显式隔离；调用方在 Electron appData 下解析。 */
+/** Data roots use fixed identity with explicit development/release isolation; callers resolve under Electron appData. */
 export function applicationDataDirectory(isPackaged: boolean): string {
   return isPackaged ? applicationId : `${applicationId}.dev`;
 }
 
-/** 同一应用数据根下的固定布局，不以品牌显示名命名文件。 */
+/** Fixed layout within one application data root; filenames do not follow brand display names. */
 export const applicationStorage = {
   databaseDirectory: "db",
   databaseFile: "workspace.sqlite",
@@ -30,8 +30,8 @@ export const applicationStorage = {
   runtimeLogFile: "runtime.log",
 } as const;
 
-/** 主进程设置文件（外观、语言、更新）的平铺格式版本；electron-store 默认值随新文件写入。界面状态是缓存，不带版本。 */
+/** Flat format version for main-process appearance/language/update files; electron-store writes defaults with new files. UI state is an unversioned cache. */
 export const preferenceVersion = 1;
 
-/** 归档会话的冷静期；仅在启动清理时判定，不是定时任务，界面只表达为约一个月。 */
+/** Archived-session retention period, checked only during startup cleanup rather than scheduled work; the UI describes it as about a month. */
 export const sessionRetentionMs = 30 * 24 * 60 * 60 * 1000;

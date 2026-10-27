@@ -2,19 +2,19 @@ import type { z } from "zod";
 import type { Json } from "./json.ts";
 import type { Source } from "./workspace.ts";
 
-/** 会话记录的公开信封：宿主把存储格式映射为它，插件按契约解码，不依赖内部节点结构。 */
+/** Public envelope for session records: the host maps its storage format to this envelope, and plugins decode by contract without depending on internal node structure. */
 export interface RecordRef { readonly id: string }
 export interface SessionRecord {
   readonly id: string;
   readonly sessionId: string;
   readonly parentId: string | null;
-  /** 会话内追加顺序，从 1 开始。 */
+  /** Append order within the session, starting at 1. */
   readonly sequence: number;
   readonly createdAt: string;
   readonly contract: RecordRef;
-  /** 写入者；宿主按写入通道打戳，关联对象属于 data。 */
+  /** Writer; stamped by the host according to the write channel, while the associated object belongs in data. */
   readonly source: Source;
-  /** 平台写入的模型可见文本：执行体投影上下文时取用；recipient 为 null 表示所有执行体。 */
+  /** Model-visible text written by the platform, consumed when executors project context; recipient being null means all executors. */
   readonly context: { readonly text: string; readonly recipient: string | null } | null;
   readonly data: Json;
 }
@@ -23,7 +23,7 @@ export type Decoded<D> =
   | { readonly status: "unknown"; readonly record: SessionRecord; readonly reason: "invalid_data" };
 export interface RecordContract<D extends Json = Json> extends RecordRef {
   readonly schema: z.ZodType<D>;
-  /** 不属于该契约返回 null；兼容与转换由 schema 决定，失败保留原始记录。 */
+  /** Return null when the record does not belong to this contract; compatibility and transformations are determined by the schema, and failure preserves the raw record. */
   decode(record: SessionRecord): Decoded<D> | null;
 }
 export function defineRecord<D extends Json>(id: string, definition: {
@@ -42,17 +42,17 @@ export function defineRecord<D extends Json>(id: string, definition: {
     },
   };
 }
-/** timeline 读取快照末端的完整祖先路径；session 按保存顺序读取快照上界内的全会话记录。 */
+/** timeline reads the complete ancestor path to the snapshot tip; session reads all session records within the snapshot's upper bound in save order. */
 export interface RecordQuery { readonly scope: "timeline" | "session" }
-/** 固定在一次读取位置的观察柄；按需读取记录，await 之后不切换到最新状态。 */
+/** An observation handle fixed at one read position; reads records on demand and does not switch to the latest state after await. */
 export interface SessionView {
   readonly id: string;
   readonly title: string;
   readonly records: {
     all(query: RecordQuery): readonly SessionRecord[];
-    /** 最早一条匹配记录；不可解码时返回 unknown，不跳过。 */
+    /** The earliest matching record; returns unknown if it cannot be decoded, without skipping it. */
     first<D extends Json>(contract: RecordContract<D>, query: RecordQuery): Decoded<D> | null;
-    /** 最新一条匹配记录；按范围和契约定位，仅解码该记录；不可解码时返回 unknown，不回退。 */
+    /** The latest matching record, located by scope and contract; decodes only that record and returns unknown if undecodable, without falling back. */
     last<D extends Json>(contract: RecordContract<D>, query: RecordQuery): Decoded<D> | null;
     query<D extends Json>(contract: RecordContract<D>, query: RecordQuery): Decoded<D>[];
   };

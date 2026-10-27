@@ -7,9 +7,9 @@ const quantities = (input: number, output: number): CostQuantity[] => [
   { modality: "text", item: "input", quantity: input, unit: "token" },
   { modality: "text", item: "output", quantity: output, unit: "token" },
 ];
-// 先逐请求整次选档，数量与单价单位必须一致，未知资料不能变成免费。
-describe("参考费用计算", () => {
-  it("逐请求选档后汇总，阈值含边界，修改价格可重算", () => {
+// Select a tier for each entire request before aggregation; quantities and unit prices must use matching units, and unknown data must not become free.
+describe("Reference cost calculation", () => {
+  it("aggregates after selecting a tier per request, includes threshold boundaries, and recalculates when prices change", () => {
     const cost = modelCostSchema.parse({ currency: "USD", rates: { text: { input: price(2), output: price(10) } },
       tiers: [{ fromInputTokens: 100, rates: { text: { input: price(4), output: price(20) } } }] });
     const first = estimateModelCost(cost, 99, quantities(99, 10));
@@ -24,7 +24,7 @@ describe("参考费用计算", () => {
     expect(first.amount).toBeCloseTo(0.000298, 10);
   });
 
-  it("按各计费项的基数计算张数和时长，拒绝用 token 代替秒数", () => {
+  it("calculates image counts and durations using each billing item's base quantity and rejects tokens as a substitute for seconds", () => {
     const cost = modelCostSchema.parse({ currency: "USD", rates: {
       image: { output: { amount: 0.04, unit: "image", per: 1 } }, audio: { input: { amount: 0.006, unit: "second", per: 60 } },
     }, tiers: [] });
@@ -40,7 +40,7 @@ describe("参考费用计算", () => {
       .toMatchObject({ amount: null, status: "unknown", lines: [{ issue: "unit" }] });
   });
 
-  it("缺价格、数量或选档依据时标明不完整，已知免费和零数量仍能区分", () => {
+  it("marks results incomplete when prices, quantities, or tier selection data are missing, while distinguishing known free usage and zero quantities", () => {
     const cost = modelCostSchema.parse({ currency: "USD", rates: { text: { input: price(0) } }, tiers: [] });
     const result = estimateModelCost(cost, 10, quantities(10, 3));
     expect(result).toMatchObject({ amount: 0, status: "partial" });

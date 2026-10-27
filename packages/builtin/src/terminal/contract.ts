@@ -15,28 +15,28 @@ export const CreateTerminal = defineCreation(TerminalResource, {
     profile: z.string().min(1).optional().describe("Shell profile ID from shell_profile_list, or 'auto' for automatic selection; defaults to the currently selected profile."),
   }).describe("Create a shared interactive terminal. Its shell starts immediately and runs until the terminal is closed, removed or the application exits."),
 });
-/** 资源投影只含配置；终端实例状态经终端通道交付，不进入会话投影。 */
+/** Resource projection contains only configuration; terminal instance state is delivered through the terminal channel and stays out of session projection. */
 export const TerminalView = builtin.data("terminal.card", terminalConfigSchema);
 
 export const terminalStatusSchema = z.strictObject({
   state: terminalStateSchema, shell: z.string().nullable(), integration: z.boolean(),
   exitCode: z.number().nullable(), error: z.string().nullable(),
-  /** shell 集成报告的当前目录；无集成时为 null。 */
+  /** Current directory reported by shell integration; null without integration. */
   cwd: z.string().nullable(),
-  /** 最近一条前台命令的退出码；无集成或尚未执行命令时为 null。 */
+  /** Exit code of the latest foreground command; null without integration or before any command has run. */
   lastExitCode: z.number().nullable(),
 });
 export type TerminalStatus = z.infer<typeof terminalStatusSchema>;
 export const inactiveStatus: TerminalStatus = { state: "inactive", shell: null, integration: false, exitCode: null, error: null, cwd: null, lastExitCode: null };
 
-/** 终端通道：前端发送输入、尺寸与已渲染字符数确认；后台发送屏幕重置、输出、尺寸与状态，均按序交付。 */
+/** Terminal channel: the frontend sends input, dimensions, and rendered-character acknowledgments; the backend sends screen resets, output, dimensions, and status, all delivered in order. */
 export type TerminalUp =
   | { type: "input"; data: string }
-  /** xterm 二进制输入（如 X10 鼠标报告），每个字符为一个字节。 */
+  /** xterm binary input (such as X10 mouse reports), with each character representing one byte. */
   | { type: "binary"; data: string }
   | { type: "resize"; cols: number; rows: number }
   | { type: "ack"; chars: number }
-  /** 前端屏幕重新挂载，请求当前屏幕快照。 */
+  /** The frontend screen has remounted and requests a current screen snapshot. */
   | { type: "refresh" };
 export type TerminalDown =
   | { type: "reset"; cols: number; rows: number; data: string }
@@ -64,7 +64,7 @@ const Input = defineTool({ id: builtin.name("tool.terminal_input"), name: "termi
   argsSchema: terminalInputSchema });
 export const TerminalInput = defineImplementation({ ...builtin.data("terminal.input-result", terminalStatusSchema.describe("Terminal status observed after input was delivered and shell feedback was collected for 250 ms.")),
   resource: TerminalResource, tool: Input, targetSchema: z.null().describe("Select the terminal itself."), effect: "write", execution: "sequential" });
-/** 终端读取的内容选择：null 为当前屏幕；history 为保留的缓冲行；raw 为原始输出流。 */
+/** Terminal read content selection: null is the current screen; history is retained buffer lines; raw is the original output stream. */
 export const terminalReadTargetSchema = z.union([
   z.null().describe("Select the visible screen: the parsed character grid with spaces and cursor coordinates."),
   z.strictObject({

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { thinkingLevels, type ThinkingLevel } from "./models.ts";
 
-/** 模型表达式 `<providerId>/<modelId>`：提供商与模型必定成对，按第一个 `/` 切分。 */
+/** Model expression `<providerId>/<modelId>`: provider and model always appear as a pair, split at the first `/`. */
 export interface ModelExpression { provider: string; model: string }
 export function parseModelExpression(value: string): ModelExpression | null {
   const index = value.indexOf("/");
@@ -10,13 +10,13 @@ export function parseModelExpression(value: string): ModelExpression | null {
 }
 export function formatModelExpression(expression: ModelExpression): string { return `${expression.provider}/${expression.model}`; }
 export const modelExpressionSchema = z.string().max(321).refine(value => parseModelExpression(value) !== null, "Use a model expression such as provider/model.");
-/** 具体模型的引用串；与模型记录一一对应，不使用随机记录 ID。 */
+/** A reference string for a specific model; corresponds one-to-one with model records without using random record IDs. */
 export function modelReference(model: { providerId: string; modelId: string }): string {
   return formatModelExpression({ provider: model.providerId, model: model.modelId });
 }
 export const thinkingSchema = z.enum(thinkingLevels);
 
-/** 展示与请求共用覆盖计算；空值沿用默认，不校验可用性或改写选择。 */
+/** Display and requests share override calculation; empty values inherit defaults, without checking availability or rewriting selections. */
 export function resolveModelSelection(
   defaults: { model: string | null; thinking: ThinkingLevel | null } | undefined,
   overrides: { model?: string | null; thinking?: ThinkingLevel | null },
@@ -27,7 +27,7 @@ export function resolveModelSelection(
   };
 }
 
-/** 仅生成菜单选项，不参与已有选择的解析或请求校验。 */
+/** Generates menu options only; does not resolve existing selections or validate requests. */
 export function availableThinkingLevels(model: { capabilities: { reasoning: boolean; thinkingLevels: readonly typeof thinkingLevels[number][] } } | null) {
   if (!model) return thinkingLevels;
   return model.capabilities.reasoning ? thinkingLevels.filter(level => model.capabilities.thinkingLevels.includes(level)) : [];

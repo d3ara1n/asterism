@@ -12,7 +12,7 @@ import { useState } from "react";
 import { useWorkbench } from "./context";
 import { useModuleViews } from "../../modules/views";
 
-/** 对象只出现一次；整行定位，行内操作管理卡片可见性。 */
+/** Each object appears once; the whole row locates it, while inline actions manage card visibility. */
 export function ObjectsPanel() {
   const i18n = useI18n();
   const { session, ready, canvas, run } = useWorkbench();

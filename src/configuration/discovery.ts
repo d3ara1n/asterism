@@ -11,7 +11,7 @@ export class ModelDiscoveryError extends Error {
 export interface DiscoveryInput { provider: ModelProvider; apiKey: string; signal: AbortSignal }
 export type DiscoverModels = (input: DiscoveryInput) => Promise<DiscoveredModel[]>;
 
-/** 保留连接路径与鉴权约定，目录响应格式由独立解析器识别。 */
+/** Preserve connection paths and authentication conventions; an independent parser identifies the catalog response format. */
 export async function discoverModels({ provider, apiKey, signal }: DiscoveryInput, transport: typeof fetch = fetch): Promise<DiscoveredModel[]> {
   validateProviderTransport(provider);
   const endpoint = new URL(`${provider.baseUrl.replace(/\/+$/, "")}/models`);
@@ -41,7 +41,7 @@ export async function discoverModels({ provider, apiKey, signal }: DiscoveryInpu
       if (!models.has(model.modelId)) models.set(model.modelId, model);
     }
     if (!page.hasMore) break;
-    // 分页只沿当前端点的游标推进，不消费服务端返回的任意 URL。
+    // Pagination advances only by the current endpoint's cursor, never arbitrary server-returned URLs.
     const cursor = page.lastId;
     if (!cursor || cursors.has(cursor) || !page.models.length) throw new ModelDiscoveryError("protocol");
     cursors.add(cursor);
@@ -50,7 +50,7 @@ export async function discoverModels({ provider, apiKey, signal }: DiscoveryInpu
   return [...models.values()];
 }
 
-/** 每个连接保留一次发现结果；刷新、删除连接及关闭时取消请求。 */
+/** Retain one discovery result per connection; cancel requests on refresh, connection removal, and close. */
 export class ModelDiscoveries {
   private entries = new Map<string, { value: ModelDiscovery; controller: AbortController; timer: ReturnType<typeof setTimeout> }>();
   constructor(private readonly changed: () => void, private readonly discover: DiscoverModels, private readonly timeout: number) {}

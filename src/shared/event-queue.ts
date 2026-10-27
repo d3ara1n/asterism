@@ -1,7 +1,7 @@
 import type { EventContract, Source, Json, SubscriptionEnd } from "@asterism/sdk/contracts";
 import { EventSubscriptionState } from "./event-subscription.ts";
 
-/** latest 合并键：同来源、同 snapshot 键的值互相替换；occurrence 契约返回空串，不参与合并。 */
+/** latest coalescing key: values with the same origin and snapshot key replace each other; occurrence contracts return an empty string and do not coalesce. */
 export function eventKey(contract: EventContract, source: Source, data: Json): string {
   if (contract.semantics.kind !== "snapshot") return "";
   const record = data && typeof data === "object" && !Array.isArray(data) ? data : {};
@@ -9,7 +9,7 @@ export function eventKey(contract: EventContract, source: Source, data: Json): s
     contract.semantics.key.map(key => record[key] ?? null)]);
 }
 
-/** 单个订阅的待消费队列：异步、按序、串行调用消费者；latest 只替换尚未交付的同键值。 */
+/** Pending queue for one subscription: asynchronous, ordered, serial consumer calls; latest replaces only undelivered values with the same key. */
 export class EventQueue<T> extends EventSubscriptionState {
   private items = new Map<string | number, T>();
   private ordinal = 0;
@@ -24,7 +24,7 @@ export class EventQueue<T> extends EventSubscriptionState {
   push(item: T, key: string): void {
     if (!this.active) return;
     const slot = this.options.latest ? key : ++this.ordinal;
-    // 删除再插入：合并后的值排在最新位置。
+    // Delete then insert so coalesced values occupy the newest position.
     this.items.delete(slot); this.items.set(slot, item);
     this.running ??= this.drain();
   }
@@ -40,6 +40,6 @@ export class EventQueue<T> extends EventSubscriptionState {
     finally { this.running = undefined; }
   }
   close(): void { this.end({ reason: "closed" }); }
-  /** 等待在途回调真正结束；取消不等于结束。 */
+  /** Wait for actual in-flight callback completion; cancellation does not mean completion. */
   async settle(): Promise<void> { await this.running; }
 }

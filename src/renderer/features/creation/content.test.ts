@@ -7,9 +7,9 @@ vi.mock("../../runtime", () => ({ runtime: { content: { execute: (command: unkno
 
 afterEach(() => { backend.execute = async () => { throw new Error("Unset."); }; });
 
-// 关闭内容作用域取消其在途操作，上传和读取均以取消收束。
-// 后台拒绝可能晚于 close 返回；不能把它呈现为普通创建失败。
-it.each(["upload.begin", "read.open"] as const)("内容关闭后 %s 的后台拒绝作为取消交付", async operation => {
+// Closing a content scope cancels its in-flight operations; uploads and reads both settle as cancelled.
+// Backend rejection may arrive after close returns; it must not appear as an ordinary creation failure.
+it.each(["upload.begin", "read.open"] as const)("delivers backend rejection of %s as cancellation after content is closed", async operation => {
   let finish!: (result: ContentResult) => void;
   let started!: () => void;
   const began = new Promise<void>(resolve => { started = resolve; });
@@ -35,8 +35,8 @@ it.each(["upload.begin", "read.open"] as const)("内容关闭后 %s 的后台拒
   } finally { await content.close(); }
 });
 
-// 正常作用域中的基础设施错误仍需暴露，不能被取消处理吞掉。
-it("内容未关闭时保留后台错误", async () => {
+// Infrastructure errors in an active scope must remain exposed, not swallowed by cancellation handling.
+it("preserves backend errors while content remains open", async () => {
   backend.execute = async (): Promise<ContentResult> => ({
     ok: false, error: { code: "unavailable", message: "Storage is unavailable." },
   });

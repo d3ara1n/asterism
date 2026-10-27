@@ -3,9 +3,9 @@ import { RuntimeClient } from "../shared/runtime-client";
 import { ChannelClient } from "../shared/channel-client";
 import { applicationBrand } from "../shared/application";
 
-/** 页面唯一的任务进程直连；模块加载即建立，端口到达前的请求按序排队。 */
+/** The page's sole direct connection to the task process; established at module load, with requests queued in order until the port arrives. */
 export const runtime = new RuntimeClient();
-/** 对象级双工通道；连接失效时全部以 disconnected 结束。 */
+/** Object-level duplex channels; all end as disconnected when the connection becomes invalid. */
 export const channels = new ChannelClient(runtime.channels);
 
 const fail = (message: string) => { runtime.fail(message); channels.disconnect(); };
@@ -23,5 +23,5 @@ window.addEventListener("message", event => {
 window.host.onStatus(status => {
   if (status === "unavailable" || status === "stopping") fail(`The task runtime has stopped. Restart ${applicationBrand.en} to reopen the workspace.`);
 });
-// 监听先于请求注册，端口不会早于接收方到达。
+// Register listeners before sending the request so the port cannot arrive before its receiver is ready.
 window.host.connectRuntime();

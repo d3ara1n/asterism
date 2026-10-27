@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const priceUnits = ["token", "image", "second"] as const;
-/** 金额使用价格表的统一币种；amount 是每 per 个 unit 的价格，0 表示免费。 */
+/** Amounts use the price table's common currency; amount is the price per per units of unit, and 0 means free. */
 export const unitPriceSchema = z.strictObject({
   amount: z.number().nonnegative(),
   unit: z.enum(priceUnits),
@@ -9,7 +9,7 @@ export const unitPriceSchema = z.strictObject({
 });
 export type UnitPrice = z.infer<typeof unitPriceSchema>;
 
-/** 模态内的计费项可以采用不同单位；缺项或 null 均表示未知。 */
+/** Billing items within a modality can use different units; missing items and null both mean unknown. */
 const itemPrice = unitPriceSchema.nullable().default(null);
 export const modalityRatesSchema = z.strictObject({
   input: itemPrice, output: itemPrice, cacheRead: itemPrice, cacheWrite: itemPrice, reasoning: itemPrice,
@@ -27,7 +27,7 @@ export const emptyModelRates = (): ModelRates => ({
   text: emptyModalityRates(), image: emptyModalityRates(), audio: emptyModalityRates(), video: emptyModalityRates(),
 });
 
-/** 按整次请求的输入 token 总量选档；达到阈值即使用该档全部单价，不做分段累进。 */
+/** Select a tier using the entire request's total input tokens; reaching a threshold applies all prices in that tier, without progressive pricing across tiers. */
 export const modelCostSchema = z.strictObject({
   currency: z.literal("USD"),
   rates: modelRatesSchema,

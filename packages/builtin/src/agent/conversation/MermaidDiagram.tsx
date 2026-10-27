@@ -8,7 +8,7 @@ import { useMermaidTheme } from "./mermaid-theme";
 
 type RenderedDiagram = { code: string; theme: MermaidConfig } & ({ svg: string; error?: never } | { error: true; svg?: never });
 
-/** 已渲染的图按主题与源码缓存；条目随滚动重新挂载时直接显示，不重新渲染。 */
+/** Rendered diagrams are cached by theme and source; items remounted during scrolling display directly without rerendering the diagram. */
 const renderedDiagrams = new Map<string, RenderedDiagram>();
 const renderedDiagramLimit = 64;
 const diagramKey = (code: string, theme: MermaidConfig) => `${JSON.stringify(theme)}\n${code}`;
@@ -20,7 +20,7 @@ function remember(diagram: RenderedDiagram): RenderedDiagram {
   return diagram;
 }
 
-/** 使用 Mermaid 官方 render/strict 清理输出；异步结果只交给仍匹配的组件实例。 */
+/** Uses Mermaid's official render/strict sanitization; asynchronous results are delivered only to the component instance that still matches. */
 export function MermaidDiagram({ code, streaming, children }: { code: string; streaming: boolean; children: ReactNode }) {
   const i18n = useI18n();
   const container = useRef<HTMLDivElement>(null);
@@ -53,7 +53,7 @@ export function MermaidDiagram({ code, streaming, children }: { code: string; st
     return () => { active = false; };
   }, [code, streaming, theme, id]);
 
-  // 外观切换时保留上一张图，待新主题就绪后替换，避免闪回源码。
+  // Keep the previous diagram during an appearance change and replace it when the new theme is ready, avoiding a flash back to source code.
   const cached = theme ? renderedDiagrams.get(diagramKey(code, theme)) : undefined;
   const current = cached?.svg ? cached : rendered?.code === code ? rendered : null;
   let content = children;

@@ -5,17 +5,17 @@ import { useI18n } from "../shared/i18n";
 
 export interface FailureAction {
   label: string;
-  /** 返回字符串表示操作失败的说明，就地显示。 */
+  /** A returned string describes an operation failure and is displayed in place. */
   run(): Promise<string | void> | string | void;
 }
 
 /**
- * 致命状态共用布局：启动失败与渲染崩溃都直接位于窗口材质上，保留窗口拖动。
- * 首个操作为主操作并取得焦点，其余为辅助操作；诊断详情默认折叠，可复制。
+ * Shared layout for fatal states: startup failures and rendering crashes sit directly on the window material, preserving window dragging.
+ * The first action is primary and receives focus; others are secondary. Diagnostic details are initially collapsed and can be copied.
  */
 export function FailureScreen({ title, body, actions, details, children }: {
   title: string; body: string; actions: readonly FailureAction[]; details: string;
-  /** 操作与详情之间的补充内容，例如数据恢复点列表。 */
+  /** Additional content between actions and details, such as a list of data recovery points. */
   children?: ReactNode;
 }) {
   const i18n = useI18n();

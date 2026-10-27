@@ -16,7 +16,7 @@ export const templateSchemaSql = `
   ) STRICT;
 `;
 
-/** 模板保存独立数据，读取目录与保存均不构造资源实例。写入由调用方事务承接。 */
+/** Templates save independent data; catalog reads and saves do not construct resource instances. Callers supply write transactions. */
 export class TemplateStore {
   private readonly data: SessionDataStore;
   constructor(private readonly db: DatabaseSync, private readonly tree: SessionTree,

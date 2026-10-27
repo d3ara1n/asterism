@@ -2,7 +2,7 @@ import { PluginApiError } from "@asterism/sdk/runtime";
 import type { CallRegistry } from "../plugins/calls.ts";
 import type { CallControl, CallFrame } from "../shared/plugin-calls.ts";
 
-/** 一个桌面连接的调用生命周期；断连取消调用处理器，不取消其引用的独立业务等待。 */
+/** Call lifetime for one desktop connection; disconnect cancels handlers without cancelling independent business waits they reference. */
 export class CallPeer {
   private pending = new Map<string, AbortController>();
   private closed = false;

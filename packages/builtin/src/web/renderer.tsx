@@ -13,7 +13,7 @@ import { webCard as appearance } from "../shared/card-appearance.ts";
 const field = (value: Json, key: string) => value && typeof value === "object" && !Array.isArray(value) && typeof value[key] === "string" ? value[key] : undefined;
 const parseResponse = (data: Json | undefined) => { const parsed = webResponseSchema.safeParse(data); return parsed.success ? parsed.data : undefined; };
 
-/** 来源信息行：域名 · 作者 · 日期；日期只取日历部分。 */
+/** Source information row: domain · author · date; dates use only the calendar portion. */
 function sourceLine(document: WebDocument) {
   return [new URL(document.url).hostname, document.author, ...document.dates?.map(date => date.value.slice(0, 10)) ?? []].filter(Boolean).join(" · ");
 }
@@ -25,7 +25,7 @@ function ResponseFrame({ data, children }: { data: WebResponse; children: ReactN
   </div>;
 }
 
-/** 搜索结果供审阅来源：每条只显示标题、来源与首段内容的两行预览，完整内容留在结果详情。 */
+/** Search results support source review: each shows only its title, source, and a two-line preview of the first content section; full content stays in result details. */
 function SearchBody({ result }: ToolRenderProps) {
   const data = parseResponse(result?.data);
   if (!data) return null;
@@ -44,7 +44,7 @@ function SearchBody({ result }: ToolRenderProps) {
   </ResponseFrame>;
 }
 
-/** 获取结果是指定页面：标题与来源之下，正文在局部滚动区内完整阅读，截断说明放在正文之外。 */
+/** Fetch results represent specified pages: beneath the title and source, the full body is readable in a local scroll area, with truncation explanations outside the body. */
 function FetchBody({ result }: ToolRenderProps) {
   const i18n = useI18n();
   const data = parseResponse(result?.data);

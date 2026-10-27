@@ -12,7 +12,7 @@ import type { AgentCapabilities } from "./capabilities.ts";
 import type { ContentLease } from "../runtime/content-store.ts";
 import type { BoundTopLevelTool } from "../plugins/top-level-tools.ts";
 
-/** 宿主固定操作入口；只在 provider 协议中表示为 tools，不属于资源工具目录。 */
+/** Fixed host operation entries; represented as tools only in the provider protocol, outside the resource tool catalog. */
 interface CoreAction {
   tool: ToolContract;
   resolve(args: Json, capabilities: AgentCapabilities): Invocation | PreparedResult;
@@ -24,7 +24,7 @@ export interface ToolObserver {
   published?(call: PendingCall, data: Json): void;
 }
 
-// 宿主入口不允许覆盖；插件顶层工具由请求起点捕获的静态贡献补充。
+// Host entries cannot be overridden; static contributions captured at request start supply plugin top-level tools.
 const actions: readonly CoreAction[] = [
   { tool: ResourceList,
     resolve: (_args, capabilities) => ({ effect: "read", execution: "parallel", implementation: reference(ResourceListResult), async execute() {
@@ -50,7 +50,7 @@ export function coreDeclarations(tools: readonly BoundTopLevelTool[] = []): Tool
   return [...actions, ...tools].map(({ tool }) => declareTool(tool));
 }
 
-/** 填充期的身份提示取自捕获目录，完整调用仍由批次独立校验。 */
+/** Identity hints during argument filling use the captured catalog; the batch still validates complete calls independently. */
 export function previewCoreCall(name: string, args: Json, capabilities: AgentCapabilities, tools: readonly BoundTopLevelTool[] = []): ToolInvocationInfo {
   const tool = tools.find(entry => entry.tool.name === name);
   if (tool) return { implementation: reference(tool.tool) };
@@ -61,7 +61,7 @@ export function previewCoreCall(name: string, args: Json, capabilities: AgentCap
     ? capabilities.preview(args.resource_id, args.tool) : {};
 }
 
-/** 批次先解析实际资源工具，再按其执行策略调度；发布快照不改变批次的模型交付边界。 */
+/** Resolve actual resource tools before scheduling by execution policy; published snapshots do not change the batch's model delivery boundary. */
 export async function executeCoreBatch(calls: readonly PendingCall[], capabilities: AgentCapabilities | null,
   signal: AbortSignal, settle: (call: PendingCall, outcome: ToolOutcome) => void,
   observer: ToolObserver = {}, handover?: ContentLease, tools: readonly BoundTopLevelTool[] = []): Promise<void> {
@@ -100,7 +100,7 @@ export async function executeCoreBatch(calls: readonly PendingCall[], capabiliti
         latest = jsonSchema.parse(data);
         observer.published?.(call, latest);
       }, handover);
-      // 在执行边界校验终结数据；schema 错误也必须收束并保留之前的合法产出。
+      // Validate completion data at the execution boundary; schema failures must still finalize and retain prior valid output.
       completion = resolveToolCompletion(completion, latest);
     } catch {
       completion = result.effect === "write"

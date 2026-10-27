@@ -34,7 +34,7 @@ async function generateTitle(models: Pick<ModelServices, "stream">, prompt: stri
   return title;
 }
 
-/** 在实际插件 setup 中交付具身份的接口；连接的清理由模块生命周期负责。 */
+/** Provides an identified interface during actual plugin setup; the module lifecycle owns connection cleanup. */
 export function createNamingModule(connect: (api: NamingApi) => () => void, userAgent?: string) {
   return defineModule(plugin => {
     function nameSession(sessionId: string, input: string, source: "user" | "agent") {
@@ -106,7 +106,7 @@ export function createNamingModule(connect: (api: NamingApi) => () => void, user
           };
           plugin.tasks.start(`naming:${session.id}:${message.record.id}`, async signal => {
             const title = await generateTitle(plugin.models, prompt, signal, session.id, userAgent);
-            // 检查与追加在同一同步提交中完成；标题由游标观察者独立同步。
+            // Check and append within the same synchronous commit; the cursor observer synchronizes the title independently.
             session.commit(writer => {
               if (applicable(session.snapshot())) writer.append(SessionNamed, {
                 title, source: "auto", auto: { level, messageId: message.record.id, model } });
@@ -114,7 +114,7 @@ export function createNamingModule(connect: (api: NamingApi) => () => void, user
           }, { timeoutMs });
         },
         cursorChanged({ snapshot, session }) {
-          // 标题 = 当前时间线最后一次命名，否则为当前时间线首条输入的截断；两者都没有时保持不变。
+          // Title = the latest naming on the current timeline, otherwise a truncation of its first input; leave it unchanged if neither exists.
           const named = snapshot.records.last(SessionNamed, { scope: "timeline" });
           if (named?.status === "unknown") return;
           const first = named ? null : userMessages(snapshot, "timeline")[0];

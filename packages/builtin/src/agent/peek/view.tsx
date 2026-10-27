@@ -15,7 +15,7 @@ function Header({ phase, invocation, result }: ToolRenderProps<PeekResult>) {
     meta={status ? i18n.text(status) : undefined} />;
 }
 
-/** 正文只呈现报告；过程状态和结局由标题及公共外壳承接。 */
+/** The body presents only the report; the title and shared shell handle process status and outcome. */
 function Body({ phase, result }: ToolRenderProps<PeekResult>) {
   const report = result?.data?.report;
   if (!report) return null;

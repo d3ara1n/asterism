@@ -14,7 +14,7 @@ import { codeViewOptions } from "./shared/code-view";
 import { ToolHeader } from "@asterism/ui/tool-header";
 import { StreamingPreview } from "@asterism/ui/streaming-preview";
 
-/** 三态复用摘要结构，已有路径、输入数量在执行和结束时继续保留。 */
+/** All three states reuse the summary structure, retaining existing paths and input counts through execution and completion. */
 function TextReadHeader({ target, invocation, result }: ToolRenderProps<TextRead>) {
   const i18n = useI18n();
   const path = inputText(target, "path");
@@ -65,7 +65,7 @@ function TextEditBody(props: ToolRenderProps<TextChange>) {
   return props.result?.data ? <TextChangeBody result={props.result} /> : <EditPreview args={props.args} />;
 }
 
-/** 用户视图消费保存的正文和差异，不显示或重新生成模型用的锚点。 */
+/** User views consume saved text and diffs without displaying or regenerating model anchors. */
 function TextReadBody({ result, target }: ToolRenderProps<TextRead>) {
   const i18n = useI18n();
   const data = result?.data;

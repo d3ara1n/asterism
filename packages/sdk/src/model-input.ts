@@ -1,10 +1,10 @@
 import { z } from "zod";
 import { contentRefSchema } from "./content.ts";
 
-/** mediaType 为客户端如实识别的 MIME，随字节发送；客户端不据此判断模型能力，是否接受由服务端反馈。 */
+/** mediaType is the MIME type truthfully identified by the client and sent with the bytes; the client does not infer model capabilities from it, and acceptance is determined by server feedback. */
 export const mediaTypeSchema = z.string().regex(/^[a-z0-9!#$&^_.+-]+\/[a-z0-9!#$&^_.+-]+$/);
 
-/** 模型输入只有文字与文件；文件保存不可变内容身份和消费元数据，字节与读取资格不进入消息。 */
+/** Model input contains only text and files; files store immutable content identity and consumption metadata, while bytes and read eligibility stay outside messages. */
 export const modelInputPartSchema = z.discriminatedUnion("kind", [
   z.strictObject({ kind: z.literal("text"), text: z.string() }),
   z.strictObject({ kind: z.literal("file"), file: contentRefSchema,
@@ -13,7 +13,7 @@ export const modelInputPartSchema = z.discriminatedUnion("kind", [
 export type ModelInputPart = z.infer<typeof modelInputPartSchema>;
 export type ModelFilePart = Extract<ModelInputPart, { kind: "file" }>;
 export const modelInputPartsSchema = z.array(modelInputPartSchema).min(1);
-/** 纯文字消费者显式提取正文，不隐式读取文件。 */
+/** Plain-text consumers explicitly extract the body without implicitly reading files. */
 export function modelInputText(parts: readonly (Extract<ModelInputPart, { kind: "text" }> | { kind: "file" })[]): string {
   return parts.flatMap(part => part.kind === "text" ? [part.text] : []).join("\n");
 }

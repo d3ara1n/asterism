@@ -20,10 +20,10 @@ function expectSeparated(objects: readonly LayoutObject[]) {
   }
 }
 
-describe("工作台显式整理", () => {
-  // 大小卡片、反向链接与孤立对象同图时，传错尺寸或漏掉连通分量会导致遮挡。
-  // 预期来自整理契约：保留尺寸、完整矩形有间距、全图中心不变。
-  it("不同尺寸、双向链接和独立对象完整避让，并保持原图中心", async () => {
+describe("Explicit workbench arrangement", () => {
+  // When cards of different sizes, reverse links, and isolated objects share a graph, incorrect dimensions or omitted connected components cause overlap.
+  // Expectations come from the arrangement contract: preserve dimensions, leave gaps between complete rectangles, and retain the graph's center.
+  it("fully separates different-sized cards, bidirectional links, and isolated objects while preserving the original graph center", async () => {
     const objects: LayoutObject[] = [
       { id: "agent", position: { x: -1500, y: 700 }, width: 560, height: 640 },
       { id: "terminal", position: { x: -1500, y: 700 }, width: 720, height: 440 },
@@ -51,8 +51,8 @@ describe("工作台显式整理", () => {
     expect(await arrangeObjects(arranged, links)).toEqual(positions);
   });
 
-  // 没有链接的资源集合仍是合法工作台，不能依赖图边来发现节点或分配空间。
-  it("完全无连接的卡片也保持间距", async () => {
+  // A resource set without links is still a valid workbench; node discovery and space allocation cannot depend on graph edges.
+  it("maintains spacing even when all cards are disconnected", async () => {
     const objects: LayoutObject[] = [
       { id: "a", position: { x: 0, y: 0 }, width: 900, height: 300 },
       { id: "b", position: { x: 0, y: 0 }, width: 300, height: 900 },
@@ -62,9 +62,9 @@ describe("工作台显式整理", () => {
     expectSeparated(objects.map(object => ({ ...object, position: positions.get(object.id)! })));
   });
 
-  // 三角关系的 ELK 根容器包含额外路由空间，按根容器居中会使每次整理向上漂移。
-  // 工作台只消费节点位置，预期中心来自完整卡片边界。
-  it("连线路由超出卡片边界时，反复整理保持卡片中心", async () => {
+  // The ELK root container for a triangular relationship includes extra routing space; centering on that container makes each arrangement drift upward.
+  // The workbench consumes only node positions; the expected center comes from complete card bounds.
+  it("repeated arrangement preserves the card center when connection routing extends beyond card bounds", async () => {
     const objects: LayoutObject[] = [
       { id: "a", position: { x: 200, y: 300 }, width: 340, height: 320 },
       { id: "b", position: { x: 200, y: 300 }, width: 560, height: 640 },

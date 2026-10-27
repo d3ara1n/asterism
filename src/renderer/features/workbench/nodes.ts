@@ -5,7 +5,7 @@ import type { ObjectNodeType } from "./ObjectNode";
 import { defaultCardPosition } from "./layout";
 import { cardSize, fallbackCardAppearance } from "./sizing";
 
-/** 后台投影更新内容；在途拖动和未确认的尺寸覆盖继续由本地意图拥有。 */
+/** Backend projections update content; local intent continues to own active dragging and unconfirmed size overrides. */
 export function workbenchNodes(
   snapshot: WorkbenchSnapshot, previous: readonly ObjectNodeType[], registry: ViewRegistry,
   onView: (objectId: string, patch: ViewPatch) => void,

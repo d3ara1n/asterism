@@ -9,13 +9,13 @@ import { useI18n } from "../i18n";
 import { useCloseGuard, useIsland } from "./Screen";
 import type { IslandWidth } from "./model";
 
-/** 面板浮岛的统一宽度：设置详情、编辑器与插件打开的浮岛共用。 */
+/** Standard panel island width, shared by settings details, editors, and islands opened by plugins. */
 export const panelIslandWidth: IslandWidth = { min: 400, grow: 1, max: 620 };
 
 /**
- * 面板浮岛：承担扩展操作的统一载体（编辑器、详情等），非模态、不阻塞其他浮岛。
- * 标题栏固定，内容区单独滚动；主操作与关闭位于标题栏右侧，不设底部操作栏，避免呈现为对话框。
- * 次要操作随内容放在对应分组中。dirty 为 true 时，关闭本浮岛（含上级关闭或替换）先确认放弃修改。
+ * Panel island: the shared container for extended operations (editors, details, etc.); non-modal and does not block other islands.
+ * The titlebar is fixed and the content area scrolls independently; primary action and close sit at the right of the titlebar, with no bottom action bar to avoid resembling a dialog.
+ * Secondary actions sit with their corresponding content groups. When dirty is true, confirm discarding changes before closing this island (including parent closure or replacement).
  */
 export function IslandPanel({ title, description, action, toolbar, dirty, compact, contentRef, children }: {
   title: string; description?: string; action?: ReactNode; toolbar?: ReactNode; dirty?: boolean;

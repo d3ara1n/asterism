@@ -11,10 +11,10 @@ const Update = ns.event("update", { schema: z.object({ value: z.number(), associ
 const roots: string[] = [], services: ApplicationService[] = [];
 afterEach(async () => { await Promise.all(services.splice(0).map(service => service.close())); roots.splice(0).forEach(root => rmSync(root, { recursive: true, force: true })); vi.restoreAllMocks(); });
 
-// 契约依据：SDK 来源印记由操作柄绑定；插件装配、真实事务和关闭复用宿主机制。
-describe("事件 SDK 与宿主边界", () => {
+// Contract basis: SDK origin stamps bind to operation handles; plugin assembly, real transactions, and close reuse host mechanisms.
+describe("Event SDK and host boundaries", () => {
 
-  it("后续模块失败会清理 setup 中的待建立订阅和契约", async () => {
+  it("later module failures clean up pending subscriptions and contracts from setup", async () => {
     let subscription!: EventSubscription;
     const broken = definePlugin({ namespace: ns, version: "1", modules: [
       defineModule(plugin => { subscription = plugin.ipc.events.subscribe(Update, {}, () => {}); return { events: [Update] }; }),

@@ -2,9 +2,9 @@ import { describe, expect, it, vi } from "vitest";
 import { focusedObject, setFocusedObject } from "../workbench/focus.ts";
 import { ObjectRetention, objectRetention } from "./retention.ts";
 
-describe("对象保留", () => {
-  // 同一对象同一 key 返回同一实例；对象离开当前投影时只释放该对象的条目，之后重新创建。
-  it("按投影释放离开的对象，保留仍在的对象", () => {
+describe("Object retention", () => {
+  // The same object and key return the same instance; when an object leaves the current projection, release only its entries and recreate them afterward.
+  it("releases objects absent from the projection and retains those still present", () => {
     const retention = new ObjectRetention(), release = vi.fn();
     const kept = retention.get("s", "a", "k", () => ({ id: "a" }), release);
     retention.get("s", "b", "k", () => ({ id: "b" }), release);
@@ -17,8 +17,8 @@ describe("对象保留", () => {
     expect(retention.get("s", "b", "k", () => ({ id: "recreated" }))).toEqual({ id: "recreated" });
   });
 
-  // 插件释放失败不影响其他条目，错误直接可见。
-  it("一个条目释放失败时其余条目仍释放", () => {
+  // A plugin release failure does not affect other entries, and the error is exposed directly.
+  it("releases remaining entries when one entry fails to release", () => {
     const retention = new ObjectRetention(), release = vi.fn();
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
     try {
@@ -30,8 +30,8 @@ describe("对象保留", () => {
     } finally { error.mockRestore(); }
   });
 
-  // 对象聚焦：对象离开当前投影时结束聚焦；改为聚焦其他对象后，旧对象离开投影不影响新聚焦。
-  it("聚焦身份随对象离开投影结束", () => {
+  // Object focus: end focus when the object leaves the current projection; after focusing another object, the old object's departure does not affect the new focus.
+  it("ends focus identity when the object leaves the projection", () => {
     setFocusedObject("focus-session", "a");
     setFocusedObject("focus-session", "b");
     objectRetention.retainOnly("focus-session", new Set(["b"]));

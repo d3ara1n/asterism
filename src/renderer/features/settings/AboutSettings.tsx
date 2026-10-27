@@ -19,7 +19,7 @@ import { useUpdates } from "../updates/state";
 import { UpdateAction, UpdateError, UpdateNotesLink, useUpdateSummary } from "../updates/controls";
 import { Row } from "./layout";
 
-/** 关于页：应用名片（图标、名称、版本）承接更新状态，次要信息以紧凑行收在其后。 */
+/** About page: the application identity card (icon, name, version) presents update state, with secondary information in compact rows afterward. */
 export function AboutSettings() {
   const i18n = useI18n();
   return <div className="pb-2">
@@ -45,7 +45,7 @@ export function AboutSettings() {
   </div>;
 }
 
-/** 更新状态的单一视觉焦点：当前版本、目标版本、状态行与进度共用一块弱化底板，按状态替换内容。 */
+/** The single visual focus for update state: current version, target version, status row, and progress share one subdued surface, replacing content by state. */
 function UpdatePanel() {
   const i18n = useI18n();
   const { state, failure } = useUpdates();
@@ -71,7 +71,7 @@ function UpdatePanel() {
       <UpdateAction />
     </div>
     <div className="mt-4 space-y-2">
-      {/* 失败说明与原始错误由 UpdateError 承接（role=alert），状态行只表达其余状态，避免同一句话出现两次。 */}
+      {/* UpdateError handles failure explanations and original errors (role=alert); the status row represents only other states to avoid repeating the same message. */}
       <div role="status" aria-live="polite">
         <AnimatePresence mode="wait" initial={false}>
           {status !== "error" && <motion.p key={status ?? "loading"} className="type-body flex min-h-5 items-center gap-2"
@@ -89,7 +89,7 @@ function UpdatePanel() {
   </section>;
 }
 
-/** 更新通道：正式版或包含预发布版本；即时生效，说明随所选通道变化。 */
+/** Update channel: stable releases or including prereleases; takes effect immediately, with the description following the selected channel. */
 function ChannelRow() {
   const i18n = useI18n();
   const { state, saving, set } = useUpdates();
@@ -104,7 +104,7 @@ function ChannelRow() {
   </Row>;
 }
 
-/** 复制应用标识：结果用临时通知反馈，进行中禁用以防重复触发。 */
+/** Copy application identity: report the result through a transient notification and disable while pending to prevent duplicate triggers. */
 function CopyIdentity() {
   const i18n = useI18n();
   const [copying, setCopying] = useState(false);

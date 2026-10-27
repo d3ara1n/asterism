@@ -8,8 +8,8 @@ const messages = ns.messages("en", defineMessages({
 }));
 const catalog = (owner: string, locale: string, translations: Record<string, string>, revision = "1") => ({ owner, locale, revision, messages: translations });
 
-describe("公共 UI 消息与语言回退", () => {
-  it("整条 ICU 消息插入用户标题时保留花括号，不把用户正文当成消息语法", () => {
+describe("Public UI messages and language fallback", () => {
+  it("whole ICU messages preserve braces in user titles without interpreting user text as message syntax", () => {
     const message = ns.messages("en", defineMessages({ draft: { id: "draft", defaultMessage: "Draft: {title}" } })).draft;
     const title = "My {draft}", translated = catalog(ns.id, "zh-Hans", { draft: "草稿：{title}" });
     expect(new MessageFormatter("en").formatMessage(message, { title })).toBe("Draft: My {draft}");
@@ -22,10 +22,10 @@ describe("公共 UI 消息与语言回退", () => {
     ["system", ["zh"], "zh", "zh-Hans"],
     ["en-GB", ["zh-Hans"], "en-GB", "en"],
     ["zh-TW", ["zh-Hans"], "en", "en"],
-  ])("逐项解析 %s %j", (preference, system, locale, interfaceLocale) => {
+  ])("resolves each item: %s %j", (preference, system, locale, interfaceLocale) => {
     expect(resolveLanguage(preference, system as string[])).toEqual({ locale, interfaceLocale });
   });
-  it("规范化语言、保持 owner 与不可变参数，IPC 不接收函数或无穷数", () => {
+  it("normalizes languages, preserves owners and immutable parameters, and rejects functions or infinite numbers over IPC", () => {
     const shared = ns.messages("EN-us", { title: { id: "title", defaultMessage: "Counter" } }).title;
     expect(shared.sourceLocale).toBe("en-US");
     expect(uiTextSchema.parse(structuredClone(shared))).toEqual(shared);
@@ -35,7 +35,7 @@ describe("公共 UI 消息与语言回退", () => {
     expect(uiTextSchema.safeParse({ ...shared, values: { count: () => 3 } }).success).toBe(false);
     expect(() => ns.messages("invalid_locale", { title: { id: "title", defaultMessage: "Counter" } })).toThrow();
   });
-  it("逐条回退、跨 owner 隔离，坏译文不影响其他消息", () => {
+  it("falls back per message, isolates owners, and keeps corrupt translations from affecting other messages", () => {
     const formatter = new MessageFormatter("zh-Hans", [catalog(ns.id, "zh-Hans", { items: "{count} 项", date: "{date, date, short}" }),
       catalog("another.plugin", "zh-Hans", { items: "另外 {count} 项" })], () => {});
     expect(formatter.formatMessage(messages.items, { count: 3 })).toBe("3 项");
@@ -50,7 +50,7 @@ describe("公共 UI 消息与语言回退", () => {
         .formatMessage(messages.items, { count: 2 })).toBe("2 items");
     expect(formatter.formatMessage(messages.items)).toBe(messages.items.defaultMessage);
   });
-  it("默认文案的复数与嵌套数字保持来源语言；独立格式保留地区", () => {
+  it("default copy plurals and nested numbers retain source languages while independent formatting retains locale", () => {
     const russian = ns.messages("ru", { plural: { id: "ru", defaultMessage: "{count, plural, one {one #} few {few #} many {many #} other {other #}}" } }).plural;
     const formatter = new MessageFormatter("en-GB", [], () => {});
     expect(formatter.formatMessage(russian, { count: 2 })).toBe("few 2");
@@ -61,7 +61,7 @@ describe("公共 UI 消息与语言回退", () => {
     const german = new MessageFormatter("zh-Hans", [catalog(ns.id, "zh-Hans", { items: "{count} 项" })]);
     expect(german.formatMessage(messages.items, { count: 1000 })).toBe("1000 项");
   });
-  it("精确目录优先，不进入不相容脚本；目录修订与声明冲突只影响展示", () => {
+  it("exact catalogs take precedence without incompatible scripts; catalog revisions and declaration conflicts affect presentation only", () => {
     expect(matchLocale("zh-TW", ["zh-Hans"])).toBeNull();
     expect(matchLocale("en-GB", ["en", "en-GB"])).toBe("en-GB");
     const diagnostics: string[] = [], first = new MessageFormatter("zh-Hans", [catalog(ns.id, "zh-Hans", { items: "{count} 项" })], message => diagnostics.push(message));

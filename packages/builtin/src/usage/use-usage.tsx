@@ -4,7 +4,7 @@ import type { PluginCalls, EventSubscription } from "@asterism/sdk/contracts";
 import { ReadUsage, UsageChanged } from "./contract";
 import { ProviderUsageClient } from "./client";
 
-/** 同一前端通信实例共享卡片缓存；最后一张卡片卸载时释放订阅和定时器。 */
+/** A single frontend communication instance shares the card cache; the last card's unmount releases subscriptions and timers. */
 const clients = new WeakMap<PluginCalls, { client: ProviderUsageClient; users: number; close(): void }>();
 function acquire(calls: PluginCalls, events: ReturnType<typeof useRendererEvents>) {
   let shared = clients.get(calls);
@@ -25,7 +25,7 @@ function acquire(calls: PluginCalls, events: ReturnType<typeof useRendererEvents
     });
     return current;
   };
-  // 先完成事件订阅再读取，避免首次读取遗漏并发更新。
+  // Complete event subscription before reading to avoid missing concurrent updates on the initial read.
   const client = new ProviderUsageClient({
     async query(providerId, refresh) {
       await subscribe().ready;
@@ -47,7 +47,7 @@ function acquire(calls: PluginCalls, events: ReturnType<typeof useRendererEvents
 
 export function useProviderUsage(providerId: string | null) {
   const calls = useRendererCalls(), events = useRendererEvents();
-  // 外部 store 的订阅由 React 管理；render 阶段不发请求或创建订阅。
+  // React manages external store subscriptions; rendering neither sends requests nor creates subscriptions.
   const store = useMemo(() => {
     let shared: ReturnType<typeof acquire> | undefined;
     return {
@@ -64,6 +64,6 @@ export function useProviderUsage(providerId: string | null) {
   }, [calls, events, providerId]);
   const state = useSyncExternalStore(store.subscribe, store.get);
   const refresh = useCallback(() => store.refresh(), [store]);
-  // 首次订阅后的同步重读由 useSyncExternalStore 完成。
+  // useSyncExternalStore performs the synchronous reread after the initial subscription.
   return { state, refresh };
 }

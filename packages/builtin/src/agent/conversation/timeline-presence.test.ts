@@ -5,9 +5,9 @@ import { timelineKey, type TimelineItem } from "./timeline";
 const text = (id: string): TimelineItem => ({ kind: "text", id, responseId: id, ordinal: 0, text: id, endedAt: 1 });
 const process: TimelineItem = { kind: "turn-process", id: "process", open: false, incomplete: false, toolCount: 2 };
 
-describe("虚拟列表的退场条目排列", () => {
-  // 自动收纳时概要行是新条目；保留的可见过程应仍在概要上方，离屏内容不占退场位置。
-  it("可见过程保留在新概要上方，离屏过程立即移出", () => {
+describe("Exiting item order in the virtual list", () => {
+  // Automatic folding adds a new summary row; retained visible process items should stay above it, while offscreen content occupies no exit position.
+  it("Visible process items stay above the new summary, while offscreen process items are removed immediately", () => {
     const hidden = text("offscreen"), visible = text("visible"), answer = text("answer");
     const result = retainExitingItems([hidden, visible, answer], [process, answer],
       new Set([timelineKey(visible), timelineKey(answer)]),
@@ -15,8 +15,8 @@ describe("虚拟列表的退场条目排列", () => {
     expect(result.map(item => item.id)).toEqual(["visible", "process", "answer"]);
   });
 
-  // 同轮 steer 保持可见；不能为了把过程归到概要上方，先将较早的过程搬到补充消息之后。
-  it("退场过程不越过中途补充消息", () => {
+  // Same-turn steer messages remain visible; earlier process items must not first move past a supplemental message merely to group them above the summary.
+  it("Exiting process items do not cross intervening supplemental messages", () => {
     const before = text("before"), after = text("after"), answer = text("answer");
     const steer: TimelineItem = { kind: "message", id: "steer", parts: [], sender: { kind: "user" }, startsTurn: false };
     const result = retainExitingItems([before, steer, after, answer], [steer, process, answer],
@@ -25,8 +25,8 @@ describe("虚拟列表的退场条目排列", () => {
     expect(result.map(item => item.id)).toEqual(["before", "steer", "after", "process", "answer"]);
   });
 
-  // 连续点击可在退场完成前恢复同一条目；应复用目标版本，不重复旧条目或吞掉最新内容。
-  it("退场期间恢复条目时使用目标内容且只出现一次", () => {
+  // Repeated clicks can restore an item before its exit completes; reuse the target version without duplicating the old item or losing the latest content.
+  it("Restoring an item during exit uses the target content and shows it exactly once", () => {
     const old = text("visible"), updated = { ...text("visible"), text: "Updated" };
     const target = [updated, { ...process, open: true }];
     const result = retainExitingItems([old, process], target, new Set([timelineKey(old), process.id]), new Map());
@@ -34,16 +34,16 @@ describe("虚拟列表的退场条目排列", () => {
     expect(result[0]).toBe(updated);
   });
 
-  // 压缩活动与成功记录身份不同；退出的运行行须在新完成行前，局部叠放才能原位交替。
-  it("压缩成功接替运行提示时，退场活动紧邻成功记录之前", () => {
+  // Compression activity and successful records have different identities; the exiting running row must precede the new completed row so local stacking can replace them in place.
+  it("When successful compression replaces the running indicator, the exiting activity sits immediately before the success record", () => {
     const running: TimelineItem = { kind: "compression", id: "activity", status: "running" };
     const completed: TimelineItem = { kind: "compression", id: "saved", status: "completed" };
     expect(retainExitingItems([running], [completed], new Set(["activity"]), new Map()).map(item => item.id))
       .toEqual(["activity", "saved"]);
   });
 
-  // 路径切换也会移除可见条目；没有收纳概要时按原来的后继定位，尾部退出项保持在末尾。
-  it("普通移除保留原先后关系和目标中的新增条目", () => {
+  // Path switches also remove visible items; without a folding summary, position them relative to their original successor, keeping trailing exit items at the end.
+  it("Ordinary removal preserves relative order and newly added items in the target", () => {
     const a = text("a"), b = text("b"), c = text("c"), d = text("d"), added = text("new");
     expect(retainExitingItems([a, b, c, d], [a, added, c], new Set([timelineKey(b), timelineKey(d)]), new Map()).map(item => item.id))
       .toEqual(["a", "new", "b", "c", "d"]);

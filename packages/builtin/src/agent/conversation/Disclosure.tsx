@@ -5,7 +5,7 @@ import { Button } from "@asterism/ui/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@asterism/ui/ui/collapsible";
 import { Item } from "@asterism/ui/ui/item";
 
-/** 思考、工具与摘要共用外壳；调用方拥有状态，标题点击区不受外层内边距挤压。 */
+/** Shared shell for thinking, tools, and summaries; the caller owns state, and outer padding does not shrink the clickable title area. */
 export function Disclosure({ header, children, open, onOpenChange, expandable = true, pending = false }: {
   header: ReactNode;
   children: ReactNode;

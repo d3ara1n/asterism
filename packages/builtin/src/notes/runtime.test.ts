@@ -21,9 +21,9 @@ function open() {
   return { root, service, sessionId: service.sessions.tree.create("Resource") };
 }
 
-// 预期来自笔记当前值契约；通用 SDK 数据校验与事务由宿主测试守护。
-describe("笔记当前正文", () => {
-  it("笔记具型状态支持空正文，缺失或损坏时卡片回退且工具不覆盖", async () => {
+// Expectations come from the note current-value contract; host tests cover generic SDK data validation and transactions.
+describe("current note body", () => {
+  it("typed note state supports an empty body; missing or corrupt state makes the card fall back and prevents tool overwrites", async () => {
     let modules!: ReturnType<typeof runtimeModules.createModules>;
     let data!: SessionDataStore;
     const createModules = runtimeModules.createModules;

@@ -12,13 +12,13 @@ import { cn } from "@asterism/ui/utils";
 import type { CardSize } from "../../../shared/workbench";
 import { ObjectSurface } from "./ObjectSurface";
 
-/** 卡片拖动柄选择器；画布只认它，卡片内容不感知拖动。 */
+/** Card drag handle selector; the canvas recognizes only this, and card content is unaware of dragging. */
 export const cardDragHandle = ".card-drag-handle";
 export type ViewPatch = { collapsed?: boolean; size?: CardSize | null };
-/** Card 上下各一条 1px 边框；外壳高度按边框内尺寸计算。 */
+/** Card has a 1px border at both top and bottom; shell height is calculated from the dimensions inside the borders. */
 const cardBorderBlock = 2;
 
-/** 画布上的对象容器：在公共外壳外加拖动柄、折叠与画布滚轮归属。 */
+/** Object container on the canvas: adds a drag handle, collapsing, and canvas wheel ownership around the shared shell. */
 export const ObjectCard = memo(function ObjectCard({ icon, kind, title, actions, controls, panels, collapsed, expandedHeight, resizing, selected, onView, children }: {
   icon: ReactNode; kind: string; title: string; actions?: ReactNode; controls?: ReactNode; panels?: readonly CardPanelView[];
   collapsed: boolean; selected: boolean;
@@ -31,11 +31,11 @@ export const ObjectCard = memo(function ObjectCard({ icon, kind, title, actions,
   useEffect(() => {
     const element = root.current;
     if (!element) return;
-    // React Flow 在原生冒泡阶段处理 wheel；React onWheel 执行时已晚于画布。只接管内容区的滚轮。
+    // React Flow handles wheel during native bubbling; React onWheel runs after the canvas. Intercept wheel events only in the content area.
     const onWheel = (event: WheelEvent) => {
       if (!(event.target instanceof Element) || !event.target.closest("[data-object-content]")) return;
       const zoom = event.ctrlKey || (window.host.platform === "darwin" && event.metaKey);
-      // 普通滚动保留浏览器默认行为；已被内部组件消费的事件不再交给画布。
+      // Preserve the browser's default behavior for ordinary scrolling; events already consumed by internal components are not passed to the canvas.
       if (!zoom || event.defaultPrevented) event.stopPropagation();
     };
     element.addEventListener("wheel", onWheel, { passive: true });

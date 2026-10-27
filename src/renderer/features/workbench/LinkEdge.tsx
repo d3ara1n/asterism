@@ -6,27 +6,27 @@ import type { ConnectionEdge } from "./connections";
 
 type LinkEdgeType = Edge<ConnectionEdge["data"]>;
 
-/** 指向卡片外侧的单位法向。 */
+/** Unit normal pointing outward from the card. */
 const outward: Record<Position, readonly [number, number]> = {
   [Position.Left]: [-1, 0], [Position.Right]: [1, 0], [Position.Top]: [0, -1], [Position.Bottom]: [0, 1],
 };
 /**
- * 端点尺寸的唯一来源，样式表经 CSS 变量读取。xyflow 以定位盒外沿为锚点，定位盒跨在卡片边缘上，
- * 边缘位于锚点内侧半个盒宽；箭头尖端停在可见圆点（含描边）外沿。
+ * Sole source of endpoint dimensions, read by the stylesheet through CSS variables. xyflow anchors to the outer edge of the positioning box, which straddles the card edge,
+ * placing the edge half a box width inside the anchor; the arrow tip stops at the outer edge of the visible dot (including its stroke).
  */
 const handleBox = 7;
 const handleDot = 7;
 export const handleSizeVariables = { "--handle-box": `${handleBox}px`, "--handle-dot": `${handleDot}px` } as CSSProperties;
 const anchorInset = handleBox / 2;
 const dotRadius = handleDot / 2;
-/** 箭头长度；线身收在箭头底边内。 */
+/** Arrow length; the line ends inside the arrow's base. */
 const headLength = 9;
-/** 路径短于此长度时不画中段箭头，避免与两端标记挤在一起。 */
+/** Omit the middle arrow for paths shorter than this to avoid crowding the endpoint markers. */
 const midArrowMinLength = 72;
 
-/** 圆角实心箭头，尖端在原点、指向 +x。 */
+/** Rounded solid arrow, with its tip at the origin and pointing toward +x. */
 const headPath = `M0 0 L${-headLength} ${-headLength * 0.55} Q${-headLength * 0.72} 0 ${-headLength} ${headLength * 0.55} Z`;
-/** 中段开口箭头，中心在原点、指向 +x。 */
+/** Open middle arrow, centered at the origin and pointing toward +x. */
 const chevronPath = "M-2.5 -4 L2 0 L-2.5 4";
 
 function offset(x: number, y: number, side: Position, distance: number) {
@@ -34,7 +34,7 @@ function offset(x: number, y: number, side: Position, distance: number) {
   return { x: x + nx * distance, y: y + ny * distance };
 }
 
-/** 箭头：尖端指向并贴住该端的端点圆点，朝卡片内侧。 */
+/** Arrow: the tip points toward and touches that endpoint's dot, facing into the card. */
 function Head({ x, y, side }: { x: number; y: number; side: Position }) {
   const [nx, ny] = outward[side];
   const angle = Math.atan2(-ny, -nx) * 180 / Math.PI;
@@ -42,8 +42,8 @@ function Head({ x, y, side }: { x: number; y: number; side: Position }) {
 }
 
 /**
- * 工作台连线：起点端点圆点、终点指向端点圆点的实心箭头与中段方向箭头共同表达链接方向；
- * 选中时沿方向流动。两端都落在卡片边缘的端点上，路径沿用连线风格对应的原生算法。
+ * Workbench connection: the source endpoint dot, solid destination arrow pointing to its dot, and middle direction arrow together express link direction;
+ * flows along that direction when selected. Both ends sit on card-edge endpoints, and paths use the native algorithm for the selected connection style.
  */
 function LinkEdge({ kind, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, selected, data, interactionWidth }:
   EdgeProps<LinkEdgeType> & { kind: Appearance["edgeStyle"] }) {
@@ -51,7 +51,7 @@ function LinkEdge({ kind, sourceX, sourceY, targetX, targetY, sourcePosition, ta
   const sourceEdge = offset(sourceX, sourceY, sourcePosition, -anchorInset);
   const sourceTip = offset(sourceX, sourceY, sourcePosition, dotRadius - anchorInset);
   const targetTip = offset(targetX, targetY, targetPosition, dotRadius - anchorInset);
-  // 单向起点从卡片边缘出发、由端点圆点盖住；箭头一端收到箭头底边内。
+  // A one-way source starts at the card edge beneath the endpoint dot; the arrow end stops inside the arrow's base.
   const inset = headLength * 0.8;
   const start = mutual ? offset(sourceTip.x, sourceTip.y, sourcePosition, inset) : sourceEdge;
   const end = offset(targetTip.x, targetTip.y, targetPosition, inset);
@@ -59,7 +59,7 @@ function LinkEdge({ kind, sourceX, sourceY, targetX, targetY, sourcePosition, ta
   const [path] = kind === "default" ? getBezierPath(endpoints) : getSmoothStepPath({ ...endpoints, borderRadius: kind === "step" ? 0 : 5 });
   const line = useRef<SVGPathElement>(null);
   const chevron = useRef<SVGPathElement>(null);
-  // 中段箭头取路径弧长中点与该处切线，三种风格共用同一测量。
+  // The middle arrow uses the path's arc-length midpoint and tangent there; all three styles share the same measurement.
   useLayoutEffect(() => {
     const element = line.current, mark = chevron.current;
     if (!element || !mark) return;
@@ -85,7 +85,7 @@ function LinkEdge({ kind, sourceX, sourceY, targetX, targetY, sourcePosition, ta
 }
 
 const MemoLinkEdge = memo(LinkEdge);
-/** 每种连线风格注册一个边类型，组件本身共用。 */
+/** Register one edge type per connection style, sharing the component itself. */
 export const linkEdgeTypes = {
   default: (props: EdgeProps<LinkEdgeType>) => <MemoLinkEdge {...props} kind="default" />,
   step: (props: EdgeProps<LinkEdgeType>) => <MemoLinkEdge {...props} kind="step" />,

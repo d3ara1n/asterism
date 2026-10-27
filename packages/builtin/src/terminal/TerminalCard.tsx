@@ -16,7 +16,7 @@ import { useTerminalLink } from "./link";
 import { ScreenWriter } from "./screen-writer";
 import { terminalTypography } from "./typography";
 
-/** 浏览器副本保留输入能力；终端协议查询由后台的唯一解析器应答。 */
+/** The browser copy retains input capability; the backend's sole parser answers terminal-protocol queries. */
 function passiveProtocol(terminal: Terminal) {
   for (const final of ["c", "n", "t"]) for (const prefix of ["", "?", ">", "="])
     terminal.parser.registerCsiHandler({ final, ...(prefix ? { prefix } : {}) }, () => true);
@@ -27,7 +27,7 @@ function passiveProtocol(terminal: Terminal) {
 const tones: Record<TerminalState, StatusTone> = { inactive: "neutral", starting: "progress", idle: "success", running: "progress", unknown: "neutral", exited: "neutral", failed: "error" };
 
 
-/** 卡片头部：实例状态与关闭。关闭结束 shell，资源对象保留，可再次开启。 */
+/** Card header: instance status and close action. Closing ends the shell while retaining the resource object for reopening. */
 export function TerminalActions({ data }: { data: TerminalConfig }) {
   const object = useRendererObject(), calls = useRendererCalls(), i18n = useI18n();
   const { status } = useTerminalLink(object);
@@ -51,7 +51,7 @@ export function TerminalActions({ data }: { data: TerminalConfig }) {
   </>;
 }
 
-/** 卡片正文：终端屏幕与开启／重新开启入口；配置与状态显示在头部。 */
+/** Card body: terminal screen and open/reopen entry point; configuration and status appear in the header. */
 export function TerminalCard() {
   const object = useRendererObject(), calls = useRendererCalls(), i18n = useI18n();
   const { link, status, end } = useTerminalLink(object);
@@ -67,7 +67,7 @@ export function TerminalCard() {
     const fit = new FitAddon();
     terminal.loadAddon(fit); passiveProtocol(terminal);
     terminal.open(host);
-    // WebGL 上下文数量受浏览器限制；创建失败或丢失时回退 DOM 渲染。
+    // Browsers limit WebGL contexts; fall back to DOM rendering if context creation fails or the context is lost.
     try {
       const webgl = new WebglAddon();
       webgl.onContextLoss(() => webgl.dispose());
@@ -85,7 +85,7 @@ export function TerminalCard() {
       return true;
     });
     let scheduled = 0;
-    // 尺寸以后台回传为准；本地只提出建议。
+    // Dimensions reported by the backend are authoritative; local dimensions are only suggestions.
     const fitScreen = () => {
       cancelAnimationFrame(scheduled);
       scheduled = requestAnimationFrame(() => {
@@ -118,10 +118,10 @@ export function TerminalCard() {
   };
   const stopped = status.state === "exited" || status.state === "failed";
   const message = end ? end.message ?? end.reason : error ?? status.error;
-  // 终端屏幕固定深色（ANSI 配色按深底设计）；底部提示条并入同一块深色屏幕，不与卡片内容面割裂。
+  // The terminal screen stays dark (ANSI colors are designed for a dark background); the bottom hint bar joins the same dark screen rather than separating from the card content surface.
   return <div className="flex min-h-0 flex-1 flex-col bg-[#1e1e1e] text-[#d4d4d4]">
     <div className="nodrag nopan relative min-h-0 flex-1 p-2" onKeyDown={event => event.stopPropagation()}>
-      {/* xterm 内部层带 z-index；隔离为独立层叠上下文，覆盖层按文档顺序位于其上。 */}
+      {/* Internal xterm layers have z-index values; isolate them in a stacking context so overlays appear above them in document order. */}
       <div ref={container} className="isolate h-full w-full" />
       {status.state === "inactive" && <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-[#1e1e1e] p-6 text-[#d4d4d4]">
         <p className="text-center text-xs">{i18n.formatMessage(terminalMessages.inactive)}</p>

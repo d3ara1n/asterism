@@ -3,12 +3,12 @@ import { DatabaseSync } from "node:sqlite";
 import { readJson, writeJson } from "./files.ts";
 
 export interface StorageChange { id: string; from: number; to: number }
-/** 一份已存在且版本落后的文件；`apply` 执行整条迁移链并提交新版本。 */
+/** An existing outdated file; `apply` executes the full migration chain and commits the new version. */
 export interface StoragePlan { change: StorageChange; apply(): void }
-/** 只读取版本号：文件不存在或已是当前版本时没有计划，由业务层按当前格式创建或读取。 */
+/** Read versions only: absent or current files need no plan; business logic creates or reads them in current format. */
 export interface StorageDefinition { id: string; file: string; inspect(): StoragePlan | null }
 
-/** 每个键代表 v → v+1；先检查整条链，再执行任何转换。 */
+/** Each key represents v → v+1; validate the entire chain before any conversion. */
 export function migrationPath<T>(id: string, from: number, to: number, steps: Readonly<Record<number, T>>): T[] {
   if (from > to) throw new Error(`Data for ${id} uses version ${from}; this application supports ${to}. Install a newer application.`);
   const path: T[] = [];
@@ -22,7 +22,7 @@ export function migrationPath<T>(id: string, from: number, to: number, steps: Re
 export interface JsonStorageOptions {
   id: string; file: string; version: number;
   migrations: Readonly<Record<number, (value: unknown) => unknown>>;
-  /** 平铺宿主文档的 `version` 与正文同层；插件文档使用 `{ version, data }` 信封。 */
+  /** Flat host documents put `version` beside body fields; plugin documents use `{ version, data }` envelopes. */
   envelope?: boolean;
 }
 export function jsonStorage({ id, file, version, migrations, envelope }: JsonStorageOptions): StorageDefinition {
@@ -36,7 +36,7 @@ export function jsonStorage({ id, file, version, migrations, envelope }: JsonSto
     return { change: { id, from: found as number, to: version }, apply() {
       let value = envelope ? (raw as { data?: unknown }).data : raw;
       for (const step of steps) value = step(value);
-      // 平铺文档的迁移步骤产生下一版正文；最终版本号由适配器统一写入。
+      // Flat-document migration steps yield next-version bodies; adapters write final version numbers centrally.
       writeJson(file, envelope ? { version, data: value } : { ...(value as object), version });
     } };
   } };
@@ -46,7 +46,7 @@ export interface SqliteStorageOptions {
   id: string; file: string; version: number;
   migrations: Readonly<Record<number, (db: DatabaseSync) => void>>;
 }
-/** `user_version` 为 0 表示尚未由业务层建立；SQL 步骤使用传入连接，事务与版本号由适配器提交。 */
+/** `user_version` 0 means business logic has not initialized the database; SQL steps use supplied connections while adapters commit transactions and versions. */
 export function sqliteStorage({ id, file, version, migrations }: SqliteStorageOptions): StorageDefinition {
   return { id, file, inspect() {
     if (!existsSync(file)) return null;

@@ -15,8 +15,8 @@ import { useObjectView } from "./object-view";
 import { ObjectSurface } from "./ObjectSurface";
 
 /**
- * 聚焦浮岛内容：与卡片同一份对象视图，换到浮岛容器中重新挂载。
- * 浮岛身份固定，切换会话或聚焦对象时只交替其中内容；环境经 WorkbenchScope 绑定到所属会话。
+ * Focus island content: the same object view as the card, remounted in the island container.
+ * Island identity is fixed; switching sessions or focused objects changes only its content, with the environment bound to its session through WorkbenchScope.
  */
 export function FocusIsland({ store, sessionId, objectId, onHome }: {
   store: WorkbenchStore; sessionId: string; objectId: string; onHome: () => void;
@@ -37,7 +37,7 @@ export function FocusIsland({ store, sessionId, objectId, onHome }: {
 function FocusedContent({ objectId }: { objectId: string }) {
   const { session, ready } = useWorkbench();
   const object = session.objects.find(item => item.id === objectId);
-  // 对象被移除后由工作台结束聚焦；此前不渲染内容。
+  // The workbench ends focus after object removal; render no content in the meantime.
   return object ? <RendererCatalogProvider ready={ready}><FocusedObject object={object} /></RendererCatalogProvider> : null;
 }
 

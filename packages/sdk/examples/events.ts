@@ -13,24 +13,24 @@ export const backend = defineModule(plugin => {
   plugin.ipc.events.subscribe(Progress, { delivery: "latest" }, event => {
     const completed: number = event.data.completed;
     plugin.log.info(`Downloaded ${completed} bytes from ${event.source?.resource?.id}.`);
-    // @ts-expect-error 领域载荷不含其他契约的字段。
+    // @ts-expect-error The domain payload does not contain fields from other contracts.
     event.data.title;
   });
   return { events: [Progress] };
 });
 export function report(object: ObjectExecutor): void {
   object.events.publish(Progress, { job: "file", completed: 10, total: 100 });
-  // @ts-expect-error 发布参数由契约推导。
+  // @ts-expect-error Publish parameters are inferred from the contract.
   object.events.publish(Progress, { job: "file", completed: "ten", total: 100 });
 }
-/** 公共状态由宿主登记；插件只经自己的资源操作柄发布，属于宿主 API 8.0。 */
+/** Public status is registered by the host; plugins publish only through their own resource handles. Part of host API 8.0. */
 export function reportStatus(object: ObjectExecutor): void {
   object.events.publish(ResourceStatusChanged, { title: "Download", status: "running" });
   object.events.publish(ResourceStatusChanged, { title: "Download", status: "running", progress: { value: 0.6 } });
   object.events.publish(ResourceStatusChanged, { title: "Download", status: "completed" });
-  // @ts-expect-error 状态标记不提供 reset 或撤回。
+  // @ts-expect-error Status markers do not provide reset or retraction.
   object.events.publish(ResourceStatusChanged, { title: "Download", status: "reset" });
-  // @ts-expect-error 进度只属于 running，终态完整替换运行状态。
+  // @ts-expect-error Progress belongs only to running; terminal states fully replace the running state.
   const invalid: ResourceStatus = { title: "Download", status: "completed", progress: { value: 1 } };
   void invalid;
 }

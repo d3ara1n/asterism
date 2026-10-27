@@ -7,9 +7,9 @@ import { callControlSchema, callFrameSchema, type CallControl, type CallFrame } 
 const contract = defineCall("test.calls/query", { scope: "object", input: z.null(), output: z.string() });
 const object = { id: "agent", sessionId: "session", kind: "test.calls/agent" };
 
-describe("插件调用客户端", () => {
-  // 设置页没有 ResourceRef，插件级调用必须完整通过正式信封而不伪造对象。
-  it("插件级调用通过无对象信封交付并按契约解码结果", async () => {
+describe("Plugin call client", () => {
+  // Settings pages have no ResourceRef; plugin-level calls must traverse real envelopes without fabricating objects.
+  it("plugin-level calls deliver through object-free envelopes and decode results by contract", async () => {
     const query = defineCall("test.calls/global", { scope: "plugin", input: z.null(), output: z.string() });
     let receive!: (frame: CallFrame) => void;
     const client = new CallClient({
@@ -25,8 +25,8 @@ describe("插件调用客户端", () => {
     try { expect(await client.invoke(query, null, {})).toBe("ready"); }
     finally { client.close(); }
   });
-  // 取消/断连必须释放等待；迟到消息不得完成另一调用，已发送的修改不能自动重放。
-  it("取消和断连拒绝对应等待，迟到结果不复用，关闭释放监听", async () => {
+  // Cancellation/disconnection releases waits; late messages cannot complete other calls and sent mutations must not replay automatically.
+  it("cancellation and disconnection reject matching waits, late results are not reused, and close releases listeners", async () => {
     const sent: CallControl[] = [];
     let receive: ((frame: CallFrame) => void) | undefined;
     const client = new CallClient({

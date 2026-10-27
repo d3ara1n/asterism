@@ -20,9 +20,9 @@ export default definePlugin({
         inspect: async data => data,
       })],
       modules: [
-        // 直接复用创建契约，无需复制 schema。
+        // Reuse the creation contract directly without copying the schema.
         defineAgentCreation({ id: ns.name("document"), description: "Create a document.", creation: CreateDocument }),
-        // 同一种资源可以提供另一个模型入口，隐藏或转换内部参数。
+        // The same resource type can provide another model entry point that hides or transforms internal parameters.
         defineAgentCreation({
           id: ns.name("quick-note"), description: "Create a document from a short note.", creation: CreateDocument,
           inputSchema: z.object({ note: z.string().min(1).describe("The note text.") }),

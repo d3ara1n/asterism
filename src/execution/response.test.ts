@@ -14,9 +14,9 @@ const start: ModelEvent = { type: "part.start", part: { id: "t", kind: "text" } 
 const call: ModelEvent = { type: "part.start", part: { id: "c", kind: "toolcall", callId: "c1", name: "read" } };
 const finish: ModelEvent = { type: "finish", reason: "stop", usage: null };
 
-describe("响应块状态机", () => {
-  // 公共记录契约：展示可以选择摘要，但持久化不能将摘要写成全文或丢掉另一通道。
-  it("思考的全文和摘要独立累积并通过记录 schema，摘要事件不能污染工具参数", () => {
+describe("Response block state machine", () => {
+  // Public record contract: display may select summaries, but persistence must not save summaries as full text or discard the other channel.
+  it("full reasoning text and summaries accumulate independently and pass the record schema; summary events cannot contaminate tool arguments", () => {
     const { response, nodes } = setup();
     response.accept({ type: "part.start", part: { id: "thought", kind: "thinking" } });
     response.accept({ type: "part.delta", partId: "thought", delta: "Summary", channel: "summary" });
@@ -33,7 +33,7 @@ describe("响应块状态机", () => {
     expect(() => tool.accept({ type: "part.delta", partId: "c", delta: "Summary", channel: "summary" })).toThrow("Only thinking blocks");
     expect(tool.calls()[0]!.text).toBe("");
   });
-  it("部分 JSON 仅成为预览，未完成转义暂缓显示，取消不保存修复后的参数", async () => {
+  it("partial JSON is preview-only; incomplete escapes defer display and cancellation does not save repaired arguments", async () => {
     const { response, nodes } = setup();
     response.accept(call);
     response.accept({ type: "part.delta", partId: "c", delta: '{"target":{"path":"src/comp' });
@@ -47,7 +47,7 @@ describe("响应块状态机", () => {
     expect(nodes[0]).toMatchObject({ complete: false, arguments: null, outcome: null });
   });
 
-  it("交错调用各自保留预览，完整参数取终结事件，不取修复结果", async () => {
+  it("interleaved calls retain separate previews and obtain complete arguments from terminal events rather than repaired results", async () => {
     const { response } = setup();
     response.accept(call);
     response.accept({ type: "part.start", part: { id: "other", kind: "toolcall", callId: "other", name: "write" } });
@@ -59,7 +59,7 @@ describe("响应块状态机", () => {
     expect(response.live()[0]).toMatchObject({ state: "ready", arguments: { path: "first.txt" } });
     expect(response.calls()[0]!.arguments).toEqual({ path: "first.txt" });
   });
-  it("即时思考携带运行时块起点，读取和增量不会重新计时；成型块保存同一对起止，供重启后显示与审计", () => {
+  it("live reasoning carries the runtime block start without resetting on reads or deltas; finalized blocks retain the same start and end for display and audit after restart", () => {
     const clock = vi.spyOn(Date, "now").mockReturnValue(1000);
     try {
       const { response, nodes } = setup();
@@ -79,7 +79,7 @@ describe("响应块状态机", () => {
     } finally { clock.mockRestore(); }
   });
 
-  it("终态归属最高序号块，和并行工具完成顺序无关；关闭只计量一次", () => {
+  it("terminal state belongs to the highest-index block regardless of parallel tool completion order; close meters once", () => {
     const { response, nodes } = setup();
     response.accept(call);
     response.accept({ type: "part.end", partId: "c", arguments: {} });
@@ -100,7 +100,7 @@ describe("响应块状态机", () => {
     expect(nodes.reduce((sum, block) => sum + (block.completion?.usage?.total ?? 0), 0)).toBe(7);
   });
 
-  it("异常流的已报告用量仍保存；未报告终态不虚构计量", () => {
+  it("reported usage survives abnormal streams and missing terminal state does not fabricate metering", () => {
     const { response, nodes } = setup();
     response.accept(start);
     response.accept({ type: "part.delta", partId: "t", delta: "partial" });
@@ -116,7 +116,7 @@ describe("响应块状态机", () => {
     expect(() => interrupted.response.accept(start)).toThrow();
   });
 
-  it("finish 不能把缺少 part.end 的工具参数变成可执行调用", () => {
+  it("finish cannot make tool arguments without part.end executable", () => {
     const { response, nodes } = setup();
     response.accept(call);
     response.accept({ type: "part.delta", partId: "c", delta: "{\"path\":" });
@@ -125,7 +125,7 @@ describe("响应块状态机", () => {
     expect(nodes).toEqual([expect.objectContaining({ kind: "toolcall", argumentsText: "{\"path\":", complete: false, outcome: null })]);
   });
 
-  it("正文等待终态一起保存，工具取得结局才保存；中断不重复追加", () => {
+  it("text waits for terminal state to persist together, tools persist after outcomes, and interruption does not append twice", () => {
     const { response, nodes } = setup();
     response.accept(start);
     response.accept({ type: "part.delta", partId: "t", delta: "hello" });
@@ -146,7 +146,7 @@ describe("响应块状态机", () => {
     expect(nodes[1]).toMatchObject({ kind: "toolcall", complete: true, outcome: { kind: "cancelled" } });
   });
 
-  it("未知块、重复块、结束后增量与重复结束都明确拒绝", () => {
+  it("rejects unknown blocks, duplicate blocks, deltas after completion, and repeated completion explicitly", () => {
     const { response } = setup();
     expect(() => response.accept({ type: "part.delta", partId: "missing", delta: "lost" })).toThrow();
     response.accept(start);
@@ -158,7 +158,7 @@ describe("响应块状态机", () => {
     expect(() => response.accept(finish)).toThrow();
   });
 
-  it("不同块不能复用调用 ID，避免将工具结果记在错误的节点上", () => {
+  it("blocks cannot reuse call IDs and misattribute tool results to the wrong nodes", () => {
     const { response } = setup();
     response.accept(call);
     expect(() => response.accept({ type: "part.start", part: { id: "other", kind: "toolcall", callId: "c1", name: "read" } })).toThrow();

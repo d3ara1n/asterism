@@ -16,13 +16,13 @@ beforeAll(async () => {
   vi.stubGlobal("window", { postMessage: electron.postMessage });
   await import("./index.ts");
   bridge = electron.exposeInMainWorld.mock.calls[0]![1] as DesktopBridge;
-  // 模块加载时注册的监听在用例开始前被清理记录，先行取出。
+  // Listeners registered at module load have their records cleared before tests begin; retrieve them first.
   relay = electron.on.mock.calls.find(([name]) => name === connectionRequestChannel)![1];
 });
 
-// 直连交接契约：页面重复请求不能让主进程重建连接（会结束在途调用与订阅）；端口原样转交页面。
-describe("任务进程直连交接", () => {
-  it("每个页面只发送一次连接请求，端口与不可用通知都转交给页面", () => {
+// Direct connection handoff contract: repeated page requests cannot recreate main-process connections and end in-flight calls/subscriptions; ports pass through unchanged.
+describe("Task process direct connection handoff", () => {
+  it("sends one connection request per page and forwards ports and unavailable notifications to the page", () => {
     bridge.connectRuntime();
     bridge.connectRuntime();
     expect(electron.send).toHaveBeenCalledExactlyOnceWith(connectionRequestChannel);

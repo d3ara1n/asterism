@@ -12,7 +12,7 @@ export function compatibilityForTarget(settings: {
   const has = (id: string) => entries.some(entry => entry.id === id);
   const reasoning = entries.find(entry => entry.id === "responsesReasoning");
   const fields = reasoning && "value" in reasoning ? reasoning.value as { content?: "array" | "object"; encryptedContent?: boolean; summary?: boolean } : {};
-  // 协议编码器解释自己认识的行为；appliesTo 只用于展示，不参与匹配。
+  // Protocol encoders interpret known behaviors; appliesTo is display-only and does not affect matching.
   return {
     systemMessage: settings.provider.protocol === "openai-responses" && has("systemMessageInMessages"),
     reasoningContent: fields.content ?? "array",
@@ -38,7 +38,7 @@ function portableCallId(seed: string): string {
 }
 const portableId = /^[A-Za-z0-9_-]{1,64}$/u;
 
-/** 每次从不可变历史投影；原生资料不适用时只省略资料，不阻断公共上下文。 */
+/** Project immutable history each time; omit inapplicable native data without blocking public context. */
 export function projectHistory(input: ModelInput): ResolvedModelItem[] {
   validateProjection(input);
   const { settings } = input;
@@ -58,7 +58,7 @@ export function projectHistory(input: ModelInput): ResolvedModelItem[] {
     for (const [partIndex, part] of item.parts.entries()) {
       const continuation = continuationForTarget(part.continuation, item, settings);
       if (part.kind === "toolcall") {
-        // 本来源的原始调用 ID 优先保留；外来 ID 只在目标格式不接受或发生冲突时转换。
+        // Preserve this origin's original call IDs first; transform foreign IDs only when rejected by the target format or conflicting.
         const callId = native || (portableId.test(part.callId) && !nativeIds.has(part.callId) && !usedIds.has(part.callId))
           ? part.callId : portableCallId(JSON.stringify([item.scope, item.adapter, index, partIndex, part.callId]));
         calls.set(part.callId, callId);
@@ -71,7 +71,7 @@ export function projectHistory(input: ModelInput): ResolvedModelItem[] {
           parts.push({ ...part, continuation });
         else if (settings.provider.protocol === "anthropic" && (part.text || typeof continuation.anthropic?.signature === "string" || typeof continuation.anthropic?.redactedData === "string"))
           parts.push({ ...part, continuation });
-        // Chat 没有公共思考输入；Anthropic 不将独立摘要伪装成 thinking 或助手正文。
+        // Chat has no public reasoning input; Anthropic does not disguise separate summaries as thinking or assistant text.
       }
     }
     if (parts.length) projected.push({ ...item, parts });

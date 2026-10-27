@@ -6,8 +6,8 @@ import { branchContains, historyBranches, branchForNode } from "./history-branch
 const message = (id: string, parentId: string | null): SessionNode => node(id, parentId, input("a", id));
 const interrupted = (id: string, parentId: string): SessionNode => node(id, parentId, text("a", "r", 0, "Partial", { complete: false, requestParentId: parentId }));
 
-describe("历史分支 Tab 契约", () => {
-  it("A-C-B 保留原后续，C-D 共享 C 并双向定位，不复制 A", () => {
+describe("History branch Tab contract", () => {
+  it("A-C-B retains the original continuation, C-D shares C with bidirectional navigation, and A is not copied", () => {
     const nodes = [message("A", null), message("C", "A"), message("B", "C"), message("D", "C")];
     const tree = historyBranches(nodes);
     const [main, child] = tree.branches;
@@ -21,7 +21,7 @@ describe("历史分支 Tab 契约", () => {
     expect(nodes.map(node => node.id)).toEqual(["A", "C", "B", "D"]);
   });
 
-  it("嵌套分支指回所属 Tab，同一位置再次分叉仍指回原分支", () => {
+  it("nested branches point back to their owning Tab, and branching again at the same position still points back to the original branch", () => {
     const tree = historyBranches([
       message("A", null), message("C", "A"), message("B", "C"), message("D", "C"),
       message("E", "D"), message("F", "D"), message("G", "C"),
@@ -33,7 +33,7 @@ describe("历史分支 Tab 契约", () => {
     expect([...child!.nodeIds]).toEqual(["C", "D", "E"]);
   });
 
-  it("继续任意路径只延长原 Tab，新增分支不改变已有身份与编号", () => {
+  it("continuing any path extends only its original Tab, and new branches preserve existing identities and numbers", () => {
     const nodes = [message("A", null), message("B", "A"), message("D", "A")];
     const before = historyBranches(nodes);
     const after = historyBranches([...nodes, message("E", "D"), message("C", "B"), message("F", "A")]);
@@ -44,7 +44,7 @@ describe("历史分支 Tab 契约", () => {
     expect([...after.branches[0]!.nodeIds]).toEqual(["A", "B", "C"]);
   });
 
-  it("从会话起点分叉仍可在共享起点往返，空会话也有可选择节点", () => {
+  it("branching from the session start still allows navigation through the shared start, and empty sessions also have a selectable node", () => {
     const empty = historyBranches([]);
     expect(empty.branches).toHaveLength(1);
     expect(branchContains(empty.branches[0]!, null)).toBe(true);
@@ -56,7 +56,7 @@ describe("历史分支 Tab 契约", () => {
     expect(branchForNode(tree, null)).toBe(main);
   });
 
-  it("不完整块同样可查看，分叉使用它自身作为共享起点", () => {
+  it("incomplete blocks remain viewable, and branching uses the block itself as the shared start", () => {
     const tree = historyBranches([
       message("A", null), interrupted("partial", "A"), message("B", "partial"),
       message("D", "partial"), interrupted("tail", "D"),

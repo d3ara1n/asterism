@@ -26,7 +26,7 @@ import { useConversationInteraction } from "./interaction";
 import { commonMessages } from "@asterism/ui/messages/common";
 import type { AgentDraft, DraftMode } from "../drafts-contract";
 
-/** 草稿箱面板；有条目或待确认交换时显示，其余时候不占空间。 */
+/** Draft box panel; shown when items or exchanges awaiting confirmation exist, and occupies no space otherwise. */
 export function AgentDraftsPanel({ onTake }: { onTake(): void }) {
   const i18n = useI18n();
   const interaction = useConversationInteraction();
@@ -37,7 +37,7 @@ export function AgentDraftsPanel({ onTake }: { onTake(): void }) {
   const { drafts } = interaction;
   if (!drafts.length && !interaction.pendingTake) return null;
 
-  // 摘要：各模式数量，只显示非零项
+  // Summary: counts by mode, showing only nonzero entries
   const counts = { follow: 0, steer: 0, none: 0 };
   for (const d of drafts) counts[d.mode]++;
   const summaryParts: string[] = [];
@@ -45,7 +45,7 @@ export function AgentDraftsPanel({ onTake }: { onTake(): void }) {
   if (counts.steer) summaryParts.push(i18n.formatMessage(messages.draftSummarySteer, { count: counts.steer }));
   if (counts.none) summaryParts.push(i18n.formatMessage(messages.draftSummaryNone, { count: counts.none }));
 
-  // 拖拽处理
+  // Drag handling
   const onDragStart = (e: DragEvent, id: string) => {
     draggingId.current = id;
     e.dataTransfer.effectAllowed = "move";
@@ -73,7 +73,7 @@ export function AgentDraftsPanel({ onTake }: { onTake(): void }) {
       className="shrink-0 border-t px-3 pb-1"
       aria-label={i18n.text(messages.drafts)}>
 
-      {/* 把手 / 标题行 */}
+      {/* Handle / title row */}
       <CollapsibleTrigger asChild>
         <button type="button"
           className="flex w-full items-center gap-2 py-1.5 outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm">
@@ -94,7 +94,7 @@ export function AgentDraftsPanel({ onTake }: { onTake(): void }) {
       </CollapsibleTrigger>
 
       <CollapsibleContent>
-        {/* 待确认交换提示 */}
+        {/* Exchange awaiting confirmation notice */}
         {interaction.pendingTake && (
           <div className="mb-1 flex items-center gap-2 rounded-md border border-warning/40 bg-warning/5 px-2 py-1">
             <StatusText tone="warning" className="min-w-0 flex-1">
@@ -108,7 +108,7 @@ export function AgentDraftsPanel({ onTake }: { onTake(): void }) {
           </div>
         )}
 
-        {/* 条目列表 */}
+        {/* Item list */}
         <div className="max-h-[min(12rem,35cqh)] space-y-0.5 overflow-y-auto py-0.5"
           role="list">
           {drafts.map((item, index) => (
@@ -131,7 +131,7 @@ export function AgentDraftsPanel({ onTake }: { onTake(): void }) {
   );
 }
 
-// ─── 单条草稿行 ────────────────────────────────────────────────────────────────
+// ─── Single draft row ────────────────────────────────────────────────────────────────
 
 function DraftRow({
   item, index, total, isDragOver, onTake,
@@ -155,7 +155,7 @@ function DraftRow({
   const files = item.parts.filter(p => p.kind === "file");
   const hasText = Boolean(text.trim());
 
-  // 键盘排序（Alt+↑/↓ on grip）
+  // Keyboard sorting (Alt+↑/↓ on grip)
   const onGripKey = (e: KeyboardEvent<HTMLButtonElement>) => {
     if (!e.altKey) return;
     if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
@@ -164,25 +164,25 @@ function DraftRow({
     setMovePending(true);
     const drafts = interaction.drafts;
     const before = e.key === "ArrowUp"
-      ? drafts[index - 1]?.id ?? null           // 上移：放到前一项的位置
-      : drafts[index + 2]?.id ?? null;           // 下移：放到后两项的位置
-    // "上移"：before = 前一项的 id（把自己插到它前面）
-    // 实际：上移 = before = drafts[index-1].id；下移 = before = drafts[index+2]?.id ?? null
+      ? drafts[index - 1]?.id ?? null           // Move up: place at the previous item's position
+      : drafts[index + 2]?.id ?? null;           // Move down: place at the position two items later
+    // "Move up": before = the previous item's id (insert this item before it)
+    // In practice: move up = before = drafts[index-1].id; move down = before = drafts[index+2]?.id ?? null
     void interaction.move(item, before).finally(() => {
       setMovePending(false);
-      // 保持焦点在 grip（移动后 React 重新渲染，需要微延迟）
+      // Keep focus on grip (React rerenders after the move, requiring a brief delay)
       requestAnimationFrame(() => gripRef.current?.focus());
     });
   };
 
   const isAgent = item.sender.kind === "agent";
   const editorHasContent = (() => {
-    // 取回时如果编辑器非空就是"交换"
+    // Retrieval is an "exchange" when the editor is nonempty
     const state = interaction.draft.getSnapshot();
     return Boolean(state.text.trim() || state.files.length);
   })();
 
-  // 来源标记
+  // Source marker
   const senderChip = isAgent ? (
     <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[--color-external-message] px-1.5 text-[--color-external-message-foreground] text-[10px] font-medium leading-4 max-w-[7rem]">
       <Bot className="size-2.5 shrink-0" aria-hidden />
@@ -194,7 +194,7 @@ function DraftRow({
     </span>
   );
 
-  // 模式标签文字和样式
+  // Mode label text and styles
   const modeLabel = { none: messages.draftNone, steer: messages.draftSteer, follow: messages.draftFollow }[item.mode];
   const modeTone = { none: "outline" as const, steer: "secondary" as const, follow: "default" as const }[item.mode];
 
@@ -209,7 +209,7 @@ function DraftRow({
         onDragOver={onDragOver}
         onDrop={onDrop}
       >
-        {/* 拖拽把手 */}
+        {/* Drag handle */}
         <button
           ref={gripRef}
           type="button"
@@ -224,10 +224,10 @@ function DraftRow({
           <GripVertical aria-hidden className="size-3" />
         </button>
 
-        {/* 来源 */}
+        {/* Source */}
         {senderChip}
 
-        {/* 正文预览（含预览 Tooltip） */}
+        {/* Body preview (with preview Tooltip) */}
         <Tooltip delayDuration={300}>
           <TooltipTrigger asChild>
             <span className="type-caption min-w-0 flex-1 cursor-default select-none truncate">
@@ -253,14 +253,14 @@ function DraftRow({
           </TooltipContent>
         </Tooltip>
 
-        {/* 附件计数小标 */}
+        {/* Attachment count badge */}
         {files.length > 0 && (
           <span className="shrink-0 inline-flex items-center gap-0.5 type-label text-muted-foreground">
             <Paperclip className="size-2.5" aria-hidden />{files.length}
           </span>
         )}
 
-        {/* 发送时机徽章 + 下拉 */}
+        {/* Delivery timing badge + dropdown */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
@@ -291,7 +291,7 @@ function DraftRow({
           </DropdownMenuContent>
         </DropdownMenu>
 
-        {/* 取出 / 交换 */}
+        {/* Retrieve / exchange */}
         <Tooltip delayDuration={300}>
           <TooltipTrigger asChild>
             <Button
@@ -308,7 +308,7 @@ function DraftRow({
           </TooltipContent>
         </Tooltip>
 
-        {/* 更多操作（移动 + 丢弃） */}
+        {/* More actions (move + discard) */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button type="button" variant="ghost" size="icon-xs"
@@ -354,7 +354,7 @@ function DraftRow({
         </DropdownMenu>
       </div>
 
-      {/* 丢弃确认对话框 */}
+      {/* Discard confirmation dialog */}
       <AlertDialog open={confirmDiscard} onOpenChange={setConfirmDiscard}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -382,7 +382,7 @@ function DraftRow({
   );
 }
 
-// ─── 模式下拉选项 ──────────────────────────────────────────────────────────────
+// ─── Mode dropdown options ──────────────────────────────────────────────────────────────
 
 function ModeItem({ value, label, hint }: { value: string; label: string; hint: string }) {
   return (

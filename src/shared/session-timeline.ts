@@ -7,7 +7,7 @@ export class SessionError extends Error {
   }
 }
 
-/** 从逻辑根到任意末端的只读时间线；末端不必是会话树的叶子，null 表示空时间线。 */
+/** Read-only timeline from logical root to any endpoint, not necessarily a tree leaf; null denotes an empty timeline. */
 export function sessionTimeline(nodes: readonly SessionNode[], at: string | null): SessionNode[] {
   const byId = new Map(nodes.map(node => [node.id, node]));
   const path: SessionNode[] = [];

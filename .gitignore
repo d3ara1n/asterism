@@ -42,6 +42,6 @@ coverage/
 playwright-report/
 test-results/
 
-# 翻译抽取产物
+# Translation extraction artifacts
 .i18n/
 .i18n-check-*/

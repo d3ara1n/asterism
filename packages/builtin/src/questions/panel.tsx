@@ -8,7 +8,7 @@ import { AnswerQuestion, CancelQuestion, type Question } from "./contract";
 import { draftSubmission, questionDrafts } from "./drafts";
 import { QuestionForm } from "./form";
 
-/** 工具执行正文内的作答界面；草稿按等待实例保留，条目卸载或切到放大视图均不丢失。 */
+/** Answer UI within the tool execution body; drafts are retained by waiting instance and survive entry unmounts or switches to the enlarged view. */
 export function QuestionPanel({ requestId, questions }: { requestId: string; questions: Question[] }) {
   const { ref } = useRendererObject();
   const calls = useRendererCalls();

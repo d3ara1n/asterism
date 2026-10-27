@@ -38,8 +38,8 @@ import { TemplateStore } from "./templates.ts";
 const agentKind = Agent.kind;
 
 /**
- * 会话应用入口：组合内置领域接口，并提供会话树、工作台事件、布局和通知机制。
- * 资源行为（含代理的提交、运行、配置）由各资源控制器负责，会话按对象类型路由命令。
+ * Session application entry: compose built-in domain interfaces and provide session trees, workbench events, layout, and notifications.
+ * Resource controllers own behavior, including agent submission, execution, and configuration; sessions route commands by object type.
  */
 export class SessionService {
   readonly calls: LoadedPlugins["calls"];
@@ -59,7 +59,7 @@ export class SessionService {
   private readonly closePlugins: () => Promise<void>;
   private readonly releasePlugins: LoadedPlugins["release"];
   private readonly restorePlugins: LoadedPlugins["restore"];
-  /** 入口 pending：同一会话的归档清理进行中不重入。 */
+  /** Entry pending: do not reenter archive cleanup for the same session while it is in progress. */
   private readonly archiving = new Set<string>();
   private readonly naming: NamingApi;
   private readonly prepare: LoadedPlugins["prepare"];
@@ -95,7 +95,7 @@ export class SessionService {
       title: sessionId => this.tree.title(sessionId),
       setTitle: (sessionId, text) => {
         const title = text.replace(/\s+/gu, " ").trim().slice(0, 160);
-        // 空标题无意义，直接忽略；在提交内随外层事务生效，否则作为一次独立提交。
+        // Ignore meaningless empty titles; apply within the outer transaction during commits, otherwise use an independent commit.
         if (!title || this.closed || title === this.tree.title(sessionId)) return;
         this.commit(sessionId, () => this.tree.setTitle(sessionId, title));
       },
@@ -120,7 +120,7 @@ export class SessionService {
     const refOf = (objectId: string): ResourceRef | null => this.tree.resourceRef(objectId);
     const models = createModelServices(configuration, adapterFactory);
     const selection = createSelection({ agents: () => configuration.current().agents });
-    // 首条 submit 准备时对象尚未创建；组合入口用已经准备好的选择执行同一模型预检。
+    // The object does not exist during first-submit preparation; composition entries use prepared selections for the same model preflight.
     this.validateInitialInput = async (value, parts, content) => {
       try {
         await models.validate({ target: selection.target(value), system: composeSystemPrompt(selection.agent(value), applicationBrand.en),
@@ -186,7 +186,7 @@ export class SessionService {
     try { const result = work(); this.db.exec("COMMIT"); return result; }
     catch (error) { this.db.exec("ROLLBACK"); throw error; }
   }
-  /** 单一写入者的同步提交区间：取父节点、记录事件与更新游标不可交错。 */
+  /** Single-writer synchronous commit interval: parent lookup, event recording, and cursor updates cannot interleave. */
   private committing: { sessionId: string; writer: SessionWriter; objects: Set<string> } | null = null;
   private writesClosed = false;
   private commit<T>(sessionId: string, work: (writer: SessionWriter) => T,
@@ -216,16 +216,16 @@ export class SessionService {
       this.committing = { sessionId, writer, objects };
       try {
         const result = work(writer);
-        // 存在性与链接参与执行校验，必须在提交成功和派发观察者之前重建。
+        // Presence and links affect execution validation; rebuild after successful commits and before observer dispatch.
         this.tree.workbench(sessionId);
         return result;
       }
       finally { this.committing = null; }
     });
-    // 标题以最外层提交成功后的实际值为准；回滚的提交不会走到这里。
+    // Titles use actual values after the outermost commit succeeds; rolled-back commits never reach here.
     const title = this.tree.titleOf(sessionId);
     if (!this.closed && title !== null && title !== titleBefore) this.events.publish(SessionTitleChanged, null, { sessionId, title });
-    // 提交后交给插件派发队列；观察者内的提交排队，队列清空后每个会话通知界面一次。
+    // Hand off to the plugin dispatch queue after commit; observer commits queue and each session notifies the UI once after draining.
     const change = { records: this.tree.since(sessionId, head), cursorChanged: before !== this.tree.position(sessionId) };
     if (this.watching.has(sessionId)) {
       const update = this.pendingUpdate(sessionId);
@@ -242,7 +242,7 @@ export class SessionService {
     else this.afterCommit(sessionId, change, id => this.notify(id));
     return result;
   }
-  /** 会话 settled：没有任何资源在活动；回溯只在此时允许。 */
+  /** A session is settled when no resource is active; only then is backtracking allowed. */
   private settled(sessionId: string): boolean {
     return ![...this.pendingCreations.values()].some(value => value.sessionId === sessionId)
       && ![...this.pendingActions.values()].some(ref => ref.sessionId === sessionId)
@@ -275,14 +275,14 @@ export class SessionService {
       busyObjectIds: [...new Set([...resources.flatMap(a => a.busy), ...plugin.busy,
         ...[...this.pendingActions.values()].filter(ref => ref.sessionId === sessionId).map(ref => ref.id)])],
       timelineBusy: [...this.pendingCreations.values()].some(item => item.sessionId === sessionId),
-      // 输入阶段的工具参数只以 argumentsText 传输，预览由前端推导。
+      // During input, tool arguments travel only as argumentsText; the frontend derives previews.
       live: [...resources.flatMap(a => a.live), ...plugin.live].map(wireLive) };
   }
   private progressChanged(sessionId: string): void {
     const previous = this.watching.get(sessionId);
     if (!previous || this.closed) return;
     const progress = this.progress(sessionId);
-    // 流式正文按块增量交付：追加只发尾部，未变化的块不重发。
+    // Deliver streaming text as block deltas: appends send only tails and unchanged blocks are not resent.
     const live = diffLive(previous.live, progress.live);
     if (!live && previous.timelineBusy === progress.timelineBusy
       && previous.busyObjectIds.length === progress.busyObjectIds.length
@@ -301,7 +301,7 @@ export class SessionService {
     return { sessionId, title, cursor, nodes, progress: this.progress(sessionId),
       workbench: this.workbench.project(sessionId, title) };
   }
-  /** 资源命令入口：事务外准备，执行时 before 在提交事务内重验对象仍在当前路径上。 */
+  /** Resource command entry: prepare outside transactions, then before rechecks current-path membership within the execution commit transaction. */
   private async invoke(sessionId: string, objectId: string, raw: ResourceCall, inputScopeId?: string): Promise<void> {
     const resource = this.object(sessionId, objectId);
     const controller = this.resources.controller(resource.kind);
@@ -309,7 +309,7 @@ export class SessionService {
     const content = this.content.fork(inputScopeId, { sessionId, objectId, resourceKind: resource.kind, contractId: raw.id });
     await this.invokeResource({ sessionId, id: objectId, kind: resource.kind }, raw, content);
   }
-  /** 前后台动作共用准备与对象队列；本次内容占用覆盖准备、排队和真实执行。 */
+  /** Frontend and backend actions share preparation and object queues; this content hold covers preparation, queuing, and actual execution. */
   private async invokeResource(ref: ResourceRef, raw: ResourceCall, content: ContentLease,
     options: { signal?: AbortSignal; check?(): void } = {}): Promise<void> {
     const pending = Symbol();
@@ -378,7 +378,7 @@ export class SessionService {
     if (object.kind !== ref.kind) throw new SessionError("invalid_request", "The resource type does not match its reference.");
     return object;
   }
-  /** 前端与插件共用身份、收束和事务检查。 */
+  /** Frontend and plugins share identity, finalization, and transaction checks. */
   private setLink(sessionId: string, receiver: ResourceRef, resource: ResourceRef, linked: boolean): void {
     this.commit(sessionId, () => {
       this.requireRef(sessionId, receiver); this.requireRef(sessionId, resource);
@@ -414,7 +414,7 @@ export class SessionService {
     const key = Symbol();
     const abortContent = () => content.controller.abort();
     signal.addEventListener("abort", abortContent, { once: true });
-    // 先登记，防止异步准备期间移动游标；成功提交始终追加到当前时间线。
+    // Register first to prevent cursor movement during asynchronous preparation; successful commits always append to the current timeline.
     let resolve!: (ref: ResourceCreationResult) => void, reject!: (error: unknown) => void;
     const done = new Promise<ResourceCreationResult>((accept, fail) => { resolve = accept; reject = fail; });
     const pending = { sessionId, controller, done };
@@ -563,11 +563,11 @@ export class SessionService {
       }
     }
   }
-  /** 首页组合入口：建立会话、创建第一个代理资源，并以代理自己的 submit 发送首条输入，整体原子提交。 */
+  /** Home composition entry: establish a session, create its first agent resource, and submit initial input through the agent's own submit in one atomic commit. */
   private starting = new Map<string, Promise<SessionReply>>();
-  /** 准备中的创建请求；取消只中止准备，不回滚已提交的事务。 */
+  /** Creation request under preparation; cancellation aborts preparation only, without rolling back committed transactions. */
   private creating = new Map<string, AbortController>();
-  /** 输入只绑定已装配契约；不提前创建对象或授予其他资源访问。 */
+  /** Input binds only assembled contracts without creating objects early or granting access to other resources. */
   openContentInput(target: ContentTarget): ContentLease {
     if (this.closed) throw new SessionError("unavailable", "The session service is closed.");
     if (target.contractId === startAgentContentTarget.contractId) {
@@ -586,7 +586,7 @@ export class SessionService {
     }
     return this.content.scope(target);
   }
-  /** 同一提交身份的并发首页发送共享一次执行。 */
+  /** Concurrent home submissions with the same submission identity share one execution. */
   private start(command: Extract<SessionCommand, { type: "start" }>): Promise<SessionReply> {
     const pending = this.starting.get(command.submissionId);
     if (pending) return pending;
@@ -594,7 +594,7 @@ export class SessionService {
     this.starting.set(command.submissionId, run);
     return run;
   }
-  /** 唯一领域例外：首页发起指名内置 agent，经正规创建与动作接口建立代理并提交首条输入。 */
+  /** Sole domain exception: home names a built-in agent, creates it through standard creation/action interfaces, and submits initial input. */
   private async startOnce(command: Extract<SessionCommand, { type: "start" }>): Promise<SessionReply> {
     const prior = this.db.prepare("SELECT session_id FROM session_submissions WHERE id = ?").get(command.submissionId) as { session_id: string } | undefined;
     if (prior) return { kind: "accepted", sessionId: prior.session_id };
@@ -611,7 +611,7 @@ export class SessionService {
         this.db.prepare("INSERT INTO session_submissions (id, session_id) VALUES (?, ?)").run(command.submissionId, sessionId);
       };
       const resource: FoldedObject = { id: agentId, kind: agentKind, title: "", data: {} };
-      // 首页首条输入同样经准备流水线；此时代理尚未创建，objectId 为将要创建的身份。
+      // Initial home input also uses the preparation pipeline; the agent is not created yet and objectId is its future identity.
       const submit = await this.prepareCommand(agentKind, resourceCall(SubmitAgentInput, { mode: "follow", submissionId: command.submissionId, parts: command.parts }), { sessionId, objectId: agentId, content });
       await this.validateInitialInput((input as { selection: AgentSelection }).selection,
         (submit.value as SubmitAgentInputData).parts, content);
@@ -619,7 +619,7 @@ export class SessionService {
       return { kind: "accepted", sessionId };
     } finally { await content.close(); }
   }
-  /** 归档与退出共用清理：中止在途创建、结束会话全部对象作用域，再标记归档时间。 */
+  /** Shared archival/exit cleanup: abort in-flight creations, end all session object scopes, then mark archive time. */
   private async archive(sessionId: string): Promise<void> {
     this.tree.cursor(sessionId);
     if (this.archiving.has(sessionId)) throw new SessionError("conflict", "This session is already being archived.");

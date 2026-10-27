@@ -17,7 +17,7 @@ import { draftSubmission, type QuestionDraft } from "./drafts";
 import { QuestionFields } from "./question-fields";
 import { submissionRows } from "./summary";
 
-/** 内联时随对话流自然撑开；放大视图内使用局部滚动区。 */
+/** Expands naturally with the conversation flow when inline; uses a local scroll area in the enlarged view. */
 export function QuestionForm({ questions, draft, update, answer, cancel, busy, failed, invalidId, setInvalidId, expanded, onEnlarge }: {
   questions: Question[]; draft: QuestionDraft; update(value: QuestionDraft): void;
   answer(value: Submission): void; cancel(): void; busy: boolean; failed: boolean;

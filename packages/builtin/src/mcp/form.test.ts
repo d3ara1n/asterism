@@ -5,27 +5,27 @@ import type { McpServerConfig } from "./contract.ts";
 const server: McpServerConfig = { id: "github", name: "GitHub", enabled: true, mode: "lazy", idleSeconds: 300,
   transport: "stdio", command: "npx", args: [], cwd: "", url: "", auth: "none" };
 
-describe("MCP 设置表单校验", () => {
-  // 新增时 ID 冲突会覆盖另一台服务器的凭据与缓存，必须在提交前按字段拒绝。
-  it("新增时拒绝已占用与不合规的 ID，编辑时不校验固定 ID", () => {
+describe("MCP settings form validation", () => {
+  // An ID collision during creation would overwrite another server's credentials and cache; reject it at the field level before submission.
+  it("rejects taken or invalid IDs on creation and does not validate the fixed ID when editing", () => {
     expect(validateDraft(draftOf(server, {}, true), ["github"])).toEqual({ ok: false, errors: { id: "idTaken" } });
     expect(validateDraft(draftOf({ ...server, id: "Git Hub" }, {}, true), [])).toEqual({ ok: false, errors: { id: "invalidId" } });
     expect(validateDraft(draftOf(server, {}, false), []).ok).toBe(true);
   });
-  // 清空空闲秒数曾被 Number("") 变成 0；lazy 必须报错，eager 不展示该字段时沿用原值。
-  it("lazy 的空闲秒数为空或越界时报错，eager 沿用原值", () => {
+  // Clearing idle seconds previously became 0 through Number(""); lazy must report an error, while eager retains the original value when the field is hidden.
+  it("reports empty or out-of-range idle seconds for lazy and retains the original value for eager", () => {
     const blank = { ...draftOf(server, {}, false), idle: "" };
     expect(validateDraft(blank, [])).toEqual({ ok: false, errors: { idle: "invalidTtl" } });
     const eager = validateDraft({ ...blank, server: { ...server, mode: "eager" } }, []);
     expect(eager.ok && eager.server.idleSeconds).toBe(300);
   });
-  // 参数与键值以原文编辑：末尾换行不产生空 argv，键值整块读回、整块写回。
-  it("保存时切分参数并解析键值，错误行按字段报告", () => {
+  // Arguments and key-value pairs are edited as raw text: a trailing newline creates no empty argv, and key-value pairs are read and written as a whole.
+  it("splits arguments and parses key-value pairs on save, reporting invalid lines by field", () => {
     const draft = { ...draftOf(server, { TOKEN: "a=b" }, false), args: "-y\n@scope/server\n" };
     expect(validateDraft(draft, [])).toMatchObject({ ok: true, server: { args: ["-y", "@scope/server"] }, credentials: { TOKEN: "a=b" } });
     expect(validateDraft({ ...draft, entries: "TOKEN" }, [])).toEqual({ ok: false, errors: { entries: "invalidEntries" } });
   });
-  it("HTTP 地址为空与协议不符分别报告", () => {
+  it("reports an empty HTTP address and an unsupported protocol separately", () => {
     const http = { ...draftOf({ ...server, transport: "http" }, {}, false) };
     expect(validateDraft(http, [])).toEqual({ ok: false, errors: { url: "required" } });
     expect(validateDraft({ ...http, server: { ...http.server, url: "ftp://host" } }, [])).toEqual({ ok: false, errors: { url: "invalidUrl" } });

@@ -10,7 +10,7 @@ import { CallPeer } from "./call-peer.ts";
 import { serve } from "./dispatch.ts";
 import type { ApplicationService } from "./service.ts";
 
-/** 一条 renderer 直连上的通道表；编号由 renderer 分配，只在本连接内有效。 */
+/** Channel table for one direct renderer connection; renderer-assigned numbers are valid only within this connection. */
 class ChannelPeer {
   private readonly open = new Map<number, OpenedChannel>();
   constructor(private readonly registry: ChannelRegistry, private readonly send: (frame: RuntimeFrame) => void) {}
@@ -53,7 +53,7 @@ function channelControl(raw: unknown): ChannelControl | null {
   return { type: "open", id: control.id, contract: control.contract, object: { sessionId: object.sessionId, id: object.id, kind: object.kind } };
 }
 
-/** renderer 直连：入口按领域结构校验一次；推送帧由受信的任务进程构造，不再逐帧校验。 */
+/** Direct renderer connection: validate domain structures once at entry; trusted task processes construct push frames without revalidating each frame. */
 export class RendererConnection {
   private readonly events: EventPeer;
   private readonly calls: CallPeer;
@@ -84,13 +84,13 @@ export class RendererConnection {
     if (frame.kind === "events") { const parsed = eventControlSchema.safeParse(frame.control); if (parsed.success) this.events.receive(parsed.data); return; }
     if (frame.kind === "calls") { const parsed = callControlSchema.safeParse(frame.control); if (parsed.success) this.calls.receive(parsed.data); }
   }
-  /** 端口关闭或 renderer 重载：结束本连接的订阅、调用与通道，释放内容传输状态。 */
+  /** Port close or renderer reload ends this connection's subscriptions, calls, and channels and releases content transfer state. */
   close() {
     if (this.closed) return;
     this.closed = true;
     this.events.close(); this.calls.close(); this.channels.close();
     void this.service.content.execute({ type: "reset" }).catch(() => {});
-    try { this.port.close(); } catch { /* 端口已关闭。 */ }
+    try { this.port.close(); } catch { /* The port is closed. */ }
     this.onClosed();
   }
 }

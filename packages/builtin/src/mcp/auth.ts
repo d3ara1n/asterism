@@ -10,7 +10,7 @@ const savedSchema = z.object({
   port: z.number().int().min(1).max(65_535).optional(),
 });
 
-/** 选取本机空闲端口；注册客户端前确定回调地址，之后持久化复用。 */
+/** Selects an available local port; determines the callback address before client registration, then persists it for reuse. */
 function freePort(): Promise<number> {
   return new Promise((resolve, reject) => {
     const probe = createServer();
@@ -25,9 +25,9 @@ function freePort(): Promise<number> {
 export interface AuthorizationRequest { url: string; callback: Promise<URLSearchParams> }
 
 /**
- * 单次连接过渡内的 OAuth provider。持久部分（客户端注册、令牌、回调端口）保存在插件 vault；
- * PKCE verifier、discovery 与 state 属于本次授权。回调监听只在需要浏览器授权时启动，收到有效回调或中止后关闭。
- * interactive 关闭后，令牌失效不再发起浏览器授权，由调用方关闭连接并在下次连接时重新授权。
+ * OAuth provider for one connection transition. Persistent state (client registration, tokens, and callback port) is saved in the plugin vault;
+ * the PKCE verifier, discovery, and state belong to this authorization attempt. The callback listener starts only when browser authorization is needed and closes after a valid callback or abort.
+ * Once interactive is disabled, expired tokens no longer trigger browser authorization; the caller closes the connection and authorizes again on the next connection.
  */
 export class McpOAuth implements OAuthClientProvider {
   private listener?: Server;
@@ -53,7 +53,7 @@ export class McpOAuth implements OAuthClientProvider {
     if (!this.port) this.port = await freePort();
     this.signal.throwIfAborted();
   }
-  /** redirectToAuthorization 交付的授权请求；每次读取后清空，下一轮连接重新判断是否需要授权。 */
+  /** Authorization request delivered by redirectToAuthorization; cleared after each read, with the next connection round reevaluating whether authorization is needed. */
   takeAuthorization(): AuthorizationRequest | undefined { const request = this.pending; this.pending = undefined; return request; }
 
   get redirectUrl() { return `http://127.0.0.1:${this.port}/callback`; }

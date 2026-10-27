@@ -5,17 +5,17 @@ import { userInputPartsSchema } from "./input.ts";
 import { agentSelectionSchema } from "./configuration.ts";
 import { agentMessageSenderSchema } from "./messaging.ts";
 
-/** 代理是普通资源：创建事件只记录身份；模型选择等可变数据属于资源私有状态。 */
+/** Agents are ordinary resources: creation events record only identity; mutable data such as model selection belongs to private resource state. */
 export const Agent = builtin.resource("agent", z.object({}));
-/** 首页发起时默认选用的内置代理预设。 */
+/** The built-in agent preset selected by default when starting from the home page. */
 export const defaultAgentPreset = "worker";
-/** 首页首次提交的宿主草稿目标；不属于可路由到已有对象的动作。 */
+/** The host draft target for the first submission from the home page; this is not an action routable to an existing object. */
 export const startAgentContentTarget = { contractId: builtin.name("session.start"), resourceKind: Agent.kind } as const;
-/** 待发送输入在请求边界或回合边界交付；空闲时直接开始执行。 */
+/** Pending input is delivered at request or turn boundaries; execution starts immediately when idle. */
 export const agentInputModeSchema = z.enum(["steer", "follow"]);
-/** 提交与草稿共用 16 位 Nano ID 身份。 */
+/** Submissions and drafts share a 16-character Nano ID identity. */
 export const submissionIdSchema = z.string().regex(/^[A-Za-z0-9_-]{16}$/u);
-/** title 可选，省略时由创建入口随机生成展示名称。 */
+/** title is optional; when omitted, the creation entry point generates a random display name. */
 export const agentCreateSchema = z.strictObject({
   selection: agentSelectionSchema,
   title: z.string().trim().min(1).max(160).optional().describe("Display title for the new Agent. When omitted, a random adjective-and-noun name such as HardStone is generated."),

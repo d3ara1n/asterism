@@ -11,17 +11,17 @@ const questions = askUserArgs.parse({ questions: [
   { id: "text", type: "text", question: "Any context?", required: false },
 ] }).questions;
 
-describe("结构化问答契约", () => {
-  // 身份唯一、推荐必须引用实际选项；否则结果无法稳定关联提问。
-  it("拒绝歧义身份及不存在的推荐，文本题不接受选择题参数", () => {
+describe("structured question-and-answer contract", () => {
+  // Identities must be unique, and recommendations must reference actual options; otherwise results cannot reliably associate with questions.
+  it("rejects ambiguous identities and nonexistent recommendations, and disallows choice parameters for text questions", () => {
     expect(askUserArgs.safeParse({ questions: [questions[0], questions[0]] }).success).toBe(false);
     expect(askUserArgs.safeParse({ questions: [{ ...questions[0], options: [choices[0], choices[0]] }] }).success).toBe(false);
     expect(askUserArgs.safeParse({ questions: [{ ...questions[0], recommendation: { optionId: "other", reason: "Reason" } }] }).success).toBe(false);
     expect(askUserArgs.safeParse({ questions: [{ ...questions[2], options: choices }] }).success).toBe(false);
   });
 
-  // 整体校验后才返回；标题来自原提问，选择、自定义与整组意见不能相互覆盖。
-  it("按原题顺序返回选择与用户原文，显式保留跳过状态", async () => {
+  // Return only after validating the whole set; titles come from the original questions, and selections, custom answers, and overall comments must not overwrite one another.
+  it("returns selections and original user text in question order and explicitly preserves skipped status", async () => {
     const service = createQuestionService(() => {});
     const waiting = service.ask(object, "call", questions, new AbortController().signal);
     const id = service.read(object).pending[0]!.id;
@@ -41,20 +41,20 @@ describe("结构化问答契约", () => {
   });
 
   const cases: [string, Question, Submission][] = [
-    ["未知题目", questions[0]!, { answers: [{ id: "unknown", status: "answered", selected: ["a"] }] }],
-    ["重复回答", questions[0]!, { answers: [1, 2].map(() => ({ id: "single", status: "answered", selected: ["a"] })) }],
-    ["必填题缺失", questions[0]!, { answers: [] }],
-    ["必填题跳过", questions[0]!, { answers: [{ id: "single", status: "skipped" }] }],
-    ["伪造选项", questions[0]!, { answers: [{ id: "single", status: "answered", selected: ["unknown"] }] }],
-    ["单选与自定义同时提交", questions[0]!, { answers: [{ id: "single", status: "answered", selected: ["a"], text: "Custom" }] }],
-    ["单选提交多项", questions[0]!, { answers: [{ id: "single", status: "answered", selected: ["a", "b"] }] }],
-    ["多选重复项", questions[1]!, { answers: [{ id: "multiple", status: "answered", selected: ["a", "a"] }] }],
-    ["多选空值冒充答案", questions[1]!, { answers: [{ id: "multiple", status: "answered", selected: [] }] }],
-    ["文本题携带选项", questions[2]!, { answers: [{ id: "text", status: "answered", selected: ["a"], text: "Text" }] }],
-    ["可选题留空冒充跳过", questions[2]!, { answers: [{ id: "text", status: "answered", selected: [] }] }],
+    ["unknown question", questions[0]!, { answers: [{ id: "unknown", status: "answered", selected: ["a"] }] }],
+    ["duplicate answers", questions[0]!, { answers: [1, 2].map(() => ({ id: "single", status: "answered", selected: ["a"] })) }],
+    ["missing required question", questions[0]!, { answers: [] }],
+    ["skipped required question", questions[0]!, { answers: [{ id: "single", status: "skipped" }] }],
+    ["forged option", questions[0]!, { answers: [{ id: "single", status: "answered", selected: ["unknown"] }] }],
+    ["single choice and custom answer submitted together", questions[0]!, { answers: [{ id: "single", status: "answered", selected: ["a"], text: "Custom" }] }],
+    ["multiple selections for a single-choice question", questions[0]!, { answers: [{ id: "single", status: "answered", selected: ["a", "b"] }] }],
+    ["duplicate multiple-choice selections", questions[1]!, { answers: [{ id: "multiple", status: "answered", selected: ["a", "a"] }] }],
+    ["empty multiple-choice selection presented as an answer", questions[1]!, { answers: [{ id: "multiple", status: "answered", selected: [] }] }],
+    ["options supplied for a text question", questions[2]!, { answers: [{ id: "text", status: "answered", selected: ["a"], text: "Text" }] }],
+    ["blank optional answer presented as skipping", questions[2]!, { answers: [{ id: "text", status: "answered", selected: [] }] }],
   ];
-  // 无效提交不得消费等待；空答案、跳过和取消各有明确语义。
-  it.each(cases)("%s不结束等待", async (_name, question, submission) => {
+  // Invalid submissions must not consume a wait; empty answers, skipping, and cancellation each have explicit semantics.
+  it.each(cases)("%s does not end the wait", async (_name, question, submission) => {
     const service = createQuestionService(() => {});
     const controller = new AbortController();
     const waiting = service.ask(object, "call", [question], controller.signal);
@@ -65,16 +65,16 @@ describe("结构化问答契约", () => {
     } finally { controller.abort(); await waiting; }
   });
 
-  // 每题始终允许自定义回答；选项不能限制用户表达。
-  it("单选可完全使用自定义答案", async () => {
+  // Every question always permits a custom answer; options must not limit user expression.
+  it("allows a single-choice question to use an entirely custom answer", async () => {
     const service = createQuestionService(() => {});
     const waiting = service.ask(object, "custom", [questions[0]!], new AbortController().signal);
     service.answer(object, service.read(object).pending[0]!.id, { answers: [{ id: "single", status: "answered", selected: [], text: "Neither; use another approach" }] });
     await expect(waiting).resolves.toMatchObject({ kind: "succeeded", data: { answers: [{ selected: [], text: "Neither; use another approach" }] } });
   });
 
-  // 同一 Agent 多组提问独立，取消不提交部分草稿、不消费其他等待。
-  it("取消只结束指定实例，变化事件和工具过程态关联同一等待身份", async () => {
+  // Multiple question sets for the same Agent are independent; cancellation neither submits partial drafts nor consumes other waits.
+  it("cancellation ends only the specified instance, and change events and tool progress refer to the same waiting identity", async () => {
     const events: string[][] = [];
     const published: string[] = [];
     const service = createQuestionService((_object, pending) => { events.push(pending.map(item => item.id)); });
@@ -89,8 +89,8 @@ describe("结构化问答契约", () => {
     await second;
   });
 
-  // 通知不回滚已受理答案，否则 UI 提交成功而模型收到工具失败。
-  it("结束通知失败仍交付已受理答案，记录错误且快照可恢复界面", async () => {
+  // Notifications do not roll back accepted answers; otherwise UI submission would succeed while the model receives a tool failure.
+  it("delivers accepted answers even if completion notification fails, logs the error, and allows snapshots to restore the UI", async () => {
     const error = new Error("Event delivery failed.");
     const log = vi.spyOn(console, "error").mockImplementation(() => {});
     const service = createQuestionService((_object, pending) => { if (!pending.length) throw error; });
@@ -109,8 +109,8 @@ describe("结构化问答契约", () => {
     }
   });
 
-  // 数据兼容：新版展示继续解码原有工具记录，不改写已保存结果。
-  it("继续解码旧版文本答案", () => {
+  // Data compatibility: the new display continues to decode existing tool records without rewriting saved results.
+  it("continues to decode legacy text answers", () => {
     expect(AskUserResult.schema.parse({ answer: "Legacy answer" })).toEqual({ answer: "Legacy answer" });
     const legacy = { answers: [{ id: "text", question: "Any context?", type: "text", status: "answered", selected: [], text: "Context", comment: "Original qualification" }] };
     expect(AskUserResult.schema.parse(legacy)).toEqual(legacy);

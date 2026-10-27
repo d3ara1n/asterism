@@ -19,7 +19,7 @@ export class ViewRegistry {
   private readonly cards: ReadonlyMap<string, CardRenderer>;
   private readonly tools: ReadonlyMap<string, ToolRenderer>;
   private readonly records: ReadonlyMap<string, RecordRenderer>;
-  /** 创建入口单独索引，按装配顺序保留，供菜单与拖放仲裁使用。 */
+  /** Index creation entries separately and retain assembly order for menus and drag-and-drop arbitration. */
   readonly creations: readonly CreationEntry[];
   constructor(modules: readonly RendererModule[]) {
     for (const resource of modules.flatMap(module => module.resources)) {
@@ -49,7 +49,7 @@ export class ViewRegistry {
   card(presentation: Presentation, context?: RendererObjectContext): CardView | null {
     return this.cards.get(presentation.contract.id)?.resolve(presentation.data, context) ?? null;
   }
-  /** 未注册或解码失败返回 null，由宿主显示未知记录；单个视图抛错同样按未知处理。 */
+  /** Return null for unregistered contracts or decoding failure so the host displays an unknown record; errors from individual views are also treated as unknown. */
   record(record: SessionRecord, context: RecordRenderContext): RecordView | null {
     try { return this.records.get(record.contract.id)?.resolve(record, context) ?? null; }
     catch (error) { console.error(`Record view ${record.contract.id} failed.`, error); return null; }

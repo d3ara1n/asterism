@@ -18,13 +18,13 @@ export function validateProviderTransport(provider: ModelProviderInput): void {
   const loopback = ["localhost", "[::1]", "::1"].includes(endpoint.hostname) || /^127(?:\.\d{1,3}){3}$/.test(endpoint.hostname);
   if (provider.auth === "api_key" && endpoint.protocol !== "https:" && !loopback) throw new ProviderTransportError();
 }
-/** 连接测试与真实执行共用传输边界；不回退环境凭据，不自动跟随重定向。 */
+/** Connection tests and real execution share a transport boundary without environment credential fallback or automatic redirects. */
 export function createProviderModel(provider: ModelProviderInput, model: ProviderModel, key: string, transport: typeof fetch = fetch, identity: ModelRequestIdentity = {}) {
   validateProviderTransport(provider);
   const identityHeaders = modelRequestHeaders({ provider, model }, identity);
   const scopedFetch: typeof fetch = (url, init) => {
     const headers = new Headers(init?.headers);
-    // 最终发送边界覆盖 SDK 自动生成或追加的 UA，保持调用方／兼容包声明的原值。
+    // Override SDK-generated or appended UAs at final transmission to preserve the caller/compatibility package's declared value.
     identityHeaders.forEach((value, name) => headers.set(name, value));
     if (provider.auth === "none") { headers.delete("authorization"); headers.delete("x-api-key"); }
     return transport(url, { ...init, headers, redirect: "error" });

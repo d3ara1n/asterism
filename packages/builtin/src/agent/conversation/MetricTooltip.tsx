@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@asterism/ui/ui/tooltip";
 
-/** 只读计量：悬停或键盘聚焦查看详情，不提供点击操作。 */
+/** Read-only measurements: hover or keyboard focus reveals details; no click action is provided. */
 export function MetricTooltip({ label, icon, value, children }: {
   label: string; icon: ReactNode; value: string; children: ReactNode;
 }) {

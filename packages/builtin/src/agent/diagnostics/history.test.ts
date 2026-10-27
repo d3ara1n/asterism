@@ -8,10 +8,10 @@ import { diagnosticHistory } from "./history.ts";
 
 const completion: ModelCompletion = { finishReason: "stop", rawFinishReason: null, providerResponseId: "upstream-id",
   usage: { input: 100, output: 10, total: 110, cacheRead: 0, cacheWrite: 0, reasoning: 0 } };
-// 诊断契约：按实际响应身份计数，用真实父链区分分支。
-describe("代理诊断历史", () => {
-  // 只有用户输入不构成已保存响应；成功摘要的真实计时仍可消费。
-  it("无回复时没有诊断请求，成功压缩保留计时", () => {
+// Diagnostics contract: count by actual response identity and distinguish branches using the real parent chain.
+describe("Agent diagnostic history", () => {
+  // User input alone is not a saved response; actual timing from successful summaries remains consumable.
+  it("No diagnostic request exists without a reply, while successful compression retains timing", () => {
     const timing = { startedAt: "2026-01-01T00:00:00.000Z", endedAt: "2026-01-01T00:00:01.000Z", durationMs: 1000,
       firstOutputMs: null, firstTextMs: null, firstReasoningMs: null, lastOutputMs: null, outputChunks: 0, outcome: "failed" };
     const nodes = [
@@ -25,7 +25,7 @@ describe("代理诊断历史", () => {
     expect(result.requests[0]).toMatchObject({ kind: "compression", completion: { timing: { outcome: "completed" } }, sent: null });
     expect(result.unreadable).toBe(0);
   });
-  it("乱序保存的响应块只计一个请求，当前路径与全分支不重复公共祖先", () => {
+  it("Response blocks saved out of order count as one request, and current-path and all-branch views do not duplicate shared ancestors", () => {
     const nodes = [
       node("input", null, message("a", "Start")),
       node("last", "input", text("a", "shared", 2, "Done", { requestParentId: "input", completion })),
@@ -48,8 +48,8 @@ describe("代理诊断历史", () => {
     expect(all.requests.map(request => [request.responseId, request.onTimeline])).toEqual([["branch-b", false], ["branch-a", true], ["shared", true]]);
   });
 
-  // 无法解码的记录独立报告，不能污染实际响应计量。
-  it("无法解码的记录保持可见，不参与实际请求计量", () => {
+  // Undecodable records are reported separately and cannot contaminate actual response measurements.
+  it("Undecodable records remain visible without contributing to actual request measurements", () => {
     const nodes = [
       node("input", null, message("a", "Start")),
       node("answer", "input", text("a", "r", 0, "Done", { requestParentId: "input", completion })),
@@ -64,7 +64,7 @@ describe("代理诊断历史", () => {
     expect(result.unreadable).toBe(1);
   });
 
-  it("输入模态沿请求真实父链判断，压缩移除旧附件后不再影响新请求", () => {
+  it("Determines input modalities along the request's actual parent chain; old attachments removed by compression no longer affect new requests", () => {
     const file = { kind: "file", file: { "$asterism.content": "00000000-0000-4000-8000-000000000001" }, mediaType: "image/png" };
     const nodes = [
       node("file", null, event(AgentInputMessage.id, { sender: { kind: "user" }, startsTurn: true, parts: [file] }, { source: agentSource("a") })),
@@ -80,8 +80,8 @@ describe("代理诊断历史", () => {
     expect(result.requests.find(request => request.responseId === "branch")?.inputHasFiles).toBe(true);
   });
 
-  // 诊断来自同一终态；回溯到块就有完整资料。
-  it("请求诊断随终态保存，回溯和分支只消费自身扩展", () => {
+  // Diagnostics come from the same terminal state; rewinding to a block provides the complete data.
+  it("Request diagnostics are saved with terminal state, and rewound paths and branches consume only their own extensions", () => {
     const sent = { system: [{ kind: "agent", role: "worker", characters: 4 }], tools: ["resource_list"] };
     const nodes = [
       node("input", null, message("a", "Start")),

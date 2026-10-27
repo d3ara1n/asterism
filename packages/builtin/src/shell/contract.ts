@@ -4,7 +4,7 @@ import { builtin, configurationIdSchema } from "@asterism/builtin-api/contracts"
 export const OUTPUT_CHAR_LIMIT = 16_384;
 export const MAX_TIMEOUT_SECONDS = 2_147_483_647 / 1000;
 
-/** 启动参数与命令参数分开，profile 可供不同 shell 使用方式共享。 */
+/** Startup arguments and command arguments are separate, allowing a profile to be shared across different shell usage modes. */
 export const shellProfileSchema = z.strictObject({
   id: configurationIdSchema.refine(value => value !== "auto", "The profile ID 'auto' is reserved."),
   executable: z.string().trim().min(1),
@@ -69,7 +69,7 @@ export const execResultSchema = shellOutputSchema.extend({
 }).describe("Processed shell output, optional temporary log location and execution status.");
 export type ExecResult = z.infer<typeof execResultSchema>;
 
-/** 模型消费输出正文与截断提示；执行信息由 UI 展示，非成功说明由公共工具层生成。 */
+/** The model consumes output text and truncation notices; the UI shows execution information, and the shared tool layer generates explanations for unsuccessful outcomes. */
 export function execToModel(data: ExecResult): string {
   const notice = data.truncation
     ? `\n\n[Output truncated: showing the last ${data.truncation.retainedChars} of ${data.truncation.totalChars} Unicode characters. Full output: ${data.truncation.file}]`

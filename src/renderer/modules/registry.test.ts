@@ -14,9 +14,9 @@ const tool = toolRenderer(data, { result: { bodyRenderer: Body } });
 const card = cardRenderer(data, { width: 340, height: 200, Body: Text });
 const props = (value: Json): ToolResultRenderProps => ({ phase: "settled", name: "sample", target: null, args: {}, invocation: {}, result: { kind: "succeeded", data: value } });
 
-describe("视图契约分派", () => {
-  // SDK 面板与主体共享校验后的投影和对象身份；解析只创建元素，不启动面板订阅或读取。
-  it("辅助面板绑定同一对象和投影，未挂载时不执行组件", () => {
+describe("View contract dispatch", () => {
+  // SDK panels and the body share a validated projection and object identity; resolution only creates elements and does not start panel subscriptions or reads.
+  it("binds auxiliary panels to the same object and projection without executing components before mounting", () => {
     const Panel = vi.fn((_props: { data: { text: string } }) => null);
     const context = { ref: { id: "object", sessionId: "session", kind: "test.text" } } as RendererObjectContext;
     const renderer = cardRenderer(data, { width: 340, height: 200, Body: Text,
@@ -37,8 +37,8 @@ describe("视图契约分派", () => {
     expect(Panel).not.toHaveBeenCalled();
     expect(renderer.resolve({ text: 7 }, context)).toBeNull();
   });
-  // 面板按卡片内的稳定 ID 导航；重复或空 ID 会让选择目标不明确，其他卡片可复用同名 ID。
-  it("面板 ID 在卡片内唯一，未声明面板的既有卡片保持兼容", () => {
+  // Panels navigate by stable IDs within a card; duplicate or empty IDs make selection ambiguous, while other cards can reuse the same IDs.
+  it("panel IDs are unique within each card, and existing cards without panel declarations remain compatible", () => {
     const panel = { id: "details", label: "Details", icon: null, Body: Text };
     expect(() => cardRenderer(data, { width: 340, height: 200, Body: Text, panels: [panel, panel] })).toThrow("Duplicate card panel ID");
     expect(() => cardRenderer(data, { width: 340, height: 200, Body: Text, panels: [{ ...panel, id: " " }] })).toThrow();
@@ -47,7 +47,7 @@ describe("视图契约分派", () => {
     expect(card.resolve({ text: "saved" })?.panels).toBeUndefined();
   });
 
-  it("填充视图独立可选，不把未完成参数交给完整参数的 renderer", () => {
+  it("input views are independently optional and do not pass incomplete arguments to renderers expecting complete arguments", () => {
     const Header = vi.fn(() => null);
     const Preview = (_props: ToolInputRenderProps) => null;
     const contract = { ...data, targetSchema: z.object({ path: z.string() }), tool: { argsSchema: z.object({ content: z.string() }) } };
@@ -61,7 +61,7 @@ describe("视图契约分派", () => {
     expect(renderer.resolve({ ...input, phase: "ready" })).toBeNull();
     expect(Header).not.toHaveBeenCalled();
   });
-  it("按身份选择组件，数据通过 schema 才进入组件", () => {
+  it("selects components by identity and passes data to components only after schema validation", () => {
     const registry = new ViewRegistry([{ resources: [], cards: [card], tools: [tool] }]);
     const node = registry.tool(reference(data), props({ text: "saved" }))?.body;
     expect(isValidElement(node) && node.type).toBe(Body);
@@ -72,7 +72,7 @@ describe("视图契约分派", () => {
     expect(registry.card({ contract: reference(data), data: { text: 7 } })).toBeNull();
     expect(new ViewRegistry([]).card(present(data, { text: "saved" }))).toBeNull();
   });
-  it("header 与 body 独立覆盖，收到同一份过程或终结结果，尚无产出时也能渲染摘要", () => {
+  it("overrides header and body independently, gives both the same progress or final result, and can render a summary before output exists", () => {
     for (const definition of [{ headerRenderer: Header }, { bodyRenderer: Body }, { headerRenderer: Header, bodyRenderer: Body }, {}]) {
       const renderer = toolRenderer(data, { input: definition, execution: definition, result: definition });
       for (const input of [
@@ -91,7 +91,7 @@ describe("视图契约分派", () => {
       }
     }
   });
-  it("拒绝重复注册；当前 schema 可自行兼容旧数据形状", () => {
+  it("rejects duplicate registrations, while the current schema can support older data shapes", () => {
     expect(() => new ViewRegistry([{ resources: [], cards: [card, card], tools: [] }])).toThrow();
     expect(() => new ViewRegistry([{ resources: [], cards: [], tools: [tool, tool] }])).toThrow();
     const current = defineData(data.id, z.union([z.strictObject({ content: z.string() }),
@@ -100,14 +100,14 @@ describe("视图契约分派", () => {
     expect(registry.tool(reference(data), props({ text: "old" }))).not.toBeNull();
     expect(registry.tool(reference(current), props({ content: "new" }))).not.toBeNull();
   });
-  it("资源识别不调用正文解析，缺少卡片或资源实例时仍可取得描述", () => {
+  it("resource identification does not parse the body, and descriptions remain available without a card or resource instance", () => {
     const resolve = vi.fn(() => null);
     const ns = pluginNamespace("example.text");
     const label = ns.messages("en", { name: { id: "type.name", defaultMessage: "Text" } }).name;
     const descriptor = { kind: "text", label, icon: null };
     const registry = new ViewRegistry([{ resources: [descriptor], cards: [{ contract: reference(data), resolve }], tools: [] }]);
     expect(registry.resource("text")).toBe(descriptor);
-    // 依据资源展示目录与 i18n 契约：枚举保留提供方消息归属，消费时再按语言格式化。
+    // Based on the resource presentation catalog and i18n contracts: enumeration preserves provider message ownership, and formatting by language occurs at consumption.
     expect(registry.resourceDescriptions()).toEqual([descriptor]);
     expect(registry.resourceDescriptions()[0]!.label).toMatchObject({ owner: ns.id, id: "type.name", defaultMessage: "Text" });
     expect(resolve).not.toHaveBeenCalled();
@@ -116,7 +116,7 @@ describe("视图契约分派", () => {
     expect(() => new ViewRegistry([{ resources: [descriptor, descriptor], cards: [], tools: [] }])).toThrow();
   });
 
-  it("三态按同级入口分派，等待使用执行视图，缺少阶段不会借用其他阶段", () => {
+  it("dispatches the three states through peer entries, uses the execution view for waiting, and does not borrow another phase when one is missing", () => {
     const Input = () => null, Execution = () => null, Result = () => null;
     const renderer = toolRenderer(data, {
       input: { headerRenderer: Input }, execution: { headerRenderer: Execution }, result: { headerRenderer: Result },

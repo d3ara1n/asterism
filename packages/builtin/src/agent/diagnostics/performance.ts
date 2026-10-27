@@ -15,7 +15,7 @@ export function outputDuration(timing: RequestTiming | undefined): number | null
   return duration >= 0 ? duration : null;
 }
 
-/** 速率的分子和分母必须来自同一次完整计量；缺失数据不按零处理。 */
+/** A rate's numerator and denominator must come from the same complete measurement; missing data is not treated as zero. */
 export function rateSamples(timing: RequestTiming | undefined, usage: Usage | null): Record<RateKey, RateSample | null> {
   const samples: Record<RateKey, RateSample | null> = { output: null, nonReasoning: null, reasoning: null, total: null, streaming: null };
   if (!timing || timing.outcome !== "completed" || !(timing.durationMs > 0) || !usage) return samples;
@@ -28,8 +28,8 @@ export function rateSamples(timing: RequestTiming | undefined, usage: Usage | nu
       samples.nonReasoning = sample(usage.output - usage.reasoning);
     }
     const duration = outputDuration(timing);
-    // 服务商明确报告无思考且未观察到思考时，输出总量才与可见接收区间相符。
-    // 首包可能包含多个 token，不能机械扣除一个 token，故始终标为估算。
+    // Only when the provider explicitly reports no thinking and none was observed does total output match the visible reception interval.
+    // The first packet may contain multiple tokens, so subtracting one token mechanically is invalid; the rate is always labeled an estimate.
     if (usage.output > 0 && usage.reasoning === 0 && timing.firstReasoningMs === null
       && timing.outputChunks > 1 && duration !== null && duration > 0)
       samples.streaming = { tokens: usage.output, durationMs: duration };
@@ -43,7 +43,7 @@ export function tokensPerSecond(sample: RateSample | null): number | null {
   return Number.isFinite(rate) ? rate : null;
 }
 
-/** 各指标只汇总具有该指标完整数据的请求，不平均各次 TPS。 */
+/** Each metric aggregates only requests with complete data for that metric, without averaging individual TPS values. */
 export function performanceOverview(requests: readonly DiagnosticRequest[]) {
   let durationMs = 0, timed = 0;
   const rates = Object.fromEntries(rateKeys.map(key => [key, { tokens: 0, durationMs: 0, count: 0 }])) as Record<RateKey, RateSample & { count: number }>;

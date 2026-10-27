@@ -5,7 +5,7 @@ import { FilesystemError, failed } from "./errors.ts";
 import type { SearchRecords } from "./search-output.ts";
 import type { SearchStopReason } from "./search-contract.ts";
 
-/** Forge 解包后，OS 进程使用实体可执行文件路径；开发路径保持原样。 */
+/** After Forge unpacking, OS processes use the physical executable path; development paths remain unchanged. */
 export function executablePath(path: string): string {
   return path.replace(/([\\/])([^\\/]+\.asar)(?=[\\/])/g, "$1$2.unpacked");
 }
@@ -28,12 +28,12 @@ export function searchArguments(kind: "find" | "grep", args: FindArgs | GrepArgs
     for (const glob of grep.glob ?? []) flags.push("--glob", glob);
     flags.push("--regexp", grep.pattern);
   }
-  // 放在用户 glob 之后，隐藏／忽略开关也不会把 Git 元数据纳入递归搜索。
+  // Place after user globs so hidden/ignore switches cannot include Git metadata in recursive searches.
   flags.push("--glob", "!.git", "--", operand);
   return flags;
 }
 
-/** 单个 rg 子进程无 shell；取消或达到输出预算后结束进程，等待管道关闭再交付结果。 */
+/** A single rg subprocess without a shell; cancellation or reaching the output budget ends the process, and results are delivered after pipes close. */
 export async function runSearch(cwd: string, argv: string[], records: SearchRecords, signal: AbortSignal): Promise<SearchStopReason> {
   signal.throwIfAborted();
   return new Promise<SearchStopReason>((resolve, reject) => {

@@ -16,7 +16,7 @@ const fields = {
   cost: modelCostMessages.title,
 };
 
-/** 模型设置中的参数获取与结果展示；失败不被随后配置读取清掉。 */
+/** Parameter fetching and result display in model settings; subsequent configuration reads do not clear failures. */
 export function useModelParameters(model: ProviderModel | undefined, disabled: boolean, onUpdated: (model: ProviderModel) => void) {
   const i18n = useI18n();
   const { run, busy: pending, error } = useConfigurationAction("inline");

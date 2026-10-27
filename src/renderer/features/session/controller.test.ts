@@ -31,9 +31,9 @@ function fixture() {
 }
 const command = (objectId: string) => ({ type: "resource.command" as const, sessionId: "s", objectId, command: resourceCall(ContinueAgent, {}) });
 
-// 打开后直接接收当前数据变化，局部操作不读取完整历史或改变工作台加载状态。
-describe("会话当前数据", () => {
-  it("资源变化只替换对应对象，动作回执不发起读取", async () => {
+// After opening, receive current data changes directly; local operations neither read complete history nor change workbench loading state.
+describe("Current session data", () => {
+  it("resource changes replace only the corresponding object, and action receipts do not initiate reads", async () => {
     const f = fixture(), initial = data();
     const object = (id: string) => ({ id, kind: "test/resource", title: id, presentation: { contract: { id: "test/view" }, data: { mode: "none" } } });
     initial.workbench.objects = [object("a"), object("b")];
@@ -52,7 +52,7 @@ describe("会话当前数据", () => {
     disconnect();
   });
 
-  it("不同对象的调用不互相等待，失败只交给发起入口", async () => {
+  it("calls for different objects do not wait for one another, and failures reach only the initiating entry", async () => {
     const f = fixture(), disconnect = f.open();
     const a = f.controller.execute(command("a")), b = f.controller.execute(command("b"));
     expect(f.requests).toHaveLength(3);
@@ -63,7 +63,7 @@ describe("会话当前数据", () => {
     disconnect();
   });
 
-  it("初始数据之后的变化直接生效，不比较版本或丢弃后重读", () => {
+  it("applies changes directly after initial data without comparing versions or discarding and rereading", () => {
     const f = fixture(), disconnect = f.open();
     f.notify({ kind: "session.changed", sessionId: "s", nodes: [], cursor: null, title: "Renamed", objects: [] });
     f.notify({ kind: "session.progress", sessionId: "s", busyObjectIds: ["a"], timelineBusy: false, live: null });
@@ -73,8 +73,8 @@ describe("会话当前数据", () => {
     disconnect();
   });
 
-  // 成型记录先交付，随后移除对应流式块；保存节点不丢失。
-  it("历史追加与流式块结束按消息顺序交付", () => {
+  // Deliver finalized records first, then remove the corresponding streaming blocks; saved nodes are not lost.
+  it("delivers history appends and streaming block endings in message order", () => {
     const f = fixture(), disconnect = f.open();
     const block = { id: "r:0", objectId: "a", responseId: "r", ordinal: 0, kind: "text" as const, text: "Hello", endedAt: null };
     f.notify({ kind: "session.progress", sessionId: "s", busyObjectIds: ["a"], timelineBusy: false, live: { order: [block.id], changes: [{ id: block.id, kind: "put", block }] } });
@@ -87,8 +87,8 @@ describe("会话当前数据", () => {
     disconnect();
   });
 
-  // 流式进度：输入阶段的工具参数只以 argumentsText 增量传输，前端推导预览；参数文本只发送追加部分。
-  it("输入阶段工具参数由前端从追加的参数文本推导，进入 ready 后采用后台完整参数", () => {
+  // Streaming progress: input-phase tool arguments are transmitted only as argumentsText deltas, and the frontend derives previews; only appended argument text is sent.
+  it("derives input-phase tool arguments on the frontend from appended argument text, then uses complete backend arguments upon entering ready", () => {
     const f = fixture(), disconnect = f.open();
     const block = { id: "r:0", objectId: "a", responseId: "r", ordinal: 0, kind: "toolcall" as const, name: "write", argumentsText: '{"path":"a.txt","content":"hel',
       arguments: null, state: "input" as const, invocation: null, result: null };
@@ -101,8 +101,8 @@ describe("会话当前数据", () => {
     disconnect();
   });
 
-  // 流式增量逐 token 到达：其他对象的实时块与运行状态若每次换新身份，所有卡片和忙碌订阅者都会随之重渲染。
-  it("一个对象的增量不改变其他对象的实时块与未变化的运行状态身份", () => {
+  // Streaming deltas arrive token by token: if other objects' live blocks and running states acquire new identities each time, all cards and busy subscribers rerender.
+  it("a delta for one object preserves the identities of other objects' live blocks and unchanged running state", () => {
     const f = fixture(), disconnect = f.open();
     const a = { id: "r:0", objectId: "a", responseId: "r", ordinal: 0, kind: "text" as const, text: "A", endedAt: null };
     const b = { id: "q:0", objectId: "b", responseId: "q", ordinal: 0, kind: "text" as const, text: "B", endedAt: null };
@@ -121,7 +121,7 @@ describe("会话当前数据", () => {
     disconnect();
   });
 
-  it("回溯只在调用期间阻止旧路径操作，目标数据由变化消息交付", async () => {
+  it("rewinding blocks old-path operations only during the call, with target data delivered through change messages", async () => {
     const f = fixture(), disconnect = f.open();
     const selected = f.controller.branchFrom(null);
     expect(f.controller.getSnapshot().navigating).toBe(true);
@@ -133,8 +133,8 @@ describe("会话当前数据", () => {
     disconnect();
   });
 
-  // 卸载取消接收旧结果，重开只认新连接的数据。
-  it("断开后迟到的打开结果不影响新连接", async () => {
+  // Unmounting cancels receipt of old results; reopening accepts only data from the new connection.
+  it("a late open result after disconnection does not affect the new connection", async () => {
     const f = fixture();
     const oldDisconnect = f.controller.connect(), oldListener = f.listener();
     oldDisconnect();
@@ -145,7 +145,7 @@ describe("会话当前数据", () => {
     disconnect();
   });
 
-  it("打开失败独立反馈，主动重试重新取得当前数据", async () => {
+  it("reports open failures independently, and explicit retries retrieve current data again", async () => {
     const f = fixture(), disconnect = f.controller.connect();
     f.requests[0]!.resolve({ ok: false, error: { code: "not_found", message: "Missing session." } }); await flush();
     expect(f.controller.getSnapshot()).toMatchObject({ status: "error", missing: true });
@@ -156,7 +156,7 @@ describe("会话当前数据", () => {
     disconnect();
   });
 
-  it("最后一个查看者断开后退订，在途调用结束再释放", async () => {
+  it("unsubscribes after the last viewer disconnects and releases after in-flight calls finish", async () => {
     const f = fixture(), a = f.open(), b = f.controller.connect();
     const pending = f.controller.execute(command("a"));
     a(); expect(f.requests.map(item => item.command.type)).not.toContain("unwatch");

@@ -14,19 +14,19 @@ import { arrangeObjects } from "./arrange";
 
 export type ObjectPlacement = { sessionId: string; position: Point; selectedObjectIds: string[] };
 
-/** 工作台画布的公共入口；屏幕尺寸、测量、动画与保存由画布管理。 */
+/** Public workbench canvas entry; the canvas manages screen dimensions, measurement, animation, and saving. */
 export interface WorkbenchCanvas {
-  /** 没有指定落点时找最近空位；未就绪时返回 null。选择在取用位置时固定。 */
+  /** Find the nearest free position when none is specified; return null when not ready. Capture the selection when obtaining the position. */
   findPlacement: (options?: { kind?: string; size?: CardSize }) => ObjectPlacement | null;
-  /** 打开隐藏对象，等待投影和测量后共同入镜；空列表或失效对象不移动视图。 */
+  /** Open hidden objects, wait for projection and measurement, then frame them together; empty lists or invalid objects do not move the viewport. */
   locateObjects: (objectIds: readonly string[], options?: { select?: boolean }) => Promise<void>;
-  /** 显式整理当前可见卡片，保存全部位置后共同入镜。 */
+  /** Explicitly arrange currently visible cards, save all positions, then frame them together. */
   arrange: () => Promise<void>;
 }
 
 type LocateRequest = { objectIds: string[]; select: boolean; token: number };
 
-/** 下游只消费 WorkbenchCanvas；React Flow 的视口操作与等待集中在此。 */
+/** Downstream code consumes only WorkbenchCanvas; React Flow viewport operations and waits are centralized here. */
 export function useWorkbenchCanvas(nodes: ObjectNodeType[], setNodes: Dispatch<SetStateAction<ObjectNodeType[]>>, element: RefObject<HTMLDivElement | null>, active: boolean) {
   const { session, controller, run, ready } = useWorkbench();
   const registry = useModuleViews();
@@ -58,7 +58,7 @@ export function useWorkbenchCanvas(nodes: ObjectNodeType[], setNodes: Dispatch<S
     const center = { x: (host.clientWidth / 2 - viewport.x) / viewport.zoom, y: (host.clientHeight / 2 - viewport.y) / viewport.zoom };
     const appearance = options.kind ? registry.resource(options.kind).card ?? fallbackCardAppearance : fallbackCardAppearance;
     const current = flow.getNodes();
-    // 新增预留展开尺寸，折叠后的测量高度不会成为未来展开时的占位上限。
+    // Reserve expanded dimensions for new items; measured collapsed height must not become the space limit for future expansion.
     const views = new Map(state.data?.workbench.views.map(view => [view.objectId, view]));
     const occupied = current.map(node => {
       const appearance = registry.card(node.data.object.presentation) ?? fallbackCardAppearance;
@@ -92,7 +92,7 @@ export function useWorkbenchCanvas(nodes: ObjectNodeType[], setNodes: Dispatch<S
       if (!hidden.has(objectId)) continue;
       if (!valid() || !operationSucceeded(await controller.execute({ type: "view.set", sessionId: controller.sessionId, objectId, hidden: false }))) return;
     }
-    // 受理与节点投影分离；画布等待全部目标测量，而非猜测某一帧已经渲染完。
+    // Acceptance is separate from node projection; the canvas waits for all targets to be measured instead of guessing that a particular frame has finished rendering.
     if (valid()) setLocating({ objectIds, select: options?.select ?? false, token });
   }, [controller]);
 
@@ -114,7 +114,7 @@ export function useWorkbenchCanvas(nodes: ObjectNodeType[], setNodes: Dispatch<S
       }), state.data.workbench.links, scope.signal);
       scope.signal.throwIfAborted();
       if (!await run({ type: "views.position", sessionId: controller.sessionId, positions }) || scope.signal.aborted) return;
-      // 整理后的入镜只取仍可见的参与对象，沿用用户在计算期间作出的隐藏或移除操作。
+      // Framing after arrangement includes only participating objects still visible, honoring hiding or removal performed by the user during calculation.
       const latest = controller.getSnapshot().data?.workbench;
       const hidden = new Set(latest?.views.filter(view => view.hidden).map(view => view.objectId));
       const visible = new Set(latest?.objects.filter(object => !hidden.has(object.id)).map(object => object.id));

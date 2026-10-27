@@ -24,7 +24,7 @@ import { createSendTool } from "./send/runtime.ts";
 import { createWaitTool } from "./wait/runtime.ts";
 import type { SkillCatalog } from "../skills/catalog.ts";
 
-/** 资源入口只装配领域模块与贡献；业务模块不依赖完整插件上下文。 */
+/** The resource entry point only assembles domain modules and contributions; business modules do not depend on the full plugin context. */
 export function createAgentModule(application: BuiltinApplication, usage: UsageConsumer, skills: SkillCatalog) {
   return defineModule(plugin => {
     const systemPrompt = (agent: Parameters<typeof composeSystemPrompt>[0]) => {
@@ -37,7 +37,7 @@ export function createAgentModule(application: BuiltinApplication, usage: UsageC
     const loop = createAgentLoop({ selection, tasks: plugin.tasks, models: plugin.models, systemPrompt, userAgent: application.userAgent,
       usage, feedback });
     const admission = createAdmission({ selection, validate: plugin.models.validate, running: loop.running, systemPrompt });
-    // 草稿与配置更新复用当前路径的回合状态；历史位置改变时才重新推导。
+    // Draft and configuration updates reuse the current path's turn state; rederive it only when the history position changes.
     const turns = new Map<string, { nodeId: string | null; interruptions: readonly (string | null)[]; state: AgentTurnState }>();
     return {
       events: [AgentSoftwareFeedback],

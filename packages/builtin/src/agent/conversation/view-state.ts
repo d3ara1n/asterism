@@ -1,7 +1,7 @@
 import type { RendererViewStateEntry } from "@asterism/sdk/renderer";
 import { ConversationHistoryWindow } from "./history-window";
 
-/** 对话时间线的条目视图状态：按 `timelineKey` 分条目保存，由代理对象保留，条目随滚动重新挂载时恢复。 */
+/** Conversation timeline item view state: saved per item by `timelineKey`, retained by the agent object, and restored when items remount during scrolling. */
 export class TimelineViewState {
   private entries = new Map<string, RendererViewStateEntry>();
   openProcesses: ReadonlySet<string> = new Set();
@@ -13,7 +13,7 @@ export class TimelineViewState {
   }
 }
 
-/** 视图状态 key：内置贡献以插件 ID 为前缀。 */
+/** View-state key: built-in contributions use the plugin ID as a prefix. */
 export const viewStateKeys = {
   disclosure: "asterism.builtin/disclosure",
   toolDetails: "asterism.builtin/tool-details",

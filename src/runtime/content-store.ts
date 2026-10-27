@@ -7,7 +7,7 @@ import { belongsTo, contentRefSchema, type ContentRef, type ContentRange, type J
 import { PluginApiError, type ContentReader, type ContentScope } from "@asterism/sdk/runtime";
 import { contentChunkSize, contentReadLimit } from "../shared/content.ts";
 
-/** 宿主实现参数：单块 1 MiB、单份 256 MiB、临时总额 1 GiB、单次 read 16 MiB。 */
+/** Host implementation parameters: 1 MiB per chunk, 256 MiB per content item, 1 GiB temporary total, 16 MiB per read. */
 export const contentLimits = { chunk: contentChunkSize, read: contentReadLimit, file: 256 * 1024 * 1024, temporary: 1024 * 1024 * 1024, scopes: 128, uploads: 16 } as const;
 export const contentSchemaSql = `
   CREATE TABLE contents (id TEXT PRIMARY KEY, digest TEXT NOT NULL UNIQUE, size INTEGER NOT NULL) STRICT;
@@ -37,7 +37,7 @@ interface Upload { id: string; scope: ContentLease; file: FileHandle; path: stri
 const unavailable = (message: string): never => { throw new PluginApiError("unavailable", message); };
 const invalid = (message: string): never => { throw new PluginApiError("invalid_argument", message); };
 
-/** 只识别完整的 SDK 引用值；schema 字段定义等普通 JSON 继续递归扫描。 */
+/** Recognize complete SDK reference values only; continue recursively scanning ordinary JSON such as schema field definitions. */
 export function contentReferences(value: Json): ContentRef[] {
   const refs = new Map<string, ContentRef>();
   const pending: Json[] = [value];
@@ -57,7 +57,7 @@ export function contentReferences(value: Json): ContentRef[] {
   return [...refs.values()];
 }
 
-/** 草稿和尝试是独立占用；关闭等真实 IO 结束后才释放。 */
+/** Drafts and attempts hold independently; close releases holds only after actual IO finishes. */
 export class ContentLease {
   readonly id = randomUUID();
   readonly refs = new Set<string>();
@@ -88,14 +88,14 @@ export class ContentLease {
   }
 }
 
-/** 文件先封存，事务仅登记引用；单一运行时串行协调引用与回收。 */
+/** Seal files first and register references transactionally; one runtime serially coordinates references and reclamation. */
 export class ContentStore {
   private readonly readers = new WeakMap<ContentReader["read"], ContentAccess>();
   private readonly pins = new Map<string, number>();
   private readonly leases = new Map<string, ContentLease>();
   private readonly uploads = new Map<string, Upload>();
   private readonly candidates = new Set<string>();
-  /** 工具执行暂存的内容在结果记录登记根之前由对象的请求占用持有；只对同一对象的提交可见。 */
+  /** Request holds for an object retain staged tool content until result records register roots; visible only to commits from the same object. */
   private readonly handovers = new Map<string, ContentLease>();
   handover(sessionId: string, objectId: string): ContentLease {
     const key = `${sessionId}\0${objectId}`, lease = this.scope();
@@ -111,12 +111,12 @@ export class ContentStore {
     mkdirSync(join(root, "sealed"), { recursive: true });
     mkdirSync(join(root, "temporary"), { recursive: true });
   }
-  /** 数据准备与引用校验完成后，由应用启动层显式调用。 */
+  /** Called explicitly by application startup after data preparation and reference validation. */
   collectStartup(): void {
     const { db, root } = this;
     rmSync(join(root, "temporary"), { recursive: true, force: true });
     mkdirSync(join(root, "temporary"), { recursive: true });
-    // 崩溃可能发生在封存之后、索引之前；只清理由本模块拥有的文件。
+    // Crashes can occur between sealing and indexing; clean up only files owned by this module.
     const known = new Set((db.prepare("SELECT id FROM contents").all() as { id: string }[]).map(row => row.id));
     for (const name of readdirSync(join(root, "sealed"))) if (!known.has(name)) rmSync(join(root, "sealed", name), { force: true });
     for (const { id } of db.prepare(`SELECT id FROM contents
@@ -125,7 +125,7 @@ export class ContentStore {
       this.candidates.add(id);
     this.collect();
   }
-  /** 未建立根的已封存内容总量；仅在根或内容集合变化后重算，分块写入不逐块扫表。 */
+  /** Total sealed content without roots; recalculate only when roots or content sets change, without scanning the table for every chunk write. */
   private unrooted?: number;
   private unrootedSize(): number {
     return this.unrooted ??= (this.db.prepare(`SELECT COALESCE(SUM(size), 0) AS size FROM contents
@@ -161,7 +161,7 @@ export class ContentStore {
     queueMicrotask(() => { this.collecting = false; if (!this.closed) this.collect(); });
   }
   collect(): void {
-    // 与同步写入事务不交错；活动 IO 在首次 await 前已 pin。
+    // Does not interleave with synchronous write transactions; active IO pins before the first await.
     if (this.db.isTransaction) return;
     for (const id of [...this.candidates]) {
       if (this.pins.has(id)) continue;
@@ -195,7 +195,7 @@ export class ContentStore {
     throw new PluginApiError("foreign_resource", "The content does not belong to this input or object.");
   }
   validate(value: Json, access: ContentAccess): void { for (const ref of contentReferences(value)) this.assert(ref, access); }
-  /** 模板持有独立的持久依赖根；源会话删除后仍可建立新的对象内容根。 */
+  /** Templates hold independent persistent dependency roots; new object content roots can still be created after source session deletion. */
   bindTemplate(templateId: string, access: ContentAccess, value: Json): void {
     if (!this.db.isTransaction) throw new Error("Template content roots require a transaction.");
     const insert = this.db.prepare("INSERT OR IGNORE INTO template_content_roots VALUES (?, ?)");
@@ -213,7 +213,7 @@ export class ContentStore {
     this.unrooted = undefined;
     this.scheduleCollection();
   }
-  /** 在首次异步等待前检查并保留整批内容，后续读取不借用输入草稿的生命周期。 */
+  /** Check and retain the complete batch before the first asynchronous wait; later reads do not borrow input draft lifetimes. */
   capture(refs: readonly ContentRef[], access: ContentAccess): CapturedContent {
     const sizes = new Map<string, number>();
     const scope = this.scope();
@@ -231,7 +231,7 @@ export class ContentStore {
       throw new PluginApiError("foreign_resource", "Use a content reader from the current plugin context.");
     return this.capture(refs, access);
   }
-  /** 在所属事务内登记根；会话与对象取自访问域，避免两处重复传递。 */
+  /** Register roots within the owning transaction; access scopes supply session and object identities without passing them twice. */
   bind(access: ContentAccess & { sessionId: string }, root: { kind: "data" | "record"; id: string }, value: Json): void {
     const refs = contentReferences(value), sessionId = access.sessionId, objectId = access.objectId ?? "";
     for (const ref of refs) this.assert(ref, access);
@@ -242,7 +242,7 @@ export class ContentStore {
       this.db.prepare("DELETE FROM content_roots WHERE session_id = ? AND object_id = ? AND kind = ? AND root_id = ?")
         .run(sessionId, objectId, root.kind, root.id);
     }
-    // 记录只追加；终态元数据可能再次指向同一物理块，不撤回其正文依赖。
+    // Records append only; terminal metadata may reference the same physical block again without revoking its body dependencies.
     const insert = this.db.prepare("INSERT OR IGNORE INTO content_roots VALUES (?, ?, ?, ?, ?)");
     for (const ref of refs) insert.run(sessionId, objectId, root.kind, root.id, ref["$asterism.content"]);
     this.unrooted = undefined; this.scheduleCollection();
@@ -251,7 +251,7 @@ export class ContentStore {
     scope.check();
     if (this.uploads.size >= contentLimits.uploads) invalid("Too many content uploads.");
     const id = randomUUID(), path = join(this.root, "temporary", id);
-    // 预留名额，防止并发 open 在 await 后越过上传数限制。
+    // Reserve slots so concurrent opens cannot exceed upload limits after awaiting.
     const upload = { id, scope, path, size: 0, hash: createHash("sha256"), tail: Promise.resolve(), sealed: false } as Upload;
     this.uploads.set(id, upload);
     try { upload.file = await open(path, "wx", 0o600); scope.check(); return id; }
@@ -274,7 +274,7 @@ export class ContentStore {
       if (temporary + [...this.uploads.values()].reduce((sum, value) => sum + value.size, 0) + bytes.length > contentLimits.temporary)
         invalid("The temporary content capacity has been reached.");
       const start = upload.size;
-      // 在首次 await 前预留容量；不同上传不能同时越过全局限额。
+      // Reserve capacity before the first await so separate uploads cannot exceed the global limit together.
       upload.size += bytes.length;
       let written = 0;
       while (written < bytes.length) {

@@ -1,15 +1,15 @@
-/** 插件 SDK interface 声明原型；仅作设计与类型验证，不是运行时实现。 */
+/** Plugin SDK interface declaration prototype; for design and type validation only, not a runtime implementation. */
 import type { z } from "zod";
 
 export type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
 export type Immutable<T> = T extends readonly (infer V)[] ? readonly Immutable<V>[] : T extends object ? { readonly [K in keyof T]: Immutable<T[K]> } : T;
 export interface ContractRef<Id extends string = string> { readonly id: Id; readonly version: number }
-/** 旧版本数据逐级升级到当前版本；键为旧版本号。 */
+/** Upgrade old data incrementally to the current version; keys are old version numbers. */
 export type Upgrades = Readonly<Record<number, (data: Json) => Json>>;
 export interface RecordContract<D extends Json = Json, Id extends string = string> extends ContractRef<Id> {
   readonly schema: z.ZodType<D>;
   readonly upgrades: Upgrades;
-  /** 纯契约解码：先按 upgrades 升到当前版本再校验；不查询宿主，也不加载领域实现。 */
+  /** Pure contract decoding: upgrade to the current version through upgrades, then validate; no host queries or domain implementation loading. */
   decode(record: SessionRecord): DecodedRecord<D> | null;
 }
 export interface CommandContract<I extends Json = Json, O extends Json = Json, Id extends string = string> extends ContractRef<Id> {
@@ -19,7 +19,7 @@ export interface CommandContract<I extends Json = Json, O extends Json = Json, I
 export type RecordMap = Readonly<Record<string, RecordContract>>;
 export type CommandMap = Readonly<Record<string, CommandContract>>;
 export interface ResourceContract<S extends Json = Json, I extends Json = Json, R extends RecordMap = RecordMap, C extends CommandMap = CommandMap, Id extends string = string> extends ContractRef<Id> {
-  /** 资源公开数据的契约；与私有状态、卡片投影的契约分开。 */
+  /** Contract for public resource data, separate from private state and card projection contracts. */
   readonly dataSchema: z.ZodType<S>;
   readonly createSchema: z.ZodType<I>;
   readonly records: R;
@@ -55,7 +55,7 @@ export interface SessionRecord {
   readonly sequence: number;
   readonly createdAt: string;
   readonly contract: ContractRef;
-  /** 记录的关联对象，不预设发送者、接收者或执行者。 */
+  /** The object associated with a record, without assuming a sender, recipient, or executor. */
   readonly resource: ResourceRef | null;
   readonly data: Immutable<Json>;
 }
@@ -64,7 +64,7 @@ export type DecodedRecord<D extends Json> =
   | (SessionRecord & { readonly status: "unknown"; readonly reason: "unsupported_version" | "invalid_data" });
 export interface RecordQuery { readonly scope: "path" | "session"; readonly objectId?: string; readonly after?: string; readonly limit?: number }
 export interface SessionRecords {
-  /** 最早的匹配记录不可解码时返回 unknown，不跳过它另取下一条。 */
+  /** Return unknown when the earliest matching record cannot be decoded; do not skip it for the next record. */
   first<C extends RecordContract>(contract: C, query: RecordQuery): Promise<DecodedRecord<RecordData<C>> | null>;
   query<C extends RecordContract>(contract: C, query: RecordQuery): AsyncIterable<DecodedRecord<RecordData<C>>>;
 }
@@ -98,7 +98,7 @@ export interface CommitEvent {
   readonly commitId: string;
   readonly snapshot: SessionSnapshot;
   readonly records: readonly SessionRecord[];
-  /** 终态等追加元数据单列，不伪装成新的正文节点。 */
+  /** Append metadata such as terminal state is stored separately, not as new body nodes. */
   readonly completions: readonly RecordRef[];
 }
 export interface EventContract<T, Id extends string = string> extends ContractRef<Id> { readonly payload?: T }
@@ -117,7 +117,7 @@ export interface Usage { input: number | null; output: number | null; total: num
 export type ModelPart =
   | { kind: "text" | "thinking"; text: string; continuation: Json }
   | { kind: "toolcall"; callId: string; name: string; arguments: Json; continuation: Json };
-/** 工具结局保留未知状态与续接资料，不压扁为 Json。 */
+/** Tool outcomes retain unknown states and continuation data rather than flattening to Json. */
 export type ToolOutcome =
   | { status: "succeeded"; output: Json; continuation?: Json }
   | { status: "failed"; code: string; message: string; output?: Json; continuation?: Json }
@@ -155,19 +155,19 @@ export type RunOutcome =
 export interface RunRequest {
   signal: AbortSignal; maxRequests?: number;
   environment(): Promise<RunEnvironment>;
-  /** 领域方据此落盘事实；抛错即中止循环并以 failed 返回，宿主不代写记录。 */
+  /** The domain persists facts through this callback; throwing aborts the loop and returns failed. The host does not write records on its behalf. */
   onEvent(event: ModelRunEvent): void | Promise<void>;
 }
 export interface TextRequest {
   target: ModelTarget;
-  /** 仅在角色相应字段为空时采用；不是覆盖，不从全局窗口推断。 */
+  /** Used only when the corresponding role field is empty; neither overrides it nor infers from a global window. */
   fallback?: ModelSelection;
   system: string;
   input: string;
   signal: AbortSignal;
 }
 export interface ModelServices {
-  /** 请求与循环不保存资源或会话状态，调用方负责自己的领域投影。 */
+  /** Requests and loops store no resource or session state; callers own their domain projections. */
   stream(request: StreamRequest): AsyncIterable<ModelEvent>;
   run(request: RunRequest): Promise<RunOutcome>;
   generateText(request: TextRequest): Promise<{ text: string; model: string; usage: Usage | null }>;
@@ -179,7 +179,7 @@ export type TaskOutcome<T> =
   | { status: "cancelled" };
 export interface TaskHandle<T> { readonly id: string; readonly result: Promise<TaskOutcome<T>>; cancel(): void }
 export interface SessionTasks {
-  /** 命名空间为当前插件、贡献、会话；第一版 key 只在本次运行期去重。 */
+  /** Namespaced by current plugin, contribution, and session; the first version deduplicates keys only within this run. */
   start<T>(options: { key: string; timeoutMs: number; run(context: TaskContext): Promise<T> }): TaskHandle<T>;
 }
 export interface ObserveContext { readonly signal: AbortSignal; readonly tasks: SessionTasks; readonly session: SessionHandle }
@@ -189,7 +189,7 @@ export declare function observe<T>(definition: {
 }): Contribution;
 
 export interface CommandServices {
-  /** 跨插件协作的唯一入口：宿主按契约身份路由到目标资源实现并校验输入输出；返回即完成。 */
+  /** The sole cross-plugin collaboration entry: the host routes by contract identity to the target resource implementation and validates input/output; returning completes the call. */
   invoke<C extends CommandContract>(contract: C, target: ResourceRef, input: NoInfer<CommandInput<C>>): Promise<CommandOutput<C>>;
 }
 
@@ -198,14 +198,14 @@ export type Preparation<D> =
   | { action: "replace"; data: D }
   | { action: "reject"; code: string; message: string };
 export interface PrepareContext { readonly signal: AbortSignal; readonly snapshot: SessionSnapshot }
-/** 进入前准备只作用于命令输入（意图）；在事务外运行，宿主提交前重验，reject 使整个命令失败。 */
+/** Pre-entry preparation applies only to command input (intent); runs outside the transaction, is rechecked by the host before commit, and reject fails the entire command. */
 export declare function prepare<C extends CommandContract>(definition: {
   id: string; on: C;
   run(proposal: { target: ResourceRef; input: Immutable<CommandInput<C>> }, context: PrepareContext): Preparation<CommandInput<C>> | Promise<Preparation<CommandInput<C>>>;
 }): Contribution;
 
 export interface ResourceWriter<R extends ResourceContract> {
-  /** 只能提交绑定资源已声明的记录，宿主填写身份与树位置。 */
+  /** Can submit only records declared by the bound resource; the host fills identity and tree position. */
   append<C extends ResourceRecord<R>>(contract: C, data: NoInfer<RecordData<C>>): RecordRef;
 }
 export interface PrivateDataContract<T extends Json> extends ContractRef { readonly schema: z.ZodType<T> }
@@ -213,7 +213,7 @@ export interface ObjectData { get<T extends Json>(contract: PrivateDataContract<
 export interface ObjectWriter<R extends ResourceContract> extends ResourceWriter<R> { set<T extends Json>(contract: PrivateDataContract<T>, data: NoInfer<T>): void }
 export interface ResourceContext<R extends ResourceContract> {
   readonly object: ResourceRef; readonly session: SessionHandle; readonly data: ObjectData;
-  /** 同步事务；实际接口也必须在运行时拒绝 Promise。 */
+  /** Synchronous transaction; the actual interface must also reject Promises at runtime. */
   commit<F extends (writer: ObjectWriter<R>) => unknown>(work: F & (ReturnType<F> extends PromiseLike<unknown> ? never : unknown)): ReturnType<F>;
 }
 export interface ResourceImplementation<R extends ResourceContract> {

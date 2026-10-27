@@ -11,12 +11,12 @@ export type SessionViewState = {
   data: SessionView | null; status: "loading" | "ready" | "error"; readError: UiText | null; missing: boolean;
   navigating: boolean;
 };
-/** 低频的运行状态：资源忙碌与时间线创建中，内容不变时保持身份。 */
+/** Low-frequency running state: resource busy state and timeline creation in progress; retain identity when content is unchanged. */
 export type SessionActivity = Omit<SessionProgress, "live">;
 const emptyActivity: SessionActivity = { busyObjectIds: [], timelineBusy: false };
 const emptyLive: readonly LiveBlock[] = [];
 
-/** 按对象分组实时块；块身份均未变化的对象沿用上一份数组，只订阅本对象的界面不随其他对象的增量重渲染。 */
+/** Group live blocks by object; reuse the previous array for objects whose block identities are all unchanged, so UIs subscribing only to their object do not rerender on other objects' deltas. */
 export function groupLive(previous: ReadonlyMap<string, readonly LiveBlock[]>, blocks: readonly LiveBlock[]): Map<string, readonly LiveBlock[]> {
   const grouped = new Map<string, LiveBlock[]>();
   for (const block of blocks) {
@@ -36,11 +36,11 @@ function sameActivity(a: SessionActivity, b: SessionActivity): boolean {
     && a.busyObjectIds.every(id => b.busyObjectIds.includes(id));
 }
 
-/** 打开时取得当前数据，之后按序应用后台变化；动作完成直接返回。 */
+/** Obtain current data on opening, then apply backend changes in order; return directly when actions complete. */
 export class SessionController {
   private state: SessionViewState = { data: null, status: "loading", navigating: false, readError: null, missing: false };
   private activity: SessionActivity = emptyActivity;
-  /** 线上形态的流式块：增量的应用基线；按对象分组的展示块由此推导预览参数。 */
+  /** Wire-format streaming blocks: the baseline for applying deltas; display blocks grouped by object derive preview arguments from these. */
   private wire: LiveBlock[] = [];
   private live = new Map<string, readonly LiveBlock[]>();
   private listeners = new Set<() => void>();
@@ -51,7 +51,7 @@ export class SessionController {
   constructor(private readonly bridge: SessionBridge, readonly sessionId: string, private readonly onRelease?: () => void) {}
   getSnapshot = (): SessionViewState => this.state;
   getActivity = (): SessionActivity => this.activity;
-  /** 对象自己的实时块；其他对象的增量不改变返回值身份。 */
+  /** The object's own live blocks; deltas for other objects do not change the returned value's identity. */
   liveOf = (objectId: string): readonly LiveBlock[] => this.live.get(objectId) ?? emptyLive;
   subscribe = (listener: () => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; };
   subscribeProgress = (listener: () => void) => { this.progressListeners.add(listener); return () => { this.progressListeners.delete(listener); }; };
@@ -111,7 +111,7 @@ export class SessionController {
     if (this.connections || this.pending) return;
     queueMicrotask(() => { if (!this.connections && !this.pending) this.onRelease?.(); });
   }
-  /** 首次连接和用户主动重试共用打开入口；初始数据与后续更新在同一通道顺序交付。 */
+  /** Initial connection and explicit user retries share the open entry; initial data and subsequent updates arrive in order over the same channel. */
   refresh = async (): Promise<void> => {
     const scope = this.scope;
     if (!scope) return;

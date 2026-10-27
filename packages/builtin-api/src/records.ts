@@ -3,14 +3,14 @@ import { defineRecord, modelBlockSchema, modelCompletionSchema, modelInputPartsS
 import { builtin } from "./identity.ts";
 import { agentMessageSenderSchema } from "./messaging.ts";
 
-/** 输入消息的记录来源为接收代理；通信发送者由 sender 独立表达。 */
+/** The record source of an input message is the receiving agent; the communication sender is represented independently by sender. */
 export const AgentInputMessage = defineRecord(builtin.name("agent.input-message"), {
   schema: z.object({ parts: modelInputPartsSchema, startsTurn: z.boolean(), sender: agentMessageSenderSchema }),
 });
 export const Execution = defineRecord(builtin.name("agent.execution"), {
   schema: z.strictObject({ type: z.literal("block"), block: modelBlockSchema }),
 });
-/** 摘要只替换模型输入的前缀；keptFrom 指向原样保留的首个历史节点。 */
+/** A summary replaces only the prefix of model input; keptFrom points to the first history node retained unchanged. */
 export const ContextSummary = defineRecord(builtin.name("agent.context-summary"), {
   schema: z.strictObject({
     summary: z.string().trim().min(1),

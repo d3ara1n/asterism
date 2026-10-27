@@ -13,7 +13,7 @@ import { ToolDetails } from "@asterism/ui/tool-content";
 import { ToolHeader } from "@asterism/ui/tool-header";
 import { ItemGroup, Item, ItemMedia, ItemContent, ItemTitle, ItemDescription } from "@asterism/ui/ui/item";
 
-/** 状态字段可能来自任何资源；常规标量直接阅读，复合值保留完整数据。 */
+/** State fields can come from any resource; ordinary scalars are read directly, while compound values retain complete data. */
 function ResourceFields({ value }: { value: Json }) {
   if (value === null || typeof value !== "object" || Array.isArray(value)) return <JsonView value={value} />;
   return <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-2 type-caption">
@@ -94,7 +94,7 @@ function fixed(renderer: ToolRenderer, props: ToolRenderProps, label: UiText, ic
   const view = !identity || identity.id === renderer.contract.id ? renderer.resolve(props) : null;
   return { label, icon, ...view, props };
 }
-/** 固定入口自己的适配负责转交；公共外壳不认识资源工具协议。 */
+/** The fixed entry's own adapter handles forwarding; the shared shell does not know the resource tool protocol. */
 const builtinViews = new Map<string, {
   preparation: UiText;
   render(props: ToolRenderProps, registry: ViewRegistry): ResolvedToolView;

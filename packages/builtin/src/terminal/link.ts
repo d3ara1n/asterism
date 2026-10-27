@@ -3,14 +3,14 @@ import type { ChannelEnd, ResourceRef } from "@asterism/sdk/contracts";
 import type { RendererChannel, RendererObjectContext } from "@asterism/sdk/renderer";
 import { TerminalChannel, inactiveStatus, type TerminalDown, type TerminalStatus, type TerminalUp } from "./contract.ts";
 
-/** 已渲染字符的确认粒度；须小于后台低水位，确认滞留不阻止恢复。 */
+/** Acknowledgment granularity for rendered characters; must stay below the backend low-water mark so delayed acknowledgments do not prevent resumption. */
 const ACK_CHUNK = 4096;
-/** 前端屏幕：按通道顺序消费帧，写入完成后确认字符数。 */
+/** Frontend screen: consumes frames in channel order and acknowledges character counts after writes complete. */
 export interface TerminalScreen { receive(frame: Exclude<TerminalDown, { type: "status" }>, done: () => void): void }
 
 /**
- * 同一终端对象在前端只开一条通道；卡片正文与头部状态共享。
- * 无屏幕挂载时帧直接确认，避免后台因无人消费而暂停 PTY。
+ * The frontend opens only one channel per terminal object, shared by the card body and header status.
+ * Frames are acknowledged directly when no screen is mounted, preventing the backend from pausing the PTY because no consumer is present.
  */
 class TerminalLink {
   status: TerminalStatus = { ...inactiveStatus };
@@ -23,7 +23,7 @@ class TerminalLink {
   constructor(open: RendererObjectContext["openChannel"], private readonly released: () => void) {
     this.channel = open(TerminalChannel);
     this.channel.onMessage(frame => this.receive(frame));
-    // 后台结束的通道不再复用：之后挂载的视图重新打开。
+    // Channels ended by the backend are not reused; views mounted later open a new one.
     void this.channel.closed.then(end => { this.released(); if (end.reason !== "closed") { this.end = end; this.notify(); } });
   }
   private receive(frame: TerminalDown) {
@@ -41,9 +41,9 @@ class TerminalLink {
   }
   private notify() { for (const listener of this.listeners) listener(); }
   send(message: TerminalUp) {
-    try { this.channel.send(message); } catch { /* 通道结束由 end 呈现。 */ }
+    try { this.channel.send(message); } catch { /* end represents channel termination. */ }
   }
-  /** 屏幕挂载时请求当前快照；同时只有一个屏幕消费输出。 */
+  /** Requests a current snapshot when the screen mounts; only one screen consumes output at a time. */
   attach(screen: TerminalScreen) {
     this.screen = screen;
     this.send({ type: "refresh" });
@@ -53,7 +53,7 @@ class TerminalLink {
   acquire() { this.users++; }
   release() {
     if (--this.users > 0) return;
-    // 同步重挂载（开发模式重放 effect）不关闭通道。
+    // Synchronous remounts (development-mode effect replay) do not close the channel.
     queueMicrotask(() => { if (this.users === 0) { this.channel.close(); this.released(); } });
   }
 }
@@ -70,7 +70,7 @@ function link(object: RendererObjectContext): TerminalLink {
   return current;
 }
 
-/** 绑定对象的终端通道；返回实时状态与通道结束原因。 */
+/** Terminal channel bound to an object; returns live status and the channel termination reason. */
 export function useTerminalLink(object: RendererObjectContext) {
   const current = link(object);
   useEffect(() => { current.acquire(); return () => current.release(); }, [current]);

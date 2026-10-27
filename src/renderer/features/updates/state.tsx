@@ -53,7 +53,7 @@ function useUpdateService() {
 
 const UpdatesContext = createContext<ReturnType<typeof useUpdateService> | null>(null);
 
-/** 标题栏与设置页共用一次读取和订阅；主进程持有更新状态。 */
+/** The titlebar and settings page share one read and subscription; the main process owns update state. */
 export function UpdatesProvider({ children }: { children: ReactNode }) {
   const updates = useUpdateService();
   return <UpdatesContext.Provider value={updates}>{children}</UpdatesContext.Provider>;

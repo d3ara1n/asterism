@@ -18,11 +18,11 @@ export type TimelineItem = SavedBlock | ModelLiveBlock
 export function timelineKey(item: TimelineItem): string {
   return "responseId" in item ? JSON.stringify([item.responseId, item.ordinal]) : item.id;
 }
-/** 正在生成：只有实时块（尚未落库、无 createdAt）且未结束；已保存的未完成块不算生成中。 */
+/** Generating: only live blocks (not yet persisted, without createdAt) that have not ended; saved incomplete blocks do not count as generating. */
 export function generating(item: TimelineItem): boolean {
   return (item.kind === "text" || item.kind === "thinking") && !("createdAt" in item) && item.endedAt === null;
 }
-/** 对话与诊断共用历史块的展示转换；摘要式思考也能阅读，原始记录不改写。 */
+/** Conversation and diagnostics share display conversion for historical blocks; summary-style thinking remains readable without rewriting original records. */
 export function savedTimelineBlock(record: Pick<SessionRecord, "id" | "createdAt">,
   block: Extract<z.infer<typeof Execution.schema>, { type: "block" }>["block"]): SavedBlock {
   return {
@@ -40,10 +40,10 @@ function item(record: SessionRecord, agentId: string): TimelineItem | null {
   if (execution?.status === "known") return savedTimelineBlock(record, execution.data.block);
   return null;
 }
-/** 历史与临时反馈的组合：流式增量期间保持条目身份，供界面按引用跳过重渲染。 */
+/** Combines history and temporary feedback, preserving item identity during streaming deltas so the UI can skip rerenders by reference. */
 export interface SavedTimeline { items: readonly TimelineItem[]; keys: ReadonlySet<string>; tail: TimelineItem | null }
 
-/** 真实块来自当前路径，临时反馈插在已有节点之后；轮次概要位于轮尾。 */
+/** Actual blocks come from the current path, temporary feedback is inserted after existing nodes, and turn summaries sit at turn ends. */
 export function savedTimeline(snapshot: SessionSnapshot, agentId: string, running: boolean, feedback: readonly InlineFeedback[] = [],
   options: { boundary?: HistoryBoundary | null; compressions?: readonly CompressionActivity[] } = {}): SavedTimeline {
   const path = snapshot.records.all({ scope: "timeline" });
@@ -92,17 +92,17 @@ export function savedTimeline(snapshot: SessionSnapshot, agentId: string, runnin
   return { items, keys, tail: last ? measured(last) : null };
 }
 
-/** 实时块以响应身份接续在已保存条目之后；已落库的同一块不重复展示。 */
+/** Live blocks follow saved items using response identity; the same block is not displayed twice once persisted. */
 export function withLive(saved: SavedTimeline, live: readonly ModelLiveBlock[]): TimelineItem[] {
   return [...saved.items, ...live.filter(block => !saved.keys.has(timelineKey(block))), ...(saved.tail ? [saved.tail] : [])];
 }
 
-/** 有可显示内容的条目；空思考块不占列表位置，避免虚拟列表留下只有间距的空项。 */
+/** Items with displayable content; empty thinking blocks occupy no list position, preventing spacing-only empty items in the virtual list. */
 export function displayedTimeline(items: readonly TimelineItem[]): TimelineItem[] {
   return items.filter(item => item.kind !== "thinking" || item.text.trim() !== "");
 }
 
-/** 虚拟列表中始终挂载的条目：尚未落库的实时块（流式动画与计时不能随卸载重放）与末项（跟随输出的锚点）。 */
+/** Items kept mounted in the virtual list: unpersisted live blocks (streaming animations and timing must not replay after unmounting) and the last item (the output-following anchor). */
 export function mountedTimelineIndexes(items: readonly TimelineItem[]): number[] {
   const indexes = items.flatMap((item, index) => "responseId" in item && !("createdAt" in item) ? [index] : []);
   if (items.length && indexes.at(-1) !== items.length - 1) indexes.push(items.length - 1);

@@ -8,7 +8,7 @@ interface CreationDirectory {
 }
 const Directory = createContext<CreationDirectory | null>(null);
 
-/** 创建入口随启动装配固定；整个前端共享一次读取，退出时取消在途调用。 */
+/** Creation entry points are fixed during startup assembly; the entire frontend shares one read, and in-flight calls are canceled on exit. */
 export function CreationDirectoryProvider({ children }: { children: ReactNode }) {
   const calls = useRendererCalls();
   const [directory, setDirectory] = useState<CreationDirectory>(() => ({ kinds: new Map(), failed: false }));

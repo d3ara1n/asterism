@@ -11,14 +11,14 @@ export const webContentPartSchema = z.object({
   kind: z.enum(["snippet", "excerpt", "body", "summary"]), format: z.enum(["text", "markdown"]), text: z.string(),
   truncated: z.boolean().optional().describe("Known content truncation. Omitted when completeness is unknown."),
 });
-/** 日期保留上游精度与种类；未知日期种类使用 unknown。 */
+/** Dates retain upstream precision and kind; use unknown for an unknown date kind. */
 export const webDateSchema = z.object({ kind: z.enum(["published", "modified", "fetched", "unknown"]), value: z.string() });
 export const webDocumentSchema = z.object({
   url: webUrlSchema, title: z.string().optional(), author: z.string().optional(),
   dates: z.array(webDateSchema).optional(), content: z.array(webContentPartSchema),
   image: webUrlSchema.optional(), favicon: webUrlSchema.optional(),
   links: z.array(z.object({ url: webUrlSchema, title: z.string().optional() })).optional(),
-  /** 分数由实际提供方解释，消费者保留结果顺序。 */
+  /** Scores are interpreted by the actual provider; consumers preserve result order. */
   score: z.number().finite().optional(), details: z.array(presentationSchema).optional(),
 });
 export const webUsageSchema = z.object({
@@ -45,12 +45,12 @@ export const webFetchRequestSchema = z.object({
   maxCharacters: z.number().int().positive().optional().describe("Maximum body characters per document, counted as Unicode code points across body parts. Excerpts and metadata are separate. Omitted uses provider defaults."),
 }).describe("URL, optional additional excerpt focus and body character limit.");
 
-/** 提供方声明凭据类型；UI 按类型渲染对应输入，不接受任意 JSON。 */
+/** Providers declare credential types; the UI renders corresponding inputs by type and does not accept arbitrary JSON. */
 export const webCredentialDefinitionSchema = z.object({
   kind: z.enum(["api_key"]),
   keyUrl: webUrlSchema.optional(),
 });
-/** 每个提供方类型至多一份配置；id 与类型 slug 相同。 */
+/** At most one configuration per provider type; id equals the type slug. */
 export const webProviderStateSchema = z.strictObject({
   id: z.string().trim().min(1),
   enabled: z.boolean(),
@@ -60,7 +60,7 @@ export const webProviderTypeSchema = z.object({
   search: z.boolean(), fetch: z.boolean(), urlPatterns: z.array(z.string().min(1)),
   credential: webCredentialDefinitionSchema.nullable(),
 });
-/** 结果中的 provider 为实际处理请求的提供方类型 slug。 */
+/** provider in results is the type slug of the provider that actually handled the request. */
 export const webSearchResultSchema = webResponseSchema.extend({ query: z.string(), provider: z.string() });
 export const webFetchResultSchema = webResponseSchema.extend({ requestedUrl: webUrlSchema, provider: z.string() });
 export type WebHint = z.infer<typeof webHintSchema>;

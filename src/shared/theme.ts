@@ -3,11 +3,11 @@ import { z } from "zod";
 import { coreChannel } from "./core.ts";
 
 /**
- * 外观设置：主题、字体、画布纹理与过程展示偏好。主题色值来自 Radix Colors，renderer 写入 :root 的 CSS 变量，
- * 组件消费 shadcn 语义 token。存储由主进程经 electron-store 落在平台用户数据目录。
+ * Appearance settings: theme, fonts, canvas texture, and progress display preferences. Radix Colors supplies theme values; renderers write CSS variables to :root,
+ * and components consume shadcn semantic tokens. Main processes persist settings through electron-store in platform user data directories.
  */
 export const modes = ["system", "light", "dark"] as const;
-/** 主题色按色相环排列；graphite 不对应 Radix 色相，表示以所选灰阶作主色的无彩模式。 */
+/** Theme colors follow hue-wheel order; graphite has no Radix hue and represents achromatic mode with the selected grayscale as accent. */
 export const accentIds = ["blue", "cyan", "teal", "jade", "grass", "amber", "orange", "tomato", "crimson", "plum", "violet", "indigo", "graphite"] as const;
 export const grayIds = ["gray", "slate", "sage", "olive", "sand", "mauve"] as const;
 export const densities = ["compact", "standard", "comfortable"] as const;
@@ -22,10 +22,10 @@ export const fontSizeRange = { min: 1, max: 100 } as const;
 export const defaultFontSize = 12;
 const fontFamilySchema = z.string().trim().min(1).max(128).nullable().default(null);
 
-/** 默认字体栈；用户字体只前置，不替换回退。 */
+/** Default font stack; user fonts prepend without replacing fallbacks. */
 export const sansStack = `system-ui, -apple-system, "Segoe UI Variable Text", "Segoe UI", "PingFang SC", "Microsoft YaHei UI", "Noto Sans CJK SC", sans-serif`;
 export const monoStack = `ui-monospace, "SF Mono", Menlo, Consolas, "Cascadia Mono", "Noto Sans Mono CJK SC", monospace`;
-/** 字体名作为 CSS 字符串转义后加引号，防止注入。 */
+/** Escape font names as quoted CSS strings to prevent injection. */
 export function fontStack(family: string | null, fallback: string): string {
   if (!family) return fallback;
   return `"${family.replace(/[\\"]/g, "\\$&").replace(/[\n\r\f]/g, " ")}", ${fallback}`;
@@ -36,17 +36,17 @@ export const appearanceSchema = z.object({
   accent: z.enum(accentIds).catch("graphite"),
   gray: z.enum(grayIds).catch("gray"),
   density: z.enum(densities).catch("standard"),
-  /** 未设置或无效时，由读取入口按平台补全。 */
+  /** Read entries fill platform-specific values when unset or invalid. */
   radius: z.enum(radii).optional().catch(undefined),
   canvas: z.enum(canvasPatterns).catch("dots"),
   edgeStyle: z.enum(edgeStyles).catch("default"),
-  /** 本机字体家族名；null 为系统默认栈。 */
+  /** Local font family name; null means the system default stack. */
   uiFont: fontFamilySchema.catch(null),
   terminalFont: fontFamilySchema.catch(null),
-  /** 终端字号固定为 px，独立于界面密度和代码字号。 */
+  /** Terminal font size is fixed in px, independent of UI density and code font size. */
   terminalFontSize: z.number().min(fontSizeRange.min).max(fontSizeRange.max).default(defaultFontSize).catch(defaultFontSize),
   codeFont: fontFamilySchema.catch(null),
-  /** 代码字号（px），null 跟随所在界面文字。 */
+  /** Code font size in px; null follows surrounding UI text. */
   codeFontSize: z.number().min(fontSizeRange.min).max(fontSizeRange.max).nullable().default(null).catch(null),
 });
 export type Appearance = z.infer<typeof appearanceSchema> & { radius: (typeof radii)[number] };
@@ -55,7 +55,7 @@ export function defaultAppearance(platform: string): Appearance {
   return parseAppearance({}, platform);
 }
 
-/** 读取的原始数据不可信：逐项回退到默认值，不因单项损坏丢弃整份设置。 */
+/** Raw read data is untrusted: fall back per field without discarding all settings for one corrupt entry. */
 export function parseAppearance(raw: unknown, platform: string): Appearance {
   const result = appearanceSchema.safeParse(raw && typeof raw === "object" ? raw : {});
   const data = result.success ? result.data : appearanceSchema.parse({});
@@ -75,7 +75,7 @@ export interface AppearanceBridge {
   onChanged(listener: (appearance: Appearance) => void): () => void;
 }
 
-/** 命名调色板：主题色与灰色的推荐组合，只是快捷写入 accent + gray，不进存储、无选中态。多数配中性灰，暖色与紫色系配同调灰。 */
+/** Named palettes recommend accent/gray combinations as shortcuts writing accent + gray, without persistence or selected state. Most use neutral gray; warm and purple colors use matching grays. */
 export const palettes: readonly { id: string; accent: AccentId; gray: GrayId }[] = [
   { id: "tundra", accent: "jade", gray: "gray" },
   { id: "graphite", accent: "graphite", gray: "gray" },
@@ -91,14 +91,14 @@ export const palettes: readonly { id: string; accent: AccentId; gray: GrayId }[]
   { id: "dusk", accent: "violet", gray: "mauve" },
 ];
 
-/** 原始层：Radix Colors 12 级色阶，下标 1–12；亮暗两套同级用途相同。 */
+/** Primitive layer: 12 Radix Colors steps indexed 1–12; light and dark variants share step purposes. */
 type Scale = (step: number) => string;
 function scale(name: string, scheme: Scheme): Scale {
   const table = (radix as unknown as Record<string, Record<string, string>>)[scheme === "dark" ? `${name}Dark` : name]!;
   return step => table[`${name}${step}`]!;
 }
 const radiusPx: Record<Appearance["radius"], number> = { none: 2, sm: 5, md: 8, lg: 12 };
-/** 密度缩放根字号：Tailwind 的间距与字号均以 rem 计，组件源码不改即可整体缩放。 */
+/** Density scales root font size: Tailwind spacing and fonts use rem, scaling the whole UI without component source changes. */
 export const densityRootPx: Record<Appearance["density"], number> = { compact: 13, standard: 14, comfortable: 16 };
 
 function luminance(hex: string): number {
@@ -108,18 +108,18 @@ function luminance(hex: string): number {
   };
   return 0.2126 * channel(1) + 0.7152 * channel(3) + 0.0722 * channel(5);
 }
-/** WCAG 2.x 对比度。 */
+/** WCAG 2.x contrast ratio. */
 export function contrastRatio(a: string, b: string): number {
   const [light, dark] = [luminance(a), luminance(b)].sort((x, y) => y - x);
   return (light + 0.05) / (dark + 0.05);
 }
-/** 实色表面上的文字：在白与深灰之间取对比度更高者。 */
+/** Text on solid surfaces: choose the higher-contrast option between white and dark gray. */
 function onSolid(background: string, dark: string): string {
   return contrastRatio(background, "#ffffff") >= contrastRatio(background, dark) ? "#ffffff" : dark;
 }
-/** 图表分类色相顺序。 */
+/** Chart categorical hue order. */
 export const chartHues = ["blue", "teal", "amber", "violet", "crimson", "orange", "cyan", "plum"] as const;
-/** 语义层：唯一一份映射，把 accent/gray 色阶按亮暗解析为 shadcn token；token 名不随任何选择改变。 */
+/** Semantic layer: one mapping resolves accent/gray steps into shadcn tokens for light/dark modes; token names never change with selections. */
 export function themeTokens(appearance: Appearance, scheme: Scheme): Record<string, string> {
   const g = scale(appearance.gray, scheme);
   const mono = appearance.accent === "graphite";
@@ -128,35 +128,35 @@ export function themeTokens(appearance: Appearance, scheme: Scheme): Record<stri
   const green = scale("green", scheme);
   const amber = scale("amber", scheme);
   const dark = scheme === "dark";
-  // 亮色用 11 级保证实色表面的白字达到 AA；暗色用 9 级。石墨以 12 级（近黑／近白）作主色。
+  // Light mode uses step 11 for AA white text on solid surfaces; dark mode uses step 9. Graphite uses step 12 (near-black/near-white) as accent.
   const primary = mono ? g(12) : dark ? a(9) : a(11);
   const fg = g(12);
   const primaryText = mono ? fg : dark ? a(11) : a(12);
   const darkForeground = scale(appearance.gray, "dark")(1);
   const solidForeground = (background: string) => onSolid(background, darkForeground);
   return {
-    // background 遵循 shadcn 约定作页面底色（亮色白）；canvas 为星图扩展，只给工作台底板等画布区域。
+    // background follows shadcn's page background convention (white in light mode); canvas is Asterism's extension for workbench bases and other canvas areas only.
     background: dark ? g(1) : "#ffffff", foreground: fg, canvas: dark ? g(1) : g(3),
     card: dark ? g(2) : "#ffffff", "card-foreground": fg,
-    // 画布卡片外壳：介于画布与内容面之间，亮色不能与 canvas 同级，否则轮廓只剩边框。
+    // Canvas card shells sit between canvas and content surfaces; light mode must differ from canvas or only borders define outlines.
     "card-shell": dark ? g(3) : g(2),
     popover: dark ? g(3) : "#ffffff", "popover-foreground": fg,
     primary, "primary-foreground": solidForeground(primary),
-    // 实色填充与表面上的强调文字分别取色，避免暗色 9 级作为小字时对比度不足。
+    // Solid fills and emphasized surface text use separate colors to avoid insufficient contrast with dark-mode step 9 small text.
     "primary-text": primaryText,
     secondary: g(3), "secondary-foreground": fg,
-    // 持续选中态独立于中性次级表面与 hover；石墨取比 hover（4 级）深一级的灰底。
+    // Persistent selection is independent of neutral secondary surfaces and hover; graphite uses a gray one step deeper than hover (step 4).
     selected: mono ? g(5) : a(3), "selected-foreground": primaryText,
     muted: g(3), "muted-foreground": g(11),
     "external-message": scale("violet", scheme)(3), "external-message-foreground": scale("violet", scheme)(12),
     accent: g(4), "accent-foreground": fg,
-    // 状态色统一取 11 级，实色表面配对独立前景色。
+    // Status colors consistently use step 11 with independent foregrounds for solid surfaces.
     destructive: red(11), "destructive-foreground": solidForeground(red(11)),
     success: green(11), "success-foreground": solidForeground(green(11)),
     warning: amber(11), "warning-foreground": solidForeground(amber(11)),
     border: dark ? g(6) : g(5), input: dark ? g(7) : g(6), ring: a(8),
     "canvas-grid": g(6), selection: mono ? g(6) : a(5),
-    // 图表分类色：固定色相第 9 级，不随主题色与灰色变化；只用于图形填充。
+    // Chart categories use fixed hues at step 9, independent of accent and gray choices, for graphical fills only.
     ...Object.fromEntries(chartHues.map((hue, index) => [`chart-${index + 1}`, scale(hue, scheme)(9)])),
     radius: `${radiusPx[appearance.radius]}px`,
   };

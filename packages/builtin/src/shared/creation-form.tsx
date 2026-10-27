@@ -9,8 +9,8 @@ import { commonMessages } from "@asterism/ui/messages/common";
 import { useI18n } from "@asterism/sdk/renderer";
 
 /**
- * 内置创建视图共用的表单与提交门禁；外壳（标题、错误、关闭）由宿主创建协调器提供。
- * 提交中仍可取消：取消会中止宿主的创建准备。
+ * Form and submission gate shared by built-in creation views; the host creation coordinator provides the shell (title, error, close).
+ * Cancellation remains available during submission and aborts the host's creation preparation.
  */
 export function CreationForm({ busy, disabled, validate, onSubmit, onCancel, children }: {
   busy: boolean;

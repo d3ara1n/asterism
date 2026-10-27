@@ -8,7 +8,7 @@ import { Button } from "./ui/button";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "./ui/collapsible";
 import { ToggleGroup, ToggleGroupItem } from "./ui/toggle-group";
 
-/** stateKey 在所在条目内唯一时，展开状态随条目重新挂载保留；省略时只作组件状态。 */
+/** When stateKey is unique within the containing item, expansion state survives item remounts; when omitted, it is only component state. */
 export function ToolDetails({ label, stateKey = null, children }: { label: string; stateKey?: string | null; children: ReactNode }) {
   const [open, setOpen] = useRendererViewState(stateKey, false);
   return <Collapsible open={open} onOpenChange={setOpen}>

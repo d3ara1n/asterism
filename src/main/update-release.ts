@@ -9,7 +9,7 @@ export const githubReleasesSchema = z.array(z.object({
 }));
 export type GitHubUpdateRelease = z.infer<typeof githubReleasesSchema>[number];
 
-/** GitHub 的发布标记决定可见范围，SemVer 决定更新顺序。 */
+/** GitHub release flags determine visibility; SemVer determines update order. */
 export function selectUpdateRelease(releases: GitHubUpdateRelease[], current: string, includePrerelease: boolean): GitHubUpdateRelease | null {
   return releases.filter(release => !release.draft && (includePrerelease || !release.prerelease) &&
     valid(release.tag_name) && gt(release.tag_name, current))

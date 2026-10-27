@@ -33,10 +33,10 @@ function environment(): I18n {
 
 let current = environment();
 
-/** 宿主非 React 展示计算；插件通过公开 hook 取得同一展示环境。 */
+/** Non-React host display calculations; plugins obtain the same display environment through public hooks. */
 export const getI18n = (): I18n => current;
 
-/** 插件目录到达时补充语言环境；主进程语言只在启动页读取和订阅一次。 */
+/** Add to the language environment when plugin catalogs arrive; main-process language is read and subscribed to only once on the startup page. */
 export function setLanguageCatalogs(entries: readonly TranslationCatalog[]): void {
   catalogs = [...entries];
   publish();
@@ -54,7 +54,7 @@ export async function startLanguage(
   bridge: LanguageBridge = window.host.language,
 ): Promise<() => void> {
   catalogs = [...entries];
-  // 先订阅再读取，直接采用收到的当前值。
+  // Subscribe before reading, and directly adopt the current value received.
   const stop = bridge.onChanged(value => {
     if (value.preference === language.preference
       && value.locale === language.locale

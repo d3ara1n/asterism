@@ -8,7 +8,7 @@ import { configurationMessages as messages } from "../../messages/configuration"
 import { diagnosticMessages } from "../../messages/diagnostics";
 import { formatPrice } from "../diagnostics/format";
 
-/** 只读当前目录资料；输出上限是配置值，参考价格不代表账户实际扣款。 */
+/** Reads only current catalog data; the output limit is configured, and reference prices do not represent actual account charges. */
 export function ModelPreview({ model, providerName }: { model: CatalogModel; providerName: string }) {
   const i18n = useI18n();
   const unknown = i18n.text(diagnosticMessages.unknown);

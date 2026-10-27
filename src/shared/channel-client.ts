@@ -39,7 +39,7 @@ class ClientChannel implements RendererChannel {
   }
 }
 
-/** renderer 侧通道表：编号在本连接内分配；连接断开时全部以 disconnected 结束。 */
+/** Renderer channel table: numbers are assigned within this connection; disconnection ends all channels as disconnected. */
 export class ChannelClient {
   private nextId = 1;
   private readonly channels = new Map<number, ClientChannel>();
@@ -57,7 +57,7 @@ export class ChannelClient {
       data => this.bridge.send({ type: "message", id, data }),
       () => {
         this.channels.delete(id);
-        try { this.bridge.send({ type: "close", id }); } catch { /* 连接已断开。 */ }
+        try { this.bridge.send({ type: "close", id }); } catch { /* The connection is disconnected. */ }
       });
     this.channels.set(id, channel);
     try { this.bridge.send({ type: "open", id, contract: contract.id, object: { sessionId: object.sessionId, id: object.id, kind: object.kind } }); }

@@ -16,7 +16,7 @@ import type { ModelItem } from "@asterism/sdk/contracts";
 import { errorMessages } from "../shared/error-display.ts";
 import type { BoundTopLevelTool } from "./top-level-tools.ts";
 
-/** 模型目标：选择一个角色，可覆盖模型表达式或思考等级；未给出的沿用角色。 */
+/** Model target: select a role and optionally override model expression or reasoning level; omitted values inherit the role. */
 export type { ModelTarget, StreamRequest } from "@asterism/sdk/contracts";
 export type ModelTargetError = "role_unavailable" | "model_unavailable" | "credential_unavailable";
 export class ModelTargetFailure extends PluginApiError {
@@ -24,15 +24,15 @@ export class ModelTargetFailure extends PluginApiError {
 }
 
 interface ResolvedTarget { settings: ModelSettings; adapter: ModelAdapter }
-/** 内部 adapter 的一次调用输入；授权视图与资源环境取用不进入公开 SDK。 */
+/** Input for one internal adapter call; authorization views and resource environment access stay outside the public SDK. */
 export interface RunRequest extends ModelRunRequest {
-  /** 发起请求的插件身份，由宿主填写；用于响应块来源打戳。 */
+  /** Initiating plugin identity, filled by the host to stamp response-block origins. */
   plugin: string;
   capabilities: AgentCapabilities;
   topLevelTools?: readonly BoundTopLevelTool[];
   context: Promise<{ file: string; text: string }[]>;
   content?: HostInputOptions["content"];
-  /** 工具暂存内容的交接占用；结果记录登记内容根前保持可读，请求结束后释放。 */
+  /** Handoff hold for staged tool content; stays readable until result records register content roots and is released when the request ends. */
   handover?: () => ContentLease | undefined;
 }
 interface HostInputOptions { content?: (messages: readonly ModelItem[]) => ModelContent | undefined }
@@ -44,7 +44,7 @@ export interface HostModels {
   list: ModelServices["list"];
 }
 
-/** 按角色与覆盖解析，思考等级编码与请求过滤由模型适配层解释。 */
+/** Resolve roles and overrides; the model adapter interprets reasoning-level encoding and request filtering. */
 export function resolveTarget(snapshot: ConfigurationSnapshot, target: ModelTarget):
   { ok: true; model: string; thinking: ThinkingLevel | null } | { ok: false; reason: ModelTargetError } {
   const role = snapshot.roles.find(item => item.id === target.role);
@@ -59,7 +59,7 @@ export function resolveTarget(snapshot: ConfigurationSnapshot, target: ModelTarg
 }
 
 export function createModelServices(configuration: ConfigurationService, adapterFactory?: (settings: ModelSettings) => ModelAdapter): HostModels {
-  // 请求前刷新凭据可用性；目录读取同步取当前配置。
+  // Refresh credential availability before requests; catalog reads synchronously use current configuration.
   const current = () => configuration.current();
   const resolve = async (target: ModelTarget, execute = true): Promise<ResolvedTarget> => {
     await configuration.execute({ type: "read" });

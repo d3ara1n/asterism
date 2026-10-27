@@ -3,7 +3,7 @@ import { toast } from "sonner";
 import { AgentSoftwareFeedback } from "./feedback";
 import { ExecutionErrorDetails } from "./ErrorDetails";
 
-/** 执行反馈订阅由独立模块持有准备与清理作用域。 */
+/** A separate module owns the preparation and cleanup scopes for execution-feedback subscriptions. */
 export const agentFeedbackRenderer = {
   resources: [], cards: [], tools: [],
   async prepare({ signal, events }) {

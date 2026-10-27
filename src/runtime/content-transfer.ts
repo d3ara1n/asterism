@@ -5,7 +5,7 @@ import type { SessionService } from "./sessions.ts";
 import type { ContentLease, ContentAccess } from "./content-store.ts";
 
 interface Reader { iterator: AsyncIterator<Uint8Array>; first?: IteratorResult<Uint8Array>; tail: Promise<unknown> }
-/** 桌面内容传输只管理前端草稿；后台提交捕获独立占用，不被 reset 撤回。 */
+/** Desktop content transfer manages frontend drafts only; backend commits capture independent holds that reset does not revoke. */
 export class ContentTransferService {
   private readonly inputs = new Map<string, ContentLease>();
   private readonly readers = new Map<string, Reader>();

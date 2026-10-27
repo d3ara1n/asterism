@@ -5,7 +5,7 @@ import { definePlugin, UsageQueryError, type HeadersUsageProvider } from "@aster
 const ns = pluginNamespace("example.header-usage");
 const balance = z.coerce.number();
 const currency = z.string().regex(/^[A-Z]{3}$/u);
-/** 示例网关把账户余额放进推理响应头；来源和 balance/quota 结果类型相互独立。 */
+/** The example gateway puts account balances in inference response headers; the source and balance/quota result types are independent. */
 const usage: HeadersUsageProvider = {
   id: "example-header-balance", label: "Example gateway balance", source: "headers",
   parseHeaders({ headers }) {

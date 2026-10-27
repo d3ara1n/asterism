@@ -11,9 +11,9 @@ const input = (patch: Partial<ReleaseInput> = {}): ReleaseInput => ({
   releases: [], commits: [root], ...patch,
 });
 
-// 预期来自发布规则：首次固定版本，随后按 main 第一父链的累计变更与发布边界计算。
-describe("main 提交驱动的发布版本", () => {
-  it("没有 tag 时忽略所有消息的版本影响，破坏性或纯维护历史都以 0.1.0 起步", () => {
+// Expectations follow release rules: a fixed initial version, then cumulative changes along main's first-parent chain and release boundaries.
+describe("Release versions driven by main commits", () => {
+  it("ignores message version impact without tags and starts breaking or maintenance-only history at 0.1.0", () => {
     for (const message of ["feat!: 新协议", "fix: 修复", "ci: 发布流程"]) {
       const value = input({ commits: [commit("head", message)] });
       expect(hasReleasableChanges(value)).toBe(true);
@@ -22,7 +22,7 @@ describe("main 提交驱动的发布版本", () => {
       expect(plan?.notes).toContain(message);
     }
   });
-  it("首个 tag 后只计算新增提交，旧的破坏性提交不会使第二包跳到 major", () => {
+  it("counts only commits after the first tag so old breaking changes cannot make the second package jump to major", () => {
     const initial = commit("initial", "refactor!: 开发期重构");
     const releases = [released("v0.1.0-prerelease.1", initial.sha)];
     expect(planRelease(input({ releases, commits: [initial] }))).toBeNull();
@@ -31,7 +31,7 @@ describe("main 提交驱动的发布版本", () => {
     expect(planRelease(input({ releases, commits: [commit("head", "feat: 新功能"), initial] }))?.version)
       .toBe("0.2.0-prerelease.1");
   });
-  it("正式版前仍累计首个 tag 后的变更，同目标继续增长预发布序号", () => {
+  it("accumulates changes since the first tag before a stable release and increments prerelease numbers for the same target", () => {
     const initial = commit("initial", "feat!: 开发期功能");
     const first = commit("first", "feat: 新功能");
     expect(planRelease(input({
@@ -39,7 +39,7 @@ describe("main 提交驱动的发布版本", () => {
       commits: [commit("head", "fix: 修复"), first, initial],
     }))?.version).toBe("0.2.0-prerelease.2");
   });
-  it("多个 feat 相对同一正式版只升一次 minor，预发布序号按数值递增且说明只列新提交", () => {
+  it("bumps minor once for multiple feats against one stable release, increments prerelease numbers numerically, and lists only new commits", () => {
     const first = commit("first", "feat: 编辑");
     const plan = planRelease(input({
       releases: [released("v1.0.0", root.sha), released("v1.1.0-prerelease.9", first.sha), released("v1.1.0-prerelease.2", first.sha)],
@@ -49,7 +49,7 @@ describe("main 提交驱动的发布版本", () => {
     expect(plan?.notes).toContain("feat: 搜索");
     expect(plan?.notes).not.toContain("feat: 编辑");
   });
-  it("累计变更提升为 feat 或 breaking 时，更换目标并重置序号", () => {
+  it("changes the target and resets the sequence when cumulative changes reach feat or breaking", () => {
     const fix = commit("fix", "fix: 修复");
     const value = input({ releases: [released("v1.0.0", root.sha), released("v1.0.1-prerelease.2", fix.sha)],
       commits: [commit("head", "feat(ui): 新功能"), fix, root] });
@@ -57,7 +57,7 @@ describe("main 提交驱动的发布版本", () => {
     value.commits.unshift(commit("breaking", "refactor(storage)!: 新格式"));
     expect(planRelease(value)?.version).toBe("2.0.0-prerelease.1");
   });
-  it("已有发布后纯维护提交不触发发包，维护条目随下次有效变更进入说明", () => {
+  it("maintenance-only commits after a release do not publish but appear in notes with the next qualifying change", () => {
     const value = input({ releases: [released("v1.0.0", root.sha)],
       commits: [commit("ci", "ci: 工作流"), commit("docs", "docs: 说明"), commit("chore", "chore: 整理"), root] });
     expect(hasReleasableChanges(value)).toBe(false);
@@ -69,7 +69,7 @@ describe("main 提交驱动的发布版本", () => {
     expect(plan?.notes).toContain("## Documentation");
     expect(plan?.notes).not.toContain("feat: 初始功能");
   });
-  it("晋级固定候选提交，说明覆盖上个正式版以来所有提交而不带入主干后续开发", () => {
+  it("promotes the fixed candidate commit and lists all changes since the last stable release without later trunk development", () => {
     const first = commit("first", "feat: 功能");
     const selected = commit("selected", "fix: 修复");
     const preview = released("v1.1.0-prerelease.2", selected.sha);
@@ -84,7 +84,7 @@ describe("main 提交驱动的发布版本", () => {
     expect(plan?.notes).not.toContain("/commit/later");
     expect(plan?.notes).toContain("compare/v1.0.0...v1.1.0");
   });
-  it("首次正式说明包含初始发布前的历史，即使该历史未参与版本计算", () => {
+  it("includes history before the initial release in the first stable notes even when excluded from version calculation", () => {
     const preview = released("v0.1.1-prerelease.1", "head");
     const plan = planRelease(input({ mode: "release", sourceTag: preview.tag, sourceSha: preview.sha,
       releases: [released("v0.1.0-prerelease.1", root.sha), preview],
@@ -94,12 +94,12 @@ describe("main 提交驱动的发布版本", () => {
     expect(plan?.notes).toContain("fix: 修复");
     expect(plan?.notes).toContain("/commits/v0.1.1");
   });
-  it("有正式版后重新建立计算基线，不重复计算之前的 feat", () => {
+  it("establishes a new baseline after a stable release without recounting previous feats", () => {
     const stable = commit("stable", "feat: 已发布");
     expect(planRelease(input({ releases: [released("v0.1.0-prerelease.1", root.sha), released("v1.1.0", stable.sha)],
       commits: [commit("head", "fix: 修复"), stable, root] }))?.version).toBe("1.1.1-prerelease.1");
   });
-  it("晋级须使用已发布候选、对应提交且高于最新正式版", () => {
+  it("promotion requires a published candidate, its matching commit, and a version above the latest stable release", () => {
     const preview = released("v1.1.0-prerelease.1", "head");
     expect(() => planRelease(input({ mode: "release", sourceTag: "unknown" }))).toThrow("Select a published prerelease");
     expect(() => planRelease(input({ mode: "release", sourceTag: preview.tag, sourceSha: "different", releases: [preview] })))
@@ -107,16 +107,16 @@ describe("main 提交驱动的发布版本", () => {
     expect(() => planRelease(input({ mode: "release", sourceTag: preview.tag, sourceSha: preview.sha,
       releases: [preview, released("v1.1.0", preview.sha)] }))).toThrow("newer than the latest stable");
   });
-  it("同目标已有新候选时拒绝晋级旧代码，避免更新后的用户收到功能倒退的正式版", () => {
+  it("rejects promotion of old code when a newer candidate has the same target so updated users do not receive a stable regression", () => {
     const older = released("v1.1.0-prerelease.1", root.sha);
     expect(() => planRelease(input({ mode: "release", sourceTag: older.tag, sourceSha: older.sha,
       releases: [older, released("v1.1.0-prerelease.2", "later")] }))).toThrow("newest prerelease for this target");
   });
 });
 
-// 范围来自提交拓扑而非发布时刻；解析覆盖 git 的多行消息与 Conventional Commits 格式。
-describe("提交解析、范围与说明", () => {
-  it("NUL 分隔保留多行正文，squash 和直接提交共用类型、破坏性标记与分类规则", () => {
+// Ranges follow commit topology, not release time; parsing covers multiline Git messages and Conventional Commits.
+describe("Commit parsing, ranges, and notes", () => {
+  it("NUL separation preserves multiline bodies and shares type, breaking-marker, and category rules between squash and direct commits", () => {
     const commits = parseGitLog("squash\0feat(ui): 新功能 (#7)\n\n详细说明\n\0direct\0ci: 打包\n\0breaking\0refactor: 协议\n\nBREAKING CHANGE: 新协议\n\0");
     expect(commits.map(({ sha, subject, level, section }) => ({ sha, subject, level, section }))).toEqual([
       { sha: "squash", subject: "feat(ui): 新功能 (#7)", level: "minor", section: "Features" },
@@ -125,7 +125,7 @@ describe("提交解析、范围与说明", () => {
     ]);
     expect(parseCommit("hyphen", "chore: 协议\n\nBREAKING-CHANGE: 新协议").level).toBe("major");
   });
-  it("较旧提交后来晋级不会让更靠近 HEAD 的已发布提交再次触发", () => {
+  it("later promotion of an older commit does not retrigger already released commits closer to HEAD", () => {
     const latest = commit("latest", "feat: 下一版功能");
     const old = commit("old", "feat: 旧候选");
     const value = input({ releases: [released("v2.0.0-prerelease.1", latest.sha, "2026-10-24T00:00:00Z"),
@@ -135,7 +135,7 @@ describe("提交解析、范围与说明", () => {
     expect(planRelease(value)).toBeNull();
     expect(commitsAfter(value.commits, latest.sha).map(commit => commit.sha)).toEqual(["head"]);
   });
-  it("每个 SHA 只列一次，未分类消息保留，条目链接直接指向提交", () => {
+  it("lists each SHA once, preserves uncategorized messages, and links entries directly to commits", () => {
     const feature = commit("abcdef123456", "feat!: 新协议 (#9)");
     const notes = releaseNotes([feature, feature, commit("other", "调整构建")], "example/app", null, "v0.1.0");
     expect(notes.match(/\[abcdef1\]/g)).toHaveLength(1);
@@ -145,7 +145,7 @@ describe("提交解析、范围与说明", () => {
     expect(notes).toContain("/commit/abcdef123456");
     expect(notes).toContain("/commits/v0.1.0");
   });
-  it("恰好二十条时完整保留，不显示省略提示", () => {
+  it("preserves exactly twenty entries without an omission notice", () => {
     const commits = Array.from({ length: 20 }, (_, index) => commit(`feature-${index}`, `feat: 功能 ${index}`));
     const notes = releaseNotes(commits, "example/app", null, "v0.1.0");
     expect(notes.split("\n").filter(line => line.startsWith("- "))).toHaveLength(20);
@@ -155,7 +155,7 @@ describe("提交解析、范围与说明", () => {
   it.each([
     [21, "1 more commit"],
     [25, "5 more commits"],
-  ])("同类 %i 条时保留最新二十条，去重后计算省略数量且各类独立限额", (count, omission) => {
+  ])("keeps the newest twenty of %i entries per category, counts omissions after deduplication, and limits categories independently", (count, omission) => {
     const features = Array.from({ length: count }, (_, index) => commit(`feature-${index}`, `feat: 功能 ${index}`));
     const fixes = Array.from({ length: 21 }, (_, index) => commit(`fix-${index}`, `fix: 修复 ${index}`));
     const commits = [features[0]!, ...features, ...fixes];

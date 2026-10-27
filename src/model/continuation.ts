@@ -1,9 +1,9 @@
 import { jsonSchema, modelScope, type Json, type ModelSettings } from "../shared/model.ts";
 
-// 全文、摘要与原生资料分别编码；来源限制只适用于不透明续接资料。
+// Full text, summaries, and native data encode separately; origin restrictions apply only to opaque continuation data.
 export const aiSdkAdapterVersion = "ai-sdk-v7/4";
 
-/** 只保留白名单原生资料，不保存完整 SDK metadata 或 HTTP 数据。 */
+/** Retain only allowlisted native data, not complete SDK metadata or HTTP data. */
 export function pickContinuation(metadata: unknown): Record<string, Record<string, Json>> {
   const options: Record<string, Record<string, Json>> = {};
   if (!metadata || typeof metadata !== "object") return options;
@@ -20,7 +20,7 @@ export function pickContinuation(metadata: unknown): Record<string, Record<strin
   return options;
 }
 
-/** 来源只限制原生附加资料的复用，不决定公共正文是否能参与请求。 */
+/** Origin limits native supplementary data reuse only; it does not determine whether public text can participate in requests. */
 export function canReuseContinuation(source: { scope: string; adapter: string }, target: ModelSettings): boolean {
   return source.adapter === aiSdkAdapterVersion && source.scope === modelScope(target);
 }

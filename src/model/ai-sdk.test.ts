@@ -16,12 +16,12 @@ const input: ModelInput = {
   system: composeSystemPrompt({ id: "worker", systemPrompt: "System" }, "Asterism"), messages: [{ kind: "input", parts: [{ kind: "text", text: "Read" }] }],
   tools: [{ name: "read", description: "Read", parameters: { type: "object", properties: { resource_id: { type: "string" } }, required: ["resource_id"] } }],
 };
-async function consume(events: AsyncIterable<ModelEvent>) { for await (const _event of events) { /* 消费到终态或错误。 */ } }
+async function consume(events: AsyncIterable<ModelEvent>) { for await (const _event of events) { /* Consume through terminal state or error. */ } }
 const transportInput: ModelInput = { ...input, settings: { ...input.settings, thinking: "off" } };
 
-describe("AI SDK 适配契约", () => {
-  // 上游状态与原文是诊断依据；HTTP 429 和 500 不能退化为同一个配置/网络猜测。
-  it.each([429, 500])("HTTP %s 保留原始错误正文与响应标识，不包含请求凭据", async status => {
+describe("AI SDK adaptation contract", () => {
+  // Upstream status and original text support diagnosis; HTTP 429 and 500 must not collapse into the same configuration/network guess.
+  it.each([429, 500])("HTTP %s preserves original error bodies and response identities without request credentials", async status => {
     const body = '{"type":"error","error":{"type":"upstream_error","message":"Original provider message","request_id":"req-1","extra":{"limit":12}}}';
     const response = new Response(body, {
       status, headers: { "content-type": "application/json", "X-Request-Id": "req-1" },
@@ -41,15 +41,15 @@ describe("AI SDK 适配契约", () => {
     expect(failure.response.headers).not.toHaveProperty("x-api-key");
     expect(transport).toHaveBeenCalledTimes(1);
   });
-  // 代理网关可以直接返回 HTML；正文不是 JSON 也应完整保留。
-  it("非 JSON 的 HTTP 错误保留响应正文", async () => {
+  // Proxy gateways may return HTML directly; preserve the complete body even when it is not JSON.
+  it("preserves response bodies for non-JSON HTTP errors", async () => {
     const body = "<html><body>upstream unavailable</body></html>";
     const adapter = new AiSdkAdapter(async () => "synthetic-key", undefined, async () => new Response(body, { status: 502 }));
     await expect(consume(adapter.prepare(transportInput).stream(new AbortController().signal)))
       .rejects.toMatchObject({ details: { statusCode: 502, httpStatus: 502, responseBody: body } });
   });
-  // 服务端拒绝是模型结果；SDK 无法解析响应的 JSON 或结构时是软件处理失败。
-  it.each(["not JSON", '{"choices":"invalid"}'])("响应解析失败显式标注软件来源：%s", async chunk => {
+  // Server rejection is a model outcome; SDK failure to parse response JSON or structure is a software processing failure.
+  it.each(["not JSON", '{"choices":"invalid"}'])("response parsing failures explicitly identify software origin: %s", async chunk => {
     const current = structuredClone(transportInput);
     current.settings.provider.protocol = "openai-chat";
     const adapter = new AiSdkAdapter(async () => "synthetic-key", undefined, async () => new Response(
@@ -57,16 +57,16 @@ describe("AI SDK 适配契约", () => {
     await expect(consume(adapter.prepare(current).stream(new AbortController().signal)))
       .rejects.toMatchObject({ origin: "software", code: "response_parsing", details: { httpStatus: 200 } });
   });
-  // Anthropic SDK 在 doStream 内消费首个错误并裁剪字段；传输前缀保留实际收到的资料。
-  it("首个 SSE 事件失败时保留原始响应，区分实际 HTTP 与 SDK 推导状态", async () => {
+  // The Anthropic SDK consumes the first error in doStream and trims fields; the transport prefix retains data actually received.
+  it("preserves the original response when the first SSE event fails and distinguishes actual HTTP from SDK-inferred status", async () => {
     const raw = 'event: error\ndata: {"type":"error","error":{"type":"overloaded_error","message":"Server busy","extra":{"retry_after":5}}}\n\n';
     const adapter = new AiSdkAdapter(async () => "synthetic-key", undefined, async () =>
       new Response(raw, { headers: { "content-type": "text/event-stream" } }));
     await expect(consume(adapter.prepare(transportInput).stream(new AbortController().signal)))
       .rejects.toMatchObject({ details: { message: "Server busy", statusCode: 529, httpStatus: 200, rawResponse: raw } });
   });
-  // HTTP 200 之后仍可能通过 SSE 报错；SDK 解码会裁剪未知字段，raw error 留作权威资料。
-  it("流内错误保留 HTTP 状态和完整服务端事件", async () => {
+  // SSE may report errors after HTTP 200; SDK decoding trims unknown fields, so raw error remains authoritative.
+  it("stream errors preserve HTTP status and complete server events", async () => {
     const raw = { type: "error", error: { type: "overloaded_error", message: "Server busy", extra: { retry_after: 5 } } };
     const start = { type: "message_start", message: { id: "m1", type: "message", role: "assistant", model: "test",
       content: [], stop_reason: null, stop_sequence: null, usage: { input_tokens: 2, output_tokens: 0 } } };
@@ -76,8 +76,8 @@ describe("AI SDK 适配契约", () => {
     await expect(consume(adapter.prepare(transportInput).stream(new AbortController().signal)))
       .rejects.toMatchObject({ details: { statusCode: 529, httpStatus: 200, rawEvent: JSON.stringify(raw), responseHeaders: { "x-request-id": "stream-1" } } });
   });
-  // 模型终态是请求边界：客户端暂停消费与连接延后关闭不延长耗时；终态之后取消也不能丢失已实报用量。
-  it.each(["close", "cancel"] as const)("消费者等待和终态之后的 %s 不改变已接收的计量", async action => {
+  // Model termination defines the request boundary: paused consumption and delayed connection close do not extend duration; later cancellation must retain reported usage.
+  it.each(["close", "cancel"] as const)("consumer waits and %s after terminal state do not change received metering", async action => {
     let now = 0;
     const clock = vi.spyOn(performance, "now").mockImplementation(() => now);
     const controller = new AbortController();
@@ -123,8 +123,8 @@ describe("AI SDK 适配契约", () => {
       else expect(failure).toBeUndefined();
     } finally { controller.abort(); clock.mockRestore(); }
   });
-  // 实际适配流在失败/取消时仍交付计时，不把空流或错误当成零 token 成功。
-  it.each(["failed", "cancelled"] as const)("保留%s流的计时", async outcome => {
+  // Actual adapter streams deliver timing on failure/cancellation without treating empty streams or errors as zero-token success.
+  it.each(["failed", "cancelled"] as const)("preserves timing for %s streams", async outcome => {
     const controller = new AbortController();
     const model = new MockLanguageModelV4({ doStream: async () => {
       if (outcome === "cancelled") controller.abort();
@@ -133,16 +133,16 @@ describe("AI SDK 适配契约", () => {
     const adapter = new AiSdkAdapter(async () => "synthetic-key", () => model);
     let failure: unknown;
     try {
-      for await (const _event of adapter.prepare(input).stream(controller.signal)) { /* 消费流。 */ }
+      for await (const _event of adapter.prepare(input).stream(controller.signal)) { /* Consume the stream. */ }
     } catch (error) { failure = error; }
     expect(failure).toBeInstanceOf(ModelFailure);
     expect((failure as ModelFailure).timing).toMatchObject({
       outcome, durationMs: expect.any(Number), firstOutputMs: null, firstTextMs: null, outputChunks: 0,
     });
   });
-  // SDK stream 的调用方上限须抵达 provider，且不得扩大用户配置的输出上限。
+  // SDK streams must deliver the caller's limit to the provider without expanding the configured output limit.
   it.each([{ requested: 400, expected: 400 }, { requested: 2000, expected: 1000 }])(
-    "单次补全输出上限 $requested 与模型配置取较小值", async ({ requested, expected }) => {
+    "uses the smaller of the single-completion limit $requested and model configuration", async ({ requested, expected }) => {
       const model = new MockLanguageModelV4({ doStream: async () => ({ stream: simulateReadableStream({
         initialDelayInMs: null, chunkDelayInMs: null, chunks: [
           { type: "finish", finishReason: { unified: "stop", raw: "stop" }, usage: {
@@ -152,7 +152,7 @@ describe("AI SDK 适配契约", () => {
         ],
       }) }) });
       const adapter = new AiSdkAdapter(async () => "synthetic-key", () => model);
-      for await (const _event of adapter.prepare({ ...input, maxOutputTokens: requested }).stream(new AbortController().signal)) { /* 消费终态。 */ }
+      for await (const _event of adapter.prepare({ ...input, maxOutputTokens: requested }).stream(new AbortController().signal)) { /* Consume terminal state. */ }
       expect(model.doStreamCalls[0]!.maxOutputTokens).toBe(expected);
       expect(() => adapter.prepare({ ...input, maxOutputTokens: 0 })).toThrow("positive safe integer");
     });
@@ -161,7 +161,7 @@ describe("AI SDK 适配契约", () => {
     { modelId: "deepseek-flash", thinking: "off", reasoning: true },
     { modelId: "o3", thinking: "high", reasoning: false },
     { modelId: "deepseek-flash", thinking: null, reasoning: false },
-  ] as const)("Responses $modelId reasoning=$reasoning 等级=$thinking：开关控制请求，所有返回思考照常接收", async ({ modelId, thinking, reasoning }) => {
+  ] as const)("Responses $modelId reasoning=$reasoning level=$thinking: the toggle controls requests and all returned reasoning is received normally", async ({ modelId, thinking, reasoning }) => {
     const current = structuredClone(input);
     current.settings.provider.protocol = "openai-responses";
     current.settings.model.modelId = modelId;
@@ -192,7 +192,7 @@ describe("AI SDK 适配契约", () => {
       (value, key) => createProviderModel(value.settings.provider, value.settings.model, key, transport));
     const events: ModelEvent[] = [];
     for await (const event of adapter.prepare(current).stream(new AbortController().signal)) events.push(event);
-    // off 只是等级编码，false 才省略思考选项；两种情况下均接收服务端实际返回的思考。
+    // off encodes only a level; false omits reasoning options. Both still accept reasoning actually returned by the server.
     if (reasoning) {
       expect(request?.reasoning).toMatchObject({ summary: "auto", effort: thinking === "off" ? "none" : thinking });
       expect(request).toMatchObject({ store: false, include: ["reasoning.encrypted_content"] });
@@ -206,8 +206,8 @@ describe("AI SDK 适配契约", () => {
     });
   });
 
-  // 请求投影契约：开关不改历史；off 不删思考；过滤后不得发送空 assistant 或丢失工具调用。
-  it("历史思考只受当前请求 reasoning 开关控制，重新开启可完整回传", () => {
+  // Request projection contract: toggles do not alter history; off does not delete reasoning; filtering must not send empty assistants or lose tool calls.
+  it("only the current request reasoning toggle controls historical reasoning and reenabling sends it back completely", () => {
     const current = structuredClone(input);
     const adapter = new AiSdkAdapter(async () => "unused");
     current.settings.thinking = "off";
@@ -234,8 +234,8 @@ describe("AI SDK 适配契约", () => {
     expect(sdkMessages(current)).toEqual(enabled);
   });
 
-  // 明文思考是协议基线；未知域名、空兼容列表也必须保存并原样回传。
-  it("Responses 原始思考正常解码，无兼容包也能明文续接", async () => {
+  // Plaintext reasoning is a protocol baseline; unknown domains and empty compatibility lists still preserve and resend it unchanged.
+  it("decodes native Responses reasoning normally and continues with plaintext without compatibility packages", async () => {
     const current = structuredClone(input);
     current.settings.provider.protocol = "openai-responses";
     current.settings.provider.baseUrl = "https://example.invalid/v1";
@@ -243,7 +243,7 @@ describe("AI SDK 适配契约", () => {
     current.settings.thinking = "medium";
     current.settings.model.generation.temperature = null;
     const response = { id: "response-plain", model: "deepseek-flash", created_at: 0 };
-    // DeepSeek 官方 Responses 示例使用 reasoning_text；summary 为空，不产生摘要事件。
+    // DeepSeek's official Responses example uses reasoning_text; an empty summary produces no summary events.
     const frames = [
       { type: "response.created", response: { ...response, status: "in_progress" } },
       { type: "response.output_item.added", output_index: 0, item: { id: "rs_1", type: "reasoning", summary: [] } },
@@ -272,7 +272,7 @@ describe("AI SDK 适配契约", () => {
       kind: "output", adapter: adapter.version, scope: modelScope(current.settings),
       parts: [{ kind: "thinking", summary: "", text: "Assess the plan.", continuation: thought.continuation ?? null }, { kind: "text", text: "Answer", continuation: null }],
     }] };
-    for await (const _event of adapter.prepare(next).stream(new AbortController().signal)) { /* 检查实际序列化请求。 */ }
+    for await (const _event of adapter.prepare(next).stream(new AbortController().signal)) { /* Check the actual serialized request. */ }
     expect(requests[0]?.reasoning).toMatchObject({ effort: "medium" });
     expect(requests[0]?.instructions).toBe(projectSystemPrompt(current.system));
     expect((requests[0]?.input as Array<{ role?: string }>)[0]?.role).toBe("user");
@@ -284,8 +284,8 @@ describe("AI SDK 适配契约", () => {
     expect(reasoning).toEqual({ type: "reasoning", content: [{ type: "reasoning_text", text: "Assess the plan." }] });
   });
 
-  // Responses summary 分段与全文可同时存在，SDK 摘要事件不能重复交付或提前结束整个 item。
-  it("真实 Responses 解码保留全文、多个摘要段落及密文，只交付一个思考块", async () => {
+  // Responses summary segments and full text can coexist; SDK summary events must neither duplicate delivery nor end the entire item early.
+  it("real Responses decoding preserves full text, multiple summary paragraphs, and ciphertext in one reasoning block", async () => {
     const response = { id: "response", model: "test", created_at: 0 };
     const frames = [
       { type: "response.created", response: { ...response, status: "in_progress" } },
@@ -320,8 +320,8 @@ describe("AI SDK 适配契约", () => {
     expect(events.find(event => event.type === "part.end")).toMatchObject({ continuation: { openai: { itemId: "rs", reasoningEncryptedContent: "opaque" } } });
   });
 
-  // 块不完整不等于终态不可用：执行状态机需要先保留服务端计量，再拒绝未闭合块。
-  it("Responses 思考缺少 done 时仍交付已收到的 incomplete 终态与用量", async () => {
+  // An incomplete block does not invalidate terminal state: the execution state machine retains server metering before rejecting unclosed blocks.
+  it("Responses reasoning without done still delivers received incomplete terminal state and usage", async () => {
     const response = { id: "response", model: "test", created_at: 0 };
     const frames = [
       { type: "response.created", response: { ...response, status: "in_progress" } },
@@ -342,7 +342,7 @@ describe("AI SDK 适配契约", () => {
     expect(events.at(-1)).toMatchObject({ type: "finish", reason: "length", usage: { input: 2, output: 3, total: 5 } });
   });
 
-  it("真实 Anthropic 解码保留 start 的 redactedData 与 delta 的签名", async () => {
+  it("real Anthropic decoding preserves start redactedData and delta signatures", async () => {
     const frames = [
       { type: "message_start", message: { id: "response-thinking", type: "message", role: "assistant", model: "test", content: [],
         stop_reason: null, stop_sequence: null, usage: { input_tokens: 3, output_tokens: 0 } } },
@@ -370,7 +370,7 @@ describe("AI SDK 适配契约", () => {
     ]);
   });
 
-  it.each(["openai-chat", "openai-responses", "anthropic"] as const)("真实 %s provider 编码图文并解码流，无鉴权头且禁止重定向", async protocol => {
+  it.each(["openai-chat", "openai-responses", "anthropic"] as const)("real %s providers encode text and images and decode streams without auth headers or redirects", async protocol => {
     const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jX1kAAAAASUVORK5CYII=", "base64");
     const response = { id: "response-1", model: "test", created_at: 0 };
     const frames = protocol === "openai-chat" ? [
@@ -433,13 +433,13 @@ describe("AI SDK 适配契约", () => {
     expect(events.at(-1)).toMatchObject({ type: "finish", reason: "stop", usage: { input: 3, output: 1, total: 4 } });
   });
 
-  it("明文远程鉴权在准备请求时拒绝，凭据不被读取", () => {
+  it("rejects remote plaintext authentication during preparation without reading credentials", () => {
     const current = structuredClone(input); current.settings.provider.baseUrl = "http://example.invalid/v1";
     const adapter = new AiSdkAdapter(async () => { throw new Error("Must not read credentials"); });
     expect(() => adapter.prepare(current)).toThrow();
   });
 
-  it("未知工具的完整调用传给执行层，SDK 不代为执行或把它变成流失败", async () => {
+  it("complete unknown-tool calls reach execution without SDK execution or conversion into stream failures", async () => {
     const model = new MockLanguageModelV4({ doStream: async () => ({ stream: simulateReadableStream({ initialDelayInMs: null, chunkDelayInMs: null, chunks: [
       { type: "stream-start", warnings: [] },
       { type: "tool-call", toolCallId: "unknown-1", toolName: "unavailable", input: '{"resource_id":"note"}' },
@@ -454,7 +454,7 @@ describe("AI SDK 适配契约", () => {
     expect(JSON.stringify(events)).not.toContain("NoSuchToolError");
   });
 
-  it("单次流保留思考签名和工具参数，计量按响应收束，后续按 assistant/tool 投影", async () => {
+  it("one stream retains reasoning signatures and tool arguments, finalizes metering per response, and projects subsequent assistant/tool messages", async () => {
     const model = new MockLanguageModelV4({ doStream: async () => ({ stream: simulateReadableStream({ initialDelayInMs: null, chunkDelayInMs: null, chunks: [
       { type: "stream-start", warnings: [] },
       { type: "response-metadata", id: "response-1", modelId: "test", timestamp: new Date(0) },
@@ -493,14 +493,14 @@ describe("AI SDK 适配契约", () => {
     expect(JSON.stringify(next)).toContain("signature-value");
   });
 
-  it("失败工具只发送文字投影，文字不二次序列化", () => {
+  it("failed tools send only text projections without serializing text twice", () => {
     const text = 'cancelled: Stopped.\n{"partial":"Captured output"}';
     const messages = sdkMessages({ ...input, messages: [{ kind: "result", callId: "cancelled", name: "resource_call", error: true, parts: [{ kind: "text", text }] }] });
     expect(messages).toEqual([{ role: "tool", content: [{ type: "tool-result", toolCallId: "cancelled", toolName: "resource_call",
       output: { type: "error-text", value: text } }] }]);
   });
 
-  it.each(["anthropic", "openai-responses", "openai-chat"] as const)("%s 工具结果文件如实交出；Chat 显式兼容包才搬运到 user 消息", protocol => {
+  it.each(["anthropic", "openai-responses", "openai-chat"] as const)("%s tool result files are delivered faithfully; Chat moves them to user messages only with an explicit compatibility package", protocol => {
     const png = new Uint8Array([1, 2, 3]);
     const current = structuredClone(input); current.settings.provider.protocol = protocol;
     current.settings.model.compatibility = [{ id: "toolFilesAsUserMessage" }];
@@ -516,13 +516,13 @@ describe("AI SDK 适配契约", () => {
     expect(messages[1]).toMatchObject({ role: "user", content: [{ type: "text" }, { type: "file", data: png, mediaType: "image/png", filename: "a.png" }] });
   });
 
-  // 网络错误没有 HTTP 响应，原始 cause 才能区分 DNS、连接和其他传输失败。
-  it("传输失败保留原始消息及 cause，不自动重试", async () => {
+  // Network errors have no HTTP response; the original cause distinguishes DNS, connection, and other transport failures.
+  it("transport failures preserve original messages and cause without automatic retries", async () => {
     const cause = Object.assign(new Error("getaddrinfo ENOTFOUND example.invalid"), { code: "ENOTFOUND" });
     const model = new MockLanguageModelV4({ doStream: async () => { throw new Error("fetch failed", { cause }); } });
     const adapter = new AiSdkAdapter(async () => "credential", () => model);
     let failure: unknown;
-    try { for await (const _event of adapter.prepare(input).stream(new AbortController().signal)) { /* 消费流。 */ } }
+    try { for await (const _event of adapter.prepare(input).stream(new AbortController().signal)) { /* Consume the stream. */ } }
     catch (error) { failure = error; }
     expect(failure).toBeInstanceOf(Error);
     expect(failure).toMatchObject({ message: "fetch failed", details: {
@@ -531,7 +531,7 @@ describe("AI SDK 适配契约", () => {
     expect(model.doStreamCalls).toHaveLength(1);
   });
 
-  it("跨模型或适配版本变化不阻断公共正文，原生资料不跨来源发送", () => {
+  it("model or adapter version changes do not block public text, and native data never crosses origins", () => {
     const adapter = new AiSdkAdapter(async () => "credential");
     const current: ModelInput = { ...input, messages: [{
       kind: "output", adapter: "older-adapter", scope: "different-provider",

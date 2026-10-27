@@ -4,7 +4,7 @@ import { fallbackCardHeight, fallbackCardWidth, minimumCardHeight, minimumCardWi
 
 export const fallbackCardAppearance: CardAppearance = { width: fallbackCardWidth, height: fallbackCardHeight };
 
-/** 默认尺寸、用户覆盖和尺寸下限在前后台使用同一解析规则。 */
+/** Frontend and backend share resolution rules for default dimensions, user overrides, and minimum dimensions. */
 export function cardSize(appearance: CardAppearance = fallbackCardAppearance, override: CardSize | null = null): CardSize {
   const size = override ?? appearance;
   return {

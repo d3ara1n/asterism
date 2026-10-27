@@ -6,7 +6,7 @@ import type { PluginConfiguration, PluginConfigurationCommand } from "../../shar
 import { errorDisplay } from "../../shared/error-display";
 import { pluginsMessages } from "../messages/plugins";
 
-/** 配置读取与写入串行，订阅先于首次读取；旧读取不会覆盖新保存结果。 */
+/** Configuration reads and writes are serialized, with subscription preceding the initial read; old reads do not overwrite newly saved results. */
 export function HostConfigsProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<{ values: Map<string, PluginConfiguration>; ready: boolean; error: UiText | null }>({ values: new Map(), ready: false, error: null });
   const queue = useRef<Promise<unknown>>(Promise.resolve());

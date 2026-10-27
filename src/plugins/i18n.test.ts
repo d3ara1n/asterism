@@ -20,8 +20,8 @@ const roots: string[] = [], services: ApplicationService[] = [];
 const temp = () => { const root = mkdtempSync(join(tmpdir(), "asterism-i18n-")); roots.push(root); return root; };
 afterEach(async () => { for (const service of services.splice(0)) await service.close(); for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
 
-describe("插件目录与展示 IPC", () => {
-  it("公共消息保留提供方归属，renderer 的 React Intl 来自宿主实例", async () => {
+describe("Plugin catalogs and presentation IPC", () => {
+  it("public messages retain provider ownership and renderer React Intl comes from the host instance", async () => {
     const provider = temp(), consumer = temp(), data = temp(), cache = join(data, "cache");
     writeFileSync(join(provider, "package.json"), JSON.stringify({ name: "@example/messages", peerDependencies: { "@asterism/sdk": `^${sdkMetadata.version}` }, exports: { "./public": "./public.ts" },
       asterism: { id: "example.messages", i18n: { catalogs: { "zh-Hans": "zh.json" } } } }));
@@ -45,7 +45,7 @@ describe("插件目录与展示 IPC", () => {
       expect(new MessageFormatter("zh-Hans", packages[0]!.catalogs).text(renderer.messages.title)).toBe("共享标题");
     } finally { if (previous === undefined) delete globals.__asterismRendererModules; else globals.__asterismRendererModules = previous; }
   });
-  it("无 renderer 的源码插件通过公开 SDK 声明消息与配置，目录内容独立更新", async () => {
+  it("source plugins without renderers declare messages and configuration through the public SDK with independently updated catalog content", async () => {
     const root = temp(), data = temp(); mkdirSync(join(root, "locales"));
     writeFileSync(join(root, "package.json"), JSON.stringify({ name: "@example/backend", peerDependencies: { "@asterism/sdk": `^${sdkMetadata.version}` }, asterism: { id: "example.backend",
       runtime: "runtime.ts", i18n: { catalogs: { "zh-Hans": "locales/zh.json" } } } }));
@@ -78,7 +78,7 @@ describe("插件目录与展示 IPC", () => {
     expect(next!.catalogs![0]!.revision).not.toBe(item!.catalogs![0]!.revision);
     expect(new MessageFormatter("zh-Hans", next!.catalogs).text(title)).toBe("最大数量");
   });
-  it("目录路径不能越过包根或符号链接，损坏翻译只诊断；清单规范化重复标签被拒绝", () => {
+  it("catalog paths cannot escape package roots or symlinks; corrupt translations produce diagnostics only and normalized duplicate manifest tags are rejected", () => {
     const root = temp(), outside = temp(), diagnostics: string[] = [];
     writeFileSync(join(outside, "catalog.json"), "{}"); symlinkSync(join(outside, "catalog.json"), join(root, "linked.json"));
     expect(loadCatalogs(root, "example.test", { en: "linked.json", fr: "missing.json" }, message => diagnostics.push(message))).toEqual([]);
@@ -86,7 +86,7 @@ describe("插件目录与展示 IPC", () => {
     writeFileSync(join(root, "package.json"), JSON.stringify({ name: "x", peerDependencies: { "@asterism/sdk": `^${sdkMetadata.version}` }, asterism: { id: "example.test", i18n: { catalogs: { en: "a.json", EN: "b.json" } } } }));
     expect(() => readManifest(root)).toThrow();
   });
-  it("准备业务原因码和 display 穿过命令 IPC；无 display 自定义原因保留英文回退", async () => {
+  it("preparation reason codes and display pass through command IPC; custom reasons without display retain English fallbacks", async () => {
     const ns = pluginNamespace("example.counter"), messages = ns.messages("en", defineMessages({ limit: { id: "limit", defaultMessage: "Limit: {limit}" } }));
     const display = withValues(messages.limit, { limit: 20 });
     const action = defineAction(ns.resource("counter", z.object({})), { id: ns.name("change"), schema: z.object({}) });

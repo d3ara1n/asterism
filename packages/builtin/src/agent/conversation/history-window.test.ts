@@ -18,9 +18,9 @@ function project(path: ReturnType<typeof node>[], window: ConversationHistoryWin
 }
 const ids = (saved: ReturnType<typeof project>) => withLive(saved, []).map(item => item.id);
 
-describe("压缩后的对话阅读范围", () => {
-  // 压缩事件通常晚于近期答复；按事件位置裁剪会误删答复，按用户输入裁剪又会漏掉轮次中间的合法保留点。
-  it("重载按 keptFrom 裁剪，保留轮次中段与最终答复，较早轮次的计量和导航消息一起移出", () => {
+describe("Conversation reading range after compression", () => {
+  // Compression events usually follow recent replies; trimming at the event would remove replies, while trimming at user input would miss valid retention points within a turn.
+  it("Reloading trims at keptFrom, preserves mid-turn content and the final reply, and removes earlier turns' measurements and navigation messages together", () => {
     const path = [
       node("old", null, message("a", "Earlier")),
       node("old-reply", "old", text("a", "old", 0, "Old reply", { completion })),
@@ -39,8 +39,8 @@ describe("压缩后的对话阅读范围", () => {
       .toEqual(["compression-boundary:summary", "kept", "turn-process:u", "reply", "turn-metrics:u"]);
   });
 
-  // 已打开视图收到新摘要时不能突然删掉前文；同一内存阅读窗口重复取用保持边界，新的窗口才采用最新摘要。
-  it("本次阅读保留旧范围并追加压缩标记，重载后从最新保留边界开始", () => {
+  // A new summary must not abruptly remove earlier content from an open view; reusing the same in-memory reading window preserves its boundary, and only a new window adopts the latest summary.
+  it("The current reading session retains its old range and adds a compression marker; reloading starts at the latest retention boundary", () => {
     const path = [node("u", null, message("a", "Work")), node("reply", "u", text("a", "final", 0, "Done", { completion }))];
     const window = new ConversationHistoryWindow();
     project(path, window);
@@ -56,8 +56,8 @@ describe("压缩后的对话阅读范围", () => {
     expect(ids(project(path, new ConversationHistoryWindow()))).toEqual(["compression-boundary:summary2", "next", "next-reply", "turn-metrics:next"]);
   });
 
-  // 历史导航会切换真实路径；上一个分支的压缩边界不能继续裁掉回溯后的内容。
-  it("回溯与换分支按目标路径重新选择边界，其他代理的摘要不改变本代理阅读范围", () => {
+  // History navigation switches the actual path; the previous branch's compression boundary must not keep trimming content after rewinding.
+  it("Rewinding and switching branches select the boundary from the target path; other agents' summaries do not change this agent's reading range", () => {
     const shared = [node("u", null, message("a", "Work")), node("reply", "u", text("a", "r", 0, "Done", { completion }))];
     const branch = [...shared, node("summary", "reply", summary("reply"))];
     const window = new ConversationHistoryWindow();
@@ -69,8 +69,8 @@ describe("压缩后的对话阅读范围", () => {
     expect(ids(project(branch, window))[0]).toBe("compression-boundary:summary");
   });
 
-  // 失败和取消只有瞬态状态，不产生成功摘要；这些状态按原位置展示，分支外活动也不能进入当前对话。
-  it("运行与未完成活动可见但不形成裁剪边界", () => {
+  // Failure and cancellation have only transient state and produce no successful summary; these states appear at their original positions, and activity outside the branch cannot enter the current conversation.
+  it("Running and incomplete activities remain visible without establishing a trimming boundary", () => {
     const path = [node("u", null, message("a", "Work"))];
     const compressions: CompressionActivity[] = [
       { id: "failed", afterNodeId: "u", status: "failed" },

@@ -6,7 +6,7 @@ export interface UsageBridge {
 }
 
 interface Entry { value: ProviderUsageState | null; listeners: Set<() => void>; reread: boolean; pending?: Promise<void>; timer?: ReturnType<typeof setTimeout> }
-/** 全窗口共享的按连接订阅；多个卡片不各自建立轮询，后台窗口暂停刷新。 */
+/** Per-connection subscriptions shared across the entire window; cards do not poll independently, and background windows pause refreshes. */
 export class ProviderUsageClient {
   private entries = new Map<string, Entry>();
   private active = true;

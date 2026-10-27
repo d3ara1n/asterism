@@ -6,21 +6,21 @@ import { IconButton } from "./icon-button"
 import { formatNumberText, limitNumber, parseNumberText, stepNumber } from "../number-input-value"
 
 /**
- * 单输入框数字控件：直接输入任意小数，方向键调整（Shift ×10，Alt ×0.1）。
- * Enter 或失焦时提交，按 precision 舍入并限制到边界；清空或还原按钮回到 defaultValue，Escape 放弃编辑。
- * value 为 null 时以占位文字显示 emptyLabel，辅助技术读作当前值。
+ * Single-field number control: enter arbitrary decimals directly and adjust with arrow keys (Shift ×10, Alt ×0.1).
+ * Commit on Enter or blur, rounding by precision and clamping to bounds; clearing or restoring returns to defaultValue, and Escape discards edits.
+ * When value is null, emptyLabel appears as placeholder text and is read by assistive technology as the current value.
  */
 function NumberInput({
   value, defaultValue, onValueChange, min, max, step = 1, precision = 2, unit, emptyLabel, locale, label, resetLabel, className,
 }: {
   value: number | null
-  /** 清空与还原的目标值；null 表示回到 emptyLabel 状态。 */
+  /** Target value for clearing and restoring; null returns to the emptyLabel state. */
   defaultValue: number | null
   onValueChange: (value: number | null) => void
   min: number
   max: number
   step?: number
-  /** 保留的小数位数。 */
+  /** Number of decimal places to retain. */
   precision?: number
   unit?: string
   emptyLabel?: string
@@ -30,7 +30,7 @@ function NumberInput({
   className?: string
 }) {
   const inputRef = React.useRef<HTMLInputElement>(null)
-  // 提交后先显示新值，不等待外部保存往返。
+  // Display the new value immediately after submission without waiting for the external save round trip.
   const [current, setCurrent] = React.useState(value)
   React.useEffect(() => { setCurrent(value) }, [value])
   const [editing, setEditing] = React.useState<string | null>(null)
@@ -52,7 +52,7 @@ function NumberInput({
   const nudge = (direction: 1 | -1, event: React.KeyboardEvent) => {
     const amount = event.altKey ? step / 10 : event.shiftKey ? step * 10 : step
     const typed = editing === null ? current : parseNumberText(editing)
-    // 空值从 defaultValue 起步；无默认数值时从下限起步。
+    // Empty values step from defaultValue; without a numeric default, they start from the lower bound.
     const base = typeof typed === "number" ? typed : defaultValue ?? min
     setEditing(null)
     apply(stepNumber(base, direction * amount, min, max, precision))

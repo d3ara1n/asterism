@@ -9,7 +9,7 @@ import { Spinner } from "@asterism/ui/ui/spinner";
 import { MetricTooltip } from "../agent/conversation/MetricTooltip";
 import { usageMessages as messages } from "../messages/usage";
 
-/** 查询消费方只理解公开结果类型；不导入任何厂商查询实现或预设。 */
+/** Query consumers understand only public result types; they import no vendor query implementations or presets. */
 export function UsageToolbarItem() {
   const { model } = useAgentModelSelection();
   const { state } = useProviderUsage(model?.providerId ?? null);

@@ -5,38 +5,38 @@ import type { Json } from "./json.ts";
 import type { RendererContentInput } from "./renderer-content.ts";
 
 /**
- * 拖入内容的宿主快照：放下时由宿主从 DataTransfer 读出，事件结束后仍然有效。
- * 文件路径由宿主经桌面桥解析，插件不能伪造。
+ * Host snapshot of dropped content: the host reads it from DataTransfer at drop time, and it remains valid after the event ends.
+ * The host resolves file paths through the desktop bridge; plugins cannot forge them.
  */
 export type DropItem =
-  /** 本机拖入带宿主解析的 path；剪贴板图片等无路径来源只有 file 字节。 */
+  /** Local drops carry a host-resolved path; sources without paths, such as clipboard images, contain only file bytes. */
   | { readonly kind: "file"; readonly file: File; readonly name: string; readonly mime: string; readonly directory: boolean; readonly path?: string }
   | { readonly kind: "url"; readonly url: string }
   | { readonly kind: "text"; readonly text: string };
 
 /**
- * 声明式受理条件：宿主在拖拽悬停时同步匹配，不调用插件函数。
- * 扩展名含前导点、小写；MIME 支持 `image/*` 形式的通配。
+ * Declarative acceptance conditions: the host matches them synchronously during drag hover without calling plugin functions.
+ * Extensions include a leading dot and use lowercase; MIME supports wildcards such as `image/*`.
  */
 export interface DropAccepts {
-  /** requiresPath 只受理带本机路径的条目；directories 隐含需要路径。 */
+  /** requiresPath accepts only items with a local path; directories implicitly requires a path. */
   readonly files?: { readonly requiresPath?: boolean; readonly directories?: boolean; readonly extensions?: readonly string[]; readonly mime?: readonly string[] };
   readonly urls?: { readonly schemes?: readonly string[] };
   readonly text?: boolean;
 }
 
-/** 入口被触发的来源；菜单没有载荷。 */
+/** The source that triggered the entry point; menus have no payload. */
 export type CreationSource = { readonly kind: "menu" } | { readonly kind: "drop"; readonly item: DropItem };
 
-/** 插件自有偏好：宿主按插件隔离、持久化于界面状态；读取时按调用方 schema 校验。 */
+/** Plugin-owned preferences: the host isolates them by plugin and persists them in UI state; reads validate using the caller's schema. */
 export interface RendererPreferences {
   get<T extends Json>(key: string, schema: z.ZodType<T>): T | null;
   set(key: string, value: Json | null): void;
 }
 
 /**
- * 输入阶段组件：可以渲染任意界面（表单、预览等），只能交回输入或取消。
- * resolve 返回宿主创建是否成功；失败时组件保持打开，错误由宿主外壳展示。
+ * Input phase component: can render any UI, such as forms or previews, and can only return input or cancel.
+ * resolve returns whether host creation succeeded; on failure the component stays open and the host shell displays the error.
  */
 export interface CreationInputProps<I = Json> {
   readonly source: CreationSource;
@@ -48,23 +48,23 @@ export interface CreationInputProps<I = Json> {
 }
 
 export interface CreationEntry<I = Json> {
-  /** 全局稳定身份，使用声明插件的命名空间；路由记忆以它为值。 */
+  /** Globally stable identity using the declaring plugin's namespace; routing memory stores this as its value. */
   readonly id: string;
   readonly contract: CreationContract<I, Json, Json>;
   readonly label: UiText;
   readonly description?: UiText;
   readonly icon?: ReactNode;
-  /** 菜单分组；未声明归入资源。 */
+  /** Menu group; defaults to resources when omitted. */
   readonly group?: "agents" | "resources";
   readonly triggers: {
     readonly menu?: { readonly initialInput?: I };
     readonly drop?: { readonly accepts: DropAccepts; toInput(item: DropItem, content: RendererContentInput): I | null | Promise<I | null> };
   };
-  /** 缺省时由触发来源直接产出输入；菜单来源此时必须提供 initialInput。 */
+  /** When omitted, input is produced directly from the trigger source; menu sources must then provide initialInput. */
   readonly InputView?: ComponentType<CreationInputProps<I>>;
 }
 
-/** 类型擦除只发生在注册边界；调用与组件的输入类型由创建契约推导。 */
+/** Type erasure occurs only at the registration boundary; call and component input types are inferred from the creation contract. */
 export function creationEntry<I, O extends Json>(contract: CreationContract<I, Json, O>,
   definition: Omit<CreationEntry<NoInfer<I> & Json>, "contract">): CreationEntry {
   if (!definition.triggers.menu && !definition.triggers.drop) throw new Error(`Creation entry ${definition.id} declares no trigger.`);

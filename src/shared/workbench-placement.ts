@@ -7,8 +7,8 @@ type PlacementNode = {
 };
 
 /**
- * 已有卡片固定，只为新卡片寻找离指定中心最近的空位。
- * 把碰撞转换为新卡片左上角的禁入矩形；最近可行点必在中心投影或矩形边界交点上。
+ * Keep existing cards fixed and find the nearest free position to the specified center for new cards only.
+ * Convert collisions into forbidden rectangles for the new card's top-left corner; nearest feasible points lie at center projections or rectangle boundary intersections.
  */
 export function placeObject(center: Point, size: CardSize, nodes: readonly PlacementNode[]): Point {
   const origin = { x: center.x - size.width / 2, y: center.y - size.height / 2 };
@@ -31,7 +31,7 @@ export function placeObject(center: Point, size: CardSize, nodes: readonly Place
       if (candidateDistance >= distance) break;
       if (occupied.some(box => x > box.left && x < box.right && y > box.top && y < box.bottom)) continue;
       best = { x, y }; distance = candidateDistance;
-      // 同一列后续点离中心更远。
+      // Later points in the same column are farther from the center.
       break;
     }
   }

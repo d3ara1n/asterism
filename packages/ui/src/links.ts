@@ -1,4 +1,4 @@
-/** 模型文本只能打开标准网页；不把模型生成的 URL 当作本机操作入口。 */
+/** Model text can open only standard web pages; model-generated URLs are not local operation entry points. */
 export function externalWebUrl(value: string): string | null {
   try {
     const url = new URL(value);

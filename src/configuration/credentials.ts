@@ -17,7 +17,7 @@ export class CredentialVault {
   async available(): Promise<boolean> { try { return await this.protector.available(); } catch { return false; } }
   exists(reference: string): boolean { return existsSync(this.path(reference)); }
   async write(value: string): Promise<string> {
-    // 主进程在 encrypt 调用内检查系统保护，不重复往返查询可用性。
+    // The main process checks system protection within encrypt; no separate availability round trip is needed.
     const encrypted = await this.protector.encrypt(value);
     const reference = randomUUID();
     try {

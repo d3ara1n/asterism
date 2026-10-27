@@ -10,19 +10,19 @@ export interface WebProviderDefinition {
   label: UiText;
   search: boolean;
   fetch: boolean;
-  /** 完整 URL 的 glob，* 匹配任意字符；fetch 路由按声明顺序匹配。 */
+  /** Glob for the complete URL, with * matching any characters; fetch routing matches in declaration order. */
   urlPatterns: readonly string[];
   defaultBaseUrl: string;
-  /** 所需凭据类型；null 表示无需凭据。 */
+  /** Required credential type; null means no credentials are required. */
   credential: WebCredentialDefinition | null;
-  /** 同步工厂；baseUrl 已去除尾斜杠，credential 为 null 当且仅当 credential 声明为 null。 */
+  /** Synchronous factory; baseUrl has trailing slashes removed, and credential is null if and only if the credential declaration is null. */
   create(context: { baseUrl: string; credential: string | null }): WebProviderInstance;
 }
 export interface WebProviderServices {
   types(): readonly WebProviderType[];
   list(): readonly WebProviderState[];
   get(id: string): WebProviderState | null;
-  /** 返回绑定提供方生命周期的调用门面；id 为提供方类型 slug。 */
+  /** Return an invocation facade bound to the provider lifecycle; id is the provider type slug. */
   resolve(id: string, options: { signal: AbortSignal }): Promise<WebProviderInstance>;
   subscribe(listener: () => void): () => void;
 }

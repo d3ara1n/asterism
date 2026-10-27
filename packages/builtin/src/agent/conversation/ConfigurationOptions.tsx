@@ -14,7 +14,7 @@ export interface ConfigurationChoice {
   navigation?: boolean;
 }
 
-/** 各配置页复用的局部选择列表；浏览高亮与已保存选择分别表达。 */
+/** Local selection list shared by configuration pages; browsing highlights and saved selections are represented separately. */
 export function ConfigurationOptions({ label, options, selected, initialActive = selected, active, disabled, searchPlaceholder, onSelect, onActiveChange, fill = false }: {
   label: string; options: ConfigurationChoice[]; selected: string; initialActive?: string; disabled: boolean; searchPlaceholder?: string;
   active?: string;

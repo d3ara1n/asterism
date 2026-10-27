@@ -50,9 +50,9 @@ function setup() {
   return { root, directory, outside, resource, modules, call, caller };
 }
 
-// 在真实临时目录和执行边界验证授权、批次失败与原子写入，避免影响用户文件。
-describe("目录正文工具", () => {
-  it("文件 read 将 target 范围交给正文读取，模型与数据来自同一次读取", async () => {
+// Verify authorization, batch failure, and atomic writes in real temporary directories at the execution boundary, avoiding user files.
+describe("Directory text tools", () => {
+  it("File read passes the target range to text reading, with model content and data coming from the same read", async () => {
     const { directory, call } = setup();
     writeFileSync(join(directory, "text.txt"), "a\nb\nc");
     const result = await call("read", { path: "text.txt", offset: 2, limit: 1 });
@@ -60,7 +60,7 @@ describe("目录正文工具", () => {
     expect(result.model.some(part => part.kind === "text" && part.text.includes("b"))).toBe(true);
   });
 
-  it("整批编辑失败不落盘；成功落盘保留权限且不留下暂存文件", async () => {
+  it("Failed edit batches write nothing; successful writes preserve permissions and leave no staging files", async () => {
     const { directory, call } = setup(), file = join(directory, "text.txt");
     writeFileSync(file, "a\nb\nc"); chmodSync(file, 0o755);
     const read = textReadSchema.strip().parse((await call("read", { path: "text.txt" })).data);
@@ -75,7 +75,7 @@ describe("目录正文工具", () => {
     expect(readdirSync(directory)).toEqual(["text.txt"]);
   });
 
-  it("write 创建父目录与空文件，覆盖和清空实际文件", async () => {
+  it("write creates parent directories and empty files, and overwrites or empties actual files", async () => {
     const { directory, call } = setup(), file = join(directory, "nested/text.txt");
     expect(await call("write", { path: "nested/text.txt" }, { content: "" })).toMatchObject({ kind: "succeeded", data: { created: true } });
     expect(readFileSync(file, "utf8")).toBe("");
@@ -85,7 +85,7 @@ describe("目录正文工具", () => {
     expect(readFileSync(file, "utf8")).toBe("");
   });
 
-  it("文件 I/O 拒绝二进制与目录，内部链接写入作用于真实文件", async () => {
+  it("File I/O rejects binary data and directories, and writes through internal links affect the real file", async () => {
     const { directory, call } = setup();
     const file = join(directory, "inside.txt");
     writeFileSync(file, "inside"); symlinkSync(file, join(directory, "alias.txt"));
@@ -97,7 +97,7 @@ describe("目录正文工具", () => {
     expect(await call("read", { path: "." })).toMatchObject({ kind: "failed", error: { code: "not_file" } });
   });
 
-  it("see 按文件头识别图片并以文件部件交给模型；非图片拒绝，不按扩展名判断", async () => {
+  it("see identifies images by file headers and delivers file parts to the model; nonimages are rejected without relying on extensions", async () => {
     const { directory, call } = setup();
     const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jX1kAAAAASUVORK5CYII=", "base64");
     writeFileSync(join(directory, "shot.dat"), png);
@@ -109,8 +109,8 @@ describe("目录正文工具", () => {
   });
 
 
-  // 原生正文工具采用后写为准：读取后的外部写入被本次提交覆盖。
-  it("准备后的外部写入被覆盖", async () => {
+  // Native text tools use later-write-wins semantics: this commit overwrites external writes made after the read.
+  it("Overwrites external writes made after preparation", async () => {
     const { directory } = setup();
     const signal = new AbortController().signal;
     const file = join(directory, "text.txt");
@@ -123,8 +123,8 @@ describe("目录正文工具", () => {
     expect(readdirSync(directory)).toEqual(["text.txt"]);
   });
 
-  // rename 原子替换：失败时目标保持原内容，结局为已知失败。
-  it("替换失败时目标保持原样并清理暂存", async () => {
+  // Atomic replacement with rename: failure preserves the target's original content and has a known failure outcome.
+  it("Replacement failure preserves the target and cleans up staging", async () => {
     const { directory, call } = setup();
     writeFileSync(join(directory, "text.txt"), "initial");
     vi.mocked(fs.rename).mockRejectedValueOnce(Object.assign(new Error("I/O failure"), { code: "EIO" }));

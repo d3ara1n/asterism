@@ -5,7 +5,7 @@ import {
   type StreamingPreferences, type StreamingStage,
 } from "./streaming-disclosure.ts";
 
-/** 开合与等待起点随条目保留；定时器只属于当前挂载的视图。 */
+/** Disclosure state and the wait start are retained with the entry; the timer belongs only to the currently mounted view. */
 export function useStreamingDisclosure(
   key: string, stage: StreamingStage, hasContent: boolean, preferences: StreamingPreferences, attention = false,
 ) {

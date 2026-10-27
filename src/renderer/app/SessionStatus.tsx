@@ -15,7 +15,7 @@ function StatusIcon({ status }: { status: ResourceStatus["status"] }) {
   return <SharedStatusIcon tone={tones[status]} icon={status === "awaiting" ? Hand : undefined} className="size-4" />;
 }
 
-/** 独立于会话导航的状态入口；展开只查看条目，不消费标记。 */
+/** State entry independent of session navigation; expanding only views entries and does not consume markers. */
 export function SessionStatus({ marks }: { marks: readonly ResourceStatusMark[] }) {
   const i18n = useI18n(), titleId = useId();
   const status = summarizeResourceStatus(marks);

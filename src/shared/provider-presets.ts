@@ -3,7 +3,7 @@ import { modelProviderInputSchema, type ModelProviderInput } from "./configurati
 export type { ModelProviderPreset } from "@asterism/sdk/contracts";
 export type ModelProviderDraft = Omit<ModelProviderInput, "enabled">;
 
-/** 深复制配置与编辑规则；目录身份和资料不进入已保存连接。 */
+/** Deep-copy configuration and editing rules; catalog identity and metadata stay outside saved connections. */
 export function modelProviderPresetDraft(preset: ModelProviderPreset, occupiedIds: readonly string[] = []): ModelProviderDraft {
   let id = preset.id;
   for (let suffix = 2; occupiedIds.includes(id); suffix++) id = `${preset.id}-${suffix}`;
@@ -11,7 +11,7 @@ export function modelProviderPresetDraft(preset: ModelProviderPreset, occupiedId
   return draft;
 }
 
-/** 所有插件预设经过同一连接校验，拒绝未实现的兼容条目。 */
+/** All plugin presets pass the same connection validation, rejecting unimplemented compatibility entries. */
 export function defineProviderPresets(presets: readonly ModelProviderPreset[]) {
   const ids = new Set<string>();
   const parsed = presets.map(preset => modelProviderPresetSchema.parse(preset));

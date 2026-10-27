@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { applicationBrand } from "../shared/application.ts";
 import { protocolVersion, runtimeMessageSchema, type Command, type CommandResult } from "../shared/contracts.ts";
 
-/** 主进程控制链路上的工作区请求；只发送一次，断线不重放可能已提交的命令，超时视为任务进程失去响应。 */
+/** Workspace requests on the main-process control channel; send once, never replay potentially committed commands after disconnect, and treat timeout as an unresponsive task process. */
 export class RuntimeRequests {
   private pending = new Map<string, { resolve: (value: CommandResult) => void; timer: ReturnType<typeof setTimeout> }>();
   private available = true;

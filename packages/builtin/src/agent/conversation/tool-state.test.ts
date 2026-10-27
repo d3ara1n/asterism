@@ -18,8 +18,8 @@ const live: Extract<ModelLiveBlock, { kind: "toolcall" }> = {
 };
 const data = { path: "src", entries: [{ name: "main.ts", type: "file" as const }], truncated: false };
 
-describe("工具调用的展示投影", () => {
-  it.each(["__proto__", "toString"])("未知一级入口 %s 在填充与终结阶段都使用默认视图", name => {
+describe("Tool call display projection", () => {
+  it.each(["__proto__", "toString"])("Unknown top-level entry %s uses the default view during both input filling and finalization", name => {
     const props: ToolRenderProps = { phase: "settled", name, args: {}, target: null, invocation: {},
       result: { kind: "rejected", data: null, error: { code: "operation_unavailable", message: "Unavailable." } } };
     const view = resolveToolView(props, new ViewRegistry([]));
@@ -29,7 +29,7 @@ describe("工具调用的展示投影", () => {
     expect(toolPreparation(name).length).toBeGreaterThan(0);
   });
 
-  it("填充交给可选视图，等待与执行通过阶段和产出区分", () => {
+  it("Delegates input filling to an optional view and distinguishes waiting from execution through phase and output", () => {
     expect(toolCallState({ ...live, argumentsText: '{"tool":"list",', arguments: { tool: "list" } })).toMatchObject({
       phase: "input", props: { phase: "input", args: { tool: "list" }, result: null },
     });
@@ -39,18 +39,18 @@ describe("工具调用的展示投影", () => {
     });
   });
 
-  it("resource_call 自己将参数和结果交给内部工具，外壳只收到一份视图", () => {
+  it("resource_call forwards arguments and results to the internal tool itself; the shell receives a single view", () => {
     const registry = new ViewRegistry([filesystem]);
     const state = toolCallState({ ...live, state: "executing", arguments: args, invocation, result: { kind: "running", data } });
     const view = resolveToolView(state.props!, registry);
     expect(view.props).toMatchObject({ name: "list", target: { path: "src" }, args: {}, result: { kind: "running", data } });
     expect(isValidElement<ToolRenderProps>(view.header) && view.header.props.invocation.resource?.title).toBe("Saved title");
     expect(isValidElement<ToolRenderProps>(view.body) && view.body.props.result).toEqual({ kind: "running", data });
-    // 一级固定入口不依赖模块工具目录。
+    // Fixed top-level entry points do not depend on the module tool catalog.
     expect(resolveToolView({ ...state.props!, phase: "settled", name: "resource_list", args: {}, invocation: {}, result: { kind: "succeeded", data: { resources: [] } } }, new ViewRegistry([])).body).toBeDefined();
   });
 
-  it("取消后的历史仍交给内部工具两个 renderer，资源身份取自保存结果", () => {
+  it("Cancelled history still reaches both internal tool renderers, with resource identity taken from the saved result", () => {
     const node: Extract<TimelineItem, { kind: "toolcall" }> = {
       id: "saved", createdAt: "2026-10-01", kind: "toolcall",
       responseId: "r", requestParentId: null, ordinal: 0, complete: true, source: { model: "p/m", adapter: "test", scope: "test" }, continuation: null,
@@ -65,7 +65,7 @@ describe("工具调用的展示投影", () => {
     expect(toolCallState({ ...node, complete: false, outcome: null })).toEqual({ phase: "incomplete", props: null });
   });
 
-  it("write 的部分参数交付填充视图，后续阶段保留当次目标与参数", () => {
+  it("Partial write arguments reach the input view, while subsequent phases retain that call's target and arguments", () => {
     const registry = new ViewRegistry([filesystem]);
     const props: ToolInputRenderProps = { phase: "input", name: "resource_call", target: null, result: null,
       invocation: { ...invocation, implementation: reference(DirectoryWrite) },

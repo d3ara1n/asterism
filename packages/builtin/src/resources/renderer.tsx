@@ -22,7 +22,7 @@ function ResourceType({ kind }: { kind: string }) {
   </Badge>;
 }
 
-/** 结果保留当次类型；当前入口目录只补充尚未终结的调用。 */
+/** Results retain the type from that call; the current entry-point catalog only supplements calls that have not finished. */
 function CreationHeader({ label, creationId, kind, title }: {
   label: string; creationId?: string; kind?: string; title?: string;
 }) {

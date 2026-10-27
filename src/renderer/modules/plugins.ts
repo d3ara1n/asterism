@@ -10,7 +10,7 @@ import type { RendererModule, RendererPlugin } from "@asterism/sdk/renderer";
 import { awaitStartup } from "../app/boot.ts";
 import { loadPluginStylesheet } from "./plugin-styles.ts";
 
-/** 共享模块白名单：插件 bundle 的这些导入解析到宿主同一实例，保证只有一个 React。 */
+/** Shared module allowlist: these imports in plugin bundles resolve to the same host instances, ensuring a single React instance. */
 (globalThis as Record<string, unknown>).__asterismRendererModules = {
   react: React, "react/jsx-runtime": ReactJsx, "react-dom": ReactDom, "react-dom/client": ReactDomClient,
   zod, "@asterism/sdk/contracts": sdkContracts, "@asterism/sdk/renderer": sdkRenderer,
@@ -43,7 +43,7 @@ export function validateRendererPlugin(plugin: RendererPlugin | undefined): asse
       throw new Error("Renderer modules must declare { resources, cards, tools }.");
   }
 }
-/** 按公共依赖装配；导入、视图冲突或提供方失败均阻止其消费者。 */
+/** Assemble by public dependencies; import failures, view conflicts, or provider failures block consumers. */
 export async function loadPluginRenderers(entries: readonly RendererEntry[], options: {
   available?: readonly string[];
   signal?: AbortSignal;
@@ -96,7 +96,7 @@ export async function loadPluginRenderers(entries: readonly RendererEntry[], opt
   };
   for (const entry of entries) {
     try { await visit(entry.id); }
-    catch { options.signal?.throwIfAborted(); /* 本插件及依赖失败均已记录；继续装配无关插件。 */ }
+    catch { options.signal?.throwIfAborted(); /* Failures in this plugin and its dependencies are already logged; continue assembling unrelated plugins. */ }
   }
   return { modules, failures };
 }

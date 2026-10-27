@@ -8,8 +8,8 @@ import type { StartupStage } from "../shared/startup.ts";
 import type { PluginStorageFailure } from "../shared/recovery.ts";
 
 /**
- * 任务进程监护与控制链路：启动、存活、退出流程与凭据解密留在主进程。
- * renderer 的业务流量经直连端口进入任务进程，不经此处转发。
+ * Task process supervision and control: startup, liveness, shutdown, and credential decryption stay in the main process.
+ * Renderer business traffic enters the task process over direct ports without forwarding here.
  */
 export class RuntimeHost {
   private child: UtilityProcess | null = null;
@@ -17,8 +17,8 @@ export class RuntimeHost {
   private status: RuntimeStatus = "starting";
   private heartbeat: ReturnType<typeof setInterval> | null = null;
   /**
-   * 存活检测：就绪后定期 ping，超过期限没有 pong 视为卡死并结束进程。
-   * renderer 直连请求不设等待期限，任务进程失联由此转为 unavailable 状态通知。
+   * Liveness detection: ping periodically after readiness; terminate as hung if no pong arrives before the deadline.
+   * Direct renderer requests have no wait deadline; loss of the task process becomes an unavailable notification here.
    */
   constructor(private readonly onStatus: (status: RuntimeStatus) => void,
     private readonly liveness = { intervalMs: 5_000, timeoutMs: 15_000 },
@@ -49,7 +49,7 @@ export class RuntimeHost {
         child.kill();
         reject(error);
       };
-      // 总等待期限覆盖构建、导入与同步装配，进度消息不延长它。
+      // The total deadline covers build, import, and synchronous assembly; progress messages do not extend it.
       const timeout = setTimeout(() => fail(Object.assign(new Error("Task runtime initialization timed out after 60 seconds."), { reason: "timeout" })), 60_000);
       let lastPong = 0;
       const watch = () => {
@@ -64,7 +64,7 @@ export class RuntimeHost {
             child.kill();
             return;
           }
-          try { child.postMessage({ kind: "ping" }); } catch { /* 退出由 exit 事件处理。 */ }
+          try { child.postMessage({ kind: "ping" }); } catch { /* The exit event handles termination. */ }
         }, this.liveness.intervalMs);
       };
       child.on("error", () => {
@@ -75,7 +75,7 @@ export class RuntimeHost {
         if (raw?.kind === "secret.request") {
           void handleSecretRequest(raw).then(response => {
             if (response && this.child === child && this.status !== "stopping") {
-              try { child.postMessage(response); } catch { /* 子进程可能已退出；不记录凭据消息。 */ }
+              try { child.postMessage(response); } catch { /* The child may have exited; do not log credential messages. */ }
             }
           });
           return;
@@ -114,7 +114,7 @@ export class RuntimeHost {
     return this.requests.execute(command);
   }
 
-  /** 把 renderer 直连的一端交给任务进程；不可用时返回 false，调用方关闭另一端。 */
+  /** Hand one end of the renderer's direct connection to the task process; return false if unavailable so the caller closes the other end. */
   connect(id: string, port: MessagePortMain): boolean {
     if (!this.ready) return false;
     try { this.child!.postMessage({ kind: "connection.open", id }, [port]); return true; }
@@ -122,7 +122,7 @@ export class RuntimeHost {
   }
   disconnect(id: string): void {
     if (!this.ready) return;
-    try { this.child!.postMessage({ kind: "connection.close", id }); } catch { /* 子进程已退出。 */ }
+    try { this.child!.postMessage({ kind: "connection.close", id }); } catch { /* The child has exited. */ }
   }
 
   private stopHeartbeat(): void {

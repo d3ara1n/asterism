@@ -13,7 +13,7 @@ afterEach(() => {
   for (const storage of storages.splice(0)) storage.close();
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
-// 测试用可逆保护：只验证命名空间隔离，不涉及系统加密。
+// Reversible test protection verifies namespace isolation only, without system encryption.
 const protector = {
   available: async () => true,
   encrypt: async (value: string) => Buffer.from(value).toString("base64"),
@@ -31,8 +31,8 @@ function setup() {
   return { root, open, warnings };
 }
 
-describe("插件托管存储", () => {
-  it("一个插件一份配置契约，默认值与界面快照不反向修改声明", () => {
+describe("Plugin managed storage", () => {
+  it("one configuration contract per plugin; defaults and UI snapshots do not mutate declarations", () => {
     const { open } = setup();
     const storage = open("acme.settings");
     const contract = defineConfig("acme.settings", z.strictObject({ limit: z.number().int().min(1) }).meta({ title: "Limits" }), { limit: 5 });
@@ -46,7 +46,7 @@ describe("插件托管存储", () => {
     (snapshot.defaults as { limit: number }).limit = 123;
     expect(storage.configuration("acme.settings")?.defaults).toEqual({ limit: 5 });
   });
-  it("界面读取保留损坏文件，保存使用原始 Zod refinement，恢复只清理配置文件", () => {
+  it("UI reads preserve corrupt files, saves use original Zod refinements, and restoration cleans configuration files only", () => {
     const { open } = setup();
     const storage = open("acme.settings");
     const schema = z.strictObject({ lower: z.number(), upper: z.number() })
@@ -67,7 +67,7 @@ describe("插件托管存储", () => {
     expect(existsSync(join(storage.dir, managedDirectory, "db.sqlite"))).toBe(true);
     expect(config.get()).toEqual({ lower: 1, upper: 2 });
   });
-  it("配置不合 schema 时回退默认值并告警，更新基于当前值，非法值被拒绝", () => {
+  it("schema-invalid configuration falls back to defaults with warnings, updates use current values, and invalid values are rejected", () => {
     const { open, warnings } = setup();
     const storage = open("acme.a");
     const config = storage.config(defineConfig("acme.a", z.strictObject({ limit: z.number().int() }), { limit: 5 }));
@@ -81,7 +81,7 @@ describe("插件托管存储", () => {
     config.update(value => ({ limit: value.limit + 1 }));
     expect(config.get()).toEqual({ limit: 10 });
   });
-  it("设置页保存、恢复与后台更新都通知订阅者和宿主，退订后不再通知", () => {
+  it("settings saves, restoration, and backend updates notify subscribers and the host until unsubscribe", () => {
     const { open } = setup();
     const storage = open("acme.a");
     const hosted: number[] = [];
@@ -99,7 +99,7 @@ describe("插件托管存储", () => {
     expect(seen).toEqual([2, 3, 1]);
   });
 
-  it("两个插件的同名凭据互不可见，插件目录不存明文", async () => {
+  it("two plugins cannot see each other's same-name credentials and plugin directories contain no plaintext", async () => {
     const { open } = setup();
     const a = open("acme.a"), b = open("acme.b");
     await a.secrets.set("token", "secret-a");
@@ -111,7 +111,7 @@ describe("插件托管存储", () => {
     expect(await a.secrets.get("token")).toBeNull();
   });
 
-  it("数据库是插件托管目录内的独立文件", () => {
+  it("databases are independent files in plugin-managed directories", () => {
     const { root, open } = setup();
     const storage = open("acme.a");
     storage.db().exec("CREATE TABLE t (x)");

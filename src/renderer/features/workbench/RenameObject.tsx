@@ -13,7 +13,7 @@ import { objectsMessages } from "../../messages/objects";
 import { useI18n } from "../../shared/i18n";
 import { useWorkbench } from "./context";
 
-/** 草稿取打开时的标题，资源投影更新不覆盖正在编辑的输入。 */
+/** The draft takes the title at opening; resource projection updates do not overwrite input being edited. */
 export function RenameObject({ object, onClose, onRestoreFocus }: {
   object: WorkbenchObject; onClose: () => void; onRestoreFocus: () => void;
 }) {

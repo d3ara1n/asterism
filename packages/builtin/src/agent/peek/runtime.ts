@@ -22,7 +22,7 @@ const system = { blocks: [{
   ].join("\n"),
 }] };
 
-/** 估算仅用于请求预算；结果计量始终使用每轮模型实报，未知值保留 null。 */
+/** Estimates are used only for request budgets; result measurements always use each round's actual model report, preserving unknown values as null. */
 function estimate(value: unknown): number {
   let tokens = 0;
   for (const char of JSON.stringify(value)) tokens += char.codePointAt(0)! < 128 ? 1 / 3 : 2;
@@ -50,7 +50,7 @@ publish: (data: PeekResult) => void): Promise<CallResult<PeekResult>> {
   const target: ModelTarget = { role: "utility", model: role.model, ...(role.thinking ? { thinking: role.thinking } : {}) };
   const outputLimit = Math.min(maxOutputTokens, Math.max(1, Math.floor((model.contextWindow ?? 65536) / 8)));
   const inputBudget = model.contextWindow === null ? null : Math.floor((model.contextWindow - outputLimit) * 0.8);
-  // 概览留出问题、工具声明和后续检索空间；原文不受概览预算影响。
+  // The overview reserves space for the question, tool declarations, and subsequent retrieval; its budget does not affect original text.
   const overviewBudget = Math.min(18000, Math.max(0, Math.floor((inputBudget ?? 32000) / 4)));
   const messages: ModelItem[] = [{ kind: "input", parts: [{ kind: "text", text: JSON.stringify({
     question: args.question, snapshot: data.snapshot, includeThinking: args.includeThinking === true,
@@ -70,7 +70,7 @@ publish: (data: PeekResult) => void): Promise<CallResult<PeekResult>> {
       signal.throwIfAborted();
       if (inputBudget !== null && estimate({ system, messages, tools: retrievalTools }) > inputBudget)
         return { kind: "failed", data, error: { code: "peek_context_overflow", message: "The investigation reached the utility model's estimated input capacity." } };
-      // 检索状态覆盖下一请求的等待期，直到新思考／报告到达；瞬时状态也能经过宿主进度合并。
+      // Retrieval status covers the next request's wait until new thinking/report content arrives; even momentary states can pass through host progress coalescing.
       data.round = round; update(round === 1 ? "investigating" : data.phase, "");
       const response = await collectPeekResponse(deps.models.stream({
         target, system, messages, tools: retrievalTools, signal, maxOutputTokens: outputLimit,
@@ -86,7 +86,7 @@ publish: (data: PeekResult) => void): Promise<CallResult<PeekResult>> {
         },
       });
       if (response.finish.reason === "length") {
-        // 输出截断保留报告文字；内部查询只在完整正常响应之后执行。
+        // Output truncation preserves report text; internal queries execute only after a complete normal response.
         data.report = response.report;
         return data.report ? { kind: "partial", data, message: "The report reached the model output limit." }
           : { kind: "failed", data, error: { code: "peek_output_limit", message: "The investigation reached the model output limit before producing a report." } };

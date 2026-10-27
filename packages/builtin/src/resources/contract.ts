@@ -2,7 +2,7 @@ import { z } from "zod";
 import { jsonSchema } from "@asterism/sdk/contracts";
 import { builtin } from "@asterism/builtin-api/contracts";
 
-/** 顶层工具的结果身份由后台与视图共享，保留实际调用时的目录与资源信息。 */
+/** Top-level tool result identities are shared by the backend and views, retaining catalog and resource information from the actual call. */
 export const AgentListResult = builtin.data("agent.list",
   z.array(z.strictObject({
     id: z.string(), description: z.string(),

@@ -4,7 +4,7 @@ import type { ObjectReader } from "./objects.ts";
 import type { Source } from "./workspace.ts";
 
 export type CallContext<S extends CallScope = CallScope> = {
-  /** 后台插件调用由宿主绑定来源；桌面用户调用为 null。 */
+  /** The host binds the source for backend plugin calls; null for desktop user calls. */
   readonly source: Source;
   readonly signal: AbortSignal;
 } & (S extends "object" ? { readonly object: ObjectReader } : { readonly object?: never });

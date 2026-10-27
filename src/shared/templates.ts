@@ -11,7 +11,7 @@ export const templateSummarySchema = z.strictObject({
 export type TemplateObjectSummary = z.infer<typeof templateObjectSummarySchema>;
 export type TemplateSummary = z.infer<typeof templateSummarySchema>;
 
-/** 静态对象数据与关系；条目身份只用于模板内部关联。 */
+/** Static object data and relationships; entry identities serve internal template association only. */
 export const templateDataSchema = z.strictObject({
   objects: z.array(templateObjectSummarySchema.extend({
     data: z.record(z.string(), jsonSchema),

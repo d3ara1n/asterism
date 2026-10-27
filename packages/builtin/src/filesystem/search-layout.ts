@@ -2,7 +2,7 @@ import type { GrepArgs } from "@asterism/builtin-api/contracts";
 import type { GrepResult } from "./search-contract.ts";
 import { displayText } from "../shared/text-row.ts";
 
-/** 界面路径相对所选搜索目标；选中单个文件时保留文件名，选区外的路径原样显示。 */
+/** Display paths are relative to the selected search target; single-file selections retain the filename, and paths outside the selection are shown unchanged. */
 export function displayPath(base: string, path: string): string {
   const prefix = base.split("/").filter(part => part && part !== ".").join("/");
   if (!prefix) return path;
@@ -14,14 +14,14 @@ export function splitPath(path: string): { directory: string; name: string } {
   return index < 0 ? { directory: "", name: path } : { directory: path.slice(0, index), name: path.slice(index + 1) };
 }
 const compare = (a: string, b: string) => a < b ? -1 : a > b ? 1 : 0;
-/** 按（目录，文件名）排序，使同一目录连续；根层条目排在最前。 */
+/** Sorts by (directory, filename), keeping each directory contiguous and root-level entries first. */
 function byLocation(a: string, b: string): number {
   const left = splitPath(a), right = splitPath(b);
   return compare(left.directory, right.directory) || compare(left.name, right.name);
 }
 
 export interface DirectoryGroup<T> { directory: string; entries: { name: string; item: T }[] }
-/** ripgrep 并行遍历的顺序不定；展示按位置排序后取预算内条目，再按目录分组。 */
+/** ripgrep's parallel traversal order is nondeterministic; display sorts by location, takes entries within budget, then groups by directory. */
 export function groupByDirectory<T>(items: readonly T[], pathOf: (item: T) => string, limit: number) {
   const sorted = [...items].sort((a, b) => byLocation(pathOf(a), pathOf(b)));
   const groups: DirectoryGroup<T>[] = [];
@@ -37,7 +37,7 @@ export function groupByDirectory<T>(items: readonly T[], pathOf: (item: T) => st
 type Row = GrepResult["rows"][number];
 export interface GrepSegment { rows: { line: number; content: string; match: boolean }[] }
 export interface GrepFile { path: string; matches: number; segments: GrepSegment[]; omitted: number }
-/** content 结果按文件聚合、文件内按行号排序；连续行合成一段，长行片段以省略号标出两端，每个文件各自承担行预算。 */
+/** content results are grouped by file and sorted by line number within each file; consecutive lines form an excerpt, long-line excerpts mark both ends with ellipses, and each file has its own line budget. */
 export function grepFiles(rows: readonly Row[], limit: number): GrepFile[] {
   const byPath = new Map<string, Row[]>();
   for (const row of rows) {
@@ -62,7 +62,7 @@ export type SearchOption =
   | { kind: "context" | "limit"; value: number }
   | { kind: "mode"; value: "files" | "count" }
   | { kind: "glob"; value: string };
-/** 只列出偏离默认值的参数；部分 JSON 参数中形状不明的字段直接忽略。 */
+/** Lists only arguments that differ from defaults; fields of unclear shape in partial JSON arguments are ignored. */
 export function searchOptions(args: unknown): SearchOption[] {
   if (args === null || typeof args !== "object" || Array.isArray(args)) return [];
   const value = args as Partial<Record<keyof GrepArgs, unknown>>;
@@ -79,7 +79,7 @@ export function searchOptions(args: unknown): SearchOption[] {
   return options;
 }
 
-/** 空结果时提示仍生效的筛选：hidden 未开启时隐藏项被跳过，noIgnore 未开启时 ignore 文件生效。 */
+/** For empty results, explains filters still in effect: hidden entries are skipped unless hidden is enabled, and ignore files apply unless noIgnore is enabled. */
 export function searchFilters(args: unknown): "both" | "hidden" | "ignored" | null {
   const value = args !== null && typeof args === "object" && !Array.isArray(args) ? args as { hidden?: unknown; noIgnore?: unknown } : {};
   const hidden = value.hidden !== true, ignored = value.noIgnore !== true;

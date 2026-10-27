@@ -6,7 +6,7 @@ export function schemaOf(schema: z.ZodType<Json>): Json {
   return jsonSchema.parse(z.toJSONSchema(schema));
 }
 
-/** 两层工具使用同一份定义投影；资源实现另行补充 target/result。 */
+/** Both tool layers share definition projection; resource implementations add target/result separately. */
 export function projectTool(tool: ToolContract) {
   return {
     name: tool.name,
@@ -16,7 +16,7 @@ export function projectTool(tool: ToolContract) {
   };
 }
 
-/** provider 不认识 guidelines 字段，固定入口将指导一起投影为协议说明。 */
+/** Providers do not recognize guidelines; fixed entries project guidance into protocol descriptions. */
 export function declareTool(tool: ToolContract) {
   const { name, description, guidelines, args } = projectTool(tool);
   return {

@@ -8,7 +8,7 @@ import { workbenchMessages as messages } from "../../messages/workbench";
 import { useI18n } from "../../shared/i18n";
 import type { WorkbenchPhase } from "./feedback";
 
-/** 工作台只承接视图等待与读取异常；普通操作进度由发起处呈现。 */
+/** The workbench handles only view waiting and read errors; ordinary operation progress is displayed at the initiating entry. */
 export function WorkbenchFeedback({ phase, hasContent, error, onRetry }: {
   phase: WorkbenchPhase; hasContent: boolean; error: UiText | null; onRetry(): void;
 }) {

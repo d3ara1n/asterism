@@ -4,7 +4,7 @@ import { promisify } from "node:util";
 
 const execute = promisify(execFile);
 
-/** 进程表的 pid／ppid 对；Windows 经 CIM 查询，其余平台用 ps。 */
+/** pid/ppid pairs from the process table; queried through CIM on Windows and ps on other platforms. */
 async function processTable(): Promise<string> {
   if (process.platform === "win32") {
     const powershell = join(process.env.SystemRoot ?? "C:\\Windows", "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
@@ -16,7 +16,7 @@ async function processTable(): Promise<string> {
   return stdout;
 }
 
-/** 由 pid／ppid 文本求 root 的全部后代，深层后代排在其父进程之前。 */
+/** Finds all descendants of root from pid/ppid text, ordering deeper descendants before their parents. */
 export function descendantsIn(table: string, root: number): number[] {
   const children = new Map<number, number[]>();
   for (const line of table.trim().split(/\r?\n/u)) {
@@ -29,14 +29,14 @@ export function descendantsIn(table: string, root: number): number[] {
   return walk(root);
 }
 
-/** 父进程退出前取得后代快照，退出后进程表的父子关系会丢失。 */
+/** Captures descendants before the parent exits, since the process table loses parent-child relationships after exit. */
 export async function descendantsOf(root: number): Promise<number[]> {
   return descendantsIn(await processTable(), root);
 }
 
 /**
- * 先取后代快照，再由调用方优雅关闭直接子进程，最后强制结束仍存活的后代。
- * 包装命令（npx、uvx、shell 脚本）的实际服务器常是孙进程，直接子进程退出不会带走它们。
+ * Capture descendants first, then let the caller gracefully close the direct child, and finally force termination of surviving descendants.
+ * Actual servers behind wrapper commands (npx, uvx, shell scripts) are often grandchildren and survive the direct child's exit.
  */
 export async function closeProcessTree(pid: number | null, close: () => Promise<void>): Promise<void> {
   if (!pid) return close();

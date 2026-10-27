@@ -12,7 +12,7 @@ function center(objects: readonly LayoutObject[]): Point {
   return { x: (left + right) / 2, y: (top + bottom) / 2 };
 }
 
-/** 显式整理可见对象；使用完整矩形与真实有向链接，结果保持原图中心。 */
+/** Explicitly arrange visible objects using complete rectangles and real directed links; preserve the original graph center. */
 export async function arrangeObjects(
   objects: readonly LayoutObject[], links: WorkbenchSnapshot["links"], signal?: AbortSignal,
 ): Promise<{ objectId: string; position: Point }[]> {
@@ -46,7 +46,7 @@ export async function arrangeObjects(
   const arranged = objects.map(object => ({
     ...object, position: { x: byId.get(object.id)!.x!, y: byId.get(object.id)!.y! },
   }));
-  // ELK 根容器包含路由空间；工作台只采用节点位置，两侧均按卡片矩形计算中心。
+  // The ELK root container includes routing space; the workbench uses only node positions, so both centers are calculated from card rectangles.
   const before = center(objects), after = center(arranged);
   return arranged.map(object => ({ objectId: object.id,
     position: { x: object.position.x + before.x - after.x, y: object.position.y + before.y - after.y } }));

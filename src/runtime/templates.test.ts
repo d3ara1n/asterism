@@ -62,9 +62,9 @@ async function start(app: ApplicationService, templateId: string) {
   return reply.sessionId;
 }
 
-// 创建记录不含笔记正文和代理选择；只复制创建 data 会漏数据，只复制会话又会夹带历史。
-// 模板应取保存时的对象当前值，所有新身份与链接独立，同时保留所选子图和布局。
-it("保存完整对象数据与所选关系，重复使用创建独立对象且不复制历史", async () => {
+// Creation records omit note bodies and agent selections; copying only creation data loses values, while copying sessions includes history.
+// Templates use current object values at save time, with independent new identities and links while preserving selected subgraphs and layout.
+it("saves complete object data and selected relationships; reuse creates independent objects without copying history", async () => {
   const { app, plugin } = open();
   const sessionId = app.sessions.tree.create("Source");
   const session = plugin.session(sessionId);
@@ -117,15 +117,15 @@ it("保存完整对象数据与所选关系，重复使用创建独立对象且�
   expect(app.execute({ type: "workspace.read" }).templates[0]?.objects.map(object => object.title)).toEqual(["A", "B", "Checklist", agent.title]);
 });
 
-// 模板在源会话之外保留文件；只有记录/当前数据根会导致源会话删除后启动回收误删内容。
-it("源会话删除并重启后模板仍保留文件，新会话接管内容根后可独立删除模板", async () => {
+// Templates retain files outside source sessions; record/current-data roots alone would allow startup reclamation to delete content after source-session deletion.
+it("templates retain files after source-session deletion and restart and can be independently deleted once new sessions take over content roots", async () => {
   const first = open();
   const sourceId = first.app.sessions.tree.create("Source");
   const source = await first.plugin.session(sourceId).create(Create, { title: "File", seed: "", file: null });
   const object = first.plugin.object(sourceId, Item, source.id);
   await first.plugin.session(sourceId).invoke(Generate, source, "retained bytes");
   const file = object.get(State)!.file!;
-  // 同一文件还作为另一对象的创建数据，覆盖两种持久根的交接。
+  // The same file is also another object's creation data, covering handoff between both persistent root kinds.
   const seed = await first.plugin.session(sourceId).create(Create, { title: "Seed", seed: "", file }, { content: object.content });
   const templateId = await save(first.app, sourceId, [source, seed]);
   await close(first.app);
@@ -148,8 +148,8 @@ it("源会话删除并重启后模板仍保留文件，新会话接管内容根�
   expect(third.app.execute({ type: "workspace.read" }).templates).toEqual([]);
 });
 
-// 插件更新可能撤回接收链接资格；链接失败发生在对象已写入之后，整个模板创建仍须回滚。
-it("建立链接失败时不留下半个会话，模板仍可读取", async () => {
+// Plugin updates may withdraw link reception; link failures after object writes must still roll back the entire template creation.
+it("link failures leave no partial sessions and templates remain readable", async () => {
   const first = open();
   const sessionId = first.app.sessions.tree.create("Source");
   const session = first.plugin.session(sessionId);
@@ -164,8 +164,8 @@ it("建立链接失败时不留下半个会话，模板仍可读取", async () =
   expect(second.app.execute({ type: "workspace.read" }).templates.map(template => template.id)).toEqual([templateId]);
 });
 
-// 保存以处理时的当前路径为准；已移除对象不能从历史或遗留 session_data 中复活到模板。
-it("拒绝保存已离开当前路径的所选对象", async () => {
+// Save against the current path at processing time; removed objects cannot reappear in templates from history or leftover session_data.
+it("rejects saving selected objects that have left the current path", async () => {
   const { app, plugin } = open();
   const sessionId = app.sessions.tree.create("Source");
   const session = plugin.session(sessionId);

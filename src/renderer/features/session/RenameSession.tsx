@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Field, FieldLabel } from "@asterism/ui/ui/field";
 import { Input } from "@asterism/ui/ui/input";
 
-/** 草稿只在打开时取当前标题；后续自动命名和视图刷新不覆盖用户输入。 */
+/** The draft takes the current title only when opened; subsequent automatic naming and view refreshes do not overwrite user input. */
 export function RenameSession({ title, disabled, onSave, onClose, onRestoreFocus }: {
   title: string; disabled: boolean; onSave: (title: string) => Promise<SessionResult>;
   onClose: () => void; onRestoreFocus: () => void;

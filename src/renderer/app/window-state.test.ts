@@ -2,8 +2,8 @@ import { expect, it, vi } from "vitest";
 import type { DesktopWindowState } from "../../shared/desktop";
 import { getDesktopWindowState, startDesktopWindow } from "./window-state";
 
-// 首帧前先订阅再读取，初始读取与事件按收到的顺序采用。
-it("先订阅再读取，直接采用每次收到的窗口状态", async () => {
+// Subscribe before reading ahead of the first frame; adopt the initial read and events in the order received.
+it("subscribes before reading and directly adopts each received window state", async () => {
   let receive!: (state: DesktopWindowState) => void;
   let resolve!: (state: DesktopWindowState) => void;
   const unsubscribe = vi.fn();
@@ -26,8 +26,8 @@ it("先订阅再读取，直接采用每次收到的窗口状态", async () => {
   expect(unsubscribe).toHaveBeenCalledOnce();
 });
 
-// 全屏内刷新不保证再次收到事件，初始读取必须能单独建立正确布局。
-it("没有切换通知时也使用当前快照，读取失败时释放订阅", async () => {
+// Refreshing in fullscreen does not guarantee another event; the initial read must establish the correct layout on its own.
+it("uses the current snapshot even without a change notification and releases the subscription on read failure", async () => {
   const stop = await startDesktopWindow({
     get: async () => ({ titleBar: "overlay", fullScreen: true }),
     onChanged: () => () => {},

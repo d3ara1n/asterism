@@ -18,7 +18,7 @@ const nouns = [
   "River", "Seal", "Sparrow", "Star", "Stone", "Tiger", "Willow", "Wolf",
 ];
 
-/** 创建时生成展示名称；资源身份由宿主管理，名称允许重复。 */
+/** Generates a display name at creation; the host manages resource identity, and duplicate names are allowed. */
 export function generateAgentName(): string {
   return adjectives[randomInt(adjectives.length)]! + nouns[randomInt(nouns.length)]!;
 }

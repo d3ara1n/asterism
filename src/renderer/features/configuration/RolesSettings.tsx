@@ -22,10 +22,10 @@ import { useConfigurationAction, useSettingsConfiguration } from "./state";
 
 const UNSET = "__unset";
 const thinkingLabel = (level: ThinkingLevel) => getI18n().text(thinkingLabels[level]);
-/** 角色值等于内置值时撤下覆盖，界面只显示生效值。 */
+/** Remove overrides when role values equal built-in values; the UI shows only effective values. */
 const toOverride = <T,>(next: T, inherited: T): T | undefined => next === inherited ? undefined : next;
 
-/** 行内模型选择：未设置表示 null；失效引用单独警示。 */
+/** Inline model selection: unset means null; invalid references receive a separate warning. */
 function ModelSelect({ value, onChange, disabled }: { value: string | null; onChange: (value: string | null) => void; disabled?: boolean }) {
   const i18n = useI18n();
   const { snapshot } = useSettingsConfiguration();
@@ -90,7 +90,7 @@ function RoleRow({ role, snapshot, selected, onOpen }: {
 }) {
   const i18n = useI18n();
   const { run, busy } = useConfigurationAction("toast");
-  // 行内修改即时保存：在现有覆盖上替换单个字段，与内置值相同则撤下。
+  // Inline changes save immediately: replace a single field in existing overrides, removing it when it matches the built-in value.
   const patch = <K extends keyof ModelRoleOverrides>(field: K, next: ModelRoleOverrides[K]) => {
     const base = snapshot.defaults.roles[role.builtin ? role.id : "default"]!;
     const overrides = { ...snapshot.overrides.roles[role.id] };
@@ -108,7 +108,7 @@ function RoleRow({ role, snapshot, selected, onOpen }: {
       <Switch aria-label={i18n.formatMessage(rolesMessages.enableRole, { role_name: role.id })} checked={role.enabled} disabled={busy} onCheckedChange={next => patch("enabled", next)} />
     </>} />;
 }
-/** 详情只放低频字段；模型、思考与启用是行内即时操作，草稿不持有，避免互相覆盖。 */
+/** Details contain only infrequent fields; model, thinking, and enabling are immediate inline actions excluded from the draft to prevent mutual overwrites. */
 function RoleEditor({ initialId, onSaved }: { initialId: string | null; onSaved(id: string): void }) {
   const i18n = useI18n();
   const slugField = useId();

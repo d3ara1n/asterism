@@ -16,7 +16,7 @@ const throughput = (i18n: I18n, value: number | null) => value === null ? "—"
   : i18n.formatMessage(messages.tps, { value: i18n.formatNumber(value, { maximumFractionDigits: 1 }) });
 const count = (value: number | null) => value === null ? "—" : formatCount(value);
 
-/** 每个已收束轮次的只读概要；用量归缓存详情，耗时与速率归吞吐详情。 */
+/** Read-only summary for each settled turn; usage belongs in cache details, while duration and rates belong in throughput details. */
 export function TurnMetrics({ metrics, incomplete }: { metrics: TurnMetricsData; incomplete: boolean }) {
   const i18n = useI18n();
   const title = i18n.text(messages.turn);

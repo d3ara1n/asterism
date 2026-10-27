@@ -14,8 +14,8 @@ import { prepareData, restorePoint, startFresh, type DataPath, type PluginStorag
 import type { PreparationProgress } from "../shared/recovery.ts";
 
 /**
- * 恢复点覆盖的应用数据；缓存（`ui-state.json`、插件构建缓存、Chromium、日志）不迁移也不备份。
- * 新增宿主持久文件时在此登记，并在 `hostStorages` 声明格式。
+ * Application data covered by recovery points; caches (`ui-state.json`, plugin builds, Chromium, logs) are neither migrated nor backed up.
+ * Register new host persistent files here and declare formats in `hostStorages`.
  */
 export const applicationDataPaths: readonly DataPath[] = [
   { path: applicationStorage.databaseDirectory },
@@ -29,7 +29,7 @@ export const applicationDataPaths: readonly DataPath[] = [
   { path: join(applicationStorage.contentDirectory, "sealed"), link: true },
 ];
 
-/** 主进程偏好为 electron-store 平铺文档，`version` 写在默认值中。 */
+/** Main-process preferences are flat electron-store documents with `version` in defaults. */
 function preferenceStorage(root: string, name: string): StorageDefinition {
   return jsonStorage({ id: name, file: join(root, `${name}.json`), version: preferenceVersion, migrations: {} });
 }
@@ -51,7 +51,7 @@ export function pluginStorages(root: string, id: string, declarations: readonly 
   });
 }
 
-/** 只构建并导入存储入口；插件运行时与 setup 留给任务进程。 */
+/** Build and import storage entries only; task processes own plugin runtime and setup. */
 async function discoverPluginStorage(root: string, onProgress?: (progress: PreparationProgress) => void): Promise<PluginStorageGroup[]> {
   const packages = await loadPackages(new PackageList(join(root, "plugins.json")), join(root, "plugins"), join(root, "plugins", ".cache"),
     [builtin.id], [builtinPublicProvider], id => onProgress?.({ stage: "dataPlugins", detail: id }), { runtime: false });

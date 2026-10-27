@@ -17,7 +17,7 @@ export const retrievalTools: NonNullable<StreamRequest["tools"]> = [
   { name: "read_records", description: "Read a saved record's text with explicit pagination.", parameters: z.toJSONSchema(read) as Json },
 ];
 
-/** 唯一检索数据源是已授权目标的记录投影；调用结果使用模型公开协议配对。 */
+/** The sole retrieval source is the authorized target's record projection; call results are paired using the public model protocol. */
 export function retrieve(records: readonly PeekRecord[], call: { name: string; callId: string; arguments: Json }): {
   result: Extract<ModelItem, { kind: "result" }>; ids: string[];
 } {

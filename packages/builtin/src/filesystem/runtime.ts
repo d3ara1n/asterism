@@ -21,10 +21,10 @@ function textFailure(error: unknown, signal: AbortSignal, operation: string): Ca
   return error instanceof TextError ? error.outcome() : filesystemFailure(error, operation);
 }
 
-/** 目录树排除的条目名，任意层级生效：`.git`（含子模块与 worktree 的 .git 文件）与 macOS Finder 元数据 `.DS_Store`。 */
+/** Entry names excluded from the directory tree at every depth: `.git` (including submodule and worktree .git files) and macOS Finder metadata `.DS_Store`. */
 const TREE_EXCLUDED = new Set([".git", ".DS_Store"]);
 
-/** 递归读取目录树路径，目录路径以 '/' 结尾。深度上限 5。 */
+/** Recursively reads directory-tree paths; directory paths end in '/'. Maximum depth is 5. */
 async function readTreePaths(rootPath: string, relPath: string, depth: number, signal: AbortSignal): Promise<string[]> {
   if (depth > 5) return [];
   signal.throwIfAborted();
@@ -45,7 +45,7 @@ async function readTreePaths(rootPath: string, relPath: string, depth: number, s
   return paths;
 }
 
-/** 读取 git 状态并映射为 pierre trees 的 GitStatusEntry 格式。非 git 仓库返回空。 */
+/** Reads git status and maps it to the pierre trees GitStatusEntry format. Returns an empty result outside git repositories. */
 async function readGitStatus(rootPath: string): Promise<{ entries: Array<{ path: string; status: string }>; hasGit: boolean }> {
   const git = simpleGit(rootPath);
   const hasGit = await git.checkIsRepo().catch(() => false);
@@ -79,7 +79,7 @@ export function createFilesystemModule(shell: ShellService) { return defineModul
       }
     },
     creation: implementCreation(CreateDirectory, {
-      /** 拖入与对话框共用；title 可选，不填用 basename。只接受存在的绝对目录路径。 */
+      /** Shared by drag-and-drop and dialogs; title is optional and falls back to basename. Accepts only existing absolute directory paths. */
       async prepare({ path }, { signal }) {
         signal.throwIfAborted();
         if (!isAbsolute(path)) throw new PluginApiError("invalid_argument", "Directory path must be absolute.");

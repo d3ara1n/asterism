@@ -1,18 +1,18 @@
 import { contractReferenceSchema } from "./presentation.ts";
 
-/** 通道载荷：结构化克隆可传递的 JSON 值与字节，可互相嵌套。宿主不逐帧校验。 */
+/** Channel payloads: JSON values and bytes supported by structured cloning, with arbitrary nesting. The host does not validate each frame. */
 export type ChannelValue = null | boolean | number | string | Uint8Array | readonly ChannelValue[] | { readonly [key: string]: ChannelValue };
-/** 通道结束原因：closed 为任一端主动关闭；removed 为对象离开当前集合；unavailable 为契约或对象不可用；disconnected 为连接断开。 */
+/** Channel end reasons: closed means either end closed it explicitly; removed means the object left the current set; unavailable means the contract or object is unavailable; disconnected means the connection was lost. */
 export type ChannelEnd = { reason: "closed" | "removed" | "unavailable" | "disconnected"; message?: string };
 
 /**
- * 对象级双工通道契约：前端打开、后台按契约路由到对象所属插件。
- * Up 为前端发往后台的消息，Down 为后台发往前端的消息；两端按序交付，不逐帧确认。
+ * Object-level duplex channel contract: opened by the frontend and routed by the backend to the object's owning plugin according to the contract.
+ * Up carries frontend-to-backend messages, and Down carries backend-to-frontend messages; both ends deliver in order without per-frame acknowledgments.
  */
 export interface ChannelContract<Up extends ChannelValue = ChannelValue, Down extends ChannelValue = ChannelValue> {
   readonly id: string;
   readonly kind: "channel";
-  /** 仅用于类型推导。 */
+  /** For type inference only. */
   readonly __types?: { up: Up; down: Down };
 }
 export function defineChannel<Up extends ChannelValue, Down extends ChannelValue>(id: string): ChannelContract<Up, Down> {

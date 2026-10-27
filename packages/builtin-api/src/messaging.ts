@@ -2,7 +2,7 @@ import { z } from "zod";
 import { defineTool } from "@asterism/sdk/contracts";
 import { builtin } from "./identity.ts";
 
-/** 发送者保留通信资源与代理名称；接收定位由资源工具实现声明。 */
+/** The sender retains the communication resource and agent name; recipient addressing is declared by the resource tool implementation. */
 export const agentMessageSenderSchema = z.discriminatedUnion("kind", [
   z.strictObject({ kind: z.literal("user") }),
   z.strictObject({
@@ -13,7 +13,7 @@ export const agentMessageSenderSchema = z.discriminatedUnion("kind", [
 ]);
 export type AgentMessageSender = z.infer<typeof agentMessageSenderSchema>;
 
-/** 资源类型匹配由宿主完成，target 由各资源实现声明。 */
+/** The host matches resource types; target is declared by each resource implementation. */
 export const Send = defineTool({
   id: builtin.name("tool.send"), name: "send",
   description: "Send a message to an Agent through a linked resource.",

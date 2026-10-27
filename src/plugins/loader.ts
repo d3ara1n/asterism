@@ -49,9 +49,9 @@ export interface PluginHostServices {
   webProviders?: WebProviderRegistry;
   modelProviderExtensions?: ModelProviderExtensions;
   vault?: CredentialVault | null;
-  /** 插件配置变更：设置页保存、恢复默认与后台 update 都经此通知。 */
+  /** Plugin configuration changes: settings saves, default restoration, and backend updates all notify here. */
   configurationChanged?: (pluginId: string) => void;
-  /** 窗口前准备的插件存储：格式声明供托管配置与数据库盖章，失败的插件本次启动不进入 setup。 */
+  /** Plugin storage prepared before windows: format declarations stamp managed configuration and databases; failed plugins skip setup for this startup. */
   preparedStorage?: PreparedPluginStorage;
   log?: (pluginId: string, level: "info" | "warn" | "error", message: string, error?: unknown) => void;
 }
@@ -69,11 +69,11 @@ export interface LoadedPlugins {
   tools: ToolRegistry;
   manifest: readonly PluginManifest[];
   initialize(): void;
-  /** 结束会话全部对象的生命周期：取消绑定运行、发布消失、等待清理；归档前调用。 */
+  /** End all object lifetimes in a session: cancel bound runs, publish disappearance, and wait for cleanup; called before archival. */
   release(sessionId: string): Promise<void>;
-  /** 恢复会话后重新发布全部对象出现。 */
+  /** Republish appearance of all objects after session restoration. */
   restore(sessionId: string): void;
-  /** 提交后派发观察；队列排空后对涉及的会话各调用一次 publish。 */
+  /** Dispatch observations after commit; once the queue drains, publish once for each affected session. */
   afterCommit(sessionId: string, change: { records: readonly SessionNode[]; cursorChanged: boolean }, publish: (sessionId: string) => void): void;
   prepare(kind: string, command: ResourceCall, context: { sessionId: string; objectId: string; signal: AbortSignal; content?: ContentLease }): Promise<ParsedCall>;
   close(): Promise<void>;
@@ -93,7 +93,7 @@ class TaskHost implements PluginTasks {
   start(key: string, run: (signal: AbortSignal) => Promise<void>, options: { timeoutMs?: number; object?: ResourceRef } = {}): boolean {
     if (this.group.closed || this.running.has(key)) return false;
     const work = this.group.start(async signal => {
-      // key 在执行前登记，setup 失败可以在业务任务开始前取消它。
+      // Register keys before execution so setup failure can cancel tasks before business work starts.
       await Promise.resolve();
       try { signal.throwIfAborted(); await run(signal); }
       catch (error) { if (!signal.aborted) this.log.error(`Task ${key} failed.`, error); }
@@ -108,7 +108,7 @@ class TaskHost implements PluginTasks {
 const defaultLog: NonNullable<PluginHostServices["log"]> = (id, level, message, error) =>
   console[level](`[plugin ${id}] ${message}`, ...(error === undefined ? [] : [error]));
 
-/** 初始化按公共依赖排序，贡献覆盖顺序仍取用户列表。 */
+/** Initialize in public dependency order; contribution override order still follows the user list. */
 function initializationOrder(plugins: readonly PluginDefinition[]) {
   const ordered: PluginDefinition[] = [], failures = new Map<string, string>(), done = new Set<string>();
   for (const plugin of plugins) if (plugins.filter(item => item.namespace.id === plugin.namespace.id).length > 1)
@@ -131,7 +131,7 @@ function initializationOrder(plugins: readonly PluginDefinition[]) {
   return { ordered, failures };
 }
 
-/** 启动时收集 SDK 贡献，按插件顺序解析覆盖并冻结目录。 */
+/** Collect SDK contributions at startup, resolve overrides in plugin order, and freeze the catalog. */
 export function loadPlugins(plugins: readonly PluginDefinition[], services: PluginHostServices): LoadedPlugins {
   const directory = Object.freeze({ list: () => services.sessions.list(), archived: () => services.sessions.archived() });
   const events = services.events ?? new EventBus();
@@ -161,7 +161,7 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
       const storage = new PluginStorage(services.extensionsDirectory, id, services.vault ?? null, log.warn, services.preparedStorage?.declarations.get(id) ?? []);
       storage.onChanged = () => services.configurationChanged?.(id);
       const lifecycle = new RunLifecycle(sessionId => services.sessions.progressChanged(sessionId)); lifecycles.push(lifecycle);
-      // 插件级生命周期随运行登记一同中止信号，清理在插件释放时按登记逆序执行。
+      // Plugin lifetime signals abort alongside run registration; cleanup runs in reverse registration order on plugin release.
       const lifetime = new LifetimeScope((message, error) => log.error(message, error), lifecycle.signal);
       const taskHost = new TaskHost(log, lifecycle.group("task"));
       const eventScope = new PluginEventScope(events, id, lifecycle.group("event"));
@@ -174,7 +174,7 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
       initialized.push(entry);
       const commandIds = new Set<string>();
       const pluginTools = entry.topLevelTools;
-      // 根入口与功能模块共用登记管线；清理责任由各模块在 setup 内向 plugin.lifetime 登记。
+      // Root entries and feature modules share registration; each module registers cleanup responsibility with plugin.lifetime during setup.
       const register = (contribution: ModuleContribution) => {
         if (contribution.webProviders?.length) {
           if (!services.webProviders) throw new Error("Web provider contributions are unavailable.");
@@ -273,7 +273,7 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
   }
   services.modelProviderExtensions?.removeOwners([...invalidEntries].map(entry => entry.plugin.namespace.id));
   services.webProviders?.removeOwners([...invalidEntries].map(entry => entry.plugin.namespace.id));
-  // setup 与后置校验失败共用一次逆序清理，避免提供方越过仍在清理的失败消费者。
+  // setup and post-validation failures share one reverse cleanup pass so providers cannot bypass failed consumers still cleaning up.
   const failedCleanup = (async () => {
     await Promise.allSettled([...invalidEntries].map(entry => entry.lifecycle.close()));
     for (const entry of [...initialized].reverse()) if (invalidEntries.has(entry)) {
@@ -296,7 +296,7 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
   const touched = new Set<string>();
   const observers = collected.flatMap(entry => entry.observers);
   const presence = new ResourcePresence();
-  /** 对象生命周期：只为声明 attach 的资源建立；父信号取所属插件的生命周期。 */
+  /** Object lifetimes exist only for resources declaring attach; parent signals come from the owning plugin lifetime. */
   const objectScopes = new Map<string, LifetimeScope>();
   const ending = new Set<Promise<void>>();
   const attach = (resource: ResourceSnapshot) => {
@@ -309,7 +309,7 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
     try { backend.attach(resource, scope); }
     catch (error) { log(`Resource ${resource.ref.kind} attach failed.`, error); }
   };
-  /** 结束对象生命周期：先中止信号并取消绑定这些对象的运行，收束后再执行清理。 */
+  /** End object lifetimes: abort signals and cancel runs bound to these objects, then clean up after finalization. */
   const detach = (refs: readonly ResourceSnapshot["ref"][]): Promise<void> => {
     const ids = new Set(refs.map(ref => ref.id));
     const scopes = refs.flatMap(ref => {
@@ -327,7 +327,7 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
   };
   const publishPresence = (sessionId: string, change: { appeared: readonly ResourceSnapshot[]; disappeared: readonly ResourceSnapshot[] }): Promise<void> => {
     if (!change.appeared.length && !change.disappeared.length) return Promise.resolve();
-    // 对象离开当前集合即结束其前端通道，再结束对象生命周期释放外部实例。
+    // End frontend channels as soon as objects leave the current set, then end object lifetimes to release external instances.
     if (change.disappeared.length) channels.release(sessionId, change.disappeared.map(resource => resource.ref.id));
     events.publish(ResourcePresenceChanged, null, { sessionId,
       appeared: change.appeared.map(resource => resource.ref.id), disappeared: change.disappeared.map(resource => resource.ref.id) });
@@ -375,10 +375,10 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
     afterCommit(sessionId, { records: nodes, cursorChanged }, publish) {
       touched.add(sessionId);
       const observed = (nodes.length > 0 && observers.some(observer => observer.committed))
-        // 游标变化总要比较资源存在性：观察者与前端通道都依赖消失通知。
+        // Always compare resource presence on cursor changes; observers and frontend channels both depend on disappearance notifications.
         || cursorChanged;
       if (observed) {
-        // 快照固定在本次提交时刻，后续排队的提交不改写它。
+        // Snapshots are fixed at this commit; subsequently queued commits do not rewrite them.
         const sequences = services.sessions.sequences(sessionId, nodes);
         notifications.push({ sessionId, records: nodes.map((node, index) => toRecord(node, sequences[index]!)), cursorChanged,
           snapshot: sessionSnapshot(services.sessions.view(sessionId)) });
@@ -442,7 +442,7 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
       closing = (async () => {
         await Promise.allSettled(collected.map(entry => entry.lifecycle.close()));
         await failedCleanup;
-        // 退出与归档共用对象生命周期清理；对象先于其所属插件的生命周期结束。
+        // Exit and archival share object lifetime cleanup; objects end before their owning plugin lifetimes.
         const scopes = [...objectScopes.values()];
         objectScopes.clear();
         await Promise.allSettled([...scopes.map(scope => scope.end()), ...ending]);

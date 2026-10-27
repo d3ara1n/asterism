@@ -2,8 +2,8 @@ import { excerptNote, rowText } from "../shared/text-row.ts";
 import type { FindResult, GrepResult, SearchStopReason } from "./search-contract.ts";
 
 /**
- * 模型投影和界面共用计数与空结果判定。matches 为命中行数（content 含长行片段中的命中，
- * count 为各文件原生计数之和，find／files 为 null）；上下文行不计作命中。
+ * Model projection and UI share counts and empty-result detection. matches is the matching-line count (content includes matches within long-line excerpts,
+ * count sums native per-file counts, and find/files use null); context lines do not count as matches.
  */
 export function searchSummary(data: FindResult | GrepResult) {
   const content = "rows" in data && data.mode === "content";
@@ -50,7 +50,7 @@ export function findToModel(data: FindResult): string {
   return [heading(data), ...data.files.map(path => JSON.stringify(path)), ...ending(data)].join("\n");
 }
 
-/** 文件标题给出命中行数；有上下文行时追加命中行号，行本身的格式与 read 一致。 */
+/** File headings show the matching-line count and add matching line numbers when context lines are present; line formatting matches read. */
 function fileHeader(path: string, rows: GrepResult["rows"]): string {
   const matches = rows.filter(row => row.match);
   const lines = matches.length < rows.length ? `: ${matches.map(row => row.line).join(", ")}` : "";

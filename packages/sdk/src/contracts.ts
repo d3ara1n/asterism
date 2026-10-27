@@ -1,4 +1,4 @@
-/** SDK 纯契约入口：不依赖 Node、Electron、React 或宿主源码。 */
+/** SDK pure contract entry point: does not depend on Node, Electron, React, or host source code. */
 export * from "./json.ts";
 export * from "./error-details.ts";
 export * from "./presentation.ts";

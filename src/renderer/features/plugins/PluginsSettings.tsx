@@ -29,7 +29,7 @@ function pluginStatus(plugin: PluginInfo, failures: ReadonlyMap<string, string>)
   return plugin.status === "loaded" && plugin.id && failures.has(plugin.id) ? "failed" : plugin.status;
 }
 
-/** 包管理状态在总览和详情之间共用，操作期间不重建页面。 */
+/** Package management state is shared between overview and details; operations do not recreate the page. */
 export function usePlugins(active: boolean) {
   const [snapshot, setSnapshot] = useState<AppSnapshot | null>(null);
   const [error, setError] = useState<UiText | null>(null);
@@ -107,7 +107,7 @@ export function PluginsOverview({ manager, onOpen, cardRef, query, filter, onQue
   </section>;
 }
 
-/** 页面的通信随卸载取消；页面打开的浮岛按插件身份隔离，并随页面卸载关闭。 */
+/** Page communication is cancelled on unmount; islands opened by the page are isolated by plugin identity and close when the page unmounts. */
 function SettingsBody({ pluginId, page, location }: { pluginId: string; page: PluginSettingsPage; location?: string }) {
   const Body = page.Body;
   return <PluginCallScope><PluginIslandProvider pluginId={pluginId} page>

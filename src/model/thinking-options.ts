@@ -10,7 +10,7 @@ type ActiveLevel = Exclude<ThinkingLevel, "off">;
 type Body = Record<string, unknown>;
 interface ThinkingMappings { levels: CustomThinkingLevels; budgets: CustomThinkingBudgets }
 
-/** 手动预算按最终总输出上限分配；最小 1024，显式覆盖始终是绝对 token 数。 */
+/** Allocate manual budgets against the final total output limit, with a minimum of 1024; explicit overrides are always absolute token counts. */
 const budgetRatios: Record<ActiveLevel, number> = {
   minimal: 0.02, low: 0.1, medium: 0.3, high: 0.6, xhigh: 0.9, max: 0.95,
 };
@@ -22,7 +22,7 @@ function object(value: unknown): Body {
   return value as Body;
 }
 
-/** 仅修改协议的具名字段；保留同一对象内的摘要、结构化输出等其他参数。 */
+/** Modify only named protocol fields; retain summaries, structured output, and other parameters in the same object. */
 function setEffort(body: Body, field: "reasoning" | "output_config", effort: string | null) {
   const values = body[field] === undefined ? {} : { ...object(body[field]) };
   if (effort === null) delete values.effort;
@@ -40,7 +40,7 @@ function resolveEffort(protocol: ModelProviderInput["protocol"], level: Thinking
 function encodeAnthropicThinking(body: Body, level: ThinkingLevel, maxOutputTokens: number | undefined, mappings: ThinkingMappings) {
   const customEffort = mappings.levels[level];
   if (level === "off") {
-    // 不接受 SDK 将 off 替换成低 effort 或 between_tools；端点不支持时由端点拒绝。
+    // Do not accept SDK replacement of off with low effort or between_tools; unsupported endpoints reject it themselves.
     body.thinking = { type: "disabled" };
     setEffort(body, "output_config", customEffort ?? null);
     return;
@@ -48,15 +48,15 @@ function encodeAnthropicThinking(body: Body, level: ThinkingLevel, maxOutputToke
 
   const thinking = body.thinking === undefined ? undefined : object(body.thinking);
   if (thinking?.type === "enabled") {
-    // 不从 SDK 已叠加预算的 max_tokens 反推上限；缺省值也由宿主固定。
+    // Do not infer limits from max_tokens after the SDK adds budgets; the host fixes defaults too.
     const limit = maxOutputTokens ?? defaultManualOutputTokens;
     const budget = mappings.budgets[level] ?? Math.max(1024, Math.floor(limit * budgetRatios[level]));
     if (!Number.isSafeInteger(budget) || budget < 1024 || budget >= limit)
       throw new ModelFailure("thinking_budget_unavailable", "The thinking budget must be at least 1024 tokens and smaller than the output token limit. Adjust the budget or output limit.");
     body.thinking = { ...thinking, budget_tokens: budget };
-    // SDK 会将思考预算额外加到 max_tokens；星图的上限包含思考，不能被扩大。
+    // The SDK adds reasoning budgets to max_tokens; Asterism's limit includes reasoning and must not expand.
     body.max_tokens = limit;
-    // 手动预算本身不需要 effort；仅显式映射时才附带，支持两者并存的端点。
+    // Manual budgets do not require effort; attach it only with explicit mappings for endpoints supporting both.
     setEffort(body, "output_config", customEffort ?? null);
     return;
   }
@@ -68,8 +68,8 @@ function encodeAnthropicThinking(body: Body, level: ThinkingLevel, maxOutputToke
 }
 
 /**
- * SDK 继续识别 Anthropic 模型的思考模式；星图拥有 effort 与手动预算映射。
- * 每次调用单独捕获选项和传输，不以共享可变状态关联并发请求。
+ * The SDK still identifies Anthropic model reasoning modes; Asterism owns effort and manual-budget mappings.
+ * Each call independently captures options and transport without shared mutable state linking concurrent requests.
  */
 export function withThinkingOptions(
   createModel: (transport: typeof fetch) => Model, transport: typeof fetch,
@@ -85,7 +85,7 @@ export function withThinkingOptions(
   const protocol = provider.protocol;
 
   const project = (params: CallOptions) => {
-    // probe、关闭思考及未设置等级时，沿用 SDK 默认请求，不消费等级或预算映射。
+    // Probes, disabled reasoning, and unset levels use SDK defaults without consuming level or budget mappings.
     if (params.reasoning === undefined || params.reasoning === "provider-default") return null;
     const level: ThinkingLevel = params.reasoning === "none" ? "off" : params.reasoning;
     const effort = resolveEffort(protocol, level, mappings.levels[level]);

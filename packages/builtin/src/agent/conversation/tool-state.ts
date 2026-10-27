@@ -7,7 +7,7 @@ export interface ToolCallState {
   phase: "input" | "ready" | "executing" | "settled" | "incomplete";
   props: ToolRenderProps | null;
 }
-/** 填充只消费即时预览；历史完全使用当次保存的身份和结果。 */
+/** Input filling consumes only live previews; history uses only the identity and results saved for that call. */
 export function toolCallState(node: ToolCallNode): ToolCallState {
   if ("state" in node) {
     if (node.state === "input") return { phase: "input",

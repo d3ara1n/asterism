@@ -7,7 +7,7 @@ import { FilesystemError, failed } from "./errors.ts";
 
 const OUTPUT_BYTES = 64 * 1024;
 const RECORD_BYTES = 1024 * 1024;
-/** stdout 分块与记录边界独立；先拼完整字节记录，再解码 UTF-8。 */
+/** stdout chunk boundaries are independent of record boundaries; assemble complete byte records before decoding UTF-8. */
 export class SearchRecords {
   private pending = Buffer.alloc(0);
   constructor(private readonly delimiter: number | (() => number), private readonly consume: (record: Buffer) => SearchStopReason,
@@ -40,7 +40,7 @@ function dataText(value: { text?: string; bytes?: string }): string {
   if (typeof value.bytes === "string") return utf8(Buffer.from(value.bytes, "base64"));
   throw new FilesystemError(failed("search_protocol", "The search process returned an invalid text field."));
 }
-/** rg 固定以 '/' 输出；相对搜索 cwd 的路径映射回资源根。 */
+/** rg consistently outputs '/' separators; paths relative to the search cwd are mapped back to the resource root. */
 export function searchPath(prefix: string, path: string): string {
   return posix.join(prefix, path);
 }
@@ -50,7 +50,7 @@ class Budget {
   private bytes = 0;
   private entries = 0;
   constructor(private readonly limit: number) {}
-  /** counted 为 false 的条目（正文模式的上下文行）只占字节预算，不占条数上限。 */
+  /** Entries with counted set to false (context lines in content mode) consume only the byte budget, not the entry limit. */
   add(value: unknown, counted = true): SearchStopReason {
     const cost = entryBytes(value);
     if (counted && this.entries >= this.limit) return "limit";
@@ -89,7 +89,7 @@ export function grepOutput(path: string, prefix: string, args: GrepArgs) {
   const result: GrepResult = { path, mode, rows: [], files: [], stopReason: null };
   const budget = new Budget(args.limit ?? 500);
   if (mode === "count") {
-    // --count --null --with-filename 输出 path NUL count LF；路径中的 LF 不参与分隔。
+    // --count --null --with-filename outputs path NUL count LF; LF within paths does not act as a delimiter.
     let file: string | undefined;
     const records = new SearchRecords(() => file === undefined ? 0 : 10, record => {
       if (file === undefined) { file = searchPath(prefix, utf8(record)); return null; }
@@ -115,15 +115,15 @@ export function grepOutput(path: string, prefix: string, args: GrepArgs) {
     const event = JSON.parse(record.toString("utf8")) as RgEvent;
     if (event.type !== "match" && event.type !== "context") return null;
     const text = dataText(event.data.lines);
-    // 与 read 的 splitLines 保持一致：只移除实际存在的 LF / CRLF，末行独立 CR 属于正文。
+    // Match read's splitLines: remove only an actual LF / CRLF; a standalone CR on the final line belongs to the body.
     const content = text.endsWith("\n") ? text.slice(0, text.endsWith("\r\n") ? -2 : -1) : text;
     const line = event.data.line_number;
     const path = searchPath(prefix, dataText(event.data.path)), match = event.type === "match";
-    // 锚点按完整行计算后再截取片段；rg 的子匹配偏移是行内 UTF-8 字节，上下文行没有命中，从行首截取。
+    // Compute anchors from complete lines before extracting excerpts; rg submatch offsets are UTF-8 bytes within the line, while context lines have no match and are excerpted from the start.
     const byte = match ? event.data.submatches?.[0]?.start ?? 0 : 0;
     const focus = content.length > SEARCH_EXCERPT_THRESHOLD ? Buffer.from(content, "utf8").subarray(0, byte).toString("utf8").length : 0;
     const entry: GrepResult["rows"][number] = { ...textRow(line, content, args.anchored !== false, SEARCH_EXCERPT_THRESHOLD, focus), path, match };
-    // limit 只计命中行；上下文行仅受字节预算约束。
+    // limit counts only matching lines; context lines are constrained only by the byte budget.
     const stopReason = budget.add(entry, entry.match);
     if (stopReason !== null) { trimDanglingContext(result.rows, args.context ?? 0); return stopReason; }
     result.rows.push(entry);
@@ -133,8 +133,8 @@ export function grepOutput(path: string, prefix: string, args: GrepArgs) {
 }
 
 /**
- * 停止时尾部可能留有下一个未返回命中的前文；只保留最后一个已返回命中的后文范围，
- * 使每个上下文行都属于某个已返回的命中。
+ * On stopping, the tail may contain leading context for the next unreturned match; retain only the trailing-context range of the last returned match,
+ * so every context line belongs to a returned match.
  */
 function trimDanglingContext(rows: GrepResult["rows"], context: number): void {
   let last: GrepResult["rows"][number] | undefined;

@@ -10,11 +10,11 @@ import { useI18n, useRendererCalls, type CreationInputProps } from "@asterism/sd
 import { useEffect, useState } from "react";
 import { ReadDirectoryDefaults } from "./contract";
 
-/** 路径示例按平台给出；仅作提示，不参与校验。 */
+/** Path examples are platform-specific hints only and do not participate in validation. */
 const pathPlaceholder = () => window.host.platform === "win32" ? "C:\\Users\\me\\project"
   : window.host.platform === "darwin" ? "/Users/me/project" : "/home/me/project";
 
-/** 目录创建：手填路径或系统选择，名称回落与路径校验由运行时处理。 */
+/** Directory creation: enter a path manually or choose it through the system dialog; the runtime handles name fallback and path validation. */
 export function DirectoryInput({ initialInput, busy, resolve, cancel }: CreationInputProps<{ path: string; title?: string }>) {
   const i18n = useI18n();
   const calls = useRendererCalls();

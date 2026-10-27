@@ -8,8 +8,8 @@ import {
 } from "../shared/theme.ts";
 
 /**
- * 外观设置：electron-store 负责原子写入，文件位于 userData（平台用户数据目录）下的 appearance.json。
- * 文件准备由启动层完成；单项显示值按 Zod 解析。
+ * Appearance settings: electron-store writes atomically to appearance.json under userData (the platform user data directory).
+ * Startup prepares the file; Zod parses individual display values.
  */
 type AppearanceStore = { version: number; appearance: Appearance };
 let store: Store<AppearanceStore> | null = null;
@@ -19,19 +19,19 @@ function open(): Store<AppearanceStore> {
   return store;
 }
 
-/** 三态模式交给 nativeTheme：系统材质与 renderer 的 prefers-color-scheme 同源。 */
+/** Delegate the three-state mode to nativeTheme so system materials and renderer prefers-color-scheme share one source. */
 export function applyThemeSource(appearance: Appearance = readAppearance()): void {
   nativeTheme.themeSource = appearance.mode;
 }
 
-/** 同步读取，供创建窗口前决定实色回退色。 */
+/** Read synchronously to determine the solid fallback color before window creation. */
 export function readAppearance(): Appearance {
   if (!settingsReady()) return defaults;
   try { return parseAppearance(open().get("appearance"), process.platform); }
   catch (error) { console.error("Appearance settings could not be read.", error); return defaults; }
 }
 
-/** 注册 IPC；仅接受来自受信主框架的请求。返回注销函数。 */
+/** Register IPC accepting only trusted main-frame requests. Returns an unregister function. */
 export function serveAppearance(window: BrowserWindow, trusted: (event: Electron.IpcMainInvokeEvent) => boolean, onChange: (appearance: Appearance) => void): () => void {
   ipcMain.removeHandler(appearanceGetChannel);
   ipcMain.removeHandler(appearanceSetChannel);

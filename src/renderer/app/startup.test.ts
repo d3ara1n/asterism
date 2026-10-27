@@ -8,9 +8,9 @@ import type { EventFrame } from "../../shared/plugin-events";
 
 const base = { resources: [], cards: [], tools: [] };
 
-describe("模块启动准备", () => {
-  // 订阅 closed 可能先于回调结束；根准备失败后也不能提前销毁回调依赖的服务。
-  it("根准备失败等待正在执行的事件回调，再释放共享服务", async () => {
+describe("Module startup preparation", () => {
+  // Subscription closed may precede callback completion; a root preparation failure must not destroy services still needed by the callback.
+  it("root preparation failure waits for active event callbacks before releasing shared services", async () => {
     const Event = pluginNamespace("test.root").event("changed", { schema: z.null(), source: "plugin", semantics: { kind: "occurrence" } });
     let receive!: (frame: EventFrame) => void, release!: () => void, started!: () => void;
     const held = new Promise<void>(resolve => { release = resolve; });
@@ -40,8 +40,8 @@ describe("模块启动准备", () => {
     } finally { release(); if (close) await close(); events.close(); }
     expect(order).toEqual(["handler", "plugin"]);
   });
-  // 模块消费根入口准备好的服务，失败根不能继续准备模块。
-  it("插件准备先于模块，关闭先取消模块订阅再释放共享服务", async () => {
+  // Modules consume services prepared by the root entry; a failed root must not proceed to prepare modules.
+  it("prepares the plugin before its modules, and cancels module subscriptions before releasing shared services on shutdown", async () => {
     const order: string[] = [];
     let moduleSignal!: AbortSignal;
     const events: EventSubscriber = { subscribe: () => { throw new Error("Unexpected subscription."); } };
@@ -64,7 +64,7 @@ describe("模块启动准备", () => {
   });
 });
 
-it("模块订阅和 Agent UI 登记在准备失败时释放，成功模块保留到应用关闭", async () => {
+it("releases module subscriptions and Agent UI registrations on preparation failure, retaining successful modules until application shutdown", async () => {
   const signals: AbortSignal[] = [];
   const events: EventSubscriber = { subscribe: (_contract, options) => {
     signals.push(options.signal!);

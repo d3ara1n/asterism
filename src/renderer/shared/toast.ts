@@ -6,7 +6,7 @@ import { getI18n } from "./i18n";
 
 export { toast };
 
-/** 操作入口消费本次回执；失败即时提示，不存入会话或其他对象的状态。 */
+/** The operation entry consumes this call's receipt; failures are reported immediately without storing them in session or other object state. */
 export function operationSucceeded(result: RendererReceipt): boolean {
   if (!result.ok) toast.error(getI18n().text(errorDisplay(result.error)));
   return result.ok;
@@ -15,9 +15,9 @@ export function operationSucceeded(result: RendererReceipt): boolean {
 export interface ToastAction { label: string; onClick: () => void }
 
 /**
- * 由状态驱动的持续通知：message 存在时显示，清除时撤下，不自动消失。
- * 提供 onDismiss 的错误通知可关闭，关闭回写状态；操作按钮不关闭通知，由状态变化撤下。
- * 进行中通知不可关闭，只能经操作（如取消）结束。
+ * State-driven persistent notifications: show while message exists, remove when cleared, and do not disappear automatically.
+ * Error notifications with onDismiss can be dismissed, writing the dismissal back to state; action buttons do not close notifications, which are removed by state changes.
+ * In-progress notifications cannot be dismissed and end only through actions (such as cancellation).
  */
 export function useStateToast(id: string, message: string | null, options: {
   tone: "error" | "loading"; action?: ToastAction; onDismiss?: () => void;

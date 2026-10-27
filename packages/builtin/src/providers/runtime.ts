@@ -16,7 +16,7 @@ export const createBuiltinUsageProviders = (transport: typeof fetch = fetch) => 
   createKimiUsage("kimi-plan-cn", transport), createKimiUsage("kimi-plan", transport),
 ];
 
-/** 预设和查询提供方属于内置插件；与第三方经过同一贡献登记和校验。 */
+/** Presets and query providers belong to the built-in plugin; they use the same contribution registration and validation as third parties. */
 export default defineModule(() => ({
   modelProviderPresets: modelProviderPresets.map(preset => ({ type: "add" as const, preset })),
   usageProviders: createBuiltinUsageProviders(),

@@ -44,7 +44,7 @@ const getFontText = () => ({
 });
 const radiusCorner: Record<Appearance["radius"], string> = { none: "0px", sm: "3px", md: "5px", lg: "8px" };
 
-/** 终端字号还原为默认值；代码字号还原为自动，自动状态下方向键从默认字号起步。 */
+/** Terminal font size resets to its default; code font size resets to automatic, where arrow keys start from the default font size. */
 function FontSizeField({ kind, value }: { kind: "terminal" | "code"; value: number | null }) {
   const i18n = useI18n();
   const code = kind === "code";
@@ -58,7 +58,7 @@ function FontSizeField({ kind, value }: { kind: "terminal" | "code"; value: numb
     }} />;
 }
 
-/** 画布纹理的 CSS 示意，与 React Flow Background 三种变体对应；颜色取 --canvas-grid。 */
+/** CSS illustrations of canvas textures, corresponding to the three React Flow Background variants; colors come from --canvas-grid. */
 function texture(kind: Appearance["canvas"], gap = 12): CSSProperties {
   const c = "var(--canvas-grid)";
   if (kind === "dots") return { backgroundImage: `radial-gradient(circle, ${c} 1px, transparent 1.2px)`, backgroundSize: `${gap}px ${gap}px` };
@@ -70,7 +70,7 @@ function texture(kind: Appearance["canvas"], gap = 12): CSSProperties {
   }
   return {};
 }
-/** 十字需要平铺：用重复的 SVG 绘制，避免渐变无法单格居中重复。 */
+/** Crosses require tiling: draw with a repeating SVG because gradients cannot repeat a centered cross within each cell. */
 function crossTile(gap: number): CSSProperties {
   const h = gap / 2;
   const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='${gap}' height='${gap}'><path d='M${h - 3} ${h}H${h + 3}M${h} ${h - 3}V${h + 3}' stroke='black' stroke-width='1'/></svg>`;
@@ -82,7 +82,7 @@ function Texture({ kind, gap }: { kind: Appearance["canvas"]; gap?: number }) {
   return <span aria-hidden="true" className="absolute inset-0" style={texture(kind, gap)} />;
 }
 
-/** 示意图复用工作台的原生路径算法，错开的端点让三种风格均可辨认。 */
+/** Illustrations reuse the workbench's native path algorithms; staggered endpoints make all three styles recognizable. */
 function ConnectionPreview({ kind }: { kind: Appearance["edgeStyle"] }) {
   const endpoints = { sourceX: 4, sourceY: 12, sourcePosition: Position.Right, targetX: 96, targetY: 44, targetPosition: Position.Left };
   const [path] = kind === "default" ? getBezierPath(endpoints) : getSmoothStepPath({ ...endpoints, borderRadius: kind === "step" ? 0 : 5 });
@@ -93,7 +93,7 @@ function ConnectionPreview({ kind }: { kind: Appearance["edgeStyle"] }) {
   </svg>;
 }
 
-/** 外观设置：修改即保存并立即应用；顶部预览随全部选项实时变化。 */
+/** Appearance settings: changes save and apply immediately; the top preview updates live with every option. */
 export function AppearanceSettings() {
   const i18n = useI18n();
   const appearance = useAppearance();
@@ -201,10 +201,10 @@ export function AppearanceSettings() {
   </div>;
 }
 
-/** 实时预览：一块画布 + 对象卡片 + 主按钮，直接消费当前 token，因此圆角、密度、亮暗都会反映。 */
+/** Live preview: a canvas, object card, and primary button consume current tokens directly, reflecting corner radius, density, and light/dark mode. */
 /**
- * 实时预览：一个缩小的工作台场景。笔记资源经连线授权给代理，代理卡片展示待运行状态；
- * 每个元素对应一类 token：画布纹理、卡片、边框、次要文字、主色与连线。
+ * Live preview: a miniature workbench scene. A link grants the agent access to the note resource, and the agent card shows a ready-to-run state;
+ * each element represents a token category: canvas texture, cards, borders, secondary text, primary color, and connections.
  */
 function LivePreview({ appearance }: { appearance: Appearance }) {
   const i18n = useI18n();
@@ -220,7 +220,7 @@ function LivePreview({ appearance }: { appearance: Appearance }) {
           <span className="block h-1.5 w-3/5 rounded-full bg-muted" />
         </div>
       </div>
-      {/* 连线：资源端到代理端，带两端连接点与授权标签。 */}
+      {/* Connection: from resource to agent, with connection points at both ends and an authorization label. */}
       <div className="relative flex min-w-16 flex-1 items-center">
         <ConnectionPreview kind={appearance.edgeStyle} />
         <span className="absolute left-1/2 -translate-x-1/2 -translate-y-8 rounded-sm bg-canvas px-1 text-[10px] text-muted-foreground">{i18n.formatMessage(appearanceMessages.previewRead)}</span>
@@ -242,7 +242,7 @@ function LivePreview({ appearance }: { appearance: Appearance }) {
   </div>;
 }
 
-/** 调色板只是快捷组合：无选中态，选一项即写入 accent + gray 并关闭。 */
+/** Palettes are only shortcuts for combinations: no selected state; choosing one writes accent + gray and closes. */
 function PaletteDialog({ open, onOpenChange, appearance }: { open: boolean; onOpenChange: (open: boolean) => void; appearance: Appearance }) {
   const i18n = useI18n();
   const scheme = useScheme();
@@ -258,7 +258,7 @@ function PaletteDialog({ open, onOpenChange, appearance }: { open: boolean; onOp
           const name = i18n.text(paletteMessages[palette.id]!);
           return <Item key={palette.id} asChild variant="outline" className="flex-col items-stretch gap-0 overflow-hidden bg-card p-0 text-left hover:border-ring/60"><button type="button"
             onClick={() => { void updateAppearance({ accent: palette.accent, gray: palette.gray }); onOpenChange(false); }}>
-            {/* 迷你界面：底色、卡片、主色条与次要文字条。 */}
+            {/* Miniature UI: background, cards, primary color bars, and secondary text bars. */}
             <span aria-hidden="true" className="flex h-16 gap-1.5 p-2" style={{ background: t.canvas }}>
               <span className="flex flex-1 flex-col gap-1 rounded-sm border p-1.5" style={{ background: t.card, borderColor: t.border }}>
                 <span className="h-1.5 w-3/4 rounded-full" style={{ background: t.foreground }} />

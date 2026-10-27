@@ -4,12 +4,12 @@ import type { TitleBarMode } from "../shared/desktop.ts";
 import { themeTokens } from "../shared/theme.ts";
 import { readAppearance } from "./appearance.ts";
 
-/** 实色回退取当前主题背景，与工作台底色一致。 */
+/** Use the current theme background as the solid fallback to match the workbench. */
 const scheme = () => nativeTheme.shouldUseDarkColors ? "dark" as const : "light" as const;
 const tokens = () => themeTokens(readAppearance(), scheme());
 const fallback = () => tokens().background!;
 
-/** 使用系统材质，不开启会改变缩放/阴影行为的 transparent 窗口模式。 */
+/** Use system materials without transparent window mode, which changes scaling and shadow behavior. */
 export function initialWindowAppearance(): BrowserWindowConstructorOptions {
   const fallbackColor = fallback();
   const allowMaterial = !nativeTheme.prefersReducedTransparency && !nativeTheme.shouldUseHighContrastColors;
@@ -31,7 +31,7 @@ export function initialWindowAppearance(): BrowserWindowConstructorOptions {
   return { backgroundColor: fallbackColor };
 }
 
-/** 监听系统偏好；减少透明度与高对比度时切回实色，关闭窗口后释放监听。 */
+/** Observe system preferences; use solid colors for reduced transparency or high contrast and release listeners after window close. */
 export function followWindowAppearance(window: BrowserWindow, titleBar: TitleBarMode): () => void {
   const update = () => {
     if (window.isDestroyed()) return;

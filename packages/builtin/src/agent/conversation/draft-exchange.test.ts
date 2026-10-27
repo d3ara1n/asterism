@@ -10,9 +10,9 @@ const content = (): RendererContentInput => ({
   stage: async () => ({ "$asterism.content": "00000000-0000-4000-8000-000000000001" }), close: async () => {},
 });
 
-describe("草稿交换受理确认", () => {
-  // 条目已经移除但回执丢失时，恢复入口仍保留原操作和附件，重试不再次交换。
-  it("未知回执后编辑器保持锁定，以同一提交重试并恢复已取出的完整草稿", async () => {
+describe("Draft exchange acceptance confirmation", () => {
+  // If the item has been removed but the receipt is lost, the recovery entry retains the original operation and attachments; retrying does not exchange again.
+  it("Keeps the editor locked after an unknown receipt, retries the same submission, and restores the complete retrieved draft", async () => {
     const editor = createMessageDraft(content);
     const file: Extract<ModelInputPart, { kind: "file" }> = {
       kind: "file", file: { "$asterism.content": "00000000-0000-4000-8000-000000000001" }, mediaType: "image/png", filename: "a.png",
@@ -39,8 +39,8 @@ describe("草稿交换受理确认", () => {
     await editor.close();
   });
 
-  // 明确的修订冲突表示资源动作未交换；保留编辑器原文并解除锁定，不无限重试已发送条目。
-  it("条目不存在的明确拒绝保留编辑器并结束待确认操作", async () => {
+  // An explicit revision conflict means the resource action did not exchange drafts; preserve the editor text and unlock it instead of retrying an already sent item indefinitely.
+  it("An explicit rejection for a missing item preserves the editor and ends the operation awaiting confirmation", async () => {
     const editor = createMessageDraft(content); editor.setText("Editor");
     const exchange = new DraftExchange(editor, () => {});
     exchange.begin({ input: { submissionId: nanoid(16), id: nanoid(16), replacement: null },

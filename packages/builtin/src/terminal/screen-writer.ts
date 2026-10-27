@@ -4,7 +4,7 @@ import type { TerminalDown } from "./contract.ts";
 type ScreenFrame = Exclude<TerminalDown, { type: "status" }>;
 interface PendingFrame { frame: ScreenFrame; done(): void }
 
-/** 每帧完成后才消费下一帧，快照与增量共用同一条 xterm 写入队列。 */
+/** Consumes each next frame only after the previous one completes; snapshots and deltas share the same xterm write queue. */
 export class ScreenWriter {
   private readonly pending: PendingFrame[] = [];
   private active: PendingFrame | null = null;
@@ -37,7 +37,7 @@ export class ScreenWriter {
     }
   }
 
-  /** 屏幕卸载后释放未消费帧并确认输出，保持仍挂载的头部通道畅通。 */
+  /** Releases unconsumed frames and acknowledges output after screen unmount, keeping the still-mounted header's channel flowing. */
   dispose() {
     this.disposed = true;
     this.active?.done();

@@ -16,12 +16,12 @@ import type { TranslationCatalog } from "../shared/i18n.ts";
 import type { PublicProvider } from "../shared/public-modules.ts";
 import { jsonStorage } from "../storage/migrations.ts";
 
-/** 插件包清单：package.json 的 asterism 字段；源码与发布产物读同一份。 */
+/** Plugin package manifest: the asterism field in package.json, shared by source and release artifacts. */
 export const manifestSchema = z.strictObject({
   id: z.string().regex(/^[a-z0-9][a-z0-9-]*(?:\.[a-z0-9][a-z0-9-]*)+$/u),
   runtime: z.string().min(1).optional(),
   renderer: z.string().min(1).optional(),
-  /** 存储声明入口：默认导出 `defineStorage([...])`，宿主在插件运行时之前单独导入。 */
+  /** Storage declaration entry: default export `defineStorage([...])`, imported separately by the host before plugin runtime. */
   storage: z.string().min(1).optional(),
   displayName: uiTextSchema.optional(),
   description: uiTextSchema.optional(),
@@ -36,7 +36,7 @@ export const manifestSchema = z.strictObject({
 export type PluginPackageManifest = z.infer<typeof manifestSchema>;
 const sdkRequirementSchema = z.object({ peerDependencies: z.object({ "@asterism/sdk": z.string().trim().min(1) }) });
 
-/** 包信息独立于 API 兼容和代码装载，失败或禁用的插件也能显示。 */
+/** Package information is independent of API compatibility and code loading, so failed or disabled plugins can still display. */
 export function readPackageMetadata(root: string): PluginMetadata {
   const pkg = z.object({
     name: z.string().optional(), version: z.string().optional(), description: z.string().optional(),
@@ -56,7 +56,7 @@ export function readPackageMetadata(root: string): PluginMetadata {
     version: pkg.version, author: typeof pkg.author === "string" ? pkg.author : pkg.author?.name, icon });
 }
 
-/** 管理列表的一项：来源只决定包根在哪里，启用标记与来源无关。 */
+/** One management-list entry: source determines only the package root location; enabled state is independent of source. */
 export const packageEntrySchema = z.strictObject({
   source: z.discriminatedUnion("kind", [
     z.strictObject({ kind: z.literal("path"), path: z.string().min(1) }),
@@ -65,7 +65,7 @@ export const packageEntrySchema = z.strictObject({
   enabled: z.boolean(),
 });
 export type PackageEntry = z.infer<typeof packageEntrySchema>;
-/** 插件列表格式；变化时递增并在 `packageListStorage` 追加迁移。 */
+/** Plugin list format; increment on changes and append migrations to `packageListStorage`. */
 const packageListVersion = 1;
 const listSchema = z.strictObject({ version: z.literal(packageListVersion), packages: z.array(packageEntrySchema) });
 export function packageListStorage(root: string) {
@@ -76,12 +76,12 @@ export class PluginPackageError extends Error {
   constructor(readonly code: "not_a_package" | "invalid_manifest" | "incompatible_api" | "duplicate" | "build_failed" | "invalid_entry", message: string) { super(message); }
 }
 
-/** 来源 adapter：只给出包根，之后的流程不再区分来源。 */
+/** Source adapter: yields only a package root; later stages no longer distinguish sources. */
 export function packageRoot(entry: PackageEntry, npmRoot: string): string {
   return entry.source.kind === "path" ? resolve(entry.source.path) : join(npmRoot, "node_modules", entry.source.name);
 }
 
-/** 读取并校验包根的清单；路径必须是包根，不向下搜索。 */
+/** Read and validate the package root manifest; paths must be package roots without downward search. */
 export function readManifest(root: string): PluginPackageManifest {
   const file = join(root, "package.json");
   if (!existsSync(file)) throw new PluginPackageError("not_a_package", `No package.json at ${root}.`);
@@ -106,7 +106,7 @@ export function readManifest(root: string): PluginPackageManifest {
   return manifest;
 }
 
-/** 包列表持久化：`<data>/plugins.json`；变化在重启后生效。 */
+/** Package list persistence: `<data>/plugins.json`; changes take effect after restart. */
 export class PackageList {
   constructor(private readonly file: string) {}
   read(): PackageEntry[] {
@@ -119,7 +119,7 @@ export class PackageList {
     writeFileSync(temporary, JSON.stringify({ version: packageListVersion, packages }, null, 2), { flush: true });
     renameSync(temporary, this.file);
   }
-  /** 添加即校验：无效包直接失败，不留条目；新添加默认启用。 */
+  /** Validate on addition: invalid packages fail without entries; new entries are enabled by default. */
   add(entry: Omit<PackageEntry, "enabled">, npmRoot: string): PluginPackageManifest {
     const manifest = readManifest(packageRoot({ ...entry, enabled: true }, npmRoot));
     const packages = this.read();
@@ -140,8 +140,8 @@ export class PackageList {
 }
 
 /**
- * 宿主共享模块：这些导入转发到已加载实例；
- * 插件公共模块及其他依赖由 package-modules 构建为 ESM 图。
+ * Host shared modules: forward these imports to already loaded instances;
+ * package-modules builds plugin public modules and other dependencies into an ESM graph.
  */
 const shared: Record<string, Record<string, unknown>> = {
   zod: zod as Record<string, unknown>,
@@ -157,14 +157,14 @@ function sharedModuleSource(id: string): string {
       `const shared${index} = m[${JSON.stringify(name)}]; export { shared${index} as ${name} };`)].join("\n");
 }
 
-/** renderer 共享模块：由宿主页面在 window.__asterismRendererModules 提供同一实例。 */
+/** Renderer shared modules: the host page supplies the same instances through window.__asterismRendererModules. */
 export const rendererShared: readonly string[] = ["react", "react/jsx-runtime", "react-dom", "react-dom/client", "react-intl", "zod", "@asterism/sdk/contracts", "@asterism/sdk/renderer"];
 function rendererModuleSource(id: string): string {
-  // CJS 形态转发：esbuild 的互操作让具名导入按属性读取同一实例。
+  // CJS forwarding: esbuild interop reads named imports as properties of the same instance.
   return `const m = globalThis.__asterismRendererModules[${JSON.stringify(id)}]; module.exports = m;`;
 }
 
-/** 宿主库保留既有实例；插件公共模块通过同一 ESM 图共享。 */
+/** Host libraries retain existing instances; plugin public modules share the same ESM graph. */
 function hostModules(realm: "runtime" | "renderer"): Plugin {
   return { name: "asterism-host-modules", setup(build) {
     build.onResolve({ filter: /.*/ }, args => (realm === "runtime" ? args.path in shared : rendererShared.includes(args.path))
@@ -185,14 +185,14 @@ export interface ResolvedPackage {
   status: "loaded" | "disabled" | "invalid" | "failed";
   error?: string;
   definition?: PluginDefinition;
-  /** 存储入口的默认导出；运行时与准备进程都按同一份声明处理格式版本。 */
+  /** Storage entry default export; runtime and preparation processes use the same declaration to handle format versions. */
   storage?: readonly PluginStorageDeclaration[];
-  /** 相对 renderer 缓存根的入口路径。 */
+  /** Entry path relative to the renderer cache root. */
   renderer?: string;
   stylesheet?: string;
 }
 
-/** 导入一个已构建入口；单个插件的导入等待有固定期限。 */
+/** Import a built entry; individual plugin imports have a fixed deadline. */
 async function importEntry(id: string, file: string, label: string): Promise<unknown> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const module = await Promise.race([
@@ -201,7 +201,7 @@ async function importEntry(id: string, file: string, label: string): Promise<unk
   ]).finally(() => clearTimeout(timer));
   return module.default;
 }
-/** 存储声明只核对结构形状；格式内容由迁移链与插件自身负责。 */
+/** Storage declarations check structural shape only; migration chains and plugins own format contents. */
 function storageDeclarations(id: string, value: unknown): readonly PluginStorageDeclaration[] {
   if (!Array.isArray(value) || value.some(item => !item || typeof item !== "object" || (item.kind !== "json" && item.kind !== "sqlite")
     || typeof item.path !== "string" || !Number.isSafeInteger(item.version) || item.version < 1 || !item.migrations || typeof item.migrations !== "object"))
@@ -209,7 +209,7 @@ function storageDeclarations(id: string, value: unknown): readonly PluginStorage
   return value as readonly PluginStorageDeclaration[];
 }
 
-/** 读取列表、校验清单与冲突、打包并导入启用的插件；失败传播给依赖方。`runtime: false` 只导入存储入口。 */
+/** Read lists, validate manifests and conflicts, bundle and import enabled plugins; propagate failures to dependents. `runtime: false` imports storage entries only. */
 export async function loadPackages(list: PackageList, npmRoot: string, cacheRoot: string, reserved: readonly string[],
   publicProviders: readonly PublicProvider[] = [], progress: (id: string) => void = () => {},
   options: { runtime?: boolean } = {}): Promise<ResolvedPackage[]> {
@@ -268,7 +268,7 @@ export async function loadPackages(list: PackageList, npmRoot: string, cacheRoot
       item.status = "failed"; item.error = error instanceof Error ? error.message : String(error);
     }
   }
-  // 导入失败同样传播给依赖方；不让消费者拿着失败提供方的公共服务进入 setup。
+  // Propagate import failures to dependents too; consumers cannot enter setup with public services from failed providers.
   let changed = true;
   while (changed) {
     changed = false;
@@ -280,7 +280,7 @@ export async function loadPackages(list: PackageList, npmRoot: string, cacheRoot
       }
     }
   }
-  // 纯公共包没有 setup；穿透其依赖，使真正的服务提供方先初始化。
+  // Pure public packages have no setup; traverse dependencies so actual service providers initialize first.
   const dependenciesOf = (id: string, visited = new Set<string>()): string[] => {
     if (visited.has(id)) return [];
     visited.add(id);

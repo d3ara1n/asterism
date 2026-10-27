@@ -6,8 +6,8 @@ const followThreshold = 80;
 const distanceFromBottom = (element: HTMLElement) => element.scrollHeight - element.scrollTop - element.clientHeight;
 
 /**
- * 跟随状态局限于滚动区域；业务受理成功时显式回到最新输出。
- * 虚拟列表测量条目后会自行补偿滚动位置，只有用户手势引起的滚动才改变跟随状态。
+ * Follow state is local to the scroll area; successful business acceptance explicitly returns to the latest output.
+ * The virtual list compensates for scroll position after measuring items; only scrolling caused by user gestures changes follow state.
  */
 export function useOutputFollow(content: readonly TimelineItem[], processOwners: ReadonlyMap<string, string>, onUserGesture: () => void) {
   const follow = useRef(true);
@@ -25,7 +25,7 @@ export function useOutputFollow(content: readonly TimelineItem[], processOwners:
     const virtualizer = list.current;
     if (!saved || !virtualizer || gesture.current) return;
     let index = content.findIndex(item => timelineKey(item) === saved.key);
-    // 正在阅读的过程被自动收起时，定位到这段过程的概要行。
+    // When the process currently being read is automatically collapsed, navigate to its summary row.
     if (index < 0) {
       const owner = processOwners.get(saved.key);
       index = content.findIndex(item => timelineKey(item) === owner);
@@ -42,7 +42,7 @@ export function useOutputFollow(content: readonly TimelineItem[], processOwners:
     if (document.activeElement === button) saved.focus = false;
   }, []);
   useLayoutEffect(restore, [restore]);
-  // 卡片在原生冒泡阶段接管内容区滚轮，React 事件收不到；用户手势在滚动元素上以原生监听识别。
+  // The card takes over content-area wheel events during native bubbling, so React does not receive them; native listeners on the scroll element identify user gestures.
   useEffect(() => {
     const element = scroll.current;
     if (!element) return;
@@ -53,23 +53,23 @@ export function useOutputFollow(content: readonly TimelineItem[], processOwners:
   }, [onUserGesture]);
   return {
     scroll, list, awayFromBottom, onProcessMount,
-    /** 测量后继续跟随输出，或保持用户选定条目在视口中的位置。 */
+    /** After measurement, continues following output or preserves the user-selected item's position in the viewport. */
     onResize: restore,
-    /** 一次滚动结束后，下一次滚动须重新由用户手势发起才改变跟随状态。 */
+    /** After a scroll ends, the next scroll must again originate from a user gesture to change follow state. */
     onScrollEnd() { gesture.current = false; },
     latest() {
       follow.current = true; setAwayFromBottom(false);
       anchor.current = null;
       toBottom();
     },
-    /** 按条目序号定位，不依赖该条目已挂载。 */
+    /** Navigates by item index without requiring that item to be mounted. */
     jumpTo(index: number) {
       follow.current = false;
       gesture.current = false;
       anchor.current = content[index] ? { key: timelineKey(content[index]), offset: 0 } : null;
       list.current?.scrollToIndex(index, { align: "start" });
     },
-    /** 展开／收起前记住末尾概要的位置；由虚拟列表补偿上方条目的插入、移除与后续测量。 */
+    /** Remembers the trailing summary's position before expansion or collapse; the virtual list compensates for insertion, removal, and later measurement of items above it. */
     preserveItem(key: string) {
       const index = content.findIndex(item => timelineKey(item) === key);
       const virtualizer = list.current;
@@ -80,14 +80,14 @@ export function useOutputFollow(content: readonly TimelineItem[], processOwners:
     },
     onScroll(event: UIEvent<HTMLDivElement>) {
       const away = distanceFromBottom(event.currentTarget) >= followThreshold;
-      // 回到末尾即恢复跟随；离开末尾只在用户手势时生效，测量补偿造成的位移不关闭跟随。
+      // Returning to the end restores following; leaving the end changes state only for user gestures, so measurement compensation does not disable following.
       if (gesture.current || !anchor.current) {
         if (!away) { follow.current = true; anchor.current = null; }
         else if (gesture.current) {
           follow.current = false;
           const virtualizer = list.current;
           if (virtualizer) {
-            // 外层 React scroll 监听可能早于虚拟列表更新，直接读取本次 DOM 位置。
+            // The outer React scroll listener may run before the virtual list updates; read the current DOM position directly.
             const offset = event.currentTarget.scrollTop;
             const index = virtualizer.findItemIndex(offset);
             const item = content[index];

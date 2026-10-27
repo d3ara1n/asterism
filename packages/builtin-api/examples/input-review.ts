@@ -2,7 +2,7 @@ import { SubmitAgentInput } from "@asterism/builtin-api/contracts";
 import { pluginNamespace } from "@asterism/sdk/contracts";
 import { defineModule, definePlugin, implementPreparer } from "@asterism/sdk/runtime";
 
-/** 外部插件消费内置动作声明；不声明第二种 Agent，也不导入其实现目录。 */
+/** External plugins consume built-in action declarations; they neither declare a second Agent type nor import its implementation directory. */
 export default definePlugin({
   namespace: pluginNamespace("example.input-review"), version: "1.0.0",
   modules: [defineModule(plugin => ({

@@ -16,7 +16,7 @@ export interface Invocation extends ToolInvocationInfo {
   execute(signal: AbortSignal, publish?: (data: Json) => void, handover?: ContentLease): Promise<CallResult>;
   toModel?: (data: Json) => ToolModelOutput;
 }
-/** 宿主目录保存 SDK 贡献适配后的执行接口。 */
+/** Host catalogs retain execution interfaces adapted from SDK contributions. */
 export interface ToolImplementation {
   reference: ContractReference;
   resourceKind: string;

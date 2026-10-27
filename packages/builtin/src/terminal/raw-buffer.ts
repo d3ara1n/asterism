@@ -2,7 +2,7 @@ const RAW_CHARACTERS = 1024 * 1024;
 const highSurrogate = (value: number) => value >= 0xd800 && value <= 0xdbff;
 const lowSurrogate = (value: number) => value >= 0xdc00 && value <= 0xdfff;
 
-/** 原始输出按块保留有界尾部；读范围与文本共同对齐 Unicode 字符边界。 */
+/** Retains a bounded tail of raw output in chunks; read ranges and text align together to Unicode character boundaries. */
 export class RawBuffer {
   private chunks: string[] = [];
   private size = 0;
@@ -24,7 +24,7 @@ export class RawBuffer {
       this.size -= dropped;
       this.start += dropped;
     }
-    // 淘汰边界切开代理对时，剩下的低代理项也属于被淘汰的字符。
+    // When an eviction boundary splits a surrogate pair, the remaining low surrogate also belongs to the evicted character.
     if (lowSurrogate(this.chunks[0]?.charCodeAt(0) ?? NaN)) {
       if (this.chunks[0]!.length === 1) this.chunks.shift();
       else this.chunks[0] = this.chunks[0]!.slice(1);
@@ -38,7 +38,7 @@ export class RawBuffer {
     let from = Math.max(this.start, Math.min(requested, this.end));
     if (this.splitsCharacter(from)) from--;
     let to = Math.min(this.end, from + limit);
-    // 至多多取一个 code unit；limit=1 时也能完整读取并向前推进。
+    // Read at most one extra code unit; even limit=1 can read a complete character and advance.
     if (this.splitsCharacter(to)) to++;
     return {
       text: this.slice(from, to),

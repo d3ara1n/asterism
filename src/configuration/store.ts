@@ -14,7 +14,7 @@ import { normalizeOverrides, resolveAgentConfiguration, resolveRoleConfiguration
 import { providerEditingMessages } from "../shared/provider-editing-messages.ts";
 import { jsonStorage } from "../storage/migrations.ts";
 
-/** 全局配置格式；变化时递增并在 `configurationStorage` 追加 n → n+1 迁移。 */
+/** Global configuration format; increment on changes and append an n → n+1 migration to `configurationStorage`. */
 export const configurationVersion = 11;
 const identity = { id: configurationIdSchema };
 const storedProviderSchema = modelProviderInputSchema.extend({ credentialRef: z.string().uuid().nullable() }).strip();
@@ -22,7 +22,7 @@ const storedWebProviderSchema = webProviderStateSchema.extend({ credentialRef: z
 const storedRoleSchema = z.object({ ...identity, builtin: z.boolean(), overrides: modelRoleOverridesSchema });
 const storedAgentSchema = z.object({ ...identity, builtin: z.boolean(), overrides: agentOverridesSchema });
 const storedModelSchema = modelSchema.extend({ cost: modelCostSchema.nullable().default(null) }).strip();
-/** 模型以 `<providerId>/<modelId>` 识别，其余以 id 识别。 */
+/** Models use `<providerId>/<modelId>` identities; other entries use id. */
 const keyOf = (item: { id: string } | { providerId: string; modelId: string }): string => "id" in item ? item.id : modelReference(item);
 const documentSchema = z.strictObject({
   version: z.literal(configurationVersion),
@@ -68,12 +68,12 @@ function initialConfiguration(): ConfigurationDocument {
     roles: defaultRoles.map(({ id, builtin }) => ({ id, builtin, overrides: {} })),
     agents: defaultAgents.map(({ id, builtin }) => ({ id, builtin, overrides: {} })) };
 }
-/** 已发布格式的转换在此追加；业务读写始终消费当前文档。 */
+/** Append conversions for released formats here; business reads and writes always consume the current document. */
 export function configurationStorage(root: string) {
   return jsonStorage({ id: "configuration", file: join(root, applicationStorage.configurationFile), version: configurationVersion, migrations: {} });
 }
 
-/** 以旧身份定位并替换；新身份与其他项冲突时拒绝。 */
+/** Locate by old identity and replace; reject new identities that conflict with other entries. */
 function upsert<T extends { id: string } | { providerId: string; modelId: string }>(items: T[], previous: string | null, item: T): void {
   const index = previous === null ? -1 : items.findIndex(value => keyOf(value) === previous);
   if (items.some((value, i) => i !== index && keyOf(value) === keyOf(item))) throw new ConfigurationError("conflict", "This ID is already used. Choose another.");
@@ -81,7 +81,7 @@ function upsert<T extends { id: string } | { providerId: string; modelId: string
   else items[index] = item;
 }
 
-/** 单实例内由配置模块独占；保存成功后才替换内存视图，调用方不接触文件格式。 */
+/** Exclusively owned by configuration within one instance; replace the in-memory view only after saving succeeds. Callers do not access the file format. */
 export class ConfigurationStore {
   private readonly path: string;
   private document: ConfigurationDocument;
@@ -92,7 +92,7 @@ export class ConfigurationStore {
     try { content = readFileSync(this.path, "utf8"); }
     catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw new ConfigurationError("unavailable", "The application configuration could not be read.");
-      // 只有文件不存在才初始化；已有文件中的删除状态不会重新播种。
+      // Initialize only when the file is absent; deletions in existing files are not reseeded.
       this.document = initialConfiguration();
       this.commit(this.document);
       return;
@@ -115,7 +115,7 @@ export class ConfigurationStore {
       case "webProvider": upsert(next.webProviders, input.id, { ...input.value, credentialRef: input.credentialRef }); break;
       case "modelProvider":
         upsert(next.modelProviders, id, { ...input.value, credentialRef: input.credentialRef });
-        // 提供商拥有其模型：改名时模型随之迁移；角色等引用不改写。
+        // Providers own their models: renaming moves models with them without rewriting references such as roles.
         if (id !== null && id !== input.value.id) for (const model of next.models) if (model.providerId === id) model.providerId = input.value.id;
         break;
       case "model": upsert(next.models, id, input.value); break;
@@ -137,7 +137,7 @@ export class ConfigurationStore {
     next.webProviders = ids.map(id => providers.get(id)!);
     this.commit(next);
   }
-  /** 编辑限制随连接保存；比较已保存值，不依赖当前预设目录。 */
+  /** Editing restrictions persist with the connection; compare saved values independently of the current preset catalog. */
   private validateEdit(input: ConfigurationSave): void {
     const reject = () => { throw new ConfigurationError("invalid_request",
       "Fixed connection settings cannot be changed.", providerEditingMessages.fixed); };
@@ -162,7 +162,7 @@ export class ConfigurationStore {
     if (!old) throw new ConfigurationError("not_found", "This configuration no longer exists.");
     if (kind === "role" && this.get("role", id)?.builtin) throw new ConfigurationError("invalid_request", "Built-in model roles cannot be deleted.");
     const next = structuredClone(this.document);
-    // 提供商与它拥有的模型在同一次保存中删除，不修改角色或会话的选择。
+    // Delete the provider and its models in one save without changing role or session selections.
     switch (kind) {
       case "webProvider": next.webProviders = next.webProviders.filter(item => item.id !== id); break;
       case "modelProvider": next.modelProviders = next.modelProviders.filter(item => item.id !== id); next.models = next.models.filter(item => item.providerId !== id); break;
@@ -173,7 +173,7 @@ export class ConfigurationStore {
     this.commit(next);
     return { credentialRef: "credentialRef" in old ? old.credentialRef : null };
   }
-  /** 一次保存全部选择；已有模型保留原值，重试不会覆盖用户配置。 */
+  /** Save all selections together; existing models retain their values and retries do not overwrite user configuration. */
   addModels(models: ProviderModel[]): void {
     const next = structuredClone(this.document);
     const existing = new Set(next.models.map(modelReference));
@@ -185,7 +185,7 @@ export class ConfigurationStore {
   }
   private commit(raw: ConfigurationDocument): void {
     let next: ConfigurationDocument;
-    // 写入前统一校验结构与生效配置；失败时不改变当前文档。
+    // Validate structure and effective configuration together before writing; failure leaves the current document unchanged.
     try { next = validate(raw); }
     catch (error) {
       if (error instanceof ConfigurationError) throw error;

@@ -19,16 +19,16 @@ const request = (clock: RequestTiming | undefined, counts: Usage | null): Diagno
   tokensBefore: null, sent: null,
 });
 
-describe("诊断速率", () => {
-  // 分清请求总耗时和输出持续时间，缓存输入不重复加进总量。
-  it("E2E、思考细分和流式速率使用各自的计量范围", () => {
+describe("Diagnostic rates", () => {
+  // Distinguish total request duration from output duration, and do not add cached input to the total again.
+  it("E2E, thinking breakdowns, and streaming rates each use their own measurement scope", () => {
     expect(outputDuration(timing)).toBe(5000);
     expect(rates()).toEqual({ output: 10, nonReasoning: 10, reasoning: 0, total: 110, streaming: 20 });
     expect(rates(timing, { ...usage, reasoning: 40 })).toEqual({ output: 10, nonReasoning: 6, reasoning: 4, total: 110, streaming: null });
   });
 
-  // 未报告思考、思考摘要与单个大包都无法给出可信的流式速率；缺用量不能当作零。
-  it("缺失或矛盾的计量及不可观测的输出范围不计算对应速率", () => {
+  // Unreported thinking, thinking summaries, and a single large packet cannot yield reliable streaming rates; missing usage cannot be treated as zero.
+  it("Does not calculate rates for missing or contradictory measurements or unobservable output ranges", () => {
     expect(rates(timing, { ...usage, reasoning: null })).toMatchObject({ nonReasoning: null, reasoning: null, streaming: null });
     expect(rates(timing, { ...usage, reasoning: 101 })).toMatchObject({ nonReasoning: null, reasoning: null, streaming: null });
     expect(rates({ ...timing, firstReasoningMs: 2000 }).streaming).toBeNull();
@@ -39,8 +39,8 @@ describe("诊断速率", () => {
     expect(Object.values(rates({ ...timing, outcome: "cancelled" }))).toEqual([null, null, null, null, null]);
   });
 
-  // 直接平均 10 TPS 和 100 TPS 会得到错误的 55；分子和分母必须来自同一批可计量请求。
-  it("按总 token 与对应总耗时汇总，没有终态计时的记录不补耗时", () => {
+  // Directly averaging 10 TPS and 100 TPS incorrectly yields 55; numerator and denominator must come from the same set of measurable requests.
+  it("Aggregates total tokens over corresponding total duration without inventing duration for records lacking terminal timing", () => {
     const overview = performanceOverview([
       request(timing, usage),
       request({ ...timing, durationMs: 1000, firstOutputMs: 100, firstTextMs: 100, lastOutputMs: 900 }, { ...usage, input: null }),

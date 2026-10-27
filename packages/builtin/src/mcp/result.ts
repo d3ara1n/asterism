@@ -4,7 +4,7 @@ import type { CallToolResult } from "@modelcontextprotocol/client";
 import type { McpCallData } from "./contract.ts";
 import { extraStructured } from "./content.ts";
 
-/** MCP 字节进入宿主不可变内容，历史与模型共用相同引用。资源链接保留 URI，不自动读取。 */
+/** MCP bytes enter immutable host content; history and the model share the same references. Resource links retain their URIs and are not read automatically. */
 export async function convertMcpResult(result: CallToolResult, content: ContentScope): Promise<Pick<McpCallData, "parts" | "structuredContent">> {
   const parts: ModelInputPart[] = [];
   for (const block of result.content ?? []) {

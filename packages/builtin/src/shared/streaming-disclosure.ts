@@ -14,9 +14,9 @@ export function initialStreamingDisclosure(): StreamingDisclosure {
 }
 
 /**
- * 阶段首段正文开始一次性等待；增量沿用起点，手动选择与关闭偏好取消待展开。
- * 需要用户处理的正文在阶段内首次出现时立即展开一次，不受偏好与此前手动选择影响；
- * 该阶段结束时保持开合，让处理结果在原位呈现。
+ * The stage's first body text starts a one-time wait; deltas retain that start, while manual choices and disabling the preference cancel pending expansion.
+ * Content requiring user action expands immediately once when it first appears in the stage, regardless of preferences and earlier manual choices;
+ * disclosure state is retained when that stage ends, so the result appears in place.
  */
 export function advanceStreamingDisclosure(
   state: StreamingDisclosure, stage: StreamingStage, hasContent: boolean,

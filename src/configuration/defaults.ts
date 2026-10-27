@@ -1,6 +1,6 @@
 import type { AgentConfiguration, ModelRole } from "../shared/configuration.ts";
 
-// 内置代理按用途提供默认配置，作为原始基准参与解析。
+// Built-in agents supply purpose-specific defaults used as the original resolution baseline.
 export const defaultAgents: AgentConfiguration[] = [
   {
     "id": "worker",

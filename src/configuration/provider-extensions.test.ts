@@ -6,9 +6,9 @@ import { RunLifecycle } from "../plugins/lifecycle.ts";
 
 const preset: ModelProviderPreset = { id: " p ", name: "P", billing: "none", sources: ["https://example.test/docs"], verifiedOn: "2026-10-20",
   connection: { protocol: "openai-chat", baseUrl: "https://example.test", auth: "none", compatibility: [] } };
-describe("提供商贡献目录", () => {
-  // schema 会 trim 身份；去重、patch 和寻址必须都消费同一归一化值。
-  it("归一化身份用于注册、修改和去重，失败不留下半份目录", async () => {
+describe("Provider contribution catalog", () => {
+  // The schema trims identities; deduplication, patching, and addressing must all consume the same normalized value.
+  it("uses normalized identities for registration, modification, and deduplication without leaving partial catalogs on failure", async () => {
     const registry = new ModelProviderExtensions(), lifecycle = new RunLifecycle(() => {});
     try {
       registry.declare("test.a", [{ id: " q ", label: "Q", query: async () => [] }], [
@@ -22,8 +22,8 @@ describe("提供商贡献目录", () => {
       expect(registry.presets()).toHaveLength(1);
     } finally { await lifecycle.close(); }
   });
-  // UsageProvider 是结构接口，类实例和闭包同样合法；注册不能丢失原型方法或其 this。
-  it("查询保留类实例的方法接收者", async () => {
+  // UsageProvider is structural: class instances and closures are valid; registration must preserve prototype methods and their this receiver.
+  it("queries preserve class method receivers", async () => {
     class Balance implements QueryUsageProvider {
       id = "balance"; label = "Balance"; #remaining = 12;
       async query(): Promise<UsageItem[]> { return [{ id: "wallet", type: "balance", scope: "account", label: "Wallet", remaining: this.#remaining, currency: "USD" }]; }

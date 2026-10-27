@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { UiText, UsageItem } from "@asterism/sdk/contracts";
 import { UsageQueryError, type QueryUsageProvider, type UsageQueryContext } from "@asterism/sdk/runtime";
 
-/** 金额接口可用十进制字符串，空串、布尔值和非有限数不能被当成零余额。 */
+/** Amount APIs may use decimal strings; empty strings, booleans, and non-finite numbers must not be treated as a zero balance. */
 export const decimal = z.union([z.number(), z.string().trim().regex(/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/u).transform(Number)])
   .pipe(z.number());
 export const timestamp = z.string().refine(value => Number.isFinite(Date.parse(value)), "Invalid timestamp.")
@@ -13,7 +13,7 @@ export function parseUsageResponse<T>(schema: z.ZodType<T>, raw: unknown): T {
   if (!result.success) throw new UsageQueryError("protocol");
   return result.data;
 }
-/** 查询路径由具体服务声明；复用错误分类、取消和认证，不跨站点回退。 */
+/** Each service declares its query path; shares error classification, cancellation, and authentication without falling back across sites. */
 export async function fetchUsageJson(context: UsageQueryContext, path: string, transport: typeof fetch = fetch,
   auth: "bearer" | "raw" = "bearer"): Promise<unknown> {
   const { connection, credential, signal } = context;

@@ -6,18 +6,18 @@ import { loadPlugins, type PluginHostServices } from "../plugins/loader.ts";
 import { applicationBrand, applicationUserAgent } from "../shared/application.ts";
 import { fileURLToPath } from "node:url";
 
-// 源码和 dist/main 相对仓库／应用根的深度相同；原生搜索读取安装包解包后的手册。
+// Source and dist/main have the same depth relative to repository/application roots; native search reads unpacked installed manuals.
 const manualDirectory = fileURLToPath(new URL("../../docs/manual/", import.meta.url))
   .replace(/([\\/])([^\\/]+\.asar)(?=[\\/])/g, "$1$2.unpacked");
 
-/** 应用装配负责连接内置领域接口与宿主，不进入插件实现包。 */
+/** Application assembly connects built-in domain interfaces with the host without entering plugin implementation packages. */
 export function createModules(services: PluginHostServices, external: readonly PluginDefinition[] = []) {
   let naming: NamingApi | null = null;
   let closed = false;
   const definition = createBuiltin({ application: { name: applicationBrand.en, userAgent: applicationUserAgent },
     manualDirectory,
     connectNaming(api) { naming = api; return () => { naming = null; }; } });
-  // 内置插件与外部插件共用存储声明与准备失败的处理。
+  // Built-in and external plugins share storage declarations and preparation failure handling.
   const declarations = new Map(services.preparedStorage?.declarations);
   declarations.set(builtin.id, builtinStorage);
   const loaded = loadPlugins([definition, ...external], { ...services,

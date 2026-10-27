@@ -7,7 +7,7 @@ export default defineModule(plugin => {
   const questions = createQuestionService((object, pending) => {
     try { plugin.ipc.events.publish(QuestionsChanged, { sessionId: object.sessionId, agentId: object.id, pending }); }
     catch (error) {
-      // 宿主关闭先结束事件路由，再取消运行；此时只收束后台等待。
+      // Host shutdown ends event routing before canceling runs; only settle backend waits at this point.
       if (!(error instanceof PluginApiError && error.code === "unavailable")) throw error;
     }
   });

@@ -37,7 +37,7 @@ function SeeBody({ result }: SeeProps) {
 }
 const seeView = { headerRenderer: SeeHeader, bodyRenderer: SeeBody };
 
-/** 标题栏刷新按钮：与 Body 共享同一 DirectoryTreeLink 实例。 */
+/** Title-bar refresh button: shares the same DirectoryTreeLink instance with Body. */
 function DirectoryTreeActions(_: { data: { path: string } }) {
   const i18n = useI18n();
   const { link, state } = useDirectoryTreeLink();
@@ -47,8 +47,8 @@ function DirectoryTreeActions(_: { data: { path: string } }) {
 }
 
 /**
- * 文件树外观映射到公共 token：行背景内缩为圆角块（与侧栏列表一致），图标与文字分别对齐
- * 标题栏的图标列（12px）与名称列（36px）。滚动区左右内边距 6px + 行外边距 2px + 行内边距 4px。
+ * File-tree appearance maps to public tokens: row backgrounds are inset rounded blocks (matching sidebar lists), with icons and text aligned respectively
+ * to the title bar's icon column (12px) and name column (36px). Horizontal spacing is 6px scroll-area padding + 2px row margin + 4px row padding.
  */
 const treeStyle = {
   height: "100%",
@@ -69,13 +69,13 @@ const treeStyle = {
   "--trees-item-row-gap-override": "8px",
 } as CSSProperties;
 
-/** 卡片正文：贴边筛选条 + 文件树；空目录、无匹配与读取失败以说明文字占位。 */
+/** Card body: edge-aligned filter bar + file tree; explanatory text fills empty-directory, no-match, and read-failure states. */
 function DirectoryTreeBody(_: { data: { path: string } }) {
   const i18n = useI18n();
   const { state } = useDirectoryTreeLink();
   const { model } = useFileTree({ paths: [], initialExpansion: "closed", itemHeight: 28, icons: { set: "complete", colored: false } });
   const search = useFileTreeSearch(model);
-  // 输入框保留用户原样输入；模型内部 trim 并小写化后匹配，不回填到输入框。
+  // The input preserves exactly what the user typed; the model trims and lowercases internally for matching without writing it back to the input.
   const [query, setQuery] = useState("");
 
   useEffect(() => {

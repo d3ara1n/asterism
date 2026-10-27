@@ -2,8 +2,8 @@ import { useSyncExternalStore } from "react";
 import { defaultAppearance, densityRootPx, fontStack, monoStack, sansStack, themeTokens, type Appearance, type AppearancePatch, type Scheme } from "../../../shared/theme";
 
 /**
- * 外观的唯一 renderer 入口：读取、写入并把 token 应用到 :root。
- * 亮暗由主进程 nativeTheme.themeSource 决定，这里只读 prefers-color-scheme，与系统材质同源。
+ * The sole renderer entry for appearance: reads, writes, and applies tokens to :root.
+ * Light/dark mode is determined by nativeTheme.themeSource in the main process; this only reads prefers-color-scheme, sharing the native material's source.
  */
 let current: Appearance = defaultAppearance(window.host.platform);
 const darkQuery = window.matchMedia("(prefers-color-scheme: dark)");
@@ -48,7 +48,7 @@ export function useAppearance(): Appearance {
   return useSyncExternalStore(subscribe, () => current);
 }
 
-/** 当前解析后的亮暗，供 React Flow colorMode 等需要显式模式的组件使用。 */
+/** Currently resolved light/dark mode for components requiring an explicit mode, such as React Flow colorMode. */
 export function useScheme(): Scheme {
   return useSyncExternalStore(subscribe, () => scheme);
 }

@@ -15,7 +15,7 @@ interface StartupOptions {
   startRuntime(failures: readonly PluginStorageFailure[]): Promise<void>;
 }
 
-/** 主进程拥有后台启动顺序、阶段和取消作用域；窗口仅消费状态与设置可用通知。 */
+/** The main process owns background startup order, stages, and cancellation scopes; windows only consume status and settings-availability notifications. */
 export class StartupCoordinator {
   state: StartupState = { status: "starting", stage: "dataCheck" };
   storageFailures: PluginStorageFailure[] = [];
@@ -76,7 +76,7 @@ export class StartupCoordinator {
       try { result = await this.prepare({ kind: "prepare" }); }
       catch (error) {
         if (this.lifetime.signal.aborted) return;
-        // 退出已确认的准备失败仍提供恢复入口；存活未确认的进程由通用启动失败处理。
+        // Preparation failures with confirmed exit still offer recovery; processes with unconfirmed liveness use the general startup failure flow.
         if (error instanceof PreparationTerminationError) throw error;
         console.error("Data preparation failed.", error);
         result = { ok: false, error: error instanceof Error ? error.message : String(error), paused: false };

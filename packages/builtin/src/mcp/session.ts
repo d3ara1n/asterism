@@ -11,7 +11,7 @@ import { closeProcessTree } from "../shared/process-tree.ts";
 
 export const credentialKey = (id: string) => `mcp.${id}.credentials`;
 export const oauthKey = (id: string) => `mcp.${id}.oauth`;
-/** 连接参数身份；变化时旧连接与缓存目录都不再适用。凭据变化由保存入口单独失效。 */
+/** Connection parameter identity; changes make the old connection and cached catalog inapplicable. The save entry point invalidates credential changes separately. */
 export function endpointOf(config: McpServerConfig): string {
   return JSON.stringify(config.transport === "stdio" ? [config.transport, config.command, config.args, config.cwd] : [config.transport, config.url, config.auth]);
 }
@@ -27,14 +27,14 @@ export interface SessionHost {
   saveDirectory(config: McpServerConfig, directory: Directory | undefined): void;
   notify(): void;
 }
-/** 一次已建立或正在建立的客户端连接；scope 中止即结束其全部请求。 */
+/** A client connection that is established or being established; aborting scope ends all its requests. */
 interface Live { client: Client; transport: Transport; scope: AbortController; oauth?: McpOAuth; stderr: string; closing?: Promise<void> }
-/** 生命周期过渡：同一服务器同时至多一个；等待者共享结果，done 不拒绝。 */
+/** Lifecycle transition: at most one per server at a time; waiters share the result, and done never rejects. */
 interface Transition { kind: "open" | "close"; done: Promise<void>; abort?: AbortController; failure?: unknown }
 
 /**
- * 单台服务器的共享会话。连接建立、断开与配置退役串行经过 transition；
- * 调用遇到 connecting／awaiting_auth 时等待当前过渡，不另起连接。
+ * Shared session for a single server. Connection establishment, disconnection, and configuration retirement pass serially through transition;
+ * calls encountering connecting/awaiting_auth wait for the current transition without starting another connection.
  */
 export class ServerSession {
   private phase: ConnectionPhase = "disconnected";
@@ -55,7 +55,7 @@ export class ServerSession {
   }
   tool(name: string): CachedTool | undefined { return this.directory?.tools.find(tool => tool.name === name); }
 
-  /** 同一端点的配置变化；返回 false 表示配置未变。停用即断开，启用的 eager 由调用方发起连接。 */
+  /** Configuration changes for the same endpoint; false means the configuration is unchanged. Disabling disconnects immediately; the caller initiates connection for enabled eager sessions. */
   reconfigure(config: McpServerConfig): boolean {
     if (JSON.stringify(config) === JSON.stringify(this.config)) return false;
     this.config = config;
@@ -64,7 +64,7 @@ export class ServerSession {
     this.host.notify();
     return true;
   }
-  /** 端点变化或删除；退役后的会话不再建立连接。 */
+  /** Endpoint change or deletion; retired sessions establish no further connections. */
   retire(): Promise<void> { this.retired = true; return this.disconnect(); }
   invalidateDirectory() { this.directory = undefined; this.host.saveDirectory(this.config, undefined); this.host.notify(); }
 
@@ -72,7 +72,7 @@ export class ServerSession {
     if (this.retired || this.host.closed || this.host.plugin.lifetime.signal.aborted) throw new McpError("service_unavailable", "The MCP server configuration changed or the service is closing.");
     if (!this.config.enabled) throw new McpError("server_disabled", `The MCP server '${this.id}' is disabled.`);
   }
-  /** 取得连接；连接过程的失败统一为 connection_failed，取消保留中止原因。 */
+  /** Obtains a connection; connection failures become connection_failed, while cancellation retains the abort reason. */
   private async connection(signal: AbortSignal): Promise<Live> {
     try { return await this.acquire(signal); }
     catch (error) {
@@ -80,7 +80,7 @@ export class ServerSession {
       throw new McpError("connection_failed", messageOf(error));
     }
   }
-  /** 取得已建立连接：正在连接或等待授权时等待该过渡，断开过渡结束后按需重新连接。 */
+  /** Obtains an established connection: waits for an ongoing connection or authorization transition, and reconnects as needed after a disconnection transition ends. */
   private async acquire(signal: AbortSignal): Promise<Live> {
     for (;;) {
       signal.throwIfAborted();
@@ -118,14 +118,14 @@ export class ServerSession {
         attempt = this.createLive(config, values, oauth, scope);
         try { await attempt.client.connect(attempt.transport, { signal: scope }); break; }
         catch (error) {
-          // 已发起浏览器授权即进入等待；SDK 可能包装认证错误，以授权请求本身为准。
+          // Enter the waiting state once browser authorization starts; the SDK may wrap authentication errors, so the authorization request itself is authoritative.
           const request = oauth?.takeAuthorization();
           if (!request) throw error;
           await this.closeLive(attempt); attempt = undefined;
           this.setPhase("awaiting_auth", null, request.url);
           const params = await request.callback;
           this.setPhase("connecting", null, null);
-          // 授权码交换使用同一 provider 的 PKCE verifier；交换后以新令牌重新连接。
+          // Authorization code exchange uses the same provider's PKCE verifier; reconnect with the new token after the exchange.
           await this.httpTransport(config, values, oauth!, scope).finishAuth(params);
         }
       }
@@ -139,7 +139,7 @@ export class ServerSession {
       stderr = attempt?.stderr ?? "";
       if (attempt) await this.closeLive(attempt);
       await oauth?.close();
-      // 断开与服务关闭中止的连接按断开处理，状态由断开过渡写入。
+      // Connections aborted by disconnection or service shutdown are treated as disconnected; the disconnection transition writes the state.
       if (!scope.aborted) {
         const message = describe(error, stderr);
         this.setPhase("error", message, null);
@@ -152,7 +152,7 @@ export class ServerSession {
   private httpTransport(config: McpServerConfig, headers: Record<string, string>, oauth: McpOAuth | undefined, scope: AbortSignal) {
     return new StreamableHTTPClientTransport(new URL(config.url), {
       requestInit: { headers }, ...(oauth && { authProvider: oauth }),
-      // SDK 的 OAuth 发现、刷新与令牌交换也消费这个 fetch，随连接作用域取消。
+      // SDK OAuth discovery, refresh, and token exchange also use this fetch and are canceled with the connection scope.
       fetch: (input, init) => fetch(input, { ...init, signal: AbortSignal.any([
         scope, ...(init?.signal ? [init.signal] : []), ...(input instanceof Request ? [input.signal] : []),
       ]) }),
@@ -162,7 +162,7 @@ export class ServerSession {
     const scope = new AbortController();
     const lifetime = AbortSignal.any([scope.signal, this.host.plugin.lifetime.signal]);
     const client = new Client({ name: "Asterism", version: "0.1.0" }, {
-      // stdio 使用默认 initialize 握手，每次连接只启动实际服务器进程；HTTP 在原连接上探测协议版本。
+      // stdio uses the default initialize handshake and starts only the actual server process per connection; HTTP probes the protocol version on the original connection.
       capabilities: {}, ...(config.transport === "http" && { versionNegotiation: { mode: "auto" as const } }),
       listMaxPages: 0, jsonSchemaValidator: this.host.validator,
       listChanged: { tools: { onChanged: (error, tools) => {
@@ -173,7 +173,7 @@ export class ServerSession {
     });
     let transport: Transport;
     if (config.transport === "stdio") {
-      // 任务进程已继承登录 shell 环境；与 shell 模块一致传递完整环境加用户配置值。
+      // The task process has inherited the login shell environment; pass the full environment plus user-configured values, as the shell module does.
       const stdio = new StdioClientTransport({ command: config.command, args: config.args, cwd: config.cwd || undefined,
         env: { ...process.env as Record<string, string>, ...values }, stderr: "pipe" });
       stdio.stderr?.on("data", (chunk: Buffer) => { live.stderr = (live.stderr + chunk.toString("utf8")).slice(-STDERR_LIMIT); });
@@ -184,14 +184,14 @@ export class ServerSession {
     client.onerror = error => { if (!scope.signal.aborted && this.live === live) { this.error = messageOf(error); this.host.notify(); } };
     return live;
   }
-  /** 已建立连接意外结束：释放资源并记录原因，下次调用重新连接。 */
+  /** Unexpected end of an established connection: releases resources and records the reason; the next call reconnects. */
   private lost(live: Live, message: string) {
     if (this.live !== live) return;
     this.live = undefined;
     void this.closeLive(live).catch(error => this.host.plugin.log.error("MCP cleanup failed.", error));
     this.setPhase("error", message, null);
   }
-  /** 中止作用域并回收进程树；包装命令的后代由快照补齐清理。 */
+  /** Aborts the scope and reaps the process tree; a snapshot supplies descendants of wrapper commands for cleanup. */
   private closeLive(live: Live): Promise<void> {
     return live.closing ??= (async () => {
       live.scope.abort();
@@ -201,7 +201,7 @@ export class ServerSession {
     })();
   }
 
-  /** 断开中止正在进行的连接或授权等待，再关闭已建立连接。 */
+  /** Disconnection aborts an ongoing connection or authorization wait, then closes the established connection. */
   async disconnect(): Promise<void> {
     clearTimeout(this.timer);
     for (;;) {
@@ -220,7 +220,7 @@ export class ServerSession {
     await transition.done;
     if (transition.failure) throw transition.failure;
   }
-  /** 未连接时建立连接；已连接时刷新目录。 */
+  /** Establishes a connection when disconnected; refreshes the catalog when connected. */
   async connect(signal: AbortSignal): Promise<void> {
     this.active++; clearTimeout(this.timer);
     try {
@@ -248,10 +248,10 @@ export class ServerSession {
       scope.throwIfAborted();
       sent = true;
       try {
-        // 调用不设期限：结束由调用取消与连接作用域决定。SDK 定时器取其最大跨度。
+        // Calls have no deadline: call cancellation and the connection scope determine completion. The SDK timer uses its maximum interval.
         return await live.client.callTool({ name, arguments: args }, { signal: scope, timeout: 2_147_483_647, onprogress: progress });
       } catch (error) {
-        // 令牌失效且需要重新授权：请求被认证层拒绝，远端工具未执行。关闭连接，下次调用重新授权。
+        // The token has expired and requires reauthorization: the authentication layer rejected the request, so the remote tool did not execute. Close the connection and reauthorize on the next call.
         if (isUnauthorized(error)) {
           const message = "MCP authorization expired. The next call starts a new authorization.";
           this.lost(live, message);
@@ -265,7 +265,7 @@ export class ServerSession {
       throw signal.aborted ? new McpInterrupted("cancelled", "The MCP call was cancelled before it was sent.") : new McpError("request_failed", messageOf(error));
     } finally { this.active--; this.armIdle(); }
   }
-  /** 本地校验按远端输入 schema 拒绝参数；schema 本身无法编译时交由服务器校验。 */
+  /** Local validation rejects arguments against the remote input schema; if the schema itself cannot compile, validation is left to the server. */
   private validate(tool: CachedTool, args: Record<string, Json>) {
     let check;
     try { check = this.host.validator.getValidator(tool.inputSchema); }
@@ -290,7 +290,7 @@ export class ServerSession {
   }
 }
 
-/** 单个等待者取消只结束自己的等待，共享过渡继续。 */
+/** Canceling one waiter ends only its own wait; the shared transition continues. */
 function wait<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
   return new Promise((resolve, reject) => {
     const abort = () => reject(signal.reason);

@@ -12,7 +12,7 @@ export interface TopLevelToolContext<D extends Json = Json> {
   readonly signal: AbortSignal;
   publish(data: D): void;
 }
-/** 顶层工具一次声明定义和实现，不依赖资源支持关系。 */
+/** Top-level tools declare their definition and implementation together, independently of resource support relationships. */
 export interface TopLevelTool<A extends Json = Json, D extends Json = Json> extends ToolContract<A> {
   readonly resultSchema: z.ZodType<D>;
   readonly effect: "read" | "write";

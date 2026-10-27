@@ -3,7 +3,7 @@ import { modelExpressionSchema, modelSchema, modelProviderInputSchema, thinkingS
 export { jsonSchema, type Json } from "@asterism/sdk/contracts";
 export { toolOutcomeSchema, type ToolOutcome } from "@asterism/sdk/contracts";
 
-/** SDK 需要非空凭据占位；无鉴权请求在传输层移除认证头。 */
+/** The SDK requires a nonempty credential placeholder; transport removes auth headers from unauthenticated requests. */
 export const unauthenticatedApiKey = "no-auth";
 
 const id = z.string().min(1).max(160);
@@ -16,7 +16,7 @@ export type ModelSettings = z.infer<typeof modelSettingsSchema>;
 export function modelScope(settings: ModelSettings): string {
   return JSON.stringify([settings.provider.id, settings.provider.protocol, settings.provider.baseUrl, settings.model.modelId]);
 }
-/** 记录用模型表达式 `<providerId>/<modelId>[:<thinking>]`；参数传递仍使用结构化字段。 */
+/** Model expression for records: `<providerId>/<modelId>[:<thinking>]`; parameters still use structured fields. */
 export function modelExpression(settings: Pick<ModelSettings, "thinking"> & { provider: { id: string }; model: { modelId: string } }): string {
   return `${settings.provider.id}/${settings.model.modelId}${settings.thinking ? `:${settings.thinking}` : ""}`;
 }

@@ -10,8 +10,8 @@ import { Toaster as Sonner, type ToasterProps } from "sonner"
 import { useScheme } from "../../features/appearance/state"
 
 /**
- * shadcn 官方 sonner 源码；唯一改动：主题取自外观的解析结果（useScheme），不引入 next-themes，
- * 状态图标按 success / warning / destructive token 着色。
+ * Official shadcn sonner source; the only changes: derive the theme from resolved appearance (useScheme) without introducing next-themes,
+ * and color status icons using success / warning / destructive tokens.
  */
 const Toaster = ({ ...props }: ToasterProps) => {
   const scheme = useScheme()

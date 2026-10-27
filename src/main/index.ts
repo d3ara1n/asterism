@@ -34,9 +34,9 @@ let quitRequest: Promise<void> | null = null;
 let updates: ApplicationUpdates | null = null;
 let notificationsDelivered = false;
 let recoveryPending = false;
-/** 宿主存储在窗口出现后才就绪时，重新接入外观、语言与更新设置。 */
+/** Reconnect appearance, language, and update settings if host storage becomes ready after the window appears. */
 let connectSettings: (() => void) | null = null;
-/** 受信渲染页地址（不含 hash），供权限判定使用。 */
+/** Trusted renderer page URL without the hash, used for permission decisions. */
 let trustedURL: string | null = null;
 const runtime = new RuntimeHost(status => {
   if (window && !window.isDestroyed()) window.webContents.send(statusChannel, status);
@@ -45,7 +45,7 @@ const runtime = new RuntimeHost(status => {
     startup.publish({ status: "failed", reason: "runtime", detail: "The task runtime has stopped." });
 }, undefined, (stage, detail) => startup.stage(stage, detail));
 
-/** 用户退出先读取资源的当前提示；确认后按原关闭流程等待后台清理。 */
+/** Read current resource prompts before user exit; after confirmation, wait for background cleanup through the existing close flow. */
 function requestQuit(restart = false, installUpdate = false): void {
   if (quitting || quitRequest) return;
   quitRequest = (async () => {
@@ -69,7 +69,7 @@ function requestQuit(restart = false, installUpdate = false): void {
       updates.install(error => {
         quitting = false;
         startup.publish({ status: "failed", reason: "runtime", detail: error.message });
-        // 工作台已结束启动订阅，重新进入启动入口以呈现失败与重启操作。
+        // The workbench has ended its startup subscription; re-enter startup to present failure and restart actions.
         if (window && !window.isDestroyed()) window.webContents.reload();
       });
       return;
@@ -79,12 +79,12 @@ function requestQuit(restart = false, installUpdate = false): void {
   })().catch(error => { console.error("Application shutdown failed.", error); }).finally(() => { quitRequest = null; });
 }
 
-/** 应用图标文件：发布包从 resources 读取 extraResource，开发时取仓库 assets/icon。 */
+/** App icon file: packaged builds read extraResource from resources; development uses repository assets/icon. */
 function applicationIconFile(name: string): string {
   return app.isPackaged ? join(process.resourcesPath, name) : join(here, "../../assets/icon", name);
 }
 
-/** 迁移成功的恢复点在首页挂载后提示一次；确认后清除提示标记。 */
+/** Prompt once after the home page mounts for a successful migration recovery point; acknowledgment clears the prompt marker. */
 async function showMigrationNotice(current: BrowserWindow): Promise<void> {
   let point: RecoveryPoint | null;
   try { point = pendingNotice(dataRoot); } catch (error) { console.error("Recovery points could not be read.", error); return; }
@@ -112,7 +112,7 @@ function createWindow(): void {
   const titleBar = titleBarMode();
   window = new BrowserWindow({
     ...state.bounds, minWidth: state.minWidth, minHeight: state.minHeight, title: applicationBrand.en,
-    // macOS 与 Windows 使用打包内嵌图标；Linux 窗口需显式指定。
+    // macOS and Windows use embedded package icons; Linux windows require an explicit icon.
     ...(process.platform === "linux" ? { icon: applicationIconFile("asterism-full.png") } : {}),
     ...initialWindowAppearance(),
     ...initialTitleBar(titleBar),
@@ -171,7 +171,7 @@ function createWindow(): void {
         });
         if (answer.response !== 1) return;
       }
-      // 恢复操作只改动文件；随后重启，由下一次启动的数据准备接续。
+      // Recovery operations only change files; restart afterward so the next startup's data preparation continues.
       await startup.recover(action);
       requestQuit(true);
     } catch (error) { return error instanceof Error ? error.message : String(error); }
@@ -183,7 +183,7 @@ function createWindow(): void {
     void showMigrationNotice(current);
     return startup.storageFailures;
   });
-  // renderer 与任务进程直连：只在交接端口时校验来源；页面重载、跳转或崩溃时关闭旧连接。
+  // Renderer and task process connect directly: validate the source only at port handoff, and close old connections on reload, navigation, or crash.
   let connection: string | null = null;
   const closeConnection = () => { if (connection) { runtime.disconnect(connection); connection = null; } };
   const requestConnection = (event: Electron.IpcMainEvent) => {
@@ -205,7 +205,7 @@ function createWindow(): void {
   const stopPreferences = servePreferences(trusted);
   const stopLanguage = serveLanguage(current, trusted);
   let stopUpdates = () => {};
-  // 宿主存储在窗口出现后才就绪时，重新应用设置并通知已载入的页面。
+  // Reapply settings and notify loaded pages if host storage becomes ready after the window appears.
   connectSettings = () => {
     if (current.isDestroyed()) return;
     stopUpdates();
@@ -228,7 +228,7 @@ function createWindow(): void {
   current.webContents.on("did-start-navigation", (_event, _url, inPlace, mainFrame) => {
     if (mainFrame && !inPlace) closeConnection();
   });
-  // 只返回用户在系统窗口中选择的路径；渲染端不能借此读取文件。
+  // Return only paths selected in the system dialog; the renderer cannot use this to read files.
   ipcMain.handle(pickDirectoryChannel, async event => {
     if (!trusted(event)) return null;
     const result = await dialog.showOpenDialog(current, { properties: ["openDirectory"] });
@@ -240,7 +240,7 @@ function createWindow(): void {
     if (!parsed.success || !isAbsolute(parsed.data)) return "An absolute local file path is required.";
     return shell.openPath(parsed.data);
   });
-  // 日志目录由主进程按数据根解析；渲染端只发起打开请求。
+  // The main process resolves the log directory from the data root; the renderer only requests opening it.
   ipcMain.handle(openLogsChannel, event => {
     if (!trusted(event)) return "Untrusted application frame.";
     const directory = join(dataRoot, applicationStorage.logsDirectory);
@@ -260,7 +260,7 @@ function createWindow(): void {
   loading.catch(error => { console.error("Renderer initialization failed.", error); dialog.showErrorBox(applicationBrand.en, startupText(startupMessages.windowLoadFailed, () => readLanguage().locale)); });
 }
 
-// 插件产物协议：只读提供启动时打包的插件缓存目录，不访问其他路径。
+// Plugin artifact protocol: read-only access to the plugin cache directory bundled at startup, with no access to other paths.
 protocol.registerSchemesAsPrivileged([{ scheme: "asterism-plugin", privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } }]);
 function servePluginArtifacts(root: string): void {
   const cache = resolve(root, "plugins", ".cache");
@@ -275,7 +275,7 @@ function servePluginArtifacts(root: string): void {
 
 app.setName(applicationBrand.en);
 if (process.platform === "win32") app.setAppUserModelId(applicationId);
-// 两种构建都显式取固定身份目录；先建目录，再设置路径和获取单实例锁。
+// Both builds explicitly use the fixed identity directory; create it before setting paths and acquiring the single-instance lock.
 const dataRoot = join(app.getPath("appData"), applicationDataDirectory(app.isPackaged));
 mkdirSync(dataRoot, { recursive: true });
 app.setPath("userData", dataRoot);
@@ -308,8 +308,8 @@ if (!app.requestSingleInstanceLock()) {
   });
   app.whenReady().then(async () => {
     if (quitting) return;
-    // 权限检查和请求共用同一策略；只放行受信主框架的字体枚举与剪贴板写入。
-    // 以窗口当前 URL 判定受信：file:// 的 origin 可能为 "null"，不可依赖 origin 字符串。
+    // Permission checks and requests share one policy, allowing only trusted main-frame font enumeration and clipboard writes.
+    // Determine trust from the window's current URL: file:// origins can be "null", so origin strings are insufficient.
     const permitted = (contents: Electron.WebContents | null, permission: string, isMainFrame: boolean) =>
       allowRendererPermission({ permission, isMainFrame, contents, mainContents: window?.webContents, trustedURL });
     session.defaultSession.setPermissionRequestHandler((contents, permission, callback, details) =>
@@ -317,7 +317,7 @@ if (!app.requestSingleInstanceLock()) {
     session.defaultSession.setPermissionCheckHandler((contents, permission, _origin, details) =>
       permitted(contents, permission, details.isMainFrame));
     servePluginArtifacts(dataRoot);
-    // 开发运行没有应用包图标，Dock 显式使用正式图标。
+    // Development runs have no application bundle icon; explicitly use the production icon in the Dock.
     if (process.platform === "darwin" && !app.isPackaged) app.dock?.setIcon(applicationIconFile("asterism.png"));
     await startup.run();
     app.on("activate", () => { if (!quitting && BrowserWindow.getAllWindows().length === 0) createWindow(); });

@@ -3,7 +3,7 @@ import { ContextSummary } from "@asterism/builtin-api/contracts";
 
 export interface HistoryBoundary { summaryId: string; keptFrom: string }
 
-/** 阅读边界随 Agent 在前端内存中保留；追加的新摘要只加标记，重新载入或显式换路径时重新取用。 */
+/** The reading boundary is retained with the Agent in frontend memory; appended summaries add markers only, and the boundary is reevaluated on reload or an explicit path switch. */
 export class ConversationHistoryWindow {
   private initialized = false;
   private tip: string | null = null;

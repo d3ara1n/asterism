@@ -23,7 +23,7 @@ function Applicability({ definition }: { definition: ModelCompatibilityDefinitio
   </span>;
 }
 
-/** 只修改当前层的显式列表；提供商条目只读，模型可复制参数条目并整项覆盖。区块可折叠，已有条目时默认展开。 */
+/** Edit only the current layer's explicit list; provider entries are read-only, while models can copy parameter entries and override them as a whole. The section is collapsible and initially expanded when entries exist. */
 export function ModelCompatibilityEditor({ value, inherited, onChange }: {
   value: ModelCompatibility[]; inherited?: ModelCompatibility[]; onChange(value: ModelCompatibility[]): void;
 }) {

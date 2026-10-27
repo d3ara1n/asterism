@@ -14,8 +14,8 @@ const snapshot = (size: CardSize | null): WorkbenchSnapshot => workbenchSnapshot
   viewport: { x: 0, y: 0, zoom: 1 }, links: [],
 });
 
-describe("尺寸保存意图", () => {
-  it("A → B → A 时，旧 A 和 B 的读取完成都不能清除最后 A 的意图", async () => {
+describe("Size save intents", () => {
+  it("for A → B → A, completion of reads for the old A and B cannot clear the final A intent", async () => {
     const a = { width: 840, height: 960 }, b = { width: 1120, height: 1280 };
     let current = snapshot(null);
     const pending = new Map<string, SizeIntent>();
@@ -41,7 +41,7 @@ describe("尺寸保存意图", () => {
     expect(pending.size).toBe(0);
   });
 
-  it("当前保存失败撤销覆盖，旧保存失败不撤销较新的意图", async () => {
+  it("a current save failure removes the override, while an old save failure does not remove a newer intent", async () => {
     const current = snapshot({ width: 800, height: 900 });
     const pending = new Map<string, SizeIntent>();
     const gates = [deferred(), deferred()];
@@ -60,7 +60,7 @@ describe("尺寸保存意图", () => {
     expect(displayed).toEqual({ width: 800, height: 900 });
   });
 
-  it("受理后的读取失败保留尺寸，后续成功投影才确认", async () => {
+  it("a read failure after acceptance retains dimensions until a later successful projection confirms them", async () => {
     const size = { width: 1000, height: 1100 };
     const pending = new Map<string, SizeIntent>();
     await saveCardSize({

@@ -2,11 +2,11 @@ import { z } from "zod";
 import { defineCall, defineCreation, defineImplementation, defineTool, jsonSchema, modelInputPartsSchema, type Json } from "@asterism/sdk/contracts";
 import { builtin } from "@asterism/builtin-api/contracts";
 
-/** 服务器 ID 是创建时确定的可读 slug，与远端工具名组成 `server_id/tool_name` 句柄；名称可随时修改。 */
+/** The server ID is a readable slug fixed at creation; together with the remote tool name it forms a `server_id/tool_name` handle. The display name can change at any time. */
 export const SERVER_ID_PATTERN = /^[a-z0-9][a-z0-9_-]*$/u;
 export const serverIdSchema = z.string().min(1).max(64).regex(SERVER_ID_PATTERN);
 
-/** 连接参数由星图管理，环境变量与 HTTP 请求头单独进入凭据存储。 */
+/** Asterism manages connection parameters; environment variables and HTTP headers go into credential storage separately. */
 export const mcpServerSchema = z.strictObject({
   id: serverIdSchema, name: z.string().trim().min(1), enabled: z.boolean(),
   mode: z.enum(["eager", "lazy"]), idleSeconds: z.number().int().min(1).max(86_400),
@@ -36,14 +36,14 @@ export const CreateMcpHost = defineCreation(McpHost, { id: builtin.name("mcp.cre
 export const McpHostView = builtin.data("mcp.card", z.object({ servers: z.array(mcpServerStateSchema) }));
 export const McpChanged = builtin.event("mcp.changed", { schema: z.object({}), source: "plugin", semantics: { kind: "snapshot", key: [] } });
 export const ReadMcp = defineCall(builtin.name("mcp.status"), { scope: "plugin", input: z.object({}), output: z.array(mcpServerStateSchema) });
-/** 编辑表单整块写回环境变量／请求头；create 区分新增与编辑，新增遇到已有 ID 时拒绝。 */
+/** The edit form writes back environment variables/headers as a whole; create distinguishes creation from editing and rejects creation when the ID already exists. */
 export const SaveMcpServer = defineCall(builtin.name("mcp.save-server"), { scope: "plugin",
   input: z.object({ server: mcpServerSchema, create: z.boolean(), credentials: credentialsSchema }), output: z.null() });
-/** 设置页读回自己保存的环境变量／请求头明文；vault 只保证落盘加密。 */
+/** The settings page reads back the plaintext environment variables/headers it saved; vault guarantees only encryption at rest. */
 export const ReadMcpCredentials = defineCall(builtin.name("mcp.read-credentials"), { scope: "plugin", input: z.object({ serverId: z.string() }), output: credentialsSchema });
 export const mcpToolSummarySchema = z.object({ name: z.string(), title: z.string().optional(), description: z.string().optional() });
 export type McpToolSummary = z.infer<typeof mcpToolSummarySchema>;
-/** 缓存目录的展示摘要；未建立目录时为 null。 */
+/** Display summary of the cached catalog; null when no catalog has been established. */
 export const ReadMcpTools = defineCall(builtin.name("mcp.read-tools"), { scope: "plugin", input: z.object({ serverId: z.string() }),
   output: z.object({ tools: z.array(mcpToolSummarySchema), instructions: z.string().optional() }).nullable() });
 export const SetMcpServerEnabled = defineCall(builtin.name("mcp.set-enabled"), { scope: "plugin", input: z.object({ serverId: z.string(), enabled: z.boolean() }), output: z.null() });

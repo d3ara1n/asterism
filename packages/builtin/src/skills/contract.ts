@@ -23,19 +23,19 @@ export const SkillRead = builtin.data("skill.read", textReadSchema.extend({
 const skillIssueSchema = z.strictObject({ file: z.string(), message: z.string() });
 export type SkillIssue = z.infer<typeof skillIssueSchema>;
 
-/** 来源只是分组与审计用的标识：目录来源为绝对路径，插件来源为插件 ID，软件内置为 builtin。 */
+/** Source is only an identifier for grouping and auditing: an absolute path for directory sources, a plugin ID for plugin sources, and builtin for software-bundled sources. */
 export const skillSourceOverviewSchema = z.strictObject({
   source: z.string(),
   skills: z.array(z.strictObject({
     name: z.string(),
     description: z.string(),
-    /** 同名技能由更高优先级来源提供时，记录生效来源。 */
+    /** Records the effective source when a higher-priority source provides a skill with the same name. */
     overriddenBy: z.string().optional(),
   })),
   issues: z.array(skillIssueSchema),
 });
 export type SkillSourceOverview = z.infer<typeof skillSourceOverviewSchema>;
-/** 来源按覆盖优先级从低到高排列：内置、插件、用户目录。 */
+/** Sources ordered from lower to higher override priority: built-in, plugins, user directories. */
 export const skillOverviewSchema = z.strictObject({ sources: z.array(skillSourceOverviewSchema) });
 export type SkillOverview = z.infer<typeof skillOverviewSchema>;
 

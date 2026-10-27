@@ -8,13 +8,13 @@ const assistantBudget = 400;
 
 export interface NamingTurn { user: string; assistant?: string }
 
-/** 命名触发与回退只消费真实用户输入；损坏记录保留 unknown 供调用方停止判断。 */
+/** Naming triggers and fallback consume only actual user input; corrupt records retain unknown so callers can stop evaluation. */
 export function userMessages(snapshot: Pick<SessionSnapshot, "records">, scope: "timeline" | "session") {
   return snapshot.records.query(AgentInputMessage, { scope })
     .filter(message => message.status === "unknown" || message.data.sender.kind === "user");
 }
 
-/** 回合是 Agent 领域投影；按代理与请求起点关联，不把 loop 启停或工具批次计作新回合。 */
+/** Turns are an Agent domain projection; associate them by agent and request start, without counting loop starts/stops or tool batches as new turns. */
 export function collectTurns(records: readonly SessionRecord[]): NamingTurn[] {
   const positions = new Map(records.map((record, i) => [record.id, i]));
   const turns: NamingTurn[] = [];
@@ -50,7 +50,7 @@ export function collectTurns(records: readonly SessionRecord[]): NamingTurn[] {
     response.texts.set(block.ordinal, block.text); response.last = position;
     responses.set(block.responseId, response);
   }
-  // 一个回复可分为多个正文块；同回合保留最后一次有正文的响应，继续仍更新原回合。
+  // A reply can span multiple body blocks; retain the last response with body text in the same turn, and continuation still updates the original turn.
   for (const response of [...responses.values()].sort((a, b) => a.last - b.last)) {
     response.turn.assistant = [...response.texts].sort(([a], [b]) => a - b).map(([, text]) => text).join("\n");
   }
@@ -89,7 +89,7 @@ export function namingPrompt(turns: readonly NamingTurn[]): string {
   ].join("\n\n");
 }
 
-/** 只规范化模型输出；空结果保留原来的会话标题。 */
+/** Normalizes only model output; an empty result preserves the existing session title. */
 export function cleanTitle(raw: string): string {
   let title = raw.trim();
   const wrapper = /^<([a-zA-Z][\w-]*)>\s*([\s\S]*?)\s*<\/\1>\s*$/u;

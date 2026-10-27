@@ -14,7 +14,7 @@ import { questionMessages as messages } from "../messages/questions";
 import type { Question } from "./contract";
 import type { AnswerDraft } from "./drafts";
 
-/** 选项详情以弹层阅读；触发器位于选项标签内，阻止冒泡使点击不改变选择。 */
+/** Option details are read in a popover; its trigger is inside the option label and stops propagation so clicking does not change selection. */
 function OptionDetail({ label, detail }: { label: string; detail: string }) {
   const i18n = useI18n();
   return <Popover>
@@ -73,7 +73,7 @@ export function QuestionFields({ question, value, update, invalid }: {
               aria-invalid={invalid && value.custom} aria-describedby={invalid && value.custom ? `${id}-error` : undefined}
               onChange={event => patch({ text: event.target.value })}
               onKeyDown={event => {
-                // 编辑文字的方向键留给光标，不触发单选组的键盘导航。
+                // Arrow keys used while editing text move the caret instead of triggering radio-group keyboard navigation.
                 if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].includes(event.key)) event.stopPropagation();
               }} />
           </FieldContent>

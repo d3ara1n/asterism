@@ -7,7 +7,7 @@ import { conversationMessages } from "../../messages/conversation";
 import type { TimelineItem } from "./timeline";
 import { conversationTransition, immediateTransition } from "./motion";
 
-/** 概要位于过程末尾；展开的原有条目出现在按钮上方。 */
+/** The summary sits at the end of the process; expanded original items appear above the button. */
 export function TurnProcess({ node, onToggle, onMount }: {
   node: Extract<TimelineItem, { kind: "turn-process" }>;
   onToggle(): void;

@@ -9,7 +9,7 @@ import {
   type UpdateState,
 } from "../shared/updates.ts";
 
-/** 更新服务由主进程持有；下载完成后通过应用已有退出流程安装。 */
+/** The main process owns updates; installation after download uses the app's existing exit flow. */
 export class ApplicationUpdates {
   private readonly updater = electronUpdater.autoUpdater;
   private readonly store = new Store<{ version: number; includePrerelease: boolean }>({
@@ -30,7 +30,7 @@ export class ApplicationUpdates {
     this.updater.allowDowngrade = false;
     this.updater.logger = console;
     this.updater.on("download-progress", progress => this.patch({ progress: progress.percent }));
-    // 框架会在 Promise 拒绝前发出 error；安装阶段的错误同样进入设置页。
+    // The framework emits error before rejecting the Promise; installation errors also reach settings.
     this.updater.on("error", error => this.failed(error));
   }
 
@@ -48,7 +48,7 @@ export class ApplicationUpdates {
   set(includePrerelease: boolean): UpdateState {
     this.store.set("includePrerelease", includePrerelease);
     this.patch({ includePrerelease });
-    // 在途检查和下载完成本次工作，下一次检查使用新偏好。
+    // In-flight checks and downloads finish their work; the next check uses new preferences.
     if (!this.operation) this.patch({ status: "idle", availableVersion: null, releaseUrl: null, progress: 0, error: null });
     return this.state;
   }
@@ -80,7 +80,7 @@ export class ApplicationUpdates {
       }
       const candidate = selectUpdateRelease(releases, this.state.version, includePrerelease);
       if (!candidate) { this.patch({ status: "current" }); return this.state; }
-      // 通用 HTTP 提供方消费选定 Release 的标准更新清单，下载、差分与安装仍由框架完成。
+      // The generic HTTP provider consumes the selected Release's standard update manifest; the framework still handles download, deltas, and installation.
       this.updater.setFeedURL({
         provider: "generic",
         url: `https://github.com/${repository}/releases/download/${encodeURIComponent(candidate.tag_name)}/`,
@@ -102,7 +102,7 @@ export class ApplicationUpdates {
   get ready(): boolean { return this.state.status === "ready"; }
   install(onFailure: (error: Error) => void): void {
     if (!this.ready) return;
-    // macOS 的原生签名校验在此后异步完成，失败时应用可显示启动恢复入口。
+    // macOS native signature validation finishes asynchronously afterward; failures can display the startup recovery entry.
     this.updater.once("error", onFailure);
     try { this.updater.quitAndInstall(false, true); }
     catch (error) {

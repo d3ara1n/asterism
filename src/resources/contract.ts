@@ -9,35 +9,35 @@ import type { ContentLease } from "../runtime/content-store.ts";
 export interface ContextFile { file: string; text: string }
 export interface ResourceCommandContext { sessionId: string; resource: FoldedObject; signal?: AbortSignal }
 /**
- * 资源控制器：资源卡片的行为入口。行为属于资源自身，会话只路由命令并记录其事件。
- * before 在资源提交其事件的同一事务内先执行：重新确认对象仍在当前路径上，
- * 或供组合入口（如首页）原子创建会话与对象；异步准备后也必须执行此检查。
+ * Resource controller: behavior entry for resource cards. Resources own behavior; sessions only route commands and record events.
+ * before first runs in the transaction where the resource commits its events, rechecking that the object remains on the current path,
+ * or allowing composition entries such as home to create sessions and objects atomically; this check also runs after asynchronous preparation.
  */
 export interface ResourceController {
   creationId?: string;
   creationContract?: CreationContract<unknown>;
   actionContracts?: readonly ActionContract<unknown>[];
-  /** 在异步准备前检查当前动作调用链，避免同对象重入等待自身。 */
+  /** Check current action call chains before asynchronous preparation to avoid same-object reentry waiting on itself. */
   assertActionEntry?(objectId: string): void;
-  /** 外部准备者按装配顺序执行后，进入资源自己的准备；每次替换按目标 schema 校验。 */
+  /** External preparers run in assembly order before resource preparation; validate each replacement against the target schema. */
   prepareCommand?(input: ParsedCall, ref: ResourceRef, signal: AbortSignal): Promise<ParsedCall>;
   parseCommand?(input: ResourceCall): ParsedCall;
-  /** 校验创建输入（可异步读取配置或文件系统），结果再交给 create。 */
+  /** Validate creation input, optionally reading configuration or files asynchronously, then pass the result to create. */
   prepareCreate?(input: ResourceCall, signal?: AbortSignal, content?: ContentLease): Promise<Json>;
-  /** 在创建事务内执行：返回标题与写入创建事件的不可变资源数据，可同时保存私有状态。 */
+  /** Run within the creation transaction: return the title and immutable resource data for the creation event, optionally saving private state too. */
   create?(sessionId: string, objectId: string, input: Json, content?: ContentLease): { title: string; data?: { [key: string]: Json } };
   execute?(context: ResourceCommandContext, command: ParsedCall, before?: () => void): Promise<void>;
   /**
-   * busy 是仍依赖当前时间线路径的对象 ID，涵盖代理与其他被捕获的资源。
-   * 外部状态的持续运行不计入；会话回溯与对象移除据此判断 settled。
-   * live 只包含模型的临时输出；活动开始与结束由宿主发布进度通知。
+   * busy contains object IDs still depending on the current timeline path, including agents and other captured resources.
+   * Persistent external-state activity does not count; session backtracking and object removal use this to determine settled state.
+   * live contains only temporary model output; the host publishes progress notifications when activities start and end.
    */
   activity?(sessionId: string): { busy: string[]; live: LiveBlock[] };
-  /** 本对象作为链接终点时，向它描述被链接资源的可用工具。 */
+  /** Describe available tools of linked resources when this object is the link destination. */
   linkTools?(sessionId: string, objectId: string, resource: FoldedObject): Json;
   close?(): Promise<void>;
 }
-/** 后台资源 adapter 的擦除接口；不会跨进程传递函数。 */
+/** Erased backend resource adapter interface; functions do not cross process boundaries. */
 export interface ResourceBackend {
   kind: string;
   card?: import("@asterism/sdk/contracts").CardAppearance;
@@ -47,7 +47,7 @@ export interface ResourceBackend {
   inspect(resource: FoldedObject): Promise<Json>;
   context(resource: FoldedObject): Promise<ContextFile[]>;
   disposalWarning?(resource: FoldedObject): import("@asterism/sdk/contracts").UiText | null;
-  /** 对象进入当前集合时由宿主调用；lifetime 结束即释放对象独占的外部实例。 */
+  /** Called by the host when an object enters the current set; lifetime end releases object-exclusive external instances. */
   attach?(resource: import("@asterism/sdk/contracts").ResourceSnapshot, lifetime: import("@asterism/sdk/runtime").Lifetime): void;
   controller?: ResourceController;
 }

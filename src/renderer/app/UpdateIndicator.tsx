@@ -12,7 +12,7 @@ import { fadeTransition } from "../shared/weave/motion";
 import { useUpdates } from "../features/updates/state";
 import { UpdateAction, UpdateError, UpdateNotesLink, useUpdateSummary } from "../features/updates/controls";
 
-/** 更新入口在浮层打开期间保持可见，承接重试后的检查与结果。 */
+/** The update entry stays visible while the popover is open, presenting checks and results after retries. */
 export function UpdateIndicator({ onSettings }: { onSettings: () => void }) {
   const i18n = useI18n();
   const { state, failure } = useUpdates();

@@ -1,15 +1,15 @@
 import { z } from "zod";
 
-/** 可传输的原始错误资料；响应正文和附加数据保持文本，避免被当成业务引用扫描。 */
+/** Transferable raw error data; response bodies and additional data remain text to avoid being scanned as business references. */
 export type ErrorDetails = {
   name?: string;
   message: string;
   code?: string | number;
   statusCode?: number;
-  /** 实际接收的 HTTP 状态；statusCode 保留错误对象的原值，可能由 SDK 推导。 */
+  /** The actual HTTP status received; statusCode preserves the error object's original value, which may be inferred by the SDK. */
   httpStatus?: number;
   responseBody?: string;
-  /** SDK 交付首个模型块前失败时，传输层实际收到的流式响应片段。 */
+  /** The streaming response fragment actually received by the transport when the SDK fails before delivering the first model block. */
   rawResponse?: string;
   rawEvent?: string;
   responseHeaders?: Record<string, string>;
@@ -25,7 +25,7 @@ export const errorDetailsSchema: z.ZodType<ErrorDetails> = z.strictObject({
   stack: z.string().optional(), causes: z.lazy(() => errorDetailsSchema.array()).optional(),
 });
 
-/** 提取错误本身与响应资料；请求正文、请求头和凭据不属于错误详情。 */
+/** Extract the error itself and response data; request bodies, request headers, and credentials are not error details. */
 export function describeError(error: unknown): ErrorDetails {
   const seen = new Set<object>();
   const encode = (value: unknown): string => {

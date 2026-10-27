@@ -12,21 +12,21 @@ export const inlineFeedbackSchema = agentFeedbackSchema.extend({
 });
 export type InlineFeedback = z.infer<typeof inlineFeedbackSchema>;
 
-/** 压缩活动属于运行时反馈；成功后由持久摘要记录承接。 */
+/** Compression activity is runtime feedback; a persistent summary record takes over on success. */
 export const compressionActivitySchema = z.strictObject({
   id: z.string(), afterNodeId: z.string().nullable(),
   status: z.enum(["running", "failed", "cancelled"]),
 });
 export type CompressionActivity = z.infer<typeof compressionActivitySchema>;
 
-/** 软件故障通过在线通知交付；模型反馈由 Agent 的内存投影交付。 */
+/** Software faults are delivered through live notifications; model feedback is delivered through the Agent's in-memory projection. */
 export const AgentSoftwareFeedback = builtin.event("agent.software-feedback", {
   source: "resource",
   semantics: { kind: "occurrence" },
   schema: agentFeedbackSchema,
 });
 
-/** 模型适配器显式标注来源，其余本地异常属于软件处理失败。 */
+/** Model adapters explicitly mark the source; other local exceptions are software processing failures. */
 export function feedbackOrigin(error: unknown): AgentFeedback["origin"] {
   return error && typeof error === "object" && "origin" in error && error.origin === "model" ? "model" : "software";
 }

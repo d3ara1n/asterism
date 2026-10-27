@@ -1,5 +1,5 @@
-// 应用图标的唯一真值：几何与配色在此声明，生成 assets/icon/ 下的源图与各平台产物。
-// 依赖本机 rsvg-convert（Homebrew librsvg）与 macOS iconutil，仅在修改图标后重新运行。
+// Single source of truth for the app icon: declare geometry and colors here to generate source images and platform artifacts under assets/icon/.
+// Requires local rsvg-convert (Homebrew librsvg) and macOS iconutil; rerun only after changing the icon.
 import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -9,13 +9,13 @@ const output = resolve(import.meta.dirname, "../assets/icon");
 const BLUE = "#2F6BFF";
 
 interface Theme {
-  /** 底板左上到右下的渐变。 */
+  /** Base gradient from top left to bottom right. */
   stops: [string, string];
-  /** 画框玻璃在底板上的叠色与不透明度。 */
+  /** Overlay color and opacity of the frame glass on the base. */
   glass: [string, number];
-  /** 玻璃最上层的白色磨砂不透明度。 */
+  /** White frost opacity on the top glass layer. */
   frost: number;
-  /** 画框投影颜色与不透明度。 */
+  /** Frame shadow color and opacity. */
   shadow: [string, number];
 }
 
@@ -25,24 +25,24 @@ const themes = {
 } satisfies Record<string, Theme>;
 
 interface Layout {
-  /** 底板边长与圆角（1024 画布内）。 */
+  /** Base side length and corner radius within the 1024 canvas. */
   body: number;
   radius: number;
-  /** 底板下方的系统式投影。 */
+  /** System-style shadow below the base. */
   drop: boolean;
 }
 
 const layouts = {
-  // macOS 图标网格：824 底板居中，四周留出投影空间。
+  // macOS icon grid: center the 824 base with space around it for the shadow.
   mac: { body: 824, radius: 185, drop: true },
-  // Windows 与 Linux：底板铺满画布，不带投影。
+  // Windows and Linux: fill the canvas with the base, without a shadow.
   full: { body: 1024, radius: 230, drop: false },
 } satisfies Record<string, Layout>;
 
 const rr = (x: number, y: number, w: number, h: number, r: number) =>
   `M${x + r} ${y}H${x + w - r}A${r} ${r} 0 0 1 ${x + w} ${y + r}V${y + h - r}A${r} ${r} 0 0 1 ${x + w - r} ${y + h}H${x + r}A${r} ${r} 0 0 1 ${x} ${y + h - r}V${y + r}A${r} ${r} 0 0 1 ${x + r} ${y}Z`;
 
-// 内容几何（1024 坐标，按底板比例缩放）：厚画框在前，画布向右上探出，画中连线镂空。
+// Content geometry (1024 coordinates, scaled to the base): thick frame in front, canvas extending to the upper right, with cutout connecting lines.
 const frame = { x: 172, y: 262, w: 640, h: 520, r: 150, t: 120 };
 const canvas = { x: 252, y: 172, w: 600, h: 520, r: 110 };
 const ring = rr(frame.x, frame.y, frame.w, frame.h, frame.r)
@@ -87,7 +87,7 @@ function rasterize(source: string, target: string, size: number): void {
   execFileSync("rsvg-convert", ["-w", String(size), "-h", String(size), source, "-o", target]);
 }
 
-/** ICO 以 PNG 内嵌各尺寸；256 在目录项中记为 0。 */
+/** ICO embeds each size as PNG; 256 is represented as 0 in directory entries. */
 function ico(images: { size: number; data: Buffer }[]): Buffer {
   const header = Buffer.alloc(6 + 16 * images.length);
   header.writeUInt16LE(0, 0);
@@ -122,7 +122,7 @@ for (const [name, content] of Object.entries(sources)) {
 
 const work = mkdtempSync(join(tmpdir(), "asterism-icon-"));
 try {
-  // macOS：iconset 全尺寸交给 iconutil 打包。
+  // macOS: pass all iconset sizes to iconutil for packaging.
   const iconset = join(work, "asterism.iconset");
   mkdirSync(iconset);
   for (const size of [16, 32, 128, 256, 512]) {
@@ -131,7 +131,7 @@ try {
   }
   execFileSync("iconutil", ["-c", "icns", iconset, "-o", join(output, "asterism.icns")]);
 
-  // Windows：铺满版各尺寸写入同一个 ICO。
+  // Windows: write all sizes of the canvas-filling variant into one ICO.
   const images = [16, 24, 32, 48, 64, 128, 256].map(size => {
     const file = join(work, `full-${size}.png`);
     rasterize(join(output, "asterism-full.svg"), file, size);

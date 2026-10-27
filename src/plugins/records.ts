@@ -4,7 +4,7 @@ import { foldWorkbench, type FoldedObject } from "../session/fold.ts";
 import type { NodeView } from "../session/view.ts";
 import { deepFreeze } from "../shared/immutable.ts";
 
-/** 存储节点到公开记录信封的直接映射：契约、来源、载荷与模型可见文本原样取自节点，宿主不解释。 */
+/** Direct mapping from storage nodes to public record envelopes: contract, origin, payload, and model-visible text pass through unchanged without host interpretation. */
 export function toRecord(node: SessionNode, sequence: number): SessionRecord {
   const { id, sessionId, parentId, createdAt, source, contract, data, model, recipient } = node;
   return deepFreeze({ id, sessionId, parentId, sequence, createdAt, contract: { id: contract },
@@ -35,8 +35,8 @@ export function sessionSnapshot(source: NodeView): SessionSnapshot {
   };
 }
 /**
- * 快照只持有固定位置的读取柄；每次查询只映射和解码被选中的记录。
- * 位置与节点均不可变、记录已深冻结，同一快照内相同的 `all` 查询复用结果，多个投影不重复复制整条历史。
+ * Snapshots hold only fixed-position read handles; each query maps and decodes only selected records.
+ * Positions and nodes are immutable and records deeply frozen; identical `all` queries within a snapshot reuse results without copying full history for each projection.
  */
 export function sessionView(source: NodeView): SessionView {
   const cache = new Map<RecordQuery["scope"], readonly SessionRecord[]>();

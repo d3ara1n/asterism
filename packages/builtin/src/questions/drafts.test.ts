@@ -7,9 +7,9 @@ const pending: PendingQuestion = {
   id: "request", callId: "call", questions: [{ id: "choice", type: "single", question: "Which?", required: true,
     options: [{ id: "a", label: "A" }, { id: "b", label: "B" }] }],
 };
-describe("问答草稿连续性", () => {
-  // 提交仍在通信中时重挂载不能再次编辑或提交，否则界面草稿与已发送答案会分离。
-  it("操作锁跨重挂载保留，失败后保留原草稿并允许重试", async () => {
+describe("question draft continuity", () => {
+  // Remounting while submission is still in transit must not allow further editing or submission, which would separate the UI draft from the submitted answers.
+  it("preserves the operation lock across remounts and retains the original draft for retry after failure", async () => {
     const drafts = createQuestionDrafts();
     const entry = drafts.get("session", "agent", pending);
     entry.update({ ...entry.getSnapshot(), message: "Original" });
@@ -30,8 +30,8 @@ describe("问答草稿连续性", () => {
     expect(remounted.getOperationSnapshot()).toEqual({ busy: false, failed: false });
   });
 
-  // 卡片卸载与视图切换不丢草稿；完成通知清理当前实例，不能跨 Agent 串答。
-  it("重挂载取得同一草稿，完成后释放且不影响其他 Agent", () => {
+  // Card unmounts and view switches preserve drafts; completion notifications clean up the current instance without mixing answers across Agents.
+  it("retrieves the same draft on remount and releases it on completion without affecting other Agents", () => {
     const drafts = createQuestionDrafts();
     const entry = drafts.get("session", "agent", pending);
     const original = entry.getSnapshot();
@@ -44,13 +44,13 @@ describe("问答草稿连续性", () => {
     drafts.reconcile("session", "agent", []);
     expect(drafts.get("session", "agent", pending)).not.toBe(entry);
     expect(drafts.get("session", "other", pending)).toBe(other);
-    // 退场组件的句柄仍可读取，不会把已释放的实例重新放回索引。
+    // An exiting component's handle remains readable without putting the released instance back in the index.
     expect(entry.getSnapshot().message).toBe("Keep this constraint");
     drafts.clear();
   });
 
-  // 自定义与单选互斥；已编辑但未选中的自定义草稿不能悄悄成为答案。
-  it("切回选项保留自定义草稿但不提交，显式跳过不携带草稿答案", () => {
+  // Custom answers and single-choice selections are mutually exclusive; an edited but unselected custom draft must not silently become the answer.
+  it("preserves but does not submit the custom draft when switching back to an option, and includes no draft answer when explicitly skipping", () => {
     const entry = createQuestionDrafts().get("session", "agent", pending);
     const draft = entry.getSnapshot();
     draft.answers[0] = { selected: ["a"], custom: false, text: "Alternative", skipped: false };
@@ -65,8 +65,8 @@ describe("问答草稿连续性", () => {
     expect(draftSubmission(pending.questions, draft).answers).toEqual([{ id: "choice", status: "skipped" }]);
   });
 
-  // 可选文本留空应可复核与提交，后端仍收到明确 skipped；必填题不能同样跳过。
-  it("可选文本留空转换为跳过，必填文本只在提交校验时要求内容", () => {
+  // Optional text left blank can be reviewed and submitted, with an explicit skipped sent to the backend; required questions cannot be skipped the same way.
+  it("converts blank optional text to skipped and requires content for mandatory text only during submission validation", () => {
     const request: PendingQuestion = { ...pending, questions: [
       { id: "optional", type: "text", question: "Anything else?", required: false },
       { id: "required", type: "text", question: "Your goal?", required: true },
@@ -83,8 +83,8 @@ describe("问答草稿连续性", () => {
     ]);
   });
 
-  // 多选的可编辑选项只有勾选才提交；已选空白自定义项须提示，不能悄悄省略。
-  it("多选自定义项独立勾选，取消勾选保留草稿但不发送", () => {
+  // Editable multiple-choice options are submitted only when selected; selected blank custom options must show a prompt rather than being silently omitted.
+  it("selects custom multiple-choice entries independently and preserves drafts without sending them when deselected", () => {
     const choice = pending.questions[0]!;
     if (choice.type !== "single") throw new Error("Expected choice question.");
     const question = { ...choice, type: "multiple" as const };

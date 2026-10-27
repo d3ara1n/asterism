@@ -16,9 +16,9 @@ const summary = event(ContextSummary.id, {
   completion: { usage: null, finishReason: "stop", rawFinishReason: null, providerResponseId: null },
 }, { source: agentSource("a") });
 
-// 代理调查契约：记录投影保留原文、时间线顺序和状态，访问范围封闭在目标快照。
-describe("peek 记录投影与检索", () => {
-  it("压缩前原文和不完整记录仍可读，其他代理及私有事件不进入投影", () => {
+// Agent investigation contract: record projection preserves original text, timeline order, and status, with access confined to the target snapshot.
+describe("peek record projection and retrieval", () => {
+  it("Original text before compression and incomplete records remain readable; other agents and private events do not enter the projection", () => {
     const records = projectPeekRecords(snapshot(
       message("a", "Original decision"), message("b", "Other agent"),
       call("a", "r", 1, "c", { arguments: { path: "/saved/path" }, outcome: { kind: "failed", data: { diff: "Evidence" },
@@ -35,7 +35,7 @@ describe("peek 记录投影与检索", () => {
     expect(JSON.stringify(records)).not.toMatch(/Other agent|other attached|Private event/);
   });
 
-  it("思考默认在概览、搜索和读取中一致排除；显式纳入也只读取公开文字", () => {
+  it("Thinking is consistently excluded by default from overview, search, and reads; explicit inclusion still reads only public text", () => {
     const view = snapshot(thinking("a", "r", 0, "Readable reasoning", {
       summary: "Thinking summary", continuation: { anthropic: { signature: "secret-signature" } },
     }));
@@ -48,7 +48,7 @@ describe("peek 记录投影与检索", () => {
     expect(JSON.stringify(admitted)).not.toContain("secret-signature");
   });
 
-  it("概览省略仍可枚举及分页读取，查询越界返回具型错误", () => {
+  it("Content omitted from the overview remains enumerable and readable by page; out-of-bounds queries return typed errors", () => {
     const records = projectPeekRecords(snapshot(message("a", "First evidence"), message("a", "Second EVIDENCE")), "a", false);
     expect(peekOverview(records, 0)).toContain("Recent entries shown: 0");
     const first = retrieve(records, { name: "search_records", callId: "s1", arguments: { query: "evidence", limit: 1 } });

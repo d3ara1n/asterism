@@ -1,8 +1,8 @@
 import { expect, it } from "vitest";
 import { workbenchPhase } from "./feedback";
 
-// loading 只表示首次内容尚未就绪；后台更新保持现有工作台。
-it("首次读取、读取错误与后台不可用分别呈现", () => {
+// loading means only that initial content is not ready; background updates preserve the existing workbench.
+it("presents initial reading, read errors, and backend unavailability separately", () => {
   expect(workbenchPhase("starting", null)).toBe("starting");
   expect(workbenchPhase("ready", null)).toBe("loading");
   expect(workbenchPhase("ready", { status: "loading" })).toBe("loading");

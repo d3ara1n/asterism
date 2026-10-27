@@ -1,6 +1,6 @@
 const open = "<peek-report>", close = "</peek-report>";
 
-/** 报告边界可跨正文块与增量；边界之外的检索说明只留在临时模型往返中。 */
+/** Report boundaries can span body blocks and deltas; retrieval explanations outside them stay only in temporary model exchanges. */
 export class PeekReport {
   text = "";
   tagged = false;

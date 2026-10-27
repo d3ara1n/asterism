@@ -2,18 +2,18 @@ import { answerIssue } from "./answers.ts";
 import type { Question, StructuredAnswer, Submission } from "./contract.ts";
 
 export interface SummaryOption { id: string; label: string; recommended: boolean }
-/** 复核与结果共用的只读行：已选项、自行填写的文字和未选项分开呈现。 */
+/** Read-only rows shared by review and results: selected options, custom text, and unselected options are presented separately. */
 export interface SummaryRow {
   id: string;
   question: string;
   type: Question["type"];
   status: "answered" | "skipped" | "pending";
   selected: SummaryOption[];
-  /** 文本题的回答或选择题的自定义答案。 */
+  /** A text-question answer or a custom answer to a choice question. */
   text?: string;
-  /** 历史结果中的逐题补充。 */
+  /** Per-question supplementary comments in historical results. */
   comment?: string;
-  /** 原提问可知时列出未选项；文本题与缺少原提问的历史结果为空。 */
+  /** Lists unselected options when the original question is known; empty for text questions and historical results without the original question. */
   others: SummaryOption[];
 }
 
@@ -23,7 +23,7 @@ function options(question: Question | undefined, selected: (id: string) => boole
     .map(option => ({ id: option.id, label: option.label, recommended: question.recommendation?.optionId === option.id }));
 }
 
-/** 草稿复核：校验未通过的题显示为待回答，与提交校验使用同一规则。 */
+/** Draft review: questions that fail validation appear as unanswered, using the same rules as submission validation. */
 export function submissionRows(questions: Question[], submission: Submission): SummaryRow[] {
   return questions.map((question, index) => {
     const answer = submission.answers[index];
@@ -39,7 +39,7 @@ export function submissionRows(questions: Question[], submission: Submission): S
   });
 }
 
-/** 终结结果：答案记录题目与所选项原文；原提问仅补充未选项和推荐标记，缺失时按答案原样展示。 */
+/** Final result: answers record original question and selected-option text; original questions only add unselected options and recommendation markers. When missing, show answers as recorded. */
 export function resultRows(questions: Question[] | null, result: StructuredAnswer): SummaryRow[] {
   return result.answers.map(answer => {
     const question = questions?.find(item => item.id === answer.id && item.type === answer.type);

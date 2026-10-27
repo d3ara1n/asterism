@@ -1,7 +1,7 @@
 import { safeStorage } from "electron";
 import { secretRequestSchema } from "../shared/secrets.ts";
 
-/** 系统保护不可用或 Linux 回退到 basic_text 时明确拒绝，不提供明文后备。 */
+/** Reject explicitly if system protection is unavailable or Linux falls back to basic_text; no plaintext fallback. */
 export async function handleSecretRequest(raw: unknown): Promise<unknown | null> {
   const parsed = secretRequestSchema.safeParse(raw);
   if (!parsed.success) return null;
@@ -17,7 +17,7 @@ export async function handleSecretRequest(raw: unknown): Promise<unknown | null>
       : (await safeStorage.decryptStringAsync(Buffer.from(request.value, "base64"))).result;
     return { ...response, ok: true, value };
   } catch {
-    // 加密异常可能包含用户信息；不记录原始异常或明文。
+    // Encryption exceptions may contain user information; do not log raw exceptions or plaintext.
     return { ...response, ok: false };
   }
 }

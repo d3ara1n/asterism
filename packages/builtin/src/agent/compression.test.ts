@@ -21,9 +21,9 @@ function append(path: SessionNode[], value: NewNode) {
   path.push(node(String(path.length), path.at(-1)?.id ?? null, value));
 }
 
-// 压缩只替换前缀，原文、工具配对、分支与请求起点不变。
-describe("上下文压缩边界", () => {
-  it("保留近期原文、原生资料和完整工具批次；交错事件不被丢失", () => {
+// Compression replaces only the prefix; original text, tool pairing, branches, and request starting points remain unchanged.
+describe("Context compression boundaries", () => {
+  it("Preserves recent original text, native data, and complete tool batches without losing interleaved events", () => {
     const path = pathOf(message("a", "Old goal"), text("a", "old", 0, "Old answer", { requestParentId: "0" }),
       message("a", "Recent request" + "r".repeat(80_000)),
       attached("a", "during"),
@@ -39,13 +39,13 @@ describe("上下文压缩边界", () => {
     expect(projected.slice(1)).toEqual(full.slice(2));
     expect(projected.slice(1).map(item => item.kind)).toEqual(["input", "output", "result", "result", "context", "context"]);
     expect(path.slice(0, original.length)).toEqual(original);
-    // 摘要之前任意节点继续都不提前消费之后的摘要；其他代理的摘要不会覆盖本代理。
+    // Continuing from any node before a summary does not consume that later summary prematurely; another agent's summary does not replace this agent's context.
     expect(projectForAgent(view(path.slice(0, -1)), "a")).toEqual(full);
     append(path, checkpoint("2", "Other agent summary", "b"));
     expect(projectForAgent(view(path), "a")).toEqual(projected);
   });
 
-  it("超长回合可从完整响应开始保留，请求起点即使在摘要前缀内也合法", () => {
+  it("An oversized turn can retain content starting at a complete response, and a request starting point within the summarized prefix remains valid", () => {
     const path = pathOf(message("a", "Long-running request"),
       call("a", "r1", 0, "old-tool", { requestParentId: "0" }),
       attached("a", "during-r2"),
@@ -53,12 +53,12 @@ describe("上下文压缩边界", () => {
         model: [{ kind: "text", text: "R".repeat(90_000) }] } }));
     const before = projectForAgent(view(path), "a");
     const plan = planCompression(context(path))!;
-    expect(plan.keptFrom).toBe("2"); // 期间事件在物理路径上更早，需一并保留。
+    expect(plan.keptFrom).toBe("2"); // Intervening events occur earlier on the physical path and must also be retained.
     append(path, checkpoint(plan.keptFrom));
     expect(projectForAgent(view(path), "a").slice(1)).toEqual(before.slice(3));
   });
 
-  it("二次压缩携带旧摘要和此前幸存原文，不重新摘要已替换前缀或堆叠摘要", () => {
+  it("Repeated compression carries forward the previous summary and surviving original text without resummarizing the replaced prefix or stacking summaries", () => {
     const path = pathOf(message("a", "Ancient detail"), text("a", "r0", 0, "Ancient answer", { requestParentId: "0" }),
       message("a", "Previously retained" + "r".repeat(80_000)), text("a", "r1", 0, "Recent answer", { requestParentId: "2" }));
     append(path, checkpoint("2", "Persistent decision"));
@@ -76,7 +76,7 @@ describe("上下文压缩边界", () => {
     expect(projectForAgent(view(path), "a").slice(1)).toEqual(before.slice(3));
   });
 
-  it("损坏的边界明确拒绝，不因落在工具响应中间而静默丢失内容", () => {
+  it("Explicitly rejects corrupt boundaries instead of silently losing content when a boundary falls within a tool response", () => {
     const path = pathOf(message("a", "go"), call("a", "r", 0, "c1", { requestParentId: "0" }),
       call("a", "r", 1, "c2", { requestParentId: "0" }), checkpoint("2"));
     expect(() => context(path)).toThrow("splits a response");
@@ -84,7 +84,7 @@ describe("上下文压缩边界", () => {
     expect(() => context(path)).toThrow("not a preceding record");
   });
 
-  it("实报 input 含缓存且只计一次；新工具结果纳入预算，压缩后和切模型不沿用旧锚点", () => {
+  it("Reported input includes cached tokens and is counted once; new tool results enter the budget, and old anchors are not reused after compression or a model switch", () => {
     const path = pathOf(message("a", "Input"),
       call("a", "r", 0, "c", { requestParentId: "0", completion, outcome: { kind: "succeeded", data: null,
         model: [{ kind: "text", text: "result".repeat(4000) }] } }));
@@ -94,13 +94,13 @@ describe("上下文压缩边界", () => {
     record.data = { ...data, block: { ...data.block, source: { ...data.block.source, model: "p/m:high" } } };
     const estimated = estimateContext(context(path), "a", "p/m", 100);
     expect(estimated).toBeGreaterThan(196_000);
-    expect(estimated).toBeLessThan(197_000); // 不把 150k cacheRead 再加一次。
+    expect(estimated).toBeLessThan(197_000); // Do not add the 150k cacheRead a second time.
     expect(estimateContext(context(path), "a", "other/model", 100)).toBeLessThan(7000);
     append(path, checkpoint("1"));
     expect(estimateContext(context(path), "a", "p/m", 100)).toBeLessThan(7000);
   });
 
-  it("摘要材料省略思考和原生资料，工具输出有截断标记，用户原文不截断", () => {
+  it("Summary material omits thinking and native data, marks truncated tool output, and preserves user text without truncation", () => {
     const path = pathOf(message("a", "User request" + "u".repeat(3000)),
       thinking("a", "r", 0, "Hidden thinking", { continuation: { openai: { reasoningEncryptedContent: "encrypted" } } }),
       call("a", "r", 1, "c", { arguments: { resource_id: "directory", target: { path: "src/main.ts" } },

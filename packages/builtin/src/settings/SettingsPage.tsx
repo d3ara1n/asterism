@@ -14,7 +14,7 @@ import { mcpMessages } from "../messages/mcp";
 import { SkillSettings } from "../skills/Settings";
 import { skillsMessages } from "../messages/skills";
 
-/** 页面自行分组，普通偏好即时提交；配置存储和通知由宿主托管。 */
+/** The page defines its own groups and submits ordinary preferences immediately; the host manages configuration storage and notifications. */
 export function BuiltinSettingsPage({ location }: { location?: string }) {
   const i18n = useI18n();
   const config = useRendererConfiguration(BuiltinSettings);
@@ -25,7 +25,7 @@ export function BuiltinSettingsPage({ location }: { location?: string }) {
     const target = location === "streaming" ? streaming.current : location === "shell" ? shell.current : location === "mcp" ? mcp.current : location === "skills" ? skills.current : null;
     target?.scrollIntoView({ block: "nearest" }); target?.focus({ preventScroll: true });
   }, [location]);
-  /** 返回是否保存成功，展开编辑的 profile 失败时保留草稿。 */
+  /** Returns whether saving succeeded; the expanded profile editor retains its draft on failure. */
   const save = async (work: () => Promise<void>) => {
     setBusy(true); setError(null);
     try { await work(); return true; }
@@ -38,7 +38,7 @@ export function BuiltinSettingsPage({ location }: { location?: string }) {
       onCheckedChange={checked => { void save(() => config.save({ ...config.value, [key]: checked })); }} /></ItemActions>
   </Item>;
   return <div className="flex flex-col gap-6">
-    {/* 恢复默认设置作用于整个插件配置，放在页面级而非任一分区内。 */}
+    {/* Restoring defaults affects the entire plugin configuration, so it belongs at page level rather than within any section. */}
     <div className="flex justify-end">
       <Button variant="outline" size="sm" disabled={busy || !config.ready} onClick={() => { void save(config.reset); }}>{busy && <Spinner />}{i18n.text(messages.reset)}</Button>
     </div>

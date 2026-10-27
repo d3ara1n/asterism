@@ -29,9 +29,9 @@ export default defineModule(plugin => {
     for (const ref of objects.values()) plugin.object(ref.sessionId, McpHost, ref.id).invalidate();
   });
   const unsubscribe = config.subscribe(value => service.configure(value.mcp.servers));
-  // 连接池挂在插件生命周期：会话归档或对象移除只注销登记，不断开其他会话仍在使用的连接。
+  // The connection pool belongs to the plugin lifecycle: archiving a session or removing an object only unregisters it, without disconnecting connections still used by other sessions.
   plugin.lifetime.defer(async () => { unsubscribe(); await service.close(); });
-  // 任务在同步装配完成后启动，状态事件与资源契约已登记。
+  // Tasks start after synchronous assembly completes, once state events and resource contracts are registered.
   plugin.tasks.start("mcp.start", async signal => { await Promise.resolve(); signal.throwIfAborted(); service.configure(config.get().mcp.servers); });
   const servers = () => config.get().mcp.servers;
   return {
@@ -47,7 +47,7 @@ export default defineModule(plugin => {
         const exists = servers().some(item => item.id === server.id);
         if (create && exists) throw new PluginApiError("conflict", `An MCP server with ID '${server.id}' already exists.`);
         if (!create && !exists) throw new PluginApiError("not_found", `The MCP server '${server.id}' is not configured.`);
-        // 新增服务器不继承同 ID 旧服务器遗留的授权；编辑时值有变化才失效目录并以新值重连。
+        // A new server does not inherit authorization left by an old server with the same ID; editing invalidates the catalog and reconnects with new values only when values change.
         if (create) await Promise.all([plugin.secrets.set(credentialKey(server.id), JSON.stringify(credentials)), plugin.secrets.delete(oauthKey(server.id))]);
         else if (JSON.stringify(await service.credentials(server.id)) !== JSON.stringify(credentials)) {
           await plugin.secrets.set(credentialKey(server.id), JSON.stringify(credentials));
@@ -68,7 +68,7 @@ export default defineModule(plugin => {
         await Promise.all([plugin.secrets.delete(credentialKey(serverId)), plugin.secrets.delete(oauthKey(serverId))]);
         return null;
       }),
-      // 设置页的连接在后台进行：等待浏览器授权期间页面其他操作照常可用，结果经状态事件呈现。
+      // Connections from the settings page run in the background: other page actions remain available while browser authorization is pending, and state events convey the result.
       implementCall(ConnectMcpServer, async ({ serverId }) => {
         const signal = plugin.lifetime.signal;
         void service.connect(serverId, signal).catch(error => { if (!signal.aborted) plugin.log.warn(`MCP connection to ${serverId} failed: ${messageOf(error)}`); });
@@ -108,7 +108,7 @@ export default defineModule(plugin => {
           const identity = { serverId: target.serverId, serverName: target.serverName, toolName: target.toolName };
           try {
             const result = await service.call(target, args.arguments, signal, progress => {
-              // 进度只是临时展示；发布失败不影响远端调用本身。
+              // Progress is transient display data; publication failure does not affect the remote call itself.
               try {
                 publish({ ...identity, parts: [], progress: { completed: progress.progress,
                   ...(progress.total !== undefined && { total: progress.total }), ...(progress.message && { message: progress.message }) } });
@@ -118,7 +118,7 @@ export default defineModule(plugin => {
             return result.isError ? { kind: "failed", data, error: { code: "tool_error", message: "The MCP server reported a tool error." } }
               : { kind: "succeeded", data };
           } catch (error) {
-            // 远端已返回后的内容转换失败属于宿主内部错误，不伪装成远端请求失败。
+            // Content conversion failure after the remote response is an internal host error, not a remote request failure.
             if (!(error instanceof McpError || error instanceof McpInterrupted)) throw error;
             return mcpOutcome(error, signal);
           }

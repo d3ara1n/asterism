@@ -29,7 +29,7 @@ async function executablePath(executable: string, env: NodeJS.ProcessEnv): Promi
     try {
       await access(candidate, windows ? constants.F_OK : constants.X_OK);
       if ((await stat(candidate)).isFile()) return resolve(candidate);
-    } catch { /* 继续查找下一个实际存在的可执行文件。 */ }
+    } catch { /* Continue searching for the next executable that actually exists. */ }
   }
   return null;
 }
@@ -50,7 +50,7 @@ async function resolveProfile(profile: ShellProfile, inherited: NodeJS.ProcessEn
   return executable ? { profile, executable, env } : null;
 }
 
-/** 查询与执行共用解析规则；模型结果只投影配置元数据与发现结果。 */
+/** Queries and execution share resolution rules; model results project only configuration metadata and discovery results. */
 export async function listShellProfiles(settings: ShellSettings, inherited: NodeJS.ProcessEnv = process.env): Promise<ShellProfileList> {
   const profiles = await Promise.all(settings.profiles.map(async profile => {
     const resolved = await resolveProfile(profile, inherited);

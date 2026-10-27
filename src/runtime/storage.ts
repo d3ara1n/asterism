@@ -10,7 +10,7 @@ import { sqliteStorage } from "../storage/migrations.ts";
 
 export const workspaceDatabaseVersion = 26;
 
-/** 业务开库只消费已准备好的格式；升级由窗口前的数据准备执行。 */
+/** Business database opening consumes prepared formats only; pre-window data preparation handles upgrades. */
 export class DatabaseVersionError extends Error {
   constructor(readonly directory: string, found: number) {
     super(`Workspace database format ${found} does not match this build (${workspaceDatabaseVersion}). Prepare the data before opening the workspace.`);
@@ -22,7 +22,7 @@ export function openDatabase(root: string): DatabaseSync {
   const db = new DatabaseSync(join(root, applicationStorage.databaseDirectory, applicationStorage.databaseFile));
   try {
     db.exec("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;");
-    // 新库在此唯一建立并盖章；已有库升级由窗口前数据准备完成。
+    // New databases are created and stamped only here; pre-window preparation upgrades existing databases.
     const version = (db.prepare("PRAGMA user_version").get() as { user_version: number }).user_version;
     if (version === 0 && !db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").get()) {
       db.exec("BEGIN IMMEDIATE;");
@@ -50,12 +50,12 @@ function initializeWorkspace(db: DatabaseSync): void {
         PRIMARY KEY(session_id, object_id)
       );
       CREATE TABLE viewports (session_id TEXT PRIMARY KEY REFERENCES sessions(id) ON DELETE CASCADE, x REAL NOT NULL, y REAL NOT NULL, zoom REAL NOT NULL);
-      -- 首页发送的会话级提交去重；代理内部的提交去重属于代理资源状态。
+      -- Session-level submission deduplication for home sends; agent-internal submission deduplication belongs to agent resource state.
       CREATE TABLE session_submissions (
         id TEXT PRIMARY KEY,
         session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE
       ) STRICT;
-      -- 当前会话数据；空 object_id 表示会话作用域，具型契约与时间线独立。
+      -- Current session data; an empty object_id denotes session scope, with typed contracts independent of the timeline.
       CREATE TABLE session_data (
         session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
         object_id TEXT NOT NULL, contract_id TEXT NOT NULL,
@@ -67,12 +67,12 @@ function initializeWorkspace(db: DatabaseSync): void {
   db.prepare("INSERT INTO workspace VALUES (?, ?)").run(randomUUID(), "Personal workspace");
 }
 
-/** 已发布的每一步迁移固定保留；键 25 表示 25 → 26。新库只由 `openDatabase` 建立。 */
+/** Retain every released migration step permanently; key 25 means 25 → 26. Only `openDatabase` creates new databases. */
 export function workspaceStorage(root: string) {
   return sqliteStorage({ id: "workspace", file: join(root, applicationStorage.databaseDirectory, applicationStorage.databaseFile),
     version: workspaceDatabaseVersion, migrations: {} });
 }
-/** 启动清理：硬删超过冷静期的归档会话，关联行随外键级联删除；孤儿内容由随后构造的内容存储回收。 */
+/** Startup cleanup hard-deletes archived sessions past retention, cascades associated rows through foreign keys, and leaves orphan content for the subsequently constructed store. */
 export function collectExpiredSessions(db: DatabaseSync, now = Date.now()): number {
   const cutoff = new Date(now - sessionRetentionMs).toISOString();
   return Number(db.prepare("DELETE FROM sessions WHERE archived_at IS NOT NULL AND archived_at <= ?").run(cutoff).changes);

@@ -3,9 +3,9 @@ import { cn } from "../utils";
 import { Input } from "./input";
 
 /**
- * 查找输入的公共组合；控件外观由官方 Input 提供。
- * `inline` 用于贴边嵌入面板顶部的筛选条：无边框与背景，图标与卡片标题图标同列（左缩进 12px），
- * 聚焦时由图标着色反馈，外层容器负责分隔线。
+ * Shared composition for search input; the official Input supplies the control appearance.
+ * `inline` is for a filter bar embedded flush with the panel top: no border or background, with its icon aligned to the card title icon column (12px left inset),
+ * focus feedback uses icon color, and the outer container supplies the separator.
  */
 export function SearchInput({ value, onChange, label, variant = "default" }: {
   value: string; onChange: (value: string) => void; label: string; variant?: "default" | "inline";

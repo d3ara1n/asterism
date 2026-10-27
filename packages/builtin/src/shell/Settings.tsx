@@ -16,14 +16,14 @@ import { shellMessages as messages } from "../messages/shell";
 import { BuiltinSettings, settingsMessages } from "../settings/contract";
 import { shellPresets, shellSettingsSchema, type ShellSettings as Settings, type ShellProfile } from "./contract";
 
-/** 编辑中的 profile；环境变量保留原始文本，保存时再解析。 */
+/** Profile being edited; environment variables retain their raw text and are parsed on save. */
 interface Draft { profile: ShellProfile; env: string }
 
 const environmentText = (env: Record<string, string>) => Object.entries(env).map(([key, value]) => `${key}=${value}`).join("\n");
 const draftOf = (profile: ShellProfile): Draft => ({ profile: structuredClone(profile), env: environmentText(profile.env) });
 const islandKey = (id: string) => `shell:${id}`;
 
-/** 默认 Shell、复制、移除与预设添加即时保存；点击 profile 在右侧浮岛中编辑，新增的 profile 随即打开。 */
+/** Default Shell, duplication, removal, and preset addition save immediately; clicking a profile edits it in an island to the right, and newly added profiles open immediately. */
 export function ShellSettings({ value, disabled, save }: {
   value: Settings; disabled: boolean; save(value: Settings): Promise<boolean>;
 }) {
@@ -46,7 +46,7 @@ export function ShellSettings({ value, disabled, save }: {
     const added = { ...structuredClone(profile), id };
     if (await commit({ ...value, profiles: [...value.profiles, added] })) void open(added, origin);
   };
-  // 移除后，编辑该 profile 的浮岛自行关闭。
+  // After removal, the island editing that profile closes itself.
   const remove = (target: string) => {
     void commit({ profiles: value.profiles.filter(item => item.id !== target), selected: value.selected === target ? "auto" : value.selected });
   };
@@ -98,8 +98,8 @@ export function ShellSettings({ value, disabled, save }: {
 }
 
 /**
- * profile 编辑浮岛：读取当前配置，保存后保持打开并以保存结果为新的基准；关闭由浮岛的关闭按钮完成。
- * profile 在别处被移除（例如恢复默认设置）时关闭浮岛。
+ * Profile editor island: reads the current configuration, stays open after saving, and uses the saved result as its new baseline; the island's close button closes it.
+ * Closes the island if the profile is removed elsewhere (for example, by restoring defaults).
  */
 function ShellProfileEditor({ id: initialId, initial, onSaved }: { id: string; initial: ShellProfile; onSaved(id: string): void }) {
   const i18n = useI18n(), island = useRendererIsland(), fieldId = useId();

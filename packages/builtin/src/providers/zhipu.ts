@@ -11,13 +11,13 @@ const rowSchema = z.object({
 });
 const responseSchema = z.object({ data: z.object({ limits: z.array(z.object({ type: z.string() }).passthrough()) }) });
 
-/** 百分比只表示比例，不伪造 token 数；未知周期仍保留真实额度与重置时间。 */
+/** Percentages express ratios only, without fabricating token counts; unknown periods still retain actual allowances and reset times. */
 export function parseZhipuQuota(raw: unknown): UsageItem[] {
   const data = parseUsageResponse(responseSchema, raw);
   return data.data.limits.filter(row => row.type === "TOKENS_LIMIT" || row.type === "CREDIT_LIMIT").map(raw => {
     const row = parseUsageResponse(rowSchema, raw);
     const hours = row.unit === 3 && row.number !== undefined;
-    // unit 6 为每周窗口；已知响应的 number 有 1/7 两种形态，不能解释成周数。
+    // unit 6 is a weekly window; known responses use both 1/7 for number, which must not be interpreted as a number of weeks.
     const weekly = row.unit === 6;
     return { type: "quota", id: `${row.type}-${row.unit ?? "unknown"}-${weekly ? 1 : row.number ?? "unknown"}`,
       label: hours ? withValues(messages.hours, { count: row.number! }) : weekly ? withValues(messages.weeks, { count: 1 }) : messages.window,

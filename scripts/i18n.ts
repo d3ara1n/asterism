@@ -61,7 +61,7 @@ function groups(packageRoot?: string): Group[] {
   }];
 }
 
-/** 使用真实官方 CLI；SDK wrapper 保留可抽取的标准字面量。 */
+/** Uses the actual official CLI; SDK wrappers retain standard extractable literals. */
 export function extractMessages(paths: readonly string[], scratch: string): Record<string, Source> {
   const inputs = join(scratch, "inputs.txt");
   const output = join(scratch, "messages.json");
@@ -106,7 +106,7 @@ export function run(mode: string, packageRoot?: string): void {
   const scratch = mkdtempSync(join(project, ".i18n-check-"));
   try {
     for (const group of groups(packageRoot)) {
-      // 分文件抽取并比较，避免聚合输出覆盖重复 ID 后掩盖不一致默认文案。
+      // Extract and compare per file so aggregate output cannot overwrite duplicate IDs and hide inconsistent default copy.
       const source: Record<string, Source> = {};
       for (const file of group.files.filter(path => /\bdefineMessages\s*\(/u.test(readFileSync(path, "utf8")))) {
         const declarations = extractMessages([file], scratch);
@@ -127,7 +127,7 @@ export function run(mode: string, packageRoot?: string): void {
         console.info(`Checked ${Object.keys(source).length} ${group.owner} source messages.`);
       }
     }
-    // 每次项目检查都使用实际 SDK 作者写法验证抽取，而不是模拟返回值。
+    // Each project check verifies extraction using actual SDK author syntax rather than mocked return values.
     if (!packageRoot) {
       const author = extractMessages([join(project, "packages/sdk/examples/i18n.ts")], scratch);
       if (author["counter.items"]?.defaultMessage !== "{count, plural, one {# item} other {# items}}") throw new Error("SDK author declarations could not be extracted.");

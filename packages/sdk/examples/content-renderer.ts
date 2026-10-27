@@ -1,7 +1,7 @@
 import { creationEntry, type RendererObjectContext } from "@asterism/sdk/renderer";
 import { CreateDocument, ReplaceDocument } from "./content-contract.ts";
 
-/** 该入口受理拖入文件（有无本机路径均可）与工作台剪贴板图片。 */
+/** This entry point accepts dropped files (with or without local paths) and clipboard images on the workbench. */
 export const importDocument = creationEntry(CreateDocument, {
   id: "example.content/import", label: "Import document",
   triggers: { drop: {
@@ -13,7 +13,7 @@ export const importDocument = creationEntry(CreateDocument, {
   } },
 });
 
-/** 草稿在命令成功后由宿主关闭；失败保留以便重试，放弃时调用 close。 */
+/** The host closes the draft after a successful command; failure preserves it for retry, and abandoning it calls close. */
 export function replacementInput(object: RendererObjectContext) {
   const draft = object.input(ReplaceDocument);
   return {

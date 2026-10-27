@@ -14,7 +14,7 @@ const keyResponse = z.object({ data: z.object({
 }).refine(value => value.limit === null || value.limit_remaining === null || value.limit_remaining <= value.limit) });
 const creditsResponse = z.object({ data: z.object({ total_credits: z.number(), total_usage: z.number() }) });
 
-/** 当前 key 的有效预算优先；无周期的金额上限不冒充账户充值余额。 */
+/** Prioritizes the current key's effective budget; an amount limit without a period is not an account top-up balance. */
 export function parseOpenRouterKey(raw: unknown): { items: UsageItem[]; management: boolean } {
   const { data } = parseUsageResponse(keyResponse, raw);
   const remaining = data.effective_budget?.remaining_usd ?? data.limit_remaining;

@@ -7,9 +7,9 @@ import { recoveryPointSchema, type PluginStorageFailure, type PreparationProgres
 import { readJson, writeJson } from "./files.ts";
 import type { StorageChange, StorageDefinition, StoragePlan } from "./migrations.ts";
 
-/** 恢复点中的一项应用数据；`link` 标记一次写入的不可变文件，以硬链接共享字节。 */
+/** One application data item in recovery points; `link` marks immutable files written once and shared by hard links. */
 export interface DataPath { path: string; link?: boolean }
-/** 保留最近的完整恢复点数；进行中操作引用的恢复点不计入清理。 */
+/** Number of recent complete recovery points to retain; points referenced by active operations are excluded from cleanup. */
 export const pointRetention = 7;
 
 const recoveryRoot = (root: string) => join(root, applicationStorage.recoveryDirectory);
@@ -19,7 +19,7 @@ export const recoveryPointDirectory = (root: string, id: string) => join(pointsR
 const pointFile = (root: string, id: string) => join(recoveryPointDirectory(root, id), "point.json");
 const pointFiles = (root: string, id: string) => join(recoveryPointDirectory(root, id), "files");
 
-/** 只在恢复操作进行中或还原后暂停时存在；迁移本身不需要持久状态。 */
+/** Exists only during recovery or post-restoration pause; migration itself needs no persistent state. */
 const stateSchema = z.discriminatedUnion("phase", [
   z.object({ phase: z.literal("restoring"), target: z.string(), displaced: z.string() }),
   z.object({ phase: z.literal("resetting"), displaced: z.string() }),
@@ -35,11 +35,11 @@ function saveState(root: string, state: RecoveryState | null): void {
   else rmSync(stateFile(root), { force: true });
 }
 
-/** 目录名以创建时间开头，字典序即时间序。 */
+/** Directory names begin with creation times, making lexical order chronological. */
 function newPointId(): string {
   return `${new Date().toISOString().replace(/[:.]/gu, "-")}-${randomUUID().slice(0, 8)}`;
 }
-/** `point.json` 最后写入，存在即表示恢复点完整。 */
+/** Write `point.json` last; its presence marks a complete recovery point. */
 function readPoint(root: string, id: string): RecoveryPoint | null {
   try {
     const parsed = recoveryPointSchema.safeParse(readJson(pointFile(root, id)));
@@ -52,13 +52,13 @@ export function listRecoveryPoints(root: string): RecoveryPoint[] {
   return readdirSync(pointsRoot(root)).sort().reverse().flatMap(id => readPoint(root, id) ?? []);
 }
 
-/** 写时复制在 APFS、Btrfs、ReFS 上克隆数据块，其他文件系统退化为普通复制。 */
+/** Copy-on-write clones blocks on APFS, Btrfs, and ReFS; other filesystems fall back to ordinary copies. */
 function copy(source: string, destination: string): void {
   mkdirSync(dirname(destination), { recursive: true, mode: 0o700 });
   cpSync(source, destination, { recursive: true, force: false, errorOnExist: true, verbatimSymlinks: true, mode: constants.COPYFILE_FICLONE });
 }
 const unlinkable = new Set(["EPERM", "ENOTSUP", "EOPNOTSUPP", "EXDEV", "EMLINK"]);
-/** 封存内容只写入一次，多个恢复点与工作目录共享同一份字节；FAT／exFAT 等不支持硬链接时复制。 */
+/** Sealed content is written once and shared by recovery points and working directories; copy on filesystems without hard links, such as FAT/exFAT. */
 function link(source: string, destination: string): void {
   if (lstatSync(source).isDirectory()) {
     mkdirSync(destination, { recursive: true, mode: 0o700 });
@@ -76,7 +76,7 @@ function place(item: DataPath, source: string, destination: string): void {
   else copy(source, destination);
 }
 
-/** 保留最近的完整恢复点；未写完 `point.json` 的目录直接清除。 */
+/** Retain recent complete recovery points; directly remove directories without completed `point.json`. */
 function prune(root: string, keep: readonly string[]): void {
   if (!existsSync(pointsRoot(root))) return;
   let complete = 0;
@@ -88,7 +88,7 @@ function prune(root: string, keep: readonly string[]): void {
   }
 }
 
-/** 迁移前复制整组数据；工作数据保持原样，复制完成后才写入 `point.json`。 */
+/** Copy the complete data set before migration without changing working data; write `point.json` only after copying finishes. */
 function snapshot(root: string, paths: readonly DataPath[], version: string, changes: StorageChange[]): string {
   const id = newPointId();
   mkdirSync(pointFiles(root, id), { recursive: true, mode: 0o700 });
@@ -101,18 +101,18 @@ function snapshot(root: string, paths: readonly DataPath[], version: string, cha
   return id;
 }
 
-/** 还原先把当前数据整体移入新恢复点，再从目标恢复点复制；重启后暂停自动迁移。 */
+/** Restoration first moves all current data into a new recovery point, then copies the target point; pause automatic migration after restart. */
 export function restorePoint(root: string, paths: readonly DataPath[], target: string, version: string): void {
   if (!readPoint(root, target)) throw new Error("The recovery point is unavailable.");
   saveState(root, { phase: "restoring", target, displaced: newPointId() });
   continueRecovery(root, paths, version);
 }
-/** 重新开始把当前数据移入新恢复点，随后由业务层按新用户创建。 */
+/** Starting over moves current data into new recovery points before business logic creates data for a new user. */
 export function startFresh(root: string, paths: readonly DataPath[], version: string): void {
   saveState(root, { phase: "resetting", displaced: newPointId() });
   continueRecovery(root, paths, version);
 }
-/** 每一步可重复执行：已移走的项不再移动，还原目标先清除再复制。 */
+/** Each step is repeatable: do not move already moved items; clear restoration targets before copying. */
 function continueRecovery(root: string, paths: readonly DataPath[], version: string): void {
   const state = readState(root);
   if (!state || state.phase === "restored") return;
@@ -138,7 +138,7 @@ function continueRecovery(root: string, paths: readonly DataPath[], version: str
   }
   saveState(root, { phase: "restored" });
 }
-/** 用户明确重试后解除还原后的暂停。 */
+/** Clear post-restoration pause after explicit user retry. */
 export function clearPause(root: string): void {
   if (readState(root)?.phase === "restored") saveState(root, null);
 }
@@ -155,9 +155,9 @@ export interface PreparationOptions {
   version: string;
   paths: readonly DataPath[];
   stores: readonly StorageDefinition[];
-  /** 宿主存储就绪后发现插件声明；插件失败只禁用该插件。 */
+  /** Discover plugin declarations after host storage is ready; plugin failures disable only that plugin. */
   discover?: () => Promise<readonly PluginStorageGroup[]>;
-  /** 宿主存储检查完成即通知；需要迁移时先报告 migrating，提交后报告 ready。 */
+  /** Notify when host storage checks finish; report migrating before required migration and ready after commit. */
   onHost?: (status: "migrating" | "ready") => void;
   onProgress?: (progress: PreparationProgress) => void;
 }
@@ -175,7 +175,7 @@ export async function prepareData(root: string, options: PreparationOptions): Pr
     if (paused && host.length) throw new Error("Automatic migration is paused after restoring a recovery point. Retry when you are ready.");
     options.onHost?.(host.length ? "migrating" : "ready");
     let point: RecoveryPoint | null = null;
-    // 同一组变化的重试沿用最近的迁移恢复点，避免反复失败挤掉更早的恢复点。
+    // Retries of the same changes reuse the latest migration recovery point so repeated failures cannot evict older points.
     const record = (changes: StorageChange[]) => {
       if (!changes.length) return;
       if (point) {

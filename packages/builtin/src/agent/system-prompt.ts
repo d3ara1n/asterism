@@ -18,7 +18,7 @@ const environment = (applicationName: string): PromptBlock => ({
   ].join("\n"),
 });
 
-/** 每次构造独立的块集合；扩展可在投影前按身份追加或替换，不修改内置源对象。 */
+/** Builds an independent block collection each time; extensions can append or replace by identity before projection without modifying built-in source objects. */
 export function composeSystemPrompt(agent: Pick<AgentConfiguration, "id" | "systemPrompt">, applicationName: string, context: readonly { file: string; text: string }[] = []): SystemPrompt {
   return { blocks: [
     environment(applicationName),

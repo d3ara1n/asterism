@@ -45,7 +45,7 @@ function fixture(ranges: (string | null)[] = [compatibleRange, `~${builtinPublic
         })] }))] }), probe: { SubmitAgentInput, calls } };
     `);
     file(root, "renderer.ts", 'export { SubmitAgentInput } from "./public.ts"; export default { modules: [{ resources: [], cards: [], tools: [] }] };');
-    // 消费者的本地安装副本不能抢占应用已经加载的声明。
+    // A consumer's local installation copy must not displace declarations already loaded by the app.
     file(root, "node_modules/@asterism/builtin-api/package.json", JSON.stringify({ name: "@asterism/builtin-api", version: builtinPublicProvider.version, exports: { "./contracts": "./copy.js" } }));
     file(root, "node_modules/@asterism/builtin-api/copy.js", 'throw new Error("A private copy must not execute.");');
     list.add({ source: { kind: "path", path: root } }, data);
@@ -57,9 +57,9 @@ function fixture(ranges: (string | null)[] = [compatibleRange, `~${builtinPublic
 }
 type Probe = { SubmitAgentInput: typeof SubmitAgentInput; calls: unknown[] };
 
-describe("内置公共包", () => {
-  // 后台创建入口服务须与内置实现共享同一导出实例，不能从消费者私有安装另取一份。
-  it("独立插件从后台公共入口取得相同的创建声明与目录服务", async () => {
+describe("Built-in public packages", () => {
+  // Backend creation entry services must share exported instances with built-in implementations rather than using consumer-private installations.
+  it("independent plugins obtain the same creation declarations and catalog services from backend public entries", async () => {
     const f = fixture([compatibleRange]);
     file(f.consumers[0]!, "runtime.ts", `
       import { agentCreations, defineAgentCreation } from "@asterism/builtin-api/runtime";
@@ -77,8 +77,8 @@ describe("内置公共包", () => {
     expect((await f.load())[0]?.error).toContain("not exported");
   });
 
-  // 依据公共契约真实实例与动作准备规则：同名副本不能绑定内置 Agent；re-export 和私有安装不得产生副本。
-  it("内置声明与两个独立源码插件共享引用，并在真实 Agent 动作上执行外部准备", async () => {
+  // Based on real public contract instances and action preparation rules: same-name copies cannot bind built-in Agents; re-exports and private installs must not create copies.
+  it("built-in declarations share references with two independent source plugins and run external preparation on real Agent actions", async () => {
     const f = fixture();
     const packages = await f.load();
     expect(packages.map(item => item.error)).toEqual([undefined, undefined]);
@@ -100,7 +100,7 @@ describe("内置公共包", () => {
       expect(probes.map(probe => probe.calls.length)).toEqual([1, 1]);
       expect(service.sessions.current(sessionId).nodes).toEqual(before.nodes);
     } finally { await service.close(); }
-    // 前端产物从其环境绑定取实例；刻意使用不同对象，防止误取后台绑定。
+    // Frontend artifacts obtain instances from their environment bindings; deliberately distinct objects catch accidental backend binding use.
     const frontendAction = { ...SubmitAgentInput };
     release.push(bindPublicProvider("renderer", builtinPublicProvider, {
       "@asterism/builtin-api/contracts": { ...builtinPublicModules["@asterism/builtin-api/contracts"], SubmitAgentInput: frontendAction },
@@ -112,8 +112,8 @@ describe("内置公共包", () => {
       expect(frontend.SubmitAgentInput).not.toBe(SubmitAgentInput);
     }
   });
-  // 依赖包名、版本范围和环境出口均是加载门禁；本地副本不能成为失败后的兜底。
-  it("拒绝缺少依赖、不兼容版本和未公开入口，保留无关消费者", async () => {
+  // Dependency package names, version ranges, and environment exports are loading gates; local copies cannot serve as fallbacks after failure.
+  it("rejects missing dependencies, incompatible versions, and private entries while retaining unrelated consumers", async () => {
     const f = fixture([null, incompatibleRange, compatibleRange, compatibleRange]);
     file(f.consumers[2]!, "public.ts", 'export { SubmitAgentInput } from "@asterism/builtin-api/private";');
     const packages = await f.load();
@@ -122,8 +122,8 @@ describe("内置公共包", () => {
     expect(packages[1]!.error).toContain(`application provides ${builtinPublicProvider.version}`);
     expect(packages[2]!.error).toContain("not exported");
   });
-  // Agent UI 只经前端公共出口加载；两个源码插件登记到内置实现所读的同一服务。
-  it("前端消费者共享 Agent UI 服务，贡献跟随登记生命周期释放", async () => {
+  // Agent UI loads only through frontend public exports; two source plugins register with the same service consumed by built-in implementations.
+  it("frontend consumers share Agent UI services and release contributions with registration lifetime", async () => {
     const f = fixture([compatibleRange, compatibleRange]);
     for (const [index, root] of f.consumers.entries()) {
       file(root, "renderer.ts", `
@@ -157,16 +157,16 @@ describe("内置公共包", () => {
     expect(builtinRendererAPI.agentUI.getSnapshot()).toEqual([]);
   });
 
-  // 公共前端服务不能进入后台模块图，避免 React/界面状态跨环境混用。
-  it("后台消费者不能导入 Agent UI 前端出口", async () => {
+  // Public frontend services must not enter backend module graphs, preventing React/UI state from mixing across environments.
+  it("backend consumers cannot import Agent UI frontend exports", async () => {
     const f = fixture([compatibleRange]);
     file(f.consumers[0]!, "runtime.ts", 'import { agentUI } from "@asterism/builtin-api/renderer"; export default agentUI;');
     const [item] = await f.load();
     expect(item!.status).toBe("failed");
     expect(item!.error).toContain("not exported");
   });
-  // 中间库没有 asterism 清单；校验它自己的 npm 依赖，运行依赖仍归实际消费者插件。
-  it.each(["nested", "symlink"] as const)("独立中间 npm 包的 %s 导入按包归属校验版本", async mode => {
+  // Intermediate libraries lack asterism manifests; validate their own npm dependencies while runtime dependencies remain with actual consumer plugins.
+  it.each(["nested", "symlink"] as const)("independent intermediate npm packages validate versions for %s imports by package ownership", async mode => {
     const f = fixture([null, compatibleRange]);
     for (const [index, root] of f.consumers.entries()) {
       const metadata = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
@@ -189,8 +189,8 @@ describe("内置公共包", () => {
     expect(incompatible!.status).toBe("failed");
     expect(incompatible!.error).toContain(`Package @fixture/helper requires @asterism/builtin-api ${incompatibleRange}`);
   });
-  // 声明导入成功不等于实现可用；缺失或 setup 失败都必须沿实际实现依赖传播。
-  it("实现提供方 setup 失败时消费者不初始化", async () => {
+  // Importing declarations successfully does not imply implementation availability; missing or failed setup propagates along actual implementation dependencies.
+  it("consumers do not initialize when implementation provider setup fails", async () => {
     const f = fixture([compatibleRange]), [consumer] = await f.load();
     const { loadPlugins } = await import("./loader.ts");
     const { SessionDataStore } = await import("../session/data.ts");
@@ -204,8 +204,8 @@ describe("内置公共包", () => {
     try { expect(loaded.manifest.map(item => item.status)).toEqual(["failed", "failed"]); }
     finally { await loaded.close(); db.close(); }
   });
-  // 前端构建成功后，提供方视图仍可能冲突；消费者不得越过失败提供方装配。
-  it("前端按依赖顺序装配并传播视图登记失败", async () => {
+  // Provider views may conflict even after frontend builds succeed; consumers must not assemble past failed providers.
+  it("frontend assembly follows dependency order and propagates view registration failure", async () => {
     const seen: string[] = [];
     const result = await loadPluginRenderers([
       { id: "consumer", renderer: "consumer", dependencies: ["provider"] },

@@ -5,7 +5,7 @@ import { agentCreations } from "@asterism/builtin-api/runtime";
 import { AgentConfigurations, ReadAgentCreations } from "@asterism/builtin-api/contracts";
 import { AgentListResult, CreationListResult, CreationInspectResult, ResourceCreateResult, ResourceRemoveResult, ResourceRenameResult } from "./contract.ts";
 
-/** 已知拒绝不伪装为未知写入；资源初始化异常仍沿用工具执行器的未知结局。 */
+/** Known rejection is not represented as an unknown write; resource initialization exceptions still use the tool executor's unknown outcome. */
 async function attempt<T extends Json>(signal: AbortSignal, work: () => T | Promise<T>): Promise<CallResult<T>> {
   try { signal.throwIfAborted(); return { kind: "succeeded", data: await work() }; }
   catch (error) {
@@ -64,7 +64,7 @@ export default defineModule(plugin => ({
       resultSchema: ResourceCreateResult.schema,
       effect: "write", execution: "sequential",
       execute(args, context) { return attempt(context.signal, async () => {
-        // 工具执行层在失败或取消时保留过程产出，成功结果显式提供实际标题。
+        // The tool execution layer retains progress output on failure or cancellation; successful results explicitly provide the actual title.
         context.publish({ type: agentCreations.inspect(plugin, args.creation_id).resourceKind });
         const resource = await agentCreations.create(plugin, args.creation_id, args.input, context);
         return { resource_id: resource.id, type: resource.kind, title: resource.title };

@@ -1,6 +1,6 @@
 import type { z } from "zod";
 
-/** 保留字段路径和 union 分支的具体校验原因，供模型修正原始 JSON 参数。 */
+/** Preserve field paths and specific validation reasons from union branches so the model can correct the raw JSON arguments. */
 export function validationMessage(error: z.ZodError, field: string): string {
   const format = (issues: readonly z.core.$ZodIssue[]): string => issues.map(issue => {
     const path = [field, ...issue.path.map(String)].filter(Boolean).join(".");

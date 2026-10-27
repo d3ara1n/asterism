@@ -1,6 +1,6 @@
 import type { CardAppearance } from "@asterism/sdk/contracts";
 
-/** 内置资源的几何声明，后台放置与前端卡片共用。 */
+/** Geometry declarations for built-in resources, shared by backend placement and frontend cards. */
 export const agentCard = { width: 560, height: 640, minWidth: 480, minHeight: 480 } satisfies CardAppearance;
 export const noteCard = { width: 340, height: 320, minWidth: 280, minHeight: 160 } satisfies CardAppearance;
 export const directoryCard = { width: 340, height: 360, minWidth: 280, minHeight: 200 } satisfies CardAppearance;

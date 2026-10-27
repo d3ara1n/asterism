@@ -15,9 +15,9 @@ const completion = (input: number, output: number, cacheRead: number, durationMs
 } satisfies ModelCompletion);
 const snapshot = (path: ReturnType<typeof node>[]) => sessionSnapshot(nodeView("s", "", path, path.at(-1)?.id ?? null));
 
-describe("对话中的逐轮计量", () => {
-  // 同批独立消息和请求之间的 steer 都归入一个回合，follow 才开始下一回合。
-  it("连续输入与插话不产生空回合或拆分请求计量", () => {
+describe("Per-turn conversation measurements", () => {
+  // Independent messages in the same batch and steer messages between requests belong to one turn; only follow starts the next turn.
+  it("Consecutive input and interjections do not create empty turns or split request measurements", () => {
     const path = [
       node("u1", null, message("a", "First")),
       node("u2", "u1", message("a", "Second", false)),
@@ -35,8 +35,8 @@ describe("对话中的逐轮计量", () => {
     expect(turnMetrics(snapshot(path), "a", true)).toHaveLength(1);
   });
 
-  // 只隐藏当前运行轮，历史轮次的计量保留在对话中。
-  it("当前轮运行期间隐藏计量，开启下一轮时保留上一轮概要", () => {
+  // Hide only the currently running turn; historical turn measurements remain in the conversation.
+  it("Hides measurements while the current turn runs and preserves the previous turn's summary when the next turn starts", () => {
     const path = [
       node("u1", null, message("a", "First")),
       node("r1", "u1", text("a", "r1", 0, "Done", { completion: completion(100, 20, 50, 2000) })),
@@ -48,8 +48,8 @@ describe("对话中的逐轮计量", () => {
     expect(turnMetrics(snapshot(path), "a", false)).toHaveLength(1);
   });
 
-  // 本轮从本代理最新用户输入开始；旧轮、其他代理消息和辅助压缩不能改变范围或混入权重。
-  it("同一轮的多个请求按总量计算命中率与吞吐，继续后的请求仍合并", () => {
+  // This turn starts at this agent's latest user input; earlier turns, other agents' messages, and auxiliary compression cannot change its range or affect weighting.
+  it("Calculates hit rate and throughput from totals across requests in the same turn, including requests after resuming", () => {
     const path = [
       node("old-user", null, message("a", "Old")),
       node("old-response", "old-user", text("a", "old", 0, "Old answer", { completion: completion(9000, 9000, 9000, 1000) })),
@@ -70,8 +70,8 @@ describe("对话中的逐轮计量", () => {
     expect(tokensPerSecond(metrics.performance.rates.output)).toBeCloseTo(100 / 3);
   });
 
-  // 不完整请求可能没有 usage；已知部分必须标出覆盖数，不能把缺失值当作零。
-  it("未取得用量的中断请求不产生零速率，继续后仅累计实际报告的数据", () => {
+  // Incomplete requests may lack usage; the known portion must indicate how many requests it covers, without treating missing values as zero.
+  it("Interrupted requests without usage do not produce zero rates; resuming aggregates only actually reported data", () => {
     const path = [
       node("u", null, message("a", "Work")),
       node("partial", "u", text("a", "interrupted", 0, "Partial", { complete: false })),
@@ -95,8 +95,8 @@ describe("对话中的逐轮计量", () => {
     expect(tokensPerSecond(resumed.performance.rates.output)).toBe(10);
   });
 
-  // 复制最终响应的所有正文，避免漏块或混入思考、过程、工具与其他轮次。
-  it("最终回复按块序号保留 Markdown，历史轮次分别保留自己的回复", () => {
+  // Copy all body text from the final response without missing blocks or including thinking, intermediate text, tools, or other turns.
+  it("Final replies preserve Markdown in block ordinal order, and historical turns retain their own replies", () => {
     const first = "# 结果\n\n- **已修复**";
     const second = "```ts\nconst ready = true;\n```\n";
     const path = [
@@ -114,12 +114,12 @@ describe("对话中的逐轮计量", () => {
       .toEqual([`${first}\n\n${second}`, "Next answer"]);
   });
 
-  // 没有最终正文时不能回退复制较早的过程文字，工具结果与思考也不能充作回复。
+  // Without a final body, do not fall back to copying earlier intermediate text; tool results and thinking cannot substitute for a reply.
   it.each([
-    ["工具响应", call("a", "last", 0, "Tool output", { completion: { ...completion(100, 20, 50, 2000), finishReason: "tool-calls" } })],
-    ["纯思考响应", thinking("a", "last", 0, "Reasoning", { completion: completion(100, 20, 50, 2000) })],
-    ["空白正文", text("a", "last", 0, " \n", { completion: completion(100, 20, 50, 2000) })],
-  ])("%s 不提供复制内容", (_label, last) => {
+    ["tool response", call("a", "last", 0, "Tool output", { completion: { ...completion(100, 20, 50, 2000), finishReason: "tool-calls" } })],
+    ["reasoning-only response", thinking("a", "last", 0, "Reasoning", { completion: completion(100, 20, 50, 2000) })],
+    ["blank body", text("a", "last", 0, " \n", { completion: completion(100, 20, 50, 2000) })],
+  ])("%s provides no copyable content", (_label, last) => {
     const path = [
       node("u", null, message("a", "Question")),
       node("earlier", "u", text("a", "earlier", 0, "Earlier response", { completion: completion(100, 20, 50, 2000) })),

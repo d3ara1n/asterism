@@ -40,7 +40,7 @@ function parseDataModel(raw: unknown): DiscoveredModel {
   const { id } = identity.parse(raw);
   const model: DiscoveredModel = { modelId: id, name: id };
   if (!hasAnthropicMetadata(raw)) return model;
-  // 已识别的元数据损坏时直接失败，不退回仅取 ID 而静默丢失能力。
+  // Fail on corrupt recognized metadata rather than silently losing capabilities by falling back to IDs only.
   const entry = anthropicModelEntry.parse(raw);
   model.name = entry.display_name ?? entry.id;
   if (entry.max_input_tokens != null) model.contextWindow = entry.max_input_tokens;
@@ -58,7 +58,7 @@ function parseCodexModel(raw: unknown): DiscoveredModel {
   return { modelId: entry.slug, name: entry.display_name ?? entry.slug };
 }
 
-/** 只按响应结构识别目录格式；消息协议与厂商身份不参与解析。 */
+/** Identify catalog formats solely by response structure; message protocol and vendor identity do not affect parsing. */
 export function parseModelListPage(raw: unknown): ModelListPage {
   const page = pageSchema.parse(raw);
   return {

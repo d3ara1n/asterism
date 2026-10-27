@@ -4,7 +4,7 @@ import { contractReferenceSchema } from "./presentation.ts";
 import { modelInputPartsSchema, type ModelInputPart } from "./model-input.ts";
 
 export const toolResourceSchema = z.strictObject({ id: z.string(), kind: z.string(), title: z.string() });
-/** 当次请求选中的身份；历史展示不能改用当前资源或当前实现。 */
+/** Identity selected for this request; history display must not substitute the current resource or current implementation. */
 export const toolInvocationSchema = z.strictObject({
   implementation: contractReferenceSchema.optional(),
   resource: toolResourceSchema.optional(),
@@ -25,9 +25,9 @@ export const toolCompletionSchema = z.discriminatedUnion("kind", [
 export const toolRunningResultSchema = z.strictObject({ kind: z.literal("running"), data: jsonSchema });
 type WithData<T, D> = T extends unknown ? Omit<T, "data"> & { data: D | null } : never;
 export type ToolCompletion<D = Json> = WithData<z.infer<typeof toolCompletionSchema>, D>;
-/** 过程态与终结态共用 data 契约，null 表示尚无有效产出。 */
+/** Progress and terminal states share the data contract; null means no valid output yet. */
 export type ToolResult<D = Json> = { kind: "running"; data: D | null } | ToolCompletion<D>;
-/** 模型投影与用户输入共用 text | file 部件；只有成功与部分成功可携带文件。 */
+/** Model projection and user input share text | file parts; only success and partial success may carry files. */
 const saved = { ...toolInvocationSchema.shape, model: modelInputPartsSchema };
 function extendSaved<I extends 0 | 1 | 2 | 3 | 4 | 5>(index: I) { return toolCompletionSchema.options[index].extend(saved); }
 export const toolOutcomeSchema = z.discriminatedUnion("kind",
@@ -37,5 +37,5 @@ export const toolOutcomeSchema = z.discriminatedUnion("kind",
   ]).refine(outcome => outcome.kind === "succeeded" || outcome.kind === "partial" || outcome.model.every(part => part.kind === "text"),
   "Only succeeded or partial tool results can carry files.");
 export type ToolOutcome = z.infer<typeof toolOutcomeSchema>;
-/** 工具交给模型的内容：字符串即一个文字部件；文件部件引用执行期暂存或对象已有的不可变内容。 */
+/** Content passed from a tool to the model: a string becomes one text part; file parts reference immutable content staged during execution or already owned by the object. */
 export type ToolModelOutput = string | ModelInputPart[];

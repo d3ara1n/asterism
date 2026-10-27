@@ -11,8 +11,8 @@ export { credentialKey, oauthKey } from "./session.ts";
 export interface CallTarget { session: ServerSession; serverId: string; serverName: string; toolName: string }
 
 /**
- * 全应用共享的服务器注册表：每台服务器一个会话，多个会话、多个 MCP Host 对象共用同一连接与进程。
- * 目录缓存按服务器 ID 与端点保存，两种连接模式在启动时同样读取。
+ * Application-wide shared server registry: one session per server, with multiple application sessions and MCP Host objects sharing the same connection and process.
+ * Catalog caches are saved by server ID and endpoint; both connection modes read them at startup.
  */
 export class McpHostService implements SessionHost {
   private sessions = new Map<string, ServerSession>();
@@ -52,7 +52,7 @@ export class McpHostService implements SessionHost {
     void work.finally(() => this.retiring.delete(work));
   }
 
-  /** 配置是唯一真值：删除与端点变化退役旧会话，新会话读取缓存，启用的 eager 在后台连接。 */
+  /** Configuration is the source of truth: deletion and endpoint changes retire old sessions, new sessions read the cache, and enabled eager sessions connect in the background. */
   configure(configs: readonly McpServerConfig[]) {
     if (this.closed) return;
     for (const [id, session] of this.sessions) {
@@ -78,7 +78,7 @@ export class McpHostService implements SessionHost {
       if (!this.plugin.lifetime.signal.aborted) this.plugin.log.warn(`MCP eager connection to ${session.id} failed: ${String(error)}`);
     });
   }
-  /** 凭据变化后旧目录可能不再对应可见工具；断开后 eager 以新凭据重新连接。 */
+  /** After credentials change, the old catalog may no longer match visible tools; eager reconnects with the new credentials after disconnecting. */
   async credentialsChanged(id: string) {
     const session = this.sessions.get(id);
     if (!session) return;
@@ -86,7 +86,7 @@ export class McpHostService implements SessionHost {
     await session.disconnect();
     if (session.config.enabled && session.config.mode === "eager") this.startEager(session);
   }
-  /** 等待已退役会话完成清理；删除服务器后再移除凭据。 */
+  /** Waits for retired sessions to finish cleanup; credentials are removed after server deletion. */
   async settled() { await Promise.allSettled([...this.retiring]); }
 
   private get(id: string) {
@@ -95,7 +95,7 @@ export class McpHostService implements SessionHost {
     if (!session) throw new PluginApiError("not_found", `The MCP server '${id}' is not configured.`);
     return session;
   }
-  /** 资源工具入口的服务器身份：五个入口对同一原因给出相同错误码。 */
+  /** Server identity at resource tool entry points: all five entry points use the same error code for the same cause. */
   private enabled(id: string) {
     if (this.closed || this.plugin.lifetime.signal.aborted) throw new McpError("service_unavailable", "The MCP service is closing.");
     const session = this.sessions.get(id);
@@ -104,7 +104,7 @@ export class McpHostService implements SessionHost {
     return session;
   }
   states(): McpServerState[] { return [...this.sessions.values()].map(session => session.state()); }
-  /** 展示用目录摘要：读取当前缓存，不建立连接。 */
+  /** Catalog summary for display: reads the current cache without establishing a connection. */
   tools(id: string) {
     const directory = this.get(id).directory;
     return directory ? { tools: directory.tools.map(({ name, title, description }) => ({ name, ...(title && { title }), ...(description && { description }) })),
@@ -127,7 +127,7 @@ export class McpHostService implements SessionHost {
     if (!tool) throw new McpError("tool_not_found", "The MCP tool is not in the server's cached directory. mcp_connect refreshes it.");
     return inspectTool({ config: session.config, state: session.state(), directory: session.directory }, tool);
   }
-  /** 调用开始前固定服务器与工具身份；之后服务器改名或移除不影响本次结果与进度。 */
+  /** Captures server and tool identities before a call starts; subsequent server renaming or removal does not affect its result or progress. */
   resolve(toolId: string): CallTarget {
     const [serverId, toolName] = parseToolIdentity(toolId), session = this.enabled(serverId);
     return { session, serverId, serverName: session.config.name, toolName };
@@ -136,7 +136,7 @@ export class McpHostService implements SessionHost {
     return target.session.call(target.toolName, args, signal, progress);
   }
   connect(id: string, signal: AbortSignal) { return this.get(id).connect(signal); }
-  /** mcp_connect 入口：服务器身份按资源工具错误码解析。 */
+  /** mcp_connect entry point: resolves server identity using resource tool error codes. */
   connectTool(id: string, signal: AbortSignal) { return this.enabled(id).connect(signal); }
   disconnect(id: string) { return this.get(id).disconnect(); }
   invalidateDirectory(id: string) { this.sessions.get(id)?.invalidateDirectory(); }

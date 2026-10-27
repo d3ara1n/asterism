@@ -27,7 +27,7 @@ export function ProviderOptions({ configuration, follow, selected, initialActive
     onSelect={value => value === follow.value ? onFollow() : onProvider(value.slice("provider:".length))} />;
 }
 
-/** 浏览只移动候选高亮；点击或回车才提交完整的提供商／模型引用。 */
+/** Browsing moves only the candidate highlight; clicking or pressing Enter commits the complete provider/model reference. */
 export function ProviderModels({ configuration, providerId, selected, effectiveModel, disabled, onSelect }: {
   configuration: Configuration; providerId: string; selected: string | null; effectiveModel: CatalogModel | null; disabled: boolean;
   onSelect(value: string): void;

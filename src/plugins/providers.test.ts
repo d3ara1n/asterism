@@ -36,9 +36,9 @@ const save = (service: ApplicationService, id: string | null = null, name = "My 
 });
 const read = (plugin: PluginContext, refresh = false) => plugin.ipc.calls.invoke(ReadUsage, { providerId: value.id, refresh }, {});
 
-describe("插件提供预设与账户用量", () => {
-  // 模型只交付公共响应元信息，调用插件自行选择消费；正文与 token usage 保持独立。
-  it("调用插件取得响应头并显式消费，模型服务不自动更新其他消费者", async () => {
+describe("Plugin presets and account usage", () => {
+  // Models deliver only public response metadata; calling plugins explicitly choose consumption, independently of text and token usage.
+  it("calling plugins obtain and explicitly consume response headers while model services do not update other consumers automatically", async () => {
     const { service, observer } = open([]);
     await service.configuration.execute({ type: "modelProvider.save", id: null, value: { ...value, auth: "none", usage: "openai" }, credential: { action: "keep" } });
     const model = createModelInput(value.id, { name: "Test", modelId: "test" });
@@ -72,8 +72,8 @@ describe("插件提供预设与账户用量", () => {
     expect(await read(observer)).toMatchObject({ state: "waiting", items: [] });
     expect(transport).toHaveBeenCalledTimes(1);
   });
-  // 预设和查询可被不同插件组合；消费者显式取凭据、选实现，目录本身不缓存。
-  it("插件注册和修改目录，消费者独立选择查询，内置工具栏使用自己的缓存", async () => {
+  // Different plugins compose presets and queries; consumers explicitly obtain credentials and choose implementations while the catalog itself does not cache.
+  it("plugins register and modify catalogs; consumers independently choose queries while the built-in toolbar uses its own cache", async () => {
     let consumer!: PluginContext;
     const query = vi.fn(async (_: UsageQueryContext) => items);
     const { service } = open([
@@ -111,8 +111,8 @@ describe("插件提供预设与账户用量", () => {
     expect(consumer.modelProviders.presets().find(preset => preset.id === "zai-plan-cn")?.connection.usage).toBe("test-usage");
   });
 
-  // 注册后 setup 失败必须撤销同插件全部贡献；不能留下幽灵提供方或预设覆盖。
-  it("失败插件的新增和覆盖全部撤回，重复查询 ID 不能替换已有实现", () => {
+  // setup failure after registration must revoke all contributions from that plugin without leaving ghost providers or preset overrides.
+  it("failed plugins retract all additions and overrides and duplicate query IDs cannot replace existing implementations", () => {
     const { service } = open([definePlugin({ namespace: pluginNamespace("test.failed"), version: "1", dependencies: ["asterism.builtin"],
       setup: () => ({ usageProviders: [{ id: "temporary", label: "Temporary", query: async () => [] }],
         modelProviderPresets: [{ type: "patch", id: "zai-plan-cn", patch: { connection: { usage: "temporary" } } }] }),
@@ -126,8 +126,8 @@ describe("插件提供预设与账户用量", () => {
     expect(service.configuration.current().usageProviders?.filter(provider => provider.id === "zai-plan-cn")).toHaveLength(1);
   });
 
-  // 查询与插件调用同样参与真实收束；取消信号不能提前释放提供方的 closing 资源。
-  it("关闭先取消查询并等待提供方退出，再清理插件", async () => {
+  // Queries finalize like plugin calls; cancellation signals must not release providers' closing resources early.
+  it("close first cancels queries and waits for provider exit before cleaning up plugins", async () => {
     let release!: () => void, started!: () => void;
     let signal!: AbortSignal;
     const began = new Promise<void>(resolve => { started = resolve; });

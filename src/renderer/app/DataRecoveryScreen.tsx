@@ -12,7 +12,7 @@ const kindMessages = {
   "before-fresh": startupMessages.pointBeforeFresh,
 } as const;
 
-/** 恢复页只依赖桌面桥，后台会话与插件尚未启动；恢复点按时间倒序列出，可任选其一还原。 */
+/** The recovery page depends only on the desktop bridge; backend sessions and plugins have not started. Recovery points are listed newest first, and any can be restored. */
 export function DataRecoveryScreen({ failure }: { failure: StartupFailure }) {
   const i18n = useI18n();
   const [current, setCurrent] = useState(failure);

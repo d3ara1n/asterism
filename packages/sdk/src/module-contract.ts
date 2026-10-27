@@ -12,7 +12,7 @@ export interface ToolContract<A extends Json = Json> extends ContractReference {
   guidelines: readonly string[];
   argsSchema: z.ZodType<A>;
 }
-/** 工具定义固定选择说明、使用指导与 args；实现只补充 target/result 和执行信息。 */
+/** Tool definitions fix selection descriptions, usage guidance, and args; implementations add only target/result and execution information. */
 export interface ImplementationContract<S extends Json, T extends Json, A extends Json, O extends Json> extends DataContract<O> {
   resource: ResourceContract<S>;
   tool: ToolContract<A>;
@@ -23,7 +23,7 @@ export interface ImplementationContract<S extends Json, T extends Json, A extend
 export function defineResource<S extends Json>(kind: string, stateSchema: z.ZodType<S>): ResourceContract<S> {
   return { kind, stateSchema };
 }
-/** 工具 args/target/result 会投影为 JSON Schema 交给模型；声明时即校验可表示，避免调用期才失败。 */
+/** Tool args/target/result are projected as JSON Schema for the model; representability is validated at declaration time to avoid failures only when invoked. */
 function requireDescription(schema: z.ZodType, subject: string): void {
   if (!schema.description?.trim()) throw new Error(`Missing schema description: ${subject}`);
   try { z.toJSONSchema(schema); } catch (error) { throw new Error(`Schema is not representable as JSON Schema: ${subject}`, { cause: error }); }

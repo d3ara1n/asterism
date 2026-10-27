@@ -1,4 +1,4 @@
-/** 测试夹具：按通用记录节点构造 agent 与工作台记录，形状只在此维护。 */
+/** Test fixtures construct agent and workbench records from generic record nodes; maintain their shapes only here. */
 import type { Json, ModelCompletion, ToolOutcome } from "@asterism/sdk/contracts";
 import { Execution, AgentInputMessage, type AgentMessageSender } from "@asterism/builtin-api/contracts";
 import type { NewNode, SessionNode } from "../shared/session.ts";
@@ -32,10 +32,10 @@ export const created = (id: string, title: string, kind = "asterism.builtin/agen
 export const attached = (receiverId: string, resourceId: string, model: string | null = `${resourceId} attached`) =>
   event("resource_attached", { id: resourceId, receiverId }, { model, recipient: receiverId });
 export const removed = (id: string) => event("object_removed", { id });
-/** 构造带身份的完整节点，供不经存储的纯函数测试使用。 */
+/** Construct complete identified nodes for pure function tests without storage. */
 export const node = (id: string, parentId: string | null, value: NewNode, createdAt = "2026-10-10T10:00:00Z"): SessionNode =>
   ({ ...value, id, parentId, sessionId: "s", createdAt });
-/** 测试读取：把通用记录节点展开为便于断言的扁平视图（kind 由契约与载荷推出），只用于测试。 */
+/** Test-only reads flatten generic record nodes into assertion-friendly views, deriving kind from contract and payload. */
 export type FlatNode = SessionNode & { kind: "message" | "thinking" | "text" | "toolcall" | "event" } & Record<string, any>;
 export function flat(node: SessionNode): FlatNode {
   const data = (node.data ?? {}) as Record<string, any>;

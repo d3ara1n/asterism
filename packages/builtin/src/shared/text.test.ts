@@ -4,9 +4,9 @@ import { Read, Edit, Write } from "@asterism/builtin-api/contracts";
 import { readText, readToModel, editText, textChange, writeToModel, editToModel } from "./text.ts";
 import { computeLineHash } from "./hashline/hash.ts";
 
-// 预期来自工具契约：定位不进 args、失败整批不写、锚点指向完整正文、编辑保留原始换行。
-describe("正文工具契约", () => {
-  it("read 只接受 anchored，write 不接受锚点，edit 按操作要求字段", () => {
+// Expectations come from the tool contract: targeting stays out of args, a failed batch writes nothing, anchors reference full content, and edits preserve original line endings.
+describe("text tool contracts", () => {
+  it("read accepts only anchored, write accepts no anchors, and edit requires fields according to the operation", () => {
     expect(Read.argsSchema.safeParse({ anchored: false }).success).toBe(true);
     expect(Read.argsSchema.safeParse({ offset: 2 }).success).toBe(false);
     expect(Write.argsSchema.safeParse({ content: "x", anchor: { line: 1, hash: "ABCD" } }).success).toBe(false);
@@ -15,7 +15,7 @@ describe("正文工具契约", () => {
     expect(Edit.argsSchema.safeParse({ edits: [{ op: "delete", anchor: { line: 1, hash: "ABCD" }, body: ["x"] }] }).success).toBe(false);
   });
 
-  it("分页与完整正文的同一行返回相同锚点，关闭 anchored 后不泄露锚点", () => {
+  it("returns the same anchor for the same line in paginated and full content, and exposes no anchors when anchored is disabled", () => {
     const text = "zero\nfirst\nsecond";
     const full = readText(text, true);
     const part = readText(text, true, { offset: 2, limit: 1 });
@@ -26,7 +26,7 @@ describe("正文工具契约", () => {
     expect(readToModel(readText(text, false))).not.toContain("#");
   });
 
-  it("按完整行限制输出，提供能继续读取的位置，不截断带锚点的内容", () => {
+  it("limits output by complete lines and provides a continuation position without truncating anchored content", () => {
     expect(readText("a\nb\nc", true, { maxBytes: 16 }).rows).toHaveLength(1);
     expect(readText("a\nb\nc", true, { maxBytes: 16 }).nextOffset).toBe(2);
     expect(() => readText("long line", true, { maxBytes: 2 })).toThrow("output limit");
@@ -34,8 +34,8 @@ describe("正文工具契约", () => {
     expect(readText("", true)).toMatchObject({ rows: [], nextOffset: null });
   });
 
-  // 压缩产物的单行曾让 read 整次拒绝或吃掉预算；片段的锚点必须按完整行计算，否则 edit 会拒绝或改错行。
-  it("超长行返回带完整行锚点的片段，不阻断前后行，锚点可直接用于 edit", () => {
+  // A single minified line previously caused read to reject the entire request or exhaust its budget; excerpt anchors must use the full line, or edit will reject or modify the wrong line.
+  it("returns excerpts of very long lines with full-line anchors, preserves surrounding lines, and allows anchors to be used directly by edit", () => {
     const long = "x".repeat(231_654), text = `short\n${long}\nafter`;
     const data = readText(text, true, { limit: 30, maxBytes: 64 * 1024 });
     expect(data.rows.map(row => row.line)).toEqual([1, 2, 3]);
@@ -43,12 +43,12 @@ describe("正文工具契约", () => {
     expect(data.rows[1].content).toHaveLength(400);
     expect(readToModel(data)).toContain("Line 2 is an excerpt (characters 0–400 of 231654); its anchor refers to the complete line.");
     expect(editText(text, [{ op: "delete", anchor: { line: 2, hash: data.rows[1].hash! } }]).text).toBe("short\nafter");
-    // 正常长段落不应被截断，否则笔记无法直接编辑。
+    // Ordinary long paragraphs should not be truncated, or notes cannot be edited directly.
     expect(readText("p".repeat(5000), true).rows[0].excerpt).toBeNull();
   });
 
-  // 删除或保留超长行时，diff 与锚点失配报错曾原样回显整行。
-  it("edit 的模型 diff 与失配报错把超长行截为片段并陈述范围", () => {
+  // When deleting or retaining very long lines, diff and anchor-mismatch errors previously echoed the entire line unchanged.
+  it("edit model diffs and mismatch errors excerpt very long lines and state their ranges", () => {
     const long = "x".repeat(60_000), before = `first\n${long}\nlast`;
     const change = textChange(before, "first\nlast", "a.txt");
     const model = editToModel(change);
@@ -61,7 +61,7 @@ describe("正文工具契约", () => {
     expect(message.length).toBeLessThan(2000);
   });
 
-  it("同一批次校验全部锚点；位移仅提供重试信息，重复候选要求重新确认", () => {
+  it("validates every anchor in a batch, uses shifts only for retry information, and requires reconfirmation for duplicate candidates", () => {
     const rows = readText("a\nb\nc", true).rows;
     const anchor = (i: number) => ({ line: rows[i].line, hash: rows[i].hash! });
     expect(() => editText("a\nchanged\nc", [
@@ -72,7 +72,7 @@ describe("正文工具契约", () => {
     expect(() => editText("prefix\na\nb\nb", [{ op: "replace", anchor: anchor(1), body: ["B"] }])).toThrow("several nearby lines");
   });
 
-  it("保留混合换行与无末尾换行，返回可直接继续编辑的锚点和真实可应用 diff", () => {
+  it("preserves mixed line endings and missing final newlines, returning reusable anchors and an actual applicable diff", () => {
     const before = "a\r\nb\nc";
     const row = readText(before, true).rows[1];
     const edited = editText(before, [{ op: "replace", anchor: { line: row.line, hash: row.hash! }, body: ["B"] }]);
@@ -85,7 +85,7 @@ describe("正文工具契约", () => {
     expect(editText("a\nlast\r", [{ op: "replace", anchor: { line: 1, hash: loneCr.hash! }, body: ["A"] }]).text).toBe("A\nlast\r");
   });
 
-  it("拒绝重叠、倒置和无变化的 edit，但完整 write 可重复且没有锚点", () => {
+  it("rejects overlapping, reversed, and unchanged edit operations, while complete write operations remain repeatable and unanchored", () => {
     const text = "a\nb\nc\n";
     const rows = readText(text, true).rows;
     const a = (i: number) => ({ line: rows[i].line, hash: rows[i].hash! });
@@ -96,7 +96,7 @@ describe("正文工具契约", () => {
     expect(textChange(text, "other\n", "note").anchors).toEqual([]);
   });
 
-  it("增删、删除到空文本、首尾插入都有明确的新锚点；无末尾换行标记不丢失", () => {
+  it("provides explicit new anchors for additions, deletions, deletion to empty text, and insertions at either end, preserving the missing-final-newline marker", () => {
     const before = "a\nb";
     const rows = readText(before, true).rows;
     const removed = editText(before, [{ op: "delete", anchor: { line: 1, hash: rows[0].hash! } }]);
@@ -110,7 +110,7 @@ describe("正文工具契约", () => {
     expect(applyPatch(before, change.diff)).toBe("a\nB\n");
   });
 
-  it("edit 的模型 diff 和新锚点有独立预算，write 保留简述", () => {
+  it("edit model diffs and new anchors have independent budgets, while write retains a brief description", () => {
     const after = Array.from({ length: 50 }, (_, i) => `${i} ${"x".repeat(2000)}`).join("\n");
     const change = textChange("", after, "text.txt", Array.from({ length: 50 }, (_, i) => i));
     expect(change.anchorsTruncated).toBe(true);
@@ -129,7 +129,7 @@ describe("正文工具契约", () => {
     expect(writeToModel(textChange(after, after, "text.txt"))).toEqual(expect.any(String));
     expect(applyPatch("", change.diff)).toBe(after);
   });
-  it("用户正文预览预算不限制 read 返回给模型的内容", () => {
+  it("the user body-preview budget does not limit content returned to the model by read", () => {
     const text = Array.from({ length: 200 }, (_, index) => `line ${index + 1}`).join("\n");
     expect(readToModel(readText(text, false))).toContain("200│line 200");
   });

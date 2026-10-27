@@ -13,12 +13,12 @@ import { resultRows } from "./summary";
 type ExecutionProps = ToolExecutionRenderProps<Answer>;
 type ResultProps = ToolResultRenderProps<Answer>;
 
-/** 历史参数可能来自旧版契约；无法解析时只展示保存的答案与题目文字。 */
+/** Historical arguments may follow an older contract; when parsing fails, show only saved answers and question text. */
 function parseQuestions(args: Json): Question[] | null {
   const parsed = askUserArgs.safeParse(args);
   return parsed.success ? parsed.data.questions : null;
 }
-/** 执行中已发布等待实例身份即可作答。 */
+/** Answering is available once the waiting instance identity has been published during execution. */
 function waitingRequest(props: ExecutionProps): string | null {
   const data = props.result?.data;
   return props.phase === "executing" && data && "requestId" in data ? data.requestId : null;
@@ -65,7 +65,7 @@ function ResultBody({ args, result }: ResultProps) {
   </div>;
 }
 
-/** 参数填充使用默认视图；执行中的正文即作答界面，提交后原位变为只读回执。 */
+/** Argument filling uses the default view; the execution body is the answer UI, which becomes a read-only receipt in place after submission. */
 export const questionToolRenderer = toolRenderer(AskUserResult, {
   label: messages.navigation, icon: <MessageCircleQuestion className="size-3.5" />,
   execution: { headerRenderer: ExecutionHeader, bodyRenderer: ExecutionBody, attention: props => waitingRequest(props) !== null },

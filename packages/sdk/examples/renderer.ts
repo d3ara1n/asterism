@@ -1,5 +1,5 @@
 import { Counter, CounterView as Card, CreateCounter, ChangeCount, CounterUpdates, counterCard } from "./counter-contract.ts";
-/** 前端作者用例：仅依赖 React、Zod 和公开 SDK，不取用 window.host。 */
+/** Frontend author example: depends only on React, Zod, and the public SDK, without accessing window.host. */
 import { createElement, useEffect, useState } from "react";
 import { z } from "zod";
 import { defineRendererPlugin, cardRenderer, useRendererCard, useRendererObject, type RendererModule, type RendererObjectContext } from "@asterism/sdk/renderer";
@@ -41,16 +41,16 @@ export function createCounter(object: RendererObjectContext) {
   return object.session.create(CreateCounter, {}, { x: 0, y: 0 });
 }
 
-/** 按对象保留的前端状态：跨重挂载与会话切换保持，对象离开投影时由宿主调用 release。 */
+/** Frontend state retained per object: survives remounts and session switches; the host calls release when the object leaves the projection. */
 export function counterNote(object: RendererObjectContext) {
   return object.retained.get("example.counter/note", () => ({ text: "" }), note => { note.text = ""; });
 }
 
 export function rejectInvalidCalls(object: RendererObjectContext) {
-  // @ts-expect-error 动作参数由共享契约推导，拼错字段不能编译。
+  // @ts-expect-error Action parameters are inferred from the shared contract; misspelled fields do not compile.
   void object.invoke(ChangeCount, { amout: 1 });
-  // @ts-expect-error 创建参数不能仅凭资源 kind 绕过契约。
+  // @ts-expect-error Creation parameters cannot bypass the contract using only the resource kind.
   void object.session.create(Counter.kind, {}, { x: 0, y: 0 });
-  // @ts-expect-error 普通对象接口不包含模型输出或对话草稿。
+  // @ts-expect-error The ordinary object interface does not include model output or conversation drafts.
   object.activity.blocks;
 }

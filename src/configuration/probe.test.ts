@@ -8,7 +8,7 @@ afterEach(() => vi.unstubAllEnvs());
 const model: ProviderModel = { providerId: "provider", name: "Test", modelId: "test-model", enabled: true, contextWindow: null, cost: null, compatibility: [],
   capabilities: { reasoning: false, tools: true, thinkingLevels: [...thinkingLevels] }, generation: { temperature: null, topP: null, maxOutputTokens: null } };
 const provider = (protocol: ModelProvider["protocol"]): ModelProvider => ({ id: "provider", name: "Test", protocol, baseUrl: "http://localhost:9999/v1", enabled: true, auth: "none", compatibility: [], credentialState: "not_required" });
-// 独立协议响应样本：分别遵循 Responses、Chat Completions、Messages 的成功响应契约。
+// Independent protocol response samples follow the success-response contracts of Responses, Chat Completions, and Messages respectively.
 const responses = {
   "openai-responses": { id: "resp_1", object: "response", created_at: 1700000000, status: "completed", model: "test-model", error: null, incomplete_details: null,
     output: [{ id: "msg_1", type: "message", role: "assistant", status: "completed", content: [{ type: "output_text", text: "OK", annotations: [] }] }],
@@ -16,9 +16,9 @@ const responses = {
   "openai-chat": { id: "chat_1", object: "chat.completion", created: 1700000000, model: "test-model", choices: [{ index: 0, message: { role: "assistant", content: "OK" }, finish_reason: "stop" }], usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 } },
   anthropic: { id: "msg_1", type: "message", role: "assistant", model: "test-model", content: [{ type: "text", text: "OK" }], stop_reason: "end_turn", stop_sequence: null, usage: { input_tokens: 1, output_tokens: 1 } },
 };
-describe("协议连接测试", () => {
-  // 无所属会话的 probe 不能共用全局 session ID；它仍携带内置客户端身份并消费 UA 覆盖。
-  it("Go 连接测试使用独立临时会话，UA 可由兼容设置覆盖", async () => {
+describe("Protocol connection tests", () => {
+  // Probes without an owning session cannot share a global session ID; they still carry the built-in client identity and honor UA overrides.
+  it("Go connection tests use independent temporary sessions and allow compatibility settings to override the UA", async () => {
     const connection = { ...provider("openai-responses"), compatibility: [{ id: "opencodeSession" }] };
     const transport = vi.fn<typeof fetch>(async () => Response.json(responses["openai-responses"]));
     const probe = () => runConnectionProbe({ provider: connection, model, apiKey: "", signal: new AbortController().signal }, transport);
@@ -35,17 +35,17 @@ describe("协议连接测试", () => {
       apiKey: "", signal: new AbortController().signal }, transport);
     expect(new Headers(transport.mock.calls[2]![1]?.headers).get("user-agent")).toBe("CustomProbe/1.0");
   });
-  it("不会把 API key 发送到远程明文 HTTP 端点", async () => {
+  it("never sends API keys to remote plaintext HTTP endpoints", async () => {
     const transport = vi.fn<typeof fetch>();
     await expect(runConnectionProbe({ provider: { ...provider("openai-chat"), auth: "api_key", baseUrl: "http://example.test/v1" },
       model, apiKey: "must-not-be-sent", signal: new AbortController().signal }, transport)).rejects.toThrow();
     expect(transport).not.toHaveBeenCalled();
   });
-  it.each(["openai-responses", "openai-chat", "anthropic"] as const)("%s 显式请求正确端点，无鉴权时不使用环境密钥", async protocol => {
+  it.each(["openai-responses", "openai-chat", "anthropic"] as const)("%s explicitly requests the correct endpoint and never uses environment keys without authentication", async protocol => {
     vi.stubEnv("OPENAI_API_KEY", "environment-key-must-not-be-used");
     vi.stubEnv("ANTHROPIC_API_KEY", "environment-key-must-not-be-used");
     const transport = vi.fn<typeof fetch>(async () => Response.json(responses[protocol]));
-    // probe 只验证连通性；模型菜单等级为空时也发送最小请求，省略思考选项。
+    // Probes verify connectivity only; send a minimal request without reasoning options even when the model menu has no levels.
     await runConnectionProbe({ provider: { ...provider(protocol), compatibility: [{ id: "systemMessageInMessages" }, { id: "responsesReasoning", value: {} }] }, model: { ...model,
       capabilities: { ...model.capabilities, reasoning: true, thinkingLevels: [] },
       compatibility: [{ id: "systemMessageInMessages" }, { id: "responsesReasoning", value: {} }, { id: "toolFilesAsUserMessage" }],
@@ -72,7 +72,7 @@ describe("协议连接测试", () => {
     }
     expect(init?.redirect).toBe("error");
   });
-  it("鉴权错误不重试，不回传服务端错误中的密钥", async () => {
+  it("does not retry authentication errors or return keys from server errors", async () => {
     const transport = vi.fn<typeof fetch>(async () => Response.json({ error: { message: "echoed-secret", type: "authentication_error", code: "invalid_api_key" } }, { status: 401 }));
     let failure: unknown;
     try { await runConnectionProbe({ provider: { ...provider("openai-chat"), auth: "api_key" }, model, apiKey: "test-key", signal: new AbortController().signal }, transport); }

@@ -1,4 +1,4 @@
-/** 执行器测试只需资源 data 与工具 handler；校验和终结仍使用真实 SDK 实现。 */
+/** Executor tests need only resource data and tool handlers; validation and finalization still use real SDK implementations. */
 import { implementTool, type ObjectExecutor, type CallResult } from "@asterism/sdk/runtime";
 import { reference, type Json, type ImplementationContract, type ToolModelOutput } from "@asterism/sdk/contracts";
 import { resourceSnapshot } from "../plugins/records.ts";
@@ -15,7 +15,7 @@ export function implement<S extends Json, T extends Json, A extends Json, D exte
     effect: contract.effect, targetSchema: contract.targetSchema, resultSchema: contract.schema,
     prepare(resource, target, args, caller) {
       const snapshot = resourceSnapshot({ sessionId: "test", id: resource.id, kind: resource.kind }, resource);
-      // 这些纯执行测试的 handler 不取用对象能力；真实对象绑定在 sdk-runtime.test.ts 验证。
+      // These pure execution test handlers do not use object capabilities; sdk-runtime.test.ts verifies real object binding.
       return contribution.prepare(snapshot, undefined as unknown as ObjectExecutor, target, args, caller);
     },
   };

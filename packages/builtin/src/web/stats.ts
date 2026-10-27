@@ -2,15 +2,15 @@ import type { Json } from "@asterism/sdk/contracts";
 
 export type WebRequestKind = "search" | "fetch";
 export type WebRequestOutcome = "succeeded" | "failed" | "cancelled";
-// 统计条目以类型别名声明，使其满足 `Json` 的索引签名，可直接作为卡片投影交付。
+// Statistics entries use type aliases to satisfy the `Json` index signature and can be delivered directly as card projections.
 export type WebCost = { currency: string; amount: number };
 export type WebRequestRecord = {
   kind: WebRequestKind; subject: string; outcome: WebRequestOutcome;
-  /** 请求结束时刻（毫秒时间戳）与实际耗时。 */
+  /** Request completion time (millisecond timestamp) and actual duration. */
   at: number; durationMs: number; cost: WebCost[];
 };
 export type WebOutcomeCounts = { succeeded: number; failed: number; cancelled: number };
-/** 单个会话在本次软件运行内的网络请求统计；只存在于后台内存。 */
+/** Network request statistics for one session during the current application run; exists only in backend memory. */
 export type WebSessionStats = {
   search: WebOutcomeCounts; fetch: WebOutcomeCounts;
   inFlight: number; totalDurationMs: number; lastDurationMs: number | null;
@@ -23,7 +23,7 @@ export const emptyWebStats = (): WebSessionStats => ({
   search: counts(), fetch: counts(), inFlight: 0, totalDurationMs: 0, lastDurationMs: null, cost: [], recent: [],
 });
 
-/** 实报用量中带币种的金额条目按币种求和；其他单位不构成费用。 */
+/** Sums currency-bearing monetary entries from reported usage by currency; other units do not constitute costs. */
 export function costOf(usage: readonly { amount: number; unit: string; currency?: string }[] | undefined): WebCost[] {
   return addCost([], (usage ?? []).flatMap(item => item.unit === "currency" && item.currency ? [{ currency: item.currency, amount: item.amount }] : []));
 }
@@ -36,7 +36,7 @@ function addCost(total: readonly WebCost[], items: readonly WebCost[]): WebCost[
 export function startRequest(stats: WebSessionStats): WebSessionStats {
   return { ...stats, inFlight: stats.inFlight + 1 };
 }
-/** 结束一次请求：计数、耗时与费用累加，最近请求按结束顺序保留最新若干条。 */
+/** Ends a request: accumulates counts, duration, and costs, and retains the latest few requests in completion order. */
 export function finishRequest(stats: WebSessionStats, record: WebRequestRecord): WebSessionStats {
   const kind = stats[record.kind];
   return {
@@ -48,13 +48,13 @@ export function finishRequest(stats: WebSessionStats, record: WebRequestRecord):
 }
 
 const finished = (item: WebOutcomeCounts) => item.succeeded + item.failed + item.cancelled;
-/** 平均耗时覆盖全部已结束请求；尚无请求时为 null。 */
+/** Average duration covers all ended requests; null when there have been none. */
 export function averageDuration(stats: WebSessionStats): number | null {
   const total = finished(stats.search) + finished(stats.fetch);
   return total ? stats.totalDurationMs / total : null;
 }
 
-/** 卡片投影只交付展示所需的汇总；结构保持为普通 JSON。 */
+/** Card projection delivers only summaries needed for display, retaining a plain JSON structure. */
 export function projectStats(stats: WebSessionStats) {
   return {
     search: stats.search, fetch: stats.fetch, inFlight: stats.inFlight,

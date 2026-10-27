@@ -12,7 +12,7 @@ import type { SessionResult } from "../shared/session.ts";
 import { sessionPluginError } from "./plugin-errors.ts";
 import { ApplicationError, type ApplicationService } from "./service.ts";
 
-/** 校验不可信命令并转为结果；不把堆栈、路径或原始异常返回 renderer。各领域服务自行解析命令结构。 */
+/** Validate untrusted commands into results without returning stacks, paths, or raw exceptions to renderers. Domain services parse their own command structures. */
 export function serveWorkspace(service: ApplicationService, command: unknown): CommandResult {
   try { return { ok: true, snapshot: service.execute(command) }; }
   catch (error) {
@@ -35,7 +35,7 @@ export async function serveSession(service: ApplicationService, command: unknown
   }
 }
 
-/** 配置响应独立于工作台投影，保存设置不会重新加载当前会话。 */
+/** Configuration responses are independent of workbench projections; saving settings does not reload current sessions. */
 export async function serveConfiguration(service: ApplicationService, command: unknown): Promise<ConfigurationResult> {
   try { return { ok: true, ...await service.configuration.execute(command) }; }
   catch (error) {
@@ -66,7 +66,7 @@ export async function serveContent(service: ApplicationService, command: unknown
   }
 }
 
-/** 直连请求按服务名分派；未知服务视为无效请求。 */
+/** Dispatch direct requests by service name; unknown services are invalid requests. */
 export async function serve(service: ApplicationService, name: ConnectionService, command: unknown): Promise<ConnectionServices[ConnectionService]["result"]> {
   switch (name) {
     case "workspace": return serveWorkspace(service, command);
@@ -78,7 +78,7 @@ export async function serve(service: ApplicationService, name: ConnectionService
   }
 }
 
-/** 主进程控制链路上的工作区请求（退出确认等）；renderer 不经此入口。 */
+/** Workspace requests such as exit confirmation on the main-process control channel; renderers do not use this entry. */
 export function dispatch(service: ApplicationService, raw: unknown): RuntimeMessage | null {
   const request = requestSchema.safeParse(raw);
   if (!request.success) return null;

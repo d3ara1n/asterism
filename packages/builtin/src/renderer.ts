@@ -3,7 +3,7 @@ import { BuiltinSettingsPage } from "./settings/SettingsPage";
 import { agentFeedbackRenderer } from "./agent/feedback-renderer";
 
 const entries = import.meta.glob<RendererModule>("./*/renderer.tsx", { eager: true, import: "default" });
-/** 前端只收集视图入口及纯契约；不导入后台模块。 */
+/** The frontend collects only view entry points and pure contracts; it imports no backend modules. */
 export const builtinViews: readonly RendererModule[] = Object.keys(entries).sort().map(path => entries[path]!);
 export const builtinRenderer = defineRendererPlugin({ modules: [...builtinViews, agentFeedbackRenderer], settings: { locations: ["streaming", "shell", "mcp", "skills"], Body: BuiltinSettingsPage } });
 export { BuiltinRendererProvider, type BuiltinRendererServices } from "./renderer-context";

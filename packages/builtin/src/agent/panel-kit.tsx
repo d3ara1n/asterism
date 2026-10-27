@@ -7,7 +7,7 @@ import { cn } from "@asterism/ui/utils";
 import { formatCount } from "@asterism/ui/format-count";
 import { contextMessages as messages } from "../messages/context";
 
-/** 代理辅助面板共用的版式与图表部件。 */
+/** Layout and chart components shared by agent auxiliary panels. */
 export const ease = [0.2, 0.8, 0.2, 1] as const;
 export const stripes: CSSProperties = { backgroundImage: "repeating-linear-gradient(-45deg, var(--border) 0 2px, transparent 2px 5px)" };
 export const percent = (i18n: I18n, part: number, total: number, digits?: number) =>
@@ -26,7 +26,7 @@ export function Section({ title, aside, children }: { title: string; aside?: Rea
 export function Swatch({ className, style }: { className?: string; style?: CSSProperties }) {
   return <span aria-hidden="true" className={cn("size-2.5 shrink-0 rounded-[3px]", className)} style={style} />;
 }
-/** 数值项：标签、等宽数值与可选说明，多个组成网格。 */
+/** Numeric item: label, tabular value, and optional explanation; multiple items form a grid. */
 export function Stat({ label, value, caption }: { label: ReactNode; value: ReactNode; caption?: ReactNode }) {
   return <div className="min-w-0 space-y-0.5">
     <dt className="type-caption">{label}</dt>
@@ -52,7 +52,7 @@ function SystemRow({ label, detail, value, total, color, nested = false }: { lab
     </div>}
   </li>;
 }
-/** 一次请求实际发出的系统提示块与工具名称；只显示字数与占比，不换算 token。 */
+/** System prompt blocks and tool names actually sent in one request; shows only character counts and proportions, without converting to tokens. */
 export function SystemComposition({ diagnostics }: { diagnostics: AgentRequestContextData }) {
   const i18n = useI18n();
   const blocks = diagnostics.system ?? [];

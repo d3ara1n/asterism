@@ -11,7 +11,7 @@ import { diagnosticModel } from "../diagnostics/cost";
 import { percent } from "../panel-kit";
 import { MetricTooltip } from "./MetricTooltip";
 
-/** 对话计量与上下文面板同源；仅显示已保存请求的实报占用。 */
+/** Conversation measurements share their source with the context panel; only reported usage from saved requests is shown. */
 export function ContextUsage() {
   const i18n = useI18n();
   const object = useRendererObject();

@@ -14,20 +14,20 @@ export class SkillError extends Error {
 }
 
 /**
- * 技能来源：一个包含技能包子目录的目录。
- * id 只用于设置分组与审计，目录来源取绝对路径，插件来源取插件 ID，软件内置取 builtin。
+ * Skill source: a directory containing skill-package subdirectories.
+ * id is used only for settings grouping and auditing: an absolute path for directory sources, a plugin ID for plugin sources, and builtin for software-bundled sources.
  */
 export interface SkillSource { id: string; directory: string }
 interface SkillEntry extends SkillMetadata { directory: string; file: string }
 interface SourceSnapshot { source: string; skills: SkillEntry[]; issues: SkillIssue[] }
 
-/** 当前系统用户的技能目录。 */
+/** Skill directory for the current system user. */
 export const userSkillSource = (): SkillSource => {
   const directory = join(homedir(), ".agents", "skills");
   return { id: directory, directory };
 };
 
-/** frontmatter 的 YAML 语义交给解析器；目录只消费名称和描述，其余字段保留在原文件中。 */
+/** The parser handles frontmatter YAML semantics; the catalog consumes only names and descriptions, leaving other fields in the original file. */
 export function parseSkillMetadata(text: string): SkillMetadata {
   const frontmatter = /^\uFEFF?---[ \t]*\r?\n([\s\S]*?)^---[ \t]*\r?$/m.exec(text);
   if (!frontmatter || frontmatter.index !== 0)
@@ -39,7 +39,7 @@ export function parseSkillMetadata(text: string): SkillMetadata {
   return parsed.data;
 }
 
-/** 包根可以由符号链接安装；包内目标的词法路径和真实路径均落在选定包根内。 */
+/** Package roots may be installed through symlinks; both lexical and real paths of internal targets stay within the selected package root. */
 function skillFile(directory: string, path: string): string {
   if (isAbsolute(path) || path.includes("\0"))
     throw new SkillError("invalid_skill_path", "path is a relative file path within the selected skill package.");
@@ -55,7 +55,7 @@ function skillFile(directory: string, path: string): string {
 const messageOf = (error: unknown) => error instanceof Error ? error.message : String(error);
 const compare = (a: string, b: string) => a < b ? -1 : a > b ? 1 : 0;
 
-/** 扫描单个来源；同一来源内的同名条目全部报告为歧义，不按扫描顺序取舍。 */
+/** Scans one source; all same-name entries within it are reported as ambiguous, with no selection based on scan order. */
 function scanSource(source: SkillSource, signal: AbortSignal): SourceSnapshot {
   signal.throwIfAborted();
   const result: SourceSnapshot = { source: source.id, skills: [], issues: [] };
@@ -74,7 +74,7 @@ function scanSource(source: SkillSource, signal: AbortSignal): SourceSnapshot {
     try {
       const directory = realpathSync(location);
       if (!statSync(directory).isDirectory()) continue;
-      // 普通分类目录没有 SKILL.md，不作为无效技能报告；断链与正文读取故障仍可见。
+      // Ordinary grouping directories lack SKILL.md and are not reported as invalid skills; broken links and body-read failures remain visible.
       if (!readdirSync(directory).includes("SKILL.md")) continue;
       const file = skillFile(directory, "SKILL.md");
       const { text } = readTextFileSync(file);
@@ -95,8 +95,8 @@ function scanSource(source: SkillSource, signal: AbortSignal): SourceSnapshot {
 }
 
 /**
- * 运行时共享目录：启动与显式刷新重建，普通查询只读取内存，正文按调用时读取。
- * 来源按优先级从低到高排列，同名技能由后者覆盖前者；模型只看到生效技能的名称与描述。
+ * Shared runtime catalog: rebuilt at startup and on explicit refresh; ordinary queries read memory only, and bodies are read at call time.
+ * Sources are ordered from lower to higher priority, with later sources overriding same-name skills from earlier ones; the model sees only effective skill names and descriptions.
  */
 export class SkillCatalog {
   private snapshots: SourceSnapshot[];
@@ -130,7 +130,7 @@ export class SkillCatalog {
     })) };
   }
 
-  /** 模型可见的刷新结果：生效技能数与发现问题。 */
+  /** Model-visible refresh result: effective skill count and discovery issues. */
   summary() {
     return { count: this.active.size, issues: this.snapshots.flatMap(snapshot => snapshot.issues.map(issue => ({ ...issue }))) };
   }

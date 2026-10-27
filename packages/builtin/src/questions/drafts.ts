@@ -22,7 +22,7 @@ export function draftSubmission(questions: Question[], draft: QuestionDraft): Su
       const selected = question.type === "single" && answer.custom ? [] : answer.selected;
       const usesText = question.type === "text" || answer.custom;
       const text = usesText ? answer.text.trim() : "";
-      // 可选题留空直接跳过；主动勾选的自定义项仍须填写，不能静默丢弃选择。
+      // Blank optional questions are skipped directly; explicitly selected custom entries still require text, so the selection is not silently discarded.
       if (answer.skipped || (!question.required && !selected.length && !text && !answer.custom))
         return { id: question.id, status: "skipped" as const };
       return {
@@ -33,7 +33,7 @@ export function draftSubmission(questions: Question[], draft: QuestionDraft): Su
     ...(draft.message.trim() ? { message: draft.message.trim() } : {}),
   };
 }
-/** 草稿只依赖等待实例身份与题目。 */
+/** Drafts depend only on the waiting instance identity and questions. */
 export type DraftRequest = Pick<PendingQuestion, "id" | "questions">;
 function createEntry(pending: DraftRequest) {
   let value: QuestionDraft = {
@@ -59,7 +59,7 @@ function createEntry(pending: DraftRequest) {
     },
   };
 }
-/** 草稿跟随提问身份而非挂载组件；已结束条目从索引移除，退场组件仍可读自己的旧句柄。 */
+/** Drafts follow question identities rather than mounted components; completed entries leave the index, while exiting components can still read their old handles. */
 export function createQuestionDrafts() {
   const drafts = new Map<string, { owner: string; id: string; entry: ReturnType<typeof createEntry> }>();
   const owner = (sessionId: string, agentId: string) => JSON.stringify([sessionId, agentId]);

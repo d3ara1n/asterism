@@ -1,5 +1,5 @@
-// 移植自 @d3ara1n/pi-hashline-edit 的 MIT 核心；来源与许可见 README.md。
-// 哈希绑定行号与内容，用于检测引用行变化；短哈希不保证无碰撞。
+// Ported from the MIT core of @d3ara1n/pi-hashline-edit; see README.md for source and license.
+// Hashes bind line numbers and content to detect changes to referenced lines; short hashes do not guarantee freedom from collisions.
 const BASE32 = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 
 function fnv1a32(str: string): number {

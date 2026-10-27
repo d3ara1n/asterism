@@ -11,12 +11,12 @@ interface ToolCallProps<T, A> {
   args: A;
   invocation: ToolInvocationInfo;
 }
-/** 部分 JSON 尚未通过参数契约；字段可能缺失、未完成或类型不符。 */
+/** Partial JSON has not passed the argument contract; fields may be missing, incomplete, or of the wrong type. */
 export interface ToolInputRenderProps extends ToolCallProps<Json, Json> {
   phase: "input";
   result: null;
 }
-/** 等待调度与执行共用视图，完整参数已通过契约校验。 */
+/** Waiting for scheduling and execution share a view; complete arguments have passed contract validation. */
 export interface ToolExecutionRenderProps<D = Json, T = Json, A = Json> extends ToolCallProps<T, A> {
   phase: "ready" | "executing";
   result: Extract<ToolResult<D>, { kind: "running" }> | null;
@@ -28,19 +28,19 @@ export interface ToolResultRenderProps<D = Json, T = Json, A = Json> extends Too
 export type ToolRenderProps<D = Json, T = Json, A = Json> =
   | ToolInputRenderProps | ToolExecutionRenderProps<D, T, A> | ToolResultRenderProps<D, T, A>;
 
-/** 三态使用相同的两个独立可选入口；可在多个阶段复用同一份声明。 */
+/** All three states use the same two independently optional entry points; the same declaration can be reused across phases. */
 export interface ToolPhaseView<P> {
   headerRenderer?: ComponentType<P>;
   bodyRenderer?: ComponentType<P>;
 }
-/** 输入与执行视图声明可预览内容，正文布局仍由 bodyRenderer 拥有。 */
+/** Input and execution views declare previewable content; bodyRenderer still owns the body layout. */
 export interface ToolStreamingPhaseView<P> extends ToolPhaseView<P> {
-  /** 纯函数：已有适合流式预览的正文时返回 true；同阶段首次命中后由外壳按用户偏好管理开合。 */
+  /** Pure function: returns true when a body suitable for streaming preview exists; after the first match within a phase, the shell manages expansion and collapse according to user preferences. */
   streaming?: (props: P) => boolean;
 }
-/** 执行视图另可声明需要用户处理的正文。 */
+/** Execution views may additionally declare bodies that require user attention. */
 export interface ToolExecutionPhaseView<P> extends ToolStreamingPhaseView<P> {
-  /** 纯函数：正文需要用户处理时返回 true；外壳在执行阶段首次命中时立即展开一次，不受流式偏好影响，用户仍可折叠。 */
+  /** Pure function: returns true when the body requires user attention; the shell immediately expands once on the first match during execution, independently of streaming preferences, and users can still collapse it. */
   attention?: (props: P) => boolean;
 }
 export interface ToolRendererDefinition<D = Json, T = Json, A = Json> {
@@ -55,9 +55,9 @@ export interface ToolView {
   icon?: ReactNode;
   header?: ReactNode;
   body?: ReactNode;
-  /** 输入或执行中的正文可参与流式预览开合；false 表示本次未命中，阶段结束由调用生命周期决定。 */
+  /** Bodies in input or execution phases may participate in streaming preview expansion and collapse; false means no match this time, and phase completion is determined by the call lifecycle. */
   streaming?: boolean;
-  /** 执行中的正文需要用户处理；外壳在该阶段首次为 true 时展开一次。 */
+  /** The executing body requires user attention; the shell expands once when this first becomes true within the phase. */
   attention?: boolean;
 }
 export interface ToolRenderer {
@@ -78,7 +78,7 @@ function render<P extends { phase: ToolRenderProps["phase"] }>(
   };
 }
 
-/** 按阶段分派；填充不冒充有效参数，执行和结果共用完整参数与产出校验。 */
+/** Dispatch by phase; streaming input is not treated as valid arguments, while execution and results share complete argument and output validation. */
 export function toolRenderer<D extends Json, T extends Json = Json, A extends Json = Json>(
   contract: DataContract<D> & { targetSchema?: z.ZodType<T>; tool?: { argsSchema: z.ZodType<A> } },
   definition: ToolRendererDefinition<D, T, A>,
@@ -91,7 +91,7 @@ export function toolRenderer<D extends Json, T extends Json = Json, A extends Js
     const target = contract.targetSchema?.safeParse(props.target);
     const args = contract.tool?.argsSchema.safeParse(props.args);
     if (target && !target.success || args && !args.success) return null;
-    // 无参数 schema 的纯数据契约保留原始 JSON，类型擦除只发生在注册边界。
+    // Pure data contracts without an argument schema preserve raw JSON; type erasure occurs only at the registration boundary.
     const input = { target: (target ? target.data : props.target) as T, args: (args ? args.data : props.args) as A };
     if (props.phase === "settled") return render(definition, definition.result, {
       ...props, ...input, result: { ...props.result, data: parsed?.data ?? null },

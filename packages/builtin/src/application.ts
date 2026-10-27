@@ -1,2 +1,2 @@
-/** 应用组合传入的展示名称与请求身份；插件不读取应用清单。 */
+/** Display name and request identity supplied by application composition; the plugin does not read the application manifest. */
 export interface BuiltinApplication { name: string; userAgent: string }

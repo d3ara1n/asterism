@@ -4,7 +4,7 @@ import { formatPatch, parsePatch, type StructuredPatchHunk } from "diff";
 import { splitLines } from "./hashline/lines.ts";
 import { displayLine } from "./text-row.ts";
 
-/** 内置插件正文的逻辑行预算；不约束工具外壳、原始详情或模型输出。 */
+/** Logical-line budget for built-in plugin bodies; does not constrain the tool shell, raw details, or model output. */
 export const TOOL_BODY_LINE_LIMIT = 120;
 
 export function textBodyPreview(text: string) {
@@ -15,7 +15,7 @@ export function textBodyPreview(text: string) {
   };
 }
 
-/** 保留真实片段位置，只把预算内的预览补丁交给 Pierre 生成行号与元数据。 */
+/** Preserves actual excerpt positions and passes only the preview patch within budget to Pierre for line numbers and metadata. */
 export function diffBodyPreview(diff: string): { fileDiff: FileDiffMetadata; omitted: number } | null {
   try {
     const patches = parsePatch(diff);

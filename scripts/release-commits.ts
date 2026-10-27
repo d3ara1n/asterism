@@ -19,11 +19,11 @@ export interface ReleaseInput {
   sourceSha: string;
   sourceTag: string | null;
   releases: PublishedRelease[];
-  /** 目标提交的第一父链，按从新到旧排列。 */
+  /** First-parent chain of the target commit, ordered newest first. */
   commits: ReleaseCommit[];
 }
 
-/** 同一次解析分别给出版本影响和说明分类，维护提交仍可进入说明。 */
+/** One parse yields both version impact and release-note category; maintenance commits may still appear in notes. */
 export function parseCommit(sha: string, message: string): ReleaseCommit {
   const subject = message.split(/\r?\n/, 1)[0]!;
   const match = /^([a-z]+)(?:\([^)]+\))?(!)?:\s+\S/.exec(subject);
@@ -35,7 +35,7 @@ export function parseCommit(sha: string, message: string): ReleaseCommit {
   return { sha, subject, level, section };
 }
 
-/** 对应 git log -z --format=%H%x00%B；正文中的换行不参与记录分隔。 */
+/** Matches git log -z --format=%H%x00%B; newlines in the body do not separate records. */
 export function parseGitLog(output: string): ReleaseCommit[] {
   const fields = output.split("\0");
   const commits: ReleaseCommit[] = [];
@@ -51,7 +51,7 @@ export function commitsAfter(commits: ReleaseCommit[], sha?: string): ReleaseCom
   return commits.slice(0, index);
 }
 
-/** 按提交位置选已发布范围，晋级较旧提交不会使已发布变更重新进入下一轮。 */
+/** Select the released range by commit position; promoting an older commit does not reintroduce released changes into the next cycle. */
 export function previousRelease(input: ReleaseInput): PublishedRelease | undefined {
   const positions = new Map(input.commits.map((commit, index) => [commit.sha, index]));
   return input.releases.filter(release => positions.has(release.sha)).sort((a, b) =>
@@ -63,7 +63,7 @@ export function hasReleasableChanges(input: ReleaseInput): boolean {
   return commitsAfter(input.commits, previousRelease(input)?.sha).some(commit => commit.level !== null);
 }
 
-/** 输入范围由调用方按从新到旧提供，提交 SHA 是说明条目的身份。 */
+/** The caller supplies the range newest first; commit SHAs identify release-note entries. */
 export function releaseNotes(commits: ReleaseCommit[], repository: string, from: string | null, to: string): string {
   const sectionLimit = 20;
   const groups = new Map<ReleaseSection, ReleaseCommit[]>();

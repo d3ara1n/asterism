@@ -7,11 +7,11 @@ import { ConfigurationError } from "./errors.ts";
 
 export type LoadModelCatalog = (signal: AbortSignal) => Promise<Catalog>;
 const client = Models.make({ fetch: (url, init) => fetch(url, { ...init, redirect: "error" }) });
-/** 官方客户端持有目录类型与传输；不向目录发送提供商凭据，不静默使用旧快照。 */
+/** The official client owns catalog types and transport; no provider credentials are sent to the catalog and stale snapshots are not silently reused. */
 export const loadModelCatalog: LoadModelCatalog = signal => client.catalog({ signal });
 
 type Match = { source: string; model: Model | ModelMetadata };
-/** 仅供参数检索：去掉厂商／路由前缀，不改写保存或发送的服务端模型 ID。 */
+/** Parameter lookup only: strip vendor/routing prefixes without rewriting saved or transmitted server model IDs. */
 const parameterModelId = (id: string): string => id.slice(id.lastIndexOf("/") + 1);
 
 function selectModel(catalog: Catalog, modelId: string): Match {
@@ -19,7 +19,7 @@ function selectModel(catalog: Catalog, modelId: string): Match {
   if (!lookupId) throw new ConfigurationError("not_found", "No exact model catalog match was found.", messages.notFound);
   const matches: Match[] = [];
   for (const [key, metadata] of Object.entries(catalog.models)) {
-    // 目录键的首段是 models.dev 的厂商分组，不是用户模型 ID 的另一种形式。
+    // The first catalog key segment is the models.dev vendor group, not another form of the user's model ID.
     const slash = key.indexOf("/");
     if (slash < 1) continue;
     const lab = key.slice(0, slash);
@@ -33,7 +33,7 @@ function selectModel(catalog: Catalog, modelId: string): Match {
   return match;
 }
 
-// 只校验实际消费的字段；不复制 SDK 的完整目录 schema。
+// Validate only consumed fields rather than copying the SDK's complete catalog schema.
 const entrySchema = z.object({
   cost: z.unknown().optional(),
   reasoning: z.boolean().optional(),
@@ -46,7 +46,7 @@ const entrySchema = z.object({
   ])).optional(),
 });
 
-// 外部目录的形状只存在于转换边界，配置与消费者使用星图自己的价格契约。
+// External catalog shapes exist only at the conversion boundary; configuration and consumers use Asterism's pricing contract.
 const catalogPrice = z.number().nonnegative();
 const catalogRatesSchema = z.strictObject({
   input: catalogPrice, output: catalogPrice,
@@ -70,7 +70,7 @@ function modelRates(value: z.infer<typeof catalogRatesSchema>): ModelRates {
   };
   rates.audio.input = tokenPrice(value.input_audio);
   rates.audio.output = tokenPrice(value.output_audio);
-  // 未提供的模态与计费项保持未知，不从文本单价推断图片、音频或视频价格。
+  // Omitted modalities and billing items stay unknown; do not infer image, audio, or video pricing from text unit prices.
   return rates;
 }
 function modelCost(raw: unknown): ModelCost | null {
@@ -88,7 +88,7 @@ function modelCost(raw: unknown): ModelCost | null {
   return result.success ? result.data : null;
 }
 
-/** 用户明确获取时覆盖可映射参数；价格整项替换，身份、连接与兼容设置保留。 */
+/** Explicit retrieval overwrites mappable parameters; pricing is replaced as a whole while identity, connection, and compatibility settings remain. */
 export function modelParameters(catalog: Catalog, current: ProviderModel): {
   value: z.infer<typeof modelInputSchema>; report: ModelParameterUpdate;
 } {
@@ -112,7 +112,7 @@ export function modelParameters(catalog: Catalog, current: ProviderModel): {
       const values = efforts?.flatMap(option => option.values);
       const levels = new Set(values?.map(level => level === null || level === "none" ? "off" : level));
       const mapped = thinkingSchema.options.filter(level => levels.has(level));
-      // toggle/budget 不能直接推导星图等级；default 也不等于任何固定等级。
+      // toggle/budget cannot directly determine Asterism levels; default does not imply any fixed level either.
       if (!mapped.length || [...levels].some(level => !thinkingSchema.safeParse(level).success)) unfilled.push("thinkingLevels");
       else value.capabilities.thinkingLevels = mapped;
     }

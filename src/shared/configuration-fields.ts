@@ -9,7 +9,7 @@ export type ConfigurationField =
   | { kind: "nullable-string"; schema: Json }
   | { kind: "string" | "number" | "integer" | "boolean" }
   | { kind: "json" };
-/** JSON Schema 只决定控件；约束与 refinement 仍由后台的原始 Zod schema 验证。 */
+/** JSON Schema selects controls only; original backend Zod schemas still validate constraints and refinements. */
 export function configurationField(schema: Json | null): ConfigurationField {
   const shape = objectValue(schema);
   if (!shape || shape.$ref || shape.oneOf || shape.allOf || shape.if) return { kind: "json" };

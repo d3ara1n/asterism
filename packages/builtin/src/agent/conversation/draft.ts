@@ -5,7 +5,7 @@ import { mediaMessages } from "../../messages/media.ts";
 interface DraftFile { part: ModelFilePart; size: number }
 interface DraftState { text: string; files: readonly DraftFile[]; uploading: boolean; locked: boolean; error: UiText | null }
 
-/** 在移除持久根之前，把附件交给编辑器自己的上传占用；失败关闭新占用，原内容保留。 */
+/** Hands attachments to the editor's own upload hold before removing the persistent root; failure closes the new hold and preserves the original content. */
 export async function copyDraft(parts: readonly ModelInputPart[], source: ContentReader, content: RendererContentInput) {
   const copied: ModelInputPart[] = [], files: DraftFile[] = [];
   try {
@@ -22,7 +22,7 @@ export async function copyDraft(parts: readonly ModelInputPart[], source: Conten
 }
 export type CopiedDraft = Awaited<ReturnType<typeof copyDraft>>;
 
-/** 草稿属于交互模块，独立于 Composer 挂载；内容资格只随提交信封传递。 */
+/** Drafts belong to the interaction module, independently of Composer mounting; content access eligibility travels only with the submission envelope. */
 export function createMessageDraft(createContent: () => RendererContentInput) {
   let state: DraftState = { text: "", files: [], uploading: false, locked: false, error: null };
   let content: RendererContentInput | undefined;
@@ -51,7 +51,7 @@ export function createMessageDraft(createContent: () => RendererContentInput) {
       try {
         for (const file of files) {
           controller.signal.throwIfAborted();
-          // 如实标注 MIME；文件怎么用由服务端决定。
+          // Label MIME accurately; the server decides how files are used.
           const mediaType = fileMediaType(file);
           if (state.files.length >= modelInputLimits.files || file.size > modelInputLimits.file
             || state.files.reduce((total, value) => total + value.size, file.size) > modelInputLimits.total) {

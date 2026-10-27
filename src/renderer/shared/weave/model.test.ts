@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { closeIsland, follow, layout, openIsland, type IslandSlot } from "./model";
 
-// 期望值来自编织约定：放得下按 grow 分配且不平移；放不下退到 min 并溢出；溢出时已可见不动、越界贴边。
+// Expected values come from the weave contract: when everything fits, distribute by grow without translation; otherwise fall back to min and overflow; during overflow, keep visible islands still and align out-of-bounds islands to the edge.
 const slot = (id: string, min: number, grow = 0, max?: number): IslandSlot => ({ id, width: { min, grow, ...(max ? { max } : {}) } });
 
 describe("layout", () => {
@@ -32,8 +32,8 @@ describe("follow", () => {
   it("keeps the viewport still when the focused island is fully visible", () => {
     expect(follow(spans, 1, 900, 0)).toBe(0);
   });
-  it("越界焦点沿移动方向贴边，返回时贴近左缘", () => {
-    // c 位于 812..1212，右缘对齐视口：1212 - 900
+  it("aligns out-of-bounds focus to the edge in the movement direction and near the left edge when returning", () => {
+    // c spans 812..1212; align its right edge with the viewport: 1212 - 900
     expect(follow(spans, 2, 900, 0)).toBe(312);
     expect(follow(spans, 0, 900, 312)).toBe(0);
   });
@@ -46,7 +46,7 @@ describe("open and close", () => {
     expect(next.islands.map(island => island.id)).toEqual(["root", "c"]);
     expect(next.focus).toBe("c");
   });
-  it("关闭深层浮岛回到保留的父浮岛，根浮岛不能关闭", () => {
+  it("closing a deeper island returns to the retained parent island, and the root island cannot close", () => {
     expect(closeIsland(state, "a")).toMatchObject({ islands: [{ id: "root" }], focus: "root" });
     expect(closeIsland(state, "root")).toBe(state);
   });

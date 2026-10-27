@@ -3,9 +3,9 @@ import { RuntimeRequests } from "./requests.ts";
 import { protocolVersion } from "../shared/contracts.ts";
 
 afterEach(() => vi.useRealTimers());
-// 主进程控制链路契约：退出确认等工作区请求按身份配对、断开时结算且不重放。
-describe("主进程工作区请求生命周期", () => {
-  it("按请求身份匹配响应，忽略未知响应", async () => {
+// Main-process control contract: workspace requests such as exit confirmation pair by identity, settle on disconnect, and are never replayed.
+describe("Main-process workspace request lifetime", () => {
+  it("matches responses by request identity and ignores unknown responses", async () => {
     const sent: { id: string }[] = [];
     const requests = new RuntimeRequests(message => sent.push(message as { id: string }), () => {});
     const pending = requests.execute({ type: "workspace.read" });
@@ -15,7 +15,7 @@ describe("主进程工作区请求生命周期", () => {
     requests.close();
   });
 
-  it("断开结算所有在途请求，后续命令不发送", async () => {
+  it("disconnection settles all in-flight requests and subsequent commands are not sent", async () => {
     const send = vi.fn();
     const requests = new RuntimeRequests(send, () => {});
     const first = requests.execute({ type: "workspace.read" });

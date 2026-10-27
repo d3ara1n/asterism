@@ -1,14 +1,14 @@
 import type { DropItem } from "@asterism/sdk/renderer";
 import type { DragKind } from "./routing";
 
-/** 悬停阶段只能读取类型列表；文件优先，其次 URL，再次纯文本。 */
+/** Only the type list can be read during hover; files take priority, followed by URLs, then plain text. */
 export function dragKinds(transfer: DataTransfer): DragKind[] {
   const types = [...transfer.types];
   if (types.includes("Files")) return ["file"];
   return [...(types.includes("text/uri-list") ? ["url" as const] : []), ...(types.includes("text/plain") ? ["text" as const] : [])];
 }
 
-/** 放下时同步读出快照；DataTransfer 在事件结束后失效。文件路径由桌面桥解析。 */
+/** Read the snapshot synchronously on drop; DataTransfer expires when the event ends. The desktop bridge resolves file paths. */
 export function snapshotDrop(transfer: DataTransfer): DropItem[] {
   const items: DropItem[] = [];
   const entries = [...transfer.items].filter(item => item.kind === "file");

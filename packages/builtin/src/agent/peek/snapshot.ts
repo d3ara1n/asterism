@@ -12,7 +12,7 @@ export interface PeekRecord {
 const partsText = (parts: readonly ModelInputPart[]) => parts.map(part => part.kind === "text" ? part.text
   : `[Saved file: ${part.filename ?? "attachment"}; ${part.mediaType}]`).join("\n");
 
-/** 调查投影保留时间线保存顺序与原始记录身份；压缩摘要在这里也是一条记录。 */
+/** Investigation projection preserves timeline save order and original record identities; a compression summary is also a record here. */
 export function projectPeekRecords(snapshot: Pick<SessionSnapshot, "records">, agentId: string, includeThinking: boolean): PeekRecord[] {
   const result: PeekRecord[] = [];
   for (const record of snapshot.records.all({ scope: "timeline" })) {
@@ -53,7 +53,7 @@ export function projectPeekRecords(snapshot: Pick<SessionSnapshot, "records">, a
   return result;
 }
 
-/** 有界概览仅影响初始输入；全部正文始终保留在本次记录集合中供检索。 */
+/** The bounded overview affects only initial input; all body text remains in this record set for retrieval. */
 export function peekOverview(records: readonly PeekRecord[], budget: number): string {
   const rows: string[] = [];
   let remaining = budget;

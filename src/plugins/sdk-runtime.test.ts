@@ -104,9 +104,9 @@ async function create(service: ApplicationService, sessionId: string, input = 1)
   return service.sessions.current(sessionId).workbench.objects.find(object => object.kind === Counter.kind)!.id;
 }
 
-describe("工作台 SDK 的宿主实现", () => {
-  // 提交内通知随事务一起生效，回滚的数据不能交付到界面。
-  it("事务中的资源投影通知在提交后交付，失败回滚不推送", async () => {
+describe("Host implementation of the workbench SDK", () => {
+  // Notifications within commits take effect with the transaction; rolled-back data must not reach the UI.
+  it("transactional resource projection notifications arrive after commit and failed rollbacks push nothing", async () => {
     const c = counter(), changed = vi.fn();
     const { service, sessionId } = open([c.plugin], undefined, changed);
     const id = await create(service, sessionId);
@@ -125,8 +125,8 @@ describe("工作台 SDK 的宿主实现", () => {
       objects: [expect.objectContaining({ presentation: expect.objectContaining({ data: { value: 2 } }) })] }));
   });
 
-  // busy 只保护当前路径；重叠占用独立释放，取消等到清理完成。
-  it("withBusy 重叠占用保护回溯，内存投影通知不写历史", async () => {
+  // busy protects only the current path; overlapping holds release independently and cancellation waits for cleanup.
+  it("withBusy overlapping holds protect backtracking and in-memory projection notifications do not write history", async () => {
     const c = counter();
     const changed = vi.fn();
     const { service, sessionId } = open([c.plugin], undefined, changed);
@@ -155,8 +155,8 @@ describe("工作台 SDK 的宿主实现", () => {
     await service.sessions.execute({ type: "select", sessionId, nodeId: before.cursor });
   });
 
-  // 后台动作消费真实契约并复用全部准备流水线，调用不取得目标私有门面。
-  it("session.invoke 跨插件复用准备与记录来源，拒绝声明副本和错误目标", async () => {
+  // Backend actions consume real contracts and reuse the complete preparation pipeline without acquiring target-private facades.
+  it("session.invoke reuses preparation and record origins across plugins and rejects declaration copies and invalid targets", async () => {
     const c = counter(), caller = pluginNamespace("test.action-caller");
     let consumer!: PluginContext, prepared = 0, reject = false;
     const { service, sessionId } = open([c.plugin, definePlugin({ namespace: caller, version: "1", setup(plugin) {
@@ -188,8 +188,8 @@ describe("工作台 SDK 的宿主实现", () => {
     expect(prepared).toBe(2);
   });
 
-  // 资源动作按对象串行，取消尚在排队的调用不会执行；后续动作仍等待前项真实完成。
-  it("后台动作与桌面动作共享队列，排队取消不改变顺序", async () => {
+  // Resource actions serialize per object; cancelled queued calls never execute and later actions still wait for actual prior completion.
+  it("backend and desktop actions share a queue and queued cancellation does not change order", async () => {
     const entered = deferred<void>(), end = actionGate(), order: number[] = [];
     const c = counter({ async execute(_object, signal, amount) {
       order.push(amount);
@@ -211,8 +211,8 @@ describe("工作台 SDK 的宿主实现", () => {
     expect(c.context().object(sessionId, Counter, id).get(State)).toBe(7);
   });
 
-  // 准备和执行都属于在途调用；取消信号不会提前释放生命周期，迟到准备不进入动作。
-  it.each(["prepare", "execute"] as const)("取消 %s 中的后台动作等待真实结束并阻止回溯", async phase => {
+  // Preparation and execution both belong to in-flight calls; cancellation signals cannot release lifetimes early and late preparation cannot enter actions.
+  it.each(["prepare", "execute"] as const)("cancelling backend actions during %s waits for actual completion and blocks backtracking", async phase => {
     const entered = deferred<AbortSignal>(), end = actionGate();
     const wait = async (signal: AbortSignal) => { entered.resolve(signal); await end.promise; signal.throwIfAborted(); };
     const c = counter(phase === "prepare" ? { prepare: wait } : { execute: (_object, signal) => wait(signal) });
@@ -229,8 +229,8 @@ describe("工作台 SDK 的宿主实现", () => {
     expect(c.context().object(sessionId, Counter, id).get(State)).toBe(1);
   });
 
-  // 关闭契约：已进入动作可以提交收尾事实，新调用门禁不阻断第一次收尾提交。
-  it("关闭时已进入的后台动作可以保存最终记录", async () => {
+  // Close contract: entered actions can commit final facts; the new-call gate must not block the first finalization commit.
+  it("backend actions already entered can save final records during close", async () => {
     const entered = deferred<AbortSignal>(), end = actionGate();
     let saved: number | null = null;
     const c = counter({ async execute(_object, signal) { entered.resolve(signal); await end.promise; expect(signal.aborted).toBe(true); },
@@ -245,8 +245,8 @@ describe("工作台 SDK 的宿主实现", () => {
     expect(saved).toBe(3);
   });
 
-  // 同对象动作重入明确冲突；动作结束后的异步工作可再次提交，避免把历史调用链当成永久锁。
-  it("拒绝同对象重入且释放已结束动作的调用链", async () => {
+  // Reentry on the same object conflicts explicitly; asynchronous work after action completion can submit again without turning historical call chains into permanent locks.
+  it("rejects same-object reentry and releases completed action call chains", async () => {
     let deferred: Promise<void> | undefined;
     const resume = actionGate();
     const c = counter({ async execute(object, _signal, amount) {
@@ -261,8 +261,8 @@ describe("工作台 SDK 的宿主实现", () => {
     expect(c.context().object(sessionId, Counter, id).get(State)).toBe(6);
   });
 
-  // 非内置提供者必须通过同一模型工具目录和只读关联门面执行，工具策略在请求开始时捕获。
-  it("外部顶层工具从首个请求声明，绑定调用对象并遵循工具筛选", async () => {
+  // External providers use the same model tool catalog and read-only association facades; tool policy is captured at request start.
+  it("external top-level tools are declared from the first request, bind calling objects, and follow tool filtering", async () => {
     const c = counter(), other = pluginNamespace("test.questions");
     let invoked = 0;
     const declaration = defineTopLevelTool({
@@ -305,8 +305,8 @@ describe("工作台 SDK 的宿主实现", () => {
     expect(invoked).toBe(1);
   });
 
-  // 顶层工具按用户列表覆盖完整声明，失败贡献不占用名称；模型声明与执行身份必须来自同一胜者。
-  it.each(["loaded", "setup-failed", "validation-failed"] as const)("同名顶层工具替换内置 ask_user，后者状态为 %s", async state => {
+  // Top-level tools override complete declarations in user-list order; failed contributions reserve no names, and model declarations and execution identities share the same winner.
+  it.each(["loaded", "setup-failed", "validation-failed"] as const)("same-name top-level tools replace built-in ask_user when the latter's state is %s", async state => {
     const c = counter(), first = pluginNamespace("test.first"), last = pluginNamespace("test.last");
     const invoked: string[] = [];
     const previous = defineTopLevelTool({
@@ -327,7 +327,7 @@ describe("工作台 SDK 的宿主实现", () => {
         ...(state === "validation-failed" ? { preparers: [{ id: "invalid", contract: missingAction, prepare: () => ({ action: "accept" as const }) }] } : {}) })),
       defineModule(() => { if (state === "setup-failed") throw new Error("Setup failed."); return {}; }),
     ] });
-    // 正常情形刻意让后者先初始化，验证覆盖依据用户列表；失败情形保持前者独立可用。
+    // The normal case deliberately initializes the later entry first to verify user-list precedence; failure cases keep the first entry independently available.
     const earlier = definePlugin({ namespace: first, version: "1", dependencies: state === "loaded" ? [last.id] : [],
       modules: [defineModule(() => ({ topLevelTools: [previous] }))] });
     const requests: ModelInput[] = [];
@@ -358,8 +358,8 @@ describe("工作台 SDK 的宿主实现", () => {
     expect(invoked).toEqual([state === "loaded" ? last.id : first.id]);
   });
 
-  // 外部贡献可以关联其他插件的对象，但声明实例、来源与私有数据边界仍由宿主守护。
-  it("具型调用绑定真实关联对象和后台来源，拒绝伪造契约、跨会话引用及非法产出", async () => {
+  // External contributions may associate other plugins' objects, while the host still protects declaration instances, origins, and private-data boundaries.
+  it("typed calls bind real associated objects and backend origins and reject forged contracts, cross-session references, and invalid output", async () => {
     const c = counter(), other = pluginNamespace("test.questions");
     const query = defineCall(other.name("query"), { scope: "object", input: z.string().trim(), output: z.string() });
     const invalid = defineCall(other.name("invalid"), { scope: "object", input: z.null(), output: z.number() });
@@ -386,8 +386,8 @@ describe("工作台 SDK 的宿主实现", () => {
     await expect(service.sessions.calls.invoke(invalid.id, null, { object }, null)).rejects.toThrow();
   });
 
-  // 只读调用不占用时间线；取消与宿主关闭仍等待 handler 真正结束。
-  it.each(["renderer", "plugin"] as const)("%s 只读调用不标记资源 busy，取消后仍等待实际清理", async source => {
+  // Read-only calls do not occupy timelines; cancellation and host close still wait for actual handler completion.
+  it.each(["renderer", "plugin"] as const)("%s read-only calls do not mark resources busy and still wait for actual cleanup after cancellation", async source => {
     const c = counter(), other = pluginNamespace("test.questions");
     const wait = defineCall(other.name("wait"), { scope: "object", input: z.null(), output: z.null() });
     let signal!: AbortSignal, release!: () => void;
@@ -414,7 +414,7 @@ describe("工作台 SDK 的宿主实现", () => {
     expect(service.sessions.running).toBe(false);
   });
 
-  it("读取门面不暴露对象或嵌套会话的修改能力", async () => {
+  it("read facades expose no mutation of objects or nested sessions", async () => {
     let reader!: ObjectReader;
     const c = counter({ onRead: value => { reader = value; } });
     const { service, sessionId } = open([c.plugin]);
@@ -426,7 +426,7 @@ describe("工作台 SDK 的宿主实现", () => {
     expect(reader.session).not.toHaveProperty("resume");
     expect(reader.session.title).not.toHaveProperty("set");
   });
-  it("动作按宿主契约校验身份、资源归属和输入，拒绝不留下写入", async () => {
+  it("actions validate identity, resource ownership, and input against host contracts and rejected calls leave no writes", async () => {
     const c = counter();
     const { service, sessionId } = open([c.plugin]);
     const objectId = await create(service, sessionId);
@@ -441,7 +441,7 @@ describe("工作台 SDK 的宿主实现", () => {
     expect(service.sessions.tree.nodes(sessionId).map(flat)).toHaveLength(before);
     expect(c.context().object(sessionId, Counter, objectId).get(State)).toBe(1);
   });
-  it("创建输入只解析一次，准备接受后 create 使用转换结果", async () => {
+  it("creation inputs parse once and create uses transformed results after preparation acceptance", async () => {
     const transform = vi.fn((value: number) => value + 1);
     const contract = defineCreation(Counter, { id: ns.name("transform"), schema: z.number().transform(transform) });
     const created = vi.fn((_value: number) => ({ title: "Counter", data: {} }));
@@ -458,7 +458,7 @@ describe("工作台 SDK 的宿主实现", () => {
     expect(prepare.mock.calls[0]?.[0]).toBe(1);
     expect(created.mock.calls[0]?.[0]).toBe(1);
   });
-  it("动作准备沿用解析结果，替换作为新输入只经资源所有者 schema 解析一次", async () => {
+  it("action preparation reuses parsed results and replacements parse once as new input through the resource owner's schema", async () => {
     const transform = vi.fn((value: string) => Number(value) + 1);
     const action = defineAction(Counter, { id: ns.name("transform"), schema: z.string().regex(/^\d+$/u).transform(transform) });
     const seen: number[] = [], executed = vi.fn();
@@ -494,7 +494,7 @@ describe("工作台 SDK 的宿主实现", () => {
     await expect(invoke()).rejects.toThrow("Blocked by preparer.");
     expect(executed).toHaveBeenCalledTimes(1);
   });
-  it("关闭取消并等待在途准备，准备结束前不释放宿主设施", async () => {
+  it("close cancels and awaits in-flight preparation without releasing host facilities before preparation ends", async () => {
     const c = counter();
     let preparationSignal!: AbortSignal;
     let begin!: () => void, release!: () => void;
@@ -520,7 +520,7 @@ describe("工作台 SDK 的宿主实现", () => {
     await Promise.all([closing, rejected]);
     expect(closed).toBe(true);
   });
-  it("首页输入准备的替换结果必须满足提交契约，失败不创建会话", async () => {
+  it("home input preparation replacements must satisfy submission contracts and failures create no sessions", async () => {
     const namespace = pluginNamespace("test.first-input");
     const plugin = definePlugin({ namespace, version: "1", modules: [defineModule(() => ({
       preparers: [{ id: "empty-input", contract: SubmitAgentInput,
@@ -534,7 +534,7 @@ describe("工作台 SDK 的宿主实现", () => {
     expect(service.sessions.tree.list()).toEqual(before);
     expect(service.sessions.running).toBe(false);
   });
-  it("当前数据按会话和对象隔离，其他插件契约不能写入本作用域", async () => {
+  it("current data is isolated by session and object and other plugin contracts cannot write into this scope", async () => {
     const c = counter(), { service, sessionId } = open([c.plugin]);
     const id = await create(service, sessionId, 3), session = c.context().session(sessionId);
     session.commit(writer => { writer.set(State, 8); });
@@ -546,7 +546,7 @@ describe("工作台 SDK 的宿主实现", () => {
     expect(session.get(State)).toBe(8);
   });
 
-  it("纯数据提交通知视图，不追加记录或调用记录观察者", async () => {
+  it("data-only commits notify views without appending records or calling record observers", async () => {
     const observed: SessionRecord[] = [], notifications: string[] = [];
     const c = counter({ observe: record => observed.push(record) });
     const { service, sessionId } = open([c.plugin], undefined, event => notifications.push(event.kind));
@@ -561,7 +561,7 @@ describe("工作台 SDK 的宿主实现", () => {
     expect(notifications).toContain("session.changed");
   });
 
-  it("嵌套提交失败一起回滚数据和记录，不向视图或观察者交付未提交状态", async () => {
+  it("nested commit failures roll back data and records together without delivering uncommitted state to views or observers", async () => {
     const observed: SessionRecord[] = [], notifications: string[] = [];
     const c = counter({ observe: record => observed.push(record) });
     const { service, sessionId } = open([c.plugin], undefined, event => notifications.push(event.kind));
@@ -578,7 +578,7 @@ describe("工作台 SDK 的宿主实现", () => {
     expect(observed).toEqual([]); expect(notifications).toEqual([]);
   });
 
-  it("数据按实际形状读取，兼容声明继续读取，不兼容声明拒绝且不改写原值", async () => {
+  it("data reads follow actual shapes; compatible declarations keep reading while incompatible declarations reject without rewriting original values", async () => {
     const c = counter();
     const nextState = ns.data("state", z.number().int());
     const { service, sessionId } = open([c.plugin]);
@@ -590,7 +590,7 @@ describe("工作台 SDK 的宿主实现", () => {
     expect(session.get(State)).toBe(12);
   });
 
-  it("不支持的数据库版本拒绝打开，既有插件数据与记录不变", async () => {
+  it("unsupported database versions reject opening without changing existing plugin data or records", async () => {
     const c = counter(), { root, service, sessionId } = open([c.plugin]);
     const id = await create(service, sessionId, 42);
     await service.close(); services.splice(services.indexOf(service), 1);
@@ -609,7 +609,7 @@ describe("工作台 SDK 的宿主实现", () => {
     expect(c.context().session(sessionId).snapshot().records.first(Changed, { scope: "timeline" })).toMatchObject({ data: { value: 42 } });
   });
 
-  it("不依赖 Agent 的资源创建与事件、状态同事务，信封关联真实资源种类", async () => {
+  it("resources independent of Agent create with events and state in one transaction and envelopes associate real resource kinds", async () => {
     const observed: SessionRecord[] = [];
     let createdValue: number | null = null;
     const c = counter({ observe: record => observed.push(record), afterCreate: object => { createdValue = object.get(State); } });
@@ -628,7 +628,7 @@ describe("工作台 SDK 的宿主实现", () => {
     });
   });
 
-  it("SDK 工具经同一个宿主目录调用，具型参数与产出在适配边界校验", async () => {
+  it("SDK tools use the same host catalog and validate typed arguments and output at the adapter boundary", async () => {
     const c = counter();
     const tool = defineTool({ id: "test.tools/counter_read", name: "counter_read", description: "Read the counter.", guidelines: [],
       argsSchema: z.strictObject({}).describe("No arguments.") });
@@ -640,7 +640,7 @@ describe("工作台 SDK 的宿主实现", () => {
     const plugin = definePlugin({ ...c.plugin, modules: [...c.plugin.modules, defineModule(() => ({
       tools: [implementTool(implementation, { async call(_data, _target, _args, context) {
         toolObject = context.object;
-        // SDK caller 是宿主提供的只读身份快照，与可写的目标对象门面分开。
+        // SDK caller is a host-provided read-only identity snapshot separate from writable target-object facades.
         expect(context.caller).toEqual({ ref: { sessionId: context.object.ref.sessionId, id: "caller", kind: "test/agent" }, title: "Caller" });
         expect(Object.isFrozen(context.caller.ref)).toBe(true);
         context.publish(context.object.get(State)!);
@@ -666,7 +666,7 @@ describe("工作台 SDK 的宿主实现", () => {
     expect(() => toolObject.session.title.set("Late")).toThrow();
   });
 
-  it("创建失败回滚对象状态和记录；临时对象门面不能越过失败创建", async () => {
+  it("creation failures roll back object state and records and temporary object facades cannot outlive failed creation", async () => {
     let provisional!: ObjectExecutor;
     const observed: SessionRecord[] = [];
     const c = counter({ failCreate: true, onCreate: object => { provisional = object; }, observe: record => observed.push(record) });
@@ -678,7 +678,7 @@ describe("工作台 SDK 的宿主实现", () => {
     expect(() => provisional.commit(writer => { writer.set(State, 9); })).toThrow();
   });
 
-  it("异步 commit 回滚，逃逸 writer 在提交结束后失效", async () => {
+  it("asynchronous commits roll back and escaped writers expire after commit ends", async () => {
     const c = counter(), { service, sessionId } = open([c.plugin]);
     const id = await create(service, sessionId), object = c.context().object(sessionId, Counter, id);
     const before = object.session.snapshot().records.all({ scope: "session" });
@@ -691,7 +691,7 @@ describe("工作台 SDK 的宿主实现", () => {
     expect(object.session.snapshot().records.all({ scope: "session" })).toEqual(before);
   });
 
-  it("记录写入只接受已声明实例，同 ID 伪造 schema 和未声明记录均被拒绝", async () => {
+  it("record writes accept declared instances only and reject same-ID forged schemas and undeclared records", async () => {
     const c = counter(), { service, sessionId } = open([c.plugin]);
     const id = await create(service, sessionId), object = c.context().object(sessionId, Counter, id);
     const before = object.session.snapshot().records.all({ scope: "session" });
@@ -702,7 +702,7 @@ describe("工作台 SDK 的宿主实现", () => {
     expect(object.session.snapshot().records.all({ scope: "session" })).toEqual(before);
   });
 
-  it("对象句柄由宿主核对会话、资源归属和当前路径", async () => {
+  it("the host validates session, resource ownership, and current path for object handles", async () => {
     const c = counter(); const { service, sessionId } = open([c.plugin]);
     const id = await create(service, sessionId);
     const object = c.context().object(sessionId, Counter, id);
@@ -713,7 +713,7 @@ describe("工作台 SDK 的宿主实现", () => {
     expect(() => object.commit(writer => { writer.set(State, 5); })).toThrow();
   });
 
-  it("纯会话事件插件只声明自己的领域；观察者追加排队且保留原批次快照", () => {
+  it("event-only session plugins declare only their domains; observer appends queue and retain original batch snapshots", () => {
     const eventNs = pluginNamespace("test.events");
     const Input = defineRecord(eventNs.name("input"), { schema: z.string() });
     const Follow = defineRecord(eventNs.name("follow"), { schema: z.string() });
@@ -740,8 +740,8 @@ describe("工作台 SDK 的宿主实现", () => {
     expect(service.sessions.tree.nodes(sessionId).map(flat)).toHaveLength(2);
   });
 
-  // 预期来自游标观察契约：追加与显式游标选择统一通知最终时间线，纯数据／标题写入和只读查询不通知。
-  it("游标观察与记录提交独立，批量与嵌套提交只通知最终位置，回滚不通知", async () => {
+  // Cursor observation contract: appends and explicit cursor selection notify the final timeline uniformly; data/title-only writes and read-only queries do not notify.
+  it("cursor observation is independent of record commits; batch and nested commits notify only final positions and rollbacks never notify", async () => {
     const eventNs = pluginNamespace("test.cursor");
     const Entry = defineRecord(eventNs.name("entry"), { schema: z.string() });
     const Current = eventNs.data("current", z.number());
@@ -802,7 +802,7 @@ describe("工作台 SDK 的宿主实现", () => {
     expect(commits).toEqual([ids, [branch]]);
   });
 
-  it("提交内写入的标题与事件同事务生效，后续异常回滚且观察者只看到一致状态", () => {
+  it("titles and events written within commits take effect in one transaction; later exceptions roll back and observers see only consistent state", () => {
     const seen: [string, number][] = [];
     const c = counter({ observe: (record, plugin) => {
       const changed = Changed.decode(record);
@@ -832,7 +832,7 @@ describe("工作台 SDK 的宿主实现", () => {
     expect(c.context().session(other).title.get()).toBe("Other");
   });
 
-  it("公开 run 交付事件，调用方决定是否按自身记录契约保存历史", async () => {
+  it("public run delivers events and callers decide whether to save history under their own record contracts", async () => {
     const c = counter();
     const Execution = defineRecord(ns.name("execution"), { schema: modelRunRecordSchema });
     const plugin = definePlugin({ ...c.plugin, modules: [...c.plugin.modules, defineModule(() => ({ records: [Execution] }))] });
@@ -863,14 +863,14 @@ describe("工作台 SDK 的宿主实现", () => {
       observer: { event() {} },
     });
     expect(inputs.map(input => input.messages)).toEqual([[{ kind: "input", parts: [{ kind: "text", text: "First projection" }] }], [{ kind: "input", parts: [{ kind: "text", text: "Second projection" }] }]]);
-    // run 的会话身份来自已校验对象，宿主不能丢失插件 UA 或在续轮时更换会话 ID。
+    // run obtains session identity from validated objects; the host must preserve plugin UA and session IDs across subsequent rounds.
     expect(inputs.map(({ userAgent, sessionId }) => ({ userAgent, sessionId }))).toEqual([
       { userAgent: "PluginAgent/1.0", sessionId }, { userAgent: "PluginAgent/1.0", sessionId },
     ]);
     expect(service.sessions.tree.nodes(sessionId).map(flat)).toHaveLength(count);
   });
 
-  it("公开 stream 固定显式输入，不保存历史或隐式加入宿主工具", async () => {
+  it("public stream fixes explicit input without saving history or implicitly adding host tools", async () => {
     const c = counter(), inputs: ModelInput[] = [];
     const { service, sessionId } = open([c.plugin], () => ({ validate() {}, version: "test-adapter", prepare(input) {
       inputs.push(input);
@@ -898,7 +898,7 @@ describe("工作台 SDK 的宿主实现", () => {
     expect(service.sessions.running).toBe(false);
   });
 
-  it.each(["cancel", "close"] as const)("运行中的 SDK 请求受收束规则保护，%s 后部分内容可提交到时间线", async mode => {
+  it.each(["cancel", "close"] as const)("active SDK requests follow finalization rules and partial content can commit to timelines after %s", async mode => {
     const c = counter();
     const Execution = defineRecord(ns.name("execution"), { schema: modelRunRecordSchema });
     const plugin = definePlugin({ ...c.plugin, modules: [...c.plugin.modules, defineModule(() => ({ records: [Execution] }))] });

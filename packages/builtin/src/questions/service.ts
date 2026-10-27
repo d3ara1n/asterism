@@ -11,7 +11,7 @@ interface Waiting {
 }
 const same = (a: ResourceRef, b: ResourceRef) => a.id === b.id && a.sessionId === b.sessionId && a.kind === b.kind;
 
-/** 服务只持有本次运行的交互；模型消息与已完成答案由既有工具历史保存。 */
+/** The service holds only interactions from the current run; existing tool history stores model messages and completed answers. */
 export function createQuestionService(changed: (object: ResourceRef, pending: PendingQuestion[]) => void) {
   const waiting = new Map<string, Waiting>();
   const current = (ref: ResourceRef) => [...waiting.values()].filter(entry => same(entry.object, ref)).map(entry => structuredClone(entry.pending));
@@ -32,7 +32,7 @@ export function createQuestionService(changed: (object: ResourceRef, pending: Pe
         const finish = (result: CallResult<Answer>) => {
           if (!waiting.delete(id)) return;
           signal.removeEventListener("abort", abort);
-          // 答案或取消已被受理；通知失败不改变工具结局，界面随工具历史终结，通知只用于清理草稿。
+          // The answer or cancellation has been accepted; notification failure does not change the tool outcome. Tool history finalizes the UI, and notifications only clean up drafts.
           resolve(result);
           try { notify(object); }
           catch (error) { console.error("Question state notification failed after settlement.", error); }

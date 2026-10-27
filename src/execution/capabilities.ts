@@ -8,7 +8,7 @@ import type { Invocation, PreparedResult, ToolImplementation } from "../tools/co
 import { projectTool, schemaOf } from "../tools/definition.ts";
 import type { ToolCaller } from "@asterism/sdk/runtime";
 
-/** 外部工具策略；支持关系、资源链接与这层策略分别判断。 */
+/** External tool policy; support relationships, resource links, and this policy are checked independently. */
 export type ToolPolicy = (name: string) => boolean;
 export function agentToolPolicy(agent: Pick<AgentConfiguration, "tools" | "excludeTools">): ToolPolicy {
   const allowed = agent.tools === null ? null : new Set(agent.tools);
@@ -17,7 +17,7 @@ export function agentToolPolicy(agent: Pick<AgentConfiguration, "tools" | "exclu
 }
 const denied = (): PreparedResult => ({ kind: "rejected", error: { code: "access_denied", message: "Resource access requires a link to the executing object." } });
 
-/** 每次请求的能力视图：链接资源 × 工具支持关系，再由外部策略筛选。资源和工具目录彼此独立。 */
+/** Per-request capability view: linked resources × tool support, filtered by external policy. Resource and tool catalogs are independent. */
 export class AgentCapabilities {
   private readonly linked = new Map<string, { resource: FoldedObject; tools: readonly ToolImplementation[] }>();
   private readonly caller?: ToolCaller;
@@ -46,7 +46,7 @@ export class AgentCapabilities {
     return resource ? { resource: { id: resource.id, kind: resource.kind, title: resource.title } } : {};
   }
 
-  /** 仅查找本次请求内的展示身份；不解析参数、不准备或执行工具。 */
+  /** Look up display identity within this request only; does not parse arguments, prepare, or execute tools. */
   preview(id: string, name: string): ToolInvocationInfo {
     const implementation = this.linked.get(id)?.tools.find(tool => tool.tool.name === name);
     return { ...this.identity(id), ...(implementation ? { implementation: implementation.reference } : {}) };

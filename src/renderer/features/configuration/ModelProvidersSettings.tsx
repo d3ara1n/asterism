@@ -38,7 +38,7 @@ const protocols = Object.entries(modelProtocolLabels).map(([value, label]) => ({
 const protocolLabel = (value: string) => protocols.find(item => item.value === value)?.label ?? value;
 type ProviderValue = ModelProviderDraft;
 
-/* ---------- 状态推导：列表与详情共用，均直接读取最新快照 ---------- */
+/* ---------- State derivation: shared by list and details, both reading the latest snapshot directly ---------- */
 
 interface Health { tone: StatusTone; label: string }
 const latestTest = (snapshot: ConfigurationSnapshot, modelId: string): ConnectionTest | undefined =>
@@ -53,7 +53,7 @@ function providerHealth(snapshot: ConfigurationSnapshot, provider: ModelProvider
   if (tests.some(test => test?.state === "succeeded")) return { tone: "success", label: getI18n().formatMessage(providersMessages.connected) };
   return { tone: "neutral", label: getI18n().formatMessage(providersMessages.notTested) };
 }
-/** 按错误类别给出下一步；原始信息仍随结果展示。 */
+/** Suggest the next step by error category; original information remains displayed with the result. */
 const testHints = (): Record<TestError, string> => ({
   configuration: getI18n().formatMessage(providersMessages.invalidSettings),
   credential: getI18n().formatMessage(providersMessages.saveApiKey),
@@ -67,7 +67,7 @@ const testHints = (): Record<TestError, string> => ({
   cancelled: getI18n().formatMessage(providersMessages.testCancelled),
 });
 
-/* ---------- 即时操作：与编辑草稿分离，任何浮岛中触发都写回同一快照 ---------- */
+/* ---------- Immediate actions: separate from edit drafts, writing to the same snapshot from any island ---------- */
 
 function useQuickActions() {
   const { snapshot } = useSettingsConfiguration();
@@ -83,7 +83,7 @@ function useQuickActions() {
     },
   };
 }
-/** 详情草稿与快捷操作共用字段投影，启用状态由各自操作显式提供。 */
+/** Detail drafts and quick actions share field projection; each operation explicitly supplies the enabled state. */
 const providerValue = (provider: ModelProvider): ProviderValue => ({
   id: provider.id, name: provider.name, protocol: provider.protocol, baseUrl: provider.baseUrl, auth: provider.auth,
   compatibility: structuredClone(provider.compatibility),
@@ -92,7 +92,7 @@ const providerValue = (provider: ModelProvider): ProviderValue => ({
 });
 const modelValue = (model: ProviderModel): ProviderModel => structuredClone(model);
 
-/* ---------- 根：提供商总览 ---------- */
+/* ---------- Root: provider overview ---------- */
 
 export function ModelProvidersSettings() {
   const i18n = useI18n();
@@ -131,7 +131,7 @@ function ProviderRow({ provider, snapshot, selected, onOpen }: {
     </>} />;
 }
 
-/* ---------- 预设选择：按计费方式分组，自适应网格与跨组搜索 ---------- */
+/* ---------- Preset selection: grouped by billing method, with an adaptive grid and cross-group search ---------- */
 
 const billingOrder = ["usage", "subscription", "none"] as const satisfies readonly ModelProviderPreset["billing"][];
 const billingLabels = {
@@ -179,16 +179,16 @@ function PresetPicker({ onPick }: { onPick: (preset: ModelProviderPreset | null)
   </div>;
 }
 
-/* ---------- 提供商详情 ---------- */
+/* ---------- Provider details ---------- */
 
-/** 由显示名称规范化出 ID：小写、空白转连字符、去掉不允许的字符；模型 ID 允许 `/`。 */
+/** Normalize a display name into an ID: lowercase, replace whitespace with hyphens, and remove disallowed characters; model IDs allow `/`. */
 export function slugify(name: string, options: { slash?: boolean } = {}): string {
   const allowed = options.slash ? /[^\p{L}\p{N}._\/-]/gu : /[^\p{L}\p{N}._-]/gu;
   return name.trim().toLowerCase().replace(/\s+/gu, "-").replace(allowed, "").replace(/-+/gu, "-").replace(/^-|-$/gu, "");
 }
 const blank: ProviderValue = { id: "", name: "", protocol: "openai-responses", baseUrl: "", auth: "api_key", compatibility: [] };
 
-/** 选择入口生成配置与编辑规则；编辑器不接收或保留预设身份。 */
+/** The selection entry generates configuration and editing rules; the editor neither receives nor retains preset identity. */
 function ProviderCreation() {
   const i18n = useI18n();
   const { snapshot } = useSettingsConfiguration();
@@ -210,11 +210,11 @@ function ProviderEditor({ initialId, initialValue = blank }: { initialId: string
   const island = useIsland();
   const [id, setId] = useState(initialId);
   const current = snapshot?.modelProviders.find(item => item.id === id);
-  // 草稿不含 enabled：启用是即时操作，始终取快照，避免与上级浮岛的开关互相覆盖。
+  // Drafts omit enabled: enabling is an immediate action that always uses the snapshot, preventing mutual overwrites with the parent island's switch.
   const [value, setValue] = useState<ProviderValue>(() => current ? providerValue(current) : structuredClone(initialValue));
   const [credential, setCredential] = useState<ConnectionCredentialDraft>({ action: current ? "keep" : "replace", key: "" });
   const set = <K extends keyof typeof value>(field: K, next: (typeof value)[K]) => setValue(previous => ({ ...previous, [field]: next }));
-  // 已填好的 ID 保持独立；空白连接在用户手动编辑 ID 前随名称生成。
+  // A prefilled ID remains independent; for a blank connection, generate it from the name until the user edits the ID manually.
   const [idEdited, setIdEdited] = useState(!!current || !!initialValue.id);
   const setName = (name: string) => setValue(previous => ({ ...previous, name, ...(idEdited ? {} : { id: slugify(name) }) }));
 
@@ -307,7 +307,7 @@ function ModelRow({ model, provider, selected, onOpen }: { model: ProviderModel;
     </>} />;
 }
 
-/* ---------- 模型详情：基本信息、参数、兼容设置与连接测试分区，参数获取位于参数区块 ---------- */
+/* ---------- Model details: basic information, parameters, compatibility settings, and connection testing; parameter fetching belongs to the parameters section ---------- */
 
 function ModelEditor({ initialId, providerId }: { initialId: string | null; providerId: string }) {
   const i18n = useI18n();
@@ -320,10 +320,10 @@ function ModelEditor({ initialId, providerId }: { initialId: string | null; prov
   const provider = snapshot?.modelProviders.find(item => item.id === providerId);
   const [value, setValue] = useState<ProviderModel>(() => current ? modelValue(current) : createModelInput(providerId, { name: "", modelId: "" }));
   const set = <K extends keyof ProviderModel>(field: K, next: ProviderModel[K]) => setValue(previous => ({ ...previous, [field]: next }));
-  // 与提供商一致：名称在前并生成 ID；手动改过 ID 或编辑已有模型时不再覆盖。
+  // As with providers: the name comes first and generates the ID; stop overwriting after manual ID editing or when editing an existing model.
   const [idEdited, setIdEdited] = useState(!!current);
   const setName = (name: string) => setValue(previous => ({ ...previous, name, ...(idEdited ? {} : { modelId: slugify(name, { slash: true }) }) }));
-  // enabled 为即时操作，比较与保存都取快照值。
+  // enabled is an immediate action; comparisons and saves both use the snapshot value.
   const dirty = useMemo(() => !current || JSON.stringify({ ...modelValue(current), enabled: 0 }) !== JSON.stringify({ ...value, enabled: 0 }), [current, value]);
   const test = current && snapshot ? latestTest(snapshot, modelReference(current)) : undefined;
   const users = current && snapshot ? snapshot.roles.filter(role => role.model === modelReference(current)) : [];

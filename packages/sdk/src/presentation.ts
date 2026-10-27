@@ -7,7 +7,7 @@ export interface DataContract<T extends Json = Json> extends ContractReference {
 export const presentationSchema = z.strictObject({ contract: contractReferenceSchema, data: jsonSchema });
 export type Presentation = z.infer<typeof presentationSchema>;
 
-/** 共享声明不依赖任何进程或 UI；两端各自注册实现。 */
+/** Shared declarations depend on no process or UI; each end registers its own implementation. */
 export function defineData<T extends Json>(id: string, schema: z.ZodType<T>): DataContract<T> {
   return { ...contractReferenceSchema.parse({ id }), schema };
 }

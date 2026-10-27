@@ -18,8 +18,8 @@ function fakeChild() {
   return child;
 }
 
-// 端口交接契约：任务进程就绪前不交出端口（调用方据此通知 renderer 不可用）；就绪后端口随转移列表交给任务进程。
-it("就绪前拒绝交接直连端口，就绪后随转移列表交给任务进程", async () => {
+// Port handoff contract: withhold ports until task readiness (callers notify the renderer of unavailability); transfer ports with the transfer list once ready.
+it("rejects direct port handoff before readiness and transfers it to the task process with the transfer list afterward", async () => {
   const root = mkdtempSync(join(tmpdir(), "asterism-connect-"));
   const child = fakeChild();
   fork.mockReturnValue(child);

@@ -4,7 +4,7 @@ import type { AgentMessageSender } from "@asterism/builtin-api/contracts";
 const escape = (text: string) => text.replace(/[&<>"']/g, char =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;" })[char]!);
 
-/** 信封只参与模型投影；持久正文、附件与编辑器保持原样。 */
+/** The envelope participates only in model projection; persisted body text, attachments, and the editor remain unchanged. */
 export function projectInputMessage(message: { sender: AgentMessageSender; parts: readonly ModelInputPart[] }): { kind: "input"; parts: ModelInputPart[] } {
   const { sender, parts } = message;
   if (sender.kind === "user") return { kind: "input", parts: [...parts] };

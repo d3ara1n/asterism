@@ -16,12 +16,12 @@ import { viewStateKeys } from "./view-state";
 
 type ThinkingNode = Extract<TimelineItem, { kind: "thinking" }>;
 
-/** 外壳的开合偏好与正文的过程/终结渲染相互独立。 */
+/** Shell expansion preferences are independent of the body's in-progress/final rendering. */
 export function ThinkingBlock({ node }: { node: ThinkingNode }) {
   const streaming = generating(node);
   const preferences = useRendererConfig(BuiltinSettings);
   const disclosure = useStreamingDisclosure(viewStateKeys.disclosure, streaming ? "thinking" : null, node.text.length > 0, preferences);
-  // 实时块与成型块都携带生成起止；历史未记录时间时不补造耗时。
+  // Both live and formed blocks carry generation start and end times; no duration is fabricated when history has no timing.
   const startedAt = node.startedAt ?? null;
   const endedAt = node.endedAt ?? null;
   const interrupted = "complete" in node && !node.complete;
@@ -32,7 +32,7 @@ export function ThinkingBlock({ node }: { node: ThinkingNode }) {
   </Disclosure>;
 }
 
-/** 计时刷新局限于 header，不让 Markdown 每秒重新渲染。 */
+/** Timing refreshes are confined to the header so Markdown does not rerender every second. */
 function ThinkingHeader({ streaming, startedAt, endedAt, interrupted }: {
   streaming: boolean; startedAt: number | null; endedAt: number | null; interrupted: boolean;
 }) {
@@ -44,7 +44,7 @@ function ThinkingHeader({ streaming, startedAt, endedAt, interrupted }: {
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
   }, [streaming, startedAt]);
-  // 只有生成中的块以当前时间计时；未结束就中断的成型块不推算用时。
+  // Only generating blocks use the current time for timing; formed blocks interrupted before completion do not infer elapsed time.
   const end = endedAt ?? (streaming ? now : null);
   const duration = end === null ? null : thinkingDuration(startedAt, end);
   return <>

@@ -4,7 +4,7 @@ import { PluginApiError } from "@asterism/sdk/runtime";
 type Kind = "task" | "action" | "model" | "prepare" | "event" | "call" | "tool";
 export interface RunningWork<T> { readonly signal: AbortSignal; readonly done: Promise<T>; cancel(): void }
 interface Entry { group: RunGroup; object?: ResourceRef; affectsHistory: boolean; cancel(): void; done: Promise<unknown> }
-/** 一个插件的运行真值：所有执行方式共享登记、取消、等待与关闭门禁。 */
+/** Runtime authority for one plugin: all execution modes share registration, cancellation, waiting, and the close gate. */
 export class RunLifecycle {
   private entries = new Set<Entry>();
   private readonly controller = new AbortController();
@@ -30,13 +30,13 @@ export class RunLifecycle {
     });
     entry.done = done;
     this.entries.add(entry);
-    // 调用时就捕获环境；去重和队列的延后由各自调度模块明确负责。
+    // Capture the environment at invocation; individual scheduling modules explicitly own deduplication and queue delays.
     try { Promise.resolve(run(signal)).then(resolve, reject); }
     catch (error) { reject(error); }
     if (object && entry.affectsHistory) this.changed(object.sessionId);
     return { signal, done, cancel };
   }
-  /** 只汇总依赖当前时间线路径的占用；资源自己的业务运行状态由资源投影。 */
+  /** Aggregate only holds depending on the current timeline path; resources project their own business runtime state. */
   activity(sessionId: string, group?: RunGroup): { busy: string[] } {
     const busy = new Set<string>();
     for (const entry of this.entries) {
@@ -52,7 +52,7 @@ export class RunLifecycle {
   async settle(group?: RunGroup): Promise<void> {
     await Promise.allSettled([...this.entries].filter(entry => !group || entry.group === group).map(entry => entry.done));
   }
-  /** 取消绑定在匹配对象上的运行并等待收束；对象作用域结束与会话归档共用。 */
+  /** Cancel runs bound to matching objects and wait for finalization; shared by object scope end and session archival. */
   async cancel(match: (object: ResourceRef) => boolean): Promise<void> {
     const bound = [...this.entries].filter(entry => entry.object && match(entry.object));
     for (const entry of bound) entry.cancel();
@@ -60,7 +60,7 @@ export class RunLifecycle {
   }
   async close(): Promise<void> { this.stop(); await this.settle(); }
 }
-/** 执行方式只持自身调度规则，活动与收束委托同一个生命周期。 */
+/** Execution modes hold only their own scheduling rules; activities and finalization use the same lifetime. */
 export class RunGroup {
   private stopped = false;
   constructor(private readonly lifecycle: RunLifecycle, readonly kind: Kind) {}
@@ -68,7 +68,7 @@ export class RunGroup {
   start<T>(run: (signal: AbortSignal) => Promise<T>, options: { object?: ResourceRef; signal?: AbortSignal; timeoutMs?: number; affectsHistory?: boolean } = {}): RunningWork<T> {
     return this.lifecycle.start(this, run, options);
   }
-  /** 拉取式流沿用运行登记；暂停消费时，关闭宿主也能关闭底层迭代器。 */
+  /** Pull streams reuse run registration; host close can also close the underlying iterator while consumption is paused. */
   iterate<T>(create: (signal: AbortSignal) => AsyncIterable<T>, signal: AbortSignal): AsyncIterable<T> {
     const group = this;
     let iterator: AsyncIterator<T> | undefined;

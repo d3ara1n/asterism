@@ -1,18 +1,18 @@
 /**
- * 浮岛编织（weave）的屏内布局模型，纯函数，不依赖 React 与 DOM。
+ * In-screen layout model for island weaving (weave); pure functions independent of React and DOM.
  *
- * 层级：页面带上的 Screen 整屏切换；Screen 内若干 Island 自左向右排列，越往右越深入。
- * 所有浮岛的 min 之和放得下时按 grow 分配宽度、不平移；放不下时各退到 min，
- * 屏内变成可溢出的带，视口跟随焦点浮岛平滑移动。
+ * Hierarchy: Screen switches as a whole on the page strip; Islands within a Screen run left to right, with deeper levels farther right.
+ * When the sum of all island min widths fits, distribute width by grow without translation; otherwise each falls back to min,
+ * forming an overflowing strip within the screen, with the viewport smoothly following the focused island.
  */
 
-/** 宽度声明：min 为不再压缩的下限；grow 为分配剩余空间的比例；max 为上限。 */
+/** Width declaration: min is the lower limit for shrinking, grow is the share of remaining space, and max is the upper limit. */
 export interface IslandWidth { min: number; grow?: number; max?: number }
 
 export interface IslandSlot { id: string; width: IslandWidth }
 
 export interface StripState {
-  /** 自左向右：越往右越深入。 */
+  /** Left to right: farther right means deeper. */
   islands: IslandSlot[];
   focus: string;
 }
@@ -20,14 +20,14 @@ export interface StripState {
 export interface Span { left: number; width: number }
 export interface ScreenLayout { spans: Span[]; total: number; overflow: boolean }
 
-/** 屏内布局：放得下时按 grow 分配（受 max 限制），放不下时退到 min 并溢出。 */
+/** In-screen layout: distribute by grow when it fits (subject to max), otherwise fall back to min and overflow. */
 export function layout(islands: IslandSlot[], viewport: number, gap: number): ScreenLayout {
   const gaps = Math.max(0, islands.length - 1) * gap;
   const mins = islands.map(island => island.width.min);
   const overflow = mins.reduce((sum, min) => sum + min, 0) + gaps > viewport;
   const widths = [...mins];
   if (!overflow) {
-    // 迭代分配剩余空间；到达 max 的浮岛退出分配，余量交给其余浮岛。
+    // Distribute remaining space iteratively; islands reaching max leave the distribution, and the remainder goes to the others.
     let open = islands.map((island, index) => (island.width.grow ?? 0) > 0 && widths[index]! < (island.width.max ?? Infinity));
     for (let round = 0; round < islands.length; round++) {
       const rest = viewport - gaps - widths.reduce((sum, width) => sum + width, 0);
@@ -46,15 +46,15 @@ export function layout(islands: IslandSlot[], viewport: number, gap: number): Sc
   return { spans, total: totalWidth(spans), overflow };
 }
 
-/** 带的总宽度。 */
+/** Total strip width. */
 export function totalWidth(spans: Span[]): number {
   const last = spans.at(-1);
   return last ? last.left + last.width : 0;
 }
 
 /**
- * 视口跟随焦点（仅溢出时使用）：焦点浮岛已完整可见则不动；否则贴近它越界的一侧对齐。
- * 结果限制在带的有效范围内，带比视口窄时偏移为 0。
+ * Viewport follows focus (used only during overflow): remain still if the focused island is fully visible; otherwise align to the side extending out of bounds.
+ * Clamp the result to the strip's valid range; offset is 0 when the strip is narrower than the viewport.
  */
 export function follow(spans: Span[], focusIndex: number, viewport: number, offset: number): number {
   const target = spans[focusIndex];
@@ -67,21 +67,21 @@ export function follow(spans: Span[], focusIndex: number, viewport: number, offs
   return Math.min(Math.max(next, 0), max);
 }
 
-/** 在 parent 右侧打开浮岛：parent 右侧原有的更深浮岛被替换，焦点移到新浮岛。 */
+/** Open an island to the right of parent: replace existing deeper islands to its right and focus the new island. */
 export function openIsland(state: StripState, parent: string, slot: IslandSlot): StripState {
   const index = state.islands.findIndex(island => island.id === parent);
   if (index < 0) return state;
   return { islands: [...state.islands.slice(0, index + 1), slot], focus: slot.id };
 }
 
-/** 关闭浮岛及其右侧更深的浮岛，焦点回到左邻；根浮岛不可关闭。 */
+/** Close the island and all deeper islands to its right, returning focus to the left neighbor; the root island cannot close. */
 export function closeIsland(state: StripState, id: string): StripState {
   const index = state.islands.findIndex(island => island.id === id);
   if (index <= 0) return state;
   return { islands: state.islands.slice(0, index), focus: state.islands[index - 1]!.id };
 }
 
-/** 移动焦点到已存在的浮岛；不改变带的组成。 */
+/** Move focus to an existing island without changing the strip's composition. */
 export function focusIsland(state: StripState, id: string): StripState {
   return state.islands.some(island => island.id === id) && state.focus !== id ? { ...state, focus: id } : state;
 }

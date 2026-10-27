@@ -1,6 +1,6 @@
-/** 会话存储结构由运行时建库和独立契约测试共用。 */
+/** Runtime database creation and independent contract tests share the session storage structure. */
 export const sessionSchemaSql = `
-  -- archived_at 为空表示活跃；非空为归档时间，超过冷静期后由启动清理删除。
+  -- archived_at is null for active sessions; otherwise it is the archive time, with startup cleanup deleting sessions past the retention period.
   CREATE TABLE sessions (id TEXT PRIMARY KEY, title TEXT NOT NULL, created_at TEXT NOT NULL, cursor TEXT, archived_at TEXT);
   CREATE TABLE session_nodes (
     seq INTEGER PRIMARY KEY AUTOINCREMENT, id TEXT NOT NULL UNIQUE,

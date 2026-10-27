@@ -4,7 +4,7 @@ import { contextMessages, ContextProjectionError, projectAgentContext as project
 
 export { contextMessages, type AgentContext, type ContextGroup } from "./context-projection.ts";
 
-/** 后台入口：投影规则见 context-projection.ts；损坏的历史以插件错误报告给调用方。 */
+/** Background entry point: projection rules are in context-projection.ts; corrupt history is reported to callers as plugin errors. */
 export function projectAgentContext(snapshot: Pick<SessionSnapshot, "records">, agentId: string): AgentContext {
   try { return project(snapshot, agentId); }
   catch (error) {

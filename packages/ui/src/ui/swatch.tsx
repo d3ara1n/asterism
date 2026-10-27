@@ -5,14 +5,14 @@ import { cn } from "../utils"
 import { Tooltip, TooltipContent, TooltipTrigger } from "./tooltip"
 
 /**
- * 可视选择组：色块与纹理格的公共外观。基于 Radix RadioGroup，键盘方向键切换、单选语义。
- * 业务只传入每项的预览内容，不另写选中/焦点样式。
+ * Visual selection group: shared appearance for color swatches and texture tiles. Based on Radix RadioGroup, with arrow-key navigation and single-selection semantics.
+ * Business code supplies only each item's preview content, without separate selection/focus styles.
  */
 function SwatchGroup({ className, ...props }: React.ComponentProps<typeof RadioGroupPrimitive.Root>) {
   return <RadioGroupPrimitive.Root data-slot="swatch-group" orientation="horizontal" className={cn("flex flex-wrap gap-2", className)} {...props} />
 }
 
-/** 圆形色块：选中加 ring 与对勾，悬停显示名称。 */
+/** Circular color swatch: selection adds a ring and checkmark, and hovering shows the name. */
 function ColorSwatch({ value, label, children, className }: { value: string; label: string; children: React.ReactNode; className?: string }) {
   return <Tooltip>
     <TooltipTrigger asChild>
@@ -29,7 +29,7 @@ function ColorSwatch({ value, label, children, className }: { value: string; lab
   </Tooltip>
 }
 
-/** 带标题的预览格：上方为预览，下方为名称。 */
+/** Labeled preview tile: preview above, name below. */
 function TileSwatch({ value, label, children, className }: { value: string; label: string; children: React.ReactNode; className?: string }) {
   return <RadioGroupPrimitive.Item value={value} data-slot="tile-swatch"
     className={cn("flex w-24 flex-col overflow-hidden rounded-md border bg-card text-left outline-none transition-colors hover:border-ring/60",

@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import { AgentRequestContext } from "@asterism/builtin-api/contracts";
 import { agentRequestExtensions } from "./request-context.ts";
 
-describe("Agent 请求上下文扩展", () => {
-  // 按 Unicode 码点保存分区字数和实际声明名称，不持久化提示正文或工具 schema。
-  it("保存来源与码点计量，领域扩展省略原始正文", () => {
+describe("Agent request context extensions", () => {
+  // Saves section character counts as Unicode code points and actual declared names, without persisting prompt bodies or tool schemas.
+  it("Saves source and code-point measurements while domain extensions omit original body text", () => {
     const [extension] = agentRequestExtensions({
       system: { blocks: [
         { id: "s", kind: "system", from: "core", text: "环境😀" },

@@ -1,6 +1,6 @@
 import type { EventSubscription, SubscriptionEnd } from "@asterism/sdk/contracts";
 
-/** 订阅建立、结束与取消的共同状态；运行中工作的真实收束由调用方管理。 */
+/** Shared subscription establishment, termination, and cancellation state; callers manage actual finalization of running work. */
 export class EventSubscriptionState {
   readonly subscription: EventSubscription;
   readonly ready: Promise<void>;
@@ -19,7 +19,7 @@ export class EventSubscriptionState {
   }
   get active(): boolean { return this.phase !== "closed"; }
   get signal(): AbortSignal { return this.controller.signal; }
-  /** 登记完清理责任后再绑定，已取消的信号也走同一个结束入口。 */
+  /** Bind after registering cleanup responsibility; already-cancelled signals use the same termination entry. */
   bind(signal?: AbortSignal): void {
     if (!this.active || !signal) return;
     this.unbind?.();
@@ -35,7 +35,7 @@ export class EventSubscriptionState {
   end(end: SubscriptionEnd): void {
     if (!this.active) return;
     this.phase = "closed"; this.unbind?.(); this.unbind = undefined;
-    // 取消监听器也是消费者代码，延后执行以免在结束方调用栈内重入。
+    // Cancellation listeners are consumer code too; defer them to avoid reentry within the terminating caller's stack.
     queueMicrotask(() => this.controller.abort());
     this.onEnd(end);
     this.rejectReady(new Error(end.message ?? end.reason)); this.resolveClosed(end);

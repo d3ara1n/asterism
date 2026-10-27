@@ -7,7 +7,7 @@ import { projectForAgent } from "./projection.ts";
 import { duplicateSubmission, rememberSubmission } from "./submissions.ts";
 import { projectInputMessage } from "./input-message.ts";
 
-/** 资源动作各自受理，共用模型预检；提交身份和落库构成一次原子受理。 */
+/** Resource actions accept inputs independently and share model preflight checks; submission identity and persistence form one atomic acceptance. */
 export function createAdmission(deps: { selection: AgentSelectionService; validate: ModelServices["validate"]; running(object: ObjectReader): boolean; systemPrompt: (agent: Parameters<typeof composeSystemPrompt>[0]) => ReturnType<typeof composeSystemPrompt> }) {
   const idle = (object: ObjectReader) => {
     if (deps.running(object)) throw new PluginApiError("conflict", "This agent is running. Cancel or wait for it to finish.");
@@ -27,7 +27,7 @@ export function createAdmission(deps: { selection: AgentSelectionService; valida
   return {
     async prepareSubmit(input: SubmitAgentInputData, object: ObjectReader, signal: AbortSignal, content: ContentReader): Promise<void> {
       if (duplicateSubmission(object, input)) return;
-      // 在途输入只受理到草稿箱；模型目标和完整上下文在实际请求边界重新校验。
+      // Inputs received during execution are accepted into the draft box only; the model target and full context are revalidated at the actual request boundary.
       if (deps.running(object)) return;
       await validate(object, signal, content, input);
     },

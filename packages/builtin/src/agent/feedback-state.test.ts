@@ -3,8 +3,8 @@ import type { ObjectExecutor } from "@asterism/sdk/runtime";
 import { AgentSoftwareFeedback } from "./feedback.ts";
 import { createAgentFeedback } from "./feedback-state.ts";
 
-// 模型结果只进内存视图，软件失败只通知；同一处理位置可以连续发生多次模型失败。
-it("按来源路由反馈，保留发生位置并随资源释放清理", () => {
+// Model results enter only the in-memory view, while software failures produce notifications only; multiple model failures can occur consecutively at the same processing position.
+it("Routes feedback by source, preserves its occurrence position, and cleans it up when the resource is released", () => {
   let nodeId = "input";
   const publish = vi.fn(), commit = vi.fn();
   const object = {
@@ -29,8 +29,8 @@ it("按来源路由反馈，保留发生位置并随资源释放清理", () => {
   expect(state.get(object)).toEqual({ inline: [], interruptions: [], compressions: [] });
 });
 
-// 压缩中可能追加错误反馈；终结活动须保留这些反馈，成功移交持久记录，失败／取消保留原位置。
-it("压缩活动按结局交接，重试成功不清除较早的失败与中途反馈", () => {
+// Error feedback may be appended during compression; finalizing the activity must preserve it, hand successful activity over to persistent records, and keep failures/cancellations at their original positions.
+it("Hands off compression activity according to outcome; successful retries do not erase earlier failures or intervening feedback", () => {
   let nodeId = "input";
   const object = { ref: { id: "agent" }, session: { snapshot: () => ({ position: { nodeId } }) },
     invalidate: vi.fn(), events: { publish: vi.fn() } } as unknown as ObjectExecutor;

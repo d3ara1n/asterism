@@ -2,12 +2,12 @@ import { timelineKey, type TimelineItem } from "./timeline";
 
 export interface ProcessTimeline {
   items: readonly TimelineItem[];
-  /** 过程条目到末尾概要行的映射，也用于折叠后的阅读位置定位。 */
+  /** Maps process items to the trailing summary row, also supporting reading-position navigation after folding. */
   owners: ReadonlyMap<string, string>;
   processIds: ReadonlySet<string>;
 }
 
-/** 按输入边界划分轮次；没有响应计量的收束轮也独立分组，正在运行的尾段保持原样。 */
+/** Groups turns by input boundaries; settled turns without response measurements are still grouped separately, while the running tail remains unchanged. */
 export function groupTurnProcesses(items: readonly TimelineItem[], running: boolean): ProcessTimeline {
   const result: TimelineItem[] = [];
   const owners = new Map<string, string>();
@@ -16,7 +16,7 @@ export function groupTurnProcesses(items: readonly TimelineItem[], running: bool
   let inputId: string | null = null;
   const finish = (settled: boolean) => {
     const footer = pending.find(item => item.kind === "turn-metrics");
-    // 阅读起点可落在轮次中间，轮尾保留原输入身份，收纳不依赖用户消息仍可见。
+    // Reading may begin mid-turn; the turn end retains the original input identity, so folding does not require the user message to remain visible.
     const turnId = inputId ?? footer?.inputId;
     if (!turnId || !settled) {
       result.push(...pending);
@@ -43,7 +43,7 @@ export function groupTurnProcesses(items: readonly TimelineItem[], running: bool
         if (entry.kind === "toolcall") toolCount++;
       }
     }
-    // 压缩可以发生在最终答复之后；正文仍留在原位置一侧，压缩标记始终独立可见。
+    // Compression can follow the final reply; body text stays on its original side of the marker, and compression markers remain independently visible.
     final.sort((a, b) => a.ordinal - b.ordinal);
     if (final.length) body.splice(Math.max(finalPosition, lastProcess + 1), 0, ...final);
     if (lastProcess >= 0) {
@@ -64,7 +64,7 @@ export function groupTurnProcesses(items: readonly TimelineItem[], running: bool
   return { items: result, owners, processIds };
 }
 
-/** 仅移除隐藏条目，不改变条目身份、原有视图与条目内部的开合状态。 */
+/** Removes hidden items only, without changing item identity, existing views, or internal expansion state. */
 export function visibleTurnProcesses(grouped: ProcessTimeline, open: ReadonlySet<string>): TimelineItem[] {
   return grouped.items.flatMap(item => {
     const owner = grouped.owners.get(timelineKey(item));

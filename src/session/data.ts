@@ -1,7 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
 import { jsonSchema, type Json } from "@asterism/sdk/contracts";
 
-/** 会话当前数据；空对象作用域表示会话本身。与历史事件独立保存。 */
+/** Current session data; an empty object scope denotes the session itself. Stored independently of historical events. */
 export class SessionDataStore {
   constructor(private readonly db: DatabaseSync) {}
   entries(sessionId: string, objectId: string): { contract: string; data: Json }[] {

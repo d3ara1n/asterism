@@ -20,9 +20,9 @@ const prepare = (directory: string, stores: StorageDefinition[], discover?: Para
   prepareData(directory, { version: "1.0.0", paths, stores, discover });
 const pointFile = (directory: string, id: string, ...parts: string[]) => join(recoveryPointDirectory(directory, id), "files", ...parts);
 
-describe("数据准备", () => {
-  // 跨多个版本升级时必须保留原值，并在改写前把整组数据（含附件）存入恢复点。
-  it("逐步升级多个版本，迁移前的数据进入恢复点", async () => {
+describe("Data preparation", () => {
+  // Multiversion upgrades retain original values and save the complete data set, including attachments, to recovery points before rewriting.
+  it("upgrades multiple versions incrementally and places pre-migration data in recovery points", async () => {
     const directory = root();
     writeJson(join(directory, "configuration.json"), { version: 1, text: "kept" });
     mkdirSync(join(directory, "content", "sealed"), { recursive: true });
@@ -33,18 +33,18 @@ describe("数据准备", () => {
     const [point] = listRecoveryPoints(directory);
     expect(point).toMatchObject({ kind: "migration", notice: true, changes: [{ id: "configuration", from: 1, to: 3 }] });
     expect(readJson(pointFile(directory, point!.id, "configuration.json"))).toEqual({ version: 1, text: "kept" });
-    // 封存内容一次写入，恢复点与工作目录共享同一份字节。
+    // Sealed content is written once; recovery points and working directories share the same bytes.
     const saved = pointFile(directory, point!.id, "content", "sealed", "attachment");
     expect(readFileSync(saved, "utf8")).toBe("original bytes");
     expect(statSync(saved).ino).toBe(statSync(join(directory, "content", "sealed", "attachment")).ino);
   });
 
-  // 版本过新、迁移路径断裂或缺少版本号都不能改写原文件，也不应先执行已知的部分步骤。
+  // Too-new versions, broken migration paths, and absent versions must neither rewrite originals nor run partial known steps first.
   it.each([
-    ["版本过新", { version: 9, text: "keep" }],
-    ["路径缺失", { version: 0, text: "keep" }],
-    ["没有版本号", { text: "keep" }],
-  ])("%s时失败并保持原文件", async (_name, original) => {
+    ["version too new", { version: 9, text: "keep" }],
+    ["missing migration path", { version: 0, text: "keep" }],
+    ["missing version", { text: "keep" }],
+  ])("fails for %s while preserving original files", async (_name, original) => {
     const directory = root();
     writeJson(join(directory, "configuration.json"), original);
     let invoked = false;
@@ -55,8 +55,8 @@ describe("数据准备", () => {
     expect(existsSync(join(directory, "recovery"))).toBe(false);
   });
 
-  // 末步失败时前面内存中的转换不能落盘；同一组变化重试时沿用原恢复点，不让反复失败挤掉更早的恢复点。
-  it("JSON 迁移中途失败保持原文件，重试沿用同一恢复点", async () => {
+  // Final-step failure must not persist earlier in-memory conversions; retries of the same changes reuse recovery points so repeated failures do not evict older points.
+  it("JSON migration failures preserve originals and retries reuse the same recovery point", async () => {
     const directory = root();
     writeJson(join(directory, "configuration.json"), { version: 1, text: "kept" });
     let fail = true;
@@ -69,8 +69,8 @@ describe("数据准备", () => {
     expect(listRecoveryPoints(directory)).toHaveLength(1);
   });
 
-  // SQL 前一步可能已删改结构；后一步失败必须将结构与格式号一并回滚。
-  it("SQLite 迁移链在一个事务中回滚", async () => {
+  // Earlier SQL steps may change or delete structure; later failures must roll back structure and format versions together.
+  it("SQLite migration chains roll back in one transaction", async () => {
     const directory = root(); mkdirSync(join(directory, "db"));
     const file = join(directory, "db", "workspace.sqlite");
     const seed = new DatabaseSync(file);
@@ -87,8 +87,8 @@ describe("数据准备", () => {
     } finally { db.close(); }
   });
 
-  // 上次退出可能留下未 checkpoint 的 WAL；只复制主文件会漏掉已提交的记录。
-  it("恢复点保留 WAL 中已提交的数据库记录", async () => {
+  // Previous exits may leave uncheckpointed WAL; copying only main files loses committed records.
+  it("recovery points preserve committed database records in WAL", async () => {
     const directory = root(); mkdirSync(join(directory, "db"));
     const seed = join(directory, "seed.sqlite"), file = join(directory, "db", "workspace.sqlite");
     const database = new DatabaseSync(seed);
@@ -105,8 +105,8 @@ describe("数据准备", () => {
     } finally { saved.close(); }
   });
 
-  // 保留策略：只留最近 7 个完整恢复点，最新的恢复点不能被清理。
-  it("只保留最近 7 个恢复点", async () => {
+  // Retention policy keeps only the latest 7 complete recovery points without deleting the newest.
+  it("keeps only the latest 7 recovery points", async () => {
     const directory = root();
     for (let version = 1; version <= 9; version++) {
       writeJson(join(directory, "configuration.json"), { version, text: String(version) });
@@ -118,8 +118,8 @@ describe("数据准备", () => {
     expect(readdirSync(join(directory, "recovery", "points"))).toHaveLength(7);
   });
 
-  // 还原替换整组数据并保留当前现场；重启后暂停自动迁移，避免同一错误循环，直到用户重试。
-  it("还原恢复点保留当前数据并暂停自动迁移", async () => {
+  // Restoration replaces the complete data set and preserves the current state; pause automatic migration after restart until user retry to prevent recurring errors.
+  it("restoring recovery points preserves current data and pauses automatic migration", async () => {
     const directory = root();
     writeJson(join(directory, "configuration.json"), { version: 1, text: "old" });
     const stores = [document(directory, 3, { 1: toV2, 2: toV3 })];
@@ -136,8 +136,8 @@ describe("数据准备", () => {
     expect(listRecoveryPoints(directory).filter(point => point.kind === "migration")).toHaveLength(2);
   });
 
-  // 还原进程可能在移动现场之前或复制途中退出；下一次准备必须先按持久状态完成还原。
-  it("中断的还原在下一次准备时继续", async () => {
+  // Restoration may exit before moving current data or during copying; next preparation must complete restoration from persisted state first.
+  it("interrupted restoration resumes on next preparation", async () => {
     const directory = root();
     writeJson(join(directory, "configuration.json"), { version: 1, text: "old" });
     const stores = [document(directory, 2, { 1: toV2 })];
@@ -149,8 +149,8 @@ describe("数据准备", () => {
     expect(readJson(pointFile(directory, "9999-interrupted", "configuration.json"))).toEqual({ version: 2, entries: ["old"] });
   });
 
-  // 重新开始必须让旧数据可找回，随后由业务层按新用户创建，不算格式迁移。
-  it("重新开始把当前数据移入恢复点", async () => {
+  // Starting over keeps old data recoverable, then business logic creates data for a new user; this is not format migration.
+  it("starting over moves current data into recovery points", async () => {
     const directory = root();
     writeFileSync(join(directory, "configuration.json"), "broken JSON");
     const stores = [document(directory, 2, {})];
@@ -163,8 +163,8 @@ describe("数据准备", () => {
     expect(await prepare(directory, stores)).toEqual({ ok: true, plugins: [] });
   });
 
-  // 插件迁移失败只禁用该插件：宿主照常升级，插件文件保持原样，不进入恢复页。
-  it("插件存储失败只报告该插件", async () => {
+  // Plugin migration failures disable only that plugin: hosts upgrade normally, plugin files stay unchanged, and recovery pages do not appear.
+  it("plugin storage failures report only the affected plugin", async () => {
     const directory = root();
     writeJson(join(directory, "configuration.json"), { version: 1, text: "host" });
     const plugin = join(directory, "extensions", "acme.notes", "notes.json");
@@ -181,8 +181,8 @@ describe("数据准备", () => {
     expect(listRecoveryPoints(directory)[0]!.notice).toBe(false);
   });
 
-  // 新安装和无变化重启只读版本号，不产生恢复点或提示。
-  it("没有迁移时不产生恢复点", async () => {
+  // New installations and unchanged restarts read versions only without recovery points or prompts.
+  it("no migration creates no recovery points", async () => {
     const directory = root();
     const stores = [document(directory, 2, {})];
     expect(await prepare(directory, stores)).toEqual({ ok: true, plugins: [] });

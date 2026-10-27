@@ -26,7 +26,7 @@ function input(protocol: ModelInput["settings"]["provider"]["protocol"] = "opena
   };
 }
 
-// 沿用真实 SDK 的流接口，只替换传输；捕获最终 HTTP 正文，避免只验证中间选项。
+// Use the real SDK streaming interface and replace only transport; capture final HTTP bodies instead of checking intermediate options alone.
 async function request(value: ModelInput, inspectHeaders?: (headers: Headers) => void): Promise<Record<string, unknown>> {
   let body: Record<string, unknown> | undefined;
   const frames = value.settings.provider.protocol === "anthropic" ? [
@@ -54,13 +54,13 @@ async function request(value: ModelInput, inspectHeaders?: (headers: Headers) =>
     return new Response(frames.map(frame => `data: ${JSON.stringify(frame)}\n\n`).join(""), { headers: { "content-type": "text/event-stream" } });
   };
   const adapter = new AiSdkAdapter(async () => "unused", (current, key) => createProviderModel(current.settings.provider, current.settings.model, key, transport, current));
-  for await (const _event of adapter.prepare(value).stream(new AbortController().signal)) { /* 消费完整流，序列化错误不能被忽略。 */ }
+  for await (const _event of adapter.prepare(value).stream(new AbortController().signal)) { /* Consume the complete stream; serialization errors cannot be ignored. */ }
   return body!;
 }
 
-describe("思考等级与预算映射", () => {
-  // 映射包只接受标准等级；预算为绝对 token 数，off 不能误编码成零预算。
-  it("等级与预算映射校验稀疏值，表单可区分默认、null 与自定义值", () => {
+describe("Reasoning level and budget mappings", () => {
+  // Mapping packages accept standard levels only; budgets are absolute token counts and off must not encode as a zero budget.
+  it("level and budget mappings validate sparse values and forms distinguish default, null, and custom values", () => {
     const levels = modelCompatibilityDefinition("customThinkingLevels")!;
     const budgets = modelCompatibilityDefinition("customThinkingBudgets")!;
     expect(modelCompatibilitySchema.parse([
@@ -80,8 +80,8 @@ describe("思考等级与预算映射", () => {
     expect(configurationField(budgetsForm.properties!.high as Json).kind).toBe("integer");
   });
 
-  // 真正发送的值必须服从显式映射，而非 SDK 的枚举或按模型名选择的默认值；历史保留标准等级。
-  it.each(["openai-responses", "openai-chat", "anthropic"] as const)("%s 原样发送自定义 effort，并支持显式省略与协议默认", async protocol => {
+  // Transmitted values follow explicit mappings rather than SDK enums or model-name defaults; history retains standard levels.
+  it.each(["openai-responses", "openai-chat", "anthropic"] as const)("%s sends custom effort unchanged and supports explicit omission and protocol defaults", async protocol => {
     const current = input(protocol);
     current.settings.model.modelId = protocol === "anthropic" ? "claude-opus-4-7" : "gpt-5.1";
     current.settings.provider.compatibility = [{ id: "customThinkingLevels", value: { low: "upstream-low" } }];
@@ -103,8 +103,8 @@ describe("思考等级与预算映射", () => {
     expect(effort(await request(current))).toBeUndefined();
   });
 
-  // 无兼容包也能使用 Anthropic 手动预算；本次输出上限含思考，不得被 SDK 额外扩张。
-  it("Anthropic 默认预算按最终输出上限分配，预算包仅覆盖指定等级", async () => {
+  // Anthropic manual budgets work without compatibility packages; the output limit includes reasoning and cannot be expanded by the SDK.
+  it("Anthropic default budgets use the final output limit and budget packages override only specified levels", async () => {
     const current = input("anthropic");
     current.settings.model.modelId = "claude-sonnet-4-5";
     current.settings.model.generation.maxOutputTokens = 20000;
@@ -121,8 +121,8 @@ describe("思考等级与预算映射", () => {
     expect(await request(current)).toMatchObject({ thinking: { type: "enabled", budget_tokens: 2048 }, max_tokens: 10000 });
   });
 
-  // 同时存在两张映射时，effort 名称不参与 token 计算；预算包不能强制 adaptive 模型改用手动预算。
-  it("Anthropic 模式与两张映射独立，off 不被 SDK 降级为低思考", async () => {
+  // With both mappings present, effort names do not affect token calculations; budget packages cannot force adaptive models into manual budgeting.
+  it("Anthropic mode is independent of both mappings and the SDK does not downgrade off to low reasoning", async () => {
     const current = input("anthropic");
     current.settings.model.generation.maxOutputTokens = 20000;
     current.settings.provider.compatibility = [
@@ -143,8 +143,8 @@ describe("思考等级与预算映射", () => {
     expect(disabled.output_config).toBeUndefined();
   });
 
-  // SDK 对未知模型把默认输出上限与预算相加、对已知模型另作截断；两者都不能成为宿主默认预算的基数。
-  it("未设置输出上限的手动预算使用固定的 4096 总上限，不随 SDK 或等级扩张", async () => {
+  // For unknown models the SDK adds the default output limit and budget, and separately truncates known models; neither defines the host default budget base.
+  it("manual budgets without output limits use a fixed total cap of 4096 without SDK or level expansion", async () => {
     const current = input("anthropic");
     current.settings.model.generation.maxOutputTokens = null;
     for (const modelId of ["test", "claude-sonnet-4-5"]) {
@@ -156,9 +156,9 @@ describe("思考等级与预算映射", () => {
     }
   });
 
-  // 超预算必须在 HTTP 发送前拒绝，且保留明确的宿主错误，不转换成误导性的网络错误。
+  // Reject excessive budgets before HTTP transmission and retain explicit host errors rather than misleading network errors.
   it.each([{ limit: 8192, budget: 8192 }, { limit: 1000, budget: undefined }])(
-    "Anthropic 预算无法容纳于输出上限 $limit 时拒绝发送", async ({ limit, budget }) => {
+    "rejects sending when the Anthropic budget cannot fit output limit $limit", async ({ limit, budget }) => {
       const current = input("anthropic");
       current.settings.model.generation.maxOutputTokens = limit;
       if (budget !== undefined) current.settings.model.compatibility = [{ id: "customThinkingBudgets", value: { low: budget } }];
@@ -167,8 +167,8 @@ describe("思考等级与预算映射", () => {
       expect(sent).toBe(false);
     });
 
-  // 流式与非流式 SDK 调用共享预算契约；最小连接 probe 不启用思考。
-  it("非流式执行使用同一预算映射，连接测试不消费映射", async () => {
+  // Streaming and non-streaming SDK calls share the budget contract; minimal connection probes do not enable reasoning.
+  it("non-streaming execution uses the same budget mapping while connection tests do not consume mappings", async () => {
     const current = input("anthropic");
     current.settings.model.generation.maxOutputTokens = 10000;
     current.settings.model.compatibility = [{ id: "customThinkingBudgets", value: { low: 2048 } }];
@@ -188,10 +188,10 @@ describe("思考等级与预算映射", () => {
   });
 });
 
-describe("显式兼容与目标投影", () => {
-  // 请求身份契约：最终 HTTP 头遵循模型 > 提供商 > 调用方，SDK 不得追加 UA；
-  // 会话头由显式兼容设置启用，同会话跨请求稳定，且身份不进入模型正文。
-  it.each(["openai-responses", "openai-chat", "anthropic"] as const)("%s 请求身份在最终传输边界生效", async protocol => {
+describe("Explicit compatibility and target projection", () => {
+  // Request identity contract: final HTTP headers follow model > provider > caller precedence, and the SDK must not append UA;
+  // explicit compatibility settings enable session headers, which remain stable across requests in a session; identity stays outside model text.
+  it.each(["openai-responses", "openai-chat", "anthropic"] as const)("%s request identity takes effect at the final transport boundary", async protocol => {
     const current = input(protocol);
     current.userAgent = "ExampleAgent/1.0";
     current.sessionId = "session-a";
@@ -218,8 +218,8 @@ describe("显式兼容与目标投影", () => {
     expect(headers[3]!.get("user-agent")).toBe("ConnectionAgent/2.0");
   });
 
-  // 公共契约：摘要不能填充全文；来源密文可复用时优先发送，空文字密文也不得丢失。
-  it("Responses 分别编码明文、摘要与原生密文，历史不变", async () => {
+  // Public contract: summaries cannot fill full text; reusable origin ciphertext takes precedence and ciphertext with empty text must survive.
+  it("Responses encodes plaintext, summaries, and native ciphertext separately without changing history", async () => {
     const current = input();
     current.messages = [{ kind: "output", adapter: aiSdkAdapterVersion, scope: modelScope(current.settings), parts: [
       { kind: "thinking", text: "Plain", summary: "Summary", continuation: null },
@@ -242,8 +242,8 @@ describe("显式兼容与目标投影", () => {
     expect((await request(current)).input).toEqual([{ role: "assistant", content: "Answer" }]);
   });
 
-  // Kimi 的 include 枚举没有 encrypted_content；GLM schema 的 content 为单对象，不能继续发数组。
-  it("端点兼容只调整字段形状和不支持的请求参数，首次请求也生效", async () => {
+  // Kimi's include enum lacks encrypted_content; GLM's schema requires a single content object rather than an array.
+  it("endpoint compatibility adjusts only field shapes and unsupported request parameters, including the first request", async () => {
     const current = input();
     current.settings.provider.compatibility = [{ id: "responsesReasoning", value: { content: "object", encryptedContent: false, summary: false } }];
     const first = await request(current);
@@ -256,8 +256,8 @@ describe("显式兼容与目标投影", () => {
     expect((await request(current)).input).toContainEqual({ type: "reasoning", content: { type: "reasoning_text", text: "Plain" } });
   });
 
-  // Messages 的签名必须对应原文字；无签名文字原样编码，摘要不伪装成 thinking，纯遮蔽块正常续接。
-  it("Messages 原生支持无签名明文、签名及遮蔽思考，并保持工具相对顺序", async () => {
+  // Messages signatures must match original text; unsigned text encodes unchanged, summaries are not disguised as thinking, and redacted-only blocks continue normally.
+  it("Messages natively supports unsigned plaintext, signatures, and redacted reasoning while preserving relative tool order", async () => {
     const current = input("anthropic");
     current.messages = [{ kind: "output", adapter: aiSdkAdapterVersion, scope: modelScope(current.settings), parts: [
       { kind: "thinking", text: "  Signed\n", summary: "Display only", continuation: { anthropic: { signature: "signed" } } },
@@ -284,8 +284,8 @@ describe("显式兼容与目标投影", () => {
     ]);
   });
 
-  // SDK 裁剪末条 assistant 的末段正文；合法前导空白不能使思考插入计划失配，签名原文不受影响。
-  it("Messages 核对 SDK 的末段正文裁剪，签名思考保留原始空白", async () => {
+  // The SDK trims the last assistant's final text segment; valid leading whitespace must not invalidate reasoning insertion plans or affect original signed text.
+  it("Messages accounts for SDK trimming of final text while signed reasoning retains original whitespace", async () => {
     const current = input("anthropic");
     current.messages = [{ kind: "output", adapter: aiSdkAdapterVersion, scope: modelScope(current.settings), parts: [
       { kind: "thinking", text: "  Thought\n", summary: "", continuation: { anthropic: { signature: "signed" } } },
@@ -297,8 +297,8 @@ describe("显式兼容与目标投影", () => {
     ] }]);
   });
 
-  // utility 与对话共用编码入口；等级列表不能拒绝或钳制 max / xhigh，空等级由上游自行选择。
-  it.each(["openai-responses", "openai-chat", "anthropic"] as const)("%s 原样编码列表外等级，未设置时省略 effort", async protocol => {
+  // Utility and conversation share encoding; level lists must not reject or clamp max/xhigh, and upstream chooses omitted levels.
+  it.each(["openai-responses", "openai-chat", "anthropic"] as const)("%s encodes unlisted levels unchanged and omits effort when unset", async protocol => {
     const current = input(protocol);
     current.settings.model.modelId = protocol === "anthropic" ? "claude-opus-4-7" : "gpt-5.1";
     current.settings.model.capabilities.thinkingLevels = ["low"];
@@ -313,8 +313,8 @@ describe("显式兼容与目标投影", () => {
     expect(effort(await request(current))).toBeUndefined();
   });
 
-  // 两层合并不能深合并参数、把空列表当禁用，或把生效条目回写到任一来源。
-  it("按 id 去重，模型参数整项优先，撤下覆盖恢复提供商条目", () => {
+  // Two-layer merging must not deep-merge parameters, treat empty lists as disabling, or write effective entries back into either source.
+  it("deduplicates by id, prefers whole model parameter entries, and restores provider entries when overrides are removed", () => {
     const provider: ModelCompatibility[] = [{ id: "tag" }, { id: "options", value: { count: 3, enabled: true } }];
     const model: ModelCompatibility[] = [{ id: "tag" }, { id: "options", value: { enabled: false } }, { id: "modelOnly" }];
     const original = structuredClone({ provider, model });
@@ -329,8 +329,8 @@ describe("显式兼容与目标投影", () => {
     expect({ provider, model }).toEqual(original);
   });
 
-  // 系统提示只能发送一份：默认 instructions，显式标签才改为首条 system。
-  it.each(["none", "provider", "model", "both"])("Responses 系统提示位置由两层标签决定：%s", async source => {
+  // Send one system prompt: instructions by default, or the first system message only with an explicit tag.
+  it.each(["none", "provider", "model", "both"])("Responses system prompt placement follows tags from both layers: %s", async source => {
     const current = input();
     current.settings.provider.compatibility = source === "provider" || source === "both" ? [{ id: "systemMessageInMessages" }] : [];
     current.settings.model.compatibility = source === "model" || source === "both" ? [{ id: "systemMessageInMessages" }] : [];
@@ -346,8 +346,8 @@ describe("显式兼容与目标投影", () => {
     }
   });
 
-  // 参考协议不限制添加；不认识这些行为的协议继续正常编码。
-  it("Responses 标签不改变 Anthropic 请求", async () => {
+  // Reference protocols do not restrict additions; protocols unaware of these behaviors continue encoding normally.
+  it("Responses tags do not change Anthropic requests", async () => {
     const current = input("anthropic");
     current.settings.provider.compatibility = [{ id: "systemMessageInMessages" }, { id: "responsesReasoning", value: {} }];
     const body = await request(current);
@@ -356,8 +356,8 @@ describe("显式兼容与目标投影", () => {
     expect(body.messages).toEqual([{ role: "user", content: [{ type: "text", text: "Question" }] }]);
   });
 
-  // 明文 reasoning 必须在原位置，不能被 SDK 丢弃，也不能破坏相邻的图片、工具配对或助手文字。
-  it("明文思考无需兼容包，按原顺序插入，跨来源只取公共文字", async () => {
+  // Plaintext reasoning must retain its position without being dropped by the SDK or disrupting adjacent images, tool pairing, or assistant text.
+  it("plaintext reasoning requires no compatibility package, inserts in original order, and uses only public text across origins", async () => {
     const current = input();
     current.settings.model.compatibility = [{ id: "systemMessageInMessages" }];
     const foreign = { adapter: "foreign-adapter", scope: "foreign-scope" };
@@ -387,8 +387,8 @@ describe("显式兼容与目标投影", () => {
     expect(current.messages).toEqual(original);
   });
 
-  // 正常原生续接属于基线；切换只省略不可复用资料，切回时原历史的投影不受中间请求污染。
-  it.each(["openai-responses", "anthropic"] as const)("%s 原生续接与 A→B→A 不改历史", async protocol => {
+  // Normal native continuation is the baseline; switching omits only nonreusable data, and switching back projects original history without contamination by intermediate requests.
+  it.each(["openai-responses", "anthropic"] as const)("%s native continuation and A→B→A leave history unchanged", async protocol => {
     const current = input(protocol);
     const native: Json = protocol === "anthropic" ? { anthropic: { signature: "native-token" } }
       : { openai: { itemId: "rs_native", reasoningEncryptedContent: "native-token" } };
@@ -425,8 +425,8 @@ describe("显式兼容与目标投影", () => {
     expect(current).toEqual(original);
   });
 
-  // 不同来源可以复用相同 call ID；投影必须保留本来源 ID，并让外来调用与其结果一起改名。
-  it("跨来源调用 ID 冲突时保留原生身份，外来调用仍与结果配对", async () => {
+  // Different origins may reuse call IDs; projection preserves this origin's IDs and renames foreign calls together with their results.
+  it("cross-origin call ID collisions preserve native identities while foreign calls remain paired with results", async () => {
     const current = input();
     current.messages = [
       { kind: "output", adapter: "foreign", scope: "foreign", parts: [
@@ -447,8 +447,8 @@ describe("显式兼容与目标投影", () => {
     expect((await request(current)).input).toEqual(body.input);
   });
 
-  // 搬运只能改变文件的表达位置，不能把它移到后续历史消息之后。
-  it("Chat 附件紧随工具结果批次，位于下一条历史消息之前", () => {
+  // Moving files can change only their representation position, never place them after subsequent historical messages.
+  it("Chat attachments immediately follow the tool result batch before the next historical message", () => {
     const current = input("openai-chat");
     current.settings.model.compatibility = [{ id: "toolFilesAsUserMessage" }];
     current.messages = [
@@ -465,8 +465,8 @@ describe("显式兼容与目标投影", () => {
     expect(messages[2]).toMatchObject({ content: [{ type: "text", text: "Following answer" }] });
   });
 
-  // 提交前的引用形式与实际请求的字节形式共用同一协议门禁，禁止静默搬运文件。
-  it("Chat 未添加工具文件标签时在 validate 与 prepare 拒绝", () => {
+  // References before submission and bytes in actual requests share one protocol gate; files cannot be moved silently.
+  it("Chat rejects tool files without a tool-file tag in validate and prepare", () => {
     const current = input("openai-chat");
     const adapter = new AiSdkAdapter(async () => { throw new Error("Must fail before reading credentials"); });
     const saved = { ...current, messages: [{ kind: "result" as const, callId: "call", name: "lookup", outcome: {

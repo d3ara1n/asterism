@@ -3,7 +3,7 @@ import { pluginNamespace, defineCreation, defineAction, defineRecord, defineChan
 
 export const sample = pluginNamespace("example.counter");
 export const Counter = sample.resource("counter", z.strictObject({}));
-/** 前后台共用，供创建空位与实际卡片使用。 */
+/** Shared by frontend and backend for creation placeholders and actual cards. */
 export const counterCard = { width: 300, height: 200 };
 export const Count = sample.data("count", z.strictObject({ value: z.number().int() }));
 export const CounterView = sample.data("card", Count.schema);
@@ -14,5 +14,5 @@ const createInput = z.strictObject({ title: z.string().trim().min(1).default("Co
 const actionInput = z.strictObject({ amount: z.number().int() });
 export const CreateCounter = defineCreation(Counter, { id: sample.name("create"), schema: createInput });
 export const ChangeCount = defineAction(Counter, { id: sample.name("change"), schema: actionInput });
-/** 对象级双工通道：前端请求实时推送，后台按对象发送当前值；不进入时间线。 */
+/** Object-level duplex channel: the frontend requests live updates, and the backend sends current values per object; does not enter the timeline. */
 export const CounterUpdates = defineChannel<{ type: "subscribe" }, { value: number }>(sample.name("updates"));

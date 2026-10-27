@@ -1,4 +1,4 @@
-/** 作者用例与类型检查；导入 SDK 和可选领域库，不执行这些声明。 */
+/** Author examples and typechecks; import the SDK and optional domain libraries without executing these declarations. */
 import { z } from "zod";
 import {
   defineModule, definePlugin, observe, prepare, pluginNamespace, implementResource, Session,
@@ -48,7 +48,7 @@ export const emptyInputGuard = prepare({
   },
 });
 
-// 以下检查针对独立契约：错误类型、错误归属和事实拦截必须在编译期被拒绝。
+// These checks target independent contracts: invalid types, incorrect ownership, and interception of facts must be rejected at compile time.
 declare const snapshot: SessionSnapshot;
 declare const rawRecord: SessionRecord;
 declare const writer: ResourceWriter<typeof AgentResource>;
@@ -61,21 +61,21 @@ const decoded = UserMessage.decode(rawRecord);
 if (decoded?.status === "known") {
   const text: string = decoded.data.text;
   void text;
-  // @ts-expect-error 用户消息不具备目录文件定位字段。
+  // @ts-expect-error User messages have no directory file locator fields.
   decoded.data.path;
-  // @ts-expect-error 观察结果不可修改。
+  // @ts-expect-error Observation results are immutable.
   decoded.data.text = "changed";
 }
 writer.append(UserMessage, { text: "Hello" });
-// @ts-expect-error 错误 payload 不能通过从第二个参数反向推导契约绕过校验。
+// @ts-expect-error Invalid payloads cannot bypass validation by inferring the contract from the second argument.
 writer.append(UserMessage, { text: 1 });
-// @ts-expect-error 其他资源的记录不能由该资源 writer 提交。
+// @ts-expect-error This resource's writer cannot submit records belonging to other resources.
 writer.append(FileRead, { path: "a.txt", text: "Hello" });
-// @ts-expect-error 已发生的事实（记录）不能注册进入前替换或拒绝，prepare 只接受命令。
+// @ts-expect-error Existing facts (records) cannot register pre-entry replacement or rejection; prepare accepts commands only.
 prepare({ id: "rewrite-output", on: TextBlock, run: () => ({ action: "accept" }) });
-// @ts-expect-error 替换必须符合命令输入契约。
+// @ts-expect-error Replacements must conform to the command input contract.
 prepare({ id: "wrong-replacement", on: Submit, run: () => ({ action: "replace", data: { text: 1, submissionId: "s" } }) });
-// @ts-expect-error 同步提交不能传入异步事务回调。
+// @ts-expect-error Synchronous commits cannot receive asynchronous transaction callbacks.
 resourceContext.commit(async () => {});
 implementResource(AgentResource, { commands: {
   async Submit(input, context) {
@@ -84,15 +84,15 @@ implementResource(AgentResource, { commands: {
   },
 } });
 implementResource(AgentResource, { commands: {
-  // @ts-expect-error 命令返回值必须符合 output 契约。
+  // @ts-expect-error Command return values must conform to the output contract.
   Submit: async () => ({ accepted: "yes" }),
 } });
 const sameShape = filesystem.record("user-message", {
   version: 1, schema: z.strictObject({ text: z.string() }),
 });
-// @ts-expect-error 同形 payload 的不同契约仍不能跨资源提交。
+// @ts-expect-error Different contracts with identically shaped payloads still cannot be submitted across resources.
 writer.append(sameShape, { text: "Hello" });
-// @ts-expect-error 观察入口要求契约值，不接受字符串事件名。
+// @ts-expect-error Observation requires contract values, not string event names.
 observe({ id: "string-event", on: "session.committed", run() {} });
 const committedRef = resourceContext.commit(writer => writer.append(UserMessage, { text: "Hello" }));
 const committedId: string = committedRef.id;
@@ -104,7 +104,7 @@ async function checkQueries() {
   if (directory) {
     const path: string = directory.data.path;
     void path;
-    // @ts-expect-error 目录公开数据没有模型选择字段。
+    // @ts-expect-error Public catalog data has no model selection fields.
     directory.data.selection;
   }
 }
@@ -113,16 +113,16 @@ async function checkInvoke() {
   const output = await commands.invoke(Submit, agentRef, { text: "Hello", submissionId: "s1" });
   const accepted: boolean = output.accepted;
   void accepted;
-  // @ts-expect-error 命令输入由契约确定。
+  // @ts-expect-error The contract determines command input.
   await commands.invoke(Submit, agentRef, { text: 1, submissionId: "s1" });
-  // @ts-expect-error 不接受字符串地址，跨插件调用必须持有命令契约。
+  // @ts-expect-error String addresses are not accepted; cross-plugin calls require a command contract.
   await commands.invoke("atelier.core/agent.submit", agentRef, { text: "Hello", submissionId: "s1" });
-  // @ts-expect-error 记录契约不能混作命令。
+  // @ts-expect-error Record contracts cannot be used as commands.
   await commands.invoke(UserMessage, agentRef, { text: "Hello" });
 }
 void checkInvoke;
 
-// 模型服务只消费 SDK 模型协议类型；无需资源或领域配置。
+// The model service consumes only SDK model protocol types; no resource or domain configuration is required.
 models.stream({ target: { role: "default" }, system: "Answer briefly.", messages: [{ kind: "input", text: "Hello" }], signal });
 void models.run({
   signal, maxRequests: 1,

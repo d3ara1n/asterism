@@ -7,9 +7,9 @@ const context = (headers: Record<string, string>): UsageHeadersContext => ({
   connection: { id: "custom", endpoint: "https://example.test/v1" }, model: "test-model", status: 200,
   receivedAt: Date.parse("2030-01-01T00:00:00Z"), headers,
 });
-describe("限流响应头", () => {
-  // OpenAI 的 reset 是持续时长，须以收到响应的时间计算；tokens 与 requests 是独立预算。
-  it("OpenAI 同时解析 token 与请求余量，并完整解析 Go duration", () => {
+describe("rate-limit response headers", () => {
+  // OpenAI reset values are durations and must be calculated from response receipt time; tokens and requests are separate budgets.
+  it("OpenAI parses both token and request allowances and fully parses Go duration", () => {
     const result = openaiHeaderUsage.parseHeaders(context({
       "x-ratelimit-limit-tokens": "1000", "x-ratelimit-remaining-tokens": "750", "x-ratelimit-reset-tokens": "1m2.5s",
       "x-ratelimit-limit-requests": "10", "x-ratelimit-remaining-requests": "0", "x-ratelimit-reset-requests": "500ms",
@@ -19,8 +19,8 @@ describe("限流响应头", () => {
       { id: "requests", value: { remaining: 0 }, window: { resetAt: context({}).receivedAt + 500 } },
     ]);
   });
-  // Anthropic 使用 ISO 时间；xAI 的已知响应使用 Unix 秒，不能共用 OpenAI 的 duration 解析。
-  it("Anthropic 保留输入/输出限制，xAI 按 Unix 秒解析重置", () => {
+  // Anthropic uses ISO timestamps; known xAI responses use Unix seconds and cannot share OpenAI duration parsing.
+  it("Anthropic preserves input/output limits and xAI parses resets as Unix seconds", () => {
     expect(anthropicHeaderUsage.parseHeaders(context({
       "anthropic-ratelimit-input-tokens-limit": "100", "anthropic-ratelimit-input-tokens-remaining": "80",
       "anthropic-ratelimit-input-tokens-reset": "2030-01-01T00:01:00Z",
@@ -32,8 +32,8 @@ describe("限流响应头", () => {
     expect(xaiHeaderUsage.parseHeaders(context({ "x-ratelimit-limit-tokens": "100", "x-ratelimit-remaining-tokens": "1", "x-ratelimit-reset-tokens": "1893456060" })))
       .toMatchObject([{ window: { resetAt: 1893456060000 } }]);
   });
-  // 无字段表示没有新观察；坏字段不能变成 0，未知重置编码不能被局部正则误读。
-  it("缺失数据返回 null，错误数量拒绝，未知 reset 保持未知", () => {
+  // Missing fields mean no new observation; invalid fields must not become 0, and partial regex matches must not misread unknown reset encodings.
+  it("returns null for missing data, rejects invalid quantities, and leaves unknown reset values unknown", () => {
     expect(openaiHeaderUsage.parseHeaders(context({}))).toBeNull();
     expect(openaiHeaderUsage.parseHeaders(context({ "x-ratelimit-limit-tokens": "100" }))).toBeNull();
     expect(() => openaiHeaderUsage.parseHeaders(context({ "x-ratelimit-limit-tokens": "", "x-ratelimit-remaining-tokens": "0" }))).toThrow();

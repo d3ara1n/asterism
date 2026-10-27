@@ -1,7 +1,7 @@
 import type { AgentScrollAreaProps } from "@asterism/builtin-api/renderer";
 import { cn } from "@asterism/ui/utils";
 
-/** 同一视口负责滚动和焦点光圈留白；负边距保持正文与固定区域对齐。 */
+/** The same viewport handles scrolling and focus-ring clearance; negative margins align body content with fixed areas. */
 export function ScrollArea({ axis = "vertical", className, ...props }: AgentScrollAreaProps) {
   return <div {...props} className={cn(
     "-m-1 min-h-0 p-1",

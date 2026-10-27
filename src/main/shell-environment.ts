@@ -1,8 +1,8 @@
 import { shellEnv } from "shell-env";
 
 /**
- * 从 Finder／Dock 启动的应用只取得 launchd 的最小环境；启动时读取用户登录 shell 的环境并写回主进程，
- * 任务进程与其派生的 shell、终端和插件子进程随之继承同一份环境。Windows 由 shell-env 原样返回。
+ * Apps launched from Finder/Dock receive only launchd's minimal environment; read the user's login shell environment into the main process at startup,
+ * so the task process and its shells, terminals, and plugin subprocesses inherit the same environment. shell-env returns Windows environments unchanged.
  */
 export async function adoptLoginShellEnvironment(signal?: AbortSignal): Promise<void> {
   try {

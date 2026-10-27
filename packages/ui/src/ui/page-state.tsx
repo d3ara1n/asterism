@@ -4,8 +4,8 @@ import { cn } from "../utils";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "./empty";
 
 /**
- * 页面级状态，由官方 Empty 组合：
- * loading 正在读取；empty 尚未创建/配置；unavailable 能力尚未接入；error 读取或操作失败。
+ * Page-level states composed from the official Empty:
+ * loading means reading; empty means not yet created/configured; unavailable means the capability is not yet integrated; error means reading or an operation failed.
  */
 export type PageStateKind = "loading" | "empty" | "unavailable" | "error";
 const icons = { loading: Loader2, empty: Inbox, unavailable: PlugZap, error: CircleAlert };

@@ -2,7 +2,7 @@ import { commonMessages } from "@asterism/ui/messages/common";
 import { useI18n } from "../shared/i18n";
 import { Component, type ReactNode } from "react";
 
-/** 插槽级错误边界：单个视图崩溃只影响自身，不波及工作台或其他卡片。 */
+/** Slot-level error boundary: a view crash affects only that view, not the workbench or other cards. */
 export class SlotBoundary extends Component<{ children: ReactNode; fallback?: ReactNode }, { failed: boolean }> {
   state = { failed: false };
   static getDerivedStateFromError() { return { failed: true }; }

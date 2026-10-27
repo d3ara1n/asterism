@@ -17,8 +17,8 @@ async function executable(name: string) {
   return path;
 }
 
-// 查询必须应用 profile 的 PATH 覆盖；仅把已配置项视为可用会误导终端创建，目录也不是可执行文件。
-it("查询按执行环境发现可执行文件，保留不可用配置且不交付环境变量", async () => {
+// Queries must apply the profile's PATH override; treating configured entries alone as available would mislead terminal creation, and directories are not executables.
+it("discovers executables using the execution environment, retains unavailable configurations, and exposes no environment variables", async () => {
   const name = "asterism-test-shell.exe";
   const path = await executable(name);
   const directory = join(root, "directory");
@@ -42,8 +42,8 @@ it("查询按执行环境发现可执行文件，保留不可用配置且不交�
   expect(result.profiles[0]).not.toHaveProperty("env");
 });
 
-// auto 先按平台预设顺序选，再尝试自定义项；配置排列不代表自动选择优先级。
-it("自动选择跳过缺失预设，优先可用预设，并与实际执行解析一致", async () => {
+// auto first follows platform preset order, then tries custom entries; configuration order is not automatic-selection priority.
+it("automatic selection skips missing presets, prioritizes available presets, and matches actual execution resolution", async () => {
   const custom = profile("custom", await executable("custom.exe"));
   const sh = profile("sh", await executable("sh.exe"));
   const settings = { selected: "auto", profiles: [custom, profile("bash", join(root, "missing.exe")), sh] };
@@ -54,8 +54,8 @@ it("自动选择跳过缺失预设，优先可用预设，并与实际执行解�
   expect((await listShellProfiles(customOnly, {})).resolvedProfile).toBe("custom");
 });
 
-// 显式默认项失效时报告不可用；借用其他可用项会使列表宣称的默认 Shell 与 exec 的失败行为矛盾。
-it("显式默认项缺失时保持未解析，其他可用配置仍可列出", async () => {
+// An invalid explicit default is reported as unavailable; borrowing another available entry would contradict exec failure behavior with the listed default Shell.
+it("leaves a missing explicit default unresolved while still listing other available configurations", async () => {
   const settings = { selected: "missing", profiles: [
     profile("missing", join(root, "missing.exe")), profile("other", await executable("other.exe")),
   ] };

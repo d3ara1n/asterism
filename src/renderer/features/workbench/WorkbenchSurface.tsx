@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { Background, BackgroundVariant, ReactFlow, ReactFlowProvider } from "@xyflow/react";
 import { useAppearance, useScheme } from "../appearance/state";
 
-/** 工作台底板随导航入场，内容读取不影响页面过渡。 */
+/** The workbench surface enters with navigation; content loading does not affect page transitions. */
 export function WorkbenchSurface({ children, overlay }: { children?: ReactNode; overlay?: ReactNode }) {
   const scheme = useScheme();
   return <div className="relative h-full overflow-hidden bg-canvas">
@@ -16,7 +16,7 @@ export function WorkbenchSurface({ children, overlay }: { children?: ReactNode; 
   </div>;
 }
 
-/** 有无会话内容时共用同一套画布纹理。 */
+/** Use the same canvas texture with or without session content. */
 export function WorkbenchBackground() {
   const { canvas } = useAppearance();
   return canvas !== "none" && <Background color="var(--canvas-grid)" gap={24}

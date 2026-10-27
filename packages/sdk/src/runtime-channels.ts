@@ -2,8 +2,8 @@ import type { ChannelContract, ChannelEnd, ChannelValue } from "./channels.ts";
 import type { ObjectReader } from "./objects.ts";
 
 /**
- * 后台持有的通道一端。消息按发送顺序交付；监听注册前到达的消息先缓存，首个监听注册时按序补交。
- * signal 在任一端关闭、对象离开当前集合、插件关闭或连接断开时中止，reason 为 ChannelEnd。
+ * The backend end of a channel. Messages are delivered in send order; messages arriving before listener registration are buffered and delivered in order when the first listener registers.
+ * signal aborts when either end closes, the object leaves the current set, the plugin shuts down, or the connection disconnects; reason is ChannelEnd.
  */
 export interface ObjectChannel<Up extends ChannelValue = ChannelValue, Down extends ChannelValue = ChannelValue> {
   readonly object: ObjectReader;
@@ -14,7 +14,7 @@ export interface ObjectChannel<Up extends ChannelValue = ChannelValue, Down exte
 }
 export interface ChannelContribution {
   readonly contract: ChannelContract;
-  /** 前端打开通道时调用；抛出 PluginApiError 以 unavailable 结束通道。 */
+  /** Called when the frontend opens a channel; throwing PluginApiError ends the channel with unavailable. */
   open(channel: ObjectChannel): void | Promise<void>;
 }
 export function implementChannel<Up extends ChannelValue, Down extends ChannelValue>(contract: ChannelContract<Up, Down>,

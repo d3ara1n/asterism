@@ -9,7 +9,7 @@ import { applicationStorage } from "../shared/application.ts";
 let file: string | undefined;
 const startupId = randomUUID();
 
-/** 主进程统一落盘；同步追加使启动失败和进程退出前的记录无需等待日志流排空。 */
+/** Centralized main-process persistence; synchronous appends avoid waiting for stream drain on startup failure or process exit. */
 function record(source: string, level: string, message: string, pid: number | undefined): void {
   if (!file) return;
   try {
@@ -19,7 +19,7 @@ function record(source: string, level: string, message: string, pid: number | un
   }
 }
 
-/** 取得单实例锁后、启动任何子进程之前接入；主进程原有控制台输出同时保留。 */
+/** Connect after acquiring the single-instance lock and before starting any child process; retain existing main-process console output. */
 export function initializeApplicationLog(root: string, version: string): void {
   try { mkdirSync(join(root, applicationStorage.logsDirectory), { recursive: true }); }
   catch (error) {
@@ -37,7 +37,7 @@ export function initializeApplicationLog(root: string, version: string): void {
   console.info(`Application starting. version=${version} startupId=${startupId} pid=${process.pid}`);
 }
 
-/** 按行汇集子进程输出；流结束时 readline 交付最后一个不带换行的片段。 */
+/** Collect child output by line; readline delivers the final fragment without a newline when the stream ends. */
 export function observeProcess(child: UtilityProcess, source: string): void {
   const started = performance.now();
   let pid: number | undefined;

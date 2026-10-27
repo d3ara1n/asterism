@@ -53,7 +53,7 @@ import { sessionController } from "../features/session/registry";
 
 import { islandTransition } from "../shared/weave/motion";
 
-/** 主屏包含侧栏与首页/工作台；设置为左侧独立屏，切换时主屏整体平移。 */
+/** The main screen contains the sidebar and home/workbench; settings occupy a separate screen on the left, and the entire main screen slides when switching. */
 type MainView = { kind: "home" } | { kind: "conversation"; sessionId: string; overview?: boolean };
 type PageId = "settings" | "main";
 const idleSubscribe = () => () => {};
@@ -71,10 +71,10 @@ export function App({ controller }: { controller: ApplicationController }) {
   const [view, setView] = useState<MainView>({ kind: "home" });
   const [sidebarVisible, setSidebarVisible] = useState(true);
   const [draft] = useState(() => createMessageDraft(() => contentInput(startAgentContentTarget)));
-  // 当前工作台的环境出口：右侧更深浮岛与左侧聚焦浮岛经它取得会话环境。
+  // Environment outlet for the current workbench: deeper islands on the right and the focus island on the left obtain the session environment through it.
   const [workbenchStore] = useState(() => new WorkbenchStore());
   const start = useStart();
-  // 每次导航递增；异步创建完成时据此判断用户是否已离开，不夺走当前视图。
+  // Increment on each navigation; when asynchronous creation completes, use this to determine whether the user has left, without taking over the current view.
   const navigation = useRef(0);
   const run = useCallback(async (command: WorkbenchOperation) => operationSucceeded(await sessionController(command.sessionId).execute(command)), []);
   const active = view.kind === "conversation" ? sessionController(view.sessionId) : null;
@@ -126,7 +126,7 @@ export function App({ controller }: { controller: ApplicationController }) {
     const command = { type: "rename" as const, sessionId, title };
     return active?.sessionId === sessionId ? active.execute(command) : runtime.session.execute(command);
   };
-  /** 归档当前会话先回到首页，再清理并重读会话目录。 */
+  /** When archiving the current session, return home first, then clean up and reread the session catalog. */
   const archiveSession = async (sessionId: string) => {
     if (view.kind === "conversation" && view.sessionId === sessionId) goHome();
     const result = await runtime.session.execute({ type: "archive", sessionId });
@@ -199,7 +199,7 @@ export function App({ controller }: { controller: ApplicationController }) {
     <Button variant="ghost" size="sm" onClick={event => workbench.current?.togglePanel("history", event.currentTarget)} aria-label={i18n.formatMessage(historyMessages.history)}><History /><span className="toolbar-label">{i18n.formatMessage(historyMessages.history)}</span></Button>
   </> : undefined;
 
-  // 反馈层与会话画布是同级子节点，各自按会话重置，键空间须互不重叠。
+  // The feedback layer and session canvas are sibling nodes, each reset by session; their key spaces must not overlap.
   const conversation = <WorkbenchSurface overlay={<WorkbenchFeedback key={`feedback:${active?.sessionId ?? ""}`} phase={phase} hasContent={!!session}
     error={phase === "unavailable" ? state.error : sessionState?.readError ?? null} onRetry={() => { void active?.refresh(); }} />}>
     {session && active ? <motion.div key={session.id} className="h-full" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
@@ -222,7 +222,7 @@ export function App({ controller }: { controller: ApplicationController }) {
       onHome={goHome} onSession={openSession} onSettings={() => go("settings")} onHide={hideSidebar}
       onRetry={() => { void controller.refresh(); }} />,
   };
-  // 聚焦浮岛：受控前置浮岛，位于侧栏与工作台之间；内容随会话切换交替，回到首页时退场。
+  // Focus island: a controlled leading island between the sidebar and workbench; its content switches with the session, and it exits when returning home.
   const focusTitle = focusedObjectId ? session?.objects.find(object => object.id === focusedObjectId)?.title : undefined;
   const focus: IslandSpec | null = view.kind === "conversation" && focusedObjectId ? {
     id: focusIslandId, label: focusTitle ?? i18n.formatMessage(objectsMessages.focusIsland), width: { min: 480, grow: 1.5 },
@@ -230,7 +230,7 @@ export function App({ controller }: { controller: ApplicationController }) {
   } : null;
   const main: IslandSpec = {
     id: "main-view", label: mainTitle, width: { min: 440, grow: 1 }, surface: view.kind === "conversation",
-    // 首页与工作台双向同时进退场；退场者脱离布局流，不与入场内容叠加占位。
+    // Home and workbench enter and exit simultaneously in both directions; exiting content leaves the layout flow so it does not occupy space alongside entering content.
     render: () => <AnimatePresence mode="popLayout" initial={false}>
       {view.kind === "home"
         ? <motion.div key="home" className="h-full" initial={{ opacity: 0, scale: 1.04 }} animate={{ opacity: 1, scale: 1 }}
@@ -246,7 +246,7 @@ export function App({ controller }: { controller: ApplicationController }) {
           {conversation}</motion.div>}
     </AnimatePresence>,
   };
-  // 会话读取失败由工作台持续提示；后台不可用在工作台可见时也由同一入口承接。
+  // The workbench persistently displays session read failures; the same entry handles backend unavailability while the workbench is visible.
   const unavailableInWorkbench = view.kind === "conversation" && !inSettings && phase === "unavailable";
   const appError = unavailableInWorkbench ? null : state.error;
   useStateToast("app-error", appError ? i18n.text(appError) : null, {
@@ -266,7 +266,7 @@ export function App({ controller }: { controller: ApplicationController }) {
         { id: "settings", label: i18n.formatMessage(settingsMessages.settings), surface: false, content:
           <SessionArchiveContext.Provider value={{ snapshot, restore: restoreSession }}><SettingsPage active={inSettings} target={settingsTarget} /></SessionArchiveContext.Provider> },
         { id: "main", label: mainTitle, surface: false,
-          // 切换会话时关闭工作台右侧的更深浮岛。
+          // Close deeper islands to the right of the workbench when switching sessions.
           content: <Screen label={i18n.formatMessage(appMessages.appNavigation)} leading={[...(sidebarVisible ? [sidebar] : []), ...(focus ? [focus] : [])]} root={main} resetKey={view.kind === "conversation" ? view.sessionId : "home"} className="h-full" /> },
       ]} />
     </Window>
@@ -276,7 +276,7 @@ export function App({ controller }: { controller: ApplicationController }) {
   </RendererSettingsNavigationProvider></UpdatesProvider>;
 }
 
-/** 首次发送：同一时刻只提交一次；连接中断后相同输入复用提交身份以找回已创建的会话。 */
+/** First send: submit only once at a time; after a connection interruption, reuse the submission identity for identical input to recover the created session. */
 function useStart() {
 
   const identity = useRef(new SubmissionIdentity());

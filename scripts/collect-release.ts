@@ -3,7 +3,7 @@ import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { hasReleasableChanges, parseGitLog, type PublishedRelease, type ReleaseInput } from "./release-commits.ts";
 
-// 只用 Node 内置模块与 gh；无新有效提交的检查在 npm ci 前结束。
+// Uses only Node built-ins and gh; the check for new qualifying commits finishes before npm ci.
 const [mode = "prerelease", sourceTag = "", outputFile = ".local/release/input.json"] = process.argv.slice(2);
 if (mode !== "prerelease" && mode !== "release") throw new Error("Expected prerelease or release.");
 const repository = process.env.GITHUB_REPOSITORY ?? "d3ara1n/asterism";

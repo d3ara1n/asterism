@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-/** 仅主进程与任务进程之间使用，不经过 renderer bridge。 */
+/** Used only between main and task processes, never through the renderer bridge. */
 export const secretRequestSchema = z.discriminatedUnion("action", [
   z.strictObject({ kind: z.literal("secret.request"), id: z.string().uuid(), action: z.literal("available") }),
   z.strictObject({ kind: z.literal("secret.request"), id: z.string().uuid(), action: z.literal("encrypt"), value: z.string().max(16_384) }),

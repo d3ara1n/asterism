@@ -5,7 +5,7 @@ import { ShellOutputBuffer } from "./output.ts";
 import { resolveShell } from "./profiles.ts";
 import { startShellProcess, type ShellProcess } from "./process.ts";
 
-/** 目录 exec 的配置与管道执行；单次调用持有进程，宿主负责取消与收束。 */
+/** Configuration and piped execution for directory exec; each call owns its process, while the host manages cancellation and settling. */
 export class ShellService {
   constructor(private readonly settings: () => ShellSettings, private readonly closingSignal: AbortSignal,
     private readonly temporaryRoot?: string) {}
@@ -58,7 +58,7 @@ export class ShellService {
       signal.addEventListener("abort", cancel, { once: true });
       if (signal.aborted) cancel();
       if (args.timeout !== undefined) timeout = setTimeout(() => { reason ??= "timeout"; void stop(); }, args.timeout * 1000);
-      // 主命令退出后只收尾输出；已启动的后台程序按命令自身生命周期继续。
+      // After the main command exits, only finalize output; background programs already started continue according to their own command lifecycles.
       const exit = await process.exited;
       clearTimeout(timeout);
       signal.removeEventListener("abort", cancel);

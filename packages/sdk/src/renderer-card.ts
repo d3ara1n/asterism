@@ -1,7 +1,7 @@
 import { createContext, useContext, type ComponentType, type ReactNode } from "react";
 import type { UiText } from "./i18n.ts";
 
-/** 辅助面板的身份在单个卡片 renderer 内唯一；内容接收与主体相同的已校验投影。 */
+/** Auxiliary panel identities are unique within a single card renderer; content receives the same validated projection as the body. */
 export interface CardPanelDefinition<T> {
   id: string;
   label: UiText;
@@ -14,7 +14,7 @@ export interface CardPanelView {
   icon: ReactNode;
   body: ReactNode;
 }
-/** 卡片局部视图操作，不提交资源命令或写入任务历史。 */
+/** Local card view operations; do not submit resource commands or write task history. */
 export interface RendererCard {
   readonly activePanel: string | null;
   openPanel(id: string): void;

@@ -1,4 +1,4 @@
-/** 样式在视图准备前加载；失败、取消或前端生命周期结束时移除。 */
+/** Load styles before view preparation; remove them on failure, cancellation, or frontend lifecycle completion. */
 export function loadPluginStylesheet(path: string, signal: AbortSignal): Promise<() => void> {
   signal.throwIfAborted();
   return new Promise((resolve, reject) => {

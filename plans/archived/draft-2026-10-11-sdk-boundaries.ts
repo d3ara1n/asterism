@@ -1,4 +1,4 @@
-/** 已归档的声明原型；实际契约以 packages/sdk/src 为准，不参与当前类型检查。 */
+/** Archived declaration prototype; packages/sdk/src defines the actual contract. Excluded from current typechecks. */
 import type { z } from "zod";
 import type { DatabaseSync } from "node:sqlite";
 import type {
@@ -27,7 +27,7 @@ export interface SessionSnapshot extends SessionView {
 export interface SessionHandle {
   readonly id: string;
   snapshot(): SessionSnapshot;
-  /** 只追加本插件的会话事件，不创建对象或修改对象状态。 */
+  /** Only appends this plugin's session events; does not create objects or modify object state. */
   commit(work: (writer: SessionWriter) => undefined): void;
   readonly title: { get(): string; propose(text: string, options: { expected: string }): boolean };
 }
@@ -41,7 +41,7 @@ export interface ObjectContext {
   readonly ref: ResourceRef;
   readonly session: SessionHandle;
   get<T extends Json>(contract: DataContract<T>): T | null;
-  /** 同步回调；宿主检查实际返回值、对象有效性与 writer 生命周期。 */
+  /** Synchronous callback; the host checks the actual return value, object validity, and writer lifetime. */
   commit(work: (writer: ObjectWriter) => undefined): void;
   readonly streams: { publish(channel: string, data: Uint8Array): void };
 }
@@ -67,7 +67,7 @@ export interface CommandPreparer {
     Preparation<Json> | Promise<Preparation<Json>>;
 }
 
-/** 宿主消费 SDK 的擦除接口；内部 FoldedObject 等只存在于 adapter。 */
+/** The host consumes the SDK's erased interface; internal FoldedObject types exist only in the adapter. */
 export interface ResourceContribution {
   readonly resource: ResourceContract;
   readonly records: readonly RecordContract[];
@@ -135,7 +135,7 @@ export declare function implementTool<S extends Json, T extends Json, A extends 
   },
 ): ToolContribution;
 
-/** 模型分支采用 SDK 的单次调用契约。 */
+/** The model branch uses the SDK's single-call contract. */
 export type { ModelRunRequest, ModelRunResult, ModelRunEvent } from "@atelier/sdk/contracts";
 export type { ModelServices } from "@atelier/sdk/contracts";
 import type { ModelServices } from "@atelier/sdk/contracts";

@@ -2,7 +2,7 @@ import { prepareApplicationData, restoreApplicationData, startFreshApplicationDa
 import { clearPause } from "../storage/preparation.ts";
 import type { PreparationMessage } from "../shared/recovery.ts";
 
-/** 提交与清理结束后发送最终结果，主进程收到后终止本进程。参数：数据根、应用版本、操作及还原目标。 */
+/** Send final results after commit and cleanup; the main process terminates this process on receipt. Arguments: data root, app version, operation, and restore target. */
 const port = process.parentPort;
 if (!port) throw new Error("Data preparation requires an Electron utility process.");
 const post = (message: PreparationMessage) => port.postMessage(message);
@@ -24,6 +24,6 @@ try {
   console.error("Data preparation failed.", error);
   terminal = { kind: "error", error: error instanceof Error ? error.message : String(error) };
 }
-// 主进程收到结果即可终止本进程；先将最后的诊断输出交给管道。
+// The main process may terminate this process on receipt; pass final diagnostics to the pipe first.
 await Promise.all([process.stdout, process.stderr].map(stream => new Promise<void>(resolve => stream.write("", () => resolve()))));
 post(terminal);

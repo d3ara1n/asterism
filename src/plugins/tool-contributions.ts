@@ -18,7 +18,7 @@ export interface ToolImplementationStatus {
   overriddenBy?: string;
 }
 
-/** 单个插件的声明必须无歧义；跨插件覆盖在全部装配成功后解析。 */
+/** Each plugin's declarations must be unambiguous; resolve cross-plugin overrides after all successful assembly. */
 export function validateToolContributions({ id, tools, topLevelTools }: ToolContributions): void {
   const names = new Set(coreDeclarations().map(tool => tool.name));
   const identities = new Set<string>();
@@ -31,7 +31,7 @@ export function validateToolContributions({ id, tools, topLevelTools }: ToolCont
   for (const tool of tools) {
     if (!belongsTo(id, tool.reference.id)) throw new Error(`Implementation ${tool.reference.id} is outside plugin namespace ${id}.`);
   }
-  // 局部声明与最终目录使用同一套契约身份、实现身份及支持关系校验。
+  // Local declarations and final catalogs share contract identity, implementation identity, and support relationship validation.
   new ToolRegistry(tools);
 }
 
@@ -41,7 +41,7 @@ interface ResourceToolSelection {
   implementations: Map<string, { implementation: ToolImplementation; plugin: string }>;
 }
 
-/** 输入仅含成功装配的插件，且已按用户列表排序；不依赖初始化顺序。 */
+/** Input contains successfully assembled plugins only, already sorted by user list; independent of initialization order. */
 export function resolveToolContributions(entries: readonly ToolContributions[]) {
   const topLevelTools = new Map<string, RegisteredTopLevelTool>();
   const resourceTools = new Map<string, ResourceToolSelection>();
@@ -50,7 +50,7 @@ export function resolveToolContributions(entries: readonly ToolContributions[]) 
     for (const registered of entry.topLevelTools) topLevelTools.set(registered.tool.name, registered);
     for (const implementation of entry.tools) {
       const contract = implementation.tool;
-      // 引入新契约时清空同名支持关系；后续引用旧契约不能重新激活它。
+      // Clear same-name support relationships when introducing new contracts; later old-contract references cannot reactivate them.
       if (!seenContracts.has(contract)) {
         seenContracts.add(contract);
         resourceTools.set(contract.name, { contract, plugin: entry.id, implementations: new Map() });

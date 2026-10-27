@@ -7,7 +7,7 @@ import { StatusText } from "@asterism/ui/ui/status";
 import { questionMessages as messages } from "../messages/questions";
 import type { SummaryRow } from "./summary";
 
-/** 复核页与终结结果共用的只读回执；作答界面提交后原位变为同一结构。 */
+/** Read-only receipt shared by the review page and final result; the answer UI becomes the same structure in place after submission. */
 export function AnswerSummary({ rows, message, action }: {
   rows: SummaryRow[]; message?: string; action?(index: number): ReactNode;
 }) {

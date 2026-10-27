@@ -17,7 +17,7 @@ export const ResourceInspectResult = defineData(coreId("resource-inspect"), z.st
   })),
 }));
 
-/** 固定入口共用工具契约，但由执行层装配，不注册到可扩展的资源工具目录。 */
+/** Fixed entries share tool contracts but are assembled by execution, outside extensible resource tool catalogs. */
 export const ResourceList = defineTool({
   id: "core.tool.resource_list",
   name: "resource_list",

@@ -18,7 +18,7 @@ export function useConversationInteraction() {
   return interaction;
 }
 
-/** 草稿、交接占用和提交身份跨卡片重挂载保留；成功后统一交接，失败保持可重试。 */
+/** Drafts, handoff holds, and submission identities survive card remounts; success completes the handoff together, while failure preserves retryability. */
 const interactionKey = "asterism.builtin/agent.interaction";
 export function useAgentConversation(object: RendererObjectContext, hasSelection: boolean, executionState: AgentExecutionState, drafts: readonly AgentDraft[]) {
   const i18n = useI18n();
@@ -74,7 +74,7 @@ export function useAgentConversation(object: RendererObjectContext, hasSelection
   const send = async (): Promise<boolean> => {
     if (!writable || (!state.text.trim() && !state.files.length)) return false;
     return mutate(async () => {
-      // 受理前后执行状态可变化；同一份完整输入始终保持相同提交身份。
+      // Execution state may change around acceptance; the same complete input always retains the same submission identity.
       const parts = draft.parts(false);
       const input = { mode: "follow" as const, parts };
       const result = await object.invoke(SubmitAgentInput, {
@@ -127,7 +127,7 @@ export function useAgentConversation(object: RendererObjectContext, hasSelection
     },
     async take(item: AgentDraft): Promise<boolean> {
       return mutate(async () => {
-        // 先为取回内容建立编辑器占用，再原子交换持久条目，最后替换可见编辑器。
+        // First establish an editor hold for the retrieved content, then atomically exchange the persistent item, and finally replace the visible editor.
         const incoming = await transfer("take", item.parts, object.content, () => object.input(SubmitAgentInput));
         const parts = draft.parts(false);
         const replacement = state.text.trim() || state.files.length

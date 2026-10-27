@@ -1,5 +1,5 @@
-// 移植自 @d3ara1n/pi-hashline-edit 的 MIT 核心；来源与许可见 README.md。
-// 全批次校验后再应用；位移恢复只提供重试锚点，不自动改写目标。
+// Ported from the MIT core of @d3ara1n/pi-hashline-edit; see README.md for source and license.
+// Validate the entire batch before applying; shift recovery only supplies anchors for retry and does not automatically rewrite the target.
 import { computeLineHash } from "./hash.ts";
 import { detectLineEnding, hasFinalNewline, splitLines } from "./lines.ts";
 import type { Anchor, AnchorFailure, AnchorRecovery, ApplyResult, Edit } from "./types.ts";

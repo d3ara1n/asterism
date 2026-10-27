@@ -19,7 +19,7 @@ import { useWorkbench } from "./context";
 import type { ViewPatch } from "./ObjectCard";
 import { RenameObject } from "./RenameObject";
 
-/** 卡片菜单集中管理名称、视图尺寸与对象移除。 */
+/** The card menu centralizes name, view dimensions, and object removal. */
 export function ObjectActions({ object, defaultSize, onView }: {
   object: WorkbenchObject; defaultSize: CardSize; onView: (patch: ViewPatch) => void;
 }) {

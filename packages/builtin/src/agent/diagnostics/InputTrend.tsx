@@ -6,14 +6,14 @@ import { diagnosticMessages as messages } from "../../messages/diagnostics";
 import { ease, percent, Swatch } from "../panel-kit";
 import type { CompressionEntry, TrendPoint } from "./overview";
 
-/** 当前路径逐请求的实报 input 与缓存读取；虚线标出压缩，水平虚线是自动压缩阈值。只画已保存的真实计量。 */
+/** Reported input and cache reads per request on the current path; dashed lines mark compression, and the horizontal dashed line marks the automatic compression threshold. Plots only saved actual measurements. */
 export function InputTrend({ points, compressions, threshold }: { points: readonly TrendPoint[]; compressions: readonly CompressionEntry[]; threshold: number | null }) {
   const i18n = useI18n();
   const reduced = useReducedMotion();
   const [active, setActive] = useState<number | null>(null);
   const current = Math.min(active ?? points.length - 1, points.length - 1);
   const peak = Math.max(...points.map(point => point.input), 1);
-  // 阈值远高于曲线时不纳入纵轴，避免把增长压成一条线。
+  // Exclude the threshold from the vertical axis when it is far above the curve, so growth is not flattened into a line.
   const showThreshold = threshold !== null && threshold > 0 && threshold <= peak * 1.4;
   const top = Math.max(peak, showThreshold ? threshold : 0) * 1.08;
   const x = (index: number) => points.length === 1 ? 50 : index / (points.length - 1) * 100;

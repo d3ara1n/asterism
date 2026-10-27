@@ -4,12 +4,12 @@ import { cacheUsage } from "./usage";
 
 export interface TrendPoint {
   id: string; sequence: number; input: number; cacheRead: number | null;
-  /** 与上一请求的精确 input 差；模型、系统快照不同或中间有压缩时为 null。 */
+  /** Exact input difference from the previous request; null when the model or system snapshot differs, or compression intervenes. */
   delta: number | null;
 }
 export interface CompressionEntry { id: string; createdAt: string; sequence: number; tokensBefore: number | null; after: number | null }
 export interface DiagnosticOverview {
-  /** 只计工作请求；压缩摘要的输入是独立的摘要材料，不代表代理上下文。 */
+  /** Counts only work requests; compression summary input is separate summary material and does not represent agent context. */
   cache: { read: number; input: number } | null;
   trend: TrendPoint[];
   compressions: CompressionEntry[];
@@ -20,7 +20,7 @@ const sameSnapshot = (a: DiagnosticRequest, b: DiagnosticRequest) =>
   a.sent !== null && b.sent !== null && a.modelScope === b.modelScope && a.model === b.model
   && JSON.stringify([a.sent.system, a.sent.tools]) === JSON.stringify([b.sent.system, b.sent.tools]);
 
-/** 全部取自已保存的实报用量与请求诊断；trend、compressions 与 headroom 只对单条路径有意义。 */
+/** All values come from saved reported usage and request diagnostics; trend, compressions, and headroom are meaningful only for a single path. */
 export function diagnosticOverview<R extends DiagnosticRequest>(requests: readonly R[], windowOf: (request: R) => number | null): DiagnosticOverview {
   const ordered = [...requests].sort((a, b) => a.sequence - b.sequence);
   const work = ordered.filter(request => request.kind === "response" && request.completion?.usage?.input != null);

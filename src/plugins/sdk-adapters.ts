@@ -33,7 +33,7 @@ export function adaptResource(contribution: ResourceContribution, sdk: SdkContex
     return action;
   };
   const queued = new Map<string, { sessionId: string; done: Promise<void> }>();
-  // 活跃动作链按宿主资源实现隔离；已完成动作的异步后代可以再次调用该对象。
+  // Active action chains are isolated by host resource implementation; asynchronous descendants of completed actions can call the object again.
   const executing = new AsyncLocalStorage<readonly { id: string; active: boolean }[]>();
   const assertActionEntry = (id: string) => {
     if (executing.getStore()?.some(entry => entry.active && entry.id === id))
@@ -186,7 +186,7 @@ export function adaptTool(contribution: ToolContribution, sdk: SdkContext, host:
         try { return await prepared.execute(signal, publish); }
         finally {
           scope.active = false;
-          // 暂存内容交接给请求占用，直到结果记录在同一事务登记内容根；未提交时随请求一起回收。
+          // Staged content passes to request holds until result records register roots in the same transaction; uncommitted content is reclaimed with the request.
           if (handover && scope.content && !handover.closed) for (const id of scope.content.refs) handover.add(id);
           await scope.content?.close();
         }

@@ -6,7 +6,7 @@ import { ModelFailure } from "./contract.ts";
 
 type Target = { provider: Pick<ModelProviderInput, "compatibility">; model: Pick<ProviderModel, "compatibility"> };
 
-/** 先合并显式覆盖，再检查最终发送值；不根据端点或模型名称启用行为。 */
+/** Merge explicit overrides before checking final transmitted values; endpoint and model names do not enable behavior. */
 function requestIdentity(target: Target, identity: ModelRequestIdentity) {
   const entries = mergeModelCompatibility(target.provider.compatibility, target.model.compatibility);
   const custom = entries.find(entry => entry.id === "customUserAgent");
@@ -24,7 +24,7 @@ export function validateRequestIdentity(target: Target, identity: ModelRequestId
   requestIdentity(target, identity);
 }
 
-/** 每次模型调用只创建一次；没有所属会话时，临时 ID 仅固定到本次调用。 */
+/** Create once per model call; without an owning session, the temporary ID is stable only for this call. */
 export function modelRequestHeaders(target: Target, identity: ModelRequestIdentity = {}): Headers {
   const { userAgent, session, sessionId } = requestIdentity(target, identity);
   const headers = new Headers();

@@ -1,6 +1,6 @@
 import type { WebContents } from "electron";
 
-/** 浏览器权限只向当前受信页面的主框架开放；剪贴板写入不赋予读取权限。 */
+/** Browser permissions are available only to the current trusted page's main frame; clipboard write grants no read access. */
 export function allowRendererPermission({ permission, isMainFrame, contents, mainContents, trustedURL }: {
   permission: string;
   isMainFrame: boolean;

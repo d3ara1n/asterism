@@ -24,9 +24,13 @@ Current example resources validate foundations and do not define the final produ
 
 Reuse maintained libraries for general controls, animation, layout, drag, and virtualization. Confirm new dependencies separately with rationale and alternatives. For a missing shadcn control, check the registry and use `npx shadcn@latest add <name>`; official controls do not count as new dependencies. Verify relative imports and remove accidental CLI additions.
 
-## Documentation ownership
+## Language
 
-All repository documentation is English, including manuals, engineering documents, source/package README files, plans, and archives. Code comments and commit subjects retain the existing Chinese convention. User-facing application copy remains bilingual, English first; runtime logs use formal English.
+Use English for code identifiers, comments, test descriptions, developer diagnostics, and model-facing harness text. All repository documentation is English, including manuals, engineering documents, source/package README files, plans, and archives.
+
+User-facing application copy remains bilingual, English first. Preserve the original language of user content, quotations, and test data whose language is relevant to the test. Runtime logs use English.
+
+## Documentation ownership
 
 The collections have distinct writing requirements:
 
@@ -64,4 +68,4 @@ Explain implementation scope and tradeoffs before proceeding; confirmed scope au
 
 Before user distribution, incompatible development formats can be rebuilt without migration, with explicit authorization for real data cleanup. Internal test releases do not establish compatibility. First user distribution, including friend-facing prereleases, requires continuous n-to-n+1 migrations and old-format fixtures thereafter.
 
-Main is the trunk. Before the first release, develop and commit directly on main. After the first release, use type-prefixed branches and squash-merged PRs, one merge commit per PR. Use Conventional Commits with a lowercase English type and Chinese subject. AI-assisted commits include a Co-Authored-By trailer using the actual model identity from PI_* and its provider noreply address, or noreply@pi.dev when unknown. Read PI_MODEL before each commit rather than reusing an earlier trailer, and keep only the provider's model ID: drop channel markers such as `[Kiro]` and variant suffixes such as `-thinking`, so `[Kiro]claude-opus-5-5-thinking` becomes `claude-opus-5-5`.
+Main is the trunk. Before the first release, develop and commit directly on main. After the first release, use type-prefixed branches and squash-merged PRs, one merge commit per PR. Use Conventional Commits with a lowercase English type; commit subjects and bodies may use any language. AI-assisted commits include a Co-Authored-By trailer using the actual model identity from PI_* and its provider noreply address, or noreply@pi.dev when unknown. Read PI_MODEL before each commit rather than reusing an earlier trailer, and keep only the provider's model ID: drop channel markers such as `[Kiro]` and variant suffixes such as `-thinking`, so `[Kiro]claude-opus-5-5-thinking` becomes `claude-opus-5-5`.

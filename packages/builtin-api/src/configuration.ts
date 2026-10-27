@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { modelExpressionSchema, thinkingSchema } from "@asterism/sdk/contracts";
 const id = z.string().min(1).max(160);
-/** 配置以可读 slug 同时供用户与模型识别。 */
+/** Configurations use readable slugs for identification by both users and models. */
 export const configurationIdSchema = z.string().trim().min(1).max(160).regex(/^[a-z0-9]+(?:[-_][a-z0-9]+)*$/u, "Use lowercase letters, digits, hyphens or underscores.");
 const names = z.array(id).max(200);
 const agentFieldsSchema = z.strictObject({
@@ -12,7 +12,7 @@ const agentFieldsSchema = z.strictObject({
 });
 export const agentInputSchema = agentFieldsSchema.refine(value => value.tools === null || value.excludeTools === null, "Tool allowlist and denylist are mutually exclusive.");
 export const agentSchema = agentInputSchema.safeExtend({ id: configurationIdSchema, builtin: z.boolean() });
-// 留空文本在保存时移除覆盖；false、null 和空列表保留各自的业务含义。
+// Blank text removes the override on save; false, null, and empty lists retain their respective business meanings.
 export const agentOverridesSchema = agentFieldsSchema.partial()
   .refine(value => value.tools == null || value.excludeTools == null, "Tool allowlist and denylist are mutually exclusive.");
 

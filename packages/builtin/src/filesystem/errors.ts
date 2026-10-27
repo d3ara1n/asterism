@@ -2,7 +2,7 @@ import type { CallResult } from "@asterism/sdk/runtime";
 
 type Failure = Extract<CallResult<never>, { kind: "failed" | "rejected" }>;
 
-/** 文件系统预期失败携带可公开的原因；原始宿主路径和堆栈留在实现边界。 */
+/** Expected filesystem failures carry public reasons; raw host paths and stacks stay within the implementation boundary. */
 export class FilesystemError extends Error {
   constructor(readonly outcome: Failure) {
     super(outcome.error.message);

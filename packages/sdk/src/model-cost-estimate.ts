@@ -1,6 +1,6 @@
 import type { ModelCost, ModelRates, ModalityRates, UnitPrice } from "./model-cost.ts";
 
-/** 已按计费口径拆分的数量；调用方负责避免总量与子项重叠。 */
+/** Quantities already split by billing category; callers are responsible for preventing overlap between totals and subcategories. */
 export interface CostQuantity {
   modality: keyof ModelRates;
   item: keyof ModalityRates;
@@ -21,7 +21,7 @@ export function selectModelRates(cost: ModelCost | null, inputTokens: number | n
   const tier = cost.tiers.findLast(tier => inputTokens !== null && inputTokens >= tier.fromInputTokens);
   return { rates: tier?.rates ?? cost.rates, fromInputTokens: tier?.fromInputTokens ?? null, unknownTier: false };
 }
-/** 只消费价格与具名数量，不修改上游 usage，也不持有历史账本。 */
+/** Consumes only prices and named quantities, without modifying upstream usage or maintaining a historical ledger. */
 export function estimateModelCost(cost: ModelCost | null, inputTokens: number | null, quantities: readonly CostQuantity[]): CostEstimate {
   const selected = selectModelRates(cost, inputTokens);
   const lines = quantities.map((quantity): CostLine => {
@@ -31,7 +31,7 @@ export function estimateModelCost(cost: ModelCost | null, inputTokens: number | 
     if (!Number.isFinite(quantity.quantity) || quantity.quantity < 0) return missing("invalid");
     if (selected.unknownTier) return missing("tier");
     if (price && price.unit !== quantity.unit) return missing("unit");
-    // 同单位的已知零数量不需要价格；零 token 不能代表零秒或零张。
+    // A known zero quantity in the same unit needs no price; zero tokens cannot represent zero seconds or zero images.
     if (quantity.quantity === 0) return { ...quantity, price, amount: 0, issue: null };
     if (!price) return missing("price");
     const amount = quantity.quantity / price.per * price.amount;

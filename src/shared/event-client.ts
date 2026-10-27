@@ -6,7 +6,7 @@ import type { EventBridge } from "./connection.ts";
 import { EventQueue, eventKey } from "./event-queue.ts";
 
 interface Consumer { queue: EventQueue<EventEnvelope>; receive(event: EventEnvelope): void; end(end: SubscriptionEnd, notify: boolean): void }
-/** 前端订阅端：按本地契约解码，latest 在本地合并；订阅不依赖 React 卡片挂载。 */
+/** Frontend subscriptions decode by local contracts and coalesce latest locally; subscriptions do not depend on React card mounting. */
 export class EventClient implements EventSubscriber {
   private consumers = new Map<string, Consumer>();
   private stopListening: () => void;
@@ -27,7 +27,7 @@ export class EventClient implements EventSubscriber {
       consume: (event, signal) => handler(event as EventEnvelope<D>, { signal }),
       ended: () => {
         this.consumers.delete(id);
-        if (notifyClose) { try { this.bridge.send({ type: "close", id }); } catch { /* 连接已关闭。 */ } }
+        if (notifyClose) { try { this.bridge.send({ type: "close", id }); } catch { /* The connection is closed. */ } }
       } });
     const end = (reason: SubscriptionEnd, notify: boolean) => { notifyClose = notify; queue.end(reason); };
     const consumer: Consumer = { queue, end, receive: event => {
@@ -48,11 +48,11 @@ export class EventClient implements EventSubscriber {
     }
     return queue.subscription;
   }
-  /** 断连终止旧订阅；运行时恢复后允许显式建立新订阅，不自动补发。 */
+  /** Disconnection ends old subscriptions; runtime recovery permits explicit new subscriptions without automatic replay. */
   disconnect(): void { for (const consumer of [...this.consumers.values()]) consumer.end({ reason: "disconnected" }, false); }
   close(): void {
     if (this.ended) return;
     this.ended = true; this.disconnect(); this.stopListening();
-    try { this.bridge.send({ type: "reset" }); } catch { /* 连接已关闭。 */ }
+    try { this.bridge.send({ type: "reset" }); } catch { /* The connection is closed. */ }
   }
 }

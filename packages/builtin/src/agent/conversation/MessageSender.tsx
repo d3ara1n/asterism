@@ -3,7 +3,7 @@ import { useI18n } from "@asterism/sdk/renderer";
 import type { AgentMessageSender } from "@asterism/builtin-api/contracts";
 import { conversationMessages } from "../../messages/conversation";
 
-/** 对话与草稿箱共用发送者标识；不向用户展示路由句柄。 */
+/** Sender identification shared by the conversation and draft box; routing handles are not shown to users. */
 export function MessageSender({ sender }: { sender: AgentMessageSender }) {
   const i18n = useI18n();
   return sender.kind === "agent"

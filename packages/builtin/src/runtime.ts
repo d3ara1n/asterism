@@ -26,20 +26,20 @@ import web from "./web/runtime.ts";
 import { SkillCatalog } from "./skills/catalog.ts";
 import { createSkillsModule } from "./skills/runtime.ts";
 
-/** 仅组合插件业务；加载、宿主服务及外部插件依赖由应用负责。 */
+/** Composes only plugin business logic; the application owns loading, host services, and external plugin dependencies. */
 export function createBuiltin(options: { application: BuiltinApplication; manualDirectory: string; connectNaming(api: NamingApi): () => void }) {
   return definePlugin({ namespace: builtin, version: metadata.version,
     setup(plugin) {
       const settings = plugin.config(BuiltinSettings);
       const skills = new SkillCatalog();
-      // 后台装配先于任务进程 ready；首次技能目录在启动加载阶段构建完成。
+      // Backend assembly precedes task-process ready; the initial skill catalog is built during startup loading.
       skills.refresh(plugin.lifetime.signal);
       const shell = new ShellService(() => settings.get().shell, plugin.lifetime.signal);
       const usage = new UsageConsumer(plugin.modelProviders, plugin.usageProviders, providerId => {
         try { plugin.ipc.events.publish(UsageChanged, { providerId }); }
         catch (error) { if (!(error instanceof PluginApiError && error.code === "unavailable")) throw error; }
       });
-      // 根入口先于功能模块登记，清理逆序执行：共享服务在模块之后释放。
+      // The root entry registers before feature modules, and cleanup runs in reverse order: shared services are released after modules.
       plugin.lifetime.defer(() => usage.close());
       return { events: [UsageChanged],
         calls: [implementCall(ReadUsage, (input, { signal }) => usage.query(input.providerId, { refresh: input.refresh, signal }))],

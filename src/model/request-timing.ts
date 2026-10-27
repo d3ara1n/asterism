@@ -4,7 +4,7 @@ import type { ModelEvent } from "./contract.ts";
 
 type ProviderPart = Awaited<ReturnType<ReturnType<typeof wrapLanguageModel>["doStream"]>>["stream"] extends ReadableStream<infer Part> ? Part : never;
 
-/** 从开始调用模型到收到终态；不计入调用方随后执行工具的时间。 */
+/** From model invocation start to received terminal state; excludes subsequent caller tool execution. */
 export class RequestTimer {
   private readonly startedAt = new Date().toISOString();
   private readonly started = performance.now();
@@ -36,7 +36,7 @@ export class RequestTimer {
   }
 }
 
-/** 在 SDK 接收 provider 内容时采样；消费端的进度发布与流收尾不改变采集结果。 */
+/** Sample as the SDK receives provider content; consumer progress publication and stream finalization do not alter measurements. */
 export function measureModel(model: Exclude<LanguageModel, string>, protocol: string, timer: RequestTimer) {
   let completion: Extract<ModelEvent, { type: "finish" }> | undefined;
   let responseId: string | undefined;

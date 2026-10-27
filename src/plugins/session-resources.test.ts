@@ -77,9 +77,9 @@ function runner(f: ReturnType<typeof open>, actor: ResourceRef, target: Awaited<
   });
 }
 
-describe("SDK 会话资源生命周期", () => {
-  // 资源标题属于历史路径；前端命令、SDK 读取和分叉必须观察同一事件结果，旧快照固定不变。
-  it("改名追加历史并按路径恢复标题，保留身份、链接与当前数据", async () => {
+describe("SDK session resource lifetimes", () => {
+  // Resource titles belong to historical paths; frontend commands, SDK reads, and forks must observe the same event result while old snapshots remain fixed.
+  it("renames append history and restore titles by path while preserving identity, links, and current data", async () => {
     const f = open(), actor = await f.session.create(Create, 0), resource = await f.session.create(Create, 4);
     f.session.link(actor, resource);
     const before = f.session.snapshot(), initial = f.app.sessions.current(f.sessionId);
@@ -108,8 +108,8 @@ describe("SDK 会话资源生命周期", () => {
     expect(f.plugin.object(f.sessionId, Item, resource.id).get(State)).toBe(5);
   });
 
-  // 公开 SDK 不能绕过前端输入约束或跨会话身份检查；失败写入不得留下历史。
-  it("改名拒绝非法标题、错误身份和已移除对象", async () => {
+  // The public SDK cannot bypass frontend input constraints or cross-session identity checks; failed writes must leave no history.
+  it("renames reject invalid titles, incorrect identities, and removed objects", async () => {
     const f = open(), resource = await f.session.create(Create, 0);
     const head = f.session.snapshot().position;
     expect(() => f.session.rename(resource, " \t ")).toThrow("non-whitespace");
@@ -123,9 +123,9 @@ describe("SDK 会话资源生命周期", () => {
     expect(f.session.snapshot().position).toEqual(removed);
   });
 
-  // 后台曾把所有默认卡片视作 340×200；真实 Agent 与新建 Agent 的右下区域因此互相遮挡。
-  // 使用实际注册的内置资源验证尺寸声明穿过 SDK 装配，连续创建按完整矩形避让且靠近创建者。
-  it("后台连续创建按各类型完整默认尺寸避让，并优先放在创建者附近", async () => {
+  // The backend previously treated all default cards as 340×200, causing real and new Agents to overlap in their bottom-right areas.
+  // Use actual registered built-in resources to verify dimensions through SDK assembly; successive creations avoid complete rectangles and stay near creators.
+  it("successive backend creations avoid each type's full default bounds and prefer positions near the creator", async () => {
     const f = open();
     const input = { selection: { agent: "worker", model: null, thinking: null } };
     const actor = await f.session.create(CreateAgent, input);
@@ -149,7 +149,7 @@ describe("SDK 会话资源生命周期", () => {
       expect(views.filter(view => view.objectId !== resource.id)).toEqual(before);
       boxes.push({ id: resource.id, position, width: entry.width, height: entry.height });
     }
-    // 用户覆盖后的尺寸继续参与后台放置，折叠也预留展开区域。
+    // User-overridden dimensions still participate in backend placement, and collapsed cards reserve their expanded area too.
     await f.app.sessions.execute({ type: "view.set", sessionId: f.sessionId, objectId: actor.id,
       size: { width: 1200, height: 1000 } });
     const note = await f.session.create(CreateNote, { title: "After resize", content: "" }, { linkTo: actor });
@@ -158,8 +158,8 @@ describe("SDK 会话资源生命周期", () => {
       || position.y + 320 + placementGap.y <= 3000 || position.y >= 4000 + placementGap.y).toBe(true);
   });
 
-  // 整理必须以单一事务保存；逐张写入中途失败会留下半张被整理的画布。
-  it("批量位置写入原子生效，保留其他视图字段与任务历史", async () => {
+  // Arrangement must save in one transaction; failure during per-card writes would leave a partially arranged canvas.
+  it("batch position writes apply atomically while preserving other view fields and task history", async () => {
     const f = open(), a = await f.session.create(Create, 0), b = await f.session.create(Create, 1);
     await f.app.sessions.execute({ type: "view.set", sessionId: f.sessionId, objectId: a.id,
       size: { width: 800, height: 600 }, collapsed: true, hidden: true });
@@ -176,8 +176,8 @@ describe("SDK 会话资源生命周期", () => {
     })));
   });
 
-  // 依据资源链接契约：第三方资源可接收链接，两个方向分别授权；字段错配会丢失访问范围或通知接收者。
-  it("通用资源链接跨 SDK 与会话命令保持方向、授权和通知接收者一致", async () => {
+  // Resource link contract: third-party resources can receive links with independent authorization in each direction; mismatched fields lose access scope or notification recipients.
+  it("generic resource links preserve direction, authorization, and notification recipients across SDK and session commands", async () => {
     let resourceId = "";
     const f = open({ adapter: adapter(() => [{ name: "resource_inspect", args: { resource_id: resourceId } }]) });
     const target = await model(f.app);
@@ -208,8 +208,8 @@ describe("SDK 会话资源生命周期", () => {
     ]);
   });
 
-  // 依据关闭收束契约：取消后仍允许读取会话目录并提交最终记录，设施只在工作真实结束后释放。
-  it("关闭期间的托管任务可枚举会话并保存收尾记录", async () => {
+  // Shutdown finalization contract: cancellation still permits session listing and final record commits; facilities release only after actual work completion.
+  it("managed tasks can enumerate sessions and save final records during close", async () => {
     const owner = pluginNamespace("test.cleanup"), Final = defineRecord(owner.name("final"), { schema: z.null() });
     let context!: PluginContext;
     const f = open({ plugins: [definePlugin({ namespace: owner, version: "1", setup(plugin) {
@@ -231,8 +231,8 @@ describe("SDK 会话资源生命周期", () => {
     expect(() => context.sessions.list()).toThrow("closed");
   });
 
-  // 依据具型创建与归属契约：标题来自提供者，即使输入没有标题；同 ID 副本不能绕过声明身份校验。
-  it("跨插件创建只解析一次，返回身份与实际标题而不泄露私有数据，并枚举会话摘要", async () => {
+  // Typed creation and ownership contract: providers supply titles even without input titles; same-ID copies cannot bypass declaration identity checks.
+  it("cross-plugin creation parses once, returns identity and actual titles without private data, and enumerates session summaries", async () => {
     let consumer!: PluginContext;
     const caller = pluginNamespace("test.caller");
     const f = open({ plugins: [definePlugin({ namespace: caller, version: "1", setup(plugin) { consumer = plugin; return {}; } })] });
@@ -249,8 +249,8 @@ describe("SDK 会话资源生命周期", () => {
     expect(f.session.snapshot().resources.all()).toHaveLength(1);
   });
 
-  // 依据宿主事务契约：创建失败或初始链接失败，身份、私有数据和事件必须整体回滚。
-  it("初始化与创建后的链接原子提交，失败不遗留对象或私有数据", async () => {
+  // Host transaction contract: failed creation or initial links must roll back identity, private data, and events together.
+  it("initialization and post-creation links commit atomically without leaving objects or private data on failure", async () => {
     let fail = false;
     const f = open({ create() { if (fail) throw new Error("Creation failed."); } });
     const before = f.app.sessions.current(f.sessionId);
@@ -271,8 +271,8 @@ describe("SDK 会话资源生命周期", () => {
     expect(f.app.sessions.current(f.sessionId).workbench.links.filter(link => link.receiverId === otherAgent.id)).toEqual([]);
   });
 
-  // 依据宿主原子创建契约：接收者类型不支持链接时，已创建的身份、内容及调用者链接一起回滚。
-  it("初始资源链接失败时整体回滚创建", async () => {
+  // Host atomic creation contract: if recipients do not support links, created identity, content, and caller links roll back together.
+  it("initial resource link failure rolls back creation entirely", async () => {
     const f = open(), actor = await f.session.create(Create, 0), resource = await f.session.create(Create, 1);
     const before = f.app.sessions.current(f.sessionId);
     await expect(f.session.create(CreateNote, { title: "Rejected note", content: "temporary" },
@@ -282,8 +282,8 @@ describe("SDK 会话资源生命周期", () => {
     expect(after.workbench).toEqual(before.workbench);
   });
 
-  // 依据请求边界与同步提交：创建准备期间禁止游标回溯，取消后不能提交迟到创建。
-  it("异步创建阻止游标移动，取消后等准备真实结束且不留下创建事件", async () => {
+  // Request boundary and synchronous commit contract: creation preparation blocks cursor backtracking and cancellation prevents late creation commits.
+  it("asynchronous creation blocks cursor movement, waits for actual preparation completion after cancellation, and leaves no creation events", async () => {
     const started = latch(), end = latch();
     const f = open({ async prepare(signal) { started.release(); await end.promise; expect(signal.aborted).toBe(true); } });
     const controller = new AbortController();
@@ -296,9 +296,9 @@ describe("SDK 会话资源生命周期", () => {
   });
 });
 
-describe("Agent 资源操作入口", () => {
-  // 顶级改名必须使用请求捕获的链接；同批新链接不授权，后续请求读取新名称。
-  it("resource_rename 沿用请求授权并返回实际保存的标题", async () => {
+describe("Agent resource operation entries", () => {
+  // Top-level renaming uses request-captured links; new links within the batch do not authorize access, and later requests read new names.
+  it("resource_rename reuses request authorization and returns the actual saved title", async () => {
     let mutate: (() => void) | undefined;
     let calls: { name: string; args: Json }[] = [];
     const f = open({ adapter: adapter(() => { mutate?.(); return calls; }) });
@@ -321,8 +321,8 @@ describe("Agent 资源操作入口", () => {
       { resource_id: resourceId, type: Item.kind, title: "Renamed" },
     ] } });
   });
-  // 依据入口拥有领域输入：资源列表只在选择的入口显式声明，通用创建参数和笔记输入保持各自的结构。
-  it("代理入口声明资源列表，笔记入口按自身 schema 创建", async () => {
+  // Entries own domain input: resource lists are explicitly declared only on selected entries; generic creation arguments and note input retain their own structures.
+  it("agent entries declare resource lists while note entries create through their own schemas", async () => {
     let calls: { name: string; args: Json }[] = [];
     const f = open({ adapter: adapter(() => calls) }), target = await model(f.app), actor = await f.session.create(Create, 0);
     expect(agentCreations.inspect(f.plugin, "asterism.builtin/agent.create").input).toHaveProperty("properties.resources");
@@ -345,8 +345,8 @@ describe("Agent 资源操作入口", () => {
     expect(f.app.sessions.current(f.sessionId).workbench.links).toEqual([{ receiverId: actor.id, resourceId: noteId }]);
   });
 
-  // 依据代理发现契约：列表仅返回启用配置的选择信息，新增配置字段和私有提示均不进入模型结果。
-  it("agent_list 公开选择字段并隔离系统提示词和执行配置", async () => {
+  // Agent discovery contract: lists return only selection information for enabled configurations; new configuration fields and private prompts never enter model results.
+  it("agent_list exposes selection fields while isolating system prompts and execution configuration", async () => {
     const f = open({ adapter: adapter(() => [{ name: "agent_list", args: {} }]) });
     const target = await model(f.app), actor = await f.session.create(Create, 0);
     await f.app.configuration.execute({ type: "agent.save", id: "worker", value: { id: "worker",
@@ -365,8 +365,8 @@ describe("Agent 资源操作入口", () => {
     expect(JSON.stringify(result.tools[0]!.model)).not.toContain("PRIVATE_AGENT_INSTRUCTIONS");
   });
 
-  // 依据显式初始链接与自身授权契约：省略或 false 不暴露自身，true 仅额外链接绑定的发起者，源链接保留。
-  it.each([undefined, false, true])("创建代理时附带选定资源与自身授权 %s，下一请求可发现新代理", async exposeSelf => {
+  // Explicit initial link and self-authorization contract: omitted/false does not expose self; true adds only the bound initiator and preserves source links.
+  it.each([undefined, false, true])("agent creation includes selected resources and self authorization %s and new agents are discoverable on the next request", async exposeSelf => {
     let calls: { name: string; args: Json }[] = [];
     const f = open({ adapter: adapter(() => calls) }), target = await model(f.app);
     const actor = await f.session.create(Create, 0), shared = await f.session.create(Create, 1), other = await f.session.create(Create, 2);
@@ -388,8 +388,8 @@ describe("Agent 资源操作入口", () => {
     expect((await run()).tools[0]?.data).toMatchObject({ resources: expect.arrayContaining([expect.objectContaining({ resource_id: child })]) });
   });
 
-  // 依据自身授权与初始资源的独立范围：expose_self 只提供绑定身份，不能把任意未授权 ID 加入 resources。
-  it("暴露自身不扩大初始资源列表的授权范围", async () => {
+  // Self authorization and initial resources have independent scopes: expose_self supplies only bound identity and cannot add arbitrary unauthorized IDs to resources.
+  it("self exposure does not expand initial resource list authorization", async () => {
     let resourceId = "";
     const f = open({ adapter: adapter(() => [{ name: "resource_create", args: {
       creation_id: "asterism.builtin/agent.create",
@@ -407,8 +407,8 @@ describe("Agent 资源操作入口", () => {
     expect(after.workbench).toEqual(before.workbench);
   });
 
-  // 依据 SDK 自身授权与原子创建契约：第三方入口可选择 exposeSelf，目标不接收链接时创建及反向链接一起回滚。
-  it("自身授权的目标不支持接收链接时整体回滚", async () => {
+  // SDK self-authorization and atomic creation contract: third-party entries can choose exposeSelf; targets rejecting links roll back creation and reverse links together.
+  it("self-authorized targets without link reception roll back entirely", async () => {
     const extra = pluginNamespace("test.expose");
     const f = open({
       plugins: [definePlugin({ namespace: extra, version: "1", modules: [
@@ -428,8 +428,8 @@ describe("Agent 资源操作入口", () => {
     expect(after.workbench).toEqual(before.workbench);
   });
 
-  // 依据请求固定授权：已知未授权 ID 和模型请求过程中新增的链接都不能成为本批次初始授权。
-  it("初始资源受请求开始时的链接范围约束", async () => {
+  // Fixed request authorization contract: known unauthorized IDs and links added during model requests cannot become this batch's initial authorization.
+  it("initial resources are constrained by the link scope at request start", async () => {
     let resourceId = "", mutate: (() => void) | undefined;
     const f = open({ adapter: adapter(() => {
       mutate?.();
@@ -448,8 +448,8 @@ describe("Agent 资源操作入口", () => {
     expect((await run()).tools[0]?.kind).toBe("succeeded");
   });
 
-  // 依据创建提交时重验端点：异步准备期间资源可能已移除，固定请求授权仍需真实资源身份才能落地链接。
-  it("准备期间移除初始资源后拒绝迟到创建", async () => {
+  // Recheck endpoints at creation commit: resources may disappear during asynchronous preparation, so fixed request authorization still requires real resource identities to create links.
+  it("removing initial resources during preparation rejects late creation", async () => {
     let resources: string[] = [], pending = false;
     const started = latch(), end = latch();
     const f = open({
@@ -468,8 +468,8 @@ describe("Agent 资源操作入口", () => {
     expect(f.session.snapshot().resources.all().map(item => item.ref.id)).toEqual([actor.id]);
   });
 
-  // 依据显式领域入口：无需 inspect，模型输入适配后走同一创建管线，结果自动链接且不继承链接。
-  it("直接创建已知入口，参数转换与工具策略生效，并可统一移除", async () => {
+  // Explicit domain entry contract: without inspect, adapted model input uses the same creation pipeline and results link automatically without inheriting links.
+  it("creates known entries directly with parameter conversion and tool policies and supports uniform removal", async () => {
     let calls = [{ name: "resource_create", args: { creation_id: ns.name("new"), input: { initial: 8 } } as Json }];
     const f = open({ adapter: adapter(() => calls) }), target = await model(f.app), actor = await f.session.create(Create, 0);
     const run = runner(f, actor, target);
@@ -487,8 +487,8 @@ describe("Agent 资源操作入口", () => {
     expect((await run()).tools[0]).toMatchObject({ kind: "rejected", error: { code: "not_found" } });
   });
 
-  // 依据请求环境固定：知道 ID 或在请求过程中新增链接都不能扩大本批次移除范围。
-  it("请求期间新链接下一次才可移除，移除不要求目标由当前 Agent 创建", async () => {
+  // Fixed request environment contract: knowing IDs or adding links during requests cannot expand this batch's removal scope.
+  it("new links become removable only on the next request and removal does not require creation by the current Agent", async () => {
     let mutate: (() => void) | undefined, targetId = "";
     const f = open({ adapter: adapter(() => { mutate?.(); return [{ name: "resource_remove", args: { resource_id: targetId } }]; }) });
     const target = await model(f.app), actor = await f.session.create(Create, 0), resource = await f.session.create(Create, 1);
@@ -500,8 +500,8 @@ describe("Agent 资源操作入口", () => {
     expect((await run()).tools[0]?.kind).toBe("succeeded");
   });
 
-  // 依据执行作用域：工具保存的操作柄不得在调用完成后继续创建或移除。
-  it("工具会话句柄在执行结束后失效", async () => {
+  // Execution scope contract: saved tool operation handles cannot create or remove resources after call completion.
+  it("tool session handles expire after execution", async () => {
     let saved!: ToolSession;
     const tool = defineTopLevelTool({ id: ns.name("save"), name: "save_session", description: "Save context.", guidelines: [],
       argsSchema: z.null().describe("No input."), resultSchema: z.null().describe("No output."), effect: "read", execution: "parallel",
@@ -516,8 +516,8 @@ describe("Agent 资源操作入口", () => {
     expect(() => saved.rename(actor.id, "New")).toThrow("scope is closed");
   });
 
-  // 依据插件生命周期与公共服务作用域：失败贡献即时移除，不串入另一个宿主实例。
-  it("创建目录按宿主隔离，公开查询包含第三方类型且排除失败登记", async () => {
+  // Plugin lifetime and public service scope contract: failed contributions disappear immediately without leaking into another host instance.
+  it("creation catalogs are isolated by host and public queries include third-party types but exclude failed registrations", async () => {
     const extra = pluginNamespace("test.extra"), missing = defineAction(extra.resource("missing", z.object({})), { id: extra.name("missing"), schema: z.null() });
     const failed = definePlugin({ namespace: extra, version: "1", modules: [
       defineAgentCreation({ id: extra.name("new"), description: "Invalid contribution.", creation: Create }),
@@ -529,7 +529,7 @@ describe("Agent 资源操作入口", () => {
     expect(agentCreations.list(first.plugin)).toEqual(agentCreations.list(second.plugin));
     expect(() => agentCreations.inspect(first.plugin, ns.name("new"))).not.toThrow();
     expect(agentCreations.inspect(first.plugin, ns.name("new")).input).toMatchObject({ type: "object", properties: { initial: { type: "number" } } });
-    // 公开展示查询使用真实目录；入口 ID 与创建契约 ID 不同，仍可取得资源类型。
+    // Public presentation queries use real catalogs; resource types remain available when entry IDs differ from creation contract IDs.
     const directory = await first.app.sessions.calls.invoke(ReadAgentCreations.id, {}, {}, null);
     expect(directory).toEqual(agentCreations.list(first.plugin).map(({ id, resourceKind }) => ({ id, resourceKind })));
     expect(directory).toContainEqual({ id: ns.name("new"), resourceKind: Item.kind });
@@ -537,9 +537,9 @@ describe("Agent 资源操作入口", () => {
   });
 });
 
-// 预期来自生命周期契约：归档、恢复与退出共用对象作用域；归档会话对插件目录与会话读取不存在。
-describe("对象生命周期与会话归档", () => {
-  it("归档结束对象作用域并从插件目录消失，恢复重新 attach，退出再次结束", async () => {
+// Lifetime contract: archival, restoration, and exit share object scopes; archived sessions are absent from plugin catalogs and session reads.
+describe("Object lifetimes and session archival", () => {
+  it("archival ends object scopes and removes them from plugin catalogs, restoration reattaches, and exit ends them again", async () => {
     const probe = pluginNamespace("test.lifetime");
     const Probe = probe.resource("probe", z.strictObject({}));
     const CreateProbe = defineCreation(Probe, { id: probe.name("create"), schema: z.null() });

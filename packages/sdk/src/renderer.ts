@@ -1,4 +1,4 @@
-/** SDK renderer 入口：卡片、工具视图与绑定对象的前端能力；React 由宿主共享。 */
+/** SDK renderer entry point: cards, tool views, and frontend capabilities bound to objects; React is shared by the host. */
 import { createContext, createElement, useContext, type ComponentType, type ReactNode } from "react";
 import type { UiText } from "./i18n.ts";
 import type { CardAppearance } from "./card.ts";
@@ -28,7 +28,7 @@ import type { EventSubscriber } from "./events.ts";
 import type { PluginCalls } from "./calls.ts";
 import type { ChannelContract, ChannelEnd, ChannelValue } from "./channels.ts";
 
-/** 前端持有的通道一端：消息按序交付，监听注册前到达的消息先缓存；closed 在任一端结束时兑现。 */
+/** The frontend end of a channel: messages are delivered in order and buffered until a listener registers; closed resolves when either end terminates. */
 export interface RendererChannel<Up extends ChannelValue = ChannelValue, Down extends ChannelValue = ChannelValue> {
   send(data: Up): void;
   onMessage(listener: (data: Down) => void): () => void;
@@ -38,24 +38,24 @@ export interface RendererChannel<Up extends ChannelValue = ChannelValue, Down ex
 
 export type RendererReceipt = { ok: true } | { ok: false; error: { code: string; message: string; display?: UiText } };
 /**
- * 按对象保留的前端状态（如输入草稿）：跨卡片重挂载、聚焦容器切换与会话视图释放保持；
- * 对象离开当前会话投影（移除或游标跳转）或显式丢弃时调用 release，应用重启后不恢复。
+ * Frontend state retained per object, such as input drafts: survives card remounts, switches between focus containers, and session view disposal;
+ * release is called when the object leaves the current session projection through removal or a cursor jump, or is explicitly discarded; state is not restored after application restart.
  */
 export interface RendererRetained {
-  /** 取得 key 对应的值，首次调用时用 create 创建；同一对象同一 key 返回同一实例。key 以插件 ID 为前缀避免与其他贡献者冲突。 */
+  /** Obtain the value for key, creating it with create on first access; the same object and key return the same instance. Prefix key with the plugin ID to avoid conflicts with other contributors. */
   get<T>(key: string, create: () => T, release?: (value: T) => void | Promise<void>): T;
-  /** 立即结束保留并调用 release；不存在时无效。 */
+  /** End retention immediately and call release; no effect if absent. */
   discard(key: string): void;
 }
-/** 绑定卡片对象的前端能力；宿主负责订阅、命令门禁和当前视图的一致性。 */
+/** Frontend capabilities bound to a card object; the host handles subscriptions, command gating, and current-view consistency. */
 export interface RendererObjectContext {
   readonly ref: ResourceRef;
   readonly content: ContentReader;
   input<I, O extends Json>(contract: ActionContract<I, O> | CreationContract<I, Json, O>): RendererContentInput;
   readonly view: {
-    /** 当前对象视图可操作；普通后台刷新与其他对象的局部提交不改变此值。 */
+    /** The current object view is operable; ordinary background refreshes and local commits on other objects do not change this value. */
     ready: boolean;
-    /** 视图读取异常；对象动作和创建失败通过各自调用回执返回。 */
+    /** View read error; object action and creation failures are returned through their respective call receipts. */
     error: UiText | null; missing: boolean;
   };
   readonly session: {
@@ -65,9 +65,9 @@ export interface RendererObjectContext {
     refresh(): Promise<void>;
   };
   invoke<I, O extends Json>(contract: ActionContract<I, O>, input: NoInfer<I> & Json, options?: RendererInputOptions): Promise<RendererReceipt>;
-  /** 打开本对象的双工通道；宿主校验对象位于当前路径并路由到所属插件，对象离开当前集合或连接断开时结束。 */
+  /** Open a duplex channel for this object; the host validates that it is on the current path and routes to its owning plugin. Ends when the object leaves the current set or the connection disconnects. */
   openChannel<Up extends ChannelValue, Down extends ChannelValue>(contract: ChannelContract<Up, Down>): RendererChannel<Up, Down>;
-  /** 对象级保留状态，生命周期由宿主统一管理。 */
+  /** Object-level retained state with a lifecycle managed uniformly by the host. */
   readonly retained: RendererRetained;
 }
 const ObjectContext = createContext<RendererObjectContext | null>(null);
@@ -77,14 +77,14 @@ export function useRendererObject(): RendererObjectContext {
   return object;
 }
 
-/** 类型级静态识别信息，不解析卡片数据，也不创建正文组件。 */
+/** Static identification information at the type level; does not parse card data or create body components. */
 export interface ResourceDescription {
   kind: string;
   label: UiText;
   icon: ReactNode;
-  /** 创建前可取用的默认卡片尺寸，与卡片 renderer 共用声明。 */
+  /** Default card dimensions available before creation, sharing a declaration with the card renderer. */
   card?: CardAppearance;
-  /** 本资源可作为有向链接终点，与后台 links.receive 一致。 */
+  /** This resource can be the endpoint of a directed link, matching backend links.receive. */
   receivesLinks?: boolean;
 }
 export interface CardView extends CardAppearance {
@@ -100,19 +100,19 @@ export interface RendererModule {
   resources: ResourceDescription[];
   cards: CardRenderer[];
   tools: ToolRenderer[];
-  /** 历史记录视图：按记录契约声明摘要、图标与可选行内容。 */
+  /** History record views: declare summaries, icons, and optional row content by record contract. */
   records?: RecordRenderer[];
-  /** 创建入口：菜单与拖放由宿主统一仲裁，最终都走所绑定的创建契约。 */
+  /** Creation entry points: the host arbitrates menus and drag-and-drop uniformly, with all paths ultimately using the bound creation contract. */
   creations?: CreationEntry[];
-  /** 启动准备：宿主在首屏前并行调用，模块自行初始化内部资源；超时或失败只记录，不阻止启动。 */
+  /** Startup preparation: the host invokes modules in parallel before the first screen, and modules initialize their own internal resources; timeouts or failures are logged without blocking startup. */
   prepare?(context: RendererPrepareContext): Promise<void>;
 }
 export interface PluginSettingsPage {
-  /** 可直接定位的页面内部位置；空位置表示根页面。 */
+  /** A directly addressable location within a page; an empty location means the root page. */
   locations?: readonly string[];
   Body: ComponentType<{ location?: string }>;
 }
-/** 前端插件拥有设置页和共享服务生命周期，功能视图由模块组合。 */
+/** Frontend plugins own settings pages and shared service lifecycles; feature views are composed from modules. */
 export interface RendererPlugin {
   modules?: readonly RendererModule[];
   settings?: PluginSettingsPage;
@@ -121,15 +121,15 @@ export interface RendererPlugin {
 }
 export function defineRendererPlugin(plugin: RendererPlugin): RendererPlugin { return plugin; }
 export interface RendererPrepareContext {
-  /** 前端模块级服务使用的具型调用；取消随准备作用域传播。 */
+  /** Typed calls for frontend module-level services; cancellation propagates with the preparation scope. */
   readonly calls: PluginCalls;
-  /** 与模块生命周期绑定的全局订阅，失败、超时和应用关闭时清理。 */
+  /** Global subscriptions bound to the module lifecycle, cleaned up on failure, timeout, or application shutdown. */
   readonly events: EventSubscriber;
-  /** 宿主放弃等待（超时或关闭）时触发；模块应尽快停止。 */
+  /** Triggered when the host stops waiting due to timeout or shutdown; the module should stop promptly. */
   readonly signal: AbortSignal;
 }
 
-/** 类型擦除只发生在注册边界；组件接收到的是已通过契约校验的数据。 */
+/** Type erasure occurs only at the registration boundary; components receive data that has passed contract validation. */
 export function cardRenderer<T extends Json>(
   contract: DataContract<T>,
   definition: CardAppearance & {

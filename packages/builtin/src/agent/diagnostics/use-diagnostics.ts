@@ -6,7 +6,7 @@ import { diagnosticHistory, type DiagnosticScope } from "./history.ts";
 import { diagnosticModel, estimateUsageCost } from "./cost.ts";
 import { diagnosticOverview } from "./overview.ts";
 
-/** 快照和配置变化时重新推导，不创建消费记录；关闭面板也不影响运行。 */
+/** Rederives values when snapshots or configuration change without creating consumption records; closing the panel does not affect execution. */
 export function useDiagnostics(scope: DiagnosticScope) {
   const object = useRendererObject();
   const catalogs = useRendererCatalogs();

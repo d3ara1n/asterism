@@ -1,18 +1,18 @@
 import type { CSSProperties, ReactNode } from "react";
 import { cn } from "@asterism/ui/utils";
 
-/** 屏声明：Space 中的一站。surface=false 时无底板，内容直接位于窗口材质上。 */
+/** Screen declaration: one stop in Space. With surface=false, there is no surface and content sits directly on the window material. */
 export interface ScreenSpec { id: string; label: string; surface?: boolean; content: ReactNode }
 
 /**
- * 受管空间：窗口内容区中唯一负责与窗口关系的层（内边距由 --space-inset 决定）。
- * 屏自左向右平铺（左浅右深），整屏平移切换；视口外的屏保持挂载但 inert。
- * 屏与浮岛只相对 Space 定位，不感知标题栏。
+ * Managed space: the only layer within the window content area responsible for its relationship to the window (padding is determined by --space-inset).
+ * Screens are tiled left to right (shallower on the left, deeper on the right) and switch by whole-screen translation; offscreen screens remain mounted but inert.
+ * Screens and islands are positioned only relative to Space and are unaware of the titlebar.
  */
 export function Space({ screens, active, className }: { screens: ScreenSpec[]; active: string; className?: string }) {
   const index = Math.max(0, screens.findIndex(screen => screen.id === active));
   return <div className={cn("space", className)}>
-    {/* 屏宽与间隙由 CSS 计算，平移用 transform 过渡，不依赖测量。 */}
+    {/* CSS calculates screen width and gaps; translation uses transform transitions without relying on measurement. */}
     <div className="space-strip" style={{ "--screen-index": index } as CSSProperties}>
       {screens.map(screen => <section key={screen.id} id={`screen-${screen.id}`} tabIndex={-1} aria-label={screen.label}
         inert={screen.id !== active} aria-hidden={screen.id !== active || undefined}

@@ -16,12 +16,12 @@ import { useLifetimeSignal } from "../shared/use-lifetime";
 import { ReadSkills, RefreshSkills, SkillsChanged, type SkillOverview, type SkillSourceOverview } from "./contract";
 
 const islandKey = (source: string) => `skills:${source}`;
-/** 目录来源下的问题以包内相对路径展示；插件与内置来源的文件保留原值。 */
+/** Issues under directory sources display paths relative to the package; files from plugin and built-in sources retain their original values. */
 const issueFile = (source: string, file: string) =>
   file.startsWith(source) && /^[\\/]/.test(file.slice(source.length)) ? file.slice(source.length + 1) : file;
 const activeCount = (group: SkillSourceOverview) => group.skills.filter(skill => !skill.overriddenBy).length;
 
-/** 设置与来源浮岛各自订阅同一份目录快照；刷新结果经 SkillsChanged 同步到所有订阅者。 */
+/** Settings and source islands independently subscribe to the same catalog snapshot; SkillsChanged synchronizes refresh results to all subscribers. */
 function useSkillCatalog() {
   const calls = useRendererCalls(), events = useRendererEvents();
   const [catalog, setCatalog] = useState<SkillOverview | null>(null);
@@ -40,7 +40,7 @@ function useSkillCatalog() {
   return { catalog, failed, retry };
 }
 
-/** 设置只呈现来源摘要；条目在来源浮岛中检索，正文与配套文件由模型按需读取。 */
+/** Settings show only source summaries; entries are searchable in source islands, while the model reads bodies and supporting files as needed. */
 export function SkillSettings() {
   const i18n = useI18n(), calls = useRendererCalls(), island = useRendererIsland();
   const { catalog, failed, retry } = useSkillCatalog();
@@ -88,8 +88,8 @@ export function SkillSettings() {
 }
 
 /**
- * 来源浮岛：发现问题置顶，技能可按名称与描述筛选；条目可达上千，列表虚拟化。
- * 虚拟列表直接位于浮岛内容区，以内容区本身作为滚动容器，状态与问题作为列表首项一同滚动。
+ * Source island: discovery issues appear first, skills can be filtered by name and description, and the list is virtualized to accommodate thousands of entries.
+ * The virtual list sits directly in the island content area, using that area as its scroll container; status and issues scroll together as the first list item.
  */
 function SkillSourcePanel({ source }: { source: string }) {
   const i18n = useI18n();

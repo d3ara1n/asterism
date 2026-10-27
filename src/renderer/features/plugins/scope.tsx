@@ -11,7 +11,7 @@ import { IslandPanel, panelIslandWidth } from "../../shared/weave/IslandPanel";
 import { useIsland } from "../../shared/weave/Screen";
 import { pluginPreferences } from "../creation/preferences";
 
-/** 插件界面异常只影响所在区域，宿主保留管理入口。 */
+/** Plugin UI errors affect only their own region; the host retains management access. */
 export class SettingsBoundary extends Component<{ children: ReactNode; fallback: ReactNode }, { failed: boolean }> {
   state = { failed: false };
   static getDerivedStateFromError() { return { failed: true }; }
@@ -19,7 +19,7 @@ export class SettingsBoundary extends Component<{ children: ReactNode; fallback:
   render() { return this.state.failed ? this.props.fallback : this.props.children; }
 }
 
-/** 区域内发起的通信随卸载取消；后台独立业务服务仍由插件生命周期拥有。 */
+/** Communication initiated within the region is cancelled on unmount; independent backend business services remain owned by the plugin lifecycle. */
 export function PluginCallScope({ children }: { children: ReactNode }) {
   const parent = useRendererCalls();
   const pending = useRef(new Set<AbortController>());
@@ -39,8 +39,8 @@ export function PluginCallScope({ children }: { children: ReactNode }) {
 }
 
 /**
- * 把所在宿主浮岛适配为插件浮岛：身份按插件隔离，宽度与外框由宿主统一。
- * page 为设置页所在浮岛：页面卸载时一并关闭它打开的浮岛（内容已失效，跳过守卫）。
+ * Adapt the containing host island into a plugin island: identities are isolated by plugin, and the host standardizes width and shell.
+ * page is the island containing the settings page: when the page unmounts, close the islands it opened as well (content is invalid, so skip guards).
  */
 export function PluginIslandProvider({ pluginId, page = false, children }: { pluginId: string; page?: boolean; children: ReactNode }) {
   const island = useIsland();
@@ -62,10 +62,10 @@ export function PluginIslandProvider({ pluginId, page = false, children }: { plu
   </RendererIslandProvider>;
 }
 
-/** 在渲染期调用插件的 render，使其异常落入边界。 */
+/** Call the plugin's render during rendering so its errors reach the boundary. */
 function Render({ render }: { render: () => ReactNode }) { return render(); }
 
-/** 插件浮岛内容在宿主屏内渲染，脱离设置页的上下文，因此重新提供插件偏好、通信作用域与异常边界。 */
+/** Plugin island content renders within the host screen, outside the settings page context, so provide plugin preferences, communication scope, and an error boundary again. */
 function PluginIslandContent({ pluginId, spec }: { pluginId: string; spec: RendererIslandSpec }) {
   const i18n = useI18n();
   return <RendererPreferencesProvider value={pluginPreferences(pluginId)}>

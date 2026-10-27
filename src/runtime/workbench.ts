@@ -11,19 +11,19 @@ import { defaultCardPosition } from "../shared/workbench-layout.ts";
 import { placeObject } from "../shared/workbench-placement.ts";
 import { cardSize } from "../shared/workbench-sizing.ts";
 
-/** 宿主工作台写入的会话级来源。 */
+/** Session-level origin for host workbench writes. */
 const host = null;
 
 type ViewRow = { object_id: string; x: number; y: number; hidden: number; collapsed: number; width: number | null; height: number | null };
 
-/** 会话的资源事件与独立布局；当前存在性与链接统一由会话树重建。 */
+/** Session resource events and independent layout; session trees reconstruct current presence and links together. */
 export class SessionWorkbench {
   constructor(private readonly db: DatabaseSync, private readonly tree: SessionTree,
     private readonly resources: ResourceRegistry,
     private readonly tools: (sessionId: string, receiverId: string, resource: FoldedObject) => Json,
     private readonly content?: ContentStore) {}
 
-  /** 通用资源创建：资源贡献给出标题并保存对象数据；创建事件保存身份、类型与标题。 */
+  /** Generic resource creation: contributions supply titles and save object data; creation events retain identity, type, and title. */
   create(sessionId: string, kind: string, input: Json, position: Point, content?: ContentLease): string {
     return this.createWith(sessionId, kind, createResourceId(), input, position, content);
   }
@@ -34,7 +34,7 @@ export class SessionWorkbench {
     return this.insert(sessionId, { id, kind, title, data: data ?? {} }, position, { scope: content });
   }
 
-  /** 将已初始化的对象数据建立为新身份；普通创建与模板实例化共用历史和内容登记。 */
+  /** Establish initialized object data under new identities; ordinary creation and template instantiation share history and content registration. */
   insert(sessionId: string, object: { id: string; kind: string; title: string; data: Record<string, Json> },
     position: Point, access: Pick<ContentAccess, "scope" | "templateId"> = {}): string {
     const { id, kind, title, data } = object;
@@ -44,7 +44,7 @@ export class SessionWorkbench {
     return id;
   }
 
-  /** 按资源声明与用户覆盖预留完整展开尺寸，创建者附近优先，已有对象保持原位。 */
+  /** Reserve full expanded dimensions from resource declarations and user overrides, prefer creator proximity, and keep existing objects in place. */
   placement(sessionId: string, kind: string, nearObjectId?: string): Point {
     const objects = this.tree.workbench(sessionId).objects;
     const views = this.db.prepare("SELECT * FROM object_views WHERE session_id = ?").all(sessionId) as ViewRow[];
@@ -79,7 +79,7 @@ export class SessionWorkbench {
       case "object.remove": {
         const target = folded.objects.find(o => o.id === command.objectId);
         if (!target) throw new SessionError("not_found", "Object does not belong to this session.");
-        // 对象移除时解除全部入向与出向链接。
+        // Remove all incoming and outgoing links when removing objects.
         for (const link of folded.links.filter(l => l.resourceId === target.id || l.receiverId === target.id)) {
           const resource = folded.objects.find(o => o.id === link.resourceId)!;
           tree.appendToTimeline(command.sessionId, { source: host, recipient: link.receiverId, contract: "resource_detached", data: { id: resource.id, receiverId: link.receiverId },
@@ -89,7 +89,7 @@ export class SessionWorkbench {
         break;
       }
       case "link.set": {
-        // 终点必须声明接收链接；起点是任意其他资源。
+        // Destinations must declare link reception; sources may be any other resource.
         const receiver = folded.objects.find(o => o.id === command.receiverId && this.resources.receivesLinks(o.kind));
         const resource = folded.objects.find(o => o.id === command.resourceId);
         if (!receiver || !resource) throw new SessionError("not_found", "The link requires a resource and a receiver that supports links in this session.");
@@ -102,7 +102,7 @@ export class SessionWorkbench {
         break;
       }
       case "view.set": {
-        // 布局不属于历史路径；旁支和已移除对象的卡片也可以调整。
+        // Layout is outside historical paths; cards for side-branch and removed objects can also move.
         const exists = tree.resourceRef(command.objectId)?.sessionId === command.sessionId;
         if (!exists) throw new SessionError("not_found", "Object does not belong to this session.");
         const previous = this.db.prepare("SELECT * FROM object_views WHERE session_id = ? AND object_id = ?").get(command.sessionId, command.objectId) as ViewRow | undefined;

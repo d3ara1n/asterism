@@ -3,7 +3,7 @@ import type { TimelineItem } from "./timeline";
 import { groupTurnProcesses, visibleTurnProcesses } from "./turn-process";
 import type { TimelineViewState } from "./view-state";
 
-/** 整轮开合随 Agent 视图保留；继续执行时撤下概要，下一次收束重新默认折叠。 */
+/** Whole-turn expansion state is retained with the Agent view; resuming removes the summary, and the next settlement defaults to collapsed again. */
 export function useTurnProcesses(items: readonly TimelineItem[], viewState: TimelineViewState, running: boolean) {
   const grouped = useMemo(() => groupTurnProcesses(items, running), [items, running]);
   const [open, setOpen] = useState(() => viewState.openProcesses);

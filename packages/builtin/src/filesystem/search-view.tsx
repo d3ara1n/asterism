@@ -29,7 +29,7 @@ const flagMessages = {
   noIgnore: messages.toolSearchOptionNoIgnore,
 } satisfies Record<Extract<SearchOption, { kind: "flag" }>["flag"], typeof messages.toolSearchLimit>;
 
-/** 主体以搜索模式开头，范围（资源与非根路径）随后，截断时优先保留模式。 */
+/** The main text starts with the search pattern, followed by scope (resource and nonroot path); truncation prioritizes preserving the pattern. */
 function Header(props: Props & { grep?: boolean }) {
   const i18n = useI18n(), data = props.result?.data;
   const path = inputText(props.target, "path");
@@ -64,7 +64,7 @@ function Options({ args }: { args: Props["args"] }) {
   </p>;
 }
 
-/** 扁平目录分组：目录标题使用次要文字，其下条目缩进；根层条目不设标题。 */
+/** Flat directory grouping: directory headings use secondary text and entries beneath are indented; root-level entries have no heading. */
 function DirectoryGroups<T>({ groups, children }: { groups: DirectoryGroup<T>[]; children: (entry: { name: string; item: T }) => ReactNode }) {
   return <div className="flex flex-col gap-1.5">
     {groups.map(group => <div key={group.directory} className="flex flex-col">
@@ -76,7 +76,7 @@ function DirectoryGroups<T>({ groups, children }: { groups: DirectoryGroup<T>[];
   </div>;
 }
 
-/** 文件行可展开查看命中片段；开合按文件路径保存在对话条目视图状态中，代码片段只在展开时挂载。 */
+/** File rows expand to show matching excerpts; expansion is saved by file path in conversation-item view state, and code excerpts mount only while expanded. */
 function GrepFileRow({ file, name, initialOpen }: { file: GrepFile; name: string; initialOpen: boolean }) {
   const i18n = useI18n();
   const [open, setOpen] = useRendererViewState(`asterism.builtin/search-file:${file.path}`, initialOpen);
@@ -135,7 +135,7 @@ function Results({ data, args }: { data: FindResult | GrepResult; args: Props["a
   </>;
 }
 
-/** 执行中与终结共用：先列出偏离默认值的参数，结果到达后追加分组结果。 */
+/** Shared by execution and final states: first lists arguments differing from defaults, then appends grouped results when they arrive. */
 function Body({ args, result }: Props) {
   const data = result?.data;
   const options = searchOptions(args);

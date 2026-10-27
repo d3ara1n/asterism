@@ -8,9 +8,9 @@ const choice: Question = {
   recommendation: { optionId: "lite", reason: "Local first" },
 };
 
-// 结果展示以保存的答案为历史事实，原提问只用于补充未选项；两者不一致时不得改写已选内容。
-describe("问答只读摘要", () => {
-  it("结果保留保存的选项原文，未选项与推荐取自同一原提问", () => {
+// Result display treats saved answers as historical facts; original questions only supply unselected options, and discrepancies must not rewrite selected content.
+describe("read-only question-and-answer summaries", () => {
+  it("preserves saved option text in results and takes unselected options and recommendations from the same original question", () => {
     const [row] = resultRows([{ ...choice, options: [{ id: "pg", label: "Renamed" }, ...choice.options.slice(1)] }], {
       answers: [{ id: "db", question: "Which database?", type: "single", status: "answered", selected: [{ id: "pg", label: "Postgres" }] }],
     });
@@ -18,15 +18,15 @@ describe("问答只读摘要", () => {
     expect(row!.others.map(option => [option.id, option.recommended])).toEqual([["lite", true], ["mongo", false]]);
   });
 
-  it("原提问缺失或题型不符时不推测未选项", () => {
+  it("does not infer unselected options when the original question is missing or its type differs", () => {
     const answer = { id: "db", question: "Which database?", type: "multiple" as const, status: "answered" as const,
       selected: [{ id: "pg", label: "Postgres" }], comment: "legacy" };
     expect(resultRows(null, { answers: [answer] })[0]).toMatchObject({ others: [], comment: "legacy" });
     expect(resultRows([choice], { answers: [answer] })[0]!.others).toEqual([]);
   });
 
-  // 复核与提交校验共用规则：未通过校验的回答显示待回答，而不是空的已回答。
-  it("复核中未通过校验的题显示待回答，自定义答案与选项分开", () => {
+  // Review and submission validation share rules: answers that fail validation appear as unanswered rather than as empty completed answers.
+  it("shows questions that fail validation as unanswered during review and separates custom answers from options", () => {
     const rows = submissionRows([choice, { ...choice, id: "other" }], {
       answers: [{ id: "db", status: "answered", selected: [], text: "DuckDB" }, { id: "other", status: "answered", selected: [] }],
     });

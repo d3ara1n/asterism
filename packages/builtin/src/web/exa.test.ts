@@ -2,7 +2,7 @@ import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 import { ExaAbortError, ExaError, ExaTimeoutError } from "exa-js";
 import { exaError, exaResponse, exaSearchOptions, exaWebProvider } from "./exa.ts";
 
-// SDK 在模块加载时取用 fetch；提前替换保证请求验证始终留在本地。
+// The SDK captures fetch when the module loads; replace it beforehand to keep request validation local.
 const http = vi.hoisted(() => {
   const original = globalThis.fetch, transport = vi.fn<typeof fetch>();
   globalThis.fetch = transport;
@@ -11,9 +11,9 @@ const http = vi.hoisted(() => {
 afterEach(() => http.transport.mockReset());
 afterAll(() => { globalThis.fetch = http.original; });
 
-describe("Exa 结果归一化", () => {
-  // 注册表在调用 create 前去除尾斜杠；此处验证不含尾斜杠的代理地址能正确路由 search 与 contents 路径。
-  it("代理端点下仍请求准确的 search 与 contents 路径", async () => {
+describe("Exa result normalization", () => {
+  // The registry strips trailing slashes before calling create; verify that proxy addresses without trailing slashes route correctly to search and contents paths.
+  it("requests the correct search and contents paths under a proxy endpoint", async () => {
     const paths: string[] = [];
     http.transport.mockImplementation(async url => {
       paths.push(new URL(typeof url === "string" ? url : url instanceof URL ? url.href : url.url).pathname);
@@ -26,8 +26,8 @@ describe("Exa 结果归一化", () => {
     await instance.fetch!({ url: "https://page.test/" }, options);
     expect(paths).toEqual(["/exa/search", "/exa/contents"]);
   });
-  // 缺省获取应保持正文请求；query 只添加摘录，字符上限还需适配 Exa 自身的参数范围。
-  it("按获取参数选择正文选项与附加摘录，显式报告上游上限调整", async () => {
+  // Default fetching should retain the body request; query only adds excerpts, and character limits must also adapt to Exa's own parameter range.
+  it("selects body options and additional excerpts from fetch arguments and explicitly reports adjustments to upstream limits", async () => {
     const requests: unknown[] = [];
     http.transport.mockImplementation(async (_url, init) => {
       requests.push(JSON.parse(String(init?.body)));
@@ -46,8 +46,8 @@ describe("Exa 结果归一化", () => {
     ]);
     expect(adjusted.hints).toMatchObject([{ code: "parameter_adjusted", parameter: "maxCharacters" }]);
   });
-  // 首页和 PDF 的 author:null 曾使整份响应失败；元数据缺失应省略字段，正文仍正常交付。
-  it("空值与缺省元数据都不影响正文归一化", () => {
+  // author:null on homepages and PDFs previously caused the entire response to fail; omit missing metadata fields while still delivering body text normally.
+  it("null and absent metadata do not affect body normalization", () => {
     const result = exaResponse({ results: [
       { url: "https://page.test/", title: null, author: null, publishedDate: null, image: null, favicon: null, text: "Page content" },
       { url: "https://page.test/paper.pdf", text: "Paper content" },
@@ -57,8 +57,8 @@ describe("Exa 结果归一化", () => {
       { url: "https://page.test/paper.pdf", content: [{ kind: "body", format: "text", text: "Paper content" }] },
     ]);
   });
-  // Exa text、highlights、summary 含义不同；合并成单个 content 会把生成摘要伪装成原文。
-  it("分别保留正文、摘录、摘要与具型来源数据", () => {
+  // Exa text, highlights, and summary have different meanings; merging them into one content field would misrepresent a generated summary as original text.
+  it("preserves body text, excerpts, summaries, and typed source data separately", () => {
     const result = exaResponse({ requestId: "request-1", results: [{ id: "source-1", url: "https://example.test/page", title: "Title",
       text: "Original body", highlights: ["Relevant passage"], summary: { finding: "Generated summary" }, author: "Author",
       publishedDate: "2026-01-01", score: 0.8, snapshotAt: "2026-01-02T00:00:00Z", entities: [{ type: "company", properties: { name: "Example" } }],
@@ -74,8 +74,8 @@ describe("Exa 结果归一化", () => {
     expect(result.usage).toEqual([{ name: "total", amount: 0.005, unit: "currency", currency: "USD" }]);
     expect(result.details?.[0]?.data).toMatchObject({ costDollars: { total: 0.005, contents: { text: 0.001 } } });
   });
-  // 服务端可能放宽查询或忽略字段，即使 HTTP 成功也必须将语义差异交给模型。
-  it("合并本地未支持条件与服务端过滤说明，保留内容获取失败", () => {
+  // Servers may relax a query or ignore fields; semantic differences must reach the model even when HTTP succeeds.
+  it("merges locally unsupported conditions with server filtering explanations and preserves content-fetch failures", () => {
     const { options, hints } = exaSearchOptions({ query: "test", maxResults: 200, language: "zh", publishedAfter: "2026-01-01" });
     expect(options.numResults).toBe(100);
     expect(options.startPublishedDate).toBe("2026-01-01");

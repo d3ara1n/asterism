@@ -3,8 +3,8 @@ import { describe, expect, it } from "vitest";
 import { projectSystemPrompt } from "./system-prompt.ts";
 import { composeSystemPrompt } from "@asterism/builtin/runtime";
 
-describe("系统提示词的运行时组装与模型投影", () => {
-  it("原始提示块保留独立来源，模型视图按声明顺序渲染并转义边界", () => {
+describe("Runtime system prompt assembly and model projection", () => {
+  it("original prompt blocks retain independent origins while model views render in declared order and escape boundaries", () => {
     const prompt: SystemPrompt = { blocks: [
       { id: "plugin", kind: "system", from: 'plugin\"<&', text: "Read <resource> & </end>; keep a < b, 1<2 and -> as is." },
       { id: "agent", kind: "agent", role: "worker", text: "Work carefully." },
@@ -14,7 +14,7 @@ describe("系统提示词的运行时组装与模型投影", () => {
     );
     expect(prompt.blocks[0]?.text).toBe("Read <resource> & </end>; keep a < b, 1<2 and -> as is.");
   });
-  it("重新组装取代码中的 harness；局部替换不改变后续加载的内置定义", () => {
+  it("reassembly uses the harness in code; local replacements do not alter subsequently loaded built-in definitions", () => {
     const agent = { id: "worker", systemPrompt: "Role instructions" };
     const first = composeSystemPrompt(agent, "Asterism");
     const original = projectSystemPrompt(first);

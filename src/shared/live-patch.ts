@@ -1,9 +1,9 @@
 import type { LiveBlock } from "./session.ts";
 
 /**
- * 流式正文的增量补丁：前后两份 live 列表按块 ID 对齐，块内按 JSON 路径比较。
- * 字符串只追加时发送尾部，数组增长时只发送新元素，对象按键比较；其余变化在最深的变化位置整值替换。
- * 未变化的块与字段不出现在补丁中。
+ * Incremental streaming-text patches: align previous and next live lists by block ID and compare JSON paths within blocks.
+ * Send tails for string appends and new elements for array growth, compare object keys, and replace other changes at the deepest changed position.
+ * Unchanged blocks and fields do not appear in patches.
  */
 export type LivePath = readonly (string | number)[];
 export type LiveOperation =
@@ -14,7 +14,7 @@ export type LiveBlockPatch =
   | { id: string; kind: "put"; block: LiveBlock }
   | { id: string; kind: "update"; ops: LiveOperation[] };
 export interface LivePatch {
-  /** 当前全部块 ID 的顺序；不在其中的旧块被移除。 */
+  /** Current order of all block IDs; remove old blocks absent from this list. */
   order: string[];
   changes: LiveBlockPatch[];
 }
@@ -52,7 +52,7 @@ function diffValue(previous: unknown, next: unknown, path: (string | number)[], 
   ops.push({ path: [...path], set: next });
 }
 
-/** 计算 previous 到 next 的补丁；没有任何变化时返回 null。 */
+/** Compute patches from previous to next; return null without changes. */
 export function diffLive(previous: readonly LiveBlock[], next: readonly LiveBlock[]): LivePatch | null {
   const before = new Map(previous.map(block => [block.id, block]));
   const changes: LiveBlockPatch[] = [];
@@ -68,7 +68,7 @@ export function diffLive(previous: readonly LiveBlock[], next: readonly LiveBloc
   return changes.length || !sameOrder ? { order, changes } : null;
 }
 
-/** 沿路径复制容器写入；路径之外的值保持对象身份。 */
+/** Copy containers along the write path; values outside the path retain object identity. */
 function applyOperation(target: unknown, operation: LiveOperation, depth = 0): unknown {
   const { path } = operation;
   if (depth === path.length) {
@@ -94,7 +94,7 @@ function applyOperation(target: unknown, operation: LiveOperation, depth = 0): u
   return copy;
 }
 
-/** 应用补丁；未变化的块与字段保持对象身份，供界面按引用跳过重渲染。 */
+/** Apply patches, preserving unchanged block/field identity so views can skip rerendering by reference. */
 export function applyLive(previous: readonly LiveBlock[], patch: LivePatch): LiveBlock[] {
   const blocks = new Map(previous.map(block => [block.id, block]));
   for (const change of patch.changes) {

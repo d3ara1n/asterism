@@ -10,7 +10,7 @@ export const cardSizeSchema = z.strictObject({
   width: z.number().finite().min(1).max(maximumCardDimension),
   height: z.number().finite().min(1).max(maximumCardDimension),
 });
-/** 存储允许远距离对象的全图概览；交互下限由画布按可见对象范围收紧。 */
+/** Storage permits full-map overviews of distant objects; canvases tighten interaction minima based on visible object bounds. */
 export const minimumViewportZoom = 0.00001;
 export const maximumViewportZoom = 4;
 export const viewportSchema = z.strictObject({ x: coordinate, y: coordinate, zoom: z.number().min(minimumViewportZoom).max(maximumViewportZoom) });
@@ -18,7 +18,7 @@ export type Point = z.infer<typeof pointSchema>;
 export type CardSize = z.infer<typeof cardSizeSchema>;
 export type Viewport = z.infer<typeof viewportSchema>;
 
-/** 资源变更与布局属于指定会话；操作始终针对执行游标。 */
+/** Resource changes and layout belong to specified sessions; operations always target execution cursors. */
 export const workbenchCommands = [
   z.strictObject({ type: z.literal("object.remove"), sessionId, objectId: id }),
   z.strictObject({ type: z.literal("object.rename"), sessionId, objectId: id, title: resourceTitleSchema }),
@@ -41,7 +41,7 @@ const viewSchema = z.strictObject({ objectId: id, position: pointSchema, hidden:
 export type ObjectView = z.infer<typeof viewSchema>;
 export const workbenchSnapshotSchema = z.strictObject({
   id: sessionId, title: z.string(), objects: z.array(objectSchema), views: z.array(viewSchema), viewport: viewportSchema,
-  /** 有向链接的两端均为资源：resourceId 指向接收访问资格的 receiverId。 */
+  /** Both directed-link endpoints are resources: resourceId points to receiverId, which receives access eligibility. */
   links: z.array(z.strictObject({ receiverId: id, resourceId: id })),
 });
 export type WorkbenchSnapshot = z.infer<typeof workbenchSnapshotSchema>;

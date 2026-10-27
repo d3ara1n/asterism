@@ -2,8 +2,8 @@ import type { Json } from "@asterism/sdk/contracts";
 import type { RendererPreferences } from "@asterism/sdk/renderer";
 
 /**
- * 受控偏好容器的 renderer 缓存：启动时读取一次，写入先更新缓存再经桥保存。
- * 宿主路由记忆与插件偏好共用同一容器，按键前缀区分归属。
+ * Renderer cache of the controlled preferences container: read once at startup; writes update the cache before saving through the bridge.
+ * Host routing memory and plugin preferences share one container, with ownership distinguished by key prefixes.
  */
 let cache: Record<string, Json> = {};
 let loaded: Promise<void> | null = null;
@@ -20,7 +20,7 @@ export function writePreference(key: string, value: Json | null): void {
   void window.host.preferences.write(key, value);
 }
 
-/** 插件偏好门面：键限定在 `plugin/<pluginId>/` 下，读取按调用方 schema 校验，失效视为缺省。 */
+/** Plugin preferences facade: keys are restricted to `plugin/<pluginId>/`; reads validate against the caller's schema, treating invalid values as unset. */
 export function pluginPreferences(pluginId: string): RendererPreferences {
   const scoped = (key: string) => `plugin/${pluginId}/${key}`;
   return {

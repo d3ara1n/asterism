@@ -62,7 +62,7 @@ export const structuredAnswerSchema = z.strictObject({
   answers: z.array(answerSchema).describe("Answers in original question order."),
   message: text.optional().describe("User-authored overall correction or additional instructions. Interpret together with the answers."),
 });
-// 历史结果只读兼容；新调用始终使用结构化问答。
+// Read-only compatibility for historical results; new calls always use structured questions and answers.
 export const AskUserResult = builtin.data("ask-user", z.union([
   structuredAnswerSchema,
   z.strictObject({ requestId: text.describe("Identity of the currently waiting question group; only published during execution.") }),

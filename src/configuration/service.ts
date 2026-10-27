@@ -38,7 +38,7 @@ export class ConfigurationService {
   }
   private providersChanged() { for (const listener of this.providerListeners) listener(); }
   private readonly store: ConfigurationStore;
-  /** 宿主凭据库；插件凭据以独立引用存于同一 vault。 */
+  /** Host credential store; plugin credentials use independent references in the same vault. */
   readonly vault: CredentialVault;
   private queue: Promise<unknown> = Promise.resolve();
   private closed = false;
@@ -101,7 +101,7 @@ export class ConfigurationService {
     });
   }
   private assertOpen(): void { if (this.closed) throw new ConfigurationError("unavailable", "Configuration service is unavailable."); }
-  /** 同步取得当前生效配置；凭据状态沿用最近一次检查结果。 */
+  /** Synchronously obtain current effective configuration; credential status retains the latest check result. */
   current(): ConfigurationSnapshot { this.assertOpen(); return this.snapshot(); }
   async executionCredential(providerId: string): Promise<string | null> {
     this.assertOpen();
@@ -268,7 +268,7 @@ export class ConfigurationService {
       controller.abort();
     }, this.testTimeoutMs);
     this.tests.set(id, { value, controller, timer, started: performance.now() });
-    // 配置与凭据在点击测试时取用；后续编辑不改变这次请求。
+    // Capture configuration and credentials when testing is requested; later edits do not change this request.
     void this.runTest(id, provider, model, storedProvider.credentialRef, controller.signal);
     return id;
   }

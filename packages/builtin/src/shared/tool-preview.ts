@@ -1,6 +1,6 @@
 import type { Json } from "@asterism/sdk/contracts";
 
-/** 预览字段尚未通过完整 schema；仅取形状已明确的内容，不补造必填值。 */
+/** Preview fields have not passed the complete schema; uses only content with a known shape and does not fabricate required values. */
 export function inputField(value: Json, key: string): Json | undefined {
   return value !== null && typeof value === "object" && !Array.isArray(value) && Object.hasOwn(value, key) ? value[key] : undefined;
 }
@@ -14,7 +14,7 @@ export function characterCount(text: string): number {
   return count;
 }
 
-/** 编辑输入的可见片段同时用于正文渲染和预览阶段识别。 */
+/** Visible excerpts of edit input serve both body rendering and preview-stage detection. */
 export function editPreviewText(args: Json): string {
   const edits = inputField(args, "edits");
   return Array.isArray(edits) ? edits.slice(-8).map(edit => {
@@ -26,7 +26,7 @@ export function editPreviewText(args: Json): string {
       .filter(value => value !== null && value !== undefined).join("\n");
   }).join("\n\n") : "";
 }
-/** 限制进入 DOM 的文本量，完整原文仍由调用参数保留。 */
+/** Limits text entering the DOM; call arguments still retain the complete original text. */
 export function toolTextTail(text: string): string {
   let tail = text.slice(-12_000);
   if (/^[\uDC00-\uDFFF]/u.test(tail)) tail = tail.slice(1);

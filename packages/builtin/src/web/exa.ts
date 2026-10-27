@@ -18,7 +18,7 @@ const responseSchema = z.object({
   warnings: z.array(z.object({ code: z.string(), message: z.string(), path: z.string().optional() }).catchall(jsonSchema)).optional(),
   notices: z.array(z.object({ code: z.string(), message: z.string(), path: z.string().optional() }).catchall(jsonSchema)).optional(),
 }).catchall(jsonSchema);
-/** Exa 专属字段保留其原始含义，公共字段由 webDocumentSchema 统一解释。 */
+/** Exa-specific fields retain their original meanings; webDocumentSchema consistently interprets shared fields. */
 export const ExaDocumentDetails = builtin.data("web.exa.document", z.object({ id: z.string().optional(), snapshotAt: z.string().optional(),
   highlightScores: z.array(z.number()).optional(), entities: z.array(jsonSchema).optional(), extras: jsonSchema.optional(),
 }).catchall(jsonSchema));

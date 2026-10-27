@@ -2,7 +2,7 @@ import * as contracts from "@asterism/builtin-api/contracts";
 import metadata from "../packages/builtin-api/package.json" with { type: "json" };
 import type { PublicProvider } from "./shared/public-modules.ts";
 
-/** 应用组合声明静态内置公共提供方，宿主加载器不导入内置领域。 */
+/** Application composition declares static built-in public providers; the host loader does not import built-in domains. */
 export const builtinPublicModules = { "@asterism/builtin-api/contracts": contracts };
 const exports = { "@asterism/builtin-api/contracts": Object.keys(contracts) };
 export const builtinPublicProvider: PublicProvider = {

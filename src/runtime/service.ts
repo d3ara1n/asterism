@@ -24,7 +24,7 @@ export class ApplicationError extends Error {
   constructor(readonly code: AppError["code"], message: string, readonly display?: UiText) { super(message); }
 }
 
-/** 应用组合根与会话索引；会话内容、操作和查询由 SessionService 拥有。 */
+/** Application composition root and session index; SessionService owns session content, operations, and queries. */
 export interface StartupPackage { source: string; enabled: boolean; id: string | null; status: "loaded" | "disabled" | "invalid" | "failed"; error: string | null; renderer: string | null; stylesheet: string | null; dependencies?: string[]; rendererDependencies?: string[] }
 
 export class ApplicationService {
@@ -44,10 +44,10 @@ export class ApplicationService {
     try {
       const unavailable = async (): Promise<string> => { throw new Error("System credential protection is unavailable."); };
       this.configuration = new ConfigurationService(root, options.protector ?? { available: async () => false, encrypt: unavailable, decrypt: unavailable }, options.onConfigurationChanged);
-      // 归档清理先释放引用，随后由会话服务显式回收内容。
+      // Archive cleanup releases references first; session services then explicitly reclaim content.
       collectExpiredSessions(this.db);
       this.sessions = new SessionService(this.db, root, this.configuration, options.onSessionChanged, options.adapterFactory, options.plugins, options.onPluginConfigurationChanged, options.preparedStorage);
-      // setup 与贡献登记也可能失败；纯前端消费者同样不能使用失败提供方。
+      // setup and contribution registration may also fail; frontend-only consumers cannot use failed providers either.
       let changed = true;
       while (changed) {
         changed = false;
@@ -96,7 +96,7 @@ export class ApplicationService {
     const sessions = this.sessions.tree.list().map(session => ({ id: session.id, title: session.title, created_at: session.createdAt }));
     const archivedSessions = this.sessions.tree.archived().map(session => ({ id: session.id, title: session.title, created_at: session.createdAt, archived_at: session.archivedAt }));
     const current = this.list.read();
-    // 列表项按来源匹配本次启动结果；新加入或改动的项显示为待重启。
+    // Match list entries to startup results by source; new or modified entries show as pending restart.
     const plugins: AppSnapshot["plugins"] = current.map((entry, index) => {
       const source = entry.source.kind === "path" ? entry.source.path : `${entry.source.name}@${entry.source.version}`;
       const startup = this.packages.find(item => item.source === source);
@@ -105,7 +105,7 @@ export class ApplicationService {
       const root = packageRoot(entry, this.npmRoot);
       try { metadata = readPackageMetadata(root); }
       catch (error) { metadataError = error instanceof Error ? error.message : String(error); }
-      if (!id) { try { id = readManifest(root).id; } catch { /* 加载状态保留包校验失败原因。 */ } }
+      if (!id) { try { id = readManifest(root).id; } catch { /* Loading state retains package validation failure reasons. */ } }
       return { index, source, metadata, enabled: entry.enabled, id, status: pending ? "pending" as const : startup.status,
         error: (pending ? null : startup.error) ?? metadataError, renderer: pending ? null : startup.renderer,
         stylesheet: pending ? null : startup.stylesheet,

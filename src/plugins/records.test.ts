@@ -24,14 +24,14 @@ const record: SessionRecord = { id: "r", sessionId: "s", parentId: null, sequenc
 const value = (id: string, parentId: string | null, data: unknown, type = contract.id) =>
   node(id, parentId, event(type, data as never, { source: { plugin: "example.plugin", resource: null } }));
 
-describe("共享时间线的契约解码", () => {
-  it("按领域身份和实际形状解码，不合 schema 的数据返回 unknown 并保留原始记录", () => {
+describe("Contract decoding on shared timelines", () => {
+  it("decodes by domain identity and actual shape; schema-invalid data returns unknown while retaining original records", () => {
     expect(contract.decode({ ...record, contract: { id: "another.plugin/event" } })).toBeNull();
     expect(contract.decode(record)).toMatchObject({ status: "known", data: { value: 1 } });
     const invalid = { ...record, data: { value: "bad" } };
     expect(contract.decode(invalid)).toEqual({ status: "unknown", record: invalid, reason: "invalid_data" });
   });
-  it("升级失败也不损坏原始数据，不阻断其他消费者读取同一信封", () => {
+  it("upgrade failures preserve original data and do not block other consumers reading the same envelope", () => {
     const next = defineRecord(contract.id, { schema: contract.schema.transform(data => {
       data.value = 99; throw new Error("Unknown legacy payload.");
     }) });
@@ -39,7 +39,7 @@ describe("共享时间线的契约解码", () => {
     expect(record.data).toEqual({ value: 1 });
     expect(contract.decode(record)).toMatchObject({ status: "known", data: { value: 1 } });
   });
-  it("具型 first 不跳过坏记录；通用读取仍可获取整条时间线和原始 payload", () => {
+  it("typed first never skips corrupt records; generic reads still expose the full timeline and raw payloads", () => {
     const first = value("r", null, { value: "bad" }), second = value("r2", "r", { value: 2 });
     const view = sessionView(nodeView("s", "Timeline", [first, second], second.id));
     expect(view.records.first(contract, { scope: "timeline" })).toMatchObject({ status: "unknown", record: { id: "r" } });
@@ -47,7 +47,7 @@ describe("共享时间线的契约解码", () => {
     expect(view.records.all({ scope: "session" }).map(record => record.data)).toEqual([{ value: "bad" }, { value: 2 }]);
     expect(() => { (view.records.all({ scope: "session" })[0]!.data as { value: string }).value = "changed"; }).toThrow();
   });
-  it("不透明插件载荷与来源按信封原样交付，宿主不解释字段", () => {
+  it("opaque plugin payloads and origins pass through unchanged from envelopes without host field interpretation", () => {
     const opaque = { value: 7, future: { secret: "plugin-owned", items: [null, "resume"] } };
     const declared = defineRecord("example.plugin/opaque", { schema: z.json() });
     const saved = node("opaque", null, event(declared.id, opaque, {
@@ -57,7 +57,7 @@ describe("共享时间线的契约解码", () => {
     expect(decoded).toMatchObject({ status: "known", data: opaque,
       record: { source: { plugin: "example.plugin", resource: { sessionId: "s", id: "resource", kind: "example.plugin/resource" } } } });
   });
-  it("具型 last 按范围仅解码目标；最新坏记录不回退，固定快照不受后续追加影响", () => {
+  it("typed last decodes only range targets; the latest corrupt record never falls back and fixed snapshots ignore later appends", () => {
     const first = value("first", null, { value: 1 });
     const branch = value("branch", "first", { value: "bad" });
     const unrelated = Array.from({ length: 1000 }, (_, i) => value(`noise-${i}`, "first", { value: i }, "other/noise"));
@@ -75,7 +75,7 @@ describe("共享时间线的契约解码", () => {
     expect(view.records.last(contract, { scope: "session" })?.record.id).toBe("branch");
     decode.mockRestore();
   });
-  it("模型可见文本与接收者进入信封 context，原事件身份与载荷保留", () => {
+  it("model-visible text and recipients enter envelope context while original event identity and payload remain", () => {
     const linked = node("event", null, attached("a", "directory", "A resource was linked."));
     expect(sessionView(nodeView("s", "", [linked], linked.id)).records.all({ scope: "timeline" })[0]).toMatchObject({
       contract: { id: "resource_attached" }, data: { id: "directory", receiverId: "a" },
@@ -83,8 +83,8 @@ describe("共享时间线的契约解码", () => {
     });
   });
 
-  // 固定快照契约：首次读取即使晚于追加、标题覆盖和分叉，也只能看到捕获位置。
-  it("存储观察柄延后读取时仍固定路径、会话上界、标题与资源存在性", () => {
+  // Fixed snapshot contract: even if the first read follows appends, title overwrites, and forks, it sees only the captured position.
+  it("deferred storage observation reads still fix paths, session bounds, titles, and resource presence", () => {
     const { tree, sessionId } = stored();
     const Resource = pluginNamespace("example.plugin").resource("item", z.object({}));
     const empty = sessionSnapshot(tree.view(sessionId));
@@ -113,8 +113,8 @@ describe("共享时间线的契约解码", () => {
     expect(current.records.query(contract, { scope: "timeline" }).map(record => record.record.id)).toEqual([first.id, branch.id]);
   });
 
-  // 序号来自会话内追加顺序；不能用跨会话数据库 seq 或当前路径下标替代。
-  it("旁支与其他会话交错追加不改变公开记录序号", () => {
+  // Sequence numbers follow session append order, not cross-session database seq or current-path indices.
+  it("interleaved appends to side branches and other sessions do not alter public record sequence numbers", () => {
     const { tree, sessionId } = stored();
     const other = tree.create("Other");
     tree.appendToTimeline(other, event(contract.id, { value: 0 }));
@@ -131,8 +131,8 @@ describe("共享时间线的契约解码", () => {
     expect(tree.sequences(sessionId, [first, old, branch])).toEqual([1, 2, 3]);
   });
 
-  // 按需读取契约：构造观察柄不物化历史；具型查询只解析命中的正文，坏尾记录仍返回 unknown。
-  it("创建观察柄不解析节点，首尾和具型查询只物化所选记录", () => {
+  // Lazy-read contract: observation handles do not materialize history; typed queries parse only matching bodies, and corrupt tail records still return unknown.
+  it("creating observation handles parses no nodes and first/last and typed queries materialize only selected records", () => {
     const { tree, sessionId } = stored();
     const first = tree.appendToTimeline(sessionId, event(contract.id, { value: 1 }));
     tree.appendToTimeline(sessionId, event("example.plugin/noise", { text: "Unrelated body" }));

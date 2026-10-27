@@ -12,10 +12,10 @@ import { Switch } from "@asterism/ui/ui/switch";
 import { StatusBadge } from "@asterism/ui/ui/status";
 import { Textarea } from "@asterism/ui/ui/textarea";
 
-/** 隐藏口令，在首页输入框完整输入后回车触发；纯前端彩蛋，不进入命令系统。 */
+/** Hidden passphrase, triggered by entering it completely in the home input and pressing Enter; a frontend-only easter egg outside the command system. */
 export const showcaseSpell = "/gamemode 1";
 
-/** 开发者组件展示：只读校验控件与主题，样例文案不进入本地化目录。 */
+/** Developer component showcase: read-only validation of controls and themes; sample copy does not enter localization catalogs. */
 export function Showcase({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   return <Dialog open={open} onOpenChange={onOpenChange}>
     <DialogContent closeLabel="Close" className="max-h-[85vh] overflow-y-auto sm:max-w-3xl">

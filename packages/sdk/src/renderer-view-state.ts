@@ -1,20 +1,20 @@
 import { createContext, createElement, useContext, useState, type ReactNode } from "react";
 
 /**
- * 列表条目的视图状态：虚拟化列表中的条目随滚动卸载与重新挂载，用户改动过的展开、选项卡等
- * 状态按条目保存在列表所有者提供的存储中，重新挂载时恢复。不在条目作用域内时与组件状态相同。
+ * List item view state: items in virtualized lists unmount and remount as they scroll; user-modified expansion, tabs, and other
+ * state are stored per item in storage supplied by the list owner and restored on remount. Outside an item scope, this behaves like component state.
  */
 export type RendererViewStateEntry = Map<string, unknown>;
 const Entry = createContext<RendererViewStateEntry | null>(null);
 
-/** 列表所有者为每个条目提供稳定的存储；同一条目重新挂载时须传入同一个实例。 */
+/** The list owner provides stable storage for each item; the same instance must be passed when that item remounts. */
 export function RendererViewStateProvider({ value, children }: { value: RendererViewStateEntry; children?: ReactNode }) {
   return createElement(Entry.Provider, { value }, children);
 }
 
 /**
- * 读写当前条目内的一项视图状态。key 在条目内唯一，以插件 ID 为前缀避免与其他贡献者冲突；
- * key 为 null 时只作组件状态，不随重新挂载保留。initial 只在条目尚无该项时取值。
+ * Read and write one view state value within the current item. key is unique within the item and prefixed with the plugin ID to avoid conflicts with other contributors;
+ * when key is null, this is only component state and does not survive remounts. initial is used only when the item has no such value yet.
  */
 export function useRendererViewState<T>(key: string | null, initial: T | (() => T)): [T, (value: T) => void] {
   const entry = useContext(Entry);

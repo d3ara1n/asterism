@@ -11,7 +11,7 @@ import { recoveryActionSchema } from "../shared/recovery.ts";
 import { updatesGetChannel, updatesSetChannel, updatesCheckChannel, updatesInstallChannel, updatesChangedChannel, updateStateSchema } from "../shared/updates.ts";
 
 let connectionRequested = false;
-// 端口直接交给页面：业务消息不经 contextBridge 二次克隆。主进程只接受受信主框架的请求。
+// Hand ports directly to the page without cloning business messages again through contextBridge. The main process accepts trusted main-frame requests only.
 ipcRenderer.on(connectionRequestChannel, event => {
   window.postMessage({ type: connectionPortMessage }, "*", event.ports.length ? [event.ports[0]!] : []);
 });

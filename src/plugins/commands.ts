@@ -4,7 +4,7 @@ import { PluginApiError, validationMessage, type Preparation } from "@asterism/s
 import type { ContentLease } from "../runtime/content-store.ts";
 
 type InputContract = ActionContract<unknown> | CreationContract<unknown>;
-/** 宿主内部的解析结果不复用传输信封，避免将 value 再当作原始 input。 */
+/** Internal host resolution results do not reuse transport envelopes, avoiding treating value as raw input again. */
 export interface ParsedCall extends ContractReference { value: Json; content?: ContentLease }
 
 export function parseInput(contract: InputContract, input: Json): Json {
@@ -17,7 +17,7 @@ export function parseCall(contract: InputContract, call: ResourceCall): ParsedCa
     throw new PluginApiError("invalid_argument", "The command contract is not available for this resource.");
   return { id: contract.id, value: parseInput(contract, call.input) };
 }
-/** 接受沿用解析结果；只有显式替换才产生需要重新解析的新输入。 */
+/** Acceptance reuses parsed results; only explicit replacement creates new input requiring parsing. */
 export function applyPreparation(contract: InputContract, value: Json, result?: Preparation): Json {
   if (result?.action === "reject") throw new PluginApiError("rejected", result.message, result.code, result.display);
   return result?.action === "replace" ? parseInput(contract, result.input) : value;

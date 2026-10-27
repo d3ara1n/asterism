@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { defineRecord } from "@asterism/sdk/contracts";
 
-/** 宿主工作台事件的记录契约；载荷由运行时工作台写入，展示由宿主工作台模块提供。 */
+/** Record contracts for host workbench events; runtime workbenches write payloads and host workbench modules provide presentation. */
 const target = z.object({ id: z.string() });
 export const ResourceCreated = defineRecord("resource_created", { schema: z.object({ id: z.string(), type: z.string(), title: z.string() }) });
 export const ResourceRenamed = defineRecord("resource_renamed", { schema: z.object({ id: z.string(), title: z.string() }) });

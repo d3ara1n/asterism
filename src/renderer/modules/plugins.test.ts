@@ -2,16 +2,16 @@ import { describe, expect, it, vi } from "vitest";
 import { loadPluginRenderers } from "./plugins";
 import { memo, forwardRef } from "react";
 
-describe("插件前端入口", () => {
-  // ComponentType 允许 React 包装组件，不能用运行时 typeof function 拒绝整个插件。
-  it.each([memo(() => null), forwardRef<unknown, { location?: string }>(() => null)])("接受 React 包装的设置页面", async Body => {
+describe("Plugin frontend entry", () => {
+  // ComponentType allows React-wrapped components; a runtime typeof function check must not reject the entire plugin.
+  it.each([memo(() => null), forwardRef<unknown, { location?: string }>(() => null)])("accepts React-wrapped settings pages", async Body => {
     const loaded = await loadPluginRenderers([{ id: "wrapped", renderer: "wrapped", dependencies: [] }], {
       load: async () => ({ default: { settings: { Body } } }),
     });
     expect(loaded.failures).toEqual([]);
   });
-  // 设置属于插件本身：没有任何资源/工具视图模块仍然能提供页面。
-  it("接受只有设置页的插件，入口初始化失败继续阻断消费者", async () => {
+  // Settings belong to the plugin itself: it can provide a page without any resource/tool view modules.
+  it("accepts plugins with only a settings page, while entry initialization failure still blocks consumers", async () => {
     const seen: string[] = [];
     const Body = () => null;
     const loaded = await loadPluginRenderers([{ id: "settings", renderer: "settings", dependencies: [] }], {
@@ -29,8 +29,8 @@ describe("插件前端入口", () => {
       expect(failed.failures.map(item => item.id)).toEqual(["provider", "consumer"]);
     } finally { log.mockRestore(); }
   });
-  // 提供方样式先于消费者，视图初始化只能在样式准备完成后执行。
-  it("按依赖顺序加载样式与入口，初始化失败移除已加载样式", async () => {
+  // Provider styles precede consumer styles, and view initialization can run only after styles are ready.
+  it("loads styles and entries in dependency order and removes loaded styles on initialization failure", async () => {
     const seen: string[] = [], removed: string[] = [];
     const log = vi.spyOn(console, "error").mockImplementation(() => {});
     try {
@@ -47,8 +47,8 @@ describe("插件前端入口", () => {
       expect(result.failures).toEqual([{ id: "consumer", error: "Preparation failed." }]);
     } finally { log.mockRestore(); }
   });
-  // 样式失败不能让缺少样式的提供方进入执行，也不能影响无关插件。
-  it("样式加载失败阻断入口及依赖方，无样式插件仍正常加载", async () => {
+  // Style failure must prevent the provider from running without styles, while leaving unrelated plugins unaffected.
+  it("style loading failure blocks the entry and its dependents, while plugins without styles load normally", async () => {
     const loaded: string[] = [];
     const log = vi.spyOn(console, "error").mockImplementation(() => {});
     try {

@@ -8,7 +8,7 @@ function number(value: string | undefined): number | null {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
 }
-/** OpenAI 返回 Go duration；必须整串匹配，不能把未知字符串中的数字当重置时间。 */
+/** OpenAI returns Go duration; match the whole string rather than treating numbers in an unknown string as a reset time. */
 function duration(value: string | undefined): number | null {
   if (!value || !/^(?:\d+(?:\.\d+)?(?:ns|us|µs|ms|s|m|h))+$/u.test(value)) return null;
   const units: Record<string, number> = { ns: 0.000001, us: 0.001, "µs": 0.001, ms: 1, s: 1000, m: 60000, h: 3600000 };
@@ -33,7 +33,7 @@ function parse(context: UsageHeadersContext, metrics: readonly Metric[], reset: 
     const resetAt = reset(context.headers[metric.reset], context.receivedAt);
     items.push({ id: metric.id, label: metric.label, type: "quota", category: "rate_limit", scope: "connection",
       value: limit === 0 ? { type: "ratio", remaining: 0 } : { type: "quantity", limit, remaining, unit: metric.unit },
-      // 重置倒计时是桶恢复时刻，不用它反推完整窗口长度。
+      // The reset countdown identifies when the bucket recovers; do not infer the full window length from it.
       window: { mode: "unknown", durationMs: null,
         resetAt: resetAt !== null && Number.isFinite(new Date(resetAt).getTime()) && resetAt >= 0 ? resetAt : null } });
   }
@@ -63,7 +63,7 @@ export const xaiHeaderUsage: HeadersUsageProvider = {
   parseHeaders: context => parse(context, openaiMetrics, (value, now) => {
     const ms = duration(value);
     if (ms !== null) return now + ms;
-    // 已知实现分别报告 Unix 秒/毫秒；小整数不能确定是相对秒数还是时间戳，保持未知。
+    // Known implementations report Unix seconds or milliseconds; small integers cannot be identified as relative seconds or timestamps and remain unknown.
     if (value && /^\d{10}(?:\.\d+)?$/u.test(value)) return Number(value) * 1000;
     if (value && /^\d{13}$/u.test(value)) return Number(value);
     return null;

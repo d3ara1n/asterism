@@ -3,7 +3,7 @@ import { pluginNamespace, type ModelProviderPreset, type UsageItem } from "@aste
 import { definePlugin, UsageQueryError, type UsageProvider } from "@asterism/sdk/runtime";
 
 const ns = pluginNamespace("example.allowance");
-// 示例站点约定：GET /account/allowance 返回余额与五小时剩余比例；由提供方负责协议解析。
+// Example site contract: GET /account/allowance returns the balance and remaining fraction of a five-hour window; the provider handles protocol parsing.
 const response = z.object({ balance: z.number(), currency: z.string().regex(/^[A-Z]{3}$/u), remainingRatio: z.number().min(0).max(1), resetAt: z.number() });
 const usage: UsageProvider = {
   id: "example-plan", label: "Example plan",

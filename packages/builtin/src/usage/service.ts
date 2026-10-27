@@ -3,7 +3,7 @@ import { UsageQueryError, type ModelProviderInfo, type ModelProviderServices, ty
 import type { ProviderUsageState } from "./contract.ts";
 
 interface Entry { value: ProviderUsageState; attemptedAt: number; controller: AbortController; pending?: Promise<ProviderUsageState> }
-/** 等待者取消不结束其他卡片共享的查询。 */
+/** Canceling a waiter does not end a query shared by other cards. */
 export function waitForUsage<T>(work: Promise<T>, signal?: AbortSignal): Promise<T> {
   if (!signal) return work;
   return new Promise((resolve, reject) => {
@@ -14,7 +14,7 @@ export function waitForUsage<T>(work: Promise<T>, signal?: AbortSignal): Promise
     else signal.addEventListener("abort", abort, { once: true });
   });
 }
-/** 内置 Agent 的消费策略：共享查询、短期缓存、消费请求结果；宿主目录不持有这些状态。 */
+/** Built-in Agent consumption policy: shared queries, short-lived caching, and request-result consumption; the host catalog holds none of this state. */
 export class UsageConsumer {
   private entries = new Map<string, Entry>();
   private closed = false;
@@ -70,7 +70,7 @@ export class UsageConsumer {
     });
     return structuredClone(await waitForUsage(current.pending, options.signal));
   }
-  /** 发起调用的 Agent 取得结果后，显式交付自己的响应元信息。 */
+  /** After receiving a result, the calling Agent explicitly supplies its own response metadata. */
   consume(response: ModelResponse): void {
     if (this.closed) return;
     const connection = this.modelProviders.get(response.connection.id);

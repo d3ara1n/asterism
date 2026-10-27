@@ -1,6 +1,6 @@
 import { defineStorage } from "@asterism/sdk/runtime";
 
-/** 内置插件的存储入口，与外部插件的 manifest `asterism.storage` 同形；不导入业务运行时。 */
+/** Storage entry point for the built-in plugin, with the same shape as an external plugin's manifest `asterism.storage`; imports no business runtime. */
 export default defineStorage([
   { kind: "json", path: ".asterism/config.json", version: 1, migrations: {} },
 ]);

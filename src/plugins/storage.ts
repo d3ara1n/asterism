@@ -7,7 +7,7 @@ import { jsonSchema, type Json, type ConfigContract } from "@asterism/sdk/contra
 import { PluginApiError, validationMessage, type PluginConfig, type PluginSecrets, type PluginStorageDeclaration } from "@asterism/sdk/runtime";
 import type { PluginConfiguration } from "../shared/plugin-configuration.ts";
 
-/** 宿主托管目录名；插件目录其余部分归插件自由写入。 */
+/** Host-managed directory name; plugins may freely write elsewhere in their directories. */
 export const managedDirectory = ".asterism";
 const secretKey = z.string().min(1).max(160).regex(/^[A-Za-z0-9._-]+$/u);
 const references = z.record(z.string(), z.string().uuid());
@@ -23,8 +23,8 @@ function writeJson(file: string, value: unknown): void {
 }
 
 /**
- * 单个插件的托管存储：`<extensions>/<pluginId>/` 与其中的 `.asterism/`。
- * 目录、配置、凭据引用与数据库均懒创建；凭据明文只在 vault 中。
+ * Managed storage for one plugin: `<extensions>/<pluginId>/` and its `.asterism/` subdirectory.
+ * Directories, configuration, credential references, and databases are created lazily; plaintext credentials exist only in the vault.
  */
 export class PluginStorage {
   readonly dir: string;
@@ -46,7 +46,7 @@ export class PluginStorage {
     return this.managed;
   }
 
-  /** 一个插件一份配置契约；后台句柄、设置页与渲染层读取共用同一份值与变更通知。 */
+  /** One configuration contract per plugin; backend handles, settings pages, and renderer reads share values and change notifications. */
   config<T extends Json>(contract: ConfigContract<T>): PluginConfig<T> {
     if (this.settings && this.settings.source !== contract)
       throw new PluginApiError("invalid_argument", "A plugin has one configuration. Import the same contract.");
@@ -63,7 +63,7 @@ export class PluginStorage {
         }
         if (raw === undefined) return { value: fallback(), status: "defaults" };
         if (declaration) {
-          // 信封版本由准备阶段对齐；不符时与正文损坏同样回退默认值。
+          // Preparation aligns envelope versions; mismatches fall back to defaults just like corrupt bodies.
           const envelope = z.object({ version: z.literal(declaration.version), data: jsonSchema }).safeParse(raw);
           if (!envelope.success) {
             this.warn("Plugin configuration has an unexpected format version; defaults are used.");
@@ -96,7 +96,7 @@ export class PluginStorage {
       },
     };
   }
-  /** 宿主观察配置变更：设置页保存、恢复默认与后台 update 都经此广播给渲染层与后台订阅者。 */
+  /** Host configuration observation: settings saves, default restoration, and backend updates broadcast here to renderer and backend subscribers. */
   onChanged: () => void = () => {};
   private readonly listeners = new Set<() => void>();
   private changed(): void {
@@ -145,7 +145,7 @@ export class PluginStorage {
     },
   };
 
-  /** 插件专属 SQLite，与宿主数据库为独立文件；首次访问时打开。声明格式时，未盖章的库写入当前版本。 */
+  /** Plugin-specific SQLite file separate from the host database, opened on first access. Declared formats stamp unstamped databases with the current version. */
   db(): DatabaseSync {
     if (!this.database) {
       const file = join(this.ensure(), "db.sqlite");

@@ -1,4 +1,4 @@
-/** 宿主内部命名空间与桌面桥身份固定，不使用对外品牌。 */
+/** Host internal namespaces and desktop bridge identities are fixed independently of public branding. */
 export const coreNamespace = "core";
 export const desktopBridgeKey = "host";
 

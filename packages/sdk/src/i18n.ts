@@ -38,7 +38,7 @@ export const uiMessageSchema = z.strictObject({
 });
 export const uiTextSchema = z.union([z.string(), uiMessageSchema]);
 
-/** 标准静态描述形状，供 FormatJS 官方抽取。 */
+/** Standard static descriptor shape for extraction by the official FormatJS tooling. */
 export function defineMessages<const T extends Record<string, SourceMessage>>(messages: T): T {
   return messages;
 }

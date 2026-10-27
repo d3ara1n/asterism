@@ -1,8 +1,8 @@
 import { expect, it } from "vitest";
 import { createComposerVisibility } from "./composer-visibility";
 
-// 工作台契约：隐藏取所有有效请求的或；卸载一个 UI 不能放开其他 UI 仍占用的输入区，也不能影响另一张卡片。
-it("多个界面的隐藏请求各自释放，不跨卡片生效", () => {
+// Workbench contract: hiding is the OR of all active requests; unmounting one UI cannot release an input area still held by another UI or affect another card.
+it("Multiple UIs release their own hide requests independently without affecting other cards", () => {
   const first = createComposerVisibility(), second = createComposerVisibility();
   const question = first.hide(), another = first.hide(), otherCard = second.hide();
   question();

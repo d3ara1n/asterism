@@ -8,7 +8,7 @@ import { satisfies, valid, validRange } from "semver";
 import { publicModuleSource, type PublicProvider, type ModuleRealm } from "../shared/public-modules.ts";
 import { PluginBuildCache } from "./build-cache.ts";
 
-/** 包公共入口是标准 exports["./public"]；类型与运行时共用正常包导入。 */
+/** Package public entry is standard exports["./public"]; types and runtime share ordinary package imports. */
 interface PackageDependencyOwner {
   name: string;
   dependencies: ReadonlyMap<string, readonly string[]>;
@@ -19,7 +19,7 @@ export interface PackageModule extends PackageDependencyOwner {
   public: boolean;
   runtime?: string;
   renderer?: string;
-  /** 存储声明入口；与后台入口同一 runtime 构建，不依赖插件运行时。 */
+  /** Storage declaration entry; shares the backend runtime build without depending on the plugin runtime. */
   storage?: string;
 }
 interface DependencyManifest {
@@ -39,7 +39,7 @@ export function packageModule(root: string, entry: { id: string; runtime?: strin
   return { ...entry, root: realpathSync(root), name: typeof pkg.name === "string" ? pkg.name : "", public: Boolean(exported),
     dependencies: dependencyRanges(pkg) };
 }
-/** 代码依赖按最近的 npm 包声明查找；生命周期仍绑定承载它的插件。 */
+/** Resolve code dependencies from the nearest npm package declaration; lifetimes remain bound to the hosting plugin. */
 function createDependencyOwnerLookup() {
   const npmOwners = new Map<string, PackageDependencyOwner | null>();
   return (importer: string): PackageDependencyOwner | null => {
@@ -74,7 +74,7 @@ export interface CompiledModules {
   failures: Map<string, string>;
 }
 
-/** 归档段 `<name>.asar` 改写为 Forge 解包出的实体目录 `<name>.asar.unpacked`；路径不在归档内时返回 null。 */
+/** Rewrite archive segment `<name>.asar` to Forge's unpacked physical directory `<name>.asar.unpacked`; return null outside archives. */
 export function unpackedArchivePath(entry: string): string | null {
   const segments = entry.split(/[\\/]/u);
   let archive = -1;
@@ -84,7 +84,7 @@ export function unpackedArchivePath(entry: string): string | null {
   return [...segments.slice(0, archive), `${segments[archive]}.unpacked`, ...segments.slice(archive + 1)].join(separator);
 }
 
-/** 存储入口与后台入口共处 runtime 构建；`@` 不出现在插件 ID 中，输出名不会冲突。 */
+/** Storage and backend entries share a runtime build; plugin IDs contain no `@`, so output names cannot conflict. */
 const storageEntry = (id: string) => `${id}@storage`;
 function realmEntries(realm: ModuleRealm, pkg: PackageModule): [string, string][] {
   if (realm === "renderer") return pkg.renderer ? [[pkg.id, resolve(pkg.root, pkg.renderer)]] : [];
@@ -93,9 +93,9 @@ function realmEntries(realm: ModuleRealm, pkg: PackageModule): [string, string][
 }
 
 /**
- * 打包后 esbuild 的 JS 入口位于 asar 归档内；Electron 只为 fs 提供归档补丁，spawn 不改写可执行路径，
- * esbuild 服务进程会以 ENOTDIR 失败。Forge 已把 esbuild 与平台包整体解包，改从实体路径加载，
- * 平台二进制由 esbuild 自行解析；开发环境（无归档段）保持正常包导入。
+ * Packaged esbuild JS entries live inside asar archives; Electron patches archives only for fs, while spawn does not rewrite executable paths,
+ * so the esbuild service fails with ENOTDIR. Forge unpacks esbuild and platform packages in full; load from physical paths instead,
+ * letting esbuild resolve platform binaries itself. Development without archive segments retains ordinary package imports.
  */
 async function loadEsbuild(): Promise<typeof import("esbuild")> {
   const nodeRequire = createRequire(import.meta.url);
@@ -105,7 +105,7 @@ async function loadEsbuild(): Promise<typeof import("esbuild")> {
   const loaded: typeof import("esbuild") | { default: typeof import("esbuild") } = await import(pathToFileURL(unpacked).href);
   return "build" in loaded ? loaded : loaded.default;
 }
-/** 一次构建一个运行环境的完整模块图，ESM 共享 chunk 保留对象身份与 live binding。 */
+/** Build the complete module graph for one runtime environment at once; shared ESM chunks preserve object identity and live bindings. */
 export async function compileModules(packages: readonly PackageModule[], enabled: ReadonlySet<string>, cacheRoot: string,
   hostModule: (realm: ModuleRealm) => Plugin, publicProviders: readonly PublicProvider[] = [], hostIdentity = "",
   progress: (id: string) => void = () => {}): Promise<CompiledModules> {
@@ -118,7 +118,7 @@ export async function compileModules(packages: readonly PackageModule[], enabled
   const result: CompiledModules = { runtime: new Map(), storage: new Map(), renderer: new Map(), stylesheets: new Map(), dependencies: new Map(), runtimeDependencies: new Map(), rendererDependencies: new Map(), failures: new Map() };
   if (!packages.some(pkg => enabled.has(pkg.id))) return result;
   const cache = new PluginBuildCache(cacheRoot, packages.filter(pkg => enabled.has(pkg.id)).map(pkg => pkg.root), {
-    // 构建选项、解析器或宿主转接规则变化时递增配方版本。
+    // Increment the recipe version when build options, resolvers, or host bridging rules change.
     recipe: 3, esbuild: createRequire(import.meta.url)("esbuild/package.json").version, platform: process.platform, arch: process.arch,
     cwd: process.cwd(), nodePath: process.env.NODE_PATH,
     packages: packages.map(pkg => ({ ...pkg, dependencies: [...pkg.dependencies] })), enabled: [...enabled], publicProviders, hostIdentity,
@@ -168,7 +168,7 @@ export async function compileModules(packages: readonly PackageModule[], enabled
         if (loaded) {
           if (!Object.hasOwn(loaded.modules[realm] ?? {}, args.path))
             return { errors: [{ text: `Public module ${args.path} is not exported in ${realm}.` }] };
-          // 独立 npm 库使用自己的依赖；无包归属的 helper 回退到承载插件。
+          // Independent npm libraries use their own dependencies; helpers without package ownership fall back to the hosting plugin.
           const consumer = npmOwner(args.importer) ?? source ?? entry;
           if (consumer) {
             const ranges = consumer.dependencies.get(name);
@@ -191,9 +191,9 @@ export async function compileModules(packages: readonly PackageModule[], enabled
         if (!provider || result.failures.has(provider.id)) return { errors: [{ text: `Public module ${name}/public has no available enabled provider.` }] };
         if (source && source.id !== provider.id && !source.dependencies.has(name))
           return { errors: [{ text: `Plugin ${source.id} must declare a dependency on ${name}.` }] };
-        // 预检入口也持有间接依赖：symlink／共享 helper 可以位于所有插件根目录之外。
+        // Preflight entries also retain indirect dependencies: symlinks/shared helpers may live outside every plugin root.
         depend(source, provider.id);
-        // 在提供方自身的 package exports 下解析，不能从消费者私有 node_modules 取另一份。
+        // Resolve under the provider's own package exports rather than another copy in consumer-private node_modules.
         return build.resolve(args.path, { kind: args.kind, resolveDir: provider.root, pluginData: { publicResolution: true } });
       });
     } });
@@ -215,7 +215,7 @@ export async function compileModules(packages: readonly PackageModule[], enabled
       } }, hostModule(realm), resolver(realm, entries.length === 1 ? entries[0] : undefined)],
     });
     const active = packages.filter(pkg => enabled.has(pkg.id));
-    // 独立预检隔离损坏插件；最终统一构建，不能使用预检产物作为各自独立的 bundle。
+    // Independent preflights isolate broken plugins; build together afterward without using preflight artifacts as independent bundles.
     for (const pkg of active) {
       if (result.failures.has(pkg.id)) continue;
       progress(pkg.id);
@@ -267,7 +267,7 @@ export async function compileModules(packages: readonly PackageModule[], enabled
         }
       }
     };
-    // 后台按公共依赖分组；预检已将损坏插件及其消费者排除。
+    // Group backend builds by public dependencies; preflight already excludes broken plugins and their consumers.
     const pending = new Set(ready.map(pkg => pkg.id));
     while (pending.size) {
       const ids = new Set<string>(), queue = [pending.values().next().value!];
@@ -280,12 +280,12 @@ export async function compileModules(packages: readonly PackageModule[], enabled
       }
       await compile("runtime", ready.filter(pkg => ids.has(pkg.id)));
     }
-    // 前端共享同一文档的类名空间；统一构建使无依赖关系的 CSS Modules 也不会重名。
+    // Frontend modules share a document class namespace; unified builds avoid CSS Module collisions even without dependency relationships.
     await compile("renderer", ready.filter(pkg => pkg.renderer && !result.failures.has(pkg.id)));
     cache.write(result, outputFiles);
     return result;
   } finally {
-    // 一个构建批次拥有 esbuild 服务，异常同样结束服务进程。
+    // Each build batch owns the esbuild service and terminates its process on exceptions too.
     await esbuild.stop();
   }
 }

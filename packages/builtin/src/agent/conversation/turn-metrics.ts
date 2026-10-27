@@ -7,7 +7,7 @@ import { projectTurnState } from "../state-projection";
 
 export const usageFields = ["input", "output", "cacheRead", "cacheWrite", "reasoning"] as const satisfies readonly (keyof Usage)[];
 
-/** 以已保存请求计算轮次概要，不写入历史。 */
+/** Calculates turn summaries from saved requests without writing history. */
 function summarizeRequests(requests: readonly DiagnosticRequest[]) {
   const usage = Object.fromEntries(usageFields.map(field => {
     const reported = requests.flatMap(request => {
@@ -28,7 +28,7 @@ export interface TurnMeasurement {
   finalResponseId: string | null;
 }
 
-/** 历史轮次保留；批次中的连续输入和 steer 属于同轮，只有当前运行轮隐藏。 */
+/** Preserves historical turns; consecutive input in a batch and steer messages belong to the same turn, and only the currently running turn is hidden. */
 export function turnMetrics(snapshot: SessionSnapshot, agentId: string, running: boolean): TurnMeasurement[] {
   const path = snapshot.records.all({ scope: "timeline" });
   const starts = path.flatMap((record, index) => {
@@ -43,7 +43,7 @@ export function turnMetrics(snapshot: SessionSnapshot, agentId: string, running:
     const current = requests.filter(request => request.sequence > start.record.sequence && (!next || request.sequence < next.record.sequence));
     if (!current.length) return [];
     const incomplete = projectTurnState(path.slice(start.index, next?.index), agentId) !== "completed";
-    // 请求按时间倒序、块按序号排列；只取最终响应，不回退到工具执行前的过程正文。
+    // Requests are ordered newest first and blocks by ordinal; take only the final response, without falling back to intermediate body text before tool execution.
     const reply = incomplete ? "" : current[0]!.blocks.flatMap(({ block }) =>
       block.kind === "text" ? [block.text] : []).join("\n\n");
     return [{

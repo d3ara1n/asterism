@@ -1,7 +1,7 @@
 import { present, type ModelRequestContext } from "@asterism/sdk/contracts";
 import { AgentRequestContext } from "@asterism/builtin-api/contracts";
 
-/** 从宿主交付的最终请求现场提取领域资料，随终态一次保存。 */
+/** Extracts domain data from the final request context delivered by the host and saves it once with terminal state. */
 export function agentRequestExtensions({ system, tools }: ModelRequestContext) {
   const characters = (text: string) => [...text].length;
   return [present(AgentRequestContext, {

@@ -18,7 +18,7 @@ export function normalizeOverrides<T extends ModelRoleOverrides | AgentOverrides
     item !== undefined && !(typeof item === "string" && item.trim() === ""))) as T;
 }
 
-/** 自定义项只继承行为字段，身份由用户提供。 */
+/** Custom entries inherit only behavior fields; users supply their identities. */
 function baseId(item: { id: string; builtin: boolean }, fallback: string): string {
   return item.builtin ? item.id : fallback;
 }
@@ -37,7 +37,7 @@ export function resolveAgentConfiguration(agent: AgentConfigurationEntry, defaul
   const base = baseId(agent, "worker");
   const inherited = defaults.agents[base];
   if (!inherited) throw new Error("Built-in agent definition is unavailable.");
-  // 允许/排除列表是一项互斥策略；覆盖其中一侧同时撤下内置的另一侧。
+  // Allow/exclude lists form one mutually exclusive policy; overriding one side also removes the opposite built-in side.
   const policy = overrides.tools !== undefined || overrides.excludeTools !== undefined
     ? { tools: overrides.tools ?? null, excludeTools: overrides.excludeTools ?? null } : {};
   return agentSchema.parse({

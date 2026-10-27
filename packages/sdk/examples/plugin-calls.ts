@@ -5,7 +5,7 @@ import { defineModule, defineTopLevelTool, implementCall } from "@asterism/sdk/r
 const ns = pluginNamespace("example.interaction");
 export const ReadState = defineCall(ns.name("read"), { scope: "object", input: z.null(), output: z.string() });
 export const module = defineModule(() => {
-  // 进程内共享业务状态；前端通过具型调用读取，不导入后台实例。
+  // Share business state within the process; the frontend reads through typed calls without importing backend instances.
   const values = new Map<string, string>();
   return {
     calls: [implementCall(ReadState, async (_input, { object }) => values.get(object.ref.id) ?? "")],

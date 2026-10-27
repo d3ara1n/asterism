@@ -25,23 +25,23 @@ const kimi = {
   ],
 };
 const moonshot = { code: 0, status: true, data: { available_balance: 12.345, voucher_balance: 5, cash_balance: 7.345 } };
-describe("内置余额与套餐查询", () => {
-  // DeepSeek 官方余额接口按币种提供 total_balance；不能只取首行或重复加赠金。
-  it("保留每种币种的余额与欠费，拒绝把空金额当零", () => {
+describe("built-in balance and plan queries", () => {
+  // The official DeepSeek balance API supplies total_balance by currency; do not take only the first row or add promotional credits twice.
+  it("preserves balances and arrears for each currency and rejects empty amounts as zero", () => {
     expect(usageItemsSchema.parse(parseDeepSeekBalance(deepseek))).toMatchObject([
       { id: "balance-CNY", remaining: 12.5, currency: "CNY", scope: "account" },
       { id: "balance-USD", remaining: -0.25, currency: "USD" },
     ]);
     expect(() => parseDeepSeekBalance({ balance_infos: [{ currency: "USD", total_balance: "" }] })).toThrow();
   });
-  // Moonshot 官方国内与国际文档分别规定 CNY/USD，响应不携带币种；子余额不能重复求和。
-  it("Moonshot 按所选地区保留币种和可用总余额，拒绝业务错误", () => {
+  // Official Moonshot domestic and international documentation specifies CNY/USD respectively; responses carry no currency, and component balances must not be summed twice.
+  it("Moonshot preserves currency and total available balance for the selected region and rejects business errors", () => {
     expect(parseMoonshotBalance(moonshot, "CNY")).toMatchObject([{ remaining: 12.345, currency: "CNY" }]);
     expect(parseMoonshotBalance(moonshot, "USD")).toMatchObject([{ remaining: 12.345, currency: "USD" }]);
     expect(() => parseMoonshotBalance({ ...moonshot, code: 1, status: false }, "USD")).toThrow();
   });
-  // /key 普通密钥可用；/credits 明确要求 management key，不应把权限失败当余额为零。
-  it("OpenRouter 普通 key 只查预算，管理 key 才查询账户余额", async () => {
+  // /key supports ordinary keys; /credits explicitly requires a management key, so permission failure must not be treated as a zero balance.
+  it("OpenRouter queries only the budget with an ordinary key and queries account balance only with a management key", async () => {
     const transport = vi.fn<typeof fetch>(async () => Response.json({ data: { limit: 10, limit_remaining: 3, is_management_key: false } }));
     const provider = createOpenRouterUsage(transport);
     const context = { connection: { id: "router", endpoint: "https://relay.test/api/v1" }, credential: "test-key", signal: new AbortController().signal };
@@ -54,8 +54,8 @@ describe("内置余额与套餐查询", () => {
     expect(String(transport.mock.calls[2]![0])).toBe("https://relay.test/api/v1/credits");
     expect(parseOpenRouterKey({ data: { limit: null, limit_remaining: null } }).items).toEqual([]);
   });
-  // effective_budget 是实际生效约束，周期预算需显示为 quota；月周期仍不伪造毫秒长度。
-  it("OpenRouter 采用生效预算并保留周期与重置时间", () => {
+  // effective_budget is the actual constraint; periodic budgets must be shown as quota, and monthly periods still must not be assigned a fabricated millisecond duration.
+  it("OpenRouter uses the effective budget and preserves the period and reset time", () => {
     const raw = { data: { limit: 100, limit_remaining: 90, effective_budget: {
       limit_usd: 20, remaining_usd: 5, reset_interval: "monthly", resets_at: "2030-02-01T00:00:00Z",
     } } };
@@ -64,8 +64,8 @@ describe("内置余额与套餐查询", () => {
       window: { durationMs: null, resetAt: Date.parse("2030-02-01T00:00:00Z") },
     }]);
   });
-  // Go 接口返回已用百分比；月窗口不转换成固定 30 天，100% 仍是合法耗尽窗口。
-  it("OpenCode 转换三个窗口的剩余比例，保留已耗尽窗口和未知重置时间", () => {
+  // The Go API returns the percentage used; monthly windows are not converted to a fixed 30 days, and 100% is a valid exhausted window.
+  it("OpenCode converts remaining ratios for three windows and preserves exhausted windows and unknown reset times", () => {
     expect(usageItemsSchema.parse(parseOpenCodeQuota(opencode))).toMatchObject([
       { id: "rolling", value: { remaining: 0.75 }, window: { durationMs: 18000000, resetAt: Date.parse("2030-01-01T05:00:00Z") } },
       { id: "weekly", value: { remaining: 0 }, window: { resetAt: null } },
@@ -73,8 +73,8 @@ describe("内置余额与套餐查询", () => {
     ]);
     expect(() => parseOpenCodeQuota({ usage: { rolling: { percent: "unknown" } } })).toThrow();
   });
-  // Kimi CLI 形状：周汇总 + limits；数字字符串、remaining 和等价周期不能导致重复或错误分母。
-  it("Kimi 保留绝对额度并去重周窗口，自然月不伪造时长", () => {
+  // Kimi CLI shape: weekly summary + limits; numeric strings, remaining, and equivalent periods must not cause duplication or incorrect denominators.
+  it("Kimi preserves absolute allowances and deduplicates weekly windows without fabricating calendar-month durations", () => {
     expect(usageItemsSchema.parse(parseKimiQuota(kimi))).toMatchObject([
       { id: "window-10080", value: { type: "quantity", remaining: 960, limit: 1000 } },
       { id: "window-300", value: { remaining: 85, limit: 100 }, window: { durationMs: 18000000 } },
@@ -83,8 +83,8 @@ describe("内置余额与套餐查询", () => {
     expect(() => parseKimiQuota({ limits: [{ window: { duration: 5, timeUnit: "HOUR" }, detail: { limit: "100", remaining: "101" } }] })).toThrow();
     expect(() => parseKimiQuota({ error: "unauthorized" })).toThrow();
   });
-  // 查询沿用户配置的站点，厂商路径明确声明；不忽略取消、不跟随重定向或发往固定官方 host。
-  it("各查询使用声明路径和 Bearer 认证，并沿当前连接 origin", async () => {
+  // Queries follow the user-configured site with explicitly declared vendor paths; do not ignore cancellation, follow redirects, or send to a fixed official host.
+  it("each query uses its declared path and Bearer authentication on the current connection origin", async () => {
     for (const { provider, body, path } of [
       { provider: createDeepSeekUsage, body: deepseek, path: "/user/balance" },
       { provider: createOpenCodeUsage, body: opencode, path: "/zen/go/v1/usage" },
@@ -98,8 +98,8 @@ describe("内置余额与套餐查询", () => {
       expect(transport.mock.calls[0]![1]).toMatchObject({ signal, redirect: "error", headers: { Authorization: "Bearer test-key" } });
     }
   });
-  // 预设的 usage 必须能找到同名提供方；不把限流响应头或未适配产品隐式接入账户查询。
-  it("支持的预设与查询目录同名绑定，未支持的预设保持关闭", () => {
+  // A preset's usage must resolve to a provider with the same name; rate-limit response headers and unsupported products must not be implicitly connected to account queries.
+  it("binds supported presets to identically named query catalog entries and leaves unsupported presets disabled", () => {
     const ids = createBuiltinUsageProviders().map(provider => provider.id).sort();
     expect(ids).toEqual(["openai", "anthropic", "xai", "deepseek", "kimi", "kimi-cn", "kimi-plan", "kimi-plan-cn", "opencode-plan", "openrouter", "zai-plan", "zai-plan-cn"].sort());
     for (const preset of modelProviderPresets) {

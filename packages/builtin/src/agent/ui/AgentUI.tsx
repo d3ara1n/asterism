@@ -24,7 +24,7 @@ function useCardUI() {
   return context;
 }
 
-/** 为每张卡片保留独立目标和输入区约束；portal 保留贡献者的 React context。 */
+/** Retains independent targets and input-area constraints for each card; portals preserve contributors' React context. */
 export function AgentUI({ selection, children }: { selection: AgentSelection | null; children: ReactNode }) {
   const [top, setTop] = useState<HTMLDivElement | null>(null);
   const [center, setCenter] = useState<HTMLDivElement | null>(null);
@@ -85,7 +85,7 @@ function useHideComposer(hidden: boolean) {
 }
 function Overlay({ position, hideComposer = false, children }: AgentOverlayProps) {
   useHideComposer(hideComposer);
-  // 外壳不裁切；局部滚动通过 AgentScrollArea 统一提供视口和焦点光圈留白。
+  // The shell does not clip; AgentScrollArea consistently provides local scrolling viewports and focus-ring clearance.
   return <ContributionPortal position={position}>
     <div className="surface-floating nokey pointer-events-auto min-h-0 p-3">{children}</div>
   </ContributionPortal>;
@@ -102,12 +102,12 @@ function ContributionPortal({ position, className = "", children }: {
   const order = useContext(ContributionOrder);
   const [container] = useState(() => document.createElement("div"));
   const target = targets[position];
-  // portal 的目标保持稳定，位置变化只移动容器，保留表单状态和订阅。
+  // Portal targets stay stable; position changes move only containers, preserving form state and subscriptions.
   useLayoutEffect(() => {
     if (!target) { container.remove(); return; }
     const focus = document.activeElement;
     container.style.order = String(order);
-    // DOM 顺序与视觉顺序一致，迟到显示的贡献仍按登记顺序参与键盘导航。
+    // DOM order matches visual order; contributions shown later still participate in keyboard navigation in registration order.
     const next = Array.from(target.children).find(child => child instanceof HTMLElement && Number(child.style.order) > order);
     target.insertBefore(container, next ?? null);
     if (focus instanceof HTMLElement && container.contains(focus)) focus.focus({ preventScroll: true });

@@ -7,7 +7,7 @@ import { withinDirectory } from "./paths.ts";
 import { filesystemFailure } from "./errors.ts";
 import { readTextFile } from "./text-io.ts";
 
-/** 目录和静态手册共享读取机制；资源实现提供根路径。 */
+/** Directories and static manuals share the read mechanism; resource implementations provide the root path. */
 export async function listFiles(root: string, target: z.infer<typeof DirectoryList.targetSchema>, signal: AbortSignal): Promise<CallResult<z.infer<typeof DirectoryList.schema>>> {
   const path = target?.path ?? ".";
   try {

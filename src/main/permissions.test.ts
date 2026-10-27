@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { allowRendererPermission } from "./permissions.ts";
 
-describe("主窗口浏览器权限", () => {
-  // 复制要求放行写入，开发 URL 与发布 file URL 都须可用。
-  it.each(["http://127.0.0.1:5173/", "file:///app/renderer/index.html"])("受信主框架可写剪贴板并枚举字体：%s", trustedURL => {
+describe("Main window browser permissions", () => {
+  // Copy requires write permission for both development URLs and packaged file URLs.
+  it.each(["http://127.0.0.1:5173/", "file:///app/renderer/index.html"])("trusted main frames can write the clipboard and enumerate fonts: %s", trustedURL => {
     const contents = { getURL: () => `${trustedURL}#workbench` };
     const frame = { contents, mainContents: contents, trustedURL, isMainFrame: true };
     expect(allowRendererPermission({ ...frame, permission: "clipboard-sanitized-write" })).toBe(true);
@@ -12,8 +12,8 @@ describe("主窗口浏览器权限", () => {
     expect(allowRendererPermission({ ...frame, permission: "media" })).toBe(false);
   });
 
-  // 只开放既有受信窗口范围，不能因允许复制而授权子框架、其他窗口或导航后的页面。
-  it("剪贴板写入仍受窗口身份、主框架和页面 URL 约束", () => {
+  // Limit access to existing trusted windows; allowing copy must not authorize subframes, other windows, or pages after navigation.
+  it("clipboard writes remain constrained by window identity, main frame, and page URL", () => {
     const trustedURL = "file:///app/renderer/index.html";
     const contents = { getURL: () => trustedURL };
     const frame = { contents, mainContents: contents, trustedURL, isMainFrame: true, permission: "clipboard-sanitized-write" };

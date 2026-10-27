@@ -15,7 +15,7 @@ interface RequestOptions {
   providerOptions: Record<string, Record<string, Json>>;
 }
 
-/** 连接测试与执行的唯一请求选项解释入口；probe 只验证基础协议连通性。 */
+/** Sole request-option interpretation entry for connection tests and execution; probes verify basic protocol connectivity only. */
 export function requestOptions(provider: Connection, model: ProviderModel, request: RequestPurpose): RequestOptions {
   const options: RequestOptions = {
     maxRetries: 0,
@@ -38,14 +38,14 @@ export function requestOptions(provider: Connection, model: ProviderModel, reque
 
   const { reasoning } = model.capabilities;
   const thinking = request.thinking;
-  // 等级集合仅用于选择器；继承后的显式等级按协议编码，由上游判断是否接受。
+  // Level sets serve selectors only; inherited explicit levels encode by protocol and upstream decides acceptance.
   if (reasoning && thinking !== null) {
     options.reasoning = thinking === "off" ? "none" : thinking;
   }
   if (provider.protocol === "anthropic") return options;
   options.providerOptions = { openai: {
     ...(provider.protocol === "openai-responses" ? {
-      // 显式 false 同样重要：否则 SDK 会按模型名自动请求加密思考。
+      // Explicit false matters too: otherwise the SDK automatically requests encrypted reasoning by model name.
       store: false, forceReasoning: reasoning,
       ...(reasoning && compatibility.encryptedContent ? { include: ["reasoning.encrypted_content"] } : {}),
       ...(reasoning && compatibility.reasoningSummary ? { reasoningSummary: "auto" } : {}),

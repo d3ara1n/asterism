@@ -3,8 +3,8 @@ import { Button } from "./button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./tooltip";
 
 /**
- * 仅图标按钮：官方 Button + Tooltip 组合。可访问名称取 label，提示默认与之一致。
- * 根节点是 Tooltip，不能作为菜单或弹层触发器的 asChild 子元素；触发器场景直接使用 Button 并提供 aria-label。
+ * Icon-only button: combines the official Button + Tooltip. The accessible name comes from label, and the tooltip matches it by default.
+ * The root is Tooltip and cannot serve as the asChild child of a menu or popover trigger; use Button directly with aria-label for triggers.
  */
 export function IconButton({ label, tooltip = label, variant = "ghost", size = "icon-sm", ...props }: ComponentProps<typeof Button> & { label: string; tooltip?: string }) {
   return <Tooltip>

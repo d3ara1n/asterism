@@ -5,7 +5,7 @@ import { usageMessages as messages } from "../messages/usage.ts";
 
 const window = z.object({ percent: z.number().min(0).max(100), resetsAt: timestamp.nullish() });
 const response = z.object({ usage: z.object({ rolling: window.nullish(), weekly: window.nullish(), monthly: window.nullish() }) });
-/** Go 返回已用百分比；自然月没有固定毫秒长度，不以 30 天伪造周期。 */
+/** Go returns the percentage used; a calendar month has no fixed millisecond duration, so do not fabricate a 30-day period. */
 export function parseOpenCodeQuota(raw: unknown): UsageItem[] {
   const { usage } = parseUsageResponse(response, raw);
   const windows = [

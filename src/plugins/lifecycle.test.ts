@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import { RunLifecycle } from "./lifecycle.ts";
 
 const object = { sessionId: "session", id: "object", kind: "test.resource/object" };
-describe("共享运行生命周期", () => {
-  // 只读查询不占用时间线，宿主关闭仍等待它真实结束。
-  it("只读通信等待不占用时间线，资源工作单独登记 busy", async () => {
+describe("Shared run lifetime", () => {
+  // Read-only queries do not occupy the timeline, but host close still waits for actual completion.
+  it("waiting on read-only communication does not occupy the timeline and resource work registers busy separately", async () => {
     const lifecycle = new RunLifecycle(() => {});
     let finishCall!: () => void, finishTask!: () => void;
     const call = lifecycle.group("call").start(() => new Promise<void>(resolve => { finishCall = resolve; }), { object, affectsHistory: false });
@@ -20,7 +20,7 @@ describe("共享运行生命周期", () => {
     await call.done;
     expect(lifecycle.activity(object.sessionId)).toEqual({ busy: [] });
   });
-  it.each(["return", "close"] as const)("流暂停消费时 %s 关闭真实迭代器，等待清理但不取消调用方信号", async mode => {
+  it.each(["return", "close"] as const)("%s closes the actual iterator while stream consumption is paused, waits for cleanup, and does not cancel the caller's signal", async mode => {
     const lifecycle = new RunLifecycle(() => {}), models = lifecycle.group("model");
     const caller = new AbortController();
     let release!: () => void, cleaned = false, starts = 0;
@@ -42,7 +42,7 @@ describe("共享运行生命周期", () => {
     expect(starts).toBe(1);
     await lifecycle.close();
   });
-  it("关闭先传播所有取消，活动直到实际结束才移除，关闭后不再受理", async () => {
+  it("close propagates all cancellations first, retains activities until actual completion, and accepts no new work", async () => {
     const lifecycle = new RunLifecycle(() => {});
     const task = lifecycle.group("task"), model = lifecycle.group("model");
     let release!: () => void;
@@ -57,7 +57,7 @@ describe("共享运行生命周期", () => {
     release(); await closing;
     expect(lifecycle.activity(object.sessionId)).toEqual({ busy: [] });
   });
-  it("执行失败仍收束；关闭一个执行组不停止其他组", async () => {
+  it("execution failures still finalize and closing one execution group does not stop other groups", async () => {
     const lifecycle = new RunLifecycle(() => {});
     const actions = lifecycle.group("action"), models = lifecycle.group("model");
     await expect(actions.start(async () => { throw new Error("failure"); }, { object }).done).rejects.toThrow("failure");

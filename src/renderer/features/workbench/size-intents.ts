@@ -2,7 +2,7 @@ import type { CardSize, WorkbenchSnapshot } from "../../../shared/workbench";
 
 export type SizeIntent = { size: CardSize | null; readCompleted: boolean };
 
-/** 受理后读取失败的意图，可在后续成功投影中确认；未结束读取屏障的意图继续保留。 */
+/** An intent whose read failed after acceptance can be confirmed by a later successful projection; retain intents whose read barrier has not finished. */
 export function confirmCardSizes(pending: Map<string, SizeIntent>, snapshot: WorkbenchSnapshot): void {
   for (const [id, intent] of pending) {
     const actual = snapshot.views.find(view => view.objectId === id)?.size ?? null;
@@ -13,7 +13,7 @@ export function confirmCardSizes(pending: Map<string, SizeIntent>, snapshot: Wor
   }
 }
 
-/** 只有本次命令受理后的读取结束，才能确认意图；相同尺寸的旧快照不构成确认。 */
+/** Only completion of the read after this command's acceptance can confirm its intent; an old snapshot with identical dimensions is not confirmation. */
 export async function saveCardSize({ pending, objectId, size, saveAndRead, read, project }: {
   pending: Map<string, SizeIntent>; objectId: string; size: CardSize | null;
   saveAndRead: () => Promise<boolean>;

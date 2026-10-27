@@ -7,7 +7,7 @@ import type { ContextFile } from "../resources/contract.ts";
 import type { ContentLease } from "../runtime/content-store.ts";
 import type { NodeView } from "../session/view.ts";
 
-/** 宿主内部的存储与执行接口；插件只接收 SDK 门面。 */
+/** Host-internal storage and execution interfaces; plugins receive SDK facades only. */
 export interface SessionHostWriter {
   append(node: NewNode): string;
   nodes(): SessionNode[];
@@ -27,7 +27,7 @@ export interface SessionHost {
   title(sessionId: string): string;
   setTitle(sessionId: string, text: string): void;
   commit<T>(sessionId: string, work: (writer: SessionHostWriter) => T, objectId?: string): T;
-  /** 会话内除 objectId 外没有在途活动；用于显式游标选择前的收束检查。 */
+  /** No in-flight activity in the session except objectId; used to check finalization before explicit cursor selection. */
   idle(sessionId: string, objectId?: string): boolean;
   progressChanged(sessionId: string): void;
   viewChanged(sessionId: string, objectId: string): void;
@@ -42,7 +42,7 @@ export interface ObjectScope {
   active: boolean;
   content?: ContentLease;
   provisional?: boolean;
-  /** 宿主已授权的工具执行，仅在调用期间允许提交捕获对象的数据。 */
+  /** Host-authorized tool execution; captured object data can be committed only during the call. */
   execution?: boolean;
   before?: () => void;
 }

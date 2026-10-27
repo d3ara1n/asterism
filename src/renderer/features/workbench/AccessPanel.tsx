@@ -27,7 +27,7 @@ import { useModuleViews } from "../../modules/views";
 import { useSession } from "../session/state";
 import { useWorkbench } from "./context";
 
-/** 授权消费真实链接；在途请求的说明不冒充单条链接的生效状态。 */
+/** Authorization consumes real links; descriptions of in-flight requests do not stand in for the effective state of an individual link. */
 export function AccessPanel() {
   const i18n = useI18n();
   const { session } = useWorkbench();

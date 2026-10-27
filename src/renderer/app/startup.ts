@@ -7,10 +7,10 @@ function scopedCalls(calls: PluginCalls, signal: AbortSignal): PluginCalls {
     { ...options, signal: options?.signal ? AbortSignal.any([signal, options.signal]) : signal }) };
 }
 
-/** 单个模块准备的等待上限；超时只放弃等待并通知模块停止，不阻止启动。 */
+/** Maximum wait for one module's preparation; timeout only stops waiting and tells the module to stop, without blocking startup. */
 export const MODULE_PREPARE_TIMEOUT_MS = 10_000;
 
-/** 插件共享服务准备完成后再准备功能模块；关闭按依赖逆序由调用方执行。 */
+/** Prepare feature modules after shared plugin services are ready; the caller shuts down in reverse dependency order. */
 export async function preparePlugin(plugin: RendererPlugin, events: EventSubscriber, signal: AbortSignal,
   timeout = MODULE_PREPARE_TIMEOUT_MS, registerCleanup?: (close: () => Promise<void>) => void,
   calls: PluginCalls = unavailableCalls): Promise<() => Promise<void>> {
@@ -31,7 +31,7 @@ export async function preparePlugin(plugin: RendererPlugin, events: EventSubscri
   let closing: Promise<void> | undefined;
   const close = () => closing ??= (async () => {
     controller.abort();
-    // closed 信封只表示订阅停止接收，不能替代处理器和超时准备的真实结束。
+    // A closed envelope only means the subscription has stopped receiving; it does not mean handlers or timed-out preparation have actually finished.
     while (work.size) await Promise.allSettled([...work]);
     await plugin.closing?.();
   })();
@@ -48,13 +48,13 @@ export async function preparePlugin(plugin: RendererPlugin, events: EventSubscri
     signal.throwIfAborted();
     return close;
   } catch (error) {
-    // 超时不假装工作已结束；取消后等待实际准备退出再释放共享服务。
+    // Timeout does not imply the work has finished; after cancellation, wait for preparation to actually exit before releasing shared services.
     void close().catch(failure => console.error("Renderer plugin cleanup failed.", failure));
     throw error;
   } finally { clearTimeout(timer); }
 }
 
-/** 并行运行模块准备；失败与超时记录日志后继续，视图保留。 */
+/** Run module preparation in parallel; log failures and timeouts and continue, retaining views. */
 export async function prepareModules(modules: readonly RendererModule[], events: EventSubscriber, timeout = MODULE_PREPARE_TIMEOUT_MS,
   signal?: AbortSignal, track: (work: Promise<void>) => Promise<void> = work => work,
   calls: PluginCalls = unavailableCalls): Promise<void> {

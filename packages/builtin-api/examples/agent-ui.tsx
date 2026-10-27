@@ -3,7 +3,7 @@ import type { ResourceRef } from "@asterism/sdk/contracts";
 import { AgentModal, AgentOverlay, AgentScrollArea, agentUI, type AgentOverlayPosition } from "@asterism/builtin-api/renderer";
 import { useRendererObject, type RendererModule } from "@asterism/sdk/renderer";
 
-/** 插件按关联 Agent 提供业务状态与提交回调，界面只消费该接口。 */
+/** Plugins provide business state and submission callbacks for the associated Agent; the UI only consumes this interface. */
 export interface AgentUIState {
   question: { id: string; text: string; answer(value: string): Promise<void> } | null;
   todos: readonly string[];
@@ -12,7 +12,7 @@ export interface AgentUIState {
   closePreview(): void;
 }
 
-/** useStateForAgent 由插件提供，可订阅自己的业务服务，并在重挂载时重读当前状态。 */
+/** useStateForAgent is provided by the plugin, which can subscribe to its own business service and reread the current state on remount. */
 export function questionAndTodoViews(
   useStateForAgent: (agent: ResourceRef) => AgentUIState,
 ): RendererModule {
@@ -44,7 +44,7 @@ function Question({ question }: { question: NonNullable<AgentUIState["question"]
   const [answer, setAnswer] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // 第三方作者可使用自己的控件库；示例只依赖公开包和 React。
+  // Third-party authors can use their own control libraries; this example depends only on public packages and React.
   return <form onSubmit={event => {
     event.preventDefault();
     if (busy) return;

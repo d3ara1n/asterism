@@ -23,7 +23,7 @@ import { useTurnProcesses } from "./use-turn-processes";
 import { useReducedMotion } from "motion/react";
 import { useTimelinePresence } from "./timeline-presence";
 
-/** 卡片标题栏中的执行状态；历史属于会话，入口在窗口标题栏。 */
+/** Execution status in the card title bar; history belongs to the session and is accessed from the window title bar. */
 export function ConversationActions({ data }: { data: { executionState: AgentExecutionState } }) {
   const i18n = useI18n();
   const object = useRendererObject();
@@ -36,10 +36,10 @@ export function ConversationActions({ data }: { data: { executionState: AgentExe
 }
 
 const emptyTimeline: readonly TimelineItem[] = [];
-/** 条目视图状态随代理对象保留：虚拟列表回收条目、卡片重挂载与聚焦切换都不丢展开状态。 */
+/** Item view state is retained with the agent object: virtualized item recycling, card remounts, and focus switches preserve expansion state. */
 const viewStateKey = "asterism.builtin/agent.timeline-view";
 
-/** 代理卡片内容：当前路径的最终视图与输入区；没有分支感，回溯在会话历史中进行。 */
+/** Agent card content: the final view of the current path and the input area; branches are not exposed here, and rewinding takes place in session history. */
 export function Conversation({ feedback, compressions }: { feedback: readonly InlineFeedback[]; compressions: readonly CompressionActivity[] }) {
   const i18n = useI18n();
   const object = useRendererObject();
@@ -52,7 +52,7 @@ export function Conversation({ feedback, compressions }: { feedback: readonly In
   const snapshot = session.snapshot();
   const viewState = object.retained.get(viewStateKey, () => new TimelineViewState());
   const running = executionState === "running";
-  // 已保存部分只随快照与运行状态重算；流式增量只追加实时块，历史条目保持身份。
+  // The saved portion is recomputed only when snapshots or run state change; streaming deltas append only live blocks, preserving historical item identity.
   const saved = useMemo(() => snapshot ? savedTimeline(snapshot, agentId, running, feedback, {
     boundary: viewState.historyWindow.read(snapshot.records.all({ scope: "timeline" }), agentId), compressions,
   }) : null, [snapshot, agentId, running, feedback, compressions, viewState]);
@@ -80,7 +80,7 @@ export function Conversation({ feedback, compressions }: { feedback: readonly In
   return <>
     <AgentUIRegion position="top" />
     <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
-      {/* 虚拟列表自行补偿滚动位置，关闭浏览器的滚动锚定以免两者冲突。 */}
+      {/* The virtual list compensates for scroll position itself; disable browser scroll anchoring to prevent conflicts. */}
       <div ref={scroll} className="min-h-0 flex-1 scroll-pt-4 select-text overflow-y-auto overscroll-contain [overflow-anchor:none]" onScroll={onScroll}>
         <VirtualConversationTimeline ref={list} items={timeline} viewState={viewState} scrollRef={scroll}
           target={target} presence={presence} reducedMotion={reducedMotion}

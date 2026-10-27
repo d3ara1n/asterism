@@ -3,15 +3,15 @@ import { PluginApiError, type ChannelContribution, type ObjectChannel } from "@a
 import type { SdkContext } from "./sdk-context.ts";
 import type { PluginHostServices } from "./loader.ts";
 
-/** 通道另一端（renderer 连接）：接收后台消息与结束通知。 */
+/** Other channel endpoint (renderer connection): receives backend messages and termination notifications. */
 export interface ChannelPeer {
   deliver(data: ChannelValue): void;
   ended(end: ChannelEnd): void;
 }
 export interface OpenedChannel {
-  /** 前端消息；按到达顺序交付给后台监听。 */
+  /** Frontend messages, delivered to backend listeners in arrival order. */
   receive(data: ChannelValue): void;
-  /** 前端或连接关闭；不再通知 peer。 */
+  /** Frontend or connection close; no further peer notification. */
   close(end: ChannelEnd): void;
 }
 
@@ -50,7 +50,7 @@ class HostChannel implements ObjectChannel {
   }
 }
 
-/** 通道按契约路由到对象所属插件；打开时校验对象位于当前路径，对象离开当前集合时由宿主结束。 */
+/** Channels route by contract to the object's plugin; validate current-path membership on open, and the host ends them when objects leave the current set. */
 export class ChannelRegistry {
   private readonly entries = new Map<string, { owner: string; contribution: ChannelContribution; sdk: SdkContext }>();
   private readonly open = new Set<HostChannel>();
@@ -72,7 +72,7 @@ export class ChannelRegistry {
     if (!actual || actual.kind !== ref.kind || actual.sessionId !== ref.sessionId || !belongsTo(entry.owner, ref.kind) ||
       !this.host.sessions.workbench(ref.sessionId).objects.some(item => item.id === ref.id))
       throw new PluginApiError("unavailable", "The associated object is not on the current session path.");
-    // 读取门面在通道打开期间有效，结束后失效。
+    // The read facade is valid while the channel is open and expires on termination.
     const scope = { active: true };
     const channel = new HostChannel(entry.sdk.reader(ref, scope), ref, entry.owner, peer, closed => {
       scope.active = false; this.open.delete(closed);
@@ -84,7 +84,7 @@ export class ChannelRegistry {
     });
     return { receive: data => channel.receive(data), close: end => channel.close(end, false) };
   }
-  /** 资源离开当前集合（移除、回溯）时结束其通道。 */
+  /** End channels when resources leave the current set through removal or backtracking. */
   release(sessionId: string, objectIds: readonly string[]) {
     const ids = new Set(objectIds);
     for (const channel of [...this.open]) if (channel.ref.sessionId === sessionId && ids.has(channel.ref.id)) channel.close({ reason: "removed" });

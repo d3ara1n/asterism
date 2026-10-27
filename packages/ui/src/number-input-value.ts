@@ -1,9 +1,9 @@
 /**
- * 数字输入的纯计算：解析用户文本、限制范围与精度、按步长调整与显示格式化。
- * 解析不依赖语言区域：全角字符经 NFKC 归一，逗号与句点均视为小数点，便于中文输入法与习惯不同的用户。
+ * Pure calculations for number input: parse user text, constrain range and precision, adjust by step, and format for display.
+ * Parsing is locale-independent: full-width characters are normalized with NFKC, and commas and periods both count as decimal separators to accommodate Chinese input methods and differing user conventions.
  */
 
-/** 返回 null 表示空输入，undefined 表示无法解析。 */
+/** Returns null for empty input and undefined for unparseable input. */
 export function parseNumberText(text: string): number | null | undefined {
   const normalized = text.normalize("NFKC").trim().replace(/[,，]/gu, ".");
   if (normalized === "") return null;
@@ -12,7 +12,7 @@ export function parseNumberText(text: string): number | null | undefined {
   return Number.isFinite(value) ? value : undefined;
 }
 
-/** 舍入到指定小数位并限制范围；舍入同时消除 12.1 + 0.1 之类的浮点尾数。 */
+/** Round to the specified decimal places and clamp to the range; rounding also removes floating-point artifacts such as those from 12.1 + 0.1. */
 export function limitNumber(value: number, min: number, max: number, precision: number): number {
   const scale = 10 ** precision;
   return Math.min(max, Math.max(min, Math.round(value * scale) / scale));
@@ -22,7 +22,7 @@ export function stepNumber(value: number, delta: number, min: number, max: numbe
   return limitNumber(value + delta, min, max, precision);
 }
 
-/** 完整显示小数，不使用千分位。 */
+/** Display all decimal places without thousands separators. */
 export function formatNumberText(value: number, locale: string): string {
   return new Intl.NumberFormat(locale, { maximumFractionDigits: 20, useGrouping: false }).format(value);
 }

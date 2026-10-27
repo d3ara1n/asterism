@@ -22,7 +22,7 @@ import { ProviderOptions, ProviderModels } from "./ModelPicker";
 type Page = "agent" | "model" | "thinking";
 const FOLLOW = "__agent_default";
 
-/** forward(+1): 新页从右入，旧页向左出；back(-1): 反向。 */
+/** forward(+1): the new page enters from the right and the old page exits to the left; back(-1): the reverse. */
 const SLIDE_X = 8;
 
 const pageVariants = {
@@ -107,7 +107,7 @@ export function AgentConfigurationPicker({ selection, disabled, onChange }: {
     else setPage(null);
   }
 
-  // 二级页面返回后恢复到原配置行；关闭整个浮层由 Popover 恢复触发器焦点。
+  // Returning from a secondary page restores focus to the original configuration row; Popover restores trigger focus when the entire popover closes.
   useLayoutEffect(() => {
     if (open && page === null && !blocked) rows.current[returnTo.current]?.focus({ preventScroll: true });
   }, [open, page, blocked]);

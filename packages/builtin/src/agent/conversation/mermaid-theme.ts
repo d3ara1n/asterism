@@ -1,7 +1,7 @@
 import type { MermaidConfig } from "mermaid";
 import { useLayoutEffect, useState, type RefObject } from "react";
 
-/** Mermaid 的颜色运算需要实际色值；从宿主公共 token 取值，不依赖应用的设置实现。 */
+/** Mermaid color calculations require actual color values; values come from public host tokens without depending on the application's settings implementation. */
 function diagramTheme(element: HTMLElement): MermaidConfig {
   const root = getComputedStyle(document.documentElement);
   const text = getComputedStyle(element);
@@ -39,7 +39,7 @@ function diagramTheme(element: HTMLElement): MermaidConfig {
       doneTaskBkgColor: muted, doneTaskBorderColor: border, gridColor: border,
       critBkgColor: token("destructive"), critBorderColor: token("destructive"), todayLineColor: primary,
       personBkg: secondary, personBorder: border,
-      // 结构图的分组维持中性表面；数量图表使用设计系统的分类色。
+      // Groups in structural diagrams use neutral surfaces; quantitative charts use the design system's category colors.
       ...Object.fromEntries(Array.from({ length: 12 }, (_, index) => [
         [`cScale${index}`, secondary], [`cScaleLabel${index}`, foreground],
         [`cScalePeer${index}`, border], [`pie${index + 1}`, palette[index % palette.length]],
@@ -67,7 +67,7 @@ function diagramTheme(element: HTMLElement): MermaidConfig {
   };
 }
 
-/** 宿主将外观写入 :root；只在相关 token 的解析结果改变时更新图形主题。 */
+/** The host writes appearance to :root; the diagram theme updates only when resolved values of relevant tokens change. */
 export function useMermaidTheme(container: RefObject<HTMLDivElement | null>): MermaidConfig | null {
   const [theme, setTheme] = useState<MermaidConfig | null>(null);
   useLayoutEffect(() => {

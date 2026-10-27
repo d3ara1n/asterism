@@ -15,7 +15,7 @@ function setup() {
   mkdirSync(source);
   return { base, source, catalog: new SkillCatalog([{ id: source, directory: source }]) };
 }
-/** 单来源目录的唯一分组。 */
+/** The only group in a catalog with a single source. */
 const only = (overview: SkillOverview) => overview.sources[0]!;
 function skill(source: string, directory: string, name = directory, description = "A useful skill") {
   const root = join(source, directory);
@@ -24,15 +24,15 @@ function skill(source: string, directory: string, name = directory, description 
   return root;
 }
 
-describe("技能目录与读取", () => {
-  it("YAML 多行和引号按规范解析，Markdown 中的同名字段不覆盖元数据", () => {
-    // 简单逐行拆分会丢掉折叠描述，或把正文中的 YAML 示例误当元数据。
+describe("skill catalog and reading", () => {
+  it("parses multiline and quoted YAML according to the specification, without letting same-name Markdown fields overwrite metadata", () => {
+    // Simple line splitting would lose folded descriptions or mistake YAML examples in the body for metadata.
     expect(parseSkillMetadata('\uFEFF---\r\nname: "code-review"\r\ndescription: >-\r\n  Review changes:\r\n  correctness and tests.\r\nmetadata:\r\n  owner: someone\r\n---\r\nname: wrong'))
       .toEqual({ name: "code-review", description: "Review changes: correctness and tests." });
   });
 
-  it("损坏或缺少名称描述的 frontmatter 明确失败，正文内的分隔符不能冒充文件头", () => {
-    // 避免把坏目录条目投影为可调用名称，或接受正文里的嵌套示例。
+  it("explicitly rejects corrupt frontmatter or missing names/descriptions, without treating body delimiters as a file header", () => {
+    // Avoid projecting invalid catalog entries as callable names or accepting nested examples in the body.
     for (const text of [
       "---\nname: a\nname: b\ndescription: test\n---",
       "---\nname: [a]\ndescription: test\n---",
@@ -42,8 +42,8 @@ describe("技能目录与读取", () => {
     ]) expect(() => parseSkillMetadata(text)).toThrow();
   });
 
-  it("目录仅在显式刷新时更新，普通查询保留启动目录，局部解析错误不影响其他技能", async () => {
-    // 安装或改名不能通过请求、设置读取和 skill_read 隐式触发重新发现。
+  it("updates the catalog only on explicit refresh, retains the startup catalog for ordinary queries, and isolates local parsing errors from other skills", async () => {
+    // Installing or renaming must not implicitly trigger rediscovery through requests, settings reads, or skill_read.
     const { source, catalog } = setup();
     skill(source, "z");
     const a = skill(source, "a");
@@ -64,7 +64,7 @@ describe("技能目录与读取", () => {
       { name: "a", description: "Updated" }, { name: "b", description: "A useful skill" },
     ]);
     expect(catalog.prompt().text).toContain('{"name":"a","description":"Updated"}');
-    // 模型只按名称取用技能，目录提示不携带来源与路径。
+    // The model accesses skills by name only; catalog hints carry no sources or paths.
     expect(catalog.prompt().text).not.toContain(source);
     expect(prompt.text).toContain('"description":"A useful skill"');
     rmSync(source, { recursive: true });
@@ -72,8 +72,8 @@ describe("技能目录与读取", () => {
     expect(catalog.refresh(signal)).toEqual({ sources: [{ source, skills: [], issues: [] }] });
   });
 
-  it("同名技能全部标为歧义，读取不会任意选中某个目录", async () => {
-    // name 是调用身份；目录遍历顺序不能决定相同身份读取哪个包。
+  it("marks all same-name skills as ambiguous and does not arbitrarily choose a directory when reading", async () => {
+    // name is the call identity; directory traversal order must not decide which package is read for the same identity.
     const { source, catalog } = setup();
     skill(source, "one", "same");
     skill(source, "two", "same");
@@ -85,8 +85,8 @@ describe("技能目录与读取", () => {
       .rejects.toMatchObject({ code: "skill_not_found" });
   });
 
-  it("跨来源同名按优先级覆盖，被覆盖条目保留在原来源中并标明生效来源", async () => {
-    // 来源是分组而非命名空间：模型按名称读取时只能得到高优先级来源的包，被覆盖条目仍在设置中按来源可见。
+  it("overrides same-name skills across sources by priority, retaining overridden entries in their original sources and identifying the effective source", async () => {
+    // Sources are groups rather than namespaces: model reads by name receive only the package from the higher-priority source, while overridden entries remain visible by source in settings.
     const { base } = setup();
     const plugin = join(base, "plugin"), user = join(base, "user");
     skill(plugin, "shared", "shared", "From plugin");
@@ -107,8 +107,8 @@ describe("技能目录与读取", () => {
     expect((await catalog.read({ name: "shared", path: "SKILL.md", offset: 1, limit: 10 }, signal)).directory).toBe(winner);
   });
 
-  it("包内参考文件按绝对行号分页，续读提示使用顶层 offset 参数，重新读取取得新正文", async () => {
-    // skill_read 参数位于顶层；目录 read 的 target.offset 提示会导致模型续读参数错误。
+  it("paginates package reference files by absolute line number, uses top-level offset in continuation hints, and reads updated text on reread", async () => {
+    // skill_read arguments are top-level; directory read hints using target.offset would cause the model to send incorrect continuation arguments.
     const { source, catalog } = setup();
     const root = skill(source, "guide");
     mkdirSync(join(root, "references"));
@@ -120,13 +120,13 @@ describe("技能目录与读取", () => {
       rows: [{ line: 2, content: "乙", hash: null }, { line: 3, content: "丙", hash: null }] });
     expect(readToModel(read, "offset")).toContain("Remaining content starts at offset:4.");
     writeFileSync(join(root, path), "已修改\n");
-    // 读取参考文件只查已加载身份；元数据此时损坏也不重新解析或使该包失效。
+    // Reading reference files looks up only loaded identities; corrupt metadata at this point does not cause reparsing or invalidate the package.
     writeFileSync(join(root, "SKILL.md"), "Edited instructions without frontmatter\n");
     expect((await catalog.read({ name: "guide", path, offset: 1, limit: 10 }, signal)).rows.map(row => row.content)).toEqual(["已修改"]);
   });
 
-  it("包根符号链接可安装技能，包内文件链接仍须留在该包内", async () => {
-    // 链接安装的真实目录是边界；内部链接不能借该入口访问相邻包或任意外部文件。
+  it("allows skill installation through package-root symlinks while requiring file symlinks inside the package to stay within it", async () => {
+    // The actual directory of a symlink installation is the boundary; internal links cannot use this entry point to access adjacent packages or arbitrary external files.
     const { base, source, catalog } = setup();
     const root = skill(base, "installed", "guide");
     symlinkSync(root, join(source, "guide"), "dir");
@@ -144,8 +144,8 @@ describe("技能目录与读取", () => {
     await expect(read("bad\0path")).rejects.toMatchObject({ code: "invalid_skill_path" });
   });
 
-  it("发现阶段同样检查 SKILL.md 的符号链接范围", async () => {
-    // 只在 skill_read 校验会使目录扫描提前读到包外内容并注入系统提示。
+  it("also checks the symlink boundary of SKILL.md during discovery", async () => {
+    // Validating only in skill_read would let catalog scanning read external package content early and inject it into the system prompt.
     const { base, source, catalog } = setup();
     const outside = skill(base, "outside");
     mkdirSync(join(source, "escape"));

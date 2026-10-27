@@ -9,9 +9,9 @@ import { historyBefore, historyEntries, historyResources, historyResourceViews, 
 const created = (id: string, title: string, kind = "agent") => make(id, title, kind);
 const label = new ViewRegistry([...builtinViews, workbenchRecordViews]);
 
-describe("历史导航契约", () => {
-  // 改名只影响该事件的后代；整棵树按追加次序展示时也不能把旁支名称带到其他分支。
-  it("历史标题沿父节点继承改名，旧记录和旁支保持各自名称", () => {
+describe("History navigation contract", () => {
+  // Renaming affects only descendants of that event; displaying the whole tree in append order must not carry names from one branch into another.
+  it("historical titles inherit renames along parent nodes, while old records and sibling branches retain their own names", () => {
     const nodes = [
       node("1", null, created("a", "Alpha")),
       node("2", "1", created("n", "Original", "note")),
@@ -28,7 +28,7 @@ describe("历史导航契约", () => {
     ]);
     expect(entries[3].label).toBe("Renamed resource: Revised");
   });
-  it("资源视图按来源身份筛选，不混入同名代理、链接事件或工具目标", () => {
+  it("resource views filter by source identity without including agents with the same name, link events, or tool targets", () => {
     const nodes = [
       node("1", null, created("a", "Same name")),
       node("2", "1", created("b", "Same name")),
@@ -46,7 +46,7 @@ describe("历史导航契约", () => {
     expect(entries.filter(entry => matchesHistoryView(entry, { kind: "all" }))).toHaveLength(8);
     expect(historyResourceViews(entries).map(source => [source.resource.id, source.count])).toEqual([["a", 2], ["b", 1]]);
   });
-  it("已移除、其他分支与非代理资源的自发事件仍可作为视图来源", () => {
+  it("self-originated events from removed objects, other branches, and non-agent resources remain available as view sources", () => {
     const nodes = [
       node("1", null, created("r", "Game", "board")),
       node("2", "1", removed("r")),
@@ -59,7 +59,7 @@ describe("历史导航契约", () => {
     expect(entries.filter(entry => matchesHistoryView(entry, { kind: "resource", resourceId: "r" })).map(entry => entry.node.id)).toEqual(["3"]);
   });
 
-  it("同一响应穿插工作台事件与另一代理输出时保持独立落点和追加顺序", () => {
+  it("preserves separate navigation positions and append order when one response is interleaved with workbench events and another agent's output", () => {
     const nodes = [
       node("1", null, created("a", "Alpha")),
       node("2", "1", text("a", "r", 0, "First\nparagraph")),
@@ -67,14 +67,14 @@ describe("历史导航契约", () => {
       node("4", "3", text("b", "other", 0, "Interleaved")),
       node("5", "4", text("a", "r", 1, "Second paragraph")),
     ];
-    nodes[4].createdAt = "2026-10-09T10:00:00Z"; // 时钟时间不参与导航排序。
+    nodes[4].createdAt = "2026-10-09T10:00:00Z"; // Wall-clock time does not determine navigation order.
     const entries = historyEntries(nodes, label);
     expect(entries.map(entry => entry.node.id)).toEqual(["1", "2", "3", "4", "5"]);
     expect(entries[2].scope).toBe("session");
     expect(entries[3].resource?.title).toBe("Beta");
     expect(entries[4].resource?.title).toBe("Alpha");
   });
-  it("不完整块也是历史位置，查看之前使用真实父节点而非过滤后的上一行", () => {
+  it("incomplete blocks are also historical positions, and viewing before them uses the real parent node rather than the preceding filtered row", () => {
     const nodes = [
       node("1", null, created("a", "A")),
       node("2", "1", thinking("a", "r", 0, "Reasoning")),

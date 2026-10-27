@@ -2,7 +2,7 @@ import { createContext, createElement, useContext, type ReactNode } from "react"
 import type { RendererPreferences } from "@asterism/sdk/renderer";
 import { CreationDirectoryProvider } from "./resources/directory";
 
-/** 应用组合注入宿主服务；内置插件不读取宿主存储实现。 */
+/** Application composition injects host services; the built-in plugin does not read host storage implementations. */
 export interface BuiltinRendererServices {
   preferences(pluginId: string): RendererPreferences;
   openLocalFile(path: string): Promise<void>;

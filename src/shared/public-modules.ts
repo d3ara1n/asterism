@@ -1,4 +1,4 @@
-/** 公共包元数据不携带业务实现；两个运行环境各自绑定已加载的导出。 */
+/** Public package metadata contains no business implementation; each runtime environment binds its own loaded exports. */
 export type ModuleRealm = "runtime" | "renderer";
 export type ModuleExports = Readonly<Record<string, unknown>>;
 export interface PublicProvider {
@@ -11,7 +11,7 @@ const registryKey = "__asterismPublicModules";
 type Binding = { version: string; pluginId: string; modules: Readonly<Record<string, ModuleExports>> };
 type Registry = Partial<Record<ModuleRealm, Record<string, Binding>>>;
 
-/** 应用在加载消费者前绑定，返回仅移除本次绑定的清理函数。公共导出须为稳定声明或访问器函数。 */
+/** Applications bind before loading consumers; cleanup removes only this binding. Public exports must be stable declarations or accessor functions. */
 export function bindPublicProvider(realm: ModuleRealm, provider: PublicProvider, modules: Readonly<Record<string, ModuleExports>>): () => void {
   const declared = provider.modules[realm];
   if (!declared || Object.keys(modules).length !== Object.keys(declared).length)
@@ -30,7 +30,7 @@ export function bindPublicProvider(realm: ModuleRealm, provider: PublicProvider,
   return () => { if (table[provider.name] === binding) delete table[provider.name]; };
 }
 
-/** 生成 ESM 转接，消费者不执行另一份声明源码；版本也是构建缓存身份的一部分。 */
+/** Generate ESM bridges so consumers do not execute duplicate declaration sources; versions also participate in build cache identity. */
 export function publicModuleSource(provider: PublicProvider, realm: ModuleRealm, specifier: string): string {
   const names = provider.modules[realm]?.[specifier];
   if (!names) throw new Error(`Public module ${specifier} is unavailable in ${realm}.`);

@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { RawBuffer } from "./raw-buffer.ts";
 
-describe("终端原始输出范围", () => {
-  // read 的 nextOffset 必须接续实际返回的文本，分页边界不能吞掉代理对。
-  it("跨块的 emoji 在分页边界完整返回，下一页接续剩余内容", () => {
+describe("terminal raw-output ranges", () => {
+  // read's nextOffset must continue from the text actually returned; pagination boundaries must not swallow surrogate pairs.
+  it("returns an emoji spanning chunks intact at a page boundary and continues the remaining content on the next page", () => {
     const buffer = new RawBuffer();
     buffer.push("A\ud83d");
     buffer.push("\ude00B");
@@ -12,8 +12,8 @@ describe("终端原始输出范围", () => {
     expect(buffer.read(first.nextOffset, 2)).toEqual({ text: "B", offset: 3, nextOffset: 4, truncated: false });
   });
 
-  // 单位为 UTF-16 的 limit=1 也必须能读完一个非 BMP 字符，避免分页停滞。
-  it("单单元预算仍能完整读取一个 emoji 并推进偏移", () => {
+  // Even a UTF-16 limit=1 must read a complete non-BMP character to avoid stalling pagination.
+  it("reads a complete emoji and advances the offset even with a single-unit budget", () => {
     const buffer = new RawBuffer();
     buffer.push("😀B");
     const first = buffer.read(0, 1);
@@ -21,16 +21,16 @@ describe("终端原始输出范围", () => {
     expect(buffer.read(first.nextOffset, 1).text).toBe("B");
   });
 
-  // 显式偏移与默认尾读都可能从低代理项开始，返回偏移需反映向前对齐。
-  it("从字符中间开始时返回完整字符及其实际起点", () => {
+  // Both explicit offsets and default tail reads may start at a low surrogate; the returned offset must reflect alignment back to the character start.
+  it("returns the complete character and its actual start when reading begins inside it", () => {
     const buffer = new RawBuffer();
     buffer.push("A😀");
     expect(buffer.read(2, 1)).toEqual({ text: "😀", offset: 1, nextOffset: 3, truncated: false });
     expect(buffer.read(undefined, 1)).toEqual({ text: "😀", offset: 1, nextOffset: 3, truncated: false });
   });
 
-  // 预算是字符数而非整块数；只淘汰整块会多保留一个块。
-  it("跨块超限裁掉最旧块的前缀，偏移仍按累计输入计算", () => {
+  // The budget counts characters rather than whole chunks; evicting only whole chunks would retain an extra chunk.
+  it("clips the oldest chunk's prefix when the limit is exceeded across chunks, keeping offsets based on cumulative input", () => {
     const buffer = new RawBuffer(8);
     buffer.push("abcdef");
     buffer.push("ghijkl");
@@ -38,16 +38,16 @@ describe("终端原始输出范围", () => {
     expect(buffer.read()).toEqual({ text: "efghijkl", offset: 4, nextOffset: 12, truncated: false });
   });
 
-  // 单块超过整个预算时，也只保留该块尾部，并释放先前缓冲。
-  it("单个大块也遵守保留上限", () => {
+  // When a single chunk exceeds the entire budget, retain only its tail and release the previous buffer.
+  it("a single large chunk also respects the retention limit", () => {
     const buffer = new RawBuffer(4);
     buffer.push("old");
     buffer.push("123456");
     expect(buffer.read(0)).toEqual({ text: "3456", offset: 5, nextOffset: 9, truncated: true });
   });
 
-  // 淘汰后孤立的低代理项属于已丢弃字符，不能以半个 emoji 开始返回。
-  it("淘汰边界切开 emoji 时丢弃其剩余半个字符并保持累计位置", () => {
+  // An isolated low surrogate after eviction belongs to an already discarded character; returned text must not start with half an emoji.
+  it("discards the remaining half-character when an eviction boundary splits an emoji, preserving cumulative positions", () => {
     const buffer = new RawBuffer(3);
     buffer.push("😀");
     buffer.push("AB");

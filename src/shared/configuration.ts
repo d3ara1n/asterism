@@ -12,12 +12,12 @@ import { modelCompatibilitySchema } from "./model-compatibility.ts";
 
 const id = z.string().min(1).max(160);
 const name = z.string().trim().min(1).max(160);
-/** 提供商 ID：程序与用户共用的可读 slug，可编辑，不含 `/` 与空白。 */
+/** Provider ID: an editable readable slug shared by code and users, without `/` or whitespace. */
 export const modelProviderIdSchema = z.string().trim().min(1).max(160).regex(/^[^/\s]+$/u, "ModelProvider IDs cannot contain '/' or whitespace.");
-/** 服务端模型 ID：全局共识的模型名，可含 `/`，不含空白。 */
+/** Server model ID: a globally recognized model name allowing `/` but no whitespace. */
 const serverModelId = z.string().trim().min(1).max(160).regex(/^\S+$/u, "Model IDs cannot contain whitespace.");
 export const protocolSchema = z.enum(["openai-responses", "openai-chat", "anthropic"]);
-/** 连接可固定的配置项；认证方式不包含凭据，兼容设置同时约束模型编辑。 */
+/** Connection fields that can be fixed; authentication methods exclude credentials and compatibility settings also constrain model editing. */
 export const modelProviderFixedFieldSchema = z.enum(modelProviderFixedFields);
 export type ModelProviderFixedField = z.infer<typeof modelProviderFixedFieldSchema>;
 const endpoint = z.string().trim().url().refine(value => {
@@ -40,7 +40,7 @@ export const modelInputSchema = z.strictObject({
   providerId: modelProviderIdSchema, name, modelId: serverModelId, enabled: z.boolean(),
   contextWindow: z.number().int().positive().nullable(),
   cost: modelCostSchema.nullable().default(null),
-  // 只保留改变请求内容的能力；文件是否被接受由服务端决定。
+  // Retain only capabilities that change requests; servers decide whether files are accepted.
   capabilities: z.strictObject({ reasoning: z.boolean(), tools: z.boolean(), thinkingLevels: z.array(thinkingSchema) }),
   generation: z.strictObject({
     temperature: z.number().min(0).max(2).nullable(), topP: z.number().min(0).max(1).nullable(),
@@ -60,7 +60,7 @@ export const connectionTestSchema = z.strictObject({
   state: z.enum(["running", "succeeded", "failed", "cancelled"]), startedAt: z.string(),
   durationMs: z.number().nonnegative().nullable(), error: testErrorSchema.nullable(), message: z.string().nullable(),
 });
-/** 发现只保存端点明确声明的资料；缺失字段不代表不支持。 */
+/** Discovery saves only explicitly declared endpoint data; missing fields do not mean unsupported. */
 export const discoveredModelSchema = z.strictObject({
   modelId: serverModelId, name,
   contextWindow: z.number().int().positive().optional(),
@@ -75,7 +75,7 @@ export const modelDiscoverySchema = z.strictObject({
 });
 export type DiscoveredModel = z.infer<typeof discoveredModelSchema>;
 export type ModelDiscovery = z.infer<typeof modelDiscoverySchema>;
-/** 手动新建与发现添加共用初始值；只用已知资料覆盖默认值。 */
+/** Manual creation and discovery additions share initial values; override defaults only with known data. */
 export function createModelInput(providerId: string, model: DiscoveredModel): z.infer<typeof modelInputSchema> {
   return {
     providerId, modelId: model.modelId, name: model.name, enabled: true,
@@ -107,7 +107,7 @@ export const configurationCommandSchema = z.discriminatedUnion("type", [
   z.strictObject({ type: z.literal("webProvider.save"), id: z.string().trim().min(1), enabled: z.boolean(), credential: credentialUpdateSchema }),
   z.strictObject({ type: z.literal("webProvider.reorder"), ids: z.array(z.string().min(1)) }),
   z.strictObject({ type: z.literal("read") }),
-  // 保存目标是当前 ID；value 中的 ID 可以不同，即改名。
+  // Save targets the current ID; a different ID in value means rename.
   z.strictObject({ type: z.literal("modelProvider.save"), id: modelProviderIdSchema.nullable(), value: modelProviderInputSchema, credential: credentialUpdateSchema }),
   z.strictObject({ type: z.literal("model.save"), id: modelExpressionSchema.nullable(), value: modelInputSchema }),
   z.strictObject({ type: z.literal("role.save"), ...target, value: modelRoleOverridesSchema.extend({ id: configurationIdSchema }) }),
@@ -134,7 +134,7 @@ export const configurationResultSchema = z.discriminatedUnion("ok", [
 ]);
 export type ModelProvider = z.infer<typeof modelProviderSchema>;
 export type ModelProviderInput = z.infer<typeof modelProviderInputSchema>;
-/** 缺少编辑规则的连接保持自由配置，不按名称、端点或目录反推来源。 */
+/** Connections without editing rules remain freely configurable; do not infer sources from names, endpoints, or catalogs. */
 export function canEditModelProviderField(provider: Pick<ModelProviderInput, "fixedFields">, field: ModelProviderFixedField): boolean {
   return !provider.fixedFields?.includes(field);
 }
@@ -151,7 +151,7 @@ export interface ConfigurationBridge {
   onChanged(listener: () => void): () => void;
 }
 
-/** 选择器和执行消费共用这一存在性/启用检查，不维护配置引用或级联状态。 */
+/** Selectors and execution share this existence/enabled check without maintaining configuration references or cascaded state. */
 export function resolveProviderModel(snapshot: ConfigurationSnapshot, reference: string | null): { model: ProviderModel; provider: ModelProvider } | null {
   const expression = reference === null ? null : parseModelExpression(reference);
   if (!expression) return null;
@@ -165,8 +165,8 @@ export { resolveAgentModel } from "@asterism/builtin-api/contracts";
 export { availableThinkingLevels } from "@asterism/sdk/contracts";
 
 /**
- * 空值才继承；丢失、停用的配置必须由消费方显式处理，不能偷偷换成其他模型。
- * 隐藏角色只对代理不开放：代理路径使用默认值，内部功能显式传 allowHidden。
+ * Only empty values inherit; consumers explicitly handle missing or disabled configuration without silently substituting models.
+ * Hidden roles are unavailable only to agents: agent paths use defaults while internal features explicitly pass allowHidden.
  */
 export function resolveModelRole(snapshot: ConfigurationSnapshot, roleId: string, current?: { model: string | null; thinking: ThinkingLevel | null }, options: { allowHidden?: boolean } = {}): {
   model: string | null; thinking: ThinkingLevel | null; error: "role_unavailable" | "model_unavailable" | null;

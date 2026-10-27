@@ -28,7 +28,7 @@ function RefreshHeader({ result }: RefreshProps) {
   return <ToolHeader label={i18n.text(skillsMessages.refresh)}
     meta={result?.data && i18n.formatMessage(skillsMessages.count, { count: result.data.count })} />;
 }
-/** 刷新结果只保存技能数与发现问题；完整目录在设置中查看。 */
+/** Refresh results save only skill counts and discovery issues; the full catalog is available in settings. */
 function RefreshBody({ result }: RefreshProps) {
   const data = result?.data;
   return data?.issues.length ? <div className="space-y-1">

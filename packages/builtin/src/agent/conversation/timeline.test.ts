@@ -6,13 +6,13 @@ import type { ModelLiveBlock, SessionSnapshot } from "@asterism/sdk/contracts";
 import { displayedTimeline, generating, mountedTimelineIndexes, savedTimeline, timelineKey, withLive } from "./timeline";
 import type { InlineFeedback } from "../feedback";
 
-/** 与代理卡片相同的两层组合：已保存部分加实时块。 */
+/** The same two-layer composition as the agent card: saved content plus live blocks. */
 const conversationTimeline = (snapshot: SessionSnapshot, agentId: string, live: readonly ModelLiveBlock[], running = live.length > 0) =>
   withLive(savedTimeline(snapshot, agentId, running), live);
 
-describe("代理的具型记录视图", () => {
-  // 显示来源读取结构化 sender，正文内的信封字样不决定归属。
-  it("输入视图保留代理来源及原始正文，用户写入的标签仍是用户消息", () => {
+describe("Agent typed record views", () => {
+  // Displayed source comes from structured sender data; envelope text within the body does not determine attribution.
+  it("Input views preserve agent source and original body text; user-written tags remain part of a user message", () => {
     const sender = { kind: "agent" as const, resource: { sessionId: "s", id: "relay", kind: "example/relay" }, name: "Reviewer" };
     const body = "<agent-message>Literal text</agent-message>";
     const nodes = [node("external", null, input("a", body, true, sender)), node("user", "external", input("a", body))];
@@ -23,14 +23,14 @@ describe("代理的具型记录视图", () => {
     ]);
   });
 
-  // 模型可能只交付思考摘要；显示转换须保留可读内容，但不能改写历史里的明文／摘要字段。
-  it("只有摘要的思考块仍可阅读", () => {
+  // A model may deliver only a thinking summary; display conversion must preserve readable content without rewriting the plain-text/summary fields in history.
+  it("Thinking blocks containing only a summary remain readable", () => {
     const saved = node("summary-only", null, thinking("a", "r", 0, "", { summary: "Saved reasoning summary" }));
     const timeline = conversationTimeline(sessionSnapshot(nodeView("s", "", [saved], saved.id)), "a", []);
     expect(timeline[0]).toMatchObject({ kind: "thinking", text: "Saved reasoning summary", summary: "Saved reasoning summary" });
     expect(saved.data).toMatchObject({ block: { text: "", summary: "Saved reasoning summary" } });
   });
-  it("同一块从内存转入历史时展示身份不变，过渡快照不重复展示", () => {
+  it("A block keeps its display identity when moving from memory to history, without duplicate display in transitional snapshots", () => {
     const live = { id: "r:0", responseId: "r", ordinal: 0, kind: "thinking" as const, text: "thinking", startedAt: 1000, endedAt: null };
     const saved = node("saved-id", null, thinking("a", "r", 0, live.text));
     const before = conversationTimeline(sessionSnapshot(nodeView("s", "", [], null)), "a", [live]);
@@ -40,7 +40,7 @@ describe("代理的具型记录视图", () => {
     expect(after[0]).toMatchObject({ id: saved.id, kind: "thinking", text: "thinking", complete: true });
   });
 
-  it("临时反馈固定在发生位置，重试不搬动，其他分支隐藏且不产生历史", () => {
+  it("Temporary feedback stays at its occurrence position through retries, is hidden on other branches, and creates no history", () => {
     const message = node("input", null, input("a", "Question"));
     const block = node("partial", message.id, text("a", "r", 0, "Partial", { complete: false, requestParentId: message.id }));
     const retried = node("retried", block.id, text("a", "next-response", 0, "Retried", { requestParentId: block.id }));
@@ -57,8 +57,8 @@ describe("代理的具型记录视图", () => {
     expect(savedTimeline(snapshot, "a", false).items.map(item => item.id)).toEqual(["input", "partial", "retried"]);
   });
 
-  // 同轮多个请求只有一份尾部概要，历史概要不因下一轮执行而消失。
-  it("各轮计量插入对应轮尾，运行中只隐藏当前轮的概要", () => {
+  // Multiple requests in one turn have only one trailing summary; historical summaries do not disappear when the next turn runs.
+  it("Inserts each turn's measurements at its end and hides only the current turn's summary while running", () => {
     const completion = { finishReason: "stop", rawFinishReason: null, providerResponseId: null,
       usage: { input: 100, output: 10, total: 110, cacheRead: 50, cacheWrite: null, reasoning: null } };
     const nodes = [
@@ -77,8 +77,8 @@ describe("代理的具型记录视图", () => {
     expect(settled.at(-1)).toMatchObject({ kind: "turn-metrics", metrics: { count: 1 }, replyMarkdown: "Latest" });
   });
 
-  // 成型块落库后也带 endedAt=null（未结束即收束）；只有实时块才算生成中，否则中断的块会永远以流式渲染、计时不停。
-  it("已保存的未结束块保留生成起止但不算生成中，实时块未结束才算", () => {
+  // Persisted formed blocks may also have endedAt=null (settled before completion); only live blocks count as generating, or interrupted blocks would stream-render and keep timing forever.
+  it("Saved unfinished blocks retain generation start and end data without counting as generating; only unfinished live blocks do", () => {
     const saved = node("cut", null, thinking("a", "r", 0, "partial", { complete: false }));
     Object.assign((saved.data as { block: object }).block, { startedAt: 1000, endedAt: null });
     const [item] = conversationTimeline(sessionSnapshot(nodeView("s", "", [saved], saved.id)), "a", []);
@@ -89,8 +89,8 @@ describe("代理的具型记录视图", () => {
     expect(generating({ ...live, endedAt: 2000 })).toBe(false);
   });
 
-  // 虚拟列表卸载实时块会重放流式动画并丢失进行中的状态；末项是跟随输出的锚点。
-  it("实时块与末项始终挂载，已保存条目随滚动回收；空思考块不占列表位置", () => {
+  // Unmounting live blocks in the virtual list replays streaming animations and loses in-progress state; the last item anchors output following.
+  it("Live blocks and the last item stay mounted while saved items are recycled during scrolling; empty thinking blocks occupy no list position", () => {
     const nodes = [node("u1", null, input("a", "First")), node("a1", "u1", text("a", "r1", 0, "Saved"))];
     const snapshot = sessionSnapshot(nodeView("s", "", nodes, "a1"));
     const live = [

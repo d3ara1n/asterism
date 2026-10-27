@@ -21,7 +21,7 @@ type BufferedBlock = {
 };
 export type LiveCall = BufferedBlock & { part: Extract<StreamPart, { kind: "toolcall" }> };
 
-/** 一次响应的内存状态机：拒绝乱序/重复事件，只有完整参数才能进入工具执行。 */
+/** In-memory state machine for one response: rejects out-of-order/duplicate events; only complete arguments can enter tool execution. */
 export class ResponseBuffer {
   private readonly blocks = new Map<string, BufferedBlock>();
   private readonly callIds = new Set<string>();
@@ -61,7 +61,7 @@ export class ResponseBuffer {
       if ([...this.blocks.values()].some(block => block.endedAt === null)) {
         throw new ModelFailure("incomplete", "The model response ended with incomplete blocks. No tools were executed.", undefined, "model");
       }
-      // 终态到达后，正文与计量一同提交；工具块继续等待各自结局。
+      // Commit text and metering together after terminal state arrives; tool blocks keep waiting for their outcomes.
       for (const block of this.blocks.values()) if (block.part.kind !== "toolcall") this.emitBlock(block, true);
       return;
     }
@@ -88,7 +88,7 @@ export class ResponseBuffer {
     return block?.part.kind === "toolcall" && block.endedAt === null;
   }
 
-  /** 宽容解析只用于即时展示，不能覆盖执行参数或未完成历史的参数。 */
+  /** Tolerant parsing serves live display only; it cannot replace execution arguments or arguments in incomplete history. */
   async preview(identity: (name: string, args: Json) => ToolInvocationInfo): Promise<void> {
     for (const block of this.calls()) {
       if (block.emitted || block.executing) continue;
@@ -131,7 +131,7 @@ export class ResponseBuffer {
     call.result = { kind: "running", data };
   }
 
-  /** 收束剩余块；未结束的正文与未执行调用在块内标记不完整，不另发终态记录。 */
+  /** Finalize remaining blocks; mark unfinished text and unexecuted calls incomplete within blocks without a separate terminal record. */
   close(): void {
     if (this.finalized) return;
     for (const block of this.blocks.values()) {

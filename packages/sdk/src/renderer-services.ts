@@ -8,7 +8,7 @@ import type { EventSubscriber } from "./events.ts";
 import type { ResourceDescription } from "./renderer.ts";
 import type { UiText } from "./i18n.ts";
 
-/** 静态资源类型展示目录；查询描述不授予资源实例访问权限。 */
+/** Static resource type presentation catalog; querying descriptions grants no access to resource instances. */
 export interface RendererResources {
   list(): readonly ResourceDescription[];
   get(kind: string): ResourceDescription;
@@ -27,7 +27,7 @@ const Models = createContext<RendererModels | null>(null);
 const Navigation = createContext<RendererNavigation | null>(null);
 const Events = createContext<EventSubscriber | null>(null);
 export const RendererEventsProvider = Events.Provider;
-/** 全局具型订阅；组件应在 effect 清理时关闭自己建立的订阅。 */
+/** Global typed subscriptions; components should close subscriptions they establish during effect cleanup. */
 export function useRendererEvents(): EventSubscriber { return required(useContext(Events), "events"); }
 export const RendererResourcesProvider = Resources.Provider;
 export const RendererCatalogsProvider = Catalogs.Provider;
@@ -44,7 +44,7 @@ export function useRendererTools(): RendererTools { return required(useContext(T
 export function useRendererModels(): RendererModels { return required(useContext(Models), "models"); }
 export function useRendererNavigation(): RendererNavigation { return required(useContext(Navigation), "navigation"); }
 
-/** 渲染层读取插件配置：宿主按契约解码，设置页保存后随变更通知更新；只能读取本插件的配置。 */
+/** Renderer access to plugin configuration: the host decodes by contract and updates on change notifications after settings are saved; can read only this plugin's configuration. */
 export interface RendererConfiguration<T extends Json> {
   value: T;
   status: "saved" | "defaults" | "invalid";
@@ -62,7 +62,7 @@ export const RendererConfigsProvider = Configs.Provider;
 export function useRendererConfig<T extends Json>(contract: ConfigContract<T>): T {
   return required(useContext(Configs), "configs").get(contract).value;
 }
-/** 自定义设置页使用托管配置；写入在后台校验，成功后同步发布新快照。 */
+/** Custom settings pages use managed configuration; writes are validated in the backend, and successful writes synchronously publish a new snapshot. */
 export function useRendererConfiguration<T extends Json>(contract: ConfigContract<T>) {
   const configs = required(useContext(Configs), "configs");
   return { ...configs.get(contract), save: (value: T) => configs.save(contract, value), reset: () => configs.reset(contract), refresh: configs.refresh };
@@ -71,5 +71,5 @@ export function useRendererConfiguration<T extends Json>(contract: ConfigContrac
 export interface RendererSettingsNavigation { open(pluginId: string, location?: string): void }
 const SettingsNavigation = createContext<RendererSettingsNavigation | null>(null);
 export const RendererSettingsNavigationProvider = SettingsNavigation.Provider;
-/** 打开插件设置，无需绑定当前资源或会话。 */
+/** Open plugin settings without binding the current resource or session. */
 export function useRendererSettings(): RendererSettingsNavigation { return required(useContext(SettingsNavigation), "settings navigation"); }

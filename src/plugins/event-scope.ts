@@ -5,7 +5,7 @@ import type { EventQueue } from "../shared/event-queue.ts";
 import { eventSubscriptionFailure, type EventBus, type EventPacket } from "./events.ts";
 import type { RunGroup } from "./lifecycle.ts";
 
-/** 插件装配与全局总线之间的适配：延后建立订阅，并将消费交给既有运行生命周期。 */
+/** Adapter between plugin assembly and the global bus: defer subscription establishment and delegate consumption to the existing run lifetime. */
 export class PluginEventScope {
   private subscriptions = new Map<EventSubscriptionState, () => void>();
   private phase: "initializing" | "active" | "closed" = "initializing";
@@ -20,7 +20,7 @@ export class PluginEventScope {
           if (queue) queue.end(end);
           else this.subscriptions.delete(state);
         });
-        // 建立失败经 ready／closed 交付，不抛出，避免中断 activate 中其余订阅的建立。
+        // Deliver establishment failure through ready/closed without throwing, so other subscriptions can still be established during activate.
         const start = () => {
           if (!state.active) return;
           try {

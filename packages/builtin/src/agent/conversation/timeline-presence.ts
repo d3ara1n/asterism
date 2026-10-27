@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 import { timelineKey, type TimelineItem } from "./timeline";
 
-/** 退场条目仍占有虚拟列表中的有效位置，Motion 完成后才释放；离屏条目直接移除。 */
+/** Exiting items retain valid virtual-list positions until Motion finishes; offscreen items are removed directly. */
 export function retainExitingItems(
   previous: readonly TimelineItem[], target: readonly TimelineItem[],
   mounted: ReadonlySet<string>, owners: ReadonlyMap<string, string>,
@@ -16,11 +16,11 @@ export function retainExitingItems(
     const item = previous[index]!, key = timelineKey(item);
     if (keys.has(key)) { next = key; continue; }
     if (!mounted.has(key)) continue;
-    // 自动收束会新增概要行，退场过程仍在它上方。
+    // Automatic folding adds a summary row; exiting process items stay above it.
     const owner = owners.get(key);
     const replacement = owner && keys.has(owner) ? owner
       : item.kind === "compression" && item.status === "running" && completedCompression ? timelineKey(completedCompression) : null;
-    // 中途补充等仍可见的后继若更靠前，过程继续留在它之前，退场期间也保持阅读顺序。
+    // If a still-visible successor such as an intervening supplemental message comes earlier, process items stay before it, preserving reading order during exit.
     const anchor = replacement && (next === null || positions.get(replacement)! < positions.get(next)!) ? replacement : next;
     const entries = before.get(anchor) ?? [];
     entries.unshift(item);
@@ -29,7 +29,7 @@ export function retainExitingItems(
   return [...target.flatMap(item => [...(before.get(timelineKey(item)) ?? []), item]), ...(before.get(null) ?? [])];
 }
 
-/** 只协调虚拟列表的条目存在性；动画时序及中途反向由 AnimatePresence 负责。 */
+/** Coordinates only item presence in the virtual list; AnimatePresence handles animation timing and mid-animation reversal. */
 export function useTimelinePresence(target: readonly TimelineItem[], owners: ReadonlyMap<string, string>, reducedMotion: boolean) {
   const mounted = useRef(new Set<string>());
   const entering = useRef(new Set<string>());

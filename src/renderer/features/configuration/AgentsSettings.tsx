@@ -27,7 +27,7 @@ const NONE = "__none";
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 const baseOf = (snapshot: ConfigurationSnapshot, agent?: AgentConfiguration): Base => snapshot.defaults.agents[agent?.builtin ? agent.id : "worker"]!;
 
-/** 覆盖归一：空白文本撤下；与内置值相同的字段撤下；工具允许/排除作为一组比较。 */
+/** Override normalization: remove blank text and fields matching built-in values; compare tool allow/exclude lists as a pair. */
 function normalize(draft: AgentOverrides, base: Base): AgentOverrides {
   const result: Record<string, unknown> = {};
   for (const [key, raw] of Object.entries(draft)) {
@@ -46,7 +46,7 @@ function normalize(draft: AgentOverrides, base: Base): AgentOverrides {
   return result as AgentOverrides;
 }
 
-/* ---------- 列表 ---------- */
+/* ---------- List ---------- */
 
 export function AgentsSettings() {
   const i18n = useI18n();
@@ -90,9 +90,9 @@ function AgentRow({ agent, snapshot, selected, onOpen }: {
     </>} />;
 }
 
-/* ---------- 编辑器公共件 ---------- */
+/* ---------- Shared editor components ---------- */
 
-/** 字段标签行：右侧在偏离内置值时给出“已修改 · 恢复”。 */
+/** Field label row: shows “Modified · Reset” on the right when the value differs from the built-in value. */
 function Label({ htmlFor, children, modified, onRestore }: { htmlFor?: string; children: ReactNode; modified?: boolean; onRestore?: () => void }) {
   return <div className="flex items-center justify-between gap-2">
     <FieldLabel htmlFor={htmlFor}>{children}</FieldLabel>
@@ -101,8 +101,8 @@ function Label({ htmlFor, children, modified, onRestore }: { htmlFor?: string; c
 }
 
 /**
- * 模型角色选择：“无”项仅在界面使用哨兵值，保存时写为 null；default 是真实角色，按普通 ID 保存。
- * 隐藏角色不向代理开放，停用角色在软件内不可用，均不进入选项；已引用的此类或失效角色以禁用项显示，避免选择框丢失当前值。
+ * Model role selection: the “None” item uses a sentinel only in the UI and saves as null; default is a real role saved as a normal ID.
+ * Hidden roles are unavailable to agents, and disabled roles are unavailable in the application; neither appears among choices. Existing references to these or invalid roles appear as disabled items so the selector retains its current value.
  */
 function RoleSelect({ id, value, onChange }: { id: string; value: string | null; onChange: (value: string | null) => void }) {
   const i18n = useI18n();
@@ -123,7 +123,7 @@ function RoleSelect({ id, value, onChange }: { id: string; value: string | null;
   </Select>;
 }
 
-/** chip 输入：回车或逗号添加，× 删除，空输入退格删除末项。 */
+/** Chip input: Enter or comma adds, × removes, and Backspace on empty input removes the last item. */
 function TagInput({ id, value, onChange, placeholder }: { id: string; value: string[]; onChange: (value: string[]) => void; placeholder: string }) {
   const i18n = useI18n();
   const [text, setText] = useState("");
@@ -144,7 +144,7 @@ function TagInput({ id, value, onChange, placeholder }: { id: string; value: str
   </div>;
 }
 
-/* ---------- 编辑器 ---------- */
+/* ---------- Editor ---------- */
 
 type ToolMode = "all" | "allow" | "exclude";
 type DelegateMode = "all" | "list" | "none";
@@ -158,7 +158,7 @@ function AgentEditor({ initialId, onSaved }: { initialId: string | null; onSaved
   const [id, setId] = useState(initialId);
   const [slug, setSlug] = useState(initialId ?? "");
   const current = snapshot?.agents.find(agent => agent.id === id);
-  // 启用是列表行内的即时操作，草稿不持有，避免互相覆盖。
+  // Enabling is an immediate row action; the draft does not hold it, preventing mutual overwrites.
   const strip = ({ enabled: _enabled, ...rest }: AgentOverrides): AgentOverrides => rest;
   const [draft, setDraft] = useState<AgentOverrides>(() => strip(id ? snapshot?.overrides.agents[id] ?? {} : {}));
   const [toolLists, setToolLists] = useState<{ allow: string[]; exclude: string[] }>({ allow: [], exclude: [] });
@@ -175,7 +175,7 @@ function AgentEditor({ initialId, onSaved }: { initialId: string | null; onSaved
   const dirty = !current || slug !== id || !same(normalized, stored);
   const modified = (field: keyof AgentOverrides) => field in normalized;
 
-  // 工具策略：两侧一组
+  // Tool policy: both sides form one group
   const groupOverridden = draft.tools !== undefined || draft.excludeTools !== undefined;
   const tools = groupOverridden ? draft.tools ?? null : base.tools;
   const excluded = groupOverridden ? draft.excludeTools ?? null : base.excludeTools;
@@ -190,7 +190,7 @@ function AgentEditor({ initialId, onSaved }: { initialId: string | null; onSaved
   };
   const setToolList = (list: string[]) => setDraft(previous => ({ ...previous, tools: toolMode === "allow" ? list : null, excludeTools: toolMode === "exclude" ? list : null }));
 
-  // 委派：null 不限定，空列表不允许，非空为名单
+  // Delegation: null is unrestricted, an empty list disallows all, and a nonempty list specifies allowed entries
   const delegates = effective("subagentRoles");
   const derivedDelegate: DelegateMode = delegates === null ? "all" : delegates.length ? "list" : "none";
   const shownDelegate = delegateMode ?? derivedDelegate;

@@ -31,9 +31,9 @@ function plugin(id: string, contract: ToolContract, options: { extra?: ToolContr
   }))] });
 }
 
-describe("插件装配", () => {
-  // 插件级调用无需对象，契约作用域不能被调用参数降级。
-  it("无模块的插件声明全局服务，后台和桌面调用共用作用域校验", async () => {
+describe("Plugin assembly", () => {
+  // Plugin-level calls need no object; call arguments cannot downgrade contract scope.
+  it("plugins without modules declare global services and share scope validation between backend and desktop calls", async () => {
     const ns = pluginNamespace("test.global");
     const query = defineCall(ns.name("query"), { scope: "plugin", input: z.string().trim(), output: z.string() });
     const objectQuery = defineCall(ns.name("object"), { scope: "object", input: z.null(), output: z.null() });
@@ -57,13 +57,13 @@ describe("插件装配", () => {
     await expect(loaded.calls.invoke(objectQuery.id, null, { object }, null)).rejects.toMatchObject({ code: "unavailable" });
     await expect(loaded.calls.invoke(query.id, 42, {}, null)).rejects.toMatchObject({ code: "invalid_argument" });
   });
-  // 共享服务必须等模块释放；根与模块的贡献仍经过同一冲突校验。
-  it.each([false, true])("插件根共享服务在模块之后清理，重复登记失败=%s", async conflict => {
+  // Shared services must outlive module release; root and module contributions use the same conflict validation.
+  it.each([false, true])("plugin root shared services clean up after modules; duplicate registration failure=%s", async conflict => {
     const ns = pluginNamespace("test.composition"), order: string[] = [];
     const query = defineCall(ns.name("query"), { scope: "plugin", input: z.null(), output: z.number() });
     const loaded = load([definePlugin({ namespace: ns, version: "1", setup(plugin) {
       const service = { value: 1 };
-      // 根先于模块登记，逆序清理使模块先释放。
+      // Roots register before modules so reverse cleanup releases modules first.
       plugin.lifetime.defer(async () => { service.value = 0; order.push("plugin"); });
       return {
         calls: [implementCall(query, async () => service.value)],
@@ -77,8 +77,8 @@ describe("插件装配", () => {
     await loaded.close(); await loaded.close();
     expect(order).toEqual(["module", "plugin"]);
   });
-  // 插件级调用不关联任何会话，但关闭依然必须等处理器真实退出再销毁共享服务。
-  it("关闭取消全局调用，处理器清理完成前保留插件服务", async () => {
+  // Plugin-level calls have no session association, but close must wait for actual handler exit before destroying shared services.
+  it("close cancels global calls and retains plugin services until handler cleanup finishes", async () => {
     const ns = pluginNamespace("test.wait");
     const wait = defineCall(ns.name("wait"), { scope: "plugin", input: z.null(), output: z.null() });
     let started!: () => void, release!: () => void, cancelled!: () => void;
@@ -100,7 +100,7 @@ describe("插件装配", () => {
     finally { release(); await result; await closing; }
     expect(order).toEqual(["handler", "plugin"]);
   });
-  it("记录可复用同一声明，独立副本即使 ID 相同也使装配失败", () => {
+  it("records can reuse the same declaration; independent copies fail assembly even with identical IDs", () => {
     const ns = pluginNamespace("test.records"), record = defineRecord(ns.name("record"), { schema: z.number() });
     const plugin = (other: typeof record) => definePlugin({ namespace: ns, version: "1", modules: [
       defineModule(() => ({ records: [record] })), defineModule(() => ({ records: [other] })),
@@ -110,14 +110,14 @@ describe("插件装配", () => {
     expect(shared.manifest[0]?.status).toBe("loaded");
     expect(conflict.manifest[0]?.status).toBe("failed");
   });
-  it("单个插件装配失败只禁用它本身", () => {
+  it("assembly failure disables only the affected plugin", () => {
     const broken = definePlugin({ namespace: pluginNamespace("acme.broken"), version: "1.0.0", modules: [defineModule(() => { throw new Error("boom"); })] });
     const loaded = load([broken, plugin("acme.ok", tool("Read."))]);
     expect(loaded.manifest.map(entry => [entry.id, entry.status])).toEqual([["acme.broken", "failed"], ["acme.ok", "loaded"]]);
     expect(loaded.resources.controller("acme.ok/thing")?.create).toBeUndefined();
     expect(loaded.manifest[0]!.error).toBe("boom");
   });
-  it("后续模块失败时逆序清理已初始化模块，关闭不会重复清理", async () => {
+  it("later module failure cleans initialized modules in reverse order and close does not clean them twice", async () => {
     const calls: string[] = [];
     const broken = definePlugin({ namespace: pluginNamespace("acme.cleanup"), version: "1", modules: [
       defineModule(plugin => { plugin.lifetime.defer(async () => { plugin.models.list(); calls.push("first"); }); return {}; }),
@@ -129,7 +129,7 @@ describe("插件装配", () => {
     await loaded.close(); await loaded.close();
     expect(calls).toEqual(["second", "first"]);
   });
-  it("失败消费者的异步清理结束前不释放仍有效的公共提供方", async () => {
+  it("valid public providers remain until failed consumers finish asynchronous cleanup", async () => {
     const calls: string[] = [];
     let release!: () => void;
     const held = new Promise<void>(resolve => { release = resolve; });
@@ -148,7 +148,7 @@ describe("插件装配", () => {
     } finally { release(); await closing; }
     expect(calls).toEqual(["consumer", "provider"]);
   });
-  it("后置契约校验失败先收集依赖失败，再按消费者到提供方清理", async () => {
+  it("post-assembly contract validation failures collect dependency failures before cleaning consumers ahead of providers", async () => {
     const calls: string[] = [], ns = pluginNamespace("acme.provider");
     const action = defineAction(ns.resource("thing", z.object({})), { id: ns.name("missing"), schema: z.null() });
     const provider = definePlugin({ namespace: ns, version: "1", modules: [defineModule(plugin => {
@@ -162,8 +162,8 @@ describe("插件装配", () => {
     await loaded.close();
     expect(calls).toEqual(["consumer", "provider"]);
   });
-  // 同一次装配中 setup 与后置校验分别失败，不能由两条清理任务越过依赖顺序。
-  it("提供方后置校验失败仍等待消费者 setup 失败后的异步清理", async () => {
+  // setup and post-validation may fail separately in one assembly; two cleanup tasks must not bypass dependency order.
+  it("provider post-validation failures still wait for asynchronous cleanup after consumer setup failures", async () => {
     const calls: string[] = [], ns = pluginNamespace("acme.provider");
     let release!: () => void, started!: () => void;
     const held = new Promise<void>(resolve => { release = resolve; });
@@ -185,8 +185,8 @@ describe("插件装配", () => {
     } finally { release(); await loaded.close(); }
     expect(calls).toEqual(["consumer", "provider"]);
   });
-  // 新契约全局替换 schema；后续引用旧声明不能把旧契约重新激活。
-  it("同名新契约全局生效，旧契约的后续引用保持下线", () => {
+  // New contracts replace schemas globally; later old-declaration references cannot reactivate old contracts.
+  it("new same-name contracts take effect globally while subsequent old-contract references remain inactive", () => {
     const shared = tool("Shared read.");
     const replacement = defineTool({ ...tool("Other read.", "test.tools/other-read"),
       argsSchema: z.strictObject({ query: z.string() }).describe("New read parameters.") });
@@ -202,8 +202,8 @@ describe("插件装配", () => {
     expect(active?.tool.argsSchema.parse({ query: "text" })).toEqual({ query: "text" });
     expect(order.manifest.flatMap(entry => entry.implementations.map(item => item.active))).toEqual([false, true, true]);
   });
-  // 同契约只替换指定资源类型；公共依赖初始化次序不能改变用户列表的覆盖优先级。
-  it("共享契约的同资源实现由用户列表后者替换，其他资源实现保留", () => {
+  // Replace only the specified resource type for a shared contract; public dependency initialization order must not alter user-list override precedence.
+  it("later user-list entries replace same-resource implementations of shared contracts while other resource implementations remain", () => {
     const shared = tool("Shared read.");
     const resource = pluginNamespace("acme.a").resource("thing", z.object({}));
     const original = plugin("acme.a", shared, { resource });
@@ -217,8 +217,8 @@ describe("插件装配", () => {
     expect(loaded.tools.match({ id: "b", kind: "acme.b/thing", title: "B", data: {} }).map(item => item.reference.id))
       .toEqual(["acme.b/thing.read"]);
   });
-  // 同插件内的重复支持关系是声明错误，不能冒充两个插件的有序覆盖。
-  it("同插件重复实现使该插件失败，并保留此前的有效实现", () => {
+  // Duplicate support relationships within one plugin are declaration errors, not ordered overrides from separate plugins.
+  it("duplicate implementations fail the plugin and retain previous valid implementations", () => {
     const shared = tool("Shared read.");
     const resource = pluginNamespace("acme.a").resource("thing", z.object({}));
     const loaded = load([plugin("acme.a", shared, { resource }), plugin("acme.bad", shared, { extra: [shared], resource })]);
@@ -226,18 +226,18 @@ describe("插件装配", () => {
     expect(loaded.tools.match({ id: "a", kind: resource.kind, title: "A", data: {} }).map(item => item.reference.id))
       .toEqual(["acme.a/thing.read"]);
   });
-  it("同一插件内同名异契约使该插件装配失败", () => {
+  it("same names with different contracts within one plugin fail its assembly", () => {
     const loaded = load([plugin("acme.self", tool("One."), { extra: [tool("Two.", "test.tools/second-read")] })]);
     expect(loaded.manifest[0]).toMatchObject({ status: "failed", error: expect.any(String) });
   });
-  it("不同插件重新声明相同工具 ID 时明确失败，不合并或替换声明", () => {
+  it("different plugins redeclaring the same tool ID fail explicitly without merging or replacing declarations", () => {
     const original = tool("Original.");
     const loaded = load([plugin("acme.a", original), plugin("acme.b", tool("Modified."))]);
     expect(loaded.manifest[0]!.status).toBe("loaded");
     expect(loaded.manifest[1]).toMatchObject({ status: "failed", error: expect.any(String) });
   });
-  // 同插件内的名称／身份冲突及宿主保留名不参与覆盖，错误仅禁用贡献插件。
-  it.each(["name", "id", "host"] as const)("顶层工具 %s 冲突使插件装配失败", conflict => {
+  // Name/identity conflicts within one plugin and reserved host names do not participate in overrides; errors disable only the contributing plugin.
+  it.each(["name", "id", "host"] as const)("top-level tool %s conflicts fail plugin assembly", conflict => {
     const ns = pluginNamespace("acme.bad");
     const declaration = defineTopLevelTool({
       id: ns.name("first"), name: conflict === "host" ? "resource_call" : "ask_user",
@@ -259,8 +259,8 @@ describe("插件装配", () => {
   });
 });
 
-describe("插件缺席", () => {
-  it("缺失实现的资源仍可投影原始数据，inspect 与调用返回可区分错误", async () => {
+describe("Absent plugins", () => {
+  it("resources without implementations still project raw data and return distinct errors from inspect and calls", async () => {
     const { ResourceRegistry } = await import("../resources/registry.ts");
     const { ToolRegistry } = await import("../tools/registry.ts");
     const { AgentCapabilities } = await import("../execution/capabilities.ts");

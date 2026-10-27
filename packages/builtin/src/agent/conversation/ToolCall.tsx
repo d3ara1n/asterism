@@ -19,7 +19,7 @@ const labels = {
   rejected: toolsMessages.toolRejected, cancelled: toolsMessages.toolCancelled, unknown: toolsMessages.toolUnknown,
 };
 
-/** 外壳只管理生命周期和展开；两个内容入口独立回退，更新和落库不重置展开。 */
+/** The shell manages only lifecycle and expansion; the two content entry points fall back independently, and updates or persistence do not reset expansion. */
 export function ToolCall({ node }: { node: ToolCallNode }) {
   const i18n = useI18n();
   const tools = useRendererTools();

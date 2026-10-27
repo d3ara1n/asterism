@@ -3,7 +3,7 @@ import { app, ipcMain } from "electron";
 import { applicationStorage } from "../shared/application.ts";
 import { parseUiState, preferencesGetChannel, preferencesSetChannel, preferenceWriteSchema, type UiState, type UiStateKey } from "../shared/ui-state.ts";
 
-/** 界面状态统一存于 userData 下的 ui-state.json；属于缓存，不迁移、不备份，文件损坏即重置。 */
+/** UI state is centralized in ui-state.json under userData; it is a cache without migration or backup and resets on corruption. */
 let store: Store<Partial<UiState>> | null = null;
 function open(): Store<Partial<UiState>> {
   store ??= new Store<Partial<UiState>>({ cwd: app.getPath("userData"), name: applicationStorage.uiStateStore, clearInvalidConfig: true });
@@ -21,8 +21,8 @@ export function writeUiState<K extends UiStateKey>(key: K, value: UiState[K]): v
 }
 
 /**
- * renderer 只能经此读写 preferences 容器内的键；其他界面状态键不开放。
- * 读取一次返回整个容器，写入按单键替换，null 表示删除。返回注销函数。
+ * The renderer can access only keys within the preferences container here; other UI state keys are not exposed.
+ * Reads return the whole container; writes replace individual keys and null deletes them. Returns an unregister function.
  */
 export function servePreferences(trusted: (event: Electron.IpcMainInvokeEvent) => boolean): () => void {
   ipcMain.removeHandler(preferencesGetChannel);

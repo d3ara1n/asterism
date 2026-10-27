@@ -20,7 +20,7 @@ function quota(value: z.infer<typeof detail>, id: string, label: QuotaItem["labe
     value: { type: "quantity", limit: value.limit, remaining: value.remaining ?? Math.max(0, value.limit - value.used!), unit: messages.planUnits },
     window: { mode: "unknown", durationMs, resetAt: value.resetTime ?? value.resetAt ?? value.reset_time ?? value.reset_at ?? null } };
 }
-/** 周汇总与重复周窗口只显示一次；保留绝对额度，不把未知计量单位解释为请求或 tokens。 */
+/** Shows weekly summaries and duplicate weekly windows only once; retains absolute allowances without interpreting unknown units as requests or tokens. */
 export function parseKimiQuota(raw: unknown): UsageItem[] {
   const data = parseUsageResponse(response, raw);
   const windows = new Map<string, QuotaItem>();

@@ -1,7 +1,7 @@
 import { mcpServerSchema, SERVER_ID_PATTERN, type McpServerConfig } from "./contract.ts";
 import { parseArgumentLines, parseCredentialLines } from "./catalog.ts";
 
-/** 编辑中的服务器：参数、空闲秒数与键值条目保留原文，完成时再解析，输入过程中的换行与空值不被即时规整。 */
+/** Server being edited: arguments, idle seconds, and key-value entries retain their raw text until completion; newlines and empty values are not normalized during input. */
 export interface McpDraft {
   server: McpServerConfig;
   args: string;
@@ -23,7 +23,7 @@ export function draftOf(server: McpServerConfig, entries: Record<string, string>
   return { server: structuredClone(server), args: server.args.join("\n"), idle: String(server.idleSeconds), entries: entriesText(entries), create, idEdited: false };
 }
 
-/** 逐字段给出错误；taken 为其他服务器已占用的 ID。eager 模式不显示空闲秒数，空闲值无效时沿用原值。 */
+/** Reports errors by field; taken contains IDs used by other servers. eager mode hides idle seconds and retains the original value when the idle value is invalid. */
 export function validateDraft(draft: McpDraft, taken: readonly string[]): McpDraftResult {
   const { server } = draft, errors: Partial<Record<McpField, McpFieldError>> = {};
   if (!server.name.trim()) errors.name = "required";
@@ -35,7 +35,7 @@ export function validateDraft(draft: McpDraft, taken: readonly string[]): McpDra
   if (server.transport === "stdio" && !server.command.trim()) errors.command = "required";
   if (server.transport === "http") {
     let valid = false;
-    try { valid = ["http:", "https:"].includes(new URL(server.url).protocol); } catch { /* 无效地址。 */ }
+    try { valid = ["http:", "https:"].includes(new URL(server.url).protocol); } catch { /* Invalid address. */ }
     if (!valid) errors.url = server.url.trim() ? "invalidUrl" : "required";
   }
   const idle = Number(draft.idle);

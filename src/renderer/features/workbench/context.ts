@@ -4,7 +4,7 @@ import type { WorkbenchSnapshot } from "../../../shared/workbench";
 import type { SessionController } from "../session/controller";
 import type { WorkbenchCanvas } from "./canvas";
 
-/** 工作台向卡片与更深浮岛提供的环境；卡片节点数据只保留对象与视图状态。 */
+/** Environment provided by the workbench to cards and deeper islands; card node data retains only objects and view state. */
 export interface WorkbenchEnvironment {
   controller: SessionController;
   session: WorkbenchSnapshot;
@@ -17,15 +17,15 @@ export type WorkbenchView = WorkbenchEnvironment & {
 };
 
 /**
- * 更深浮岛与聚焦浮岛由 Screen 渲染，不在工作台的 React 子树内；
- * 应用持有一份 store，当前工作台把最新环境写入其中，浮岛经 WorkbenchScope 订阅。
+ * Deeper islands and the focus island are rendered by Screen outside the workbench's React subtree;
+ * the application holds a store, the current workbench writes its latest environment into it, and islands subscribe through WorkbenchScope.
  */
 export class WorkbenchStore {
   private value: WorkbenchView | null = null;
   private listeners = new Set<() => void>();
   get = (): WorkbenchView | null => this.value;
   set(value: WorkbenchView): void { this.value = value; this.listeners.forEach(listener => listener()); }
-  /** 撤回仍为当前值的环境；已被其他工作台覆盖时无效。 */
+  /** Withdraw the environment only if it is still current; no effect after another workbench has replaced it. */
   clear(value: WorkbenchView): void {
     if (this.value !== value) return;
     this.value = null; this.listeners.forEach(listener => listener());
@@ -36,8 +36,8 @@ export class WorkbenchStore {
 export const WorkbenchContext = createContext<WorkbenchView | null>(null);
 
 /**
- * 浮岛绑定所属会话：只接受该会话的环境，切换会话后保留最后一份，
- * 让退场中的浮岛继续呈现原内容；所属会话的环境就绪前不渲染内容。
+ * Islands are bound to their session: accept only that session's environment and retain the last one after switching sessions,
+ * allowing exiting islands to continue showing their original content; render nothing until their session's environment is ready.
  */
 export function WorkbenchScope({ store, sessionId, children }: { store: WorkbenchStore; sessionId: string; children: ReactNode }) {
   const current = useSyncExternalStore(store.subscribe, store.get);

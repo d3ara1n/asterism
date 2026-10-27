@@ -15,7 +15,7 @@ function parse<T>(schema: z.ZodType<T>, input: unknown, subject: string): T {
   if (!result.success) throw new PluginApiError("invalid_argument", validationMessage(result.error, subject));
   return result.data;
 }
-/** 创建与动作在宿主完成校验后调用；类型只在贡献装配处擦除。 */
+/** Creation and actions are invoked after host validation; types are erased only during contribution assembly. */
 export function implementCreation<I, S extends Json, O extends Json>(contract: CreationContract<I, S, O>, definition: {
   prepare?(input: NoInfer<O>, context: CreationPreparation): Preparation<NoInfer<I> & Json> | Promise<Preparation<NoInfer<I> & Json>>;
   create(input: NoInfer<O>, object: ObjectExecutor): { title: string; data: NoInfer<S> };
@@ -45,7 +45,7 @@ export function implementResource<S extends Json, V extends Json>(
     inspect(data: NoInfer<S>, object: ObjectReader): Promise<Json>;
     context?(data: NoInfer<S>, object: ObjectReader): Promise<ContextFile[]>;
     disposalWarning?(data: NoInfer<S>, object: ObjectReader): import("./i18n.ts").UiText | null;
-    /** 对象进入当前集合时调用；对象独占的外部实例向 lifetime 登记清理。 */
+    /** Called when an object enters the current set; external instances owned exclusively by the object register cleanup with lifetime. */
     attach?(data: NoInfer<S>, object: ObjectReader, lifetime: Lifetime): void;
   },
 ): ResourceContribution {
@@ -87,7 +87,7 @@ export function implementTool<S extends Json, T extends Json, A extends Json, D 
         ].join("\n") } };
       return {
         effect: contract.effect, execution: contract.execution, implementation: identity,
-        // 未声明投影时以 JSON 文本交给模型；字符串与部件原样保留，不二次序列化。
+        // When no projection is declared, pass JSON text to the model; preserve strings and parts unchanged without serializing them twice.
         toModel: data => definition.toModel ? definition.toModel(contract.schema.parse(data)) : JSON.stringify(data),
         async execute(signal, publish) {
           let active = true;

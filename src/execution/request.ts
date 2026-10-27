@@ -21,7 +21,7 @@ export interface ModelExecutionEnvironment extends ModelRequestIdentity {
   system: SystemPrompt;
   messages: ResolvedModelItem[];
 }
-/** 一次补全及完整工具批次。缓冲只在此次调用内存在，输出交给消费者，不接触时间线。 */
+/** One completion and its entire tool batch. Buffers exist only for this call; outputs go to consumers without touching the timeline. */
 export async function runModelRequest(request: ModelRunRequest, environment: Promise<ModelExecutionEnvironment>, handover?: ContentLease): Promise<ModelRunResult> {
   const controller = new AbortController();
   const signal = AbortSignal.any([request.signal, controller.signal]);
@@ -49,7 +49,7 @@ export async function runModelRequest(request: ModelRunRequest, environment: Pro
   let callIds: string[] = [];
   let termination: { reason: "completed" } | { reason: "cancelled" } | { reason: "failed"; code: string; details?: ErrorDetails } = { reason: "completed" };
   try {
-    // 即使已取消也消费准备 Promise 的拒绝，避免遗留未处理异常。
+    // Consume preparation Promise rejections even after cancellation to avoid unhandled exceptions.
     const { adapter, settings, capabilities, system, messages, userAgent, sessionId, topLevelTools = [] } = await environment;
     signal.throwIfAborted();
     source = { model: modelExpression(settings), adapter: adapter.version, scope: modelScope(settings) };
@@ -59,12 +59,12 @@ export async function runModelRequest(request: ModelRunRequest, environment: Pro
     const extendCompletion = request.completionExtensions;
     const extensions = presentationSchema.array().parse(extendCompletion
       ? synchronous(() => extendCompletion(structuredClone({ system, tools }))) : []);
-    // 平台只交付准备完整的块，终态随最高序号块保存；分组与投影由执行体负责。
+    // The platform delivers only fully prepared blocks, saving terminal state with the highest-index block; the executor owns grouping and projection.
     const response = new ResponseBuffer({ responseId, requestParentId: request.requestParentId, source }, block => {
       emit({ type: "block", block });
     }, extensions);
     const progress = () => emit({ type: "progress", blocks: response.live() });
-    // 合并工具参数的高频解析；正文与思考仍即时发布，计时器不越过响应生命周期。
+    // Coalesce frequent tool-argument parsing while publishing text and reasoning immediately; the timer stays within the response lifetime.
     let progressTimer: ReturnType<typeof setTimeout> | undefined;
     let pendingProgress = Promise.resolve();
     const flushProgress = () => {
@@ -79,7 +79,7 @@ export async function runModelRequest(request: ModelRunRequest, environment: Pro
     try {
       for await (const event of prepared.stream(signal)) {
         if (event.type === "finish") responseMetadata = event.response ?? null;
-        // 适配层处理中止并交付此前取得的终态；工具批次开始前再检查取消。
+        // The adapter handles aborts and delivers previously acquired terminal state; check cancellation again before the tool batch starts.
         response.accept(event);
         if (event.type === "part.delta") {
           if (response.isToolInput(event.partId)) progressTimer ??= setTimeout(() => {
@@ -109,7 +109,7 @@ export async function runModelRequest(request: ModelRunRequest, environment: Pro
         }, handover, topLevelTools);
       if (request.cache?.expectHit && finish.usage?.cacheRead === 0 && (finish.usage.input ?? 0) > 2048)
         diagnostic("cache_miss", "The provider reported no cached input for this request.", "warning");
-      // 工具结局作为下一请求的反馈交付；代理生命周期由外层取消信号与控制器管理。
+      // Deliver tool outcomes as feedback for the next request; the outer cancellation signal and controller manage the agent lifetime.
       signal.throwIfAborted();
     } finally {
       try { await flushProgress(); }

@@ -16,12 +16,12 @@ import { ease, PanelBody, percent, Section, stripes, Swatch, SystemComposition }
 import { allocateTiles, contextInsight, conversationCategories, type ContextInsight, type ConversationCategory } from "./insight";
 
 const COLUMNS = 20, ROWS = 5;
-/** 类别按固定顺序取图表色。 */
+/** Categories take chart colors in a fixed order. */
 const fill: Record<ConversationCategory, string> = {
   user: "bg-chart-1", assistant: "bg-chart-2", thinking: "bg-chart-4", toolcall: "bg-chart-6",
   result: "bg-chart-3", context: "bg-chart-7", summary: "bg-chart-8", agentMessage: "bg-chart-5",
 };
-/** 窗口占用：已用取实报 input，窗口与预留来自所测请求的模型配置；不画未计量内容。 */
+/** Window usage: used capacity comes from reported input, while the window and reserve come from the measured request's model configuration; unmeasured content is not plotted. */
 function WindowUsage({ insight, selection }: { insight: ContextInsight; selection: z.infer<typeof AgentView.schema>["selection"] }) {
   const i18n = useI18n();
   const configuration = useRendererCatalogs().get(ModelConfiguration);
@@ -67,7 +67,7 @@ function WindowUsage({ insight, selection }: { insight: ContextInsight; selectio
   </Section>;
 }
 
-/** 对话构成：以对话字数为 100% 的瓷砖图，图例与格子悬停或聚焦双向高亮。 */
+/** Conversation composition: a tile chart with the conversation's character count as 100%; hovering or focusing either the legend or tiles highlights both. */
 function ConversationMix({ conversation }: { conversation: ContextInsight["conversation"] }) {
   const i18n = useI18n();
   const [active, setActive] = useState<ConversationCategory | null>(null);
@@ -105,7 +105,7 @@ function ConversationMix({ conversation }: { conversation: ContextInsight["conve
   </Section>;
 }
 
-/** 系统部分：还原最近一次请求发出的提示块与工具名称，不换算 token。 */
+/** System section: reconstructs the prompt blocks and tool names sent in the latest request without converting them to tokens. */
 function SystemParts({ system }: { system: ContextInsight["system"] }) {
   const i18n = useI18n();
   if (!system) return <Section title={i18n.text(messages.system)}><p className="type-caption">{i18n.text(messages.systemPending)}</p></Section>;
@@ -115,7 +115,7 @@ function SystemParts({ system }: { system: ContextInsight["system"] }) {
   </Section>;
 }
 
-/** 上下文面板：只读当前路径与已保存计量，打开或浏览不发起请求、不写入历史。 */
+/** Context panel: reads only the current path and saved measurements; opening or browsing it sends no requests and writes no history. */
 export function ContextPanel({ data }: { data: z.infer<typeof AgentView.schema> }) {
   const i18n = useI18n();
   const object = useRendererObject();

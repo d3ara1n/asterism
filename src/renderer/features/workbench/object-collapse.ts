@@ -3,7 +3,7 @@ import { useLayoutEffect, useRef, useState } from "react";
 
 import { easeOut } from "../../shared/weave/motion";
 
-/** 底板负责真实高度，内容保留展开尺寸；动画中断后从当前值继续，不把逐帧高度写回视图。 */
+/** The surface controls actual height while content retains expanded dimensions; interrupted animations continue from the current value without writing frame-by-frame heights back to the view. */
 export function useObjectCollapse(collapsed: boolean, expandedHeight: number | undefined, resizing: boolean) {
   const header = useRef<HTMLElement>(null);
   const [headerHeight, setHeaderHeight] = useState<number | null>(null);

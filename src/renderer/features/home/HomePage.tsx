@@ -24,7 +24,7 @@ import type { SettingsCategoryId } from "../settings/SettingsPage";
 
 export type StartInput = Omit<Extract<SessionCommand, { type: "start" }>, "type" | "submissionId" | "contentScopeId">;
 
-/** 应用级草稿只保存显式覆盖；默认模型和等级在请求时解析。 */
+/** Application-level drafts store only explicit overrides; default model and level are resolved at request time. */
 export function HomePage({ active, draft, onSettings, ready, busy, submitError, onStart, templates, onTemplateStart, onTemplatesChanged }: {
   active: boolean; draft: MessageDraft; onSettings: (category: SettingsCategoryId) => void;
   ready: boolean; busy: boolean; submitError: UiText | null; onStart: (input: StartInput) => Promise<void>;
@@ -42,14 +42,14 @@ export function HomePage({ active, draft, onSettings, ready, busy, submitError, 
     if (!snapshot) return;
     if (!initialized.current) {
       initialized.current = true;
-      // 首页发起的唯一领域例外：默认选择内置 agent 预设。
+      // The sole domain exception for home initiation: select the built-in agent preset by default.
       setAgentId(defaultAgentPreset);
       return;
     }
   }, [snapshot]);
   const agent = snapshot?.agents.find(item => item.id === agentId && item.enabled);
   const canSend = ready && !busy && !inputState.uploading && !!agent && (!!inputState.text.trim() || !!inputState.files.length);
-  // 配置存在即表示用户已接触对应概念；引导进度独立于请求可用性。
+  // Existing configuration means the user has encountered the corresponding concept; onboarding progress is independent of request availability.
   const guidance = !snapshot ? null
     : !snapshot.modelProviders.length ? { message: homeMessages.setupProvider, action: homeMessages.openProviders, category: "providers" as const }
     : !snapshot.models.length ? { message: homeMessages.setupModel, action: homeMessages.openModels, category: "providers" as const }
@@ -61,7 +61,7 @@ export function HomePage({ active, draft, onSettings, ready, busy, submitError, 
         <BrandMark className="mb-4 size-12 text-primary" /><h1 className="type-page">{i18n.formatMessage(appMessages.appName)}</h1>
         <p className="type-body mt-2 text-muted-foreground">{i18n.formatMessage(homeMessages.homePrompt)}</p>
       </header>
-      {/* 两层输入区：亮色输入表面在上，灰色选项托盘挂在下方；选项为紧凑的幽灵按钮 + 菜单，不用表单下拉框。 */}
+      {/* Two-layer input area: a light input surface above a gray options tray; options use compact ghost buttons + menus, not form dropdowns. */}
       <form {...fileInputEvents(draft, busy || !ready)} onSubmit={event => {
         event.preventDefault();
         if (canSend) void onStart({ agent: agent!.id, model: modelId, thinking, parts: draft.parts() });
@@ -71,7 +71,7 @@ export function HomePage({ active, draft, onSettings, ready, busy, submitError, 
           <InputGroupTextarea id="home-message" className="min-h-32 px-4 py-4" rows={4} maxLength={100_000}
             placeholder={i18n.formatMessage(homeMessages.homePlaceholder)} value={inputState.text} disabled={busy} onChange={event => draft.setText(event.target.value)} aria-describedby="home-availability"
             onKeyDown={event => {
-              // 彩蛋：完整输入口令后回车打开组件展示，不进入命令系统。
+              // Easter egg: entering the complete passphrase and pressing Enter opens the component showcase without entering the command system.
               if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
               event.preventDefault();
               if (inputState.text.trim() === showcaseSpell) { draft.setText(""); setShowcase(true); }

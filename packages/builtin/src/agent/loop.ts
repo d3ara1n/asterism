@@ -22,12 +22,12 @@ interface AgentLoopDependencies {
   feedback: ReturnType<typeof createAgentFeedback>;
 }
 
-/** 循环持有执行计数；消息和回合边界从时间线读取，待发送输入由资源持有。 */
+/** The loop owns execution counts; message and turn boundaries are read from the timeline, and pending input belongs to the resource. */
 export function createAgentLoop(deps: AgentLoopDependencies) {
-  // 资源输入受理依赖仍会消费消息的循环；宿主任务稍后的清理仍由其生命周期跟踪。
+  // Resource input acceptance relies on a loop that still consumes messages; later host-task cleanup remains tracked by its lifecycle.
   const active = new Map<string, { key: string; entered: boolean }>();
   const waiters = new Map<string, Set<() => void>>();
-  // 循环退出（正常结束、失败、取消或未能启动）都经此移除运行，并唤醒等待该代理收束的调用。
+  // All loop exits (normal completion, failure, cancellation, or failure to start) remove the run here and wake callers waiting for this agent to settle.
   const finish = (id: string) => {
     active.delete(id);
     const pending = waiters.get(id);
@@ -41,7 +41,7 @@ export function createAgentLoop(deps: AgentLoopDependencies) {
   };
   return {
     running,
-    /** 等待当前执行循环退出；未运行时立即兑现。退出后交付的新输入开启新循环，由调用方按需再次等待。 */
+    /** Waits for the current execution loop to exit, resolving immediately when not running. Input delivered after exit starts a new loop, which callers can wait for again as needed. */
     settled(object: ObjectReader, signal: AbortSignal): Promise<void> {
       signal.throwIfAborted();
       if (!running(object)) return Promise.resolve();
@@ -58,7 +58,7 @@ export function createAgentLoop(deps: AgentLoopDependencies) {
       const run = active.get(object.ref.id);
       if (!run) return;
       deps.tasks.cancel(run.key);
-      // 宿主在调用任务体之前就收到取消时，不会进入任务体的 finally。
+      // If the host receives cancellation before invoking the task body, the task body's finally is never entered.
       if (!run.entered) {
         deps.feedback.report(object, { origin: "model", level: "warning", code: "cancelled", message: "Execution was cancelled." }, true);
         finish(object.ref.id); object.invalidate();
@@ -94,9 +94,9 @@ export function createAgentLoop(deps: AgentLoopDependencies) {
         run.entered = true;
         let status: ResourceStatus["status"] = "failed";
         try {
-          // Agent start 的扩展位置；生命周期观察与拦截由实际消费者接入时定义。
+          // Agent start extension point; lifecycle observation and interception are defined when actual consumers integrate.
           publish("running");
-          // Turn start 的扩展位置；显式继续执行仍属于原回合。
+          // Turn start extension point; explicitly resuming execution still belongs to the original turn.
           let request = 0;
           for (;;) {
             signal.throwIfAborted();
@@ -107,9 +107,9 @@ export function createAgentLoop(deps: AgentLoopDependencies) {
                 message: "The agent reached the model request limit. Continue explicitly to resume." }, true);
               status = "awaiting";
             } else {
-              // 摘要持久写入失败直接结束执行，不进入模型错误的消费分支。
+              // Summary persistence failure ends execution directly instead of entering the model-error handling branch.
               const compressed = await compress(signal);
-              // Request start 的扩展位置：摘要完成后固定本次上下文、配置与授权。
+              // Request start extension point: capture this request's context, configuration, and authorization after summarization completes.
               const selection = selectionOf(object).selection, agent = deps.selection.agent(selection);
               const snapshot = object.session.snapshot();
               const observer: ModelRunObserver = {
@@ -145,7 +145,7 @@ export function createAgentLoop(deps: AgentLoopDependencies) {
                     ...(result.details ? { details: result.details } : {}) }, true);
                   return;
                 }
-                // Request end：包含该响应的完整工具批次；取消后保留所有待发送输入。
+                // Request end: includes the response's complete tool batch; cancellation preserves all pending input.
                 cancelled = signal.aborted || result.reason === "cancelled";
                 completed = result.reason === "completed";
                 hasTools = result.tools.length > 0;
@@ -158,21 +158,21 @@ export function createAgentLoop(deps: AgentLoopDependencies) {
               if (hasTools) continue;
               await compress(signal);
             }
-            // Turn end 与 Agent settled 独立；正常结束、错误和请求上限均可交付下一批。
+            // Turn end and Agent settled are independent; normal completion, errors, and request limits can all deliver the next batch.
             signal.throwIfAborted();
             if (!deliverDrafts(object, "turn")) return;
-            // 下一批输入已原子交付；此处进入新的 turn。
+            // The next input batch has been delivered atomically; enter a new turn here.
             request = 0;
           }
         } catch (error) {
           status = signal.aborted ? "awaiting" : "failed";
           feedback(error, signal);
         } finally {
-          // 从此处开始的新输入启动新循环，不会落入已经停止消费的旧循环。
+          // New input from this point starts a new loop instead of entering the old loop that has stopped consuming.
           finish(object.ref.id);
           object.invalidate();
           publish(status);
-          // Agent settled 由宿主等待任务和相关活动真实结束后判定。
+          // Agent settled is determined after the host waits for the task and related activities to actually end.
         }
       }, { object: object.ref }); }
       catch (error) { finish(object.ref.id); throw error; }

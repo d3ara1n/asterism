@@ -5,7 +5,7 @@ import { inputSummary, Execution, AgentInputMessage, ContextSummary } from "@ast
 import { Badge } from "@asterism/ui/ui/badge";
 import { conversationMessages } from "../messages/conversation";
 
-/** 代理记录的历史行：以样式区分用户、思考与输出，不依赖文字前缀。 */
+/** History rows for agent records: styles distinguish user input, thinking, and output without relying on text prefixes. */
 const RowText = ({ label, className }: { label: string; className?: string }) => <span className={`block truncate leading-5 ${className ?? ""}`}>{label}</span>;
 const record = (value: unknown): Record<string, unknown> => value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 

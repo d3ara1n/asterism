@@ -8,13 +8,13 @@ import { DataRecoveryScreen } from "./DataRecoveryScreen";
 
 export type StartupFailure = Omit<Extract<StartupState, { status: "failed" }>, "status">;
 
-/** 等待指示延迟显现的时长，与 styles.css 中 `.startup-reveal` 一致；快速启动不闪现加载画面。 */
+/** Delay before the waiting indicator appears, matching `.startup-reveal` in styles.css; fast startups do not flash a loading screen. */
 const REVEAL_DELAY_MS = 300;
 
-/** 启动页独立于工作台和插件，等待与失败共用同一窗口。 */
+/** The startup page is independent of the workbench and plugins; waiting and failure share the same window. */
 export function StartupScreen({ stage, detail, failure }: { stage: UiText; detail?: string; failure?: StartupFailure }) {
   const i18n = useI18n();
-  // 静态占位的显现动画从页面载入开始计时；React 接管后按已过时间续接，不重新等待。
+  // The static placeholder reveal animation starts at page load; React continues from the elapsed time when taking over, without restarting the wait.
   const [revealDelay] = useState(() => REVEAL_DELAY_MS - performance.now());
   if (failure?.reason === "data") return <DataRecoveryScreen failure={failure} />;
   if (failure) {

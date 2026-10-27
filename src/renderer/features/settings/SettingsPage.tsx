@@ -23,11 +23,11 @@ import { settingsMessages } from "../../messages/settings";
 import { useI18n } from "../../shared/i18n";
 import { useEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
 
-/** 官方 Card 作为详情动画的承载元素；组件源码不改。 */
+/** The official Card carries the detail animation; component source remains unchanged. */
 const MotionCard = motion.create(Card);
 import { fadeTransition, islandTransition } from "../../shared/weave/motion";
 
-/** 设置分类注册表：新增分类只需追加一项。仅列入有明确用途的分类。 */
+/** Settings category registry: add a category by appending one entry. Include only categories with a clear purpose. */
 export type SettingsCategoryId = "general" | "appearance" | "providers" | "roles" | "agents" | "about";
 interface SettingsCategory { id: SettingsCategoryId; title: import("@asterism/sdk/contracts").UiText; summary: import("@asterism/sdk/contracts").UiText; icon: ComponentType<LucideProps>; content: () => ReactNode }
 
@@ -41,8 +41,8 @@ const categories: SettingsCategory[] = [
 ];
 
 /**
- * 设置屏：根浮岛先是平铺在材质上的分类卡片；打开分类时总览淡出，分类内容以被点击卡片为变换原点放大淡入，
- * 关闭时沿同一原点收回。只动 opacity/transform，不做布局插值。分类内容可在右侧打开更深的浮岛（如提供商详情）。
+ * Settings screen: the root island initially shows category cards tiled over the material; opening a category fades out the overview and scales and fades in category content from the clicked card's transform origin,
+ * reversing toward the same origin when closing. Animate only opacity/transform, without layout interpolation. Category content can open deeper islands on the right (such as provider details).
  */
 export type SettingsTarget = ({ category: SettingsCategoryId } | { pluginId: string; location?: string }) & { sequence: number };
 function SettingsRoot({ openId, onOpen, onClosed, manager, location }: { openId: string | null; onOpen: (id: string) => void; onClosed: () => void; manager: PluginManager; location?: string }) {
@@ -53,7 +53,7 @@ function SettingsRoot({ openId, onOpen, onClosed, manager, location }: { openId:
   const cards = useRef(new Map<string, HTMLButtonElement>());
   const lastCard = useRef<string | null>(null);
   const overviewScroll = useRef(0);
-  // 详情与总览共用的变换原点（相对舞台）：取最近一次点击的卡片中心；外部直接打开时沿用上次或顶部居中。
+  // Transform origin shared by details and overview (relative to the stage): use the center of the last clicked card; when opened directly from outside, reuse the previous origin or top center.
   const [origin, setOrigin] = useState("50% 0px");
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("all");
@@ -79,7 +79,7 @@ function SettingsRoot({ openId, onOpen, onClosed, manager, location }: { openId:
     if (event.key === "Escape" && open && !event.defaultPrevented) { event.preventDefault(); event.stopPropagation(); close(); }
   }}>
     <h1 className="sr-only">{i18n.formatMessage(settingsMessages.settings)}</h1>
-    {/* 详情绝对定位叠在总览之上，两者同时进出场；总览随原点轻微后退，详情从卡片位置长出。 */}
+    {/* Details are absolutely positioned over the overview, and both enter and exit simultaneously; the overview recedes slightly around the origin while details grow from the card position. */}
     <AnimatePresence initial={false}
       onExitComplete={() => { const id = lastCard.current; if (id) cards.current.get(id)?.focus({ preventScroll: true }); lastCard.current = null; }}>
       {!open ? <motion.div key="grid" className="flex h-full flex-col gap-8 overflow-y-auto"
@@ -111,7 +111,7 @@ function SettingsRoot({ openId, onOpen, onClosed, manager, location }: { openId:
         transition={islandTransition}>
         <div className="p-6">
           <Button variant="ghost" size="sm" className="-ml-2 mb-4" onClick={() => void close()}><ArrowLeft />{i18n.formatMessage(settingsMessages.allSettings)}</Button>
-          {/* 关于页以应用名片作为可见标题，分类标题只保留给辅助技术与焦点落点。 */}
+          {/* The About page uses the application identity card as its visible heading; retain the category title only for assistive technology and as a focus target. */}
           <h2 ref={heading} tabIndex={-1} className={open.id === "about" ? "sr-only" : "type-page mb-2 outline-none"}>{i18n.text(open.title)}</h2>
           {["providers", "roles", "agents"].includes(open.id) && <ConfigurationReadStatus />}
           {open.content()}
@@ -144,8 +144,8 @@ export function SettingsPage({ active, target }: { active: boolean; target: Sett
   useEffect(() => {
     if (openId?.startsWith("plugin:") && !manager.list.some(plugin => pluginKey(plugin) === openId)) setOpenId(null);
   }, [openId, manager.list]);
-  // 离开设置页时回到分类总览（重建屏，清除更深的浮岛）。
-  // 等页面带平移结束、设置已移出视口后再重置，避免离场过程中可见的重建。
+  // Return to the category overview when leaving settings (recreate the screen and clear deeper islands).
+  // Reset after the page strip finishes sliding and settings leave the viewport, avoiding visible reconstruction during exit.
   useEffect(() => {
     if (active) return;
     const timer = window.setTimeout(() => { setOpenId(null); setGeneration(g => g + 1); }, pageMotion());
@@ -153,7 +153,7 @@ export function SettingsPage({ active, target }: { active: boolean; target: Sett
   }, [active]);
   const root: IslandSpec = {
     id: "settings", label: i18n.formatMessage(settingsMessages.settings), surface: false,
-    // 总览按内容居中；打开分类后要求更宽的最小宽度，窄窗口下与详情浮岛并列时溢出。
+    // Center the overview according to content; opening a category requires a wider minimum width, overflowing alongside detail islands in narrow windows.
     width: openId ? { min: 440, grow: 1, max: 720 } : { min: 320, grow: 1, max: 768 },
     render: () => <SettingsRoot openId={openId} onOpen={id => { setLocation(undefined); setOpenId(id); }}
       onClosed={() => { setLocation(undefined); setOpenId(null); }} manager={manager} location={location} />,

@@ -6,7 +6,7 @@ import { workbenchMessages } from "../../messages/workbench";
 import { useI18n } from "../../shared/i18n";
 import type { WorkbenchCanvas } from "./canvas";
 
-/** 标题栏独立的布局分类，操作状态仅归属此入口。 */
+/** Separate layout category in the titlebar; operation state belongs only to this entry. */
 export function LayoutMenu({ canvas, disabled }: { canvas: () => WorkbenchCanvas | null; disabled: boolean }) {
   const i18n = useI18n();
   const pending = useRef(false);

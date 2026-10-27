@@ -2,7 +2,7 @@ import { z } from "zod";
 import { uiTextSchema, type UiText } from "./i18n.ts";
 import { jsonSchema, type Json } from "./json.ts";
 
-/** 用量查询与预设使用全局目录 ID；连接身份独立，重复目录身份必须显式报错。 */
+/** Usage queries and presets use global catalog IDs; connection identity is independent, and duplicate catalog identities must fail explicitly. */
 export const providerUsageIdSchema = z.string().trim().min(1).max(160).regex(/^\S+$/u);
 export const modelProviderFixedFields = ["protocol", "baseUrl", "auth", "compatibility", "usage"] as const;
 export interface ModelProviderConnection {
@@ -39,7 +39,7 @@ export const modelProviderPresetSchema = z.strictObject({
   connection: modelProviderConnectionSchema, keyUrl: webUrl.optional(),
   sources: z.tuple([webUrl]).rest(webUrl), verifiedOn: z.iso.date(), keywords: z.array(z.string()).optional(),
 });
-/** patch 只覆盖显式字段；connection 按字段合并，数组整项替换，不改写已保存连接。 */
+/** patch overrides only explicit fields; connection merges by field, arrays are replaced as a whole, and saved connections are not rewritten. */
 export type ModelProviderPresetContribution =
   | { type: "add"; preset: ModelProviderPreset }
   | { type: "patch"; id: string; patch: Partial<Omit<ModelProviderPreset, "id" | "connection">> & { connection?: Partial<ModelProviderConnection> } };
@@ -59,7 +59,7 @@ export const usageItemSchema = z.discriminatedUnion("type", [
     category: z.enum(["allowance", "rate_limit"]).optional(),
     window: z.strictObject({
       mode: z.enum(["rolling", "fixed", "unknown"]),
-      /** 仅在已知时填写实际固定时长；未知周期不能伪造为周或月。 */
+      /** Supply an actual fixed duration only when known; unknown periods must not be fabricated as weeks or months. */
       durationMs: z.number().positive().nullable(),
       resetAt: z.number().nonnegative().nullable(),
     }),
@@ -78,7 +78,7 @@ export type UsageProviderInfo = z.infer<typeof usageProviderInfoSchema>;
 export function quotaRemaining(item: QuotaItem): number {
   return item.value.type === "ratio" ? item.value.remaining : item.value.remaining / item.value.limit;
 }
-/** 选周期最短的窗口，不以重置倒计时决定；未知周期排在已知周期之后，同长保留来源顺序。 */
+/** Select the window with the shortest period, independently of the reset countdown; unknown periods follow known ones, and equal lengths retain source order. */
 export function primaryQuota(items: readonly UsageItem[]): QuotaItem | null {
   let selected: QuotaItem | null = null;
   for (const item of items) if (item.type === "quota" && (!selected ||

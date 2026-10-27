@@ -2,42 +2,42 @@ import { createContext, createElement, useContext, useEffect, useRef, type Compo
 import type { UiText } from "./i18n.ts";
 
 /**
- * 浮岛：宿主屏内的一列独立表面，在所在浮岛右侧打开并替换原有的更深浮岛。
- * 宽度、位置、动效与焦点由宿主统一管理；插件只提供身份、无障碍名称与内容。
+ * Island: an independent surface column within the host screen; opening one places it to the right of the current island and replaces existing deeper islands.
+ * The host uniformly manages width, position, motion, and focus; plugins provide only identity, an accessible name, and content.
  */
 export interface RendererIslandSpec {
-  /** 插件内唯一的浮岛身份；宿主按插件身份隔离。同一身份再次打开时替换内容。 */
+  /** Island identity unique within the plugin; the host isolates it by plugin identity. Opening the same identity again replaces its content. */
   key: string;
-  /** 浮岛无障碍名称与溢出导航提示。 */
+  /** The island's accessible name and overflow navigation hint. */
   label: UiText;
-  /** 打开它的元素：用于展开动画，关闭后焦点回到该元素。 */
+  /** The element that opened it: used for the expansion animation and receives focus again after closing. */
   origin?: HTMLElement | null;
   render: () => ReactNode;
 }
-/** 关闭守卫：返回 false（或解析为 false）时中止关闭；可异步等待用户确认。 */
+/** Close guard: returning false (or resolving to false) aborts closing; may asynchronously wait for user confirmation. */
 export type RendererCloseGuard = () => boolean | Promise<boolean>;
 export interface RendererIsland {
-  /** 本浮岛右侧由本插件打开的更深浮岛身份。 */
+  /** Identities of deeper islands opened by this plugin to the right of this island. */
   readonly child: string | undefined;
-  /** 在本浮岛右侧打开更深的浮岛；被替换的浮岛可经守卫拒绝。解析为是否已打开。 */
+  /** Open a deeper island to the right of this one; replaced islands may refuse through guards. Resolves to whether it opened. */
   open(spec: RendererIslandSpec): Promise<boolean>;
-  /** 关闭本浮岛及更深浮岛；插件设置页所在的浮岛由宿主管理，调用无效。force 跳过守卫。 */
+  /** Close this island and deeper islands; has no effect on the host-managed island containing the plugin settings page. force skips guards. */
   close(options?: { force?: boolean }): Promise<boolean>;
-  /** 关闭本浮岛右侧的更深浮岛。 */
+  /** Close deeper islands to the right of this one. */
   closeChild(options?: { force?: boolean }): Promise<boolean>;
-  /** 注册本浮岛的关闭守卫，返回注销函数。一般经 useRendererCloseGuard 使用。 */
+  /** Register a close guard for this island and return an unregister function. Normally used through useRendererCloseGuard. */
   guard(guard: RendererCloseGuard): () => void;
 }
 /**
- * 面板浮岛外框：标题栏固定，内容区单独滚动；主操作与关闭位于标题栏右侧。
- * dirty 为 true 时关闭本浮岛（含上级关闭或替换）先由宿主确认放弃修改。
+ * Panel island frame: the title bar stays fixed and the content scrolls independently; the primary action and close control sit on the right of the title bar.
+ * When dirty is true, the host asks for confirmation to discard changes before closing this island, including through ancestor closure or replacement.
  */
 export interface RendererIslandPanelProps {
   title: string;
   description?: string;
-  /** 标题栏主操作，如保存。 */
+  /** Primary title bar action, such as save. */
   action?: ReactNode;
-  /** 标题栏下方固定的工具区，如搜索。 */
+  /** Fixed toolbar below the title bar, such as search. */
   toolbar?: ReactNode;
   dirty?: boolean;
   children: ReactNode;
@@ -51,16 +51,16 @@ function required<T>(value: T | null, name: string): T {
   if (value === null) throw new Error(`Renderer ${name} must be provided by the host.`);
   return value;
 }
-/** 所在浮岛；插件设置页与其打开的浮岛内可用。 */
+/** The containing island; available within plugin settings pages and islands they open. */
 export function useRendererIsland(): RendererIsland { return required(useContext(Island), "island"); }
-/** 为所在浮岛注册关闭守卫；guard 为 null 时放行，守卫始终取最新的回调。 */
+/** Register a close guard for the containing island; null guard permits closing, and the guard always uses the latest callback. */
 export function useRendererCloseGuard(guard: RendererCloseGuard | null) {
   const island = useRendererIsland();
   const latest = useRef(guard);
   latest.current = guard;
   useEffect(() => island.guard(() => latest.current ? latest.current() : true), [island]);
 }
-/** 宿主绘制的面板外框，在插件打开的浮岛内使用。 */
+/** Host-rendered panel frame for use within islands opened by plugins. */
 export function IslandPanel(props: RendererIslandPanelProps) {
   return createElement(required(useContext(Panel), "island panel"), props);
 }

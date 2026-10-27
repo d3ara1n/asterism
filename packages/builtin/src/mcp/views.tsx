@@ -6,7 +6,7 @@ import type { ConnectionPhase } from "./contract";
 import { mcpMessages as messages } from "../messages/mcp";
 import { phaseTone } from "./status";
 
-/** 主机卡片、目录结果与连接结果共用的服务器摘要：状态、名称与工具数量（未建立目录时显示未索引）。 */
+/** Server summary shared by host cards, catalog results, and connection results: status, name, and tool count (unindexed when no catalog has been established). */
 export interface ServerSummaryData { name: string; enabled: boolean; connection: ConnectionPhase; indexed: boolean; toolCount: number; error: string | null }
 
 export function ServerSummary({ server }: { server: ServerSummaryData }) {
@@ -21,12 +21,12 @@ export function ServerSummary({ server }: { server: ServerSummaryData }) {
   </>;
 }
 
-/** 收起时的单行错误；完整错误在卡片展开区或结果详情中阅读。 */
+/** Single-line error when collapsed; read the full error in the expanded card area or result details. */
 export function ServerError({ error, className }: { error: string | null; className?: string }) {
   return error ? <p className={cn("type-caption truncate text-destructive", className)} title={error}>{error}</p> : null;
 }
 
-/** 工具结果中的服务器行：停用服务器弱化，错误缩进到名称下方。 */
+/** Server rows in tool results: disabled servers are dimmed, with errors indented beneath the name. */
 export function ServerLine({ server }: { server: ServerSummaryData }) {
   return <div className={cn("flex min-w-0 flex-col gap-0.5", !server.enabled && "opacity-60")}>
     <div className="flex min-w-0 items-center gap-1.5"><ServerSummary server={server} /></div>
@@ -45,12 +45,12 @@ function ToolEntry({ name, title, description, server }: ToolEntryData) {
 }
 const toolKey = (tool: ToolEntryData, index: number) => `${tool.server ?? ""}/${tool.name}/${index}`;
 
-/** 分页结果中的工具条目；条目数受单页限制，直接渲染。 */
+/** Tool entries in paginated results; the page size bounds the entry count, so they are rendered directly. */
 export function ToolList({ tools }: { tools: readonly ToolEntryData[] }) {
   return <ul className="flex flex-col gap-2">{tools.map((tool, index) => <li key={toolKey(tool, index)}><ToolEntry {...tool} /></li>)}</ul>;
 }
 
-/** 卡片中的完整缓存目录可达数百条：在有界的局部滚动区内虚拟化，少量条目时高度随内容收缩。 */
+/** A card's full cached catalog may contain hundreds of entries: virtualize within a bounded local scroll area, shrinking to fit when there are few entries. */
 export function VirtualToolList({ tools }: { tools: readonly ToolEntryData[] }) {
   return <div className="max-h-72 overflow-y-auto">
     <Virtualizer as="ul" item="li" data={tools}>
@@ -67,7 +67,7 @@ export function Instructions({ text }: { text: string }) {
   </div>;
 }
 
-/** 分页结果只交付一页；总数大于本页时提示其余条目。 */
+/** Paginated results deliver only one page; indicate remaining entries when the total exceeds this page. */
 export function PageNote({ shown, total }: { shown: number; total: number }) {
   const i18n = useI18n();
   return total > shown ? <p className="type-caption tabular-nums text-muted-foreground">{i18n.formatMessage(messages.page, { shown, total })}</p> : null;

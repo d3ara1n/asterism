@@ -24,23 +24,23 @@ function setup(provider: UsageProvider) {
     } };
 }
 
-describe("内置用量消费者", () => {
-  // 已取消等待仍需接管原 Promise 的拒绝，避免 unhandledRejection。
-  it("已取消的等待仍接管异步拒绝", async () => {
+describe("built-in usage consumer", () => {
+  // A canceled wait must still handle rejection of the original Promise to avoid unhandledRejection.
+  it("a canceled wait still handles asynchronous rejection", async () => {
     const reason = new Error("cancelled");
     await expect(waitForUsage(Promise.reject(new Error("credential failed")), AbortSignal.abort(reason))).rejects.toBe(reason);
     await new Promise<void>(resolve => setImmediate(resolve));
   });
-  // 关闭发生在排队查询与取凭据之间，不能再访问凭据服务。
-  it("立即关闭阻止尚未开始的凭据读取", async () => {
+  // Shutdown occurs between query queuing and credential retrieval; the credential service must no longer be accessed.
+  it("immediate shutdown prevents credential reads that have not started", async () => {
     const fixture = setup({ id: "q", label: "Q", query: async () => [] });
     const pending = fixture.usage.query("p");
     fixture.usage.close();
     expect(await pending).toMatchObject({ state: "error", error: "unavailable", items: [] });
     expect(fixture.credential).not.toHaveBeenCalled();
   });
-  // 被动来源读取不取凭据；null 保留，空列表清空；解析错误不影响 Agent 消费模型结果。
-  it("调用者交付响应后更新，无数据保留，错误保留实报且隔离失败", async () => {
+  // Reading passive sources retrieves no credentials; null retains existing data, and an empty list clears it. Parsing errors do not affect the Agent's consumption of model results.
+  it("updates after the caller supplies a response, retains data when none is supplied, and preserves reported data while isolating errors", async () => {
     const parseHeaders = vi.fn((): UsageItem[] | null => items);
     const fixture = setup({ id: "headers", label: "Headers", source: "headers", parseHeaders });
     try {
@@ -61,8 +61,8 @@ describe("内置用量消费者", () => {
       expect(await fixture.usage.query("p")).toMatchObject({ state: "ready", items: [] });
     } finally { fixture.usage.close(); }
   });
-  // 响应按连接当前 usage 消费；请求取用的端点变化不使返回结果失效。
-  it("连接变化清空缓存，迟到响应仍按当前目录消费", async () => {
+  // Responses use the connection's current usage configuration; changes to the endpoint captured by the request do not invalidate returned results.
+  it("connection changes clear the cache, and late responses are still consumed using the current catalog", async () => {
     const parseHeaders = vi.fn(() => items);
     const fixture = setup({ id: "headers", label: "Headers", source: "headers", parseHeaders });
     try {

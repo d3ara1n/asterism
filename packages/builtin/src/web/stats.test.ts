@@ -5,8 +5,8 @@ const record = (overrides: Partial<WebRequestRecord> = {}): WebRequestRecord =>
   ({ kind: "search", subject: "q", outcome: "succeeded", at: 0, durationMs: 100, cost: [], ...overrides });
 
 describe("costOf", () => {
-  // 用量中混有 token、请求数等非费用单位；只有带币种的金额条目构成费用，同币种合并。
-  it("只按币种汇总金额条目", () => {
+  // Usage includes non-cost units such as tokens and request counts; only monetary entries with currencies constitute costs, and matching currencies are combined.
+  it("aggregates monetary entries only by currency", () => {
     expect(costOf([
       { amount: 0.005, unit: "currency", currency: "USD" },
       { amount: 3, unit: "requests" },
@@ -19,8 +19,8 @@ describe("costOf", () => {
 });
 
 describe("finishRequest", () => {
-  // 结束请求需同时归还进行中计数、按类型与结果计数并累计费用；遗漏任何一项卡片都会长期显示错误数字。
-  it("计数、进行中与费用随请求结束更新", () => {
+  // Ending a request must decrement the in-flight count, count by type and outcome, and accumulate costs together; missing any step leaves the card showing incorrect numbers.
+  it("updates counts, in-flight requests, and costs when a request ends", () => {
     let stats = startRequest(startRequest(emptyWebStats()));
     stats = finishRequest(stats, record({ cost: [{ currency: "USD", amount: 0.01 }] }));
     stats = finishRequest(stats, record({ kind: "fetch", outcome: "failed", cost: [{ currency: "USD", amount: 0.02 }] }));
@@ -30,8 +30,8 @@ describe("finishRequest", () => {
     expect(stats.cost).toEqual([{ currency: "USD", amount: 0.03 }]);
   });
 
-  // 最近请求按结束顺序最新在前，只保留固定条数。
-  it("最近请求最新在前且有上限", () => {
+  // Recent requests are ordered newest first by completion time, retaining only a fixed count.
+  it("keeps recent requests newest first with a fixed limit", () => {
     let stats = emptyWebStats();
     for (let at = 0; at < RECENT_LIMIT + 2; at++) stats = finishRequest(startRequest(stats), record({ at }));
     expect(stats.recent.map(item => item.at)).toEqual([6, 5, 4, 3, 2]);
@@ -39,8 +39,8 @@ describe("finishRequest", () => {
 });
 
 describe("averageDuration", () => {
-  // 平均耗时覆盖全部已结束请求（含失败与取消）；无请求时为 null，卡片据此显示空状态而非 0。
-  it("覆盖所有已结束请求，无请求时为 null", () => {
+  // Average duration covers all ended requests, including failures and cancellations; null when there are none lets the card show an empty state rather than 0.
+  it("covers all ended requests and returns null when there are none", () => {
     expect(averageDuration(emptyWebStats())).toBeNull();
     let stats = finishRequest(emptyWebStats(), record({ durationMs: 100 }));
     stats = finishRequest(stats, record({ kind: "fetch", outcome: "cancelled", durationMs: 300 }));

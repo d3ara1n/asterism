@@ -1,4 +1,4 @@
-/** 插件与宿主共用的后台接口；存储、事务和授权由宿主实现。 */
+/** Backend interfaces shared by plugins and the host; the host implements storage, transactions, and authorization. */
 import type { UiText } from "./i18n.ts";
 import type { CardAppearance } from "./card.ts";
 import type { ConfigContract } from "./config.ts";
@@ -27,17 +27,17 @@ export type * from "./objects.ts";
 export type { ResourceRef, ResourceCreationResult, ResourceSnapshot, SessionSnapshot } from "./workspace.ts";
 
 /**
- * 生命周期作用域：结束时先中止 signal，再按登记逆序等待全部清理完成。
- * 宿主维护应用、会话、对象三层作用域，父作用域结束前先结束子作用域；退出、归档与对象移除共用同一清理路径。
+ * Lifecycle scope: on termination, abort signal first, then await all cleanup in reverse registration order.
+ * The host maintains application, session, and object scopes; child scopes end before their parent. Exit, archival, and object removal share the same cleanup path.
  */
 export interface Lifetime {
   readonly signal: AbortSignal;
-  /** 登记清理；作用域已结束时抛出 unavailable。清理失败只记录日志，不阻止其余清理。 */
+  /** Register cleanup; throws unavailable if the scope has ended. Cleanup failures are only logged and do not block remaining cleanup. */
   defer(cleanup: () => void | Promise<void>): void;
 }
 export interface PluginContext {
   readonly id: string;
-  /** 插件级生命周期：与宿主运行实例同寿；插件共享服务（连接池、订阅、公共登记）挂在这里。 */
+  /** Plugin-level lifecycle: lasts as long as the host runtime instance; shared plugin services such as connection pools, subscriptions, and public registrations belong here. */
   readonly lifetime: Lifetime;
   readonly sessions: SessionDirectory;
   readonly dir: string;
@@ -55,7 +55,7 @@ export interface PluginContext {
   readonly web: WebServices;
   readonly catalogs: { get<T extends Json>(contract: DataContract<T>): T | null };
   session(id: string): SessionExecutor;
-  /** 以具名资源契约取得对象操作柄；宿主校验契约属于本插件、对象存在且类型一致，写入记录以此打戳。 */
+  /** Obtain an object handle using a named resource contract; the host validates plugin ownership of the contract, object existence, and matching type, and stamps records accordingly. */
   object<S extends Json>(sessionId: string, contract: ResourceContract<S>, id: string): ObjectExecutor;
 }
 export interface SessionCommitted {
@@ -63,7 +63,7 @@ export interface SessionCommitted {
   readonly records: readonly SessionRecord[];
   readonly session: SessionExecutor;
 }
-/** 执行游标变化后的固定快照；正常追加与显式游标选择使用同一形状，面板候选选择不触发。 */
+/** Fixed snapshot after the execution cursor changes; ordinary appends and explicit cursor selection use the same shape, while panel candidate selection does not trigger it. */
 export interface SessionCursorChanged {
   readonly snapshot: SessionSnapshot;
   readonly session: SessionExecutor;
@@ -77,7 +77,7 @@ export type Preparation<C extends Json = Json> =
   | { action: "accept" }
   | { action: "replace"; input: C }
   | { action: "reject"; code: string; message: string; display?: UiText };
-/** 准备上下文：资源自身准备可读写本次作用域内容，外部准备者只读；均不修改会话数据。 */
+/** Preparation context: the resource's own preparation can read and write content in this scope, while external preparers can only read; neither modifies session data. */
 export interface CreationPreparation { readonly signal: AbortSignal; readonly content: ContentScope }
 export interface ActionPreparation extends CreationPreparation { readonly object: ObjectReader }
 export interface ExternalPreparation { readonly signal: AbortSignal; readonly object: ObjectReader; readonly content: ContentReader }
@@ -99,21 +99,21 @@ export interface ActionContribution {
 }
 export interface ResourceContribution {
   readonly resource: ResourceContract;
-  /** 后台放置使用的几何声明，与 ResourceDescription 和 cardRenderer 共用。 */
+  /** Geometry declarations for backend placement, shared with ResourceDescription and cardRenderer. */
   readonly card?: CardAppearance;
   readonly records: readonly RecordContract[];
-  /** 声明本资源可作为链接接收者，并提供接收端工具策略；与 Agent 领域类型无关。 */
+  /** Declare that this resource can receive links and provide the recipient's tool policy; independent of Agent domain types. */
   readonly links?: { receive: boolean; tools?(object: ObjectReader): { allow?: readonly string[]; exclude?: readonly string[] } };
   readonly creation?: CreationContribution;
   readonly actions?: readonly ActionContribution[];
   project(resource: ResourceSnapshot, object: ObjectReader): Presentation;
   inspect(resource: ResourceSnapshot, object: ObjectReader): Promise<Json>;
   context?(resource: ResourceSnapshot, object: ObjectReader): Promise<ContextFile[]>;
-  /** 结束当前实例前呈现给用户的说明；不阻止后台移除或等待外部清理。 */
+  /** Explanation presented to users before ending the current instance; does not block backend removal or wait for external cleanup. */
   disposalWarning?(resource: ResourceSnapshot, object: ObjectReader): UiText | null;
   /**
-   * 对象进入当前集合时同步调用（启动、创建、恢复、回溯使其重新出现）；lifetime 在对象离开当前集合、
-   * 所属会话归档或应用退出时结束。对象独占的外部实例在此登记清理。
+   * Called synchronously when an object enters the current set through startup, creation, restoration, or rewinding that makes it reappear; lifetime ends when the object leaves the current set,
+   * its session is archived, or the application exits. Register cleanup here for external instances owned exclusively by the object.
    */
   attach?(resource: ResourceSnapshot, object: ObjectReader, lifetime: Lifetime): void;
 }
@@ -123,7 +123,7 @@ export type CallResult<D extends Json = Json> =
   | { kind: "partial"; data: D; message: string }
   | OptionalData<Exclude<ToolCompletion, { kind: "succeeded" | "partial" }>, D>;
 export type PreparedResult = CallResult & ToolInvocationInfo;
-/** 请求边界捕获的工具调用者身份；不携带资源私有状态或操作权限。 */
+/** Tool caller identity captured at the request boundary; carries neither private resource state nor operation permissions. */
 export type ToolCaller = Readonly<Pick<ResourceSnapshot, "ref" | "title">>;
 export interface ToolInvocation extends ToolInvocationInfo {
   effect: "read" | "write";
@@ -140,7 +140,7 @@ export interface ModuleContribution {
   usageProviders?: readonly UsageProvider[];
   modelProviderPresets?: readonly ModelProviderPresetContribution[];
   calls?: readonly CallContribution[];
-  /** 对象级双工通道；契约归本插件，按对象类型所属插件路由。 */
+  /** Object-level duplex channel; the contract belongs to this plugin, and routing follows the plugin owning the object type. */
   channels?: readonly ChannelContribution[];
   topLevelTools?: readonly TopLevelTool[];
   events?: readonly EventContract[];
@@ -150,15 +150,15 @@ export interface ModuleContribution {
   observers?: readonly SessionObserver[];
   preparers?: readonly CommandPreparer[];
 }
-/** 具名模块入口：插件提供贡献，宿主负责装配与调用。 */
+/** Named module entry point: plugins provide contributions, and the host handles assembly and invocation. */
 export interface PluginModule { setup(plugin: PluginContext): ModuleContribution }
-/** 插件共享服务与功能模块的组合；共享服务先建立、在模块之后释放。 */
+/** Composition of shared plugin services and feature modules; shared services are established first and released after the modules. */
 export interface PluginContribution extends ModuleContribution {
   modules?: readonly PluginModule[];
 }
 /**
- * 插件持久文件的格式声明；路径相对于 extensions/<pluginId>，迁移键 n 表示 n → n+1。
- * 版本由写入方盖章：JSON 为 `{ version, data }` 信封，SQLite 为 `PRAGMA user_version`。
+ * Format declarations for persistent plugin files; paths are relative to extensions/<pluginId>, and migration key n means n → n+1.
+ * Versions are stamped by the writer: JSON uses a `{ version, data }` envelope, and SQLite uses `PRAGMA user_version`.
  */
 export type PluginStorageDeclaration = {
   kind: "json"; path: string; version: number;
@@ -167,7 +167,7 @@ export type PluginStorageDeclaration = {
   kind: "sqlite"; path: string; version: number;
   migrations: Readonly<Record<number, (db: DatabaseSync) => void>>;
 };
-/** 存储入口（manifest `asterism.storage`）的默认导出；宿主在插件运行时之前单独导入。 */
+/** Default export of the storage entry point (manifest `asterism.storage`); the host imports it separately before the plugin runtime. */
 export function defineStorage(declarations: readonly PluginStorageDeclaration[]): readonly PluginStorageDeclaration[] {
   for (const item of declarations) if (!Number.isSafeInteger(item.version) || item.version < 1)
     throw new Error(`Storage ${item.path} must declare a positive integer version.`);
@@ -176,7 +176,7 @@ export function defineStorage(declarations: readonly PluginStorageDeclaration[])
 export interface PluginDefinition {
   namespace: PluginNamespace; version: string; modules?: readonly PluginModule[];
   setup?(plugin: PluginContext): PluginContribution;
-  /** 包加载器从公共模块导入关系填充；提供方先 setup，消费者先清理。 */
+  /** Populated by the package loader from public module imports; providers run setup first, and consumers clean up first. */
   dependencies?: readonly string[];
 }
 export function defineModule(setup: PluginModule["setup"]): PluginModule {

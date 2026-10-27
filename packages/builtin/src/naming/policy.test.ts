@@ -16,8 +16,8 @@ function output(id: string, agentId: string, origin: string, text: string, extra
   } }), agentId);
 }
 
-describe("自动命名的领域材料", () => {
-  it("交错代理按请求起点配对；继续更新原回合，多正文块按序合并，思考与未完成正文排除", () => {
+describe("domain material for automatic naming", () => {
+  it("pairs interleaved agents by request start, updates the original turn on continuation, merges body blocks in order, and excludes thinking and incomplete text", () => {
     const records = [
       input("a1", "a", "修复登录"), input("b1", "b", "整理账单"),
       output("a-progress", "a", "b1", "正在检查"), output("b-final", "b", "a-progress", "已核对账单"),
@@ -36,7 +36,7 @@ describe("自动命名的领域材料", () => {
     expect(collectTurns(records.slice(0, -2))[0]?.assistant).toBe("修复 token 刷新\n通过测试");
   });
 
-  it("长对话保留前后各四回合，字段头尾与角色结构保持，最新用户输入可没有回复", () => {
+  it("retains the first and last four turns of long conversations, preserves field beginnings and endings and role structure, and allows the latest user input to lack a reply", () => {
     const turns = Array.from({ length: 12 }, (_, i) => ({ user: `用户${i + 1}`, assistant: `结果${i + 1}` }));
     turns[0]!.user = "开头" + "x".repeat(300) + "末尾";
     const prompt = namingPrompt([...turns, { user: "最后请求" }]);
@@ -49,7 +49,7 @@ describe("自动命名的领域材料", () => {
     expect(prompt).toMatch(/5.*omit/i);
   });
 
-  it("清理标题包装并按 Unicode 字符限制长度，空标题保持为空", () => {
+  it("removes title wrappers and limits length by Unicode characters, preserving an empty title", () => {
     expect(cleanTitle('<title>Title: “修复登录。”</title>')).toBe("修复登录");
     expect(Array.from(cleanTitle("🛠".repeat(70)))).toHaveLength(50);
     expect(cleanTitle("<title> </title>")).toBe("");

@@ -13,7 +13,7 @@ export const directorySchema = z.object({ tools: z.array(cachedToolSchema), inst
 export type Directory = z.infer<typeof directorySchema>;
 export interface CatalogServer { config: McpServerConfig; state: McpServerState; directory?: Directory }
 
-/** 服务器 ID 不含 `/`，句柄按第一个 `/` 切分；远端工具名自身可以包含 `/`。 */
+/** Server IDs contain no `/`; split handles at the first `/`. Remote tool names may themselves contain `/`. */
 export function toolIdentity(serverId: string, name: string): string { return `${serverId}/${name}`; }
 export function parseToolIdentity(value: string): [string, string] {
   const split = value.indexOf("/");
@@ -22,7 +22,7 @@ export function parseToolIdentity(value: string): [string, string] {
   return [serverId, name];
 }
 
-/** 名称生成的默认 ID；无法转写的名称回落到 server，并以数字后缀避开已有 ID。 */
+/** Default ID generated from the name; names that cannot be transliterated fall back to server, with numeric suffixes to avoid existing IDs. */
 export function slugifyServerId(name: string, taken: Iterable<string>): string {
   const base = name.normalize("NFKD").toLowerCase().replace(/[^a-z0-9]+/gu, "-").replace(/^-+|-+$/gu, "").slice(0, 48) || "server";
   const used = new Set(taken);
@@ -38,7 +38,7 @@ function brief(server: CatalogServer, tool: CachedTool) {
   return { tool_id: toolIdentity(server.config.id, tool.name), server_id: server.config.id, server: server.config.name, name: tool.name,
     ...(tool.title && { title: tool.title }), description: clip(tool.description ?? "", 240) };
 }
-/** 模型侧只消费发现所需状态，浏览器授权地址留在设置界面。 */
+/** The model consumes only the state needed for discovery; browser authorization URLs stay in the settings UI. */
 export function describeServer(state: McpServerState) {
   return { server_id: state.id, name: state.name, enabled: state.enabled,
     mode: state.mode, connection: state.connection, indexed: state.indexed, tool_count: state.toolCount,
@@ -60,7 +60,7 @@ function score(query: string[], name: string, server: string, description: strin
   const n = name.toLocaleLowerCase(), s = server.toLocaleLowerCase(), d = description.toLocaleLowerCase();
   return query.reduce((total, word) => total + (n.includes(word) ? 8 : 0) + (s.includes(word) ? 4 : 0) + (d.includes(word) ? 1 : 0), 0);
 }
-/** 工具命中按 offset/limit 分页；未索引服务器只随第一页交付，完整服务器清单由 list 提供。 */
+/** Tool matches are paginated by offset/limit; unindexed servers are delivered only with the first page. list provides the complete server list. */
 export function searchCatalog(all: CatalogServer[], args: { query: string; server_id?: string; offset: number; limit: number }) {
   const servers = all.filter(server => server.config.enabled && (!args.server_id || server.config.id === args.server_id));
   const words = terms(args.query);
@@ -75,7 +75,7 @@ export function searchCatalog(all: CatalogServer[], args: { query: string; serve
     coverage: { indexed_servers: servers.length - unindexed.length, unindexed_servers: unindexed.length } };
 }
 
-/** 表单逐行输入 KEY=VALUE；值中的等号和空白保持原样。 */
+/** The form accepts KEY=VALUE one line at a time; equals signs and whitespace in values are preserved. */
 export function parseCredentialLines(text: string): Record<string, string> {
   return Object.fromEntries(text.split(/\r?\n/u).filter(line => line.trim()).map(line => {
     const split = line.indexOf("=");
@@ -83,7 +83,7 @@ export function parseCredentialLines(text: string): Record<string, string> {
     return [line.slice(0, split).trim(), line.slice(split + 1)];
   }));
 }
-/** 每行一个 argv；文本末尾的空行来自换行符，不构成参数，中间的空行是显式的空参数。 */
+/** One argv per line; trailing blank lines come from newline characters and do not constitute arguments. Blank lines in between are explicit empty arguments. */
 export function parseArgumentLines(text: string): string[] {
   const lines = text.split(/\r?\n/u);
   while (lines.length && !lines.at(-1)) lines.pop();

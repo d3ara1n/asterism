@@ -15,11 +15,11 @@ export const openLocalFileChannel = coreChannel("open-local-file");
 export const openLogsChannel = coreChannel("open-logs");
 export const localFilePathSchema = z.string().min(1).refine(value => !value.includes("\0"), "A local file path is required.");
 const id = z.string().uuid();
-/** 应用入口只读取工作区身份和会话摘要，不持有已打开会话的正文。 */
+/** Application entries read workspace identity and session summaries only, without holding open-session bodies. */
 export const commandSchema = z.discriminatedUnion("type", [
   z.strictObject({ type: z.literal("workspace.read") }),
   z.strictObject({ type: z.literal("workspace.prepare-close") }),
-  // 插件包管理：只改包列表，重启后生效；路径必须是含 Asterism 清单的包根。
+  // Plugin package management changes lists only and takes effect after restart; paths must be package roots containing Asterism manifests.
   z.strictObject({ type: z.literal("plugin.add"), path: z.string().min(1).max(4096) }),
   z.strictObject({ type: z.literal("plugin.enable"), index: z.number().int().nonnegative(), enabled: z.boolean() }),
   z.strictObject({ type: z.literal("plugin.remove"), index: z.number().int().nonnegative() }),
@@ -31,15 +31,15 @@ export const snapshotSchema = z.strictObject({
   workspace: z.strictObject({ id, title: z.string() }),
   sessions: z.array(z.strictObject({ id, title: z.string(), created_at: z.string() })),
   templates: z.array(templateSummarySchema),
-  /** 回收站目录：只含会话本身，供设置页计数与恢复。 */
+  /** Trash catalog containing sessions themselves only, used for settings counts and restoration. */
   archivedSessions: z.array(z.strictObject({ id, title: z.string(), created_at: z.string(), archived_at: z.string() })),
-  /** 插件包：启动时状态；renderer 为 asterism-plugin:// 下的入口路径。 */
+  /** Plugin packages at startup; renderer is the entry path under asterism-plugin://. */
   plugins: z.array(z.strictObject({ index: z.number().int().nonnegative().nullable(), id: z.string().nullable(), source: z.string(),
     status: z.enum(["loaded", "disabled", "invalid", "failed", "pending"]), enabled: z.boolean(), error: z.string().nullable(), renderer: z.string().nullable(),
     stylesheet: z.string().nullable(),
     metadata: pluginMetadataSchema.default({}),
     dependencies: z.array(z.string()).default([]) })),
-  /** 包列表与本次启动不同：需要重启生效。 */
+  /** Package lists differing from this startup require restart to take effect. */
   restartRequired: z.boolean(),
   catalogs: z.array(translationCatalogSchema).optional(),
   disposalWarnings: z.array(z.strictObject({ title: z.string(), warning: uiTextSchema })).optional(),
@@ -58,32 +58,32 @@ export const runtimeMessageSchema = z.discriminatedUnion("kind", [
   z.strictObject({ kind: z.literal("startup"), stage: startupStageSchema, detail: z.string().optional() }),
   z.strictObject({ kind: z.literal("ready"), version: z.literal(protocolVersion) }),
   z.strictObject({ kind: z.literal("response"), ...responseSchema.shape }),
-  // reason 为启动失败类别，main 按类别选择提示；迁移上线时扩展类别值，不改消息形状。
+  // reason identifies startup failure categories and main selects prompts accordingly; extend categories when migration lands without changing message shapes.
   z.strictObject({ kind: z.literal("fatal"), message: z.string(), reason: z.enum(["database_version", "unknown"]), directory: z.string().optional() }),
 ]);
 export type RuntimeMessage = z.infer<typeof runtimeMessageSchema>;
-/** 主进程能力：窗口、外观、语言、偏好与系统对话框。任务进程能力经 connectRuntime 交接的直连端口使用。 */
+/** Main-process capabilities: windows, appearance, language, preferences, and system dialogs. Task-process capabilities use direct ports handed off by connectRuntime. */
 export interface DesktopBridge {
   startup: StartupBridge;
   updates: UpdatesBridge;
   language: LanguageBridge;
   appearance: AppearanceBridge;
-  /** 受控偏好容器：只能读写 preferences 内宿主规定前缀的键。 */
+  /** Controlled preference container: only keys with host-defined prefixes within preferences can be read or written. */
   preferences: { read(): Promise<Record<string, Json>>; write(key: string, value: Json | null): Promise<boolean> };
   window: DesktopWindowBridge;
   readonly platform: DesktopPlatform;
-  /** 系统目录选择窗口；取消返回 null。 */
+  /** System directory picker; returns null on cancellation. */
   pickDirectory(): Promise<string | null>;
-  /** 用户点击的本机文件交给系统关联应用打开；失败返回错误文字。 */
+  /** Open user-clicked local files with system-associated apps; return error text on failure. */
   openLocalFile(path: string): Promise<string>;
-  /** 在系统文件管理器中打开应用日志目录；失败返回错误文字。 */
+  /** Open the application log directory in the system file manager; return error text on failure. */
   openLogs(): Promise<string>;
-  /** 拖入文件的本机路径；由 Electron webUtils 解析，renderer 不能伪造 File.path。 */
+  /** Local paths for dropped files, resolved by Electron webUtils; renderers cannot fabricate File.path. */
   pathForFile(file: File): string;
   onStatus(listener: (status: RuntimeStatus) => void): () => void;
   /**
-   * 请求任务进程直连；每个页面只受理一次。端口经 window 消息（connectionPortMessage）交给页面，
-   * 任务进程不可用时消息不带端口。
+   * Request a direct task-process connection, accepted once per page. Deliver ports through window messages (connectionPortMessage),
+   * without a port when the task process is unavailable.
    */
   connectRuntime(): void;
 }

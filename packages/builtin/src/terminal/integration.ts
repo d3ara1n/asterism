@@ -3,8 +3,8 @@ import { basename, join } from "node:path";
 import type { ResolvedShell } from "../shell/profiles.ts";
 
 /**
- * Shell 集成适配：集成只报告提示符、执行边界、退出码与当前目录（OSC 133／633 语义），命令编辑仍由 shell 处理。
- * 脚本内容固定，所有终端共用；实例 nonce 经环境变量传入，脚本读取后立即 unset。
+ * Shell integration adapter: integration reports only prompts, execution boundaries, exit codes, and the current directory (OSC 133/633 semantics); the shell still handles command editing.
+ * Script content is fixed and shared by all terminals; the instance nonce is passed through an environment variable, which the script immediately unsets after reading.
  */
 export type IntegrationMode = "injected" | "native" | "none";
 export interface ShellLaunch { args: string[]; env: Record<string, string>; mode: IntegrationMode }
@@ -14,7 +14,7 @@ const zshFiles = {
   ".zshenv": `ASTERISM_INTEGRATION_DIR="$ZDOTDIR"
 if [[ -n "\${ASTERISM_USER_ZDOTDIR-}" ]]; then ZDOTDIR="$ASTERISM_USER_ZDOTDIR"; else ZDOTDIR="$HOME"; _asterism_zdotdir_default=1; fi
 [[ -f "$ZDOTDIR/.zshenv" ]] && source "$ZDOTDIR/.zshenv"
-# 用户 .zshenv 可改写 ZDOTDIR（XDG 布局）；之后的启动文件从它读取。
+# User .zshenv may change ZDOTDIR (XDG layouts); subsequent startup files are read from it.
 ASTERISM_USER_ZDOTDIR="$ZDOTDIR"
 ZDOTDIR="$ASTERISM_INTEGRATION_DIR"
 `,
@@ -48,7 +48,7 @@ _asterism_preexec() {
   _asterism_ran=1
   ${mark('133;C;%s')} "$_asterism_nonce"
 }
-# 首位 precmd 读取的 $? 才是前台命令的退出码。
+# Only the first precmd reads the foreground command's exit code from $?.
 precmd_functions=(_asterism_precmd "\${precmd_functions[@]}")
 preexec_functions+=(_asterism_preexec)
 `,
@@ -56,7 +56,7 @@ preexec_functions+=(_asterism_preexec)
 const bashRc = `_asterism_nonce="$ASTERISM_NONCE"
 _asterism_login="$ASTERISM_LOGIN"
 unset ASTERISM_NONCE ASTERISM_LOGIN
-# bash 登录模式会忽略 --rcfile；由此脚本按登录 shell 的顺序读取启动文件。
+# bash login mode ignores --rcfile; this script reads startup files in login-shell order.
 if [[ "$_asterism_login" == 1 ]]; then
   [[ -r /etc/profile ]] && source /etc/profile
   if [[ -r ~/.bash_profile ]]; then source ~/.bash_profile
@@ -87,7 +87,7 @@ _asterism_prompt() {
   ${mark('133;A;%s')} "$_asterism_nonce"
   _asterism_ready=1
 }
-# DEBUG 同时覆盖 macOS 自带的 Bash 3.2；保留用户已有 DEBUG handler。
+# DEBUG also supports macOS Bash 3.2; preserve the user's existing DEBUG handler.
 _asterism_previous_debug=$(trap -p DEBUG)
 _asterism_previous_debug=\${_asterism_previous_debug#trap -- }
 _asterism_previous_debug=\${_asterism_previous_debug% DEBUG}
@@ -137,7 +137,7 @@ if (Get-Module PSReadLine) {
 `;
 
 const written = new Map<string, Promise<string>>();
-/** 每次运行写入一次固定脚本，覆盖旧版本内容；返回集成目录。 */
+/** Writes the fixed scripts once per application run, replacing old contents; returns the integration directory. */
 export function ensureIntegration(root: string): Promise<string> {
   let pending = written.get(root);
   if (!pending) {
@@ -158,7 +158,7 @@ export function ensureIntegration(root: string): Promise<string> {
 }
 
 const loginFlags = ["-l", "--login", "-Login", "-login"];
-/** 按 shell 种类构造启动参数与环境；macOS 默认登录 shell，与系统终端一致。 */
+/** Builds startup arguments and environment by shell type; macOS defaults to a login shell, matching the system terminal. */
 export async function prepareLaunch(shell: ResolvedShell, root: string, nonce: string, platform: NodeJS.Platform = process.platform): Promise<ShellLaunch> {
   const kind = basename(shell.executable).replace(/\.exe$/i, "").toLowerCase();
   const env: Record<string, string> = {};
@@ -176,7 +176,7 @@ export async function prepareLaunch(shell: ResolvedShell, root: string, nonce: s
   if (kind === "bash") {
     const rc = join(await ensureIntegration(root), "bashrc");
     Object.assign(env, { ASTERISM_NONCE: nonce, ASTERISM_LOGIN: login ? "1" : "0" });
-    // 长选项须在单字符选项之前；登录模式由脚本模拟。
+    // Long options must precede single-character options; the script simulates login mode.
     return { args: ["--rcfile", rc, ...others.filter(arg => arg !== "-i"), "-i"], env, mode: "injected" };
   }
   if (kind === "pwsh" || kind === "powershell") {
@@ -186,7 +186,7 @@ export async function prepareLaunch(shell: ResolvedShell, root: string, nonce: s
     return { args: [...loginArgs, ...others, "-NoExit", "-Command", `. '${script.replaceAll("'", "''")}'`], env, mode: "injected" };
   }
   if (kind === "fish" || kind === "nu") {
-    // 两者自带 OSC 133；不注入脚本。
+    // Both provide OSC 133 natively; no script injection.
     return { args: [...login && platform !== "win32" ? ["-l"] : [], ...others], env, mode: "native" };
   }
   return { args: shell.profile.args, env, mode: "none" };

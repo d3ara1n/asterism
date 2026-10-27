@@ -6,7 +6,7 @@ import type { ContextFile, ResourceBackend, ResourceController } from "./contrac
 import { SessionError } from "../session/tree.ts";
 import { templateMessages } from "../shared/template-messages.ts";
 
-/** 后台资源 adapter 目录；资源内容投影由对应模块负责。 */
+/** Backend resource adapter catalog; corresponding modules own resource content projection. */
 export class ResourceRegistry {
   private readonly backends: ReadonlyMap<string, ResourceBackend>;
   constructor(backends: readonly ResourceBackend[]) {

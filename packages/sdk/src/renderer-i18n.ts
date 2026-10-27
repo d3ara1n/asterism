@@ -28,7 +28,7 @@ export function useI18n(): I18n {
 
 const cache = createIntlCache();
 
-/** 富文本映射只留在 React；默认文案仍由标准 defineMessages 声明和抽取。 */
+/** Rich-text mappings remain in React; default copy is still declared and extracted through standard defineMessages. */
 export function UiFormattedMessage({ message, values }: {
   message: UiMessage;
   values?: Record<string, string | number | boolean | ((chunks: ReactNode[]) => ReactNode)>;

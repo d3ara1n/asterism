@@ -1,14 +1,14 @@
 import type { SessionNode } from "../shared/session.ts";
 import { sessionTimeline } from "../shared/session-timeline.ts";
 
-/** 查询范围与契约筛选；省略 edge 时返回全部匹配节点。 */
+/** Query ranges and contract filters; omitted edge returns all matching nodes. */
 export interface NodeQuery {
   scope: "timeline" | "session";
   contracts?: readonly string[];
   edge?: "first" | "last";
 }
 export interface SequencedNode { node: SessionNode; sequence: number }
-/** 固定位置的节点读取柄；领域解码由消费方负责。 */
+/** Fixed-position node read handle; consumers own domain decoding. */
 export interface NodeView {
   readonly id: string;
   readonly title: string;
@@ -17,7 +17,7 @@ export interface NodeView {
   timelineIds(): readonly string[];
 }
 
-/** 已交付的不可变节点集合（前端与纯投影）也按需构造公开记录。 */
+/** Already-delivered immutable node sets in frontends and pure projections also construct public records on demand. */
 export function nodeView(id: string, title: string, nodes: readonly SessionNode[], nodeId: string | null): NodeView {
   const length = nodes.length;
   const fixedNodes = () => nodes.length === length ? nodes : nodes.slice(0, length);

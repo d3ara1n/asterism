@@ -10,7 +10,7 @@ import { MermaidDiagram } from "./MermaidDiagram";
 
 export const MarkdownStreamingContext = createContext(false);
 
-/** fenced code 的正文与语言直接取自 Markdown AST；着色交给公共 Pierre 视图。 */
+/** The fenced code body and language come directly from the Markdown AST; highlighting is handled by the shared Pierre view. */
 export function MarkdownCode({ code, language }: { code: string; language: string }) {
   const i18n = useI18n();
   const streaming = useContext(MarkdownStreamingContext);

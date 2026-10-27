@@ -14,7 +14,7 @@ import { mcpToolRenderers } from "./tool-views";
 import { useLifetimeSignal } from "../shared/use-lifetime";
 
 import { mcpCard as appearance } from "../shared/card-appearance.ts";
-/** 列：展开箭头 · 状态 · 名称 · 工具数 · 操作；各行以 subgrid 共用列宽，展开区从名称列起对齐。 */
+/** Columns: expand arrow · status · name · tool count · actions; rows share column widths through subgrid, and expanded content aligns with the name column. */
 const columns = "grid grid-cols-[auto_auto_minmax(0,1fr)_auto_auto] gap-x-1.5";
 const detail = "col-[3/-1] min-w-0";
 
@@ -23,13 +23,13 @@ function useOpenSettings() {
   return () => settings.open("asterism.builtin", "mcp");
 }
 
-/** 标题栏入口：服务器管理位于内置插件设置的 MCP 分区。 */
+/** Titlebar entry point: server management is in the MCP section of the built-in plugin settings. */
 function HostActions() {
   const i18n = useI18n(), openSettings = useOpenSettings();
   return <IconButton size="icon-xs" label={i18n.text(messages.openSettings)} onClick={openSettings}><Settings /></IconButton>;
 }
 
-/** 展开后才读取缓存目录；目录随模块状态事件刷新。 */
+/** Reads the cached catalog only when expanded; module state events refresh the catalog. */
 function ServerTools({ server }: { server: McpServerState }) {
   const i18n = useI18n();
   const { directory, error } = useMcpTools(server.id, true);
@@ -46,11 +46,11 @@ function ServerTools({ server }: { server: McpServerState }) {
   </div>;
 }
 
-/** 单台服务器：行内显示状态与当前可用的连接操作，展开审阅缓存工具。 */
+/** A single server: shows status and currently available connection actions inline; expand to review cached tools. */
 function ServerRow({ server }: { server: McpServerState }) {
   const i18n = useI18n(), calls = useRendererCalls(), lifetime = useLifetimeSignal();
   const [open, setOpen] = useState(false), [busy, setBusy] = useState(false);
-  // 连接在后台进行，结果经资源投影呈现；这里只防止同一入口重入。
+  // Connection runs in the background, with results shown through resource projection; this only prevents reentry at the same entry point.
   const connect = () => {
     const signal = lifetime();
     setBusy(true);

@@ -11,7 +11,7 @@ import { Input } from "@asterism/ui/ui/input";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectGroup, SelectItem } from "@asterism/ui/ui/select";
 import { cn } from "@asterism/ui/utils";
 
-/** 复杂值保留完整文本；无效输入阻止提交，不把部分值或旧值保存为新配置。 */
+/** Complex values retain complete text; invalid input prevents submission rather than saving partial or old values as new configuration. */
 function JsonInput({ id, value, onChange, required, title, description, actions }: {
   id: string; value: Json | undefined; onChange(value: Json | undefined): void; required: boolean; title: string; description?: string; actions?: ReactNode;
 }) {

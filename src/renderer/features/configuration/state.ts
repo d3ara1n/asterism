@@ -9,7 +9,7 @@ import { toast } from "../../shared/toast";
 type ConfigurationOperation = Exclude<ConfigurationCommand, { type: "read" }>;
 type ConfigurationSuccess = Extract<ConfigurationResult, { ok: true }>;
 
-/** 共享配置快照与读取异常；操作回执只更新成功快照，反馈归发起入口。 */
+/** Shared configuration snapshot and read errors; operation receipts update only successful snapshots, and feedback belongs to the initiating entry. */
 export function useConfiguration(active: boolean) {
   const [snapshot, setSnapshot] = useState<ConfigurationSnapshot | null>(null);
   const [readError, setReadError] = useState<UiText | null>(null);
@@ -39,16 +39,16 @@ function useConfigurationContext(): ConfigurationState {
   return value;
 }
 
-/** 读取入口只取得数据与读取状态；配置操作通过 useConfigurationAction 声明反馈归属。 */
+/** Read entries obtain only data and read state; configuration operations declare feedback ownership through useConfigurationAction. */
 export function useSettingsConfiguration(): Pick<ConfigurationState, "snapshot" | "readError" | "load"> {
   const { snapshot, readError, load } = useConfigurationContext();
   return { snapshot, readError, load };
 }
 
 /**
- * 每个表单、区块或快捷操作持有独立实例，busy 只阻止该入口重入。
- * inline 由调用处呈现 error；toast 由本 hook 提示。反馈通道为必填项。
- * run 返回成功回执，失败或重复进入返回 null；失败反馈已在选定通道承接。
+ * Each form, section, or quick action holds its own instance; busy prevents reentry only at that entry.
+ * For inline, the call site displays error; for toast, this hook displays it. The feedback channel is required.
+ * run returns a success receipt, or null on failure or reentry; the selected channel has already handled failure feedback.
  */
 export function useConfigurationAction(feedback: "inline" | "toast") {
   const { execute } = useConfigurationContext();

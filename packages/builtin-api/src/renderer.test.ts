@@ -6,9 +6,9 @@ const scope = () => { const value = new AbortController(); scopes.push(value); r
 afterEach(() => { for (const controller of scopes.splice(0)) controller.abort(); });
 const Component = () => null;
 
-describe("Agent UI 公共登记", () => {
-  // 公共 API 契约：重复身份必须显式失败，旧清理不得移除同名的新登记。
-  it("保留登记顺序并按登记实例释放，不覆盖同名贡献", () => {
+describe("Public Agent UI registration", () => {
+  // Public API contract: duplicate identities must fail explicitly, and old cleanup must not remove a new registration with the same name.
+  it("preserves registration order and releases by registration instance without overwriting contributions with the same name", () => {
     const first = scope(), second = scope();
     const remove = agentUI.register({ id: "example.ask/question", Component }, first);
     expect(() => agentUI.register({ id: "example.ask/question", Component }, second)).toThrow("Duplicate Agent UI");
@@ -23,8 +23,8 @@ describe("Agent UI 公共登记", () => {
     expect(agentUI.getSnapshot()).toEqual([]);
   });
 
-  // prepare 失败／超时通过 signal 清理，迟到的初始化不得重新挂上 UI。
-  it("取消释放贡献并通知订阅者，已取消的作用域拒绝登记", () => {
+  // prepare failure/timeout triggers cleanup through signal; late initialization must not reattach the UI.
+  it("cancellation releases contributions and notifies subscribers, and canceled scopes reject registration", () => {
     const controller = scope();
     let observed = 0;
     const stop = agentUI.subscribe(() => { observed = agentUI.getSnapshot().length; });

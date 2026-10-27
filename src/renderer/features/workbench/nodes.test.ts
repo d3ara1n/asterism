@@ -18,8 +18,8 @@ const snapshot = () => workbenchSnapshotSchema.parse({
 });
 const onView = () => {};
 
-describe("卡片尺寸与投影协调", () => {
-  it("折叠只撤销当前高度，展开恢复保存的宽高，恢复默认清除尺寸覆盖", () => {
+describe("Card size and projection coordination", () => {
+  it("collapsing removes only the current height, expanding restores saved width and height, and resetting defaults clears size overrides", () => {
     const state = snapshot();
     const expanded = workbenchNodes(state, [], registry, onView, new Map());
     state.views[0].collapsed = true;
@@ -31,7 +31,7 @@ describe("卡片尺寸与投影协调", () => {
       .toMatchObject({ width: 560, height: 640 });
   });
 
-  it("拖动与松手后的未确认尺寸不被旧投影覆盖，内容与选中状态仍更新", () => {
+  it("old projections do not overwrite dragging or unconfirmed dimensions after release, while content and selection still update", () => {
     const state = snapshot();
     const previous = workbenchNodes(state, [], registry, onView, new Map());
     previous[0] = { ...previous[0], width: 1000, height: 1100, resizing: true, selected: true };
@@ -45,7 +45,7 @@ describe("卡片尺寸与投影协调", () => {
     expect(workbenchNodes(state, resizing, registry, onView, new Map())[0]).toMatchObject({ width: 1200, height: 1300 });
   });
 
-  it("使用模块的尺寸下限；视口缩放不改变卡片尺寸", () => {
+  it("uses the module's minimum dimensions, and viewport zoom does not change card dimensions", () => {
     const state = snapshot();
     state.views[0].size = { width: 300, height: 200 };
     state.viewport.zoom = 0.25;

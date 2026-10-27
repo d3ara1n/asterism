@@ -21,7 +21,7 @@ import { useRendererObject } from "@asterism/sdk/renderer";
 import { mediaMessages } from "../messages/media";
 import { inputField, inputText } from "../shared/tool-preview";
 
-// Select 的非空占位值独立于实际 profile ID；选项值统一加前缀。
+// Select's nonempty placeholder value is independent of actual profile IDs; all option values receive a prefix.
 const DEFAULT_PROFILE = "default";
 const profileValue = (id: string) => `profile:${id}`;
 
@@ -88,7 +88,7 @@ function ImageBody({ result }: ToolRenderProps<z.infer<typeof TerminalSee.schema
     </div>
   </div>;
 }
-/** 终端状态行：state · cwd（集成时）· 末次退出码（集成时）· 错误信息 */
+/** Terminal status row: state · cwd (with integration) · latest exit code (with integration) · error message */
 function StatusRow({ data, children }: { data: TerminalStatus; children?: ReactNode }) {
   const i18n = useI18n();
   return <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 type-caption text-muted-foreground">
@@ -99,7 +99,7 @@ function StatusRow({ data, children }: { data: TerminalStatus; children?: ReactN
     {children}
   </div>;
 }
-/** 输入内容预览：text → [key] → ↵，按发送顺序拼接 */
+/** Input preview: text → [key] → ↵, concatenated in send order */
 function sentDisplay(args: ToolRenderProps["args"]): string | undefined {
   const text = inputText(args, "text"), key = inputText(args, "key"), enter = inputField(args, "enter") === true;
   if (text === undefined && key === undefined && !enter) return undefined;

@@ -28,7 +28,7 @@ export function defineEvent<I, D extends Json>(id: string, definition: EventDefi
     : Object.freeze({ kind: "occurrence" as const });
   return Object.freeze({ id, schema: definition.schema, source: definition.source, semantics });
 }
-/** 来源条件只筛选宿主信封；不解释领域载荷，不授予资源操作权限。 */
+/** Source conditions filter only the host envelope; they neither interpret domain payloads nor grant resource operation permissions. */
 export interface EventFilter { plugin?: string; sessionId?: string; resourceId?: string; resourceKind?: string }
 export interface EventSubscribeOptions {
   delivery?: "all" | "latest";
@@ -49,19 +49,19 @@ export interface EventSubscriber {
   subscribe<I, D extends Json>(contract: EventContract<I, D>, options: EventSubscribeOptions, handler: EventHandler<NoInfer<D>>): EventSubscription;
 }
 export interface EventPublisher {
-  /** 同步校验后立即投递，不等待消费完成，也不随事务回滚；需要确保已生效时在成功提交后发布。 */
+  /** Deliver immediately after synchronous validation, without waiting for consumption or rolling back with the transaction; publish after a successful commit when effects must be confirmed. */
   publish<I, D extends Json>(contract: EventContract<I, D>, data: NoInfer<I> & Json): void;
 }
 export interface PluginEvents extends EventSubscriber, EventPublisher {}
 
-/** 软件本身发布的公共事件：会话标题实际变化后发出，无插件与资源来源。 */
+/** Public event published by the application itself after a session title actually changes, with no plugin or resource source. */
 export const SessionTitleChanged = defineEvent("asterism/session-title", {
   schema: z.strictObject({ sessionId: z.string(), title: z.string() }),
   source: "host",
   semantics: { kind: "snapshot", key: ["sessionId"] },
 });
 
-/** 当前资源集合的瞬态变化；供跨会话的 UI 状态释放使用。 */
+/** Transient changes to the current resource set; used to release UI state across sessions. */
 export const ResourcePresenceChanged = defineEvent("asterism/resource-presence", {
   schema: z.strictObject({
     sessionId: z.string(),
@@ -72,7 +72,7 @@ export const ResourcePresenceChanged = defineEvent("asterism/resource-presence",
   semantics: { kind: "occurrence" },
 });
 
-/** 每次发布完整替换资源状态；running 持续展示，其他状态在查看会话时消费。 */
+/** Each publication fully replaces resource status; running remains visible, while other states are consumed when the session is viewed. */
 export const ResourceStatusChanged = defineEvent("asterism/resource-status", {
   schema: z.discriminatedUnion("status", [
     z.strictObject({

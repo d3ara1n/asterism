@@ -1,4 +1,4 @@
-/** core 领域库的声明用例；依赖 SDK，SDK 不依赖本文件。 */
+/** Declaration examples for the core domain library; depends on the SDK, which does not depend on this file. */
 import { z } from "zod";
 import { pluginNamespace } from "./draft-2026-10-12-plugin-sdk.ts";
 

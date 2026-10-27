@@ -19,16 +19,16 @@ function setup() {
   return service;
 }
 
-// IPC 只校验信封；领域服务校验命令并交付错误，应用列表不消费会话身份与执行位置。
-describe("运行时 IPC 校验", () => {
-  it("应用通道拒绝夹带会话位置，合法读取只返回列表", () => {
+// IPC validates envelopes only; domain services validate commands and deliver errors, while application lists do not consume session identity or execution position.
+describe("Runtime IPC validation", () => {
+  it("application channels reject embedded session positions and valid reads return only the list", () => {
     const service = setup();
     expect(dispatch(service, { version: protocolVersion, id: randomUUID(), command: { type: "workspace.read", session_id: randomUUID() } }))
       .toMatchObject({ result: { ok: false, error: { code: "invalid_request" } } });
     expect(service.execute({ type: "workspace.read" })).not.toHaveProperty("session");
   });
 
-  it("会话通道先拒绝非法命令，再执行合法读取并交付当前执行位置", async () => {
+  it("session channels reject invalid commands before executing valid reads and delivering current execution positions", async () => {
     const service = setup(), sessionId = service.sessions.tree.create("IPC");
     const command = { type: "read", sessionId };
     expect(await serveSession(service, { ...command, extra: true })).toMatchObject({ ok: false, error: { code: "invalid_request" } });

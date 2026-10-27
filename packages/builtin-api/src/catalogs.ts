@@ -3,7 +3,7 @@ import { modelCostSchema, modelReference, resolveModelSelection, thinkingSchema 
 import { agentSchema, type AgentSelection } from "./configuration.ts";
 import { builtin } from "./identity.ts";
 
-/** 应用投影给内置插件的目录；不包含配置文件格式、凭据、连接测试或覆盖编辑状态。 */
+/** Catalogs projected by the application for built-in plugins; excludes configuration file formats, credentials, connection tests, and override editing state. */
 export const AgentConfigurations = builtin.data("agent.configurations", z.array(agentSchema));
 const modelProviderSchema = z.object({ id: z.string(), name: z.string(), enabled: z.boolean() });
 const modelSchema = z.object({
@@ -27,7 +27,7 @@ export function resolveAgentModel<M extends CatalogModel>(snapshot: Omit<ModelCo
   return resolveAgentModelSelection(snapshot, { ...selection, thinking: null }).model;
 }
 
-/** 当前目录下的展示解析；保留原始覆盖与失效引用，请求仍独立取用其边界上的配置。 */
+/** Display resolution against the current catalogs; preserves raw overrides and invalid references, while requests independently use the configuration at their boundaries. */
 export function resolveAgentModelSelection<M extends CatalogModel>(
   snapshot: Omit<ModelConfigurationSnapshot, "models"> & { models: M[] },
   selection: Omit<AgentSelection, "agent"> & { agent: string | null },

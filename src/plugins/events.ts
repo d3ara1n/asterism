@@ -7,7 +7,7 @@ import { eventFilterSchema } from "../shared/plugin-events.ts";
 
 export interface EventPacket {
   readonly event: EventEnvelope;
-  /** 原始 JSON 输入；跨进程由接收端以同一契约解码，避免转换型 schema 被重复应用。 */
+  /** Raw JSON input; receivers decode across processes with the same contract so transforming schemas are not applied twice. */
   readonly wire: EventEnvelope;
 }
 interface Listener { filter?: EventFilter; queue: EventQueue<EventPacket> }
@@ -21,7 +21,7 @@ export function eventSubscriptionFailure(error: unknown): SubscriptionEnd {
     message: error instanceof Error ? error.message : String(error) };
 }
 
-/** 全局契约路由：校验、打来源戳后立即投递给匹配订阅；不保存状态，不随事务回滚。 */
+/** Global contract routing: validate, stamp origin, and immediately deliver to matching subscriptions; stores no state and does not roll back with transactions. */
 export class EventBus {
   private contracts = new Map<string, EventContract>();
   private listeners = new Map<string, Set<Listener>>();
@@ -30,7 +30,7 @@ export class EventBus {
     if (!belongsTo(owner, contract.id)) throw new PluginApiError("foreign_event", "The event contract belongs to another plugin.");
     this.declarePublic(contract);
   }
-  /** 软件登记的公共契约；发布身份仍由各契约的 source 约束。 */
+  /** Public contracts registered by software; each contract's source still constrains publisher identity. */
   declarePublic(contract: EventContract): void {
     if (this.stopped) throw new PluginApiError("unavailable", "The event bus is closed.");
     const previous = this.contracts.get(contract.id);

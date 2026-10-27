@@ -30,7 +30,7 @@ function compatible(request: string, candidate: string): boolean {
   return requested.language === available.language && requested.script === available.script;
 }
 
-/** 先按 language/script 筛选，再让成熟匹配器选地区。 */
+/** Filter by language/script first, then let the established matcher select regions. */
 export function matchLocale(request: string, available: readonly string[]): string | null {
   const locale = canonicalLocale(request);
   if (!locale) return null;
@@ -51,7 +51,7 @@ export function resolveLanguage(preference: string, system: readonly string[]): 
   return { locale: "en", interfaceLocale: "en" };
 }
 
-/** 参数类型来自 ICU AST；富文本 tag 不进入纯数据消息。 */
+/** ICU AST determines parameter types; rich-text tags stay outside pure-data messages. */
 export function messageParameters(message: string): Map<string, Set<string>> {
   const result = new Map<string, Set<string>>();
   const visit = (items: MessageFormatElement[]) => {
@@ -116,7 +116,7 @@ export class MessageFormatter {
     return intl;
   }
 
-  /** 富文本调用者也使用这一解析结果，保持整条消息语言一致。 */
+  /** Rich-text callers share this parse result to keep each complete message in one language. */
   resolve(message: UiMessage): ResolvedMessage {
     const key = `${message.owner}/${message.id}`;
     const previous = this.declarations.get(key);
@@ -138,7 +138,7 @@ export class MessageFormatter {
           this.resolved.set(cacheKey, resolved);
           return resolved;
         }
-      } catch { /* 单条坏译文回退。 */ }
+      } catch { /* Fall back for this invalid translation only. */ }
       this.diagnose(`Invalid translation: ${key} (${selected}).`);
     }
     const resolved = { locale: message.sourceLocale, message: message.defaultMessage, revision: `${message.owner}/source` };

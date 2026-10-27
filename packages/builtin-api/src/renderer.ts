@@ -3,13 +3,13 @@ import { pluginOf, pluginNamespace, type ThinkingLevel, type UiText } from "@ast
 import type { AgentSelection } from "./configuration.ts";
 import type { CatalogModel } from "./catalogs.ts";
 
-/** 每个已展开的 Agent 卡片挂载一份；通过 SDK useRendererObject 取得关联对象。 */
+/** One instance mounts per expanded Agent card; obtains the associated object through SDK useRendererObject. */
 export interface AgentUIContribution {
   readonly id: string;
   readonly Component: ComponentType;
 }
 
-/** 由内置实现和消费者共享的前端登记表；业务状态仍归贡献插件。 */
+/** The frontend registry shared by the built-in implementation and consumers; business state remains owned by the contributing plugin. */
 function createAgentUIRegistry() {
   let entries: readonly AgentUIContribution[] = [];
   const listeners = new Set<() => void>();
@@ -17,7 +17,7 @@ function createAgentUIRegistry() {
   return {
     getSnapshot: () => entries,
     subscribe(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener); }; },
-    /** 在 renderer.prepare 中登记；准备失败、超时或应用退出时随 signal 释放。 */
+    /** Register in renderer.prepare; released through signal on preparation failure, timeout, or application exit. */
     register(contribution: AgentUIContribution, { signal }: { signal: AbortSignal }): () => void {
       signal.throwIfAborted();
       const plugin = pluginOf(contribution.id);
@@ -42,7 +42,7 @@ function createAgentUIRegistry() {
 
 export const agentUI = createAgentUIRegistry();
 
-/** 当前选择与目录解析结果；不代表正在执行的请求所用模型，也不包含凭据。 */
+/** The current selection and catalog resolution result; does not represent the model used by an executing request and contains no credentials. */
 export interface AgentModelSelection {
   readonly selection: Readonly<AgentSelection> | null;
   readonly reference: string | null;
@@ -50,7 +50,7 @@ export interface AgentModelSelection {
   readonly thinking: ThinkingLevel | null;
 }
 const ModelSelection = createContext<AgentModelSelection | null>(null);
-/** 由内置 Agent 为同一卡片及其全部贡献注入只读选择。 */
+/** The built-in Agent injects a read-only selection for the same card and all its contributions. */
 export const AgentModelSelectionProvider = ModelSelection.Provider;
 export function useAgentModelSelection(): AgentModelSelection {
   const selection = useContext(ModelSelection);
@@ -64,7 +64,7 @@ export interface AgentToolbarItemProps {
 export type AgentOverlayPosition = "top" | "center" | "bottom";
 export interface AgentOverlayProps {
   position: AgentOverlayPosition;
-  /** 界面存在期间隐藏并禁用输入区；多个请求取或。 */
+  /** Hides and disables the input area while the UI exists; multiple requests are combined with OR. */
   hideComposer?: boolean;
   children: ReactNode;
 }
@@ -72,19 +72,19 @@ export interface AgentModalProps {
   open: boolean;
   title: UiText;
   description?: UiText;
-  /** 宽内容（例如方案比较）可主动使用更宽的标准模态窗。 */
+  /** Wide content, such as proposal comparisons, can explicitly use a wider standard modal. */
   size?: "default" | "wide";
-  /** 关闭只是界面意图；是否结束业务等待由插件处理。未提供时没有关闭入口。 */
+  /** Closing is only a UI intent; the plugin decides whether to end the business wait. No close control is provided when omitted. */
   onOpenChange?(open: boolean): void;
   hideComposer?: boolean;
   children: ReactNode;
 }
-/** overlay／modal 内的标准滚动视口；内置实现统一预留控件焦点光圈空间。 */
+/** The standard scroll viewport within an overlay/modal; the built-in implementation consistently reserves space for control focus rings. */
 export interface AgentScrollAreaProps extends ComponentProps<"div"> {
   axis?: "vertical" | "horizontal" | "both";
 }
 
-/** 内置 Agent 注入布局实现；公共包不依赖实现包或控件库。 */
+/** The built-in Agent injects the layout implementation; the public package does not depend on implementation packages or control libraries. */
 export interface AgentUIRenderer {
   ToolbarItem: ComponentType<AgentToolbarItemProps>;
   Overlay: ComponentType<AgentOverlayProps>;

@@ -4,8 +4,8 @@ import { builtin } from "./identity.ts";
 import { editOperationSchema } from "./text.ts";
 
 /**
- * 公共资源工具：声明只规定参数与语义；target 选择什么、结果包含什么由各资源实现声明。
- * 第三方资源可实现同一声明，模型以同一工具名操作不同资源。
+ * Public resource tools: declarations specify only parameters and semantics; each resource implementation declares what target selects and what results contain.
+ * Third-party resources can implement the same declaration, letting models operate on different resources through the same tool name.
  */
 export const List = defineTool({
   id: builtin.name("tool.list"),

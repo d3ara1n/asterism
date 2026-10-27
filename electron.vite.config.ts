@@ -8,7 +8,7 @@ import { coreId } from "./src/shared/core.ts";
 export default defineConfig({
   main: {
     build: {
-      // 工作区源码包随应用静态编译，发布产物不在运行时读取仓库中的 .ts。
+      // Workspace source packages are compiled statically with the app; release artifacts do not read repository .ts files at runtime.
       externalizeDeps: {
         exclude: ["@asterism/sdk", "@asterism/builtin-api", "@asterism/builtin", "@asterism/ui"],
         include: ["node-pty", "@xterm/headless", "@xterm/addon-serialize", "@vscode/ripgrep"],
@@ -45,7 +45,7 @@ export default defineConfig({
       {
         name: coreId("development-csp"),
         apply: "serve",
-        // React Fast Refresh 的开发入口包含内联 preamble；发布构建不放宽脚本策略。
+        // The React Fast Refresh development entry includes an inline preamble; release builds keep the script policy unchanged.
         transformIndexHtml: html => html.replace("script-src 'self' asterism-plugin:;", "script-src 'self' asterism-plugin: 'unsafe-inline';"),
       },
     ],

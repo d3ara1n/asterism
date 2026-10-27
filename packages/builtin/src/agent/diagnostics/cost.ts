@@ -5,7 +5,7 @@ import {
 import { type CatalogModel } from "@asterism/builtin-api/contracts";
 import type { DiagnosticRequest } from "./history.ts";
 
-/** scope 保存实际模型身份；旧记录只有表达式时必须唯一匹配，不能随意剥掉模型名中的冒号。 */
+/** scope stores the actual model identity; older records with only an expression require a unique match, without arbitrarily stripping colons from model names. */
 export function diagnosticModel(request: Pick<DiagnosticRequest, "model" | "modelScope">, models: readonly CatalogModel[]): CatalogModel | null {
   if (request.modelScope) {
     let scope: unknown;
@@ -18,14 +18,14 @@ export function diagnosticModel(request: Pick<DiagnosticRequest, "model" | "mode
   return matches.length === 1 ? matches[0]! : null;
 }
 
-/** 总量为零时子项必为零；其他未知子项不擅自补零。负值标记相互矛盾的用量。 */
+/** A zero total implies zero subtotals; other unknown subtotals are not filled with zero. Negative values mark contradictory usage. */
 function split(total: number | null, parts: (number | null)[]): { rest: number | null; parts: (number | null)[] } {
   const known = parts.reduce<number>((sum, value) => sum + (value ?? 0), 0);
   if (total !== null && known > total) return { rest: -1, parts: parts.map(() => -1) };
   if (total === 0) return { rest: 0, parts: parts.map(() => 0) };
   return { rest: total === null || parts.some(value => value === null) ? null : total - known, parts };
 }
-/** 当前上游协议只有 token 总量与缓存／思考细分，其他模态数量与秒数、张数均不能推断。 */
+/** The current upstream protocol provides only token totals and cache/thinking breakdowns; quantities for other modalities, seconds, and image counts cannot be inferred. */
 export function estimateUsageCost(usage: Usage | null, cost: ModelCost | null, inputHasFiles: boolean | null) {
   const input = usage?.input ?? null;
   const output = usage?.output ?? null;
@@ -37,7 +37,7 @@ export function estimateUsageCost(usage: Usage | null, cost: ModelCost | null, i
     { modality: "text", item: "cacheRead", quantity: textInput(inputs.parts[0]!), unit: "token" },
     { modality: "text", item: "cacheWrite", quantity: textInput(inputs.parts[1]!), unit: "token" },
   ];
-  // output 已包含 reasoning；只有显式配置独立思考价才拆分，否则按输出总价计算一次。
+  // output already includes reasoning; split thinking out only when a separate thinking price is explicitly configured, otherwise charge the output total once.
   if (selected.rates?.text.reasoning) {
     const outputs = split(output, [usage?.reasoning ?? null]);
     quantities.push({ modality: "text", item: "output", quantity: outputs.rest, unit: "token" },

@@ -13,7 +13,7 @@ async function execute<K extends ContentReply["kind"]>(command: ContentCommand, 
   return result.reply as Extract<ContentReply, { kind: K }>;
 }
 
-/** 消费者提前退出 for-await 时关闭读取；分块协议不暴露给插件组件。 */
+/** Close the read when a consumer exits for-await early; the chunking protocol is not exposed to plugin components. */
 export function contentReader(source: () => Source | Promise<Source>, request = execute): ContentReader {
   const open = async function* (ref: ContentRef, range?: ContentRange): AsyncIterable<Uint8Array> {
     const { readerId } = await request({ type: "read.open", source: await source(), ref, range }, "reader");
@@ -38,7 +38,7 @@ export function contentReader(source: () => Source | Promise<Source>, request = 
   } };
 }
 
-/** 惰性打开草稿；普通文本创建不发生内容 IPC。 */
+/** Open drafts lazily; plain text creation performs no content IPC. */
 export function contentInput(target: Target): RendererContentInput {
   const bound = { ...target };
   let scope: Promise<string> | undefined, closed = false;
@@ -93,7 +93,7 @@ export async function contentCommand(content: RendererContentInput | undefined, 
   run: (scopeId: string | undefined) => Promise<RendererReceipt>): Promise<RendererReceipt> {
   try {
     const receipt = await run(await contentScopeId(content, target));
-    // 成功即消费草稿；失败保留以便重试同一份上传。
+    // Success consumes the draft; failure retains it so the same upload can be retried.
     if (receipt.ok) await content?.close();
     return receipt;
   } catch (error) { return { ok: false, error: { code: "unavailable", message: error instanceof Error ? error.message : "Content input is unavailable." } }; }

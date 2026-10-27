@@ -18,7 +18,7 @@ const coreVersion = (version: string) => {
   return `${parsed.major}.${parsed.minor}.${parsed.patch}`;
 };
 
-/** 正式版前以首个发布 tag 为基线，之后以上个正式版为基线累计版本影响。 */
+/** Accumulate version impact from the first release tag before a stable release, then from the previous stable release. */
 export function planRelease(input: ReleaseInput): ReleasePlan | null {
   const published = [...input.releases].sort((a, b) => rcompare(versionOf(a), versionOf(b)));
   const stable = published.find(release => !release.prerelease && prerelease(versionOf(release)) === null);
@@ -33,7 +33,7 @@ export function planRelease(input: ReleaseInput): ReleasePlan | null {
     const parsed = parse(versionOf(source))!;
     if (!parsed.prerelease.length) throw new Error("The selected release has no prerelease version suffix.");
     version = coreVersion(versionOf(source));
-    // 正式号高于同目标的所有预发布；晋级旧候选会让较新预发布用户装回旧代码。
+    // A stable version exceeds all prereleases for the same target; promoting an old candidate would send newer prerelease users back to old code.
     if (published.some(release => release.prerelease && coreVersion(versionOf(release)) === version && gt(versionOf(release), parsed)))
       throw new Error("Select the newest prerelease for this target version.");
     if (stableVersion && !gt(version, stableVersion)) throw new Error("Promotion must be newer than the latest stable release.");
@@ -42,7 +42,7 @@ export function planRelease(input: ReleaseInput): ReleasePlan | null {
   } else {
     if (!hasReleasableChanges(input)) return null;
     let target = "0.1.0";
-    // 无历史 tag 时固定初始目标；首包之前的提交不参与后续版本计算。
+    // Fix the initial target when no historical tag exists; commits before the first package do not affect subsequent version calculations.
     const baseline = stable ?? published.at(-1);
     if (baseline) {
       const levels = commitsAfter(input.commits, baseline.sha).map(commit => commit.level);

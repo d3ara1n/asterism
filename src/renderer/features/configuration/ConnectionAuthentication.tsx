@@ -14,7 +14,7 @@ export interface ConnectionCredentialDraft {
   key: string;
 }
 
-/** 认证控件按认证方式组合；固定方式仍允许填写、更换和清除凭据。 */
+/** Compose authentication controls by method; a fixed method still allows entering, replacing, and clearing credentials. */
 export function ConnectionAuthentication({ auth, editable, credentialState, storageAvailable, draft, onAuthChange, onDraftChange }: {
   auth: "api_key" | "none";
   editable: boolean;

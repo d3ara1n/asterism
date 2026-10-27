@@ -2,7 +2,7 @@ import type { EventQueue } from "../shared/event-queue.ts";
 import type { EventControl, EventFrame } from "../shared/plugin-events.ts";
 import { eventSubscriptionFailure, type EventBus, type EventPacket } from "../plugins/events.ts";
 
-/** 一条受信 renderer 连接：逐条转发原始信封；latest 合并在接收端按同一契约进行。 */
+/** One trusted renderer connection: forward raw envelopes individually; receivers coalesce latest values under the same contract. */
 export class EventPeer {
   private subscriptions = new Map<string, EventQueue<EventPacket>>();
   constructor(private readonly bus: EventBus, private readonly send: (frame: EventFrame) => void) {}
@@ -17,11 +17,11 @@ export class EventPeer {
       void queue.closed.then(end => {
         if (this.subscriptions.get(command.id) !== queue) return;
         this.subscriptions.delete(command.id);
-        try { this.send({ type: "closed", id: command.id, end }); } catch { /* 连接已关闭。 */ }
+        try { this.send({ type: "closed", id: command.id, end }); } catch { /* The connection is closed. */ }
       });
       this.send({ type: "ready", id: command.id });
     } catch (error) {
-      try { this.send({ type: "closed", id: command.id, end: eventSubscriptionFailure(error) }); } catch { /* 连接已关闭。 */ }
+      try { this.send({ type: "closed", id: command.id, end: eventSubscriptionFailure(error) }); } catch { /* The connection is closed. */ }
     }
   }
   close(): void {

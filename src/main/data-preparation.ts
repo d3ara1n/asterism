@@ -5,10 +5,10 @@ import { observeProcess } from "./logging.ts";
 
 export type PreparationAction = { kind: "prepare" } | RecoveryAction;
 
-/** 尚未确认进程退出时只允许重启应用，恢复操作仍需独占数据目录。 */
+/** Only application restart is allowed until process exit is confirmed; recovery operations require exclusive access to the data directory. */
 export class PreparationTerminationError extends Error {}
 
-/** 工作期间无启动期限；最终结果到达后由主进程终止，确认退出才交付结果。 */
+/** No startup deadline during work; the main process terminates after the final result and delivers it only after exit confirmation. */
 export function prepareDataProcess(entry: string, root: string, version: string, action: PreparationAction, signal: AbortSignal,
   onHost: (status: "migrating" | "ready") => void = () => {},
   onProgress: (progress: PreparationProgress) => void = () => {},
@@ -66,7 +66,7 @@ export function prepareDataProcess(entry: string, root: string, version: string,
     child.once("exit", code => {
       signal.removeEventListener("abort", abort);
       clearTimeout(timer);
-      // 收到最终结果后的主动结束允许非零退出码；提前退出始终失败。
+      // Intentional termination after the final result allows nonzero exit codes; premature exit always fails.
       if (failure || !result) reject(failure ?? new Error(`Data preparation exited before delivering its result. code=${code}`));
       else resolve(result);
     });

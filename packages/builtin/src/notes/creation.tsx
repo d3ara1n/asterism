@@ -9,7 +9,7 @@ import { commonMessages } from "../messages/common";
 
 type Value = { title: string; content: string };
 
-/** 笔记在提交时检查名称；拖入文本时正文预填。 */
+/** Notes validate the name on submission; dropped text prefills the body. */
 export function NoteInput({ initialInput, busy, resolve, cancel }: CreationInputProps<Partial<Value>>) {
   const i18n = useI18n();
   const titleInput = useRef<HTMLInputElement>(null);

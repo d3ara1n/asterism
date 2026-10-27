@@ -15,7 +15,7 @@ export const settingsMessages = builtin.messages("en", defineMessages({
   autoCollapse: { id: "settings.autoCollapse", defaultMessage: "Automatically collapse when streaming finishes" },
 }));
 
-/** 内置插件的托管配置；页面布局独立于存储契约。 */
+/** Managed configuration for the built-in plugin; page layout is independent of the storage contract. */
 export const BuiltinSettings = builtin.config(z.object({
   autoExpand: z.boolean().default(true), autoCollapse: z.boolean().default(true),
   shell: shellSettingsSchema.default(defaultShellSettings),

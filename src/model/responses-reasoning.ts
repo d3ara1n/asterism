@@ -13,7 +13,7 @@ function encodingFailure(): never {
   throw new ModelFailure("protocol_encoding", "The Responses encoder cannot preserve the requested plain-text reasoning order.");
 }
 
-/** 在 SDK 编码前固定顺序；原生文件、工具和普通消息仍交给 SDK 编码。 */
+/** Fix order before SDK encoding; the SDK still encodes native files, tools, and ordinary messages. */
 function prepare(options: CallOptions, contentShape: "array" | "object"): { prompt: CallOptions["prompt"]; steps: InputStep[] } | null {
   if (!options.prompt.some(message => message.role === "assistant" && message.content.some(part => part.type === "reasoning"))) return null;
   const openai = options.providerOptions?.openai;
@@ -62,7 +62,7 @@ function prepare(options: CallOptions, contentShape: "array" | "object"): { prom
   return { prompt, steps };
 }
 
-/** SDK 已序列化的输入必须与计划逐项对应；升级造成形状变化时明确失败，不猜测位置。 */
+/** Serialized SDK input must correspond to the plan item by item; fail explicitly on upgrade-induced shape changes without guessing positions. */
 function insertThinking(body: unknown, steps: readonly InputStep[]): unknown {
   if (!body || typeof body !== "object" || Array.isArray(body)) encodingFailure();
   const request = body as Record<string, unknown>;
@@ -89,10 +89,10 @@ function insertThinking(body: unknown, steps: readonly InputStep[]): unknown {
   return { ...request, input };
 }
 
-/** 公共思考的原生编码；兼容配置仅改变字段形状与参数，不决定明文是否参与请求。 */
+/** Native encoding of public reasoning; compatibility configuration changes only field shapes and parameters, not plaintext participation. */
 export function withResponsesReasoning(createModel: (transport: typeof fetch) => ResponsesModel, transport: typeof fetch,
   fields: { reasoningContent: "array" | "object"; encryptedContent: boolean; reasoningSummary: boolean }) {
-  // SDK 会自行加入密文 include 和默认摘要，须在最终请求边界应用端点字段约定。
+  // The SDK adds ciphertext include and default summaries itself; apply endpoint field conventions at the final request boundary.
   const wireFetch: typeof fetch = (url, init) => {
     if (fields.encryptedContent && fields.reasoningSummary) return transport(url, init);
     if (typeof init?.body !== "string") encodingFailure();

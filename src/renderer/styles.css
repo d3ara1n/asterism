@@ -1,15 +1,15 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "katex/dist/katex.min.css";
-/* 画布基础样式先于下方覆盖规则加载，顺序独立于工作台的异步装载。 */
+/* Load base canvas styles before the overrides below, independently of asynchronous workbench loading. */
 @import "@xyflow/react/dist/style.css";
 @source "../../packages/builtin/src";
 @source "../../packages/ui/src";
 
-/* 主题 token、两种表面、窗口与编织布局机制；公共控件经 packages/ui 消费语义 token。 */
+/* Theme tokens, two surfaces, window and weave layout mechanisms; public controls consume semantic tokens through packages/ui. */
 :root {
   color-scheme: light;
-  /* shadcn 标准语义 token；组件与业务只消费这一层。主题替换整组值即可。 */
+  /* Standard shadcn semantic tokens; components and business code consume only this layer. Replace the whole set to change themes. */
   --radius: 8px;
   --background: #ffffff;
   --foreground: #202020;
@@ -40,22 +40,22 @@
   --border: #e0e0e0;
   --input: #d9d9d9;
   --ring: #bbbbbb;
-  /* 星图扩展：画布底色、纹理与选区。 */
+  /* Asterism extensions: canvas background, texture, and selection. */
   --canvas: #f0f0f0;
   --canvas-grid: #d9d9d9;
   --selection: #d9d9d9;
-  /* 图表分类色：Radix 第 9 级，亮暗同值；运行时由 themeTokens 写入。 */
+  /* Chart categorical colors: Radix step 9, identical in light/dark modes; written by themeTokens at runtime. */
   --chart-1: #0090ff; --chart-2: #12a594; --chart-3: #ffc53d; --chart-4: #6e56cf;
   --chart-5: #e93d82; --chart-6: #f76b15; --chart-7: #00a2c7; --chart-8: #ab4aba;
-  /* 受管空间内边距：浮岛顶边与页面顶边对齐。 */
+  /* Managed space padding: align island tops with page tops. */
   --space-inset: 0px;
   --motion-fast: 200ms;
   --motion-page: 560ms;
   --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
-  /* 屏切换：指数型缓出，起步迅速、长尾缓慢落定，不越过终点。 */
+  /* Screen transitions: exponential ease-out, fast initially with a slow settling tail and no overshoot. */
   --ease-page: cubic-bezier(0.16, 1, 0.3, 1);
 }
-/* 暗色首帧兜底（graphite + gray）；运行时由 themeTokens 覆盖。 */
+/* Dark first-frame fallback (graphite + gray); overridden by themeTokens at runtime. */
 @media (prefers-color-scheme: dark) {
   :root {
     color-scheme: dark;
@@ -75,7 +75,7 @@
     --canvas: #111111; --canvas-grid: #3a3a3a; --selection: #3a3a3a;
   }
 }
-/* shadcn 组件自带的 dark: 类绑定到解析后的亮暗；业务代码不写 dark:。 */
+/* shadcn dark: classes bind to resolved light/dark mode; business code does not specify dark:. */
 @custom-variant dark (&:where([data-mode=dark], [data-mode=dark] *));
 @theme inline {
   --color-background: var(--background);
@@ -116,7 +116,7 @@
   --color-chart-6: var(--chart-6);
   --color-chart-7: var(--chart-7);
   --color-chart-8: var(--chart-8);
-  /* 字体由外观设置在 :root 写入 --app-font-sans / --app-font-mono；此处为未加载前的回退。 */
+  /* Appearance settings write --app-font-sans / --app-font-mono to :root; these are pre-load fallbacks. */
   --font-sans: var(--app-font-sans, system-ui, -apple-system, "Segoe UI Variable Text", "Segoe UI", "PingFang SC", "Microsoft YaHei UI", "Noto Sans CJK SC", sans-serif);
   --font-mono: var(--app-font-mono, ui-monospace, "SF Mono", Menlo, Consolas, "Cascadia Mono", "Noto Sans Mono CJK SC", monospace);
   --radius-sm: calc(var(--radius) - 4px);
@@ -124,8 +124,8 @@
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
 }
-/* 唯二的表面：内容面与 Card 一致（实色 + 1px 边框），浮层与 Popover 一致（实色 + 边框 + 阴影）。
-   不能使用 Card 组件的位置（窗口部件、浮岛底板、动画元素）用这两个 utility。 */
+/* The only two surfaces: content matches Card (solid + 1px border), overlays match Popover (solid + border + shadow).
+   Use these utilities where Card components cannot be used, such as window parts, island bases, and animated elements. */
 @utility surface { @apply rounded-lg border bg-card text-card-foreground; }
 @utility surface-floating { @apply rounded-lg border bg-popover text-popover-foreground shadow-md; }
 @layer base {
@@ -139,11 +139,11 @@
   ::selection { background: var(--selection); }
 }
 @layer components {
-  /* 字号层级：展示数字 / 页面标题 / 区块标题 / 正文 / 说明 / 标签。 */
+  /* Type hierarchy: display numbers / page titles / section titles / body / descriptions / labels. */
   .type-display { @apply text-4xl font-light leading-none tracking-tight tabular-nums; }
   .type-page { @apply text-xl font-semibold tracking-tight; }
   .type-section { @apply text-sm font-semibold; }
-  /* 代码文字：代码字体 + 代码字号（未设置时跟随所在文字）；代码块、行内代码与编辑器统一使用。 */
+  /* Code text: code font + code size (inheriting surrounding text when unset), shared by blocks, inline code, and editors. */
   .type-code { font-family: var(--font-mono); font-size: var(--code-font-size, 1em); }
   .type-body { @apply text-sm leading-relaxed; }
   .type-caption { @apply text-xs leading-relaxed text-muted-foreground; }
@@ -153,15 +153,15 @@
     @apply grid h-dvh min-h-0 overflow-hidden text-foreground;
     grid-template-rows: var(--window-header-height) minmax(0, 1fr);
     gap: var(--window-gap);
-    /* 外边距只给标题栏；主体行贴住窗口左右下边缘，边距由 Space 在滚动容器内部提供。 */
+    /* Only titlebars receive outer margins; body rows meet window side/bottom edges, with Space supplying margins inside scroll containers. */
     padding-top: var(--window-gutter);
-    /* 没有全窗口底色，间隙直接露出主进程的系统材质或实色回退。 */
+    /* No full-window background; gaps expose main-process system materials or solid fallbacks directly. */
     -webkit-app-region: drag;
     app-region: drag;
   }
   .window * {
-    /* Electron 44 中区域属性会继承。必须用 CSS-wide initial 清除区域贡献；
-       显式 none 也会按历史兼容规则生成 no-drag，不能用它重置后代。 */
+    /* Electron 44 inherits region properties. Clear region contributions with CSS-wide initial;
+       explicit none also generates no-drag under legacy compatibility rules and cannot reset descendants. */
     window-drag: initial;
   }
   .titlebar {
@@ -180,19 +180,19 @@
   .window-actions { @apply shrink-0 gap-0.5; }
   .window-actions[data-hidden="true"] { visibility: hidden; }
   .window[data-titlebar="macos"][data-fullscreen="false"] .window-navigation {
-    /* 按集中配置的原生按钮坐标对称避让；不使用 titlebar-area-x，其值包含系统额外留白。 */
+    /* Symmetrically avoid native button coordinates from centralized configuration; titlebar-area-x includes extra system spacing. */
     padding-inline-start: var(--mac-controls-inset);
   }
   .window[data-titlebar="overlay"][data-fullscreen="false"] .titlebar {
-    /* Windows/Linux 共用官方可用区域；同时兼容桌面将按钮放在左侧的布局。
-       控件与菜单之间保留 window-gap，不限制系统按钮的实际占用宽度。 */
+    /* Windows/Linux share the official available area, including desktops with left-side buttons.
+       Keep window-gap between controls and menus without limiting actual system-button width. */
     padding-left: max(0px, calc(env(titlebar-area-x, 0px) + var(--window-gap) - var(--window-gutter)));
     padding-right: max(0px, calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, calc(100vw - 138px)) + var(--window-gap) - var(--window-gutter)));
   }
 
-  /* 受管空间：唯一负责与窗口的关系；屏自左向右平铺，整屏平移切换（左浅右深）。 */
+  /* Managed space alone owns the window relationship; screens tile left to right and translate as a whole, shallower left and deeper right. */
   .space {
-    /* clip 而非 hidden：hidden 仍可被 focus/scrollIntoView 程序化滚动，会打乱平移方向。 */
+    /* Use clip rather than hidden: focus/scrollIntoView can still scroll hidden programmatically and disrupt translation direction. */
     @apply relative min-h-0 min-w-0 overflow-clip;
     -webkit-app-region: no-drag;
     app-region: no-drag;
@@ -204,7 +204,7 @@
     transition: transform var(--motion-page) var(--ease-page);
   }
   .space-screen { @apply relative isolate h-full min-h-0 w-full shrink-0 overflow-hidden rounded-lg outline-none; }
-  /* 屏铺满 Space、贴住窗口边缘；滚动容器在屏内部留出 --space-inset。带底板的屏自身让出边距。 */
+  /* Screens fill Space to window edges; internal scroll containers reserve --space-inset. Screens with surfaces supply their own margins. */
   .space-screen[data-surface] {
     @apply surface bg-canvas;
     margin: 0 var(--space-inset) var(--space-inset);
@@ -217,20 +217,20 @@
     -webkit-app-region: no-drag;
     app-region: no-drag;
   }
-  /* Portal 位于 shell 外，浮层需要显式排除其下方的底座拖动区域；按 shadcn 的 data-slot 识别。 */
+  /* Portals sit outside shells; overlays must explicitly exclude underlying drag regions, identified by shadcn data-slot. */
   [data-slot$="-overlay"], [data-slot$="-content"] {
     -webkit-app-region: no-drag;
     app-region: no-drag;
   }
   [data-slot$="-content"] * { window-drag: initial; }
 
-  /* 应用导航与主内容为相邻浮岛；首页输入框与模板卡片形成表面，其余透出窗口材质。 */
+  /* App navigation and main content are neighboring islands; home inputs and template cards form surfaces while the rest expose window material. */
   .app-sidebar { @apply flex h-full min-h-0 flex-col p-3; }
   .home-page { @apply flex h-full overflow-y-auto px-6 py-10; padding-inline: calc(1.5rem + var(--space-inset)); }
   .home-content { @apply m-auto w-full max-w-5xl shrink-0; }
 
-  /* 设置：分类卡片平铺在材质上；分类详情绝对定位叠在总览之上，以卡片为原点淡入放大。 */
-  /* 浮岛编织：屏内浮岛自左向右；放得下时分栏居中，放不下时溢出并跟随焦点。 */
+  /* Settings: category cards sit on the material; details overlay the overview absolutely and fade/scale from the card origin. */
+  /* Island weave: left-to-right islands center in columns when they fit, otherwise overflow and follow focus. */
   .weave-viewport { @apply relative min-h-0 min-w-0 overflow-clip; }
   .weave-strip { position: absolute; inset: 0 var(--space-inset) var(--space-inset); }
   .island { @apply absolute top-0 left-0 h-full outline-none; }
@@ -240,16 +240,16 @@
   }
   .island[data-focused] > .island-backdrop { border-color: var(--ring); }
   .island-body { @apply relative h-full overflow-y-auto; }
-  /* 带底板的浮岛：内容区内缩一个边框宽度并按内圆角裁切，任何内容都盖不住边框与焦点高光，也不会从圆角露出。 */
+  /* Surfaced islands inset content by one border width and clip to inner radii, keeping borders and focus highlights visible without corner leakage. */
   .island[data-surface] > .island-body { position: absolute; inset: 1px; height: auto; border-radius: calc(var(--radius) - 1px); }
-  /* 面板浮岛：标题栏固定，内容区单独滚动；body 不再滚动，由内容区承担。 */
+  /* Panel islands: fixed titlebar and independently scrolling content; content areas take over body scrolling. */
   .island-body:has(> .island-panel) { overflow: hidden; }
   .island-panel { @apply flex h-full min-h-0 flex-col; }
   .island-panel-header { @apply flex shrink-0 items-center gap-2 border-b py-2.5 pr-2.5 pl-5; }
   .island-panel-content { @apply min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-5; }
   .island[data-peek] { cursor: pointer; }
   .island[data-peek] > .island-body { opacity: 0.6; transition: opacity var(--motion-fast); }
-  /* 溢出时的分段导航：命中区占满底部留白，可见条居中；可见浮岛加深，焦点浮岛最深。 */
+  /* Overflow segmented navigation fills bottom spacing with its hit area and centers visible bars; visible islands darken and focused islands are darkest. */
   .weave-indicator { @apply absolute bottom-0; height: var(--space-inset); inset-inline: var(--space-inset); }
   .weave-segment { @apply absolute inset-y-0 cursor-pointer rounded-full outline-none; }
   .weave-segment::before {
@@ -265,34 +265,34 @@
     @apply grid gap-3;
     grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   }
-  /* 卡片外观来自官方 Item，详情底板来自 Card。 */
+  /* Card appearance comes from the official Item; detail surfaces come from Card. */
   .settings-card { @apply text-left; }
   .settings-detail { @apply absolute inset-x-0 top-0 max-h-full overflow-y-auto overscroll-contain; }
 }
-/* 启动屏在工作台装载前独立显示，保留原生窗口拖动与控件。 */
+/* Startup screens display independently before workbench loading, preserving native window dragging and controls. */
 .startup-screen { display: flex; height: 100%; padding: 3rem 1.5rem; flex-direction: column; align-items: center; justify-content: center; gap: 0.75rem; color: var(--muted-foreground); font-family: var(--font-sans); font-size: 0.8125rem; -webkit-app-region: drag; }
 .startup-content { width: min(100%, 32rem); text-align: center; -webkit-app-region: no-drag; }
 .startup-indicator { width: 1.25rem; height: 1.25rem; border-radius: 9999px; border: 2px solid var(--border); border-top-color: var(--muted-foreground); animation: startup-spin 0.8s linear infinite; }
 .startup-stage { margin: 0; min-height: 1.25em; }
-/* 等待内容延迟显现：快速启动在显现前完成，不闪现加载画面；React 接管时以内联负延迟续接静态占位的计时。 */
+/* Delay waiting content so fast startup never flashes loading; React uses an inline negative delay to continue static-placeholder timing. */
 .startup-reveal { display: flex; flex-direction: column; align-items: center; gap: 0.75rem; animation: startup-reveal var(--motion-fast) var(--ease-out) 300ms backwards; }
 @keyframes startup-reveal { from { opacity: 0; } }
 @keyframes startup-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .startup-indicator { animation-duration: 2.4s; } }
 .react-flow__attribution { background: transparent !important; font-size: 9px !important; }
-/* xflow 的光标全由状态类推出，与按键无关；工作台的实际手势是空白处左键框选、
-   中/右键平移、按住空格后左键平移，卡片仅标题栏可拖。选择器前面缀 .react-flow
-   以稳定压过 xflow 自带样式。 */
+/* xflow cursors derive entirely from state classes, independently of keys; workbench gestures are left-button box selection on empty space,
+   middle/right-button panning, Space + left-button panning, and titlebar-only card dragging. Prefix selectors with .react-flow
+   to reliably override xflow's own styles. */
 .react-flow .react-flow__pane,
 .react-flow .react-flow__pane.selection { cursor: default; }
-/* 可左键平移的状态：按住空格（draggable 此时才挂上）与平移中。 */
+/* States allowing left-button panning: holding Space (only then is draggable attached) and active panning. */
 .react-flow .react-flow__pane.draggable { cursor: grab; }
 .react-flow .react-flow__pane.dragging { cursor: grabbing; }
-/* 节点外壳铺满整张卡片，但只有卡片拖动柄能起拖；外壳不承担手势光标，
-   否则内容区会显示并无拖动行为的抓取手型。拖动中指针常移出拖动柄，仍给出 grabbing。 */
+/* Node shells fill cards, but only card drag handles initiate dragging; shells do not own gesture cursors,
+   or content would show a grab cursor without drag behavior. Pointers often leave handles while dragging, so retain grabbing then. */
 .react-flow .react-flow__node.draggable { cursor: default; }
 .react-flow .react-flow__node.draggable.dragging { cursor: grabbing; }
-/* 原生滚动条保留可拖动轨道，内容溢出时直接提供入口。 */
+/* Native scrollbars retain draggable tracks, directly exposing an entry when content overflows. */
 .content-scrollbar::-webkit-scrollbar { width: 0.625rem; height: 0.625rem; }
 .content-scrollbar::-webkit-scrollbar-track,
 .content-scrollbar::-webkit-scrollbar-corner { background: transparent; }
@@ -304,7 +304,7 @@
 }
 .content-scrollbar::-webkit-scrollbar-thumb:hover { background-color: var(--foreground); }
 
-/* 无样式 Markdown 引擎只输出语义节点，排版沿用公共文字与表面 token。 */
+/* The unstyled Markdown engine emits semantic nodes only; typography uses shared text and surface tokens. */
 .markdown-content :where(p, ul, ol, blockquote, hr) { margin-block: 1rem; }
 .markdown-content :where(h1, h2, h3, h4, h5, h6) { margin-block: 1.25rem 0.5rem; font-weight: 600; line-height: 1.3; }
 .markdown-content h1 { font-size: 1.5em; }
@@ -326,7 +326,7 @@
 .markdown-content .katex-display { overflow-x: auto; overflow-y: hidden; padding-block: 0.25rem; }
 .markdown-content > :first-child, .markdown-content > .streamdown-animated > :first-child { margin-top: 0; }
 .markdown-content > :last-child, .markdown-content > .streamdown-animated > :last-child { margin-bottom: 0; }
-/* Pierre 自行绘制差异与语法颜色；宿主只接入公共字体、字号与紧凑间距。 */
+/* Pierre draws diffs and syntax colors itself; the host supplies shared fonts, sizes, and compact spacing. */
 .pierre-code {
   display: block;
   min-width: 0;
@@ -338,11 +338,11 @@
 }
 .react-flow__edge-text { fill: var(--muted-foreground); font-family: var(--font-sans); font-size: 10px; }
 .react-flow__edge-textbg { fill: var(--canvas); }
-/* 画布底色只来自 canvas token；xyflow 暗色模式自带的 #141414 不另起一层。 */
+/* Canvas background comes only from the canvas token; xyflow's dark-mode #141414 does not form another layer. */
 .react-flow { --xy-background-color: var(--canvas); }
 /*
- * 端点盒跨在卡片边缘上：xyflow 以盒外沿作为连线锚点，连线据此贴住卡片边缘。尺寸由 LinkEdge.tsx 经变量注入。
- * 可见圆点与命中区由伪元素放大；常态位于 isolate 卡片之下只露出外半圆，悬停或拖线时浮到卡片之上。
+ * Endpoint boxes straddle card edges: xyflow anchors lines to their outer edges so lines meet card boundaries. LinkEdge.tsx injects dimensions through variables.
+ * Pseudo-elements enlarge visible dots and hit areas; normally below isolated cards with only outer semicircles showing, they rise above cards on hover or connection dragging.
  */
 .react-flow__handle { width: var(--handle-box); height: var(--handle-box); background: transparent; border: 0; }
 .react-flow__handle:hover, .react-flow__handle.connectingfrom, .react-flow__handle.connectingto { z-index: 1; }
@@ -352,10 +352,10 @@
   box-shadow: 0 0 0 0 color-mix(in oklab, var(--primary) 25%, transparent);
   transition: scale var(--motion-fast) var(--ease-out), box-shadow var(--motion-fast) var(--ease-out);
 }
-/* 透明命中区，卡片外侧的部分比可见圆点宽。 */
+/* Transparent hit area, wider than visible dots outside the card. */
 .react-flow__handle::after { width: 20px; height: 20px; }
 .react-flow__handle:hover::before, .react-flow__handle.connectingto::before { scale: 1.3; box-shadow: 0 0 0 3px color-mix(in oklab, var(--primary) 25%, transparent); }
-/* 连线：常态主题色半透明，悬停与选中时实色加粗；光晕用画布底色把线与纹理、交叉线分开。 */
+/* Links: translucent accent normally, solid and thicker on hover/selection; canvas-colored halos separate lines from textures and crossings. */
 .link-edge { --link-opacity: 0.6; --link-width: 1.5px; }
 .react-flow__edge:hover .link-edge { --link-opacity: 0.9; }
 .link-edge[data-selected] { --link-opacity: 1; --link-width: 2.25px; }
@@ -366,10 +366,10 @@
   transition: stroke-opacity var(--motion-fast) var(--ease-out), stroke-width var(--motion-fast) var(--ease-out);
 }
 .link-edge-head { fill: var(--primary); fill-opacity: var(--link-opacity); stroke: var(--primary); stroke-opacity: var(--link-opacity); stroke-width: 1px; stroke-linejoin: round; transition: fill-opacity var(--motion-fast) var(--ease-out); }
-/* 选中时线身上的画布底色缺口沿起点流向终点。 */
+/* Selected links animate canvas-colored gaps from source toward destination. */
 .link-edge-flow { stroke: var(--canvas); stroke-linecap: butt; stroke-width: calc(var(--link-width) + 0.5px); stroke-dasharray: 3 11; animation: link-edge-flow 0.9s linear infinite; }
 @keyframes link-edge-flow { to { stroke-dashoffset: -14; } }
-/* 复用画布缩放控件；右下角独立命中区与四边的连线端点分开。圆形小角标跨在卡片圆角上，与端点圆点同一语汇。 */
+/* Reuse canvas zoom controls; the independent bottom-right hit area stays separate from edge endpoints. Small round badges straddle card corners, matching endpoint dots. */
 .react-flow__resize-control.object-resize-handle {
   display: flex; align-items: center; justify-content: center;
   width: 18px; height: 18px;

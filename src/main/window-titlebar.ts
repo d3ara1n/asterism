@@ -1,7 +1,7 @@
 import { ipcMain, type BrowserWindow, type BrowserWindowConstructorOptions } from "electron";
 import { desktopWindowChangedChannel, desktopWindowGetChannel, windowGeometry, type DesktopWindowState, type TitleBarMode } from "../shared/desktop.ts";
 
-/** 标题栏模式在创建窗口时固定；Linux 可显式交回桌面环境装饰。 */
+/** Fix the titlebar mode at window creation; Linux can explicitly delegate decoration to the desktop environment. */
 export function titleBarMode(platform = process.platform, nativeTitleBar = process.argv.includes("--native-titlebar")): TitleBarMode {
   if (platform === "darwin") return "macos";
   if (platform === "win32" || (platform === "linux" && !nativeTitleBar)) return "overlay";
@@ -21,7 +21,7 @@ export function initialTitleBar(mode: TitleBarMode): BrowserWindowConstructorOpt
   };
 }
 
-/** 原生全屏事件是窗口状态真值；读取入口供首次加载与全屏内刷新使用。 */
+/** Native fullscreen events are the window-state authority; reads serve initial load and refresh within fullscreen. */
 export function serveDesktopWindow(
   window: BrowserWindow,
   mode: TitleBarMode,

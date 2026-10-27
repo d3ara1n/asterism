@@ -14,7 +14,7 @@ const labels = {
   cancelled: conversationMessages.compressionCancelled,
 };
 
-/** 压缩只显示活动状态与阅读边界；摘要正文留在原始记录中。 */
+/** Compression shows only activity status and the reading boundary; the summary body stays in the original record. */
 export function CompressionMarker({ node }: { node: Extract<TimelineItem, { kind: "compression" }> }) {
   const i18n = useI18n();
   const running = node.status === "running";

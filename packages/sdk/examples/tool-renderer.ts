@@ -1,4 +1,4 @@
-/** 工具视图作者用例：三态平行声明，同一组件可以跨阶段复用。 */
+/** Tool view author example: the three states are declared in parallel, and the same component can be reused across phases. */
 import { createElement } from "react";
 import { z } from "zod";
 import { defineData, type Json } from "@asterism/sdk/contracts";
@@ -34,7 +34,7 @@ export const writerView = toolRenderer({ ...Result, targetSchema, tool: { argsSc
   execution: view, result: view,
 });
 
-/** 插件自行渲染渐进输出；外壳根据声明与用户设置管理自动开合。 */
+/** Plugins render progressive output themselves; the shell manages automatic expansion and collapse based on declarations and user settings. */
 const Report = defineData("example.writer/report", z.object({ text: z.string() }));
 function ReportBody({ phase, result }: ToolRenderProps<z.infer<typeof Report.schema>>) {
   const text = result?.data?.text ?? "";
@@ -49,9 +49,9 @@ export const reportView = toolRenderer(Report, {
 export const checkedStages = {
   input: {
     headerRenderer(props) {
-      // @ts-expect-error 部分 JSON 不是已校验的 target，必须先收窄类型。
+      // @ts-expect-error Partial JSON is not a validated target; narrow the type first.
       props.target.path;
-      // @ts-expect-error 填充期没有执行结果。
+      // @ts-expect-error No execution result exists during input streaming.
       props.result.data;
       return null;
     },
@@ -60,7 +60,7 @@ export const checkedStages = {
     headerRenderer(props) {
       props.target.path.toUpperCase();
       props.args.content.length;
-      // @ts-expect-error 等待与执行期尚无终结结局。
+      // @ts-expect-error Waiting and execution phases do not yet have a final outcome.
       const terminal: "succeeded" = props.result?.kind;
       return terminal;
     },
@@ -68,7 +68,7 @@ export const checkedStages = {
   result: {
     headerRenderer(props) {
       const terminal = props.result.kind;
-      // @ts-expect-error 结果视图不可能收到运行中产出。
+      // @ts-expect-error Result views cannot receive output from ongoing execution.
       const running: "running" = terminal;
       return running;
     },

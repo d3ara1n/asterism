@@ -11,7 +11,7 @@ import { Spinner } from "@asterism/ui/ui/spinner";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemSeparator, ItemTitle } from "@asterism/ui/ui/item";
 import { Section, Row } from "./layout";
 
-/** 会话管理所需的应用数据：会话目录由应用层持有，恢复后由应用层重读。 */
+/** Application data needed for session management: the application layer owns the session catalog and rereads it after restoration. */
 export interface SessionArchive {
   snapshot: AppSnapshot | null;
   restore(sessionId: string): Promise<SessionResult>;
@@ -23,7 +23,7 @@ function useSessionArchive(): SessionArchive {
   return value;
 }
 
-/** 通用设置中的会话管理版面：只展示计数，回收站作为更深浮岛打开，不单独成为设置分类。 */
+/** Session management layout within general settings: shows only counts; the recycle bin opens as a deeper island rather than a separate settings category. */
 export function SessionsSettings() {
   const i18n = useI18n();
   const island = useIsland();
@@ -43,7 +43,7 @@ export function SessionsSettings() {
   </Section>;
 }
 
-/** 回收站：列出归档会话本身并提供恢复；清除由启动清理在冷静期后进行。 */
+/** Recycle bin: lists archived sessions themselves and offers restoration; startup cleanup removes them after the grace period. */
 function RecycleBin() {
   const i18n = useI18n();
   const { snapshot, restore } = useSessionArchive();

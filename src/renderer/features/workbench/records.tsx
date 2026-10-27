@@ -5,7 +5,7 @@ import { Link, Unlink, Plus, Minus, PanelsTopLeft, PenLine } from "lucide-react"
 import { historyMessages } from "../../messages/history";
 import { ResourceCreated, ResourceRenamed, ObjectAdded, ObjectRemoved, ResourceAttached, ResourceDetached } from "../../../shared/workbench-records";
 
-/** 宿主工作台事件的历史视图；与插件记录走同一注册表。 */
+/** History views for host workbench events; use the same registry as plugin records. */
 export const workbenchRecordViews: RendererModule = {
   resources: [], cards: [], tools: [],
   records: [

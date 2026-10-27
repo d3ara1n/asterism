@@ -15,7 +15,7 @@ async function result<T extends Json>(work: () => Promise<T>, signal: AbortSigna
 }
 export default defineModule(plugin => {
   const objects = new Map<string, ResourceRef>();
-  /** 按会话累计的请求统计只在本次运行内存在；回溯不清零，请求与费用已经实际发生。 */
+  /** Per-session cumulative request statistics exist only during this run; rewind does not reset them because requests and costs have already occurred. */
   const sessions = new Map<string, WebSessionStats>();
   const notify = (sessionId?: string) => {
     for (const ref of objects.values()) if (sessionId === undefined || ref.sessionId === sessionId) plugin.object(ref.sessionId, WebResource, ref.id).invalidate();
@@ -25,7 +25,7 @@ export default defineModule(plugin => {
     sessions.set(sessionId, change(sessions.get(sessionId) ?? emptyWebStats()));
     notify(sessionId);
   };
-  /** 记录一次请求的耗时、结果与实报费用；记录不影响工具结果。 */
+  /** Records duration, outcome, and reported cost for one request; recording does not affect the tool result. */
   async function tracked<T extends WebSearchResult | WebFetchResult>(sessionId: string, kind: WebRequestKind, subject: string,
     work: () => Promise<T>, signal: AbortSignal): Promise<CallResult<T>> {
     const started = performance.now();

@@ -1,4 +1,4 @@
-/** 只读 token／字数共用十进制工程缩写；单位符号不随界面语言变化。 */
+/** Read-only token/character counts share decimal engineering abbreviations; unit symbols do not change with the UI language. */
 const countFormats = {
   auto: new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1, useGrouping: false }),
   exceptZero: new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1, useGrouping: false, signDisplay: "exceptZero" }),

@@ -4,7 +4,7 @@ import type { SdkContext } from "./sdk-context.ts";
 import type { RunGroup } from "./lifecycle.ts";
 import type { PluginHostServices } from "./loader.ts";
 
-/** 调用按契约路由，独立于资源动作队列；对象关联不授予其私有数据访问权。 */
+/** Calls route by contract independently of resource action queues; object association grants no access to private data. */
 export class CallRegistry {
   private entries = new Map<string, { owner: string; contribution: CallContribution; sdk: SdkContext; runs: RunGroup }>();
   constructor(private readonly host: PluginHostServices) {}
@@ -39,7 +39,7 @@ export class CallRegistry {
           ...(ref ? { object: entry.sdk.reader(ref, scope) } : {}), source: structuredClone(source), signal,
         });
         signal.throwIfAborted();
-        // 返回原始 JSON；接收方按自己的同一契约解码，转换型 schema 不重复应用。
+        // Return raw JSON; recipients decode using their own copy of the same contract so transforming schemas do not apply twice.
         const wire = jsonSchema.parse(result);
         entry.contribution.contract.output.parse(wire);
         return wire;

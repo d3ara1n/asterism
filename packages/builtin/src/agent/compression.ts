@@ -7,17 +7,17 @@ import { contextMessages, projectAgentContext, type AgentContext } from "./proje
 
 import { COMPRESSION_KEEP_RECENT, COMPRESSION_MAX_OUTPUT, COMPRESSION_RESERVE } from "./context-budget.ts";
 
-// 窗口预留与近期保留预算；工具结果截取只用于独立的摘要材料。
+// Window reserve and recent-content retention budgets; tool results are excerpted only for the separate summary material.
 export { COMPRESSION_KEEP_RECENT, COMPRESSION_MAX_OUTPUT, COMPRESSION_RESERVE } from "./context-budget.ts";
 
-/** 字符估算只用于选取和触发；不作为 provider 实报计量持久化。 */
+/** Character-based estimates are used only for selection and triggering; they are not persisted as provider-reported measurements. */
 function estimateItems(items: readonly ModelItem[]): number {
   return items.reduce((sum, item) => {
     const content = item.kind === "result" ? item.outcome.model : item.parts;
     return sum + 4 + Math.ceil(JSON.stringify(content).length / 4);
   }, 0);
 }
-/** 实报 input 已含缓存；仅增加该请求起点之后的输出、结果与新消息，禁止重复加 cacheRead。 */
+/** Reported input already includes cached tokens; add only output, results, and new messages after that request's starting point, without counting cacheRead again. */
 export function estimateContext(context: AgentContext, agentId: string, model: string, systemTokens: number): number {
   const positions = new Map(context.path.map((record, index) => [record.id, index]));
   const summaryPosition = context.summary ? positions.get(context.summary.record.id)! : -1;
@@ -35,7 +35,7 @@ export function estimateContext(context: AgentContext, agentId: string, model: s
   return systemTokens + estimateItems(contextMessages(context));
 }
 export interface CompressionPlan { keptFrom: string; messages: ModelItem[]; previousSummary?: string }
-/** 投影可把响应移到期间事件之前；只有前后两部分在时间线上也不交错时才可截取。 */
+/** Projection can move a response before intervening events; a cut is valid only when the two resulting parts also do not interleave on the timeline. */
 export function planCompression(context: AgentContext): CompressionPlan | null {
   const { groups, path } = context;
   if (groups.length < 2) return null;
@@ -59,7 +59,7 @@ export function planCompression(context: AgentContext): CompressionPlan | null {
   }
   return null;
 }
-/** 运行在代理托管任务内；仅完整成功的摘要一次提交，取消沿用代理生命周期。 */
+/** Runs within an agent-managed task; only a fully successful summary is committed, in one operation, and cancellation follows the agent lifecycle. */
 export async function compressContext(
   object: ObjectExecutor, target: ModelTarget, systemTokens: number,
   models: Pick<ModelServices, "stream" | "list" | "roles">, signal: AbortSignal,
@@ -87,7 +87,7 @@ export async function compressContext(
   }
 }
 
-/** 完整摘要保存后才交付成功；生成失败保留原模型投影。 */
+/** Reports success only after the complete summary is saved; generation failure preserves the original model projection. */
 async function summarizeContext(
   object: ObjectExecutor, target: ModelTarget, model: string,
   models: Pick<ModelServices, "stream">, signal: AbortSignal, feedback: (value: AgentFeedback) => void,
@@ -128,7 +128,7 @@ async function summarizeContext(
       message: `Context compression failed; the existing context is unchanged. ${details.message}`, details });
     return false;
   }
-  // 提交失败交给代理循环报告；不能把持久化故障伪装成可继续的摘要失败。
+  // Let the agent loop report commit failures; persistence faults must not be disguised as recoverable summary failures.
   object.commit(writer => { writer.append(ContextSummary, {
     summary: text.trim(), keptFrom: plan.keptFrom, model: finish.source?.model ?? model, tokensBefore,
     completion: { usage: finish.usage, finishReason: finish.reason, rawFinishReason: finish.rawFinishReason ?? null, providerResponseId: finish.responseId ?? null,

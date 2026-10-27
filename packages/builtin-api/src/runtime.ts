@@ -14,7 +14,7 @@ interface Entry {
   create(input: Json, context: TopLevelToolContext): ReturnType<TopLevelToolContext["session"]["create"]>;
 }
 type CreationOptions = Parameters<TopLevelToolContext["session"]["create"]>[2];
-/** 目录按宿主运行实例隔离；共享公共导出不使不同宿主的插件登记串线。 */
+/** Catalogs are isolated by host runtime instance; shared public exports do not mix plugin registrations from different hosts. */
 const directories = new WeakMap<SessionDirectory, Map<string, Entry>>();
 function directory(plugin: PluginContext): Map<string, Entry> {
   plugin.lifetime.signal.throwIfAborted();
@@ -28,7 +28,7 @@ function entry(plugin: PluginContext, id: string): Entry {
   return value;
 }
 
-/** 内置创建工具与插件共用的领域服务；查询不是创建的前置条件。 */
+/** The domain service shared by built-in creation tools and plugins; querying is not a prerequisite for creation. */
 export const agentCreations = {
   list(plugin: PluginContext) {
     return [...directory(plugin).values()].map(({ description: { id, resourceKind, description } }) => ({ id, resourceKind, description }));
@@ -39,7 +39,7 @@ export const agentCreations = {
   },
 };
 
-/** Agent 创建入口是独立领域贡献；直接复用创建输入，或显式适配模型输入。 */
+/** Agent creation entry points are independent domain contributions; they reuse creation input directly or explicitly adapt model input. */
 export function defineAgentCreation<I, S extends Json, O extends Json, A extends Json = Json>(definition: {
   id: string;
   description: string;
@@ -73,7 +73,7 @@ export function defineAgentCreation<I, S extends Json, O extends Json, A extends
       },
     };
     entries.set(definition.id, value);
-    // 插件中止即撤下登记：装配失败的插件不得在异步清理期间仍被公开查询到。
+    // Remove registrations as soon as the plugin aborts: a plugin whose assembly failed must not remain publicly queryable during asynchronous cleanup.
     plugin.lifetime.signal.addEventListener("abort", () => { if (entries.get(definition.id) === value) entries.delete(definition.id); }, { once: true });
     return {};
   });

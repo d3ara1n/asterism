@@ -49,7 +49,7 @@ function setup() {
     new AgentCapabilities(resources, tools, linked, agentToolPolicy(policy), toolCaller);
   return { root, outside, resource, note, resources, tools, scope, service, sessionId };
 }
-/** 成功结果的模型投影是一次序列化的 JSON 文本；断言时解析回结构，非成功结局保留文字。 */
+/** Successful model projections are JSON text serialized once; parse them for structural assertions while unsuccessful outcomes remain text. */
 const decode = (text: string): Json => { try { return JSON.parse(text) as Json; } catch { return text; } };
 type Decoded = ToolOutcome extends infer O ? O extends ToolOutcome ? Omit<O, "model"> & { model: Json } : never : never;
 async function invoke(capabilities: AgentCapabilities, name: string, args: Json): Promise<Decoded> {
@@ -61,8 +61,8 @@ async function invoke(capabilities: AgentCapabilities, name: string, args: Json)
   return { ...outcome, model: decode(text) } as Decoded;
 }
 
-describe("工具与资源的匹配及授权", () => {
-  it("请求捕获的目录和笔记在期间移除后仍能检查和写入，后续请求撤销访问", async () => {
+describe("Tool/resource matching and authorization", () => {
+  it("request-captured directories and notes remain inspectable and writable after removal during the request, with access revoked on later requests", async () => {
     const { service, sessionId, resource, scope } = setup();
     await service.sessions.execute({ type: "resource.create", sessionId, kind: "asterism.builtin/note", creation: { id: "asterism.builtin/note.create" },
       input: { title: "Captured note", content: "before" }, position: { x: 0, y: 0 } });
@@ -83,7 +83,7 @@ describe("工具与资源的匹配及授权", () => {
       .toMatchObject({ kind: "rejected", error: { code: "access_denied" } });
   });
 
-  it("resource_call 只作用于已链接资源，参数不合 schema 时指向 inspect 契约", async () => {
+  it("resource_call applies only to linked resources and points schema-invalid arguments to the inspect contract", async () => {
     const { scope } = setup();
     expect(await invoke(scope(), "resource_call", { resource_id: "d1", tool: "list", args: {} })).toMatchObject({ kind: "succeeded" });
     expect(await invoke(scope(), "resource_call", { resource_id: "d1", tool: "list", target: { path: 42 }, args: {} })).toMatchObject({ kind: "rejected", error: { code: "invalid_arguments" } });
@@ -93,7 +93,7 @@ describe("工具与资源的匹配及授权", () => {
   });
 
 
-  it("校验错误保留字段定位，一级入口和资源实现都拒绝错误参数", async () => {
+  it("validation errors preserve field locations and both top-level entries and resource implementations reject invalid arguments", async () => {
     const { scope } = setup();
     expect(await invoke(scope(), "resource_call", { resource_id: "d1", tool: "list", target: { path: 42, extra: true }, args: {} }))
       .toMatchObject({ kind: "rejected", error: { code: "invalid_arguments", message: expect.stringContaining("target.path") } });
@@ -102,14 +102,14 @@ describe("工具与资源的匹配及授权", () => {
     });
   });
 
-  it("list 拒绝普通文件和非目录父路径，修正目标后同一能力目录可重试", async () => {
+  it("list rejects ordinary files and non-directory parent paths and the same capability catalog supports retry after target correction", async () => {
     const { scope } = setup(), capabilities = scope();
     for (const path of ["a.txt", "a.txt/child"]) expect(await invoke(capabilities, "resource_call", { resource_id: "d1", tool: "list", target: { path }, args: {} }))
       .toMatchObject({ kind: "failed", error: { code: "not_directory" } });
     expect(await invoke(capabilities, "resource_call", { resource_id: "d1", tool: "list", target: { path: "subdir" }, args: {} })).toMatchObject({ kind: "succeeded" });
   });
 
-  it("list 只匹配目录支持关系，笔记调用返回工具不可用", async () => {
+  it("list matches directory support only and note calls return tool unavailable", async () => {
     const { resource, note, tools, scope } = setup();
     expect(tools.match(resource).some(tool => tool.tool.name === "list")).toBe(true);
     expect(tools.match(note).some(tool => tool.tool.name === "list")).toBe(false);
@@ -117,7 +117,7 @@ describe("工具与资源的匹配及授权", () => {
       .toMatchObject({ kind: "rejected", error: { code: "tool_unavailable" } });
   });
 
-  it("inspect 使用当前外部状态，目录删除后明确不存在", async () => {
+  it("inspect uses current external state and explicitly reports missing directories after deletion", async () => {
     const { root, resource, scope } = setup(), capabilities = scope();
     expect(await invoke(capabilities, "resource_inspect", { resource_id: resource.id })).toMatchObject({
       kind: "succeeded", model: { state: { exists: true } },
@@ -126,7 +126,7 @@ describe("工具与资源的匹配及授权", () => {
     expect(await invoke(capabilities, "resource_inspect", { resource_id: resource.id })).toMatchObject({ kind: "succeeded", model: { state: { exists: false } } });
   });
 
-  it("请求环境每次读取当前 AGENTS.md 正文，不缓存旧内容", async () => {
+  it("request environments read current AGENTS.md bodies each time without caching old content", async () => {
     const { root, resource, resources } = setup();
     expect(await resources.context([resource])).toEqual([]);
     writeFileSync(join(root, "AGENTS.md"), "v1"); expect((await resources.context([resource]))[0]?.text).toBe("v1");
@@ -135,7 +135,7 @@ describe("工具与资源的匹配及授权", () => {
 
 
 
-  it("外部白名单不改变支持关系；摘要、inspect 和调用使用同一份筛选结果", async () => {
+  it("external allowlists do not change support relationships; summaries, inspect, and calls share filtering results", async () => {
     const { resource, resources, tools, scope } = setup();
     const capabilities = scope([resource], { tools: ["list"], excludeTools: null });
     const description = capabilities.describe(resource.id);
@@ -155,7 +155,7 @@ describe("工具与资源的匹配及授权", () => {
   });
 
 
-  it("禁用所有工具时宿主列举与 inspect 仍可用；一级入口名字不授权实际工具", async () => {
+  it("host listing and inspect remain available when all tools are disabled; top-level entry names do not authorize actual tools", async () => {
     const { resource, scope } = setup();
     for (const tools of [[], ["resource_call"]]) {
       const capabilities = scope([resource], { tools, excludeTools: null });
@@ -166,7 +166,7 @@ describe("工具与资源的匹配及授权", () => {
     }
   });
 
-  it("请求内固定策略与资源身份，下一次请求才采用变更", async () => {
+  it("policy and resource identities remain fixed within requests and changes apply on the next request", async () => {
     const { resource, scope } = setup();
     const policy = { tools: ["list"], excludeTools: null };
     const capabilities = scope([resource], policy);
@@ -177,7 +177,7 @@ describe("工具与资源的匹配及授权", () => {
     expect(scope([resource], policy).describe(resource.id)).toEqual([]);
   });
 
-  it("已选定实现但尚未执行就取消，仍保留实现身份", async () => {
+  it("cancellation after implementation selection but before execution still retains implementation identity", async () => {
     const { scope, resource } = setup();
     const controller = new AbortController();
     controller.abort();
@@ -191,7 +191,7 @@ describe("工具与资源的匹配及授权", () => {
     expect(results[0]).not.toHaveProperty("startedAt");
   });
 
-  it.each(["parallel", "sequential"] as const)("resource_call 按实际工具的 %s 策略调度", async execution => {
+  it.each(["parallel", "sequential"] as const)("resource_call schedules using the actual tool's %s policy", async execution => {
     const { resource, resources } = setup();
     const order: string[] = [];
     const contract = defineImplementation({

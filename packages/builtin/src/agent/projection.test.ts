@@ -14,10 +14,10 @@ function records(...values: NewNode[]): SessionNode[] {
 }
 const project = (path: SessionNode[], agent = "a") => projectForAgent(sessionView(nodeView("s", "", path, path.at(-1)?.id ?? null)), agent);
 
-// 预期来自时间线投影契约；存储、路径选择和通用信封转换由各自边界守护。
-describe("代理模型投影", () => {
-  // 地址允许中继类型，身份与正文分别转义，UI 与历史调查消费同一保存来源。
-  it("中继资源与具名代理的信封只在模型投影生成，展示保留原文与来源", () => {
+// Expectations follow the timeline projection contract; storage, path selection, and generic envelope conversion are protected at their own boundaries.
+describe("Agent model projection", () => {
+  // Addresses allow relay types; identity and body are escaped separately, and the UI and history investigation consume the same saved source.
+  it("Generates envelopes for relay resources and named agents only in model projection, while display preserves original text and source", () => {
     const sender = { kind: "agent" as const, resource: { sessionId: "s", id: "relay", kind: "example/relay" }, name: '审查 "A" & B' };
     const body = "  <agent-message>raw & text</agent-message>\n";
     const path = records(message("a", "User"), message("a", body, false, sender));
@@ -35,8 +35,8 @@ describe("代理模型投影", () => {
     expect(path[1]!.data).toMatchObject({ sender, parts: [{ text: body }] });
   });
 
-  // 公共载荷经过 Execution 解码和重建后，摘要与全文仍须独立，不能由展示选择覆写。
-  it("历史思考保留独立的全文、摘要和续接资料", () => {
+  // After public payloads pass through Execution decoding and reconstruction, summaries and full text must remain independent and cannot be overwritten by display choices.
+  it("Historical thinking preserves separate full text, summaries, and continuation data", () => {
     const continuation = { openai: { reasoningEncryptedContent: "cipher" } };
     const path = records(
       message("a", "go"),
@@ -48,7 +48,7 @@ describe("代理模型投影", () => {
       { kind: "text", text: "Answer" },
     ] });
   });
-  it("请求起点后的事件置于响应之后，下一请求保留已发送前缀", () => {
+  it("Places events after the request starting point after the response, preserving the sent prefix for the next request", () => {
     const path = records(message("a", "go"), attached("a", "before"));
     const sent = project(path);
     path.push(node("during", "1", attached("a", "during")));
@@ -64,7 +64,7 @@ describe("代理模型投影", () => {
     expect(project(path.slice(0, 3)).at(-1)).toMatchObject({ kind: "context", parts: [{ kind: "text", text: "during attached" }] });
   });
 
-  it("请求起点可以属于其他代理，各代理只投影自身记录与模型可见事件", () => {
+  it("The request starting point may belong to another agent; each agent projects only its own records and model-visible events", () => {
     const path = records(
       message("a", "for A"), message("b", "for B"),
       event("resource_attached", { id: "shared" }, { model: "shared attached", recipient: null }),
@@ -80,7 +80,7 @@ describe("代理模型投影", () => {
     }
   });
 
-  it("响应按 ordinal 归组，工具结果随后，期间事件延后且其他代理输出不可见", () => {
+  it("Groups responses by ordinal, followed by tool results; intervening events are deferred and other agents' output remains invisible", () => {
     const path = records(
       message("a", "go"),
       call("a", "r1", 1, "c2", { requestParentId: "0" }),
@@ -92,15 +92,15 @@ describe("代理模型投影", () => {
       : item.kind === "result" ? item.callId : item.kind)).toEqual(["input", "c1,c2", "c1", "c2", "context"]);
   });
 
-  it("只投影查看路径上的调用，每个调用都有对应结果", () => {
+  it("Projects only calls on the viewed path, with a corresponding result for every call", () => {
     const path = records(message("a", "go"), call("a", "r1", 0, "c1"), call("a", "r1", 1, "c2"));
     const items = project(path.slice(0, 2));
     expect(items.filter(item => item.kind === "result").map(item => item.callId)).toEqual(["c1"]);
   });
 
-  it("末尾思考不作为续接输出结尾", () => {
+  it("Trailing thinking does not end continuation output", () => {
     expect(project(records(message("a", "go"), thinking("a", "r1", 0, "reasoning"))).map(item => item.kind)).toEqual(["input"]);
-    // 正文填充中断时先跳过未完成块，再清除由此暴露出来的末尾思考。
+    // When body filling is interrupted, skip incomplete blocks first, then remove the trailing thinking exposed by that omission.
     expect(project(records(message("a", "go"), thinking("a", "r1", 0, "reasoning"),
       text("a", "r1", 1, "partial", { complete: false }))).map(item => item.kind)).toEqual(["input"]);
   });

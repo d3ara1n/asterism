@@ -3,26 +3,26 @@ import { jsonSchema } from "@asterism/sdk/contracts";
 import { coreChannel } from "./core.ts";
 
 /**
- * 界面状态：应用顺手记下、不出现在设置页的零碎持久化状态（窗口尺寸、侧栏宽度、「不再提示」等）。
- * 每个键在此登记 schema 与默认值；读出时按键校验，单项损坏只回退该项。属于缓存，不带格式版本、不迁移、不进入恢复点，文件损坏即重置。
- * 任务相关的视口与卡片位置属于任务视图事件，不放这里；用户可见可改的偏好属于设置，也不放这里。
+ * UI state: incidental persisted state outside settings, such as window dimensions, sidebar widths, and "do not show again" flags.
+ * Register each key's schema and default here; validate on read and fall back only for corrupt entries. An unversioned cache without migration or recovery points, reset on file corruption.
+ * Task viewports and card positions belong to task view events, not here; user-visible editable preferences belong to settings instead.
  */
-/** 偏好键只允许宿主规定的两个前缀，renderer 不能写入其他界面状态。 */
+/** Preference keys allow only two host-defined prefixes; renderers cannot write other UI state. */
 export const preferenceKeySchema = z.string().min(1).max(512).regex(/^(?:creation-route|plugin)\/[\x21-\x7e]+$/u);
 export const preferencesGetChannel = coreChannel("preferences:get");
 export const preferencesSetChannel = coreChannel("preferences:set");
 export const preferenceWriteSchema = z.strictObject({ key: preferenceKeySchema, value: jsonSchema.nullable() });
 
 export const uiStateSchemas = {
-  /** 主窗口常规尺寸、位置与最大化标记；仅主进程使用。 */
+  /** Normal main-window bounds, position, and maximized flag, used only by main processes. */
   window: z.object({
     x: z.number().int(), y: z.number().int(),
     width: z.number().int().positive(), height: z.number().int().positive(),
     maximized: z.boolean(),
   }).nullable(),
   /**
-   * 受控偏好容器：宿主路由记忆（`creation-route/...`）与按插件隔离的偏好（`plugin/<pluginId>/...`）。
-   * 键由宿主生成，值为 JSON；单键语义由读取方按自己的 schema 校验，失效即回退并可清理。
+   * Controlled preference container: host route memory (`creation-route/...`) and plugin-isolated preferences (`plugin/<pluginId>/...`).
+   * Hosts generate keys with JSON values; readers validate individual key semantics using their own schemas, falling back and optionally cleaning invalid values.
    */
   preferences: z.record(preferenceKeySchema, jsonSchema),
 } satisfies Record<string, z.ZodType>;

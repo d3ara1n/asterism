@@ -11,15 +11,15 @@ import { HeadlessScreen } from "./screen.ts";
 import { inactiveStatus, type TerminalConfig, type TerminalDown, type TerminalState, type TerminalStatus, type TerminalUp, type keyNames } from "./contract.ts";
 
 const execute = promisify(execFile);
-/** 输出合批：短时间内的 PTY 块合成一帧；单帧超过上限立即交付。 */
+/** Output batching: combines PTY chunks arriving within a short interval into one frame; delivers immediately when a frame exceeds the limit. */
 const BATCH_MS = 5, BATCH_CHARACTERS = 64 * 1024;
-/** 模型输入后收集 shell 反馈，再观察状态。 */
+/** Collects shell feedback after model input, then observes state. */
 const INPUT_OBSERVATION_MS = 250;
-/** 流控水位：未解析与未确认字符超过高水位暂停 PTY，降到低水位恢复。 */
+/** Flow-control watermarks: pause the PTY when unparsed and unacknowledged characters exceed the high-water mark; resume at the low-water mark. */
 const HIGH_WATERMARK = 100_000, LOW_WATERMARK = 5_000;
-/** 注入集成等待首个标记的上限；超时降级为无状态检测。 */
+/** Maximum wait for the first marker from injected integration; timeout falls back to no state detection. */
 const HANDSHAKE_MS = 10_000, NATIVE_HANDSHAKE_MS = 3_000;
-/** 结束实例：SIGHUP 后的宽限期与强制结束后的等待上限。 */
+/** Instance termination: grace period after SIGHUP and maximum wait after forced termination. */
 const HANGUP_GRACE_MS = 2_000, KILL_WAIT_MS = 2_000;
 const DEFAULT_COLS = 100, DEFAULT_ROWS = 28;
 
@@ -31,7 +31,7 @@ interface InstanceHooks {
   changed(status: TerminalStatus): void;
 }
 
-/** 一个 shell 进程及其后台屏幕；退出后保留最后屏幕供读取，直到被替换或关闭。 */
+/** One shell process and its backend screen; retains the final screen for reading after exit until replaced or closed. */
 export class ShellInstance {
   private readonly screen: HeadlessScreen;
   private process?: pty.IPty;
@@ -60,7 +60,7 @@ export class ShellInstance {
     terminal.parser.registerOscHandler(133, data => this.promptMark(data));
     terminal.parser.registerOscHandler(633, data => this.property(data));
     terminal.parser.registerOscHandler(7, data => this.location(data));
-    // 后台是终端协议自动回复的唯一发送者；前端副本只转发用户输入。
+    // The backend is the sole sender of terminal-protocol automatic replies; the frontend copy forwards only user input.
     terminal.onData(data => { if (this.alive) this.process!.write(data); });
   }
   get status(): TerminalStatus { return { ...this.statusValue }; }
@@ -76,7 +76,7 @@ export class ShellInstance {
     this.hooks.changed(this.status);
     for (const waiter of [...this.waiters]) waiter();
   }
-  /** 注入集成要求 nonce；原生集成接受无 nonce 的标准标记。 */
+  /** Injected integration requires a nonce; native integration accepts standard markers without a nonce. */
   private trusted(params: string[]): string[] | null {
     if (this.mode === "none") return null;
     if (this.mode === "injected") return params.at(-1) === this.nonce ? params.slice(0, -1) : null;
@@ -95,7 +95,7 @@ export class ShellInstance {
     if (kind === "A") {
       const initial = !this.ready;
       this.ready = true;
-      // 首个提示符之前已提交的输入仍在 shell 队列中，提示符不能证明就绪。
+      // Input submitted before the first prompt remains in the shell queue; the prompt cannot establish readiness.
       if (initial && this.submittedBeforePrompt) this.setState("unknown");
       else this.setState("idle");
     } else if (kind === "C") this.setState("running");
@@ -115,7 +115,7 @@ export class ShellInstance {
   private location(data: string): boolean {
     if (this.mode !== "native") return true;
     try { const url = new URL(data); if (url.protocol === "file:") this.setState(this.statusValue.state, { cwd: decodeURIComponent(url.pathname) }); }
-    catch { /* 非法 OSC 7 忽略。 */ }
+    catch { /* Ignore invalid OSC 7. */ }
     return true;
   }
 
@@ -143,7 +143,7 @@ export class ShellInstance {
       if (launch.mode === "none") { this.ready = true; this.setState("unknown"); return; }
       this.watchdog = setTimeout(() => {
         if (this.statusValue.integration || !this.alive) return;
-        // 集成未加载（rc 报错、exec 替换 shell 等）：降级为无状态检测。
+        // Integration did not load (rc errors, exec replacing the shell, etc.); fall back to no state detection.
         this.ready = true;
         this.setState("unknown", { integration: false });
       }, launch.mode === "injected" ? HANDSHAKE_MS : NATIVE_HANDSHAKE_MS);
@@ -174,7 +174,7 @@ export class ShellInstance {
       });
     }));
   }
-  /** 后台解析积压与前端未确认字符共同决定是否暂停 PTY。 */
+  /** Backend parsing backlog and frontend unacknowledged characters jointly determine whether to pause the PTY. */
   setBacklog(chars: number) { this.backlog = chars; this.regulate(); }
   private regulate() {
     if (!this.alive) return;
@@ -188,7 +188,7 @@ export class ShellInstance {
     const text = typeof data === "string" ? data : "";
     if (/[\r\n]/u.test(text)) {
       if (!this.ready) this.submittedBeforePrompt = true;
-      // 提交后旧提示符不再证明就绪；新的 shell 标记确认执行或返回提示符。
+      // After submission, the old prompt no longer establishes readiness; new shell markers confirm execution or a return to the prompt.
       if (this.statusValue.state === "idle") this.setState("unknown");
     }
     this.process!.write(data);
@@ -212,7 +212,7 @@ export class ShellInstance {
       this.hooks.resize(cols, rows);
     });
   }
-  /** 在输出解析链上执行：之前的输出已进入屏幕，之后的输出尚未进入。 */
+  /** Executes on the output parsing chain: earlier output has entered the screen, and later output has not. */
   enqueue<T>(work: () => T): Promise<T> {
     this.flush();
     const result = this.chain.then(work);
@@ -277,25 +277,25 @@ export function keySequence(key: typeof keyNames[number], applicationCursor: boo
 
 const within = (promise: Promise<void>, ms: number) => Promise.race([promise.then(() => true), new Promise<boolean>(resolve => setTimeout(() => resolve(false), ms))]);
 /**
- * 先挂断让 shell 与前台程序按自身语义退出（写历史、清理临时文件），宽限期后强制结束残留后代。
- * 后代在挂断前按进程表快照：shell 退出后它们会被重新挂到 init 上，无法再按父进程追溯。
+ * Hang up first so the shell and foreground program exit according to their own semantics (writing history, cleaning temporary files); force termination of remaining descendants after the grace period.
+ * Snapshot descendants from the process table before hanging up: after shell exit they are reparented to init and can no longer be traced through the parent.
  */
 async function terminate(process: pty.IPty, exited: Promise<void>) {
   if (globalThis.process.platform === "win32") {
-    try { process.kill(); } catch { /* 已退出。 */ }
+    try { process.kill(); } catch { /* Already exited. */ }
     if (await within(exited, HANGUP_GRACE_MS)) return;
-    try { await execute("taskkill", ["/PID", String(process.pid), "/T", "/F"]); } catch { /* 进程可能已退出。 */ }
+    try { await execute("taskkill", ["/PID", String(process.pid), "/T", "/F"]); } catch { /* The process may have exited. */ }
     if (!await within(exited, KILL_WAIT_MS)) throw new Error("The shell process did not exit.");
     return;
   }
   const descendants = await descendantsOf(process.pid).catch(() => []);
-  try { process.kill("SIGHUP"); } catch { /* 已退出。 */ }
+  try { process.kill("SIGHUP"); } catch { /* Already exited. */ }
   const clean = await within(exited, HANGUP_GRACE_MS);
   for (const pid of descendants) {
     try { globalThis.process.kill(pid, "SIGKILL"); } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ESRCH") throw error; }
   }
   if (clean) return;
-  try { process.kill("SIGKILL"); } catch { /* 已退出。 */ }
+  try { process.kill("SIGKILL"); } catch { /* Already exited. */ }
   if (!await within(exited, KILL_WAIT_MS)) throw new Error("The shell process did not exit.");
 }
 
@@ -303,8 +303,8 @@ export interface TerminalViewer { send(frame: TerminalDown): void }
 interface ViewerState { viewer: TerminalViewer; live: boolean; unacked: number }
 
 /**
- * 终端资源对应的外部实例：资源对象只是入口，实例在开启时创建、关闭或资源消失时结束。
- * 所有视图共享同一实例；每个视图先收到屏幕快照，再接续之后的输出。
+ * External instance corresponding to a terminal resource: the resource object is only an entry point; the instance is created on opening and ends on closing or resource disappearance.
+ * All views share one instance; each view receives a screen snapshot first, followed by subsequent output.
  */
 export class SharedTerminal {
   private instance: ShellInstance | null = null;
@@ -317,7 +317,7 @@ export class SharedTerminal {
   get status(): TerminalStatus { return this.instance?.status ?? { ...inactiveStatus }; }
   get started(): boolean { return this.instance !== null; }
 
-  /** 开启 shell；运行中为空操作，已退出或失败时以新实例替换。 */
+  /** Opens the shell; a no-op while running, and replaces exited or failed instances with a new one. */
   start(): Promise<void> {
     if (this.closed) return Promise.reject(new TerminalError("terminal_removed", "The terminal resource was removed."));
     if (this.launching) return this.launching;
@@ -356,7 +356,7 @@ export class SharedTerminal {
   private updateBacklog() {
     this.instance?.setBacklog(Math.max(0, ...[...this.viewers].map(state => state.unacked)));
   }
-  /** 视图重新同步：快照在输出解析链上取得，之后的输出顺次交付，不重不漏。 */
+  /** View resynchronization: obtains the snapshot on the output parsing chain, then delivers subsequent output in order without duplication or omission. */
   private replay(states: Iterable<ViewerState> = this.viewers) {
     const instance = this.instance;
     for (const state of states) {
@@ -376,7 +376,7 @@ export class SharedTerminal {
     }
     this.updateBacklog();
   }
-  /** 结束当前实例并回到未开启；资源对象保留，可再次开启。 */
+  /** Ends the current instance and returns to unopened; the resource object remains and can be reopened. */
   async close(): Promise<void> {
     const instance = this.instance;
     this.instance = null; this.launching = null;
@@ -426,7 +426,7 @@ export class SharedTerminal {
     }
   }
 
-  /** 模型输入：未开启时开启；已退出或失败的 shell 由用户在卡片中重新开启。 */
+  /** Model input: opens an unopened shell; users reopen exited or failed shells from the card. */
   async input(data: string, signal: AbortSignal): Promise<TerminalStatus> {
     if (!this.instance) {
       try { await this.start(); }

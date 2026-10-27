@@ -3,7 +3,7 @@ import { ChevronDown } from "lucide-react";
 import { Button } from "./ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "./ui/dropdown-menu";
 
-/** 首页输入托盘与创建表单中的展开配置选择。 */
+/** Expanded configuration selection in the home input tray and creation forms. */
 export function ConfigurationChoice({ icon, label, value, selected, options, disabled, onSelect }: {
   icon: ReactNode; label: string; value: string; selected: string; disabled?: boolean;
   options: { value: string; label: string }[]; onSelect: (value: string) => void;

@@ -6,7 +6,7 @@ import type { CopiedDraft, MessageDraft } from "./draft.ts";
 type Input = z.infer<typeof ExchangeAgentDraft.schema>;
 interface Exchange { input: Input; incoming: CopiedDraft; replacement: CopiedDraft | null }
 
-/** 不确定回执保留原操作及两侧附件，恢复入口独立于可能已经移除的持久条目。 */
+/** An uncertain receipt retains the original operation and attachments on both sides; recovery is independent of the persistent item, which may already have been removed. */
 export class DraftExchange {
   pending: Exchange | null = null;
   working = false;
@@ -28,7 +28,7 @@ export class DraftExchange {
         this.release(exchange.incoming.content);
         this.editor.restore(exchange.incoming);
       } else if (["invalid_request", "not_found"].includes(result.error.code)) {
-        // 业务拒绝发生在资源动作队列中；旧提交若已生效会先命中幂等受理。
+        // Business rejection occurs in the resource action queue; an earlier submission that already took effect first matches idempotent acceptance.
         this.pending = null;
         this.release();
       }

@@ -15,9 +15,9 @@ function setup() {
 }
 const record = (value: string) => event("example.plugin/opaque", { value });
 
-// 预期来自时间线契约：所有记录沿当前游标追加，节点与游标修改原子提交。
-describe("会话级扁平树", () => {
-  it("未知领域载荷原样保存并可重开读取", () => {
+// Timeline contract: all records append along the current cursor and node/cursor changes commit atomically.
+describe("Session-level flat tree", () => {
+  it("unknown domain payloads persist unchanged and remain readable after reopen", () => {
     const { db, tree, s } = setup();
     const payload = { custom: { values: [1, null, "opaque"] }, format: "plugin-owned" };
     const saved = tree.appendToTimeline(s, event("example.plugin/unknown", payload));
@@ -25,7 +25,7 @@ describe("会话级扁平树", () => {
     expect(new SessionTree(db).nodes(s)).toMatchObject([{ id: saved.id, data: payload }]);
   });
 
-  it("读取不写选择日志；显式选择保存原位置和实际位置，历史保持不变", () => {
+  it("reads do not write selection logs; explicit selection saves original and actual positions without changing history", () => {
     const { tree, s } = setup();
     const first = tree.appendToTimeline(s, record("first"));
     const last = tree.appendToTimeline(s, record("last"));
@@ -41,7 +41,7 @@ describe("会话级扁平树", () => {
     expect(tree.nodes(s)).toEqual(original);
   });
 
-  it("游标或选择日志任一写入失败时，两者一起回退；可嵌入外层事务", () => {
+  it("cursor or selection-log write failure rolls back both and can nest within outer transactions", () => {
     const { db, tree, s } = setup();
     const input = tree.appendToTimeline(s, record("go"));
     db.exec("CREATE TRIGGER fail_cursor BEFORE UPDATE ON sessions BEGIN SELECT RAISE(ABORT, 'Cursor failed'); END;");
@@ -58,7 +58,7 @@ describe("会话级扁平树", () => {
     expect(tree.cursor(s)).toBe(input.id);
   });
 
-  it("分叉保留旧后代，新路径只沿选中位置追加", () => {
+  it("forks preserve old descendants and new paths append only from selected positions", () => {
     const { tree, s } = setup();
     const first = tree.appendToTimeline(s, record("first"));
     const old = tree.appendToTimeline(s, record("old branch"));
@@ -69,7 +69,7 @@ describe("会话级扁平树", () => {
     expect(next.parentId).toBe(first.id);
   });
 
-  it("带审计信息的记录与后续记录连续追加，每条记录都可选并推进游标", () => {
+  it("records with audit metadata append consecutively with later records and every record is selectable and advances the cursor", () => {
     const { tree, s } = setup();
     const input = tree.appendToTimeline(s, record("first"));
     const partial = tree.appendToTimeline(s, event("example.plugin/partial", { complete: false, usage: { total: 7 } }));
@@ -80,7 +80,7 @@ describe("会话级扁平树", () => {
     expect(tree.select(s, partial.id)).toBe(partial.id);
   });
 
-  it("游标更新失败时节点追加也回退", () => {
+  it("cursor update failures also roll back appended nodes", () => {
     const { db, tree, s } = setup();
     db.exec("CREATE TRIGGER fail_cursor BEFORE UPDATE ON sessions BEGIN SELECT RAISE(ABORT, 'Cursor failed'); END;");
     expect(() => tree.appendToTimeline(s, record("hello"))).toThrow("Cursor failed");
@@ -88,8 +88,8 @@ describe("会话级扁平树", () => {
     expect(tree.cursor(s)).toBeNull();
   });
 
-  // 工作台契约：追加、回溯、旁支选择与重开都从执行路径重建存在性和关系。
-  it("工作台随游标重建，不带入旁支对象或链接", () => {
+  // Workbench contract: appends, backtracking, side-branch selection, and reopen reconstruct presence and relationships from execution paths.
+  it("workbenches rebuild with cursors without including side-branch objects or links", () => {
     const { db, tree, s } = setup();
     tree.appendToTimeline(s, created("agent-a", "A"));
     tree.appendToTimeline(s, created("agent-b", "B"));
@@ -109,8 +109,8 @@ describe("会话级扁平树", () => {
     expect(new SessionTree(db).workbench(s).objects.map(object => object.id)).toEqual(["agent-a", "agent-b", "branch-only"]);
   });
 
-  // 提交内读到的派生状态不能越过回滚边界，否则会错误放行资源或沿用失效授权。
-  it("事务内重建后回滚，下一次读取恢复真实游标的存在性和链接", () => {
+  // Derived state read within commits cannot cross rollback boundaries, which could wrongly allow resources or reuse invalid authorization.
+  it("after rebuilding within a rolled-back transaction, the next read restores presence and links from the actual cursor", () => {
     const { db, tree, s } = setup();
     tree.appendToTimeline(s, created("a", "A"));
     tree.appendToTimeline(s, created("b", "B"));

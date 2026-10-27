@@ -2,7 +2,7 @@ import type { FoldedObject } from "../session/fold.ts";
 import type { ToolContract } from "@asterism/sdk/contracts";
 import type { ToolImplementation } from "./contract.ts";
 
-/** 工具契约按身份归组，实现按后端选择；不比较 target/result 来猜测工具身份。 */
+/** Group tool contracts by identity and select implementations by backend; never infer tool identity by comparing target/result. */
 export class ToolRegistry {
   private readonly implementations: readonly ToolImplementation[];
   constructor(implementations: readonly ToolImplementation[]) {

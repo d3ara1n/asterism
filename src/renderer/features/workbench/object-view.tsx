@@ -9,8 +9,8 @@ import { useI18n } from "../../shared/i18n";
 import { fallbackCardAppearance } from "./sizing";
 
 /**
- * 解析对象内容的视图：主体、辅助面板与资源操作均已绑定对象能力并隔离异常。
- * 卡片与聚焦浮岛共用这一份解析，内容在哪个容器里挂载由调用方决定。
+ * Resolved object content view: body, auxiliary panels, and resource actions are all bound to object capabilities and isolated by error boundaries.
+ * Cards and focus islands share this resolution; the caller chooses which container mounts the content.
  */
 export function useObjectView(object: WorkbenchObject) {
   const i18n = useI18n();

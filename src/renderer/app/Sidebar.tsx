@@ -15,7 +15,7 @@ import { SessionActions } from "./SessionActions";
 import { SessionStatus } from "./SessionStatus";
 import type { ResourceStatusMark } from "./resource-status";
 
-/** 应用导航只消费会话摘要；选择会话后由应用层显式加载工作台。 */
+/** Application navigation consumes only session summaries; after selecting a session, the application layer explicitly loads the workbench. */
 export function Sidebar({ snapshot, status, busy, resourceStatuses, selectedSessionId, renameDisabledSessionId, homeActive, onHome, onSession, onRename, onArchive, onTemplateSaved, onSettings, onHide, onRetry }: {
   snapshot: AppSnapshot | null; status: RuntimeStatus; busy: boolean; selectedSessionId: string | null;
   resourceStatuses: readonly ResourceStatusMark[];

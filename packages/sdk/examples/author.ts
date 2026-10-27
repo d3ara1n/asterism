@@ -1,5 +1,5 @@
 import { sample, Counter, Count, CounterView, CountChanged, CreateCounter, ChangeCount, CounterUpdates, counterCard } from "./counter-contract.ts";
-/** SDK 作者用例与类型反例：只编译，不执行插件、数据库或真实模型请求。 */
+/** SDK author examples and type counterexamples: compile only, without executing plugins, databases, or real model requests. */
 import { z } from "zod";
 import { pluginNamespace, defineAction, resourceCall, defineRecord, defineTool, defineImplementation, modelRunRecordSchema, type ModelItem } from "@asterism/sdk/contracts";
 import {
@@ -7,7 +7,7 @@ import {
   type PluginContext, type ObjectReader, type ObjectExecutor, type SessionObserver, type SessionSnapshot, type ResourceRef,
 } from "@asterism/sdk/runtime";
 
-/** 场景一：只使用会话事件与生命周期，不需要资源、模型或 Agent。 */
+/** Scenario one: uses only session events and lifecycles, without resources, models, or Agents. */
 const journal = pluginNamespace("example.journal");
 const Annotation = defineRecord(journal.name("annotation"), {
   schema: z.strictObject({ text: z.string() }),
@@ -34,19 +34,19 @@ export const journalPlugin = definePlugin({
 export function annotate(plugin: PluginContext, sessionId: string, text: string) {
   plugin.session(sessionId).commit(writer => { writer.append(Annotation, { text }); });
 }
-/** 最新具型记录按范围和契约定位；unknown 保留给领域消费者处理。 */
+/** Locate the latest typed record by scope and contract; leave unknown for domain consumers to handle. */
 export function latestAnnotation(plugin: PluginContext, sessionId: string) {
   return plugin.session(sessionId).snapshot().records.last(Annotation, { scope: "session" });
 }
 const CurrentSummary = journal.data("summary", z.strictObject({ text: z.string() }));
-/** 当前会话数据不进入时间线；与对象数据及插件私有数据库分别保存。 */
+/** Current session data does not enter the timeline; it is stored separately from object data and private plugin databases. */
 export function saveSummary(plugin: PluginContext, sessionId: string, text: string) {
   const session = plugin.session(sessionId);
   session.commit(writer => { writer.set(CurrentSummary, { text }); });
   return session.get(CurrentSummary);
 }
 
-/** 场景二：独立资源的创建、状态、事件、动作与工具，不使用模型能力。 */
+/** Scenario two: creation, state, events, actions, and tools for an independent resource, without model capabilities. */
 const counterSettings = z.strictObject({
   maxChange: z.number().int().min(1).max(100).meta({
     title: "Maximum change", description: "Largest absolute increment accepted by a counter action.",
@@ -68,7 +68,7 @@ function currentCount(object: ObjectReader) {
   if (value === null) throw new Error("Counter state is unavailable.");
   return value;
 }
-/** 功能模块只取得自己的设置读取能力；配置声明留在装配位置。 */
+/** Feature modules receive only their own settings read capability; configuration declarations remain at the assembly site. */
 function counterChange(limit: () => number) {
   return implementAction(ChangeCount, {
     prepare(input) {
@@ -108,7 +108,7 @@ export const counterPlugin = definePlugin({
           return { kind: "succeeded", data: currentCount(context.object) };
         },
       })],
-      // 通道随对象存在：对象被移除或回溯消失时宿主中止 signal。
+      // The channel follows the object's lifetime: the host aborts signal when the object is removed or disappears after rewinding.
       channels: [implementChannel(CounterUpdates, channel => {
         channel.onMessage(() => channel.send(currentCount(channel.object)));
         const timer = setInterval(() => channel.send(currentCount(channel.object)), 1000);
@@ -118,11 +118,11 @@ export const counterPlugin = definePlugin({
   })],
 });
 
-/** 场景三：插件自己的 Agent 推动循环，context 每次从时间线投影。 */
+/** Scenario three: the plugin's own Agent drives the loop, with context projected from the timeline each time. */
 const research = pluginNamespace("example.research");
 const Execution = defineRecord(research.name("execution"), { schema: modelRunRecordSchema });
 export const modelRecordsModule = defineModule(() => ({ records: [Execution] }));
-/** 由领域插件根据自己的输入／执行事件构造投影，不保存在 Agent 或 run 中。 */
+/** The domain plugin constructs the projection from its own input/execution events; it is not stored in Agent or run. */
 declare function projectOwnContext(snapshot: SessionSnapshot, object: ResourceRef): ModelItem[];
 export async function modelWork(plugin: PluginContext, object: ObjectExecutor, signal: AbortSignal) {
   for (let request = 0; request < 8; request++) {
@@ -141,45 +141,45 @@ export async function modelWork(plugin: PluginContext, object: ObjectExecutor, s
   throw new Error("The model request limit was reached.");
 }
 
-/** 反例依据：具型事件、同步提交／观察、显式模型输入与资源输入。 */
+/** Counterexample basis: typed events, synchronous commits/observation, explicit model input, and resource input. */
 export function rejectInvalidUsage(plugin: PluginContext, object: ObjectExecutor, reader: ObjectReader) {
-  // @ts-expect-error 读取门面不能提交。
+  // @ts-expect-error The read facade cannot commit.
   reader.commit(() => {});
-  // @ts-expect-error 只读标题不能写入。
+  // @ts-expect-error A read-only title cannot be written.
   reader.session.title.set("New");
-  // @ts-expect-error 生命周期不是字符串事件总线。
+  // @ts-expect-error The lifecycle is not a string-based event bus.
   plugin.on("start", () => {});
-  // @ts-expect-error 基础对象接口不承担模型执行。
+  // @ts-expect-error The base object interface does not handle model execution.
   object.run({}, new AbortController().signal);
-  // @ts-expect-error 不公开内部会话节点数组。
+  // @ts-expect-error The internal session node array is not exposed.
   object.session.nodes();
-  // @ts-expect-error 会话数据也必须匹配持有的契约。
+  // @ts-expect-error Session data must also match the held contract.
   object.session.commit(writer => { writer.set(Count, { value: "wrong" }); });
-  // @ts-expect-error 同步回调契约不接受 Promise。
+  // @ts-expect-error The synchronous callback contract does not accept a Promise.
   object.commit(async writer => { writer.set(Count, { value: 1 }); });
   const invalidObserver: SessionObserver = {
     id: "invalid-observer",
-    // @ts-expect-error 长工作交托管任务，不在同步观察者中返回 Promise。
+    // @ts-expect-error Delegate long-running work to managed tasks instead of returning a Promise from synchronous observers.
     async committed() {},
   };
   void invalidObserver;
   object.commit(writer => {
-    // @ts-expect-error 状态值须匹配持有的契约。
+    // @ts-expect-error State values must match the held contract.
     writer.set(Count, { value: "wrong" });
-    // @ts-expect-error 事件数据须匹配持有的契约。
+    // @ts-expect-error Event data must match the held contract.
     writer.append(CountChanged, { value: "wrong" });
   });
-  // @ts-expect-error 每次调用必须显式提供目标、提示、投影输入和事件消费者。
+  // @ts-expect-error Each call must explicitly provide the target, prompt, projected input, and event consumer.
   plugin.models.run({ object: object.ref, signal: new AbortController().signal });
 }
 
-/** 外部准备者同样由所持动作契约推导输入，不重复声明 schema。 */
+/** External preparers also infer input from the action contract they hold, without redeclaring the schema. */
 export const counterLimit = implementPreparer(ChangeCount, {
   id: "clamp-change",
   prepare(input) { return { action: "replace", input: { amount: Math.max(-10, Math.min(10, input.amount)) } }; },
 });
 
-/** 调用与替换接收原始字符串，准备和执行接收 schema 转换后的数字。 */
+/** Invocation and replacement receive raw strings; preparation and execution receive numbers transformed by the schema. */
 const FromText = defineAction(Counter, { id: sample.name("from-text"),
   schema: z.string().regex(/^\d+$/u).transform(Number),
 });
@@ -189,11 +189,11 @@ export const parsedAction = implementAction(FromText, {
 });
 export function parsedInputExamples() {
   resourceCall(FromText, "5");
-  // @ts-expect-error 调用方提交原始输入，不能用解析结果代替。
+  // @ts-expect-error Callers submit raw input and cannot substitute parsed results.
   resourceCall(FromText, 5);
   implementPreparer(FromText, {
     id: "invalid-replacement",
-    // @ts-expect-error replace 是新输入，必须符合原始输入类型。
+    // @ts-expect-error replace supplies new input and must match the raw input type.
     prepare(value) { return { action: "replace", input: value }; },
   });
 }

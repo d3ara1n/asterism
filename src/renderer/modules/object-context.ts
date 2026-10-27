@@ -28,7 +28,7 @@ export function RendererCatalogProvider({ ready, children }: { ready: boolean; c
   return createElement(RendererCatalogsProvider, { value }, children);
 }
 
-/** 宿主把协调后的会话视图和对象能力交给 SDK 卡片，不暴露控制器或物理节点。 */
+/** The host supplies coordinated session views and object capabilities to SDK cards without exposing controllers or physical nodes. */
 export function useObjectContext(object: WorkbenchObject): RendererObjectContext {
   const workbench = useWorkbench();
   const { controller } = workbench;
@@ -62,12 +62,12 @@ export function useObjectContext(object: WorkbenchObject): RendererObjectContext
   };
 }
 
-/** 专门能力按对象绑定，读取与基础对象接口相同的宿主状态源。 */
+/** Specialized capabilities are bound per object and read the same host state source as the base object interface. */
 export function ObjectServices({ object, children }: { object: WorkbenchObject; children: ReactNode }) {
   const { controller } = useWorkbench();
   const live = useObjectLive(controller, object.id);
   const registry = useModuleViews();
-  // 只订阅本对象的实时块：其他对象生成时，本卡片的模型上下文保持身份。
+  // Subscribe only to this object's live blocks: this card's model context retains its identity while other objects generate.
   const models = useMemo(() => ({ blocks: live }), [live]);
   const tools = useMemo(() => ({ resolve: (props: Parameters<typeof resolveToolView>[0]) => resolveToolView(props, registry), preparation: toolPreparation }), [registry]);
   const preferences = useMemo(() => pluginPreferences(pluginOf(object.kind) ?? "unknown"), [object.kind]);

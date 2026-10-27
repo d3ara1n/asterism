@@ -13,7 +13,7 @@ export type ConnectionEdge = {
   data: { links: WorkbenchSnapshot["links"] };
 };
 
-/** 端点是布局投影：四边按对方位置选择，同边按对方坐标排序并分散，不改变链接方向。 */
+/** Endpoints are a layout projection: choose among four sides by the other object's position, then sort and distribute on each side by the other object's coordinates, without changing link direction. */
 export function layoutConnections(nodes: readonly LayoutNode[], links: WorkbenchSnapshot["links"]) {
   const geometry = new Map(nodes.map(node => {
     const width = node.measured?.width ?? fallbackCardWidth;
@@ -26,7 +26,7 @@ export function layoutConnections(nodes: readonly LayoutNode[], links: Workbench
   const pairs = new Map<string, ConnectionEdge>();
   for (const link of links) {
     if (!geometry.has(link.resourceId) || !geometry.has(link.receiverId)) continue;
-    // 显示身份只取决于对象对；增加或解除反向关系时保留连线选中状态和端点身份。
+    // Display identity depends only on the object pair; adding or removing the reverse relationship preserves connection selection and endpoint identities.
     const id = [link.receiverId, link.resourceId].sort().map(encodeURIComponent).join(":");
     const existing = pairs.get(id);
     if (existing) existing.data.links.push(link);
@@ -49,7 +49,7 @@ export function layoutConnections(nodes: readonly LayoutNode[], links: Workbench
   for (const [nodeId, group] of groups) {
     ports.set(nodeId, sides.flatMap(side => {
       const endpoints = group[side].sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
-      // 无连线的一边也保留一个入口；有连线时每条线获得独立端点，均可继续拖线。
+      // A side without connections still retains one entry point; with connections, each gets its own endpoint, and all remain available for dragging new connections.
       return endpoints.length
         ? endpoints.map((endpoint, index) => ({ id: endpoint.id, side, offset: (index + 1) / (endpoints.length + 1) }))
         : [{ id: side, side, offset: 0.5 }];
@@ -58,7 +58,7 @@ export function layoutConnections(nodes: readonly LayoutNode[], links: Workbench
   return { edges, ports };
 }
 
-/** 端点按身份、边与偏移逐项比较；用于在布局重算后沿用未变化节点的数据身份。 */
+/** Compare endpoints individually by identity, side, and offset; reuse unchanged node data identities after layout recalculation. */
 export function samePorts(a: readonly ConnectionPort[] | undefined, b: readonly ConnectionPort[] | undefined) {
   if (a === b) return true;
   if (!a || !b || a.length !== b.length) return false;

@@ -10,7 +10,7 @@ export class ModelFailure extends Error {
 export interface ToolDeclaration { name: string; description: string; parameters: Json }
 export type { ModelEvent, StreamPart } from "@asterism/sdk/contracts";
 export type ResolvedInputPart = Extract<ModelInputPart, { kind: "text" }> | { kind: "file"; data: Uint8Array; mediaType: string; filename?: string };
-/** 工具结果只保留模型需要的成败与部件；界面数据与执行元数据不进入请求。 */
+/** Tool results retain only success/failure and parts needed by the model; UI data and execution metadata stay outside requests. */
 export type ResolvedModelItem = Extract<ModelItem, { kind: "output" }>
   | { kind: "input" | "context"; parts: readonly ResolvedInputPart[] }
   | { kind: "result"; callId: string; name: string; error: boolean; parts: readonly ResolvedInputPart[] };

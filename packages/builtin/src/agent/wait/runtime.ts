@@ -8,7 +8,7 @@ interface AgentSettling {
   settled(object: ObjectReader, signal: AbortSignal): Promise<void>;
 }
 
-/** 等待代理收束；循环退出后若已交付的输入开启新循环，继续等待直到不再运行或超时。 */
+/** Waits for the agent to settle; if delivered input starts a new loop after the previous one exits, keeps waiting until execution stops or times out. */
 export function createWaitTool(loop: AgentSettling) {
   return implementTool(AgentWait, {
     async call(_data, _target, args, { object, caller, signal }) {

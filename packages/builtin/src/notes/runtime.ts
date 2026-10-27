@@ -32,7 +32,7 @@ function mutationFailure(error: unknown, signal: AbortSignal, operation: string)
   throw error;
 }
 
-/** 笔记只保存当前可变正文；游标回溯不恢复正文。 */
+/** Notes save only the current mutable body; cursor rewind does not restore the body. */
 export default defineModule(() => ({
   resources: [implementResource(Note, NoteView, {
     card: noteCard,

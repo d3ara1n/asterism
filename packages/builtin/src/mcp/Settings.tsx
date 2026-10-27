@@ -31,8 +31,8 @@ const summary = (server: McpServerConfig) => server.transport === "stdio" ? [ser
 const islandKey = (serverId: string | null) => `mcp:${serverId ?? "new"}`;
 
 /**
- * 服务器逐行列出：启用开关与连接操作即时生效，点击服务器在右侧浮岛中编辑。
- * 各服务器的操作分别 pending，等待浏览器授权不阻塞其他服务器。
+ * Servers are listed by row: enable switches and connection actions take effect immediately; clicking a server opens an editor in an island to the right.
+ * Each server has independent pending actions; waiting for browser authorization does not block other servers.
  */
 export function McpSettings() {
   const i18n = useI18n(), calls = useRendererCalls(), config = useRendererConfig(BuiltinSettings), island = useRendererIsland();
@@ -43,7 +43,7 @@ export function McpSettings() {
   const lifetime = useLifetimeSignal();
   const servers = config.mcp.servers;
 
-  /** 新增保存成功后以服务器身份重新打开，与点击该行打开的是同一浮岛。 */
+  /** After successful creation, reopens using the server identity in the same island used when clicking its row. */
   const open = (serverId: string | null, origin?: HTMLElement | null, initial?: McpServerConfig) => island.open({ key: islandKey(serverId), label: messages.server, origin,
     render: () => <McpServerEditor serverId={serverId} initial={initial}
       onCreated={server => { void open(server.id, origin, server); }} /> });
@@ -125,9 +125,9 @@ export function McpSettings() {
 }
 
 /**
- * 服务器编辑浮岛：serverId 为 null 时新增。已有服务器读回保存的键值后才可保存；
- * 保存后保持打开并以保存结果为新的基准，新增成功后经 onCreated 以服务器身份重新打开。
- * 服务器在别处被移除时关闭浮岛。
+ * Server editor island: serverId is null for creation. Existing servers can be saved only after their saved key-value pairs have been read;
+ * it stays open after saving and uses the saved result as the new baseline. After successful creation, onCreated reopens it using the server identity.
+ * Closes the island if the server is removed elsewhere.
  */
 function McpServerEditor({ serverId, initial, onCreated }: { serverId: string | null; initial?: McpServerConfig; onCreated(server: McpServerConfig): void }) {
   const i18n = useI18n(), calls = useRendererCalls(), config = useRendererConfig(BuiltinSettings), island = useRendererIsland(), id = useId();
@@ -153,14 +153,14 @@ function McpServerEditor({ serverId, initial, onCreated }: { serverId: string | 
     }, error => { if (!controller.signal.aborted) setFailure(messageOf(error)); });
     return () => controller.abort();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  // 已出现过的服务器消失即视为被移除；新增后重新打开时配置可能尚未送达，先以 initial 呈现。
+  // A server that was previously present and disappears is considered removed; configuration may not yet have arrived when reopening after creation, so render initial first.
   const seen = useRef(false);
   useEffect(() => {
     if (create) return;
     if (saved) seen.current = true;
     else if (seen.current || !initial) void island.close({ force: true });
   }, [create, saved, initial, island]);
-  // 基准更新生效后再替换为服务器身份的浮岛，此时已无未保存修改。
+  // Replace the island with one keyed by server identity after the baseline update takes effect, when there are no unsaved changes.
   useEffect(() => { if (created) onCreated(created); }, [created]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const dirty = JSON.stringify(draft) !== JSON.stringify(baseline);

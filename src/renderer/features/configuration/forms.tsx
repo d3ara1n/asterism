@@ -37,7 +37,7 @@ export function NumberField({ label, value, onChange, min = 0, max, integer = fa
 }) {
   const i18n = useI18n();
   const id = useId();
-  // InputGroup 组合：去掉原生步进箭头，恢复/清除作为输入框内的附加按钮。
+  // InputGroup composition: remove native stepper arrows and place reset/clear as additional buttons inside the input.
   return <Field><FieldLabel htmlFor={id}>{label}</FieldLabel><InputGroup>
     <InputGroupInput id={id} type="number" inputMode={integer ? "numeric" : "decimal"} value={value ?? ""} min={min} max={max} step={integer ? 1 : "any"}
       className="[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
@@ -66,7 +66,7 @@ export function ChoiceField({ label, value, onChange, options, empty }: {
     </SelectContent></Select></Field>;
 }
 export const lines = (value: string): string[] => [...new Set(value.split("\n").map(line => line.trim()).filter(Boolean))];
-/** 覆盖表单复用同一选择控件，缺省与显式 null 各有独立选项。 */
+/** Override forms reuse the same selector, with separate options for unset and explicit null. */
 export function OverrideChoiceField({ value, inherited, onChange, ...props }: {
   label: string; value: string | null | undefined; inherited: string | null; onChange: (value: string | null | undefined) => void;
   options: { value: string; label: string; disabled?: boolean }[]; empty?: string;
@@ -77,7 +77,7 @@ export function OverrideChoiceField({ value, inherited, onChange, ...props }: {
     options={[{ value: "__inherit", label: `${i18n.formatMessage(formsMessages.builtin)} · ${inheritedLabel ?? ""}` }, ...props.options]}
     onChange={next => onChange(next === "__inherit" ? undefined : next)} />;
 }
-/** 开关显示生效值；与内置值不同才写覆盖，并给出“已修改 · 恢复”。 */
+/** Switches show effective values; write an override only when different from the built-in value, and show “Modified · Reset”. */
 export function OverrideToggleField({ value, inherited, onChange, label, hint }: {
   label: string; value: boolean | undefined; inherited: boolean; onChange: (value: boolean | undefined) => void; hint?: string;
 }) {
@@ -104,7 +104,7 @@ export function OverrideNumberField({ value, inherited, onChange, empty, ...prop
     onReset={value !== undefined ? () => onChange(undefined) : undefined}
     onClear={value !== null ? () => onChange(null) : undefined} clearLabel={empty} />;
 }
-/** 列表缺省继承，显式空列表清空；不以空文本猜测列表策略。 */
+/** Unset lists inherit, and explicit empty lists clear; do not infer list policy from empty text. */
 export function OverrideListField({ label, value, inherited, onChange, empty, hint }: {
   label: string; value: string[] | undefined; inherited: string[]; onChange: (value: string[] | undefined) => void; empty: string; hint?: string;
 }) {
@@ -119,9 +119,9 @@ export function OverrideListField({ label, value, inherited, onChange, empty, hi
   </>;
 }
 /**
- * 配置编辑器：套用面板浮岛；保存位于标题栏，经 form 属性提交内容区中的表单。
- * 传入 dirty 时：无修改禁用保存；有修改时由面板浮岛在关闭前确认放弃。
- * busy / error 来自本表单的操作实例；disabled 表达同一编辑器内其他操作对表单的占用。
+ * Configuration editor: uses a panel island; Save sits in the titlebar and submits the content area's form through the form attribute.
+ * When dirty is supplied: disable Save without changes; with changes, the panel island confirms discarding before closing.
+ * busy / error come from this form's operation instance; disabled represents other operations in the same editor occupying the form.
  */
 export interface RemoveAction { title: string; description: string; onConfirm: () => void }
 export function Editor({ title, description, form, dirty, busy, error, disabled = false, saveDisabled = false, remove, restore, children }: {
@@ -151,27 +151,27 @@ export function Editor({ title, description, form, dirty, busy, error, disabled 
     </AlertDialog>}
   </IslandPanel>;
 }
-/** 表单与区块显式呈现所属操作的失败；重试由原操作入口发起。 */
+/** Forms and sections explicitly display failures from their own operations; retries start at the original operation entry. */
 export function ConfigurationActionError({ error }: { error: UiText | null }) {
   const i18n = useI18n();
   return error && <Alert variant="destructive" className="mb-4"><AlertDescription>{i18n.text(error)}</AlertDescription></Alert>;
 }
 
-/** 共享读取状态由设置分类页承接一次。 */
+/** Shared read state is handled once by the settings category page. */
 export function ConfigurationReadStatus() {
   const i18n = useI18n();
   const { snapshot, readError, load } = useSettingsConfiguration();
   if (readError) return <Alert variant="destructive" className="mb-4"><AlertDescription>{i18n.text(readError)}<Button variant="outline" size="sm" className="mt-2" onClick={() => void load()}>{i18n.formatMessage(formsMessages.reload)}</Button></AlertDescription></Alert>;
   return !snapshot ? <p role="status" className="type-caption flex items-center gap-2 py-4"><Spinner aria-hidden="true" />{i18n.formatMessage(formsMessages.loading)}</p> : null;
 }
-/** 字段偏离内置或继承值时的“已修改 · 恢复”。 */
+/** “Modified · Reset” when a field differs from its built-in or inherited value. */
 export function ModifiedNote({ onRestore }: { onRestore: () => void }) {
   const i18n = useI18n();
   return <span className="type-caption">{i18n.formatMessage(formsMessages.modified)} · <Button type="button" variant="link" size="sm" className="h-auto p-0 text-xs" onClick={onRestore}>{i18n.formatMessage(formsMessages.restore)}</Button></span>;
 }
 /**
- * 编辑器区块：标题、说明与右侧操作，区块之间以分隔线隔开，首个区块不带分隔线。
- * collapsible 时标题即展开开关；说明、操作与操作结果（status）在折叠时仍可见，只有正文随折叠收起。
+ * Editor section: title, description, and actions on the right; sections are separated by dividers, with none before the first.
+ * When collapsible, the title toggles expansion; description, actions, and operation results (status) remain visible when collapsed, and only the body collapses.
  */
 export function EditorSection({ title, hint, action, status, collapsible = false, defaultOpen = true, children }: {
   title: string; hint?: ReactNode; action?: ReactNode; status?: ReactNode; collapsible?: boolean; defaultOpen?: boolean; children: ReactNode;

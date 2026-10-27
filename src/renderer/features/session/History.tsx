@@ -26,7 +26,7 @@ import { foldWorkbench } from "../../../session/fold";
 
 const branchLabel = (branch: HistoryBranch) => branch.number === 0 ? getI18n().formatMessage(historyMessages.historyMainBranch) : getI18n().formatMessage(historyMessages.historyBranch, { number: branch.number });
 
-/** 历史逐节点导航；正文阅读与 response 聚合属于代理卡片。 */
+/** History navigates node by node; body reading and response aggregation belong to the agent card. */
 export function SessionHistoryPanel({ controller }: { controller: SessionController }) {
   const i18n = useI18n();
   const { snapshot, state } = useSession(controller);
@@ -70,7 +70,7 @@ export function SessionHistoryPanel({ controller }: { controller: SessionControl
   };
   const selectEntry = (nodeId: string | null) => navigate(branchForNode(tree, nodeId, branch.id), nodeId);
   useLayoutEffect(() => {
-    // 切换 Tab 后承接原条目焦点，不夺取搜索等控件的焦点。
+    // After switching Tabs, carry over the original item's focus without taking focus from controls such as search.
     const transferFocus = focusOrigin.current && (document.activeElement === focusOrigin.current
       || document.activeElement === document.body || list.current?.contains(document.activeElement));
     focusOrigin.current = null;
@@ -149,7 +149,7 @@ export function SessionHistoryPanel({ controller }: { controller: SessionControl
   </Tabs>;
 }
 
-/** 分叉点是事件之后的导航行；随所属事件筛选，不作为历史节点或事件操作。 */
+/** A branch point is a navigation row after an event; it is filtered with its event and is neither a historical node nor an event action. */
 function BranchNavigationRow({ parent, branches, onNavigate }: { parent?: HistoryBranch; branches: HistoryBranch[]; onNavigate: (branch: HistoryBranch) => void }) {
   const i18n = useI18n();
   if (!parent && branches.length === 0) return null;
@@ -198,7 +198,7 @@ function HistoryViewPicker({ entries, value, onChange }: { entries: HistoryEntry
       </CommandList></Command></PopoverContent></Popover>;
 }
 
-/** 进度订阅只刷新继续操作，不使整份历史列表随流增量重渲染。 */
+/** Progress subscriptions refresh only the continue action, preventing the entire history list from rerendering on stream deltas. */
 function ContinueAction({ controller, nodeId }: { controller: SessionController; nodeId: string | null }) {
   const i18n = useI18n();
   const { snapshot, state } = useSession(controller);
@@ -207,7 +207,7 @@ function ContinueAction({ controller, nodeId }: { controller: SessionController;
   const [target, setTarget] = useState<{ id: string | null } | null>(null);
   const [saving, setSaving] = useState(false);
   const resources = useMemo(() => historyResources(snapshot?.nodes ?? []), [snapshot?.nodes, i18n]);
-  // 回溯将移出当前集合的对象；确认框打开时才计算并查询其结束提示。
+  // Rewinding will move objects out of the current set; compute them and query their disposal notices only when the confirmation dialog opens.
   const leaving = useMemo(() => {
     if (!target || !snapshot) return null;
     const retained = new Set(foldWorkbench(sessionTimeline(snapshot.nodes, target.id)).objects.map(object => object.id));

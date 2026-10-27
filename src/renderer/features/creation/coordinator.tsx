@@ -28,7 +28,7 @@ type ChoiceState = { item: DropItem; candidates: CreationEntry[]; key: string; d
 type RunningState = { label: import("@asterism/sdk/contracts").UiText; requestId: string; sessionId: string; content?: RendererContentInput };
 
 export interface CreationCoordinator {
-  /** 菜单入口，按装配顺序。 */
+  /** Menu entries in assembly order. */
   readonly menu: readonly CreationEntry[];
   readonly pending: boolean;
   open(entry: CreationEntry): void;
@@ -38,8 +38,8 @@ export interface CreationCoordinator {
 }
 
 /**
- * 宿主创建协调器：菜单与拖放共用的唯一创建入口。负责候选仲裁与路由记忆、插件输入视图外壳、
- * 放置位置、提交与取消；插件视图只拿到 resolve/cancel，不接触可写会话。
+ * Host creation coordinator: the sole creation entry shared by menus and drag-and-drop. Handles candidate arbitration, remembered routing, the shell for plugin input views,
+ * placement, submission, and cancellation; plugin views receive only resolve/cancel and do not access a writable session.
  */
 export function useCreationCoordinator({ controller, canvas, writable, ready }: {
   controller: SessionController | null; canvas: () => WorkbenchCanvas | null; writable: boolean; ready: boolean;
@@ -64,7 +64,7 @@ export function useCreationCoordinator({ controller, canvas, writable, ready }: 
     setInput(null); setChoice(null);
   }, [controller]);
 
-  /** 提交一次创建；带请求身份，准备阶段可由用户取消。 */
+  /** Submit one creation with a request identity; the user can cancel during preparation. */
   const create = useCallback(async (entry: CreationEntry, value: Json, position: Point | null, content: RendererContentInput): Promise<boolean> => {
     if (submitting.current.has(content)) return false;
     const active = latest.current.controller;
@@ -101,7 +101,7 @@ export function useCreationCoordinator({ controller, canvas, writable, ready }: 
       setError(null); setInput({ entry, source, position, content, initialInput, done });
     }), []);
 
-  /** 有输入视图时打开外壳，否则由来源直接产出输入。 */
+  /** Open the shell when an input view exists; otherwise produce input directly from the source. */
   const start = useCallback(async (entry: CreationEntry, source: CreationSource, position: Point | null) => {
     const active = latest.current.controller;
     if (!active) return false;
@@ -142,7 +142,7 @@ export function useCreationCoordinator({ controller, canvas, writable, ready }: 
   const drop = useCallback((items: readonly DropItem[], origin: Point) => {
     if (!latest.current.writable || latest.current.pending) return;
     void (async () => {
-      // 多项拖入逐项路由，依次错开落点；后项等前项完成再开始。
+      // Route multiple dropped items individually, staggering placement; each starts after the preceding one completes.
       let index = 0;
       for (const item of items) {
         const candidates = dropCandidates(registry.creations, item);
@@ -165,7 +165,7 @@ export function useCreationCoordinator({ controller, canvas, writable, ready }: 
     setInput(current => { current?.done(ok); return null; });
     setError(null);
   };
-  // 输入对话框之外的进度与错误经临时通知呈现；对话框打开时错误留在对话框内。
+  // Progress and errors outside the input dialog appear through transient notifications; while the dialog is open, errors remain inside it.
   useStateToast("creation-running", running && !input ? i18n.formatMessage(creationMessages.adding, { running_label: i18n.text(running.label) }) : null, {
     tone: "loading", action: { label: i18n.formatMessage(commonMessages.cancel), onClick: cancelRunning },
   });
@@ -201,7 +201,7 @@ export function useCreationCoordinator({ controller, canvas, writable, ready }: 
   return { menu, pending, open, canDrop, drop, element };
 }
 
-/** 多个入口受理同一拖入项时由用户选择，可记住此类内容的选择。 */
+/** When multiple entries accept the same dropped item, the user chooses and can remember the choice for that content type. */
 function RouteChooser({ choice, onDone }: { choice: ChoiceState; onDone: (entry: CreationEntry | null, remember: boolean) => void }) {
   const i18n = useI18n();
   const [remember, setRemember] = useState(false);

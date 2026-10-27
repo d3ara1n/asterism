@@ -1,4 +1,4 @@
-/** 每张卡片独立持有；每个挂载界面只释放自己的隐藏请求。 */
+/** Owned independently by each card; each mounted UI releases only its own hide request. */
 export function createComposerVisibility() {
   const requests = new Set<symbol>();
   const listeners = new Set<() => void>();

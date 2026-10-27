@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const storageChangeSchema = z.object({ id: z.string(), from: z.number().int(), to: z.number().int() });
-/** 恢复点：迁移前复制，或还原／重新开始前移走的整组应用数据。 */
+/** Recovery point: the complete application data set copied before migration or moved before restoration/restart from scratch. */
 export const recoveryPointSchema = z.object({
   version: z.literal(1),
   id: z.string(),
@@ -9,7 +9,7 @@ export const recoveryPointSchema = z.object({
   createdAt: z.string(),
   applicationVersion: z.string(),
   changes: z.array(storageChangeSchema),
-  /** 迁移成功后待提示；用户确认后清除。 */
+  /** Pending prompt after successful migration; cleared on user acknowledgment. */
   notice: z.boolean(),
 });
 export type RecoveryPoint = z.infer<typeof recoveryPointSchema>;
@@ -19,17 +19,17 @@ export type PluginStorageFailure = z.infer<typeof pluginStorageFailureSchema>;
 
 export const preparationResultSchema = z.discriminatedUnion("ok", [
   z.object({ ok: z.literal(true), plugins: z.array(pluginStorageFailureSchema) }),
-  /** `paused` 表示还原后暂停自动迁移，等待用户重试。 */
+  /** `paused` means automatic migration is paused after restoration, awaiting user retry. */
   z.object({ ok: z.literal(false), error: z.string(), paused: z.boolean() }),
 ]);
 export type PreparationResult = z.infer<typeof preparationResultSchema>;
 
-/** 数据准备的实际工作阶段；宿主设置可读性通过独立消息回报。 */
+/** Actual data preparation stage; separate messages report host settings readability. */
 export const preparationStageSchema = z.enum(["dataCheck", "dataBackup", "data", "dataPlugins"]);
 export type PreparationStage = z.infer<typeof preparationStageSchema>;
 export interface PreparationProgress { stage: PreparationStage; detail?: string }
 
-/** 最终结果表示提交与资源清理均已结束；主进程接收后终止准备进程。 */
+/** Final results mean commits and resource cleanup are complete; the main process terminates preparation on receipt. */
 export const preparationMessageSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("host"), status: z.enum(["migrating", "ready"]) }),
   z.object({ kind: z.literal("progress"), stage: preparationStageSchema, detail: z.string().optional() }),

@@ -4,7 +4,7 @@ import { FailureScreen } from "./FailureScreen";
 
 import { Component, type ReactNode } from "react";
 
-/** 渲染异常兜底：显示可复制的错误与组件栈；重新加载回到首页，已保存的工作从持久化读取。 */
+/** Rendering error fallback: displays copyable errors and component stacks; reloading returns home, and saved work is read from persistence. */
 export class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null; stack: string | null }> {
   state = { error: null as Error | null, stack: null as string | null };
   static getDerivedStateFromError(error: Error) { return { error }; }

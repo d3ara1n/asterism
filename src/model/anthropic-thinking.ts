@@ -8,7 +8,7 @@ type Step = { kind: "thinking"; value: Record<string, unknown> } | { kind: "text
 type Group = { role: "user" | "assistant"; steps: Step[] };
 function fail(): never { throw new ModelFailure("protocol_encoding", "The Messages encoder cannot preserve the requested thinking order."); }
 
-/** 签名、遮蔽与无签名明文都是 Messages 思考输入；独立摘要不伪装成 thinking。 */
+/** Signatures, redacted data, and unsigned plaintext are all Messages reasoning inputs; separate summaries are not disguised as thinking. */
 function prepare(options: CallOptions) {
   if (!options.prompt.some(message => message.role === "assistant" && message.content.some(part => part.type === "reasoning"))) return null;
   const groups: Group[] = [];
@@ -33,7 +33,7 @@ function prepare(options: CallOptions) {
       else fail();
       return true;
     });
-    // 保留空 assistant 的分组边界；序列化之后补回只含思考的消息。
+    // Preserve grouping boundaries for empty assistants; restore reasoning-only messages after serialization.
     return { ...message, content };
   });
   return { prompt, groups };
@@ -54,7 +54,7 @@ function insert(body: unknown, groups: Group[]) {
     const remaining = [...message.content] as Record<string, unknown>[];
     const content = group.steps.map(step => {
       if (step.kind === "thinking") return step.value;
-      // SDK 将 tool_use 移到块尾，并 trim 最后 assistant 的末段正文；签名思考不参与裁剪。
+      // The SDK moves tool_use to the block end and trims the last assistant's final text segment; signed reasoning is not trimmed.
       const trimmedLastText = group === groups.at(-1) && step === ordinary.at(-1);
       const position = remaining.findIndex(part => step.kind === "tool"
         ? part.type === "tool_use" && part.id === step.id

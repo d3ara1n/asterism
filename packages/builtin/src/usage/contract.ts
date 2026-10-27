@@ -2,7 +2,7 @@ import { z } from "zod";
 import { defineCall, providerUsageIdSchema, usageItemsSchema, providerUsageErrorSchema } from "@asterism/sdk/contracts";
 import { builtin } from "@asterism/builtin-api/contracts";
 
-/** 内置消费者的展示状态；不约束其他插件的缓存或刷新策略。 */
+/** Display state for the built-in consumer; does not constrain other plugins' caching or refresh policies. */
 export const providerUsageStateSchema = z.strictObject({
   providerId: z.string(), usage: providerUsageIdSchema.nullable(),
   source: z.enum(["query", "headers"]).optional(), model: z.string().optional(),

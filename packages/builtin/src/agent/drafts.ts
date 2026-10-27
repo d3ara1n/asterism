@@ -35,7 +35,7 @@ export function exchangeDraft(object: ObjectExecutor, input: {
     rememberSubmission(object, writer, input);
   });
 }
-/** 丢弃与排序按身份作用，重放同一意图得到同一结果；条目已消费时返回 not_found。 */
+/** Discarding and sorting act by identity; replaying the same intent produces the same result, and consumed items return not_found. */
 export function discardDraft(object: ObjectExecutor, input: { id: string }): void {
   object.commit(writer => {
     const { drafts } = currentDraft(object, input.id);
@@ -47,14 +47,14 @@ export function moveDraft(object: ObjectExecutor, input: { id: string; before: s
     const { drafts, draft } = currentDraft(object, input.id);
     if (input.before === input.id) return;
     const rest = drafts.filter(item => item.id !== input.id);
-    // 顺序即交付顺序；锚点已被消费时退回末尾，不丢条目。
+    // Order is delivery order; if the anchor has been consumed, fall back to the end without losing the item.
     const index = input.before === null ? rest.length : rest.findIndex(item => item.id === input.before);
     const next = [...rest];
     next.splice(index < 0 ? rest.length : index, 0, draft);
     writer.set(AgentDrafts, next);
   });
 }
-/** 先形成完整批次，再允许循环取上下文；消息与持久附件的归属在同一事务交接。 */
+/** Forms a complete batch before allowing the loop to read context; message and persistent-attachment ownership transfer in the same transaction. */
 export function deliverDrafts(object: ObjectExecutor, boundary: "request" | "turn"): boolean {
   const drafts = object.get(AgentDrafts) ?? [];
   const batch = drafts.filter(item => item.mode === "steer" || boundary === "turn" && item.mode === "follow");

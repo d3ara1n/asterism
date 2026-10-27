@@ -8,22 +8,22 @@ import type { ActionContract, CreationContract } from "./commands.ts";
 
 export interface ResourceCreationOptions {
   signal?: AbortSignal;
-  /** 输入引用的内容读取资格；省略时使用当前会话内容门面。 */
+  /** Read eligibility for content referenced by the input; defaults to the current session content facade when omitted. */
   content?: ContentReader;
-  /** 新资源链接给此接收者，与创建原子提交。 */
+  /** Link the new resource to this recipient, committed atomically with creation. */
   linkTo?: ResourceRef;
-  /** 新资源接收的初始资源链接，与创建原子提交。 */
+  /** Initial resource links received by the new resource, committed atomically with creation. */
   resources?: readonly ResourceRef[];
 }
 export interface ResourceActionOptions {
   signal?: AbortSignal;
-  /** 本次动作输入的合法内容来源；省略时使用调用者绑定的会话／对象内容门面。 */
+  /** The valid content source for this action's input; defaults to the caller's bound session/object content facade when omitted. */
   content?: ContentReader;
 }
 
-/** 同步事务中的数据与事件写入；宿主限制 writer 的调用有效期。 */
+/** Data and event writes within a synchronous transaction; the host limits the validity of writer calls. */
 export interface SessionWriter {
-  /** 向提交时的当前时间线末端追加并推进游标；此前取得的只读快照不决定追加位置。 */
+  /** Append to the current timeline tip at commit time and advance the cursor; previously obtained read-only snapshots do not determine the append position. */
   append<T extends Json>(contract: RecordContract<T>, data: NoInfer<T>): string;
   set<T extends Json>(contract: DataContract<T>, data: NoInfer<T>): void;
 }
@@ -35,33 +35,33 @@ export interface SessionReader {
   get<T extends Json>(contract: DataContract<T>): T | null;
   readonly title: { get(): string };
 }
-/** 会话层面的通用执行门面；资源操作使用显式引用，调用者视角由具体调用入口绑定。 */
+/** Generic execution facade at the session level; resource operations use explicit references, and the specific call entry point binds the caller's perspective. */
 export interface SessionExecutor extends SessionReader {
   create<I, S extends Json, O extends Json>(contract: CreationContract<I, S, O>, input: NoInfer<I> & Json, options?: ResourceCreationOptions): Promise<ResourceCreationResult>;
-  /** 调用资源公开动作；返回表示动作处理完成，独立托管工作由资源自身管理。 */
+  /** Invoke a resource's public action; returning means action handling is complete, while the resource manages any independent managed work itself. */
   invoke<I, O extends Json>(contract: ActionContract<I, O>, target: ResourceRef, input: NoInfer<I> & Json, options?: ResourceActionOptions): Promise<void>;
-  /** 将资源链接给接收者；两端均为资源，接收者由资源类型声明支持链接。 */
+  /** Link a resource to a recipient; both ends are resources, and the recipient's resource type declares support for receiving links. */
   link(receiver: ResourceRef, resource: ResourceRef): void;
-  /** 解除指定方向的链接；反向链接独立保留。 */
+  /** Unlink the specified direction; the reverse link remains independently. */
   unlink(receiver: ResourceRef, resource: ResourceRef): void;
-  /** 移除已收束对象并解除所有链接；保留历史与外部实体。 */
+  /** Remove a settled object and all its links; preserve history and external entities. */
   remove(resource: ResourceRef): void;
-  /** 标题变化时追加资源改名事件，返回去除首尾空白后的标题。 */
+  /** Append a resource rename event when the title changes; return the title with leading and trailing whitespace removed. */
   rename(resource: ResourceRef, title: string): string;
   commit(work: (writer: SessionWriter) => undefined): void;
-  /** set 直接覆盖会话标题；可在同步 commit 内调用并随其提交或回滚。 */
+  /** set directly overwrites the session title; it can be called within a synchronous commit and commits or rolls back with it. */
   readonly title: SessionReader["title"] & { set(text: string): void };
 }
 /**
- * 同一会话在工具调用发起者与本次请求视角下的操作门面。
- * 宿主绑定发起资源、请求开始时的有效链接范围和工具执行作用域，统一处理身份与执行校验。
- * 操作从发起资源出发：创建后链接给发起者，移除与改名目标从本请求有效链接范围内解析。
- * 新增操作沿用此视角，明确隐式绑定的端点、可操作资源范围及执行作用域。
+ * An operation facade for the same session from the perspective of the tool caller and this request.
+ * The host binds the originating resource, the effective link scope at request start, and the tool execution scope, handling identity and execution validation consistently.
+ * Operations originate from the initiating resource: newly created resources link to it, while removal and rename targets resolve within this request's effective link scope.
+ * New operations use this perspective, explicitly defining implicitly bound endpoints, the operable resource scope, and the execution scope.
  */
 export interface ToolSession extends SessionReader {
   create<I, S extends Json, O extends Json>(contract: CreationContract<I, S, O>, input: NoInfer<I> & Json, options?: {
     resources?: readonly string[];
-    /** 将绑定的发起者链接给新资源，与创建原子提交；省略为 false。 */
+    /** Link the bound initiator to the new resource, committed atomically with creation; defaults to false when omitted. */
     exposeSelf?: boolean;
   }): Promise<ResourceCreationResult>;
   remove(resourceId: string): void;
@@ -71,19 +71,19 @@ export interface ObjectReader {
   readonly ref: ResourceRef;
   readonly content: ContentReader;
   readonly session: SessionReader;
-  /** 调用绑定的资源快照；创建事务内尚未建立身份时为 null。 */
+  /** The resource snapshot bound to the call; null when identity has not yet been established within the creation transaction. */
   snapshot(): ResourceSnapshot | null;
-  /** 当前数据独立于固定快照，不随游标回溯或分叉恢复。 */
+  /** Current data is independent of the fixed snapshot and is not restored by cursor rewinding or branching. */
   get<T extends Json>(contract: DataContract<T>): T | null;
 }
 export interface ObjectExecutor extends ObjectReader {
   readonly events: EventPublisher;
-  /** 暂存仅在宿主执行作用域有效；读取按对象已有归属或本次输入校验。 */
+  /** Staging is valid only within the host execution scope; reads are validated against content already owned by the object or supplied in this input. */
   readonly content: ContentScope;
   readonly session: SessionExecutor;
   commit(work: (writer: ObjectWriter) => undefined): void;
-  /** 标记依赖当前时间线路径的异步工作；嵌套占用分别释放，取消后等待工作真实结束。 */
+  /** Mark asynchronous work that depends on the current timeline path; nested holds release independently, and cancellation waits for work to actually end. */
   withBusy<T>(work: (signal: AbortSignal) => Promise<T>, options?: { signal?: AbortSignal }): Promise<T>;
-  /** 内存中的展示数据变化后通知宿主重新查询投影；不追加历史或保存资源数据。 */
+  /** Notify the host to query the projection again after in-memory display data changes; does not append history or save resource data. */
   invalidate(): void;
 }

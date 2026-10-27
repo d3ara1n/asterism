@@ -2,13 +2,13 @@ import { describe, expect, it } from "vitest";
 import { viewportSchema } from "../../../shared/workbench";
 import { locateViewport, overviewMinZoom } from "./viewport";
 
-describe("画布概览与缩放契约", () => {
-  it("普通画布与空画布使用 5% 下限", () => {
+describe("Canvas overview and zoom contract", () => {
+  it("uses a 5% minimum for ordinary and empty canvases", () => {
     expect(overviewMinZoom({ x: 0, y: 0, width: 1200, height: 800 }, 1000, 700)).toBe(0.05);
     expect(overviewMinZoom({ x: 0, y: 0, width: 0, height: 0 }, 1000, 700)).toBe(0.05);
   });
 
-  it("远处分散的对象共同入镜，窄视口仍能概览且动态下限保留余量", () => {
+  it("frames distant scattered objects together, supports overview in a narrow viewport, and retains margin in the dynamic minimum", () => {
     const bounds = { x: -100_000, y: -50_000, width: 200_560, height: 100_640 };
     const width = 1000, height = 700;
     const minZoom = overviewMinZoom(bounds, width, height);
@@ -25,7 +25,7 @@ describe("画布概览与缩放契约", () => {
   });
 
 
-  it("缩放契约拒绝零、负数及非有限数值", () => {
+  it("the zoom contract rejects zero, negative, and non-finite values", () => {
     for (const zoom of [0, -1, Infinity, NaN]) {
       expect(viewportSchema.safeParse({ x: 0, y: 0, zoom }).success).toBe(false);
     }

@@ -7,7 +7,7 @@ export const phaseTone: Record<ConnectionPhase, StatusTone> = {
   connected: "success", connecting: "progress", awaiting_auth: "warning", error: "error", disconnected: "neutral",
 };
 
-/** 订阅模块状态事件，每次变化重新读取当前值。 */
+/** Subscribes to module state events and rereads the current value on each change. */
 function useMcpRead<T>(read: (signal: AbortSignal) => Promise<T>, enabled: boolean, deps: readonly unknown[]) {
   const events = useRendererEvents();
   const [value, setValue] = useState<T | undefined>(undefined), [error, setError] = useState<string | null>(null);
@@ -31,7 +31,7 @@ export function useMcpStatus() {
   return { servers: value ?? [], error };
 }
 
-/** 展开时才读取缓存目录摘要；undefined 表示尚未读到，null 表示该服务器还没有目录。 */
+/** Reads the cached catalog summary only when expanded; undefined means it has not yet been read, and null means the server has no catalog yet. */
 export function useMcpTools(serverId: string, enabled: boolean) {
   const calls = useRendererCalls();
   const { value, error } = useMcpRead<{ tools: McpToolSummary[]; instructions?: string } | null>(

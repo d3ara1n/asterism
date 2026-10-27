@@ -1,4 +1,4 @@
-/** 宿主在渲染器启动时发布字体 token；交互终端与图片共用解析结果。 */
+/** The host publishes font tokens at renderer startup; interactive terminals and images share the resolved values. */
 export function terminalTypography(): { fontFamily: string; fontSize: number } {
   const style = getComputedStyle(document.documentElement);
   return {

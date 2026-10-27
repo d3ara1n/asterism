@@ -3,7 +3,7 @@ import { AgentConfigurationPicker } from "./ConfigurationPicker";
 import { ContextUsage } from "./ContextUsage";
 import { useConversationInteraction } from "./interaction";
 
-/** 内置项与第三方共用登记、只读选择和工具栏呈现入口。 */
+/** Built-in and third-party items share registration, read-only selection, and toolbar presentation entry points. */
 export function ConfigurationToolbarItem() {
   const { selection } = useAgentModelSelection();
   const interaction = useConversationInteraction();

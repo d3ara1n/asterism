@@ -1,11 +1,11 @@
 import type { Point } from "./workbench.ts";
 
-/** 模块未注册卡片视图时使用的默认尺寸与缩放下限。 */
+/** Default dimensions and minimum scale when modules register no card views. */
 export const fallbackCardWidth = 340;
 export const fallbackCardHeight = 200;
 export const minimumCardWidth = 280;
 export const minimumCardHeight = 160;
-/** 缺少视图行的早期对象按默认可见处理，位置在用户首次移动时保存。 */
+/** Early objects without view rows default to visible; save positions on the user's first move. */
 export const defaultCardPosition: Point = { x: 48, y: 48 };
-/** 相邻卡片之间的水平与垂直空隙。 */
+/** Horizontal and vertical spacing between adjacent cards. */
 export const placementGap = { x: 80, y: 80 };

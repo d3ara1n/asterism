@@ -2,10 +2,10 @@ import { z } from "zod";
 import { jsonSchema, thinkingLevels, type Json, type ThinkingLevel } from "@asterism/sdk/contracts";
 import type { ModelProviderInput } from "./configuration.ts";
 
-/** 应用预定义的声明目录；参数与展示同源，行为由请求投影层按 id 解释。 */
+/** Application-predefined declaration catalog; parameters and display share a source and request projection interprets behavior by id. */
 export type ModelCompatibilityDefinition = {
   id: string;
-  /** 仅供用户参考；不用于自动启用、添加限制或运行时匹配。 */
+  /** User reference only; not used for automatic enablement, addition restrictions, or runtime matching. */
   appliesTo: {
     protocols: readonly ModelProviderInput["protocol"][];
     endpoints?: readonly string[];
@@ -132,7 +132,7 @@ const entrySchema = z.strictObject({ id: z.string().min(1), value: jsonSchema.op
   return parsed.data === undefined ? { id: entry.id } : { id: entry.id, value: parsed.data };
 });
 
-/** 每层只保存显式条目；不按协议阻止保存，同层不允许重复 id。 */
+/** Each layer saves explicit entries only; protocols do not block saves and duplicate ids within a layer are forbidden. */
 export const modelCompatibilitySchema = z.array(entrySchema).superRefine((entries, context) => {
   const ids = new Set<string>();
   entries.forEach((entry, index) => {
@@ -141,7 +141,7 @@ export const modelCompatibilitySchema = z.array(entrySchema).superRefine((entrie
   });
 });
 
-/** 请求与展示共用：按 id 合并，模型条目整项优先，省略的参数不从提供商补齐。 */
+/** Shared by requests and presentation: merge by id with whole model entries taking precedence; omitted parameters do not inherit from providers. */
 export function mergeModelCompatibility(
   provider: readonly ModelCompatibility[], model: readonly ModelCompatibility[],
 ): ModelCompatibility[] {

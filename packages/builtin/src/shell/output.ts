@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { OUTPUT_CHAR_LIMIT, type ShellOutput } from "./contract.ts";
 
-/** 按流过滤终端控制序列；跨 chunk 的序列只保留解析状态，不缓存任意长度正文。 */
+/** Filters terminal control sequences per stream; sequences spanning chunks retain only parser state, without buffering arbitrarily long text. */
 class DisplayText {
   private state: "text" | "escape" | "csi" | "string" | "stringEscape" = "text";
   private carriage = false;
@@ -30,7 +30,7 @@ class DisplayText {
   }
 }
 
-/** 完整的处理后文本仅在超限时写系统临时文件；历史消费者只取得有界尾部。 */
+/** Writes the complete processed text to a system temporary file only when the limit is exceeded; history consumers receive only a bounded tail. */
 export class ShellOutputBuffer {
   private readonly decoders = { stdout: new TextDecoder(), stderr: new TextDecoder() };
   private readonly display = { stdout: new DisplayText(), stderr: new DisplayText() };

@@ -22,9 +22,9 @@ function configuration(): ConfigurationSnapshot {
   };
 }
 
-// 模型配置契约：空选择逐层继承，等级集合只影响菜单，显式等级由上游判断是否接受。
-describe("模型选择的继承与请求解析", () => {
-  it("摘要与请求独立解析同一配置，空选择保留继承，角色修改生效，失效模型不回退", () => {
+// Model configuration contract: empty selections inherit by layer, level sets affect menus only, and upstream decides explicit-level acceptance.
+describe("Model selection inheritance and request resolution", () => {
+  it("summaries and requests independently resolve the same configuration, preserve empty inheritance, honor role changes, and never fall back from invalid models", () => {
     const config = configuration();
     const service = createSelection({ agents: () => config.agents });
     const selection = agentSelectionSchema.parse({ agent: "worker", model: null, thinking: null });
@@ -49,8 +49,8 @@ describe("模型选择的继承与请求解析", () => {
     expect(selection).toEqual({ agent: "worker", model: null, thinking: null });
   });
 
-  // 模型配置契约：停用角色即不可解析，显式模型覆盖不能使失效角色重新可用。
-  it("摘要不把停用角色下的显式模型显示为可用", () => {
+  // Model configuration contract: disabled roles cannot resolve, and explicit model overrides cannot revive invalid roles.
+  it("summaries do not show explicit models under disabled roles as available", () => {
     const config = configuration();
     config.roles.find(role => role.id === "default")!.enabled = false;
     const selection = { agent: "worker", model: "p/test", thinking: null };
@@ -66,7 +66,7 @@ describe("模型选择的继承与请求解析", () => {
     { override: null, inherited: null, levels: [...thinkingLevels] },
     { override: "off", inherited: "high", levels: [] },
   ] as { override: ThinkingLevel | null; inherited: ThinkingLevel | null; levels: ThinkingLevel[] }[])(
-    "等级 $override / 继承 $inherited 不因可用集合被拒绝或替换", ({ override, inherited, levels }) => {
+    "level $override / inherited $inherited is not rejected or replaced by the available set", ({ override, inherited, levels }) => {
       const config = configuration();
       config.models[0]!.capabilities.thinkingLevels = levels;
       config.roles.find(role => role.id === "default")!.thinking = inherited;
@@ -85,7 +85,7 @@ describe("模型选择的继承与请求解析", () => {
       expect(selection.thinking).toBe(override);
     });
 
-  it("菜单按继承模型过滤；off 是普通可选等级，空集没有等级，选择不被改写", () => {
+  it("menus filter by inherited model; off is an ordinary level, empty sets have none, and selections are not rewritten", () => {
     const config = configuration();
     const selection = { agent: "worker", model: null, thinking: null };
     const model = resolveAgentModel(config, selection)!;

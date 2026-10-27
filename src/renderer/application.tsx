@@ -33,7 +33,7 @@ import { builtinPublicProvider, builtinPublicModules } from "../builtin-public";
 
 import { runtime } from "./runtime";
 
-/** 首页挂载后取得一次启动通知：存储准备失败而停用的插件以持续错误提示呈现。 */
+/** Retrieve startup notices once after the home page mounts: plugins disabled due to storage preparation failure appear as persistent errors. */
 function StartupNotification() {
   const i18n = useI18n();
   useEffect(() => {
@@ -44,7 +44,7 @@ function StartupNotification() {
   }, [i18n]);
   return null;
 }
-/** 工作台及插件在轻量启动页出现后装载；应用控制器从首次读取起持续订阅。 */
+/** Load the workbench and plugins after the lightweight startup page appears; the application controller stays subscribed from the initial read onward. */
 export async function startApplication(root: Root, progress: (message: UiText, detail?: string) => void, signal: AbortSignal): Promise<void> {
   signal.throwIfAborted();
   const events = new EventClient(runtime.events);
@@ -54,7 +54,7 @@ export async function startApplication(root: Root, progress: (message: UiText, d
   signal.addEventListener("abort", () => { events.close(); calls.close(); stopEventStatus(); }, { once: true });
   const stopController = controller.connect({ read: false });
   signal.addEventListener("abort", stopController, { once: true });
-  // 插件视图只在启动时加载；内置视图之后合并，重复契约使该插件视图被忽略。
+  // Plugin views load only at startup; built-in views are merged afterward, and duplicate contracts cause the plugin's views to be ignored.
   await controller.refresh();
   signal.throwIfAborted();
   const initial = controller.getSnapshot();

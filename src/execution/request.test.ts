@@ -44,9 +44,9 @@ const write = defineImplementation({ ...defineData("example.resource/write", z.n
   tool: defineTool({ id: "test.tools/write", name: "write", description: "Write a value.", guidelines: [], argsSchema: z.object({}).describe("No arguments.") }),
   targetSchema: z.null().describe("The whole item."), effect: "write", execution: "sequential" });
 
-describe("无状态的单次模型执行", () => {
-  // 中途断流时已有块仍交付；原始错误经过事件和记录校验后仍可供界面读取。
-  it("部分响应失败的详情同时保留在返回值与可保存诊断中", async () => {
+describe("Stateless single model execution", () => {
+  // Deliver existing blocks even if the stream breaks; original errors remain readable by the UI after event and record validation.
+  it("partial response failure details remain in both the return value and persistable diagnostics", async () => {
     const details = { message: "Upstream overloaded", statusCode: 503, responseBody: '{"error":"busy"}' };
     const failure = new ModelFailure("provider_error", details.message, details, "model");
     const events: ModelRunEvent[] = [];
@@ -58,8 +58,8 @@ describe("无状态的单次模型执行", () => {
     expect(records).toContainEqual({ type: "diagnostic", origin: "model", code: "provider_error", message: details.message, level: "error", details });
     expect(records[0]).toMatchObject({ type: "block", block: { kind: "text", text: "Hello", complete: true } });
   });
-  // 响应元信息只随返回结果交付发起者，不进入可保存的块、诊断或进度事件。
-  it.each(["completed", "failed"] as const)("%s 结果保留 HTTP 元信息，观察事件不包含 headers", async outcome => {
+  // Response metadata goes only to the initiator through the result, never to persistable blocks, diagnostics, or progress events.
+  it.each(["completed", "failed"] as const)("%s results preserve HTTP metadata while observation events exclude headers", async outcome => {
     const response = { connection: { id: "p" }, endpoint: settings.provider.baseUrl, model: "test",
       status: outcome === "completed" ? 200 : 429, receivedAt: 1, headers: { "x-test-metadata": "private-response" } };
     const failure = new ModelFailure("provider_error", "Failed.");
@@ -72,8 +72,8 @@ describe("无状态的单次模型执行", () => {
     expect(result).toMatchObject({ reason: outcome, response });
     expect(JSON.stringify(events)).not.toContain("private-response");
   });
-  // 终态计时与 usage 一起交付，执行工具不重置时间；失败也保留计时。
-  it("保留模型终态和失败携带的计时，不用工具批次结束时间覆盖", async () => {
+  // Terminal timing accompanies usage; executing tools does not reset it, and failure retains timing too.
+  it("preserves timing from model termination and failure without replacing it with tool batch completion time", async () => {
     const timing: RequestTiming = { startedAt: "2026-01-01T00:00:00.000Z", endedAt: "2026-01-01T00:00:01.000Z",
       durationMs: 1000, firstOutputMs: 100, firstTextMs: null, firstReasoningMs: null, lastOutputMs: 900, outputChunks: 2, outcome: "completed" };
     const events = calls(["list"]);
@@ -98,7 +98,7 @@ describe("无状态的单次模型执行", () => {
     expect(failed).toMatchObject({ reason: "failed", completion: null, timing: { outcome: "failed", durationMs: 1000 } });
   });
 
-  it("工具批次结束即返回，不隐式发起下一请求，另一次调用只使用显式输入", async () => {
+  it("returns when the tool batch finishes without implicitly starting another request; separate calls use only explicit input", async () => {
     let requests = 0;
     const seen: unknown[] = [];
     const adapter: ModelAdapter = { validate() {}, version: "test", prepare(request) {
@@ -115,7 +115,7 @@ describe("无状态的单次模型执行", () => {
     expect(seen).toEqual([[{ kind: "input", parts: [{ kind: "text", text: "Input" }] }], [{ kind: "input", parts: [{ kind: "text", text: "New projection" }] }]]);
   });
 
-  it("截断响应只交付未完成审计块，保留已报告终态，不执行工具", async () => {
+  it("truncated responses deliver only incomplete audit blocks, retain reported terminal state, and execute no tools", async () => {
     const events: ModelRunEvent[] = [];
     const result = await execute(input(events), model([
       { type: "part.start", part: { id: "c", kind: "toolcall", callId: "c", name: "resource_list" } },
@@ -126,7 +126,7 @@ describe("无状态的单次模型执行", () => {
     expect(events.at(-1)).toEqual({ type: "progress", blocks: [] });
   });
 
-  it("事件消费者失败时取消执行并收束整批，保留未知写入与未启动调用的结局", async () => {
+  it("event consumer failure cancels execution and finalizes the batch, retaining unknown writes and outcomes of unstarted calls", async () => {
     let started = 0;
     const tool = implement(write, { async call(_state, _target, _args, { publish, signal }) {
       started++; publish(1); signal.throwIfAborted(); return { kind: "succeeded", data: 2 };
@@ -147,8 +147,8 @@ describe("无状态的单次模型执行", () => {
     expect(later).toBe(0);
   });
 
-  // 工具结局是模型反馈；显式未知与写工具抛错均不改变模型请求结局。
-  it("未知工具结局和写工具异常正常交付，整批完成供代理继续处理", async () => {
+  // Tool outcomes are model feedback; explicit unknown outcomes and write-tool exceptions do not change model request outcomes.
+  it("delivers unknown tool outcomes and write-tool exceptions normally and completes the batch for the agent to continue", async () => {
     let executions = 0;
     const tool = implement(write, { async call() {
       if (++executions === 2) throw new Error("The command stopped before reporting its result.");
@@ -164,7 +164,7 @@ describe("无状态的单次模型执行", () => {
     expect(events.filter(event => event.type === "diagnostic")).toEqual([]);
   });
 
-  it("缓存命中预期每次显式输入，不根据上次调用推断", async () => {
+  it("cache hits reflect each explicit input rather than inference from the previous call", async () => {
     const finish = { type: "finish" as const, reason: "stop", usage: { input: 3000, output: 10, total: 3010, reasoning: null, cacheRead: 0, cacheWrite: null } };
     const adapter = model([...text.slice(0, -1), finish]);
     const first: ModelRunEvent[] = []; const second: ModelRunEvent[] = []; const third: ModelRunEvent[] = [];
@@ -175,8 +175,8 @@ describe("无状态的单次模型执行", () => {
     expect(second.filter(event => event.type === "diagnostic")).toMatchObject([{ code: "cache_miss", level: "warning" }]);
     expect(third.filter(event => event.type === "diagnostic")).toEqual([]);
   });
-  // 领域扩展消费最终现场的独立副本，与 usage 同时交付最高序号块，公共层只保留封装。
-  it("领域扩展在准备后生成，随终态块一次交付，未知或不兼容扩展不破坏公共计量", async () => {
+  // Domain extensions consume an independent copy of the final state and accompany usage on the highest-index block; the public layer retains only the envelope.
+  it("generates domain extensions after preparation and delivers them once with the terminal block; unknown or incompatible extensions preserve public metering", async () => {
     const contract = defineData("example.agent/request", z.object({ tools: z.array(z.string()) }));
     const unknown = { contract: { id: "other.plugin/opaque" }, data: { version: 42 } };
     const system = { blocks: [{ id: "s", kind: "system" as const, from: "core", text: "Environment" }] };

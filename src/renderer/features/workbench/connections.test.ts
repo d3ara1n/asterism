@@ -9,8 +9,8 @@ const nodes = [
 const forward = { resourceId: "a", receiverId: "b" };
 const reverse = { resourceId: "b", receiverId: "a" };
 
-describe("双向连线投影", () => {
-  it("反向链接合并为一条线，保留整条删除所需的两个方向", () => {
+describe("Bidirectional connection projection", () => {
+  it("merges reverse links into one connection while retaining both directions needed to delete the entire connection", () => {
     const links = [forward, reverse];
     const { edges, ports } = layoutConnections(nodes, links);
     expect(edges).toHaveLength(1);
@@ -22,7 +22,7 @@ describe("双向连线投影", () => {
     expect(links).toEqual([forward, reverse]);
   });
 
-  it("增加或解除任一方向、重排输入时保留连线身份，单向仍指向接收资源", () => {
+  it("preserves connection identity when either direction is added or removed or input is reordered, while one-way links still point to the receiving resource", () => {
     const single = layoutConnections(nodes, [forward]).edges[0]!;
     const mutual = layoutConnections(nodes, [forward, reverse]).edges[0]!;
     const reordered = layoutConnections(nodes, [reverse, forward]).edges[0]!;
@@ -34,7 +34,7 @@ describe("双向连线投影", () => {
     expect(remaining).toMatchObject({ source: "b", target: "a", data: { links: [reverse] } });
   });
 
-  it("只合并同一对象对，隐藏端点时收起整条关系线", () => {
+  it("merges only the same object pair and hides the entire relationship connection when an endpoint is hidden", () => {
     const other = { resourceId: "a", receiverId: "c" };
     const links = [forward, reverse, other];
     const visible = layoutConnections(nodes, links);

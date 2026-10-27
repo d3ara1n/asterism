@@ -30,10 +30,10 @@ export function OpenSettings() {
   const settings = useRendererSettings();
   return createElement("button", { onClick: () => settings.open(settingsPlugin.id, "general") }, "Open settings");
 }
-/** 对象和插件作用域的类型约束与后台校验保持一致。 */
+/** Object and plugin scope type constraints match backend validation. */
 export function invalidCalls(calls: PluginCalls, object: ResourceRef) {
-  // @ts-expect-error 插件级调用不能虚构关联对象。
+  // @ts-expect-error Plugin-level calls cannot fabricate an associated object.
   void calls.invoke(ReadLabel, null, { object });
-  // @ts-expect-error 对象级调用必须提供关联对象。
+  // @ts-expect-error Object-level calls must provide an associated object.
   void calls.invoke(ReadState, null, {});
 }

@@ -3,7 +3,7 @@ import { AgentSubmissions } from "./data.ts";
 
 type Submission = { submissionId: string };
 
-/** 提交身份用于重试去重，相同身份沿用已受理结果。 */
+/** Submission identity deduplicates retries; the same identity reuses the accepted result. */
 export function duplicateSubmission(object: ObjectReader, input: Submission): boolean {
   return object.get(AgentSubmissions)?.[input.submissionId] === true;
 }

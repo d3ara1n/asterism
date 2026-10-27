@@ -11,7 +11,7 @@ const MAX_ANCHOR_LINES = 40;
 const MAX_ANCHOR_BYTES = 16 * 1024;
 const MAX_MODEL_DIFF_BYTES = 64 * 1024;
 
-/** 预期的正文操作失败发生在写入之前；执行层仍负责未知写入结局。 */
+/** Expected text-operation failures occur before writing; the execution layer still owns unknown write outcomes. */
 export class TextError extends Error {
   constructor(readonly code: string, message: string) { super(message); }
   outcome(): CallResult<never> { return { kind: "rejected", error: { code: this.code, message: this.message } }; }
@@ -24,7 +24,7 @@ export function readText(text: string, anchored: boolean, range: { offset?: numb
   const end = Math.min(lines.length, fromLine - 1 + (range.limit ?? lines.length));
   let bytes = 0;
   for (let i = fromLine - 1; i < end; i++) {
-    // 超长行返回带完整行锚点的片段，字节预算按片段计算，单行不再占满或阻断整次读取。
+    // Very long lines return excerpts with full-line anchors, with bytes budgeted by excerpt so a single line no longer consumes or blocks the entire read.
     const row = textRow(i + 1, lines[i], anchored, READ_EXCERPT_THRESHOLD);
     const cost = Buffer.byteLength(`${rowText(row)}\n`);
     if (range.maxBytes !== undefined && bytes + cost > range.maxBytes) {
@@ -61,7 +61,7 @@ export function editText(text: string, edits: Edit[]): { text: string; touchedLi
   if (!applied.ok) throw new TextError(applied.failure.kind === "anchor" ? "anchor_mismatch" : applied.failure.kind === "range" ? "invalid_edit_range" : "edit_no_change", failureMessage(applied.failure));
   return applied;
 }
-/** 在写入之前生成实际 diff；算法超出预算时拒绝操作，不返回虚构差异。 */
+/** Generates the actual diff before writing; rejects the operation if the algorithm exceeds its budget rather than returning a fabricated diff. */
 export function textChange(before: string, after: string, label: string, touched: readonly number[] = []): TextChange {
   label = label.replace(/[\r\n\t]/g, " ");
   const patch = structuredPatch(label, label, before, after, "", "", { context: 3, timeout: 1000, maxEditLength: 10000 });
@@ -92,13 +92,13 @@ function changeSummary(data: TextChange): string {
 export function writeToModel(data: TextChange): string {
   return changeSummary(data);
 }
-/** 统一 diff 中超长行从行首截取，按 hunk 头推算行号，在 diff 之后逐条陈述截取范围。 */
+/** Clips very long unified-diff lines from the start, derives line numbers from hunk headers, and states each excerpt range after the diff. */
 function boundedDiff(diff: string): { lines: string[]; notes: string[]; truncated: boolean } {
   const lines: string[] = [], notes: string[] = [];
   let bytes = 0, oldLine = 0, newLine = 0, inHunk = false;
   for (const raw of diff.split("\n")) {
     const hunk = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(raw);
-    // 首个 hunk 之前只有 ---／+++ 文件头；之后以 -- 开头的删除行仍是正文。
+    // Only ---/+++ file headers precede the first hunk; subsequent deletion lines starting with -- are still body content.
     const clipped = hunk || !inHunk ? null : clipDiffLine(raw);
     const text = clipped?.text ?? raw;
     const cost = Buffer.byteLength(text) + 1;
@@ -117,7 +117,7 @@ function boundedDiff(diff: string): { lines: string[]; notes: string[]; truncate
   return { lines, notes, truncated: false };
 }
 export function editToModel(data: TextChange): string {
-  // 历史保留完整 diff；模型收到有界 diff 与可继续编辑的新锚点。
+  // History retains the complete diff; the model receives a bounded diff and new anchors for further editing.
   const diff = boundedDiff(data.diff);
   return [
     changeSummary(data),

@@ -3,8 +3,8 @@ import { defineRecord } from "@asterism/sdk/contracts";
 import { builtin } from "./identity.ts";
 
 /**
- * 会话级命名事件：每次实际生效命名追加一条，既有事件不改写。
- * 自动命名附带触发消息、层级与生成模型，后续判断只读最新一条。
+ * Session-level naming events: append one for each naming operation that takes effect; existing events are not rewritten.
+ * Automatic naming includes the triggering message, level, and generating model; subsequent decisions read only the latest event.
  */
 export const SessionNamed = defineRecord(builtin.name("session.named"), {
   schema: z.strictObject({

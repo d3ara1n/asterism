@@ -42,7 +42,7 @@ export function UpdateError() {
   </AlertDescription></Alert>;
 }
 
-/** 目标版本的发布说明在 GitHub Release 页面查看；窗口打开处理器交给系统浏览器。 */
+/** View release notes for the target version on its GitHub Release page; the window-open handler delegates to the system browser. */
 export function UpdateNotesLink() {
   const i18n = useI18n();
   const { state } = useUpdates();

@@ -2,7 +2,7 @@ import type { ModelBlock, SessionRecord, SessionSnapshot } from "@asterism/sdk/c
 import { Execution, AgentInputMessage } from "@asterism/builtin-api/contracts";
 import type { AgentTurnState } from "./state.ts";
 
-/** 当前路径叠加本次运行时的中断位置；模型输入由上下文投影独立生成。 */
+/** Overlays this runtime's interruption position on the current path; context projection generates model input independently. */
 export function projectAgentTurnState(
   snapshot: Pick<SessionSnapshot, "records">,
   agentId: string,
@@ -11,7 +11,7 @@ export function projectAgentTurnState(
   return projectTurnState(snapshot.records.all({ scope: "timeline" }), agentId, interruptions);
 }
 
-/** 同一状态规则也用于历史轮次；传入该轮的记录区间，不创建历史快照副本。 */
+/** The same state rules apply to historical turns; pass that turn's record interval without creating a copy of the history snapshot. */
 export function projectTurnState(records: readonly SessionRecord[], agentId: string, interruptions: readonly (string | null)[] = []): AgentTurnState {
   let hasInput = false;
   let responseId: string | null = null;
@@ -45,7 +45,7 @@ export function projectTurnState(records: readonly SessionRecord[], agentId: str
   if (interrupted) return "incomplete";
   const response = [...blocks.values()];
   const terminal = response.find(block => block.completion);
-  // 终态随最高序号块保存；历史可能停在工具结果尚未全部落库的位置。
+  // Terminal state is saved with the highest-ordinal block; history may stop before all tool results are persisted.
   const completed = terminal?.completion?.finishReason === "stop"
     && terminal.ordinal + 1 === blocks.size
     && response.every(block => block.ordinal < blocks.size && block.complete && block.kind !== "toolcall");

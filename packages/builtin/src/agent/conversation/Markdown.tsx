@@ -29,15 +29,15 @@ const components: NonNullable<StreamdownProps["components"]> = {
   table: ({ children }) => <div className="content-scrollbar my-4 overflow-x-auto"><table>{children}</table></div>,
 };
 
-/** 流式结束后平滑输出的排空窗口（balanced 预设上限约 880ms），之后换回静态渲染。 */
+/** Drain window for smoothed output after streaming ends (the balanced preset has an upper bound of about 880ms), after which rendering returns to static mode. */
 const streamSettleMs = 1000;
 
 /**
- * 解析、补全与渐入由库负责；历史内容静态显示。
- * Streamdown 没有结束信号，尾块挂载期间始终保留逐词动画，因此只在生成期间及排空窗口内挂载它。
+ * The library handles parsing, completion, and fade-in; historical content is displayed statically.
+ * Streamdown has no end signal and retains word-by-word animation while the trailing block is mounted, so mount it only during generation and the drain window.
  */
 export const Markdown = memo(function Markdown({ children, streaming = false }: { children: string; streaming?: boolean }) {
-  // 实时块落库后仍由同一渲染器收完平滑输出，避免切静态时把尚未显示的尾部直接弹出。
+  // After the live block is persisted, the same renderer finishes draining smoothed output so switching to static rendering does not abruptly reveal the undisplayed tail.
   const [settling, setSettling] = useState(streaming);
   useEffect(() => {
     if (streaming) { setSettling(true); return; }

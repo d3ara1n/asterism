@@ -7,10 +7,10 @@ const presetMessages = builtin.messages("en", defineMessages({
   coding: { id: "providerPreset.coding", defaultMessage: "Coding plan · Supported clients only" },
 }));
 
-/** 官方入口固定接入细节；编辑器只消费规则，不识别预设身份。 */
+/** Official entry points fix connection details; the editor consumes only rules and does not recognize preset identities. */
 const fixedFields: NonNullable<ModelProviderConnection["fixedFields"]> = ["protocol", "baseUrl", "auth", "compatibility", "usage"];
 
-/** 智谱与 Z.ai 采用同一 Responses 适配；地区只选择地址，计费产品保留独立凭据说明。 */
+/** Zhipu and Z.ai use the same Responses adapter; region selects only the address, while billing products retain separate credential guidance. */
 const zaiResponses = (baseUrl: string): ModelProviderPreset["connection"] => ({
   protocol: "openai-responses", baseUrl, auth: "api_key", fixedFields,
   compatibility: [{ id: "responsesReasoning", value: { content: "object", encryptedContent: false, summary: false } }],

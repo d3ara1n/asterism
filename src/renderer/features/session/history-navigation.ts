@@ -14,7 +14,7 @@ export type HistoryView = { kind: "all" | "session" | "resources" } | { kind: "r
 const record = (value: Json): Record<string, Json> => value !== null && typeof value === "object" && !Array.isArray(value) ? value : {};
 const snippet = (value: string) => value.slice(0, 500).replace(/\s+/gu, " ").trim() || "…";
 
-/** 按记录来源筛选；工具的目标和工作台链接中的对象不等于记录的发出者。 */
+/** Filter by record source; a tool target or an object in a workbench link is not the record's issuer. */
 export function matchesHistoryView(entry: HistoryEntry, view: HistoryView): boolean {
   switch (view.kind) {
     case "all": return true;
@@ -24,7 +24,7 @@ export function matchesHistoryView(entry: HistoryEntry, view: HistoryView): bool
   }
 }
 
-/** 来源选项来自整份历史的可查看记录，保留已移除及其他分支的来源，省略没有自发记录的资源。 */
+/** Source options come from viewable records across the entire history, retaining removed sources and sources on other branches while omitting resources with no self-originated records. */
 export function historyResourceViews(entries: readonly HistoryEntry[]): Array<{ resource: HistoryResource; count: number }> {
   const sources = new Map<string, { resource: HistoryResource; count: number }>();
   for (const entry of entries) {
@@ -36,7 +36,7 @@ export function historyResourceViews(entries: readonly HistoryEntry[]): Array<{ 
   return [...sources.values()];
 }
 
-/** 元数据来自整棵树的资源创建记录，历史对象被移除或处于其他分支时仍能识别来源。 */
+/** Metadata comes from resource creation records across the whole tree, so sources remain identifiable when historical objects are removed or on other branches. */
 export function historyResources(nodes: readonly SessionNode[]): Map<string, HistoryResource> {
   const result = new Map<string, HistoryResource>();
   for (const node of nodes) {
@@ -49,11 +49,11 @@ export function historyResources(nodes: readonly SessionNode[]): Map<string, His
   return result;
 }
 
-/** 保持输入的追加次序和节点身份；摘要与图标由记录契约的提供方注册，宿主只区分来源。 */
+/** Preserve input append order and node identity; record contract providers register summaries and icons, while the host distinguishes only sources. */
 export function historyEntries(nodes: readonly SessionNode[], views: Pick<ViewRegistry, "record" | "resource">): HistoryEntry[] {
   const resources = historyResources(nodes);
   const i18n = getI18n();
-  // 分支继承父节点的改名；只有改名事件复制名称表，后续节点共享该分支的不可变版本。
+  // Branches inherit renames from parent nodes; only rename events copy the name map, and subsequent nodes share that branch's immutable version.
   const titlesByNode = new Map<string, ReadonlyMap<string, string>>();
   const initialTitles = new Map<string, string>();
   return nodes.map((node, index) => {
@@ -71,7 +71,7 @@ export function historyEntries(nodes: readonly SessionNode[], views: Pick<ViewRe
     };
     const item = toRecord(node, index + 1);
     const view = views.record(item, context);
-    // 来源只看记录归属：有归属对象是资源记录，否则是会话级记录；宿主不认识具体契约。
+    // Source depends only on record ownership: a record with an associated object is a resource record, otherwise it is a session-level record; the host does not know specific contracts.
     const owner = item.source?.resource?.id ?? null;
     const resource = owner ? resources.get(owner) : null;
     const label = view ? i18n.text(view.label) : i18n.formatMessage(historyMessages.unknownRecord, { id: item.contract.id });
@@ -80,7 +80,7 @@ export function historyEntries(nodes: readonly SessionNode[], views: Pick<ViewRe
   });
 }
 
-/** “之前”定位真实父节点，不受列表过滤影响。 */
+/** “Before” targets the real parent node, unaffected by list filtering. */
 export function historyBefore(nodes: readonly SessionNode[], node: SessionNode): string | null {
   return nodes.some(parent => parent.id === node.parentId) ? node.parentId : null;
 }

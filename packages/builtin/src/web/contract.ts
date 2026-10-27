@@ -7,7 +7,7 @@ export const WebResource = builtin.resource("web", z.object({}));
 export const CreateWeb = defineCreation(WebResource, { id: builtin.name("web.create"), schema: z.object({ title: z.string().trim().min(1).default("Web") }) });
 const countsSchema = z.object({ succeeded: z.number(), failed: z.number(), cancelled: z.number() });
 const costSchema = z.object({ currency: z.string(), amount: z.number() });
-/** 卡片投影：是否有启用的提供方，以及所在会话在本次运行内的请求统计（仅在后台内存中，不进入资源数据）。 */
+/** Card projection: whether any provider is enabled, and request statistics for its session during this run (backend memory only, not resource data). */
 export const WebView = builtin.data("web.card", z.object({
   configured: z.boolean(),
   stats: z.object({

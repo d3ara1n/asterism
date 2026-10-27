@@ -15,8 +15,8 @@ afterEach(async () => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
 
-describe("插件配置的 SDK 与 IPC 接入", () => {
-  it("配置 IPC 只列已声明配置的加载插件，读写与 SDK 使用同一份当前值", async () => {
+describe("Plugin configuration SDK and IPC integration", () => {
+  it("configuration IPC lists only loaded plugins declaring configuration and shares current values with SDK reads/writes", async () => {
     const schema = z.strictObject({ limit: z.number().int() }), defaults = { limit: 1 };
     let handle!: PluginConfig<z.infer<typeof schema>>;
     const ns = pluginNamespace("acme.settings"), empty = pluginNamespace("acme.none");

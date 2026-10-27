@@ -4,7 +4,7 @@ import { FilesystemError, failed } from "./errors.ts";
 import { withinDirectory } from "./paths.ts";
 import { modelInputLimits } from "@asterism/sdk/contracts";
 
-/** 按文件头识别图片，不信任扩展名；非图片不作为工具文件返回。 */
+/** Identifies images by file headers without trusting extensions; nonimages are not returned as tool files. */
 export function imageMediaType(bytes: Uint8Array): string | null {
   const at = (offset: number, ...values: number[]) => values.every((value, i) => bytes[offset + i] === value);
   if (at(0, 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a)) return "image/png";

@@ -1,20 +1,20 @@
 import { defineModule, definePlugin, implementAction, implementCreation, implementResource, type ObjectReader } from "@asterism/sdk/runtime";
 import { CreateDocument, Document, DocumentContent, Imported, ReplaceDocument, files } from "./content-contract.ts";
 
-/** 会话持有内容，插件只解释业务格式；示例不访问宿主源码或私有路径。 */
+/** The session owns content, and plugins only interpret business formats; this example does not access host source code or private paths. */
 export default definePlugin({ namespace: files, version: "1", modules: [defineModule(() => ({
   resources: [implementResource(Document, DocumentContent, {
     records: [Imported],
     creation: implementCreation(CreateDocument, {
       async prepare(input, { content }) {
-        // 格式检查可以读取有限范围，也可以通过 open 流式处理大文件。
+        // Format checks can read a bounded range or use open to stream large files.
         await content.read(input.file, { length: 512 });
         return { action: "accept" };
       },
       create(input, object) {
         object.commit(writer => {
           writer.set(DocumentContent, input);
-          // 该例明确保留最初导入内容；仅保存当前值的资源可省去这个事件。
+          // This example explicitly retains the originally imported content; resources that store only the current value can omit this event.
           writer.append(Imported, input);
         });
         return { title: input.name, data: {} };
@@ -29,6 +29,6 @@ export default definePlugin({ namespace: files, version: "1", modules: [defineMo
 }))] });
 
 export function rejectReadOnlyStaging(object: ObjectReader) {
-  // @ts-expect-error 读取门面没有内容暂存能力。
+  // @ts-expect-error The read facade cannot stage content.
   void object.content.stage(new Uint8Array());
 }

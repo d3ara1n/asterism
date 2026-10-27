@@ -20,13 +20,13 @@ export type CursorSelection = {
 
 type NodeIndex = { id: string; seq: number; contract: string };
 
-/** 会话树存储与当前时间线执行；节点不可改写，sessions.cursor 确定当前时间线末端。 */
+/** Session tree storage and current timeline execution; nodes are immutable and sessions.cursor determines the current timeline end. */
 export class SessionTree {
   constructor(private readonly db: DatabaseSync) {}
   private readonly workbenches = new Map<string, { cursor: string | null; state: FoldedState }>();
   private readonly identities = new Map<string, ResourceRef>();
 
-  /** 创建记录的身份不可变；首次按 ID 查找后直接复用，不重复读取历史正文。 */
+  /** Creation record identity is immutable; reuse after the first ID lookup without rereading historical bodies. */
   resourceRef(id: string): ResourceRef | null {
     const known = this.identities.get(id);
     if (known) return known;
@@ -40,7 +40,7 @@ export class SessionTree {
     return ref;
   }
 
-  /** 当前工作台的唯一重建入口；游标变化全量重放，回滚后按实际游标重新取用。 */
+  /** Sole current-workbench reconstruction entry; replay fully on cursor changes and use the actual cursor again after rollback. */
   workbench(sessionId: string): FoldedState {
     const cursor = this.cursor(sessionId);
     const previous = this.workbenches.get(sessionId);
@@ -56,25 +56,25 @@ export class SessionTree {
     this.db.prepare("INSERT INTO sessions (id, title, created_at, cursor) VALUES (?, ?, ?, NULL)").run(id, title, new Date().toISOString());
     return id;
   }
-  /** 活跃会话目录；归档会话只经 archived 读取。 */
+  /** Active session catalog; archived sessions are read only through archived. */
   list(): { id: string; title: string; createdAt: string }[] {
     return (this.db.prepare("SELECT id, title, created_at FROM sessions WHERE archived_at IS NULL ORDER BY created_at DESC, rowid DESC").all() as
       { id: string; title: string; created_at: string }[]).map(r => ({ id: r.id, title: r.title, createdAt: r.created_at }));
   }
-  /** 回收站目录：只列会话本身，不读取会话内容。 */
+  /** Trash catalog: lists sessions themselves without reading their contents. */
   archived(): { id: string; title: string; createdAt: string; archivedAt: string }[] {
     return (this.db.prepare("SELECT id, title, created_at, archived_at FROM sessions WHERE archived_at IS NOT NULL ORDER BY archived_at DESC, rowid DESC").all() as
       { id: string; title: string; created_at: string; archived_at: string }[])
       .map(r => ({ id: r.id, title: r.title, createdAt: r.created_at, archivedAt: r.archived_at }));
   }
-  /** 标记归档；此后该会话的读取、写入与对象身份解析一律视为不存在。 */
+  /** Mark archived; subsequent reads, writes, and object identity resolution treat the session as absent. */
   archive(sessionId: string, at = new Date().toISOString()): void {
     if (!this.db.prepare("UPDATE sessions SET archived_at = ? WHERE id = ? AND archived_at IS NULL").run(at, sessionId).changes)
       throw new SessionError("not_found", "Session not found.");
     this.workbenches.delete(sessionId);
     for (const [id, ref] of this.identities) if (ref.sessionId === sessionId) this.identities.delete(id);
   }
-  /** 取消归档；只清除字段，不读取会话内容。 */
+  /** Unarchive by clearing the field only, without reading session contents. */
   restore(sessionId: string): void {
     if (!this.db.prepare("UPDATE sessions SET archived_at = NULL WHERE id = ? AND archived_at IS NOT NULL").run(sessionId).changes)
       throw new SessionError("not_found", "Archived session not found.");
@@ -90,7 +90,7 @@ export class SessionTree {
       .map(r => sessionNodeSchema.parse(JSON.parse(r.payload)));
   }
 
-  /** 节点不可变：固定末端与追加上界即可延后读取，无需持有事务或复制历史。 */
+  /** Immutable nodes allow deferred reads with fixed endpoints and append bounds, without holding transactions or copying history. */
   view(sessionId: string): NodeView {
     const row = this.db.prepare("SELECT title, cursor FROM sessions WHERE id = ? AND archived_at IS NULL").get(sessionId) as
       { title: string; cursor: string | null } | undefined;
@@ -101,7 +101,7 @@ export class SessionTree {
       read: query => this.readView(sessionId, row.cursor, upperSeq, query) };
   }
 
-  /** 沿父指针逐个交付结构字段；last 命中即可停止，不搬运无关正文。 */
+  /** Deliver structural fields one by one along parent pointers; stop at a last match without moving unrelated bodies. */
   private *ancestors(sessionId: string, nodeId: string | null, upperSeq: number): Iterable<NodeIndex> {
     const read = this.db.prepare("SELECT id, parent_id, seq, contract FROM session_nodes WHERE session_id = ? AND id = ?");
     let before = upperSeq + 1;
@@ -144,7 +144,7 @@ export class SessionTree {
     return this.readNodes(selected).map((node, index) => ({ node, sequence: sequences[index]! }));
   }
 
-  /** 输入按追加顺序排列；只数互不重叠的索引区间，不读取其他记录的正文。 */
+  /** Input follows append order; count only nonoverlapping index ranges without reading other record bodies. */
   private numberSequences(sessionId: string, positions: readonly number[]): number[] {
     const count = this.db.prepare("SELECT COUNT(*) AS count FROM session_nodes WHERE session_id = ? AND seq > ? AND seq <= ?");
     let previous = 0, sequence = 0;
@@ -155,7 +155,7 @@ export class SessionTree {
     });
   }
 
-  /** 本批提交的记录已有正文，仅补齐会话内顺序。 */
+  /** Records committed in this batch already have bodies; fill in their session order only. */
   sequences(sessionId: string, nodes: readonly SessionNode[]): number[] {
     if (!nodes.length) return [];
     const position = this.db.prepare("SELECT seq FROM session_nodes WHERE session_id = ? AND id = ?");
@@ -166,11 +166,11 @@ export class SessionTree {
     }));
   }
 
-  /** 向提交时的当前时间线末端追加并推进游标；不提供向任意树节点写入的能力。 */
+  /** Append at the current timeline end at commit time and advance the cursor; does not support writing to arbitrary tree nodes. */
   appendToTimeline(sessionId: string, node: NewNode): SessionNode {
     const parentId = this.cursor(sessionId);
     const full = sessionNodeSchema.parse({ ...node, id: nanoid(16), sessionId, parentId, createdAt: new Date().toISOString() });
-    // savepoint 可嵌在应用事务中；节点与游标要么同时保存，要么同时回退。
+    // savepoints can nest in application transactions; nodes and cursors save or roll back together.
     this.db.exec("SAVEPOINT append_session_node");
     try {
       this.db.prepare("INSERT INTO session_nodes (id, session_id, parent_id, payload) VALUES (?, ?, ?, ?)")
@@ -184,7 +184,7 @@ export class SessionTree {
     return full;
   }
 
-  /** 选择历史位置；调用方须保证会话 settled。所有节点都可作为位置，不吸附。 */
+  /** Select a historical position; callers must ensure sessions are settled. Every node is a valid position without snapping. */
   select(sessionId: string, nodeId: string | null): string | null {
     const from = this.cursor(sessionId);
     if (nodeId !== null && !this.db.prepare("SELECT 1 FROM session_nodes WHERE session_id = ? AND id = ?").get(sessionId, nodeId))
@@ -208,24 +208,24 @@ export class SessionTree {
       reason, recorded_at AS recordedAt FROM cursor_selections WHERE session_id = ? ORDER BY seq`).all(sessionId) as CursorSelection[];
   }
 
-  /** 已提交的最大节点序号；通知与查询据此判断新旧。 */
+  /** Maximum committed node sequence number; notifications and queries use it to determine freshness. */
   head(sessionId: string): number {
     return Number((this.db.prepare("SELECT COALESCE(MAX(seq), 0) AS seq FROM session_nodes WHERE session_id = ?").get(sessionId) as { seq: number }).seq);
   }
-  /** 序号大于 seq 的已提交节点；提交后通知据此取本批记录。 */
+  /** Committed nodes with sequence numbers above seq; post-commit notifications use this to obtain batch records. */
   since(sessionId: string, seq: number): SessionNode[] {
     return (this.db.prepare("SELECT payload FROM session_nodes WHERE session_id = ? AND seq > ? ORDER BY seq").all(sessionId, seq) as { payload: string }[])
       .map(row => sessionNodeSchema.parse(JSON.parse(row.payload)));
   }
-  /** 覆盖会话标题；不追加节点。 */
+  /** Overwrite session titles without appending nodes. */
   setTitle(sessionId: string, text: string): void {
     this.db.prepare("UPDATE sessions SET title = ? WHERE id = ?").run(text, sessionId);
   }
-  /** 执行游标；会话尚未创建时为 undefined，供提交前后比较。 */
+  /** Execution cursor; undefined before session creation, for before/after commit comparisons. */
   position(sessionId: string): string | null | undefined {
     return (this.db.prepare("SELECT cursor FROM sessions WHERE id = ? AND archived_at IS NULL").get(sessionId) as { cursor: string | null } | undefined)?.cursor;
   }
-  /** 会话尚未创建时为 null，供提交前后比较。 */
+  /** null before session creation, for before/after commit comparisons. */
   titleOf(sessionId: string): string | null {
     return (this.db.prepare("SELECT title FROM sessions WHERE id = ? AND archived_at IS NULL").get(sessionId) as { title: string } | undefined)?.title ?? null;
   }
@@ -234,7 +234,7 @@ export class SessionTree {
     if (title === null) throw new SessionError("not_found", "Session not found.");
     return title;
   }
-  /** 读取根到末端的时间线；省略 at 时取执行游标，读取不激活该位置或授予追加能力。 */
+  /** Read root-to-end timelines; omitted at uses the execution cursor. Reading neither activates positions nor grants append capability. */
   timeline(sessionId: string, at?: string | null): SessionNode[] {
     const cursor = this.cursor(sessionId);
     return this.readNodes(this.ancestors(sessionId, at === undefined ? cursor : at, this.head(sessionId))).reverse();

@@ -28,14 +28,14 @@ function catalog(model: Model = entry): Catalog {
 afterEach(() => { vi.unstubAllGlobals(); });
 const perMillion = { unit: "token", per: 1_000_000 } as const;
 
-describe("models.dev 参数覆盖", () => {
-  // 新建默认开启思考，但端点的明确 false 仍是有效配置。
-  it("新建模型默认开启思考并保留端点明确关闭", () => {
+describe("models.dev parameter overrides", () => {
+  // New models enable reasoning by default, while an endpoint's explicit false remains valid configuration.
+  it("new models enable reasoning by default and preserve an endpoint's explicit disablement", () => {
     expect(createModelInput("local", { modelId: "new", name: "New" }).capabilities.reasoning).toBe(true);
     expect(createModelInput("local", { modelId: "new", name: "New", reasoning: false }).capabilities.reasoning).toBe(false);
   });
-  // 用户明确获取即替换有效旧值；显示身份、兼容设置和未提供的生成参数不属于目录参数。
-  it("按模型 ID 覆盖所有可映射字段并保留非目录配置", () => {
+  // Explicit retrieval replaces valid old values; display identity, compatibility settings, and omitted generation parameters are not catalog parameters.
+  it("overwrites all mappable fields by model ID and preserves non-catalog configuration", () => {
     const result = modelParameters(catalog(), current);
     expect(result.value).toMatchObject({
       name: "My model", modelId: "test-model", providerId: "my-connection", enabled: true,
@@ -47,8 +47,8 @@ describe("models.dev 参数覆盖", () => {
     expect(disabled.value.capabilities).toEqual({ reasoning: false, tools: false, thinkingLevels: [] });
   });
 
-  // 相同模型 ID 的参考参数不随连接变化；中转站记录不参与选择，歧义 ID 不任意取第一条。
-  it("只按模型 ID 匹配原模型，忽略连接与中转覆盖；歧义和刁钻别名报错", () => {
+  // Reference parameters for a model ID do not vary by connection; relay records are excluded and ambiguous IDs do not arbitrarily select the first match.
+  it("matches original models solely by model ID, ignores connection and relay overrides, and rejects ambiguous IDs and tricky aliases", () => {
     const data = catalog();
     data.providers.relay = { ...data.providers.lab!, id: "relay", api: "https://relay.test/v1",
       models: { "test-model": { ...entry, limit: { context: 100, output: 10 }, reasoning_options: [{ type: "effort", values: ["high"] }] } } };
@@ -65,8 +65,8 @@ describe("models.dev 参数覆盖", () => {
     expect(() => modelParameters(data, { ...current, modelId: "lab/test-model" })).toThrow(expect.objectContaining({ code: "conflict" }));
   });
 
-  // 参数查询剥离前缀，但保存与请求仍须携带中转站要求的完整 modelId。
-  it("查询去掉所有路由前缀，保存的模型 ID、全局引用和兼容设置保持原样", () => {
+  // Parameter lookup strips prefixes, but saving and requests retain the complete modelId required by the relay.
+  it("strips all routing prefixes for lookup while preserving saved model IDs, global references, and compatibility settings", () => {
     const data: Catalog = { providers: {}, models: {
       "lab/vendor/model": { id: "lab/vendor/model", name: "Model", description: "", reasoning: true, tool_call: true },
     } };
@@ -82,8 +82,8 @@ describe("models.dev 参数覆盖", () => {
       expect(() => modelParameters(data, { ...current, modelId })).toThrow(expect.objectContaining({ code: "not_found" }));
   });
 
-  // 能力开关/预算不是等级列表，缺失的值不得清空，也不得宣称已经完整获取。
-  it("预算或开关不能伪造等级；缺失和不支持的字段列入报告", () => {
+  // Capability toggles and budgets are not level lists; missing values must neither clear fields nor imply complete retrieval.
+  it("budgets and toggles cannot fabricate levels; missing and unsupported fields appear in the report", () => {
     const data: Catalog = { providers: {}, models: {
       "lab/test-model": { id: "lab/test-model", name: "Model", description: "", reasoning: true, tool_call: false },
     } };
@@ -100,8 +100,8 @@ describe("models.dev 参数覆盖", () => {
       .toThrow(expect.objectContaining({ code: "unavailable" }));
   });
 
-  // 价格属于原模型 API 参考资料；必须映射成独立契约，保留零价、未知项及全部档位。
-  it("转换参考单价和任意输入阈值，按阈值排序且不继承缺失的档内单价", () => {
+  // Prices are original-model API reference data; map them to an independent contract preserving zero prices, unknowns, and all tiers.
+  it("converts reference unit prices and arbitrary input thresholds, sorts by threshold, and does not inherit missing tier prices", () => {
     const result = modelParameters(catalog({ ...entry, cost: {
       input: 0, output: 10, cache_read: 0, cache_write: 2.5, reasoning: 12, input_audio: 3, output_audio: 15,
       tiers: [
@@ -127,8 +127,8 @@ describe("models.dev 参数覆盖", () => {
     expect(result.report.unfilled).toEqual([]);
   });
 
-  // 旧字段表达严格超过 200k，新字段则保留目录声明的含边界起点；不能把任意阈值折成 200k。
-  it("只有旧分档字段时转换为 200001 起点，新版空档位列表仍优先", () => {
+  // Legacy fields mean strictly above 200k; new fields preserve inclusive starts from the catalog rather than collapsing arbitrary thresholds to 200k.
+  it("converts legacy-only tiers to a 200001 start while preferring a newer empty tier list", () => {
     const cost = { input: 1, output: 2, context_over_200k: { input: 3, output: 4 } };
     expect(modelParameters(catalog({ ...entry, cost }), current).value.cost?.tiers)
       .toEqual([{ fromInputTokens: 200001, rates: { ...emptyModelRates(), text: { ...emptyModalityRates(),
@@ -136,8 +136,8 @@ describe("models.dev 参数覆盖", () => {
     expect(modelParameters(catalog({ ...entry, cost: { ...cost, tiers: [] } }), current).value.cost?.tiers).toEqual([]);
   });
 
-  // 不可表示的价格规则不能被静默简化成基础价；整份旧价格保留，不妨碍其余有效参数更新。
-  it("缺失、非法或未知的价格规则保留原价格并报告，合法零价可以覆盖", () => {
+  // Unrepresentable pricing rules cannot silently simplify to base prices; preserve all old pricing without blocking other valid parameter updates.
+  it("preserves and reports missing, invalid, or unknown pricing rules while allowing valid zero prices to override", () => {
     const previous: ModelCost = { currency: "USD", rates: { ...emptyModelRates(), text: { ...emptyModalityRates(),
       input: { amount: 9, ...perMillion }, output: { amount: 20, ...perMillion } } }, tiers: [] };
     const tier = { tier: { type: "context", size: 100000 }, input: 3, output: 4 };
@@ -157,8 +157,8 @@ describe("models.dev 参数覆盖", () => {
         input: { amount: 0, ...perMillion }, output: { amount: 0, ...perMillion } } }, tiers: [] });
   });
 
-  // 官方客户端只访问公开目录；提供商凭据与模型 ID 无需传给 models.dev。
-  it("官方 SDK 获取完整目录，无认证头、无查询泄露、无重定向", async () => {
+  // The official client accesses only the public catalog; provider credentials and model IDs need not reach models.dev.
+  it("the official SDK fetches the complete catalog without auth headers, query leaks, or redirects", async () => {
     const transport = vi.fn<typeof fetch>(async () => Response.json(catalog()));
     vi.stubGlobal("fetch", transport);
     const signal = new AbortController().signal;

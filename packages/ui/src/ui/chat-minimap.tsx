@@ -9,7 +9,7 @@ export interface ChatMinimapItem {
   preview: string;
 }
 
-/** 贴在阅读区边缘的用户消息导航；消息投影与正文滚动由调用方负责。 */
+/** User message navigation along the reading area's edge; the caller handles message projection and body scrolling. */
 export function ChatMinimap({ items, label, onSelect }: {
   items: readonly ChatMinimapItem[];
   label: string;
@@ -38,12 +38,12 @@ export function ChatMinimap({ items, label, onSelect }: {
     if (!container || !button) return;
     setHovered(null);
     cancelAnimationFrame(focusFrame.current);
-    // 只移动柱列自身，避免键盘聚焦带动画布或正文滚动。
+    // Move only the bar column itself so keyboard focus does not scroll the canvas or body.
     if (button.offsetTop < container.scrollTop) container.scrollTop = button.offsetTop;
     else if (button.offsetTop + button.offsetHeight > container.scrollTop + container.clientHeight) {
       container.scrollTop = button.offsetTop + button.offsetHeight - container.clientHeight;
     }
-    // 滚动事件会关闭 Tooltip，待柱列完成滚动后再聚焦并打开预览。
+    // Scroll events close the Tooltip; focus and open the preview after the bar column finishes scrolling.
     focusFrame.current = requestAnimationFrame(() => {
       if (container.contains(document.activeElement)) button.focus({ preventScroll: true });
     });
@@ -72,7 +72,7 @@ export function ChatMinimap({ items, label, onSelect }: {
                 <span aria-hidden="true" className="chat-minimap-marker block h-0.5 shrink-0 bg-muted-foreground" />
               </Button>
             </TooltipTrigger>
-            {/* Tooltip 自行在祖先滚动时关闭；不启用会把避让留白计入短柱裁切的 hideWhenDetached。 */}
+            {/* Tooltip closes itself when an ancestor scrolls; leave hideWhenDetached disabled because it would count avoidance padding when clipping short bars. */}
             <TooltipContent side="right" sideOffset={8} collisionPadding={12}
               className="max-h-(--radix-tooltip-content-available-height) w-72 max-w-(--radix-tooltip-content-available-width) overflow-hidden text-left text-wrap">
               <p className="mb-1 font-medium">{item.label}</p>

@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 
-/** 文件不存在与解析失败分别交付；写入成功后才替换原文件。 */
+/** Report missing files and parse failures separately; replace originals only after successful writes. */
 export function readJson(file: string): unknown | undefined {
   let text: string;
   try { text = readFileSync(file, "utf8"); }

@@ -6,7 +6,7 @@ import type { TimelineItem } from "./timeline";
 
 type AgentInputMessage = Extract<TimelineItem, { kind: "message" }>;
 
-/** 在交给 Tooltip 前截断；纯附件消息使用文件名，不加载文件内容。 */
+/** Truncates before passing to Tooltip; attachment-only messages use filenames without loading file contents. */
 function preview(message: AgentInputMessage): string {
   const text = message.parts.filter(part => part.kind === "text").map(part => part.text);
   const sources = text.some(value => value.trim()) ? text

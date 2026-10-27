@@ -5,9 +5,9 @@ import { ResourceStatusChanged, ResourcePresenceChanged, type EventHandler, type
 import { summarizeResourceStatus } from "./resource-status.ts";
 
 const snapshot: AppSnapshot = { workspace: { id: "w", title: "Workspace" }, sessions: [], templates: [], archivedSessions: [], plugins: [], restartRequired: false };
-describe("应用会话列表", () => {
-  // 启动读取和首页共享同一个控制器，提前订阅后的一次读取即可交付首屏。
-  it("启动阶段先订阅再读取，首页复用快照且保持后续变化订阅", async () => {
+describe("Application session list", () => {
+  // Startup reading and the home page share one controller; a single read after subscribing can supply the initial screen.
+  it("subscribes before reading during startup, and the home page reuses the snapshot while retaining the subscription to subsequent changes", async () => {
     const order: string[] = [];
     const execute = vi.fn(async () => { order.push("read"); return { ok: true as const, snapshot }; });
     const controller = new ApplicationController({ execute, onStatus: () => () => {},
@@ -21,8 +21,8 @@ describe("应用会话列表", () => {
     } finally { stop(); }
     expect(order.at(-1)).toBe("close");
   });
-  // 工作台状态反馈：成功读取恢复可用后，旧连接错误必须撤下，不能转为过期的全局通知。
-  it("后台恢复后的静默读取清除连接错误", async () => {
+  // Workbench state feedback: after a successful read restores availability, remove the old connection error rather than turning it into a stale global notification.
+  it("a quiet read after backend recovery clears the connection error", async () => {
     const execute = vi.fn<() => Promise<CommandResult>>()
       .mockResolvedValueOnce({ ok: false, error: { code: "unavailable", message: "Connection lost.", display: "Connection lost." } })
       .mockResolvedValueOnce({ ok: true, snapshot });
@@ -34,8 +34,8 @@ describe("应用会话列表", () => {
     expect(controller.getSnapshot()).toMatchObject({ status: "ready", error: null, snapshot });
   });
 
-  // 工作台契约：同资源完整替换，查看只消费终态；相同数据不刷新，进度不单独持有。
-  it("按资源保留最新状态，running 跨查看保留，终态查看即清除", () => {
+  // Workbench contract: fully replace state for the same resource, and viewing consumes only terminal states; identical data does not refresh, and progress is not held separately.
+  it("retains the latest state per resource, preserves running across views, and clears terminal states when viewed", () => {
     let receive!: EventHandler<ResourceStatus>;
     let presence!: EventHandler<{ sessionId: string; appeared: string[]; disappeared: string[] }>;
     const events: EventSubscriber = { subscribe(contract, _options, handler) {
@@ -84,16 +84,16 @@ describe("应用会话列表", () => {
       expect(controller.getSnapshot().resourceStatuses[1]).not.toHaveProperty("progress");
       controller.setVisibleSession("a");
       expect(controller.getSnapshot().resourceStatuses.map(mark => mark.resource.id)).toEqual(["three"]);
-      // 未查看会话的外部资源也能被移除；其 running 标记随存在性通知释放。
+      // External resources in sessions that are not being viewed can also be removed; their running markers are released on presence notifications.
       send("b", "three", "running");
       presence({ contract: { id: ResourcePresenceChanged.id }, emittedAt: "", source: null,
         data: { sessionId: "b", appeared: [], disappeared: ["three"] } }, { signal: new AbortController().signal });
       expect(controller.getSnapshot().resourceStatuses).toEqual([]);
-      // 只有连接时的列表读取；每条状态及查看操作都不发查询或命令。
+      // Only the list read on connection occurs; individual state updates and viewing operations send no queries or commands.
       expect(execute.mock.calls).toHaveLength(1);
     } finally { disconnect(); }
   });
-  it("查询途中再次刷新时补读，晚到创建可刷新列表且不携带任何会话位置", async () => {
+  it("rereads when refreshed again during a query, and a late creation can refresh the list without carrying any session position", async () => {
     const requests: Array<(result: CommandResult) => void> = [];
     const execute = vi.fn(() => new Promise<CommandResult>(resolve => requests.push(resolve)));
     const controller = new ApplicationController({ execute, onStatus: () => () => {}, session: { execute: vi.fn(), onChanged: () => () => {} } });

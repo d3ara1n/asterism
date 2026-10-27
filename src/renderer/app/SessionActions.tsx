@@ -13,7 +13,7 @@ import { Spinner } from "@asterism/ui/ui/spinner";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@asterism/ui/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@asterism/ui/ui/alert-dialog";
 
-/** 会话行菜单：重命名、保存模板与归档；操作独立于会话导航。 */
+/** Session row menu: rename, save as template, and archive; actions are independent of session navigation. */
 export function SessionActions({ sessionId, title, disabled, renameDisabled, onRename, onArchive, onTemplateSaved }: {
   sessionId: string; title: string; disabled: boolean; renameDisabled: boolean;
   onRename: (title: string) => Promise<SessionResult>;
@@ -24,7 +24,7 @@ export function SessionActions({ sessionId, title, disabled, renameDisabled, onR
   const trigger = useRef<HTMLButtonElement>(null);
   const [renaming, setRenaming] = useState(false);
   const [savingTemplate, setSavingTemplate] = useState(false);
-  /** 归档总要二次确认；资源声明了结束提示时额外列出，内容与退出确认一致。 */
+  /** Archiving always requires confirmation; resources with disposal notices are listed additionally, using the same content as exit confirmation. */
   const [confirming, setConfirming] = useState(false);
   const [archiving, setArchiving] = useState(false);
   const warnings = useDisposalWarnings(sessionId, confirming ? "all" : null);

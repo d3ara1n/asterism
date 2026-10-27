@@ -10,35 +10,35 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@asterism/ui/ui/tooltip
 import { fadeTransition, islandTransition } from "./motion";
 import { closeIsland, focusIsland, follow, layout, openIsland, type IslandWidth } from "./model";
 
-/** 浮岛声明：宽度、无障碍名称与内容。origin 为打开它的元素，用于展开动画与焦点归还。 */
+/** Island declaration: width, accessible name, and content. origin is the element that opened it, used for expansion animation and focus restoration. */
 export interface IslandSpec {
   id: string;
   width: IslandWidth;
   label: UiText;
   render: () => ReactNode;
-  /** false 时浮岛无底板，内容直接位于窗口材质上。 */
+  /** When false, the island has no surface, and content sits directly on the window material. */
   surface?: boolean;
   origin?: HTMLElement | null;
 }
 
-/** 关闭守卫：返回 false（或解析为 false）时中止关闭；可异步等待用户确认。 */
+/** Close guard: returning false (or resolving to false) cancels closing; can asynchronously await user confirmation. */
 export type CloseGuard = () => boolean | Promise<boolean>;
 
 export interface IslandApi {
   id: string;
-  /** 本浮岛右侧（更深一层）的浮岛 id。 */
+  /** ID of the island to this island's right (one level deeper). */
   child?: string;
-  /** 在本浮岛右侧打开更深的浮岛，替换原有的更深浮岛；被替换的浮岛可经守卫拒绝。解析为是否已打开。 */
+  /** Open a deeper island on this island's right, replacing existing deeper islands; replaced islands can refuse through guards. Resolves to whether it opened. */
   open: (spec: IslandSpec) => Promise<boolean>;
-  /** 关闭本浮岛及更深浮岛（根浮岛无效）。force 跳过守卫，用于内容已失效（如已删除）的场合。解析为是否已关闭。 */
+  /** Close this island and deeper islands (no effect on the root). force skips guards for invalid content (such as deleted content). Resolves to whether it closed. */
   close: (options?: { force?: boolean }) => Promise<boolean>;
-  /** 关闭本浮岛右侧的更深浮岛。 */
+  /** Close deeper islands to this island's right. */
   closeChild: (options?: { force?: boolean }) => Promise<boolean>;
-  /** 注册本浮岛的关闭守卫，返回注销函数。一般经 useCloseGuard 使用。 */
+  /** Register a close guard for this island and return an unregister function. Usually used through useCloseGuard. */
   guard: (guard: CloseGuard) => () => void;
 }
 const IslandContext = createContext<IslandApi | null>(null);
-/** 在浮岛内容中使用。 */
+/** Use within island content. */
 export function useIsland(): IslandApi {
   const api = useContext(IslandContext);
   if (!api) throw new Error("useIsland must be used inside a Screen island.");
@@ -46,8 +46,8 @@ export function useIsland(): IslandApi {
 }
 
 /**
- * 为所在浮岛注册关闭守卫：关闭本浮岛、关闭其上级，或上级打开其他浮岛替换它时都会询问。
- * guard 为 null 时放行；守卫始终取最新的回调，无需随状态重新注册。
+ * Register a close guard for the containing island: consulted when closing this island, closing its parent, or opening another island from the parent to replace it.
+ * A null guard allows closing; guards always use the latest callback, with no need to reregister on state changes.
  */
 export function useCloseGuard(guard: CloseGuard | null) {
   const island = useIsland();
@@ -57,12 +57,12 @@ export function useCloseGuard(guard: CloseGuard | null) {
 }
 
 /**
- * 一屏：可声明位于根浮岛左侧的受控浮岛；根右侧更深的浮岛由 open/close 管理。
- * 所有 min 放得下时按 grow 分配并居中、不平移；放不下时退到 min，视口跟随焦点。
+ * One screen: controlled islands can be declared to the left of the root; deeper islands to the root's right are managed through open/close.
+ * When all min widths fit, distribute by grow and center without translation; otherwise fall back to min and let the viewport follow focus.
  */
 export function Screen({ label, root, leading, className, resetKey }: {
   label: string; root: IslandSpec; leading?: IslandSpec[]; className?: string;
-  /** 变化时关闭全部更深浮岛。 */ resetKey?: string;
+  /** Close all deeper islands when this changes. */ resetKey?: string;
 }) {
   const i18n = useI18n();
   const viewport = useRef<HTMLDivElement>(null);
@@ -79,7 +79,7 @@ export function Screen({ label, root, leading, className, resetKey }: {
   }, [islands, focus, root.id]);
 
   useLayoutEffect(() => {
-    // 排布宽度取扣掉 --space-inset 后的条带宽度；视口本身铺满容器。
+    // Layout width uses the strip width after subtracting --space-inset; the viewport itself fills the container.
     const element = strip.current;
     if (!element) return;
     setWidth(element.clientWidth);
@@ -90,17 +90,17 @@ export function Screen({ label, root, leading, className, resetKey }: {
 
   const { spans, total, overflow } = useMemo(() => layout(islands, width, gap), [islands, width, gap]);
   const focusIndex = Math.max(0, islands.findIndex(island => island.id === focus));
-  // 仅溢出时跟随焦点：已可见不动，越界贴边；放得下时不平移。
+  // Follow focus only during overflow: stay still when visible and align to the edge when out of bounds; do not translate when everything fits.
   useLayoutEffect(() => { setOffset(current => overflow ? follow(spans, focusIndex, width, current) : 0); }, [spans, focusIndex, width, overflow]);
 
-  // 受控前置浮岛只参与布局与焦点，不参与父子浮岛的打开/关闭。
-  // 守卫可能异步等待确认，期间状态会变化：决策一律取最新状态，而非发起时的闭包。
+  // Controlled leading islands participate only in layout and focus, not in opening/closing parent-child islands.
+  // Guards may asynchronously await confirmation while state changes: always decide using the latest state rather than the closure captured at initiation.
   const latest = useRef({ deeper, focus });
   latest.current = { deeper, focus };
   const current = () => ({ islands: [root, ...latest.current.deeper], focus: latest.current.focus });
   const guards = useRef(new Map<string, Set<CloseGuard>>());
   const pending = useRef(false);
-  /** 由深到浅询问即将移除的浮岛；任一拒绝即中止。询问期间的其他关闭请求被忽略。 */
+  /** Consult islands to be removed from deepest to shallowest; any refusal cancels the operation. Ignore other close requests while consulting. */
   const release = async (removed: string[], force?: boolean): Promise<boolean> => {
     if (force || removed.length === 0) return true;
     if (pending.current) return false;
@@ -125,7 +125,7 @@ export function Screen({ label, root, leading, className, resetKey }: {
     apply(openIsland(current(), parent, spec), spec);
     return true;
   };
-  // 退场动画由 AnimatePresence 在卸载前完成。
+  // AnimatePresence completes the exit animation before unmounting.
   const close = async (id: string, force?: boolean) => {
     const spec = latest.current.deeper.find(item => item.id === id);
     if (!spec || id === root.id) return false;
@@ -145,25 +145,25 @@ export function Screen({ label, root, leading, className, resetKey }: {
   const shift = overflow ? -offset : (width - total) / 2;
   const onWheel = (event: React.WheelEvent) => {
     if (!overflow || Math.abs(event.deltaX) <= Math.abs(event.deltaY)) return;
-    if ((event.target as Element).closest(".island-body")) return; // 浮岛内部（含画布）不接管
+    if ((event.target as Element).closest(".island-body")) return; // Do not take over inside islands (including the canvas)
     setOffset(current => Math.min(Math.max(current + event.deltaX, 0), total - width));
   };
   const onKeyDown = (event: React.KeyboardEvent) => {
-    // 最深的屏先处理 Esc：关闭焦点浮岛；只剩根浮岛时交给外层。
+    // The deepest screen handles Esc first: close the focused island; if only the root remains, defer to the outer layer.
     if (event.key !== "Escape" || event.defaultPrevented || !deeper.some(island => island.id === focus)) return;
     event.preventDefault(); event.stopPropagation();
     void close(focus);
   };
-  /** 分段导航：焦点移到目标浮岛，视口随之跟随；等目标解除 inert 后再移入 DOM 焦点。 */
+  /** Segmented navigation: focus the target island so the viewport follows it; move DOM focus only after the target is no longer inert. */
   const moveTo = (id: string) => {
     setFocus(current => focusIsland({ islands, focus: current }, id).focus);
     requestAnimationFrame(() => viewport.current?.querySelector<HTMLElement>(`[data-island="${CSS.escape(id)}"]`)?.focus({ preventScroll: true }));
   };
 
   return <div className={cn("weave-viewport", className)} aria-label={label} role="group" ref={viewport} onWheel={onWheel} onKeyDown={onKeyDown}>
-    {/* 视口宽度测得之前不排布浮岛，避免以 0 宽度按溢出布局渲染一帧。 */}
+    {/* Do not lay out islands until viewport width is measured, avoiding a frame of overflow layout at zero width. */}
     <div className="weave-strip" ref={strip} style={{ visibility: width ? undefined : "hidden" }}>
-      {/* 每个浮岛绝对定位，自身插值到目标 x 与宽度：增删浮岛时其余浮岛从当前位置平滑让位，不叠加整条平移与 layout 动画。 */}
+      {/* Each island is absolutely positioned and interpolates to its own target x and width: adding or removing islands makes others smoothly yield from their current positions, without combining whole-strip translation and layout animation. */}
       <AnimatePresence initial={false}>{islands.map((island, index) => {
         const span = spans[index] ?? { left: 0, width: 0 };
         const visibleLeft = span.left - (overflow ? offset : 0), visibleRight = visibleLeft + span.width;
@@ -181,7 +181,7 @@ export function Screen({ label, root, leading, className, resetKey }: {
           onFocus={() => setFocus(current => focusIsland({ islands, focus: current }, island.id).focus)} />;
       })}</AnimatePresence>
     </div>
-    {/* 溢出时的分段导航：每段对应一个浮岛，点击把焦点移到该浮岛，视口随之跟随；被完全挤出的浮岛也能回到视口。 */}
+    {/* Segmented navigation during overflow: each segment corresponds to an island; clicking focuses it and the viewport follows, allowing even completely displaced islands to return into view. */}
     {overflow && <div className="weave-indicator">
       {islands.map((island, index) => {
         const span = spans[index] ?? { left: 0, width: 0 };
@@ -204,7 +204,7 @@ function Island({ ref, spec, width, x, hidden, peek, focused, api, onFocus }: {
 }) {
   const i18n = useI18n();
   const element = useRef<HTMLElement>(null);
-  // 由内容打开的浮岛挂载后接收焦点。
+  // Islands opened by content receive focus after mounting.
   useEffect(() => { if (spec.origin) element.current?.focus({ preventScroll: true }); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const latest = useRef(api);
   latest.current = api;
@@ -214,8 +214,8 @@ function Island({ ref, spec, width, x, hidden, peek, focused, api, onFocus }: {
     closeChild: options => latest.current.closeChild(options), guard: fn => latest.current.guard(fn),
   }), []);
   const focusSelf = useCallback(() => onFocus(), [onFocus]);
-  // 部分越出视口的浮岛：点击露出的部分即移入。
-  // 原地展开：在目标位置左侧轻微位移淡入；位置与宽度变化由 Motion 从当前值过渡。
+  // For islands partially outside the viewport, clicking the exposed portion brings them into view.
+  // Expand in place: fade in from a slight offset left of the target position; Motion transitions position and width from their current values.
   return <motion.section ref={node => { element.current = node; if (typeof ref === "function") ref(node); else if (ref) ref.current = node; }}
     initial={{ opacity: 0, x: x - 16, scale: 0.98, width }} animate={{ opacity: 1, x, scale: 1, width }} exit={{ opacity: 0, scale: 0.98, transition: fadeTransition }}
     transition={islandTransition} data-island={spec.id} tabIndex={-1} aria-label={i18n.text(spec.label)}

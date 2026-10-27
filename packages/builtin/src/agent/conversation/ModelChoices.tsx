@@ -8,7 +8,7 @@ import { useI18n } from "@asterism/sdk/renderer";
 
 const FOLLOW = "__agent_default";
 
-/** 选择只保存覆盖；生效模型用于展示能力，不回填默认值或拦截提交。 */
+/** Selection saves overrides only; the effective model is used to display capabilities, without filling in defaults or intercepting submission. */
 export function ModelChoices({ configuration, agent, model, thinking, disabled, onModelChange, onThinkingChange }: {
   configuration: ModelConfigurationSnapshot | null | undefined;
   agent: string | null; model: string | null; thinking: ThinkingLevel | null; disabled?: boolean;

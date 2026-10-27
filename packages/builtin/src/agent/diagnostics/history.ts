@@ -9,17 +9,17 @@ export interface DiagnosticRequest {
   blocks: { record: SessionRecord; block: ModelBlock }[];
   summary: string | null; onTimeline: boolean;
   relatedInput: { id: string; parts: readonly ModelInputPart[]; sender: AgentMessageSender } | null;
-  /** 仅判断历史投影是否含文件，不把多模态总 token 冒充文本细分。 */
+  /** Determines only whether the historical projection contains files; multimodal token totals are not presented as a text breakdown. */
   inputHasFiles: boolean | null;
-  /** 压缩请求保存的压缩前估算量；工作请求为 null。 */
+  /** Pre-compression estimate saved by a compression request; null for work requests. */
   tokensBefore: number | null;
-  /** 本请求 completion 中的领域扩展；缺失时为 null。 */
+  /** Domain extension in this request's completion; null when absent. */
   sent: AgentRequestContextData | null;
 }
 interface HistoryState { lastFile: number | null; input: DiagnosticRequest["relatedInput"] }
 export interface DiagnosticHistory { requests: DiagnosticRequest[]; unreadable: number }
 
-/** 从实际输出块按响应归组；临时执行反馈不参与历史统计。 */
+/** Groups actual output blocks by response; temporary execution feedback does not contribute to historical statistics. */
 export function diagnosticHistory(snapshot: Pick<SessionView, "records">, agentId: string, scope: DiagnosticScope): DiagnosticHistory {
   const records = snapshot.records.all({ scope });
   const timelineIds = new Set(snapshot.records.all({ scope: "timeline" }).map(record => record.id));

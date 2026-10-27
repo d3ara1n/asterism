@@ -1,7 +1,7 @@
 import { jsonSchema, type CallContract, type CallOptions, type CallScope, type Json, type PluginCalls } from "@asterism/sdk/contracts";
 import type { CallBridge } from "./connection.ts";
 
-/** 请求与取消独立传输；不为进程内业务等待设置期限，不自动重放提交。 */
+/** Requests and cancellation travel independently; no deadlines for in-process business waits or automatic submission replay. */
 export class CallClient implements PluginCalls {
   private pending = new Map<string, { resolve(value: Json): void; reject(error: Error): void }>();
   private stopListening: () => void;
@@ -25,7 +25,7 @@ export class CallClient implements PluginCalls {
         work();
       };
       const abort = () => {
-        try { this.bridge.send({ type: "cancel", id }); } catch { /* 断连由当前请求报告。 */ }
+        try { this.bridge.send({ type: "cancel", id }); } catch { /* The current request reports disconnection. */ }
         finish(() => reject(options.signal?.reason ?? new Error("The call was cancelled.")));
       };
       this.pending.set(id, { resolve: value => finish(() => resolve(value)), reject: error => finish(() => reject(error)) });
@@ -40,6 +40,6 @@ export class CallClient implements PluginCalls {
   close() {
     if (this.closed) return;
     this.closed = true; this.disconnect(); this.stopListening();
-    try { this.bridge.send({ type: "reset" }); } catch { /* 连接已关闭。 */ }
+    try { this.bridge.send({ type: "reset" }); } catch { /* The connection is closed. */ }
   }
 }

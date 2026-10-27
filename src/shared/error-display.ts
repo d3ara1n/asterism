@@ -1,5 +1,5 @@
 import { defineMessages, pluginNamespace, type UiText } from "@asterism/sdk/contracts";
-/** 稳定公共错误码的界面说明；英文诊断与插件业务提示保持原样。 */
+/** UI explanations for stable public error codes; English diagnostics and plugin business prompts remain unchanged. */
 export const errorMessages = pluginNamespace("asterism.host").messages("en", defineMessages({
   invalid_request: { id: "error.invalidRequest", defaultMessage: "The request is invalid. Check your input and try again." },
   not_found: { id: "error.notFound", defaultMessage: "The requested item is no longer available." },

@@ -33,9 +33,9 @@ function target() {
   return { nodes, object: { ref: { sessionId: "s", id: "a", kind: "asterism.builtin/agent" }, session: { snapshot } } };
 }
 
-// 代理调查契约：增量进入工具进度，完整终态才执行检索；取消和失败保持真实结局。
-describe("peek 调查流", () => {
-  it("报告标签跨增量和文本边界解析，报告外文字不发布", () => {
+// Agent investigation contract: deltas enter tool progress, retrieval executes only after a complete terminal state, and cancellation and failure retain their actual outcomes.
+describe("peek investigation stream", () => {
+  it("Parses report tags across delta and text boundaries without publishing text outside the report", () => {
     const parser = new PeekReport();
     for (const character of "Searching…<peek-report>Evidence</peek-report>After") parser.push(character);
     expect(parser.text).toBe("Evidence");
@@ -43,7 +43,7 @@ describe("peek 调查流", () => {
     expect(new PeekReport().finish("Plain terminal report")).toBe("Plain terminal report");
   });
 
-  it("在模型终结前发布报告，检索续轮替换草稿并保留协议配对及计量", async () => {
+  it("Publishes the report before model finalization; subsequent retrieval rounds replace the draft while preserving protocol pairing and measurements", async () => {
     const { object, nodes } = target(), updates: PeekResult[] = [], targets: StreamRequest["target"][] = [];
     let request = 0;
     const stream: ModelServices["stream"] = async function* (input) {
@@ -76,7 +76,7 @@ describe("peek 调查流", () => {
     expect(targets[0]).toEqual({ role: "utility", model: "p/m" });
   });
 
-  it("输出截断的工具调用不执行，截断报告作为部分结果保存", async () => {
+  it("Does not execute tool calls truncated by the output limit, and saves truncated reports as partial results", async () => {
     const { object } = target();
     const stream: ModelServices["stream"] = async function* () {
       yield* text("<peek-report>Partial evidence");
@@ -86,7 +86,7 @@ describe("peek 调查流", () => {
     expect(result).toMatchObject({ kind: "partial", data: { report: "Partial evidence", queries: [], requests: [expect.anything()] } });
   });
 
-  it("取消传入在途请求并保留已流出的正文；缺失终态也不启动查询", async () => {
+  it("Propagates cancellation to in-flight requests and preserves streamed body text; missing terminal state also prevents queries from starting", async () => {
     const { object } = target(), controller = new AbortController();
     const cancelled: ModelServices["stream"] = async function* (request) {
       expect(request.signal).toBe(controller.signal);
@@ -104,7 +104,7 @@ describe("peek 调查流", () => {
       .toMatchObject({ kind: "failed", data: { queries: [] } });
   });
 
-  it("utility 缺少工具能力时显式失败，请求数上限结束检索循环", async () => {
+  it("Fails explicitly when utility lacks tool capability, and ends the retrieval loop at the request limit", async () => {
     const { object } = target();
     const stream = vi.fn<ModelServices["stream"]>(async function* () { yield* query(); yield finish("tool-calls"); });
     const unavailable = deps(stream);

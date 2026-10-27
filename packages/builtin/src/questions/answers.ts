@@ -1,6 +1,6 @@
 import type { Question, Submission, SubmittedAnswer, StructuredAnswer } from "./contract.ts";
 
-/** 只接受本次提问中的身份；前端校验与后台受理共享同一业务规则。 */
+/** Accepts only identities from the current question set; frontend validation and backend acceptance share the same business rules. */
 export function answerIssue(question: Question, answer: SubmittedAnswer | undefined): string | null {
   if (!answer) return "An answer or explicit skip is required.";
   if (answer.status === "skipped") return question.required ? "This question cannot be skipped." : null;

@@ -1,4 +1,4 @@
-/** 桌面窗口状态与几何，不属于任务历史或运行时协议。 */
+/** Desktop window state and geometry, outside task history and runtime protocols. */
 import { z } from "zod";
 import { coreChannel } from "./core.ts";
 
@@ -17,13 +17,13 @@ export interface DesktopWindowBridge {
   onChanged(listener: (state: DesktopWindowState) => void): () => void;
 }
 
-// 原生窗口按钮与 renderer 的留白使用同一套几何参数（单位：DIP）。
+// Native window buttons and renderer spacing share geometry parameters in DIP.
 export const windowGeometry = {
   gutter: 6,
   gap: 6,
   headerHeight: 32,
-  // 红绿灯按钮组自身宽度；左右留白按 x 坐标对称计算。
+  // Width of the traffic-light button group itself; horizontal padding is symmetric around the x coordinate.
   macControlsWidth: 52,
-  // 原生控件的视觉落点，单位为窗口客户区 DIP；不依赖默认位置偏移。
+  // Native control visual positions in window client-area DIP, independent of default position offsets.
   macControlsPosition: { x: 20, y: 15 },
 } as const;

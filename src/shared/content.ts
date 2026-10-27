@@ -1,9 +1,9 @@
 import { z } from "zod";
 import { contentRefSchema } from "@asterism/sdk/contracts";
 
-/** 单块传输上限；分块确认形成背压。 */
+/** Per-chunk transfer limit; chunk acknowledgments provide backpressure. */
 export const contentChunkSize = 1024 * 1024;
-/** 单次 read 上限；更大内容用 open 或范围读取。 */
+/** Per-read limit; larger content uses open or range reads. */
 export const contentReadLimit = 16 * 1024 * 1024;
 const id = z.string().uuid();
 const identity = z.string().min(1).max(160);

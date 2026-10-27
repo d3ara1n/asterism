@@ -1,6 +1,6 @@
 import type { DiagnosticRequest } from "./history";
 
-/** 命中率的分子、分母使用同批实报齐全的对话请求，不混入压缩材料。 */
+/** Hit-rate numerator and denominator use the same conversation requests with complete reports, excluding compression material. */
 export function cacheUsage(requests: readonly DiagnosticRequest[]) {
   const reported = requests.filter(request => request.kind === "response"
     && request.completion?.usage?.input != null && request.completion.usage.cacheRead != null);

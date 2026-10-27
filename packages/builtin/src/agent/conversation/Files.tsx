@@ -41,7 +41,7 @@ export function FilePreview({ part, content }: { part: ModelFilePart; content: C
   </Attachment>;
 }
 
-/** 随提示浮层挂载，关闭时释放图片读取结果与临时 URL。 */
+/** Mounts with the tooltip overlay; releases image read results and temporary URLs when closed. */
 function DraftFileDetails({ part, content }: { part: ModelFilePart; content: ContentReader }) {
   const i18n = useI18n();
   const preview = useFileImage(part, content);
@@ -109,7 +109,7 @@ export function AttachFiles({ draft, disabled }: { draft: MessageDraft; disabled
       <Button type="button" size="icon-xs" variant="ghost" onClick={draft.cancelUpload} aria-label={i18n.text(mediaMessages.cancel)}><X /></Button></>}
   </div>;
 }
-/** 文件由对话入口受理，阻止冒泡到工作台创建路由；普通文字粘贴沿用输入框行为。 */
+/** Files are accepted by the conversation entry point, preventing propagation to workbench creation routing; plain-text paste retains input behavior. */
 export function fileInputEvents(draft: MessageDraft, disabled: boolean) {
   return {
     onPaste(event: ClipboardEvent) {

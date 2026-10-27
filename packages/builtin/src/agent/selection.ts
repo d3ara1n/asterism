@@ -8,7 +8,7 @@ export function selectionOf(object: ObjectReader) {
   if (!value) throw new PluginApiError("not_found", "Agent not found.");
   return value;
 }
-/** 配置每次读取当前值，链接说明与请求使用同一份策略规则。 */
+/** Configuration reads always use current values; link descriptions and requests use the same policy rules. */
 export function createSelection(deps: { agents(): readonly AgentConfiguration[] }) {
   const configurations = () => deps.agents().filter(agent => agent.enabled);
   const agentOf = (selection: Selection) => {

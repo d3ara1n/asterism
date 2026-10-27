@@ -13,7 +13,7 @@ const event = (type: "match" | "context", text: string, line: number, submatch?:
     ...(submatch === undefined ? {} : { submatches: [{ start: submatch }] }) },
 })}\n`);
 
-/** 只交付字节协议，在调用方相同的边界记录停止原因；不启动真实进程。 */
+/** Delivers only the byte protocol and records stop reasons at the same boundary as the caller; starts no real processes. */
 function collect<T extends { stopReason: SearchStopReason }>(output: { result: T; records: SearchRecords }, ...chunks: Buffer[]): T {
   for (const chunk of chunks) {
     output.result.stopReason = output.records.push(chunk);
@@ -23,9 +23,9 @@ function collect<T extends { stopReason: SearchStopReason }>(output: { result: T
   return output.result;
 }
 
-describe("搜索输出协议", () => {
-  // OS 管道在任意字节分块；文件名也可能含换行，NUL 才是 find 的真实边界。
-  it("跨块 UTF-8 与含换行路径保持原样，并映射回资源根", () => {
+describe("Search output protocol", () => {
+  // OS pipes split at arbitrary bytes; filenames may contain newlines, so NUL is the actual find boundary.
+  it("Preserves UTF-8 across chunks and paths containing newlines, mapping them back to the resource root", () => {
     const output = findOutput("src", "src", 10);
     const bytes = Buffer.from("./中文\n文件.ts\0./next.ts\0");
     for (const byte of bytes) expect(output.records.push(Buffer.from([byte]))).toBeNull();
@@ -33,8 +33,8 @@ describe("搜索输出协议", () => {
     expect(output.result.files).toEqual(["src/中文\n文件.ts", "src/next.ts"]);
   });
 
-  // grep 与 read 的锚点必须可互用；CRLF、BOM 与末行 CR 最易产生不同正文。
-  it("匹配与上下文使用完整行，锚点可直接交给现有 edit", () => {
+  // grep and read anchors must be interchangeable; CRLF, BOM, and a final-line CR are especially likely to produce differing body text.
+  it("Matches and context use complete lines, with anchors directly usable by the existing edit", () => {
     const source = "\uFEFFfirst\r\n中文\r\nlast\r";
     const data = collect(grepOutput(".", "", { pattern: "中文" }),
       event("context", "\uFEFFfirst\r\n", 1), event("match", "中文\r\n", 2), event("context", "last\r", 3));
@@ -43,12 +43,12 @@ describe("搜索输出协议", () => {
     expect(data.rows.map(row => row.match)).toEqual([false, true, false]);
     expect(grepToModel(data)).toContain(`2#${read.rows[1].hash}│中文`);
     expect(searchSummary(data)).toMatchObject({ returned: 3, matches: 1, excerpts: 0, complete: true });
-    // 有上下文时文件标题列出命中行号，模型无需靠位置推断哪一行是命中。
+    // When context lines are present, file headings list matching line numbers so the model need not infer matches from position.
     expect(grepToModel(data)).toContain('"file.txt" · 1 matching line: 2');
   });
 
-  // 压缩 JS/SVG 的单行可达数百 KiB；命中必须可见，片段围绕命中而非行首，rg 偏移是 UTF-8 字节；锚点按完整行计算，片段不能产生假锚点。
-  it("超长命中行返回命中附近片段，按 UTF-8 字节偏移定位，锚点指向完整行", () => {
+  // A single minified JS/SVG line can reach hundreds of KiB; matches must remain visible, with excerpts centered near matches rather than line starts. rg offsets are UTF-8 bytes; anchors use full lines, and excerpts must not create false anchors.
+  it("Returns excerpts near matches in oversized lines, locates them by UTF-8 byte offsets, and anchors them to complete lines", () => {
     const long = `${"中".repeat(2000)}svg${"x".repeat(2000)}`;
     const data = collect(grepOutput("assets", "assets", { pattern: "svg" }),
       event("match", `${long}\n`, 1, 6000), event("match", "svg\n", 2));
@@ -60,15 +60,15 @@ describe("搜索输出协议", () => {
     expect(searchSummary(data)).toMatchObject({ returned: 2, matches: 2, excerpts: 1, complete: true, empty: null });
     const model = grepToModel(data);
     expect(model).toContain("2 matching lines in 1 file · search complete");
-    // 全部是命中行时标题不重复列出行号。
+    // When every line is a matching line, the heading does not repeat line numbers.
     expect(model).toContain('"assets/file.txt" · 2 matching lines\n');
-    // 行内只有窗口文字，范围在行外陈述，避免与正文混淆。
+    // Lines contain only excerpt text; ranges are stated outside the line to avoid confusion with body content.
     expect(model).toContain(`1#${excerpt.hash}│中`);
     expect(model).toContain('"assets/file.txt" line 1 is an excerpt (characters 1880–2280 of 4003); its anchor refers to the complete line.');
   });
 
-  // 上下文长行没有命中可居中，从行首截取；片段不能被计成命中，也不占命中行上限。
-  it("超长上下文行从行首截取，且不占命中行上限", () => {
+  // Long context lines have no match to center on, so excerpt from the start; excerpts must not count as matches or consume the matching-line limit.
+  it("Excerpts oversized context lines from the start without consuming the matching-line limit", () => {
     const data = collect(grepOutput(".", "", { pattern: "found", limit: 1, context: 1 }),
       event("context", `${'"'.repeat(40 * 1024)}\n`, 1), event("match", "found\n", 2));
     expect(data.rows.map(row => [row.excerpt !== null, row.line, row.match])).toEqual([[true, 1, false], [false, 2, true]]);
@@ -78,8 +78,8 @@ describe("搜索输出协议", () => {
     expect(grepToModel(data)).toContain(`characters 0–400 of ${40 * 1024}`);
   });
 
-  // limit 只数命中行：上限前的命中保留完整后文；停在下一命中时，它已送达的前文不属于任何返回的命中，须裁掉。
-  it("命中行上限不计上下文，停止时裁掉未返回命中的前文", () => {
+  // limit counts only matching lines: matches before the limit retain full trailing context; when stopping at the next match, its already delivered leading context belongs to no returned match and must be trimmed.
+  it("The matching-line limit excludes context, and stopping trims leading context for unreturned matches", () => {
     const data = collect(grepOutput(".", "", { pattern: "x", limit: 1, context: 1 }),
       event("context", "a\n", 1), event("match", "x\n", 2), event("context", "b\n", 3),
       event("context", "c\n", 5), event("match", "x\n", 6));
@@ -88,8 +88,8 @@ describe("搜索输出协议", () => {
     expect(grepToModel(data)).toContain("Search stopped at the matching-line limit.");
   });
 
-  // 正常行仅因剩余预算不足时应报告搜索停止，不应冒充单行超长后继续扫描。
-  it("区分条数上限与累计字节上限，计数明确为已返回条目", () => {
+  // When an ordinary line exceeds only the remaining budget, report that search stopped instead of treating it as an oversized line and continuing the scan.
+  it("Distinguishes entry limits from cumulative byte limits and clearly counts returned entries", () => {
     const exact = collect(findOutput(".", "", 1), Buffer.from("./a\0"));
     expect(exact.stopReason).toBeNull();
     const limited = collect(findOutput(".", "", 1), Buffer.from("./a\0./b\0"));
@@ -107,8 +107,8 @@ describe("搜索输出协议", () => {
     expect(grepToModel(data)).not.toContain("narrower");
   });
 
-  // 过大的管道记录尚未解析；即使空数组也只能说明未返回，不能宣称没有匹配或捏造定位。
-  it("记录上限与空的字节截断结果都不会输出没有匹配", () => {
+  // An oversized pipe record has not yet been parsed; even an empty array means only that nothing was returned, not that there are no matches, and cannot justify fabricated locations.
+  it("Record limits and empty byte-truncated results never report no matches", () => {
     const data = collect(grepOutput(".", "", { pattern: "." }), event("match", "x".repeat(1024 * 1024), 1));
     expect(data.stopReason).toBe("record_bytes");
     expect(data.rows).toEqual([]);
@@ -122,8 +122,8 @@ describe("搜索输出协议", () => {
     expect(findToModel(files)).not.toContain("No matching");
   });
 
-  // 空结果本身不是失败；正常读到 EOF 才能报告指定范围没有匹配。
-  it("正常完成的空搜索仍明确报告没有匹配", () => {
+  // An empty result is not itself a failure; only normal EOF permits reporting no matches in the specified scope.
+  it("A normally completed empty search explicitly reports no matches", () => {
     const grep = collect(grepOutput(".", "", { pattern: "." }));
     const find = collect(findOutput(".", "", 10));
     expect(searchSummary(grep)).toMatchObject({ complete: true, empty: "no_matches" });
@@ -133,8 +133,8 @@ describe("搜索输出协议", () => {
     expect(grepToModel(files)).toContain("No matching files.");
   });
 
-  // rg 对非 UTF-8 输出 base64；替换字符会改变文件身份或伪造编辑锚点。
-  it("解码合法 base64 正文，拒绝不可表示的路径或正文", () => {
+  // rg outputs base64 for non-UTF-8 data; replacement characters would change file identity or fabricate edit anchors.
+  it("Decodes valid base64 body text and rejects unrepresentable paths or text", () => {
     const output = grepOutput(".", "", { pattern: ".", anchored: false });
     const encode = (bytes: Buffer) => Buffer.from(`${JSON.stringify({
       type: "match", data: { path: { text: "a" }, lines: { bytes: bytes.toString("base64") }, line_number: 1 },
@@ -145,8 +145,8 @@ describe("搜索输出协议", () => {
     expect(() => findOutput(".", "", 10).records.push(Buffer.from([0xff, 0]))).toThrow(/not UTF-8/);
   });
 
-  // count 是原生的每文件命中行数；路径可以包含 LF，因此不能统一按行切分整条输出。
-  it("文件模式和计数模式保留含分隔字符的路径与原生计数", () => {
+  // count is the native matching-line count per file; paths may contain LF, so the entire output cannot simply be split into lines.
+  it("File and count modes preserve paths containing delimiter characters and native counts", () => {
     const files = collect(grepOutput(".", "", { pattern: ".", outputMode: "files" }), Buffer.from("./a:b.txt\0"));
     expect(files.files).toEqual([{ path: "a:b.txt", count: null }]);
     const output = grepOutput(".", "", { pattern: ".", outputMode: "count", limit: 2 });
@@ -162,17 +162,17 @@ describe("搜索输出协议", () => {
     expect(() => partial.records.finish()).toThrow(/incomplete/);
   });
 
-  // EOF 中断是协议失败，区别于有明确原因的预算停止。
-  it("残缺记录不能作为正常完成返回", () => {
+  // EOF interruption is a protocol failure, distinct from a budget stop with an explicit reason.
+  it("Incomplete records cannot be returned as normal completion", () => {
     const records = new SearchRecords(10, () => null);
     records.push(Buffer.from('{"type":'));
     expect(() => records.finish()).toThrow(/incomplete/);
   });
 });
 
-describe("搜索参数与分发路径", () => {
-  // - 开头的模式与文件名不能成为选项，空格和 shell 标点保持一个 argv 参数。
-  it("模式、glob 和目标按 argv 传递，隔离用户 rg 配置", () => {
+describe("Search arguments and dispatch paths", () => {
+  // Patterns and filenames beginning with - must not become options; spaces and shell punctuation remain within a single argv argument.
+  it("Passes patterns, globs, and targets through argv and isolates user rg configuration", () => {
     const args = searchArguments("grep", { pattern: "-x; echo bad", literal: true, ignoreCase: true,
       glob: ["**/*.ts", "!vendor/**"], context: 2 }, "./-target");
     expect(args).toContain("--no-config");
@@ -189,8 +189,8 @@ describe("搜索参数与分发路径", () => {
     expect(count).not.toContain("--json");
   });
 
-  // spawn 不读取 asar 虚拟路径；同时覆盖 Windows 分隔符，普通目录名不应被误改。
-  it("仅改写归档路径段，跨平台定位解包可执行文件", () => {
+  // spawn cannot read asar virtual paths; also cover Windows separators without incorrectly rewriting ordinary directory names.
+  it("Rewrites only archive path segments to locate unpacked executables across platforms", () => {
     expect(executablePath("/app/app.asar/node_modules/@vscode/ripgrep-darwin-arm64/bin/rg"))
       .toBe("/app/app.asar.unpacked/node_modules/@vscode/ripgrep-darwin-arm64/bin/rg");
     expect(executablePath("C:\\app\\app.asar\\node_modules\\rg.exe")).toBe("C:\\app\\app.asar.unpacked\\node_modules\\rg.exe");
@@ -199,17 +199,17 @@ describe("搜索参数与分发路径", () => {
   });
 });
 
-describe("搜索结果界面布局", () => {
-  // 路径相对所选目标显示；单文件 grep 的行路径等于目标本身，去前缀后会变成空串。
-  it("显示路径相对搜索目标，单文件目标保留文件名，前缀相同的兄弟目录不被误裁", () => {
+describe("Search result UI layout", () => {
+  // Display paths relative to the selected target; for a single-file grep, the line path equals the target itself and would become empty after prefix removal.
+  it("Displays paths relative to the search target, retains filenames for single-file targets, and does not trim sibling directories sharing a prefix", () => {
     expect(displayPath(".", "src/a.ts")).toBe("src/a.ts");
     expect(displayPath("src", "src/lib/a.ts")).toBe("lib/a.ts");
     expect(displayPath("src/a.ts", "src/a.ts")).toBe("a.ts");
     expect(displayPath("src", "srcx/a.ts")).toBe("srcx/a.ts");
   });
 
-  // rg 并行输出顺序不定，纯字符串排序会让根层文件插进子目录之间、同一目录被拆成多组。
-  it("同一目录的条目连续成组，根层在前，预算在排序后截取", () => {
+  // rg parallel output order is nondeterministic; plain string sorting can place root-level files between subdirectories and split one directory into multiple groups.
+  it("Groups entries from the same directory contiguously, places root-level entries first, and applies the budget after sorting", () => {
     const { groups, omitted } = groupByDirectory(["b/z.ts", "a.ts", "b/c/d.ts", "b/a.ts", "b.ts"], path => path, 4);
     expect(groups.map(group => [group.directory, group.entries.map(entry => entry.name)])).toEqual([
       ["", ["a.ts", "b.ts"]], ["b", ["a.ts", "z.ts"]],
@@ -217,13 +217,13 @@ describe("搜索结果界面布局", () => {
     expect(omitted).toBe(1);
   });
 
-  // 片段起止若落在代理对中间，会留下孤立代理并显示为乱码。
-  it("片段窗口不拆开代理对", () => {
+  // Excerpt boundaries inside surrogate pairs leave lone surrogates that display as garbled text.
+  it("Excerpt windows do not split surrogate pairs", () => {
     expect(excerptWindow("😀".repeat(1000), 1001)).toEqual({ start: 882, end: 1280 });
   });
 
-  // 不连续行若并入同一段会被 CodeRows 连续编号，显示出错误的行号；长行片段与完整行一样参与连续分段，两端以省略号标出。
-  it("文件内按行号排序，连续行合段，行号断开处分段，预算按文件独立", () => {
+  // Merging nonconsecutive lines into one excerpt makes CodeRows number them consecutively, producing incorrect line numbers; long-line excerpts participate in contiguous grouping like full lines, with ellipses marking both ends.
+  it("Sorts lines within files, groups consecutive lines, splits at line-number gaps, and budgets each file independently", () => {
     const row = (line: number, match = true) => ({ path: "a.ts", line, content: `l${line}`, hash: null, excerpt: null, match });
     const files = grepFiles([row(6), row(2, false), row(3),
       { path: "a.ts", line: 4, match: false, content: "mid", hash: null, excerpt: { start: 5, length: 20 } },
@@ -237,8 +237,8 @@ describe("搜索结果界面布局", () => {
     expect(files[1]).toMatchObject({ matches: 1, omitted: 0 });
   });
 
-  // header 摘要不能把上下文行算成命中，也不能把行数当作文件数。
-  it("content 摘要统计命中行与涉及文件，count 摘要合计每文件命中数", () => {
+  // The header summary must not count context lines as matches or line counts as file counts.
+  it("content summaries count matching lines and affected files; count summaries sum per-file match counts", () => {
     const content = collect(grepOutput(".", "", { pattern: "x", context: 1 }),
       event("context", "a\n", 1), event("match", "x\n", 2), event("match", "x\n", 3));
     expect(searchSummary(content)).toMatchObject({ files: 1, matches: 2, complete: true });
@@ -246,8 +246,8 @@ describe("搜索结果界面布局", () => {
     expect(searchSummary(counts)).toMatchObject({ files: 2, matches: 12, complete: true });
   });
 
-  // 选项行只提示偏离默认值的参数；填充阶段的部分 JSON 可能含形状不明的字段。
-  it("只列出非默认参数并忽略形状不明的字段", () => {
+  // Option rows show only arguments differing from defaults; partial JSON during input filling may contain fields of unclear shape.
+  it("Lists only nondefault arguments and ignores fields of unclear shape", () => {
     expect(searchOptions({ pattern: "x", ignoreCase: true, literal: false, context: 0, limit: 500, outputMode: "content" })).toEqual([
       { kind: "flag", flag: "ignoreCase" },
     ]);
@@ -255,7 +255,7 @@ describe("搜索结果界面布局", () => {
       { kind: "mode", value: "count" }, { kind: "context", value: 2 }, { kind: "limit", value: 50 }, { kind: "glob", value: "*.ts" },
     ]);
     expect(searchOptions(null)).toEqual([]);
-    // 空结果提示只列出仍生效的筛选；两者都已关闭时没有可提示的筛选。
+    // Empty-result hints list only filters still in effect; when both are disabled, there are no filters to explain.
     expect(searchFilters({})).toBe("both");
     expect(searchFilters({ hidden: true })).toBe("ignored");
     expect(searchFilters({ noIgnore: true })).toBe("hidden");

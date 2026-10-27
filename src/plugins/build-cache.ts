@@ -16,8 +16,8 @@ function inside(root: string, path: string): boolean {
 }
 
 /**
- * 完整源码树与候选 node_modules 的内容指纹覆盖新增解析候选。
- * 范围外 helper、配置继承与路径映射仍正常构建，本批次不复用缓存。
+ * Content fingerprints of the complete source tree and candidate node_modules cover new resolution candidates.
+ * Out-of-scope helpers, configuration inheritance, and path mapping still build normally without cache reuse in this batch.
  */
 export class PluginBuildCache {
   private readonly roots: string[];
@@ -76,7 +76,7 @@ export class PluginBuildCache {
   private covers(path: string): boolean {
     return !inside(this.directory, path) && !path.split(sep).includes(".git") && this.roots.some(root => inside(root, path));
   }
-  /** 检查原始候选的父目录，覆盖 ../pkg 同时可能解析到 pkg.js 或 pkg/index.js 的情况。 */
+  /** Check original candidate parent directories to cover ../pkg resolving to either pkg.js or pkg/index.js. */
   resolution(path: string, importer: string, resolveDir: string): void {
     if (!this.reusable || !importer || !resolveDir) return;
     if (path.startsWith("#")) { this.reusable = false; return; }

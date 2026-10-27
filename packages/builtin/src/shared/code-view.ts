@@ -6,14 +6,14 @@ export const codeViewOptions = {
   disableFileHeader: true, overflow: "wrap",
 } satisfies BaseCodeOptions;
 
-/** 启动时挂载的常用语法；其余语言由库在首次使用时异步补齐着色。 */
+/** Common grammars registered at startup; the library asynchronously adds highlighting for other languages on first use. */
 const preloadedLanguages: SupportedLanguages[] = [
   "text", "typescript", "tsx", "javascript", "jsx", "json", "markdown", "css", "html",
   "python", "shellscript", "yaml", "toml", "rust", "go", "java", "c", "cpp", "sql", "xml",
 ];
 
 let preparing: Promise<void> | null = null;
-/** 共享高亮器在首屏前完成主题与常用语法挂载，File 与 FileDiff 首次渲染即可同步出正文。 */
+/** The shared highlighter registers themes and common grammars before the first screen, letting File and FileDiff render content synchronously on their first render. */
 export function prepareCodeView(): Promise<void> {
   preparing ??= preloadHighlighter({
     themes: [codeViewOptions.theme.light, codeViewOptions.theme.dark],

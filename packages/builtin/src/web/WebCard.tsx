@@ -20,7 +20,7 @@ function cost(i18n: I18n, items: Stats["cost"]) {
   return items.map(item => i18n.formatNumber(item.amount, { style: "currency", currency: item.currency, minimumFractionDigits: 2, maximumFractionDigits: 4 })).join(" · ");
 }
 
-/** 指标块：主数值在上，次要说明在下；数字等宽便于并列比较。 */
+/** Metric block: main value above and secondary explanation below; tabular numerals support side-by-side comparison. */
 function Metric({ label, value, note }: { label: string; value: ReactNode; note?: ReactNode }) {
   return <div className="flex min-w-0 flex-col gap-0.5 rounded-md border px-2.5 py-2">
     <dt className="type-label truncate">{label}</dt>
@@ -35,7 +35,7 @@ function countNote(i18n: I18n, counts: Counts) {
 }
 const total = (counts: Counts) => counts.succeeded + counts.failed + counts.cancelled;
 
-/** Web 卡片是本会话的网络使用面板：统计只存在于本次运行内存中，提供方配置在设置中管理。 */
+/** The Web card is this session's network usage panel: statistics exist only in memory for this run, and provider configuration is managed in settings. */
 export function WebCard({ data }: { data: WebCardData }) {
   const i18n = useI18n(), { stats } = data;
   const requests = total(stats.search) + total(stats.fetch);

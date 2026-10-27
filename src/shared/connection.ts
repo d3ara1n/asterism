@@ -10,11 +10,11 @@ export type { ChannelEnd, ChannelValue };
 import type { CallControl, CallFrame } from "./plugin-calls.ts";
 
 /**
- * renderer 与任务进程的直连：主进程只在交接 MessagePort 时校验来源，之后不再转发业务消息。
- * 两端由同一构建产出，帧形状以类型约束；结构校验在任务进程入口按领域命令各做一次。
+ * Direct renderer/task-process connections: the main process checks sources only when handing off MessagePorts and never forwards subsequent business messages.
+ * Both endpoints come from one build with typed frame shapes; task-process domain command entries validate structure once each.
  */
 export const connectionRequestChannel = coreChannel("runtime-connection");
-/** preload 向页面转交端口时使用的 window 消息标记。 */
+/** Window message marker used by preload to hand ports to pages. */
 export const connectionPortMessage = "asterism:runtime-port";
 
 export interface ConnectionServices {
@@ -51,7 +51,7 @@ export type RuntimeFrame =
   | { kind: "calls"; frame: CallFrame }
   | { kind: "channels"; frame: ChannelFrame };
 
-/** 两端共用的最小端口形状；Electron MessagePortMain、DOM MessagePort 与 Node MessagePort 各自适配。 */
+/** Minimal shared port shape, adapted by Electron MessagePortMain, DOM MessagePort, and Node MessagePort. */
 export interface ConnectionPort<In, Out> {
   post(message: Out): void;
   onMessage(listener: (message: In) => void): void;
@@ -62,7 +62,7 @@ export interface EventBridge { send(control: EventControl): void; onFrame(listen
 export interface CallBridge { send(control: CallControl): void; onFrame(listener: (frame: CallFrame) => void): () => void }
 export interface ChannelBridge { send(control: ChannelControl): void; onFrame(listener: (frame: ChannelFrame) => void): () => void }
 
-/** renderer 可用的任务进程能力；与主进程能力（窗口、外观、语言等）分开。 */
+/** Renderer-accessible task-process capabilities, separate from main-process window, appearance, language, and other capabilities. */
 export interface RuntimeBridge {
   execute(command: Command): Promise<CommandResult>;
   session: SessionBridge;

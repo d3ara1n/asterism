@@ -4,7 +4,7 @@ export type HistoryBranch = {
   id: string;
   number: number;
   parentId: string | null;
-  /** 共享起点是同一历史节点的引用；null 表示会话起点。 */
+  /** The shared start references the same historical node; null denotes the session start. */
   forkId: string | null;
   nodeIds: Set<string>;
   tip: string | null;
@@ -15,11 +15,11 @@ export type HistoryBranches = {
 };
 
 /**
- * 分支代表根到叶子的完整时间线；Tab 只保存共享起点与独有后续，公共前缀由父分支承接。
- * 执行游标位于共同前缀时，Tab 归属只是展示选择，不决定当前时间线。
- * 第一个后代延续原分支，之后追加的兄弟后代另开 Tab。
- * 身份来自首节点，编号来自追加顺序；游标变化、继续追加都不重命名分支。
- * 所有记录都参与树结构，也可成为展示行与跳转目标。
+ * A branch represents a complete root-to-leaf timeline; its Tab stores only the shared start and unique continuation, with the parent branch carrying the common prefix.
+ * When the execution cursor is in the common prefix, Tab ownership is only a display choice and does not determine the current timeline.
+ * The first descendant continues the original branch; sibling descendants appended later open separate Tabs.
+ * Identity comes from the first node, and numbering from append order; cursor changes and further appends do not rename branches.
+ * All records participate in the tree structure and can become display rows and navigation targets.
  */
 export function historyBranches(nodes: readonly SessionNode[]): HistoryBranches {
   const main: HistoryBranch = { id: "main", number: 0, parentId: null, forkId: null, nodeIds: new Set(), tip: null };
@@ -47,7 +47,7 @@ export function branchContains(branch: HistoryBranch, nodeId: string | null): bo
   return nodeId === null ? branch.forkId === null : branch.nodeIds.has(nodeId);
 }
 
-/** 共享起点可同时属于两个 Tab；显式选择优先，外部定位则落到节点所属分支。 */
+/** A shared start can belong to two Tabs; explicit selection takes priority, while external navigation uses the node's owning branch. */
 export function branchForNode(tree: HistoryBranches, nodeId: string | null, preferredId?: string | null): HistoryBranch {
   const preferred = tree.branches.find(branch => branch.id === preferredId);
   if (preferred && branchContains(preferred, nodeId)) return preferred;

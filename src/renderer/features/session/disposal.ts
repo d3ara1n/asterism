@@ -4,7 +4,7 @@ import { runtime } from "../../runtime";
 
 export type DisposalWarning = { objectId: string; title: string; warning: UiText };
 
-/** 确认框打开时向后台读取结束提示；提示反映实例当前状态，不随投影推送。ids 为 null 表示未打开，"all" 取会话全部对象。 */
+/** Read disposal notices from the backend when the confirmation dialog opens; notices reflect current instance state and are not pushed with projections. ids is null when closed, and "all" selects all session objects. */
 export function useDisposalWarnings(sessionId: string, ids: readonly string[] | "all" | null): readonly DisposalWarning[] {
   const [warnings, setWarnings] = useState<readonly DisposalWarning[]>([]);
   const key = ids === "all" ? "\0all" : ids ? ids.join("\n") : null;

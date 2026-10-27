@@ -37,7 +37,7 @@ const nodeTypes = { object: ObjectNode };
 const connectionLineTypes = { default: ConnectionLineType.Bezier, step: ConnectionLineType.Step, smoothstep: ConnectionLineType.SmoothStep };
 export type PanelKind = "objects" | "history" | "access";
 
-/** 标题栏操作经此句柄进入工作台浮岛；面板作为更深浮岛打开，不另建浮层。 */
+/** Titlebar actions enter the workbench island through this handle; panels open as deeper islands without separate overlays. */
 export interface WorkbenchHandle {
   togglePanel: (kind: PanelKind, origin: HTMLElement | null) => void;
   canvas: WorkbenchCanvas;
@@ -46,12 +46,12 @@ export interface WorkbenchHandle {
 type DropHandlers = { canDrop(kinds: readonly DragKind[]): boolean; onDropItems(items: readonly DropItem[], origin: Point): void };
 type Props = WorkbenchEnvironment & DropHandlers & {
   ref?: Ref<WorkbenchHandle>; onHome(): void; overview?: boolean; active: boolean;
-  /** 应用持有的环境出口：更深浮岛与聚焦浮岛在工作台子树之外经它取得同一份环境。 */ store: WorkbenchStore;
+  /** Application-owned environment outlet: deeper islands and the focus island obtain the same environment outside the workbench subtree through it. */ store: WorkbenchStore;
 };
 type Run = (command: WorkbenchOperation) => Promise<boolean>;
 type WorkbenchEdge = Edge<ConnectionEdge["data"]>;
 
-/** 工作台根浮岛：投影平级对象和关系；代理对话只是代理对象的卡片内容。 */
+/** Workbench root island: projects peer objects and relationships; agent conversation is only the agent object's card content. */
 export function Workbench({ ref, controller, session, ready, run, onHome, store, canDrop, onDropItems, overview, active }: Props) {
   const i18n = useI18n();
   const canvasRef = useRef<WorkbenchCanvas>(null);
@@ -60,7 +60,7 @@ export function Workbench({ ref, controller, session, ready, run, onHome, store,
     locateObjects: async (ids, options) => { await canvasRef.current?.locateObjects(ids, options); },
     arrange: async () => { await canvasRef.current?.arrange(); },
   }), []);
-  // 按字段组装环境，只有字段真的变化时才通知卡片与面板浮岛。
+  // Assemble the environment by field, notifying cards and panel islands only when fields actually change.
   const context = useMemo<WorkbenchView>(
     () => ({ controller, session, ready, run, canvas }),
     [controller, session, ready, run, canvas]);
@@ -69,7 +69,7 @@ export function Workbench({ ref, controller, session, ready, run, onHome, store,
   const island = useIsland();
   const open = useCallback((id: string, label: import("@asterism/sdk/contracts").UiText, render: () => ReactNode, origin: HTMLElement | null) => {
     if (island.child === id) island.closeChild();
-    // 面板浮岛在工作台子树之外渲染，经 WorkbenchScope 取得本会话的同一份环境。
+    // Panel islands render outside the workbench subtree and obtain this session's same environment through WorkbenchScope.
     else island.open({ id, label, width: { min: 320, max: 400 }, origin, render: () => <WorkbenchScope store={store} sessionId={session.id}>{render()}</WorkbenchScope> });
   }, [island, store, session.id]);
   useImperativeHandle(ref, () => ({
@@ -78,7 +78,7 @@ export function Workbench({ ref, controller, session, ready, run, onHome, store,
     canvas,
   }), [open, canvas, controller]);
   useLayoutEffect(() => store.set(context), [store, context]);
-  // 卸载时撤回本工作台写入的环境，离开会话后不再引用其控制器与投影；退场中的浮岛已由 WorkbenchScope 固定各自的环境。
+  // On unmount, withdraw the environment written by this workbench so its controller and projection are no longer referenced after leaving the session; exiting islands already have their own environments captured by WorkbenchScope.
   useLayoutEffect(() => () => store.clear(latestContext.current), [store]);
 
   return <RendererNavigationProvider value={{ home: onHome }}><RendererCatalogProvider ready={ready}><WorkbenchContext.Provider value={context}>
@@ -102,7 +102,7 @@ function Canvas({ ref, session, run, writable, canDrop, onDropItems, overview, a
   const [dropping, setDropping] = useState(false);
   const scheme = useScheme();
   const { edgeStyle } = useAppearance();
-  // 回调经 ref 读取最新会话，保持稳定身份，避免每次快照更新重建所有节点。
+  // Callbacks read the latest session through refs while retaining stable identities, avoiding rebuilding every node on each snapshot update.
   const latest = useRef(session);
   latest.current = session;
   const pendingSizes = useRef(new Map<string, SizeIntent>());
@@ -128,7 +128,7 @@ function Canvas({ ref, session, run, writable, canDrop, onDropItems, overview, a
     setNodes(previous => toNodes(session, previous));
   }, [session, toNodes]);
   const { api: canvas, minZoom } = useWorkbenchCanvas(nodes, setNodes, viewportElement, active);
-  // 模板进入时定位初始可见对象，视口按当前窗口计算并由公共定位入口保存。
+  // On template entry, frame the initially visible objects; calculate the viewport for the current window and save through the shared positioning entry.
   const [initialObjects, setInitialObjects] = useState(() => overview ? nodes.filter(node => !node.hidden).map(node => node.id) : []);
   useEffect(() => {
     if (writable && active && initialObjects.length) {
@@ -138,7 +138,7 @@ function Canvas({ ref, session, run, writable, canDrop, onDropItems, overview, a
   }, [canvas, writable, active, initialObjects]);
   useImperativeHandle(ref, () => canvas, [canvas]);
   const connections = useMemo(() => layoutConnections(nodes, session.links), [nodes, session.links]);
-  // 端点未变时沿用上一份 data，拖动一张卡片不让其余卡片的内容逐帧重渲染。
+  // Reuse previous data when endpoints are unchanged, so dragging one card does not rerender other cards' content each frame.
   const nodeData = useRef(new Map<string, ObjectNodeType["data"]>());
   const canvasNodes = useMemo(() => {
     const cache = nodeData.current;
@@ -153,13 +153,13 @@ function Canvas({ ref, session, run, writable, canDrop, onDropItems, overview, a
         && previous.onView === node.data.onView && samePorts(previous.ports, ports)
         ? previous : { ...node.data, expandedHeight, resizing, ports };
       next.set(node.id, data);
-      // 卡片驱动可见高度，React Flow 测量真实外壳并更新端点；目标高度只传给卡片。
+      // Cards drive visible height; React Flow measures the actual shell and updates endpoints, while target height is passed only to cards.
       return { ...node, height: undefined, data };
     });
     nodeData.current = next;
     return result;
   }, [nodes, connections]);
-  // 连线由快照决定，选中状态留在本地；否则受控连线永远选不中，Delete 无从生效。
+  // Snapshots determine connections, while selection stays local; otherwise controlled connections can never be selected and Delete cannot work.
   const [selectedEdges, setSelectedEdges] = useState<ReadonlySet<string>>(new Set());
   const edges: WorkbenchEdge[] = useMemo(() => connections.edges.map(edge => ({
     ...edge, type: edgeStyle, selected: selectedEdges.has(edge.id),
@@ -172,19 +172,19 @@ function Canvas({ ref, session, run, writable, canDrop, onDropItems, overview, a
     });
   }, [edges]);
   const objects = useMemo(() => new Map(session.objects.map(o => [o.id, o])), [session.objects]);
-  // 终点由资源的静态接收声明决定；起点是任意其他对象。
+  // The destination is determined by the resource's static receive declaration; the source can be any other object.
   const isValidConnection: IsValidConnection = useCallback(c => !!c.source && !!c.target && c.source !== c.target
     && !!objects.get(c.target) && registry.resource(objects.get(c.target)!.kind).receivesLinks === true && !session.links.some(l => l.receiverId === c.target && l.resourceId === c.source), [objects, session.links, registry]);
   const onConnect = useCallback((c: Connection) => {
     void run({ type: "link.set", sessionId: latest.current.id, receiverId: c.target, resourceId: c.source, linked: true });
   }, [run]);
   const onEdgesDelete = useCallback((removed: WorkbenchEdge[]) => {
-    // 合并线携带其代表的有向关系；整条删除时逐一解除，后端仍分别记录事件。
+    // A merged connection carries the directed relationships it represents; deleting it entirely unlinks each one, while the backend still records separate events.
     for (const edge of removed) for (const link of edge.data?.links ?? []) {
       void run({ type: "link.set", sessionId: latest.current.id, ...link, linked: false });
     }
   }, [run]);
-  // 拖入内容：放下时同步快照，再交给宿主创建协调器仲裁。
+  // Dropped content: capture a synchronous snapshot on drop, then hand it to the host creation coordinator for arbitration.
   const onDrop = (event: React.DragEvent) => {
     setDropping(false);
     if (!writable || !canDrop(dragKinds(event.dataTransfer))) return;
@@ -200,7 +200,7 @@ function Canvas({ ref, session, run, writable, canDrop, onDropItems, overview, a
       }
       if (change.type === "position" && change.position && change.dragging === false) {
         void run({ type: "view.set", sessionId: latest.current.id, objectId: change.id, position: change.position }).then(saved => {
-          // 失败时按最新快照回滚，而非拖动开始时的旧位置。
+          // On failure, roll back to the latest snapshot rather than the old position at drag start.
           if (!saved) setNodes(previous => toNodes(latest.current, previous.map(n => ({ ...n, dragging: false }))));
         });
       }
@@ -239,10 +239,10 @@ function ViewControls({ session, run, canvas, objects, selected }: { session: Wo
   const flow = useReactFlow();
   const move = async (action: () => Promise<boolean>) => {
     await action();
-    // 工具栏是明确的用户操作；程序化缩放不产生 DOM event，需显式保存。
+    // Toolbar actions are explicit user operations; programmatic zoom produces no DOM event and must be saved explicitly.
     await run({ type: "viewport.set", sessionId: session.id, viewport: flow.getViewport() });
   };
-  // 所有对象平级：定位当前选中的卡片，而非某个“主”代理。
+  // All objects are peers: locate the currently selected cards rather than a “main” agent.
   const controls = [
     [i18n.formatMessage(commonMessages.zoomIn), Plus, () => move(() => flow.zoomIn())],
     [i18n.formatMessage(commonMessages.resetZoom), RotateCcw, () => move(() => flow.zoomTo(1))],

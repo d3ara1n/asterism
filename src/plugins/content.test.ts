@@ -80,10 +80,10 @@ function fixture(options: { prepare?: (content: ContentScope, signal: AbortSigna
 const bytes = (text: string) => new TextEncoder().encode(text);
 const text = (data: Uint8Array) => new TextDecoder().decode(data);
 
-// 预期来自内容归属、同步提交和历史契约；验证公开 SDK 完整调用路径。
-describe("宿主不可变内容", () => {
-  // 跨插件动作在首次等待前捕获调用者合法内容，后续失去原根仍可完成交接。
-  it("后台跨插件动作要求合法内容来源，并独立保留输入直到提交", async () => {
+// Expectations follow content ownership, synchronous commit, and history contracts; verify the complete public SDK call path.
+describe("Host immutable content", () => {
+  // Cross-plugin actions capture valid caller content before the first wait; handoff can complete after the original root is lost.
+  it("backend cross-plugin actions require valid content origins and independently retain input until commit", async () => {
     const ns = pluginNamespace("test.action-source");
     const Source = ns.resource("source", z.object({}));
     const SourceFile = ns.data("file", z.object({ file: contentRefSchema.nullable() }));
@@ -131,8 +131,8 @@ describe("宿主不可变内容", () => {
     } finally { release(); await invoked; }
   });
 
-  // SDK 创建必须显式交接合法内容资格，不能因知道引用就读取另一个对象的私有内容。
-  it("后台创建可交接本插件对象内容，缺少读取资格时拒绝", async () => {
+  // SDK creation explicitly hands off valid content eligibility; knowing references alone cannot expose another object's private content.
+  it("backend creation can hand off content from this plugin's objects and rejects missing read eligibility", async () => {
     const f = fixture(), draft = f.input();
     const file = await f.store.writer({ scope: draft }).stage(bytes("shared creation input"));
     const id = await f.create(file, draft.id);
@@ -143,8 +143,8 @@ describe("宿主不可变内容", () => {
     expect(text(await f.object(copy.id).content.read(file))).toBe("shared creation input");
   });
 
-  // 关联只读对象不能以已知 ContentRef 绕过私有 get；对象、会话和在途交接根需分别守住。
-  it("外部调用只能读取关联对象的公开历史内容，不能读取私有当前数据或交接占用", async () => {
+  // Associated read-only objects cannot bypass private get using known ContentRefs; object, session, and in-flight handoff roots need separate protection.
+  it("external calls read only associated objects' public historical content, not private current data or handoff holds", async () => {
     const foreign = pluginNamespace("test.foreign");
     const Read = defineCall(foreign.name("read"), { scope: "object",
       input: z.strictObject({ ref: contentRefSchema, session: z.boolean() }), output: z.string(),
@@ -173,7 +173,7 @@ describe("宿主不可变内容", () => {
     } finally { await Promise.all([draft.close(), handover.close(), lease.close()]); }
   });
 
-  it("二进制导入经准备、同步创建、当前数据读取持久化，并支持缺席插件重开", async () => {
+  it("binary imports persist through preparation, synchronous creation, and current-data reads and reopen with absent plugins", async () => {
     const f = fixture(), draft = f.input();
     const source = new Uint8Array([99, 0, 255, 128, 42]);
     const ref = await f.store.writer({ scope: draft }).stage(source.subarray(1, 4));
@@ -188,7 +188,7 @@ describe("宿主不可变内容", () => {
     expect(await reopened.content.execute({ type: "read.next", readerId: reader.readerId })).toMatchObject({ kind: "bytes", data: new Uint8Array([0, 255, 128]) });
     await reopened.content.execute({ type: "read.close", readerId: reader.readerId });
   });
-  it("失败回滚所有引用，保留草稿可重试，取消草稿后孤儿被回收", async () => {
+  it("failure rolls back all references, keeps drafts retryable, and reclaims orphans after draft cancellation", async () => {
     const f = fixture(), draft = f.input();
     const ref = await f.store.writer({ scope: draft }).stage(bytes("retry"));
     await expect(f.create(ref, draft.id, { fail: true })).rejects.toThrow();
@@ -200,8 +200,8 @@ describe("宿主不可变内容", () => {
     await abandoned.close(); f.store.collect();
     expect(() => f.store.reader({ sessionId: f.sessionId, objectId: id }).read(orphan)).toThrow();
   });
-  // 桌面内容契约：读取只按执行游标授权；旧分支记录仍保留字节，但已知引用不授予访问。
-  it("桌面读取随游标重建资格，拒绝旁支记录和已移除对象", async () => {
+  // Desktop content contract: reads are authorized only by the execution cursor; old branches retain bytes, but known references grant no access.
+  it("desktop reads rebuild eligibility with the cursor and reject side-branch records and removed objects", async () => {
     const f = fixture(), draft = f.input();
     const ref = await f.store.writer({ scope: draft }).stage(bytes("saved"));
     const id = await f.create(ref, draft.id);
@@ -221,7 +221,7 @@ describe("宿主不可变内容", () => {
     await f.service.sessions.execute({ type: "object.remove", sessionId: f.sessionId, objectId: id });
     await expect(read()).rejects.toMatchObject({ code: "foreign_resource" });
   });
-  it("替换当前值后历史事件和创建原件的独立根仍保留", async () => {
+  it("independent roots for historical events and creation originals survive current-value replacement", async () => {
     const f = fixture(), draft = f.input();
     const original = await f.store.writer({ scope: draft }).stage(bytes("original"));
     const id = await f.create(original, draft.id, { history: true }); await draft.close();
@@ -235,7 +235,7 @@ describe("宿主不可变内容", () => {
     await f.service.sessions.execute({ type: "object.remove", sessionId: f.sessionId, objectId: id }); f.store.collect();
     expect(text(await f.object(id).content.read(original))).toBe("original");
   });
-  it("同会话不同对象不能凭已知引用读取或认领", async () => {
+  it("objects in the same session cannot read or claim each other's content through known references", async () => {
     const f = fixture(), first = f.input(), second = f.input();
     const a = await f.store.writer({ scope: first }).stage(bytes("A"));
     const b = await f.store.writer({ scope: second }).stage(bytes("B"));
@@ -246,7 +246,7 @@ describe("宿主不可变内容", () => {
     expect(f.object(bid).get(Current)!.file).toEqual(b);
     expect(text(await f.object(aid).content.read(a))).toBe("A");
   });
-  it("动作输入绑定真实对象，使用后可关闭草稿且新内容仍持久保存", async () => {
+  it("action inputs bind to real objects; drafts can close after use while new content remains persisted", async () => {
     const f = fixture(), draft = f.input();
     const old = await f.store.writer({ scope: draft }).stage(bytes("old"));
     const id = await f.create(old, draft.id); await draft.close();
@@ -257,7 +257,7 @@ describe("宿主不可变内容", () => {
     expect(text(await f.object(id).content.read(file))).toBe("new");
     expect(() => f.object(id).content.read(old)).toThrow();
   });
-  it("依赖来自实际保存的 schema 输出，转换移除引用后不保留字节", async () => {
+  it("dependencies derive from actual saved schema output; removing references during transformation releases bytes", async () => {
     const f = fixture(), draft = f.input();
     const ref = await f.store.writer({ scope: draft }).stage(bytes("stripped"));
     const id = await f.create(ref, draft.id); await draft.close();
@@ -269,7 +269,7 @@ describe("宿主不可变内容", () => {
     await f.replace(id, { file: null }); f.store.collect();
     expect(() => f.object(id).content.read(ref)).toThrow();
   });
-  it("读取占用保护已被替换的内容，结束读取才可回收", async () => {
+  it("read holds protect replaced content until reads finish", async () => {
     const f = fixture(), draft = f.input();
     const payload = new Uint8Array(contentLimits.chunk + 3).fill(7);
     const ref = await f.store.writer({ scope: draft }).stage(payload);
@@ -283,7 +283,7 @@ describe("宿主不可变内容", () => {
     f.store.collect();
     expect(() => f.object(id).content.read(ref)).toThrow();
   });
-  it("关闭原始草稿不撤回已捕获的创建尝试", async () => {
+  it("closing original drafts does not revoke captured creation attempts", async () => {
     let started!: () => void, finish!: () => void;
     const ready = new Promise<void>(resolve => { started = resolve; });
     const wait = new Promise<void>(resolve => { finish = resolve; });
@@ -294,7 +294,7 @@ describe("宿主不可变内容", () => {
     const id = await creating;
     expect(text(await f.object(id).content.read(ref))).toBe("captured");
   });
-  it("显式取消等待准备结束，原草稿仍可读，关闭后不能再次受理", async () => {
+  it("explicit cancellation waits for preparation to finish, keeps original drafts readable, and rejects new attempts after close", async () => {
     let started!: () => void;
     const ready = new Promise<void>(resolve => { started = resolve; });
     const f = fixture({ prepare: async (_content, signal) => {
@@ -308,7 +308,7 @@ describe("宿主不可变内容", () => {
     expect(text(await f.store.reader({ scope: draft }).read(ref))).toBe("cancel");
     await draft.close(); await expect(f.create(ref, draft.id)).rejects.toThrow();
   });
-  it("嵌套提交回滚后旧数据与引用保持一致", async () => {
+  it("old data and references remain consistent after nested commit rollback", async () => {
     const f = fixture(), draft = f.input();
     const ref = await f.store.writer({ scope: draft }).stage(bytes("keep"));
     const id = await f.create(ref, draft.id); await draft.close();
@@ -320,7 +320,7 @@ describe("宿主不可变内容", () => {
     await expect(f.replace(id, { file: null, fail: true })).rejects.toThrow();
     f.store.collect(); expect(object.get(Current)!.file).toEqual(ref);
   });
-  it("对象内容只取当前值与可见历史，分叉保留共同原件而不取得旁支专有引用", async () => {
+  it("object content includes only current values and visible history; forks retain shared originals without acquiring references exclusive to side branches", async () => {
     const f = fixture(), draft = f.input();
     const original = await f.store.writer({ scope: draft }).stage(bytes("ancestor"));
     const id = await f.create(original, draft.id, { history: true }); await draft.close();
@@ -336,7 +336,7 @@ describe("宿主不可变内容", () => {
     await expect(f.replace(id, { file: branch })).rejects.toThrow();
     expect(f.object(id).get(Current)!.file).toEqual(original);
   });
-  it("外部准备者只能读取，replace 引用不能扩大尝试资格", async () => {
+  it("external preparers can only read and replacement references cannot expand attempt eligibility", async () => {
     let replacement: ContentRef | null = null;
     const extra = definePlugin({ namespace: pluginNamespace("test.preparer"), version: "1", modules: [defineModule(() => ({ preparers: [implementPreparer(Replace, {
       id: "replace", prepare(_input, { object, content }) {
@@ -352,7 +352,7 @@ describe("宿主不可变内容", () => {
     await expect(f.replace(id, { file: ref })).rejects.toThrow();
     expect(f.object(id).get(Current)!.file).toEqual(ref);
   });
-  it("内容服务拒绝超大块，顺序错误不能封存，空文件可正常导入", async () => {
+  it("content services reject oversized chunks, cannot seal out-of-order input, and import empty files normally", async () => {
     const f = fixture();
     const opened = await f.service.content.execute({ type: "input.open", target: { sessionId: f.sessionId, resourceKind: Document.kind, contractId: Create.id } });
     if (opened.kind !== "input") throw new Error("Expected input.");
@@ -382,8 +382,8 @@ describe("宿主不可变内容", () => {
   });
 });
 
-/** 预期来自内容授权和请求边界：文件须可读，临时输入与请求分别保留。 */
-describe("模型消费不可变内容", () => {
+/** Expectations follow content authorization and request boundaries: files must be readable, and temporary input and requests retain separate holds. */
+describe("Models consuming immutable content", () => {
   const request = (file: ContentRef, mediaType = "image/png") => ({
     target: { role: "default", model: "media/model" }, system: { blocks: [] },
     messages: [{ kind: "input", parts: [{ kind: "file", file, mediaType, filename: "input.png" }] }],
@@ -404,7 +404,7 @@ describe("模型消费不可变内容", () => {
     } };
   } });
 
-  it("创建前 prepare 可校验和发送临时内容；提前关闭模型流不消耗调用方输入", async () => {
+  it("prepare before creation can validate and send temporary content; closing model streams early does not consume caller input", async () => {
     const seen: ModelInput[] = [];
     let ref!: ContentRef;
     const f = fixture({ adapter: adapter(seen), async prepare(content) {
@@ -420,7 +420,7 @@ describe("模型消费不可变内容", () => {
     expect(text(await f.store.reader({ scope: draft }).read(ref))).toBe("temporary");
   });
 
-  it("无门面、伪造门面及其他对象引用在发送前拒绝；run 只取自身内容", async () => {
+  it("rejects missing facades, forged facades, and other-object references before sending; run consumes only its own content", async () => {
     const seen: ModelInput[] = [], f = fixture({ adapter: adapter(seen) }); await configure(f);
     const draft = f.input(), file = await f.store.writer({ scope: draft }).stage(bytes("first"));
     const a = await f.create(file, draft.id);
@@ -438,7 +438,7 @@ describe("模型消费不可变内容", () => {
     expect(seen).toHaveLength(1);
   });
 
-  it("请求开始后替换最后一个当前根仍能读取；请求关闭后释放占用", async () => {
+  it("replacing the last current root after request start preserves reads until request close releases the hold", async () => {
     const seen: ModelInput[] = [], f = fixture({ adapter: adapter(seen) }); await configure(f);
     const draft = f.input(), file = await f.store.writer({ scope: draft }).stage(bytes("captured"));
     const id = await f.create(file, draft.id); await draft.close();
@@ -456,14 +456,14 @@ describe("模型消费不可变内容", () => {
     } finally { release(); await iterator.return?.(); spy.mockRestore(); }
   });
 
-  it("validate 只读元数据；文件损坏在请求读取时失败，大小独立检查", async () => {
+  it("validate reads only metadata; corrupt files fail during request reads and size is checked independently", async () => {
     const seen: ModelInput[] = [], f = fixture({ adapter: adapter(seen) }); await configure(f);
     const draft = f.input(), file = await f.store.writer({ scope: draft }).stage(bytes("intact"));
     const id = await f.create(file, draft.id), content = f.object(id).content;
     writeFileSync(join(f.root, applicationStorage.contentDirectory, "sealed", file["$asterism.content"]), bytes("broken"));
     await f.context.models.validate(request(file), { content });
     await expect((async () => { for await (const _ of f.context.models.stream(request(file), { content })) {} })()).rejects.toMatchObject({ code: "content_unavailable" });
-    // 使用同一对象的动作草稿建立合法归属，避免把越权误当成大小校验。
+    // Establish valid ownership using the same object's action draft so authorization failure is not mistaken for size validation.
     const actionDraft = f.service.sessions.openContentInput({ sessionId: f.sessionId, objectId: id, resourceKind: Document.kind, contractId: Replace.id });
     const large = await f.store.writer({ scope: actionDraft }).stage(new Uint8Array(modelInputLimits.file + 1));
     await f.replace(id, { file: large }, actionDraft.id);

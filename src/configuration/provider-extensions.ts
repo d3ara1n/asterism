@@ -5,7 +5,7 @@ import { defineProviderPresets } from "../shared/provider-presets.ts";
 import { synchronous } from "../plugins/synchronous.ts";
 
 interface Layer { owner: string; changes: readonly ModelProviderPresetContribution[] }
-/** 插件贡献的目录：按装配次序覆盖预设；查询身份唯一，不以覆盖预设隐式替换实现。 */
+/** Plugin contribution catalog: override presets in assembly order; query identities are unique, and overriding presets does not implicitly replace implementations. */
 export class ModelProviderExtensions {
   private layers: Layer[] = [];
   private queries = new Map<string, { owner: string; provider: UsageProvider; runs: RunGroup }>();
@@ -48,7 +48,7 @@ export class ModelProviderExtensions {
       if (change.type === "patch") return { ...change, id: modelProviderPresetSchema.shape.id.parse(change.id) };
       throw new Error("Invalid provider preset contribution.");
     });
-    // 修改其他插件新增的预设需要声明依赖，保证失败撤销和关闭次序可确定。
+    // Modifying presets added by other plugins requires a declared dependency so rollback and shutdown order are deterministic.
     for (const change of normalizedChanges) if (change.type === "patch") {
       const source = this.layers.find(layer => layer.changes.some(item => item.type === "add" && item.preset.id === change.id));
       if (source && source.owner !== owner && !dependencies.includes(source.owner))
@@ -66,7 +66,7 @@ export class ModelProviderExtensions {
     for (const [id, query] of this.queries) if (removed.has(query.owner)) this.queries.delete(id);
     this.changed();
   }
-  /** 句柄绑定登记实例；同 ID 重新登记不会复用旧句柄。 */
+  /** Handles bind to registration instances; re-registering the same ID does not reuse old handles. */
   get(id: string): UsageProvider | null {
     const entry = this.queries.get(id);
     if (!entry) return null;

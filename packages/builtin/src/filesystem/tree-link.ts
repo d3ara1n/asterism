@@ -17,7 +17,7 @@ export interface TreeLinkState {
 type Calls = ReturnType<typeof useRendererCalls>;
 const key = (ref: ResourceRef) => `${ref.sessionId}\n${ref.id}`;
 
-/** Actions 与 Body 共享同一棵树的加载状态；引用计数归零时取消并从 map 移除。 */
+/** Actions and Body share loading state for the same tree; when the reference count reaches zero, cancel and remove it from the map. */
 class DirectoryTreeLink {
   state: TreeLinkState = { loading: true, data: null, error: null };
   private controller = new AbortController();

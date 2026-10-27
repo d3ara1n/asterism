@@ -1,6 +1,6 @@
 import type { ResourceSnapshot } from "@asterism/sdk/contracts";
 
-/** 资源存在性独立于事件动作；回溯与普通提交比较同一份当前集合。 */
+/** Resource presence is independent of event actions; backtracking and ordinary commits compare the same current set. */
 export class ResourcePresence {
   private readonly sessions = new Map<string, Map<string, ResourceSnapshot>>();
 
@@ -13,7 +13,7 @@ export class ResourcePresence {
       disappeared: [...previous.values()].filter(resource => !current.has(resource.ref.id)),
     };
   }
-  /** 会话离开在场集合（归档）：返回此前的全部资源并清除登记。 */
+  /** When a session leaves the present set (archival), return all previous resources and clear registration. */
   forget(sessionId: string): ResourceSnapshot[] {
     const previous = this.sessions.get(sessionId);
     this.sessions.delete(sessionId);

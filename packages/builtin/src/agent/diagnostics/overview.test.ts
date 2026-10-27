@@ -19,9 +19,9 @@ const compression = (sequence: number, tokensBefore: number) => request(sequence
   id: `s${sequence}`, kind: "compression", responseId: null, sent: null, tokensBefore,
 });
 
-// 只用实报用量；增量仅在模型与系统快照一致、期间无压缩时成立。
-describe("诊断概览", () => {
-  it("增量只在可比的相邻请求之间给出；压缩历史配对下一次实报 input", () => {
+// Use only reported usage; deltas are valid only when model and system snapshots match and no compression intervenes.
+describe("Diagnostic overview", () => {
+  it("Provides deltas only between comparable adjacent requests and pairs compression history with the next reported input", () => {
     const requests = [
       request(1, 1000), request(2, 1500),
       request(3, 1800, { sent: { ...sent, tools: ["resource_list", "resource_call"] } }),
@@ -32,7 +32,7 @@ describe("诊断概览", () => {
     expect(compressions).toEqual([expect.objectContaining({ tokensBefore: 1900, after: 600 })]);
   });
 
-  it("缓存命中只计工作请求；压缩后余量不再沿用旧 input", () => {
+  it("Cache hits include only work requests; headroom after compression does not reuse old input", () => {
     const window = 100_000;
     const open = diagnosticOverview([request(1, 1000), compression(2, 900), request(3, 4000)], () => window);
     expect(open.cache).toEqual({ read: 500 + 2000, input: 5000 });

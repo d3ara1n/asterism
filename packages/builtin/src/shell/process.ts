@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 export interface ProcessExit { exitCode: number | null; signal: string | null; error: string | null }
 export interface ShellProcess {
-  /** 退出与输出收尾分别观察，等待本身不终止进程。 */
+  /** Observes exit and output finalization separately; waiting itself does not terminate the process. */
   exited: Promise<ProcessExit>;
   settled: Promise<ProcessExit>;
   stop(): Promise<void>;
@@ -25,7 +25,7 @@ async function killProcessGroup(pid: number): Promise<void> {
   }
 }
 
-/** 管道后端；拥有进程及 IO 生命周期，调用方决定何时 stop。 */
+/** Pipe backend; owns the process and IO lifecycle, while the caller decides when to stop. */
 export function startShellProcess(executable: string, args: string[], options: {
   cwd: string; env: NodeJS.ProcessEnv;
   onData(stream: "stdout" | "stderr", bytes: Buffer): Promise<void>;
@@ -51,7 +51,7 @@ export function startShellProcess(executable: string, args: string[], options: {
     child.stdout.destroy(); child.stderr.destroy();
     void queue.then(() => resolveSettled({ ...exit!, error: ioError ?? exit!.error }));
   };
-  // 主进程退出后，空闲的继承管道不会永久阻塞；背压中的数据先完成消费。
+  // After the main process exits, idle inherited pipes do not block forever; data under backpressure is consumed first.
   const armIdle = () => {
     clearTimeout(idle);
     idle = setTimeout(() => {

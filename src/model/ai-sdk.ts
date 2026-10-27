@@ -13,7 +13,7 @@ import { describeError, type ModelResponse } from "@asterism/sdk/contracts";
 import { ZodError } from "zod";
 
 function json(value: unknown): Json { return jsonSchema.parse(JSON.parse(JSON.stringify(value))); }
-/** SDK 解码失败属于软件处理错误；服务端拒绝和传输失败属于模型请求结果。 */
+/** SDK decoding failures are software processing errors; server rejection and transport failure are model request outcomes. */
 function providerFailure(error: unknown): ModelFailure {
   if (error instanceof ModelFailure) return error;
   const details = describeError(error);
@@ -25,7 +25,7 @@ export function sdkMessages(input: ModelInput): ModelMessage[] {
   const messages: ModelMessage[] = [];
   const chat = input.settings.provider.protocol === "openai-chat";
   const attachments: Extract<ResolvedInputPart, { kind: "file" }>[] = [];
-  /** 工具文件已由目标投影检查显式标签；获准搬运的同批文件合入后续 user 消息。 */
+  /** Target projection has checked explicit tool-file tags; permitted files from the same batch merge into subsequent user messages. */
   const flushAttachments = () => {
     if (!attachments.length) return;
     messages.push({ role: "user", content: [{ type: "text", text: "Files attached from the preceding tool results:" },
@@ -36,7 +36,7 @@ export function sdkMessages(input: ModelInput): ModelMessage[] {
     if (item.kind !== "result") flushAttachments();
     if (item.kind === "input" || item.kind === "context") messages.push({ role: "user", content: item.parts.map(part =>
       part.kind === "text" ? { type: "text" as const, text: part.text }
-        // 各模态统一按 AI SDK 文件部件发送，mediaType 为编码标签；端点是否接受由服务端反馈。
+        // All modalities use AI SDK file parts with mediaType as the encoding tag; server feedback determines endpoint acceptance.
         : { type: "file" as const, data: part.data, mediaType: part.mediaType, ...(part.filename ? { filename: part.filename } : {}) }) });
     if (item.kind === "output") {
       const parts = item.parts;
@@ -52,7 +52,7 @@ export function sdkMessages(input: ModelInput): ModelMessage[] {
     if (item.kind === "result") {
       const files = item.parts.filter(part => part.kind === "file");
       const text = item.parts.flatMap(part => part.kind === "text" ? [part.text] : []).join("\n");
-      // 文字只序列化一次；Chat 工具文件已通过显式兼容门禁，才能搬运到后续 user 消息。
+      // Serialize text once; Chat tool files must pass the explicit compatibility gate before moving to subsequent user messages.
       let output: ToolResultPart["output"];
       if (!files.length || chat) {
         const notice = files.length ? `[${files.length} file(s) attached in the following user message: ${files.map(file => file.filename ?? file.mediaType).join(", ")}]` : "";
@@ -82,7 +82,7 @@ export class AiSdkAdapter implements ModelAdapter {
     validateProjection(input);
   }
   prepare(input: ModelInput): PreparedModel {
-    // 固定顶层请求身份，避免等待凭据时读到调用方后续替换的值。
+    // Capture top-level request identity so waiting for credentials cannot observe values later replaced by the caller.
     input = { ...input };
     this.validate(input);
     const messages = sdkMessages(input);
@@ -99,7 +99,7 @@ export class AiSdkAdapter implements ModelAdapter {
     const controller = new AbortController();
     const streamSignal = AbortSignal.any([signal, controller.signal]);
     let responseMetadata: ModelResponse | null = null;
-    // SDK 可在 doStream 返回前消费首个 SSE 错误；保留已收到的前缀，首块交付即释放。
+    // The SDK may consume the first SSE error before doStream returns; retain the received prefix and release it on first-block delivery.
     let capturePrefix = true, responsePrefix = "";
     const decoder = new TextDecoder();
     const transport: typeof fetch = async (url, init) => {
@@ -132,12 +132,12 @@ export class AiSdkAdapter implements ModelAdapter {
         yield event.type === "finish" ? { ...event, response: responseMetadata } : event;
       }
     } catch (error) {
-      // 模型终态可能早于连接关闭或用户取消；已取得的计量仍须交付。
+      // Model termination may precede connection close or user cancellation; acquired metering must still be delivered.
       if (measured.completion) yield { ...measured.completion, response: responseMetadata };
       const failure = providerFailure(error);
       failure.details ??= describeError(error);
       if (responsePrefix) failure.details.rawResponse = responsePrefix;
-      // 响应由异步 transport 回调赋值，类型收窄以回调之后实际取得的值为准。
+      // An asynchronous transport callback assigns the response; narrow to the actual value obtained after the callback.
       const received = responseMetadata as ModelResponse | null;
       if (received) {
         failure.details = { ...failure.details,
@@ -161,10 +161,10 @@ export class AiSdkAdapter implements ModelAdapter {
     const result = streamText({ model: measured.model, messages, tools,
       ...options, abortSignal: signal,
       include: { rawChunks: true },
-      // SDK 不执行工具；单步结果交还星图循环，工具注册中不提供 execute。
+      // The SDK does not execute tools; return single-step results to the Asterism loop without execute in tool registrations.
       onError: () => {},
     });
-    // 使用 SDK 自带消费分支持续接收，避免调用方等待进度处理时拖慢采样。
+    // Use the SDK's consuming branch to receive continuously so waiting for caller progress handling does not slow sampling.
     void result.consumeStream();
     const calls = new Set<string>();
     const thinkingItems = new Map<number, { partId: string; itemId: string; summaryIndex: number | null; hasSummary: boolean }>();
@@ -196,7 +196,7 @@ export class AiSdkAdapter implements ModelAdapter {
           if (raw.type === "error" || raw.type === "response.failed" || raw.error != null)
             rawFailure = JSON.stringify(raw);
           if (protocol !== "openai-responses") break;
-          // 按 Responses item 收束，全文与摘要分别接收；SDK 的摘要分段不另建思考块。
+          // Finalize by Responses item and receive full text and summaries separately; SDK summary segments do not create separate reasoning blocks.
           if (raw.type === "response.output_item.added" || raw.type === "response.output_item.done") {
             const item = raw.item as Record<string, unknown> | undefined;
             if (item?.type !== "reasoning") break;
@@ -266,7 +266,7 @@ export class AiSdkAdapter implements ModelAdapter {
           }
           yield { type: "part.end", partId: `tool:${event.toolCallId}`, arguments: json(event.input), continuation: pickContinuation(event.providerMetadata) }; break;
         case "error":
-          // 服务端与传输错误保留原始诊断；程序分类不替换其消息与响应正文。
+          // Server and transport errors retain original diagnostics; programmatic classification does not replace their messages or response bodies.
           {
             const failure = providerFailure(event.error);
             failure.details ??= describeError(event.error);
@@ -275,18 +275,18 @@ export class AiSdkAdapter implements ModelAdapter {
           }
         case "abort": throw new ModelFailure("cancelled", "The provider stream was cancelled.");
         case "tool-error":
-          // SDK 会为解析/目录错误合成结果；正式拒绝由星图记录，避免保存 SDK 错误对象。
+          // The SDK synthesizes results for parsing/catalog errors; Asterism records formal rejections without saving SDK error objects.
           if (!event.providerExecuted && rejectedBySdk.has(event.toolCallId)) break;
           throw new ModelFailure("unsupported_content", "The provider returned an unexpected tool result.");
-        // custom 是 provider 扩展元数据（如 Anthropic message_start 的早期用量），非正文内容；
-        // 用量由接收端计量采集，续接由 pickContinuation 白名单收束，无需处理。
+        // custom is provider extension metadata, such as early Anthropic message_start usage, rather than body content;
+        // the receiver collects usage and pickContinuation filters continuation data through an allowlist, so no handling is needed here.
         case "custom": break;
         case "file": case "reasoning-file": case "tool-result":
           throw new ModelFailure("unsupported_content", "The provider returned unsupported response content.");
         case "finish": break;
       }
     }
-    // 已收到的终态必须交付；ResponseBuffer 先保留计量，再拒绝仍未闭合的块。
+    // Received terminal state must be delivered; ResponseBuffer retains metering before rejecting blocks that remain unclosed.
     if (!measured.completion) throw new ModelFailure("interrupted", "The provider stream ended without a finish event.", undefined, "model");
     yield measured.completion;
   }

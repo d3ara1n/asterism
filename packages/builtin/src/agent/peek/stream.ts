@@ -5,7 +5,7 @@ import type { PeekResult } from "./contract.ts";
 type Finish = Extract<ModelEvent, { type: "finish" }>;
 type Part = { value: ModelPart; ended: boolean; argumentsReady: boolean };
 
-/** 仅在完整终态之后交付工具调用；原生续接资料留在本次调查的临时消息中。 */
+/** Delivers tool calls only after a complete terminal state; native continuation data stays in this investigation's temporary messages. */
 export async function collectPeekResponse(events: AsyncIterable<ModelEvent>, signal: AbortSignal, callbacks: {
   progress(phase: PeekResult["phase"], report: string): void;
   finish(event: Finish): void;

@@ -4,7 +4,7 @@ export class StartupError extends Error {
   constructor(readonly failure: Extract<StartupState, { status: "failed" }>) { super(failure.detail); }
 }
 
-/** 先订阅再读取当前启动状态；重载页面同样能取得已经发生的失败。 */
+/** Subscribe before reading the current startup state; reloading the page also retrieves failures that have already occurred. */
 export function waitForRuntime(bridge: StartupBridge, signal: AbortSignal, progress: (state: Extract<StartupState, { status: "starting" }>) => void,
   readSignal: AbortSignal = signal): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -29,7 +29,7 @@ export function waitForRuntime(bridge: StartupBridge, signal: AbortSignal, progr
   });
 }
 
-/** 只限制启动等待；取消信号同时传给实际准备工作，等待结束时撤销监听。 */
+/** Limits only the startup wait; the cancellation signal also reaches the actual preparation work, and listeners are removed when waiting ends. */
 export function awaitStartup<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
   return new Promise((resolve, reject) => {
     const abort = () => reject(signal.reason);

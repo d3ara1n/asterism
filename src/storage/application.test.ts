@@ -13,16 +13,16 @@ const roots: string[] = [];
 function root() { const directory = mkdtempSync(join(tmpdir(), "asterism-prepare-")); roots.push(directory); return directory; }
 afterEach(() => { for (const directory of roots.splice(0)) rmSync(directory, { recursive: true, force: true }); });
 
-// 新安装由业务层按当前格式创建；准备阶段不应抢先写文件或误报迁移。
-it("新数据目录的统一准备不创建文件也不产生恢复点", async () => {
+// Business logic creates new installations in the current format; preparation must not write files early or falsely report migration.
+it("unified preparation of new data directories creates no files or recovery points", async () => {
   const directory = root();
   expect(await prepareApplicationData(directory, "0.1.0")).toEqual({ ok: true, plugins: [] });
   expect(existsSync(join(directory, "configuration.json"))).toBe(false);
   expect(existsSync(join(directory, "recovery"))).toBe(false);
 });
 
-// 托管配置的信封必须贯通读写：迁移后的值可读，保存后版本号保留，否则下次启动又会触发迁移或回退默认值。
-it("托管配置按声明版本读写信封", async () => {
+// Managed configuration envelopes must survive reads/writes: migrated values stay readable and saves retain versions to avoid remigration or default fallback at next startup.
+it("managed configuration reads and writes envelopes at declared versions", async () => {
   const directory = root();
   const file = join(directory, "extensions", "asterism.builtin", ".asterism", "config.json");
   const declarations = [{ ...builtinStorage[0]!, version: 2, migrations: { 1: (data: unknown) => ({ ...(data as object), autoExpand: false }) } }];
@@ -38,8 +38,8 @@ it("托管配置按声明版本读写信封", async () => {
   } finally { storage.close(); }
 });
 
-// 版本不符的信封与损坏正文一样回退默认值，不让读取抛错打断插件。
-it("信封版本不符时回退默认值", () => {
+// Version-mismatched envelopes fall back like corrupt bodies without throwing read errors that interrupt plugins.
+it("envelope version mismatches fall back to defaults", () => {
   const directory = root();
   writeJson(join(directory, "extensions", "asterism.builtin", ".asterism", "config.json"), { version: 7, data: { autoExpand: false } });
   const storage = new PluginStorage(join(directory, "extensions"), "asterism.builtin", null, () => {}, builtinStorage);
@@ -47,8 +47,8 @@ it("信封版本不符时回退默认值", () => {
   finally { storage.close(); }
 });
 
-// 托管数据库首次打开即盖章，之后准备阶段才能据 user_version 判断是否迁移。
-it("托管数据库首次打开写入声明版本", () => {
+// Stamp managed databases on first open so later preparation can use user_version to determine migration needs.
+it("managed databases write declared versions on first open", () => {
   const directory = root();
   const storage = new PluginStorage(join(directory, "extensions"), "acme.notes", null, () => {}, [{ kind: "sqlite", path: ".asterism/db.sqlite", version: 3, migrations: {} }]);
   try { expect(storage.db().prepare("PRAGMA user_version").get()).toMatchObject({ user_version: 3 }); }

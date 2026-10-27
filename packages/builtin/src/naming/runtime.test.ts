@@ -48,9 +48,9 @@ function namingObserver() {
   return { append, snapshot, start, roles, stream, committed };
 }
 
-describe("显式命名优先于自动命名", () => {
-  // 第五条用户消息命中自动检查点，但用户或 Agent 的明确选择应在模型解析和任务启动前阻止更新。
-  it.each(["user", "agent"] as const)("%s 命名阻止检查点任务，无显式命名的路径仍可自动命名", source => {
+describe("explicit naming takes precedence over automatic naming", () => {
+  // The fifth user message reaches an automatic checkpoint, but an explicit user or Agent choice should prevent updates before model resolution and task startup.
+  it.each(["user", "agent"] as const)("%s naming blocks checkpoint tasks while paths without explicit naming still allow automatic naming", source => {
     const naming = namingObserver();
     naming.committed(checkpoint(source));
     expect(naming.roles).not.toHaveBeenCalled();
@@ -59,8 +59,8 @@ describe("显式命名优先于自动命名", () => {
     expect(naming.start).toHaveBeenCalledOnce();
   });
 
-  // 自动生成与对话工具独立进行；生成期间落入当前路径的显式命名必须阻止已启动任务写回。
-  it.each(["user", "agent"] as const)("%s 命名阻止在途自动结果落盘", async source => {
+  // Automatic generation runs independently of conversation tools; explicit naming added to the current path during generation must prevent the running task from writing back.
+  it.each(["user", "agent"] as const)("%s naming prevents in-flight automatic results from being persisted", async source => {
     const naming = namingObserver();
     naming.snapshot.mockReturnValue(checkpoint());
     naming.stream.mockImplementation(async function* () {
@@ -75,10 +75,10 @@ describe("显式命名优先于自动命名", () => {
   });
 });
 
-describe("人工命名入口", () => {
+describe("manual naming entry point", () => {
 
-  // 插件装配契约：命名 setup 成功后其余模块失败，也不能泄漏可调用的半初始化接口。
-  it("builtin 后续模块装配失败时拒绝人工命名，不覆盖标题或追加记录", async () => {
+  // Plugin assembly contract: if naming setup succeeds but a later module fails, no callable partially initialized interface may leak.
+  it("rejects manual naming when a later builtin module fails assembly, without overwriting the title or appending records", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     vi.spyOn(pluginLoader, "loadPlugins").mockImplementation(([builtin, ...external], host) => loadPlugins([
       { ...builtin!, modules: [...builtin!.modules ?? [], defineModule(() => { throw new Error("Setup failed."); })] },

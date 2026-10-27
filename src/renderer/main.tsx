@@ -30,11 +30,11 @@ async function boot(): Promise<void> {
       loadPreferences(),
       startDesktopWindow(window.host.window).then(keep),
     ]), desktopSignal),
-    // 桌面桥首次读取有期限；后台阶段持续订阅，由主进程管理实际工作的期限。
+    // The initial desktop bridge read has a deadline; backend phases remain subscribed, and the main process manages deadlines for actual work.
     waitForRuntime(window.host.startup, lifetime.signal, state => show(startupMessages[state.stage], state.detail), desktopSignal),
   ]);
   show(startupMessages.interface);
-  // 页面装载和前端插件准备共用总等待期限，单个插件另有更短的准备期限。
+  // Page loading and frontend plugin preparation share an overall wait deadline; individual plugins have shorter preparation deadlines.
   const deadline = new AbortController();
   const signal = AbortSignal.any([lifetime.signal, deadline.signal]);
   const timer = setTimeout(() => deadline.abort(new DOMException("Interface initialization timed out after 60 seconds.", "TimeoutError")), 60_000);

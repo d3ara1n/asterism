@@ -7,7 +7,7 @@ import { applicationUserAgent } from "../shared/application.ts";
 export interface ProbeInput { provider: ModelProvider; model: ProviderModel; apiKey: string; signal: AbortSignal }
 export type ConnectionProbe = (input: ProbeInput) => Promise<void>;
 
-/** 显式协议实例，不使用 Gateway 或环境变量中的模型/凭据。无鉴权连接删除鉴权头。 */
+/** Explicit protocol instances, without Gateway or environment models/credentials. Unauthenticated connections remove auth headers. */
 export async function runConnectionProbe(input: ProbeInput, transport: typeof fetch = fetch): Promise<void> {
   const { provider, model, apiKey, signal } = input;
   const languageModel = createProviderModel(provider, model, apiKey, transport, { userAgent: applicationUserAgent });
@@ -17,7 +17,7 @@ export async function runConnectionProbe(input: ProbeInput, transport: typeof fe
   });
 }
 
-/** provider 的原始错误正文和请求信息可能含凭据，只返回固定分类与文案。 */
+/** Raw provider error bodies and request details may contain credentials; return only fixed categories and copy. */
 export function classifyProbeError(error: unknown): { error: TestError; message: string } {
   if (error instanceof ProviderTransportError) return { error: "configuration", message: error.message };
   if (APICallError.isInstance(error)) {

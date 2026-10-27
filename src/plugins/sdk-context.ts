@@ -58,13 +58,13 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
     checkAvailable();
     if (scope?.execution && !scope.active) throw new PluginApiError("unavailable", "The tool execution scope is closed.");
   };
-  /** 内容访问域：已建立对象取当前路径上的记录根；尚未建立身份的对象只有本次作用域。 */
+  /** Content access scope: established objects use record roots on the current path; objects without established identity have only this scope. */
   const access = <S extends string | undefined>(sessionId: S, objectId?: string, scope?: ObjectScope) => {
     const established = !!sessionId && !scope?.provisional;
     const view = established ? host.sessions.view(sessionId!) : undefined;
-    // 动作作用域结束后对象仍按自身记录根与请求交接读取；工具执行作用域关闭后严格拒绝。
+    // After action scopes end, objects still read through their own record roots and request handoffs; closed tool execution scopes reject strictly.
     return { owner: internal.id, sessionId, objectId,
-      // 关联其他插件的对象不授予其在途暂存内容；历史与当前数据根另按归属校验。
+      // Associating objects from other plugins grants no access to their in-flight staged content; history and current-data roots validate ownership separately.
       allowHandover: !objectId || belongsTo(internal.id, host.refOf(objectId)?.kind ?? ""),
       get recordIds() { return new Set(view?.timelineIds()); },
       get scope() { return scope?.active ? scope.content : undefined; }, check: () => {
@@ -75,7 +75,7 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
   const unavailable = async (): Promise<never> => { throw new PluginApiError("unavailable", "Content storage is unavailable."); };
   const missing: ContentScope = Object.freeze({ read: unavailable, async *open() { await unavailable(); }, stage: unavailable });
   const readOnly = (source: ContentReader): ContentReader => Object.freeze({ read: source.read, open: source.open });
-  /** 取消信号传到内容占用，等待中的传输随之中止。 */
+  /** Propagate cancellation signals to content holds and abort waiting transfers. */
   const linkAbort = (lease: ContentLease | undefined, signal: AbortSignal) => {
     if (!lease) return;
     if (signal.aborted) lease.controller.abort();
@@ -172,7 +172,7 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
             const parsed = declared.schema.safeParse(data);
             if (!parsed.success) throw new PluginApiError("invalid_argument", validationMessage(parsed.error, declared.id));
             const value = jsonSchema.parse(parsed.data);
-            // 来源由写入通道打戳：插件身份来自操作柄，资源来自已校验的对象引用。
+            // Write channels stamp origins: operation handles supply plugin identity and validated object references supply resources.
             const recordId = writer.append({ contract: declared.id, data: value, model: null, recipient: null,
               source: { plugin: internal.id, resource: ref ?? null } });
             host.content?.bind(access(id, ref?.id, scope), { kind: "record", id: recordId }, value);
@@ -199,7 +199,7 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
       events: { publish(contract, data) {
         checkExecution(scope); own(ref.kind);
         if (!(scope?.active && (scope.provisional || scope.execution))) {
-          // 身份已在绑定时检查；热路径只检查当前工作台，不扫描所有会话历史。
+          // Identity was checked on binding; the hot path checks only the current workbench without scanning all session history.
           const actual = host.sessions.workbench(ref.sessionId).objects.find(object => object.id === ref.id);
           if (!actual || actual.kind !== ref.kind) throw new PluginApiError("unavailable", "The event resource is no longer available.");
         }

@@ -29,13 +29,13 @@ function textFile(bytes: Buffer, mode: number): TextFile {
   if (bytes.length > MAX_TEXT_BYTES) throw new TextError("file_too_large", "The target exceeds the 8 MiB text file limit.");
   return { text: decodeText(bytes), mode };
 }
-/** 同步装配与显式目录刷新使用同一文本格式校验。 */
+/** Synchronous assembly and explicit directory refresh use the same text-format validation. */
 export function readTextFileSync(path: string): TextFile {
   const info = statSync(path);
   validateFile(info);
   return textFile(readFileSync(path), info.mode);
 }
-/** 读取操作开始时已解析的真实路径。 */
+/** Real path resolved when the read operation begins. */
 export async function readTextFile(path: string, signal: AbortSignal): Promise<TextFile> {
   signal.throwIfAborted();
   const info = await stat(path);
@@ -43,7 +43,7 @@ export async function readTextFile(path: string, signal: AbortSignal): Promise<T
   return textFile(await readFile(path, { signal }), info.mode);
 }
 
-/** 同目录写入暂存文件并落盘，再以 rename 原子替换目标；失败时目标保持原样并清理暂存。 */
+/** Writes and flushes a staging file in the same directory, then atomically replaces the target with rename; failure preserves the target and cleans up staging. */
 export async function commitTextFile(path: string, before: TextFile | null, text: string, signal: AbortSignal): Promise<void> {
   validateTextSize(text);
   signal.throwIfAborted();

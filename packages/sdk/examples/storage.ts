@@ -2,12 +2,12 @@ import { z } from "zod";
 import { defineStorage } from "@asterism/sdk/runtime";
 
 /**
- * 存储入口：package.json 中 `"asterism": { "storage": "./src/storage.ts" }` 指向本文件。
- * 宿主在插件运行时之前单独导入它，只依赖格式声明本身；每一步只解释自己接收的历史形状。
+ * Storage entry point: `"asterism": { "storage": "./src/storage.ts" }` in package.json points to this file.
+ * The host imports it separately before the plugin runtime, depending only on the format declarations themselves; each step interprets only the historical shape it receives.
  */
 export default defineStorage([
   {
-    // 托管配置：`plugin.config` 读写时处理 `{ version, data }` 信封，插件仍消费配置值。
+    // Managed configuration: `plugin.config` handles the `{ version, data }` envelope on reads and writes, while the plugin still consumes configuration values.
     kind: "json", path: ".asterism/config.json", version: 2,
     migrations: {
       1: raw => {
@@ -17,7 +17,7 @@ export default defineStorage([
     },
   },
   {
-    // 托管数据库：首次创建时宿主写入当前 `user_version`，迁移在宿主事务内执行同步 SQL。
+    // Managed database: the host writes the current `user_version` on initial creation; migrations execute synchronous SQL within a host transaction.
     kind: "sqlite", path: ".asterism/db.sqlite", version: 2,
     migrations: {
       1: db => db.exec("ALTER TABLE notes ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0;"),

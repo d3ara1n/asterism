@@ -21,30 +21,30 @@ export type ObjectNodeType = Node<{
   object: WorkbenchObject; collapsed: boolean; expandedHeight: number;
   resizing?: boolean;
   ports?: ConnectionPort[];
-  /** 工作台提供的稳定回调，按对象 ID 分派视图变更。 */
+  /** Stable callback provided by the workbench, dispatching view changes by object ID. */
   onView: (objectId: string, patch: ViewPatch) => void;
 }, "object">;
 
 /**
- * ReactFlow 直接渲染的节点外壳：仅维护端点布局与连线锚点。
+ * Node shell rendered directly by ReactFlow: maintains only endpoint layout and connection anchors.
  *
- * ReactFlow 在每次拖动帧传入新的 xPos/yPos/dragging 等内部 props；外壳渲染极轻
- * （只渲染 Handle），卡片内容由 ObjectNodeContent 承担——后者只接收
- * id/data/selected，与位置 props 物理隔离，拖动期间不重渲染。
+ * ReactFlow passes new internal props such as xPos/yPos/dragging on each drag frame; rendering the shell is very lightweight
+ * (it renders only Handle), while ObjectNodeContent handles card content and receives only
+ * id/data/selected, separated from position props so it does not rerender during dragging.
  *
- * 如需在拖动期间加视觉效果（如阴影），在此外壳读取 dragging 即可，不要把
- * 位置相关 props 传入 ObjectNodeContent，否则会恢复每帧重渲染。
+ * For visual effects during dragging (such as shadows), read dragging in this shell; do not pass
+ * position-related props into ObjectNodeContent, or it will resume rerendering every frame.
  */
 export const ObjectNode = memo(function ObjectNode({ id, data, selected }: NodeProps<ObjectNodeType>) {
   const ports = data.ports ?? defaultConnectionPorts;
   const updateNodeInternals = useUpdateNodeInternals();
   const portLayout = ports.map(port => `${port.id}:${port.side}:${port.offset}`).join("|");
-  // 端点数量或位置变化后，使用画布自身的测量机制刷新连线锚点。
+  // After endpoint count or position changes, refresh connection anchors using the canvas's own measurement mechanism.
   useEffect(() => { updateNodeInternals(id); }, [id, portLayout, updateNodeInternals]);
   const registry = useModuleViews();
   const receivesLinks = registry.resource(data.object.kind).receivesLinks === true;
   return <>
-    {/* Loose 模式按拖动起点确定方向；接收端由资源静态声明。 */}
+    {/* Loose mode determines direction from the drag origin; the resource statically declares the receiving end. */}
     {ports.map(port => <Handle key={port.id} id={port.id} type="source"
       position={{ left: Position.Left, right: Position.Right, top: Position.Top, bottom: Position.Bottom }[port.side]}
       style={port.side === "left" || port.side === "right" ? { top: `${port.offset * 100}%` } : { left: `${port.offset * 100}%` }}
@@ -54,11 +54,11 @@ export const ObjectNode = memo(function ObjectNode({ id, data, selected }: NodeP
 });
 
 /**
- * 卡片内容：工作台拥有框架，模块按版本化投影提供内容，缺失时仍可查看原始数据。
- * 对象聚焦时内容移到聚焦浮岛，卡片保留视图操作，内容区只留提示。
+ * Card content: the workbench owns the frame, and modules provide content through versioned projections; raw data remains viewable when a module is missing.
+ * When an object is focused, content moves to the focus island; the card retains view actions and shows only a notice in its content area.
  *
- * 只接收 id/data/selected，默认 memo 浅比较即可保证拖动期间不重渲染——
- * 这三个 props 都来自应用状态，不受 ReactFlow 内部位置 props 影响。
+ * Receives only id/data/selected, so the default memo shallow comparison prevents rerenders during dragging;
+ * all three props come from application state, unaffected by ReactFlow's internal position props.
  */
 const ObjectNodeContent = memo(function ObjectNodeContent({ id, data, selected }: {
   id: string; data: ObjectNodeType["data"]; selected: boolean;

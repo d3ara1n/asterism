@@ -2,7 +2,7 @@ import { z } from "zod";
 import { defineAction } from "@asterism/sdk/contracts";
 import { Agent, builtin, userInputPartsSchema, agentMessageSenderSchema, submissionIdSchema } from "@asterism/builtin-api/contracts";
 
-/** 草稿箱属于资源当前数据；界面动作只在内置包内共享。 */
+/** The draft box belongs to the resource's current data; UI actions are shared only within the built-in package. */
 export const draftModeSchema = z.enum(["none", "steer", "follow"]);
 export const agentDraftSchema = z.object({
   id: submissionIdSchema,

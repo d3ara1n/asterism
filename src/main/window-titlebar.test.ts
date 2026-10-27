@@ -7,8 +7,8 @@ import { serveDesktopWindow } from "./window-titlebar.ts";
 const ipc = vi.hoisted(() => ({ handle: vi.fn(), removeHandler: vi.fn() }));
 vi.mock("electron", () => ({ ipcMain: ipc }));
 
-// 全屏状态来自原生窗口，重读与事件必须一致；只允许受信主框架读取。
-it("提供当前全屏快照与原生切换通知，关闭后释放 IPC 与窗口监听", () => {
+// Fullscreen state comes from the native window; reads and events must agree, and only trusted main frames may read it.
+it("delivers current fullscreen snapshots and native transition notifications, releasing IPC and window listeners on close", () => {
   let fullScreen = true;
   const send = vi.fn();
   const window = Object.assign(new EventEmitter(), {
@@ -21,7 +21,7 @@ it("提供当前全屏快照与原生切换通知，关闭后释放 IPC 与窗�
   const [channel, read] = ipc.handle.mock.calls.at(-1)!;
   try {
     expect(channel).toBe(desktopWindowGetChannel);
-    // 在全屏内刷新页面时，没有新的 enter 事件，仍须取得 true。
+    // Refreshing within fullscreen produces no new enter event but must still return true.
     expect(read(trusted)).toEqual({ titleBar: "overlay", fullScreen: true });
     expect(read({})).toBeNull();
     fullScreen = false;

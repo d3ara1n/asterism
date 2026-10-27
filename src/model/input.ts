@@ -7,7 +7,7 @@ export interface ModelContent {
   sizes: ReadonlyMap<string, number>;
   close(): Promise<void>;
 }
-/** 用户输入、context 与工具结果共用 text | file 部件。 */
+/** User input, context, and tool results share text | file parts. */
 function itemParts(item: ModelItem): readonly ModelInputPart[] | null {
   return item.kind === "input" || item.kind === "context" ? item.parts : item.kind === "result" ? item.outcome.model : null;
 }
@@ -34,7 +34,7 @@ export function validateInput(messages: readonly ModelItem[], content?: ModelCon
     }
   }
 }
-/** 只在模型请求内生成字节部件，不建立另一份持久上下文。 */
+/** Generate byte parts only within model requests without creating another persistent context. */
 export async function resolveInput(messages: readonly ModelItem[], content: ModelContent | undefined,
   signal: AbortSignal): Promise<ResolvedModelItem[]> {
   validateInput(messages, content);

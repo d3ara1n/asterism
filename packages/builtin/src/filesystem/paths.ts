@@ -21,7 +21,7 @@ function relativeTarget(base: string, rel: string): string {
   if (!insideDirectory(base, candidate)) throw outsideDirectory();
   return candidate;
 }
-/** 目录是文件系统引用；访问解析真实路径并限制在根目录内。 */
+/** A directory is a filesystem reference; access resolves real paths and is confined to the root directory. */
 export async function withinDirectory(root: string, rel: string): Promise<string> {
   const base = await directoryRoot(root);
   const candidate = relativeTarget(base, rel);
@@ -31,7 +31,7 @@ export async function withinDirectory(root: string, rel: string): Promise<string
   if (!insideDirectory(base, target)) throw outsideDirectory();
   return target;
 }
-/** 尚不存在的写入目标逐段解析；已有符号链接必须在根内，断链不能当成新文件。 */
+/** Resolves nonexistent write targets segment by segment; existing symlinks must stay within the root, and broken links cannot be treated as new files. */
 export async function writableTarget(root: string, rel: string): Promise<{ root: string; path: string }> {
   const base = await directoryRoot(root);
   const candidate = relativeTarget(base, rel);
@@ -47,7 +47,7 @@ export async function writableTarget(root: string, rel: string): Promise<{ root:
         throw new FilesystemError(failed("not_directory", "target.path requires directory entries for its parent components."));
       }
     } catch (error) {
-      // 只有 lstat 确认不存在时才采用剩余路径；realpath 的 ENOENT 可能是断开的链接。
+      // Use the remaining path only when lstat confirms absence; ENOENT from realpath may indicate a broken link.
       if ((error as NodeJS.ErrnoException).code === "ENOENT" && !(await lstat(path).catch(() => null))) {
         return { root: base, path: join(path, ...parts.slice(i + 1)) };
       }

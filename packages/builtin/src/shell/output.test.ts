@@ -5,8 +5,8 @@ import { expect, it } from "vitest";
 import { ShellOutputBuffer } from "./output.ts";
 import { OUTPUT_CHAR_LIMIT, execToModel } from "./contract.ts";
 
-// 字符按 Unicode 码点计；跨流 UTF-8 与控制序列不能污染正文，超限才产生临时日志。
-it("流式解码、尾部预算与临时日志保留处理后的完整文本，提示只在模型投影中加入", async () => {
+// Characters are counted as Unicode code points; UTF-8 and control sequences spanning stream chunks must not corrupt text, and temporary logs are created only when the limit is exceeded.
+it("streaming decoding, tail budgets, and temporary logs preserve the complete processed text, with notices added only in model projection", async () => {
   const root = await mkdtemp(join(tmpdir(), "asterism-output-test-"));
   const output = new ShellOutputBuffer(root);
   try {
@@ -16,7 +16,7 @@ it("流式解码、尾部预算与临时日志保留处理后的完整文本，�
     await output.append("stdout", bytes.subarray(4));
     await output.append("stderr", Buffer.from("1m错误\x1b[0m\r"));
     await output.append("stderr", Buffer.from("\n"));
-    // tput sgr0 的字符集复位可跨 chunk，终结字节 B 属于转义序列。
+    // The character-set reset from tput sgr0 can span chunks; the final byte B belongs to the escape sequence.
     await output.append("stdout", Buffer.from("\x1b("));
     await output.append("stdout", Buffer.from("B\x1b[0m"));
     expect(output.snapshot()).toEqual({ output: "首😀错误\n", truncation: null });

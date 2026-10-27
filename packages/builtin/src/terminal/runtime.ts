@@ -13,12 +13,12 @@ import { TerminalResource, CreateTerminal, TerminalView, TerminalInput, Terminal
   StartTerminal, CloseTerminal, TerminalImageRequested, CompleteTerminalImage, inactiveStatus, type TerminalConfig, type TerminalDown, type TerminalImage } from "./contract.ts";
 
 /**
- * 终端资源是静态入口，外部 shell 实例挂在对象生命周期上：只有新建资源时自动开启；
- * 软件重启、回溯与会话恢复后保持未开启。对象生命周期结束（移除、离开当前集合、归档、退出）时结束实例。
+ * A terminal resource is a static entry point, with its external shell instance attached to the object lifecycle: it starts automatically only when the resource is newly created;
+ * it remains unopened after application restart, rewind, or session restoration. The instance ends with the object lifecycle (removal, leaving the current set, archival, exit).
  */
 export function createTerminalModule(settings: () => ShellSettings) { return defineModule(plugin => {
   const terminals = new Map<string, SharedTerminal>();
-  /** 本次运行中新建、尚待出现通知的资源；出现时自动开启。 */
+  /** Resources newly created in this run and awaiting an appearance notification; start automatically when they appear. */
   const pendingStart = new Set<string>();
   const images = new Map<string, { resolve(png: Uint8Array): void; reject(error: Error): void }>();
   const root = join(plugin.dir, "shell-integration");
@@ -33,12 +33,12 @@ export function createTerminalModule(settings: () => ShellSettings) { return def
     const existing = terminals.get(ref.id);
     if (existing) return existing;
     const created = new SharedTerminal(config, settings, root, {
-      // 会话列表只标记启动失败；交互 shell 的每条命令不构成完成或常驻运行标记。
+      // The session list marks only startup failures; individual interactive shell commands do not create completion or persistent-running markers.
       failed(error) {
         if (plugin.lifetime.signal.aborted || terminals.get(ref.id) !== created) return;
         plugin.log.warn(`Terminal startup failed: ${error instanceof Error ? error.message : String(error)}`);
         try { plugin.object(ref.sessionId, TerminalResource, ref.id).events.publish(ResourceStatusChanged, ResourceStatusChanged.schema.parse({ status: "failed", title: terminalMessages.terminal })); }
-        catch { /* 资源已离开当前集合。 */ }
+        catch { /* The resource has left the current set. */ }
       },
       log: (message, error) => plugin.log.error(message, error),
     });
@@ -52,7 +52,7 @@ export function createTerminalModule(settings: () => ShellSettings) { return def
   }
   const statusOf = (object: ObjectReader) => terminals.get(object.ref.id)?.status ?? { ...inactiveStatus };
   plugin.lifetime.defer(() => {
-    // 终端实例由对象作用域释放；宿主先等待对象清理，再结束插件作用域。
+    // The object scope releases terminal instances; the host waits for object cleanup before ending the plugin scope.
     for (const image of images.values()) image.reject(new TerminalError("renderer_unavailable", "The terminal image service is closing."));
   });
 
@@ -120,7 +120,7 @@ export function createTerminalModule(settings: () => ShellSettings) { return def
       implementCall(StartTerminal, async (_input, { object }) => {
         try { await get(object).start(); }
         catch (error) {
-          // 失败已反映在终端状态中；调用方取得可读原因。
+          // The failure is already reflected in terminal state; the caller receives a readable reason.
           throw new PluginApiError("unavailable", error instanceof Error ? error.message : "The shell could not be started.");
         }
         return null;

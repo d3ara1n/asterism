@@ -1,7 +1,7 @@
 import type { StreamRequest, UsageItem } from "@asterism/sdk/contracts";
 import type { PluginContext } from "@asterism/sdk/runtime";
 
-/** 示例消费者：请求前主动查询，按响应连接的当前目录解析响应头。 */
+/** Example consumer: actively queries before a request and parses response headers against the current catalog for the response's connection. */
 export async function* streamWithUsage(plugin: PluginContext, connectionId: string, request: StreamRequest,
   receive: (items: UsageItem[]) => void) {
   const connection = plugin.modelProviders.get(connectionId);

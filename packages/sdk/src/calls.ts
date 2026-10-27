@@ -4,7 +4,7 @@ import { contractReferenceSchema } from "./presentation.ts";
 import type { ResourceRef } from "./workspace.ts";
 
 export type CallScope = "plugin" | "object";
-/** 作用域由契约声明，调用方不能省略对象来降级对象级操作。 */
+/** Scope is declared by the contract; callers cannot downgrade an object-level operation by omitting the object. */
 export interface CallContract<I extends Json = Json, O extends Json = Json, S extends CallScope = CallScope> {
   readonly id: string;
   readonly scope: S;
