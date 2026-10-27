@@ -20,7 +20,7 @@ export type GrayId = (typeof grayIds)[number];
 
 export const fontSizeRange = { min: 1, max: 100 } as const;
 export const defaultFontSize = 12;
-const fontFamilySchema = z.string().trim().min(1).max(128).nullable().default(null);
+const fontFamilySchema = z.string().trim().min(1).max(128).nullable();
 
 /** Default font stack; user fonts prepend without replacing fallbacks. */
 export const sansStack = `system-ui, -apple-system, "Segoe UI Variable Text", "Segoe UI", "PingFang SC", "Microsoft YaHei UI", "Noto Sans CJK SC", sans-serif`;
@@ -44,10 +44,10 @@ export const appearanceSchema = z.object({
   uiFont: fontFamilySchema.catch(null),
   terminalFont: fontFamilySchema.catch(null),
   /** Terminal font size is fixed in px, independent of UI density and code font size. */
-  terminalFontSize: z.number().min(fontSizeRange.min).max(fontSizeRange.max).default(defaultFontSize).catch(defaultFontSize),
+  terminalFontSize: z.number().min(fontSizeRange.min).max(fontSizeRange.max).catch(defaultFontSize),
   codeFont: fontFamilySchema.catch(null),
   /** Code font size in px; null follows surrounding UI text. */
-  codeFontSize: z.number().min(fontSizeRange.min).max(fontSizeRange.max).nullable().default(null).catch(null),
+  codeFontSize: z.number().min(fontSizeRange.min).max(fontSizeRange.max).nullable().catch(null),
 });
 export type Appearance = z.infer<typeof appearanceSchema> & { radius: (typeof radii)[number] };
 
@@ -62,6 +62,7 @@ export function parseAppearance(raw: unknown, platform: string): Appearance {
   return { ...data, radius: data.radius ?? (platform === "darwin" ? "lg" : platform === "win32" ? "md" : "sm") };
 }
 
+/** Omitted patch fields stay absent; read fallbacks use catch rather than defaults that partial parsing would materialize. */
 export const appearancePatchSchema = appearanceSchema.partial().strict();
 export type AppearancePatch = z.infer<typeof appearancePatchSchema>;
 
