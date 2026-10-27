@@ -19,23 +19,28 @@ export interface ToastAction { label: string; onClick: () => void }
  * Error notifications with onDismiss can be dismissed, writing the dismissal back to state; action buttons do not close notifications, which are removed by state changes.
  * In-progress notifications cannot be dismissed and end only through actions (such as cancellation).
  */
-export function useStateToast(id: string, message: string | null, options: {
+export function useStateToast(message: string | null, options: {
   tone: "error" | "loading"; action?: ToastAction; onDismiss?: () => void;
 }) {
   const latest = useRef(options);
   latest.current = options;
+  const tone = options.tone;
   const actionLabel = options.action?.label;
-  const dismissible = options.tone === "error" && !!options.onDismiss;
+  const dismissible = tone === "error" && !!options.onDismiss;
   useEffect(() => {
-    if (!message) { toast.dismiss(id); return; }
-    const { tone } = latest.current;
+    if (!message) return;
+    let active = true;
     const action = actionLabel ? { label: actionLabel, onClick: (event: MouseEvent<HTMLButtonElement>) => {
       event.preventDefault();
-      latest.current.action?.onClick();
+      if (active) latest.current.action?.onClick();
     } } : undefined;
-    const common = { id, duration: Infinity, action, dismissible, closeButton: dismissible };
-    if (tone === "loading") toast.loading(message, common);
-    else toast.error(message, { ...common, onDismiss: () => latest.current.onDismiss?.() });
-  }, [id, message, actionLabel, dismissible]);
-  useEffect(() => () => { toast.dismiss(id); }, [id]);
+    const common = { duration: Infinity, action, dismissible, closeButton: dismissible };
+    const toastId = tone === "loading" ? toast.loading(message, common)
+      : toast.error(message, { ...common, onDismiss: () => { if (active) latest.current.onDismiss?.(); } });
+    return () => {
+      active = false;
+      // Sonner queues insertion in a timer; dismiss afterward so removal cannot precede insertion.
+      setTimeout(() => toast.dismiss(toastId), 0);
+    };
+  }, [message, tone, actionLabel, dismissible]);
 }

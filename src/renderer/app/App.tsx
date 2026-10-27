@@ -249,7 +249,7 @@ export function App({ controller }: { controller: ApplicationController }) {
   // The workbench persistently displays session read failures; the same entry handles backend unavailability while the workbench is visible.
   const unavailableInWorkbench = view.kind === "conversation" && !inSettings && phase === "unavailable";
   const appError = unavailableInWorkbench ? null : state.error;
-  useStateToast("app-error", appError ? i18n.text(appError) : null, {
+  useStateToast(appError ? i18n.text(appError) : null, {
     tone: "error",
     onDismiss: controller.clearError,
   });

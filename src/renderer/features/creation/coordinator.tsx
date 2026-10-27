@@ -166,10 +166,10 @@ export function useCreationCoordinator({ controller, canvas, writable, ready }: 
     setError(null);
   };
   // Progress and errors outside the input dialog appear through transient notifications; while the dialog is open, errors remain inside it.
-  useStateToast("creation-running", running && !input ? i18n.formatMessage(creationMessages.adding, { running_label: i18n.text(running.label) }) : null, {
+  useStateToast(running && !input ? i18n.formatMessage(creationMessages.adding, { running_label: i18n.text(running.label) }) : null, {
     tone: "loading", action: { label: i18n.formatMessage(commonMessages.cancel), onClick: cancelRunning },
   });
-  useStateToast("creation-error", error && !input && !running ? i18n.text(error) : null, { tone: "error", onDismiss: () => setError(null) });
+  useStateToast(error && !input && !running ? i18n.text(error) : null, { tone: "error", onDismiss: () => setError(null) });
   const View = input?.entry.InputView;
   const element = <>
     {input && View && <Dialog open onOpenChange={next => { if (!next) closeInput(false); }}>
