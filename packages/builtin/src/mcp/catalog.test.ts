@@ -3,7 +3,7 @@ import { listCatalog, searchCatalog, toolIdentity, parseToolIdentity, parseCrede
 
 function server(id: string, name: string, tools?: { name: string; description?: string }[]): CatalogServer {
   return { config: { id, name, enabled: true, mode: "lazy", idleSeconds: 300, transport: "stdio", command: "server", args: [], cwd: "", url: "", auth: "none" },
-    state: { id, name, enabled: true, mode: "lazy", connection: "disconnected", indexed: tools !== undefined, toolCount: tools?.length ?? 0, error: null, authorizationUrl: null },
+    state: { id, name, enabled: true, mode: "lazy", connection: "disconnected", indexed: tools !== undefined, toolCount: tools?.length ?? 0, error: null, authorizationUrl: null, authorizationExpiresAt: null },
     ...(tools && { directory: { tools: tools.map(tool => ({ ...tool, inputSchema: { type: "object" } })) } }) };
 }
 

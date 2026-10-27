@@ -12,19 +12,25 @@ External server state can be shared across sessions and agents. The host does no
 
 ## Configuration and authentication
 
-Asterism owns server configuration in the built-in settings page. Stable server IDs distinguish identity from editable display names.
+Asterism owns server configuration and connection actions in the built-in settings page. MCP Host cards display shared status and cached tools, with one settings entry point. Stable server IDs distinguish identity from editable display names.
 
 Stdio uses an executable and argument array without shell concatenation, with the application environment plus configured overrides. Streamable HTTP supports the declared authentication methods, including headers and OAuth.
 
 Environment values, headers, and OAuth material use encrypted plugin credentials. Changes invalidate affected discovery and connections. A newly created server does not inherit old credentials merely because it reuses an ID.
 
-OAuth discovery, registration, exchange, and refresh use the official SDK. The local callback listener exists only during authorization. Cancellation closes its transition; a single caller cancelling its wait does not cancel unrelated waiters.
+OAuth discovery, registration, exchange, and refresh use the official SDK. A connection that needs browser authorization waits for the user to start it in settings. Starting authorization opens the local callback listener before the browser and starts a bounded wait. Reopening the browser uses the same attempt and deadline.
+
+The connection transition owns authorization independently of individual transports. Replacing a failed transport preserves the callback listener. A valid callback returns the server to connecting while the SDK exchanges the response and the client loads its tools. Authorization timeout or failure ends the attempt; explicit cancellation returns to disconnected. No separate completion, cancellation, or timeout connection phases are needed.
+
+Callback completion, timeout, cancellation, and plugin shutdown release the listener and timer. Leaving settings does not cancel authorization. Cancellation from settings closes the shared transition; a single caller cancelling its own wait does not cancel unrelated waiters. Cancelling a connection does not delete saved credentials.
 
 The client advertises implemented capabilities. Legacy transports and unsupported server-initiated features are not implicitly enabled.
 
 ## Connection lifecycle and cache
 
 Connection and disconnection transitions serialize per server. Calls can await an existing connecting or authorization transition instead of opening another connection.
+
+Network stages during connection establishment have bounded waits, independent of the browser authorization deadline. These deadlines do not limit remote tool execution.
 
 Eager and lazy differ only in connection timing. Both load persisted discovery. Eager connects in the background at startup; lazy connects for use and closes after its configured idle period.
 

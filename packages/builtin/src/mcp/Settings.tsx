@@ -17,7 +17,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@asterism-app/ui/ui/alert-dialog";
 import { mcpMessages as messages } from "../messages/mcp";
 import { BuiltinSettings } from "../settings/contract";
-import { SaveMcpServer, ReadMcpCredentials, SetMcpServerEnabled, RemoveMcpServer, ConnectMcpServer, DisconnectMcpServer, ResetMcpAuth,
+import { SaveMcpServer, ReadMcpCredentials, SetMcpServerEnabled, RemoveMcpServer, ConnectMcpServer, AuthorizeMcpServer, DisconnectMcpServer, ResetMcpAuth,
   type McpServerConfig, type McpServerState } from "./contract";
 import { slugifyServerId } from "./catalog";
 import { draftOf, validateDraft, type McpDraft, type McpField, type McpFieldError } from "./form";
@@ -29,6 +29,18 @@ const blank = (taken: string[]): McpServerConfig => ({ id: slugifyServerId("", t
 const messageOf = (error: unknown) => error instanceof Error ? error.message : String(error);
 const summary = (server: McpServerConfig) => server.transport === "stdio" ? [server.command, ...server.args].filter(Boolean).join(" ") : server.url;
 const islandKey = (serverId: string | null) => `mcp:${serverId ?? "new"}`;
+
+/** The backend owns expiration; this clock only renders its remaining time. */
+function AuthorizationRemaining({ expiresAt }: { expiresAt: number }) {
+  const i18n = useI18n(), [now, setNow] = useState(Date.now);
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  const seconds = Math.max(0, Math.ceil((expiresAt - now) / 1000));
+  const time = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+  return <span className="block tabular-nums">{i18n.formatMessage(messages.authorizationRemaining, { time })}</span>;
+}
 
 /**
  * Servers are listed by row: enable switches and connection actions take effect immediately; clicking a server opens an editor in an island to the right.
@@ -62,8 +74,15 @@ export function McpSettings() {
       () => { void run(server.id, signal => calls.invoke(contract, { serverId: server.id }, { signal })); };
     switch (state.connection) {
       case "awaiting_auth": return <>
+        <Button variant="outline" size="sm" disabled={busy} onClick={() => { void run(server.id, async signal => {
+          const { url } = await calls.invoke(AuthorizeMcpServer, { serverId: server.id }, { signal });
+          if (!signal.aborted) window.open(url, "_blank", "noopener,noreferrer");
+        }); }}>{busy && <Spinner data-icon="inline-start" />}{i18n.text(messages.authorize)}</Button>
+        <Button variant="ghost" size="sm" disabled={busy} onClick={invoke(DisconnectMcpServer)}>{i18n.text(messages.cancel)}</Button>
+      </>;
+      case "authorizing": return <>
         {state.authorizationUrl && <Button variant="outline" size="sm" asChild>
-          <a href={state.authorizationUrl} target="_blank" rel="noopener noreferrer">{i18n.text(messages.authorize)}</a></Button>}
+          <a href={state.authorizationUrl} target="_blank" rel="noopener noreferrer">{i18n.text(messages.reopenAuthorization)}</a></Button>}
         <Button variant="ghost" size="sm" disabled={busy} onClick={invoke(DisconnectMcpServer)}>{i18n.text(messages.cancel)}</Button>
       </>;
       case "connecting": return <Button variant="ghost" size="sm" disabled={busy} onClick={invoke(DisconnectMcpServer)}>{i18n.text(messages.cancel)}</Button>;
@@ -85,8 +104,12 @@ export function McpSettings() {
         title={<span className="flex min-w-0 items-center gap-2"><span className="truncate">{server.name}</span>
           {!server.enabled && <Badge variant="secondary">{i18n.text(messages.disabled)}</Badge>}</span>}
         description={<span className="font-mono text-xs">{server.id} · {summary(server)}</span>}
-        details={<>{i18n.formatMessage(messages.state, { state: phase })}{" · "}
-          {state?.indexed ? i18n.formatMessage(messages.tools, { count: state.toolCount }) : i18n.text(messages.unindexed)}</>}
+        details={<>
+          <span role="status">{i18n.formatMessage(messages.state, { state: phase })}{" · "}
+            {state?.indexed ? i18n.formatMessage(messages.tools, { count: state.toolCount }) : i18n.text(messages.unindexed)}</span>
+          {phase === "authorizing" && state?.authorizationExpiresAt != null
+            && <AuthorizationRemaining key={state.authorizationExpiresAt} expiresAt={state.authorizationExpiresAt} />}
+        </>}
         actions={<>
           {connection(server, state, busy)}
           <Switch checked={server.enabled} disabled={busy} aria-label={i18n.text(messages.enabled)}

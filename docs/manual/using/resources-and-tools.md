@@ -41,6 +41,10 @@ Configure web providers in **Settings → Providers**. Link a Web resource to th
 
 Configure MCP servers in the built-in plugin’s settings. Link an MCP Host resource to the agent to expose the enabled server collection. Server authentication and connection errors appear in that collection; a resource link is not a separate server login.
 
+MCP Host cards show connection status and cached tools. Use their settings entry to connect, refresh tools, or manage authorization. When a server needs OAuth, choose **Start authorization** in settings and complete the browser flow within five minutes. Settings shows the remaining time and lets you reopen the browser or cancel. Leaving settings keeps authorization running. After the browser returns, the server shows **Connecting** until the connection and tool discovery finish.
+
+If authorization expires or fails, start a new connection from settings. Cancelling returns the server to disconnected without deleting saved credentials; **Reset authorization** clears saved OAuth credentials separately.
+
 MCP Host resources share the configured servers. External server state can therefore be shared across agents and sessions.
 
 ## Collaborate with another agent

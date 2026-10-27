@@ -23,12 +23,13 @@ export type McpServerConfig = z.infer<typeof mcpServerSchema>;
 export const mcpSettingsSchema = z.object({ servers: z.array(mcpServerSchema).refine(values => new Set(values.map(value => value.id)).size === values.length, "Server IDs are unique.") });
 export const defaultMcpSettings = { servers: [] };
 export const credentialsSchema = z.record(z.string(), z.string());
-export const connectionPhases = ["disconnected", "connecting", "awaiting_auth", "connected", "error"] as const;
+export const connectionPhases = ["disconnected", "connecting", "awaiting_auth", "authorizing", "connected", "error"] as const;
 export type ConnectionPhase = typeof connectionPhases[number];
 export const mcpServerStateSchema = z.object({
   id: z.string(), name: z.string(), enabled: z.boolean(), mode: z.enum(["eager", "lazy"]),
   connection: z.enum(connectionPhases),
   indexed: z.boolean(), toolCount: z.number(), error: z.string().nullable(), authorizationUrl: z.string().nullable(),
+  authorizationExpiresAt: z.number().nullable(),
 });
 export type McpServerState = z.infer<typeof mcpServerStateSchema>;
 export const McpHost = builtin.resource("mcp", z.object({}));
@@ -49,6 +50,7 @@ export const ReadMcpTools = defineCall(builtin.name("mcp.read-tools"), { scope: 
 export const SetMcpServerEnabled = defineCall(builtin.name("mcp.set-enabled"), { scope: "plugin", input: z.object({ serverId: z.string(), enabled: z.boolean() }), output: z.null() });
 export const RemoveMcpServer = defineCall(builtin.name("mcp.remove-server"), { scope: "plugin", input: z.object({ serverId: z.string() }), output: z.null() });
 export const ConnectMcpServer = defineCall(builtin.name("mcp.connect-server"), { scope: "plugin", input: z.object({ serverId: z.string() }), output: z.null() });
+export const AuthorizeMcpServer = defineCall(builtin.name("mcp.authorize-server"), { scope: "plugin", input: z.object({ serverId: z.string() }), output: z.object({ url: z.string() }) });
 export const DisconnectMcpServer = defineCall(builtin.name("mcp.disconnect-server"), { scope: "plugin", input: z.object({ serverId: z.string() }), output: z.null() });
 export const ResetMcpAuth = defineCall(builtin.name("mcp.reset-auth"), { scope: "plugin", input: z.object({ serverId: z.string() }), output: z.null() });
 

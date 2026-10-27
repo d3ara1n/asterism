@@ -4,7 +4,7 @@ import type { StatusTone } from "@asterism-app/ui/ui/status";
 import { McpChanged, ReadMcp, ReadMcpTools, type ConnectionPhase, type McpServerState, type McpToolSummary } from "./contract.ts";
 
 export const phaseTone: Record<ConnectionPhase, StatusTone> = {
-  connected: "success", connecting: "progress", awaiting_auth: "warning", error: "error", disconnected: "neutral",
+  connected: "success", connecting: "progress", awaiting_auth: "warning", authorizing: "progress", error: "error", disconnected: "neutral",
 };
 
 /** Subscribes to module state events and rereads the current value on each change. */

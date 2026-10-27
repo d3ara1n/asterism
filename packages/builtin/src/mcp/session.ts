@@ -6,7 +6,7 @@ import type { Json } from "@asterism-app/sdk/contracts";
 import type { ConnectionPhase, McpServerConfig, McpServerState } from "./contract.ts";
 import { directorySchema, type CachedTool, type Directory } from "./catalog.ts";
 import { McpError, McpInterrupted } from "./errors.ts";
-import { McpOAuth } from "./auth.ts";
+import { McpOAuth, type AuthorizationRequest } from "./auth.ts";
 import { closeProcessTree } from "../shared/process-tree.ts";
 
 export const credentialKey = (id: string) => `mcp.${id}.credentials`;
@@ -28,18 +28,18 @@ export interface SessionHost {
   notify(): void;
 }
 /** A client connection that is established or being established; aborting scope ends all its requests. */
-interface Live { client: Client; transport: Transport; scope: AbortController; oauth?: McpOAuth; stderr: string; closing?: Promise<void> }
+interface Live { client: Client; transport: Transport; scope: AbortController; stderr: string; closing?: Promise<void> }
 /** Lifecycle transition: at most one per server at a time; waiters share the result, and done never rejects. */
 interface Transition { kind: "open" | "close"; done: Promise<void>; abort?: AbortController; failure?: unknown }
 
 /**
  * Shared session for a single server. Connection establishment, disconnection, and configuration retirement pass serially through transition;
- * calls encountering connecting/awaiting_auth wait for the current transition without starting another connection.
+ * Calls awaiting connection or authorization share the current transition.
  */
 export class ServerSession {
   private phase: ConnectionPhase = "disconnected";
   private error: string | null = null;
-  private authorizationUrl: string | null = null;
+  private authorization?: AuthorizationRequest;
   private live?: Live;
   private transition?: Transition;
   private active = 0;
@@ -51,7 +51,9 @@ export class ServerSession {
   state(): McpServerState {
     const { id, name, enabled, mode } = this.config;
     return { id, name, enabled, mode, connection: this.phase, indexed: !!this.directory,
-      toolCount: this.directory?.tools.length ?? 0, error: this.error, authorizationUrl: this.authorizationUrl };
+      toolCount: this.directory?.tools.length ?? 0, error: this.error,
+      authorizationUrl: this.phase === "authorizing" ? this.authorization?.url ?? null : null,
+      authorizationExpiresAt: this.phase === "authorizing" ? this.authorization?.expiresAt ?? null : null };
   }
   tool(name: string): CachedTool | undefined { return this.directory?.tools.find(tool => tool.name === name); }
 
@@ -76,7 +78,7 @@ export class ServerSession {
   private async connection(signal: AbortSignal): Promise<Live> {
     try { return await this.acquire(signal); }
     catch (error) {
-      if (error instanceof McpError || signal.aborted) throw error;
+      if (error instanceof McpError || error instanceof McpInterrupted || signal.aborted) throw error;
       throw new McpError("connection_failed", messageOf(error));
     }
   }
@@ -105,7 +107,7 @@ export class ServerSession {
   private async open(signal: AbortSignal): Promise<void> {
     const config = this.config;
     const scope = AbortSignal.any([signal, this.host.plugin.lifetime.signal]);
-    this.setPhase("connecting", null, null);
+    this.setPhase("connecting", null);
     let oauth: McpOAuth | undefined, attempt: Live | undefined, stderr = "";
     try {
       const values = await this.host.credentials(config.id);
@@ -115,39 +117,74 @@ export class ServerSession {
         await oauth.load();
       }
       for (;;) {
-        attempt = this.createLive(config, values, oauth, scope);
-        try { await attempt.client.connect(attempt.transport, { signal: scope }); break; }
+        try {
+          await connecting(scope, async stage => {
+            const live = this.createLive(config, values, oauth, stage);
+            attempt = live;
+            // SDK HTTP negotiation settles on transport closure even when its probe ignores the request signal.
+            const abort = () => { void this.closeLive(live).catch(error => this.host.plugin.log.error("MCP cleanup failed.", error)); };
+            stage.addEventListener("abort", abort, { once: true });
+            try {
+              stage.throwIfAborted();
+              await live.client.connect(live.transport, { signal: stage });
+            } finally {
+              stage.removeEventListener("abort", abort);
+              if (stage.aborted) await this.closeLive(live);
+            }
+          });
+          break;
+        }
         catch (error) {
-          // Enter the waiting state once browser authorization starts; the SDK may wrap authentication errors, so the authorization request itself is authoritative.
+          // The SDK may wrap authentication errors; a prepared authorization request identifies the user action needed.
           const request = oauth?.takeAuthorization();
           if (!request) throw error;
-          await this.closeLive(attempt); attempt = undefined;
-          this.setPhase("awaiting_auth", null, request.url);
+          if (attempt) await this.closeLive(attempt);
+          attempt = undefined;
+          this.authorization = request;
+          this.setPhase("awaiting_auth", null);
           const params = await request.callback;
-          this.setPhase("connecting", null, null);
+          this.authorization = undefined;
+          scope.throwIfAborted();
+          this.setPhase("connecting", null);
           // Authorization code exchange uses the same provider's PKCE verifier; reconnect with the new token after the exchange.
-          await this.httpTransport(config, values, oauth!, scope).finishAuth(params);
+          await connecting(scope, async stage => {
+            const transport = this.httpTransport(config, values, oauth!, stage);
+            try { await transport.finishAuth(params); }
+            finally { await transport.close(); }
+          });
         }
       }
       if (oauth) oauth.interactive = false;
-      const listed = await attempt.client.listTools(undefined, { signal: scope, cacheMode: "refresh" });
+      const connected = attempt!;
+      const listed = await connecting(scope, stage => connected.client.listTools(undefined, { signal: stage, cacheMode: "refresh" }));
       scope.throwIfAborted();
-      this.storeDirectory(listed.tools, attempt.client.getInstructions());
-      this.live = attempt; attempt = undefined;
-      this.setPhase("connected", null, null);
+      this.storeDirectory(listed.tools, connected.client.getInstructions());
+      this.live = connected; attempt = undefined;
+      this.setPhase("connected", null);
     } catch (error) {
       stderr = attempt?.stderr ?? "";
       if (attempt) await this.closeLive(attempt);
-      await oauth?.close();
       // Connections aborted by disconnection or service shutdown are treated as disconnected; the disconnection transition writes the state.
       if (!scope.aborted) {
         const message = describe(error, stderr);
-        this.setPhase("error", message, null);
+        this.setPhase("error", message);
         this.host.plugin.log.warn(`MCP server ${config.id} connection failed: ${message}`);
         throw new Error(message);
       }
       throw error;
+    } finally {
+      this.authorization = undefined;
+      await oauth?.close();
     }
+  }
+  /** Settings starts the listener before opening the browser; reopening keeps the existing deadline. */
+  async authorize(): Promise<{ url: string }> {
+    this.usable();
+    const request = this.authorization;
+    if (!request) throw new McpError("connection_failed", "The MCP server is not waiting for authorization.");
+    await request.start();
+    this.setPhase("authorizing", null);
+    return { url: request.url };
   }
   private httpTransport(config: McpServerConfig, headers: Record<string, string>, oauth: McpOAuth | undefined, scope: AbortSignal) {
     return new StreamableHTTPClientTransport(new URL(config.url), {
@@ -179,7 +216,7 @@ export class ServerSession {
       stdio.stderr?.on("data", (chunk: Buffer) => { live.stderr = (live.stderr + chunk.toString("utf8")).slice(-STDERR_LIMIT); });
       transport = stdio;
     } else transport = this.httpTransport(config, values, oauth, AbortSignal.any([lifetime, transitionScope]));
-    const live: Live = { client, transport, scope, oauth, stderr: "" };
+    const live: Live = { client, transport, scope, stderr: "" };
     client.onclose = () => { if (!scope.signal.aborted) this.lost(live, describe(new Error("The MCP server closed the connection."), live.stderr)); };
     client.onerror = error => { if (!scope.signal.aborted && this.live === live) { this.error = messageOf(error); this.host.notify(); } };
     return live;
@@ -189,7 +226,7 @@ export class ServerSession {
     if (this.live !== live) return;
     this.live = undefined;
     void this.closeLive(live).catch(error => this.host.plugin.log.error("MCP cleanup failed.", error));
-    this.setPhase("error", message, null);
+    this.setPhase("error", message);
   }
   /** Aborts the scope and reaps the process tree; a snapshot supplies descendants of wrapper commands for cleanup. */
   private closeLive(live: Live): Promise<void> {
@@ -197,7 +234,6 @@ export class ServerSession {
       live.scope.abort();
       const pid = live.transport instanceof StdioClientTransport ? live.transport.pid : null;
       await closeProcessTree(pid, async () => { await Promise.allSettled([live.client.close(), live.transport.close()]); });
-      await live.oauth?.close();
     })();
   }
 
@@ -207,7 +243,7 @@ export class ServerSession {
     for (;;) {
       const current = this.transition;
       if (!current) break;
-      current.abort?.abort();
+      current.abort?.abort(new McpInterrupted("cancelled", "The MCP connection was cancelled."));
       await current.done;
       if (current.kind === "close") { if (current.failure) throw current.failure; return; }
     }
@@ -216,7 +252,7 @@ export class ServerSession {
     const live = this.live; this.live = undefined;
     transition.done = (async () => { if (live) await this.closeLive(live); })()
       .catch(error => { transition.failure = error; })
-      .finally(() => { if (this.transition === transition) this.transition = undefined; this.setPhase("disconnected", null, null); });
+      .finally(() => { if (this.transition === transition) this.transition = undefined; this.setPhase("disconnected", null); });
     await transition.done;
     if (transition.failure) throw transition.failure;
   }
@@ -284,10 +320,25 @@ export class ServerSession {
     this.host.saveDirectory(this.config, this.directory);
     this.host.notify();
   }
-  private setPhase(phase: ConnectionPhase, error: string | null, authorizationUrl: string | null) {
-    this.phase = phase; this.error = error; this.authorizationUrl = authorizationUrl;
+  private setPhase(phase: ConnectionPhase, error: string | null) {
+    this.phase = phase; this.error = error;
     this.host.notify();
   }
+}
+
+/** Network connection stages have a deadline; human authorization and tool execution have their own lifetimes. */
+async function connecting<T>(signal: AbortSignal, work: (signal: AbortSignal) => Promise<T>): Promise<T> {
+  const deadline = new AbortController();
+  const scope = AbortSignal.any([signal, deadline.signal]);
+  const timer = setTimeout(() => deadline.abort(new Error("MCP connection timed out. Connect again in MCP settings.")), 30_000);
+  try {
+    const result = await work(scope);
+    scope.throwIfAborted();
+    return result;
+  } catch (error) {
+    scope.throwIfAborted();
+    throw error;
+  } finally { clearTimeout(timer); }
 }
 
 /** Canceling one waiter ends only its own wait; the shared transition continues. */

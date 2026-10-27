@@ -22,15 +22,24 @@ function freePort(): Promise<number> {
   });
 }
 
-export interface AuthorizationRequest { url: string; callback: Promise<URLSearchParams> }
+const AUTHORIZATION_TIMEOUT_MS = 5 * 60_000;
+
+export interface AuthorizationRequest {
+  url: string;
+  callback: Promise<URLSearchParams>;
+  expiresAt: number | null;
+  start(): Promise<void>;
+}
 
 /**
  * OAuth provider for one connection transition. Persistent state (client registration, tokens, and callback port) is saved in the plugin vault;
- * the PKCE verifier, discovery, and state belong to this authorization attempt. The callback listener starts only when browser authorization is needed and closes after a valid callback or abort.
+ * the PKCE verifier, discovery, and state belong to this authorization attempt. Settings starts the callback listener before opening the browser.
+ * The connection transition owns authorization; replacing a transport does not close the listener.
  * Once interactive is disabled, expired tokens no longer trigger browser authorization; the caller closes the connection and authorizes again on the next connection.
  */
 export class McpOAuth implements OAuthClientProvider {
   private listener?: Server;
+  private closing?: Promise<void>;
   private verifier = "";
   private readonly nonce = randomUUID();
   private discovery?: OAuthDiscoveryState;
@@ -38,6 +47,7 @@ export class McpOAuth implements OAuthClientProvider {
   private client?: StoredOAuthClientInformation;
   private port = 0;
   private pending?: AuthorizationRequest;
+  private cancelAuthorization?: (reason: unknown) => void;
   interactive = true;
   constructor(private readonly secrets: PluginSecrets, private readonly key: string, private readonly signal: AbortSignal) {}
 
@@ -82,33 +92,52 @@ export class McpOAuth implements OAuthClientProvider {
   async redirectToAuthorization(url: URL): Promise<void> {
     if (!this.interactive) throw new Error("MCP authorization expired. The next connection starts a new authorization.");
     await this.close();
+    this.signal.throwIfAborted();
     let deliver!: (params: URLSearchParams) => void, fail!: (error: unknown) => void;
     const callback = new Promise<URLSearchParams>((resolve, reject) => { deliver = resolve; fail = reject; });
-    callback.catch(() => {});
-    const listener = createServer((request, response) => {
-      const received = new URL(request.url ?? "/", this.redirectUrl);
-      if (received.pathname !== "/callback" || received.searchParams.get("state") !== this.nonce) {
-        response.writeHead(400, { "Content-Type": "text/plain; charset=utf-8" }).end("Invalid authorization callback."); return;
-      }
-      response.writeHead(200, { "Content-Type": "text/plain; charset=utf-8", Connection: "close" })
-        .end("Authorization received. Return to Asterism. / 已收到授权，请返回星图。", () => { void this.close(); });
-      deliver(received.searchParams);
-    });
-    await new Promise<void>((resolve, reject) => {
-      listener.once("error", error => reject((error as NodeJS.ErrnoException).code === "EADDRINUSE"
-        ? new Error(`OAuth callback port ${this.port} is in use. Reset authorization in MCP settings to choose another port.`) : error));
-      listener.listen(this.port, "127.0.0.1", () => resolve());
-    });
-    this.listener = listener;
-    const abort = () => { fail(this.signal.reason); void this.close(); };
-    if (this.signal.aborted) abort(); else this.signal.addEventListener("abort", abort, { once: true });
-    void callback.finally(() => this.signal.removeEventListener("abort", abort)).catch(() => {});
-    this.pending = { url: url.toString(), callback };
+    let timer: ReturnType<typeof setTimeout> | undefined, starting: Promise<void> | undefined;
+    const abort = () => fail(this.signal.reason);
+    this.cancelAuthorization = fail;
+    this.signal.addEventListener("abort", abort, { once: true });
+    void callback.finally(async () => {
+      clearTimeout(timer);
+      this.signal.removeEventListener("abort", abort);
+      this.cancelAuthorization = undefined;
+      await this.close();
+    }).catch(() => {});
+    const authorization: AuthorizationRequest = {
+      url: url.toString(), callback, expiresAt: null,
+      start: () => starting ??= (async () => {
+        this.signal.throwIfAborted();
+        const listener = createServer((request, response) => {
+          const received = new URL(request.url ?? "/", this.redirectUrl);
+          if (received.pathname !== "/callback" || received.searchParams.get("state") !== this.nonce) {
+            response.writeHead(400, { "Content-Type": "text/plain; charset=utf-8" }).end("Invalid authorization callback."); return;
+          }
+          response.writeHead(200, { "Content-Type": "text/plain; charset=utf-8", Connection: "close" })
+            .end("Authorization response received. Return to Asterism. / 已收到授权响应，请返回星图。",
+              () => deliver(received.searchParams));
+        });
+        await new Promise<void>((resolve, reject) => {
+          listener.once("error", error => reject((error as NodeJS.ErrnoException).code === "EADDRINUSE"
+            ? new Error(`OAuth callback port ${this.port} is in use. Reset authorization in MCP settings to choose another port.`) : error));
+          listener.listen(this.port, "127.0.0.1", () => resolve());
+        });
+        this.listener = listener;
+        this.signal.throwIfAborted();
+        authorization.expiresAt = Date.now() + AUTHORIZATION_TIMEOUT_MS;
+        timer = setTimeout(() => fail(new Error("MCP authorization timed out. Start authorization again in MCP settings.")), AUTHORIZATION_TIMEOUT_MS);
+      })().catch(async error => { fail(error); await this.close(); throw error; }),
+    };
+    this.pending = authorization;
   }
   async close(): Promise<void> {
+    this.cancelAuthorization?.(new Error("MCP authorization was cancelled."));
+    this.cancelAuthorization = undefined;
+    this.pending = undefined;
     const listener = this.listener; this.listener = undefined;
-    if (!listener?.listening) return;
+    if (!listener?.listening) return this.closing;
     listener.closeAllConnections();
-    await new Promise<void>(resolve => listener.close(() => resolve()));
+    await (this.closing = new Promise<void>(resolve => listener.close(() => resolve())));
   }
 }

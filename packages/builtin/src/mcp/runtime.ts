@@ -2,7 +2,7 @@ import { mcpCard } from "../shared/card-appearance.ts";
 import { defineModule, implementResource, implementCreation, implementTool, implementCall, PluginApiError, type CallResult } from "@asterism-app/sdk/runtime";
 import { type Json, type ResourceRef } from "@asterism-app/sdk/contracts";
 import { McpHost, CreateMcpHost, McpHostView, McpList, McpSearch, McpInspect, McpConnect, McpCall, McpChanged,
-  ReadMcp, SaveMcpServer, ReadMcpCredentials, ReadMcpTools, SetMcpServerEnabled, RemoveMcpServer, ConnectMcpServer, DisconnectMcpServer, ResetMcpAuth, type McpCallData } from "./contract.ts";
+  ReadMcp, SaveMcpServer, ReadMcpCredentials, ReadMcpTools, SetMcpServerEnabled, RemoveMcpServer, ConnectMcpServer, AuthorizeMcpServer, DisconnectMcpServer, ResetMcpAuth, type McpCallData } from "./contract.ts";
 import { McpHostService, credentialKey, oauthKey, type CallTarget } from "./service.ts";
 import { McpError, McpInterrupted, mcpErrorCodes } from "./errors.ts";
 import { convertMcpResult, mcpResultToModel } from "./result.ts";
@@ -75,6 +75,7 @@ export default defineModule(plugin => {
         return null;
       }),
       implementCall(DisconnectMcpServer, async ({ serverId }) => { await service.disconnect(serverId); return null; }),
+      implementCall(AuthorizeMcpServer, async ({ serverId }) => service.authorize(serverId)),
       implementCall(ResetMcpAuth, async ({ serverId }) => {
         await service.disconnect(serverId);
         await plugin.secrets.delete(oauthKey(serverId));

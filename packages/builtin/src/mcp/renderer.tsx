@@ -1,21 +1,20 @@
 import { useState } from "react";
-import { ChevronRight, Network, RefreshCw, Settings } from "lucide-react";
-import { useI18n, useRendererCalls, useRendererSettings, creationEntry, cardRenderer, type RendererModule } from "@asterism-app/sdk/renderer";
+import { ChevronRight, Network, Settings } from "lucide-react";
+import { useI18n, useRendererSettings, creationEntry, cardRenderer, type RendererModule } from "@asterism-app/sdk/renderer";
 import { Button } from "@asterism-app/ui/ui/button";
 import { IconButton } from "@asterism-app/ui/ui/icon-button";
 import { Spinner } from "@asterism-app/ui/ui/spinner";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@asterism-app/ui/ui/collapsible";
 import { cn } from "@asterism-app/ui/utils";
-import { McpHost, CreateMcpHost, McpHostView, ConnectMcpServer, type McpServerState } from "./contract";
+import { McpHost, CreateMcpHost, McpHostView, type McpServerState } from "./contract";
 import { mcpMessages as messages } from "../messages/mcp";
 import { useMcpTools } from "./status";
 import { Instructions, ServerError, ServerSummary, VirtualToolList } from "./views";
 import { mcpToolRenderers } from "./tool-views";
-import { useLifetimeSignal } from "../shared/use-lifetime";
 
 import { mcpCard as appearance } from "../shared/card-appearance.ts";
-/** Columns: expand arrow · status · name · tool count · actions; rows share column widths through subgrid, and expanded content aligns with the name column. */
-const columns = "grid grid-cols-[auto_auto_minmax(0,1fr)_auto_auto] gap-x-1.5";
+/** Columns: expand arrow · status · name · tool count; expanded content aligns with the name column. */
+const columns = "grid grid-cols-[auto_auto_minmax(0,1fr)_auto] gap-x-1.5";
 const detail = "col-[3/-1] min-w-0";
 
 function useOpenSettings() {
@@ -46,23 +45,10 @@ function ServerTools({ server }: { server: McpServerState }) {
   </div>;
 }
 
-/** A single server: shows status and currently available connection actions inline; expand to review cached tools. */
+/** A single server: status and cached tools; connection management belongs to settings. */
 function ServerRow({ server }: { server: McpServerState }) {
-  const i18n = useI18n(), calls = useRendererCalls(), lifetime = useLifetimeSignal();
-  const [open, setOpen] = useState(false), [busy, setBusy] = useState(false);
-  // Connection runs in the background, with results shown through resource projection; this only prevents reentry at the same entry point.
-  const connect = () => {
-    const signal = lifetime();
-    setBusy(true);
-    void calls.invoke(ConnectMcpServer, { serverId: server.id }, { signal }).catch(() => {}).finally(() => { if (!signal.aborted) setBusy(false); });
-  };
-  const action = !server.enabled ? <span className="type-caption text-muted-foreground">{i18n.text(messages.disabled)}</span>
-    : server.connection === "awaiting_auth" && server.authorizationUrl
-      ? <Button variant="outline" size="xs" asChild><a href={server.authorizationUrl} target="_blank" rel="noopener noreferrer">{i18n.text(messages.authorize)}</a></Button>
-      : server.connection === "connected"
-        ? <IconButton size="icon-xs" label={i18n.text(messages.refresh)} disabled={busy} onClick={connect}><RefreshCw className={cn(busy && "animate-spin motion-reduce:animate-none")} /></IconButton>
-        : server.connection === "connecting" ? null
-          : <Button variant="outline" size="xs" disabled={busy} onClick={connect}>{i18n.text(messages.connect)}</Button>;
+  const i18n = useI18n();
+  const [open, setOpen] = useState(false);
   return <Collapsible open={open} onOpenChange={setOpen} className="col-span-full grid grid-cols-subgrid">
     <div className={cn("col-span-full grid min-h-8 grid-cols-subgrid items-center py-1", !server.enabled && "opacity-60")}>
       <CollapsibleTrigger asChild>
@@ -71,8 +57,11 @@ function ServerRow({ server }: { server: McpServerState }) {
           <ServerSummary server={server} />
         </button>
       </CollapsibleTrigger>
-      <div className="flex shrink-0 items-center justify-end">{action}</div>
     </div>
+    <p role="status" className={cn(detail, "type-caption pb-1 text-muted-foreground")}>
+      {server.enabled ? i18n.formatMessage(messages.state, { state: server.connection }) : i18n.text(messages.disabled)}
+      {server.enabled && server.connection === "awaiting_auth" && <>{" · "}{i18n.text(messages.authorizeInSettings)}</>}
+    </p>
     {!open && <ServerError error={server.error} className={detail} />}
     <CollapsibleContent className={detail}>{open && <ServerTools server={server} />}</CollapsibleContent>
   </Collapsible>;

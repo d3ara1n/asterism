@@ -136,6 +136,7 @@ export class McpHostService implements SessionHost {
     return target.session.call(target.toolName, args, signal, progress);
   }
   connect(id: string, signal: AbortSignal) { return this.get(id).connect(signal); }
+  authorize(id: string) { return this.get(id).authorize(); }
   /** mcp_connect entry point: resolves server identity using resource tool error codes. */
   connectTool(id: string, signal: AbortSignal) { return this.enabled(id).connect(signal); }
   disconnect(id: string) { return this.get(id).disconnect(); }
