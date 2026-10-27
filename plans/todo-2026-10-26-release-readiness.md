@@ -18,7 +18,7 @@ Before sharing, the actual distribution platforms need accepted update, migratio
 - [ ] Accept migration failure, restore, retry, and fresh-start recovery, including plugin failure isolation.
 - [ ] Verify prerelease-to-stable selection and data continuation, using fixtures until an actual promotion candidate is ready.
 - [ ] Record the first user-distributed version, source commit, and storage baselines, and retain migration fixtures.
-- [ ] Provide necessary installation and issue-reporting information for the accepted platforms; in-product usage guidance will come through models consulting the internal manual.
+- [ ] Provide necessary installation and issue-reporting information for the accepted platforms; models can consult the internal manual for in-product usage guidance.
 
 ## Plugin delivery
 
@@ -31,7 +31,9 @@ A marketplace service is outside the confirmed initial scope.
 
 ## Public API stability
 
-- [ ] Complete public-package delivery and record the compatibility scope supported by internal plugin development in `plans/todo-2026-10-27-public-api-stability.md` before declaring stable public interfaces.
+- [x] Publish initial public packages: `@asterism-app/sdk@0.47.0` and `@asterism-app/builtin-api@0.19.1`, manually published from `e861a14`.
+- [x] Integrate public-package publication into the application Release workflow, with independent package versions and channel dist-tags.
+- [ ] Verify automated package publication and promotion, and complete external-plugin acceptance in `plans/todo-2026-10-27-public-api-stability.md` before declaring stable public interfaces.
 
 Confirmed SDK boundary defects and the template-copy participation boundary are resolved. Protocol, authentication, output, and external-message extensions remain driven by concrete integrations. Shared-environment and unchanged-plugin evidence accumulate during internal development; future feature completeness is not a condition for delivering the current SDK.
 
@@ -50,7 +52,8 @@ Confirmed SDK boundary defects and the template-copy participation boundary are 
 - [ ] Verify migration from the earliest user-distributed baseline to the stable candidate.
 - [ ] Establish issue-reporting information: application version, platform, reproduction, and logs.
 - [ ] Complete and accept official branding and platform icons.
-- [ ] Integrate the English internal manual through resources/tools and verify that models can discover and read it.
+- [x] Integrate the English internal manual through resources/tools and verify direct discovery and reading. Application guides and public-package guides/examples are included in application packaging.
+- [ ] Accept manual creation, linking, discovery, and reading through the GUI and an installed application.
 - [ ] Promote a tested latest candidate and verify stable notes, assets, and update continuation.
 
 Captured-resource restore, provider OAuth, additional protocols, plugin prompt/skill contributions, skill picking, manual compaction, media/export/sync, and a search-library replacement remain separate scope decisions.

@@ -6,7 +6,7 @@ Filed on 2026-10-27. Initial inspection: main at `262be7e`.
 
 Prepare the implemented SDK for real external plugin development and package delivery. Resolve demonstrated contract defects now, then use internal plugin development and application updates to establish compatibility evidence. Future model protocols, authentication methods, output categories, and external-message bridges are demand-driven extensions; implementing or fully designing all of them is not a prerequisite for the current SDK's delivery.
 
-The public packages are unpublished. Unsuitable interfaces can be replaced directly with their current consumers, without compatibility facades. Existing real data still requires explicit authorization before cleanup. Application data compatibility starts at the first user distribution, including friend-facing prereleases, independently of the public packages' version numbers.
+The public packages are `@asterism-app/sdk` and `@asterism-app/builtin-api`; initial versions have been published to npm. `@asterism-app/ui` remains a private implementation package. At the initial investigation, all packages were unpublished and contract fixes were applied directly with their consumers. Publication and validation evidence below define the current delivery status; stable compatibility claims remain subject to external-plugin acceptance. Existing real data requires explicit authorization before cleanup. Application data compatibility starts at the first user distribution, including friend-facing prereleases, independently of the public packages' version numbers.
 
 Current support must describe implemented behavior. Internal testing does not establish universal compatibility across future shared libraries, native modules, protocols, or platforms. Keep independent plugin artifacts and data when claiming that an update preserves existing consumers.
 
@@ -23,13 +23,14 @@ Current support must describe implemented behavior. Internal testing does not es
 
 `plans/archived/review-2026-10-27-sdk-contract-boundaries.md` preserves the concrete findings and their dispositions. The generic contribution, call/event/channel, resource, and lifetime architecture has no unresolved confirmed redesign requirement from that review.
 
-## Package delivery remaining
+## Package delivery
 
 These tasks concern actual package delivery, not future feature completeness.
 
-- [x] Run offline package previews for `@asterism/sdk`, `@asterism/builtin-api`, and `@asterism/ui`; verify fixed export targets are included. All three previews passed. Packages remain private.
-- [ ] Review the actual published export surface, wildcard exports, dependency closure, examples, and assets against package contents. Treat source TypeScript exports according to the supported plugin build environment.
-- [ ] Verify packed packages in an isolated external plugin project, including editor/typecheck resolution and the host's runtime/frontend loading path. Reuse the counter and public provider/consumer examples where appropriate.
+- [x] Run initial offline package previews and verify fixed export targets. The previews covered the then-private `@asterism/sdk`, `@asterism/builtin-api`, and `@asterism/ui` packages; this is historical validation, not the current publication scope.
+- [x] Prepare the two public packages under `@asterism-app`, including licenses, installation guidance, tarball consumer typechecks, and npm publication dry runs.
+- [ ] Complete review of the two public packages' published exports, dependency closure, examples, and assets against package contents. Treat source TypeScript exports according to the supported plugin build environment.
+- [ ] Complete isolated external-plugin acceptance using packed packages, including editor resolution and the host's runtime/frontend loading path. Tarball consumer typechecks have passed; they do not establish runtime or GUI acceptance. Reuse the counter and public provider/consumer examples where appropriate.
 - [x] Decide package versions, npm scope ownership, publication access, and release workflow. Packages publish through the application Release workflow with independent computed versions and channel dist-tags.
 - [x] Publish only after explicit authorization. `@asterism-app/sdk@0.47.0` and `@asterism-app/builtin-api@0.19.1` were published manually from `e861a14`.
 - [x] Register npm trusted publishers for both packages (`release.yml` publish, `promote.yml` dist-tag).
@@ -69,4 +70,6 @@ Prompt contributions, plugin-carried skills, explicit skill picking, notificatio
 
 The initial readiness investigation passed typechecks and 98 selected plugin tests; that established current behavior, not old-version compatibility. Subsequent fixes recorded their focused validation in the archived review, including dependency loading, typed calls, directional data encoding, resource state, and templates.
 
-The template participation change passed project typechecks, 95 tests across template, loader, SDK runtime, and content suites, and the bilingual catalog checks. Cases cover selected current data, undeclared data exclusion, unsupported resources, withdrawn policies, removed/invalid saved data, independent identities, immutable history, codecs, and content retention. Offline npm previews included all fixed export targets for the three public packages. No npm publication, GUI acceptance, native-runtime acceptance, or real-data cleanup was performed.
+The template participation change passed project typechecks, 95 tests across template, loader, SDK runtime, and content suites, and the bilingual catalog checks. Cases cover selected current data, undeclared data exclusion, unsupported resources, withdrawn policies, removed/invalid saved data, independent identities, immutable history, codecs, and content retention. Initial offline npm previews included all fixed export targets for the three then-private packages. That validation stage did not include npm publication, GUI acceptance, native-runtime acceptance, or real-data cleanup.
+
+The package preparation commit `e861a14` records passing typechecks, a production build, 57 plugin tests, tarball consumer typechecks, and npm publication dry runs. The two public packages were subsequently published manually from that commit as recorded above. Commit `f82a410` integrates package publication and promotion into the application release workflows. The first automated publication and promotion, installed runtime behavior, and external-plugin GUI acceptance remain pending.
