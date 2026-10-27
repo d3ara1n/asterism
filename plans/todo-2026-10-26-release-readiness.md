@@ -29,6 +29,10 @@ Before sharing, the actual distribution platforms need accepted update, migratio
 
 A marketplace service is outside the confirmed initial scope.
 
+## Public API stability
+
+- [ ] Close the freeze decisions, compatibility defects, and old-plugin evidence in `plans/todo-2026-10-27-public-api-stability.md` before declaring stable public interfaces. Proven additive extensions may remain deferred.
+
 ## Product acceptance
 
 - [ ] Decide the formal resource catalog and access interaction.
