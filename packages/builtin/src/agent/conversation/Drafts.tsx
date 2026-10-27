@@ -313,7 +313,7 @@ function DraftRow({
           <DropdownMenuTrigger asChild>
             <Button type="button" variant="ghost" size="icon-xs"
               disabled={!interaction.editable}
-              aria-label="更多操作"
+              aria-label={i18n.text(messages.draftMoreActions)}
               className="opacity-0 transition-opacity group-hover/draft:opacity-100 focus:opacity-100 data-[state=open]:opacity-100">
               <MoreHorizontal aria-hidden />
             </Button>
