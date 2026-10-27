@@ -30,8 +30,10 @@ These tasks concern actual package delivery, not future feature completeness.
 - [x] Run offline package previews for `@asterism/sdk`, `@asterism/builtin-api`, and `@asterism/ui`; verify fixed export targets are included. All three previews passed. Packages remain private.
 - [ ] Review the actual published export surface, wildcard exports, dependency closure, examples, and assets against package contents. Treat source TypeScript exports according to the supported plugin build environment.
 - [ ] Verify packed packages in an isolated external plugin project, including editor/typecheck resolution and the host's runtime/frontend loading path. Reuse the counter and public provider/consumer examples where appropriate.
-- [ ] Decide package versions, npm scope ownership, publication access, and release workflow; change private/public package configuration only as part of that concrete publishing task.
-- [ ] Publish only after explicit authorization. Record the published versions and source commit.
+- [x] Decide package versions, npm scope ownership, publication access, and release workflow. Packages publish through the application Release workflow with independent computed versions and channel dist-tags.
+- [x] Publish only after explicit authorization. `@asterism-app/sdk@0.47.0` and `@asterism-app/builtin-api@0.19.1` were published manually from `e861a14`.
+- [x] Register npm trusted publishers for both packages (`release.yml` publish, `promote.yml` dist-tag).
+- [ ] Verify the first automated prerelease publication and promotion.
 
 Application-side npm acquisition, exact versions/integrity, upgrade, removal, and private-data cleanup remain delivery work in `plans/todo-2026-10-12-plugin-system.md` and `plans/todo-2026-10-26-release-readiness.md`. They are distinct from publishing the SDK package. A marketplace is outside the current scope.
 

@@ -4,11 +4,15 @@ Release operations preserve one explicit source commit, complete artifacts, and 
 
 ## Publish plugin development packages
 
-The SDK and built-in public API are independently versioned npm packages under the `@asterism-app` scope. Their publish configuration targets the public npm registry with public access and the `next` distribution tag. The application and its internal implementation packages remain private npm workspaces.
+The SDK and built-in public API are npm packages under the `@asterism-app` scope, published by the application Release workflow from the same source commit. The application and its internal implementation packages remain private npm workspaces.
 
-Verify package contents and compile an independent plugin against the packed artifacts before publishing. Publish the SDK workspace first, then the built-in API workspace, so its SDK peer dependency is available. npm publication requires an authenticated maintainer with access to the organization.
+Each package versions independently with semantic versioning. The baseline is the nearest published version whose recorded npm `gitHead` lies on the source's first-parent history. Commits after it that touch the package directory raise its version once by their highest level, using the application's commit rules: breaking raises major, features raise minor, and fixes/refactors raise patch. Commit scope does not matter. Without such commits the package keeps its published version and is not republished; an application release does not imply a package release. Source `package.json` versions are not authoritative; the workflow writes computed versions into the build and publication checkouts without committing them.
 
-The `next` tag points to the current testing version; it does not restrict access or change the package's semantic version. Developers can install `@next` and save the resolved version for reproducible development. Each changed artifact needs a new version after publication. Moving a distribution tag changes which existing version it selects. Package publication is separate from application releases and does not update the APIs supplied by an installed application.
+Distribution tags follow the application channels. A prerelease publishes changed packages under `next`; promotion builds the same commit, reuses the versions its prerelease published, and moves `latest` to them. Developers targeting the stable application install `@latest`, and those targeting the preview application install `@next`; each resolves to the packages matching that channel's newest application. Release notes list the matching package versions. Promotion fails when a package has changes its prerelease did not publish.
+
+The SDK publishes before the built-in API, which declares it as a peer. A package's first publication is manual so that a registry baseline exists. Re-running a failed publish job skips versions already on npm.
+
+The workflow authenticates through npm trusted publishing. For each package, register `release.yml` with publish permission and `promote.yml` with dist-tag permission; npm validates the calling workflow of a reusable workflow. Trusted publishing from a public repository generates provenance automatically.
 
 ## Prepare signing and repository access
 

@@ -10,7 +10,7 @@ Public interfaces should express a capability an author needs. Internal decompos
 
 ## Installation
 
-Install the testing release with `npm install --save-dev --save-exact @asterism-app/sdk@next`. Declare `@asterism-app/sdk` as a peer dependency with `"*"` in the plugin package.
+Install with `npm install --save-dev --save-exact @asterism-app/sdk@latest` to target the stable application, or `@next` to target the preview application. Declare `@asterism-app/sdk` as a peer dependency with `"*"` in the plugin package.
 
 The package ships TypeScript source. Asterism compiles plugin entries and supplies its own SDK instance at runtime. Use declarations compatible with the target application; installing a newer SDK does not update the application's APIs.
 

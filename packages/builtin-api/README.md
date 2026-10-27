@@ -10,7 +10,7 @@ General hosting facilities belong to the SDK. Built-in-specific behavior belongs
 
 ## Installation
 
-Install the testing releases with `npm install --save-dev --save-exact @asterism-app/sdk@next @asterism-app/builtin-api@next`. Declare both packages as peer dependencies with `"*"` in the plugin package.
+Install with `npm install --save-dev --save-exact @asterism-app/sdk@latest @asterism-app/builtin-api@latest` to target the stable application, or use `@next` for both to target the preview application. Declare both packages as peer dependencies with `"*"` in the plugin package.
 
 The package ships TypeScript source. Asterism supplies the built-in public API at runtime, preserving shared declaration identity. Use development versions compatible with the target application; installing these packages does not install or update the built-in implementation.
 
