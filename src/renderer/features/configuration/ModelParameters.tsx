@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Download } from "lucide-react";
-import { modelReference, type ProviderModel, type ModelParameterUpdate } from "../../../shared/configuration";
+import { type ModelParameters, type ModelParameterUpdate } from "../../../shared/configuration";
 import { modelCatalogMessages as messages } from "../../../shared/model-catalog-messages";
 import { providersMessages } from "../../messages/providers";
 import { modelCostMessages } from "../../messages/model-cost";
@@ -17,22 +17,21 @@ const fields = {
 };
 
 /** Parameter fetching and result display in model settings; subsequent configuration reads do not clear failures. */
-export function useModelParameters(model: ProviderModel | undefined, disabled: boolean, onUpdated: (model: ProviderModel) => void) {
+export function useModelParameters(modelId: string, disabled: boolean, onFetched: (parameters: ModelParameters) => void) {
   const i18n = useI18n();
   const { run, busy: pending, error } = useConfigurationAction("inline");
   const [report, setReport] = useState<ModelParameterUpdate | null>(null);
   const fetchParameters = async () => {
-    if (!model || pending || disabled) return;
+    if (!modelId.trim() || pending || disabled) return;
     setReport(null);
-    const response = await run({ type: "model.parameters", model: modelReference(model) });
-    if (!response) return;
-    if (response.parameterUpdate) setReport(response.parameterUpdate);
-    const updated = response.snapshot.models.find(item => modelReference(item) === modelReference(model));
-    if (updated) onUpdated(updated);
+    const response = await run({ type: "model.parameters", modelId });
+    if (!response?.parameterUpdate) return;
+    setReport(response.parameterUpdate);
+    onFetched(response.parameterUpdate.parameters);
   };
   return {
     pending,
-    action: <Button type="button" size="sm" variant="outline" disabled={!model || disabled || pending}
+    action: <Button type="button" size="sm" variant="outline" disabled={!modelId.trim() || disabled || pending}
       title={i18n.text(messages.hint)} onClick={() => void fetchParameters()}>
       {pending ? <Spinner data-icon="inline-start" /> : <Download data-icon="inline-start" />}
       {i18n.text(pending ? messages.fetching : messages.fetch)}
@@ -40,7 +39,7 @@ export function useModelParameters(model: ProviderModel | undefined, disabled: b
     feedback: (error || report) && <Alert role={error ? "alert" : "status"} variant={error ? "destructive" : "default"}>
       <AlertDescription>
         {error ? i18n.text(error) : report && <>
-          <p>{i18n.formatMessage(messages.saved, { source: report.source })}</p>
+          <p>{i18n.formatMessage(messages.filled, { source: report.source })}</p>
           {report.unfilled.length > 0 && <p>{i18n.formatMessage(messages.unfilled, {
             fields: report.unfilled.map(field => i18n.text(fields[field])).join(", "),
           })}</p>}

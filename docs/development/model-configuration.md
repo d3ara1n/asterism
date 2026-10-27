@@ -22,9 +22,9 @@ List parsing follows recognized response structure rather than provider branding
 
 All pages must succeed before delivering the deduplicated list. Adding models is atomic and does not overwrite existing entries. Only explicitly returned, supported metadata is imported.
 
-Parameter lookup from models.dev maps supported capabilities and prices into the selected saved model. It matches normalized terminal model IDs exactly, with ambiguity treated as failure. The original full service ID remains the request identity.
+Parameter lookup from models.dev returns supported capabilities and prices for the model ID entered in the editor. It matches normalized terminal model IDs exactly, with ambiguity treated as failure. The original full service ID remains the request identity.
 
-Valid mapped fields overwrite their current values. Missing or unrepresentable metadata retains existing values with a diagnostic. Lookup does not infer compatibility packs from model names.
+Valid mapped fields overwrite the current draft values, using the same change detection and explicit save as manual editing. Lookup works before the model is saved and does not persist configuration or invalidate connection tests. Missing or unrepresentable metadata retains draft values with a diagnostic. Lookup does not infer compatibility packs from model names.
 
 Input files are sent with their media types; the service determines accepted modalities. The client’s model capability switches govern reasoning and tool declaration.
 

@@ -1,6 +1,6 @@
 import { Models, type Catalog, type Model, type ModelMetadata } from "@opencode-ai/models";
 import { z } from "zod";
-import { modelInputSchema, thinkingSchema, type ProviderModel, type ModelParameterUpdate } from "../shared/configuration.ts";
+import { modelParametersSchema, thinkingSchema, type ModelParameters, type ModelParameterUpdate } from "../shared/configuration.ts";
 import { modelCatalogMessages as messages } from "../shared/model-catalog-messages.ts";
 import { emptyModelRates, modelCostSchema, type ModelCost, type ModelRates, type UnitPrice } from "@asterism-app/sdk/contracts";
 import { ConfigurationError } from "./errors.ts";
@@ -88,14 +88,12 @@ function modelCost(raw: unknown): ModelCost | null {
   return result.success ? result.data : null;
 }
 
-/** Explicit retrieval overwrites mappable parameters; pricing is replaced as a whole while identity, connection, and compatibility settings remain. */
-export function modelParameters(catalog: Catalog, current: ProviderModel): {
-  value: z.infer<typeof modelInputSchema>; report: ModelParameterUpdate;
-} {
+/** Return mappable fields for draft editing; omitted fields remain absent and pricing is supplied as a whole. */
+export function modelParameters(catalog: Catalog, modelId: string): ModelParameterUpdate {
   try {
-    const match = selectModel(catalog, current.modelId);
+    const match = selectModel(catalog, modelId);
     const entry = entrySchema.parse(match.model);
-    const value = structuredClone(current);
+    const value: ModelParameters = { capabilities: {}, generation: {} };
     const unfilled: ModelParameterUpdate["unfilled"] = [];
     if (entry.limit?.context) value.contextWindow = entry.limit.context;
     else unfilled.push("contextWindow");
@@ -120,7 +118,7 @@ export function modelParameters(catalog: Catalog, current: ProviderModel): {
     if (cost) value.cost = cost;
     else unfilled.push("cost");
     if (unfilled.length === 6) throw new ConfigurationError("unavailable", "No usable catalog parameters were found.", messages.invalid);
-    return { value: modelInputSchema.parse(value), report: { source: match.source, unfilled } };
+    return { parameters: modelParametersSchema.parse(value), source: match.source, unfilled };
   } catch (error) {
     if (error instanceof ConfigurationError) throw error;
     throw new ConfigurationError("unavailable", "Invalid model catalog data.", messages.invalid);

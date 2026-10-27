@@ -1,7 +1,7 @@
 import { Plus, Zap, Search, PlugZap } from "lucide-react";
 import { useMemo, useState } from "react";
 
-import { canEditModelProviderField, createModelInput, modelReference, thinkingSchema, type ConfigurationSnapshot, type ConnectionTest, type ModelProvider, type ModelProviderInput, type ProviderModel, type TestError } from "../../../shared/configuration";
+import { applyModelParameters, canEditModelProviderField, createModelInput, modelReference, thinkingSchema, type ConfigurationSnapshot, type ConnectionTest, type ModelProvider, type ModelProviderInput, type ProviderModel, type TestError } from "../../../shared/configuration";
 import { modelProviderPresetDraft, type ModelProviderPreset, type ModelProviderDraft } from "../../../shared/provider-presets";
 import { commonMessages } from "@asterism-app/ui/messages/common";
 import { providersMessages } from "../../messages/providers";
@@ -327,7 +327,7 @@ function ModelEditor({ initialId, providerId }: { initialId: string | null; prov
   const dirty = useMemo(() => !current || JSON.stringify({ ...modelValue(current), enabled: 0 }) !== JSON.stringify({ ...value, enabled: 0 }), [current, value]);
   const test = current && snapshot ? latestTest(snapshot, modelReference(current)) : undefined;
   const users = current && snapshot ? snapshot.roles.filter(role => role.model === modelReference(current)) : [];
-  const parameters = useModelParameters(current, dirty || busy, updated => setValue(modelValue(updated)));
+  const parameters = useModelParameters(value.modelId, busy, fetched => setValue(draft => applyModelParameters(draft, fetched)));
 
   return <Editor form="model-form" title={current?.name ?? i18n.formatMessage(providersMessages.newModel)} description={provider?.name} dirty={dirty}
     busy={busy} error={error} disabled={parameters.pending}
@@ -354,7 +354,7 @@ function ModelEditor({ initialId, providerId }: { initialId: string | null; prov
       </Field>}
     </FieldGroup>
       <EditorSection collapsible title={i18n.formatMessage(providersMessages.parameters)} action={parameters.action}
-        hint={<>{i18n.text(modelCatalogMessages.hint)}{dirty && <> {i18n.text(modelCatalogMessages.saveFirst)}</>}</>}
+        hint={i18n.text(modelCatalogMessages.hint)}
         status={parameters.feedback}>
         <FieldSet><FieldLegend variant="label">{i18n.formatMessage(providersMessages.capabilities)}</FieldLegend>
           <div className="surface">

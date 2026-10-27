@@ -16,6 +16,8 @@ Choose a preset for a supported service or create a custom connection from that 
 
 Model discovery retrieves available model IDs. Parameter lookup supplies reference capabilities and pricing. Check both against the service you actually use: a matching name alone does not establish identical capabilities or billing.
 
+In the model editor, enter a service model ID and fetch parameters to fill the form, including for a new, unsaved model. Returned fields replace the values currently entered; unavailable fields keep their values. Review or edit the result, then save. The save action becomes available when the draft differs from the saved model.
+
 Changing a preset catalog does not rewrite connections already saved from it.
 
 ## Choose a model for work

@@ -1,15 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Catalog, Model } from "@opencode-ai/models";
-import { createModelInput, modelReference, type ProviderModel } from "../shared/configuration.ts";
 import { loadModelCatalog, modelParameters } from "./model-catalog.ts";
-import { emptyModelRates, emptyModalityRates, type ModelCost } from "@asterism-app/sdk/contracts";
+import { emptyModelRates, emptyModalityRates } from "@asterism-app/sdk/contracts";
 
-const current: ProviderModel = {
-  ...createModelInput("my-connection", { modelId: "test-model", name: "My model" }),
-  contextWindow: 1000,
-  generation: { maxOutputTokens: 100, temperature: 0.5, topP: 0.9 },
-  compatibility: [{ id: "systemMessageInMessages" }],
-};
 const entry: Model = {
   id: "test-model", name: "Upstream name", description: "", reasoning: true, tool_call: true,
   attachment: false, modalities: { input: ["text"], output: ["text"] }, open_weights: false,
@@ -28,23 +21,16 @@ function catalog(model: Model = entry): Catalog {
 afterEach(() => { vi.unstubAllGlobals(); });
 const perMillion = { unit: "token", per: 1_000_000 } as const;
 
-describe("models.dev parameter overrides", () => {
-  // New models enable reasoning by default, while an endpoint's explicit false remains valid configuration.
-  it("new models enable reasoning by default and preserve an endpoint's explicit disablement", () => {
-    expect(createModelInput("local", { modelId: "new", name: "New" }).capabilities.reasoning).toBe(true);
-    expect(createModelInput("local", { modelId: "new", name: "New", reasoning: false }).capabilities.reasoning).toBe(false);
-  });
-  // Explicit retrieval replaces valid old values; display identity, compatibility settings, and omitted generation parameters are not catalog parameters.
-  it("overwrites all mappable fields by model ID and preserves non-catalog configuration", () => {
-    const result = modelParameters(catalog(), current);
-    expect(result.value).toMatchObject({
-      name: "My model", modelId: "test-model", providerId: "my-connection", enabled: true,
+describe("models.dev parameter lookup", () => {
+  it("maps supported fields by model ID, including explicit capability disablement", () => {
+    const { parameters, ...report } = modelParameters(catalog(), "test-model");
+    expect(parameters).toMatchObject({
       contextWindow: 200000, capabilities: { reasoning: true, tools: true, thinkingLevels: ["off", "low", "high"] },
-      generation: { maxOutputTokens: 32000, temperature: 0.5, topP: 0.9 }, compatibility: current.compatibility,
+      generation: { maxOutputTokens: 32000 },
     });
-    expect(result.report).toEqual({ source: "lab/test-model", unfilled: [] });
-    const disabled = modelParameters(catalog({ ...entry, reasoning: false, tool_call: false, reasoning_options: undefined }), current);
-    expect(disabled.value.capabilities).toEqual({ reasoning: false, tools: false, thinkingLevels: [] });
+    expect(report).toEqual({ source: "lab/test-model", unfilled: [] });
+    const disabled = modelParameters(catalog({ ...entry, reasoning: false, tool_call: false, reasoning_options: undefined }), "test-model");
+    expect(disabled.parameters.capabilities).toEqual({ reasoning: false, tools: false, thinkingLevels: [] });
   });
 
   // Reference parameters for a model ID do not vary by connection; relay records are excluded and ambiguous IDs do not arbitrarily select the first match.
@@ -52,34 +38,26 @@ describe("models.dev parameter overrides", () => {
     const data = catalog();
     data.providers.relay = { ...data.providers.lab!, id: "relay", api: "https://relay.test/v1",
       models: { "test-model": { ...entry, limit: { context: 100, output: 10 }, reasoning_options: [{ type: "effort", values: ["high"] }] } } };
-    for (const providerId of ["lab", "relay", "my-connection"]) {
-      const result = modelParameters(data, { ...current, providerId });
-      expect(result.report).toEqual({ source: "lab/test-model", unfilled: [] });
-      expect(result.value.contextWindow).toBe(200000);
-      expect(result.value.capabilities.thinkingLevels).toEqual(["off", "low", "high"]);
-    }
-    expect(modelParameters(data, { ...current, modelId: "lab/test-model" }).report.source).toBe("lab/test-model");
-    expect(() => modelParameters(data, { ...current, modelId: "test-model-thinking-latest" })).toThrow(expect.objectContaining({ code: "not_found" }));
+    const result = modelParameters(data, "test-model");
+    expect(result.source).toBe("lab/test-model");
+    expect(result.parameters.contextWindow).toBe(200000);
+    expect(result.parameters.capabilities.thinkingLevels).toEqual(["off", "low", "high"]);
+    expect(modelParameters(data, "lab/test-model").source).toBe("lab/test-model");
+    expect(() => modelParameters(data, "test-model-thinking-latest")).toThrow(expect.objectContaining({ code: "not_found" }));
     data.models["other/test-model"] = { ...data.models["lab/test-model"]!, id: "other/test-model" };
-    expect(() => modelParameters(data, current)).toThrow(expect.objectContaining({ code: "conflict" }));
-    expect(() => modelParameters(data, { ...current, modelId: "lab/test-model" })).toThrow(expect.objectContaining({ code: "conflict" }));
+    expect(() => modelParameters(data, "test-model")).toThrow(expect.objectContaining({ code: "conflict" }));
+    expect(() => modelParameters(data, "lab/test-model")).toThrow(expect.objectContaining({ code: "conflict" }));
   });
 
-  // Parameter lookup strips prefixes, but saving and requests retain the complete modelId required by the relay.
-  it("strips all routing prefixes for lookup while preserving saved model IDs, global references, and compatibility settings", () => {
+  it("strips all routing prefixes for exact lookup without accepting suffix or case aliases", () => {
     const data: Catalog = { providers: {}, models: {
       "lab/vendor/model": { id: "lab/vendor/model", name: "Model", description: "", reasoning: true, tool_call: true },
     } };
     for (const modelId of ["model", "vendor/model", "route/vendor/model"]) {
-      const model = { ...current, providerId: "my-provider", modelId };
-      const result = modelParameters(data, model);
-      expect(result.report.source).toBe("lab/vendor/model");
-      expect(result.value.modelId).toBe(modelId);
-      expect(modelReference(result.value)).toBe(`my-provider/${modelId}`);
-      expect(result.value.compatibility).toEqual(model.compatibility);
+      expect(modelParameters(data, modelId).source).toBe("lab/vendor/model");
     }
     for (const modelId of ["vendor/", "vendor/model-thinking", "vendor/MODEL"])
-      expect(() => modelParameters(data, { ...current, modelId })).toThrow(expect.objectContaining({ code: "not_found" }));
+      expect(() => modelParameters(data, modelId)).toThrow(expect.objectContaining({ code: "not_found" }));
   });
 
   // Capability toggles and budgets are not level lists; missing values must neither clear fields nor imply complete retrieval.
@@ -87,16 +65,15 @@ describe("models.dev parameter overrides", () => {
     const data: Catalog = { providers: {}, models: {
       "lab/test-model": { id: "lab/test-model", name: "Model", description: "", reasoning: true, tool_call: false },
     } };
-    const result = modelParameters(data, current);
-    expect(result.value.contextWindow).toBe(current.contextWindow);
-    expect(result.value.capabilities.thinkingLevels).toEqual(current.capabilities.thinkingLevels);
-    expect(result.report.unfilled).toEqual(["contextWindow", "maxOutputTokens", "thinkingLevels", "cost"]);
-    const budget = modelParameters(catalog({ ...entry, reasoning_options: [{ type: "budget_tokens", min: 1024 }, { type: "toggle" }] }), current);
-    expect(budget.report.unfilled).toEqual(["thinkingLevels"]);
-    const partial = modelParameters(catalog({ ...entry, reasoning_options: [{ type: "effort", values: ["default", "high"] }] }), current);
-    expect(partial.value.capabilities.thinkingLevels).toEqual(current.capabilities.thinkingLevels);
-    expect(partial.report.unfilled).toEqual(["thinkingLevels"]);
-    expect(() => modelParameters(catalog({ ...entry, limit: { context: -1, output: 32000 } }), current))
+    const result = modelParameters(data, "test-model");
+    expect(result.parameters).toEqual({ capabilities: { reasoning: true, tools: false }, generation: {} });
+    expect(result.unfilled).toEqual(["contextWindow", "maxOutputTokens", "thinkingLevels", "cost"]);
+    const budget = modelParameters(catalog({ ...entry, reasoning_options: [{ type: "budget_tokens", min: 1024 }, { type: "toggle" }] }), "test-model");
+    expect(budget.unfilled).toEqual(["thinkingLevels"]);
+    const partial = modelParameters(catalog({ ...entry, reasoning_options: [{ type: "effort", values: ["default", "high"] }] }), "test-model");
+    expect(partial.parameters.capabilities.thinkingLevels).toBeUndefined();
+    expect(partial.unfilled).toEqual(["thinkingLevels"]);
+    expect(() => modelParameters(catalog({ ...entry, limit: { context: -1, output: 32000 } }), "test-model"))
       .toThrow(expect.objectContaining({ code: "unavailable" }));
   });
 
@@ -109,8 +86,8 @@ describe("models.dev parameter overrides", () => {
         { tier: { type: "context", size: 128000 }, input: 3, output: 15 },
       ],
       context_over_200k: { input: 99, output: 99 },
-    } }), current);
-    expect(result.value.cost).toEqual({
+    } }), "test-model");
+    expect(result.parameters.cost).toEqual({
       currency: "USD",
       rates: {
         text: { input: { amount: 0, ...perMillion }, output: { amount: 10, ...perMillion },
@@ -124,22 +101,20 @@ describe("models.dev parameter overrides", () => {
           input: { amount: 5, ...perMillion }, output: { amount: 22.5, ...perMillion }, cacheRead: { amount: 0.5, ...perMillion } } } },
       ],
     });
-    expect(result.report.unfilled).toEqual([]);
+    expect(result.unfilled).toEqual([]);
   });
 
   // Legacy fields mean strictly above 200k; new fields preserve inclusive starts from the catalog rather than collapsing arbitrary thresholds to 200k.
   it("converts legacy-only tiers to a 200001 start while preferring a newer empty tier list", () => {
     const cost = { input: 1, output: 2, context_over_200k: { input: 3, output: 4 } };
-    expect(modelParameters(catalog({ ...entry, cost }), current).value.cost?.tiers)
+    expect(modelParameters(catalog({ ...entry, cost }), "test-model").parameters.cost?.tiers)
       .toEqual([{ fromInputTokens: 200001, rates: { ...emptyModelRates(), text: { ...emptyModalityRates(),
         input: { amount: 3, ...perMillion }, output: { amount: 4, ...perMillion } } } }]);
-    expect(modelParameters(catalog({ ...entry, cost: { ...cost, tiers: [] } }), current).value.cost?.tiers).toEqual([]);
+    expect(modelParameters(catalog({ ...entry, cost: { ...cost, tiers: [] } }), "test-model").parameters.cost?.tiers).toEqual([]);
   });
 
-  // Unrepresentable pricing rules cannot silently simplify to base prices; preserve all old pricing without blocking other valid parameter updates.
-  it("preserves and reports missing, invalid, or unknown pricing rules while allowing valid zero prices to override", () => {
-    const previous: ModelCost = { currency: "USD", rates: { ...emptyModelRates(), text: { ...emptyModalityRates(),
-      input: { amount: 9, ...perMillion }, output: { amount: 20, ...perMillion } } }, tiers: [] };
+  // Unrepresentable pricing rules cannot silently simplify to base prices or clear existing prices.
+  it("omits and reports missing, invalid, or unknown pricing rules while returning valid zero prices", () => {
     const tier = { tier: { type: "context", size: 100000 }, input: 3, output: 4 };
     const cases: unknown[] = [
       undefined, { input: -1, output: 2 }, { input: 1, output: 2, tiers: [tier, tier] },
@@ -147,12 +122,12 @@ describe("models.dev parameter overrides", () => {
       { input: 1, output: 2, per_request: 5 },
     ];
     for (const cost of cases) {
-      const result = modelParameters(catalog({ ...entry, cost } as Model), { ...current, cost: previous });
-      expect(result.value.cost).toEqual(previous);
-      expect(result.value.contextWindow).toBe(200000);
-      expect(result.report.unfilled).toEqual(["cost"]);
+      const result = modelParameters(catalog({ ...entry, cost } as Model), "test-model");
+      expect(result.parameters).not.toHaveProperty("cost");
+      expect(result.parameters.contextWindow).toBe(200000);
+      expect(result.unfilled).toEqual(["cost"]);
     }
-    expect(modelParameters(catalog({ ...entry, cost: { input: 0, output: 0 } }), { ...current, cost: previous }).value.cost)
+    expect(modelParameters(catalog({ ...entry, cost: { input: 0, output: 0 } }), "test-model").parameters.cost)
       .toEqual({ currency: "USD", rates: { ...emptyModelRates(), text: { ...emptyModalityRates(),
         input: { amount: 0, ...perMillion }, output: { amount: 0, ...perMillion } } }, tiers: [] });
   });

@@ -162,38 +162,42 @@ describe("Real configuration and consumption boundaries", () => {
     expect(reopened.current().models[0]?.compatibility).toEqual([{ id: "systemMessageInMessages" }]);
   });
 
-  // Parameter retrieval waits outside the queue and saves atomically on success; network failures preserve saved configuration.
-  it("catalog parameters overwrite and persist old values; retrieval failures preserve them and return explicit feedback", async () => {
+  // Lookup needs only the draft's model ID; it must not create configuration records.
+  it("returns catalog parameters before a model or connection has been saved", async () => {
     const data: Catalog = { providers: {}, models: { "lab/test-model": {
       id: "lab/test-model", name: "Test", description: "", reasoning: true, tool_call: false,
       limit: { context: 128000, output: 16000 },
     } } };
-    data.providers.lab = { id: "lab", name: "Lab", env: [], npm: "@ai-sdk/openai", doc: "https://lab.test", models: {
-      "test-model": { id: "test-model", name: "Test", description: "", reasoning: true, tool_call: false,
-        attachment: false, modalities: { input: ["text"], output: ["text"] }, open_weights: false,
-        release_date: "2026-01-01", last_updated: "2026-01-01", limit: { context: 128000, output: 16000 },
-        cost: { input: 1, output: 2, tiers: [{ tier: { type: "context", size: 64000 }, input: 3, output: 4 }] } },
-    } };
-    const catalog = vi.fn<LoadModelCatalog>(async () => data);
-    const { service, root, protector } = setup(undefined, true, 30_000, undefined, catalog);
-    const { modelId } = await addModel(service);
-    const updated = await service.execute({ type: "model.parameters", model: modelId });
-    expect(updated.snapshot.models[0]).toMatchObject({
-      contextWindow: 128000, capabilities: { reasoning: true, tools: false }, generation: { maxOutputTokens: 16000 },
-      cost: { currency: "USD", rates: { text: {
-        input: { amount: 1, unit: "token", per: 1_000_000 }, output: { amount: 2, unit: "token", per: 1_000_000 },
-      } }, tiers: [{ fromInputTokens: 64000, rates: { text: {
-        input: { amount: 3, unit: "token", per: 1_000_000 }, output: { amount: 4, unit: "token", per: 1_000_000 },
-      } } }] },
+    const { service, changed } = setup(undefined, false, 30_000, undefined, async () => data);
+    const initial = service.current();
+    const result = await service.execute({ type: "model.parameters", modelId: "route/test-model" });
+    expect(result.parameterUpdate).toEqual({
+      parameters: { contextWindow: 128000, capabilities: { reasoning: true, tools: false }, generation: { maxOutputTokens: 16000 } },
+      source: "lab/test-model", unfilled: ["thinkingLevels", "cost"],
     });
-    expect(updated.parameterUpdate).toEqual({ source: "lab/test-model", unfilled: ["thinkingLevels"] });
-    const reopened = new ConfigurationService(root, protector);
-    cleanups.push(() => reopened.close());
-    expect(reopened.current().models).toEqual(updated.snapshot.models);
+    expect(result.savedId).toBeNull();
+    expect(service.current()).toEqual(initial);
+    expect(changed).not.toHaveBeenCalled();
+  });
+
+  it("successful and failed catalog lookups leave saved configuration unchanged", async () => {
+    const catalog = vi.fn<LoadModelCatalog>(async () => ({ providers: {}, models: {
+      "lab/test-model": { id: "lab/test-model", name: "Test", description: "", limit: { context: 128000 } },
+    } }));
+    const { service, root, changed } = setup(undefined, true, 30_000, undefined, catalog);
+    const { snapshot } = await addModel(service);
+    const original = readFileSync(join(root, "configuration.json"), "utf8");
+    changed.mockClear();
+    await service.execute({ type: "model.parameters", modelId: "test-model" });
+    expect(service.current()).toEqual(snapshot);
+    expect(readFileSync(join(root, "configuration.json"), "utf8")).toBe(original);
+    expect(changed).not.toHaveBeenCalled();
     catalog.mockRejectedValueOnce(new Error("Sensitive upstream diagnostic"));
-    await expect(service.execute({ type: "model.parameters", model: modelId }))
+    await expect(service.execute({ type: "model.parameters", modelId: "test-model" }))
       .rejects.toMatchObject({ code: "unavailable", message: "Model catalog request failed.", display: { id: "modelCatalog.failed" } });
-    expect(service.current().models).toEqual(updated.snapshot.models);
+    expect(service.current()).toEqual(snapshot);
+    expect(readFileSync(join(root, "configuration.json"), "utf8")).toBe(original);
+    expect(changed).not.toHaveBeenCalled();
   });
 
   // Adding optional pricing data must not prevent opening existing configuration, treat missing pricing as zero, or rewrite the original file.
@@ -212,41 +216,17 @@ describe("Real configuration and consumption boundaries", () => {
     expect(readFileSync(path, "utf8")).toBe(original);
   });
 
-  // Parameter merging uses the current model: preserve intervening renames, apply catalog parameters in processing order, and cancel requests on close.
-  it("catalog waits do not block configuration, merge the current model on return, and cancel requests on exit", async () => {
+  it("cancels catalog requests on exit", async () => {
     let finish!: (catalog: Catalog) => void;
     let signal!: AbortSignal;
     const catalog: LoadModelCatalog = input => { signal = input; return new Promise(resolve => { finish = resolve; }); };
     const { service } = setup(undefined, true, 30_000, undefined, catalog);
-    const { modelId } = await addModel(service);
-    const request = service.execute({ type: "model.parameters", model: modelId });
-    const snapshot = (await service.execute({ type: "read" })).snapshot;
-    const value = snapshot.models[0]!;
-    await service.execute({ type: "model.save", id: modelId, value: { ...value, name: "Renamed", contextWindow: 777 } });
-    finish({ providers: {}, models: { "lab/test-model": {
-      id: "lab/test-model", name: "Test", description: "", limit: { context: 64000 },
-    } } });
-    expect((await request).snapshot.models[0]).toMatchObject({ name: "Renamed", contextWindow: 64000 });
-    const second = service.execute({ type: "model.parameters", model: modelId });
-    const closed = expect(second).rejects.toMatchObject({ code: "unavailable" });
-    await service.execute({ type: "read" });
+    const request = service.execute({ type: "model.parameters", modelId: "test-model" });
+    const closed = expect(request).rejects.toMatchObject({ code: "unavailable" });
     service.close();
     expect(signal.aborted).toBe(true);
     finish({ providers: {}, models: {} });
     await closed;
-  });
-  // A model missing when parameters return is a real not_found; do not create a record or substitute conflict.
-  it("returns not_found when the model has been removed before parameters return", async () => {
-    let finish!: (catalog: Catalog) => void;
-    const catalog: LoadModelCatalog = () => new Promise(resolve => { finish = resolve; });
-    const { service } = setup(undefined, true, 30_000, undefined, catalog);
-    const { modelId } = await addModel(service);
-    const request = service.execute({ type: "model.parameters", model: modelId });
-    const rejected = expect(request).rejects.toMatchObject({ code: "not_found" });
-    await service.execute({ type: "remove", kind: "model", id: modelId });
-    finish({ providers: {}, models: {} });
-    await rejected;
-    expect(service.current().models).toEqual([]);
   });
 
   // Both layers save explicit entries independently; reference protocols do not block saving, and invalid candidates cannot contaminate saved data.

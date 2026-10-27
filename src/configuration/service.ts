@@ -56,7 +56,7 @@ export class ConfigurationService {
   execute(raw: unknown): Promise<{ snapshot: ConfigurationSnapshot; savedId: string | null; parameterUpdate?: ModelParameterUpdate }> {
     const parsed = configurationCommandSchema.safeParse(raw);
     if (!parsed.success) return Promise.reject(new ConfigurationError("invalid_request", "Invalid configuration. Check the entered values."));
-    if (parsed.data.type === "model.parameters") return this.fetchParameters(parsed.data.model);
+    if (parsed.data.type === "model.parameters") return this.fetchParameters(parsed.data.modelId);
     const command = parsed.data;
     return this.enqueue(async () => {
       this.assertOpen();
@@ -74,13 +74,8 @@ export class ConfigurationService {
     this.queue = operation.catch(() => {});
     return operation;
   }
-  private async fetchParameters(reference: string) {
-    await this.enqueue(() => {
-      this.assertOpen();
-      const model = this.store.get("model", reference);
-      const provider = model && this.store.get("modelProvider", model.providerId);
-      if (!model || !provider) throw new ConfigurationError("not_found", "The model or provider no longer exists.");
-    });
+  private async fetchParameters(modelId: string) {
+    this.assertOpen();
     const timeout = AbortSignal.timeout(10_000);
     const signal = AbortSignal.any([timeout, this.shutdown.signal]);
     let catalog;
@@ -91,13 +86,7 @@ export class ConfigurationService {
     }
     return this.enqueue(() => {
       this.assertOpen();
-      const model = this.store.get("model", reference);
-      if (!model) throw new ConfigurationError("not_found", "The model no longer exists.");
-      const { value, report } = modelParameters(catalog, model);
-      this.store.save({ kind: "model", id: reference, value });
-      this.clearFinishedTests("model", reference);
-      this.onChanged();
-      return { snapshot: this.snapshot(), savedId: reference, parameterUpdate: report };
+      return { snapshot: this.snapshot(), savedId: null, parameterUpdate: modelParameters(catalog, modelId) };
     });
   }
   private assertOpen(): void { if (this.closed) throw new ConfigurationError("unavailable", "Configuration service is unavailable."); }

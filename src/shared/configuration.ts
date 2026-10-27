@@ -118,9 +118,25 @@ export const configurationCommandSchema = z.discriminatedUnion("type", [
   z.strictObject({ type: z.literal("discovery.start"), providerId: modelProviderIdSchema }),
   z.strictObject({ type: z.literal("discovery.cancel"), id }),
   z.strictObject({ type: z.literal("discovery.add"), id, modelIds: z.array(serverModelId).min(1) }),
-  z.strictObject({ type: z.literal("model.parameters"), model: modelExpressionSchema }),
+  z.strictObject({ type: z.literal("model.parameters"), modelId: serverModelId }),
 ]);
+export const modelParametersSchema = z.strictObject({
+  contextWindow: modelInputSchema.shape.contextWindow.unwrap().optional(),
+  cost: modelCostSchema.optional(),
+  capabilities: modelInputSchema.shape.capabilities.partial(),
+  generation: modelInputSchema.shape.generation.pick({ maxOutputTokens: true }).partial(),
+});
+export type ModelParameters = z.infer<typeof modelParametersSchema>;
+/** Catalog fields fill the draft like manual edits; absent fields retain the user's values. */
+export function applyModelParameters(draft: ProviderModel, parameters: ModelParameters): ProviderModel {
+  return {
+    ...draft, ...parameters,
+    capabilities: { ...draft.capabilities, ...parameters.capabilities },
+    generation: { ...draft.generation, ...parameters.generation },
+  };
+}
 export const modelParameterUpdateSchema = z.strictObject({
+  parameters: modelParametersSchema,
   source: z.string(),
   unfilled: z.array(z.enum(["contextWindow", "maxOutputTokens", "reasoning", "tools", "thinkingLevels", "cost"])),
 });
