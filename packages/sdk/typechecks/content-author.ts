@@ -1,4 +1,4 @@
-import { defineModule, definePlugin, implementAction, implementCreation, implementResource, type ObjectReader } from "@asterism/sdk/runtime";
+import { defineModule, definePlugin, implementAction, implementCreation, implementResource, type ObjectReader } from "@asterism-app/sdk/runtime";
 import { CreateDocument, Document, DocumentContent, Imported, ReplaceDocument, files } from "../examples/content-contract.ts";
 
 export function rejectReadOnlyStaging(object: ObjectReader) {

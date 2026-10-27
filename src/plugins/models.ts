@@ -3,21 +3,21 @@ import type { ContentLease } from "../runtime/content-store.ts";
 import { AiSdkAdapter } from "../model/ai-sdk.ts";
 import { ModelFailure, type ModelAdapter, type ModelEvent } from "../model/contract.ts";
 import { runModelRequest } from "../execution/request.ts";
-import { resolveModelSelection, type ModelRunRequest, type ModelRunResult, type ModelTarget, type StreamRequest } from "@asterism/sdk/contracts";
+import { resolveModelSelection, type ModelRunRequest, type ModelRunResult, type ModelTarget, type StreamRequest } from "@asterism-app/sdk/contracts";
 import type { AgentCapabilities } from "../execution/capabilities.ts";
 import { modelReference, parseModelExpression, resolveProviderModel, type ConfigurationSnapshot, type ThinkingLevel } from "../shared/configuration.ts";
 import { modelExpression, modelScope, type ModelSettings } from "../shared/model.ts";
-import { PluginApiError } from "@asterism/sdk/runtime";
-import type { ModelServices } from "@asterism/sdk/runtime";
+import { PluginApiError } from "@asterism-app/sdk/runtime";
+import type { ModelServices } from "@asterism-app/sdk/runtime";
 import { coreDeclarations } from "../execution/core.ts";
 import { coreId } from "../shared/core.ts";
 import { inputReferences, validateInput, resolveInput, type ModelContent } from "../model/input.ts";
-import type { ModelItem } from "@asterism/sdk/contracts";
+import type { ModelItem } from "@asterism-app/sdk/contracts";
 import { errorMessages } from "../shared/error-display.ts";
 import type { BoundTopLevelTool } from "./top-level-tools.ts";
 
 /** Model target: select a role and optionally override model expression or reasoning level; omitted values inherit the role. */
-export type { ModelTarget, StreamRequest } from "@asterism/sdk/contracts";
+export type { ModelTarget, StreamRequest } from "@asterism-app/sdk/contracts";
 export type ModelTargetError = "role_unavailable" | "model_unavailable" | "credential_unavailable";
 export class ModelTargetFailure extends PluginApiError {
   constructor(readonly reason: ModelTargetError, message: string) { super("unavailable", message); }

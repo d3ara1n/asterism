@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { defineCall, defineChannel, defineCreation, defineImplementation, defineTool, contentRefSchema } from "@asterism/sdk/contracts";
-import { builtin, Read, See, Wait } from "@asterism/builtin-api/contracts";
+import { defineCall, defineChannel, defineCreation, defineImplementation, defineTool, contentRefSchema } from "@asterism-app/sdk/contracts";
+import { builtin, Read, See, Wait } from "@asterism-app/builtin-api/contracts";
 
 export const terminalStateSchema = z.enum(["inactive", "starting", "idle", "running", "unknown", "exited", "failed"]);
 export type TerminalState = z.infer<typeof terminalStateSchema>;

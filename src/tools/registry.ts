@@ -1,5 +1,5 @@
 import type { FoldedObject } from "../session/fold.ts";
-import type { ToolContract } from "@asterism/sdk/contracts";
+import type { ToolContract } from "@asterism-app/sdk/contracts";
 import type { ToolImplementation } from "./contract.ts";
 
 /** Group tool contracts by identity and select implementations by backend; never infer tool identity by comparing target/result. */

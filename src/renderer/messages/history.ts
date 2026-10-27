@@ -1,4 +1,4 @@
-import { defineMessages, pluginNamespace } from "@asterism/sdk/contracts";
+import { defineMessages, pluginNamespace } from "@asterism-app/sdk/contracts";
 
 export const historyMessages = pluginNamespace("asterism.host").messages("en", defineMessages({
   eventRenamed: { id: "eventRenamed", defaultMessage: "Renamed resource: {title}" },

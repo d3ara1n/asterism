@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { modelCostSchema, modelReference, resolveModelSelection, thinkingSchema } from "@asterism/sdk/contracts";
+import { modelCostSchema, modelReference, resolveModelSelection, thinkingSchema } from "@asterism-app/sdk/contracts";
 import { agentSchema, type AgentSelection } from "./configuration.ts";
 import { builtin } from "./identity.ts";
 

@@ -1,9 +1,9 @@
 import type { ReactNode } from "react";
-import type { UnitPrice } from "@asterism/sdk/contracts";
-import type { CatalogModel } from "@asterism/builtin-api/contracts";
-import { useI18n } from "@asterism/sdk/renderer";
-import { Separator } from "@asterism/ui/ui/separator";
-import { formatCount } from "@asterism/ui/format-count";
+import type { UnitPrice } from "@asterism-app/sdk/contracts";
+import type { CatalogModel } from "@asterism-app/builtin-api/contracts";
+import { useI18n } from "@asterism-app/sdk/renderer";
+import { Separator } from "@asterism-app/ui/ui/separator";
+import { formatCount } from "@asterism-app/ui/format-count";
 import { configurationMessages as messages } from "../../messages/configuration";
 import { diagnosticMessages } from "../../messages/diagnostics";
 import { formatPrice } from "../diagnostics/format";

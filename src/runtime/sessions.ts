@@ -1,5 +1,5 @@
-import { resourceCall, resourceTitleSchema, jsonSchema, type ActionContract, type CreationContract, type ResourceCall, type ResourceCreationResult, type Json, type ModelInputPart, ResourceStatusChanged, SessionTitleChanged } from "@asterism/sdk/contracts";
-import { type ResourceRef, type PluginDefinition, type ResourceCreationOptions, type ResourceActionOptions, PluginApiError } from "@asterism/sdk/runtime";
+import { resourceCall, resourceTitleSchema, jsonSchema, type ActionContract, type CreationContract, type ResourceCall, type ResourceCreationResult, type Json, type ModelInputPart, ResourceStatusChanged, SessionTitleChanged } from "@asterism-app/sdk/contracts";
+import { type ResourceRef, type PluginDefinition, type ResourceCreationOptions, type ResourceActionOptions, PluginApiError } from "@asterism-app/sdk/runtime";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
@@ -9,8 +9,8 @@ import { AgentCapabilities } from "../execution/capabilities.ts";
 import type { ModelAdapter } from "../model/contract.ts";
 import {
   Agent, CreateAgent, SubmitAgentInput, startAgentContentTarget, type SubmitAgentInputData, type NamingApi, inputSummary,
-} from "@asterism/builtin-api/contracts";
-import { createSelection, composeSystemPrompt } from "@asterism/builtin/runtime";
+} from "@asterism-app/builtin-api/contracts";
+import { createSelection, composeSystemPrompt } from "@asterism-app/builtin/runtime";
 import { inputReferences } from "../model/input.ts";
 import { createModules } from "./builtin.ts";
 import type { ParsedCall } from "../plugins/commands.ts";
@@ -34,7 +34,7 @@ import { ContentStore, contentReferences, type ContentLease, type ContentTarget 
 import { applicationStorage, applicationBrand } from "../shared/application.ts";
 import { EventBus } from "../plugins/events.ts";
 import { TemplateStore } from "./templates.ts";
-import type { ManualSource } from "@asterism/builtin-api/runtime";
+import type { ManualSource } from "@asterism-app/builtin-api/runtime";
 
 const agentKind = Agent.kind;
 

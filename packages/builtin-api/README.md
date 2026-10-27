@@ -8,8 +8,14 @@ Public declarations retain their identity across consumers. The package is a sha
 
 General hosting facilities belong to the SDK. Built-in-specific behavior belongs here only when it is intentionally public.
 
+## Installation
+
+Install the testing releases with `npm install --save-dev --save-exact @asterism-app/sdk@next @asterism-app/builtin-api@next`. Declare both packages as peer dependencies with `"*"` in the plugin package.
+
+The package ships TypeScript source. Asterism supplies the built-in public API at runtime, preserving shared declaration identity. Use development versions compatible with the target application; installing these packages does not install or update the built-in implementation.
+
 ## Authoring material
 
 The source package includes `docs/` for built-in domain development guides and `examples/` for agent input, input preparation, resource creation, and agent UI extensions. These examples are fragments to compose into a plugin with compatible SDK and built-in API dependencies. They participate in repository type checking.
 
-The application's manual exposes these directories directly. Generic plugin development material and the complete starter package belong to `@asterism/sdk`.
+The application's manual exposes these directories directly. Generic plugin development material and the complete starter package belong to `@asterism-app/sdk`.

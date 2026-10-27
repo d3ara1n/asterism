@@ -1,4 +1,4 @@
-import type { RequestTiming } from "@asterism/sdk/contracts";
+import type { RequestTiming } from "@asterism-app/sdk/contracts";
 import { wrapLanguageModel, type LanguageModel } from "ai";
 import type { ModelEvent } from "./contract.ts";
 

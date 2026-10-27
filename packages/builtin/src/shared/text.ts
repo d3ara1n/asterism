@@ -4,8 +4,8 @@ import { applyEdits } from "./hashline/apply.ts";
 import { clipDiffLine, excerptNote, READ_EXCERPT_THRESHOLD, rowText, textRow } from "./text-row.ts";
 import { hasFinalNewline, splitLines } from "./hashline/lines.ts";
 import type { ApplyFailure, Edit } from "./hashline/types.ts";
-import type { TextRead, TextChange } from "@asterism/builtin-api/contracts";
-import type { CallResult } from "@asterism/sdk/runtime";
+import type { TextRead, TextChange } from "@asterism-app/builtin-api/contracts";
+import type { CallResult } from "@asterism-app/sdk/runtime";
 
 const MAX_ANCHOR_LINES = 40;
 const MAX_ANCHOR_BYTES = 16 * 1024;

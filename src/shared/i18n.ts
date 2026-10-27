@@ -1,4 +1,4 @@
-import { messageValuesSchema, type UiMessage, type UiText, type MessageValues } from "@asterism/sdk/contracts";
+import { messageValuesSchema, type UiMessage, type UiText, type MessageValues } from "@asterism-app/sdk/contracts";
 import { parse, TYPE, type MessageFormatElement } from "@formatjs/icu-messageformat-parser";
 import { createIntl, createIntlCache, type IntlShape } from "@formatjs/intl";
 import { match } from "@formatjs/intl-localematcher";

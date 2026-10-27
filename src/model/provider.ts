@@ -1,6 +1,6 @@
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAI } from "@ai-sdk/openai";
-import type { ModelRequestIdentity } from "@asterism/sdk/contracts";
+import type { ModelRequestIdentity } from "@asterism-app/sdk/contracts";
 import type { ModelProviderInput, ProviderModel } from "../shared/configuration.ts";
 import { ModelFailure } from "./contract.ts";
 import { unauthenticatedApiKey } from "../shared/model.ts";

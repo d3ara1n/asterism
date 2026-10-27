@@ -1,4 +1,4 @@
-import { creationEntry, type RendererObjectContext } from "@asterism/sdk/renderer";
+import { creationEntry, type RendererObjectContext } from "@asterism-app/sdk/renderer";
 import { CreateDocument, ReplaceDocument } from "./content-contract.ts";
 
 /** This entry point accepts dropped files (with or without local paths) and clipboard images on the workbench. */

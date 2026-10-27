@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { jsonSchema } from "@asterism/sdk/contracts";
+import { jsonSchema } from "@asterism-app/sdk/contracts";
 
 const id = z.string().uuid();
 const ref = z.strictObject({ sessionId: z.string().min(1), id: z.string().min(1), kind: z.string().min(1) });

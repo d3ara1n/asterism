@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { defineCall, providerUsageIdSchema, usageItemsSchema, providerUsageErrorSchema } from "@asterism/sdk/contracts";
-import { builtin } from "@asterism/builtin-api/contracts";
+import { defineCall, providerUsageIdSchema, usageItemsSchema, providerUsageErrorSchema } from "@asterism-app/sdk/contracts";
+import { builtin } from "@asterism-app/builtin-api/contracts";
 
 /** Display state for the built-in consumer; does not constrain other plugins' caching or refresh policies. */
 export const providerUsageStateSchema = z.strictObject({

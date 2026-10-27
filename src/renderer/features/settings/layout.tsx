@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Item, ItemContent, ItemTitle, ItemDescription, ItemActions } from "@asterism/ui/ui/item";
+import { Item, ItemContent, ItemTitle, ItemDescription, ItemActions } from "@asterism-app/ui/ui/item";
 
 /** Settings group: title + rounded group surface, with dividers between rows. */
 export function Section({ title, hint, action, children }: { title: string; hint?: string; action?: ReactNode; children: ReactNode }) {

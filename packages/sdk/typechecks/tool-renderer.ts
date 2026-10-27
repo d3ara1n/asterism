@@ -1,8 +1,8 @@
 /** Tool view author example: the three states are declared in parallel, and the same component can be reused across phases. */
 import { createElement } from "react";
 import { z } from "zod";
-import { defineData, type Json } from "@asterism/sdk/contracts";
-import { toolRenderer, type ToolRenderProps, type ToolRendererDefinition } from "@asterism/sdk/renderer";
+import { defineData, type Json } from "@asterism-app/sdk/contracts";
+import { toolRenderer, type ToolRenderProps, type ToolRendererDefinition } from "@asterism-app/sdk/renderer";
 
 const Result = defineData("example.writer/write", z.object({ written: z.number() }));
 const targetSchema = z.object({ path: z.string() });

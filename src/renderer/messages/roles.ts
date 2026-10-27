@@ -1,4 +1,4 @@
-import { defineMessages, pluginNamespace } from "@asterism/sdk/contracts";
+import { defineMessages, pluginNamespace } from "@asterism-app/sdk/contracts";
 
 export const rolesMessages = pluginNamespace("asterism.host").messages("en", defineMessages({
   model: {

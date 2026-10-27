@@ -1,4 +1,4 @@
-import type { RendererViewStateEntry } from "@asterism/sdk/renderer";
+import type { RendererViewStateEntry } from "@asterism-app/sdk/renderer";
 import { ConversationHistoryWindow } from "./history-window";
 
 /** Conversation timeline item view state: saved per item by `timelineKey`, retained by the agent object, and restored when items remount during scrolling. */

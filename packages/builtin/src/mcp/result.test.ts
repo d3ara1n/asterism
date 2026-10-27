@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ContentScope } from "@asterism/sdk/runtime";
+import type { ContentScope } from "@asterism-app/sdk/runtime";
 import { convertMcpResult, mcpResultToModel } from "./result.ts";
 
 const identity = { serverId: "server", serverName: "Server", toolName: "read" };

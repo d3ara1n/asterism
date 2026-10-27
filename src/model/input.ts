@@ -1,5 +1,5 @@
-import { modelInputPartsSchema, type ContentRef, type ModelInputPart, type ModelItem, modelInputLimits } from "@asterism/sdk/contracts";
-import type { ContentReader } from "@asterism/sdk/runtime";
+import { modelInputPartsSchema, type ContentRef, type ModelInputPart, type ModelItem, modelInputLimits } from "@asterism-app/sdk/contracts";
+import type { ContentReader } from "@asterism-app/sdk/runtime";
 import { ModelFailure, type ResolvedInputPart, type ResolvedModelItem } from "./contract.ts";
 
 export interface ModelContent {

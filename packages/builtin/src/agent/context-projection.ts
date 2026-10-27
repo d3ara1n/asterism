@@ -1,6 +1,6 @@
-import type { SessionRecord, SessionSnapshot, ModelBlock, ModelItem, ModelPart } from "@asterism/sdk/contracts";
+import type { SessionRecord, SessionSnapshot, ModelBlock, ModelItem, ModelPart } from "@asterism-app/sdk/contracts";
 import type { z } from "zod";
-import { ContextSummary, Execution, AgentInputMessage } from "@asterism/builtin-api/contracts";
+import { ContextSummary, Execution, AgentInputMessage } from "@asterism-app/builtin-api/contracts";
 import { projectInputMessage } from "./input-message.ts";
 
 /** Projection depends only on pure contracts; background requests and the frontend context panel share the same rules, and the background entry point converts failures to plugin errors. */

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { uiTextSchema, pluginMetadataSchema, type Json } from "@asterism/sdk/contracts";
+import { uiTextSchema, pluginMetadataSchema, type Json } from "@asterism-app/sdk/contracts";
 import { translationCatalogSchema, type LanguageBridge } from "./language.ts";
 import { coreChannel } from "./core.ts";
 import type { DesktopPlatform, DesktopWindowBridge } from "./desktop.ts";

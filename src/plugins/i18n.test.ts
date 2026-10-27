@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { afterEach, describe, expect, it } from "vitest";
-import { defineMessages, defineAction, pluginNamespace, withValues, uiTextSchema, localeSchema, present } from "@asterism/sdk/contracts";
+import { defineMessages, defineAction, pluginNamespace, withValues, uiTextSchema, localeSchema, present } from "@asterism-app/sdk/contracts";
 import { z } from 'zod';
 import { applyPreparation } from "./commands.ts";
 import { PackageList, loadPackages, readManifest } from "./packages.ts";
@@ -11,9 +11,9 @@ import { loadCatalogs } from "./catalogs.ts";
 import { MessageFormatter } from "../shared/i18n.ts";
 import { ApplicationService } from "../runtime/service.ts";
 import { servePluginConfiguration, serveSession } from "../runtime/dispatch.ts";
-import { PluginApiError } from "@asterism/sdk/runtime";
-import sdkMetadata from "@asterism/sdk/package.json" with { type: "json" };
-import * as sdkContracts from "@asterism/sdk/contracts";
+import { PluginApiError } from "@asterism-app/sdk/runtime";
+import sdkMetadata from "@asterism-app/sdk/package.json" with { type: "json" };
+import * as sdkContracts from "@asterism-app/sdk/contracts";
 import * as ReactIntl from "react-intl";
 import { pathToFileURL } from "node:url";
 const roots: string[] = [], services: ApplicationService[] = [];
@@ -33,12 +33,12 @@ describe("Plugin catalogs and presentation IPC", () => {
   });
   it("public messages retain provider ownership and renderer React Intl comes from the host instance", async () => {
     const provider = temp(), consumer = temp(), data = temp(), cache = join(data, "cache");
-    writeFileSync(join(provider, "package.json"), JSON.stringify({ name: "@example/messages", peerDependencies: { "@asterism/sdk": `^${sdkMetadata.version}` }, exports: { "./public": "./public.ts" },
+    writeFileSync(join(provider, "package.json"), JSON.stringify({ name: "@example/messages", peerDependencies: { "@asterism-app/sdk": `^${sdkMetadata.version}` }, exports: { "./public": "./public.ts" },
       asterism: { id: "example.messages", i18n: { catalogs: { "zh-Hans": "zh.json" } } } }));
-    writeFileSync(join(provider, "public.ts"), `import {pluginNamespace,defineMessages} from '@asterism/sdk/contracts';
+    writeFileSync(join(provider, "public.ts"), `import {pluginNamespace,defineMessages} from '@asterism-app/sdk/contracts';
       export const messages=pluginNamespace('example.messages').messages('en',defineMessages({title:{id:'title',defaultMessage:'Shared title'}}));`);
     writeFileSync(join(provider, "zh.json"), JSON.stringify({ title: "共享标题" }));
-    writeFileSync(join(consumer, "package.json"), JSON.stringify({ name: "@example/consumer", peerDependencies: { "@asterism/sdk": `^${sdkMetadata.version}` }, dependencies: { "@example/messages": "*" },
+    writeFileSync(join(consumer, "package.json"), JSON.stringify({ name: "@example/consumer", peerDependencies: { "@asterism-app/sdk": `^${sdkMetadata.version}` }, dependencies: { "@example/messages": "*" },
       asterism: { id: "example.consumer", renderer: "renderer.ts" } }));
     writeFileSync(join(consumer, "renderer.ts"), `export {messages} from '@example/messages/public';
       export {IntlProvider, useIntl} from 'react-intl'; export default {modules:[{resources:[],cards:[],tools:[]}]};`);
@@ -47,7 +47,7 @@ describe("Plugin catalogs and presentation IPC", () => {
     const packages = await loadPackages(list, data, cache, []);
     expect(packages.map(item => item.status)).toEqual(["loaded", "loaded"]);
     const globals = globalThis as Record<string, unknown>, previous = globals.__asterismRendererModules;
-    globals.__asterismRendererModules = { "@asterism/sdk/contracts": sdkContracts, "react-intl": ReactIntl };
+    globals.__asterismRendererModules = { "@asterism-app/sdk/contracts": sdkContracts, "react-intl": ReactIntl };
     try {
       const renderer = await import(pathToFileURL(join(cache, packages[1]!.renderer!)).href);
       expect(renderer.IntlProvider).toBe(ReactIntl.IntlProvider); expect(renderer.useIntl).toBe(ReactIntl.useIntl);
@@ -57,11 +57,11 @@ describe("Plugin catalogs and presentation IPC", () => {
   });
   it("source plugins without renderers declare messages and configuration through the public SDK with independently updated catalog content", async () => {
     const root = temp(), data = temp(); mkdirSync(join(root, "locales"));
-    writeFileSync(join(root, "package.json"), JSON.stringify({ name: "@example/backend", peerDependencies: { "@asterism/sdk": `^${sdkMetadata.version}` }, asterism: { id: "example.backend",
+    writeFileSync(join(root, "package.json"), JSON.stringify({ name: "@example/backend", peerDependencies: { "@asterism-app/sdk": `^${sdkMetadata.version}` }, asterism: { id: "example.backend",
       runtime: "runtime.ts", i18n: { catalogs: { "zh-Hans": "locales/zh.json" } } } }));
     writeFileSync(join(root, "runtime.ts"), `import { z } from 'zod';
-      import {pluginNamespace,defineMessages} from '@asterism/sdk/contracts';
-      import { definePlugin, defineModule, PluginApiError } from '@asterism/sdk/runtime';
+      import {pluginNamespace,defineMessages} from '@asterism-app/sdk/contracts';
+      import { definePlugin, defineModule, PluginApiError } from '@asterism-app/sdk/runtime';
       const ns = pluginNamespace('example.backend');
       const messages = ns.messages('en', defineMessages({ limit: { id: 'limit', defaultMessage: 'Limit' } }));
       export default definePlugin({namespace: ns, modules: [defineModule(plugin => {
@@ -93,7 +93,7 @@ describe("Plugin catalogs and presentation IPC", () => {
     writeFileSync(join(outside, "catalog.json"), "{}"); symlinkSync(join(outside, "catalog.json"), join(root, "linked.json"));
     expect(loadCatalogs(root, "example.test", { en: "linked.json", fr: "missing.json" }, message => diagnostics.push(message))).toEqual([]);
     expect(diagnostics.length).toBeGreaterThan(0);
-    writeFileSync(join(root, "package.json"), JSON.stringify({ name: "x", peerDependencies: { "@asterism/sdk": `^${sdkMetadata.version}` }, asterism: { id: "example.test", i18n: { catalogs: { en: "a.json", EN: "b.json" } } } }));
+    writeFileSync(join(root, "package.json"), JSON.stringify({ name: "x", peerDependencies: { "@asterism-app/sdk": `^${sdkMetadata.version}` }, asterism: { id: "example.test", i18n: { catalogs: { en: "a.json", EN: "b.json" } } } }));
     expect(() => readManifest(root)).toThrow();
   });
   it("preparation reason codes and display pass through command IPC; custom reasons without display retain English fallbacks", async () => {

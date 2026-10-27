@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { applyPatch } from "diff";
-import { Read, Edit, Write } from "@asterism/builtin-api/contracts";
+import { Read, Edit, Write } from "@asterism-app/builtin-api/contracts";
 import { readText, readToModel, editText, textChange, writeToModel, editToModel } from "./text.ts";
 import { computeLineHash } from "./hashline/hash.ts";
 

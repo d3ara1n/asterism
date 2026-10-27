@@ -1,7 +1,7 @@
 import { nanoid } from "nanoid";
-import { SubmitAgentInput, CancelAgent, type AgentMessageSender } from "@asterism/builtin-api/contracts";
-import type { ModelInputPart } from "@asterism/sdk/contracts";
-import type { PluginContext, ResourceRef, ResourceActionOptions } from "@asterism/sdk/runtime";
+import { SubmitAgentInput, CancelAgent, type AgentMessageSender } from "@asterism-app/builtin-api/contracts";
+import type { ModelInputPart } from "@asterism-app/sdk/contracts";
+import type { PluginContext, ResourceRef, ResourceActionOptions } from "@asterism-app/sdk/runtime";
 
 /** Backend plugins submit complete input using a resource reference; returning means acceptance, while the Agent maintains its own execution state. */
 export async function steerAgent(plugin: PluginContext, agent: ResourceRef, parts: ModelInputPart[], options?: ResourceActionOptions) {

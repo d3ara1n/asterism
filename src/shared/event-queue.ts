@@ -1,4 +1,4 @@
-import type { EventContract, Source, Json, SubscriptionEnd } from "@asterism/sdk/contracts";
+import type { EventContract, Source, Json, SubscriptionEnd } from "@asterism-app/sdk/contracts";
 import { EventSubscriptionState } from "./event-subscription.ts";
 
 /** latest coalescing key: values with the same origin and snapshot key replace each other; occurrence contracts return an empty string and do not coalesce. */

@@ -1,4 +1,4 @@
-import { defineMessages, pluginNamespace } from "@asterism/sdk/contracts";
+import { defineMessages, pluginNamespace } from "@asterism-app/sdk/contracts";
 
 export const resourceStatusMessages = pluginNamespace("asterism.host").messages("en", defineMessages({
   title: { id: "resourceStatus.title", defaultMessage: "Resource status" },

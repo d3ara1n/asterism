@@ -1,4 +1,4 @@
-import { commonMessages } from "@asterism/ui/messages/common";
+import { commonMessages } from "@asterism-app/ui/messages/common";
 import { useI18n } from "../shared/i18n";
 import { FailureScreen } from "./FailureScreen";
 

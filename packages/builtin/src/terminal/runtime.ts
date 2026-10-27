@@ -4,8 +4,8 @@ import { homedir } from "node:os";
 import { isAbsolute, join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { defineModule, implementResource, implementCreation, implementTool, implementCall, implementChannel, PluginApiError,
-  type CallResult, type ObjectReader } from "@asterism/sdk/runtime";
-import { ResourceStatusChanged, type Json } from "@asterism/sdk/contracts";
+  type CallResult, type ObjectReader } from "@asterism-app/sdk/runtime";
+import { ResourceStatusChanged, type Json } from "@asterism-app/sdk/contracts";
 import type { ShellSettings } from "../shell/contract.ts";
 import { terminalMessages } from "../messages/terminal.ts";
 import { SharedTerminal, TerminalError, keySequence, type TerminalViewer } from "./service.ts";

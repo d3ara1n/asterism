@@ -1,4 +1,4 @@
-import type { ChannelEnd, ChannelValue } from "@asterism/sdk/contracts";
+import type { ChannelEnd, ChannelValue } from "@asterism-app/sdk/contracts";
 import { coreChannel } from "./core.ts";
 import type { Command, CommandResult } from "./contracts.ts";
 import type { SessionBridge, SessionChanged, SessionCommand, SessionResult } from "./session.ts";

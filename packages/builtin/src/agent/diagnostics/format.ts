@@ -1,6 +1,6 @@
-import type { I18n } from "@asterism/sdk/renderer";
-import type { UnitPrice } from "@asterism/sdk/contracts";
-import { formatCount } from "@asterism/ui/format-count";
+import type { I18n } from "@asterism-app/sdk/renderer";
+import type { UnitPrice } from "@asterism-app/sdk/contracts";
+import { formatCount } from "@asterism-app/ui/format-count";
 import { diagnosticMessages as messages } from "../../messages/diagnostics";
 import { performanceMessages } from "../../messages/performance";
 

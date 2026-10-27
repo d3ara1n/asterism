@@ -1,8 +1,8 @@
 import { TerminalSquare } from "lucide-react";
-import { toolRenderer, useI18n, type RendererModule, type ToolRenderProps } from "@asterism/sdk/renderer";
-import { ToolHeader } from "@asterism/ui/tool-header";
-import { Badge } from "@asterism/ui/ui/badge";
-import { Item, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@asterism/ui/ui/item";
+import { toolRenderer, useI18n, type RendererModule, type ToolRenderProps } from "@asterism-app/sdk/renderer";
+import { ToolHeader } from "@asterism-app/ui/tool-header";
+import { Badge } from "@asterism-app/ui/ui/badge";
+import { Item, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@asterism-app/ui/ui/item";
 import { shellMessages as messages } from "../messages/shell";
 import { resourceMessages } from "../messages/resources";
 import { TOOL_BODY_LINE_LIMIT } from "../shared/tool-body";

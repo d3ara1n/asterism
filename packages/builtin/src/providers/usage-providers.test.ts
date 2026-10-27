@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { usageItemsSchema } from "@asterism/sdk/contracts";
+import { usageItemsSchema } from "@asterism-app/sdk/contracts";
 import { createDeepSeekUsage, parseDeepSeekBalance } from "./deepseek.ts";
 import { createKimiUsage, parseKimiQuota } from "./kimi.ts";
 import { createOpenCodeUsage, parseOpenCodeQuota } from "./opencode.ts";

@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useSyncExternalStore } from "react";
-import { useRendererCalls, useRendererEvents } from "@asterism/sdk/renderer";
-import type { PluginCalls, EventSubscription } from "@asterism/sdk/contracts";
+import { useRendererCalls, useRendererEvents } from "@asterism-app/sdk/renderer";
+import type { PluginCalls, EventSubscription } from "@asterism-app/sdk/contracts";
 import { ReadUsage, UsageChanged } from "./contract";
 import { ProviderUsageClient } from "./client";
 

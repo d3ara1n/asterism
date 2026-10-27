@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { rgPath } from "@vscode/ripgrep";
-import type { FindArgs, GrepArgs } from "@asterism/builtin-api/contracts";
+import type { FindArgs, GrepArgs } from "@asterism-app/builtin-api/contracts";
 import { FilesystemError, failed } from "./errors.ts";
 import type { SearchRecords } from "./search-output.ts";
 import type { SearchStopReason } from "./search-contract.ts";

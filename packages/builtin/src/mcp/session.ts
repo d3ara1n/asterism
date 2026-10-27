@@ -1,8 +1,8 @@
 import { Client, StreamableHTTPClientTransport, UnauthorizedError, type CallToolResult, type Progress, type Transport } from "@modelcontextprotocol/client";
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
 import type { AjvJsonSchemaValidator } from "@modelcontextprotocol/client/validators/ajv";
-import type { PluginContext } from "@asterism/sdk/runtime";
-import type { Json } from "@asterism/sdk/contracts";
+import type { PluginContext } from "@asterism-app/sdk/runtime";
+import type { Json } from "@asterism-app/sdk/contracts";
 import type { ConnectionPhase, McpServerConfig, McpServerState } from "./contract.ts";
 import { directorySchema, type CachedTool, type Directory } from "./catalog.ts";
 import { McpError, McpInterrupted } from "./errors.ts";

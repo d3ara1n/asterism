@@ -1,11 +1,11 @@
 import { ChevronDown, Plus, Trash2 } from "lucide-react";
-import { emptyModelRates, priceUnits, type ModelCost, type ModelRates, type ModalityRates, type UnitPrice } from "@asterism/sdk/contracts";
+import { emptyModelRates, priceUnits, type ModelCost, type ModelRates, type ModalityRates, type UnitPrice } from "@asterism-app/sdk/contracts";
 import { modelCostMessages as messages } from "../../messages/model-cost";
 import { useI18n } from "../../shared/i18n";
-import { Button } from "@asterism/ui/ui/button";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@asterism/ui/ui/collapsible";
-import { FieldDescription, FieldGroup, FieldLegend, FieldSet } from "@asterism/ui/ui/field";
-import { IconButton } from "@asterism/ui/ui/icon-button";
+import { Button } from "@asterism-app/ui/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@asterism-app/ui/ui/collapsible";
+import { FieldDescription, FieldGroup, FieldLegend, FieldSet } from "@asterism-app/ui/ui/field";
+import { IconButton } from "@asterism-app/ui/ui/icon-button";
 import { ChoiceField, EditorSection, NumberField } from "./forms";
 
 const unitLabels = { token: messages.tokenUnit, image: messages.imageUnit, second: messages.secondUnit };

@@ -1,6 +1,6 @@
 import { app, BrowserWindow, dialog, ipcMain, MessageChannelMain, net, protocol, session, shell } from "electron";
 import { randomUUID } from "node:crypto";
-import { externalWebUrl } from "@asterism/ui/links";
+import { externalWebUrl } from "@asterism-app/ui/links";
 import { mkdirSync } from "node:fs";
 import { stat } from "node:fs/promises";
 import { homedir } from "node:os";

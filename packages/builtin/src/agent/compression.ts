@@ -1,6 +1,6 @@
-import { thinkingLevels, describeError, type ModelItem, type ModelTarget, type ModelEvent } from "@asterism/sdk/contracts";
-import type { ModelServices, ObjectExecutor } from "@asterism/sdk/runtime";
-import { ContextSummary, Execution } from "@asterism/builtin-api/contracts";
+import { thinkingLevels, describeError, type ModelItem, type ModelTarget, type ModelEvent } from "@asterism-app/sdk/contracts";
+import type { ModelServices, ObjectExecutor } from "@asterism-app/sdk/runtime";
+import { ContextSummary, Execution } from "@asterism-app/builtin-api/contracts";
 import { feedbackOrigin, type AgentFeedback } from "./feedback.ts";
 import { summaryPrompt, summarySystemPrompt } from "./compression-prompt.ts";
 import { contextMessages, projectAgentContext, type AgentContext } from "./projection.ts";

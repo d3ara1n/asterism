@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { Copy } from "lucide-react";
 import { toast } from "sonner";
-import { useI18n } from "@asterism/sdk/renderer";
-import { IconButton } from "@asterism/ui/ui/icon-button";
+import { useI18n } from "@asterism-app/sdk/renderer";
+import { IconButton } from "@asterism-app/ui/ui/icon-button";
 import { turnMetricMessages as messages } from "../../messages/turn-metrics";
 import type { TurnMetricsData } from "./turn-metrics";
 import { TurnMetrics } from "./TurnMetrics";

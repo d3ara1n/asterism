@@ -1,4 +1,4 @@
-import type { GrepArgs } from "@asterism/builtin-api/contracts";
+import type { GrepArgs } from "@asterism-app/builtin-api/contracts";
 import type { GrepResult } from "./search-contract.ts";
 import { displayText } from "../shared/text-row.ts";
 

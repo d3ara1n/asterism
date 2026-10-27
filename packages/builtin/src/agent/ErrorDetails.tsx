@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { Copy, FileText } from "lucide-react";
-import { useI18n } from "@asterism/sdk/renderer";
-import type { ErrorDetails } from "@asterism/sdk/contracts";
-import { JsonView } from "@asterism/ui/json-view";
-import { Button } from "@asterism/ui/ui/button";
-import { Badge } from "@asterism/ui/ui/badge";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@asterism/ui/ui/dialog";
+import { useI18n } from "@asterism-app/sdk/renderer";
+import type { ErrorDetails } from "@asterism-app/sdk/contracts";
+import { JsonView } from "@asterism-app/ui/json-view";
+import { Button } from "@asterism-app/ui/ui/button";
+import { Badge } from "@asterism-app/ui/ui/badge";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@asterism-app/ui/ui/dialog";
 import { errorDetailMessages as messages } from "../messages/errors";
 
 /** Transient feedback and historical notifications share details; response bodies are displayed verbatim, and copying includes the full cause chain. */

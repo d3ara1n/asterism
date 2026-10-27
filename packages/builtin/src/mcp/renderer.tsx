@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { ChevronRight, Network, RefreshCw, Settings } from "lucide-react";
-import { useI18n, useRendererCalls, useRendererSettings, creationEntry, cardRenderer, type RendererModule } from "@asterism/sdk/renderer";
-import { Button } from "@asterism/ui/ui/button";
-import { IconButton } from "@asterism/ui/ui/icon-button";
-import { Spinner } from "@asterism/ui/ui/spinner";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@asterism/ui/ui/collapsible";
-import { cn } from "@asterism/ui/utils";
+import { useI18n, useRendererCalls, useRendererSettings, creationEntry, cardRenderer, type RendererModule } from "@asterism-app/sdk/renderer";
+import { Button } from "@asterism-app/ui/ui/button";
+import { IconButton } from "@asterism-app/ui/ui/icon-button";
+import { Spinner } from "@asterism-app/ui/ui/spinner";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@asterism-app/ui/ui/collapsible";
+import { cn } from "@asterism-app/ui/utils";
 import { McpHost, CreateMcpHost, McpHostView, ConnectMcpServer, type McpServerState } from "./contract";
 import { mcpMessages as messages } from "../messages/mcp";
 import { useMcpTools } from "./status";

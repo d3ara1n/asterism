@@ -1,29 +1,29 @@
 import { useState, useRef, type DragEvent, type KeyboardEvent } from "react";
-import { useI18n } from "@asterism/sdk/renderer";
-import { modelInputText } from "@asterism/sdk/contracts";
+import { useI18n } from "@asterism-app/sdk/renderer";
+import { modelInputText } from "@asterism-app/sdk/contracts";
 import {
   GripVertical, Inbox, ChevronDown, Paperclip,
   Bot, User, ArrowDownToLine, ArrowLeftRight, Trash2, MoreHorizontal,
   AlertTriangle,
 } from "lucide-react";
-import { Button } from "@asterism/ui/ui/button";
-import { Badge } from "@asterism/ui/ui/badge";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@asterism/ui/ui/collapsible";
-import { Tooltip, TooltipTrigger, TooltipContent } from "@asterism/ui/ui/tooltip";
+import { Button } from "@asterism-app/ui/ui/button";
+import { Badge } from "@asterism-app/ui/ui/badge";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@asterism-app/ui/ui/collapsible";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@asterism-app/ui/ui/tooltip";
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
   DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator,
   DropdownMenuItem, DropdownMenuGroup,
-} from "@asterism/ui/ui/dropdown-menu";
+} from "@asterism-app/ui/ui/dropdown-menu";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-} from "@asterism/ui/ui/alert-dialog";
-import { StatusText } from "@asterism/ui/ui/status";
-import { cn } from "@asterism/ui/utils";
+} from "@asterism-app/ui/ui/alert-dialog";
+import { StatusText } from "@asterism-app/ui/ui/status";
+import { cn } from "@asterism-app/ui/utils";
 import { conversationMessages as messages } from "../../messages/conversation";
 import { useConversationInteraction } from "./interaction";
-import { commonMessages } from "@asterism/ui/messages/common";
+import { commonMessages } from "@asterism-app/ui/messages/common";
 import type { AgentDraft, DraftMode } from "../drafts-contract";
 
 /** Draft box panel; shown when items or exchanges awaiting confirmation exist, and occupies no space otherwise. */

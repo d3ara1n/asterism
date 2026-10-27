@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { defineModule, defineTopLevelTool, type ModelServices } from "@asterism/sdk/runtime";
-import { inputSummary, builtin, SessionNamed, type NamingApi } from "@asterism/builtin-api/contracts";
-import type { SessionSnapshot } from "@asterism/sdk/contracts";
+import { defineModule, defineTopLevelTool, type ModelServices } from "@asterism-app/sdk/runtime";
+import { inputSummary, builtin, SessionNamed, type NamingApi } from "@asterism-app/builtin-api/contracts";
+import type { SessionSnapshot } from "@asterism-app/sdk/contracts";
 import { cleanTitle, collectTurns, namingInstruction, namingPrompt, userMessages } from "./policy.ts";
 import { SessionNameResult, SessionRenameResult } from "./contract.ts";
 

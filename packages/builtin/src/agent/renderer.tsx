@@ -1,11 +1,11 @@
 import { AgentView } from "./data.ts";
-import { creationEntry, cardRenderer, useRendererObject, type RendererModule } from "@asterism/sdk/renderer";
+import { creationEntry, cardRenderer, useRendererObject, type RendererModule } from "@asterism-app/sdk/renderer";
 import { Bot } from "lucide-react";
 import type { z } from "zod";
 
 import { commonMessages } from "../messages/common";
-import { builtin, CreateAgent } from "@asterism/builtin-api/contracts";
-import { agentUI } from "@asterism/builtin-api/renderer";
+import { builtin, CreateAgent } from "@asterism-app/builtin-api/contracts";
+import { agentUI } from "@asterism-app/builtin-api/renderer";
 import { Conversation, ConversationActions } from "./conversation/Conversation";
 import { AgentInput } from "./creation";
 import { agentRecordViews } from "./history";

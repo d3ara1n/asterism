@@ -1,5 +1,5 @@
 import { wrapLanguageModel, type LanguageModelMiddleware } from "ai";
-import type { ThinkingLevel } from "@asterism/sdk/contracts";
+import type { ThinkingLevel } from "@asterism-app/sdk/contracts";
 import type { ModelProviderInput, ProviderModel } from "../shared/configuration.ts";
 import { mergeModelCompatibility, type CustomThinkingLevels, type CustomThinkingBudgets } from "../shared/model-compatibility.ts";
 import { ModelFailure } from "./contract.ts";

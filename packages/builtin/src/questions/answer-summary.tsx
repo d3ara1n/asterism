@@ -1,9 +1,9 @@
 import type { ReactNode } from "react";
 import { Check } from "lucide-react";
-import { useI18n } from "@asterism/sdk/renderer";
-import { Badge } from "@asterism/ui/ui/badge";
-import { Separator } from "@asterism/ui/ui/separator";
-import { StatusText } from "@asterism/ui/ui/status";
+import { useI18n } from "@asterism-app/sdk/renderer";
+import { Badge } from "@asterism-app/ui/ui/badge";
+import { Separator } from "@asterism-app/ui/ui/separator";
+import { StatusText } from "@asterism-app/ui/ui/status";
 import { questionMessages as messages } from "../messages/questions";
 import type { SummaryRow } from "./summary";
 

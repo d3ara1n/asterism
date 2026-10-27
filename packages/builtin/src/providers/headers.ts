@@ -1,6 +1,6 @@
-import type { QuotaItem, UiText, UsageItem } from "@asterism/sdk/contracts";
+import type { QuotaItem, UiText, UsageItem } from "@asterism-app/sdk/contracts";
 import { z } from "zod";
-import { UsageQueryError, type HeadersUsageProvider, type UsageHeadersContext } from "@asterism/sdk/runtime";
+import { UsageQueryError, type HeadersUsageProvider, type UsageHeadersContext } from "@asterism-app/sdk/runtime";
 import { usageMessages as messages } from "../messages/usage.ts";
 
 function number(value: string | undefined): number | null {

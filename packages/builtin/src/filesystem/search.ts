@@ -1,7 +1,7 @@
 import { stat } from "node:fs/promises";
 import type { z } from "zod";
 import { basename, dirname, relative, sep } from "node:path";
-import { implementTool, type CallResult } from "@asterism/sdk/runtime";
+import { implementTool, type CallResult } from "@asterism-app/sdk/runtime";
 import { DirectoryFind, DirectoryGrep } from "./search-contract.ts";
 import { directoryRoot, withinDirectory } from "./paths.ts";
 import { filesystemFailure, FilesystemError, failed, rejected } from "./errors.ts";

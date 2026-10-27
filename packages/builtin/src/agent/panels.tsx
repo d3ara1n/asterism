@@ -1,5 +1,5 @@
 import { AgentView } from "./data.ts";
-import type { CardPanelDefinition } from "@asterism/sdk/renderer";
+import type { CardPanelDefinition } from "@asterism-app/sdk/renderer";
 import { Layers, Stethoscope } from "lucide-react";
 import type { z } from "zod";
 import { agentPanelMessages as messages } from "../messages/agent-panels";

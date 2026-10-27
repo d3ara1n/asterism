@@ -1,5 +1,5 @@
-import { ResourceStatusChanged, type ResourceStatus } from "@asterism/sdk/contracts";
-import type { ObjectExecutor, PluginContext } from "@asterism/sdk/runtime";
+import { ResourceStatusChanged, type ResourceStatus } from "@asterism-app/sdk/contracts";
+import type { ObjectExecutor, PluginContext } from "@asterism-app/sdk/runtime";
 import { Progress } from "../examples/events.ts";
 
 export function invalidEvents(plugin: PluginContext, object: ObjectExecutor) {

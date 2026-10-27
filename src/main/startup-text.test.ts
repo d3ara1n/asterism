@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { startupText } from "./startup-text.ts";
-import { defineMessages, pluginNamespace } from "@asterism/sdk/contracts";
+import { defineMessages, pluginNamespace } from "@asterism-app/sdk/contracts";
 import { MessageFormatter } from "../shared/i18n.ts";
 const message = pluginNamespace("example.startup").messages("en", defineMessages({ failure: { id: "failure", defaultMessage: "Open failed: {object}" } })).failure;
 describe("Localization boundary for startup failure prompts", () => {

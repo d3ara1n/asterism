@@ -1,5 +1,5 @@
-import type { StreamRequest, UsageItem } from "@asterism/sdk/contracts";
-import type { PluginContext } from "@asterism/sdk/runtime";
+import type { StreamRequest, UsageItem } from "@asterism-app/sdk/contracts";
+import type { PluginContext } from "@asterism-app/sdk/runtime";
 
 /** Example consumer: actively queries before a request and parses response headers against the current catalog for the response's connection. */
 export async function* streamWithUsage(plugin: PluginContext, connectionId: string, request: StreamRequest,

@@ -9,7 +9,7 @@ import { aiSdkAdapterVersion, pickContinuation } from "./continuation.ts";
 import { projectHistory, validateProjection } from "./projection.ts";
 import { validateRequestIdentity } from "./request-identity.ts";
 import { measureModel, RequestTimer } from "./request-timing.ts";
-import { describeError, type ModelResponse } from "@asterism/sdk/contracts";
+import { describeError, type ModelResponse } from "@asterism-app/sdk/contracts";
 import { ZodError } from "zod";
 
 function json(value: unknown): Json { return jsonSchema.parse(JSON.parse(JSON.stringify(value))); }

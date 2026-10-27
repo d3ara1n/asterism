@@ -1,4 +1,4 @@
-import { thinkingLevels } from "@asterism/sdk/contracts";
+import { thinkingLevels } from "@asterism-app/sdk/contracts";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";

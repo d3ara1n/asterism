@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { defineCreation, pluginNamespace } from "@asterism/sdk/contracts";
-import { definePlugin, implementCreation, implementResource } from "@asterism/sdk/runtime";
-import { defineAgentCreation } from "@asterism/builtin-api/runtime";
+import { defineCreation, pluginNamespace } from "@asterism-app/sdk/contracts";
+import { definePlugin, implementCreation, implementResource } from "@asterism-app/sdk/runtime";
+import { defineAgentCreation } from "@asterism-app/builtin-api/runtime";
 
 const ns = pluginNamespace("example.documents");
 const Document = ns.resource("document", z.object({ text: z.string() }));

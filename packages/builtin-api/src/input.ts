@@ -1,4 +1,4 @@
-import { modelInputPartsSchema, modelInputText, type ModelInputPart } from "@asterism/sdk/contracts";
+import { modelInputPartsSchema, modelInputText, type ModelInputPart } from "@asterism-app/sdk/contracts";
 
 /** Business limits for a single user input; model requests accumulate history separately. */
 export const userInputPartsSchema = modelInputPartsSchema.max(128)

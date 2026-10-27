@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { builtin, agentSelectionSchema } from "@asterism/builtin-api/contracts";
+import { builtin, agentSelectionSchema } from "@asterism-app/builtin-api/contracts";
 import { agentExecutionStateSchema } from "./state.ts";
 import { agentDraftSchema } from "./drafts-contract.ts";
 import { inlineFeedbackSchema, compressionActivitySchema } from "./feedback.ts";

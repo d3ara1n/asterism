@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { jsonSchema } from "@asterism/sdk/contracts";
-import { builtin } from "@asterism/builtin-api/contracts";
+import { jsonSchema } from "@asterism-app/sdk/contracts";
+import { builtin } from "@asterism-app/builtin-api/contracts";
 
 /** Top-level tool result identities are shared by the backend and views, retaining catalog and resource information from the actual call. */
 export const AgentListResult = builtin.data("agent.list",

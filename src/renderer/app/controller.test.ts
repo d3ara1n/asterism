@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { AppSnapshot, CommandResult } from "../../shared/contracts.ts";
 import { ApplicationController } from "./controller.ts";
-import { ResourceStatusChanged, ResourcePresenceChanged, type EventHandler, type EventSubscriber, type ResourceStatus } from "@asterism/sdk/contracts";
+import { ResourceStatusChanged, ResourcePresenceChanged, type EventHandler, type EventSubscriber, type ResourceStatus } from "@asterism-app/sdk/contracts";
 import { summarizeResourceStatus } from "./resource-status.ts";
 
 const snapshot: AppSnapshot = { workspace: { id: "w", title: "Workspace" }, sessions: [], templates: [], archivedSessions: [], plugins: [], restartRequired: false };

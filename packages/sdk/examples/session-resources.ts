@@ -1,4 +1,4 @@
-import type { PluginContext, ResourceRef, ObjectReader } from "@asterism/sdk/runtime";
+import type { PluginContext, ResourceRef, ObjectReader } from "@asterism-app/sdk/runtime";
 import { CreateCounter, ChangeCount } from "./counter-contract.ts";
 
 /** Callers provide public creation input, and resource providers handle initialization; the return value contains only identity. */

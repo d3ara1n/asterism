@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { Json, ModelItem, StreamRequest } from "@asterism/sdk/contracts";
+import type { Json, ModelItem, StreamRequest } from "@asterism-app/sdk/contracts";
 import type { PeekRecord } from "./snapshot.ts";
 
 const search = z.strictObject({

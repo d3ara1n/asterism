@@ -1,10 +1,10 @@
 import type { ReactNode } from "react";
 import { z } from "zod";
 import { FileSearch, ListTree, Plug, Search, Zap } from "lucide-react";
-import { toolRenderer, useI18n, useRendererObject, type ToolRenderProps } from "@asterism/sdk/renderer";
-import type { Json, UiText } from "@asterism/sdk/contracts";
-import { ToolHeader } from "@asterism/ui/tool-header";
-import { formatCount } from "@asterism/ui/format-count";
+import { toolRenderer, useI18n, useRendererObject, type ToolRenderProps } from "@asterism-app/sdk/renderer";
+import type { Json, UiText } from "@asterism-app/sdk/contracts";
+import { ToolHeader } from "@asterism-app/ui/tool-header";
+import { formatCount } from "@asterism-app/ui/format-count";
 import { McpList, McpSearch, McpInspect, McpConnect, McpCall, connectionPhases, type McpCallData } from "./contract";
 import { mcpMessages as messages } from "../messages/mcp";
 import { textMessages } from "../messages/text";

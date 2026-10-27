@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { Terminal, FileText } from "lucide-react";
-import { toolRenderer, useI18n, type ToolRenderProps } from "@asterism/sdk/renderer";
-import { Button } from "@asterism/ui/ui/button";
-import { ToolHeader } from "@asterism/ui/tool-header";
-import { StreamingPreview } from "@asterism/ui/streaming-preview";
+import { toolRenderer, useI18n, type ToolRenderProps } from "@asterism-app/sdk/renderer";
+import { Button } from "@asterism-app/ui/ui/button";
+import { ToolHeader } from "@asterism-app/ui/tool-header";
+import { StreamingPreview } from "@asterism-app/ui/streaming-preview";
 import { DirectoryExec } from "./exec-contract";
 import type { ExecResult } from "../shell/contract";
 import { shellMessages as messages } from "../messages/shell";

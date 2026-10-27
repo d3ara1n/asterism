@@ -1,4 +1,4 @@
-import { defineModule } from "@asterism/sdk/runtime";
+import { defineModule } from "@asterism-app/sdk/runtime";
 import { modelProviderPresets } from "./presets.ts";
 import { createZhipuUsage } from "./zhipu.ts";
 import { createDeepSeekUsage } from "./deepseek.ts";

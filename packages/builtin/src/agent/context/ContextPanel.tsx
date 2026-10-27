@@ -1,12 +1,12 @@
 import { useMemo, useState } from "react";
 import { motion } from "motion/react";
-import { useI18n, useRendererCatalogs, useRendererObject } from "@asterism/sdk/renderer";
+import { useI18n, useRendererCatalogs, useRendererObject } from "@asterism-app/sdk/renderer";
 import type { z } from "zod";
-import { Alert, AlertDescription } from "@asterism/ui/ui/alert";
-import { cn } from "@asterism/ui/utils";
-import { formatCount } from "@asterism/ui/format-count";
-import { modelReference } from "@asterism/sdk/contracts";
-import { resolveAgentModel, ModelConfiguration } from "@asterism/builtin-api/contracts";
+import { Alert, AlertDescription } from "@asterism-app/ui/ui/alert";
+import { cn } from "@asterism-app/ui/utils";
+import { formatCount } from "@asterism-app/ui/format-count";
+import { modelReference } from "@asterism-app/sdk/contracts";
+import { resolveAgentModel, ModelConfiguration } from "@asterism-app/builtin-api/contracts";
 import { contextMessages as messages } from "../../messages/context";
 import { COMPRESSION_RESERVE } from "../context-budget";
 import { ContextProjectionError } from "../context-projection";

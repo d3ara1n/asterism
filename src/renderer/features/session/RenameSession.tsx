@@ -1,16 +1,16 @@
 import { useId, useRef, useState } from "react";
-import type { UiText } from "@asterism/sdk/contracts";
+import type { UiText } from "@asterism-app/sdk/contracts";
 import type { SessionResult } from "../../../shared/session";
 import { errorDisplay } from "../../../shared/error-display";
 import { appMessages } from "../../messages/app";
-import { commonMessages } from "@asterism/ui/messages/common";
+import { commonMessages } from "@asterism-app/ui/messages/common";
 import { formsMessages } from "../../messages/forms";
 import { useI18n } from "../../shared/i18n";
-import { Alert, AlertDescription } from "@asterism/ui/ui/alert";
-import { Button } from "@asterism/ui/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@asterism/ui/ui/dialog";
-import { Field, FieldLabel } from "@asterism/ui/ui/field";
-import { Input } from "@asterism/ui/ui/input";
+import { Alert, AlertDescription } from "@asterism-app/ui/ui/alert";
+import { Button } from "@asterism-app/ui/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@asterism-app/ui/ui/dialog";
+import { Field, FieldLabel } from "@asterism-app/ui/ui/field";
+import { Input } from "@asterism-app/ui/ui/input";
 
 /** The draft takes the current title only when opened; subsequent automatic naming and view refreshes do not overwrite user input. */
 export function RenameSession({ title, disabled, onSave, onClose, onRestoreFocus }: {

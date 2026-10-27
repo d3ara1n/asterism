@@ -1,18 +1,18 @@
 import { textMessages } from "./messages/text";
-import { formatCount } from "@asterism/ui/format-count";
+import { formatCount } from "@asterism-app/ui/format-count";
 import { toolsMessages } from "./messages/tools";
-import { useI18n, type ToolRenderProps, type ToolRendererDefinition } from "@asterism/sdk/renderer";
-import type { Json, ToolResult } from "@asterism/sdk/contracts";
+import { useI18n, type ToolRenderProps, type ToolRendererDefinition } from "@asterism-app/sdk/renderer";
+import type { Json, ToolResult } from "@asterism-app/sdk/contracts";
 import { useMemo } from "react";
 import { FileDiff, type FileDiffOptions } from "@pierre/diffs/react";
-import type { TextRead, TextChange } from "@asterism/builtin-api/contracts";
+import type { TextRead, TextChange } from "@asterism-app/builtin-api/contracts";
 import { inputField, inputText, characterCount, toolTextTail, editPreviewText } from "./shared/tool-preview";
 import { TOOL_BODY_LINE_LIMIT, diffBodyPreview, textBodyPreview } from "./shared/tool-body";
 import { displayText } from "./shared/text-row";
 import { CodeRows } from "./code-view";
 import { codeViewOptions } from "./shared/code-view";
-import { ToolHeader } from "@asterism/ui/tool-header";
-import { StreamingPreview } from "@asterism/ui/streaming-preview";
+import { ToolHeader } from "@asterism-app/ui/tool-header";
+import { StreamingPreview } from "@asterism-app/ui/streaming-preview";
 
 /** All three states reuse the summary structure, retaining existing paths and input counts through execution and completion. */
 function TextReadHeader({ target, invocation, result }: ToolRenderProps<TextRead>) {

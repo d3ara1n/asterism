@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { jsonSchema, type Json } from "@asterism/sdk/contracts";
-import type { ToolContract } from "@asterism/sdk/contracts";
+import { jsonSchema, type Json } from "@asterism-app/sdk/contracts";
+import type { ToolContract } from "@asterism-app/sdk/contracts";
 
 export function schemaOf(schema: z.ZodType<Json>): Json {
   return jsonSchema.parse(z.toJSONSchema(schema));

@@ -1,9 +1,9 @@
 import { CachedMarkdown, Streamdown, type StreamdownProps } from "@lobehub/streamdown";
-import { useI18n } from "@asterism/sdk/renderer";
+import { useI18n } from "@asterism-app/sdk/renderer";
 import { useReducedMotion } from "motion/react";
 import { memo, useEffect, useState } from "react";
 
-import { externalWebUrl } from "@asterism/ui/links";
+import { externalWebUrl } from "@asterism-app/ui/links";
 import { markdownMessages } from "../../messages/markdown";
 import { MarkdownCode, MarkdownStreamingContext } from "./MarkdownCode";
 import { markdownOptions } from "./markdown-options";

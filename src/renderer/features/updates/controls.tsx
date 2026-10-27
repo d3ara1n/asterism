@@ -1,7 +1,7 @@
-import { Button } from "@asterism/ui/ui/button";
-import { Alert, AlertDescription } from "@asterism/ui/ui/alert";
+import { Button } from "@asterism-app/ui/ui/button";
+import { Alert, AlertDescription } from "@asterism-app/ui/ui/alert";
 import { ExternalLink } from "lucide-react";
-import { commonMessages } from "@asterism/ui/messages/common";
+import { commonMessages } from "@asterism-app/ui/messages/common";
 import { updatesMessages as messages } from "../../messages/updates";
 import { useI18n } from "../../shared/i18n";
 import { useUpdates } from "./state";

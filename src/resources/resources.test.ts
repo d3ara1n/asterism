@@ -6,7 +6,7 @@ import { z } from "zod";
 import * as runtimeModules from "../runtime/builtin.ts";
 import { ApplicationService } from "../runtime/service.ts";
 import { Directory } from "../../packages/builtin/src/filesystem/contract.ts";
-import { defineData, defineImplementation, defineTool } from "@asterism/sdk/contracts";
+import { defineData, defineImplementation, defineTool } from "@asterism-app/sdk/contracts";
 import { implement, toolCaller } from "../tools/testing.ts";
 import { ToolRegistry } from "../tools/registry.ts";
 import { AgentCapabilities, agentToolPolicy } from "../execution/capabilities.ts";

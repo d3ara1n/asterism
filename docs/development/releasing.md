@@ -2,6 +2,14 @@
 
 Release operations preserve one explicit source commit, complete artifacts, and an accepted update/data path. Implementation completion and real installed acceptance are separate.
 
+## Publish plugin development packages
+
+The SDK and built-in public API are independently versioned npm packages under the `@asterism-app` scope. Their publish configuration targets the public npm registry with public access and the `next` distribution tag. The application and its internal implementation packages remain private npm workspaces.
+
+Verify package contents and compile an independent plugin against the packed artifacts before publishing. Publish the SDK workspace first, then the built-in API workspace, so its SDK peer dependency is available. npm publication requires an authenticated maintainer with access to the organization.
+
+The `next` tag points to the current testing version; it does not restrict access or change the package's semantic version. Developers can install `@next` and save the resolved version for reproducible development. Each changed artifact needs a new version after publication. Moving a distribution tag changes which existing version it selects. Package publication is separate from application releases and does not update the APIs supplied by an installed application.
+
 ## Prepare signing and repository access
 
 The release repository is `d3ara1n/asterism`. Clients read public assets anonymously and contain no GitHub credentials.

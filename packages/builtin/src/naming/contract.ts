@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { builtin } from "@asterism/builtin-api/contracts";
+import { builtin } from "@asterism-app/builtin-api/contracts";
 
 const titleResultSchema = z.strictObject({
   title: z.string().describe("The session title."),

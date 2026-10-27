@@ -1,7 +1,7 @@
 import { useMemo, useState, useSyncExternalStore } from "react";
-import { useI18n, useRendererCalls, useRendererObject } from "@asterism/sdk/renderer";
-import { AgentModal } from "@asterism/builtin-api/renderer";
-import { Button } from "@asterism/ui/ui/button";
+import { useI18n, useRendererCalls, useRendererObject } from "@asterism-app/sdk/renderer";
+import { AgentModal } from "@asterism-app/builtin-api/renderer";
+import { Button } from "@asterism-app/ui/ui/button";
 import { questionMessages as messages } from "../messages/questions";
 import { answerIssue } from "./answers";
 import { AnswerQuestion, CancelQuestion, type Question } from "./contract";

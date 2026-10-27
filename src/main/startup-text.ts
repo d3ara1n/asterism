@@ -1,4 +1,4 @@
-import type { UiMessage } from "@asterism/sdk/contracts";
+import type { UiMessage } from "@asterism-app/sdk/contracts";
 import { MessageFormatter } from "../shared/i18n.ts";
 import { hostCatalog } from "../shared/host-catalog.ts";
 /** Startup failure prompts cannot depend on IPC, the task process, or the renderer; localization failure still displays default text. */

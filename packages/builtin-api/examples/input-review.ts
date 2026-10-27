@@ -1,6 +1,6 @@
-import { SubmitAgentInput } from "@asterism/builtin-api/contracts";
-import { pluginNamespace } from "@asterism/sdk/contracts";
-import { defineModule, definePlugin, implementPreparer } from "@asterism/sdk/runtime";
+import { SubmitAgentInput } from "@asterism-app/builtin-api/contracts";
+import { pluginNamespace } from "@asterism-app/sdk/contracts";
+import { defineModule, definePlugin, implementPreparer } from "@asterism-app/sdk/runtime";
 
 /** External plugins consume built-in action declarations; they neither declare a second Agent type nor import its implementation directory. */
 export default definePlugin({

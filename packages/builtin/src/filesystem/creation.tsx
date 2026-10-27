@@ -1,12 +1,12 @@
 import { CreationForm } from "../shared/creation-form";
-import { Field, FieldLabel, FieldError } from "@asterism/ui/ui/field";
+import { Field, FieldLabel, FieldError } from "@asterism-app/ui/ui/field";
 
-import { Input } from "@asterism/ui/ui/input";
-import { Button } from "@asterism/ui/ui/button";
+import { Input } from "@asterism-app/ui/ui/input";
+import { Button } from "@asterism-app/ui/ui/button";
 
 import { commonMessages } from "../messages/common";
 import { filesystemMessages } from "../messages/filesystem";
-import { useI18n, useRendererCalls, type CreationInputProps } from "@asterism/sdk/renderer";
+import { useI18n, useRendererCalls, type CreationInputProps } from "@asterism-app/sdk/renderer";
 import { useEffect, useState } from "react";
 import { ReadDirectoryDefaults } from "./contract";
 
@@ -22,7 +22,7 @@ export function DirectoryInput({ initialInput, busy, resolve, cancel }: Creation
   const [title, setTitle] = useState(initialInput?.title ?? "");
   const [loading, setLoading] = useState(initialInput?.path === undefined);
   const [browsing, setBrowsing] = useState(false);
-  const [pathError, setPathError] = useState<import("@asterism/sdk/contracts").UiText | null>(null);
+  const [pathError, setPathError] = useState<import("@asterism-app/sdk/contracts").UiText | null>(null);
   useEffect(() => {
     if (initialInput?.path !== undefined) return;
     const controller = new AbortController();

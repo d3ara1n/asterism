@@ -1,15 +1,15 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
-import { jsonSchema, type UiText, type Json } from "@asterism/sdk/contracts";
+import { jsonSchema, type UiText, type Json } from "@asterism-app/sdk/contracts";
 import { configurationField, configurationLabel, configurationProperty, objectValue } from "../../shared/configuration-fields";
 import { configurationFieldMessages } from "../messages/configuration-fields";
 import { useI18n } from "./i18n";
-import { Field, FieldLabel, FieldDescription, FieldError, FieldSet, FieldLegend, FieldGroup, FieldContent } from "@asterism/ui/ui/field";
-import { Textarea } from "@asterism/ui/ui/textarea";
-import { Button } from "@asterism/ui/ui/button";
-import { Switch } from "@asterism/ui/ui/switch";
-import { Input } from "@asterism/ui/ui/input";
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectGroup, SelectItem } from "@asterism/ui/ui/select";
-import { cn } from "@asterism/ui/utils";
+import { Field, FieldLabel, FieldDescription, FieldError, FieldSet, FieldLegend, FieldGroup, FieldContent } from "@asterism-app/ui/ui/field";
+import { Textarea } from "@asterism-app/ui/ui/textarea";
+import { Button } from "@asterism-app/ui/ui/button";
+import { Switch } from "@asterism-app/ui/ui/switch";
+import { Input } from "@asterism-app/ui/ui/input";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectGroup, SelectItem } from "@asterism-app/ui/ui/select";
+import { cn } from "@asterism-app/ui/utils";
 
 /** Complex values retain complete text; invalid input prevents submission rather than saving partial or old values as new configuration. */
 function JsonInput({ id, value, onChange, required, title, description, actions }: {

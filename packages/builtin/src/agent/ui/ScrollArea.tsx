@@ -1,5 +1,5 @@
-import type { AgentScrollAreaProps } from "@asterism/builtin-api/renderer";
-import { cn } from "@asterism/ui/utils";
+import type { AgentScrollAreaProps } from "@asterism-app/builtin-api/renderer";
+import { cn } from "@asterism-app/ui/utils";
 
 /** The same viewport handles scrolling and focus-ring clearance; negative margins align body content with fixed areas. */
 export function ScrollArea({ axis = "vertical", className, ...props }: AgentScrollAreaProps) {

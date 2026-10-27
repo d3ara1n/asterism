@@ -1,5 +1,5 @@
-import type { ModelItem } from "@asterism/sdk/contracts";
-import { PluginApiError, type SessionSnapshot } from "@asterism/sdk/runtime";
+import type { ModelItem } from "@asterism-app/sdk/contracts";
+import { PluginApiError, type SessionSnapshot } from "@asterism-app/sdk/runtime";
 import { contextMessages, ContextProjectionError, projectAgentContext as project, type AgentContext } from "./context-projection.ts";
 
 export { contextMessages, type AgentContext, type ContextGroup } from "./context-projection.ts";

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createMessageDraft, copyDraft } from "./draft.ts";
-import type { RendererContentInput } from "@asterism/sdk/renderer";
-import type { ContentRef } from "@asterism/sdk/contracts";
+import type { RendererContentInput } from "@asterism-app/sdk/renderer";
+import type { ContentRef } from "@asterism-app/sdk/contracts";
 
 const ref: ContentRef = { "$asterism.content": "00000000-0000-4000-8000-000000000001" };
 const reader = { read: async () => new Uint8Array(), async *open() {} };

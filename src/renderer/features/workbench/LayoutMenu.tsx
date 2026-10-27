@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { ChevronDown, LayoutDashboard, LayoutGrid } from "lucide-react";
-import { Button } from "@asterism/ui/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@asterism/ui/ui/dropdown-menu";
+import { Button } from "@asterism-app/ui/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@asterism-app/ui/ui/dropdown-menu";
 import { workbenchMessages } from "../../messages/workbench";
 import { useI18n } from "../../shared/i18n";
 import type { WorkbenchCanvas } from "./canvas";

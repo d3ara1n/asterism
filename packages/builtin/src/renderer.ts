@@ -1,4 +1,4 @@
-import { defineRendererPlugin, type RendererModule } from "@asterism/sdk/renderer";
+import { defineRendererPlugin, type RendererModule } from "@asterism-app/sdk/renderer";
 import { BuiltinSettingsPage } from "./settings/SettingsPage";
 import { agentFeedbackRenderer } from "./agent/feedback-renderer";
 

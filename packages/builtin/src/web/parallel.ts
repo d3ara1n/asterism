@@ -1,8 +1,8 @@
 import { z } from "zod";
 import Parallel from "parallel-web";
-import { jsonSchema, present, webUrlSchema, type WebDocument, type WebHint, type WebResponse, type WebSearchRequest } from "@asterism/sdk/contracts";
-import { WebError, type WebProviderDefinition } from "@asterism/sdk/runtime";
-import { builtin } from "@asterism/builtin-api/contracts";
+import { jsonSchema, present, webUrlSchema, type WebDocument, type WebHint, type WebResponse, type WebSearchRequest } from "@asterism-app/sdk/contracts";
+import { WebError, type WebProviderDefinition } from "@asterism-app/sdk/runtime";
+import { builtin } from "@asterism-app/builtin-api/contracts";
 
 const resultSchema = z.object({
   url: webUrlSchema, title: z.string().nullish(), publish_date: z.string().nullish(),

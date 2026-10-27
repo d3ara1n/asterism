@@ -1,4 +1,4 @@
-import { thinkingLevels } from "@asterism/sdk/contracts";
+import { thinkingLevels } from "@asterism-app/sdk/contracts";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ModelProvider, ProviderModel } from "../shared/configuration.ts";
 import { classifyProbeError, runConnectionProbe } from "./probe.ts";

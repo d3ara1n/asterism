@@ -1,4 +1,4 @@
-import { defineMessages, pluginNamespace, type UiText } from "@asterism/sdk/contracts";
+import { defineMessages, pluginNamespace, type UiText } from "@asterism-app/sdk/contracts";
 /** UI explanations for stable public error codes; English diagnostics and plugin business prompts remain unchanged. */
 export const errorMessages = pluginNamespace("asterism.host").messages("en", defineMessages({
   invalid_request: { id: "error.invalidRequest", defaultMessage: "The request is invalid. Check your input and try again." },

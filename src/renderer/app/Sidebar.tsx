@@ -1,11 +1,11 @@
-import { BrandMark } from "@asterism/ui/ui/brand-mark";
-import { Button } from "@asterism/ui/ui/button";
-import { IconButton } from "@asterism/ui/ui/icon-button";
-import { ListRow } from "@asterism/ui/ui/list-row";
+import { BrandMark } from "@asterism-app/ui/ui/brand-mark";
+import { Button } from "@asterism-app/ui/ui/button";
+import { IconButton } from "@asterism-app/ui/ui/icon-button";
+import { ListRow } from "@asterism-app/ui/ui/list-row";
 import { PanelLeftClose, House, MessageSquare, Settings } from "lucide-react";
 
 import { appMessages } from "../messages/app";
-import { commonMessages } from "@asterism/ui/messages/common";
+import { commonMessages } from "@asterism-app/ui/messages/common";
 import { settingsMessages } from "../messages/settings";
 import { useI18n } from "../shared/i18n";
 

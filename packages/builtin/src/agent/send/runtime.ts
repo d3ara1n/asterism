@@ -1,6 +1,6 @@
 import { nanoid } from "nanoid";
-import { implementTool, PluginApiError } from "@asterism/sdk/runtime";
-import { SubmitAgentInput } from "@asterism/builtin-api/contracts";
+import { implementTool, PluginApiError } from "@asterism-app/sdk/runtime";
+import { SubmitAgentInput } from "@asterism-app/builtin-api/contracts";
 import { AgentSend } from "./contract.ts";
 
 export function createSendTool() {

@@ -1,6 +1,6 @@
 import { webProviderTypeSchema, webResponseSchema, webSearchRequestSchema, webFetchRequestSchema,
-  type WebProviderState, type WebProviderType, type WebSearchRequest, type WebFetchRequest, type WebResponse } from "@asterism/sdk/contracts";
-import { WebError, type WebProviderDefinition, type WebProviderInstance, type WebProviderServices, type WebServices } from "@asterism/sdk/runtime";
+  type WebProviderState, type WebProviderType, type WebSearchRequest, type WebFetchRequest, type WebResponse } from "@asterism-app/sdk/contracts";
+import { WebError, type WebProviderDefinition, type WebProviderInstance, type WebProviderServices, type WebServices } from "@asterism-app/sdk/runtime";
 import type { RunGroup } from "../plugins/lifecycle.ts";
 
 /** Match the full normalized URL, treating only asterisks as wildcards. */

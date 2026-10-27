@@ -1,4 +1,4 @@
-import type { PluginContext, ResourceRef, ObjectReader, ToolSession } from "@asterism/sdk/runtime";
+import type { PluginContext, ResourceRef, ObjectReader, ToolSession } from "@asterism-app/sdk/runtime";
 import { CreateCounter, ChangeCount } from "../examples/counter-contract.ts";
 
 /** Type counterexamples: generic backend actions belong to the execution facade; read facades and constrained model tool facades retain their respective capabilities. */

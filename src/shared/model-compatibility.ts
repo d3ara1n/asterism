@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { jsonSchema, thinkingLevels, type Json, type ThinkingLevel } from "@asterism/sdk/contracts";
+import { jsonSchema, thinkingLevels, type Json, type ThinkingLevel } from "@asterism-app/sdk/contracts";
 import type { ModelProviderInput } from "./configuration.ts";
 
 /** Application-predefined declaration catalog; parameters and display share a source and request projection interprets behavior by id. */

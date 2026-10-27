@@ -1,4 +1,4 @@
-import type { ResourceSnapshot } from "@asterism/sdk/contracts";
+import type { ResourceSnapshot } from "@asterism-app/sdk/contracts";
 
 /** Resource presence is independent of event actions; backtracking and ordinary commits compare the same current set. */
 export class ResourcePresence {

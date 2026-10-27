@@ -1,21 +1,21 @@
 import { runtime } from "../../runtime";
-import { pluginOf, reference, type Json, type UiText } from "@asterism/sdk/contracts";
-import { RendererPreferencesProvider, type CreationEntry, type CreationSource, type DropItem, type RendererContentInput } from "@asterism/sdk/renderer";
+import { pluginOf, reference, type Json, type UiText } from "@asterism-app/sdk/contracts";
+import { RendererPreferencesProvider, type CreationEntry, type CreationSource, type DropItem, type RendererContentInput } from "@asterism-app/sdk/renderer";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { errorDisplay } from "../../../shared/error-display.ts";
 import type { Point } from "../../../shared/workbench";
-import { commonMessages } from "@asterism/ui/messages/common";
+import { commonMessages } from "@asterism-app/ui/messages/common";
 import { creationMessages } from "../../messages/creation";
 import { RendererCatalogProvider } from "../../modules/object-context";
 import { SlotBoundary } from "../../modules/SlotBoundary";
 import { useModuleViews } from "../../modules/views";
 import { useI18n } from "../../shared/i18n";
-import { Alert, AlertDescription } from "@asterism/ui/ui/alert";
-import { Button } from "@asterism/ui/ui/button";
-import { Checkbox } from "@asterism/ui/ui/checkbox";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@asterism/ui/ui/dialog";
-import { Label } from "@asterism/ui/ui/label";
+import { Alert, AlertDescription } from "@asterism-app/ui/ui/alert";
+import { Button } from "@asterism-app/ui/ui/button";
+import { Checkbox } from "@asterism-app/ui/ui/checkbox";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@asterism-app/ui/ui/dialog";
+import { Label } from "@asterism-app/ui/ui/label";
 import { useStateToast } from "../../shared/toast";
 import type { SessionController } from "../session/controller";
 import type { WorkbenchCanvas } from "../workbench/canvas";
@@ -25,7 +25,7 @@ import { contentInput, contentScopeId } from "./content";
 
 type InputState = { entry: CreationEntry; source: CreationSource; initialInput?: Json; content: RendererContentInput; position: Point | null; done: (ok: boolean) => void };
 type ChoiceState = { item: DropItem; candidates: CreationEntry[]; key: string; done: (entry: CreationEntry | null) => void };
-type RunningState = { label: import("@asterism/sdk/contracts").UiText; requestId: string; sessionId: string; content?: RendererContentInput };
+type RunningState = { label: import("@asterism-app/sdk/contracts").UiText; requestId: string; sessionId: string; content?: RendererContentInput };
 
 export interface CreationCoordinator {
   /** Menu entries in assembly order. */

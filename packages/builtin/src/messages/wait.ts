@@ -1,5 +1,5 @@
-import { defineMessages } from "@asterism/sdk/contracts";
-import { builtin } from "@asterism/builtin-api/contracts";
+import { defineMessages } from "@asterism-app/sdk/contracts";
+import { builtin } from "@asterism-app/builtin-api/contracts";
 
 export const waitMessages = builtin.messages("en", defineMessages({
   title: { id: "agent_wait_title", defaultMessage: "Wait for agent" },

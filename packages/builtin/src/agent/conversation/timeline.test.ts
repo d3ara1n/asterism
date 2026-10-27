@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { sessionSnapshot } from "../../../../../src/plugins/records";
 import { nodeView } from "../../../../../src/session/view";
 import { node, text, thinking, message as input } from "../../../../../src/session/test-nodes";
-import type { ModelLiveBlock, SessionSnapshot } from "@asterism/sdk/contracts";
+import type { ModelLiveBlock, SessionSnapshot } from "@asterism-app/sdk/contracts";
 import { displayedTimeline, generating, mountedTimelineIndexes, savedTimeline, timelineKey, withLive } from "./timeline";
 import type { InlineFeedback } from "../feedback";
 

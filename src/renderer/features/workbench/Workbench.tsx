@@ -1,11 +1,11 @@
-import { RendererNavigationProvider, type DropItem } from "@asterism/sdk/renderer";
+import { RendererNavigationProvider, type DropItem } from "@asterism-app/sdk/renderer";
 import { ReactFlowProvider, ReactFlow, Panel, useReactFlow, applyNodeChanges, applyEdgeChanges, ConnectionMode, ConnectionLineType, type NodeChange, type EdgeChange, type Edge, type Connection, type IsValidConnection } from "@xyflow/react";
 import { Crosshair, Maximize, Minus, Plus, RotateCcw } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useImperativeHandle, useMemo, useRef, useState, type ReactNode, type Ref } from "react";
 
 import { maximumViewportZoom, type Point, type WorkbenchSnapshot } from "../../../shared/workbench";
 import { accessMessages } from "../../messages/access";
-import { commonMessages } from "@asterism/ui/messages/common";
+import { commonMessages } from "@asterism-app/ui/messages/common";
 import { historyMessages } from "../../messages/history";
 import { objectsMessages } from "../../messages/objects";
 import { workbenchMessages } from "../../messages/workbench";
@@ -27,7 +27,7 @@ import { handleSizeVariables, linkEdgeTypes } from "./LinkEdge";
 import { WorkbenchScope, WorkbenchContext, useWorkbench, type WorkbenchEnvironment, type WorkbenchStore, type WorkbenchView } from "./context";
 import { workbenchNodes } from "./nodes";
 import { type ViewPatch } from "./ObjectCard";
-import { IconButton } from "@asterism/ui/ui/icon-button";
+import { IconButton } from "@asterism-app/ui/ui/icon-button";
 import { ObjectNode, type ObjectNodeType } from "./ObjectNode";
 import { ObjectsPanel } from "./ObjectsPanel";
 import { confirmCardSizes, saveCardSize, type SizeIntent } from "./size-intents";
@@ -67,7 +67,7 @@ export function Workbench({ ref, controller, session, ready, run, onHome, store,
   const latestContext = useRef(context);
   latestContext.current = context;
   const island = useIsland();
-  const open = useCallback((id: string, label: import("@asterism/sdk/contracts").UiText, render: () => ReactNode, origin: HTMLElement | null) => {
+  const open = useCallback((id: string, label: import("@asterism-app/sdk/contracts").UiText, render: () => ReactNode, origin: HTMLElement | null) => {
     if (island.child === id) island.closeChild();
     // Panel islands render outside the workbench subtree and obtain this session's same environment through WorkbenchScope.
     else island.open({ id, label, width: { min: 320, max: 400 }, origin, render: () => <WorkbenchScope store={store} sessionId={session.id}>{render()}</WorkbenchScope> });

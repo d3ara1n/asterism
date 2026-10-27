@@ -1,4 +1,4 @@
-import type { ObjectReader, ObjectWriter } from "@asterism/sdk/runtime";
+import type { ObjectReader, ObjectWriter } from "@asterism-app/sdk/runtime";
 import { AgentSubmissions } from "./data.ts";
 
 type Submission = { submissionId: string };

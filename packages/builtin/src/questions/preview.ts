@@ -1,4 +1,4 @@
-import type { Json } from "@asterism/sdk/contracts";
+import type { Json } from "@asterism-app/sdk/contracts";
 
 /** Partial arguments consume only question text already present, shared by body rendering and preview-stage detection. */
 export function questionTitles(args: Json): string[] {

@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { defineCall, defineCreation, defineImplementation, defineTool, jsonSchema, modelInputPartsSchema, type Json } from "@asterism/sdk/contracts";
-import { builtin } from "@asterism/builtin-api/contracts";
+import { defineCall, defineCreation, defineImplementation, defineTool, jsonSchema, modelInputPartsSchema, type Json } from "@asterism-app/sdk/contracts";
+import { builtin } from "@asterism-app/builtin-api/contracts";
 
 /** The server ID is a readable slug fixed at creation; together with the remote tool name it forms a `server_id/tool_name` handle. The display name can change at any time. */
 export const SERVER_ID_PATTERN = /^[a-z0-9][a-z0-9_-]*$/u;

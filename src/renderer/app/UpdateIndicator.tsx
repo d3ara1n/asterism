@@ -1,11 +1,11 @@
 import { useId, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { CircleArrowUp } from "lucide-react";
-import { Button } from "@asterism/ui/ui/button";
-import { StatusIcon } from "@asterism/ui/ui/status";
-import { Popover, PopoverContent, PopoverTrigger } from "@asterism/ui/ui/popover";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@asterism/ui/ui/tooltip";
-import { Progress } from "@asterism/ui/ui/progress";
+import { Button } from "@asterism-app/ui/ui/button";
+import { StatusIcon } from "@asterism-app/ui/ui/status";
+import { Popover, PopoverContent, PopoverTrigger } from "@asterism-app/ui/ui/popover";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@asterism-app/ui/ui/tooltip";
+import { Progress } from "@asterism-app/ui/ui/progress";
 import { updatesMessages as messages } from "../messages/updates";
 import { useI18n } from "../shared/i18n";
 import { fadeTransition } from "../shared/weave/motion";

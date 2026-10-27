@@ -1,4 +1,4 @@
-import type { Json } from "@asterism/sdk/contracts";
+import type { Json } from "@asterism-app/sdk/contracts";
 
 /** Preview fields have not passed the complete schema; uses only content with a known shape and does not fabricate required values. */
 export function inputField(value: Json, key: string): Json | undefined {

@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { pluginNamespace, type ModelProviderPreset, type UsageItem } from "@asterism/sdk/contracts";
-import { definePlugin, UsageQueryError, type UsageProvider } from "@asterism/sdk/runtime";
+import { pluginNamespace, type ModelProviderPreset, type UsageItem } from "@asterism-app/sdk/contracts";
+import { definePlugin, UsageQueryError, type UsageProvider } from "@asterism-app/sdk/runtime";
 
 const ns = pluginNamespace("example.allowance");
 // Example site contract: GET /account/allowance returns the balance and remaining fraction of a five-hour window; the provider handles protocol parsing.

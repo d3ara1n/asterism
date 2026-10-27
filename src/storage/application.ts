@@ -1,7 +1,7 @@
 import { isAbsolute, join, relative, resolve } from "node:path";
-import { builtin } from "@asterism/builtin-api/contracts";
-import builtinStorage from "@asterism/builtin/storage";
-import type { PluginStorageDeclaration } from "@asterism/sdk/runtime";
+import { builtin } from "@asterism-app/builtin-api/contracts";
+import builtinStorage from "@asterism-app/builtin/storage";
+import type { PluginStorageDeclaration } from "@asterism-app/sdk/runtime";
 import { configurationStorage } from "../configuration/store.ts";
 import { workspaceStorage } from "../runtime/storage.ts";
 import { loadPackages, PackageList, packageListStorage } from "../plugins/packages.ts";

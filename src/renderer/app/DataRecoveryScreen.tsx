@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Button } from "@asterism/ui/ui/button";
+import { Button } from "@asterism-app/ui/ui/button";
 import { startupMessages } from "../../shared/error-display";
 import type { RecoveryPoint } from "../../shared/recovery";
 import { useI18n } from "../shared/i18n";

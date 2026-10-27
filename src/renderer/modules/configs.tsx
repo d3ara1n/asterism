@@ -1,6 +1,6 @@
 import { runtime } from "../runtime";
-import { readConfig, type UiText } from "@asterism/sdk/contracts";
-import { RendererConfigsProvider, type RendererConfigs } from "@asterism/sdk/renderer";
+import { readConfig, type UiText } from "@asterism-app/sdk/contracts";
+import { RendererConfigsProvider, type RendererConfigs } from "@asterism-app/sdk/renderer";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { PluginConfiguration, PluginConfigurationCommand } from "../../shared/plugin-configuration";
 import { errorDisplay } from "../../shared/error-display";

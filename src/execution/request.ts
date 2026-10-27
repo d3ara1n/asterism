@@ -3,7 +3,7 @@ import {
   presentationSchema, type ModelRunRequest, type ModelRunResult, type ModelRunEvent, type ModelSource,
   type ModelCompletion, type ModelResponse, type SystemPrompt, type ModelRequestIdentity, type RequestTiming,
   describeError, type ErrorDetails,
-} from "@asterism/sdk/contracts";
+} from "@asterism-app/sdk/contracts";
 import { modelExpression, modelScope, type ModelSettings, type ToolOutcome } from "../shared/model.ts";
 import { ModelFailure, type ModelAdapter, type ResolvedModelItem } from "../model/contract.ts";
 import { executeCoreBatch, coreDeclarations, previewCoreCall } from "./core.ts";

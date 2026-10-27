@@ -1,14 +1,14 @@
 import { useEffect, useState, type CSSProperties } from "react";
-import { useI18n, useRendererObject, creationEntry, cardRenderer, toolRenderer, type RendererModule, type ToolRenderProps } from "@asterism/sdk/renderer";
+import { useI18n, useRendererObject, creationEntry, cardRenderer, toolRenderer, type RendererModule, type ToolRenderProps } from "@asterism-app/sdk/renderer";
 import type { z } from "zod";
 import { Eye, Folder, BookOpen, FilePenLine, FilePlus2, ListTree, RefreshCw } from "lucide-react";
 import { FileTree, useFileTree, useFileTreeSearch } from "@pierre/trees/react";
 import type { GitStatus } from "@pierre/trees";
 
-import { ToolHeader } from "@asterism/ui/tool-header";
-import { IconButton } from "@asterism/ui/ui/icon-button";
-import { SearchInput } from "@asterism/ui/ui/search-input";
-import { cn } from "@asterism/ui/utils";
+import { ToolHeader } from "@asterism-app/ui/tool-header";
+import { IconButton } from "@asterism-app/ui/ui/icon-button";
+import { SearchInput } from "@asterism-app/ui/ui/search-input";
+import { cn } from "@asterism-app/ui/utils";
 import { filesystemMessages } from "../messages/filesystem";
 import { textMessages } from "../messages/text";
 import { prepareCodeView } from "../shared/code-view";

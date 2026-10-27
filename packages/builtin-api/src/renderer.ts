@@ -1,5 +1,5 @@
 import { createContext, createElement, useContext, type ComponentProps, type ComponentType, type ReactNode } from "react";
-import { pluginOf, pluginNamespace, type ThinkingLevel, type UiText } from "@asterism/sdk/contracts";
+import { pluginOf, pluginNamespace, type ThinkingLevel, type UiText } from "@asterism-app/sdk/contracts";
 import type { AgentSelection } from "./configuration.ts";
 import type { CatalogModel } from "./catalogs.ts";
 

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { Agent } from "@asterism/builtin-api/contracts";
+import { Agent } from "@asterism-app/builtin-api/contracts";
 import { askUserArgs, AskUserResult, type Question, type Submission } from "./contract.ts";
 import { createQuestionService } from "./service.ts";
 

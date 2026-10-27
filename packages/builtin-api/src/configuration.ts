@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { modelExpressionSchema, thinkingSchema } from "@asterism/sdk/contracts";
+import { modelExpressionSchema, thinkingSchema } from "@asterism-app/sdk/contracts";
 const id = z.string().min(1).max(160);
 /** Configurations use readable slugs for identification by both users and models. */
 export const configurationIdSchema = z.string().trim().min(1).max(160).regex(/^[a-z0-9]+(?:[-_][a-z0-9]+)*$/u, "Use lowercase letters, digits, hyphens or underscores.");

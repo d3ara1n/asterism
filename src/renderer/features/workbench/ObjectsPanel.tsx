@@ -1,10 +1,10 @@
 import { IslandPanel } from "../../shared/weave/IslandPanel";
-import { SearchInput } from "@asterism/ui/ui/search-input";
-import { ToggleGroup, ToggleGroupItem } from "@asterism/ui/ui/toggle-group";
-import { IconButton } from "@asterism/ui/ui/icon-button";
-import { ListRow } from "@asterism/ui/ui/list-row";
+import { SearchInput } from "@asterism-app/ui/ui/search-input";
+import { ToggleGroup, ToggleGroupItem } from "@asterism-app/ui/ui/toggle-group";
+import { IconButton } from "@asterism-app/ui/ui/icon-button";
+import { ListRow } from "@asterism-app/ui/ui/list-row";
 import { Eye, EyeClosed } from "lucide-react";
-import { commonMessages } from "@asterism/ui/messages/common";
+import { commonMessages } from "@asterism-app/ui/messages/common";
 import { objectsMessages } from "../../messages/objects";
 import { useI18n } from "../../shared/i18n";
 import { useState } from "react";

@@ -1,5 +1,5 @@
-import { jsonSchema, type ModelInputPart } from "@asterism/sdk/contracts";
-import type { ContentScope } from "@asterism/sdk/runtime";
+import { jsonSchema, type ModelInputPart } from "@asterism-app/sdk/contracts";
+import type { ContentScope } from "@asterism-app/sdk/runtime";
 import type { CallToolResult } from "@modelcontextprotocol/client";
 import type { McpCallData } from "./contract.ts";
 import { extraStructured } from "./content.ts";

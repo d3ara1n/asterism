@@ -1,5 +1,5 @@
-import { present, type ModelRequestContext } from "@asterism/sdk/contracts";
-import { AgentRequestContext } from "@asterism/builtin-api/contracts";
+import { present, type ModelRequestContext } from "@asterism-app/sdk/contracts";
+import { AgentRequestContext } from "@asterism-app/builtin-api/contracts";
 
 /** Extracts domain data from the final request context delivered by the host and saves it once with terminal state. */
 export function agentRequestExtensions({ system, tools }: ModelRequestContext) {

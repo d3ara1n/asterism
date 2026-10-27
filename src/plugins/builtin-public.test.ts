@@ -4,12 +4,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { Agent, CreateAgent, SubmitAgentInput, builtin } from "@asterism/builtin-api/contracts";
-import * as builtinRendererAPI from "@asterism/builtin-api/renderer";
-import { agentCreations, defineAgentCreation } from "@asterism/builtin-api/runtime";
-import { resourceCall } from "@asterism/sdk/contracts";
-import type { PluginDefinition } from "@asterism/sdk/runtime";
-import sdkMetadata from "@asterism/sdk/package.json" with { type: "json" };
+import { Agent, CreateAgent, SubmitAgentInput, builtin } from "@asterism-app/builtin-api/contracts";
+import * as builtinRendererAPI from "@asterism-app/builtin-api/renderer";
+import { agentCreations, defineAgentCreation } from "@asterism-app/builtin-api/runtime";
+import { resourceCall } from "@asterism-app/sdk/contracts";
+import type { PluginDefinition } from "@asterism-app/sdk/runtime";
+import sdkMetadata from "@asterism-app/sdk/package.json" with { type: "json" };
 import { PackageList, loadPackages } from "./packages.ts";
 import { ApplicationService } from "../runtime/service.ts";
 import { bindPublicProvider } from "../shared/public-modules.ts";
@@ -29,12 +29,12 @@ function fixture(ranges: (string | null)[] = [currentRange, `~${builtinApiMetada
   const consumers = ranges.map((range, index) => {
     const root = temp(), id = `fixture.consumer${index}`;
     file(root, "package.json", JSON.stringify({ name: `@fixture/consumer${index}`, version: "1.0.0",
-      peerDependencies: { "@asterism/sdk": `^${sdkMetadata.version}`, ...(range === null ? {} : { "@asterism/builtin-api": range }) },
+      peerDependencies: { "@asterism-app/sdk": `^${sdkMetadata.version}`, ...(range === null ? {} : { "@asterism-app/builtin-api": range }) },
       asterism: { id, runtime: "runtime.ts", renderer: "renderer.ts" } }));
-    file(root, "public.ts", 'export { SubmitAgentInput } from "@asterism/builtin-api/contracts";');
+    file(root, "public.ts", 'export { SubmitAgentInput } from "@asterism-app/builtin-api/contracts";');
     file(root, "runtime.ts", `
-      import { pluginNamespace } from "@asterism/sdk/contracts";
-      import { definePlugin, defineModule, implementPreparer } from "@asterism/sdk/runtime";
+      import { pluginNamespace } from "@asterism-app/sdk/contracts";
+      import { definePlugin, defineModule, implementPreparer } from "@asterism-app/sdk/runtime";
       import { SubmitAgentInput } from "./public.ts";
       const calls = [];
       export default { ...definePlugin({ namespace: pluginNamespace(${JSON.stringify(id)}),
@@ -47,8 +47,8 @@ function fixture(ranges: (string | null)[] = [currentRange, `~${builtinApiMetada
     `);
     file(root, "renderer.ts", 'export { SubmitAgentInput } from "./public.ts"; export default { modules: [{ resources: [], cards: [], tools: [] }] };');
     // A consumer's local installation copy must not displace declarations already loaded by the app.
-    file(root, "node_modules/@asterism/builtin-api/package.json", JSON.stringify({ name: "@asterism/builtin-api", version: "0.0.0", exports: { "./contracts": "./copy.js" } }));
-    file(root, "node_modules/@asterism/builtin-api/copy.js", 'throw new Error("A private copy must not execute.");');
+    file(root, "node_modules/@asterism-app/builtin-api/package.json", JSON.stringify({ name: "@asterism-app/builtin-api", version: "0.0.0", exports: { "./contracts": "./copy.js" } }));
+    file(root, "node_modules/@asterism-app/builtin-api/copy.js", 'throw new Error("A private copy must not execute.");');
     list.add({ source: { kind: "path", path: root } }, data);
     return root;
   });
@@ -63,9 +63,9 @@ describe("Built-in public packages", () => {
   it("independent plugins obtain the same creation declarations and catalog services from backend public entries", async () => {
     const f = fixture([currentRange]);
     file(f.consumers[0]!, "runtime.ts", `
-      import { agentCreations, defineAgentCreation } from "@asterism/builtin-api/runtime";
-      import { pluginNamespace } from "@asterism/sdk/contracts";
-      import { definePlugin } from "@asterism/sdk/runtime";
+      import { agentCreations, defineAgentCreation } from "@asterism-app/builtin-api/runtime";
+      import { pluginNamespace } from "@asterism-app/sdk/contracts";
+      import { definePlugin } from "@asterism-app/sdk/runtime";
       export default { ...definePlugin({ namespace: pluginNamespace("fixture.consumer0") }),
         probe: { agentCreations, defineAgentCreation } };
     `);
@@ -74,7 +74,7 @@ describe("Built-in public packages", () => {
     const probe = (loaded!.definition as PluginDefinition & { probe: { agentCreations: unknown; defineAgentCreation: unknown } }).probe;
     expect(probe.agentCreations).toBe(agentCreations);
     expect(probe.defineAgentCreation).toBe(defineAgentCreation);
-    file(f.consumers[0]!, "renderer.ts", 'import { agentCreations } from "@asterism/builtin-api/runtime"; export default agentCreations;');
+    file(f.consumers[0]!, "renderer.ts", 'import { agentCreations } from "@asterism-app/builtin-api/runtime"; export default agentCreations;');
     expect((await f.load())[0]?.error).toContain("not exported");
   });
 
@@ -105,8 +105,8 @@ describe("Built-in public packages", () => {
     // Frontend artifacts obtain instances from their environment bindings; deliberately distinct objects catch accidental backend binding use.
     const frontendAction = { ...SubmitAgentInput };
     release.push(bindPublicProvider("renderer", builtinPublicProvider, {
-      "@asterism/builtin-api/contracts": { ...builtinPublicModules["@asterism/builtin-api/contracts"], SubmitAgentInput: frontendAction },
-      "@asterism/builtin-api/renderer": builtinRendererAPI,
+      "@asterism-app/builtin-api/contracts": { ...builtinPublicModules["@asterism-app/builtin-api/contracts"], SubmitAgentInput: frontendAction },
+      "@asterism-app/builtin-api/renderer": builtinRendererAPI,
     }));
     for (const item of packages) {
       const frontend = await import(pathToFileURL(join(f.cache, item.renderer!)).href);
@@ -117,7 +117,7 @@ describe("Built-in public packages", () => {
   // Public bindings follow actual exports, independently of peer ranges; private entries remain unavailable.
   it("loads available APIs despite absent or older peer ranges and rejects private entries", async () => {
     const f = fixture([null, olderRange, currentRange, currentRange]);
-    file(f.consumers[2]!, "public.ts", 'export { SubmitAgentInput } from "@asterism/builtin-api/private";');
+    file(f.consumers[2]!, "public.ts", 'export { SubmitAgentInput } from "@asterism-app/builtin-api/private";');
     const packages = await f.load();
     expect(packages.map(item => item.status)).toEqual(["loaded", "loaded", "failed", "loaded"]);
     for (const index of [0, 1, 3])
@@ -129,7 +129,7 @@ describe("Built-in public packages", () => {
     const f = fixture([currentRange, currentRange]);
     for (const [index, root] of f.consumers.entries()) {
       file(root, "renderer.ts", `
-        import { agentUI, AgentOverlay, AgentScrollArea, AgentToolbarItem, useAgentModelSelection } from "@asterism/builtin-api/renderer";
+        import { agentUI, AgentOverlay, AgentScrollArea, AgentToolbarItem, useAgentModelSelection } from "@asterism-app/builtin-api/renderer";
         import { createElement } from "react";
         export { agentUI, AgentOverlay, AgentScrollArea, AgentToolbarItem, useAgentModelSelection };
         export default { modules: [{ resources: [], cards: [], tools: [] }], async prepare({ signal }) {
@@ -143,7 +143,7 @@ describe("Built-in public packages", () => {
     const packages = await f.load();
     expect(packages.map(item => item.error)).toEqual([undefined, undefined]);
     release.push(bindPublicProvider("renderer", builtinPublicProvider, {
-      ...builtinPublicModules, "@asterism/builtin-api/renderer": builtinRendererAPI,
+      ...builtinPublicModules, "@asterism-app/builtin-api/renderer": builtinRendererAPI,
     }));
     const loaded = await Promise.all(packages.map(item => import(pathToFileURL(join(f.cache, item.renderer!)).href)));
     expect(loaded.every(module => module.agentUI === builtinRendererAPI.agentUI
@@ -162,7 +162,7 @@ describe("Built-in public packages", () => {
   // Public frontend services must not enter backend module graphs, preventing React/UI state from mixing across environments.
   it("backend consumers cannot import Agent UI frontend exports", async () => {
     const f = fixture([currentRange]);
-    file(f.consumers[0]!, "runtime.ts", 'import { agentUI } from "@asterism/builtin-api/renderer"; export default agentUI;');
+    file(f.consumers[0]!, "runtime.ts", 'import { agentUI } from "@asterism-app/builtin-api/renderer"; export default agentUI;');
     const [item] = await f.load();
     expect(item!.status).toBe("failed");
     expect(item!.error).toContain("not exported");
@@ -176,8 +176,8 @@ describe("Built-in public packages", () => {
       file(root, "package.json", JSON.stringify(metadata));
       const helper = mode === "nested" ? join(root, "node_modules/@fixture/helper") : temp();
       file(helper, "package.json", JSON.stringify({ name: "@fixture/helper", version: "1.0.0", type: "module",
-        exports: "./index.js", peerDependencies: { "@asterism/builtin-api": index === 0 ? currentRange : olderRange } }));
-      file(helper, "index.js", 'export { SubmitAgentInput } from "@asterism/builtin-api/contracts";');
+        exports: "./index.js", peerDependencies: { "@asterism-app/builtin-api": index === 0 ? currentRange : olderRange } }));
+      file(helper, "index.js", 'export { SubmitAgentInput } from "@asterism-app/builtin-api/contracts";');
       if (mode === "symlink") {
         mkdirSync(join(root, "node_modules/@fixture"), { recursive: true });
         symlinkSync(helper, join(root, "node_modules/@fixture/helper"), "dir");

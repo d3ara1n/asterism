@@ -1,4 +1,4 @@
-import type { CreationEntry, DropAccepts, DropItem } from "@asterism/sdk/renderer";
+import type { CreationEntry, DropAccepts, DropItem } from "@asterism-app/sdk/renderer";
 
 /**
  * Pure drag-and-drop arbitration logic: declarative matching, candidate sets, and routing memory keys.

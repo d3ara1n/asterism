@@ -1,5 +1,5 @@
-import type { Json } from "@asterism/sdk/contracts";
-import type { RendererPreferences } from "@asterism/sdk/renderer";
+import type { Json } from "@asterism-app/sdk/contracts";
+import type { RendererPreferences } from "@asterism-app/sdk/renderer";
 
 /**
  * Renderer cache of the controlled preferences container: read once at startup; writes update the cache before saving through the bridge.

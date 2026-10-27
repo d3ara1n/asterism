@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { defineCreation, defineImplementation } from "@asterism/sdk/contracts";
-import { builtin } from "@asterism/builtin-api/contracts";
+import { defineCreation, defineImplementation } from "@asterism-app/sdk/contracts";
+import { builtin } from "@asterism-app/builtin-api/contracts";
 import { DirectoryList, DirectoryRead } from "../filesystem/contract.ts";
 import { DirectoryFind, DirectoryGrep } from "../filesystem/search-contract.ts";
 

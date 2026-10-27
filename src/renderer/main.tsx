@@ -6,7 +6,7 @@ import { loadPreferences } from "./features/creation/preferences";
 import { StartupScreen, type StartupFailure } from "./app/StartupScreen";
 import { StartupError, awaitStartup, waitForRuntime } from "./app/boot";
 import { startupMessages } from "../shared/error-display";
-import type { UiText } from "@asterism/sdk/contracts";
+import type { UiText } from "@asterism-app/sdk/contracts";
 import "./styles.css";
 
 const root = createRoot(document.getElementById("root")!);

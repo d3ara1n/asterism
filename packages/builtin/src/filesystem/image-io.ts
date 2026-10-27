@@ -2,7 +2,7 @@ import { readFile, stat } from "node:fs/promises";
 import { TextError } from "../shared/text.ts";
 import { FilesystemError, failed } from "./errors.ts";
 import { withinDirectory } from "./paths.ts";
-import { modelInputLimits } from "@asterism/sdk/contracts";
+import { modelInputLimits } from "@asterism-app/sdk/contracts";
 
 /** Identifies images by file headers without trusting extensions; nonimages are not returned as tool files. */
 export function imageMediaType(bytes: Uint8Array): string | null {

@@ -1,4 +1,4 @@
-import { defineMessages, pluginNamespace } from "@asterism/sdk/contracts";
+import { defineMessages, pluginNamespace } from "@asterism-app/sdk/contracts";
 
 export const errorDetailMessages = pluginNamespace("asterism.builtin").messages("en", defineMessages({
   view: { id: "error.details.view", defaultMessage: "View error details" },

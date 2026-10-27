@@ -1,5 +1,5 @@
 import { Allow, parse } from "partial-json";
-import type { Json } from "@asterism/sdk/contracts";
+import type { Json } from "@asterism-app/sdk/contracts";
 import type { LiveBlock } from "./session.ts";
 
 /** Tolerantly parse streaming tool arguments for display and call identity only; null for empty or unparseable text. Reject NaN/Infinity as non-JSON. */

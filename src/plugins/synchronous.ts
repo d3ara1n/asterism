@@ -1,4 +1,4 @@
-import { PluginApiError } from "@asterism/sdk/runtime";
+import { PluginApiError } from "@asterism-app/sdk/runtime";
 
 /** Synchronous interfaces also check actual return values, covering plugins that bypass TypeScript. */
 export function synchronous<T>(work: () => T): T {

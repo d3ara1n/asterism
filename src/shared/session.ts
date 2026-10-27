@@ -1,10 +1,10 @@
 import { z } from "zod";
 import type { LivePatch } from "./live-patch.ts";
-import { userInputPartsSchema, submissionIdSchema } from "@asterism/builtin-api/contracts";
+import { userInputPartsSchema, submissionIdSchema } from "@asterism-app/builtin-api/contracts";
 import {
   resourceCallSchema, contractReferenceSchema, toolInvocationSchema,
   toolRunningResultSchema, uiTextSchema,
-} from "@asterism/sdk/contracts";
+} from "@asterism-app/sdk/contracts";
 import { jsonSchema } from "./model.ts";
 import { modelExpressionSchema, thinkingSchema } from "./configuration.ts";
 import { pointSchema, workbenchCommands, workbenchSnapshotSchema, type WorkbenchSnapshot } from "./workbench.ts";

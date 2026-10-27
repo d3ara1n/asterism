@@ -1,6 +1,6 @@
-import { belongsTo, ResourcePresenceChanged, type ActionContract, type ResourceCall, type ResourceSnapshot, type SessionRecord, type SessionSnapshot, type ToolContract } from "@asterism/sdk/contracts";
+import { belongsTo, ResourcePresenceChanged, type ActionContract, type ResourceCall, type ResourceSnapshot, type SessionRecord, type SessionSnapshot, type ToolContract } from "@asterism-app/sdk/contracts";
 import { PluginApiError, type PluginDefinition, type PluginLogger, type PluginTasks,
-  type ResourceRef, type SessionObserver, type CommandPreparer, type ModuleContribution } from "@asterism/sdk/runtime";
+  type ResourceRef, type SessionObserver, type CommandPreparer, type ModuleContribution } from "@asterism-app/sdk/runtime";
 import type { CredentialVault } from "../configuration/credentials.ts";
 import type { ResourceBackend } from "../resources/contract.ts";
 import { ResourceRegistry } from "../resources/registry.ts";
@@ -28,7 +28,7 @@ import { CallRegistry } from "./calls.ts";
 import { bindTopLevelTools, type RegisteredTopLevelTool } from "./top-level-tools.ts";
 import { resolveToolContributions, validateToolContributions, type ToolImplementationStatus } from "./tool-contributions.ts";
 import type { ModelProviderExtensions } from "../configuration/provider-extensions.ts";
-import type { ModelProviderServices, PluginStorageDeclaration, UsageProviderServices } from "@asterism/sdk/runtime";
+import type { ModelProviderServices, PluginStorageDeclaration, UsageProviderServices } from "@asterism-app/sdk/runtime";
 import type { WebProviderRegistry } from "../configuration/web-providers.ts";
 
 export interface PreparedPluginStorage {

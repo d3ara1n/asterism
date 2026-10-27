@@ -1,11 +1,11 @@
-import { RendererViewStateProvider, useI18n, useRendererObject, useRendererViewState, type RendererViewStateEntry } from "@asterism/sdk/renderer";
+import { RendererViewStateProvider, useI18n, useRendererObject, useRendererViewState, type RendererViewStateEntry } from "@asterism-app/sdk/renderer";
 import { TriangleAlert, Info } from "lucide-react";
 import { memo, useLayoutEffect, useMemo, useState, type ReactNode, type Ref, type RefObject } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Virtualizer, type VirtualizerHandle } from "virtua";
 
-import { Alert, AlertDescription } from "@asterism/ui/ui/alert";
-import { Badge } from "@asterism/ui/ui/badge";
+import { Alert, AlertDescription } from "@asterism-app/ui/ui/alert";
+import { Badge } from "@asterism-app/ui/ui/badge";
 import { conversationMessages } from "../../messages/conversation";
 import { Markdown } from "./Markdown";
 import { ThinkingBlock } from "./ThinkingBlock";

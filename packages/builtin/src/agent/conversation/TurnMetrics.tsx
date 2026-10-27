@@ -1,7 +1,7 @@
 import { DatabaseZap, Gauge } from "lucide-react";
-import { useI18n, type I18n } from "@asterism/sdk/renderer";
-import { formatCount } from "@asterism/ui/format-count";
-import { Separator } from "@asterism/ui/ui/separator";
+import { useI18n, type I18n } from "@asterism-app/sdk/renderer";
+import { formatCount } from "@asterism-app/ui/format-count";
+import { Separator } from "@asterism-app/ui/ui/separator";
 import { diagnosticMessages } from "../../messages/diagnostics";
 import { performanceMessages } from "../../messages/performance";
 import { turnMetricMessages as messages } from "../../messages/turn-metrics";

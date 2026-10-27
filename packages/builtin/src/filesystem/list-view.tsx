@@ -1,6 +1,6 @@
-import { useI18n, type ToolRenderProps } from "@asterism/sdk/renderer";
+import { useI18n, type ToolRenderProps } from "@asterism-app/sdk/renderer";
 import type { z } from "zod";
-import { ToolHeader } from "@asterism/ui/tool-header";
+import { ToolHeader } from "@asterism-app/ui/tool-header";
 import { filesystemMessages } from "../messages/filesystem";
 import { textMessages } from "../messages/text";
 import { inputText } from "../shared/tool-preview";

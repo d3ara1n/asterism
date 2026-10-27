@@ -1,4 +1,4 @@
-import type { TextRow } from "@asterism/builtin-api/contracts";
+import type { TextRow } from "@asterism-app/builtin-api/contracts";
 import { computeLineHash } from "./hashline/hash.ts";
 
 /** Long-line threshold for read/edit echoes: allows ordinary long paragraphs while limiting minified output and inline base64. */

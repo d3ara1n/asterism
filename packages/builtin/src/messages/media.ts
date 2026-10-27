@@ -1,5 +1,5 @@
-import { defineMessages } from "@asterism/sdk/contracts";
-import { builtin } from "@asterism/builtin-api/contracts";
+import { defineMessages } from "@asterism-app/sdk/contracts";
+import { builtin } from "@asterism-app/builtin-api/contracts";
 
 export const mediaMessages = builtin.messages("en", defineMessages({
   attach: { id: "agent_media_attach", defaultMessage: "Attach files" },

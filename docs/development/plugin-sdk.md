@@ -146,4 +146,4 @@ Creation entries coordinate menu and drop input through the same host creation p
 
 Tool input, execution, and result phases share presentation identity but consume different data. Streaming-preview declarations request ordinary automatic disclosure; attention declarations request one immediate disclosure for user handling.
 
-Agent-specific toolbar, overlay, and modal composition belongs to `@asterism/builtin-api`, not a generic SDK slot system.
+Agent-specific toolbar, overlay, and modal composition belongs to `@asterism-app/builtin-api`, not a generic SDK slot system.

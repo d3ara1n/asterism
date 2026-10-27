@@ -1,16 +1,27 @@
 {
-  "name": "@asterism/builtin-api",
-  "private": true,
+  "name": "@asterism-app/builtin-api",
   "version": "0.19.1",
+  "description": "Public domain contracts and extensions for Asterism built-in features",
+  "license": "MIT",
+  "author": "Chien Zhang",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/d3ara1n/asterism.git",
+    "directory": "packages/builtin-api"
+  },
+  "publishConfig": {
+    "access": "public",
+    "tag": "next",
+    "registry": "https://registry.npmjs.org/"
+  },
   "type": "module",
   "exports": {
     "./contracts": "./src/contracts.ts",
     "./renderer": "./src/renderer.ts",
     "./runtime": "./src/runtime.ts"
   },
-  "dependencies": {},
   "peerDependencies": {
-    "@asterism/sdk": "*",
+    "@asterism-app/sdk": "*",
     "react": "^19.3.0",
     "zod": "^4.6.5"
   },

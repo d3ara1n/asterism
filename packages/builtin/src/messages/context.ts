@@ -1,4 +1,4 @@
-import { defineMessages, pluginNamespace } from "@asterism/sdk/contracts";
+import { defineMessages, pluginNamespace } from "@asterism-app/sdk/contracts";
 
 export const contextMessages = pluginNamespace("asterism.builtin").messages("en", defineMessages({
   window: { id: "context.window", defaultMessage: "Context window" },

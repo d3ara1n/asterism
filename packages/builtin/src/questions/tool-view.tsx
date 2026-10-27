@@ -1,8 +1,8 @@
 import { MessageCircleQuestion } from "lucide-react";
-import type { Json } from "@asterism/sdk/contracts";
-import { toolRenderer, useI18n, type ToolExecutionRenderProps, type ToolResultRenderProps } from "@asterism/sdk/renderer";
-import { StatusText } from "@asterism/ui/ui/status";
-import { ToolHeader } from "@asterism/ui/tool-header";
+import type { Json } from "@asterism-app/sdk/contracts";
+import { toolRenderer, useI18n, type ToolExecutionRenderProps, type ToolResultRenderProps } from "@asterism-app/sdk/renderer";
+import { StatusText } from "@asterism-app/ui/ui/status";
+import { ToolHeader } from "@asterism-app/ui/tool-header";
 import { questionMessages as messages } from "../messages/questions";
 import { AnswerSummary } from "./answer-summary";
 import { askUserArgs, AskUserResult, type Answer, type Question } from "./contract";

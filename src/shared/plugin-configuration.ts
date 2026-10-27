@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { jsonSchema, uiTextSchema } from "@asterism/sdk/contracts";
+import { jsonSchema, uiTextSchema } from "@asterism-app/sdk/contracts";
 
 const id = z.string().min(1).max(160);
 /** Responses carry encoded configuration values; save commands submit decoded domain values for backend encoding. */

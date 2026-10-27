@@ -1,9 +1,9 @@
 import { createElement, isValidElement, type ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { defineData, present, reference, pluginNamespace } from "@asterism/sdk/contracts";
-import type { Json } from "@asterism/sdk/contracts";
-import { cardRenderer, toolRenderer, type RendererObjectContext, type ToolRenderProps, type ToolInputRenderProps, type ToolResultRenderProps } from "@asterism/sdk/renderer";
+import { defineData, present, reference, pluginNamespace } from "@asterism-app/sdk/contracts";
+import type { Json } from "@asterism-app/sdk/contracts";
+import { cardRenderer, toolRenderer, type RendererObjectContext, type ToolRenderProps, type ToolInputRenderProps, type ToolResultRenderProps } from "@asterism-app/sdk/renderer";
 import { ViewRegistry } from "./registry";
 
 const data = defineData("test.text", z.strictObject({ text: z.string() }));

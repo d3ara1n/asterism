@@ -1,5 +1,5 @@
 import { type EventContract, type EventEnvelope, type EventHandler, type EventSubscriber,
-  type EventSubscribeOptions, type EventSubscription, type Json, type SubscriptionEnd } from "@asterism/sdk/contracts";
+  type EventSubscribeOptions, type EventSubscription, type Json, type SubscriptionEnd } from "@asterism-app/sdk/contracts";
 import { deepFreeze } from "./immutable.ts";
 import type { EventFrame } from "./plugin-events.ts";
 import type { EventBridge } from "./connection.ts";

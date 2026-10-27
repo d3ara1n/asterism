@@ -1,8 +1,8 @@
-import { recordRenderer, useI18n, type RecordRenderer } from "@asterism/sdk/renderer";
+import { recordRenderer, useI18n, type RecordRenderer } from "@asterism-app/sdk/renderer";
 import { Brain, MessageSquareText, User, Bot, Wrench, Info } from "lucide-react";
 
-import { inputSummary, Execution, AgentInputMessage, ContextSummary } from "@asterism/builtin-api/contracts";
-import { Badge } from "@asterism/ui/ui/badge";
+import { inputSummary, Execution, AgentInputMessage, ContextSummary } from "@asterism-app/builtin-api/contracts";
+import { Badge } from "@asterism-app/ui/ui/badge";
 import { conversationMessages } from "../messages/conversation";
 
 /** History rows for agent records: styles distinguish user input, thinking, and output without relying on text prefixes. */

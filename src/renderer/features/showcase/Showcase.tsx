@@ -1,16 +1,16 @@
 import { Bot, Info } from "lucide-react";
-import { Alert, AlertDescription, AlertTitle } from "@asterism/ui/ui/alert";
-import { Badge } from "@asterism/ui/ui/badge";
-import { Button } from "@asterism/ui/ui/button";
-import { Card, CardDescription, CardHeader, CardTitle } from "@asterism/ui/ui/card";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@asterism/ui/ui/dialog";
-import { Input } from "@asterism/ui/ui/input";
-import { Item, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@asterism/ui/ui/item";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@asterism/ui/ui/select";
-import { Separator } from "@asterism/ui/ui/separator";
-import { Switch } from "@asterism/ui/ui/switch";
-import { StatusBadge } from "@asterism/ui/ui/status";
-import { Textarea } from "@asterism/ui/ui/textarea";
+import { Alert, AlertDescription, AlertTitle } from "@asterism-app/ui/ui/alert";
+import { Badge } from "@asterism-app/ui/ui/badge";
+import { Button } from "@asterism-app/ui/ui/button";
+import { Card, CardDescription, CardHeader, CardTitle } from "@asterism-app/ui/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@asterism-app/ui/ui/dialog";
+import { Input } from "@asterism-app/ui/ui/input";
+import { Item, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@asterism-app/ui/ui/item";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@asterism-app/ui/ui/select";
+import { Separator } from "@asterism-app/ui/ui/separator";
+import { Switch } from "@asterism-app/ui/ui/switch";
+import { StatusBadge } from "@asterism-app/ui/ui/status";
+import { Textarea } from "@asterism-app/ui/ui/textarea";
 
 /** Hidden passphrase, triggered by entering it completely in the home input and pressing Enter; a frontend-only easter egg outside the command system. */
 export const showcaseSpell = "/gamemode 1";

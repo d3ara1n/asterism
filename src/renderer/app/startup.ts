@@ -1,5 +1,5 @@
-import type { RendererModule, RendererPlugin } from "@asterism/sdk/renderer";
-import type { EventSubscriber, PluginCalls } from "@asterism/sdk/contracts";
+import type { RendererModule, RendererPlugin } from "@asterism-app/sdk/renderer";
+import type { EventSubscriber, PluginCalls } from "@asterism-app/sdk/contracts";
 
 const unavailableCalls: PluginCalls = { invoke: async () => { throw new Error("Renderer calls are unavailable."); } };
 function scopedCalls(calls: PluginCalls, signal: AbortSignal): PluginCalls {

@@ -1,4 +1,4 @@
-import type { RendererModule } from "@asterism/sdk/renderer";
+import type { RendererModule } from "@asterism-app/sdk/renderer";
 import { QuestionsChanged } from "./contract";
 import { questionDrafts } from "./drafts";
 import { questionToolRenderer } from "./tool-view";

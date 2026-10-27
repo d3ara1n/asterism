@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { defineCall } from "@asterism/sdk/contracts";
-import { builtin } from "@asterism/builtin-api/contracts";
+import { defineCall } from "@asterism-app/sdk/contracts";
+import { builtin } from "@asterism-app/builtin-api/contracts";
 
 const text = z.string().trim().min(1);
 const optionSchema = z.strictObject({

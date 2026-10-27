@@ -1,4 +1,4 @@
-import { thinkingLevels } from "@asterism/sdk/contracts";
+import { thinkingLevels } from "@asterism-app/sdk/contracts";
 import { describe, expect, it, vi } from "vitest";
 import { setImmediate } from "node:timers/promises";
 import { MockLanguageModelV4, simulateReadableStream } from "ai/test";
@@ -7,7 +7,7 @@ import { modelScope } from "../shared/model.ts";
 import { ModelFailure, type ModelInput, type ModelEvent } from "./contract.ts";
 import { createProviderModel } from "./provider.ts";
 import { projectSystemPrompt } from "./system-prompt.ts";
-import { composeSystemPrompt } from "@asterism/builtin/runtime";
+import { composeSystemPrompt } from "@asterism-app/builtin/runtime";
 
 const input: ModelInput = {
   settings: { provider: { id: "p", name: "Provider", enabled: true, baseUrl: "https://example.invalid", protocol: "anthropic", auth: "api_key", compatibility: [] },

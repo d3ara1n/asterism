@@ -1,4 +1,4 @@
-import { defineCreation, defineAction } from "@asterism/sdk/contracts";
+import { defineCreation, defineAction } from "@asterism-app/sdk/contracts";
 import { z } from "zod";
 import { builtin } from "./identity.ts";
 import { userInputPartsSchema } from "./input.ts";

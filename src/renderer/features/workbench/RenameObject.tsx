@@ -1,11 +1,11 @@
 import { useId, useRef, useState } from "react";
-import type { UiText } from "@asterism/sdk/contracts";
-import { Alert, AlertDescription } from "@asterism/ui/ui/alert";
-import { Button } from "@asterism/ui/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@asterism/ui/ui/dialog";
-import { Field, FieldGroup, FieldLabel } from "@asterism/ui/ui/field";
-import { Input } from "@asterism/ui/ui/input";
-import { commonMessages } from "@asterism/ui/messages/common";
+import type { UiText } from "@asterism-app/sdk/contracts";
+import { Alert, AlertDescription } from "@asterism-app/ui/ui/alert";
+import { Button } from "@asterism-app/ui/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@asterism-app/ui/ui/dialog";
+import { Field, FieldGroup, FieldLabel } from "@asterism-app/ui/ui/field";
+import { Input } from "@asterism-app/ui/ui/input";
+import { commonMessages } from "@asterism-app/ui/messages/common";
 import { errorDisplay } from "../../../shared/error-display";
 import type { WorkbenchObject } from "../../../shared/workbench";
 import { formsMessages } from "../../messages/forms";

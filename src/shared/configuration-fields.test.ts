@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Json } from "@asterism/sdk/contracts";
+import type { Json } from "@asterism-app/sdk/contracts";
 import { configurationField, configurationLabel, configurationProperty } from "./configuration-fields.ts";
 
 describe("Configuration schema control selection", () => {

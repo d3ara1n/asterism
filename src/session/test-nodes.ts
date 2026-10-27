@@ -1,6 +1,6 @@
 /** Test fixtures construct agent and workbench records from generic record nodes; maintain their shapes only here. */
-import type { Json, ModelCompletion, ToolOutcome } from "@asterism/sdk/contracts";
-import { Execution, AgentInputMessage, type AgentMessageSender } from "@asterism/builtin-api/contracts";
+import type { Json, ModelCompletion, ToolOutcome } from "@asterism-app/sdk/contracts";
+import { Execution, AgentInputMessage, type AgentMessageSender } from "@asterism-app/builtin-api/contracts";
 import type { NewNode, SessionNode } from "../shared/session.ts";
 
 export const agentSource = (id: string) => ({ plugin: "asterism.builtin", resource: { sessionId: "s", id, kind: "asterism.builtin/agent" } });

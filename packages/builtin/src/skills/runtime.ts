@@ -1,4 +1,4 @@
-import { defineModule, defineTopLevelTool, implementCall } from "@asterism/sdk/runtime";
+import { defineModule, defineTopLevelTool, implementCall } from "@asterism-app/sdk/runtime";
 import { z } from "zod";
 import { TextError, readToModel } from "../shared/text.ts";
 import { filesystemFailure } from "../filesystem/errors.ts";

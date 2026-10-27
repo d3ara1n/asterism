@@ -2,7 +2,7 @@ import { z } from "zod";
 import {
   pluginNamespace, defineCreation, defineAction, defineCall,
   defineRecord, defineTool, defineImplementation,
-} from "@asterism/sdk/contracts";
+} from "@asterism-app/sdk/contracts";
 
 export const ns = pluginNamespace("example.counter");
 export const card = { width: 280, height: 180 };

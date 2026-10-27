@@ -1,5 +1,5 @@
-import { defaultToolModel, reference, type Json, type ResourceRef, type ToolContract } from "@asterism/sdk/contracts";
-import { PluginApiError, type TopLevelTool } from "@asterism/sdk/runtime";
+import { defaultToolModel, reference, type Json, type ResourceRef, type ToolContract } from "@asterism-app/sdk/contracts";
+import { PluginApiError, type TopLevelTool } from "@asterism-app/sdk/runtime";
 import type { Invocation } from "../tools/contract.ts";
 import type { SdkContext } from "./sdk-context.ts";
 import type { RunGroup } from "./lifecycle.ts";

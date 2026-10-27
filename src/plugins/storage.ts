@@ -3,8 +3,8 @@ import { join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { z } from "zod";
 import type { CredentialVault } from "../configuration/credentials.ts";
-import { jsonSchema, type Json, type ConfigContract } from "@asterism/sdk/contracts";
-import { PluginApiError, type PluginConfig, type PluginSecrets, type PluginStorageDeclaration } from "@asterism/sdk/runtime";
+import { jsonSchema, type Json, type ConfigContract } from "@asterism-app/sdk/contracts";
+import { PluginApiError, type PluginConfig, type PluginSecrets, type PluginStorageDeclaration } from "@asterism-app/sdk/runtime";
 import type { PluginConfiguration } from "../shared/plugin-configuration.ts";
 import { encodePluginData } from "./data-encoding.ts";
 

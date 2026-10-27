@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { WebResponse } from "@asterism/sdk/contracts";
-import { WebError, type WebProviderDefinition } from "@asterism/sdk/runtime";
+import type { WebResponse } from "@asterism-app/sdk/contracts";
+import { WebError, type WebProviderDefinition } from "@asterism-app/sdk/runtime";
 import { RunLifecycle } from "../plugins/lifecycle.ts";
 import { limitWebBody, matchesWebUrl, matchWebProviders, WebProviderRegistry } from "./web-providers.ts";
 

@@ -1,4 +1,4 @@
-import { useI18n } from "@asterism/sdk/renderer";
+import { useI18n } from "@asterism-app/sdk/renderer";
 import { Loader2Icon } from "lucide-react";
 
 import { commonMessages } from "../messages/common";

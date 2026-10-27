@@ -1,4 +1,4 @@
-import { PluginApiError, type Lifetime } from "@asterism/sdk/runtime";
+import { PluginApiError, type Lifetime } from "@asterism-app/sdk/runtime";
 
 /**
  * Host lifetime scope: end first aborts the signal, then awaits cleanup in reverse registration order.

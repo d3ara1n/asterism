@@ -1,4 +1,4 @@
-import { defineMessages, pluginNamespace } from "@asterism/sdk/contracts";
+import { defineMessages, pluginNamespace } from "@asterism-app/sdk/contracts";
 
 export const objectsMessages = pluginNamespace("asterism.host").messages("en", defineMessages({
   renameObject: { id: "objects.rename", defaultMessage: "Rename resource" },

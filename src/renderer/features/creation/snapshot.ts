@@ -1,4 +1,4 @@
-import type { DropItem } from "@asterism/sdk/renderer";
+import type { DropItem } from "@asterism-app/sdk/renderer";
 import type { DragKind } from "./routing";
 
 /** Only the type list can be read during hover; files take priority, followed by URLs, then plain text. */

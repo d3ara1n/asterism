@@ -2,7 +2,7 @@ import { directoryCard } from "../shared/card-appearance.ts";
 import { readdir, readFile, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, isAbsolute, join } from "node:path";
-import { defineModule, implementResource, implementCreation, implementTool, implementCall, PluginApiError, type CallResult } from "@asterism/sdk/runtime";
+import { defineModule, implementResource, implementCreation, implementTool, implementCall, PluginApiError, type CallResult } from "@asterism-app/sdk/runtime";
 import { TextError, readToModel, editText, textChange, writeToModel, editToModel } from "../shared/text.ts";
 import { Directory, CreateDirectory, ReadDirectoryDefaults, DirectoryView, DirectoryList, DirectoryRead, DirectoryEdit, DirectoryWrite, DirectorySee, DirectoryTree } from "./contract.ts";
 import { readImageFile } from "./image-io.ts";

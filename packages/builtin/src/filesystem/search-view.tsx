@@ -1,10 +1,10 @@
 import type { ReactNode } from "react";
 import { ChevronRight, FileSearch, Search } from "lucide-react";
-import { toolRenderer, useI18n, useRendererViewState, type ToolRenderProps } from "@asterism/sdk/renderer";
-import { ToolHeader } from "@asterism/ui/tool-header";
-import { Button } from "@asterism/ui/ui/button";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@asterism/ui/ui/collapsible";
-import { cn } from "@asterism/ui/utils";
+import { toolRenderer, useI18n, useRendererViewState, type ToolRenderProps } from "@asterism-app/sdk/renderer";
+import { ToolHeader } from "@asterism-app/ui/tool-header";
+import { Button } from "@asterism-app/ui/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@asterism-app/ui/ui/collapsible";
+import { cn } from "@asterism-app/ui/utils";
 import { CodeRows } from "../code-view";
 import { filesystemMessages as messages } from "../messages/filesystem";
 import { textMessages } from "../messages/text";

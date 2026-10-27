@@ -1,13 +1,13 @@
-import type { UiText } from "@asterism/sdk/contracts";
-import { type PluginDefinition, PluginApiError } from "@asterism/sdk/runtime";
+import type { UiText } from "@asterism-app/sdk/contracts";
+import { type PluginDefinition, PluginApiError } from "@asterism-app/sdk/runtime";
 import { join } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 
 import { ConfigurationService } from "../configuration/service.ts";
 import type { ModelAdapter } from "../model/contract.ts";
 import { PackageList, PluginPackageError, readManifest, readPackageMetadata, packageRoot } from "../plugins/packages.ts";
-import { builtinMetadata } from "@asterism/builtin/runtime";
-import { builtin } from "@asterism/builtin-api/contracts";
+import { builtinMetadata } from "@asterism-app/builtin/runtime";
+import { builtin } from "@asterism-app/builtin-api/contracts";
 import { commandSchema, snapshotSchema, type AppSnapshot, type AppError } from "../shared/contracts.ts";
 import type { TranslationCatalog } from "../shared/i18n.ts";
 import type { ModelSettings } from "../shared/model.ts";
@@ -19,7 +19,7 @@ import type { PreparedPluginStorage } from "../plugins/loader.ts";
 import { SessionService } from "./sessions.ts";
 import { collectExpiredSessions, openDatabase } from "./storage.ts";
 import { ContentTransferService } from "./content-transfer.ts";
-import type { ManualSource } from "@asterism/builtin-api/runtime";
+import type { ManualSource } from "@asterism-app/builtin-api/runtime";
 
 export class ApplicationError extends Error {
   constructor(readonly code: AppError["code"], message: string, readonly display?: UiText) { super(message); }
@@ -115,7 +115,7 @@ export class ApplicationService {
         dependencies: startup?.rendererDependencies ?? [] };
     });
     const builtIn = this.sessions.plugins.find(plugin => plugin.id === builtin.id);
-    plugins.push({ index: null, source: "@asterism/builtin", id: builtin.id, metadata: builtinMetadata,
+    plugins.push({ index: null, source: "@asterism-app/builtin", id: builtin.id, metadata: builtinMetadata,
       status: builtIn?.status ?? "failed", enabled: true, error: builtIn?.error ?? null, renderer: null, stylesheet: null, dependencies: [] });
     return snapshotSchema.parse({ workspace, sessions, templates: this.sessions.templates.list(), archivedSessions, plugins, catalogs: this.options.catalogs ?? [], restartRequired: JSON.stringify(current) !== this.started,
       ...(command.type === "workspace.prepare-close" ? { disposalWarnings: this.sessions.disposalWarnings() } : {}) });

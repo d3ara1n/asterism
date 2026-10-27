@@ -1,12 +1,12 @@
 import type { AgentConfiguration } from "../shared/configuration.ts";
 import type { Json } from "../shared/model.ts";
-import type { ToolInvocationInfo } from "@asterism/sdk/contracts";
+import type { ToolInvocationInfo } from "@asterism-app/sdk/contracts";
 import type { FoldedObject } from "../session/fold.ts";
 import type { ResourceRegistry } from "../resources/registry.ts";
 import type { ToolRegistry } from "../tools/registry.ts";
 import type { Invocation, PreparedResult, ToolImplementation } from "../tools/contract.ts";
 import { projectTool, schemaOf } from "../tools/definition.ts";
-import type { ToolCaller } from "@asterism/sdk/runtime";
+import type { ToolCaller } from "@asterism-app/sdk/runtime";
 
 /** External tool policy; support relationships, resource links, and this policy are checked independently. */
 export type ToolPolicy = (name: string) => boolean;

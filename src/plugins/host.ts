@@ -1,5 +1,5 @@
-import type { ActionContract, CreationContract, DataContract, Json, ResourceRef, ResourceCreationResult, SessionDirectory } from "@asterism/sdk/contracts";
-import type { ResourceActionOptions, ResourceCreationOptions, ToolCaller } from "@asterism/sdk/runtime";
+import type { ActionContract, CreationContract, DataContract, Json, ResourceRef, ResourceCreationResult, SessionDirectory } from "@asterism-app/sdk/contracts";
+import type { ResourceActionOptions, ResourceCreationOptions, ToolCaller } from "@asterism-app/sdk/runtime";
 import type { NewNode, SessionNode } from "../shared/session.ts";
 import type { FoldedObject, FoldedState } from "../session/fold.ts";
 import type { AgentCapabilities, ToolPolicy } from "../execution/capabilities.ts";

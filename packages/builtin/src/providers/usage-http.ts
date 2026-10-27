@@ -1,6 +1,6 @@
 import { z } from "zod";
-import type { UiText, UsageItem } from "@asterism/sdk/contracts";
-import { UsageQueryError, type QueryUsageProvider, type UsageQueryContext } from "@asterism/sdk/runtime";
+import type { UiText, UsageItem } from "@asterism-app/sdk/contracts";
+import { UsageQueryError, type QueryUsageProvider, type UsageQueryContext } from "@asterism-app/sdk/runtime";
 
 /** Amount APIs may use decimal strings; empty strings, booleans, and non-finite numbers must not be treated as a zero balance. */
 export const decimal = z.union([z.number(), z.string().trim().regex(/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/u).transform(Number)])

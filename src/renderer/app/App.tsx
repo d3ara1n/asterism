@@ -1,10 +1,10 @@
 import { runtime } from "../runtime";
 import { motion, AnimatePresence } from "motion/react";
-import { DropdownMenuItem, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuSeparator, DropdownMenuLabel } from "@asterism/ui/ui/dropdown-menu";
-import { Button } from "@asterism/ui/ui/button";
+import { DropdownMenuItem, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuSeparator, DropdownMenuLabel } from "@asterism-app/ui/ui/dropdown-menu";
+import { Button } from "@asterism-app/ui/ui/button";
 import { PanelLeft, ArrowLeft, ChevronDown, House, Settings, Plus, KeyRound, ListTree, History } from "lucide-react";
 
-import { BrandMark } from "@asterism/ui/ui/brand-mark";
+import { BrandMark } from "@asterism-app/ui/ui/brand-mark";
 
 import { WorkbenchSurface } from "../features/workbench/WorkbenchSurface";
 import { WorkbenchFeedback } from "../features/workbench/WorkbenchFeedback";
@@ -17,10 +17,10 @@ import { focusIslandId, useFocusedObject } from "../features/workbench/focus";
 import { Sidebar } from "./Sidebar";
 
 import { HomePage, type StartInput } from "../features/home/HomePage";
-import { createMessageDraft, SubmissionIdentity } from "@asterism/builtin/renderer";
-import { startAgentContentTarget } from "@asterism/builtin-api/contracts";
+import { createMessageDraft, SubmissionIdentity } from "@asterism-app/builtin/renderer";
+import { startAgentContentTarget } from "@asterism-app/builtin-api/contracts";
 import { contentInput, contentScopeId } from "../features/creation/content";
-import { RendererSettingsNavigationProvider, type RendererContentInput } from "@asterism/sdk/renderer";
+import { RendererSettingsNavigationProvider, type RendererContentInput } from "@asterism-app/sdk/renderer";
 import { Window, Titlebar } from "./Window";
 import { UpdateIndicator } from "./UpdateIndicator";
 import { UpdatesProvider } from "../features/updates/state";
@@ -31,14 +31,14 @@ import { SessionArchiveContext } from "../features/settings/SessionsSettings";
 import { usePluginSettingsRegistry } from "../modules/settings";
 import { Screen, type IslandSpec } from "../shared/weave/Screen";
 import { Toaster } from "../shared/ui/sonner";
-import { IconButton } from "@asterism/ui/ui/icon-button";
+import { IconButton } from "@asterism-app/ui/ui/icon-button";
 import { operationSucceeded, useStateToast } from "../shared/toast";
 
 import { errorDisplay } from "../../shared/error-display.ts";
-import type { UiText } from "@asterism/sdk/contracts";
+import type { UiText } from "@asterism-app/sdk/contracts";
 import { accessMessages } from "../messages/access";
 import { appMessages } from "../messages/app";
-import { commonMessages } from "@asterism/ui/messages/common";
+import { commonMessages } from "@asterism-app/ui/messages/common";
 import { historyMessages } from "../messages/history";
 import { objectsMessages } from "../messages/objects";
 import { settingsMessages } from "../messages/settings";

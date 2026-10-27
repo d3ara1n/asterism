@@ -3,14 +3,14 @@ import { extname, join, relative, resolve, isAbsolute, posix, win32 } from "node
 import { pathToFileURL } from "node:url";
 import { z } from "zod";
 import * as zod from "zod";
-import * as sdkContracts from "@asterism/sdk/contracts";
-import * as sdkRuntime from "@asterism/sdk/runtime";
-import sdkMetadata from "@asterism/sdk/package.json" with { type: "json" };
-import type { PluginDefinition, PluginStorageDeclaration } from "@asterism/sdk/runtime";
+import * as sdkContracts from "@asterism-app/sdk/contracts";
+import * as sdkRuntime from "@asterism-app/sdk/runtime";
+import sdkMetadata from "@asterism-app/sdk/package.json" with { type: "json" };
+import type { PluginDefinition, PluginStorageDeclaration } from "@asterism-app/sdk/runtime";
 import type { Plugin } from "esbuild";
 import { compileModules, packageModule, type PackageModule } from "./package-modules.ts";
 import { loadCatalogs } from "./catalogs.ts";
-import { localeSchema, uiTextSchema, pluginMetadataSchema, type PluginMetadata } from "@asterism/sdk/contracts";
+import { localeSchema, uiTextSchema, pluginMetadataSchema, type PluginMetadata } from "@asterism-app/sdk/contracts";
 import type { TranslationCatalog } from "../shared/i18n.ts";
 import type { PublicProvider } from "../shared/public-modules.ts";
 import { jsonStorage } from "../storage/migrations.ts";
@@ -156,8 +156,8 @@ export class PackageList {
  */
 const shared: Record<string, Record<string, unknown>> = {
   zod: zod as Record<string, unknown>,
-  "@asterism/sdk/contracts": sdkContracts as Record<string, unknown>,
-  "@asterism/sdk/runtime": sdkRuntime as Record<string, unknown>,
+  "@asterism-app/sdk/contracts": sdkContracts as Record<string, unknown>,
+  "@asterism-app/sdk/runtime": sdkRuntime as Record<string, unknown>,
 };
 const sharedGlobal = "__asterismSharedModules";
 (globalThis as Record<string, unknown>)[sharedGlobal] = shared;
@@ -169,7 +169,7 @@ function sharedModuleSource(id: string): string {
 }
 
 /** Renderer shared modules: the host page supplies the same instances through window.__asterismRendererModules. */
-export const rendererShared: readonly string[] = ["react", "react/jsx-runtime", "react-dom", "react-dom/client", "react-intl", "zod", "@asterism/sdk/contracts", "@asterism/sdk/renderer"];
+export const rendererShared: readonly string[] = ["react", "react/jsx-runtime", "react-dom", "react-dom/client", "react-intl", "zod", "@asterism-app/sdk/contracts", "@asterism-app/sdk/renderer"];
 function rendererModuleSource(id: string): string {
   // CJS forwarding: esbuild interop reads named imports as properties of the same instance.
   return `const m = globalThis.__asterismRendererModules[${JSON.stringify(id)}]; module.exports = m;`;

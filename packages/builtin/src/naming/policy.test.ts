@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { ModelBlock, SessionRecord } from "@asterism/sdk/contracts";
-import { jsonSchema } from "@asterism/sdk/contracts";
-import { Execution, AgentInputMessage } from "@asterism/builtin-api/contracts";
+import type { ModelBlock, SessionRecord } from "@asterism-app/sdk/contracts";
+import { jsonSchema } from "@asterism-app/sdk/contracts";
+import { Execution, AgentInputMessage } from "@asterism-app/builtin-api/contracts";
 import { cleanTitle, collectTurns, namingPrompt } from "./policy.ts";
 
 function record(id: string, contract: string, data: SessionRecord["data"], agentId: string): SessionRecord {

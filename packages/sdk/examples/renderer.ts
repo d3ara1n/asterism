@@ -2,7 +2,7 @@ import { Counter, CounterView as Card, CreateCounter, ChangeCount, CounterUpdate
 /** Frontend author example: depends only on React, Zod, and the public SDK, without accessing window.host. */
 import { createElement, useEffect, useState } from "react";
 import { z } from "zod";
-import { defineRendererPlugin, cardRenderer, useRendererCard, useRendererObject, type RendererModule, type RendererObjectContext } from "@asterism/sdk/renderer";
+import { defineRendererPlugin, cardRenderer, useRendererCard, useRendererObject, type RendererModule, type RendererObjectContext } from "@asterism-app/sdk/renderer";
 
 function CounterBody({ data }: { data: z.infer<typeof Card.schema> }) {
   const { openChannel, invoke, view, session } = useRendererObject();

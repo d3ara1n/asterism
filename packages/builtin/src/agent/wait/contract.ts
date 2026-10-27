@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { defineImplementation } from "@asterism/sdk/contracts";
-import { Agent, builtin, Wait } from "@asterism/builtin-api/contracts";
+import { defineImplementation } from "@asterism-app/sdk/contracts";
+import { Agent, builtin, Wait } from "@asterism-app/builtin-api/contracts";
 import { agentExecutionStateSchema } from "../state.ts";
 
 export const agentWaitResultSchema = z.strictObject({

@@ -1,7 +1,19 @@
 {
-  "name": "@asterism/sdk",
-  "private": true,
+  "name": "@asterism-app/sdk",
   "version": "0.47.0",
+  "description": "Public contracts and host capabilities for Asterism plugins",
+  "license": "MIT",
+  "author": "Chien Zhang",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/d3ara1n/asterism.git",
+    "directory": "packages/sdk"
+  },
+  "publishConfig": {
+    "access": "public",
+    "tag": "next",
+    "registry": "https://registry.npmjs.org/"
+  },
   "type": "module",
   "exports": {
     "./package.json": "./package.json",

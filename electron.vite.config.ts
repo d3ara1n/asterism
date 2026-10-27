@@ -10,7 +10,7 @@ export default defineConfig({
     build: {
       // Workspace source packages are compiled statically with the app; release artifacts do not read repository .ts files at runtime.
       externalizeDeps: {
-        exclude: ["@asterism/sdk", "@asterism/builtin-api", "@asterism/builtin", "@asterism/ui"],
+        exclude: ["@asterism-app/sdk", "@asterism-app/builtin-api", "@asterism-app/builtin", "@asterism-app/ui"],
         include: ["node-pty", "@xterm/headless", "@xterm/addon-serialize", "@vscode/ripgrep"],
       },
       outDir: resolve("dist/main"),

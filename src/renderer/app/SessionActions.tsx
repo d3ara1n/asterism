@@ -7,11 +7,11 @@ import { templateMessages } from "../../shared/template-messages";
 import { useDisposalWarnings } from "../features/session/disposal";
 import { appMessages } from "../messages/app";
 import { useI18n } from "../shared/i18n";
-import { commonMessages } from "@asterism/ui/messages/common";
-import { ListRowAction } from "@asterism/ui/ui/list-row";
-import { Spinner } from "@asterism/ui/ui/spinner";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@asterism/ui/ui/dropdown-menu";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@asterism/ui/ui/alert-dialog";
+import { commonMessages } from "@asterism-app/ui/messages/common";
+import { ListRowAction } from "@asterism-app/ui/ui/list-row";
+import { Spinner } from "@asterism-app/ui/ui/spinner";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@asterism-app/ui/ui/dropdown-menu";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@asterism-app/ui/ui/alert-dialog";
 
 /** Session row menu: rename, save as template, and archive; actions are independent of session navigation. */
 export function SessionActions({ sessionId, title, disabled, renameDisabled, onRename, onArchive, onTemplateSaved }: {

@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { pluginNamespace, defineRecord, present } from "@asterism/sdk/contracts";
-import type { ObjectExecutor } from "@asterism/sdk/runtime";
+import { pluginNamespace, defineRecord, present } from "@asterism-app/sdk/contracts";
+import type { ObjectExecutor } from "@asterism-app/sdk/runtime";
 
 const ns = pluginNamespace("example.codec");
 const current = z.strictObject({ text: z.string() });

@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { present, type ModelCompletion } from "@asterism/sdk/contracts";
+import { present, type ModelCompletion } from "@asterism-app/sdk/contracts";
 import { sessionView } from "../../../../../src/plugins/records.ts";
 import { nodeView } from "../../../../../src/session/view.ts";
 import { agentSource, call, event, message, node, text, thinking } from "../../../../../src/session/test-nodes.ts";
-import { ContextSummary, Execution, AgentRequestContext, AgentInputMessage } from "@asterism/builtin-api/contracts";
+import { ContextSummary, Execution, AgentRequestContext, AgentInputMessage } from "@asterism-app/builtin-api/contracts";
 import { diagnosticHistory } from "./history.ts";
 
 const completion: ModelCompletion = { finishReason: "stop", rawFinishReason: null, providerResponseId: "upstream-id",

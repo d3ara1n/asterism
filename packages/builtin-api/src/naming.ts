@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { defineRecord } from "@asterism/sdk/contracts";
+import { defineRecord } from "@asterism-app/sdk/contracts";
 import { builtin } from "./identity.ts";
 
 /**

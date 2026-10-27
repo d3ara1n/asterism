@@ -1,10 +1,10 @@
-import { useI18n } from "@asterism/sdk/renderer";
+import { useI18n } from "@asterism-app/sdk/renderer";
 import { useEffect, useState } from "react";
 
 import type { LanguageState } from "../../../shared/language";
 import { settingsMessages } from "../../messages/settings";
-import { Alert, AlertDescription } from "@asterism/ui/ui/alert";
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@asterism/ui/ui/select";
+import { Alert, AlertDescription } from "@asterism-app/ui/ui/alert";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@asterism-app/ui/ui/select";
 import { Section, Row } from "./layout";
 
 export function LanguageSettings() {

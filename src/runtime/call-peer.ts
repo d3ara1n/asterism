@@ -1,4 +1,4 @@
-import { PluginApiError } from "@asterism/sdk/runtime";
+import { PluginApiError } from "@asterism-app/sdk/runtime";
 import type { CallRegistry } from "../plugins/calls.ts";
 import type { CallControl, CallFrame } from "../shared/plugin-calls.ts";
 

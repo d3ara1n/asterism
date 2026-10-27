@@ -1,4 +1,4 @@
-import { jsonSchema, type CallContract, type CallOptions, type CallScope, type Json, type PluginCalls } from "@asterism/sdk/contracts";
+import { jsonSchema, type CallContract, type CallOptions, type CallScope, type Json, type PluginCalls } from "@asterism-app/sdk/contracts";
 import type { z } from "zod";
 import type { CallBridge } from "./connection.ts";
 

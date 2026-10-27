@@ -1,5 +1,5 @@
 import type { DatabaseSync } from "node:sqlite";
-import { jsonSchema, type Json } from "@asterism/sdk/contracts";
+import { jsonSchema, type Json } from "@asterism-app/sdk/contracts";
 
 /** Current session data; an empty object scope denotes the session itself. Stored independently of historical events. */
 export class SessionDataStore {

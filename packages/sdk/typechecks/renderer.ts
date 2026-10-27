@@ -1,7 +1,7 @@
 import { Counter, CounterView as Card, CreateCounter, ChangeCount, CounterUpdates, counterCard } from "../examples/counter-contract.ts";
 import { createElement, useEffect, useState } from "react";
 import { z } from "zod";
-import { defineRendererPlugin, cardRenderer, useRendererCard, useRendererObject, type RendererModule, type RendererObjectContext } from "@asterism/sdk/renderer";
+import { defineRendererPlugin, cardRenderer, useRendererCard, useRendererObject, type RendererModule, type RendererObjectContext } from "@asterism-app/sdk/renderer";
 
 export function rejectInvalidCalls(object: RendererObjectContext) {
   // @ts-expect-error Action parameters are inferred from the shared contract; misspelled fields do not compile.

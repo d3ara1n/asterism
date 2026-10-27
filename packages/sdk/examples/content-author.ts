@@ -1,4 +1,4 @@
-import { defineModule, definePlugin, implementAction, implementCreation, implementResource } from "@asterism/sdk/runtime";
+import { defineModule, definePlugin, implementAction, implementCreation, implementResource } from "@asterism-app/sdk/runtime";
 import { CreateDocument, Document, DocumentContent, Imported, ReplaceDocument, files } from "./content-contract.ts";
 
 /** The session owns content, and plugins only interpret business formats; this example does not access host source code or private paths. */

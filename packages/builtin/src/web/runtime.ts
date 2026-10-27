@@ -1,6 +1,6 @@
 import { webCard } from "../shared/card-appearance.ts";
-import { defineModule, implementResource, implementCreation, implementTool, WebError, type CallResult } from "@asterism/sdk/runtime";
-import type { Json, ResourceRef, WebFetchResult, WebSearchResult } from "@asterism/sdk/contracts";
+import { defineModule, implementResource, implementCreation, implementTool, WebError, type CallResult } from "@asterism-app/sdk/runtime";
+import type { Json, ResourceRef, WebFetchResult, WebSearchResult } from "@asterism-app/sdk/contracts";
 import { WebResource, CreateWeb, WebView, WebSearch, WebFetch } from "./contract.ts";
 import { exaWebProvider } from "./exa.ts";
 import { parallelWebProvider } from "./parallel.ts";

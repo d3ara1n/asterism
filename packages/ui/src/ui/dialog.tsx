@@ -1,5 +1,5 @@
-import type { UiText } from "@asterism/sdk/contracts";
-import { useI18n } from "@asterism/sdk/renderer";
+import type { UiText } from "@asterism-app/sdk/contracts";
+import { useI18n } from "@asterism-app/sdk/renderer";
 import { XIcon } from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import * as React from "react";

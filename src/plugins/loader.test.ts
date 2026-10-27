@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { z } from "zod";
-import { belongsTo, pluginNamespace, defineCall, defineAction, defineRecord, defineImplementation, defineTool, type ResourceContract, type ToolContract } from "@asterism/sdk/contracts";
-import { defineTopLevelTool, definePlugin, defineModule, implementCall, implementTool, implementResource, type PluginDefinition, type PluginContext } from "@asterism/sdk/runtime";
+import { belongsTo, pluginNamespace, defineCall, defineAction, defineRecord, defineImplementation, defineTool, type ResourceContract, type ToolContract } from "@asterism-app/sdk/contracts";
+import { defineTopLevelTool, definePlugin, defineModule, implementCall, implementTool, implementResource, type PluginDefinition, type PluginContext } from "@asterism-app/sdk/runtime";
 import { loadPlugins, type PluginHostServices } from "./loader.ts";
 import { CallClient } from "../shared/call-client.ts";
 import type { CallFrame } from "../shared/plugin-calls.ts";

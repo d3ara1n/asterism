@@ -1,6 +1,6 @@
-import { modelProviderPresetSchema, type ModelProviderPreset } from "@asterism/sdk/contracts";
+import { modelProviderPresetSchema, type ModelProviderPreset } from "@asterism-app/sdk/contracts";
 import { modelProviderInputSchema, type ModelProviderInput } from "./configuration.ts";
-export type { ModelProviderPreset } from "@asterism/sdk/contracts";
+export type { ModelProviderPreset } from "@asterism-app/sdk/contracts";
 export type ModelProviderDraft = Omit<ModelProviderInput, "enabled">;
 
 /** Deep-copy configuration and editing rules; catalog identity and metadata stay outside saved connections. */

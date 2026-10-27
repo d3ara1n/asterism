@@ -10,10 +10,10 @@
     "cssVariables": true
   },
   "aliases": {
-    "components": "@asterism/ui/ui",
-    "ui": "@asterism/ui/ui",
-    "utils": "@asterism/ui/utils",
-    "lib": "@asterism/ui/lib",
-    "hooks": "@asterism/ui/hooks"
+    "components": "@asterism-app/ui/ui",
+    "ui": "@asterism-app/ui/ui",
+    "utils": "@asterism-app/ui/utils",
+    "lib": "@asterism-app/ui/lib",
+    "hooks": "@asterism-app/ui/hooks"
   }
 }

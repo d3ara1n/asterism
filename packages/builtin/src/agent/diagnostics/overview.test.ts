@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { AgentRequestContextData } from "@asterism/builtin-api/contracts";
+import type { AgentRequestContextData } from "@asterism-app/builtin-api/contracts";
 import { COMPRESSION_RESERVE } from "../context-budget.ts";
 import type { DiagnosticRequest } from "./history.ts";
 import { diagnosticOverview } from "./overview.ts";

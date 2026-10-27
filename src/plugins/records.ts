@@ -1,4 +1,4 @@
-import type { Decoded, Json, RecordContract, RecordQuery, ResourceRef, ResourceSnapshot, SessionRecord, SessionSnapshot, SessionView } from "@asterism/sdk/contracts";
+import type { Decoded, Json, RecordContract, RecordQuery, ResourceRef, ResourceSnapshot, SessionRecord, SessionSnapshot, SessionView } from "@asterism-app/sdk/contracts";
 import type { SessionNode } from "../shared/session.ts";
 import { foldWorkbench, type FoldedObject } from "../session/fold.ts";
 import type { NodeView } from "../session/view.ts";

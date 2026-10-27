@@ -1,12 +1,12 @@
-import { FieldSet, FieldGroup } from "@asterism/ui/ui/field";
+import { FieldSet, FieldGroup } from "@asterism-app/ui/ui/field";
 
-import { DialogFooter } from "@asterism/ui/ui/dialog";
-import { Button } from "@asterism/ui/ui/button";
-import { Spinner } from "@asterism/ui/ui/spinner";
+import { DialogFooter } from "@asterism-app/ui/ui/dialog";
+import { Button } from "@asterism-app/ui/ui/button";
+import { Spinner } from "@asterism-app/ui/ui/spinner";
 import { useRef, useState, type ReactNode } from "react";
 
-import { commonMessages } from "@asterism/ui/messages/common";
-import { useI18n } from "@asterism/sdk/renderer";
+import { commonMessages } from "@asterism-app/ui/messages/common";
+import { useI18n } from "@asterism-app/sdk/renderer";
 
 /**
  * Form and submission gate shared by built-in creation views; the host creation coordinator provides the shell (title, error, close).

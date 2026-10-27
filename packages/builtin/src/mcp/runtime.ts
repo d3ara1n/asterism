@@ -1,6 +1,6 @@
 import { mcpCard } from "../shared/card-appearance.ts";
-import { defineModule, implementResource, implementCreation, implementTool, implementCall, PluginApiError, type CallResult } from "@asterism/sdk/runtime";
-import { type Json, type ResourceRef } from "@asterism/sdk/contracts";
+import { defineModule, implementResource, implementCreation, implementTool, implementCall, PluginApiError, type CallResult } from "@asterism-app/sdk/runtime";
+import { type Json, type ResourceRef } from "@asterism-app/sdk/contracts";
 import { McpHost, CreateMcpHost, McpHostView, McpList, McpSearch, McpInspect, McpConnect, McpCall, McpChanged,
   ReadMcp, SaveMcpServer, ReadMcpCredentials, ReadMcpTools, SetMcpServerEnabled, RemoveMcpServer, ConnectMcpServer, DisconnectMcpServer, ResetMcpAuth, type McpCallData } from "./contract.ts";
 import { McpHostService, credentialKey, oauthKey, type CallTarget } from "./service.ts";

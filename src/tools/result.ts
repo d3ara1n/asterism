@@ -1,5 +1,5 @@
-import type { Json, ModelInputPart, ToolModelOutput } from "@asterism/sdk/contracts";
-import { defaultToolModel, toolCompletionSchema, toolOutcomeSchema, type ToolInvocationInfo, type ToolOutcome } from "@asterism/sdk/contracts";
+import type { Json, ModelInputPart, ToolModelOutput } from "@asterism-app/sdk/contracts";
+import { defaultToolModel, toolCompletionSchema, toolOutcomeSchema, type ToolInvocationInfo, type ToolOutcome } from "@asterism-app/sdk/contracts";
 import type { CallResult } from "./contract.ts";
 
 /** Only unsuccessful outcomes may inherit intermediate output; previews cannot implicitly become successful results. */

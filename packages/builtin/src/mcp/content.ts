@@ -1,4 +1,4 @@
-import type { Json, ModelInputPart } from "@asterism/sdk/contracts";
+import type { Json, ModelInputPart } from "@asterism-app/sdk/contracts";
 import type { McpCallData } from "./contract.ts";
 
 function containsStructured(parts: ModelInputPart[], value: Json): boolean {

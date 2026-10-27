@@ -1,10 +1,10 @@
 import { Brain, Cpu } from "lucide-react";
-import { availableThinkingLevels, modelReference, type ThinkingLevel } from "@asterism/sdk/contracts";
-import { resolveAgentModel, resolveCatalogModel, type ModelConfigurationSnapshot } from "@asterism/builtin-api/contracts";
-import { commonMessages } from "@asterism/ui/messages/common";
-import { modelSelectionMessages, thinkingLabels } from "@asterism/ui/messages/model-selection";
-import { ConfigurationChoice } from "@asterism/ui/ConfigurationChoice";
-import { useI18n } from "@asterism/sdk/renderer";
+import { availableThinkingLevels, modelReference, type ThinkingLevel } from "@asterism-app/sdk/contracts";
+import { resolveAgentModel, resolveCatalogModel, type ModelConfigurationSnapshot } from "@asterism-app/builtin-api/contracts";
+import { commonMessages } from "@asterism-app/ui/messages/common";
+import { modelSelectionMessages, thinkingLabels } from "@asterism-app/ui/messages/model-selection";
+import { ConfigurationChoice } from "@asterism-app/ui/ConfigurationChoice";
+import { useI18n } from "@asterism-app/sdk/renderer";
 
 const FOLLOW = "__agent_default";
 

@@ -1,4 +1,4 @@
-import { implementTool, type ObjectReader } from "@asterism/sdk/runtime";
+import { implementTool, type ObjectReader } from "@asterism-app/sdk/runtime";
 import { AgentWait, type AgentWaitResult } from "./contract.ts";
 import { projectAgentTurnState } from "../state-projection.ts";
 import { agentExecutionState } from "../state.ts";

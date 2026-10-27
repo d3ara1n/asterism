@@ -25,7 +25,7 @@ The main process resolves the login-shell environment before starting the runtim
 
 Application composition can depend on host interfaces, SDK contracts, and the built-in plugin’s public domain API. Generic host mechanisms depend on the SDK and do not interpret Agent turns, messages, or naming rules.
 
-The built-in implementation uses the SDK and `@asterism/builtin-api`. External plugins use the SDK and their declared public dependencies. Public API packages do not import implementations, and the SDK imports no host implementation.
+The built-in implementation uses the SDK and `@asterism-app/builtin-api`. External plugins use the SDK and their declared public dependencies. Public API packages do not import implementations, and the SDK imports no host implementation.
 
 Bundling a plugin with the application grants no bypass of identity, validation, or lifecycle rules. Built-in entries compile statically; external entries use the host’s package graph. Both contribute through the same mechanisms.
 

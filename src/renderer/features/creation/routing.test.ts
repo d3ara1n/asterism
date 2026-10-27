@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { CreationEntry, DropAccepts, DropItem } from "@asterism/sdk/renderer";
+import type { CreationEntry, DropAccepts, DropItem } from "@asterism-app/sdk/renderer";
 import { acceptsItem, dropCandidates, rememberedEntry, routeKey } from "./routing";
 
 const file = (name: string, mime = "", directory = false): DropItem => ({ kind: "file", file: new File([], name), path: `/tmp/${name}`, name, mime, directory });

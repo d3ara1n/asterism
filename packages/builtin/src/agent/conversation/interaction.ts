@@ -1,6 +1,6 @@
-import { useI18n, type RendererObjectContext, type RendererReceipt, type ContentReader, type RendererContentInput } from "@asterism/sdk/renderer";
-import { SubmitAgentInput, ConfigureAgent, ContinueAgent, CancelAgent, type AgentSelection } from "@asterism/builtin-api/contracts";
-import type { ModelInputPart } from "@asterism/sdk/contracts";
+import { useI18n, type RendererObjectContext, type RendererReceipt, type ContentReader, type RendererContentInput } from "@asterism-app/sdk/renderer";
+import { SubmitAgentInput, ConfigureAgent, ContinueAgent, CancelAgent, type AgentSelection } from "@asterism-app/builtin-api/contracts";
+import type { ModelInputPart } from "@asterism-app/sdk/contracts";
 import { createContext, useContext, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 import { SubmissionIdentity } from "./submission";

@@ -1,20 +1,20 @@
 import { CreationForm } from "../shared/creation-form";
-import { Field, FieldLabel, FieldTitle } from "@asterism/ui/ui/field";
+import { Field, FieldLabel, FieldTitle } from "@asterism-app/ui/ui/field";
 
-import { Input } from "@asterism/ui/ui/input";
+import { Input } from "@asterism-app/ui/ui/input";
 
-import { Alert, AlertDescription } from "@asterism/ui/ui/alert";
+import { Alert, AlertDescription } from "@asterism-app/ui/ui/alert";
 
-import { ConfigurationChoice as Choice } from "@asterism/ui/ConfigurationChoice";
+import { ConfigurationChoice as Choice } from "@asterism-app/ui/ConfigurationChoice";
 import { Bot } from "lucide-react";
 
 import { commonMessages } from "../messages/common";
 import { creationMessages } from "../messages/creation";
-import { useI18n, useRendererCatalogs, type CreationInputProps } from "@asterism/sdk/renderer";
+import { useI18n, useRendererCatalogs, type CreationInputProps } from "@asterism-app/sdk/renderer";
 import { useState } from "react";
 
-import type { ThinkingLevel } from "@asterism/sdk/contracts";
-import { type AgentSelection, ModelConfiguration } from "@asterism/builtin-api/contracts";
+import type { ThinkingLevel } from "@asterism-app/sdk/contracts";
+import { type AgentSelection, ModelConfiguration } from "@asterism-app/builtin-api/contracts";
 import { ModelChoices } from "./conversation/ModelChoices";
 
 

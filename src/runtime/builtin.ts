@@ -1,11 +1,11 @@
-import { PluginApiError, type PluginDefinition } from "@asterism/sdk/runtime";
-import { builtin, type NamingApi } from "@asterism/builtin-api/contracts";
-import { createBuiltin } from "@asterism/builtin/runtime";
-import builtinStorage from "@asterism/builtin/storage";
+import { PluginApiError, type PluginDefinition } from "@asterism-app/sdk/runtime";
+import { builtin, type NamingApi } from "@asterism-app/builtin-api/contracts";
+import { createBuiltin } from "@asterism-app/builtin/runtime";
+import builtinStorage from "@asterism-app/builtin/storage";
 import { loadPlugins, type PluginHostServices } from "../plugins/loader.ts";
 import { applicationBrand, applicationUserAgent } from "../shared/application.ts";
 import { fileURLToPath } from "node:url";
-import type { ManualSource } from "@asterism/builtin-api/runtime";
+import type { ManualSource } from "@asterism-app/builtin-api/runtime";
 
 // Source and dist/main have the same depth relative to repository/application roots; native search reads unpacked installed manuals.
 const documentationDirectory = (path: string) => fileURLToPath(new URL(`../../${path}/`, import.meta.url))

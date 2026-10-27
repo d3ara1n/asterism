@@ -1,7 +1,7 @@
-import type { SystemPrompt } from "@asterism/sdk/contracts";
+import type { SystemPrompt } from "@asterism-app/sdk/contracts";
 import { describe, expect, it } from "vitest";
 import { projectSystemPrompt } from "./system-prompt.ts";
-import { composeSystemPrompt } from "@asterism/builtin/runtime";
+import { composeSystemPrompt } from "@asterism-app/builtin/runtime";
 
 describe("Runtime system prompt assembly and model projection", () => {
   it("original prompt blocks retain independent origins while model views render in declared order and escape boundaries", () => {

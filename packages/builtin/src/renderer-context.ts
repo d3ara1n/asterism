@@ -1,5 +1,5 @@
 import { createContext, createElement, useContext, type ReactNode } from "react";
-import type { RendererPreferences } from "@asterism/sdk/renderer";
+import type { RendererPreferences } from "@asterism-app/sdk/renderer";
 import { CreationDirectoryProvider } from "./resources/directory";
 
 /** Application composition injects host services; the built-in plugin does not read host storage implementations. */

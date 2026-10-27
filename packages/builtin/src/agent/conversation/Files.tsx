@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type ClipboardEvent, type DragEvent } from "react";
-import { useI18n, type ContentReader } from "@asterism/sdk/renderer";
-import { type ModelFilePart, previewsAsImage } from "@asterism/sdk/contracts";
+import { useI18n, type ContentReader } from "@asterism-app/sdk/renderer";
+import { type ModelFilePart, previewsAsImage } from "@asterism-app/sdk/contracts";
 import { File as FileIcon, Image as ImageIcon, Paperclip, X } from "lucide-react";
-import { Button } from "@asterism/ui/ui/button";
-import { Attachment, AttachmentGroup, AttachmentMedia, AttachmentContent, AttachmentTitle, AttachmentDescription, AttachmentActions, AttachmentAction, AttachmentTrigger } from "@asterism/ui/ui/attachment";
-import { Tooltip, TooltipTrigger, TooltipContent } from "@asterism/ui/ui/tooltip";
-import { Spinner } from "@asterism/ui/ui/spinner";
-import { cn } from "@asterism/ui/utils";
+import { Button } from "@asterism-app/ui/ui/button";
+import { Attachment, AttachmentGroup, AttachmentMedia, AttachmentContent, AttachmentTitle, AttachmentDescription, AttachmentActions, AttachmentAction, AttachmentTrigger } from "@asterism-app/ui/ui/attachment";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@asterism-app/ui/ui/tooltip";
+import { Spinner } from "@asterism-app/ui/ui/spinner";
+import { cn } from "@asterism-app/ui/utils";
 import { mediaMessages } from "../../messages/media";
 import type { MessageDraft } from "./draft";
 

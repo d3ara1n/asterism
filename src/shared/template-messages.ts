@@ -1,4 +1,4 @@
-import { defineMessages, pluginNamespace } from "@asterism/sdk/contracts";
+import { defineMessages, pluginNamespace } from "@asterism-app/sdk/contracts";
 
 export const templateMessages = pluginNamespace("asterism.host").messages("en", defineMessages({
   templates: { id: "templates.title", defaultMessage: "Templates" },

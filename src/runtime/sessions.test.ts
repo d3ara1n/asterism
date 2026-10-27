@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, it } from "vitest";
 import { ApplicationService } from "./service.ts";
-import sdkMetadata from "@asterism/sdk/package.json" with { type: "json" };
+import sdkMetadata from "@asterism-app/sdk/package.json" with { type: "json" };
 
 const roots: string[] = [], services: ApplicationService[] = [];
 afterEach(async () => {
@@ -16,7 +16,7 @@ it("application commands register and remove plugin packages and represent resta
   const root = mkdtempSync(join(tmpdir(), "core-session-")); roots.push(root);
   const service = new ApplicationService(root); services.push(service);
   const dir = join(root, "pkg"); mkdirSync(dir);
-  writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "p", peerDependencies: { "@asterism/sdk": `^${sdkMetadata.version}` }, asterism: { id: "acme.p" } }));
+  writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "p", peerDependencies: { "@asterism-app/sdk": `^${sdkMetadata.version}` }, asterism: { id: "acme.p" } }));
   const added = service.execute({ type: "plugin.add", path: dir });
   expect(added.plugins.filter(p => p.index !== null).map(p => [p.source, p.status, p.enabled])).toEqual([[dir, "pending", true]]);
   expect(added.plugins.find(p => p.index === null)).toMatchObject({ id: "asterism.builtin", status: "loaded" });

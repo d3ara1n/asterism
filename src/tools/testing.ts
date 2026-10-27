@@ -1,6 +1,6 @@
 /** Executor tests need only resource data and tool handlers; validation and finalization still use real SDK implementations. */
-import { implementTool, type ObjectExecutor, type CallResult } from "@asterism/sdk/runtime";
-import { reference, type Json, type ImplementationContract, type ToolModelOutput } from "@asterism/sdk/contracts";
+import { implementTool, type ObjectExecutor, type CallResult } from "@asterism-app/sdk/runtime";
+import { reference, type Json, type ImplementationContract, type ToolModelOutput } from "@asterism-app/sdk/contracts";
 import { resourceSnapshot } from "../plugins/records.ts";
 import type { ToolImplementation } from "./contract.ts";
 

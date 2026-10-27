@@ -1,4 +1,4 @@
-import type { Json } from "@asterism/sdk/contracts";
+import type { Json } from "@asterism-app/sdk/contracts";
 
 export type WebRequestKind = "search" | "fetch";
 export type WebRequestOutcome = "succeeded" | "failed" | "cancelled";

@@ -1,7 +1,7 @@
 import { Virtualizer } from "virtua";
-import { useI18n } from "@asterism/sdk/renderer";
-import { StatusIcon } from "@asterism/ui/ui/status";
-import { cn } from "@asterism/ui/utils";
+import { useI18n } from "@asterism-app/sdk/renderer";
+import { StatusIcon } from "@asterism-app/ui/ui/status";
+import { cn } from "@asterism-app/ui/utils";
 import type { ConnectionPhase } from "./contract";
 import { mcpMessages as messages } from "../messages/mcp";
 import { phaseTone } from "./status";

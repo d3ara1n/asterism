@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { contentRefSchema, defineAction, defineCreation, defineRecord, pluginNamespace } from "@asterism/sdk/contracts";
+import { contentRefSchema, defineAction, defineCreation, defineRecord, pluginNamespace } from "@asterism-app/sdk/contracts";
 
 /** Content identities can be embedded in ordinary contracts; authors need not declare a separate list of persistent attachments. */
 export const files = pluginNamespace("example.content");

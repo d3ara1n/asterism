@@ -1,8 +1,8 @@
 import { z } from "zod";
-import { jsonSchema, resourceTitleSchema, type Json } from "@asterism/sdk/contracts";
-import { defineModule, defineTopLevelTool, implementCall, PluginApiError, type CallResult } from "@asterism/sdk/runtime";
-import { agentCreations } from "@asterism/builtin-api/runtime";
-import { AgentConfigurations, ReadAgentCreations } from "@asterism/builtin-api/contracts";
+import { jsonSchema, resourceTitleSchema, type Json } from "@asterism-app/sdk/contracts";
+import { defineModule, defineTopLevelTool, implementCall, PluginApiError, type CallResult } from "@asterism-app/sdk/runtime";
+import { agentCreations } from "@asterism-app/builtin-api/runtime";
+import { AgentConfigurations, ReadAgentCreations } from "@asterism-app/builtin-api/contracts";
 import { AgentListResult, CreationListResult, CreationInspectResult, ResourceCreateResult, ResourceRemoveResult, ResourceRenameResult } from "./contract.ts";
 
 /** Known rejection is not represented as an unknown write; resource initialization exceptions still use the tool executor's unknown outcome. */

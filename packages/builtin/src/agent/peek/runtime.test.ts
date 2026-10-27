@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import type { ModelEvent, StreamRequest } from "@asterism/sdk/contracts";
-import type { ModelServices } from "@asterism/sdk/runtime";
+import type { ModelEvent, StreamRequest } from "@asterism-app/sdk/contracts";
+import type { ModelServices } from "@asterism-app/sdk/runtime";
 import { sessionSnapshot } from "../../../../../src/plugins/records.ts";
 import { nodeView } from "../../../../../src/session/view.ts";
 import { message, node } from "../../../../../src/session/test-nodes.ts";

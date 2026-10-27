@@ -1,12 +1,12 @@
-import { useI18n } from "@asterism/sdk/renderer";
+import { useI18n } from "@asterism-app/sdk/renderer";
 import { Square, ArrowUp, Archive } from "lucide-react";
 import { useState, useSyncExternalStore, type Ref } from "react";
 import type { MessageDraft } from "./draft";
 import type { AgentExecutionState } from "../state";
 import { AttachFiles, DraftFiles, DraftFileError, fileInputEvents } from "./Files";
 
-import { Button } from "@asterism/ui/ui/button";
-import { InputGroup, InputGroupTextarea, InputGroupAddon } from "@asterism/ui/ui/input-group";
+import { Button } from "@asterism-app/ui/ui/button";
+import { InputGroup, InputGroupTextarea, InputGroupAddon } from "@asterism-app/ui/ui/input-group";
 import { commonMessages } from "../../messages/common";
 import { conversationMessages } from "../../messages/conversation";
 

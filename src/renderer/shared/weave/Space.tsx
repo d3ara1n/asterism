@@ -1,5 +1,5 @@
 import type { CSSProperties, ReactNode } from "react";
-import { cn } from "@asterism/ui/utils";
+import { cn } from "@asterism-app/ui/utils";
 
 /** Screen declaration: one stop in Space. With surface=false, there is no surface and content sits directly on the window material. */
 export interface ScreenSpec { id: string; label: string; surface?: boolean; content: ReactNode }

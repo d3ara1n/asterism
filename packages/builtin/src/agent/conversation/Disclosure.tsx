@@ -1,9 +1,9 @@
 import type { ReactNode } from "react";
 import { ChevronDown } from "lucide-react";
-import { cn } from "@asterism/ui/utils";
-import { Button } from "@asterism/ui/ui/button";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@asterism/ui/ui/collapsible";
-import { Item } from "@asterism/ui/ui/item";
+import { cn } from "@asterism-app/ui/utils";
+import { Button } from "@asterism-app/ui/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@asterism-app/ui/ui/collapsible";
+import { Item } from "@asterism-app/ui/ui/item";
 
 /** Shared shell for thinking, tools, and summaries; the caller owns state, and outer padding does not shrink the clickable title area. */
 export function Disclosure({ header, children, open, onOpenChange, expandable = true, pending = false }: {

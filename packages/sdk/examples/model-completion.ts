@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { pluginNamespace, present, completionData, type ModelCompletion, type ModelRunRequest } from "@asterism/sdk/contracts";
+import { pluginNamespace, present, completionData, type ModelCompletion, type ModelRunRequest } from "@asterism-app/sdk/contracts";
 
 const ns = pluginNamespace("example.agent");
 const RequestTools = ns.data("request-tools", z.object({ names: z.array(z.string()) }));

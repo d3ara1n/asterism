@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { localeSchema } from "@asterism/sdk/contracts";
+import { localeSchema } from "@asterism-app/sdk/contracts";
 import { coreChannel } from "./core.ts";
 export const languageGetChannel = coreChannel("language.get");
 export const languageSetChannel = coreChannel("language.set");

@@ -1,5 +1,5 @@
 {
-  "name": "@asterism/builtin",
+  "name": "@asterism-app/builtin",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -10,9 +10,9 @@
     "./locales/zh-Hans.json": "./src/locales/zh-Hans.json"
   },
   "dependencies": {
-    "@asterism/builtin-api": "*",
-    "@asterism/sdk": "*",
-    "@asterism/ui": "*",
+    "@asterism-app/builtin-api": "*",
+    "@asterism-app/sdk": "*",
+    "@asterism-app/ui": "*",
     "@lobehub/streamdown": "1.4.1",
     "@modelcontextprotocol/client": "2.3.1",
     "@pierre/diffs": "1.5.2",

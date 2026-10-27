@@ -1,8 +1,8 @@
 import {
   thinkingLevels, type Usage, modelReference, type ModelCost, estimateModelCost, selectModelRates,
   type CostQuantity,
-} from "@asterism/sdk/contracts";
-import { type CatalogModel } from "@asterism/builtin-api/contracts";
+} from "@asterism-app/sdk/contracts";
+import { type CatalogModel } from "@asterism-app/builtin-api/contracts";
 import type { DiagnosticRequest } from "./history.ts";
 
 /** scope stores the actual model identity; older records with only an expression require a unique match, without arbitrarily stripping colons from model names. */

@@ -1,10 +1,10 @@
 import type { CredentialState } from "../../../shared/configuration";
-import { commonMessages } from "@asterism/ui/messages/common";
-import { Alert, AlertDescription } from "@asterism/ui/ui/alert";
-import { Button } from "@asterism/ui/ui/button";
-import { Field, FieldDescription, FieldLabel } from "@asterism/ui/ui/field";
-import { Input } from "@asterism/ui/ui/input";
-import { StatusText } from "@asterism/ui/ui/status";
+import { commonMessages } from "@asterism-app/ui/messages/common";
+import { Alert, AlertDescription } from "@asterism-app/ui/ui/alert";
+import { Button } from "@asterism-app/ui/ui/button";
+import { Field, FieldDescription, FieldLabel } from "@asterism-app/ui/ui/field";
+import { Input } from "@asterism-app/ui/ui/input";
+import { StatusText } from "@asterism-app/ui/ui/status";
 import { providersMessages } from "../../messages/providers";
 import { useI18n } from "../../shared/i18n";
 import { ChoiceField } from "./forms";

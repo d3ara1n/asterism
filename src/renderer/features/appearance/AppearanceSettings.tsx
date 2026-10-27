@@ -5,17 +5,17 @@ import { getBezierPath, getSmoothStepPath, Position } from "@xyflow/react";
 import { accentIds, defaultFontSize, fontSizeRange, grayIds, palettes, themeTokens, type AccentId, type Appearance, type GrayId } from "../../../shared/theme";
 import { appearanceMessages } from "../../messages/appearance";
 import { getI18n, useI18n } from "../../shared/i18n";
-import { Button } from "@asterism/ui/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@asterism/ui/ui/dialog";
-import { FontPicker } from "@asterism/ui/ui/font-picker";
-import { NumberInput } from "@asterism/ui/ui/number-input";
-import { ItemGroup, ItemSeparator, Item, ItemContent, ItemTitle, ItemDescription, ItemActions } from "@asterism/ui/ui/item";
-import { SwatchGroup, ColorSwatch, TileSwatch } from "@asterism/ui/ui/swatch";
-import { ToggleGroup, ToggleGroupItem } from "@asterism/ui/ui/toggle-group";
+import { Button } from "@asterism-app/ui/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@asterism-app/ui/ui/dialog";
+import { FontPicker } from "@asterism-app/ui/ui/font-picker";
+import { NumberInput } from "@asterism-app/ui/ui/number-input";
+import { ItemGroup, ItemSeparator, Item, ItemContent, ItemTitle, ItemDescription, ItemActions } from "@asterism-app/ui/ui/item";
+import { SwatchGroup, ColorSwatch, TileSwatch } from "@asterism-app/ui/ui/swatch";
+import { ToggleGroup, ToggleGroupItem } from "@asterism-app/ui/ui/toggle-group";
 import { Section } from "../settings/layout";
 import { updateAppearance, useAppearance, useScheme } from "./state";
 
-const paletteMessages: Record<string, import("@asterism/sdk/contracts").UiMessage> = {
+const paletteMessages: Record<string, import("@asterism-app/sdk/contracts").UiMessage> = {
   tundra: appearanceMessages.paletteTundra, graphite: appearanceMessages.paletteGraphite, sky: appearanceMessages.paletteSky, ink: appearanceMessages.paletteInk,
   lagoon: appearanceMessages.paletteLagoon, celadon: appearanceMessages.paletteCeladon, meadow: appearanceMessages.paletteMeadow, honey: appearanceMessages.paletteHoney,
   terracotta: appearanceMessages.paletteTerracotta, coral: appearanceMessages.paletteCoral, rose: appearanceMessages.paletteRose, dusk: appearanceMessages.paletteDusk,

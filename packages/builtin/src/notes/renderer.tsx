@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { useI18n, creationEntry, cardRenderer, toolRenderer, type RendererModule } from "@asterism/sdk/renderer";
+import { useI18n, creationEntry, cardRenderer, toolRenderer, type RendererModule } from "@asterism-app/sdk/renderer";
 import { FileText, BookOpen, FilePenLine, FilePlus2, Copy } from "lucide-react";
 import { toast } from "sonner";
-import { IconButton } from "@asterism/ui/ui/icon-button";
+import { IconButton } from "@asterism-app/ui/ui/icon-button";
 
 import { Markdown } from "../agent/conversation/Markdown";
 import { commonMessages } from "../messages/common";

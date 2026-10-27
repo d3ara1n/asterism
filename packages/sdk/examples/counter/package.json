@@ -5,13 +5,13 @@
   "type": "module",
   "scripts": { "typecheck": "tsc --noEmit" },
   "peerDependencies": {
-    "@asterism/sdk": "*",
+    "@asterism-app/sdk": "*",
     "react": "^19.3.0",
     "react-intl": "^12.1.4",
     "zod": "^4.6.5"
   },
   "devDependencies": {
-    "@asterism/sdk": "file:../asterism/packages/sdk",
+    "@asterism-app/sdk": "0.47.0",
     "typescript": "^7.0.2",
     "@types/node": "^26.6.1",
     "@types/react": "^19.3.0"

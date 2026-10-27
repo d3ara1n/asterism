@@ -1,6 +1,6 @@
 import { Bot } from "lucide-react";
-import { useI18n } from "@asterism/sdk/renderer";
-import type { AgentMessageSender } from "@asterism/builtin-api/contracts";
+import { useI18n } from "@asterism-app/sdk/renderer";
+import type { AgentMessageSender } from "@asterism-app/builtin-api/contracts";
 import { conversationMessages } from "../../messages/conversation";
 
 /** Sender identification shared by the conversation and draft box; routing handles are not shown to users. */

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { contentRefSchema } from "@asterism/sdk/contracts";
+import { contentRefSchema } from "@asterism-app/sdk/contracts";
 
 /** Per-chunk transfer limit; chunk acknowledgments provide backpressure. */
 export const contentChunkSize = 1024 * 1024;

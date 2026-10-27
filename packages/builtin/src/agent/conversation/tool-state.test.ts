@@ -1,12 +1,12 @@
 import { isValidElement } from "react";
 import { describe, expect, it } from "vitest";
-import { reference, type ModelLiveBlock } from "@asterism/sdk/contracts";
+import { reference, type ModelLiveBlock } from "@asterism-app/sdk/contracts";
 import type { TimelineItem } from "./timeline";
 
 import { DirectoryList, DirectoryWrite } from "../../filesystem/contract";
 import filesystem from "../../filesystem/renderer";
 import { ViewRegistry } from "../../../../../src/renderer/modules/registry";
-import type { ToolRenderProps, ToolInputRenderProps } from "@asterism/sdk/renderer";
+import type { ToolRenderProps, ToolInputRenderProps } from "@asterism-app/sdk/renderer";
 import { toolCallState } from "./tool-state";
 import { resolveToolView, toolPreparation } from "../../../../../src/renderer/features/conversation/tool-views";
 

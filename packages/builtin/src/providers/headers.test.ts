@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { usageItemsSchema } from "@asterism/sdk/contracts";
-import type { UsageHeadersContext } from "@asterism/sdk/runtime";
+import { usageItemsSchema } from "@asterism-app/sdk/contracts";
+import type { UsageHeadersContext } from "@asterism-app/sdk/runtime";
 import { openaiHeaderUsage, anthropicHeaderUsage, xaiHeaderUsage } from "./headers.ts";
 
 const context = (headers: Record<string, string>): UsageHeadersContext => ({

@@ -1,4 +1,4 @@
-import type { RendererPrepareContext } from "@asterism/sdk/renderer";
+import type { RendererPrepareContext } from "@asterism-app/sdk/renderer";
 import { CompleteTerminalImage, TerminalImageRequested, type TerminalImage } from "./contract.ts";
 import { terminalTypography } from "./typography.ts";
 

@@ -1,4 +1,4 @@
-import type { ModelBlock, ModelSource, ModelCompletion, ModelLiveBlock, ToolInvocationInfo, ToolResult, Presentation } from "@asterism/sdk/contracts";
+import type { ModelBlock, ModelSource, ModelCompletion, ModelLiveBlock, ToolInvocationInfo, ToolResult, Presentation } from "@asterism-app/sdk/contracts";
 import { ModelFailure, type ModelEvent, type StreamPart } from "../model/contract.ts";
 import { previewArguments } from "../shared/partial-arguments.ts";
 import type { Json, ToolOutcome } from "../shared/model.ts";

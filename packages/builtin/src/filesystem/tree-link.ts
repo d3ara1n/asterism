@@ -1,6 +1,6 @@
 import { useEffect, useSyncExternalStore } from "react";
-import { useRendererCalls, useRendererObject } from "@asterism/sdk/renderer";
-import type { ResourceRef } from "@asterism/sdk/contracts";
+import { useRendererCalls, useRendererObject } from "@asterism-app/sdk/renderer";
+import type { ResourceRef } from "@asterism-app/sdk/contracts";
 import { DirectoryTree } from "./contract.ts";
 
 export interface TreeData {

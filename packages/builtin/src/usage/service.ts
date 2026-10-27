@@ -1,5 +1,5 @@
-import type { ModelResponse } from "@asterism/sdk/contracts";
-import { UsageQueryError, type ModelProviderInfo, type ModelProviderServices, type UsageProviderServices } from "@asterism/sdk/runtime";
+import type { ModelResponse } from "@asterism-app/sdk/contracts";
+import { UsageQueryError, type ModelProviderInfo, type ModelProviderServices, type UsageProviderServices } from "@asterism-app/sdk/runtime";
 import type { ProviderUsageState } from "./contract.ts";
 
 interface Entry { value: ProviderUsageState; attemptedAt: number; controller: AbortController; pending?: Promise<ProviderUsageState> }

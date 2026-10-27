@@ -13,7 +13,7 @@ import { loadModelCatalog, modelParameters, type LoadModelCatalog } from "./mode
 import { modelCatalogMessages } from "../shared/model-catalog-messages.ts";
 import { ModelProviderExtensions } from "./provider-extensions.ts";
 import { WebProviderRegistry } from "./web-providers.ts";
-import { WebError } from "@asterism/sdk/runtime";
+import { WebError } from "@asterism-app/sdk/runtime";
 
 const saveKinds = { "modelProvider.save": "modelProvider", "model.save": "model", "role.save": "role", "agent.save": "agent" } as const;
 

@@ -1,5 +1,5 @@
 import { useEffect, useReducer } from "react";
-import { useRendererViewState } from "@asterism/sdk/renderer";
+import { useRendererViewState } from "@asterism-app/sdk/renderer";
 import {
   advanceStreamingDisclosure, changeStreamingDisclosure, initialStreamingDisclosure,
   type StreamingPreferences, type StreamingStage,

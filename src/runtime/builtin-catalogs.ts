@@ -1,5 +1,5 @@
 import type { ConfigurationService } from "../configuration/service.ts";
-import { AgentConfigurations } from "@asterism/builtin-api/contracts";
+import { AgentConfigurations } from "@asterism-app/builtin-api/contracts";
 import type { CatalogHost } from "../plugins/host.ts";
 
 /** Project application configuration into built-in domain catalogs; model execution modules know nothing about Agent configuration. */

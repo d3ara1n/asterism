@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { ModelProviderPreset, UsageItem } from "@asterism/sdk/contracts";
-import type { QueryUsageProvider } from "@asterism/sdk/runtime";
+import type { ModelProviderPreset, UsageItem } from "@asterism-app/sdk/contracts";
+import type { QueryUsageProvider } from "@asterism-app/sdk/runtime";
 import { ModelProviderExtensions } from "./provider-extensions.ts";
 import { RunLifecycle } from "../plugins/lifecycle.ts";
 

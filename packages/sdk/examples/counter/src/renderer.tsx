@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import {
   defineRendererPlugin, cardRenderer, creationEntry, toolRenderer,
   useRendererObject, useRendererConfiguration, useRendererCalls, useI18n,
-} from "@asterism/sdk/renderer";
+} from "@asterism-app/sdk/renderer";
 import { ns, card, Counter, View, Create, Increment, Settings, ReadStep, ReadCounter } from "./contracts.ts";
 import styles from "./panel.module.css";
 

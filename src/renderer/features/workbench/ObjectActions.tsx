@@ -1,12 +1,12 @@
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuGroup, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent, DropdownMenuItem, DropdownMenuSeparator } from "@asterism/ui/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuGroup, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent, DropdownMenuItem, DropdownMenuSeparator } from "@asterism-app/ui/ui/dropdown-menu";
 
-import { Button } from "@asterism/ui/ui/button";
+import { Button } from "@asterism-app/ui/ui/button";
 import { MoreHorizontal, PenLine, Scaling, RotateCcw, Trash2 } from "lucide-react";
 
-import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@asterism/ui/ui/alert-dialog";
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@asterism-app/ui/ui/alert-dialog";
 
-import { Spinner } from "@asterism/ui/ui/spinner";
-import { commonMessages } from "@asterism/ui/messages/common";
+import { Spinner } from "@asterism-app/ui/ui/spinner";
+import { commonMessages } from "@asterism-app/ui/messages/common";
 import { objectsMessages } from "../../messages/objects";
 import { useI18n } from "../../shared/i18n";
 import { useRef, useState } from "react";

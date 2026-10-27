@@ -6,8 +6,8 @@
   "tailwind": { "config": "", "css": "src/renderer/styles.css", "baseColor": "neutral", "cssVariables": true },
   "aliases": {
     "components": "@/shared",
-    "ui": "@asterism/ui/ui",
-    "utils": "@asterism/ui/utils",
+    "ui": "@asterism-app/ui/ui",
+    "utils": "@asterism-app/ui/utils",
     "lib": "@/shared",
     "hooks": "@/app"
   }

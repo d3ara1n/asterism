@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
 import { Globe, Search, Download } from "lucide-react";
-import { cardRenderer, creationEntry, toolRenderer, useI18n, type RendererModule, type ToolRenderProps } from "@asterism/sdk/renderer";
-import { webResponseSchema, type Json, type WebDocument, type WebResponse } from "@asterism/sdk/contracts";
-import { ToolHeader } from "@asterism/ui/tool-header";
+import { cardRenderer, creationEntry, toolRenderer, useI18n, type RendererModule, type ToolRenderProps } from "@asterism-app/sdk/renderer";
+import { webResponseSchema, type Json, type WebDocument, type WebResponse } from "@asterism-app/sdk/contracts";
+import { ToolHeader } from "@asterism-app/ui/tool-header";
 import { WebResource, CreateWeb, WebView, WebSearch, WebFetch } from "./contract";
 import { webMessages as messages } from "../messages/web";
 import { Markdown } from "../agent/conversation/Markdown";

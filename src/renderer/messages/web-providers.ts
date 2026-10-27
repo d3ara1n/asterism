@@ -1,4 +1,4 @@
-import { defineMessages, pluginNamespace } from "@asterism/sdk/contracts";
+import { defineMessages, pluginNamespace } from "@asterism-app/sdk/contracts";
 
 export const webProviderMessages = pluginNamespace("asterism.host").messages("en", defineMessages({
   title: { id: "webProviders.title", defaultMessage: "Web providers" },

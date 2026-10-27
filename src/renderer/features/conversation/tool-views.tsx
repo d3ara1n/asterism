@@ -1,17 +1,17 @@
 import { Boxes, ScanSearch, Wrench } from "lucide-react";
 import type { ReactNode } from "react";
 import type { z } from "zod";
-import type { Json, UiText } from "@asterism/sdk/contracts";
-import { toolRenderer, type ToolRenderProps, type ToolRenderer, type ToolView } from "@asterism/sdk/renderer";
+import type { Json, UiText } from "@asterism-app/sdk/contracts";
+import { toolRenderer, type ToolRenderProps, type ToolRenderer, type ToolView } from "@asterism-app/sdk/renderer";
 
 import { ResourceCall, ResourceInspectResult, ResourceListResult } from "../../../tools/core";
 import { toolsMessages } from "../../messages/tools";
 import { JsonView, useModuleViews } from "../../modules/views";
 import type { ViewRegistry } from "../../modules/registry";
 import { getI18n, useI18n } from "../../shared/i18n";
-import { ToolDetails } from "@asterism/ui/tool-content";
-import { ToolHeader } from "@asterism/ui/tool-header";
-import { ItemGroup, Item, ItemMedia, ItemContent, ItemTitle, ItemDescription } from "@asterism/ui/ui/item";
+import { ToolDetails } from "@asterism-app/ui/tool-content";
+import { ToolHeader } from "@asterism-app/ui/tool-header";
+import { ItemGroup, Item, ItemMedia, ItemContent, ItemTitle, ItemDescription } from "@asterism-app/ui/ui/item";
 
 /** State fields can come from any resource; ordinary scalars are read directly, while compound values retain complete data. */
 function ResourceFields({ value }: { value: Json }) {

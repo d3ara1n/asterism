@@ -1,7 +1,7 @@
 import { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { defineRecord, pluginNamespace, type SessionRecord } from "@asterism/sdk/contracts";
+import { defineRecord, pluginNamespace, type SessionRecord } from "@asterism-app/sdk/contracts";
 import { sessionSnapshot, sessionView } from "./records.ts";
 import { nodeView } from "../session/view.ts";
 import { attached, created, event, node, removed } from "../session/test-nodes.ts";

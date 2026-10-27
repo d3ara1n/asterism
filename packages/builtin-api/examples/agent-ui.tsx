@@ -1,7 +1,7 @@
 import { useState } from "react";
-import type { ResourceRef } from "@asterism/sdk/contracts";
-import { AgentModal, AgentOverlay, AgentScrollArea, agentUI, type AgentOverlayPosition } from "@asterism/builtin-api/renderer";
-import { useRendererObject, type RendererModule } from "@asterism/sdk/renderer";
+import type { ResourceRef } from "@asterism-app/sdk/contracts";
+import { AgentModal, AgentOverlay, AgentScrollArea, agentUI, type AgentOverlayPosition } from "@asterism-app/builtin-api/renderer";
+import { useRendererObject, type RendererModule } from "@asterism-app/sdk/renderer";
 
 /** Plugins provide business state and submission callbacks for the associated Agent; the UI only consumes this interface. */
 export interface AgentUIState {

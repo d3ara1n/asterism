@@ -1,14 +1,14 @@
-import type { CardPanelView } from "@asterism/sdk/renderer";
+import type { CardPanelView } from "@asterism-app/sdk/renderer";
 import { ChevronRight } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import { memo, useCallback, useEffect, useRef, type ReactNode } from "react";
 
-import { commonMessages } from "@asterism/ui/messages/common";
+import { commonMessages } from "@asterism-app/ui/messages/common";
 import { useI18n } from "../../shared/i18n";
 import { fadeTransition } from "../../shared/weave/motion";
-import { Card } from "@asterism/ui/ui/card";
-import { IconButton } from "@asterism/ui/ui/icon-button";
-import { cn } from "@asterism/ui/utils";
+import { Card } from "@asterism-app/ui/ui/card";
+import { IconButton } from "@asterism-app/ui/ui/icon-button";
+import { cn } from "@asterism-app/ui/utils";
 import type { CardSize } from "../../../shared/workbench";
 import { ObjectSurface } from "./ObjectSurface";
 

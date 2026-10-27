@@ -1,6 +1,6 @@
-import { completionData, type ModelInputPart, type ModelItem, type SessionSnapshot } from "@asterism/sdk/contracts";
+import { completionData, type ModelInputPart, type ModelItem, type SessionSnapshot } from "@asterism-app/sdk/contracts";
 import { contextMessages, projectAgentContext } from "../context-projection.ts";
-import { ContextSummary, Execution, AgentRequestContext, AgentInputMessage, type AgentRequestContextData } from "@asterism/builtin-api/contracts";
+import { ContextSummary, Execution, AgentRequestContext, AgentInputMessage, type AgentRequestContextData } from "@asterism-app/builtin-api/contracts";
 
 /** Fixed categories and display order for conversation composition. */
 export const conversationCategories = ["user", "agentMessage", "assistant", "thinking", "toolcall", "result", "context", "summary"] as const;

@@ -1,4 +1,4 @@
-import type { CardAppearance } from "@asterism/sdk/contracts";
+import type { CardAppearance } from "@asterism-app/sdk/contracts";
 import { maximumCardDimension, type CardSize } from "./workbench.ts";
 import { fallbackCardHeight, fallbackCardWidth, minimumCardHeight, minimumCardWidth } from "./workbench-layout.ts";
 

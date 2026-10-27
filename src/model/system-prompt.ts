@@ -1,4 +1,4 @@
-import type { SystemPrompt } from "@asterism/sdk/contracts";
+import type { SystemPrompt } from "@asterism-app/sdk/contracts";
 
 /** The body is Markdown; neutralize only tag syntax `<name` and `</name`, preserving all other characters. */
 function escapeTags(value: string): string {

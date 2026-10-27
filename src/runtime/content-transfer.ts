@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { PluginApiError } from "@asterism/sdk/runtime";
+import { PluginApiError } from "@asterism-app/sdk/runtime";
 import { contentCommandSchema, type ContentCommand, type ContentReply } from "../shared/content.ts";
 import type { SessionService } from "./sessions.ts";
 import type { ContentLease, ContentAccess } from "./content-store.ts";

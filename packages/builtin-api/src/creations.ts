@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { defineCall } from "@asterism/sdk/contracts";
+import { defineCall } from "@asterism-app/sdk/contracts";
 import { builtin } from "./identity.ts";
 
 /** The public association between model-facing creation entry points and resource types; excludes instance titles and execution permissions. */

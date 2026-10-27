@@ -6,7 +6,7 @@ import { prepareApplicationData, pluginStorages } from "./application.ts";
 import { prepareData } from "./preparation.ts";
 import { readJson, writeJson } from "./files.ts";
 import { PluginStorage } from "../plugins/storage.ts";
-import builtinStorage from "@asterism/builtin/storage";
+import builtinStorage from "@asterism-app/builtin/storage";
 import { BuiltinSettings } from "../../packages/builtin/src/settings/contract.ts";
 
 const roots: string[] = [];

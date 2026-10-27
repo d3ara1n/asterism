@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { ModelRequestIdentity } from "@asterism/sdk/contracts";
+import type { ModelRequestIdentity } from "@asterism-app/sdk/contracts";
 import { mergeModelCompatibility } from "../shared/model-compatibility.ts";
 import type { ModelProviderInput, ProviderModel } from "../shared/configuration.ts";
 import { ModelFailure } from "./contract.ts";

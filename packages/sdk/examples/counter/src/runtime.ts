@@ -1,7 +1,7 @@
 import {
   definePlugin, implementResource, implementCreation,
   implementAction, implementTool, implementCall, type ObjectReader,
-} from "@asterism/sdk/runtime";
+} from "@asterism-app/sdk/runtime";
 import {
   ns, card, Counter, Value, View, Changed, Create, Increment,
   Settings, ReadStep, ReadCounter,

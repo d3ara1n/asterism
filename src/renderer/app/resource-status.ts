@@ -1,4 +1,4 @@
-import type { ResourceRef, ResourceStatus } from "@asterism/sdk/contracts";
+import type { ResourceRef, ResourceStatus } from "@asterism-app/sdk/contracts";
 
 export type ResourceStatusMark = ResourceStatus & {
   resource: ResourceRef;

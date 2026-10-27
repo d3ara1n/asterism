@@ -1,10 +1,10 @@
-import { useI18n, type CreationInputProps } from "@asterism/sdk/renderer";
+import { useI18n, type CreationInputProps } from "@asterism-app/sdk/renderer";
 import { useRef, useState } from "react";
 
 import { CreationForm } from "../shared/creation-form";
-import { Field, FieldLabel, FieldError } from "@asterism/ui/ui/field";
-import { Input } from "@asterism/ui/ui/input";
-import { Textarea } from "@asterism/ui/ui/textarea";
+import { Field, FieldLabel, FieldError } from "@asterism-app/ui/ui/field";
+import { Input } from "@asterism-app/ui/ui/input";
+import { Textarea } from "@asterism-app/ui/ui/textarea";
 import { commonMessages } from "../messages/common";
 
 type Value = { title: string; content: string };
@@ -15,7 +15,7 @@ export function NoteInput({ initialInput, busy, resolve, cancel }: CreationInput
   const titleInput = useRef<HTMLInputElement>(null);
   const [title, setTitle] = useState(initialInput?.title ?? "");
   const [content, setContent] = useState(initialInput?.content ?? "");
-  const [titleError, setTitleError] = useState<import("@asterism/sdk/contracts").UiText | null>(null);
+  const [titleError, setTitleError] = useState<import("@asterism-app/sdk/contracts").UiText | null>(null);
   return <CreationForm busy={busy} onCancel={cancel}
     validate={() => {
       if (title.trim()) return true;

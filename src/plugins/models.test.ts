@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { thinkingLevels } from "@asterism/sdk/contracts";
-import { ModelConfiguration, resolveAgentModelSelection } from "@asterism/builtin-api/contracts";
+import { thinkingLevels } from "@asterism-app/sdk/contracts";
+import { ModelConfiguration, resolveAgentModelSelection } from "@asterism-app/builtin-api/contracts";
 import { defaultAgents, defaultRoles } from "../configuration/defaults.ts";
 import { AiSdkAdapter } from "../model/ai-sdk.ts";
 import { createSelection } from "../../packages/builtin/src/agent/selection.ts";

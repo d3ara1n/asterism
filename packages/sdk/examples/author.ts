@@ -1,11 +1,11 @@
 import { sample, Counter, Count, CounterView, CountChanged, CreateCounter, ChangeCount, CounterUpdates, counterCard } from "./counter-contract.ts";
 /** Independent examples of session records, resource behavior, and model execution. */
 import { z } from "zod";
-import { pluginNamespace, defineAction, resourceCall, defineRecord, defineTool, defineImplementation, modelRunRecordSchema, type ModelItem } from "@asterism/sdk/contracts";
+import { pluginNamespace, defineAction, resourceCall, defineRecord, defineTool, defineImplementation, modelRunRecordSchema, type ModelItem } from "@asterism-app/sdk/contracts";
 import {
   defineModule, definePlugin, implementCreation, implementAction, implementPreparer, implementResource, implementTool, implementChannel,
   type PluginContext, type ObjectReader, type ObjectExecutor, type SessionObserver, type SessionSnapshot, type ResourceRef,
-} from "@asterism/sdk/runtime";
+} from "@asterism-app/sdk/runtime";
 
 /** Scenario one: uses only session events and lifecycles, without resources, models, or Agents. */
 const journal = pluginNamespace("example.journal");

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { builtin, configurationIdSchema } from "@asterism/builtin-api/contracts";
+import { builtin, configurationIdSchema } from "@asterism-app/builtin-api/contracts";
 
 export const OUTPUT_CHAR_LIMIT = 16_384;
 export const MAX_TIMEOUT_SECONDS = 2_147_483_647 / 1000;

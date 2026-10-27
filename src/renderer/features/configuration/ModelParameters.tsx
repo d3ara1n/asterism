@@ -5,9 +5,9 @@ import { modelCatalogMessages as messages } from "../../../shared/model-catalog-
 import { providersMessages } from "../../messages/providers";
 import { modelCostMessages } from "../../messages/model-cost";
 import { useI18n } from "../../shared/i18n";
-import { Alert, AlertDescription } from "@asterism/ui/ui/alert";
-import { Button } from "@asterism/ui/ui/button";
-import { Spinner } from "@asterism/ui/ui/spinner";
+import { Alert, AlertDescription } from "@asterism-app/ui/ui/alert";
+import { Button } from "@asterism-app/ui/ui/button";
+import { Spinner } from "@asterism-app/ui/ui/spinner";
 import { useConfigurationAction } from "./state";
 
 const fields = {

@@ -1,12 +1,12 @@
 import { useId, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { ArrowRight, CircleArrowUp, Copy } from "lucide-react";
-import { Button } from "@asterism/ui/ui/button";
-import { IconButton } from "@asterism/ui/ui/icon-button";
-import { Progress } from "@asterism/ui/ui/progress";
-import { Separator } from "@asterism/ui/ui/separator";
-import { StatusIcon, type StatusTone } from "@asterism/ui/ui/status";
-import { ToggleGroup, ToggleGroupItem } from "@asterism/ui/ui/toggle-group";
+import { Button } from "@asterism-app/ui/ui/button";
+import { IconButton } from "@asterism-app/ui/ui/icon-button";
+import { Progress } from "@asterism-app/ui/ui/progress";
+import { Separator } from "@asterism-app/ui/ui/separator";
+import { StatusIcon, type StatusTone } from "@asterism-app/ui/ui/status";
+import { ToggleGroup, ToggleGroupItem } from "@asterism-app/ui/ui/toggle-group";
 import appIcon from "../../../../assets/icon/asterism.svg";
 import { applicationId } from "../../../shared/application";
 import { appMessages } from "../../messages/app";

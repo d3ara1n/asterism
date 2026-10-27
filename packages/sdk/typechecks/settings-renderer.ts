@@ -1,6 +1,6 @@
 import { createElement, useState } from "react";
-import { defineRendererPlugin, useRendererCalls, useRendererConfiguration, useRendererSettings } from "@asterism/sdk/renderer";
-import type { PluginCalls, ResourceRef } from "@asterism/sdk/contracts";
+import { defineRendererPlugin, useRendererCalls, useRendererConfiguration, useRendererSettings } from "@asterism-app/sdk/renderer";
+import type { PluginCalls, ResourceRef } from "@asterism-app/sdk/contracts";
 import { ReadLabel, Settings, settingsPlugin } from "../examples/settings-contract.ts";
 import { ReadState } from "../examples/plugin-calls.ts";
 

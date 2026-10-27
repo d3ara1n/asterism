@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@asterism/ui/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@asterism-app/ui/ui/tooltip";
 
 /** Read-only measurements: hover or keyboard focus reveals details; no click action is provided. */
 export function MetricTooltip({ label, icon, value, children }: {

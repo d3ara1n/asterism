@@ -1,9 +1,9 @@
-import type { Json, CreationContract, ActionContract, ResourceCall } from "@asterism/sdk/contracts";
+import type { Json, CreationContract, ActionContract, ResourceCall } from "@asterism-app/sdk/contracts";
 import type { ParsedCall } from "../plugins/commands.ts";
-import type { Presentation } from "@asterism/sdk/contracts";
+import type { Presentation } from "@asterism-app/sdk/contracts";
 import type { LiveBlock } from "../shared/session.ts";
 import type { FoldedObject } from "../session/fold.ts";
-import type { ResourceRef } from "@asterism/sdk/runtime";
+import type { ResourceRef } from "@asterism-app/sdk/runtime";
 import type { ContentLease } from "../runtime/content-store.ts";
 
 export interface ContextFile { file: string; text: string }
@@ -40,15 +40,15 @@ export interface ResourceController {
 /** Erased backend resource adapter interface; functions do not cross process boundaries. */
 export interface ResourceBackend {
   kind: string;
-  template?: import("@asterism/sdk/runtime").ResourceContribution["template"];
-  card?: import("@asterism/sdk/contracts").CardAppearance;
+  template?: import("@asterism-app/sdk/runtime").ResourceContribution["template"];
+  card?: import("@asterism-app/sdk/contracts").CardAppearance;
   receivesLinks?: boolean;
   validateState?(data: Json): void;
   project(resource: FoldedObject): Presentation;
   inspect(resource: FoldedObject): Promise<Json>;
   context(resource: FoldedObject): Promise<ContextFile[]>;
-  disposalWarning?(resource: FoldedObject): import("@asterism/sdk/contracts").UiText | null;
+  disposalWarning?(resource: FoldedObject): import("@asterism-app/sdk/contracts").UiText | null;
   /** Called by the host when an object enters the current set; lifetime end releases object-exclusive external instances. */
-  attach?(resource: import("@asterism/sdk/contracts").ResourceSnapshot, lifetime: import("@asterism/sdk/runtime").Lifetime): void;
+  attach?(resource: import("@asterism-app/sdk/contracts").ResourceSnapshot, lifetime: import("@asterism-app/sdk/runtime").Lifetime): void;
   controller?: ResourceController;
 }

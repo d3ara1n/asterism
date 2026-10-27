@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import type { ModelResponse, UsageItem } from "@asterism/sdk/contracts";
-import { UsageQueryError, type ModelProviderInfo, type ModelProviderServices, type UsageProvider, type UsageProviderServices } from "@asterism/sdk/runtime";
+import type { ModelResponse, UsageItem } from "@asterism-app/sdk/contracts";
+import { UsageQueryError, type ModelProviderInfo, type ModelProviderServices, type UsageProvider, type UsageProviderServices } from "@asterism-app/sdk/runtime";
 import { waitForUsage, UsageConsumer } from "./service.ts";
 
 const items: UsageItem[] = [{ id: "quota", label: "Quota", scope: "connection", type: "quota", category: "rate_limit",

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { defineRecord, jsonSchema } from "@asterism/sdk/contracts";
+import { defineRecord, jsonSchema } from "@asterism-app/sdk/contracts";
 
 /** Record contracts for host workbench events; runtime workbenches write payloads and host workbench modules provide presentation. */
 const target = z.object({ id: z.string() });

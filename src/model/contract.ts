@@ -1,5 +1,5 @@
 import type { Json, ModelSettings } from "../shared/model.ts";
-import type { ModelItem, SystemPrompt, ModelInputPart, ModelRequestIdentity, ModelResponse, ModelEvent, RequestTiming, ErrorDetails } from "@asterism/sdk/contracts";
+import type { ModelItem, SystemPrompt, ModelInputPart, ModelRequestIdentity, ModelResponse, ModelEvent, RequestTiming, ErrorDetails } from "@asterism-app/sdk/contracts";
 
 export class ModelFailure extends Error {
   timing?: RequestTiming;
@@ -8,7 +8,7 @@ export class ModelFailure extends Error {
     readonly origin: "model" | "software" = "software") { super(message); }
 }
 export interface ToolDeclaration { name: string; description: string; parameters: Json }
-export type { ModelEvent, StreamPart } from "@asterism/sdk/contracts";
+export type { ModelEvent, StreamPart } from "@asterism-app/sdk/contracts";
 export type ResolvedInputPart = Extract<ModelInputPart, { kind: "text" }> | { kind: "file"; data: Uint8Array; mediaType: string; filename?: string };
 /** Tool results retain only success/failure and parts needed by the model; UI data and execution metadata stay outside requests. */
 export type ResolvedModelItem = Extract<ModelItem, { kind: "output" }>

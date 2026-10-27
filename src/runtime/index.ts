@@ -4,7 +4,7 @@ import { protocolVersion } from "../shared/contracts.ts";
 import { SecretClient } from "./secret-client.ts";
 import { join } from "node:path";
 import { PackageList, loadPackages } from "../plugins/packages.ts";
-import { builtin } from "@asterism/builtin-api/contracts";
+import { builtin } from "@asterism-app/builtin-api/contracts";
 import { DatabaseVersionError } from "./storage.ts";
 import { RendererConnection } from "./connection.ts";
 import type { RendererFrame, RuntimeFrame } from "../shared/connection.ts";

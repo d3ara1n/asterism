@@ -1,9 +1,9 @@
-import { IconButton } from "@asterism/ui/ui/icon-button";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@asterism/ui/ui/alert-dialog";
+import { IconButton } from "@asterism-app/ui/ui/icon-button";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@asterism-app/ui/ui/alert-dialog";
 import { X } from "lucide-react";
 import { useState, type ReactNode, type Ref } from "react";
 
-import { commonMessages } from "@asterism/ui/messages/common";
+import { commonMessages } from "@asterism-app/ui/messages/common";
 import { formsMessages } from "../../messages/forms";
 import { useI18n } from "../i18n";
 import { useCloseGuard, useIsland } from "./Screen";

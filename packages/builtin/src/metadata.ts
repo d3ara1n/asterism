@@ -1,5 +1,5 @@
-import { defineMessages, type PluginMetadata } from "@asterism/sdk/contracts";
-import { builtin } from "@asterism/builtin-api/contracts";
+import { defineMessages, type PluginMetadata } from "@asterism-app/sdk/contracts";
+import { builtin } from "@asterism-app/builtin-api/contracts";
 import pkg from "../package.json" with { type: "json" };
 
 const messages = builtin.messages("en", defineMessages({

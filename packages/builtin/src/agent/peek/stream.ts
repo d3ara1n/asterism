@@ -1,4 +1,4 @@
-import type { ModelEvent, ModelItem, ModelPart } from "@asterism/sdk/contracts";
+import type { ModelEvent, ModelItem, ModelPart } from "@asterism-app/sdk/contracts";
 import { PeekReport } from "./report.ts";
 import type { PeekResult } from "./contract.ts";
 

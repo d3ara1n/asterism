@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import type { ToolRenderProps } from "@asterism/sdk/renderer";
+import type { ToolRenderProps } from "@asterism-app/sdk/renderer";
 
 /** No body before results arrive; passed as a component to avoid falling back to DefaultToolBody's “No output” during execution. */
 const noBody = () => null;

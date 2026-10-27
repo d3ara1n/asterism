@@ -1,20 +1,20 @@
 import { nanoid } from "nanoid";
-import { thinkingLevels } from "@asterism/sdk/contracts";
+import { thinkingLevels } from "@asterism-app/sdk/contracts";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { defineCall, defineCreation, defineAction, resourceCall, defineRecord, defineImplementation, defineTool, pluginNamespace, modelRunRecordSchema, type SessionRecord, type ModelRunEvent } from "@asterism/sdk/contracts";
-import { defineTopLevelTool, implementCall, defineModule, definePlugin, implementCreation, implementAction, implementPreparer, implementResource, implementTool, type ObjectReader, type ObjectExecutor, type ObjectWriter, type PluginContext, type PluginDefinition } from "@asterism/sdk/runtime";
+import { defineCall, defineCreation, defineAction, resourceCall, defineRecord, defineImplementation, defineTool, pluginNamespace, modelRunRecordSchema, type SessionRecord, type ModelRunEvent } from "@asterism-app/sdk/contracts";
+import { defineTopLevelTool, implementCall, defineModule, definePlugin, implementCreation, implementAction, implementPreparer, implementResource, implementTool, type ObjectReader, type ObjectExecutor, type ObjectWriter, type PluginContext, type PluginDefinition } from "@asterism-app/sdk/runtime";
 import { ApplicationService } from "../runtime/service.ts";
 import { DatabaseVersionError } from "../runtime/storage.ts";
 import * as runtimeModules from "../runtime/builtin.ts";
 import type { ToolRegistry } from "../tools/registry.ts";
 import { foldWorkbench } from "../session/fold.ts";
 import type { ModelAdapter, ModelInput } from "../model/contract.ts";
-import { SubmitAgentInput } from "@asterism/builtin-api/contracts";
+import { SubmitAgentInput } from "@asterism-app/builtin-api/contracts";
 import { applicationStorage } from "../shared/application.ts";
 import { flat } from "../session/test-nodes.ts";
 

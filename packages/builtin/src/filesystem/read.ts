@@ -1,6 +1,6 @@
 import { readdir } from "node:fs/promises";
 import type { z } from "zod";
-import type { CallResult } from "@asterism/sdk/runtime";
+import type { CallResult } from "@asterism-app/sdk/runtime";
 import { TextError, readText } from "../shared/text.ts";
 import { DirectoryList, DirectoryRead } from "./contract.ts";
 import { withinDirectory } from "./paths.ts";

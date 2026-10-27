@@ -2,7 +2,7 @@ import { createServer, type Server } from "node:http";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { OAuthClientProvider, OAuthDiscoveryState, StoredOAuthTokens, StoredOAuthClientInformation } from "@modelcontextprotocol/client";
-import type { PluginSecrets } from "@asterism/sdk/runtime";
+import type { PluginSecrets } from "@asterism-app/sdk/runtime";
 
 const savedSchema = z.object({
   token: z.looseObject({ access_token: z.string(), token_type: z.string() }).optional(),

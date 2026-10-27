@@ -1,4 +1,4 @@
-import type { EventSubscription, SubscriptionEnd } from "@asterism/sdk/contracts";
+import type { EventSubscription, SubscriptionEnd } from "@asterism-app/sdk/contracts";
 
 /** Shared subscription establishment, termination, and cancellation state; callers manage actual finalization of running work. */
 export class EventSubscriptionState {

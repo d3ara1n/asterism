@@ -1,6 +1,6 @@
-import { PluginApiError, type ObjectExecutor, type ObjectReader, type PluginTasks, type ModelServices } from "@asterism/sdk/runtime";
-import { ResourceStatusChanged, describeError, type ResourceStatus, type ModelRunObserver } from "@asterism/sdk/contracts";
-import { Execution } from "@asterism/builtin-api/contracts";
+import { PluginApiError, type ObjectExecutor, type ObjectReader, type PluginTasks, type ModelServices } from "@asterism-app/sdk/runtime";
+import { ResourceStatusChanged, describeError, type ResourceStatus, type ModelRunObserver } from "@asterism-app/sdk/contracts";
+import { Execution } from "@asterism-app/builtin-api/contracts";
 import { agentRequestExtensions } from "./request-context.ts";
 import { feedbackOrigin } from "./feedback.ts";
 import type { createAgentFeedback } from "./feedback-state.ts";

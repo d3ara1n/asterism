@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { generateText } from "ai";
 import { z } from "zod";
-import { thinkingLevels } from "@asterism/sdk/contracts";
+import { thinkingLevels } from "@asterism-app/sdk/contracts";
 import { AiSdkAdapter, sdkMessages } from "./ai-sdk.ts";
 import { createProviderModel } from "./provider.ts";
 import { aiSdkAdapterVersion } from "./continuation.ts";

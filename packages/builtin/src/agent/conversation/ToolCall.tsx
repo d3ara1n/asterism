@@ -1,12 +1,12 @@
-import { useI18n, useRendererTools, useRendererConfig } from "@asterism/sdk/renderer";
+import { useI18n, useRendererTools, useRendererConfig } from "@asterism-app/sdk/renderer";
 import { TextCursorInput, Wrench } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 
-import { JsonView } from "@asterism/ui/json-view";
-import { DefaultToolHeader, DefaultToolBody, ToolDetailsSwitcher } from "@asterism/ui/tool-content";
-import { ToolHeader } from "@asterism/ui/tool-header";
-import { Alert, AlertDescription } from "@asterism/ui/ui/alert";
-import { StatusBadge, StatusIcon, type StatusTone } from "@asterism/ui/ui/status";
+import { JsonView } from "@asterism-app/ui/json-view";
+import { DefaultToolHeader, DefaultToolBody, ToolDetailsSwitcher } from "@asterism-app/ui/tool-content";
+import { ToolHeader } from "@asterism-app/ui/tool-header";
+import { Alert, AlertDescription } from "@asterism-app/ui/ui/alert";
+import { StatusBadge, StatusIcon, type StatusTone } from "@asterism-app/ui/ui/status";
 import { toolsMessages } from "../../messages/tools";
 import { Disclosure } from "./Disclosure";
 import { toolCallState, type ToolCallNode } from "./tool-state";

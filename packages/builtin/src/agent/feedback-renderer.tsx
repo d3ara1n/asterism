@@ -1,4 +1,4 @@
-import type { RendererModule } from "@asterism/sdk/renderer";
+import type { RendererModule } from "@asterism-app/sdk/renderer";
 import { toast } from "sonner";
 import { AgentSoftwareFeedback } from "./feedback";
 import { ExecutionErrorDetails } from "./ErrorDetails";

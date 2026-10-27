@@ -1,7 +1,7 @@
 import { nanoid } from "nanoid";
 import { describe, expect, it } from "vitest";
-import type { RendererContentInput } from "@asterism/sdk/renderer";
-import type { ModelInputPart } from "@asterism/sdk/contracts";
+import type { RendererContentInput } from "@asterism-app/sdk/renderer";
+import type { ModelInputPart } from "@asterism-app/sdk/contracts";
 import { DraftExchange } from "./draft-exchange";
 import { createMessageDraft, type CopiedDraft } from "./draft";
 

@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { defineImplementation, defineCreation } from "@asterism/sdk/contracts";
-import { builtin, Read, Edit, Write, textReadSchema, textChangeSchema } from "@asterism/builtin-api/contracts";
+import { defineImplementation, defineCreation } from "@asterism-app/sdk/contracts";
+import { builtin, Read, Edit, Write, textReadSchema, textChangeSchema } from "@asterism-app/builtin-api/contracts";
 
 export const MAX_NOTE_LENGTH = 100_000;
 export const Note = builtin.resource("note", z.object({}));

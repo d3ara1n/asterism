@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { pluginNamespace, defineCreation, defineAction, defineRecord, defineChannel } from "@asterism/sdk/contracts";
+import { pluginNamespace, defineCreation, defineAction, defineRecord, defineChannel } from "@asterism-app/sdk/contracts";
 
 export const sample = pluginNamespace("example.counter");
 export const Counter = sample.resource("counter", z.strictObject({}));

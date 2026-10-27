@@ -1,6 +1,6 @@
 import type { TimelineItem } from "./timeline";
-import type { ToolInvocationInfo } from "@asterism/sdk/contracts";
-import type { ToolRenderProps } from "@asterism/sdk/renderer";
+import type { ToolInvocationInfo } from "@asterism-app/sdk/contracts";
+import type { ToolRenderProps } from "@asterism-app/sdk/renderer";
 
 export type ToolCallNode = Extract<TimelineItem, { kind: "toolcall" }>;
 export interface ToolCallState {

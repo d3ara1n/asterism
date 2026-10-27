@@ -1,8 +1,8 @@
-import { useI18n } from "@asterism/sdk/renderer";
+import { useI18n } from "@asterism-app/sdk/renderer";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import type { MermaidConfig } from "mermaid";
-import { Alert, AlertDescription } from "@asterism/ui/ui/alert";
-import { StatusText } from "@asterism/ui/ui/status";
+import { Alert, AlertDescription } from "@asterism-app/ui/ui/alert";
+import { StatusText } from "@asterism-app/ui/ui/status";
 import { markdownMessages } from "../../messages/markdown";
 import { useMermaidTheme } from "./mermaid-theme";
 

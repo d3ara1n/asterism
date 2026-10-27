@@ -3,21 +3,21 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { PackageList, loadPackages, readManifest, readPackageMetadata } from "./packages.ts";
-import sdkMetadata from "@asterism/sdk/package.json" with { type: "json" };
+import sdkMetadata from "@asterism-app/sdk/package.json" with { type: "json" };
 import { ApplicationService } from "../runtime/service.ts";
 import { pathToFileURL } from "node:url";
-import type { PluginDefinition } from "@asterism/sdk/runtime";
+import type { PluginDefinition } from "@asterism-app/sdk/runtime";
 
 const roots: string[] = [];
 afterEach(() => { for (const r of roots.splice(0)) rmSync(r, { recursive: true, force: true }); });
 function temp() { const r = mkdtempSync(join(tmpdir(), "plugin-pkg-")); roots.push(r); return r; }
 function pkg(root: string, asterism: unknown, source?: string) {
   mkdirSync(join(root, "src"), { recursive: true });
-  writeFileSync(join(root, "package.json"), JSON.stringify({ name: "x", version: "1.0.0", peerDependencies: { "@asterism/sdk": `^${sdkMetadata.version}` }, asterism }));
+  writeFileSync(join(root, "package.json"), JSON.stringify({ name: "x", version: "1.0.0", peerDependencies: { "@asterism-app/sdk": `^${sdkMetadata.version}` }, asterism }));
   if (source) writeFileSync(join(root, "src", "runtime.ts"), source);
 }
-const runtime = (id: string) => `import { pluginNamespace } from "@asterism/sdk/contracts";
-import { definePlugin, defineModule } from "@asterism/sdk/runtime";
+const runtime = (id: string) => `import { pluginNamespace } from "@asterism-app/sdk/contracts";
+import { definePlugin, defineModule } from "@asterism-app/sdk/runtime";
 const ns = pluginNamespace(${JSON.stringify(id)});
 export default definePlugin({ namespace: ns, modules: [defineModule(() => ({}))] });`;
 
@@ -43,7 +43,7 @@ describe("Plugin packages", () => {
     const root = temp();
     writeFileSync(join(root, "package.json"), JSON.stringify({
       name: "@example/info", version: "1.2.3", description: "Package description", author: { name: "Author" },
-      peerDependencies: { "@asterism/sdk": "^0.1.0" },
+      peerDependencies: { "@asterism-app/sdk": "^0.1.0" },
       asterism: { id: "example.info", displayName: "Display name", icon: "icon.svg", runtime: "runtime.ts" },
     }));
     writeFileSync(join(root, "runtime.ts"), 'throw new Error("Must not execute.");');
@@ -67,7 +67,7 @@ describe("Plugin packages", () => {
     const dir = temp(), data = temp();
     pkg(dir, { id: "acme.x", runtime: "src/runtime.ts" }, runtime("acme.x"));
     const metadata = JSON.parse(readFileSync(join(dir, "package.json"), "utf8"));
-    metadata.peerDependencies["@asterism/sdk"] = range;
+    metadata.peerDependencies["@asterism-app/sdk"] = range;
     writeFileSync(join(dir, "package.json"), JSON.stringify(metadata));
     const list = new PackageList(join(data, "plugins.json"));
     list.add({ source: { kind: "path", path: dir } }, data);
@@ -102,8 +102,8 @@ describe("Plugin packages", () => {
     const data = temp(); const root = temp();
     pkg(root, { id: "acme.sdk", runtime: "src/runtime.ts" }, `
       import { z } from "zod";
-      import { pluginNamespace, defineCreation, defineAction } from "@asterism/sdk/contracts";
-      import { definePlugin, defineModule, implementResource, implementCreation, implementAction } from "@asterism/sdk/runtime";
+      import { pluginNamespace, defineCreation, defineAction } from "@asterism-app/sdk/contracts";
+      import { definePlugin, defineModule, implementResource, implementCreation, implementAction } from "@asterism-app/sdk/runtime";
       const ns = pluginNamespace("acme.sdk");
       const resource = ns.resource("label", z.object({ label: z.string() }));
       const content = ns.data("content", z.string());
@@ -184,7 +184,7 @@ it("registers independent styles, preserves CSS Module names and asset paths, an
 function publicFixture() {
   const data = temp(), provider = temp(), consumer = temp();
   pkg(provider, { id: "acme.provider", runtime: "src/runtime.ts", renderer: "src/renderer.ts" }, `
-    import { pluginNamespace } from "@asterism/sdk/contracts";
+    import { pluginNamespace } from "@asterism-app/sdk/contracts";
     import { Read, settings, Marker, events } from "./state.ts";
     export default { namespace: pluginNamespace("acme.provider"),
       probe: { Read, settings, Marker, events }, modules: [{ setup(plugin) {
@@ -196,7 +196,7 @@ function publicFixture() {
   const info = JSON.parse(readFileSync(join(provider, "package.json"), "utf8"));
   writeFileSync(join(provider, "package.json"), JSON.stringify({ ...info, name: "@fixture/provider", exports: { "./public": "./src/public.ts" } }));
   writeFileSync(join(provider, "src/state.ts"), `
-    import { defineTool } from "@asterism/sdk/contracts";
+    import { defineTool } from "@asterism-app/sdk/contracts";
     import { z } from "zod";
     export const Read = defineTool({ id: "acme.provider/read", name: "read", description: "Read.", guidelines: [],
       argsSchema: z.null().describe("No arguments.") });
@@ -207,8 +207,8 @@ function publicFixture() {
   writeFileSync(join(provider, "src/public.ts"), 'export { Read, settings, Marker, events } from "./state.ts";');
   writeFileSync(join(provider, "src/renderer.ts"), 'export { Read, settings, Marker } from "./state.ts"; export default { modules: [{ resources: [], cards: [], tools: [] }] };');
   pkg(consumer, { id: "acme.consumer", runtime: "src/runtime.ts", renderer: "src/renderer.ts" }, `
-    import { pluginNamespace, defineImplementation } from "@asterism/sdk/contracts";
-    import { implementTool } from "@asterism/sdk/runtime";
+    import { pluginNamespace, defineImplementation } from "@asterism-app/sdk/contracts";
+    import { implementTool } from "@asterism-app/sdk/runtime";
     import { z } from "zod";
     import { Read, settings, Marker, events } from "@fixture/provider/public";
     const ns = pluginNamespace("acme.consumer");
@@ -316,7 +316,7 @@ describe("Public modules", () => {
     const packages = await loadPackages(fixture.list, fixture.data, fixture.cache, []);
     // Supply the frontend dependency table in an isolated test process to verify build artifacts directly without launching a GUI.
     const globals = globalThis as Record<string, unknown>, previous = globals.__asterismRendererModules;
-    globals.__asterismRendererModules = { zod: await import("zod"), "@asterism/sdk/contracts": await import("@asterism/sdk/contracts") };
+    globals.__asterismRendererModules = { zod: await import("zod"), "@asterism-app/sdk/contracts": await import("@asterism-app/sdk/contracts") };
     try {
       const consumer = await import(pathToFileURL(join(fixture.cache, packages[0]!.renderer!)).href) as Probe;
       const provider = await import(pathToFileURL(join(fixture.cache, packages[1]!.renderer!)).href) as Probe;

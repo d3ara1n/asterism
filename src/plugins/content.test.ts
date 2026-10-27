@@ -1,19 +1,19 @@
-import { thinkingLevels } from "@asterism/sdk/contracts";
+import { thinkingLevels } from "@asterism-app/sdk/contracts";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { contentRefSchema, defineCall, defineAction, defineCreation, defineRecord, pluginNamespace, resourceCall, type ContentRef } from "@asterism/sdk/contracts";
-import { implementCall, defineModule, definePlugin, implementAction, implementCreation, implementPreparer, implementResource, type ObjectExecutor, type ContentScope, type PluginContext } from "@asterism/sdk/runtime";
+import { contentRefSchema, defineCall, defineAction, defineCreation, defineRecord, pluginNamespace, resourceCall, type ContentRef } from "@asterism-app/sdk/contracts";
+import { implementCall, defineModule, definePlugin, implementAction, implementCreation, implementPreparer, implementResource, type ObjectExecutor, type ContentScope, type PluginContext } from "@asterism-app/sdk/runtime";
 import { ApplicationService } from "../runtime/service.ts";
 import { contentLimits } from "../runtime/content-store.ts";
 import { serveContent } from "../runtime/dispatch.ts";
 import { contentResultSchema } from "../shared/content.ts";
 import { randomUUID } from "node:crypto";
 import type { ModelAdapter, ModelInput } from "../model/contract.ts";
-import type { StreamRequest } from "@asterism/sdk/contracts";
-import { modelInputLimits } from "@asterism/sdk/contracts";
+import type { StreamRequest } from "@asterism-app/sdk/contracts";
+import { modelInputLimits } from "@asterism-app/sdk/contracts";
 import { applicationStorage } from "../shared/application.ts";
 
 const ns = pluginNamespace("test.content");

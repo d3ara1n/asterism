@@ -1,6 +1,6 @@
 import { useEffect, useSyncExternalStore } from "react";
-import type { ChannelEnd, ResourceRef } from "@asterism/sdk/contracts";
-import type { RendererChannel, RendererObjectContext } from "@asterism/sdk/renderer";
+import type { ChannelEnd, ResourceRef } from "@asterism-app/sdk/contracts";
+import type { RendererChannel, RendererObjectContext } from "@asterism-app/sdk/renderer";
 import { TerminalChannel, inactiveStatus, type TerminalDown, type TerminalStatus, type TerminalUp } from "./contract.ts";
 
 /** Acknowledgment granularity for rendered characters; must stay below the backend low-water mark so delayed acknowledgments do not prevent resumption. */

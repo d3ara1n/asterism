@@ -1,5 +1,5 @@
-import { present, type DataContract, type Json } from "@asterism/sdk/contracts";
-import { PluginApiError } from "@asterism/sdk/runtime";
+import { present, type DataContract, type Json } from "@asterism-app/sdk/contracts";
+import { PluginApiError } from "@asterism-app/sdk/runtime";
 
 /** Convert encoding failures into the host's write-boundary error without losing contract identity. */
 export function encodePluginData<T extends Json>(contract: DataContract<T>, value: T): Json {

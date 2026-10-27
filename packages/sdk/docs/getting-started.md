@@ -8,7 +8,9 @@ Use a TypeScript package and the public SDK compatible with the application you 
 
 Set the plugin's release version in `package.json.version`. That version identifies distributed releases and updates; it does not affect loading or execution. The runtime definition declares its namespace and behavior. Keep ordinary runtime libraries in `dependencies`; npm or another package manager installs them using its usual dependency and lockfile rules.
 
-Declare host-provided packages such as `@asterism/sdk` in `peerDependencies` with `"*"`. The running plugin always uses the host's instance, so a narrower range adds maintenance without changing behavior. Install the SDK source package through a `file:` reference in `devDependencies` while it remains unpublished. This gives the editor and type checker local declarations. Extensions to built-in features can use the same arrangement for `@asterism/builtin-api`.
+Declare host-provided packages such as `@asterism-app/sdk` in `peerDependencies` with `"*"`. The running plugin always uses the host's instance, so a narrower range adds maintenance without changing behavior. Install a version of the SDK compatible with the target application in `devDependencies` for editor support and type checking. Extensions to built-in features can use the same arrangement for `@asterism-app/builtin-api`.
+
+The npm `next` tag identifies the current testing release. Install it with `npm install --save-dev --save-exact @asterism-app/sdk@next`; add `@asterism-app/builtin-api@next` when using built-in domain APIs. Saving an exact development version keeps the declarations stable until an intentional update. The packages include TypeScript source, guides, and examples. Installing a newer development package does not update the APIs provided by the running application.
 
 Asterism binds shared public imports to the active host or plugin provider. Dependency ranges do not reject loading; missing modules, missing exports, invalid contributions, and initialization errors produce loading failures. Check the APIs your plugin actually uses with TypeScript and exercise them in the target application.
 

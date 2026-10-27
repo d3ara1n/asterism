@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { defineCall, type PluginCalls, type ResourceRef } from "@asterism/sdk/contracts";
-import { implementCall } from "@asterism/sdk/runtime";
+import { defineCall, type PluginCalls, type ResourceRef } from "@asterism-app/sdk/contracts";
+import { implementCall } from "@asterism-app/sdk/runtime";
 
 const Calculate = defineCall("example.calls/calculate", {
   scope: "plugin",

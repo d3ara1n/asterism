@@ -1,22 +1,22 @@
 import { ChevronDown, RotateCcw, Trash2 } from "lucide-react";
 import { useId, useState, type ReactNode } from "react";
-import type { UiText } from "@asterism/sdk/contracts";
+import type { UiText } from "@asterism-app/sdk/contracts";
 
 import { formsMessages } from "../../messages/forms";
 import { useI18n } from "../../shared/i18n";
-import { Alert, AlertDescription } from "@asterism/ui/ui/alert";
-import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@asterism/ui/ui/alert-dialog";
-import { Button } from "@asterism/ui/ui/button";
-import { IconButton } from "@asterism/ui/ui/icon-button";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@asterism/ui/ui/collapsible";
-import { Field, FieldLabel, FieldDescription } from "@asterism/ui/ui/field";
-import { Input } from "@asterism/ui/ui/input";
-import { InputGroup, InputGroupInput, InputGroupAddon, InputGroupButton } from "@asterism/ui/ui/input-group";
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@asterism/ui/ui/select";
-import { Separator } from "@asterism/ui/ui/separator";
-import { Spinner } from "@asterism/ui/ui/spinner";
-import { Switch } from "@asterism/ui/ui/switch";
-import { Textarea } from "@asterism/ui/ui/textarea";
+import { Alert, AlertDescription } from "@asterism-app/ui/ui/alert";
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@asterism-app/ui/ui/alert-dialog";
+import { Button } from "@asterism-app/ui/ui/button";
+import { IconButton } from "@asterism-app/ui/ui/icon-button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@asterism-app/ui/ui/collapsible";
+import { Field, FieldLabel, FieldDescription } from "@asterism-app/ui/ui/field";
+import { Input } from "@asterism-app/ui/ui/input";
+import { InputGroup, InputGroupInput, InputGroupAddon, InputGroupButton } from "@asterism-app/ui/ui/input-group";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@asterism-app/ui/ui/select";
+import { Separator } from "@asterism-app/ui/ui/separator";
+import { Spinner } from "@asterism-app/ui/ui/spinner";
+import { Switch } from "@asterism-app/ui/ui/switch";
+import { Textarea } from "@asterism-app/ui/ui/textarea";
 import { IslandPanel } from "../../shared/weave/IslandPanel";
 import { useSettingsConfiguration } from "./state";
 

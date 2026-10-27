@@ -8,13 +8,13 @@ import { RolesSettings } from "../configuration/RolesSettings";
 import { AgentsSettings } from "../configuration/AgentsSettings";
 import { PluginsOverview, PluginDetails, usePlugins, pluginKey, type PluginManager } from "../plugins/PluginsSettings";
 import { pluginsMessages } from "../../messages/plugins";
-import { Item, ItemContent, ItemTitle, ItemDescription } from "@asterism/ui/ui/item";
-import { Separator } from "@asterism/ui/ui/separator";
+import { Item, ItemContent, ItemTitle, ItemDescription } from "@asterism-app/ui/ui/item";
+import { Separator } from "@asterism-app/ui/ui/separator";
 import { AnimatePresence, motion } from "motion/react";
 
-import { Card } from "@asterism/ui/ui/card";
+import { Card } from "@asterism-app/ui/ui/card";
 
-import { Button } from "@asterism/ui/ui/button";
+import { Button } from "@asterism-app/ui/ui/button";
 import { ArrowLeft, Info, Palette, Cpu, PlugZap, Bot, type LucideProps } from "lucide-react";
 import { ConfigurationReadStatus } from "../configuration/forms";
 import { ConfigurationContext, useConfiguration } from "../configuration/state";
@@ -29,7 +29,7 @@ import { fadeTransition, islandTransition } from "../../shared/weave/motion";
 
 /** Settings category registry: add a category by appending one entry. Include only categories with a clear purpose. */
 export type SettingsCategoryId = "general" | "appearance" | "providers" | "roles" | "agents" | "about";
-interface SettingsCategory { id: SettingsCategoryId; title: import("@asterism/sdk/contracts").UiText; summary: import("@asterism/sdk/contracts").UiText; icon: ComponentType<LucideProps>; content: () => ReactNode }
+interface SettingsCategory { id: SettingsCategoryId; title: import("@asterism-app/sdk/contracts").UiText; summary: import("@asterism-app/sdk/contracts").UiText; icon: ComponentType<LucideProps>; content: () => ReactNode }
 
 const categories: SettingsCategory[] = [
   { id: "general", title: settingsMessages.generalTitle, summary: settingsMessages.generalSummary, icon: Info, content: () => <><LanguageSettings /><SessionsSettings /></> },

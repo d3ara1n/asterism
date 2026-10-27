@@ -1,4 +1,4 @@
-import { defineMessages, pluginNamespace } from "@asterism/sdk/contracts";
+import { defineMessages, pluginNamespace } from "@asterism-app/sdk/contracts";
 
 export const conversationMessages = pluginNamespace("asterism.builtin").messages("en", defineMessages({
   executionProcess: { id: "agent_conversation_executionProcess", defaultMessage: "Execution process" },

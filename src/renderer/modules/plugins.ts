@@ -4,16 +4,16 @@ import * as ReactDom from "react-dom";
 import * as ReactDomClient from "react-dom/client";
 import * as ReactIntl from "react-intl";
 import * as zod from "zod";
-import * as sdkContracts from "@asterism/sdk/contracts";
-import * as sdkRenderer from "@asterism/sdk/renderer";
-import type { RendererModule, RendererPlugin } from "@asterism/sdk/renderer";
+import * as sdkContracts from "@asterism-app/sdk/contracts";
+import * as sdkRenderer from "@asterism-app/sdk/renderer";
+import type { RendererModule, RendererPlugin } from "@asterism-app/sdk/renderer";
 import { awaitStartup } from "../app/boot.ts";
 import { loadPluginStylesheet } from "./plugin-styles.ts";
 
 /** Shared module allowlist: these imports in plugin bundles resolve to the same host instances, ensuring a single React instance. */
 (globalThis as Record<string, unknown>).__asterismRendererModules = {
   react: React, "react/jsx-runtime": ReactJsx, "react-dom": ReactDom, "react-dom/client": ReactDomClient,
-  zod, "@asterism/sdk/contracts": sdkContracts, "@asterism/sdk/renderer": sdkRenderer,
+  zod, "@asterism-app/sdk/contracts": sdkContracts, "@asterism-app/sdk/renderer": sdkRenderer,
   "react-intl": ReactIntl,
 };
 

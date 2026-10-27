@@ -1,12 +1,12 @@
-import { StatusBadge, StatusIcon } from "@asterism/ui/ui/status";
+import { StatusBadge, StatusIcon } from "@asterism-app/ui/ui/status";
 import { ArrowDown } from "lucide-react";
-import { Button } from "@asterism/ui/ui/button";
+import { Button } from "@asterism-app/ui/ui/button";
 import { VirtualConversationTimeline } from "./ConversationTimeline";
 import { ConversationMinimap } from "./ConversationMinimap";
 
 import { MessageComposer } from "./Composer";
 import { conversationMessages } from "../../messages/conversation";
-import { useI18n, useRendererObject, useRendererModels } from "@asterism/sdk/renderer";
+import { useI18n, useRendererObject, useRendererModels } from "@asterism-app/sdk/renderer";
 
 import { useOutputFollow } from "./output-follow";
 import { useMemo, useRef } from "react";

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { RequestTiming, Usage } from "@asterism/sdk/contracts";
+import type { RequestTiming, Usage } from "@asterism-app/sdk/contracts";
 import { outputDuration, performanceOverview, rateSamples, tokensPerSecond } from "./performance";
 import type { DiagnosticRequest } from "./history";
 

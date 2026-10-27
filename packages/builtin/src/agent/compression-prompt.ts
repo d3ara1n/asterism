@@ -1,4 +1,4 @@
-import type { ModelInputPart, ModelItem } from "@asterism/sdk/contracts";
+import type { ModelInputPart, ModelItem } from "@asterism-app/sdk/contracts";
 
 const TOOL_RESULT_CHARS = 2_000;
 

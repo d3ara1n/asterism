@@ -1,11 +1,11 @@
 import { StrictMode, useEffect } from "react";
-import { RendererEventsProvider, RendererCallsProvider } from "@asterism/sdk/renderer";
+import { RendererEventsProvider, RendererCallsProvider } from "@asterism-app/sdk/renderer";
 import { EventClient } from "../shared/event-client";
 import { CallClient } from "../shared/call-client";
 import { HostI18nProvider, setLanguageCatalogs } from "./shared/i18n";
 import { ErrorBoundary } from "./app/ErrorBoundary";
 import { MotionConfig } from "motion/react";
-import { TooltipProvider } from "@asterism/ui/ui/tooltip";
+import { TooltipProvider } from "@asterism-app/ui/ui/tooltip";
 import { ModuleViewsProvider } from "./modules/views";
 import { HostConfigsProvider } from "./modules/configs";
 import { App } from "./app/App";
@@ -14,20 +14,20 @@ import type { Root } from "react-dom/client";
 
 import { ApplicationController } from "./app/controller";
 
-import { builtinRenderer, BuiltinRendererProvider } from "@asterism/builtin/renderer";
-import * as builtinRendererAPI from "@asterism/builtin-api/renderer";
+import { builtinRenderer, BuiltinRendererProvider } from "@asterism-app/builtin/renderer";
+import * as builtinRendererAPI from "@asterism-app/builtin-api/renderer";
 import { ViewRegistry } from "./modules/registry";
 import { workbenchRecordViews } from "./features/workbench/records";
 import { loadPluginRenderers } from "./modules/plugins";
 import { pluginPreferences } from "./features/creation/preferences";
 import { preparePlugin } from "./app/startup";
 import { PluginSettingsProvider } from "./modules/settings";
-import type { PluginSettingsPage } from "@asterism/sdk/renderer";
+import type { PluginSettingsPage } from "@asterism-app/sdk/renderer";
 import { getI18n, useI18n } from "./shared/i18n";
 import { toast } from "./shared/toast";
 import { startupMessages } from "../shared/error-display";
-import type { UiText } from "@asterism/sdk/contracts";
-import { builtin } from "@asterism/builtin-api/contracts";
+import type { UiText } from "@asterism-app/sdk/contracts";
+import { builtin } from "@asterism-app/builtin-api/contracts";
 import { bindPublicProvider } from "../shared/public-modules";
 import { builtinPublicProvider, builtinPublicModules } from "../builtin-public";
 
@@ -75,7 +75,7 @@ export async function startApplication(root: Root, progress: (message: UiText, d
   new ViewRegistry(accepted);
   const releasePublic = bindPublicProvider("renderer", builtinPublicProvider, {
     ...builtinPublicModules,
-    "@asterism/builtin-api/renderer": builtinRendererAPI,
+    "@asterism-app/builtin-api/renderer": builtinRendererAPI,
   });
   signal.addEventListener("abort", releasePublic, { once: true });
   const rendererPlugins = await loadPluginRenderers(plugins, { available: [builtin.id], signal,

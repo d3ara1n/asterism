@@ -1,5 +1,5 @@
-import type { ResourceRef } from "@asterism/sdk/contracts";
-import { PluginApiError } from "@asterism/sdk/runtime";
+import type { ResourceRef } from "@asterism-app/sdk/contracts";
+import { PluginApiError } from "@asterism-app/sdk/runtime";
 
 type Kind = "task" | "action" | "model" | "prepare" | "event" | "call" | "tool";
 export interface RunningWork<T> { readonly signal: AbortSignal; readonly done: Promise<T>; cancel(): void }

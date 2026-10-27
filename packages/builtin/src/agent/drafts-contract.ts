@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { defineAction } from "@asterism/sdk/contracts";
-import { Agent, builtin, userInputPartsSchema, agentMessageSenderSchema, submissionIdSchema } from "@asterism/builtin-api/contracts";
+import { defineAction } from "@asterism-app/sdk/contracts";
+import { Agent, builtin, userInputPartsSchema, agentMessageSenderSchema, submissionIdSchema } from "@asterism-app/builtin-api/contracts";
 
 /** The draft box belongs to the resource's current data; UI actions are shared only within the built-in package. */
 export const draftModeSchema = z.enum(["none", "steer", "follow"]);

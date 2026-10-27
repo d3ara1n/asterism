@@ -1,7 +1,7 @@
 import type { z } from "zod";
 import { BookOpen, RefreshCw } from "lucide-react";
-import { toolRenderer, useI18n, type RendererModule, type ToolRenderProps } from "@asterism/sdk/renderer";
-import { ToolHeader } from "@asterism/ui/tool-header";
+import { toolRenderer, useI18n, type RendererModule, type ToolRenderProps } from "@asterism-app/sdk/renderer";
+import { ToolHeader } from "@asterism-app/ui/tool-header";
 import { CodeRows } from "../code-view";
 import { prepareCodeView } from "../shared/code-view";
 import { inputField, inputText } from "../shared/tool-preview";

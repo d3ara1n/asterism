@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { ModelCompletion } from "@asterism/sdk/contracts";
-import { ContextSummary } from "@asterism/builtin-api/contracts";
+import type { ModelCompletion } from "@asterism-app/sdk/contracts";
+import { ContextSummary } from "@asterism-app/builtin-api/contracts";
 import { sessionSnapshot } from "../../../../../src/plugins/records";
 import { nodeView } from "../../../../../src/session/view";
 import { agentSource, call, event, message, node, text, thinking } from "../../../../../src/session/test-nodes";

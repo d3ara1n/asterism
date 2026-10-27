@@ -1,5 +1,5 @@
-import type { ModelBlock, SessionRecord, SessionSnapshot } from "@asterism/sdk/contracts";
-import { Execution, AgentInputMessage } from "@asterism/builtin-api/contracts";
+import type { ModelBlock, SessionRecord, SessionSnapshot } from "@asterism-app/sdk/contracts";
+import { Execution, AgentInputMessage } from "@asterism-app/builtin-api/contracts";
 import type { AgentTurnState } from "./state.ts";
 
 /** Overlays this runtime's interruption position on the current path; context projection generates model input independently. */

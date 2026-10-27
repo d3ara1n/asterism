@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { defineTool } from "@asterism/sdk/contracts";
+import { defineTool } from "@asterism-app/sdk/contracts";
 import { builtin } from "./identity.ts";
 
 /** The sender retains the communication resource and agent name; recipient addressing is declared by the resource tool implementation. */

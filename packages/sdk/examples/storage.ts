@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { defineStorage } from "@asterism/sdk/runtime";
+import { defineStorage } from "@asterism-app/sdk/runtime";
 
 /**
  * Storage entry point: `"asterism": { "storage": "./src/storage.ts" }` in package.json points to this file.

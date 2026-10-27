@@ -1,5 +1,5 @@
 import { BookOpen, FileSearch, ListTree, Search } from "lucide-react";
-import { cardRenderer, creationEntry, toolRenderer, useI18n, type RendererModule } from "@asterism/sdk/renderer";
+import { cardRenderer, creationEntry, toolRenderer, useI18n, type RendererModule } from "@asterism-app/sdk/renderer";
 import { Manual, CreateManual, ManualView, ManualList, ManualRead, ManualFind, ManualGrep } from "./contract";
 import { manualMessages as messages } from "../messages/manual";
 import { filesystemMessages } from "../messages/filesystem";

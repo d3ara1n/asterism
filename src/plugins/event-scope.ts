@@ -1,5 +1,5 @@
-import type { EventContract, Source, PluginEvents } from "@asterism/sdk/contracts";
-import { PluginApiError } from "@asterism/sdk/runtime";
+import type { EventContract, Source, PluginEvents } from "@asterism-app/sdk/contracts";
+import { PluginApiError } from "@asterism-app/sdk/runtime";
 import { EventSubscriptionState } from "../shared/event-subscription.ts";
 import type { EventQueue } from "../shared/event-queue.ts";
 import { eventSubscriptionFailure, type EventBus, type EventPacket } from "./events.ts";

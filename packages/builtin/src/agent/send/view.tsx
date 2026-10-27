@@ -1,6 +1,6 @@
 import { Send } from "lucide-react";
-import { toolRenderer, useI18n, type ToolRenderProps } from "@asterism/sdk/renderer";
-import { ToolHeader } from "@asterism/ui/tool-header";
+import { toolRenderer, useI18n, type ToolRenderProps } from "@asterism-app/sdk/renderer";
+import { ToolHeader } from "@asterism-app/ui/tool-header";
 import { AgentSend, type SendResult } from "./contract";
 import { sendMessages as messages } from "../../messages/send";
 import { Markdown } from "../conversation/Markdown";

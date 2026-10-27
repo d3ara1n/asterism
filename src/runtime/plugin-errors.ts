@@ -1,5 +1,5 @@
-import type { UiText } from "@asterism/sdk/contracts";
-import type { PluginApiError } from "@asterism/sdk/runtime";
+import type { UiText } from "@asterism-app/sdk/contracts";
+import type { PluginApiError } from "@asterism-app/sdk/runtime";
 import { SessionError } from "../shared/session-timeline.ts";
 
 /** Preserve original plugin text when custom business reasons lack display descriptions instead of applying same-name host error codes. */

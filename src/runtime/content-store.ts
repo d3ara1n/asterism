@@ -3,8 +3,8 @@ import { mkdirSync, readdirSync, renameSync, rmSync } from "node:fs";
 import { open, type FileHandle } from "node:fs/promises";
 import { join } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
-import { belongsTo, contentRefSchema, type ContentRef, type ContentRange, type Json } from "@asterism/sdk/contracts";
-import { PluginApiError, type ContentReader, type ContentScope } from "@asterism/sdk/runtime";
+import { belongsTo, contentRefSchema, type ContentRef, type ContentRange, type Json } from "@asterism-app/sdk/contracts";
+import { PluginApiError, type ContentReader, type ContentScope } from "@asterism-app/sdk/runtime";
 import { contentChunkSize, contentReadLimit } from "../shared/content.ts";
 
 /** Host implementation parameters: 1 MiB per chunk, 256 MiB per content item, 1 GiB temporary total, 16 MiB per read. */

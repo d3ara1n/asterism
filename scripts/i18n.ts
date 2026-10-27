@@ -1,4 +1,4 @@
-import { localeSchema } from "@asterism/sdk/contracts";
+import { localeSchema } from "@asterism-app/sdk/contracts";
 import { parse } from "@formatjs/icu-messageformat-parser";
 import { execFileSync } from "node:child_process";
 import { readdirSync, readFileSync, writeFileSync, mkdirSync, mkdtempSync, rmSync, realpathSync } from "node:fs";

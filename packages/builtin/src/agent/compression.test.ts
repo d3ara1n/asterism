@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ContextSummary, Execution } from "@asterism/builtin-api/contracts";
+import { ContextSummary, Execution } from "@asterism-app/builtin-api/contracts";
 import { projectAgentContext, projectForAgent, contextMessages } from "./projection.ts";
 import { estimateContext, planCompression } from "./compression.ts";
 import { serializeForSummary, summaryPrompt } from "./compression-prompt.ts";

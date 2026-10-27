@@ -1,4 +1,4 @@
-import { defineMessages, pluginNamespace } from "@asterism/sdk/contracts";
+import { defineMessages, pluginNamespace } from "@asterism-app/sdk/contracts";
 
 export const modelCatalogMessages = pluginNamespace("asterism.host").messages("en", defineMessages({
   fetch: { id: "modelCatalog.fetch", defaultMessage: "Fetch parameters" },

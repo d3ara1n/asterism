@@ -3,7 +3,7 @@ import type { ResourceRegistry } from "../resources/registry.ts";
 import { createResourceId } from "../resources/id.ts";
 import type { FoldedObject } from "../session/fold.ts";
 import { SessionError, type SessionTree } from "../session/tree.ts";
-import type { Json } from "@asterism/sdk/contracts";
+import type { Json } from "@asterism-app/sdk/contracts";
 
 import { type WorkbenchCommand, type WorkbenchSnapshot, type Point, type Viewport } from "../shared/workbench.ts";
 import type { ContentStore, ContentLease, ContentAccess } from "./content-store.ts";

@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { belongsTo, jsonSchema, type CreationContract, type Json, type SessionDirectory } from "@asterism/sdk/contracts";
-import { defineModule, PluginApiError, type PluginContext, type PluginModule, type ObjectReader, type TopLevelToolContext } from "@asterism/sdk/runtime";
+import { belongsTo, jsonSchema, type CreationContract, type Json, type SessionDirectory } from "@asterism-app/sdk/contracts";
+import { defineModule, PluginApiError, type PluginContext, type PluginModule, type ObjectReader, type TopLevelToolContext } from "@asterism-app/sdk/runtime";
 
 export type { ManualSource } from "./manual.ts";
 

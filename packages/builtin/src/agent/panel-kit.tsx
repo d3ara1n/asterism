@@ -1,10 +1,10 @@
 import type { CSSProperties, ReactNode } from "react";
 import { motion } from "motion/react";
-import { useI18n, type I18n } from "@asterism/sdk/renderer";
-import type { AgentRequestContextData } from "@asterism/builtin-api/contracts";
-import { Badge } from "@asterism/ui/ui/badge";
-import { cn } from "@asterism/ui/utils";
-import { formatCount } from "@asterism/ui/format-count";
+import { useI18n, type I18n } from "@asterism-app/sdk/renderer";
+import type { AgentRequestContextData } from "@asterism-app/builtin-api/contracts";
+import { Badge } from "@asterism-app/ui/ui/badge";
+import { cn } from "@asterism-app/ui/utils";
+import { formatCount } from "@asterism-app/ui/format-count";
 import { contextMessages as messages } from "../messages/context";
 
 /** Layout and chart components shared by agent auxiliary panels. */

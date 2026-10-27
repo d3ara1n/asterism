@@ -1,5 +1,5 @@
-import type { ContentRef, ModelItem, ModelInputPart } from "@asterism/sdk/contracts";
-import type { ContentScope, ModelServices } from "@asterism/sdk/runtime";
+import type { ContentRef, ModelItem, ModelInputPart } from "@asterism-app/sdk/contracts";
+import type { ContentScope, ModelServices } from "@asterism-app/sdk/runtime";
 
 export function inputTypeExamples(ref: ContentRef): ModelInputPart[] {
   const valid: ModelInputPart = { kind: "file", file: ref, mediaType: "image/png" };

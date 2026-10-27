@@ -1,5 +1,5 @@
 import type { SessionNode } from "../shared/session.ts";
-import type { Json } from "@asterism/sdk/contracts";
+import type { Json } from "@asterism-app/sdk/contracts";
 import { ResourceCreated } from "../shared/workbench-records.ts";
 
 /** Workbench objects result from folding event nodes along paths and appear or disappear with paths during backtracking. */

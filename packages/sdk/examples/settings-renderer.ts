@@ -1,5 +1,5 @@
 import { createElement, useState } from "react";
-import { defineRendererPlugin, useRendererCalls, useRendererConfiguration, useRendererSettings } from "@asterism/sdk/renderer";
+import { defineRendererPlugin, useRendererCalls, useRendererConfiguration, useRendererSettings } from "@asterism-app/sdk/renderer";
 import { ReadLabel, Settings, settingsPlugin } from "./settings-contract.ts";
 
 function SettingsPage() {

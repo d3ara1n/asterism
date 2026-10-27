@@ -1,14 +1,14 @@
 import type { z } from "zod";
-import type { Json, ToolModelOutput } from "@asterism/sdk/contracts";
-import type { ToolInvocationInfo } from "@asterism/sdk/contracts";
-import type { ToolContract } from "@asterism/sdk/contracts";
-import type { ContractReference } from "@asterism/sdk/contracts";
+import type { Json, ToolModelOutput } from "@asterism-app/sdk/contracts";
+import type { ToolInvocationInfo } from "@asterism-app/sdk/contracts";
+import type { ToolContract } from "@asterism-app/sdk/contracts";
+import type { ContractReference } from "@asterism-app/sdk/contracts";
 import type { FoldedObject } from "../session/fold.ts";
 import type { ContentLease } from "../runtime/content-store.ts";
-import type { ToolCaller } from "@asterism/sdk/runtime";
+import type { ToolCaller } from "@asterism-app/sdk/runtime";
 
-export type { CallResult } from "@asterism/sdk/runtime";
-import type { CallResult } from "@asterism/sdk/runtime";
+export type { CallResult } from "@asterism-app/sdk/runtime";
+import type { CallResult } from "@asterism-app/sdk/runtime";
 export type PreparedResult = CallResult & ToolInvocationInfo;
 export interface Invocation extends ToolInvocationInfo {
   effect: "read" | "write";

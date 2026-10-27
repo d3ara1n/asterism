@@ -1,4 +1,4 @@
-import type { CardAppearance } from "@asterism/sdk/contracts";
+import type { CardAppearance } from "@asterism-app/sdk/contracts";
 
 /** Geometry declarations for built-in resources, shared by backend placement and frontend cards. */
 export const agentCard = { width: 560, height: 640, minWidth: 480, minHeight: 480 } satisfies CardAppearance;
