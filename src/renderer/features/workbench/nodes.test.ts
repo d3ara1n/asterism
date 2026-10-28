@@ -14,7 +14,7 @@ const snapshot = () => workbenchSnapshotSchema.parse({
   id: "00000000-0000-4000-8000-000000000001", title: "Test",
   objects: [{ id: "a", kind: "test", title: "Card", presentation: present(contract, null), receivesLinks: false }],
   views: [{ objectId: "a", position: { x: 10, y: 20 }, hidden: false, collapsed: false, size: { width: 800, height: 900 } }],
-  viewport: { x: 0, y: 0, zoom: 1 }, links: [],
+  viewport: { x: 0, y: 0, zoom: 1 }, focus: { objectId: null, width: null }, links: [],
 });
 const onView = () => {};
 

@@ -7,7 +7,7 @@ import {
 } from "@asterism-app/sdk/contracts";
 import { jsonSchema } from "./model.ts";
 import { modelExpressionSchema, thinkingSchema } from "./configuration.ts";
-import { pointSchema, workbenchCommands, workbenchSnapshotSchema, type WorkbenchSnapshot } from "./workbench.ts";
+import { pointSchema, workbenchCommands, workbenchSnapshotSchema, type WorkbenchLayout, type WorkbenchSnapshot } from "./workbench.ts";
 import { templateCommands, templateObjectSummarySchema } from "./templates.ts";
 
 const id = z.string().min(1).max(160);
@@ -100,7 +100,7 @@ export type SessionResult = z.infer<typeof sessionResultSchema>;
 export type SessionChanged =
   | { kind: "session.opened"; sessionId: string; data: SessionData }
   | { kind: "session.changed"; sessionId: string; nodes: SessionNode[]; cursor: string | null; title: string;
-      objects: WorkbenchSnapshot["objects"]; workbench?: WorkbenchSnapshot; layout?: Pick<WorkbenchSnapshot, "views" | "viewport"> }
+      objects: WorkbenchSnapshot["objects"]; workbench?: WorkbenchSnapshot; layout?: WorkbenchLayout }
   /** live is incremental relative to the last delivery; null means streaming text is unchanged. */
   | { kind: "session.progress"; sessionId: string; busyObjectIds: string[]; timelineBusy: boolean; live: LivePatch | null };
 export interface SessionBridge {

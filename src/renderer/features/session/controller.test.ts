@@ -6,7 +6,7 @@ import { SessionController } from "./controller.ts";
 
 function data(): SessionData {
   return { sessionId: "s", title: "Session", cursor: null, nodes: [],
-    workbench: { id: "s", title: "Session", objects: [], links: [], views: [], viewport: { x: 0, y: 0, zoom: 1 } },
+    workbench: { id: "s", title: "Session", objects: [], links: [], views: [], viewport: { x: 0, y: 0, zoom: 1 }, focus: { objectId: null, width: null } },
     progress: { busyObjectIds: [], timelineBusy: false, live: [] } };
 }
 const accepted: SessionResult = { ok: true, reply: { kind: "accepted", sessionId: "s" } };

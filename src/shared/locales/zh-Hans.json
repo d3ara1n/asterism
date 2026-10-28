@@ -67,6 +67,7 @@
   "objects.returnToCard": "返回卡片",
   "objects.focusedInIsland": "内容已在聚焦浮岛中打开。",
   "objects.focusIsland": "聚焦",
+  "objects.focusActions": "聚焦浮岛操作",
   "modelCatalog.fetch": "获取参数",
   "modelCatalog.fetching": "正在获取…",
   "modelCatalog.hint": "从 models.dev 填入参数与 API 参考价格，覆盖当前表单值。请检查并保存修改。",

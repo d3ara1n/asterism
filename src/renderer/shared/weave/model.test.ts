@@ -37,6 +37,11 @@ describe("follow", () => {
     expect(follow(spans, 2, 900, 0)).toBe(312);
     expect(follow(spans, 0, 900, 312)).toBe(0);
   });
+  it("aligns the leading edge of an island wider than the viewport", () => {
+    // b spans 406..1606 and cannot fit; its header stays visible instead of its trailing edge.
+    const wide = layout([slot("a", 400), slot("b", 1200), slot("c", 400)], 900, 6).spans;
+    expect(follow(wide, 1, 900, 0)).toBe(406);
+  });
 });
 
 describe("open and close", () => {

@@ -8,7 +8,7 @@ import { contentSchemaSql } from "./content-store.ts";
 import { templateSchemaSql } from "./templates.ts";
 import { sqliteStorage } from "../storage/migrations.ts";
 
-export const workspaceDatabaseVersion = 27;
+export const workspaceDatabaseVersion = 28;
 
 /** Business database opening consumes prepared formats only; pre-window data preparation handles upgrades. */
 export class DatabaseVersionError extends Error {
@@ -50,6 +50,7 @@ function initializeWorkspace(db: DatabaseSync): void {
         PRIMARY KEY(session_id, object_id)
       );
       CREATE TABLE viewports (session_id TEXT PRIMARY KEY REFERENCES sessions(id) ON DELETE CASCADE, x REAL NOT NULL, y REAL NOT NULL, zoom REAL NOT NULL);
+      ${focusTableSql}
       -- Session-level submission deduplication for home sends; agent-internal submission deduplication belongs to agent resource state.
       CREATE TABLE session_submissions (
         id TEXT PRIMARY KEY,
@@ -67,10 +68,26 @@ function initializeWorkspace(db: DatabaseSync): void {
   db.prepare("INSERT INTO workspace VALUES (?, ?)").run(randomUUID(), "Personal workspace");
 }
 
+/** Session focus island state; a null object_id means no object is focused while the width remains; a null width shares the screen. */
+const focusTableSql = `
+      CREATE TABLE workbench_focus (
+        session_id TEXT PRIMARY KEY REFERENCES sessions(id) ON DELETE CASCADE,
+        object_id TEXT,
+        width REAL CHECK (width IS NULL OR width > 0)
+      ) STRICT;`;
+
 /** Retain every released migration step permanently; key 25 means 25 → 26. Only `openDatabase` creates new databases. */
 export function workspaceStorage(root: string) {
   return sqliteStorage({ id: "workspace", file: join(root, applicationStorage.databaseDirectory, applicationStorage.databaseFile),
-    version: workspaceDatabaseVersion, migrations: {} });
+    version: workspaceDatabaseVersion, migrations: {
+      // Released steps keep their own SQL instead of referencing current schema constants.
+      27: db => db.exec(`
+        CREATE TABLE workbench_focus (
+          session_id TEXT PRIMARY KEY REFERENCES sessions(id) ON DELETE CASCADE,
+          object_id TEXT,
+          width REAL CHECK (width IS NULL OR width > 0)
+        ) STRICT;`),
+    } });
 }
 /** Startup cleanup hard-deletes archived sessions past retention, cascades associated rows through foreign keys, and leaves orphan content for the subsequently constructed store. */
 export function collectExpiredSessions(db: DatabaseSync, now = Date.now()): number {

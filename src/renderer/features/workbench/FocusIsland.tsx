@@ -1,18 +1,21 @@
 import { RendererNavigationProvider } from "@asterism-app/sdk/renderer";
 import { AnimatePresence, motion } from "motion/react";
-import { PanelLeftClose } from "lucide-react";
-import { useMemo } from "react";
+import { MoreHorizontal, PanelLeftClose } from "lucide-react";
+import { useEffect, useMemo } from "react";
 
 import type { WorkbenchObject } from "../../../shared/workbench";
 import { objectsMessages } from "../../messages/objects";
 import { RendererCatalogProvider } from "../../modules/object-context";
 import { useI18n } from "../../shared/i18n";
 import { fadeTransition } from "../../shared/weave/motion";
+import { Button } from "@asterism-app/ui/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@asterism-app/ui/ui/dropdown-menu";
 import { IconButton } from "@asterism-app/ui/ui/icon-button";
 import { useWorkbench, WorkbenchScope, type WorkbenchStore } from "./context";
-import { exitFocus } from "./focus";
+import { claimFocusRequest, exitFocus, focusIslandElement, focusMediumWidth, setFocusWidth } from "./focus";
 import { useObjectView } from "./object-view";
 import { ObjectSurface } from "./ObjectSurface";
+import { SizeMenu } from "./SizeMenu";
 
 /**
  * Focus island content: the same object view as the card, remounted in the island container.
@@ -43,12 +46,26 @@ function FocusedContent({ objectId }: { objectId: string }) {
 
 function FocusedObject({ object }: { object: WorkbenchObject }) {
   const i18n = useI18n();
-  const { session } = useWorkbench();
+  const { session, run } = useWorkbench();
   const content = useObjectView(object);
+  // Only a focus the user just requested moves keyboard focus; focus restored from the session leaves it in place.
+  useEffect(() => {
+    if (claimFocusRequest(object.id)) requestAnimationFrame(() => focusIslandElement()?.focus({ preventScroll: true }));
+  }, [object.id]);
   return <ObjectSurface icon={content.icon} kind={content.kind} title={object.title} actions={content.actions} panels={content.panels}
-    controls={<IconButton size="icon-xs" label={i18n.text(objectsMessages.returnToCard)} onClick={() => exitFocus(session.id, object.id)}>
-      <PanelLeftClose />
-    </IconButton>}>
+    controls={<>
+      <DropdownMenu><DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon-xs" aria-label={i18n.formatMessage(objectsMessages.focusActions)}><MoreHorizontal /></Button>
+      </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <SizeMenu onScale={scale => { void setFocusWidth(run, session.id, Math.round(focusMediumWidth * scale)); }}
+            onRestore={() => { void setFocusWidth(run, session.id, null); }} />
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <IconButton size="icon-xs" label={i18n.text(objectsMessages.returnToCard)} onClick={() => { void exitFocus(run, session.id, object.id); }}>
+        <PanelLeftClose />
+      </IconButton>
+    </>}>
     {content.body}
   </ObjectSurface>;
 }

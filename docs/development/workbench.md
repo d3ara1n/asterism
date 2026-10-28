@@ -30,7 +30,7 @@ Initial reads can show a loading state. Updates retain existing content and comp
 
 Current values follow backend processing order. Subscriptions establish change observation before reading. Commands return independently of view synchronization.
 
-View subscriptions and projections follow session visibility. User-created drafts, focus identity, and selected per-item view state follow object presence in frontend memory. Leaving the current projection releases retained object state. Restart does not restore those memory-only values.
+View subscriptions and projections follow session visibility. User-created drafts and selected per-item view state follow object presence in frontend memory. Leaving the current projection releases retained object state. Restart does not restore those memory-only values.
 
 ## Session notifications
 
@@ -61,6 +61,10 @@ Card panels show supplemental object information within the same card width. Wid
 The card shell owns panel focus, switching, closing, and Escape handling. Independent popovers handle Escape first. Closing restores the opening control when available.
 
 Object focus moves content into a leading island beside the workbench. The canvas retains a placeholder card and its links. Only one object is focused per session. Focus changes presentation and may remount content, but preserves object-retained state and backend work.
+
+The focused object and the island width are session layout state, saved beside card views and the canvas viewport and outside history. Reopening a session or restarting restores both. The projection shows no focus once the focused object leaves the current projection, so branch selection or removal ends focus without a separate release step. Ending focus keeps the width for the next entry.
+
+Without a chosen width, the focus island shares the screen with the main view and the pair fills the window. Size presets set a fixed width that holds regardless of the window. A fixed width can exceed the window; the screen strip then scrolls horizontally and follows the focused island. Restoring the default size returns to the shared layout.
 
 ## Links and workbench panels
 

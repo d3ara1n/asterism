@@ -11,7 +11,7 @@ const snapshot = (size: CardSize | null): WorkbenchSnapshot => workbenchSnapshot
   id: "00000000-0000-4000-8000-000000000001", title: "Test",
   objects: [{ id: "a", kind: "test", title: "Card", presentation: { contract: { id: "test" }, data: null }, receivesLinks: false }],
   views: [{ objectId: "a", position: { x: 0, y: 0 }, hidden: false, collapsed: false, size }],
-  viewport: { x: 0, y: 0, zoom: 1 }, links: [],
+  viewport: { x: 0, y: 0, zoom: 1 }, focus: { objectId: null, width: null }, links: [],
 });
 
 describe("Size save intents", () => {

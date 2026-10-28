@@ -9,6 +9,7 @@ export const objectsMessages = pluginNamespace("asterism.host").messages("en", d
   returnToCard: { id: "objects.returnToCard", defaultMessage: "Return to card" },
   focusedInIsland: { id: "objects.focusedInIsland", defaultMessage: "This content is open in the focus island." },
   focusIsland: { id: "objects.focusIsland", defaultMessage: "Focus" },
+  focusActions: { id: "objects.focusActions", defaultMessage: "Focus island actions" },
   closeAuxiliaryPanel: { id: "objects.closeAuxiliaryPanel", defaultMessage: "Close panel" },
   objectActions: {
     id: "objectActions",

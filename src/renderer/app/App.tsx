@@ -13,7 +13,7 @@ import { Workbench, type WorkbenchHandle } from "../features/workbench/Workbench
 import { LayoutMenu } from "../features/workbench/LayoutMenu";
 import { WorkbenchStore } from "../features/workbench/context";
 import { FocusIsland } from "../features/workbench/FocusIsland";
-import { focusIslandId, useFocusedObject } from "../features/workbench/focus";
+import { focusIslandId, focusIslandWidth } from "../features/workbench/focus";
 import { Sidebar } from "./Sidebar";
 
 import { HomePage, type StartInput } from "../features/home/HomePage";
@@ -86,7 +86,7 @@ export function App({ controller }: { controller: ApplicationController }) {
   const sessionBlocked = !!sessionState && (sessionState.navigating || sessionState.status !== "ready");
   const phase = workbenchPhase(state.status, sessionState);
   const writable = ready && !sessionBlocked && !!session;
-  const focusedObjectId = useFocusedObject(view.kind === "conversation" ? view.sessionId : null);
+  const focusedObjectId = view.kind === "conversation" ? session?.focus.objectId ?? null : null;
   const inSettings = page === "settings";
   const mainTitle = view.kind === "home" ? i18n.formatMessage(commonMessages.home)
     : session?.title ?? snapshot?.sessions.find(item => item.id === view.sessionId)?.title ?? i18n.formatMessage(commonMessages.conversation);
@@ -225,7 +225,8 @@ export function App({ controller }: { controller: ApplicationController }) {
   // Focus island: a controlled leading island between the sidebar and workbench; its content switches with the session, and it exits when returning home.
   const focusTitle = focusedObjectId ? session?.objects.find(object => object.id === focusedObjectId)?.title : undefined;
   const focus: IslandSpec | null = view.kind === "conversation" && focusedObjectId ? {
-    id: focusIslandId, label: focusTitle ?? i18n.formatMessage(objectsMessages.focusIsland), width: { min: 480, grow: 1.5 },
+    id: focusIslandId, label: focusTitle ?? i18n.formatMessage(objectsMessages.focusIsland),
+    width: focusIslandWidth(session?.focus.width ?? null),
     render: () => <FocusIsland store={workbenchStore} sessionId={view.sessionId} objectId={focusedObjectId} onHome={goHome} />,
   } : null;
   const main: IslandSpec = {

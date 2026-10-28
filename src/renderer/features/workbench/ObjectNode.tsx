@@ -9,7 +9,7 @@ import { Button } from "@asterism-app/ui/ui/button";
 import { IconButton } from "@asterism-app/ui/ui/icon-button";
 import { defaultConnectionPorts, type ConnectionPort } from "./connections";
 import { useWorkbench } from "./context";
-import { enterFocus, exitFocus, useFocusedObject } from "./focus";
+import { enterFocus, exitFocus } from "./focus";
 import { minimumCardHeight, minimumCardWidth } from "./layout";
 import { ObjectActions } from "./ObjectActions";
 import { ObjectCard, type ViewPatch } from "./ObjectCard";
@@ -61,11 +61,11 @@ const ObjectNodeContent = memo(function ObjectNodeContent({ id, data, selected }
 }) {
   const i18n = useI18n();
   const { object, collapsed, onView } = data;
-  const { session } = useWorkbench();
-  const focused = useFocusedObject(session.id) === object.id;
+  const { session, run } = useWorkbench();
+  const focused = session.focus.objectId === object.id;
   const content = useObjectView(object);
   const onObjectView = useCallback((patch: ViewPatch) => onView(object.id, patch), [onView, object.id]);
-  const toggleFocus = () => focused ? exitFocus(session.id, object.id) : enterFocus(session.id, object.id);
+  const toggleFocus = () => { void (focused ? exitFocus(run, session.id, object.id) : enterFocus(run, session.id, object.id)); };
   const focusLabel = i18n.text(focused ? objectsMessages.returnToCard : objectsMessages.openInIsland);
   return <>
     <ObjectCard title={object.title} collapsed={collapsed} expandedHeight={data.expandedHeight} resizing={!!data.resizing} selected={!!selected} onView={onObjectView}
@@ -78,7 +78,7 @@ const ObjectNodeContent = memo(function ObjectNodeContent({ id, data, selected }
       {focused
         ? <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
           <p className="type-caption">{i18n.text(objectsMessages.focusedInIsland)}</p>
-          <Button variant="outline" size="sm" onClick={() => exitFocus(session.id, object.id)}><PanelLeftClose />{i18n.text(objectsMessages.returnToCard)}</Button>
+          <Button variant="outline" size="sm" onClick={() => { void exitFocus(run, session.id, object.id); }}><PanelLeftClose />{i18n.text(objectsMessages.returnToCard)}</Button>
         </div>
         : content.body}
     </ObjectCard>

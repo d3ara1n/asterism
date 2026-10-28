@@ -1,7 +1,7 @@
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuGroup, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent, DropdownMenuItem, DropdownMenuSeparator } from "@asterism-app/ui/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuSeparator } from "@asterism-app/ui/ui/dropdown-menu";
 
 import { Button } from "@asterism-app/ui/ui/button";
-import { MoreHorizontal, PenLine, Scaling, RotateCcw, Trash2 } from "lucide-react";
+import { MoreHorizontal, PenLine, Trash2 } from "lucide-react";
 
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@asterism-app/ui/ui/alert-dialog";
 
@@ -19,6 +19,7 @@ import { useDisposalWarnings } from "../session/disposal";
 import { useWorkbench } from "./context";
 import type { ViewPatch } from "./ObjectCard";
 import { RenameObject } from "./RenameObject";
+import { SizeMenu } from "./SizeMenu";
 import { cardSize } from "./sizing";
 
 /** The card menu centralizes name, view dimensions, and object removal. */
@@ -41,23 +42,10 @@ export function ObjectActions({ object, appearance, onView }: {
         </DropdownMenuItem>
       </DropdownMenuGroup>
       <DropdownMenuSeparator />
-      <DropdownMenuSub><DropdownMenuSubTrigger><Scaling />{i18n.formatMessage(objectsMessages.cardSize)}</DropdownMenuSubTrigger>
-        <DropdownMenuSubContent>
-          <DropdownMenuGroup>
-            {[
-              { label: objectsMessages.cardSizeSmall, scale: 0.75 },
-              { label: objectsMessages.cardSizeMedium, scale: 1 },
-              { label: objectsMessages.cardSizeLarge, scale: 1.5 },
-            ].map(({ label, scale }) =>
-              <DropdownMenuItem key={scale} onSelect={() => onView({ size: scale === 1 ? null : cardSize(appearance, {
-                width: Math.round(defaultSize.width * scale),
-                height: Math.round(defaultSize.height * scale),
-              }) })}>{i18n.text(label)}</DropdownMenuItem>)}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={() => onView({ size: null })}><RotateCcw />{i18n.formatMessage(objectsMessages.restoreCardSize)}</DropdownMenuItem>
-          </DropdownMenuGroup>
-        </DropdownMenuSubContent>
-      </DropdownMenuSub>
+      <SizeMenu onRestore={() => onView({ size: null })} onScale={scale => onView({ size: scale === 1 ? null : cardSize(appearance, {
+        width: Math.round(defaultSize.width * scale),
+        height: Math.round(defaultSize.height * scale),
+      }) })} />
       <DropdownMenuSeparator />
       <DropdownMenuGroup><DropdownMenuItem disabled={!ready} onSelect={() => setDialog("remove")}><Trash2 />{i18n.formatMessage(objectsMessages.removeObject, { title: object.title })}…</DropdownMenuItem></DropdownMenuGroup>
     </DropdownMenuContent>

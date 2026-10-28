@@ -54,6 +54,7 @@ export function totalWidth(spans: Span[]): number {
 
 /**
  * Viewport follows focus (used only during overflow): remain still if the focused island is fully visible; otherwise align to the side extending out of bounds.
+ * An island wider than the viewport aligns its leading edge, keeping its header visible.
  * Clamp the result to the strip's valid range; offset is 0 when the strip is narrower than the viewport.
  */
 export function follow(spans: Span[], focusIndex: number, viewport: number, offset: number): number {
@@ -61,7 +62,7 @@ export function follow(spans: Span[], focusIndex: number, viewport: number, offs
   const max = Math.max(0, totalWidth(spans) - viewport);
   let next = offset;
   if (target) {
-    if (target.left < next) next = target.left;
+    if (target.left < next || target.width > viewport) next = target.left;
     else if (target.left + target.width > next + viewport) next = target.left + target.width - viewport;
   }
   return Math.min(Math.max(next, 0), max);

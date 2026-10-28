@@ -3,7 +3,7 @@ import type { RendererRetained } from "@asterism-app/sdk/renderer";
 type Entry = { value: unknown; release?: (value: never) => void | Promise<void> };
 
 /**
- * Object retention: user-created frontend state that cannot be reconstructed from projections (drafts, focus identity, etc.) is registered per object,
+ * Object retention: user-created frontend state that cannot be reconstructed from projections (drafts, etc.) is registered per object,
  * independently of session view mounting and release; call release when the object leaves the current session projection or is explicitly discarded.
  * Exists only in application memory and is not restored after restart.
  */

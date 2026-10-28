@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { focusedObject, setFocusedObject } from "../workbench/focus.ts";
-import { ObjectRetention, objectRetention } from "./retention.ts";
+import { ObjectRetention } from "./retention.ts";
 
 describe("Object retention", () => {
   // The same object and key return the same instance; when an object leaves the current projection, release only its entries and recreate them afterward.
@@ -28,15 +27,5 @@ describe("Object retention", () => {
       expect(release).toHaveBeenCalledWith(2);
       expect(error).toHaveBeenCalledOnce();
     } finally { error.mockRestore(); }
-  });
-
-  // Object focus: end focus when the object leaves the current projection; after focusing another object, the old object's departure does not affect the new focus.
-  it("ends focus identity when the object leaves the projection", () => {
-    setFocusedObject("focus-session", "a");
-    setFocusedObject("focus-session", "b");
-    objectRetention.retainOnly("focus-session", new Set(["b"]));
-    expect(focusedObject("focus-session")).toBe("b");
-    objectRetention.retainOnly("focus-session", new Set());
-    expect(focusedObject("focus-session")).toBeNull();
   });
 });
