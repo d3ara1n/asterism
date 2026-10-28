@@ -11,7 +11,6 @@ import { defaultConnectionPorts, type ConnectionPort } from "./connections";
 import { useWorkbench } from "./context";
 import { enterFocus, exitFocus, useFocusedObject } from "./focus";
 import { minimumCardHeight, minimumCardWidth } from "./layout";
-import { useModuleViews } from "../../modules/views";
 import { ObjectActions } from "./ObjectActions";
 import { ObjectCard, type ViewPatch } from "./ObjectCard";
 import { useObjectView } from "./object-view";
@@ -41,14 +40,12 @@ export const ObjectNode = memo(function ObjectNode({ id, data, selected }: NodeP
   const portLayout = ports.map(port => `${port.id}:${port.side}:${port.offset}`).join("|");
   // After endpoint count or position changes, refresh connection anchors using the canvas's own measurement mechanism.
   useEffect(() => { updateNodeInternals(id); }, [id, portLayout, updateNodeInternals]);
-  const registry = useModuleViews();
-  const receivesLinks = registry.resource(data.object.kind).receivesLinks === true;
   return <>
-    {/* Loose mode determines direction from the drag origin; the resource statically declares the receiving end. */}
+    {/* Loose mode determines direction from the drag origin; the backend projection identifies valid receivers. */}
     {ports.map(port => <Handle key={port.id} id={port.id} type="source"
       position={{ left: Position.Left, right: Position.Right, top: Position.Top, bottom: Position.Bottom }[port.side]}
       style={port.side === "left" || port.side === "right" ? { top: `${port.offset * 100}%` } : { left: `${port.offset * 100}%` }}
-      isConnectableEnd={receivesLinks} />)}
+      isConnectableEnd={data.object.receivesLinks} />)}
     <ObjectNodeContent id={id} data={data} selected={selected} />
   </>;
 });

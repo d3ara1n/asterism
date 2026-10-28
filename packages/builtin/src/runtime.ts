@@ -52,11 +52,11 @@ export function createBuiltin(options: { application: BuiltinApplication; manual
         defineAgentCreation({ id: CreateManual.id, creation: CreateManual,
           description: "Open the Asterism manual for software use and plugin development. Provides list, find, grep, and read over application guides, public package examples, and documentation exposed by loaded plugins.",
           guidelines: [] }),
-        defineAgentCreation({ id: builtin.name("terminal.create"), creation: CreateTerminal,
+        defineAgentCreation({ id: CreateTerminal.id, creation: CreateTerminal,
           description: "Create a shared interactive terminal. Its shell and screen remain available between tool calls and while viewing other sessions.",
           guidelines: ["The terminal runs as the current OS user. Input, screen observation and waiting for the shell are separate resource tools.",
             "Removing the resource ends its shell and child processes. Application restart retains the resource configuration."] }),
-        defineAgentCreation({ id: builtin.name("agent.create"), creation: CreateAgent,
+        defineAgentCreation({ id: CreateAgent.id, creation: CreateAgent,
           description: "Create an Agent with a selected agent configuration, optional model/thinking overrides, and initial resource links.",
           inputSchema: agentCreateSchema.extend({
             resources: z.array(z.string().min(1)).optional()
@@ -71,7 +71,7 @@ export function createBuiltin(options: { application: BuiltinApplication; manual
             "resource_list returns your linked resource IDs.",
             "Creation and all initial links are committed together. The new Agent uses its own configuration's tool policy.",
           ] }),
-        defineAgentCreation({ id: builtin.name("note.create"), creation: CreateNote,
+        defineAgentCreation({ id: CreateNote.id, creation: CreateNote,
           description: "Create a note with a title and optional initial text.",
           guidelines: ["Notes store their current text."] }),
       ] };

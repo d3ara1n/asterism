@@ -84,8 +84,6 @@ export interface ResourceDescription {
   icon: ReactNode;
   /** Default card dimensions available before creation, sharing a declaration with the card renderer. */
   card?: CardAppearance;
-  /** This resource can be the endpoint of a directed link, matching backend links.receive. */
-  receivesLinks?: boolean;
 }
 export interface CardView extends CardAppearance {
   body: ReactNode;

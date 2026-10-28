@@ -4,7 +4,7 @@ import { Bot } from "lucide-react";
 import type { z } from "zod";
 
 import { commonMessages } from "../messages/common";
-import { builtin, CreateAgent } from "@asterism-app/builtin-api/contracts";
+import { Agent, builtin, CreateAgent } from "@asterism-app/builtin-api/contracts";
 import { agentUI } from "@asterism-app/builtin-api/renderer";
 import { Conversation, ConversationActions } from "./conversation/Conversation";
 import { AgentInput } from "./creation";
@@ -20,7 +20,7 @@ import { waitToolRenderer } from "./wait/view";
 import { agentCard as appearance } from "../shared/card-appearance.ts";
 
 export default {
-  resources: [{ kind: "asterism.builtin/agent", label: commonMessages.kindAgent, icon: <Bot className="size-4" />, card: appearance, receivesLinks: true }],
+  resources: [{ kind: Agent.kind, label: commonMessages.kindAgent, icon: <Bot className="size-4" />, card: appearance }],
   cards: [cardRenderer(AgentView, {
     ...appearance,
     Body: AgentBody,

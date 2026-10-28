@@ -36,7 +36,7 @@ export function AccessPanel() {
   const [selectedReceiver, setSelectedReceiver] = useState("");
   const [selectedResource, setSelectedResource] = useState("");
   const [query, setQuery] = useState("");
-  const receivers = session.objects.filter(object => registry.resource(object.kind).receivesLinks === true);
+  const receivers = session.objects.filter(object => object.receivesLinks);
   const byReceiver = mode === "receiver";
   const choices = byReceiver ? receivers : session.objects;
   const selectedId = byReceiver ? selectedReceiver : selectedResource;

@@ -35,7 +35,7 @@ const command = (objectId: string) => ({ type: "resource.command" as const, sess
 describe("Current session data", () => {
   it("resource changes replace only the corresponding object, and action receipts do not initiate reads", async () => {
     const f = fixture(), initial = data();
-    const object = (id: string) => ({ id, kind: "test/resource", title: id, presentation: { contract: { id: "test/view" }, data: { mode: "none" } } });
+    const object = (id: string) => ({ id, kind: "test/resource", title: id, presentation: { contract: { id: "test/view" }, data: { mode: "none" } }, receivesLinks: false });
     initial.workbench.objects = [object("a"), object("b")];
     const disconnect = f.open(initial);
     const before = f.controller.getSnapshot().data!;

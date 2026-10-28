@@ -1,5 +1,6 @@
 import { Plus, X } from "lucide-react";
 import { useId, useState, type ReactNode } from "react";
+import { defaultAgentPreset } from "@asterism-app/builtin-api/contracts";
 
 import type { AgentConfiguration, AgentOverrides, ConfigurationSnapshot } from "../../../shared/configuration";
 import { agentsMessages } from "../../messages/agents";
@@ -25,7 +26,7 @@ import { useConfigurationAction, useSettingsConfiguration } from "./state";
 type Base = Omit<AgentConfiguration, "id" | "builtin">;
 const NONE = "__none";
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
-const baseOf = (snapshot: ConfigurationSnapshot, agent?: AgentConfiguration): Base => snapshot.defaults.agents[agent?.builtin ? agent.id : "worker"]!;
+const baseOf = (snapshot: ConfigurationSnapshot, agent?: AgentConfiguration): Base => snapshot.defaults.agents[agent?.builtin ? agent.id : defaultAgentPreset]!;
 
 /** Override normalization: remove blank text and fields matching built-in values; compare tool allow/exclude lists as a pair. */
 function normalize(draft: AgentOverrides, base: Base): AgentOverrides {
@@ -80,7 +81,7 @@ function AgentRow({ agent, snapshot, selected, onOpen }: {
   };
   const role = agent.modelRole === null ? null : snapshot.roles.find(item => item.id === agent.modelRole);
   return <ListRow selected={selected} inactive={!agent.enabled} onOpen={onOpen}
-    title={<>{agent.id}{agent.id === "worker" && <Badge variant="secondary">{i18n.formatMessage(agentsMessages.default)}</Badge>}</>}
+    title={<>{agent.id}{agent.id === defaultAgentPreset && <Badge variant="secondary">{i18n.formatMessage(agentsMessages.default)}</Badge>}</>}
     description={agent.description}
     actions={<>
       {agent.modelRole !== null && !role

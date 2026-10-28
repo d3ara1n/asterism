@@ -4,7 +4,7 @@ import type { z } from "zod";
 import type { Json, UiText } from "@asterism-app/sdk/contracts";
 import { toolRenderer, type ToolRenderProps, type ToolRenderer, type ToolView } from "@asterism-app/sdk/renderer";
 
-import { ResourceCall, ResourceInspectResult, ResourceListResult } from "../../../tools/core";
+import { ResourceCall, ResourceInspect, ResourceInspectResult, ResourceList, ResourceListResult } from "../../../tools/core";
 import { toolsMessages } from "../../messages/tools";
 import { JsonView, useModuleViews } from "../../modules/views";
 import type { ViewRegistry } from "../../modules/registry";
@@ -99,9 +99,9 @@ const builtinViews = new Map<string, {
   preparation: UiText;
   render(props: ToolRenderProps, registry: ViewRegistry): ResolvedToolView;
 }>([
-  ["resource_list", { preparation: toolsMessages.toolPreparingList, render: props => fixed(list, props, toolsMessages.toolResourceList, <Boxes className="size-3.5" />) }],
-  ["resource_inspect", { preparation: toolsMessages.toolPreparingInspect, render: props => fixed(inspect, props, toolsMessages.toolResourceInspect, <ScanSearch className="size-3.5" />) }],
-  ["resource_call", { preparation: toolsMessages.toolPreparing, render(props, registry) {
+  [ResourceList.name, { preparation: toolsMessages.toolPreparingList, render: props => fixed(list, props, toolsMessages.toolResourceList, <Boxes className="size-3.5" />) }],
+  [ResourceInspect.name, { preparation: toolsMessages.toolPreparingInspect, render: props => fixed(inspect, props, toolsMessages.toolResourceInspect, <ScanSearch className="size-3.5" />) }],
+  [ResourceCall.name, { preparation: toolsMessages.toolPreparing, render(props, registry) {
     if (props.phase === "input") {
       const args = props.args;
       if (!args || typeof args !== "object" || Array.isArray(args) || typeof args.tool !== "string") return { props };

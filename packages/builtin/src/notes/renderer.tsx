@@ -9,7 +9,7 @@ import { commonMessages } from "../messages/common";
 import { textMessages } from "../messages/text";
 import { prepareCodeView } from "../shared/code-view";
 import { textReadViews, textWriteViews, textEditViews } from "../text-view";
-import { CreateNote, NoteView, NoteRead, NoteEdit, NoteWrite } from "./contract";
+import { Note, CreateNote, NoteView, NoteRead, NoteEdit, NoteWrite } from "./contract";
 import { NoteInput } from "./creation";
 
 import { noteCard as appearance } from "../shared/card-appearance.ts";
@@ -38,7 +38,7 @@ function NoteActions({ data }: { data: { text: string | null } }) {
 
 export default {
   prepare: prepareCodeView,
-  resources: [{ kind: "asterism.builtin/note", label: commonMessages.kindNote, icon: <FileText className="size-4" />, card: appearance }],
+  resources: [{ kind: Note.kind, label: commonMessages.kindNote, icon: <FileText className="size-4" />, card: appearance }],
   cards: [cardRenderer(NoteView, {
     ...appearance,
     Actions: NoteActions,

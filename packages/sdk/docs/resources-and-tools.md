@@ -12,6 +12,8 @@ Creation supplies initial state. Actions change the object through typed applica
 
 Resource titles belong to session history. Use the session's rename operation with a resource reference to change a title; the host appends the event and reconstructs names along each history path. Tool sessions accept a resource ID within the request's captured links. Existing snapshots keep their captured titles.
 
+Declare `links: { receive: true }` in the backend resource implementation when the object can receive directed links. The host supplies this capability to the workbench's connection controls and authorization panel. Renderer resource descriptions supply labels, icons, and card geometry; link reception needs no frontend declaration.
+
 Use a session snapshot to query the resources directly linked to a receiver. Results contain resource references, titles, and public data on that snapshot's timeline path. Reverse links and links through another resource are independent. For external event handling, such as forwarding network messages to linked agents, read a fresh snapshot for each event. Session observers can also query their supplied snapshot after commits or cursor changes. The query exposes relationships without granting access to private state or expanding a model request's operation scope.
 
 ## Add a model operation

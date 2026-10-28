@@ -64,6 +64,8 @@ Object focus moves content into a leading island beside the workbench. The canva
 
 Drag from a resource to a link-capable receiver to establish a directed link. Direction follows resource semantics, not card position. Two opposite links can render as one double-arrow edge while retaining separate stored relations.
 
+Link reception is declared only by the resource's backend implementation. The host projects that capability with each workbench object, and canvas endpoints, connection validation, and the authorization panel consume it. Renderer resource descriptions own presentation metadata. An unavailable backend cannot receive new links. Link capability is current runtime metadata and is not stored in session history.
+
 The object panel offers a flat searchable object list, locating and visibility. The authorization panel edits actual directed links and explains request-boundary effects without inventing per-link pending status.
 
 The history panel lists individual records in actual append order. Source filters use record provenance. Branch tabs organize continuations and shared positions.

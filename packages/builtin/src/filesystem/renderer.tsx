@@ -14,7 +14,7 @@ import { textMessages } from "../messages/text";
 import { prepareCodeView } from "../shared/code-view";
 import { textReadViews, textWriteViews, textEditViews } from "../text-view";
 import { inputText } from "../shared/tool-preview";
-import { CreateDirectory, DirectoryView, DirectoryList, DirectoryRead, DirectoryEdit, DirectoryWrite, DirectorySee } from "./contract";
+import { Directory, CreateDirectory, DirectoryView, DirectoryList, DirectoryRead, DirectoryEdit, DirectoryWrite, DirectorySee } from "./contract";
 import { FilePreview } from "../agent/conversation/Files";
 import { DirectoryInput } from "./creation";
 import { execToolRenderer } from "./exec-view";
@@ -103,7 +103,7 @@ function DirectoryTreeBody(_: { data: { path: string } }) {
 
 export default {
   prepare: prepareCodeView,
-  resources: [{ kind: "asterism.builtin/directory", label: filesystemMessages.directory, icon: <Folder className="size-4" />, card: appearance }],
+  resources: [{ kind: Directory.kind, label: filesystemMessages.directory, icon: <Folder className="size-4" />, card: appearance }],
   cards: [cardRenderer(DirectoryView, {
     ...appearance,
     Body: DirectoryTreeBody,

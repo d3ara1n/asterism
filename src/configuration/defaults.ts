@@ -1,9 +1,10 @@
 import type { AgentConfiguration, ModelRole } from "../shared/configuration.ts";
+import { defaultAgentPreset } from "@asterism-app/builtin-api/contracts";
 
 // Built-in agents supply purpose-specific defaults used as the original resolution baseline.
 export const defaultAgents: AgentConfiguration[] = [
   {
-    "id": "worker",
+    "id": defaultAgentPreset,
     "builtin": true,
     "enabled": true,
     "description": "Implementation of features, fixes, refactors, and content changes.",

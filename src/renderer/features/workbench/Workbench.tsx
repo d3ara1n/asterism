@@ -172,9 +172,12 @@ function Canvas({ ref, session, run, writable, canDrop, onDropItems, overview, a
     });
   }, [edges]);
   const objects = useMemo(() => new Map(session.objects.map(o => [o.id, o])), [session.objects]);
-  // The destination is determined by the resource's static receive declaration; the source can be any other object.
-  const isValidConnection: IsValidConnection = useCallback(c => !!c.source && !!c.target && c.source !== c.target
-    && !!objects.get(c.target) && registry.resource(objects.get(c.target)!.kind).receivesLinks === true && !session.links.some(l => l.receiverId === c.target && l.resourceId === c.source), [objects, session.links, registry]);
+  // The backend projects link reception; the source can be any other object.
+  const isValidConnection: IsValidConnection = useCallback(({ source, target }) =>
+    !!source && !!target && source !== target
+    && objects.get(target)?.receivesLinks === true
+    && !session.links.some(link => link.receiverId === target && link.resourceId === source),
+  [objects, session.links]);
   const onConnect = useCallback((c: Connection) => {
     void run({ type: "link.set", sessionId: latest.current.id, receiverId: c.target, resourceId: c.source, linked: true });
   }, [run]);

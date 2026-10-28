@@ -1,8 +1,7 @@
-import { jsonSchema, type Json } from "@asterism-app/sdk/contracts";
-import { missingResourceContract, pluginOf } from "@asterism-app/sdk/contracts";
-import type { Presentation } from "@asterism-app/sdk/contracts";
+import { jsonSchema, missingResourceContract, pluginOf, type Json, type Presentation } from "@asterism-app/sdk/contracts";
+import type { ContextFile } from "@asterism-app/sdk/runtime";
 import type { FoldedObject } from "../session/fold.ts";
-import type { ContextFile, ResourceBackend, ResourceController } from "./contract.ts";
+import type { ResourceBackend, ResourceController } from "./contract.ts";
 import { SessionError } from "../session/tree.ts";
 import { templateMessages } from "../shared/template-messages.ts";
 

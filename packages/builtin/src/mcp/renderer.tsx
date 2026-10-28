@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronRight, Network, Settings } from "lucide-react";
+import { ChevronRight, Server, Settings } from "lucide-react";
 import { useI18n, useRendererSettings, creationEntry, cardRenderer, type RendererModule } from "@asterism-app/sdk/renderer";
 import { Button } from "@asterism-app/ui/ui/button";
 import { IconButton } from "@asterism-app/ui/ui/icon-button";
@@ -79,8 +79,8 @@ function HostBody({ data }: { data: { servers: McpServerState[] } }) {
 }
 
 export default {
-  resources: [{ kind: McpHost.kind, label: messages.title, icon: <Network className="size-4" />, card: appearance }],
+  resources: [{ kind: McpHost.kind, label: messages.title, icon: <Server className="size-4" />, card: appearance }],
   cards: [cardRenderer(McpHostView, { ...appearance, Body: HostBody, Actions: HostActions })],
   tools: mcpToolRenderers,
-  creations: [creationEntry(CreateMcpHost, { id: "asterism.builtin/mcp.blank", label: messages.title, icon: <Network className="size-4" />, group: "resources", triggers: { menu: { initialInput: { title: "MCP Host" } } } })],
+  creations: [creationEntry(CreateMcpHost, { id: "asterism.builtin/mcp.blank", label: messages.title, icon: <Server className="size-4" />, group: "resources", triggers: { menu: { initialInput: { title: "MCP Host" } } } })],
 } satisfies RendererModule;

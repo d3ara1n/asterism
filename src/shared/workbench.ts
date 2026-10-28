@@ -34,7 +34,11 @@ export type WorkbenchCommand = z.infer<typeof workbenchCommandSchema>;
 export function isLayoutCommand(command: { type: string }): boolean {
   return command.type === "view.set" || command.type === "views.position" || command.type === "viewport.set";
 }
-const objectSchema = z.strictObject({ id, kind: z.string().min(1).max(160), title: z.string(), presentation: presentationSchema });
+const objectSchema = z.strictObject({
+  id, kind: z.string().min(1).max(160), title: z.string(), presentation: presentationSchema,
+  /** Current link capability projected from the registered backend implementation. */
+  receivesLinks: z.boolean(),
+});
 export type WorkbenchObject = z.infer<typeof objectSchema>;
 const viewSchema = z.strictObject({ objectId: id, position: pointSchema, hidden: z.boolean(),
   collapsed: z.boolean(), size: cardSizeSchema.nullable().default(null) });

@@ -1,12 +1,10 @@
-import type { Json, CreationContract, ActionContract, ResourceCall } from "@asterism-app/sdk/contracts";
+import type { Json, CreationContract, ActionContract, ResourceCall, Presentation } from "@asterism-app/sdk/contracts";
 import type { ParsedCall } from "../plugins/commands.ts";
-import type { Presentation } from "@asterism-app/sdk/contracts";
 import type { LiveBlock } from "../shared/session.ts";
 import type { FoldedObject } from "../session/fold.ts";
-import type { ResourceRef } from "@asterism-app/sdk/runtime";
+import type { ContextFile, ResourceRef } from "@asterism-app/sdk/runtime";
 import type { ContentLease } from "../runtime/content-store.ts";
 
-export interface ContextFile { file: string; text: string }
 export interface ResourceCommandContext { sessionId: string; resource: FoldedObject; signal?: AbortSignal }
 /**
  * Resource controller: behavior entry for resource cards. Resources own behavior; sessions only route commands and record events.
@@ -14,7 +12,6 @@ export interface ResourceCommandContext { sessionId: string; resource: FoldedObj
  * or allowing composition entries such as home to create sessions and objects atomically; this check also runs after asynchronous preparation.
  */
 export interface ResourceController {
-  creationId?: string;
   creationContract?: CreationContract<unknown>;
   actionContracts?: readonly ActionContract<unknown>[];
   /** Check current action call chains before asynchronous preparation to avoid same-object reentry waiting on itself. */

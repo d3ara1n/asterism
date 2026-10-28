@@ -68,7 +68,6 @@ export function adaptResource(contribution: ResourceContribution, sdk: SdkContex
     ...(contribution.attach ? { attach: (captured: ResourceSnapshot, lifetime: Lifetime) =>
       synchronous(() => contribution.attach!(captured, sdk.reader(captured.ref, undefined, captured), lifetime)) } : {}),
     controller: {
-      creationId: creation?.contract.id,
       creationContract: creation?.contract,
       actionContracts: [...actions.values()].map(action => action.contract),
       assertActionEntry,

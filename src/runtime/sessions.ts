@@ -583,7 +583,7 @@ export class SessionService {
         || !controller?.actionContracts?.some(action => action.id === target.contractId))
         throw new SessionError("invalid_request", "The content input does not match this object action.");
     } else {
-      if (controller?.creationId !== target.contractId) throw new SessionError("invalid_request", "Unknown content creation contract.");
+      if (controller?.creationContract?.id !== target.contractId) throw new SessionError("invalid_request", "Unknown content creation contract.");
       if (target.sessionId) this.tree.cursor(target.sessionId);
     }
     return this.content.scope(target);

@@ -3,6 +3,7 @@ import {
   type AgentOverrides, type ModelRoleOverrides, type ConfigurationSnapshot,
 } from "../shared/configuration.ts";
 import { defaultAgents, defaultRoles } from "./defaults.ts";
+import { defaultAgentPreset } from "@asterism-app/builtin-api/contracts";
 
 type ConfigurationIdentity = { id: string; builtin: boolean };
 export type RoleConfigurationEntry = ConfigurationIdentity & { overrides: ModelRoleOverrides };
@@ -34,7 +35,7 @@ export function resolveRoleConfiguration(role: RoleConfigurationEntry, defaults 
 }
 export function resolveAgentConfiguration(agent: AgentConfigurationEntry, defaults = configurationDefaults) {
   const overrides = agentOverridesSchema.parse(agent.overrides);
-  const base = baseId(agent, "worker");
+  const base = baseId(agent, defaultAgentPreset);
   const inherited = defaults.agents[base];
   if (!inherited) throw new Error("Built-in agent definition is unavailable.");
   // Allow/exclude lists form one mutually exclusive policy; overriding one side also removes the opposite built-in side.
