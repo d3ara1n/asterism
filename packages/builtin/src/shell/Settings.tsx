@@ -1,8 +1,9 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { Copy, Trash2 } from "lucide-react";
-import { IslandPanel, useI18n, useRendererConfiguration, useRendererIsland } from "@asterism-app/sdk/renderer";
+import { CopyPlus, RefreshCw, Trash2 } from "lucide-react";
+import { IslandPanel, useI18n, useRendererCalls, useRendererConfiguration, useRendererIsland } from "@asterism-app/sdk/renderer";
 import type { UiText } from "@asterism-app/sdk/contracts";
 import { Button } from "@asterism-app/ui/ui/button";
+import { Alert, AlertDescription } from "@asterism-app/ui/ui/alert";
 import { IconButton } from "@asterism-app/ui/ui/icon-button";
 import { Input } from "@asterism-app/ui/ui/input";
 import { Textarea } from "@asterism-app/ui/ui/textarea";
@@ -11,10 +12,10 @@ import { Badge } from "@asterism-app/ui/ui/badge";
 import { Spinner } from "@asterism-app/ui/ui/spinner";
 import { ListRow } from "@asterism-app/ui/ui/list-row";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemSeparator, ItemTitle } from "@asterism-app/ui/ui/item";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@asterism-app/ui/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@asterism-app/ui/ui/select";
 import { shellMessages as messages } from "../messages/shell";
 import { BuiltinSettings, settingsMessages } from "../settings/contract";
-import { shellPresets, shellSettingsSchema, type ShellSettings as Settings, type ShellProfile } from "./contract";
+import { ReadShellProfiles, shellPresets, shellSettingsSchema, type ShellSettings as Settings, type ShellProfile, type ShellProfileList } from "./contract";
 
 /** Profile being edited; environment variables retain their raw text and are parsed on save. */
 interface Draft { profile: ShellProfile; env: string }
@@ -27,9 +28,22 @@ const islandKey = (id: string) => `shell:${id}`;
 export function ShellSettings({ value, disabled, save }: {
   value: Settings; disabled: boolean; save(value: Settings): Promise<boolean>;
 }) {
-  const i18n = useI18n(), island = useRendererIsland();
+  const i18n = useI18n(), island = useRendererIsland(), calls = useRendererCalls();
   const [editingId, setEditingId] = useState<string | null>(null);
   const presetTrigger = useRef<HTMLButtonElement>(null);
+  const [discovery, setDiscovery] = useState<ShellProfileList | null>(null);
+  const [discoveryFailed, setDiscoveryFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  useEffect(() => {
+    const controller = new AbortController();
+    setDiscovery(null); setDiscoveryFailed(false);
+    void calls.invoke(ReadShellProfiles, {}, { signal: controller.signal }).then(
+      result => { if (!controller.signal.aborted) setDiscovery(result); },
+      () => { if (!controller.signal.aborted) setDiscoveryFailed(true); },
+    );
+    return () => controller.abort();
+  }, [calls, attempt]);
+  const checking = !discovery && !discoveryFailed;
   const open = async (profile: ShellProfile, origin?: HTMLElement | null) => {
     const opened = await island.open({ key: islandKey(profile.id), label: messages.profile, origin,
       render: () => <ShellProfileEditor id={profile.id} initial={profile} onSaved={setEditingId} /> });
@@ -52,19 +66,27 @@ export function ShellSettings({ value, disabled, save }: {
   };
   const preview = (item: ShellProfile) =>
     [item.executable, ...item.args, ...item.commandArgs].filter(Boolean).join(" ") + ` ${i18n.text(messages.command)}`;
-  const row = (saved: ShellProfile) => <div key={saved.id} role="listitem">
-    <ListRow selected={!!island.child && editingId === saved.id} onOpen={origin => { void open(saved, origin); }}
-      title={<>{saved.id}{value.selected === saved.id && <Badge variant="secondary">{i18n.text(messages.isDefault)}</Badge>}</>}
-      description={<span className="font-mono text-xs">{preview(saved)}</span>}
-      actions={<>
-        <IconButton label={i18n.text(messages.add)} disabled={disabled} onClick={event => { void append(saved, event.currentTarget); }}><Copy /></IconButton>
-        <IconButton label={i18n.text(messages.remove)} disabled={disabled} onClick={() => remove(saved.id)}><Trash2 /></IconButton>
-      </>} />
-  </div>;
+  const row = (saved: ShellProfile) => {
+    const installedPath = discovery?.profiles.find(item => item.id === saved.id)?.resolvedExecutable;
+    return <div key={saved.id} role="listitem">
+      <ListRow selected={!!island.child && editingId === saved.id} onOpen={origin => { void open(saved, origin); }}
+        title={<>{saved.id}{value.selected === saved.id && <Badge variant="secondary">{i18n.text(messages.isDefault)}</Badge>}</>}
+        description={<span className="font-mono text-xs">{preview(saved)}</span>}
+        details={installedPath && <span className="flex min-w-0 items-center gap-2">
+          <Badge variant="success">{i18n.text(messages.installed)}</Badge>
+          <span className="truncate font-mono" title={installedPath}>{installedPath}</span>
+        </span>}
+        actions={<>
+          <IconButton label={i18n.text(messages.add)} disabled={disabled} onClick={event => { void append(saved, event.currentTarget); }}><CopyPlus /></IconButton>
+          <IconButton label={i18n.text(messages.remove)} disabled={disabled} onClick={() => remove(saved.id)}><Trash2 /></IconButton>
+        </>} />
+    </div>;
+  };
 
   const selectedLabel = i18n.text(messages.selected);
   return <div className="flex flex-col gap-4">
     <p className="type-caption">{i18n.text(messages.description)}</p>
+    {discoveryFailed && <Alert variant="destructive"><AlertDescription>{i18n.text(messages.checkFailed)}</AlertDescription></Alert>}
     <ItemGroup className="surface">
       <Item>
         <ItemContent>
@@ -75,8 +97,10 @@ export function ShellSettings({ value, disabled, save }: {
           <Select value={value.selected} disabled={disabled} onValueChange={selected => { void commit({ ...value, selected }); }}>
             <SelectTrigger aria-label={selectedLabel} className="min-w-40"><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="auto">{i18n.text(messages.auto)}</SelectItem>
-              {value.profiles.map(item => <SelectItem key={item.id} value={item.id}>{item.id}</SelectItem>)}
+              <SelectGroup>
+                <SelectItem value="auto">{i18n.text(messages.auto)}</SelectItem>
+                {value.profiles.map(item => <SelectItem key={item.id} value={item.id}>{item.id}</SelectItem>)}
+              </SelectGroup>
             </SelectContent>
           </Select>
         </ItemActions>
@@ -85,10 +109,14 @@ export function ShellSettings({ value, disabled, save }: {
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between gap-2">
         <h4 className="type-label">{i18n.text(messages.profiles)}</h4>
-        <Select value="" disabled={disabled} onValueChange={preset => { void append(shellPresets.find(item => item.id === preset)!, presetTrigger.current); }}>
-          <SelectTrigger ref={presetTrigger} size="sm" aria-label={i18n.text(messages.preset)}><SelectValue placeholder={i18n.text(messages.preset)} /></SelectTrigger>
-          <SelectContent align="end">{shellPresets.map(item => <SelectItem key={item.id} value={item.id}>{item.id}</SelectItem>)}</SelectContent>
-        </Select>
+        <div className="flex items-center gap-2">
+          <IconButton label={i18n.text(messages.refreshAvailability)} disabled={checking} aria-busy={checking}
+            onClick={() => setAttempt(current => current + 1)}>{checking ? <Spinner /> : <RefreshCw />}</IconButton>
+          <Select value="" disabled={disabled} onValueChange={preset => { void append(shellPresets.find(item => item.id === preset)!, presetTrigger.current); }}>
+            <SelectTrigger ref={presetTrigger} size="sm" aria-label={i18n.text(messages.preset)}><SelectValue placeholder={i18n.text(messages.preset)} /></SelectTrigger>
+            <SelectContent align="end"><SelectGroup>{shellPresets.map(item => <SelectItem key={item.id} value={item.id}>{item.id}</SelectItem>)}</SelectGroup></SelectContent>
+          </Select>
+        </div>
       </div>
       {value.profiles.length > 0 && <ItemGroup className="surface">
         {value.profiles.flatMap((item, index) => index ? [<ItemSeparator key={`${item.id}-separator`} />, row(item)] : [row(item)])}

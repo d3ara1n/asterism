@@ -1,10 +1,11 @@
 import { z } from "zod";
-import { defineModule, defineTopLevelTool } from "@asterism-app/sdk/runtime";
-import { ShellProfileListResult, type ShellSettings } from "./contract.ts";
+import { defineModule, defineTopLevelTool, implementCall } from "@asterism-app/sdk/runtime";
+import { ReadShellProfiles, ShellProfileListResult, type ShellSettings } from "./contract.ts";
 import { listShellProfiles } from "./profiles.ts";
 
 export function createShellModule(settings: () => ShellSettings) {
   return defineModule(() => ({
+    calls: [implementCall(ReadShellProfiles, () => listShellProfiles(settings()))],
     topLevelTools: [defineTopLevelTool({
       id: ShellProfileListResult.id,
       name: "shell_profile_list",

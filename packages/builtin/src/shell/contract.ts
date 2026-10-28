@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { defineCall } from "@asterism-app/sdk/contracts";
 import { builtin, configurationIdSchema } from "@asterism-app/builtin-api/contracts";
 
 export const OUTPUT_CHAR_LIMIT = 16_384;
@@ -50,6 +51,10 @@ export const ShellProfileListResult = builtin.data("shell.profile-list", z.stric
   })).describe("Configured profiles in settings order, including unavailable executables."),
 }).describe("Shared shell profiles for directory exec and terminal creation. Availability reflects executable discovery at query time."));
 export type ShellProfileList = z.infer<typeof ShellProfileListResult.schema>;
+
+export const ReadShellProfiles = defineCall(builtin.name("shell.profiles.read"), {
+  scope: "plugin", input: z.strictObject({}), output: ShellProfileListResult.schema,
+});
 
 export const shellOutputSchema = z.strictObject({
   output: z.string().describe(`Processed output, retaining at most the last ${OUTPUT_CHAR_LIMIT} Unicode characters.`),
