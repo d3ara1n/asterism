@@ -2,6 +2,8 @@
 
 Filed on 2026-10-25.
 
+Archived on 2026-10-28. Superseded by `plans/todo-2026-10-28-agent-skills-instructions.md` under the layering in `plans/ref-2026-10-28-plugin-paradigm-layering.md`. Implementation remains deferred; the original scope below is preserved.
+
 A shared runtime catalog already supplies skill summaries at request boundaries and reads package text on demand. Plugin registration remains unimplemented.
 
 The confirmed source priority is user directories above plugins above built-in skills. Source identity describes provenance and grouping; skill names select effective entries.

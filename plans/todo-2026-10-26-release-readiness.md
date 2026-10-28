@@ -2,7 +2,7 @@
 
 Filed on 2026-10-26.
 
-Prereleases are already distributed to a small group of friends; no stable release exists yet. This plan tracks the work before a stable release. Storage baselines, migration, and recovery acceptance belong to `plans/todo-2026-10-12-storage-migration.md`. New feature interaction and protocol decisions remain separate; a computed version number does not establish product readiness.
+Prereleases so far are maintainer test releases with no other users; no stable release exists yet. This plan tracks the work before a stable release. Storage baselines, migration, and recovery acceptance belong to `plans/todo-2026-10-12-storage-migration.md`. New feature interaction and protocol decisions remain separate; a computed version number does not establish product readiness.
 
 ## Prerelease channel
 
@@ -53,4 +53,4 @@ The user has accepted installed task execution and persistence, PTY/search execu
 - [x] Integrate the English internal manual through resources/tools and verify direct discovery and reading. Application guides and public-package guides/examples are included in application packaging.
 - [x] Accept manual creation, linking, discovery, and reading through the GUI and an installed application.
 
-Captured-resource restore, provider OAuth, additional protocols, plugin prompt/skill contributions, skill picking, manual compaction, media/export/sync, and a search-library replacement remain separate scope decisions.
+Plugin prompt/skill contributions and the paradigm layering are planned in `plans/ref-2026-10-28-plugin-paradigm-layering.md` and its todos. Captured-resource restore, provider OAuth, additional protocols, skill picking, manual compaction, media/export/sync, and a search-library replacement remain separate scope decisions.

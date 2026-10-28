@@ -1,6 +1,6 @@
 # Asterism project conventions
 
-Asterism is an object-centered personal agent workbench for organizing work, resources, and execution history.
+Asterism is an object-centered, plugin-based personal agent workbench for organizing work, resources, and execution history. Agent paradigms are plugin features; the bundled builtin plugin is the official paradigm.
 
 ## Engineering principles
 
@@ -12,7 +12,7 @@ Asterism is an object-centered personal agent workbench for organizing work, res
 - **The harness describes primitives.** Host prompts, tool descriptions, and feedback use declarative input/output and infrastructure facts. Users compose workflows. Remove host-authored negative instructions, temporary missing-capability restrictions, and workflow prescriptions when maintaining harness text; preserve user instructions.
 - **Keep top-level context stable.** Host and plugin top-level tools register statically. Resource changes affect secondary tools and subsequent projection without interrupting one response.
 - **Trust plugins and expose failures.** Installed plugins are trusted. Protect identity, authorization contracts, and immutable history; avoid speculative quotas, fairness layers, and silent fallback.
-- **Separate composition from mechanism.** Application composition can use host interfaces and built-in public domain APIs. Generic host code and plugins depend on the SDK. Built-in distribution grants no special lifecycle or validation bypass.
+- **Paradigms are plugins.** A concept belongs to the host when its meaning is independent of the Agent paradigm and it has application-wide configuration or state shared by plugins. The host owns its configuration, the SDK owns its domain model and capabilities, and plugins own its usage: resources, tools, views, and model-facing text. Shape capabilities from current real consumers. Agent paradigms own roles, Agent configuration, request assembly, and conversation behavior. The host and SDK import no builtin package; builtin depends on the SDK like any plugin and publishes its paradigm API through `@asterism-app/builtin-api`. Built-in distribution grants no special lifecycle, validation, or host coupling.
 
 ## Environment and implementation
 

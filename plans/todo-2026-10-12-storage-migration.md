@@ -4,14 +4,11 @@ Filed on 2026-10-12.
 
 Version-based preparation, consecutive migrations, recovery points, isolated plugin storage entries, and plugin failure isolation are implemented and verified with isolated data. Installed-build and GUI acceptance is partly complete.
 
-## User-distributed baselines
+## Distribution baselines
 
-Prereleases are shared with a small group of friends, so continuous n-to-n+1 migrations apply from these baselines onward.
+No build has reached a user other than the maintainer. `v0.1.0-prerelease.1` (`52bddcc`) and `v1.0.0-prerelease.1` (`d81c5c7`) were maintainer test releases that validated the release, update, and distribution workflows; they establish no migration obligation.
 
-- First user-distributed build: `v1.0.0-prerelease.1`, from `d81c5c7f7cb9c601c6ee7961b8c1b585a6880544`.
-- Baselines: workspace SQLite 27, configuration 11, plugin package list 1, appearance/language/update preferences 1, built-in plugin config 1.
-- `v0.1.0-prerelease.1` (`52bddcc`, workspace 26) only tested the release workflow itself and had no users; there is no migration path from it.
-- Workspace format 28 adds the first user-facing migration step (27 → 28).
+The continuous n-to-n+1 obligation starts with the first build distributed to another user. Record that build and its format versions here when it ships. Until then, the plugin paradigm layering work can rebuild incompatible formats, and real development data cleanup still requires explicit authorization. Existing migration steps remain implementation evidence; whether to fold them into a fresh baseline is decided at that point.
 
 ## Implemented
 
