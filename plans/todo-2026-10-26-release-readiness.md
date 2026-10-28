@@ -1,24 +1,17 @@
-# Distribution and stable-release readiness
+# Stable-release readiness
 
 Filed on 2026-10-26.
 
-The distribution gate is agreed. New feature interaction and protocol decisions remain separate; a computed version number does not establish product readiness.
+Prereleases are already distributed to a small group of friends; no stable release exists yet. This plan tracks the work before a stable release. Storage baselines, migration, and recovery acceptance belong to `plans/todo-2026-10-12-storage-migration.md`. New feature interaction and protocol decisions remain separate; a computed version number does not establish product readiness.
 
-## Distribution boundary
+## Prerelease channel
 
-Maintainers first verify prerelease installers internally. Sharing a build with friends begins user-facing compatibility obligations, even before a stable release.
-
-Before sharing, the actual distribution platforms need accepted update, migration, and recovery behavior. The first distribution platforms and stable release date/version remain undecided.
-
-## Before sharing prereleases
+The stable release date/version remains undecided.
 
 - [x] Implement shared release version/notes computation from one explicit source commit.
-- [ ] Accept two consecutive installed prereleases: setup, real tasks, native helpers, download, restart replacement, and retained work.
-- [ ] Accept a real format-changing update and consecutive migrations across skipped app versions, using isolated data and fixtures.
-- [ ] Accept migration failure, restore, retry, and fresh-start recovery, including plugin failure isolation.
-- [ ] Verify prerelease-to-stable selection and data continuation, using fixtures until an actual promotion candidate is ready.
-- [ ] Record the first user-distributed version, source commit, and storage baselines, and retain migration fixtures.
-- [ ] Provide necessary installation and issue-reporting information for the accepted platforms; models can consult the internal manual for in-product usage guidance.
+- [x] Update between consecutive installed prereleases: `v0.1.0-prerelease.1` → `v1.0.0-prerelease.1` downloaded, replaced on restart, and started.
+- [ ] Verify prerelease-to-stable selection without downgrade. No stable release exists yet; use fixtures until an actual promotion candidate is ready.
+- [ ] Promote a tested latest candidate and verify stable notes, assets, and update continuation.
 
 ## Plugin delivery
 
@@ -49,11 +42,9 @@ Confirmed SDK boundary defects and the template-copy participation boundary are 
 
 - [ ] Accept installation, core features, credentials, processes, and updating on each release platform.
 - [ ] Verify plugin compatibility and failure isolation across application updates.
-- [ ] Verify migration from the earliest user-distributed baseline to the stable candidate.
-- [ ] Establish issue-reporting information: application version, platform, reproduction, and logs.
+- [ ] Provide installation and issue-reporting information for the accepted platforms: application version, platform, reproduction, and logs. Models can consult the internal manual for in-product usage guidance.
 - [ ] Complete and accept official branding and platform icons.
 - [x] Integrate the English internal manual through resources/tools and verify direct discovery and reading. Application guides and public-package guides/examples are included in application packaging.
 - [ ] Accept manual creation, linking, discovery, and reading through the GUI and an installed application.
-- [ ] Promote a tested latest candidate and verify stable notes, assets, and update continuation.
 
 Captured-resource restore, provider OAuth, additional protocols, plugin prompt/skill contributions, skill picking, manual compaction, media/export/sync, and a search-library replacement remain separate scope decisions.
