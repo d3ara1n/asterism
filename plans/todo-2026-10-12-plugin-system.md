@@ -12,13 +12,13 @@ The implementation separated read and execution facades, shared actual contract 
 
 Built-in public packages and the initial question consumer later verified cross-plugin actions, top-level tools, and Agent UI extensions. More advanced interactions require their own evidence.
 
-## Pending settings acceptance
+## Settings acceptance
 
 Plugin-owned settings pages and shared service scopes are implemented.
 
-- [ ] Accept settings sections, plugin cards, transitions, searching/filtering, and preserved navigation position.
+- [x] Accept settings sections, plugin cards, transitions, searching/filtering, and preserved navigation position.
 - [ ] Accept enable/disable/removal and restart feedback.
-- [ ] Accept immediate built-in settings changes and restoring defaults.
+- [x] Accept immediate built-in settings changes and restoring defaults.
 - [ ] Accept external settings pages, internal navigation, and page-failure recovery.
 
 ## Deferred implementation

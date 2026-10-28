@@ -14,10 +14,13 @@ Calls validate declared scope and associated object identity, remain independent
 
 Automated checks covered identities, ordering/coalescing, rollback-related publication, failure isolation, cancellation, schema boundaries, disconnect cleanup, and status aggregation.
 
+## Accepted
+
+- [x] Manually accept title updates for unopened sessions.
+- [x] Manually accept badge summaries, detail popup, running-state retention across navigation, terminal-state consumption on viewing, and animation continuity.
+
 ## Remaining work
 
-- [ ] Manually accept title updates for unopened sessions.
-- [ ] Manually accept badge summaries, detail popup, running-state retention across navigation, terminal-state consumption on viewing, and animation continuity.
 - [ ] Define a notification event from a real consumer such as copy feedback, including ownership, source scope, severity, and display text.
 - [ ] Let plugins publish notification meaning while the application chooses presentation and shows host-stamped source.
 - [ ] Replace the built-in frontend's direct notification-library use with that event path.

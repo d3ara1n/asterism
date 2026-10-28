@@ -56,7 +56,9 @@ Promotion does not require a new main commit and does not include later main cha
 
 Before sharing builds with users, verify consecutive installed versions on the actual distribution platforms: first install, model setup, a saved task, download, restart replacement, and retained data.
 
-Check native helpers inside the installed artifact. On macOS, use an environment without the developer certificate installed; an ad-hoc local package does not validate the fixed-certificate update path.
+Check native helpers inside the installed artifact. macOS releases use a fixed self-signed identity. The native updater validates the new application against the installed application's designated requirement, which binds the application identifier and signing certificate hash. Users do not need to import the signing certificate. CI keychain trust supports signing on the build machine.
+
+Gatekeeper first-launch checks are separate from update signature continuity. Verify first launch and updating on an ordinary user installation; an ad-hoc local package does not validate the fixed-certificate update path.
 
 Verify stable/prerelease selection without downgrade and a real format-changing update with recovery. Use isolated data and representative migration fixtures.
 

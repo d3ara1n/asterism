@@ -2,7 +2,9 @@
 
 Filed on 2026-10-01.
 
-The implementation now includes model requests, tool batches, persistent drafts and steering, agent creation/communication, context compaction, filesystem search and commands, terminals, MCP, Web, skills, naming, archiving, and conversation virtualization. These capabilities must not be treated as absent because early task notes predated their implementation.
+The implementation now includes model requests, tool batches, persistent drafts and steering, agent creation/communication, cross-session Mesh channels, context compaction, filesystem search and commands, terminals, MCP, Web, skills, naming, archiving, and conversation virtualization. These capabilities must not be treated as absent because early task notes predated their implementation.
+
+Mesh provides member discovery, messaging, saved-record investigation, task profiles, and persistent name disambiguation across sessions. Directional links determine access and membership, captured at request boundaries. The user has accepted real Agent/Mesh collaboration tasks.
 
 ## Product and extension decisions
 
@@ -12,7 +14,7 @@ The implementation now includes model requests, tool batches, persistent drafts 
 - [ ] Add explicit cloning or reference-mapping capabilities when a concrete resource needs external-instance or private-state duplication. Data-copy templates already require resource participation and selected current-data contracts.
 - [ ] Extend context-file discovery, hierarchical scope, ordering, and diagnostics where real tasks require them.
 - [ ] Verify default agent tool and delegation policies against the available capabilities.
-- [ ] Design higher-level delegation/skill composition and relay resources when needed; basic direct communication already exists.
+- [ ] Design higher-level delegation and skill composition when needed. Additional relay behavior requires a concrete need beyond the implemented direct communication and cross-session Mesh.
 - [ ] Clarify whether and how backup model roles participate in execution.
 
 Plugin prompt contributions, plugin-carried skills, and explicit skill picking remain deferred extension work. Their existence in a design discussion does not establish an exposed API.
@@ -41,10 +43,10 @@ Current content collection and application recovery are implemented. Resource-st
 
 ## Workbench and scale acceptance
 
-- [ ] Accept hidden-card recovery, concurrent-branch navigation, authorization write failure, and feedback during navigation.
-- [ ] Accept narrow windows, keyboard access, focus, and both schemes for object/access/history panels.
+- [x] Accept hidden-card recovery, concurrent-branch navigation, authorization write failure, and feedback during navigation.
+- [x] Accept narrow windows, keyboard access, focus, and both schemes for object/access/history panels.
 - [ ] Measure large history queries, branch density, and many simultaneously visible cards. Conversation virtualization does not establish bounded database reads.
-- [ ] Exercise real multi-agent and dynamic-tool tasks, fixing concrete reliability problems.
+- [x] Exercise real Agent/Mesh collaboration and tasks using MCP, Web, terminals, and skills.
 - [ ] Decide log retention and remaining diagnostic needs.
 
-Basic panel locating/filtering and core model execution received earlier user acceptance. Those confirmations do not cover all listed edge interactions.
+The checked workbench and real-task items are user-confirmed acceptance. Large-scale measurements and long-conversation compaction quality remain separate follow-up.

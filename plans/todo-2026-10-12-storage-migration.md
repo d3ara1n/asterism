@@ -26,16 +26,20 @@ Prereleases are shared with a small group of friends, so continuous n-to-n+1 mig
 ## Accepted
 
 - [x] A failed preparation in an installed build starts with new data: the first use of an installed build found leftover incompatible development-era data, failed preparation, and started normally with new data.
+- [x] A real format-changing installed update preserves sessions, attachments, settings, and plugin data. The user confirmed this acceptance; the exact version pair was not recorded.
+- [x] Saved appearance is retained on a no-migration startup, without a window-size jump.
+- [x] Transitional appearance and language during migration are correct, without a window-size jump.
+- [x] The successful-migration notice appears once after Home appears.
+- [x] Recovery-point listing, opening directories, retry, and native confirmations work.
 
 ## Remaining acceptance
 
-- [ ] Use isolated data to verify a real format-changing installed update and an upgrade skipping intermediate app versions. Preserve sessions, attachments, settings, and plugin data without inventing production version changes for a demonstration. Evidence so far: a development build migrated real development data 27 → 28 with an unreleased draft of the step. The `v0.1.0-prerelease.1` → `v1.0.0-prerelease.1` update had no migration path, so no installed update has retained data across a format change yet; the next prerelease carrying 27 → 28 is the first candidate.
+- [ ] Use isolated data to verify an upgrade skipping intermediate app versions, preserving the same data categories. Use actual format steps rather than inventing production version changes for a demonstration.
 - [ ] Verify migration from the earliest user-distributed baseline to the stable candidate.
-- [ ] Verify saved appearance on a no-migration startup and transitional appearance/language during migration, without a window-size jump.
-- [ ] Verify the one-time successful-migration notice after Home appears.
-- [ ] Exercise recovery-point listing, opening directories, retry, and native confirmations.
 - [ ] Restore and restart into paused recovery, then explicitly retry migration.
 - [ ] Confirm the old data remains recoverable after starting with new data.
 - [ ] Confirm one plugin's failed migration disables it while other features remain usable.
+
+Earlier evidence included a development build migrating real development data 27 → 28 with an unreleased draft of the step. The `v0.1.0-prerelease.1` → `v1.0.0-prerelease.1` update had no migration path and remains evidence of application replacement and fresh start only. The subsequent user confirmation above establishes format-changing installed-update acceptance without assigning it to that earlier version pair.
 
 Real development data was not used by automated verification. Failure and reset acceptance must also use isolated data; the accepted fresh start above was an incidental installed-build observation, not a planned isolated run.

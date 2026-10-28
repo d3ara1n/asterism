@@ -10,7 +10,8 @@ The stable release date/version remains undecided.
 
 - [x] Implement shared release version/notes computation from one explicit source commit.
 - [x] Update between consecutive installed prereleases: `v0.1.0-prerelease.1` → `v1.0.0-prerelease.1` downloaded, replaced on restart, and started.
-- [ ] Verify prerelease-to-stable selection without downgrade. No stable release exists yet; use fixtures until an actual promotion candidate is ready.
+- [x] Cover prerelease-to-stable candidate selection and avoiding downgrade with existing release-selection fixtures.
+- [ ] Verify prerelease-to-stable selection in an installed application when an actual stable candidate exists. No stable release exists yet.
 - [ ] Promote a tested latest candidate and verify stable notes, assets, and update continuation.
 
 ## Plugin delivery
@@ -33,18 +34,23 @@ Confirmed SDK boundary defects and the template-copy participation boundary are 
 ## Product acceptance
 
 - [ ] Decide the formal resource catalog and access interaction.
-- [ ] Accept the first-task path from an empty installation through setup, material, access, execution, questions, stop/continue, reopen, and branching.
-- [ ] Finish pending plugin, session-status, startup, and workbench-panel GUI acceptance.
-- [ ] Exercise real tasks using agent collaboration, MCP, Web, terminals, skills, and long conversations.
+- [x] Accept installed model setup and execution, questions, stop/continue, reopen, and branching.
+- [ ] Verify the complete first-task path from an empty installation, including material creation and access setup.
+- [x] Accept settings navigation and built-in setting changes/defaults, session-status presentation, startup, and workbench panels.
+- [ ] Finish plugin enable/disable/removal and external settings-page acceptance.
+- [x] Exercise real tasks using Agent/Mesh collaboration, MCP, Web, terminals, and skills.
+- [ ] Accept long-conversation continuation after automatic compaction.
 - [ ] Resolve remaining stale capability claims as their concrete behavior is accepted.
 
 ## Platform and maintenance
+
+The user has accepted installed task execution and persistence, PTY/search execution, update progress/settings navigation, cancellation of exit with an update ready, and a format-changing installed update on their own environment. Unencountered scenarios and other platforms remain pending.
 
 - [ ] Accept installation, core features, credentials, processes, and updating on each release platform.
 - [ ] Verify plugin compatibility and failure isolation across application updates.
 - [ ] Provide installation and issue-reporting information for the accepted platforms: application version, platform, reproduction, and logs. Models can consult the internal manual for in-product usage guidance.
 - [ ] Complete and accept official branding and platform icons.
 - [x] Integrate the English internal manual through resources/tools and verify direct discovery and reading. Application guides and public-package guides/examples are included in application packaging.
-- [ ] Accept manual creation, linking, discovery, and reading through the GUI and an installed application.
+- [x] Accept manual creation, linking, discovery, and reading through the GUI and an installed application.
 
 Captured-resource restore, provider OAuth, additional protocols, plugin prompt/skill contributions, skill picking, manual compaction, media/export/sync, and a search-library replacement remain separate scope decisions.
