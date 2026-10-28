@@ -89,6 +89,8 @@ Use shadcn/Radix controls and shared combinations in `packages/ui/src/ui/`. Feat
 
 Icon-only actions use the shared accessible tooltip control. Destructive entry points and their confirmation remain distinct.
 
+Every size-adjustment handle supports double-clicking to restore the affected surface's default geometry. Reset clears the user size override and uses the current default, subject to the surface's minimum and maximum dimensions. Handle hints describe both dragging and double-click reset. An explicit reset action also remains available through a keyboard-accessible control or menu.
+
 Status uses shared status components with text and icons. Field errors stay with fields; command progress stays at its entry; persistent failures use local alerts; transient feedback uses notifications.
 
 A workbench reread does not become a global saving badge or block ordinary interaction.

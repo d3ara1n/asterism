@@ -40,15 +40,19 @@ export const objectsMessages = pluginNamespace("asterism.host").messages("en", d
   },
   resizeCard: {
     id: "resizeCard",
-    defaultMessage: "Drag to resize",
+    defaultMessage: "Drag to resize; double-click to restore default size",
+  },
+  cardSizeSmall: {
+    id: "cardSizeSmall",
+    defaultMessage: "Small",
+  },
+  cardSizeMedium: {
+    id: "cardSizeMedium",
+    defaultMessage: "Medium",
   },
   cardSizeLarge: {
     id: "cardSizeLarge",
     defaultMessage: "Large",
-  },
-  cardSizeExtraLarge: {
-    id: "cardSizeExtraLarge",
-    defaultMessage: "Extra large",
   },
   restoreCardSize: {
     id: "restoreCardSize",

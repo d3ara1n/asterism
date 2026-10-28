@@ -11,19 +11,22 @@ import { objectsMessages } from "../../messages/objects";
 import { useI18n } from "../../shared/i18n";
 import { useRef, useState } from "react";
 
-import { maximumCardDimension, type CardSize, type WorkbenchObject } from "../../../shared/workbench";
+import type { CardAppearance } from "@asterism-app/sdk/contracts";
+import type { WorkbenchObject } from "../../../shared/workbench";
 
 import { useSessionActivity } from "../session/state";
 import { useDisposalWarnings } from "../session/disposal";
 import { useWorkbench } from "./context";
 import type { ViewPatch } from "./ObjectCard";
 import { RenameObject } from "./RenameObject";
+import { cardSize } from "./sizing";
 
 /** The card menu centralizes name, view dimensions, and object removal. */
-export function ObjectActions({ object, defaultSize, onView }: {
-  object: WorkbenchObject; defaultSize: CardSize; onView: (patch: ViewPatch) => void;
+export function ObjectActions({ object, appearance, onView }: {
+  object: WorkbenchObject; appearance: CardAppearance; onView: (patch: ViewPatch) => void;
 }) {
   const i18n = useI18n();
+  const defaultSize = cardSize(appearance);
   const { ready } = useWorkbench();
   const [dialog, setDialog] = useState<"rename" | "remove" | null>(null);
   const trigger = useRef<HTMLButtonElement>(null);
@@ -41,11 +44,15 @@ export function ObjectActions({ object, defaultSize, onView }: {
       <DropdownMenuSub><DropdownMenuSubTrigger><Scaling />{i18n.formatMessage(objectsMessages.cardSize)}</DropdownMenuSubTrigger>
         <DropdownMenuSubContent>
           <DropdownMenuGroup>
-            {[{ label: i18n.formatMessage(objectsMessages.cardSizeLarge), scale: 1.5 }, { label: i18n.formatMessage(objectsMessages.cardSizeExtraLarge), scale: 2 }].map(({ label, scale }) =>
-              <DropdownMenuItem key={scale} onSelect={() => onView({ size: {
-                width: Math.min(maximumCardDimension, Math.round(defaultSize.width * scale)),
-                height: Math.min(maximumCardDimension, Math.round(defaultSize.height * scale)),
-              } })}>{label}</DropdownMenuItem>)}
+            {[
+              { label: objectsMessages.cardSizeSmall, scale: 0.75 },
+              { label: objectsMessages.cardSizeMedium, scale: 1 },
+              { label: objectsMessages.cardSizeLarge, scale: 1.5 },
+            ].map(({ label, scale }) =>
+              <DropdownMenuItem key={scale} onSelect={() => onView({ size: scale === 1 ? null : cardSize(appearance, {
+                width: Math.round(defaultSize.width * scale),
+                height: Math.round(defaultSize.height * scale),
+              }) })}>{i18n.text(label)}</DropdownMenuItem>)}
             <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={() => onView({ size: null })}><RotateCcw />{i18n.formatMessage(objectsMessages.restoreCardSize)}</DropdownMenuItem>
           </DropdownMenuGroup>

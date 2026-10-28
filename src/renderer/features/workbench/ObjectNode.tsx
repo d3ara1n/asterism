@@ -14,7 +14,6 @@ import { minimumCardHeight, minimumCardWidth } from "./layout";
 import { ObjectActions } from "./ObjectActions";
 import { ObjectCard, type ViewPatch } from "./ObjectCard";
 import { useObjectView } from "./object-view";
-import { cardSize } from "./sizing";
 
 export type ObjectNodeType = Node<{
   object: WorkbenchObject; collapsed: boolean; expandedHeight: number;
@@ -72,7 +71,7 @@ const ObjectNodeContent = memo(function ObjectNodeContent({ id, data, selected }
     <ObjectCard title={object.title} collapsed={collapsed} expandedHeight={data.expandedHeight} resizing={!!data.resizing} selected={!!selected} onView={onObjectView}
       icon={content.icon} kind={content.kind}
       panels={focused ? undefined : content.panels}
-      actions={<>{!focused && content.actions}<ObjectActions object={object} defaultSize={cardSize(content.view)} onView={onObjectView} /></>}
+      actions={<>{!focused && content.actions}<ObjectActions object={object} appearance={content.view} onView={onObjectView} /></>}
       controls={<IconButton size="icon-xs" label={focusLabel} aria-pressed={focused} data-object-focus="" onClick={toggleFocus}>
         {focused ? <PanelLeftClose /> : <PanelLeftOpen />}
       </IconButton>}>
@@ -83,10 +82,13 @@ const ObjectNodeContent = memo(function ObjectNodeContent({ id, data, selected }
         </div>
         : content.body}
     </ObjectCard>
-    {selected && !collapsed && <NodeResizeControl position="bottom-right"
-      className="object-resize-handle nopan" minWidth={content.view.minWidth ?? minimumCardWidth}
-      minHeight={content.view.minHeight ?? minimumCardHeight} maxWidth={maximumCardDimension} maxHeight={maximumCardDimension}>
-      <Grip className="size-2.5" aria-hidden="true"><title>{i18n.formatMessage(objectsMessages.resizeCard)}</title></Grip>
-    </NodeResizeControl>}
+    {selected && !collapsed && <div className="contents" title={i18n.text(objectsMessages.resizeCard)}
+      onDoubleClick={event => { event.stopPropagation(); onObjectView({ size: null }); }}>
+      <NodeResizeControl position="bottom-right"
+        className="object-resize-handle nopan" minWidth={content.view.minWidth ?? minimumCardWidth}
+        minHeight={content.view.minHeight ?? minimumCardHeight} maxWidth={maximumCardDimension} maxHeight={maximumCardDimension}>
+        <Grip className="size-2.5" aria-hidden="true" />
+      </NodeResizeControl>
+    </div>}
   </>;
 });

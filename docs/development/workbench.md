@@ -44,6 +44,8 @@ Session row navigation, status access, and the action menu retain separate hit t
 
 Every object uses `ObjectCard` and the shared `ObjectSurface`. Resource declarations supply default geometry. User size, position, visibility, folding, and viewport are view data outside history.
 
+Card size presets are Small, Medium, and Large, with Medium using the resource's default geometry. Presets respect the resource's minimum dimensions and the workbench's maximum dimensions. Double-clicking the resize handle or choosing the menu's restore action clears the size override and restores the resource's current default geometry.
+
 New cards find a nearby empty rectangle using actual card sizes. Model-created resources prefer the caller’s location; user creation prefers the viewport. Drop placement uses the drop point. Existing cards retain their position.
 
 Arrange explicitly runs the layout engine over visible cards and links, preserves the graph center, and commits positions together. It retains size and other view choices. Streaming updates never trigger automatic full arrangement.
