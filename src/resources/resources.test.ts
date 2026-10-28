@@ -9,7 +9,7 @@ import { Directory } from "../../packages/builtin/src/filesystem/contract.ts";
 import { defineData, defineImplementation, defineTool } from "@asterism-app/sdk/contracts";
 import { implement, toolCaller } from "../tools/testing.ts";
 import { ToolRegistry } from "../tools/registry.ts";
-import { AgentCapabilities, agentToolPolicy } from "../execution/capabilities.ts";
+import { AgentCapabilities, type ToolPolicy } from "../execution/capabilities.ts";
 import { executeCoreBatch, coreDeclarations } from "../execution/core.ts";
 import type { Json, ToolOutcome } from "../shared/model.ts";
 import { foldWorkbench, type FoldedObject } from "../session/fold.ts";
@@ -17,7 +17,6 @@ import { foldWorkbench, type FoldedObject } from "../session/fold.ts";
 const roots: string[] = [];
 const services: ApplicationService[] = [];
 const signal = new AbortController().signal;
-const unrestricted = { tools: null, excludeTools: null };
 afterEach(async () => {
   for (const service of services.splice(0)) await service.close();
   vi.restoreAllMocks();
@@ -45,8 +44,8 @@ function setup() {
     data: { id: object.id, type: object.kind, title: object.title, data: object.data },
   });
   const { resources, tools } = modules;
-  const scope = (linked: readonly FoldedObject[] = [resource], policy: Parameters<typeof agentToolPolicy>[0] = unrestricted) =>
-    new AgentCapabilities(resources, tools, linked, agentToolPolicy(policy), toolCaller);
+  const scope = (linked: readonly FoldedObject[] = [resource], policy: ToolPolicy = () => true) =>
+    new AgentCapabilities(resources, tools, linked, policy, toolCaller);
   return { root, outside, resource, note, resources, tools, scope, service, sessionId };
 }
 /** Successful model projections are JSON text serialized once; parse them for structural assertions while unsuccessful outcomes remain text. */
@@ -136,8 +135,8 @@ describe("Tool/resource matching and authorization", () => {
 
 
   it("external allowlists do not change support relationships; summaries, inspect, and calls share filtering results", async () => {
-    const { resource, resources, tools, scope } = setup();
-    const capabilities = scope([resource], { tools: ["list"], excludeTools: null });
+    const { resource, tools, scope } = setup();
+    const capabilities = scope([resource], name => name === "list");
     const description = capabilities.describe(resource.id);
     expect(description).toHaveLength(1);
     expect((description as { name: string }[]).map(tool => tool.name)).toEqual(["list"]);
@@ -148,17 +147,13 @@ describe("Tool/resource matching and authorization", () => {
       .toMatchObject({ kind: "succeeded" });
     expect(await invoke(capabilities, "resource_call", { resource_id: resource.id, tool: "read", args: {} }))
       .toMatchObject({ kind: "rejected", error: { code: "tool_unavailable" } });
-    const allowed = agentToolPolicy({ tools: ["list"], excludeTools: null }), excluded = new Set(["list"]);
-    const combined = new AgentCapabilities(resources, tools, [resource], name => allowed(name) && !excluded.has(name), toolCaller);
-    expect(combined.describe(resource.id)).toEqual([]);
-    expect(await invoke(combined, "resource_call", { resource_id: resource.id, tool: "list", args: {} })).toMatchObject({ kind: "rejected", error: { code: "tool_unavailable" } });
   });
 
 
   it("host listing and inspect remain available when all tools are disabled; top-level entry names do not authorize actual tools", async () => {
     const { resource, scope } = setup();
     for (const tools of [[], ["resource_call"]]) {
-      const capabilities = scope([resource], { tools, excludeTools: null });
+      const capabilities = scope([resource], name => tools.includes(name));
       expect(await invoke(capabilities, "resource_list", {})).toMatchObject({ kind: "succeeded" });
       expect(await invoke(capabilities, "resource_inspect", { resource_id: resource.id })).toMatchObject({ kind: "succeeded", model: { tools: [] } });
       expect(await invoke(capabilities, "resource_call", { resource_id: resource.id, tool: "list", args: {} }))
@@ -168,9 +163,10 @@ describe("Tool/resource matching and authorization", () => {
 
   it("policy and resource identities remain fixed within requests and changes apply on the next request", async () => {
     const { resource, scope } = setup();
-    const policy = { tools: ["list"], excludeTools: null };
+    const allowed = ["list"];
+    const policy = (name: string) => allowed.includes(name);
     const capabilities = scope([resource], policy);
-    policy.tools.length = 0;
+    allowed.length = 0;
     resource.data.path = "/no-longer-linked";
     expect(await invoke(capabilities, "resource_call", { resource_id: resource.id, tool: "list", args: {} }))
       .toMatchObject({ kind: "succeeded" });

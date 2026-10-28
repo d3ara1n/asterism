@@ -1,4 +1,3 @@
-import type { AgentConfiguration } from "../shared/configuration.ts";
 import type { Json } from "../shared/model.ts";
 import type { ToolInvocationInfo } from "@asterism-app/sdk/contracts";
 import type { FoldedObject } from "../session/fold.ts";
@@ -10,11 +9,6 @@ import type { ToolCaller } from "@asterism-app/sdk/runtime";
 
 /** External tool policy; support relationships, resource links, and this policy are checked independently. */
 export type ToolPolicy = (name: string) => boolean;
-export function agentToolPolicy(agent: Pick<AgentConfiguration, "tools" | "excludeTools">): ToolPolicy {
-  const allowed = agent.tools === null ? null : new Set(agent.tools);
-  const excluded = new Set(agent.excludeTools ?? []);
-  return name => (allowed === null || allowed.has(name)) && !excluded.has(name);
-}
 const denied = (): PreparedResult => ({ kind: "rejected", error: { code: "access_denied", message: "Resource access requires a link to the executing object." } });
 
 /** Per-request capability view: linked resources × tool support, filtered by external policy. Resource and tool catalogs are independent. */
