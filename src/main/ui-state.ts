@@ -16,7 +16,7 @@ export function readUiState<K extends UiStateKey>(key: K): UiState[K] {
 }
 
 export function writeUiState<K extends UiStateKey>(key: K, value: UiState[K]): void {
-  try { open().set(key, value); }
+  try { open().set({ [key]: value }); }
   catch (error) { console.error(`UI state "${key}" could not be saved.`, error); }
 }
 
